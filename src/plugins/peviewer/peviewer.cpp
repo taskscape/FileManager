@@ -281,7 +281,7 @@ CPluginInterface::GetInterfaceForViewer()
 BOOL MapFileToMemory(LPCTSTR name, HANDLE& hFile, HANDLE& hFileMapping,
                      LPVOID& lpFileBase, DWORD& fileSize, BOOL quietMode)
 {
-    hFile = CreateFile(name, GENERIC_READ, FILE_SHARE_READ, NULL,
+    hFile = CreateFileUtf8Local(name, GENERIC_READ, FILE_SHARE_READ, NULL,
                        OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, 0);
 
     if (hFile == INVALID_HANDLE_VALUE)

@@ -1951,8 +1951,8 @@ void CLogs::SaveLog(HWND parent, const char* itemName, int uid)
         }
 
         if (SalamanderGeneral->SalGetFileAttributes(fileName) != 0xFFFFFFFF) // so that a read-only file can be overwritten
-            SetFileAttributes(fileName, FILE_ATTRIBUTE_ARCHIVE);
-        HANDLE file = HANDLES_Q(CreateFile(fileName, GENERIC_WRITE,
+            SetFileAttributesUtf8Local(fileName, FILE_ATTRIBUTE_ARCHIVE);
+        HANDLE file = HANDLES_Q(CreateFileUtf8Local(fileName, GENERIC_WRITE,
                                            FILE_SHARE_READ, NULL,
                                            CREATE_ALWAYS,
                                            FILE_FLAG_SEQUENTIAL_SCAN,
@@ -2008,7 +2008,7 @@ void CLogs::SaveLog(HWND parent, const char* itemName, int uid)
                 sprintf(buf, LoadStr(IDS_SAVELOGERROR), SalamanderGeneral->GetErrorText(err));
                 SalamanderGeneral->SalMessageBox(parent, buf, LoadStr(IDS_FTPERRORTITLE),
                                                  MB_OK | MB_ICONEXCLAMATION);
-                DeleteFile(fileName); // delete the file when an error occurs
+                DeleteFileUtf8Local(fileName); // delete the file when an error occurs
             }
 
             // announce a change on the path (our file may have appeared)

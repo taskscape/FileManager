@@ -1,4 +1,4 @@
-﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2023 Open Salamander Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 // CommentsTranslationProject: TRANSLATED
 
@@ -13,6 +13,16 @@
 #include "stswnd.h"
 #include "shellib.h"
 #include "snooper.h"
+
+static BOOL TextOutUtf8(HDC hdc, int x, int y, const char* text, int len)
+{
+    if (text == NULL || len <= 0)
+        return TextOutW(hdc, x, y, L"", 0);
+    CStrP textW(ConvertAllocUtf8ToWide(text, -1));
+    if (textW == NULL)
+        return TextOutW(hdc, x, y, L"?", 1);
+    return TextOutW(hdc, x, y, textW, lstrlenW(textW));
+}
 
 //****************************************************************************
 //
@@ -227,7 +237,7 @@ void CHeaderLine::PaintItem(HDC hDC, int index, int x)
         int oldMode = SetBkMode(ItemBitmap.HMemDC, TRANSPARENT);
         COLORREF oldColor = SetTextColor(ItemBitmap.HMemDC, hot1 ? GetCOLORREF(CurrentColors[HOT_PANEL]) : GetSysColor(COLOR_BTNTEXT));
         int nameLen = lstrlen(column->Name);
-        TextOut(ItemBitmap.HMemDC, r.left + 3, (r.bottom - FontCharHeight) / 2, column->Name, nameLen);
+        TextOutUtf8(ItemBitmap.HMemDC, r.left + 3, (r.bottom - FontCharHeight) / 2, column->Name, nameLen);
 
         SIZE sz;
         sz.cx = 0;
@@ -267,7 +277,7 @@ void CHeaderLine::PaintItem(HDC hDC, int index, int x)
             SetTextColor(ItemBitmap.HMemDC, hot2 ? GetCOLORREF(CurrentColors[HOT_PANEL]) : GetSysColor(COLOR_BTNTEXT));
             char* colExtStr = column->Name + nameLen + 1; // the text "Ext" is stored after the name (in the same buffer)
             int colExtStrLen = (int)strlen(colExtStr);
-            TextOut(ItemBitmap.HMemDC, textLeft, (r.bottom - FontCharHeight) / 2,
+            TextOutUtf8(ItemBitmap.HMemDC, textLeft, (r.bottom - FontCharHeight) / 2,
                     colExtStr, colExtStrLen);
             if (panel->SortType == stExtension)
             {
@@ -733,3 +743,4 @@ CHeaderLine::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
     }
     return CWindow::WindowProc(uMsg, wParam, lParam);
 }
+

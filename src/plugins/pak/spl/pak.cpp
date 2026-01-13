@@ -475,7 +475,7 @@ BOOL CPluginInterfaceForArchiver::UnpackFiles(TIndirectArray2<CFileInfo>& files,
                 CloseHandle(IOFile);
                 if (!ret)
                 {
-                    DeleteFile(targetName);
+                    DeleteFileUtf8Local(targetName);
                     if (Abort)
                         return FALSE;
                 }
@@ -601,7 +601,7 @@ BOOL CPluginInterfaceForArchiver::UnpackOneFile(CSalamanderForOperationsAbstract
                 lstrcpy(targetName, targetDir);
                 SalamanderGeneral->SalPathAppend(targetName, name, MAX_PATH);
                 IOFileName = targetName;
-                IOFile = CreateFile(targetName, GENERIC_WRITE, FILE_SHARE_READ, NULL, CREATE_ALWAYS,
+                IOFile = CreateFileUtf8Local(targetName, GENERIC_WRITE, FILE_SHARE_READ, NULL, CREATE_ALWAYS,
                                     FILE_ATTRIBUTE_NORMAL, NULL);
                 if (IOFile == INVALID_HANDLE_VALUE)
                 {
@@ -622,7 +622,7 @@ BOOL CPluginInterfaceForArchiver::UnpackOneFile(CSalamanderForOperationsAbstract
                     if (r)
                         ret = TRUE;
                     else
-                        DeleteFile(targetName);
+                        DeleteFileUtf8Local(targetName);
                 }
             }
         }

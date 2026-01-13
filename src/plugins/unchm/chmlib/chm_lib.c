@@ -71,6 +71,43 @@
 
 #include "chm_lib.h"
 
+#ifdef WIN32
+static WCHAR* AllocWideFromUtf8(const char* src)
+{
+    if (src == NULL)
+        return NULL;
+    int len = MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, src, -1, NULL, 0);
+    if (len <= 0)
+        return NULL;
+    WCHAR* buf = (WCHAR*)malloc(sizeof(WCHAR) * len);
+    if (buf == NULL)
+        return NULL;
+    if (MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, src, -1, buf, len) == 0)
+    {
+        free(buf);
+        return NULL;
+    }
+    return buf;
+}
+
+static HANDLE CreateFileUtf8Local(const char* fileName, DWORD desiredAccess, DWORD shareMode,
+                                  LPSECURITY_ATTRIBUTES securityAttributes, DWORD creationDisposition,
+                                  DWORD flagsAndAttributes, HANDLE templateFile)
+{
+    HANDLE h = INVALID_HANDLE_VALUE;
+    WCHAR* fileNameW = AllocWideFromUtf8(fileName);
+    if (fileNameW == NULL)
+    {
+        SetLastError(ERROR_INVALID_PARAMETER);
+        return INVALID_HANDLE_VALUE;
+    }
+    h = CreateFileW(fileNameW, desiredAccess, shareMode, securityAttributes,
+                    creationDisposition, flagsAndAttributes, templateFile);
+    free(fileNameW);
+    return h;
+}
+#endif // WIN32
+
 #ifdef CHM_MT
 #define _REENTRANT
 #endif
@@ -689,7 +726,7 @@ struct chmFile* chm_open(const char* filename)
     /* open file */
 #ifdef WIN32
 #ifdef PPC_BSTR
-    if ((newHandle->fd = CreateFile(filename,
+    if ((newHandle->fd = CreateFileUtf8Local(filename,
                                     GENERIC_READ,
                                     FILE_SHARE_READ,
                                     NULL,

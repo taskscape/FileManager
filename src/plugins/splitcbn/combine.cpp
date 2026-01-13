@@ -159,7 +159,7 @@ BOOL CombineFiles(TIndirectArray<char>& files, LPTSTR targetName,
         else
         {
             SalamanderSafeFile->SafeFileClose(&outfile);
-            DeleteFile(targetName);
+            DeleteFileUtf8Local(targetName);
         }
     }
 
@@ -194,7 +194,7 @@ BOOL CombineFiles(TIndirectArray<char>& files, LPTSTR targetName,
     SalamanderGeneral->ShowMessageBox(LoadStr(IDS_TOOLONGNAME2), LoadStr(IDS_CALCCRC), MSGBOX_ERROR);
     return FALSE;
   }
-  if ((hFile = CreateFile(path, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING,
+  if ((hFile = CreateFileUtf8Local(path, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING,
     FILE_FLAG_SEQUENTIAL_SCAN, NULL)) == INVALID_HANDLE_VALUE)
   {
     return Error(IDS_CALCCRC, IDS_OPENERROR);
@@ -362,7 +362,7 @@ static void AnalyzeFile(LPTSTR fileName, LPTSTR origName, UINT32& origCrc, FILET
     bNameAcquired = bCrcAcquired = FALSE;
     // load the file into a buffer
     HANDLE hFile;
-    if ((hFile = CreateFile(fileName, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING,
+    if ((hFile = CreateFileUtf8Local(fileName, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING,
                             FILE_FLAG_SEQUENTIAL_SCAN, NULL)) == INVALID_HANDLE_VALUE)
         return;
     DWORD size = GetFileSize(hFile, NULL), numread;

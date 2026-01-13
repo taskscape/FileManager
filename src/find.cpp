@@ -830,7 +830,7 @@ BOOL CDuplicateCandidates::GetMD5Digest(CGrepData* data, CFoundFilesData* file,
     data->SearchingText->Set(fullPath); // set the current file
 
     // open the file for reading with sequential access
-    HANDLE hFile = HANDLES_Q(CreateFile(fullPath, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE,
+    HANDLE hFile = HANDLES_Q(CreateFileUtf8(fullPath, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE,
                                         NULL, OPEN_EXISTING, FILE_FLAG_SEQUENTIAL_SCAN, NULL));
     if (hFile != INVALID_HANDLE_VALUE)
     {
@@ -1367,7 +1367,7 @@ BOOL TestFileContent(DWORD sizeLow, DWORD sizeHigh, const char* path, CGrepData*
     {
         DWORD err = ERROR_SUCCESS;
         data->SearchingText->Set(path); // set the current file
-        HANDLE hFile = HANDLES_Q(CreateFile(path, GENERIC_READ,
+        HANDLE hFile = HANDLES_Q(CreateFileUtf8(path, GENERIC_READ,
                                             FILE_SHARE_READ | FILE_SHARE_WRITE, NULL,
                                             OPEN_EXISTING,
                                             FILE_FLAG_SEQUENTIAL_SCAN,
@@ -1555,8 +1555,10 @@ void SearchDirectory(char (&path)[MAX_PATH], char* end, int startPathLen,
         return;
     }
 
+    WIN32_FIND_DATAW fileW;
     WIN32_FIND_DATA file;
-    HANDLE find = HANDLES_Q(FindFirstFile(path, &file));
+    CStrP pathW(ConvertAllocUtf8ToWide(path, -1));
+    HANDLE find = pathW != NULL ? HANDLES_Q(FindFirstFileW(pathW, &fileW)) : INVALID_HANDLE_VALUE;
     if (find != INVALID_HANDLE_VALUE)
     {
         if (end - path > 3)
@@ -1576,6 +1578,7 @@ void SearchDirectory(char (&path)[MAX_PATH], char* end, int startPathLen,
 
         do
         {
+            ConvertFindDataWToUtf8(fileW, &file);
             BOOL isDir = (file.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) != 0;
             BOOL ignoreDir = isDir && (lstrcmp(file.cFileName, ".") == 0 || lstrcmp(file.cFileName, "..") == 0);
             if (ignoreDir || (end - path) + lstrlen(file.cFileName) < _countof(path))
@@ -1716,7 +1719,7 @@ void SearchDirectory(char (&path)[MAX_PATH], char* end, int startPathLen,
                 testFindNextErr = FALSE;
                 break;
             }
-        } while (FindNextFile(find, &file));
+        } while (FindNextFileW(find, &fileW));
         DWORD err = GetLastError();
         HANDLES(FindClose(find));
 

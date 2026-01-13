@@ -1321,7 +1321,7 @@ BOOL CRenamerDialog::LoadSubdir(char* path, const char* subdir)
     WIN32_FIND_DATA fd;
     HANDLE hFind;
 
-    while ((hFind = FindFirstFile(path, &fd)) == INVALID_HANDLE_VALUE)
+    while ((hFind = FindFirstFileUtf8Local(path, &fd)) == INVALID_HANDLE_VALUE)
     {
         BOOL skip;
         if (!FileError(HWindow, path, IDS_ERRREADDIR, TRUE,
@@ -1416,7 +1416,7 @@ BOOL CRenamerDialog::LoadSubdir(char* path, const char* subdir)
             }
         }
 
-        while (!FindNextFile(hFind, &fd))
+        while (!FindNextFileUtf8Local(hFind, &fd))
         {
             if (GetLastError() == ERROR_NO_MORE_FILES ||
                 !FileError(HWindow, path, IDS_ERRREADDIR, TRUE,

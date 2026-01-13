@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include <windows.h>
+#include <stdlib.h>
 #include <commctrl.h>
 #include <shlobj.h>
 
@@ -25,6 +26,109 @@ HWND DlgWin;
 BOOL WaitingForExit = FALSE;
 #endif // FOR_SALAMANDER_SETUP
 
+static WCHAR* AllocWideFromUtf8(const char* src)
+{
+    if (src == NULL)
+        return NULL;
+    int len = MultiByteToWideChar(CP_UTF8, 0, src, -1, NULL, 0);
+    if (len == 0)
+        len = MultiByteToWideChar(CP_ACP, 0, src, -1, NULL, 0);
+    if (len == 0)
+        return NULL;
+    WCHAR* buf = (WCHAR*)HeapAlloc(GetProcessHeap(), 0, sizeof(WCHAR) * len);
+    if (buf == NULL)
+        return NULL;
+    if (MultiByteToWideChar(CP_UTF8, 0, src, -1, buf, len) == 0)
+    {
+        if (MultiByteToWideChar(CP_ACP, 0, src, -1, buf, len) == 0)
+        {
+            HeapFree(GetProcessHeap(), 0, buf);
+            return NULL;
+        }
+    }
+    return buf;
+}
+
+static BOOL WideToUtf8Simple(const WCHAR* src, char* buf, int bufSize)
+{
+    if (buf == NULL || bufSize <= 0)
+        return FALSE;
+    buf[0] = 0;
+    if (src == NULL)
+        return FALSE;
+    int res = WideCharToMultiByte(CP_UTF8, 0, src, -1, buf, bufSize, NULL, NULL);
+    if (res == 0)
+        res = WideCharToMultiByte(CP_ACP, 0, src, -1, buf, bufSize, NULL, NULL);
+    return res != 0;
+}
+
+static HANDLE CreateFileUtf8Local(const char* fileName, DWORD desiredAccess, DWORD shareMode,
+                                  LPSECURITY_ATTRIBUTES securityAttributes, DWORD creationDisposition,
+                                  DWORD flagsAndAttributes, HANDLE templateFile)
+{
+    WCHAR* fileNameW = AllocWideFromUtf8(fileName);
+    if (fileNameW == NULL)
+        return INVALID_HANDLE_VALUE;
+    HANDLE hFile = CreateFileW(fileNameW, desiredAccess, shareMode, securityAttributes,
+                               creationDisposition, flagsAndAttributes, templateFile);
+    HeapFree(GetProcessHeap(), 0, fileNameW);
+    return hFile;
+}
+
+static BOOL DeleteFileUtf8Local(const char* fileName)
+{
+    WCHAR* fileNameW = AllocWideFromUtf8(fileName);
+    if (fileNameW == NULL)
+        return FALSE;
+    BOOL ok = DeleteFileW(fileNameW);
+    HeapFree(GetProcessHeap(), 0, fileNameW);
+    return ok;
+}
+
+static BOOL SetFileAttributesUtf8Local(const char* fileName, DWORD attrs)
+{
+    WCHAR* fileNameW = AllocWideFromUtf8(fileName);
+    if (fileNameW == NULL)
+        return FALSE;
+    BOOL ok = SetFileAttributesW(fileNameW, attrs);
+    HeapFree(GetProcessHeap(), 0, fileNameW);
+    return ok;
+}
+
+static BOOL RemoveDirectoryUtf8Local(const char* dirName)
+{
+    WCHAR* dirNameW = AllocWideFromUtf8(dirName);
+    if (dirNameW == NULL)
+        return FALSE;
+    BOOL ok = RemoveDirectoryW(dirNameW);
+    HeapFree(GetProcessHeap(), 0, dirNameW);
+    return ok;
+}
+
+static DWORD GetFileAttributesUtf8Local(const char* fileName)
+{
+    WCHAR* fileNameW = AllocWideFromUtf8(fileName);
+    if (fileNameW == NULL)
+        return INVALID_FILE_ATTRIBUTES;
+    DWORD attrs = GetFileAttributesW(fileNameW);
+    HeapFree(GetProcessHeap(), 0, fileNameW);
+    return attrs;
+}
+
+static void SetDlgItemTextUtf8Local(HWND hWnd, int itemId, const char* text)
+{
+    WCHAR* textW = AllocWideFromUtf8(text != NULL ? text : "");
+    if (textW != NULL)
+    {
+        SetDlgItemTextW(hWnd, itemId, textW);
+        HeapFree(GetProcessHeap(), 0, textW);
+    }
+    else
+    {
+        SetDlgItemTextW(hWnd, itemId, L"");
+    }
+}
+
 int Help()
 {
     char title[500];
@@ -37,7 +141,7 @@ int Help()
 
 BOOL FileExists(const char* fileName)
 {
-    DWORD attr = GetFileAttributes(fileName);
+    DWORD attr = GetFileAttributesUtf8Local(fileName);
     return (attr != INVALID_FILE_ATTRIBUTES && (attr & FILE_ATTRIBUTE_DIRECTORY) == 0);
 }
 
@@ -68,49 +172,57 @@ void _RemoveTemporaryDir(const char* dir)
     char path[MAX_PATH];
     char* end;
     HANDLE find;
-    WIN32_FIND_DATA file;
+    WIN32_FIND_DATAW fileW;
+    char fileNameUtf8[MAX_PATH];
 
     lstrcpy(path, dir);
     end = path + lstrlen(path);
     if (*(end - 1) != '\\')
         *end++ = '\\';
     lstrcpy(end, "*.*");
-    find = FindFirstFile(path, &file);
+    {
+        WCHAR* pathW = AllocWideFromUtf8(path);
+        find = pathW != NULL ? FindFirstFileW(pathW, &fileW) : INVALID_HANDLE_VALUE;
+        if (pathW != NULL)
+            HeapFree(GetProcessHeap(), 0, pathW);
+    }
     if (find != INVALID_HANDLE_VALUE)
     {
         do
         {
-            if (file.cFileName[0] != '.' || file.cFileName[1] != '\0' &&
-                                                (file.cFileName[1] != '.' || file.cFileName[2] != '\0'))
+            if (!WideToUtf8Simple(fileW.cFileName, fileNameUtf8, MAX_PATH))
+                fileNameUtf8[0] = 0;
+            if (fileNameUtf8[0] != '.' || fileNameUtf8[1] != '\0' &&
+                                              (fileNameUtf8[1] != '.' || fileNameUtf8[2] != '\0'))
             {
-                lstrcpy(end, file.cFileName);
-                if (file.dwFileAttributes & (FILE_ATTRIBUTE_READONLY | FILE_ATTRIBUTE_HIDDEN |
-                                             FILE_ATTRIBUTE_SYSTEM))
-                    SetFileAttributes(path, FILE_ATTRIBUTE_ARCHIVE);
-                if (file.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)
+                lstrcpy(end, fileNameUtf8);
+                if (fileW.dwFileAttributes & (FILE_ATTRIBUTE_READONLY | FILE_ATTRIBUTE_HIDDEN |
+                                              FILE_ATTRIBUTE_SYSTEM))
+                    SetFileAttributesUtf8Local(path, FILE_ATTRIBUTE_ARCHIVE);
+                if (fileW.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)
                     _RemoveTemporaryDir(path);
                 else
-                    DeleteFile(path);
+                    DeleteFileUtf8Local(path);
             }
-        } while (FindNextFile(find, &file));
+        } while (FindNextFileW(find, &fileW));
         FindClose(find);
     }
     *(end - 1) = 0;
-    RemoveDirectory(path);
+    RemoveDirectoryUtf8Local(path);
 }
 
 void RemoveTemporaryDir(const char* dir)
 {
-    char buf[MAX_PATH];
+    WCHAR bufW[MAX_PATH];
 
     _RemoveTemporaryDir(dir);
-    GetSystemDirectory(buf, MAX_PATH);
-    SetCurrentDirectory(buf); // leave the directory or it cannot be deleted
+    GetSystemDirectoryW(bufW, MAX_PATH);
+    SetCurrentDirectoryW(bufW); // leave the directory or it cannot be deleted
 
-    if (GetFileAttributes(dir) & (FILE_ATTRIBUTE_READONLY | FILE_ATTRIBUTE_HIDDEN |
-                                  FILE_ATTRIBUTE_SYSTEM))
-        SetFileAttributes(dir, FILE_ATTRIBUTE_ARCHIVE);
-    RemoveDirectory(dir);
+    if (GetFileAttributesUtf8Local(dir) & (FILE_ATTRIBUTE_READONLY | FILE_ATTRIBUTE_HIDDEN |
+                                           FILE_ATTRIBUTE_SYSTEM))
+        SetFileAttributesUtf8Local(dir, FILE_ATTRIBUTE_ARCHIVE);
+    RemoveDirectoryUtf8Local(dir);
 }
 
 BOOL CALLBACK DlgProc(HWND hWindow, UINT uMsg, WPARAM wParam, LPARAM lParam)
@@ -121,7 +233,7 @@ BOOL CALLBACK DlgProc(HWND hWindow, UINT uMsg, WPARAM wParam, LPARAM lParam)
     {
         RECT dlg;
         long x, y;
-        SetDlgItemText(hWindow, IDC_DIR, tmpName);
+        SetDlgItemTextUtf8Local(hWindow, IDC_DIR, (const char*)tmpName);
         SendDlgItemMessage(hWindow, IDC_PROGRESS, PBM_SETRANGE, 0, MAKELPARAM(0, 200)); // 0..100 for SzDecode(), which first extracts everything to memory, 100..200 for copying to disk
         GetWindowRect(hWindow, &dlg);
         x = (GetSystemMetrics(SM_CXSCREEN) - (dlg.right - dlg.left)) / 2;
@@ -153,7 +265,7 @@ BOOL CALLBACK DlgProc(HWND hWindow, UINT uMsg, WPARAM wParam, LPARAM lParam)
         return TRUE;
     }
     case WM_USER_UPDATEFNAME:
-        SetDlgItemText(hWindow, IDC_FILE, CurrentName);
+        SetDlgItemTextUtf8Local(hWindow, IDC_FILE, (const char*)CurrentName);
         return TRUE;
     case WM_COMMAND:
         switch (LOWORD(wParam))
@@ -186,7 +298,10 @@ BOOL GetSpecialFolderPath(int folder, char* path)
     if (SUCCEEDED(SHGetSpecialFolderLocation(NULL, folder, &pidl)))
     {
         IMalloc* alloc;
-        BOOL ret = SHGetPathFromIDList(pidl, path);
+        WCHAR pathW[MAX_PATH];
+        BOOL ret = SHGetPathFromIDListW(pidl, pathW);
+        if (ret)
+            WideToUtf8Simple(pathW, path, MAX_PATH);
         if (SUCCEEDED(CoGetMalloc(1, &alloc)))
         {
             if (alloc->lpVtbl->DidAlloc(alloc, pidl) == 1)
@@ -255,7 +370,7 @@ BOOL CreateParamsFileIfNeeded(const char* path, char* name)
         {
             HANDLE file;
             lstrcpy(name + len, "params.txt");
-            file = CreateFile(name, GENERIC_WRITE, 0, NULL, CREATE_NEW, FILE_ATTRIBUTE_NORMAL, NULL);
+            file = CreateFileUtf8Local(name, GENERIC_WRITE, 0, NULL, CREATE_NEW, FILE_ATTRIBUTE_NORMAL, NULL);
             if (file != INVALID_HANDLE_VALUE)
             {
                 char userPaths[7][MAX_PATH];
@@ -334,7 +449,7 @@ void MyCreateProcess(const char* fileName, BOOL parseCurDir, BOOL addQuotes, con
 
 void ProcessResultsInParamsFile(const char* name, BOOL* waitForExec)
 {
-    HANDLE file = CreateFile(name, GENERIC_READ, 0, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+    HANDLE file = CreateFileUtf8Local(name, GENERIC_READ, 0, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
     if (file != INVALID_HANDLE_VALUE)
     {
         DWORD sizeLo, sizeHi;
@@ -570,7 +685,7 @@ int MyWinMain(struct SCabinet* cabinet)
     lstrcpy(instPrefix, "SFX");
     if (GetTempFileName(tmpPath, instPrefix, 0, tmpName) == 0)
         return HandleError(ERROR_TITLE, ERROR_TEMPNAME, GetLastError(), NULL);
-    if (DeleteFile(tmpName) == 0)
+    if (DeleteFileUtf8Local(tmpName) == 0)
         return HandleError(ERROR_TITLE, ERROR_DELFILE, GetLastError(), tmpName);
     if (CreateDirectory(tmpName, NULL) == 0)
         return HandleError(ERROR_TITLE, ERROR_MKDIR, GetLastError(), tmpName);

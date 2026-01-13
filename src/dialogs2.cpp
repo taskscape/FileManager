@@ -907,21 +907,28 @@ void CLanguageSelectorDialog::Transfer(CTransferInfo& ti)
 
 BOOL CLanguageSelectorDialog::Initialize(const char* slgSearchPath, HINSTANCE pluginDLL)
 {
-    char path[MAX_PATH];
+    WCHAR pathW[MAX_PATH];
     if (slgSearchPath == NULL)
     {
-        GetModuleFileName(NULL, path, MAX_PATH);
-        lstrcpy(strrchr(path, '\\') + 1, "lang\\*.slg");
+        GetModuleFileNameW(NULL, pathW, MAX_PATH);
+        WCHAR* pathEnd = wcsrchr(pathW, L'\\');
+        if (pathEnd != NULL)
+            lstrcpyW(pathEnd + 1, L"lang\\*.slg");
     }
     else
-        lstrcpyn(path, slgSearchPath, MAX_PATH);
+    {
+        ConvertUtf8ToWide(slgSearchPath, -1, pathW, MAX_PATH);
+        pathW[MAX_PATH - 1] = 0;
+    }
 
+    WIN32_FIND_DATAW fileW;
     WIN32_FIND_DATA file;
-    HANDLE hFind = HANDLES_Q(FindFirstFile(path, &file));
+    HANDLE hFind = HANDLES_Q(FindFirstFileW(pathW, &fileW));
     if (hFind != INVALID_HANDLE_VALUE)
     {
         do
         {
+            ConvertFindDataWToUtf8(fileW, &file);
             char* point = strrchr(file.cFileName, '.');
             if (point != NULL && stricmp(point + 1, "slg") == 0) // it was returning *.slg*
             {
@@ -937,7 +944,7 @@ BOOL CLanguageSelectorDialog::Initialize(const char* slgSearchPath, HINSTANCE pl
                     }
                 }
             }
-        } while (FindNextFile(hFind, &file));
+        } while (FindNextFileW(hFind, &fileW));
         HANDLES(FindClose(hFind));
     }
     return TRUE;

@@ -53,7 +53,7 @@ public:
         BYTE* tbs;
         BOOL val;
 
-        fa = CreateFile(filename, FILE_READ_DATA, FILE_READ_DATA, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+        fa = CreateFileUtf8Local(filename, FILE_READ_DATA, FILE_READ_DATA, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
         if (fa == INVALID_HANDLE_VALUE)
         {
             err = GetLastError();

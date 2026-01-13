@@ -364,7 +364,7 @@ BOOL CData::Save()
             lstrcpy(buff, Data.FullTargetFile);
             lstrcpy(strrchr(buff, '.') + 1, "bak");
             if (!DeleteFile(buff) &&
-                GetFileAttributes(buff) != INVALID_FILE_ATTRIBUTES) // The deletion did not fail due to a missing .bak file.
+                GetFileAttributesUtf8Local(buff) != INVALID_FILE_ATTRIBUTES) // The deletion did not fail due to a missing .bak file.
             {                                                       // Deletion probably failed because the .bak is opened by a running Salamander from the bin folder.
                 // Attempt to rename it to "xxxx (2).bak", "xxxx (3).bak", etc.
                 char buff2[MAX_PATH + 20];
@@ -1420,7 +1420,7 @@ BOOL CData::ExportAsTextArchive(const char* fileName, BOOL withoutVerInfo)
     */
     if (!withoutVerInfo)
     {
-        if (GetFileAttributes(fileName) != INVALID_FILE_ATTRIBUTES) // Target SLT file already exists.
+        if (GetFileAttributesUtf8Local(fileName) != INVALID_FILE_ATTRIBUTES) // Target SLT file already exists.
         {
             int res = IDYES;
             if (wcscmp(SLGSignature.CRCofImpSLT, L"none") == 0) // English edition.

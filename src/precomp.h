@@ -41,6 +41,10 @@
 #undef GetGValue
 #define GetGValue(rgb) ((BYTE)(((rgb) >> 8) & 0xFF))
 
+#ifndef CB_SETUNICODEFORMAT
+#define CB_SETUNICODEFORMAT 0x2005
+#endif
+
 #pragma warning(pop)
 
 #pragma warning(3 : 4706) // warning C4706: assignment within conditional expression

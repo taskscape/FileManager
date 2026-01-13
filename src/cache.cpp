@@ -114,9 +114,9 @@ BOOL CCacheData::CleanFromDisk()
             {
                 if (attrs & FILE_ATTRIBUTE_READONLY)
                 {
-                    SetFileAttributes(TmpName, FILE_ATTRIBUTE_ARCHIVE);
+                    SetFileAttributesUtf8(TmpName, FILE_ATTRIBUTE_ARCHIVE);
                 }
-                DeleteFile(TmpName);
+                DeleteFileUtf8(TmpName);
             }
             attrs = SalGetFileAttributes(TmpName); // check if the deletion was successful
             if (attrs == 0xFFFFFFFF)
@@ -185,7 +185,7 @@ CCacheData::GetName(CDiskCache* monitor, BOOL* exists, BOOL canBlock, BOOL onlyA
         DWORD attrs = SalGetFileAttributes(dir);
         if (attrs == 0xFFFFFFFF)
         {
-          if (!CreateDirectory(dir, NULL))
+          if (!CreateDirectoryUtf8(dir, NULL))
           {
             TRACE_E("Unable to create tmp-directory " << dir);
           }
@@ -346,8 +346,8 @@ CCacheDirData::~CCacheDirData()
     }
     if (PathLength > 0)
         Path[PathLength - 1] = 0; // trimming a backslash
-    SetFileAttributes(Path, FILE_ATTRIBUTE_ARCHIVE);
-    RemoveDirectory(Path);
+    SetFileAttributesUtf8(Path, FILE_ATTRIBUTE_ARCHIVE);
+    RemoveDirectoryUtf8(Path);
 }
 
 BOOL CCacheDirData::ContainTmpName(const char* tmpName, const char* rootTmpPath,
@@ -380,11 +380,14 @@ BOOL CCacheDirData::ContainTmpName(const char* tmpName, const char* rootTmpPath,
                         return TRUE;
                 }
 
+                WIN32_FIND_DATAW dataW;
                 WIN32_FIND_DATA data;
-                HANDLE find = HANDLES_Q(FindFirstFile(tmpFullName, &data));
+                CStrP tmpFullNameW(ConvertAllocUtf8ToWide(tmpFullName, -1));
+                HANDLE find = tmpFullNameW != NULL ? HANDLES_Q(FindFirstFileW(tmpFullNameW, &dataW)) : INVALID_HANDLE_VALUE;
                 if (find != INVALID_HANDLE_VALUE)
                 {
                     HANDLES(FindClose(find));
+                    ConvertFindDataWToUtf8(dataW, &data);
                     if (StrICmp(tmpName, data.cFileName) == 0)
                     {
                         TRACE_E("CCacheDirData::ContainTmpName(): unexpected situation: tmp-directory contains unknown file!");
@@ -469,9 +472,12 @@ void CCacheDirData::RemoveEmptyTmpDirsOnlyFromDisk()
 
     if (PathLength > 0)
         Path[PathLength - 1] = 0; // backslash trimming
-    SetFileAttributes(Path, FILE_ATTRIBUTE_ARCHIVE);
+    CStrP pathW(ConvertAllocUtf8ToWide(Path, -1));
+    if (pathW != NULL)
+        SetFileAttributesW(pathW, FILE_ATTRIBUTE_ARCHIVE);
     // the system deletes our tmp-directory only if it's empty (in case of further need for a tmp-directory, we will create it in CCacheDirData::GetName())
-    RemoveDirectory(Path);
+    if (pathW != NULL)
+        RemoveDirectoryW(pathW);
     if (PathLength > 0)
         Path[PathLength - 1] = '\\'; // restoring backslash
 }
@@ -1189,7 +1195,7 @@ CDiskCache::GetName(const char* name, const char* tmpName, BOOL* exists, BOOL on
     if (newDir == NULL)
     {
         TRACE_E(LOW_MEMORY);
-        RemoveDirectory(newDirPath);
+        RemoveDirectoryUtf8(newDirPath);
         *exists = TRUE; // fatal error
         Leave();
         if (errorCode != NULL)
@@ -1201,7 +1207,7 @@ CDiskCache::GetName(const char* name, const char* tmpName, BOOL* exists, BOOL on
     {
         delete newDir;
         Dirs.ResetState();
-        RemoveDirectory(newDirPath);
+        RemoveDirectoryUtf8(newDirPath);
         *exists = TRUE; // fatal error
         Leave();
         if (errorCode != NULL)
@@ -1466,12 +1472,15 @@ void CDiskCache::ClearTEMPIfNeeded(HWND parent, HWND hActivePanel)
         {
             TIndirectArray<char> tmpDirs(10, 50);
 
+            WIN32_FIND_DATAW dataW;
             WIN32_FIND_DATA data;
-            HANDLE find = HANDLES_Q(FindFirstFile(tmpDir, &data));
+            CStrP tmpDirW(ConvertAllocUtf8ToWide(tmpDir, -1));
+            HANDLE find = tmpDirW != NULL ? HANDLES_Q(FindFirstFileW(tmpDirW, &dataW)) : INVALID_HANDLE_VALUE;
             if (find != INVALID_HANDLE_VALUE)
             {
                 do
                 { // we will process all found directories (search errors are ignored)
+                    ConvertFindDataWToUtf8(dataW, &data);
                     if (data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)
                     {
                         char* s = data.cFileName + 3;
@@ -1492,7 +1501,7 @@ void CDiskCache::ClearTEMPIfNeeded(HWND parent, HWND hActivePanel)
                             }
                         }
                     }
-                } while (FindNextFile(find, &data));
+                } while (FindNextFileW(find, &dataW));
                 HANDLES(FindClose(find));
             }
 

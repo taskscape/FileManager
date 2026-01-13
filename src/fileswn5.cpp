@@ -251,18 +251,19 @@ void CFilesWindow::ChangeAttr(BOOL setCompress, BOOL compressed, BOOL setEncrypt
                             strcpy(fileName, GetPath());
                             SalPathAppend(fileName, f->Name, MAX_PATH);
 
-                            WIN32_FIND_DATA find;
-                            HANDLE hFind = HANDLES_Q(FindFirstFile(fileName, &find));
+                            WIN32_FIND_DATAW findW;
+                            CStrP fileNameW(ConvertAllocUtf8ToWide(fileName, -1));
+                            HANDLE hFind = fileNameW != NULL ? HANDLES_Q(FindFirstFileW(fileNameW, &findW)) : INVALID_HANDLE_VALUE;
                             if (hFind != INVALID_HANDLE_VALUE)
                             {
                                 HANDLES(FindClose(hFind));
 
                                 FILETIME ft;
-                                if (FileTimeToLocalFileTime(&find.ftCreationTime, &ft) &&
+                                if (FileTimeToLocalFileTime(&findW.ftCreationTime, &ft) &&
                                     FileTimeToSystemTime(&ft, &timeCreated) &&
-                                    FileTimeToLocalFileTime(&find.ftLastAccessTime, &ft) &&
+                                    FileTimeToLocalFileTime(&findW.ftLastAccessTime, &ft) &&
                                     FileTimeToSystemTime(&ft, &timeAccessed) &&
-                                    FileTimeToLocalFileTime(&find.ftLastWriteTime, &ft) &&
+                                    FileTimeToLocalFileTime(&findW.ftLastWriteTime, &ft) &&
                                     FileTimeToSystemTime(&ft, &timeModified))
                                 {
                                     timeObtained = TRUE;
@@ -879,7 +880,7 @@ void CFilesWindow::ViewFile(char* name, BOOL altView, DWORD handlerID, int enumF
                             SetCursor(oldCur);
                             SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_ABOVE_NORMAL);
                             CQuadWord size(0, 0);
-                            HANDLE file = HANDLES_Q(CreateFile(name, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE,
+                            HANDLE file = HANDLES_Q(CreateFileUtf8(name, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE,
                                                                NULL, OPEN_EXISTING, 0, NULL));
                             if (file != INVALID_HANDLE_VALUE)
                             {
@@ -2190,11 +2191,14 @@ void CFilesWindow::RenameFileInternal(CFileData* f, const char* formatedFileName
                     (err == ERROR_FILE_EXISTS ||   // check whether it's only rewriting the DOS name of the file
                      err == ERROR_ALREADY_EXISTS))
                 {
+                    WIN32_FIND_DATAW dataW;
                     WIN32_FIND_DATA data;
-                    HANDLE find = HANDLES_Q(FindFirstFile(tgtPath, &data));
+                    CStrP tgtPathW(ConvertAllocUtf8ToWide(tgtPath, -1));
+                    HANDLE find = tgtPathW != NULL ? HANDLES_Q(FindFirstFileW(tgtPathW, &dataW)) : INVALID_HANDLE_VALUE;
                     if (find != INVALID_HANDLE_VALUE)
                     {
                         HANDLES(FindClose(find));
+                        ConvertFindDataWToUtf8(dataW, &data);
                         const char* tgtName = SalPathFindFileName(tgtPath);
                         if (StrICmp(tgtName, data.cAlternateFileName) == 0 && // match only for DOS name
                             StrICmp(tgtName, data.cFileName) != 0)            // (full name differs)
@@ -2256,10 +2260,10 @@ void CFilesWindow::RenameFileInternal(CFileData* f, const char* formatedFileName
                     if ((inAttr & FILE_ATTRIBUTE_DIRECTORY) == 0 &&
                         (outAttr & FILE_ATTRIBUTE_DIRECTORY) == 0)
                     { // only if both are files
-                        HANDLE in = HANDLES_Q(CreateFile(path, 0, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL,
+                        HANDLE in = HANDLES_Q(CreateFileUtf8(path, 0, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL,
                                                          OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL,
                                                          NULL));
-                        HANDLE out = HANDLES_Q(CreateFile(tgtPath, 0, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL,
+                        HANDLE out = HANDLES_Q(CreateFileUtf8(tgtPath, 0, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL,
                                                           OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL,
                                                           NULL));
                         if (in != INVALID_HANDLE_VALUE && out != INVALID_HANDLE_VALUE)
@@ -2284,7 +2288,7 @@ void CFilesWindow::RenameFileInternal(CFileData* f, const char* formatedFileName
                             case IDYES:
                             {
                                 ClearReadOnlyAttr(tgtPath); // so it can be deleted ...
-                                if (!DeleteFile(tgtPath) || !SalMoveFile(path, tgtPath))
+                                if (!DeleteFileUtf8(tgtPath) || !SalMoveFile(path, tgtPath))
                                     err = GetLastError();
                                 else
                                 {

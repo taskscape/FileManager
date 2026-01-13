@@ -170,7 +170,7 @@ INT64 CZDirectory::PopulateDir(CWorkerThread* mythread, TCHAR* path, int pos, si
 	}
 	path[MAX_PATH] = (char)radixHistorgram[2048];
 */
-    hFind = FindFirstFile(path, &FindFileData);
+    hFind = FindFirstFileUtf8Local(path, &FindFileData);
     if (hFind == INVALID_HANDLE_VALUE)
     {
         //ERROR
@@ -302,7 +302,7 @@ INT64 CZDirectory::PopulateDir(CWorkerThread* mythread, TCHAR* path, int pos, si
                 filecount = 0;
                 tsize = 0;
             }
-        } while ((FindNextFile(hFind, &FindFileData) != 0) && (mythread == NULL || !mythread->Aborting()));
+        } while ((FindNextFileUtf8Local(hFind, &FindFileData) != 0) && (mythread == NULL || !mythread->Aborting()));
 
         this->_root->IncStats(filecount, dircount, tsize);
 

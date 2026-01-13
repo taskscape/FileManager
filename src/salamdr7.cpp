@@ -360,7 +360,7 @@ void RegenEnvironmentVariables()
 BOOL QueryVolumeTRIM(const char* volume, BOOL* trim)
 {
     BOOL ret = FALSE;
-    HANDLE hVolume = HANDLES(CreateFile(volume, FILE_READ_ATTRIBUTES, FILE_SHARE_READ, NULL,
+    HANDLE hVolume = HANDLES(CreateFileUtf8(volume, FILE_READ_ATTRIBUTES, FILE_SHARE_READ, NULL,
                                         OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL));
     if (hVolume != INVALID_HANDLE_VALUE)
     {
@@ -390,7 +390,7 @@ BOOL QueryVolumeTRIM(const char* volume, BOOL* trim)
 BOOL QueryVolumeSeekPenalty(const char* volume, BOOL* seekPenalty)
 {
     BOOL ret = FALSE;
-    HANDLE hVolume = HANDLES(CreateFile(volume, FILE_READ_ATTRIBUTES, FILE_SHARE_READ, NULL,
+    HANDLE hVolume = HANDLES(CreateFileUtf8(volume, FILE_READ_ATTRIBUTES, FILE_SHARE_READ, NULL,
                                         OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL));
     if (hVolume != INVALID_HANDLE_VALUE)
     {
@@ -421,7 +421,7 @@ BOOL QueryVolumeSeekPenalty(const char* volume, BOOL* seekPenalty)
 BOOL QueryVolumeATARPM(const char* volume, WORD* rpm)
 {
     BOOL ret = FALSE;
-    HANDLE hVolume = HANDLES_Q(CreateFile(volume, GENERIC_READ | GENERIC_WRITE,
+    HANDLE hVolume = HANDLES_Q(CreateFileUtf8(volume, GENERIC_READ | GENERIC_WRITE,
                                           FILE_SHARE_READ | FILE_SHARE_WRITE, NULL,
                                           OPEN_EXISTING, 0, NULL));
     if (hVolume != INVALID_HANDLE_VALUE)

@@ -87,7 +87,7 @@ BOOL CPluginInterfaceForArchiver::MakeFileList3(TIndirectArray2<CFileInfo>& file
                 file = INVALID_HANDLE_VALUE;
                 while (file == INVALID_HANDLE_VALUE && !skip)
                 {
-                    file = CreateFile(sourName, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL,
+                    file = CreateFileUtf8Local(sourName, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL,
                                       OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
                     if (file != INVALID_HANDLE_VALUE)
                         break;
@@ -217,7 +217,7 @@ BOOL CPluginInterfaceForArchiver::AddFiles(TIndirectArray2<CFileInfo>& files, un
         IOFile = INVALID_HANDLE_VALUE;
         while (IOFile == INVALID_HANDLE_VALUE)
         {
-            IOFile = CreateFile(f->Name /* + sourPathLen*/, GENERIC_READ, FILE_SHARE_READ, NULL,
+            IOFile = CreateFileUtf8Local(f->Name /* + sourPathLen*/, GENERIC_READ, FILE_SHARE_READ, NULL,
                                 OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
             if (IOFile != INVALID_HANDLE_VALUE)
                 break;
@@ -313,12 +313,12 @@ void CPluginInterfaceForArchiver::DeleteSourceFiles(TIndirectArray2<CFileInfo>& 
         if (f->Status == STATUS_OK)
         {
             SalamanderGeneral->ClearReadOnlyAttr(f->Name);
-            DeleteFile(f->Name);
+            DeleteFileUtf8Local(f->Name);
             lstrcpy(path, f->Name);
             while (ComputeDirDepth(path) > sourceDepth + 1)
             {
                 SalamanderGeneral->CutDirectory(path);
-                if (!RemoveDirectory(path))
+                if (!RemoveDirectoryUtf8Local(path))
                     break;
             }
         }

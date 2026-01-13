@@ -112,7 +112,7 @@ void CFilesWindow::Execute(int index)
                     return;
                 }
                 OLECHAR oleName[MAX_PATH];
-                MultiByteToWideChar(CP_ACP, MB_PRECOMPOSED, fullName, -1, oleName, MAX_PATH);
+                ConvertUtf8ToWide(fullName, -1, oleName, MAX_PATH);
                 oleName[MAX_PATH - 1] = 0;
 
                 HCURSOR oldCur = SetCursor(LoadCursor(NULL, IDC_WAIT));
@@ -342,8 +342,9 @@ void CFilesWindow::Execute(int index)
                     repPointType == 2 /* JUNCTION POINT */ &&
                     SalPathAppend(fullName, "*", MAX_PATH + 10))
                 {
-                    WIN32_FIND_DATA fileData;
-                    HANDLE search = HANDLES_Q(FindFirstFile(fullName, &fileData));
+                    WIN32_FIND_DATAW fileDataW;
+                    CStrP fullNameW(ConvertAllocUtf8ToWide(fullName, -1));
+                    HANDLE search = fullNameW != NULL ? HANDLES_Q(FindFirstFileW(fullNameW, &fileDataW)) : INVALID_HANDLE_VALUE;
                     DWORD err = GetLastError();
                     CutDirectory(fullName);
                     if (search != INVALID_HANDLE_VALUE)
@@ -2122,7 +2123,7 @@ BOOL CFilesWindow::ChangePathToArchive(const char* archive, const char* archiveP
             {
                 // retrieve file info (does it exist?, size, date & time)
                 DWORD err2 = NO_ERROR;
-                HANDLE file = HANDLES_Q(CreateFile(archive, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE,
+                HANDLE file = HANDLES_Q(CreateFileUtf8(archive, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE,
                                                    NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL));
                 if (file != INVALID_HANDLE_VALUE)
                 {
@@ -2249,7 +2250,7 @@ BOOL CFilesWindow::ChangePathToArchive(const char* archive, const char* archiveP
             DWORD err;
             if ((err = CheckPath(!isRefresh)) == ERROR_SUCCESS) // no need to restore network connections here ...
             {
-                HANDLE file = HANDLES_Q(CreateFile(archive, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE,
+                HANDLE file = HANDLES_Q(CreateFileUtf8(archive, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE,
                                                    NULL, OPEN_EXISTING, 0, NULL));
                 if (file != INVALID_HANDLE_VALUE)
                 {

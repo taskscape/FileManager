@@ -559,7 +559,7 @@ BOOL CVersionInfo::WriteResourceToFile(HINSTANCE hInstance, int resID, const cha
                 if (data != NULL)
                 {
                     BYTE* ptr = (BYTE*)data;
-                    HANDLE file = CreateFile(fileName, GENERIC_WRITE, 0, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+                    HANDLE file = CreateFileUtf8(fileName, GENERIC_WRITE, 0, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
                     if (file != INVALID_HANDLE_VALUE)
                     {
                         DWORD written;

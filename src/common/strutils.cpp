@@ -214,6 +214,299 @@ WCHAR* ConvertAllocA2U(const char* src, int srcLen, UINT codepage)
     return txt;
 }
 
+int ConvertUtf8ToWide(const char* src, int srcLen, WCHAR* buf, int bufSizeInChars)
+{
+    if (buf == NULL || bufSizeInChars <= 0)
+    {
+        SetLastError(ERROR_INVALID_PARAMETER);
+        return 0;
+    }
+    buf[0] = 0;
+    if (src == NULL)
+    {
+        SetLastError(ERROR_INVALID_PARAMETER);
+        return 0;
+    }
+    if (srcLen != -1 && srcLen <= 0)
+    {
+        if (srcLen == 0)
+            return 1;
+        SetLastError(ERROR_INVALID_PARAMETER);
+        return 0;
+    }
+    int res = MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, src, srcLen, buf, bufSizeInChars);
+    if (res == 0 && GetLastError() == ERROR_NO_UNICODE_TRANSLATION)
+        res = MultiByteToWideChar(CP_UTF8, 0, src, srcLen, buf, bufSizeInChars);
+    if (srcLen != -1 && res > 0)
+        res++;
+    if (res > 0 && res <= bufSizeInChars)
+        buf[res - 1] = 0;
+    else
+    {
+        if (res > bufSizeInChars || res == 0 && GetLastError() == ERROR_INSUFFICIENT_BUFFER)
+        {
+            SetLastError(ERROR_INSUFFICIENT_BUFFER);
+            buf[bufSizeInChars - 1] = 0;
+        }
+        else
+            buf[0] = 0;
+        res = 0;
+    }
+    return res;
+}
+
+int ConvertWideToUtf8(const WCHAR* src, int srcLen, char* buf, int bufSizeInBytes)
+{
+    if (buf == NULL || bufSizeInBytes <= 0)
+    {
+        SetLastError(ERROR_INVALID_PARAMETER);
+        return 0;
+    }
+    buf[0] = 0;
+    if (src == NULL)
+    {
+        SetLastError(ERROR_INVALID_PARAMETER);
+        return 0;
+    }
+    if (srcLen != -1 && srcLen <= 0)
+    {
+        if (srcLen == 0)
+            return 1;
+        SetLastError(ERROR_INVALID_PARAMETER);
+        return 0;
+    }
+    int res = WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, src, srcLen, buf, bufSizeInBytes, NULL, NULL);
+    if (res == 0 && GetLastError() == ERROR_NO_UNICODE_TRANSLATION)
+        res = WideCharToMultiByte(CP_UTF8, 0, src, srcLen, buf, bufSizeInBytes, NULL, NULL);
+    if (srcLen != -1 && res > 0)
+        res++;
+    if (res > 0 && res <= bufSizeInBytes)
+        buf[res - 1] = 0;
+    else
+    {
+        if (res > bufSizeInBytes || res == 0 && GetLastError() == ERROR_INSUFFICIENT_BUFFER)
+        {
+            SetLastError(ERROR_INSUFFICIENT_BUFFER);
+            buf[bufSizeInBytes - 1] = 0;
+        }
+        else
+            buf[0] = 0;
+        res = 0;
+    }
+    return res;
+}
+
+WCHAR* ConvertAllocUtf8ToWide(const char* src, int srcLen)
+{
+    if (src == NULL)
+    {
+        SetLastError(ERROR_INVALID_PARAMETER);
+        return NULL;
+    }
+    if (srcLen != -1 && srcLen <= 0)
+    {
+        if (srcLen == 0)
+        {
+            WCHAR* txt = (WCHAR*)malloc(1 * sizeof(WCHAR));
+#ifndef SAFE_ALLOC
+            if (txt == NULL)
+                SetLastError(ERROR_OUTOFMEMORY);
+            else
+            {
+#endif // SAFE_ALLOC
+                *txt = 0;
+#ifndef SAFE_ALLOC
+            }
+#endif // SAFE_ALLOC
+            return txt;
+        }
+        SetLastError(ERROR_INVALID_PARAMETER);
+        return NULL;
+    }
+    int len = MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, src, srcLen, NULL, 0);
+    if (len == 0 && GetLastError() == ERROR_NO_UNICODE_TRANSLATION)
+        len = MultiByteToWideChar(CP_UTF8, 0, src, srcLen, NULL, 0);
+    if (srcLen != -1 && len > 0)
+        len++;
+    if (len == 0)
+        return NULL;
+    WCHAR* txt = (WCHAR*)malloc(len * sizeof(WCHAR));
+#ifndef SAFE_ALLOC
+    if (txt == NULL)
+        SetLastError(ERROR_OUTOFMEMORY);
+    else
+    {
+#endif // SAFE_ALLOC
+        int res = MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, src, srcLen, txt, len);
+        if (res == 0 && GetLastError() == ERROR_NO_UNICODE_TRANSLATION)
+            res = MultiByteToWideChar(CP_UTF8, 0, src, srcLen, txt, len);
+        if (srcLen != -1 && res > 0)
+            res++;
+        if (res > 0 && res <= len)
+            txt[res - 1] = 0;
+        else
+        {
+            DWORD err = GetLastError();
+            free(txt);
+            txt = NULL;
+            SetLastError(err);
+        }
+#ifndef SAFE_ALLOC
+    }
+#endif // SAFE_ALLOC
+    return txt;
+}
+
+char* ConvertAllocWideToUtf8(const WCHAR* src, int srcLen)
+{
+    if (src == NULL)
+    {
+        SetLastError(ERROR_INVALID_PARAMETER);
+        return NULL;
+    }
+    if (srcLen != -1 && srcLen <= 0)
+    {
+        if (srcLen == 0)
+        {
+            char* txt = (char*)malloc(1);
+#ifndef SAFE_ALLOC
+            if (txt == NULL)
+                SetLastError(ERROR_OUTOFMEMORY);
+            else
+            {
+#endif // SAFE_ALLOC
+                *txt = 0;
+#ifndef SAFE_ALLOC
+            }
+#endif // SAFE_ALLOC
+            return txt;
+        }
+        SetLastError(ERROR_INVALID_PARAMETER);
+        return NULL;
+    }
+    int len = WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, src, srcLen, NULL, 0, NULL, NULL);
+    if (len == 0 && GetLastError() == ERROR_NO_UNICODE_TRANSLATION)
+        len = WideCharToMultiByte(CP_UTF8, 0, src, srcLen, NULL, 0, NULL, NULL);
+    if (srcLen != -1 && len > 0)
+        len++;
+    if (len == 0)
+        return NULL;
+    char* txt = (char*)malloc(len);
+#ifndef SAFE_ALLOC
+    if (txt == NULL)
+        SetLastError(ERROR_OUTOFMEMORY);
+    else
+    {
+#endif // SAFE_ALLOC
+        int res = WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, src, srcLen, txt, len, NULL, NULL);
+        if (res == 0 && GetLastError() == ERROR_NO_UNICODE_TRANSLATION)
+            res = WideCharToMultiByte(CP_UTF8, 0, src, srcLen, txt, len, NULL, NULL);
+        if (srcLen != -1 && res > 0)
+            res++;
+        if (res > 0 && res <= len)
+            txt[res - 1] = 0;
+        else
+        {
+            DWORD err = GetLastError();
+            free(txt);
+            txt = NULL;
+            SetLastError(err);
+        }
+#ifndef SAFE_ALLOC
+    }
+#endif // SAFE_ALLOC
+    return txt;
+}
+
+BOOL ConvertFindDataWToUtf8(const WIN32_FIND_DATAW& src, WIN32_FIND_DATAA* dst)
+{
+    if (dst == NULL)
+        return FALSE;
+    ZeroMemory(dst, sizeof(*dst));
+    dst->dwFileAttributes = src.dwFileAttributes;
+    dst->ftCreationTime = src.ftCreationTime;
+    dst->ftLastAccessTime = src.ftLastAccessTime;
+    dst->ftLastWriteTime = src.ftLastWriteTime;
+    dst->nFileSizeHigh = src.nFileSizeHigh;
+    dst->nFileSizeLow = src.nFileSizeLow;
+    dst->dwReserved0 = src.dwReserved0;
+    dst->dwReserved1 = src.dwReserved1;
+    if (ConvertWideToUtf8(src.cFileName, -1, dst->cFileName, _countof(dst->cFileName)) == 0)
+        dst->cFileName[0] = 0;
+    if (ConvertWideToUtf8(src.cAlternateFileName, -1, dst->cAlternateFileName, _countof(dst->cAlternateFileName)) == 0)
+        dst->cAlternateFileName[0] = 0;
+    return TRUE;
+}
+
+HANDLE CreateFileUtf8(const char* fileName, DWORD desiredAccess, DWORD shareMode,
+                      LPSECURITY_ATTRIBUTES securityAttributes, DWORD creationDisposition,
+                      DWORD flagsAndAttributes, HANDLE templateFile)
+{
+    CStrP fileNameW(ConvertAllocUtf8ToWide(fileName, -1));
+    if (fileNameW == NULL)
+    {
+        SetLastError(ERROR_INVALID_PARAMETER);
+        return INVALID_HANDLE_VALUE;
+    }
+    return CreateFileW(fileNameW, desiredAccess, shareMode, securityAttributes,
+                       creationDisposition, flagsAndAttributes, templateFile);
+}
+
+BOOL DeleteFileUtf8(const char* fileName)
+{
+    CStrP fileNameW(ConvertAllocUtf8ToWide(fileName, -1));
+    if (fileNameW == NULL)
+    {
+        SetLastError(ERROR_INVALID_PARAMETER);
+        return FALSE;
+    }
+    return DeleteFileW(fileNameW);
+}
+
+BOOL CreateDirectoryUtf8(const char* dirName, LPSECURITY_ATTRIBUTES securityAttributes)
+{
+    CStrP dirNameW(ConvertAllocUtf8ToWide(dirName, -1));
+    if (dirNameW == NULL)
+    {
+        SetLastError(ERROR_INVALID_PARAMETER);
+        return FALSE;
+    }
+    return CreateDirectoryW(dirNameW, securityAttributes);
+}
+
+BOOL RemoveDirectoryUtf8(const char* dirName)
+{
+    CStrP dirNameW(ConvertAllocUtf8ToWide(dirName, -1));
+    if (dirNameW == NULL)
+    {
+        SetLastError(ERROR_INVALID_PARAMETER);
+        return FALSE;
+    }
+    return RemoveDirectoryW(dirNameW);
+}
+
+BOOL SetFileAttributesUtf8(const char* fileName, DWORD attrs)
+{
+    CStrP fileNameW(ConvertAllocUtf8ToWide(fileName, -1));
+    if (fileNameW == NULL)
+    {
+        SetLastError(ERROR_INVALID_PARAMETER);
+        return FALSE;
+    }
+    return SetFileAttributesW(fileNameW, attrs);
+}
+
+DWORD GetFileAttributesUtf8(const char* fileName)
+{
+    CStrP fileNameW(ConvertAllocUtf8ToWide(fileName, -1));
+    if (fileNameW == NULL)
+    {
+        SetLastError(ERROR_INVALID_PARAMETER);
+        return INVALID_FILE_ATTRIBUTES;
+    }
+    return GetFileAttributesW(fileNameW);
+}
+
 WCHAR* DupStr(const WCHAR* txt)
 {
     if (txt == NULL)
@@ -324,7 +617,7 @@ na zobrazitelne znaky (sekvence WCHARu odpovidajici jednomu zobrazenemu znaku).
   res = FoldString(MAP_FOLDCZONE | MAP_EXPAND_LIGATURES, s1, -1, wbuf, 50);
   res = FoldString(MAP_FOLDCZONE | MAP_PRECOMPOSED, wbuf, -1, wbuf2, 50);
 
-  HANDLE file = CreateFile(s1, GENERIC_WRITE, 0, NULL, CREATE_NEW, FILE_ATTRIBUTE_NORMAL, NULL);
+  HANDLE file = CreateFileUtf8(s1, GENERIC_WRITE, 0, NULL, CREATE_NEW, FILE_ATTRIBUTE_NORMAL, NULL);
   if (file != INVALID_HANDLE_VALUE) CloseHandle(file);
 
   res = CompareString(LOCALE_USER_DEFAULT, 0, s1, -1, s2, -1);

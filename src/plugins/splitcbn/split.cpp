@@ -270,7 +270,7 @@ static BOOL SplitFile(LPTSTR fileName, LPTSTR targetDir, CQuadWord& qwPartSize,
             SalamanderSafeFile->SafeFileClose(&outfile);
             if (ret == FALSE)
             {
-                DeleteFile(text);
+                DeleteFileUtf8Local(text);
                 break;
             }
         }
@@ -459,7 +459,7 @@ BOOL SplitCommand(HWND parent, CSalamanderForOperationsAbstract* salamander)
     CQuadWord qwFileSize;
     SalamanderGeneral->GetPanelPath(PANEL_SOURCE, path, MAX_PATH, NULL, NULL);
     BOOL tooLong = !SalamanderGeneral->SalPathAppend(path, pfd->Name, MAX_PATH);
-    if (!tooLong && (hFind = FindFirstFile(path, &wfd)) != INVALID_HANDLE_VALUE)
+    if (!tooLong && (hFind = FindFirstFileUtf8Local(path, &wfd)) != INVALID_HANDLE_VALUE)
     {
         FindClose(hFind);
         qwFileSize.Set(wfd.nFileSizeLow, wfd.nFileSizeHigh);

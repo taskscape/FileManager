@@ -43,6 +43,31 @@ int ConvertA2U(const char* src, int srcLen, WCHAR* buf, int bufSizeInChars,
 // chybe vraci NULL (detaily viz GetLastError())
 WCHAR* ConvertAllocA2U(const char* src, int srcLen, UINT codepage = CP_ACP);
 
+// prevody mezi UTF-8 a UTF-16; 'srcLen' je delka bez zakoncujici nuly
+// (pri zadani -1 se delka urci podle zakoncujici nuly); vraci pocet znaku
+// zapsanych do 'buf' (vcetne zakoncujici nuly) nebo 0 pri chybe; vzdy zajisti
+// nulou zakonceny 'buf' (i pri chybe)
+int ConvertUtf8ToWide(const char* src, int srcLen, WCHAR* buf, int bufSizeInChars);
+int ConvertWideToUtf8(const WCHAR* src, int srcLen, char* buf, int bufSizeInBytes);
+
+// prevod UTF-8 na alokovany UTF-16 string (volajici uvolnuje)
+WCHAR* ConvertAllocUtf8ToWide(const char* src, int srcLen);
+// prevod UTF-16 na alokovany UTF-8 string (volajici uvolnuje)
+char* ConvertAllocWideToUtf8(const WCHAR* src, int srcLen);
+
+// prevod WIN32_FIND_DATAW na WIN32_FIND_DATAA s UTF-8 jmeny
+BOOL ConvertFindDataWToUtf8(const WIN32_FIND_DATAW& src, WIN32_FIND_DATAA* dst);
+
+// UTF-8 file API wrappers (use WinAPI W variants under the hood)
+HANDLE CreateFileUtf8(const char* fileName, DWORD desiredAccess, DWORD shareMode,
+                      LPSECURITY_ATTRIBUTES securityAttributes, DWORD creationDisposition,
+                      DWORD flagsAndAttributes, HANDLE templateFile);
+BOOL DeleteFileUtf8(const char* fileName);
+BOOL CreateDirectoryUtf8(const char* dirName, LPSECURITY_ATTRIBUTES securityAttributes);
+BOOL RemoveDirectoryUtf8(const char* dirName);
+BOOL SetFileAttributesUtf8(const char* fileName, DWORD attrs);
+DWORD GetFileAttributesUtf8(const char* fileName);
+
 // nakopiruje string 'txt' do nove naalokovaneho stringu, NULL = malo pameti (hrozi jen pokud
 // se nepouziva allochan.*) nebo 'txt'==NULL
 WCHAR* DupStr(const WCHAR* txt);

@@ -4,6 +4,8 @@
 
 #include "precomp.h"
 
+#include <commctrl.h>
+
 #include "mainwnd.h"
 #include "plugins.h"
 #include "fileswnd.h"
@@ -16,6 +18,39 @@
 #include "codetbl.h"
 #include "worker.h"
 #include "menu.h"
+
+static void EnsureComboUnicode(HWND hWnd)
+{
+    SendMessage(hWnd, CB_SETUNICODEFORMAT, TRUE, 0);
+}
+
+static void SetWindowTextUtf8(HWND hWnd, const char* text)
+{
+    CStrP wide(ConvertAllocUtf8ToWide(text != NULL ? text : "", -1));
+    SendMessageW(hWnd, WM_SETTEXT, 0, (LPARAM)(wide != NULL ? wide.Ptr : L""));
+}
+
+static void GetWindowTextUtf8(HWND hWnd, char* buf, int bufSize)
+{
+    if (buf == NULL || bufSize <= 0)
+        return;
+    buf[0] = 0;
+    int len = GetWindowTextLengthW(hWnd);
+    if (len <= 0)
+        return;
+    CStrP wide((WCHAR*)malloc(sizeof(WCHAR) * (len + 1)));
+    if (wide == NULL)
+        return;
+    GetWindowTextW(hWnd, wide, len + 1);
+    ConvertWideToUtf8(wide, -1, buf, bufSize);
+}
+
+static void ComboAddStringUtf8(HWND hWnd, const char* text)
+{
+    CStrP wide(ConvertAllocUtf8ToWide(text != NULL ? text : "", -1));
+    if (wide != NULL)
+        SendMessageW(hWnd, CB_ADDSTRING, 0, (LPARAM)wide.Ptr);
+}
 
 //
 // ****************************************************************************
@@ -419,27 +454,31 @@ void CCopyMoveDialog::SetSelectionEnd(int selectionEnd)
 void CCopyMoveDialog::Transfer(CTransferInfo& ti)
 {
     CALL_STACK_MESSAGE1("CCopyMoveDialog::Transfer()");
-    if (History != NULL)
+    HWND hWnd;
+    if (ti.GetControl(hWnd, IDE_PATH))
     {
-        HWND hWnd;
-        if (ti.GetControl(hWnd, IDE_PATH))
+        if (History != NULL)
         {
+            EnsureComboUnicode(hWnd);
             if (ti.Type == ttDataToWindow)
             {
                 LoadComboFromStdHistoryValues(hWnd, History, HistoryCount);
                 SendMessage(hWnd, CB_LIMITTEXT, PathBufSize - 1, 0);
-                SendMessage(hWnd, WM_SETTEXT, 0, (LPARAM)Path);
+                SetWindowTextUtf8(hWnd, Path);
             }
             else
             {
-                SendMessage(hWnd, WM_GETTEXT, PathBufSize, (LPARAM)Path);
+                GetWindowTextUtf8(hWnd, Path, PathBufSize);
                 AddValueToStdHistoryValues(History, HistoryCount, Path, FALSE);
             }
         }
-    }
-    else
-    {
-        ti.EditLine(IDE_PATH, Path, PathBufSize);
+        else
+        {
+            if (ti.Type == ttDataToWindow)
+                SetWindowTextUtf8(hWnd, Path);
+            else
+                GetWindowTextUtf8(hWnd, Path, PathBufSize);
+        }
     }
 }
 
@@ -462,7 +501,7 @@ CCopyMoveDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         SetWindowText(HWindow, Title);
         HWND hSubject = GetDlgItem(HWindow, IDS_SUBJECT);
         if (Subject->TruncateText(hSubject))
-            SetWindowText(hSubject, Subject->Get());
+            SetWindowTextUtf8(hSubject, Subject->Get());
 
         INT_PTR ret = CCommonDialog::DialogProc(uMsg, wParam, lParam);
         // we can select only the name without the dot and extension
@@ -543,7 +582,7 @@ MENU_TEMPLATE_ITEM EditNewFileDialogMenu[] =
             if (cmd == 1)
             {
                 Configuration.UseEditNewFileDefault = TRUE;
-                SendDlgItemMessage(HWindow, IDE_PATH, WM_GETTEXT, MAX_PATH, (LPARAM)Configuration.EditNewFileDefault);
+                GetWindowTextUtf8(GetDlgItem(HWindow, IDE_PATH), Configuration.EditNewFileDefault, MAX_PATH);
             }
             if (cmd == 2)
             {
@@ -599,27 +638,31 @@ CCopyMoveMoreDialog::~CCopyMoveMoreDialog()
 void CCopyMoveMoreDialog::Transfer(CTransferInfo& ti)
 {
     CALL_STACK_MESSAGE1("CCopyMoveMoreDialog::Transfer()");
-    if (History != NULL)
+    HWND hWnd;
+    if (ti.GetControl(hWnd, IDE_PATH))
     {
-        HWND hWnd;
-        if (ti.GetControl(hWnd, IDE_PATH))
+        if (History != NULL)
         {
+            EnsureComboUnicode(hWnd);
             if (ti.Type == ttDataToWindow)
             {
                 LoadComboFromStdHistoryValues(hWnd, History, HistoryCount);
                 SendMessage(hWnd, CB_LIMITTEXT, PathBufSize - 1, 0);
-                SendMessage(hWnd, WM_SETTEXT, 0, (LPARAM)Path);
+                SetWindowTextUtf8(hWnd, Path);
             }
             else
             {
-                SendMessage(hWnd, WM_GETTEXT, PathBufSize, (LPARAM)Path);
+                GetWindowTextUtf8(hWnd, Path, PathBufSize);
                 AddValueToStdHistoryValues(History, HistoryCount, Path, FALSE);
             }
         }
-    }
-    else
-    {
-        ti.EditLine(IDE_PATH, Path, PathBufSize);
+        else
+        {
+            if (ti.Type == ttDataToWindow)
+                SetWindowTextUtf8(hWnd, Path);
+            else
+                GetWindowTextUtf8(hWnd, Path, PathBufSize);
+        }
     }
     TransferCriteriaControls(ti);
 }
@@ -957,7 +1000,7 @@ CCopyMoveMoreDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
             char buff[MAX_PATH];
             lstrcpyn(buff, Subject->Get(), MAX_PATH - 1);
             DuplicateAmpersands(buff, MAX_PATH - 1, TRUE);
-            SetWindowText(hSubject, buff);
+            SetWindowTextUtf8(hSubject, buff);
         }
 
         // now we are at full size => measure the dialog
@@ -1164,15 +1207,16 @@ void CChangeDirDlg::Transfer(CTransferInfo& ti)
     HWND hWnd;
     if (ti.GetControl(hWnd, IDE_PATH))
     {
+        EnsureComboUnicode(hWnd);
         if (ti.Type == ttDataToWindow)
         {
             LoadComboFromStdHistoryValues(hWnd, history, CHANGEDIR_HISTORY_SIZE);
             SendMessage(hWnd, CB_LIMITTEXT, 2 * MAX_PATH - 1, 0);
-            SendMessage(hWnd, WM_SETTEXT, 0, (LPARAM)Path);
+            SetWindowTextUtf8(hWnd, Path);
         }
         else
         {
-            SendMessage(hWnd, WM_GETTEXT, 2 * MAX_PATH, (LPARAM)Path);
+            GetWindowTextUtf8(hWnd, Path, 2 * MAX_PATH);
             AddValueToStdHistoryValues(history, CHANGEDIR_HISTORY_SIZE, Path, FALSE);
         }
     }
@@ -1738,7 +1782,7 @@ CEnterPasswdDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
     {
     case WM_INITDIALOG:
     {
-        SetWindowText(GetDlgItem(HWindow, IDS_NETPATH), Path);
+        SetWindowTextUtf8(GetDlgItem(HWindow, IDS_NETPATH), Path);
         break;
     }
     }
@@ -1809,14 +1853,15 @@ void CPackDialog::Transfer(CTransferInfo& ti)
     {
         // WARNING: code must stay consistent with CPackDialog::DialogProc/WM_COMMAND
         ti.GetControl(combo, IDE_PATH);
-        SendMessage(combo, CB_ADDSTRING, 0, (LPARAM)Path);
+        EnsureComboUnicode(combo);
+        ComboAddStringUtf8(combo, Path);
         // if the alternative path matches the first one, don't add it (target isn't ptDisk)
         if (StrICmp(Path, PathAlt) != 0)
-            SendMessage(combo, CB_ADDSTRING, 0, (LPARAM)PathAlt);
+            ComboAddStringUtf8(combo, PathAlt);
         SendMessage(combo, CB_SETCURSEL, 0, 0);
     }
     else
-        ti.EditLine(IDE_PATH, Path, MAX_PATH);
+        GetWindowTextUtf8(GetDlgItem(HWindow, IDE_PATH), Path, MAX_PATH);
 
     if (ti.Type == ttDataFromWindow) // if the entered name lacks an extension, add it automatically
     {
@@ -1898,7 +1943,7 @@ CPackDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 
         HWND hSubject = GetDlgItem(HWindow, IDS_SUBJECT);
         if (Subject->TruncateText(hSubject))
-            SetWindowText(hSubject, Subject->Get());
+            SetWindowTextUtf8(hSubject, Subject->Get());
 
         INT_PTR ret = CCommonDialog::DialogProc(uMsg, wParam, lParam);
         // we can select only the name without the dot and extension
@@ -1919,25 +1964,26 @@ CPackDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 
                 int curSel = (int)SendDlgItemMessage(HWindow, IDE_PATH, CB_GETCURSEL, 0, 0);
                 if (curSel == CB_ERR) // we must retrieve the text here because CB_RESETCONTENT would wipe it
-                    GetWindowText(GetDlgItem(HWindow, IDE_PATH), name2, MAX_PATH);
+                    GetWindowTextUtf8(GetDlgItem(HWindow, IDE_PATH), name2, MAX_PATH);
 
                 // WARNING: code must stay consistent with CPackDialog::Transfer
                 // swap extensions in the combobox
+                EnsureComboUnicode(GetDlgItem(HWindow, IDE_PATH));
                 SendDlgItemMessage(HWindow, IDE_PATH, CB_RESETCONTENT, 0, 0);
                 strcpy(name, Path);
                 if (ChangeExtension(name, PackerConfig->GetPackerExt(i)))
-                    SendDlgItemMessage(HWindow, IDE_PATH, CB_ADDSTRING, 0, (LPARAM)name);
+                    ComboAddStringUtf8(GetDlgItem(HWindow, IDE_PATH), name);
                 else
-                    SendDlgItemMessage(HWindow, IDE_PATH, CB_ADDSTRING, 0, (LPARAM)Path);
+                    ComboAddStringUtf8(GetDlgItem(HWindow, IDE_PATH), Path);
 
                 // if the alternative path matches the first one, don't add it (target isn't ptDisk)
                 if (StrICmp(Path, PathAlt) != 0)
                 {
                     strcpy(name, PathAlt);
                     if (ChangeExtension(name, PackerConfig->GetPackerExt(i)))
-                        SendDlgItemMessage(HWindow, IDE_PATH, CB_ADDSTRING, 0, (LPARAM)name);
+                        ComboAddStringUtf8(GetDlgItem(HWindow, IDE_PATH), name);
                     else
-                        SendDlgItemMessage(HWindow, IDE_PATH, CB_ADDSTRING, 0, (LPARAM)PathAlt);
+                        ComboAddStringUtf8(GetDlgItem(HWindow, IDE_PATH), PathAlt);
                 }
 
                 if (curSel != CB_ERR)
@@ -1946,7 +1992,7 @@ CPackDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                 {
                     // if the editline was modified, change the extension there as well
                     if (ChangeExtension(name2, PackerConfig->GetPackerExt(i)))
-                        SetWindowText(GetDlgItem(HWindow, IDE_PATH), name2);
+                        SetWindowTextUtf8(GetDlgItem(HWindow, IDE_PATH), name2);
                 }
 
                 BOOL supMove = TRUE;
@@ -2019,16 +2065,17 @@ void CUnpackDialog::Transfer(CTransferInfo& ti)
     if (ti.Type == ttDataToWindow)
     {
         ti.GetControl(combo, IDE_PATH);
-        SendMessage(combo, CB_ADDSTRING, 0, (LPARAM)Path);
+        EnsureComboUnicode(combo);
+        ComboAddStringUtf8(combo, Path);
         // if the alternative path matches the first one, don't add it (target isn't ptDisk)
         if (StrICmp(Path, PathAlt) != 0)
-            SendMessage(combo, CB_ADDSTRING, 0, (LPARAM)PathAlt);
+            ComboAddStringUtf8(combo, PathAlt);
         SendMessage(combo, CB_SETCURSEL, 0, 0);
         ti.CheckBox(IDC_DELETEARCHIVEFILES, *DelArchiveWhenDone);
     }
     else
     {
-        ti.EditLine(IDE_PATH, Path, MAX_PATH);
+        GetWindowTextUtf8(GetDlgItem(HWindow, IDE_PATH), Path, MAX_PATH);
         if (IsWindowEnabled(GetDlgItem(HWindow, IDC_DELETEARCHIVEFILES)))
             ti.CheckBox(IDC_DELETEARCHIVEFILES, *DelArchiveWhenDone);
         else
@@ -2050,7 +2097,7 @@ CUnpackDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 
         HWND hSubject = GetDlgItem(HWindow, IDS_SUBJECT);
         if (Subject->TruncateText(hSubject))
-            SetWindowText(hSubject, Subject->Get());
+            SetWindowTextUtf8(hSubject, Subject->Get());
 
         CHyperLink* hl = new CHyperLink(HWindow, IDC_FILEMASK_HINT, STF_DOTUNDERLINE);
         if (hl != NULL)

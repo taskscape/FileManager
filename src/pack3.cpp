@@ -1250,8 +1250,9 @@ const char* WINAPI PackExpArcDosName(HWND msgParent, void* param)
                 while (1)
                 {
                     sprintf(s, "%X.*", randNum);
-                    WIN32_FIND_DATA findData;
-                    HANDLE find = HANDLES_Q(FindFirstFile(path, &findData));
+                    WIN32_FIND_DATAW findDataW;
+                    CStrP pathW(ConvertAllocUtf8ToWide(path, -1));
+                    HANDLE find = pathW != NULL ? HANDLES_Q(FindFirstFileW(pathW, &findDataW)) : INVALID_HANDLE_VALUE;
                     if (find != INVALID_HANDLE_VALUE)
                         HANDLES(FindClose(find)); // this name already exists with some extension, searching again
                     else
@@ -1278,14 +1279,14 @@ const char* WINAPI PackExpArcDosName(HWND msgParent, void* param)
                     randNum++;
                 }
 
-                HANDLE h = HANDLES_Q(CreateFile(path, GENERIC_WRITE, 0, NULL, CREATE_NEW,
+                HANDLE h = HANDLES_Q(CreateFileUtf8(path, GENERIC_WRITE, 0, NULL, CREATE_NEW,
                                                 FILE_ATTRIBUTE_NORMAL, NULL));
                 if (h != INVALID_HANDLE_VALUE)
                 {
                     HANDLES(CloseHandle(h));
                     strcpy(data->DOSTmpFile, path);
                     BOOL ok = GetShortPathName(data->DOSTmpFile, buff2, MAX_PATH);
-                    DeleteFile(data->DOSTmpFile); // we no longer need the file (let the archiver create it)
+                    DeleteFileUtf8(data->DOSTmpFile); // we no longer need the file (let the archiver create it)
                     if (!ok)
                     {
                         TRACE_E("Error (2) in GetShortPathName() in PackExpArcDosName().");

@@ -648,7 +648,7 @@ void CSalShExtPastedData::DoPasteOperation(BOOL copy, const char* tgtPath)
             BOOL canUseData = FALSE;
             FILETIME archiveDate;  // datum&cas souboru archivu
             CQuadWord archiveSize; // velikost souboru archivu
-            HANDLE file = HANDLES_Q(CreateFile(ArchiveFileName, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE,
+            HANDLE file = HANDLES_Q(CreateFileUtf8(ArchiveFileName, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE,
                                                NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL));
             if (file != INVALID_HANDLE_VALUE)
             {
@@ -685,7 +685,7 @@ void CSalShExtPastedData::DoPasteOperation(BOOL copy, const char* tgtPath)
             DWORD err = NO_ERROR;
             FILETIME archiveDate;  // datum&cas souboru archivu
             CQuadWord archiveSize; // velikost souboru archivu
-            HANDLE file = HANDLES_Q(CreateFile(ArchiveFileName, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE,
+            HANDLE file = HANDLES_Q(CreateFileUtf8(ArchiveFileName, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE,
                                                NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL));
             if (file != INVALID_HANDLE_VALUE)
             {

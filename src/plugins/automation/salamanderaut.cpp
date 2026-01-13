@@ -463,7 +463,7 @@ void CSalamanderAutomation::OnEndExecution()
 
         if (SalamanderGeneral->SalGetTempFileName(NULL, _T("AUT"), szTempFile, TRUE, &dwDosErr))
         {
-            if (CopyFile(fileT, szTempFile, FALSE))
+            if (CopyFileUtf8Local(fileT, szTempFile, FALSE))
             {
                 viewerData.FileName = szTempFile;
             }

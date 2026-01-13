@@ -164,7 +164,7 @@ BOOL CPakIface::OpenPak(const char* fileName, DWORD mode)
 
     while (PakFile == INVALID_HANDLE_VALUE)
     {
-        PakFile = CreateFile(fileName, mode, FILE_SHARE_READ, NULL, OPEN_ALWAYS,
+        PakFile = CreateFileUtf8Local(fileName, mode, FILE_SHARE_READ, NULL, OPEN_ALWAYS,
                              FILE_ATTRIBUTE_NORMAL, NULL);
         if (PakFile != INVALID_HANDLE_VALUE)
             break;

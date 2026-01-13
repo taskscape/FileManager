@@ -778,7 +778,7 @@ BOOL CRawEditValDialog::ExportToTempFile()
     ReplaceUnsafeCharacters(TempFile + tlen);
 
     // create/open the temp file
-    HANDLE file = CreateFile(TempFile, GENERIC_WRITE, FILE_SHARE_READ, NULL,
+    HANDLE file = CreateFileUtf8Local(TempFile, GENERIC_WRITE, FILE_SHARE_READ, NULL,
                              CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
     if (file == INVALID_HANDLE_VALUE)
     {
@@ -806,7 +806,7 @@ BOOL CRawEditValDialog::ImportFromTempFile()
 {
     CALL_STACK_MESSAGE1("CRawEditValDialog::ImportFromTempFile()");
     // create/open the temp file
-    HANDLE file = CreateFile(TempFile, GENERIC_READ, FILE_SHARE_READ, NULL,
+    HANDLE file = CreateFileUtf8Local(TempFile, GENERIC_READ, FILE_SHARE_READ, NULL,
                              OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
     if (file == INVALID_HANDLE_VALUE)
         return Error(IDS_OPENTEMP);

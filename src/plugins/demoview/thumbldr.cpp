@@ -150,7 +150,7 @@ CPluginInterfaceForThumbLoader::LoadThumbnail(const char* filename,
     // we must call thumbMaker->SetError() when error occures and stopFurtherLoaders is TRUE
 
     // open the file
-    HANDLE hFile = HANDLES_Q(CreateFile(filename, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE,
+    HANDLE hFile = HANDLES_Q(CreateFileUtf8Local(filename, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE,
                                         NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL));
     if (hFile != NULL)
     {

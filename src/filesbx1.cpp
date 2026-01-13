@@ -1,4 +1,4 @@
-﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2023 Open Salamander Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 // CommentsTranslationProject: TRANSLATED
 
@@ -13,6 +13,16 @@
 #include "stswnd.h"
 #include "shellib.h"
 #include "snooper.h"
+
+static int DrawTextUtf8(HDC hdc, const char* text, int len, RECT* rect, UINT format)
+{
+    if (text == NULL || len == 0)
+        return DrawTextW(hdc, L"", 0, rect, format);
+    CStrP textW(ConvertAllocUtf8ToWide(text, -1));
+    if (textW == NULL)
+        return DrawTextW(hdc, L"?", 1, rect, format);
+    return DrawTextW(hdc, textW, lstrlenW(textW), rect, format);
+}
 
 const char* CFILESBOX_CLASSNAME = "SalamanderItemsBox";
 
@@ -424,7 +434,7 @@ void CFilesBox::PaintAllItems(HRGN hUpdateRgn, DWORD drawFlags)
         int oldTextColor = SetTextColor(HPrivateDC, newColor);
         HFONT hOldFont = (HFONT)SelectObject(HPrivateDC, Font);
         // if it flickers we can measure the text and use ExtTextOut
-        DrawText(HPrivateDC, textBuf, -1,
+        DrawTextUtf8(HPrivateDC, textBuf, -1,
                  &textR, DT_CENTER | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
         SelectObject(HPrivateDC, hOldFont);
         SetTextColor(HPrivateDC, oldTextColor);
@@ -2584,3 +2594,4 @@ void CFilesBox::PaintHeaderLine()
         HANDLES(ReleaseDC(HeaderLine.HWindow, hDC));
     }
 }
+

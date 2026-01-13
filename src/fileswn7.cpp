@@ -604,7 +604,7 @@ void CFilesWindow::UnpackZIPArchive(CFilesWindow* target, BOOL deleteOp, const c
                                             invalidPath = TRUE;
                                     }
                                 }
-                                if (invalidPath || !CreateDirectory(newDirs, NULL))
+                                if (invalidPath || !CreateDirectoryUtf8(newDirs, NULL))
                                 {
                                     sprintf(textBuf, LoadStr(IDS_CREATEDIRFAILED), newDirs);
                                     SalMessageBox(HWindow, textBuf, LoadStr(IDS_ERRORCOPY), MB_OK | MB_ICONEXCLAMATION);
@@ -831,8 +831,10 @@ BOOL _ReadDirectoryTree(HWND parent, char (&path)[MAX_PATH], char* name, CSalama
     strcpy(end, name);
     strcat(end, "\\*");
 
+    WIN32_FIND_DATAW fileW;
     WIN32_FIND_DATA file;
-    HANDLE find = HANDLES_Q(FindFirstFile(path, &file));
+    CStrP pathW(ConvertAllocUtf8ToWide(path, -1));
+    HANDLE find = pathW != NULL ? HANDLES_Q(FindFirstFileW(pathW, &fileW)) : INVALID_HANDLE_VALUE;
     *end = 0; // restore the path
     if (find == INVALID_HANDLE_VALUE)
     {
@@ -880,6 +882,7 @@ BOOL _ReadDirectoryTree(HWND parent, char (&path)[MAX_PATH], char* name, CSalama
 
         do
         {
+            ConvertFindDataWToUtf8(fileW, &file);
             if (file.cFileName[0] == 0 ||
                 file.cFileName[0] == '.' &&
                     (file.cFileName[1] == 0 || (file.cFileName[1] == '.' && file.cFileName[2] == 0)))
@@ -1024,7 +1027,7 @@ BOOL _ReadDirectoryTree(HWND parent, char (&path)[MAX_PATH], char* name, CSalama
                     }
                 }
             }
-        } while (FindNextFile(find, &file));
+        } while (FindNextFileW(find, &fileW));
         DWORD err = GetLastError();
         HANDLES(FindClose(find));
         *end = 0; // restore the path
@@ -1597,7 +1600,7 @@ _PACK_AGAIN:
                 if (msgBoxRed == IDNO) // OVERWRITE
                 {
                     ClearReadOnlyAttr(fileBuf); // so it can be deleted...
-                    if (!DeleteFile(fileBuf))
+                    if (!DeleteFileUtf8(fileBuf))
                     {
                         DWORD err;
                         err = GetLastError();
@@ -1816,7 +1819,7 @@ void CFilesWindow::Unpack(CFilesWindow* target, int pluginIndex, const char* plu
                                     while (1)
                                     {
                                         ClearReadOnlyAttr(name); // allow deletion of read-only files too
-                                        if (!DeleteFile(name) && !skipAll)
+                                        if (!DeleteFileUtf8(name) && !skipAll)
                                         {
                                             DWORD err = GetLastError();
                                             if (err == ERROR_FILE_NOT_FOUND)

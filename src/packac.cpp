@@ -410,7 +410,7 @@ BOOL CPackACDialog::MyGetBinaryType(LPCSTR filename, LPDWORD lpBinaryType)
 
     BOOL ret = FALSE;
     // open the file for reading
-    HANDLE hfile = HANDLES_Q(CreateFile(filename, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, 0, NULL));
+    HANDLE hfile = HANDLES_Q(CreateFileUtf8(filename, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, 0, NULL));
     if (hfile != INVALID_HANDLE_VALUE)
     {
         IMAGE_DOS_HEADER mz_header;
@@ -597,13 +597,16 @@ BOOL CPackACDialog::DirectorySearch(char* path)
 
     // set up some variables
     BOOL mustStop = FALSE;
+    WIN32_FIND_DATAW findDataW;
     WIN32_FIND_DATA findData;
     // try to find the first file
-    HANDLE fileFind = HANDLES_Q(FindFirstFile(fileName, &findData));
+    CStrP fileNameW(ConvertAllocUtf8ToWide(fileName, -1));
+    HANDLE fileFind = fileNameW != NULL ? HANDLES_Q(FindFirstFileW(fileNameW, &findDataW)) : INVALID_HANDLE_VALUE;
     if (fileFind != INVALID_HANDLE_VALUE)
     {
         do
         {
+            ConvertFindDataWToUtf8(findDataW, &findData);
             unsigned int nameLen = (unsigned int)strlen(findData.cFileName);
             if ((findData.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) == 0)
             {
@@ -665,7 +668,7 @@ BOOL CPackACDialog::DirectorySearch(char* path)
             DWORD ret = WaitForSingleObject(StopSearch, 0);
             if (ret != WAIT_TIMEOUT)
                 mustStop = TRUE;
-        } while (FindNextFile(fileFind, &findData) && !mustStop);
+        } while (FindNextFileW(fileFind, &findDataW) && !mustStop);
         HANDLES(FindClose(fileFind));
     }
     HANDLES(GlobalFree((HGLOBAL)fileName));

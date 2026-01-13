@@ -207,7 +207,7 @@ CTipOfTheDayDialog::LoadTips(BOOL quiet)
   GetModuleFileName(HInstance, fileName, MAX_PATH);
   CutDirectory(fileName);
   SalPathAppend(fileName, "help\\tips.txt", MAX_PATH);
-  HANDLE hFile = HANDLES_Q(CreateFile(fileName, GENERIC_READ, FILE_SHARE_READ |
+  HANDLE hFile = HANDLES_Q(CreateFileUtf8(fileName, GENERIC_READ, FILE_SHARE_READ |
                                       FILE_SHARE_WRITE, NULL,
                                       OPEN_EXISTING, FILE_FLAG_SEQUENTIAL_SCAN, NULL));
   if (hFile == INVALID_HANDLE_VALUE)
@@ -2449,9 +2449,10 @@ CDriveSelectErrDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
             lstrcpyn(fileName, DrvPath, MAX_PATH + 10);
             if (SalPathAppend(fileName, "*", MAX_PATH + 10))
             {
-                WIN32_FIND_DATA fileData;
+                WIN32_FIND_DATAW fileDataW;
                 HANDLE search;
-                search = HANDLES_Q(FindFirstFile(fileName, &fileData));
+                CStrP fileNameW(ConvertAllocUtf8ToWide(fileName, -1));
+                search = fileNameW != NULL ? HANDLES_Q(FindFirstFileW(fileNameW, &fileDataW)) : INVALID_HANDLE_VALUE;
                 if (search == INVALID_HANDLE_VALUE)
                 {
                     DWORD err = GetLastError();

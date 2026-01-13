@@ -289,9 +289,9 @@ BOOL CompareFilesByContent(HWND hWindow, CCmpDirProgressDialog* progressDlg,
 
     //  DWORD totalTi = GetTickCount();
 
-    HANDLE hFile1 = HANDLES_Q(CreateFile(file1, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE,
+    HANDLE hFile1 = HANDLES_Q(CreateFileUtf8(file1, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE,
                                          NULL, OPEN_EXISTING, FILE_FLAG_SEQUENTIAL_SCAN, NULL));
-    HANDLE hFile2 = hFile1 != INVALID_HANDLE_VALUE ? HANDLES_Q(CreateFile(file2, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE,
+    HANDLE hFile2 = hFile1 != INVALID_HANDLE_VALUE ? HANDLES_Q(CreateFileUtf8(file2, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE,
                                                                           NULL, OPEN_EXISTING, FILE_FLAG_SEQUENTIAL_SCAN, NULL))
                                                    : INVALID_HANDLE_VALUE;
     DWORD err = GetLastError();
@@ -567,9 +567,11 @@ BOOL ReadDirsAndFilesAux(HWND hWindow, DWORD flags, CCmpDirProgressDialog* progr
         }
 
         DWORD counter = 0;
+        WIN32_FIND_DATAW dataW;
         WIN32_FIND_DATA data;
         HANDLE hFind;
-        hFind = HANDLES_Q(FindFirstFile(path, &data));
+        CStrP pathW(ConvertAllocUtf8ToWide(path, -1));
+        hFind = pathW != NULL ? HANDLES_Q(FindFirstFileW(pathW, &dataW)) : INVALID_HANDLE_VALUE;
         if (hFind == INVALID_HANDLE_VALUE)
         {
             DWORD err = GetLastError();
@@ -590,6 +592,7 @@ BOOL ReadDirsAndFilesAux(HWND hWindow, DWORD flags, CCmpDirProgressDialog* progr
         }
         do
         {
+            ConvertFindDataWToUtf8(dataW, &data);
             if (data.cFileName[0] != 0 &&
                 (data.cFileName[0] != '.' ||
                  (data.cFileName[1] != 0 && (data.cFileName[1] != '.' || data.cFileName[2] != 0))))
@@ -693,7 +696,7 @@ BOOL ReadDirsAndFilesAux(HWND hWindow, DWORD flags, CCmpDirProgressDialog* progr
                         free(file.Name);
                 }
             }
-        } while (FindNextFile(hFind, &data));
+        } while (FindNextFileW(hFind, &dataW));
         DWORD err = GetLastError();
         if (err != ERROR_NO_MORE_FILES)
         {

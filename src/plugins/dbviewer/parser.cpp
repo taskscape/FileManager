@@ -257,7 +257,7 @@ BOOL CParserInterfaceDBF::GetFileInfo(HWND hEdit)
     SendMessage(hEdit, EM_REPLACESEL, FALSE, (LPARAM)buff);
 
     // obtain file information (size, date & time)
-    HANDLE file = CreateFile(FileName, GENERIC_READ,
+    HANDLE file = CreateFileUtf8Local(FileName, GENERIC_READ,
                              FILE_SHARE_READ | FILE_SHARE_WRITE,
                              NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
     if (file != INVALID_HANDLE_VALUE)
@@ -967,7 +967,7 @@ BOOL CParserInterfaceCSV::GetFileInfo(HWND hEdit)
     SendMessage(hEdit, EM_REPLACESEL, FALSE, (LPARAM)buff);
 
     // obtain file information (size, date & time)
-    HANDLE file = CreateFile(FileName, GENERIC_READ,
+    HANDLE file = CreateFileUtf8Local(FileName, GENERIC_READ,
                              FILE_SHARE_READ | FILE_SHARE_WRITE,
                              NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
     if (file != INVALID_HANDLE_VALUE)

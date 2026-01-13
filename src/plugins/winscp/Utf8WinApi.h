@@ -1,42 +1,14 @@
-﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2023 Open Salamander Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #pragma once
 
-#define WIN32_LEAN_AND_MEAN // exclude rarely-used stuff from Windows headers
+#ifdef _WIN32
 
 #include <windows.h>
-#include <CommDlg.h>
-#include <crtdbg.h>
-#include <ostream>
-#include <olectl.h>
-#include <commctrl.h>
-#include <limits.h>
-#include <stdio.h>
-#include <exdisp.h>
-#include <process.h>
-#include <objbase.h>
-#include <exdispid.h> // IExplorer Dispatch Events
-
-#if defined(_DEBUG) && defined(_MSC_VER) // without passing file+line to 'new' operator, list of memory leaks shows only 'crtdbg.h(552)'
-#define new new (_NORMAL_BLOCK, __FILE__, __LINE__)
-#endif
-
-#include "versinfo.rh2"
-
-#include "spl_com.h"
-#include "spl_base.h"
-#include "spl_gen.h"
-#include "spl_view.h"
-#include "spl_vers.h"
-
-#include "auxtools.h"
 #include <stdlib.h>
 
-#ifndef SALAMANDER_UTF8_WINAPI
-#define SALAMANDER_UTF8_WINAPI
-
-static WCHAR* Utf8AllocWide(const char* src)
+static WCHAR* WinScpUtf8AllocWide(const char* src)
 {
     if (src == NULL)
         return NULL;
@@ -54,7 +26,7 @@ static WCHAR* Utf8AllocWide(const char* src)
     return buf;
 }
 
-static BOOL WideToUtf8Buffer(const WCHAR* src, char* dst, int dstSize)
+static BOOL WinScpWideToUtf8Buffer(const WCHAR* src, char* dst, int dstSize)
 {
     if (dst == NULL || dstSize <= 0)
         return FALSE;
@@ -69,7 +41,7 @@ static BOOL WideToUtf8Buffer(const WCHAR* src, char* dst, int dstSize)
     return len != 0;
 }
 
-static BOOL ConvertFindDataWToUtf8Local(const WIN32_FIND_DATAW* src, WIN32_FIND_DATAA* dst)
+static BOOL WinScpConvertFindDataWToUtf8Local(const WIN32_FIND_DATAW* src, WIN32_FIND_DATAA* dst)
 {
     if (dst == NULL || src == NULL)
         return FALSE;
@@ -82,17 +54,17 @@ static BOOL ConvertFindDataWToUtf8Local(const WIN32_FIND_DATAW* src, WIN32_FIND_
     dst->nFileSizeLow = src->nFileSizeLow;
     dst->dwReserved0 = src->dwReserved0;
     dst->dwReserved1 = src->dwReserved1;
-    WideToUtf8Buffer(src->cFileName, dst->cFileName, (int)sizeof(dst->cFileName));
-    WideToUtf8Buffer(src->cAlternateFileName, dst->cAlternateFileName, (int)sizeof(dst->cAlternateFileName));
+    WinScpWideToUtf8Buffer(src->cFileName, dst->cFileName, (int)sizeof(dst->cFileName));
+    WinScpWideToUtf8Buffer(src->cAlternateFileName, dst->cAlternateFileName, (int)sizeof(dst->cAlternateFileName));
     return TRUE;
 }
 
-static HANDLE CreateFileUtf8Local(const char* fileName, DWORD desiredAccess, DWORD shareMode,
-                                 LPSECURITY_ATTRIBUTES securityAttributes, DWORD creationDisposition,
-                                 DWORD flagsAndAttributes, HANDLE templateFile)
+static HANDLE WinScpCreateFileUtf8(const char* fileName, DWORD desiredAccess, DWORD shareMode,
+                                   LPSECURITY_ATTRIBUTES securityAttributes, DWORD creationDisposition,
+                                   DWORD flagsAndAttributes, HANDLE templateFile)
 {
     HANDLE h = INVALID_HANDLE_VALUE;
-    WCHAR* fileNameW = Utf8AllocWide(fileName);
+    WCHAR* fileNameW = WinScpUtf8AllocWide(fileName);
     if (fileNameW == NULL)
     {
         SetLastError(ERROR_INVALID_PARAMETER);
@@ -104,10 +76,10 @@ static HANDLE CreateFileUtf8Local(const char* fileName, DWORD desiredAccess, DWO
     return h;
 }
 
-static BOOL DeleteFileUtf8Local(const char* fileName)
+static BOOL WinScpDeleteFileUtf8(const char* fileName)
 {
     BOOL ok = FALSE;
-    WCHAR* fileNameW = Utf8AllocWide(fileName);
+    WCHAR* fileNameW = WinScpUtf8AllocWide(fileName);
     if (fileNameW == NULL)
     {
         SetLastError(ERROR_INVALID_PARAMETER);
@@ -118,11 +90,11 @@ static BOOL DeleteFileUtf8Local(const char* fileName)
     return ok;
 }
 
-static BOOL MoveFileUtf8Local(const char* srcName, const char* destName)
+static BOOL WinScpMoveFileUtf8(const char* srcName, const char* destName)
 {
     BOOL ok = FALSE;
-    WCHAR* srcNameW = Utf8AllocWide(srcName);
-    WCHAR* destNameW = Utf8AllocWide(destName);
+    WCHAR* srcNameW = WinScpUtf8AllocWide(srcName);
+    WCHAR* destNameW = WinScpUtf8AllocWide(destName);
     if (srcNameW == NULL || destNameW == NULL)
     {
         free(srcNameW);
@@ -136,11 +108,11 @@ static BOOL MoveFileUtf8Local(const char* srcName, const char* destName)
     return ok;
 }
 
-static BOOL CopyFileUtf8Local(const char* existingFileName, const char* newFileName, BOOL failIfExists)
+static BOOL WinScpCopyFileUtf8(const char* existingFileName, const char* newFileName, BOOL failIfExists)
 {
     BOOL ok = FALSE;
-    WCHAR* existingW = Utf8AllocWide(existingFileName);
-    WCHAR* newW = Utf8AllocWide(newFileName);
+    WCHAR* existingW = WinScpUtf8AllocWide(existingFileName);
+    WCHAR* newW = WinScpUtf8AllocWide(newFileName);
     if (existingW == NULL || newW == NULL)
     {
         free(existingW);
@@ -154,10 +126,10 @@ static BOOL CopyFileUtf8Local(const char* existingFileName, const char* newFileN
     return ok;
 }
 
-static DWORD GetFileAttributesUtf8Local(const char* fileName)
+static DWORD WinScpGetFileAttributesUtf8(const char* fileName)
 {
     DWORD attrs = INVALID_FILE_ATTRIBUTES;
-    WCHAR* fileNameW = Utf8AllocWide(fileName);
+    WCHAR* fileNameW = WinScpUtf8AllocWide(fileName);
     if (fileNameW == NULL)
     {
         SetLastError(ERROR_INVALID_PARAMETER);
@@ -168,10 +140,10 @@ static DWORD GetFileAttributesUtf8Local(const char* fileName)
     return attrs;
 }
 
-static BOOL SetFileAttributesUtf8Local(const char* fileName, DWORD attrs)
+static BOOL WinScpSetFileAttributesUtf8(const char* fileName, DWORD attrs)
 {
     BOOL ok = FALSE;
-    WCHAR* fileNameW = Utf8AllocWide(fileName);
+    WCHAR* fileNameW = WinScpUtf8AllocWide(fileName);
     if (fileNameW == NULL)
     {
         SetLastError(ERROR_INVALID_PARAMETER);
@@ -182,10 +154,10 @@ static BOOL SetFileAttributesUtf8Local(const char* fileName, DWORD attrs)
     return ok;
 }
 
-static BOOL CreateDirectoryUtf8Local(const char* dirName, LPSECURITY_ATTRIBUTES securityAttributes)
+static BOOL WinScpCreateDirectoryUtf8(const char* dirName, LPSECURITY_ATTRIBUTES securityAttributes)
 {
     BOOL ok = FALSE;
-    WCHAR* dirNameW = Utf8AllocWide(dirName);
+    WCHAR* dirNameW = WinScpUtf8AllocWide(dirName);
     if (dirNameW == NULL)
     {
         SetLastError(ERROR_INVALID_PARAMETER);
@@ -196,10 +168,10 @@ static BOOL CreateDirectoryUtf8Local(const char* dirName, LPSECURITY_ATTRIBUTES 
     return ok;
 }
 
-static BOOL RemoveDirectoryUtf8Local(const char* dirName)
+static BOOL WinScpRemoveDirectoryUtf8(const char* dirName)
 {
     BOOL ok = FALSE;
-    WCHAR* dirNameW = Utf8AllocWide(dirName);
+    WCHAR* dirNameW = WinScpUtf8AllocWide(dirName);
     if (dirNameW == NULL)
     {
         SetLastError(ERROR_INVALID_PARAMETER);
@@ -210,10 +182,10 @@ static BOOL RemoveDirectoryUtf8Local(const char* dirName)
     return ok;
 }
 
-static HANDLE FindFirstFileUtf8Local(const char* fileName, WIN32_FIND_DATAA* findFileData)
+static HANDLE WinScpFindFirstFileUtf8(const char* fileName, WIN32_FIND_DATAA* findFileData)
 {
     HANDLE h = INVALID_HANDLE_VALUE;
-    WCHAR* fileNameW = Utf8AllocWide(fileName);
+    WCHAR* fileNameW = WinScpUtf8AllocWide(fileName);
     if (fileNameW == NULL)
     {
         SetLastError(ERROR_INVALID_PARAMETER);
@@ -225,19 +197,18 @@ static HANDLE FindFirstFileUtf8Local(const char* fileName, WIN32_FIND_DATAA* fin
     if (h == INVALID_HANDLE_VALUE)
         return h;
     if (findFileData != NULL)
-        ConvertFindDataWToUtf8Local(&dataW, findFileData);
+        WinScpConvertFindDataWToUtf8Local(&dataW, findFileData);
     return h;
 }
 
-static BOOL FindNextFileUtf8Local(HANDLE hFindFile, WIN32_FIND_DATAA* findFileData)
+static BOOL WinScpFindNextFileUtf8(HANDLE hFindFile, WIN32_FIND_DATAA* findFileData)
 {
     WIN32_FIND_DATAW dataW;
     if (!FindNextFileW(hFindFile, &dataW))
         return FALSE;
     if (findFileData != NULL)
-        ConvertFindDataWToUtf8Local(&dataW, findFileData);
+        WinScpConvertFindDataWToUtf8Local(&dataW, findFileData);
     return TRUE;
 }
 
-
-#endif // SALAMANDER_UTF8_WINAPI
+#endif // _WIN32

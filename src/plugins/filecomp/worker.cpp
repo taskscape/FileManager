@@ -220,7 +220,7 @@ void CFilecompWorker::GuardedBody()
         // NOTE: IntViewer can open such files, users wants FC to support them as well
         // See https://forum.altap.cz/viewtopic.php?t=2675
         // See also CHexFileViewWindow::SetData()
-        Files[i].File = CreateFile(Files[i].Name, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE,
+        Files[i].File = CreateFileUtf8Local(Files[i].Name, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE,
                                    NULL, OPEN_EXISTING, FILE_FLAG_SEQUENTIAL_SCAN, NULL);
         if (Files[i].File == INVALID_HANDLE_VALUE)
             CException::Raise(IDS_OPEN, GetLastError(), Files[i].Name);

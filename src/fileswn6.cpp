@@ -322,8 +322,10 @@ BOOL CFilesWindow::MoveFiles(const char* source, const char* target, const char*
         sourceDir[len++] = '\\';
         strcpy(sourceDir + len, "*");
 
+        WIN32_FIND_DATAW fileW;
         WIN32_FIND_DATA file;
-        HANDLE find = HANDLES_Q(FindFirstFile(sourceDir, &file));
+        CStrP sourceDirW(ConvertAllocUtf8ToWide(sourceDir, -1));
+        HANDLE find = sourceDirW != NULL ? HANDLES_Q(FindFirstFileW(sourceDirW, &fileW)) : INVALID_HANDLE_VALUE;
         if (find == INVALID_HANDLE_VALUE)
         {
             FreeScript(script);
@@ -364,6 +366,7 @@ BOOL CFilesWindow::MoveFiles(const char* source, const char* target, const char*
             BOOL scriptOK = TRUE; // result of script creation, success?
             do
             {
+                ConvertFindDataWToUtf8(fileW, &file);
                 if (file.cFileName[0] != 0 &&
                     (file.cFileName[0] != '.' ||
                      (file.cFileName[1] != 0 && (file.cFileName[1] != '.' || file.cFileName[2] != 0))))
@@ -394,7 +397,7 @@ BOOL CFilesWindow::MoveFiles(const char* source, const char* target, const char*
                         }
                     }
                 }
-            } while (FindNextFile(find, &file));
+            } while (FindNextFileW(find, &fileW));
             HANDLES(FindClose(find));
             int i;
             for (i = 0; i < script->Count; i++)
@@ -923,7 +926,7 @@ BOOL CFilesWindow::BuildScriptMain2(COperations* script, BOOL copy, char* target
                 }
                 else
                 {
-                    HANDLE h = HANDLES_Q(CreateFile(fileName, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE,
+                    HANDLE h = HANDLES_Q(CreateFileUtf8(fileName, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE,
                                                     NULL, OPEN_EXISTING,
                                                     FILE_ATTRIBUTE_NORMAL, NULL));
                     DWORD err = NO_ERROR;
@@ -1457,10 +1460,14 @@ void GetADSStreamsNames(char* listBuf, int bufSize, char* fileName, BOOL isDir)
             while (*end != 0 && *end != L':')
                 end++;
             int wr = 0;
-            if ((wr = WideCharToMultiByte(CP_ACP, 0, str, (int)(end - str), s, size, NULL, NULL)) == 0)
+            if ((wr = ConvertWideToUtf8(str, (int)(end - str), s, size)) == 0)
             {
                 *s++ = '?';
                 *s = 0;
+            }
+            else
+            {
+                wr--; // ConvertWideToUtf8 returns length including null terminator for srcLen != -1
             }
             size -= wr;
             char* e = s + wr;
@@ -1871,8 +1878,9 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
                             lstrcpyn(finalName, sourcePath, 2 * MAX_PATH + 200);
                             if (SalPathAppend(finalName, "*", 2 * MAX_PATH + 200))
                             {
-                                WIN32_FIND_DATA f;
-                                HANDLE search = HANDLES_Q(FindFirstFile(finalName, &f));
+                                WIN32_FIND_DATAW fW;
+                                CStrP finalNameW(ConvertAllocUtf8ToWide(finalName, -1));
+                                HANDLE search = finalNameW != NULL ? HANDLES_Q(FindFirstFileW(finalNameW, &fW)) : INVALID_HANDLE_VALUE;
                                 if (search == INVALID_HANDLE_VALUE)
                                 {
                                     DWORD err = GetLastError();
@@ -2072,9 +2080,11 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
     BOOL canDelDirAfterMove = TRUE; // Move only: FALSE if not everything is moved (filter skipped something), source directory can't be removed (won't be empty)
     if (!copyMoveDirIsLink || !copyMoveSkipLinkContent)
     {
+        WIN32_FIND_DATAW fW;
         WIN32_FIND_DATA f;
         strcpy(st, "\\*");
-        HANDLE search = HANDLES_Q(FindFirstFile(sourcePath, &f));
+        CStrP sourcePathW(ConvertAllocUtf8ToWide(sourcePath, -1));
+        HANDLE search = sourcePathW != NULL ? HANDLES_Q(FindFirstFileW(sourcePathW, &fW)) : INVALID_HANDLE_VALUE;
         *st = 0; // remove "\\*"
         if (search == INVALID_HANDLE_VALUE)
         {
@@ -2086,7 +2096,8 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
                     SalPathAppend(finalName, dirDOSName, 2 * MAX_PATH + 200) &&
                     SalPathAppend(finalName, "*", 2 * MAX_PATH + 200))
                 {
-                    search = HANDLES_Q(FindFirstFile(finalName, &f));
+                    CStrP finalNameW(ConvertAllocUtf8ToWide(finalName, -1));
+                    search = finalNameW != NULL ? HANDLES_Q(FindFirstFileW(finalNameW, &fW)) : INVALID_HANDLE_VALUE;
                     if (search != INVALID_HANDLE_VALUE)
                     {
                         strcpy(*sourceEnd == '\\' ? sourceEnd + 1 : sourceEnd, dirDOSName); // modify sourcePath (it's used further for handling found files and directories)
@@ -2151,6 +2162,7 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
             BOOL testFindNextErr = TRUE;
             do
             {
+                ConvertFindDataWToUtf8(fW, &f);
                 if (f.cFileName[0] == '.' &&
                         (f.cFileName[1] == 0 || (f.cFileName[1] == '.' && f.cFileName[2] == 0)) ||
                     f.cFileName[0] == 0)
@@ -2227,7 +2239,7 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
                     else
                         canDelDirAfterMove = FALSE; // not everything is being moved (filter skipped something); the source directory cannot be deleted (it would not be empty)
                 }
-            } while (FindNextFile(search, &f));
+            } while (FindNextFileW(search, &fW));
             DWORD err = GetLastError();
             HANDLES(FindClose(search));
 
@@ -2606,11 +2618,14 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
                 if (!invalidTgtName)
                 {
                     HANDLE find;
+                    WIN32_FIND_DATAW dataOutW;
                     WIN32_FIND_DATA dataOut;
-                    find = HANDLES_Q(FindFirstFile(op.TargetName, &dataOut));
+                    CStrP targetNameW(ConvertAllocUtf8ToWide(op.TargetName, -1));
+                    find = targetNameW != NULL ? HANDLES_Q(FindFirstFileW(targetNameW, &dataOutW)) : INVALID_HANDLE_VALUE;
                     if (find != INVALID_HANDLE_VALUE)
                     {
                         HANDLES(FindClose(find));
+                        ConvertFindDataWToUtf8(dataOutW, &dataOut);
 
                         const char* tgtName = SalPathFindFileName(op.TargetName);
                         if (StrICmp(tgtName, dataOut.cFileName) == 0 &&                 // if it's not just a DOS-name match (that would change the DOS-name instead of overwriting)
@@ -2742,7 +2757,7 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
                         HANDLE in;
                         if (!invalidSrcName)
                         {
-                            in = HANDLES_Q(CreateFile(op.SourceName, GENERIC_READ,
+                            in = HANDLES_Q(CreateFileUtf8(op.SourceName, GENERIC_READ,
                                                       FILE_SHARE_READ | FILE_SHARE_WRITE, NULL,
                                                       OPEN_EXISTING, FILE_FLAG_SEQUENTIAL_SCAN, NULL));
                         }
@@ -3171,10 +3186,13 @@ void CFilesWindow::ExecuteFromArchive(int index, BOOL edit, HWND editWithMenuPar
             SetCursor(oldCur);
             SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_ABOVE_NORMAL);
 
-            HANDLE find = HANDLES_Q(FindFirstFile(name, &data));
+            WIN32_FIND_DATAW dataW;
+            CStrP nameW(ConvertAllocUtf8ToWide(name, -1));
+            HANDLE find = nameW != NULL ? HANDLES_Q(FindFirstFileW(nameW, &dataW)) : INVALID_HANDLE_VALUE;
             if (find != INVALID_HANDLE_VALUE)
             {
                 HANDLES(FindClose(find));
+                ConvertFindDataWToUtf8(dataW, &data);
                 fileSize = CQuadWord(data.nFileSizeLow, data.nFileSizeHigh);
                 lastWrite = data.ftLastWriteTime;
                 attr = data.dwFileAttributes;
@@ -3228,10 +3246,13 @@ void CFilesWindow::ExecuteFromArchive(int index, BOOL edit, HWND editWithMenuPar
 
     if (fileSize == CQuadWord(-1, -1))
     {
-        HANDLE find = HANDLES_Q(FindFirstFile(name, &data));
+        WIN32_FIND_DATAW dataW;
+        CStrP nameW(ConvertAllocUtf8ToWide(name, -1));
+        HANDLE find = nameW != NULL ? HANDLES_Q(FindFirstFileW(nameW, &dataW)) : INVALID_HANDLE_VALUE;
         if (find != INVALID_HANDLE_VALUE)
         {
             HANDLES(FindClose(find));
+            ConvertFindDataWToUtf8(dataW, &data);
             fileSize = CQuadWord(data.nFileSizeLow, data.nFileSizeHigh);
             lastWrite = data.ftLastWriteTime;
             attr = data.dwFileAttributes;

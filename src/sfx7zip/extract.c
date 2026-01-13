@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include <windows.h>
+#include <stdlib.h>
 
 #include "sfx7zip.h"
 
@@ -12,6 +13,29 @@
 #include "7zip\archive\7zHeader.h"
 
 #define INF_BUFFER_SIZE 5000
+
+static WCHAR* AllocWideFromUtf8(const char* src)
+{
+    if (src == NULL)
+        return NULL;
+    int len = MultiByteToWideChar(CP_UTF8, 0, src, -1, NULL, 0);
+    if (len == 0)
+        len = MultiByteToWideChar(CP_ACP, 0, src, -1, NULL, 0);
+    if (len == 0)
+        return NULL;
+    WCHAR* buf = (WCHAR*)HeapAlloc(GetProcessHeap(), 0, sizeof(WCHAR) * len);
+    if (buf == NULL)
+        return NULL;
+    if (MultiByteToWideChar(CP_UTF8, 0, src, -1, buf, len) == 0)
+    {
+        if (MultiByteToWideChar(CP_ACP, 0, src, -1, buf, len) == 0)
+        {
+            HeapFree(GetProcessHeap(), 0, buf);
+            return NULL;
+        }
+    }
+    return buf;
+}
 
 int HandleError(int titleID, int messageID, unsigned long err, const char* fileName)
 {
@@ -69,14 +93,27 @@ int InitExtraction(const char* name, struct SCabinet* cabinet)
     unsigned long sectionOffset, sectionSize, direntries;
     int sections;
     DWORD read;
+    WCHAR* nameW = AllocWideFromUtf8(name);
+#define RETURN_ERROR(code)           \
+    do                              \
+    {                               \
+        if (nameW != NULL)          \
+            HeapFree(GetProcessHeap(), 0, nameW);            \
+        return (code);              \
+    } while (0)
 
     //
     // open the archive file (exe) and map it into memory
     //
-    cabinet->file = CreateFile(name, GENERIC_READ, FILE_SHARE_READ, NULL,
-                               OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+    cabinet->file = nameW != NULL ? CreateFileW(nameW, GENERIC_READ, FILE_SHARE_READ, NULL,
+                                                OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL)
+                                  : INVALID_HANDLE_VALUE;
     if (cabinet->file == INVALID_HANDLE_VALUE)
-        return HandleError(ERROR_TITLE, ERROR_INFOPEN, GetLastError(), name);
+    {
+        int ret = nameW != NULL ? HandleErrorW(ERROR_TITLE, ERROR_INFOPEN, GetLastError(), nameW)
+                                : HandleError(ERROR_TITLE, ERROR_INFOPEN, GetLastError(), name);
+        RETURN_ERROR(ret);
+    }
     //
     // we have the file, now analyze the exe header
     //
@@ -85,29 +122,29 @@ int InitExtraction(const char* name, struct SCabinet* cabinet)
     if (!ReadFile(cabinet->file, data, sizeof(IMAGE_DOS_HEADER), &read, NULL) ||
         read != sizeof(IMAGE_DOS_HEADER))
         if (read != sizeof(IMAGE_DOS_HEADER))
-            return HandleError(ERROR_TITLE, ARC_INEOF, 0, name);
+            RETURN_ERROR(HandleErrorW(ERROR_TITLE, ARC_INEOF, 0, nameW));
         else
-            return HandleError(ERROR_TITLE, ERROR_INFREAD, GetLastError(), name);
+            RETURN_ERROR(HandleErrorW(ERROR_TITLE, ERROR_INFREAD, GetLastError(), nameW));
     if (((IMAGE_DOS_HEADER*)data)->e_magic != ('M' + ('Z' << 8)))
-        return HandleError(ERROR_TITLE, ARC_NOEXESIG, 0, name);
+        RETURN_ERROR(HandleErrorW(ERROR_TITLE, ARC_NOEXESIG, 0, nameW));
     if (SetFilePointer(cabinet->file, ((IMAGE_DOS_HEADER*)data)->e_lfanew, NULL, FILE_BEGIN) == 0xFFFFFFFF)
-        return HandleError(ERROR_TITLE, ERROR_INFSEEK, GetLastError(), name);
+        RETURN_ERROR(HandleErrorW(ERROR_TITLE, ERROR_INFSEEK, GetLastError(), nameW));
     // read the headers
     if (!ReadFile(cabinet->file, data, sizeof(unsigned long) + sizeof(IMAGE_FILE_HEADER) + 24 * 4, &read, NULL) ||
         read != sizeof(unsigned long) + sizeof(IMAGE_FILE_HEADER) + 24 * 4)
         if (read != sizeof(unsigned long) + sizeof(IMAGE_FILE_HEADER) + 24 * 4)
-            return HandleError(ERROR_TITLE, ARC_INEOF, 0, name);
+            RETURN_ERROR(HandleErrorW(ERROR_TITLE, ARC_INEOF, 0, nameW));
         else
-            return HandleError(ERROR_TITLE, ERROR_INFREAD, GetLastError(), name);
+            RETURN_ERROR(HandleErrorW(ERROR_TITLE, ERROR_INFREAD, GetLastError(), nameW));
     if (*(unsigned long*)data != ('P' + ('E' << 8) + ('\0' << 16) + ('\0' << 24)))
-        return HandleError(ERROR_TITLE, ARC_NOPESIG, 0, name);
+        RETURN_ERROR(HandleErrorW(ERROR_TITLE, ARC_NOPESIG, 0, nameW));
     // number of sections
     sections = ((IMAGE_FILE_HEADER*)(data + sizeof(unsigned long)))->NumberOfSections;
     // number of directory entries
     direntries = ((IMAGE_OPTIONAL_HEADER*)(data + sizeof(unsigned long) + sizeof(IMAGE_FILE_HEADER)))->NumberOfRvaAndSizes;
     // skip the directory entries
     if (SetFilePointer(cabinet->file, direntries * sizeof(IMAGE_DATA_DIRECTORY), NULL, FILE_CURRENT) == 0xFFFFFFFF)
-        return HandleError(ERROR_TITLE, ERROR_INFSEEK, GetLastError(), name);
+        RETURN_ERROR(HandleErrorW(ERROR_TITLE, ERROR_INFSEEK, GetLastError(), nameW));
     sectionOffset = 0;
     sectionSize = 0;
     // read the headers of all sections
@@ -115,9 +152,9 @@ int InitExtraction(const char* name, struct SCabinet* cabinet)
     {
         if (!ReadFile(cabinet->file, data, sizeof(IMAGE_SECTION_HEADER), &read, NULL) || read != sizeof(IMAGE_SECTION_HEADER))
             if (read != sizeof(IMAGE_SECTION_HEADER))
-                return HandleError(ERROR_TITLE, ARC_INEOF, 0, name);
+                RETURN_ERROR(HandleErrorW(ERROR_TITLE, ARC_INEOF, 0, nameW));
             else
-                return HandleError(ERROR_TITLE, ERROR_INFREAD, GetLastError(), name);
+                RETURN_ERROR(HandleErrorW(ERROR_TITLE, ERROR_INFREAD, GetLastError(), nameW));
         // get position and size of the last section
         if (sectionOffset < ((IMAGE_SECTION_HEADER*)data)->PointerToRawData)
         {
@@ -127,14 +164,16 @@ int InitExtraction(const char* name, struct SCabinet* cabinet)
     }
     // jump to the start of the archive
     if (SetFilePointer(cabinet->file, sectionOffset + sectionSize, NULL, FILE_BEGIN) == 0xFFFFFFFF)
-        return HandleError(ERROR_TITLE, ERROR_INFSEEK, GetLastError(), name);
+        RETURN_ERROR(HandleErrorW(ERROR_TITLE, ERROR_INFSEEK, GetLastError(), nameW));
     //
     // Prepare decompression
     //
     if (!DecompressInit(cabinet))
-        return HandleError(ERROR_TITLE, ARC_INEOF, 0, name);
-    else
-        return 0;
+        RETURN_ERROR(HandleErrorW(ERROR_TITLE, ARC_INEOF, 0, nameW));
+    if (nameW != NULL)
+        HeapFree(GetProcessHeap(), 0, nameW);
+    return 0;
+#undef RETURN_ERROR
 }
 
 void FinalWait()

@@ -33,6 +33,59 @@ int DeltaForTotalCount(int total)
     return delta;
 }
 
+static BOOL ConvertFindDataWToA(const WIN32_FIND_DATAW& src, WIN32_FIND_DATAA& dst)
+{
+    ZeroMemory(&dst, sizeof(dst));
+    dst.dwFileAttributes = src.dwFileAttributes;
+    dst.ftCreationTime = src.ftCreationTime;
+    dst.ftLastAccessTime = src.ftLastAccessTime;
+    dst.ftLastWriteTime = src.ftLastWriteTime;
+    dst.nFileSizeHigh = src.nFileSizeHigh;
+    dst.nFileSizeLow = src.nFileSizeLow;
+    dst.dwReserved0 = src.dwReserved0;
+    dst.dwReserved1 = src.dwReserved1;
+    if (ConvertWideToUtf8(src.cFileName, -1, dst.cFileName, _countof(dst.cFileName)) == 0)
+        return FALSE;
+    if (ConvertWideToUtf8(src.cAlternateFileName, -1, dst.cAlternateFileName, _countof(dst.cAlternateFileName)) == 0)
+        dst.cAlternateFileName[0] = 0;
+    return TRUE;
+}
+
+static HANDLE FindFirstFileUtf8(const char* path, WIN32_FIND_DATAA& data)
+{
+    CStrP pathW(ConvertAllocUtf8ToWide(path, -1));
+    if (pathW == NULL)
+    {
+        SetLastError(ERROR_NO_UNICODE_TRANSLATION);
+        return INVALID_HANDLE_VALUE;
+    }
+    WIN32_FIND_DATAW dataW;
+    HANDLE h = FindFirstFileW(pathW, &dataW);
+    if (h != INVALID_HANDLE_VALUE)
+    {
+        if (!ConvertFindDataWToA(dataW, data))
+        {
+            FindClose(h);
+            SetLastError(ERROR_NO_UNICODE_TRANSLATION);
+            return INVALID_HANDLE_VALUE;
+        }
+    }
+    return h;
+}
+
+static BOOL FindNextFileUtf8(HANDLE hFind, WIN32_FIND_DATAA& data)
+{
+    WIN32_FIND_DATAW dataW;
+    if (!FindNextFileW(hFind, &dataW))
+        return FALSE;
+    if (!ConvertFindDataWToA(dataW, data))
+    {
+        SetLastError(ERROR_NO_UNICODE_TRANSLATION);
+        return FALSE;
+    }
+    return TRUE;
+}
+
 #ifndef _WIN64
 
 BOOL AddWin64RedirectedDir(const char* path, CFilesArray* dirs, WIN32_FIND_DATA* fileData,
@@ -290,9 +343,11 @@ BOOL CFilesWindow::ReadDirectory(HWND parent, BOOL isRefresh)
                                            // so that there was a refresh of the directory)
 
         BOOL isUpDir = FALSE;
-        WIN32_FIND_DATA fileData;
+        WIN32_FIND_DATAW fileDataW;
+        WIN32_FIND_DATAA fileData;
         HANDLE search;
-        search = HANDLES_Q(FindFirstFile(fileName, &fileData));
+        CStrP fileNameW(ConvertAllocUtf8ToWide(fileName, -1));
+        search = fileNameW != NULL ? HANDLES_Q(FindFirstFileW(fileNameW, &fileDataW)) : INVALID_HANDLE_VALUE;
         if (search == INVALID_HANDLE_VALUE)
         {
             DWORD err = GetLastError();
@@ -381,8 +436,20 @@ BOOL CFilesWindow::ReadDirectory(HWND parent, BOOL isRefresh)
         }
         else
         {
+            if (!ConvertFindDataWToA(fileDataW, fileData))
+            {
+                if (!FindNextFileW(search, &fileDataW))
+                {
+                    HANDLES(FindClose(search));
+                    DestroySafeWaitWindow();
+                    return TRUE;
+                }
+                ConvertFindDataWToA(fileDataW, fileData);
+            }
             BOOL testFindNextErr;
             testFindNextErr = TRUE;
+            BOOL hasNext;
+            hasNext = TRUE;
             do
             {
                 NumberOfItemsInCurDir++;
@@ -843,7 +910,13 @@ BOOL CFilesWindow::ReadDirectory(HWND parent, BOOL isRefresh)
 #endif                     // _WIN64
                     break; // the second pass (adding ".." or win64 redirected-dir)
                 }
-            } while (FindNextFile(search, &fileData));
+                hasNext = FindNextFileW(search, &fileDataW) != 0;
+                if (hasNext)
+                {
+                    if (!ConvertFindDataWToA(fileDataW, fileData))
+                        continue;
+                }
+            } while (hasNext);
             DWORD err = GetLastError();
 
             if (search != NULL) // the first pass
@@ -867,7 +940,11 @@ BOOL CFilesWindow::ReadDirectory(HWND parent, BOOL isRefresh)
             upDir = FALSE;
             *(fileNameEnd - 1) = 0; // it's not logical, but times ".." are from current directory
             if (!UNCRootUpDir)
-                search = HANDLES_Q(FindFirstFile(fileName, &fileData));
+            {
+                search = fileNameW != NULL ? HANDLES_Q(FindFirstFileW(fileNameW, &fileDataW)) : INVALID_HANDLE_VALUE;
+                if (search != INVALID_HANDLE_VALUE)
+                    ConvertFindDataWToA(fileDataW, fileData);
+            }
             else
                 search = INVALID_HANDLE_VALUE;
             if (search == INVALID_HANDLE_VALUE)
@@ -1709,11 +1786,11 @@ BOOL IsWin64RedirectedDirAux(const char* subDir, const char* redirectedDir, cons
     {
         strcpy(winDirEnd, redirectedDir);
 
-        WIN32_FIND_DATA find;
+        WIN32_FIND_DATAA find;
         HANDLE h;
         if (failIfDirWithSameNameExists)
         {
-            h = HANDLES_Q(FindFirstFile(winDir, &find));
+            h = FindFirstFileUtf8(winDir, find);
             if (h != INVALID_HANDLE_VALUE)
             {
                 HANDLES(FindClose(h));
@@ -1722,7 +1799,7 @@ BOOL IsWin64RedirectedDirAux(const char* subDir, const char* redirectedDir, cons
         }
 
         strcat(winDirEnd, "\\*");
-        h = HANDLES_Q(FindFirstFile(winDir, &find));
+        h = FindFirstFileUtf8(winDir, find);
         if (h != INVALID_HANDLE_VALUE)
         {
             HANDLES(FindClose(h));
@@ -1817,19 +1894,23 @@ BOOL AddWin64RedirectedDirAux(const char* path, const char* subDir, const char* 
             SalPathAppend(findPath, "*", MAX_PATH))
         {
             HANDLE h;
-            h = HANDLES_Q(FindFirstFile(findPath, fileData)); // find-data for redirected-dir can be obtained from the "." directory in the listing of redirected-dir
+            WIN32_FIND_DATAW dataW;
+            CStrP findPathW(ConvertAllocUtf8ToWide(findPath, -1));
+            h = findPathW != NULL ? HANDLES_Q(FindFirstFileW(findPathW, &dataW)) : INVALID_HANDLE_VALUE; // find-data for redirected-dir can be obtained from the "." directory in the listing of redirected-dir
             if (h != INVALID_HANDLE_VALUE)
             {
                 BOOL found = FALSE;
                 do
                 {
+                    if (!ConvertFindDataWToA(dataW, *fileData))
+                        continue;
                     if (strcmp(fileData->cFileName, "..") == 0 &&
                         (fileData->dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) != 0) // "." directory
                     {
                         found = TRUE;
                         break;
                     }
-                } while (FindNextFile(h, fileData));
+                } while (FindNextFileW(h, &dataW));
                 HANDLES(FindClose(h));
                 if (found)
                 {
@@ -1840,13 +1921,16 @@ BOOL AddWin64RedirectedDirAux(const char* path, const char* subDir, const char* 
 
                     if (CutDirectory(findPath)) // find out if there's a directory with the same name as redirected-dir on the disk (it does not need to be in the 'dirs' array, e.g. because of the command "Hide Selected Names")
                     {
-                        WIN32_FIND_DATA fd;
-                        h = HANDLES_Q(FindFirstFile(findPath, &fd));
+                        WIN32_FIND_DATAW fdW;
+                        WIN32_FIND_DATAA fdA;
+                        CStrP findPath2W(ConvertAllocUtf8ToWide(findPath, -1));
+                        h = findPath2W != NULL ? HANDLES_Q(FindFirstFileW(findPath2W, &fdW)) : INVALID_HANDLE_VALUE;
                         if (h != INVALID_HANDLE_VALUE)
                         {
                             HANDLES(FindClose(h));
-                            if ((fd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) != 0 &&
-                                StrICmp(fd.cFileName, redirectedDirLastComp) == 0)
+                            if (ConvertFindDataWToA(fdW, fdA) &&
+                                (fdA.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) != 0 &&
+                                StrICmp(fdA.cFileName, redirectedDirLastComp) == 0)
                             {
                                 *dirWithSameNameExists = TRUE;
                             }
@@ -2226,7 +2310,7 @@ CHANGE_AGAIN:
                         WIN32_FIND_DATA find;
                         HANDLE h;
                         if (!pathEndsWithSpaceOrDot)
-                            h = HANDLES_Q(FindFirstFile(copy, &find));
+                            h = FindFirstFileUtf8(copy, find);
                         else
                             h = INVALID_HANDLE_VALUE;
                         DWORD err;
@@ -2253,7 +2337,7 @@ CHANGE_AGAIN:
                                     }
                                     else
                                     {
-                                        h = HANDLES_Q(FindFirstFile(copy, &find));
+                                        h = FindFirstFileUtf8(copy, find);
                                         if (h != INVALID_HANDLE_VALUE)
                                             break; // we've found an accessible component, continuing...
                                         err = GetLastError();
@@ -2266,7 +2350,7 @@ CHANGE_AGAIN:
                                 {
                                     if ((int)strlen(copy) < MAX_PATH && SalPathAppend(copy, "*.*", MAX_PATH + 10))
                                     {
-                                        h = HANDLES_Q(FindFirstFile(copy, &find));
+                                        h = FindFirstFileUtf8(copy, find);
                                         CutDirectory(copy);
                                         if (h != INVALID_HANDLE_VALUE) // the path can be listed
                                         {

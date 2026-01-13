@@ -712,7 +712,7 @@ CRAPI::CopyFileToPC(LPCTSTR lpExistingFileName, LPCTSTR lpNewFileName, BOOL bFai
     if (!GetFileTime(srcHandle, &creationTime, &accessedTime, &writeTime))
         goto ONERROR_SRC;
 
-    dstHandle = ::CreateFile(lpNewFileName, GENERIC_WRITE, 0, NULL, bFailIfExists ? CREATE_NEW : CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+    dstHandle = CreateFileUtf8Local(lpNewFileName, GENERIC_WRITE, 0, NULL, bFailIfExists ? CREATE_NEW : CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
     if (dstHandle == INVALID_HANDLE_VALUE)
         goto ONERROR_DST;
 
@@ -742,14 +742,14 @@ CRAPI::CopyFileToPC(LPCTSTR lpExistingFileName, LPCTSTR lpNewFileName, BOOL bFai
                 err = -1;
                 ::CloseHandle(dstHandle);
                 dstHandle = INVALID_HANDLE_VALUE;
-                ::DeleteFile(lpNewFileName);
+                DeleteFileUtf8Local(lpNewFileName);
                 goto RETURN;
             }
         }
     } while (read >= sizeof(buffer));
 
     ::SetFileTime(dstHandle, &creationTime, &accessedTime, &writeTime); // JR REVIEW: should we ignore potential errors?
-    ::SetFileAttributes(lpNewFileName, attr);
+    SetFileAttributesUtf8Local(lpNewFileName, attr);
 
 RETURN:
     if (srcHandle != INVALID_HANDLE_VALUE)
@@ -789,7 +789,7 @@ CRAPI::CopyFileToCE(LPCTSTR lpExistingFileName, LPCTSTR lpNewFileName, BOOL bFai
     if (attr == 0xFFFFFFFF)
         goto ONERROR_SRC;
 
-    srcHandle = ::CreateFile(lpExistingFileName, GENERIC_READ, 0, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+    srcHandle = CreateFileUtf8Local(lpExistingFileName, GENERIC_READ, 0, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
     if (srcHandle == INVALID_HANDLE_VALUE)
         goto ONERROR_SRC;
 

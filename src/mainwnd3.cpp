@@ -185,12 +185,15 @@ BOOL OpenHtmlHelp(char* helpFileName, HWND parent, CHtmlHelpCommand command, DWO
                     lstrcpyn(helpPath, CurrentHelpDir, MAX_PATH);
                     if (SalPathAppend(helpPath, "*", MAX_PATH))
                     { // try to find at least some other directory
+                        WIN32_FIND_DATAW dataW;
                         WIN32_FIND_DATA data;
-                        HANDLE find = HANDLES_Q(FindFirstFile(helpPath, &data));
+                        CStrP helpPathW(ConvertAllocUtf8ToWide(helpPath, -1));
+                        HANDLE find = helpPathW != NULL ? HANDLES_Q(FindFirstFileW(helpPathW, &dataW)) : INVALID_HANDLE_VALUE;
                         if (find != INVALID_HANDLE_VALUE)
                         {
                             do
                             {
+                                ConvertFindDataWToUtf8(dataW, &data);
                                 if (strcmp(data.cFileName, ".") != 0 && strcmp(data.cFileName, "..") != 0 &&
                                     (data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) != 0) // only if it is a directory
                                 {
@@ -201,7 +204,7 @@ BOOL OpenHtmlHelp(char* helpFileName, HWND parent, CHtmlHelpCommand command, DWO
                                         break;
                                     }
                                 }
-                            } while (FindNextFile(find, &data));
+                            } while (FindNextFileW(find, &dataW));
                             HANDLES(FindClose(find));
                         }
                     }
@@ -2868,7 +2871,7 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
                                       MB_OK | MB_ICONINFORMATION);
                     }
                     else
-                        DeleteFile(file);
+                        DeleteFileUtf8(file);
                 }
             }
             return 0;

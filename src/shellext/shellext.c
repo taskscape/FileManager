@@ -28,6 +28,32 @@ const char* ShExtName = "salextx64.dll";
 const char* ShExtName = "salextx86.dll";
 #endif // _WIN64
 
+static BOOL Utf8ToWideSimple(const char* src, WCHAR* buf, int bufSize)
+{
+    if (buf == NULL || bufSize <= 0)
+        return FALSE;
+    buf[0] = 0;
+    if (src == NULL)
+        return FALSE;
+    int res = MultiByteToWideChar(CP_UTF8, 0, src, -1, buf, bufSize);
+    if (res == 0)
+        res = MultiByteToWideChar(CP_ACP, 0, src, -1, buf, bufSize);
+    return res != 0;
+}
+
+static BOOL WideToUtf8Simple(const WCHAR* src, char* buf, int bufSize)
+{
+    if (buf == NULL || bufSize <= 0)
+        return FALSE;
+    buf[0] = 0;
+    if (src == NULL)
+        return FALSE;
+    int res = WideCharToMultiByte(CP_UTF8, 0, src, -1, buf, bufSize, NULL, NULL);
+    if (res == 0)
+        res = WideCharToMultiByte(CP_ACP, 0, src, -1, buf, bufSize, NULL, NULL);
+    return res != 0;
+}
+
 void WriteToLog(const char* str)
 {
     if (LogFile != NULL)
@@ -162,9 +188,25 @@ DllMain(HINSTANCE hInstance, DWORD dwReason, LPVOID lpReserved)
             SECURITY_DESCRIPTOR sd;
             SECURITY_ATTRIBUTES* saPtr = CreateAccessableSecurityAttributes(&sa, &sd, SYNCHRONIZE /*| MUTEX_MODIFY_STATE*/, &psidEveryone, &paclNewDacl);
 
-            GetModuleFileName(g_hmodThisDll, ModuleName, MAX_PATH);
-            LogFile = CreateFile(SHEXT_LOG_FILENAME, GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE,
-                                 NULL, OPEN_ALWAYS, 0, NULL);
+            {
+                WCHAR moduleNameW[MAX_PATH];
+                if (GetModuleFileNameW(g_hmodThisDll, moduleNameW, MAX_PATH) != 0)
+                    WideToUtf8Simple(moduleNameW, ModuleName, MAX_PATH);
+                else
+                    ModuleName[0] = 0;
+            }
+            {
+                WCHAR logFileNameW[MAX_PATH];
+                if (Utf8ToWideSimple(SHEXT_LOG_FILENAME, logFileNameW, MAX_PATH))
+                {
+                    LogFile = CreateFileW(logFileNameW, GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE,
+                                          NULL, OPEN_ALWAYS, 0, NULL);
+                }
+                else
+                {
+                    LogFile = INVALID_HANDLE_VALUE;
+                }
+            }
 
             LogFileMutex = CreateMutex(saPtr, FALSE, "shext-log-mutex");
             if (LogFileMutex == NULL)

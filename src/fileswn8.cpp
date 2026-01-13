@@ -587,7 +587,7 @@ void CFilesWindow::FilesAction(CActionType type, CFilesWindow* target, int count
                             BOOL haveSize = FALSE;
                             CQuadWord size;
                             DWORD err;
-                            HANDLE hFile = HANDLES_Q(CreateFile(path, GENERIC_READ, 0, NULL, OPEN_EXISTING, 0, NULL));
+                            HANDLE hFile = HANDLES_Q(CreateFileUtf8(path, GENERIC_READ, 0, NULL, OPEN_EXISTING, 0, NULL));
                             if (hFile != INVALID_HANDLE_VALUE)
                             {
                                 haveSize = SalGetFileSize(hFile, size, err);
@@ -605,7 +605,7 @@ void CFilesWindow::FilesAction(CActionType type, CFilesWindow* target, int count
                                 {
                                     nullFileAttrs = SalGetFileAttributes(path);
                                     ClearReadOnlyAttr(path, nullFileAttrs); // so it's possible to delete even read-only files
-                                    DeleteFile(path);
+                                    DeleteFileUtf8(path);
                                 }
                                 //---  custom packing
                                 SetCurrentDirectory(GetPath());
@@ -616,7 +616,7 @@ void CFilesWindow::FilesAction(CActionType type, CFilesWindow* target, int count
                                     if (nullFile && // a zero-size file might have a different compressed attribute; set the archive to the same
                                         nullFileAttrs != INVALID_FILE_ATTRIBUTES)
                                     {
-                                        HANDLE hFile2 = HANDLES_Q(CreateFile(path, GENERIC_READ | GENERIC_WRITE,
+                                        HANDLE hFile2 = HANDLES_Q(CreateFileUtf8(path, GENERIC_READ | GENERIC_WRITE,
                                                                              0, NULL, OPEN_EXISTING,
                                                                              0, NULL));
                                         if (hFile2 != INVALID_HANDLE_VALUE)
@@ -627,7 +627,7 @@ void CFilesWindow::FilesAction(CActionType type, CFilesWindow* target, int count
                                             DeviceIoControl(hFile2, FSCTL_SET_COMPRESSION, &state,
                                                             sizeof(USHORT), NULL, 0, &length, FALSE);
                                             HANDLES(CloseHandle(hFile2));
-                                            SetFileAttributes(path, nullFileAttrs);
+                                            SetFileAttributesUtf8(path, nullFileAttrs);
                                         }
                                     }
                                     SetSel(FALSE, -1, TRUE);                        // explicit redraw
@@ -637,7 +637,7 @@ void CFilesWindow::FilesAction(CActionType type, CFilesWindow* target, int count
                                 {
                                     if (nullFile) // it failed, we have to create it again
                                     {
-                                        HANDLE hFile2 = HANDLES_Q(CreateFile(path, GENERIC_READ | GENERIC_WRITE,
+                                        HANDLE hFile2 = HANDLES_Q(CreateFileUtf8(path, GENERIC_READ | GENERIC_WRITE,
                                                                              0, NULL, OPEN_ALWAYS,
                                                                              0, NULL));
                                         if (hFile2 != INVALID_HANDLE_VALUE)
@@ -652,7 +652,7 @@ void CFilesWindow::FilesAction(CActionType type, CFilesWindow* target, int count
                                             }
                                             HANDLES(CloseHandle(hFile2));
                                             if (nullFileAttrs != INVALID_FILE_ATTRIBUTES)
-                                                SetFileAttributes(path, nullFileAttrs);
+                                                SetFileAttributesUtf8(path, nullFileAttrs);
                                         }
                                     }
                                 }
@@ -1168,6 +1168,7 @@ void CFilesWindow::FilesAction(CActionType type, CFilesWindow* target, int count
 // returns TRUE, if everything succeeded; otherwise returns FALSE
 BOOL EmailFilesAddDirectory(CSimpleMAPI* mapi, const char* path, BOOL* errGetFileSizeOfLnkTgtIgnAll)
 {
+    WIN32_FIND_DATAW fileW;
     WIN32_FIND_DATA file;
     char myPath[MAX_PATH + 4];
     int l = (int)strlen(path);
@@ -1176,7 +1177,8 @@ BOOL EmailFilesAddDirectory(CSimpleMAPI* mapi, const char* path, BOOL* errGetFil
         myPath[l++] = '\\';
     char* name = myPath + l;
     strcpy(name, "*");
-    HANDLE find = HANDLES_Q(FindFirstFile(myPath, &file));
+    CStrP myPathW(ConvertAllocUtf8ToWide(myPath, -1));
+    HANDLE find = myPathW != NULL ? HANDLES_Q(FindFirstFileW(myPathW, &fileW)) : INVALID_HANDLE_VALUE;
     if (find == INVALID_HANDLE_VALUE)
     {
         DWORD err = GetLastError();
@@ -1197,6 +1199,7 @@ BOOL EmailFilesAddDirectory(CSimpleMAPI* mapi, const char* path, BOOL* errGetFil
     BOOL ok = TRUE;
     do
     {
+        ConvertFindDataWToUtf8(fileW, &file);
         if (file.cFileName[0] != 0 &&
             (file.cFileName[0] != '.' ||
              (file.cFileName[1] != 0 && (file.cFileName[1] != '.' || file.cFileName[2] != 0))))
@@ -1227,7 +1230,7 @@ BOOL EmailFilesAddDirectory(CSimpleMAPI* mapi, const char* path, BOOL* errGetFil
                 }
             }
         }
-    } while (FindNextFile(find, &file));
+    } while (FindNextFileW(find, &fileW));
     HANDLES(FindClose(find));
     return ok;
 }

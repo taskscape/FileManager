@@ -386,7 +386,7 @@ bool SaveToFile(const CString& sHtml, const CString& sBase, const CString& sName
     sFileName.m_strPath = GenFileName(sBase, sName);
     sFilePath += sFileName;
 
-    hFile = CreateFile(sFilePath, GENERIC_WRITE, FILE_SHARE_READ, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+    hFile = CreateFileUtf8Local(sFilePath, GENERIC_WRITE, FILE_SHARE_READ, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
     if (hFile == INVALID_HANDLE_VALUE)
     {
         return false;

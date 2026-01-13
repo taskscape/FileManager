@@ -815,7 +815,7 @@ BOOL CRendererWindow::OnFileSaveAs(LPCTSTR pInitDir)
                 }
             }
         }
-        hFile = CreateFile(fileName, GENERIC_READ | GENERIC_WRITE, 0, NULL,
+        hFile = CreateFileUtf8Local(fileName, GENERIC_READ | GENERIC_WRITE, 0, NULL,
                            OPEN_EXISTING, 0, 0);
         if (hFile != INVALID_HANDLE_VALUE)
         {
@@ -867,7 +867,7 @@ BOOL CRendererWindow::OnFileSaveAs(LPCTSTR pInitDir)
                 // else: no rights: DeleteFile should also fail with ERROR_ACCESS_DENIED
             }
         }
-        if (!DeleteFile(fileName))
+        if (!DeleteFileUtf8Local(fileName))
         {
             ret = GetLastError();
             SalamanderGeneral->GetErrorText(ret, errBuff, SizeOf(errBuff));

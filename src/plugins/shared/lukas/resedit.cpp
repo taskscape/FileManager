@@ -71,7 +71,7 @@ BOOL CResEdit::BeginUpdateResource(LPCSTR pFileName, BOOL bDeleteExistingResourc
     int num_of_retries = 0;
 
 try_again:
-    File = CreateFile(pFileName, GENERIC_WRITE | GENERIC_READ, 0, NULL, OPEN_EXISTING,
+    File = CreateFileUtf8Local(pFileName, GENERIC_WRITE | GENERIC_READ, 0, NULL, OPEN_EXISTING,
                       FILE_ATTRIBUTE_NORMAL, NULL);
 
     if (!File)

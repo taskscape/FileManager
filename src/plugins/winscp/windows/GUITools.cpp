@@ -11,6 +11,7 @@
 #include <TextsCore.h>
 #include <CoreMain.h>
 #include <SessionData.h>
+#include "..\\Utf8WinApi.h"
 //---------------------------------------------------------------------------
 #pragma package(smart_init)
 //---------------------------------------------------------------------------
@@ -310,7 +311,7 @@ bool __fastcall DeleteDirectory(const AnsiString DirName)
     }
     else
     {
-      retval = DeleteFile(DirName + "\\" + sr.Name);
+      retval = WinScpDeleteFileUtf8((DirName + "\\" + sr.Name).c_str());
     }
 
     if (retval)
@@ -324,7 +325,7 @@ bool __fastcall DeleteDirectory(const AnsiString DirName)
         }
         else
         {
-          retval = DeleteFile(DirName + "\\" + sr.Name);
+          retval = WinScpDeleteFileUtf8((DirName + "\\" + sr.Name).c_str());
         }
 
         if (!retval) break;

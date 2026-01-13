@@ -14,6 +14,7 @@
 //#include <string.h>
 
 #include <windows.h>
+#include <stdlib.h>
 
 #include "sfx7zip.h"
 
@@ -35,6 +36,62 @@ typedef struct _CFileInStream
     HANDLE File;
     unsigned long Offset;
 } CFileInStream;
+
+static WCHAR* AllocWideFromUtf8(const char* src)
+{
+    if (src == NULL)
+        return NULL;
+    int len = MultiByteToWideChar(CP_UTF8, 0, src, -1, NULL, 0);
+    if (len == 0)
+        len = MultiByteToWideChar(CP_ACP, 0, src, -1, NULL, 0);
+    if (len == 0)
+        return NULL;
+    WCHAR* buf = (WCHAR*)HeapAlloc(GetProcessHeap(), 0, sizeof(WCHAR) * len);
+    if (buf == NULL)
+        return NULL;
+    if (MultiByteToWideChar(CP_UTF8, 0, src, -1, buf, len) == 0)
+    {
+        if (MultiByteToWideChar(CP_ACP, 0, src, -1, buf, len) == 0)
+        {
+            HeapFree(GetProcessHeap(), 0, buf);
+            return NULL;
+        }
+    }
+    return buf;
+}
+
+static HANDLE CreateFileUtf8Local(const char* fileName, DWORD desiredAccess, DWORD shareMode,
+                                  LPSECURITY_ATTRIBUTES securityAttributes, DWORD creationDisposition,
+                                  DWORD flagsAndAttributes, HANDLE templateFile)
+{
+    WCHAR* fileNameW = AllocWideFromUtf8(fileName);
+    if (fileNameW == NULL)
+        return INVALID_HANDLE_VALUE;
+    HANDLE hFile = CreateFileW(fileNameW, desiredAccess, shareMode, securityAttributes,
+                               creationDisposition, flagsAndAttributes, templateFile);
+    HeapFree(GetProcessHeap(), 0, fileNameW);
+    return hFile;
+}
+
+static BOOL CreateDirectoryUtf8Local(const char* dirName, LPSECURITY_ATTRIBUTES securityAttributes)
+{
+    WCHAR* dirNameW = AllocWideFromUtf8(dirName);
+    if (dirNameW == NULL)
+        return FALSE;
+    BOOL ok = CreateDirectoryW(dirNameW, securityAttributes);
+    HeapFree(GetProcessHeap(), 0, dirNameW);
+    return ok;
+}
+
+static BOOL SetFileAttributesUtf8Local(const char* fileName, DWORD attrs)
+{
+    WCHAR* fileNameW = AllocWideFromUtf8(fileName);
+    if (fileNameW == NULL)
+        return FALSE;
+    BOOL ok = SetFileAttributesW(fileNameW, attrs);
+    HeapFree(GetProcessHeap(), 0, fileNameW);
+    return ok;
+}
 
 /* could be used for files smaller than 2GB */
 #define GetFilePointer(hFile) SetFilePointer(hFile, 0, NULL, FILE_CURRENT)
@@ -142,11 +199,11 @@ int Extract(char *fileName, char *targetPath) {
         break;
 
       if (f->IsDirectory) {
-        CreateDirectory(f->Name, NULL);
+        CreateDirectoryUtf8Local(f->Name, NULL);
       }
       else {
 
-        HANDLE hFile = CreateFile(f->Name, GENERIC_WRITE, 0, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+        HANDLE hFile = CreateFileUtf8Local(f->Name, GENERIC_WRITE, 0, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
         if (hFile == INVALID_HANDLE_VALUE) 
         {
           //PrintError("can not open output file");
@@ -177,7 +234,7 @@ int Extract(char *fileName, char *targetPath) {
 
         // set attributes
         if (f->AreAttributesDefined) {
-          SetFileAttributes(f->Name, (DWORD) f->Attributes);
+          SetFileAttributesUtf8Local(f->Name, (DWORD) f->Attributes);
         }
       }
     }

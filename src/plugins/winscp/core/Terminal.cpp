@@ -25,6 +25,7 @@
 
 #ifndef AUTO_WINSOCK
 #include <winsock2.h>
+#include "..\\Utf8WinApi.h"
 #endif
 //---------------------------------------------------------------------------
 #pragma package(smart_init)
@@ -3576,7 +3577,7 @@ bool __fastcall TTerminal::DoCreateLocalFile(const AnsiString FileName,
   unsigned int CreateAttr = FILE_ATTRIBUTE_NORMAL;
   do
   {
-    *AHandle = CreateFile(FileName.c_str(), GENERIC_WRITE, FILE_SHARE_READ,
+    *AHandle = WinScpCreateFileUtf8(FileName.c_str(), GENERIC_WRITE, FILE_SHARE_READ,
       NULL, CREATE_ALWAYS, CreateAttr, 0);
     Done = (*AHandle != INVALID_HANDLE_VALUE);
     if (!Done)
@@ -3681,7 +3682,7 @@ void __fastcall TTerminal::OpenLocalFile(const AnsiString FileName,
     }
 
     FILE_OPERATION_LOOP (FMTLOAD(OPENFILE_ERROR, (FileName)),
-      Handle = CreateFile(FileName.c_str(), Access,
+      Handle = WinScpCreateFileUtf8(FileName.c_str(), Access,
         Access == GENERIC_READ ? FILE_SHARE_READ | FILE_SHARE_WRITE : FILE_SHARE_READ,
         NULL, OPEN_EXISTING, 0, 0);
       if (Handle == INVALID_HANDLE_VALUE)
@@ -3754,7 +3755,7 @@ bool __fastcall TTerminal::AllowLocalFileTransfer(AnsiString FileName,
     WIN32_FIND_DATA FindData;
     HANDLE Handle;
     FILE_OPERATION_LOOP (FMTLOAD(FILE_NOT_EXISTS, (FileName)),
-      Handle = FindFirstFile(FileName.c_str(), &FindData);
+      Handle = WinScpFindFirstFileUtf8(FileName.c_str(), &FindData);
       if (Handle == INVALID_HANDLE_VALUE)
       {
         Abort();

@@ -13,7 +13,7 @@ BOOL CRenamerDialog::ExportToTempFile()
         return Error(IDS_CREATETEMP);
 
     // create/open the tmp file
-    HANDLE file = CreateFile(TempFile, GENERIC_WRITE, FILE_SHARE_READ, NULL,
+    HANDLE file = CreateFileUtf8Local(TempFile, GENERIC_WRITE, FILE_SHARE_READ, NULL,
                              CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
     if (file == INVALID_HANDLE_VALUE)
     {
@@ -51,7 +51,7 @@ BOOL CRenamerDialog::ImportFromTempFile()
 {
     CALL_STACK_MESSAGE1("CRawEditValDialog::ImportFromTempFile()");
     // open the tmp file
-    HANDLE file = CreateFile(TempFile, GENERIC_READ, FILE_SHARE_READ, NULL,
+    HANDLE file = CreateFileUtf8Local(TempFile, GENERIC_READ, FILE_SHARE_READ, NULL,
                              OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
     if (file == INVALID_HANDLE_VALUE)
         return Error(IDS_OPENTEMP);
@@ -186,10 +186,10 @@ BOOL CRenamerDialog::ExecuteCommand(const char* command)
     inPipeWr = INVALID_HANDLE_VALUE;
 
     // create/open tmp files for output
-    outFile = CreateFile(outName, GENERIC_READ | GENERIC_WRITE,
+    outFile = CreateFileUtf8Local(outName, GENERIC_READ | GENERIC_WRITE,
                          FILE_SHARE_READ | FILE_SHARE_WRITE, &saAttr, CREATE_ALWAYS,
                          FILE_ATTRIBUTE_TEMPORARY, NULL);
-    errFile = CreateFile(errName, GENERIC_READ | GENERIC_WRITE,
+    errFile = CreateFileUtf8Local(errName, GENERIC_READ | GENERIC_WRITE,
                          FILE_SHARE_READ | FILE_SHARE_WRITE, &saAttr, CREATE_ALWAYS,
                          FILE_ATTRIBUTE_TEMPORARY, NULL);
     if (outFile == INVALID_HANDLE_VALUE ||

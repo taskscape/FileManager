@@ -1013,7 +1013,7 @@ BOOL PackUC2List(const char* archiveFileName, CPackLineArray& lineArray,
     strncpy(arcPath, archiveFileName, arcName - archiveFileName);
     arcPath[arcName - archiveFileName] = '\0';
     strcat(arcPath, "U$~RESLT.OK");
-    DeleteFile(arcPath);
+    DeleteFileUtf8(arcPath);
 
     char* txtPtr;         // pointer to the current position in the read line
     char currentDir[256]; // current directory we are exploring
@@ -1476,8 +1476,8 @@ BOOL PackUniversalUncompress(HWND parent, const char* command, TPackErrorTable* 
     FILE* listFile;
     if ((listFile = fopen(tmpListNameBuf, "w")) == NULL)
     {
-        RemoveDirectory(tmpDirNameBuf);
-        DeleteFile(tmpListNameBuf);
+        RemoveDirectoryUtf8(tmpDirNameBuf);
+        DeleteFileUtf8(tmpListNameBuf);
         return (*PackErrorHandlerPtr)(parent, IDS_PACKERR_FILE);
     }
 
@@ -1506,8 +1506,8 @@ BOOL PackUniversalUncompress(HWND parent, const char* command, TPackErrorTable* 
             if (fprintf(listFile, "%s%s\n", rootPath, namecnv) <= 0)
             {
                 fclose(listFile);
-                DeleteFile(tmpListNameBuf);
-                RemoveDirectory(tmpDirNameBuf);
+                DeleteFileUtf8(tmpListNameBuf);
+                RemoveDirectoryUtf8(tmpDirNameBuf);
                 return (*PackErrorHandlerPtr)(parent, IDS_PACKERR_FILE);
             }
         }
@@ -1520,8 +1520,8 @@ BOOL PackUniversalUncompress(HWND parent, const char* command, TPackErrorTable* 
     if (errorOccured == SALENUM_CANCEL ||
         !TestFreeSpace(parent, tmpDirNameBuf, totalSize, LoadStr(IDS_PACKERR_TITLE)))
     {
-        DeleteFile(tmpListNameBuf);
-        RemoveDirectory(tmpDirNameBuf);
+        DeleteFileUtf8(tmpListNameBuf);
+        RemoveDirectoryUtf8(tmpDirNameBuf);
         return FALSE;
     }
 
@@ -1533,8 +1533,8 @@ BOOL PackUniversalUncompress(HWND parent, const char* command, TPackErrorTable* 
     if (!PackExpandCmdLine(archiveFileName, tmpDirNameBuf, tmpListNameBuf, NULL,
                            command, cmdLine, PACK_CMDLINE_MAXLEN, NULL))
     {
-        DeleteFile(tmpListNameBuf);
-        RemoveDirectory(tmpDirNameBuf);
+        DeleteFileUtf8(tmpListNameBuf);
+        RemoveDirectoryUtf8(tmpDirNameBuf);
         return (*PackErrorHandlerPtr)(parent, IDS_PACKERR_CMDLNERR);
     }
 
@@ -1542,8 +1542,8 @@ BOOL PackUniversalUncompress(HWND parent, const char* command, TPackErrorTable* 
     if (!supportLongNames && strlen(cmdLine) >= 128)
     {
         char buffer[1000];
-        DeleteFile(tmpListNameBuf);
-        RemoveDirectory(tmpDirNameBuf);
+        DeleteFileUtf8(tmpListNameBuf);
+        RemoveDirectoryUtf8(tmpDirNameBuf);
         strcpy(buffer, cmdLine);
         return (*PackErrorHandlerPtr)(parent, IDS_PACKERR_CMDLNLEN, buffer);
     }
@@ -1556,8 +1556,8 @@ BOOL PackUniversalUncompress(HWND parent, const char* command, TPackErrorTable* 
             strcpy(currentDir, initDir);
         else
         {
-            DeleteFile(tmpListNameBuf);
-            RemoveDirectory(tmpDirNameBuf);
+            DeleteFileUtf8(tmpListNameBuf);
+            RemoveDirectoryUtf8(tmpDirNameBuf);
             return (*PackErrorHandlerPtr)(parent, IDS_PACKERR_IDIRERR);
         }
     }
@@ -1565,8 +1565,8 @@ BOOL PackUniversalUncompress(HWND parent, const char* command, TPackErrorTable* 
     {
         if (!PackExpandInitDir(archiveFileName, NULL, tmpDirNameBuf, initDir, currentDir, MAX_PATH))
         {
-            DeleteFile(tmpListNameBuf);
-            RemoveDirectory(tmpDirNameBuf);
+            DeleteFileUtf8(tmpListNameBuf);
+            RemoveDirectoryUtf8(tmpDirNameBuf);
             return (*PackErrorHandlerPtr)(parent, IDS_PACKERR_IDIRERR);
         }
     }
@@ -1574,12 +1574,12 @@ BOOL PackUniversalUncompress(HWND parent, const char* command, TPackErrorTable* 
     // and run the external program
     if (!PackExecute(NULL, cmdLine, currentDir, errorTable))
     {
-        DeleteFile(tmpListNameBuf);
+        DeleteFileUtf8(tmpListNameBuf);
         RemoveTemporaryDir(tmpDirNameBuf);
         return FALSE; // the error message has already been shown
     }
     // the file list is no longer needed
-    DeleteFile(tmpListNameBuf);
+    DeleteFileUtf8(tmpListNameBuf);
 
     // and now finally move the files where they belong
     char srcDir[MAX_PATH];
@@ -1589,6 +1589,7 @@ BOOL PackUniversalUncompress(HWND parent, const char* command, TPackErrorTable* 
         // locate the extracted subdirectory path - names of subdirectories may not match
         // because of the Czech characters and long names :-(
         char* r = rootPath;
+        WIN32_FIND_DATAW foundFileW;
         WIN32_FIND_DATA foundFile;
         char buffer[1000];
         while (1)
@@ -1601,7 +1602,8 @@ BOOL PackUniversalUncompress(HWND parent, const char* command, TPackErrorTable* 
                 r++; // skip the backslash in the original rootPath
             strcat(srcDir, "\\*");
 
-            HANDLE found = HANDLES_Q(FindFirstFile(srcDir, &foundFile));
+            CStrP srcDirW(ConvertAllocUtf8ToWide(srcDir, -1));
+            HANDLE found = srcDirW != NULL ? HANDLES_Q(FindFirstFileW(srcDirW, &foundFileW)) : INVALID_HANDLE_VALUE;
             if (found == INVALID_HANDLE_VALUE)
             {
                 strcpy(buffer, "FindFirstFile: ");
@@ -1612,16 +1614,18 @@ BOOL PackUniversalUncompress(HWND parent, const char* command, TPackErrorTable* 
                 RemoveTemporaryDir(tmpDirNameBuf);
                 return (*PackErrorHandlerPtr)(parent, IDS_PACKERR_GENERAL, buffer);
             }
+            ConvertFindDataWToUtf8(foundFileW, &foundFile);
             while (foundFile.cFileName[0] == 0 ||
                    strcmp(foundFile.cFileName, ".") == 0 || // we ignore "." and ".."
                    strcmp(foundFile.cFileName, "..") == 0)
             {
-                if (!FindNextFile(found, &foundFile))
+                if (!FindNextFileW(found, &foundFileW))
                 {
                     HANDLES(FindClose(found));
                     strcpy(buffer, "FindNextFile: ");
                     goto _ERR;
                 }
+                ConvertFindDataWToUtf8(foundFileW, &foundFile);
             }
             HANDLES(FindClose(found));
 
@@ -1857,10 +1861,12 @@ BOOL PackUnpackOneFile(CFilesWindow* panel, const char* archiveFileName,
 
     // find the extracted file - the name may not match due to the Czech characters and long names :-(
     char* extractedFile = (char*)malloc(strlen(tmpDirNameBuf) + 2 + 1);
+    WIN32_FIND_DATAW foundFileW;
     WIN32_FIND_DATA foundFile;
     strcpy(extractedFile, tmpDirNameBuf);
     strcat(extractedFile, "\\*");
-    HANDLE found = HANDLES_Q(FindFirstFile(extractedFile, &foundFile));
+    CStrP extractedFileW(ConvertAllocUtf8ToWide(extractedFile, -1));
+    HANDLE found = extractedFileW != NULL ? HANDLES_Q(FindFirstFileW(extractedFileW, &foundFileW)) : INVALID_HANDLE_VALUE;
     if (found == INVALID_HANDLE_VALUE)
     {
         char buffer[1000];
@@ -1871,10 +1877,11 @@ BOOL PackUnpackOneFile(CFilesWindow* panel, const char* archiveFileName,
         return (*PackErrorHandlerPtr)(NULL, IDS_PACKERR_GENERAL, buffer);
     }
     free(extractedFile);
+    ConvertFindDataWToUtf8(foundFileW, &foundFile);
     while (foundFile.cFileName[0] == 0 ||
            strcmp(foundFile.cFileName, ".") == 0 || strcmp(foundFile.cFileName, "..") == 0)
     {
-        if (!FindNextFile(found, &foundFile))
+        if (!FindNextFileW(found, &foundFileW))
         {
             char buffer[1000];
             strcpy(buffer, "FindNextFile: ");
@@ -1883,6 +1890,7 @@ BOOL PackUnpackOneFile(CFilesWindow* panel, const char* archiveFileName,
             RemoveTemporaryDir(tmpDirNameBuf);
             return (*PackErrorHandlerPtr)(NULL, IDS_PACKERR_GENERAL, buffer);
         }
+        ConvertFindDataWToUtf8(foundFileW, &foundFile);
     }
     HANDLES(FindClose(found));
 

@@ -587,7 +587,7 @@ DWORD OS<CHAR>::OS_GetDriveFormFactor(const CHAR* drive)
         {
             char tsz[8];
             sprintf(tsz, "\\\\.\\%c:", (char)(drive[0]));
-            h = HANDLES_Q(CreateFileA(tsz, 0, FILE_SHARE_WRITE, 0, OPEN_EXISTING, 0, 0));
+            h = HANDLES_Q(CreateFileUtf8Local(tsz, 0, FILE_SHARE_WRITE, 0, OPEN_EXISTING, 0, 0));
         }
         else
         {

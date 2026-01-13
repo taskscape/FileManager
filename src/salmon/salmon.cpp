@@ -19,6 +19,26 @@ const char* APP_NAME = "Open Salamander Bug Reporter";
 
 // ****************************************************************************
 
+static WCHAR* AllocUtf8ToWide(const char* text)
+{
+    if (text == NULL)
+        return NULL;
+    int len = MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, text, -1, NULL, 0);
+    if (len <= 0)
+        return NULL;
+    WCHAR* buf = (WCHAR*)malloc(len * sizeof(WCHAR));
+    if (buf == NULL)
+        return NULL;
+    if (MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, text, -1, buf, len) == 0)
+    {
+        free(buf);
+        return NULL;
+    }
+    return buf;
+}
+
+// ****************************************************************************
+
 class C__StrCriticalSection
 {
 public:
@@ -205,6 +225,7 @@ DWORD SalGetFileAttributes(const char* fileName)
 {
     int fileNameLen = (int)strlen(fileName);
     char fileNameCopy[3 * MAX_PATH];
+    const char* nameToCheck = fileName;
     // if the path ends with a space/dot, we must append '\\', otherwise GetFileAttributes trims
     // the spaces/dots and works with a different path; for files it does not work anyway,
     // but it is still better than getting attributes of another file/directory (for "c:\\file.txt   "
@@ -215,14 +236,19 @@ DWORD SalGetFileAttributes(const char* fileName)
         memcpy(fileNameCopy, fileName, fileNameLen);
         fileNameCopy[fileNameLen] = '\\';
         fileNameCopy[fileNameLen + 1] = 0;
-        return GetFileAttributes(fileNameCopy);
+        nameToCheck = fileNameCopy;
     }
-    else // a plain path, nothing special to do, just call the Windows GetFileAttributes
-    {
-        return GetFileAttributes(fileName);
-    }
-}
 
+    WCHAR* fileNameW = AllocUtf8ToWide(nameToCheck);
+    if (fileNameW == NULL)
+    {
+        SetLastError(ERROR_NO_UNICODE_TRANSLATION);
+        return INVALID_FILE_ATTRIBUTES;
+    }
+    DWORD attr = GetFileAttributesW(fileNameW);
+    free(fileNameW);
+    return attr;
+}
 //*****************************************************************************
 //
 // DirExists

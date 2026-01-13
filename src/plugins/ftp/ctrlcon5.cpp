@@ -255,8 +255,8 @@ void CControlConnectionSocket::DownloadOneFile(HWND parent, const char* fileName
                             // wait for the file to close in the disk cache; otherwise the file cannot be deleted
                             dataConnection->WaitForFileClose(5000); // max. 5 seconds
 
-                            SetFileAttributes(tgtFileName, FILE_ATTRIBUTE_NORMAL);
-                            DeleteFile(tgtFileName);
+                            SetFileAttributesUtf8Local(tgtFileName, FILE_ATTRIBUTE_NORMAL);
+                            DeleteFileUtf8Local(tgtFileName);
                             asciiMode = FALSE; // download again in binary mode
 
                             ok = FALSE; // repeat the download
@@ -271,8 +271,8 @@ void CControlConnectionSocket::DownloadOneFile(HWND parent, const char* fileName
                                 // wait for the file to close in the disk cache; otherwise the file cannot be deleted
                                 dataConnection->WaitForFileClose(5000); // max. 5 seconds
 
-                                SetFileAttributes(tgtFileName, FILE_ATTRIBUTE_NORMAL);
-                                DeleteFile(tgtFileName);
+                                SetFileAttributesUtf8Local(tgtFileName, FILE_ATTRIBUTE_NORMAL);
+                                DeleteFileUtf8Local(tgtFileName);
                                 ok = FALSE; // do not show any message; the user already confirmed the cancel
                             }
                         }
@@ -406,8 +406,8 @@ void CControlConnectionSocket::DownloadOneFile(HWND parent, const char* fileName
 
                         if (run) // go for another attempt; clean the target file just in case (it may have been created before the error/interruption)
                         {        // we are not in any critical section, so even if the disk operation stalls for a while, nothing happens
-                            SetFileAttributes(tgtFileName, FILE_ATTRIBUTE_NORMAL);
-                            DeleteFile(tgtFileName);
+                            SetFileAttributesUtf8Local(tgtFileName, FILE_ATTRIBUTE_NORMAL);
+                            DeleteFileUtf8Local(tgtFileName);
                         }
                         else // finish the download
                         {
@@ -421,8 +421,8 @@ void CControlConnectionSocket::DownloadOneFile(HWND parent, const char* fileName
                                     TRACE_E("CControlConnectionSocket::DownloadOneFile(): unexpected situation: file was not created, but its size is not null!");
 
                                 // we are not in any critical section, so even if the disk operation stalls for a while, nothing happens
-                                SetFileAttributes(tgtFileName, FILE_ATTRIBUTE_NORMAL); // so a read-only file can be overwritten
-                                HANDLE file = HANDLES_Q(CreateFile(tgtFileName, GENERIC_WRITE,
+                                SetFileAttributesUtf8Local(tgtFileName, FILE_ATTRIBUTE_NORMAL); // so a read-only file can be overwritten
+                                HANDLE file = HANDLES_Q(CreateFileUtf8Local(tgtFileName, GENERIC_WRITE,
                                                                    FILE_SHARE_READ, NULL,
                                                                    CREATE_ALWAYS,
                                                                    FILE_FLAG_SEQUENTIAL_SCAN,

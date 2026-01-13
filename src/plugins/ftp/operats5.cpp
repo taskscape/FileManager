@@ -1224,7 +1224,7 @@ void DoCreateDir(CFTPDiskWork& localWork, char* fullName, BOOL& workDone, BOOL& 
                     break;
                 }
                 // try another directory name
-                if (!CreateDirectory(fullName, NULL))
+                if (!CreateDirectoryUtf8Local(fullName, NULL))
                 {
                     winErr = GetLastError();
                     if (winErr != ERROR_ALREADY_EXISTS && winErr != ERROR_FILE_EXISTS)
@@ -1271,7 +1271,7 @@ void DoCreateDir(CFTPDiskWork& localWork, char* fullName, BOOL& workDone, BOOL& 
 }
 
 CFTPQueueItemState DoCreateFileGetWantedErrorState(CFTPDiskWork& localWork)
-{                                          // helper function for DoCreateFile()
+{                                          // helper function for DoCreateFileUtf8Local()
     CFTPQueueItemState state = sqisFailed; // may still be adjusted in the code a few lines below
     switch (localWork.CannotCreateFile)    // reported error is "unable to create or open file"
     {
@@ -1286,7 +1286,7 @@ CFTPQueueItemState DoCreateFileGetWantedErrorState(CFTPDiskWork& localWork)
     return state;
 }
 
-void DoCreateFile(CFTPDiskWork& localWork, char* fullName, BOOL& workDone, BOOL& needCopyBack,
+void DoCreateFileUtf8Local(CFTPDiskWork& localWork, char* fullName, BOOL& workDone, BOOL& needCopyBack,
                   char* nameBackup, char* suffix)
 {
     BOOL isValid = SalamanderGeneral->SalIsValidFileNameComponent(localWork.Name);
@@ -1634,7 +1634,7 @@ void DoCreateFile(CFTPDiskWork& localWork, char* fullName, BOOL& workDone, BOOL&
                     break;
                 }
                 // try another file name
-                file = HANDLES_Q(CreateFile(fullName, GENERIC_WRITE, FILE_SHARE_READ, NULL,
+                file = HANDLES_Q(CreateFileUtf8Local(fullName, GENERIC_WRITE, FILE_SHARE_READ, NULL,
                                             CREATE_NEW, FILE_FLAG_SEQUENTIAL_SCAN, NULL));
                 if (file == INVALID_HANDLE_VALUE)
                 {
@@ -1676,7 +1676,7 @@ void DoCreateFile(CFTPDiskWork& localWork, char* fullName, BOOL& workDone, BOOL&
         case 2: // resume (for already exists, transfer failed, and force action) + if reduceFileSize==TRUE we also need to shrink the file
         case 3: // resume or overwrite (for already exists, transfer failed, and force action)
         {
-            file = HANDLES_Q(CreateFile(fullName,
+            file = HANDLES_Q(CreateFileUtf8Local(fullName,
                                         GENERIC_READ /* we will read and check the overlap */ |
                                             GENERIC_WRITE,
                                         FILE_SHARE_READ, NULL,
@@ -1689,8 +1689,8 @@ void DoCreateFile(CFTPDiskWork& localWork, char* fullName, BOOL& workDone, BOOL&
                 if (attr != INVALID_FILE_ATTRIBUTES && (attr & FILE_ATTRIBUTE_READONLY))
                 { // try to clear the read-only attribute and open the file again
                     readonly = TRUE;
-                    SetFileAttributes(fullName, attr & (~FILE_ATTRIBUTE_READONLY));
-                    file = HANDLES_Q(CreateFile(fullName,
+                    SetFileAttributesUtf8Local(fullName, attr & (~FILE_ATTRIBUTE_READONLY));
+                    file = HANDLES_Q(CreateFileUtf8Local(fullName,
                                                 GENERIC_READ /* we will read and check the overlap */ |
                                                     GENERIC_WRITE,
                                                 FILE_SHARE_READ, NULL,
@@ -1768,7 +1768,7 @@ void DoCreateFile(CFTPDiskWork& localWork, char* fullName, BOOL& workDone, BOOL&
             if (action == 2 /* resume */ || denyOverwrite)
             {
                 if (readonly)
-                    SetFileAttributes(fullName, attr); // restore the read-only attribute (failed to open the file)
+                    SetFileAttributesUtf8Local(fullName, attr); // restore the read-only attribute (failed to open the file)
 
                 localWork.ProblemID = ITEMPR_CANNOTCREATETGTFILE;
                 localWork.WinError = winErr;
@@ -1787,10 +1787,10 @@ void DoCreateFile(CFTPDiskWork& localWork, char* fullName, BOOL& workDone, BOOL&
                 if (attr != INVALID_FILE_ATTRIBUTES && (attr & FILE_ATTRIBUTE_READONLY))
                 { // try to clear the read-only attribute
                     readonly = TRUE;
-                    SetFileAttributes(fullName, attr & (~FILE_ATTRIBUTE_READONLY));
+                    SetFileAttributesUtf8Local(fullName, attr & (~FILE_ATTRIBUTE_READONLY));
                 }
             }
-            file = HANDLES_Q(CreateFile(fullName, GENERIC_WRITE, FILE_SHARE_READ, NULL,
+            file = HANDLES_Q(CreateFileUtf8Local(fullName, GENERIC_WRITE, FILE_SHARE_READ, NULL,
                                         CREATE_ALWAYS, FILE_FLAG_SEQUENTIAL_SCAN, NULL));
             if (file == INVALID_HANDLE_VALUE) // cannot open the file
             {
@@ -1803,9 +1803,9 @@ void DoCreateFile(CFTPDiskWork& localWork, char* fullName, BOOL& workDone, BOOL&
                 // (on Samba it is possible to allow deleting read-only files, which makes deleting a read-only file possible,
                 //  otherwise it cannot be deleted because Windows cannot remove a read-only file and at the same time
                 //  the "read-only" attribute cannot be cleared on that file because the current user is not the owner)
-                if (DeleteFile(fullName)) // if it is read-only, it can be deleted only on Samba with "delete readonly" enabled
+                if (DeleteFileUtf8Local(fullName)) // if it is read-only, it can be deleted only on Samba with "delete readonly" enabled
                 {
-                    file = HANDLES_Q(CreateFile(fullName, GENERIC_WRITE, FILE_SHARE_READ, NULL,
+                    file = HANDLES_Q(CreateFileUtf8Local(fullName, GENERIC_WRITE, FILE_SHARE_READ, NULL,
                                                 CREATE_ALWAYS, FILE_FLAG_SEQUENTIAL_SCAN, NULL));
                     winErr = GetLastError();
                 }
@@ -1823,7 +1823,7 @@ void DoCreateFile(CFTPDiskWork& localWork, char* fullName, BOOL& workDone, BOOL&
             else
             {
                 if (readonly)
-                    SetFileAttributes(fullName, attr); // restore the read-only attribute (failed to delete the file)
+                    SetFileAttributesUtf8Local(fullName, attr); // restore the read-only attribute (failed to delete the file)
 
                 localWork.ProblemID = ITEMPR_CANNOTCREATETGTFILE;
                 localWork.WinError = winErr;
@@ -1979,8 +1979,8 @@ void DoCreateAndWriteFile(CFTPDiskWork& localWork, BOOL& needCopyBack, BOOL& wor
     HANDLE file = NULL;
     if (localWork.WorkFile == NULL) // the file has not been created yet
     {
-        SetFileAttributes(localWork.Name, FILE_ATTRIBUTE_NORMAL); // to allow overwriting a read-only file as well
-        HANDLE f = HANDLES_Q(CreateFile(localWork.Name, GENERIC_WRITE,
+        SetFileAttributesUtf8Local(localWork.Name, FILE_ATTRIBUTE_NORMAL); // to allow overwriting a read-only file as well
+        HANDLE f = HANDLES_Q(CreateFileUtf8Local(localWork.Name, GENERIC_WRITE,
                                         FILE_SHARE_READ, NULL,
                                         CREATE_ALWAYS,
                                         FILE_FLAG_SEQUENTIAL_SCAN,
@@ -2029,7 +2029,7 @@ void DoListDirectory(CFTPDiskWork& localWork, BOOL& needCopyBack)
             SalamanderGeneral->SalPathAppend(srcPath, "*.*", MAX_PATH + 10); // cannot fail
             char* srcPathEnd = strrchr(srcPath, '\\');                       // cannot fail either
             WIN32_FIND_DATA fileData;
-            HANDLE search = HANDLES_Q(FindFirstFile(srcPath, &fileData));
+            HANDLE search = HANDLES_Q(FindFirstFileUtf8Local(srcPath, &fileData));
             if (search == INVALID_HANDLE_VALUE)
             {
                 DWORD err = GetLastError();
@@ -2084,7 +2084,7 @@ void DoListDirectory(CFTPDiskWork& localWork, BOOL& needCopyBack)
                         localWork.ProblemID = ITEMPR_LOWMEM;
                         break;
                     }
-                } while (FindNextFile(search, &fileData));
+                } while (FindNextFileUtf8Local(search, &fileData));
                 DWORD err = GetLastError();
                 HANDLES(FindClose(search));
                 if (localWork.State != sqisFailed && err != ERROR_NO_MORE_FILES)
@@ -2123,13 +2123,13 @@ void DoDeleteDir(CFTPDiskWork& localWork, BOOL& needCopyBack)
     {
         DWORD attr = SalamanderGeneral->SalGetFileAttributes(delPath);
         BOOL chAttrs = SalamanderGeneral->ClearReadOnlyAttr(delPath, attr); // so it can be deleted ...
-        if (!RemoveDirectory(delPath))
+        if (!RemoveDirectoryUtf8Local(delPath))
         {
             DWORD err = GetLastError();
             if (err != ERROR_FILE_NOT_FOUND && err != ERROR_PATH_NOT_FOUND)
             { // if the directory no longer exists, everything is OK, otherwise print an error:
                 if (chAttrs)
-                    SetFileAttributes(delPath, attr); // deletion failed, so at least try to restore its attributes
+                    SetFileAttributesUtf8Local(delPath, attr); // deletion failed, so at least try to restore its attributes
                 localWork.State = sqisFailed;
                 localWork.ProblemID = ITEMPR_UNABLETODELETEDISKDIR;
                 localWork.WinError = err;
@@ -2145,7 +2145,7 @@ void DoDeleteDir(CFTPDiskWork& localWork, BOOL& needCopyBack)
     }
 }
 
-void DoDeleteFile(CFTPDiskWork& localWork, BOOL& needCopyBack)
+void DoDeleteFileUtf8Local(CFTPDiskWork& localWork, BOOL& needCopyBack)
 {
     char delPath[MAX_PATH + 10];
     lstrcpyn(delPath, localWork.Path, MAX_PATH);
@@ -2153,13 +2153,13 @@ void DoDeleteFile(CFTPDiskWork& localWork, BOOL& needCopyBack)
     {
         DWORD attr = SalamanderGeneral->SalGetFileAttributes(delPath);
         BOOL chAttrs = SalamanderGeneral->ClearReadOnlyAttr(delPath, attr); // so it can be deleted ...
-        if (!DeleteFile(delPath))
+        if (!DeleteFileUtf8Local(delPath))
         {
             DWORD err = GetLastError();
             if (err != ERROR_FILE_NOT_FOUND && err != ERROR_PATH_NOT_FOUND)
             { // if the file no longer exists, everything is OK, otherwise print an error:
                 if (chAttrs)
-                    SetFileAttributes(delPath, attr); // deletion failed, so at least try to restore its attributes
+                    SetFileAttributesUtf8Local(delPath, attr); // deletion failed, so at least try to restore its attributes
                 localWork.State = sqisFailed;
                 localWork.ProblemID = ITEMPR_UNABLETODELETEDISKFILE;
                 localWork.WinError = err;
@@ -2184,7 +2184,7 @@ void DoOpenFileForReading(CFTPDiskWork& localWork, BOOL& needCopyBack)
     BOOL ok = FALSE;
     if (SalamanderGeneral->SalPathAppend(fileName, localWork.Name, MAX_PATH))
     {
-        HANDLE in = HANDLES_Q(CreateFile(fileName, GENERIC_READ,
+        HANDLE in = HANDLES_Q(CreateFileUtf8Local(fileName, GENERIC_READ,
                                          FILE_SHARE_READ | FILE_SHARE_WRITE, NULL,
                                          OPEN_EXISTING, FILE_FLAG_SEQUENTIAL_SCAN, NULL));
         if (in != INVALID_HANDLE_VALUE)
@@ -2466,7 +2466,7 @@ CFTPDiskThread::Body()
             }
             HANDLES(CloseHandle(fileToClose->File));
             if (delFile)
-                DeleteFile(fileToClose->FileName);
+                DeleteFileUtf8Local(fileToClose->FileName);
             delete fileToClose;
 
             HANDLES(EnterCriticalSection(&DiskCritSect));
@@ -2494,7 +2494,7 @@ CFTPDiskThread::Body()
                 case fdwtRetryCreatedFile:
                 case fdwtRetryResumedFile:
                 {
-                    DoCreateFile(localWork, fullName, workDone, needCopyBack, nameBackup, suffix);
+                    DoCreateFileUtf8Local(localWork, fullName, workDone, needCopyBack, nameBackup, suffix);
                     break;
                 }
 
@@ -2537,7 +2537,7 @@ CFTPDiskThread::Body()
 
                 case fdwtDeleteFile:
                 {
-                    DoDeleteFile(localWork, needCopyBack);
+                    DoDeleteFileUtf8Local(localWork, needCopyBack);
                     break;
                 }
 
@@ -2600,7 +2600,7 @@ CFTPDiskThread::Body()
                     {
                         if (workDone)
                         {
-                            if (!RemoveDirectory(fullName))
+                            if (!RemoveDirectoryUtf8Local(fullName))
                                 TRACE_E("CFTPDiskThread::Body(): cancelling disk operation: unable to remove directory: " << fullName);
                         }
                         break;
@@ -2612,7 +2612,7 @@ CFTPDiskThread::Body()
                     {
                         if (workDone)
                         {
-                            if (!DeleteFile(fullName)) // the created file cannot have the read-only attribute; otherwise it could not be opened for writing
+                            if (!DeleteFileUtf8Local(fullName)) // the created file cannot have the read-only attribute; otherwise it could not be opened for writing
                                 TRACE_E("CFTPDiskThread::Body(): cancelling disk operation: unable to remove file: " << fullName);
                         }
                         break;
@@ -2622,7 +2622,7 @@ CFTPDiskThread::Body()
                     {
                         if (workDone)
                         {
-                            if (!DeleteFile(localWork.Name)) // the created file cannot have the read-only attribute
+                            if (!DeleteFileUtf8Local(localWork.Name)) // the created file cannot have the read-only attribute
                                 TRACE_E("CFTPDiskThread::Body(): cancelling disk operation: unable to remove target file: " << localWork.Name);
                         }
                         // break; // intentionally no break here!

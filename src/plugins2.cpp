@@ -2725,14 +2725,17 @@ int CPlugins::GetViewerCount(int index)
 }
 
 // helper function for CPlugins::AutoInstallStdPluginsDir
-void SearchForSPLs(char* buf, char* s, TIndirectArray<char>& foundFiles, WIN32_FIND_DATA& data)
+void SearchForSPLs(char* buf, char* s, TIndirectArray<char>& foundFiles, WIN32_FIND_DATAW& dataW)
 {
     strcpy(s++, "\\*");
-    HANDLE find = HANDLES_Q(FindFirstFile(buf, &data));
+    WIN32_FIND_DATA data;
+    CStrP bufW(ConvertAllocUtf8ToWide(buf, -1));
+    HANDLE find = bufW != NULL ? HANDLES_Q(FindFirstFileW(bufW, &dataW)) : INVALID_HANDLE_VALUE;
     if (find != INVALID_HANDLE_VALUE)
     {
         do
         {
+            ConvertFindDataWToUtf8(dataW, &data);
             if ((data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) == 0) // it's a file
             {
                 char* str = strrchr(data.cFileName, '.');
@@ -2759,10 +2762,10 @@ void SearchForSPLs(char* buf, char* s, TIndirectArray<char>& foundFiles, WIN32_F
                 if (data.cFileName[0] != 0 && strcmp(data.cFileName, ".") != 0 && strcmp(data.cFileName, "..") != 0)
                 { // not "." or "..", search the subdirectory...
                     strcpy(s, data.cFileName);
-                    SearchForSPLs(buf, s + strlen(s), foundFiles, data);
+                    SearchForSPLs(buf, s + strlen(s), foundFiles, dataW);
                 }
             }
-        } while (FindNextFile(find, &data));
+        } while (FindNextFileW(find, &dataW));
         HANDLES(FindClose(find));
     }
 }
@@ -2770,7 +2773,7 @@ void SearchForSPLs(char* buf, char* s, TIndirectArray<char>& foundFiles, WIN32_F
 BOOL SearchForAddedSPLs(char* buf, char* s, TIndirectArray<char>& foundFiles)
 { // returns TRUE if plugins from 'foundFiles' should be installed and all plugins loaded
     strcpy(s, "\\plugins.ver");
-    HANDLE file = HANDLES_Q(CreateFile(buf, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING,
+    HANDLE file = HANDLES_Q(CreateFileUtf8(buf, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING,
                                        FILE_FLAG_SEQUENTIAL_SCAN, NULL));
     if (file != INVALID_HANDLE_VALUE)
     {
@@ -3356,7 +3359,7 @@ void CPlugins::AutoInstallStdPluginsDir(HWND parent)
 
     // search for *.spl in the "plugins" directory and its subdirectories
     TIndirectArray<char> foundFiles(10, 10);
-    WIN32_FIND_DATA data;
+    WIN32_FIND_DATAW data;
     SearchForSPLs(buf, s, foundFiles, data);
 
     // for progress compute the number of existing plugins that will be loaded later

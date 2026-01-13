@@ -437,7 +437,7 @@ CPluginFSInterface::ListCurrentPath(CSalamanderDirectoryAbstract* dir,
     strcpy(curPath, Path);
     SalamanderGeneral->SalPathAppend(curPath, "*.*", MAX_PATH + 4);
     char* name = curPath + strlen(curPath) - 3;
-    HANDLE find = HANDLES_Q(FindFirstFile(curPath, &data));
+    HANDLE find = HANDLES_Q(FindFirstFileUtf8Local(curPath, &data));
 
     if (find == INVALID_HANDLE_VALUE)
     {
@@ -583,7 +583,7 @@ CPluginFSInterface::ListCurrentPath(CSalamanderDirectoryAbstract* dir,
     }
     //end j.r.
 */
-        if (!FindNextFile(find, &data))
+        if (!FindNextFileUtf8Local(find, &data))
         {
             HANDLES(FindClose(find));
             break; // end of enumeration
@@ -935,7 +935,7 @@ CPluginFSInterface::QuickRename(const char* fsName, int mode, HWND parent, CFile
         // 'newName' is returned after adjustment (mask applied)
         return FALSE; // error -> show the standard dialog again
     }
-    if (!MoveFile(nameFrom, nameTo))
+    if (!MoveFileUtf8Local(nameFrom, nameTo))
     {
         // (overwriting is not handled here; treat it as an error as well)
         SalamanderGeneral->GetErrorText(GetLastError(), buf, 2 * MAX_PATH);
@@ -1229,10 +1229,10 @@ CPluginFSInterface::ViewFile(const char* fsName, HWND parent,
     if (!fileExists) // preparing the file copy (download) is necessary
     {
         const char* name = uniqueFileName + strlen(fsName) + 1;
-        if (CopyFile(name, tmpFileName, TRUE)) // the copy succeeded
+        if (CopyFileUtf8Local(name, tmpFileName, TRUE)) // the copy succeeded
         {
             newFileOK = TRUE; // if determining the file size fails, newFileSize stays zero (not too important)
-            HANDLE hFile = HANDLES_Q(CreateFile(tmpFileName, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE,
+            HANDLE hFile = HANDLES_Q(CreateFileUtf8Local(tmpFileName, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE,
                                                 NULL, OPEN_EXISTING, 0, NULL));
             if (hFile != INVALID_HANDLE_VALUE)
             { // ignore errors; the exact file size is not essential
@@ -1468,7 +1468,7 @@ CPluginFSInterface::Delete(const char* fsName, int mode, HWND parent, int panel,
           while (1)
           {
             SalamanderGeneral->ClearReadOnlyAttr(fileName, f->Attr);  // allow deletion of read-only items
-            if (!DeleteFile(fileName))
+            if (!DeleteFileUtf8Local(fileName))
             {
               if (!skipAllErrors)
               {
@@ -2208,7 +2208,7 @@ CPluginFSInterface::CopyOrMoveFromFS(BOOL copy, int mode, const char* fsName, HW
                         // (the ConfirmOnFileOverwrite and ConfirmOnSystemHiddenFileOverwrite flags apply)
                         while (1)
                         {
-                            if (!CopyFile(sourceName, targetName, TRUE))
+                            if (!CopyFileUtf8Local(sourceName, targetName, TRUE))
                             {
                                 if (!skipAllErrors)
                                 {
@@ -2254,7 +2254,7 @@ CPluginFSInterface::CopyOrMoveFromFS(BOOL copy, int mode, const char* fsName, HW
                             char tmpName2[MAX_PATH];
                             if (SalamanderGeneral->SalGetTempFileName(NULL, "DFS", tmpName2, TRUE, NULL))
                             {
-                                if (CopyFile(targetName, tmpName2, FALSE))
+                                if (CopyFileUtf8Local(targetName, tmpName2, FALSE))
                                 {
                                     BOOL alreadyExists;
                                     if (!SalamanderGeneral->MoveFileToCache(dfsSourceName, f->Name, NULL, tmpName2,
@@ -2270,7 +2270,7 @@ CPluginFSInterface::CopyOrMoveFromFS(BOOL copy, int mode, const char* fsName, HW
                                 {
                                     // clear the read-only attribute so the temporary copy can be deleted
                                     SalamanderGeneral->ClearReadOnlyAttr(tmpName2);
-                                    DeleteFile(tmpName2);
+                                    DeleteFileUtf8Local(tmpName2);
                                 }
                             }
                             else
@@ -2304,7 +2304,7 @@ CPluginFSInterface::CopyOrMoveFromFS(BOOL copy, int mode, const char* fsName, HW
                         // (the ConfirmOnFileOverwrite and ConfirmOnSystemHiddenFileOverwrite flags apply)
                         while (1)
                         {
-                            if (!CopyFile(tmpName, targetName, TRUE))
+                            if (!CopyFileUtf8Local(tmpName, targetName, TRUE))
                             {
                                 if (!skipAllErrors)
                                 {
@@ -2350,7 +2350,7 @@ CPluginFSInterface::CopyOrMoveFromFS(BOOL copy, int mode, const char* fsName, HW
                         {
                             // allow deletion of read-only items
                             SalamanderGeneral->ClearReadOnlyAttr(sourceName, f->Attr);
-                            if (!DeleteFile(sourceName))
+                            if (!DeleteFileUtf8Local(sourceName))
                             {
                                 if (!skipAllErrors)
                                 {
@@ -2760,7 +2760,7 @@ CPluginFSInterface::CopyOrMoveFromDiskToFS(BOOL copy, int mode, const char* fsNa
                 // (the ConfirmOnFileOverwrite and ConfirmOnSystemHiddenFileOverwrite flags apply)
                 while (1)
                 {
-                    if (!CopyFile(sourceName, targetName, TRUE))
+                    if (!CopyFileUtf8Local(sourceName, targetName, TRUE))
                     {
                         if (!skipAllErrors)
                         {
@@ -2803,7 +2803,7 @@ CPluginFSInterface::CopyOrMoveFromDiskToFS(BOOL copy, int mode, const char* fsNa
                         // allow deletion of read-only items
                         SalamanderGeneral->ClearReadOnlyAttr(sourceName, attr);
 
-                        if (!DeleteFile(sourceName))
+                        if (!DeleteFileUtf8Local(sourceName))
                         {
                             if (!skipAllErrors)
                             {

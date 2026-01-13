@@ -2452,7 +2452,7 @@ BOOL CNethoodCacheEnumerationThread::ResolveNetShortcut(
     lstrcpyn(name, path, MAX_PATH);
     if (SalamanderGeneral->SalPathAppend(name, "desktop.ini", MAX_PATH))
     {
-        HANDLE hFile = HANDLES_Q(CreateFile(name, GENERIC_READ,
+        HANDLE hFile = HANDLES_Q(CreateFileUtf8Local(name, GENERIC_READ,
                                             FILE_SHARE_WRITE | FILE_SHARE_READ, NULL,
                                             OPEN_EXISTING,
                                             FILE_FLAG_SEQUENTIAL_SCAN,
@@ -2502,7 +2502,7 @@ BOOL CNethoodCacheEnumerationThread::ResolveNetShortcut(
         if (SalamanderGeneral->SalPathAppend(name, "target.lnk", MAX_PATH))
         {
             WIN32_FIND_DATA data;
-            HANDLE find = HANDLES_Q(FindFirstFile(name, &data));
+            HANDLE find = HANDLES_Q(FindFirstFileUtf8Local(name, &data));
             if (find != INVALID_HANDLE_VALUE) // The file exists and we already retrieved its metadata.
             {
                 HANDLES(FindClose(find));
@@ -2558,7 +2558,7 @@ DWORD CNethoodCacheEnumerationThread::EnumNetworkShortcuts()
         return NO_ERROR;
     }
 
-    hFind = HANDLES_Q(FindFirstFile(szFindMask, &wfd));
+    hFind = HANDLES_Q(FindFirstFileUtf8Local(szFindMask, &wfd));
     if (hFind == INVALID_HANDLE_VALUE)
     {
         return NO_ERROR;
@@ -2583,7 +2583,7 @@ DWORD CNethoodCacheEnumerationThread::EnumNetworkShortcuts()
                 }
             }
 
-            res = FindNextFile(hFind, &wfd);
+            res = FindNextFileUtf8Local(hFind, &wfd);
         }
 
         CoUninitialize();

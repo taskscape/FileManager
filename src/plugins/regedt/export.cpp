@@ -76,7 +76,7 @@ BOOL ExportKey(LPWSTR fullName)
             if (SG->DialogQuestion(GetParent(), BUTTONS_YESNOCANCEL, file, LoadStr(IDS_OVERWRITE), LoadStr(IDS_OVERWRITETITLE)) != DIALOG_YES)
                 continue; // show the dialog again
             SG->ClearReadOnlyAttr(file);
-            if (!DeleteFile(file))
+            if (!DeleteFileUtf8Local(file))
             {
                 Error(IDS_REPLACEERROR);
                 continue; // show the dialog again

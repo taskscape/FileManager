@@ -769,7 +769,7 @@ CPluginFSInterface::ViewFile(const char* fsName, HWND parent,
         if (err == 0) // the copy succeeded
         {
             newFileOK = TRUE; // if the size query fails, newFileSize stays zero (not critical)
-            HANDLE hFile = HANDLES_Q(CreateFile(tmpFileName, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE,
+            HANDLE hFile = HANDLES_Q(CreateFileUtf8Local(tmpFileName, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE,
                                                 NULL, OPEN_EXISTING, 0, NULL));
             if (hFile != INVALID_HANDLE_VALUE)
             { // ignore errors; the exact file size is not essential
@@ -1158,7 +1158,7 @@ static void GetFileData(const char* name, char (&buf)[100])
 
     WIN32_FIND_DATA data;
 
-    HANDLE find = FindFirstFile(name, &data);
+    HANDLE find = FindFirstFileUtf8Local(name, &data);
     if (find == INVALID_HANDLE_VALUE)
         return;
 
@@ -1856,7 +1856,7 @@ CPluginFSInterface::CopyOrMoveFromFS(BOOL copy, int mode, const char* fsName, HW
                     {
                         if (attr != 0xFFFFFFFF &&
                             (attr & (FILE_ATTRIBUTE_SYSTEM | FILE_ATTRIBUTE_HIDDEN | FILE_ATTRIBUTE_READONLY)))
-                            SetFileAttributes(targetName, FILE_ATTRIBUTE_ARCHIVE);
+                            SetFileAttributesUtf8Local(targetName, FILE_ATTRIBUTE_ARCHIVE);
 
                         err = CRAPI::CopyFileToPC(sourceName, targetName, FALSE, &dlg, copied, totalsize, &errFileName);
                     }
@@ -2067,7 +2067,7 @@ static BOOL FindAllFilesInTree(LPCTSTR rootPath, char (&path)[MAX_PATH], LPCTSTR
         !SalamanderGeneral->SalPathAppend(fullPath, fileName, MAX_PATH))
         goto ONERROR_TOOLONG;
 
-    find = FindFirstFile(fullPath, &data);
+    find = FindFirstFileUtf8Local(fullPath, &data);
     if (find == INVALID_HANDLE_VALUE)
     {
         DWORD err = GetLastError();
@@ -2139,7 +2139,7 @@ static BOOL FindAllFilesInTree(LPCTSTR rootPath, char (&path)[MAX_PATH], LPCTSTR
             }
         }
 
-        if (!FindNextFile(find, &data))
+        if (!FindNextFileUtf8Local(find, &data))
         {
             if (GetLastError() == ERROR_NO_MORE_FILES)
                 break; // JR Everything is fine, stop
@@ -2628,7 +2628,7 @@ CPluginFSInterface::CopyOrMoveFromDiskToFS(BOOL copy, int mode, const char* fsNa
                     {
                         SalamanderGeneral->ClearReadOnlyAttr(sourceName, fi.dwFileAttributes);
 
-                        if (!RemoveDirectory(sourceName))
+                        if (!RemoveDirectoryUtf8Local(sourceName))
                         {
                             if (!skipAllErrors)
                             {
@@ -2668,7 +2668,7 @@ CPluginFSInterface::CopyOrMoveFromDiskToFS(BOOL copy, int mode, const char* fsNa
                 {
                     SalamanderGeneral->ClearReadOnlyAttr(sourceName, fi.dwFileAttributes);
 
-                    if (!DeleteFile(sourceName))
+                    if (!DeleteFileUtf8Local(sourceName))
                     {
                         if (!skipAllErrors)
                         {

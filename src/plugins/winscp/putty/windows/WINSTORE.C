@@ -10,6 +10,7 @@
 #include "storage.h"
 
 #include <shlobj.h>
+#include "..\\..\\Utf8WinApi.h"
 #ifndef CSIDL_APPDATA
 #define CSIDL_APPDATA 0x001a
 #endif
@@ -463,7 +464,7 @@ static int try_random_seed(char const *path, int action, HANDLE *ret)
 	return FALSE;		       /* so we'll do the next ones too */
     }
 
-    *ret = CreateFile(path,
+    *ret = WinScpCreateFileUtf8(path,
 		      action == OPEN_W ? GENERIC_WRITE : GENERIC_READ,
 		      action == OPEN_W ? 0 : (FILE_SHARE_READ |
 					      FILE_SHARE_WRITE),

@@ -170,8 +170,9 @@ CPF_AGAIN:
         if (GetDriveType(root) == DRIVE_FIXED)
         {
             SalPathAppend(threadPath, "*", MAX_PATH + 5);
-            WIN32_FIND_DATA data;
-            HANDLE find = HANDLES_Q(FindFirstFile(threadPath, &data));
+            WIN32_FIND_DATAW data;
+            CStrP threadPathW(ConvertAllocUtf8ToWide(threadPath, -1));
+            HANDLE find = threadPathW != NULL ? HANDLES_Q(FindFirstFileW(threadPathW, &data)) : INVALID_HANDLE_VALUE;
             if (find != INVALID_HANDLE_VALUE)
             {
                 // cesta je preci jen asi OK (bez testu na fixed disk nelze pouzit, bohuzel FindFirstFile
@@ -960,7 +961,7 @@ BOOL SalSplitWindowsPath(HWND parent, const char* title, const char* errorTitle,
                             invalidPath = TRUE;
                     }
                 }
-                if (invalidPath || !CreateDirectory(newDirs, NULL))
+                if (invalidPath || !CreateDirectoryUtf8(newDirs, NULL))
                 {
                     sprintf(textBuf, LoadStr(IDS_CREATEDIRFAILED), newDirs);
                     SalMessageBox(parent, textBuf, errorTitle, MB_OK | MB_ICONEXCLAMATION);
@@ -1231,7 +1232,15 @@ BOOL SalMoveFile(const char* srcName, const char* destName)
     char destNameCopy[3 * MAX_PATH];
     MakeCopyWithBackslashIfNeeded(destName, destNameCopy);
 
-    if (!MoveFile(srcName, destName))
+    CStrP srcNameW(ConvertAllocUtf8ToWide(srcName, -1));
+    CStrP destNameW(ConvertAllocUtf8ToWide(destName, -1));
+    if (srcNameW == NULL || destNameW == NULL)
+    {
+        SetLastError(ERROR_NO_UNICODE_TRANSLATION);
+        return FALSE;
+    }
+
+    if (!MoveFileW(srcNameW, destNameW))
     {
         DWORD err = GetLastError();
         if (err == ERROR_ACCESS_DENIED)
@@ -1239,16 +1248,16 @@ BOOL SalMoveFile(const char* srcName, const char* destName)
             DWORD attr = SalGetFileAttributes(srcName);
             if (attr != 0xFFFFFFFF && (attr & FILE_ATTRIBUTE_READONLY))
             {
-                SetFileAttributes(srcName, FILE_ATTRIBUTE_ARCHIVE);
-                if (MoveFile(srcName, destName))
+                SetFileAttributesW(srcNameW, FILE_ATTRIBUTE_ARCHIVE);
+                if (MoveFileW(srcNameW, destNameW))
                 {
-                    SetFileAttributes(destName, attr);
+                    SetFileAttributesW(destNameW, attr);
                     return TRUE;
                 }
                 else
                 {
                     err = GetLastError();
-                    SetFileAttributes(srcName, attr);
+                    SetFileAttributesW(srcNameW, attr);
                 }
             }
             SetLastError(err);
@@ -1471,8 +1480,17 @@ BOOL SalGetFileSize(HANDLE file, CQuadWord& size, DWORD& err)
 
 BOOL SalGetFileSize2(const char* fileName, CQuadWord& size, DWORD* err)
 {
-    HANDLE hFile = HANDLES_Q(CreateFile(fileName, 0, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
-                                        NULL, OPEN_EXISTING, 0, NULL));
+    CStrP fileNameW(ConvertAllocUtf8ToWide(fileName, -1));
+    if (fileNameW == NULL)
+    {
+        if (err != NULL)
+            *err = ERROR_NO_UNICODE_TRANSLATION;
+        size.Set(0, 0);
+        SetLastError(ERROR_NO_UNICODE_TRANSLATION);
+        return FALSE;
+    }
+    HANDLE hFile = HANDLES_Q(CreateFileW(fileNameW, 0, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+                                         NULL, OPEN_EXISTING, 0, NULL));
     if (hFile != INVALID_HANDLE_VALUE)
     {
         DWORD dummyErr;
@@ -1496,7 +1514,13 @@ DWORD SalGetFileAttributes(const char* fileName)
     char fileNameCopy[3 * MAX_PATH];
     MakeCopyWithBackslashIfNeeded(fileName, fileNameCopy);
 
-    return GetFileAttributes(fileName);
+    CStrP fileNameW(ConvertAllocUtf8ToWide(fileName, -1));
+    if (fileNameW == NULL)
+    {
+        SetLastError(ERROR_NO_UNICODE_TRANSLATION);
+        return INVALID_FILE_ATTRIBUTES;
+    }
+    return GetFileAttributesW(fileNameW);
 }
 
 BOOL ClearReadOnlyAttr(const char* name, DWORD attr)
@@ -1508,7 +1532,8 @@ BOOL ClearReadOnlyAttr(const char* name, DWORD attr)
         // shodime jen RO (u hardlinku zmeni i atributy ostatnich hardlinku na stejny soubor, tak at je to co nejmene)
         if ((attr & FILE_ATTRIBUTE_READONLY) != 0)
         {
-            if (!SetFileAttributes(name, attr & ~FILE_ATTRIBUTE_READONLY))
+            CStrP nameW(ConvertAllocUtf8ToWide(name, -1));
+            if (nameW == NULL || !SetFileAttributesW(nameW, attr & ~FILE_ATTRIBUTE_READONLY))
                 TRACE_E("ClearReadOnlyAttr(): error setting attrs (0x" << std::hex << (attr & ~FILE_ATTRIBUTE_READONLY) << std::dec << "): " << name);
             return TRUE;
         }
@@ -1516,7 +1541,8 @@ BOOL ClearReadOnlyAttr(const char* name, DWORD attr)
     else
     {
         TRACE_E("ClearReadOnlyAttr(): error getting attrs: " << name);
-        if (!SetFileAttributes(name, FILE_ATTRIBUTE_ARCHIVE)) // nelze cist atributy, zkusime aspon zapsat (uz neresime, jestli je to potreba)
+        CStrP nameW(ConvertAllocUtf8ToWide(name, -1));
+        if (nameW == NULL || !SetFileAttributesW(nameW, FILE_ATTRIBUTE_ARCHIVE)) // nelze cist atributy, zkusime aspon zapsat (uz neresime, jestli je to potreba)
             TRACE_E("ClearReadOnlyAttr(): error setting attrs (FILE_ATTRIBUTE_ARCHIVE): " << name);
         return TRUE;
     }
@@ -1902,7 +1928,7 @@ BOOL CreateOurPathInRoamingAPPDATA(char* buf)
     {
         if (SalPathAppend(path, "Open Salamander", MAX_PATH))
         {
-            CreateDirectory(path, NULL); // jestli selze (napr. uz existuje), neresime...
+            CreateDirectoryUtf8(path, NULL); // jestli selze (napr. uz existuje), neresime...
             if (buf != NULL)
                 lstrcpyn(buf, path, MAX_PATH);
             return TRUE;

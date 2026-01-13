@@ -258,7 +258,7 @@ CPluginInterfaceForMenuExt::ExecuteMenuItem(CSalamanderForOperationsAbstract* sa
       DWORD error;
       if (SalamanderGeneral->SalGetTempFileName(NULL, "view", fileNameBuf, TRUE, &error))
       {
-        HANDLE file = HANDLES_Q(CreateFile(viewerData.FileName, GENERIC_WRITE, FILE_SHARE_READ, NULL,
+        HANDLE file = HANDLES_Q(CreateFileUtf8Local(viewerData.FileName, GENERIC_WRITE, FILE_SHARE_READ, NULL,
                                            OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL));
         if (file != INVALID_HANDLE_VALUE)
         {
@@ -277,7 +277,7 @@ CPluginInterfaceForMenuExt::ExecuteMenuItem(CSalamanderForOperationsAbstract* sa
           viewerData.Caption = "My file test.txt";
           viewerData.WholeCaption = FALSE; // let Salamander append the standard viewer title
           BOOL ok = SalamanderGeneral->ViewFileInPluginViewer(NULL, &viewerData, TRUE, NULL, "test.txt", err);
-//          DeleteFile(viewerData.FileName);   // if disk cache is not used the file has to be deleted manually
+//          DeleteFileUtf8Local(viewerData.FileName);   // if disk cache is not used the file has to be deleted manually
         }
       }
 */

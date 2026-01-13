@@ -1,4 +1,4 @@
-﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2023 Open Salamander Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 // CommentsTranslationProject: TRANSLATED
 
@@ -23,6 +23,16 @@ extern "C"
 #include "shexreg.h"
 }
 #include "salshlib.h"
+
+static int DrawTextUtf8(HDC hdc, const char* text, int len, RECT* rect, UINT format)
+{
+    if (text == NULL || len == 0)
+        return DrawTextW(hdc, L"", 0, rect, format);
+    CStrP textW(ConvertAllocUtf8ToWide(text, -1));
+    if (textW == NULL)
+        return DrawTextW(hdc, L"?", 1, rect, format);
+    return DrawTextW(hdc, textW, lstrlenW(textW), rect, format);
+}
 
 // !!! do not use StdColumnsPrivate directly, use GetStdColumn()
 CColumDataItem StdColumnsPrivate[STANDARD_COLUMNS_COUNT] =
@@ -1650,13 +1660,13 @@ CFilesWindow::CreateDragImage(int cursorX, int cursorY, int& dxHotspot, int& dyH
         int oldTextColor = SetTextColor(hDC, GetCOLORREF(CurrentColors[ITEM_FG_FOCUSED]));
         int oldBkColor = SetBkColor(hDC, GetCOLORREF(CurrentColors[ITEM_BK_FOCUSED]));
         r.left = iconWidth;
-        DrawText(hDC, buff, buffLen, &r, DT_LEFT | DT_SINGLELINE | DT_TOP | DT_NOPREFIX);
+        DrawTextUtf8(hDC, buff, buffLen, &r, DT_LEFT | DT_SINGLELINE | DT_TOP | DT_NOPREFIX);
         SetTextColor(hDC, oldTextColor);
         SelectObject(hDC, hOldFont);
         hOldFont = (HFONT)SelectObject(hMaskDC, Font);
         SetTextColor(hMaskDC, RGB(0, 0, 0));
         SetBkColor(hMaskDC, RGB(0, 0, 0));
-        DrawText(hMaskDC, buff, buffLen, &r, DT_LEFT | DT_SINGLELINE | DT_TOP | DT_NOPREFIX);
+        DrawTextUtf8(hMaskDC, buff, buffLen, &r, DT_LEFT | DT_SINGLELINE | DT_TOP | DT_NOPREFIX);
         SelectObject(hMaskDC, hOldFont);
         SetTextColor(hDC, oldTextColor);
         SetBkColor(hDC, oldBkColor);
@@ -2189,3 +2199,4 @@ CFilesWindow::GetHeaderLine()
     else
         return ListBox->GetHeaderLine();
 }
+

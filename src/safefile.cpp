@@ -15,6 +15,20 @@
 
 CSalamanderSafeFile SalSafeFile;
 
+static HANDLE CreateFileUtf8(const char* fileName, DWORD dwDesiredAccess, DWORD dwShareMode,
+                             LPSECURITY_ATTRIBUTES lpSecurityAttributes, DWORD dwCreationDisposition,
+                             DWORD dwFlagsAndAttributes, HANDLE hTemplateFile)
+{
+    CStrP fileNameW(ConvertAllocUtf8ToWide(fileName, -1));
+    if (fileNameW == NULL)
+    {
+        SetLastError(ERROR_INVALID_PARAMETER);
+        return INVALID_HANDLE_VALUE;
+    }
+    return CreateFileW(fileNameW, dwDesiredAccess, dwShareMode, lpSecurityAttributes,
+                       dwCreationDisposition, dwFlagsAndAttributes, hTemplateFile);
+}
+
 //*****************************************************************************
 //
 // CSalamanderSafeFile
@@ -43,7 +57,7 @@ BOOL CSalamanderSafeFile::SafeFileOpen(SAFE_FILE* file,
     int fileNameLen = (int)strlen(fileName);
     do
     {
-        hFile = fileNameLen >= MAX_PATH ? INVALID_HANDLE_VALUE : HANDLES_Q(CreateFile(fileName, dwDesiredAccess, dwShareMode, NULL, dwCreationDisposition, dwFlagsAndAttributes, NULL));
+        hFile = fileNameLen >= MAX_PATH ? INVALID_HANDLE_VALUE : HANDLES_Q(CreateFileUtf8(fileName, dwDesiredAccess, dwShareMode, NULL, dwCreationDisposition, dwFlagsAndAttributes, NULL));
         if (hFile == INVALID_HANDLE_VALUE)
         {
             DWORD dlgRet;
@@ -139,11 +153,14 @@ CSalamanderSafeFile::SafeFileCreate(const char* fileName,
         // it already exists; we’ll check whether it’s just a collision with a DOS-style name (the full name of the existing file/directory is different)
         if (!isDir)
         {
+            WIN32_FIND_DATAW dataW;
             WIN32_FIND_DATA data;
-            HANDLE find = HANDLES_Q(FindFirstFile(fileName, &data));
+            CStrP fileNameW(ConvertAllocUtf8ToWide(fileName, -1));
+            HANDLE find = fileNameW != NULL ? HANDLES_Q(FindFirstFileW(fileNameW, &dataW)) : INVALID_HANDLE_VALUE;
             if (find != INVALID_HANDLE_VALUE)
             {
                 HANDLES(FindClose(find));
+                ConvertFindDataWToUtf8(dataW, &data);
                 const char* tgtName = SalPathFindFileName(fileName);
                 if (StrICmp(tgtName, data.cAlternateFileName) == 0 && // match only for the DOS name
                     StrICmp(tgtName, data.cFileName) != 0)            // (the full name is different)
@@ -176,7 +193,7 @@ CSalamanderSafeFile::SafeFileCreate(const char* fileName,
                             hFile = INVALID_HANDLE_VALUE;
                             //              if (!isDir)   // file
                             //              {       // add the handle to HANDLES at the end only if the SAFE_FILE structure is being filled
-                            hFile = NOHANDLES(CreateFile(fileName, dwDesiredAccess, dwShareMode, NULL,
+                            hFile = NOHANDLES(CreateFileUtf8(fileName, dwDesiredAccess, dwShareMode, NULL,
                                                          CREATE_NEW, dwFlagsAndAttributes, NULL));
                             //              }
                             //              else   // directory
@@ -193,7 +210,7 @@ CSalamanderSafeFile::SafeFileCreate(const char* fileName,
                                     CloseHandle(hFile);
                                     hFile = INVALID_HANDLE_VALUE;
                                     //                  if (!isDir)
-                                    DeleteFile(fileName);
+                                    DeleteFileUtf8(fileName);
                                     //                  else RemoveDirectory(fileName);
                                     if (!::SalMoveFile(tmpName, origFullName))
                                         TRACE_E("Fatal unexpected situation in CSalamanderGeneral::SafeCreateFile(): unable to rename file from tmp-name to original long file name! " << origFullName);
@@ -285,7 +302,7 @@ CSalamanderSafeFile::SafeFileCreate(const char* fileName,
                 else
                 {
                     char fibuffer[500];
-                    HANDLE file2 = HANDLES_Q(CreateFile(fileName, 0, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL,
+                    HANDLE file2 = HANDLES_Q(CreateFileUtf8(fileName, 0, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL,
                                                         OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL));
                     if (file2 != INVALID_HANDLE_VALUE)
                     {
@@ -366,7 +383,7 @@ CSalamanderSafeFile::SafeFileCreate(const char* fileName,
                         }
                         if (ret == DIALOG_YES)
                         {
-                            SetFileAttributes(fileName, FILE_ATTRIBUTE_NORMAL);
+                            SetFileAttributesUtf8(fileName, FILE_ATTRIBUTE_NORMAL);
                             break;
                         }
                     }
@@ -588,7 +605,7 @@ CSalamanderSafeFile::SafeFileCreate(const char* fileName,
             namecpy2[len += (int)(slash - src)] = '\0';
             if (namecpy2[len - 1] <= ' ' || namecpy2[len - 1] == '.')
                 invalidPath = TRUE; // spaces and dots at the end of the directory name being created are undesirable
-            while (invalidPath || !CreateDirectory(namecpy2, NULL))
+            while (invalidPath || !CreateDirectoryUtf8(namecpy2, NULL))
             {
                 // failed to create the directory, display an error
                 int ret;
@@ -633,7 +650,7 @@ CREATE_FILE:
     // if it is a file, create it
     if (!isDir)
     { // add the handle to HANDLES at the end only if the SAFE_FILE structure is being filled
-        while ((hFile = NOHANDLES(CreateFile(fileName, dwDesiredAccess, dwShareMode, NULL,
+        while ((hFile = NOHANDLES(CreateFileUtf8(fileName, dwDesiredAccess, dwShareMode, NULL,
                                              CREATE_ALWAYS, dwFlagsAndAttributes, NULL))) == INVALID_HANDLE_VALUE)
         {
             DWORD err = GetLastError();
@@ -644,9 +661,9 @@ CREATE_FILE:
             // (on Samba it is possible to allow deleting read-only files, which allows deleting a read-only file,
             //  otherwise it cannot be deleted because Windows cannot delete a read-only file and at the same time
             //  the "read-only" attribute cannot be cleared on that file because the current user is not the owner)
-            if (DeleteFile(fileName)) // if it is read-only, it can be deleted only on Samba with "delete readonly" allowed
+            if (DeleteFileUtf8(fileName)) // if it is read-only, it can be deleted only on Samba with "delete readonly" allowed
             {                         // add the handle to HANDLES at the end only if the SAFE_FILE structure is being filled
-                hFile = NOHANDLES(CreateFile(fileName, dwDesiredAccess, dwShareMode, NULL,
+                hFile = NOHANDLES(CreateFileUtf8(fileName, dwDesiredAccess, dwShareMode, NULL,
                                              CREATE_ALWAYS, dwFlagsAndAttributes, NULL));
                 if (hFile != INVALID_HANDLE_VALUE)
                     break;
@@ -746,7 +763,7 @@ CREATE_FILE:
 
                 CloseHandle(hFile);
                 ClearReadOnlyAttr(fileName); // in case it ended up read-only so we can handle it
-                DeleteFile(fileName);
+                DeleteFileUtf8(fileName);
 
                 allocateWholeFile = NULL; // next time we will no longer try to preallocate
                 goto CREATE_FILE;
@@ -947,7 +964,7 @@ BOOL CSalamanderSafeFile::SafeFileRead(SAFE_FILE* file, LPVOID lpBuffer,
                     HANDLES(CloseHandle(file->HFile)); // close the invalid handle because we could not read from it anyway
                 }
 
-                file->HFile = HANDLES_Q(CreateFile(file->FileName, file->dwDesiredAccess, file->dwShareMode, NULL,
+                file->HFile = HANDLES_Q(CreateFileUtf8(file->FileName, file->dwDesiredAccess, file->dwShareMode, NULL,
                                                    file->dwCreationDisposition, file->dwFlagsAndAttributes, NULL));
                 if (file->HFile != INVALID_HANDLE_VALUE) // opened; now set the offset
                 {
@@ -1031,7 +1048,7 @@ BOOL CSalamanderSafeFile::SafeFileWrite(SAFE_FILE* file, LPVOID lpBuffer,
                     HANDLES(CloseHandle(file->HFile)); // close the invalid handle because we could not read from it anyway
                 }
 
-                file->HFile = HANDLES_Q(CreateFile(file->FileName, file->dwDesiredAccess, file->dwShareMode, NULL,
+                file->HFile = HANDLES_Q(CreateFileUtf8(file->FileName, file->dwDesiredAccess, file->dwShareMode, NULL,
                                                    file->dwCreationDisposition, file->dwFlagsAndAttributes, NULL));
                 if (file->HFile != INVALID_HANDLE_VALUE) // opened; now set the offset
                 {
@@ -1068,3 +1085,5 @@ BOOL CSalamanderSafeFile::SafeFileWrite(SAFE_FILE* file, LPVOID lpBuffer,
         }
     }
 }
+
+

@@ -214,21 +214,21 @@ const char* SalPathFindFileName(const char* path)
 
 BOOL SalGetTempFileName(const char* path, const char* prefix, char* tmpName, BOOL file)
 {
-    char tmpDir[MAX_PATH + 10];
-    char* end = tmpDir + MAX_PATH + 10;
+    WCHAR tmpDirW[MAX_PATH + 10];
+    WCHAR* endW = tmpDirW + MAX_PATH + 10;
     if (path == NULL)
     {
-        if (!GetTempPath(MAX_PATH, tmpDir))
+        if (!GetTempPathW(MAX_PATH, tmpDirW))
         {
             DWORD err = GetLastError();
             TRACE_E("Unable to get TEMP directory.");
             SetLastError(err);
             return FALSE;
         }
-        if (SalGetFileAttributes(tmpDir) == 0xFFFFFFFF)
+        if (GetFileAttributesW(tmpDirW) == 0xFFFFFFFF)
         {
             SalMessageBox(NULL, LoadStr(IDS_TMPDIRERROR), LoadStr(IDS_ERRORTITLE), MB_OK | MB_ICONEXCLAMATION);
-            if (GetSystemDirectory(tmpDir, MAX_PATH) == 0)
+            if (GetSystemDirectoryW(tmpDirW, MAX_PATH) == 0)
             {
                 DWORD err = GetLastError();
                 TRACE_E("Unable to get system directory.");
@@ -238,36 +238,62 @@ BOOL SalGetTempFileName(const char* path, const char* prefix, char* tmpName, BOO
         }
     }
     else
-        strcpy(tmpDir, path);
+    {
+        if (ConvertUtf8ToWide(path, -1, tmpDirW, _countof(tmpDirW)) == 0)
+        {
+            SetLastError(ERROR_NO_UNICODE_TRANSLATION);
+            return FALSE;
+        }
+    }
 
-    char* s = tmpDir + strlen(tmpDir);
-    if (s > tmpDir && *(s - 1) != '\\')
-        *s++ = '\\';
-    while (s < end && *prefix != 0)
-        *s++ = *prefix++;
+    WCHAR* sW = tmpDirW + lstrlenW(tmpDirW);
+    if (sW > tmpDirW && *(sW - 1) != L'\\')
+        *sW++ = L'\\';
 
-    if ((s - tmpDir) + 8 < MAX_PATH) // dost mista pro pripojeni "XXXX.tmp"
+    WCHAR prefixW[128];
+    prefixW[0] = 0;
+    if (prefix != NULL && *prefix != 0)
+    {
+        if (ConvertUtf8ToWide(prefix, -1, prefixW, _countof(prefixW)) == 0)
+        {
+            SetLastError(ERROR_NO_UNICODE_TRANSLATION);
+            return FALSE;
+        }
+        const WCHAR* pW = prefixW;
+        while (sW < endW && *pW != 0)
+            *sW++ = *pW++;
+    }
+
+    if ((sW - tmpDirW) + 8 < MAX_PATH) // dost mista pro pripojeni "XXXX.tmp"
     {
         DWORD randNum = (GetTickCount() & 0xFFF);
         while (1)
         {
-            sprintf(s, "%X.tmp", randNum++);
+            wsprintfW(sW, L"%X.tmp", randNum++);
             if (file) // soubor
             {
-                HANDLE h = HANDLES_Q(CreateFile(tmpDir, GENERIC_WRITE, 0, NULL, CREATE_NEW,
-                                                FILE_ATTRIBUTE_NORMAL, NULL));
+                HANDLE h = HANDLES_Q(CreateFileW(tmpDirW, GENERIC_WRITE, 0, NULL, CREATE_NEW,
+                                                 FILE_ATTRIBUTE_NORMAL, NULL));
                 if (h != INVALID_HANDLE_VALUE)
                 {
                     HANDLES(CloseHandle(h));
-                    strcpy(tmpName, tmpDir); // nakopirujeme vysledek
+                    if (ConvertWideToUtf8(tmpDirW, -1, tmpName, MAX_PATH) == 0)
+                    {
+                        SetLastError(ERROR_NO_UNICODE_TRANSLATION);
+                        return FALSE;
+                    }
                     return TRUE;
                 }
             }
             else // adresar
             {
-                if (CreateDirectory(tmpDir, NULL))
+                if (CreateDirectoryW(tmpDirW, NULL))
                 {
-                    strcpy(tmpName, tmpDir); // nakopirujeme vysledek
+                    if (ConvertWideToUtf8(tmpDirW, -1, tmpName, MAX_PATH) == 0)
+                    {
+                        SetLastError(ERROR_NO_UNICODE_TRANSLATION);
+                        return FALSE;
+                    }
                     return TRUE;
                 }
             }
@@ -959,9 +985,9 @@ void AllowChangeDirectory(BOOL allow)
 
 void SetCurrentDirectoryToSystem()
 {
-    char buf[MAX_PATH];
-    GetSystemDirectory(buf, MAX_PATH);
-    SetCurrentDirectory(buf);
+    WCHAR bufW[MAX_PATH];
+    GetSystemDirectoryW(bufW, MAX_PATH);
+    SetCurrentDirectoryW(bufW);
 }
 
 // ****************************************************************************
@@ -969,17 +995,20 @@ void SetCurrentDirectoryToSystem()
 void _RemoveTemporaryDir(const char* dir)
 {
     char path[MAX_PATH + 2];
+    WIN32_FIND_DATAW fileW;
     WIN32_FIND_DATA file;
     strcpy(path, dir);
     char* end = path + strlen(path);
     if (*(end - 1) != '\\')
         *end++ = '\\';
     strcpy(end, "*");
-    HANDLE find = HANDLES_Q(FindFirstFile(path, &file));
+    CStrP pathW(ConvertAllocUtf8ToWide(path, -1));
+    HANDLE find = pathW != NULL ? HANDLES_Q(FindFirstFileW(pathW, &fileW)) : INVALID_HANDLE_VALUE;
     if (find != INVALID_HANDLE_VALUE)
     {
         do
         {
+            ConvertFindDataWToUtf8(fileW, &file);
             if (file.cFileName[0] != 0 && strcmp(file.cFileName, "..") && strcmp(file.cFileName, ".") &&
                 (end - path) + strlen(file.cFileName) < MAX_PATH)
             {
@@ -988,25 +1017,41 @@ void _RemoveTemporaryDir(const char* dir)
                 if (file.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)
                     _RemoveTemporaryDir(path);
                 else
-                    DeleteFile(path);
+                {
+                    CStrP delPathW(ConvertAllocUtf8ToWide(path, -1));
+                    if (delPathW != NULL)
+                        DeleteFileW(delPathW);
+                }
             }
-        } while (FindNextFile(find, &file));
+        } while (FindNextFileW(find, &fileW));
         HANDLES(FindClose(find));
     }
     *(end - 1) = 0;
-    RemoveDirectory(path);
+    {
+        CStrP removePathW(ConvertAllocUtf8ToWide(path, -1));
+        if (removePathW != NULL)
+            RemoveDirectoryW(removePathW);
+    }
 }
 
 void RemoveTemporaryDir(const char* dir)
 {
     CALL_STACK_MESSAGE2("RemoveTemporaryDir(%s)", dir);
-    SetCurrentDirectory(dir); // aby to lepe odsejpalo (system ma rad cur-dir)
+    {
+        CStrP dirW(ConvertAllocUtf8ToWide(dir, -1));
+        if (dirW != NULL)
+            SetCurrentDirectoryW(dirW);
+    } // aby to lepe odsejpalo (system ma rad cur-dir)
     if (strlen(dir) < MAX_PATH)
         _RemoveTemporaryDir(dir);
     SetCurrentDirectoryToSystem(); // musime z nej odejit, jinak nepujde smazat
 
     ClearReadOnlyAttr(dir);
-    RemoveDirectory(dir);
+    {
+        CStrP dirW(ConvertAllocUtf8ToWide(dir, -1));
+        if (dirW != NULL)
+            RemoveDirectoryW(dirW);
+    }
 }
 
 // ****************************************************************************
@@ -1014,17 +1059,20 @@ void RemoveTemporaryDir(const char* dir)
 void _RemoveEmptyDirs(const char* dir)
 {
     char path[MAX_PATH + 2];
+    WIN32_FIND_DATAW fileW;
     WIN32_FIND_DATA file;
     strcpy(path, dir);
     char* end = path + strlen(path);
     if (*(end - 1) != '\\')
         *end++ = '\\';
     strcpy(end, "*");
-    HANDLE find = HANDLES_Q(FindFirstFile(path, &file));
+    CStrP pathW(ConvertAllocUtf8ToWide(path, -1));
+    HANDLE find = pathW != NULL ? HANDLES_Q(FindFirstFileW(pathW, &fileW)) : INVALID_HANDLE_VALUE;
     if (find != INVALID_HANDLE_VALUE)
     {
         do
         {
+            ConvertFindDataWToUtf8(fileW, &file);
             if (file.cFileName[0] != 0 && strcmp(file.cFileName, "..") && strcmp(file.cFileName, "."))
             {
                 if ((file.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) &&
@@ -1035,23 +1083,35 @@ void _RemoveEmptyDirs(const char* dir)
                     _RemoveEmptyDirs(path);
                 }
             }
-        } while (FindNextFile(find, &file));
+        } while (FindNextFileW(find, &fileW));
         HANDLES(FindClose(find));
     }
     *(end - 1) = 0;
-    RemoveDirectory(path);
+    {
+        CStrP removePathW(ConvertAllocUtf8ToWide(path, -1));
+        if (removePathW != NULL)
+            RemoveDirectoryW(removePathW);
+    }
 }
 
 void RemoveEmptyDirs(const char* dir)
 {
     CALL_STACK_MESSAGE2("RemoveEmptyDirs(%s)", dir);
-    SetCurrentDirectory(dir); // aby to lepe odsejpalo (system ma rad cur-dir)
+    {
+        CStrP dirW(ConvertAllocUtf8ToWide(dir, -1));
+        if (dirW != NULL)
+            SetCurrentDirectoryW(dirW);
+    } // aby to lepe odsejpalo (system ma rad cur-dir)
     if (strlen(dir) < MAX_PATH)
         _RemoveEmptyDirs(dir);
     SetCurrentDirectoryToSystem(); // musime z nej odejit, jinak nepujde smazat
 
     ClearReadOnlyAttr(dir);
-    RemoveDirectory(dir);
+    {
+        CStrP dirW(ConvertAllocUtf8ToWide(dir, -1));
+        if (dirW != NULL)
+            RemoveDirectoryW(dirW);
+    }
 }
 
 // ****************************************************************************
@@ -1194,7 +1254,7 @@ AGAIN:
                 if (name[len - 1] <= ' ' || name[len - 1] == '.')
                     invalidName = TRUE; // mezery a tecky na konci jmena vytvareneho adresare jsou nezadouci
             AGAIN2:
-                if (invalidName || !CreateDirectory(name, NULL))
+                if (invalidName || !CreateDirectoryUtf8(name, NULL))
                 {
                     DWORD lastErr = invalidName ? ERROR_INVALID_NAME : GetLastError();
                     sprintf(buf, LoadStr(IDS_CREATEDIRFAILED), name);
@@ -3256,6 +3316,7 @@ void CFileTimeStamps::CheckAndPackAndClear(HWND parent, BOOL* someFilesChanged, 
     if (archMaybeUpdated != NULL)
         *archMaybeUpdated = FALSE;
     char buf[MAX_PATH + 100];
+    WIN32_FIND_DATAW dataW;
     WIN32_FIND_DATA data;
     int i;
     for (i = List.Count - 1; i >= 0; i--)
@@ -3263,10 +3324,12 @@ void CFileTimeStamps::CheckAndPackAndClear(HWND parent, BOOL* someFilesChanged, 
         CFileTimeStampsItem* item = List[i];
         sprintf(buf, "%s\\%s", item->SourcePath, item->FileName);
         BOOL kill = TRUE;
-        HANDLE find = HANDLES_Q(FindFirstFile(buf, &data));
+        CStrP bufW(ConvertAllocUtf8ToWide(buf, -1));
+        HANDLE find = bufW != NULL ? HANDLES_Q(FindFirstFileW(bufW, &dataW)) : INVALID_HANDLE_VALUE;
         if (find != INVALID_HANDLE_VALUE)
         {
             HANDLES(FindClose(find));
+            ConvertFindDataWToUtf8(dataW, &data);
             if (CompareFileTime(&data.ftLastWriteTime, &item->LastWrite) != 0 ||    // lisi se casy
                 CQuadWord(data.nFileSizeLow, data.nFileSizeHigh) != item->FileSize) // lisi se velikosti
             {
@@ -3622,8 +3685,50 @@ BOOL SetEditOrComboText(HWND hWnd, const char* text)
     else
         hEdit = hWnd;
 
-    SendMessage(hEdit, WM_SETTEXT, 0, (LPARAM)text);
-    SendMessage(hEdit, EM_SETSEL, 0, lstrlen(text));
+    CStrP wide(ConvertAllocUtf8ToWide(text != NULL ? text : "", -1));
+    SendMessageW(hEdit, WM_SETTEXT, 0, (LPARAM)(wide != NULL ? wide.Ptr : L""));
+    SendMessage(hEdit, EM_SETSEL, 0, wide != NULL ? lstrlenW(wide) : 0);
+    return TRUE;
+}
+
+BOOL GetEditOrComboTextUtf8(HWND hWnd, char* buf, int bufSize)
+{
+    if (buf == NULL || bufSize <= 0)
+        return FALSE;
+    buf[0] = 0;
+
+    char className[31];
+    className[0] = 0;
+    if (GetClassName(hWnd, className, 30) == 0)
+    {
+        TRACE_E("GetClassName failed on hWnd=0x" << hWnd);
+        return FALSE;
+    }
+
+    HWND hEdit;
+    if (StrICmp(className, "edit") != 0)
+    {
+        hEdit = GetWindow(hWnd, GW_CHILD);
+        if (hEdit == NULL ||
+            GetClassName(hEdit, className, 30) == 0 ||
+            StrICmp(className, "edit") != 0)
+        {
+            TRACE_E("Edit window was not found hWnd=0x" << hWnd);
+            return FALSE;
+        }
+    }
+    else
+        hEdit = hWnd;
+
+    int len = GetWindowTextLengthW(hEdit);
+    if (len <= 0)
+        return TRUE;
+
+    CStrP wide((WCHAR*)malloc(sizeof(WCHAR) * (len + 1)));
+    if (wide == NULL)
+        return FALSE;
+    GetWindowTextW(hEdit, wide, len + 1);
+    ConvertWideToUtf8(wide, -1, buf, bufSize);
     return TRUE;
 }
 
@@ -3789,9 +3894,15 @@ void InvokeDirectoryMenuCommand(DWORD cmd, HWND hDialog, int editID, int editBuf
     case DIRECTORY_COMMAND_BROWSE:
     {
         // browse
-        GetDlgItemText(hDialog, editID, path, MAX_PATH);
+        GetEditOrComboTextUtf8(GetDlgItem(hDialog, editID), path, MAX_PATH);
         char caption[100];
-        GetWindowText(hDialog, caption, 100); // bude mit stejny caption jako dialog
+        {
+            CStrP wide((WCHAR*)malloc(sizeof(WCHAR) * 100));
+            if (wide != NULL && GetWindowTextW(hDialog, wide, 100) > 0)
+                ConvertWideToUtf8(wide, -1, caption, 100);
+            else
+                caption[0] = 0;
+        }
         if (GetTargetDirectory(hDialog, hDialog, caption, LoadStr(IDS_BROWSETARGETDIRECTORY), path, FALSE, path))
             setPathToEdit = TRUE;
         break;

@@ -8,7 +8,7 @@ BOOL PathAppend(char* path, const char* name, int pathSize);
 
 BOOL FileExists(const char* fileName)
 {
-    DWORD attr = GetFileAttributes(fileName);
+    DWORD attr = GetFileAttributesUtf8Local(fileName);
     return (attr != INVALID_FILE_ATTRIBUTES && (attr & FILE_ATTRIBUTE_DIRECTORY) == 0);
 }
 

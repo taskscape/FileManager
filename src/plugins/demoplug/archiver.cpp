@@ -410,7 +410,7 @@ CPluginInterfaceForArchiver::UnpackOneFile(CSalamanderForOperationsAbstract* sal
         lastComp = nameInArchive;
     if (SalamanderGeneral->SalPathAppend(name, lastComp, MAX_PATH))
     {
-        HANDLE file = HANDLES_Q(CreateFile(name, GENERIC_WRITE,
+        HANDLE file = HANDLES_Q(CreateFileUtf8Local(name, GENERIC_WRITE,
                                            FILE_SHARE_READ, NULL,
                                            CREATE_ALWAYS,
                                            FILE_FLAG_SEQUENTIAL_SCAN,
@@ -719,7 +719,7 @@ void ClearTEMPIfNeeded(HWND parent)
             TIndirectArray<char> tmpDirs(10, 50);
 
             WIN32_FIND_DATA data;
-            HANDLE find = HANDLES_Q(FindFirstFile(tmpDir, &data));
+            HANDLE find = HANDLES_Q(FindFirstFileUtf8Local(tmpDir, &data));
             if (find != INVALID_HANDLE_VALUE)
             {
                 do
@@ -744,7 +744,7 @@ void ClearTEMPIfNeeded(HWND parent)
                             }
                         }
                     }
-                } while (FindNextFile(find, &data));
+                } while (FindNextFileUtf8Local(find, &data));
                 HANDLES(FindClose(find));
             }
 
@@ -835,7 +835,7 @@ CPluginInterfaceForArchiver::DeleteTmpCopy(const char* fileName, BOOL firstFile)
     // regular file deletion
     SalamanderGeneral->ClearReadOnlyAttr(fileName);
 
-    if (DeleteFile(fileName))
+    if (DeleteFileUtf8Local(fileName))
         TRACE_I("Temporary copy from disk-cache (" << fileName << ") was deleted.");
     else
         TRACE_I("Unable to delete temporary copy from disk-cache (" << fileName << ").");

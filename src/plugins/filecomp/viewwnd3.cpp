@@ -159,7 +159,7 @@ BOOL CHexFileViewWindow::SetData(QWORD firstDiff, const char* path, QWORD siblin
     DestroyData();
 
     // FILE_SHARE_WRITE : See also CFilecompWorker::GuardedBody()
-    HANDLE hFile = CreateFile(path, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_EXISTING, 0, NULL);
+    HANDLE hFile = CreateFileUtf8Local(path, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_EXISTING, 0, NULL);
     strcpy(Path, path); // Path may be needed in Retry dialog upon WM_USER_HANDLEFILEERROR
     if (hFile == INVALID_HANDLE_VALUE)
         return Error(GetParent(HWindow), IDS_OPEN, path);

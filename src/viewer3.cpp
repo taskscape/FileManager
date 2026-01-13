@@ -1599,7 +1599,7 @@ CViewerWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                             strcpy(tmpFile, fileName);
                         if (attr == 0xFFFFFFFF || SalGetTempFileName(path, "sal", tmpFile, TRUE))
                         {
-                            HANDLE file = HANDLES_Q(CreateFile(tmpFile, GENERIC_WRITE,
+                            HANDLE file = HANDLES_Q(CreateFileUtf8(tmpFile, GENERIC_WRITE,
                                                                FILE_SHARE_READ, NULL,
                                                                CREATE_ALWAYS,
                                                                FILE_FLAG_SEQUENTIAL_SCAN,
@@ -1629,13 +1629,13 @@ CViewerWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                                 }
                                 HANDLES(CloseHandle(file));
                                 if (fatalErr || off != end)
-                                    DeleteFile(tmpFile); // delete it if an error occurs
+                                    DeleteFileUtf8(tmpFile); // delete it if an error occurs
                                 else
                                 {
                                     if (attr != 0xFFFFFFFF) // overwrite: tmp -> fileName
                                     {
                                         BOOL setAttr = ClearReadOnlyAttr(fileName, attr); // for the case of a read-only file
-                                        if (DeleteFile(fileName))
+                                        if (DeleteFileUtf8(fileName))
                                         {
                                             if (!SalMoveFile(tmpFile, fileName))
                                             {
@@ -1649,8 +1649,8 @@ CViewerWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                                         {
                                             DWORD err = GetLastError();
                                             if (setAttr)
-                                                SetFileAttributes(fileName, attr); // restore the original attributes
-                                            DeleteFile(tmpFile);                   // the file cannot be overwritten; delete the temp file (it's useless)
+                                                SetFileAttributesUtf8(fileName, attr); // restore the original attributes
+                                            DeleteFileUtf8(tmpFile);                   // the file cannot be overwritten; delete the temp file (it's useless)
                                             SetCursor(oldCur);
                                             SalMessageBox(HWindow, GetErrorText(err),
                                                           LoadStr(IDS_ERRORTITLE), MB_OK | MB_ICONEXCLAMATION);
@@ -1671,7 +1671,7 @@ CViewerWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                             {
                                 DWORD err = GetLastError();
                                 if (attr != 0xFFFFFFFF)
-                                    DeleteFile(tmpFile);
+                                    DeleteFileUtf8(tmpFile);
                                 SetCursor(oldCur);
                                 SalMessageBox(HWindow, GetErrorText(err),
                                               LoadStr(IDS_ERRORTITLE), MB_OK | MB_ICONEXCLAMATION);

@@ -2281,7 +2281,9 @@ int CALLBACK DirectoryBrowse(HWND hwnd, UINT uMsg, LPARAM lParam, LPARAM lpData)
         MultiMonCenterWindow(hwnd, ((CBrowseData*)lpData)->HCenterWindow, FALSE);
 
         // nastavim header
-        SetWindowText(hwnd, ((CBrowseData*)lpData)->Title);
+        CStrP titleW(ConvertAllocUtf8ToWide(((CBrowseData*)lpData)->Title, -1));
+        if (titleW != NULL)
+            SetWindowTextW(hwnd, titleW);
         if (((CBrowseData*)lpData)->InitDir != NULL)
         {
             char path[MAX_PATH];
@@ -2293,15 +2295,17 @@ int CALLBACK DirectoryBrowse(HWND hwnd, UINT uMsg, LPARAM lParam, LPARAM lpData)
                 if (ch == '\\')
                     ch = 0;
             }
-            SendMessage(hwnd, BFFM_SETSELECTION, TRUE, (LPARAM)path);
+            CStrP pathW(ConvertAllocUtf8ToWide(path, -1));
+            if (pathW != NULL)
+                SendMessageW(hwnd, BFFM_SETSELECTIONW, TRUE, (LPARAM)pathW.Ptr);
         }
     }
     if (uMsg == BFFM_SELCHANGED)
     {
         if ((ITEMIDLIST*)lParam != NULL)
         {
-            char path[MAX_PATH];
-            BOOL ret = SHGetPathFromIDList((ITEMIDLIST*)lParam, path);
+            WCHAR pathW[MAX_PATH];
+            BOOL ret = SHGetPathFromIDListW((ITEMIDLIST*)lParam, pathW);
             SendMessage(hwnd, BFFM_ENABLEOK, 0, ret);
         }
     }
@@ -2321,13 +2325,14 @@ BOOL GetTargetDirectoryAux(HWND parent, HWND hCenterWindow,
             pidl = NULL;
 
         // otevreni dialogu
-        char display[MAX_PATH];
-        BROWSEINFO bi;
+        WCHAR display[MAX_PATH];
+        BROWSEINFOW bi;
         ZeroMemory(&bi, sizeof(bi));
         bi.hwndOwner = parent;
         bi.pidlRoot = pidl;
         bi.pszDisplayName = display;
-        bi.lpszTitle = comment;
+        WCHAR* commentW = ConvertAllocUtf8ToWide(comment, -1);
+        bi.lpszTitle = commentW != NULL ? commentW : L"";
         bi.ulFlags = BIF_RETURNONLYFSDIRS;
         /* j.r.: pod W2K se po otevreni focus stavi na OK misto do treeview (jak to bylo drive); navic nefunguje ensure_visible; proste HNUS, vracime se ke stare verzi dialogu; pripadne ho muzem casem prepsat
     if (!onlyNet)  // Petr: dialog Network funguje jen ve stare verzi - nova neumi pozadat usera o login na server (situace, kdy mu nestaci aktualni login)
@@ -2339,13 +2344,19 @@ BOOL GetTargetDirectoryAux(HWND parent, HWND hCenterWindow,
         bd.InitDir = initDir;
         bd.HCenterWindow = hCenterWindow;
         bi.lParam = (LPARAM)&bd;
-        LPITEMIDLIST res = SHBrowseForFolder(&bi);
+        LPITEMIDLIST res = SHBrowseForFolderW(&bi);
         BOOL ret = FALSE; // navratova hodnota
         if (res != NULL)
         {
-            SHGetPathFromIDList(res, path);
-            ret = TRUE;
+            WCHAR pathW[MAX_PATH];
+            if (SHGetPathFromIDListW(res, pathW))
+            {
+                ConvertWideToUtf8(pathW, -1, path, MAX_PATH);
+                ret = TRUE;
+            }
         }
+        if (commentW != NULL)
+            free(commentW);
         // uvolneni item-id-listu
         IMalloc* alloc;
         if ((pidl != NULL || res != NULL) && SUCCEEDED(CoGetMalloc(1, &alloc)))
@@ -2379,7 +2390,7 @@ void ResolveNetHoodPath(char* path)
     lstrcpyn(name, path, MAX_PATH);
     if (SalPathAppend(name, "desktop.ini", MAX_PATH))
     {
-        HANDLE hFile = HANDLES_Q(CreateFile(name, GENERIC_READ,
+        HANDLE hFile = HANDLES_Q(CreateFileUtf8(name, GENERIC_READ,
                                             FILE_SHARE_WRITE | FILE_SHARE_READ, NULL,
                                             OPEN_EXISTING,
                                             FILE_FLAG_SEQUENTIAL_SCAN,
@@ -2426,11 +2437,26 @@ void ResolveNetHoodPath(char* path)
         lstrcpyn(name, path, MAX_PATH);
         if (SalPathAppend(name, "target.lnk", MAX_PATH))
         {
-            WIN32_FIND_DATA data;
-            HANDLE find = HANDLES_Q(FindFirstFile(name, &data));
+            WIN32_FIND_DATAW dataW;
+            WIN32_FIND_DATAA data;
+            CStrP nameW(ConvertAllocUtf8ToWide(name, -1));
+            HANDLE find = nameW != NULL ? HANDLES_Q(FindFirstFileW(nameW, &dataW)) : INVALID_HANDLE_VALUE;
             if (find != INVALID_HANDLE_VALUE) // soubor existuje a mame jeho 'data'
             {
                 HANDLES(FindClose(find));
+                ZeroMemory(&data, sizeof(data));
+                data.dwFileAttributes = dataW.dwFileAttributes;
+                data.ftCreationTime = dataW.ftCreationTime;
+                data.ftLastAccessTime = dataW.ftLastAccessTime;
+                data.ftLastWriteTime = dataW.ftLastWriteTime;
+                data.nFileSizeHigh = dataW.nFileSizeHigh;
+                data.nFileSizeLow = dataW.nFileSizeLow;
+                data.dwReserved0 = dataW.dwReserved0;
+                data.dwReserved1 = dataW.dwReserved1;
+                if (ConvertWideToUtf8(dataW.cFileName, -1, data.cFileName, _countof(data.cFileName)) == 0)
+                    data.cFileName[0] = 0;
+                if (ConvertWideToUtf8(dataW.cAlternateFileName, -1, data.cAlternateFileName, _countof(data.cAlternateFileName)) == 0)
+                    data.cAlternateFileName[0] = 0;
 
                 HCURSOR oldCur = SetCursor(LoadCursor(NULL, IDC_WAIT));
                 IShellLink* link;
@@ -2442,7 +2468,7 @@ void ResolveNetHoodPath(char* path)
                     if (link->QueryInterface(IID_IPersistFile, (LPVOID*)&fileInt) == S_OK)
                     {
                         OLECHAR oleName[MAX_PATH];
-                        MultiByteToWideChar(CP_ACP, MB_PRECOMPOSED, name, -1, oleName, MAX_PATH);
+                        ConvertUtf8ToWide(name, -1, oleName, MAX_PATH);
                         oleName[MAX_PATH - 1] = 0;
                         if (fileInt->Load(oleName, STGM_READ) == S_OK)
                         {

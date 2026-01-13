@@ -21,6 +21,18 @@
 
 #define NOHANDLES(function) function
 
+#if defined(CreateFile)
+#pragma push_macro("CreateFile")
+#undef CreateFile
+#define MHANDLES_POP_CREATEFILE
+#endif
+
+#if defined(FindFirstFile)
+#pragma push_macro("FindFirstFile")
+#undef FindFirstFile
+#define MHANDLES_POP_FINDFIRSTFILE
+#endif
+
 #ifndef MHANDLES_ENABLE
 
 // aby nedochazelo k problemum se stredniky v nize nadefinovanych makrech
@@ -385,6 +397,13 @@ public:
                       DWORD dwCreationDistribution, DWORD dwFlagsAndAttributes,
                       HANDLE hTemplateFile);
 
+    HANDLE CreateFileUtf8Local(const char* lpFileName, DWORD dwDesiredAccess,
+                               DWORD dwShareMode,
+                               LPSECURITY_ATTRIBUTES lpSecurityAttributes,
+                               DWORD dwCreationDistribution,
+                               DWORD dwFlagsAndAttributes,
+                               HANDLE hTemplateFile);
+
     HANDLE CreateMailslot(LPCTSTR lpName, DWORD nMaxMessageSize,
                           DWORD lReadTimeout,
                           LPSECURITY_ATTRIBUTES lpSecurityAttributes);
@@ -596,6 +615,7 @@ public:
     VOID LeaveCriticalSection(LPCRITICAL_SECTION lpCriticalSection);
 
     HANDLE FindFirstFile(LPCTSTR lpFileName, LPWIN32_FIND_DATA lpFindFileData);
+    HANDLE FindFirstFileUtf8Local(const char* lpFileName, WIN32_FIND_DATAA* lpFindFileData);
 
     BOOL FindClose(HANDLE hFindFile);
 
@@ -686,5 +706,15 @@ protected:
 };
 
 extern C__Handles __Handles;
+
+#ifdef MHANDLES_POP_CREATEFILE
+#pragma pop_macro("CreateFile")
+#undef MHANDLES_POP_CREATEFILE
+#endif
+
+#ifdef MHANDLES_POP_FINDFIRSTFILE
+#pragma pop_macro("FindFirstFile")
+#undef MHANDLES_POP_FINDFIRSTFILE
+#endif
 
 #endif // MHANDLES_ENABLE

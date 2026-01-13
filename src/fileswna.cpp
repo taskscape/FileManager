@@ -15,6 +15,59 @@
 #include "shellib.h"
 #include "pack.h"
 
+static BOOL ConvertFindDataWToA(const WIN32_FIND_DATAW& src, WIN32_FIND_DATAA& dst)
+{
+    ZeroMemory(&dst, sizeof(dst));
+    dst.dwFileAttributes = src.dwFileAttributes;
+    dst.ftCreationTime = src.ftCreationTime;
+    dst.ftLastAccessTime = src.ftLastAccessTime;
+    dst.ftLastWriteTime = src.ftLastWriteTime;
+    dst.nFileSizeHigh = src.nFileSizeHigh;
+    dst.nFileSizeLow = src.nFileSizeLow;
+    dst.dwReserved0 = src.dwReserved0;
+    dst.dwReserved1 = src.dwReserved1;
+    if (ConvertWideToUtf8(src.cFileName, -1, dst.cFileName, _countof(dst.cFileName)) == 0)
+        return FALSE;
+    if (ConvertWideToUtf8(src.cAlternateFileName, -1, dst.cAlternateFileName, _countof(dst.cAlternateFileName)) == 0)
+        dst.cAlternateFileName[0] = 0;
+    return TRUE;
+}
+
+static HANDLE FindFirstFileUtf8(const char* path, WIN32_FIND_DATAA* data)
+{
+    CStrP pathW(ConvertAllocUtf8ToWide(path, -1));
+    if (pathW == NULL)
+    {
+        SetLastError(ERROR_NO_UNICODE_TRANSLATION);
+        return INVALID_HANDLE_VALUE;
+    }
+    WIN32_FIND_DATAW dataW;
+    HANDLE h = FindFirstFileW(pathW, &dataW);
+    if (h != INVALID_HANDLE_VALUE)
+    {
+        if (data != NULL && !ConvertFindDataWToA(dataW, *data))
+        {
+            FindClose(h);
+            SetLastError(ERROR_NO_UNICODE_TRANSLATION);
+            return INVALID_HANDLE_VALUE;
+        }
+    }
+    return h;
+}
+
+static BOOL FindNextFileUtf8(HANDLE hFind, WIN32_FIND_DATAA* data)
+{
+    WIN32_FIND_DATAW dataW;
+    if (!FindNextFileW(hFind, &dataW))
+        return FALSE;
+    if (data != NULL && !ConvertFindDataWToA(dataW, *data))
+    {
+        SetLastError(ERROR_NO_UNICODE_TRANSLATION);
+        return FALSE;
+    }
+    return TRUE;
+}
+
 void CFilesWindow::PluginFSFilesAction(CPluginFSActionType type)
 {
     CALL_STACK_MESSAGE2("CFilesWindow::PluginFSFilesAction(%d)", type);
@@ -372,8 +425,8 @@ void CFilesWindow::DragDropToArcOrFS(CTmpDragDropOperData* data)
     char* end = path + strlen(path);
     SalPathAppend(path, "*", MAX_PATH + 10);
     char text[2 * MAX_PATH + 100];
-    WIN32_FIND_DATA file;
-    HANDLE find = HANDLES_Q(FindFirstFile(path, &file));
+    WIN32_FIND_DATAA file;
+    HANDLE find = HANDLES_Q(FindFirstFileUtf8(path, &file));
     *end = 0; // fix the path
     if (find == INVALID_HANDLE_VALUE)
     {
@@ -484,7 +537,7 @@ void CFilesWindow::DragDropToArcOrFS(CTmpDragDropOperData* data)
                 testFindNextErr = FALSE;
                 break;
             }
-        } while (FindNextFile(find, &file));
+        } while (FindNextFileUtf8(find, &file));
         DWORD err = GetLastError();
         HANDLES(FindClose(find));
 
@@ -550,7 +603,7 @@ void CFilesWindow::DragDropToArcOrFS(CTmpDragDropOperData* data)
                 BOOL haveSize = FALSE;
                 CQuadWord size;
                 DWORD err;
-                HANDLE hFile = HANDLES_Q(CreateFile(data->ArchiveOrFSName, GENERIC_READ, 0, NULL, OPEN_EXISTING, 0, NULL));
+                HANDLE hFile = HANDLES_Q(CreateFileUtf8(data->ArchiveOrFSName, GENERIC_READ, 0, NULL, OPEN_EXISTING, 0, NULL));
                 if (hFile != INVALID_HANDLE_VALUE)
                 {
                     haveSize = SalGetFileSize(hFile, size, err);
@@ -568,7 +621,7 @@ void CFilesWindow::DragDropToArcOrFS(CTmpDragDropOperData* data)
                     {
                         nullFileAttrs = SalGetFileAttributes(data->ArchiveOrFSName);
                         ClearReadOnlyAttr(data->ArchiveOrFSName, nullFileAttrs); // to allow deletion even if read-only
-                        DeleteFile(data->ArchiveOrFSName);
+                        DeleteFileUtf8(data->ArchiveOrFSName);
                     }
                     //---  actual packing
                     SetCurrentDirectory(data->Data->SrcPath);
@@ -579,7 +632,7 @@ void CFilesWindow::DragDropToArcOrFS(CTmpDragDropOperData* data)
                         if (nullFile && // zero-length file might have had a different compressed attribute, set archive accordingly
                             nullFileAttrs != INVALID_FILE_ATTRIBUTES)
                         {
-                            HANDLE hFile2 = HANDLES_Q(CreateFile(data->ArchiveOrFSName, GENERIC_READ | GENERIC_WRITE,
+                            HANDLE hFile2 = HANDLES_Q(CreateFileUtf8(data->ArchiveOrFSName, GENERIC_READ | GENERIC_WRITE,
                                                                  0, NULL, OPEN_EXISTING,
                                                                  0, NULL));
                             if (hFile2 != INVALID_HANDLE_VALUE)
@@ -590,7 +643,7 @@ void CFilesWindow::DragDropToArcOrFS(CTmpDragDropOperData* data)
                                 DeviceIoControl(hFile2, FSCTL_SET_COMPRESSION, &state,
                                                 sizeof(USHORT), NULL, 0, &length, FALSE);
                                 HANDLES(CloseHandle(hFile2));
-                                SetFileAttributes(data->ArchiveOrFSName, nullFileAttrs);
+                                SetFileAttributesUtf8(data->ArchiveOrFSName, nullFileAttrs);
                             }
                         }
                     }
@@ -598,7 +651,7 @@ void CFilesWindow::DragDropToArcOrFS(CTmpDragDropOperData* data)
                     {
                         if (nullFile) // operation failed, we must recreate it
                         {
-                            HANDLE hFile2 = HANDLES_Q(CreateFile(data->ArchiveOrFSName, GENERIC_READ | GENERIC_WRITE,
+                            HANDLE hFile2 = HANDLES_Q(CreateFileUtf8(data->ArchiveOrFSName, GENERIC_READ | GENERIC_WRITE,
                                                                  0, NULL, OPEN_ALWAYS,
                                                                  0, NULL));
                             if (hFile2 != INVALID_HANDLE_VALUE)
@@ -613,7 +666,7 @@ void CFilesWindow::DragDropToArcOrFS(CTmpDragDropOperData* data)
                                 }
                                 HANDLES(CloseHandle(hFile2));
                                 if (nullFileAttrs != INVALID_FILE_ATTRIBUTES)
-                                    SetFileAttributes(data->ArchiveOrFSName, nullFileAttrs);
+                                    SetFileAttributesUtf8(data->ArchiveOrFSName, nullFileAttrs);
                             }
                         }
                     }

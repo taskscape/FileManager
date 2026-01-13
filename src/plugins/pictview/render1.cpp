@@ -2823,10 +2823,10 @@ BOOL CRendererWindow::RenameFileInternal(LPCTSTR oldPath, LPCTSTR oldName, TCHAR
                     if ((inAttr & FILE_ATTRIBUTE_DIRECTORY) == 0 &&
                         (outAttr & FILE_ATTRIBUTE_DIRECTORY) == 0)
                     { // only if both files are present
-                        HANDLE in = CreateFile(path, 0, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL,
+                        HANDLE in = CreateFileUtf8Local(path, 0, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL,
                                                OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL,
                                                NULL);
-                        HANDLE out = CreateFile(tgtPath, 0, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL,
+                        HANDLE out = CreateFileUtf8Local(tgtPath, 0, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL,
                                                 OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL,
                                                 NULL);
                         if (in != INVALID_HANDLE_VALUE && out != INVALID_HANDLE_VALUE)
@@ -2851,7 +2851,7 @@ BOOL CRendererWindow::RenameFileInternal(LPCTSTR oldPath, LPCTSTR oldName, TCHAR
                             case IDYES:
                             {
                                 SalamanderGeneral->ClearReadOnlyAttr(tgtPath); // to allow it to be deleted ...
-                                if (!DeleteFile(tgtPath) || !SalamanderGeneral->SalMoveFile(path, tgtPath, &err))
+                                if (!DeleteFileUtf8Local(tgtPath) || !SalamanderGeneral->SalMoveFile(path, tgtPath, &err))
                                 {
                                     //err = GetLastError();
                                 }

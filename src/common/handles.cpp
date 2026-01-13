@@ -15,6 +15,42 @@
 
 #ifdef HANDLES_ENABLE
 
+static WCHAR* Utf8AllocWideHandles(const char* src)
+{
+    if (src == NULL)
+        return NULL;
+    int len = MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, src, -1, NULL, 0);
+    if (len <= 0)
+        return NULL;
+    WCHAR* buf = (WCHAR*)malloc(len * sizeof(WCHAR));
+    if (buf == NULL)
+        return NULL;
+    if (MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, src, -1, buf, len) == 0)
+    {
+        free(buf);
+        return NULL;
+    }
+    return buf;
+}
+
+static BOOL ConvertFindDataWToUtf8Local(const WIN32_FIND_DATAW* src, WIN32_FIND_DATAA* dst)
+{
+    if (dst == NULL || src == NULL)
+        return FALSE;
+    ZeroMemory(dst, sizeof(*dst));
+    dst->dwFileAttributes = src->dwFileAttributes;
+    dst->ftCreationTime = src->ftCreationTime;
+    dst->ftLastAccessTime = src->ftLastAccessTime;
+    dst->ftLastWriteTime = src->ftLastWriteTime;
+    dst->nFileSizeHigh = src->nFileSizeHigh;
+    dst->nFileSizeLow = src->nFileSizeLow;
+    dst->dwReserved0 = src->dwReserved0;
+    dst->dwReserved1 = src->dwReserved1;
+    WideCharToMultiByte(CP_UTF8, 0, src->cFileName, -1, dst->cFileName, (int)sizeof(dst->cFileName), NULL, NULL);
+    WideCharToMultiByte(CP_UTF8, 0, src->cAlternateFileName, -1, dst->cAlternateFileName, (int)sizeof(dst->cAlternateFileName), NULL, NULL);
+    return TRUE;
+}
+
 // The order here is important.
 // Section names must be 8 characters or less.
 // The sections with the same name before the $
@@ -956,6 +992,56 @@ C__Handles::CreateFileW(LPCWSTR lpFileName, DWORD dwDesiredAccess,
         SetLastError(err);
     }
     CheckCreate(ret != INVALID_HANDLE_VALUE, __htFile, __hoCreateFile, ret, GetLastError(), TRUE, NULL, NULL, params);
+    return ret;
+}
+
+HANDLE
+C__Handles::CreateFileUtf8(LPCSTR lpFileName, DWORD dwDesiredAccess,
+                           DWORD dwShareMode,
+                           LPSECURITY_ATTRIBUTES lpSecurityAttributes,
+                           DWORD dwCreationDisposition,
+                           DWORD dwFlagsAndAttributes,
+                           HANDLE hTemplateFile)
+{
+    HANDLE ret = INVALID_HANDLE_VALUE;
+    WCHAR* fileNameW = Utf8AllocWideHandles(lpFileName);
+    if (fileNameW == NULL)
+    {
+        SetLastError(ERROR_NO_UNICODE_TRANSLATION);
+    }
+    else
+    {
+        ret = ::CreateFileW(fileNameW, dwDesiredAccess, dwShareMode,
+                            lpSecurityAttributes, dwCreationDisposition,
+                            dwFlagsAndAttributes, hTemplateFile);
+    }
+    const char* paramsA = NULL;
+    const WCHAR* paramsW = NULL;
+    char paramsABuf[MAX_PATH + 200];
+    WCHAR paramsWBuf[800 + 200]; // limit file name length for messages
+    if (ret == INVALID_HANDLE_VALUE)
+    {
+        DWORD err = GetLastError();
+        if (fileNameW != NULL)
+        {
+            _snwprintf_s(paramsWBuf, _TRUNCATE,
+                         L"dwDesiredAccess=0x%X,\ndwShareMode=0x%X,\ndwCreationDisposition=0x%X,\ndwFlagsAndAttributes=0x%X,\nlpFileName=%s",
+                         dwDesiredAccess, dwShareMode, dwCreationDisposition, dwFlagsAndAttributes, fileNameW);
+            paramsW = paramsWBuf;
+        }
+        else
+        {
+            _snprintf_s(paramsABuf, _TRUNCATE,
+                        "%s,\ndwDesiredAccess=0x%X,\ndwShareMode=0x%X,\ndwCreationDisposition=0x%X,\ndwFlagsAndAttributes=0x%X",
+                        lpFileName != NULL ? lpFileName : "<null>",
+                        dwDesiredAccess, dwShareMode, dwCreationDisposition, dwFlagsAndAttributes);
+            paramsA = paramsABuf;
+        }
+        SetLastError(err);
+    }
+    if (fileNameW != NULL)
+        free(fileNameW);
+    CheckCreate(ret != INVALID_HANDLE_VALUE, __htFile, __hoCreateFile, ret, GetLastError(), TRUE, NULL, paramsA, paramsW);
     return ret;
 }
 
@@ -2046,6 +2132,29 @@ C__Handles::FindFirstFileW(LPCWSTR lpFileName, LPWIN32_FIND_DATAW lpFindFileData
     HANDLE ret = ::FindFirstFileW(lpFileName, lpFindFileData);
     CheckCreate(ret != INVALID_HANDLE_VALUE, __htFindFile, __hoFindFirstFile,
                 ret, GetLastError(), TRUE, NULL, NULL, lpFileName);
+    return ret;
+}
+
+HANDLE
+C__Handles::FindFirstFileUtf8(LPCSTR lpFileName, LPWIN32_FIND_DATAA lpFindFileData)
+{
+    HANDLE ret = INVALID_HANDLE_VALUE;
+    WCHAR* fileNameW = Utf8AllocWideHandles(lpFileName);
+    if (fileNameW == NULL)
+    {
+        SetLastError(ERROR_NO_UNICODE_TRANSLATION);
+    }
+    else
+    {
+        WIN32_FIND_DATAW dataW;
+        ret = ::FindFirstFileW(fileNameW, &dataW);
+        if (ret != INVALID_HANDLE_VALUE && lpFindFileData != NULL)
+            ConvertFindDataWToUtf8Local(&dataW, lpFindFileData);
+    }
+    if (fileNameW != NULL)
+        free(fileNameW);
+    CheckCreate(ret != INVALID_HANDLE_VALUE, __htFindFile, __hoFindFirstFile,
+                ret, GetLastError(), TRUE, NULL, lpFileName);
     return ret;
 }
 

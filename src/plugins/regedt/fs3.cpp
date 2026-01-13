@@ -344,7 +344,7 @@ BOOL ExportValueData(int root, LPCWSTR key, LPCWSTR value, const char* tmpFileNa
     }
 
     // create or open the temporary file
-    HANDLE file = CreateFile(tmpFileName, GENERIC_WRITE, FILE_SHARE_READ, NULL,
+    HANDLE file = CreateFileUtf8Local(tmpFileName, GENERIC_WRITE, FILE_SHARE_READ, NULL,
                              CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
     if (file == INVALID_HANDLE_VALUE)
     {

@@ -300,7 +300,7 @@ BOOL PackUniversalCompress(HWND parent, const char* command, TPackErrorTable* co
     FILE* listFile;
     if ((listFile = fopen(tmpListNameBuf, "w")) == NULL)
     {
-        DeleteFile(tmpListNameBuf);
+        DeleteFileUtf8(tmpListNameBuf);
         return (*PackErrorHandlerPtr)(parent, IDS_PACKERR_FILE);
     }
 
@@ -338,7 +338,7 @@ BOOL PackUniversalCompress(HWND parent, const char* command, TPackErrorTable* co
                 strcat(buffer, ", GetShortPathName: ");
                 strcat(buffer, GetErrorText(GetLastError()));
                 fclose(listFile);
-                DeleteFile(tmpListNameBuf);
+                DeleteFileUtf8(tmpListNameBuf);
                 return (*PackErrorHandlerPtr)(parent, IDS_PACKERR_GENERAL, buffer);
             }
             if (!needANSIListFile)
@@ -350,7 +350,7 @@ BOOL PackUniversalCompress(HWND parent, const char* command, TPackErrorTable* co
         {
             char buffer[1000];
             fclose(listFile);
-            DeleteFile(tmpListNameBuf);
+            DeleteFileUtf8(tmpListNameBuf);
             sprintf(buffer, "%s\\%s", sourceShortName, namecnv);
             return (*PackErrorHandlerPtr)(parent, IDS_PACKERR_PATH, buffer);
         }
@@ -361,7 +361,7 @@ BOOL PackUniversalCompress(HWND parent, const char* command, TPackErrorTable* co
             if (fprintf(listFile, "%s\n", namecnv) <= 0)
             {
                 fclose(listFile);
-                DeleteFile(tmpListNameBuf);
+                DeleteFileUtf8(tmpListNameBuf);
                 return (*PackErrorHandlerPtr)(parent, IDS_PACKERR_FILE);
             }
         }
@@ -372,7 +372,7 @@ BOOL PackUniversalCompress(HWND parent, const char* command, TPackErrorTable* co
     // if an error occurred and the user decided to cancel the operation, end it
     if (errorOccured == SALENUM_CANCEL)
     {
-        DeleteFile(tmpListNameBuf);
+        DeleteFileUtf8(tmpListNameBuf);
         return FALSE;
     }
 
@@ -387,7 +387,7 @@ BOOL PackUniversalCompress(HWND parent, const char* command, TPackErrorTable* co
     if (!PackExpandCmdLine(archiveFileName, rootPath, tmpListNameBuf, NULL,
                            command, cmdLine, PACK_CMDLINE_MAXLEN, DOSTmpName))
     {
-        DeleteFile(tmpListNameBuf);
+        DeleteFileUtf8(tmpListNameBuf);
         return (*PackErrorHandlerPtr)(parent, IDS_PACKERR_CMDLNERR);
     }
 
@@ -413,7 +413,7 @@ BOOL PackUniversalCompress(HWND parent, const char* command, TPackErrorTable* co
     {
         char buffer[1000];
         strcpy(buffer, cmdLine);
-        DeleteFile(tmpListNameBuf);
+        DeleteFileUtf8(tmpListNameBuf);
         return (*PackErrorHandlerPtr)(parent, IDS_PACKERR_CMDLNLEN, buffer);
     }
 
@@ -425,7 +425,7 @@ BOOL PackUniversalCompress(HWND parent, const char* command, TPackErrorTable* co
             strcpy(currentDir, initDir);
         else
         {
-            DeleteFile(tmpListNameBuf);
+            DeleteFileUtf8(tmpListNameBuf);
             return (*PackErrorHandlerPtr)(parent, IDS_PACKERR_IDIRERR);
         }
     }
@@ -434,7 +434,7 @@ BOOL PackUniversalCompress(HWND parent, const char* command, TPackErrorTable* co
         if (!PackExpandInitDir(archiveFileName, sourceDir, rootPath, initDir, currentDir,
                                MAX_PATH))
         {
-            DeleteFile(tmpListNameBuf);
+            DeleteFileUtf8(tmpListNameBuf);
             return (*PackErrorHandlerPtr)(parent, IDS_PACKERR_IDIRERR);
         }
     }
@@ -457,12 +457,12 @@ BOOL PackUniversalCompress(HWND parent, const char* command, TPackErrorTable* co
     }
     if (!exec)
     {
-        DeleteFile(tmpListNameBuf);
+        DeleteFileUtf8(tmpListNameBuf);
         return FALSE; // error message has already been displayed
     }
 
     // the file list is no longer needed
-    DeleteFile(tmpListNameBuf);
+    DeleteFileUtf8(tmpListNameBuf);
 
     // if we used a temporary DOS name, rename all files of that name (name.*) to the desired long name
     if (DOSTmpName[0] != 0)
@@ -493,15 +493,18 @@ BOOL PackUniversalCompress(HWND parent, const char* command, TPackErrorTable* co
         if (ext < path || *ext == '\\')
             ext = path + strlen(path); // for "name" or "path\\name" there is no extension; in Windows ".cvspass" is an extension
         strcpy(ext, ".*");
+        WIN32_FIND_DATAW findDataW;
         WIN32_FIND_DATA findData;
         int i;
         for (i = 0; i < 2; i++)
         {
-            HANDLE find = HANDLES_Q(FindFirstFile(path, &findData));
+            CStrP pathW(ConvertAllocUtf8ToWide(path, -1));
+            HANDLE find = pathW != NULL ? HANDLES_Q(FindFirstFileW(pathW, &findDataW)) : INVALID_HANDLE_VALUE;
             if (find != INVALID_HANDLE_VALUE)
             {
                 do
                 {
+                    ConvertFindDataWToUtf8(findDataW, &findData);
                     strcpy(srcName, findData.cFileName);
                     const char* dst;
                     if (StrICmp(tmpOrigName, findData.cFileName) == 0)
@@ -535,7 +538,7 @@ BOOL PackUniversalCompress(HWND parent, const char* command, TPackErrorTable* co
                             TRACE_E("Error (" << err << ") in SalMoveFile(" << src << ", " << dst << ").");
                         }
                     }
-                } while (FindNextFile(find, &findData));
+                } while (FindNextFileW(find, &findDataW));
                 HANDLES(FindClose(find)); // this name already exists with some extension, searching further
             }
         }
@@ -640,7 +643,7 @@ BOOL PackDelFromArc(HWND parent, CFilesWindow* panel, const char* archiveFileNam
     FILE* listFile;
     if ((listFile = fopen(tmpListNameBuf, "w")) == NULL)
     {
-        DeleteFile(tmpListNameBuf);
+        DeleteFileUtf8(tmpListNameBuf);
         return (*PackErrorHandlerPtr)(parent, IDS_PACKERR_FILE);
     }
 
@@ -664,7 +667,7 @@ BOOL PackDelFromArc(HWND parent, CFilesWindow* panel, const char* archiveFileNam
             if (fprintf(listFile, "%s%s\n", rootPath, namecnv) <= 0)
             {
                 fclose(listFile);
-                DeleteFile(tmpListNameBuf);
+                DeleteFileUtf8(tmpListNameBuf);
                 return (*PackErrorHandlerPtr)(parent, IDS_PACKERR_FILE);
             }
         }
@@ -675,7 +678,7 @@ BOOL PackDelFromArc(HWND parent, CFilesWindow* panel, const char* archiveFileNam
                 if (fprintf(listFile, "%s%s\n", rootPath, namecnv) <= 0)
                 {
                     fclose(listFile);
-                    DeleteFile(tmpListNameBuf);
+                    DeleteFileUtf8(tmpListNameBuf);
                     return (*PackErrorHandlerPtr)(parent, IDS_PACKERR_FILE);
                 }
             }
@@ -686,7 +689,7 @@ BOOL PackDelFromArc(HWND parent, CFilesWindow* panel, const char* archiveFileNam
                     if (fprintf(listFile, "%s%s\\*\n", rootPath, namecnv) <= 0)
                     {
                         fclose(listFile);
-                        DeleteFile(tmpListNameBuf);
+                        DeleteFileUtf8(tmpListNameBuf);
                         return (*PackErrorHandlerPtr)(parent, IDS_PACKERR_FILE);
                     }
                 }
@@ -699,7 +702,7 @@ BOOL PackDelFromArc(HWND parent, CFilesWindow* panel, const char* archiveFileNam
     // if an error occurred and the user decided to cancel the operation, end it
     if (errorOccured == SALENUM_CANCEL)
     {
-        DeleteFile(tmpListNameBuf);
+        DeleteFileUtf8(tmpListNameBuf);
         return FALSE;
     }
 
@@ -711,7 +714,7 @@ BOOL PackDelFromArc(HWND parent, CFilesWindow* panel, const char* archiveFileNam
     if (!PackExpandCmdLine(archiveFileName, NULL, tmpListNameBuf, NULL,
                            modifyTable->DeleteCommand, cmdLine, PACK_CMDLINE_MAXLEN, NULL))
     {
-        DeleteFile(tmpListNameBuf);
+        DeleteFileUtf8(tmpListNameBuf);
         return (*PackErrorHandlerPtr)(parent, IDS_PACKERR_CMDLNERR);
     }
 
@@ -719,7 +722,7 @@ BOOL PackDelFromArc(HWND parent, CFilesWindow* panel, const char* archiveFileNam
     if (!modifyTable->SupportLongNames && strlen(cmdLine) >= 128)
     {
         char buffer[1000];
-        DeleteFile(tmpListNameBuf);
+        DeleteFileUtf8(tmpListNameBuf);
         strcpy(buffer, cmdLine);
         return (*PackErrorHandlerPtr)(parent, IDS_PACKERR_CMDLNLEN, buffer);
     }
@@ -729,7 +732,7 @@ BOOL PackDelFromArc(HWND parent, CFilesWindow* panel, const char* archiveFileNam
     if (!PackExpandInitDir(archiveFileName, NULL, NULL, modifyTable->DeleteInitDir,
                            currentDir, MAX_PATH))
     {
-        DeleteFile(tmpListNameBuf);
+        DeleteFileUtf8(tmpListNameBuf);
         return (*PackErrorHandlerPtr)(parent, IDS_PACKERR_IDIRERR);
     }
 
@@ -756,18 +759,18 @@ BOOL PackDelFromArc(HWND parent, CFilesWindow* panel, const char* archiveFileNam
     }
     if (!exec)
     {
-        DeleteFile(tmpListNameBuf);
+        DeleteFileUtf8(tmpListNameBuf);
         return FALSE; // error message has already been displayed
     }
 
     // if deleting removed the archive, create a zero-length file
-    HANDLE tmpHandle = HANDLES_Q(CreateFile(archiveFileName, GENERIC_READ, 0, NULL,
+    HANDLE tmpHandle = HANDLES_Q(CreateFileUtf8(archiveFileName, GENERIC_READ, 0, NULL,
                                             OPEN_ALWAYS, fileAttrs, NULL));
     if (tmpHandle != INVALID_HANDLE_VALUE)
         HANDLES(CloseHandle(tmpHandle));
 
     // the file list is no longer needed
-    DeleteFile(tmpListNameBuf);
+    DeleteFileUtf8(tmpListNameBuf);
 
     return TRUE;
 }

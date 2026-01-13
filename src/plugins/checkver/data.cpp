@@ -978,7 +978,7 @@ BOOL CModules::BuildDataFromScript()
 BOOL LoadScripDataFromFile(const char* fileName)
 {
     char buff[1024];
-    HANDLE hFile = CreateFile(fileName, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL,
+    HANDLE hFile = CreateFileUtf8Local(fileName, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL,
                               OPEN_EXISTING, FILE_FLAG_SEQUENTIAL_SCAN, NULL);
     if (hFile == INVALID_HANDLE_VALUE)
     {

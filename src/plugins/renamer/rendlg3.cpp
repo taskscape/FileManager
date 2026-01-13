@@ -47,7 +47,7 @@ BOOL CRenamerDialog::MoveFile(char* sourceName, char* targetName, char* newPart,
                 SG->ClearReadOnlyAttr(targetName); // so it can be deleted ...
                 while (1)
                 {
-                    if (DeleteFile(targetName))
+                    if (DeleteFileUtf8Local(targetName))
                         break;
 
                     if (!FileError(HWindow, targetName, IDS_OVERWRITEERROR,
@@ -76,7 +76,7 @@ BOOL CRenamerDialog::MoveFile(char* sourceName, char* targetName, char* newPart,
         SG->ClearReadOnlyAttr(sourceName); // so it can be deleted ...
         while (1)
         {
-            if (DeleteFile(sourceName))
+            if (DeleteFileUtf8Local(sourceName))
                 break;
 
             if (!FileError(HWindow, sourceName, IDS_DELETEERROR,
@@ -117,7 +117,7 @@ BOOL CRenamerDialog::CheckAndCreateDirectory(char* directory, char* newPart, BOO
     {
         end = (char*)GetNextPathComponent(start);
         *end = 0;
-        f = FindFirstFile(directory, &fd);
+        f = FindFirstFileUtf8Local(directory, &fd);
         if (f == INVALID_HANDLE_VALUE)
             goto CREATE_PATH;
         else
@@ -160,7 +160,7 @@ BOOL CRenamerDialog::CheckAndCreateDirectory(char* directory, char* newPart, BOO
 
         while (1)
         {
-            if (CreateDirectory(directory, NULL))
+            if (CreateDirectoryUtf8Local(directory, NULL))
             {
                 if (!Undoing)
                     UndoStack.Add(new CUndoStackEntry(directory, NULL, NULL, FALSE, FALSE));
@@ -192,7 +192,7 @@ COPY_AGAIN:
 
     while (1)
     {
-        in = CreateFile(sourceName, GENERIC_READ,
+        in = CreateFileUtf8Local(sourceName, GENERIC_READ,
                         FILE_SHARE_READ | FILE_SHARE_WRITE, NULL,
                         OPEN_EXISTING, FILE_FLAG_SEQUENTIAL_SCAN, NULL);
         if (in != INVALID_HANDLE_VALUE)
@@ -200,7 +200,7 @@ COPY_AGAIN:
             HANDLE out;
             while (1)
             {
-                out = CreateFile(targetName, GENERIC_WRITE, 0, NULL,
+                out = CreateFileUtf8Local(targetName, GENERIC_WRITE, 0, NULL,
                                  CREATE_NEW, FILE_FLAG_SEQUENTIAL_SCAN, NULL);
                 if (out != INVALID_HANDLE_VALUE)
                 {
@@ -230,14 +230,14 @@ COPY_AGAIN:
                                             CloseHandle(in);
                                         if (out != NULL)
                                             CloseHandle(out);
-                                        DeleteFile(targetName);
+                                        DeleteFileUtf8Local(targetName);
                                         return FALSE;
                                     }
 
                                     // retry
                                     if (out != NULL)
                                         CloseHandle(out); // close the invalid handle
-                                    out = CreateFile(targetName, GENERIC_WRITE, 0, NULL,
+                                    out = CreateFileUtf8Local(targetName, GENERIC_WRITE, 0, NULL,
                                                      OPEN_ALWAYS, FILE_FLAG_SEQUENTIAL_SCAN, NULL);
                                     if (out != INVALID_HANDLE_VALUE) // opened, now set the offset
                                     {
@@ -248,7 +248,7 @@ COPY_AGAIN:
                                         { // cannot get the size or the file is too small, start over
                                             CloseHandle(in);
                                             CloseHandle(out);
-                                            DeleteFile(targetName);
+                                            DeleteFileUtf8Local(targetName);
                                             goto COPY_AGAIN;
                                         }
                                         else // success (the file is large enough), set the offset
@@ -263,7 +263,7 @@ COPY_AGAIN:
                                             { // cannot set the offset, start over
                                                 CloseHandle(in);
                                                 CloseHandle(out);
-                                                DeleteFile(targetName);
+                                                DeleteFileUtf8Local(targetName);
                                                 goto COPY_AGAIN;
                                             }
                                             break;
@@ -289,13 +289,13 @@ COPY_AGAIN:
                                         CloseHandle(in);
                                     if (out != NULL)
                                         CloseHandle(out);
-                                    DeleteFile(targetName);
+                                    DeleteFileUtf8Local(targetName);
                                     return FALSE;
                                 }
 
                                 if (in != NULL)
                                     CloseHandle(in); // close the invalid handle
-                                in = CreateFile(sourceName, GENERIC_READ,
+                                in = CreateFileUtf8Local(sourceName, GENERIC_READ,
                                                 FILE_SHARE_READ | FILE_SHARE_WRITE, NULL,
                                                 OPEN_EXISTING, FILE_FLAG_SEQUENTIAL_SCAN, NULL);
                                 if (in != INVALID_HANDLE_VALUE) // opened, now set the offset
@@ -307,7 +307,7 @@ COPY_AGAIN:
                                     { // cannot get the size or the file is too small, start over
                                         CloseHandle(in);
                                         CloseHandle(out);
-                                        DeleteFile(targetName);
+                                        DeleteFileUtf8Local(targetName);
                                         goto COPY_AGAIN;
                                     }
                                     else // success (the file is large enough), set the offset
@@ -322,7 +322,7 @@ COPY_AGAIN:
                                         { // cannot set the offset, start over
                                             CloseHandle(in);
                                             CloseHandle(out);
-                                            DeleteFile(targetName);
+                                            DeleteFileUtf8Local(targetName);
                                             goto COPY_AGAIN;
                                         }
                                         break;
@@ -346,7 +346,7 @@ COPY_AGAIN:
                     DWORD attr;
                     attr = SG->SalGetFileAttributes(sourceName);
                     if (attr != -1)
-                        SetFileAttributes(targetName, attr | FILE_ATTRIBUTE_ARCHIVE);
+                        SetFileAttributesUtf8Local(targetName, attr | FILE_ATTRIBUTE_ARCHIVE);
                     return TRUE;
                 }
                 else
@@ -369,10 +369,10 @@ COPY_AGAIN:
                         if (attr != 0xFFFFFFFF && (attr & FILE_ATTRIBUTE_READONLY))
                         {
                             readonly = TRUE;
-                            SetFileAttributes(targetName, attr & (~FILE_ATTRIBUTE_READONLY));
+                            SetFileAttributesUtf8Local(targetName, attr & (~FILE_ATTRIBUTE_READONLY));
                         }
 
-                        out = CreateFile(targetName, GENERIC_WRITE, 0, NULL,
+                        out = CreateFileUtf8Local(targetName, GENERIC_WRITE, 0, NULL,
                                          OPEN_ALWAYS, FILE_FLAG_SEQUENTIAL_SCAN, NULL);
 
                         if (out != INVALID_HANDLE_VALUE)
@@ -387,7 +387,7 @@ COPY_AGAIN:
                         {
                             err = GetLastError();
                             if (readonly)
-                                SetFileAttributes(targetName, attr);
+                                SetFileAttributesUtf8Local(targetName, attr);
                             goto NORMAL_ERROR;
                         }
                     }

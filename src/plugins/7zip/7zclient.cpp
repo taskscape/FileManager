@@ -730,7 +730,7 @@ int C7zClient::Delete(CSalamanderForOperationsAbstract* salamander, const char* 
             // close the open archive
             inArchive->Close();
             // delete it
-            if (::DeleteFile(archiveName))
+            if (DeleteFileUtf8Local(archiveName))
             {
                 DWORD err2;
                 // rename the tmp file to the archive
@@ -757,7 +757,7 @@ int C7zClient::Delete(CSalamanderForOperationsAbstract* salamander, const char* 
             Error(VARIANT_BOOLToBool(propVariant.boolVal) ? IDS_7Z_SOLID_DELETE_UNSUP : IDS_7Z_UPDATE_ERROR);
             /*
       // delete the temp file
-      if (!::DeleteFile(tmpName))
+      if (!DeleteFileUtf8Local(tmpName))
       {
         DWORD err = ::GetLastError();
         // report the error
@@ -775,7 +775,7 @@ int C7zClient::Delete(CSalamanderForOperationsAbstract* salamander, const char* 
     }
 
     delete archiveItems;
-    ::DeleteFile(tmpName);
+    DeleteFileUtf8Local(tmpName);
 
     return ret;
 } /* C7zClient::Delete */
@@ -1201,7 +1201,7 @@ int C7zClient::Update(CSalamanderForOperationsAbstract* salamander, const char* 
                 // close the open archive
                 inArchive->Close();
                 // delete it
-                if (!::DeleteFile(archiveName))
+                if (!DeleteFileUtf8Local(archiveName))
                 {
                     Error(IDS_CANT_UPDATE_ARCHIVE, FALSE, archiveName);
                     throw OPER_CANCEL;
@@ -1253,7 +1253,7 @@ int C7zClient::Update(CSalamanderForOperationsAbstract* salamander, const char* 
             //      }
             /*
       // delete the temp file
-      if (!::DeleteFile(tmpName))
+      if (!DeleteFileUtf8Local(tmpName))
       {
         SysError(IDS_CANT_DELETE_TMPARCHIVE, ::GetLastError(), FALSE, tmpName);
         throw OPER_CANCEL;
@@ -1269,7 +1269,7 @@ int C7zClient::Update(CSalamanderForOperationsAbstract* salamander, const char* 
     delete archiveItems;
     delete updateList;
 
-    ::DeleteFile(tmpName);
+    DeleteFileUtf8Local(tmpName);
 
     return ret;
 } /* C7zClient::Update */

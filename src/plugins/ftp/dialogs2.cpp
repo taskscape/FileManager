@@ -296,8 +296,8 @@ void CWelcomeMsgDlg::OnSaveTextAs()
         }
 
         if (SalamanderGeneral->SalGetFileAttributes(fileName) != 0xFFFFFFFF) // allow overwriting even a read-only file
-            SetFileAttributes(fileName, FILE_ATTRIBUTE_ARCHIVE);
-        HANDLE file = HANDLES_Q(CreateFile(fileName, GENERIC_WRITE,
+            SetFileAttributesUtf8Local(fileName, FILE_ATTRIBUTE_ARCHIVE);
+        HANDLE file = HANDLES_Q(CreateFileUtf8Local(fileName, GENERIC_WRITE,
                                            FILE_SHARE_READ, NULL,
                                            CREATE_ALWAYS,
                                            FILE_FLAG_SEQUENTIAL_SCAN,
@@ -324,7 +324,7 @@ void CWelcomeMsgDlg::OnSaveTextAs()
                 sprintf(buf, LoadStr(IDS_RAWLISTSAVEERROR), SalamanderGeneral->GetErrorText(err));
                 SalamanderGeneral->SalMessageBox(HWindow, buf, LoadStr(IDS_FTPERRORTITLE),
                                                  MB_OK | MB_ICONEXCLAMATION);
-                DeleteFile(fileName); // delete the file if an error occurred
+                DeleteFileUtf8Local(fileName); // delete the file if an error occurred
             }
         }
         else

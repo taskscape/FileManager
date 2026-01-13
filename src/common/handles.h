@@ -359,6 +359,13 @@ public:
                        DWORD dwCreationDisposition, DWORD dwFlagsAndAttributes,
                        HANDLE hTemplateFile);
 
+    HANDLE CreateFileUtf8(LPCSTR lpFileName, DWORD dwDesiredAccess,
+                          DWORD dwShareMode,
+                          LPSECURITY_ATTRIBUTES lpSecurityAttributes,
+                          DWORD dwCreationDisposition,
+                          DWORD dwFlagsAndAttributes,
+                          HANDLE hTemplateFile);
+
     HANDLE CreateMailslot(LPCTSTR lpName, DWORD nMaxMessageSize,
                           DWORD lReadTimeout,
                           LPSECURITY_ATTRIBUTES lpSecurityAttributes);
@@ -572,6 +579,7 @@ public:
 
     HANDLE FindFirstFileA(LPCSTR lpFileName, LPWIN32_FIND_DATAA lpFindFileData);
     HANDLE FindFirstFileW(LPCWSTR lpFileName, LPWIN32_FIND_DATAW lpFindFileData);
+    HANDLE FindFirstFileUtf8(LPCSTR lpFileName, LPWIN32_FIND_DATAA lpFindFileData);
 
     BOOL FindClose(HANDLE hFindFile);
 

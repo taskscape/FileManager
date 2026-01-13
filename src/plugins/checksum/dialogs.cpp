@@ -489,7 +489,7 @@ BOOL CCalculateDialog::AddDir(char (&path)[MAX_PATH + 50], size_t root, BOOL* ig
     do
     {
         again = FALSE;
-        if ((hFind = HANDLES_Q(FindFirstFile(path, &fd))) != INVALID_HANDLE_VALUE)
+        if ((hFind = HANDLES_Q(FindFirstFileUtf8Local(path, &fd))) != INVALID_HANDLE_VALUE)
         {
             do
             {
@@ -537,7 +537,7 @@ BOOL CCalculateDialog::AddDir(char (&path)[MAX_PATH + 50], size_t root, BOOL* ig
                         ret = FALSE;
                     }
                 }
-            } while (!StopReadingDirectories && ret && FindNextFile(hFind, &fd));
+            } while (!StopReadingDirectories && ret && FindNextFileUtf8Local(hFind, &fd));
             HANDLES(FindClose(hFind));
             if (StopReadingDirectories)
                 return FALSE;
@@ -699,7 +699,7 @@ unsigned CCalculateThread::Body()
             TRACE_E("CCalculateThread::Body(): unexpected situation: SalPathAppend() has failed");
             break;
         }
-        if (!SafeOpenCreateFile(path, GENERIC_READ, FILE_SHARE_READ, OPEN_EXISTING, FILE_FLAG_SEQUENTIAL_SCAN,
+        if (!SafeOpenCreateFileUtf8Local(path, GENERIC_READ, FILE_SHARE_READ, OPEN_EXISTING, FILE_FLAG_SEQUENTIAL_SCAN,
                                 &hFile, &skip, &silent, dialog->HWindow))
             break;
         if (skip)
@@ -708,7 +708,7 @@ unsigned CCalculateThread::Body()
             // advance progress by the size of the skipped file
             WIN32_FIND_DATA fd;
             memset(&fd, 0, sizeof(fd));
-            HANDLE find = HANDLES_Q(FindFirstFile(path, &fd));
+            HANDLE find = HANDLES_Q(FindFirstFileUtf8Local(path, &fd));
             if (find != INVALID_HANDLE_VALUE)
             {
                 HANDLES(FindClose(find));
@@ -743,7 +743,7 @@ unsigned CCalculateThread::Body()
                     // advance progress by the size of the skipped file
                     WIN32_FIND_DATA fd;
                     memset(&fd, 0, sizeof(fd));
-                    HANDLE find = HANDLES_Q(FindFirstFile(path, &fd));
+                    HANDLE find = HANDLES_Q(FindFirstFileUtf8Local(path, &fd));
                     if (find != INVALID_HANDLE_VALUE)
                     {
                         HANDLES(FindClose(find));
@@ -1432,7 +1432,7 @@ void CVerifyDialog::LTrimStr(char* str)
 char* CVerifyDialog::LoadFile(char* name)
 {
     CALL_STACK_MESSAGE2("CVerifyDialog::LoadFile(%s)", name);
-    HANDLE file = CreateFile(name, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, 0, NULL);
+    HANDLE file = CreateFileUtf8Local(name, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, 0, NULL);
     if (file == INVALID_HANDLE_VALUE)
     {
         Error(HWindow, GetLastError(), IDS_VERIFYTITLE, IDS_ERROROPENING2, name);
@@ -1626,7 +1626,7 @@ BOOL CVerifyDialog::LoadSourceFile()
                 if (SalamanderGeneral->SalPathAppend(path, info->fileName, MAX_PATH))
                 {
                     WIN32_FIND_DATA fd;
-                    HANDLE hFind = HANDLES_Q(FindFirstFile(path, &fd));
+                    HANDLE hFind = HANDLES_Q(FindFirstFileUtf8Local(path, &fd));
                     info->bFileExist = (hFind != INVALID_HANDLE_VALUE);
                     if (info->bFileExist)
                     {
@@ -1738,7 +1738,7 @@ unsigned CVerifyThread::Body()
 
         // open the file
         HANDLE hFile;
-        if (!SafeOpenCreateFile(info->fileName, GENERIC_READ, FILE_SHARE_READ, OPEN_EXISTING, FILE_FLAG_SEQUENTIAL_SCAN,
+        if (!SafeOpenCreateFileUtf8Local(info->fileName, GENERIC_READ, FILE_SHARE_READ, OPEN_EXISTING, FILE_FLAG_SEQUENTIAL_SCAN,
                                 &hFile, &skip, &silent, dialog->HWindow))
         {
             dialog->SetItemTextAndIcon(i, 2, LoadStr(IDS_CANCELED));

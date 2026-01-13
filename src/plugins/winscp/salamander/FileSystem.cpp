@@ -25,6 +25,7 @@
 #include <Queue.h>
 #include <Tools.h>
 #include <VCLCommon.h>
+#include "..\\Utf8WinApi.h"
 //---------------------------------------------------------------------------
 #pragma package(smart_init)
 //---------------------------------------------------------------------------
@@ -2281,7 +2282,7 @@ void WINAPI CPluginFSInterface::ViewFile(const char* /*FSName*/, HWND Parent,
                         DestroyFileList();
                     }
 
-                    HANDLE Handle = CreateFile(TempFileName, GENERIC_READ,
+                    HANDLE Handle = WinScpCreateFileUtf8(TempFileName.c_str(), GENERIC_READ,
                                                FILE_SHARE_READ, NULL, OPEN_EXISTING, 0, 0);
                     CacheCreated = (Handle != INVALID_HANDLE_VALUE);
                     if (CacheCreated)

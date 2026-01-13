@@ -2463,7 +2463,7 @@ BOOL ViewFileInPluginViewer(const char* pluginSPL,
         {
             TRACE_E("Unexpected value of 'fileNameInCache' in CSalamanderGeneral::ViewFileInPluginViewer!");
             error = 3;
-            ::DeleteFile(pluginData->FileName);
+            ::DeleteFileUtf8(pluginData->FileName);
             return FALSE;
         }
 
@@ -2480,7 +2480,7 @@ BOOL ViewFileInPluginViewer(const char* pluginSPL,
                 else            // fatal error
                 {
                     error = 3;
-                    ::DeleteFile(pluginData->FileName);
+                    ::DeleteFileUtf8(pluginData->FileName);
                     return FALSE; // fatal error
                 }
             }
@@ -2491,7 +2491,7 @@ BOOL ViewFileInPluginViewer(const char* pluginSPL,
         {
             DWORD err = GetLastError();
             TRACE_E("Unable to move file to disk cache! (error " << ::GetErrorText(err) << ")");
-            ::DeleteFile(pluginData->FileName);
+            ::DeleteFileUtf8(pluginData->FileName);
             DiskCache.ReleaseName(viewUniqueName, FALSE);
             error = 3;
             return FALSE;
@@ -2499,7 +2499,7 @@ BOOL ViewFileInPluginViewer(const char* pluginSPL,
         else // successfully obtained a temp file; we must call NamePrepared()
         {
             CQuadWord size(0, 0);
-            HANDLE file = HANDLES_Q(CreateFile(fileName, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE,
+            HANDLE file = HANDLES_Q(CreateFileUtf8(fileName, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE,
                                                NULL, OPEN_EXISTING, 0, NULL));
             if (file != INVALID_HANDLE_VALUE)
             { // ignore the error; the file size is not that important
@@ -2615,7 +2615,7 @@ BOOL ViewFileInPluginViewer(const char* pluginSPL,
     if (useCache && !diskCacheNameClosed)
     {
         DiskCache.ReleaseName(viewUniqueName, FALSE);
-        //    ::DeleteFile(fileName);   // the cache already removed the file and deallocated fileName
+        //    ::DeleteFileUtf8(fileName);   // the cache already removed the file and deallocated fileName
     }
     return error == 0; // returning success?
 }

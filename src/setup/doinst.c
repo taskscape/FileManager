@@ -20,6 +20,80 @@
 
 DWORD InstallFinish(BOOL DoRunOnce);
 
+static WCHAR* AllocWideFromUtf8(const char* src)
+{
+    if (src == NULL)
+        return NULL;
+    int len = MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, src, -1, NULL, 0);
+    if (len <= 0)
+        return NULL;
+    WCHAR* buf = (WCHAR*)malloc(len * sizeof(WCHAR));
+    if (buf == NULL)
+        return NULL;
+    if (MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, src, -1, buf, len) == 0)
+    {
+        free(buf);
+        return NULL;
+    }
+    return buf;
+}
+
+static DWORD GetFileAttributesUtf8Local(const char* fileName)
+{
+    DWORD attrs = INVALID_FILE_ATTRIBUTES;
+    WCHAR* fileNameW = AllocWideFromUtf8(fileName);
+    if (fileNameW == NULL)
+    {
+        SetLastError(ERROR_INVALID_PARAMETER);
+        return attrs;
+    }
+    attrs = GetFileAttributesW(fileNameW);
+    free(fileNameW);
+    return attrs;
+}
+
+static BOOL CreateDirectoryUtf8Local(const char* dirName, LPSECURITY_ATTRIBUTES securityAttributes)
+{
+    BOOL ok = FALSE;
+    WCHAR* dirNameW = AllocWideFromUtf8(dirName);
+    if (dirNameW == NULL)
+    {
+        SetLastError(ERROR_INVALID_PARAMETER);
+        return FALSE;
+    }
+    ok = CreateDirectoryW(dirNameW, securityAttributes);
+    free(dirNameW);
+    return ok;
+}
+
+static BOOL SetFileAttributesUtf8Local(const char* fileName, DWORD attrs)
+{
+    BOOL ok = FALSE;
+    WCHAR* fileNameW = AllocWideFromUtf8(fileName);
+    if (fileNameW == NULL)
+    {
+        SetLastError(ERROR_INVALID_PARAMETER);
+        return FALSE;
+    }
+    ok = SetFileAttributesW(fileNameW, attrs);
+    free(fileNameW);
+    return ok;
+}
+
+static BOOL RemoveDirectoryUtf8Local(const char* dirName)
+{
+    BOOL ok = FALSE;
+    WCHAR* dirNameW = AllocWideFromUtf8(dirName);
+    if (dirNameW == NULL)
+    {
+        SetLastError(ERROR_INVALID_PARAMETER);
+        return FALSE;
+    }
+    ok = RemoveDirectoryW(dirNameW);
+    free(dirNameW);
+    return ok;
+}
+
 // sections
 const char* INF_PRIVATE_SECTION = "Private";
 const char* INF_COPYSECTION = "CopyFiles";
@@ -205,7 +279,7 @@ int MyMemCmp(CONST VOID* src1, CONST VOID* src2, DWORD len)
 BOOL CheckAndCreateDirectory(const char* dir)
 {
     BOOL quiet = TRUE;
-    DWORD attrs = GetFileAttributes(dir);
+    DWORD attrs = GetFileAttributesUtf8Local(dir);
     char buf[MAX_PATH + 100];
     char name[MAX_PATH];
     if (attrs == INVALID_FILE_ATTRIBUTES) // probably does not exist, allow it to be created
@@ -248,7 +322,7 @@ BOOL CheckAndCreateDirectory(const char* dir)
                     lstrcpy(name, root);
                     break; // already at the root directory
                 }
-                attrs = GetFileAttributes(name);
+                attrs = GetFileAttributesUtf8Local(name);
                 if (attrs != INVALID_FILE_ATTRIBUTES) // name exists
                 {
                     if (attrs & FILE_ATTRIBUTE_DIRECTORY)
@@ -283,7 +357,7 @@ BOOL CheckAndCreateDirectory(const char* dir)
                 name[len += (int)(slash - st)] = 0;
                 while (1)
                 {
-                    if (!CreateDirectory(name, NULL))
+                    if (!CreateDirectoryUtf8Local(name, NULL))
                     {
                         if (!SetupInfo.Silent)
                         {
@@ -597,7 +671,7 @@ BOOL QueryRetry(const char* sFileName, DWORD error, int* result)
 
 BOOL FileExist(const char* fileName)
 {
-    DWORD attr = GetFileAttributes(fileName);
+    DWORD attr = GetFileAttributesUtf8Local(fileName);
     if (attr == INVALID_FILE_ATTRIBUTES)
         return FALSE;
     return TRUE;
@@ -826,7 +900,7 @@ BOOL MyCopyFile(const char* sFileName, const char* tFileName,
     if (FileExist(tFileName))
     {
         // override READONLY/SYSTEM/HIDDEN attributes
-        if (!SetFileAttributes(tFileName, FILE_ATTRIBUTE_ARCHIVE))
+        if (!SetFileAttributesUtf8Local(tFileName, FILE_ATTRIBUTE_ARCHIVE))
         {
             DWORD error = GetLastError();
             wsprintf(buff, LoadStr(ERROR_CF_FILESETATTR), tFileName);
@@ -836,7 +910,7 @@ BOOL MyCopyFile(const char* sFileName, const char* tFileName,
         }
     }
 
-    fileAtttr = GetFileAttributes(sFileName);
+    fileAtttr = GetFileAttributesUtf8Local(sFileName);
     if (fileAtttr == INVALID_FILE_ATTRIBUTES)
     {
         HandleError(IDS_MAINWINDOWTITLE, ERROR_CF_GETATTR, GetLastError());
@@ -1960,7 +2034,7 @@ BOOL DelEmptyDirs()
             char buff[MAX_PATH];
             lstrcpyn(buff, line, MAX_PATH);
             ExpandPath(buff);
-            RemoveDirectory(buff);
+            RemoveDirectoryUtf8Local(buff);
         }
         line += len + 1;
     }
@@ -2734,7 +2808,7 @@ BOOL FindConflictWithAnotherVersion(BOOL* sameOrOlderVersion, BOOL* sameVersion,
                         DWORD attrs;
                         lstrcpy(removeLog, SetupInfo.SaveRemoveLog);
                         ExpandPath(removeLog);
-                        attrs = GetFileAttributes(removeLog);
+                        attrs = GetFileAttributesUtf8Local(removeLog);
                         *foundRemoveLog = (attrs != INVALID_FILE_ATTRIBUTES && (attrs & FILE_ATTRIBUTE_DIRECTORY) == 0);
                     }
 
@@ -2762,7 +2836,7 @@ BOOL ContainsPathUpgradableVersion(const char* path)
     BOOL sameOrOlderVersion;
 
     // the path must exist
-    DWORD attrs = GetFileAttributes(path);
+    DWORD attrs = GetFileAttributesUtf8Local(path);
     if (attrs == INVALID_FILE_ATTRIBUTES || (attrs & FILE_ATTRIBUTE_DIRECTORY) == 0)
         return FALSE;
 

@@ -82,13 +82,13 @@ BOOL SafeWriteFile(HANDLE hFile, LPVOID lpBuffer, DWORD nBytesToWrite, DWORD* pn
     return TRUE;
 }
 
-BOOL SafeOpenCreateFile(LPCTSTR fileName, DWORD desiredAccess, DWORD shareMode, DWORD creationDisposition,
+BOOL SafeOpenCreateFileUtf8Local(LPCTSTR fileName, DWORD desiredAccess, DWORD shareMode, DWORD creationDisposition,
                         DWORD flagsAndAttributes, HANDLE* hFile, BOOL* skip, int* silent, HWND parent)
 {
-    CALL_STACK_MESSAGE6("SafeOpenCreateFile(%s, 0x%X, 0x%X, 0x%X, 0x%X, , , )", fileName, desiredAccess,
+    CALL_STACK_MESSAGE6("SafeOpenCreateFileUtf8Local(%s, 0x%X, 0x%X, 0x%X, 0x%X, , , )", fileName, desiredAccess,
                         shareMode, creationDisposition, flagsAndAttributes);
 
-    while ((*hFile = CreateFile(fileName, desiredAccess, shareMode, NULL, creationDisposition,
+    while ((*hFile = CreateFileUtf8Local(fileName, desiredAccess, shareMode, NULL, creationDisposition,
                                 flagsAndAttributes, NULL)) == INVALID_HANDLE_VALUE &&
            ((silent != NULL) ? !*silent : 1))
     {

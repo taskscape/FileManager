@@ -8,6 +8,7 @@
 #include "putty.h"
 #include "ssh.h"
 #include "storage.h"
+#include "..\\..\\Utf8WinApi.h"
 
 #ifdef MPEXT
 extern CRITICAL_SECTION noise_section;
@@ -28,11 +29,11 @@ void noise_get_heavy(void (*func) (void *, int))
 
     GetWindowsDirectory(winpath, sizeof(winpath));
     strcat(winpath, "\\*");
-    srch = FindFirstFile(winpath, &finddata);
+    srch = WinScpFindFirstFileUtf8(winpath, &finddata);
     if (srch != INVALID_HANDLE_VALUE) {
 	do {
 	    func(&finddata, sizeof(finddata));
-	} while (FindNextFile(srch, &finddata));
+	} while (WinScpFindNextFileUtf8(srch, &finddata));
 	FindClose(srch);
     }
 

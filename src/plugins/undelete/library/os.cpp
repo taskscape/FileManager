@@ -263,8 +263,8 @@ HANDLE OS<char>::OS_CreateFile(const char* fileName, DWORD desiredAccess, DWORD 
                                SECURITY_ATTRIBUTES* securityAttributes, DWORD creationDisposition,
                                DWORD flagsAndAttributes, HANDLE templateFile)
 {
-    return HANDLES_Q(CreateFileA(fileName, desiredAccess, shareMode, securityAttributes,
-                                 creationDisposition, flagsAndAttributes, templateFile));
+    return HANDLES_Q(CreateFileUtf8Local(fileName, desiredAccess, shareMode, securityAttributes,
+                                         creationDisposition, flagsAndAttributes, templateFile));
 }
 
 // ****************************************************************************

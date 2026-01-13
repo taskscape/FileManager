@@ -49,7 +49,7 @@ DWORD GetSVGSysColor(int index)
 char* ReadSVGFile(const char* fileName)
 {
     char* buff = NULL;
-    HANDLE hFile = HANDLES_Q(CreateFile(fileName, GENERIC_READ,
+    HANDLE hFile = HANDLES_Q(CreateFileUtf8(fileName, GENERIC_READ,
                                         FILE_SHARE_READ, NULL,
                                         OPEN_EXISTING,
                                         FILE_FLAG_SEQUENTIAL_SCAN,

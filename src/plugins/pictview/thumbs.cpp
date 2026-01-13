@@ -385,7 +385,7 @@ void UpdateThumbnails(CSalamanderForOperationsAbstract* Salamander)
                         {
 #endif
                             // SalamanderGeneral->SalGetTempFileName created the file
-                            DeleteFile(newFile);
+                            DeleteFileUtf8Local(newFile);
                             _stprintf(newFile, LoadStr(IDS_REGENERATE_THUMB_WRITEFILE), str ? str + 1 : path);
                             SalamanderGeneral->ShowMessageBox(newFile, LoadStr(IDS_PLUGINNAME), MSGBOX_ERROR);
                         }
@@ -393,7 +393,7 @@ void UpdateThumbnails(CSalamanderForOperationsAbstract* Salamander)
                         {
                             do
                             {
-                                if (DeleteFile(path))
+                                if (DeleteFileUtf8Local(path))
                                     break;
                                 if (flags & FL_OVERWRITE_RO_ALL)
                                 {
@@ -455,11 +455,11 @@ void UpdateThumbnails(CSalamanderForOperationsAbstract* Salamander)
                             if (flags & FL_SKIP)
                             {
                                 // delete the temporary file
-                                DeleteFile(newFile);
+                                DeleteFileUtf8Local(newFile);
                             }
                             else
                             {
-                                MoveFile(newFile, path);
+                                MoveFileUtf8Local(newFile, path);
                                 SalamanderGeneral->CutDirectory(path);
                                 SalamanderGeneral->PostChangeOnPathNotification(path, FALSE);
                                 processed++;
@@ -590,7 +590,7 @@ int ExtractWinThumbnail(LPCTSTR filename, unsigned char** pptr)
     wcscpy(pwcFile + i, L"Thumbs.db");
 
     // get the last modification time
-    hFind = FindFirstFile(filename, &ffd);
+    hFind = FindFirstFileUtf8Local(filename, &ffd);
     if (hFind != INVALID_HANDLE_VALUE)
     {
         FindClose(hFind);
@@ -752,7 +752,7 @@ int ExtractWinThumbnail(LPCTSTR filename, unsigned char** pptr)
 
             _tcscpy(tmp, filename);
             _tcscat(tmp, _T(":\5Q30lsldxJoudresxAaaqpcawXc"));
-            hFile = CreateFile(tmp, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, 0, NULL);
+            hFile = CreateFileUtf8Local(tmp, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, 0, NULL);
             free(tmp);
             if (hFile != INVALID_HANDLE_VALUE)
             {

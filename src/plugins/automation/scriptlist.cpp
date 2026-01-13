@@ -261,7 +261,7 @@ HRESULT CScriptInfo::LoadOleStringFromFile(PCTSTR pszFileName, __out LPOLESTR& s
     HRESULT hr;
     int cchRequired, cchConverted;
 
-    hFile = CreateFile(pszFileName, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, 0, NULL);
+    hFile = CreateFileUtf8Local(pszFileName, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, 0, NULL);
     if (hFile == INVALID_HANDLE_VALUE)
     {
         return HRESULT_FROM_WIN32(GetLastError());
@@ -859,7 +859,7 @@ int CScriptLookup::FillContainer(
     g_oAutomationPlugin.ExpandPath(pContainer->GetPath(), szPattern, _countof(szPattern));
     SalamanderGeneral->SalPathAppend(szPattern, _T("*"), _countof(szPattern));
 
-    hFind = FindFirstFile(szPattern, &fd);
+    hFind = FindFirstFileUtf8Local(szPattern, &fd);
     if (hFind == INVALID_HANDLE_VALUE)
     {
         return 0;
@@ -917,7 +917,7 @@ int CScriptLookup::FillContainer(
                 }
             }
         }
-    } while (FindNextFile(hFind, &fd));
+    } while (FindNextFileUtf8Local(hFind, &fd));
 
     FindClose(hFind);
 

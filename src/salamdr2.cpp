@@ -615,7 +615,7 @@ BOOL FileExists(const char* fileName)
   // beware of GENERIC_READ: it would return FALSE for files that have all permissions removed
   // j.r. note: without GENERIC_READ (with value 0) NT4 always returns TRUE for files on UNC paths
   // the solution would probably be to set GENERIC_READ and check what error occurred via GetLastError()
-  HANDLE hFile = HANDLES_Q(CreateFile(fileName, 0, FILE_SHARE_READ | FILE_SHARE_WRITE,
+  HANDLE hFile = HANDLES_Q(CreateFileUtf8(fileName, 0, FILE_SHARE_READ | FILE_SHARE_WRITE,
                                       NULL, OPEN_EXISTING, 0, NULL));
   if (hFile == INVALID_HANDLE_VALUE)
   {
@@ -1415,14 +1415,14 @@ BOOL GetReparsePointDestination(const char* repPointDir, char* repPointDstBuf, D
     char repPointDirCrFileCopy[3 * MAX_PATH];
     MakeCopyWithBackslashIfNeeded(repPointDirCrFile, repPointDirCrFileCopy);
 
-    DWORD attrs = GetFileAttributes(repPointDirCrFile);
+    DWORD attrs = SalGetFileAttributes(repPointDirCrFile);
     if (attrs == 0xffffffff || (attrs & FILE_ATTRIBUTE_REPARSE_POINT) == 0)
     {
         //    TRACE_I("GetReparsePointDestination(): Reparse point not found: " << repPointDir);
         return FALSE;
     }
 
-    HANDLE file = HANDLES_Q(CreateFile(repPointDirCrFile, 0 /*GENERIC_READ*/, 0, 0, OPEN_EXISTING,
+    HANDLE file = HANDLES_Q(CreateFileUtf8(repPointDirCrFile, 0 /*GENERIC_READ*/, 0, 0, OPEN_EXISTING,
                                        FILE_FLAG_BACKUP_SEMANTICS | FILE_FLAG_OPEN_REPARSE_POINT, NULL));
     if (file == INVALID_HANDLE_VALUE)
     {
@@ -2705,7 +2705,7 @@ BOOL ImportConfiguration(HWND hParent, const char* fileName, BOOL ignoreIfNotExi
 {
     TRACE_I("ImportConfiguration(): begin");
     DWORD err = 0;
-    HANDLE file = HANDLES_Q(CreateFile(fileName, GENERIC_READ, FILE_SHARE_READ, NULL,
+    HANDLE file = HANDLES_Q(CreateFileUtf8(fileName, GENERIC_READ, FILE_SHARE_READ, NULL,
                                        OPEN_EXISTING, 0, 0));
     if (file == INVALID_HANDLE_VALUE)
     {

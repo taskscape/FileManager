@@ -383,11 +383,18 @@ void AddValueToStdHistoryValues(char** historyArr, int historyItemsCount,
 void LoadComboFromStdHistoryValues(HWND combo, char** historyArr, int historyItemsCount)
 {
     CALL_STACK_MESSAGE1("LoadComboFromStdHistoryValues()");
+    SendMessage(combo, CB_SETUNICODEFORMAT, TRUE, 0);
     SendMessage(combo, CB_RESETCONTENT, 0, 0);
     int i;
     for (i = 0; i < historyItemsCount; i++)
+    {
         if (historyArr[i] != NULL && strlen(historyArr[i]) > 0)
-            SendMessage(combo, CB_ADDSTRING, 0, (LPARAM)historyArr[i]);
+        {
+            CStrP itemW(ConvertAllocUtf8ToWide(historyArr[i], -1));
+            if (itemW != NULL)
+                SendMessageW(combo, CB_ADDSTRING, 0, (LPARAM)itemW.Ptr);
+        }
+    }
 }
 
 BOOL IsPathOnVolumeSupADS(const char* path, BOOL* isFAT32)

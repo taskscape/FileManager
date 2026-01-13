@@ -617,15 +617,16 @@ int CountNumberOfItemsOnPath(const char* path)
     lstrcpyn(s, path, MAX_PATH + 10);
     if (SalPathAppend(s, "*.*", MAX_PATH + 10))
     {
-        WIN32_FIND_DATA fileData;
-        HANDLE search = HANDLES_Q(FindFirstFile(s, &fileData));
+        WIN32_FIND_DATAW fileDataW;
+        CStrP sW(ConvertAllocUtf8ToWide(s, -1));
+        HANDLE search = sW != NULL ? HANDLES_Q(FindFirstFileW(sW, &fileDataW)) : INVALID_HANDLE_VALUE;
         if (search != INVALID_HANDLE_VALUE)
         {
             int num = 0;
             do
             {
                 num++;
-            } while (FindNextFile(search, &fileData));
+            } while (FindNextFileW(search, &fileDataW));
             HANDLES(FindClose(search));
             return num;
         }
@@ -918,7 +919,7 @@ void DoDragFromArchiveOrFS(CFilesWindow* panel, BOOL& dropDone, char* targetPath
             // zbavit DROPFAKE metody
             if (SalPathAppend(fakeRootDir, "DROPFAKE", MAX_PATH))
             {
-                if (CreateDirectory(fakeRootDir, NULL))
+                if (CreateDirectoryUtf8(fakeRootDir, NULL))
                 {
                     // vytvorime objekty pro drag&drop
                     *fakeName = 0;
@@ -1330,7 +1331,7 @@ void ShellAction(CFilesWindow* panel, CShellAction action, BOOL useSelection,
                         fakeName = fakeRootDir + strlen(fakeRootDir);
                         if (SalPathAppend(fakeRootDir, "CLIPFAKE", MAX_PATH))
                         {
-                            if (CreateDirectory(fakeRootDir, NULL))
+                            if (CreateDirectoryUtf8(fakeRootDir, NULL))
                             {
                                 DWORD prefferedDropEffect = DROPEFFECT_COPY; // DROPEFFECT_MOVE (pouzivali jsme pro ladici ucely)
 

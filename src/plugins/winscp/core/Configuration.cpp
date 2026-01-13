@@ -13,6 +13,7 @@
 #include "CoreMain.h"
 #include "Security.h"
 #include <shfolder.h>
+#include "..\\Utf8WinApi.h"
 //---------------------------------------------------------------------------
 #pragma package(smart_init)
 //---------------------------------------------------------------------------
@@ -495,7 +496,7 @@ void __fastcall TConfiguration::CleanupRandomSeedFile()
     DontSaveRandomSeed();
     if (FileExists(RandomSeedFileName))
     {
-      if (!DeleteFile(RandomSeedFileName))
+      if (!WinScpDeleteFileUtf8(RandomSeedFileName.c_str()))
       {
         RaiseLastOSError();
       }
@@ -513,7 +514,7 @@ void __fastcall TConfiguration::CleanupIniFile()
   {
     if (FileExists(IniFileStorageName))
     {
-      if (!DeleteFile(IniFileStorageName))
+      if (!WinScpDeleteFileUtf8(IniFileStorageName.c_str()))
       {
         RaiseLastOSError();
       }
@@ -844,7 +845,7 @@ void __fastcall TConfiguration::SetRandomSeedFile(AnsiString value)
         FileExists(PrevRandomSeedFileName))
     {
       // ignore any error
-      DeleteFile(PrevRandomSeedFileName);
+      WinScpDeleteFileUtf8(PrevRandomSeedFileName.c_str());
     }
   }
 }

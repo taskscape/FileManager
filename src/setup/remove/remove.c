@@ -69,6 +69,66 @@ const char* BATCH_FILE_BEGIN = "@echo off\r\n:Repeat\r\ndel \"%s\"\r\nif exist \
 const char* BATCH_FILE_DELDIR = "rmdir \"%s\"\r\n";
 const char* BATCH_FILE_DELFILE = "del \"%s\"\r\n";
 
+static WCHAR* AllocWideFromUtf8(const char* src)
+{
+    if (src == NULL)
+        return NULL;
+    int len = MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, src, -1, NULL, 0);
+    if (len <= 0)
+        return NULL;
+    WCHAR* buf = (WCHAR*)malloc(len * sizeof(WCHAR));
+    if (buf == NULL)
+        return NULL;
+    if (MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, src, -1, buf, len) == 0)
+    {
+        free(buf);
+        return NULL;
+    }
+    return buf;
+}
+
+static DWORD GetFileAttributesUtf8Local(const char* fileName)
+{
+    DWORD attrs = INVALID_FILE_ATTRIBUTES;
+    WCHAR* fileNameW = AllocWideFromUtf8(fileName);
+    if (fileNameW == NULL)
+    {
+        SetLastError(ERROR_INVALID_PARAMETER);
+        return attrs;
+    }
+    attrs = GetFileAttributesW(fileNameW);
+    free(fileNameW);
+    return attrs;
+}
+
+static BOOL SetFileAttributesUtf8Local(const char* fileName, DWORD attrs)
+{
+    BOOL ok = FALSE;
+    WCHAR* fileNameW = AllocWideFromUtf8(fileName);
+    if (fileNameW == NULL)
+    {
+        SetLastError(ERROR_INVALID_PARAMETER);
+        return FALSE;
+    }
+    ok = SetFileAttributesW(fileNameW, attrs);
+    free(fileNameW);
+    return ok;
+}
+
+static BOOL RemoveDirectoryUtf8Local(const char* dirName)
+{
+    BOOL ok = FALSE;
+    WCHAR* dirNameW = AllocWideFromUtf8(dirName);
+    if (dirNameW == NULL)
+    {
+        SetLastError(ERROR_INVALID_PARAMETER);
+        return FALSE;
+    }
+    ok = RemoveDirectoryW(dirNameW);
+    free(dirNameW);
+    return ok;
+}
+
 typedef struct
 {
     const char* AppName;
@@ -503,7 +563,7 @@ BOOL ExistFiles(const char* files)
     while (*line != 0)
     {
         int len = lstrlen(line);
-        if (GetFileAttributes(line) != INVALID_FILE_ATTRIBUTES)
+        if (GetFileAttributesUtf8Local(line) != INVALID_FILE_ATTRIBUTES)
             return TRUE;
         line += len + 1;
     }
@@ -546,7 +606,7 @@ BOOL DoRemoveFiles(const char* removeFiles)
     {
         int len = lstrlen(line);
     AGAIN:
-        SetFileAttributes(line, FILE_ATTRIBUTE_ARCHIVE);
+        SetFileAttributesUtf8Local(line, FILE_ATTRIBUTE_ARCHIVE);
         if (!DeleteFile(line))
         {
             err = GetLastError();
@@ -590,8 +650,8 @@ BOOL DoRemoveDirs()
         while (*line != 0)
         {
             int len = lstrlen(line);
-            SetFileAttributes(line, FILE_ATTRIBUTE_ARCHIVE);
-            if (RemoveDirectory(line))
+            SetFileAttributesUtf8Local(line, FILE_ATTRIBUTE_ARCHIVE);
+            if (RemoveDirectoryUtf8Local(line))
                 someDirDeleted = TRUE;
             line += len + 1;
         }
@@ -1049,11 +1109,11 @@ RemoveShellExt(const char *clsid)
     }
 
     // check whether the DLL exists and delete it
-    attrs = GetFileAttributes(shellExtPath);
+    attrs = GetFileAttributesUtf8Local(shellExtPath);
     if (attrs != INVALID_FILE_ATTRIBUTES)
     {
       if (attrs & FILE_ATTRIBUTE_READONLY)
-        SetFileAttributes(shellExtPath, attrs ^ FILE_ATTRIBUTE_READONLY);
+        SetFileAttributesUtf8Local(shellExtPath, attrs ^ FILE_ATTRIBUTE_READONLY);
       // if it cannot be deleted normally, remove it after restart
       if (!DeleteFile(shellExtPath))
       {
@@ -1090,7 +1150,7 @@ BOOL TryToRenameShellExt(char* name)
     do
     {
         wsprintf(p, "_%d%s", counter, ext);
-        exist = GetFileAttributes(buff) != INVALID_FILE_ATTRIBUTES;
+        exist = GetFileAttributesUtf8Local(buff) != INVALID_FILE_ATTRIBUTES;
         if (exist)
             counter++;
     } while (exist && counter < 1000);
@@ -1123,19 +1183,19 @@ BOOL RemoveShellExt(const char* shellExtPath, BOOL* delayedDelete, BOOL* renamin
     }
 
     // check whether the DLL exists and delete it
-    attrs = GetFileAttributes(shellExtPath);
+    attrs = GetFileAttributesUtf8Local(shellExtPath);
     if (attrs != INVALID_FILE_ATTRIBUTES)
     {
         // drop the read-only attribute if it is set
         if (attrs & FILE_ATTRIBUTE_READONLY)
-            SetFileAttributes(shellExtPath, attrs ^ FILE_ATTRIBUTE_READONLY);
+            SetFileAttributesUtf8Local(shellExtPath, attrs ^ FILE_ATTRIBUTE_READONLY);
 
         if (attrs & FILE_ATTRIBUTE_DIRECTORY)
         {
             if (*delayedDelete)
                 RemoveOnReboot(shellExtPath);
             else
-                RemoveDirectory(shellExtPath);
+                RemoveDirectoryUtf8Local(shellExtPath);
         }
         else
         {

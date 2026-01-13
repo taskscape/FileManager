@@ -512,9 +512,9 @@ BOOL CPluginInterfaceForArchiver::UnpackArchive(CSalamanderForOperationsAbstract
                     SetFileTime(TargetFile, NULL, NULL, &header.Time);
                     CloseHandle(TargetFile);
                     if (!ret)
-                        DeleteFile(TargetName);
+                        DeleteFileUtf8Local(TargetName);
                     else
-                        SetFileAttributes(TargetName, header.Attr);
+                        SetFileAttributesUtf8Local(TargetName, header.Attr);
                 }
                 if (Abort)
                 {
@@ -700,11 +700,11 @@ BOOL CPluginInterfaceForArchiver::UnpackOneFile(CSalamanderForOperationsAbstract
                 CloseHandle(TargetFile);
                 if (r)
                 {
-                    SetFileAttributes(TargetName, header.Attr);
+                    SetFileAttributesUtf8Local(TargetName, header.Attr);
                     ret = TRUE;
                 }
                 else
-                    DeleteFile(TargetName);
+                    DeleteFileUtf8Local(TargetName);
             }
             if (match || !r)
                 break;
@@ -837,7 +837,7 @@ BOOL CPluginInterfaceForArchiver::UnpackWholeArchive(CSalamanderForOperationsAbs
                         if (!(header.Flags & RHDF_DIRECTORY))
                             op = RAR_TEST;
                         else
-                            SetFileAttributes(TargetName, header.Attr);
+                            SetFileAttributesUtf8Local(TargetName, header.Attr);
                     }
                     break;
                 }
@@ -850,9 +850,9 @@ BOOL CPluginInterfaceForArchiver::UnpackWholeArchive(CSalamanderForOperationsAbs
                 SetFileTime(TargetFile, NULL, NULL, &header.Time);
                 CloseHandle(TargetFile);
                 if (!ret)
-                    DeleteFile(TargetName);
+                    DeleteFileUtf8Local(TargetName);
                 else
-                    SetFileAttributes(TargetName, header.Attr);
+                    SetFileAttributesUtf8Local(TargetName, header.Attr);
             }
             if (Abort)
             {
@@ -1494,7 +1494,7 @@ BOOL CPluginInterfaceForArchiver::MakeFilesList(TIndirectArray2<CRARExtractInfo>
                                                    &PluginData->Silent, TRUE, &skip, NULL, 0, NULL, NULL) == INVALID_HANDLE_VALUE &&
                 !skip)
                 return FALSE;
-            SetFileAttributes(dir, pFileData->Attr);
+            SetFileAttributesUtf8Local(dir, pFileData->Attr);
         }
         else
         {

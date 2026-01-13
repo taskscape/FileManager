@@ -8,6 +8,8 @@ BOOL SafeReadFile(HANDLE hFile, LPVOID lpBuffer, DWORD nBytesToRead, DWORD* pnBy
 BOOL SafeWriteFile(HANDLE hFile, LPVOID lpBuffer, DWORD nBytesToWrite, DWORD* pnBytesWritten, char* fileName, HWND parent);
 BOOL SafeOpenCreateFile(LPCTSTR fileName, DWORD desiredAccess, DWORD shareMode, DWORD creationDisposition,
                         DWORD flagsAndAttributes, HANDLE* hFile, BOOL* skip, int* silent, HWND parent);
+BOOL SafeOpenCreateFileUtf8Local(LPCTSTR fileName, DWORD desiredAccess, DWORD shareMode, DWORD creationDisposition,
+                                 DWORD flagsAndAttributes, HANDLE* hFile, BOOL* skip, int* silent, HWND parent);
 
 void GetFirstWord(char* str, int& pos, int& len, char delimitChar = 0);
 void GetLastWord(char* str, int& pos, int& len, char delimitChar = 0);

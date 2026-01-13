@@ -405,7 +405,7 @@ BOOL CPluginInterfaceForViewer::ViewFile(const char* name, int left, int top, in
     HCURSOR hOldCur = SetCursor(LoadCursor(NULL, IDC_WAIT));
 
     // open the input file
-    HANDLE file = CreateFile(name, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING,
+    HANDLE file = CreateFileUtf8Local(name, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING,
                              FILE_FLAG_SEQUENTIAL_SCAN, NULL);
     if (file == INVALID_HANDLE_VALUE)
     {
@@ -468,7 +468,7 @@ BOOL CPluginInterfaceForViewer::ViewFile(const char* name, int left, int top, in
     {
         SetCursor(hOldCur);
         fclose(fContents);
-        DeleteFile(tempFileName);
+        DeleteFileUtf8Local(tempFileName);
         free(buffer);
         CloseHandle(file);
         SalamanderGeneral->ShowMessageBox(LoadStr(IDS_ERR_MEMORY), LoadStr(IDS_ERR_RPMTITLE), MSGBOX_ERROR);
@@ -479,7 +479,7 @@ BOOL CPluginInterfaceForViewer::ViewFile(const char* name, int left, int top, in
     {
         SetCursor(hOldCur);
         fclose(fContents);
-        DeleteFile(tempFileName);
+        DeleteFileUtf8Local(tempFileName);
         free(buffer);
         CloseHandle(file);
         if (archive->GetErrorCode() == 0)

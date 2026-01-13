@@ -1529,7 +1529,7 @@ static inline UINT GetCurrentCodePage()
   #if defined(UNDER_CE) || !defined(_WIN32)
   return CP_ACP;
   #else
-  return ::AreFileApisANSI() ? CP_ACP : CP_OEMCP;
+  return CP_UTF8;
   #endif
 }
 

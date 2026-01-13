@@ -1,4 +1,4 @@
-﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2023 Open Salamander Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 // CommentsTranslationProject: TRANSLATED
 
@@ -10,6 +10,18 @@
 #include "fileswnd.h"
 #include "filesbox.h"
 #include "shiconov.h"
+
+static BOOL ExtTextOutUtf8(HDC hdc, int x, int y, UINT options, const RECT* lprc,
+                           const char* text, UINT len, const INT* dx)
+{
+    if (text == NULL || len == 0)
+        return ExtTextOutW(hdc, x, y, options, lprc, L"", 0, NULL);
+    CStrP textW(ConvertAllocUtf8ToWide(text, -1));
+    if (textW == NULL)
+        return ExtTextOutW(hdc, x, y, options, lprc, L"?", 1, NULL);
+    int wlen = lstrlenW(textW);
+    return ExtTextOutW(hdc, x, y, options, lprc, textW, wlen, NULL);
+}
 
 //****************************************************************************
 //
@@ -741,12 +753,12 @@ void CFilesWindow::DrawBriefDetailedItem(HDC hTgtDC, int itemIndex, RECT* itemRe
                     }
 
                     // DRAWFLAG_MASK: hack, under XP some stuff is added in font of the text in the mask while drawing short texts; not an issue if text is not drawn
-                    ExtTextOut(hDC, r.left + 2, y, ETO_OPAQUE, &adjR, DrawItemBuff, (drawFlags & DRAWFLAG_MASK) ? 0 : totalCount, NULL);
+                    ExtTextOutUtf8(hDC, r.left + 2, y, ETO_OPAQUE, &adjR, DrawItemBuff, (drawFlags & DRAWFLAG_MASK) ? 0 : totalCount, NULL);
                     goto SKIP1;
                 }
             }
             // DRAWFLAG_MASK: hack, under XP some stuff is added in font of the text in the mask while drawing short texts; not an issue if text is not drawn
-            ExtTextOut(hDC, r.left + 2, y, ETO_OPAQUE, &adjR, TransferBuffer, (drawFlags & DRAWFLAG_MASK) ? 0 : nameLen, NULL);
+            ExtTextOutUtf8(hDC, r.left + 2, y, ETO_OPAQUE, &adjR, TransferBuffer, (drawFlags & DRAWFLAG_MASK) ? 0 : nameLen, NULL);
         SKIP1:
             if (!Configuration.FullRowSelect || GetViewMode() == vmBrief)
             {
@@ -767,7 +779,7 @@ void CFilesWindow::DrawBriefDetailedItem(HDC hTgtDC, int itemIndex, RECT* itemRe
                     SetBkColor(hDC, GetCOLORREF(*bkColor));
                     if (drawFlags & DRAWFLAG_MASK) // mask is b&w; we must not paint a colored background into it
                         SetBkColor(hDC, RGB(255, 255, 255));
-                    ExtTextOut(hDC, 0, 0, ETO_OPAQUE, &r, "", 0, NULL);
+                    ExtTextOutUtf8(hDC, 0, 0, ETO_OPAQUE, &r, "", 0, NULL);
                 }
             }
         }
@@ -847,7 +859,7 @@ void CFilesWindow::DrawBriefDetailedItem(HDC hTgtDC, int itemIndex, RECT* itemRe
                     }
 
                     if (TransferLen == 0)
-                        ExtTextOut(hDC, r.left, y, ETO_OPAQUE, &adjR, "", 0, NULL); // just clearing
+                        ExtTextOutUtf8(hDC, r.left, y, ETO_OPAQUE, &adjR, "", 0, NULL); // just clearing
                     else
                     {
                         if (column->FixedWidth == 1) // NarrowedNameColumn does not apply here (not Name column)
@@ -877,7 +889,7 @@ void CFilesWindow::DrawBriefDetailedItem(HDC hTgtDC, int itemIndex, RECT* itemRe
                                     DrawItemBuff[1] = '.';
                                     totalCount = 2;
                                 }
-                                ExtTextOut(hDC, r.left + SPACE_WIDTH / 2, y, ETO_OPAQUE, &adjR, DrawItemBuff, totalCount, NULL);
+                                ExtTextOutUtf8(hDC, r.left + SPACE_WIDTH / 2, y, ETO_OPAQUE, &adjR, DrawItemBuff, totalCount, NULL);
                             }
                             else
                             {
@@ -889,7 +901,7 @@ void CFilesWindow::DrawBriefDetailedItem(HDC hTgtDC, int itemIndex, RECT* itemRe
                                 }
                                 else
                                     deltaX = SPACE_WIDTH / 2;
-                                ExtTextOut(hDC, r.left + deltaX, y, ETO_OPAQUE, &adjR, TransferBuffer, TransferLen, NULL);
+                                ExtTextOutUtf8(hDC, r.left + deltaX, y, ETO_OPAQUE, &adjR, TransferBuffer, TransferLen, NULL);
                             }
                         }
                         else
@@ -906,7 +918,7 @@ void CFilesWindow::DrawBriefDetailedItem(HDC hTgtDC, int itemIndex, RECT* itemRe
                             else
                                 deltaX = SPACE_WIDTH / 2;
 
-                            ExtTextOut(hDC, r.left + deltaX, y, ETO_OPAQUE, &adjR, TransferBuffer, TransferLen, NULL);
+                            ExtTextOutUtf8(hDC, r.left + deltaX, y, ETO_OPAQUE, &adjR, TransferBuffer, TransferLen, NULL);
                         }
                     }
                 }
@@ -932,7 +944,7 @@ void CFilesWindow::DrawBriefDetailedItem(HDC hTgtDC, int itemIndex, RECT* itemRe
                 SetBkColor(hDC, GetCOLORREF(CurrentColors[ITEM_BK_NORMAL]));
                 if (drawFlags & DRAWFLAG_MASK) // mask is b&w; we must not paint a colored background into it
                     SetBkColor(hDC, RGB(255, 255, 255));
-                ExtTextOut(hDC, r.left, r.top, ETO_OPAQUE, &adjR, "", 0, NULL);
+                ExtTextOutUtf8(hDC, r.left, r.top, ETO_OPAQUE, &adjR, "", 0, NULL);
             }
         }
 
@@ -1505,14 +1517,14 @@ void CFilesWindow::DrawIconThumbnailItem(HDC hTgtDC, int itemIndex, RECT* itemRe
 
         // display the centered first line; also clear background of the second line
         // DRAWFLAG_MASK: hack, under XP some stuff is added in font of the text in the mask while drawing short texts; not an issue if text is not drawn
-        ExtTextOut(hDC, rect.left + (itemWidth - out1Width) / 2, y,
+        ExtTextOutUtf8(hDC, rect.left + (itemWidth - out1Width) / 2, y,
                    ETO_OPAQUE, &r, out1, (drawFlags & DRAWFLAG_MASK) ? 0 : out1Len, NULL);
 
         // display the centered second line
         if (out2Len > 0)
         {
             // DRAWFLAG_MASK: hack, under XP some stuff is added in font of the text in the mask while drawing short texts; not an issue if text is not drawn
-            ExtTextOut(hDC, rect.left + (itemWidth - out2Width) / 2, y += FontCharHeight,
+            ExtTextOutUtf8(hDC, rect.left + (itemWidth - out2Width) / 2, y += FontCharHeight,
                        0, NULL, out2, (drawFlags & DRAWFLAG_MASK) ? 0 : out2Len, NULL);
         }
 
@@ -1893,7 +1905,7 @@ void CFilesWindow::DrawTileItem(HDC hTgtDC, int itemIndex, RECT* itemRect, DWORD
                 r.bottom--;
         }
         // DRAWFLAG_MASK: hack, under XP some stuff is added in font of the text in the mask while drawing short texts; not an issue if text is not drawn
-        ExtTextOut(hDC, textX, textY, ETO_OPAQUE, &r, out0, (drawFlags & DRAWFLAG_MASK) ? 0 : out0Len, NULL);
+        ExtTextOutUtf8(hDC, textX, textY, ETO_OPAQUE, &r, out0, (drawFlags & DRAWFLAG_MASK) ? 0 : out0Len, NULL);
 
         // display the second line
         if (out1[0] != 0)
@@ -1908,7 +1920,7 @@ void CFilesWindow::DrawTileItem(HDC hTgtDC, int itemIndex, RECT* itemRect, DWORD
                     r.bottom--;
             }
             // DRAWFLAG_MASK: hack, under XP some stuff is added in font of the text in the mask while drawing short texts; not an issue if text is not drawn
-            ExtTextOut(hDC, textX, textY, ETO_OPAQUE, &r, out1, (drawFlags & DRAWFLAG_MASK) ? 0 : out1Len, NULL);
+            ExtTextOutUtf8(hDC, textX, textY, ETO_OPAQUE, &r, out1, (drawFlags & DRAWFLAG_MASK) ? 0 : out1Len, NULL);
         }
         // display the third line and clear the background of the area below it
         if (out2[0] != 0)
@@ -1919,7 +1931,7 @@ void CFilesWindow::DrawTileItem(HDC hTgtDC, int itemIndex, RECT* itemRect, DWORD
                 r.bottom--;
             textY += FontCharHeight;
             // DRAWFLAG_MASK: hack, under XP some stuff is added in font of the text in the mask while drawing short texts; not an issue if text is not drawn
-            ExtTextOut(hDC, textX, textY, ETO_OPAQUE, &r, out2, (drawFlags & DRAWFLAG_MASK) ? 0 : out2Len, NULL);
+            ExtTextOutUtf8(hDC, textX, textY, ETO_OPAQUE, &r, out2, (drawFlags & DRAWFLAG_MASK) ? 0 : out2Len, NULL);
         }
 
         //*****************************************
@@ -2077,3 +2089,4 @@ BOOL StateImageList_Draw(CIconList* iconList, int imageIndex, HDC hDC, int xDst,
 
     return TRUE;
 }
+

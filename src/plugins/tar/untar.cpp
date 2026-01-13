@@ -1,4 +1,4 @@
-﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2023 Open Salamander Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "precomp.h"
@@ -635,7 +635,7 @@ int CArchive::WriteOutData(const SCommonHeader& header, const char* targetPath,
                 if (!simulate)
                 {
                     CloseHandle(file);
-                    DeleteFile(extractedName);
+                    DeleteFileUtf8Local(extractedName);
                     free(extractedName);
                 }
                 return TAR_ERROR;
@@ -648,7 +648,7 @@ int CArchive::WriteOutData(const SCommonHeader& header, const char* targetPath,
                 if (!simulate)
                 {
                     CloseHandle(file);
-                    DeleteFile(extractedName);
+                    DeleteFileUtf8Local(extractedName);
                     free(extractedName);
                 }
                 return TAR_ERROR;
@@ -669,7 +669,7 @@ int CArchive::WriteOutData(const SCommonHeader& header, const char* targetPath,
             strcat(message, SalamanderGeneral->GetErrorText(err));
           SalamanderGeneral->ShowMessageBox(message, LoadStr(IDS_TARERR_TITLE), MSGBOX_ERROR);
           CloseHandle(file);
-          DeleteFile(extractedName);
+          DeleteFileUtf8Local(extractedName);
           free(extractedName);
           return TAR_ERROR;
         }
@@ -688,7 +688,7 @@ int CArchive::WriteOutData(const SCommonHeader& header, const char* targetPath,
                     if (!simulate)
                     {
                         CloseHandle(file);
-                        DeleteFile(extractedName);
+                        DeleteFileUtf8Local(extractedName);
                         free(extractedName);
                     }
                     return TAR_ERROR;
@@ -715,7 +715,7 @@ int CArchive::WriteOutData(const SCommonHeader& header, const char* targetPath,
             if (!simulate)
             {
                 CloseHandle(file);
-                DeleteFile(extractedName);
+                DeleteFileUtf8Local(extractedName);
                 free(extractedName);
             }
             return TAR_ERROR;
@@ -733,7 +733,7 @@ int CArchive::WriteOutData(const SCommonHeader& header, const char* targetPath,
                     strcat(message, SalamanderGeneral->GetErrorText(GetLastError()));
                 SalamanderGeneral->ShowMessageBox(message, LoadStr(IDS_TARERR_TITLE), MSGBOX_ERROR);
                 CloseHandle(file);
-                DeleteFile(extractedName);
+                DeleteFileUtf8Local(extractedName);
                 free(extractedName);
                 return TAR_ERROR;
             }
@@ -751,7 +751,7 @@ int CArchive::WriteOutData(const SCommonHeader& header, const char* targetPath,
                 if (!simulate)
                 {
                     CloseHandle(file);
-                    DeleteFile(extractedName);
+                    DeleteFileUtf8Local(extractedName);
                     free(extractedName);
                 }
                 return TAR_ERROR;
@@ -775,7 +775,7 @@ int CArchive::WriteOutData(const SCommonHeader& header, const char* targetPath,
         if (!simulate)
         {
             CloseHandle(file);
-            DeleteFile(extractedName);
+            DeleteFileUtf8Local(extractedName);
             free(extractedName);
         }
         return TAR_ERROR;
@@ -793,12 +793,12 @@ int CArchive::WriteOutData(const SCommonHeader& header, const char* targetPath,
                 strcpy(buffer, LoadStr(IDS_TARERR_FWRITE));
                 strcat(buffer, SalamanderGeneral->GetErrorText(err));
                 SalamanderGeneral->ShowMessageBox(buffer, LoadStr(IDS_TARERR_TITLE), MSGBOX_ERROR);
-                DeleteFile(extractedName);
+                DeleteFileUtf8Local(extractedName);
                 free(extractedName);
                 return TAR_ERROR;
             }
         }
-        SetFileAttributes(extractedName, header.FileInfo.Attr);
+        SetFileAttributesUtf8Local(extractedName, header.FileInfo.Attr);
     }
     // the name is no longer needed
     if (!simulate || doProgress)
@@ -1771,7 +1771,7 @@ BOOL CArchive::UnpackStream(const char* targetPath, BOOL doProgress,
             SalamanderGeneral->ShowMessageBox(LoadErr(Stream->GetErrorCode(), Stream->GetLastErr()),
                                               LoadStr(IDS_TARERR_TITLE), MSGBOX_ERROR);
             CloseHandle(file);
-            DeleteFile(extractedName);
+            DeleteFileUtf8Local(extractedName);
             free(extractedName);
             SalamanderIf->CloseProgressDialog();
             return FALSE;
@@ -1792,7 +1792,7 @@ BOOL CArchive::UnpackStream(const char* targetPath, BOOL doProgress,
                 strcat(message, SalamanderGeneral->GetErrorText(err));
             SalamanderGeneral->ShowMessageBox(message, LoadStr(IDS_TARERR_TITLE), MSGBOX_ERROR);
             CloseHandle(file);
-            DeleteFile(extractedName);
+            DeleteFileUtf8Local(extractedName);
             free(extractedName);
             SalamanderIf->CloseProgressDialog();
             return FALSE;
@@ -1808,7 +1808,7 @@ BOOL CArchive::UnpackStream(const char* targetPath, BOOL doProgress,
             {
                 // handle cancellation
                 CloseHandle(file);
-                DeleteFile(extractedName);
+                DeleteFileUtf8Local(extractedName);
                 free(extractedName);
                 SalamanderIf->CloseProgressDialog();
                 return FALSE;
@@ -1824,12 +1824,12 @@ BOOL CArchive::UnpackStream(const char* targetPath, BOOL doProgress,
         strcpy(buffer, LoadStr(IDS_TARERR_FWRITE));
         strcat(buffer, SalamanderGeneral->GetErrorText(err));
         SalamanderGeneral->ShowMessageBox(buffer, LoadStr(IDS_TARERR_TITLE), MSGBOX_ERROR);
-        DeleteFile(extractedName);
+        DeleteFileUtf8Local(extractedName);
         free(extractedName);
         SalamanderIf->CloseProgressDialog();
         return FALSE;
     }
-    SetFileAttributes(extractedName, header.FileInfo.Attr);
+    SetFileAttributesUtf8Local(extractedName, header.FileInfo.Attr);
     // the name is no longer needed
     free(extractedName);
     SalamanderIf->CloseProgressDialog();
@@ -1852,3 +1852,4 @@ CArchiveAbstract* CreateArchive(LPCTSTR fileName, CSalamanderForOperationsAbstra
 
     return NULL;
 }
+

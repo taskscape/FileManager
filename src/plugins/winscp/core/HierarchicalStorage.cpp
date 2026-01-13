@@ -8,6 +8,7 @@
 #include "HierarchicalStorage.h"
 #include <TextsCore.h>
 #include <vector>
+#include "..\\Utf8WinApi.h"
 //---------------------------------------------------------------------------
 #pragma package(smart_init)
 //---------------------------------------------------------------------------
@@ -631,14 +632,14 @@ void __fastcall TIniFileStorage::Flush()
         bool Exists = FileExists(Storage);
         if (Exists)
         {
-          Attr = GetFileAttributes(Storage.c_str());
+          Attr = WinScpGetFileAttributesUtf8(Storage.c_str());
         }
         else
         {
           Attr = FILE_ATTRIBUTE_NORMAL;
         }
 
-        HANDLE Handle = CreateFile(Storage.c_str(), GENERIC_READ | GENERIC_WRITE,
+        HANDLE Handle = WinScpCreateFileUtf8(Storage.c_str(), GENERIC_READ | GENERIC_WRITE,
           0, NULL, CREATE_ALWAYS, Attr, 0);
 
         if (Handle == INVALID_HANDLE_VALUE)

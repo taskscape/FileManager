@@ -18,7 +18,7 @@ char* ReadTable(const char* fileName, char* table)
 { // reads the 'fileName' file, converts it using 'table'; returns an error message on failure, otherwise NULL
     CALL_STACK_MESSAGE2("ReadTable(%s,)", fileName);
     char* text = NULL;
-    HANDLE hFile = HANDLES_Q(CreateFile(fileName, GENERIC_READ,
+    HANDLE hFile = HANDLES_Q(CreateFileUtf8(fileName, GENERIC_READ,
                                         FILE_SHARE_READ, NULL,
                                         OPEN_EXISTING,
                                         FILE_FLAG_SEQUENTIAL_SCAN,
@@ -322,7 +322,7 @@ CCodeTable::CCodeTable(HWND hWindow, const char* dirName)
     fileNameEnd += strlen(fileNameEnd);
     strcpy(fileNameEnd, "convert.cfg");
 
-    HANDLE hFile = HANDLES_Q(CreateFile(fileName, GENERIC_READ,
+    HANDLE hFile = HANDLES_Q(CreateFileUtf8(fileName, GENERIC_READ,
                                         FILE_SHARE_READ, NULL,
                                         OPEN_EXISTING,
                                         FILE_FLAG_SEQUENTIAL_SCAN,
@@ -451,16 +451,20 @@ void CCodeTables::PreloadAllConversions()
     HANDLES(EnterCriticalSection(&PreloadCS));
     Preloaded.DestroyMembers();
 
-    char path[MAX_PATH];
-    GetModuleFileName(NULL, path, MAX_PATH);
-    lstrcpy(strrchr(path, '\\') + 1, "convert\\*.*");
+    WCHAR pathW[MAX_PATH];
+    GetModuleFileNameW(NULL, pathW, MAX_PATH);
+    WCHAR* pathEnd = wcsrchr(pathW, L'\\');
+    if (pathEnd != NULL)
+        lstrcpyW(pathEnd + 1, L"convert\\*.*");
 
+    WIN32_FIND_DATAW findW;
     WIN32_FIND_DATA find;
-    HANDLE hFind = HANDLES_Q(FindFirstFile(path, &find));
+    HANDLE hFind = HANDLES_Q(FindFirstFileW(pathW, &findW));
     if (hFind != INVALID_HANDLE_VALUE)
     {
         do
         {
+            ConvertFindDataWToUtf8(findW, &find);
             if (find.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)
             {
                 if (find.cFileName[0] != 0 && strcmp(find.cFileName, ".") != 0 && strcmp(find.cFileName, "..") != 0)
@@ -486,7 +490,7 @@ void CCodeTables::PreloadAllConversions()
                         delete table; //  we are not interested in the default table -- discard it
                 }
             }
-        } while (FindNextFile(hFind, &find));
+        } while (FindNextFileW(hFind, &findW));
         HANDLES(FindClose(hFind));
     }
 }

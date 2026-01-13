@@ -98,7 +98,7 @@ char* GetFileData(const char* file, char* buffer)
 {
     CALL_STACK_MESSAGE2("GetFileData(%s, )", file);
     WIN32_FIND_DATA fd;
-    HANDLE h = FindFirstFile(file, &fd);
+    HANDLE h = FindFirstFileUtf8Local(file, &fd);
     if (h == INVALID_HANDLE_VALUE)
     {
         if (!FormatMessage(FORMAT_MESSAGE_FROM_SYSTEM |
