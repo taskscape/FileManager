@@ -396,7 +396,7 @@ BOOL CToolBar::InsertItem2(DWORD position, BOOL byPosition, const TLBI_ITEM_INFO
         return FALSE;
     }
 
-    // nastavime data
+    // set data
     if (!SetItemInfo2(newPos, TRUE, tii))
     {
         Items.Delete(newPos);
@@ -459,7 +459,7 @@ BOOL CToolBar::SetItemInfo2(DWORD position, BOOL byPosition, const TLBI_ITEM_INF
         }
         else if (hadIcon)
         {
-            HasIconDirty = TRUE; // nevime, jestli jeste nejaka ikona zbyla - bude treba to zjistit
+            HasIconDirty = TRUE; // don't know if any icon remains - will need to check
         }
     }
 
@@ -752,7 +752,7 @@ void CToolBar::SetStyle(DWORD style)
     }
     DWORD oldStyle = Style;
     Style = style;
-    // pokud se zmenilo zobrazovani textu, prealokuju si
+    // if text display changed, reallocate
     if ((oldStyle & TLB_STYLE_TEXT) != (Style & TLB_STYLE_TEXT))
         SetFont();
     DirtyItems = TRUE;
@@ -822,7 +822,7 @@ void CToolBar::UpdateItemsState()
 
 void CToolBar::OnColorsChanged()
 {
-    // pokud existuje barevna bitmapa, nechame ji prebuildit pro aktualni barevnou hloubku
+    // if color bitmap exists, rebuild it for current color depth
     if (CacheBitmap != NULL)
         CacheBitmap->ReCreateForScreenDC();
 }
@@ -989,8 +989,8 @@ CToolBar::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
     case WM_LBUTTONDOWN:
     case WM_LBUTTONDBLCLK:
     {
-        // pokud kliknuti prislo do 25ms po odmacknuti drop downu, zahodime ho, aby nedoslo
-        // ke zbytecnemu novemu zamacknuti
+        // if click came within 25ms after releasing drop down, discard it to avoid
+        // unnecessary new press
         if (GetTickCount() - DropDownUpTime <= 25)
             break;
 
@@ -1040,7 +1040,7 @@ CToolBar::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                     DownIndex = -1;
                     SendMessage(HWindow, WM_MOUSEMOVE, 0, MAKELPARAM(p.x, p.y));
                     if (HotIndex == index)
-                        DrawItem(HotIndex); // pokud nedoslo ke zmene, musim prekreslit stav
+                        DrawItem(HotIndex); // if no change occurred, must redraw state
                     RelayToolTip = TRUE;
                     DropDownUpTime = GetTickCount();
                 }

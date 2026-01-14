@@ -116,7 +116,7 @@ int MyEntryPoint()
 BOOL SalamanderBusy = TRUE;       // je Salamander busy?
 DWORD LastSalamanderIdleTime = 0; // GetTickCount() z okamziku, kdy SalamanderBusy naposledy presel na TRUE
 
-int PasteLinkIsRunning = 0; // pokud je vetsi nez nula, probiha prave Past Shortcuts prikaz v jednom z panelu
+int PasteLinkIsRunning = 0; // if greater than zero, Past Shortcuts command is currently running in one of the panels
 
 BOOL CannotCloseSalMainWnd = FALSE; // TRUE = nesmi dojit k zavreni hlavniho okna
 
@@ -190,13 +190,13 @@ const char* CommonFileTypeName2 = NULL;
 char WindowsDirectory[MAX_PATH] = "";
 
 // pro zajisteni uniku z odstranenych drivu na fixed drive (po vysunuti device - USB flash disk, atd.)
-BOOL ChangeLeftPanelToFixedWhenIdleInProgress = FALSE; // TRUE = prave se meni cesta, nastaveni ChangeLeftPanelToFixedWhenIdle na TRUE je zbytecne
+BOOL ChangeLeftPanelToFixedWhenIdleInProgress = FALSE; // TRUE = path is currently being changed, setting ChangeLeftPanelToFixedWhenIdle to TRUE is unnecessary
 BOOL ChangeLeftPanelToFixedWhenIdle = FALSE;
-BOOL ChangeRightPanelToFixedWhenIdleInProgress = FALSE; // TRUE = prave se meni cesta, nastaveni ChangeRightPanelToFixedWhenIdle na TRUE je zbytecne
+BOOL ChangeRightPanelToFixedWhenIdleInProgress = FALSE; // TRUE = path is currently being changed, setting ChangeRightPanelToFixedWhenIdle to TRUE is unnecessary
 BOOL ChangeRightPanelToFixedWhenIdle = FALSE;
 BOOL OpenCfgToChangeIfPathIsInaccessibleGoTo = FALSE; // TRUE = v idle otevre konfiguraci na Drives a focusne "If path in panel is inaccessible, go to:"
 
-char IsSLGIncomplete[ISSLGINCOMPLETE_SIZE]; // pokud je retezec prazdny, SLG je kompletne prelozene; jinak obsahuje URL na forum do sekce daneho jazyka
+char IsSLGIncomplete[ISSLGINCOMPLETE_SIZE]; // if string is empty, SLG is completely translated; otherwise contains URL to forum section for the given language
 
 UINT TaskbarBtnCreatedMsg = 0;
 
@@ -229,11 +229,11 @@ HINSTANCE NtDLL = NULL;             // handle k ntdll.dll
 HINSTANCE Shell32DLL = NULL;        // handle k shell32.dll (ikonky)
 HINSTANCE ImageResDLL = NULL;       // handle k imageres.dll (ikonky - Vista)
 HINSTANCE User32DLL = NULL;         // handle k user32.dll (DisableProcessWindowsGhosting)
-HINSTANCE HLanguage = NULL;         // handle k jazykove zavislym resourcum (.SPL souboru)
-char CurrentHelpDir[MAX_PATH] = ""; // po prvnim pouziti helpu je zde cesta do adresare helpu (umisteni vsech .chm souboru)
-WORD LanguageID = 0;                // language-id .SPL souboru
+HINSTANCE HLanguage = NULL;         // handle to language-dependent resources (.SPL file)
+char CurrentHelpDir[MAX_PATH] = ""; // after first help usage, contains path to help directory (location of all .chm files)
+WORD LanguageID = 0;                // language-id of .SPL file
 
-char OpenReadmeInNotepad[MAX_PATH]; // pouziva se jen pri spusteni z instalaku: jmeno souboru, ktere mame v IDLE otevrit v notepadu (spustit notepad)
+char OpenReadmeInNotepad[MAX_PATH]; // used only when launched from installer: name of file to open in notepad during IDLE (launch notepad)
 
 BOOL UseCustomPanelFont = FALSE;
 HFONT Font = NULL;
@@ -343,8 +343,8 @@ void* SalOpenSharedMem = NULL;
 // mutex pro synchronizaci load/save do Registry (dva procesy najednou nemuzou, ma to neblahe vysledky)
 CLoadSaveToRegistryMutex LoadSaveToRegistryMutex;
 
-BOOL IsNotAlphaNorNum[256]; // pole TRUE/FALSE pro znaky (TRUE = neni pismeno ani cislice)
-BOOL IsAlpha[256];          // pole TRUE/FALSE pro znaky (TRUE = pismeno)
+BOOL IsNotAlphaNorNum[256]; // array of TRUE/FALSE for characters (TRUE = not a letter or digit)
+BOOL IsAlpha[256];          // array of TRUE/FALSE for characters (TRUE = letter)
 
 // defaultni useruv charset pro fonty; pod W2K+ uz by stacilo DEFAULT_CHARSET
 //
@@ -356,7 +356,7 @@ BOOL IsAlpha[256];          // pole TRUE/FALSE pro znaky (TRUE = pismeno)
 // kde si lze volit mezi FF_SWISS a FF_ROMAN fonty (bezpatkove/patkove).
 int UserCharset = DEFAULT_CHARSET;
 
-DWORD AllocationGranularity = 1; // granularita alokaci (potreba pro pouzivani souboru mapovanych do pameti)
+DWORD AllocationGranularity = 1; // allocation granularity (needed for using memory-mapped files)
 
 #ifdef USE_BETA_EXPIRATION_DATE
 
@@ -798,15 +798,15 @@ BOOL SalamanderIsNotBusy(DWORD* lastIdleTime)
 {
     // k SalamanderBusy a k LastSalamanderIdleTime se chodi bez kritickych sekci, nevadi,
     // protoze jsou to DWORDy a tudiz nemuzou byt "rozpracovane" pri switchnuti kontextu
-    // (vzdy je tam stara nebo nova hodnota, nic jineho nehrozi)
+    // (always contains old or new value, nothing else can happen)
     if (lastIdleTime != NULL)
         *lastIdleTime = LastSalamanderIdleTime;
     if (!SalamanderBusy)
         return TRUE;
     DWORD oldLastIdleTime = LastSalamanderIdleTime;
-    if (GetTickCount() - oldLastIdleTime <= 100)                                   // pokud neni SalamanderBusy uz prilis dlouho (napr. otevreny modalni dialog)
-        Sleep(100);                                                                // pockame jestli se SalamanderBusy nezmeni
-    return !SalamanderBusy || (int)(LastSalamanderIdleTime - oldLastIdleTime) > 0; // neni "busy" nebo aspon osciluje
+    if (GetTickCount() - oldLastIdleTime <= 100)                                   // if SalamanderBusy hasn't been set for too long (e.g., modal dialog is open)
+        Sleep(100);                                                                // wait to see if SalamanderBusy changes
+    return !SalamanderBusy || (int)(LastSalamanderIdleTime - oldLastIdleTime) > 0; // not "busy" or at least oscillating
 }
 
 BOOL InitPreloadedStrings()
@@ -1142,44 +1142,44 @@ BOOL HasTheSameRootPathAndVolume(const char* p1, const char* p2)
         lstrcpyn(resPath, p1, MAX_PATH);
         ResolveSubsts(resPath);
         GetRootPath(root, resPath);
-        if (!IsUNCPath(root) && GetDriveType(root) == DRIVE_FIXED) // reparse pointy ma smysl hledat jen na fixed discich
+        if (!IsUNCPath(root) && GetDriveType(root) == DRIVE_FIXED) // reparse points only make sense on fixed disks
         {
-            // pokud nejde o root cestu, zkusime jeste traverzovat po reparse pointech
+            // if it's not a root path, try to traverse through reparse points
             BOOL cutPathIsPossible = TRUE;
             char p1NetPath[MAX_PATH];
             p1NetPath[0] = 0;
             ResolveLocalPathWithReparsePoints(ourPath, p1, &cutPathIsPossible, NULL, NULL, NULL, NULL, p1NetPath);
 
-            if (p1NetPath[0] == 0) // ze sitove cesty volume ziskat nelze, nebudeme se ani snazit
+            if (p1NetPath[0] == 0) // cannot get volume from network path, won't even try
             {
                 while (!GetVolumeNameForVolumeMountPoint(ourPath, p1Volume, 100))
                 {
                     if (!cutPathIsPossible || !CutDirectory(ourPath))
                     {
-                        strcpy(p1Volume, "fail"); // ani root nevratil uspech, neocekavane (bohuzel se deje na substenych discich pod W2K - ladeno u Bachaalany - pri selhani na obou cestach vracime SHODU, protoze je pravdepodobnejsi)
+                        strcpy(p1Volume, "fail"); // even root didn't return success, unexpected (unfortunately happens on substed drives under W2K - debugged at Bachaalany - on failure of both paths we return MATCH as it's more probable)
                         break;
                     }
                     SalPathAddBackslash(ourPath, MAX_PATH);
                 }
             }
 
-            // pokud jsme pod W2K a nejde o root cestu, zkusime jeste traverzovat po reparse pointech
+            // if under W2K and it's not a root path, try to traverse through reparse points
             cutPathIsPossible = TRUE;
             char p2NetPath[MAX_PATH];
             p2NetPath[0] = 0;
             ResolveLocalPathWithReparsePoints(ourPath, p2, &cutPathIsPossible, NULL, NULL, NULL, NULL, p2NetPath);
 
-            if ((p1NetPath[0] == 0) != (p2NetPath[0] == 0) || // pokud je jen jedna z cest sitova nebo
+            if ((p1NetPath[0] == 0) != (p2NetPath[0] == 0) || // if only one of the paths is a network path or
                 p1NetPath[0] != 0 && !HasTheSameRootPath(p1NetPath, p2NetPath))
-                ret = FALSE; // nemaji stejny root, ohlasime ruzne volumy (na sitovych cestach nelze overit volumy)
+                ret = FALSE; // don't have same root, report different volumes (can't verify volumes on network paths)
 
-            if (p2NetPath[0] == 0 && ret) // ze sitove cesty volume ziskat nelze, nebudeme se ani snazit + pokud uz je rozhodnuto, tez se nebudeme snazit
+            if (p2NetPath[0] == 0 && ret) // cannot get volume from network path, won't even try + if already decided, won't try either
             {
                 while (!GetVolumeNameForVolumeMountPoint(ourPath, p2Volume, 100))
                 {
                     if (!cutPathIsPossible || !CutDirectory(ourPath))
                     {
-                        strcpy(p2Volume, "fail"); // ani root nevratil uspech, neocekavane (bohuzel se deje na substenych discich pod W2K - ladeno u Bachaalany - pri selhani na obou cestach vracime SHODU, protoze je pravdepodobnejsi)
+                        strcpy(p2Volume, "fail"); // even root didn't return success, unexpected (unfortunately happens on substed drives under W2K - debugged at Bachaalany - on failure of both paths we return MATCH as it's more probable)
                         break;
                     }
                     SalPathAddBackslash(ourPath, MAX_PATH);
@@ -1211,7 +1211,7 @@ BOOL PathsAreOnTheSameVolume(const char* path1, const char* path2, BOOL* resIsOn
     BOOL trySimpleTest = TRUE;
     if (resIsOnlyEstimation != NULL)
         *resIsOnlyEstimation = TRUE;
-    if (!IsUNCPath(path1) && !IsUNCPath(path2)) // svazky na UNC cestach nema smysl resit
+    if (!IsUNCPath(path1) && !IsUNCPath(path2)) // no point checking volumes on UNC paths
     {
         char p1Volume[100] = "1";
         char p2Volume[100] = "2";
@@ -1220,21 +1220,21 @@ BOOL PathsAreOnTheSameVolume(const char* path1, const char* path2, BOOL* resIsOn
         if (drvType1 != DRIVE_REMOTE && drvType2 != DRIVE_REMOTE) // krome site je sance zjistit "volume name"
         {
             BOOL cutPathIsPossible = TRUE;
-            path1NetPath[0] = 0;         // sitova cesta, na kterou vede aktualni (posledni) lokalni symlink v ceste
-            if (drvType1 == DRIVE_FIXED) // reparse pointy ma smysl hledat jen na fixed discich
+            path1NetPath[0] = 0;         // network path pointed to by current (last) local symlink in the path
+            if (drvType1 == DRIVE_FIXED) // reparse points only make sense on fixed disks
             {
-                // pokud jsme pod W2K a nejde o root cestu, zkusime jeste traverzovat po reparse pointech
+                // if under W2K and it's not a root path, try to traverse through reparse points
                 ResolveLocalPathWithReparsePoints(ourPath, path1, &cutPathIsPossible, NULL, NULL, NULL, NULL, path1NetPath);
             }
             else
                 lstrcpyn(ourPath, root1, MAX_PATH);
             int numOfGetVolNamesFailed = 0;
-            if (path1NetPath[0] == 0) // ze sitove cesty "volume name" ziskat nelze, nebudeme se ani snazit
+            if (path1NetPath[0] == 0) // cannot get "volume name" from network path, won't even try
             {
                 while (!GetVolumeNameForVolumeMountPoint(ourPath, p1Volume, 100))
                 {
                     if (!cutPathIsPossible || !CutDirectory(ourPath))
-                    { // ani root nevratil uspech, neocekavane (bohuzel se deje na substenych discich pod W2K - ladeno u Bachaalany - pri selhani na obou cestach se stejnymi rooty vracime SHODU, protoze je pravdepodobnejsi)
+                    { // even root didn't return success, unexpected (unfortunately happens on substed drives under W2K - debugged at Bachaalany - on failure of both paths with same roots we return MATCH as it's more probable)
                         numOfGetVolNamesFailed++;
                         break;
                     }
@@ -1243,22 +1243,22 @@ BOOL PathsAreOnTheSameVolume(const char* path1, const char* path2, BOOL* resIsOn
             }
 
             cutPathIsPossible = TRUE;
-            path2NetPath[0] = 0;         // sitova cesta, na kterou vede aktualni (posledni) lokalni symlink v ceste
-            if (drvType2 == DRIVE_FIXED) // reparse pointy ma smysl hledat jen na fixed discich
+            path2NetPath[0] = 0;         // network path pointed to by current (last) local symlink in the path
+            if (drvType2 == DRIVE_FIXED) // reparse points only make sense on fixed disks
             {
-                // pokud jsme pod W2K a nejde o root cestu, zkusime jeste traverzovat po reparse pointech
+                // if under W2K and it's not a root path, try to traverse through reparse points
                 ResolveLocalPathWithReparsePoints(ourPath, path2, &cutPathIsPossible, NULL, NULL, NULL, NULL, path2NetPath);
             }
             else
                 lstrcpyn(ourPath, root2, MAX_PATH);
-            if (path2NetPath[0] == 0) // ze sitove cesty "volume name" ziskat nelze, nebudeme se ani snazit
+            if (path2NetPath[0] == 0) // cannot get "volume name" from network path, won't even try
             {
                 if (path1NetPath[0] == 0)
                 {
                     while (!GetVolumeNameForVolumeMountPoint(ourPath, p2Volume, 100))
                     {
                         if (!cutPathIsPossible || !CutDirectory(ourPath))
-                        { // ani root nevratil uspech, neocekavane (bohuzel se deje na substenych discich pod W2K - ladeno u Bachaalany - pri selhani na obou cestach se stejnymi rooty vracime SHODU, protoze je pravdepodobnejsi)
+                        { // even root didn't return success, unexpected (unfortunately happens on substed drives under W2K - debugged at Bachaalany - on failure of both paths with same roots we return MATCH as it's more probable)
                             numOfGetVolNamesFailed++;
                             break;
                         }

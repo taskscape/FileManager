@@ -13,35 +13,35 @@
 
 CSystemPolicies SystemPolicies;
 
-const int ctsNotRunning = 0x00;   // muze byt spusten
-const int ctsActive = 0x01;       // tento thread je aktivni/jen dobiha
-const int ctsCanTerminate = 0x02; // muze byt terminovan - uz se nainicializoval z glob. dat
+const int ctsNotRunning = 0x00;   // can be started
+const int ctsActive = 0x01;       // this thread is active/just finishing
+const int ctsCanTerminate = 0x02; // can be terminated - already initialized from global data
 
 HANDLE ThreadCheckPath[NUM_OF_CHECKTHREADS];
-int ThreadCheckState[NUM_OF_CHECKTHREADS]; // stav jednotlivych threadu
-char ThreadPath[MAX_PATH];                 // vstup aktivniho threadu
-BOOL ThreadValid;                          // vysledek aktivniho threadu
-DWORD ThreadLastError;                     // vysledek aktivniho threadu
+int ThreadCheckState[NUM_OF_CHECKTHREADS]; // state of individual threads
+char ThreadPath[MAX_PATH];                 // input of active thread
+BOOL ThreadValid;                          // result of active thread
+DWORD ThreadLastError;                     // result of active thread
 
-CRITICAL_SECTION CheckPathCS; // kriticka sekce check-path, nutne kvuli volani z vice threadu (nejen z hl.)
+CRITICAL_SECTION CheckPathCS; // critical section for check-path, necessary due to calls from multiple threads (not just main)
 
-// optimalizace: prvni check-path thread se neukoncuje - pouziva se opakovane
-BOOL CPFirstFree = FALSE;      // je mozne pouzit prvni check-path thread?
-BOOL CPFirstTerminate = FALSE; // ma se ukoncit prvni check-path thread?
-HANDLE CPFirstStart = NULL;    // event pro startovani prvniho check-path threadu
-HANDLE CPFirstEnd = NULL;      // event pro test ukonceni prvniho check-path threadu
-DWORD CPFirstExit;             // nahrada exit-codu prvniho check-path threadu (neukoncuje se)
+// optimization: first check-path thread does not terminate - used repeatedly
+BOOL CPFirstFree = FALSE;      // is it possible to use first check-path thread?
+BOOL CPFirstTerminate = FALSE; // should the first check-path thread terminate?
+HANDLE CPFirstStart = NULL;    // event for starting the first check-path thread
+HANDLE CPFirstEnd = NULL;      // event for testing completion of the first check-path thread
+DWORD CPFirstExit;             // replacement for exit code of first check-path thread (does not terminate)
 
-char CheckPathRootWithRetryMsgBox[MAX_PATH] = ""; // root drivu (i UNC), pro ktery je zobrazen messagebox "drive not ready" s Retry+Cancel tlacitky (pouziva se pro automaticke Retry po vlozeni media do drivu)
-HWND LastDriveSelectErrDlgHWnd = NULL;            // dialog "drive not ready" s Retry+Cancel tlacitky (pouziva se pro automaticke Retry po vlozeni media do drivu)
+char CheckPathRootWithRetryMsgBox[MAX_PATH] = ""; // root of drive (including UNC), for which a "drive not ready" messagebox with Retry+Cancel buttons is displayed (used for automatic Retry after inserting media into drive)
+HWND LastDriveSelectErrDlgHWnd = NULL;            // "drive not ready" dialog with Retry+Cancel buttons (used for automatic Retry after inserting media into drive)
 
 DWORD WINAPI ThreadCheckPathF(void* param);
 
-CRITICAL_SECTION OpenHtmlHelpCS; // kriticka sekce pro OpenHtmlHelp()
+CRITICAL_SECTION OpenHtmlHelpCS; // critical section for OpenHtmlHelp()
 
-// neblokujici cteni volume-name CD drivu:
-CRITICAL_SECTION ReadCDVolNameCS;        // kriticka sekce pro pristup k datum
-UINT_PTR ReadCDVolNameReqUID = 0;        // UID pozadavku (pro rozpoznani jestli na vysledek jeste nekdo ceka)
+// non-blocking reading of CD drive volume-name:
+CRITICAL_SECTION ReadCDVolNameCS;        // critical section for data access
+UINT_PTR ReadCDVolNameReqUID = 0;        // request UID (for determining if someone is still waiting for result)
 char ReadCDVolNameBuffer[MAX_PATH] = ""; // IN/OUT buffer (root/volume_name)
 
 struct CInitOpenHtmlHelpCS
@@ -71,10 +71,10 @@ BOOL InitializeCheckThread()
         return FALSE;
     }
 
-    // pokusime se nahodit prvni check-path thread
+    // try to start the first check-path thread
     DWORD ThreadID;
     ThreadCheckPath[0] = HANDLES(CreateThread(NULL, 0, ThreadCheckPathF, (void*)0, 0, &ThreadID));
-    if (ThreadCheckPath[0] == NULL) // nezadarilo se, ale to neva ...
+    if (ThreadCheckPath[0] == NULL) // failed, but it doesn't matter ...
     {
         TRACE_E("Unable to start the first CheckPath thread.");
     }
@@ -90,9 +90,9 @@ void ReleaseCheckThreads()
 
     if (CPFirstStart != NULL)
     {
-        CPFirstTerminate = TRUE; // nechame ukoncit prvni check-path thread
+        CPFirstTerminate = TRUE; // let the first check-path thread terminate
         SetEvent(CPFirstStart);
-        Sleep(100); // dame mu sanci zareagovat
+        Sleep(100); // give it a chance to react
     }
     int i;
     for (i = 0; i < NUM_OF_CHECKTHREADS; i++)
@@ -101,9 +101,9 @@ void ReleaseCheckThreads()
         {
             DWORD code;
             if (GetExitCodeThread(ThreadCheckPath[i], &code) && code == STILL_ACTIVE)
-            { // uz nema co bezet, terminujeme ho
+            { // nothing left to do, terminate it
                 TerminateThread(ThreadCheckPath[i], 666);
-                WaitForSingleObject(ThreadCheckPath[i], INFINITE); // pockame az thread skutecne skonci, nekdy mu to dost trva
+                WaitForSingleObject(ThreadCheckPath[i], INFINITE); // wait until thread actually finishes, sometimes it takes quite a while
             }
             ThreadCheckState[i] = ctsNotRunning;
             HANDLES(CloseHandle(ThreadCheckPath[i]));
@@ -122,7 +122,7 @@ void ReleaseCheckThreads()
     }
 }
 
-unsigned ThreadCheckPathFBody(void* param) // test pristupnosti adresare
+unsigned ThreadCheckPathFBody(void* param) // test directory accessibility
 {
     CALL_STACK_MESSAGE1("ThreadCheckPathFBody()");
     int i = (int)(INT_PTR)param;
@@ -134,14 +134,14 @@ unsigned ThreadCheckPathFBody(void* param) // test pristupnosti adresare
 
 CPF_AGAIN:
 
-    if (i == 0) // prvni check-path thread (optimalizace: bezi stale)
+    if (i == 0) // first check-path thread (optimization: runs continuously)
     {
-        CPFirstFree = TRUE;                          // pro prichod do threadu, jinak zbytecna pojistka ;-)
+        CPFirstFree = TRUE;                          // for thread entry, otherwise unnecessary safeguard ;-)
                                                      //    TRACE_I("First check-path thread: Wait for start");
-        WaitForSingleObject(CPFirstStart, INFINITE); // cekame na odstartovani nebo ukonceni
+        WaitForSingleObject(CPFirstStart, INFINITE); // wait for start or termination
                                                      //    TRACE_I("First check-path thread: Wait satisfied");
         CPFirstFree = FALSE;
-        if (CPFirstTerminate) // ukonceni
+        if (CPFirstTerminate) // termination
         {
             //      TRACE_I("First check-path thread: End");
             return 0;
@@ -150,15 +150,15 @@ CPF_AGAIN:
     //  TRACE_I("Testing path " << ThreadPath);
 
     strcpy(threadPath, ThreadPath);
-    ThreadCheckState[i] |= ctsCanTerminate; // hl. threadu uz muze terminovat
+    ThreadCheckState[i] |= ctsCanTerminate; // main thread can now terminate
 
-    // tady to muze vytuhnout, a proto delame celou tu saskarnu kolem
+    // this can freeze, that's why we do all this circus around it
     BOOL threadValid = (SalGetFileAttributes(threadPath) != 0xFFFFFFFF);
     DWORD error = GetLastError();
-    if (!threadValid && error == ERROR_INVALID_PARAMETER) // hlasi na rootu removable medii (CD/DVD, ZIPka)
-        error = ERROR_NOT_READY;                          // trochu prasarna, ale proste jde o problem "not ready" a ne "invalid parameter" ;-)
+    if (!threadValid && error == ERROR_INVALID_PARAMETER) // reports on root of removable media (CD/DVD, ZIP)
+        error = ERROR_NOT_READY;                          // a bit of a hack, but it's a "not ready" problem, not "invalid parameter" ;-)
 
-    // obchazime chybu pri cteni atributu (od W2K se da zakazat cteni atributu v Properties/Security) alespon na fixed discich
+    // workaround for error when reading attributes (from W2K onwards, attribute reading can be disabled in Properties/Security) at least on fixed disks
     if (!threadValid && error == ERROR_ACCESS_DENIED &&
         (threadPath[0] >= 'a' && threadPath[0] <= 'z' ||
          threadPath[0] >= 'A' && threadPath[0] <= 'Z') &&
@@ -175,18 +175,18 @@ CPF_AGAIN:
             HANDLE find = threadPathW != NULL ? HANDLES_Q(FindFirstFileW(threadPathW, &data)) : INVALID_HANDLE_VALUE;
             if (find != INVALID_HANDLE_VALUE)
             {
-                // cesta je preci jen asi OK (bez testu na fixed disk nelze pouzit, bohuzel FindFirstFile
-                // jede nejspis z cache, protoze odpojeny sitovy disk klidne zacne listovat, pro
-                // check-path je tedy nepouzitelna (uz tu byla a museli jsme ji vymenit))
+                // path is probably OK after all (cannot be used without testing for fixed disk, unfortunately FindFirstFile
+                // probably runs from cache, because a disconnected network disk can start listing, so it's
+                // unusable for check-path (it was here before and we had to replace it))
                 threadValid = TRUE;
                 HANDLES(FindClose(find));
             }
         }
     }
 
-    if (i == 0) // prvni check-path thread (optimalizace: bezi stale)
+    if (i == 0) // first check-path thread (optimization: runs continuously)
     {
-        CPFirstFree = TRUE; // ted uz vse probehne hladce az do WaitForSingleObject(CPFirstStart, INFINITE)
+        CPFirstFree = TRUE; // now everything will run smoothly until WaitForSingleObject(CPFirstStart, INFINITE)
     }
 
     if (!threadValid && error != ERROR_SUCCESS)
@@ -196,7 +196,7 @@ CPF_AGAIN:
     }
 
     int ret;
-    if (ThreadCheckState[i] & ctsActive) // stoji hl. thread o vysledky ?
+    if (ThreadCheckState[i] & ctsActive) // does main thread want results?
     {
         ThreadValid = threadValid;
         if (!ThreadValid)
@@ -208,12 +208,12 @@ CPF_AGAIN:
     else
         ret = 1;
 
-    if (i == 0) // prvni check-path thread (optimalizace: bezi stale)
+    if (i == 0) // first check-path thread (optimization: runs continuously)
     {
         CPFirstExit = ret;
-        SetEvent(CPFirstEnd); // POZOR, okamzite prepne do hl. threadu (ma vyssi prioritu)
+        SetEvent(CPFirstEnd); // WARNING, immediately switches to main thread (has higher priority)
 
-        goto CPF_AGAIN; // jdeme cekat na dalsi pozadavek
+        goto CPF_AGAIN; // go wait for next request
     }
 
     //  TRACE_I("End");
@@ -234,7 +234,7 @@ unsigned ThreadCheckPathFEH(void* param)
     {
         TRACE_I("Thread CheckPath: calling ExitProcess(1).");
         //    ExitProcess(1);
-        TerminateProcess(GetCurrentProcess(), 1); // tvrdsi exit (tenhle jeste neco vola)
+        TerminateProcess(GetCurrentProcess(), 1); // harder exit (this one still calls something)
         return 1;
     }
 #endif // CALLSTK_DISABLE
@@ -252,21 +252,21 @@ DWORD WINAPI ThreadCheckPathF(void* param)
 DWORD SalCheckPath(BOOL echo, const char* path, DWORD err, BOOL postRefresh, HWND parent)
 {
     CALL_STACK_MESSAGE5("SalCheckPath(%d, %s, 0x%X, %d, )", echo, path, err, postRefresh);
-    // obrana proti vicenasobnemu volani z vice threadu
+    // protection against multiple calls from multiple threads
     HANDLES(EnterCriticalSection(&CheckPathCS));
 
-    // obrana proti vicenasobnemu volani z jednoho threadu
+    // protection against multiple calls from a single thread
     static BOOL called = FALSE;
     if (called)
     {
-        // znamy je zatim jen pripad deaktivace/aktivace po ESC v CheckPath(), jsou i dalsi?
+        // so far only known case is deactivation/activation after ESC in CheckPath(), are there others?
         HANDLES(LeaveCriticalSection(&CheckPathCS));
         TRACE_I("SalCheckPath: recursive call (in one thread) is not allowed!");
         return 666;
     }
     called = TRUE;
 
-    BeginStopRefresh(); // aby se nevolal refresh - rekurze
+    BeginStopRefresh(); // to prevent refresh from being called - recursion
 
     BOOL valid;
     DWORD lastError;
@@ -299,7 +299,7 @@ RETRY:
                     {
                         DWORD exit;
                         if (!GetExitCodeThread(ThreadCheckPath[freeThreadIndex], &exit) ||
-                            exit != STILL_ACTIVE) // uz skoncil
+                            exit != STILL_ACTIVE) // already finished
                         {
                             ThreadCheckState[freeThreadIndex] = ctsNotRunning;
                             HANDLES(CloseHandle(ThreadCheckPath[freeThreadIndex]));
@@ -330,7 +330,7 @@ RETRY:
             }
             if (runAsMainThread) // neni sitovy -> do hl. threadu
             {
-                valid = (SalGetFileAttributes(path) != 0xFFFFFFFF); // test pristupnosti adresare
+                valid = (SalGetFileAttributes(path) != 0xFFFFFFFF); // test directory accessibility
                 if (!valid)
                     lastError = GetLastError();
                 else
@@ -338,7 +338,7 @@ RETRY:
             }
             else // je sitovy -> do jednoho z vedl. threadu
             {
-                Sleep(100); // tak si chvilku oddechnem a znovu to testnem
+                Sleep(100); // let's take a short break and test again
                 goto TEST_AGAIN;
             }
         }
@@ -361,7 +361,7 @@ RETRY:
                 {
                     TRACE_E("Unable to start CheckPath thread.");
                     ThreadCheckState[freeThreadIndex] = ctsNotRunning;
-                    valid = (SalGetFileAttributes(path) != 0xFFFFFFFF); // test pristupnosti adresare
+                    valid = (SalGetFileAttributes(path) != 0xFFFFFFFF); // test directory accessibility
                     if (!valid)
                         lastError = GetLastError();
                     else
@@ -381,7 +381,7 @@ RETRY:
                         exit = CPFirstExit; // nahrada navratove hodnoty
                     }
                     else
-                        exit = STILL_ACTIVE; // jeste bezi
+                        exit = STILL_ACTIVE; // still running
                 }
                 else
                 {
@@ -389,9 +389,9 @@ RETRY:
                     if (!GetExitCodeThread(ThreadCheckPath[freeThreadIndex], &exit))
                         exit = STILL_ACTIVE;
                 }
-                if (exit == STILL_ACTIVE) // postarame se o kill pres ESC
+                if (exit == STILL_ACTIVE) // take care of kill via ESC
                 {
-                    // po 3 sekundach vybalime okno "ESC to cancel"
+                    // after 3 seconds show "ESC to cancel" window
                     char buf[MAX_PATH + 100];
                     sprintf(buf, LoadStr(IDS_CHECKINGPATHESC), path);
                     CreateSafeWaitWindow(buf, NULL, 4800 + 200, TRUE, NULL);
@@ -404,9 +404,9 @@ RETRY:
                             {
                                 exit = 1;
                                 ThreadCheckState[freeThreadIndex] &= ~ctsActive;
-                                // thread se neda terminovat okamzite, vetsinou system ceka na skonceni
-                                // posledniho systemoveho volani - pokud jde o sit, trva i par sekund
-                                // tudiz je zbytecne TerminateThread vubec volat, thread dobehne sam stejne rychle
+                                // thread cannot be terminated immediately, usually the system waits for completion
+                                // of the last system call - if it's a network, it takes a few seconds
+                                // therefore it's pointless to call TerminateThread at all, thread will finish just as fast on its own
                                 //                TerminateThread(ThreadCheckPath[freeThreadIndex], exit);
                                 //                WaitForSingleObject(ThreadCheckPath[freeThreadIndex], INFINITE);  // pockame az thread skutecne skonci, nekdy mu to dost trva
                                 break;
@@ -420,7 +420,7 @@ RETRY:
                                 exit = CPFirstExit; // nahrada navratove hodnoty
                             }
                             else
-                                exit = STILL_ACTIVE; // jeste bezi
+                                exit = STILL_ACTIVE; // still running
                         }
                         else
                         {
@@ -433,7 +433,7 @@ RETRY:
                     }
                     DestroySafeWaitWindow();
                 }
-                if (exit == 0) // byl uspesne dokoncen
+                if (exit == 0) // was successfully completed
                 {
                     valid = ThreadValid;
                     lastError = ThreadLastError;
@@ -444,12 +444,12 @@ RETRY:
                         ThreadCheckPath[freeThreadIndex] = NULL;
                     }
                 }
-                else // byl terminovan, nechame ho dobehnout
+                else // was terminated, let it finish
                 {
                     valid = FALSE;
-                    lastError = ERROR_USER_TERMINATED; // muj error
+                    lastError = ERROR_USER_TERMINATED; // my error
 
-                    MSG msg; // vyhodime nabufferovany ESC
+                    MSG msg; // discard buffered ESC
                     while (PeekMessage(&msg, NULL, WM_KEYFIRST, WM_KEYLAST, PM_REMOVE))
                         ;
 

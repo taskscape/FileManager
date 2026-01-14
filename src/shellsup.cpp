@@ -26,8 +26,8 @@ extern "C"
 
 BOOL UseOwnRutine(IDataObject* pDataObject)
 {
-    return DropSourcePanel != NULL || // bud se to tahne od nas
-           OurClipDataObject;         // nebo je to od nas na clipboardu
+    return DropSourcePanel != NULL || // either it's being dragged from us
+           OurClipDataObject;         // or it's from us on clipboard
 }
 
 //
@@ -228,7 +228,7 @@ void DoGetFSToFSDropEffect(const char* srcFSPath, const char* tgtFSPath,
                                             keyState, dropEffect);
     }
 
-    // pokud se FS nevyjadril nebo vratil blbost, dame prioritu Copy
+    // if FS didn't express itself or returned nonsense, we give priority to Copy
     if (*dropEffect != DROPEFFECT_COPY && *dropEffect != DROPEFFECT_MOVE &&
         *dropEffect != DROPEFFECT_NONE)
     {
@@ -254,7 +254,7 @@ const char* GetCurrentDir(POINTL& pt, void* param, DWORD* effect, BOOL rButton, 
                           DWORD keyState, int& tgtType, int srcType)
 {
     CFilesWindow* panel = (CFilesWindow*)param;
-    isTgtFile = FALSE; // zatim neni drop target file -> operaci muzeme resime i my
+    isTgtFile = FALSE; // not a drop target file yet -> we can also handle the operation
     tgtType = idtttWindows;
     RECT r;
     GetWindowRect(panel->GetListBoxHWND(), &r);
@@ -268,7 +268,7 @@ const char* GetCurrentDir(POINTL& pt, void* param, DWORD* effect, BOOL rButton, 
             {
                 format--;
                 if (PackerFormatConfig.GetUsePacker(format) &&
-                        (*effect & (DROPEFFECT_MOVE | DROPEFFECT_COPY)) != 0 || // ma edit? + effect je copy nebo move?
+                        (*effect & (DROPEFFECT_MOVE | DROPEFFECT_COPY)) != 0 || // has edit? + effect is copy or move?
                     index == 0 && panel->Dirs->Count > 0 && strcmp(panel->Dirs->At(0).Name, "..") == 0 &&
                         (panel->GetZIPPath()[0] == 0 || panel->GetZIPPath()[0] == '\\' && panel->GetZIPPath()[1] == 0)) // drop na diskovou cestu
                 {
@@ -276,7 +276,7 @@ const char* GetCurrentDir(POINTL& pt, void* param, DWORD* effect, BOOL rButton, 
                     DWORD origEffect = *effect;
                     *effect &= (DROPEFFECT_MOVE | DROPEFFECT_COPY); // orizneme effect na copy+move
 
-                    if (index >= 0 && index < panel->Dirs->Count) // drop na adresari
+                    if (index >= 0 && index < panel->Dirs->Count) // drop on directory
                     {
                         panel->SetDropTarget(index);
                         int l = (int)strlen(panel->GetZIPPath());
@@ -286,7 +286,7 @@ const char* GetCurrentDir(POINTL& pt, void* param, DWORD* effect, BOOL rButton, 
                             if (l > 0 && panel->DropPath[l - 1] == '\\')
                                 panel->DropPath[--l] = 0;
                             int backSlash = 0;
-                            if (l == 0) // drop-path bude disk (".." vedou ven z archivu)
+                            if (l == 0) // drop-path will be disk (".." leads out of archive)
                             {
                                 tgtType = idtttWindows;
                                 *effect = origEffect;
@@ -335,19 +335,19 @@ const char* GetCurrentDir(POINTL& pt, void* param, DWORD* effect, BOOL rButton, 
                     int l = (int)strlen(panel->GetPluginFS()->GetPluginFSName());
                     memcpy(panel->DropPath, panel->GetPluginFS()->GetPluginFSName(), l);
                     panel->DropPath[l++] = ':';
-                    if (index >= 0 && index < panel->Dirs->Count) // drop na adresari
+                    if (index >= 0 && index < panel->Dirs->Count) // drop on directory
                     {
                         if (panel == DropSourcePanel) // drag&drop v ramci jednoho panelu
                         {
                             if (panel->GetSelCount() == 0 &&
                                     index == panel->GetCaretIndex() ||
                                 panel->GetSel(index) != 0)
-                            {                             // adresar sam do sebe
-                                panel->SetDropTarget(-1); // schovat znacku (kopie pujde do akt. adresare, ne do fokusenyho podadresare)
+                            {                             // directory into itself
+                                panel->SetDropTarget(-1); // hide marker (copy will go to current directory, not to focused subdirectory)
                                 if (!rButton && (keyState & (MK_CONTROL | MK_SHIFT | MK_ALT)) == 0)
                                 {
                                     tgtType = idtttWindows;
-                                    return NULL; // bez modifikatoru zustava STOP kurzor (zabranuje nechtenemu kopirovani do aktualniho adresare)
+                                    return NULL; // without modifier STOP cursor remains (prevents unwanted copying to current directory)
                                 }
                                 if (effect != NULL)
                                     *effect &= ~DROPEFFECT_MOVE;
@@ -367,7 +367,7 @@ const char* GetCurrentDir(POINTL& pt, void* param, DWORD* effect, BOOL rButton, 
                         {
                             if (DropSourcePanel != NULL && DropSourcePanel->Is(ptPluginFS) &&
                                 DropSourcePanel->GetPluginFS()->NotEmpty() && effect != NULL)
-                            { // zdrojovy FS muze ovlivnit povolene drop-effecty
+                            { // source FS can affect allowed drop-effects
                                 DropSourcePanel->GetPluginFS()->GetAllowedDropEffects(1 /* drag-over-fs */, panel->DropPath,
                                                                                       effect);
                             }
@@ -414,7 +414,7 @@ const char* GetCurrentDir(POINTL& pt, void* param, DWORD* effect, BOOL rButton, 
                     tgtType = idtttPluginFS;
                     *effect &= posEff; // orizneme effect na moznosti FS
 
-                    if (index >= 0 && index < panel->Dirs->Count) // drop na adresari
+                    if (index >= 0 && index < panel->Dirs->Count) // drop on directory
                     {
                         if (panel->GetPluginFS()->GetFullName(panel->Dirs->At(index),
                                                               (index == 0 && strcmp(panel->Dirs->At(0).Name, "..") == 0) ? 2 : 1,
@@ -486,14 +486,14 @@ const char* GetCurrentDir(POINTL& pt, void* param, DWORD* effect, BOOL rButton, 
     else
     {
         if (index >= panel->Dirs->Count && index < panel->Dirs->Count + panel->Files->Count)
-        {                                 // drop na souboru
+        {                                 // drop on file
             if (panel == DropSourcePanel) // drag&drop v ramci jednoho panelu
             {
                 if (panel->GetSelCount() == 0 &&
                         index == panel->GetCaretIndex() ||
                     panel->GetSel(index) != 0)
-                {                             // soubor sam do sebe
-                    panel->SetDropTarget(-1); // schovat znacku (kopie/shortcuta pujde do akt. adresare, ne do fokusenyho souboru)
+                {                             // file into itself
+                    panel->SetDropTarget(-1); // hide marker (copy/shortcut will go to current directory, not to focused file)
                     if (!rButton && (keyState & (MK_CONTROL | MK_SHIFT | MK_ALT)) == 0)
                         return NULL; // bez modifikatoru zustava STOP kurzor (zabranuje nechtenemu kopirovani do aktualniho adresare)
                     if (effect != NULL)
@@ -516,11 +516,11 @@ const char* GetCurrentDir(POINTL& pt, void* param, DWORD* effect, BOOL rButton, 
             strcpy(fullName + l, file->Name);
 
             // jde-li o shortcutu, provedeme jeji analyzu
-            BOOL linkIsDir = FALSE;  // TRUE -> short-cut na adresar -> ChangePathToDisk
-            BOOL linkIsFile = FALSE; // TRUE -> short-cut na soubor -> test archivu
+            BOOL linkIsDir = FALSE;  // TRUE -> short-cut to directory -> ChangePathToDisk
+            BOOL linkIsFile = FALSE; // TRUE -> short-cut to file -> archive test
             char linkTgt[MAX_PATH];
             linkTgt[0] = 0;
-            if (StrICmp(file->Ext, "lnk") == 0) // neni to short-cut adresare?
+            if (StrICmp(file->Ext, "lnk") == 0) // isn't it a directory short-cut?
             {
                 IShellLink* link;
                 if (CoCreateInstance(CLSID_ShellLink, NULL,
@@ -547,7 +547,7 @@ const char* GetCurrentDir(POINTL& pt, void* param, DWORD* effect, BOOL rButton, 
                     link->Release();
                 }
             }
-            if (linkIsDir) // link vede do adresare, cesta je o.k., prepneme se na ni
+            if (linkIsDir) // link leads to directory, path is o.k., we switch to it
             {
                 panel->SetDropTarget(index);
                 strcpy(panel->DropPath, linkTgt);
@@ -573,7 +573,7 @@ const char* GetCurrentDir(POINTL& pt, void* param, DWORD* effect, BOOL rButton, 
 
             if (HasDropTarget(fullName))
             {
-                isTgtFile = TRUE; // drop target file -> musi resit shell
+                isTgtFile = TRUE; // drop target file -> shell must handle it
                 panel->SetDropTarget(index);
                 strcpy(panel->DropPath, fullName);
                 return panel->DropPath;
@@ -597,7 +597,7 @@ const char* GetCurrentDirClipboard(POINTL& pt, void* param, DWORD* effect, BOOL 
     CFilesWindow* panel = (CFilesWindow*)param;
     isTgtFile = FALSE;
     tgtType = idtttWindows;
-    if (panel->Is(ptZIPArchive) || panel->Is(ptPluginFS)) // do archivu a FS zatim ne
+    if (panel->Is(ptZIPArchive) || panel->Is(ptPluginFS)) // not to archive and FS yet
     {
         //    if (panel->Is(ptZIPArchive)) tgtType = idtttArchive;
         //    else tgtType = idtttPluginFS;
@@ -650,7 +650,7 @@ void DropEnd(BOOL drop, BOOL shortcuts, void* param, BOOL ownRutine, BOOL isFake
          MainWindow->LeftPanel->GetNetworkDrive() ||
          MainWindow->RightPanel->GetNetworkDrive()))
     {
-        BOOL again = TRUE; // dokud soubory pribyvaji, nacitame
+        BOOL again = TRUE; // as long as files keep coming, we read them
         int numLeft = MainWindow->LeftPanel->NumberOfItemsInCurDir;
         int numRight = MainWindow->RightPanel->NumberOfItemsInCurDir;
         while (again)
@@ -763,8 +763,8 @@ void AuxInvokeCommand2(CFilesWindow* panel, CMINVOKECOMMANDINFO* ici)
 {
     CALL_STACK_MESSAGE_NONE
 
-    // docasne snizime prioritu threadu, aby nam nejaka zmatena shell extension nesezrala CPU
-    HANDLE hThread = GetCurrentThread(); // pseudo-handle, neni treba uvolnovat
+    // temporarily lower thread priority, so that some confused shell extension doesn't eat up CPU
+    HANDLE hThread = GetCurrentThread(); // pseudo-handle, no need to release
     int oldThreadPriority = GetThreadPriority(hThread);
     SetThreadPriority(hThread, THREAD_PRIORITY_NORMAL);
 
@@ -784,8 +784,8 @@ void AuxInvokeCommand(CFilesWindow* panel, CMINVOKECOMMANDINFO* ici)
 { // POZOR: pouziva se i z CSalamanderGeneral::OpenNetworkContextMenu()
     CALL_STACK_MESSAGE_NONE
 
-    // docasne snizime prioritu threadu, aby nam nejaka zmatena shell extension nesezrala CPU
-    HANDLE hThread = GetCurrentThread(); // pseudo-handle, neni treba uvolnovat
+    // temporarily lower thread priority, so that some confused shell extension doesn't eat up CPU
+    HANDLE hThread = GetCurrentThread(); // pseudo-handle, no need to release
     int oldThreadPriority = GetThreadPriority(hThread);
     SetThreadPriority(hThread, THREAD_PRIORITY_NORMAL);
 
@@ -805,8 +805,8 @@ void AuxInvokeAndRelease(IContextMenu2* menu, CMINVOKECOMMANDINFO* ici)
 {
     CALL_STACK_MESSAGE_NONE
 
-    // docasne snizime prioritu threadu, aby nam nejaka zmatena shell extension nesezrala CPU
-    HANDLE hThread = GetCurrentThread(); // pseudo-handle, neni treba uvolnovat
+    // temporarily lower thread priority, so that some confused shell extension doesn't eat up CPU
+    HANDLE hThread = GetCurrentThread(); // pseudo-handle, no need to release
     int oldThreadPriority = GetThreadPriority(hThread);
     SetThreadPriority(hThread, THREAD_PRIORITY_NORMAL);
 
@@ -837,8 +837,8 @@ HRESULT AuxGetCommandString(IContextMenu2* menu, UINT_PTR idCmd, UINT uType, UIN
     HRESULT ret = E_UNEXPECTED;
     __try
     {
-        // roky nam chodi pady pri volani IContextMenu2::GetCommandString()
-        // pro chod programu neni toto volani zasadni, takze ho osetrime do try/except bloku
+        // we've been getting crashes for years when calling IContextMenu2::GetCommandString()
+        // this call is not critical for program operation, so we protect it with try/except block
         ret = menu->GetCommandString(idCmd, uType, pReserved, pszName, cchMax);
     }
     __except (CCallStack::HandleException(GetExceptionInformation(), 19))
@@ -852,8 +852,8 @@ void ShellActionAux5(UINT flags, CFilesWindow* panel, HMENU h)
 { // POZOR: pouziva se i z CSalamanderGeneral::OpenNetworkContextMenu()
     CALL_STACK_MESSAGE_NONE
 
-    // docasne snizime prioritu threadu, aby nam nejaka zmatena shell extension nesezrala CPU
-    HANDLE hThread = GetCurrentThread(); // pseudo-handle, neni treba uvolnovat
+    // temporarily lower thread priority, so that some confused shell extension doesn't eat up CPU
+    HANDLE hThread = GetCurrentThread(); // pseudo-handle, no need to release
     int oldThreadPriority = GetThreadPriority(hThread);
     SetThreadPriority(hThread, THREAD_PRIORITY_NORMAL);
 
@@ -908,15 +908,15 @@ void DoDragFromArchiveOrFS(CFilesWindow* panel, BOOL& dropDone, char* targetPath
     {
         CALL_STACK_MESSAGE1("ShellAction::archive/FS::drag_files");
 
-        // vytvorime "fake" adresar
+        // create "fake" directory
         char fakeRootDir[MAX_PATH];
         char* fakeName;
         if (SalGetTempFileName(NULL, "SAL", fakeRootDir, FALSE))
         {
             fakeName = fakeRootDir + strlen(fakeRootDir);
-            // jr: Nasel jsem na netu zminku "Did implementing "IPersistStream" and providing the undocumented
-            // "OleClipboardPersistOnFlush" format solve the problem?" -- pro pripad, ze bychom se potrebovali
-            // zbavit DROPFAKE metody
+            // jr: I found a mention on the net "Did implementing "IPersistStream" and providing the undocumented
+            // "OleClipboardPersistOnFlush" format solve the problem?" -- in case we need to
+            // get rid of the DROPFAKE method
             if (SalPathAppend(fakeRootDir, "DROPFAKE", MAX_PATH))
             {
                 if (CreateDirectoryUtf8(fakeRootDir, NULL))
@@ -955,13 +955,13 @@ void DoDragFromArchiveOrFS(CFilesWindow* panel, BOOL& dropDone, char* targetPath
                                 LastWndFromGetData = NULL; // pro jistotu, kdyby se nevolalo fakeDataObject->GetData
                                 hr = DoDragDrop(fakeDataObject, dropSource, allowedEffects, &dwEffect);
                                 DropSourcePanel = NULL;
-                                // precteme vysledky drag&dropu
-                                // Poznamka: vraci dwEffect == 0 pri MOVE, proto zavadime obezlicku pres dropSource->LastEffect,
-                                // duvody viz "Handling Shell Data Transfer Scenarios" sekce "Handling Optimized Move Operations":
+                                // read drag&drop results
+                                // Note: returns dwEffect == 0 for MOVE, so we introduce a workaround via dropSource->LastEffect,
+                                // reasons see "Handling Shell Data Transfer Scenarios" section "Handling Optimized Move Operations":
                                 // http://msdn.microsoft.com/en-us/library/windows/desktop/bb776904%28v=vs.85%29.aspx
-                                // (zkracene: dela se optimalizovany Move, coz znamena ze se nedela kopie do cile nasledovana mazanim
-                                //            originalu, aby zdroj nechtene nesmazal original (jeste nemusi byt presunuty), dostane
-                                //            vysledek operace DROPEFFECT_NONE nebo DROPEFFECT_COPY)
+                                // (in short: optimized Move is performed, meaning no copy to target followed by deletion of
+                                //            original, so that source doesn't unintentionally delete original (which may not be moved yet), it receives
+                                //            operation result DROPEFFECT_NONE or DROPEFFECT_COPY)
                                 if (hr == DRAGDROP_S_DROP && dropSource->LastEffect != DROPEFFECT_NONE)
                                 {
                                     WaitForSingleObject(SalShExtSharedMemMutex, INFINITE);
@@ -972,13 +972,13 @@ void DoDragFromArchiveOrFS(CFilesWindow* panel, BOOL& dropDone, char* targetPath
                                         lstrcpyn(targetPath, SalShExtSharedMemView->TargetPath, 2 * MAX_PATH);
                                         if (leftMouseButton && dragFromPluginFSWithCopyAndMove)
                                             operation = (dropSource->LastEffect & DROPEFFECT_MOVE) ? SALSHEXT_MOVE : SALSHEXT_COPY;
-                                        else // archivy + FS s Copy nebo Move (ne oboje) + FS s Copy+Move pri tazeni pravym tlacitkem, kdy vysledek z menu na pravem tlacitku neni ovlivnen zmenou kurzoru mysi (trik s Copy kurzorem pri Move effectu), takze vysledek bereme z copy-hooku (SalShExtSharedMemView->Operation)
+                                        else // archives + FS with Copy or Move (not both) + FS with Copy+Move when dragging with right button, where result from right button menu is not affected by mouse cursor change (trick with Copy cursor for Move effect), so we take result from copy-hook (SalShExtSharedMemView->Operation)
                                             operation = SalShExtSharedMemView->Operation;
                                     }
                                     ReleaseMutex(SalShExtSharedMemMutex);
 
-                                    if (!dropDone &&                 // nereaguje copy-hook nebo dal user Cancel v drop-menu (ukazuje se pri D&D pravym tlacitkem)
-                                        dwEffect != DROPEFFECT_NONE) // detekce Cancelu: vzhledem k tomu, ze nezabral copy-hook, je vraceny drop-effect platny, tedy ho porovname na Cancel
+                                    if (!dropDone &&                 // copy-hook doesn't respond or user gave Cancel in drop-menu (shown when D&D with right button)
+                                        dwEffect != DROPEFFECT_NONE) // Cancel detection: since copy-hook didn't work, returned drop-effect is valid, so we compare it to Cancel
                                     {
                                         SalMessageBox(MainWindow->HWindow, LoadStr(IDS_SHEXT_NOTLOADEDYET),
                                                       LoadStr(IDS_ERRORTITLE), MB_OK | MB_ICONEXCLAMATION);
@@ -1071,7 +1071,7 @@ BOOL ResourceGetDialogName(WCHAR* buff, int buffSize, char* name, int nameMax)
     if (style != 0xffff0001)
     {
         TRACE_E("ResourceGetDialogName(): resource is not DLGTEMPLATEEX!");
-        // cteni klasickeho DLGTEMPLATE viz altap translator, pravdepodobne ale nebude potreba implementovat
+        // reading classic DLGTEMPLATE see altap translator, but probably won't need to implement
         return FALSE;
     }
 
@@ -1155,8 +1155,8 @@ BOOL ResourceGetDialogName(WCHAR* buff, int buffSize, char* name, int nameMax)
     return TRUE;
 }
 
-// pokusi se nacist aclui.dll a vytahnout nazev dialogu ulozeneho s ID 103 (zalozka Security)
-// v pripade uspechu naplni nazev dialogu do pageName a vrati TRUE; jinak vrati FALSE
+// attempts to load aclui.dll and extract the name of dialog stored with ID 103 (Security tab)
+// on success fills dialog name into pageName and returns TRUE; otherwise returns FALSE
 BOOL GetACLUISecurityPageName(char* pageName, int pageNameMax)
 {
     BOOL ret = FALSE;
@@ -1199,7 +1199,7 @@ void ShellAction(CFilesWindow* panel, CShellAction action, BOOL useSelection,
     if (panel->QuickSearchMode)
         panel->EndQuickSearch();
     if (panel->Dirs->Count + panel->Files->Count == 0 && useSelection)
-    { // bez souboru a adresaru -> neni co delat
+    { // without files and directories -> nothing to do
         return;
     }
 
@@ -1322,7 +1322,7 @@ void ShellAction(CFilesWindow* panel, CShellAction action, BOOL useSelection,
                 {
                     CALL_STACK_MESSAGE1("ShellAction::archive::clipcopy_files");
 
-                    // vytvorime "fake" adresar
+                    // create "fake" directory
                     char fakeRootDir[MAX_PATH];
                     char* fakeName;
                     if (SalGetTempFileName(NULL, "SAL", fakeRootDir, FALSE))
@@ -2410,8 +2410,8 @@ void ExecuteAssociationAux(IContextMenu2* menu, CMINVOKECOMMANDINFO& ici)
 {
     CALL_STACK_MESSAGE_NONE
 
-    // docasne snizime prioritu threadu, aby nam nejaka zmatena shell extension nesezrala CPU
-    HANDLE hThread = GetCurrentThread(); // pseudo-handle, neni treba uvolnovat
+    // temporarily lower thread priority, so that some confused shell extension doesn't eat up CPU
+    HANDLE hThread = GetCurrentThread(); // pseudo-handle, no need to release
     int oldThreadPriority = GetThreadPriority(hThread);
     SetThreadPriority(hThread, THREAD_PRIORITY_NORMAL);
 
@@ -2431,8 +2431,8 @@ void ExecuteAssociationAux2(IContextMenu2* menu, HMENU h, DWORD flags)
 {
     CALL_STACK_MESSAGE_NONE
 
-    // docasne snizime prioritu threadu, aby nam nejaka zmatena shell extension nesezrala CPU
-    HANDLE hThread = GetCurrentThread(); // pseudo-handle, neni treba uvolnovat
+    // temporarily lower thread priority, so that some confused shell extension doesn't eat up CPU
+    HANDLE hThread = GetCurrentThread(); // pseudo-handle, no need to release
     int oldThreadPriority = GetThreadPriority(hThread);
     SetThreadPriority(hThread, THREAD_PRIORITY_NORMAL);
 

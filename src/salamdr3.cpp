@@ -112,7 +112,7 @@ void SalPathRemoveExtension(char* path)
     {
         if (*iterator == '.')
         {
-            //      if (iterator != path && *(iterator - 1) != '\\')  // ".cvspass" ve Windows je pripona ...
+            //      if (iterator != path && *(iterator - 1) != '\\')  // ".cvspass" in Windows is an extension ...
             *iterator = 0;
             break;
         }
@@ -136,8 +136,8 @@ BOOL SalPathAddExtension(char* path, const char* extension, int pathSize)
     {
         if (*iterator == '.')
         {
-            //      if (iterator != path && *(iterator - 1) != '\\')  // ".cvspass" ve Windows je pripona ...
-            return TRUE; // pripona jiz existuje
+            //      if (iterator != path && *(iterator - 1) != '\\')  // ".cvspass" in Windows is an extension ...
+            return TRUE; // extension already exists
                          //      break;  // dal hledat nema smysl
         }
         if (*iterator == '\\')
@@ -169,10 +169,10 @@ BOOL SalPathRenameExtension(char* path, const char* extension, int pathSize)
     {
         if (*iterator == '.')
         {
-            //      if (iterator != path && *(iterator - 1) != '\\')  // ".cvspass" ve Windows je pripona ...
+            //      if (iterator != path && *(iterator - 1) != '\\')  // ".cvspass" in Windows is an extension ...
             //      {
             len = (int)(iterator - path);
-            break; // pripona jiz existuje -> prepiseme ji
+            break; // extension already exists -> overwrite it
                    //      }
                    //      break;
         }
@@ -270,7 +270,7 @@ BOOL SalGetTempFileName(const char* path, const char* prefix, char* tmpName, BOO
         while (1)
         {
             wsprintfW(sW, L"%X.tmp", randNum++);
-            if (file) // soubor
+            if (file) // file
             {
                 HANDLE h = HANDLES_Q(CreateFileW(tmpDirW, GENERIC_WRITE, 0, NULL, CREATE_NEW,
                                                  FILE_ATTRIBUTE_NORMAL, NULL));
@@ -285,7 +285,7 @@ BOOL SalGetTempFileName(const char* path, const char* prefix, char* tmpName, BOO
                     return TRUE;
                 }
             }
-            else // adresar
+            else // directory
             {
                 if (CreateDirectoryW(tmpDirW, NULL))
                 {
@@ -318,15 +318,15 @@ BOOL SalGetTempFileName(const char* path, const char* prefix, char* tmpName, BOO
 
 int HandleFileException(EXCEPTION_POINTERS* e, char* fileMem, DWORD fileMemSize)
 {
-    if (e->ExceptionRecord->ExceptionCode == EXCEPTION_IN_PAGE_ERROR) // in-page-error znamena urcite chybu souboru
+    if (e->ExceptionRecord->ExceptionCode == EXCEPTION_IN_PAGE_ERROR) // in-page-error definitely means file error
     {
         return EXCEPTION_EXECUTE_HANDLER; // spustime __except blok
     }
     else
     {
-        if (e->ExceptionRecord->ExceptionCode == EXCEPTION_ACCESS_VIOLATION &&    // access violation znamena chybu souboru jen pokud adresa chyby odpovida souboru
-            (e->ExceptionRecord->NumberParameters >= 2 &&                         // mame co testovat
-             e->ExceptionRecord->ExceptionInformation[1] >= (ULONG_PTR)fileMem && // ptr chyby ve view souboru
+        if (e->ExceptionRecord->ExceptionCode == EXCEPTION_ACCESS_VIOLATION &&    // access violation means file error only if error address corresponds to file
+            (e->ExceptionRecord->NumberParameters >= 2 &&                         // have something to test
+             e->ExceptionRecord->ExceptionInformation[1] >= (ULONG_PTR)fileMem && // error ptr in file view
              e->ExceptionRecord->ExceptionInformation[1] < ((ULONG_PTR)fileMem) + fileMemSize))
         {
             return EXCEPTION_EXECUTE_HANDLER; // spustime __except blok
@@ -349,14 +349,14 @@ BOOL SalRemovePointsFromPath(char* afterRoot)
             d++;
         if (*d == '.')
         {
-            if (d == afterRoot || d > afterRoot && *(d - 1) == '\\') // '.' za root cestou nebo "\."
+            if (d == afterRoot || d > afterRoot && *(d - 1) == '\\') // '.' after root path or "\."
             {
                 if (*(d + 1) == '.' && (*(d + 2) == '\\' || *(d + 2) == 0)) // ".."
                 {
                     char* l = d - 1;
                     while (l > afterRoot && *(l - 1) != '\\')
                         l--;
-                    if (l >= afterRoot) // vypusteni adresare + ".."
+                    if (l >= afterRoot) // skip directory + ".."
                     {
                         if (*(d + 2) == 0)
                             *l = 0;
@@ -396,14 +396,14 @@ BOOL SalRemovePointsFromPath(WCHAR* afterRoot)
             d++;
         if (*d == L'.')
         {
-            if (d == afterRoot || d > afterRoot && *(d - 1) == L'\\') // '.' za root cestou nebo "\."
+            if (d == afterRoot || d > afterRoot && *(d - 1) == L'\\') // '.' after root path or "\."
             {
                 if (*(d + 1) == L'.' && (*(d + 2) == L'\\' || *(d + 2) == 0)) // ".."
                 {
                     WCHAR* l = d - 1;
                     while (l > afterRoot && *(l - 1) != L'\\')
                         l--;
-                    if (l >= afterRoot) // vypusteni adresare + ".."
+                    if (l >= afterRoot) // skip directory + ".."
                     {
                         if (*(d + 2) == 0)
                             *l = 0;
@@ -440,7 +440,7 @@ BOOL SalGetFullName(char* name, int* errTextID, const char* curDir, char* nextFo
     CALL_STACK_MESSAGE5("SalGetFullName(%s, , %s, , , %d, %d)", name, curDir, nameBufSize, allowRelPathWithSpaces);
     int err = 0;
 
-    int rootOffset = 3; // offset zacatku adresarove casti cesty (3 pro "c:\path")
+    int rootOffset = 3; // offset of beginning of directory part of path (3 for "c:\path")
     char* s = name;
     while (*s >= 1 && *s <= ' ')
         s++;
@@ -488,7 +488,7 @@ BOOL SalGetFullName(char* name, int* errTextID, const char* curDir, char* nextFo
             }
         }
     }
-    else // cesta zadana pomoci disku (c:\...)
+    else // path specified using drive letter (c:\...)
     {
         if (*s != 0)
         {
@@ -613,33 +613,33 @@ BOOL SalGetFullName(char* name, int* errTextID, const char* curDir, char* nextFo
         int l = (int)strlen(name);
         if (l > 1 && name[1] == ':') // typ cesty "c:\path"
         {
-            if (l > 3) // neni root cesta
+            if (l > 3) // not root path
             {
                 if (name[l - 1] == '\\')
                     name[l - 1] = 0; // orez backslashe
             }
             else
             {
-                name[2] = '\\'; // root cesta, backslash nutny ("c:\")
+                name[2] = '\\'; // root path, backslash necessary ("c:\")
                 name[3] = 0;
             }
         }
         else
         {
-            if (name[0] == '\\' && name[1] == '\\' && name[2] == '.' && name[3] == '\\' && name[4] != 0 && name[5] == ':') // cesta typu "\\.\C:\"
+            if (name[0] == '\\' && name[1] == '\\' && name[2] == '.' && name[3] == '\\' && name[4] != 0 && name[5] == ':') // path type "\\.\C:\"
             {
-                if (l > 7) // neni root cesta
+                if (l > 7) // not root path
                 {
                     if (name[l - 1] == '\\')
                         name[l - 1] = 0; // orez backslashe
                 }
                 else
                 {
-                    name[6] = '\\'; // root cesta, backslash nutny ("\\.\C:\")
+                    name[6] = '\\'; // root path, backslash necessary ("\\.\C:\")
                     name[7] = 0;
                 }
             }
-            else // UNC cesta
+            else // UNC path
             {
                 if (l > 0 && name[l - 1] == '\\')
                     name[l - 1] = 0; // orez backslashe
@@ -1044,7 +1044,7 @@ void RemoveTemporaryDir(const char* dir)
     } // aby to lepe odsejpalo (system ma rad cur-dir)
     if (strlen(dir) < MAX_PATH)
         _RemoveTemporaryDir(dir);
-    SetCurrentDirectoryToSystem(); // musime z nej odejit, jinak nepujde smazat
+    SetCurrentDirectoryToSystem(); // must leave it, otherwise it can't be deleted
 
     ClearReadOnlyAttr(dir);
     {
@@ -1104,7 +1104,7 @@ void RemoveEmptyDirs(const char* dir)
     } // aby to lepe odsejpalo (system ma rad cur-dir)
     if (strlen(dir) < MAX_PATH)
         _RemoveEmptyDirs(dir);
-    SetCurrentDirectoryToSystem(); // musime z nej odejit, jinak nepujde smazat
+    SetCurrentDirectoryToSystem(); // must leave it, otherwise it can't be deleted
 
     ClearReadOnlyAttr(dir);
     {

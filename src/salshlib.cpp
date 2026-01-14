@@ -16,30 +16,30 @@ extern "C"
 }
 #include "salshlib.h"
 
-// mutex pro pristup do sdilene pameti
+// mutex for access to shared memory
 HANDLE SalShExtSharedMemMutex = NULL;
-// sdilena pamet - viz struktura CSalShExtSharedMem
+// shared memory - see CSalShExtSharedMem structure
 HANDLE SalShExtSharedMem = NULL;
-// event pro zaslani zadosti o provedeni Paste ve zdrojovem Salamanderovi (pouziva se jen ve Vista+)
+// event for sending request to perform Paste in source Salamander (used only in Vista+)
 HANDLE SalShExtDoPasteEvent = NULL;
-// namapovana sdilena pamet - viz struktura CSalShExtSharedMem
+// mapped shared memory - see CSalShExtSharedMem structure
 CSalShExtSharedMem* SalShExtSharedMemView = NULL;
 
-// TRUE pokud se podarilo registrovat SalShExt/SalamExt/SalExtX86/SalExtX64.DLL nebo uz registrovane
-// bylo (kontroluje i soubor)
+// TRUE if SalShExt/SalamExt/SalExtX86/SalExtX64.DLL was successfully registered or already registered
+// (also checks the file)
 BOOL SalShExtRegistered = FALSE;
 
-// maximalni prasarna: potrebujeme zjistit do ktereho okna probehne Drop, zjistujeme to
-// v GetData podle pozice mysi, v tyhle promenny je posledni vysledek testu
+// maximum hack: we need to find out which window the Drop will happen in, we determine this
+// in GetData based on mouse position, this variable holds the last test result
 HWND LastWndFromGetData = NULL;
 
-// maximalni prasarna: potrebujeme zjistit do ktereho okna probehne Paste, zjistujeme to
-// v GetData podle foreground window, v tyhle promenny je posledni vysledek testu
+// maximum hack: we need to find out which window the Paste will happen in, we determine this
+// in GetData based on foreground window, this variable holds the last test result
 HWND LastWndFromPasteGetData = NULL;
 
-BOOL OurDataOnClipboard = FALSE; // TRUE = na clipboardu je nas data-object (copy&paste z archivu)
+BOOL OurDataOnClipboard = FALSE; // TRUE = our data-object is on clipboard (copy&paste from archive)
 
-// data pro Paste z clipboardu ulozena uvnitr "zdrojoveho" Salamandera
+// data for Paste from clipboard stored inside "source" Salamander
 CSalShExtPastedData SalShExtPastedData;
 
 //*****************************************************************************
@@ -367,12 +367,12 @@ CFakeCopyPasteDataObject::Release(void)
     {
         OurDataOnClipboard = FALSE;
 
-        if (CutOrCopyDone) // pokud doslo k chybe behem cut/copy, cekani nema smysl a cisteni provedeme jinde
+        if (CutOrCopyDone) // if an error occurred during cut/copy, waiting doesn't make sense and we'll do cleanup elsewhere
         {
             //      TRACE_I("CFakeCopyPasteDataObject::Release(): deleting clipfake directory!");
 
-            // ted uz muzeme zrusit "paste" ve sdilene pameti, vycistit fake-dir a zrusit data-object
-            if (SalShExtSharedMemView != NULL) // ulozime cas do sdilene pameti (pro rozliseni mezi paste a jinym copy/move fake-diru)
+            // now we can cancel "paste" in shared memory, clean fake-dir and cancel data-object
+            if (SalShExtSharedMemView != NULL) // save time to shared memory (to distinguish between paste and other copy/move of fake-dir)
             {
                 //        TRACE_I("CFakeCopyPasteDataObject::Release(): DoPasteFromSalamander = FALSE");
                 WaitForSingleObject(SalShExtSharedMemMutex, INFINITE);
@@ -385,16 +385,16 @@ CFakeCopyPasteDataObject::Release(void)
             //      TRACE_I("CFakeCopyPasteDataObject::Release(): removedir");
             char* cutDir;
             if (CutDirectory(dir, &cutDir) && cutDir != NULL && strcmp(cutDir, "CLIPFAKE") == 0)
-            { // pro jistotu zkontrolujeme, jestli skutecne smazeme jen fake-dir
+            { // just to be safe, check that we're really only deleting fake-dir
                 RemoveTemporaryDir(dir);
             }
             //      TRACE_I("CFakeCopyPasteDataObject::Release(): posting WM_USER_SALSHEXT_TRYRELDATA");
             if (MainWindow != NULL)
-                PostMessage(MainWindow->HWindow, WM_USER_SALSHEXT_TRYRELDATA, 0, 0); // zkusime provest uvolneni dat (nejsou-li zamcena ani blokovana)
+                PostMessage(MainWindow->HWindow, WM_USER_SALSHEXT_TRYRELDATA, 0, 0); // try to release data (if not locked or blocked)
         }
 
         delete this;
-        return 0; // nesmime sahnout do objektu, uz neexistuje
+        return 0; // must not touch the object, it no longer exists
     }
     return RefCount;
 }
@@ -412,17 +412,17 @@ STDMETHODIMP CFakeCopyPasteDataObject::GetData(FORMATETC* formatEtc, STGMEDIUM* 
         medium->tymed = TYMED_HGLOBAL;
         medium->hGlobal = NULL;
         medium->pUnkForRelease = NULL;
-        return S_OK; // vracime S_OK, abysme vyhoveli testu ve funkci IsFakeDataObject()
+        return S_OK; // return S_OK to satisfy the test in IsFakeDataObject() function
     }
     else
     {
         if (formatEtc->cfFormat == CFIdList)
-        { // Paste do Explorera pouziva tenhle format, ostatni nas nezajimaji (stejne nepouziji copy-hook)
-            // resi problem ve Win98: pri Copy to clipboard z Exploreru se na stavajici objekt na clipboardu
-            // vola GetData, az pak se uvolni a nahradi novym objektem z Exploreru (problem je 2 sekundovy
-            // timeout z duvodu cekani na zavolani copy-hooku - po GetData ho vzdycky ocekavame)
+        { // Paste to Explorer uses this format, others don't interest us (they won't use copy-hook anyway)
+            // solves problem in Win98: during Copy to clipboard from Explorer, GetData is called on existing object on clipboard,
+            // only then is it released and replaced with new object from Explorer (problem is 2 second
+            // timeout due to waiting for copy-hook call - after GetData we always expect it)
             DWORD ti = GetTickCount();
-            if (ti - LastGetDataCallTime >= 100) // optimalizace: ukladame novy cas jen pri zmene o minimalne 100ms
+            if (ti - LastGetDataCallTime >= 100) // optimization: save new time only when changed by at least 100ms
             {
                 LastGetDataCallTime = ti;
                 if (SalShExtSharedMemView != NULL) // ulozime cas do sdilene pameti (pro rozliseni mezi paste a jinym copy/move fake-diru)

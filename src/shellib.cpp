@@ -12,13 +12,13 @@ extern "C"
 }
 #include "salshlib.h"
 
-// puvodni umisteni v fileswnd.h (zde je jen kvuli MakeCopyOfName v CImpDropTarget::ProcessClipboardData)
-extern BOOL OurClipDataObject; // TRUE pri "paste" naseho IDataObject
-                               // (detekce vlastni copy/move rutiny s cizimi daty)
+// original location in fileswnd.h (here only for MakeCopyOfName in CImpDropTarget::ProcessClipboardData)
+extern BOOL OurClipDataObject; // TRUE during "paste" of our IDataObject
+                               // (detection of our own copy/move routine with foreign data)
 
 void* LastSafeDataObject = NULL;
 
-DWORD ExecuteAssociationTlsIndex = TLS_OUT_OF_INDEXES; // dovoli jen jedno volani zaroven (zamezi rekurzi) v kazdem threadu
+DWORD ExecuteAssociationTlsIndex = TLS_OUT_OF_INDEXES; // allows only one call at a time (prevents recursion) in each thread
 
 BOOL DragFromPluginFSEffectIsFromPlugin = FALSE;
 
@@ -189,10 +189,10 @@ BOOL CImpDropTarget::ProcessClipboardData(BOOL copy, const DROPFILES* data,
     CCopyMoveData* array = new CCopyMoveData(100, 50);
     if (array != NULL)
     {
-        // array->MakeCopyOfName bude TRUE pokud jde o nas vlastni copy & paste z clipboardu
-        // (kopirovani s tim, ze pokud jiz cil existuje, bude se vytvaret "Copy of ...")
-        //    array->MakeCopyOfName = copy && OurClipDataObject && mapA == NULL && mapW == NULL;  // aby chodilo i pres drag&drop
-        array->MakeCopyOfName = copy && mapA == NULL && mapW == NULL; // sem se dostane jen nas data-object
+        // array->MakeCopyOfName will be TRUE if it's our own copy & paste from clipboard
+        // (copying with the condition that if target already exists, it will create "Copy of ...")
+        //    array->MakeCopyOfName = copy && OurClipDataObject && mapA == NULL && mapW == NULL;  // to work even through drag&drop
+        array->MakeCopyOfName = copy && mapA == NULL && mapW == NULL; // only our data-object gets here
 
         if (data->fWide)
         {
@@ -344,12 +344,11 @@ BOOL IsSimpleSelection(IDataObject* pDataObject, CDragDropOperData* namesList)
             UINT CF_FileMapA = RegisterClipboardFormat(CFSTR_FILENAMEMAPA);
             UINT CF_FileMapW = RegisterClipboardFormat(CFSTR_FILENAMEMAPW);
 
-            // Windows XP Remote Desktop problem, viz https://forum.altap.cz/viewtopic.php?p=13176#13176
-            // Pokud detekujeme zkracene verze nazvu formatu, jde s nejvyssi pravdepodobnosti o Remote Desktop
-            // a nesmime zavolat pDataObject->GetData(), protoze bychom na vzdalenem stroji spustili kopirovani
-            // soubor k nam do tempu a po tu doby bychom byli zamrzly
-            // Od Windows Vista uz je problem opraveny a zaroven uz nejsou oreazen nazvy, takze tento patch
-            // se dotkane pouze XP.
+            // If we detect truncated versions of format names, it's most likely Remote Desktop
+            // and we must not call pDataObject->GetData(), because we would trigger copying
+            // of files to our temp on the remote machine and we would be frozen during that time
+            // From Windows Vista onwards the problem is fixed and names are no longer truncated, so this patch
+            // only affects XP.
             BOOL cfRemoteDesktop1 = FALSE;
             BOOL cfRemoteDesktop2 = FALSE;
             BOOL cfRemoteDesktop3 = FALSE;
@@ -415,9 +414,9 @@ BOOL IsSimpleSelection(IDataObject* pDataObject, CDragDropOperData* namesList)
                                 const wchar_t* fileW = (wchar_t*)(((char*)data) + data->pFiles);
                                 while (1) // double null terminated, nepocita s prazdnymi stringy (zacatek)
                                 {
-                                    if (*fileW == 0) // uz nejsou zadna dalsi jmena, uspech!
+                                    if (*fileW == 0) // no more names, success!
                                     {
-                                        if (namesList != NULL) // pridame do namesList spolecnou cestu vsech jmen
+                                        if (namesList != NULL) // add to namesList the common path of all names
                                         {
                                             if (WideCharToMultiByte(CP_ACP, 0, prefix, prefixLen + 1, mulbyteName, MAX_PATH, NULL, NULL) == 0)
                                             {
@@ -433,9 +432,9 @@ BOOL IsSimpleSelection(IDataObject* pDataObject, CDragDropOperData* namesList)
                                         break;
                                     }
 
-                                    // test na spolecnou cestu vsech obsazenych jmen
+                                    // test for common path of all contained names
                                     const wchar_t* s = fileW;
-                                    const wchar_t* lastBackslash = NULL; // posledni backslash (krome toho na konci retezce)
+                                    const wchar_t* lastBackslash = NULL; // last backslash (except the one at the end of string)
                                     while (*s != 0)
                                     {
                                         if (*s == L'\\' && *(s + 1) != 0)
@@ -449,7 +448,7 @@ BOOL IsSimpleSelection(IDataObject* pDataObject, CDragDropOperData* namesList)
                                             if (CompareStringW(LOCALE_USER_DEFAULT, NORM_IGNORECASE, fileW,
                                                                prefixLen, prefix, prefixLen) != CSTR_EQUAL)
                                             {
-                                                ret = FALSE; // zmena cesty, chyba
+                                                ret = FALSE; // path change, error
                                                 break;
                                             }
                                         }
@@ -465,15 +464,15 @@ BOOL IsSimpleSelection(IDataObject* pDataObject, CDragDropOperData* namesList)
                                             }
                                             else
                                             {
-                                                ret = FALSE; // zmena cesty, chyba
+                                                ret = FALSE; // path change, error
                                                 break;
                                             }
                                         }
 
-                                        if (namesList != NULL) // pridame do namesList aktualni jmeno souboru nebo adresare
+                                        if (namesList != NULL) // add to namesList current file or directory name
                                         {
                                             if (s > fileW && *(s - 1) == L'\\')
-                                                s--; // pripadny orez koncoveho backslashe
+                                                s--; // optional trim of trailing backslash
                                             int len;
                                             if ((len = WideCharToMultiByte(CP_ACP, 0, lastBackslash + 1,
                                                                            (int)(s - (lastBackslash + 1)), mulbyteName,
@@ -493,20 +492,20 @@ BOOL IsSimpleSelection(IDataObject* pDataObject, CDragDropOperData* namesList)
                                                 {
                                                     namesList->Names.ResetState();
                                                     free(add);
-                                                    ret = FALSE; // nedostatek pameti pro jmena souboru/adresaru, chyba
+                                                    ret = FALSE; // insufficient memory for file/directory names, error
                                                     break;
                                                 }
                                             }
                                             else
                                             {
-                                                ret = FALSE; // nedostatek pameti pro jmena souboru/adresaru, chyba
+                                                ret = FALSE; // insufficient memory for file/directory names, error
                                                 break;
                                             }
                                         }
                                     }
                                     else
                                     {
-                                        ret = FALSE; // neni plna cesta, chyba
+                                        ret = FALSE; // not a full path, error
                                         break;
                                     }
 
@@ -519,9 +518,9 @@ BOOL IsSimpleSelection(IDataObject* pDataObject, CDragDropOperData* namesList)
                                 const char* fileA = ((char*)data) + data->pFiles;
                                 while (1) // double null terminated, nepocita s prazdnymi stringy (zacatek)
                                 {
-                                    if (*fileA == 0) // uz nejsou zadna dalsi jmena, uspech!
+                                    if (*fileA == 0) // no more names, success!
                                     {
-                                        if (namesList != NULL) // pridame do namesList spolecnou cestu vsech jmen
+                                        if (namesList != NULL) // add to namesList the common path of all names
                                         {
                                             strcpy(namesList->SrcPath, prefix);
                                             if (prefixLen < 3)
@@ -531,9 +530,9 @@ BOOL IsSimpleSelection(IDataObject* pDataObject, CDragDropOperData* namesList)
                                         break;
                                     }
 
-                                    // test na spolecnou cestu vsech obsazenych jmen
+                                    // test for common path of all contained names
                                     const char* s = fileA;
-                                    const char* lastBackslash = NULL; // posledni backslash (krome toho na konci retezce)
+                                    const char* lastBackslash = NULL; // last backslash (except the one at the end of string)
                                     while (*s != 0)
                                     {
                                         if (*s == '\\' && *(s + 1) != 0)
@@ -546,7 +545,7 @@ BOOL IsSimpleSelection(IDataObject* pDataObject, CDragDropOperData* namesList)
                                         {
                                             if (StrICmpEx(fileA, prefixLen, prefix, prefixLen) != 0)
                                             {
-                                                ret = FALSE; // zmena cesty, chyba
+                                                ret = FALSE; // path change, error
                                                 break;
                                             }
                                         }
@@ -562,15 +561,15 @@ BOOL IsSimpleSelection(IDataObject* pDataObject, CDragDropOperData* namesList)
                                             }
                                             else
                                             {
-                                                ret = FALSE; // zmena cesty, chyba
+                                                ret = FALSE; // path change, error
                                                 break;
                                             }
                                         }
 
-                                        if (namesList != NULL) // pridame do namesList aktualni jmeno souboru nebo adresare
+                                        if (namesList != NULL) // add to namesList current file or directory name
                                         {
                                             if (s > fileA && *(s - 1) == '\\')
-                                                s--; // pripadny orez koncoveho backslashe
+                                                s--; // optional trim of trailing backslash
                                             char* add = (char*)malloc(s - (lastBackslash + 1) + 1);
                                             if (add != NULL)
                                             {
@@ -581,20 +580,20 @@ BOOL IsSimpleSelection(IDataObject* pDataObject, CDragDropOperData* namesList)
                                                 {
                                                     namesList->Names.ResetState();
                                                     free(add);
-                                                    ret = FALSE; // nedostatek pameti pro jmena souboru/adresaru, chyba
+                                                    ret = FALSE; // insufficient memory for file/directory names, error
                                                     break;
                                                 }
                                             }
                                             else
                                             {
-                                                ret = FALSE; // nedostatek pameti pro jmena souboru/adresaru, chyba
+                                                ret = FALSE; // insufficient memory for file/directory names, error
                                                 break;
                                             }
                                         }
                                     }
                                     else
                                     {
-                                        ret = FALSE; // neni plna cesta, chyba
+                                        ret = FALSE; // not a full path, error
                                         break;
                                     }
 
@@ -645,7 +644,7 @@ STDMETHODIMP CImpDropTarget::DragEnter(IDataObject* pDataObject,
     OldDataObjectIsFake = IsFakeDataObject(OldDataObject, &OldDataObjectSrcType,
                                            OldDataObjectSrcFSPath, 2 * MAX_PATH);
 
-    OldDataObjectIsSimple = -1; // neznama hodnota
+    OldDataObjectIsSimple = -1; // unknown value
     OldDataObject->AddRef();
 
     if (ImageDragging)
@@ -658,27 +657,27 @@ STDMETHODIMP CImpDropTarget::DragEnter(IDataObject* pDataObject,
                                         grfKeyState, tgtType, OldDataObjectSrcType);
         SetDirectory(tgtPath, 0, pt, NULL, OldDataObject, tgtFile, tgtType);
         if (TgtType != idtttWindows && TgtType != idtttFullPluginFSPath)
-        { // neni-li oznaceni z jedne cesty (hrozi asi jen u Findu), neumime copy/move do archivu ani FS
+        { // if selection is not from one path (probably only possible in Find), we cannot copy/move to archive or FS
             OldDataObjectIsSimple = IsSimpleSelection(OldDataObject, NULL);
             if (!OldDataObjectIsSimple)
                 SetDirectory(NULL, 0, pt, NULL, OldDataObject, FALSE, idtttWindows);
         }
     }
 
-    if (CurDirDropTarget != NULL) // jen idtttWindows
+    if (CurDirDropTarget != NULL) // only idtttWindows
     {
         HRESULT res = CurDirDropTarget->DragEnter(pDataObject, grfKeyState, pt, pdwEffect);
-        if (res != S_OK) // chyba drop-targetu - ohlasime ji jako "none" drop-effect, protoze
-        {                // ostatni drop-targety v panelu muzou stale fungovat
+        if (res != S_OK) // drop-target error - we report it as "none" drop-effect, because
+        {                // other drop-targets in the panel can still work
             LastEffect = -1;
             *pdwEffect = DROPEFFECT_NONE;
-            CurDirDropTarget->Release(); // zrusime drop-target, aby se mu nezavolal drag-over
+            CurDirDropTarget->Release(); // cancel drop-target, so drag-over is not called on it
             CurDirDropTarget = NULL;
         }
         else
         {
             if (OldDataObjectIsFake)
-            { // nas data-object (nemusi byt z tohoto procesu): defaultni je Copy (fake je v TEMPU, na stejnem disku to delalo defaultne Move, tak to takhle obejdeme)
+            { // our data-object (may not be from this process): default is Copy (fake is in TEMP, on same disk it would default to Move, so we work around it this way)
                 if ((origKeyState & MK_SHIFT) != 0 && (origKeyState & MK_CONTROL) == 0 &&
                     (origEffect & DROPEFFECT_MOVE) != 0)
                 {
@@ -692,12 +691,12 @@ STDMETHODIMP CImpDropTarget::DragEnter(IDataObject* pDataObject,
                     {
                         if ((origEffect & DROPEFFECT_MOVE) != 0)
                             *pdwEffect = DROPEFFECT_MOVE;
-                        else // chyba drop-targetu
+                        else // drop-target error
                         {
                             *pdwEffect = DROPEFFECT_NONE;
                             pdwEffect = NULL;
                             CurDirDropTarget->DragLeave();
-                            CurDirDropTarget->Release(); // zrusime drop-target, aby se mu nezavolal drag-over
+                            CurDirDropTarget->Release(); // cancel drop-target, so drag-over is not called on it
                             CurDirDropTarget = NULL;
                         }
                     }
@@ -778,18 +777,18 @@ STDMETHODIMP CImpDropTarget::DragOver(DWORD grfKeyState, POINTL pt,
                                         grfKeyState, tgtType, OldDataObjectSrcType);
         SetDirectory(tgtPath, grfKeyState, pt, pdwEffect, OldDataObject, tgtFile, tgtType);
         if (TgtType != idtttWindows && TgtType != idtttFullPluginFSPath)
-        { // neni-li oznaceni z jedne cesty (hrozi asi jen u Findu), neumime copy/move do archivu ani FS
+        { // if selection is not from one path (probably only possible in Find), we cannot copy/move to archive or FS
             if (OldDataObjectIsSimple == -1)
                 OldDataObjectIsSimple = IsSimpleSelection(OldDataObject, NULL);
             if (!OldDataObjectIsSimple)
                 SetDirectory(NULL, grfKeyState, pt, pdwEffect, OldDataObject, FALSE, idtttWindows);
         }
     }
-    if (CurDirDropTarget != NULL) // jen idtttWindows
+    if (CurDirDropTarget != NULL) // only idtttWindows
     {
         HRESULT res = CurDirDropTarget->DragOver(grfKeyState, pt, pdwEffect);
         if (res == S_OK && OldDataObjectIsFake)
-        { // nas data-object (nemusi byt z tohoto procesu): defaultni je Copy (fake je v TEMPU, na stejnem disku to delalo defaultne Move, tak to takhle obejdeme)
+        { // our data-object (may not be from this process): default is Copy (fake is in TEMP, on same disk it would default to Move, so we work around it this way)
             if ((origKeyState & MK_SHIFT) != 0 && (origKeyState & MK_CONTROL) == 0 &&
                 (origEffect & DROPEFFECT_MOVE) != 0)
             {
@@ -803,12 +802,12 @@ STDMETHODIMP CImpDropTarget::DragOver(DWORD grfKeyState, POINTL pt,
                 {
                     if ((origEffect & DROPEFFECT_MOVE) != 0)
                         *pdwEffect = DROPEFFECT_MOVE;
-                    else // chyba drop-targetu
+                    else // drop-target error
                     {
                         *pdwEffect = DROPEFFECT_NONE;
                         pdwEffect = NULL;
                         CurDirDropTarget->DragLeave();
-                        CurDirDropTarget->Release(); // zrusime drop-target, aby se mu nezavolal drag-over
+                        CurDirDropTarget->Release(); // cancel drop-target, so drag-over is not called on it
                         CurDirDropTarget = NULL;
                     }
                 }
@@ -884,7 +883,7 @@ STDMETHODIMP CImpDropTarget::DragLeave()
         OldDataObject->Release();
         OldDataObject = NULL;
         OldDataObjectIsFake = FALSE;
-        OldDataObjectIsSimple = -1; // neznama hodnota
+        OldDataObjectIsSimple = -1; // unknown value
         OldDataObjectSrcType = 0;
         OldDataObjectSrcFSPath[0] = 0;
     }
@@ -909,7 +908,7 @@ STDMETHODIMP CImpDropTarget::Drop(IDataObject* pDataObject, DWORD grfKeyState,
     CALL_STACK_MESSAGE2("CImpDropTarget::Drop(, 0x%X, ,)", grfKeyState);
 
     DWORD lastEffect = LastEffect;
-    LastEffect = -1; // zjednodusene zneplatneni (nemusi byt pred kazdym returnem)
+    LastEffect = -1; // simplified invalidation (does not need to be before every return)
 
     if (pdwEffect == NULL)
     {
@@ -928,7 +927,7 @@ STDMETHODIMP CImpDropTarget::Drop(IDataObject* pDataObject, DWORD grfKeyState,
     DWORD defEffect = -1;
     if (RButton || ConfirmDropEnable != NULL && *ConfirmDropEnable)
     {
-        if (GetCurDir != NULL) // musime nechat omezit pdwEffect pri tazeni v ramci panelu
+        if (GetCurDir != NULL) // we must let pdwEffect be limited when dragging within panel
         {
             BOOL tgtFile;
             int tgtType;
@@ -1047,7 +1046,7 @@ STDMETHODIMP CImpDropTarget::Drop(IDataObject* pDataObject, DWORD grfKeyState,
         OldDataObject->Release();
         OldDataObject = NULL;
         OldDataObjectIsFake = FALSE;
-        OldDataObjectIsSimple = -1; // neznama hodnota
+        OldDataObjectIsSimple = -1; // unknown value
         OldDataObjectSrcType = 0;
         OldDataObjectSrcFSPath[0] = 0;
     }
@@ -1055,7 +1054,7 @@ STDMETHODIMP CImpDropTarget::Drop(IDataObject* pDataObject, DWORD grfKeyState,
     int dataObjectSrcType;
     char dataObjectSrcFSPath[2 * MAX_PATH];
     BOOL isFake = IsFakeDataObject(pDataObject, &dataObjectSrcType, dataObjectSrcFSPath, 2 * MAX_PATH);
-    BOOL tgtFile = TRUE; // je cilem operace soubor?
+    BOOL tgtFile = TRUE; // is the operation target a file?
     CDragDropOperData* namesList = new CDragDropOperData;
     if (GetCurDir != NULL)
     {
@@ -1102,7 +1101,7 @@ STDMETHODIMP CImpDropTarget::Drop(IDataObject* pDataObject, DWORD grfKeyState,
         if (ownRutine &&
             (defEffect == DROPEFFECT_COPY || defEffect == DROPEFFECT_MOVE) &&
             pDataObject != NULL && DoCopyMove != NULL)
-        { // nebudem schopny provest operaci sami ?
+        { // will we be able to perform the operation ourselves?
             IEnumFORMATETC* enumFormat;
             if (pDataObject->EnumFormatEtc(DATADIR_GET, &enumFormat) == S_OK)
             {
@@ -1141,11 +1140,11 @@ STDMETHODIMP CImpDropTarget::Drop(IDataObject* pDataObject, DWORD grfKeyState,
             }
         }
 
-        // pokud jde o "fake" adresar (unpack z archivu, copy/move z FS), zpracujeme ho zde
+        // if it's a "fake" directory (unpack from archive, copy/move from FS), we process it here
         if (!operationDone && isFake && CurDir[0] != 0)
         {
-            // zjisteni default drop effectu - nas data-object (nemusi byt z tohoto procesu): defaultni je
-            // Copy (fake je v TEMPU, na stejnem disku to delalo defaultne Move, tak to takhle obejdeme)
+            // determine default drop effect - our data-object (may not be from this process): default is
+            // Copy (fake is in TEMP, on same disk it would default to Move, so we work around it this way)
             if ((origKeyState & MK_SHIFT) != 0 && (origKeyState & MK_CONTROL) == 0 &&
                 (origEffect & DROPEFFECT_MOVE) != 0)
             {
@@ -1174,7 +1173,7 @@ STDMETHODIMP CImpDropTarget::Drop(IDataObject* pDataObject, DWORD grfKeyState,
                     {
                         SalShExtSharedMemView->DropDone = TRUE;
                         SalShExtSharedMemView->PasteDone = FALSE;
-                        lstrcpyn(SalShExtSharedMemView->TargetPath, CurDir, MAX_PATH); // jen diskova cesta, staci MAX_PATH
+                        lstrcpyn(SalShExtSharedMemView->TargetPath, CurDir, MAX_PATH); // only disk path, MAX_PATH is enough
                         SalShExtSharedMemView->Operation = *pdwEffect == DROPEFFECT_COPY ? SALSHEXT_COPY : SALSHEXT_MOVE;
                         success = TRUE;
                     }
@@ -1252,7 +1251,7 @@ STDMETHODIMP CImpDropTarget::Drop(IDataObject* pDataObject, DWORD grfKeyState,
                         {
                             SalShExtSharedMemView->DropDone = TRUE;
                             SalShExtSharedMemView->PasteDone = FALSE;
-                            lstrcpyn(SalShExtSharedMemView->TargetPath, CurDir, 2 * MAX_PATH); // full FS cesta, potreba 2 * MAX_PATH
+                            lstrcpyn(SalShExtSharedMemView->TargetPath, CurDir, 2 * MAX_PATH); // full FS path, need 2 * MAX_PATH
                             SalShExtSharedMemView->Operation = *pdwEffect == DROPEFFECT_COPY ? SALSHEXT_COPY : SALSHEXT_MOVE;
                         }
                         ReleaseMutex(SalShExtSharedMemMutex);
@@ -1266,7 +1265,7 @@ STDMETHODIMP CImpDropTarget::Drop(IDataObject* pDataObject, DWORD grfKeyState,
                         DoDragDropOper(*pdwEffect == DROPEFFECT_COPY, TgtType == idtttArchive || TgtType == idtttArchiveOnWinPath,
                                        TgtType == idtttArchiveOnWinPath ? CurDir : NULL,
                                        TgtType == idtttArchiveOnWinPath ? "" : CurDir, namesList, DoDragDropOperParam);
-                        namesList = NULL; // DoDragDropOper ho necha dealokovat, tady uz to delat nebudeme
+                        namesList = NULL; // DoDragDropOper will deallocate it, we won't do it here anymore
                     }
                 }
                 ret = S_OK;
@@ -1357,15 +1356,15 @@ LPITEMIDLIST GetItemIdListForFileName(LPSHELLFOLDER folder, const char* fileName
 {
     CALL_STACK_MESSAGE4("GetItemIdListForFileName(, %s, %d, %d,)", fileName, addUNCPrefix, useEnumForPIDLs);
 
-    // pokud hledame jmeno, ktere konci na mezeru/tecku, nezbyva nez hledat pomalu
-    // s pouzitim enumerace celeho folderu
+    // if we're looking for a name ending with space/dot, we have no choice but to search slowly
+    // using enumeration of the entire folder
     if (!useEnumForPIDLs && enumNamePrefix != NULL && !addUNCPrefix)
     {
         int len = (int)strlen(fileName);
         if (len > 0 && (fileName[len - 1] <= ' ' || fileName[len - 1] == '.'))
             useEnumForPIDLs = TRUE;
     }
-    if (useEnumForPIDLs) // pomalejsi varianta, bohuzel pro ziskani PIDLu sharu na serveru je nutna
+    if (useEnumForPIDLs) // slower variant, unfortunately necessary for getting PIDL of share on server
     {
         LPITEMIDLIST foundPidl = NULL;
         LPENUMIDLIST enumIDList;
@@ -1521,9 +1520,9 @@ ITEMIDLIST** CreateItemIdList(LPSHELLFOLDER folder, int files,
     for (i = 0; i < files; i++)
     {
         const char* fileName = nextFile(i, param);
-        // napr. pro ziskani funkcniho data-objectu je nutne, aby obsazena jmena byla validni,
-        // drag&drop invalidniho jmena znamena operaci nad jmenem s tise orezanymi mezerami/teckami
-        // na konci (misto "a   " vezme "a"), to rozhodne nechceme
+        // e.g. for getting a functional data-object it's necessary that contained names are valid,
+        // drag&drop of invalid name means operation on name with silently trimmed spaces/dots
+        // at the end (instead of "a   " it takes "a"), we definitely don't want that
         if (namesMustBeValid && FileNameIsInvalid(fileName, FALSE))
         {
             TRACE_I("CreateItemIdList: unable to create IdList becuase of invalid name: \"" << fileName << "\"");
@@ -1562,16 +1561,16 @@ BOOL GetShellFolder(const char* dir, IShellFolder*& shellFolderObj, LPITEMIDLIST
     pidlFolder = NULL;
     HRESULT ret;
     LPSHELLFOLDER desktop;
-    // pokud cesta obsahuje komponenty koncici na mezery/tecky, shell nam nevrati
-    // folder pro pozadovanou cestu, ale pro cestu vzniklou oriznutim techto
-    // mezer/tecek, takze radsi se na to vcas vykasleme...
+    // if path contains components ending with spaces/dots, shell won't return
+    // folder for the requested path, but for path created by trimming these
+    // spaces/dots, so we better bail out early...
     if (PathContainsValidComponents((char*)dir, FALSE))
     {
         if (SUCCEEDED((ret = SHGetDesktopFolder(&desktop))))
         {
             int rootFolder;
             if (dir[0] != '\\')
-                rootFolder = CSIDL_DRIVES; // normalni cesta
+                rootFolder = CSIDL_DRIVES; // normal path
             else
                 rootFolder = CSIDL_NETWORK; // UNC - sitove zdroje
             LPITEMIDLIST rootFolderID;
@@ -1583,7 +1582,7 @@ BOOL GetShellFolder(const char* dir, IShellFolder*& shellFolderObj, LPITEMIDLIST
                 {
                     char root[MAX_PATH];
                     GetRootPath(root, dir);
-                    if (strlen(root) < strlen(dir)) // neni to root cesta
+                    if (strlen(root) < strlen(dir)) // it's not a root path
                     {
                         strcpy(root, dir);
                         char* name = root + strlen(root);
@@ -1664,10 +1663,10 @@ BOOL GetShellFolder(const char* dir, IShellFolder*& shellFolderObj, LPITEMIDLIST
 
                                                 if (name != NULL)
                                                 {
-                                                    if (strlen(name) <= 3 && StrNICmp(name, root, 2) == 0) // name = "c:" nebo "c:\"
+                                                    if (strlen(name) <= 3 && StrNICmp(name, root, 2) == 0) // name = "c:" or "c:\"
                                                     {
                                                         pidlFolder = idList;
-                                                        break; // pidl nalezen (ziskan)
+                                                        break; // pidl found (obtained)
                                                     }
                                                 }
                                             }
@@ -1684,12 +1683,12 @@ BOOL GetShellFolder(const char* dir, IShellFolder*& shellFolderObj, LPITEMIDLIST
                         }
                         else
                         {
-                            if (rootFolder == CSIDL_NETWORK) // musime ziskat slozite pidl, jinak nechodi mapovani
+                            if (rootFolder == CSIDL_NETWORK) // we must get complex pidl, otherwise mapping doesn't work
                             {
                                 *(root + strlen(root) - 1) = 0;
                                 dir = root;
                                 char* s = root + 2;
-                                if (*s == 0) // sitova cesta "\\\\" (root site)
+                                if (*s == 0) // network path "\\\\" (network root)
                                 {
                                     shellFolderObj->Release();
                                     shellFolderObj = desktop;
@@ -1699,7 +1698,7 @@ BOOL GetShellFolder(const char* dir, IShellFolder*& shellFolderObj, LPITEMIDLIST
                                 }
                                 else
                                 {
-                                    BOOL setWait = (GetCursor() != LoadCursor(NULL, IDC_WAIT)); // ceka uz ?
+                                    BOOL setWait = (GetCursor() != LoadCursor(NULL, IDC_WAIT)); // already waiting?
                                     HCURSOR oldCur;
                                     if (setWait)
                                         oldCur = SetCursor(LoadCursor(NULL, IDC_WAIT));
@@ -1709,7 +1708,7 @@ BOOL GetShellFolder(const char* dir, IShellFolder*& shellFolderObj, LPITEMIDLIST
                                     BOOL dirIsOnlyServer = *s == 0;
                                     *s = 0;
                                     LPITEMIDLIST pidl = GetItemIdListForFileName(shellFolderObj, root);
-                                    if (dirIsOnlyServer) // sitova cesta "\\\\server" (server na siti)
+                                    if (dirIsOnlyServer) // network path "\\\\server" (server on network)
                                     {
                                         pidlFolder = pidl;
                                         pidl = NULL;
@@ -1774,7 +1773,7 @@ BOOL GetShellFolder(const char* dir, IShellFolder*& shellFolderObj, LPITEMIDLIST
                                                                         LPSHELLFOLDER swap = shellFolderObj;
                                                                         shellFolderObj = folder2;
                                                                         folder2 = swap;
-                                                                        break; // pidl nalezen (ziskan)
+                                                                        break; // pidl found (obtained)
                                                                     }
                                                                 }
                                                             }
@@ -2058,7 +2057,7 @@ BOOL HasDropTarget(const char* dir)
   if (GetShellFolder(dir, shellFolderObj, pidlFolder))
   {
     HRESULT ret;
-    attrs = SFGAO_DROPTARGET;  // ptame se jen na tento atribut
+    attrs = SFGAO_DROPTARGET;  // we're only asking about this attribute
     if (!SUCCEEDED((ret = shellFolderObj->GetAttributesOf(1, (LPCITEMIDLIST *)&pidlFolder, &attrs))))
     {
       TRACE_E("GetAttributesOf error: " << hex << ret);
@@ -2075,7 +2074,7 @@ BOOL HasDropTarget(const char* dir)
   }
   return (attrs & SFGAO_DROPTARGET) != 0;
 */
-    IDropTarget* drop = CreateIDropTarget(NULL, dir); // bohuzel to jinak nejde ...
+    IDropTarget* drop = CreateIDropTarget(NULL, dir); // unfortunately there's no other way...
     if (drop != NULL)
     {
         drop->Release();
@@ -2171,17 +2170,17 @@ void OpenSpecFolder(HWND hOwnerWindow, int specFolder)
 void OpenFolderAndFocusItem(HWND hOwnerWindow, const char* dir, const char* item)
 {
     CALL_STACK_MESSAGE2("OpenFolder(, %s)", dir);
-    // pokud cesta obsahuje komponenty koncici na mezery/tecky, shell nam nevrati
-    // pidl pro pozadovanou cestu, ale pro cestu vzniklou oriznutim techto
-    // mezer/tecek, takze radsi se na to vcas vykasleme...
+    // if path contains components ending with spaces/dots, shell won't return
+    // pidl for the requested path, but for path created by trimming these
+    // spaces/dots, so we better bail out early...
     char mydir[2 * MAX_PATH];
     strcpy(mydir, dir);
     if (item[0] != 0)
         SalPathAppend(mydir, item, 2 * MAX_PATH);
     if (PathContainsValidComponents((char*)mydir, FALSE))
     {
-        BOOL useOldMethod = TRUE; // SHOpenFolderAndSelectItems je podporovano od XP dal a my zatim behame i na W2K a XP bez SPx
-        if (item[0] != 0)         // pokud nemame vybrat polozku, nepouzijeme SHOpenFolderAndSelectItems, protoze by zobrazilo nadrazeny adresar, viz MSDN
+        BOOL useOldMethod = TRUE; // SHOpenFolderAndSelectItems is supported from XP onwards and we still run on W2K and XP without SPx
+        if (item[0] != 0)         // if we don't have to select an item, we won't use SHOpenFolderAndSelectItems, because it would show parent directory, see MSDN
         {
             HMODULE hShell32 = LoadLibrary("shell32.dll");
             if (hShell32 != NULL)
@@ -2259,12 +2258,12 @@ void OpenFolderAndFocusItem(HWND hOwnerWindow, const char* dir, const char* item
 //
 // GetTargetDirectory
 //
-//  parent  - okno vlastnika dialogu
-//  title   - titul dialogu
-//  comment - text zobrazeny nad tree-view
-//  path    - buffer pro vybranou cestu (delka minimalne MAX_PATH)
+//  parent  - dialog owner window
+//  title   - dialog title
+//  comment - text displayed above tree-view
+//  path    - buffer for selected path (length at least MAX_PATH)
 //
-//  vraci TRUE pokud je path platna nova cesta
+//  returns TRUE if path is a valid new path
 
 struct CBrowseData
 {
@@ -2288,7 +2287,7 @@ int CALLBACK DirectoryBrowse(HWND hwnd, UINT uMsg, LPARAM lParam, LPARAM lpData)
         {
             char path[MAX_PATH];
             GetRootPath(path, ((CBrowseData*)lpData)->InitDir);
-            if (strlen(path) < strlen(((CBrowseData*)lpData)->InitDir)) // neni to root-dir
+            if (strlen(path) < strlen(((CBrowseData*)lpData)->InitDir)) // it's not a root-dir
             {
                 strcpy(path, ((CBrowseData*)lpData)->InitDir);
                 char& ch = path[strlen(path) - 1];
@@ -2335,8 +2334,8 @@ BOOL GetTargetDirectoryAux(HWND parent, HWND hCenterWindow,
         bi.lpszTitle = commentW != NULL ? commentW : L"";
         bi.ulFlags = BIF_RETURNONLYFSDIRS;
         /* j.r.: pod W2K se po otevreni focus stavi na OK misto do treeview (jak to bylo drive); navic nefunguje ensure_visible; proste HNUS, vracime se ke stare verzi dialogu; pripadne ho muzem casem prepsat
-    if (!onlyNet)  // Petr: dialog Network funguje jen ve stare verzi - nova neumi pozadat usera o login na server (situace, kdy mu nestaci aktualni login)
-      bi.ulFlags |= BIF_NEWDIALOGSTYLE; // vetsi a natahovaci dialog
+    if (!onlyNet)  // Petr: dialog Network only works in old version - new one cannot ask user for login to server (situation when current login is not sufficient)
+      bi.ulFlags |= BIF_NEWDIALOGSTYLE; // larger and resizable dialog
     */
         bi.lpfn = DirectoryBrowse;
         CBrowseData bd;
@@ -2345,7 +2344,7 @@ BOOL GetTargetDirectoryAux(HWND parent, HWND hCenterWindow,
         bd.HCenterWindow = hCenterWindow;
         bi.lParam = (LPARAM)&bd;
         LPITEMIDLIST res = SHBrowseForFolderW(&bi);
-        BOOL ret = FALSE; // navratova hodnota
+        BOOL ret = FALSE; // return value
         if (res != NULL)
         {
             WCHAR pathW[MAX_PATH];
@@ -2357,7 +2356,7 @@ BOOL GetTargetDirectoryAux(HWND parent, HWND hCenterWindow,
         }
         if (commentW != NULL)
             free(commentW);
-        // uvolneni item-id-listu
+        // releasing item-id-list
         IMalloc* alloc;
         if ((pidl != NULL || res != NULL) && SUCCEEDED(CoGetMalloc(1, &alloc)))
         {
@@ -2379,14 +2378,14 @@ BOOL GetTargetDirectoryAux(HWND parent, HWND hCenterWindow,
 void ResolveNetHoodPath(char* path)
 {
     if (path[0] == '\\')
-        return; // UNC cesta -> nemuze byt NetHood
+        return; // UNC path -> cannot be NetHood
 
     char name[MAX_PATH];
     GetRootPath(name, path);
     if (GetDriveType(name) != DRIVE_FIXED)
-        return; // neni lokalni fixed cesta -> nemuze byt NetHood
+        return; // not a local fixed path -> cannot be NetHood
 
-    BOOL tryTarget = FALSE; // je-li TRUE, ma cenu zkouset najit soubor "target.lnk"
+    BOOL tryTarget = FALSE; // if TRUE, it's worth trying to find file "target.lnk"
     lstrcpyn(name, path, MAX_PATH);
     if (SalPathAppend(name, "desktop.ini", MAX_PATH))
     {
@@ -2401,11 +2400,11 @@ void ResolveNetHoodPath(char* path)
             {
                 char buf[1000];
                 DWORD read;
-                if (ReadFile(hFile, buf, 1000, &read, NULL) && read != 0) // nacteme soubor do pameti
+                if (ReadFile(hFile, buf, 1000, &read, NULL) && read != 0) // load file into memory
                 {
                     char* s = buf;
                     char* end = buf + read;
-                    while (s < end) // hledame v souboru CLSID "folder shortcut"
+                    while (s < end) // search for CLSID "folder shortcut" in file
                     {
                         if (*s == '{')
                         {
@@ -2441,7 +2440,7 @@ void ResolveNetHoodPath(char* path)
             WIN32_FIND_DATAA data;
             CStrP nameW(ConvertAllocUtf8ToWide(name, -1));
             HANDLE find = nameW != NULL ? HANDLES_Q(FindFirstFileW(nameW, &dataW)) : INVALID_HANDLE_VALUE;
-            if (find != INVALID_HANDLE_VALUE) // soubor existuje a mame jeho 'data'
+            if (find != INVALID_HANDLE_VALUE) // file exists and we have its 'data'
             {
                 HANDLES(FindClose(find));
                 ZeroMemory(&data, sizeof(data));
@@ -2473,8 +2472,8 @@ void ResolveNetHoodPath(char* path)
                         if (fileInt->Load(oleName, STGM_READ) == S_OK)
                         {
                             if (link->GetPath(name, MAX_PATH, &data, SLGP_UNCPRIORITY) == NOERROR)
-                            {                       // nepouzijeme Resolve, protoze zde to neni az tak kriticke a dost by to zpomalovalo
-                                strcpy(path, name); // heureka, konecne vime kam ten link vede
+                            {                       // we won't use Resolve, because it's not that critical here and would slow things down considerably
+                                strcpy(path, name); // eureka, we finally know where the link points to
                             }
                         }
                         fileInt->Release();
@@ -2502,25 +2501,25 @@ BOOL GetTargetDirectory(HWND parent, HWND hCenterWindow,
 //
 // GetNewOrBackgroundMenu
 //
-// hOwnerWindow - predek oteviranych oken (jak chyb, tak prikazu kontextoveho menu)
-// dir - adresar, od ktereho se ziskava menu New
-// menu - navratova hodnota - submenu New + jeho interfacy
-// minCmd, maxCmd - interval moznych hodnot prikazu v 'menu'
-// backgoundMenu - TRUE = chceme kompletni view-background menu (right-click za polozkami v Explorerovi; nejen menu New, ale take napr. Tortoise CVS, atd.)
+// hOwnerWindow - parent of opened windows (both errors and context menu commands)
+// dir - directory from which to get menu New
+// menu - return value - submenu New + its interfaces
+// minCmd, maxCmd - interval of possible command values in 'menu'
+// backgoundMenu - TRUE = we want complete view-background menu (right-click behind items in Explorer; not just menu New, but also e.g. Tortoise CVS, etc.)
 
 void GetMenuNewAux(IContextMenu2* contextMenu2, HMENU m, int minCmd, int maxCmd)
 {
     CALL_STACK_MESSAGE_NONE
 
-    // docasne snizime prioritu threadu, aby nam nejaka zmatena shell extension nesezrala CPU
-    HANDLE hThread = GetCurrentThread(); // pseudo-handle, neni treba uvolnovat
+    // temporarily lower thread priority, so that some confused shell extension doesn't eat up CPU
+    HANDLE hThread = GetCurrentThread(); // pseudo-handle, no need to release
     int oldThreadPriority = GetThreadPriority(hThread);
     SetThreadPriority(hThread, THREAD_PRIORITY_NORMAL);
 
     __try
     {
         UINT flags = CMF_NORMAL | CMF_EXPLORE;
-        // osetrime stisknuty shift - rozsirene kontextove menu, pod W2K je tam napriklad Run as...
+        // handle pressed shift - extended context menu, under W2K there's for example Run as...
 #define CMF_EXTENDEDVERBS 0x00000100 // rarely used verbs
         BOOL shiftPressed = (GetKeyState(VK_SHIFT) & 0x8000) != 0;
         if (shiftPressed)
@@ -2568,7 +2567,7 @@ void GetNewOrBackgroundMenu(HWND hOwnerWindow, const char* dir, CMenuNew* menu,
                         {
                             menu->Set(contextMenu2, m);
                         }
-                        else // vyrizneme jen menu New
+                        else // cut out only menu New
                         {
                             MENUITEMINFO mi;
                             int index = 0;
@@ -2581,7 +2580,7 @@ void GetNewOrBackgroundMenu(HWND hOwnerWindow, const char* dir, CMenuNew* menu,
                                 if (GetMenuItemInfo(m, index, TRUE, &mi))
                                 {
                                     if (mi.hSubMenu != NULL)
-                                    { // hledame posledni submenu (uzivatelske polozky snad pribyvaji jen pred Windows polozky, uvidime casem)
+                                    { // search for last submenu (user items hopefully only appear before Windows items, we'll see over time)
                                         foundIndex = index;
                                         foundSubMenu = mi.hSubMenu;
                                     }
@@ -2626,9 +2625,9 @@ void CMenuNew::ReleaseBody()
 {
     __try
     {
-        // HMENU Menu je zdestruovano primo z menu, do ktereho bylo pripojeno
+        // HMENU Menu is destroyed directly from the menu it was attached to
         if (Menu2 != NULL)
-            Menu2->Release(); // toto volani sem tam spadne
+            Menu2->Release(); // this call occasionally crashes
     }
     __except (EXCEPTION_EXECUTE_HANDLER)
     {
@@ -2793,9 +2792,9 @@ BOOL GetSHObjectName(ITEMIDLIST* pidl, DWORD flags, char* name, int nameSize, IM
     BOOL ret = FALSE;
     if (nameSize > 0)
         name[0] = 0;
-    if (pidl != NULL && pidl->mkid.cb != 0) // v seznamu musi byt alespon jedno IDcko, jinak neni co zjistovat
+    if (pidl != NULL && pidl->mkid.cb != 0) // there must be at least one ID in the list, otherwise there's nothing to find out
     {
-        // najdu posledni IDcko v seznamu
+        // find last ID in the list
         ITEMIDLIST* lastID = pidl;
         while (1)
         {
@@ -2806,7 +2805,7 @@ BOOL GetSHObjectName(ITEMIDLIST* pidl, DWORD flags, char* name, int nameSize, IM
                 break;
         }
 
-        // provizorne zkratim seznam IDcek a ziskam IShellFolder, ve kterem lezi puvodni 'pidl'
+        // temporarily shorten the list of IDs and get IShellFolder in which the original 'pidl' resides
         USHORT lastCB = lastID->mkid.cb;
         lastID->mkid.cb = 0;
 
@@ -2815,7 +2814,7 @@ BOOL GetSHObjectName(ITEMIDLIST* pidl, DWORD flags, char* name, int nameSize, IM
         if (SHGetDesktopFolder(&desktopFolder) == NOERROR && desktopFolder != NULL)
         {
             IShellFolder* folder;
-            if (pidl->mkid.cb != 0) // neprazdny seznam IDcek, pozadame desktop o prislusny folder
+            if (pidl->mkid.cb != 0) // non-empty list of IDs, ask desktop for appropriate folder
             {
                 if (desktopFolder->BindToObject(pidl, NULL, IID_IShellFolder, (void**)&folder) != S_OK)
                 {
@@ -2824,12 +2823,12 @@ BOOL GetSHObjectName(ITEMIDLIST* pidl, DWORD flags, char* name, int nameSize, IM
                 }
                 desktopFolder->Release();
             }
-            else // prazdny seznam IDcek = folder je primo desktop
+            else // empty list of IDs = folder is directly desktop
                 folder = desktopFolder;
 
             if (folder != NULL)
             {
-                // oprava seznamu ('pidl') do puvodni velikosti
+                // restore list ('pidl') to original size
                 lastID->mkid.cb = lastCB;
 
                 STRRET str;
