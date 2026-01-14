@@ -15,6 +15,7 @@
 #include "cache.h"
 #include <uxtheme.h>
 #include "dialogs.h"
+#include "execlog.h"
 
 CPlugins Plugins;
 
@@ -116,10 +117,12 @@ BOOL CPluginFSInterfaceEncapsulation::ListCurrentPath(CSalamanderDirectoryAbstra
 {
     CALL_STACK_MESSAGE4("CPluginFSInterfaceEncapsulation::ListCurrentPath(, , , %d) (%s v. %s)",
                         forceRefresh, DLLName, Version);
+    ExecLogFileListingStart(PluginFSName, TRUE, PluginFSName);
     EnterPlugin();
     //TRACE_I("list path: begin");
     BOOL r = Interface->ListCurrentPath(dir, pluginData, iconsType, forceRefresh);
     //TRACE_I("list path: end");
+    ExecLogFileListingResult(PluginFSName, r, -1, -1, TRUE, PluginFSName);
 #ifdef _DEBUG
     if (r && pluginData != NULL) // increase OpenedPDCounter
     {
@@ -2143,6 +2146,27 @@ BOOL CPluginData::InitDLL(HWND parent, BOOL quiet, BOOL waitCursor, BOOL showUns
                         releaseDynMenuIcons, DLLName, Version);
 
     char bufText[MAX_PATH + 200];
+    const BOOL shouldLogLoad = (DLL == NULL && IsGood());
+    struct CPluginLoadLogScope
+    {
+        BOOL Enabled;
+        const char* DllName;
+        const char* PluginName;
+        const HINSTANCE* DllHandle;
+
+        CPluginLoadLogScope(BOOL enabled, const char* dllName, const char* pluginName, const HINSTANCE* dllHandle)
+            : Enabled(enabled), DllName(dllName), PluginName(pluginName), DllHandle(dllHandle)
+        {
+            if (Enabled)
+                ExecLogPluginLoadStart(DllName, PluginName);
+        }
+
+        ~CPluginLoadLogScope()
+        {
+            if (Enabled)
+                ExecLogPluginLoadResult(DllName, PluginName, DllHandle != NULL && *DllHandle != NULL);
+        }
+    } loadLogScope(shouldLogLoad, DLLName, Name, &DLL);
 
 #ifdef _WIN64 // FIXME_X64_WINSCP - this probably needs a different solution... (ignoring missing WinSCP in the x64 version of Salamander)
     const char* pluginNameEN;
@@ -3705,6 +3729,7 @@ BOOL CPluginData::ViewFile(const char* name, int left, int top, int width, int h
                          name, left, top, width, height, showCmd, alwaysOnTop, returnLock,
                          enumFilesSourceUID, enumFilesCurrentIndex, DLLName, Version);
     BOOL ret = FALSE;
+    ExecLogFeatureStart("plugin view file", name);
     if (InitDLL(MainWindow->HWindow)
         /*&& PluginIfaceForViewer.NotEmpty()*/) // unnecessary, because downgrade is impossible and InitDLL checks the interfaces
     {
@@ -3716,6 +3741,7 @@ BOOL CPluginData::ViewFile(const char* name, int left, int top, int width, int h
             HANDLES_ADD(__htEvent, __hoCreateEvent, *lock);
         }
     }
+    ExecLogFeatureResult("plugin view file", name, ret);
     return ret;
 }
 

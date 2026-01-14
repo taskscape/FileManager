@@ -6,6 +6,7 @@
 
 #include "cfgdlg.h"
 #include "worker.h"
+#include "execlog.h"
 
 #include <Aclapi.h>
 #include <Ntsecapi.h>
@@ -2484,7 +2485,7 @@ COPY_ADS_AGAIN:
                             // if possible, pre-allocate the required space (avoids disk fragmentation and smooths writes to floppies)
                             BOOL wholeFileAllocated = FALSE;
                             if (fileSize > CQuadWord(limitBufferSize, 0) && // pointless to pre-allocate below the copy buffer size
-                                fileSize < CQuadWord(0, 0x80000000))        // file size must be positive (otherwise seeking fails – values above 8 EB, so practically never)
+                                fileSize < CQuadWord(0, 0x80000000))        // file size must be positive (otherwise seeking fails ï¿½ values above 8 EB, so practically never)
                             {
                                 BOOL fatal = TRUE;
                                 BOOL ignoreErr = FALSE;
@@ -7069,7 +7070,7 @@ BOOL DoDeleteDir(HWND hProgressDlg, char* name, const CQuadWord& size, COperatio
 #define IO_REPARSE_TAG_SYMLINK (0xA000000CL)
 
 /*  This code copies a junction point into an empty directory (the directory must be created in
-    advance – to keep it simple we always use "D:\\ZUMPA\\link" here).
+    advance ï¿½ to keep it simple we always use "D:\\ZUMPA\\link" here).
 
   People sometimes want to copy the contents of the junction, sometimes they want to copy only the junction as a link,
   and sometimes they want to skip it (unclear whether that should create an empty junction directory)...
@@ -7440,7 +7441,7 @@ CONVERT_AGAIN:
                                                 // capture CRLF which splits across the buffer boundary
                                                 if (lastChar && *sourceIterator == '\r')
                                                     crlfBreak = TRUE;
-                                                // capture CRLF that is contiguous – skip the LF
+                                                // capture CRLF that is contiguous ï¿½ skip the LF
                                                 if (!lastChar &&
                                                     *sourceIterator == '\r' && *(sourceIterator + 1) == '\n')
                                                     sourceIterator++;
@@ -8054,6 +8055,8 @@ unsigned ThreadWorkerBody(void* parameter)
             {
             case ocCopyFile:
             {
+                const char* opName = "copy file";
+                ExecLogFileOperationStart(opName, op->SourceName, op->TargetName);
                 pd.Operation = opStrCopying;
                 pd.Source = op->SourceName;
                 pd.Preposition = opStrCopyingPrep;
@@ -8070,12 +8073,15 @@ unsigned ThreadWorkerBody(void* parameter)
                                     (op->OpFlags & OPFL_COPY_ADS) != 0,
                                     (op->OpFlags & OPFL_AS_ENCRYPTED) != 0,
                                     FALSE, asyncPar);
+                ExecLogFileOperationResult(opName, op->SourceName, op->TargetName, !Error);
                 break;
             }
 
             case ocMoveDir:
             case ocMoveFile:
             {
+                const char* opName = op->Opcode == ocMoveDir ? "move dir" : "move file";
+                ExecLogFileOperationStart(opName, op->SourceName, op->TargetName);
                 pd.Operation = opStrMoving;
                 pd.Source = op->SourceName;
                 pd.Preposition = opStrMovingPrep;
@@ -8094,11 +8100,14 @@ unsigned ThreadWorkerBody(void* parameter)
                                     (op->OpFlags & OPFL_COPY_ADS) != 0,
                                     (op->OpFlags & OPFL_AS_ENCRYPTED) != 0,
                                     &setDirTimeAfterMove, asyncPar, ignInvalidName);
+                ExecLogFileOperationResult(opName, op->SourceName, op->TargetName, !Error);
                 break;
             }
 
             case ocCreateDir:
             {
+                const char* opName = "create dir";
+                ExecLogFileOperationStart(opName, op->TargetName, "");
                 BOOL copyADS = (op->OpFlags & OPFL_COPY_ADS) != 0;
                 BOOL crAsEncrypted = (op->OpFlags & OPFL_AS_ENCRYPTED) != 0;
                 BOOL ignInvalidName = (op->OpFlags & OPFL_IGNORE_INVALID_NAME) != 0;
@@ -8114,6 +8123,7 @@ unsigned ThreadWorkerBody(void* parameter)
                 Error = !DoCreateDir(hProgressDlg, op->TargetName, op->Attr, clearReadonlyMask, dlgData,
                                      totalDone, op->Size, op->SourceName, copyADS, script, buffer, skip,
                                      alreadyExisted, crAsEncrypted, ignInvalidName);
+                ExecLogFileOperationResult(opName, op->TargetName, "", !Error);
                 if (!Error)
                 {
                     if (skip) // skip directory creation
@@ -8220,6 +8230,8 @@ unsigned ThreadWorkerBody(void* parameter)
             case ocDeleteDir:
             case ocDeleteDirLink:
             {
+                const char* opName = op->Opcode == ocDeleteFile ? "delete file" : (op->Opcode == ocDeleteDir ? "delete dir" : "delete dir link");
+                ExecLogFileOperationStart(opName, op->SourceName, "");
                 pd.Operation = opStrDeleting;
                 pd.Source = op->SourceName;
                 pd.Preposition = "";
@@ -8247,11 +8259,14 @@ unsigned ThreadWorkerBody(void* parameter)
                                                  script, totalDone, dlgData);
                     }
                 }
+                ExecLogFileOperationResult(opName, op->SourceName, "", !Error);
                 break;
             }
 
             case ocConvert:
             {
+                const char* opName = "convert file";
+                ExecLogFileOperationStart(opName, op->SourceName, "");
                 // output buffer - the conversion will be performed in it (in the worst case,
                 // when the input file contains only CR or LF and we translate them to CRLF,
                 // this buffer is twice the size of sourceBuffer) and afterwards we will write from it
@@ -8276,11 +8291,14 @@ unsigned ThreadWorkerBody(void* parameter)
 
                 Error = !DoConvert(hProgressDlg, op->SourceName, (char*)buffer, tgtBuffer, op->Size, script,
                                    totalDone, convertData, dlgData);
+                ExecLogFileOperationResult(opName, op->SourceName, "", !Error);
                 break;
             }
 
             case ocChangeAttrs:
             {
+                const char* opName = "change attrs";
+                ExecLogFileOperationStart(opName, op->SourceName, "");
                 pd.Operation = opChangAttrs;
                 pd.Source = op->SourceName;
                 pd.Preposition = "";
@@ -8296,6 +8314,7 @@ unsigned ThreadWorkerBody(void* parameter)
                                        attrsData->ChangeTimeAccessed ? &attrsData->TimeAccessed : NULL,
                                        attrsData->ChangeCompression, attrsData->ChangeEncryption,
                                        op->Attr, dlgData);
+                ExecLogFileOperationResult(opName, op->SourceName, "", !Error);
                 break;
             }
 

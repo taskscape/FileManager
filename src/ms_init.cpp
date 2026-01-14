@@ -4,6 +4,8 @@
 
 #include "precomp.h"
 
+#include "execlog.h"
+
 DWORD SalamanderStartTime = 0;
 DWORD SalamanderExceptionTime = 0;
 
@@ -62,6 +64,9 @@ C__MSInit::C__MSInit()
 #ifdef TRACE_ENABLE
     Initialize__Trace(); // trace.cpp
 #endif                   // TRACE_ENABLE
+#ifdef TRACE_ENABLE
+    ExecLogStartupBegin();
+#endif // TRACE_ENABLE
 #ifndef MESSAGES_DISABLE
     Initialize__Messages(); // messages.cpp
 #endif                      // MESSAGES_DISABLE

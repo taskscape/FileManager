@@ -372,6 +372,9 @@
     <ClCompile Include="..\viewer3.cpp">
       <Filter>cpp</Filter>
     </ClCompile>
+    <ClCompile Include="..\execlog.cpp">
+      <Filter>cpp</Filter>
+    </ClCompile>
     <ClCompile Include="..\worker.cpp">
       <Filter>cpp</Filter>
     </ClCompile>

@@ -18,6 +18,7 @@
 #include "mainwnd.h"
 #include "cfgdlg.h"
 #include "dialogs.h"
+#include "execlog.h"
 #include "snooper.h"
 #include "shellib.h"
 #include "menu.h"
@@ -1004,6 +1005,7 @@ CMainWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
     case WM_CREATE:
     {
         SHChangeNotifyInitialize(); // request receiving Shell Notifications
+        ExecLogStartupPhase("main window create");
 
         SetTimer(HWindow, IDT_ADDNEWMODULES, 15000, NULL); // timer after 15 seconds for AddNewlyLoadedModulesToGlobalModulesStore()
 
@@ -1225,6 +1227,7 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
         TaskbarRestartMsg = RegisterWindowMessage(TEXT("TaskbarCreated"));
 
         Created = TRUE;
+        ExecLogStartupComplete();
         return 0;
     }
 
@@ -2107,6 +2110,9 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
             {
                 activePanel->UserWorkedOnThisPath = TRUE;
                 {
+                    char newMenuDetail[64];
+                    _snprintf_s(newMenuDetail, _TRUNCATE, "id=%u", (unsigned)LOWORD(wParam));
+                    ExecLogFeatureStart("new item", newMenuDetail);
                     CALL_STACK_MESSAGE1("CMainWindow::WindowProc::menu_new");
                     IContextMenu* menu2 = ContextMenuNew->GetMenu2();
                     menu2->AddRef(); // just in case ContextMenuNew vanishes asynchronously (message loop)
@@ -2124,6 +2130,7 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
                     activePanel->FocusFirstNewItem = TRUE; // select the newly generated file/directory
 
                     CMainWindowWindowProcAux(menu2, ici);
+                    ExecLogFeatureResult("new item", newMenuDetail, TRUE);
 
                     menu2->Release();
                 }
@@ -2132,7 +2139,10 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
                 MainWindow->PostChangeOnPathNotification(activePanel->GetPath(), FALSE);
             }
             else
+            {
+                ExecLogFeatureResult("new item", "menu unavailable", FALSE);
                 TRACE_E("ContextMenuNew is not valid anymore, it is not posible to invoke menu New command.");
+            }
             return 0;
         }
 
@@ -2153,7 +2163,12 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
             // lower the thread priority to "normal" (so operations don't burden the system)
             SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_NORMAL);
 
-            if (Plugins.ExecuteMenuItem(activePanel, HWindow, LOWORD(wParam)))
+            char pluginCmdDetail[64];
+            _snprintf_s(pluginCmdDetail, _TRUNCATE, "id=%u", (unsigned)LOWORD(wParam));
+            ExecLogFeatureStart("plugin command", pluginCmdDetail);
+            BOOL pluginCmdResult = Plugins.ExecuteMenuItem(activePanel, HWindow, LOWORD(wParam));
+            ExecLogFeatureResult("plugin command", pluginCmdDetail, pluginCmdResult);
+            if (pluginCmdResult)
             {
                 activePanel->StoreSelection();                               // save selection for Restore Selection command
                 activePanel->SetSel(FALSE, -1, TRUE);                        // explicit redraw
@@ -2174,7 +2189,10 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
             // lower the thread priority to "normal" (so operations don't burden the system)
             SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_NORMAL);
 
-            if (Plugins.OnLastCommand(activePanel, HWindow))
+            ExecLogFeatureStart("plugin last command", "");
+            BOOL lastCmdResult = Plugins.OnLastCommand(activePanel, HWindow);
+            ExecLogFeatureResult("plugin last command", "", lastCmdResult);
+            if (lastCmdResult)
             {
                 activePanel->StoreSelection();                               // save selection for Restore Selection command
                 activePanel->SetSel(FALSE, -1, TRUE);                        // explicit redraw
@@ -3468,6 +3486,7 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
         {
             if (activePanel->Is(ptDisk))
             {
+                ExecLogFeatureStart("encrypt", activePanel->GetPath());
                 activePanel->UserWorkedOnThisPath = TRUE;
                 activePanel->StoreSelection(); // save selection for Restore Selection command
                 activePanel->ChangeAttr(FALSE, FALSE, TRUE, TRUE);
@@ -3479,6 +3498,7 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
         {
             if (activePanel->Is(ptDisk))
             {
+                ExecLogFeatureStart("decrypt", activePanel->GetPath());
                 activePanel->UserWorkedOnThisPath = TRUE;
                 activePanel->StoreSelection(); // save selection for Restore Selection command
                 activePanel->ChangeAttr(FALSE, FALSE, TRUE, FALSE);
@@ -3490,6 +3510,7 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
         {
             if (activePanel->Is(ptDisk))
             {
+                ExecLogFeatureStart("pack", activePanel->GetPath());
                 activePanel->UserWorkedOnThisPath = TRUE;
                 activePanel->StoreSelection(); // save selection for Restore Selection command
                 activePanel->Pack(GetNonActivePanel());
@@ -3501,6 +3522,7 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
         {
             if (activePanel->Is(ptDisk))
             {
+                ExecLogFeatureStart("unpack", activePanel->GetPath());
                 activePanel->UserWorkedOnThisPath = TRUE;
                 activePanel->StoreSelection(); // save selection for Restore Selection command
                 activePanel->Unpack(GetNonActivePanel());
@@ -3522,6 +3544,7 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
         {
             if (EnablerShowProperties)
             {
+                ExecLogFeatureStart("properties", activePanel->GetPath());
                 activePanel->UserWorkedOnThisPath = TRUE;
                 activePanel->StoreSelection(); // save selection for Restore Selection command
                 ShellAction(activePanel, saProperties, TRUE, FALSE);
@@ -3531,6 +3554,7 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
 
         case CM_OPEN:
         {
+            ExecLogFeatureStart("open", activePanel->GetPath());
             activePanel->UserWorkedOnThisPath = TRUE;
             activePanel->CtrlPageDnOrEnter(VK_RETURN);
             return 0;
@@ -3538,6 +3562,7 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
 
         case CM_VIEW:
         {
+            ExecLogFeatureStart("view", activePanel->GetPath());
             activePanel->UserWorkedOnThisPath = TRUE;
             activePanel->ViewFile(NULL, FALSE, 0xFFFFFFFF, activePanel->Is(ptDisk) ? activePanel->EnumFileNamesSourceUID : -1, -1);
             return 0;
@@ -3545,6 +3570,7 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
 
         case CM_ALTVIEW:
         {
+            ExecLogFeatureStart("alt view", activePanel->GetPath());
             activePanel->UserWorkedOnThisPath = TRUE;
             activePanel->ViewFile(NULL, TRUE, 0xFFFFFFFF, activePanel->Is(ptDisk) ? activePanel->EnumFileNamesSourceUID : -1, -1);
             return 0;
@@ -3553,6 +3579,7 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
         case CM_VIEW_WITH:
         {
             POINT menuPos;
+            ExecLogFeatureStart("view with", activePanel->GetPath());
             activePanel->UserWorkedOnThisPath = TRUE;
             activePanel->GetContextMenuPos(&menuPos);
             activePanel->ViewFileWith(NULL, HWindow, &menuPos, NULL,
@@ -3564,6 +3591,7 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
         {
             if (EnablerFileOnDiskOrArchive)
             {
+                ExecLogFeatureStart("edit", activePanel->GetPath());
                 activePanel->UserWorkedOnThisPath = TRUE;
                 if (activePanel->Is(ptZIPArchive))
                 {
@@ -3584,6 +3612,7 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
         {
             if (activePanel->Is(ptDisk))
             {
+                ExecLogFeatureStart("edit new", activePanel->GetPath());
                 activePanel->UserWorkedOnThisPath = TRUE;
                 activePanel->EditNewFile();
             }
@@ -3594,6 +3623,7 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
         {
             activePanel->UserWorkedOnThisPath = TRUE;
             POINT menuPos;
+            ExecLogFeatureStart("edit with", activePanel->GetPath());
             activePanel->GetContextMenuPos(&menuPos);
             if (activePanel->Is(ptDisk))
             {
@@ -3616,6 +3646,7 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
 
         case CM_FINDFILE:
         {
+            ExecLogFeatureStart("find file", activePanel->GetPath());
             if (activePanel->Is(ptDisk)) // does Find relate to the current path? (archives and FS not yet)
             {
                 activePanel->UserWorkedOnThisPath = TRUE;
@@ -3633,6 +3664,7 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
 
         case CM_CREATEDIR:
         {
+            ExecLogFeatureStart("create dir", activePanel->GetPath());
             activePanel->UserWorkedOnThisPath = TRUE;
             activePanel->CreateDir(GetNonActivePanel());
             return 0;
@@ -3640,36 +3672,42 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
 
         case CM_ACTIVE_CHANGEDIR:
         {
+            ExecLogFeatureStart("change dir", activePanel->GetPath());
             activePanel->ChangeDir();
             return 0;
         }
 
         case CM_LEFT_CHANGEDIR:
         {
+            ExecLogFeatureStart("change dir", LeftPanel->GetPath());
             LeftPanel->ChangeDir();
             return 0;
         }
 
         case CM_RIGHT_CHANGEDIR:
         {
+            ExecLogFeatureStart("change dir", RightPanel->GetPath());
             RightPanel->ChangeDir();
             return 0;
         }
 
         case CM_ACTIVE_AS_OTHER:
         {
+            ExecLogFeatureStart("sync path", "active to other");
             activePanel->ChangePathToOtherPanelPath();
             return 0;
         }
 
         case CM_LEFT_AS_OTHER:
         {
+            ExecLogFeatureStart("sync path", "left to other");
             LeftPanel->ChangePathToOtherPanelPath();
             return 0;
         }
 
         case CM_RIGHT_AS_OTHER:
         {
+            ExecLogFeatureStart("sync path", "right to other");
             RightPanel->ChangePathToOtherPanelPath();
             return 0;
         }
@@ -3791,8 +3829,12 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
             char rightPath[2 * MAX_PATH];
             LeftPanel->GetGeneralPath(leftPath, 2 * MAX_PATH);
             RightPanel->GetGeneralPath(rightPath, 2 * MAX_PATH);
+            char compareDetail[4 * MAX_PATH];
+            _snprintf_s(compareDetail, _TRUNCATE, "left=%s, right=%s", leftPath, rightPath);
+            ExecLogFeatureStart("compare dirs", compareDetail);
             if (strcmp(leftPath, rightPath) == 0) // case sensitive; if this condition fails, it's fine
             {
+                ExecLogFeatureResult("compare dirs", compareDetail, FALSE);
                 SalMessageBox(HWindow, LoadStr(IDS_COMPARE_SAMEPATH), LoadStr(IDS_COMPAREDIRSTITLE), MB_OK | MB_ICONINFORMATION);
                 return 0;
             }
@@ -3839,6 +3881,11 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
                     Configuration.CompareIgnoreDirs)
                     flags |= COMPARE_DIRECTORIES_IGNDIRNAMES;
                 CompareDirectories(flags);
+                ExecLogFeatureResult("compare dirs", compareDetail, TRUE);
+            }
+            else
+            {
+                ExecLogFeatureResult("compare dirs", compareDetail, FALSE);
             }
             return 0;
         }
@@ -4179,6 +4226,7 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
             }
 
             AddDoubleQuotesIfNeeded(cmd, MAX_PATH); // CreateProcess requires the name with spaces in quotes (otherwise it tries various options; see help)
+            ExecLogFeatureStart("command shell", cmd);
 
             SetDefaultDirectories();
 
@@ -4206,9 +4254,11 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
 
             PROCESS_INFORMATION pi;
 
-            if (!HANDLES(CreateProcess(NULL, cmd, NULL, NULL, FALSE,
-                                       CREATE_DEFAULT_ERROR_MODE | NORMAL_PRIORITY_CLASS, NULL,
-                                       (activePanel->Is(ptDisk) || activePanel->Is(ptZIPArchive)) ? activePanel->GetPath() : NULL, &si, &pi)))
+            BOOL createProcessOk = HANDLES(CreateProcess(NULL, cmd, NULL, NULL, FALSE,
+                                                         CREATE_DEFAULT_ERROR_MODE | NORMAL_PRIORITY_CLASS, NULL,
+                                                         (activePanel->Is(ptDisk) || activePanel->Is(ptZIPArchive)) ? activePanel->GetPath() : NULL, &si, &pi));
+            ExecLogFeatureResult("command shell", cmd, createProcessOk);
+            if (!createProcessOk)
             {
                 DWORD err = GetLastError();
                 SalMessageBox(HWindow, GetErrorText(err),
@@ -4225,6 +4275,7 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
 
         case CM_FILELIST:
         {
+            ExecLogFeatureStart("file list", activePanel->GetPath());
             activePanel->UserWorkedOnThisPath = TRUE;
             activePanel->StoreSelection(); // save selection for Restore Selection command
             MakeFileList();
@@ -4233,6 +4284,7 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
 
         case CM_OPENACTUALFOLDER:
         {
+            ExecLogFeatureStart("open active folder", activePanel->GetPath());
             activePanel->OpenActiveFolder();
             return 0;
         }

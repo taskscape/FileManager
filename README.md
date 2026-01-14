@@ -32,6 +32,10 @@ Solution ```\src\vcxproj\salamand.sln``` may be built from within Visual Studio 
 
 Use ```\src\vcxproj\!populate_build_dir.cmd``` to populate build directory with files required to run Open Salamander.
 
+### Execution Logging
+
+The execution logging system runs only in DEBUG builds. It records major application execution paths (startup, plugin loading, directory listing, file operations, and key UI features) through the Trace system. The logs are emitted as TRACE messages, so they appear in the Trace Server when it is connected. In release builds, the logging calls are compiled out and produce no output.
+
 ### Contributing
 
 This project welcomes contributions to build and enhance Open Salamander!
