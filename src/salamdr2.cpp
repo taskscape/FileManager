@@ -3034,7 +3034,7 @@ BOOL CLanguage::Init(const char* fileName, HINSTANCE modul)
     GetModuleFileName(modul, path, MAX_PATH);
     sprintf(strrchr(path, '\\') + 1, "lang\\%s", fileName);
 
-    HINSTANCE hLib = HANDLES(LoadLibrary(path));
+    HINSTANCE hLib = HANDLES(LoadLibraryUtf8(path));
     if (hLib != NULL)
     {
         WORD langID;

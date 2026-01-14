@@ -595,6 +595,7 @@ public:
     BOOL TlsFree(DWORD dwTlsIndex);
 
     HINSTANCE LoadLibrary(LPCTSTR lpLibFileName);
+    HINSTANCE LoadLibraryUtf8(LPCSTR lpLibFileName);
 
     HINSTANCE LoadLibraryEx(LPCTSTR lpLibFileName, HANDLE hFile, DWORD dwFlags);
 

@@ -300,7 +300,7 @@ char* NumberToStr(char* buffer, const __int64 number)
 {
     char ThousandsSeparator[5];
     int ThousandsSeparatorLen;
-    if ((ThousandsSeparatorLen = GetLocaleInfo(LOCALE_USER_DEFAULT, LOCALE_STHOUSAND, ThousandsSeparator, 5)) == 0 ||
+    if ((ThousandsSeparatorLen = GetLocaleInfoA(LOCALE_USER_DEFAULT, LOCALE_STHOUSAND, ThousandsSeparator, 5)) == 0 ||
         ThousandsSeparatorLen > 5)
     {
         ThousandsSeparator[0] = ' ';

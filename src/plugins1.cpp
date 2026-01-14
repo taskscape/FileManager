@@ -1733,7 +1733,7 @@ CSalamanderPluginEntry::LoadLanguageModule(HWND parent, const char* pluginName)
 
     // first try to load the SLG of the language Salamander is currently running in
     lstrcpyn(slgName, Configuration.LoadedSLGName, slgNameBufSize);
-    lang = HANDLES_Q(LoadLibrary(path));
+    lang = HANDLES_Q(LoadLibraryUtf8(path));
     WORD languageID = 0;
     if (lang == NULL || !IsSLGFileValid(Plugin->GetPluginDLL(), lang, languageID, NULL))
     { // the SLG doesn't exist or isn't the expected one (completely different file or at least another version)
@@ -1760,7 +1760,7 @@ CSalamanderPluginEntry::LoadLanguageModule(HWND parent, const char* pluginName)
         else // try to load the .slg chosen during the previous plugin load
         {
             lstrcpyn(slgName, Plugin->LastSLGName, slgNameBufSize);
-            lang = HANDLES_Q(LoadLibrary(path));
+            lang = HANDLES_Q(LoadLibraryUtf8(path));
             if (lang == NULL || !IsSLGFileValid(Plugin->GetPluginDLL(), lang, languageID, NULL))
             { // the SLG doesn't exist or isn't the expected one (completely different file or at least another version)
                 if (lang != NULL)
@@ -1809,7 +1809,7 @@ CSalamanderPluginEntry::LoadLanguageModule(HWND parent, const char* pluginName)
                     }
                 }
                 lstrcpyn(slgName, selSLGName, slgNameBufSize);
-                lang = HANDLES_Q(LoadLibrary(path));
+                lang = HANDLES_Q(LoadLibraryUtf8(path));
                 if (lang == NULL || !IsSLGFileValid(Plugin->GetPluginDLL(), lang, languageID, NULL))
                 { // shouldn't theoretically happen (dialog verifies the validity of the .SLG module)
                     if (lang != NULL)
@@ -2178,7 +2178,7 @@ BOOL CPluginData::InitDLL(HWND parent, BOOL quiet, BOOL waitCursor, BOOL showUns
         HCURSOR oldCur;
         if (waitCursor)
             oldCur = SetCursor(LoadCursor(NULL, IDC_WAIT));
-        DLL = HANDLES(LoadLibrary(s));
+        DLL = HANDLES(LoadLibraryUtf8(s));
         if (waitCursor)
             SetCursor(oldCur);
         if (DLL == NULL) // error

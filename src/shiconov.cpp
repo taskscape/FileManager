@@ -51,7 +51,7 @@ CSQLite3DynLoad::CSQLite3DynLoad()
     char sqlitePath[MAX_PATH];
     if (GetSQLitePath(sqlitePath, MAX_PATH))
     {
-        SQLite3DLL = HANDLES(LoadLibrary(sqlitePath));
+        SQLite3DLL = HANDLES(LoadLibraryUtf8(sqlitePath));
         if (SQLite3DLL != NULL)
         {
             open_v2 = (FT_sqlite3_open_v2)GetProcAddress(SQLite3DLL, "sqlite3_open_v2");

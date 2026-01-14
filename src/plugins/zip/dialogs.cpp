@@ -284,7 +284,7 @@ BOOL CPackDialog::OnInit(WPARAM wParam, LPARAM lParam)
     SubClassStatic(IDC_ARCHIVE, true);
     SubClassComboBox(IDC_VOLSIZE, true);
 
-    if ((DecimalSeparatorLen = GetLocaleInfo(LOCALE_USER_DEFAULT, LOCALE_SDECIMAL, DecimalSeparator, 5)) == 0 ||
+    if ((DecimalSeparatorLen = GetLocaleInfoA(LOCALE_USER_DEFAULT, LOCALE_SDECIMAL, DecimalSeparator, 5)) == 0 ||
         DecimalSeparatorLen > 5)
     {
         strcpy(DecimalSeparator, ".");

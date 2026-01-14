@@ -2207,6 +2207,24 @@ C__Handles::LoadLibrary(LPCTSTR lpLibFileName)
 }
 
 HINSTANCE
+C__Handles::LoadLibraryUtf8(LPCSTR lpLibFileName)
+{
+    HINSTANCE ret = NULL;
+    WCHAR* fileNameW = Utf8AllocWideHandles(lpLibFileName);
+    if (fileNameW == NULL)
+    {
+        SetLastError(ERROR_NO_UNICODE_TRANSLATION);
+    }
+    else
+    {
+        ret = ::LoadLibraryW(fileNameW);
+        free(fileNameW);
+    }
+    CheckCreate(ret != NULL, __htLibrary, __hoLoadLibrary, ret, GetLastError(), TRUE, lpLibFileName);
+    return ret;
+}
+
+HINSTANCE
 C__Handles::LoadLibraryEx(LPCTSTR lpLibFileName, HANDLE hFile, DWORD dwFlags)
 {
     HINSTANCE ret = ::LoadLibraryEx(lpLibFileName, hFile, dwFlags);

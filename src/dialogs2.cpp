@@ -793,7 +793,7 @@ int CLanguageSelectorDialog::Execute()
         char path[MAX_PATH];
         GetModuleFileName(HInstance, path, MAX_PATH);
         sprintf(strrchr(path, '\\') + 1, "lang\\%s", Items[index].FileName);
-        hTmpLanguage = HANDLES(LoadLibrary(path));
+        hTmpLanguage = HANDLES(LoadLibraryUtf8(path));
         if (hTmpLanguage != NULL)
             Modul = hTmpLanguage;
     }

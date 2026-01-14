@@ -3810,7 +3810,7 @@ FIND_NEW_SLG_FILE:
     char errorText[MAX_PATH + 200];
     GetModuleFileName(NULL, path, MAX_PATH);
     sprintf(strrchr(path, '\\') + 1, "lang\\%s", Configuration.SLGName);
-    HLanguage = HANDLES(LoadLibrary(path));
+    HLanguage = HANDLES(LoadLibraryUtf8(path));
     LanguageID = 0;
     if (HLanguage == NULL || !IsSLGFileValid(HInstance, HLanguage, LanguageID, IsSLGIncomplete))
     {
