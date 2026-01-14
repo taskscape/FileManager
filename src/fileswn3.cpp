@@ -33,8 +33,73 @@ int DeltaForTotalCount(int total)
     return delta;
 }
 
+// Debug logging helper
+static void DebugLogToFile(const char* message)
+{
+    static HANDLE hDebugFile = INVALID_HANDLE_VALUE;
+    static CRITICAL_SECTION cs;
+    static BOOL csInitialized = FALSE;
+
+    // Always output to debugger
+    OutputDebugStringA("[SALAMANDER] ");
+    OutputDebugStringA(message);
+    OutputDebugStringA("\n");
+
+    if (!csInitialized)
+    {
+        InitializeCriticalSection(&cs);
+        csInitialized = TRUE;
+    }
+
+    EnterCriticalSection(&cs);
+
+    if (hDebugFile == INVALID_HANDLE_VALUE)
+    {
+        char tempPath[MAX_PATH * 2];
+        DWORD len = GetTempPathA(MAX_PATH, tempPath);
+        if (len > 0 && len < MAX_PATH)
+        {
+            if (tempPath[len - 1] != '\\')
+                strcat_s(tempPath, sizeof(tempPath), "\\");
+            strcat_s(tempPath, sizeof(tempPath), "salamander_debug.log");
+            hDebugFile = CreateFileA(tempPath, GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+
+            if (hDebugFile != INVALID_HANDLE_VALUE)
+            {
+                char initMsg[512];
+                sprintf(initMsg, "Debug log created at: %s\r\n", tempPath);
+                DWORD written;
+                WriteFile(hDebugFile, initMsg, (DWORD)strlen(initMsg), &written, NULL);
+                FlushFileBuffers(hDebugFile);
+            }
+        }
+    }
+
+    if (hDebugFile != INVALID_HANDLE_VALUE)
+    {
+        DWORD written;
+        DWORD len = (DWORD)strlen(message);
+        WriteFile(hDebugFile, message, len, &written, NULL);
+        WriteFile(hDebugFile, "\r\n", 2, &written, NULL);
+        FlushFileBuffers(hDebugFile);
+    }
+
+    LeaveCriticalSection(&cs);
+}
+
+static void DebugLogWideString(const char* prefix, const WCHAR* wstr)
+{
+    char buffer[2048];
+    sprintf(buffer, "%s", prefix);
+    int len = (int)strlen(buffer);
+    WideCharToMultiByte(CP_UTF8, 0, wstr, -1, buffer + len, sizeof(buffer) - len - 1, NULL, NULL);
+    DebugLogToFile(buffer);
+}
+
 static BOOL ConvertFindDataWToA(const WIN32_FIND_DATAW& src, WIN32_FIND_DATAA& dst)
 {
+    DebugLogWideString("ConvertFindDataWToA: Processing file: ", src.cFileName);
+
     ZeroMemory(&dst, sizeof(dst));
     dst.dwFileAttributes = src.dwFileAttributes;
     dst.ftCreationTime = src.ftCreationTime;
@@ -44,10 +109,20 @@ static BOOL ConvertFindDataWToA(const WIN32_FIND_DATAW& src, WIN32_FIND_DATAA& d
     dst.nFileSizeLow = src.nFileSizeLow;
     dst.dwReserved0 = src.dwReserved0;
     dst.dwReserved1 = src.dwReserved1;
+
     if (ConvertWideToUtf8(src.cFileName, -1, dst.cFileName, _countof(dst.cFileName)) == 0)
+    {
+        DebugLogWideString("ConvertFindDataWToA: FAILED to convert filename: ", src.cFileName);
         return FALSE;
+    }
+
     if (ConvertWideToUtf8(src.cAlternateFileName, -1, dst.cAlternateFileName, _countof(dst.cAlternateFileName)) == 0)
         dst.cAlternateFileName[0] = 0;
+
+    char buffer[512];
+    sprintf(buffer, "ConvertFindDataWToA: SUCCESS - Converted to: %s", dst.cFileName);
+    DebugLogToFile(buffer);
+
     return TRUE;
 }
 
@@ -107,6 +182,15 @@ BOOL IsFilePlaceholder(WIN32_FIND_DATA const* findData)
 BOOL CFilesWindow::ReadDirectory(HWND parent, BOOL isRefresh)
 {
     CALL_STACK_MESSAGE1("CFilesWindow::ReadDirectory()");
+
+    // Test logging immediately
+    DebugLogToFile("========================================");
+    DebugLogToFile("ReadDirectory() CALLED!");
+    DebugLogToFile("========================================");
+
+    char dbgMsg[1024];
+    sprintf(dbgMsg, "ReadDirectory() START: path = %s", GetPath());
+    DebugLogToFile(dbgMsg);
 
     //  TRACE_I("ReadDirectory: begin");
 
@@ -346,8 +430,17 @@ BOOL CFilesWindow::ReadDirectory(HWND parent, BOOL isRefresh)
         WIN32_FIND_DATAW fileDataW;
         WIN32_FIND_DATAA fileData;
         HANDLE search;
+
+        char logMsg[1024];
+        sprintf(logMsg, "Calling FindFirstFileW for: %s", fileName);
+        DebugLogToFile(logMsg);
+
         CStrP fileNameW(ConvertAllocUtf8ToWide(fileName, -1));
         search = fileNameW != NULL ? HANDLES_Q(FindFirstFileW(fileNameW, &fileDataW)) : INVALID_HANDLE_VALUE;
+
+        sprintf(logMsg, "FindFirstFileW returned search handle: 0x%p", search);
+        DebugLogToFile(logMsg);
+
         if (search == INVALID_HANDLE_VALUE)
         {
             DWORD err = GetLastError();
@@ -454,6 +547,10 @@ BOOL CFilesWindow::ReadDirectory(HWND parent, BOOL isRefresh)
             {
                 NumberOfItemsInCurDir++;
 
+                char logBuf[512];
+                sprintf(logBuf, "=== Loop START: Processing item #%d, file: %s ===", NumberOfItemsInCurDir, fileData.cFileName);
+                DebugLogToFile(logBuf);
+
                 // test ESC - doesn't user want to interrupt reading?
                 if (GetTickCount() - lastEscCheckTime >= 200) // 5 times per second
                 {
@@ -507,7 +604,7 @@ BOOL CFilesWindow::ReadDirectory(HWND parent, BOOL isRefresh)
                       CQuadWord(fileData.ftLastWriteTime.dwLowDateTime, // date on ".." is older or equal to 1.1.1980, we better read it later "properly"
                                 fileData.ftLastWriteTime.dwHighDateTime) <= CQuadWord(2148603904, 27846551)) &&
                      isUpDir))
-                    continue;
+                    goto SKIP_TO_NEXT_FILE;
 
                 if (Configuration.NotHiddenSystemFiles &&
                     !IsFilePlaceholder(&fileData) && // placeholder is hidden, but Explorer shows it normally, so we will show it normally too
@@ -519,7 +616,7 @@ BOOL CFilesWindow::ReadDirectory(HWND parent, BOOL isRefresh)
                     else
                         HiddenFilesCount++;
                     HiddenDirsFilesReason |= HIDDEN_REASON_ATTRIBUTE;
-                    continue;
+                    goto SKIP_TO_NEXT_FILE;
                 }
                 //--- applying filter to files
                 if (FilterEnabled && !isDir)
@@ -535,7 +632,7 @@ BOOL CFilesWindow::ReadDirectory(HWND parent, BOOL isRefresh)
                     {
                         HiddenFilesCount++;
                         HiddenDirsFilesReason |= HIDDEN_REASON_FILTER;
-                        continue;
+                        goto SKIP_TO_NEXT_FILE;
                     }
                 }
 
@@ -547,7 +644,7 @@ BOOL CFilesWindow::ReadDirectory(HWND parent, BOOL isRefresh)
                     else
                         HiddenFilesCount++;
                     HiddenDirsFilesReason |= HIDDEN_REASON_HIDECMD;
-                    continue;
+                    goto SKIP_TO_NEXT_FILE;
                 }
 
             ADD_ITEM: // to add ".."
@@ -820,7 +917,7 @@ BOOL CFilesWindow::ReadDirectory(HWND parent, BOOL isRefresh)
                                 PeekMessage(&msg2, HWindow, WM_USER_UPDATEPANEL, WM_USER_UPDATEPANEL, PM_REMOVE);
 
                                 if (cont)
-                                    continue;
+                                    goto SKIP_TO_NEXT_FILE;
                             }
 
                             foundThumbLoaderPlugins.Add(p);
@@ -902,20 +999,43 @@ BOOL CFilesWindow::ReadDirectory(HWND parent, BOOL isRefresh)
                             free(iconData.NameAndData);
                     }
                 }
+            SKIP_TO_NEXT_FILE:
                 if (search == NULL)
                 {
+                    DebugLogToFile("Loop: search == NULL, breaking (second pass)");
                     testFindNextErr = FALSE;
 #ifndef _WIN64
                     isWin64RedirectedDir = FALSE;
 #endif                     // _WIN64
                     break; // the second pass (adding ".." or win64 redirected-dir)
                 }
-                hasNext = FindNextFileW(search, &fileDataW) != 0;
-                if (hasNext)
+
+                char dbgBuf[512];
+                sprintf(dbgBuf, "Loop: Calling FindNextFileW (iteration %d)", NumberOfItemsInCurDir);
+                DebugLogToFile(dbgBuf);
+
+                do
                 {
-                    if (!ConvertFindDataWToA(fileDataW, fileData))
-                        continue;
-                }
+                    hasNext = FindNextFileW(search, &fileDataW) != 0;
+                    sprintf(dbgBuf, "Loop: FindNextFileW returned %d, hasNext = %d", hasNext, hasNext);
+                    DebugLogToFile(dbgBuf);
+
+                    if (hasNext && ConvertFindDataWToA(fileDataW, fileData))
+                    {
+                        DebugLogToFile("Loop: Conversion succeeded, breaking inner loop to process file");
+                        break;
+                    }
+
+                    if (hasNext)
+                        DebugLogToFile("Loop: Conversion failed, continuing inner loop to get next file");
+                    else
+                        DebugLogToFile("Loop: No more files, exiting inner loop");
+
+                } while (hasNext);
+
+                sprintf(dbgBuf, "Loop: After inner loop, hasNext = %d, continuing outer loop", hasNext);
+                DebugLogToFile(dbgBuf);
+
             } while (hasNext);
             DWORD err = GetLastError();
 
