@@ -1,4 +1,4 @@
-﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2023 Open Salamander Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "precomp.h"
@@ -877,28 +877,36 @@ void InitLocales()
         IsAlpha[i] = IsCharAlpha((char)i);
     }
 
-    if ((DecimalSeparatorLen = GetLocaleInfoA(LOCALE_USER_DEFAULT, LOCALE_SDECIMAL, DecimalSeparator, 5)) == 0 ||
-        DecimalSeparatorLen > 5)
+    WCHAR decimalSeparatorW[5];
+    int decimalSeparatorUtf8Len = 0;
+    int decimalSeparatorWLen = GetLocaleInfoW(LOCALE_USER_DEFAULT, LOCALE_SDECIMAL, decimalSeparatorW, _countof(decimalSeparatorW));
+    if (decimalSeparatorWLen > 0 && decimalSeparatorWLen <= (int)_countof(decimalSeparatorW))
+        decimalSeparatorUtf8Len = ConvertWideToUtf8(decimalSeparatorW, -1, DecimalSeparator, _countof(DecimalSeparator));
+    if (decimalSeparatorUtf8Len == 0 || decimalSeparatorUtf8Len > (int)_countof(DecimalSeparator))
     {
         strcpy(DecimalSeparator, ".");
         DecimalSeparatorLen = 1;
     }
     else
     {
-        DecimalSeparatorLen--;
-        DecimalSeparator[DecimalSeparatorLen] = 0; // posychrujeme nulu na konci
+        DecimalSeparatorLen = decimalSeparatorUtf8Len - 1;
+        DecimalSeparator[DecimalSeparatorLen] = 0; // keep the terminator in place
     }
 
-    if ((ThousandsSeparatorLen = GetLocaleInfoA(LOCALE_USER_DEFAULT, LOCALE_STHOUSAND, ThousandsSeparator, 5)) == 0 ||
-        ThousandsSeparatorLen > 5)
+    WCHAR thousandsSeparatorW[5];
+    int thousandsSeparatorUtf8Len = 0;
+    int thousandsSeparatorWLen = GetLocaleInfoW(LOCALE_USER_DEFAULT, LOCALE_STHOUSAND, thousandsSeparatorW, _countof(thousandsSeparatorW));
+    if (thousandsSeparatorWLen > 0 && thousandsSeparatorWLen <= (int)_countof(thousandsSeparatorW))
+        thousandsSeparatorUtf8Len = ConvertWideToUtf8(thousandsSeparatorW, -1, ThousandsSeparator, _countof(ThousandsSeparator));
+    if (thousandsSeparatorUtf8Len == 0 || thousandsSeparatorUtf8Len > (int)_countof(ThousandsSeparator))
     {
         strcpy(ThousandsSeparator, " ");
         ThousandsSeparatorLen = 1;
     }
     else
     {
-        ThousandsSeparatorLen--;
-        ThousandsSeparator[ThousandsSeparatorLen] = 0; // posychrujeme nulu na konci
+        ThousandsSeparatorLen = thousandsSeparatorUtf8Len - 1;
+        ThousandsSeparator[ThousandsSeparatorLen] = 0; // keep the terminator in place
     }
 }
 

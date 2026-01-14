@@ -16,11 +16,24 @@ static BOOL ExtTextOutUtf8(HDC hdc, int x, int y, UINT options, const RECT* lprc
 {
     if (text == NULL || len == 0)
         return ExtTextOutW(hdc, x, y, options, lprc, L"", 0, NULL);
-    CStrP textW(ConvertAllocUtf8ToWide(text, -1));
+    CStrP textW(ConvertAllocUtf8ToWide(text, (int)len));
     if (textW == NULL)
         return ExtTextOutW(hdc, x, y, options, lprc, L"?", 1, NULL);
     int wlen = lstrlenW(textW);
     return ExtTextOutW(hdc, x, y, options, lprc, textW, wlen, NULL);
+}
+
+static BOOL GetTextExtentPoint32Utf8(HDC hdc, const char* text, int len, SIZE* size)
+{
+    size->cx = 0;
+    size->cy = 0;
+    if (text == NULL || len <= 0)
+        return TRUE;
+    CStrP textW(ConvertAllocUtf8ToWide(text, len));
+    if (textW == NULL)
+        return GetTextExtentPoint32(hdc, text, len, size);
+    int wlen = lstrlenW(textW);
+    return GetTextExtentPoint32W(hdc, textW, wlen, size);
 }
 
 //****************************************************************************
@@ -895,6 +908,8 @@ void CFilesWindow::DrawBriefDetailedItem(HDC hTgtDC, int itemIndex, RECT* itemRe
                             {
                                 if (column->LeftAlignment == 0)
                                 {
+                                    if (!GetTextExtentPoint32Utf8(hDC, TransferBuffer, TransferLen, &textSize))
+                                        textSize.cx = 0;
                                     deltaX = r.right - r.left - SPACE_WIDTH / 2 - textSize.cx;
                                     if (deltaX < SPACE_WIDTH / 2)
                                         deltaX = SPACE_WIDTH / 2;
@@ -910,7 +925,8 @@ void CFilesWindow::DrawBriefDetailedItem(HDC hTgtDC, int itemIndex, RECT* itemRe
                             if (column->LeftAlignment == 0)
                             {
                                 // if the column is right-aligned, measure the text width
-                                GetTextExtentPoint32(hDC, TransferBuffer, TransferLen, &textSize);
+                            if (!GetTextExtentPoint32Utf8(hDC, TransferBuffer, TransferLen, &textSize))
+                                textSize.cx = 0;
                                 deltaX = r.right - r.left - SPACE_WIDTH / 2 - textSize.cx;
                                 if (deltaX < SPACE_WIDTH / 2)
                                     deltaX = SPACE_WIDTH / 2;
