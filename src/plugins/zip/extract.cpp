@@ -1316,7 +1316,7 @@ int CZipUnpack::ExtractSingleFile(char* targetDir, int targetDirLen,
                                 {
                                     if (aesExtraField.VendorID != AES_NONVENDOR_ID ||
                                         ((AES_VERSION_1 != aesExtraField.Version) && (AES_VERSION_2 != aesExtraField.Version)))
-                                        TRACE_E("POZOR: soubor '" << FileNameDisp << "' je zakryptovan neznamou verzi AES, mozne komplikace");
+                                        TRACE_E("WARNING: file '" << FileNameDisp << "' is encrypted with unknown AES version, possible complications");
 
                                     char pwd[MAX_PASSWORD];
                                     unsigned char salt[SAL_AES_MAX_SALT_LENGTH];

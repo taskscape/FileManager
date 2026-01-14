@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 // ****************************************************************************
-// Boyer-Mooruv algoritmus hledani podretezce
+// Boyer-Moore algorithm for substring search
 // ****************************************************************************
 
 #pragma once

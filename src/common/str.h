@@ -6,21 +6,21 @@
 //*****************************************************************************
 //
 // 20.1.2003
-// Poznamka k optimalizacim prevodem do ASM: optimalizace se projevi predevsim
-// u porovnani shodnych retezcu, tedy da-li se funkcim prilezitost k prohledavat
-// retezce cele. Navic je optimalizace znatelnejsi na starsich procesorech, kde
-// ASM varianty dokazou pracovat 8x rychleji (stara pentia).
+// Note on optimizations by conversion to ASM: optimizations show primarily
+// in comparison of identical strings, i.e. when functions are given opportunity to search
+// entire strings. Additionally, optimization is more noticeable on older processors, where
+// ASM variants can work 8x faster (old Pentium).
 //
-// Moderni procesory (AMD Athlon, Pentium Pro) dokazou optimalizovanou C++
-// variantu vykonat temer stejne rychle jako jeji ASM variantu. Protoze ale
-// zatim nejsou optimalizovane C++ varianty rychlejsi a ASM je mnohem rychlejsi
-// nez debug C++ varianta, pouzivame ASM varianty.
+// Modern processors (AMD Athlon, Pentium Pro) can execute optimized C++
+// variant almost as fast as its ASM variant. However, since
+// optimized C++ variants are not yet faster and ASM is much faster
+// than debug C++ variant, we use ASM variants.
 //
-// Funkce StrNICmp v C++ na Pentiu Pro beha rychleji nez v ASM varianta.
+// StrNICmp function in C++ on Pentium Pro runs faster than in ASM variant.
 //
 
-extern BYTE LowerCase[256]; // premapovani vsech znaku na male; generovano pomoci API CharLower
-extern BYTE UpperCase[256]; // premapovani vsech znaku na velke; generovano pomoci API CharUpper
+extern BYTE LowerCase[256]; // remapping of all characters to lowercase; generated using CharLower API
+extern BYTE UpperCase[256]; // remapping of all characters to uppercase; generated using CharUpper API
 
 //*****************************************************************************
 //

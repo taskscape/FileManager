@@ -3,18 +3,18 @@
 
 #pragma once
 
-// Pridat do DEBUG verze projektu makro _CRTDBG_MAP_ALLOC, jinak se neukazuje zdroj leaku.
+// Add _CRTDBG_MAP_ALLOC macro to DEBUG version of project, otherwise leak source is not shown.
 
 #if defined(_DEBUG) && !defined(HEAP_DISABLE)
 
-#define GCHEAP_MAX_USED_MODULES 100 // kolik nejvic modulu se ma pamatovat pro load pred vypisem leaku
+#define GCHEAP_MAX_USED_MODULES 100 // how many modules at most should be remembered for load before leak output
 
-// vola se pro moduly, ve kterych se muzou hlasit memory leaky, pokud se memory leaky detekuji,
-// dojde k loadu "as image" (bez initu modulu) vsech takto registrovanych modulu (pri kontrole
-// memory leaku uz jsou tyto moduly unloadle), a pak teprve k vypisu memory leaku = jsou videt
-// jmena .cpp modulu misto "#File Error#" hlasek, zaroven MSVC neotravuje s hromadou generovanych
-// exceptionu (jmena modulu jsou dostupna)
-// mozne volat z libovolneho threadu
+// called for modules where memory leaks may be reported, if memory leaks are detected,
+// "as image" load occurs (without module init) of all such registered modules (during
+// memory leak check these modules are already unloaded), and only then memory leak output = visible
+// .cpp module names instead of "#File Error#" messages, also MSVC doesn't bother with a bunch of generated
+// exceptions (module names are available)
+// can be called from any thread
 void AddModuleWithPossibleMemoryLeaks(const TCHAR* fileName);
 
 #endif // defined(_DEBUG) && !defined(HEAP_DISABLE)

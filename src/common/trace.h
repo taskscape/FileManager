@@ -3,43 +3,43 @@
 
 #pragma once
 
-// makro TRACE_ENABLE - zapoji vypis hlasek na server
-// makro MULTITHREADED_TRACE_ENABLE - zapoji premapovavani TID na UTID
-// makro TRACE_TO_FILE - zapoji vypis hlasek do souboru v TEMPu (vyzaduje definici TRACE_ENABLE)
-// makro TRACE_IGNORE_AUTOCLEAR - zakaze Trace Serveru pri pripojeni tohoto procesu smazat vsechny zpravy,
-//                                i kdyz to ma zaple v nastaveni (hodi se pro utilitky spoustene za behu
-//                                hlavniho programu, u kterych je mazani zprav nezadouci)
-// makro __TRACESERVER - includeno z trace-serveru
+// TRACE_ENABLE macro - connects message output to server
+// MULTITHREADED_TRACE_ENABLE macro - connects remapping of TID to UTID
+// TRACE_TO_FILE macro - connects message output to file in TEMP (requires TRACE_ENABLE definition)
+// TRACE_IGNORE_AUTOCLEAR macro - prevents Trace Server from deleting all messages when this process connects,
+//                                even if it has it enabled in settings (useful for utilities run during
+//                                main program execution, where message deletion is undesirable)
+// __TRACESERVER macro - included from trace-server
 
-// modul TRACE je pripraven na multi-threadove aplikace
+// TRACE module is prepared for multi-threaded applications
 
-// POZOR: TRACE_C se nesmi pouzivat v DllMain knihoven, ani v zadnem kodu, ktery
-//        se z DllMainu vola, jinak dojde k deadlocku, vice viz implementace
-//        C__Trace::SendMessageToServer
+// WARNING: TRACE_C must not be used in DllMain of libraries, nor in any code that
+//          is called from DllMain, otherwise a deadlock will occur, see implementation
+//          C__Trace::SendMessageToServer for details
 
 #if defined(__TRACESERVER) || defined(TRACE_ENABLE)
 
 enum C__MessageType
 {
-    // druh message
+    // message type
     __mtInformation,
     __mtError,
 
-    // nastaveni nazvu procesu / threadu
+    // setting process / thread name
     __mtSetProcessName,
     __mtSetThreadName,
 
-    // druh message - unicodove varianty zprav
+    // message type - unicode message variants
     __mtInformationW,
     __mtErrorW,
 
-    // nastaveni nazvu procesu / threadu - unicodove varianty zprav
+    // setting process / thread name - unicode message variants
     __mtSetProcessNameW,
     __mtSetThreadNameW,
 
-    // zakazeme Trace Serveru pri pripojeni tohoto procesu smazat vsechny zpravy, i kdyz to ma
-    // zaple v nastaveni (hodi se pro utilitky spoustene za behu hlavniho programu, u kterych je
-    // mazani zprav nezadouci)
+    // prevent Trace Server from deleting all messages when this process connects, even if it has
+    // it enabled in settings (useful for utilities run during main program execution, where
+    // message deletion is undesirable)
     __mtIgnoreAutoClear,
 };
 

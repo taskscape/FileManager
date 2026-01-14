@@ -167,7 +167,7 @@ public:
     CEOCentrDirRecordEx EOCentrDir; //end of central directory record
     QWORD CentrDirSize;
     QWORD CentrDirOffs;
-    int CentrDirStartDisk; //jen pro list a extract
+    int CentrDirStartDisk; // only for list and extract
                            // number of the disk with the start of the central directory
     bool Zip64;
     QWORD ExtraBytes;
@@ -251,12 +251,12 @@ public:
 #else  //SSZIP
     int ChangeDisk()
     {
-        TRACE_E("ChangeDisk() - dummy, tato funkce by nemnela byt nikdy volana");
+        TRACE_E("ChangeDisk() - dummy, this function should never be called");
         return -1;
     }
     void FindLastFile(char* lastFile)
     {
-        TRACE_E("FindLastFile() - dummy, tato funkce by nemnela byt nikdy volana");
+        TRACE_E("FindLastFile() - dummy, this function should never be called");
         *lastFile = 0;
     }
 #endif //SSZIP

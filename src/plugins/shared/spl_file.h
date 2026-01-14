@@ -1,5 +1,6 @@
 ﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
+// CommentsTranslationProject: TRANSLATED
 
 //****************************************************************************
 //
@@ -12,7 +13,7 @@
 #pragma once
 
 #ifdef _MSC_VER
-#pragma pack(push, enter_include_spl_file) // aby byly struktury nezavisle na nastavenem zarovnavani
+#pragma pack(push, enter_include_spl_file) // so that structures are independent of the set alignment
 #pragma pack(4)
 #endif // _MSC_VER
 #ifdef __BORLANDC__
@@ -23,85 +24,85 @@
 //
 // CSalamanderSafeFileAbstract
 //
-// Rodina metod SafeFile slouzi pro osetrenou praci se soubory. Metody kontroluji
-// chybove stavy API volani a zobrazuji odpovidajici chybove hlasky. Chybove hlasky
-// mohou obsahovat ruzne kombinace tlacitek. Od OK, pres Retry/Cancel, az po
-// Retry/Skip/Skip all/Cancel. Kombinaci tlacitek urcuje volajici funkce jednim
-// z parametru.
+// The SafeFile family of methods is used for protected file operations. The methods check
+// error states of API calls and display corresponding error messages. Error messages
+// can contain various combinations of buttons. From OK, through Retry/Cancel, up to
+// Retry/Skip/Skip all/Cancel. The button combination is determined by the calling function
+// with one of the parameters.
 //
-// Metody behem reseni problemovych stavu potrebuji znat nazev souboru, aby mohly
-// zobrazit solidni chybovou hlasku. Zaroven potrebuji znat parametry oteviraneho
-// souboru (jako je dwDesiredAccess, dwShareMode, atd), aby v pripade chyby mohly
-// zavrit handle a znovu jej otevrit. Pokud napriklad dojde k preruseni na urovni
-// sitove vrstvy behem operace ReadFile nebo WriteFile a uzivatel odstrani pricinu
-// problemy a stiskne Retry, nelze znovu pouzit stary handle souboru. Je treba
-// stary handle zavrit, soubor znovu otevrit, nastavit ukazovatko a operaci opakovat.
-// Proto POZOR: metody SafeFileRead a SafeFileWrite pri reseni chybovych stavu mohou
-// zmenit hodnotu SAFE_FILE::HFile.
+// The methods need to know the file name during problem state resolution, so they can
+// display a solid error message. They also need to know the parameters of the opened
+// file (such as dwDesiredAccess, dwShareMode, etc.), so that in case of an error they can
+// close the handle and reopen it. If, for example, there is an interruption at the
+// network layer level during a ReadFile or WriteFile operation and the user removes the cause
+// of the problem and presses Retry, the old file handle cannot be reused. It is necessary
+// to close the old handle, reopen the file, set the pointer and repeat the operation.
+// Therefore CAUTION: the SafeFileRead and SafeFileWrite methods may change the
+// SAFE_FILE::HFile value when resolving error states.
 //
-// Z popsanych duvodu tedy nestacil klasicky HANDLE pro drzeni kontextu a nahrazuje
-// jej struktura SAFE_FILE. V pripade metody SafeFileOpen je to nezbytny parametr,
-// zatimco pro metody SafeFileCreate je tento parametr pouze [optional]. To je dano
-// potrebou zachovat kompatibilni chovani metody SafeFileCreate pro sarsi pluginy.
+// For the reasons described, a classic HANDLE was not sufficient to hold the context and is replaced
+// by the SAFE_FILE structure. In the case of the SafeFileOpen method, this is a necessary parameter,
+// while for SafeFileCreate methods this parameter is only [optional]. This is due to
+// the need to maintain compatible behavior of the SafeFileCreate method for older plugins.
 //
-// Metody podporujici tlacitka Skip all/Overwrite all maji parametr 'silentMask'.
-// Jedna se o ukazatel na bitove pole slozene SILENT_SKIP_xxx a SILENT_OVERWRITE_xxx.
-// Pokud je ukazatel ruzny od NULL, plni bitove pole dve funkce:
-// (1) vstupni: pokud je nastaven odpovidajici bit, metoda v pripade chyby nezobrazi
-//              chybove hlaseni a tise si odpovi bez interakce s uzivatelem.
-// (2) vystupni: Pokud uzivatel odpovi na dotaz v pripade chyby tlacitkem Skip all
-//               nebo Overwrite all, metoda nastavi prislusny bit v bitovem poli.
-// Toto bitové pole slouží jako kontext předávaný do jednotlivých metod. Pro jednu
-// logickou skupinu operací (například vybalování více souborů z archivu) předává
-// volající stejné bitové pole, které na začátku inicializuje na hodnotu 0.
-// Pripadne muze nektere bity v bitovem poli explicitne nastavit, aby potlacil
-// prislusne dotazy.
-// Salamander rezervuje cast bitoveho pole pro vnitrni stavy pluginu.
-// Jedna se o jednickove bity v SILENT_RESERVED_FOR_PLUGINS.
+// Methods supporting Skip all/Overwrite all buttons have a 'silentMask' parameter.
+// This is a pointer to a bit field composed of SILENT_SKIP_xxx and SILENT_OVERWRITE_xxx.
+// If the pointer is not NULL, the bit field serves two functions:
+// (1) input: if the corresponding bit is set, the method does not display
+//            an error message in case of an error and silently responds without user interaction.
+// (2) output: If the user responds to a query in case of an error with Skip all
+//             or Overwrite all button, the method sets the corresponding bit in the bit field.
+// This bit field serves as context passed to individual methods. For one
+// logical group of operations (for example, unpacking multiple files from an archive), the
+// caller passes the same bit field, which it initializes to 0 at the beginning.
+// It can also explicitly set some bits in the bit field to suppress
+// corresponding queries.
+// Salamander reserves part of the bit field for internal plugin states.
+// These are the one bits in SILENT_RESERVED_FOR_PLUGINS.
 //
-// Pokud neni u ukazatelu predavanych do metody rozhrani specifikovano jinak,
-// nesmeji mit hodnotu NULL.
+// Unless otherwise specified for pointers passed to the interface method,
+// they must not be NULL.
 //
 
 struct SAFE_FILE
 {
-    HANDLE HFile;                // handle otevreneho souboru (pozor, je pod HANDLES jadra Salamanadera)
-    char* FileName;              // nazev otevreneho souboru s plnou cestou
-    HWND HParentWnd;             // handle okna hParent z volani SafeFileOpen/SafeFileCreate; pouziva se
-                                 // pokud je hParent v nasledujich volani nastaven na HWND_STORED
-    DWORD dwDesiredAccess;       // > zaloha parametru pro API CreateFile
-    DWORD dwShareMode;           // > pro jeji pripadne opakovani volani
-    DWORD dwCreationDisposition; // > v pripade chyb behem cteni nebo zapisu
+    HANDLE HFile;                // handle of the opened file (caution, it is under Salamander core HANDLES)
+    char* FileName;              // name of the opened file with full path
+    HWND HParentWnd;             // window handle hParent from SafeFileOpen/SafeFileCreate call; used
+                                 // if hParent in subsequent calls is set to HWND_STORED
+    DWORD dwDesiredAccess;       // > backup of parameters for API CreateFile
+    DWORD dwShareMode;           // > for its possible repeated call
+    DWORD dwCreationDisposition; // > in case of errors during reading or writing
     DWORD dwFlagsAndAttributes;  // >
-    BOOL WholeFileAllocated;     // TRUE pokud fce SafeFileCreate predalokovala cely soubor
+    BOOL WholeFileAllocated;     // TRUE if SafeFileCreate function pre-allocated the entire file
 };
 
 #define HWND_STORED ((HWND) - 1)
 
-#define SAFE_FILE_CHECK_SIZE 0x00010000 // FIXME: overit, ze nekonflikti s BUTTONS_xxx
+#define SAFE_FILE_CHECK_SIZE 0x00010000 // FIXME: verify that it doesn't conflict with BUTTONS_xxx
 
-// bity masky silentMask
-// skip sekce
-#define SILENT_SKIP_FILE_NAMEUSED 0x00000001 // preskakuje soubory, ktere nelze vytvorit, protoze uz \
-                                             // existuje stejne pojmenovany adresar (old CNFRM_MASK_NAMEUSED)
-#define SILENT_SKIP_DIR_NAMEUSED 0x00000002  // preskakuje adresare, ktere nelze vytvorit, protoze uz \
-                                             // existuje stejne pojmenovany soubor (old CNFRM_MASK_NAMEUSED)
-#define SILENT_SKIP_FILE_CREATE 0x00000004   // preskakuje soubory, ktere nelze vytvorit z jineho duvodu (old CNFRM_MASK_ERRCREATEFILE)
-#define SILENT_SKIP_DIR_CREATE 0x00000008    // preskakuje adresare, ktere nelze vytvorit z jineho duvodu (old CNFRM_MASK_ERRCREATEDIR)
-#define SILENT_SKIP_FILE_EXIST 0x00000010    // preskakuje soubory, ktere uz existuji (old CNFRM_MASK_FILEOVERSKIP) \
-                                             // vylucuje se s SILENT_OVERWRITE_FILE_EXIST
-#define SILENT_SKIP_FILE_SYSHID 0x00000020   // preskakuje System/Hidden soubory, ktere uz existuji (old CNFRM_MASK_SHFILEOVERSKIP) \
-                                             // vylucuje se s SILENT_OVERWRITE_FILE_SYSHID
-#define SILENT_SKIP_FILE_READ 0x00000040     // preskakuje soubory, pri jejichz cteni doslo k chybe
-#define SILENT_SKIP_FILE_WRITE 0x00000080    // preskakuje soubory, pri jejichz zapisu doslo k chybe
-#define SILENT_SKIP_FILE_OPEN 0x00000100     // preskakuje soubory, ktere nelze otevrit
+// silentMask mask bits
+// skip section
+#define SILENT_SKIP_FILE_NAMEUSED 0x00000001 // skips files that cannot be created because \
+                                             // a directory with the same name already exists (old CNFRM_MASK_NAMEUSED)
+#define SILENT_SKIP_DIR_NAMEUSED 0x00000002  // skips directories that cannot be created because \
+                                             // a file with the same name already exists (old CNFRM_MASK_NAMEUSED)
+#define SILENT_SKIP_FILE_CREATE 0x00000004   // skips files that cannot be created for another reason (old CNFRM_MASK_ERRCREATEFILE)
+#define SILENT_SKIP_DIR_CREATE 0x00000008    // skips directories that cannot be created for another reason (old CNFRM_MASK_ERRCREATEDIR)
+#define SILENT_SKIP_FILE_EXIST 0x00000010    // skips files that already exist (old CNFRM_MASK_FILEOVERSKIP) \
+                                             // mutually exclusive with SILENT_OVERWRITE_FILE_EXIST
+#define SILENT_SKIP_FILE_SYSHID 0x00000020   // skips System/Hidden files that already exist (old CNFRM_MASK_SHFILEOVERSKIP) \
+                                             // mutually exclusive with SILENT_OVERWRITE_FILE_SYSHID
+#define SILENT_SKIP_FILE_READ 0x00000040     // skips files whose reading resulted in an error
+#define SILENT_SKIP_FILE_WRITE 0x00000080    // skips files whose writing resulted in an error
+#define SILENT_SKIP_FILE_OPEN 0x00000100     // skips files that cannot be opened
 
-// overwrite sekce
-#define SILENT_OVERWRITE_FILE_EXIST 0x00001000  // prepisuje soubory, ktere uz existuji (old CNFRM_MASK_FILEOVERYES) \
-                                                // vylucuje se s SILENT_SKIP_FILE_EXIST
-#define SILENT_OVERWRITE_FILE_SYSHID 0x00002000 // prepisuje System/Hidden soubory, ktere uz existuji (old CNFRM_MASK_SHFILEOVERYES) \
-                                                // vylucuje se s SILENT_SKIP_FILE_SYSHID
-#define SILENT_RESERVED_FOR_PLUGINS 0xFFFF0000  // tento prostor maji pluginy k dispozici pro vlastni flagy
+// overwrite section
+#define SILENT_OVERWRITE_FILE_EXIST 0x00001000  // overwrites files that already exist (old CNFRM_MASK_FILEOVERYES) \
+                                                // mutually exclusive with SILENT_SKIP_FILE_EXIST
+#define SILENT_OVERWRITE_FILE_SYSHID 0x00002000 // overwrites System/Hidden files that already exist (old CNFRM_MASK_SHFILEOVERYES) \
+                                                // mutually exclusive with SILENT_SKIP_FILE_SYSHID
+#define SILENT_RESERVED_FOR_PLUGINS 0xFFFF0000  // this space is available to plugins for their own flags
 
 class CSalamanderSafeFileAbstract
 {

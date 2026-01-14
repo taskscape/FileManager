@@ -408,7 +408,7 @@ RETRY:
                                 // of the last system call - if it's a network, it takes a few seconds
                                 // therefore it's pointless to call TerminateThread at all, thread will finish just as fast on its own
                                 //                TerminateThread(ThreadCheckPath[freeThreadIndex], exit);
-                                //                WaitForSingleObject(ThreadCheckPath[freeThreadIndex], INFINITE);  // pockame az thread skutecne skonci, nekdy mu to dost trva
+                                //                WaitForSingleObject(ThreadCheckPath[freeThreadIndex], INFINITE);  // wait for thread to actually finish, sometimes it takes a while
                                 break;
                             }
                         }
@@ -550,7 +550,7 @@ BOOL SalCheckAndRestorePath(HWND parent, const char* path, BOOL tryNet)
         {
             tryNet = FALSE;
             if (LowerCase[path[0]] >= 'a' && LowerCase[path[0]] <= 'z' &&
-                path[1] == ':') // normalni cesta (ne UNC)
+                path[1] == ':') // normal path (not UNC)
             {
                 if (CheckAndRestoreNetworkConnection(parent, path[0], pathInvalid))
                 {
@@ -558,9 +558,9 @@ BOOL SalCheckAndRestorePath(HWND parent, const char* path, BOOL tryNet)
                         ok = TRUE;
                 }
             }
-            else // pokud user vubec nema konto na pozadovane masine
+            else // if user doesn't have an account on the requested machine at all
             {
-                // provedeme test pristupnosti UNC cesty, pripadne nechame usera zalogovat
+                // test UNC path accessibility, possibly let user log in
                 if (CheckAndConnectUNCNetworkPath(parent, path, pathInvalid, FALSE))
                 {
                     if ((err = SalCheckPath(FALSE, path, ERROR_SUCCESS, TRUE, parent)) == ERROR_SUCCESS)
@@ -570,18 +570,18 @@ BOOL SalCheckAndRestorePath(HWND parent, const char* path, BOOL tryNet)
         }
         if (!ok)
         {
-            if (pathInvalid ||                                                // prerusene obnovovani spojeni nebo neuspesny pokus o obnoveni
-                err == ERROR_USER_TERMINATED ||                               // preruseni CheckPath klavesou ESC
-                SalCheckPath(TRUE, path, err, TRUE, parent) != ERROR_SUCCESS) // ostatni chyby vypiseme
+            if (pathInvalid ||                                                // interrupted connection restore or unsuccessful restore attempt
+                err == ERROR_USER_TERMINATED ||                               // CheckPath interrupted by ESC key
+                SalCheckPath(TRUE, path, err, TRUE, parent) != ERROR_SUCCESS) // report other errors
             {
                 return FALSE;
             }
         }
     }
 
-    if (tryNet) // pokud jiz jsme obnovu sitoveho spojeni nezkouseli
+    if (tryNet) // if we haven't tried network connection restore yet
     {
-        // provedeme test pristupnosti UNC cesty, pripadne nechame usera zalogovat
+        // test UNC path accessibility, possibly let user log in
         BOOL pathInvalid;
         if (CheckAndConnectUNCNetworkPath(parent, path, pathInvalid, FALSE))
         {
@@ -625,28 +625,28 @@ _CHECK_AGAIN:
         {
             tryNet = FALSE;
             if (LowerCase[path[0]] >= 'a' && LowerCase[path[0]] <= 'z' &&
-                path[1] == ':') // jde o normalni cestu (ne UNC)
+                path[1] == ':') // it's a normal path (not UNC)
             {
                 if (!donotReconnect && CheckAndRestoreNetworkConnection(parent, path[0], pathInvalid))
                     continue;
             }
-            else // pokud user vubec nema konto na pozadovane masine
+            else // if user doesn't have an account on the requested machine at all
             {
-                // provedeme test pristupnosti UNC cesty, pripadne nechame usera zalogovat
+                // test UNC path accessibility, possibly let user log in
                 if (CheckAndConnectUNCNetworkPath(parent, path, pathInvalid, donotReconnect))
                     continue;
             }
             if (pathInvalid)
-                break; // CutDirectory tomu nepomuze ...
+                break; // CutDirectory won't help...
         }
         lastErr = err;
         if (!IsDirError(err))
-            break; // CutDirectory tomu nepomuze ...
+            break; // CutDirectory won't help...
         if (!CutDirectory(path))
             break;
         cut = TRUE;
     }
-    // provedeme test pristupnosti UNC cesty, pripadne nechame usera zalogovat
+    // test UNC path accessibility, possibly let user log in
     if (tryNet && err != ERROR_USER_TERMINATED)
     {
         tryNet = FALSE;
@@ -678,7 +678,7 @@ PARSE_AGAIN:
 
     char fsName[MAX_PATH];
     char* fsUserPart;
-    if (IsPluginFSPath(path, fsName, &fsUserPart)) // FS cesta
+    if (IsPluginFSPath(path, fsName, &fsUserPart)) // FS path
     {
         int index;
         int fsNameIndex;
@@ -698,11 +698,11 @@ PARSE_AGAIN:
     else // Windows/archive cesty
     {
         int len = (int)strlen(path);
-        BOOL backslashAtEnd = (len > 0 && path[len - 1] == '\\'); // cesta konci na backslash -> nutne adresar/archiv (a ne jmeno obyc. souboru)
+        BOOL backslashAtEnd = (len > 0 && path[len - 1] == '\\'); // path ends with backslash -> necessarily directory/archive (not ordinary file name)
         BOOL mustBePath = (len == 2 && LowerCase[path[0]] >= 'a' && LowerCase[path[0]] <= 'z' &&
-                           path[1] == ':'); // cesta typu "c:" musi byt i po expanzi cesta (ne soubor)
+                           path[1] == ':'); // path type "c:" must be path after expansion (not file)
 
-        if (nextFocus != NULL && !mustBePath) // vyber pristiho fokusu - jen "jmeno" nebo "jmeno s backslashem na konci"
+        if (nextFocus != NULL && !mustBePath) // selection of next focus - just "name" or "name with backslash at end"
         {
             char* s = strchr(path, '\\');
             if (s == NULL || *(s + 1) == 0)
@@ -727,7 +727,7 @@ PARSE_AGAIN:
         {
             if (errTextID == IDS_EMPTYNAMENOTALLOWED)
             {
-                if (curPath == NULL) // neni cim nahradit prazdnou cestu (chapanou jako aktualni adresar)
+                if (curPath == NULL) // nothing to replace empty path with (understood as current directory)
                 {
                     if (error != NULL)
                         *error = SPP_EMPTYPATHNOTALLOWED;
@@ -746,8 +746,8 @@ PARSE_AGAIN:
                         *error = SPP_INCOMLETEPATH;
                     if (!curPathIsDiskOrArchive)
                     {
-                        // vracime FALSE bez hlaseni uzivateli - vyjimka umoznujici dalsi zpracovani
-                        // relativnich cest na FS
+                        // return FALSE without reporting to user - exception allowing further processing
+                        // of relative paths on FS
                         return FALSE;
                     }
                 }
@@ -762,8 +762,8 @@ PARSE_AGAIN:
         if (text == NULL)
         {
             if (curArchivePath != NULL && StrICmp(path, curArchivePath) == 0)
-            { // pomucka pro usery: operace z archivu do rootu archivu -> musi koncit na '\\', jinak pujde jen
-                // o prepis existujiciho souboru
+            { // helper for users: operation from archive to archive root -> must end with '\\', otherwise it will just
+                // overwrite existing file
                 SalPathAddBackslash(path, pathBufSize);
                 backslashAtEnd = TRUE;
             }
@@ -771,10 +771,10 @@ PARSE_AGAIN:
             char root[MAX_PATH];
             GetRootPath(root, path);
 
-            // sitove cesty nebudeme testovat, pokud jsme na ne zrovna pristupovali
+            // we won't test network paths if we just accessed them
             BOOL tryNet = !curPathIsDiskOrArchive || curPath == NULL || !HasTheSameRootPath(root, curPath);
 
-            // zkontrolujeme/pripojime root cestu, pokud pojede root cesta, zbytek cesty uz snad taky pojede
+            // check/connect root path, if root path works, rest of path should hopefully work too
             if (!SalCheckAndRestorePath(parent, root, tryNet))
             {
                 if (backslashAtEnd || mustBePath)
@@ -791,7 +791,7 @@ PARSE_AGAIN:
                 afterRoot++;
             char lastChar = 0;
 
-            // pokud je v ceste maska, odrizneme ji bez volani SalGetFileAttributes
+            // if there's a mask in the path, cut it off without calling SalGetFileAttributes
             BOOL hasMask = FALSE;
             if (end > afterRoot) // jeste neni jen root
             {
@@ -801,9 +801,9 @@ PARSE_AGAIN:
                     if (*end2 == '*' || *end2 == '?')
                         hasMask = TRUE;
                 }
-                if (hasMask) // ve jmene je maska -> orizneme
+                if (hasMask) // there's a mask in the name -> cut it off
                 {
-                    CutSpacesFromBothSides(end2 + 1); // mezery na zacatku a konci masky jsou 100% na odstrel, hrozi jen neplecha (napr. "*.* " + "a" = "a. ")
+                    CutSpacesFromBothSides(end2 + 1); // spaces at beginning and end of mask are 100% for removal, only risk is trouble (e.g. "*.* " + "a" = "a. ")
                     end = end2;
                     lastChar = *end;
                     *end = 0;
@@ -817,18 +817,18 @@ PARSE_AGAIN:
             while (end > afterRoot) // jeste neni jen root
             {
                 int len2 = (int)strlen(path);
-                if (path[len2 - 1] != '\\') // cesty koncici na backslash se chovaji ruzne (klasika a UNC): UNC vraci uspech, klasika ERROR_INVALID_NAME: vybalovani z archivu lezicim na UNC ceste na cestu "" hlasilo neznamy archiv (do PackerFormatConfig.PackIsArchive slo totiz napr. "...test.zip\\" misto "...test.zip")
+                if (path[len2 - 1] != '\\') // paths ending with backslash behave differently (classic and UNC): UNC returns success, classic ERROR_INVALID_NAME: unpacking from archive on UNC path to path "" reported unknown archive (PackerFormatConfig.PackIsArchive got e.g. "...test.zip\\" instead of "...test.zip")
                 {
                     DWORD attrs = len2 < MAX_PATH ? SalGetFileAttributes(path) : 0xFFFFFFFF;
-                    if (attrs != 0xFFFFFFFF) // tato cast cesty existuje
+                    if (attrs != 0xFFFFFFFF) // this part of path exists
                     {
-                        if ((attrs & FILE_ATTRIBUTE_DIRECTORY) == 0) // je to soubor
+                        if ((attrs & FILE_ATTRIBUTE_DIRECTORY) == 0) // it's a file
                         {
-                            if (lastChar != 0 || backslashAtEnd || mustBePath) // je za jmenem archivu backslash?
+                            if (lastChar != 0 || backslashAtEnd || mustBePath) // is there a backslash after archive name?
                             {
-                                if (PackerFormatConfig.PackIsArchive(path)) // je to archiv
+                                if (PackerFormatConfig.PackIsArchive(path)) // it's an archive
                                 {
-                                    *end = lastChar; // opravime 'path'
+                                    *end = lastChar; // fix 'path'
                                     secondPart = end;
                                     type = PATH_TYPE_ARCHIVE;
                                     isDir = FALSE;
@@ -837,58 +837,58 @@ PARSE_AGAIN:
 
                                     return TRUE;
                                 }
-                                else // mel byt archiv (je dana i cesta v souboru), zarveme
+                                else // should have been archive (path in file is given), abort
                                 {
                                     text = LoadStr(IDS_NOTARCHIVEPATH);
                                     if (error != NULL)
                                         *error = SPP_NOTARCHIVEFILE;
-                                    break; // ohlasime chybu
+                                    break; // report error
                                 }
                             }
-                            else // jeste se nezkracovalo + na konci neni '\\' -> jde o prepis souboru
+                            else // not yet shortened + no '\\' at end -> it's file overwrite
                             {
-                                // existujici cesta nema obsahovat jmeno souboru, orizneme...
+                                // existing path should not contain file name, cut it off...
                                 isDir = FALSE;
                                 while (*--end != '\\')
-                                    ;            // je jiste, ze aspon za root-cestou je jeden '\\'
-                                lastChar = *end; // aby se nezrusila cesta
-                                break;           // obycejna Windows cesta - ale k souboru
+                                    ;            // it's certain that there's at least one '\\' after root path
+                                lastChar = *end; // so path won't be deleted
+                                break;           // ordinary Windows path - but to file
                             }
                         }
                         else
-                            break; // obycejna Windows cesta
+                            break; // ordinary Windows path
                     }
                     else
                     {
                         DWORD err = len2 < MAX_PATH ? GetLastError() : ERROR_INVALID_NAME /* too long path */;
                         if (err != ERROR_FILE_NOT_FOUND && err != ERROR_INVALID_NAME &&
                             err != ERROR_PATH_NOT_FOUND && err != ERROR_BAD_PATHNAME &&
-                            err != ERROR_DIRECTORY) // divna chyba - jen vypiseme
+                            err != ERROR_DIRECTORY) // strange error - just report it
                         {
                             text = GetErrorText(err);
                             if (error != NULL)
                                 *error = SPP_WINDOWSPATHERROR;
-                            break; // ohlasime chybu
+                            break; // report error
                         }
                     }
                 }
-                *end = lastChar; // obnova 'path'
+                *end = lastChar; // restore 'path'
                 while (*--end != '\\')
-                    ; // je jiste, ze aspon za root-cestou je jeden '\\'
+                    ; // it's certain that there's at least one '\\' after root path
                 lastChar = *end;
                 *end = 0;
             }
-            *end = lastChar; // opravime 'path'
+            *end = lastChar; // fix 'path'
 
             SetCursor(oldCur);
 
             if (text == NULL)
             {
-                // Windows cesta
+                // Windows path
                 if (*end == '\\')
                     end++;
                 if (isDir && *end != 0 && !hasMask && strchr(end, '\\') == NULL)
-                { // cesta konci neexistujicim adresarem (nejde o masku), ocistime jmeno od nezadoucich znaku na zacatku a konci
+                { // path ends with non-existent directory (not a mask), clean name from unwanted characters at beginning and end
                     BOOL changeNextFocus = nextFocus != NULL && strcmp(nextFocus, end) == 0;
                     if (MakeValidFileName(end))
                     {
@@ -928,13 +928,13 @@ BOOL SalSplitWindowsPath(HWND parent, const char* title, const char* errorTitle,
                             pathIsDir, backslashAtEnd, dirName, curDiskPath, mask, newDirs, NULL))
     {
         if (mask - 1 > path && *(mask - 2) == '\\' &&
-            (mask - 1 > afterRoot || *path == '\\'))           // neni root nebo je UNC root
-        {                                                      // je treba odstranit zbytecny backslash z konce retezce
+            (mask - 1 > afterRoot || *path == '\\'))           // not root or is UNC root
+        {                                                      // need to remove unnecessary backslash from end of string
             memmove(mask - 2, mask - 1, 1 + strlen(mask) + 1); // '\0' + maska + '\0'
             mask--;
         }
 
-        if (newDirs[0] != 0) // vytvorime nove adresare na cilove ceste
+        if (newDirs[0] != 0) // create new directories on target path
         {
             memmove(newDirs + (secondPart - path), newDirs, strlen(newDirs) + 1);
             memmove(newDirs, path, secondPart - path);
@@ -971,27 +971,27 @@ BOOL SalSplitWindowsPath(HWND parent, const char* title, const char* errorTitle,
                 if (slash != NULL)
                     *slash = '\\';
                 else
-                    break; // to byl posledni '\\'
+                    break; // that was the last '\\'
                 st = slash + 1;
             }
 
-            //---  refresh neautomaticky refreshovanych adresaru (probehne az po ukonceni
-            // stop-refreshe, takze az po ukonceni operace)
+            //---  refresh non-automatically refreshed directories (runs after ending
+            // stop-refresh, so after operation ends)
             char changesRoot[MAX_PATH];
             memmove(changesRoot, path, secondPart - path);
             changesRoot[secondPart - path] = 0;
-            // zmena cesty - vytvoreni novych podadresaru na ceste (je potreba i pokud
-            // se nove adresare nepodarilo vytvorit) - zmena bez podadresaru (vytvarely se jen podadresare)
+            // path change - creation of new subdirectories on path (needed even if
+            // new directories failed to create) - change without subdirectories (only subdirectories were being created)
             MainWindow->PostChangeOnPathNotification(changesRoot, FALSE);
 
             if (!ok)
             {
-                char* e = path + strlen(path); // oprava 'path' (spojeni 'path' a 'mask')
+                char* e = path + strlen(path); // fix 'path' (join 'path' and 'mask')
                 if (e > path && *(e - 1) != '\\')
                     *e++ = '\\';
                 if (e != mask)
-                    memmove(e, mask, strlen(mask) + 1); // je-li potreba, prisuneme masku
-                return FALSE;                           // znovu do copy/move dialogu
+                    memmove(e, mask, strlen(mask) + 1); // if needed, move mask closer
+                return FALSE;                           // back to copy/move dialog
             }
         }
         return TRUE;
@@ -1012,11 +1012,11 @@ BOOL SalSplitGeneralPath(HWND parent, const char* title, const char* errorTitle,
     if (newDirs != NULL)
         newDirs[0] = 0;
 
-    if (pathIsDir) // existujici cast cesty je adresar
+    if (pathIsDir) // existing part of path is directory
     {
-        if (*secondPart != 0) // je zde i neexistujici cast cesty
+        if (*secondPart != 0) // there's also non-existent part of path
         {
-            // rozanalyzujeme neexistujici cast cesty - soubor/adresar + maska?
+            // analyze non-existent part of path - file/directory + mask?
             char* s = secondPart;
             BOOL hasMask = FALSE;
             char* maskFrom = secondPart;
@@ -1033,7 +1033,7 @@ BOOL SalSplitGeneralPath(HWND parent, const char* title, const char* errorTitle,
                 }
             }
 
-            if (maskFrom != secondPart) // je tu nejaka cesta pred maskou
+            if (maskFrom != secondPart) // there's some path before mask
             {
                 memcpy(tmpNewDirs, secondPart, maskFrom - secondPart);
                 tmpNewDirs[maskFrom - secondPart] = 0;
@@ -1041,7 +1041,7 @@ BOOL SalSplitGeneralPath(HWND parent, const char* title, const char* errorTitle,
 
             if (hasMask)
             {
-                // zajistime rozdeleni na cestu (konci backslashem) a masku
+                // ensure split into path (ending with backslash) and mask
                 memmove(maskFrom + 1, maskFrom, strlen(maskFrom) + 1);
                 *maskFrom++ = 0;
 
@@ -1049,41 +1049,41 @@ BOOL SalSplitGeneralPath(HWND parent, const char* title, const char* errorTitle,
             }
             else
             {
-                if (!backslashAtEnd) // jen jmeno (maska bez '*' a '?')
+                if (!backslashAtEnd) // just name (mask without '*' and '?')
                 {
                     if (selCount > 1 &&
                         SalMessageBox(parent, LoadStr(IDS_MOVECOPY_NONSENSE), title,
                                       MB_YESNO | MB_DEFBUTTON2 | MB_ICONQUESTION) != IDYES)
                     {
-                        return FALSE; // znovu do copy/move dialogu
+                        return FALSE; // back to copy/move dialog
                     }
 
-                    // zajistime rozdeleni na cestu (konci backslashem) a masku
+                    // ensure split into path (ending with backslash) and mask
                     memmove(maskFrom + 1, maskFrom, strlen(maskFrom) + 1);
                     *maskFrom++ = 0;
 
                     mask = maskFrom;
                 }
-                else // jmeno s lomitkem na konci -> adresar
+                else // name with slash at end -> directory
                 {
                     SalPathAppend(tmpNewDirs, maskFrom, MAX_PATH);
-                    SalPathAddBackslash(path, 2 * MAX_PATH); // cesta ma vzdy koncit na backslash, zajistime to...
+                    SalPathAddBackslash(path, 2 * MAX_PATH); // path must always end with backslash, ensure it...
                     mask = path + strlen(path) + 1;
                     strcpy(mask, "*.*");
                 }
             }
-            CutSpacesFromBothSides(mask); // mezery na zacatku a konci masky jsou 100% na odstrel, hrozi jen neplecha
+            CutSpacesFromBothSides(mask); // spaces at beginning and end of mask are 100% for removal, only risk is trouble
 
-            if (tmpNewDirs[0] != 0) // zbyva jeste vytvorit ty nove adresare
+            if (tmpNewDirs[0] != 0) // still need to create those new directories
             {
-                if (newDirs != NULL) // vytvareni je podporovane
+                if (newDirs != NULL) // creation is supported
                 {
                     strcpy(newDirs, tmpNewDirs);
                     memmove(tmpNewDirs, path, secondPart - path);
                     strcpy(tmpNewDirs + (secondPart - path), newDirs);
                     SalPathRemoveBackslash(tmpNewDirs);
 
-                    if (Configuration.CnfrmCreatePath) // zeptame se, jestli se ma cesta vytvorit
+                    if (Configuration.CnfrmCreatePath) // ask if path should be created
                     {
                         BOOL dontShow = FALSE;
                         sprintf(textBuf, LoadStr(IDS_MOVECOPY_CREATEPATH), tmpNewDirs);
@@ -1100,12 +1100,12 @@ BOOL SalSplitGeneralPath(HWND parent, const char* title, const char* errorTitle,
                         Configuration.CnfrmCreatePath = !dontShow;
                         if (cont)
                         {
-                            char* e = path + strlen(path); // oprava 'path' (spojeni 'path' a 'mask')
+                            char* e = path + strlen(path); // fix 'path' (join 'path' and 'mask')
                             if (e > path && *(e - 1) != '\\')
                                 *e++ = '\\';
                             if (e != mask)
-                                memmove(e, mask, strlen(mask) + 1); // je-li potreba, prisuneme masku
-                            return FALSE;                           // znovu do copy/move dialogu
+                                memmove(e, mask, strlen(mask) + 1); // if needed, move mask closer
+                            return FALSE;                           // back to copy/move dialog
                         }
                     }
                 }
@@ -1120,12 +1120,12 @@ BOOL SalSplitGeneralPath(HWND parent, const char* title, const char* errorTitle,
                     return FALSE;                           // znovu do copy/move dialogu
                 }
             }
-            return TRUE; // opustime smycku Copy/Move dialogu a jdeme provest operaci
+            return TRUE; // leave Copy/Move dialog loop and go perform operation
         }
-        else // zadna neexistujici cast cesty neni (zadana cesta komplet existuje)
+        else // no non-existent part of path (entered path completely exists)
         {
             if (dirName != NULL && curPath != NULL &&
-                !backslashAtEnd && selCount <= 1) // bez '\\' na konci cesty (force adresare) + jeden zdroj
+                !backslashAtEnd && selCount <= 1) // without '\\' at end of path (force directory) + one source
             {
                 char* name = path + strlen(path);
                 while (name >= afterRoot && *(name - 1) != '\\')
@@ -1136,55 +1136,55 @@ BOOL SalSplitGeneralPath(HWND parent, const char* title, const char* errorTitle,
                     if (StrICmp(dirName, name) == 0 &&
                         (isTheSamePathF != NULL && isTheSamePathF(path, curPath) ||
                          isTheSamePathF == NULL && IsTheSamePath(path, curPath)))
-                    { // prejmenovani adresare na stejne jmeno (krom velikosti pismen, identita mozna)
-                        // zajistime rozdeleni na cestu (konci backslashem) a masku
+                    { // renaming directory to same name (except case, identity possible)
+                        // ensure split into path (ending with backslash) and mask
                         memmove(name + 1, name, strlen(name) + 1);
                         *(name - 1) = '\\';
                         *name++ = 0;
 
                         mask = name;
-                        // CutSpacesFromBothSides(mask); // tady nelze: existuje adresar presne tohoto jmena, bez mezer uz by slo o jiny adresar (neni problem: "nelegalni" adresar existoval uz pred operaci, nic noveho "nelegalniho" nevznikne)
-                        return TRUE; // opustime smycku Copy/Move dialogu a jdeme provest operaci
+                        // CutSpacesFromBothSides(mask); // cannot here: directory with this exact name exists, without spaces it would be a different directory (not a problem: "illegal" directory existed before operation, nothing new "illegal" will be created)
+                        return TRUE; // leave Copy/Move dialog loop and go perform operation
                     }
                     *(name - 1) = '\\';
                 }
             }
 
-            // jednoduchy cil cesty s univerzalni maskou
-            SalPathAddBackslash(path, 2 * MAX_PATH); // cesta ma vzdy koncit na backslash, zajistime to...
+            // simple path target with universal mask
+            SalPathAddBackslash(path, 2 * MAX_PATH); // path must always end with backslash, ensure it...
             mask = path + strlen(path) + 1;
             strcpy(mask, "*.*");
-            return TRUE; // opustime smycku Copy/Move dialogu a jdeme provest operaci
+            return TRUE; // leave Copy/Move dialog loop and go perform operation
         }
     }
-    else // prepis souboru - 'secondPart' ukazuje na jmeno souboru v ceste 'path'
+    else // file overwrite - 'secondPart' points to file name in path 'path'
     {
         char* nameEnd = secondPart;
         while (*nameEnd != 0 && *nameEnd != '\\')
             nameEnd++;
-        if (*nameEnd == 0 && !backslashAtEnd) // prejmenovani/prepis existujiciho souboru
+        if (*nameEnd == 0 && !backslashAtEnd) // rename/overwrite existing file
         {
             if (selCount > 1 &&
                 SalMessageBox(parent, LoadStr(IDS_MOVECOPY_NONSENSE), title,
                               MB_YESNO | MB_DEFBUTTON2 | MB_ICONQUESTION) != IDYES)
             {
-                return FALSE; // znovu do copy/move dialogu
+                return FALSE; // back to copy/move dialog
             }
 
-            // zajistime rozdeleni na cestu (konci backslashem) a masku
+            // ensure split into path (ending with backslash) and mask
             memmove(secondPart + 1, secondPart, strlen(secondPart) + 1);
             *secondPart++ = 0;
 
             mask = secondPart;
-            // CutSpacesFromBothSides(mask); // tady nelze: existuje soubor presne tohoto jmena, bez mezer uz by slo o jiny soubor (neni problem: "nelegalni" soubor existoval uz pred operaci, nic noveho "nelegalniho" nevznikne)
-            return TRUE; // opustime smycku Copy/Move dialogu a jdeme provest operaci
+            // CutSpacesFromBothSides(mask); // cannot here: file with this exact name exists, without spaces it would be a different file (not a problem: "illegal" file existed before operation, nothing new "illegal" will be created)
+            return TRUE; // leave Copy/Move dialog loop and go perform operation
         }
-        else // cesta do archivu? tady neni mozna...
+        else // path to archive? not possible here...
         {
             SalMessageBox(parent, LoadStr(IDS_ARCPATHNOTSUPPORTED), errorTitle, MB_OK | MB_ICONEXCLAMATION);
             if (backslashAtEnd)
-                SalPathAddBackslash(path, 2 * MAX_PATH); // pokud byl '\\' oriznut, doplnime ho
-            return FALSE;                                // znovu do copy/move dialogu
+                SalPathAddBackslash(path, 2 * MAX_PATH); // if '\\' was cut off, add it back
+            return FALSE;                                // back to copy/move dialog
         }
     }
 }
@@ -1218,15 +1218,15 @@ BOOL FileNameIsInvalid(const char* name, BOOL isFullName, BOOL ignInvalidName)
     if (*s == ':')
         return TRUE;
     if (ignInvalidName)
-        return FALSE; // tecky a mezery na konci nas ted nezajimaji (adresar toho jmena muze existovat na disku)
+        return FALSE; // dots and spaces at end don't concern us now (directory with that name may exist on disk)
     int nameLen = (int)(s - name);
     return nameLen > 0 && (name[nameLen - 1] <= ' ' || name[nameLen - 1] == '.');
 }
 
 BOOL SalMoveFile(const char* srcName, const char* destName)
 {
-    // pokud jmeno konci mezerou/teckou, musime pripojit '\\', jinak MoveFile
-    // mezery/tecky orizne a pracuje tak s jinym jmenem
+    // if name ends with space/dot, we must append '\\', otherwise MoveFile
+    // will trim spaces/dots and work with different name
     char srcNameCopy[3 * MAX_PATH];
     MakeCopyWithBackslashIfNeeded(srcName, srcNameCopy);
     char destNameCopy[3 * MAX_PATH];
@@ -1244,7 +1244,7 @@ BOOL SalMoveFile(const char* srcName, const char* destName)
     {
         DWORD err = GetLastError();
         if (err == ERROR_ACCESS_DENIED)
-        { // mohlo by jit o problem Novellu (MoveFile vraci chybu u souboru s read-only atributem)
+        { // could be Novell problem (MoveFile returns error for file with read-only attribute)
             DWORD attr = SalGetFileAttributes(srcName);
             if (attr != 0xFFFFFFFF && (attr & FILE_ATTRIBUTE_READONLY))
             {
@@ -1282,13 +1282,13 @@ void RecognizeFileType(HWND parent, const char* pattern, int patternLen, BOOL fo
 CSystemPolicies::CSystemPolicies()
     : RestrictRunList(10, 50), DisallowRunList(10, 50)
 {
-    // vsechno povolime
+    // allow everything
     EnableAll();
 }
 
 CSystemPolicies::~CSystemPolicies()
 {
-    // uvolnime seznamy
+    // free lists
     EnableAll();
 }
 
@@ -1307,7 +1307,7 @@ void CSystemPolicies::EnableAll()
     DisallowRun = 0;
     NoDotBreakInLogicalCompare = 0;
 
-    // uvolnim seznamy alokovanych string
+    // free lists of allocated strings
 
     int i;
     for (i = 0; i < RestrictRunList.Count; i++)
@@ -1382,14 +1382,14 @@ BOOL CSystemPolicies::GetMyCanRun(const char* fileName)
         p = fileName;
     else
         p++;
-    // zleva preskocim mezery
+    // skip spaces from left
     while (*p != 0 && *p == ' ')
         p++;
     if (strlen(p) >= MAX_PATH)
-        return RestrictRun == 0; // zakazeme spousteni pokud je povoleno spoustet jen vybrane prikazy (tento se nepodarilo separovat z prikazove radky)
+        return RestrictRun == 0; // disallow running if only selected commands are allowed (failed to separate this from command line)
     char name[MAX_PATH];
     lstrcpyn(name, p, MAX_PATH);
-    // zprava oriznu mezery
+    // trim spaces from right
     char* p2 = name + strlen(name) - 1;
     while (p2 >= name && *p2 == ' ')
     {
@@ -1411,10 +1411,10 @@ BOOL CSystemPolicies::GetMyCanRun(const char* fileName)
 
 void CSystemPolicies::LoadFromRegistry()
 {
-    // vsechno povolime
+    // allow everything
     EnableAll();
 
-    // vytahneme restrikce
+    // extract restrictions
     HKEY hKey;
     if (OpenKeyAux(NULL, HKEY_CURRENT_USER, "Software\\Microsoft\\Windows\\CurrentVersion\\Policies\\Explorer", hKey))
     {
@@ -1430,7 +1430,7 @@ void CSystemPolicies::LoadFromRegistry()
         GetValueDontCheckTypeAux(hKey, "NoNetConnectDisconnect", /*REG_DWORD,*/ &NoNetConnectDisconnect, sizeof(DWORD));
         GetValueDontCheckTypeAux(hKey, "RestrictRun", /*REG_DWORD,*/ &RestrictRun, sizeof(DWORD));
         if (RestrictRun && !LoadList(&RestrictRunList, HKEY_CURRENT_USER, "Software\\Microsoft\\Windows\\CurrentVersion\\Policies\\Explorer\\RestrictRun"))
-            RestrictRun = 0; // malo pameti; zrusime tento option
+            RestrictRun = 0; // low memory; cancel this option
         GetValueDontCheckTypeAux(hKey, "DisallowRun", /*REG_DWORD,*/ &DisallowRun, sizeof(DWORD));
         if (DisallowRun && !LoadList(&DisallowRunList, HKEY_CURRENT_USER, "Software\\Microsoft\\Windows\\CurrentVersion\\Policies\\Explorer\\DisallowRun"))
             DisallowRun = 0; // malo pameti; zrusime tento option
@@ -1507,10 +1507,10 @@ BOOL SalGetFileSize2(const char* fileName, CQuadWord& size, DWORD* err)
 DWORD SalGetFileAttributes(const char* fileName)
 {
     CALL_STACK_MESSAGE2("SalGetFileAttributes(%s)", fileName);
-    // pokud cesta konci mezerou/teckou, musime pripojit '\\', jinak GetFileAttributes
-    // mezery/tecky orizne a pracuje tak s jinou cestou + u souboru to sice nefunguje,
-    // ale porad lepsi nez ziskat atributy jineho souboru/adresare (pro "c:\\file.txt   "
-    // pracuje se jmenem "c:\\file.txt")
+    // if path ends with space/dot, we must append '\\', otherwise GetFileAttributes
+    // will trim spaces/dots and work with different path + for files it doesn't work,
+    // but still better than getting attributes of different file/directory (for "c:\\file.txt   "
+    // works with name "c:\\file.txt")
     char fileNameCopy[3 * MAX_PATH];
     MakeCopyWithBackslashIfNeeded(fileName, fileNameCopy);
 
@@ -1529,7 +1529,7 @@ BOOL ClearReadOnlyAttr(const char* name, DWORD attr)
         attr = SalGetFileAttributes(name);
     if (attr != INVALID_FILE_ATTRIBUTES)
     {
-        // shodime jen RO (u hardlinku zmeni i atributy ostatnich hardlinku na stejny soubor, tak at je to co nejmene)
+        // clear only RO (for hardlink it also changes attributes of other hardlinks to same file, so let it be minimal)
         if ((attr & FILE_ATTRIBUTE_READONLY) != 0)
         {
             CStrP nameW(ConvertAllocUtf8ToWide(name, -1));
@@ -1542,7 +1542,7 @@ BOOL ClearReadOnlyAttr(const char* name, DWORD attr)
     {
         TRACE_E("ClearReadOnlyAttr(): error getting attrs: " << name);
         CStrP nameW(ConvertAllocUtf8ToWide(name, -1));
-        if (nameW == NULL || !SetFileAttributesW(nameW, FILE_ATTRIBUTE_ARCHIVE)) // nelze cist atributy, zkusime aspon zapsat (uz neresime, jestli je to potreba)
+        if (nameW == NULL || !SetFileAttributesW(nameW, FILE_ATTRIBUTE_ARCHIVE)) // cannot read attributes, try at least to write (no longer check if it's needed)
             TRACE_E("ClearReadOnlyAttr(): error setting attrs (FILE_ATTRIBUTE_ARCHIVE): " << name);
         return TRUE;
     }
@@ -1620,10 +1620,10 @@ BOOL IsLantasticDrive(const char* path, char* lastLantasticCheckRoot, BOOL& last
 
     GetRootPath(lastLantasticCheckRoot, path);
     lastIsLantasticPath = FALSE;
-    if (path[0] != '\\') // neni UNC - nemusi jit o sitovou cestu (ta nemuze byt LANTASTIC)
+    if (path[0] != '\\') // not UNC - may not be network path (that cannot be LANTASTIC)
     {
         if (GetDriveType(lastLantasticCheckRoot) != DRIVE_REMOTE)
-            return FALSE; // neni sitova cesta
+            return FALSE; // not network path
     }
 
     return lastIsLantasticPath = IsNetworkProviderDrive(lastLantasticCheckRoot, WNNC_NET_LANTASTIC);
@@ -1638,19 +1638,19 @@ BOOL IsNetworkPath(const char* path)
         return GetDriveType(root) == DRIVE_REMOTE;
     }
     else
-        return TRUE; // UNC cesta je vzdy sitova
+        return TRUE; // UNC path is always network
 }
 
 HCURSOR SetHandCursor()
 {
-    // pouzijeme systemovy kurzor -- zamezime zbytecnemu
-    // poblikavani pri zmene kurzoru
+    // use system cursor -- prevent unnecessary
+    // blinking when changing cursor
     return SetCursor(LoadCursor(NULL, IDC_HAND));
 }
 
 void WaitForESCRelease()
 {
-    int c = 20; // do 1/5 sekundy pockame na pusteni ESC (aby po ESC v dialogu hned neprerusil cteni adresare)
+    int c = 20; // up to 1/5 second wait for ESC release (so after ESC in dialog it doesn't immediately interrupt directory reading)
     while (c--)
     {
         if ((GetAsyncKeyState(VK_ESCAPE) & 0x8001) == 0)
@@ -1693,7 +1693,7 @@ BOOL IsDeviceNameAux(const char* s, const char* end)
 {
     while (end > s && *(end - 1) <= ' ')
         end--;
-    // zkusime jestli to neni vyhrazene jmeno
+    // try if it's not a reserved name
     static const char* dev1_arr[] = {"CON", "PRN", "AUX", "NUL", NULL};
     if (end - s == 3)
     {
@@ -1702,7 +1702,7 @@ BOOL IsDeviceNameAux(const char* s, const char* end)
             if (strnicmp(s, *dev1++, 3) == 0)
                 return TRUE;
     }
-    // zkusime jestli to neni vyhrazene jmeno nasledovane cislici '1'..'9'
+    // try if it's not a reserved name followed by digit '1'..'9'
     static const char* dev2_arr[] = {"COM", "LPT", NULL};
     if (end - s == 4 && *(end - 1) >= '1' && *(end - 1) <= '9')
     {
@@ -1717,20 +1717,20 @@ BOOL IsDeviceNameAux(const char* s, const char* end)
 BOOL SalIsValidFileNameComponent(const char* fileNameComponent)
 {
     const char* start = fileNameComponent;
-    // test white-spaces na zacatku (Petr: zakomentovano, protoze mezery na zacatku jmen souboru a adresaru proste muzou byt)
+    // test white-spaces at beginning (Petr: commented out, because spaces at beginning of file and directory names can simply be there)
     // if (*start != 0 && *start <= ' ') return FALSE;
 
-    // test na maximalni delku MAX_PATH-4
+    // test for maximum length MAX_PATH-4
     const char* s = fileNameComponent + strlen(fileNameComponent);
     if (s - fileNameComponent > MAX_PATH - 4)
         return FALSE;
-    // test white-spaces a '.' na konci jmena (file-system by je orizl)
+    // test white-spaces and '.' at end of name (file-system would trim them)
     s--;
     if (s >= start && (*s <= ' ' || *s == '.'))
         return FALSE;
 
     BOOL testSimple = TRUE;
-    BOOL simple = TRUE; // TRUE = hrozi "lpt1", "prn" a dalsi kriticky jmena, radsi doplnime '_'
+    BOOL simple = TRUE; // TRUE = risk of "lpt1", "prn" and other critical names, better add '_'
     BOOL wasSpace = FALSE;
 
     while (*fileNameComponent != 0)
@@ -1740,7 +1740,7 @@ BOOL SalIsValidFileNameComponent(const char* fileNameComponent)
             (*fileNameComponent < 'A' || *fileNameComponent > 'Z') &&
             (*fileNameComponent < '0' || *fileNameComponent > '9'))
         {
-            simple = FALSE; // "prn.txt" i "prn  .txt" jsou rezervovana jmena
+            simple = FALSE; // "prn.txt" and "prn  .txt" are reserved names
             testSimple = FALSE;
             if (*fileNameComponent == '.' && fileNameComponent > start &&
                 IsDeviceNameAux(start, fileNameComponent))
@@ -1752,13 +1752,13 @@ BOOL SalIsValidFileNameComponent(const char* fileNameComponent)
         {
             wasSpace = TRUE;
             if (*fileNameComponent != ' ')
-                return FALSE; // nepovoleny white-space
+                return FALSE; // disallowed white-space
         }
         else
         {
             if (testSimple && wasSpace)
             {
-                simple = FALSE; // "prn bla.txt" neni rezervovane jmeno
+                simple = FALSE; // "prn bla.txt" is not reserved name
                 testSimple = FALSE;
             }
         }
@@ -1773,12 +1773,12 @@ BOOL SalIsValidFileNameComponent(const char* fileNameComponent)
         case '|':
         case '"':
         case ':':
-            return FALSE; // nepovoleny znak
+            return FALSE; // disallowed character
         }
         fileNameComponent++;
     }
     if (simple && IsDeviceNameAux(start, fileNameComponent))
-        return FALSE; // jednoduche jmeno + device
+        return FALSE; // simple name + device
     return TRUE;
 }
 
@@ -1786,9 +1786,9 @@ void SalMakeValidFileNameComponent(char* fileNameComponent)
 {
     char* start = fileNameComponent;
     BOOL testSimple = TRUE;
-    BOOL simple = TRUE; // TRUE = hrozi "lpt1", "prn" a dalsi kriticky jmena, radsi doplnime '_'
+    BOOL simple = TRUE; // TRUE = risk of "lpt1", "prn" and other critical names, better add '_'
     BOOL wasSpace = FALSE;
-    // odstraneni white-spaces na zacatku (Petr: zakomentovano, protoze mezery na zacatku jmen souboru a adresaru proste muzou byt)
+    // removal of white-spaces at beginning (Petr: commented out, because spaces at beginning of file and directory names can simply be there)
     /*
   while (*start != 0 && *start <= ' ') start++;
   if (start > fileNameComponent)
@@ -1797,20 +1797,20 @@ void SalMakeValidFileNameComponent(char* fileNameComponent)
     start = fileNameComponent;
   }
 */
-    // orizneme na maximalni delku MAX_PATH-4
+    // trim to maximum length MAX_PATH-4
     char* s = fileNameComponent + strlen(fileNameComponent);
     if (s - fileNameComponent > MAX_PATH - 4)
     {
         s = fileNameComponent + (MAX_PATH - 4);
         *s = 0;
     }
-    // orizneme white-spaces a '.' na konci jmena (file-system by to stejne udelal, aspon bude jasno hned)
+    // trim white-spaces and '.' at end of name (file-system would do it anyway, at least it will be clear immediately)
     s--;
     while (s >= start && (*s <= ' ' || *s == '.'))
         s--;
     if (s >= start)
         *(s + 1) = 0;
-    else // prazdny retezec nebo sekvence znaku '.' a white-spaces -> nahradime jmenem "_" (system tohle vsechno tez orezava)
+    else // empty string or sequence of '.' and white-spaces characters -> replace with name "_" (system also trims all this)
     {
         strcpy(start, "_");
         simple = FALSE;
@@ -1824,7 +1824,7 @@ void SalMakeValidFileNameComponent(char* fileNameComponent)
             (*fileNameComponent < 'A' || *fileNameComponent > 'Z') &&
             (*fileNameComponent < '0' || *fileNameComponent > '9'))
         {
-            simple = FALSE; // "prn.txt" i "prn  .txt" jsou rezervovana jmena
+            simple = FALSE; // "prn.txt" and "prn  .txt" are reserved names
             testSimple = FALSE;
             if (*fileNameComponent == '.' && fileNameComponent > start &&
                 IsDeviceNameAux(start, fileNameComponent))
@@ -1841,7 +1841,7 @@ void SalMakeValidFileNameComponent(char* fileNameComponent)
                 }
                 else
                 {
-                    *fileNameComponent = 0; // u jmen typu "prn          .txt" (s vice mezerami)
+                    *fileNameComponent = 0; // for names like "prn          .txt" (with more spaces)
                     break;
                 }
             }
@@ -1849,13 +1849,13 @@ void SalMakeValidFileNameComponent(char* fileNameComponent)
         if (*fileNameComponent <= ' ')
         {
             wasSpace = TRUE;
-            *fileNameComponent = ' '; // vsechny white-spaces nahradime ' '
+            *fileNameComponent = ' '; // replace all white-spaces with ' '
         }
         else
         {
             if (testSimple && wasSpace)
             {
-                simple = FALSE; // "prn bla.txt" neni rezervovane jmeno
+                simple = FALSE; // "prn bla.txt" is not reserved name
                 testSimple = FALSE;
             }
         }
@@ -1875,7 +1875,7 @@ void SalMakeValidFileNameComponent(char* fileNameComponent)
         }
         fileNameComponent++;
     }
-    if (simple && IsDeviceNameAux(start, fileNameComponent)) // u jednoduchych jmen doplnime '_'
+    if (simple && IsDeviceNameAux(start, fileNameComponent)) // for simple names add '_'
     {
         *fileNameComponent++ = '_';
         *fileNameComponent = 0;
@@ -1921,14 +1921,14 @@ BOOL GetOurPathInRoamingAPPDATA(char* buf)
 
 BOOL CreateOurPathInRoamingAPPDATA(char* buf)
 {
-    static char path[MAX_PATH]; // vola se z handleru exceptiony, stack muze byt plnej
+    static char path[MAX_PATH]; // called from exception handler, stack may be full
     if (buf != NULL)
         buf[0] = 0;
     if (SHGetFolderPath(NULL, CSIDL_APPDATA, NULL, 0 /* SHGFP_TYPE_CURRENT */, path) == S_OK)
     {
         if (SalPathAppend(path, "Open Salamander", MAX_PATH))
         {
-            CreateDirectoryUtf8(path, NULL); // jestli selze (napr. uz existuje), neresime...
+            CreateDirectoryUtf8(path, NULL); // if it fails (e.g. already exists), we don't care...
             if (buf != NULL)
                 lstrcpyn(buf, path, MAX_PATH);
             return TRUE;
@@ -1939,7 +1939,7 @@ BOOL CreateOurPathInRoamingAPPDATA(char* buf)
 
 void SlashesToBackslashesAndRemoveDups(char* path)
 {
-    char* s = path - 1; // preklopime '/' na '\\' a eliminujeme zdvojene backslashe (krome zacatku, kde znamenaji UNC cestu nebo \\.\C:)
+    char* s = path - 1; // convert '/' to '\\' and eliminate double backslashes (except at start, where they mean UNC path or \\.\C:)
     while (*++s != 0)
     {
         if (*s == '/')

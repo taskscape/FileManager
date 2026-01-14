@@ -25,23 +25,23 @@
 
 #include "winlib.h"
 
-// opatreni proti runtime check failure v debug verzi: puvodni verze makra pretypovava rgb na WORD,
-// takze hlasi ztratu dat (RED slozky)
+// precaution against runtime check failure in debug version: original macro version casts rgb to WORD,
+// thus reporting data loss (RED component)
 #undef GetGValue
 #define GetGValue(rgb) ((BYTE)(((rgb) >> 8) & 0xFF))
 
 const TCHAR* CWINDOW_CLASSNAME = _T("WinLib Universal Window");
-const TCHAR* CWINDOW_CLASSNAME2 = _T("WinLib Universal Window2"); // nema CS_VREDRAW | CS_HREDRAW
+const TCHAR* CWINDOW_CLASSNAME2 = _T("WinLib Universal Window2"); // without CS_VREDRAW | CS_HREDRAW
 
 #ifndef _UNICODE
 const WCHAR* CWINDOW_CLASSNAMEW = L"WinLib Universal Window Unicode";
-const WCHAR* CWINDOW_CLASSNAME2W = L"WinLib Universal Window Unicode2"; // nema CS_VREDRAW | CS_HREDRAW
+const WCHAR* CWINDOW_CLASSNAME2W = L"WinLib Universal Window Unicode2"; // without CS_VREDRAW | CS_HREDRAW
 #endif                                                                  // _UNICODE
 
 CWinLibHelp* WinLibHelp = NULL;
 CWindowsManager WindowsManager;
 HINSTANCE HInstance = NULL;
-BOOL WinLibReleased = FALSE; // TRUE = uz se volalo ReleaseWinLib()
+BOOL WinLibReleased = FALSE; // TRUE = ReleaseWinLib() was already called
 
 TCHAR WinLibStrings[WLS_COUNT][101] = {
     _T("Invalid number!"),
@@ -71,7 +71,7 @@ BOOL InitializeWinLib()
 
 void ReleaseWinLib()
 {
-    // musime odpojit otevrena okna od WinLibu, protoze WinLib konci ...
+    // we must disconnect opened windows from WinLib, because WinLib is terminating ...
     int c = WindowsManager.GetCount();
     if (c > 0)
         TRACE_ET(_T("ReleaseWinLib(): WindowsManager still contains opened windows: ") << c);
@@ -102,7 +102,7 @@ BOOL WinLibIsWindowsVersionOrGreater(WORD wMajorVersion, WORD wMinorVersion, WOR
                                                                                VER_MINORVERSION, VER_GREATER_EQUAL),
                                                            VER_SERVICEPACKMAJOR, VER_GREATER_EQUAL);
 
-    SecureZeroMemory(&osvi, sizeof(osvi)); // nahrada za memset (nevyzaduje RTLko)
+    SecureZeroMemory(&osvi, sizeof(osvi)); // replacement for memset (does not require RTL)
     osvi.dwOSVersionInfoSize = sizeof(osvi);
     osvi.dwMajorVersion = wMajorVersion;
     osvi.dwMinorVersion = wMinorVersion;
@@ -114,8 +114,8 @@ BOOL WinLibIsWindowsVersionOrGreater(WORD wMajorVersion, WORD wMinorVersion, WOR
 // ****************************************************************************
 // CWindow
 //
-// lpvParam - v pripade, ze se pri CreateWindow zavola CWindow::CWindowProc
-//            (je v tride okna), musi obsahovat adresu objektu vytvareneho okna
+// lpvParam - in case CWindow::CWindowProc is called during CreateWindow
+//            (it's in window class), must contain address of created window object
 
 HWND CWindow::CreateEx(DWORD dwExStyle,        // extended window style
                        LPCTSTR lpszClassName,  // address of registered class name
@@ -144,8 +144,8 @@ HWND CWindow::CreateEx(DWORD dwExStyle,        // extended window style
                                lpvParam);
     if (hWnd != 0)
     {
-        if (WindowsManager.GetWindowPtr(hWnd) == NULL) // pokud se jeste neni ve WindowsManageru
-            AttachToWindow(hWnd);                      // tak ho pridame -> subclassing
+        if (WindowsManager.GetWindowPtr(hWnd) == NULL) // if not yet in WindowsManager
+            AttachToWindow(hWnd);                      // add it -> subclassing
     }
     return hWnd;
 }
@@ -205,8 +205,8 @@ HWND CWindow::CreateExW(DWORD dwExStyle,        // extended window style
                                 lpvParam);
     if (hWnd != 0)
     {
-        if (WindowsManager.GetWindowPtr(hWnd) == NULL) // pokud se jeste neni ve WindowsManageru
-            AttachToWindow(hWnd);                      // tak ho pridame -> subclassing
+        if (WindowsManager.GetWindowPtr(hWnd) == NULL) // if not yet in WindowsManager
+            AttachToWindow(hWnd);                      // add it -> subclassing
     }
     return hWnd;
 }
@@ -275,7 +275,7 @@ void CWindow::AttachToWindow(HWND hWnd)
 #ifndef _UNICODE
         || DefWndProc == CWindow::CWindowProcW
 #endif    // _UNICODE
-        ) // to by byla rekurze
+        ) // this would be recursion
     {
         TRACE_CT(_T("This should never happen."));
         DefWndProc = GetDefWindowProc();

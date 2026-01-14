@@ -10,17 +10,17 @@ class CTreePropHolderDlg;
 
 struct CElasticLayoutCtrl
 {
-    HWND HCtrl; // handl prvku, ktery mame posouvat
-    POINT Pos;  // pozice prvku vuci spodni hrane opsane obalky
+    HWND HCtrl; // handle of element that we should move
+    POINT Pos;  // element position relative to bottom edge of bounding box
 };
 
-// pomocna trida slouzici pro layout prvku dialogu na zaklade jeho velikosti
+// helper class for dialog element layout based on its size
 class CElasticLayout
 {
 public:
     CElasticLayout(HWND hWindow);
     void AddResizeCtrl(int resID);
-    // provede rozmisteni prvku
+    // performs element layout
     void LayoutCtrls();
 
 protected:
@@ -29,25 +29,25 @@ protected:
     void FindMoveCtrls();
 
 protected:
-    // handle dialogu, jehoz layout zajistujeme
+    // dialog handle whose layout we ensure
     HWND HWindow;
-    // delici linka, od ktere jiz prvky posouvame (lezi na spodni hrane ResizeCntrls)
-    // client souradnice v bodech
+    // dividing line from which we move elements (lies on bottom edge of ResizeCntrls)
+    // client coordinates in points
     int SplitY;
-    // prvky ktere s velikosti natahujeme (typicky listview)
+    // elements that we stretch with size (typically listview)
     TDirectArray<CElasticLayoutCtrl> ResizeCtrls;
-    // docasne pole plnene z FindMoveCtrls; idealne by slo o lokalni promennou, ale
-    // pro pohodlne volani callbacku FindMoveControls (kam ho potrebujeme predat)
-    // ho umistuji jako atribut tridy
+    // temporary array filled from FindMoveCtrls; ideally would be a local variable, but
+    // for convenient callback FindMoveControls calling (where we need to pass it)
+    // I place it as a class attribute
     TDirectArray<CElasticLayoutCtrl> MoveCtrls;
 };
 
 class CPropSheetPage : protected CDialog
 {
 public:
-    CDialog::SetObjectOrigin; // zpristupneni povolenych metod predku
+    CDialog::SetObjectOrigin; // making allowed ancestor methods accessible
     CDialog::Transfer;
-    CDialog::HWindow; // HWindow zustane take pristupne
+    CDialog::HWindow; // HWindow remains also accessible
 
     CPropSheetPage(const TCHAR* title, HINSTANCE modul, int resID,
                    DWORD flags /* = PSP_USETITLE*/, HICON icon,
@@ -79,13 +79,13 @@ protected:
     DWORD Flags;
     HICON Icon;
 
-    CPropertyDialog* ParentDialog; // vlastnik teto stranky
-    // pro TreeDialog
+    CPropertyDialog* ParentDialog; // owner of this page
+    // for TreeDialog
     CPropSheetPage* ParentPage;
     HTREEITEM HTreeItem;
     BOOL* Expanded;
 
-    // pokud je ruzne od NULL, se zmenou velikosti dialogu menime layout prvku
+    // if different from NULL, we change element layout with dialog size change
     CElasticLayout* ElasticLayout;
 
     friend class CPropertyDialog;

@@ -236,13 +236,13 @@ BOOL CAdvancedSEDialog::OnInit(WPARAM wParam, LPARAM lParam)
         CurrentSfxLang = (CSfxLang*)SendDlgItemMessage(Dlg, IDC_LANGUAGE, CB_GETITEMDATA, i, 0);
         if ((LRESULT)CurrentSfxLang == CB_ERR)
         {
-            TRACE_E("nepodarilo se ziskat aktualni jazyk z comboboxu");
+            TRACE_E("failed to get current language from combobox");
             CurrentSfxLang = NULL;
         }
     }
     else
     {
-        TRACE_E("nepodarilo se ziskat aktualni jazyk z comboboxu");
+        TRACE_E("failed to get current language from combobox");
         CurrentSfxLang = NULL;
     }
 
@@ -486,10 +486,10 @@ BOOL CAdvancedSEDialog::OnTexts(WORD wNotifyCode, WORD wID, HWND hwndCtl)
             dlg.Proceed();
         }
         else
-            TRACE_E("nepodarilo se ziskat aktualni jazyk z comboboxu");
+            TRACE_E("failed to get current language from combobox");
     }
     else
-        TRACE_E("nepodarilo se ziskat aktualni jazyk z comboboxu");
+        TRACE_E("failed to get current language from combobox");
 
     return TRUE;
 }
@@ -1047,7 +1047,7 @@ BOOL CAdvancedSEDialog::OnImport()
                     lstrcpy(settings.SfxFile, DefLanguage->FileName);
                 else
                 {
-                    TRACE_E("CAdvancedSEDialog::OnImport(), neni naloadena DefLanguage");
+                    TRACE_E("CAdvancedSEDialog::OnImport(), DefLanguage not loaded");
                     settings.SfxFile[0] = 0;
                 }
 

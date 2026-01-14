@@ -6,7 +6,7 @@
 //*****************************************************************************
 //*****************************************************************************
 //
-// puvodni regexp.h
+// original regexp.h
 //
 //*****************************************************************************
 //*****************************************************************************
@@ -36,12 +36,12 @@ void regerror(const char* error);
 //*****************************************************************************
 //*****************************************************************************
 //
-// moje cast regexp.h
+// my part of regexp.h
 //
 //*****************************************************************************
 //*****************************************************************************
 
-// chyby, ktere mohou nastat pri compilaci a hledani reg. expr.
+// errors that can occur during compilation and searching of reg. expr.
 enum CRegExpErrors
 {
     reeNoError,
@@ -59,7 +59,7 @@ enum CRegExpErrors
     reeInternalDisaster,
 };
 
-// funkce, ktera vraci text nastale chyby
+// function that returns text of occurred error
 const char* RegExpErrorText(CRegExpErrors err);
 
 // search flags
@@ -74,18 +74,18 @@ const char* RegExpErrorText(CRegExpErrors err);
 class CRegularExpression
 {
 public:
-    static const char* LastError; // text posledni chyby
+    static const char* LastError; // text of last error
 
 protected:
     const char* LastErrorText;
     char* OriginalPattern;
-    regexp* Expression; // nakompilovany regularni vyraz
+    regexp* Expression; // compiled regular expression
     WORD Flags;
 
-    char* Line;                // buffer pro radek
-    const char* OrigLineStart; // pointer na zacatek puvodniho textu (predaneho do SetLine() jako 'start')
-    int Allocated;             // kolik bytu je alokovano
-    int LineLength;            // aktualni delka radky
+    char* Line;                // buffer for line
+    const char* OrigLineStart; // pointer to the beginning of original text (passed to SetLine() as 'start')
+    int Allocated;             // how many bytes are allocated
+    int LineLength;            // current line length
 
 public:
     CRegularExpression()
