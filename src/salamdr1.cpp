@@ -877,7 +877,7 @@ void InitLocales()
         IsAlpha[i] = IsCharAlpha((char)i);
     }
 
-    if ((DecimalSeparatorLen = GetLocaleInfo(LOCALE_USER_DEFAULT, LOCALE_SDECIMAL, DecimalSeparator, 5)) == 0 ||
+    if ((DecimalSeparatorLen = GetLocaleInfoA(LOCALE_USER_DEFAULT, LOCALE_SDECIMAL, DecimalSeparator, 5)) == 0 ||
         DecimalSeparatorLen > 5)
     {
         strcpy(DecimalSeparator, ".");
@@ -889,7 +889,7 @@ void InitLocales()
         DecimalSeparator[DecimalSeparatorLen] = 0; // posychrujeme nulu na konci
     }
 
-    if ((ThousandsSeparatorLen = GetLocaleInfo(LOCALE_USER_DEFAULT, LOCALE_STHOUSAND, ThousandsSeparator, 5)) == 0 ||
+    if ((ThousandsSeparatorLen = GetLocaleInfoA(LOCALE_USER_DEFAULT, LOCALE_STHOUSAND, ThousandsSeparator, 5)) == 0 ||
         ThousandsSeparatorLen > 5)
     {
         strcpy(ThousandsSeparator, " ");
