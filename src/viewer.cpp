@@ -1,4 +1,4 @@
-﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2023 Open Salamander Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 // CommentsTranslationProject: TRANSLATED
 
@@ -46,6 +46,39 @@ void GetDefaultViewerLogFont(LOGFONT* lf)
 //
 //*****************************************************************************
 
+static void EnsureComboUnicode(HWND hWnd)
+{
+    SendMessage(hWnd, CB_SETUNICODEFORMAT, TRUE, 0);
+}
+
+static void SetWindowTextUtf8(HWND hWnd, const char* text)
+{
+    CStrP wide(ConvertAllocUtf8ToWide(text != NULL ? text : "", -1));
+    SendMessageW(hWnd, WM_SETTEXT, 0, (LPARAM)(wide != NULL ? wide.Ptr : L""));
+}
+
+static void GetWindowTextUtf8(HWND hWnd, char* buf, int bufSize)
+{
+    if (buf == NULL || bufSize <= 0)
+        return;
+    buf[0] = 0;
+    int len = GetWindowTextLengthW(hWnd);
+    if (len <= 0)
+        return;
+    CStrP wide((WCHAR*)malloc(sizeof(WCHAR) * (len + 1)));
+    if (wide == NULL)
+        return;
+    GetWindowTextW(hWnd, wide, len + 1);
+    ConvertWideToUtf8(wide, -1, buf, bufSize);
+}
+
+static void ComboAddStringUtf8(HWND hWnd, const char* text)
+{
+    CStrP wide(ConvertAllocUtf8ToWide(text != NULL ? text : "", -1));
+    if (wide != NULL)
+        SendMessageW(hWnd, CB_ADDSTRING, 0, (LPARAM)wide.Ptr);
+}
+
 void HistoryComboBox(HWND hWindow, CTransferInfo& ti, int ctrlID, char* Text,
                      int textLen, BOOL hexMode, int historySize, char* history[],
                      BOOL changeOnlyHistory)
@@ -55,20 +88,21 @@ void HistoryComboBox(HWND hWindow, CTransferInfo& ti, int ctrlID, char* Text,
     HWND hwnd;
     if (changeOnlyHistory || ti.GetControl(hwnd, ctrlID))
     {
+        EnsureComboUnicode(hwnd);
         if (!changeOnlyHistory && ti.Type == ttDataToWindow)
         {
             SendMessage(hwnd, CB_RESETCONTENT, 0, 0);
             SendMessage(hwnd, CB_LIMITTEXT, textLen - 1, 0);
-            SendMessage(hwnd, WM_SETTEXT, 0, (LPARAM)Text);
+            SetWindowTextUtf8(hwnd, Text);
         }
         else
         {
             if (!changeOnlyHistory)
             {
-                SendMessage(hwnd, WM_GETTEXT, textLen, (LPARAM)Text);
+                GetWindowTextUtf8(hwnd, Text, textLen);
                 SendMessage(hwnd, CB_RESETCONTENT, 0, 0);
                 SendMessage(hwnd, CB_LIMITTEXT, textLen - 1, 0);
-                SendMessage(hwnd, WM_SETTEXT, 0, (LPARAM)Text);
+                SetWindowTextUtf8(hwnd, Text);
             }
 
             // hex mode handling
@@ -153,7 +187,7 @@ void HistoryComboBox(HWND hWindow, CTransferInfo& ti, int ctrlID, char* Text,
             int i;
             for (i = 0; i < historySize; i++) // fill the combo-box list
                 if (history[i] != NULL)
-                    SendMessage(hwnd, CB_ADDSTRING, 0, (LPARAM)history[i]);
+                    ComboAddStringUtf8(hwnd, history[i]);
                 else
                     break;
         }
