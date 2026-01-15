@@ -1,4 +1,4 @@
-﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2023 Open Salamander Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 // CommentsTranslationProject: TRANSLATED
 
@@ -2532,13 +2532,45 @@ BOOL CFilesWindow::IsQuickRenameActive()
     return QuickRenameWindow.HWindow != NULL;
 }
 
+static void SetWindowTextUtf8(HWND hWnd, const char* text)
+{
+    CStrP wide(ConvertAllocUtf8ToWide(text != NULL ? text : "", -1));
+    SendMessageW(hWnd, WM_SETTEXT, 0, (LPARAM)(wide != NULL ? wide.Ptr : L""));
+}
+
+static void GetWindowTextUtf8(HWND hWnd, char* buf, int bufSize)
+{
+    if (buf == NULL || bufSize <= 0)
+        return;
+    buf[0] = 0;
+    int len = GetWindowTextLengthW(hWnd);
+    if (len <= 0)
+        return;
+    CStrP wide((WCHAR*)malloc(sizeof(WCHAR) * (len + 1)));
+    if (wide == NULL)
+        return;
+    GetWindowTextW(hWnd, wide, len + 1);
+    ConvertWideToUtf8(wide, -1, buf, bufSize);
+}
+
+static int MeasureTextWidthUtf8(HDC hdc, HFONT font, const char* text)
+{
+    CStrP wide(ConvertAllocUtf8ToWide(text != NULL ? text : "", -1));
+    SIZE sz = {0, 0};
+    HFONT hOldFont = (HFONT)SelectObject(hdc, font);
+    GetTextExtentPoint32W(hdc, wide != NULL ? wide.Ptr : L"", wide != NULL ? (int)wcslen(wide.Ptr) : 0, &sz);
+    SelectObject(hdc, hOldFont);
+    return sz.cx;
+}
+
 void CFilesWindow::AdjustQuickRenameRect(const char* text, RECT* r)
 {
     // measure the length of the text
     HDC hDC = HANDLES(GetDC(ListBox->HWindow));
     HFONT hOldFont = (HFONT)SelectObject(hDC, Font);
     SIZE sz;
-    GetTextExtentPoint32(hDC, text, (int)strlen(text), &sz);
+    sz.cx = MeasureTextWidthUtf8(hDC, Font, text);
+    sz.cy = 0;
     TEXTMETRIC tm;
     GetTextMetrics(hDC, &tm);
     SelectObject(hDC, hOldFont);
@@ -2577,7 +2609,7 @@ void CFilesWindow::AdjustQuickRenameWindow()
     MapWindowPoints(NULL, HWindow, (POINT*)&r, 2);
 
     char buff[3 * MAX_PATH];
-    GetWindowText(QuickRenameWindow.HWindow, buff, 3 * MAX_PATH);
+    GetWindowTextUtf8(QuickRenameWindow.HWindow, buff, 3 * MAX_PATH);
     AdjustQuickRenameRect(buff, &r);
     SetWindowPos(QuickRenameWindow.HWindow, NULL, 0, 0,
                  r.right - r.left, r.bottom - r.top,
@@ -2693,15 +2725,16 @@ void CFilesWindow::QuickRenameBegin(int index, const RECT* labelRect)
     RECT r = *labelRect;
     AdjustQuickRenameRect(formatedFileName, &r);
 
-    HWND hWnd = QuickRenameWindow.CreateEx(0,
-                                           "edit",
-                                           formatedFileName,
-                                           WS_BORDER | WS_CHILD | WS_CLIPSIBLINGS | ES_AUTOHSCROLL | ES_LEFT,
-                                           r.left, r.top, r.right - r.left, r.bottom - r.top,
-                                           GetListBoxHWND(),
-                                           NULL,
-                                           HInstance,
-                                           &QuickRenameWindow);
+    CStrP wideName(ConvertAllocUtf8ToWide(formatedFileName, -1));
+    HWND hWnd = QuickRenameWindow.CreateExW(0,
+                                            L"edit",
+                                            wideName != NULL ? wideName.Ptr : L"",
+                                            WS_BORDER | WS_CHILD | WS_CLIPSIBLINGS | ES_AUTOHSCROLL | ES_LEFT,
+                                            r.left, r.top, r.right - r.left, r.bottom - r.top,
+                                            GetListBoxHWND(),
+                                            NULL,
+                                            HInstance,
+                                            &QuickRenameWindow);
     if (hWnd == NULL)
     {
         TRACE_E("Cannot create QuickRenameWindow");
@@ -2764,7 +2797,7 @@ BOOL CFilesWindow::HandeQuickRenameWindowKey(WPARAM wParam)
 
     HWND hWnd = QuickRenameWindow.HWindow;
     char newName[MAX_PATH];
-    GetWindowText(hWnd, newName, MAX_PATH);
+    GetWindowTextUtf8(hWnd, newName, MAX_PATH);
 
     // lower the thread priority to "normal" (so operations don't overload the machine)
     SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_NORMAL);
@@ -2790,7 +2823,7 @@ BOOL CFilesWindow::HandeQuickRenameWindowKey(WPARAM wParam)
         if (!ret && !cancel)
         {
             tryAgain = TRUE;
-            SetWindowText(hWnd, newName);
+            SetWindowTextUtf8(hWnd, newName);
         }
         else
         {
@@ -2844,7 +2877,11 @@ void CFilesWindow::KillQuickRenameTimer()
 //
 
 CQuickRenameWindow::CQuickRenameWindow()
+#ifdef _UNICODE
     : CWindow(ooStatic)
+#else
+    : CWindow(ooStatic, TRUE) // create a Unicode window for correct UTF-8 conversions
+#endif
 {
     FilesWindow = NULL;
     CloseEnabled = TRUE;
