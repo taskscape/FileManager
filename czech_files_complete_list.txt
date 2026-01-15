@@ -1,0 +1,141 @@
+================================================================================
+COMPLETE LIST OF FILES WITH CZECH COMMENTS
+C:\Projects\FileManager\src Directory
+================================================================================
+
+SINGLE-LINE COMMENTS (// ...):
+-------------------------------
+Count | File Path
+------+-----------------------------------------------------------------------
+  997 | src\plugins\shared\spl_gen.h
+  352 | src\plugins\shared\spl_fs.h
+  207 | src\plugins\shared\spl_com.h
+  146 | src\plugins\shared\spl_base.h
+  138 | src\plugins\shared\spl_gui.h
+  108 | src\plugins\shared\spl_file.h
+   99 | src\salamdr1.cpp
+   74 | src\salamdr3.cpp
+   47 | src\plugins\shared\spl_arc.h
+   46 | src\shellsup.cpp
+   45 | src\menu.h
+   44 | src\gui.h
+   40 | src\sort.cpp
+   39 | src\fileswnb.cpp
+   37 | src\icncache.cpp
+   31 | src\toolbar.h
+   28 | src\tasklist.h
+   27 | src\iconlist.h
+   27 | src\stswnd.cpp
+   26 | src\shellib.h
+   25 | src\snooper.cpp
+   24 | src\toolbar4.cpp
+   24 | src\salmoncl.cpp
+   23 | src\plugins\shared\spl_thum.h
+   23 | src\iconlist.cpp
+   23 | src\salshlib.h
+   22 | src\stswnd.h
+   21 | src\icncache.h
+   20 | src\tooltip.h
+   20 | src\plugins\shared\winliblt.cpp
+   17 | src\tasklist.cpp
+   17 | src\plugins\shared\winliblt.h
+   16 | src\plugins\shared\auxtools.h
+   14 | src\usermenu.h
+   13 | src\plugins\shared\spl_vers.h
+   13 | src\tooltip.cpp
+   13 | src\thumbnl.cpp
+   12 | src\shiconov.h
+   11 | src\plugins\shared\mhandles.cpp
+   11 | src\plugins\shared\spl_menu.h
+   10 | src\svg.h
+   10 | src\thumbnl.h
+   10 | src\common\trace.h
+   10 | src\shexreg.c
+   10 | src\shares.cpp
+    9 | src\common\sheets.cpp
+    8 | src\toolbar2.cpp
+    7 | src\common\regexp.h
+    7 | src\salmoncl.h
+    7 | src\plugins\shared\dbg.cpp
+    7 | src\common\moore.h
+    6 | src\plugins\shared\auxtools.cpp
+    6 | src\common\str.h
+    6 | src\plugins\shared\dbg.h
+    5 | src\plugins\shared\lukas\array2.h
+    5 | src\salopen\salopen.cpp
+    4 | src\toolbar3.cpp
+    4 | src\common\sheets.h
+    4 | src\plugins\shared\spl_view.h
+    4 | src\toolbar5.cpp
+    4 | src\sort.h
+    4 | src\common\strutils.h
+    3 | src\plugins\shared\lukas\resedit.h
+    3 | src\toolbar6.cpp
+    3 | src\plugins\shared\lukas\utilaux.cpp
+    3 | src\toolbar1.cpp
+    3 | src\versinfo.cpp
+    2 | src\common\messages.cpp
+    2 | src\common\multimon.cpp
+    2 | src\plugins\shared\lukas\lcutils.h
+    1 | src\common\dib.cpp
+    1 | src\plugins\shared\lukas\resedit.cpp
+    1 | src\svg.cpp
+    1 | src\salinflt.h
+    1 | src\common\ms_init.cpp
+    1 | src\plugins\shared\mhandles.h
+    1 | src\toolbar7.cpp
+    1 | src\masks.cpp
+    1 | src\shellib.cpp
+    1 | src\snooper.h
+    1 | src\plugins\shared\lukas\utilbase.cpp
+    1 | src\salspawn\salspawn.cpp
+    1 | src\plugins\shared\lukas\killdbg.h
+    1 | src\md5.cpp
+    1 | src\common\regexp.cpp
+    1 | src\salamdr5.cpp
+------+-----------------------------------------------------------------------
+TOTAL: 86 files, 3,104 comments
+
+
+MULTI-LINE COMMENTS (/* ... */):
+---------------------------------
+Count | File Path
+------+-----------------------------------------------------------------------
+    4 | src\salamdr3.cpp
+    4 | src\salamdr1.cpp
+    3 | src\snooper.cpp
+    2 | src\menu.h
+    2 | src\shellsup.cpp
+    2 | src\common\regexp.cpp
+    2 | src\toolbar4.cpp
+    2 | src\sort.cpp
+    2 | src\plugins\shared\spl_fs.h
+    1 | src\plugins\shared\spl_gen.h
+    1 | src\fileswn2.cpp
+    1 | src\common\str.h
+    1 | src\gui.h
+    1 | src\toolbar7.cpp
+    1 | src\toolbar5.cpp
+    1 | src\plugins\shared\lukas\utilaux.cpp
+    1 | src\shares.cpp
+    1 | src\fileswnb.cpp
+    1 | src\salamdr5.cpp
+    1 | src\tasklist.cpp
+    1 | src\plugins\shared\spl_gui.h
+    1 | src\plugins\shared\mhandles.cpp
+    1 | src\iconlist.cpp
+    1 | src\salshlib.h
+    1 | src\plugins\shared\spl_base.h
+    1 | src\masks.cpp
+    1 | src\common\messages.h
+    1 | src\plugins\shared\winliblt.h
+------+-----------------------------------------------------------------------
+TOTAL: 28 files, 42 comments
+
+
+COMBINED TOTALS:
+----------------
+Unique files with Czech comments: 94 files (some files have both types)
+Total Czech comments found: 3,146 comments (3,104 single + 42 multi-line)
+
+================================================================================

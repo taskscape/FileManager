@@ -1,0 +1,100 @@
+================================================================================
+CZECH COMMENT VERIFICATION REPORT
+C:\Projects\FileManager\src Directory Structure
+Generated: 2026-01-15
+================================================================================
+
+SUMMARY:
+--------
+Translation Status: INCOMPLETE - Czech comments still present
+Total Files with Czech Single-Line Comments (//): 86 files
+Total Czech Single-Line Comments: 3,104 comments
+Total Files with Czech Multi-Line Comments (/* */): 28 files
+Total Czech Multi-Line Comments: 42 comments
+
+VERIFICATION STATUS: FAILED
+---------------------------
+The codebase still contains a significant number of Czech comments that have
+NOT been translated to English.
+
+TOP 20 FILES WITH MOST CZECH COMMENTS (Single-Line):
+-----------------------------------------------------
+  997 - src\plugins\shared\spl_gen.h
+  352 - src\plugins\shared\spl_fs.h
+  207 - src\plugins\shared\spl_com.h
+  146 - src\plugins\shared\spl_base.h
+  138 - src\plugins\shared\spl_gui.h
+  108 - src\plugins\shared\spl_file.h
+   99 - src\salamdr1.cpp
+   74 - src\salamdr3.cpp
+   47 - src\plugins\shared\spl_arc.h
+   46 - src\shellsup.cpp
+   45 - src\menu.h
+   44 - src\gui.h
+   40 - src\sort.cpp
+   39 - src\fileswnb.cpp
+   37 - src\icncache.cpp
+   31 - src\toolbar.h
+   28 - src\tasklist.h
+   27 - src\iconlist.h
+   27 - src\stswnd.cpp
+   26 - src\shellib.h
+
+TOP 10 FILES WITH MOST CZECH COMMENTS (Multi-Line):
+----------------------------------------------------
+    4 - src\salamdr3.cpp
+    4 - src\salamdr1.cpp
+    3 - src\snooper.cpp
+    2 - src\menu.h
+    2 - src\shellsup.cpp
+    2 - src\common\regexp.cpp
+    2 - src\toolbar4.cpp
+    2 - src\sort.cpp
+    2 - src\plugins\shared\spl_fs.h
+    1 - src\plugins\shared\spl_gen.h
+
+EXAMPLES OF CZECH COMMENTS FOUND:
+----------------------------------
+From src\plugins\shared\spl_gen.h:
+  - "pokud se pouziva CheckBoxText, bude v nem vyhledan oddelovac"
+  - "windowsova cesta"
+  - "cesta do archivu"
+  - "prilis dlouha cesta"
+  - "prazdny retezec 'name'"
+
+From src\fileswnb.cpp:
+  - "pouze predame hlavnimu oknu"
+  - "pokud je nad timto panelem otevrene Alt+F1(2) menu"
+  - "nebo hlaseni konce cteni ikonek"
+
+AFFECTED DIRECTORIES:
+---------------------
+- src\ (main source)
+- src\plugins\shared\ (plugin SDK headers - heavily affected)
+- src\common\ (common utilities)
+- src\salopen\, src\salspawn\ (helper utilities)
+
+EXCLUSIONS (as requested):
+--------------------------
+- Language resource files (*.slg) - excluded
+- language/czech/, language/slovak/ directories - excluded
+- Test data strings (e.g., "testíček") - these are test data, not comments
+
+RECOMMENDATION:
+---------------
+The translation effort is NOT complete. There are 3,146 Czech comments (3,104
+single-line + 42 multi-line) across 86 files that still need to be translated
+to English. The most critical files are the plugin SDK headers in
+src\plugins\shared\ directory, which contain nearly 2,000 Czech comments.
+
+SEARCH PATTERNS USED:
+---------------------
+Czech keywords searched: pokud, nebo, pouze, pro je, muze, musi, bude, podle,
+obsahuje, adresar, soubor, cesta, jinak, vraci, prida, odstrani, konci, delka,
+velikost, buffer, retezec, jmeno, pripona, atd, pokial, nastavena, promenna,
+dostupny, mozne, nutne, puvodni, volani, hodnot
+
+Pattern for single-line: //.*\b(czech_keywords)\b
+Pattern for multi-line: /\*[\s\S]*?\*/ containing czech_keywords
+
+================================================================================
