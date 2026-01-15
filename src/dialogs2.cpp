@@ -1,4 +1,4 @@
-﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2023 Open Salamander Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 // CommentsTranslationProject: TRANSLATED
 
@@ -13,6 +13,17 @@
 #include "mainwnd.h"
 #include "gui.h"
 #include "shellib.h"
+
+static void SetWindowTextUtf8(HWND hWnd, const char* text)
+{
+    CStrP wide(ConvertAllocUtf8ToWide(text != NULL ? text : "", -1));
+    SendMessageW(hWnd, WM_SETTEXT, 0, (LPARAM)(wide != NULL ? wide.Ptr : L""));
+}
+
+static void SetDlgItemTextUtf8(HWND hWnd, int itemID, const char* text)
+{
+    SetWindowTextUtf8(GetDlgItem(hWnd, itemID), text);
+}
 
 //****************************************************************************
 //
@@ -373,7 +384,7 @@ void CSizeResultsDlg::UpdateEstimate()
                          CQuadWord(bytesPerCluster - 1, 0);
         }
 
-        SetWindowText(GetDlgItem(HWindow, IDC_EST_SIZE), PrintDiskSize(buf, estimated, 1));
+        SetDlgItemTextUtf8(HWindow, IDC_EST_SIZE, PrintDiskSize(buf, estimated, 1));
 
         if (estimated == CQuadWord(0, 0))
             strcpy(buf, "0 %");
@@ -382,7 +393,7 @@ void CSizeResultsDlg::UpdateEstimate()
             sprintf(buf, "%-1.4lg %%", 100 * Size.GetDouble() / estimated.GetDouble());
             PointToLocalDecimalSeparator(buf, _countof(buf));
         }
-        SetWindowText(GetDlgItem(HWindow, IDC_EST_UTIL), buf);
+        SetDlgItemTextUtf8(HWindow, IDC_EST_UTIL, buf);
 
         EnableWindow(GetDlgItem(HWindow, IDC_EST_SIZE), TRUE);
         EnableWindow(GetDlgItem(HWindow, IDC_EST_UTIL), TRUE);
@@ -391,8 +402,8 @@ void CSizeResultsDlg::UpdateEstimate()
     {
         EnableWindow(GetDlgItem(HWindow, IDC_EST_SIZE), FALSE);
         EnableWindow(GetDlgItem(HWindow, IDC_EST_UTIL), FALSE);
-        SetWindowText(GetDlgItem(HWindow, IDC_EST_SIZE), UnknownText);
-        SetWindowText(GetDlgItem(HWindow, IDC_EST_UTIL), UnknownText);
+        SetDlgItemTextUtf8(HWindow, IDC_EST_SIZE, UnknownText);
+        SetDlgItemTextUtf8(HWindow, IDC_EST_UTIL, UnknownText);
     }
 }
 
@@ -408,12 +419,12 @@ CSizeResultsDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 
         char buf[100];
 
-        SetWindowText(GetDlgItem(HWindow, IDS_FILESCOUNT), NumberToStr(buf, CQuadWord(Files, 0)));
-        SetWindowText(GetDlgItem(HWindow, IDS_DIRSCOUNT), NumberToStr(buf, CQuadWord(Dirs, 0)));
+        SetDlgItemTextUtf8(HWindow, IDS_FILESCOUNT, NumberToStr(buf, CQuadWord(Files, 0)));
+        SetDlgItemTextUtf8(HWindow, IDS_DIRSCOUNT, NumberToStr(buf, CQuadWord(Dirs, 0)));
 
         if (Occupied != CQuadWord(-1, -1))
         {
-            SetWindowText(GetDlgItem(HWindow, IDS_OCCUPIED), PrintDiskSize(buf, Occupied, 1));
+            SetDlgItemTextUtf8(HWindow, IDS_OCCUPIED, PrintDiskSize(buf, Occupied, 1));
             if (Occupied == CQuadWord(0, 0))
                 strcpy(buf, "0 %");
             else
@@ -428,7 +439,7 @@ CSizeResultsDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                     sprintf(buf, "%-1.4lg %%", result);
                 PointToLocalDecimalSeparator(buf, _countof(buf));
             }
-            SetWindowText(GetDlgItem(HWindow, IDS_DISKUTILIZATION), buf);
+            SetDlgItemTextUtf8(HWindow, IDS_DISKUTILIZATION, buf);
         }
         else
         {
@@ -436,10 +447,10 @@ CSizeResultsDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
             EnableWindow(GetDlgItem(HWindow, IDS_DISKUTILIZATION), FALSE);
         }
 
-        SetWindowText(GetDlgItem(HWindow, IDS_SIZE), PrintDiskSize(buf, Size, 1));
+        SetDlgItemTextUtf8(HWindow, IDS_SIZE, PrintDiskSize(buf, Size, 1));
         if (Compressed != CQuadWord(-1, -1))
         {
-            SetWindowText(GetDlgItem(HWindow, IDS_COMPSIZE), PrintDiskSize(buf, Compressed, 1));
+            SetDlgItemTextUtf8(HWindow, IDS_COMPSIZE, PrintDiskSize(buf, Compressed, 1));
             if (Size == CQuadWord(0, 0))
             {
                 strcpy(buf, "100 %");
@@ -449,7 +460,7 @@ CSizeResultsDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                 sprintf(buf, "%-1.4lg %%", 100 * Compressed.GetDouble() / Size.GetDouble());
                 PointToLocalDecimalSeparator(buf, _countof(buf));
             }
-            SetWindowText(GetDlgItem(HWindow, IDS_COMPRATIO), buf);
+            SetDlgItemTextUtf8(HWindow, IDS_COMPRATIO, buf);
         }
         else
         {
