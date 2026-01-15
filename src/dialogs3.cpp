@@ -1,4 +1,4 @@
-﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2023 Open Salamander Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 // CommentsTranslationProject: TRANSLATED
 
@@ -28,6 +28,11 @@ static void SetWindowTextUtf8(HWND hWnd, const char* text)
 {
     CStrP wide(ConvertAllocUtf8ToWide(text != NULL ? text : "", -1));
     SendMessageW(hWnd, WM_SETTEXT, 0, (LPARAM)(wide != NULL ? wide.Ptr : L""));
+}
+
+static void SetDlgItemTextUtf8(HWND hWnd, int itemID, const char* text)
+{
+    SetWindowTextUtf8(GetDlgItem(hWnd, itemID), text);
 }
 
 static void GetWindowTextUtf8(HWND hWnd, char* buf, int bufSize)
@@ -1340,7 +1345,7 @@ void CDriveInfo::Transfer(CTransferInfo& ti)
         //---  GetVolumeInformation - display
         if (!err)
         {
-            SetWindowText(GetDlgItem(HWindow, IDE_VOLNAME), volumeName);
+            SetDlgItemTextUtf8(HWindow, IDE_VOLNAME, volumeName);
             strcpy(OldVolumeName, volumeName);
 
             char mountPoint[MAX_PATH];
@@ -1349,8 +1354,8 @@ void CDriveInfo::Transfer(CTransferInfo& ti)
             guidPath[0] = 0;
             if (GetResolvedPathMountPointAndGUID(VolumePath, mountPoint, guidPath))
             {
-                SetWindowText(GetDlgItem(HWindow, IDT_MOUNTPOINT), mountPoint);
-                SetWindowText(GetDlgItem(HWindow, IDT_GUIDPATH), guidPath);
+                SetDlgItemTextUtf8(HWindow, IDT_MOUNTPOINT, mountPoint);
+                SetDlgItemTextUtf8(HWindow, IDT_GUIDPATH, guidPath);
             }
 
             strcpy(volumeName, VolumePath);
@@ -1359,13 +1364,13 @@ void CDriveInfo::Transfer(CTransferInfo& ti)
             sprintf(buff, "(%s) ", volumeName);
             GetWindowText(HWindow, buff + strlen(buff), 100);
 
-            SetWindowText(HWindow, buff);
+            SetWindowTextUtf8(HWindow, buff);
 
             sprintf(volumeName, "%04X-%04X", HIWORD(volumeSerialNumber), LOWORD(volumeSerialNumber));
-            SetWindowText(GetDlgItem(HWindow, IDT_VOLSERNUM), volumeName);
+            SetDlgItemTextUtf8(HWindow, IDT_VOLSERNUM, volumeName);
 
             strcpy(volumeName, (maximumComponentLength > 100) ? LoadStr(IDS_INFODLGYES) : LoadStr(IDS_INFODLGNO));
-            SetWindowText(GetDlgItem(HWindow, IDT_LONGNAMES), volumeName);
+            SetDlgItemTextUtf8(HWindow, IDT_LONGNAMES, volumeName);
 
             volumeName[0] = 0;
             BOOL first = TRUE;
@@ -1460,9 +1465,9 @@ void CDriveInfo::Transfer(CTransferInfo& ti)
                 strcat(volumeName, LoadStr(IDS_INFODLGFLAG13));
                 first = FALSE;
             }
-            SetWindowText(GetDlgItem(HWindow, IDT_FILESYSTEMFLAGS), volumeName);
+            SetDlgItemTextUtf8(HWindow, IDT_FILESYSTEMFLAGS, volumeName);
 
-            SetWindowText(GetDlgItem(HWindow, IDT_FILESYSTEMNAME), fileSystemNameBuffer);
+            SetDlgItemTextUtf8(HWindow, IDT_FILESYSTEMNAME, fileSystemNameBuffer);
         }
         //---  GetDiskFreeSpace
         DWORD sectorsPerCluster;
@@ -1490,22 +1495,22 @@ void CDriveInfo::Transfer(CTransferInfo& ti)
         if (!err)
         {
             NumberToStr(volumeName, CQuadWord(sectorsPerCluster, 0));
-            SetWindowText(GetDlgItem(HWindow, IDT_SPC), volumeName);
+            SetDlgItemTextUtf8(HWindow, IDT_SPC, volumeName);
 
             NumberToStr(volumeName, CQuadWord(bytesPerSector, 0));
-            SetWindowText(GetDlgItem(HWindow, IDT_BPS), volumeName);
+            SetDlgItemTextUtf8(HWindow, IDT_BPS, volumeName);
 
             if (CQuadWord(bytesPerSector, 0) * CQuadWord(sectorsPerCluster, 0) != CQuadWord(0, 0))
                 NumberToStr(volumeName, diskTotalBytes / (CQuadWord(bytesPerSector, 0) * CQuadWord(sectorsPerCluster, 0)));
             else
                 volumeName[0] = 0;
-            SetWindowText(GetDlgItem(HWindow, IDT_NOC), volumeName);
+            SetDlgItemTextUtf8(HWindow, IDT_NOC, volumeName);
 
             if (CQuadWord(bytesPerSector, 0) * CQuadWord(sectorsPerCluster, 0) != CQuadWord(0, 0))
                 NumberToStr(volumeName, CQuadWord(bytesPerSector, 0) * CQuadWord(sectorsPerCluster, 0));
             else
                 volumeName[0] = 0;
-            SetWindowText(GetDlgItem(HWindow, IDT_BPC), volumeName);
+            SetDlgItemTextUtf8(HWindow, IDT_BPC, volumeName);
         }
         if (diskTotalBytes != CQuadWord(-1, -1))
         {
@@ -1519,16 +1524,16 @@ void CDriveInfo::Transfer(CTransferInfo& ti)
             GetWindowRect(GetDlgItem(HWindow, IDB_GRAPH), &tmpR2);
             spaceForLongAndShort = tmpR2.left - tmpR1.left;
 
-            SetWindowText(GetDlgItem(HWindow, IDT_CAPACITY), PrintDiskSize(volumeName, diskTotalBytes, 2));
-            SetWindowText(GetDlgItem(HWindow, IDT_CAPACITY_SHORT), PrintDiskSize(volumeName, diskTotalBytes, 0));
-            SetWindowText(GetDlgItem(HWindow, IDT_FREESPACE), PrintDiskSize(volumeName, diskFreeBytes, 2));
-            SetWindowText(GetDlgItem(HWindow, IDT_FREESPACE_SHORT), PrintDiskSize(volumeName, diskFreeBytes, 0));
+            SetDlgItemTextUtf8(HWindow, IDT_CAPACITY, PrintDiskSize(volumeName, diskTotalBytes, 2));
+            SetDlgItemTextUtf8(HWindow, IDT_CAPACITY_SHORT, PrintDiskSize(volumeName, diskTotalBytes, 0));
+            SetDlgItemTextUtf8(HWindow, IDT_FREESPACE, PrintDiskSize(volumeName, diskFreeBytes, 2));
+            SetDlgItemTextUtf8(HWindow, IDT_FREESPACE_SHORT, PrintDiskSize(volumeName, diskFreeBytes, 0));
             if (diskTotalBytes >= diskFreeBytes)
                 diskTotalBytes -= diskFreeBytes;
             else
                 diskTotalBytes.SetUI64(0); // rather zero than complete nonsense
-            SetWindowText(GetDlgItem(HWindow, IDT_USEDSPACE), PrintDiskSize(volumeName, diskTotalBytes, 2));
-            SetWindowText(GetDlgItem(HWindow, IDT_USEDSPACE_SHORT), PrintDiskSize(volumeName, diskTotalBytes, 0));
+            SetDlgItemTextUtf8(HWindow, IDT_USEDSPACE, PrintDiskSize(volumeName, diskTotalBytes, 2));
+            SetDlgItemTextUtf8(HWindow, IDT_USEDSPACE_SHORT, PrintDiskSize(volumeName, diskTotalBytes, 0));
             // position the static controls
             int height;
             RECT r;
@@ -1647,7 +1652,7 @@ void CDriveInfo::Transfer(CTransferInfo& ti)
                 sprintf(volumeName + strlen(volumeName), LoadStr(linkType == 2 ? IDS_INFODLGTYPE9 : IDS_INFODLGTYPE10),
                         junctionOrSymlinkTgt);
             }
-            SetWindowText(GetDlgItem(HWindow, IDT_DRIVETYPE), volumeName);
+            SetDlgItemTextUtf8(HWindow, IDT_DRIVETYPE, volumeName);
         }
         //---  GetDriveIcon
         HDriveIcon = GetDriveIcon(volumePathWithBackslash, driveType, TRUE, TRUE);
@@ -2147,9 +2152,9 @@ CZIPSizeResultsDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
       MoveWindow(HWindow, r1.left, r1.top, width, r1.bottom - r1.top, FALSE);
       */
         char buf[50];
-        SetWindowText(GetDlgItem(HWindow, IDS_SIZE), PrintDiskSize(buf, Size, 1));
-        SetWindowText(GetDlgItem(HWindow, IDS_FILESCOUNT), NumberToStr(buf, CQuadWord(Files, 0)));
-        SetWindowText(GetDlgItem(HWindow, IDS_DIRSCOUNT), NumberToStr(buf, CQuadWord(Dirs, 0)));
+        SetDlgItemTextUtf8(HWindow, IDS_SIZE, PrintDiskSize(buf, Size, 1));
+        SetDlgItemTextUtf8(HWindow, IDS_FILESCOUNT, NumberToStr(buf, CQuadWord(Files, 0)));
+        SetDlgItemTextUtf8(HWindow, IDS_DIRSCOUNT, NumberToStr(buf, CQuadWord(Dirs, 0)));
         break;
     }
     }
