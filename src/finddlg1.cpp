@@ -1,4 +1,4 @@
-﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2023 Open Salamander Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 // CommentsTranslationProject: TRANSLATED
 
@@ -25,6 +25,24 @@ const char* NORMAL_FINDING_CAPTION = "%s [%s %s]";
 BOOL FindManageInUse = FALSE;
 BOOL FindIgnoreInUse = FALSE;
 
+static char FoundFilesDataTextBuffer[4 * MAX_PATH];
+static WCHAR FoundFilesDataTextBufferW[4 * MAX_PATH];
+
+static void Utf8ToAnsiWithLimit(const char* src, char* dst, int dstSize)
+{
+    if (dst == NULL || dstSize <= 0)
+        return;
+    dst[0] = 0;
+
+    WCHAR wide[4 * MAX_PATH];
+    int wLen = ConvertUtf8ToWide(src, -1, wide, _countof(wide));
+    if (wLen == 0)
+        return;
+
+    int res = WideCharToMultiByte(CP_ACP, 0, wide, -1, dst, dstSize, NULL, NULL);
+    if (res == 0 && GetLastError() == ERROR_INSUFFICIENT_BUFFER)
+        dst[dstSize - 1] = 0;
+}
 //****************************************************************************
 //
 // CFindTBHeader
@@ -162,6 +180,8 @@ CFoundFilesListView::CFoundFilesListView(HWND dlg, int ctrlID, CFindDialog* find
 {
     FindDialog = findDialog;
     HANDLES(InitializeCriticalSection(&DataCriticalSection));
+    // use Unicode notifications if available
+    ListView_SetUnicodeFormat(HWindow, TRUE);
 
     // add this panel to the array of sources for enumerating files in viewers
     EnumFileNamesAddSourceUID(HWindow, &EnumFileNamesSourceUID);
@@ -4095,12 +4115,64 @@ MENU_TEMPLATE_ITEM FindLookInBrowseMenu[] =
 
             case LVN_GETDISPINFO:
             {
-                LV_DISPINFO* info = (LV_DISPINFO*)lParam;
-                CFoundFilesData* item = FoundFilesListView->At(info->item.iItem);
-                if (info->item.mask & LVIF_IMAGE)
-                    info->item.iImage = item->IsDir ? 0 : 1;
-                if (info->item.mask & LVIF_TEXT)
-                    info->item.pszText = item->GetText(info->item.iSubItem, FoundFilesDataTextBuffer, FileNameFormat);
+                if (ListView_GetUnicodeFormat(HWindow))
+                {
+                    NMLVDISPINFOW* infoW = (NMLVDISPINFOW*)lParam;
+                    CFoundFilesData* item = FoundFilesListView->At(infoW->item.iItem);
+                    if (infoW->item.mask & LVIF_IMAGE)
+                        infoW->item.iImage = item->IsDir ? 0 : 1;
+                    if (infoW->item.mask & LVIF_TEXT)
+                    {
+                        const char* text = item->GetText(infoW->item.iSubItem, FoundFilesDataTextBuffer, FileNameFormat);
+                        if ((text == NULL || text[0] == 0) && infoW->item.iSubItem == 0)
+                            text = item->Path; // fallback to path if name missing
+                        int maxChars = infoW->item.cchTextMax > 0 ? infoW->item.cchTextMax : (int)_countof(FoundFilesDataTextBufferW);
+                        if (maxChars <= 0)
+                            maxChars = (int)_countof(FoundFilesDataTextBufferW);
+                        if (maxChars > (int)_countof(FoundFilesDataTextBufferW))
+                            maxChars = (int)_countof(FoundFilesDataTextBufferW);
+
+                        // always write into our own buffer and point pszText to it
+                        if (ConvertUtf8ToWide(text, -1, FoundFilesDataTextBufferW, maxChars) == 0)
+                        {
+                            MultiByteToWideChar(CP_ACP, 0, text, -1, FoundFilesDataTextBufferW, maxChars);
+                            FoundFilesDataTextBufferW[maxChars - 1] = 0;
+                        }
+                        if (FoundFilesDataTextBufferW[0] == 0 && text != NULL)
+                        {
+                            // ultimate fallback: copy ANSI text to wide directly
+                            MultiByteToWideChar(CP_ACP, 0, text, -1, FoundFilesDataTextBufferW, maxChars);
+                            FoundFilesDataTextBufferW[maxChars - 1] = 0;
+                        }
+                        infoW->item.pszText = FoundFilesDataTextBufferW;
+                    }
+                }
+                else
+                {
+                    LV_DISPINFO* info = (LV_DISPINFO*)lParam;
+                    CFoundFilesData* item = FoundFilesListView->At(info->item.iItem);
+                    if (info->item.mask & LVIF_IMAGE)
+                        info->item.iImage = item->IsDir ? 0 : 1;
+                    if (info->item.mask & LVIF_TEXT)
+                    {
+                        const char* text = item->GetText(info->item.iSubItem, FoundFilesDataTextBuffer, FileNameFormat);
+                        if ((text == NULL || text[0] == 0) && info->item.iSubItem == 0)
+                            text = item->Path; // fallback to path if name missing
+                        int maxChars = info->item.cchTextMax > 0 ? info->item.cchTextMax : (int)sizeof(FoundFilesDataTextBuffer);
+                        if (maxChars <= 0)
+                            maxChars = (int)sizeof(FoundFilesDataTextBuffer);
+                        if (maxChars > (int)sizeof(FoundFilesDataTextBuffer))
+                            maxChars = (int)sizeof(FoundFilesDataTextBuffer);
+
+                        Utf8ToAnsiWithLimit(text, FoundFilesDataTextBuffer, maxChars);
+                        if (FoundFilesDataTextBuffer[0] == 0 && text != NULL)
+                        {
+                            lstrcpyn(FoundFilesDataTextBuffer, text, maxChars);
+                            FoundFilesDataTextBuffer[maxChars - 1] = 0;
+                        }
+                        info->item.pszText = FoundFilesDataTextBuffer;
+                    }
+                }
                 break;
             }
 
