@@ -30,20 +30,20 @@
 #define SSTHUMB_MIRROR_VERT 2                                           // obrazek je potreba vertikalne zrcadlit
 #define SSTHUMB_ROTATE_90CW 4                                           // obrazek je potreba otocit o 90 stupnu ve smeru hodinovych rucicek
 #define SSTHUMB_ROTATE_180 (SSTHUMB_MIRROR_VERT | SSTHUMB_MIRROR_HOR)   // obrazek je potreba otocit o 180 stupnu
-#define SSTHUMB_ROTATE_90CCW (SSTHUMB_ROTATE_90CW | SSTHUMB_ROTATE_180) // obrazek je potreba otocit o 90 stupnu proti smeru hodinovych rucicek
-// obrazek je v horsi kvalite nebo mensi nez je potreba, Salamander po dokonceni prvniho kola
-// ziskavani "rychlych" thumbnailu zkusi pro tento obrazek ziskat "kvalitni" thumbnail
+#define SSTHUMB_ROTATE_90CCW (SSTHUMB_ROTATE_90CW | SSTHUMB_ROTATE_180) // image needs to be rotated 90 degrees counterclockwise
+// image is in worse quality or smaller than needed, Salamander after completing first round
+// of getting "fast" thumbnails tries to get "quality" thumbnail for this image
 #define SSTHUMB_ONLY_PREVIEW 8
 
 class CSalamanderThumbnailMakerAbstract
 {
 public:
-    // nastaveni parametru zpracovani obrazku pri tvorbe thumbnailu; nutne volat
+    // setting parameters for image processing when creating thumbnail; must be called
     // jako prvni metodu tohoto rozhrani; 'picWidth' a 'picHeight' jsou rozmery
     // zpracovavaneho obrazku (v bodech); 'flags' je kombinace flagu SSTHUMB_XXX,
-    // ktera udava informace o obrazku predavanem v parametru 'buffer' v metode
-    // ProcessBuffer; vraci TRUE, pokud se podarilo alokovat buffery pro zmensovani
-    // a je mozne nasledne volat ProcessBuffer; pokud vrati FALSE, doslo k chybe
+    // which provides information about image passed in parameter 'buffer' in method
+    // ProcessBuffer; returns TRUE, if buffers for reduction were successfully allocated
+    // and it is possible to subsequently call ProcessBuffer; if returns FALSE, error occurred
     // a je treba ukoncit nacitani thumbnailu
     virtual BOOL WINAPI SetParameters(int picWidth, int picHeight, DWORD flags) = 0;
 
@@ -53,11 +53,11 @@ public:
     // ctvrteho bytu, ktery se ignoruje); rozlisujeme dva typy zpracovani: kopie
     // obrazku do vysledneho thumbnailu (nepresahuje-li velikost zpracovavaneho obrazku
     // velikost thumbnailu) a zmenseni obrazku do thumbnailu (obrazek vetsi nez
-    // thumbnail); 'buffer' je pouzit pouze pro cteni; 'rowsCount' urcuje kolik radku
+    // thumbnail); 'buffer' is used only for reading; 'rowsCount' specifies how many rows
     // obrazku je v bufferu;
     // je-li'buffer' NULL, berou se data z vlastniho bufferu (plugin ziska pres GetBuffer);
-    // vraci TRUE pokud ma plugin pokracovat s nacitanim obrazku, vraci-li FALSE,
-    // tvorba thumbnailu je hotova (byl zpracovan cely obrazek) nebo se ma co
+    // returns TRUE if plugin should continue loading image, if returns FALSE,
+    // thumbnail creation is finished (entire image was processed) or should
     // nejdrive prerusit (napr. uzivatel zmenil cestu v panelu, thumbnail tedy jiz
     // neni potreba)
     //

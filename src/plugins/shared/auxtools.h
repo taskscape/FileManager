@@ -19,7 +19,7 @@
 struct CThreadQueueItem
 {
     HANDLE Thread;
-    DWORD ThreadID; // jen pro ladici ucely (nalezeni threadu v seznamu threadu v debuggeru)
+    DWORD ThreadID; // only for debugging purposes (finding thread in thread list in debugger)
     int Locks;      // pocet zamku, je-li > 0 nesmime zavrit 'Thread'
     CThreadQueueItem* Next;
 
@@ -35,9 +35,9 @@ struct CThreadQueueItem
 class CThreadQueue
 {
 protected:
-    const char* QueueName; // jmeno fronty (jen pro debugovaci ucely)
+    const char* QueueName; // queue name (only for debugging purposes)
     CThreadQueueItem* Head;
-    HANDLE Continue; // musime pockat na predani dat do startovaneho threadu
+    HANDLE Continue; // we must wait for data transfer to started thread
 
     struct CCS // pristup z vice threadu -> nutna synchronizace
     {
@@ -55,46 +55,46 @@ public:
     ~CThreadQueue();
 
     // spusti funkci 'body' s parametrem 'param' v nove vytvorenem threadu se zasobnikem
-    // o velikosti 'stack_size' (0 = default); vraci handle threadu nebo NULL pri chybe,
+    // of size 'stack_size' (0 = default); returns thread handle or NULL on error,
     // zaroven vysledek zapise pred spustenim threadu (resume) i do 'threadHandle'
-    // (neni-li NULL), vraceny handle threadu pouzivat jen na testy na NULL a pro volani
+    // (if not NULL), use returned thread handle only for NULL tests and for calling
     // metod CThreadQueue: WaitForExit() a KillThread(); zavreni handlu threadu zajistuje
     // tento objekt fronty
-    // POZOR: -thread se muze spustit se zpozdenim az po navratu ze StartThread()
+    // WARNING: -thread may start with delay after return from StartThread()
     //         (je-li 'param' ukazatel na strukturu ulozenou na zasobniku, je nutne
-    //          synchronizovat predani dat z 'param' - hl. thread musi pockat
+    //          synchronize data transfer from 'param' - main thread must wait
     //          na prevzeti dat novym threadem)
-    //        -vraceny handle threadu jiz muze byt zavreny pokud thread dobehne pred
-    //         navratem ze StartThread() a z jineho threadu se vola StartThread() nebo
+    //        -returned thread handle may already be closed if thread finishes before
+    //         return from StartThread() and StartThread() is called from another thread or
     //         KillAll()
     // mozne volat z libovolneho threadu
     HANDLE StartThread(unsigned(WINAPI* body)(void*), void* param, unsigned stack_size = 0,
                        HANDLE* threadHandle = NULL, DWORD* threadID = NULL);
 
-    // ceka na ukonceni threadu z teto fronty; 'thread' je handle threadu, ktery jiz muze
-    // byt i zavreny (zavira tento objekt pri volani StartThread a KillAll); pokud se
+    // waits for thread termination from this queue; 'thread' is thread handle, which may already
+    // be closed (this object closes it when calling StartThread and KillAll); if
     // docka ukonceni threadu, vyradi thread z fronty a zavre jeho handle
     BOOL WaitForExit(HANDLE thread, int milliseconds = INFINITE);
 
     // zabije thread z teto fronty (pres TerminateThread()); 'thread' je handle threadu,
-    // ktery jiz muze byt i zavreny (zavira tento objekt pri volani StartThread a KillAll);
-    // pokud thread najde, zabije ho, vyradi z fronty a zavre jeho handle (objekt threadu
-    // se nedealokuje, protoze jeho stav je neznamy, mozna nekonzistentni)
+    // which may already be closed (this object closes it when calling StartThread and KillAll);
+    // if thread is found, kills it, removes from queue and closes its handle (thread object
+    // is not deallocated, because its state is unknown, possibly inconsistent)
     void KillThread(HANDLE thread, DWORD exitCode = 666);
 
     // overi, ze vsechny thready skoncily; je-li 'force' TRUE a nejaky thread jeste bezi,
     // ceka 'forceWaitTime' (v ms) na ukonceni vsech threadu, pak bezici thready zabije
-    // (jejich objekty se nedealokuji, protoze jejich stav je neznamy, mozna nekonzistentni);
-    // vraci TRUE, jsou-li vsechny thready ukoncene, pri 'force' TRUE vzdy vraci TRUE;
+    // (their objects are not deallocated, because their state is unknown, possibly inconsistent);
+    // returns TRUE, if all threads are terminated, with 'force' TRUE always returns TRUE;
     // je-li 'force' FALSE a nejaky thread jeste bezi, ceka 'waitTime' (v ms) na ukonceni
-    // vsech threadu, pokud pak jeste stale neco bezi, vraci FALSE; cas INFINITE = neomezene
+    // of all threads, if something is still running then, returns FALSE; time INFINITE = unlimited
     // dlouhe cekani
     // mozne volat z libovolneho threadu
     BOOL KillAll(BOOL force, int waitTime = 1000, int forceWaitTime = 200, DWORD exitCode = 666);
 
-protected:                                                 // vnitrni nesynchronizovane metody
-    BOOL Add(CThreadQueueItem* item);                      // prida polozku do fronty, vraci uspech
-    BOOL FindAndLockItem(HANDLE thread);                   // najde polozku pro 'thread' ve fronte a zamkne ji
+protected:                                                 // internal unsynchronized methods
+    BOOL Add(CThreadQueueItem* item);                      // adds item to queue, returns success
+    BOOL FindAndLockItem(HANDLE thread);                   // finds item for 'thread' in queue and locks it
     void UnlockItem(HANDLE thread, BOOL deleteIfUnlocked); // odemkne polozku pro 'thread' ve fronte, pripadne ji smaze
     void ClearFinishedThreads();                           // vyradi z fronty thready, ktere jiz dobehly
     static DWORD WINAPI ThreadBase(void* param);           // univerzalni body threadu

@@ -4,9 +4,9 @@
 #pragma once
 
 // nasledujici funkce nepadaji pri praci s neplatnou pameti (ani pri praci s NULL):
-// lstrcpy, lstrcpyn, lstrlen a lstrcat (ty jsou definovane s priponou A nebo W, proto
+// lstrcpy, lstrcpyn, lstrlen and lstrcat (these are defined with suffix A or W, therefore
 // je primo neredefinujeme), v zajmu snazsiho odladeni chyb potrebujeme, aby padaly,
-// protoze jinak se na chybu prijde pozdeji v miste, kde uz nemusi byt jasne, co ji
+// because otherwise error is found later in a place where it may not be clear what
 // zpusobilo
 #define lstrcpyA _sal_lstrcpyA
 #define lstrcpyW _sal_lstrcpyW

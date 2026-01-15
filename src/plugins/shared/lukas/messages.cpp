@@ -91,7 +91,7 @@ BOOL CMessageCenter::SendMessage(CMessage* message, BOOL bufferTimeout)
         // uvolnime kritickou sekci
         ReleaseMutex(DataMutex);
 
-        // pockame az se uvolni misto v bufferu, nebo server chcipne
+        // wait until space is freed in buffer, or server dies
         HANDLE handles[] = {BufferFree, Reciever};
         DWORD ret = WaitForMultipleObjects(2, handles, FALSE, bufferTimeout);
         if (ret == WAIT_TIMEOUT)
@@ -211,11 +211,11 @@ BOOL CMessageCenter::Init()
 
     do
     {
-        // initem muze prochazet pouze jeden process
+        // init can only be done by one process
         str = Concatenate(Name, " - Startup Mutex");
         if (Sender)
         {
-            // odesilatel se muze aktivovat, jedine pokud bezi prijemce
+            // sender can activate, only if receiver is running
             StartupMutex = OpenMutex(MUTEX_ALL_ACCESS, FALSE, str);
             if (!StartupMutex)
             {
@@ -233,7 +233,7 @@ BOOL CMessageCenter::Init()
                 TRACE_E("Unable to create starting mutex.");
                 break;
             }
-            // jde pustit pouze jeden prijemce
+            // only one receiver can be started
             if (GetLastError() == ERROR_ALREADY_EXISTS)
             {
                 TRACE_I("Receiver '" << Name << "' is already running.");

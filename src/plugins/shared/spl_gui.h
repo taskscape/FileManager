@@ -21,8 +21,8 @@
 
 ////////////////////////////////////////////////////////
 //                                                    //
-// Prostor WM_APP + 200 az WM_APP + 399 je v const.h  //
-// vyjmut z prostoru pouzivaneho pro interni zpravy   //
+// Space WM_APP + 200 to WM_APP + 399 is in const.h  //
+// excluded from space used for internal messages   //
 // Salamandera.                                       //
 //                                                    //
 ////////////////////////////////////////////////////////
@@ -34,10 +34,10 @@
 #define WM_USER_INITMENUPOPUP WM_APP + 204   // [(CGUIMenuPopupAbstract*)menuPopup, LOWORD(uPos), HIWORD(uID)]
 #define WM_USER_UNINITMENUPOPUP WM_APP + 205 // [(CGUIMenuPopupAbstract*)menuPopup, LOWORD(uPos), HIWORD(uID)]
 #define WM_USER_CONTEXTMENU WM_APP + 206     // [(CGUIMenuPopupAbstract*)menuPopup, (BOOL)fromMouse \
-                                             //   (pokud dojde mysi akci, je rovno TRUE (pouzit GetMessagePos); \
-                                             //    pokud jde o klavesnicovou akci VK_APPS nebo Shift+F10, je rovno FALSE)] \
-                                             // p.s. pokud vrati TRUE, dojde ke spusteni prikazu menu nebo otevreni submenu \
-                                             // Pokud chceme v Salamu pretypovat menuPopup na CMenuPopup, \
+                                             //   (if mouse action occurs, is equal to TRUE (use GetMessagePos); \
+                                             //    if it is keyboard action VK_APPS or Shift+F10, is equal to FALSE)] \
+                                             // p.s. if returns TRUE, menu command execution or submenu opening occurs \
+                                             // If we want to typecast menuPopup to CMenuPopup in Salam, \
                                              // pouzijeme (CMenuPopup*)(CGUIMenuPopupAbstract*)menuPopup.
 
 // toolbar messages
@@ -54,9 +54,9 @@
 #define WM_USER_TTGETTEXT WM_APP + 240 // [ID predany v SetCurrentToolTip, buffer omezeny TOOLTIP_TEXT_MAX]
 
 // button pressed
-#define WM_USER_BUTTON WM_APP + 244 // [(LO)WORD buttonID, (LO)WORD udalost byla vyvolana z klavesnice, pokud otevirame menu, vybrat prvni polozku]
+#define WM_USER_BUTTON WM_APP + 244 // [(LO)WORD buttonID, (LO)WORD event was triggered from keyboard, if opening menu, select first item]
 // drop down of button pressed
-#define WM_USER_BUTTONDROPDOWN WM_APP + 245 // [(LO)WORD buttonID, (LO)WORD udalost byla vyvolana z klavesnice, pokud otevirame menu, vybrat prvni polozku]
+#define WM_USER_BUTTONDROPDOWN WM_APP + 245 // [(LO)WORD buttonID, (LO)WORD event was triggered from keyboard, if opening menu, select first item]
 
 #define WM_USER_KEYDOWN WM_APP + 246 // [(LO)WORD ctrlID, DWORD virtual-key code]
 
@@ -68,12 +68,12 @@
 class CGUIProgressBarAbstract
 {
 public:
-    // nastavuje progres, pripadne text uprostred
+    // sets progress, optionally text in the middle
     //
     // existuje bezpecnejsi varianta SetProgress2(), podivejte se na ni nez pouzijete tuto metodu
     //
     // progres dokaze pracovat ve dvou rezimech:
-    //   1) pro 'progress' >= 0 jde o klasicky teplomer 0% az 100%
+    //   1) for 'progress' >= 0 it is classic thermometer 0% to 100%
     //      v tomto rezimu lze pomoci promenne 'text' nastavit vlastni text zobrazeny uprostred
     //      pokud je 'text' == NULL, zobrazi se uprostred standardni procenta
     //   2) pro 'progress' == -1 jde o neurcity stav, kdy maly obdelnicek jezdi tam a zpet
@@ -102,7 +102,7 @@ public:
     // pokud se obdelnicek prave pohybuje (diky SetSelfMoveTime), bude zastaven
     virtual void WINAPI Stop() = 0;
 
-    // nastavuje progres, pripadne text uprostred
+    // sets progress, optionally text in the middle
     //
     // proti SetProgress() ma vyhodu v tom, ze pokud je 'progressCurrent' >= 'progressTotal',
     // nastavi progres primo: je-li 'progressTotal' 0 nastavi 0%, jinak 100% a neprovadi vypocet

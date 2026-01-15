@@ -263,7 +263,7 @@ BOOL CRegularExpression::ExpandVariables(char* pattern, char* buffer, int bufSiz
 {
     char* sour = pattern;
     char* dest = buffer;
-    bufSize--; //rezervujeme si misto pro NULL
+    bufSize--; //reserve space for NULL
     while (*sour)
     {
         if (!bufSize)
@@ -350,7 +350,7 @@ void CRegularExpression::ReverseRegExp(char*& dstExpEnd, char* srcExp, char* src
 
     while (s < srcExpEnd)
     {
-        //---  hledani konce atomu - pro zopakovani '*', '+' a '?'
+        //---  find end of atom - for repetition '*', '+' and '?'
         char* ss;    // ukazuje za atom
         BOOL addPar; // paruji zavorky? (ma se pridat zavorka do paru)
         switch (*s)
@@ -446,13 +446,13 @@ void CRegularExpression::ReverseRegExp(char*& dstExpEnd, char* srcExp, char* src
             else
                 *--dstExpEnd = (*s == '(') ? ')' : ']';
 
-            if (oldSS - s >= 2) // pokud vyraz nekonci otevrenou zavorkou
+            if (oldSS - s >= 2) // if expression does not end with opening bracket
             {
                 if (*s == '(')
                 { // kopie reversovaneho vyrazu - ohraniceni
                     ReverseRegExp(dstExpEnd, s + 1, oldSS - 1);
                 }
-                else // prosta kopie vnitrku - mnozina
+                else // simple copy of interior - set
                 {
                     dstExpEnd -= (oldSS - 1) - (s + 1);
                     memcpy(dstExpEnd, s + 1, (oldSS - 1) - (s + 1));

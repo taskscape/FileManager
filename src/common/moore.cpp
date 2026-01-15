@@ -162,7 +162,7 @@ void CSearchData::Set(const char* pattern, WORD flags)
     if (OriginalPattern != NULL)
     {
         memcpy(OriginalPattern, pattern, Length);
-        OriginalPattern[Length] = 0; // pro kompatibilitu s beznym stringem
+        OriginalPattern[Length] = 0; // for compatibility with normal string
     }
     if (Pattern != NULL)
     {
@@ -189,7 +189,7 @@ void CSearchData::Set(const char* pattern, const int length, WORD flags)
     if (OriginalPattern != NULL)
     {
         memcpy(OriginalPattern, pattern, Length);
-        OriginalPattern[Length] = 0; // pro kompatibilitu s beznym stringem
+        OriginalPattern[Length] = 0; // for compatibility with normal string
     }
     if (Pattern != NULL)
     {

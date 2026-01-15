@@ -201,7 +201,7 @@ public:
                 HWND hwndParent,        // handle of parent or owner window
                 HMENU hmenu,            // handle of menu or child-window identifier
                 HINSTANCE hinst,        // handle of application instance
-                LPVOID lpvParam);       // ukazatel na objekt vytvareneho okna
+                LPVOID lpvParam);       // pointer to created window object
 
     HWND CreateEx(DWORD dwExStyle,        // extended window style
                   LPCTSTR lpszClassName,  // address of registered class name
@@ -227,7 +227,7 @@ public:
                  HWND hwndParent,        // handle of parent or owner window
                  HMENU hmenu,            // handle of menu or child-window identifier
                  HINSTANCE hinst,        // handle of application instance
-                 LPVOID lpvParam);       // ukazatel na objekt vytvareneho okna
+                 LPVOID lpvParam);       // pointer to created window object
 
     HWND CreateExW(DWORD dwExStyle,        // extended window style
                    LPCWSTR lpszClassName,  // address of registered class name

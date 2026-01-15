@@ -72,7 +72,7 @@ void HistoryComboBox(CTransferInfo& ti, int id, char* text, int textMax,
             // uvolnime pamet vymazavane polozky
             if (history[toMove])
                 delete[] history[toMove];
-            // vytvorime misto pro cestu kterou budeme ukladat
+            // create space for path we will save
             for (i = toMove; i > 0; i--)
                 history[i] = history[i - 1];
             // ulozime cestu

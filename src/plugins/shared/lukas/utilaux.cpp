@@ -384,12 +384,12 @@ BOOL SalGetFullName(char* name, int* errTextID, const char* curDir)
             err = GFN_PATHISINVALID;
     }
 
-    if (err == 0) // vyhozeni pripadneho nezadouciho backslashe z konce retezce
+    if (err == 0) // remove possible unwanted backslash from end of string
     {
         size_t l = strlen(name);
         if (l > 1 && name[1] == ':') // typ cesty "c:\path"
         {
-            if (l > 3) // neni root cesta
+            if (l > 3) // is not root path
             {
                 if (name[l - 1] == '\\')
                     name[l - 1] = 0; // orez backslashe
@@ -400,7 +400,7 @@ BOOL SalGetFullName(char* name, int* errTextID, const char* curDir)
                 name[3] = 0;
             }
         }
-        else // UNC cesta
+        else // UNC path
         {
             if (l > 0 && name[l - 1] == '\\')
                 name[l - 1] = 0; // orez backslashe

@@ -20,7 +20,7 @@
 #pragma option -a4
 #endif // __BORLANDC__
 
-// v debug verzi budeme testovat, jestli se neprekryvaji zdrojova a cilova pamet (pro memcpy se nesmi prekryvat)
+// in debug version we will test if source and target memory do not overlap (for memcpy they must not overlap)
 #if defined(_DEBUG) && defined(TRACE_ENABLE)
 #define memcpy _sal_safe_memcpy
 #ifdef __cplusplus
@@ -33,10 +33,10 @@ extern "C"
 #endif
 #endif // defined(_DEBUG) && defined(TRACE_ENABLE)
 
-// nasledujici funkce nepadaji pri praci s neplatnou pameti (ani pri praci s NULL):
-// lstrcpy, lstrcpyn, lstrlen a lstrcat (ty jsou definovane s priponou A nebo W, proto
+// following functions do not crash when working with invalid memory (even when working with NULL):
+// lstrcpy, lstrcpyn, lstrlen and lstrcat (these are defined with suffix A or W, therefore
 // je primo neredefinujeme), v zajmu snazsiho odladeni chyb potrebujeme, aby padaly,
-// protoze jinak se na chybu prijde pozdeji v miste, kde uz nemusi byt jasne, co ji
+// because otherwise error is found later in a place where it may not be clear what
 // zpusobilo
 #define lstrcpyA _sal_lstrcpyA
 #define lstrcpyW _sal_lstrcpyW
@@ -82,11 +82,11 @@ class CGUIIconListAbstract;
 // ****************************************************************************
 // CSalamanderDebugAbstract
 //
-// sada metod ze Salamandera, ktere se pouzivaji pro hledani chyb v debug i release verzi
+// set of Salamander methods used for finding errors in debug and release versions
 
-// makro CALLSTK_MEASURETIMES - zapne mereni casu straveneho pri priprave call-stack hlaseni (meri se pomer proti
+// CALLSTK_MEASURETIMES macro - enables time measurement spent preparing call-stack messages (ratio is measured against
 //                              celkovemu casu behu funkci)
-//                              POZOR: nutne zapnout tez pro kazdy plugin zvlast
+//                              WARNING: must also be enabled for each plugin separately
 // makro CALLSTK_DISABLEMEASURETIMES - potlaci mereni casu straveneho pri priprave call-stack hlaseni v DEBUG/SDK/PB verzi
 
 #if (defined(_DEBUG) || defined(CALLSTK_MEASURETIMES)) && !defined(CALLSTK_DISABLEMEASURETIMES)
@@ -105,15 +105,15 @@ struct CCallStackMsgContext;
 class CSalamanderDebugAbstract
 {
 public:
-    // vypise 'file'+'line'+'str' TRACE_I na TRACE SERVER - pouze pri DEBUG/SDK/PB verzi Salamandera
+    // outputs 'file'+'line'+'str' TRACE_I to TRACE SERVER - only in DEBUG/SDK/PB version of Salamander
     virtual void WINAPI TraceI(const char* file, int line, const char* str) = 0;
     virtual void WINAPI TraceIW(const WCHAR* file, int line, const WCHAR* str) = 0;
 
-    // vypise 'file'+'line'+'str' TRACE_E na TRACE SERVER - pouze pri DEBUG/SDK/PB verzi Salamandera
+    // outputs 'file'+'line'+'str' TRACE_E to TRACE SERVER - only in DEBUG/SDK/PB version of Salamander
     virtual void WINAPI TraceE(const char* file, int line, const char* str) = 0;
     virtual void WINAPI TraceEW(const WCHAR* file, int line, const WCHAR* str) = 0;
 
-    // zaregistruje novy thread u TRACE (prideli Unique ID), 'thread'+'tid' vraci
+    // registers new thread with TRACE (assigns Unique ID), 'thread'+'tid' returns
     // _beginthreadex i CreateThread, nepovine (UID je pak -1)
     virtual void WINAPI TraceAttachThread(HANDLE thread, unsigned tid) = 0;
 

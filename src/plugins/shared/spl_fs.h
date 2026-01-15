@@ -28,24 +28,24 @@ class CPluginDataInterfaceAbstract;
 // ****************************************************************************
 // CSalamanderForViewFileOnFSAbstract
 //
-// sada metod ze Salamandera pro podporu provedeni ViewFile v CPluginFSInterfaceAbstract,
-// platnost interfacu je omezena na metodu, ktere je interface predan jako parametr
+// set of Salamander methods to support ViewFile execution in CPluginFSInterfaceAbstract,
+// interface validity is limited to method to which interface is passed as parameter
 
 class CSalamanderForViewFileOnFSAbstract
 {
 public:
-    // najde v disk-cache existujici kopii souboru nebo pokud jeste kopie souboru neni
-    // v disk-cache, rezervuje pro ni jmeno (cilovy soubor napr. pro download z FTP);
-    // 'uniqueFileName' je unikatni nazev originalniho souboru (podle tohoto nazvu
-    // se prohledava disk-cache; melo by stacit plne jmeno souboru v salamanderovske
-    // forme - "fs-name:fs-user-part"; POZOR: nazev se porovnava "case-sensitive", pokud
-    // plugin vyzaduje "case-insensitive", musi vsechny nazvy prevadet napr. na mala
+    // finds existing file copy in disk-cache or if file copy is not yet
+    // in disk-cache, reserves name for it (target file e.g. for download from FTP);
+    // 'uniqueFileName' is unique name of original file (by this name
+    // disk-cache is searched; full file name in Salamander
+    // form should suffice - "fs-name:fs-user-part"; WARNING: name is compared "case-sensitive", if
+    // plugin requires "case-insensitive", must convert all names e.g. to lowercase
     // pismena - viz CSalamanderGeneralAbstract::ToLowerCase); 'nameInCache' je jmeno
     // kopie souboru, ktera je umistena v disk-cache (ocekava se zde posledni
     // cast jmena originalniho souboru, aby pozdeji v titulku viewru uzivateli pripominala
     // originalni soubor); je-li 'rootTmpPath' NULL, je diskova cache ve Windows TEMP
-    // adresari, jinak je cesta do disk-cache v 'rootTmpPath'; pri systemove chybe vraci
-    // NULL (nemelo by vubec nastat), jinak vraci plne jmeno kopie souboru v disk-cache
+    // directory, otherwise path to disk-cache is in 'rootTmpPath'; on system error returns
+    // NULL (should not happen at all), otherwise returns full name of file copy in disk-cache
     // a ve 'fileExists' vraci TRUE pokud soubor v disk-cache existuje (napr. uz probehl
     // download z FTP) nebo FALSE pokud je soubor teprve potreba pripravit (napr. provest
     // jeho download); 'parent' je parent messageboxu s chybami (napriklad prilis dlouhy

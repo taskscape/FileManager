@@ -114,12 +114,12 @@ public:
     // Parameters
     //   'file'
     //      [out] Ukazatel na strukturu 'SAFE_FILE' ktera obdrzi informace o otevrenem
-    //      souboru. Tato struktura slouzi jako kontext pro ostatni metody z rodiny
-    //      SafeFile. Hodnoty struktury maji vyznam pouze v pripade, ze SafeFileOpen
-    //      vratila TRUE. Pro zavreni souboru je treba zavolat metodu SafeFileClose.
+    //      file. This structure serves as context for other methods from the
+    //      SafeFile family. Structure values have meaning only if SafeFileOpen
+    //      returned TRUE. To close the file, SafeFileClose method must be called.
     //
     //   'fileName'
-    //      [in] Ukazatel na retezec zakonceny nulou, ktery obsahuje nazev oteviraneho
+    //      [in] Pointer to zero-terminated string that contains name of file being opened
     //      souboru.
     //
     //   'dwDesiredAccess'
@@ -136,8 +136,8 @@ public:
     //
     //   'pressedButton'
     //      [out] Ukazatel na promennou, ktera obdrzi stisknute tlacitko behem chybove
-    //      hlasky. Promenna ma vyznam pouze v pripade, ze metoda SafeFileOpen vrati FALSE,
-    //      jinak jeji hodnota neni definovana. Vraci jednu z hodnot DIALOG_xxx.
+    //      message. Variable has meaning only if SafeFileOpen method returns FALSE,
+    //      otherwise its value is undefined. Returns one of DIALOG_xxx values.
     //      V pripade chyb vraci hodnotu DIALOG_CANCEL.
     //      Pokud je diky 'silentMask' ignorovana nektera chybova hlaska, vraci hodnotu
     //      odpovidajiciho tlacitka (napriklad DIALOG_SKIP nebo DIALOG_YES).
@@ -288,7 +288,7 @@ public:
     //
     //    'file'
     //      [out] Ukazatel na strukturu 'SAFE_FILE' ktera obdrzi informace o otevrenem
-    //      souboru. Tato struktura slouzi jako kontext pro ostatni metody z rodiny
+    //      file. This structure serves as context for other methods from the
     //      SafeFile. Hodnoty struktury maji vyznam pouze v pripade, ze SafeFileCreate
     //      vratila hodnotu ruznou od INVALID_HANDLE_VALUE. Pro zavreni souboru je treba
     //      zavolat metodu SafeFileClose. Pokud je 'file' ruzne od NULL, zaradi

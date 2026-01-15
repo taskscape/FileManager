@@ -13,29 +13,29 @@
 
 #pragma once
 
-// makra pro potlaceni nepotrebnych casti WinLibLT (snazsi kompilace):
-// ENABLE_PROPERTYDIALOG - je-li definovano, je mozne pouzivat property sheet dialog (CPropertyDialog)
+// macros for suppressing unnecessary parts of WinLibLT (easier compilation):
+// ENABLE_PROPERTYDIALOG - if defined, it is possible to use property sheet dialog (CPropertyDialog)
 
 // nastaveni vlastnich textu do WinLibu
 void SetWinLibStrings(const char* invalidNumber, // "neni cislo" (u transferbufferu cisel)
                       const char* error);        // titulek "chyba" (u transferbufferu cisel)
 
 // je potreba zavolat pred pouzitim WinLibu; 'pluginName' je jmeno pluginu (napr. "DEMOPLUG"),
-// pouziva se pro odliseni jmen trid univerzalnich oken WinLibu (mezi pluginy se musi lisit,
-// jinak nastane kolize jmen trid a WinLib nemuze fungovat - bude fungovat jen prvni spusteny
+// used to distinguish names of WinLib universal window classes (must differ between plugins,
+// otherwise class name collision occurs and WinLib cannot function - only first started
 // plugin); 'dllInstance' je modul pluginu (pouziva se pri registraci univerzalnich trid WinLibu)
 BOOL InitializeWinLib(const char* pluginName, HINSTANCE dllInstance);
 // je potreba zavolat po pouziti WinLibu; 'dllInstance' je modul pluginu (pouziva se pri zruseni
 // registrace univerzalnich trid WinLibu)
 void ReleaseWinLib(HINSTANCE dllInstance);
 
-// typ callbacku pro pripojeni na HTML help
+// callback type for connecting to HTML help
 typedef void(WINAPI* FWinLibLTHelpCallback)(HWND hWindow, UINT helpID);
 
-// nastaveni callbacku pro pripojeni na HTML help
+// callback setting for connecting to HTML help
 void SetupWinLibHelp(FWinLibLTHelpCallback helpCallback);
 
-// konstanty pro stringy WinLibu (jen interni pouziti ve WinLibu)
+// constants for WinLib strings (only internal use within WinLib)
 enum CWLS
 {
     WLS_INVALID_NUMBER,
@@ -51,14 +51,14 @@ extern char CWINDOW_CLASSNAME2[100]; // jmeno tridy universalniho okna - nema CS
 
 enum CObjectOrigin // pouzito pri destrukci oken a dialogu
 {
-    ooAllocated, // pri WM_DESTROY se bude dealokovat
+    ooAllocated, // will be deallocated on WM_DESTROY
     ooStatic,    // pri WM_DESTROY se HWindow nastavi na NULL
-    ooStandard   // pro modalni dlg =ooStatic, pro nemodalni dlg =ooAllocated
+    ooStandard   // for modal dlg =ooStatic, for modeless dlg =ooAllocated
 };
 
 // ****************************************************************************
 
-enum CObjectType // pro rozpoznani typu objektu
+enum CObjectType // for object type recognition
 {
     otBase,
     otWindow,
@@ -218,15 +218,15 @@ public:
     void RadioButton(int ctrlID, int ctrlValue, int& value);
     void CheckBox(int ctrlID, int& value); // 0-unchecked, 1-checked, 2-grayed
 
-    // kontroluje double hodnotu (pokud to neni cislo, neprojde), oddelovac muze byt '.' i ',';
-    // 'format' se pouziva v sprintf pri prevodu cisla na retezec (napr. "%.2f" nebo "%g")
+    // validates double value (if it is not a number, it fails), separator can be '.' or ',';
+    // 'format' is used in sprintf when converting number to string (e.g. "%.2f" or "%g")
     void EditLine(int ctrlID, double& value, char* format, BOOL select = TRUE);
 
-    // kontroluje int hodnotu (pokud to neni cislo, neprojde)
+    // validates int value (if it is not a number, it fails)
     void EditLine(int ctrlID, int& value, BOOL select = TRUE);
 
 protected:
-    HWND HDialog; // handle dialogu, pro ktery se provadi transfer
+    HWND HDialog; // dialog handle for which transfer is performed
 };
 
 // ****************************************************************************

@@ -11,7 +11,7 @@
 
 #pragma once
 
-// definice maker TRACE_I, TRACE_IW, TRACE_E, TRACE_EW, TRACE_C, TRACE_CW a CALL_STACK_MESSAGEXXX pro pluginy,
+// definition of macros TRACE_I, TRACE_IW, TRACE_E, TRACE_EW, TRACE_C, TRACE_CW and CALL_STACK_MESSAGEXXX for plugins,
 // v pluginu je treba definovat promennou SalamanderDebug (typ viz nize) a
 // v SalamanderPluginEntry tuto promennou inicializovat:
 // SalamanderDebug = salamander->GetSalamanderDebug();
@@ -23,12 +23,12 @@
 //        se z DllMainu vola, jinak dojde k deadlocku, vice viz implementace
 //        C__Trace::SendMessageToServer
 
-// makro CALLSTK_MEASURETIMES - zapne mereni casu straveneho pri priprave call-stack hlaseni (meri se pomer proti
+// CALLSTK_MEASURETIMES macro - enables time measurement spent preparing call-stack messages (ratio is measured against
 //                              celkovemu casu behu funkci)
-//                              POZOR: nutne zapnout tez pro kazdy plugin zvlast
+//                              WARNING: must also be enabled for each plugin separately
 // makro CALLSTK_DISABLEMEASURETIMES - potlaci mereni casu straveneho pri priprave call-stack hlaseni v DEBUG verzi
 
-// prehled typu maker: (vsechna jsou neprazdna jen pokud neni definovano CALLSTK_DISABLE)
+// overview of macro types: (all are non-empty only if CALLSTK_DISABLE is not defined)
 // CALL_STACK_MESSAGE - bezne call-stack makro
 // SLOW_CALL_STACK_MESSAGE - call-stack makro, u ktereho se ignoruje libovolne zpomaleni kodu (pouziti
 //                           na mistech, kde vime, ze vyrazne zpomaluje kod, ale presto ho na tomto
@@ -374,7 +374,7 @@ public:
 
 #ifndef TRACE_ENABLE
 
-// aby nedochazelo k problemum se stredniky v nize nadefinovanych makrech
+// to avoid problems with semicolons in macros defined below
 
 // Bypasses a clang-format bug in version 19.1.5 (part of Visual Studio 2022 17.14).
 // clang-format off
@@ -392,12 +392,12 @@ inline void __TraceEmptyFunction() {}
 #define TRACE_E(str) __TraceEmptyFunction()
 #define TRACE_EW(str) __TraceEmptyFunction()
 // pri crashi softu pres DebugBreak() nejde vystopovat, kde lezi volani
-// TRACE_C/TRACE_MC, protoze adresa exceptiony je kdesi v ntdll.dll
-// a sekce Stack Back Trace bug reportu muze obsahovat nesmysly, pokud
+// TRACE_C/TRACE_MC, because exception address is somewhere in ntdll.dll
+// and Stack Back Trace section of bug report may contain nonsense, if
 // funkce volajici TRACE_C/TRACE_MC nepouziva stary jednoduchy model
 // ukladani a prace s EBP/ESP, ovsem i v tom pripade je zde jen adresa
 // odkud byla tato funkce volana (ne primo adresa TRACE_C/TRACE_MC),
-// proto aspon prozatim pouzivame stary primitivni zpusob crashe
+// therefore at least for now we use old primitive crash method
 // zapisem na NULL
 //#define TRACE_MC(file, line, str) DebugBreak()
 //#define TRACE_MCW(file, line, str) DebugBreak()
@@ -452,13 +452,13 @@ inline void __TraceEmptyFunction() {}
 #define TRACE_EW(str) TRACE_MEW(__WFILE__, __LINE__, str)
 
 // fatal-error-trace (CRASHING TRACE), manualne zadana pozice v souboru;
-// zastavime soft v debuggeru, pro snadne odladeni problemu, ktery prave vznikl,
-// release verze spadne a problem snad bude jasny z call-stacku v bug-reportu;
-// nepouzivame DebugBreak(), protoze pri crashi softu nejde vystopovat, kde
-// lezi volani DebugBreak(), protoze adresa exceptiony je kdesi v ntdll.dll
-// a sekce Stack Back Trace bug reportu muze obsahovat nesmysly, pokud
+// stop software in debugger, for easy debugging of problem that just occurred,
+// release version will crash and problem should be clear from call-stack in bug-report;
+// we do not use DebugBreak(), because when software crashes it is not possible to trace where
+// DebugBreak() call is, because exception address is somewhere in ntdll.dll
+// and Stack Back Trace section of bug report may contain nonsense, if
 // funkce, ze ktere volame TRACE_C/MC, nepouziva stary jednoduchy model ukladani
-// a prace s EBP/ESP (to zalezi na kompileru a zaplych optimalizacich), proto
+// and work with EBP/ESP (it depends on compiler and enabled optimizations), therefore
 // aspon prozatim pouzivame stary primitivni zpusob crashe zapisem na NULL
 #define TRACE_MC(file, line, str) \
     ((::EnterCriticalSection(&__Trace.CriticalSection), __Trace.OStream() << str, \

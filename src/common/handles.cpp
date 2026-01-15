@@ -758,7 +758,7 @@ BOOL C__Handles::DeleteHandle(C__HandlesType& type, HANDLE handle,
             }
         }
     }
-    if (foundTypeOK != -1) // nalezen jen handle, ktery nemusi byt uvolneny
+    if (foundTypeOK != -1) // found only handle that may not be freed
     {
         type = Handles[foundTypeOK].Handle.Type;
         if (origin != NULL)
@@ -2347,7 +2347,7 @@ BOOL C__Handles::FindCloseChangeNotification(HANDLE hChangeHandle)
     ::LeaveCriticalSection(&CriticalSection);
 #endif // MULTITHREADED_HANDLES_ENABLE
 
-    BOOL ret = ::FindCloseChangeNotification(hChangeHandle); // muze se kousnout i na dost dlouho
+    BOOL ret = ::FindCloseChangeNotification(hChangeHandle); // may take quite a long time
 
 #ifdef MULTITHREADED_HANDLES_ENABLE
     ::EnterCriticalSection(&CriticalSection);
@@ -2506,7 +2506,7 @@ HDWP C__Handles::DeferWindowPos(HDWP hWinPosInfo, HWND hWnd, HWND hWndInsertAfte
 {
     HDWP ret = ::DeferWindowPos(hWinPosInfo, hWnd, hWndInsertAfter, x, y, cx, cy, uFlags);
 
-    if (ret != hWinPosInfo) // doslo k realokaci struktury - musime zmenit hodnotu hlidaneho handlu
+    if (ret != hWinPosInfo) // structure reallocation occurred - we must change watched handle value
     {
         CheckClose(TRUE, (HANDLE)hWinPosInfo, __htDeferWindowPos, __GetHandlesOrigin(__hoDeferWindowPos), ERROR_SUCCESS, FALSE);
         CheckCreate(ret != NULL, __htDeferWindowPos, __hoDeferWindowPos, (HANDLE)ret, GetLastError());

@@ -33,7 +33,7 @@
 #define VERSINFO_SAL_SHORT_VERSION VERSINFO_xstr(VERSINFO_SALAMANDER_MAJOR) VERSINFO_xstr(VERSINFO_SALAMANDER_MINORA) VERSINFO_xstr(VERSINFO_SALAMANDER_MINORB) VERSINFO_BETAVERSIONSHORT_TXT
 #endif
 
-#ifdef VERSINFO_MAJOR      // je definovane jen pokud se pouziva z pluginu
+#ifdef VERSINFO_MAJOR      // is defined only if used from plugin
 #if (VERSINFO_MINORB == 0) // nulu na setinach nepiseme 2.50 -> 2.5
 #define VERSINFO_VERSION VERSINFO_xstr(VERSINFO_MAJOR) "." VERSINFO_xstr(VERSINFO_MINORA) VERSINFO_BETAVERSION_TXT
 #define VERSINFO_VERSION_NO_PLATFORM VERSINFO_xstr(VERSINFO_MAJOR) "." VERSINFO_xstr(VERSINFO_MINORA) VERSINFO_BETAVERSION_TXT_NO_PLATFORM
@@ -53,7 +53,7 @@
 //
 // Slouzi ke snadnemu odliseni verzi vsech modulu mezi jednotlivymi verzemi
 // Salamandera (jde o posledni komponentu cisla verze vsech pluginu a
-// Salamandera). Zvysovat s kazdou verzi (IB, DB, PB, beta, release nebo i
+// of Salamander). Increase with each version (IB, DB, PB, beta, release or even
 // jen testovaci verze poslana jednomu uzivateli). Prehled ruznych typu verzi
 // je v souboru doc\versions.txt. Vzdy zavest komentar s popisem, ke ktere
 // verzi Salamandera patri nove pouzite cislo buildu.
@@ -104,24 +104,24 @@
 // VERSINFO_BETAVERSION_TXT:
 //
 // Meni se s kazdym buildem, v pripade release verze bude VERSINFO_BETAVERSION_TXT="".
-// Pokud vydavame specialni opravne beta verze typu 2.5 beta 9a, zvysime
+// If we release special corrective beta versions like 2.5 beta 9a, we increase
 // VERSINFO_BUILDNUMBER o jedna a dame VERSINFO_BETAVERSION_TXT==" beta 9a".
 //
-// VERSINFO_BETAVERSIONSHORT_TXT slouzi pro pojmenovani bug reportu, jde o co nejkratsi zapis
+// VERSINFO_BETAVERSIONSHORT_TXT is used for bug report naming, it is the shortest possible notation
 
-// priklady ("x86" je pro 32-bit verzi, "x64" pro 64-bit verzi, v nasledujicich prikladech jsou
-// x86/x64 zamenne): " (x86)" (pro release verze), " beta 2 (x64)", " beta 2 (SDK x86)",
+// examples ("x86" is for 32-bit version, "x64" for 64-bit version, in following examples
+// x86/x64 are interchangeable): " (x86)" (for release versions), " beta 2 (x64)", " beta 2 (SDK x86)",
 // " RC1 (x64)", " beta 2 (IB21 x86)", " beta 2 (DB21 x64)", " beta 2 (PB21 x86)"
 #define VERSINFO_BETAVERSION_TXT " (" SAL_VER_PLATFORM ")"
 #define VERSINFO_BETAVERSION_TXT_NO_PLATFORM "" // kopie radku vyse + smazat SAL_VER_PLATFORM + je-li zavorka prazdna, smazat ji + smazat nadbytecne mezery
 
-// priklady (x86/x64 viz predchozi odstavec): "x86" (pro release verze), "B2x64", "B2SDKx86",
+// examples (x86/x64 see previous paragraph): "x86" (for release versions), "B2x64", "B2SDKx86",
 // "RC1x64", "B2IB21x86", "B2DB21x64", "B2PB21x86"
 #define VERSINFO_BETAVERSIONSHORT_TXT SAL_VER_PLATFORM
 
 // LAST_VERSION_OF_SALAMANDER:
 //
-// Podpora pro kontrolu aktualnosti verze Salamandera, kterou interni pluginy
+// Support for checking Salamander version currency, which internal plugins
 // (distribuovane v jednom balicku se Salamanderem) provadi behem entry-pointu
 // (SalamanderPluginEntry) viz metoda CSalamanderPluginEntryAbstract::GetVersion()
 // (v spl_base.h). Slouzi hlavne pro jednoduchost: interni plugin muze volat

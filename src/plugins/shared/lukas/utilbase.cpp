@@ -7,7 +7,7 @@
 
 HINSTANCE DLLInstance = NULL; // handle k SPL-ku - jazykove nezavisle resourcy
 HINSTANCE HLanguage = NULL;   // handle k SLG-cku - jazykove zavisle resourcy
-BOOL WindowsVistaAndLater;    // Windows Vista nebo pozdejsi z rady NT (6.0+)
+BOOL WindowsVistaAndLater;    // Windows Vista or later from NT family (6.0+)
 BOOL WindowsXP64AndLater;     // Windows XP 64, Vista or later (5.2+)
 
 // rozhrani Open Salamandera - platna od volani InitUtils() az do

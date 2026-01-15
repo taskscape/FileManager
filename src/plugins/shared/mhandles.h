@@ -14,10 +14,10 @@
 // makro MHANDLES_ENABLE - zapina monitorovani handlu
 // POZOR: volat HANDLES_CAN_USE_TRACE() tesne po inicializaci "dbg.h" modulu
 //        (po inicializaci SalamanderDebug a SalamanderVersion)
-// POZOR: MHANDLES se inicializuji/rusi na urovni "lib", pokud tedy plugin
-//        uroven "lib" (nebo "compiler") pouziva, musi si sam zajistit, ze na
-//        techto urovnich nebude pouzivat MHANDLES (viz #pragma init_seg (lib))
-// POZNAMKA: pro snazsi rozmisteni maker HANDLES() a HANDLES_Q() pouzijte program CheckHnd.exe
+// WARNING: MHANDLES are initialized/destroyed at "lib" level, so if plugin
+//        uses "lib" (or "compiler") level, must ensure itself that at
+//        these levels it will not use MHANDLES (see #pragma init_seg (lib))
+// NOTE: for easier placement of HANDLES() and HANDLES_Q() macros use CheckHnd.exe program
 
 #define NOHANDLES(function) function
 
@@ -35,7 +35,7 @@
 
 #ifndef MHANDLES_ENABLE
 
-// aby nedochazelo k problemum se stredniky v nize nadefinovanych makrech
+// to avoid problems with semicolons in macros defined below
 inline void __HandlesEmptyFunction() {}
 
 #define HANDLES_CAN_USE_TRACE() __HandlesEmptyFunction()
@@ -232,7 +232,7 @@ struct C__HandlesHandle
 {
     C__HandlesType Type;
     C__HandlesOrigin Origin;
-    HANDLE Handle; // univerzalni, pro vsechny druhy handlu
+    HANDLE Handle; // universal, for all kinds of handles
 
     C__HandlesHandle() {}
 
@@ -296,7 +296,7 @@ typedef unsigned int uintptr_t;
 class C__Handles
 {
 public:
-    // objekty pro praci s messageboxy, zde je jen pro zaruceni poradi konstrukce/destrukce
+    // objects for working with messageboxes, here only to ensure construction/destruction order
     std::ostream __MessagesStrStream;
     C__Messages __Messages;
 
@@ -304,8 +304,8 @@ protected:
     C_HandlesDataArray Handles;       // vsechny kontrolovane handly
     C__HandlesData TemporaryHandle;   // pri vkladani nastaven z SetInfo()
     C__HandlesOutputType OutputType;  // typ vystupu hlasek
-    CRITICAL_SECTION CriticalSection; // pro synchronizaci multi-threadu
-    BOOL CanUseTrace;                 // TRUE az po inicializaci "dbg.h" modulu, az bude mozne pouzivat TRACE_ makra
+    CRITICAL_SECTION CriticalSection; // for multi-thread synchronization
+    BOOL CanUseTrace;                 // TRUE only after initialization of "dbg.h" module, when it will be possible to use TRACE_ macros
 
 public:
     C__Handles();
@@ -699,7 +699,7 @@ public:
 protected:
     void AddHandle(C__HandlesHandle handle); // prida TemporaryHandle
 
-    // vyjme handle, pri uspechu vraci TRUE
+    // removes handle, on success returns TRUE
     BOOL DeleteHandle(C__HandlesType& type, HANDLE handle,
                       C__HandlesOrigin* origin,
                       C__HandlesType expType);

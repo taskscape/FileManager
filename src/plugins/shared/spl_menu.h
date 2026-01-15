@@ -25,32 +25,32 @@ class CSalamanderForOperationsAbstract;
 // ****************************************************************************
 // CSalamanderBuildMenuAbstract
 //
-// sada metod Salamandera pro stavbu menu pluginu
+// set of Salamander methods for building plugin menu
 //
 // jde o podmnozinu metod CSalamanderConnectAbstract, metody se stejne chovaji,
-// pouzivaji se stejne konstanty, popis viz CSalamanderConnectAbstract
+// same constants are used, description see CSalamanderConnectAbstract
 
 class CSalamanderBuildMenuAbstract
 {
 public:
     // ikony se zadavaji metodou CSalamanderBuildMenuAbstract::SetIconListForMenu, zbytek
-    // popisu viz CSalamanderConnectAbstract::AddMenuItem
+    // description see CSalamanderConnectAbstract::AddMenuItem
     virtual void WINAPI AddMenuItem(int iconIndex, const char* name, DWORD hotKey, int id, BOOL callGetState,
                                     DWORD state_or, DWORD state_and, DWORD skillLevel) = 0;
 
     // ikony se zadavaji metodou CSalamanderBuildMenuAbstract::SetIconListForMenu, zbytek
-    // popisu viz CSalamanderConnectAbstract::AddSubmenuStart
+    // description see CSalamanderConnectAbstract::AddSubmenuStart
     virtual void WINAPI AddSubmenuStart(int iconIndex, const char* name, int id, BOOL callGetState,
                                         DWORD state_or, DWORD state_and, DWORD skillLevel) = 0;
 
-    // popis viz CSalamanderConnectAbstract::AddSubmenuEnd
+    // description see CSalamanderConnectAbstract::AddSubmenuEnd
     virtual void WINAPI AddSubmenuEnd() = 0;
 
-    // nastavi bitmapu s ikonami pluginu pro menu; bitmapu je treba alokovat pomoci volani
+    // sets bitmap with plugin icons for menu; bitmap must be allocated by calling
     // CSalamanderGUIAbstract::CreateIconList() a nasledne vytvorit a naplnit pomoci
-    // metod CGUIIconListAbstract interfacu; rozmery ikonek musi byt 16x16 bodu;
+    // methods of CGUIIconListAbstract interface; icon dimensions must be 16x16 pixels;
     // Salamander si objekt bitmapy prebira do sve spravy, plugin ji po zavolani
-    // teto funkce nesmi destruovat; Salamander ji drzi jen v pameti, nikam se neuklada
+    // must not destroy this function; Salamander only holds it in memory, it is not saved anywhere
     virtual void WINAPI SetIconListForMenu(CGUIIconListAbstract* iconList) = 0;
 };
 
@@ -59,9 +59,9 @@ public:
 // CPluginInterfaceForMenuExtAbstract
 //
 
-// flagy stavu polozek v menu (pro pluginy rozsireni menu)
+// flags for menu item states (for menu extension plugins)
 #define MENU_ITEM_STATE_ENABLED 0x01 // enablovana, bez tohoto flagu je polozka disablovana
-#define MENU_ITEM_STATE_CHECKED 0x02 // pred polozkou je "check" nebo "radio" znacka
+#define MENU_ITEM_STATE_CHECKED 0x02 // before item is "check" or "radio" mark
 #define MENU_ITEM_STATE_RADIO 0x04   // bez MENU_ITEM_STATE_CHECKED se ignoruje, \
                                      // "radio" znacka, bez tohoto flagu "check" znacka
 #define MENU_ITEM_STATE_HIDDEN 0x08  // polozka se v menu vubec nema objevit

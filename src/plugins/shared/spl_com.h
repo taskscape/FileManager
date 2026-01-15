@@ -35,11 +35,11 @@ extern int SalamanderVersion;
 // oddelovace v ceste jsou backslashe ('\\')
 //
 
-// CQuadWord - 64-bitovy unsigned integer pro velikosti souboru
+// CQuadWord - 64-bit unsigned integer for file sizes
 // triky:
-//  -rychlejsi predani vstupniho parametru typu CQuadWord: const CQuadWord &
+//  -faster passing of input parameter of type CQuadWord: const CQuadWord -rychlejsi predani vstupniho parametru typu CQuadWord: const CQuadWord &
 //  -priradit 64-bit integer: quadWord.Value = XXX;
-//  -pocitat pomer velikosti: quadWord1.GetDouble() / quadWord2.GetDouble()  // ztrata presnosti pred delenim se projevi malo (max. 1e-15)
+//  -calculate size ratio: quadWord1.GetDouble() / quadWord2.GetDouble()  // loss of precision before division manifests minimally (max. 1e-15)
 //  -oriznout na DWORD: (DWORD)quadWord.Value
 //  -prevest (unsigned) __int64 na CQuadWord: CQuadWord().SetUI64(XXX)
 
@@ -55,9 +55,9 @@ struct CQuadWord
         unsigned __int64 Value;
     };
 
-    // POZOR: nesmi sem prijit operator prirazeni ani konstruktor pro jeden DWORD,
-    //        jinak bude pouziti 8-bytovych cisel zcela nekontrolovatelne (C++ vse
-    //        vzajemne prevede, coz nemusi byt vzdy prave ono)
+    // WARNING: assignment operator or constructor for single DWORD must not come here,
+    //        otherwise use of 8-byte numbers will be completely uncontrollable (C++ will convert
+    //        everything mutually, which may not always be exactly right)
 
     CQuadWord() {}
     CQuadWord(DWORD lo, DWORD hi)
@@ -187,7 +187,7 @@ struct CQuadWord
 
     // prevod na double (pozor na ztratu presnosti u velkych cisel - double ma jen 15 platnych cislic)
     double GetDouble() const
-    { // MSVC neumi konverzi unsigned __int64 na double, takze si musime pomoct sami
+    { // MSVC cannot convert unsigned __int64 to double, so we must help ourselves
         if (Value < CQuadWord(0, 0x80000000).Value)
             return (double)(__int64)Value; // kladne cislo
         else
@@ -197,7 +197,7 @@ struct CQuadWord
 
 #define QW_MAX CQuadWord(0xFFFFFFFF, 0xFFFFFFFF)
 
-#define ICONOVERLAYINDEX_NOTUSED 15 // hodnota pro CFileData::IconOverlayIndex v pripade, ze ikona nema overlay
+#define ICONOVERLAYINDEX_NOTUSED 15 // value for CFileData::IconOverlayIndex in case icon has no overlay
 
 // zaznam kazdeho souboru a adresare v Salamanderovi (zakladni data o souboru/adresari)
 struct CFileData // nesmi sem prijit destruktor !
@@ -205,8 +205,8 @@ struct CFileData // nesmi sem prijit destruktor !
     char* Name;                    // naalokovane jmeno souboru (bez cesty), nutne alokovat na heapu
                                    // Salamandera (viz CSalamanderGeneralAbstract::Alloc/Realloc/Free)
     char* Ext;                     // ukazatel do Name za prvni tecku zprava (vcetne tecky na zacatku jmena,
-                                   // na Windows se chape jako pripona, narozdil od UNIXu) nebo na konec
-                                   // Name, pokud pripona neexistuje; je-li v konfiguraci nastaveno FALSE
+                                   // on Windows is understood as extension, unlike on UNIX) or at end
+                                   // of Name, if extension does not exist; if FALSE is set in configuration
                                    // pro SALCFG_SORTBYEXTDIRSASFILES, je v Ext pro adresare ukazatel na konec
                                    // Name (adresare nemaji pripony)
     CQuadWord Size;                // velikost souboru v bytech

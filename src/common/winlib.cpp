@@ -8,7 +8,7 @@
 #include <ostream>
 #include <stdio.h>
 #include <limits.h>
-#include <commctrl.h> // potrebuju LPCOLORMAP
+#include <commctrl.h> // need LPCOLORMAP
 #include <tchar.h>
 
 #if defined(_DEBUG) && defined(_MSC_VER) // without passing file+line to 'new' operator, list of memory leaks shows only 'crtdbg.h(552)'
@@ -85,7 +85,7 @@ BOOL SetupWinLibHelp(CWinLibHelp* winLibHelp)
 }
 
 // ****************************************************************************
-// WinLibIsWindowsVersionOrGreater (kopie SalIsWindowsVersionOrGreater)
+// WinLibIsWindowsVersionOrGreater (copy of SalIsWindowsVersionOrGreater)
 //
 // Based on SDK 8.1 VersionHelpers.h
 // Indicates if the current OS version matches, or is greater than, the provided
@@ -128,7 +128,7 @@ HWND CWindow::CreateEx(DWORD dwExStyle,        // extended window style
                        HWND hwndParent,        // handle of parent or owner window
                        HMENU hmenu,            // handle of menu or child-window identifier
                        HINSTANCE hinst,        // handle of application instance
-                       LPVOID lpvParam)        // ukazatel na objekt vytvareneho okna
+                       LPVOID lpvParam)        // pointer to created window object
 {
     HWND hWnd = CreateWindowEx(dwExStyle,
                                lpszClassName,
@@ -160,7 +160,7 @@ HWND CWindow::Create(LPCTSTR lpszClassName,  // address of registered class name
                      HWND hwndParent,        // handle of parent or owner window
                      HMENU hmenu,            // handle of menu or child-window identifier
                      HINSTANCE hinst,        // handle of application instance
-                     LPVOID lpvParam)        // ukazatel na objekt vytvareneho okna
+                     LPVOID lpvParam)        // pointer to created window object
 {
     return CreateEx(0,
                     lpszClassName,
@@ -189,7 +189,7 @@ HWND CWindow::CreateExW(DWORD dwExStyle,        // extended window style
                         HWND hwndParent,        // handle of parent or owner window
                         HMENU hmenu,            // handle of menu or child-window identifier
                         HINSTANCE hinst,        // handle of application instance
-                        LPVOID lpvParam)        // ukazatel na objekt vytvareneho okna
+                        LPVOID lpvParam)        // pointer to created window object
 {
     HWND hWnd = CreateWindowExW(dwExStyle,
                                 lpszClassName,
@@ -221,7 +221,7 @@ HWND CWindow::CreateW(LPCWSTR lpszClassName,  // address of registered class nam
                       HWND hwndParent,        // handle of parent or owner window
                       HMENU hmenu,            // handle of menu or child-window identifier
                       HINSTANCE hinst,        // handle of application instance
-                      LPVOID lpvParam)        // ukazatel na objekt vytvareneho okna
+                      LPVOID lpvParam)        // pointer to created window object
 {
     return CreateExW(0,
                      lpszClassName,
@@ -328,8 +328,8 @@ CWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
             return TRUE;
         }
         if (GetWindowLongPtr(HWindow, GWL_STYLE) & WS_CHILD)
-            break;   // pokud F1 nezpracujeme a pokud je to child okno, nechame F1 propadnout do parenta
-        return TRUE; // pokud to neni child, ukoncime zpracovani F1
+            break;   // if F1 is not processed and it is a child window, let F1 propagate to parent
+        return TRUE; // if it is not a child, terminate F1 processing
     }
     }
 #ifndef _UNICODE
@@ -363,11 +363,11 @@ CWindow::CWindowProcInt(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam, BOOL
     CWindow* wnd;
     switch (uMsg)
     {
-    case WM_CREATE: // prvni zprava - pripojeni objektu k oknu
+    case WM_CREATE: // first message - attach object to window
     {
         // osetrim MDI_CHILD_WINDOW
-        if (((CREATESTRUCT*)lParam)->dwExStyle & WS_EX_MDICHILD)                                 // CREATESTRUCTA a CREATESTRUCTW se pro dwExStyle ani lpCreateParams nelisi
-            wnd = (CWindow*)((MDICREATESTRUCT*)((CREATESTRUCT*)lParam)->lpCreateParams)->lParam; // MDICREATESTRUCTA a MDICREATESTRUCTW se pro lParam nelisi
+        if (((CREATESTRUCT*)lParam)->dwExStyle & WS_EX_MDICHILD)                                 // CREATESTRUCTA and CREATESTRUCTW do not differ for dwExStyle and lpCreateParams
+            wnd = (CWindow*)((MDICREATESTRUCT*)((CREATESTRUCT*)lParam)->lpCreateParams)->lParam; // MDICREATESTRUCTA and MDICREATESTRUCTW do not differ for lParam
         else
             wnd = (CWindow*)((CREATESTRUCT*)lParam)->lpCreateParams;
         if (wnd == NULL)
@@ -382,8 +382,8 @@ CWindow::CWindowProcInt(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam, BOOL
             if (wnd->UnicodeWnd != unicode)
                 TRACE_C("Incompatible windows procedure.");
 #endif                                                // _UNICODE
-                                                      //--- zarazeni okna podle hwnd do seznamu oken
-            if (!WindowsManager.AddWindow(hwnd, wnd)) // chyba
+                                                      //--- insert window by hwnd into window list
+            if (!WindowsManager.AddWindow(hwnd, wnd)) // error
             {
                 TRACE_ET(_T("Unable to create window."));
                 return FALSE;
@@ -392,7 +392,7 @@ CWindow::CWindowProcInt(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam, BOOL
         break;
     }
 
-    case WM_DESTROY: // posledni zprava - odpojeni objektu od okna
+    case WM_DESTROY: // last message - detach object from window
     {
         wnd = (CWindow*)WindowsManager.GetWindowPtr(hwnd);
 #ifndef _UNICODE
@@ -401,23 +401,23 @@ CWindow::CWindowProcInt(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam, BOOL
 #endif // _UNICODE
         if (wnd != NULL && wnd->Is(otWindow))
         {
-            // Petr: posunul jsem dolu pod wnd->WindowProc(), aby behem WM_DESTROY
-            //       jeste dochazely zpravy (potreboval Lukas)
+            // Petr: posunul jsem dolu pod wnd->WindowProc(), so that during WM_DESTROY
+            //       messages still arrive (needed by Lukas)
             // WindowsManager.DetachWindow(hwnd);
 
             LRESULT res = wnd->WindowProc(uMsg, wParam, lParam);
 
-            // ted uz zase do stare procedury (kvuli subclassingu)
+            // now back to old procedure (due to subclassing)
             WindowsManager.DetachWindow(hwnd);
 
-            // pokud aktualni WndProc je jina nez nase, nebudeme ji menit,
-            // protoze nekdo v rade subclasseni uz vratil puvodni WndProc
+            // if current WndProc is different from ours, we will not change it,
+            // because someone in the subclassing chain already restored original WndProc
 #ifdef _UNICODE
             WNDPROC currentWndProc = (WNDPROC)GetWindowLongPtr(wnd->HWindow, GWLP_WNDPROC);
             if (currentWndProc == CWindow::CWindowProc)
                 SetWindowLongPtr(wnd->HWindow, GWLP_WNDPROC, (LONG_PTR)wnd->DefWndProc);
 #else  // _UNICODE
-            if (wnd->UnicodeWnd) // je-li nase window procedura unicodova, musime pouzit "W" varianty API funkci
+            if (wnd->UnicodeWnd) // if our window procedure is unicode, we must use "W" variants of API functions
             {
                 WNDPROC currentWndProc = (WNDPROC)GetWindowLongPtrW(wnd->HWindow, GWLP_WNDPROC);
                 if (currentWndProc == CWindow::CWindowProcW || currentWndProc == CWindow::CWindowProc)
@@ -458,11 +458,11 @@ CWindow::CWindowProcInt(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam, BOOL
 #endif // _UNICODE
     }
     }
-    //--- zavolani metody WindowProc(...) prislusneho objektu okna
+    //--- call WindowProc(...) method of corresponding window object
     LRESULT lResult;
     if (wnd != NULL)
         lResult = wnd->WindowProc(uMsg, wParam, lParam);
-    else // chyba nebo message prisla pred WM_CREATE
+    else // error or message arrived before WM_CREATE
     {
 #ifndef _UNICODE
         lResult = unicode ? DefWindowProcW(hwnd, uMsg, wParam, lParam) : DefWindowProcA(hwnd, uMsg, wParam, lParam);
@@ -650,7 +650,7 @@ CDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                                (GetKeyState(VK_CONTROL) & 0x8000) != 0,
                                (GetKeyState(VK_SHIFT) & 0x8000) != 0);
         }
-        return TRUE; // F1 nenechame propadnout do parenta ani pokud nevolame WinLibHelp->OnHelp()
+        return TRUE; // do not let F1 propagate to parent even if we do not call WinLibHelp->OnHelp()
     }
 
     case WM_CONTEXTMENU:
@@ -706,7 +706,7 @@ CDialog::CDialogProc(HWND hwndDlg, UINT uMsg, WPARAM wParam, LPARAM lParam)
     CDialog* dlg;
     switch (uMsg)
     {
-    case WM_INITDIALOG: // prvni zprava - pripojeni objektu k dialogu
+    case WM_INITDIALOG: // first message - attach object to dialog
     {
         dlg = (CDialog*)lParam;
         if (dlg == NULL)
@@ -717,25 +717,25 @@ CDialog::CDialogProc(HWND hwndDlg, UINT uMsg, WPARAM wParam, LPARAM lParam)
         else
         {
             dlg->HWindow = hwndDlg;
-            //--- zarazeni okna podle hwndDlg do seznamu oken
-            if (!WindowsManager.AddWindow(hwndDlg, dlg)) // chyba
+            //--- insert window by hwndDlg into window list
+            if (!WindowsManager.AddWindow(hwndDlg, dlg)) // error
             {
                 TRACE_ET(_T("Unable to create dialog."));
                 return TRUE;
             }
-            dlg->NotifDlgJustCreated(); // zavedeno jako misto pro upravu layoutu dialogu
+            dlg->NotifDlgJustCreated(); // introduced as a place to modify dialog layout
         }
         break;
     }
 
-    case WM_DESTROY: // posledni zprava - odpojeni objektu od dialogu
+    case WM_DESTROY: // last message - detach object from dialog
     {
         dlg = (CDialog*)WindowsManager.GetWindowPtr(hwndDlg);
-        INT_PTR ret = FALSE; // pro pripad, ze ji nezpracuje
+        INT_PTR ret = FALSE; // in case it does not process it
         if (dlg != NULL && dlg->Is(otDialog))
         {
-            // Petr: posunul jsem dolu pod dlg->DialogProc(), aby behem WM_DESTROY
-            //       jeste dochazely zpravy (potreboval Lukas)
+            // Petr: posunul jsem dolu pod dlg->DialogProc(), so that during WM_DESTROY
+            //       messages still arrive (needed by Lukas)
             // WindowsManager.DetachWindow(hwndDlg);
 
             ret = dlg->DialogProc(uMsg, wParam, lParam);
@@ -761,12 +761,12 @@ CDialog::CDialogProc(HWND hwndDlg, UINT uMsg, WPARAM wParam, LPARAM lParam)
 #endif
     }
     }
-    //--- zavolani metody DialogProc(...) prislusneho objektu dialogu
+    //--- call DialogProc(...) method of corresponding dialog object
     INT_PTR dlgRes;
     if (dlg != NULL)
         dlgRes = dlg->DialogProc(uMsg, wParam, lParam);
     else
-        dlgRes = FALSE; // chyba nebo message neprisla mezi WM_INITDIALOG a WM_DESTROY
+        dlgRes = FALSE; // error or message did not arrive between WM_INITDIALOG and WM_DESTROY
 
     return dlgRes;
 }
@@ -835,7 +835,7 @@ void CWindowsManager::DetachWindow(HWND hWnd)
         return;
 
     CS.Enter();
-    if (LastHWnd[GetCacheIndex(hWnd)] == hWnd) // musime vycistit cache
+    if (LastHWnd[GetCacheIndex(hWnd)] == hWnd) // we must clear cache
     {
         LastHWnd[GetCacheIndex(hWnd)] = NULL;
         LastWnd[GetCacheIndex(hWnd)] = NULL;
@@ -912,8 +912,8 @@ CWindowQueue::~CWindowQueue()
 {
     if (!Empty())
         TRACE_ET(_T("Some window is still opened in ") << QueueName << _T(" queue!")); // nemelo by nastat...
-    // tady uz multi-threadovost nehrozi (konci soft, thready jsou/byly ukonceny)
-    // dealokujeme aspon nejakou pamet
+    // multi-threading is no longer a concern here (software is ending, threads are/were terminated)
+    // deallocate at least some memory
     CWindowQueueItem* last;
     CWindowQueueItem* item = Head;
     while (item != NULL)
@@ -1021,7 +1021,7 @@ void CTransferInfo::EnsureControlIsFocused(int ctrlID)
         HWND wnd = GetFocus();
         while (wnd != NULL && wnd != ctrl)
             wnd = ::GetParent(wnd);
-        if (wnd == NULL) // fokusime jen pokud neni ctrl predek GetFocusu
+        if (wnd == NULL) // focus only if ctrl is not ancestor of GetFocus
         {                // jako napr. edit-line v combo-boxu
             SendMessage(HDialog, WM_NEXTDLGCTL, (WPARAM)ctrl, TRUE);
         }
@@ -1139,10 +1139,10 @@ void CTransferInfo::EditLine(int ctrlID, double& value, TCHAR* format, BOOL sele
             if (*s == 0)
             {
                 TCHAR* stopString;                  // dummy
-                value = _tcstod(buff, &stopString); // jen pokud je cislo
+                value = _tcstod(buff, &stopString); // only if it is a number
             }
             else
-                value = 0; // pri chybe dame nulu
+                value = 0; // on error set to zero
             break;
         }
         }
@@ -1174,7 +1174,7 @@ void CTransferInfo::EditLine(int ctrlID, int& value, BOOL select)
             TCHAR* s = buff;
             if (*s == _T('-') || *s == _T('+'))
                 s++;        // preskok znamenka
-            while (*s != 0) // kontrola cisla
+            while (*s != 0) // number validation
             {
                 if (*s < _T('0') || *s > _T('9'))
                 {
@@ -1187,7 +1187,7 @@ void CTransferInfo::EditLine(int ctrlID, int& value, BOOL select)
             }
 
             TCHAR* endptr;
-            value = _tcstoul(buff, &endptr, 10); // nahrada za atoi / _ttoi, ktere misto 4000000000 vraci 2147483647 (protoze je to SIGNED INT)
+            value = _tcstoul(buff, &endptr, 10); // replacement for atoi / _ttoi, which returns 2147483647 instead of 4000000000 (because it is SIGNED INT)
             break;
         }
         }
@@ -1230,7 +1230,7 @@ void CTransferInfo::EditLine(int ctrlID, __int64& value, BOOL select, BOOL unsig
                 s++; // preskok znamenka
             unsigned __int64 num = 0;
             BOOL overflow = FALSE;
-            while (*s != 0) // kontrola cisla
+            while (*s != 0) // number validation
             {
                 if ((*s < _T('0') || *s > _T('9')) && (!hexMode || *s < _T('A') || *s > _T('F')))
                 {
@@ -1257,11 +1257,11 @@ void CTransferInfo::EditLine(int ctrlID, __int64& value, BOOL select, BOOL unsig
             }
             if (*s != 0)
             {
-                value = 0; // pri chybe dame nulu
+                value = 0; // on error set to zero
                 break;
             }
 
-            // pri preteceni davame mezni hodnoty (inspirace: value = _ttoi64(buff))
+            // on overflow we set limit values (inspiration: value = _ttoi64(buff))
             if (unsignedNum)
             {
                 if (overflow)

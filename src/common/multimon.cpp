@@ -58,7 +58,7 @@ void MultiMonGetClipRectByWindow(HWND hByWnd, RECT* workClipRect, RECT* monitorC
     }
     else
     {
-        // pokud nalezneme foreground okno patrici nasi aplikaci,
+        // if we find foreground window belonging to our application,
         // centrujeme okno na stejny desktop
         HWND hForegroundWnd = GetForegroundWindow();
         DWORD processID;
@@ -95,7 +95,7 @@ void MultiMonCenterWindow(HWND hWindow, HWND hByWnd, BOOL findTopWindow)
 
     if (IsZoomed(hWindow))
     {
-        // s maximalizovany oknem nebudeme hybat
+        // we will not move maximized window
         return;
     }
 
@@ -130,7 +130,7 @@ void MultiMonCenterWindowByRect(HWND hWindow, const RECT& clipR, const RECT& byR
 
     if (IsZoomed(hWindow))
     {
-        // s maximalizovany oknem nebudeme hybat
+        // we will not move maximized window
         return;
     }
 
@@ -146,13 +146,13 @@ void MultiMonCenterWindowByRect(HWND hWindow, const RECT& clipR, const RECT& byR
     wndRect.bottom = wndRect.top + wndHeight;
 
     // ohlidame hranice
-    if (wndRect.left < clipR.left) // pokud je okno vetsi nez clipR, nechame zobrazit jeho levou cast
+    if (wndRect.left < clipR.left) // if window is larger than clipR, let its left part be displayed
     {
         wndRect.left = clipR.left;
         wndRect.right = wndRect.left + wndWidth;
     }
 
-    if (wndRect.top < clipR.top) // pokud je okno vetsi nez clipR, nechame zobrazit jeho hotni cast
+    if (wndRect.top < clipR.top) // if window is larger than clipR, let its top part be displayed
     {
         wndRect.top = clipR.top;
         wndRect.bottom = wndRect.top + wndHeight;
@@ -160,7 +160,7 @@ void MultiMonCenterWindowByRect(HWND hWindow, const RECT& clipR, const RECT& byR
 
     if (wndWidth <= clipR.right - clipR.left)
     {
-        // pokud je okno mensi nez clipR, osetrime aby nelezlo vpravo za hranici clipR
+        // if window is smaller than clipR, ensure it does not lie right beyond clipR boundary
         if (wndRect.right >= clipR.right)
         {
             wndRect.left = clipR.right - wndWidth;
@@ -169,14 +169,14 @@ void MultiMonCenterWindowByRect(HWND hWindow, const RECT& clipR, const RECT& byR
     }
     else
     {
-        // pokud je okno vetsi nez clipR
+        // if window is larger than clipR
         if (wndRect.left > clipR.left)
-            wndRect.left = clipR.left; // vyuzijeme maximalne prostor
+            wndRect.left = clipR.left; // use maximum space
     }
 
     if (wndHeight <= clipR.bottom - clipR.top)
     {
-        // pokud je okno mensi nez clipR, osetrime aby nelezlo dole za hranici clipR
+        // if window is smaller than clipR, ensure it does not lie below clipR boundary
         if (wndRect.bottom >= clipR.bottom)
         {
             wndRect.top = clipR.bottom - wndHeight;
@@ -185,9 +185,9 @@ void MultiMonCenterWindowByRect(HWND hWindow, const RECT& clipR, const RECT& byR
     }
     else
     {
-        // pokud je okno vetsi nez clipR
+        // if window is larger than clipR
         if (wndRect.top > clipR.top)
-            wndRect.top = clipR.top; // vyuzijeme maximalne prostor
+            wndRect.top = clipR.top; // use maximum space
     }
 
     SetWindowPos(hWindow, NULL, wndRect.left, wndRect.top, 0, 0,
@@ -242,7 +242,7 @@ BOOL MultiMonGetDefaultWindowPos(HWND hByWnd, POINT* p)
                 // trik s dummy oknem funguje pekne pod MSVC, ale pri spusteni salamandera bez MSVC
                 // se okno otevira na primarnim monitoru (nezjistil jsem proc, kdyz ma parenta)
 
-                // pomuzeme si -- posuneme okno na nas monitor
+                // help ourselves -- move window to our monitor
                 MONITORINFO tmpInfo;
                 tmpInfo.cbSize = sizeof(tmpInfo);
                 GetMonitorInfo(hTmpMonitor, &tmpInfo);

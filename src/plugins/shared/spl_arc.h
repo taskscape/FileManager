@@ -31,30 +31,30 @@ class CPluginDataInterfaceAbstract;
 class CPluginInterfaceForArchiverAbstract
 {
 #ifdef INSIDE_SALAMANDER
-private: // ochrana proti nespravnemu primemu volani metod (viz CPluginInterfaceForArchiverEncapsulation)
+private: // protection against incorrect direct method calls (see CPluginInterfaceForArchiverEncapsulation)
     friend class CPluginInterfaceForArchiverEncapsulation;
 #else  // INSIDE_SALAMANDER
 public:
 #endif // INSIDE_SALAMANDER
 
-    // funkce pro "panel archiver view"; vola se pro nacteni obsahu archivu 'fileName';
+    // function for "panel archiver view"; called to load archive 'fileName' content;
     // obsah se plni do objektu 'dir'; Salamander zjisti obsah
-    // pluginem pridanych sloupcu pomoci interfacu 'pluginData' (pokud plugin sloupce
-    // nepridava, vraci 'pluginData'==NULL); vraci TRUE pri uspesnem nacteni obsahu archivu,
-    // pokud vrati FALSE, navratova hodnota 'pluginData' se ignoruje (data v 'dir' je potreba
-    // uvolnit pomoci 'dir.Clear(pluginData)', jinak se uvolni jen Salamanderovska cast dat);
+    // columns added by plugin using interface 'pluginData' (if plugin does not add columns
+    // returns 'pluginData'==NULL); returns TRUE on successful archive content loading,
+    // if returns FALSE, return value 'pluginData' is ignored (data in 'dir' must be
+    // freed using 'dir.Clear(pluginData)', otherwise only Salamander part of data is freed);
     // 'salamander' je sada uzitecnych metod vyvezenych ze Salamandera,
-    // POZOR: soubor fileName take nemusi existovat (pokud je otevren v panelu a odjinud smazan),
-    // ListArchive neni volan pro soubory nulove delky, ty maji automaticky prazdny obsah,
+    // WARNING: file fileName may not exist (if opened in panel and deleted from elsewhere),
+    // ListArchive is not called for zero-length files, they automatically have empty content,
     // pri pakovani do takovych souboru se soubor pred volanim PackToArchive smaze (pro
     // kompatibilitu s externimi pakovaci)
     virtual BOOL WINAPI ListArchive(CSalamanderForOperationsAbstract* salamander, const char* fileName,
                                     CSalamanderDirectoryAbstract* dir,
                                     CPluginDataInterfaceAbstract*& pluginData) = 0;
 
-    // funkce pro "panel archiver view", vola se pri pozadavku na rozpakovani souboru/adresaru
+    // function for "panel archiver view", called on request to unpack files/directories
     // z archivu 'fileName' do adresare 'targetDir' z cesty v archivu 'archiveRoot'; 'pluginData'
-    // je interface pro praci s informacemi o souborech/adresarich, ktere jsou specificke pluginu
+    // is interface for working with file/directory information that is plugin-specific
     // (napr. data z pridanych sloupcu; jde o stejny interface, ktery vraci metoda ListArchive
     // v parametru 'pluginData' - takze muze byt i NULL); soubory/adresare jsou zadany enumeracni
     // funkci 'next' jejimz parametrem je 'nextParam'; vraci TRUE pri uspesnem rozpakovani (nebyl

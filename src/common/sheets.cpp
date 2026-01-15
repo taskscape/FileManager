@@ -44,7 +44,7 @@ void CElasticLayout::AddResizeCtrl(int resID)
         RECT r;
         GetWindowRect(hChild, &r);
 
-        // pokud je spodni hrana prvku vetsi nez SplitY, posuneme SplitY hranici
+        // if bottom edge of element is greater than SplitY, we move SplitY boundary
         POINT p = {r.right, r.bottom};
         ScreenToClient(HWindow, &p);
         if (p.y > SplitY)
@@ -67,7 +67,7 @@ CElasticLayout::FindMoveControls(HWND hChild, LPARAM lParam)
 {
     CElasticLayout* el = (CElasticLayout*)lParam;
 
-    // pokud prvek lezi pod SplitY, pridame ho do seznamu prvku, ktere budou posouvat
+    // if element lies below SplitY, we add it to list of elements that will be moved
     RECT r;
     GetWindowRect(hChild, &r);
     POINT p = {r.left, r.top};
@@ -111,7 +111,7 @@ void CElasticLayout::FindMoveCtrls()
     for (int i = 0; i < MoveCtrls.Count; i++)
         MoveCtrls[i].Pos.y = envelopeBottom - MoveCtrls[i].Pos.y;
 
-    // pro prvky ResizeCtrls ulozime jejich vzdalenost spodni hrany od spodni hrany obalky
+    // for ResizeCtrls elements we save their bottom edge distance from bottom edge of container
     for (int i = 0; i < ResizeCtrls.Count; i++)
     {
         if (ResizeCtrls[i].Pos.y == 0)
@@ -198,7 +198,7 @@ void CPropSheetPage::Init(const TCHAR* title, HINSTANCE modul, int resID,
     Flags = flags;
     Icon = icon;
 
-    ParentDialog = NULL; // nastavuje se z CPropertyDialog::Execute()
+    ParentDialog = NULL; // set from CPropertyDialog::Execute()
     ParentPage = NULL;
     HTreeItem = NULL;
     Expanded = NULL;
@@ -309,7 +309,7 @@ CPropSheetPage::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                                (GetKeyState(VK_SHIFT) & 0x8000) != 0);
             return TRUE;
         }
-        break; // F1 nechame propadnout do parenta
+        break; // let F1 propagate to parent
     }
 
     case WM_CONTEXTMENU:
@@ -340,7 +340,7 @@ CPropSheetPage::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         }
 
         if (((NMHDR*)lParam)->code == PSN_APPLY)
-        { // stisknuto tlacitko ApplyNow nebo OK
+        { // ApplyNow or OK button pressed
             if (TransferData(ttDataFromWindow))
                 SetWindowLongPtr(HWindow, DWLP_MSGRESULT, PSNRET_NOERROR);
             else
@@ -350,14 +350,14 @@ CPropSheetPage::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 
         if (((NMHDR*)lParam)->code == PSN_WIZFINISH)
         { // stisknuto tlacitko Finish
-            // neprislo PSN_KILLACTIVE - provedu validaci
+            // PSN_KILLACTIVE did not arrive - perform validation
             if (!ValidateData())
             {
                 SetWindowLongPtr(HWindow, DWLP_MSGRESULT, TRUE);
                 return TRUE;
             }
 
-            // obehnu vsechny stranky pro transfer
+            // go through all pages for transfer
             for (int i = 0; i < ParentDialog->Count; i++)
             {
                 if (ParentDialog->At(i)->HWindow != NULL)
@@ -397,13 +397,13 @@ CPropSheetPage::CPropSheetPageProc(HWND hwndDlg, UINT uMsg, WPARAM wParam,
         {
             dlg->HWindow = hwndDlg;
             dlg->Parent = ::GetParent(hwndDlg);
-            //--- zarazeni okna podle hwndDlg do seznamu oken
+            //--- insert window by hwndDlg into window list
             if (!WindowsManager.AddWindow(hwndDlg, dlg)) // chyba
             {
                 TRACE_ET(_T("Unable to create dialog."));
                 return TRUE;
             }
-            dlg->NotifDlgJustCreated(); // zavedeno jako misto pro upravu layoutu dialogu
+            dlg->NotifDlgJustCreated(); // introduced as a place to modify dialog layout
         }
         break;
     }
@@ -411,7 +411,7 @@ CPropSheetPage::CPropSheetPageProc(HWND hwndDlg, UINT uMsg, WPARAM wParam,
     case WM_DESTROY: // posledni zprava - odpojeni objektu od dialogu
     {
         dlg = (CPropSheetPage*)WindowsManager.GetWindowPtr(hwndDlg);
-        INT_PTR ret = FALSE; // pro pripad, ze ji nezpracuje
+        INT_PTR ret = FALSE; // in case it does not process it
         if (dlg != NULL && dlg->Is(otDialog))
         {
             // Petr: posunul jsem dolu pod wnd->WindowProc(), aby behem WM_DESTROY
@@ -445,7 +445,7 @@ CPropSheetPage::CPropSheetPageProc(HWND hwndDlg, UINT uMsg, WPARAM wParam,
     if (dlg != NULL)
         return dlg->DialogProc(uMsg, wParam, lParam);
     else
-        return FALSE; // chyba nebo message neprisla mezi WM_INITDIALOG a WM_DESTROY
+        return FALSE; // error or message did not arrive between WM_INITDIALOG and WM_DESTROY
 }
 
 //
@@ -568,7 +568,7 @@ CTPHCaptionWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         GetClientRect(HWindow, &r);
 
         int devCaps = GetDeviceCaps(hdc, NUMCOLORS);
-        if (devCaps == -1) // gradient pouzijeme pouze pri vice nez 256 barvach
+        if (devCaps == -1) // use gradient only with more than 256 colors
         {
             HBRUSH hOldBrush = (HBRUSH)GetCurrentObject(hdc, OBJ_BRUSH);
 #define TPH_STEPS 100
@@ -641,7 +641,7 @@ CTPHGripWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
     {
     case WM_SETCURSOR:
     {
-        // chceme pouze north-south kurzor
+        // we want only north-south cursor
         SetCursor(LoadCursor(NULL, IDC_SIZENS));
         return TRUE;
     }
@@ -666,7 +666,7 @@ CTreePropHolderDlg::CTreePropHolderDlg(HWND hParent, DWORD* windowHeight)
 INT_PTR
 CTreePropHolderDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 {
-    // WM_INITDIALOG zavolame az ve chvili, kdy budeme znat rozmery okna
+    // we call WM_INITDIALOG only when we know window dimensions
     if (TPD != NULL && uMsg != WM_INITDIALOG)
         TPD->DialogProc(uMsg, wParam, lParam); // forward zprav
     switch (uMsg)
@@ -695,7 +695,7 @@ CTreePropHolderDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         if (appIsThemed)
         {
             RECT rect = {0, 0, 4, 8};
-            MapDialogRect(HWindow, &rect); // ziskame baseUnitX a baseUnitY pro prepocet dlg-units na pixels
+            MapDialogRect(HWindow, &rect); // get baseUnitX and baseUnitY for converting dlg-units to pixels
             treeIndent = MulDiv(9 /* odsazeni v dlg-units */, rect.right /* baseUnitX */, 4);
             TreeView_SetIndent(HTreeView, treeIndent);
         }
@@ -734,7 +734,7 @@ CTreePropHolderDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                            MarginSize.cy + 1 + MarginSize.cy +
                            ButtonSize.cy + MarginSize.cy + marginH;
 
-        // nastavime uzivatelsky rozmer okna a provedeme layout prvku
+        // set user window size and perform element layout
         int height = (int)*WindowHeight;
         RECT clipR; // nechceme byt vetsi nez vyska obrazovky
         MultiMonGetClipRectByWindow(HWindow, &clipR, NULL);
@@ -791,7 +791,7 @@ CTreePropHolderDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
             if (!ChildDialog->ValidateData())
                 return TRUE;
 
-            // obehnu vsechny stranky pro transfer
+            // go through all pages for transfer
             for (int i = 0; i < TPD->Count; i++)
                 if (TPD->At(i)->HWindow != NULL)
                     if (!TPD->At(i)->TransferData(ttDataFromWindow))
