@@ -1,4 +1,4 @@
-﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2023 Open Salamander Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "precomp.h"
@@ -11,6 +11,174 @@
 #include "fileswnd.h"
 #include "shellib.h"
 #include "svg.h"
+
+//
+// ****************************************************************************
+// UTF-8-aware text drawing helper functions
+//
+
+static BOOL ExtTextOutUtf8(HDC hdc, int x, int y, UINT options, const RECT* lprc,
+                           const char* text, UINT len, const INT* dx)
+{
+    if (text == NULL || len == 0)
+        return ExtTextOutW(hdc, x, y, options, lprc, L"", 0, NULL);
+    CStrP textW(ConvertAllocUtf8ToWide(text, (int)len));
+    if (textW == NULL)
+        return ExtTextOutW(hdc, x, y, options, lprc, L"?", 1, NULL);
+    int wlen = lstrlenW(textW);
+    return ExtTextOutW(hdc, x, y, options, lprc, textW, wlen, NULL);
+}
+
+static BOOL GetTextExtentPoint32Utf8(HDC hdc, const char* text, int len, SIZE* size)
+{
+    size->cx = 0;
+    size->cy = 0;
+    if (text == NULL || len <= 0)
+        return TRUE;
+    CStrP textW(ConvertAllocUtf8ToWide(text, len));
+    if (textW == NULL)
+        return GetTextExtentPoint32(hdc, text, len, size);
+    int wlen = lstrlenW(textW);
+    return GetTextExtentPoint32W(hdc, textW, wlen, size);
+}
+
+static int DrawTextUtf8(HDC hdc, const char* text, int textLen, RECT* lprc, UINT format)
+{
+    if (text == NULL)
+        return 0;
+    if (textLen == -1)
+        textLen = (int)strlen(text);
+    if (textLen == 0)
+        return DrawTextW(hdc, L"", 0, lprc, format);
+    CStrP textW(ConvertAllocUtf8ToWide(text, textLen));
+    if (textW == NULL)
+        return DrawText(hdc, text, textLen, lprc, format);
+    int wlen = lstrlenW(textW);
+    return DrawTextW(hdc, textW, wlen, lprc, format);
+}
+
+// UTF-8-aware version of GetTextExtentExPoint that also fills alpDx with character positions
+// Note: alpDx[i] contains the cumulative width from the start up to and including byte i
+static BOOL GetTextExtentExPointUtf8(HDC hdc, const char* text, int textLen, int maxWidth, int* lpnFit, int* alpDx, SIZE* lpSize)
+{
+    if (text == NULL || textLen <= 0)
+    {
+        if (lpnFit)
+            *lpnFit = 0;
+        if (lpSize)
+        {
+            lpSize->cx = 0;
+            lpSize->cy = 0;
+        }
+        return TRUE;
+    }
+
+    // Convert UTF-8 to wide string
+    CStrP textW(ConvertAllocUtf8ToWide(text, textLen));
+    if (textW == NULL)
+    {
+        // Fall back to ANSI version if conversion fails
+        return GetTextExtentExPoint(hdc, text, textLen, maxWidth, lpnFit, alpDx, lpSize);
+    }
+    int wlen = lstrlenW(textW);
+
+    // Handle empty wide string case
+    if (wlen == 0)
+    {
+        if (lpnFit)
+            *lpnFit = 0;
+        if (lpSize)
+        {
+            lpSize->cx = 0;
+            lpSize->cy = 0;
+        }
+        if (alpDx != NULL)
+        {
+            for (int i = 0; i < textLen; i++)
+                alpDx[i] = 0;
+        }
+        return TRUE;
+    }
+
+    // Allocate array for wide character positions
+    int* wideAlpDx = (int*)malloc(wlen * sizeof(int));
+    if (wideAlpDx == NULL)
+    {
+        return GetTextExtentExPoint(hdc, text, textLen, maxWidth, lpnFit, alpDx, lpSize);
+    }
+
+    // Initialize the array to avoid uninitialized values
+    for (int i = 0; i < wlen; i++)
+        wideAlpDx[i] = 0;
+
+    // Get wide character positions (cumulative widths)
+    // When maxWidth is 0, we need to use a large value to get all character widths
+    int effectiveMaxWidth = (maxWidth == 0) ? INT_MAX : maxWidth;
+    int wideFit = 0;
+    BOOL result = GetTextExtentExPointW(hdc, textW, wlen, effectiveMaxWidth, &wideFit, wideAlpDx, lpSize);
+    if (!result)
+    {
+        free(wideAlpDx);
+        return FALSE;
+    }
+
+    // Map wide character cumulative widths back to UTF-8 byte positions
+    // Each UTF-8 byte gets the cumulative width of the Unicode character it belongs to
+    if (alpDx != NULL)
+    {
+        int widePos = 0;
+        for (int i = 0; i < textLen; i++)
+        {
+            unsigned char c = (unsigned char)text[i];
+            // Check if this is the start of a UTF-8 character (not a continuation byte)
+            if ((c & 0xC0) != 0x80)
+            {
+                // This is the start of a new UTF-8 character, move to next wide char
+                if (widePos < wlen)
+                {
+                    widePos++;
+                }
+            }
+            // Assign the cumulative width at this wide character position
+            // widePos-1 because we incremented it above, and wideAlpDx is 0-indexed
+            if (widePos > 0 && widePos <= wlen)
+            {
+                alpDx[i] = wideAlpDx[widePos - 1];
+            }
+            else
+            {
+                alpDx[i] = 0;
+            }
+        }
+    }
+
+    if (lpnFit != NULL)
+    {
+        if (maxWidth == 0)
+        {
+            // When maxWidth is 0, report all UTF-8 bytes fit
+            *lpnFit = textLen;
+        }
+        else
+        {
+            // Convert wide fit count back to UTF-8 byte count
+            *lpnFit = 0;
+            int wideCount = 0;
+            for (int i = 0; i < textLen && wideCount < wideFit; i++)
+            {
+                unsigned char c = (unsigned char)text[i];
+                if ((c & 0xC0) != 0x80) // Start of a new UTF-8 character
+                {
+                    wideCount++;
+                }
+                (*lpnFit)++;
+            }
+        }
+    }
+
+    free(wideAlpDx);
+    return result;
+}
 
 //
 // ****************************************************************************
@@ -184,7 +352,7 @@ void CStatusWindow::BuildHotTrackItems()
             int pathLen = (PathLen != -1) ? PathLen : (int)strlen(Text);
             // ziskame pozice vsech znaku
             SIZE s;
-            GetTextExtentExPoint(dc, Text, TextLen, 0, NULL, AlpDX, &s);
+            GetTextExtentExPointUtf8(dc, Text, TextLen, 0, NULL, AlpDX, &s);
 
             if (FilesWindow->Is(ptDisk) || FilesWindow->Is(ptZIPArchive))
             {
@@ -270,7 +438,7 @@ void CStatusWindow::BuildHotTrackItems()
         {
             // ziskame pozice vsech znaku
             SIZE s;
-            GetTextExtentExPoint(dc, Text, TextLen, 0, NULL, AlpDX, &s);
+            GetTextExtentExPointUtf8(dc, Text, TextLen, 0, NULL, AlpDX, &s);
 
             DWORD len = TextLen;
             SIZE sOffset;
@@ -285,8 +453,8 @@ void CStatusWindow::BuildHotTrackItems()
                     TRACE_E("charOffset + charLen >= len");
                     continue;
                 }
-                GetTextExtentPoint32(dc, Text, charOffset, &sOffset);
-                GetTextExtentPoint32(dc, Text + charOffset, charLen, &sSub);
+                GetTextExtentPoint32Utf8(dc, Text, charOffset, &sOffset);
+                GetTextExtentPoint32Utf8(dc, Text + charOffset, charLen, &sSub);
                 item.PixelsOffset = (WORD)sOffset.cx;
                 item.Pixels = (WORD)sSub.cx;
                 item.Offset = charOffset;
@@ -1000,7 +1168,7 @@ void CStatusWindow::Paint(HDC hdc, BOOL highlightText, BOOL highlightHotTrackOnl
             {
                 if (truncateEnd)
                 { // bez zkraceni nebo ustrizen konec
-                    ExtTextOut(dc, TextRect.left, textY, 0, NULL, Text, min(visibleChars, firstClipChar), NULL);
+                    ExtTextOutUtf8(dc, TextRect.left, textY, 0, NULL, Text, min(visibleChars, firstClipChar), NULL);
                     if (visibleChars < min(TextLen, firstClipChar)) // pokud byl ustrizen konec -> pripojime "..."
                     {
                         int offset = (visibleChars > 0) ? AlpDX[visibleChars - 1] : 0;
@@ -1011,12 +1179,12 @@ void CStatusWindow::Paint(HDC hdc, BOOL highlightText, BOOL highlightHotTrackOnl
                 { // uriznuta cast za root slozkou
                     // root cast
                     int rootChars = HotTrackItems[0].Chars;
-                    ExtTextOut(dc, TextRect.left, textY, 0, NULL, Text, rootChars, NULL);
+                    ExtTextOutUtf8(dc, TextRect.left, textY, 0, NULL, Text, rootChars, NULL);
                     // "..."
                     ExtTextOut(dc, TextRect.left + AlpDX[rootChars - 1], textY, 0, NULL, "...", 3, NULL);
                     // zbytek
-                    ExtTextOut(dc, TextRect.left + AlpDX[rootChars - 1] + TextEllipsisWidthEnv,
-                               textY, 0, NULL, Text + TextLen - visibleChars, visibleChars, NULL);
+                    ExtTextOutUtf8(dc, TextRect.left + AlpDX[rootChars - 1] + TextEllipsisWidthEnv,
+                                   textY, 0, NULL, Text + TextLen - visibleChars, visibleChars, NULL);
                 }
             }
 
@@ -1025,7 +1193,7 @@ void CStatusWindow::Paint(HDC hdc, BOOL highlightText, BOOL highlightHotTrackOnl
             {
                 // bez zkraceni nebo ustrizen konec
                 int visibleChars2 = visibleChars - lastClipChar;
-                ExtTextOut(dc, TextRect.left + AlpDX[lastClipChar - 1], textY, 0, NULL, Text + lastClipChar, visibleChars2, NULL);
+                ExtTextOutUtf8(dc, TextRect.left + AlpDX[lastClipChar - 1], textY, 0, NULL, Text + lastClipChar, visibleChars2, NULL);
                 if (visibleChars < TextLen) // pokud byl ustrizen konec -> pripojime "..."
                 {
                     int offset = (visibleChars > 0) ? AlpDX[visibleChars - 1] : 0;
@@ -1049,8 +1217,8 @@ void CStatusWindow::Paint(HDC hdc, BOOL highlightText, BOOL highlightHotTrackOnl
                     if (firstChar < rootChars + EllipsedChars) // je potreba preskocit pripadne zpetne lomitko, ktere by lezlo do vypustky
                         firstChar = rootChars + EllipsedChars;
                 }
-                ExtTextOut(dc, TextRect.left + AlpDX[firstChar - 1] - EllipsedWidth + TextEllipsisWidthEnv,
-                           textY, 0, NULL, Text + firstChar, TextLen - firstChar, NULL);
+                ExtTextOutUtf8(dc, TextRect.left + AlpDX[firstChar - 1] - EllipsedWidth + TextEllipsisWidthEnv,
+                               textY, 0, NULL, Text + firstChar, TextLen - firstChar, NULL);
             }
 
             // zobrazime hot track polozku
@@ -1082,8 +1250,8 @@ void CStatusWindow::Paint(HDC hdc, BOOL highlightText, BOOL highlightHotTrackOnl
                     }
                     if (showChars > 0)
                     {
-                        ExtTextOut(dc, TextRect.left + hotItem->PixelsOffset, textY, 0, NULL,
-                                   Text + hotItem->Offset, showChars, NULL);
+                        ExtTextOutUtf8(dc, TextRect.left + hotItem->PixelsOffset, textY, 0, NULL,
+                                       Text + hotItem->Offset, showChars, NULL);
                     }
                 }
                 else
@@ -1091,7 +1259,7 @@ void CStatusWindow::Paint(HDC hdc, BOOL highlightText, BOOL highlightHotTrackOnl
                     int showChars = hotItem->Chars;
 
                     int rootChars = HotTrackItems[0].Chars;
-                    ExtTextOut(dc, TextRect.left, textY, 0, NULL, Text, rootChars, NULL);
+                    ExtTextOutUtf8(dc, TextRect.left, textY, 0, NULL, Text, rootChars, NULL);
                     if (showChars > rootChars)
                     {
                         // "..."
@@ -1099,8 +1267,8 @@ void CStatusWindow::Paint(HDC hdc, BOOL highlightText, BOOL highlightHotTrackOnl
                         if (showChars - rootChars - EllipsedChars > 0)
                         {
                             // zbytek
-                            ExtTextOut(dc, TextRect.left + AlpDX[rootChars - 1] + TextEllipsisWidthEnv,
-                                       textY, 0, NULL, Text + rootChars + EllipsedChars, showChars - rootChars - EllipsedChars, NULL);
+                            ExtTextOutUtf8(dc, TextRect.left + AlpDX[rootChars - 1] + TextEllipsisWidthEnv,
+                                           textY, 0, NULL, Text + rootChars + EllipsedChars, showChars - rootChars - EllipsedChars, NULL);
                         }
                     }
                 }
@@ -2210,7 +2378,7 @@ CStatusWindow::CreateDragImage(const char* text, int& dxHotspot, int& dyHotspot,
     HDC hDC = ItemBitmap.HMemDC;
     HFONT hOldFont = (HFONT)SelectObject(hDC, Font);
     SIZE sz;
-    GetTextExtentPoint32(hDC, text, textLen, &sz);
+    GetTextExtentPoint32Utf8(hDC, text, textLen, &sz);
     ItemBitmap.Enlarge(sz.cx, sz.cy); // alokace bitmapy v ItemBitmap.HMemDC
     // podmazu pozadi
     RECT r;
@@ -2221,7 +2389,7 @@ CStatusWindow::CreateDragImage(const char* text, int& dxHotspot, int& dyHotspot,
     FillRect(hDC, &r, HNormalBkBrush);
     int oldBkMode = SetBkMode(hDC, TRANSPARENT);
     int oldTextColor = SetTextColor(hDC, GetCOLORREF(CurrentColors[ITEM_FG_NORMAL]));
-    DrawText(hDC, text, textLen, &r, DT_LEFT | DT_SINGLELINE | DT_VCENTER | DT_NOPREFIX);
+    DrawTextUtf8(hDC, text, textLen, &r, DT_LEFT | DT_SINGLELINE | DT_VCENTER | DT_NOPREFIX);
     SetTextColor(hDC, oldTextColor);
     SetBkMode(hDC, oldBkMode);
     SelectObject(hDC, hOldFont);
