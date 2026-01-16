@@ -57,7 +57,7 @@ class CCopyMoveData;
 struct CTmpDropData
 {
     BOOL Copy;
-    char TargetPath[MAX_PATH];
+    char TargetPath[2 * MAX_PATH]; // 2x for UTF-8 encoded paths
     CCopyMoveData* Data;
 };
 
@@ -65,8 +65,8 @@ struct CTmpDragDropOperData
 {
     BOOL Copy;      // copy/move
     BOOL ToArchive; // archive/FS
-    char ArchiveOrFSName[MAX_PATH];
-    char ArchivePathOrUserPart[MAX_PATH];
+    char ArchiveOrFSName[2 * MAX_PATH];       // 2x for UTF-8
+    char ArchivePathOrUserPart[2 * MAX_PATH]; // 2x for UTF-8
     CDragDropOperData* Data;
 };
 

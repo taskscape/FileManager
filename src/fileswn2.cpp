@@ -1646,11 +1646,7 @@ BOOL CFilesWindow::ChangePathToDisk(HWND parent, const char* path, int suggested
                         suggestedTopIndex, suggestedFocusName, refreshListBox, canForce, isRefresh,
                         shorterPathWarning, tryCloseReason);
 
-    {
-        char dbgBuf[2 * MAX_PATH + 200];
-        sprintf(dbgBuf, "SALDBG ChangePathToDisk: path=\"%s\", strlen=%zu\n", path, strlen(path));
-        OutputDebugStringA(dbgBuf);
-    }
+    // DEBUG OUTPUT REMOVED - was causing path corruption
 
     if (strlen(path) >= 2 * MAX_PATH - 2)
     {

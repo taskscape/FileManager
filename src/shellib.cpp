@@ -1,4 +1,4 @@
-﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2023 Open Salamander Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "precomp.h"
@@ -70,12 +70,23 @@ char* CCopyMoveRecord::AllocChars(const wchar_t* name)
     if (name == NULL)
         return NULL;
 
-    int l = lstrlenW(name);
-    char* newName = (char*)malloc(l + 1);
+    // First get required buffer size for UTF-8 conversion
+    int utf8Len = WideCharToMultiByte(CP_UTF8, 0, name, -1, NULL, 0, NULL, NULL);
+    if (utf8Len == 0)
+    {
+        TRACE_E("AllocChars: WideCharToMultiByte failed to get size");
+        return NULL;
+    }
+    
+    char* newName = (char*)malloc(utf8Len);
     if (newName != NULL)
     {
-        WideCharToMultiByte(CP_ACP, 0, name, l + 1, newName, l + 1, NULL, NULL);
-        newName[l] = 0;
+        int result = WideCharToMultiByte(CP_UTF8, 0, name, -1, newName, utf8Len, NULL, NULL);
+        if (result == 0)
+        {
+            free(newName);
+            return NULL;
+        }
     }
     else
         TRACE_E(LOW_MEMORY);
@@ -211,7 +222,14 @@ BOOL CImpDropTarget::ProcessClipboardData(BOOL copy, const DROPFILES* data,
                 else
                     cr = new CCopyMoveRecord(fileW, mapW);
                 if (cr != NULL)
+                {
+                    if (cr->FileName == NULL)
+                    {
+                        delete cr;
+                        break;
+                    }
                     array->Add(cr);
+                }
                 else
                     break;
                 if (!array->IsGood())
@@ -1439,12 +1457,12 @@ LPITEMIDLIST GetItemIdListForFileName(LPSHELLFOLDER folder, const char* fileName
             TRACE_E("GetItemIdListForFileName(): unable to find PIDL usign enumeration, trying to get it using ParseDisplayName...");
     }
 
-    OLECHAR olePath[MAX_PATH];
+    OLECHAR olePath[2 * MAX_PATH]; // 2x for UTF-8 encoded paths
     if (addUNCPrefix)
         olePath[0] = olePath[1] = L'\\';
-    MultiByteToWideChar(CP_ACP, MB_PRECOMPOSED, fileName, -1, olePath + (addUNCPrefix ? 2 : 0),
-                        MAX_PATH - (addUNCPrefix ? 2 : 0));
-    olePath[MAX_PATH - 1] = 0;
+    MultiByteToWideChar(CP_UTF8, 0, fileName, -1, olePath + (addUNCPrefix ? 2 : 0),
+                        2 * MAX_PATH - (addUNCPrefix ? 2 : 0));
+    olePath[2 * MAX_PATH - 1] = 0;
 
     LPITEMIDLIST pidl;
     ULONG chEaten;

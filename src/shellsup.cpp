@@ -143,7 +143,7 @@ BOOL DoCopyMove(BOOL copy, char* targetDir, CCopyMoveData* data, void* param)
     if (tmp != NULL)
     {
         tmp->Copy = copy;
-        strcpy(tmp->TargetPath, targetDir);
+        lstrcpyn(tmp->TargetPath, targetDir, 2 * MAX_PATH);
         tmp->Data = data;
         PostMessage(panel->HWindow, WM_USER_DROPCOPYMOVE, (WPARAM)tmp, 0);
         return TRUE;
@@ -195,8 +195,8 @@ void DoDragDropOper(BOOL copy, BOOL toArchive, const char* archiveOrFSName, cons
         }
         if (ok)
         {
-            lstrcpyn(tmp->ArchiveOrFSName, archiveOrFSName, MAX_PATH);
-            lstrcpyn(tmp->ArchivePathOrUserPart, archivePathOrUserPart, MAX_PATH);
+            lstrcpyn(tmp->ArchiveOrFSName, archiveOrFSName, 2 * MAX_PATH);
+            lstrcpyn(tmp->ArchivePathOrUserPart, archivePathOrUserPart, 2 * MAX_PATH);
             tmp->Data = data;
             PostMessage(panel->HWindow, WM_USER_DROPTOARCORFS, (WPARAM)tmp, 0);
             data = NULL;

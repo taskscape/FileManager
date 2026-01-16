@@ -87,12 +87,12 @@ static HANDLE FindFirstFileUtf8(const char* path, WIN32_FIND_DATAA& data)
         return INVALID_HANDLE_VALUE;
     }
     WIN32_FIND_DATAW dataW;
-    HANDLE h = FindFirstFileW(pathW, &dataW);
+    HANDLE h = HANDLES_Q(FindFirstFileW(pathW, &dataW));
     if (h != INVALID_HANDLE_VALUE)
     {
         if (!ConvertFindDataWToA(dataW, data))
         {
-            FindClose(h);
+            HANDLES(FindClose(h));
             SetLastError(ERROR_NO_UNICODE_TRANSLATION);
             return INVALID_HANDLE_VALUE;
         }

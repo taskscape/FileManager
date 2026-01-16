@@ -1,4 +1,4 @@
-﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2023 Open Salamander Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 // CommentsTranslationProject: TRANSLATED
 
@@ -1018,8 +1018,8 @@ void CFilesWindow::DropCopyMove(BOOL copy, char* targetPath, CCopyMoveData* data
         {
             if (!copy && data->Count > 0)
             {
-                char source[MAX_PATH];
-                lstrcpyn(source, data->At(0)->FileName, MAX_PATH);
+                char source[2 * MAX_PATH];
+                lstrcpyn(source, data->At(0)->FileName, 2 * MAX_PATH);
                 CutDirectory(source);
                 BOOL sameRootPath = HasTheSameRootPath(source, targetPath);
                 script->SameRootButDiffVolume = sameRootPath && !HasTheSameRootPathAndVolume(source, targetPath);
@@ -1091,8 +1091,8 @@ void CFilesWindow::DropCopyMove(BOOL copy, char* targetPath, CCopyMoveData* data
                     char* name = data->At(0)->FileName;
                     if (name != NULL)
                     {
-                        char path[MAX_PATH];
-                        lstrcpyn(path, name, MAX_PATH);
+                        char path[2 * MAX_PATH];
+                        lstrcpyn(path, name, 2 * MAX_PATH);
                         if (CutDirectory(path)) // assume a single source directory (panel operations only, not Find)
                         {
                             // change in the source directory and its subdirectories
