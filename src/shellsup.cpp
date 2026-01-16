@@ -1,4 +1,4 @@
-﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2023 Open Salamander Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "precomp.h"
@@ -306,7 +306,7 @@ const char* GetCurrentDir(POINTL& pt, void* param, DWORD* effect, BOOL rButton, 
                         {
                             if (l > 0 && panel->DropPath[l - 1] != '\\')
                                 panel->DropPath[l++] = '\\';
-                            if (l + panel->Dirs->At(index).NameLen >= MAX_PATH)
+                            if (l + panel->Dirs->At(index).NameLen >= 2 * MAX_PATH)
                             {
                                 TRACE_E("GetCurrentDir(): too long file name!");
                                 tgtType = idtttWindows;
@@ -473,7 +473,7 @@ const char* GetCurrentDir(POINTL& pt, void* param, DWORD* effect, BOOL rButton, 
         {
             if (panel->GetPath()[l - 1] != '\\')
                 panel->DropPath[l++] = '\\';
-            if (l + panel->Dirs->At(index).NameLen >= MAX_PATH)
+            if (l + panel->Dirs->At(index).NameLen >= 2 * MAX_PATH)
             {
                 TRACE_E("GetCurrentDir(): too long file name!");
                 panel->SetDropTarget(-1); // schovat znacku
@@ -501,13 +501,13 @@ const char* GetCurrentDir(POINTL& pt, void* param, DWORD* effect, BOOL rButton, 
                     return panel->GetPath();
                 }
             }
-            char fullName[MAX_PATH];
+            char fullName[2 * MAX_PATH];
             int l = (int)strlen(panel->GetPath());
             memcpy(fullName, panel->GetPath(), l);
             if (fullName[l - 1] != '\\')
                 fullName[l++] = '\\';
             CFileData* file = &(panel->Files->At(index - panel->Dirs->Count));
-            if (l + file->NameLen >= MAX_PATH)
+            if (l + file->NameLen >= 2 * MAX_PATH)
             {
                 TRACE_E("GetCurrentDir(): too long file name!");
                 panel->SetDropTarget(-1); // schovat znacku
@@ -518,7 +518,7 @@ const char* GetCurrentDir(POINTL& pt, void* param, DWORD* effect, BOOL rButton, 
             // jde-li o shortcutu, provedeme jeji analyzu
             BOOL linkIsDir = FALSE;  // TRUE -> short-cut to directory -> ChangePathToDisk
             BOOL linkIsFile = FALSE; // TRUE -> short-cut to file -> archive test
-            char linkTgt[MAX_PATH];
+            char linkTgt[2 * MAX_PATH];
             linkTgt[0] = 0;
             if (StrICmp(file->Ext, "lnk") == 0) // isn't it a directory short-cut?
             {

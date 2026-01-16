@@ -365,7 +365,7 @@ void CStatusWindow::BuildHotTrackItems()
                 }
                 else
                 {
-                    char rootPath[MAX_PATH];
+                    char rootPath[2 * MAX_PATH];
                     GetRootPath(rootPath, Text);
                     chars = (int)strlen(rootPath);
 

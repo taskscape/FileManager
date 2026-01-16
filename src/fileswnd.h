@@ -1,4 +1,4 @@
-﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2023 Open Salamander Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 // CommentsTranslationProject: TRANSLATED
 
@@ -475,7 +475,7 @@ public:
 class CFilesWindowAncestor : public CWindow // the real object core - everything private ;-)
 {
 private:
-    char Path[MAX_PATH];      // path for a ptDisk panel - normal ("c:\path") or UNC ("\\server\share\path")
+    char Path[2 * MAX_PATH];  // path for a ptDisk panel - normal ("c:\path") or UNC ("\\server\share\path"); 2x for UTF-8
     BOOL SuppressAutoRefresh; // TRUE if the user canceled directory listing during reading and chose temporary auto-refresh suppression
 
     CPanelType PanelType; // type of panel (disk, archive, plugin FS)
@@ -485,8 +485,8 @@ private:
 
     // when we are inside an archive:
     CSalamanderDirectory* ArchiveDir; // content of the open archive; basic data - array of CFileData
-    char ZIPArchive[MAX_PATH];        // path to the open archive
-    char ZIPPath[MAX_PATH];           // path inside the open archive
+    char ZIPArchive[2 * MAX_PATH];    // path to the open archive; 2x for UTF-8
+    char ZIPPath[2 * MAX_PATH];       // path inside the open archive; 2x for UTF-8
     FILETIME ZIPArchiveDate;          // archive date (used for the ".." date and during refresh)
     CQuadWord ZIPArchiveSize;         // archive size - used to detect archive changes
 
@@ -767,8 +767,8 @@ public:
     BOOL SortedWithRegSet;    // used to monitor changes of the global variable Configuration.SortUsesLocale
     BOOL SortedWithDetectNum; // used to monitor changes of the global variable Configuration.SortDetectNumbers
 
-    char DropPath[2 * MAX_PATH];  // buffer for the current directory used in a drop operation
-    char NextFocusName[MAX_PATH]; // the name that will receive focus on the next refresh
+    char DropPath[2 * MAX_PATH];      // buffer for the current directory used in a drop operation
+    char NextFocusName[2 * MAX_PATH]; // the name that will receive focus on the next refresh; 2x for UTF-8
     BOOL DontClearNextFocusName;  // TRUE = do not clear NextFocusName when the main Salamander window is activated
     BOOL FocusFirstNewItem;       // refresh: should the newly added item be selected? (for system New)
     CTopIndexMem TopIndexMem;     // memory of top index for Execute()

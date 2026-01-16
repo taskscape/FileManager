@@ -1,4 +1,4 @@
-﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2023 Open Salamander Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 // CommentsTranslationProject: TRANSLATED
 
@@ -2086,15 +2086,15 @@ BOOL CFilesWindow::ChangeDir(const char* newDir, int suggestedTopIndex, const ch
                         suggestedFocusName, mode, convertFSPathToInternal, showNewDirPathInErrBoxes);
 
     // backup the string (it could change during execution - e.g. Name from CFileData from panel)
-    char backup[MAX_PATH];
+    char backup[2 * MAX_PATH];
     if (suggestedFocusName != NULL)
     {
-        lstrcpyn(backup, suggestedFocusName, MAX_PATH);
+        lstrcpyn(backup, suggestedFocusName, 2 * MAX_PATH);
         suggestedFocusName = backup;
     }
 
     MainWindow->CancelPanelsUI(); // cancel QuickSearch and QuickEdit
-    char absFSPath[MAX_PATH];
+    char absFSPath[2 * MAX_PATH];
     char path[2 * MAX_PATH];
     char errBuf[3 * MAX_PATH + 100];
     GetGeneralPath(path, 2 * MAX_PATH, TRUE);
@@ -2133,11 +2133,11 @@ CHANGE_AGAIN:
             suggestedFocusName = NULL;
         }
 
-        char fsName[MAX_PATH];
+        char fsName[2 * MAX_PATH];
         char* fsUserPart;
         if (!sendDirectlyToPluginLocal && IsPluginFSPath(path, fsName, (const char**)&fsUserPart))
         {
-            if (strlen(fsUserPart) >= MAX_PATH) // plugins do not count with longer path
+            if (strlen(fsUserPart) >= 2 * MAX_PATH) // plugins do not count with longer path
             {
                 sprintf(errBuf, LoadStr(IDS_PATHERRORFORMAT), path, LoadStr(IDS_TOOLONGPATH));
                 SalMessageBox(HWindow, errBuf, LoadStr(IDS_ERRORCHANGINGDIR),
@@ -2309,7 +2309,7 @@ CHANGE_AGAIN:
                         MainWindow->GetActivePanel()->GetPluginFS()->NotEmpty())
                     {
                         BOOL success = TRUE;
-                        if ((int)strlen(path) < MAX_PATH)
+                        if ((int)strlen(path) < 2 * MAX_PATH)
                             strcpy(absFSPath, path);
                         else
                         {
@@ -2321,7 +2321,7 @@ CHANGE_AGAIN:
                         if (!success ||
                             MainWindow->GetActivePanel()->GetPluginFS()->GetFullFSPath(HWindow,
                                                                                        MainWindow->GetActivePanel()->GetPluginFS()->GetPluginFSName(),
-                                                                                       absFSPath, MAX_PATH, success))
+                                                                                       absFSPath, 2 * MAX_PATH, success))
                         {
                             if (success) // we have the absolute path
                             {
@@ -2390,7 +2390,7 @@ CHANGE_AGAIN:
                         DWORD copyAttr;
                         int copyLen;
                         copyLen = (int)strlen(copy);
-                        if (copyLen >= MAX_PATH)
+                        if (copyLen >= 2 * MAX_PATH)
                         {
                             if (*end != 0 && !SalPathAppend(copy, end + 1, 2 * MAX_PATH)) // if the so far processed part of the path is enlengthened and the rest of the path does not fit, we will use the original form of the path
                                 strcpy(copy, path);
@@ -2431,7 +2431,7 @@ CHANGE_AGAIN:
                                     memcpy(st, s, end - s);
                                     st[end - s] = 0;
                                     s = end;
-                                    if ((int)strlen(copy) >= MAX_PATH) // too long path, we're finished...
+                                    if ((int)strlen(copy) >= 2 * MAX_PATH) // too long path, we're finished...
                                     {
                                         h = INVALID_HANDLE_VALUE;
                                         break;
@@ -2449,7 +2449,7 @@ CHANGE_AGAIN:
                                 }
                                 if (*end == 0 && h == INVALID_HANDLE_VALUE) // another accessible component not found, we will try if the current path can be listed
                                 {
-                                    if ((int)strlen(copy) < MAX_PATH && SalPathAppend(copy, "*.*", MAX_PATH + 10))
+                                    if ((int)strlen(copy) < 2 * MAX_PATH && SalPathAppend(copy, "*.*", 2 * MAX_PATH + 10))
                                     {
                                         h = FindFirstFileUtf8(copy, find);
                                         CutDirectory(copy);
@@ -2512,7 +2512,7 @@ CHANGE_AGAIN:
                             { // file -> is it an archive?
                                 if (PackerFormatConfig.PackIsArchive(copy))
                                 {
-                                    if ((int)strlen(*end != 0 ? end + 1 : end) >= MAX_PATH) // too long path in archive
+                                    if ((int)strlen(*end != 0 ? end + 1 : end) >= 2 * MAX_PATH) // too long path in archive
                                     {
                                         if (!SalPathAppend(copy, end + 1, 2 * MAX_PATH)) // if the archive name is enlengthened and the rest of the path does not fit, we will use the original form of the path
                                             strcpy(copy, path);

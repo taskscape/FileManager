@@ -1,4 +1,4 @@
-﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2023 Open Salamander Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 // CommentsTranslationProject: TRANSLATED
 
@@ -1745,9 +1745,9 @@ void GetIfPathIsInaccessibleGoTo(char* path, BOOL forceIsMyDocs)
 {
     if (forceIsMyDocs || Configuration.IfPathIsInaccessibleGoToIsMyDocs)
     {
-        if (!GetMyDocumentsOrDesktopPath(path, MAX_PATH))
+        if (!GetMyDocumentsOrDesktopPath(path, 2 * MAX_PATH))
         {
-            char winPath[MAX_PATH];
+            char winPath[2 * MAX_PATH];
             if (GetWindowsDirectory(winPath, MAX_PATH) != 0)
                 GetRootPath(path, winPath);
             else
@@ -1756,7 +1756,7 @@ void GetIfPathIsInaccessibleGoTo(char* path, BOOL forceIsMyDocs)
     }
     else
     {
-        lstrcpyn(path, Configuration.IfPathIsInaccessibleGoTo, MAX_PATH);
+        lstrcpyn(path, Configuration.IfPathIsInaccessibleGoTo, 2 * MAX_PATH);
         if (path[0] != 0 && path[1] == ':')
         {
             path[0] = UpperCase[path[0]];

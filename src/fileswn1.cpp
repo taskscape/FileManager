@@ -1,4 +1,4 @@
-﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2023 Open Salamander Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 // CommentsTranslationProject: TRANSLATED
 
@@ -2153,7 +2153,7 @@ void CFilesWindow::GotoRoot()
     CALL_STACK_MESSAGE1("CFilesWindow::GotoRoot()");
     TopIndexMem.Clear(); // long jump
 
-    char root[MAX_PATH];
+    char root[2 * MAX_PATH];
     if (Is(ptDisk) || Is(ptZIPArchive))
     {
         if (Is(ptZIPArchive) && GetZIPPath()[0] != 0) // we are not in the root of the archive -> go there
@@ -2181,7 +2181,7 @@ void CFilesWindow::GotoRoot()
         {
             if (GetPluginFS()->GetRootPath(root))
             {
-                char fsname[MAX_PATH];
+                char fsname[2 * MAX_PATH];
                 strcpy(fsname, GetPluginFS()->GetPluginFSName()); // in case of changes, a local copy of the name
                 ChangePathToPluginFS(fsname, root);
             }

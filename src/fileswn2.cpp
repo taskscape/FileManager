@@ -1,4 +1,4 @@
-﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2023 Open Salamander Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 // CommentsTranslationProject: TRANSLATED
 
@@ -1648,7 +1648,7 @@ BOOL CFilesWindow::ChangePathToDisk(HWND parent, const char* path, int suggested
 
     //TRACE_I("change-to-disk: begin");
 
-    if (strlen(path) >= MAX_PATH - 2)
+    if (strlen(path) >= 2 * MAX_PATH - 2)
     {
         SalMessageBox(parent, LoadStr(IDS_TOOLONGNAME), LoadStr(IDS_ERRORCHANGINGDIR),
                       MB_OK | MB_ICONEXCLAMATION);
@@ -1658,12 +1658,12 @@ BOOL CFilesWindow::ChangePathToDisk(HWND parent, const char* path, int suggested
     }
 
     // we make backup copies
-    char backup[MAX_PATH];
-    lstrcpyn(backup, path, MAX_PATH); // must be done before UpdateDefaultDir (it may point to DefaultDir[])
-    char backup2[MAX_PATH];
+    char backup[2 * MAX_PATH];
+    lstrcpyn(backup, path, 2 * MAX_PATH); // must be done before UpdateDefaultDir (it may point to DefaultDir[])
+    char backup2[2 * MAX_PATH];
     if (suggestedFocusName != NULL)
     {
-        lstrcpyn(backup2, suggestedFocusName, MAX_PATH);
+        lstrcpyn(backup2, suggestedFocusName, 2 * MAX_PATH);
         suggestedFocusName = backup2;
     }
 
@@ -1703,7 +1703,7 @@ BOOL CFilesWindow::ChangePathToDisk(HWND parent, const char* path, int suggested
     BOOL fixedDrive = FALSE;
     BOOL canTryUserRescuePath = FALSE; // allows using Configuration.IfPathIsInaccessibleGoTo right before the fixed-drive path
     BOOL openIfPathIsInaccessibleGoToCfg = FALSE;
-    char ifPathIsInaccessibleGoTo[MAX_PATH];
+    char ifPathIsInaccessibleGoTo[2 * MAX_PATH];
     GetIfPathIsInaccessibleGoTo(ifPathIsInaccessibleGoTo);
     if ((ifPathIsInaccessibleGoTo[0] == '\\' && ifPathIsInaccessibleGoTo[1] == '\\' ||
          ifPathIsInaccessibleGoTo[0] != 0 && ifPathIsInaccessibleGoTo[1] == ':') &&
@@ -1718,7 +1718,7 @@ BOOL CFilesWindow::ChangePathToDisk(HWND parent, const char* path, int suggested
     BOOL detachFS;
     if (PrepareCloseCurrentPath(parent, canForce, TRUE, detachFS, tryCloseReason))
     { // change within "ptDisk" or we can close the current path, we try to open a new one
-        char changedPath[MAX_PATH];
+        char changedPath[2 * MAX_PATH];
         strcpy(changedPath, path);
         BOOL tryNet = !CriticalShutdown && ((!Is(ptDisk) && !Is(ptZIPArchive)) || !HasTheSameRootPath(path, GetPath()));
 
@@ -2005,15 +2005,15 @@ BOOL CFilesWindow::ChangePathToArchive(const char* archive, const char* archiveP
                          forceUpdate, refreshListBox, isRefresh, canFocusFileName, isHistory);
 
     // we make backup copies
-    char backup1[MAX_PATH];
-    lstrcpyn(backup1, archive, MAX_PATH);
-    char backup2[MAX_PATH];
-    lstrcpyn(backup2, archivePath, MAX_PATH);
+    char backup1[2 * MAX_PATH];
+    lstrcpyn(backup1, archive, 2 * MAX_PATH);
+    char backup2[2 * MAX_PATH];
+    lstrcpyn(backup2, archivePath, 2 * MAX_PATH);
     archivePath = backup2;
-    char backup3[MAX_PATH];
+    char backup3[2 * MAX_PATH];
     if (suggestedFocusName != NULL)
     {
-        lstrcpyn(backup3, suggestedFocusName, MAX_PATH);
+        lstrcpyn(backup3, suggestedFocusName, 2 * MAX_PATH);
         suggestedFocusName = backup3;
     }
 
@@ -2054,8 +2054,8 @@ BOOL CFilesWindow::ChangePathToArchive(const char* archive, const char* archiveP
     FILETIME archiveDate;  // date and time of the archive file
     CQuadWord archiveSize; // size of the archive file
 
-    char text[MAX_PATH + 500];
-    char path[MAX_PATH];
+    char text[2 * MAX_PATH + 500];
+    char path[2 * MAX_PATH];
     BOOL sameArch;
     BOOL checkPath = TRUE;
     BOOL forceUpdateInt = FALSE; // is path change required? (possibly even to disk)
@@ -2700,8 +2700,8 @@ BOOL CFilesWindow::ChangePathToPluginFS(const char* fsName, const char* fsUserPa
     //TRACE_I("change-to-fs: begin");
 
     // as a precaution if fsName points to an unchangeable string (GetPluginFS()->PluginFSName()), we create a backup copy
-    char backup[MAX_PATH];
-    lstrcpyn(backup, fsName, MAX_PATH);
+    char backup[2 * MAX_PATH];
+    lstrcpyn(backup, fsName, 2 * MAX_PATH);
     fsName = backup;
 
     if (noChange != NULL)
@@ -2712,7 +2712,7 @@ BOOL CFilesWindow::ChangePathToPluginFS(const char* fsName, const char* fsUserPa
         canFocusFileName = FALSE;
     }
 
-    if (strlen(fsUserPart) >= MAX_PATH)
+    if (strlen(fsUserPart) >= 2 * MAX_PATH)
     {
         if (failReason != NULL)
             *failReason = CHPPFR_INVALIDPATH;
@@ -2720,14 +2720,14 @@ BOOL CFilesWindow::ChangePathToPluginFS(const char* fsName, const char* fsUserPa
         return FALSE;
     }
     // make backup copies
-    char backup2[MAX_PATH];
-    lstrcpyn(backup2, fsUserPart, MAX_PATH);
+    char backup2[2 * MAX_PATH];
+    lstrcpyn(backup2, fsUserPart, 2 * MAX_PATH);
     fsUserPart = backup2;
     char* fsUserPart2 = backup2;
-    char backup3[MAX_PATH];
+    char backup3[2 * MAX_PATH];
     if (suggestedFocusName != NULL)
     {
-        lstrcpyn(backup3, suggestedFocusName, MAX_PATH);
+        lstrcpyn(backup3, suggestedFocusName, 2 * MAX_PATH);
         suggestedFocusName = backup3;
     }
 
@@ -2746,7 +2746,7 @@ BOOL CFilesWindow::ChangePathToPluginFS(const char* fsName, const char* fsUserPa
 
     BOOL ok = FALSE;
     BOOL shorterPath;
-    char cutFileNameBuf[MAX_PATH];
+    char cutFileNameBuf[2 * MAX_PATH];
     int fsNameIndex;
     if (!Is(ptPluginFS) || !IsPathFromActiveFS(fsName, fsUserPart2, fsNameIndex, convertPathToInternal))
     { // is not FS or the path is from a different FS (even within a single plug-in - one FS name)
@@ -3207,10 +3207,10 @@ BOOL CFilesWindow::ChangePathToDetachedFS(int fsIndex, int suggestedTopIndex,
                         suggestedTopIndex, suggestedFocusName, refreshListBox, newFSName, newUserPart,
                         mode, canFocusFileName);
 
-    char backup[MAX_PATH];
+    char backup[2 * MAX_PATH];
     if (suggestedFocusName != NULL)
     {
-        lstrcpyn(backup, suggestedFocusName, MAX_PATH);
+        lstrcpyn(backup, suggestedFocusName, 2 * MAX_PATH);
         suggestedFocusName = backup;
     }
     if (newUserPart == NULL || newFSName == NULL)
@@ -3218,16 +3218,16 @@ BOOL CFilesWindow::ChangePathToDetachedFS(int fsIndex, int suggestedTopIndex,
         newUserPart = NULL;
         newFSName = NULL;
     }
-    char backup2[MAX_PATH];
+    char backup2[2 * MAX_PATH];
     if (newUserPart != NULL)
     {
-        lstrcpyn(backup2, newUserPart, MAX_PATH);
+        lstrcpyn(backup2, newUserPart, 2 * MAX_PATH);
         newUserPart = backup2;
     }
-    char backup3[MAX_PATH];
+    char backup3[2 * MAX_PATH];
     if (newFSName != NULL)
     {
-        lstrcpyn(backup3, newFSName, MAX_PATH);
+        lstrcpyn(backup3, newFSName, 2 * MAX_PATH);
         newFSName = backup3;
     }
 
@@ -3254,7 +3254,7 @@ BOOL CFilesWindow::ChangePathToDetachedFS(int fsIndex, int suggestedTopIndex,
     CPluginFSInterfaceEncapsulation* pluginFS = MainWindow->DetachedFSList->At(fsIndex);
 
     // retrieve fs-name of the detached FS
-    char fsName[MAX_PATH];
+    char fsName[2 * MAX_PATH];
     int fsNameIndex;
     if (newFSName != NULL) // if we must switch to a new fs-name, find out whether it exists and obtain its fs-name-index
     {
@@ -3299,7 +3299,7 @@ BOOL CFilesWindow::ChangePathToDetachedFS(int fsIndex, int suggestedTopIndex,
 
     BOOL ok = FALSE;
     BOOL shorterPath;
-    char cutFileNameBuf[MAX_PATH];
+    char cutFileNameBuf[2 * MAX_PATH];
 
     // not a FS path or the path is from another FS (even within the same plugin - one FS name)
     BOOL detachFS;
