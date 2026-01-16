@@ -57,6 +57,24 @@ static void ComboAddStringUtf8(HWND hWnd, const char* text)
         SendMessageW(hWnd, CB_ADDSTRING, 0, (LPARAM)wide.Ptr);
 }
 
+// Helper function to draw UTF-8 text using Unicode API
+static int DrawTextUtf8(HDC hDC, const char* text, int textLen, LPRECT rect, UINT format)
+{
+    if (text == NULL)
+        return 0;
+    if (textLen == -1)
+        textLen = (int)strlen(text);
+    // Convert UTF-8 to wide characters
+    int wideLen = MultiByteToWideChar(CP_UTF8, 0, text, textLen, NULL, 0);
+    if (wideLen <= 0)
+        return DrawText(hDC, text, textLen, rect, format); // Fallback to ANSI
+    
+    wchar_t* wideText = (wchar_t*)_alloca((wideLen + 1) * sizeof(wchar_t));
+    MultiByteToWideChar(CP_UTF8, 0, text, textLen, wideText, wideLen + 1);
+    wideText[wideLen] = 0;
+    return DrawTextW(hDC, wideText, wideLen, rect, format);
+}
+
 //
 // ****************************************************************************
 // CChangeCaseDlg
@@ -2489,12 +2507,12 @@ HWND CWaitWindow::Create(HWND hForegroundWnd)
         tR.top = 0;
         tR.right = 1;
         tR.bottom = 1;
-        DrawText(dc, Text, -1, &tR, DT_CALCRECT | DT_LEFT | DT_NOPREFIX);
+        DrawTextUtf8(dc, Text, -1, &tR, DT_CALCRECT | DT_LEFT | DT_NOPREFIX);
         if (tR.right + 2 * WAITWINDOW_HMARGIN >= scrW)
         {
             tR.right = (int)(scrW / 1.8);
             tR.bottom = 1;
-            DrawText(dc, Text, -1, &tR, DT_CALCRECT | DT_LEFT | DT_NOPREFIX | DT_WORDBREAK);
+            DrawTextUtf8(dc, Text, -1, &tR, DT_CALCRECT | DT_LEFT | DT_NOPREFIX | DT_WORDBREAK);
             NeedWrap = TRUE;
         }
         TextSize.cx = tR.right;
@@ -2643,7 +2661,7 @@ void CWaitWindow::PaintText(HDC hDC)
         SetTextColor(hDestDC, GetSysColor(COLOR_BTNTEXT));
         // we won't clip so that we survive minor text extension
         // that may occur during a SetText call
-        DrawText(hDestDC, Text, (int)strlen(Text), &r, DT_LEFT | DT_NOPREFIX | DT_NOCLIP | (NeedWrap ? DT_WORDBREAK : 0));
+        DrawTextUtf8(hDestDC, Text, (int)strlen(Text), &r, DT_LEFT | DT_NOPREFIX | DT_NOCLIP | (NeedWrap ? DT_WORDBREAK : 0));
         SetBkMode(hDestDC, prevBkMode);
         SelectObject(hDestDC, hOldFont);
 

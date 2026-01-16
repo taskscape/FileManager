@@ -1,4 +1,4 @@
-﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2023 Open Salamander Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "precomp.h"
@@ -7,6 +7,24 @@
 #include "mainwnd.h"
 
 #define WC_TOOLTIP "SalamanderToolTip"
+
+// Helper function to draw UTF-8 text using Unicode API
+static int DrawTextUtf8(HDC hDC, const char* text, int textLen, LPRECT rect, UINT format)
+{
+    if (text == NULL)
+        return 0;
+    if (textLen == -1)
+        textLen = (int)strlen(text);
+    // Convert UTF-8 to wide characters
+    int wideLen = MultiByteToWideChar(CP_UTF8, 0, text, textLen, NULL, 0);
+    if (wideLen <= 0)
+        return DrawText(hDC, text, textLen, rect, format); // Fallback to ANSI
+    
+    wchar_t* wideText = (wchar_t*)_alloca((wideLen + 1) * sizeof(wchar_t));
+    MultiByteToWideChar(CP_UTF8, 0, text, textLen, wideText, wideLen + 1);
+    wideText[wideLen] = 0;
+    return DrawTextW(hDC, wideText, wideLen, rect, format);
+}
 
 //*****************************************************************************
 //
@@ -320,7 +338,7 @@ void CToolTip::GetNeededWindowSize(SIZE* sz)
     tR.top = 0;
     tR.right = 0;
     tR.bottom = 0;
-    DrawText(hDC, Text, TextLen, &tR, DT_CALCRECT | DT_LEFT | DT_NOPREFIX | DT_EXPANDTABS);
+    DrawTextUtf8(hDC, Text, TextLen, &tR, DT_CALCRECT | DT_LEFT | DT_NOPREFIX | DT_EXPANDTABS);
     HANDLES(ReleaseDC(HWindow, hDC));
     sz->cx = tR.right - tR.left;
     sz->cy = tR.bottom - tR.top;
@@ -637,7 +655,7 @@ CToolTip::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         int oldBkMode = SetBkMode(hDC, TRANSPARENT);
         r.left += 2;
         r.top += 1;
-        DrawText(hDC, Text, TextLen, &r, DT_LEFT | DT_NOPREFIX | DT_NOCLIP | DT_EXPANDTABS);
+        DrawTextUtf8(hDC, Text, TextLen, &r, DT_LEFT | DT_NOPREFIX | DT_NOCLIP | DT_EXPANDTABS);
         SetBkMode(hDC, oldBkMode);
         SetTextColor(hDC, oldTextColor);
         SelectObject(hDC, hOldFont);

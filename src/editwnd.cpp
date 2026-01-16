@@ -1,4 +1,4 @@
-﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2023 Open Salamander Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 // CommentsTranslationProject: TRANSLATED
 
@@ -13,6 +13,37 @@
 #include <uxtheme.h>
 
 #include <Shlwapi.h>
+
+// Helper function to draw UTF-8 text using Unicode API
+static int DrawTextUtf8(HDC hDC, const char* text, int textLen, LPRECT rect, UINT format)
+{
+    if (text == NULL)
+        return 0;
+    if (textLen == -1)
+        textLen = (int)strlen(text);
+    // Convert UTF-8 to wide characters
+    int wideLen = MultiByteToWideChar(CP_UTF8, 0, text, textLen, NULL, 0);
+    if (wideLen <= 0)
+        return DrawText(hDC, text, textLen, rect, format); // Fallback to ANSI
+    
+    wchar_t* wideText = (wchar_t*)_alloca((wideLen + 1) * sizeof(wchar_t));
+    MultiByteToWideChar(CP_UTF8, 0, text, textLen, wideText, wideLen + 1);
+    wideText[wideLen] = 0;
+    return DrawTextW(hDC, wideText, wideLen, rect, format);
+}
+
+// Helper function for PathCompactPath that handles UTF-8
+static BOOL PathCompactPathUtf8(HDC hDC, char* path, UINT dx)
+{
+    if (path == NULL)
+        return FALSE;
+    // Convert UTF-8 to wide, compact, then back to UTF-8
+    wchar_t wpath[2 * MAX_PATH];
+    MultiByteToWideChar(CP_UTF8, 0, path, -1, wpath, 2 * MAX_PATH);
+    BOOL result = PathCompactPathW(hDC, wpath, dx);
+    WideCharToMultiByte(CP_UTF8, 0, wpath, -1, path, 2 * MAX_PATH, NULL, NULL);
+    return result;
+}
 
 //*****************************************************************************
 //
@@ -1564,9 +1595,9 @@ CInnerText::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
             // PathCompactPath() works better than combining DT_PATH_ELLIPSIS with DT_END_ELLIPSIS (because the last character misbehaves)
             char buff[2 * MAX_PATH];
             strncpy_s(buff, _countof(buff), Message, _TRUNCATE);
-            PathCompactPath(dc, buff, r.right - r.left);
+            PathCompactPathUtf8(dc, buff, r.right - r.left);
 
-            DrawText(dc, buff, -1, &r,
+            DrawTextUtf8(dc, buff, -1, &r,
                      /*DT_END_ELLIPSIS | DT_PATH_ELLIPSIS | */ DT_LEFT | DT_SINGLELINE | DT_VCENTER | DT_NOPREFIX);
             SetBkMode(dc, oldBkMode);
             SetTextColor(dc, oldColor);

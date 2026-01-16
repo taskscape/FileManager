@@ -1,4 +1,4 @@
-﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2023 Open Salamander Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 // CommentsTranslationProject: TRANSLATED
 
@@ -12,6 +12,24 @@
 #include "plugins.h"
 #include "pack.h"
 #include "fileswnd.h"
+
+// Helper function to draw UTF-8 text using Unicode API
+static int DrawTextUtf8(HDC hDC, const char* text, int textLen, LPRECT rect, UINT format)
+{
+    if (text == NULL)
+        return 0;
+    if (textLen == -1)
+        textLen = (int)strlen(text);
+    // Convert UTF-8 to wide characters
+    int wideLen = MultiByteToWideChar(CP_UTF8, 0, text, textLen, NULL, 0);
+    if (wideLen <= 0)
+        return DrawText(hDC, text, textLen, rect, format); // Fallback to ANSI
+    
+    wchar_t* wideText = (wchar_t*)_alloca((wideLen + 1) * sizeof(wchar_t));
+    MultiByteToWideChar(CP_UTF8, 0, text, textLen, wideText, wideLen + 1);
+    wideText[wideLen] = 0;
+    return DrawTextW(hDC, wideText, wideLen, rect, format);
+}
 
 //
 // ****************************************************************************
@@ -2036,7 +2054,7 @@ CExecuteWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
             HFONT hOldFont = (HFONT)SelectObject(dc, EnvFont);
             int prevBkMode = SetBkMode(dc, TRANSPARENT);
             SetTextColor(dc, GetSysColor(COLOR_BTNTEXT));
-            DrawText(dc, Text, (int)strlen(Text), &r, DT_CENTER | DT_SINGLELINE | DT_VCENTER | DT_NOPREFIX);
+            DrawTextUtf8(dc, Text, (int)strlen(Text), &r, DT_CENTER | DT_SINGLELINE | DT_VCENTER | DT_NOPREFIX);
             SetBkMode(dc, prevBkMode);
             SelectObject(dc, hOldFont);
         }

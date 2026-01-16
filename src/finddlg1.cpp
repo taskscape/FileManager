@@ -22,6 +22,37 @@
 const char* MINIMIZED_FINDING_CAPTION = "(%d) %s [%s %s]";
 const char* NORMAL_FINDING_CAPTION = "%s [%s %s]";
 
+// Helper function to draw UTF-8 text using Unicode API
+static int DrawTextUtf8(HDC hDC, const char* text, int textLen, LPRECT rect, UINT format)
+{
+    if (text == NULL)
+        return 0;
+    if (textLen == -1)
+        textLen = (int)strlen(text);
+    // Convert UTF-8 to wide characters
+    int wideLen = MultiByteToWideChar(CP_UTF8, 0, text, textLen, NULL, 0);
+    if (wideLen <= 0)
+        return DrawText(hDC, text, textLen, rect, format); // Fallback to ANSI
+    
+    wchar_t* wideText = (wchar_t*)_alloca((wideLen + 1) * sizeof(wchar_t));
+    MultiByteToWideChar(CP_UTF8, 0, text, textLen, wideText, wideLen + 1);
+    wideText[wideLen] = 0;
+    return DrawTextW(hDC, wideText, wideLen, rect, format);
+}
+
+// Helper function for PathCompactPath that handles UTF-8
+static BOOL PathCompactPathUtf8(HDC hDC, char* path, UINT dx)
+{
+    if (path == NULL)
+        return FALSE;
+    // Convert UTF-8 to wide, compact, then back to UTF-8
+    wchar_t wpath[2 * MAX_PATH];
+    MultiByteToWideChar(CP_UTF8, 0, path, -1, wpath, 2 * MAX_PATH);
+    BOOL result = PathCompactPathW(hDC, wpath, dx);
+    WideCharToMultiByte(CP_UTF8, 0, wpath, -1, path, 2 * MAX_PATH, NULL, NULL);
+    return result;
+}
+
 BOOL FindManageInUse = FALSE;
 BOOL FindIgnoreInUse = FALSE;
 
@@ -3845,7 +3876,7 @@ MENU_TEMPLATE_ITEM FindLookInBrowseMenu[] =
             int prevBkMode = SetBkMode(di->hDC, TRANSPARENT);
             char buff[MAX_PATH + 50];
             SearchingText.Get(buff, MAX_PATH + 50);
-            DrawText(di->hDC, buff, (int)strlen(buff), &di->rcItem, DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX | DT_PATH_ELLIPSIS);
+            DrawTextUtf8(di->hDC, buff, (int)strlen(buff), &di->rcItem, DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX | DT_PATH_ELLIPSIS);
             SetBkMode(di->hDC, prevBkMode);
             return TRUE;
         }
@@ -4012,8 +4043,8 @@ MENU_TEMPLATE_ITEM FindLookInBrowseMenu[] =
                         // PathCompactPath() requires a copy in a local buffer but doesn't clip text
                         char buff[2 * MAX_PATH];
                         strncpy_s(buff, _countof(buff), item2->Path, _TRUNCATE);
-                        PathCompactPath(CacheBitmap->HMemDC, buff, r2.right - r2.left);
-                        DrawText(CacheBitmap->HMemDC, buff, -1, &r2,
+                        PathCompactPathUtf8(CacheBitmap->HMemDC, buff, r2.right - r2.left);
+                        DrawTextUtf8(CacheBitmap->HMemDC, buff, -1, &r2,
                                  DT_VCENTER | DT_LEFT | DT_NOPREFIX | DT_SINGLELINE);
                         //                DrawText(CacheBitmap->HMemDC, item2->Path, -1, &r2,
                         //                         DT_VCENTER | DT_LEFT | DT_NOPREFIX | DT_SINGLELINE | DT_PATH_ELLIPSIS);

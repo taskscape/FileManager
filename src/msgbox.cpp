@@ -1,4 +1,4 @@
-﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2023 Open Salamander Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 // CommentsTranslationProject: TRANSLATED
 
@@ -11,6 +11,24 @@
 #include "mainwnd.h"
 #include "gui.h"
 #include "logo.h"
+
+// Helper function to draw UTF-8 text using Unicode API
+static int DrawTextUtf8(HDC hDC, const char* text, int textLen, LPRECT rect, UINT format)
+{
+    if (text == NULL)
+        return 0;
+    if (textLen == -1)
+        textLen = (int)strlen(text);
+    // Convert UTF-8 to wide characters
+    int wideLen = MultiByteToWideChar(CP_UTF8, 0, text, textLen, NULL, 0);
+    if (wideLen <= 0)
+        return DrawText(hDC, text, textLen, rect, format); // Fallback to ANSI
+    
+    wchar_t* wideText = (wchar_t*)_alloca((wideLen + 1) * sizeof(wchar_t));
+    MultiByteToWideChar(CP_UTF8, 0, text, textLen, wideText, wideLen + 1);
+    wideText[wideLen] = 0;
+    return DrawTextW(hDC, wideText, wideLen, rect, format);
+}
 
 // helper object for sending Ctrl+C to the parent via the WM_COPY message
 class CKeyForwarderWindow : public CWindow
@@ -585,7 +603,7 @@ CMessageBox::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
             maxTextWidth = fontCharWidth * 90;
 
         tR.right = maxTextWidth;
-        DrawText(hDC, Text.Get(), -1, &tR, DT_CALCRECT | DT_LEFT | DT_WORDBREAK | DT_EXPANDTABS | DT_NOPREFIX);
+        DrawTextUtf8(hDC, Text.Get(), -1, &tR, DT_CALCRECT | DT_LEFT | DT_WORDBREAK | DT_EXPANDTABS | DT_NOPREFIX);
 
         if (tR.right > maxTextWidth)
         {
@@ -595,7 +613,7 @@ CMessageBox::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
             if (newText != NULL)
             {
                 tR.right = maxTextWidth;
-                DrawText(hDC, newText, -1, &tR, DT_CALCRECT | DT_LEFT | DT_WORDBREAK | DT_EXPANDTABS | DT_NOPREFIX);
+                DrawTextUtf8(hDC, newText, -1, &tR, DT_CALCRECT | DT_LEFT | DT_WORDBREAK | DT_EXPANDTABS | DT_NOPREFIX);
                 SetDlgItemText(HWindow, IDS_MSGBOX_TEXT, newText);
                 free((void*)newText);
             }
@@ -610,7 +628,7 @@ CMessageBox::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
             {
                 goodRight = iterRect.right;
                 iterRect.right -= 5; // step by five pixels
-                DrawText(hDC, Text.Get(), -1, &iterRect, DT_CALCRECT | DT_LEFT | DT_WORDBREAK | DT_EXPANDTABS | DT_NOPREFIX);
+                DrawTextUtf8(hDC, Text.Get(), -1, &iterRect, DT_CALCRECT | DT_LEFT | DT_WORDBREAK | DT_EXPANDTABS | DT_NOPREFIX);
                 //        TRACE_I("Iter: right="<<iterRect.right);
             } while (iterRect.bottom == tR.bottom && iterRect.right < goodRight && iterRect.right >= 0);
             tR.right = goodRight;
@@ -620,20 +638,20 @@ CMessageBox::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         RECT urlR = {0};
         if (urlText != NULL)
         {
-            DrawText(hDC, urlText, -1, &urlR, DT_CALCRECT | DT_LEFT | DT_SINGLELINE | DT_NOPREFIX);
+            DrawTextUtf8(hDC, urlText, -1, &urlR, DT_CALCRECT | DT_LEFT | DT_SINGLELINE | DT_NOPREFIX);
             tR.bottom += urlR.bottom; // URL height
         }
 
         BOOL multiline = tR.bottom > textR.bottom;
         if (CheckText != NULL)
         {
-            DrawText(hDC, CheckText, -1, &tRCheck, DT_SINGLELINE | DT_CALCRECT | DT_LEFT | DT_EXPANDTABS);
+            DrawTextUtf8(hDC, CheckText, -1, &tRCheck, DT_SINGLELINE | DT_CALCRECT | DT_LEFT | DT_EXPANDTABS);
             //tRCheck.right -= (3 * tRCheck.bottom) / 2;
         }
         else
             memset(&tRCheck, 0, sizeof(tRCheck));
         if (hintVisible)
-            DrawText(hDC, hintLabel, -1, &tRHint, DT_SINGLELINE | DT_CALCRECT | DT_LEFT);
+            DrawTextUtf8(hDC, hintLabel, -1, &tRHint, DT_SINGLELINE | DT_CALCRECT | DT_LEFT);
         else
             memset(&tRHint, 0, sizeof(tRHint));
         int hintWidth = tRHint.right - tRHint.left;

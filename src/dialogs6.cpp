@@ -1,4 +1,4 @@
-﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2023 Open Salamander Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 // CommentsTranslationProject: TRANSLATED
 
@@ -15,6 +15,24 @@
 #include "gui.h"
 #include "drivelst.h"
 #include "shiconov.h"
+
+// Helper function to draw UTF-8 text using Unicode API
+static int DrawTextUtf8(HDC hDC, const char* text, int textLen, LPRECT rect, UINT format)
+{
+    if (text == NULL)
+        return 0;
+    if (textLen == -1)
+        textLen = (int)strlen(text);
+    // Convert UTF-8 to wide characters
+    int wideLen = MultiByteToWideChar(CP_UTF8, 0, text, textLen, NULL, 0);
+    if (wideLen <= 0)
+        return DrawText(hDC, text, textLen, rect, format); // Fallback to ANSI
+    
+    wchar_t* wideText = (wchar_t*)_alloca((wideLen + 1) * sizeof(wchar_t));
+    MultiByteToWideChar(CP_UTF8, 0, text, textLen, wideText, wideLen + 1);
+    wideText[wideLen] = 0;
+    return DrawTextW(hDC, wideText, wideLen, rect, format);
+}
 
 /*
 //****************************************************************************
@@ -96,7 +114,7 @@ CTipOfTheDayWindow::PaintBodyText(HDC hDC)
     int oldBkMode = SetBkMode(hDC, TRANSPARENT);
     COLORREF oldTextColor = SetTextColor(hDC, GetSysColor(COLOR_WINDOWTEXT));
     char *line = (char *)Parent->Tips[tipIndex];
-    DrawText(hDC, line, -1, &r, DT_LEFT | DT_NOPREFIX | DT_WORDBREAK);
+    DrawTextUtf8(hDC, line, -1, &r, DT_LEFT | DT_NOPREFIX | DT_WORDBREAK);
     SetTextColor(hDC, oldTextColor);
     SetBkMode(hDC, oldBkMode);
     SelectObject(hDC, hOldFont);
@@ -158,7 +176,7 @@ CTipOfTheDayWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
       r.left += leftWidth / 8;
       HFONT hOldFont = (HFONT)SelectObject(hDC, HHeadingFont);
       int oldBkMode = SetBkMode(hDC, TRANSPARENT);
-      DrawText(hDC, LoadStr(IDS_TOD_DIDYOUKNOW), -1, &r, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
+      DrawTextUtf8(hDC, LoadStr(IDS_TOD_DIDYOUKNOW), -1, &r, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
 
       // separating gray line
       SelectObject(hDC, BtnShadowPen);
