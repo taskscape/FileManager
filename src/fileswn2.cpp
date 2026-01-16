@@ -1646,7 +1646,11 @@ BOOL CFilesWindow::ChangePathToDisk(HWND parent, const char* path, int suggested
                         suggestedTopIndex, suggestedFocusName, refreshListBox, canForce, isRefresh,
                         shorterPathWarning, tryCloseReason);
 
-    //TRACE_I("change-to-disk: begin");
+    {
+        char dbgBuf[2 * MAX_PATH + 200];
+        sprintf(dbgBuf, "SALDBG ChangePathToDisk: path=\"%s\", strlen=%zu\n", path, strlen(path));
+        OutputDebugStringA(dbgBuf);
+    }
 
     if (strlen(path) >= 2 * MAX_PATH - 2)
     {
