@@ -1,4 +1,4 @@
-﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2023 Open Salamander Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 // CommentsTranslationProject: TRANSLATED
 
@@ -1687,13 +1687,15 @@ void CMainWindow::SetTrayIconText(const char* text)
         TRACE_E("CMainWindow::SetTrayIconText(): !Configuration.StatusArea");
         return;
     }
-    NOTIFYICONDATA tnid;
-    tnid.cbSize = sizeof(NOTIFYICONDATA);
+    NOTIFYICONDATAW tnid;
+    tnid.cbSize = sizeof(NOTIFYICONDATAW);
     tnid.hWnd = HWindow;
     tnid.uID = TASKBAR_ICON_ID;
     tnid.uFlags = NIF_TIP;
-    lstrcpyn(tnid.szTip, text, sizeof(tnid.szTip));
-    Shell_NotifyIcon(NIM_MODIFY, &tnid);
+    // Convert UTF-8 to wide characters for proper Unicode display
+    MultiByteToWideChar(CP_UTF8, 0, text, -1, tnid.szTip, _countof(tnid.szTip));
+    tnid.szTip[_countof(tnid.szTip) - 1] = 0;
+    Shell_NotifyIconW(NIM_MODIFY, &tnid);
 }
 
 void CMainWindow::GetFormatedPathForTitle(char* path)
@@ -1846,9 +1848,11 @@ void CMainWindow::GetFormatedPathForTitle(char* path)
 void CMainWindow::SetWindowTitle(const char* text)
 {
     CALL_STACK_MESSAGE2("CMainWindow::SetWindowTitle(%s)", text);
-    char buff[1000];
-    ::GetWindowText(HWindow, buff, 1000);
-    buff[999] = 0;
+    
+    // Get current window title in wide characters for comparison
+    wchar_t buffW[1000];
+    ::GetWindowTextW(HWindow, buffW, 1000);
+    buffW[999] = 0;
 
     char stdWndName[2 * MAX_PATH + 300];
     if (text == NULL)
@@ -1904,9 +1908,14 @@ void CMainWindow::SetWindowTitle(const char* text)
         text = stdWndName;
     }
 
-    if (strcmp(text, buff) != 0)
+    // Convert UTF-8 to wide characters for proper Unicode display
+    wchar_t textW[2 * MAX_PATH + 300];
+    MultiByteToWideChar(CP_UTF8, 0, text, -1, textW, _countof(textW));
+    textW[_countof(textW) - 1] = 0;
+
+    if (wcscmp(textW, buffW) != 0)
     {
-        ::SetWindowText(HWindow, text);
+        ::SetWindowTextW(HWindow, textW);
         if (Configuration.StatusArea)
             SetTrayIconText(text);
     }

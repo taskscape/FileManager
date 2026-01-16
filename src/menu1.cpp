@@ -1,10 +1,27 @@
-﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2023 Open Salamander Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 // CommentsTranslationProject: TRANSLATED
 
 #include "precomp.h"
 
 #include "menu.h"
+
+// Helper function to measure UTF-8 text using Unicode API
+static int DrawTextUtf8(HDC hDC, const char* text, int textLen, LPRECT rect, UINT format)
+{
+    if (text == NULL)
+        return 0;
+    // Convert UTF-8 to wide characters
+    int wideLen = MultiByteToWideChar(CP_UTF8, 0, text, textLen, NULL, 0);
+    if (wideLen <= 0)
+        return DrawText(hDC, text, textLen, rect, format); // Fallback to ANSI
+    
+    wchar_t* wideText = (wchar_t*)_alloca((wideLen + 1) * sizeof(wchar_t));
+    MultiByteToWideChar(CP_UTF8, 0, text, textLen, wideText, wideLen + 1);
+    if (textLen == -1)
+        wideText[wideLen] = 0;
+    return DrawTextW(hDC, wideText, textLen == -1 ? -1 : wideLen, rect, format);
+}
 
 const char* WC_POPUPMENU = "PopupMenuClass";
 
@@ -318,7 +335,7 @@ void CMenuItem::DecodeSubTextLenghtsAndWidths(CMenuSharedResources* sharedRes, B
         iterator++;
     }
 
-    // calculate text widths
+    // calculate text widths using UTF-8 aware function
     HFONT hOldFont;
     if (State & MENU_STATE_DEFAULT)
         hOldFont = (HFONT)SelectObject(sharedRes->HTempMemDC, sharedRes->HBoldFont);
@@ -328,21 +345,21 @@ void CMenuItem::DecodeSubTextLenghtsAndWidths(CMenuSharedResources* sharedRes, B
     if (ColumnL1 != NULL)
     {
         ZeroMemory(&size, sizeof(size));
-        DrawText(sharedRes->HTempMemDC, ColumnL1, ColumnL1Len,
+        DrawTextUtf8(sharedRes->HTempMemDC, ColumnL1, ColumnL1Len,
                  &size, DT_NOCLIP | DT_LEFT | DT_SINGLELINE | DT_CALCRECT);
         ColumnL1Width = size.right;
     }
     if (ColumnL2 != NULL)
     {
         ZeroMemory(&size, sizeof(size));
-        DrawText(sharedRes->HTempMemDC, ColumnL2, ColumnL2Len,
+        DrawTextUtf8(sharedRes->HTempMemDC, ColumnL2, ColumnL2Len,
                  &size, DT_NOCLIP | DT_LEFT | DT_SINGLELINE | DT_CALCRECT);
         ColumnL2Width = size.right;
     }
     if (ColumnR != NULL)
     {
         ZeroMemory(&size, sizeof(size));
-        DrawText(sharedRes->HTempMemDC, ColumnR, ColumnRLen,
+        DrawTextUtf8(sharedRes->HTempMemDC, ColumnR, ColumnRLen,
                  &size, DT_NOCLIP | DT_LEFT | DT_SINGLELINE | DT_CALCRECT);
         ColumnRWidth = size.right;
     }

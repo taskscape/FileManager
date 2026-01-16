@@ -1,4 +1,4 @@
-﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2023 Open Salamander Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 // CommentsTranslationProject: TRANSLATED
 
@@ -9,6 +9,23 @@
 
 #define COLUMN_L1_L2_MARGIN 5 // space between column L1 and L2
 #define STANDARD_BITMAP_SIZE 17
+
+// Helper function to draw UTF-8 text using Unicode API
+static int DrawTextUtf8(HDC hDC, const char* text, int textLen, LPRECT rect, UINT format)
+{
+    if (text == NULL)
+        return 0;
+    // Convert UTF-8 to wide characters
+    int wideLen = MultiByteToWideChar(CP_UTF8, 0, text, textLen, NULL, 0);
+    if (wideLen <= 0)
+        return DrawText(hDC, text, textLen, rect, format); // Fallback to ANSI
+    
+    wchar_t* wideText = (wchar_t*)_alloca((wideLen + 1) * sizeof(wchar_t));
+    MultiByteToWideChar(CP_UTF8, 0, text, textLen, wideText, wideLen + 1);
+    if (textLen == -1)
+        wideText[wideLen] = 0;
+    return DrawTextW(hDC, wideText, textLen == -1 ? -1 : wideLen, rect, format);
+}
 
 //*****************************************************************************
 //
@@ -932,17 +949,17 @@ void CMenuPopup::DrawItem(HDC hDC, CMenuItem* item, int yOffset, BOOL selected)
                         textR2.top++;
                         textR2.right++;
                         textR2.bottom++;
-                        DrawText(hDC, item->ColumnL1, item->ColumnL1Len, &textR2, dtFlags);
+                        DrawTextUtf8(hDC, item->ColumnL1, item->ColumnL1Len, &textR2, dtFlags);
                         SetBkMode(hDC, TRANSPARENT);
                         SetTextColor(hDC, SharedRes->GrayTextColor);
                     }
                     else
                         SetTextColor(hDC, SharedRes->NormalBkColor);
-                    DrawText(hDC, item->ColumnL1, item->ColumnL1Len, &textR, dtFlags);
+                    DrawTextUtf8(hDC, item->ColumnL1, item->ColumnL1Len, &textR, dtFlags);
                     SetBkMode(hDC, OPAQUE);
                 }
                 else
-                    DrawText(hDC, item->ColumnL1, item->ColumnL1Len, &textR, dtFlags);
+                    DrawTextUtf8(hDC, item->ColumnL1, item->ColumnL1Len, &textR, dtFlags);
             }
 
             if (item->ColumnL2 != NULL)
@@ -958,19 +975,19 @@ void CMenuPopup::DrawItem(HDC hDC, CMenuItem* item, int yOffset, BOOL selected)
                         textR2.top++;
                         textR2.right++;
                         textR2.bottom++;
-                        DrawText(hDC, item->ColumnL2, item->ColumnL2Len,
+                        DrawTextUtf8(hDC, item->ColumnL2, item->ColumnL2Len,
                                  &textR2, DT_NOCLIP | DT_LEFT | DT_SINGLELINE | DT_VCENTER);
                         SetBkMode(hDC, TRANSPARENT);
                         SetTextColor(hDC, SharedRes->GrayTextColor);
                     }
                     else
                         SetTextColor(hDC, SharedRes->NormalBkColor);
-                    DrawText(hDC, item->ColumnL2, item->ColumnL2Len,
+                    DrawTextUtf8(hDC, item->ColumnL2, item->ColumnL2Len,
                              &textR, DT_NOCLIP | DT_LEFT | DT_SINGLELINE | DT_VCENTER);
                     SetBkMode(hDC, OPAQUE);
                 }
                 else
-                    DrawText(hDC, item->ColumnL2, item->ColumnL2Len,
+                    DrawTextUtf8(hDC, item->ColumnL2, item->ColumnL2Len,
                              &textR, DT_NOCLIP | DT_LEFT | DT_SINGLELINE | DT_VCENTER);
             }
 
@@ -987,18 +1004,18 @@ void CMenuPopup::DrawItem(HDC hDC, CMenuItem* item, int yOffset, BOOL selected)
                         textR2.top++;
                         textR2.right++;
                         textR2.bottom++;
-                        DrawText(hDC, item->ColumnR, item->ColumnRLen,
+                        DrawTextUtf8(hDC, item->ColumnR, item->ColumnRLen,
                                  &textR2, DT_NOCLIP | DT_LEFT | DT_SINGLELINE | DT_VCENTER);
                         SetBkMode(hDC, TRANSPARENT);
                         SetTextColor(hDC, SharedRes->GrayTextColor);
                     }
                     else
                         SetTextColor(hDC, SharedRes->NormalBkColor);
-                    DrawText(hDC, item->ColumnR, item->ColumnRLen,
+                    DrawTextUtf8(hDC, item->ColumnR, item->ColumnRLen,
                              &textR, DT_NOCLIP | DT_LEFT | DT_SINGLELINE | DT_VCENTER);
                 }
                 else
-                    DrawText(hDC, item->ColumnR, item->ColumnRLen,
+                    DrawTextUtf8(hDC, item->ColumnR, item->ColumnRLen,
                              &textR, DT_NOCLIP | DT_LEFT | DT_SINGLELINE | DT_VCENTER);
             }
             // restore the original values

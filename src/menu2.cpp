@@ -1,4 +1,4 @@
-﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2023 Open Salamander Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 // CommentsTranslationProject: TRANSLATED
 
@@ -1058,7 +1058,7 @@ BOOL CMenuPopup::GetStatesFromHWindowsMenu(HMENU hMenu)
 }
 
 // This version works since W2K; we use it from Vista where MS introduced
-// alpha blended icons in menus
+// alpha blended icons in menus (Wide character version for Unicode support)
 typedef struct
 {
     UINT cbSize;
@@ -1070,10 +1070,10 @@ typedef struct
     HBITMAP hbmpChecked;   // used if MIIM_CHECKMARKS
     HBITMAP hbmpUnchecked; // used if MIIM_CHECKMARKS
     ULONG_PTR dwItemData;  // used if MIIM_DATA
-    LPSTR dwTypeData;      // used if MIIM_TYPE (4.0) or MIIM_STRING (>4.0)
+    LPWSTR dwTypeData;     // used if MIIM_TYPE (4.0) or MIIM_STRING (>4.0) - wide char for Unicode
     UINT cch;              // used if MIIM_TYPE (4.0) or MIIM_STRING (>4.0)
     HBITMAP hbmpItem;      // used if MIIM_BITMAP
-} MENUITEMINFOA_NEW, FAR* LPMENUITEMINFOA_NEW;
+} MENUITEMINFOW_NEW, FAR* LPMENUITEMINFOW_NEW;
 
 #define MIIM_STRING 0x00000040
 #define MIIM_BITMAP 0x00000080
@@ -1082,8 +1082,9 @@ typedef struct
 BOOL CMenuPopup::LoadFromHandle()
 {
     CALL_STACK_MESSAGE1("CMenuPopup::LoadFromHandle()");
-    char buff[2048];
-    MENUITEMINFOA_NEW mii;
+    wchar_t buffW[2048];  // Wide character buffer for Unicode
+    char buff[4096];      // UTF-8 buffer (4x size for worst case)
+    MENUITEMINFOW_NEW mii;
     mii.cbSize = sizeof(mii);
     mii.fMask = MIIM_CHECKMARKS | MIIM_DATA | MIIM_ID | MIIM_STATE | MIIM_SUBMENU | MIIM_FTYPE | MIIM_BITMAP | MIIM_STRING;
     // convert all menu items to our data structures
@@ -1092,12 +1093,12 @@ BOOL CMenuPopup::LoadFromHandle()
     int i;
     for (i = 0; i < count; i++)
     {
-        mii.dwTypeData = buff;
+        mii.dwTypeData = buffW;
         mii.cch = 2048;
-        // retrieve all available information about the item from the menu
-        if (!GetMenuItemInfo(HWindowsMenu, i, TRUE, (MENUITEMINFO*)&mii))
+        // retrieve all available information about the item from the menu using Unicode API
+        if (!GetMenuItemInfoW(HWindowsMenu, i, TRUE, (MENUITEMINFOW*)&mii))
         {
-            TRACE_E("GetMenuItemInfo failed");
+            TRACE_E("GetMenuItemInfoW failed");
             return FALSE;
         }
 
@@ -1152,17 +1153,31 @@ BOOL CMenuPopup::LoadFromHandle()
         // data
         item->CustomData = mii.dwItemData;
 
-        // in the case of a string, copy the string
+        // in the case of a string, copy the string (convert from Unicode to UTF-8)
         if (item->Type & MENU_TYPE_STRING)
         {
-            const char* p = mii.dwTypeData;
-            int len = mii.cch;
-            if (p == NULL)
+            const wchar_t* pW = mii.dwTypeData;
+            int len = 0;
+            if (pW == NULL || pW[0] == 0)
             {
-                p = "";
+                buff[0] = 0;
                 len = 0;
             }
-            if (!item->SetText(p, len))
+            else
+            {
+                // Convert wide char to UTF-8
+                len = WideCharToMultiByte(CP_UTF8, 0, pW, mii.cch, buff, sizeof(buff) - 1, NULL, NULL);
+                if (len <= 0)
+                {
+                    buff[0] = 0;
+                    len = 0;
+                }
+                else
+                {
+                    buff[len] = 0;
+                }
+            }
+            if (!item->SetText(buff, len))
             {
                 TRACE_E(LOW_MEMORY);
                 Items.Detach(index);

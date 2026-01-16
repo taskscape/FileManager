@@ -1,4 +1,4 @@
-﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2023 Open Salamander Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 // CommentsTranslationProject: TRANSLATED
 
@@ -2755,26 +2755,36 @@ void CCfgPageHotPath::Transfer(CTransferInfo& ti)
         DisableNotification = TRUE;
         char buff[20];
         char name[MAX_PATH];
+        wchar_t nameW[MAX_PATH];
         int i;
         for (i = 0; i < HOT_PATHS_COUNT; i++)
         {
-            LVITEM lvi;
+            LVITEMW lvi;
             lvi.mask = LVIF_TEXT | LVIF_STATE;
             lvi.iItem = i;
             lvi.iSubItem = 0;
             lvi.state = 0;
             name[0] = 0;
             Config->GetName(i, name, MAX_PATH);
-            lvi.pszText = name;
-            ListView_InsertItem(HListView, &lvi);
+            // Convert UTF-8 to wide characters for proper Unicode display
+            MultiByteToWideChar(CP_UTF8, 0, name, -1, nameW, MAX_PATH);
+            lvi.pszText = nameW;
+            SendMessageW(HListView, LVM_INSERTITEMW, 0, (LPARAM)&lvi);
 
             UINT state = INDEXTOSTATEIMAGEMASK((Config->GetVisible(i) ? 2 : 1));
             ListView_SetItemState(HListView, i, state, LVIS_STATEIMAGEMASK);
 
             if (i < 10)
             {
+                wchar_t buffW[20];
                 sprintf(buff, "%s+%d", LoadStr(IDS_CTRL), i < 9 ? i + 1 : 0);
-                ListView_SetItemText(HListView, i, 1, buff);
+                MultiByteToWideChar(CP_ACP, 0, buff, -1, buffW, 20);
+                LVITEMW lviHotKey;
+                lviHotKey.mask = LVIF_TEXT;
+                lviHotKey.iItem = i;
+                lviHotKey.iSubItem = 1;
+                lviHotKey.pszText = buffW;
+                SendMessageW(HListView, LVM_SETITEMTEXTW, i, (LPARAM)&lviHotKey);
             }
         }
 
@@ -2814,7 +2824,10 @@ void CCfgPageHotPath::LoadControls()
 
     DisableNotification = TRUE;
     SendDlgItemMessage(HWindow, IDC_HOTPATH_PATH, EM_LIMITTEXT, HOTPATHITEM_MAXPATH - 1, 0);
-    SetDlgItemText(HWindow, IDC_HOTPATH_PATH, path);
+    // Convert UTF-8 to wide characters for proper Unicode display
+    wchar_t pathW[HOTPATHITEM_MAXPATH];
+    MultiByteToWideChar(CP_UTF8, 0, path, -1, pathW, HOTPATHITEM_MAXPATH);
+    SetDlgItemTextW(HWindow, IDC_HOTPATH_PATH, pathW);
 
     DisableNotification = FALSE;
     EnableControls();
@@ -2825,8 +2838,11 @@ void CCfgPageHotPath::StoreControls()
     int index = ListView_GetNextItem(HListView, -1, LVNI_SELECTED);
     if (index != -1)
     {
+        // Get text in wide characters then convert to UTF-8
+        wchar_t buffW[HOTPATHITEM_MAXPATH];
+        GetDlgItemTextW(HWindow, IDC_HOTPATH_PATH, buffW, HOTPATHITEM_MAXPATH);
         char buff[HOTPATHITEM_MAXPATH];
-        GetDlgItemText(HWindow, IDC_HOTPATH_PATH, buff, HOTPATHITEM_MAXPATH);
+        WideCharToMultiByte(CP_UTF8, 0, buffW, -1, buff, HOTPATHITEM_MAXPATH, NULL, NULL);
         Config->SetPath(index, buff);
     }
 }
@@ -2869,8 +2885,13 @@ void CCfgPageHotPath::OnDelete()
     if (index != -1)
     {
         Config->Set(index, "", "");
-        char buffEmpty[] = "";
-        ListView_SetItemText(HListView, index, 0, buffEmpty);
+        wchar_t buffEmptyW[] = L"";
+        LVITEMW lvi;
+        lvi.mask = LVIF_TEXT;
+        lvi.iItem = index;
+        lvi.iSubItem = 0;
+        lvi.pszText = buffEmptyW;
+        SendMessageW(HListView, LVM_SETITEMTEXTW, index, (LPARAM)&lvi);
         LoadControls();
     }
     EnableHeader();
@@ -2892,10 +2913,22 @@ void CCfgPageHotPath::OnMove(BOOL up)
     {
         char name1[MAX_PATH];
         char name2[MAX_PATH];
+        wchar_t name1W[MAX_PATH];
+        wchar_t name2W[MAX_PATH];
         Config->GetName(index1, name1, MAX_PATH);
         Config->GetName(index2, name2, MAX_PATH);
-        ListView_SetItemText(HListView, index1, 0, name2);
-        ListView_SetItemText(HListView, index2, 0, name1);
+        // Convert UTF-8 to wide characters for proper Unicode display
+        MultiByteToWideChar(CP_UTF8, 0, name1, -1, name1W, MAX_PATH);
+        MultiByteToWideChar(CP_UTF8, 0, name2, -1, name2W, MAX_PATH);
+        LVITEMW lvi;
+        lvi.mask = LVIF_TEXT;
+        lvi.iSubItem = 0;
+        lvi.iItem = index1;
+        lvi.pszText = name2W;
+        SendMessageW(HListView, LVM_SETITEMTEXTW, index1, (LPARAM)&lvi);
+        lvi.iItem = index2;
+        lvi.pszText = name1W;
+        SendMessageW(HListView, LVM_SETITEMTEXTW, index2, (LPARAM)&lvi);
         DWORD state1 = ListView_GetItemState(HListView, index1, LVIS_STATEIMAGEMASK);
         DWORD state2 = ListView_GetItemState(HListView, index2, LVIS_STATEIMAGEMASK);
         ListView_SetItemState(HListView, index1, state2, LVIS_STATEIMAGEMASK);
@@ -3058,7 +3091,15 @@ CCfgPageHotPath::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                         Config->GetPath(index, path, HOTPATHITEM_MAXPATH);
                     Config->Set(index, name, path);
                     LoadControls();
-                    ListView_SetItemText(HListView, index, 0, name);
+                    // Convert UTF-8 to wide characters for proper Unicode display
+                    wchar_t nameW[MAX_PATH];
+                    MultiByteToWideChar(CP_UTF8, 0, name, -1, nameW, MAX_PATH);
+                    LVITEMW lvi;
+                    lvi.mask = LVIF_TEXT;
+                    lvi.iItem = index;
+                    lvi.iSubItem = 0;
+                    lvi.pszText = nameW;
+                    SendMessageW(HListView, LVM_SETITEMTEXTW, index, (LPARAM)&lvi);
                     Dirty = TRUE;
                     break;
                 }
