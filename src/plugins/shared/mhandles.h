@@ -301,7 +301,7 @@ public:
     C__Messages __Messages;
 
 protected:
-    C_HandlesDataArray Handles;       // vsechny kontrolovane handly
+    C_HandlesDataArray Handles;       // all monitored handles
     C__HandlesData TemporaryHandle;   // pri vkladani nastaven z SetInfo()
     C__HandlesOutputType OutputType;  // typ vystupu hlasek
     CRITICAL_SECTION CriticalSection; // for multi-thread synchronization

@@ -37,7 +37,7 @@ private: \
 
 extern HINSTANCE DLLInstance;     // handle k SPL-ku - jazykove nezavisle resourcy
 extern HINSTANCE HLanguage;       // handle k SLG-cku - jazykove zavisle resourcy
-extern BOOL WindowsVistaAndLater; // Windows Vista nebo pozdejsi z rady NT (6.0+)
+extern BOOL WindowsVistaAndLater; // Windows Vista or later from NT series (6.0+)
 extern BOOL WindowsXP64AndLater;  // Windows XP 64, Vista or later (5.2+)
 
 // rozhrani Open Salamandera - platna od volani InitUtils() az do
@@ -81,7 +81,7 @@ const char* Concatenate(const char* string1, const char* string2);
 // ****************************************************************************
 //
 // CDialogStack -- slouzi k ukladani hiearchie oken na zasobnik, vrchol
-// zasobniku je parent pro zobrazovane message- a error-boxy, kazdy thread
+// stack is parent for displayed message- and error-boxes, each thread
 // ma svou vlastni hierarchii oken
 //
 

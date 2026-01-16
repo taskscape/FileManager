@@ -42,11 +42,11 @@ CThreadQueue::CThreadQueue(const char* queueName)
 
 CThreadQueue::~CThreadQueue()
 {
-    ClearFinishedThreads(); // neni treba sekce, uz by mel pouzivat jen jeden thread
+    ClearFinishedThreads(); // section not needed, only one thread should be using it now
     if (Continue != NULL)
         CloseHandle(Continue);
     if (Head != NULL)
-        TRACE_E("Some thread is still in " << QueueName << " queue!"); // po terminovani threadu, ktery ceka na (nebo zrovna terminuje) jiny thread z fronty, jinak by nemelo nastat...
+        TRACE_E("Some thread is still in " << QueueName << " queue!"); // after terminating thread that waits for (or is currently terminating) another thread from queue, otherwise should not happen...
 }
 
 void CThreadQueue::ClearFinishedThreads()
@@ -151,7 +151,7 @@ BOOL CThreadQueue::WaitForExit(HANDLE thread, int milliseconds)
     BOOL ret = TRUE;
     if (thread != NULL)
     {
-        if (FindAndLockItem(thread)) // handle threadu nalezen a uzamcen - muzeme na nej cekat, pak ho zrusime
+        if (FindAndLockItem(thread)) // thread handle found and locked - we can wait for it, then delete it
         {
             ret = WaitForSingleObject(thread, milliseconds) != WAIT_TIMEOUT;
 
@@ -168,7 +168,7 @@ void CThreadQueue::KillThread(HANDLE thread, DWORD exitCode)
     CALL_STACK_MESSAGE2("CThreadQueue::KillThread(, %d)", exitCode);
     if (thread != NULL)
     {
-        if (FindAndLockItem(thread)) // handle threadu nalezen a uzamcen - muzeme ho terminovat, pak ho zrusime
+        if (FindAndLockItem(thread)) // thread handle found and locked - we can terminate it, then delete it
         {
             TerminateThread(thread, exitCode);
             WaitForSingleObject(thread, INFINITE); // pockame az thread skutecne skonci, nekdy mu to dost trva
@@ -188,7 +188,7 @@ BOOL CThreadQueue::KillAll(BOOL force, int waitTime, int forceWaitTime, DWORD ex
 
     CS.Enter();
 
-    // vykillujeme vsechny thready, ktere nehodlaji koncit sami
+    // kill all threads that do not intend to finish themselves
     CThreadQueueItem* prevItem = NULL;
     CThreadQueueItem* item = Head;
     while (item != NULL)
@@ -200,7 +200,7 @@ BOOL CThreadQueue::KillAll(BOOL force, int waitTime, int forceWaitTime, DWORD ex
             DWORD t = GetTickCount() - ti;
             if (w == INFINITE || t < w) // mame jeste cekat
             {
-                // uvolnime frontu pro dalsi thready (aby se napr. dockaly ukonceni threadu z fronty a pak se sami ukoncily)
+                // release queue for other threads (so they can e.g. wait for thread termination from queue and then terminate themselves)
                 CS.Leave();
 
                 if (w == INFINITE || 50 < w - t)
@@ -208,7 +208,7 @@ BOOL CThreadQueue::KillAll(BOOL force, int waitTime, int forceWaitTime, DWORD ex
                 else
                 {
                     Sleep(w - t);
-                    ti -= w; // pro priste vyradime test na cekani
+                    ti -= w; // next time we exclude the wait test
                 }
 
                 CS.Enter();
@@ -221,14 +221,14 @@ BOOL CThreadQueue::KillAll(BOOL force, int waitTime, int forceWaitTime, DWORD ex
                 TRACE_E("Thread has not ended itself, we must terminate it (" << QueueName << " queue).");
                 TerminateThread(item->Thread, exitCode);
                 WaitForSingleObject(item->Thread, INFINITE); // pockame az thread skutecne skonci, nekdy mu to dost trva
-                // pokud nejaky thread ceka na ukonceni prave zabiteho threadu, pustime pro nej na chvilku
-                // frontu, jinak zustane zasekly v UnlockItem()
+                // if any thread is waiting for termination of just killed thread, we release for it for a moment
+                // the queue, otherwise it will remain stuck in UnlockItem()
                 leaveCS = item->Locks > 0;
             }
             else // bez 'force' jen ohlasime, ze jeste neco bezi
             {
                 TRACE_I("KillAll(): At least one thread is still running in " << QueueName << " queue.");
-                ClearFinishedThreads(); // jen tak pro prehlednost pri debugovani
+                ClearFinishedThreads(); // just for clarity when debugging
                 CS.Leave();
                 return FALSE;
             }
@@ -249,7 +249,7 @@ BOOL CThreadQueue::KillAll(BOOL force, int waitTime, int forceWaitTime, DWORD ex
 
         if (leaveCS)
         {
-            // uvolnime frontu pro dalsi thready (aby se napr. dockaly ukonceni threadu z fronty a pak se sami ukoncily)
+            // release queue for other threads (so they can e.g. wait for thread termination from queue and then terminate themselves)
             CS.Leave();
 
             Sleep(50); // chvilka na prevzeti fronty a prip. dobeh threadu (nez ho pujdeme zabit jako vsechny ostatni)

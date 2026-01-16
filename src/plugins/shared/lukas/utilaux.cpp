@@ -243,7 +243,7 @@ BOOL SalGetFullName(char* name, int* errTextID, const char* curDir)
     CALL_STACK_MESSAGE3("SalGetFullName(%s, , %s)", name, curDir);
     int err = 0;
 
-    size_t rootOffset = 3; // offset zacatku adresarove casti cesty (3 pro "c:\path")
+    size_t rootOffset = 3; // offset of directory part of path start (3 for "c:\path")
     char* s = name;
     while (*s == ' ')
         s++;
@@ -292,7 +292,7 @@ BOOL SalGetFullName(char* name, int* errTextID, const char* curDir)
             if (curDir != NULL && SalamanderGeneral->CharToLowerCase(curDir[0]) == SalamanderGeneral->CharToLowerCase(*s)) head = curDir;
             else head = DefaultDir[LowerCase[*s] - 'a'];
             int l2 = strlen(head);
-            if (head[l2 - 1] != '\\') l2++;  // misto pro '\\'
+            if (head[l2 - 1] != '\\') l2++;  // space for '\\'
             if (l1 + l2 >= MAX_PATH) err = GFN_TOOLONGPATH;
             else  // sestaveni full path
             {

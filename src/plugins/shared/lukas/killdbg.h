@@ -5,14 +5,14 @@
 
 // ****************************************************************************
 //
-// Eliminace TRACE a CALL-STACK pro projekty, ktere to nepodporuji
+// Elimination of TRACE and CALL-STACK for projects that do not support it
 
 // ****************************************************************************
 //
 // TRACE
 //
 
-// aby nedochazelo k problemum se stredniky v nize nadefinovanych makrech
+// to prevent problems with semicolons in macros defined below
 inline void __TraceEmptyFunction() {}
 
 #define TRACE_MI(file, line, str) __TraceEmptyFunction()

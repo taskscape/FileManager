@@ -114,17 +114,17 @@ public:
     const char* GetPattern() const { return OriginalPattern; }
 
     const char* GetLastErrorText() const { return LastErrorText; }
-    BOOL Set(const char* pattern, WORD flags); // vraci FALSE pri chybe (volat metodu GetLastErrorText)
-    BOOL SetFlags(WORD flags);                 // vraci FALSE pri chybe (volat metodu GetLastErrorText)
+    BOOL Set(const char* pattern, WORD flags); // returns FALSE on error (call GetLastErrorText method)
+    BOOL SetFlags(WORD flags);                 // returns FALSE on error (call GetLastErrorText method)
 
-    BOOL SetLine(const char* start, const char* end); // radek textu, ve kterem vyhledava, vraci FALSE pri chybe (volat metodu GetLastErrorText)
+    BOOL SetLine(const char* start, const char* end); // line of text to search in, returns FALSE on error (call GetLastErrorText method)
 
     int SearchForward(int start, int& foundLen);
     int SearchBackward(int length, int& foundLen);
 
-    // nahradi promnene \1 ... \9 textem zachycenym odpovidajicima zavorkama
+    // replaces variables \1 ... \9 with text captured by corresponding parentheses
     // 'pattern' je vzor kterym se nahrazuje nalezeny match, 'buffer' buffer
-    // pro vystup, 'bufSize' maximalni velikost textu vcetne ukoncovaciho NULL
+    // for output, 'bufSize' maximum text size including terminating NULL
     // znaku, v promnene 'count' vraci pocet znaku zkopirovanych do bufferu
     // vraci TRUE pokud se vyraz vesel cely do bufferu
     BOOL ExpandVariables(char* pattern, char* buffer,

@@ -119,7 +119,7 @@ public:
     virtual int GetCurSel();
 
 protected:
-    HWND Parent; // parametry pro vytvareni dialogu
+    HWND Parent; // parameters for dialog creation
     HWND HWindow;
     HINSTANCE Modul;
     HICON Icon;
@@ -128,7 +128,7 @@ protected:
     DWORD Flags;
     PFNPROPSHEETCALLBACK Callback;
 
-    DWORD* LastPage; // posledni zvolena stranka (muze byt NULL, pokud nezajima)
+    DWORD* LastPage; // last selected page (can be NULL if not interested)
 
     friend class CPropSheetPage;
 };
@@ -137,7 +137,7 @@ protected:
 
 class CTreePropDialog;
 
-// sedivy stinovany pruh nad property sheet v tree variante PropertyDialog,
+// gray shadowed stripe above property sheet in tree variant PropertyDialog,
 // kde je zobrazen nazev aktualni stranky
 class CTPHCaptionWindow : protected CWindow
 {
@@ -155,7 +155,7 @@ protected:
     virtual LRESULT WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam);
 };
 
-// na grip controlu chceme pouze top-down kurzor
+// on grip control we want only top-down cursor
 class CTPHGripWindow : public CWindow
 {
 public:
@@ -165,7 +165,7 @@ protected:
     virtual LRESULT WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam);
 };
 
-// dialog, ktery drzi treeview, stinovany nadpis a aktualni property sheet
+// dialog that holds treeview, shadowed title and current property sheet
 class CTreePropHolderDlg : public CDialog
 {
 protected:

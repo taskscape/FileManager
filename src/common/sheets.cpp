@@ -761,7 +761,7 @@ CTreePropHolderDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                                (GetKeyState(VK_CONTROL) & 0x8000) != 0,
                                (GetKeyState(VK_SHIFT) & 0x8000) != 0);
         }
-        return TRUE; // F1 nenechame propadnout do parenta ani pokud nevolame WinLibHelp->OnHelp()
+        return TRUE; // we do not let F1 propagate to parent even if we do not call WinLibHelp->OnHelp()
     }
 
     case WM_COMMAND:

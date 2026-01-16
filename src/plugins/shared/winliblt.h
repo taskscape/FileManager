@@ -20,12 +20,12 @@
 void SetWinLibStrings(const char* invalidNumber, // "neni cislo" (u transferbufferu cisel)
                       const char* error);        // titulek "chyba" (u transferbufferu cisel)
 
-// je potreba zavolat pred pouzitim WinLibu; 'pluginName' je jmeno pluginu (napr. "DEMOPLUG"),
+// must be called before using WinLib; 'pluginName' is plugin name (e.g. "DEMOPLUG"),
 // used to distinguish names of WinLib universal window classes (must differ between plugins,
 // otherwise class name collision occurs and WinLib cannot function - only first started
-// plugin); 'dllInstance' je modul pluginu (pouziva se pri registraci univerzalnich trid WinLibu)
+// plugin); 'dllInstance' is plugin module (used when registering universal WinLib classes)
 BOOL InitializeWinLib(const char* pluginName, HINSTANCE dllInstance);
-// je potreba zavolat po pouziti WinLibu; 'dllInstance' je modul pluginu (pouziva se pri zruseni
+// must be called after using WinLib; 'dllInstance' is plugin module (used when canceling
 // registrace univerzalnich trid WinLibu)
 void ReleaseWinLib(HINSTANCE dllInstance);
 
@@ -71,7 +71,7 @@ enum CObjectType // for object type recognition
 
 // ****************************************************************************
 
-class CWindowsObject // predek vsech MS-Windows objektu
+class CWindowsObject // ancestor of all MS-Windows objects
 {
 public:
     HWND HWindow;
@@ -136,7 +136,7 @@ public:
     static BOOL RegisterUniversalClass(HINSTANCE dllInstance);
 
     // registrace vlastni univerzalni tridy; POZOR: pri unloadu pluginu je nutne zrusit registraci tridy,
-    // jinak pri opakovanem loadu pluginu dojde k chybe pri registraci (konflikt se starou tridou)
+    // otherwise repeated plugin load will result in registration error (conflict with old class)
     static BOOL RegisterUniversalClass(UINT style,
                                        int cbClsExtra,
                                        int cbWndExtra,
@@ -199,7 +199,7 @@ enum CTransferType
 class CTransferInfo
 {
 public:
-    int FailCtrlID; // INT_MAX - vse v poradku, jinak ID controlu s chybou
+    int FailCtrlID; // INT_MAX - all OK, otherwise ID of control with error
     CTransferType Type;
 
     CTransferInfo(HWND hDialog, CTransferType type)
@@ -301,7 +301,7 @@ public:
 
     // testovano s resourcem dialogu stranky se stylem:
     // DS_CONTROL | DS_3DLOOK | WS_CHILD | WS_CAPTION;
-    // pokud chceme pouzit primo titulek z resourcu, staci dat 'title'==NULL a
+    // if we want to use title directly from resources, just set 'title'==NULL and
     // 'flags'==0
     CPropSheetPage(char* title, HINSTANCE modul, int resID,
                    DWORD flags /* = PSP_USETITLE*/, HICON icon,
@@ -343,8 +343,8 @@ class CPropertyDialog : public TIndirectArray<CPropSheetPage>
 {
 public:
     // do tohoto objektu je idealni pridat objekty jednotlivych stranek
-    // a pak je jako "staticke" (defaultni volba) napridavat pres metodu Add;
-    // 'startPage' a 'lastPage' muze byt jen jedina promenna (hodnota in/odkaz out);
+    // and then add them as "static" (default choice) via Add method;
+    // 'startPage' and 'lastPage' can be only single variable (value in/reference out);
     // 'flags' viz help k 'PROPSHEETHEADER', pouzitelne hlavne konstanty
     // PSH_NOAPPLYNOW, PSH_USECALLBACK a PSH_HASHELP (jinak staci 'flags'==0)
     CPropertyDialog(HWND parent, HINSTANCE modul, char* caption,

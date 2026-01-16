@@ -99,7 +99,7 @@ C__Handles __Handles;
 
 //*****************************************************************************
 //
-// vlozeny modul MESSAGES (zobrazovani messageboxu v aktualnim nebo vlastnim threadu)
+// embedded MESSAGES module (displaying messageboxes in current or own thread)
 //
 //*****************************************************************************
 
@@ -115,13 +115,13 @@ HWND __MessagesParent = NULL;
 
 // zajisti aktualnimu threadu pristup k funkcim a datum modulu
 void EnterMessagesModul();
-// volat az aktualni thread nebude potrebovat pristup k funkcim a datum modulu
+// call when current thread will no longer need access to module functions and data
 void LeaveMessagesModul();
 
-/// vraci ukazatel na globalni buffer, ktery naplni retezcem z sprintf
+/// returns pointer to global buffer which it fills with string from sprintf
 const char* spf(const char* formatString, ...);
 
-/// vraci ukazatel na globalni buffer, ktery naplni popisem chyby
+/// returns pointer to global buffer which it fills with error description
 const char* err(DWORD error);
 
 #define MESSAGE(parent, str, buttons) \
@@ -152,7 +152,7 @@ const char* err(DWORD error);
 #define MESSAGE_TE(str, buttons) \
     MESSAGE_T(str, MB_ICONEXCLAMATION | (buttons))
 
-// kriticka sekce pro cely modul - monitor
+// critical section for entire module - monitor
 CRITICAL_SECTION __MessagesCriticalSection;
 
 const char* __MessagesLowMemory = "Insufficient memory.";
@@ -193,8 +193,8 @@ struct C__MessageBoxData
 };
 
 int CALLBACK __MessagesMessageBoxThreadF(C__MessageBoxData* data)
-{ // nesmi cekat na odezvu volajiciho threadu, protoze ten nebude reagovat
-    // proto je parent==NULL -> zadne disablovani oken atd.
+{ // must not wait for response from calling thread, because it will not respond
+    // therefore parent==NULL -> no window disabling etc.
     data->Return = MessageBox(NULL, data->Text, data->Caption, data->Type | MB_SETFOREGROUND);
     return 0;
 }
@@ -232,7 +232,7 @@ int C__Messages::MessageBoxT(LPCTSTR lpText, LPCTSTR lpCaption, UINT uType)
     if (message != NULL)
         free(message);
 
-    __MessagesStringBuf.erase(); // priprava pro dalsi message
+    __MessagesStringBuf.erase(); // preparation for next message
 
     return data.Return;
 }
@@ -257,7 +257,7 @@ int C__Messages::MessageBox(HWND hWnd, LPCTSTR lpText, LPCTSTR lpCaption, UINT u
     if (message != NULL)
         free(message);
 
-    __MessagesStringBuf.erase(); // priprava pro dalsi message
+    __MessagesStringBuf.erase(); // preparation for next message
 
     return ret;
 }
@@ -900,7 +900,7 @@ BOOL C__Handles::DeleteHandle(C__HandlesType& type, HANDLE handle,
             {
                 C__HandlesOrigin org = Handles[i].Handle.Origin;
                 if (org != __hoLoadAccelerators && org != __hoLoadIcon &&
-                    org != __hoGetStockObject) // nejde o handle, ktery nemusi byt uvolneny (prioritne uvolnujeme handly, ktere se musi uvolnit)
+                    org != __hoGetStockObject) // not a handle that does not have to be released (we primarily release handles that must be released)
                 {
                     if (origin != NULL)
                         *origin = org;

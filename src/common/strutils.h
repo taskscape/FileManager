@@ -5,8 +5,8 @@
 
 // SAFE_ALLOC macro removes code that tests if memory allocation succeeded (see allochan.*)
 
-// prevod Unicodoveho stringu (UTF-16) na ANSI multibytovy string; 'src' je Unicodovy string;
-// 'srcLen' je delka Unicodoveho stringu (bez zakoncujici nuly; pri zadani -1 se delka urci
+// convert Unicode string (UTF-16) to ANSI multibyte string; 'src' is Unicode string;
+// 'srcLen' is length of Unicode string (without terminating zero; when -1 is specified, length is determined
 // by terminating zero); 'bufSize' (must be greater than 0) is size of target buffer
 // 'buf' for ANSI string; if 'compositeCheck' is TRUE, uses flag WC_COMPOSITECHECK
 // (see MSDN), must not be used for filenames (NTFS distinguishes names written as
@@ -20,13 +20,13 @@ int ConvertU2A(const WCHAR* src, int srcLen, char* buf, int bufSize,
 // convert Unicode string (UTF-16) to allocated ANSI multibyte string (caller is
 // responsible for string deallocation); 'src' is Unicode string; 'srcLen' is length of Unicode
 // string (without terminating zero; when -1 is specified, length is determined by terminating zero);
-// je-li 'compositeCheck' TRUE, pouziva flag WC_COMPOSITECHECK (viz MSDN), nesmi se pouzit
+// if 'compositeCheck' is TRUE, uses flag WC_COMPOSITECHECK (see MSDN), must not be used
 // for filenames (NTFS distinguishes names written as precomposed and composite, i.e.
 // does not perform name normalization); 'codepage' is code page of ANSI string; returns allocated
 // ANSI string; on error returns NULL (details see GetLastError())
 char* ConvertAllocU2A(const WCHAR* src, int srcLen, BOOL compositeCheck = FALSE, UINT codepage = CP_ACP);
 
-// prevod ANSI multibytoveho stringu na Unicodovy string (UTF-16); 'src' je ANSI string;
+// convert ANSI multibyte string to Unicode string (UTF-16); 'src' is ANSI string;
 // 'srcLen' je delka ANSI stringu (bez zakoncujici nuly; pri zadani -1 se delka urci
 // by terminating zero); 'bufSize' (must be greater than 0) is size of target buffer
 // 'buf' for Unicode string; 'codepage' is code page of ANSI string;

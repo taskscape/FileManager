@@ -69,7 +69,7 @@ private:
     HANDLE HaveMessage;
     HANDLE FileMapping;
     CBuffer* Buffer;
-    HANDLE Reciever;   // jen pro odesilatele, handle ciloveho procesu
-    DWORD RecieverPid; // jen pro odesilatele, id ciloveho procesu
+    HANDLE Reciever;   // only for sender, handle of target process
+    DWORD RecieverPid; // only for sender, id of target process
     int SenderID;      // unikatni identifikator odesilatele
 };

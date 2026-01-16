@@ -380,45 +380,45 @@ struct C__ClientServerInitData
 //
 // CPipeDataHeader
 //
-// pomoci teto struktury komunikuje client se serverem pres pipu
+// client communicates with server through pipe using this structure
 
-// Pro Type == __mtInformation || Type == __mtError
-// maji promenne tyto vyznamy:
+// For Type == __mtInformation || Type == __mtError
+// variables have these meanings:
 struct C__PipeDataHeader
 {
-    int Type;                // typ zpravy (C__MessageType)
-    DWORD ThreadID;          // pro upresneni jeste ID threadu
-    DWORD UniqueThreadID;    // unikatni cislo threadu (systemove ID se opakuji)
-    SYSTEMTIME Time;         // cas vzniku message
-    DWORD MessageSize;       // delka bufferu potrebneho pro prijem textu
-    DWORD MessageTextOffset; // offset textu ve spolecnem bufferu s filem
-    DWORD Line;              // cislo radky
-    double Counter;          // presne pocitadlo v ms
+    int Type;                // message type (C__MessageType)
+    DWORD ThreadID;          // for clarification also thread ID
+    DWORD UniqueThreadID;    // unique thread number (system IDs repeat)
+    SYSTEMTIME Time;         // message creation time
+    DWORD MessageSize;       // buffer length needed for text reception
+    DWORD MessageTextOffset; // text offset in shared buffer with file
+    DWORD Line;              // line number
+    double Counter;          // precise counter in ms
 };
 
 #define __SIZEOF_PIPEDATAHEADER 48
 
-// Pro Type == __mtSetProcessName
-// C__MessageType Type;              // typ zpravy
-// DWORD          MessageSize        // delka bufferu potrebneho pro prijem nazvu
+// For Type == __mtSetProcessName
+// C__MessageType Type;              // message type
+// DWORD          MessageSize        // buffer length needed for name reception
 
-// Pro Type == __mtSetThreadName
-// C__MessageType Type;              // typ zpravy
+// For Type == __mtSetThreadName
+// C__MessageType Type;              // message type
 // DWORD          UniqueThreadID;    // Unique Thread ID
-// DWORD          MessageSize        // delka bufferu potrebneho pro prijem nazvu
+// DWORD          MessageSize        // buffer length needed for name reception
 
-// Pro Type == __mtIgnoreAutoClear
-// C__MessageType Type;              // typ zpravy
-// DWORD      ThreadID;              // 0 = neignorovat, 1 = ignorovat auto-clear na Trace Serveru
+// For Type == __mtIgnoreAutoClear
+// C__MessageType Type;              // message type
+// DWORD      ThreadID;              // 0 = do not ignore, 1 = ignore auto-clear on Trace Server
 
-// aktualni verze clientu (porovnava se s verzi serveru)
+// current client version (compared with server version)
 #define TRACE_CLIENT_VERSION 7
 
 #endif // defined(__TRACESERVER) || defined(TRACE_ENABLE)
 
 #ifndef TRACE_ENABLE
 
-// aby nedochazelo k problemum se stredniky v nize nadefinovanych makrech
+// to prevent problems with semicolons in macros defined below
 inline void __TraceEmptyFunction() {}
 
 #define TRACE_MI(file, line, str) __TraceEmptyFunction()
@@ -431,13 +431,13 @@ inline void __TraceEmptyFunction() {}
 #define TRACE_MEW(file, line, str) __TraceEmptyFunction()
 #define TRACE_E(str) __TraceEmptyFunction()
 #define TRACE_EW(str) __TraceEmptyFunction()
-// pri crashi softu pres DebugBreak() nejde vystopovat, kde lezi volani
-// TRACE_C/TRACE_MC, protoze adresa exceptiony je kdesi v ntdll.dll
-// a sekce Stack Back Trace bug reportu muze obsahovat nesmysly, pokud
-// funkce volajici TRACE_C/TRACE_MC nepouziva stary jednoduchy model
-// ukladani a prace s EBP/ESP, ovsem i v tom pripade je zde jen adresa
-// odkud byla tato funkce volana (ne primo adresa TRACE_C/TRACE_MC),
-// proto aspon prozatim pouzivame stary primitivni zpusob crashe
+// when software crashes via DebugBreak() it is not possible to trace where the call lies
+// TRACE_C/TRACE_MC, because exception address is somewhere in ntdll.dll
+// and Stack Back Trace section of bug report may contain nonsense, if
+// function calling TRACE_C/TRACE_MC does not use old simple model
+// of storing and working with EBP/ESP, but even in that case there is only address
+// from where this function was called (not direct address of TRACE_C/TRACE_MC),
+// therefore at least for now we use old primitive way of crash
 // zapisem na NULL
 //#define TRACE_MC(file, line, str) DebugBreak()
 //#define TRACE_MCW(file, line, str) DebugBreak()
@@ -526,7 +526,7 @@ uintptr_t __TRACE_beginthreadex(void* security, unsigned stack_size,
 // release verze spadne a problem snad bude jasny z call-stacku v bug-reportu;
 // nepouzivame DebugBreak(), protoze pri crashi softu nejde vystopovat, kde
 // lezi volani DebugBreak(), protoze adresa exceptiony je kdesi v ntdll.dll
-// a sekce Stack Back Trace bug reportu muze obsahovat nesmysly, pokud
+// and Stack Back Trace section of bug report may contain nonsense, if
 // funkce, ze ktere volame TRACE_C/MC, nepouziva stary jednoduchy model ukladani
 // a prace s EBP/ESP (to zalezi na kompileru a zaplych optimalizacich), proto
 // aspon prozatim pouzivame stary primitivni zpusob crashe zapisem na NULL

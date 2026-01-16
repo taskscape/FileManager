@@ -15,10 +15,10 @@ BOOL WindowsXP64AndLater;     // Windows XP 64, Vista or later (5.2+)
 CSalamanderGeneralAbstract* SG = NULL;
 CSalamanderGUIAbstract* SalGUI = NULL;
 
-// definice promenne pro "dbg.h"
+// variable definition for "dbg.h"
 CSalamanderDebugAbstract* SalamanderDebug = NULL;
 
-// definice promenne pro "spl_com.h"
+// variable definition for "spl_com.h"
 int SalamanderVersion = 0;
 
 DWORD MainThreadID;
@@ -49,15 +49,15 @@ BOOL InitLCUtils(CSalamanderPluginEntryAbstract* salamander, const char* pluginN
 {
     CALL_STACK_MESSAGE_NONE
 
-    // nastavime SalamanderDebug pro "dbg.h"
+    // set SalamanderDebug for "dbg.h"
     SalamanderDebug = salamander->GetSalamanderDebug();
 
-    // nastavime SalamanderVersion pro "spl_com.h"
+    // set SalamanderVersion for "spl_com.h"
     SalamanderVersion = salamander->GetVersion();
 
     CALL_STACK_MESSAGE1("InitLCUtils()");
 
-    // tento plugin je delany pro aktualni verzi Salamandera a vyssi - provedeme kontrolu
+    // this plugin is made for current version of Salamander and higher - perform check
     if (SalamanderVersion < LAST_VERSION_OF_SALAMANDER)
     { // tady nelze volat Error, protoze pouziva SG->SalMessageBox (SG neni inicializovane + jde o nekompatibilni rozhrani)
         MessageBox(salamander->GetParentWindow(),

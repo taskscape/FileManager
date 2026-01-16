@@ -5,7 +5,7 @@
 
 // ****************************************************************************
 //
-// CBackbufferedDC -- DC s back bufferem, pro hladke kresleni slozitejsich
+// CBackbufferedDC -- DC with back buffer, for smooth drawing of more complex
 // grafickych celku
 //
 
@@ -24,14 +24,14 @@ public:
     // obrazovky apod; nevolat mezi BeginPaint a EndPaint
     void Update();
 
-    // zahaji kresleni do okna, _musi_ parovat s EndPaint, nelze volat
+    // starts drawing to window, _must_ pair with EndPaint, cannot be called
     // opakovane
     void BeginPaint();
 
     // ukonci kresleni a zkopiruje obsah back-bufferu na obrazovku
     void EndPaint();
 
-    // DC pro kresleni do okna, platne jen mezi BeginPaint a EndPaint
+    // DC for drawing to window, valid only between BeginPaint and EndPaint
     operator HDC();
 
     // vrati rectangle o rozmerech bufferu

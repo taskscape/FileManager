@@ -44,14 +44,14 @@
 char CWINDOW_CLASSNAME[100] = "";
 char CWINDOW_CLASSNAME2[100] = ""; // nema CS_VREDRAW | CS_HREDRAW
 
-ATOM AtomObject = 0; // "property" okna s ukazatelem na objekt (pouzivane ve WindowsManageru)
+ATOM AtomObject = 0; // window "property" with pointer to object (used in WindowsManager)
 CWindowsManager WindowsManager;
 
 char WinLibStrings[WLS_COUNT][101] = {
     "Invalid number!",
     "Error"};
 
-FWinLibLTHelpCallback WinLibLTHelpCallback = NULL; // callbacku pro pripojeni na HTML help
+FWinLibLTHelpCallback WinLibLTHelpCallback = NULL; // callback for connection to HTML help
 
 //
 // ****************************************************************************
@@ -74,7 +74,7 @@ BOOL InitializeWinLib(const char* pluginName, HINSTANCE dllInstance)
     lstrcpyn(CWINDOW_CLASSNAME2, pluginName, 50);
     strcat(CWINDOW_CLASSNAME2, " - WinLib Universal Window2");
 
-    AtomObject = GlobalAddAtom("object handle"); // vsechny pluginy budou pouzivat stejny atom, zadna kolize
+    AtomObject = GlobalAddAtom("object handle"); // all plugins will use same atom, no collision
     if (AtomObject == 0)
     {
         TRACE_E("GlobalAddAtom has failed");
@@ -104,13 +104,13 @@ void ReleaseWinLib(HINSTANCE dllInstance)
 {
     if (WindowsManager.WindowsCount != 0)
     {
-        // pruser - po unloadu pluginu muze spadnout soft, protoze se zavola window-procedura
+        // problem - after plugin unload software may crash, because window-procedure is called
         //          v unloadnutem DLL (jde-li o okna zabita v ramci zabitych threadu, je to OK)
         TRACE_E("Unable to release WinLibLT - some window or dialog (count = " << WindowsManager.WindowsCount << ") is still attached to WinLibLT!");
-        // return;  // pokud slo o okno v killnutem threadu, pujde WinLibLT uvolnit, jinak unregister-funkce vrati error
+        // return;  // if it was window in killed thread, WinLibLT will be freed, otherwise unregister-function returns error
     }
 
-    // provedeme odregistrovani trid, aby pri dalsim loadu pluginu mohly byt znovu zaregistrovany
+    // perform class unregistration so they can be registered again on next plugin load
     if (CWINDOW_CLASSNAME2[0] != 0 && CWINDOW_CLASSNAME[0] != 0)
     {
         if (!UnregisterClass(CWINDOW_CLASSNAME2, dllInstance))
@@ -128,7 +128,7 @@ void ReleaseWinLib(HINSTANCE dllInstance)
 // CWindow
 //
 // lpvParam - v pripade, ze se pri CreateWindow zavola CWindow::CWindowProc
-//            (je v tride okna), musi obsahovat adresu objektu vytvareneho okna
+//            (is in window class), must contain address of created window object
 
 HWND CWindow::CreateEx(DWORD dwExStyle,        // extended window style
                        LPCTSTR lpszClassName,  // address of registered class name
@@ -157,7 +157,7 @@ HWND CWindow::CreateEx(DWORD dwExStyle,        // extended window style
                                lpvParam);
     if (hWnd != 0)
     {
-        if (WindowsManager.GetWindowPtr(hWnd) == NULL) // pokud se jeste neni ve WindowsManageru
+        if (WindowsManager.GetWindowPtr(hWnd) == NULL) // if not yet in WindowsManager
             AttachToWindow(hWnd);                      // tak ho pridame -> subclassing
     }
     return hWnd;
@@ -252,8 +252,8 @@ CWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
             return TRUE;
         }
         if (GetWindowLong(HWindow, GWL_STYLE) & WS_CHILD)
-            break;   // pokud F1 nezpracujeme a pokud je to child okno, nechame F1 propadnout do parenta
-        return TRUE; // pokud to neni child, ukoncime zpracovani F1
+            break;   // if we do not process F1 and if it is child window, let F1 propagate to parent
+        return TRUE; // if it is not child, terminate F1 processing
     }
     }
     return CallWindowProc((WNDPROC)DefWndProc, HWindow, uMsg, wParam, lParam);

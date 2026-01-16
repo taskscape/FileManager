@@ -92,7 +92,7 @@ try_again:
         if (lastError == ERROR_INVALID_HANDLE && ++num_of_retries <= 10)
         {
             CloseHandle(File);
-            Sleep(100); // cekame 10x 100ms na "zvalidneni" handlu (asi do toho zasahuje antivir?)
+            Sleep(100); // we wait 10x 100ms for handle "validation" (probably antivirus interfering?)
             goto try_again;
         }
         TRACE_E("Error reading headers.");
@@ -138,7 +138,7 @@ try_again:
         TRACE_I(".rsrc section not found.");
     else
     {
-        // overime ze nalezena section obsahuje resource dir
+        // verify that found section contains resource dir
         if (Sections[RsrcSectIndex].VirtualAddress > OptHead.DataDirectory[IMAGE_DIRECTORY_ENTRY_RESOURCE].VirtualAddress ||
             Sections[RsrcSectIndex].VirtualAddress + Sections[RsrcSectIndex].SizeOfRawData <= OptHead.DataDirectory[IMAGE_DIRECTORY_ENTRY_RESOURCE].VirtualAddress)
         {
@@ -146,7 +146,7 @@ try_again:
             goto error;
         }
 
-        // overime .rsrc section neobsahuje jine data adresare (jako napr UPXnuty exac,
+        // verify .rsrc section does not contain other directory data (such as UPX-packed exe,
         // ktery ma v .rsrc sekci ulozenou import tabulku)
         DWORD alignedSize = ((Sections[RsrcSectIndex].Misc.VirtualSize + OptHead.SectionAlignment - 1) / OptHead.SectionAlignment) * OptHead.SectionAlignment;
         for (i = 0; i < OptHead.NumberOfRvaAndSizes; i++)

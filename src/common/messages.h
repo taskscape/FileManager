@@ -302,7 +302,7 @@ inline int __MessagesEmptyFunction() { return 0; }
 #define EnterMessagesModul() __MessagesEmptyFunction()
 #define LeaveMessagesModul() __MessagesEmptyFunction()
 
-/* tyhle funkce musi hlasit kompilacni chybu
+/* these functions must report compilation error
 const char *rsc(int resID);
 const WCHAR *rscW(int resID);
 const char *spf(const char *formatString, ...);

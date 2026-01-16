@@ -24,10 +24,10 @@
 typedef void(__cdecl* _PVFV)(void);
 
 #pragma section(".i_trc$a", read)
-__declspec(allocate(".i_trc$a")) const _PVFV i_trace = (_PVFV)1; // na zacatek sekce .i_trc si dame promennou i_trace
+__declspec(allocate(".i_trc$a")) const _PVFV i_trace = (_PVFV)1; // at the beginning of .i_trc section we place variable i_trace
 
 #pragma section(".i_trc$z", read)
-__declspec(allocate(".i_trc$z")) const _PVFV i_trace_end = (_PVFV)1; // a na konec sekce .i_trc si dame promennou i_trace_end
+__declspec(allocate(".i_trc$z")) const _PVFV i_trace_end = (_PVFV)1; // and at the end of .i_trc section we place variable i_trace_end
 
 void Initialize__Trace()
 {
@@ -371,19 +371,19 @@ CWStr::CWStr(const char* s)
 C__Trace::C__Trace() : TraceStrStream(&TraceStringBuf), TraceStrStreamW(&TraceStringBufW)
 {
 #ifdef _DEBUG
-    // nove streamy pouzivaji interne locales, ktere maji implementovany
+    // new streams use locales internally, which have individual
     // individual "facets" using lazy creation - are allocated on heap
     // kdyz jsou potreba, tedy kdyz nekdo posle do streamu neco, co ma
     // formatovani zavisle na lokalich pravidlech, treba cislo, datum,
     // or boolean. These "facets" are then deallocated on exit
-    // programu s prioritou compiler, tzn. po nasi kontrole memory leaku.
+    // of program with compiler priority, i.e. after our memory leak check.
     // So if someone uses stream to output anything localizable,
     // nas debug heap zacne hlasit memory leaky, i kdyz zadne nejsou. Abychom
     // to prevent this, we force locales to create all "facets" now, while
     // jeste nehlidame heap.
     // For now we only use output stream and only with strings (without conversion)
     // and numbers. So sending a number to stringstream should suffice. If
-    // v budoucnu zacneme pouzivat streamy vic a debug heap zacne hlasit
+    // in the future we start using streams more and debug heap starts reporting
     // leaky, we will have to add more input/output here.
     std::stringstream s;
     s << 1;

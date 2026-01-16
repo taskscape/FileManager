@@ -74,7 +74,7 @@ BOOL CMessageCenter::SendMessage(CMessage* message, BOOL bufferTimeout)
         {
             // nastavime ID odesilatele
             message->SenderID = SenderID;
-            // provedeme zapis
+            // perform write
             my_memcpy2((char*)Buffer + Buffer->WritePos, message, message->Size);
             // informuje prijemce, ze ma v bufferu zpravu
             if (Buffer->WritePos == sizeof(CBuffer))
@@ -134,7 +134,7 @@ BOOL CMessageCenter::RecieveMessages(CMessageListener* listener)
             listener->RecieveMessage(MESSAGE_AT_POS(pos));
         }
     }
-    // nastavime buffer na prazdny (i pro abadoned data-mutex)
+    // set buffer to empty (also for abandoned data-mutex)
     Buffer->WritePos = sizeof(CBuffer);
     SetEvent(BufferFree);
     ResetEvent(HaveMessage);
@@ -313,7 +313,7 @@ BOOL CMessageCenter::Init()
             ReleaseMutex(DataMutex);
         }
 
-        // nechame ostatni procesy projit initem
+        // let other processes go through init
         ReleaseMutex(StartupMutex);
         if (Sender)
         {

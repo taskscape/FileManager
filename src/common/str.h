@@ -144,12 +144,12 @@ int MemICmp(const void* buf1, const void* buf2, int n);
 
 // rychlejsi strlen, jede po ctyrech znacich
 // do str se saha po ctyrech bytech -> nutny vetsi buffer
-// int StrLen(const char *str);    // pouze 2 x rychlejsi, zbytecne riziko pristupu do nezarovnane pameti
+// int StrLen(const char *str);    // only 2x faster, unnecessary risk of accessing unaligned memory
 
-// nakopiruje text do nove naalokovaneho prostoru, NULL = malo pameti
+// copies text to newly allocated space, NULL = insufficient memory
 char* DupStr(const char* txt);
 
-// nakopiruje text do nove naalokovaneho prostoru, NULL = malo pameti,
+// copies text to newly allocated space, NULL = insufficient memory,
 // navic pri nedostatku pameti nastavi 'err' na TRUE
 char* DupStrEx(const char* str, BOOL& err);
 

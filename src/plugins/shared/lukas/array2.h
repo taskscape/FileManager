@@ -5,10 +5,10 @@
 
 // ****************************************************************************
 // TDirectArray2:
-//  -pole, ktere dynamicky roste/zmensuje se po blocich (neni nutne realokovat
-//   jiz obsazenou pamnet, pouze se prida dalsi blok)
+//  -array that dynamically grows/shrinks in blocks (no need to reallocate
+//   already occupied memory, only add another block)
 //  -pri mazani prvku z pole se vola metoda Destructor(index_prvku),
-//   ktera v zakladnim objektu nic neprovadi
+//   which does nothing in base object
 
 template <class DATA_TYPE>
 class TDirectArray2
@@ -36,10 +36,10 @@ public:
     BOOL Delete(int index);            // zrusi prvek na dane pozici, na jeho misto
                                        // soupne prvek z posledniho mista a zmensi pole
                                        /*
-    CDynamicArray * const &operator[](float index); // funkce se nikdy nevola, ale kdyz tu neni
+    CDynamicArray * const &operator[](float index); // function is never called, but when it is not here
                                                     // tak dela MSVC strasny veci
 */
-    DATA_TYPE& operator[](int index)   //vraci prvek na pozici
+    DATA_TYPE& operator[](int index)   //returns element at position
     {
         return Blocks[index / BlockSize][index % BlockSize];
     }

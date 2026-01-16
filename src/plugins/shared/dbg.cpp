@@ -17,7 +17,7 @@
 #endif // _MSC_VER
 
 // potlaceni warningu C4996: This function or variable may be unsafe. Consider using strcat_s instead.
-// duvod: lstrcat a dalsi Windows rutiny prost nejsou safe, takze to nema smysl resit tady
+// reason: lstrcat and other Windows routines are simply not safe, so it makes no sense to solve it here
 #pragma warning(push)
 #pragma warning(disable : 4996)
 
@@ -288,17 +288,17 @@ void C__Trace::SendMessageToServer(BOOL information, BOOL unicode, BOOL crash)
         }
     }
     // jen je-li crash==TRUE:
-    // vyrobime kopii dat, start threadu pro msgbox totiz muze vyvolat dalsi TRACE
-    // hlasky (napr. v DllMain reakce na DLL_THREAD_ATTACH), pokud bysme neopustili
+    // we make a copy of data, because starting thread for msgbox can trigger more TRACE
+    // messages (e.g. in DllMain reaction to DLL_THREAD_ATTACH), if we did not leave
     // CriticalSection, nastal by deadlock;
-    // v DllMain se nesmi pouzivat TRACE_C, jinak dojde k deadlocku:
-    //   - pokud se da do DLL_THREAD_ATTACH: chce si otevrit novy thread pro msgbox
+    // TRACE_C must not be used in DllMain, otherwise deadlock occurs:
+    //   - if placed in DLL_THREAD_ATTACH: wants to open new thread for msgbox
     //     a to je z DllMainu blokovane
-    //   - pokud se da do DLL_THREAD_DETACH: pri cekani na zavreni threadu s msgboxem
+    //   - if placed in DLL_THREAD_DETACH: when waiting for thread with msgbox to close
     //     predesleho TRACE_C zachytime TRACE_C z DLL_THREAD_DETACH a nechame ho
     //     cekat v nekonecnem cyklu, viz nize
-    // navic zavadime obranu proti mnozeni msgboxu pri vice TRACE_C zaroven, pusobilo
-    // by to jen zmatky, ted se otevre msgbox jen pro prvni a ten po uzavreni vyvola
+    // additionally we introduce defense against multiplying msgboxes with multiple TRACE_C at once, it caused
+    // only confusion, now msgbox opens only for first one and after closing it triggers
     // padacku, ostatni TRACE_C zustanou chyceny v nekonecne cekaci smycce, viz nize
     static BOOL msgBoxOpened = FALSE;
     C__TraceMsgBoxThreadData threadData;
@@ -343,7 +343,7 @@ void C__Trace::SendMessageToServer(BOOL information, BOOL unicode, BOOL crash)
         }
     }
     if (unicode)
-        TraceStringBufW.erase(); // priprava pro dalsi trace
+        TraceStringBufW.erase(); // preparation for next trace
     else
         TraceStringBuf.erase();
     LeaveCriticalSection(&CriticalSection);
@@ -358,7 +358,7 @@ void C__Trace::SendMessageToServer(BOOL information, BOOL unicode, BOOL crash)
                                                unicode ? (void*)&threadDataW : (void*)&threadData, 0, &id);
             if (msgBoxThread != NULL)
             {
-                WaitForSingleObject(msgBoxThread, INFINITE); // pokud se da TRACE_C do DllMain do DLL_THREAD_ATTACH, dojde k deadlocku - silne nepravdepodobne, neresime
+                WaitForSingleObject(msgBoxThread, INFINITE); // if TRACE_C is placed in DllMain in DLL_THREAD_ATTACH, deadlock occurs - highly unlikely, we do not solve it
                 CloseHandle(msgBoxThread);
             }
             msgBoxOpened = FALSE;

@@ -43,10 +43,10 @@
 typedef void(__cdecl* _PVFV)(void);
 
 #pragma section(".i_str$a", read)
-__declspec(allocate(".i_str$a")) const _PVFV i_str = (_PVFV)1; // na zacatek sekce .i_str si dame promennou i_str
+__declspec(allocate(".i_str$a")) const _PVFV i_str = (_PVFV)1; // at the beginning of .i_str section we place variable i_str
 
 #pragma section(".i_str$z", read)
-__declspec(allocate(".i_str$z")) const _PVFV i_str_end = (_PVFV)1; // a na konec sekce .i_str si dame promennou i_str_end
+__declspec(allocate(".i_str$z")) const _PVFV i_str_end = (_PVFV)1; // and at the end of .i_str section we place variable i_str_end
 
 void Initialize__Str()
 {

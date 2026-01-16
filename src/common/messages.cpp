@@ -324,15 +324,15 @@ int C__MessagesW::MessageBoxT(const WCHAR* lpCaption, UINT uType)
     else
         data.Text = __MessagesLowMemoryW;
     MessagesStringBuf.erase(); // preparation for next message
-    LeaveMessagesModul();      // ted uz muzou zacit blbnout ostatni thready + message loopy
+    LeaveMessagesModul();      // now other threads and message loops can start interfering
 #endif                         // MULTITHREADED_MESSAGES_ENABLE
 
-    // MessageBox nahodime v novem threadu, aby nerozeslal message tohoto threadu
+    // show MessageBox in new thread so it does not dispatch messages for this thread
     DWORD threadID;
     HANDLE thread = CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)__MessagesWMessageBoxThreadF, &data, 0, &threadID);
     if (thread != NULL)
     {
-        WaitForSingleObject(thread, INFINITE); // pockame az ho user odmackne
+        WaitForSingleObject(thread, INFINITE); // wait until user dismisses it
         CloseHandle(thread);
     }
     else
@@ -366,7 +366,7 @@ int C__MessagesW::MessageBox(HWND hWnd, const WCHAR* lpCaption, UINT uType)
     else
         txt = (WCHAR*)__MessagesLowMemoryW;
     MessagesStringBuf.erase(); // preparation for next message
-    LeaveMessagesModul();      // ted uz muzou zacit blbnout ostatni thready + message loopy
+    LeaveMessagesModul();      // now other threads and message loops can start interfering
 
     if (!IsWindow(hWnd))
         hWnd = NULL;

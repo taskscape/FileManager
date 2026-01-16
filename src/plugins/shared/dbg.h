@@ -12,15 +12,15 @@
 #pragma once
 
 // definition of macros TRACE_I, TRACE_IW, TRACE_E, TRACE_EW, TRACE_C, TRACE_CW and CALL_STACK_MESSAGEXXX for plugins,
-// v pluginu je treba definovat promennou SalamanderDebug (typ viz nize) a
-// v SalamanderPluginEntry tuto promennou inicializovat:
+// in plugin it is necessary to define variable SalamanderDebug (type see below) and
+// initialize this variable in SalamanderPluginEntry:
 // SalamanderDebug = salamander->GetSalamanderDebug();
 //
 // TRACE se zapina definici makra TRACE_ENABLE
 // CALL-STACK se vypina definici makra CALLSTK_DISABLE
 
-// POZOR: TRACE_C se nesmi pouzivat v DllMain knihoven, ani v zadnem kodu, ktery
-//        se z DllMainu vola, jinak dojde k deadlocku, vice viz implementace
+// WARNING: TRACE_C must not be used in DllMain of libraries, nor in any code that
+//        is called from DllMain, otherwise deadlock occurs, more see implementation
 //        C__Trace::SendMessageToServer
 
 // CALLSTK_MEASURETIMES macro - enables time measurement spent preparing call-stack messages (ratio is measured against
@@ -37,10 +37,10 @@
 //                                 se chova jako SLOW_CALL_STACK_MESSAGE (pouziti na mistech, kde jsme
 //                                 ochotni ignorovat zpomaleni jen v debug verzi, release verze je rychla)
 
-// globalni promenna s interfacem CSalamanderDebugAbstract
+// global variable with CSalamanderDebugAbstract interface
 extern CSalamanderDebugAbstract* SalamanderDebug;
 
-// kopie z spl_com.h: globalni promenna s verzi Salamandera, ve kterem je tento plugin nacteny
+// copy from spl_com.h: global variable with Salamander version in which this plugin is loaded
 extern int SalamanderVersion;
 
 #ifndef __WFILE__
@@ -394,7 +394,7 @@ inline void __TraceEmptyFunction() {}
 // pri crashi softu pres DebugBreak() nejde vystopovat, kde lezi volani
 // TRACE_C/TRACE_MC, because exception address is somewhere in ntdll.dll
 // and Stack Back Trace section of bug report may contain nonsense, if
-// funkce volajici TRACE_C/TRACE_MC nepouziva stary jednoduchy model
+// function calling TRACE_C/TRACE_MC does not use old simple model
 // ukladani a prace s EBP/ESP, ovsem i v tom pripade je zde jen adresa
 // odkud byla tato funkce volana (ne primo adresa TRACE_C/TRACE_MC),
 // therefore at least for now we use old primitive crash method
