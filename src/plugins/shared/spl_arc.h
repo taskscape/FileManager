@@ -12,7 +12,7 @@
 #pragma once
 
 #ifdef _MSC_VER
-#pragma pack(push, enter_include_spl_arc) // aby byly struktury nezavisle na nastavenem zarovnavani
+#pragma pack(push, enter_include_spl_arc) // so that structures are independent of the set alignment
 #pragma pack(4)
 #endif // _MSC_VER
 #ifdef __BORLANDC__
@@ -38,149 +38,148 @@ public:
 #endif // INSIDE_SALAMANDER
 
     // function for "panel archiver view"; called to load archive 'fileName' content;
-    // obsah se plni do objektu 'dir'; Salamander zjisti obsah
+    // content is filled into the 'dir' object; Salamander will find the content
     // columns added by plugin using interface 'pluginData' (if plugin does not add columns
     // returns 'pluginData'==NULL); returns TRUE on successful archive content loading,
     // if returns FALSE, return value 'pluginData' is ignored (data in 'dir' must be
     // freed using 'dir.Clear(pluginData)', otherwise only Salamander part of data is freed);
-    // 'salamander' je sada uzitecnych metod vyvezenych ze Salamandera,
+    // 'salamander' is a set of useful methods exported from Salamander,
     // WARNING: file fileName may not exist (if opened in panel and deleted from elsewhere),
     // ListArchive is not called for zero-length files, they automatically have empty content,
-    // pri pakovani do takovych souboru se soubor pred volanim PackToArchive smaze (pro
-    // kompatibilitu s externimi pakovaci)
+    // when packing into such files, the file is deleted before calling PackToArchive (for
+    // compatibility with external packers)
     virtual BOOL WINAPI ListArchive(CSalamanderForOperationsAbstract* salamander, const char* fileName,
                                     CSalamanderDirectoryAbstract* dir,
                                     CPluginDataInterfaceAbstract*& pluginData) = 0;
 
     // function for "panel archiver view", called on request to unpack files/directories
-    // z archivu 'fileName' do adresare 'targetDir' z cesty v archivu 'archiveRoot'; 'pluginData'
+    // from archive 'fileName' to directory 'targetDir' from path in archive 'archiveRoot'; 'pluginData'
     // is interface for working with file/directory information that is plugin-specific
-    // (napr. data z pridanych sloupcu; jde o stejny interface, ktery vraci metoda ListArchive
-    // v parametru 'pluginData' - takze muze byt i NULL); soubory/adresare jsou zadany enumeracni
-    // funkci 'next' jejimz parametrem je 'nextParam'; vraci TRUE pri uspesnem rozpakovani (nebyl
-    // pouzit Cancel, mohl byt pouzit Skip) - zdroj operace v panelu je odznacen, jinak vraci
-    // FALSE (neprovede se odznaceni); 'salamander' je sada uzitecnych metod vyvezenych ze
-    // Salamandera
+    // (e.g. data from added columns; same interface that ListArchive method returns
+    // in parameter 'pluginData' - so it can be NULL); files/directories are specified by enumeration
+    // function 'next' with parameter 'nextParam'; returns TRUE on successful unpacking (Cancel was not
+    // used, Skip could be used) - operation source in panel is unmarked, otherwise returns
+    // FALSE (no unmark is performed); 'salamander' is a set of useful methods exported from
+    // Salamander
     virtual BOOL WINAPI UnpackArchive(CSalamanderForOperationsAbstract* salamander, const char* fileName,
                                       CPluginDataInterfaceAbstract* pluginData, const char* targetDir,
                                       const char* archiveRoot, SalEnumSelection next,
                                       void* nextParam) = 0;
 
-    // funkce pro "panel archiver view", vola se pri pozadavku na rozpakovani jednoho souboru pro view/edit
-    // z archivu 'fileName' do adresare 'targetDir'; jmeno souboru v archivu je 'nameInArchive';
-    // 'pluginData' je interface pro praci s informacemi o souboru, ktere jsou specificke pluginu
-    // (napr. data z pridanych sloupcu; jde o stejny interface, ktery vraci metoda ListArchive
-    // v parametru 'pluginData' - takze muze byt i NULL); 'fileData' je ukazatel na strukturu CFileData
-    // vypakovavaneho souboru (strukturu sestavil plugin pri listovani archivu); 'newFileName' (neni-li
-    // NULL) je nove jmeno pro rozbalovany soubor (pouziva se pokud puvodni jmeno z archivu neni mozne
-    // vybalit na disk (napr. "aux", "prn", atd.)); do 'renamingNotSupported' (jen neni-li 'newFileName'
-    // NULL) zapsat TRUE pokud plugin nepodporuje prejmenovani pri vybalovani (standardni chybova hlaska
-    // "renaming not supported" se zobrazi ze Salamandera); vraci TRUE pri uspesnem rozpakovani souboru
-    // (soubor je na zadane ceste, nebyl pouzit Cancel ani Skip), 'salamander' je sada uzitecnych metod
-    // vyvezenych ze Salamandera
+    // function for "panel archiver view", called on request to unpack one file for view/edit
+    // from archive 'fileName' to directory 'targetDir'; file name in archive is 'nameInArchive';
+    // 'pluginData' is interface for working with file information that is plugin-specific
+    // (e.g. data from added columns; same interface that ListArchive method returns
+    // in parameter 'pluginData' - so it can be NULL); 'fileData' is pointer to CFileData structure
+    // of unpacked file (structure was created by plugin when listing archive); 'newFileName' (if not
+    // NULL) is new name for unpacked file (used if original name from archive cannot be
+    // unpacked to disk (e.g. "aux", "prn", etc.)); write TRUE to 'renamingNotSupported' (only if 'newFileName' is not
+    // NULL) if plugin does not support renaming during unpacking (standard error message
+    // "renaming not supported" will be displayed from Salamander); returns TRUE on successful file unpacking
+    // (file is at specified path, Cancel and Skip were not used), 'salamander' is a set of useful methods
+    // exported from Salamander
     virtual BOOL WINAPI UnpackOneFile(CSalamanderForOperationsAbstract* salamander, const char* fileName,
                                       CPluginDataInterfaceAbstract* pluginData, const char* nameInArchive,
                                       const CFileData* fileData, const char* targetDir,
                                       const char* newFileName, BOOL* renamingNotSupported) = 0;
 
-    // funkce pro "panel archiver edit" a "custom archiver pack", vola se pri pozadavku na zapakovani
-    // souboru/adresaru do archivu 'fileName' na cestu 'archiveRoot', soubory/adresare jsou zadany
-    // zdrojovou cestou 'sourcePath' a enumeracni funkci 'next' s parametrem 'nextParam',
-    // je-li 'move' TRUE, zapakovane soubory/adresare by mely byt odstranene z disku, vraci TRUE
-    // pokud se podari zapakovat/odstranit vsechny soubory/adresare (nebyl pouzit Cancel, mohl byt
-    // pouzit Skip) - zdroj operace v panelu je odznacen, jinak vraci FALSE (neprovede se odznaceni),
-    // 'salamander' je sada uzitecnych metod vyvezenych ze Salamandera
+    // function for "panel archiver edit" and "custom archiver pack", called on request to pack
+    // files/directories to archive 'fileName' at path 'archiveRoot', files/directories are specified by
+    // source path 'sourcePath' and enumeration function 'next' with parameter 'nextParam',
+    // if 'move' is TRUE, packed files/directories should be removed from disk, returns TRUE
+    // if all files/directories were successfully packed/removed (Cancel was not used, Skip could be
+    // used) - operation source in panel is unmarked, otherwise returns FALSE (no unmark is performed),
+    // 'salamander' is a set of useful methods exported from Salamander
     virtual BOOL WINAPI PackToArchive(CSalamanderForOperationsAbstract* salamander, const char* fileName,
                                       const char* archiveRoot, BOOL move, const char* sourcePath,
                                       SalEnumSelection2 next, void* nextParam) = 0;
 
-    // funkce pro "panel archiver edit", vola se pri pozadavku na smazani souboru/adresaru z archivu
-    // 'fileName'; soubory/adresare jsou zadany cestou 'archiveRoot' a enumeracni funkci 'next'
-    // s parametrem 'nextParam'; 'pluginData' je interface pro praci s informacemi o souborech/adresarich,
-    // ktere jsou specificke pluginu (napr. data z pridanych sloupcu; jde o stejny interface, ktery vraci
-    // metoda ListArchive v parametru 'pluginData' - takze muze byt i NULL); vraci TRUE pokud se
-    // podari smazat vsechny soubory/adresare (nebyl pouzit Cancel, mohl byt pouzit Skip) - zdroj
-    // operace v panelu je odznacen, jinak vraci FALSE (neprovede se odznaceni); 'salamander' je sada
-    // uzitecnych metod vyvezenych ze Salamandera
+    // function for "panel archiver edit", called on request to delete files/directories from archive
+    // 'fileName'; files/directories are specified by path 'archiveRoot' and enumeration function 'next'
+    // with parameter 'nextParam'; 'pluginData' is interface for working with file/directory information
+    // that is plugin-specific (e.g. data from added columns; same interface that
+    // ListArchive method returns in parameter 'pluginData' - so it can be NULL); returns TRUE if
+    // all files/directories were successfully deleted (Cancel was not used, Skip could be used) - operation
+    // source in panel is unmarked, otherwise returns FALSE (no unmark is performed); 'salamander' is a set of
+    // useful methods exported from Salamander
     virtual BOOL WINAPI DeleteFromArchive(CSalamanderForOperationsAbstract* salamander, const char* fileName,
                                           CPluginDataInterfaceAbstract* pluginData, const char* archiveRoot,
                                           SalEnumSelection next, void* nextParam) = 0;
 
-    // funkce pro "custom archiver unpack"; vola se pri pozadavku na rozbaleni souboru/adresaru z archivu
-    // 'fileName' do adresare 'targetDir'; soubory/adresare jsou zadany maskou 'mask'; vraci TRUE pokud
-    // se podari rozbalit vsechny soubory/adresare (nebyl pouzit Cancel, mohl byt pouzit Skip);
-    // je-li 'delArchiveWhenDone' TRUE, je potreba napridavat do 'archiveVolumes' vsechny svazky archivu
-    // (vcetne null-terminatoru; neni-li vicesvazkovy, bude tam jen 'fileName'), vrati-li se z teto funkce
-    // TRUE (uspesne rozbaleni), dojde nasledne ke smazani vsech souboru z 'archiveVolumes';
-    // 'salamander' je sada uzitecnych metod vyvezenych ze Salamandera
+    // function for "custom archiver unpack"; called on request to unpack files/directories from archive
+    // 'fileName' to directory 'targetDir'; files/directories are specified by mask 'mask'; returns TRUE if
+    // all files/directories were successfully unpacked (Cancel was not used, Skip could be used);
+    // if 'delArchiveWhenDone' is TRUE, it's necessary to add to 'archiveVolumes' all archive volumes
+    // (including null-terminator; if not multi-volume, there will be only 'fileName'), if this function returns
+    // TRUE (successful unpacking), all files from 'archiveVolumes' will be subsequently deleted;
+    // 'salamander' is a set of useful methods exported from Salamander
     virtual BOOL WINAPI UnpackWholeArchive(CSalamanderForOperationsAbstract* salamander, const char* fileName,
                                            const char* mask, const char* targetDir, BOOL delArchiveWhenDone,
                                            CDynamicString* archiveVolumes) = 0;
 
-    // funkce pro "panel archiver view/edit", vola se pred zavrenim panelu s archivem
-    // POZOR: pokud se nepodari otevrit novou cestu, archiv muze v panelu zustat (nezavisle na tom,
-    //        co vrati CanCloseArchive); metodu tedy nelze pouzit pro destrukci kontextu;
-    //        je urcena napriklad pro optimalizaci operace Delete z archivu, kdy muze pri
-    //        jeho opousteni nabidnou "setreseni" archivu
-    //        pro destrukci kontextu lze pouzit metodu CPluginInterfaceAbstract::ReleasePluginDataInterface,
-    //        viz dokument archivatory.txt
-    // 'fileName' je jmeno archivu; 'salamander' je sada uzitecnych metod vyvezenych ze Salamandera;
-    // 'panel' oznacuje panel, ve kterem je archiv otevreny (PANEL_LEFT nebo PANEL_RIGHT);
-    // vraci TRUE pokud je zavreni mozne, je-li 'force' TRUE, vraci TRUE vzdy; pokud probiha
-    // critical shutdown (vice viz CSalamanderGeneralAbstract::IsCriticalShutdown), nema
-    // smysl se usera na cokoliv ptat
+    // function for "panel archiver view/edit", called before closing panel with archive
+    // WARNING: if opening new path fails, archive can stay in panel (regardless of
+    //        what CanCloseArchive returns); therefore this method cannot be used for context destruction;
+    //        it's intended for example for optimizing Delete operation from archive, when it can
+    //        offer "compacting" of archive when leaving it
+    //        for context destruction use CPluginInterfaceAbstract::ReleasePluginDataInterface method,
+    //        see document archivatory.txt
+    // 'fileName' is archive name; 'salamander' is a set of useful methods exported from Salamander;
+    // 'panel' indicates panel in which archive is open (PANEL_LEFT or PANEL_RIGHT);
+    // returns TRUE if closing is possible, if 'force' is TRUE, returns TRUE always; if
+    // critical shutdown is in progress (see CSalamanderGeneralAbstract::IsCriticalShutdown for more), there's
+    // no point in asking user anything
     virtual BOOL WINAPI CanCloseArchive(CSalamanderForOperationsAbstract* salamander, const char* fileName,
                                         BOOL force, int panel) = 0;
 
-    // zjisti pozadovane nastaveni disk-cache (disk-cache se pouziva pro docasne kopie
-    // souboru pri otevirani souboru z archivu ve viewerech, editorech a pres systemove
-    // asociace); normalne (podari-li se po volani naalokovat kopii 'tempPath') se vola
-    // jen jednou a to pred prvnim pouzitim disk-cache (napr. pred prvnim otevrenim
-    // souboru z archivu ve vieweru/editoru); pokud vraci FALSE, pouziva
-    // se standardni nastaveni (soubory v TEMP adresari, kopie se mazou pomoci Win32
-    // API funkce DeleteFile() az pri prekroceni limitni velikosti cache nebo pri zavreni archivu)
-    // a vsechny ostatni navratove hodnoty se ignoruji; vraci-li TRUE, pouzivaji se nasledujici
-    // navratove hodnoty: neni-li 'tempPath' (buffer o velikosti MAX_PATH) prazdny retezec, budou
-    // se vsechny docasne kopie vypakovane pluginem z archivu ukladat do podadresaru teto cesty
-    // (tyto podadresare zrusi disk-cache pri ukonceni Salamandera, ale pluginu nic nebrani
-    // v jejich smazani drive, napr. pri svem unloadu; zaroven je vhodne pri loadu prvni instance
-    // pluginu (nejen v ramci jednoho spusteneho Salamandera) promazat podadresare "SAL*.tmp" na teto
-    // ceste - resi problemy vznikle zamknutymi soubory a pady softu) + je-li 'ownDelete' TRUE,
-    // bude se pro mazani kopii volat metoda DeleteTmpCopy a PrematureDeleteTmpCopy + je-li
-    // 'cacheCopies' FALSE, budou se kopie mazat hned jakmile se uvolni (napr. jakmile se zavre
-    // viewer), je-li 'cacheCopies' TRUE, budou se kopie mazat az pri prekroceni limitni velikosti
-    // cache nebo pri zavreni archivu
+    // determines required disk-cache settings (disk-cache is used for temporary copies
+    // of files when opening files from archive in viewers, editors and through system
+    // associations); normally (if copying 'tempPath' succeeds after calling) it's called
+    // only once before first use of disk-cache (e.g. before first opening
+    // file from archive in viewer/editor); if returns FALSE, uses
+    // standard settings (files in TEMP directory, copies are deleted using Win32
+    // API function DeleteFile() only when cache size limit is exceeded or when archive is closed)
+    // and all other return values are ignored; if returns TRUE, following
+    // return values are used: if 'tempPath' (buffer of size MAX_PATH) is not empty string,
+    // all temporary copies unpacked by plugin from archive will be stored in subdirectories of this path
+    // (these subdirectories are removed by disk-cache when Salamander closes, but nothing prevents plugin
+    // from deleting them earlier, e.g. during its unload; also it's recommended when loading first instance
+    // of plugin (not just within one running Salamander) to clean up "SAL*.tmp" subdirectories on this
+    // path - solves problems caused by locked files and software crashes) + if 'ownDelete' is TRUE,
+    // DeleteTmpCopy and PrematureDeleteTmpCopy methods will be called for deleting copies + if
+    // 'cacheCopies' is FALSE, copies will be deleted as soon as they're released (e.g. as soon as
+    // viewer is closed), if 'cacheCopies' is TRUE, copies will be deleted only when cache size limit is exceeded
+    // or when archive is closed
     virtual BOOL WINAPI GetCacheInfo(char* tempPath, BOOL* ownDelete, BOOL* cacheCopies) = 0;
 
-    // pouziva se jen pokud metoda GetCacheInfo vraci v parametru 'ownDelete' TRUE:
-    // smaze docasnou kopii vypakovanou z tohoto archivu (pozor na read-only soubory,
-    // u nich je treba nejprve zmenit atributy, a pak jdou teprve smazat), pokud mozno
-    // by nemelo zobrazovat zadna okna (uzivatel cinnost primo nevyvolal, muze ho rusit
-    // v jine cinnosti), pri delsich akcich se hodi vyuziti wait-okenka (viz
-    // CSalamanderGeneralAbstract::CreateSafeWaitWindow); 'fileName' je jmeno souboru
-    // s kopii; pokud se maze vic souboru najednou (muze nastat napr. po zavreni
-    // editovaneho archivu), je 'firstFile' TRUE pro prvni soubor a FALSE pro ostatni
-    // soubory (pouziva se ke korektnimu zobrazeni wait-okenka - viz DEMOPLUG)
+    // used only if GetCacheInfo method returns TRUE in parameter 'ownDelete':
+    // deletes temporary copy unpacked from this archive (beware of read-only files,
+    // for them attributes must be changed first, only then can they be deleted), if possible
+    // should not display any windows (user didn't directly invoke action, could disturb him
+    // in other activity), for longer actions it's useful to use wait-window (see
+    // CSalamanderGeneralAbstract::CreateSafeWaitWindow); 'fileName' is name of file
+    // with copy; if multiple files are deleted at once (can happen e.g. after closing
+    // edited archive), 'firstFile' is TRUE for first file and FALSE for other
+    // files (used for correct wait-window display - see DEMOPLUG)
     //
-    // POZOR: vola se v hl. threadu na zaklade doruceni zpravy z disk-cache hl. oknu - posila se
-    // zprava o potrebe uvolnit docasnou kopii (typicky v okamziku zavreni vieweru nebo
-    // "rozeditovaneho" archivu v panelu), tedy muze dojit k opakovanemu vstupu do pluginu
-    // (pokud zpravu distribuuje message-loopa uvnitr pluginu), dalsi vstup do DeleteTmpCopy
-    // je vylouceny, protoze do ukonceni volani DeleteTmpCopy disk-cache zadne dalsi zpravy
-    // neposila
+    // WARNING: called in main thread based on message delivery from disk-cache to main window - sends
+    // message about need to release temporary copy (typically when viewer is closed or
+    // "edited" archive in panel), so repeated entry to plugin can occur
+    // (if message is distributed by message-loop inside plugin), further entry to DeleteTmpCopy
+    // is excluded, because until DeleteTmpCopy call finishes, disk-cache doesn't send any more messages
     virtual void WINAPI DeleteTmpCopy(const char* fileName, BOOL firstFile) = 0;
 
-    // pouziva se jen pokud metoda GetCacheInfo vraci v parametru 'ownDelete' TRUE:
-    // pri unloadu pluginu zjisti, jestli se ma volat DeleteTmpCopy pro kopie, ktere jsou
-    // jeste pouzivane (napr. otevrene ve vieweru) - vola se jen pokud takove kopie
-    // existuji; 'parent' je parent pripadneho messageboxu s dotazem uzivateli (pripadne
-    // doporuceni, aby user zavrel vsechny soubory z archivu, aby je plugin mohl smazat);
-    // 'copiesCount' je pocet pouzivanych kopii souboru z archivu; vraci TRUE pokud se
-    // ma volat DeleteTmpCopy, pokud vrati FALSE, kopie zustanou na disku; pokud probiha
-    // critical shutdown (vice viz CSalamanderGeneralAbstract::IsCriticalShutdown), nema
-    // smysl se usera na cokoliv ptat a provadet zdlouhave akce (napr. shredovani souboru)
-    // POZNAMKA: behem provadeni PrematureDeleteTmpCopy je zajisteno, ze nedojde
-    // k volani DeleteTmpCopy
+    // used only if GetCacheInfo method returns TRUE in parameter 'ownDelete':
+    // during plugin unload determines whether DeleteTmpCopy should be called for copies that are
+    // still in use (e.g. open in viewer) - called only if such copies
+    // exist; 'parent' is parent of potential messagebox with user query (possibly
+    // recommendation that user should close all files from archive so plugin can delete them);
+    // 'copiesCount' is number of used copies of files from archive; returns TRUE if
+    // DeleteTmpCopy should be called, if returns FALSE, copies remain on disk; if
+    // critical shutdown is in progress (see CSalamanderGeneralAbstract::IsCriticalShutdown for more), there's
+    // no point in asking user anything and performing lengthy actions (e.g. file shredding)
+    // NOTE: during PrematureDeleteTmpCopy execution it's ensured that
+    // DeleteTmpCopy is not called
     virtual BOOL WINAPI PrematureDeleteTmpCopy(HWND parent, int copiesCount) = 0;
 };
 

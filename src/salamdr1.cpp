@@ -46,11 +46,11 @@ extern "C"
 #include "execute.h"
 #include "drivelst.h"
 
-#pragma comment(linker, "/ENTRY:MyEntryPoint") // chceme vlastni vstupni bod do aplikace
+#pragma comment(linker, "/ENTRY:MyEntryPoint") // we want our own entry point to the application
 
 #pragma comment(lib, "UxTheme.lib")
 
-// zpristupnime si puvodni vstupni bod aplikace
+// expose the original entry point of the application
 extern "C" int WinMainCRTStartup();
 
 #ifdef X64_STRESS_TEST
@@ -61,55 +61,55 @@ LPVOID X64StressTestPointers[X64_STRESS_TEST_ALLOC_COUNT];
 
 void X64StressTestAlloc()
 {
-    // v teto chvili jiz loader nacetl EXE a RTL a v inicializaci RTL doslo k vytvoreni a alokaci heapu,
-    // ktery lezi na adresach pod 4GB; abychom dalsi alokace vystrcili nahoru nad 4GB, muysime zabrat spodek
-    // virtualni pameti a pak nasledne donutit RTL pomoci alokaci k rozsireni jeho heapu
+    // at this point, loader has already loaded EXE and RTL, and during RTL initialization a heap was created and allocated,
+    // which resides at addresses below 4GB; to push further allocations above 4GB, we must occupy the lower part
+    // of virtual memory and then force RTL through allocations to expand its heap
     //
-    // zabereme prostor ve virtualni pameti
+    // occupy space in virtual memory
     UINT64 vaAllocated = 0;
     _int64 allocSize[] = {10000000, 1000000, 100000, 10000, 1000, 100, 10, 1, 0};
     for (int i = 0; allocSize[i] != 0; i++)
-        while (VirtualAlloc(0, allocSize[i], MEM_RESERVE, PAGE_NOACCESS) <= (LPVOID)(UINT_PTR)0x00000000ffffffff) // pri pristupu chceme exception a nechceme MEM_COMMIT, at zbytecne nezerem
+        while (VirtualAlloc(0, allocSize[i], MEM_RESERVE, PAGE_NOACCESS) <= (LPVOID)(UINT_PTR)0x00000000ffffffff) // on access we want exception and we don't want MEM_COMMIT, so we don't waste space unnecessarily
             vaAllocated += allocSize[i];
 
-    // nyni nafoukneme RTL heap
+    // now inflate RTL heap
     UINT64 rtlAllocated = 0;
     _int64 rtlAllocSize[] = {10000000, 1000000, 100000, 10000, 1000, 100, 10, 1, 0};
     for (int i = 0; rtlAllocSize[i] != 0; i++)
         while (_malloc_dbg(rtlAllocSize[i], _CRT_BLOCK, __FILE__, __LINE__) <= (LPVOID)(UINT_PTR)0x00000000ffffffff)
             rtlAllocated += rtlAllocSize[i];
 
-    // kontrola uspechu
-    void* testNew = new char; // new jede pres alloc, ale radeji take overime
+    // check success
+    void* testNew = new char; // new goes through alloc, but we should verify it too
     if (testNew <= (LPVOID)(UINT_PTR)0x00000000ffffffff)
         MessageBox(NULL, "new address <= 0x00000000ffffffff!\nPlease contact jan.rysavy@altap.cz with this information.", "X64_STRESS_TEST", MB_OK | MB_ICONEXCLAMATION);
     delete testNew;
 }
 
 #endif //X64_STRESS_TEST
-// nas vlastni vstupni bod, o ktery jsme si pozadali linker pomoci pragmy
+// our own entry point, which we requested from linker using pragma
 int MyEntryPoint()
 {
 #ifdef X64_STRESS_TEST
-    // alokacema vyzereme spodni 4GB pameti, aby dalsi alokace mely ukazatele vetsi nez DWORD
+    // through allocations we eat up lower 4GB of memory, so that further allocations have pointers larger than DWORD
     X64StressTestAlloc();
 #endif //X64_STRESS_TEST
 
     int ret = 1; // error
 
-    // spustime Salmon, chceme aby pochytal maximum nasich padu
+    // start Salmon, we want it to catch maximum of our crashes
     if (SalmonInit())
     {
-        // zavolame puvodni entry point aplikace a spustime tim program
+        // call original entry point of application and start the program
         ret = WinMainCRTStartup();
     }
     else
         MessageBox(NULL, "Open Salamander Bug Reporter (salmon.exe) initialization has failed. Please reinstall Open Salamander.",
                    SALAMANDER_TEXT_VERSION, MB_OK | MB_ICONSTOP);
 
-    // sem uz mi debugger nechodi, sestreli nas v RTL (testovano pod VC 2008 s nasim RTL)
+    // debugger doesn't come here anymore, it gets killed in RTL (tested under VC 2008 with our RTL)
 
-    // koncime
+    // finishing
     return ret;
 }
 
@@ -131,8 +131,8 @@ int GTDExceptionHasOccured = 0;
 int SHLExceptionHasOccured = 0;
 int RelExceptionHasOccured = 0;
 
-char DecimalSeparator[5] = "."; // "znaky" (max. 4 znaky) vytazene ze systemu
-int DecimalSeparatorLen = 1;    // delka ve znacich bez nuly na konci
+char DecimalSeparator[5] = "."; // "characters" (max. 4 characters) extracted from system
+int DecimalSeparatorLen = 1;    // length in characters without terminating zero
 char ThousandsSeparator[5] = " ";
 int ThousandsSeparatorLen = 1;
 
@@ -189,12 +189,12 @@ const char* CommonFileTypeName2 = NULL;
 
 char WindowsDirectory[MAX_PATH] = "";
 
-// pro zajisteni uniku z odstranenych drivu na fixed drive (po vysunuti device - USB flash disk, atd.)
+// to ensure escape from removed drives to fixed drive (after ejecting device - USB flash disk, etc.)
 BOOL ChangeLeftPanelToFixedWhenIdleInProgress = FALSE; // TRUE = path is currently being changed, setting ChangeLeftPanelToFixedWhenIdle to TRUE is unnecessary
 BOOL ChangeLeftPanelToFixedWhenIdle = FALSE;
 BOOL ChangeRightPanelToFixedWhenIdleInProgress = FALSE; // TRUE = path is currently being changed, setting ChangeRightPanelToFixedWhenIdle to TRUE is unnecessary
 BOOL ChangeRightPanelToFixedWhenIdle = FALSE;
-BOOL OpenCfgToChangeIfPathIsInaccessibleGoTo = FALSE; // TRUE = v idle otevre konfiguraci na Drives a focusne "If path in panel is inaccessible, go to:"
+BOOL OpenCfgToChangeIfPathIsInaccessibleGoTo = FALSE; // TRUE = in idle opens configuration on Drives and focuses "If path in panel is inaccessible, go to:"
 
 char IsSLGIncomplete[ISSLGINCOMPLETE_SIZE]; // if string is empty, SLG is completely translated; otherwise contains URL to forum section for the given language
 
@@ -217,7 +217,7 @@ const char* CMAINWINDOW_CLASSNAME = "SalamanderMainWindowVer25";
 const char* SAVEBITS_CLASSNAME = "SalamanderSaveBits";
 const char* SHELLEXECUTE_CLASSNAME = "SalamanderShellExecute";
 
-CAssociations Associations; // asociace nactene z registry
+CAssociations Associations; // associations loaded from registry
 CShares Shares;
 
 char DefaultDir['Z' - 'A' + 1][MAX_PATH];
@@ -225,10 +225,10 @@ char DefaultDir['Z' - 'A' + 1][MAX_PATH];
 HACCEL AccelTable1 = NULL;
 HACCEL AccelTable2 = NULL;
 
-HINSTANCE NtDLL = NULL;             // handle k ntdll.dll
-HINSTANCE Shell32DLL = NULL;        // handle k shell32.dll (ikonky)
-HINSTANCE ImageResDLL = NULL;       // handle k imageres.dll (ikonky - Vista)
-HINSTANCE User32DLL = NULL;         // handle k user32.dll (DisableProcessWindowsGhosting)
+HINSTANCE NtDLL = NULL;             // handle to ntdll.dll
+HINSTANCE Shell32DLL = NULL;        // handle to shell32.dll (icons)
+HINSTANCE ImageResDLL = NULL;       // handle to imageres.dll (icons - Vista)
+HINSTANCE User32DLL = NULL;         // handle to user32.dll (DisableProcessWindowsGhosting)
 HINSTANCE HLanguage = NULL;         // handle to language-dependent resources (.SPL file)
 char CurrentHelpDir[MAX_PATH] = ""; // after first help usage, contains path to help directory (location of all .chm files)
 WORD LanguageID = 0;                // language-id of .SPL file
@@ -262,12 +262,12 @@ HBRUSH HMenuSelectedTextBrush = NULL;
 HBRUSH HMenuHilightBrush = NULL;
 HBRUSH HMenuGrayTextBrush = NULL;
 
-HPEN HActiveNormalPen = NULL; // pera pro ramecek kolem polozky
+HPEN HActiveNormalPen = NULL; // pens for frame around item
 HPEN HActiveSelectedPen = NULL;
 HPEN HInactiveNormalPen = NULL;
 HPEN HInactiveSelectedPen = NULL;
 
-HPEN HThumbnailNormalPen = NULL; // pera pro ramecek kolem thumbnail
+HPEN HThumbnailNormalPen = NULL; // pens for frame around thumbnail
 HPEN HThumbnailFucsedPen = NULL;
 HPEN HThumbnailSelectedPen = NULL;
 HPEN HThumbnailFocSelPen = NULL;
@@ -297,7 +297,7 @@ HBITMAP HZoomBitmap = NULL;
 
 HCURSOR HHelpCursor = NULL;
 
-int SystemDPI = 0; // Globalni DPI pres vsechny monitory. Salamander nepodporuje Per-Monitor DPI, viz https://msdn.microsoft.com/library/windows/desktop/dn469266.aspx
+int SystemDPI = 0; // Global DPI across all monitors. Salamander does not support Per-Monitor DPI, see https://msdn.microsoft.com/library/windows/desktop/dn469266.aspx
 int IconSizes[] = {16, 32, 48};
 int IconLRFlags = 0;
 HICON HSharedOverlays[] = {0};
@@ -305,7 +305,7 @@ HICON HShortcutOverlays[] = {0};
 HICON HSlowFileOverlays[] = {0};
 CIconList* SimpleIconLists[] = {0};
 CIconList* ThrobberFrames = NULL;
-CIconList* LockFrames = NULL; // pro jednoduchost deklaruji a nacitam jako throbber
+CIconList* LockFrames = NULL; // for simplicity declare and load as throbber
 
 HICON HGroupIcon = NULL;
 HICON HFavoritIcon = NULL;
@@ -315,9 +315,9 @@ RGBQUAD ColorTable[256] = {0};
 
 DWORD MouseHoverTime = 0;
 
-SYSTEMTIME SalamanderStartSystemTime = {0}; // cas startu Salamandera (GetSystemTime)
+SYSTEMTIME SalamanderStartSystemTime = {0}; // Salamander start time (GetSystemTime)
 
-BOOL WaitForESCReleaseBeforeTestingESC = FALSE; // ma se cekat na pusteni ESC pred zacatkem listovani cesty v panelu?
+BOOL WaitForESCReleaseBeforeTestingESC = FALSE; // should we wait for ESC release before starting to browse path in panel?
 
 int SPACE_WIDTH = 10;
 

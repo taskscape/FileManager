@@ -12,38 +12,38 @@ CWindowArray WindowArray(10, 5);
 CObjectArray ObjectArray(10, 5);
 
 HANDLE Thread = NULL;
-HANDLE DataUsageMutex = NULL;       // kvuli arrayum s daty pro thread i proces
-HANDLE RefreshFinishedEvent = NULL; // kvuli "PostMessage", ceka na zprac.
-HANDLE WantDataEvent = NULL;        // hl. thread chce pristoupit ke spolecnym datum
-HANDLE TerminateEvent = NULL;       // hl. thread chce terminovat thread cmuchala
-HANDLE ContinueEvent = NULL;        // pomocne event pro synchronizaci
-HANDLE BeginSuspendEvent = NULL;    // zacatek suspend modu
-HANDLE EndSuspendEvent = NULL;      // konec suspend modu pro cmuchala
-HANDLE SharesEvent = NULL;          // bude signaled pokud se zmeni LanMan Shares
+HANDLE DataUsageMutex = NULL;       // because of arrays with data for thread and process
+HANDLE RefreshFinishedEvent = NULL; // because of "PostMessage", waits for processing
+HANDLE WantDataEvent = NULL;        // main thread wants to access shared data
+HANDLE TerminateEvent = NULL;       // main thread wants to terminate snooper thread
+HANDLE ContinueEvent = NULL;        // auxiliary event for synchronization
+HANDLE BeginSuspendEvent = NULL;    // start of suspend mode
+HANDLE EndSuspendEvent = NULL;      // end of suspend mode for snooper
+HANDLE SharesEvent = NULL;          // will be signaled if LanMan Shares change
 
 int SnooperSuspended = 0;
 
-CRITICAL_SECTION TimeCounterSection; // pro synchronizaci pristupu k MyTimeCounter
-int MyTimeCounter = 0;               // aktualni cas
+CRITICAL_SECTION TimeCounterSection; // for synchronizing access to MyTimeCounter
+int MyTimeCounter = 0;               // current time
 
 HANDLE SafeFindCloseThread = NULL;              // thread "safe handle killer"
-TDirectArray<HANDLE> SafeFindCloseCNArr(10, 5); // bezpecne (netuhnouci) zavirani handlu change-notify
-CRITICAL_SECTION SafeFindCloseCS;               // krit. sekce pro pristup do pole handlu
-BOOL SafeFindCloseTerminate = FALSE;            // pro ukonceni threadu
-HANDLE SafeFindCloseStart = NULL;               // "starter" threadu - je-li non-signaled, ceka
-HANDLE SafeFindCloseFinished = NULL;            // signaled -> thread uz zavrel vsechny handly
+TDirectArray<HANDLE> SafeFindCloseCNArr(10, 5); // safe (non-hanging) closing of change-notify handles
+CRITICAL_SECTION SafeFindCloseCS;               // critical section for access to handle array
+BOOL SafeFindCloseTerminate = FALSE;            // for thread termination
+HANDLE SafeFindCloseStart = NULL;               // thread "starter" - if non-signaled, waits
+HANDLE SafeFindCloseFinished = NULL;            // signaled -> thread has already closed all handles
 
 DWORD WINAPI ThreadFindCloseChangeNotification(void* param);
 
 void DoWantDataEvent()
 {
-    ReleaseMutex(DataUsageMutex);                  // uvolnime data pro hl. thread
-    WaitForSingleObject(WantDataEvent, INFINITE);  // pockame az je zabere
-    WaitForSingleObject(DataUsageMutex, INFINITE); // az skonci jsou opet nase
-    SetEvent(ContinueEvent);                       // uz jsou nase, pustime dale hl. thread
+    ReleaseMutex(DataUsageMutex);                  // release data for main thread
+    WaitForSingleObject(WantDataEvent, INFINITE);  // wait until it takes them
+    WaitForSingleObject(DataUsageMutex, INFINITE); // when finished, they're ours again
+    SetEvent(ContinueEvent);                       // they're ours now, let main thread continue
 }
 
-unsigned ThreadSnooperBody(void* /*param*/) // nevolat funkce hl. threadu (ani TRACE) !!!
+unsigned ThreadSnooperBody(void* /*param*/) // don't call main thread functions (not even TRACE) !!!
 {
     CALL_STACK_MESSAGE1("ThreadSnooperBody()");
     SetThreadNameInVCAndTrace("Snooper");
@@ -59,7 +59,7 @@ unsigned ThreadSnooperBody(void* /*param*/) // nevolat funkce hl. threadu (ani T
         sharesKey = NULL;
         TRACE_E("Unable to open key in registry (LanMan Shares). error: " << GetErrorText(res));
     }
-    else // klic je o.k., nahodime notifikace (bez toho se uz RegNotifyChangeKeyValue nezavola)
+    else // key is ok, enable notifications (without this RegNotifyChangeKeyValue won't be called anymore)
     {
         if ((res = RegNotifyChangeKeyValue(sharesKey, TRUE, REG_NOTIFY_CHANGE_NAME | REG_NOTIFY_CHANGE_LAST_SET, SharesEvent,
                                            TRUE)) != ERROR_SUCCESS)
@@ -70,9 +70,9 @@ unsigned ThreadSnooperBody(void* /*param*/) // nevolat funkce hl. threadu (ani T
 
     if (WaitForSingleObject(DataUsageMutex, INFINITE) == WAIT_OBJECT_0)
     {
-        SetEvent(ContinueEvent); // ted uz jsou data cmuchala, hl. thread muze pokracovat
+        SetEvent(ContinueEvent); // now data belongs to snooper, main thread can continue
 
-        WindowArray.Add(NULL); // zakladni objekty, musi byt na zacatku !
+        WindowArray.Add(NULL); // basic objects, must be at the beginning!
         WindowArray.Add(NULL);
         WindowArray.Add(NULL);
         WindowArray.Add(NULL);
@@ -81,8 +81,8 @@ unsigned ThreadSnooperBody(void* /*param*/) // nevolat funkce hl. threadu (ani T
         ObjectArray.Add(BeginSuspendEvent);
         ObjectArray.Add(SharesEvent);
 
-        BOOL ignoreRefreshes = FALSE;        // TRUE = ignorovat refreshe (zmeny v adresarich), jinak fungujeme normalne
-        DWORD ignoreRefreshesAbsTimeout = 0; // az bude (int)(GetTickCount() - ignoreRefreshesAbsTimeout) >= 0, prepneme ignoreRefreshes na FALSE
+        BOOL ignoreRefreshes = FALSE;        // TRUE = ignore refreshes (changes in directories), otherwise function normally
+        DWORD ignoreRefreshesAbsTimeout = 0; // when (int)(GetTickCount() - ignoreRefreshesAbsTimeout) >= 0, switch ignoreRefreshes to FALSE
         BOOL notEnd = TRUE;
         while (notEnd)
         {
@@ -110,16 +110,16 @@ unsigned ThreadSnooperBody(void* /*param*/) // nevolat funkce hl. threadu (ani T
             {
                 TRACE_I("Start suspend mode");
 
-                SetEvent(ContinueEvent); // uz jsme v suspendu -> pustime dale hl. thread
+                SetEvent(ContinueEvent); // we're in suspend now -> let main thread continue
 
-                TDirectArray<HWND> refreshPanels(10, 5); // pro pripad smazani sledovaneho adresare
+                TDirectArray<HWND> refreshPanels(10, 5); // in case monitored directory is deleted
 
-                ObjectArray[2] = EndSuspendEvent; // misto beginu ted end suspend modu
+                ObjectArray[2] = EndSuspendEvent; // instead of begin, now end of suspend mode
 
-                BOOL setSharesEvent = FALSE; // TRUE => znovu nahodit sledovani registry
+                BOOL setSharesEvent = FALSE; // TRUE => re-enable registry monitoring
                 BOOL suspendNotFinished = TRUE;
-                while (suspendNotFinished) // pockame na konec suspend modu
-                {                          // osetreni vseho krome zmen v adresarich
+                while (suspendNotFinished) // wait for end of suspend mode
+                {                          // handling everything except changes in directories
                     timeout = ignoreRefreshes ? (int)(ignoreRefreshesAbsTimeout - GetTickCount()) : INFINITE;
                     if (ignoreRefreshes && timeout <= 0)
                     {
@@ -145,13 +145,13 @@ unsigned ThreadSnooperBody(void* /*param*/) // nevolat funkce hl. threadu (ani T
                         break;              // EndSuspendEvent
                     case WAIT_OBJECT_0 + 3: // SharesEvent
                     {
-                        // obnovime shary + refreshneme prip. i panely (pomoci WM_USER_REFRESH_SHARES)
+                        // refresh shares + refresh panels if needed (via WM_USER_REFRESH_SHARES)
                         setSharesEvent = TRUE;
                         break;
                     }
 
                     case WAIT_TIMEOUT:
-                        break; // ignorujeme (konec rezimu ignorovani zmen v adresarich)
+                        break; // ignore (end of directory change ignoring mode)
 
                     default:
                     {
@@ -159,12 +159,12 @@ unsigned ThreadSnooperBody(void* /*param*/) // nevolat funkce hl. threadu (ani T
                         if (index < 0 || index >= WindowArray.Count)
                         {
                             TRACE_E("Unexpected value returned from WaitForMultipleObjects(): " << res);
-                            break; // pro pripad nejake jine hodnoty res
+                            break; // in case of some other res value
                         }
 
-                        // volani FindCloseChangeNotification znehodnoti ostatni handly na stejnou cestu
-                        // (dela u UNC cest), proto signaled-state simulujeme nasilne
-                        HANDLE sameHandle = NULL; // != NULL -> handle na stejnou cestu
+                        // calling FindCloseChangeNotification invalidates other handles to same path
+                        // (happens with UNC paths), so we simulate signaled-state forcibly
+                        HANDLE sameHandle = NULL; // != NULL -> handle to same path
                         CFilesWindow* actWin = WindowArray[index];
                         int e;
                         for (e = 0; e < WindowArray.Count; e++)
@@ -177,7 +177,7 @@ unsigned ThreadSnooperBody(void* /*param*/) // nevolat funkce hl. threadu (ani T
                             }
                         }
 
-                        // uz doslo ke zmenene, dalsi nas nezajima, za suspend prijde refresh
+                        // change already occurred, we don't care about more, refresh will come after suspend
                         if (MainWindowCS.LockIfNotClosed())
                         {
                             //                  TRACE_I("Change notification in suspend mode: " << (MainWindow->LeftPanel == WindowArray[index] ? "left" : "right"));
@@ -190,11 +190,11 @@ unsigned ThreadSnooperBody(void* /*param*/) // nevolat funkce hl. threadu (ani T
                             WindowArray[index]->DeviceNotification = NULL;
                         }
                         HANDLES(FindCloseChangeNotification((HANDLE)ObjectArray[index]));
-                        refreshPanels.Add(WindowArray[index]->HWindow); // pridame mezi obnovovane
-                        ObjectArray.Delete(index);                      // vyhodime ho ze seznamu
+                        refreshPanels.Add(WindowArray[index]->HWindow); // add to refresh list
+                        ObjectArray.Delete(index);                      // remove from list
                         WindowArray.Delete(index);
 
-                        // pokud je potreba obejit chybu systemu, provedeme to zde
+                        // if we need to work around system bug, do it here
                         if (sameHandle != NULL)
                         {
                             for (index = 0; index < ObjectArray.Count; index++)
@@ -208,8 +208,8 @@ unsigned ThreadSnooperBody(void* /*param*/) // nevolat funkce hl. threadu (ani T
                                         WindowArray[index]->DeviceNotification = NULL;
                                     }
                                     HANDLES(FindCloseChangeNotification((HANDLE)ObjectArray[index]));
-                                    refreshPanels.Add(WindowArray[index]->HWindow); // pridame mezi obnovovane
-                                    ObjectArray.Delete(index);                      // vyhodime ho ze seznamu
+                                    refreshPanels.Add(WindowArray[index]->HWindow); // add to refresh list
+                                    ObjectArray.Delete(index);                      // remove from list
                                     WindowArray.Delete(index);
                                 }
                             }
@@ -218,9 +218,9 @@ unsigned ThreadSnooperBody(void* /*param*/) // nevolat funkce hl. threadu (ani T
                     }
                     }
                 }
-                SetEvent(ContinueEvent); // uz nejsme suspendu -> pustime dale hl. thread
+                SetEvent(ContinueEvent); // we're not in suspend anymore -> let main thread continue
 
-                if (setSharesEvent) // budeme sledovat dalsi zmeny v registry
+                if (setSharesEvent) // will monitor next changes in registry
                 {
                     if (MainWindowCS.LockIfNotClosed())
                     {
@@ -241,7 +241,7 @@ unsigned ThreadSnooperBody(void* /*param*/) // nevolat funkce hl. threadu (ani T
                 CALL_STACK_MESSAGE1("ThreadSnooperBody::post_refresh");
 
                 HANDLES(EnterCriticalSection(&TimeCounterSection));
-                // refreshneme zmenene panely
+                // refresh changed panels
                 int i;
                 for (i = 0; i < refreshPanels.Count; i++)
                 {
@@ -252,7 +252,7 @@ unsigned ThreadSnooperBody(void* /*param*/) // nevolat funkce hl. threadu (ani T
                     }
                 }
                 HANDLES(LeaveCriticalSection(&TimeCounterSection));
-                // jeste posleme notifikaci o ukonceni suspend modu
+                // also send notification about suspend mode end
                 if (MainWindowCS.LockIfNotClosed())
                 {
                     if (MainWindow != NULL && MainWindow->LeftPanel != NULL && MainWindow->RightPanel != NULL)
@@ -265,7 +265,7 @@ unsigned ThreadSnooperBody(void* /*param*/) // nevolat funkce hl. threadu (ani T
 
                 if (refreshPanels.Count > 0)
                 {
-                    // dame si prestavku, aby se nezahltil system
+                    // take a break so system doesn't get overwhelmed
                     ignoreRefreshes = TRUE;
                     ignoreRefreshesAbsTimeout = GetTickCount() + REFRESH_PAUSE;
                 }
