@@ -1,4 +1,4 @@
-﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2023 Open Salamander Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #pragma once
@@ -108,14 +108,19 @@ protected:
     BOOL ShowHint();
 
     DWORD Flags;         // flagy pro chovani controlu
-    char* Text;          // alokovany text
-    int TextLen;         // delka retezce
+    char* Text;          // alokovany text (UTF-8)
+    int TextLen;         // delka retezce v bytech
+    wchar_t* TextW;      // alokovany text (UTF-16 pro Windows API)
+    int TextLenW;        // delka retezce ve wchar_t
     char* Text2;         // alokovany text obshujici vypustku; pouziva se se pouze s STF_END_ELLIPSIS nebo STF_PATH_ELLIPSIS
     int Text2Len;        // delka Text2
+    wchar_t* Text2W;     // wide char verze Text2
+    int Text2LenW;       // delka Text2W ve wchar_t
     int* AlpDX;          // pole delek substringu; pouziva se se pouze s STF_END_ELLIPSIS nebo STF_PATH_ELLIPSIS
     int TextWidth;       // sirka textu v bodech
     int TextHeight;      // vyska textu v bodech
     int Allocated;       // velikost alokovaneho bufferu 'Text' a 'AlpDX'
+    int AllocatedW;      // velikost alokovaneho bufferu 'TextW'
     int Width, Height;   // rozmery staticu
     CBitmap* Bitmap;     // cache pro kresleni; pouziva se pouze s STF_CACHED_PAINT
     HFONT HFont;         // handlu fontu pouzivany ro kresleni textu
