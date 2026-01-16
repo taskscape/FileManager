@@ -698,128 +698,128 @@ public:
     // normal addition); if returns FALSE, only Salamander part will be released from 'dir'
     virtual BOOL WINAPI GetFileDataForNewDir(const char* dirName, CFileData& dir) = 0;
 
-    // jen pro FS s vlastnimi ikonami (pitFromPlugin):
-    // vraci image-list s jednoduchymi ikonami, behem kresleni polozek v panelu se
-    // pomoci call-backu ziskava icon-index do tohoto image-listu; vola se vzdy po
-    // ziskani noveho listingu (po volani CPluginFSInterfaceAbstract::ListCurrentPath),
-    // takze je mozne image-list predelavat pro kazdy novy listing;
-    // 'iconSize' urcuje pozadovanou velikost ikon a jde o jednu z hodnot SALICONSIZE_xxx
-    // destrukci image-listu si plugin zajisti pri dalsim volani GetSimplePluginIcons
-    // nebo pri uvolneni celeho interfacu (v jeho destruktoru - volan z
+    // only for FS with own icons (pitFromPlugin):
+    // returns image-list with simple icons, during drawing of items in panel
+    // icon-index into this image-list is obtained using callback; called always after
+    // obtaining new listing (after calling CPluginFSInterfaceAbstract::ListCurrentPath),
+    // so it is possible to rebuild image-list for each new listing;
+    // 'iconSize' specifies required icon size and is one of SALICONSIZE_xxx values
+    // destruction of image-list is handled by plugin at next call of GetSimplePluginIcons
+    // or when releasing entire interface (in its destructor - called from
     // CPluginInterfaceAbstract::ReleasePluginDataInterface)
-    // pokud image-list nelze vytvorit, vraci NULL a aktualni plugin-icons-type
-    // degraduje na pitSimple
+    // if image-list cannot be created, returns NULL and current plugin-icons-type
+    // degrades to pitSimple
     virtual HIMAGELIST WINAPI GetSimplePluginIcons(int iconSize) = 0;
 
-    // jen pro FS s vlastnimi ikonami (pitFromPlugin):
-    // vraci TRUE, pokud pro dany soubor/adresar ('isDir' FALSE/TRUE) 'file'
-    // ma byt pouzita jednoducha ikona; vraci FALSE, pokud se ma pro ziskani ikony volat
-    // z threadu pro nacitani ikon metoda GetPluginIcon (nacteni ikony "na pozadi");
-    // zaroven v teto metode muze byt predpocitan icon-index pro jednoduchou ikonu
-    // (u ikon ctenych "na pozadi" se az do okamziku nacteni pouzivaji take jednoduche
-    // ikony) a ulozen do CFileData (nejspise do CFileData::PluginData);
-    // omezeni: z CSalamanderGeneralAbstract je mozne pouzivat jen metody, ktere lze
-    // volat z libovolneho threadu (metody nezavisle na stavu panelu)
+    // only for FS with own icons (pitFromPlugin):
+    // returns TRUE, if for given file/directory ('isDir' FALSE/TRUE) 'file'
+    // simple icon should be used; returns FALSE, if for obtaining icon method
+    // GetPluginIcon should be called from thread for loading icons (loading icon "in background");
+    // at the same time in this method icon-index for simple icon can be precalculated
+    // (for icons read "in background", simple icons are also used until the moment of loading)
+    // and stored in CFileData (most likely in CFileData::PluginData);
+    // limitation: from CSalamanderGeneralAbstract only methods can be used that can be
+    // called from any thread (methods independent of panel state)
     virtual BOOL WINAPI HasSimplePluginIcon(CFileData& file, BOOL isDir) = 0;
 
-    // jen pro FS s vlastnimi ikonami (pitFromPlugin):
-    // vraci ikonu pro soubor nebo adresar 'file' nebo NULL pokud ikona nelze ziskat; vraci-li
-    // v 'destroyIcon' TRUE, vola se pro uvolneni vracene ikony Win32 API funkce DestroyIcon;
-    // 'iconSize' urcuje velikost pozadovane ikony a jde o jednu z hodnot SALICONSIZE_xxx
-    // omezeni: jelikoz se vola z threadu pro nacitani ikon (neni to hlavni thread), lze z
-    // CSalamanderGeneralAbstract pouzivat jen metody, ktere lze volat z libovolneho threadu
+    // only for FS with own icons (pitFromPlugin):
+    // returns icon for file or directory 'file' or NULL if icon cannot be obtained; if returns
+    // TRUE in 'destroyIcon', Win32 API function DestroyIcon is called to release returned icon;
+    // 'iconSize' specifies size of requested icon and is one of SALICONSIZE_xxx values
+    // limitation: since it is called from thread for loading icons (not main thread), from
+    // CSalamanderGeneralAbstract only methods can be used that can be called from any thread
     virtual HICON WINAPI GetPluginIcon(const CFileData* file, int iconSize, BOOL& destroyIcon) = 0;
 
-    // jen pro FS s vlastnimi ikonami (pitFromPlugin):
-    // porovna 'file1' (muze jit o soubor i adresar) a 'file2' (muze jit o soubor i adresar),
-    // nesmi pro zadne dve polozky listingu vratit, ze jsou shodne (zajistuje jednoznacne
-    // prirazeni vlastni ikony k souboru/adresari); pokud nehrozi duplicitni jmena v listingu
-    // cesty (obvykly pripad), lze jednoduse implementovat jako:
+    // only for FS with own icons (pitFromPlugin):
+    // compares 'file1' (can be file or directory) and 'file2' (can be file or directory),
+    // must not return that any two items in listing are identical (ensures unique
+    // assignment of own icon to file/directory); if duplicate names in path listing
+    // are not a concern (common case), can be simply implemented as:
     // {return strcmp(file1->Name, file2->Name);}
-    // vraci cislo mensi nez nula pokud 'file1' < 'file2', nulu pokud 'file1' == 'file2' a
-    // cislo vetsi nez nula pokud 'file1' > 'file2';
-    // omezeni: jelikoz se vola i z threadu pro nacitani ikon (nejen z hlavniho threadu), lze
-    // z CSalamanderGeneralAbstract pouzivat jen metody, ktere lze volat z libovolneho threadu
+    // returns number less than zero if 'file1' < 'file2', zero if 'file1' == 'file2' and
+    // number greater than zero if 'file1' > 'file2';
+    // limitation: since it is called also from thread for loading icons (not only from main thread),
+    // from CSalamanderGeneralAbstract only methods can be used that can be called from any thread
     virtual int WINAPI CompareFilesFromFS(const CFileData* file1, const CFileData* file2) = 0;
 
-    // slouzi k nastaveni parametru pohledu, tato metoda je zavolana vzdy pred zobrazenim noveho
-    // obsahu panelu (pri zmene cesty) a pri zmene aktualniho pohledu (i rucni zmena sirky
-    // sloupce); 'leftPanel' je TRUE pokud jde o levy panel (FALSE pokud jde o pravy panel);
-    // 'view' je interface pro modifikaci pohledu (nastaveni rezimu, prace se
-    // sloupci); jde-li o data archivu, obsahuje 'archivePath' soucasnou cestu v archivu,
-    // pro data FS je 'archivePath' NULL; jde-li o data archivu, je 'upperDir' ukazatel na
-    // nadrazeny adresar (je-li soucasna cesta root archivu, je 'upperDir' NULL), pro data
-    // FS je vzdy NULL;
-    // POZOR: behem volani teto metody nesmi dojit k prekresleni panelu (muze se zde zmenit
-    //        velikost ikon, atd.), takze zadne messageloopy (zadne dialogy, atd.)!
-    // omezeni: z CSalamanderGeneralAbstract je mozne pouzivat jen metody, ktere lze
-    //          volat z libovolneho threadu (metody nezavisle na stavu panelu)
+    // serves to set view parameters, this method is called always before displaying new
+    // panel content (when path changes) and when current view changes (including manual change of column
+    // width); 'leftPanel' is TRUE if it concerns left panel (FALSE if it concerns right panel);
+    // 'view' is interface for modifying view (setting mode, working with
+    // columns); if it concerns archive data, 'archivePath' contains current path in archive,
+    // for FS data 'archivePath' is NULL; if it concerns archive data, 'upperDir' is pointer to
+    // parent directory (if current path is archive root, 'upperDir' is NULL), for FS
+    // data it is always NULL;
+    // WARNING: during calling this method panel must not be repainted (icon size can change
+    //          here, etc.), so no messageloops (no dialogs, etc.)!
+    // limitation: from CSalamanderGeneralAbstract only methods can be used that can be
+    //             called from any thread (methods independent of panel state)
     virtual void WINAPI SetupView(BOOL leftPanel, CSalamanderViewAbstract* view,
                                   const char* archivePath, const CFileData* upperDir) = 0;
 
-    // nastaveni nove hodnoty "column->FixedWidth" - uzivatel pouzil kontextove menu
-    // na pluginem pridanem sloupci v header-line > "Automatic Column Width"; plugin
-    // by si mel ulozit novou hodnotu column->FixedWidth ulozenou v 'newFixedWidth'
-    // (je to vzdy negace column->FixedWidth), aby pri nasledujicich volanich SetupView() mohl
-    // sloupec pridat uz se spravne nastavenou FixedWidth; zaroven pokud se zapina pevna
-    // sirka sloupce, mel by si plugin nastavit soucasnou hodnotu "column->Width" (aby
-    // se timto zapnutim pevne sirky nezmenila sirka sloupce) - idealni je zavolat
-    // "ColumnWidthWasChanged(leftPanel, column, column->Width)"; 'column' identifikuje
-    // sloupec, ktery se ma zmenit; 'leftPanel' je TRUE pokud jde o sloupec z leveho
-    // panelu (FALSE pokud jde o sloupec z praveho panelu)
+    // setting new value of "column->FixedWidth" - user used context menu
+    // on plugin-added column in header-line > "Automatic Column Width"; plugin
+    // should save new value of column->FixedWidth stored in 'newFixedWidth'
+    // (it is always negation of column->FixedWidth), so that in following calls of SetupView() it can
+    // add column already with correctly set FixedWidth; at the same time if fixed
+    // column width is being enabled, plugin should set current value of "column->Width" (so that
+    // this enabling of fixed width does not change column width) - ideally call
+    // "ColumnWidthWasChanged(leftPanel, column, column->Width)"; 'column' identifies
+    // column that should be changed; 'leftPanel' is TRUE if it concerns column from left
+    // panel (FALSE if it concerns column from right panel)
     virtual void WINAPI ColumnFixedWidthShouldChange(BOOL leftPanel, const CColumn* column,
                                                      int newFixedWidth) = 0;
 
-    // nastaveni nove hodnoty "column->Width" - uzivatel mysi zmenil sirku pluginem pridaneho
-    // sloupce v header-line; plugin by si mel ulozit novou hodnotu column->Width (je ulozena
-    // i v 'newWidth'), aby pri nasledujicich volanich SetupView() mohl sloupec pridat uz se
-    // spravne nastavenou Width; 'column' identifikuje sloupec, ktery se zmenil; 'leftPanel'
-    // je TRUE pokud jde o sloupec z leveho panelu (FALSE pokud jde o sloupec z praveho panelu)
+    // setting new value of "column->Width" - user changed width of plugin-added column
+    // in header-line with mouse; plugin should save new value of column->Width (it is also stored
+    // in 'newWidth'), so that in following calls of SetupView() it can add column already with
+    // correctly set Width; 'column' identifies column that was changed; 'leftPanel'
+    // is TRUE if it concerns column from left panel (FALSE if it concerns column from right panel)
     virtual void WINAPI ColumnWidthWasChanged(BOOL leftPanel, const CColumn* column,
                                               int newWidth) = 0;
 
-    // ziska obsah Information Line pro soubor/adresar ('isDir' TRUE/FALSE) 'file'
-    // nebo oznacene soubory a adresare ('file' je NULL a pocty oznacenych souboru/adresaru
-    // jsou v 'selectedFiles'/'selectedDirs') v panelu ('panel' je jeden z PANEL_XXX);
-    // vola se i pri prazdnem listingu (tyka se jen FS, u archivu nemuze nastat, 'file' je NULL,
-    // 'selectedFiles' a 'selectedDirs' jsou 0); je-li 'displaySize' TRUE, je znama velikost
-    // vsech oznacenych adresaru (viz CFileData::SizeValid; pokud neni nic oznaceneho, je zde
-    // TRUE); v 'selectedSize' je soucet cisel CFileData::Size oznacenych souboru a adresaru
-    // (pokud neni nic oznaceneho, je zde nula); 'buffer' je buffer pro vraceny text (velikost
-    // 1000 bytu); 'hotTexts' je pole (velikost 100 DWORDu), ve kterem se vraci informace o poloze
-    // hot-textu, vzdy spodni WORD obsahuje pozici hot-textu v 'buffer', horni WORD obsahuje
-    // delku hot-textu; v 'hotTextsCount' je velikost pole 'hotTexts' (100) a vraci se v nem pocet
-    // zapsanych hot-textu v poli 'hotTexts'; vraci TRUE pokud je 'buffer' + 'hotTexts' +
-    // 'hotTextsCount' nastaveno, vraci FALSE pokud se ma Information Line plnit standardnim
-    // zpusobem (jako na disku)
+    // obtains content of Information Line for file/directory ('isDir' TRUE/FALSE) 'file'
+    // or selected files and directories ('file' is NULL and counts of selected files/directories
+    // are in 'selectedFiles'/'selectedDirs') in panel ('panel' is one of PANEL_XXX);
+    // called also with empty listing (concerns only FS, for archives cannot occur, 'file' is NULL,
+    // 'selectedFiles' and 'selectedDirs' are 0); if 'displaySize' is TRUE, size is known for
+    // all selected directories (see CFileData::SizeValid; if nothing is selected, it is
+    // TRUE here); in 'selectedSize' is sum of CFileData::Size numbers of selected files and directories
+    // (if nothing is selected, there is zero here); 'buffer' is buffer for returned text (size
+    // 1000 bytes); 'hotTexts' is array (size 100 DWORDs), in which information about position
+    // of hot-text is returned, always lower WORD contains position of hot-text in 'buffer', upper WORD contains
+    // length of hot-text; in 'hotTextsCount' is size of array 'hotTexts' (100) and number of
+    // written hot-texts in array 'hotTexts' is returned in it; returns TRUE if 'buffer' + 'hotTexts' +
+    // 'hotTextsCount' is set, returns FALSE if Information Line should be filled in standard
+    // way (as on disk)
     virtual BOOL WINAPI GetInfoLineContent(int panel, const CFileData* file, BOOL isDir, int selectedFiles,
                                            int selectedDirs, BOOL displaySize, const CQuadWord& selectedSize,
                                            char* buffer, DWORD* hotTexts, int& hotTextsCount) = 0;
 
-    // jen pro archivy: uzivatel ulozil soubory/adresare z archivu na clipboard, ted zavira
-    // archiv v panelu: pokud metoda vrati TRUE, tento objekt zustane otevreny (optimalizace
-    // pripadneho Paste z clipboardu - archiv uz je vylistovany), pokud metoda vrati FALSE,
-    // tento objekt se uvolni (pripadny Paste z clipboardu zpusobi listovani archivu, pak
-    // teprve dojde k vybaleni vybranych souboru/adresaru); POZNAMKA: pokud je po zivotnost
-    // objektu otevreny soubor archivu, metoda by mela vracet FALSE, jinak bude po celou
-    // dobu "pobytu" dat na clipboardu soubor archivu otevreny (nepujde smazat, atd.)
+    // only for archives: user saved files/directories from archive to clipboard, now closing
+    // archive in panel: if method returns TRUE, this object remains open (optimization
+    // of potential Paste from clipboard - archive is already listed), if method returns FALSE,
+    // this object is released (potential Paste from clipboard will cause listing of archive, then
+    // only extraction of selected files/directories will occur); NOTE: if during lifetime
+    // of object archive file is open, method should return FALSE, otherwise during entire
+    // "stay" of data on clipboard archive file will be open (cannot be deleted, etc.)
     virtual BOOL WINAPI CanBeCopiedToClipboard() = 0;
 
-    // jen pri zadani VALID_DATA_PL_SIZE do CSalamanderDirectoryAbstract::SetValidData():
-    // vraci TRUE pokud je velikost souboru/adresare ('isDir' TRUE/FALSE) 'file' znama,
-    // jinak vraci FALSE; velikost vraci v 'size'
+    // only when VALID_DATA_PL_SIZE is specified in CSalamanderDirectoryAbstract::SetValidData():
+    // returns TRUE if size of file/directory ('isDir' TRUE/FALSE) 'file' is known,
+    // otherwise returns FALSE; returns size in 'size'
     virtual BOOL WINAPI GetByteSize(const CFileData* file, BOOL isDir, CQuadWord* size) = 0;
 
-    // jen pri zadani VALID_DATA_PL_DATE do CSalamanderDirectoryAbstract::SetValidData():
-    // vraci TRUE pokud je datum souboru/adresare ('isDir' TRUE/FALSE) 'file' znamy,
-    // jinak vraci FALSE; datum vraci v "datumove" casti struktury 'date' ("casova" cast
-    // by mela zustat netknuta)
+    // only when VALID_DATA_PL_DATE is specified in CSalamanderDirectoryAbstract::SetValidData():
+    // returns TRUE if date of file/directory ('isDir' TRUE/FALSE) 'file' is known,
+    // otherwise returns FALSE; returns date in "date" part of structure 'date' ("time" part
+    // should remain untouched)
     virtual BOOL WINAPI GetLastWriteDate(const CFileData* file, BOOL isDir, SYSTEMTIME* date) = 0;
 
-    // jen pri zadani VALID_DATA_PL_TIME do CSalamanderDirectoryAbstract::SetValidData():
-    // vraci TRUE pokud je cas souboru/adresare ('isDir' TRUE/FALSE) 'file' znamy,
-    // jinak vraci FALSE; cas vraci v "casove" casti struktury 'time' ("datumova" cast
-    // by mela zustat netknuta)
+    // only when VALID_DATA_PL_TIME is specified in CSalamanderDirectoryAbstract::SetValidData():
+    // returns TRUE if time of file/directory ('isDir' TRUE/FALSE) 'file' is known,
+    // otherwise returns FALSE; returns time in "time" part of structure 'time' ("date" part
+    // should remain untouched)
     virtual BOOL WINAPI GetLastWriteTime(const CFileData* file, BOOL isDir, SYSTEMTIME* time) = 0;
 };
 
@@ -827,57 +827,57 @@ public:
 // ****************************************************************************
 // CSalamanderForOperationsAbstract
 //
-// sada metod ze Salamandera pro podporu provadeni operaci, platnost interfacu je
-// omezena na metodu, ktere je interface predan jako parametr; tedy lze volat pouze
-// z tohoto threadu a v teto metode (objekt je na stacku, takze po navratu zanika)
+// set of methods from Salamander for supporting execution of operations, validity of interface is
+// limited to method to which interface is passed as parameter; thus can be called only
+// from this thread and in this method (object is on stack, so it ceases to exist after return)
 
 class CSalamanderForOperationsAbstract
 {
 public:
-    // PROGRESS DIALOG: dialog obsahuje jeden/dva ('twoProgressBars' FALSE/TRUE) progress-metry
-    // otevre progress-dialog s titulkem 'title'; 'parent' je parent okno progress-dialogu (je-li
-    // NULL, pouzije se hlavni okno); pokud obsahuje jen jeden progress-metr, muze byt popsan
-    // jako "File" ('fileProgress' je TRUE) nebo "Total" ('fileProgress' je FALSE)
+    // PROGRESS DIALOG: dialog contains one/two ('twoProgressBars' FALSE/TRUE) progress-bars
+    // opens progress-dialog with title 'title'; 'parent' is parent window of progress-dialog (if
+    // NULL, main window is used); if contains only one progress-bar, it can be described
+    // as "File" ('fileProgress' is TRUE) or "Total" ('fileProgress' is FALSE)
     //
-    // dialog nebezi ve vlastnim threadu; pro jeho fungovani (tlacitko Cancel + vnitrni timer)
-    // je treba obcas vyprazdni message queue; to zajistuji metody ProgressDialogAddText,
-    // ProgressAddSize a ProgressSetSize
+    // dialog does not run in its own thread; for its functioning (Cancel button + internal timer)
+    // it is necessary to occasionally empty message queue; this is ensured by methods ProgressDialogAddText,
+    // ProgressAddSize and ProgressSetSize
     //
-    // protoze real-time zobrazovani textu a zmen v progress bare silne zdrzuje, maji
-    // metody ProgressDialogAddText, ProgressAddSize a ProgressSetSize parametr
-    // 'delayedPaint'; ten by mel byt TRUE pro vsechny rychle se menici texty a hodnoty;
-    // metody si pak ulozi texty a zobrazi je az po doruceni vnitrniho timeru dialogu;
-    // 'delayedPaint' nastavime na FALSE pro inicializacni/koncove texty typu "preparing data..."
-    // nebo "canceling operation...", po jejiz zobrazeni nedame dialogu prilezitost k distribuci
-    // zprav (timeru); pokud je u takove operace pravdepodobne, ze bude trvat dlouho, meli
-    // bychom behem teto doby dialog "obcerstvovat" volanim ProgressAddSize(CQuadWord(0, 0), TRUE)
-    // a podle jeji navratove hodnoty akci pripadne predcasne ukoncit
+    // because real-time displaying of text and changes in progress bar strongly delays, methods
+    // ProgressDialogAddText, ProgressAddSize and ProgressSetSize have parameter
+    // 'delayedPaint'; it should be TRUE for all rapidly changing texts and values;
+    // methods then save texts and display them only after delivery of internal timer of dialog;
+    // we set 'delayedPaint' to FALSE for initialization/final texts of type "preparing data..."
+    // or "canceling operation...", after whose display we do not give dialog opportunity to distribute
+    // messages (timer); if it is probable that such operation will take long time, we should
+    // during this time "refresh" dialog by calling ProgressAddSize(CQuadWord(0, 0), TRUE)
+    // and according to its return value possibly terminate action prematurely
     virtual void WINAPI OpenProgressDialog(const char* title, BOOL twoProgressBars,
                                            HWND parent, BOOL fileProgress) = 0;
-    // vypise text 'txt' (i nekolik radku - provadi se rozpad na radky) do progress-dialogu
+    // writes text 'txt' (even multiple lines - line breaking is performed) to progress-dialog
     virtual void WINAPI ProgressDialogAddText(const char* txt, BOOL delayedPaint) = 0;
-    // neni-li 'totalSize1' CQuadWord(-1, -1), nastavi 'totalSize1' jako 100 procent prvniho progress-metru,
-    // neni-li 'totalSize2' CQuadWord(-1, -1), nastavi 'totalSize2' jako 100 procent druheho progress-metru
-    // (pro progress-dialog s jednim progress-metrem je povinne 'totalSize2' CQuadWord(-1, -1))
+    // if 'totalSize1' is not CQuadWord(-1, -1), sets 'totalSize1' as 100 percent of first progress-bar,
+    // if 'totalSize2' is not CQuadWord(-1, -1), sets 'totalSize2' as 100 percent of second progress-bar
+    // (for progress-dialog with one progress-bar, 'totalSize2' CQuadWord(-1, -1) is mandatory)
     virtual void WINAPI ProgressSetTotalSize(const CQuadWord& totalSize1, const CQuadWord& totalSize2) = 0;
-    // neni-li 'size1' CQuadWord(-1, -1), nastavi velikost 'size1' (size1/total1*100 procent) na prvnim progress-metru,
-    // neni-li 'size2' CQuadWord(-1, -1), nastavi velikost 'size2' (size2/total2*100 procent) na druhem progress-metru
-    // (pro progress-dialog s jednim progress-metrem je povinne 'size2' CQuadWord(-1, -1)), vraci informaci jestli ma
-    // akce pokracovat (FALSE = konec)
+    // if 'size1' is not CQuadWord(-1, -1), sets size 'size1' (size1/total1*100 percent) on first progress-bar,
+    // if 'size2' is not CQuadWord(-1, -1), sets size 'size2' (size2/total2*100 percent) on second progress-bar
+    // (for progress-dialog with one progress-bar, 'size2' CQuadWord(-1, -1) is mandatory), returns information whether
+    // action should continue (FALSE = end)
     virtual BOOL WINAPI ProgressSetSize(const CQuadWord& size1, const CQuadWord& size2, BOOL delayedPaint) = 0;
-    // prida (pripadne k oboum progress-metrum) velikost 'size' (size/total*100 procent progressu),
-    // vraci informaci jestli ma akce pokracovat (FALSE = konec)
+    // adds (possibly to both progress-bars) size 'size' (size/total*100 percent of progress),
+    // returns information whether action should continue (FALSE = end)
     virtual BOOL WINAPI ProgressAddSize(int size, BOOL delayedPaint) = 0;
-    // enabluje/disabluje tlacitko Cancel
+    // enables/disables Cancel button
     virtual void WINAPI ProgressEnableCancel(BOOL enable) = 0;
-    // vraci HWND dialogu progressu (hodi se pri vypisu chyb a dotazu pri otevrenem progress-dialogu)
+    // returns HWND of progress dialog (useful when displaying errors and queries when progress-dialog is open)
     virtual HWND WINAPI ProgressGetHWND() = 0;
-    // zavre progress-dialog
+    // closes progress-dialog
     virtual void WINAPI CloseProgressDialog() = 0;
 
-    // presune vsechny soubory ze 'source' adresare do 'target' adresare,
-    // navic premapovava predpony zobrazovanych jmen ('remapNameFrom' -> 'remapNameTo')
-    // vraci uspech operace
+    // moves all files from 'source' directory to 'target' directory,
+    // additionally remaps prefixes of displayed names ('remapNameFrom' -> 'remapNameTo')
+    // returns success of operation
     virtual BOOL WINAPI MoveFiles(const char* source, const char* target, const char* remapNameFrom,
                                   const char* remapNameTo) = 0;
 };
