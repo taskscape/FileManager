@@ -10,13 +10,13 @@
 // CIconList
 //
 
-// udava pocet polozek v jedne radce; po vzoru W2K davame 4;
-// asi pro vetsi rychlost provadenych operaci?
+// specifies number of items in one row; following W2K we use 4;
+// probably for faster performed operations?
 const int IL_ITEMS_IN_ROW = 4;
 
-#define IL_TYPE_NORMAL 0 // bezna ikona, kterou lze vykreslit pres BitBlt
-#define IL_TYPE_XOR 1    // ikona obsahujici oblasti, ktere je treba XORovat
-#define IL_TYPE_ALPHA 2  // ikona obsahujici alfa kanal
+#define IL_TYPE_NORMAL 0 // regular icon that can be drawn via BitBlt
+#define IL_TYPE_XOR 1    // icon containing regions that need to be XORed
+#define IL_TYPE_ALPHA 2  // icon containing alpha channel
 
 HDC CIconList::HMemDC = NULL;
 HBITMAP CIconList::HOldBitmap = NULL;
@@ -153,12 +153,12 @@ BOOL CIconList::Create(int imageWidth, int imageHeight, int imageCount)
         HANDLES(LeaveCriticalSection(&CriticalSection));
         return FALSE;
     }
-    ZeroMemory(ImageFlags, sizeof(BYTE) * imageCount); // bez alfa kanalu
+    ZeroMemory(ImageFlags, sizeof(BYTE) * imageCount); // without alpha channel
 
     int bmpWidth = imageWidth * min(imageCount, IL_ITEMS_IN_ROW);
     int bmpHeight = imageHeight * ((imageCount + IL_ITEMS_IN_ROW - 1) / IL_ITEMS_IN_ROW);
 
-    // pomocne DC, abychom mohli vytvorit kompatibilni bitmapu
+    // helper DC so we can create compatible bitmap
     HDC hDC = HANDLES(GetDC(NULL));
     if (hDC == NULL)
     {
@@ -185,7 +185,7 @@ BOOL CIconList::Create(int imageWidth, int imageHeight, int imageCount)
     }
     MemDCLocks++;
 
-    // pokud jeste neexistuje cache/mask bitmapa nebo je mala, vytvorime ji
+    // if cache/mask bitmap does not exist yet or is too small, we create it
     if (!CreateOrEnlargeTmpImage(imageWidth, imageHeight))
     {
         HANDLES(ReleaseDC(NULL, hDC));
@@ -239,7 +239,7 @@ BOOL CIconList::CreateFromImageList(HIMAGELIST hIL, int requiredImageSize)
         return FALSE;
     }
 
-    // vytahneme geometrii image listu
+    // extract image list geometry
     int count = ImageList_GetImageCount(hIL);
     if (count == 0)
     {
@@ -288,20 +288,20 @@ BOOL CIconList::CreateFromImageList(HIMAGELIST hIL, int requiredImageSize)
     return TRUE;
 }
 
-// Pokud mam pod W2K desktop 32bpp, dostavam XP ikonky s alfa kanalem neorezane,
-// tedy vcetne alfa kanalu. Pokud prepnu desktop na 16bpp, je alfa kanal orezany (nulovany).
-// Pokud tedy ApplyMaskToImage dostane ikonku vcetne alfa kanalu, vrati typ
-// IL_TYPE_ALPHA a Salamander bude korektne zobrazovat tyto ikony i pod OS < XP
+// If I have desktop 32bpp under W2K, I get XP icons with alpha channel untrimmed,
+// that is including alpha channel. If I switch desktop to 16bpp, the alpha channel is trimmed (zeroed).
+// So if ApplyMaskToImage receives an icon including alpha channel, it returns type
+// IL_TYPE_ALPHA and Salamander will correctly display these icons even under OS < XP
 
 BYTE CIconList::ApplyMaskToImage(int index, BYTE forceXOR)
 {
     HANDLES(EnterCriticalSection(&CriticalSection));
 
-    // souradnice v bodech v HImage
+    // coordinates in points in HImage
     int iX = ImageWidth * (index % IL_ITEMS_IN_ROW);
     int iY = ImageHeight * (index / IL_ITEMS_IN_ROW);
 
-    // prohledneme celou ikonku a urcime o jaky typ se jedna (NORMAL, XOR, ALPHA)
+    // examine entire icon and determine what type it is (NORMAL, XOR, ALPHA)
     BYTE type = IL_TYPE_NORMAL;
     if (forceXOR)
         type = IL_TYPE_XOR;
@@ -323,8 +323,8 @@ BYTE CIconList::ApplyMaskToImage(int index, BYTE forceXOR)
                 if ((*maskPtr != 0) && (*ptr != 0))
                 {
                     type = IL_TYPE_XOR;
-                    // to ze je ikonka kandidat na XOR jeste neznamena,
-                    // ze nebude ALPHA, takze nemuzeme vypadnout
+                    // the fact that an icon is a candidate for XOR does not mean yet
+                    // that it won't be ALPHA, so we cannot exit
                 }
                 ptr++;
                 maskPtr++;
@@ -337,9 +337,9 @@ BYTE CIconList::ApplyMaskToImage(int index, BYTE forceXOR)
 SKIP:
     if (type == IL_TYPE_NORMAL)
     {
-        // pripravime si barvu pozadi ve spravnem formatu
+        // prepare background color in correct format
         DWORD bkClr = GetRValue(BkColor) << 16 | GetGValue(BkColor) << 8 | GetBValue(BkColor);
-        // pruhledne oblasti masky preneseme do alfa kanalu
+        // transfer transparent mask regions to alpha channel
         int row;
         for (row = 0; row < ImageHeight; row++)
         {
@@ -485,7 +485,7 @@ BOOL CIconList::ReplaceIcon(int index, HICON hIcon)
         goto BAIL;
     }
 
-    // if this is a b// pokud se jedna o b&w ikonu, mela by mit sudou vyskuw icon, it should have even height
+    // if this is a b&w icon, it should have even height
     if (ii.hbmColor == NULL && (bm.bmHeight & 1) == 1)
     {
         TRACE_E("CIconList::ReplaceIcon() Icon has wrong MASK height");
@@ -568,7 +568,7 @@ CIconList::GetIcon(int index)
         return NULL;
     }
 
-    // create B// vytvorime B&W masku + barevnou bitmapu dle obrazovkyW mask + colored bitmap according to screen
+    // create B&W mask + colored bitmap according to screen
     HDC hDC = HANDLES(GetDC(NULL));
     HBITMAP hMask = HANDLES(CreateBitmap(ImageWidth, ImageHeight, 1, 1, NULL));
     HBITMAP hColor = HANDLES(CreateCompatibleBitmap(hDC, ImageWidth, ImageHeight));
@@ -599,8 +599,8 @@ CIconList::GetIcon(int index)
             }
             else
             {
-                // v pruhledne oblasti je barva pozadi image listu, ale my tam
-                // musime dodat cernou barvu, aby fungoval XOR mechanismus kresleni
+                // in transparent area is the background color of image list, but we
+                // must provide black color there for XOR drawing mechanism to work
                 if (alpha != 0)
                     *tmpPtr = argb;
                 else
@@ -678,7 +678,7 @@ BOOL CIconList::Draw(int index, HDC hDC, int x, int y, COLORREF blendClr, DWORD 
         return FALSE;
     }
 
-    if (flags & IL_DRAW_MASK) // mask is used in drag// maska se pouziva pri drag&dropu, napriklad u shared adesaru, viz StateImageList_Draw()drop, for example for shared directories, see StateImageList_Draw()
+    if (flags & IL_DRAW_MASK) // mask is used in drag&drop, for example for shared directories, see StateImageList_Draw()
         return DrawMask(hDC, x, y, index, RGB(0, 0, 0), RGB(255, 255, 255));
     if (flags & IL_DRAW_BLEND)
         return AlphaBlend(hDC, x, y, index, BkColor, blendClr);
@@ -726,7 +726,7 @@ BOOL CIconList::DrawMask(HDC hDC, int x, int y, int index, COLORREF fgColor, COL
     SelectObject(HMemDC, HTmpImage);
     BitBlt(HMemDC, 0, 0, ImageWidth, ImageHeight, hDC, x, y, SRCCOPY);
 
-    // budeme kreslit do HTmpImage
+    // we will draw to HTmpImage
     int row;
     for (row = 0; row < ImageHeight; row++)
     {
@@ -999,7 +999,7 @@ BOOL CIconList::AlphaBlend(HDC hDC, int x, int y, int index, COLORREF bkColor, C
 
                 if (xorType && alpha == 0)
                 {
-                    // XOR // XOR && pruhledna oblast// XOR && pruhledna oblast transparent area
+                    // XOR && transparent area
                     BYTE bkR = GetRValue(bkColor);
                     BYTE bkG = GetGValue(bkColor);
                     BYTE bkB = GetBValue(bkColor);
@@ -1051,7 +1051,7 @@ BOOL CIconList::AlphaBlend(HDC hDC, int x, int y, int index, COLORREF bkColor, C
 
                 if (xorType && alpha == 0)
                 {
-                    // XOR // XOR && pruhledna oblast// XOR && pruhledna oblast transparent area
+                    // XOR && transparent area
                     *tmpPtr = (DWORD)bkR << 16 | (DWORD)bkG << 8 | (DWORD)bkB;
                     *tmpPtr ^= (argb & 0x00FFFFFF);
                 }
@@ -1400,7 +1400,7 @@ BOOL CIconList::ConvertToGrayscale(BOOL forceAlphaForBW)
             BYTE brightness = GetGrayscaleFromRGB(r, g, b);
             if (forceAlphaForBW)
             {
-                // pokud jde vystup do BW bitmapy, nastavime prah mezi bilou a cernou (odladeno na Vista ikonkach v user menu)
+                // if output goes to BW bitmap, we set threshold between white and black (tuned on Vista icons in user menu)
                 if (alpha < 200)
                     alpha = 0;
                 if (brightness > 240)
@@ -2062,7 +2062,7 @@ struct CPNGBitmapWriteCallbackData
 {
     BYTE* RawPNGIterator;
     DWORD FreeSpace;
-    // navratove hodnoty
+    // return values
     BOOL NotEnoughSpace;
     DWORD Size;
 };
@@ -2098,7 +2098,7 @@ BOOL CIconList::SaveToPNG(BYTE** rawPNG, DWORD* rawPNGSize)
         int row;
         for (row = 0; row < ImageHeight; row++)
         {
-            // souradnice v bodech ve zdroji
+            // coordinates in points in source
             int iX = ImageWidth * (index % IL_ITEMS_IN_ROW);
             int iY = ImageHeight * (index / IL_ITEMS_IN_ROW);
             BYTE* srcPtr = (BYTE*)ImageRaw + iX * 4 + (iY + row) * BitmapWidth * 4;
