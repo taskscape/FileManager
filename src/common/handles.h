@@ -1,4 +1,4 @@
-﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2023 Open Salamander Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 // CommentsTranslationProject: TRANSLATED
 
@@ -14,6 +14,37 @@
 
 // to avoid problems with semicolons in the macros defined below
 inline void __HandlesEmptyFunction() {}
+
+// UTF-8 to wide string conversion helper for Release mode
+inline WCHAR* Utf8AllocWideHandlesRelease(const char* src)
+{
+    if (src == NULL)
+        return NULL;
+    int len = MultiByteToWideChar(CP_UTF8, 0, src, -1, NULL, 0);
+    if (len <= 0)
+        return NULL;
+    WCHAR* dst = (WCHAR*)malloc(len * sizeof(WCHAR));
+    if (dst != NULL)
+        MultiByteToWideChar(CP_UTF8, 0, src, -1, dst, len);
+    return dst;
+}
+
+// LoadLibraryUtf8 for Release mode (when HANDLES_ENABLE is not defined)
+inline HINSTANCE LoadLibraryUtf8(LPCSTR lpLibFileName)
+{
+    HINSTANCE ret = NULL;
+    WCHAR* fileNameW = Utf8AllocWideHandlesRelease(lpLibFileName);
+    if (fileNameW == NULL)
+    {
+        SetLastError(ERROR_NO_UNICODE_TRANSLATION);
+    }
+    else
+    {
+        ret = ::LoadLibraryW(fileNameW);
+        free(fileNameW);
+    }
+    return ret;
+}
 
 #define HANDLES(function) ::function
 #define HANDLES_Q(function) ::function
