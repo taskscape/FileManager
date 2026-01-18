@@ -1,4 +1,4 @@
-﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2023 Open Salamander Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 // CommentsTranslationProject: TRANSLATED
 
@@ -27,19 +27,162 @@ class CMenuPopup;
 
 //
 // ****************************************************************************
+// CStringArena
+//
+// Memory arena for fast allocation of file name strings during directory listing.
+// Instead of calling malloc() for each file name, strings are allocated from
+// pre-allocated blocks, significantly reducing allocation overhead.
+//
+
+#define STRING_ARENA_BLOCK_SIZE (64 * 1024) // 64KB blocks
+
+class CStringArena
+{
+protected:
+    struct CArenaBlock
+    {
+        CArenaBlock* Next; // linked list of blocks
+        size_t Used;       // bytes used in this block
+        size_t Capacity;   // total capacity of this block
+        char Data[1];      // variable-length data array (actual size is Capacity)
+    };
+
+    CArenaBlock* FirstBlock; // head of the linked list of blocks
+    CArenaBlock* CurrentBlock; // current block for allocations
+
+    // Allocate a new block with at least 'minSize' bytes of capacity
+    CArenaBlock* AllocBlock(size_t minSize)
+    {
+        size_t capacity = (minSize > STRING_ARENA_BLOCK_SIZE) ? minSize : STRING_ARENA_BLOCK_SIZE;
+        CArenaBlock* block = (CArenaBlock*)malloc(sizeof(CArenaBlock) - 1 + capacity);
+        if (block != NULL)
+        {
+            block->Next = NULL;
+            block->Used = 0;
+            block->Capacity = capacity;
+        }
+        return block;
+    }
+
+public:
+    CStringArena()
+    {
+        FirstBlock = NULL;
+        CurrentBlock = NULL;
+    }
+
+    ~CStringArena()
+    {
+        Release();
+    }
+
+    // Release all memory held by the arena
+    void Release()
+    {
+        CArenaBlock* block = FirstBlock;
+        while (block != NULL)
+        {
+            CArenaBlock* next = block->Next;
+            free(block);
+            block = next;
+        }
+        FirstBlock = NULL;
+        CurrentBlock = NULL;
+    }
+
+    // Allocate 'size' bytes from the arena
+    // Returns NULL on failure (out of memory)
+    char* Alloc(size_t size)
+    {
+        // Align to pointer size for better performance
+        size = (size + sizeof(void*) - 1) & ~(sizeof(void*) - 1);
+
+        // Check if current block has enough space
+        if (CurrentBlock != NULL && CurrentBlock->Used + size <= CurrentBlock->Capacity)
+        {
+            char* ptr = CurrentBlock->Data + CurrentBlock->Used;
+            CurrentBlock->Used += size;
+            return ptr;
+        }
+
+        // Need a new block
+        CArenaBlock* newBlock = AllocBlock(size);
+        if (newBlock == NULL)
+            return NULL;
+
+        // Link new block
+        if (FirstBlock == NULL)
+        {
+            FirstBlock = newBlock;
+        }
+        else
+        {
+            // Insert at current position for locality
+            newBlock->Next = CurrentBlock ? CurrentBlock->Next : NULL;
+            if (CurrentBlock)
+                CurrentBlock->Next = newBlock;
+        }
+        CurrentBlock = newBlock;
+
+        char* ptr = CurrentBlock->Data + CurrentBlock->Used;
+        CurrentBlock->Used += size;
+        return ptr;
+    }
+
+    // Convenience method: allocate and copy a string
+    char* AllocString(const char* src, size_t len)
+    {
+        char* dst = Alloc(len + 1);
+        if (dst != NULL)
+        {
+            memcpy(dst, src, len);
+            dst[len] = '\0';
+        }
+        return dst;
+    }
+
+    // Check if arena is active (has any allocations)
+    BOOL IsActive() const { return FirstBlock != NULL; }
+
+    // Pre-allocate initial block to avoid first-allocation overhead
+    BOOL Preallocate()
+    {
+        if (FirstBlock == NULL)
+        {
+            FirstBlock = AllocBlock(STRING_ARENA_BLOCK_SIZE);
+            CurrentBlock = FirstBlock;
+            return FirstBlock != NULL;
+        }
+        return TRUE;
+    }
+};
+
+//
+// ****************************************************************************
 
 class CFilesArray : public TDirectArray<CFileData>
 {
 protected:
-    BOOL DeleteData; // should destructors of removed elements be called?
+    BOOL DeleteData;          // should destructors of removed elements be called?
+    CStringArena* Arena;      // optional arena for string allocations (NULL = use malloc/free)
 
 public:
     // j.r. is increasing the delta to 800 because when entering larger directories (several thousand files)
     // Enlarge() starts to really eat CPU according to the profiler
-    CFilesArray(int base = 200, int delta = 800) : TDirectArray<CFileData>(base, delta) { DeleteData = TRUE; }
+    CFilesArray(int base = 200, int delta = 800) : TDirectArray<CFileData>(base, delta)
+    {
+        DeleteData = TRUE;
+        Arena = NULL;
+    }
     ~CFilesArray() { Destroy(); }
 
     void SetDeleteData(BOOL deleteData) { DeleteData = deleteData; }
+
+    // Set the arena to use for string allocations
+    // When arena is set, strings are allocated from the arena and not freed individually
+    // The arena must outlive this CFilesArray or be released after DestroyMembers()
+    void SetArena(CStringArena* arena) { Arena = arena; }
+    CStringArena* GetArena() const { return Arena; }
 
     void DestroyMembers()
     {
@@ -47,6 +190,7 @@ public:
             TDirectArray<CFileData>::DestroyMembers();
         else
             TDirectArray<CFileData>::DetachMembers();
+        // Note: Arena is NOT released here - it's managed externally
     }
 
     void Destroy()
@@ -54,6 +198,7 @@ public:
         if (!DeleteData)
             DetachMembers();
         TDirectArray<CFileData>::Destroy();
+        Arena = NULL;
     }
 
     void Delete(int index)
@@ -70,9 +215,15 @@ public:
         if (!DeleteData)
             TRACE_E("Unexpected situation in CFilesArray::CallDestructor()");
 #endif // _DEBUG
-        free(member.Name);
-        if (member.DosName != NULL)
-            free(member.DosName);
+        // If arena is active, strings were allocated from it and will be freed
+        // when the arena is released - don't free them individually
+        if (Arena == NULL)
+        {
+            free(member.Name);
+            if (member.DosName != NULL)
+                free(member.DosName);
+        }
+        // else: strings are in the arena, will be freed in bulk
     }
 };
 

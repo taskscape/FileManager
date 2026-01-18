@@ -151,6 +151,11 @@ BOOL CFilesWindow::ReadDirectory(HWND parent, BOOL isRefresh)
     UseThumbnails = FALSE;
     Files->DestroyMembers();
     Dirs->DestroyMembers();
+    // Release the arena after DestroyMembers - old strings are now invalid
+    // Clear arena pointers first to ensure no accidental use of released arena
+    Files->SetArena(NULL);
+    Dirs->SetArena(NULL);
+    FileNamesArena.Release();
     VisibleItemsArray.InvalidateArr();
     VisibleItemsArraySurround.InvalidateArr();
     SelectedCount = 0;
@@ -213,6 +218,11 @@ BOOL CFilesWindow::ReadDirectory(HWND parent, BOOL isRefresh)
 
         Files->SetDeleteData(TRUE);
         Dirs->SetDeleteData(TRUE);
+
+        // Set up the memory arena for fast file name allocations
+        FileNamesArena.Preallocate();
+        Files->SetArena(&FileNamesArena);
+        Dirs->SetArena(&FileNamesArena);
 
         if (WaitForESCReleaseBeforeTestingESC) // waiting for ESC release (so that listing is not interrupted
                                                // immediately - this ESC probably ended modal dialog/messagebox)
@@ -585,7 +595,7 @@ BOOL CFilesWindow::ReadDirectory(HWND parent, BOOL isRefresh)
             ADD_ITEM: // to add ".."
 
                 //--- name
-                file.Name = (char*)malloc(len + 1); // allocation
+                file.Name = FileNamesArena.AllocString(st, len); // allocation from arena
                 if (file.Name == NULL)
                 {
                     if (search != NULL)
@@ -603,7 +613,6 @@ BOOL CFilesWindow::ReadDirectory(HWND parent, BOOL isRefresh)
                     //          TRACE_I("ReadDirectory: end");
                     return FALSE;
                 }
-                memmove(file.Name, st, len + 1); // copy of text
                 file.NameLen = len;
                 //--- extension
                 if (!Configuration.SortDirsByExt && (fileData.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)) // this is ptDisk
@@ -638,11 +647,11 @@ BOOL CFilesWindow::ReadDirectory(HWND parent, BOOL isRefresh)
 
                 if (fileData.cAlternateFileName[0] != 0)
                 {
-                    int l = (int)strlen(fileData.cAlternateFileName) + 1;
-                    file.DosName = (char*)malloc(l);
+                    int l = (int)strlen(fileData.cAlternateFileName);
+                    file.DosName = FileNamesArena.AllocString(fileData.cAlternateFileName, l); // allocation from arena
                     if (file.DosName == NULL)
                     {
-                        free(file.Name);
+                        // Note: file.Name is in the arena, no need to free it individually
                         if (search != NULL)
                         {
                             DestroySafeWaitWindow();
@@ -658,7 +667,6 @@ BOOL CFilesWindow::ReadDirectory(HWND parent, BOOL isRefresh)
                         //            TRACE_I("ReadDirectory: end");
                         return FALSE;
                     }
-                    memmove(file.DosName, fileData.cAlternateFileName, l);
                 }
                 else
                     file.DosName = NULL;

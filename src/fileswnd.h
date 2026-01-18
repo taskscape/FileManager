@@ -726,6 +726,8 @@ public:
     CFilesMap FilesMap;        // used for selecting items by dragging a selection box
     CScrollPanel ScrollObject; // used for automatic scrolling while working with the mouse
 
+    CStringArena FileNamesArena; // memory arena for file name allocations during directory listing
+
     CIconCache* IconCache;                // cache containing icons directly from files
     BOOL IconCacheValid;                  // is the cache already loaded?
     BOOL InactWinOptimizedReading;        // TRUE = only icons/thumbnails/overlays from the visible part of the panel are being read (used when the main window is inactive and a refresh is triggered – we try to minimize system load as we're "in the background")
