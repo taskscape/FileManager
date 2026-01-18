@@ -1,4 +1,4 @@
-﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2023 Open Salamander Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 // CommentsTranslationProject: TRANSLATED
 
@@ -19,7 +19,8 @@
 // 4/2012 - increased the buffer to ten times the old size; large files over the network now reach speeds 
 // comparable to Total Commander and finish 2-3x faster than with the previous one-tenth buffer
 // verified on local disks and across the network; I see no downside to the larger buffer
-#define OPERATION_BUFFER (10 * 32768)          // 320KB buffer for Copy and Move
+#define OPERATION_BUFFER (10 * 32768)          // 320KB buffer for Copy and Move (default for mixed/network operations)
+#define FAST_LOCAL_COPY_BUFFER (1024 * 1024)   // 1MB buffer for fast local-to-local Copy and Move (SSD/HDD to SSD/HDD)
 #define REMOVABLE_DISK_COPY_BUFFER 65536       // 64KB buffer for Copy and Move on removable media (floppy, ZIP)
 #define ASYNC_COPY_BUF_SIZE_512KB (128 * 1024) // 128KB buffer for files up to 512KB
 #define ASYNC_COPY_BUF_SIZE_2MB (256 * 1024)   // 256KB buffer for files up to 2MB
@@ -28,7 +29,7 @@
 #define ASYNC_SLOW_COPY_BUF_SIZE (8 * 1024)    // 8KB buffer for slow copy (primarily network disks over VPN)
 #define ASYNC_SLOW_COPY_BUF_MINBLOCKS 12
 
-// WARNING: HIGH_SPEED_LIMIT must be >= the largest value in the previous group (OPERATION_BUFFER,
+// WARNING: HIGH_SPEED_LIMIT must be >= the largest value in the previous group (OPERATION_BUFFER, FAST_LOCAL_COPY_BUFFER,
 //        REMOVABLE_DISK_COPY_BUFFER, ASYNC_COPY_BUF_SIZE)
 #define HIGH_SPEED_LIMIT (1024 * 1024) // when the speed-limit >= this number we throttle by inserting a braking \ Sleep after (speed-limit / HIGH_SPEED_LIMIT_BRAKE_DIV) bytes, if needed
 #define HIGH_SPEED_LIMIT_BRAKE_DIV 10  // see HIGH_SPEED_LIMIT for details

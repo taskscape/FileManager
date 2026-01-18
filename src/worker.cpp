@@ -70,6 +70,26 @@ static BOOL RemoveDirectoryUtf8(const char* path)
 // comment out when we no longer want to monitor all the messages from the asynchronous copy algorithm
 //#define ASYNC_COPY_DEBUG_MSG
 
+// Helper function to determine optimal buffer size for synchronous copy operations
+// Returns the buffer size based on drive types and operation flags
+static int GetOptimalSyncCopyBufferSize(COperations* script, DWORD opFlags)
+{
+    // For removable disks (floppies), use the smallest buffer
+    if (script->RemovableSrcDisk || script->RemovableTgtDisk)
+        return REMOVABLE_DISK_COPY_BUFFER;
+
+    // For fast local-to-local operations (both source and target are fast drives),
+    // use the larger 1MB buffer for better throughput on SSDs and HDDs
+    if ((opFlags & OPFL_SRCPATH_IS_FAST) && (opFlags & OPFL_TGTPATH_IS_FAST) &&
+        !(opFlags & OPFL_SRCPATH_IS_NET) && !(opFlags & OPFL_TGTPATH_IS_NET))
+    {
+        return FAST_LOCAL_COPY_BUFFER;
+    }
+
+    // Default: use standard buffer for network or mixed operations
+    return OPERATION_BUFFER;
+}
+
 //
 // ****************************************************************************
 // CTransferSpeedMeter
@@ -2394,9 +2414,11 @@ BOOL CheckTailOfOutFile(CAsyncCopyParams* asyncPar, HANDLE in, HANDLE out, const
 // copies ADS into the newly created file/directory
 // returns FALSE only when cancelled; success + Skip both return TRUE; Skip sets 'skip'
 // (when not NULL) to TRUE
+// 'optimalBufferSize' is the pre-computed optimal buffer size (0 = use default based on script flags)
 BOOL DoCopyADS(HWND hProgressDlg, const char* sourceName, BOOL isDir, const char* targetName,
                CQuadWord const& totalDone, CQuadWord& operDone, CQuadWord const& operTotal,
-               CProgressDlgData& dlgData, COperations* script, BOOL* skip, void* buffer)
+               CProgressDlgData& dlgData, COperations* script, BOOL* skip, void* buffer,
+               int optimalBufferSize = 0)
 {
     BOOL doCopyADSRet = TRUE;
     BOOL lowMemory;
@@ -2433,7 +2455,9 @@ COPY_ADS_AGAIN:
         if (tgtEnd > tgtName && *(tgtEnd - 1) == L'\\')
             *--tgtEnd = 0;
 
-        int bufferSize = script->RemovableSrcDisk || script->RemovableTgtDisk ? REMOVABLE_DISK_COPY_BUFFER : OPERATION_BUFFER;
+        // Use pre-computed buffer size if provided, otherwise fall back to default logic
+        int bufferSize = (optimalBufferSize > 0) ? optimalBufferSize :
+            (script->RemovableSrcDisk || script->RemovableTgtDisk ? REMOVABLE_DISK_COPY_BUFFER : OPERATION_BUFFER);
 
         char nameBuf[2 * MAX_PATH];
         BOOL endProcessing = FALSE;
@@ -4640,7 +4664,7 @@ COPY_AGAIN:
             bufferSize = ASYNC_COPY_BUF_SIZE;
     }
     else
-        bufferSize = script->RemovableSrcDisk || script->RemovableTgtDisk ? REMOVABLE_DISK_COPY_BUFFER : OPERATION_BUFFER;
+        bufferSize = GetOptimalSyncCopyBufferSize(script, op->OpFlags);
 
     int limitBufferSize = bufferSize;
     script->SetTFSandProgressSize(lastTransferredFileSize, totalDone, &limitBufferSize, bufferSize);
@@ -4978,8 +5002,10 @@ COPY_AGAIN:
                         if (operDone < COPY_MIN_FILE_SIZE)
                             operDone = COPY_MIN_FILE_SIZE; // zero/small files take at least as long as files of size COPY_MIN_FILE_SIZE
                         BOOL adsSkip = FALSE;
+                        // Pass the optimal buffer size computed from op->OpFlags for ADS copy
+                        int adsBufferSize = GetOptimalSyncCopyBufferSize(script, op->OpFlags);
                         if (!DoCopyADS(hProgressDlg, op->SourceName, FALSE, op->TargetName, totalDone,
-                                       operDone, op->Size, dlgData, script, &adsSkip, buffer) ||
+                                       operDone, op->Size, dlgData, script, &adsSkip, buffer, adsBufferSize) ||
                             adsSkip) // user hit cancel or skipped at least one ADS
                         {
                             if (out != NULL)
