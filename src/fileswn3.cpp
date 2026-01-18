@@ -34,24 +34,8 @@ int DeltaForTotalCount(int total)
     return delta;
 }
 
-static void LogReadDirectory(const char* message)
-{
-    ExecLogFeatureStart("read directory", message);
-}
-
-static void LogReadDirectoryWide(const char* prefix, const WCHAR* wstr)
-{
-    char buffer[2048];
-    sprintf(buffer, "%s", prefix);
-    int len = (int)strlen(buffer);
-    WideCharToMultiByte(CP_UTF8, 0, wstr, -1, buffer + len, sizeof(buffer) - len - 1, NULL, NULL);
-    LogReadDirectory(buffer);
-}
-
 static BOOL ConvertFindDataWToA(const WIN32_FIND_DATAW& src, WIN32_FIND_DATAA& dst)
 {
-    LogReadDirectoryWide("ConvertFindDataWToA: Processing file: ", src.cFileName);
-
     ZeroMemory(&dst, sizeof(dst));
     dst.dwFileAttributes = src.dwFileAttributes;
     dst.ftCreationTime = src.ftCreationTime;
@@ -63,17 +47,10 @@ static BOOL ConvertFindDataWToA(const WIN32_FIND_DATAW& src, WIN32_FIND_DATAA& d
     dst.dwReserved1 = src.dwReserved1;
 
     if (ConvertWideToUtf8(src.cFileName, -1, dst.cFileName, _countof(dst.cFileName)) == 0)
-    {
-        LogReadDirectoryWide("ConvertFindDataWToA: FAILED to convert filename: ", src.cFileName);
         return FALSE;
-    }
 
     if (ConvertWideToUtf8(src.cAlternateFileName, -1, dst.cAlternateFileName, _countof(dst.cAlternateFileName)) == 0)
         dst.cAlternateFileName[0] = 0;
-
-    char buffer[512];
-    sprintf(buffer, "ConvertFindDataWToA: SUCCESS - Converted to: %s", dst.cFileName);
-    LogReadDirectory(buffer);
 
     return TRUE;
 }
@@ -160,15 +137,6 @@ BOOL CFilesWindow::ReadDirectory(HWND parent, BOOL isRefresh)
                                      FALSE, "");
         }
     } listLogScope(GetPath(), &listingSuccess, &logFilesCount, &logDirsCount);
-
-    // Test logging immediately
-    LogReadDirectory("========================================");
-    LogReadDirectory("ReadDirectory() CALLED!");
-    LogReadDirectory("========================================");
-
-    char dbgMsg[1024];
-    sprintf(dbgMsg, "ReadDirectory() START: path = %s", GetPath());
-    LogReadDirectory(dbgMsg);
 
     //  TRACE_I("ReadDirectory: begin");
 
@@ -409,15 +377,8 @@ BOOL CFilesWindow::ReadDirectory(HWND parent, BOOL isRefresh)
         WIN32_FIND_DATAA fileData;
         HANDLE search;
 
-        char logMsg[1024];
-        sprintf(logMsg, "Calling FindFirstFileW for: %s", fileName);
-        LogReadDirectory(logMsg);
-
         CStrP fileNameW(ConvertAllocUtf8ToWide(fileName, -1));
         search = fileNameW != NULL ? HANDLES_Q(FindFirstFileW(fileNameW, &fileDataW)) : INVALID_HANDLE_VALUE;
-
-        sprintf(logMsg, "FindFirstFileW returned search handle: 0x%p", search);
-        LogReadDirectory(logMsg);
 
         if (search == INVALID_HANDLE_VALUE)
         {
@@ -524,10 +485,6 @@ BOOL CFilesWindow::ReadDirectory(HWND parent, BOOL isRefresh)
             do
             {
                 NumberOfItemsInCurDir++;
-
-                char logBuf[512];
-                sprintf(logBuf, "=== Loop START: Processing item #%d, file: %s ===", NumberOfItemsInCurDir, fileData.cFileName);
-                LogReadDirectory(logBuf);
 
                 // test ESC - doesn't user want to interrupt reading?
                 if (GetTickCount() - lastEscCheckTime >= 200) // 5 times per second
@@ -980,7 +937,6 @@ BOOL CFilesWindow::ReadDirectory(HWND parent, BOOL isRefresh)
             SKIP_TO_NEXT_FILE:
                 if (search == NULL)
                 {
-                    LogReadDirectory("Loop: search == NULL, breaking (second pass)");
                     testFindNextErr = FALSE;
 #ifndef _WIN64
                     isWin64RedirectedDir = FALSE;
@@ -988,31 +944,12 @@ BOOL CFilesWindow::ReadDirectory(HWND parent, BOOL isRefresh)
                     break; // the second pass (adding ".." or win64 redirected-dir)
                 }
 
-                char dbgBuf[512];
-                sprintf(dbgBuf, "Loop: Calling FindNextFileW (iteration %d)", NumberOfItemsInCurDir);
-                LogReadDirectory(dbgBuf);
-
                 do
                 {
                     hasNext = FindNextFileW(search, &fileDataW) != 0;
-                    sprintf(dbgBuf, "Loop: FindNextFileW returned %d, hasNext = %d", hasNext, hasNext);
-                    LogReadDirectory(dbgBuf);
-
                     if (hasNext && ConvertFindDataWToA(fileDataW, fileData))
-                    {
-                        LogReadDirectory("Loop: Conversion succeeded, breaking inner loop to process file");
                         break;
-                    }
-
-                    if (hasNext)
-                        LogReadDirectory("Loop: Conversion failed, continuing inner loop to get next file");
-                    else
-                        LogReadDirectory("Loop: No more files, exiting inner loop");
-
                 } while (hasNext);
-
-                sprintf(dbgBuf, "Loop: After inner loop, hasNext = %d, continuing outer loop", hasNext);
-                LogReadDirectory(dbgBuf);
 
             } while (hasNext);
             DWORD err = GetLastError();
