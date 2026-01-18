@@ -15,6 +15,7 @@
 #include "mainwnd.h"
 #include "shellib.h"
 #include "worker.h"
+#include "iconpool.h"
 #include "snooper.h"
 #include "viewer.h"
 #include "editwnd.h"
@@ -4071,6 +4072,17 @@ FIND_NEW_SLG_FILE:
     // inicializace workera (diskove operace)
     InitWorker();
 
+    // initialize icon thread pool for parallel icon extraction
+    // uses number of CPU cores - 1, minimum 2, maximum ICON_POOL_MAX_WORKERS
+    SYSTEM_INFO sysInfo;
+    GetSystemInfo(&sysInfo);
+    int iconPoolWorkers = (int)sysInfo.dwNumberOfProcessors - 1;
+    if (iconPoolWorkers < 2)
+        iconPoolWorkers = 2;
+    if (iconPoolWorkers > ICON_POOL_MAX_WORKERS)
+        iconPoolWorkers = ICON_POOL_MAX_WORKERS;
+    IconPool.Initialize(iconPoolWorkers);
+
     // inicializace knihovny pro komunikaci s SalShExt/SalamExt/SalExtX86/SalExtX64.DLL (shell copy hook + shell context menu)
     InitSalShLib();
 
@@ -4685,6 +4697,7 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
     ReleaseFileNamesEnumForViewers();
     ReleaseShellIconOverlays();
     ReleaseSalShLib();
+    IconPool.Shutdown(); // shutdown icon thread pool before worker
     ReleaseWorker();
     ReleaseViewer();
     ReleaseWinLib();

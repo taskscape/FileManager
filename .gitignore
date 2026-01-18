@@ -67,3 +67,5 @@ src/vcxproj/rebuild_release_x86.log.wrn
 .claude/settings.local.json
 nul
 tmpclaude*
+*.bak
+*.backup
