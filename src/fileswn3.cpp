@@ -57,7 +57,9 @@ static BOOL ConvertFindDataWToA(const WIN32_FIND_DATAW& src, WIN32_FIND_DATAA& d
 
 static HANDLE FindFirstFileUtf8(const char* path, WIN32_FIND_DATAA& data)
 {
-    CStrP pathW(ConvertAllocUtf8ToWide(path, -1));
+    // Use stack buffer for common case (paths under MAX_PATH), heap for long paths
+    WCHAR stackBuf[MAX_PATH];
+    CStrStackOrHeap pathW(path, stackBuf, MAX_PATH);
     if (pathW == NULL)
     {
         SetLastError(ERROR_NO_UNICODE_TRANSLATION);
@@ -387,7 +389,9 @@ BOOL CFilesWindow::ReadDirectory(HWND parent, BOOL isRefresh)
         WIN32_FIND_DATAA fileData;
         HANDLE search;
 
-        CStrP fileNameW(ConvertAllocUtf8ToWide(fileName, -1));
+        // Use stack buffer for common case (paths under MAX_PATH), heap for long paths
+        WCHAR fileNameStackBuf[MAX_PATH];
+        CStrStackOrHeap fileNameW(fileName, fileNameStackBuf, MAX_PATH);
         search = fileNameW != NULL ? HANDLES_Q(FindFirstFileW(fileNameW, &fileDataW)) : INVALID_HANDLE_VALUE;
 
         if (search == INVALID_HANDLE_VALUE)
@@ -1941,7 +1945,9 @@ BOOL AddWin64RedirectedDirAux(const char* path, const char* subDir, const char* 
         {
             HANDLE h;
             WIN32_FIND_DATAW dataW;
-            CStrP findPathW(ConvertAllocUtf8ToWide(findPath, -1));
+            // Use stack buffer - findPath is MAX_PATH so it always fits
+            WCHAR findPathStackBuf[MAX_PATH];
+            CStrStackOrHeap findPathW(findPath, findPathStackBuf, MAX_PATH);
             h = findPathW != NULL ? HANDLES_Q(FindFirstFileW(findPathW, &dataW)) : INVALID_HANDLE_VALUE; // find-data for redirected-dir can be obtained from the "." directory in the listing of redirected-dir
             if (h != INVALID_HANDLE_VALUE)
             {
@@ -1969,7 +1975,9 @@ BOOL AddWin64RedirectedDirAux(const char* path, const char* subDir, const char* 
                     {
                         WIN32_FIND_DATAW fdW;
                         WIN32_FIND_DATAA fdA;
-                        CStrP findPath2W(ConvertAllocUtf8ToWide(findPath, -1));
+                        // Use stack buffer - findPath is MAX_PATH so it always fits
+                        WCHAR findPath2StackBuf[MAX_PATH];
+                        CStrStackOrHeap findPath2W(findPath, findPath2StackBuf, MAX_PATH);
                         h = findPath2W != NULL ? HANDLES_Q(FindFirstFileW(findPath2W, &fdW)) : INVALID_HANDLE_VALUE;
                         if (h != INVALID_HANDLE_VALUE)
                         {

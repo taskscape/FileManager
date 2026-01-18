@@ -1,4 +1,4 @@
-﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2023 Open Salamander Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "precomp.h"
@@ -442,7 +442,9 @@ HANDLE CreateFileUtf8(const char* fileName, DWORD desiredAccess, DWORD shareMode
                       LPSECURITY_ATTRIBUTES securityAttributes, DWORD creationDisposition,
                       DWORD flagsAndAttributes, HANDLE templateFile)
 {
-    CStrP fileNameW(ConvertAllocUtf8ToWide(fileName, -1));
+    // Use stack buffer for common case (paths under MAX_PATH), heap for long paths
+    WCHAR stackBuf[MAX_PATH];
+    CStrStackOrHeap fileNameW(fileName, stackBuf, MAX_PATH);
     if (fileNameW == NULL)
     {
         SetLastError(ERROR_INVALID_PARAMETER);
@@ -454,7 +456,9 @@ HANDLE CreateFileUtf8(const char* fileName, DWORD desiredAccess, DWORD shareMode
 
 BOOL DeleteFileUtf8(const char* fileName)
 {
-    CStrP fileNameW(ConvertAllocUtf8ToWide(fileName, -1));
+    // Use stack buffer for common case (paths under MAX_PATH), heap for long paths
+    WCHAR stackBuf[MAX_PATH];
+    CStrStackOrHeap fileNameW(fileName, stackBuf, MAX_PATH);
     if (fileNameW == NULL)
     {
         SetLastError(ERROR_INVALID_PARAMETER);
@@ -465,7 +469,9 @@ BOOL DeleteFileUtf8(const char* fileName)
 
 BOOL CreateDirectoryUtf8(const char* dirName, LPSECURITY_ATTRIBUTES securityAttributes)
 {
-    CStrP dirNameW(ConvertAllocUtf8ToWide(dirName, -1));
+    // Use stack buffer for common case (paths under MAX_PATH), heap for long paths
+    WCHAR stackBuf[MAX_PATH];
+    CStrStackOrHeap dirNameW(dirName, stackBuf, MAX_PATH);
     if (dirNameW == NULL)
     {
         SetLastError(ERROR_INVALID_PARAMETER);
@@ -476,7 +482,9 @@ BOOL CreateDirectoryUtf8(const char* dirName, LPSECURITY_ATTRIBUTES securityAttr
 
 BOOL RemoveDirectoryUtf8(const char* dirName)
 {
-    CStrP dirNameW(ConvertAllocUtf8ToWide(dirName, -1));
+    // Use stack buffer for common case (paths under MAX_PATH), heap for long paths
+    WCHAR stackBuf[MAX_PATH];
+    CStrStackOrHeap dirNameW(dirName, stackBuf, MAX_PATH);
     if (dirNameW == NULL)
     {
         SetLastError(ERROR_INVALID_PARAMETER);
@@ -487,7 +495,9 @@ BOOL RemoveDirectoryUtf8(const char* dirName)
 
 BOOL SetFileAttributesUtf8(const char* fileName, DWORD attrs)
 {
-    CStrP fileNameW(ConvertAllocUtf8ToWide(fileName, -1));
+    // Use stack buffer for common case (paths under MAX_PATH), heap for long paths
+    WCHAR stackBuf[MAX_PATH];
+    CStrStackOrHeap fileNameW(fileName, stackBuf, MAX_PATH);
     if (fileNameW == NULL)
     {
         SetLastError(ERROR_INVALID_PARAMETER);
@@ -498,7 +508,9 @@ BOOL SetFileAttributesUtf8(const char* fileName, DWORD attrs)
 
 DWORD GetFileAttributesUtf8(const char* fileName)
 {
-    CStrP fileNameW(ConvertAllocUtf8ToWide(fileName, -1));
+    // Use stack buffer for common case (paths under MAX_PATH), heap for long paths
+    WCHAR stackBuf[MAX_PATH];
+    CStrStackOrHeap fileNameW(fileName, stackBuf, MAX_PATH);
     if (fileNameW == NULL)
     {
         SetLastError(ERROR_INVALID_PARAMETER);

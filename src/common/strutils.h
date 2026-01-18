@@ -1,4 +1,4 @@
-﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2023 Open Salamander Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #pragma once
@@ -54,6 +54,82 @@ int ConvertWideToUtf8(const WCHAR* src, int srcLen, char* buf, int bufSizeInByte
 WCHAR* ConvertAllocUtf8ToWide(const char* src, int srcLen);
 // convert UTF-16 to allocated UTF-8 string (caller frees)
 char* ConvertAllocWideToUtf8(const WCHAR* src, int srcLen);
+
+// Convert UTF-8 to wide string using stack buffer with heap fallback for long paths.
+// Tries stack buffer first, falls back to heap allocation only if needed.
+// Returns pointer to the converted string (either stackBuf or newly allocated).
+// Sets *heapAllocated to TRUE if heap allocation was used (caller must free).
+// Returns NULL on error.
+// Usage example:
+//   WCHAR stackBuf[MAX_PATH];
+//   BOOL heapAlloc;
+//   WCHAR* fileNameW = ConvertUtf8ToWideStackOrHeap(fileName, stackBuf, MAX_PATH, &heapAlloc);
+//   if (fileNameW != NULL) { ... use fileNameW ... }
+//   if (heapAlloc) free(fileNameW);
+inline WCHAR* ConvertUtf8ToWideStackOrHeap(const char* src, WCHAR* stackBuf, int stackBufSizeInChars, BOOL* heapAllocated)
+{
+    *heapAllocated = FALSE;
+    if (src == NULL)
+    {
+        SetLastError(ERROR_INVALID_PARAMETER);
+        return NULL;
+    }
+
+    // Get required length first
+    int len = MultiByteToWideChar(CP_UTF8, 0, src, -1, NULL, 0);
+    if (len <= 0)
+    {
+        SetLastError(ERROR_NO_UNICODE_TRANSLATION);
+        return NULL;
+    }
+
+    if (len <= stackBufSizeInChars)
+    {
+        // Fits in stack buffer - use it directly (no heap allocation)
+        MultiByteToWideChar(CP_UTF8, 0, src, -1, stackBuf, stackBufSizeInChars);
+        return stackBuf;
+    }
+
+    // Path too long for stack buffer - fall back to heap allocation
+    WCHAR* heapBuf = (WCHAR*)malloc(len * sizeof(WCHAR));
+    if (heapBuf == NULL)
+    {
+        SetLastError(ERROR_NOT_ENOUGH_MEMORY);
+        return NULL;
+    }
+    MultiByteToWideChar(CP_UTF8, 0, src, -1, heapBuf, len);
+    *heapAllocated = TRUE;
+    return heapBuf;
+}
+
+// Helper class for automatic cleanup of stack-or-heap wide string buffers.
+// If the string was heap-allocated, it frees the memory on destruction.
+// Usage:
+//   WCHAR stackBuf[MAX_PATH];
+//   CStrStackOrHeap fileNameW(fileName, stackBuf, MAX_PATH);
+//   if (fileNameW != NULL) { ... use fileNameW ... }
+class CStrStackOrHeap
+{
+public:
+    WCHAR* Ptr;
+    BOOL HeapAllocated;
+
+public:
+    // Convert UTF-8 string using stack buffer with heap fallback
+    CStrStackOrHeap(const char* src, WCHAR* stackBuf, int stackBufSizeInChars)
+    {
+        Ptr = ConvertUtf8ToWideStackOrHeap(src, stackBuf, stackBufSizeInChars, &HeapAllocated);
+    }
+
+    ~CStrStackOrHeap()
+    {
+        if (HeapAllocated && Ptr != NULL)
+            free(Ptr);
+    }
+
+    operator WCHAR*() { return Ptr; }
+    BOOL IsValid() const { return Ptr != NULL; }
+};
 
 // prevod WIN32_FIND_DATAW na WIN32_FIND_DATAA s UTF-8 jmeny
 BOOL ConvertFindDataWToUtf8(const WIN32_FIND_DATAW& src, WIN32_FIND_DATAA* dst);
