@@ -19,11 +19,11 @@
 // CFilesWindow
 //
 
-int DeleteThroughRecycleBinAux(SHFILEOPSTRUCT* fo)
+int DeleteThroughRecycleBinAux(SHFILEOPSTRUCTW* fo)
 {
     __try
     {
-        return SHFileOperation(fo);
+        return SHFileOperationW(fo);
     }
     __except (CCallStack::HandleException(GetExceptionInformation(), 5))
     {
@@ -99,18 +99,30 @@ BOOL CFilesWindow::DeleteThroughRecycleBin(int* selection, int selCount, CFileDa
     SetCurrentDirectory(GetPath()); // for faster operation
 
     CShellExecuteWnd shellExecuteWnd;
-    SHFILEOPSTRUCT fo;
+    SHFILEOPSTRUCTW fo;
     fo.hwnd = shellExecuteWnd.Create(MainWindow->HWindow, "SEW: CFilesWindow::DeleteThroughRecycleBin");
     fo.wFunc = FO_DELETE;
-    fo.pFrom = names.Text;
-    fo.pTo = NULL;
-    fo.fFlags = FOF_ALLOWUNDO;
-    fo.fAnyOperationsAborted = FALSE;
-    fo.hNameMappings = NULL;
-    fo.lpszProgressTitle = "";
-    // Perform the actual deletion - wonderfully simple, unfortunately it sometimes crashes ;-)
-    CALL_STACK_MESSAGE1("CFilesWindow::DeleteThroughRecycleBin::SHFileOperation");
-    BOOL ret = DeleteThroughRecycleBinAux(&fo) == 0;
+
+    // Convert names to Wide (it's already double-null terminated in UTF-8 sense)
+    // MultiByteToWideChar with -1 won't work because of multiple nulls.
+    // Use names.Length + 1 to include the double-null.
+    int namesLenW = MultiByteToWideChar(CP_UTF8, 0, names.Text, names.Length + 1, NULL, 0);
+    WCHAR* namesW = (WCHAR*)malloc(namesLenW * sizeof(WCHAR));
+    if (namesW != NULL)
+    {
+        MultiByteToWideChar(CP_UTF8, 0, names.Text, names.Length + 1, namesW, namesLenW);
+        fo.pFrom = namesW;
+        fo.pTo = NULL;
+        fo.fFlags = FOF_ALLOWUNDO;
+        fo.fAnyOperationsAborted = FALSE;
+        fo.hNameMappings = NULL;
+        fo.lpszProgressTitle = L"";
+        // Perform the actual deletion - wonderfully simple, unfortunately it sometimes crashes ;-)
+        CALL_STACK_MESSAGE1("CFilesWindow::DeleteThroughRecycleBin::SHFileOperation");
+        DeleteThroughRecycleBinAux(&fo);
+        free(namesW);
+    }
+
     SetCurrentDirectoryToSystem();
 
     return FALSE; /*ret && !fo.fAnyOperationsAborted*/

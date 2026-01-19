@@ -1070,7 +1070,7 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
         }
         return NULL;
     }
-    char* txt = new char[len + 1];
+    char* txt = (char*)malloc(len + 1);
     if (txt == NULL)
     {
         TRACE_E(LOW_MEMORY);

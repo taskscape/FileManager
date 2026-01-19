@@ -17,51 +17,108 @@ NTFSCONTROLFILE DynNtFsControlFile = NULL;
 
 COperationsQueue OperationsQueue; // queue of disk operations
 
+static WCHAR* SafeConvertAllocUtf8ToWide(const char* src, int len)
+{
+    __try {
+        return ConvertAllocUtf8ToWide(src, len);
+    } __except(EXCEPTION_EXECUTE_HANDLER) {
+        SetLastError(ERROR_NOACCESS);
+        return NULL;
+    }
+}
+
+static HANDLE SafeCreateFileW(LPCWSTR lpFileName, DWORD dwDesiredAccess, DWORD dwShareMode,
+                              LPSECURITY_ATTRIBUTES lpSecurityAttributes, DWORD dwCreationDisposition,
+                              DWORD dwFlagsAndAttributes, HANDLE hTemplateFile)
+{
+    __try {
+        return CreateFileW(lpFileName, dwDesiredAccess, dwShareMode, lpSecurityAttributes,
+                           dwCreationDisposition, dwFlagsAndAttributes, hTemplateFile);
+    } __except(EXCEPTION_EXECUTE_HANDLER) {
+        SetLastError(ERROR_NOACCESS);
+        return INVALID_HANDLE_VALUE;
+    }
+}
+
+static BOOL SafeDeleteFileW(LPCWSTR lpFileName)
+{
+    __try {
+        return DeleteFileW(lpFileName);
+    } __except(EXCEPTION_EXECUTE_HANDLER) {
+        SetLastError(ERROR_NOACCESS);
+        return FALSE;
+    }
+}
+
+static BOOL SafeSetFileAttributesW(LPCWSTR lpFileName, DWORD dwFileAttributes)
+{
+    __try {
+        return SetFileAttributesW(lpFileName, dwFileAttributes);
+    } __except(EXCEPTION_EXECUTE_HANDLER) {
+        SetLastError(ERROR_NOACCESS);
+        return FALSE;
+    }
+}
+
+static BOOL SafeRemoveDirectoryW(LPCWSTR lpPathName)
+{
+    __try {
+        return RemoveDirectoryW(lpPathName);
+    } __except(EXCEPTION_EXECUTE_HANDLER) {
+        SetLastError(ERROR_NOACCESS);
+        return FALSE;
+    }
+}
+
 static HANDLE CreateFileUtf8(const char* fileName, DWORD desiredAccess, DWORD shareMode,
                              LPSECURITY_ATTRIBUTES securityAttributes, DWORD creationDisposition,
                              DWORD flagsAndAttributes, HANDLE templateFile)
 {
-    CStrP fileNameW(ConvertAllocUtf8ToWide(fileName, -1));
+    WCHAR* wName = SafeConvertAllocUtf8ToWide(fileName, -1);
+    CStrP fileNameW(wName);
     if (fileNameW == NULL)
     {
         SetLastError(ERROR_NO_UNICODE_TRANSLATION);
         return INVALID_HANDLE_VALUE;
     }
-    return CreateFileW(fileNameW, desiredAccess, shareMode, securityAttributes, creationDisposition,
-                       flagsAndAttributes, templateFile);
+    return SafeCreateFileW(fileNameW, desiredAccess, shareMode, securityAttributes, creationDisposition,
+                           flagsAndAttributes, templateFile);
 }
 
 static BOOL DeleteFileUtf8(const char* fileName)
 {
-    CStrP fileNameW(ConvertAllocUtf8ToWide(fileName, -1));
+    WCHAR* wName = SafeConvertAllocUtf8ToWide(fileName, -1);
+    CStrP fileNameW(wName);
     if (fileNameW == NULL)
     {
         SetLastError(ERROR_NO_UNICODE_TRANSLATION);
         return FALSE;
     }
-    return DeleteFileW(fileNameW);
+    return SafeDeleteFileW(fileNameW);
 }
 
 static BOOL SetFileAttributesUtf8(const char* fileName, DWORD attrs)
 {
-    CStrP fileNameW(ConvertAllocUtf8ToWide(fileName, -1));
+    WCHAR* wName = SafeConvertAllocUtf8ToWide(fileName, -1);
+    CStrP fileNameW(wName);
     if (fileNameW == NULL)
     {
         SetLastError(ERROR_NO_UNICODE_TRANSLATION);
         return FALSE;
     }
-    return SetFileAttributesW(fileNameW, attrs);
+    return SafeSetFileAttributesW(fileNameW, attrs);
 }
 
 static BOOL RemoveDirectoryUtf8(const char* path)
 {
-    CStrP pathW(ConvertAllocUtf8ToWide(path, -1));
+    WCHAR* wName = SafeConvertAllocUtf8ToWide(path, -1);
+    CStrP pathW(wName);
     if (pathW == NULL)
     {
         SetLastError(ERROR_NO_UNICODE_TRANSLATION);
         return FALSE;
     }
-    return RemoveDirectoryW(pathW);
+    return SafeRemoveDirectoryW(pathW);
 }
 
 // if defined, various debug messages are written to TRACE
@@ -3028,41 +3085,129 @@ COPY_ADS_AGAIN:
     return doCopyADSRet;
 }
 
-static WCHAR* SafeConvertAllocUtf8ToWide(const char* src, int len)
-{
-    __try {
-        return ConvertAllocUtf8ToWide(src, len);
-    } __except(EXCEPTION_EXECUTE_HANDLER) {
-        SetLastError(ERROR_NOACCESS);
-        return NULL;
-    }
-}
-
-static HANDLE SafeCreateFileW(LPCWSTR lpFileName, DWORD dwDesiredAccess, DWORD dwShareMode,
-                              LPSECURITY_ATTRIBUTES lpSecurityAttributes, DWORD dwCreationDisposition,
-                              DWORD dwFlagsAndAttributes, HANDLE hTemplateFile)
-{
-    __try {
-        return CreateFileW(lpFileName, dwDesiredAccess, dwShareMode, lpSecurityAttributes,
-                           dwCreationDisposition, dwFlagsAndAttributes, hTemplateFile);
-    } __except(EXCEPTION_EXECUTE_HANDLER) {
-        SetLastError(ERROR_NOACCESS);
-        return INVALID_HANDLE_VALUE;
-    }
-}
-
 HANDLE SalCreateFileEx(const char* fileName, DWORD desiredAccess,
                        DWORD shareMode, DWORD flagsAndAttributes, BOOL* encryptionNotSupported)
 {
-    WCHAR* wName = SafeConvertAllocUtf8ToWide(fileName, -1);
-    CStrP fileNameW(wName);
+    CStrP fileNameW(ConvertAllocUtf8ToWide(fileName, -1));
     if (fileNameW == NULL)
     {
         SetLastError(ERROR_NO_UNICODE_TRANSLATION);
         return INVALID_HANDLE_VALUE;
     }
-    HANDLE out = NOHANDLES(SafeCreateFileW(fileNameW, desiredAccess, shareMode, NULL,
+    HANDLE out = NOHANDLES(CreateFileW(fileNameW, desiredAccess, shareMode, NULL,
                                        CREATE_NEW, flagsAndAttributes, NULL));
+    if (out == INVALID_HANDLE_VALUE)
+    {
+        DWORD err = GetLastError();
+        if (encryptionNotSupported != NULL && (flagsAndAttributes & FILE_ATTRIBUTE_ENCRYPTED))
+        { // when the target disk cannot create an Encrypted file (observed on NTFS network disk (tested on share from XP) while logged in under a different username than we have in the system (on the current console) - the remote machine has a same-named user without a password, so it cannot be used over the network)
+            out = NOHANDLES(CreateFileW(fileNameW, desiredAccess, shareMode, NULL,
+                                        CREATE_NEW, (flagsAndAttributes & ~(FILE_ATTRIBUTE_ENCRYPTED | FILE_ATTRIBUTE_READONLY)), NULL));
+            if (out != INVALID_HANDLE_VALUE)
+            {
+                *encryptionNotSupported = TRUE;
+                NOHANDLES(CloseHandle(out));
+                out = INVALID_HANDLE_VALUE;
+                if (!DeleteFileW(fileNameW)) // XP and Vista ignore this scenario, so do the same (at worst warn user that a zero-length file was added on disk and cannot be deleted)
+                    TRACE_I("Unable to delete testing target file: " << fileName);
+            }
+        }
+        if (err == ERROR_FILE_EXISTS || // check whether this is merely overwriting the DOS name
+            err == ERROR_ALREADY_EXISTS ||
+            err == ERROR_ACCESS_DENIED)
+        {
+            WIN32_FIND_DATAW data;
+            HANDLE find = HANDLES_Q(FindFirstFileW(fileNameW, &data));
+            if (find != INVALID_HANDLE_VALUE)
+            {
+                HANDLES(FindClose(find));
+                if (err != ERROR_ACCESS_DENIED || (data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY))
+                {
+                    const char* tgtName = SalPathFindFileName(fileName);
+                    char altName[MAX_PATH];
+                    char fullName[MAX_PATH];
+                    if (ConvertWideToUtf8(data.cAlternateFileName, -1, altName, _countof(altName)) == 0)
+                        altName[0] = 0;
+                    if (ConvertWideToUtf8(data.cFileName, -1, fullName, _countof(fullName)) == 0)
+                        fullName[0] = 0;
+                    if (StrICmp(tgtName, altName) == 0 && // match only for DOS name
+                        StrICmp(tgtName, fullName) != 0) // (full name differs)
+                    {
+                        // rename ("tidy up") the file/directory with the conflicting DOS name to a temporary 8.3 name (no extra DOS name needed)
+                        char tmpName[MAX_PATH + 20];
+                        lstrcpyn(tmpName, fileName, MAX_PATH);
+                        CutDirectory(tmpName);
+                        SalPathAddBackslash(tmpName, MAX_PATH + 20);
+                        char* tmpNamePart = tmpName + strlen(tmpName);
+                        char origFullName[MAX_PATH];
+                        if (SalPathAppend(tmpName, fullName, MAX_PATH))
+                        {
+                            strcpy(origFullName, tmpName);
+                            DWORD num = (GetTickCount() / 10) % 0xFFF;
+                            DWORD origFullNameAttr = SalGetFileAttributes(origFullName);
+                            while (1)
+                            {
+                                sprintf(tmpNamePart, "sal%03X", num++);
+                                if (SalMoveFile(origFullName, tmpName))
+                                    break;
+                                DWORD e = GetLastError();
+                                if (e != ERROR_FILE_EXISTS && e != ERROR_ALREADY_EXISTS)
+                                {
+                                    tmpName[0] = 0;
+                                    break;
+                                }
+                            }
+                            if (tmpName[0] != 0) // if we successfully "tidied" the conflicting file, try creating
+                            {                    // the target file again, then restore the original name
+                                out = NOHANDLES(CreateFileW(fileNameW, desiredAccess, shareMode, NULL,
+                                                            CREATE_NEW, flagsAndAttributes, NULL));
+                                if (out == INVALID_HANDLE_VALUE && encryptionNotSupported != NULL &&
+                                    (flagsAndAttributes & FILE_ATTRIBUTE_ENCRYPTED))
+                                { // when the target disk cannot create an Encrypted file (observed on NTFS network disk (tested on share from XP) while logged in under a different username than we have in the system (on the current console) - the remote machine has a same-named user without a password, so it cannot be used over the network)
+                                    out = NOHANDLES(CreateFileW(fileNameW, desiredAccess, shareMode, NULL,
+                                                                CREATE_NEW, (flagsAndAttributes & ~(FILE_ATTRIBUTE_ENCRYPTED | FILE_ATTRIBUTE_READONLY)), NULL));
+                                    if (out != INVALID_HANDLE_VALUE)
+                                    {
+                                        *encryptionNotSupported = TRUE;
+                                        NOHANDLES(CloseHandle(out));
+                                        out = INVALID_HANDLE_VALUE;
+                                        if (!DeleteFileW(fileNameW)) // XP and Vista ignore this scenario, so do the same (at worst warn user that a zero-length file was added on disk and cannot be deleted)
+                                            TRACE_E("Unable to delete testing target file: " << fileName);
+                                    }
+                                }
+                                if (!SalMoveFile(tmpName, origFullName))
+                                { // this apparently can happen; inexplicably, Windows creates a file named origFullName instead of fileName (the DOS name)
+                                    TRACE_I("Unexpected situation in SalCreateFileEx(): unable to rename file from tmp-name to original long file name! " << origFullName);
+
+                                    if (out != INVALID_HANDLE_VALUE)
+                                    {
+                                        NOHANDLES(CloseHandle(out));
+                                        out = INVALID_HANDLE_VALUE;
+                                        DeleteFileW(fileNameW);
+                                        if (!SalMoveFile(tmpName, origFullName))
+                                            TRACE_E("Fatal unexpected situation in SalCreateFileEx(): unable to rename file from tmp-name to original long file name! " << origFullName);
+                                    }
+                                }
+                                else
+                                {
+                                    if ((origFullNameAttr & FILE_ATTRIBUTE_ARCHIVE) == 0)
+                                    {
+                                        CStrP origFullNameW(ConvertAllocUtf8ToWide(origFullName, -1));
+                                        if (origFullNameW != NULL)
+                                            SetFileAttributesW(origFullNameW, origFullNameAttr); // leave without extra handling or retry; not critical (normally toggles unpredictably)
+                                    }
+                                }
+                            }
+                        }
+                        else
+                            TRACE_E("SalCreateFileEx(): Original full file name is too long, unable to bypass only-dos-name-overwrite problem!");
+                    }
+                }
+            }
+        }
+        if (out == INVALID_HANDLE_VALUE)
+            SetLastError(err);
+    }
     return out;
 }
 
@@ -6291,27 +6436,44 @@ BOOL DoDeleteFile(HWND hProgressDlg, char* name, const CQuadWord& size, COperati
             }
             if (useRecycleBin)
             {
-                char nameList[MAX_PATH + 1];
-                int l = (int)strlen(name) + 1;
-                memmove(nameList, name, l);
-                nameList[l] = 0;
-                if (!PathContainsValidComponents(nameList, FALSE))
+                if (!PathContainsValidComponents((char*)name, FALSE))
                 {
                     err = ERROR_INVALID_NAME;
                 }
                 else
                 {
-                    CShellExecuteWnd shellExecuteWnd;
-                    SHFILEOPSTRUCT opCode;
-                    memset(&opCode, 0, sizeof(opCode));
+                    CStrP nameW(ConvertAllocUtf8ToWide(name, -1));
+                    if (nameW == NULL)
+                    {
+                        err = ERROR_NO_UNICODE_TRANSLATION;
+                    }
+                    else
+                    {
+                        int nameLen = lstrlenW(nameW);
+                        WCHAR* nameListW = (WCHAR*)malloc((nameLen + 2) * sizeof(WCHAR));
+                        if (nameListW == NULL)
+                        {
+                            err = ERROR_NOT_ENOUGH_MEMORY;
+                        }
+                        else
+                        {
+                            memcpy(nameListW, nameW, (nameLen + 1) * sizeof(WCHAR));
+                            nameListW[nameLen + 1] = 0; // double null
 
-                    opCode.hwnd = shellExecuteWnd.Create(hProgressDlg, "SEW: DoDeleteFile");
+                            CShellExecuteWnd shellExecuteWnd;
+                            SHFILEOPSTRUCTW opCode;
+                            memset(&opCode, 0, sizeof(opCode));
 
-                    opCode.wFunc = FO_DELETE;
-                    opCode.pFrom = nameList;
-                    opCode.fFlags = FOF_ALLOWUNDO | FOF_SILENT | FOF_NOCONFIRMATION;
-                    opCode.lpszProgressTitle = "";
-                    err = SHFileOperation(&opCode);
+                            opCode.hwnd = shellExecuteWnd.Create(hProgressDlg, "SEW: DoDeleteFile");
+
+                            opCode.wFunc = FO_DELETE;
+                            opCode.pFrom = nameListW;
+                            opCode.fFlags = FOF_ALLOWUNDO | FOF_SILENT | FOF_NOCONFIRMATION;
+                            opCode.lpszProgressTitle = L"";
+                            err = SHFileOperationW(&opCode);
+                            free(nameListW);
+                        }
+                    }
                 }
             }
             else
@@ -6938,27 +7100,44 @@ BOOL DoDeleteDir(HWND hProgressDlg, char* name, const CQuadWord& size, COperatio
              !script->InvertRecycleBin && dlgData.UseRecycleBin == 1) &&
             IsDirectoryEmpty(name)) // subdirectory must not contain any files!!!
         {
-            char nameList[MAX_PATH + 1];
-            int l = (int)strlen(name) + 1;
-            memmove(nameList, name, l);
-            nameList[l] = 0;
-            if (!PathContainsValidComponents(nameList, FALSE))
+            if (!PathContainsValidComponents((char*)name, FALSE))
             {
                 err = ERROR_INVALID_NAME;
             }
             else
             {
-                CShellExecuteWnd shellExecuteWnd;
-                SHFILEOPSTRUCT opCode;
-                memset(&opCode, 0, sizeof(opCode));
+                CStrP nameW(ConvertAllocUtf8ToWide(name, -1));
+                if (nameW == NULL)
+                {
+                    err = ERROR_NO_UNICODE_TRANSLATION;
+                }
+                else
+                {
+                    int nameLen = lstrlenW(nameW);
+                    WCHAR* nameListW = (WCHAR*)malloc((nameLen + 2) * sizeof(WCHAR));
+                    if (nameListW == NULL)
+                    {
+                        err = ERROR_NOT_ENOUGH_MEMORY;
+                    }
+                    else
+                    {
+                        memcpy(nameListW, nameW, (nameLen + 1) * sizeof(WCHAR));
+                        nameListW[nameLen + 1] = 0; // double null
 
-                opCode.hwnd = shellExecuteWnd.Create(hProgressDlg, "SEW: DoDeleteDir");
+                        CShellExecuteWnd shellExecuteWnd;
+                        SHFILEOPSTRUCTW opCode;
+                        memset(&opCode, 0, sizeof(opCode));
 
-                opCode.wFunc = FO_DELETE;
-                opCode.pFrom = nameList;
-                opCode.fFlags = FOF_ALLOWUNDO | FOF_SILENT | FOF_NOCONFIRMATION;
-                opCode.lpszProgressTitle = "";
-                err = SHFileOperation(&opCode);
+                        opCode.hwnd = shellExecuteWnd.Create(hProgressDlg, "SEW: DoDeleteDir");
+
+                        opCode.wFunc = FO_DELETE;
+                        opCode.pFrom = nameListW;
+                        opCode.fFlags = FOF_ALLOWUNDO | FOF_SILENT | FOF_NOCONFIRMATION;
+                        opCode.lpszProgressTitle = L"";
+                        err = SHFileOperationW(&opCode);
+                        free(nameListW);
+                    }
+                }
             }
         }
         else
@@ -8240,7 +8419,7 @@ unsigned ThreadWorkerBody(void* parameter)
                 // to the temporary file
                 if (tgtBuffer == NULL) // first pass?
                 {
-                    tgtBuffer = (char*)malloc(OPERATION_BUFFER * 2);
+                    tgtBuffer = (char*)malloc(FAST_LOCAL_COPY_BUFFER * 2);
                     if (tgtBuffer == NULL)
                     {
                         TRACE_E(LOW_MEMORY);
@@ -8378,7 +8557,7 @@ HANDLE StartWorker(COperations* script, HWND hDlg, CChangeAttrsData* attrsData,
     else
     {
         data.BufferIsAllocated = TRUE;
-        data.Buffer = malloc(max(REMOVABLE_DISK_COPY_BUFFER, OPERATION_BUFFER));
+        data.Buffer = malloc(FAST_LOCAL_COPY_BUFFER);
         if (data.Buffer == NULL)
         {
             TRACE_E(LOW_MEMORY);
@@ -8412,9 +8591,9 @@ void FreeScript(COperations* script)
     {
         COperation* op = &script->At(i);
         if (op->SourceName != NULL && op->Opcode != ocCopyDirTime && op->Opcode != ocLabelForSkipOfCreateDir)
-            delete[] op->SourceName;
+            free(op->SourceName);
         if (op->TargetName != NULL && op->Opcode != ocChangeAttrs && op->Opcode != ocLabelForSkipOfCreateDir)
-            delete[] op->TargetName;
+            free(op->TargetName);
     }
     if (script->WaitInQueueSubject != NULL)
         free(script->WaitInQueueSubject);

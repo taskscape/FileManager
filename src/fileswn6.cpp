@@ -1385,7 +1385,7 @@ BOOL CFilesWindow::BuildScriptMain(COperations* script, CActionType type,
                         {
                             if ((op.TargetName = BuildName(sourcePath, oneFile->Name)) == NULL) // too long name already handled by previous condition
                             {
-                                delete[] op.SourceName;
+                                free(op.SourceName);
                                 SetCurrentDirectoryToSystem();
                                 return FALSE;
                             }
@@ -1397,8 +1397,8 @@ BOOL CFilesWindow::BuildScriptMain(COperations* script, CActionType type,
                                 script->Add(op);
                             if (sameName || !script->IsGood())
                             {
-                                delete[] op.SourceName;
-                                delete[] op.TargetName;
+                                free(op.SourceName);
+                                free(op.TargetName);
                                 if (!sameName)
                                 {
                                     script->ResetState();
@@ -1675,7 +1675,7 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
         if (!script->IsGood())
         {
             script->ResetState();
-            delete[] op.SourceName;
+            free(op.SourceName);
             return FALSE;
         }
         else
@@ -1744,7 +1744,7 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
                 }
                 if ((op.TargetName = BuildName(targetPath, NULL)) == NULL)
                 {
-                    delete[] op.SourceName;
+                    free(op.SourceName);
                     goto _ERROR;
                 }
                 *sourceEnd = 0; // restoring sourcePath
@@ -1753,8 +1753,8 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
                 if (!script->IsGood())
                 {
                     script->ResetState();
-                    delete[] op.SourceName;
-                    delete[] op.TargetName;
+                    free(op.SourceName);
+                    free(op.TargetName);
                     return FALSE;
                 }
                 else
@@ -1814,14 +1814,14 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
                             goto _ERROR;
                         if ((op.TargetName = BuildName(targetPath, NULL)) == NULL)
                         {
-                            delete[] op.SourceName;
+                            free(op.SourceName);
                             goto _ERROR;
                         }
                         createDirIndex = script->Add(op);
                         if (!script->IsGood())
                         {
-                            delete[] op.SourceName;
-                            delete[] op.TargetName;
+                            free(op.SourceName);
+                            free(op.TargetName);
                             script->ResetState();
                             goto _ERROR;
                         }
@@ -1980,15 +1980,15 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
                 goto _ERROR;
             if ((op.TargetName = BuildName(targetPath, NULL)) == NULL)
             {
-                delete[] op.SourceName;
+                free(op.SourceName);
                 goto _ERROR;
             }
             createDirIndex = script->Add(op);
             if (!script->IsGood())
             {
                 script->ResetState();
-                delete[] op.SourceName;
-                delete[] op.TargetName;
+                free(op.SourceName);
+                free(op.TargetName);
                 goto _ERROR;
             }
         }
@@ -2010,7 +2010,7 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
         if (!script->IsGood())
         {
             script->ResetState();
-            delete[] op.SourceName;
+            free(op.SourceName);
             *sourceEnd = 0; // restoring sourcePath
             return FALSE;
         }
@@ -2315,7 +2315,7 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
         }
         if ((op.TargetName = BuildName(sourcePath, dirName)) == NULL) // overly long name not a concern here, previous condition would handle it
         {
-            delete[] op.SourceName;
+            free(op.SourceName);
             return FALSE;
         }
         int offset = (int)strlen(op.SourceName) - (int)strlen(dirName);
@@ -2326,8 +2326,8 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
             script->Add(op);
         if (sameName || !script->IsGood())
         {
-            delete[] op.SourceName;
-            delete[] op.TargetName;
+            free(op.SourceName);
+            free(op.TargetName);
             if (!sameName)
             {
                 script->ResetState();
@@ -2367,12 +2367,7 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
             op.OpFlags = 0;
             op.Size = CHATTRS_FILE_SIZE;
             op.SourceName = sourceDirTime != NULL ? (char*)(DWORD_PTR)sourceDirTime->dwLowDateTime : NULL;
-            {
-                const char* src = script->At(createDirIndex).TargetName;
-                int len = (int)strlen(src) + 1;
-                op.TargetName = new char[len];
-                memcpy(op.TargetName, src, len);
-            }
+            op.TargetName = DupStr(script->At(createDirIndex).TargetName);
             if (op.TargetName == NULL)
                 return FALSE;
             op.Attr = sourceDirTime != NULL ? sourceDirTime->dwHighDateTime : 0;
@@ -2413,7 +2408,7 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
                 if (!script->IsGood())
                 {
                     script->ResetState();
-                    delete[] op.SourceName;
+                    free(op.SourceName);
                     return FALSE;
                 }
             }
@@ -2568,7 +2563,7 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
                 if (msgRes == DIALOG_NO /* Skip All */)
                     ErrTooBigFileFAT32SkipAll = TRUE;
             }
-            delete[] op.SourceName;
+            free(op.SourceName);
             return (msgRes == DIALOG_YES /* Skip */ || msgRes == DIALOG_NO /* Skip All */);
         }
         char finalName[2 * MAX_PATH + 200]; // +200 is a reserve (Windows creates paths longer than MAX_PATH)
@@ -2582,7 +2577,7 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
                                            MaskName(finalName, 2 * MAX_PATH + 200, fileName, opMask),
                                            NULL, &skip, &ErrTooLongTgtNameSkipAll, sourcePath)) == NULL)
             {
-                delete[] op.SourceName;
+                free(op.SourceName);
                 return skip;
             }
         }
@@ -2591,15 +2586,15 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
             if ((op.TargetName = BuildName(targetPath, mapName, NULL, &skip,
                                            &ErrTooLongTgtNameSkipAll, sourcePath)) == NULL)
             {
-                delete[] op.SourceName;
+                free(op.SourceName);
                 return skip;
             }
         }
         if (type == atMove && strcmp(op.SourceName, op.TargetName) == 0 ||
             type == atCopy && StrICmp(op.SourceName, op.TargetName) == 0)
         {
-            delete[] op.SourceName;
-            delete[] op.TargetName;
+            free(op.SourceName);
+            free(op.TargetName);
             if (type == atMove) // moving where it already is ...
             {
                 SalMessageBox(MainWindow->HWindow, LoadStr(IDS_CANNOTMOVEFILETOITSELF),
@@ -2655,8 +2650,8 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
 
                             if (CompareFileTime(&roundedInTime, &dataOut.ftLastWriteTime) <= 0) // source file is not newer than the target one - skip the copy operation
                             {
-                                delete[] op.SourceName;
-                                delete[] op.TargetName;
+                                free(op.SourceName);
+                                free(op.TargetName);
                                 return TRUE;
                             }
                             op.OpFlags |= OPFL_OVERWROLDERALRTESTED;
@@ -2679,7 +2674,7 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
                     // file too large for FAT32 (warn the user the operation will likely fail)
                     if (targetPathIsFAT32 && fileSizeLoc > CQuadWord(0xFFFFFFFF /* 4GB minus 1 Byte */, 0))
                     {
-                        delete[] op.TargetName;
+                        free(op.TargetName);
                         op.TargetName = NULL;
 
                         goto FAT_TOO_BIG_FILE;
@@ -2747,15 +2742,15 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
                             ConfirmADSLossSkipAll = TRUE; // intentional fallthrough
                         case IDB_SKIP:
                         {
-                            delete[] op.SourceName;
-                            delete[] op.TargetName;
+                            free(op.SourceName);
+                            free(op.TargetName);
                             return TRUE;
                         }
 
                         case IDCANCEL:
                         {
-                            delete[] op.SourceName;
-                            delete[] op.TargetName;
+                            free(op.SourceName);
+                            free(op.TargetName);
                             return FALSE;
                         }
                         }
@@ -2805,8 +2800,8 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
 
                             case IDCANCEL:
                             {
-                                delete[] op.SourceName;
-                                delete[] op.TargetName;
+                                free(op.SourceName);
+                                free(op.TargetName);
                                 return FALSE;
                             }
                             }
@@ -2834,15 +2829,15 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
                                 ErrFileSkipAll = TRUE; // intentional fallthrough
                             case IDB_SKIP:
                             {
-                                delete[] op.SourceName;
-                                delete[] op.TargetName;
+                                free(op.SourceName);
+                                free(op.TargetName);
                                 return TRUE;
                             }
 
                             case IDCANCEL:
                             {
-                                delete[] op.SourceName;
-                                delete[] op.TargetName;
+                                free(op.SourceName);
+                                free(op.TargetName);
                                 return FALSE;
                             }
                             }
@@ -2871,8 +2866,8 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
         if (!script->IsGood())
         {
             script->ResetState();
-            delete[] op.SourceName;
-            delete[] op.TargetName;
+            free(op.SourceName);
+            free(op.TargetName);
             return FALSE;
         }
         else
@@ -2896,7 +2891,7 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
         if (!script->IsGood())
         {
             script->ResetState();
-            delete[] op.SourceName;
+            free(op.SourceName);
             return FALSE;
         }
         else
@@ -3000,7 +2995,7 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
         if (!script->IsGood())
         {
             script->ResetState();
-            delete[] op.SourceName;
+            free(op.SourceName);
             return FALSE;
         }
         else
@@ -3025,7 +3020,7 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
         if (!script->IsGood())
         {
             script->ResetState();
-            delete[] op.SourceName;
+            free(op.SourceName);
             return FALSE;
         }
         else
@@ -3047,7 +3042,7 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
         }
         if ((op.TargetName = BuildName(sourcePath, fileName)) == NULL) // if the name is too long, it will manifest already at this earlier condition
         {
-            delete[] op.SourceName;
+            free(op.SourceName);
             return FALSE;
         }
         int offset = (int)strlen(op.SourceName) - (int)strlen(fileName);
@@ -3058,8 +3053,8 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
             script->Add(op);
         if (sameName || !script->IsGood())
         {
-            delete[] op.SourceName;
-            delete[] op.TargetName;
+            free(op.SourceName);
+            free(op.TargetName);
             if (!script->IsGood())
                 script->ResetState();
             return sameName;
