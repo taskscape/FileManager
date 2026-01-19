@@ -1,0 +1,22 @@
+{
+    "version": 1,
+    "revision": 0,
+    "rules": [
+        {
+            "primary-output": "salamander\\Release_x64\\plugins\\wmobile\\lang\\Intermediate\\microsoft\\STL\\std.obj",
+            "outputs": [
+                "salamander\\Release_x64\\plugins\\wmobile\\lang\\Intermediate\\microsoft\\STL\\std.ixx.ifc.dt.module.json",
+                "salamander\\Release_x64\\plugins\\wmobile\\lang\\Intermediate\\microsoft\\STL\\std.ixx.ifc.dt.d.json",
+                "salamander\\Release_x64\\plugins\\wmobile\\lang\\Intermediate\\microsoft\\STL\\std.ifc"
+            ],
+            "provides": [
+                {
+                    "logical-name": "std",
+                    "source-path": "c:\\program files\\microsoft visual studio\\2022\\enterprise\\vc\\tools\\msvc\\14.43.34808\\modules\\std.ixx",
+                    "is-interface": true
+                }
+            ],
+            "requires": []
+        }
+    ]
+}
