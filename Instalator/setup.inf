@@ -1,7 +1,7 @@
 [Private]
-ApplicationName=Altap Salamander 5.0
-ApplicationNameVer=Altap Salamander 5.0
-DefaultDirectory=C:\Program Files\Altap Salamander 5.0
+ApplicationName=Salamander 5.0
+ApplicationNameVer=Salamander 5.0
+DefaultDirectory=C:\Program Files\Salamander 5.0
 LicenseFile=LICENSE
 SkipChooseDirectory=0
 
