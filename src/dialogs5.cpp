@@ -2893,28 +2893,32 @@ void CCfgPageAppearance::LoadControls()
 {
     CALL_STACK_MESSAGE1("CCfgPageAppearance::LoadControls()");
 
-    LOGFONT logFont;
+    LOGFONTW logFont; // Use LOGFONTW for Unicode compatibility
 
     if (LocalUseCustomPanelFont)
-        logFont = LocalPanelLogFont;
+    {
+        // Convert LocalPanelLogFont (LOGFONTA) to LOGFONTW
+        memcpy(&logFont, &LocalPanelLogFont, sizeof(LOGFONTA) - LF_FACESIZE);
+        ConvertA2U(LocalPanelLogFont.lfFaceName, -1, logFont.lfFaceName, LF_FACESIZE);
+    }
     else
-        GetSystemGUIFont(&logFont);
+        GetSystemGUIFontW(&logFont); // Use the Unicode version
 
     HWND hEdit = GetDlgItem(HWindow, IDE_PANELFONT);
     int origHeight = logFont.lfHeight;
     logFont.lfHeight = GetWindowFontHeight(hEdit); // use the edit line's font size for font preview
     if (HPanelFont != NULL)
         HANDLES(DeleteObject(HPanelFont));
-    HPanelFont = HANDLES(CreateFontIndirect(&logFont));
+    HPanelFont = HANDLES(CreateFontIndirectW(&logFont)); // Use CreateFontIndirectW
 
     HDC hDC = HANDLES(GetDC(HWindow));
     SendMessage(hEdit, WM_SETFONT, (WPARAM)HPanelFont, MAKELPARAM(TRUE, 0));
-    char buf[LF_FACESIZE + 200];
-    _snprintf_s(buf, _TRUNCATE, LoadStr(IDS_FONTDESCRIPTION),
+    WCHAR wbuf[LF_FACESIZE + 200]; // Use WCHAR buffer
+    _snwprintf_s(wbuf, _TRUNCATE, LoadStrW(IDS_FONTDESCRIPTION), // Use _snwprintf_s and LoadStrW
                 MulDiv(-origHeight, 72, GetDeviceCaps(hDC, LOGPIXELSY)),
                 logFont.lfFaceName,
-                LoadStr(LocalUseCustomPanelFont ? IDS_FONTDESCRIPTION_CST : IDS_FONTDESCRIPTION_DEF));
-    SetWindowText(hEdit, buf);
+                LoadStrW(LocalUseCustomPanelFont ? IDS_FONTDESCRIPTION_CST : IDS_FONTDESCRIPTION_DEF));
+    SetWindowTextW(hEdit, wbuf); // Use SetWindowTextW
 
     HANDLES(ReleaseDC(HWindow, hDC));
 }

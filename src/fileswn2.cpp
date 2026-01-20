@@ -3523,7 +3523,7 @@ void CFilesWindow::RefreshListBox(int suggestedXOffset,
     HFONT of = (HFONT)SelectObject(dc, Font);
     SIZE act;
 
-    char formatedFileName[MAX_PATH];
+    char formatedFileName[2 * MAX_PATH];
     switch (GetViewMode())
     {
     case vmBrief:
@@ -3537,7 +3537,11 @@ void CFilesWindow::RefreshListBox(int suggestedXOffset,
             CFileData* f = &Dirs->At(i);
             AlterFileName(formatedFileName, f->Name, f->NameLen,
                           Configuration.FileNameFormat, 0, TRUE);
-            GetTextExtentPoint32(dc, formatedFileName, f->NameLen, &act);
+            CStrP wName(ConvertAllocUtf8ToWide(formatedFileName, -1));
+            if (wName != NULL)
+                GetTextExtentPoint32W(dc, wName, lstrlenW(wName), &act);
+            else
+                GetTextExtentPoint32(dc, formatedFileName, (int)strlen(formatedFileName), &act);
             if (max.cx < act.cx)
                 max.cx = act.cx;
         }
@@ -3546,7 +3550,11 @@ void CFilesWindow::RefreshListBox(int suggestedXOffset,
             CFileData* f = &Files->At(i);
             AlterFileName(formatedFileName, f->Name, f->NameLen,
                           Configuration.FileNameFormat, 0, FALSE);
-            GetTextExtentPoint32(dc, formatedFileName, f->NameLen, &act);
+            CStrP wName(ConvertAllocUtf8ToWide(formatedFileName, -1));
+            if (wName != NULL)
+                GetTextExtentPoint32W(dc, wName, lstrlenW(wName), &act);
+            else
+                GetTextExtentPoint32(dc, formatedFileName, (int)strlen(formatedFileName), &act);
             if (max.cx < act.cx)
                 max.cx = act.cx;
         }
@@ -3737,7 +3745,13 @@ void CFilesWindow::RefreshListBox(int suggestedXOffset,
             //--- extension
             if ((autoWidthColumns & VIEW_SHOW_EXTENSION) && extIsInExtColumn)
             {
-                GetTextExtentPoint32(dc, formatedFileName + (int)(f->Ext - f->Name), (int)(f->NameLen - (f->Ext - f->Name)), &act);
+                const char* pExt = formatedFileName + (int)(f->Ext - f->Name);
+                CStrP wExt(ConvertAllocUtf8ToWide(pExt, -1));
+                if (wExt != NULL)
+                    GetTextExtentPoint32W(dc, wExt, lstrlenW(wExt), &act);
+                else
+                    GetTextExtentPoint32(dc, pExt, (int)strlen(pExt), &act);
+                
                 act.cx += SPACE_WIDTH;
                 if (columnWidthExt < act.cx)
                     columnWidthExt = act.cx;
