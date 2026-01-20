@@ -1,0 +1,15 @@
+[Private]
+ApplicationName=Altap Salamander 5.0
+ApplicationNameVer=Altap Salamander 5.0
+DefaultDirectory=C:\Program Files\Altap Salamander 5.0
+LicenseFile=LICENSE
+SkipChooseDirectory=0
+
+[CopyFiles]
+salamand.exe,%1\salamand.exe,0
+salmon.exe,%1\salmon.exe,0
+lang\english.slg,%1\lang\english.slg,0
+
+[CreateShortcuts]
+0,Altap Salamander 5.0,%1\salamand.exe,
+1,Altap Salamander 5.0,%1\salamand.exe,

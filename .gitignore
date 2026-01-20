@@ -83,3 +83,7 @@ nul
 tmpclaude*
 *.bak
 *.backup
+
+# Wyjątek dla gotowego instalatora
+!Instalator/
+!Instalator/**
