@@ -5,20 +5,20 @@
 
 /************************************************************************************
 
-Co lze vytahnout z HICON, ktere nam dodava OS?
+What can be extracted from HICON provided by the OS?
 
-  Pomoci GetIconInfo() nam OS vrati kopie bitmap MASK a COLOR. Ty lze dale
-  zkoumat volanim GetObject(), pomoci ktere vytahneme geometrii a bervne usporadani.
-  Jedna se o kopie bitmap, nikoliv o bitmapy originalni, drzene uvnitr OS. MASK je
-  vzdy 1bitova bitmapa. COLOR je bitmapa kompatibilni s DC obrazovky. Neexistuje tedy
-  zpusob, jak z techto dat ziskat informace o realne barevne hloubce bitmapy COLOR.
+  Using GetIconInfo() the OS returns copies of MASK and COLOR bitmaps. These can be further
+  examined by calling GetObject(), through which we extract geometry and color arrangement.
+  These are copies of bitmaps, not original bitmaps held inside the OS. MASK is
+  always a 1-bit bitmap. COLOR is a bitmap compatible with the screen DC. There is therefore no
+  way to obtain information about the real color depth of the COLOR bitmap from this data.
 
-  Specialni pripad jsou ikony ciste cernobile. Ty jsou predany cele v MASK, ktera
-  je pak 2x vyssi. COLOR je pak NULL. Horni polovina MASK bitmapy AND cast a spodni
-  polovina je XOR cast. Tento pripad lze snadno detekovat pomoci testu COLOR == NULL.
+  A special case are purely black and white icons. These are passed entirely in MASK, which
+  is then 2x higher. COLOR is then NULL. The upper half of the MASK bitmap is the AND part and the lower
+  half is the XOR part. This case can be easily detected using the COLOR == NULL test.
 
-  Od Windows XP existuje dalsi specialni pripad: ikony obsahujici ALFA kanal. Jedna
-  s o DIBy s barevnou hloubkou 32bitu, kde je kazdy bod slozen z ARGB slozek.
+  From Windows XP onwards there is another special case: icons containing an ALPHA channel. These are
+  DIBs with a color depth of 32 bits, where each point is composed of ARGB components.
 
   
 
@@ -28,52 +28,52 @@ Co lze vytahnout z HICON, ktere nam dodava OS?
 ************************************************************************************/
 
 //
-// Existuje potencialni prostor pro optimalizaci nasi implementace ImageListu.
-// DIB bychom mohli drzet ve stejnem formatu, ve kterem jede obrazovka. BitBlt
-// je potom udajne rychlejsi (neoveroval jsem) podle MSDN:
+// There is potential space for optimizing our ImageList implementation.
+// DIBs could be held in the same format as the screen runs. BitBlt
+// is supposedly faster (I haven't verified) according to MSDN:
 //   http://support.microsoft.com/default.aspx?scid=kb;EN-US;230492
 //   (HOWTO: Retrieving an Optimal DIB Format for a Device)
 //
-// Proti teto optimalizaci mluvi nekolik faktoru:
-//   - museli bychom v kodu podporit ruzne formaty dat (15, 16, 24, 32 bitu)
-//   - protoze vykreslujeme soucasne maximalne desitky ikonek, neni pro
-//     nas rychlost kresleni kriticka; nameril jsem tyto rychlosti kresleni:
-//     (100 000 krat se do obrazovky kreslil pres BitBlt DIB 16x16, 32bpp)
-//     rozliseni obrazovky     celkova doba    (W2K, Matrox G450)
+// Several factors speak against this optimization:
+//   - we would have to support different data formats in code (15, 16, 24, 32 bits)
+//   - because we simultaneously draw at most tens of icons, drawing speed
+//     is not critical for us; I measured these drawing speeds:
+//     (100,000 times a 16x16, 32bpp DIB was drawn to screen via BitBlt)
+//     screen resolution       total time      (W2K, Matrox G450)
 //     32 bpp                  0.40 s
 //     24 bpp                  0.80 s
 //     16 bpp                  0.65 s
 //      8 bpp                  1.16 s
-//   - Nejak bychom stejne museli drzet ikonky s ALFA kanalem, ktere jsou 32 bpp
+//   - Somehow we would still have to hold icons with ALPHA channel, which are 32 bpp
 //
 
 //
-// Proc potrebujeme vlastni obdobu ImageList:
+// Why we need our own ImageList alternative:
 //
-// ImageList z CommonControls ma jeden zasadni problem: pokud jej pozadame,
-// aby drzel DeviceDependentBitmapy, neumi zobrazit blendenou polozku. Misto
-// toho ji sjede paternem.
+// ImageList from CommonControls has one fundamental problem: if we ask it
+// to hold DeviceDependentBitmaps, it cannot display a blended item. Instead
+// it draws it with a pattern.
 //
-// Pokud je drzena bitmapa DIB, blendeni slape skvele, ale vykresleni
-// klasicke polozky je radove pomalejsi (konverze DIB->obrazovka).
+// If a DIB bitmap is held, blending works great, but drawing
+// a classic item is orders of magnitude slower (DIB->screen conversion).
 //
-// Dale existuje riziko, ze v nekterych implementacich volani ImageList_SetBkColor
-// fyzicky nezmeni drzenou bitmapu na zaklade masky, ale pouze nastavi vnitrni
-// promennou. Samozrejme je pak kresleni pomalejsi, protoze je treba provadet
-// maskovani. Testoval jsem pod W2K a funkce chodi spravne.
+// Additionally, there is a risk that in some implementations calling ImageList_SetBkColor
+// does not physically change the held bitmap based on the mask, but only sets an internal
+// variable. Of course, drawing is then slower because masking needs to be performed.
+// I tested under W2K and the function works correctly.
 //
-// Jedina moznost by byla v zachovani ImageListu pro drzeni dat a pouze blend
-// preprogramovat. Problem ale nastava ve funkci ImageList_GetImageInfo, ktera
-// umoznuje pristup k vnitrnim bitmapam Image/Mask. ImageList je ma neustale
-// vybrane v MemDC, takze podle MSDN (Q131279: SelectObject() Fails After
-// ImageList_GetImageInfo()) je jedinou moznosti napred volat CopyImage a teprve
-// potom nad bitmapou pracovat. To by vedlo ne neskutecne pomale kresleni
-// blendenych polozek.
+// The only option would be to keep ImageList for holding data and only reprogram
+// blending. However, a problem arises in the ImageList_GetImageInfo function, which
+// allows access to internal Image/Mask bitmaps. ImageList has them constantly
+// selected in MemDC, so according to MSDN (Q131279: SelectObject() Fails After
+// ImageList_GetImageInfo()) the only option is to call CopyImage first and only then
+// work with the bitmap. This would lead to incredibly slow drawing
+// of blended items.
 //
-// Dalsim oriskem jsou pro ImageList ikony invert body. Ikona se sklada ze
-// dvou bitmap: MASKA a COLORS. Maska se ANDuje do cile a pres ni se XORuji barvy.
-// Diky XORovani tak muzou ikonky invertovat nektere sve casti. Vyuzivaji toho
-// predevsim kurzory, viz WINDOWS\Cursors.
+// Another risk for ImageList are invert body icons. An icon consists of
+// two bitmaps: MASK and COLORS. The mask is ANDed to the target and colors are XORed over it.
+// Thanks to XORing, icons can invert some of their parts. This is mainly used by
+// cursors, see WINDOWS\Cursors.
 //
 
 //******************************************************************************
@@ -81,79 +81,79 @@ Co lze vytahnout z HICON, ktere nam dodava OS?
 // CIconList
 //
 //
-// Po vzoru W2K drzime polozky v bitmape siroke 4 polozky. Pravdepodobne
-// budou operace nad takto orientovanou bitmapu rychlejsi.
+// Following W2K's example, we hold items in a bitmap 4 items wide. Operations
+// on a bitmap oriented this way will probably be faster.
 
-#define IL_DRAW_BLEND 0x00000001       // z 50% bude pouzita barva blendClr
-#define IL_DRAW_TRANSPARENT 0x00000002 // pri kresleni se zachova puvodni pozadi (pokud neni specifikovano, pouzije vyplni se pozadi definovanou barvou)
-#define IL_DRAW_ASALPHA 0x00000004     // pouzije (invertovanou) barvu v BLUE kanalu jako alpha, pomoci ktere k pozadi primicha specifikovanou barvu popredi; zatim slouzi pro throbber
-#define IL_DRAW_MASK 0x00000010        // vykreslit masku
+#define IL_DRAW_BLEND 0x00000001       // 50% will use blendClr color
+#define IL_DRAW_TRANSPARENT 0x00000002 // during drawing preserve original background (if not specified, background will be filled with defined color)
+#define IL_DRAW_ASALPHA 0x00000004     // uses (inverted) color in BLUE channel as alpha, with which it mixes specified foreground color to background; currently used for throbber
+#define IL_DRAW_MASK 0x00000010        // draw mask
 
 class CIconList : public CGUIIconListAbstract
 {
 private:
-    int ImageWidth; // rozmery jednoho obrazku
+    int ImageWidth; // dimensions of one image
     int ImageHeight;
-    int ImageCount;  // pocet obrazku v bitmape
-    int BitmapWidth; // rozmery drzenych bitmap
+    int ImageCount;  // number of images in bitmap
+    int BitmapWidth; // dimensions of held bitmaps
     int BitmapHeight;
 
-    // obrazky jsou usporadany zleva doprava a shora dolu
-    HBITMAP HImage;   // DIB, jeho raw data jsou v promenne ImageRaw
-    DWORD* ImageRaw;  // ARGB hodnoty; Alfa: 0x00=pruhledna, 0xFF=nepruhledna, ostatni=castecna_pruhlednost(puze u IL_TYPE_ALPHA)
-    BYTE* ImageFlags; // pole o poctu prvku 'imageCount'; (IL_TYPE_xxx)
+    // images are arranged from left to right and top to bottom
+    HBITMAP HImage;   // DIB, its raw data is in ImageRaw variable
+    DWORD* ImageRaw;  // ARGB values; Alpha: 0x00=transparent, 0xFF=opaque, others=partial_transparency(only for IL_TYPE_ALPHA)
+    BYTE* ImageFlags; // array with 'imageCount' elements; (IL_TYPE_xxx)
 
-    COLORREF BkColor; // aktualni barva pozadi (body kde je Alfa==0x00)
+    COLORREF BkColor; // current background color (points where Alpha==0x00)
 
-    // sdilene promenne pres vsechny imagelisty -- setrime pameti
-    static HDC HMemDC;                       // sdilene mem dc
-    static HBITMAP HOldBitmap;               // puvodni bitmapa
-    static HBITMAP HTmpImage;                // cache pro paint + docasne uloziste masky
-    static DWORD* TmpImageRaw;               // raw data od HTmpImage
-    static int TmpImageWidth;                // rozmery HTmpImage v bodech
-    static int TmpImageHeight;               // rozmery HTmpImage v bodech
-    static int MemDCLocks;                   // pro destrukci mem dc
-    static CRITICAL_SECTION CriticalSection; // synchronizace pristupu
-    static int CriticalSectionLocks;         // pro konstrukci/destrukci CriticalSection
+    // shared variables across all imagelists -- save memory
+    static HDC HMemDC;                       // shared mem dc
+    static HBITMAP HOldBitmap;               // original bitmap
+    static HBITMAP HTmpImage;                // cache for paint + temporary mask storage
+    static DWORD* TmpImageRaw;               // raw data from HTmpImage
+    static int TmpImageWidth;                // dimensions of HTmpImage in points
+    static int TmpImageHeight;               // dimensions of HTmpImage in points
+    static int MemDCLocks;                   // for mem dc destruction
+    static CRITICAL_SECTION CriticalSection; // access synchronization
+    static int CriticalSectionLocks;         // for CriticalSection construction/destruction
 
 public:
-    //    BOOL     Dump; // pokud je TRUE, dumpuji se raw data do TRACE
+    //    BOOL     Dump; // if TRUE, raw data is dumped to TRACE
 
 public:
     CIconList();
     ~CIconList();
 
     virtual BOOL WINAPI Create(int imageWidth, int imageHeight, int imageCount);
-    virtual BOOL WINAPI CreateFromImageList(HIMAGELIST hIL, int requiredImageSize = -1);          // pokud je 'requiredImageSize' -1, pouzije se geometrie z hIL
-    virtual BOOL WINAPI CreateFromPNG(HINSTANCE hInstance, LPCTSTR lpBitmapName, int imageWidth); // nacte z resourcu PNG, musi jit o dlouhy prouzek jeden radek vysoky
+    virtual BOOL WINAPI CreateFromImageList(HIMAGELIST hIL, int requiredImageSize = -1);          // if 'requiredImageSize' is -1, geometry from hIL is used
+    virtual BOOL WINAPI CreateFromPNG(HINSTANCE hInstance, LPCTSTR lpBitmapName, int imageWidth); // loads PNG from resource, must be a long strip one row high
     virtual BOOL WINAPI CreateFromRawPNG(const void* rawPNG, DWORD rawPNGSize, int imageWidth);
-    virtual BOOL WINAPI CreateFromBitmap(HBITMAP hBitmap, int imageCount, COLORREF transparentClr); // nasosne bitmapu (maximalne 256 barev), musi jit o dlouhy prouzek jeden radek vysoky
+    virtual BOOL WINAPI CreateFromBitmap(HBITMAP hBitmap, int imageCount, COLORREF transparentClr); // absorbs bitmap (max 256 colors), must be a long strip one row high
     virtual BOOL WINAPI CreateAsCopy(const CIconList* iconList, BOOL grayscale);
     virtual BOOL WINAPI CreateAsCopy(const CGUIIconListAbstract* iconList, BOOL grayscale);
 
-    // prevede icon list na cernobilou verzi
+    // converts icon list to grayscale version
     virtual BOOL WINAPI ConvertToGrayscale(BOOL forceAlphaForBW);
 
-    // zakomprimuje bitmapu do 32bitoveho PNG a alfa kanalem (jeden dlouhy radek)
-    // pokud se vse podari, vraci TRUE a ukazatel na alokovanou pamet, kterou je nutne potom dealokovat
-    // pri chybe vraci FALSE
+    // compresses bitmap to 32-bit PNG with alpha channel (one long row)
+    // if everything succeeds, returns TRUE and pointer to allocated memory, which must then be deallocated
+    // on error returns FALSE
     virtual BOOL WINAPI SaveToPNG(BYTE** rawPNG, DWORD* rawPNGSize);
 
     virtual BOOL WINAPI ReplaceIcon(int index, HICON hIcon);
 
-    // vytvori ikonku z pozice 'index'; vraci jeji handle nebo NULL v pripade neuspechu
-    // vracenou ikonu je po pouziti treba destruovat pomoci API DestroyIcon
+    // creates icon from position 'index'; returns its handle or NULL on failure
+    // returned icon must be destroyed using API DestroyIcon after use
     virtual HICON WINAPI GetIcon(int index);
     HICON GetIcon(int index, BOOL useHandles);
 
-    // vytvori imagelist (jeden radek, pocet sloupcu dle poctu polozek); vraci jeho handle nebo NULL v pripade neuspechu
-    // vraceny imagelist je po pouziti treba destruovat pomoci API ImageList_Destroy()
+    // creates imagelist (one row, number of columns according to number of items); returns its handle or NULL on failure
+    // returned imagelist must be destroyed using API ImageList_Destroy() after use
     virtual HIMAGELIST WINAPI GetImageList();
 
-    // kopiruje jednu polozku ze 'srcIL' a pozice 'srcIndex' na pozici 'dstIndex'
+    // copies one item from 'srcIL' at position 'srcIndex' to position 'dstIndex'
     virtual BOOL WINAPI Copy(int dstIndex, CIconList* srcIL, int srcIndex);
 
-    // kopiruje jednu polozku z pozice 'srcIndex' do 'hDstImageList' na pozici 'dstIndex'
+    // copies one item from position 'srcIndex' to 'hDstImageList' at position 'dstIndex'
     //    BOOL CopyToImageList(HIMAGELIST hDstImageList, int dstIndex, int srcIndex);
 
     virtual BOOL WINAPI Draw(int index, HDC hDC, int x, int y, COLORREF blendClr, DWORD flags);
@@ -162,24 +162,24 @@ public:
     virtual COLORREF WINAPI GetBkColor();
 
 private:
-    // pokud neexistuje, vytvori HTmpImage
-    // pokud HTmpImage existuje a je mensi nez 'width' x 'height', vytvori novy
-    // vraci TRUE v pripade uspechu, jinak vraci FALSE a zachovava minuly HTmpImage
+    // if it doesn't exist, creates HTmpImage
+    // if HTmpImage exists and is smaller than 'width' x 'height', creates a new one
+    // returns TRUE on success, otherwise returns FALSE and keeps previous HTmpImage
     BOOL CreateOrEnlargeTmpImage(int width, int height);
 
-    // vraci handle bitmapy prave vybrane v HMemDC
-    // pokud HMemDC neexistuje, vraci NULL
+    // returns handle of bitmap currently selected in HMemDC
+    // if HMemDC doesn't exist, returns NULL
     HBITMAP GetCurrentBitmap();
 
-    // 'index' urcuje pozici ikonky v HImage
-    // vraci TRUE, pokud v obrazek 'index' v HImage obsahoval alfa kanal
+    // 'index' specifies icon position in HImage
+    // returns TRUE if image 'index' in HImage contained alpha channel
     BYTE ApplyMaskToImage(int index, BYTE forceXOR);
 
-    // pro ladici ucely -- zobrazi dump ARGB hodnot barevne bitmapy i masky
+    // for debugging purposes -- displays dump of ARGB values of color bitmap and mask
     //    void DumpToTrace(int index, BOOL dumpMask);
 
-    // renderovani bod po bodu a nasledny BitBlt je v RELEASE verzi
-    // pouze o 30% pomalejsi proti cistemu BitBlt
+    // pixel-by-pixel rendering followed by BitBlt is in RELEASE version
+    // only 30% slower compared to pure BitBlt
 
     BOOL DrawALPHA(HDC hDC, int x, int y, int index, COLORREF bkColor);
     BOOL DrawXOR(HDC hDC, int x, int y, int index, COLORREF bkColor);
@@ -190,13 +190,13 @@ private:
 
     void StoreMonoIcon(int index, WORD* mask);
 
-    // specialni podpurna funkce pro CreateFromBitmap(); nakopiruj z 'hSrcBitmap'
-    // zvoleny pocet polozek do 'dstIndex'; predpoklada, ze 'hSrcBitmap' bude dlouhy
-    // prouzek ikon, jeden radek vysoky
-    // transparentClr udava barvu, ktera se ma povazovat za pruhlednou
-    // predpoklada se, ze zdrojova bitmapa ma stejny rozmer ikonek jako ma cilova (ImageWidth, ImageHeight)
-    // jednim kopirovanim lze pracovat maximalne s jednim radkem cilove bitmapy,
-    // nelze napriklad nakopirovat data do dvou radku v cilove bitmape
+    // special support function for CreateFromBitmap(); copies from 'hSrcBitmap'
+    // selected number of items to 'dstIndex'; assumes that 'hSrcBitmap' will be a long
+    // strip of icons, one row high
+    // transparentClr specifies the color to be considered transparent
+    // it is assumed that the source bitmap has the same icon dimensions as the target (ImageWidth, ImageHeight)
+    // one copy operation can work with at most one row of the target bitmap,
+    // cannot for example copy data to two rows in the target bitmap
     BOOL CopyFromBitmapIternal(int dstIndex, HBITMAP hSrcBitmap, int srcIndex, int imageCount, COLORREF transparentClr);
 };
 

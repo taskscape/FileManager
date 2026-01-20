@@ -27,26 +27,26 @@ int ConvertU2A(const WCHAR* src, int srcLen, char* buf, int bufSize,
 char* ConvertAllocU2A(const WCHAR* src, int srcLen, BOOL compositeCheck = FALSE, UINT codepage = CP_ACP);
 
 // convert ANSI multibyte string to Unicode string (UTF-16); 'src' is ANSI string;
-// 'srcLen' je delka ANSI stringu (bez zakoncujici nuly; pri zadani -1 se delka urci
+// 'srcLen' is length of ANSI string (without terminating zero; when -1 is specified, length is determined
 // by terminating zero); 'bufSize' (must be greater than 0) is size of target buffer
 // 'buf' for Unicode string; 'codepage' is code page of ANSI string;
 // returns number of characters written to 'buf' (including terminating zero); on error returns zero
-// (detaily viz GetLastError()); vzdy zajisti nulou zakonceny 'buf' (i pri chybe);
+// (details see GetLastError()); always ensures zero-terminated 'buf' (even on error);
 // if 'buf' is small, function returns zero, but in 'buf' at least part of string is converted
 int ConvertA2U(const char* src, int srcLen, WCHAR* buf, int bufSizeInChars,
                UINT codepage = CP_ACP);
 
 // convert ANSI multibyte string to allocated (caller is responsible for deallocation
-// stringu) Unicodovy string (UTF-16); 'src' je ANSI string; 'srcLen' je delka ANSI
+// of string) Unicode string (UTF-16); 'src' is ANSI string; 'srcLen' is length of ANSI
 // string (without terminating zero; when -1 is specified, length is determined by terminating zero);
 // 'codepage' is code page of ANSI string; returns allocated Unicode string; on
 // error returns NULL (details see GetLastError())
 WCHAR* ConvertAllocA2U(const char* src, int srcLen, UINT codepage = CP_ACP);
 
-// prevody mezi UTF-8 a UTF-16; 'srcLen' je delka bez zakoncujici nuly
+// conversions between UTF-8 and UTF-16; 'srcLen' is length without terminating zero
 // (when -1 is specified, length is determined by terminating zero); returns number of characters
 // written to 'buf' (including terminating zero) or 0 on error; always ensures
-// nulou zakonceny 'buf' (i pri chybe)
+// zero-terminated 'buf' (even on error)
 int ConvertUtf8ToWide(const char* src, int srcLen, WCHAR* buf, int bufSizeInChars);
 int ConvertWideToUtf8(const WCHAR* src, int srcLen, char* buf, int bufSizeInBytes);
 
@@ -131,7 +131,7 @@ public:
     BOOL IsValid() const { return Ptr != NULL; }
 };
 
-// prevod WIN32_FIND_DATAW na WIN32_FIND_DATAA s UTF-8 jmeny
+// convert WIN32_FIND_DATAW to WIN32_FIND_DATAA with UTF-8 names
 BOOL ConvertFindDataWToUtf8(const WIN32_FIND_DATAW& src, WIN32_FIND_DATAA* dst);
 
 // UTF-8 file API wrappers (use WinAPI W variants under the hood)
@@ -180,6 +180,6 @@ public:
     }
 };
 
-// drzi alokovany string, postara se o uvolneni pri prepisu jinym stringem (tez alokovanym)
-// a pri sve destrukci
+// holds allocated string, takes care of deallocation when overwritten by another string (also allocated)
+// and on its destruction
 typedef CAllocP<WCHAR> CStrP;

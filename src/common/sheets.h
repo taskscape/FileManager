@@ -138,7 +138,7 @@ protected:
 class CTreePropDialog;
 
 // gray shadowed stripe above property sheet in tree variant PropertyDialog,
-// kde je zobrazen nazev aktualni stranky
+// where the current page title is displayed
 class CTPHCaptionWindow : protected CWindow
 {
 protected:
@@ -176,17 +176,17 @@ protected:
     RECT ChildDialogRect;
     int CurrentPageIndex;
     CPropSheetPage* ChildDialog;
-    int ExitButton; // idcko tlacitka, ktere ukoncilo dialog
+    int ExitButton; // ID of button that closed the dialog
 
-    // rozmery v bodech
-    SIZE MinWindowSize;  // minimalni rozmery dialogu (urcene podle nejvetsiho child dlg)
-    DWORD* WindowHeight; // aktualni vyska dialogu
-    int TreeWidth;       // sirka treeview, pocitana na zaklade obsahu
-    int CaptionHeight;   // vyska titulku
-    SIZE ButtonSize;     // rozmery tlacitek na spodni hrane dialogu
-    int ButtonMargin;    // mezera mezi tlacitky
-    SIZE GripSize;       // rozmery resize gripu v pravem spodnim rohu dialogu
-    SIZE MarginSize;     // vodorovny a svisly okraj
+    // dimensions in points
+    SIZE MinWindowSize;  // minimum dialog dimensions (determined by largest child dlg)
+    DWORD* WindowHeight; // current dialog height
+    int TreeWidth;       // treeview width, calculated based on content
+    int CaptionHeight;   // caption height
+    SIZE ButtonSize;     // button dimensions on bottom edge of dialog
+    int ButtonMargin;    // spacing between buttons
+    SIZE GripSize;       // resize grip dimensions in bottom right corner of dialog
+    SIZE MarginSize;     // horizontal and vertical margin
 
 public:
     CTreePropHolderDlg(HWND hParent, DWORD* windowHeight);
@@ -205,7 +205,7 @@ protected:
     friend class CTreePropDialog;
 };
 
-// datovy drzak stranek pro tree verzi PropertyDialog
+// data holder for pages in tree version of PropertyDialog
 class CTreePropDialog : public CPropertyDialog
 {
 protected:
@@ -235,6 +235,6 @@ protected:
     //    DLGTEMPLATE *DoLockDlgRes(int page);
     friend class CTreePropHolderDlg;
 
-    // pouze pro forwarding zprav z CTreePropHolderDlg
+    // only for forwarding messages from CTreePropHolderDlg
     virtual void DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam) {};
 };
