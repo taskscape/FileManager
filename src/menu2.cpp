@@ -176,7 +176,7 @@ void CMenuPopup::AssignHotKeys()
                     char buffa[2];
                     buffa[0] = *p;
                     buffa[1] = 0;
-                    MultiByteToWideChar(CP_ACP, MB_COMPOSITE, buffa, -1, buffw, 10); // "á" -> "a´"
+                    MultiByteToWideChar(CP_ACP, MB_COMPOSITE, buffa, -1, buffw, 10); // accented character decomposition, e.g., "á" -> "a´"
                 }
 
                 char upper = UpperCase[*p];

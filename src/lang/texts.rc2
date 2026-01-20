@@ -1484,12 +1484,12 @@ STRINGTABLE
  IDS_DLG_PLURAL_X_DIRS, "{!}%d Director{y|1|ies}"
  IDS_DLG_PLURAL_X_FILES_Y_DIRS, "{!}%d File{|1|s} and %d Director{y|1|ies}"
 
-// IDS_PLURAL_X_FILES, "{!}%d {vybraný soubor|1|vybrané soubory|4|vybraných souborů}"
-// IDS_PLURAL_X_DIRS, "{!}%d {vybraný adresář|1|vybrané adresáře|4|vybraných adresářů}"
-// IDS_PLURAL_X_FILES_Y_DIRS, "{!}%d {vybraný soubor|1|vybrané soubory|4|vybraných souborů} a %d {vybraný adresář|1|vybrané adresáře|4|vybraných adresářů}"
-// IDS_PLURAL_X_BYTES_Y_FILES, "{!}%s bajt{ů|0||1|y|4|ů} {v %d vybraném souboru|1|ve %d vybraných souborech}"
-// IDS_PLURAL_X_BYTES_Y_DIRS, "{!}%s bajt{ů|0||1|y|4|ů} {v %d vybraném adresáři|1|ve %d vybraných adresářích}"
-// IDS_PLURAL_X_BYTES_Y_FILES_Z_DIRS, "{!}%s bajt{ů|0||1|y|4|ů} {v %d vybraném souboru|1|ve %d vybraných souborech} a %d {vybraném adresáři|1|vybraných adresářích}"
+// IDS_PLURAL_X_FILES, "{!}%d {selected file|1|selected files|4|selected files}" (Czech: vybraný soubor|vybrané soubory|vybraných souborů)
+// IDS_PLURAL_X_DIRS, "{!}%d {selected directory|1|selected directories|4|selected directories}" (Czech: vybraný adresář|vybrané adresáře|vybraných adresářů)
+// IDS_PLURAL_X_FILES_Y_DIRS, "{!}%d {selected file|1|selected files|4|selected files} and %d {selected directory|1|selected directories|4|selected directories}" (Czech: a = and)
+// IDS_PLURAL_X_BYTES_Y_FILES, "{!}%s byte{s|0||1|s|4|s} {in %d selected file|1|in %d selected files}" (Czech: bajt = byte, v/ve = in)
+// IDS_PLURAL_X_BYTES_Y_DIRS, "{!}%s byte{s|0||1|s|4|s} {in %d selected directory|1|in %d selected directories}" (Czech: bajt = byte, v/ve = in)
+// IDS_PLURAL_X_BYTES_Y_FILES_Z_DIRS, "{!}%s byte{s|0||1|s|4|s} {in %d selected file|1|in %d selected files} and %d {selected directory|1|selected directories}" (Czech: bajt = byte, v/ve = in, a = and)
 
 //
 // plural strings -- end
