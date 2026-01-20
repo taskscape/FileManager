@@ -1516,6 +1516,10 @@ BOOL CFilesWindow::BuildScriptDir(COperations* script, CActionType type, char* s
                                   BOOL* canDelUpperDirAfterMove, FILETIME* sourceDirTime,
                                   DWORD srcAndTgtPathsFlags)
 {
+    char log_buffer[1024];
+    _snprintf_s(log_buffer, sizeof(log_buffer), _TRUNCATE, "BuildScriptDir START: sourcePath='%s', targetPath='%s', dirName='%s'", sourcePath, targetPath ? targetPath : "NULL", dirName);
+    OutputDebugStringA(log_buffer);
+
     SLOW_CALL_STACK_MESSAGE16("CFilesWindow::BuildScriptDir(, %d, %s, %d, %s, %d, %d, %d, %s, %s, , , %s, 0x%X, , %d, %d, %d, , , , 0x%X)",
                               type, sourcePath, sourcePathSupADS, targetPath,
                               targetPathState, targetPathSupADS, targetPathIsFAT32,
@@ -1575,6 +1579,8 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
             if (msgRes == DIALOG_OK /* Focus */)
                 MainWindow->PostFocusNameInPanel(PANEL_SOURCE, sourcePath, dirName);
         }
+        _snprintf_s(log_buffer, sizeof(log_buffer), _TRUNCATE, "BuildScriptDir END (Too long source directory name): sourcePath='%s', targetPath='%s'", sourcePath, targetPath ? targetPath : "NULL");
+        OutputDebugStringA(log_buffer);
         return skip;
     }
     while (*s != 0)
@@ -1644,6 +1650,8 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
                 if (msgRes == DIALOG_OK /* Focus */)
                     MainWindow->PostFocusNameInPanel(PANEL_SOURCE, sourcePath, sourceEnd + 1);
             }
+            _snprintf_s(log_buffer, sizeof(log_buffer), _TRUNCATE, "BuildScriptDir END (Too long target directory name): sourcePath='%s', targetPath='%s'", sourcePath, targetPath ? targetPath : "NULL");
+            OutputDebugStringA(log_buffer);
             return skip;
         }
         strcpy(targetPath + targetLen, s2);
@@ -2338,8 +2346,8 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
         filterCriteria->SkipEmptyDirs && createDirIndex >= 0 &&
         createDirIndex == script->Count - 1)
     {
-        free(script->At(createDirIndex).SourceName);
-        free(script->At(createDirIndex).TargetName);
+        delete[] script->At(createDirIndex).SourceName;
+        delete[] script->At(createDirIndex).TargetName;
         script->Delete(createDirIndex);
         if (!script->IsGood())
             script->ResetState();
@@ -2465,9 +2473,9 @@ READLINKTGTSIZE_AGAIN:
         {
             if (op != NULL)
             {
-                free(op->SourceName);
+                delete[] op->SourceName;
                 if (op->TargetName != NULL)
-                    free(op->TargetName);
+                    delete[] op->TargetName;
             }
             *cancel = TRUE;
             break;
@@ -2486,6 +2494,10 @@ BOOL CFilesWindow::BuildScriptFile(COperations* script, CActionType type, char* 
                                    CChangeCaseData* chCaseData, BOOL onlySize,
                                    FILETIME* fileLastWriteTime, DWORD srcAndTgtPathsFlags)
 {
+    char log_buffer[1024];
+    _snprintf_s(log_buffer, sizeof(log_buffer), _TRUNCATE, "BuildScriptFile START: sourcePath='%s', fileName='%s'", sourcePath, fileName);
+    OutputDebugStringA(log_buffer);
+
     SLOW_CALL_STACK_MESSAGE14("CFilesWindow::BuildScriptFile(, %d, %s, %d, %s, %d, %d, %d, %s, %s, , , , %s, 0x%X, , %d, , 0x%X)",
                               type, sourcePath, sourcePathSupADS, targetPath, targetPathState, targetPathSupADS,
                               targetPathIsFAT32, mask, fileName, mapName, sourceFileAttr, onlySize, srcAndTgtPathsFlags);

@@ -161,7 +161,7 @@ BOOL SalmonStartProcess(const char* fileMappingName) //Configuration.LoadedSLGNa
     ret = FALSE;
     GetModuleFileName(NULL, cmd, MAX_PATH);
     *(strrchr(cmd, '\\') + 1) = 0;
-    lstrcat(cmd, "utils\\salmon.exe");
+    lstrcat(cmd, "salmon.exe");
     AddDoubleQuotesIfNeeded(cmd, MAX_PATH); // CreateProcess chce mit jmeno s mezerama v uvozovkach (jinak zkousi ruzny varianty, viz help)
     GetStartupSLGName(slgName, sizeof(slgName));
     wsprintf(cmd + strlen(cmd), " \"%s\" \"%s\"", fileMappingName, slgName); // slgName muze byt prazdny retezec, pokud neexistuje konfigurace

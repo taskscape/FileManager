@@ -863,7 +863,8 @@ BOOL LookForSubTexts(char* text, DWORD* varPlacements, int* varPlacementsCount);
 void MinimizeApp(HWND mainWnd);             // app minimization
 void RestoreApp(HWND mainWnd, HWND dlgWnd); // restore from minimized state of app.
                                             // changes the name format (letter case), filename must always be terminated with null character
-void AlterFileName(char* tgtName, char* filename, int filenameLen, int format, int change, BOOL dir);
+void AlterFileName(WCHAR* tgtName, const WCHAR* filename, int filenameLen, int format, int change, BOOL dir);
+void AlterFileName(char* tgtName, const char* filename, int filenameLen, int format, int change, BOOL dir);
 
 // returns string with file size and times; returns time in 'fileTime', variable can be NULL;
 // if 'getTimeFailed' is not NULL, TRUE is written to it on error getting file time
@@ -1380,7 +1381,8 @@ extern HFONT EnvFontUL;       // listbox font underlined
 extern int EnvFontCharHeight; // font height
 extern HFONT TooltipFont;     // font for tooltips (and statusbars, but we don't use it there)
 
-BOOL GetSystemGUIFont(LOGFONT* lf); // returns font used for Salamander main window
+BOOL GetSystemGUIFontW(LOGFONTW* lf); // returns font used for Salamander main window (Unicode)
+BOOL GetSystemGUIFont(LOGFONT* lf);  // returns font used for Salamander main window (ANSI)
 BOOL CreateEnvFonts();              // fills EnvFont, EnvFontUL, EnvFontCharHeight, TooltipFont based on metrics
 
 extern DWORD MouseHoverTime; // after what time should highlighting occur

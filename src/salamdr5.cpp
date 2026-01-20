@@ -1248,7 +1248,7 @@ BOOL SalMoveFile(const char* srcName, const char* destName)
             DWORD attr = SalGetFileAttributes(srcName);
             if (attr != 0xFFFFFFFF && (attr & FILE_ATTRIBUTE_READONLY))
             {
-                SetFileAttributesW(srcNameW, FILE_ATTRIBUTE_ARCHIVE);
+                SetFileAttributesW(srcNameW, attr & ~FILE_ATTRIBUTE_READONLY);
                 if (MoveFileW(srcNameW, destNameW))
                 {
                     SetFileAttributesW(destNameW, attr);

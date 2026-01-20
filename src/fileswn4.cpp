@@ -749,23 +749,33 @@ void CFilesWindow::DrawBriefDetailedItem(HDC hTgtDC, int itemIndex, RECT* itemRe
                     // search from the end for the character after which we can copy "..." and it fits in the column
                     while (fitChars > 0 && DrawItemAlpDx[fitChars - 1] + TextEllipsisWidth > textWidth)
                         fitChars--;
-                    // copy a part of the original string to another buffer
-                    int totalCount;
-                    if (fitChars > 0)
-                    {
-                        memmove(DrawItemBuff, TransferBuffer, fitChars);
-                        // and append "..."
-                        memmove(DrawItemBuff + fitChars, "...", 3);
-                        totalCount = fitChars + 3;
-                    }
-                    else
-                    {
-                        DrawItemBuff[0] = TransferBuffer[0];
-                        DrawItemBuff[1] = '.';
-                        totalCount = 2;
-                    }
-
-                    // DRAWFLAG_MASK: hack, under XP some stuff is added in font of the text in the mask while drawing short texts; not an issue if text is not drawn
+                                    // copy a part of the original string to another buffer
+                                    int totalCount;
+                                    CStrP wName(ConvertAllocUtf8ToWide(TransferBuffer, -1));
+                                    if (wName != NULL)
+                                    {
+                                        if (fitChars > (int)wcslen(wName)) fitChars = (int)wcslen(wName);
+                                        wName[fitChars] = 0;
+                                        wcscat_s(wName, lstrlenW(wName) + 4, L"...");
+                                        ConvertWideToUtf8(wName, -1, DrawItemBuff, 1024);
+                                        totalCount = (int)strlen(DrawItemBuff);
+                                    }
+                                    else
+                                    {
+                                        if (fitChars > 0)
+                                        {
+                                            memmove(DrawItemBuff, TransferBuffer, fitChars);
+                                            memmove(DrawItemBuff + fitChars, "...", 3);
+                                            totalCount = fitChars + 3;
+                                        }
+                                        else
+                                        {
+                                            DrawItemBuff[0] = TransferBuffer[0];
+                                            DrawItemBuff[1] = '.';
+                                            totalCount = 2;
+                                        }
+                                    }
+                                        // DRAWFLAG_MASK: hack, under XP some stuff is added in font of the text in the mask while drawing short texts; not an issue if text is not drawn
                     ExtTextOutUtf8(hDC, r.left + 2, y, ETO_OPAQUE, &adjR, DrawItemBuff, (drawFlags & DRAWFLAG_MASK) ? 0 : totalCount, NULL);
                     goto SKIP1;
                 }
