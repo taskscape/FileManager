@@ -4,6 +4,8 @@
 
 #include "precomp.h"
 
+#include <cwctype>
+#include "common/strutils.h"
 #include "cfgdlg.h"
 #include "mainwnd.h"
 #include "dialogs.h"
@@ -1700,183 +1702,118 @@ void GetMessagePos(POINT& p)
 //
 //   dir    - is it a directory?
 
-void AlterFileName(char* tgtName, char* filename, int filenameLen, int format, int change, BOOL dir)
+void AlterFileName(WCHAR* tgtName, const WCHAR* filename, int filenameLen, int format, int change, BOOL dir)
 {
-    // j.r. I disabled the macro because AlterFileName is called heavily from RefreshListBox()
     CALL_STACK_MESSAGE_NONE
-    //  CALL_STACK_MESSAGE6("AlterFileName(, %s, %d, %d, %d, %d)", filename, filenameLen, format, change, dir);
+
     if (format == 6)
         format = dir ? 3 : 2; // VC display style
     if (format == 7 && change != 0)
         format = (change == 1) ? 1 : 2; // convert to mixed/lower case
 
-    char* ext = NULL; // points past the last dot or is NULL (no extension)
-    if (change != 0 && format != 5 && format != 7)
+    if (tgtName != filename)
+        wcscpy_s(tgtName, MAX_PATH, filename);
+
+    WCHAR* ext = wcsrchr(tgtName, L'.');
+    if (ext == tgtName) ext = NULL; // dot at the beginning is not an extension separator
+
+    // Helper variables for string operations to avoid pointer math errors
+    WCHAR* pWork = tgtName;
+    size_t workSize = MAX_PATH;
+    WCHAR savedExt[MAX_PATH] = { 0 };
+
+    if (change == 1 && ext != NULL) // name only
     {
-        char* s = filename;
-        while (*s != 0) // searching for the last dot (file extensions)
-            if (*s++ == '.')
-                ext = s;
-        //  if (ext != NULL && ext <= filename + 1) ext = NULL;  // ".cvspass" in Windows is considered an extension ..
-        if (change == 1) // change only the name
-        {
-            if (ext != NULL)
-                *(ext - 1) = 0; // overwrite '.' with the end of string (0)
-        }
-        else // change only the extension
-        {
-            if (ext == NULL || *ext == 0) // no extension
-            {
-                strcpy(tgtName, filename);
-                return;
-            }
-            memmove(tgtName, filename, ext - filename); // copy of the name + '.'
-            tgtName += ext - filename;
-            filename = ext;
-        }
+        wcscpy_s(savedExt, MAX_PATH, ext);
+        *ext = 0;
+        workSize = (ext - tgtName) + 1; // size of name part including null
+    }
+    else if (change == 2 && ext != NULL) // extension only
+    {
+        pWork = ext;
+        workSize = MAX_PATH - (ext - tgtName);
     }
 
     switch (format)
     {
-    case 5: // explorer style
+    case 1: // Capitalize (first letter of each word)
+    case 5: // Explorer style (Title Case)
     {
-        char* s = filename;
-        int c = 8;
-        while (c-- && *s != 0 && *s == UpperCase[*s] && *s != '.')
-            s++; // name
-        if (*s == '.')
-            s++;
-        else if (*s != 0)
+        BOOL capitalizeNext = TRUE;
+        for (int i = 0; pWork[i] != 0; i++)
         {
-            strcpy(tgtName, filename);
-            break;
-        }
-        c = 3;
-        while (c-- && *s != 0 && *s != '.' && *s == UpperCase[*s])
-            s++; // ext
-        if (*s != 0)
-        {
-            strcpy(tgtName, filename);
-            break;
-        }
-        BOOL capital = TRUE;
-        char* tgt = tgtName;
-        char* name = filename;
-        while (*name != 0)
-        {
-            if (!capital)
+            if (iswspace(pWork[i]) || iswpunct(pWork[i]))
             {
-                *tgt++ = LowerCase[*name];
-                if (*name++ == ' ')
-                    capital = TRUE;
+                capitalizeNext = TRUE;
             }
-            else
+            else if (capitalizeNext)
             {
-                *tgt++ = UpperCase[*name];
-                if (*name++ != ' ')
-                    capital = FALSE;
+                pWork[i] = towupper(pWork[i]);
+                capitalizeNext = FALSE;
+            }
+            else if (format == 5) // In explorer style, others are lowercase
+            {
+                pWork[i] = towlower(pWork[i]);
             }
         }
-        *tgt = 0;
         break;
     }
 
-    case 1: // capitalize
-    {
-        BOOL capital = TRUE;
-        char* tgt = tgtName;
-        char* name = filename;
-        while (*name != 0)
-        {
-            if (!capital)
-            {
-                *tgt++ = LowerCase[*name];
-                if (*name == ' ' || *name == '.')
-                    capital = TRUE;
-            }
-            else
-            {
-                *tgt++ = UpperCase[*name];
-                if (*name != ' ' || *name == '.')
-                    capital = FALSE;
-            }
-            name++;
-        }
-        *tgt = 0;
+    case 2: // lowercase
+        _wcslwr_s(pWork, workSize);
         break;
-    }
 
-    case 2: // lower case
-    {
-        char* tgt = tgtName;
-        char* name = filename;
-        while (*name != 0)
-            *tgt++ = LowerCase[*name++];
-        *tgt = 0;
+    case 3: // uppercase
+        _wcsupr_s(pWork, workSize);
         break;
-    }
-
-    case 3: // upper case
-    {
-        char* tgt = tgtName;
-        char* name = filename;
-        while (*name != 0)
-            *tgt++ = UpperCase[*name++];
-        *tgt = 0;
-        break;
-    }
 
     case 7: // name mixed case, extension lower case
     {
-        char* s = filename;
-        while (*s != 0) // searching for the last dot (file extension)
-            if (*s++ == '.')
-                ext = s;
-        //    if (ext == NULL || ext <= filename + 1) ext = s;  // ".cvspass" in Windows is considered an extension ...
-        if (ext == NULL)
-            ext = s;
-
-        BOOL capital = TRUE;
-        char* tgt = tgtName;
-        char* name = filename;
-        while (name < ext) // name mixed case
+        WCHAR* lastDot = wcsrchr(tgtName, L'.');
+        if (lastDot)
         {
-            if (!capital)
+            BOOL cap = TRUE;
+            for (WCHAR* p = tgtName; p < lastDot; p++)
             {
-                *tgt++ = LowerCase[*name];
-                if (*name++ == ' ')
-                    capital = TRUE;
+                if (iswspace(*p) || iswpunct(*p)) cap = TRUE;
+                else if (cap) { *p = towupper(*p); cap = FALSE; }
+                else *p = towlower(*p);
             }
-            else
-            {
-                *tgt++ = UpperCase[*name];
-                if (*name++ != ' ')
-                    capital = FALSE;
-            }
+            _wcslwr_s(lastDot, MAX_PATH - (lastDot - tgtName));
         }
-        while (*name != 0)
-            *tgt++ = LowerCase[*name++]; // extension lower case
-        *tgt = 0;
-        break;
-    }
-
-    default:
-    {
-        if (filenameLen == -1)
-            strcpy(tgtName, filename);
         else
-            memcpy(tgtName, filename, filenameLen + 1);
+        {
+            _wcslwr_s(tgtName, MAX_PATH);
+        }
         break;
     }
     }
 
-    if (change == 1 && format != 5 && format != 7) // change only the name
+    // Restore extension if it was hidden
+    if (change == 1 && savedExt[0] != 0)
     {
-        if (ext != NULL)
-        {
-            *--ext = '.';                            // restore '.' in the name
-            strcpy(tgtName + (ext - filename), ext); // append the extension
-        }
+        wcscat_s(tgtName, MAX_PATH, savedExt);
+    }
+}
+
+void AlterFileName(char* tgtName, const char* filename, int filenameLen, int format, int change, BOOL dir)
+{
+    WCHAR wTgtName[MAX_PATH];
+    WCHAR wFileName[MAX_PATH];
+
+    // Important: Use UTF-8 to preserve Unicode characters in char* buffers
+    if (ConvertUtf8ToWide(filename, filenameLen, wFileName, MAX_PATH) == 0)
+    {
+        // Fallback to ANSI if not valid UTF-8
+        ConvertA2U(filename, filenameLen, wFileName, MAX_PATH, CP_ACP);
+    }
+    
+    AlterFileName(wTgtName, wFileName, -1, format, change, dir);
+    
+    if (ConvertWideToUtf8(wTgtName, -1, tgtName, MAX_PATH) == 0)
+    {
+        // Fallback to ANSI if UTF-8 conversion fails
+        ConvertU2A(wTgtName, -1, tgtName, MAX_PATH, FALSE, CP_ACP);
     }
 }
 

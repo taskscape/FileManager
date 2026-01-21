@@ -1296,28 +1296,67 @@ int CMainWindow::GetUnassignedHotPathIndex()
 }
 
 // font for our GUI (the panel font can be defined in the configuration)
-BOOL GetSystemGUIFont(LOGFONT* lf)
+BOOL GetSystemGUIFontW(LOGFONTW* lf)
 {
-    if (!SystemParametersInfo(SPI_GETICONTITLELOGFONT, sizeof(LOGFONT), lf, 0))
+    if (!SystemParametersInfoW(SPI_GETICONTITLELOGFONT, sizeof(LOGFONTW), lf, 0))
     {
         // if SystemParametersInfo fails unexpectedly, use a fallback
-        NONCLIENTMETRICS ncm;
+        NONCLIENTMETRICSW ncm;
+        memset(&ncm, 0, sizeof(ncm));
         ncm.cbSize = sizeof(ncm);
-        SystemParametersInfo(SPI_GETNONCLIENTMETRICS, ncm.cbSize, &ncm, 0);
+        
+        // On older versions of Windows (XP), cbSize was smaller. 
+        // If it fails, try the older size.
+        if (!SystemParametersInfoW(SPI_GETNONCLIENTMETRICS, ncm.cbSize, &ncm, 0))
+        {
+            ncm.cbSize = sizeof(NONCLIENTMETRICSW) - sizeof(ncm.iPaddedBorderWidth);
+            SystemParametersInfoW(SPI_GETNONCLIENTMETRICS, ncm.cbSize, &ncm, 0);
+        }
         *lf = ncm.lfMessageFont;
         lf->lfWeight = FW_NORMAL;
     }
     return TRUE;
 }
 
-// tooltip font
-BOOL GetSystemTooltipFont(LOGFONT* lf)
+BOOL GetSystemGUIFont(LOGFONT* lf)
 {
-    NONCLIENTMETRICS ncm;
+    LOGFONTW lfw;
+    if (GetSystemGUIFontW(&lfw))
+    {
+        // copy font metrics and convert face name from Unicode to ANSI
+        memcpy(lf, &lfw, sizeof(LOGFONTA) - LF_FACESIZE);
+        ConvertU2A(lfw.lfFaceName, -1, lf->lfFaceName, LF_FACESIZE);
+        return TRUE;
+    }
+    return FALSE;
+}
+
+// tooltip font
+BOOL GetSystemTooltipFontW(LOGFONTW* lf)
+{
+    NONCLIENTMETRICSW ncm;
+    memset(&ncm, 0, sizeof(ncm));
     ncm.cbSize = sizeof(ncm);
-    SystemParametersInfo(SPI_GETNONCLIENTMETRICS, ncm.cbSize, &ncm, 0);
+    if (!SystemParametersInfoW(SPI_GETNONCLIENTMETRICS, ncm.cbSize, &ncm, 0))
+    {
+        ncm.cbSize = sizeof(NONCLIENTMETRICSW) - sizeof(ncm.iPaddedBorderWidth);
+        SystemParametersInfoW(SPI_GETNONCLIENTMETRICS, ncm.cbSize, &ncm, 0);
+    }
     *lf = ncm.lfStatusFont;
     return TRUE;
+}
+
+BOOL GetSystemTooltipFont(LOGFONT* lf)
+{
+    LOGFONTW lfw;
+    if (GetSystemTooltipFontW(&lfw))
+    {
+        // copy font metrics and convert face name from Unicode to ANSI
+        memcpy(lf, &lfw, sizeof(LOGFONTA) - LF_FACESIZE);
+        ConvertU2A(lfw.lfFaceName, -1, lf->lfFaceName, LF_FACESIZE);
+        return TRUE;
+    }
+    return FALSE;
 }
 
 BOOL CreatePanelFont()
@@ -1327,13 +1366,17 @@ BOOL CreatePanelFont()
     if (Font != NULL)
         HANDLES(DeleteObject(Font));
 
-    LOGFONT lf;
+    LOGFONTW lf;
     if (UseCustomPanelFont)
-        lf = LogFont; // the user set a custom font
+    {
+        memcpy(&lf, &LogFont, sizeof(LOGFONTA) - LF_FACESIZE);
+        ConvertA2U(LogFont.lfFaceName, -1, lf.lfFaceName, LF_FACESIZE);
+        // Do NOT overwrite lfCharSet if we want to keep the original encoding
+    }
     else
-        GetSystemGUIFont(&lf); // get the font from the system
+        GetSystemGUIFontW(&lf); // get the font from the system
 
-    Font = HANDLES(CreateFontIndirect(&lf));
+    Font = HANDLES(CreateFontIndirectW(&lf));
     if (Font == NULL)
     {
         TRACE_E("Unable to create panel font.");
@@ -1345,7 +1388,7 @@ BOOL CreatePanelFont()
     lf.lfUnderline = TRUE;
     if (FontUL != NULL)
         HANDLES(DeleteObject(FontUL));
-    FontUL = HANDLES(CreateFontIndirect(&lf));
+    FontUL = HANDLES(CreateFontIndirectW(&lf));
     lf.lfUnderline = oldUnderline;
     if (FontUL == NULL)
     {
@@ -1368,12 +1411,13 @@ BOOL CreatePanelFont()
 
 BOOL CreateEnvFonts()
 {
-    LOGFONT lf;
-    GetSystemGUIFont(&lf);
+    LOGFONTW lf;
+    GetSystemGUIFontW(&lf);
+    lf.lfCharSet = DEFAULT_CHARSET; // Ensure Unicode charset for the created font
 
     if (EnvFont != NULL)
         HANDLES(DeleteObject(EnvFont));
-    EnvFont = HANDLES(CreateFontIndirect(&lf));
+    EnvFont = HANDLES(CreateFontIndirectW(&lf));
     if (EnvFont == NULL)
     {
         TRACE_E("Unable to create font.");
@@ -1384,7 +1428,7 @@ BOOL CreateEnvFonts()
     lf.lfUnderline = TRUE;
     if (EnvFontUL != NULL)
         HANDLES(DeleteObject(EnvFontUL));
-    EnvFontUL = HANDLES(CreateFontIndirect(&lf));
+    EnvFontUL = HANDLES(CreateFontIndirectW(&lf));
     if (EnvFontUL == NULL)
     {
         TRACE_E("Unable to create font.");
@@ -1402,11 +1446,12 @@ BOOL CreateEnvFonts()
     SelectObject(dc, oldFont);
     HANDLES(ReleaseDC(NULL, dc));
 
-    LOGFONT toolLF;
-    GetSystemTooltipFont(&toolLF);
+    LOGFONTW toolLF;
+    GetSystemTooltipFontW(&toolLF);
+    toolLF.lfCharSet = DEFAULT_CHARSET; // Ensure Unicode charset for the created font
     if (TooltipFont != NULL)
         HANDLES(DeleteObject(TooltipFont));
-    TooltipFont = HANDLES(CreateFontIndirect(&toolLF));
+    TooltipFont = HANDLES(CreateFontIndirectW(&toolLF));
     if (TooltipFont == NULL)
     {
         TRACE_E("Unable to create font.");
@@ -1414,6 +1459,7 @@ BOOL CreateEnvFonts()
     }
 
     return TRUE;
+
 }
 
 void CMainWindow::SetFont()

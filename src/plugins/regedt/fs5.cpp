@@ -1099,7 +1099,7 @@ void CPluginFSInterface::OpenActiveFolder(const char* fsName, HWND parent)
     // regedit has no parameter to set which Registry path should be displayed
     // but we can set HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Applets\Regedit\LastKey
     // in the form (e.g.) "Computer\HKEY_CURRENT_USER\AppEvents\Schemes\Apps"
-    // NOTE: the word "Computer" is localized as "Počítač" on Czech Win7, fortunately regedit.exe
+    // NOTE: the word "Computer" is localized (e.g., Czech "Počítač") on Win7, fortunately regedit.exe
     // does not require the word and the path may start directly at the HKEY_* root
 
     // store the current panel path into the LastKey value for RegEdit

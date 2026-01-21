@@ -373,14 +373,14 @@ C__Trace::C__Trace() : TraceStrStream(&TraceStringBuf), TraceStrStreamW(&TraceSt
 #ifdef _DEBUG
     // new streams use locales internally, which have individual
     // individual "facets" using lazy creation - are allocated on heap
-    // kdyz jsou potreba, tedy kdyz nekdo posle do streamu neco, co ma
-    // formatovani zavisle na lokalich pravidlech, treba cislo, datum,
+    // when they are needed, i.e. when someone sends something to the stream that has
+    // formatting dependent on locale rules, such as a number, date,
     // or boolean. These "facets" are then deallocated on exit
     // of program with compiler priority, i.e. after our memory leak check.
     // So if someone uses stream to output anything localizable,
-    // nas debug heap zacne hlasit memory leaky, i kdyz zadne nejsou. Abychom
-    // to prevent this, we force locales to create all "facets" now, while
-    // jeste nehlidame heap.
+    // our debug heap will start reporting memory leaks, even though there are none. To
+    // prevent this, we force locales to create all "facets" now, while
+    // we are not yet monitoring the heap.
     // For now we only use output stream and only with strings (without conversion)
     // and numbers. So sending a number to stringstream should suffice. If
     // in the future we start using streams more and debug heap starts reporting
@@ -1140,16 +1140,16 @@ C__Trace::SendMessageToServer(C__MessageType type, BOOL crash)
             }
             msgBoxOpened = FALSE;
             GlobalFree(unicode ? (HGLOBAL)threadDataW.Msg : (HGLOBAL)threadData.Msg);
-            // pad softu vyvolame primo v kodu, kde je umisteny TRACE_C/TRACE_MC, aby
-            // bylo v bug reportu videt presne kde makra lezi; padacka tedy nasleduje
-            // po dokonceni teto metody
+            // we trigger the software crash directly in the code where TRACE_C/TRACE_MC is located, so
+            // that the bug report shows exactly where the macro is; the crash therefore follows
+            // after completion of this method
         }
         else // other threads with TRACE_C will be blocked until msgbox opened for
-        {    // prvni TRACE_C, tak to tam i spadne, at v tom neni bordel
+        {    // first TRACE_C, so it will crash there too, to avoid confusion
             if (msgBoxOpened)
             {
                 while (1)
-                    Sleep(1000); // blokace vede na deadlock napr. kdyz je (a nema byt) TRACE_C v DLL_THREAD_DETACH
+                    Sleep(1000); // blocking leads to deadlock e.g. when there is (and should not be) TRACE_C in DLL_THREAD_DETACH
             }
         }
     }

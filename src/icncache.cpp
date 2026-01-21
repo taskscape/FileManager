@@ -114,7 +114,7 @@ LABEL_SortArrayInt:
     {
         if (i < right)
         {
-            if (j - left < right - i) // je potreba seradit obe "poloviny", tedy do rekurze posleme tu mensi, tu druhou zpracujeme pres "goto"
+            if (j - left < right - i) // need to sort both "halves", so send the smaller one to recursion, process the other one via "goto"
             {
                 SortArrayInt(left, j);
                 left = i;
@@ -168,7 +168,7 @@ LABEL_SortArrayForFSInt:
         }
     } while (i <= j);
 
-    // nasledujici "hezky" kod jsme nahradili kodem podstatne setricim stack (max. log(N) zanoreni rekurze)
+    // we replaced the following "nice" code with code that saves stack significantly (max. log(N) recursion depth)
     //  if (left < j) SortArrayForFSInt(left, j);
     //  if (i < right) SortArrayForFSInt(i, right);
 
@@ -216,8 +216,8 @@ BOOL CIconCache::GetIndex(const char* name, int& index, CPluginDataInterfaceEnca
         return FALSE;
     }
 
-    if (dataIface != NULL) // jde o pitFromPlugin: nechame plugin, aby polozky porovnal sam (musi jit o porovnani
-    {                      // beze shod zadnych dvou polozek listingu)
+    if (dataIface != NULL) // dealing with pitFromPlugin: let plugin compare items itself (must be comparison
+    {                      // without any two listing items matching)
         int l = 0, r = Count - 1, m;
         int res;
         while (1)
@@ -234,25 +234,25 @@ BOOL CIconCache::GetIndex(const char* name, int& index, CPluginDataInterfaceEnca
                 index = 0;
                 return FALSE; // error -> we return for example: not found, insert at the beginning of the array
             }
-            if (res == 0) // nalezeno
+            if (res == 0) // found
             {
                 index = m;
                 return TRUE;
             }
             else if (res > 0)
             {
-                if (l == r || l > m - 1) // nenalezeno
+                if (l == r || l > m - 1) // not found
                 {
-                    index = m; // mel by byt na teto pozici
+                    index = m; // should be at this position
                     return FALSE;
                 }
                 r = m - 1;
             }
             else
             {
-                if (l == r) // nenalezeno
+                if (l == r) // not found
                 {
-                    index = m + 1; // mel by byt az za touto pozici
+                    index = m + 1; // should be after this position
                     return FALSE;
                 }
                 l = m + 1;
@@ -329,9 +329,9 @@ void CIconCache::Destroy()
 void CIconCache::ColorsChanged()
 {
     CALL_STACK_MESSAGE1("CIconCache::ColorsChanged()");
-    // tato funkce je volana pri zmene barev nebo barevne hloubky obrazovky
-    // druhy pripad neni reseny -- bylo by treba znovu konstruovat bitmapy
-    // v imagelistech pro aktualni barevnou hloubku
+    // this function is called when screen colors or color depth changes
+    // the second case is not handled -- would need to reconstruct bitmaps
+    // in imagelists for current color depth
     COLORREF bkColor = GetCOLORREF(CurrentColors[ITEM_BK_NORMAL]);
     int i;
     for (i = 0; i < IconsCache.Count; i++)
@@ -473,8 +473,8 @@ void CIconCache::GetIconsAndThumbsFrom(CIconCache* icons, CPluginDataInterfaceEn
     int index1 = 0;
     int index2 = 0;
 
-    if (dataIface != NULL) // jde o pitFromPlugin: nechame plugin, aby polozky porovnal sam (musi jit o porovnani
-    {                      // beze shod zadnych dvou polozek listingu)
+    if (dataIface != NULL) // dealing with pitFromPlugin: let plugin compare items itself (must be comparison
+    {                      // without any two listing items matching)
         const CFileData *file1, *file2;
 
         if (index1 < Count)
@@ -489,7 +489,7 @@ void CIconCache::GetIconsAndThumbsFrom(CIconCache* icons, CPluginDataInterfaceEn
             }
         }
         else
-            return; // neni co spojovat
+            return; // nothing to merge
 
         if (index2 < icons->Count)
         {
@@ -503,12 +503,12 @@ void CIconCache::GetIconsAndThumbsFrom(CIconCache* icons, CPluginDataInterfaceEn
             }
         }
         else
-            return; // neni co spojovat
+            return; // nothing to merge
         int res;
         while (1)
         {
             res = dataIface->CompareFilesFromFS(file1, file2);
-            if (res == 0) // shodne -> provedeme kopii (ikony a masky)
+            if (res == 0) // matching -> perform copy (icons and masks)
             {
                 CIconList* srcIconList;
                 int srcIconListIndex;
@@ -518,13 +518,13 @@ void CIconCache::GetIconsAndThumbsFrom(CIconCache* icons, CPluginDataInterfaceEn
 
                 DWORD flag = icons->At(index2).GetFlag();
 
-                if ((flag == 1 || flag == 2) &&  // platna nebo stara ikona
-                    At(index1).GetFlag() == 0 && // zajima nas ikona (pokud doslo k prepnuti na thumbnail, starou ikonu nepotrebujeme)
+                if ((flag == 1 || flag == 2) &&  // valid or old icon
+                    At(index1).GetFlag() == 0 && // we're interested in icon (if switched to thumbnail, we don't need old icon)
                     GetIcon(At(index1).GetIndex(), &dstIconList, &dstIconListIndex) &&
                     icons->GetIcon(icons->At(index2).GetIndex(), &srcIconList, &srcIconListIndex))
                 {
                     dstIconList->Copy(dstIconListIndex, srcIconList, srcIconListIndex);
-                    At(index1).SetFlag((flag == 1 && transferIconsAndThumbnailsAsNew) ? 1 : 2); // ted uz je to stara (nebo platna/nova) verze ikony
+                    At(index1).SetFlag((flag == 1 && transferIconsAndThumbnailsAsNew) ? 1 : 2); // now it's old (or valid/new) icon version
                 }
             }
 
@@ -542,7 +542,7 @@ void CIconCache::GetIconsAndThumbsFrom(CIconCache* icons, CPluginDataInterfaceEn
                     }
                 }
                 else
-                    break; // uz neni co spojovat
+                    break; // nothing more to merge
             }
 
             if (res == 0 || res > 0) // index2++
@@ -559,7 +559,7 @@ void CIconCache::GetIconsAndThumbsFrom(CIconCache* icons, CPluginDataInterfaceEn
                     }
                 }
                 else
-                    break; // uz neni co spojovat
+                    break; // nothing more to merge
             }
         }
     }
@@ -574,12 +574,12 @@ void CIconCache::GetIconsAndThumbsFrom(CIconCache* icons, CPluginDataInterfaceEn
             length = (int)strlen(name1);
         }
         else
-            return; // neni co spojovat
+            return; // nothing to merge
 
         if (index2 < icons->Count)
             name2 = icons->At(index2).NameAndData;
         else
-            return; // neni co spojovat
+            return; // nothing to merge
         int res;
         while (1)
         {
@@ -594,13 +594,13 @@ void CIconCache::GetIconsAndThumbsFrom(CIconCache* icons, CPluginDataInterfaceEn
 
                 DWORD flag = icons->At(index2).GetFlag();
 
-                if ((flag == 1 || flag == 2) &&  // platna nebo stara ikona
-                    At(index1).GetFlag() == 0 && // zajima nas ikona (pokud doslo k prepnuti na thumbnail, starou ikonu nepotrebujeme)
+                if ((flag == 1 || flag == 2) &&  // valid or old icon
+                    At(index1).GetFlag() == 0 && // we're interested in icon (if switched to thumbnail, we don't need old icon)
                     GetIcon(At(index1).GetIndex(), &dstIconList, &dstIconListIndex) &&
                     icons->GetIcon(icons->At(index2).GetIndex(), &srcIconList, &srcIconListIndex))
                 {
                     dstIconList->Copy(dstIconListIndex, srcIconList, srcIconListIndex);
-                    At(index1).SetFlag((flag == 1 && transferIconsAndThumbnailsAsNew) ? 1 : 2); // ted uz je to stara (nebo platna/nova) verze ikony
+                    At(index1).SetFlag((flag == 1 && transferIconsAndThumbnailsAsNew) ? 1 : 2); // now it's old (or valid/new) icon version
                 }
                 else
                 {
@@ -650,7 +650,7 @@ void CIconCache::GetIconsAndThumbsFrom(CIconCache* icons, CPluginDataInterfaceEn
                     length = (int)strlen(name1);
                 }
                 else
-                    break; // uz neni co spojovat
+                    break; // nothing more to merge
             }
 
             if (res == 0 || res > 0) // index2++
@@ -658,7 +658,7 @@ void CIconCache::GetIconsAndThumbsFrom(CIconCache* icons, CPluginDataInterfaceEn
                 if (++index2 < icons->Count)
                     name2 = icons->At(index2).NameAndData;
                 else
-                    break; // uz neni co spojovat
+                    break; // nothing more to merge
             }
         }
     }
@@ -891,9 +891,9 @@ void CAssociations::Destroy()
 void CAssociations::ColorsChanged()
 {
     CALL_STACK_MESSAGE1("CAssociations::ColorsChanged()");
-    // tato funkce je volana pri zmene barev nebo barevne hloubky obrazovky
-    // druhy pripad neni reseny -- bylo by treba znovu konstruovat bitmapy
-    // v imagelistech pro aktualni barevnou hloubku
+    // this function is called when screen colors or color depth changes
+    // the second case is not handled -- would need to reconstruct bitmaps
+    // in imagelists for current color depth
     COLORREF bkColor = GetCOLORREF(CurrentColors[ITEM_BK_NORMAL]);
     int j;
     for (j = 0; j < ICONSIZE_COUNT; j++)
