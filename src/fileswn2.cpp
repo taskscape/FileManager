@@ -691,7 +691,7 @@ BOOL CFilesWindow::ChangeToFixedDrive(HWND parent, BOOL* noChange, BOOL refreshL
     if (noChange != NULL)
         *noChange = TRUE;
     char sysDir[MAX_PATH];
-    char root[4] = " :\\";
+    char root[5] = " :\\";
     if (GetWindowsDirectory(sysDir, MAX_PATH) != 0 && sysDir[0] != 0 && sysDir[1] == ':')
     {
         root[0] = sysDir[0];
@@ -787,7 +787,7 @@ void CFilesWindow::ConnectNet(BOOL readOnlyUNC, const char* netRootPath, BOOL ch
                     *newlyMappedDrive = d;
                 if (changeToNewDrive)
                 {
-                    char root[4] = " :\\";
+                    char root[5] = " :\\";
                     root[0] = d;
                     ChangePathToDisk(HWindow, root, -1, NULL, NULL, TRUE, FALSE, FALSE, NULL, FALSE);
                 }
@@ -1833,7 +1833,7 @@ BOOL CFilesWindow::ChangePathToDisk(HWND parent, const char* path, int suggested
 
                         // cannot shorten, we find the system or first fixed-drive (our "escape drive")
                         char sysDir[MAX_PATH];
-                        char root[4] = " :\\";
+                        char root[5] = " :\\";
                         BOOL done = FALSE;
                         if (GetWindowsDirectory(sysDir, MAX_PATH) != 0 && sysDir[0] != 0 && sysDir[1] == ':')
                         {

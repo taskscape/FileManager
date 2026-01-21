@@ -17,51 +17,108 @@ NTFSCONTROLFILE DynNtFsControlFile = NULL;
 
 COperationsQueue OperationsQueue; // queue of disk operations
 
+static WCHAR* SafeConvertAllocUtf8ToWide(const char* src, int len)
+{
+    __try {
+        return ConvertAllocUtf8ToWide(src, len);
+    } __except(EXCEPTION_EXECUTE_HANDLER) {
+        SetLastError(ERROR_NOACCESS);
+        return NULL;
+    }
+}
+
+static HANDLE SafeCreateFileW(LPCWSTR lpFileName, DWORD dwDesiredAccess, DWORD dwShareMode,
+                              LPSECURITY_ATTRIBUTES lpSecurityAttributes, DWORD dwCreationDisposition,
+                              DWORD dwFlagsAndAttributes, HANDLE hTemplateFile)
+{
+    __try {
+        return CreateFileW(lpFileName, dwDesiredAccess, dwShareMode, lpSecurityAttributes,
+                           dwCreationDisposition, dwFlagsAndAttributes, hTemplateFile);
+    } __except(EXCEPTION_EXECUTE_HANDLER) {
+        SetLastError(ERROR_NOACCESS);
+        return INVALID_HANDLE_VALUE;
+    }
+}
+
+static BOOL SafeDeleteFileW(LPCWSTR lpFileName)
+{
+    __try {
+        return DeleteFileW(lpFileName);
+    } __except(EXCEPTION_EXECUTE_HANDLER) {
+        SetLastError(ERROR_NOACCESS);
+        return FALSE;
+    }
+}
+
+static BOOL SafeSetFileAttributesW(LPCWSTR lpFileName, DWORD dwFileAttributes)
+{
+    __try {
+        return SetFileAttributesW(lpFileName, dwFileAttributes);
+    } __except(EXCEPTION_EXECUTE_HANDLER) {
+        SetLastError(ERROR_NOACCESS);
+        return FALSE;
+    }
+}
+
+static BOOL SafeRemoveDirectoryW(LPCWSTR lpPathName)
+{
+    __try {
+        return RemoveDirectoryW(lpPathName);
+    } __except(EXCEPTION_EXECUTE_HANDLER) {
+        SetLastError(ERROR_NOACCESS);
+        return FALSE;
+    }
+}
+
 static HANDLE CreateFileUtf8(const char* fileName, DWORD desiredAccess, DWORD shareMode,
                              LPSECURITY_ATTRIBUTES securityAttributes, DWORD creationDisposition,
                              DWORD flagsAndAttributes, HANDLE templateFile)
 {
-    CStrP fileNameW(ConvertAllocUtf8ToWide(fileName, -1));
+    WCHAR* wName = SafeConvertAllocUtf8ToWide(fileName, -1);
+    CStrP fileNameW(wName);
     if (fileNameW == NULL)
     {
         SetLastError(ERROR_NO_UNICODE_TRANSLATION);
         return INVALID_HANDLE_VALUE;
     }
-    return CreateFileW(fileNameW, desiredAccess, shareMode, securityAttributes, creationDisposition,
-                       flagsAndAttributes, templateFile);
+    return SafeCreateFileW(fileNameW, desiredAccess, shareMode, securityAttributes, creationDisposition,
+                           flagsAndAttributes, templateFile);
 }
 
 static BOOL DeleteFileUtf8(const char* fileName)
 {
-    CStrP fileNameW(ConvertAllocUtf8ToWide(fileName, -1));
+    WCHAR* wName = SafeConvertAllocUtf8ToWide(fileName, -1);
+    CStrP fileNameW(wName);
     if (fileNameW == NULL)
     {
         SetLastError(ERROR_NO_UNICODE_TRANSLATION);
         return FALSE;
     }
-    return DeleteFileW(fileNameW);
+    return SafeDeleteFileW(fileNameW);
 }
 
 static BOOL SetFileAttributesUtf8(const char* fileName, DWORD attrs)
 {
-    CStrP fileNameW(ConvertAllocUtf8ToWide(fileName, -1));
+    WCHAR* wName = SafeConvertAllocUtf8ToWide(fileName, -1);
+    CStrP fileNameW(wName);
     if (fileNameW == NULL)
     {
         SetLastError(ERROR_NO_UNICODE_TRANSLATION);
         return FALSE;
     }
-    return SetFileAttributesW(fileNameW, attrs);
+    return SafeSetFileAttributesW(fileNameW, attrs);
 }
 
 static BOOL RemoveDirectoryUtf8(const char* path)
 {
-    CStrP pathW(ConvertAllocUtf8ToWide(path, -1));
+    WCHAR* wName = SafeConvertAllocUtf8ToWide(path, -1);
+    CStrP pathW(wName);
     if (pathW == NULL)
     {
         SetLastError(ERROR_NO_UNICODE_TRANSLATION);
         return FALSE;
     }
-    return RemoveDirectoryW(pathW);
+    return SafeRemoveDirectoryW(pathW);
 }
 
 // if defined, various debug messages are written to TRACE
@@ -1571,9 +1628,17 @@ BOOL DoCopySecurity(const char* sourceName, const char* targetName, DWORD* err, 
     }
     else // obtain the security info from the source
     {
-        *err = GetNamedSecurityInfo((char*)sourceNameSec, SE_FILE_OBJECT,
-                                    DACL_SECURITY_INFORMATION | GROUP_SECURITY_INFORMATION | OWNER_SECURITY_INFORMATION,
-                                    &srcOwner, &srcGroup, &srcDACL, NULL, &srcSD);
+        CStrP sourceNameSecW(ConvertAllocUtf8ToWide(sourceNameSec, -1));
+        if (sourceNameSecW != NULL)
+        {
+            *err = GetNamedSecurityInfoW(sourceNameSecW, SE_FILE_OBJECT,
+                                        DACL_SECURITY_INFORMATION | GROUP_SECURITY_INFORMATION | OWNER_SECURITY_INFORMATION,
+                                        &srcOwner, &srcGroup, &srcDACL, NULL, &srcSD);
+        }
+        else
+        {
+            *err = ERROR_NO_UNICODE_TRANSLATION;
+        }
     }
     BOOL ret = *err == ERROR_SUCCESS;
 
@@ -1588,26 +1653,34 @@ BOOL DoCopySecurity(const char* sourceName, const char* targetName, DWORD* err, 
         }
         else
         {
-            BOOL inheritedDACL = /*(srcSDControl & SE_DACL_AUTO_INHERITED) != 0 &&*/ (srcSDControl & SE_DACL_PROTECTED) == 0; // SE_DACL_AUTO_INHERITED unfortunately is not always set (for example Total Commander clears it after moving a file, so we ignore it)
-            DWORD attr = GetFileAttributesUtf8(targetNameSec);
-            *err = SetNamedSecurityInfo((char*)targetNameSec, SE_FILE_OBJECT,
-                                        DACL_SECURITY_INFORMATION | GROUP_SECURITY_INFORMATION | OWNER_SECURITY_INFORMATION |
-                                            (inheritedDACL ? UNPROTECTED_DACL_SECURITY_INFORMATION : PROTECTED_DACL_SECURITY_INFORMATION),
-                                        srcOwner, srcGroup, srcDACL, NULL);
-            ret = *err == ERROR_SUCCESS;
-
-            if (!ret)
+            CStrP targetNameSecW(ConvertAllocUtf8ToWide(targetNameSec, -1));
+            if (targetNameSecW == NULL)
             {
-                // if the owner and group cannot be changed (we do not have the rights in the directory - for example we only have "change" rights),
-                // check whether the owner and group are already set (that would not be an error)
-                PSID tgtOwner = NULL;
-                PSID tgtGroup = NULL;
-                PACL tgtDACL = NULL;
-                PSECURITY_DESCRIPTOR tgtSD = NULL;
-                BOOL tgtRead = GetNamedSecurityInfo((char*)targetNameSec, SE_FILE_OBJECT,
-                                                    DACL_SECURITY_INFORMATION | GROUP_SECURITY_INFORMATION | OWNER_SECURITY_INFORMATION,
-                                                    &tgtOwner, &tgtGroup, &tgtDACL, NULL, &tgtSD) == ERROR_SUCCESS;
-                // if the owner of the target file is not the current user, try to set it ("take ownership") - only
+                *err = ERROR_NO_UNICODE_TRANSLATION;
+                ret = FALSE;
+            }
+            else
+            {
+                BOOL inheritedDACL = /*(srcSDControl & SE_DACL_AUTO_INHERITED) != 0 &&*/ (srcSDControl & SE_DACL_PROTECTED) == 0; // SE_DACL_AUTO_INHERITED unfortunately is not always set (for example Total Commander clears it after moving a file, so we ignore it)
+                DWORD attr = GetFileAttributesUtf8(targetNameSec);
+                *err = SetNamedSecurityInfoW(targetNameSecW, SE_FILE_OBJECT,
+                                            DACL_SECURITY_INFORMATION | GROUP_SECURITY_INFORMATION | OWNER_SECURITY_INFORMATION |
+                                                (inheritedDACL ? UNPROTECTED_DACL_SECURITY_INFORMATION : PROTECTED_DACL_SECURITY_INFORMATION),
+                                            srcOwner, srcGroup, srcDACL, NULL);
+                ret = *err == ERROR_SUCCESS;
+
+                if (!ret)
+                {
+                    // if the owner and group cannot be changed (we do not have the rights in the directory - for example we only have "change" rights),
+                    // check whether the owner and group are already set (that would not be an error)
+                    PSID tgtOwner = NULL;
+                    PSID tgtGroup = NULL;
+                    PACL tgtDACL = NULL;
+                    PSECURITY_DESCRIPTOR tgtSD = NULL;
+                    BOOL tgtRead = GetNamedSecurityInfoW(targetNameSecW, SE_FILE_OBJECT,
+                                                        DACL_SECURITY_INFORMATION | GROUP_SECURITY_INFORMATION | OWNER_SECURITY_INFORMATION,
+                                                        &tgtOwner, &tgtGroup, &tgtDACL, NULL, &tgtSD) == ERROR_SUCCESS;
+                    // if the owner of the target file is not the current user, try to set it ("take ownership") - only
                 // provided we have the right to write the owner so that we can write back the original owner afterwards
                 BOOL ownerOfFile = FALSE;
                 if (!tgtRead ||         // if the security info cannot be read from the target, the owner is most likely not the current user (the owner has unblocked read rights)
@@ -1617,7 +1690,7 @@ BOOL DoCopySecurity(const char* sourceName, const char* targetName, DWORD* err, 
                 {
                     if (HaveWriteOwnerRight &&
                         CurrentProcessTokenUserValid && CurrentProcessTokenUser->User.Sid != NULL &&
-                        SetNamedSecurityInfo((char*)targetNameSec, SE_FILE_OBJECT, OWNER_SECURITY_INFORMATION,
+                        SetNamedSecurityInfoW(targetNameSecW, SE_FILE_OBJECT, OWNER_SECURITY_INFORMATION,
                                              CurrentProcessTokenUser->User.Sid, NULL, NULL, NULL) == ERROR_SUCCESS)
                     { // setting succeeded; we must retrieve 'tgtSD' again
                         ownerOfFile = TRUE;
@@ -1627,7 +1700,7 @@ BOOL DoCopySecurity(const char* sourceName, const char* targetName, DWORD* err, 
                         tgtGroup = NULL;
                         tgtDACL = NULL;
                         tgtSD = NULL;
-                        tgtRead = GetNamedSecurityInfo((char*)targetNameSec, SE_FILE_OBJECT,
+                        tgtRead = GetNamedSecurityInfoW(targetNameSecW, SE_FILE_OBJECT,
                                                        DACL_SECURITY_INFORMATION | GROUP_SECURITY_INFORMATION | OWNER_SECURITY_INFORMATION,
                                                        &tgtOwner, &tgtGroup, &tgtDACL, NULL, &tgtSD) == ERROR_SUCCESS;
                     }
@@ -1653,24 +1726,24 @@ BOOL DoCopySecurity(const char* sourceName, const char* targetName, DWORD* err, 
                     if (allowChPermDACL != NULL && InitializeAcl(allowChPermDACL, allowChPermDACLSize, ACL_REVISION) &&
                         AddAccessAllowedAce(allowChPermDACL, ACL_REVISION, READ_CONTROL | WRITE_DAC | WRITE_OWNER,
                                             CurrentProcessTokenUser->User.Sid) &&
-                        SetNamedSecurityInfo((char*)targetNameSec, SE_FILE_OBJECT,
+                        SetNamedSecurityInfoW(targetNameSecW, SE_FILE_OBJECT,
                                              DACL_SECURITY_INFORMATION | PROTECTED_DACL_SECURITY_INFORMATION,
                                              NULL, NULL, allowChPermDACL, NULL) == ERROR_SUCCESS)
                     {
-                        ownerOK = SetNamedSecurityInfo((char*)targetNameSec, SE_FILE_OBJECT,
+                        ownerOK = SetNamedSecurityInfoW(targetNameSecW, SE_FILE_OBJECT,
                                                        OWNER_SECURITY_INFORMATION,
                                                        srcOwner, NULL, NULL, NULL) == ERROR_SUCCESS;
-                        groupOK = SetNamedSecurityInfo((char*)targetNameSec, SE_FILE_OBJECT,
+                        groupOK = SetNamedSecurityInfoW(targetNameSecW, SE_FILE_OBJECT,
                                                        GROUP_SECURITY_INFORMATION,
                                                        NULL, srcGroup, NULL, NULL) == ERROR_SUCCESS;
-                        daclOK = SetNamedSecurityInfo((char*)targetNameSec, SE_FILE_OBJECT, DACL_SECURITY_INFORMATION | (inheritedDACL ? UNPROTECTED_DACL_SECURITY_INFORMATION : PROTECTED_DACL_SECURITY_INFORMATION),
+                        daclOK = SetNamedSecurityInfoW(targetNameSecW, SE_FILE_OBJECT, DACL_SECURITY_INFORMATION | (inheritedDACL ? UNPROTECTED_DACL_SECURITY_INFORMATION : PROTECTED_DACL_SECURITY_INFORMATION),
                                                       NULL, NULL, srcDACL, NULL) == ERROR_SUCCESS;
                     }
                     if (allowChPermDACL != (PACL)buff3 && allowChPermDACL != NULL)
                         free(allowChPermDACL);
                 }
                 if (!ownerOK &&
-                    (SetNamedSecurityInfo((char*)targetNameSec, SE_FILE_OBJECT, OWNER_SECURITY_INFORMATION,
+                    (SetNamedSecurityInfoW(targetNameSecW, SE_FILE_OBJECT, OWNER_SECURITY_INFORMATION,
                                           srcOwner, NULL, NULL, NULL) == ERROR_SUCCESS ||
                      tgtRead && (srcOwner == NULL && tgtOwner == NULL || // if the owner is already set, ignore a potential error while setting
                                  srcOwner != NULL && tgtOwner != NULL && EqualSid(srcOwner, tgtOwner))))
@@ -1678,7 +1751,7 @@ BOOL DoCopySecurity(const char* sourceName, const char* targetName, DWORD* err, 
                     ownerOK = TRUE;
                 }
                 if (!groupOK &&
-                    (SetNamedSecurityInfo((char*)targetNameSec, SE_FILE_OBJECT, GROUP_SECURITY_INFORMATION,
+                    (SetNamedSecurityInfoW(targetNameSecW, SE_FILE_OBJECT, GROUP_SECURITY_INFORMATION,
                                           NULL, srcGroup, NULL, NULL) == ERROR_SUCCESS ||
                      tgtRead && (srcGroup == NULL && tgtGroup == NULL || // if the group is already set, ignore a potential error while setting
                                  srcGroup != NULL && tgtGroup != NULL && EqualSid(srcGroup, tgtGroup))))
@@ -1686,7 +1759,7 @@ BOOL DoCopySecurity(const char* sourceName, const char* targetName, DWORD* err, 
                     groupOK = TRUE;
                 }
                 if (!daclOK && // the DACL must be set last because it depends on the owner (CREATOR OWNER is replaced with the real owner, etc.)
-                    SetNamedSecurityInfo((char*)targetNameSec, SE_FILE_OBJECT, DACL_SECURITY_INFORMATION | (inheritedDACL ? UNPROTECTED_DACL_SECURITY_INFORMATION : PROTECTED_DACL_SECURITY_INFORMATION),
+                    SetNamedSecurityInfoW(targetNameSecW, SE_FILE_OBJECT, DACL_SECURITY_INFORMATION | (inheritedDACL ? UNPROTECTED_DACL_SECURITY_INFORMATION : PROTECTED_DACL_SECURITY_INFORMATION),
                                          NULL, NULL, srcDACL, NULL) == ERROR_SUCCESS)
                 {
                     daclOK = TRUE;
@@ -1701,6 +1774,7 @@ BOOL DoCopySecurity(const char* sourceName, const char* targetName, DWORD* err, 
             }
             if (attr != INVALID_FILE_ATTRIBUTES)
                 SetFileAttributesUtf8(targetNameSec, attr);
+            }
         }
     }
     if (srcSD != NULL)
@@ -5670,6 +5744,10 @@ BOOL DoMoveFile(COperation* op, HWND hProgressDlg, void* buffer,
                 BOOL* setDirTimeAfterMove, CAsyncCopyParams*& asyncPar,
                 BOOL ignInvalidName)
 {
+    char log_buffer[1024];
+    _snprintf_s(log_buffer, sizeof(log_buffer), _TRUNCATE, "DoMoveFile: Source='%s', Target='%s'", op->SourceName ? op->SourceName : "NULL", op->TargetName ? op->TargetName : "NULL");
+    OutputDebugStringA(log_buffer);
+
     if (script->CopyAttrs && copyAsEncrypted)
         TRACE_E("DoMoveFile(): unexpected parameter value: copyAsEncrypted is TRUE when script->CopyAttrs is TRUE!");
 
@@ -5697,10 +5775,18 @@ BOOL DoMoveFile(COperation* op, HWND hProgressDlg, void* buffer,
         BOOL srcSecurityErr = FALSE;
         if (!invalidName && script->CopySecurity) // should we copy NTFS security permissions?
         {
-            srcSecurity.SrcError = GetNamedSecurityInfo(sourceNameMvDir, SE_FILE_OBJECT,
-                                                        DACL_SECURITY_INFORMATION | GROUP_SECURITY_INFORMATION | OWNER_SECURITY_INFORMATION,
-                                                        &srcSecurity.SrcOwner, &srcSecurity.SrcGroup, &srcSecurity.SrcDACL,
-                                                        NULL, &srcSecurity.SrcSD);
+            CStrP sourceNameMvDirW(ConvertAllocUtf8ToWide(sourceNameMvDir, -1));
+            if (sourceNameMvDirW != NULL)
+            {
+                srcSecurity.SrcError = GetNamedSecurityInfoW(sourceNameMvDirW, SE_FILE_OBJECT,
+                                                            DACL_SECURITY_INFORMATION | GROUP_SECURITY_INFORMATION | OWNER_SECURITY_INFORMATION,
+                                                            &srcSecurity.SrcOwner, &srcSecurity.SrcGroup, &srcSecurity.SrcDACL,
+                                                            NULL, &srcSecurity.SrcSD);
+            }
+            else
+            {
+                srcSecurity.SrcError = ERROR_NO_UNICODE_TRANSLATION;
+            }
             if (srcSecurity.SrcError != ERROR_SUCCESS) // failed to read security info from the source file -> nothing to apply on the target
             {
                 srcSecurityErr = TRUE;
@@ -6350,27 +6436,44 @@ BOOL DoDeleteFile(HWND hProgressDlg, char* name, const CQuadWord& size, COperati
             }
             if (useRecycleBin)
             {
-                char nameList[MAX_PATH + 1];
-                int l = (int)strlen(name) + 1;
-                memmove(nameList, name, l);
-                nameList[l] = 0;
-                if (!PathContainsValidComponents(nameList, FALSE))
+                if (!PathContainsValidComponents((char*)name, FALSE))
                 {
                     err = ERROR_INVALID_NAME;
                 }
                 else
                 {
-                    CShellExecuteWnd shellExecuteWnd;
-                    SHFILEOPSTRUCT opCode;
-                    memset(&opCode, 0, sizeof(opCode));
+                    CStrP nameW(ConvertAllocUtf8ToWide(name, -1));
+                    if (nameW == NULL)
+                    {
+                        err = ERROR_NO_UNICODE_TRANSLATION;
+                    }
+                    else
+                    {
+                        int nameLen = lstrlenW(nameW);
+                        WCHAR* nameListW = (WCHAR*)malloc((nameLen + 2) * sizeof(WCHAR));
+                        if (nameListW == NULL)
+                        {
+                            err = ERROR_NOT_ENOUGH_MEMORY;
+                        }
+                        else
+                        {
+                            memcpy(nameListW, nameW, (nameLen + 1) * sizeof(WCHAR));
+                            nameListW[nameLen + 1] = 0; // double null
 
-                    opCode.hwnd = shellExecuteWnd.Create(hProgressDlg, "SEW: DoDeleteFile");
+                            CShellExecuteWnd shellExecuteWnd;
+                            SHFILEOPSTRUCTW opCode;
+                            memset(&opCode, 0, sizeof(opCode));
 
-                    opCode.wFunc = FO_DELETE;
-                    opCode.pFrom = nameList;
-                    opCode.fFlags = FOF_ALLOWUNDO | FOF_SILENT | FOF_NOCONFIRMATION;
-                    opCode.lpszProgressTitle = "";
-                    err = SHFileOperation(&opCode);
+                            opCode.hwnd = shellExecuteWnd.Create(hProgressDlg, "SEW: DoDeleteFile");
+
+                            opCode.wFunc = FO_DELETE;
+                            opCode.pFrom = nameListW;
+                            opCode.fFlags = FOF_ALLOWUNDO | FOF_SILENT | FOF_NOCONFIRMATION;
+                            opCode.lpszProgressTitle = L"";
+                            err = SHFileOperationW(&opCode);
+                            free(nameListW);
+                        }
+                    }
                 }
             }
             else
@@ -6997,27 +7100,44 @@ BOOL DoDeleteDir(HWND hProgressDlg, char* name, const CQuadWord& size, COperatio
              !script->InvertRecycleBin && dlgData.UseRecycleBin == 1) &&
             IsDirectoryEmpty(name)) // subdirectory must not contain any files!!!
         {
-            char nameList[MAX_PATH + 1];
-            int l = (int)strlen(name) + 1;
-            memmove(nameList, name, l);
-            nameList[l] = 0;
-            if (!PathContainsValidComponents(nameList, FALSE))
+            if (!PathContainsValidComponents((char*)name, FALSE))
             {
                 err = ERROR_INVALID_NAME;
             }
             else
             {
-                CShellExecuteWnd shellExecuteWnd;
-                SHFILEOPSTRUCT opCode;
-                memset(&opCode, 0, sizeof(opCode));
+                CStrP nameW(ConvertAllocUtf8ToWide(name, -1));
+                if (nameW == NULL)
+                {
+                    err = ERROR_NO_UNICODE_TRANSLATION;
+                }
+                else
+                {
+                    int nameLen = lstrlenW(nameW);
+                    WCHAR* nameListW = (WCHAR*)malloc((nameLen + 2) * sizeof(WCHAR));
+                    if (nameListW == NULL)
+                    {
+                        err = ERROR_NOT_ENOUGH_MEMORY;
+                    }
+                    else
+                    {
+                        memcpy(nameListW, nameW, (nameLen + 1) * sizeof(WCHAR));
+                        nameListW[nameLen + 1] = 0; // double null
 
-                opCode.hwnd = shellExecuteWnd.Create(hProgressDlg, "SEW: DoDeleteDir");
+                        CShellExecuteWnd shellExecuteWnd;
+                        SHFILEOPSTRUCTW opCode;
+                        memset(&opCode, 0, sizeof(opCode));
 
-                opCode.wFunc = FO_DELETE;
-                opCode.pFrom = nameList;
-                opCode.fFlags = FOF_ALLOWUNDO | FOF_SILENT | FOF_NOCONFIRMATION;
-                opCode.lpszProgressTitle = "";
-                err = SHFileOperation(&opCode);
+                        opCode.hwnd = shellExecuteWnd.Create(hProgressDlg, "SEW: DoDeleteDir");
+
+                        opCode.wFunc = FO_DELETE;
+                        opCode.pFrom = nameListW;
+                        opCode.fFlags = FOF_ALLOWUNDO | FOF_SILENT | FOF_NOCONFIRMATION;
+                        opCode.lpszProgressTitle = L"";
+                        err = SHFileOperationW(&opCode);
+                        free(nameListW);
+                    }
+                }
             }
         }
         else
@@ -8299,7 +8419,7 @@ unsigned ThreadWorkerBody(void* parameter)
                 // to the temporary file
                 if (tgtBuffer == NULL) // first pass?
                 {
-                    tgtBuffer = (char*)malloc(OPERATION_BUFFER * 2);
+                    tgtBuffer = (char*)malloc(FAST_LOCAL_COPY_BUFFER * 2);
                     if (tgtBuffer == NULL)
                     {
                         TRACE_E(LOW_MEMORY);
@@ -8437,7 +8557,7 @@ HANDLE StartWorker(COperations* script, HWND hDlg, CChangeAttrsData* attrsData,
     else
     {
         data.BufferIsAllocated = TRUE;
-        data.Buffer = malloc(max(REMOVABLE_DISK_COPY_BUFFER, OPERATION_BUFFER));
+        data.Buffer = malloc(FAST_LOCAL_COPY_BUFFER);
         if (data.Buffer == NULL)
         {
             TRACE_E(LOW_MEMORY);
