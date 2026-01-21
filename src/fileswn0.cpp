@@ -1,4 +1,4 @@
-﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2023 Open Salamander Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 // CommentsTranslationProject: TRANSLATED
 
@@ -2642,7 +2642,27 @@ void CFilesWindow::RefreshDirectory(BOOL probablyUselessRefresh, BOOL forceReloa
         }
     }
     if (OnlyDetachFSListing)
+    {
         TRACE_E("FATAL ERROR: New listing didn't use prealocated objects???");
+        // OnlyDetachFSListing being TRUE means ReleaseListing was never called, so the old data
+        // (oldDirs/oldFiles) may have been invalidated by the plugin. We cannot safely access
+        // the old data for synchronization - skip to cleanup.
+        OnlyDetachFSListing = FALSE;
+        if (NewFSFiles != NULL)
+            delete NewFSFiles;
+        if (NewFSDirs != NULL)
+            delete NewFSDirs;
+        if (NewFSPluginFSDir != NULL)
+            delete NewFSPluginFSDir;
+        if (NewFSIconCache != NULL)
+            delete NewFSIconCache;
+        NewFSFiles = NULL;
+        NewFSDirs = NULL;
+        NewFSPluginFSDir = NULL;
+        NewFSIconCache = NULL;
+        // Skip to cleanup without accessing potentially invalid old data
+        goto _LABEL_2;
+    }
 
     // we perform the postponed sorting of the FS listing
     if (sortDirectoryPostponed)
