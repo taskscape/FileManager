@@ -1,13 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
-<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
-<svg version="1.1" id="Icon" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" x="0px" y="0px"
-	 width="16px" height="16px" viewBox="0 0 16 16" enable-background="new 0 0 16 16" xml:space="preserve">
-<g>
-	<polygon fill="#FFFFFF" points="5.934,4.5 7.268,2.5 14.5,2.5 14.5,4.5 	"/>
-	<path fill="#DCB47A" d="M14,3v1H6.869l0.667-1H14 M14.5,2H7L5,5h10V2.5C15,2.224,14.776,2,14.5,2L14.5,2z"/>
-</g>
-<path fill="#DCB47A" d="M2,4C1.448,4,1,4.448,1,5v3.194v1.667V14c0,0.552,0.448,1,1,1h6.265H14c0.552,0,1-0.448,1-1V8.194V5
-	c0-0.552-0.448-1-1-1H2z"/>
-<path fill="#00539C" d="M11,9H8.707l1.621-1.621L9.621,6.672L8,8.293V6H7v2.293L5.379,6.672L4.672,7.379L6.293,9H4v1h2.293
-	l-1.621,1.621l0.707,0.707L7,10.707V13h1v-2.293l1.621,1.621l0.707-0.707L8.707,10H11V9z M8,10H7V9h1V10z"/>
+<svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+<path d="M8 14.5C10.5 14.5 12.5 12.5 12.5 10C12.5 7.5 10.5 5.5 10 2.5C9.5 5.5 8 6 6.5 6C5 6 3.5 7.5 3.5 10C3.5 12.5 5.5 14.5 8 14.5Z" fill="#FF8C00" stroke="#E25822" stroke-width="1"/>
+<path d="M8 14.5C8 14.5 9 12.5 9 11C9 9.5 8 9 8 9C8 9 7 9.5 7 11C7 12.5 8 14.5 8 14.5Z" fill="#FCD164"/>
 </svg>
