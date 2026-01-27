@@ -2489,6 +2489,39 @@ void ExecuteAssociation(HWND hWindow, const char* path, const char* name)
             // pokud selze salopen.exe, spoustime klasickym zpusobem (nebezpeci otevrenych handlu v adresari)
         }
 
+        // Attempt to use ShellExecuteExW (Unicode) first
+        wchar_t wPath[MAX_PATH];
+        wchar_t wName[MAX_PATH];
+        if (MultiByteToWideChar(CP_UTF8, 0, path, -1, wPath, MAX_PATH) > 0 &&
+            MultiByteToWideChar(CP_UTF8, 0, name, -1, wName, MAX_PATH) > 0)
+        {
+            wchar_t wFullPath[MAX_PATH * 2];
+            wcscpy(wFullPath, wPath);
+            size_t len = wcslen(wFullPath);
+            if (len > 0 && wFullPath[len - 1] != '\\')
+                wcscat(wFullPath, L"\\");
+            wcscat(wFullPath, wName);
+
+            SHELLEXECUTEINFOW sei = {0};
+            sei.cbSize = sizeof(sei);
+            sei.fMask = SEE_MASK_UNICODE | SEE_MASK_FLAG_NO_UI;
+            sei.hwnd = hWindow;
+            sei.lpVerb = NULL;
+            sei.lpFile = wFullPath;
+            sei.lpDirectory = wPath;
+            sei.nShow = SW_SHOWNORMAL;
+
+            CShellExecuteWnd shellExecuteWnd;
+            sei.hwnd = shellExecuteWnd.Create(hWindow, "SEW: ExecuteAssociation(Unicode) %S", wName);
+
+            if (ShellExecuteExW(&sei))
+            {
+                if (ExecuteAssociationTlsIndex != TLS_OUT_OF_INDEXES)
+                    TlsSetValue(ExecuteAssociationTlsIndex, (void*)0);
+                return;
+            }
+        }
+
         IContextMenu2* menu = CreateIContextMenu2(hWindow, path, 1,
                                                   ReturnNameFromParam, (void*)name);
         if (menu != NULL)

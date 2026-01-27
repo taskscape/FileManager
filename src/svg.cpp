@@ -92,63 +92,87 @@ void RenderSVGImage(NSVGrasterizer* rast, HDC hDC, int x, int y, const char* svg
     GetModuleFileName(NULL, svgFile, _countof(svgFile));
     char* s = strrchr(svgFile, '\\');
     if (s != NULL)
-        sprintf(s + 1, "toolbars\\%s.svg", svgName);
-    char* svg = ReadSVGFile(svgFile);
-    if (svg != NULL)
     {
-        HDC hMemDC = HANDLES(CreateCompatibleDC(NULL));
-        BITMAPINFOHEADER bmhdr;
-        memset(&bmhdr, 0, sizeof(bmhdr));
-        bmhdr.biSize = sizeof(bmhdr);
-        bmhdr.biWidth = iconSize;
-        bmhdr.biHeight = -iconSize;
-        if (bmhdr.biHeight == 0)
-            bmhdr.biHeight = -1;
-        bmhdr.biPlanes = 1;
-        bmhdr.biBitCount = 32;
-        bmhdr.biCompression = BI_RGB;
-        void* lpMemBits = NULL;
-        HBITMAP hMemBmp = HANDLES(CreateDIBSection(hMemDC, (CONST BITMAPINFO*)&bmhdr, DIB_RGB_COLORS, &lpMemBits, NULL, 0));
-        SelectObject(hMemDC, hMemBmp);
-
-        RECT r;
-        r.left = x;
-        r.top = y;
-        r.right = x + iconSize;
-        r.bottom = y + iconSize;
-        SetBkColor(hDC, bkColor);
-        ExtTextOut(hDC, 0, 0, ETO_OPAQUE, &r, "", 0, NULL);
-
-        float sysDPIScale = (float)GetScaleForSystemDPI();
-        NSVGimage* image = nsvgParse(svg, "px", sysDPIScale);
-
-        if (!enabled)
+        *s = 0; // terminate path at directory
+        
+        // 1. Try Instalator/toolbars (where executable usually is)
+        char path[2 * MAX_PATH];
+        sprintf(path, "%s\\toolbars\\%s.svg", svgFile, svgName);
+        
+        char* svg = ReadSVGFile(path);
+        
+        // 2. Try src/res/toolbars (relative to project root if running from Instalator)
+        if (svg == NULL)
         {
-            DWORD disabledColor = GetSVGSysColor(COLOR_BTNSHADOW); // JRYFIXME - initial draft, where should we get the disabled color from?
-            NSVGshape* shape = image->shapes;
-            while (shape != NULL)
-            {
-                if ((shape->fill.color & 0x00FFFFFF) != 0x00FFFFFF)
-                    shape->fill.color = disabledColor;
-                shape = shape->next;
-            }
+             // If we are in "Instalator", go up one level then to src/res/toolbars
+             sprintf(path, "%s\\..\\src\\res\\toolbars\\%s.svg", svgFile, svgName);
+             svg = ReadSVGFile(path);
+        }
+        
+        // 3. Try src/res/toolbars (relative to build output e.g. x64/Debug)
+        if (svg == NULL)
+        {
+             // Go up two levels (x64\Debug -> root) then to src/res/toolbars
+             sprintf(path, "%s\\..\\..\\src\\res\\toolbars\\%s.svg", svgFile, svgName);
+             svg = ReadSVGFile(path);
         }
 
-        float scale = sysDPIScale / 100;
-        nsvgRasterize(rast, image, 0, 0, scale, (BYTE*)lpMemBits, iconSize, iconSize, iconSize * 4);
-        nsvgDelete(image);
+        if (svg != NULL)
+        {
+            HDC hMemDC = HANDLES(CreateCompatibleDC(NULL));
+            BITMAPINFOHEADER bmhdr;
+            memset(&bmhdr, 0, sizeof(bmhdr));
+            bmhdr.biSize = sizeof(bmhdr);
+            bmhdr.biWidth = iconSize;
+            bmhdr.biHeight = -iconSize;
+            if (bmhdr.biHeight == 0)
+                bmhdr.biHeight = -1;
+            bmhdr.biPlanes = 1;
+            bmhdr.biBitCount = 32;
+            bmhdr.biCompression = BI_RGB;
+            void* lpMemBits = NULL;
+            HBITMAP hMemBmp = HANDLES(CreateDIBSection(hMemDC, (CONST BITMAPINFO*)&bmhdr, DIB_RGB_COLORS, &lpMemBits, NULL, 0));
+            SelectObject(hMemDC, hMemBmp);
 
-        BLENDFUNCTION bf;
-        bf.BlendOp = AC_SRC_OVER;
-        bf.BlendFlags = 0;
-        bf.SourceConstantAlpha = 0xff; // want to use per-pixel alpha values
-        bf.AlphaFormat = AC_SRC_ALPHA;
-        AlphaBlend(hDC, x, y, iconSize, iconSize, hMemDC, 0, 0, iconSize, iconSize, bf);
+            RECT r;
+            r.left = x;
+            r.top = y;
+            r.right = x + iconSize;
+            r.bottom = y + iconSize;
+            SetBkColor(hDC, bkColor);
+            ExtTextOut(hDC, 0, 0, ETO_OPAQUE, &r, "", 0, NULL);
 
-        HANDLES(DeleteObject(hMemBmp));
-        HANDLES(DeleteDC(hMemDC));
+            float sysDPIScale = (float)GetScaleForSystemDPI();
+            NSVGimage* image = nsvgParse(svg, "px", sysDPIScale);
 
-        free(svg);
+            if (!enabled)
+            {
+                DWORD disabledColor = GetSVGSysColor(COLOR_BTNSHADOW); // JRYFIXME - initial draft, where should we get the disabled color from?
+                NSVGshape* shape = image->shapes;
+                while (shape != NULL)
+                {
+                    if ((shape->fill.color & 0x00FFFFFF) != 0x00FFFFFF)
+                        shape->fill.color = disabledColor;
+                    shape = shape->next;
+                }
+            }
+
+            float scale = sysDPIScale / 100;
+            nsvgRasterize(rast, image, 0, 0, scale, (BYTE*)lpMemBits, iconSize, iconSize, iconSize * 4);
+            nsvgDelete(image);
+
+            BLENDFUNCTION bf;
+            bf.BlendOp = AC_SRC_OVER;
+            bf.BlendFlags = 0;
+            bf.SourceConstantAlpha = 0xff; // want to use per-pixel alpha values
+            bf.AlphaFormat = AC_SRC_ALPHA;
+            AlphaBlend(hDC, x, y, iconSize, iconSize, hMemDC, 0, 0, iconSize, iconSize, bf);
+
+            HANDLES(DeleteObject(hMemBmp));
+            HANDLES(DeleteDC(hMemDC));
+
+            free(svg);
+        }
     }
 }
 
