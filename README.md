@@ -8,9 +8,22 @@ The original version of Servant Salamander was developed by Petr Šolín during 
 
 The name Servant Salamander came about when Petr Šolín and his friend Pavel Schreib were brainstorming name for this project. At that time, the well-known file managers were the aging Norton Commander and the rising Windows Commander. They questioned why a file manager should be named Commander, which implied that it commanded instead of served. This thought led to the birth of the name Servant Salamander.
 
-Please bear with us as Salamander was our first major project where we learned to program in C++. From a technology standpoint, it does not use [C++ Core Guidelines](https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines), smart pointers, [RAII](https://en.cppreference.com/w/cpp/language/raii), [STL](https://github.com/microsoft/STL), or [WIL](https://github.com/microsoft/wil), all of which were just beginning to evolve during the time Salamander was created. Many of the comments are written in Czech, but this is manageable due to recent progress in AI-powered translation. Salamander is a pure WinAPI application and does not use any frameworks, such as MFC.
+Please bear with us as Salamander was our first major project where we learned to program in C++. From a technology standpoint, it does not use [C++ Core Guidelines](https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines), smart pointers, [RAII](https://en.cppreference.com/w/cpp/language/raii), [STL](https://github.com/microsoft/STL), or [WIL](https://github.com/microsoft/wil), all of which were just beginning to evolve during the time Salamander was created. Historically, many comments were written in Czech. However, an active community effort is translating the codebase to English to improve accessibility for international contributors. Salamander is a pure WinAPI application and does not use any frameworks, such as MFC.
 
 We would like to thank [Fine company](https://www.finesoftware.eu/) for making the open sourced Salamander release possible.
+
+## Open Salamander 5.0 Updates
+
+The 5.0 release marks a transition to open development with several key enhancements:
+
+- **UI Modernization:** Introduced high-quality SVG icons for toolbars, replacing legacy bitmaps for better scaling on modern displays.
+- **Performance Breakthroughs:**
+    - **Asynchronous Loading:** File icons are now loaded using a dedicated thread pool, significantly speeding up directory browsing.
+    - **Optimized I/O:** Local-to-local file operations now use a 1MB buffer to minimize system calls and improve throughput.
+    - **Memory Management:** Refined memory allocation strategies specifically for Unicode string handling.
+- **Enhanced Unicode Support:** Comprehensive fixes for Unicode handling in window titles, file execution, and viewer outputs, ensuring full compatibility with international filenames.
+- **Codebase Internationalization:** We are systematically translating legacy Czech comments into English (`// CommentsTranslationProject: TRANSLATED`) to foster a global contributor community.
+- **Reliability:** Addressed critical threading issues, fixed "Access Denied" errors in worker threads, and resolved stability bugs in directory refreshing.
 
 ## Development
 
