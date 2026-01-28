@@ -952,6 +952,13 @@
       <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
     </ProjectReference>
   </ItemGroup>
+  <ItemDefinitionGroup>
+    <PostBuildEvent>
+      <Command>robocopy ..\res\toolbars "$(OutDir)toolbars" /E /XO /NP /NJS /NJH
+if %errorlevel% leq 1 exit 0 else exit %errorlevel%</Command>
+      <Message>Copying resources to output directory...</Message>
+    </PostBuildEvent>
+  </ItemDefinitionGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets">
   </Import>
   <ImportGroup Label="ExtensionTargets">

@@ -1,4 +1,4 @@
-﻿// Microsoft Visual C++ generated resource script.
+// Microsoft Visual C++ generated resource script.
 //
 #pragma code_page(65001)
 
@@ -35,9 +35,9 @@ END
 
 2 TEXTINCLUDE 
 BEGIN
-    "#include ""winresrc.h""\r\n"
+    "#include \"winresrc.h\"\r\n"
     "\r\n"
-    "#include ""resource.rh2""\r\n"
+    "#include \"resource.rh2\"\r\n"
     "\0"
 END
 
@@ -45,7 +45,7 @@ END
 BEGIN
     "#if !defined(AFX_RESOURCE_DLL) || defined(AFX_TARG_NEU)\r\n"
     "LANGUAGE LANG_NEUTRAL,SUBLANG_NEUTRAL\r\n"
-    "#include ""salamand.rc2""   // non-Microsoft Visual C++ edited resources\r\n"
+    "#include \"salamand.rc2\"   // non-Microsoft Visual C++ edited resources\r\n"
     "#endif\r\n"
     "\0"
 END
@@ -206,11 +206,8 @@ END
 //
 // Generated from the TEXTINCLUDE 3 resource.
 //
-#if !defined(AFX_RESOURCE_DLL) || defined(AFX_TARG_NEU)
 LANGUAGE LANG_NEUTRAL,SUBLANG_NEUTRAL
 #include "salamand.rc2"   // non-Microsoft Visual C++ edited resources
-#endif
 
 /////////////////////////////////////////////////////////////////////////////
 #endif    // not APSTUDIO_INVOKED
-
