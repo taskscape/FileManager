@@ -1,7 +1,7 @@
 [Private]
 ApplicationName=Salamander 5.0
 ApplicationNameVer=Salamander 5.0
-DefaultDirectory=C:\Program Files\Salamander 5.0
+DefaultDirectory=C:\ Program Files\Salamander 5.0
 LicenseFile=LICENSE
 SkipChooseDirectory=0
 
@@ -9,6 +9,71 @@ SkipChooseDirectory=0
 salamand.exe,%1\salamand.exe,0
 salmon.exe,%1\salmon.exe,0
 lang\english.slg,%1\lang\english.slg,0
+toolbars\Back.svg,%1\toolbars\Back.svg,0
+toolbars\CalculateDirectorySizes.svg,%1\toolbars\CalculateDirectorySizes.svg,0
+toolbars\CalculateOccupiedSpace.svg,%1\toolbars\CalculateOccupiedSpace.svg,0
+toolbars\ChangeAttributes.svg,%1\toolbars\ChangeAttributes.svg,0
+toolbars\ChangeCase.svg,%1\toolbars\ChangeCase.svg,0
+toolbars\ChangeDirectory.svg,%1\toolbars\ChangeDirectory.svg,0
+toolbars\ClipboardCopy.svg,%1\toolbars\ClipboardCopy.svg,0
+toolbars\ClipboardCut.svg,%1\toolbars\ClipboardCut.svg,0
+toolbars\ClipboardPaste.svg,%1\toolbars\ClipboardPaste.svg,0
+toolbars\CommandShell.svg,%1\toolbars\CommandShell.svg,0
+toolbars\CompareDirectories.svg,%1\toolbars\CompareDirectories.svg,0
+toolbars\Configuration.svg,%1\toolbars\Configuration.svg,0
+toolbars\ConnectNetworkDrive.svg,%1\toolbars\ConnectNetworkDrive.svg,0
+toolbars\Convert.svg,%1\toolbars\Convert.svg,0
+toolbars\Copy.svg,%1\toolbars\Copy.svg,0
+toolbars\CreateDirectory.svg,%1\toolbars\CreateDirectory.svg,0
+toolbars\Delete.svg,%1\toolbars\Delete.svg,0
+toolbars\Disconnect.svg,%1\toolbars\Disconnect.svg,0
+toolbars\DriveInformation.svg,%1\toolbars\DriveInformation.svg,0
+toolbars\Edit.svg,%1\toolbars\Edit.svg,0
+toolbars\EditNewFile.svg,%1\toolbars\EditNewFile.svg,0
+toolbars\Email.svg,%1\toolbars\Email.svg,0
+toolbars\Filter.svg,%1\toolbars\Filter.svg,0
+toolbars\FindFilesAndDirectories.svg,%1\toolbars\FindFilesAndDirectories.svg,0
+toolbars\FocusNameInOtherPanel.svg,%1\toolbars\FocusNameInOtherPanel.svg,0
+toolbars\Forward.svg,%1\toolbars\Forward.svg,0
+toolbars\GoToHotPath.svg,%1\toolbars\GoToHotPath.svg,0
+toolbars\GoToPathfromOtherPanel.svg,%1\toolbars\GoToPathfromOtherPanel.svg,0
+toolbars\GoToShortcutTarget.svg,%1\toolbars\GoToShortcutTarget.svg,0
+toolbars\HelpContents.svg,%1\toolbars\HelpContents.svg,0
+toolbars\HideSelectedNames.svg,%1\toolbars\HideSelectedNames.svg,0
+toolbars\HideUnselectedNames.svg,%1\toolbars\HideUnselectedNames.svg,0
+toolbars\Modify.svg,%1\toolbars\Modify.svg,0
+toolbars\Move.svg,%1\toolbars\Move.svg,0
+toolbars\MoveItemDown.svg,%1\toolbars\MoveItemDown.svg,0
+toolbars\MoveItemUp.svg,%1\toolbars\MoveItemUp.svg,0
+toolbars\New.svg,%1\toolbars\New.svg,0
+toolbars\NTFSCompress.svg,%1\toolbars\NTFSCompress.svg,0
+toolbars\NTFSUncompress.svg,%1\toolbars\NTFSUncompress.svg,0
+toolbars\OpenFolder.svg,%1\toolbars\OpenFolder.svg,0
+toolbars\OpenNameinOtherPanel.svg,%1\toolbars\OpenNameinOtherPanel.svg,0
+toolbars\Pack.svg,%1\toolbars\Pack.svg,0
+toolbars\ParentDirectory.svg,%1\toolbars\ParentDirectory.svg,0
+toolbars\PasteShortcut.svg,%1\toolbars\PasteShortcut.svg,0
+toolbars\Properties.svg,%1\toolbars\Properties.svg,0
+toolbars\QuickRename.svg,%1\toolbars\QuickRename.svg,0
+toolbars\Refresh.svg,%1\toolbars\Refresh.svg,0
+toolbars\RootDirectory.svg,%1\toolbars\RootDirectory.svg,0
+toolbars\Security.svg,%1\toolbars\Security.svg,0
+toolbars\SelectAll.svg,%1\toolbars\SelectAll.svg,0
+toolbars\SharedDirectories.svg,%1\toolbars\SharedDirectories.svg,0
+toolbars\ShowHiddenNames.svg,%1\toolbars\ShowHiddenNames.svg,0
+toolbars\SmartColumnMode.svg,%1\toolbars\SmartColumnMode.svg,0
+toolbars\SortByAttributes.svg,%1\toolbars\SortByAttributes.svg,0
+toolbars\SortByDate.svg,%1\toolbars\SortByDate.svg,0
+toolbars\SortByExtension.svg,%1\toolbars\SortByExtension.svg,0
+toolbars\SortByName.svg,%1\toolbars\SortByName.svg,0
+toolbars\SortBySize.svg,%1\toolbars\SortBySize.svg,0
+toolbars\SwapPanels.svg,%1\toolbars\SwapPanels.svg,0
+toolbars\Unpack.svg,%1\toolbars\Unpack.svg,0
+toolbars\UnselectAll.svg,%1\toolbars\UnselectAll.svg,0
+toolbars\UserMenu.svg,%1\toolbars\UserMenu.svg,0
+toolbars\View.svg,%1\toolbars\View.svg,0
+toolbars\Views.svg,%1\toolbars\Views.svg,0
+toolbars\WhatIsThis.svg,%1\toolbars\WhatIsThis.svg,0
 
 [CreateShortcuts]
 0,Altap Salamander 5.0,%1\salamand.exe,
