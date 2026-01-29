@@ -45,6 +45,33 @@ Solution ```\src\vcxproj\salamand.sln``` may be built from within Visual Studio 
 
 Use ```\src\vcxproj\!populate_build_dir.cmd``` to populate build directory with files required to run Open Salamander.
 
+### Creating SFX Installer
+
+To create a standalone self-extracting installer (EXE) for distribution:
+
+1.  **Prepare files:** Ensure the `Instalator` directory contains the latest build of `salamand.exe`, `salmon.exe`, and other required files.
+2.  **Run the script:** Use the provided PowerShell script in the `tools` directory.
+
+```powershell
+# Run from the project root
+.\tools\Create-Sfx.ps1 -SourceDir "Instalator" -OutputPath "OpenSalamander_Setup.exe"
+```
+
+The script automatically:
+- Compiles a C# bootstrap (stub) for extraction.
+- Includes the latest SVG icons from `src\res\toolbars`.
+- Modifies `setup.inf` (internally in the package) if necessary to ensure icons are installed.
+- Produces a single `OpenSalamander_Setup.exe`.
+
+## Customization
+
+### Icons
+Open Salamander uses scalable SVG icons for its toolbars.
+- **Location:** `src\res\toolbars`
+- **Format:** Standard SVG
+- **Dimensions:** The standard viewbox is **16x16 pixels**.
+- **Process:** To add or update an icon, simply place the `.svg` file in the `src\res\toolbars` directory. The build scripts (`!populate_build_dir.cmd` for local dev and `Create-Sfx.ps1` for installer) will automatically include them.
+
 ### Execution Logging
 
 The execution logging system runs only in DEBUG builds. It records major application execution paths (startup, plugin loading, directory listing, file operations, and key UI features) through the Trace system. The logs are emitted as TRACE messages, so they appear in the Trace Server when it is connected. In release builds, the logging calls are compiled out and produce no output.
