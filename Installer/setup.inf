@@ -1,7 +1,7 @@
 [Private]
-ApplicationName=Salamander 5.0
-ApplicationNameVer=Salamander 5.0
-DefaultDirectory=C:\ Program Files\Salamander 5.0
+ApplicationName=Open Salamander 5.0
+ApplicationNameVer=Open Salamander 5.0
+DefaultDirectory=C:\ Program Files\Open Salamander 5.0
 LicenseFile=LICENSE
 SkipChooseDirectory=0
 
@@ -76,5 +76,5 @@ toolbars\Views.svg,%1\toolbars\Views.svg,0
 toolbars\WhatIsThis.svg,%1\toolbars\WhatIsThis.svg,0
 
 [CreateShortcuts]
-0,Altap Salamander 5.0,%1\salamand.exe,
-1,Altap Salamander 5.0,%1\salamand.exe,
+0,Open Salamander 5.0,%1\salamand.exe,
+1,Open Salamander 5.0,%1\salamand.exe,
