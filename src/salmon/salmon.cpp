@@ -782,7 +782,7 @@ BOOL GetStringSid(LPTSTR* stringSid)
     return TRUE;
 }
 
-#define SALMON_MAINDLG_MUTEX_NAME "Taskscape LtdSalamanderSalmonMainDialog"
+#define SALMON_MAINDLG_MUTEX_NAME "TaskscapeLtdSalamanderSalmonMainDialog"
 
 class CMainDialogMutex
 {

@@ -12,7 +12,7 @@
 // Globals
 //
 
-const char* MAINWINDOW_CLASS = "Taskscape LtdInstallMW";
+const char* MAINWINDOW_CLASS = "TaskscapeLtdInstallMW";
 char MAINWINDOW_TITLE[100] = {0};
 
 INSTALLINFO SetupInfo = {0}; // a structure containing the review information
@@ -757,3 +757,4 @@ BOOL GetRegString(HKEY hRootKey, LPSTR pszKey, LPSTR pszValue, LPSTR pszData)
         pszData[0] = 0;
     return ret;
 }
+

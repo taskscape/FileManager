@@ -26,7 +26,7 @@ HANDLE GetBugReporterRegistryMutex()
     SetSecurityDescriptorDacl(secAttr.lpSecurityDescriptor, TRUE, 0, FALSE);
     // do nazvu mutexu by bylo sikovne pridat SID, protoze procesy s ruznym SID bezi s jinym HKCU stromem
     // ale pro jednoduchost na to kaslem a mutex bude opravdu globalni
-    const char* MUTEX_NAME = "Global\\Taskscape LtdSalamanderBugReporterRegistryMutex";
+    const char* MUTEX_NAME = "Global\\TaskscapeLtdSalamanderBugReporterRegistryMutex";
     HANDLE hMutex = NOHANDLES(CreateMutex(&secAttr, FALSE, MUTEX_NAME));
     if (hMutex == NULL) // uz create umi otevrite existujici mutex, ale muze selhat, proto pak zkusime jeste open
         hMutex = NOHANDLES(OpenMutex(SYNCHRONIZE, FALSE, MUTEX_NAME));

@@ -2232,13 +2232,13 @@ void AddWERLocalDump(const char* exeName)
             {
                 DWORD size = sizeof(taskscapeRefCount);
                 dwType = REG_DWORD;
-                if (RegQueryValueEx(hExeKey, "Taskscape LtdRefCount", 0, &dwType, (BYTE*)&taskscapeRefCount, &size) != ERROR_SUCCESS || dwType != REG_DWORD)
+                if (RegQueryValueEx(hExeKey, "TaskscapeLtdRefCount", 0, &dwType, (BYTE*)&taskscapeRefCount, &size) != ERROR_SUCCESS || dwType != REG_DWORD)
                     taskscapeRefCount = 0;
             }
             taskscapeRefCount++;
 
             dwType = REG_DWORD;
-            RegSetValueEx(hExeKey, "Taskscape LtdRefCount", 0, dwType, (const BYTE*)&taskscapeRefCount, sizeof(taskscapeRefCount));
+            RegSetValueEx(hExeKey, "TaskscapeLtdRefCount", 0, dwType, (const BYTE*)&taskscapeRefCount, sizeof(taskscapeRefCount));
             dumpCount = 50;
             RegSetValueEx(hExeKey, "DumpCount", 0, dwType, (const BYTE*)&dumpCount, sizeof(dumpCount));
             dumpType = 0; // custom dump type
@@ -3007,3 +3007,4 @@ BOOL DoInstallation()
 
     return TRUE;
 }
+

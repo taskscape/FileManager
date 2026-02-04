@@ -1018,7 +1018,7 @@ void DoRemoveWERLocalDump(const char* exeName)
             DWORD size = sizeof(taskscapeRefCount);
             const char* dumpFolder = "%LOCALAPPDATA%\\Taskscape Ltd\\Open Salamander";
             dwType = REG_DWORD;
-            if (RegQueryValueEx(hExeKey, "Taskscape LtdRefCount", 0, &dwType, (BYTE*)&taskscapeRefCount, &size) == ERROR_SUCCESS && dwType == REG_DWORD)
+            if (RegQueryValueEx(hExeKey, "TaskscapeLtdRefCount", 0, &dwType, (BYTE*)&taskscapeRefCount, &size) == ERROR_SUCCESS && dwType == REG_DWORD)
             {
                 if (taskscapeRefCount != 0xffffffff && taskscapeRefCount > 0)
                     taskscapeRefCount--;
@@ -1031,7 +1031,7 @@ void DoRemoveWERLocalDump(const char* exeName)
                 {
                     // store the new RefCount
                     dwType = REG_DWORD;
-                    RegSetValueEx(hExeKey, "Taskscape LtdRefCount", 0, dwType, (const BYTE*)&taskscapeRefCount, sizeof(taskscapeRefCount));
+                    RegSetValueEx(hExeKey, "TaskscapeLtdRefCount", 0, dwType, (const BYTE*)&taskscapeRefCount, sizeof(taskscapeRefCount));
                 }
             }
             RegCloseKey(hExeKey);
@@ -1862,3 +1862,4 @@ BOOL DoUninstall(HWND hParent, BOOL* needRestart)
     return ret;
 }
 #endif //INSIDE_SETUP
+

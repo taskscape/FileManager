@@ -7,7 +7,7 @@
 #include "wndlayt.h"
 #include "trlipc.h"
 
-const char* SHARED_MEMORY_NAME = "Local\\Taskscape LtdTranslatorSharedMemory";
+const char* SHARED_MEMORY_NAME = "Local\\TaskscapeLtdTranslatorSharedMemory";
 
 #define SHARED_MEMORY_VERSION 1
 
@@ -189,3 +189,4 @@ BOOL CLayoutEditor::StartNewTranslatorWithLayoutEditor()
     CloseSharedMemory(sharedFileHandle, sharedMemory);
     return TRUE;
 }
+
