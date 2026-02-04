@@ -8,6 +8,6 @@
 
 "&Entpacken"
 
-"Self-Extractor © 2000-2023 Open Salamander Authors"
+"Self-Extractor ï¿½ 2000-2023 Taskscape Ltd"
 
-"https://www.altap.cz"
+"https://www.taskscape.com"

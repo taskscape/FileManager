@@ -1,4 +1,4 @@
-﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2023 Taskscape Ltd
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #pragma once
@@ -75,7 +75,7 @@ struct CConfiguration
     int Version;                       //config version (0 - default; 1 - beta 3; 2 - beta 4)
     char DefSfxFile[MAX_PATH];         //default sfx package
     char LastExportPath[MAX_PATH];     //default path to export sfx settings to
-    int CurSalamanderVersion;          //current version of Altap Salamnder
+    int CurSalamanderVersion;          //current version of Taskscape Ltd Salamnder
     int ChangeLangReaction;            //viz CLR_xxx
     BOOL WinZipNames;                  // winzip compatible multi-volume archive names
 

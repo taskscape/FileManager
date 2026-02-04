@@ -1,4 +1,4 @@
-﻿//
+//
 // lang.rc2 - resources Microsoft Visual C++ does not edit directly
 //
 
@@ -113,3 +113,4 @@ STRINGTABLE
   IDS_ERROR_COPY_FAILED "Could not copy the selected text to the clipboard."
   IDS_LOWMEM_TRY_BINARY "The comparison in text mode failed because not enough memory is available or the files are too large. You may try binary comparison."
 }
+

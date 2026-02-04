@@ -1,4 +1,4 @@
-﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2023 Taskscape Ltd
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "precomp.h"
@@ -88,7 +88,7 @@ BOOL ExportKey(LPWSTR fullName)
         char command[4096];
         if (root != -1) // regedit.exe can do "export all", so we'll use it for this task even after XP
         {
-            // starting with XP we invoke the reg.exe command line, see https://forum.altap.cz/viewtopic.php?f=24&t=5682
+            // starting with XP we invoke the reg.exe command line, see /viewtopic.php?f=24&t=5682
             // the advantage of reg.exe is that from Vista onward it does not require UAC elevation for exports
             char sysdir[MAX_PATH];
             if (!GetSystemDirectory(sysdir, MAX_PATH))

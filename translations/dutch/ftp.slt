@@ -1,4 +1,4 @@
-﻿[EXPORTINFO]
+[EXPORTINFO]
 PROJECTNAME,"translator\salamand 4.0\projects\dutch\ftp.atp"
 TEXTVERSION,"1.35 (x86)"
 VERSION,"1,3,5,180"
@@ -6,7 +6,7 @@ VERSION,"1,3,5,180"
 [TRANSLATION]
 LANGID,1043
 AUTHOR,"Cor van der Smissen, Marco Fung, Patrick Vijgeboom, S.V. (Stephan) Rietveld"
-WEB,"forum.altap.cz/viewtopic.php?f=23&t=7009"
+WEB,"/viewtopic.php?f=23&t=7009"
 COMMENT,"Nederlandse versie"
 
 [DIALOG 500]
@@ -1536,7 +1536,7 @@ COMMENT,"Nederlandse versie"
 10674,1,"Ongeldige tekenreeks in geschreven maanden (formaat: 12 maanden door spatie gescheiden)."
 10680,1,"Autodetect conditie bevat fout.\n\nFout: %s"
 10685,1,"Onbekende server type, kan text lijst niet analyseren...\r\n"
-10686,1,"Kan de lijst van bestanden en mappen van de server niet analyseren. Alleen de normale text lijst kan in het paneel weergegeven worden.\n\nZie aub onze web paginas voor een nieuwe versie van Open Salamander. Als u de nieuwste versie al gebruikt, stuur ons aub de ruwe weergave lijst (Rechtse klik in het paneel > Ruwe Lijst Weergave > Opslaan Als) naar email support@altap.cz. Help ons aub om zoveel mogelijk servers te ondersteunen als mogelijk."
+10686,1,"Kan de lijst van bestanden en mappen van de server niet analyseren. Alleen de normale text lijst kan in het paneel weergegeven worden.\n\nZie aub onze web paginas voor een nieuwe versie van Open Salamander. Als u de nieuwste versie al gebruikt, stuur ons aub de ruwe weergave lijst (Rechtse klik in het paneel > Ruwe Lijst Weergave > Opslaan Als) naar email support@taskscape.com. Help ons aub om zoveel mogelijk servers te ondersteunen als mogelijk."
 10687,1,"Kan de text lijst van het geselecteerde server type niet analyseren...\r\n"
 
 [STRINGTABLE 42]

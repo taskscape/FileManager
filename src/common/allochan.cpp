@@ -1,4 +1,4 @@
-﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2023 Taskscape Ltd
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "precomp.h"
@@ -51,12 +51,12 @@ void Initialize__Allochan()
 class C__AllocHandlerInit
 {
 public:
-    static int AltapNewHandler(size_t size);
+    static int Taskscape LtdNewHandler(size_t size);
 
     C__AllocHandlerInit()
     {
         InitializeCriticalSection(&CriticalSection);
-        OldNewHandler = _set_new_handler(AltapNewHandler); // operator new should call our new-handler on insufficient memory
+        OldNewHandler = _set_new_handler(Taskscape LtdNewHandler); // operator new should call our new-handler on insufficient memory
         OldNewMode = _set_new_mode(1);                     // malloc should call our new-handler on insufficient memory
     }
     ~C__AllocHandlerInit()
@@ -95,9 +95,9 @@ void SetAllocHandlerMessage(const TCHAR* message, const TCHAR* title, const TCHA
         lstrcpyn(__AllocHandlerWarningAbort, warningAbort, 200);
 }
 
-int C__AllocHandlerInit::AltapNewHandler(size_t size)
+int C__AllocHandlerInit::Taskscape LtdNewHandler(size_t size)
 {
-    TRACE_ET(_T("AltapNewHandler: not enough memory to allocate ") << size << _T(" bytes!"));
+    TRACE_ET(_T("Taskscape LtdNewHandler: not enough memory to allocate ") << size << _T(" bytes!"));
     int ret = 1;
     int ti = GetTickCount();
     EnterCriticalSection(&__AllocHandlerInit.CriticalSection);
@@ -111,7 +111,7 @@ int C__AllocHandlerInit::AltapNewHandler(size_t size)
             res = MessageBox(NULL, buf, __AllocHandlerTitle, MB_ICONERROR | MB_TASKMODAL | MB_ABORTRETRYIGNORE | MB_DEFBUTTON2);
             if (res == 0)
             {
-                TRACE_ET(_T("AltapNewHandler: unable to open message-box!"));
+                TRACE_ET(_T("Taskscape LtdNewHandler: unable to open message-box!"));
                 Sleep(1000); // let the machine rest and try to show msgbox again
             }
         } while (res == 0);
@@ -122,7 +122,7 @@ int C__AllocHandlerInit::AltapNewHandler(size_t size)
                 res = MessageBox(NULL, __AllocHandlerWarningAbort, __AllocHandlerTitle, MB_ICONQUESTION | MB_TASKMODAL | MB_YESNO | MB_DEFBUTTON2);
                 if (res == 0)
                 {
-                    TRACE_ET(_T("AltapNewHandler: unable to open message-box with abort-warning!"));
+                    TRACE_ET(_T("Taskscape LtdNewHandler: unable to open message-box with abort-warning!"));
                     Sleep(1000); // let the machine rest and try to show msgbox again
                 }
             } while (res == 0);
@@ -138,7 +138,7 @@ int C__AllocHandlerInit::AltapNewHandler(size_t size)
                     res = MessageBox(NULL, __AllocHandlerWarningIgnore, __AllocHandlerTitle, MB_ICONQUESTION | MB_TASKMODAL | MB_YESNO | MB_DEFBUTTON2);
                     if (res == 0)
                     {
-                        TRACE_ET(_T("AltapNewHandler: unable to open message-box with ignore-warning!"));
+                        TRACE_ET(_T("Taskscape LtdNewHandler: unable to open message-box with ignore-warning!"));
                         Sleep(1000); // let the machine rest and try to show msgbox again
                     }
                 } while (res == 0);

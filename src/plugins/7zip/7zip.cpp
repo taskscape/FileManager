@@ -1,4 +1,4 @@
-﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2023 Taskscape Ltd
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "precomp.h"
@@ -176,7 +176,7 @@ CPluginInterfaceAbstract* WINAPI SalamanderPluginEntry(CSalamanderPluginEntryAbs
                                    VERSINFO_VERSION_NO_PLATFORM, VERSINFO_COPYRIGHT, LoadStr(IDS_PLUGIN_DESCRIPTION),
                                    "7zip", "7z");
 
-    salamander->SetPluginHomePageURL("www.altap.cz");
+    salamander->SetPluginHomePageURL("www.taskscape.com");
 
     return &PluginInterface;
 }
@@ -1108,7 +1108,7 @@ BOOL CPluginInterfaceForArchiver::PackToArchive(CSalamanderForOperationsAbstract
 
     // delete files afterwards if we are moving them into the archive
     if (move && ret)
-    { // first lock the archive file so we cannot delete it ourselves (bug: https://forum.altap.cz/viewtopic.php?f=3&t=3859)
+    { // first lock the archive file so we cannot delete it ourselves (bug: /viewtopic.php?f=3&t=3859)
         while (1)
         {
             hArchive = CreateFileUtf8Local(fileName, GENERIC_READ /* I tried 0, but the system then allowed deleting the file */,

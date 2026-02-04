@@ -1,4 +1,4 @@
-﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2023 Taskscape Ltd
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "precomp.h"
@@ -185,7 +185,7 @@ int main(int argc, char* argv[])
 {
     EnableExceptionsOn64();
 
-    printf("\nSFXMake 1.2\tCopyright (c) 1997-2023 Open Salamander Authors\t\n\n");
+    printf("\nSFXMake 1.2\tCopyright (c) 1997-2023 Taskscape Ltd\t\n\n");
     if (argc < 5 || argc > 5)
     {
         printf("Usage:\tsfxmake <sfxname> <textfile> <compatible version> <current version>\n\n"

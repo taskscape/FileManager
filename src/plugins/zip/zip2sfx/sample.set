@@ -148,11 +148,11 @@ button_text="&Extract"
 
 ;vendor name in bottom-left corner of main sfx dialog
 
-vendor="Self-Extractor © 2000-2023 Open Salamander Authors"
+vendor="Self-Extractor ï¿½ 2000-2023 Taskscape Ltd"
 
 ;www link in bottom-right corner of main sfx dialog
 
-link="https://www.altap.cz"
+link="https://www.taskscape.com"
 
 ;files containing icon data, it can be either an ICO file or an PE
 ;executable file (like win32 EXEs or DLLs) containing the icon

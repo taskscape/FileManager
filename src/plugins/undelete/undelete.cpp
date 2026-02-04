@@ -1,4 +1,4 @@
-﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2023 Taskscape Ltd
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 // ****************************************************************************
@@ -263,7 +263,7 @@ CPluginInterfaceAbstract* WINAPI SalamanderPluginEntry(CSalamanderPluginEntryAbs
                                    String<char>::LoadStr(IDS_DESCRIPTION),
                                    "UNDELETE" /* DO NOT TRANSLATE! */, NULL, "del");
 
-    salamander->SetPluginHomePageURL("www.altap.cz");
+    salamander->SetPluginHomePageURL("www.taskscape.com");
 
     // get our FS-name (it could be different than "del", Salamander could change it)
     SalamanderGeneral->GetPluginFSName(AssignedFSName, 0);

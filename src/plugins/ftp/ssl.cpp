@@ -1,4 +1,4 @@
-﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2023 Taskscape Ltd
 // SPDX-License-Identifier: GPL-2.0-or-later
 // CommentsTranslationProject: TRANSLATED
 
@@ -825,7 +825,7 @@ bool InitSSL(int logUID, int* errorID)
             //
             // SSLv23_client_method() is default method used in OpenSLL.exe and CURL.
             // Unsafe SSL2 protocol is disabled using OPENSSL_NO_SSL2 define.
-            // SSLv3_client_method() didn't work with wedos server: https://forum.altap.cz/viewtopic.php?f=2&t=6667
+            // SSLv3_client_method() didn't work with wedos server: /viewtopic.php?f=2&t=6667
             //    SSLLib.Meth = SSLLib.SSLv3_client_method();
             SSLLib.Meth = SSLLib.SSLv23_client_method();
             if (SSLLib.Meth)

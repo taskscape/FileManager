@@ -1,4 +1,4 @@
-﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2023 Taskscape Ltd
 // SPDX-License-Identifier: GPL-2.0-or-later
 // CommentsTranslationProject: TRANSLATED
 
@@ -421,7 +421,7 @@ CAboutDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         hl = new CHyperLink(HWindow, IDC_ABOUT_WWW);
         if (hl != NULL)
         {
-            const char* url = english ? "https://www.altap.cz" : "https://www.altap.cz/cz";
+            const char* url = english ? "https://www.taskscape.com" : "https://www.taskscape.com/cz";
             SetDlgItemText(HWindow, IDC_ABOUT_WWW, url + 8);
             hl->SetActionOpen(url);
         }

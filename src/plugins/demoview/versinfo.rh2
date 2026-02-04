@@ -1,6 +1,6 @@
-﻿//****************************************************************************
+//****************************************************************************
 //
-// Copyright (c) 2023 Open Salamander Authors
+// Copyright (c) 2023 Taskscape Ltd
 //
 // This is a part of the Open Salamander SDK library.
 //
@@ -23,7 +23,7 @@
 
 #include "spl_vers.h" // retrieve the version and build numbers
 
-#define VERSINFO_COPYRIGHT   "Copyright © 2008-2023 Open Salamander Authors"
+#define VERSINFO_COPYRIGHT   "Copyright © 2008-2023 Taskscape Ltd"
 #define VERSINFO_COMPANY     "Open Salamander"
 
 #define VERSINFO_DESCRIPTION "Sample plugin for Open Salamander"
@@ -37,7 +37,7 @@
 #endif
 
 // for SLG translators
-#define VERSINFO_SLG_WEB     "www.altap.cz"
+#define VERSINFO_SLG_WEB     "www.taskscape.com"
 #define VERSINFO_SLG_COMMENT "English version"
 
 #endif // __DEMOVIEW_VERSINFO_RH2

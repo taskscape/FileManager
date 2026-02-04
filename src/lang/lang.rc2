@@ -1,4 +1,4 @@
-﻿//
+//
 // lang.rc2 - resources Microsoft Visual C++ does not edit directly
 //
 
@@ -118,3 +118,4 @@ IDM_VIEWERCONTEXTMENU MENU
   MENUITEM "&Wrap\tCtrl+W", CM_WRAPED
  }
 }
+

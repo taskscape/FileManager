@@ -1,11 +1,11 @@
-﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2023 Taskscape Ltd
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 /*
   PE Viewer Plugin for Open Salamander
 
   Copyright (c) 2015-2016 Milan Kase <manison@manison.cz>
-  Copyright (c) 2015-2016 Open Salamander Authors
+  Copyright (c) 2015-2016 Taskscape Ltd
 
   BinaryReader.h
   Binary reader.

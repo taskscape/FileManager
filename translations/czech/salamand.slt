@@ -1,4 +1,4 @@
-﻿[EXPORTINFO]
+[EXPORTINFO]
 PROJECTNAME,"translator\salamand 4.0\projects\czech\salamand.atp"
 TEXTVERSION,"4.0 (x86)"
 VERSION,"4,0,0,180"
@@ -6,7 +6,7 @@ VERSION,"4,0,0,180"
 [TRANSLATION]
 LANGID,1029
 AUTHOR,"Hynek Mikulič"
-WEB,"forum.altap.cz/viewtopic.php?f=23&t=7008"
+WEB,"/viewtopic.php?f=23&t=7008"
 COMMENT,"Česká verze"
 HELPDIR,"ENGLISH"
 SLGINCOMPLETE,""
@@ -299,9 +299,9 @@ SLGINCOMPLETE,""
 290,174,1,123,104,1,""
 1,124,162,50,14,1,"Zavřít"
 271,10,87,201,8,1,"Verze"
-1150,10,97,200,8,1,"Copyright © 1997-2023 Open Salamander Authors"
+1150,10,97,200,8,1,"Copyright © 1997-2023 Taskscape Ltd"
 1152,10,108,20,8,1,"Web:"
-272,31,108,64,8,1,"www.altap.cz"
+272,31,108,64,8,1,"www.taskscape.com"
 286,2,154,294,1,1,""
 
 [DIALOG 300]
@@ -1063,7 +1063,7 @@ SLGINCOMPLETE,""
 2,100,57,50,14,1,"&Konec"
 1,157,57,50,14,1,"&Pokračovat"
 1150,10,10,290,8,1,"Platnost této beta verze vypršela. Prosíme stáhněte a nainstalujte si novější beta verzi:"
-1142,10,23,290,8,1,"www.altap.cz/salamander/downloads/beta"
+1142,10,23,290,8,1,"www.taskscape.com/salamander/downloads/beta"
 1141,10,36,290,16,1,"Dnes je %s a platnost této verze vypršela %s."
 
 [DIALOG 2300]
@@ -3236,7 +3236,7 @@ SLGINCOMPLETE,""
 13743,1,"&Příště nezobrazovat tuto zprávu pro ostatní pluginy"
 
 [STRINGTABLE 136]
-13750,1,"Konfigurace uložená v registru je poškozená a nemůže být načtena. Open Salamander byl pravděpodobně ukončen během ukládání konfigurace. K tomu dochází zejména, pokud je Open Salamander spuštěný během vypínání operačního systému (nebo odhlašování uživatele). Chcete-li tomuto problému zabránit, ukončete Open Salamander před vypnutím operačního systému Windows (nebo odhlášením).\n\nNyní můžete zálohovat poškozenou konfiguraci (spusťte RegEdit.exe, přejmenujte klíč HKEY_CURRENT_USER\\%s). Později této zálohy můžete získat některá nastavení (Uživatelskou nabídku, Adresářové zkratky, FTP záložky, atd.), navštivte forum.altap.cz pro detaily.\n\nPoškozená konfigurace musí být před spuštěním Open Salamanderu odstraněna z registru."
+13750,1,"Konfigurace uložená v registru je poškozená a nemůže být načtena. Open Salamander byl pravděpodobně ukončen během ukládání konfigurace. K tomu dochází zejména, pokud je Open Salamander spuštěný během vypínání operačního systému (nebo odhlašování uživatele). Chcete-li tomuto problému zabránit, ukončete Open Salamander před vypnutím operačního systému Windows (nebo odhlášením).\n\nNyní můžete zálohovat poškozenou konfiguraci (spusťte RegEdit.exe, přejmenujte klíč HKEY_CURRENT_USER\\%s). Později této zálohy můžete získat některá nastavení (Uživatelskou nabídku, Adresářové zkratky, FTP záložky, atd.), navštivte  pro detaily.\n\nPoškozená konfigurace musí být před spuštěním Open Salamanderu odstraněna z registru."
 13751,1,"Používáte nestandardní hodnoty následujících parametrů používaných během odhlášení uživatele a vypnutí operačního systému. Je to pravděpodobně příčina poškození konfigurace Open Salamanderu (je ukončen během ukládání konfigurace do registru).\n\nHKEY_CURRENT_USER\\Control Panel\\Desktop\\WaitToKillAppTimeout by měl být 20000.\nHKEY_CURRENT_USER\\Control Panel\\Desktop\\AutoEndTasks by měl být 0."
 13752,1,"&Odstranit konfiguraci"
 13755,1,"Zadejte, zda chcete porovnat soubory nebo adresáře."
@@ -3281,7 +3281,7 @@ SLGINCOMPLETE,""
 [STRINGTABLE 143]
 13856,1,"Popis"
 13857,1,"Změna překryvů ikon se projeví až po restartování Open Salamanderu."
-13865,1,"Open Salamander se stal nestabilní. Vyskytla se výjimka v %s obslužné funkci překryvů ikon. Podobným haváriím Open Salamanderu můžete předejít, pokud nebudete používat tuto rutinu (klepněte na tlačítko Tento) nebo úplně zastavíte zobrazování překryvů ikon (klepněte na tlačítko Vše). Můžete také zkusit aktualizovat software poskytující překryvy ikon (prohledejte forum.altap.cz pro detaily).\n\nKterou obslužnou rutinu překryvů ikon chcete vypnout?\n\nPoznámka: zobrazení překryvů ikon můžete nastavit v konfiguračním dialogu (viz. stránka Překryvy ikon)."
+13865,1,"Open Salamander se stal nestabilní. Vyskytla se výjimka v %s obslužné funkci překryvů ikon. Podobným haváriím Open Salamanderu můžete předejít, pokud nebudete používat tuto rutinu (klepněte na tlačítko Tento) nebo úplně zastavíte zobrazování překryvů ikon (klepněte na tlačítko Vše). Můžete také zkusit aktualizovat software poskytující překryvy ikon ().\n\nKterou obslužnou rutinu překryvů ikon chcete vypnout?\n\nPoznámka: zobrazení překryvů ikon můžete nastavit v konfiguračním dialogu (viz. stránka Překryvy ikon)."
 13866,1,"&Tento"
 13867,1,"&Vše"
 13870,1,"Soubor config.reg (nebo jiný zadaný s argumentem -c) nebyl importován do registru kvůli importu konfigurace ze starší verze Open Salamanderu. Pro vyřešení tohoto problému nyní ukončete Open Salamander a spusťte jej znovu."
@@ -3403,11 +3403,11 @@ SLGINCOMPLETE,""
 [STRINGTABLE 156]
 14064,1,"Probíhá nahrávání, čekejte prosím..."
 14065,1,"Hlášení bylo úspěšně nahráno.\n\nDěkujeme, že nám pomáháte vylepšovat Open Salamander!"
-14066,1,"Selhalo nahrání chybového hlášení, důvod: %s\n\nOdešlete nám prosím chybové hlášení pomocí emailu na adresu support@altap.cz a odstraňte hlášení z pevného disku. Stiskněte tlačítko OK pro zobrazení chybového hlášení."
-14067,1,"Selhala komprimace chybového hlášení, důvod: %s\n\nZabalte prosím chybové hlášení pomocí 7-Zip, odešlete ho na email support@altap.cz, a následně odstraňte soubory z pevného disku. Stiskněte tlačítko OK pro zobrazení chybového hlášení."
+14066,1,"Selhalo nahrání chybového hlášení, důvod: %s\n\nOdešlete nám prosím chybové hlášení pomocí emailu na adresu support@taskscape.com a odstraňte hlášení z pevného disku. Stiskněte tlačítko OK pro zobrazení chybového hlášení."
+14067,1,"Selhala komprimace chybového hlášení, důvod: %s\n\nZabalte prosím chybové hlášení pomocí 7-Zip, odešlete ho na email support@taskscape.com, a následně odstraňte soubory z pevného disku. Stiskněte tlačítko OK pro zobrazení chybového hlášení."
 14068,1,"Načtení %s selhalo."
 14070,1,"Toto je interní nástroj programu Open Salamander, nespouštějte ho prosím přímo."
-14071,1,"Nesprávná verze programu Chybová hlášení programu Open Salamander. Kontaktujte nás prosím na support@altap.cz."
+14071,1,"Nesprávná verze programu Chybová hlášení programu Open Salamander. Kontaktujte nás prosím na support@taskscape.com."
 14072,1,"Nastal problém, který si vynutil ukončení programu Open Salamander.\nVytváří se chybové hlášení, čekejte prosím..."
 14073,1,"Během vytváření chybového hlášení došlo k chybě:\n%s"
 14074,1,"Nelze vytvořit minidump soubor %s. Kód: %d."

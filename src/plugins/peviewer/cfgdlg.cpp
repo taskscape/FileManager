@@ -1,4 +1,4 @@
-﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2023 Taskscape Ltd
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 // vim: noexpandtab:sw=8:ts=8
@@ -7,7 +7,7 @@
 	PE File Viewer Plugin for Open Salamander
 
 	Copyright (c) 2015-2023 Milan Kase <manison@manison.cz>
-	Copyright (c) 2015-2023 Open Salamander Authors
+	Copyright (c) 2015-2023 Taskscape Ltd
 
 	cfgdlg.cpp
 	Configuration dialog box.

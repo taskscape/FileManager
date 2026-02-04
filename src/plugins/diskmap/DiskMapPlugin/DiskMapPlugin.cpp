@@ -1,4 +1,4 @@
-﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2023 Taskscape Ltd
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 // DiskMapPlugin.cpp : Defines the entry point for the DLL application.
@@ -31,7 +31,7 @@ const char* CONFIG_PATHFORMAT = "Tooltip Path Format";
 
 char* LoadStr(int resID);
 
-TCHAR szPluginWebsite[] = TEXT("www.altap.cz"); // original domain not running: http://salamander.diskmap.net
+TCHAR szPluginWebsite[] = TEXT("www.taskscape.com"); // original domain not running: http://salamander.diskmap.net
 
 HINSTANCE DLLInstance = NULL; // handle to SPL - language-independent resources
 HINSTANCE HLanguage = NULL;   // handle to SLG - language-dependent resources

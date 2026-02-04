@@ -1,4 +1,4 @@
-﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2023 Taskscape Ltd
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "precomp.h"
@@ -7,7 +7,7 @@
 #include "wndlayt.h"
 #include "trlipc.h"
 
-const char* SHARED_MEMORY_NAME = "Local\\AltapTranslatorSharedMemory";
+const char* SHARED_MEMORY_NAME = "Local\\Taskscape LtdTranslatorSharedMemory";
 
 #define SHARED_MEMORY_VERSION 1
 

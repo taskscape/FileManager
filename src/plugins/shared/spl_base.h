@@ -1,10 +1,10 @@
-﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2023 Taskscape Ltd
 // SPDX-License-Identifier: GPL-2.0-or-later
 // CommentsTranslationProject: TRANSLATED
 
 //****************************************************************************
 //
-// Copyright (c) 2023 Open Salamander Authors
+// Copyright (c) 2023 Taskscape Ltd
 //
 // This is a part of the Open Salamander SDK library.
 //
@@ -608,7 +608,7 @@ public:
                                  FUNCTION_CONFIGURATION | FUNCTION_LOADSAVECONFIGURATION |
                                  FUNCTION_VIEWER | FUNCTION_FILESYSTEM,
                                  "2.0",
-                                 "Copyright © 1999-2023 Open Salamander Authors",
+                                 "Copyright © 1999-2023 Taskscape Ltd",
                                  "This plugin should help you to make your own plugins.",
 -                                "DEMOPLUG", "dmp", "dfs");
 +                                "DEMOPLUG", "dmp;dmp2", "dfs");

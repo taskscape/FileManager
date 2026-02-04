@@ -1,4 +1,4 @@
-﻿[EXPORTINFO]
+[EXPORTINFO]
 PROJECTNAME,"translator\salamand 4.0\projects\spanish\unchm.atp"
 TEXTVERSION,"1.03 (x86)"
 VERSION,"1,0,3,180"
@@ -6,7 +6,7 @@ VERSION,"1,0,3,180"
 [TRANSLATION]
 LANGID,3082
 AUTHOR,"Juan Pablo Barrio Lera"
-WEB,"forum.altap.cz/viewtopic.php?f=23&t=6168"
+WEB,"/viewtopic.php?f=23&t=6168"
 COMMENT,"Versión en español"
 
 [STRINGTABLE 0]
@@ -23,7 +23,7 @@ COMMENT,"Versión en español"
 1009,1,"Hojear y extraer ficheros CHM."
 1010,1,"Imposible crear directorio temporal."
 1011,1,"Imposible borrar fichero temporal."
-1012,1,"Formato de fichero desconocido o no es una imagen CHM válida.\n\nSi está seguro de que ésta es una imagen CHM válida, contacte con support@altap.cz y ayúdenos a incorporar este formato."
+1012,1,"Formato de fichero desconocido o no es una imagen CHM válida.\n\nSi está seguro de que ésta es una imagen CHM válida, contacte con support@taskscape.com y ayúdenos a incorporar este formato."
 1013,1,"No es posible abrir este fichero."
 1014,1,"Ha fallado la creación del fichero temporal."
 1015,1,"No es posible ajustar atributos del fichero."

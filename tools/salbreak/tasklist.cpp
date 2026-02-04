@@ -1,4 +1,4 @@
-﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2023 Taskscape Ltd
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include <windows.h>
@@ -12,14 +12,14 @@ CTaskList TaskList;
 
 // process list je sdileny skrz vsechny salamander v lokani session
 // od AS 3.0 menime pojeti "Break" udalosti - vyvola v cili exception, takze mame "plnotucny" bug reprot, ale zaroven tim cil konci
-// proto menim nasledujici konstanty "AltapSalamander*" -> "AltapSalamander3*", abychom byli oddeleni od starsich verzi
-const char* AS_PROCESSLIST_NAME = "AltapSalamander3bProcessList";                               // sdilena pamet CProcessList
-const char* AS_PROCESSLIST_MUTEX_NAME = "AltapSalamander3bProcessListMutex";                    // synchronizace pro pristup do sdilene pameti
-const char* AS_PROCESSLIST_EVENT_NAME = "AltapSalamander3bProcessListEvent";                    // odpaleni udalosti (co se ma delat je ulozeno ve sdilene pameti)
-const char* AS_PROCESSLIST_EVENT_PROCESSED_NAME = "AltapSalamander3bProcessListEventProcessed"; // odpalena udalost byla zpracovana
+// proto menim nasledujici konstanty "Taskscape LtdSalamander*" -> "Taskscape LtdSalamander3*", abychom byli oddeleni od starsich verzi
+const char* AS_PROCESSLIST_NAME = "Taskscape LtdSalamander3bProcessList";                               // sdilena pamet CProcessList
+const char* AS_PROCESSLIST_MUTEX_NAME = "Taskscape LtdSalamander3bProcessListMutex";                    // synchronizace pro pristup do sdilene pameti
+const char* AS_PROCESSLIST_EVENT_NAME = "Taskscape LtdSalamander3bProcessListEvent";                    // odpaleni udalosti (co se ma delat je ulozeno ve sdilene pameti)
+const char* AS_PROCESSLIST_EVENT_PROCESSED_NAME = "Taskscape LtdSalamander3bProcessListEventProcessed"; // odpalena udalost byla zpracovana
 
-const char* FIRST_SALAMANDER_MUTEX_NAME = "AltapSalamanderFirstInstance";     // zavedeno od AS 2.52 beta 1
-const char* LOADSAVE_REGISTRY_MUTEX_NAME = "AltapSalamanderLoadSaveRegistry"; // zavedeno od AS 2.52 beta 1
+const char* FIRST_SALAMANDER_MUTEX_NAME = "Taskscape LtdSalamanderFirstInstance";     // zavedeno od AS 2.52 beta 1
+const char* LOADSAVE_REGISTRY_MUTEX_NAME = "Taskscape LtdSalamanderLoadSaveRegistry"; // zavedeno od AS 2.52 beta 1
 
 //
 // ****************************************************************************

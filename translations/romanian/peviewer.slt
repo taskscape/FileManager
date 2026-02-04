@@ -1,4 +1,4 @@
-﻿[EXPORTINFO]
+[EXPORTINFO]
 PROJECTNAME,"translator\salamand 4.0\projects\romanian\peviewer.atp"
 TEXTVERSION,"3.0 (x86)"
 VERSION,"3,0,0,180"
@@ -6,7 +6,7 @@ VERSION,"3,0,0,180"
 [TRANSLATION]
 LANGID,1048
 AUTHOR,"Ioan Stefancu, Donca Radu"
-WEB,"forum.altap.cz/viewtopic.php?f=23&t=6165"
+WEB,"/viewtopic.php?f=23&t=6165"
 COMMENT,"Versiunea romana"
 
 [DIALOG 8501]
@@ -30,7 +30,7 @@ COMMENT,"Versiunea romana"
 10100,1,"Vizualizator Executabil Portabil"
 10101,1,"Nu pot deschide fisierul %s."
 10102,1,"Crearea fisierului temporar a esuat."
-10103,1,"A aparut o exceptie.\n\nFisierul vizualizat: %s\n\nDaca tu consideri ca fisierul vizualizat nu este corupt, te rog trimite acest fisier la support@altap.cz.\nVom reface si fixa defectul vizualizatorului. Multumiri pentru cooperare!"
+10103,1,"A aparut o exceptie.\n\nFisierul vizualizat: %s\n\nDaca tu consideri ca fisierul vizualizat nu este corupt, te rog trimite acest fisier la support@taskscape.com.\nVom reface si fixa defectul vizualizatorului. Multumiri pentru cooperare!"
 10104,1,"Afiseaza informatii despre fisiere Executabile Portabile cum ar fi EXE, DLL, etc."
 
 [STRINGTABLE 2]

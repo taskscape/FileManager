@@ -1,13 +1,13 @@
 04
 
-"×Ô½âÑ¹ ZIP Ñ¹Ëõ°ü"
+"ï¿½Ô½ï¿½Ñ¹ ZIP Ñ¹ï¿½ï¿½ï¿½ï¿½"
 
-"Õâ½«½âÑ¹Ëõ ZIP Ñ¹Ëõ°ü¡£"
+"ï¿½â½«ï¿½ï¿½Ñ¹ï¿½ï¿½ ZIP Ñ¹ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½"
 
-"°æ±¾ 1.40"
+"ï¿½æ±¾ 1.40"
 
-"½âÑ¹(&E)"
+"ï¿½ï¿½Ñ¹(&E)"
 
-"Self-Extractor (c) 2000-2023 Open Salamander Authors"
+"Self-Extractor (c) 2000-2023 Taskscape Ltd"
 
-"https://www.altap.cz"
+"https://www.taskscape.com"

@@ -1,4 +1,4 @@
-﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2023 Taskscape Ltd
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "precomp.h"
@@ -26,7 +26,7 @@ HANDLE GetBugReporterRegistryMutex()
     SetSecurityDescriptorDacl(secAttr.lpSecurityDescriptor, TRUE, 0, FALSE);
     // do nazvu mutexu by bylo sikovne pridat SID, protoze procesy s ruznym SID bezi s jinym HKCU stromem
     // ale pro jednoduchost na to kaslem a mutex bude opravdu globalni
-    const char* MUTEX_NAME = "Global\\AltapSalamanderBugReporterRegistryMutex";
+    const char* MUTEX_NAME = "Global\\Taskscape LtdSalamanderBugReporterRegistryMutex";
     HANDLE hMutex = NOHANDLES(CreateMutex(&secAttr, FALSE, MUTEX_NAME));
     if (hMutex == NULL) // uz create umi otevrite existujici mutex, ale muze selhat, proto pak zkusime jeste open
         hMutex = NOHANDLES(OpenMutex(SYNCHRONIZE, FALSE, MUTEX_NAME));
@@ -191,7 +191,7 @@ BOOL SalmonStartProcess(const char* fileMappingName) //Configuration.LoadedSLGNa
         envPATH[0] = 0;
 
     // puvodne jsme pouze predavali rtlDir do CreateProcess, ale v nekterych kombinacich s UAC salmon.exe nebylo mozne spustit,
-    // protoze nevidel RTL: https://forum.altap.cz/viewtopic.php?f=2&t=6957&p=26548#p26548
+    // protoze nevidel RTL: /viewtopic.php?f=2&t=6957&p=26548#p26548
     // zkusime jeste navic nastavit current directory
     // pokud nezabere, muzeme zkusit do CreateProcess misto rtlDir predat NULL, pak by se podle MSDN mel podedit current directory od spoustejiciho procesu
     SetCurrentDirectory(rtlDir);

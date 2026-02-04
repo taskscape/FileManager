@@ -1,4 +1,4 @@
-﻿//
+//
 // texts.rc2 - resources Microsoft Visual C++ does not edit directly
 //
 
@@ -26,3 +26,4 @@ STRINGTABLE
  IDS_PAK_ERRWRITEFILE, "Unable write to file: %s"
  IDS_PAK_TOOLONGNAME, "Can't add file because of too long name."
 }
+

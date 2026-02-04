@@ -1,4 +1,4 @@
-﻿//
+//
 // lang.rc2 - resources Microsoft Visual C++ does not edit directly
 //
 
@@ -30,3 +30,4 @@ STRINGTABLE
  IDS_RESOURCE_FORK_LOST, "Warning: this file contains a Mac resource fork.\nThis fork will not be unpacked."
  IDS_DONT_SHOW_AGAIN, "&Don't show this again"
 }
+

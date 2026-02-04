@@ -1,4 +1,4 @@
-﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2023 Taskscape Ltd
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "precomp.h"
@@ -145,7 +145,7 @@ CPluginInterfaceAbstract* WINAPI SalamanderPluginEntry(CSalamanderPluginEntryAbs
                                    NULL, "pak");
 
     // set the plugin home page URL
-    salamander->SetPluginHomePageURL("www.altap.cz");
+    salamander->SetPluginHomePageURL("www.taskscape.com");
 
     return &PluginInterface;
 }

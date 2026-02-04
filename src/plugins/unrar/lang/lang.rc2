@@ -1,4 +1,4 @@
-﻿//
+//
 // lang.rc2 - resources Microsoft Visual C++ does not edit directly
 //
 
@@ -52,3 +52,4 @@ STRINGTABLE
   IDS_LISTINFO_PAKEDSIZE      "Packed"
   IDS_LISTINFO_PAKEDSIZE_DESC "Packed size of file"
 }
+

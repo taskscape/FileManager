@@ -1,4 +1,4 @@
-﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2023 Taskscape Ltd
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "precomp.h"
@@ -131,7 +131,7 @@ int __GetCharacterString(wchar_t* buf, int bufSize, wchar_t data) // Buffer shou
 {
     switch (data)
     {
-        //    case L'\'': wcscpy_s(buf, L"\\'"); return 2;   // Not needed for Altap Translator.
+        //    case L'\'': wcscpy_s(buf, L"\\'"); return 2;   // Not needed for Taskscape Ltd Translator.
         //    case L'\"': wcscpy_s(buf, L"\\\""); return 2;
     case L'\\':
         wcscpy_s(buf, bufSize, L"\\\\");

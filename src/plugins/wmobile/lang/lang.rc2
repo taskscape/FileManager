@@ -1,4 +1,4 @@
-﻿//
+//
 // lang.rc2 - resources Microsoft Visual C++ does not edit directly
 //
 
@@ -65,3 +65,4 @@ BEGIN
   IDS_ATTRIBUTES              "Attributes"
   IDS_CHANGING                "Changing"
 END
+

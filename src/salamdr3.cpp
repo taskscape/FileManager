@@ -1,4 +1,4 @@
-﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2023 Taskscape Ltd
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "precomp.h"
@@ -2928,7 +2928,7 @@ BOOL PostMouseWheelMessage(MSG* pMSG)
             // nektere verze synaptics touchpad (napriklad na HP noteboocich) zobrazi pod kurzorem sve okno se symbolem
             // scrolovani; v takovem pripade se nebudeme snazit o routeni do "spravneho" okna pod kurzorem, protoze
             // se o to postara sam touchpad
-            // https://forum.altap.cz/viewtopic.php?f=24&t=6039
+            // /viewtopic.php?f=24&t=6039
             if (strcmp(className, "SynTrackCursorWindowClass") == 0 || strcmp(className, "Syn Visual Class") == 0)
             {
                 //TRACE_I("Synaptics touchpad detected className="<<className);
@@ -2989,7 +2989,7 @@ LRESULT CALLBACK MenuWheelHookProc(int nCode, WPARAM wParam, LPARAM lParam)
     // v panelech a commandline.
 
     // 30.11.2012 - na foru se objevil clovek, kteremu WM_MOUSEHWEEL nechodi skrz message hook (stejna jako drive
-    // u Manisona v pripade WM_MOUSEHWHEEL): https://forum.altap.cz/viewtopic.php?f=24&t=6039
+    // u Manisona v pripade WM_MOUSEHWHEEL): /viewtopic.php?f=24&t=6039
     // takze nove budeme zpravu chytat take v jednotlivych oknech, kam muze potencialne chodit (dle focusu)
     // a nasledne ji routit tak, aby se dorucila do okna pod kurzorem, jak jsme to vzdy delali
 

@@ -1,4 +1,4 @@
-﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2023 Taskscape Ltd
 // SPDX-License-Identifier: GPL-2.0-or-later
 // CommentsTranslationProject: TRANSLATED
 
@@ -868,7 +868,7 @@ BOOL CMainWindow::OnAssociationsChangedNotification(BOOL showWaitWnd)
 {
     // tweak the icon size
 
-    LoadSaveToRegistryMutex.Enter(); // users reported shrunken icons, see https://forum.altap.cz/viewtopic.php?t=638
+    LoadSaveToRegistryMutex.Enter(); // users reported shrunken icons, see /viewtopic.php?t=638
     // this synchronization ensures that two Salamanders do not interfere with each other
     // unfortunately the trick with changing "Shell Icon Size" to rebuild the cache is used by many tools (including Tweak UI),
     // so if they refresh at the same time as Salamander, conflicts occur
@@ -2011,7 +2011,7 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
     {
         // we catch messages coming especially from newer mice (4th button and above)
         // and multimedia keyboards
-        // viz https://forum.altap.cz/viewtopic.php?t=192
+        // viz /viewtopic.php?t=192
         DWORD cmd = GET_APPCOMMAND_LPARAM(lParam);
         switch (cmd)
         {
@@ -2562,13 +2562,13 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
             /*
         case CM_HELP_KEYBOARD:
         {
-          ShellExecute(HWindow, "open", "https://www.altap.cz/salam_en/features/keyboard.html", NULL, NULL, SW_SHOWNORMAL);
+          ShellExecute(HWindow, "open", "https://www.taskscape.com/salam_en/features/keyboard.html", NULL, NULL, SW_SHOWNORMAL);
           return 0;
         }
 */
         case CM_FORUM:
         {
-            ShellExecute(HWindow, "open", "https://forum.altap.cz/", NULL, NULL, SW_SHOWNORMAL);
+            ShellExecute(HWindow, "open", "/", NULL, NULL, SW_SHOWNORMAL);
             return 0;
         }
 
@@ -6028,7 +6028,7 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
                 // until 2.53b1 only this branch existed and the timer version was commented out
                 // on Windows 7 users reported activation issues when icon grouping was enabled
                 // and Salamander was minimized; sometimes clicking its preview (or Alt+Tab)
-                // would not restore Salamander, only a beep; see https://forum.altap.cz/viewtopic.php?f=6&t=3791
+                // would not restore Salamander, only a beep; see /viewtopic.php?f=6&t=3791
                 //
                 // so we enable the delayed variant (200ms) again, but only on W7 and only if the window is minimized
                 PostMessage(HWindow, WM_USER_END_SUSPMODE, 0, 0); // if ActivateSuspMode is not >= 1, nothing happens

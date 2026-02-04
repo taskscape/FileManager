@@ -1,4 +1,4 @@
-﻿[EXPORTINFO]
+[EXPORTINFO]
 PROJECTNAME,"translator\salamand 4.0\projects\french\automation.atp"
 TEXTVERSION,"1.7 (x86)"
 VERSION,"1,7,0,180"
@@ -6,7 +6,7 @@ VERSION,"1,7,0,180"
 [TRANSLATION]
 LANGID,1036
 AUTHOR,"Gérard Gréco, Arnaud Dupin de Beyssat, Jérémy Marc, Maxime Abbey"
-WEB,"forum.altap.cz/viewtopic.php?f=23&t=6162"
+WEB,"/viewtopic.php?f=23&t=6162"
 COMMENT,"Version française"
 
 [DIALOG 100]

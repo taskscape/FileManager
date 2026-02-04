@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2023 Taskscape Ltd
 // SPDX-License-Identifier: GPL-2.0-or-later
 // CommentsTranslationProject: TRANSLATED
 
@@ -592,7 +592,7 @@ BOOL CFilesWindow::PostProcessPathFromUser(HWND parent, char (&buff)[2 * MAX_PAT
     // trim spaces at the beginning and the end
     CutSpacesFromBothSides(buff);
 
-    // trim quotes, see https://forum.altap.cz/viewtopic.php?t=4160
+    // trim quotes, see /viewtopic.php?t=4160
     CutDoubleQuotesFromBothSides(buff);
 
     if (IsFileURLPath(buff)) // it is a URL: convert URL (file://) to a Windows path

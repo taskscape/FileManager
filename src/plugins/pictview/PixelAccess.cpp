@@ -1,4 +1,4 @@
-﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2023 Taskscape Ltd
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 /* This is a dual file, include both in PictView.spl and PV Envelope.
@@ -12,7 +12,7 @@
 #include "PixelAccess.h"
 
 #pragma runtime_checks("", off)
-// false RTC error for PV_COLOR_HC16 mode - see https://forum.altap.cz/viewtopic.php?f=16&t=5577
+// false RTC error for PV_COLOR_HC16 mode - see /viewtopic.php?f=16&t=5577
 bool GetRGBAtCursor(LPPVHandle PVHandle, DWORD Colors, int x, int y, RGBQUAD* pRGB, int* pIndex)
 {
     LPPVImageHandles pHandles;

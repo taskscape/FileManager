@@ -1,4 +1,4 @@
-﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2023 Taskscape Ltd
 // SPDX-License-Identifier: GPL-2.0-or-later
 // CommentsTranslationProject: TRANSLATED
 
@@ -30,7 +30,7 @@ const char* FILTERCRITERIA_USETOTIME_REG = "UseToTime";
 const char* FILTERCRITERIA_TOLO_REG = "ToLo";
 const char* FILTERCRITERIA_TOHI_REG = "ToHi";
 
-// we used the following variables in Altap Salamander 2.5,
+// we used the following variables in Open Salamander 2.5,
 // where we switched to CFilterCriteria and its Save/Load
 const char* OLD_FINDOPTIONSITEM_ARCHIVE_REG = "Archive";
 const char* OLD_FINDOPTIONSITEM_READONLY_REG = "ReadOnly";
@@ -324,7 +324,7 @@ void CFilterCriteria::PrepareForTest()
         if (SystemTimeToFileTime(&stCurrent, (FILETIME*)&MaxTime))
         {
             // since 2.52b1, we do not include future files in "Modified during"; see report on the forum
-            // https://forum.altap.cz/viewtopic.php?t=2818
+            // /viewtopic.php?t=2818
             UseMaxTime = TRUE;
         }
     }

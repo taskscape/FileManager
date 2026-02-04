@@ -1,4 +1,4 @@
-﻿#ifdef APSTUDIO_INVOKED
+#ifdef APSTUDIO_INVOKED
 #error this file is not editable by Microsoft Visual C++
 #endif //APSTUDIO_INVOKED
 
@@ -41,3 +41,4 @@ STRINGTABLE
   IDS_ERRORREADINGBMP, "Error reading $Bitmap file. File damage estimation aborted."
   IDS_BITMAPISEMPTY, "$Bitmap has zero size. File damage estimation aborted."
 }
+

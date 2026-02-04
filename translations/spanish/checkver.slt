@@ -1,4 +1,4 @@
-﻿[EXPORTINFO]
+[EXPORTINFO]
 PROJECTNAME,"translator\salamand 4.0\projects\spanish\checkver.atp"
 TEXTVERSION,"1.26 (x86)"
 VERSION,"1,2,6,180"
@@ -6,7 +6,7 @@ VERSION,"1,2,6,180"
 [TRANSLATION]
 LANGID,3082
 AUTHOR,"Juan Pablo Barrio Lera"
-WEB,"forum.altap.cz/viewtopic.php?f=23&t=6168"
+WEB,"/viewtopic.php?f=23&t=6168"
 COMMENT,"Versión en español"
 
 [DIALOG 100]
@@ -78,7 +78,7 @@ COMMENT,"Versión en español"
 218,1,"El plugin está trabajando con Internet.\n¿Desea interrumpir esta sesión de Internet?"
 220,1,"Inicializando conexión con Internet..."
 221,1,"Inicialización fallida: %s"
-222,1,"Conectando con \tuwww.altap.cz\tlhttps://www.altap.cz\tn..."
+222,1,"Conectando con \tuwww.taskscape.com\tlhttps://www.taskscape.com\tn..."
 223,1,"Conexión fallida: %s"
 
 [STRINGTABLE 2]

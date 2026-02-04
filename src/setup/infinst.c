@@ -1,4 +1,4 @@
-﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2023 Taskscape Ltd
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "precomp.h"
@@ -12,7 +12,7 @@
 // Globals
 //
 
-const char* MAINWINDOW_CLASS = "AltapInstallMW";
+const char* MAINWINDOW_CLASS = "Taskscape LtdInstallMW";
 char MAINWINDOW_TITLE[100] = {0};
 
 INSTALLINFO SetupInfo = {0}; // a structure containing the review information

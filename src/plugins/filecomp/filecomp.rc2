@@ -1,4 +1,4 @@
-﻿//
+//
 // filecomp.rc2 - resources Microsoft Visual C++ does not edit directly
 //
 
@@ -21,3 +21,4 @@ IDB_TOOLBAR BITMAP "toolbar.bmp"
 IDB_FILECOMP BITMAP "filecomp.bmp"
 
 IDI_BROWSE ICON "browse.ico"
+

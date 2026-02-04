@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2023 Taskscape Ltd
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "precomp.h"
@@ -83,7 +83,7 @@ void X64StressTestAlloc()
     // check success
     void* testNew = new char; // new goes through alloc, but we should verify it too
     if (testNew <= (LPVOID)(UINT_PTR)0x00000000ffffffff)
-        MessageBox(NULL, "new address <= 0x00000000ffffffff!\nPlease contact jan.rysavy@altap.cz with this information.", "X64_STRESS_TEST", MB_OK | MB_ICONEXCLAMATION);
+        MessageBox(NULL, "new address <= 0x00000000ffffffff!\nPlease contact support@taskscape.com with this information.", "X64_STRESS_TEST", MB_OK | MB_ICONEXCLAMATION);
     delete testNew;
 }
 
@@ -3788,7 +3788,7 @@ FIND_NEW_SLG_FILE:
 
 // kdyz se tohle zakomentuje, nebudeme posilat lidi tahat jazykove verze z webu (napr. kdyz tam zadne nejsou)
 // JRY: pro AS 2.53, kery jde s cestinou, nemcinou a anglictinou je pro ostatni jazyky posleme na forum do sekce
-//      "Translations" https://forum.altap.cz/viewforum.php?f=23 - treba to nekoho namotivuje a pujde svuj preklad vytvorit
+//      "Translations" /viewforum.php?f=23 - treba to nekoho namotivuje a pujde svuj preklad vytvorit
 #define OFFER_OTHERLANGUAGE_VERSIONS
 
 #ifndef OFFER_OTHERLANGUAGE_VERSIONS
@@ -4315,7 +4315,7 @@ FIND_NEW_SLG_FILE:
                         // muzou soubory v TEMPu zustat)
                         // musime testoval na globalni (skrz vsechny sessions) promennou, aby se videly dve
                         // instance Salamanderu spustene pod FastUserSwitching
-                        // Problem nahlasen na foru: https://forum.altap.cz/viewtopic.php?t=2643
+                        // Problem nahlasen na foru: /viewtopic.php?t=2643
                         if (FirstInstance_3_or_later)
                         {
                             DiskCache.ClearTEMPIfNeeded(MainWindow->HWindow, MainWindow->GetActivePanelHWND());

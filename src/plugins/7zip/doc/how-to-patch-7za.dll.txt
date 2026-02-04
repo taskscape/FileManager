@@ -1,14 +1,14 @@
 ==================================================================================================
 
 In Salamander 3.07 we finally updated 7za.dll to the latest 16.02 after many years.
-Users reported security holes in the old build: https://forum.altap.cz/viewtopic.php?t=32446
-We maintain two branches in the E:\Source\7zip repository: default and ALTAP. Procedure:
+Users reported security holes in the old build: /viewtopic.php?t=32446
+We maintain two branches in the E:\Source\7zip repository: default and Taskscape Ltd. Procedure:
 1. download the current 7-Zip sources (for example 7z1602-src.7z)
 2. update the working copy in E:\Source\7zip to the default branch
 3. remove everything except the .hg directory
 4. extract the downloaded sources
 5. commit (adding new files and deleting the removed ones)
-6. merge into the ALTAP branch, producing a new 7-Zip version with the ALTAP patches
+6. merge into the Taskscape Ltd branch, producing a new 7-Zip version with the Taskscape Ltd patches
 7. walk through every directory in E:\Source\salamand\plugins\7zip\7za and
    synchronize any directories that appeared in step 6
 8. if Igor added or removed a cpp file, you might need to add it to the project –

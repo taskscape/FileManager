@@ -1,4 +1,4 @@
-﻿//
+//
 // lang.rc2 - resources Microsoft Visual C++ does not edit directly
 //
 
@@ -316,3 +316,4 @@ STRINGTABLE DISCARDABLE
 BEGIN
     IDS_MMV_EXTENSION_ERROR "Unable to initialize Windows extensions"
 END
+

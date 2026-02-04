@@ -1,4 +1,4 @@
-﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2023 Taskscape Ltd
 // SPDX-License-Identifier: GPL-2.0-or-later
 // CommentsTranslationProject: TRANSLATED
 
@@ -2095,7 +2095,7 @@ BOOL LoadRGB(HKEY hKey, const char* name, COLORREF& color)
 {
     char buf[50];
     DWORD returnedType;
-    // for backward compatibility (up to reg:\HKEY_CURRENT_USER\Software\Altap\Altap Salamander 2.53 beta 1 (DB 33) inclusive) we can load both
+    // for backward compatibility (up to reg:\HKEY_CURRENT_USER\Software\Taskscape Ltd\Open Salamander 2.53 beta 1 (DB 33) inclusive) we can load both
     // the representation as a string and the more efficient binary one
     if (GetValue2(hKey, name, REG_SZ, REG_DWORD, &returnedType, buf, 50))
     {
@@ -2146,7 +2146,7 @@ BOOL LoadRGBF(HKEY hKey, const char* name, SALCOLOR& color)
 {
     char buf[50];
     DWORD returnedType;
-    // for backward compatibility (up to reg:\HKEY_CURRENT_USER\Software\Altap\Altap Salamander 2.53 beta 1 (DB 33) inclusive) we can load both
+    // for backward compatibility (up to reg:\HKEY_CURRENT_USER\Software\Taskscape Ltd\Open Salamander 2.53 beta 1 (DB 33) inclusive) we can load both
     // the representation as a string and the more efficient binary one
     if (GetValue2(hKey, name, REG_SZ, REG_DWORD, &returnedType, buf, 50))
     {

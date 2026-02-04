@@ -4,7 +4,7 @@ Open Salamander is a fast and reliable two-panel file manager for Windows.
 
 ## Origin
 
-The original version of Servant Salamander was developed by Petr Šolín during his studies at the Czech Technical University. He released it as freeware in 1997. After graduation, Petr Šolín founded the company [Altap](https://www.altap.cz/) in cooperation with Jan Ryšavý. In 2001 they released the first shareware version of the program. In 2007 a new version was renamed to Altap Salamander 2.5. Many other programmers and translators [contributed](AUTHORS) to the project. In 2019, Altap was acquired by [Fine](https://www.finesoftware.eu/). After this acquisition, Altap Salamander 4.0 was released as freeware. In 2023, the project was open sourced under the GPLv2 license as Open Salamander 5.0.
+The original version of Servant Salamander was developed by Petr Šolín during his studies at the Czech Technical University. He released it as freeware in 1997. After graduation, Petr Šolín founded the company [Taskscape Ltd](https://www.taskscape.com/) in cooperation with Jan Ryšavý. In 2001 they released the first shareware version of the program. In 2007 a new version was renamed to Open Salamander 2.5. Many other programmers and translators [contributed](AUTHORS) to the project. In 2019, Taskscape Ltd was acquired by [Fine](https://www.finesoftware.eu/). After this acquisition, Open Salamander 4.0 was released as freeware. In 2023, the project was open sourced under the GPLv2 license as Open Salamander 5.0.
 
 The name Servant Salamander came about when Petr Šolín and his friend Pavel Schreib were brainstorming name for this project. At that time, the well-known file managers were the aging Norton Commander and the rising Windows Commander. They questioned why a file manager should be named Commander, which implied that it commanded instead of served. This thought led to the birth of the name Servant Salamander.
 
@@ -106,20 +106,21 @@ This project welcomes contributions to build and enhance Open Salamander!
 \translations    Translations into other languages
 ```
 
-A few Altap Salamander 4.0 plugins are either not included or cannot be compiled. For instance, the PictView engine ```pvw32cnv.dll``` is not open-sourced, so we should consider switching to [WIC](https://learn.microsoft.com/en-us/windows/win32/wic/-wic-about-windows-imaging-codec) or another library. The Encrypt plugin is incompatible with modern SSD disks and has been deprecated. The UnRAR plugin lacks [unrar.dll](https://www.rarlab.com/rar_add.htm), and the FTP plugin is missing [OpenSSL](https://www.openssl.org/) libraries. Both issues are solvable as both projects are open source. To build WinSCP plugin you need Embarcadero C++ Builder.
+A few Open Salamander 4.0 plugins are either not included or cannot be compiled. For instance, the PictView engine ```pvw32cnv.dll``` is not open-sourced, so we should consider switching to [WIC](https://learn.microsoft.com/en-us/windows/win32/wic/-wic-about-windows-imaging-codec) or another library. The Encrypt plugin is incompatible with modern SSD disks and has been deprecated. The UnRAR plugin lacks [unrar.dll](https://www.rarlab.com/rar_add.htm), and the FTP plugin is missing [OpenSSL](https://www.openssl.org/) libraries. Both issues are solvable as both projects are open source. To build WinSCP plugin you need Embarcadero C++ Builder.
 
 All the source code uses UTF-8-BOM encoding and is formatted with ```clang-format```. Refer to the ```\normalize.ps1``` script for more information.
 
 ## Resources
 
-- [Altap Salamander Website](https://www.altap.cz/)
-- Altap Salamander 4.0 [features](https://www.altap.cz/salamander/features/)
-- Altap Salamander 4.0 [documentation](https://www.altap.cz/salamander/help/)
-- Servant Salamander and Altap Salamander [changelogs](https://www.altap.cz/salamander/changelogs/)
-- [User Community Forum](https://forum.altap.cz/)
-- Altap Salamander on [Wikipedia](https://en.wikipedia.org/wiki/Altap_Salamander)
+- [Open Salamander Website](https://www.taskscape.com/)
+- Open Salamander 4.0 [features](https://www.taskscape.com/salamander/features/)
+- Open Salamander 4.0 [documentation](https://www.taskscape.com/salamander/help/)
+- Servant Salamander and Open Salamander [changelogs](https://www.taskscape.com/salamander/changelogs/)
+- [User Community Forum](/)
+- Open Salamander on [Wikipedia](https://en.wikipedia.org/wiki/Taskscape Ltd_Salamander)
 
 ## License
 
 Open Salamander is open source software licensed [GPLv2](doc/license_gpl.txt) and later.
 Individual [files and libraries](doc/third_party.txt) have a different, but compatible license.
+

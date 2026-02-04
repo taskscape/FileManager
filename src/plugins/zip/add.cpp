@@ -1,4 +1,4 @@
-﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2023 Taskscape Ltd
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "precomp.h"
@@ -2850,7 +2850,7 @@ BOOL CZipPack::LoadDefaults()
       lstrcpy(Options.SfxSettings.Title, LoadStr(IDS_DEFSFXTITLE));
       lstrcpy(Options.About, "Version 1.0 beta, Personal Edition\r\n\r\n"
                                   "Coded by Lukas Cerman\r\n"
-                                  "E-mail: lukas.cerman@altap.cz\r\n\r\n"
+                                  "E-mail: support@taskscape.com\r\n\r\n"
                                   "ATTENTION: This selfextractor edition is licenced only for "
                                   "personal use and may not be used in business or for programs "
                                   "distribution.");

@@ -1,4 +1,4 @@
-﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2023 Taskscape Ltd
 // SPDX-License-Identifier: GPL-2.0-or-later
 // CommentsTranslationProject: TRANSLATED
 
@@ -12,11 +12,11 @@ enum CFTPServerPathType
 {
     ftpsptEmpty,   // empty value (has not been evaluated yet at all)
     ftpsptUnknown, // does not match any of the following path types
-    ftpsptUnix,    // e.g. /pub/altap/salamand (but also /\dir-with-backslash)
-    ftpsptNetware, // e.g. /pub/altap/salamand or \pub\altap\salamand
+    ftpsptUnix,    // e.g. /pub/taskscape/salamand (but also /\dir-with-backslash)
+    ftpsptNetware, // e.g. /pub/taskscape/salamand or \pub\taskscape\salamand
     ftpsptOpenVMS, // e.g. PUB$DEVICE:[PUB.VMS] or [PUB.VMS] (named "OpenVMS" so it is not confused with "MVS")
     ftpsptMVS,     // e.g. 'VEA0016.MAIN.CLIST'
-    ftpsptWindows, // e.g. /pub/altap/salamand or \pub\altap\salamand
+    ftpsptWindows, // e.g. /pub/taskscape/salamand or \pub\taskscape\salamand
     ftpsptIBMz_VM, // e.g. ACADEM:ANONYMOU.PICS or ACADEM:ANONYMOU. (root)
     ftpsptOS2,     // e.g. C:/DIR1/DIR2 or C:\DIR1\DIR2
     ftpsptTandem,  // e.g. \SYSTEM.$VVVVV.SUBVOLUM.FILENAME

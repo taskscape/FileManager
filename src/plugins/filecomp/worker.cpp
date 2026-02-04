@@ -1,4 +1,4 @@
-﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2023 Taskscape Ltd
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "precomp.h"
@@ -218,7 +218,7 @@ void CFilecompWorker::GuardedBody()
     {
         // Patera 2008.12.28: FILE_SHARE_WRITE added to support files locked by others
         // NOTE: IntViewer can open such files, users wants FC to support them as well
-        // See https://forum.altap.cz/viewtopic.php?t=2675
+        // See /viewtopic.php?t=2675
         // See also CHexFileViewWindow::SetData()
         Files[i].File = CreateFileUtf8Local(Files[i].Name, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE,
                                    NULL, OPEN_EXISTING, FILE_FLAG_SEQUENTIAL_SCAN, NULL);

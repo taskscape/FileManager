@@ -1,4 +1,4 @@
-﻿[EXPORTINFO]
+[EXPORTINFO]
 PROJECTNAME,"translator\salamand 4.0\projects\slovak\salamand.atp"
 TEXTVERSION,"4.0 (x86)"
 VERSION,"4,0,0,180"
@@ -6,7 +6,7 @@ VERSION,"4,0,0,180"
 [TRANSLATION]
 LANGID,1051
 AUTHOR,"Roman Paholík"
-WEB,"forum.altap.cz/viewtopic.php?f=23&t=6167"
+WEB,"/viewtopic.php?f=23&t=6167"
 COMMENT,"Slovenská verzia"
 HELPDIR,"ENGLISH"
 SLGINCOMPLETE,""
@@ -299,9 +299,9 @@ SLGINCOMPLETE,""
 290,174,1,123,104,1,""
 1,124,162,50,14,1,"Zatvoriť"
 271,10,87,201,8,1,"Verzia"
-1150,10,97,196,8,1,"Copyright © 1997-2023 Open Salamander Authors"
+1150,10,97,196,8,1,"Copyright © 1997-2023 Taskscape Ltd"
 1152,10,108,20,8,1,"Web:"
-272,31,108,64,8,1,"www.altap.cz"
+272,31,108,64,8,1,"www.taskscape.com"
 286,2,154,294,1,1,""
 
 [DIALOG 300]
@@ -1063,7 +1063,7 @@ SLGINCOMPLETE,""
 2,99,57,50,14,1,"&Koniec"
 1,156,57,50,14,1,"&Pokračovať"
 1150,10,10,289,8,1,"Táto beta verzia vypršala. Prosím stiahnite a nainštalujte si aktualizovanú beta verziu:"
-1142,10,23,289,8,1,"www.altap.cz/salamander/downloads/beta"
+1142,10,23,289,8,1,"www.taskscape.com/salamander/downloads/beta"
 1141,10,36,289,16,1,"Dnes je %s a táto verzia vypršala dňa %s."
 
 [DIALOG 2300]
@@ -3236,7 +3236,7 @@ SLGINCOMPLETE,""
 13743,1,"&Nabudúce nezobrazovať túto správu pre ostatné pluginy"
 
 [STRINGTABLE 136]
-13750,1,"Konfigurácia uložená v registri je poškodená a nemôže byť načítaná. Open Salamander bol pravdepodobne ukončený počas ukladania konfigurácie. K tomu dochádza hlavne keď sa Open Salamander spúšťa počas vypínania operačného systému (alebo odhlasovania užívateľa). Ak tomu chcete zabrániť, ukončite Open Salamander pred vypnutím operačného systému Windows (alebo odhlásením).\n\nTeraz môžete zálohovať poškodenú konfiguráciu (spustite RegEdit.exe, premenujte kľúč HKEY_CURRENT_USER\\%s). Neskôr z tejto zálohy môžete získať niektoré nastavenia (Užívateľskú ponuku, Adresárové skratky, FTP záložky, atď.), navštívte forum.altap.cz pre podrobnosti.\n\nPoškodená konfigurácia musí byť pred spustením Open Salamandera odstránená z registra."
+13750,1,"Konfigurácia uložená v registri je poškodená a nemôže byť načítaná. Open Salamander bol pravdepodobne ukončený počas ukladania konfigurácie. K tomu dochádza hlavne keď sa Open Salamander spúšťa počas vypínania operačného systému (alebo odhlasovania užívateľa). Ak tomu chcete zabrániť, ukončite Open Salamander pred vypnutím operačného systému Windows (alebo odhlásením).\n\nTeraz môžete zálohovať poškodenú konfiguráciu (spustite RegEdit.exe, premenujte kľúč HKEY_CURRENT_USER\\%s). Neskôr z tejto zálohy môžete získať niektoré nastavenia (Užívateľskú ponuku, Adresárové skratky, FTP záložky, atď.), navštívte  pre podrobnosti.\n\nPoškodená konfigurácia musí byť pred spustením Open Salamandera odstránená z registra."
 13751,1,"Používate neštandardné hodnoty nasledujúcich parametrov používaných počas odhlásenia užívateľa a vypnutia operačného systému. Je to pravdepodobne príčina poškodenia konfigurácie Open Salamandera (je ukončený počas ukladania konfigurácie do registra).\n\nHKEY_CURRENT_USER\\Control Panel\\Desktop\\WaitToKillAppTimeout by mel byť 20000.\nHKEY_CURRENT_USER\\Control Panel\\Desktop\\AutoEndTasks by mal byť 0."
 13752,1,"&Odstrániť konfiguráciu"
 13755,1,"Zadajte či chcete porovnať súbory alebo adresáre."
@@ -3281,7 +3281,7 @@ SLGINCOMPLETE,""
 [STRINGTABLE 143]
 13856,1,"Popis"
 13857,1,"Zmena prekryvov ikon sa prejaví až po reštartovaní Open Salamandera."
-13865,1,"Open Salamander sa stal nestabilný. Vyskytla sa výnimka v %s obslužnej rutine prekryvu ikon. Podobným haváriám Open Salamandera môžete predísť, ak nebudete používať túto rutinu (kliknite na tlačidlo Tento) alebo úplne zastavíte zobrazovanie prekryvov ikon (kliknite na tlačidlo Všetko). Môžete skúsiť aj aktualizovať softvér poskytujúci prekryvy ikon (prehľadajte forum.altap.cz pre podrobnosti).\n\nKtorú obslužnú rutinu prekryvov ikon chcete vypnúť?\n\nPoznámka: zobrazenie prekryvov ikon môžete nastaviť v konfiguračnom dialógu (viď stránka Prekryvy ikon)."
+13865,1,"Open Salamander sa stal nestabilný. Vyskytla sa výnimka v %s obslužnej rutine prekryvu ikon. Podobným haváriám Open Salamandera môžete predísť, ak nebudete používať túto rutinu (kliknite na tlačidlo Tento) alebo úplne zastavíte zobrazovanie prekryvov ikon (kliknite na tlačidlo Všetko). Môžete skúsiť aj aktualizovať softvér poskytujúci prekryvy ikon (prehľadajte  pre podrobnosti).\n\nKtorú obslužnú rutinu prekryvov ikon chcete vypnúť?\n\nPoznámka: zobrazenie prekryvov ikon môžete nastaviť v konfiguračnom dialógu (viď stránka Prekryvy ikon)."
 13866,1,"&Tento"
 13867,1,"&Všetko"
 13870,1,"Súbor config.reg (alebo iný zadaný s argumentom -c) nebol importovaný do registra kvôli importu konfigurácie zo staršej verzie Open Salamandera. Na vyriešenie tohto problému teraz ukončite Open Salamander a spustite ho znova."
@@ -3403,11 +3403,11 @@ SLGINCOMPLETE,""
 [STRINGTABLE 156]
 14064,1,"Nahrávanie, prosím čakajte..."
 14065,1,"Správa bola úspešne nahraná.\n\nĎakujeme, že nám pomáhate zlepšovať Open Salamander!"
-14066,1,"Nahranie správy zlyhalo, dôvod: %s\n\nProsím pošlite nám správu pomocou e-mailu na support@altap.cz a vymažte ich z disku. Kliknite na OK na zobrazanie správy."
-14067,1,"Komprimácia správy zlyhala, dôvod: %s\n\nProsím skomprimujte vašu správu pomocou 7-Zip, pošlite ju na support@altap.cz, a vymažte súbory správy z disku. Kliknite na OK na zobrazenie správy."
+14066,1,"Nahranie správy zlyhalo, dôvod: %s\n\nProsím pošlite nám správu pomocou e-mailu na support@taskscape.com a vymažte ich z disku. Kliknite na OK na zobrazanie správy."
+14067,1,"Komprimácia správy zlyhala, dôvod: %s\n\nProsím skomprimujte vašu správu pomocou 7-Zip, pošlite ju na support@taskscape.com, a vymažte súbory správy z disku. Kliknite na OK na zobrazenie správy."
 14068,1,"Načítanie %s zlyhalo."
 14070,1,"Toto je interný nástroj Open Salamandera, prosím nespúšťajte ho priamo."
-14071,1,"Nesprávna verzia oznamovača chýb Open Salamandera. Prosím kontaktujte nás na support@altap.cz."
+14071,1,"Nesprávna verzia oznamovača chýb Open Salamandera. Prosím kontaktujte nás na support@taskscape.com."
 14072,1,"Vyskytla sa chyba, ktorá vyžaduje zatvorenie Open Salamandera.\nVytvára sa správa o chybe, prosím čakajte..."
 14073,1,"Počas vytvárania správy o chybe sa vyskytol nejaký problém:\n%s"
 14074,1,"Nemôžem vytvoriť súbor minidumpu %s. Kód: %d."

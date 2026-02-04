@@ -31,3 +31,4 @@
 ## Troubleshooting
 - If activation fails after switching Python versions, rerun `uv sync`.
 - Delete the `.venv` directory inside `tools/` and `uv sync` again to rebuild a broken environment.
+

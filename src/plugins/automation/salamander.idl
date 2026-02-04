@@ -2,7 +2,7 @@
 	Automation Plugin for Open Salamander
 	
 	Copyright (c) 2009-2023 Milan Kase <manison@manison.cz>
-	Copyright (c) 2010-2023 Open Salamander Authors
+	Copyright (c) 2010-2023 Taskscape Ltd
 	
 	salamander.idl
 	Salamander Object Model interface description.
@@ -316,7 +316,7 @@ interface ISalamander : IUnknown
 
 	/// \brief Sends an error message to the Trace Server.
 	///
-	/// The \b TraceE method sends the error level message to the Altap
+	/// The \b TraceE method sends the error level message to the Taskscape Ltd
 	/// Trace Server.
 	///
 	/// \param message Required. String to be sent to the Trace Server.

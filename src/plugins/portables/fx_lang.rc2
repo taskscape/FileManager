@@ -1,8 +1,8 @@
-﻿/*
+/*
 	Salamander Plugin Development Framework
 	
 	Copyright (c) 2015 Milan Kase <manison@manison.cz>
-	Copyright (c) 2015 Open Salamander Authors
+	Copyright (c) 2015 Taskscape Ltd
 	
 	fx_lang.rc2
 	Language dependent resources.
@@ -40,3 +40,4 @@ BEGIN
 	IDS_FX_CHANGEPATHERRORTITLE	"Error Changing Directory"
 	IDS_FX_CHANGEPATHERRORFMT	"Path: ""%s""\r\nError: %s"
 END
+

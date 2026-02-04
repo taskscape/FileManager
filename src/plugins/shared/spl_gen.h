@@ -1,9 +1,9 @@
-﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2023 Taskscape Ltd
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 //****************************************************************************
 //
-// Copyright (c) 2023 Open Salamander Authors
+// Copyright (c) 2023 Taskscape Ltd
 //
 // This is a part of the Open Salamander SDK library.
 //
@@ -62,7 +62,7 @@ class CPluginDataInterfaceAbstract;
 
 #define MSGBOXEX_SETFOREGROUND 0x00010000 // MB_SETFOREGROUND (bit mask)
 
-// altap specific
+// taskscape specific
 #define MSGBOXEX_SILENT 0x10000000 // messagebox will not emit any sound when opened (bit mask)
 // in case of MB_YESNO messagebox allows Escape (generates IDNO); in MB_ABORTRETRYIGNORE messagebox
 // allows Escape (generates IDCANCEL) (bit mask)
@@ -90,7 +90,7 @@ class CPluginDataInterfaceAbstract;
 #define DIALOG_NO 0x00000007       // IDNO
 #define DIALOG_TRYAGAIN 0x0000000a // IDTRYAGAIN
 #define DIALOG_CONTINUE 0x0000000b // IDCONTINUE
-// altap specific
+// taskscape specific
 #define DIALOG_SKIP 0x10000000
 #define DIALOG_SKIPALL 0x20000000
 #define DIALOG_ALL 0x30000000
@@ -757,7 +757,7 @@ public:
     // can be called from any thread
     virtual HBITMAP WINAPI LoadRawPNGBitmap(const void* rawPNG, DWORD rawPNGSize, DWORD flags, COLORREF unused) = 0;
 
-    // note 1: loaded PNG should be compressed using PNGSlim, see https://forum.altap.cz/viewtopic.php?f=15&t=3278
+    // note 1: loaded PNG should be compressed using PNGSlim, see /viewtopic.php?f=15&t=3278
     // note 2: example of direct access to DIB data see Demoplugin, AlphaBlend function
     // note 3: supported are non-interlaced PNG of type Greyscale, Greyscale with alpha, Truecolour, Truecolour with alpha, Indexed-colour
     //             condition is 8 bits per channel
@@ -1865,7 +1865,7 @@ public:
 
     // sets message that Bug Report dialog should display if crash occurs inside plugin
     // (inside plugin = at least one call-stack-message saved from plugin) and allows redefining
-    // standard bug-report email address (support@altap.cz); 'message' is new message
+    // standard bug-report email address (support@taskscape.com); 'message' is new message
     // (NULL means "no message"); 'email' is new email address (NULL means "use
     // standard"; max. email length is 100 characters); this method can be called repeatedly, original
     // message and email are overwritten; Salamander doesn't remember message or
@@ -2538,7 +2538,7 @@ public:
     //
     virtual BOOL WINAPI InstallWordBreakProc(HWND hWindow) = 0;
 
-    // Salamander 3 or newer: returns TRUE, if this instance of Altap
+    // Salamander 3 or newer: returns TRUE, if this instance of Taskscape Ltd
     // Salamander was first started (at instance startup time other running
     // instances of version 3 or newer are searched for);
     //

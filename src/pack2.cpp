@@ -1,4 +1,4 @@
-﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2023 Taskscape Ltd
 // SPDX-License-Identifier: GPL-2.0-or-later
 // CommentsTranslationProject: TRANSLATED
 
@@ -392,7 +392,7 @@ BOOL PackUniversalCompress(HWND parent, const char* command, TPackErrorTable* co
     }
 
     // hack for RAR 4.x+ that dislikes "-ap""" when addressing the archive root; this cleanup works with older RAR too
-    // see https://forum.altap.cz/viewtopic.php?f=2&t=5487
+    // see /viewtopic.php?f=2&t=5487
     if (*rootPath == 0 && strstr(command, "$(Rar32bitExecutable) ") == command)
     {
         char* pAP = strstr(cmdLine, "\" -ap\"\" @\"");
@@ -400,7 +400,7 @@ BOOL PackUniversalCompress(HWND parent, const char* command, TPackErrorTable* co
             memmove(pAP + 1, "         ", 7); // remove "-ap"" that causes issues with newer RAR
     }
     // hack for copying into a directory in RAR - it fails if the path begins with a backslash; it created e.g. \Test directory but Salam shows it as Test
-    // https://forum.altap.cz/viewtopic.php?p=24586#p24586
+    // /viewtopic.php?p=24586#p24586
     if (*rootPath == '\\' && strstr(command, "$(Rar32bitExecutable) ") == command)
     {
         char* pAP = strstr(cmdLine, "\" -ap\"\\");

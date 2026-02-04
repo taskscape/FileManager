@@ -1,4 +1,4 @@
-﻿[EXPORTINFO]
+[EXPORTINFO]
 PROJECTNAME,"translator\salamand 4.0\projects\hungarian\uniso.atp"
 TEXTVERSION,"1.37 (x86)"
 VERSION,"1,3,7,180"
@@ -6,7 +6,7 @@ VERSION,"1,3,7,180"
 [TRANSLATION]
 LANGID,1038
 AUTHOR,"Török József"
-WEB,"forum.altap.cz/viewtopic.php?f=23&t=6164"
+WEB,"/viewtopic.php?f=23&t=6164"
 COMMENT,"Magyar változat"
 
 [DIALOG 1200]
@@ -32,7 +32,7 @@ COMMENT,"Magyar változat"
 1009,1,"CD/DVD ISO képfájlok böngészése és kibontása."
 1010,1,"Az ideiglenes mappa nem hozható létre."
 1011,1,"Az ideiglenes fájl nem törölhető."
-1012,1,"Ismeretlen fájl formátum vagy nem érvényes ISO kép.\n\nHa biztos benne, hogy ez érvényes ISO kép, lépjen velünk kapcsolatba a support@altap.cz címen és segítsen támogatni ezt a formátumot."
+1012,1,"Ismeretlen fájl formátum vagy nem érvényes ISO kép.\n\nHa biztos benne, hogy ez érvényes ISO kép, lépjen velünk kapcsolatba a support@taskscape.com címen és segítsen támogatni ezt a formátumot."
 1013,1,"A fájl nem nyitható meg: '%s'."
 1014,1,"Ideiglenes fájl létrehozása sikertelen."
 1015,1,"A fájl attribútum nem állítható be."
@@ -45,7 +45,7 @@ COMMENT,"Magyar változat"
 [STRINGTABLE 2]
 1024,1,"Hiba lépett fel a többmenetes kép olvasásakor.\n\nCsak a helyesen olvasott menetek jelennek meg."
 1025,1,"Ismeretlen sáv típus."
-1026,1,"Ismeretlen kiosztási stratégia (%d).\n\nLépjen velünk kapcsolatba a support@altap.cz címen és segítsen kijavítani ezt a problémát."
+1026,1,"Ismeretlen kiosztási stratégia (%d).\n\nLépjen velünk kapcsolatba a support@taskscape.com címen és segítsen kijavítani ezt a problémát."
 1027,1,"Rossz formátumú .CCD fájl.\n\nA megjelenített kép hiányos."
 1028,1,"Hiányzó .CCD fájl.\n\nA megjelenített kép hiányos."
 1029,1,"A szektor nem olvasható: #%08X."

@@ -1,9 +1,9 @@
-﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2023 Taskscape Ltd
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 //****************************************************************************
 //
-// Copyright (c) 2023 Open Salamander Authors
+// Copyright (c) 2023 Taskscape Ltd
 //
 // This is a part of the Open Salamander SDK library.
 //
@@ -386,7 +386,7 @@ BOOL CCtrlExampleDialog::CreateChilds()
     hl = SalamanderGUI->AttachHyperLink(HWindow, IDC_CE_HLOPEN, STF_UNDERLINE | STF_HYPERLINK_COLOR);
     if (hl == NULL)
         return FALSE;
-    hl->SetActionOpen("https://www.altap.cz");
+    hl->SetActionOpen("https://www.taskscape.com");
 
     hl = SalamanderGUI->AttachHyperLink(HWindow, IDC_CE_HLCOMMAND, STF_UNDERLINE | STF_HYPERLINK_COLOR);
     if (hl == NULL)

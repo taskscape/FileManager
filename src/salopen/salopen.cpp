@@ -1,4 +1,4 @@
-﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2023 Taskscape Ltd
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include <windows.h>
@@ -731,7 +731,7 @@ void WinMainCRTStartup()
     {
         //    DWORD written;
         //    WriteFile(GetStdHandle(STD_OUTPUT_HANDLE),
-        //              "SALOPEN: Opener for Open Salamander, (C) 2023 Open Salamander Authors\nUsage: salopen <PID> <file-mapping-handle>\n",
+        //              "SALOPEN: Opener for Open Salamander, (C) 2023 Taskscape Ltd\nUsage: salopen <PID> <file-mapping-handle>\n",
         //              98, &written, NULL);
         OleUninitialize();
         ExitProcess(1);

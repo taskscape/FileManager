@@ -1,4 +1,4 @@
-﻿[EXPORTINFO]
+[EXPORTINFO]
 PROJECTNAME,"translator\salamand 4.0\projects\romanian\checkver.atp"
 TEXTVERSION,"1.26 (x86)"
 VERSION,"1,2,6,180"
@@ -6,7 +6,7 @@ VERSION,"1,2,6,180"
 [TRANSLATION]
 LANGID,1048
 AUTHOR,"Ioan Stefancu, Donca Radu"
-WEB,"forum.altap.cz/viewtopic.php?f=23&t=6165"
+WEB,"/viewtopic.php?f=23&t=6165"
 COMMENT,"Versiunea romana"
 
 [DIALOG 100]
@@ -78,7 +78,7 @@ COMMENT,"Versiunea romana"
 218,1,"Plugin lucreaza cu Internetul.\nDoriti sa anulati aceasta sesiune de Internet?"
 220,1,"Initializez conexiunea la Internet..."
 221,1,"Initializare esuata: %s"
-222,1,"Ma conectez la \tuwww.altap.cz\tlhttps://www.altap.cz\tn..."
+222,1,"Ma conectez la \tuwww.taskscape.com\tlhttps://www.taskscape.com\tn..."
 223,1,"Conexiune esuata: %s"
 
 [STRINGTABLE 2]

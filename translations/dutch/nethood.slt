@@ -1,4 +1,4 @@
-﻿[EXPORTINFO]
+[EXPORTINFO]
 PROJECTNAME,"translator\salamand 4.0\projects\dutch\nethood.atp"
 TEXTVERSION,"1.08 (x86)"
 VERSION,"1,0,8,180"
@@ -6,7 +6,7 @@ VERSION,"1,0,8,180"
 [TRANSLATION]
 LANGID,1043
 AUTHOR,"Cor van der Smissen, Marco Fung, Patrick Vijgeboom, S.V. (Stephan) Rietveld"
-WEB,"forum.altap.cz/viewtopic.php?f=23&t=7009"
+WEB,"/viewtopic.php?f=23&t=7009"
 COMMENT,"Nederlandse versie"
 
 [DIALOG 102]

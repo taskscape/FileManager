@@ -1,4 +1,4 @@
-﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2023 Taskscape Ltd
 // SPDX-License-Identifier: GPL-2.0-or-later
 // CommentsTranslationProject: TRANSLATED
 
@@ -341,7 +341,7 @@ CPluginInterfaceAbstract* WINAPI SalamanderPluginEntry(CSalamanderPluginEntryAbs
                                    LoadStr(IDS_PLUGINDESCR),
                                    "FTP", NULL, "ftp");
 
-    salamander->SetPluginHomePageURL("www.altap.cz");
+    salamander->SetPluginHomePageURL("www.taskscape.com");
 
     // we want to receive messages about creation/change/removal of the master password
     SalamanderGeneral->SetPluginUsesPasswordManager();

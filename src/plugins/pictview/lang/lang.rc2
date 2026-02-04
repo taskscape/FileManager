@@ -1,4 +1,4 @@
-﻿//
+//
 // lang.rc2 - resources Microsoft Visual C++ does not edit directly
 //
 
@@ -559,7 +559,7 @@ STRINGTABLE
   IDS_MENU_EDIT_SELECTALL, "Select &All\tCtrl+A"
   IDS_MENU_EDIT_DESELECT, "&Deselect All\tCtrl+D"
   IDS_MENU_EDIT_CROP, "Cr&op\tC"
-  IDS_MENU_EDIT_180, "Rotate &180°\tT"
+  IDS_MENU_EDIT_180, "Rotate &180�\tT"
   IDS_MENU_EDIT_RIGHT, "Rotate &Right\tR"
   IDS_MENU_EDIT_LEFT, "Rotate &Left\tL"
   IDS_MENU_EDIT_FLIPH, "Flip &Horizontal\tH"
@@ -745,3 +745,4 @@ STRINGTABLE
   
   IDS_SCAN_OPEN_EXTRA_IMGS, "You have received more images from scanner. The first image was opened in this window. Do you want to open other images each in its own window? If not, images will be ignored.\n\nNumber of new windows: %d"
 }
+

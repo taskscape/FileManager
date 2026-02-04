@@ -1,4 +1,4 @@
-﻿[EXPORTINFO]
+[EXPORTINFO]
 PROJECTNAME,"translator\salamand 4.0\projects\slovak\unchm.atp"
 TEXTVERSION,"1.03 (x86)"
 VERSION,"1,0,3,180"
@@ -6,7 +6,7 @@ VERSION,"1,0,3,180"
 [TRANSLATION]
 LANGID,1051
 AUTHOR,"Roman Paholík"
-WEB,"forum.altap.cz/viewtopic.php?f=23&t=6167"
+WEB,"/viewtopic.php?f=23&t=6167"
 COMMENT,"Slovenská verzia"
 
 [STRINGTABLE 0]
@@ -23,7 +23,7 @@ COMMENT,"Slovenská verzia"
 1009,1,"Prehliada a extrahuje CHM súbory."
 1010,1,"Nie je možné vytvoriť dočasný adresár."
 1011,1,"Nie je možné odstrániť dočasný súbor."
-1012,1,"Neznámy formát súboru alebo neplatný CHM obraz.\n\nAk ste si istý, že je to platný CHM obraz, prosím kontaktujte support@altap.cz a pomôžete nám s podporou tohto formátu."
+1012,1,"Neznámy formát súboru alebo neplatný CHM obraz.\n\nAk ste si istý, že je to platný CHM obraz, prosím kontaktujte support@taskscape.com a pomôžete nám s podporou tohto formátu."
 1013,1,"Nie je možné otvoriť tento súbor."
 1014,1,"Vytvorenie dočasného súboru zlyhalo."
 1015,1,"Nie je možné nastaviť atribúty súboru."

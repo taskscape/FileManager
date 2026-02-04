@@ -1,11 +1,11 @@
-﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2023 Taskscape Ltd
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 /*
 	Salamander Plugin Development Framework
 	
 	Copyright (c) 2015 Milan Kase <manison@manison.cz>
-	Copyright (c) 2015 Open Salamander Authors
+	Copyright (c) 2015 Taskscape Ltd
 	
 	fx_errcodes.h
 	Defines framework error codes.

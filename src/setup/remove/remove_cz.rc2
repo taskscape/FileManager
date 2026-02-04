@@ -1,9 +1,10 @@
-ï»¿STRINGTABLE 
+STRINGTABLE 
 BEGIN
-    IDS_REMOVE_SUCCESS      "Aplikace %s byla ÃºspÄ›Å¡nÄ› odinstalovÃ¡na."
+    IDS_REMOVE_SUCCESS      "Aplikace %s byla úspìšnì odinstalována."
     IDS_REMOVE_TITLE        "Odinstalace aplikace"
-    IDS_REMOVE_ERROR_LOADINF "Chyba ÄtenÃ­ log souboru: %s."
-    IDS_REMOVE_APPRUNNING   "OdinstalaÄnÃ­ program zjistil, Å¾e odinstalovÃ¡vanÃ¡ aplikace je spuÅ¡tÄ›nÃ¡:\n%s\n\nZavÅ™ete prosÃ­m aplikaci a stisknÄ›te Opakovat pro pokraÄovÃ¡nÃ­."
+    IDS_REMOVE_ERROR_LOADINF "Chyba ètení log souboru: %s."
+    IDS_REMOVE_APPRUNNING   "Odinstalaèní program zjistil, e odinstalovávaná aplikace je spuštìná:\n%s\n\nZavøete prosím aplikaci a stisknìte Opakovat pro pokraèování."
     IDS_REMOVE_DELETEFAILED "Nelze vymazat soubor\n%s\n\n%s"
-    IDS_REMOVE_XPRUNASADMIN "Pokud jste pro instalaci tÃ©to aplikace pouÅ¾ili administrÃ¡torskÃ½ uÄet, musÃ­te pouÅ¾Ã­t stejnÃ½ ÃºÄet pro jejÃ­ odinstalovÃ¡nÃ­. ÃšÄet mÅ¯Å¾ete zvolit v nÃ¡sledujÃ­cÃ­m oknÄ› Spustit jako."
+    IDS_REMOVE_XPRUNASADMIN "Pokud jste pro instalaci této aplikace pouili administrátorskı uèet, musíte pouít stejnı úèet pro její odinstalování. Úèet mùete zvolit v následujícím oknì Spustit jako."
 END
+
