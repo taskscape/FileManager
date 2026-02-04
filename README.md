@@ -52,12 +52,12 @@ Use ```\src\vcxproj\!populate_build_dir.cmd``` to populate build directory with 
 
 To create a standalone self-extracting installer (EXE) for distribution:
 
-1. **Prepare files:** Ensure the `Instalator` directory contains the latest build of `salamand.exe`, `salmon.exe`, and other required files.
+1. **Prepare files:** Ensure the `Installer` directory contains the latest build of `salamand.exe`, `salmon.exe`, and other required files.
 2. **Run the script:** Use the provided PowerShell script in the `tools` directory.
 
 ```powershell
 # Run from the project root
-.\tools\Create-Sfx.ps1 -SourceDir "Instalator" -OutputPath "OpenSalamander_Setup.exe"
+.\tools\Create-Sfx.ps1 -SourceDir "Installer" -OutputPath "OpenSalamander_Setup.exe"
 ```
 
 The script automatically:
@@ -111,18 +111,13 @@ This project welcomes contributions to build and enhance Open Salamander!
 \translations    Translations into other languages
 ```
 
-A few Altap Salamander 4.0 plugins are either not included or cannot be compiled. For instance, the PictView engine ```pvw32cnv.dll``` is not open-sourced, so we should consider switching to [WIC](https://learn.microsoft.com/en-us/windows/win32/wic/-wic-about-windows-imaging-codec) or another library. The Encrypt plugin is incompatible with modern SSD disks and has been deprecated. The UnRAR plugin lacks [unrar.dll](https://www.rarlab.com/rar_add.htm), and the FTP plugin is missing [OpenSSL](https://www.openssl.org/) libraries. Both issues are solvable as both projects are open source. To build WinSCP plugin you need Embarcadero C++ Builder.
+A few Open Salamander 5.0 plugins are either not included or cannot be compiled. For instance, the PictView engine ```pvw32cnv.dll``` is not open-sourced, so we should consider switching to [WIC](https://learn.microsoft.com/en-us/windows/win32/wic/-wic-about-windows-imaging-codec) or another library. The Encrypt plugin is incompatible with modern SSD disks and has been deprecated. The UnRAR plugin lacks [unrar.dll](https://www.rarlab.com/rar_add.htm), and the FTP plugin is missing [OpenSSL](https://www.openssl.org/) libraries. Both issues are solvable as both projects are open source. To build WinSCP plugin you need Embarcadero C++ Builder.
 
 All the source code uses UTF-8-BOM encoding and is formatted with ```clang-format```. Refer to the ```\normalize.ps1``` script for more information.
 
 ## Resources
 
-- [Altap Salamander Website](https://www.altap.cz/)
-- Altap Salamander 4.0 [features](https://www.altap.cz/salamander/features/)
-- Altap Salamander 4.0 [documentation](https://www.altap.cz/salamander/help/)
-- Servant Salamander and Altap Salamander [changelogs](https://www.altap.cz/salamander/changelogs/)
-- [User Community Forum](https://forum.altap.cz/)
-- Altap Salamander on [Wikipedia](https://en.wikipedia.org/wiki/Altap_Salamander)
+- [Open Salamander Website](https://www.opensalamander.org/)
 
 ## License
 
