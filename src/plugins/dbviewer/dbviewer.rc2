@@ -1,4 +1,4 @@
-﻿//
+//
 // dbviewer.rc2 - resources Microsoft Visual C++ does not edit directly
 //
 
@@ -54,3 +54,4 @@ IDA_ACCELERATORS ACCELERATORS
     VK_SPACE,  CM_FILE_NEXTSELFILE, CONTROL, VIRTKEY, NOINVERT
     VK_SPACE,  CM_FILE_LAST, SHIFT, VIRTKEY, NOINVERT
 }
+

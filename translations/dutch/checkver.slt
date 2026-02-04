@@ -1,4 +1,4 @@
-﻿[EXPORTINFO]
+[EXPORTINFO]
 PROJECTNAME,"translator\salamand 4.0\projects\dutch\checkver.atp"
 TEXTVERSION,"1.26 (x86)"
 VERSION,"1,2,6,180"
@@ -6,7 +6,7 @@ VERSION,"1,2,6,180"
 [TRANSLATION]
 LANGID,1043
 AUTHOR,"Cor van der Smissen, Marco Fung, Patrick Vijgeboom, S.V. (Stephan) Rietveld"
-WEB,"forum.altap.cz/viewtopic.php?f=23&t=7009"
+WEB,"/viewtopic.php?f=23&t=7009"
 COMMENT,"Nederlandse versie"
 
 [DIALOG 100]
@@ -78,7 +78,7 @@ COMMENT,"Nederlandse versie"
 218,1,"Plugin is bezig.\nWilt u deze internet sessie beëindigen?"
 220,1,"Initialiseren internet verbinding..."
 221,1,"Initialiseren mislukt: %s"
-222,1,"Verbinden met \tuwww.altap.cz\tlhttps://www.altap.cz\tn..."
+222,1,"Verbinden met \tuwww.taskscape.com\tlhttps://www.taskscape.com\tn..."
 223,1,"Verbinding mislukt: %s"
 
 [STRINGTABLE 2]

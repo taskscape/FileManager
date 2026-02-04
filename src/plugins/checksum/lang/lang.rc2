@@ -1,4 +1,4 @@
-﻿//
+//
 // lang.rc2 - resources Microsoft Visual C++ does not edit directly
 //
 
@@ -74,3 +74,4 @@ STRINGTABLE
  IDS_COLUMN_SHA512 "SHA-512"
  IDS_TOOLONGNAME, "Cannot finish operation because of too long name."
 }
+

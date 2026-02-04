@@ -1,4 +1,4 @@
-﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2023 Taskscape Ltd
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #pragma once
@@ -62,7 +62,7 @@
 //
 // ****************************************************************************
 //
-// Ported to C++ by Lukas Cerman <lukas.cerman altap.cz> in January 2006.
+// Ported to C++ by Lukas Cerman <lukas.cerman taskscape.com> in January 2006.
 //
 // Original copyright notice:
 //

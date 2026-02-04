@@ -1,4 +1,4 @@
-﻿// Microsoft Visual C++ generated resource script.
+// Microsoft Visual C++ generated resource script.
 //
 #pragma code_page(65001)
 
@@ -66,7 +66,7 @@ BEGIN
     DEFPUSHBUTTON   "E&xit",IDCANCEL,92,57,50,14,WS_GROUP
     PUSHBUTTON      "&Continue",IDOK,149,57,50,14
     LTEXT           "This beta version has expired. Please download and install updated beta version:",IDC_STATIC_1,10,10,274,8
-    LTEXT           "www.altap.cz/salamander/downloads/beta",IDC_BETAEXPIREDURL,10,23,274,8,WS_TABSTOP
+    LTEXT           "www.taskscape.com/salamander/downloads/beta",IDC_BETAEXPIREDURL,10,23,274,8,WS_TABSTOP
     LTEXT           "Today is %s and this version expired on %s.",IDC_BETAEXPIREDDATE,10,36,274,16
 END
 
@@ -634,9 +634,9 @@ BEGIN
     LTEXT           "",IDC_ABOUT_LOGO,174,1,123,104
     DEFPUSHBUTTON   "Close",IDOK,124,162,50,14,WS_GROUP
     LTEXT           "Version",IDS_ABOUT_SALAMANDER,10,86,201,8
-    LTEXT           "Copyright © 1997-2023 Open Salamander Authors",IDC_STATIC_1,10,97,196,8
+    LTEXT           "Copyright © 1997-2023 Taskscape Ltd",IDC_STATIC_1,10,97,196,8
     LTEXT           "Web:",IDC_STATIC_3,10,108,20,8
-    LTEXT           "www.altap.cz",IDC_ABOUT_WWW,31,108,64,8,WS_TABSTOP
+    LTEXT           "www.taskscape.com",IDC_ABOUT_WWW,31,108,64,8,WS_TABSTOP
     LTEXT           "Open Salamander is free software",IDC_STATIC_4,10,119,165,8
     LTEXT           "Licensed under GNU General Public License version 2 or later",IDC_STATIC_5,10,130,214,8
     CONTROL         "",IDC_ABOUT_BOTTOM,"Static",SS_ETCHEDHORZ | WS_GROUP,2,154,294,1

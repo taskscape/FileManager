@@ -1,4 +1,4 @@
-﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2023 Taskscape Ltd
 // SPDX-License-Identifier: GPL-2.0-or-later
 // CommentsTranslationProject: TRANSLATED
 
@@ -581,9 +581,9 @@ C__Handles::~C__Handles()
     if (Handles.Count != 0)
     {
         // I had to replace the code below that uses MESSAGE_E, because when calling
-        // this destructor in ALTAPDB, the stream facets are already destroyed and when sending int
+        // this destructor in TASKSCAPEDB, the stream facets are already destroyed and when sending int
         // or handle to the stream it simply crashes (only in VC2010 and VC2012, in VC2008
-        // it still works); in Salamander it doesn't cause problems, probably due to RTL in DLL (in ALTAPDB it's
+        // it still works); in Salamander it doesn't cause problems, probably due to RTL in DLL (in TASKSCAPEDB it's
         // static), or something, I didn't investigate further, a better solution would be to ensure
         // facets destruction after this module, but unfortunately I don't know how (only also at "lib" level)
         char msgBuf[1000];
@@ -613,7 +613,7 @@ C__Handles::~C__Handles()
             TRACE_I("List of opened handles:");
             for (int i = 0; i < Handles.Count; i++)
             {
-                // workaround via msgBuf due to crashes in ALTAPDB, details see comment above
+                // workaround via msgBuf due to crashes in TASKSCAPEDB, details see comment above
                 sprintf_s(msgBuf, "%p", Handles[i].Handle.Handle);
                 TRACE_MI(Handles[i].File, Handles[i].Line,
                          __GetHandlesTypeName(Handles[i].Handle.Type) << " - " << __GetHandlesOrigin(Handles[i].Handle.Origin) << " - " << msgBuf);
@@ -622,7 +622,7 @@ C__Handles::~C__Handles()
         else
         {
             ConnectToTraceServer();
-            // workaround via msgBuf due to crashes in ALTAPDB, details see comment above
+            // workaround via msgBuf due to crashes in TASKSCAPEDB, details see comment above
             sprintf_s(msgBuf, "%d", Handles.Count);
             TRACE_I(__HandlesMessageNumberOpened << msgBuf);
         }

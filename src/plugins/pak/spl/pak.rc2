@@ -1,4 +1,4 @@
-﻿//
+//
 // pak.rc2 - resources Microsoft Visual C++ does not edit directly
 //
 
@@ -13,3 +13,4 @@
 #include "versinfo.rc2"
 
 IDB_PAK BITMAP "pak.bmp"
+

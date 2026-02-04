@@ -1,4 +1,4 @@
-﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2023 Taskscape Ltd
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #pragma once
@@ -27,20 +27,20 @@
 // salexten.dll (Servant Salamander 2.5 beta 2 through RC1) class id: c78b6131-f3ea-11d2-94a1-00e0292a01e3 (copied to the TEMP directory and shared between multiple Salamander builds)
 // salamext.dll (Servant Salamander 2.5 RC2) class id:           c78b6132-f3ea-11d2-94a1-00e0292a01e3 (first version kept in the installation; each Salamander release ships with its own shell extension)
 // salamext.dll (Servant Salamander 2.5 RC3) class id:           c78b6133-f3ea-11d2-94a1-00e0292a01e3
-// salamext.dll (Altap Salamander 2.5 RC3) class id:             c78b6134-f3ea-11d2-94a1-00e0292a01e3
-// salamext.dll (Altap Salamander 2.5) class id:                 c78b6135-f3ea-11d2-94a1-00e0292a01e3
-// salamext.dll (Altap Salamander 2.51) class id:                c78b6136-f3ea-11d2-94a1-00e0292a01e3
-// salamext.dll (Altap Salamander 2.52 beta 1) class id:         c78b6137-f3ea-11d2-94a1-00e0292a01e3
-// salamext.dll (Altap Salamander 2.52 beta 1) class id:         c78b6138-f3ea-11d2-94a1-00e0292a01e3 (mutex-creation changes broke compatibility with older versions)
-// salamext.dll (Altap Salamander 2.52 beta 1) class id:         c78b6139-f3ea-11d2-94a1-00e0292a01e3 (creating mutexes with restricted permissions prevented older Salamanders—for example 2.51—from opening them, so the mutex, shared-memory, etc. names changed)
-// salamext.dll (Altap Salamander 2.52 beta 2) class id:         c78b613a-f3ea-11d2-94a1-00e0292a01e3
-// salamext.dll (Altap Salamander 2.52) class id:                c78b613b-f3ea-11d2-94a1-00e0292a01e3
-// salamext.dll (Altap Salamander 2.53 beta 1) class id:         c78b613c-f3ea-11d2-94a1-00e0292a01e3
-// salamext.dll (Altap Salamander 2.53) class id:                c78b613d-f3ea-11d2-94a1-00e0292a01e3 (unused—we ultimately released 2.53 beta 2 instead)
-// salamext.dll (Altap Salamander 2.53 beta 2) class id:         c78b613e-f3ea-11d2-94a1-00e0292a01e3
-// salamext.dll (Altap Salamander 2.53) class id:                c78b613f-f3ea-11d2-94a1-00e0292a01e3
-// salamext.dll (Altap Salamander 2.54) class id:                c78b6140-f3ea-11d2-94a1-00e0292a01e3
-// salamext.dll (Altap Salamander 2.55 beta 1) class id:         c78b6141-f3ea-11d2-94a1-00e0292a01e3
+// salamext.dll (Open Salamander 2.5 RC3) class id:             c78b6134-f3ea-11d2-94a1-00e0292a01e3
+// salamext.dll (Open Salamander 2.5) class id:                 c78b6135-f3ea-11d2-94a1-00e0292a01e3
+// salamext.dll (Open Salamander 2.51) class id:                c78b6136-f3ea-11d2-94a1-00e0292a01e3
+// salamext.dll (Open Salamander 2.52 beta 1) class id:         c78b6137-f3ea-11d2-94a1-00e0292a01e3
+// salamext.dll (Open Salamander 2.52 beta 1) class id:         c78b6138-f3ea-11d2-94a1-00e0292a01e3 (mutex-creation changes broke compatibility with older versions)
+// salamext.dll (Open Salamander 2.52 beta 1) class id:         c78b6139-f3ea-11d2-94a1-00e0292a01e3 (creating mutexes with restricted permissions prevented older Salamanders—for example 2.51—from opening them, so the mutex, shared-memory, etc. names changed)
+// salamext.dll (Open Salamander 2.52 beta 2) class id:         c78b613a-f3ea-11d2-94a1-00e0292a01e3
+// salamext.dll (Open Salamander 2.52) class id:                c78b613b-f3ea-11d2-94a1-00e0292a01e3
+// salamext.dll (Open Salamander 2.53 beta 1) class id:         c78b613c-f3ea-11d2-94a1-00e0292a01e3
+// salamext.dll (Open Salamander 2.53) class id:                c78b613d-f3ea-11d2-94a1-00e0292a01e3 (unused—we ultimately released 2.53 beta 2 instead)
+// salamext.dll (Open Salamander 2.53 beta 2) class id:         c78b613e-f3ea-11d2-94a1-00e0292a01e3
+// salamext.dll (Open Salamander 2.53) class id:                c78b613f-f3ea-11d2-94a1-00e0292a01e3
+// salamext.dll (Open Salamander 2.54) class id:                c78b6140-f3ea-11d2-94a1-00e0292a01e3
+// salamext.dll (Open Salamander 2.55 beta 1) class id:         c78b6141-f3ea-11d2-94a1-00e0292a01e3
 // salextx86.dll + salextx64.dll (Salamander 3.0 beta 1) class id: c78b6142-f3ea-11d2-94a1-00e0292a01e3 (first build that ships x86 and x64 versions together)
 // salextx86.dll + salextx64.dll (Salamander 3.0 beta 2) class id: c78b6143-f3ea-11d2-94a1-00e0292a01e3
 // salextx86.dll + salextx64.dll (Salamander 3.0 beta 3) class id: c78b6144-f3ea-11d2-94a1-00e0292a01e3
@@ -64,43 +64,43 @@ DEFINE_GUID(CLSID_ShellExtension, 0xc78b614fL, 0xf3ea, 0x11d2, 0x94, 0xa1, 0x00,
 //
 // Servant Salamander 2.5 RC2                - 25RC2
 // Servant Salamander 2.5 RC3                - 25RC3
-// Altap Salamander 2.5 RC3                  - 25RC3
-// Altap Salamander 2.5                      - 25
-// Altap Salamander 2.51                     - 251
-// Altap Salamander 2.52 beta 1              - 252B1
-// Altap Salamander 2.52 beta 1              - 252B1a  (mutex creation/open adjustments caused incompatibility with older builds)
-// Altap Salamander 2.52 beta 1              - 252B1b  (mutexes with restricted permissions prevented older Salamanders, e.g. 2.51, from opening them, so the mutex/shared-memory names changed)
-// Altap Salamander 2.52 beta 2              - 252B2
-// Altap Salamander 2.52                     - 252
-// Altap Salamander 2.53 beta 1              - 253B1
-// Altap Salamander 2.53                     - 253     (unused—we ultimately shipped 2.53 beta 2)
-// Altap Salamander 2.53 beta 2              - 253B2
-// Altap Salamander 2.53                     - 253R
-// Altap Salamander 2.54                     - 254
-// Altap Salamander 2.55 beta 1              - 255B1   (unused—we eventually released 3.0 beta 1 instead)
-// Altap Salamander 3.0 beta 1               - 300B1
-// Altap Salamander 3.0 beta 2               - 300B2
-// Altap Salamander 3.0 beta 3               - 300B3
-// Altap Salamander 3.0 beta 4               - 300B4
-// Altap Salamander 3.0                      - 300B5   (left as "3.0 beta 5" by mistake; we released 3.0)
-// Altap Salamander 3.1 beta 1 (unreleased)  - 310B1
-// Altap Salamander 3.01                     - 301
-// Altap Salamander 3.1 beta 1 (unreleased)  - 310B1_2 (second attempt to ship "3.1 beta 1")
-// Altap Salamander 3.02                     - 302
-// Altap Salamander 3.1 beta 1 (unreleased)  - 310B1_3 (third attempt to ship "3.1 beta 1")
-// Altap Salamander 3.03                     - 303
-// Altap Salamander 3.1 beta 1 (unreleased)  - 310B1_4 (fourth attempt to ship "3.1 beta 1")
-// Altap Salamander 3.04                     - 304
-// Altap Salamander 3.1 beta 1               - 310B1_5 (fifth attempt to ship "3.1 beta 1")
-// Altap Salamander 3.05                     - 305
-// Altap Salamander 3.1 beta 1               - 310B1_6 (sixth attempt to ship "3.1 beta 1")
-// Altap Salamander 3.06                     - 306
-// Altap Salamander 3.1 beta 1               - 310B1_7 (seventh attempt to ship "3.1 beta 1")
-// Altap Salamander 3.07                     - 307
-// Altap Salamander 4.0 beta 1               - 400B1
-// Altap Salamander 3.08                     - 308
-// Altap Salamander 4.0 beta 1               - 400B1_2 (second attempt to ship "4.0 beta 1")
-// Altap Salamander 4.0                      - 400
+// Open Salamander 2.5 RC3                  - 25RC3
+// Open Salamander 2.5                      - 25
+// Open Salamander 2.51                     - 251
+// Open Salamander 2.52 beta 1              - 252B1
+// Open Salamander 2.52 beta 1              - 252B1a  (mutex creation/open adjustments caused incompatibility with older builds)
+// Open Salamander 2.52 beta 1              - 252B1b  (mutexes with restricted permissions prevented older Salamanders, e.g. 2.51, from opening them, so the mutex/shared-memory names changed)
+// Open Salamander 2.52 beta 2              - 252B2
+// Open Salamander 2.52                     - 252
+// Open Salamander 2.53 beta 1              - 253B1
+// Open Salamander 2.53                     - 253     (unused—we ultimately shipped 2.53 beta 2)
+// Open Salamander 2.53 beta 2              - 253B2
+// Open Salamander 2.53                     - 253R
+// Open Salamander 2.54                     - 254
+// Open Salamander 2.55 beta 1              - 255B1   (unused—we eventually released 3.0 beta 1 instead)
+// Open Salamander 3.0 beta 1               - 300B1
+// Open Salamander 3.0 beta 2               - 300B2
+// Open Salamander 3.0 beta 3               - 300B3
+// Open Salamander 3.0 beta 4               - 300B4
+// Open Salamander 3.0                      - 300B5   (left as "3.0 beta 5" by mistake; we released 3.0)
+// Open Salamander 3.1 beta 1 (unreleased)  - 310B1
+// Open Salamander 3.01                     - 301
+// Open Salamander 3.1 beta 1 (unreleased)  - 310B1_2 (second attempt to ship "3.1 beta 1")
+// Open Salamander 3.02                     - 302
+// Open Salamander 3.1 beta 1 (unreleased)  - 310B1_3 (third attempt to ship "3.1 beta 1")
+// Open Salamander 3.03                     - 303
+// Open Salamander 3.1 beta 1 (unreleased)  - 310B1_4 (fourth attempt to ship "3.1 beta 1")
+// Open Salamander 3.04                     - 304
+// Open Salamander 3.1 beta 1               - 310B1_5 (fifth attempt to ship "3.1 beta 1")
+// Open Salamander 3.05                     - 305
+// Open Salamander 3.1 beta 1               - 310B1_6 (sixth attempt to ship "3.1 beta 1")
+// Open Salamander 3.06                     - 306
+// Open Salamander 3.1 beta 1               - 310B1_7 (seventh attempt to ship "3.1 beta 1")
+// Open Salamander 3.07                     - 307
+// Open Salamander 4.0 beta 1               - 400B1
+// Open Salamander 3.08                     - 308
+// Open Salamander 4.0 beta 1               - 400B1_2 (second attempt to ship "4.0 beta 1")
+// Open Salamander 4.0                      - 400
 // Open Salamander 5.0                       - 500
 
 #define SALSHEXT_SHAREDNAMESAPPENDIX "500"
@@ -221,7 +221,7 @@ typedef struct CSalShExtSharedMem CSalShExtSharedMem;
 #pragma pack(pop)
 
 //
-// ============================================= Altap Salamander only
+// ============================================= Open Salamander only
 //
 
 #ifdef INSIDE_SALAMANDER

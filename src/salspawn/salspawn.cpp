@@ -1,4 +1,4 @@
-﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2023 Taskscape Ltd
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include <windows.h>
@@ -155,7 +155,7 @@ void mainCRTStartup()
     {
         DWORD written;
         WriteFile(GetStdHandle(STD_OUTPUT_HANDLE),
-                  "SALSPAWN: Spawn for Open Salamander, Copyright (C) 1998-2023 Open Salamander Authors\n\nUsage: salspawn [-|/<switch>] <executable> [exe params]\n\nAvailable switches:\n  ?,h,H - this help screen\n  c<num> - sets base of SALSPAWN error level to <num>\n\n",
+                  "SALSPAWN: Spawn for Open Salamander, Copyright (C) 1998-2023 Taskscape Ltd\n\nUsage: salspawn [-|/<switch>] <executable> [exe params]\n\nAvailable switches:\n  ?,h,H - this help screen\n  c<num> - sets base of SALSPAWN error level to <num>\n\n",
                   221, &written, NULL);
         ExitProcess(retBase + 1);
     }

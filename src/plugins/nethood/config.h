@@ -1,4 +1,4 @@
-﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2023 Taskscape Ltd
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 /*
@@ -12,7 +12,7 @@
 
 static const TCHAR SuggestedFSName[] = TEXT("net");
 
-static const TCHAR HomePageUrl[] = TEXT("www.altap.cz");
+static const TCHAR HomePageUrl[] = TEXT("www.taskscape.com");
 
 static const TCHAR PluginNameEN[] = TEXT("Network"); // do not translate - it's used before language module is loaded and for debugging purposes
 

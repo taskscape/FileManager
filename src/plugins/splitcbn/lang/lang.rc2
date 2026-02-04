@@ -1,4 +1,4 @@
-﻿//
+//
 // lang.rc2 - resources Microsoft Visual C++ does not edit directly
 //
 
@@ -89,3 +89,4 @@ NOT WS_BORDER | NOT WS_TABSTOP
 NOT WS_BORDER | NOT WS_TABSTOP
  ICON "", IDC_ICON_OK, 7,22,21,20, SS_REALSIZEIMAGE
 }*/
+

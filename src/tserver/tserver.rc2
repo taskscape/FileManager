@@ -1,4 +1,4 @@
-﻿//
+//
 // tserver.rc2 - resources Microsoft Visual C++ does not edit directly
 //
 
@@ -24,3 +24,4 @@ IC_TSERVER_1     ICON "tsrv1.ico"
 //
 
 BMP_TYPE         BITMAP "state.bmp"
+

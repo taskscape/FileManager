@@ -1,12 +1,12 @@
-﻿<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <assembly xmlns="urn:schemas-microsoft-com:asm.v1" manifestVersion="1.0">
 <assemblyIdentity
-    name="Altap.Uninstall"
+    name="Taskscape Ltd.Uninstall"
     processorArchitecture="*"
     type="win32"
     version="1.26.0.0">
 </assemblyIdentity>
-<description>Altap Uninstall</description>
+<description>Taskscape Ltd Uninstall</description>
 <dependency>
     <dependentAssembly>
         <assemblyIdentity

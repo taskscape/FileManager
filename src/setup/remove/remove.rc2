@@ -1,4 +1,4 @@
-﻿/////////////////////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////////////////////
 //
 // Manifest
 //
@@ -39,7 +39,7 @@ BEGIN
             VALUE "FileVersion", "1.28.0.0"
             VALUE "InternalName", "Open Salamander Uninstaller"
             VALUE "OriginalFilename", "remove.exe"
-            VALUE "LegalCopyright", "Copyright © 1997-2023 Open Salamander Authors"
+            VALUE "LegalCopyright", "Copyright © 1997-2023 Taskscape Ltd"
         END
     END
     BLOCK "VarFileInfo"
@@ -47,4 +47,5 @@ BEGIN
         VALUE "Translation", 0x409, 1200
     END
 END
+
 

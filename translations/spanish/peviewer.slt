@@ -1,4 +1,4 @@
-﻿[EXPORTINFO]
+[EXPORTINFO]
 PROJECTNAME,"translator\salamand 4.0\projects\spanish\peviewer.atp"
 TEXTVERSION,"3.0 (x86)"
 VERSION,"3,0,0,180"
@@ -6,7 +6,7 @@ VERSION,"3,0,0,180"
 [TRANSLATION]
 LANGID,3082
 AUTHOR,"Juan Pablo Barrio Lera"
-WEB,"forum.altap.cz/viewtopic.php?f=23&t=6168"
+WEB,"/viewtopic.php?f=23&t=6168"
 COMMENT,"Versión en español"
 
 [DIALOG 8501]
@@ -30,7 +30,7 @@ COMMENT,"Versión en español"
 10100,1,"Visor de ejecutable portátil"
 10101,1,"Imposible abrir el fichero %s."
 10102,1,"Ha fallado la creación de un fichero temporal."
-10103,1,"Ha sucedido una excepción.\n\nFichero visto: %s\n\nSi cree que el fichero visto no está corrupto, envíe este fichero a support@altap.cz.\nLo reproduciremos y corregiremos el fallo. ¡Gracias por su cooperación!"
+10103,1,"Ha sucedido una excepción.\n\nFichero visto: %s\n\nSi cree que el fichero visto no está corrupto, envíe este fichero a support@taskscape.com.\nLo reproduciremos y corregiremos el fallo. ¡Gracias por su cooperación!"
 10104,1,"Presenta información sobre ficheros ejecutables portátiles como EXE, DLL, etc."
 
 [STRINGTABLE 2]

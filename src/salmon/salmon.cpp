@@ -1,4 +1,4 @@
-﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2023 Taskscape Ltd
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "precomp.h"
@@ -334,7 +334,7 @@ HINSTANCE LoadSLG(const char* slgName)
         }
     }
     if (hSLG == NULL)
-        MessageBox(NULL, "Internal error: cannot load any language file. Please contact us at support@altap.cz.", APP_NAME, MB_OK | MB_ICONEXCLAMATION | MB_SETFOREGROUND);
+        MessageBox(NULL, "Internal error: cannot load any language file. Please contact us at support@taskscape.com.", APP_NAME, MB_OK | MB_ICONEXCLAMATION | MB_SETFOREGROUND);
     return hSLG;
 }
 
@@ -782,7 +782,7 @@ BOOL GetStringSid(LPTSTR* stringSid)
     return TRUE;
 }
 
-#define SALMON_MAINDLG_MUTEX_NAME "AltapSalamanderSalmonMainDialog"
+#define SALMON_MAINDLG_MUTEX_NAME "TaskscapeLtdSalamanderSalmonMainDialog"
 
 class CMainDialogMutex
 {
@@ -1111,7 +1111,7 @@ WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR cmdLine, int cmdShow
         {
             // salmon.exe uses the Win32 subsystem where Windows expects a message loop, which we do not have.
             // After starting salmon.exe a wait cursor was shown for about 5 seconds, see
-            // https://forum.altap.cz/viewtopic.php?f=16&t=5572.
+            // /viewtopic.php?f=16&t=5572.
             // To get rid of it we had two options: switch to the "console" subsystem
             // or pump the message loop, which I chose as the cleaner solution (when launched by the user it shows no shell window, only a message box).
             MSG msg;

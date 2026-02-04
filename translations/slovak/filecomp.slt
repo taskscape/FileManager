@@ -1,4 +1,4 @@
-﻿[EXPORTINFO]
+[EXPORTINFO]
 PROJECTNAME,"translator\salamand 4.0\projects\slovak\filecomp.atp"
 TEXTVERSION,"1.19 (x86)"
 VERSION,"1,1,9,180"
@@ -6,7 +6,7 @@ VERSION,"1,1,9,180"
 [TRANSLATION]
 LANGID,1051
 AUTHOR,"Roman Paholík"
-WEB,"forum.altap.cz/viewtopic.php?f=23&t=6167"
+WEB,"/viewtopic.php?f=23&t=6167"
 COMMENT,"Slovenská verzia"
 
 [DIALOG 100]

@@ -1,4 +1,4 @@
-﻿[EXPORTINFO]
+[EXPORTINFO]
 PROJECTNAME,"translator\salamand 4.0\projects\german\peviewer.atp"
 TEXTVERSION,"3.0 (x86)"
 VERSION,"3,0,0,180"
@@ -6,7 +6,7 @@ VERSION,"3,0,0,180"
 [TRANSLATION]
 LANGID,1031
 AUTHOR,"Dirk Bornhütter, Thomas Kelso, Thomas Pagels, Thomas Wölk, Marko Meister und Mick Weiss"
-WEB,"forum.altap.cz/viewtopic.php?f=23&t=7334"
+WEB,"/viewtopic.php?f=23&t=7334"
 COMMENT,"Deutsche Version"
 
 [DIALOG 8501]
@@ -30,7 +30,7 @@ COMMENT,"Deutsche Version"
 10100,1,"PE Dateibetrachter"
 10101,1,"Fehler beim Öffnen der Datei %s."
 10102,1,"Fehler beim Erzeugen der temporären Datei."
-10103,1,"Ausnahmefehler aufgetreten.\n\nAngesehene Datei: %s\n\nWenn die angezeigte Datei nach Ihrer Meinung nicht defekt ist, senden Sie uns bitte die Datei an support@altap.cz.\nWir werden den Fehler im Betrachter beseitigen. Vielen Dank für die Kooperation!"
+10103,1,"Ausnahmefehler aufgetreten.\n\nAngesehene Datei: %s\n\nWenn die angezeigte Datei nach Ihrer Meinung nicht defekt ist, senden Sie uns bitte die Datei an support@taskscape.com.\nWir werden den Fehler im Betrachter beseitigen. Vielen Dank für die Kooperation!"
 10104,1,"Zeigt Informationen über ausführbare Dateien an (EXE, DLL, usw.)."
 
 [STRINGTABLE 2]

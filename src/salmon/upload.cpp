@@ -1,4 +1,4 @@
-﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2023 Taskscape Ltd
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "precomp.h"
@@ -10,7 +10,7 @@
 
 using namespace std;
 
-const char* SERVER_NAME = "reports.altap.cz";
+const char* SERVER_NAME = "reports.taskscape.com";
 
 BOOL CreateHTTPOutput(CUploadParams* uploadParams, char** buffer, int* bufferSize)
 {
@@ -49,7 +49,7 @@ BOOL CreateHTTPOutput(CUploadParams* uploadParams, char** buffer, int* bufferSiz
                 s += strlen(s);
                 sprintf(s, "-----------------------------90721038027008\r\n");
                 s += strlen(s);
-                sprintf(s, "Content-Disposition: form-data; name=\"altapfile\"; filename=\"%s\"\r\n", fileNameOnly);
+                sprintf(s, "Content-Disposition: form-data; name=\"taskscapefile\"; filename=\"%s\"\r\n", fileNameOnly);
                 s += strlen(s); // "protechfile"
                 sprintf(s, "Content-Type: application/octet-stream\r\n");
                 s += strlen(s);

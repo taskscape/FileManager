@@ -1,4 +1,4 @@
-﻿//
+//
 // lang.rc2 - resources Microsoft Visual C++ does not edit directly
 //
 
@@ -33,3 +33,4 @@ STRINGTABLE
 
   IDS_ERROR, "Error"
 }
+

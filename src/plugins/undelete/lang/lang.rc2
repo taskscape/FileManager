@@ -1,4 +1,4 @@
-﻿//
+//
 // lang.rc2 - resources Microsoft Visual C++ does not edit directly
 //
 
@@ -70,3 +70,4 @@ STRINGTABLE
   IDS_PARTIALRECOVER_DONTASK, "Choose the same answer next time"
   IDS_ERRORRECOVER, "Error recovering file %s"
 }
+

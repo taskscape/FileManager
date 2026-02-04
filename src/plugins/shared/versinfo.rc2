@@ -1,6 +1,6 @@
-﻿//****************************************************************************
+//****************************************************************************
 //
-// Copyright (c) 2023 Open Salamander Authors
+// Copyright (c) 2023 Taskscape Ltd
 //
 // This is a part of the Open Salamander SDK library.
 //
@@ -65,7 +65,7 @@ BEGIN
             VALUE "SLGCRCofImpSLT", "none\0"
 #ifdef _LANG_SALAMANDER
             VALUE "SLGHelpDir", "ENGLISH\0"
-            VALUE "SLGIncomplete", "\0" // pri nekompletnim prekladu davat: "https://forum.altap.cz/viewforum.php?f=23\0"
+            VALUE "SLGIncomplete", "\0" // pri nekompletnim prekladu davat: "/viewforum.php?f=23\0"
 #endif
 #endif
         END
@@ -75,3 +75,4 @@ BEGIN
         VALUE "Translation", 0x0409, 0x04b0
     END
 END
+

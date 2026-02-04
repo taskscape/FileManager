@@ -1,4 +1,4 @@
-﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2023 Taskscape Ltd
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "precomp.h"
@@ -74,7 +74,7 @@ protected:
     BOOL Beta; // FALSE = release version; TRUE = beta version
     // allocated strings
     char* Name;                // Open Salamander
-    char* Url;                 // www.altap.cz
+    char* Url;                 // www.taskscape.com
     TDirectArray<char*> Infos; // a certain number of lines describing the module
 
     // internal flag for CompareWithInstalledModulesAndLogIt

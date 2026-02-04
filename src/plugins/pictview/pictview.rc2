@@ -1,4 +1,4 @@
-﻿//
+//
 // pictview.rc2 - resources Microsoft Visual C++ does not edit directly
 //
 
@@ -106,3 +106,4 @@ IDA_ACCELERATORS ACCELERATORS
 // VK_SPACE, CMD_FILE_LAST, SHIFT, VIRTKEY, NOINVERT
  VK_INSERT, CMD_FILE_TOGGLESELECT, VIRTKEY, NOINVERT
 }
+

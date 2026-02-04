@@ -1,6 +1,6 @@
-﻿//****************************************************************************
+//****************************************************************************
 //
-// Copyright (c) 2023 Open Salamander Authors
+// Copyright (c) 2023 Taskscape Ltd
 //
 // This is a part of the Open Salamander SDK library.
 //
@@ -39,3 +39,4 @@ BEGIN
     IDS_PLUGIN_NAME         "Network"
     IDS_DESCRIPTION         "Provides access to computers on the network."
 END
+

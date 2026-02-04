@@ -41,7 +41,7 @@ version 3.21: (28/04/2005) J.Patera
 
 version 3.22: (23/01/2006) J.Patera
   -GZIP: EXTRA_FIELD correctly split into EXTRA_FIELD & CONTINUATION,
-   see https://forum.altap.cz/viewtopic.php?t=187
+   see /viewtopic.php?t=187
 
 version 3.24: (15/05/2008) J.Patera
   -GZIP: if original file name contains Unix path

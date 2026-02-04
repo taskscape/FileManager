@@ -1,4 +1,4 @@
-﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2023 Taskscape Ltd
 // SPDX-License-Identifier: GPL-2.0-or-later
 // CommentsTranslationProject: TRANSLATED
 
@@ -34,7 +34,7 @@ const char* FINDOPTIONSITEM_GREP_REG = "Grep";
 const char* FINDIGNOREITEM_PATH_REG = "Path";
 const char* FINDIGNOREITEM_ENABLED_REG = "Enabled";
 
-// following variable was used up to Altap Salamander 2.5,
+// following variable was used up to Open Salamander 2.5,
 // where we switched to CFilterCriteria with its Save/Load
 const char* OLD_FINDOPTIONSITEM_EXCLUDEMASK_REG = "ExcludeMask";
 
@@ -523,7 +523,7 @@ BOOL CFindIgnore::Contains(const char* path, int startPathLen)
     for (i = 0; i < Items.Count; i++)
     {
         // startPathLen is the path length entered in the Find dialog (search root);
-        // only its subpaths are ignored, see https://forum.altap.cz/viewtopic.php?f=7&t=7434
+        // only its subpaths are ignored, see /viewtopic.php?f=7&t=7434
         CFindIgnoreItem* item = Items[i];
         switch (item->Type)
         {

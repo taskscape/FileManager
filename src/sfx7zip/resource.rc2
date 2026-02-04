@@ -1,4 +1,4 @@
-﻿//
+//
 // resource.rc2 - resources Microsoft Visual C++ does not edit directly
 //
 
@@ -32,7 +32,7 @@ BEGIN
             VALUE "FileVersion", "2.0.0.0"
             VALUE "InternalName", "Open Salamander Installer"
             VALUE "OriginalFilename", "sfx7zip.exe"
-            VALUE "LegalCopyright", "Copyright © 1997-2023 Open Salamander Authors"
+            VALUE "LegalCopyright", "Copyright © 1997-2023 Taskscape Ltd"
         END
     END
     BLOCK "VarFileInfo"
@@ -76,3 +76,4 @@ END
 #ifdef OPEN_VERSION
 1 RT_MANIFEST "open.xml"
 #endif
+

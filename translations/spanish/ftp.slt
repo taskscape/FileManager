@@ -1,4 +1,4 @@
-﻿[EXPORTINFO]
+[EXPORTINFO]
 PROJECTNAME,"translator\salamand 4.0\projects\spanish\ftp.atp"
 TEXTVERSION,"1.35 (x86)"
 VERSION,"1,3,5,180"
@@ -6,7 +6,7 @@ VERSION,"1,3,5,180"
 [TRANSLATION]
 LANGID,3082
 AUTHOR,"Juan Pablo Barrio Lera"
-WEB,"forum.altap.cz/viewtopic.php?f=23&t=6168"
+WEB,"/viewtopic.php?f=23&t=6168"
 COMMENT,"Versión en español"
 
 [DIALOG 500]
@@ -1536,7 +1536,7 @@ COMMENT,"Versión en español"
 10674,1,"Cadena con meses en texto incorrecta (formato: 12 meses separados con espacios)."
 10680,1,"La condición de autodetección contiene un error.\n\nError: %s"
 10685,1,"Tipo de servidor desconocido; imposible analizar listado de texto...\r\n"
-10686,1,"Imposible analizar listado de ficheros y directorios del servidor. Sólo se mostrará el texto del listado en el panel.\n\nCompruebe nuestra página web para una nueva versión de Open Salamander. Si está usando la última versión, envíenos el listado bruto (si no es confidencial; haga click derecho en panel > Ver listado bruto > Guardar como) a la dirección support@altap.cz. Ayúdenos a poder usar tantos tipos de servidor como sea posible."
+10686,1,"Imposible analizar listado de ficheros y directorios del servidor. Sólo se mostrará el texto del listado en el panel.\n\nCompruebe nuestra página web para una nueva versión de Open Salamander. Si está usando la última versión, envíenos el listado bruto (si no es confidencial; haga click derecho en panel > Ver listado bruto > Guardar como) a la dirección support@taskscape.com. Ayúdenos a poder usar tantos tipos de servidor como sea posible."
 10687,1,"Imposible analizar el listado de texto usando el tipo de servidor seleccionado...\r\n"
 
 [STRINGTABLE 42]

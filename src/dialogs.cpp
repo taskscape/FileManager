@@ -1,4 +1,4 @@
-﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2023 Taskscape Ltd
 // SPDX-License-Identifier: GPL-2.0-or-later
 // CommentsTranslationProject: TRANSLATED
 
@@ -1505,7 +1505,7 @@ MENU_TEMPLATE_ITEM ProgressDialogMenu2[] =
         // messes up the Z-order and the system without the following hack after closing the progress window
         // activates the top-most window that is the highest; see \Source\zorder and
         // \Source\windowtest utilities.
-        // Issue reported here: https://forum.altap.cz/viewtopic.php?t=2922&start=15
+        // Issue reported here: /viewtopic.php?t=2922&start=15
         if (NextForegroundWindow != NULL && NextForegroundWindow != GetForegroundWindow())
         {
             DWORD pid;
@@ -2075,9 +2075,9 @@ CBetaExpiredDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 
             const char* url =
 #ifndef THIS_IS_EAP_VERSION
-                english ? "https://www.altap.cz/salamander/downloads/beta" : "https://www.altap.cz/cz/salamander/downloads/beta";
+                english ? "https://www.taskscape.com/salamander/downloads/beta" : "https://www.taskscape.com/cz/salamander/downloads/beta";
 #else  // THIS_IS_EAP_VERSION
-                english ? "https://www.altap.cz/salamander/downloads/eap" : "https://www.altap.cz/cz/salamander/downloads/eap";
+                english ? "https://www.taskscape.com/salamander/downloads/eap" : "https://www.taskscape.com/cz/salamander/downloads/eap";
 #endif // THIS_IS_EAP_VERSION
 
             SetDlgItemText(HWindow, IDC_BETAEXPIREDURL, url + 8);

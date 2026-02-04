@@ -1,4 +1,4 @@
-﻿[EXPORTINFO]
+[EXPORTINFO]
 PROJECTNAME,"translator\salamand 4.0\projects\hungarian\dbviewer.atp"
 TEXTVERSION,"1.23 (x86)"
 VERSION,"1,2,3,180"
@@ -6,7 +6,7 @@ VERSION,"1,2,3,180"
 [TRANSLATION]
 LANGID,1038
 AUTHOR,"Török József"
-WEB,"forum.altap.cz/viewtopic.php?f=23&t=6164"
+WEB,"/viewtopic.php?f=23&t=6164"
 COMMENT,"Magyar változat"
 
 [DIALOG 12200]

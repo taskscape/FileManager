@@ -1,4 +1,4 @@
-﻿[EXPORTINFO]
+[EXPORTINFO]
 PROJECTNAME,"translator\salamand 4.0\projects\hungarian\checkver.atp"
 TEXTVERSION,"1.26 (x86)"
 VERSION,"1,2,6,180"
@@ -6,7 +6,7 @@ VERSION,"1,2,6,180"
 [TRANSLATION]
 LANGID,1038
 AUTHOR,"Török József"
-WEB,"forum.altap.cz/viewtopic.php?f=23&t=6164"
+WEB,"/viewtopic.php?f=23&t=6164"
 COMMENT,"Magyar változat"
 
 [DIALOG 100]
@@ -78,7 +78,7 @@ COMMENT,"Magyar változat"
 218,1,"A plugin az internettel dolgozik.\nMegszakítja ezt az internet feladatot?"
 220,1,"Internet kapcsolat inicializálása..."
 221,1,"Sikertelen inicializálás: %s"
-222,1,"Kapcsolódás a \tuwww.altap.cz\tlhttps://www.altap.cz\tn oldalra..."
+222,1,"Kapcsolódás a \tuwww.taskscape.com\tlhttps://www.taskscape.com\tn oldalra..."
 223,1,"Csatlakozás sikertelen: %s"
 
 [STRINGTABLE 2]

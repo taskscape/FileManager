@@ -1,4 +1,4 @@
-﻿//
+//
 // uniso.rc2 - resources Microsoft Visual C++ does not edit directly
 //
 
@@ -13,3 +13,4 @@
 #include "versinfo.rc2"
 
 IDB_UNISO BITMAP "res\\uniso.bmp"
+

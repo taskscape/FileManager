@@ -1,4 +1,4 @@
-﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2023 Taskscape Ltd
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "precomp.h"
@@ -1454,7 +1454,7 @@ WizardDlgProc(HWND hDlg, UINT uMsg, WPARAM wParam, LPARAM lParam)
         {
             if (uMsg == WM_LBUTTONDOWN)
             {
-                ShellExecute(NULL, "open", "https://www.altap.cz", NULL, NULL, 0);
+                ShellExecute(NULL, "open", "https://www.taskscape.com", NULL, NULL, 0);
             }
             else
             {

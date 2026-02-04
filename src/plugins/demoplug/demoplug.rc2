@@ -1,6 +1,6 @@
-﻿//****************************************************************************
+//****************************************************************************
 //
-// Copyright (c) 2023 Open Salamander Authors
+// Copyright (c) 2023 Taskscape Ltd
 //
 // This is a part of the Open Salamander SDK library.
 //
@@ -26,3 +26,4 @@ IDI_FS ICON "res\\fs.ico"
 IDB_TOOLBAR16_PNG RCDATA "res\\tb16.png"
 IDB_TOOLBAR256_PNG RCDATA "res\\tb256.png"
 IDB_GRAYALPHA_PNG RCDATA "res\\grayalph.png"
+

@@ -1,4 +1,4 @@
-﻿[EXPORTINFO]
+[EXPORTINFO]
 PROJECTNAME,"translator\salamand 4.0\projects\german\unchm.atp"
 TEXTVERSION,"1.03 (x86)"
 VERSION,"1,0,3,180"
@@ -6,7 +6,7 @@ VERSION,"1,0,3,180"
 [TRANSLATION]
 LANGID,1031
 AUTHOR,"Dirk Bornhütter, Thomas Kelso, Thomas Pagels, Thomas Wölk, Marko Meister und Mick Weiss"
-WEB,"forum.altap.cz/viewtopic.php?f=23&t=7334"
+WEB,"/viewtopic.php?f=23&t=7334"
 COMMENT,"Deutsche Version"
 
 [STRINGTABLE 0]
@@ -23,7 +23,7 @@ COMMENT,"Deutsche Version"
 1009,1,"Durchsucht und entpackt CHM-Dateien."
 1010,1,"Kann kein temporäres Verzeichnis erstellen."
 1011,1,"Kann temporäre Datei nicht löschen."
-1012,1,"Unbekanntes Dateiformat oder ungültiges CHM-Abbild.\n\nWenn Sie sicher sind, dass dies ein gültiges CHM-Abbild ist, wenden Sie sich bitte an support@altap.cz und helfen uns dieses Format zu unterstützen."
+1012,1,"Unbekanntes Dateiformat oder ungültiges CHM-Abbild.\n\nWenn Sie sicher sind, dass dies ein gültiges CHM-Abbild ist, wenden Sie sich bitte an support@taskscape.com und helfen uns dieses Format zu unterstützen."
 1013,1,"Diese Datei kann nicht geöffnet werden."
 1014,1,"Erstellen einer temporären Datei ist fehlgeschlagen."
 1015,1,"Dateiattribute können nicht gesetzt werden."

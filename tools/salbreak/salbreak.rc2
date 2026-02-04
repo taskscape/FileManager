@@ -1,4 +1,4 @@
-﻿//
+//
 // salbreak.rc2 - resources Microsoft Visual C++ does not edit directly
 //
 
@@ -10,3 +10,4 @@
 // Add manually edited resources here...
 
 CREATEPROCESS_MANIFEST_RESOURCE_ID RT_MANIFEST "manifest.xml"
+

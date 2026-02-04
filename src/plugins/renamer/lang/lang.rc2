@@ -1,4 +1,4 @@
-﻿//
+//
 // lang.rc2 - resources Microsoft Visual C++ does not edit directly
 //
 
@@ -299,3 +299,4 @@ STRINGTABLE
   IDS_EXP_SALDIR, "Salamander Directory"
   IDS_CFG_CONFLICT, "The configuration is already opened."
 }
+

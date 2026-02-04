@@ -1,4 +1,4 @@
-﻿//
+//
 // wmobile.rc2 - resources Microsoft Visual C++ does not edit directly
 //
 
@@ -13,3 +13,4 @@
 #include "versinfo.rc2"
 
 IDI_FS ICON "res\\fs.ico"
+

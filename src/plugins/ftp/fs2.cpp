@@ -1,4 +1,4 @@
-﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2023 Taskscape Ltd
 // SPDX-License-Identifier: GPL-2.0-or-later
 // CommentsTranslationProject: TRANSLATED
 
@@ -548,7 +548,7 @@ BOOL CPluginFSInterface::ChangePath(int currentFSNameIndex, char* fsName, int fs
                                                        compressData);
             memset(password, 0, lstrlen(password)); // clear the buffer with the password
         }
-        else // connection based on changing the path in the FTP file system (e.g. Shift+F7 + "ftp://ftp.altap.cz/")
+        else // connection based on changing the path in the FTP file system (e.g. Shift+F7 + "ftp://ftp.taskscape.com/")
         {
             if (Config.UseConnectionDataFromConfig)
                 TRACE_E("Unexpected situation in CPluginFSInterface::ChangePath() - UseConnectionDataFromConfig + nonempty userpart.");
@@ -1232,7 +1232,7 @@ BOOL CPluginFSInterface::ListCurrentPath(CSalamanderDirectoryAbstract* dir,
 
             if (!err)
             {
-                if (needSimpleListing) // unknown listing; show a message about sending the information to ALTAP
+                if (needSimpleListing) // unknown listing; show a message about sending the information to Taskscape Ltd
                 {                      // and log "Unknown Server Type"
                     lstrcpyn(logBuf, LoadStr(AutodetectSrvType ? IDS_LOGMSGUNKNOWNSRVTYPE : IDS_LOGMSGUNKNOWNSRVTYPE2),
                              200 + FTP_MAX_PATH);

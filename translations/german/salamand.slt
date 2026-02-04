@@ -1,4 +1,4 @@
-﻿[EXPORTINFO]
+[EXPORTINFO]
 PROJECTNAME,"translator\salamand 4.0\projects\german\salamand.atp"
 TEXTVERSION,"4.0 (x86)"
 VERSION,"4,0,0,180"
@@ -6,7 +6,7 @@ VERSION,"4,0,0,180"
 [TRANSLATION]
 LANGID,1031
 AUTHOR,"Dirk Bornhütter, Thomas Kelso, Thomas Pagels, Thomas Wölk, Marko Meister und Mick Weiss"
-WEB,"forum.altap.cz/viewtopic.php?f=23&t=7334"
+WEB,"/viewtopic.php?f=23&t=7334"
 COMMENT,"Deutsche Version"
 HELPDIR,"ENGLISH"
 SLGINCOMPLETE,""
@@ -299,9 +299,9 @@ SLGINCOMPLETE,""
 290,174,1,123,104,1,""
 1,124,162,50,14,1,"Schließen"
 271,10,87,201,8,1,"Version"
-1150,10,97,196,8,1,"Copyright © 1997-2023 Open Salamander Authors"
+1150,10,97,196,8,1,"Copyright © 1997-2023 Taskscape Ltd"
 1152,10,108,20,8,1,"Web:"
-272,31,108,64,8,1,"www.altap.cz"
+272,31,108,64,8,1,"www.taskscape.com"
 286,2,154,294,1,1,""
 
 [DIALOG 300]
@@ -1063,7 +1063,7 @@ SLGINCOMPLETE,""
 2,92,57,50,14,1,"&Beenden"
 1,149,57,50,14,1,"&Weiter"
 1150,10,10,274,8,1,"Diese Betaversion ist abgelaufen. Installieren Sie bitte die aktuelle Betaversion:"
-1142,10,23,274,8,1,"www.altap.cz/salamander/downloads/beta"
+1142,10,23,274,8,1,"www.taskscape.com/salamander/downloads/beta"
 1141,10,36,274,16,1,"Heute ist der %s und diese Version läuft am %s ab."
 
 [DIALOG 2300]
@@ -3236,7 +3236,7 @@ SLGINCOMPLETE,""
 13743,1,"&Diesen Hinweis nicht für andere Plugins anzeigen"
 
 [STRINGTABLE 136]
-13750,1,"Die in der Registrierung gespeicherte Konfiguration ist defekt und kann deshalb nicht geladen werden. Der Open Salamander wurde wahrscheinlich während dem Speichern der Konfiguration beendet. Dies geschieht überwiegend wenn der Open Salamander beim Herunterfahren (oder Abmelden) noch läuft. Um dieses Problem zu verhindern, beenden Sie bitte den Open Salamander vor dem Herunterfahren (oder Abmelden).\n\nSie können jetzt von den defekten Daten ein Backup anlegen (Rufen Sie RegEdit.exe auf und benennen Sie den Schlüssel HKEY_CURRENT_USER\\%s um). Später können Sie von diesem Backup die Einstellungen wieder einspielen (Benutzermenü, Favoriten, FTP Adressen, etc.), Besuchen Sie bitte forum.altap.cz für weitere Details.\n\nDie defekte Konfiguration muss aus der Registrierung entfernt werden bevor Sie den Open Salamander starten."
+13750,1,"Die in der Registrierung gespeicherte Konfiguration ist defekt und kann deshalb nicht geladen werden. Der Open Salamander wurde wahrscheinlich während dem Speichern der Konfiguration beendet. Dies geschieht überwiegend wenn der Open Salamander beim Herunterfahren (oder Abmelden) noch läuft. Um dieses Problem zu verhindern, beenden Sie bitte den Open Salamander vor dem Herunterfahren (oder Abmelden).\n\nSie können jetzt von den defekten Daten ein Backup anlegen (Rufen Sie RegEdit.exe auf und benennen Sie den Schlüssel HKEY_CURRENT_USER\\%s um). Später können Sie von diesem Backup die Einstellungen wieder einspielen (Benutzermenü, Favoriten, FTP Adressen, etc.), Besuchen Sie bitte  für weitere Details.\n\nDie defekte Konfiguration muss aus der Registrierung entfernt werden bevor Sie den Open Salamander starten."
 13751,1,"Sie benutzen vom Standard abweichende Werte für die nachfolgenden Parameter die während des Abmeldens oder Herunterfahrens benötigt werden. Das aknn zu einer defekten Konfiguration des Open Salamander führen (er bricht während des Speicherns der Konfiguration ab).\n\nHKEY_CURRENT_USER\\Control Panel\\Desktop\\WaitToKillAppTimeout sollte auf 20000 stehen.\nHKEY_CURRENT_USER\\Control Panel\\Desktop\\AutoEndTasks sollte auf 0 stehen."
 13752,1,"&Entferne Konfiguration"
 13755,1,"Bitte geben Sie an ob Dateien oder Verzeichnisse verglichen werden sollen."
@@ -3281,7 +3281,7 @@ SLGINCOMPLETE,""
 [STRINGTABLE 143]
 13856,1,"Beschreibung"
 13857,1,"Die Änderung der überlagerten Symbole wirkt sich erst nach einem Neustart des Open Salamander aus."
-13865,1,"Open Salamander wurde instabil. Eine unerwartete Ausnahmebedingung trat im %s-Handler für überlagerte Symbole auf. Sie können ähnlichen Abstürzen vorbeugen indem der Open Salamander diesen Handler nicht mehr benutzt (drücken Sie die Schaltfläche 'Diesen') oder indem die Anzeige aller benutzerdefinierten überlagerten Symbole verhindert wird (drücken Sie die Schaltfläche 'Alle'). Sie können auch prüfen ob für diesen Handler eine Aktualisierung bereitgestellt wurde (Durchsuchen Sie forum.altap.cz für weitere Informationen).\n\nWelchen Handler für überlagerte Symbole wollen Sie abschalten?\n\nHinweis: Sie können überlagerte Symbole in der Konfiguration bearbeiten (siehe Seite 'Überlagerte Symbole')."
+13865,1,"Open Salamander wurde instabil. Eine unerwartete Ausnahmebedingung trat im %s-Handler für überlagerte Symbole auf. Sie können ähnlichen Abstürzen vorbeugen indem der Open Salamander diesen Handler nicht mehr benutzt (drücken Sie die Schaltfläche 'Diesen') oder indem die Anzeige aller benutzerdefinierten überlagerten Symbole verhindert wird (drücken Sie die Schaltfläche 'Alle'). Sie können auch prüfen ob für diesen Handler eine Aktualisierung bereitgestellt wurde (Durchsuchen Sie  für weitere Informationen).\n\nWelchen Handler für überlagerte Symbole wollen Sie abschalten?\n\nHinweis: Sie können überlagerte Symbole in der Konfiguration bearbeiten (siehe Seite 'Überlagerte Symbole')."
 13866,1,"&Diese"
 13867,1,"&Alle"
 13870,1,"Die config.reg Datei (oder die mit dem -c Parameter angegebene Datei) wurde wegen des Imports einer Konfiguration einer älteren Open Salamander Version nicht in die Registrierung importiert. Bitte beenden Sie jetzt Open Salamander und starten ihn neu um das Problem zu lösen."
@@ -3403,11 +3403,11 @@ SLGINCOMPLETE,""
 [STRINGTABLE 156]
 14064,1,"Upload, bitte warten..."
 14065,1,"Bericht wurde erfolgreich hochgeladen.\n\nDanke für Ihre Hilfe Open Salamander zu verbessern!"
-14066,1,"Aus folgendem Grund ist der Upload fehlgeschlagen: %s\n\nBitte senden Sie uns den Bericht per E-Mail an support@altap.cz und löschen Sie diesen von ihrer Festplatte. Drücken Sie 'OK', um den Bericht anzusehen."
-14067,1,"Aus folgendem Grund ist die Komprimierung des Berichts fehlgeschlagen: %s\n\nPacken Sie bitte den Fehlerbericht mit 7-Zip und mailen Sie ihn an support@altap.cz, anschließend können Sie die Dateien von ihrer Festplatte löschen. Drücken Sie 'OK', um den Bericht anzusehen."
+14066,1,"Aus folgendem Grund ist der Upload fehlgeschlagen: %s\n\nBitte senden Sie uns den Bericht per E-Mail an support@taskscape.com und löschen Sie diesen von ihrer Festplatte. Drücken Sie 'OK', um den Bericht anzusehen."
+14067,1,"Aus folgendem Grund ist die Komprimierung des Berichts fehlgeschlagen: %s\n\nPacken Sie bitte den Fehlerbericht mit 7-Zip und mailen Sie ihn an support@taskscape.com, anschließend können Sie die Dateien von ihrer Festplatte löschen. Drücken Sie 'OK', um den Bericht anzusehen."
 14068,1,"Laden von %s fehlgeschlagen."
 14070,1,"Dies ist ein internes Hilfsprogramm von Open Salamander, öffnen Sie es bitte nicht direkt."
-14071,1,"Unzulässige Bug-Reporter Version von Open Salamander. Kontaktieren Sie bitte support@altap.cz."
+14071,1,"Unzulässige Bug-Reporter Version von Open Salamander. Kontaktieren Sie bitte support@taskscape.com."
 14072,1,"Ein Problem ist aufgetreten, die Schließung von Open Salamander wird erzwungen.\nErstelle ein Fehlerbericht, bitte warten..."
 14073,1,"Es ist ein Problem beim Erstellen des Fehlerberichts aufgetreten:\n%s"
 14074,1,"Minidump-Datei %s kann nicht erstellt werden. Code: %d."

@@ -1,4 +1,4 @@
-﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2023 Taskscape Ltd
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "precomp.h"
@@ -72,7 +72,7 @@ BOOL WINAPI DllMain(HINSTANCE hinstDLL, DWORD fdwReason, LPVOID lpvReserved)
     }
     if (fdwReason == DLL_PROCESS_DETACH)
     {
-        // if Altap Salamander is blocked from accessing the internet by the firewall and Salamander is closed while checkver is running,
+        // if Open Salamander is blocked from accessing the internet by the firewall and Salamander is closed while checkver is running,
         // TRACE is destroyed before this function is called, which leads to a crash in TRACE_I,
         // therefore TRACE must not be called here
         //TRACE_I("CheckVer DLL_PROCESS_DETACH");
@@ -144,7 +144,7 @@ CPluginInterfaceAbstract* WINAPI SalamanderPluginEntry(CSalamanderPluginEntryAbs
                                    LoadStr(IDS_PLUGIN_DESCRIPTION),
                                    "CHECKVER");
 
-    salamander->SetPluginHomePageURL("www.altap.cz");
+    salamander->SetPluginHomePageURL("www.taskscape.com");
 
     // load-on-start
     SalGeneral->SetFlagLoadOnSalamanderStart(TRUE);

@@ -1,4 +1,4 @@
-﻿//
+//
 // regedt.rc2 - resources Microsoft Visual C++ does not edit directly
 //
 
@@ -18,3 +18,4 @@ IDI_BIN ICON "bin.ico"
 IDI_UNKNOWN ICON "unknown.ico"
 IDI_FIND ICON "find.ico"
 IDB_REGEDT BITMAP "regedt.bmp"
+

@@ -1,4 +1,4 @@
-﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2023 Taskscape Ltd
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #pragma once
@@ -198,8 +198,8 @@ BOOL FileNameInvalidForManualCreate(const char* path);
 BOOL CutSpacesFromBothSides(char* path);
 
 // trims spaces at beginning and spaces and dots at end of name, Explorer does it this way
-// and people insisted they want it this way too, see https://forum.altap.cz/viewtopic.php?f=16&t=5891
-// and https://forum.altap.cz/viewtopic.php?f=2&t=4210
+// and people insisted they want it this way too, see /viewtopic.php?f=16&t=5891
+// and /viewtopic.php?f=2&t=4210
 // returns TRUE if 'path' content changed
 BOOL MakeValidFileName(char* path);
 

@@ -1,4 +1,4 @@
-﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2023 Taskscape Ltd
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 /* This wrapper implements stubs for the functions exported by PVW32Cnv.dll
@@ -168,7 +168,7 @@ const char* WINAPI PVGetErrorTextStub(DWORD ErrorCode)
     // FIXME: make this thread-safe.
     // FIXME: implement providing the string from Salamander, when needed
     //  (PVW32Cnv.dll doesn't contain most strings anymore)
-    // FIXME: consult the default error text with Altap
+    // FIXME: consult the default error text with Taskscape Ltd
     static char errorStr[512];
 
     if (ErrorCode == PVC_ENVELOPE_NOT_LOADED)

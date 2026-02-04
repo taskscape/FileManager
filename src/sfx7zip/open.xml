@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <assembly xmlns="urn:schemas-microsoft-com:asm.v1" manifestVersion="1.0">
 <!-- 
   WARNING: Multiple xmlns schema properties may can cause heap corruption on Windows XP SP2 
@@ -6,7 +6,7 @@
   Whenever we modify this file, we need to CHECK COMPILED (inside exe) manifest against multiple xmlns!
 -->
 <assemblyIdentity
-    name="Altap.Self.Extractor"
+    name="Taskscape Ltd.Self.Extractor"
     processorArchitecture="x86"
     type="win32"
     version="2.0.0.0">

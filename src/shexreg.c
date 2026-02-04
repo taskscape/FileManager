@@ -1,4 +1,4 @@
-﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2023 Taskscape Ltd
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include <windows.h>
@@ -34,7 +34,7 @@ const char* SALSHEXT_DOPASTEEVENTNAME = "SalExten_DoPasteEvent4";     // salextx
 //const char *SHEXREG_OPENSALAMANDER_DESCR = "Shell Extension for Servant Salamander";     // salshext.dll (Sal 2.5 beta 1)
 //const char *SHEXREG_OPENSALAMANDER = "ServantSalamander25";                              // salexten.dll - 2.5 beta 2 az RC1
 //const char *SHEXREG_OPENSALAMANDER_DESCR = "Shell Extension for Servant Salamander 2.5"; // salexten.dll - 2.5 beta 2 az RC1
-//const char* SHEXREG_OPENSALAMANDER = "AltapSalamanderVer" SALSHEXT_SHAREDNAMESAPPENDIX;  // salexten.dll - do 4.0
+//const char* SHEXREG_OPENSALAMANDER = "TaskscapeLtdSalamanderVer" SALSHEXT_SHAREDNAMESAPPENDIX;  // salexten.dll - do 4.0
 const char* SHEXREG_OPENSALAMANDER = "OpenSalamanderVer" SALSHEXT_SHAREDNAMESAPPENDIX;
 #ifdef INSIDE_SALAMANDER
 #include "versinfo.rh2"
@@ -47,7 +47,7 @@ const char* SHEXREG_OPENSALAMANDER_DESCR = "Shell Extension (%s) for Open Salama
 // ============================================= spolecna cast
 //
 /*
-const char *SHELLEXT_ROOT_REG = "Software\\Altap\\Servant Salamander\\Shell Extension";
+const char *SHELLEXT_ROOT_REG = "Software\\Taskscape Ltd\\Servant Salamander\\Shell Extension";
 const char *SHELLEXT_CONTEXTMENU = "Context Menu";
 const char *SHELLEXT_VERSION = "Version";
 
@@ -434,12 +434,12 @@ BOOL CheckVersionOfDLL(const char* name)
 // - od verze 2.5 RC2 uz se nepouziva: - delete souboru z TEMPu (default value v HKEY_CLASSES_ROOT\CLSID\{C78B6131-F3EA-11D2-94A1-00E0292A01E3}\InProcServer32) (pocitat s tim, ze nemusi jit smazat hned - umet naplanovat po rebootu masiny)
 // - od verze 3.0 B1: pocitat s tim, ze utils\salextx86.dll a salextx64.dll nemusi jit smazat hned - umet naplanovat po rebootu masiny
 // - smazat HKEY_CLASSES_ROOT\CLSID\{C78B61??-F3EA-11D2-94A1-00E0292A01E3} (aktualni CLSID je v CLSID_ShellExtension)
-// - smazat HKEY_CLASSES_ROOT\Directory\shellex\CopyHookHandlers\AltapSalamander?? (aktualni jmeno klice je v SHEXREG_OPENSALAMANDER)
+// - smazat HKEY_CLASSES_ROOT\Directory\shellex\CopyHookHandlers\TaskscapeLtdSalamander?? (aktualni jmeno klice je v SHEXREG_OPENSALAMANDER)
 // - smazat v klici HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\Shell Extensions\Approved
 //   hodnotu {C78B61??-F3EA-11D2-94A1-00E0292A01E3} (aktualni CLSID je v CLSID_ShellExtension)
 // - je-li definovano makro ENABLE_SH_MENU_EXT:
-//   - smazat HKEY_CLASSES_ROOT\*\shellex\ContextMenuHandlers\AltapSalamander?? (aktualni jmeno klice je v SHEXREG_OPENSALAMANDER)
-//   - smazat HKEY_CLASSES_ROOT\Directory\shellex\ContextMenuHandlers\AltapSalamander?? (aktualni jmeno klice je v SHEXREG_OPENSALAMANDER)
+//   - smazat HKEY_CLASSES_ROOT\*\shellex\ContextMenuHandlers\TaskscapeLtdSalamander?? (aktualni jmeno klice je v SHEXREG_OPENSALAMANDER)
+//   - smazat HKEY_CLASSES_ROOT\Directory\shellex\ContextMenuHandlers\TaskscapeLtdSalamander?? (aktualni jmeno klice je v SHEXREG_OPENSALAMANDER)
 // - vse co bylo receno o klici HKEY_CLASSES_ROOT je potreba zkusit smazat tez z klice
 //   HKEY_CURRENT_USER\Software\Classes (vyuziva se pokud user nema prava pro zapis do
 //   HKEY_CLASSES_ROOT)
@@ -738,3 +738,4 @@ BOOL SECSetName(int index, const char* name)
 #endif // ENABLE_SH_MENU_EXT
 
 #endif //INSIDE_SALAMANDER
+

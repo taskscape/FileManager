@@ -1,4 +1,4 @@
-﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2023 Taskscape Ltd
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "precomp.h"
@@ -23,17 +23,17 @@ BOOL FirstInstance_3_or_later = FALSE;
 
 // process list is shared across all salamander instances in local session
 // from AS 3.0 we change the concept of "Break" event - it causes an exception in the target, so we have a "full-featured" bug report, but at the same time it ends the target
-// therefore I'm changing the following constants "AltapSalamander*" -> "AltapSalamander3*", so we are separated from older versions
+// therefore I'm changing the following constants "TaskscapeLtdSalamander*" -> "TaskscapeLtdSalamander3*", so we are separated from older versions
 
 // WARNING: when changing, salbreak.exe needs to be modified, just send me the info please ... thanks, Petr
 
-const char* AS_PROCESSLIST_NAME = "AltapSalamander3bProcessList";                               // shared memory CProcessList
-const char* AS_PROCESSLIST_MUTEX_NAME = "AltapSalamander3bProcessListMutex";                    // synchronization for access to shared memory
-const char* AS_PROCESSLIST_EVENT_NAME = "AltapSalamander3bProcessListEvent";                    // triggering event (what should be done is stored in shared memory)
-const char* AS_PROCESSLIST_EVENT_PROCESSED_NAME = "AltapSalamander3bProcessListEventProcessed"; // triggered event was processed
+const char* AS_PROCESSLIST_NAME = "TaskscapeLtdSalamander3bProcessList";                               // shared memory CProcessList
+const char* AS_PROCESSLIST_MUTEX_NAME = "TaskscapeLtdSalamander3bProcessListMutex";                    // synchronization for access to shared memory
+const char* AS_PROCESSLIST_EVENT_NAME = "TaskscapeLtdSalamander3bProcessListEvent";                    // triggering event (what should be done is stored in shared memory)
+const char* AS_PROCESSLIST_EVENT_PROCESSED_NAME = "TaskscapeLtdSalamander3bProcessListEventProcessed"; // triggered event was processed
 
-const char* FIRST_SALAMANDER_MUTEX_NAME = "AltapSalamanderFirstInstance";     // introduced from AS 2.52 beta 1
-const char* LOADSAVE_REGISTRY_MUTEX_NAME = "AltapSalamanderLoadSaveRegistry"; // introduced from AS 2.52 beta 1
+const char* FIRST_SALAMANDER_MUTEX_NAME = "TaskscapeLtdSalamanderFirstInstance";     // introduced from AS 2.52 beta 1
+const char* LOADSAVE_REGISTRY_MUTEX_NAME = "TaskscapeLtdSalamanderLoadSaveRegistry"; // introduced from AS 2.52 beta 1
 
 // path where we save bug report and minidump; later salmon packs it into 7z and uploads to server
 char BugReportPath[MAX_PATH] = "";

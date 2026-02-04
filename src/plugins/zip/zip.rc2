@@ -1,4 +1,4 @@
-﻿//
+//
 // zip.rc2 - resources Microsoft Visual C++ does not edit directly
 //
 
@@ -20,3 +20,4 @@ IDB_ZIP BITMAP "zip.bmp"
 // data
 ID_SFX_MANIFEST_REGULAR	RCDATA "sfxregul.xml"
 ID_SFX_MANIFEST_ADMIN	RCDATA "sfxadmin.xml"
+

@@ -1,4 +1,4 @@
-﻿[EXPORTINFO]
+[EXPORTINFO]
 PROJECTNAME,"translator\salamand 4.0\projects\czech\unchm.atp"
 TEXTVERSION,"1.03 (x86)"
 VERSION,"1,0,3,180"
@@ -6,7 +6,7 @@ VERSION,"1,0,3,180"
 [TRANSLATION]
 LANGID,1029
 AUTHOR,"Hynek Mikulič"
-WEB,"forum.altap.cz/viewtopic.php?f=23&t=7008"
+WEB,"/viewtopic.php?f=23&t=7008"
 COMMENT,"Česká verze"
 
 [STRINGTABLE 0]
@@ -23,7 +23,7 @@ COMMENT,"Česká verze"
 1009,1,"Prohlíží a extrahuje CHM soubory."
 1010,1,"Nelze vytvořit dočasný adresář."
 1011,1,"Nelze odstranit dočasný soubor."
-1012,1,"Neznámý formát souboru nebo neplatný CHM obraz.\n\nPokud jste si jistý, že je to platný CHM obraz, prosím kontaktujte support@altap.cz a pomůžete nám s podporou tohoto formátu."
+1012,1,"Neznámý formát souboru nebo neplatný CHM obraz.\n\nPokud jste si jistý, že je to platný CHM obraz, prosím kontaktujte support@taskscape.com a pomůžete nám s podporou tohoto formátu."
 1013,1,"Nelze otevřít tento soubor."
 1014,1,"Vytváření dočasného souboru selhalo."
 1015,1,"Nelze nastavit atributy souboru."

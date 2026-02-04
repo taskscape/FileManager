@@ -3,9 +3,9 @@
 // Count Lines of Text Files 
 //
 // Microsoft JScript for Open Salamander Automation plugin
-// Contact us on forum.altap.cz
+// Contact us 
 //
-// Copyright (c) 2010-2023 Open Salamander Authors
+// Copyright (c) 2010-2023 Taskscape Ltd
 //
 // Permission is hereby granted, free of charge, to any person
 // obtaining a copy of this software and associated documentation
@@ -53,7 +53,7 @@ var countWords = false;
 //   regular expressions, output log with opearation summary.
 //
 // Installation and Requirements:
-//   Install Open Salamander: https://www.altap.cz/
+//   Install Open Salamander: https://www.taskscape.com/
 //
 // Usage:
 //   In Open Salamander panel select files (or directories) you want to count
@@ -478,7 +478,7 @@ function CheckVersions()
     if (typeof(WScript) != "undefined")
     {
       var infText = "This script requires Open Salamander with Automation plugin installed.\n";
-      infText += "Please download latest version of Open Salamander from www.altap.cz.\n";
+      infText += "Please download latest version of Open Salamander from www.taskscape.com.\n";
       infText += "Install it and use menu Plugins > Automation > Run Focused Script to start this script.";
       try
       {

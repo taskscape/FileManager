@@ -1,4 +1,4 @@
-﻿//
+//
 // lang.rc2 - resources Microsoft Visual C++ does not edit directly
 //
 
@@ -49,3 +49,4 @@ STRINGTABLE
  IDS_MENUOPTIMIZE, "&Optimize PAK"
  IDS_EXPIRE, "Sorry, the plugin has expired. Please check our web site for newer version."
 }
+

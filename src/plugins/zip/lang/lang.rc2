@@ -1,4 +1,4 @@
-﻿//
+//
 // lang.rc2 - resources Microsoft Visual C++ does not edit directly
 //
 
@@ -244,3 +244,4 @@ STRINGTABLE
   IDS_SFX_COMMENT_WAITFOR3, ";In this manner behaves e.g like some versions of Install Shield.\r\n;This option is ignored unless 'remove_temp' is set to 1.\r\n\r\n"
   IDS_SFX_COMMENT_REQUIRESADMIN, "\r\n;requires administrative privileges to run on Windows Vista or later\r\n\r\n"
 }
+

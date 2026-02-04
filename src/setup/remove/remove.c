@@ -1,4 +1,4 @@
-﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2023 Taskscape Ltd
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "precomp.h"
@@ -901,8 +901,8 @@ BOOL DoRemoveRegKeys(BOOL removeConfiguration)
     char key[MAX_PATH];
     char tmp[MAX_PATH];
     const char* UNINSTALL_KEY = "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall";
-    const char* SALAMNDER_KEY_NEW = "Software\\Altap\\Altap Salamander";
-    const char* SALAMNDER_KEY_OLD = "Software\\Altap\\Servant Salamander";
+    const char* SALAMNDER_KEY_NEW = "Software\\Taskscape Ltd\\Open Salamander";
+    const char* SALAMNDER_KEY_OLD = "Software\\Taskscape Ltd\\Servant Salamander";
 
     line = RemoveRegKeys;
     while (*line != 0)
@@ -1003,7 +1003,7 @@ void DoRemoveWERLocalDump(const char* exeName)
     // http://msdn.microsoft.com/en-us/library/windows/desktop/aa384129%28v=vs.85%29.aspx
     // Note that bypassing the redirector also applies to doinst.c!
     HKEY hKey;
-    DWORD altapRefCount = 0xffffffff;
+    DWORD taskscapeRefCount = 0xffffffff;
     BOOL delExeKey = FALSE;
     REGSAM samDesired = 0;
     if (RemoveIsWow64())
@@ -1015,14 +1015,14 @@ void DoRemoveWERLocalDump(const char* exeName)
         if (RegOpenKeyEx(hKey, exeName, 0, samDesired | KEY_READ | KEY_WRITE, &hExeKey) == ERROR_SUCCESS)
         {
             DWORD dwType;
-            DWORD size = sizeof(altapRefCount);
-            const char* dumpFolder = "%LOCALAPPDATA%\\Altap\\Open Salamander";
+            DWORD size = sizeof(taskscapeRefCount);
+            const char* dumpFolder = "%LOCALAPPDATA%\\Taskscape Ltd\\Open Salamander";
             dwType = REG_DWORD;
-            if (RegQueryValueEx(hExeKey, "AltapRefCount", 0, &dwType, (BYTE*)&altapRefCount, &size) == ERROR_SUCCESS && dwType == REG_DWORD)
+            if (RegQueryValueEx(hExeKey, "TaskscapeLtdRefCount", 0, &dwType, (BYTE*)&taskscapeRefCount, &size) == ERROR_SUCCESS && dwType == REG_DWORD)
             {
-                if (altapRefCount != 0xffffffff && altapRefCount > 0)
-                    altapRefCount--;
-                if (altapRefCount == 0)
+                if (taskscapeRefCount != 0xffffffff && taskscapeRefCount > 0)
+                    taskscapeRefCount--;
+                if (taskscapeRefCount == 0)
                 {
                     // delete the entire key after closing it
                     delExeKey = TRUE;
@@ -1031,7 +1031,7 @@ void DoRemoveWERLocalDump(const char* exeName)
                 {
                     // store the new RefCount
                     dwType = REG_DWORD;
-                    RegSetValueEx(hExeKey, "AltapRefCount", 0, dwType, (const BYTE*)&altapRefCount, sizeof(altapRefCount));
+                    RegSetValueEx(hExeKey, "TaskscapeLtdRefCount", 0, dwType, (const BYTE*)&taskscapeRefCount, sizeof(taskscapeRefCount));
                 }
             }
             RegCloseKey(hExeKey);
@@ -1862,3 +1862,4 @@ BOOL DoUninstall(HWND hParent, BOOL* needRestart)
     return ret;
 }
 #endif //INSIDE_SETUP
+

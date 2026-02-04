@@ -1,4 +1,4 @@
-﻿[EXPORTINFO]
+[EXPORTINFO]
 PROJECTNAME,"translator\salamand 4.0\projects\slovak\uniso.atp"
 TEXTVERSION,"1.37 (x86)"
 VERSION,"1,3,7,180"
@@ -6,7 +6,7 @@ VERSION,"1,3,7,180"
 [TRANSLATION]
 LANGID,1051
 AUTHOR,"Roman Paholík"
-WEB,"forum.altap.cz/viewtopic.php?f=23&t=6167"
+WEB,"/viewtopic.php?f=23&t=6167"
 COMMENT,"Slovenská verzia"
 
 [DIALOG 1200]
@@ -32,7 +32,7 @@ COMMENT,"Slovenská verzia"
 1009,1,"Prehliada a extrahuje CD/DVD ISO obrazy."
 1010,1,"Nie je možné vytvoriť dočasný adresár."
 1011,1,"Nie je možné vymazať dočasný súbor."
-1012,1,"Neznámy formát súboru alebo neplatný ISO obraz.\n\nAk ste si jistý, že je to platný ISO obraz, prosím kontaktujte support@altap.cz a pomôžete nám s podporou tohto formátu."
+1012,1,"Neznámy formát súboru alebo neplatný ISO obraz.\n\nAk ste si jistý, že je to platný ISO obraz, prosím kontaktujte support@taskscape.com a pomôžete nám s podporou tohto formátu."
 1013,1,"Nie je možné otvoriť súbor '%s'."
 1014,1,"Vytváranie dočasného súboru zlyhalo."
 1015,1,"Nie je možné nastaviť atribúty súboru."
@@ -45,7 +45,7 @@ COMMENT,"Slovenská verzia"
 [STRINGTABLE 2]
 1024,1,"Pri načítaní viacsekciového obrazu vznikla neznáma chyba.\n\nZobrazujem len správne načítané sekcie."
 1025,1,"Neznámy typ stopy."
-1026,1,"Neznáma alokačná stratégia (%d).\n\nProsím kontaktujte support@altap.cz a pomôžete nám opraviť tento problém."
+1026,1,"Neznáma alokačná stratégia (%d).\n\nProsím kontaktujte support@taskscape.com a pomôžete nám opraviť tento problém."
 1027,1,"Neplatný formát .CCD súboru.\n\nZobraziť aj nekompletný obraz."
 1028,1,"Chýba .CCD súbor.\n\nZobraziť aj nekompletný obraz."
 1029,1,"Nie je možné načítať sektor #%08X."

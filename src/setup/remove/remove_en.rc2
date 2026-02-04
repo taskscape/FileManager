@@ -1,4 +1,4 @@
-﻿STRINGTABLE 
+STRINGTABLE 
 BEGIN
     IDS_REMOVE_SUCCESS      "The %s was successfully removed."
     IDS_REMOVE_TITLE        "Uninstall Application"
@@ -7,3 +7,4 @@ BEGIN
     IDS_REMOVE_DELETEFAILED "Cannot delete file\n%s\n\n%s"
     IDS_REMOVE_XPRUNASADMIN "If you have used some administrator account to install this application, you should use the same administrative account to uninstall it. You can choose account in the following Run As window."
 END
+

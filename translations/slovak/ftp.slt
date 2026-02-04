@@ -1,4 +1,4 @@
-﻿[EXPORTINFO]
+[EXPORTINFO]
 PROJECTNAME,"translator\salamand 4.0\projects\slovak\ftp.atp"
 TEXTVERSION,"1.35 (x86)"
 VERSION,"1,3,5,180"
@@ -6,7 +6,7 @@ VERSION,"1,3,5,180"
 [TRANSLATION]
 LANGID,1051
 AUTHOR,"Roman Paholík"
-WEB,"forum.altap.cz/viewtopic.php?f=23&t=6167"
+WEB,"/viewtopic.php?f=23&t=6167"
 COMMENT,"Slovenská verzia"
 
 [DIALOG 500]
@@ -1536,7 +1536,7 @@ COMMENT,"Slovenská verzia"
 10674,1,"Neplatný reťazec s textom mesiacov (formát: 12 mesiacov sa oddeľuje medzerou)."
 10680,1,"Stav automatickej detekcie obsahuje chybu.\n\nChyba: %s"
 10685,1,"Neznámy typ servera, nie je možné analyzovať text výpisu...\r\n"
-10686,1,"Nie je možné analyzovať výpis súborov a adresárov zo servera. V paneli bude zobrazený len čistý text výpisu.\n\nProsím skontrolujte naše web stránky pre novšiu verziu Open Salamandera. Ak používate poslednú verziu, prosím pošlite nám raw výpis (ak nie je dôverný; pravý klik v paneli > Zobraziť Raw výpis > Uložiť ako) na e-mail support@altap.cz. Prosím pomôžte nám s podporou ďalších typov serverov, ak je to možné."
+10686,1,"Nie je možné analyzovať výpis súborov a adresárov zo servera. V paneli bude zobrazený len čistý text výpisu.\n\nProsím skontrolujte naše web stránky pre novšiu verziu Open Salamandera. Ak používate poslednú verziu, prosím pošlite nám raw výpis (ak nie je dôverný; pravý klik v paneli > Zobraziť Raw výpis > Uložiť ako) na e-mail support@taskscape.com. Prosím pomôžte nám s podporou ďalších typov serverov, ak je to možné."
 10687,1,"Nie je možné analyzovať text výpisu používajúci vybraný typ servera...\r\n"
 
 [STRINGTABLE 42]

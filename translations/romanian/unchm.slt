@@ -1,4 +1,4 @@
-﻿[EXPORTINFO]
+[EXPORTINFO]
 PROJECTNAME,"translator\salamand 4.0\projects\romanian\unchm.atp"
 TEXTVERSION,"1.03 (x86)"
 VERSION,"1,0,3,180"
@@ -6,7 +6,7 @@ VERSION,"1,0,3,180"
 [TRANSLATION]
 LANGID,1048
 AUTHOR,"Ioan Stefancu, Donca Radu"
-WEB,"forum.altap.cz/viewtopic.php?f=23&t=6165"
+WEB,"/viewtopic.php?f=23&t=6165"
 COMMENT,"Versiunea romana"
 
 [STRINGTABLE 0]
@@ -23,7 +23,7 @@ COMMENT,"Versiunea romana"
 1009,1,"Rasfoieste si extrage fisierele CHM."
 1010,1,"Nu pot crea director temporar."
 1011,1,"Nu pot sterge fisier temporar."
-1012,1,"Format fisier necunoscut sau imagine CHM invalida.\n\nDaca esti sigur ca este o imagine CHM valida, va rugam sa ne contactati la support@altap.cz si sa ne ajutati sa suportam acest format."
+1012,1,"Format fisier necunoscut sau imagine CHM invalida.\n\nDaca esti sigur ca este o imagine CHM valida, va rugam sa ne contactati la support@taskscape.com si sa ne ajutati sa suportam acest format."
 1013,1,"Nu pot deschide acest fisier."
 1014,1,"Crearea fisierului temporar a esuat."
 1015,1,"Nu pot seta atribute fisier."

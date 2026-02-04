@@ -1,13 +1,13 @@
 0E
 
-"Önkitömörítõ ZIP archívum"
+"ï¿½nkitï¿½mï¿½rï¿½tï¿½ ZIP archï¿½vum"
 
-"Kitömöríti a ZIP archívumot."
+"Kitï¿½mï¿½rï¿½ti a ZIP archï¿½vumot."
 
-"Verzió 1.40"
+"Verziï¿½ 1.40"
 
-"Kitömörít"
+"Kitï¿½mï¿½rï¿½t"
 
-"Self-Extractor © 2000-2023 Open Salamander Authors"
+"Self-Extractor ï¿½ 2000-2023 Taskscape Ltd"
 
-"https://www.altap.cz"
+"https://www.taskscape.com"

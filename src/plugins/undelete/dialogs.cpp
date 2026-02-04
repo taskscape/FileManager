@@ -1,4 +1,4 @@
-﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2023 Taskscape Ltd
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "precomp.h"
@@ -545,7 +545,7 @@ void CConnectDialog::OnImageBrowse()
     openInfo.hwndOwner = HWindow;
     openInfo.lpstrFilter = "Image Files (*.img;*.ima)\0*.IMG;*.IMA\0AllFiles (*.*)\0*.*\0\0\0";
     openInfo.lpstrFile = Volume;
-    // TODO: this still feels wrong; when the volume is e.g. C:\Work\Altap\, the initial dir becomes garbage because of lpstrFile
+    // TODO: this still feels wrong; when the volume is e.g. C:\Work\Taskscape Ltd\, the initial dir becomes garbage because of lpstrFile
     openInfo.lpstrInitialDir = Volume;
     openInfo.nMaxFile = MAX_PATH;
     openInfo.Flags = OFN_FILEMUSTEXIST | OFN_READONLY;

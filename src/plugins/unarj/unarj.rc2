@@ -1,4 +1,4 @@
-﻿//
+//
 // unarj.rc2 - resources Microsoft Visual C++ does not edit directly
 //
 
@@ -11,3 +11,4 @@
 
 #include "versinfo.rh2"
 #include "versinfo.rc2"
+

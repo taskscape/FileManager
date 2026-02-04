@@ -1,4 +1,4 @@
-﻿//
+//
 // DiskMap.Global.rc2 - resources Microsoft Visual C++ does not edit directly
 //
 
@@ -26,5 +26,6 @@ IDR_CUSHIONDATA_LEGACY  CUSHIONDATA             "..\\DiskMap\\Resources\\plastic
 IDR_CUSHIONDATA_SLEEK   CUSHIONDATA             "..\\DiskMap\\Resources\\sleek2_mask.ztc"
 IDR_CUSHIONDATA_TEST    CUSHIONDATA             "..\\DiskMap\\Resources\\test_rgba.ztc"
 #endif
+
 
 

@@ -1,4 +1,4 @@
-﻿//
+//
 // undelete.rc2 - resources Microsoft Visual C++ does not edit directly
 //
 
@@ -15,3 +15,4 @@
 IDI_FS      ICON   "res/fs.ico"
 IDB_FS      BITMAP "res/fs.bmp"
 IDI_DELETED ICON   "res/deleted.ico"
+

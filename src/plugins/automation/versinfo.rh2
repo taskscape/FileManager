@@ -1,8 +1,8 @@
-﻿/*
+/*
 	Automation Plugin for Open Salamander
 	
 	Copyright (c) 2009-2023 Milan Kase <manison@manison.cz>
-	Copyright (c) 2010-2023 Open Salamander Authors
+	Copyright (c) 2010-2023 Taskscape Ltd
 	
 	versinfo.rh2
 	Defines for plugin.SPL and plugin.SLG VERSIONINFO look at shared\versinfo.rc2.
@@ -22,7 +22,7 @@
 
 #include "spl_vers.h" // get version and build numbers
 
-#define VERSINFO_COPYRIGHT   "Copyright © 2009-2023 Open Salamander Authors"
+#define VERSINFO_COPYRIGHT   "Copyright © 2009-2023 Taskscape Ltd"
 #define VERSINFO_COMPANY     "Open Salamander"
 
 #define VERSINFO_DESCRIPTION "Automation plugin for Open Salamander"
@@ -36,7 +36,7 @@
 #endif
 
 // for SLG translators
-#define VERSINFO_SLG_WEB     "www.altap.cz"
+#define VERSINFO_SLG_WEB     "www.taskscape.com"
 #define VERSINFO_SLG_COMMENT "English version"
 
 #endif // __AUTOMATION_VERSINFO_RH2

@@ -1,4 +1,4 @@
-﻿//
+//
 // folders.rc2 - resources Microsoft Visual C++ does not edit directly
 //
 
@@ -13,3 +13,4 @@
 #include "versinfo.rc2"
 
 IDB_FOLDERS BITMAP "res\\folders.bmp"
+

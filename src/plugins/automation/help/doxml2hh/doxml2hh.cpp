@@ -1,4 +1,4 @@
-﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2023 Taskscape Ltd
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 // doxml2hh.cpp : Defines the entry point for the console application.
@@ -27,7 +27,7 @@ static const TCHAR HTML_HEADER[] =
 
 static const TCHAR HTML_FOOTER[] =
     _T("\n</div> <!--page-->\n")
-    _T("<div class=\"footer\">&copy; 2023 Open Salamander Authors</div>\n")
+    _T("<div class=\"footer\">&copy; 2023 Taskscape Ltd</div>\n")
     _T("</div> <!--help_page-->\n")
     _T("</body>\n")
     _T("</html>\n");

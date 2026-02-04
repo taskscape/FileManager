@@ -1,13 +1,13 @@
 05
 
-"Samorozbalitelný ZIP archiv"
+"Samorozbalitelnï¿½ ZIP archiv"
 
-"Tento program rozbalí ZIP archiv."
+"Tento program rozbalï¿½ ZIP archiv."
 
 "Verze 1.40"
 
 "&Rozbalit"
 
-"Self-Extractor © 2000-2023 Open Salamander Authors"
+"Self-Extractor ï¿½ 2000-2023 Taskscape Ltd"
 
-"https://www.altap.cz"
+"https://www.taskscape.com"

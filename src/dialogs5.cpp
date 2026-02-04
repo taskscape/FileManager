@@ -1,4 +1,4 @@
-﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2023 Taskscape Ltd
 // SPDX-License-Identifier: GPL-2.0-or-later
 // CommentsTranslationProject: TRANSLATED
 
@@ -3653,7 +3653,7 @@ CCfgPageKeyboard::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         CHyperLink* hl = new CHyperLink(HWindow, IDC_KEYBOARD_SHORTCUTS);
         if (hl != NULL)
             hl->SetActionPostCommand(CM_HELP_KEYBOARD);
-        //        hl->SetActionOpen("https://www.altap.cz/salam_en/features/keyboard.html"); // beware, one more occurrence
+        //        hl->SetActionOpen("https://www.taskscape.com/salam_en/features/keyboard.html"); // beware, one more occurrence
         break;
     }
 

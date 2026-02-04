@@ -1,4 +1,4 @@
-﻿//
+//
 // wpd.rc2 - resources Microsoft Visual C++ does not edit directly
 //
 
@@ -15,3 +15,4 @@
 #include "fx.rh"
 
 IDB_FX_PLUGIN_ICONS         RCDATA                     "res\\portables.png"
+

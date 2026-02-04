@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2023 Taskscape Ltd
 // SPDX-License-Identifier: GPL-2.0-or-later
 // CommentsTranslationProject: TRANSLATED
 
@@ -639,11 +639,11 @@ void CImportConfigDialog::Transfer(CTransferInfo& ti)
         {
             if (ConfigurationExist[i])
             {
-                // detect whether this is "Open Salamander", "Altap Salamander", or the old "Servant Salamander"
+                // detect whether this is "Open Salamander", "Open Salamander", or the old "Servant Salamander"
                 BOOL openSalamander = StrIStr(SalamanderConfigurationRoots[i], "Open Salamander") != NULL;
-                BOOL altapSalamander = StrIStr(SalamanderConfigurationRoots[i], "Altap Salamander") != NULL;
+                BOOL taskscapeSalamander = StrIStr(SalamanderConfigurationRoots[i], "Open Salamander") != NULL;
                 const char* name = openSalamander    ? "Open Salamander %s"
-                                   : altapSalamander ? "Altap Salamander %s"
+                                   : taskscapeSalamander ? "Open Salamander %s"
                                                      : "Servant Salamander %s";
                 sprintf(buff, name, SalamanderConfigurationVersions[i]);
                 SendDlgItemMessage(HWindow, IDC_IMPORTCONFIG, CB_ADDSTRING, 0, (LPARAM)buff);
@@ -671,11 +671,11 @@ void CImportConfigDialog::Transfer(CTransferInfo& ti)
                 lvi.iSubItem = 0;
                 lvi.state = 0;
 
-                // detect whether this is "Open Salamander", "Altap Salamander", or the old "Servant Salamander"
+                // detect whether this is "Open Salamander", "Open Salamander", or the old "Servant Salamander"
                 BOOL openSalamander = StrIStr(SalamanderConfigurationRoots[i], "Open Salamander") != NULL;
-                BOOL altapSalamander = StrIStr(SalamanderConfigurationRoots[i], "Altap Salamander") != NULL;
+                BOOL taskscapeSalamander = StrIStr(SalamanderConfigurationRoots[i], "Open Salamander") != NULL;
                 const char* name = openSalamander    ? "Open Salamander %s"
-                                   : altapSalamander ? "Altap Salamander %s"
+                                   : taskscapeSalamander ? "Open Salamander %s"
                                                      : "Servant Salamander %s";
                 sprintf(buff, name, SalamanderConfigurationVersions[i]);
                 lvi.pszText = buff;
@@ -1018,7 +1018,7 @@ CLanguageSelectorDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
     {
 
         // JRY: For AS 2.53 which ships with Czech, German and English we send other translations to the "Translations" section on the forum
-        //     https://forum.altap.cz/viewforum.php?f=23 - in the hope that someone will be motivated to create a translation.
+        //     /viewforum.php?f=23 - in the hope that someone will be motivated to create a translation.
 
         // There is no download page for languages yet, so this button is disabled
         // EnableWindow(GetDlgItem(HWindow, IDB_GETMORELANGS), FALSE);
@@ -1081,7 +1081,7 @@ CLanguageSelectorDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         if (PluginName != NULL && LOWORD(wParam) == IDCANCEL)
             return 0;
         if (LOWORD(wParam) == IDB_GETMORELANGS)
-            ShellExecute(HWindow, "open", "https://forum.altap.cz/viewforum.php?f=23", NULL, NULL, SW_SHOWNORMAL);
+            ShellExecute(HWindow, "open", "/viewforum.php?f=23", NULL, NULL, SW_SHOWNORMAL);
         if (LOWORD(wParam) == IDB_REFRESHLANGS)
         {
             ListView_DeleteAllItems(HListView);

@@ -1,4 +1,4 @@
-﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2023 Taskscape Ltd
 // SPDX-License-Identifier: GPL-2.0-or-later
 // CommentsTranslationProject: TRANSLATED
 
@@ -389,8 +389,8 @@ BOOL CPluginFSInterface::GetNextDirectoryLineHotPath(const char* text, int pathL
             break;
         }
 
-        case ftpsptNetware: // "/pub/altap/salamand" or "\pub\altap\salamand"
-        case ftpsptWindows: // "/pub/altap/salamand" or "\pub\altap\salamand"
+        case ftpsptNetware: // "/pub/taskscape/salamand" or "\pub\taskscape\salamand"
+        case ftpsptWindows: // "/pub/taskscape/salamand" or "\pub\taskscape\salamand"
         case ftpsptOS2:     // e.g. C:/DIR1/DIR2 or C:\DIR1\DIR2
         {                   // the separators are '/' and '\\'
             if (*s == '/' || *s == '\\')
@@ -400,7 +400,7 @@ BOOL CPluginFSInterface::GetNextDirectoryLineHotPath(const char* text, int pathL
             break;
         }
 
-        default: // Unix and others: "/pub/altap/salamand" (but also "/\dir-with-backslash")
+        default: // Unix and others: "/pub/taskscape/salamand" (but also "/\dir-with-backslash")
         {        // the separator is '/'
             if (*s == '/')
                 s++;
@@ -577,8 +577,8 @@ BOOL CPluginFSInterface::GetPathForMainWindowTitle(const char* fsName, int mode,
                 break;
             }
 
-            case ftpsptNetware: // "/pub/altap/salamand" or "\pub\altap\salamand"
-            case ftpsptWindows: // "/pub/altap/salamand" or "\pub\altap\salamand"
+            case ftpsptNetware: // "/pub/taskscape/salamand" or "\pub\taskscape\salamand"
+            case ftpsptWindows: // "/pub/taskscape/salamand" or "\pub\taskscape\salamand"
             {                   // the separators are '/' and '\\'
                 if (path[0] == '/' || path[0] == '\\')
                     trimStart = path + 1;
@@ -624,7 +624,7 @@ BOOL CPluginFSInterface::GetPathForMainWindowTitle(const char* fsName, int mode,
                 break;
             }
 
-            default: // Unix and others: "/pub/altap/salamand" (but also "/\dir-with-backslash")
+            default: // Unix and others: "/pub/taskscape/salamand" (but also "/\dir-with-backslash")
             {        // the separator is '/'
                 if (path[0] == '/')
                     trimStart = path + 1;

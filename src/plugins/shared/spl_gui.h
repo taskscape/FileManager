@@ -1,9 +1,9 @@
-﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2023 Taskscape Ltd
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 //****************************************************************************
 //
-// Copyright (c) 2023 Open Salamander Authors
+// Copyright (c) 2023 Taskscape Ltd
 //
 // This is a part of the Open Salamander SDK library.
 //
@@ -231,7 +231,7 @@ public:
     // returns NULL if SetText has not been called yet and static control was without text
     virtual const char* WINAPI GetText() = 0;
 
-    // assigns action to open URL address (file="https://www.altap.cz") or
+    // assigns action to open URL address (file="https://www.taskscape.com") or
     // start program (file="C:\\TEST.EXE"); ShellExecute is called on parameter
     // with 'open' command.
     virtual void WINAPI SetActionOpen(const char* file) = 0;
@@ -1864,7 +1864,7 @@ public:
     // creates based on provided PNG resource; 'hInstance' and 'lpBitmapName' specify resource,
     // 'imageWidth' specifies width of one icon in points; on success returns TRUE, otherwise FALSE
     // note: PNG must be a strip of icons one row high
-    // note: PNG should be compressed using PNGSlim, see https://forum.altap.cz/viewtopic.php?f=15&t=3278
+    // note: PNG should be compressed using PNGSlim, see /viewtopic.php?f=15&t=3278
     virtual BOOL WINAPI CreateFromPNG(HINSTANCE hInstance, LPCTSTR lpBitmapName, int imageWidth) = 0;
 
     // replaces icon at given index with icon 'hIcon'; on success returns TRUE, otherwise FALSE
@@ -1878,7 +1878,7 @@ public:
     // (for example loaded from file) and 'rawPNGSize' specifies size of memory occupied by PNG in bytes,
     // 'imageWidth' specifies width of one icon in points; on success returns TRUE, otherwise FALSE
     // note: PNG must be a strip of icons one row high
-    // note: PNG should be compressed using PNGSlim, see https://forum.altap.cz/viewtopic.php?f=15&t=3278
+    // note: PNG should be compressed using PNGSlim, see /viewtopic.php?f=15&t=3278
     virtual BOOL WINAPI CreateFromRawPNG(const void* rawPNG, DWORD rawPNGSize, int imageWidth) = 0;
 
     // creates as copy of another (created) icon list; if 'grayscale' is TRUE,

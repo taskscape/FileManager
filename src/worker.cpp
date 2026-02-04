@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2023 Taskscape Ltd
 // SPDX-License-Identifier: GPL-2.0-or-later
 // CommentsTranslationProject: TRANSLATED
 
@@ -2865,7 +2865,7 @@ COPY_ADS_AGAIN:
 
                             HANDLES(CloseHandle(in));
                             if (!HANDLES(CloseHandle(out))) // even after a failed call we assume the handle is closed,
-                            {                               // see https://forum.altap.cz/viewtopic.php?f=6&t=8455
+                            {                               // see /viewtopic.php?f=6&t=8455
                                 in = out = NULL;            // (reports that the target file can be deleted, so its handle was not left open)
                                 written = read = 0;
                                 goto WRITE_ERROR_ADS;
@@ -7714,7 +7714,7 @@ CONVERT_AGAIN:
                         // do not reuse operationDone so the progress stays correct even if the file changes "under our feet"
                         HANDLES(CloseHandle(hSource));
                         if (!HANDLES(CloseHandle(hTarget))) // even after a failed call we assume the handle is closed,
-                        {                                   // see https://forum.altap.cz/viewtopic.php?f=6&t=8455
+                        {                                   // see /viewtopic.php?f=6&t=8455
                             hSource = hTarget = NULL;       // (it states that the target file can be deleted, so the handle was not left open)
                             goto WRITE_ERROR_CONVERT;
                         }

@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <AutoVisualizer xmlns="http://schemas.microsoft.com/vstudio/debugger/natvis/2010">
-  <!--ALTAP's data arrays (TDirectArray and TIndirectArray)-->
+  <!--Taskscape Ltd's data arrays (TDirectArray and TIndirectArray)-->
   <Type Name="TDirectArray&lt;*&gt;">
     <DisplayString Condition="State != 0">TDirectArray in Error State: {State}</DisplayString>
     <DisplayString Condition="Count == 0">TDirectArray empty</DisplayString>

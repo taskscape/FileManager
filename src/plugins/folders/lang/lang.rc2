@@ -1,4 +1,4 @@
-﻿//
+//
 // lang.rc2 - resources Microsoft Visual C++ does not edit directly
 //
 
@@ -20,3 +20,4 @@ STRINGTABLE
     IDS_PLUGIN_DESCRIPTION      "Browse folders such as Desktop, Control Panel, Recycle Bin, etc."
     IDS_DRIVEMENUTEXT,          "'\tDesktop"
 }
+

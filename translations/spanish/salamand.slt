@@ -1,4 +1,4 @@
-﻿[EXPORTINFO]
+[EXPORTINFO]
 PROJECTNAME,"translator\salamand 4.0\projects\spanish\salamand.atp"
 TEXTVERSION,"4.0 (x86)"
 VERSION,"4,0,0,180"
@@ -6,7 +6,7 @@ VERSION,"4,0,0,180"
 [TRANSLATION]
 LANGID,3082
 AUTHOR,"Juan Pablo Barrio Lera"
-WEB,"forum.altap.cz/viewtopic.php?f=23&t=6168"
+WEB,"/viewtopic.php?f=23&t=6168"
 COMMENT,"Versión en español"
 HELPDIR,"ENGLISH"
 SLGINCOMPLETE,""
@@ -299,9 +299,9 @@ SLGINCOMPLETE,""
 290,174,1,123,104,1,""
 1,124,162,50,14,1,"Cerrar"
 271,10,87,201,8,1,"Versión"
-1150,10,97,216,8,1,"Copyright © 1997-2023 Open Salamander Authors"
+1150,10,97,216,8,1,"Copyright © 1997-2023 Taskscape Ltd"
 1152,10,108,20,8,1,"Web:"
-272,31,108,64,8,1,"www.altap.cz"
+272,31,108,64,8,1,"www.taskscape.com"
 286,2,154,294,1,1,""
 
 [DIALOG 300]
@@ -1063,7 +1063,7 @@ SLGINCOMPLETE,""
 2,97,57,50,14,1,"&Salir"
 1,154,57,50,14,1,"&Continuar"
 1150,10,10,282,8,1,"Esta versión beta ha expirado. Por favor, descargue e instale la versión actualizada:"
-1142,10,23,282,8,1,"www.altap.cz/salamander/downloads/beta"
+1142,10,23,282,8,1,"www.taskscape.com/salamander/downloads/beta"
 1141,10,36,282,16,1,"Hoy es %s y esta versión expiró el %s."
 
 [DIALOG 2300]
@@ -3236,7 +3236,7 @@ SLGINCOMPLETE,""
 13743,1,"&No presentar este mensaje para otros plugins"
 
 [STRINGTABLE 136]
-13750,1,"La configuración guardada en el registro está mal, y no puede ser cargada. Open Salamander probablemente se cerró mientras guardaba la configuración. Esto suele pasar cuando Open Salamander todavía está en uso cuando apaga Windows (o cierra la sesión). Para impedir este problema, cierre Open Salamander antes de apagar (o cerrar sesión).\n\nPuede salvar copia de la configuración ahora (ejecute RegEdit.exe, cambie de nombre la clave HKEY_CURRENT_USER\\%s). Más tarde puede intentar conseguir parte de la configuración de esta copia Menú´de usuario, rutas rápidas, marcas FTP, etc.); visite forum.altap.cz para detalles.\n\nLa configuración errónea debe ser retirada del registro antes de iniciar Open Salamander."
+13750,1,"La configuración guardada en el registro está mal, y no puede ser cargada. Open Salamander probablemente se cerró mientras guardaba la configuración. Esto suele pasar cuando Open Salamander todavía está en uso cuando apaga Windows (o cierra la sesión). Para impedir este problema, cierre Open Salamander antes de apagar (o cerrar sesión).\n\nPuede salvar copia de la configuración ahora (ejecute RegEdit.exe, cambie de nombre la clave HKEY_CURRENT_USER\\%s). Más tarde puede intentar conseguir parte de la configuración de esta copia Menú´de usuario, rutas rápidas, marcas FTP, etc.); visite  para detalles.\n\nLa configuración errónea debe ser retirada del registro antes de iniciar Open Salamander."
 13751,1,"Está usando valores no estándar para los siguientes parámetros durante el apagado y cierre de sesión. Probablemente cause alteración de la configuración de Open Salamander (termina durante la grabación de la configuración).\n\nHKEY_CURRENT_USER\\Control Panel\\Desktop\\WaitToKillAppTimeout debería ser 20000.\nHKEY_CURRENT_USER\\Control Panel\\Desktop\\AutoEndTasks debería ser 0."
 13752,1,"&Eliminar configuración"
 13755,1,"Por favor, espeficique si quiere comparar ficheros o directorios."
@@ -3281,7 +3281,7 @@ SLGINCOMPLETE,""
 [STRINGTABLE 143]
 13856,1,"Descripción"
 13857,1,"Los cambios de transparencia de iconos no tendrán efecto hasta que se reinicie Open Salamander."
-13865,1,"Open Salamander se ha vuelto inestable. Ha ocurrido una excepción no gestionada en el gestor de iconos %s. Puede impedir cuelgues similares si Open Salamander no usa este gestor (pulse botón Este) o deja de presentar iconos personalizados (pulsar botón Todos). Puede intentar también actualizar el software que provee este gestor (busque en  forum.altap.cz más detalles).\n\n¿Qué gestores de iconos desea deshabilitar?\n\nNota: puede disponer transparencias de iconos en el diálogo configuración (ver página Transparencia de iconos)."
+13865,1,"Open Salamander se ha vuelto inestable. Ha ocurrido una excepción no gestionada en el gestor de iconos %s. Puede impedir cuelgues similares si Open Salamander no usa este gestor (pulse botón Este) o deja de presentar iconos personalizados (pulsar botón Todos). Puede intentar también actualizar el software que provee este gestor (busque en   más detalles).\n\n¿Qué gestores de iconos desea deshabilitar?\n\nNota: puede disponer transparencias de iconos en el diálogo configuración (ver página Transparencia de iconos)."
 13866,1,"&Este"
 13867,1,"&Todos"
 13870,1,"El fichero config.reg (u otro fichero especificado con parámetro -c) no fue importado al registro por haber importado la configuración de una versión anterior de Open Salamander. Salga de Open Salamander ahora y reinicielo para resolver este problema."
@@ -3403,11 +3403,11 @@ SLGINCOMPLETE,""
 [STRINGTABLE 156]
 14064,1,"Cargando, espere por favor..."
 14065,1,"El informe ha sido cargado con éxito.\n\nGracias por ayudarnos a mejorar Open Salamander!"
-14066,1,"La carga del informe ha fallado; razón: %s\n\nPor favor, envíenos el informe por email a support@altap.cz y bórrelo de su disco. Pulse OK para ver el informe."
-14067,1,"La compresión del informe ha fallado; razón: %s\n\nPor favor, comprima su informe de fallos usando 7-Zip, envíelo por email a support@altap.cz, y borre el fichero de su disco. Pulse OK para ver el informe."
+14066,1,"La carga del informe ha fallado; razón: %s\n\nPor favor, envíenos el informe por email a support@taskscape.com y bórrelo de su disco. Pulse OK para ver el informe."
+14067,1,"La compresión del informe ha fallado; razón: %s\n\nPor favor, comprima su informe de fallos usando 7-Zip, envíelo por email a support@taskscape.com, y borre el fichero de su disco. Pulse OK para ver el informe."
 14068,1,"La carga de %s ha fallado."
 14070,1,"Esta es una utilidad interna de Open Salamander, no la inicie directamente."
-14071,1,"Versión incorrecta del Informador de Fallos de Open Salamander . Por favor, contactge con nosotros en support@altap.cz."
+14071,1,"Versión incorrecta del Informador de Fallos de Open Salamander . Por favor, contactge con nosotros en support@taskscape.com."
 14072,1,"Ha surgido un problema, forzando el cierre de Open Salamander.\nCreando informe de fallos, espere por favor..."
 14073,1,"Ha ocurrido algún problema durante la creación del informe de fallos:\n%s"
 14074,1,"No es posible crear el fichero de minidump %s. Código: %d."

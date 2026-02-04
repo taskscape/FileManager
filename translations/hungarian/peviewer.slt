@@ -1,4 +1,4 @@
-﻿[EXPORTINFO]
+[EXPORTINFO]
 PROJECTNAME,"translator\salamand 4.0\projects\hungarian\peviewer.atp"
 TEXTVERSION,"3.0 (x86)"
 VERSION,"3,0,0,180"
@@ -6,7 +6,7 @@ VERSION,"3,0,0,180"
 [TRANSLATION]
 LANGID,1038
 AUTHOR,"Török József"
-WEB,"forum.altap.cz/viewtopic.php?f=23&t=6164"
+WEB,"/viewtopic.php?f=23&t=6164"
 COMMENT,"Magyar változat"
 
 [DIALOG 8501]
@@ -30,7 +30,7 @@ COMMENT,"Magyar változat"
 10100,1,"Hordozható futtatható néző"
 10101,1,"A(z) %s nem nyitható meg."
 10102,1,"Ideiglenes fájl létrehozása sikertelen."
-10103,1,"Kivétel lépett fel.\n\nNézett fájl: %s\n\nHa biztos, hogy a megnézett fájl nem sérült, küldje el a fájlt a support@altap.cz címre.\nÚjra előidézzük és kijavítjuk a hibát. Köszönjük az együttműködését!"
+10103,1,"Kivétel lépett fel.\n\nNézett fájl: %s\n\nHa biztos, hogy a megnézett fájl nem sérült, küldje el a fájlt a support@taskscape.com címre.\nÚjra előidézzük és kijavítjuk a hibát. Köszönjük az együttműködését!"
 10104,1,"Olyan futtatható fájlok információinak megjelenítése, mint EXE, DLL, stb."
 
 [STRINGTABLE 2]

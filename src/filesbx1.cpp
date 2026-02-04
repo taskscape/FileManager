@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2023 Taskscape Ltd
 // SPDX-License-Identifier: GPL-2.0-or-later
 // CommentsTranslationProject: TRANSLATED
 
@@ -1638,7 +1638,7 @@ CFilesBox::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         // I disabled the hook and now we must capture messages in windows that can have focus
         // so they can be forwarded.
         // 30.11.2012 - on our forum a user reported WM_MOUSEHWHEEL not passing through the message hook (same as before
-        // in Manison's case): https://forum.altap.cz/viewtopic.php?f=24&t=6039
+        // in Manison's case): /viewtopic.php?f=24&t=6039
         // therefore we will now also catch the message in individual windows where it can potentially appear (depending on focus)
         // and then route it so that it is delivered to the window under the cursor, as we always did
 

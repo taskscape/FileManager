@@ -52,7 +52,7 @@ Use ```\src\vcxproj\!populate_build_dir.cmd``` to populate build directory with 
 
 To create a standalone self-extracting installer (EXE) for distribution:
 
-1. **Prepare files:** Ensure the `Instalator` directory contains the latest build of `salamand.exe`, `salmon.exe`, and other required files.
+1. **Prepare files:** Ensure the `Installer` directory contains the latest build of `salamand.exe`, `salmon.exe`, and other required files.
 2. **Run the script:** Use the provided PowerShell script in the `tools` directory.
 
 ```powershell

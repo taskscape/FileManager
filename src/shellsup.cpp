@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2023 Taskscape Ltd
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "precomp.h"
@@ -1071,7 +1071,7 @@ BOOL ResourceGetDialogName(WCHAR* buff, int buffSize, char* name, int nameMax)
     if (style != 0xffff0001)
     {
         TRACE_E("ResourceGetDialogName(): resource is not DLGTEMPLATEEX!");
-        // reading classic DLGTEMPLATE see altap translator, but probably won't need to implement
+        // reading classic DLGTEMPLATE see taskscape translator, but probably won't need to implement
         return FALSE;
     }
 
@@ -2599,7 +2599,7 @@ BOOL CanUseShellExecuteWndAsParent(const char* cmdName)
         return FALSE;
 
     // pod Windows 8 zlobilo Open With - pri volbe vlastniho programu se nezobrazil Open dialog
-    // https://forum.altap.cz/viewtopic.php?f=16&t=6730 a https://forum.altap.cz/viewtopic.php?t=6782
+    // /viewtopic.php?f=16&t=6730 a /viewtopic.php?t=6782
     // problem je tam v tom, ze se kod vrati z invoke, ale pozdeji si MS sahnou na parent okno, ktere my uz mame zrusene
     // TODO: nabizelo by se reseni, kdy bychom ShellExecuteWnd nechavali zit (child okno, roztazene pres celou plochu Salama, uplne na jeho pozadi)
     // pouze bychom si vzdy pred jeho predanim overili, ze zije (ze ho nekdo nestrelil)

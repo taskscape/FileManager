@@ -1,4 +1,4 @@
-﻿//
+//
 // lang.rc2 - resources Microsoft Visual C++ does not edit directly
 //
 
@@ -169,3 +169,4 @@ STRINGTABLE
   IDS_COPYPATH, "Copy Full Path as Text"
   IDS_BUSY, "Open Salamander is busy. The requested command cannot be accomplished, please try it again later."
 }
+

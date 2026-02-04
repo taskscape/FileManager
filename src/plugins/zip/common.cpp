@@ -1,4 +1,4 @@
-﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2023 Taskscape Ltd
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "precomp.h"
@@ -52,7 +52,7 @@ const CConfiguration DefConfig =
         0,                            //config version (0 - default; 1 - beta 3; 2 - beta 4)
         "english.sfx",                //default sfx package
         "",                           //default path to export sfx settings to
-        0,                            //current version of Altap Salamander, will be set elsewhere
+        0,                            //current version of Open Salamander, will be set elsewhere
         CLR_ASK,                      // ChangeLangReaction, viz CLR_xxx
         TRUE,                         // winzip compatible multi-volume archive names
         // Custom columns:

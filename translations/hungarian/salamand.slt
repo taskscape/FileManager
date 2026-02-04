@@ -1,4 +1,4 @@
-﻿[EXPORTINFO]
+[EXPORTINFO]
 PROJECTNAME,"translator\salamand 4.0\projects\hungarian\salamand.atp"
 TEXTVERSION,"4.0 (x86)"
 VERSION,"4,0,0,180"
@@ -6,7 +6,7 @@ VERSION,"4,0,0,180"
 [TRANSLATION]
 LANGID,1038
 AUTHOR,"Török József"
-WEB,"forum.altap.cz/viewtopic.php?f=23&t=6164"
+WEB,"/viewtopic.php?f=23&t=6164"
 COMMENT,"Magyar változat"
 HELPDIR,"ENGLISH"
 SLGINCOMPLETE,""
@@ -299,9 +299,9 @@ SLGINCOMPLETE,""
 290,174,1,123,104,1,""
 1,124,162,50,14,1,"Bezárás"
 271,10,87,201,8,1,"Verzió"
-1150,10,97,196,8,1,"Copyright © 1997-2023 Open Salamander Authors"
+1150,10,97,196,8,1,"Copyright © 1997-2023 Taskscape Ltd"
 1152,10,108,20,8,1,"Web:"
-272,31,108,64,8,1,"www.altap.cz"
+272,31,108,64,8,1,"www.taskscape.com"
 286,2,154,294,1,1,""
 
 [DIALOG 300]
@@ -1063,7 +1063,7 @@ SLGINCOMPLETE,""
 2,92,57,50,14,1,"K&ilépés"
 1,149,57,50,14,1,"&Folytatás"
 1150,10,10,274,8,1,"A béta verzió lejárt. Kérem töltse le és telepítse a frissített béta verziót:"
-1142,10,23,274,8,1,"www.altap.cz/salamander/downloads/beta"
+1142,10,23,274,8,1,"www.taskscape.com/salamander/downloads/beta"
 1141,10,36,274,16,1,"Mai dátum: %s. Ezen verzió a következő napon járt le: %s."
 
 [DIALOG 2300]
@@ -3236,7 +3236,7 @@ SLGINCOMPLETE,""
 13743,1,"&Ne mutassa az üzenetet a többi plugin-nál"
 
 [STRINGTABLE 136]
-13750,1,"A beállítást tároló regisztrációs bejegyzés sérült és nem tölthető be. Az Open Salamander valószínűleg leállt a beállítások mentése közben. Ez történik, ha az Open Salamander még fut, mikor leállítja a rendszert (vagy kijelentkezik). Hogy megelőzze a problémát, zárja be az Open Salamander-t a leállítás előtt (vagy kijelentkezésnél).\n\nMost készíthet biztonsági mentést a beállításokról (RegEdit.exe futtatása, kulcs átnevezése: HKEY_CURRENT_USER\\%s). Később kinyerhet a mentésből néhány beállítást (Egyéni menü, Gyors elérések, FTP könyvjelzők, stb.), részletek a forum.altap.cz oldalon.\n\nA sérült beállítások törlődnek a regisztrációs adatbázisból."
+13750,1,"A beállítást tároló regisztrációs bejegyzés sérült és nem tölthető be. Az Open Salamander valószínűleg leállt a beállítások mentése közben. Ez történik, ha az Open Salamander még fut, mikor leállítja a rendszert (vagy kijelentkezik). Hogy megelőzze a problémát, zárja be az Open Salamander-t a leállítás előtt (vagy kijelentkezésnél).\n\nMost készíthet biztonsági mentést a beállításokról (RegEdit.exe futtatása, kulcs átnevezése: HKEY_CURRENT_USER\\%s). Később kinyerhet a mentésből néhány beállítást (Egyéni menü, Gyors elérések, FTP könyvjelzők, stb.), részletek a  oldalon.\n\nA sérült beállítások törlődnek a regisztrációs adatbázisból."
 13751,1,"Nem elfogadott paraméterértékeket használ a Kijelentkezés és Lekapcsolás során. Valószínűleg megsérült az Open Salamander beállítása (megszakadt a beállítások mentése közben).\n\nHKEY_CURRENT_USER\\Control Panel\\Desktop\\WaitToKillAppTimeout értékének 20000-nek kellene lennie.\nHKEY_CURRENT_USER\\Control Panel\\Desktop\\AutoEndTasks értékének 0-nak kellene lennie."
 13752,1,"Beállítás tö&rlése"
 13755,1,"Adja meg, ha fájlokat vagy mappákat akar összehasonlítani."
@@ -3281,7 +3281,7 @@ SLGINCOMPLETE,""
 [STRINGTABLE 143]
 13856,1,"Leírás"
 13857,1,"Ikon felülírások nem jelennek meg az Open Salamander újraindításáig."
-13865,1,"Az Open Salamander instabillá vált. Egy kezelhetetlen kivétel lépett fel a(z) %s ikon felülírás kezelőben. Megakadályozhatja a hasonló összeomlásokat, ha az Open Salamander nem használja többet ezt a kezelőt (Ezt gomb) vagy leállítva az összes egyéni ikon megjelenítőt (Mind gomb). Megpróbálhatja a szoftvert frissíteni, a kezelőtől függően (részleteket a forum.altap.cz oldalon keressen).\n\nMelyik ikon felülírási kezelőt akarja kikapcsolni?\n\nMegj.: a beállítások ablakban módosíthatja az ikon felülírásokat (Ikon felülírások oldal)."
+13865,1,"Az Open Salamander instabillá vált. Egy kezelhetetlen kivétel lépett fel a(z) %s ikon felülírás kezelőben. Megakadályozhatja a hasonló összeomlásokat, ha az Open Salamander nem használja többet ezt a kezelőt (Ezt gomb) vagy leállítva az összes egyéni ikon megjelenítőt (Mind gomb). Megpróbálhatja a szoftvert frissíteni, a kezelőtől függően (részleteket a  oldalon keressen).\n\nMelyik ikon felülírási kezelőt akarja kikapcsolni?\n\nMegj.: a beállítások ablakban módosíthatja az ikon felülírásokat (Ikon felülírások oldal)."
 13866,1,"&Ezt"
 13867,1,"&Mind"
 13870,1,"A config.reg fájl (vagy egyéb -c paraméterrel megadott fájl) nem importálható a regisztrációs bejegyzésekbe, mert egy régebbi Open Salamander verzió beállításait tartalmazza. Most lépjen ki az Open Salamander-ből és indítsa újra a probléma megoldásához."
@@ -3403,11 +3403,11 @@ SLGINCOMPLETE,""
 [STRINGTABLE 156]
 14064,1,"Feltöltés, kérem várjon..."
 14065,1,"Jelentés sikeresen feltöltve.\n\nKöszönjük, hogy segít nekünk az Open Salamander tökéletesítésében!"
-14066,1,"Jelentés feltöltése sikertelen, oka: %s\n\nKérem küldje el a jelentést a support@altap.cz e-mail címre és törölje azt a gépről. Jelentés megjelenítéséhez OK gomb."
-14067,1,"Jelentés tömörítése sikertelen, oka: %s\n\nKérem tömörítse be a hibajelentést 7-Zip segítségével, küldje el a support@altap.cz e-mail címre, és törölje azt a gépről. Jelentés megjelenítéséhez OK gomb."
+14066,1,"Jelentés feltöltése sikertelen, oka: %s\n\nKérem küldje el a jelentést a support@taskscape.com e-mail címre és törölje azt a gépről. Jelentés megjelenítéséhez OK gomb."
+14067,1,"Jelentés tömörítése sikertelen, oka: %s\n\nKérem tömörítse be a hibajelentést 7-Zip segítségével, küldje el a support@taskscape.com e-mail címre, és törölje azt a gépről. Jelentés megjelenítéséhez OK gomb."
 14068,1,"Betöltés sikertelen: %s."
 14070,1,"Ez egy belső Open Salamander segédprogram, ne közvetlen futtassa."
-14071,1,"Helytelen Open Salamander Bug Reporter verzió. Értesítsen minket a support@altap.cz e-mail címen."
+14071,1,"Helytelen Open Salamander Bug Reporter verzió. Értesítsen minket a support@taskscape.com e-mail címen."
 14072,1,"Probléma lépett fel, bezárásra kényszerítve az Open Salamander-t.\nHibajelentés készítése, kérem várjon..."
 14073,1,"Problémák léptek fel a hibajelentés készítése közben:\n%s"
 14074,1,"Minidump fájl létrehozása sikertelen: %s. Kód: %d."

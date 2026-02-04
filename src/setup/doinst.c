@@ -1,4 +1,4 @@
-﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2023 Taskscape Ltd
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "precomp.h"
@@ -2211,7 +2211,7 @@ void AddWERLocalDump(const char* exeName)
     // Note that bypassing the redirector also applies to remove.c!
     HKEY hKey;
     DWORD dwDisposition;
-    DWORD altapRefCount = 0;
+    DWORD taskscapeRefCount = 0;
     REGSAM samDesired = 0;
     if (IsWow64())
         samDesired = KEY_WOW64_64KEY;
@@ -2230,15 +2230,15 @@ void AddWERLocalDump(const char* exeName)
             // if the key already existed, read the reference count
             if (dwDisposition == REG_OPENED_EXISTING_KEY)
             {
-                DWORD size = sizeof(altapRefCount);
+                DWORD size = sizeof(taskscapeRefCount);
                 dwType = REG_DWORD;
-                if (RegQueryValueEx(hExeKey, "AltapRefCount", 0, &dwType, (BYTE*)&altapRefCount, &size) != ERROR_SUCCESS || dwType != REG_DWORD)
-                    altapRefCount = 0;
+                if (RegQueryValueEx(hExeKey, "TaskscapeLtdRefCount", 0, &dwType, (BYTE*)&taskscapeRefCount, &size) != ERROR_SUCCESS || dwType != REG_DWORD)
+                    taskscapeRefCount = 0;
             }
-            altapRefCount++;
+            taskscapeRefCount++;
 
             dwType = REG_DWORD;
-            RegSetValueEx(hExeKey, "AltapRefCount", 0, dwType, (const BYTE*)&altapRefCount, sizeof(altapRefCount));
+            RegSetValueEx(hExeKey, "TaskscapeLtdRefCount", 0, dwType, (const BYTE*)&taskscapeRefCount, sizeof(taskscapeRefCount));
             dumpCount = 50;
             RegSetValueEx(hExeKey, "DumpCount", 0, dwType, (const BYTE*)&dumpCount, sizeof(dumpCount));
             dumpType = 0; // custom dump type
@@ -3007,3 +3007,4 @@ BOOL DoInstallation()
 
     return TRUE;
 }
+

@@ -1,4 +1,4 @@
-﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2023 Taskscape Ltd
 // SPDX-License-Identifier: GPL-2.0-or-later
 // CommentsTranslationProject: TRANSLATED
 
@@ -9,7 +9,7 @@
 // ****************************************************************************
 
 // if defined, DATACON_SNDBUF_SIZE and DATACON_RCVBUF_SIZE are set for data connections
-// solves the problem: https://forum.altap.cz/viewtopic.php?f=6&t=31923
+// solves the problem: /viewtopic.php?f=6&t=31923
 // help for the forum: ver1 = 8k (version without setting buffers), ver2 = 4m (4MB RECV buffer, 256KB SEND buffer)
 #define DATACON_USES_OUR_BUF_SIZES
 

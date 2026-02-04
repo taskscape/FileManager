@@ -1,4 +1,4 @@
-﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2023 Taskscape Ltd
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "precomp.h"
@@ -362,7 +362,7 @@ BOOL CData::LoadSalMenu(const char* fileName)
     if (parserState.Errors > 0)
     {
         wchar_t err[1000];
-        swprintf_s(err, L"SalMenu: found %d error(s). Please contact ALTAP for updated .mnu files.", parserState.Errors);
+        swprintf_s(err, L"SalMenu: found %d error(s). Please contact Taskscape Ltd for updated .mnu files.", parserState.Errors);
         OutWindow.AddLine(err, mteSummary);
     }
 

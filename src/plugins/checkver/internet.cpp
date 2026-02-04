@@ -1,4 +1,4 @@
-﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2023 Taskscape Ltd
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "precomp.h"
@@ -9,10 +9,10 @@
 #include "checkver.rh2"
 #include "lang\lang.rh"
 
-const char* SCRIPT_URL_FTP_EN = "ftp://ftp.altap.cz/pub/altap/salamand/checkver/salupdate40_en.txt";
-const char* SCRIPT_URL_FTP_CZ = "ftp://ftp.altap.cz/pub/altap/salamand/checkver/salupdate40_cz.txt";
-const char* SCRIPT_URL_HTTP = "https://www.altap.cz/salupdate40/";
-const char* SCRIPT_URL_HTTP_AFTERINSTALL = "https://www.altap.cz/salupdatenew40/";
+const char* SCRIPT_URL_FTP_EN = "ftp://ftp.taskscape.com/pub/taskscape/salamand/checkver/salupdate40_en.txt";
+const char* SCRIPT_URL_FTP_CZ = "ftp://ftp.taskscape.com/pub/taskscape/salamand/checkver/salupdate40_cz.txt";
+const char* SCRIPT_URL_HTTP = "https://www.taskscape.com/salupdate40/";
+const char* SCRIPT_URL_HTTP_AFTERINSTALL = "https://www.taskscape.com/salupdatenew40/";
 
 const char* AGENT_NAME = "Open Salamander CheckVer Plugin";
 

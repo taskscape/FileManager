@@ -1,4 +1,4 @@
-﻿//
+//
 // mmviewer.rc2 - resources Microsoft Visual C++ does not edit directly
 //
 
@@ -46,3 +46,4 @@ BEGIN
     VK_SPACE,       CM_FILE_NEXT, VIRTKEY, NOINVERT
     VK_SPACE,       CM_FILE_LAST, SHIFT, VIRTKEY, NOINVERT
 END
+

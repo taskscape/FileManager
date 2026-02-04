@@ -1,4 +1,4 @@
-﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2023 Taskscape Ltd
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "precomp.h"
@@ -443,7 +443,7 @@ BOOL C__Trace::Connect(BOOL onUserRequest)
             WCHAR* s = tmpDir + wcslen(tmpDir);
             if (s > tmpDir && *(s - 1) != L'\\')
                 *s++ = L'\\';
-            lstrcpynW(s, L"altap_traces", int(end - s));
+            lstrcpynW(s, L"taskscape_traces", int(end - s));
             s += wcslen(s);
 
             if ((s - tmpDir) + 15 < MAX_PATH) // enough space to append "_2000000000.log"

@@ -1,4 +1,4 @@
-﻿[EXPORTINFO]
+[EXPORTINFO]
 PROJECTNAME,"translator\salamand 4.0\projects\german\mmviewer.atp"
 TEXTVERSION,"1.16 (x86)"
 VERSION,"1,1,6,180"
@@ -6,7 +6,7 @@ VERSION,"1,1,6,180"
 [TRANSLATION]
 LANGID,1031
 AUTHOR,"Dirk Bornhütter, Thomas Kelso, Thomas Pagels, Thomas Wölk, Marko Meister und Mick Weiss"
-WEB,"forum.altap.cz/viewtopic.php?f=23&t=7334"
+WEB,"/viewtopic.php?f=23&t=7334"
 COMMENT,"Deutsche Version"
 
 [DIALOG 10500]

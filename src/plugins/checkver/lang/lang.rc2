@@ -1,4 +1,4 @@
-﻿//
+//
 // lang.rc2 - resources Microsoft Visual C++ does not edit directly
 //
 
@@ -28,7 +28,7 @@ STRINGTABLE
  IDS_ABORT_DOWNLOAD, "Plugin is working with Internet.\nDo you want to abort this Internet session?"
  IDS_INET_INIT, "Initializing Internet connection..."
  IDS_INET_INIT_FAILED, "Initializing failed: %s"
- IDS_INET_CONNECT, "Connecting to \tuwww.altap.cz\tlhttps://www.altap.cz\tn..."
+ IDS_INET_CONNECT, "Connecting to \tuwww.taskscape.com\tlhttps://www.taskscape.com\tn..."
  IDS_INET_CONNECT_FAILED, "Connecting failed: %s"
  IDS_INET_READ, "Reading information about new versions..."
  IDS_INET_READ_FAILED, "Reading failed: %s"
@@ -71,3 +71,4 @@ STRINGTABLE
  IDS_FILE_READERROR, "Unable to read from the file '%s'."
  IDS_FILE_OPENED, "File %s was successfully read."
 }
+

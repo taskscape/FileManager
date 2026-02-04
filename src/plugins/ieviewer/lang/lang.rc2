@@ -1,4 +1,4 @@
-﻿//
+//
 // lang.rc2 - resources Microsoft Visual C++ does not edit directly
 //
 
@@ -17,6 +17,7 @@ STRINGTABLE
  IDS_PLUGIN_DESCRIPTION, "Lightweight HTML and XML viewer based on Internet Explorer."
  IDS_ABOUT, "About Plugin"
  IDS_PLUGINNAME, "Internet Explorer Viewer"
- IDS_UNABLETOOPENIE, "Unable to open Internet Explorer Viewer.\nPlease report this problem to support@altap.cz."
+ IDS_UNABLETOOPENIE, "Unable to open Internet Explorer Viewer.\nPlease report this problem to support@taskscape.com."
  IDS_ERRORTITLE, "Error"
 }
+

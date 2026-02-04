@@ -1,4 +1,4 @@
-﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2023 Taskscape Ltd
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "precomp.h"
@@ -19,7 +19,7 @@
 // in the registry and sends a WM_SETTINGCHANGE notification / lParam == "Environment".
 // Regeneration is done through the undocumented function SHELL32.DLL / RegenerateUserEnvironment, which assembles
 // env. variables for a new process. We've been using this function for years, but when investigating a problem reported
-// on the forum https://forum.altap.cz/viewtopic.php?f=2&t=6188 it turned out that the function is not ideal for Salamander.
+// on the forum /viewtopic.php?f=2&t=6188 it turned out that the function is not ideal for Salamander.
 // It has two problems: when called from an x86 process on x64 Windows, it discards several important variables:
 // "CommonProgramFiles(x86)", "CommonProgramW6432", "ProgramFiles(x86)", "ProgramW6432".
 // The second problem is that it discards variables that the process inherited when starting. In the case of Windows Explorer,

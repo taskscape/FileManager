@@ -1,4 +1,4 @@
-﻿//
+//
 // ftp.rc2 - resources that Microsoft Visual C++ does not edit directly
 //
 
@@ -20,3 +20,4 @@ IDC_WARNINGICON ICON "warning.ico"
 IDC_FTPICONBMP BITMAP "ftp.bmp"
 
 IDC_DRAGCURSOR CURSOR "drag.cur"
+

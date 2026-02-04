@@ -1,4 +1,4 @@
-﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+// SPDX-FileCopyrightText: 2023 Taskscape Ltd
 // SPDX-License-Identifier: GPL-2.0-or-later
 // CommentsTranslationProject: TRANSLATED
 
@@ -616,9 +616,9 @@ CConfiguration::~CConfiguration()
 BOOL CConfiguration::InitWithSalamanderGeneral()
 {
     // allocated through SalamanderGeneral, therefore it has to be here
-    FTPServerList.AddServer("ALTAP",
-                            "ftp.altap.cz",
-                            "/pub/altap/salamand");
+    FTPServerList.AddServer("Taskscape Ltd",
+                            "ftp.taskscape.com",
+                            "/pub/taskscape/salamand");
 
     // description of the string in the array: "visible,ID,nameStrID,nameStr,descrStrID,descrStr,colType,emptyValue,leftAlignment,fixedWidth,width"
     const char* unix1Columns[] = {"1,name,0,\\0,0,\\0,1,\\0",    // name
