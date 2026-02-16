@@ -478,7 +478,7 @@ BOOL IsPathOnSSD(const char* path)
 
     char guidPath[MAX_PATH];
     guidPath[0] = 0;
-    if (GetResolvedPathMountPointAndGUID(path, NULL, guidPath))
+    if (GetResolvedPathMountPointAndGUID(path, NULL, 0, guidPath, _countof(guidPath)))
     {
         SalPathRemoveBackslash(guidPath); // the following CreateFile doesn't like the backslash after volume
         BOOL trim = FALSE;
@@ -498,13 +498,34 @@ BOOL IsPathOnSSD(const char* path)
     return FALSE;
 }
 
-BOOL GetResolvedPathMountPointAndGUID(const char* path, char* mountPoint, char* guidPath)
+BOOL GetResolvedPathMountPointAndGUID(const char* path, char* mountPoint, int mountPointBufSize, char* guidPath, int guidPathBufSize)
 {
+    if (path == NULL)
+        return FALSE;
+    if (mountPoint != NULL)
+    {
+        if (mountPointBufSize <= 0)
+            return FALSE;
+        mountPoint[0] = 0;
+    }
+    if (guidPath != NULL)
+    {
+        if (guidPathBufSize <= 0)
+            return FALSE;
+        guidPath[0] = 0;
+    }
+
     char resolvedPath[MAX_PATH];
-    strcpy(resolvedPath, path);
+    lstrcpyn(resolvedPath, path, _countof(resolvedPath));
+    if ((int)strlen(path) >= _countof(resolvedPath))
+    {
+        TRACE_E("GetResolvedPathMountPointAndGUID(): path is too long.");
+        return FALSE;
+    }
     ResolveSubsts(resolvedPath);
     char rootPath[MAX_PATH];
-    GetRootPath(rootPath, resolvedPath);
+    if (GetRootPath(rootPath, _countof(rootPath), resolvedPath) == 0)
+        return FALSE;
     BOOL remotePath = TRUE;
     if (!IsUNCPath(rootPath) && GetDriveType(rootPath) == DRIVE_FIXED) // reparse points make sense to search only on fixed disks
     {
@@ -517,12 +538,13 @@ BOOL GetResolvedPathMountPointAndGUID(const char* path, char* mountPoint, char* 
         // for GetVolumeNameForVolumeMountPoint we need root
         if (cutPathIsPossible)
         {
-            GetRootPath(rootPath, resolvedPath);
-            strcpy(resolvedPath, rootPath);
+            if (GetRootPath(rootPath, _countof(rootPath), resolvedPath) == 0)
+                return FALSE;
+            lstrcpyn(resolvedPath, rootPath, _countof(resolvedPath));
         }
     }
     else
-        strcpy(resolvedPath, rootPath); // for non-DRIVE_FIXED disks we take root path, GetVolumeNameForVolumeMountPoint needs mount point and searching for it by gradually shortening the path seems too time-consuming for now (at least for network paths + for cards hopefully mount points in subdirectories are not a threat, right?)
+        lstrcpyn(resolvedPath, rootPath, _countof(resolvedPath)); // for non-DRIVE_FIXED disks we take root path, GetVolumeNameForVolumeMountPoint needs mount point and searching for it by gradually shortening the path seems too time-consuming for now (at least for network paths + for cards hopefully mount points in subdirectories are not a threat, right?)
     // GUID can be obtained even for non-DRIVE_FIXED disks, for example card readers
     // according to https://msdn.microsoft.com/en-us/library/windows/desktop/aa364996%28v=vs.85%29.aspx there is no support for DRIVE_REMOTE yet,
     // but that could potentially come too
@@ -531,11 +553,23 @@ BOOL GetResolvedPathMountPointAndGUID(const char* path, char* mountPoint, char* 
     if (GetVolumeNameForVolumeMountPoint(resolvedPath, guidP, sizeof(guidP)))
     {
         if (mountPoint != NULL)
-            strcpy(mountPoint, resolvedPath);
+        {
+            lstrcpyn(mountPoint, resolvedPath, mountPointBufSize);
+            if ((int)strlen(resolvedPath) >= mountPointBufSize)
+            {
+                TRACE_E("GetResolvedPathMountPointAndGUID(): mountPoint buffer too small.");
+                return FALSE;
+            }
+        }
         if (guidPath != NULL)
         {
             SalPathAddBackslash(guidP, sizeof(guidP));
-            strcpy(guidPath, guidP);
+            lstrcpyn(guidPath, guidP, guidPathBufSize);
+            if ((int)strlen(guidP) >= guidPathBufSize)
+            {
+                TRACE_E("GetResolvedPathMountPointAndGUID(): guidPath buffer too small.");
+                return FALSE;
+            }
         }
         return TRUE;
     }
@@ -548,4 +582,9 @@ BOOL GetResolvedPathMountPointAndGUID(const char* path, char* mountPoint, char* 
         }
     }
     return FALSE;
+}
+
+BOOL GetResolvedPathMountPointAndGUID(const char* path, char* mountPoint, char* guidPath)
+{
+    return GetResolvedPathMountPointAndGUID(path, mountPoint, MAX_PATH, guidPath, MAX_PATH);
 }

@@ -450,7 +450,7 @@ BOOL CFilesWindow::ReadDirectory(HWND parent, BOOL isRefresh)
                         }
                         if (drvType2 != DRIVE_REMOTE)
                         {
-                            GetCurrentLocalReparsePoint(GetPath(), CheckPathRootWithRetryMsgBox);
+                            GetCurrentLocalReparsePoint(GetPath(), CheckPathRootWithRetryMsgBox, MAX_PATH);
                             if (strlen(CheckPathRootWithRetryMsgBox) > 3)
                             {
                                 lstrcpyn(drive, CheckPathRootWithRetryMsgBox, MAX_PATH);
@@ -2088,7 +2088,7 @@ CHANGE_AGAIN:
 
         char fsName[2 * MAX_PATH];
         char* fsUserPart;
-        if (!sendDirectlyToPluginLocal && IsPluginFSPath(path, fsName, (const char**)&fsUserPart))
+        if (!sendDirectlyToPluginLocal && IsPluginFSPath(path, fsName, _countof(fsName), (const char**)&fsUserPart))
         {
             if (strlen(fsUserPart) >= 2 * MAX_PATH) // plugins do not count with longer path
             {
@@ -2553,7 +2553,7 @@ CHANGE_AGAIN:
                                             }
                                             if (drvType != DRIVE_REMOTE)
                                             {
-                                                GetCurrentLocalReparsePoint(copy, CheckPathRootWithRetryMsgBox);
+                                                GetCurrentLocalReparsePoint(copy, CheckPathRootWithRetryMsgBox, MAX_PATH);
                                                 if (strlen(CheckPathRootWithRetryMsgBox) > 3)
                                                 {
                                                     lstrcpyn(drive, CheckPathRootWithRetryMsgBox, MAX_PATH);

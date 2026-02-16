@@ -1190,7 +1190,7 @@ void ResolveLocalPathWithReparsePoints(char* resPath, const char* path, BOOL* cu
             char repPointPath[MAX_PATH];
             int allowedDepth = 50;
             BOOL firstRepPoint = TRUE;
-            while (GetCurrentLocalReparsePoint(resPath, repPointPath))
+            while (GetCurrentLocalReparsePoint(resPath, repPointPath, _countof(repPointPath)))
             {
                 if (rootOrCurReparsePointSet != NULL && !*rootOrCurReparsePointSet && rootOrCurReparsePoint != NULL)
                 {
@@ -1538,11 +1538,25 @@ BOOL GetReparsePointDestination(const char* repPointDir, char* repPointDstBuf, D
     return TRUE;
 }
 
-BOOL GetCurrentLocalReparsePoint(const char* path, char* currentReparsePoint, BOOL* error)
+BOOL GetCurrentLocalReparsePoint(const char* path, char* currentReparsePoint, int currentReparsePointBufSize, BOOL* error)
 {
     BOOL ret = TRUE;
-    lstrcpyn(currentReparsePoint, path, MAX_PATH);
-    if (!SalPathAddBackslash(currentReparsePoint, MAX_PATH))
+    if (path == NULL || currentReparsePoint == NULL || currentReparsePointBufSize <= 0)
+    {
+        if (error != NULL)
+            *error = TRUE;
+        return FALSE;
+    }
+
+    lstrcpyn(currentReparsePoint, path, currentReparsePointBufSize);
+    if ((int)strlen(path) >= currentReparsePointBufSize)
+    {
+        TRACE_E("GetCurrentLocalReparsePoint(): path does not fit in output buffer.");
+        if (error != NULL)
+            *error = TRUE;
+        ret = FALSE;
+    }
+    else if (!SalPathAddBackslash(currentReparsePoint, currentReparsePointBufSize))
     {
         TRACE_E("GetCurrentLocalReparsePoint(): too long path");
         if (error != NULL)
@@ -1581,8 +1595,13 @@ BOOL GetCurrentLocalReparsePoint(const char* path, char* currentReparsePoint, BO
             ret = FALSE; // no reparse point found
     }
     if (!ret)
-        GetRootPath(currentReparsePoint, path);
+        GetRootPath(currentReparsePoint, currentReparsePointBufSize, path);
     return ret;
+}
+
+BOOL GetCurrentLocalReparsePoint(const char* path, char* currentReparsePoint, BOOL* error)
+{
+    return GetCurrentLocalReparsePoint(path, currentReparsePoint, MAX_PATH, error);
 }
 
 UINT MyGetDriveType(const char* path)

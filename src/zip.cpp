@@ -3005,7 +3005,7 @@ BOOL CSalamanderGeneral::GetConfigParameter(int paramID, void* buffer, int buffe
     {
         auxType = SALCFGTYPE_STRING;
         char ifPathIsInaccessibleGoTo[MAX_PATH];
-        GetIfPathIsInaccessibleGoTo(ifPathIsInaccessibleGoTo);
+        GetIfPathIsInaccessibleGoTo(ifPathIsInaccessibleGoTo, _countof(ifPathIsInaccessibleGoTo), FALSE);
         auxDataSize = (int)strlen(ifPathIsInaccessibleGoTo) + 1;
         if (auxDataSize > MAX_PATH)
             auxDataSize = MAX_PATH; // we limited the required buffer to MAX_PATH characters

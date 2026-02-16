@@ -647,7 +647,7 @@ BOOL CFilesWindow::ChangeToRescuePathOrFixedDrive(HWND parent, BOOL* noChange, B
                         refreshListBox, canForce, tryCloseReason);
     BOOL noChangeUsed = FALSE;
     char ifPathIsInaccessibleGoTo[MAX_PATH];
-    GetIfPathIsInaccessibleGoTo(ifPathIsInaccessibleGoTo);
+    GetIfPathIsInaccessibleGoTo(ifPathIsInaccessibleGoTo, _countof(ifPathIsInaccessibleGoTo), FALSE);
     if (ifPathIsInaccessibleGoTo[0] == '\\' && ifPathIsInaccessibleGoTo[1] == '\\' ||
         ifPathIsInaccessibleGoTo[0] != 0 && ifPathIsInaccessibleGoTo[1] == ':')
     {
@@ -1704,7 +1704,7 @@ BOOL CFilesWindow::ChangePathToDisk(HWND parent, const char* path, int suggested
     BOOL canTryUserRescuePath = FALSE; // allows using Configuration.IfPathIsInaccessibleGoTo right before the fixed-drive path
     BOOL openIfPathIsInaccessibleGoToCfg = FALSE;
     char ifPathIsInaccessibleGoTo[2 * MAX_PATH];
-    GetIfPathIsInaccessibleGoTo(ifPathIsInaccessibleGoTo);
+    GetIfPathIsInaccessibleGoTo(ifPathIsInaccessibleGoTo, _countof(ifPathIsInaccessibleGoTo), FALSE);
     if ((ifPathIsInaccessibleGoTo[0] == '\\' && ifPathIsInaccessibleGoTo[1] == '\\' ||
          ifPathIsInaccessibleGoTo[0] != 0 && ifPathIsInaccessibleGoTo[1] == ':') &&
         !IsTheSamePath(path, ifPathIsInaccessibleGoTo))
@@ -1822,7 +1822,7 @@ BOOL CFilesWindow::ChangePathToDisk(HWND parent, const char* path, int suggested
                         canTryUserRescuePath = FALSE; // we won't try it more than once
                         openIfPathIsInaccessibleGoToCfg = TRUE;
                         fixedDrive = FALSE; // we'll allow switching to a fixed-drive (perhaps it was tried already but the user path had priority)
-                        GetIfPathIsInaccessibleGoTo(changedPath);
+                        GetIfPathIsInaccessibleGoTo(changedPath, _countof(changedPath), FALSE);
                         shorterPathWarning = TRUE; // we want to see errors for the "rescue" path
                         change = TRUE;
                     }
@@ -1934,7 +1934,7 @@ BOOL CFilesWindow::ChangePathToDisk(HWND parent, const char* path, int suggested
                 }
                 if (drvType != DRIVE_REMOTE)
                 {
-                    GetCurrentLocalReparsePoint(changedPath, CheckPathRootWithRetryMsgBox);
+                    GetCurrentLocalReparsePoint(changedPath, CheckPathRootWithRetryMsgBox, MAX_PATH);
                     if (strlen(CheckPathRootWithRetryMsgBox) > 3)
                     {
                         lstrcpyn(drive, CheckPathRootWithRetryMsgBox, MAX_PATH);
@@ -3483,8 +3483,18 @@ void CFilesWindow::GetContextMenuPos(POINT* p)
     ClientToScreen(GetListBoxHWND(), p);
 }
 
-void GetCommonFileTypeStr(char* buf, int* resLen, const char* ext)
+void GetCommonFileTypeStr(char* buf, int bufSize, int* resLen, const char* ext)
 {
+    if (buf == NULL || resLen == NULL || ext == NULL || bufSize <= 0)
+    {
+        TRACE_E("GetCommonFileTypeStr(): invalid parameter.");
+        if (buf != NULL && bufSize > 0)
+            buf[0] = 0;
+        if (resLen != NULL)
+            *resLen = 0;
+        return;
+    }
+
     char uppercaseExt[MAX_PATH];
     char* d = uppercaseExt;
     char* end = uppercaseExt + MAX_PATH - 1;
@@ -3493,15 +3503,20 @@ void GetCommonFileTypeStr(char* buf, int* resLen, const char* ext)
     *d = 0;
     if (*ext == 0 && uppercaseExt[0] != 0)
     { // we have the entire extension in uppercase (no spaces and shorter than MAX_PATH) + it is not empty
-        *resLen = _snprintf_s(buf, TRANSFER_BUFFER_MAX, _TRUNCATE, CommonFileTypeName2, uppercaseExt);
+        *resLen = _snprintf_s(buf, bufSize, _TRUNCATE, CommonFileTypeName2, uppercaseExt);
         if (*resLen < 0)
-            *resLen = TRANSFER_BUFFER_MAX - 1; // _snprintf_s reports truncation to the buffer size
+            *resLen = bufSize - 1; // _snprintf_s reports truncation to the buffer size
     }
     else
     {
-        memcpy(buf, CommonFileTypeName, CommonFileTypeNameLen + 1);
-        *resLen = CommonFileTypeNameLen;
+        lstrcpyn(buf, CommonFileTypeName, bufSize);
+        *resLen = (int)strlen(buf);
     }
+}
+
+void GetCommonFileTypeStr(char* buf, int* resLen, const char* ext)
+{
+    GetCommonFileTypeStr(buf, TRANSFER_BUFFER_MAX, resLen, ext);
 }
 
 void CFilesWindow::RefreshListBox(int suggestedXOffset,
@@ -3859,7 +3874,7 @@ void CFilesWindow::RefreshListBox(int suggestedXOffset,
                     if (commonFileType)
                     {
                         int resLen;
-                        GetCommonFileTypeStr(buf, &resLen, f->Ext);
+                        GetCommonFileTypeStr(buf, _countof(buf), &resLen, f->Ext);
                         GetTextExtentPoint32(dc, buf, resLen, &act);
                         act.cx += SPACE_WIDTH;
                         if (columnWidthType < act.cx)

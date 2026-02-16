@@ -2434,7 +2434,7 @@ CDriveSelectErrDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 
             case DRIVE_FIXED: // mount-point, determine the root of removable drive
             {
-                if (!GetCurrentLocalReparsePoint(DrvPath, root))
+                if (!GetCurrentLocalReparsePoint(DrvPath, root, _countof(root)))
                     setTimer = FALSE; // can't be a mount-point, no periodic tests
                 break;
             }

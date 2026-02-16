@@ -288,7 +288,7 @@ BOOL PackUniversalCompress(HWND parent, const char* command, TPackErrorTable* co
 
     // Create the temporary file name
     char tmpListNameBuf[MAX_PATH];
-    if (!SalGetTempFileName(NULL, "PACK", tmpListNameBuf, TRUE))
+    if (!SalGetTempFileName(NULL, "PACK", tmpListNameBuf, _countof(tmpListNameBuf), TRUE))
     {
         char buffer[1000];
         strcpy(buffer, "SalGetTempFileName: ");
@@ -631,7 +631,7 @@ BOOL PackDelFromArc(HWND parent, CFilesWindow* panel, const char* archiveFileNam
     //
     // buffer for the full name of the helper file
     char tmpListNameBuf[MAX_PATH];
-    if (!SalGetTempFileName(NULL, "PACK", tmpListNameBuf, TRUE))
+    if (!SalGetTempFileName(NULL, "PACK", tmpListNameBuf, _countof(tmpListNameBuf), TRUE))
     {
         char buffer[1000];
         strcpy(buffer, "SalGetTempFileName: ");

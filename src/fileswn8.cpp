@@ -135,7 +135,7 @@ void PluginFSConvertPathToExternal(char* path)
     char* fsUserPart;
     int index;
     int fsNameIndex;
-    if (IsPluginFSPath(path, fsName, (const char**)&fsUserPart) &&
+    if (IsPluginFSPath(path, fsName, _countof(fsName), (const char**)&fsUserPart) &&
         Plugins.IsPluginFS(fsName, index, fsNameIndex))
     {
         CPluginData* plugin = Plugins.Get(index);

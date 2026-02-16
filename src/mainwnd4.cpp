@@ -247,7 +247,7 @@ void CMainWindow::MakeFileList()
         case 0: // clipboard
         case 1: // viewer
         {
-            if (!SalGetTempFileName(NULL, "MFL", fileName, TRUE))
+            if (!SalGetTempFileName(NULL, "MFL", fileName, _countof(fileName), TRUE))
             {
                 DWORD err = GetLastError();
                 char errorText[200 + 2 * MAX_PATH];

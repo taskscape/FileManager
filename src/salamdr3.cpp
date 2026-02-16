@@ -214,8 +214,14 @@ const char* SalPathFindFileName(const char* path)
 
 // ****************************************************************************
 
-BOOL SalGetTempFileName(const char* path, const char* prefix, char* tmpName, BOOL file)
+BOOL SalGetTempFileName(const char* path, const char* prefix, char* tmpName, int tmpNameLen, BOOL file)
 {
+    if (tmpName == NULL || tmpNameLen <= 0)
+    {
+        SetLastError(ERROR_INVALID_PARAMETER);
+        return FALSE;
+    }
+
     WCHAR tmpDirW[MAX_PATH + 10];
     WCHAR* endW = tmpDirW + MAX_PATH + 10;
     if (path == NULL)
@@ -287,7 +293,7 @@ BOOL SalGetTempFileName(const char* path, const char* prefix, char* tmpName, BOO
                 if (h != INVALID_HANDLE_VALUE)
                 {
                     HANDLES(CloseHandle(h));
-                    if (ConvertWideToUtf8(tmpDirW, -1, tmpName, MAX_PATH) == 0)
+                    if (ConvertWideToUtf8(tmpDirW, -1, tmpName, tmpNameLen) == 0)
                     {
                         SetLastError(ERROR_NO_UNICODE_TRANSLATION);
                         return FALSE;
@@ -299,7 +305,7 @@ BOOL SalGetTempFileName(const char* path, const char* prefix, char* tmpName, BOO
             {
                 if (CreateDirectoryW(tmpDirW, NULL))
                 {
-                    if (ConvertWideToUtf8(tmpDirW, -1, tmpName, MAX_PATH) == 0)
+                    if (ConvertWideToUtf8(tmpDirW, -1, tmpName, tmpNameLen) == 0)
                     {
                         SetLastError(ERROR_NO_UNICODE_TRANSLATION);
                         return FALSE;
@@ -2255,7 +2261,7 @@ void CPathHistory::LoadFromRegistry(HKEY hKey, const char* name)
                     else
                     {
                         // kandidat na FS path
-                        if (IsPluginFSPath(path, fsName, &archivePathOrFSUserPart))
+                        if (IsPluginFSPath(path, fsName, _countof(fsName), &archivePathOrFSUserPart))
                         {
                             pathOrArchiveOrFSName = fsName;
                             type = 2;
@@ -3243,6 +3249,11 @@ void CFileTimeStamps::AddFilesToListBox(HWND list)
         if (strlen(List[i]->ZIPRoot) < _countof(buf) && SalPathAppend(buf, List[i]->FileName, _countof(buf)))
             SendMessage(list, LB_ADDSTRING, 0, (LPARAM)buf);
     }
+}
+
+BOOL SalGetTempFileName(const char* path, const char* prefix, char* tmpName, BOOL file)
+{
+    return SalGetTempFileName(path, prefix, tmpName, MAX_PATH, file);
 }
 
 void CFileTimeStamps::Remove(int* indexes, int count)

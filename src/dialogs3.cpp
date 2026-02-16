@@ -1370,7 +1370,7 @@ void CDriveInfo::Transfer(CTransferInfo& ti)
             char guidPath[MAX_PATH];
             mountPoint[0] = 0;
             guidPath[0] = 0;
-            if (GetResolvedPathMountPointAndGUID(VolumePath, mountPoint, guidPath))
+            if (GetResolvedPathMountPointAndGUID(VolumePath, mountPoint, _countof(mountPoint), guidPath, _countof(guidPath)))
             {
                 SetDlgItemTextUtf8(HWindow, IDT_MOUNTPOINT, mountPoint);
                 SetDlgItemTextUtf8(HWindow, IDT_GUIDPATH, guidPath);

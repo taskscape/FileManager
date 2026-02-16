@@ -1741,32 +1741,46 @@ BOOL SafeGetSaveFileName(LPOPENFILENAME lpofn)
     return ret;
 }
 
-void GetIfPathIsInaccessibleGoTo(char* path, BOOL forceIsMyDocs)
+void GetIfPathIsInaccessibleGoTo(char* path, int pathBufSize, BOOL forceIsMyDocs)
 {
+    if (path == NULL || pathBufSize <= 0)
+    {
+        TRACE_E("GetIfPathIsInaccessibleGoTo(): invalid output buffer.");
+        return;
+    }
+
     if (forceIsMyDocs || Configuration.IfPathIsInaccessibleGoToIsMyDocs)
     {
-        if (!GetMyDocumentsOrDesktopPath(path, 2 * MAX_PATH))
+        if (!GetMyDocumentsOrDesktopPath(path, pathBufSize))
         {
             char winPath[2 * MAX_PATH];
             if (GetWindowsDirectory(winPath, MAX_PATH) != 0)
-                GetRootPath(path, winPath);
+                GetRootPath(path, pathBufSize, winPath);
             else
-                strcpy(path, "C:\\");
+                lstrcpyn(path, "C:\\", pathBufSize);
         }
     }
     else
     {
-        lstrcpyn(path, Configuration.IfPathIsInaccessibleGoTo, 2 * MAX_PATH);
+        lstrcpyn(path, Configuration.IfPathIsInaccessibleGoTo, pathBufSize);
         if (path[0] != 0 && path[1] == ':')
         {
             path[0] = UpperCase[path[0]];
             if (path[2] == 0)
             { // "C:" -> "C:\"
-                path[2] = '\\';
-                path[3] = 0;
+                if (pathBufSize > 3)
+                {
+                    path[2] = '\\';
+                    path[3] = 0;
+                }
             }
         }
     }
+}
+
+void GetIfPathIsInaccessibleGoTo(char* path, BOOL forceIsMyDocs)
+{
+    GetIfPathIsInaccessibleGoTo(path, 2 * MAX_PATH, forceIsMyDocs);
 }
 
 HICON SalLoadImage(int vistaResID, int otherResID, int cx, int cy, UINT flags)

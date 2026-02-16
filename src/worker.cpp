@@ -7512,7 +7512,7 @@ CONVERT_AGAIN:
             BOOL tmpFileExists = FALSE;
             while (1)
             {
-                if (SalGetTempFileName(tmpPath, "cnv", tmpFileName, TRUE))
+                if (SalGetTempFileName(tmpPath, "cnv", tmpFileName, _countof(tmpFileName), TRUE))
                 {
                     tmpFileExists = TRUE;
 
@@ -8265,7 +8265,7 @@ unsigned ThreadWorkerBody(void* parameter)
 
                 SetProgress(hProgressDlg, 0, CaclProg(totalDone, script->TotalSize), dlgData);
 
-                BOOL lantasticCheck = IsLantasticDrive(op->TargetName, lastLantasticCheckRoot, lastIsLantasticPath);
+                BOOL lantasticCheck = IsLantasticDrive(op->TargetName, lastLantasticCheckRoot, _countof(lastLantasticCheckRoot), lastIsLantasticPath);
 
                 Error = !DoCopyFile(op, hProgressDlg, buffer, script, totalDone,
                                     clearReadonlyMask, NULL, lantasticCheck, mustDeleteFileBeforeOverwrite,
@@ -8290,7 +8290,7 @@ unsigned ThreadWorkerBody(void* parameter)
 
                 SetProgress(hProgressDlg, 0, CaclProg(totalDone, script->TotalSize), dlgData);
 
-                BOOL lantasticCheck = IsLantasticDrive(op->TargetName, lastLantasticCheckRoot, lastIsLantasticPath);
+                BOOL lantasticCheck = IsLantasticDrive(op->TargetName, lastLantasticCheckRoot, _countof(lastLantasticCheckRoot), lastIsLantasticPath);
                 BOOL ignInvalidName = op->Opcode == ocMoveDir && (op->OpFlags & OPFL_IGNORE_INVALID_NAME) != 0;
 
                 Error = !DoMoveFile(op, hProgressDlg, buffer, script, totalDone,

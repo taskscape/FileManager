@@ -1481,8 +1481,13 @@ BOOL CutDirectory(char* path, char** cutDir)
 
 // ****************************************************************************
 
-int GetRootPath(char* root, const char* path)
+int GetRootPath(char* root, int rootBufSize, const char* path)
 {                                           // POZOR: netypicke pouziti z GetShellFolder(): pro "\\\\" vraci "\\\\\\", pro "\\\\server" vraci "\\\\server\\"
+    if (root == NULL || path == NULL || rootBufSize <= 0)
+        return 0;
+
+    root[0] = 0;
+
     if (path[0] == '\\' && path[1] == '\\') // UNC
     {
         const char* s = path + 2;
@@ -1493,8 +1498,10 @@ int GetRootPath(char* root, const char* path)
         while (*s != 0 && *s != '\\')
             s++;
         int len = (int)(s - path);
-        if (len > MAX_PATH - 2)
-            len = MAX_PATH - 2; // aby se to veslo i s '\\' do MAX_PATH bufferu (ocekavana velikost), orez neva, 100% je to beztak chyba
+        if (len > rootBufSize - 2)
+            len = rootBufSize - 2;
+        if (len < 0)
+            return 0;
         memcpy(root, path, len);
         root[len] = '\\';
         root[len + 1] = 0;
@@ -1502,12 +1509,19 @@ int GetRootPath(char* root, const char* path)
     }
     else
     {
+        if (rootBufSize < 4)
+            return 0;
         root[0] = path[0];
         root[1] = ':';
         root[2] = '\\';
         root[3] = 0;
         return 3;
     }
+}
+
+int GetRootPath(char* root, const char* path)
+{
+    return GetRootPath(root, MAX_PATH, path);
 }
 
 // ****************************************************************************
@@ -3370,7 +3384,7 @@ BOOL ParseCommandLineParameters(LPSTR cmdLine, CCommandLineParams* cmdLineParams
     *(strrchr(ConfigurationName, '\\') + 1) = 0;
     const char* configReg = "config.reg";
     strcat(ConfigurationName, configReg);
-    if (!FileExists(ConfigurationName) && GetOurPathInRoamingAPPDATA(curDir) &&
+    if (!FileExists(ConfigurationName) && GetOurPathInRoamingAPPDATA(curDir, _countof(curDir)) &&
         SalPathAppend(curDir, configReg, MAX_PATH) && FileExists(curDir))
     { // pokud neexistuje soubor config.reg u .exe, hledame ho jeste v APPDATA
         lstrcpyn(ConfigurationName, curDir, MAX_PATH);
@@ -3437,7 +3451,7 @@ BOOL ParseCommandLineParameters(LPSTR cmdLine, CCommandLineParams* cmdLineParams
                         GetModuleFileName(HInstance, ConfigurationName, MAX_PATH);
                         *(strrchr(ConfigurationName, '\\') + 1) = 0;
                         SalPathAppend(ConfigurationName, s, MAX_PATH);
-                        if (!FileExists(ConfigurationName) && GetOurPathInRoamingAPPDATA(curDir) &&
+                        if (!FileExists(ConfigurationName) && GetOurPathInRoamingAPPDATA(curDir, _countof(curDir)) &&
                             SalPathAppend(curDir, s, MAX_PATH) && FileExists(curDir))
                         { // pokud neexistuje relativne zadany soubor za -C u .exe, hledame ho jeste v APPDATA
                             lstrcpyn(ConfigurationName, curDir, MAX_PATH);

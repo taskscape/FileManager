@@ -1207,7 +1207,7 @@ CDiskCache::GetName(const char* name, const char* tmpName, BOOL* exists, BOOL on
     if (rootTmpPath != NULL &&
             (SalCheckPath(TRUE, sysTmpDir, ERROR_SUCCESS, TRUE, MainWindow->HWindow) != ERROR_SUCCESS ||
              !CheckAndCreateDirectory(rootTmpPath, NULL, TRUE)) || // if it's not TEMP, tmp-root must be verified and created, if needed
-        !SalGetTempFileName(rootTmpPath, "SAL", newDirPath, FALSE))
+        !SalGetTempFileName(rootTmpPath, "SAL", newDirPath, _countof(newDirPath), FALSE))
     {
         *exists = TRUE; // fatal error
         Leave();
