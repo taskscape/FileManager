@@ -1219,9 +1219,9 @@ void GetFileOverwriteInfo(char* buff, int buffLen, HANDLE file, const char* file
         if (fileTime != NULL)
             *fileTime = ft;
         if (GetTimeFormat(LOCALE_USER_DEFAULT, 0, &st, NULL, time, 50) == 0)
-            sprintf(time, "%u:%02u:%02u", st.wHour, st.wMinute, st.wSecond);
+            _snprintf_s(time, _countof(time), _TRUNCATE, "%u:%02u:%02u", st.wHour, st.wMinute, st.wSecond);
         if (GetDateFormat(LOCALE_USER_DEFAULT, DATE_SHORTDATE, &st, NULL, date, 50) == 0)
-            sprintf(date, "%u.%u.%u", st.wDay, st.wMonth, st.wYear);
+            _snprintf_s(date, _countof(date), _TRUNCATE, "%u.%u.%u", st.wDay, st.wMonth, st.wYear);
     }
 
     char attr[30];
@@ -1243,8 +1243,10 @@ void GetFileOverwriteInfo(char* buff, int buffLen, HANDLE file, const char* file
     _snprintf_s(buff, buffLen, _TRUNCATE, "%s, %s, %s%s", number, date, time, attr);
 }
 
-void GetDirInfo(char* buffer, const char* dir)
+void GetDirInfo(char* buffer, int bufferLen, const char* dir)
 {
+    if (bufferLen <= 0)
+        return;
     const char* dirFindFirst = dir;
     char dirFindFirstCopy[3 * MAX_PATH];
     MakeCopyWithBackslashIfNeeded(dirFindFirst, dirFindFirstCopy);
@@ -1287,14 +1289,14 @@ void GetDirInfo(char* buffer, const char* dir)
         {
             char date[50], time[50];
             if (GetTimeFormat(LOCALE_USER_DEFAULT, 0, &st, NULL, time, 50) == 0)
-                sprintf(time, "%u:%02u:%02u", st.wHour, st.wMinute, st.wSecond);
+                _snprintf_s(time, _countof(time), _TRUNCATE, "%u:%02u:%02u", st.wHour, st.wMinute, st.wSecond);
             if (GetDateFormat(LOCALE_USER_DEFAULT, DATE_SHORTDATE, &st, NULL, date, 50) == 0)
-                sprintf(date, "%u.%u.%u", st.wDay, st.wMonth, st.wYear);
+                _snprintf_s(date, _countof(date), _TRUNCATE, "%u.%u.%u", st.wDay, st.wMonth, st.wYear);
 
-            sprintf(buffer, "%s, %s", date, time);
+            _snprintf_s(buffer, bufferLen, _TRUNCATE, "%s, %s", date, time);
         }
         else
-            sprintf(buffer, "%s, %s", LoadStr(IDS_INVALID_DATEORTIME), LoadStr(IDS_INVALID_DATEORTIME));
+            _snprintf_s(buffer, bufferLen, _TRUNCATE, "%s, %s", LoadStr(IDS_INVALID_DATEORTIME), LoadStr(IDS_INVALID_DATEORTIME));
     }
     else
         buffer[0] = 0;
@@ -1304,11 +1306,15 @@ BOOL IsDirectoryEmpty(const char* name) // directories/subdirectories contain no
 {
     char dir[MAX_PATH + 5];
     int len = (int)strlen(name);
+    if (len <= 0 || len >= _countof(dir) - 2)
+        return FALSE;
     memcpy(dir, name, len);
+    dir[len] = 0;
     if (dir[len - 1] != '\\')
         dir[len++] = '\\';
     char* end = dir + len;
-    strcpy(end, "*");
+    *end++ = '*';
+    *end = 0;
 
     WIN32_FIND_DATAW fileData;
     HANDLE search;
@@ -1325,7 +1331,8 @@ BOOL IsDirectoryEmpty(const char* name) // directories/subdirectories contain no
 
             if (fileData.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)
             {
-                if (ConvertWideToUtf8(fileData.cFileName, -1, end, MAX_PATH) == 0)
+                int remaining = (int)(_countof(dir) - (end - dir));
+                if (remaining <= 1 || ConvertWideToUtf8(fileData.cFileName, -1, end, remaining) == 0)
                     continue;
                 if (!IsDirectoryEmpty(dir)) // the subdirectory is not empty
                 {
@@ -3135,72 +3142,79 @@ HANDLE SalCreateFileEx(const char* fileName, DWORD desiredAccess,
                     {
                         // rename ("tidy up") the file/directory with the conflicting DOS name to a temporary 8.3 name (no extra DOS name needed)
                         char tmpName[MAX_PATH + 20];
-                        lstrcpyn(tmpName, fileName, MAX_PATH);
-                        CutDirectory(tmpName);
-                        SalPathAddBackslash(tmpName, MAX_PATH + 20);
-                        char* tmpNamePart = tmpName + strlen(tmpName);
-                        char origFullName[MAX_PATH];
-                        if (SalPathAppend(tmpName, fullName, MAX_PATH))
+                        if (strlen(fileName) >= _countof(tmpName))
                         {
-                            strcpy(origFullName, tmpName);
-                            DWORD num = (GetTickCount() / 10) % 0xFFF;
-                            DWORD origFullNameAttr = SalGetFileAttributes(origFullName);
-                            while (1)
-                            {
-                                sprintf(tmpNamePart, "sal%03X", num++);
-                                if (SalMoveFile(origFullName, tmpName))
-                                    break;
-                                DWORD e = GetLastError();
-                                if (e != ERROR_FILE_EXISTS && e != ERROR_ALREADY_EXISTS)
-                                {
-                                    tmpName[0] = 0;
-                                    break;
-                                }
-                            }
-                            if (tmpName[0] != 0) // if we successfully "tidied" the conflicting file, try creating
-                            {                    // the target file again, then restore the original name
-                                out = NOHANDLES(CreateFileW(fileNameW, desiredAccess, shareMode, NULL,
-                                                            CREATE_NEW, flagsAndAttributes, NULL));
-                                if (out == INVALID_HANDLE_VALUE && encryptionNotSupported != NULL &&
-                                    (flagsAndAttributes & FILE_ATTRIBUTE_ENCRYPTED))
-                                { // when the target disk cannot create an Encrypted file (observed on NTFS network disk (tested on share from XP) while logged in under a different username than we have in the system (on the current console) - the remote machine has a same-named user without a password, so it cannot be used over the network)
-                                    out = NOHANDLES(CreateFileW(fileNameW, desiredAccess, shareMode, NULL,
-                                                                CREATE_NEW, (flagsAndAttributes & ~(FILE_ATTRIBUTE_ENCRYPTED | FILE_ATTRIBUTE_READONLY)), NULL));
-                                    if (out != INVALID_HANDLE_VALUE)
-                                    {
-                                        *encryptionNotSupported = TRUE;
-                                        NOHANDLES(CloseHandle(out));
-                                        out = INVALID_HANDLE_VALUE;
-                                        if (!DeleteFileW(fileNameW)) // XP and Vista ignore this scenario, so do the same (at worst warn user that a zero-length file was added on disk and cannot be deleted)
-                                            TRACE_E("Unable to delete testing target file: " << fileName);
-                                    }
-                                }
-                                if (!SalMoveFile(tmpName, origFullName))
-                                { // this apparently can happen; inexplicably, Windows creates a file named origFullName instead of fileName (the DOS name)
-                                    TRACE_I("Unexpected situation in SalCreateFileEx(): unable to rename file from tmp-name to original long file name! " << origFullName);
-
-                                    if (out != INVALID_HANDLE_VALUE)
-                                    {
-                                        NOHANDLES(CloseHandle(out));
-                                        out = INVALID_HANDLE_VALUE;
-                                        DeleteFileW(fileNameW);
-                                        if (!SalMoveFile(tmpName, origFullName))
-                                            TRACE_E("Fatal unexpected situation in SalCreateFileEx(): unable to rename file from tmp-name to original long file name! " << origFullName);
-                                    }
-                                }
-                                else
-                                {
-                                    if ((origFullNameAttr & FILE_ATTRIBUTE_ARCHIVE) == 0)
-                                    {
-                                        CStrP origFullNameW(ConvertAllocUtf8ToWide(origFullName, -1));
-                                        if (origFullNameW != NULL)
-                                            SetFileAttributesW(origFullNameW, origFullNameAttr); // leave without extra handling or retry; not critical (normally toggles unpredictably)
-                                    }
-                                }
-                            }
+                            TRACE_E("SalCreateFileEx(): path too long for DOS-name collision workaround: " << fileName);
                         }
                         else
-                            TRACE_E("SalCreateFileEx(): Original full file name is too long, unable to bypass only-dos-name-overwrite problem!");
+                        {
+                            lstrcpyn(tmpName, fileName, _countof(tmpName));
+                            CutDirectory(tmpName);
+                            SalPathAddBackslash(tmpName, _countof(tmpName));
+                            char* tmpNamePart = tmpName + strlen(tmpName);
+                            char origFullName[MAX_PATH + 20];
+                            if (SalPathAppend(tmpName, fullName, _countof(tmpName)))
+                            {
+                                strcpy(origFullName, tmpName);
+                                DWORD num = (GetTickCount() / 10) % 0xFFF;
+                                DWORD origFullNameAttr = SalGetFileAttributes(origFullName);
+                                while (1)
+                                {
+                                    sprintf(tmpNamePart, "sal%03X", num++);
+                                    if (SalMoveFile(origFullName, tmpName))
+                                        break;
+                                    DWORD e = GetLastError();
+                                    if (e != ERROR_FILE_EXISTS && e != ERROR_ALREADY_EXISTS)
+                                    {
+                                        tmpName[0] = 0;
+                                        break;
+                                    }
+                                }
+                                if (tmpName[0] != 0) // if we successfully "tidied" the conflicting file, try creating
+                                {                    // the target file again, then restore the original name
+                                    out = NOHANDLES(CreateFileW(fileNameW, desiredAccess, shareMode, NULL,
+                                                                CREATE_NEW, flagsAndAttributes, NULL));
+                                    if (out == INVALID_HANDLE_VALUE && encryptionNotSupported != NULL &&
+                                        (flagsAndAttributes & FILE_ATTRIBUTE_ENCRYPTED))
+                                    { // when the target disk cannot create an Encrypted file (observed on NTFS network disk (tested on share from XP) while logged in under a different username than we have in the system (on the current console) - the remote machine has a same-named user without a password, so it cannot be used over the network)
+                                        out = NOHANDLES(CreateFileW(fileNameW, desiredAccess, shareMode, NULL,
+                                                                    CREATE_NEW, (flagsAndAttributes & ~(FILE_ATTRIBUTE_ENCRYPTED | FILE_ATTRIBUTE_READONLY)), NULL));
+                                        if (out != INVALID_HANDLE_VALUE)
+                                        {
+                                            *encryptionNotSupported = TRUE;
+                                            NOHANDLES(CloseHandle(out));
+                                            out = INVALID_HANDLE_VALUE;
+                                            if (!DeleteFileW(fileNameW)) // XP and Vista ignore this scenario, so do the same (at worst warn user that a zero-length file was added on disk and cannot be deleted)
+                                                TRACE_E("Unable to delete testing target file: " << fileName);
+                                        }
+                                    }
+                                    if (!SalMoveFile(tmpName, origFullName))
+                                    { // this apparently can happen; inexplicably, Windows creates a file named origFullName instead of fileName (the DOS name)
+                                        TRACE_I("Unexpected situation in SalCreateFileEx(): unable to rename file from tmp-name to original long file name! " << origFullName);
+
+                                        if (out != INVALID_HANDLE_VALUE)
+                                        {
+                                            NOHANDLES(CloseHandle(out));
+                                            out = INVALID_HANDLE_VALUE;
+                                            DeleteFileW(fileNameW);
+                                            if (!SalMoveFile(tmpName, origFullName))
+                                                TRACE_E("Fatal unexpected situation in SalCreateFileEx(): unable to rename file from tmp-name to original long file name! " << origFullName);
+                                        }
+                                    }
+                                    else
+                                    {
+                                        if ((origFullNameAttr & FILE_ATTRIBUTE_ARCHIVE) == 0)
+                                        {
+                                            CStrP origFullNameW(ConvertAllocUtf8ToWide(origFullName, -1));
+                                            if (origFullNameW != NULL)
+                                                SetFileAttributesW(origFullNameW, origFullNameAttr); // leave without extra handling or retry; not critical (normally toggles unpredictably)
+                                        }
+                                    }
+                                }
+                            }
+                            else
+                                TRACE_E("SalCreateFileEx(): Original full file name is too long, unable to bypass only-dos-name-overwrite problem!");
+                        }
                     }
                 }
             }
@@ -5356,7 +5370,7 @@ COPY_AGAIN:
                                 else
                                 {
                                     getTimeFailed = TRUE;
-                                    strcpy(tAttr, LoadStr(IDS_ERR_FILEOPEN));
+                                    lstrcpyn(tAttr, LoadStr(IDS_ERR_FILEOPEN), _countof(tAttr));
                                 }
                                 out = NULL;
 
@@ -5987,60 +6001,67 @@ BOOL DoMoveFile(COperation* op, HWND hProgressDlg, void* buffer,
                         {
                             // rename ("tidy up") the file/directory with the conflicting DOS name to a temporary 8.3 name (does not need an extra DOS name)
                             char tmpName[MAX_PATH + 20];
-                            lstrcpyn(tmpName, op->TargetName, MAX_PATH);
-                            CutDirectory(tmpName);
-                            SalPathAddBackslash(tmpName, MAX_PATH + 20);
-                            char* tmpNamePart = tmpName + strlen(tmpName);
-                            char origFullName[MAX_PATH];
-                            if (SalPathAppend(tmpName, fullName, MAX_PATH))
+                            if (strlen(op->TargetName) >= _countof(tmpName))
                             {
-                                strcpy(origFullName, tmpName);
-                                DWORD num = (GetTickCount() / 10) % 0xFFF;
-                                DWORD origFullNameAttr = SalGetFileAttributes(origFullName);
-                                while (1)
-                                {
-                                    sprintf(tmpNamePart, "sal%03X", num++);
-                                    if (SalMoveFile(origFullName, tmpName))
-                                        break;
-                                    DWORD e = GetLastError();
-                                    if (e != ERROR_FILE_EXISTS && e != ERROR_ALREADY_EXISTS)
-                                    {
-                                        tmpName[0] = 0;
-                                        break;
-                                    }
-                                }
-                                if (tmpName[0] != 0) // if we managed to "tidy up" the conflicting file/directory, try moving it again
-                                {                    // then restore the original name of the "tidied" file/directory
-                                    BOOL moveDone = SalMoveFile(sourceNameMvDir, op->TargetName);
-                                    if (script->CopyAttrs && (op->Attr & FILE_ATTRIBUTE_ARCHIVE) == 0) // the Archive attribute was not set; MoveFile turned it on, clear it again
-                                    {
-                                        CStrP targetNameW2(ConvertAllocUtf8ToWide(op->TargetName, -1));
-                                        if (targetNameW2 != NULL)
-                                            SetFileAttributesW(targetNameW2, op->Attr); // leave without handling or retry, not important (it normally toggles chaotically)
-                                    }
-                                    if (!SalMoveFile(tmpName, origFullName))
-                                    { // this apparently can happen; inexplicably, Windows creates a file named origFullName instead of op->TargetName (the DOS name)
-                                        TRACE_I("DoMoveFile(): Unexpected situation: unable to rename file/dir from tmp-name to original long file name! " << origFullName);
-                                        if (moveDone)
-                                        {
-                                            if (SalMoveFile(op->TargetName, sourceNameMvDir))
-                                                moveDone = FALSE;
-                                            if (!SalMoveFile(tmpName, origFullName))
-                                                TRACE_E("DoMoveFile(): Fatal unexpected situation: unable to rename file/dir from tmp-name to original long file name! " << origFullName);
-                                        }
-                                    }
-                                    else
-                                    {
-                                        if ((origFullNameAttr & FILE_ATTRIBUTE_ARCHIVE) == 0)
-                                            SetFileAttributesUtf8(origFullName, origFullNameAttr); // leave without handling or retry, not important (it normally toggles chaotically)
-                                    }
-
-                                    if (moveDone)
-                                        goto OPERATION_DONE;
-                                }
+                                TRACE_E("DoMoveFile(): target path too long for DOS-name collision workaround: " << op->TargetName);
                             }
                             else
-                                TRACE_E("DoMoveFile(): Original full file/dir name is too long, unable to bypass only-dos-name-overwrite problem!");
+                            {
+                                lstrcpyn(tmpName, op->TargetName, _countof(tmpName));
+                                CutDirectory(tmpName);
+                                SalPathAddBackslash(tmpName, _countof(tmpName));
+                                char* tmpNamePart = tmpName + strlen(tmpName);
+                                char origFullName[MAX_PATH + 20];
+                                if (SalPathAppend(tmpName, fullName, _countof(tmpName)))
+                                {
+                                    strcpy(origFullName, tmpName);
+                                    DWORD num = (GetTickCount() / 10) % 0xFFF;
+                                    DWORD origFullNameAttr = SalGetFileAttributes(origFullName);
+                                    while (1)
+                                    {
+                                        sprintf(tmpNamePart, "sal%03X", num++);
+                                        if (SalMoveFile(origFullName, tmpName))
+                                            break;
+                                        DWORD e = GetLastError();
+                                        if (e != ERROR_FILE_EXISTS && e != ERROR_ALREADY_EXISTS)
+                                        {
+                                            tmpName[0] = 0;
+                                            break;
+                                        }
+                                    }
+                                    if (tmpName[0] != 0) // if we managed to "tidy up" the conflicting file/directory, try moving it again
+                                    {                    // then restore the original name of the "tidied" file/directory
+                                        BOOL moveDone = SalMoveFile(sourceNameMvDir, op->TargetName);
+                                        if (script->CopyAttrs && (op->Attr & FILE_ATTRIBUTE_ARCHIVE) == 0) // the Archive attribute was not set; MoveFile turned it on, clear it again
+                                        {
+                                            CStrP targetNameW2(ConvertAllocUtf8ToWide(op->TargetName, -1));
+                                            if (targetNameW2 != NULL)
+                                                SetFileAttributesW(targetNameW2, op->Attr); // leave without handling or retry, not important (it normally toggles chaotically)
+                                        }
+                                        if (!SalMoveFile(tmpName, origFullName))
+                                        { // this apparently can happen; inexplicably, Windows creates a file named origFullName instead of op->TargetName (the DOS name)
+                                            TRACE_I("DoMoveFile(): Unexpected situation: unable to rename file/dir from tmp-name to original long file name! " << origFullName);
+                                            if (moveDone)
+                                            {
+                                                if (SalMoveFile(op->TargetName, sourceNameMvDir))
+                                                    moveDone = FALSE;
+                                                if (!SalMoveFile(tmpName, origFullName))
+                                                    TRACE_E("DoMoveFile(): Fatal unexpected situation: unable to rename file/dir from tmp-name to original long file name! " << origFullName);
+                                            }
+                                        }
+                                        else
+                                        {
+                                            if ((origFullNameAttr & FILE_ATTRIBUTE_ARCHIVE) == 0)
+                                                SetFileAttributesUtf8(origFullName, origFullNameAttr); // leave without handling or retry, not important (it normally toggles chaotically)
+                                        }
+
+                                        if (moveDone)
+                                            goto OPERATION_DONE;
+                                    }
+                                }
+                                else
+                                    TRACE_E("DoMoveFile(): Original full file/dir name is too long, unable to bypass only-dos-name-overwrite problem!");
+                            }
                         }
                     }
                 }
@@ -6582,58 +6603,65 @@ BOOL SalCreateDirectoryEx(const char* name, DWORD* err)
                 {
                     // rename ("tidy up") the file/directory whose DOS name conflicts to a temporary 8.3 name (no extra DOS name needed)
                     char tmpName[MAX_PATH + 20];
-                    lstrcpyn(tmpName, name, MAX_PATH);
-                    CutDirectory(tmpName);
-                    SalPathAddBackslash(tmpName, MAX_PATH + 20);
-                    char* tmpNamePart = tmpName + strlen(tmpName);
-                    char origFullName[MAX_PATH];
-                    if (SalPathAppend(tmpName, fullName, MAX_PATH))
+                    if (strlen(name) >= _countof(tmpName))
                     {
-                        strcpy(origFullName, tmpName);
-                        DWORD num = (GetTickCount() / 10) % 0xFFF;
-                        DWORD origFullNameAttr = SalGetFileAttributes(origFullName);
-                        while (1)
-                        {
-                            sprintf(tmpNamePart, "sal%03X", num++);
-                            if (SalMoveFile(origFullName, tmpName))
-                                break;
-                            DWORD e = GetLastError();
-                            if (e != ERROR_FILE_EXISTS && e != ERROR_ALREADY_EXISTS)
-                            {
-                                tmpName[0] = 0;
-                                break;
-                            }
-                        }
-                        if (tmpName[0] != 0) // if we managed to "tidy up" the conflicting file, retry the move
-                        {                    // and then restore the original name of the "tidied" file
-                            BOOL createDirDone = nameW != NULL ? CreateDirectoryW(nameW, NULL) : FALSE;
-                            if (!SalMoveFile(tmpName, origFullName))
-                            { // this can apparently happen: inexplicably Windows creates a file named origFullName instead of name (the DOS name)
-                                TRACE_I("Unexpected situation: unable to rename file from tmp-name to original long file name! " << origFullName);
-                                if (createDirDone)
-                                {
-                                    if (nameW != NULL && RemoveDirectoryW(nameW))
-                                        createDirDone = FALSE;
-                                    if (!SalMoveFile(tmpName, origFullName))
-                                        TRACE_E("Fatal unexpected situation: unable to rename file from tmp-name to original long file name! " << origFullName);
-                                }
-                            }
-                            else
-                            {
-                                if ((origFullNameAttr & FILE_ATTRIBUTE_ARCHIVE) == 0)
-                                {
-                                    CStrP origFullNameW(ConvertAllocUtf8ToWide(origFullName, -1));
-                                    if (origFullNameW != NULL)
-                                        SetFileAttributesW(origFullNameW, origFullNameAttr); // leave it without extra handling or retries; not important (normally toggles unpredictably)
-                                }
-                            }
-
-                            if (createDirDone)
-                                return TRUE;
-                        }
+                        TRACE_E("SalCreateDirectoryEx(): path too long for DOS-name collision workaround: " << name);
                     }
                     else
-                        TRACE_E("Original full file name is too long, unable to bypass only-dos-name-overwrite problem!");
+                    {
+                        lstrcpyn(tmpName, name, _countof(tmpName));
+                        CutDirectory(tmpName);
+                        SalPathAddBackslash(tmpName, _countof(tmpName));
+                        char* tmpNamePart = tmpName + strlen(tmpName);
+                        char origFullName[MAX_PATH + 20];
+                        if (SalPathAppend(tmpName, fullName, _countof(tmpName)))
+                        {
+                            strcpy(origFullName, tmpName);
+                            DWORD num = (GetTickCount() / 10) % 0xFFF;
+                            DWORD origFullNameAttr = SalGetFileAttributes(origFullName);
+                            while (1)
+                            {
+                                sprintf(tmpNamePart, "sal%03X", num++);
+                                if (SalMoveFile(origFullName, tmpName))
+                                    break;
+                                DWORD e = GetLastError();
+                                if (e != ERROR_FILE_EXISTS && e != ERROR_ALREADY_EXISTS)
+                                {
+                                    tmpName[0] = 0;
+                                    break;
+                                }
+                            }
+                            if (tmpName[0] != 0) // if we managed to "tidy up" the conflicting file, retry the move
+                            {                    // and then restore the original name of the "tidied" file
+                                BOOL createDirDone = nameW != NULL ? CreateDirectoryW(nameW, NULL) : FALSE;
+                                if (!SalMoveFile(tmpName, origFullName))
+                                { // this can apparently happen: inexplicably Windows creates a file named origFullName instead of name (the DOS name)
+                                    TRACE_I("Unexpected situation: unable to rename file from tmp-name to original long file name! " << origFullName);
+                                    if (createDirDone)
+                                    {
+                                        if (nameW != NULL && RemoveDirectoryW(nameW))
+                                            createDirDone = FALSE;
+                                        if (!SalMoveFile(tmpName, origFullName))
+                                            TRACE_E("Fatal unexpected situation: unable to rename file from tmp-name to original long file name! " << origFullName);
+                                    }
+                                }
+                                else
+                                {
+                                    if ((origFullNameAttr & FILE_ATTRIBUTE_ARCHIVE) == 0)
+                                    {
+                                        CStrP origFullNameW(ConvertAllocUtf8ToWide(origFullName, -1));
+                                        if (origFullNameW != NULL)
+                                            SetFileAttributesW(origFullNameW, origFullNameAttr); // leave it without extra handling or retries; not important (normally toggles unpredictably)
+                                    }
+                                }
+
+                                if (createDirDone)
+                                    return TRUE;
+                            }
+                        }
+                        else
+                            TRACE_E("Original full file name is too long, unable to bypass only-dos-name-overwrite problem!");
+                    }
                 }
             }
         }
@@ -6973,8 +7001,8 @@ BOOL DoCreateDir(HWND hProgressDlg, char* name, DWORD attr,
                     if (dlgData.CnfrmDirOver && !dlgData.DirOverwriteAll) // should we ask the user about overwriting the directory?
                     {
                         char sAttr[101], tAttr[101];
-                        GetDirInfo(sAttr, sourceDir);
-                        GetDirInfo(tAttr, name);
+                        GetDirInfo(sAttr, _countof(sAttr), sourceDir);
+                        GetDirInfo(tAttr, _countof(tAttr), name);
 
                         WaitForSingleObject(dlgData.WorkerNotSuspended, INFINITE); // if we should be in suspend mode, wait ...
                         if (*dlgData.CancelWorker)

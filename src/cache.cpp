@@ -365,6 +365,8 @@ BOOL CCacheDirData::ContainTmpName(const char* tmpName, const char* rootTmpPath,
     CALL_STACK_MESSAGE2("CCacheDirData::ContainTmpName(%s, , ,)", tmpName);
 
     *canContainThisName = FALSE;
+    if (PathLength <= 0)
+        return FALSE;
     if (rootTmpPathLen < PathLength &&
         StrNICmp(Path, rootTmpPath, rootTmpPathLen) == 0)
     {
@@ -479,6 +481,8 @@ void CCacheDirData::RemoveEmptyTmpDirsOnlyFromDisk()
 {
     CALL_STACK_MESSAGE1("CCacheDirData::RemoveEmptyTmpDirsOnlyFromDisk()");
 
+    if (PathLength <= 0)
+        return;
     if (PathLength > 0)
         Path[PathLength - 1] = 0; // backslash trimming
     CStrP pathW(ConvertAllocUtf8ToWide(Path, -1));
@@ -495,6 +499,8 @@ BOOL CCacheDirData::GetName(CDiskCache* monitor, const char* name, BOOL* exists,
                             BOOL canBlock, BOOL onlyAdd, int* errorCode)
 {
     CALL_STACK_MESSAGE4("CCacheDirData::GetName(, %s, , , %d, %d,)", name, canBlock, onlyAdd);
+    if (PathLength <= 0)
+        return FALSE;
     int i;
     if (errorCode != NULL)
         *errorCode = DCGNE_SUCCESS;
@@ -517,6 +523,14 @@ CCacheDirData::GetName(const char* name, const char* tmpName, BOOL* exists, BOOL
     CALL_STACK_MESSAGE4("CCacheDirData::GetName(%s, %s, , %d, ,)", name, tmpName, ownDelete);
     if (errorCode != NULL)
         *errorCode = DCGNE_SUCCESS;
+    if (PathLength <= 0)
+    {
+        TRACE_E("CCacheDirData::GetName(): invalid tmp-directory path.");
+        *exists = TRUE;
+        if (errorCode != NULL)
+            *errorCode = DCGNE_TOOLONGNAME;
+        return NULL;
+    }
     char tmpFullName[MAX_PATH];
     memcpy(tmpFullName, Path, PathLength);
     if (PathLength + strlen(tmpName) + 1 <= MAX_PATH)
@@ -662,6 +676,8 @@ void CCacheDirData::AddVictimsToArray(TDirectArray<CCacheData*>& victArr)
 
 BOOL CCacheDirData::DetachTmpFile(const char* tmpName)
 {
+    if (PathLength <= 0)
+        return FALSE;
     if (StrNICmp(tmpName, Path, PathLength) == 0) // if there's a chance that this is our tmp-file
     {
         int i;
