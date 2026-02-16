@@ -7461,7 +7461,13 @@ CONVERT_AGAIN:
         if (hSource != INVALID_HANDLE_VALUE)
         {
             // derive the path for the temporary file
-            char tmpPath[MAX_PATH];
+            char tmpPath[3 * MAX_PATH];
+            if (strlen(name) >= _countof(tmpPath))
+            {
+                TRACE_E("DoConvert(): source path is too long for temporary path handling: " << name);
+                HANDLES(CloseHandle(hSource));
+                return FALSE;
+            }
             strcpy(tmpPath, name);
             char* terminator = strrchr(tmpPath, '\\');
             if (terminator == NULL)
@@ -7594,14 +7600,14 @@ CONVERT_AGAIN:
                                             }
                                             else
                                             {
-                                                *targetIterator = convertData.CodeTable[*sourceIterator];
+                                                *targetIterator = convertData.CodeTable[(unsigned char)*sourceIterator];
                                                 targetIterator++;
                                             }
                                         }
                                     }
                                     else
                                     {
-                                        *targetIterator = convertData.CodeTable[*sourceIterator];
+                                        *targetIterator = convertData.CodeTable[(unsigned char)*sourceIterator];
                                         targetIterator++;
                                     }
                                     sourceIterator++;
@@ -7738,10 +7744,18 @@ CONVERT_AGAIN:
 
                                         WaitForSingleObject(dlgData.WorkerNotSuspended, INFINITE); // if we should be in suspend mode, wait ...
                                         if (*dlgData.CancelWorker)
+                                        {
+                                            ClearReadOnlyAttr(tmpFileName); // ensure it can be deleted
+                                            DeleteFileUtf8(tmpFileName);
                                             return FALSE;
+                                        }
 
                                         if (dlgData.SkipAllMoveErrors)
+                                        {
+                                            ClearReadOnlyAttr(tmpFileName); // ensure it can be deleted
+                                            DeleteFileUtf8(tmpFileName);
                                             return TRUE;
+                                        }
 
                                         int ret = IDCANCEL;
                                         char* data[4];
@@ -7758,9 +7772,13 @@ CONVERT_AGAIN:
                                         case IDB_SKIPALL:
                                             dlgData.SkipAllMoveErrors = TRUE;
                                         case IDB_SKIP:
+                                            ClearReadOnlyAttr(tmpFileName); // ensure it can be deleted
+                                            DeleteFileUtf8(tmpFileName);
                                             return TRUE;
 
                                         case IDCANCEL:
+                                            ClearReadOnlyAttr(tmpFileName); // ensure it can be deleted
+                                            DeleteFileUtf8(tmpFileName);
                                             return FALSE;
                                         }
                                     }
@@ -7822,7 +7840,7 @@ CONVERT_AGAIN:
 
                     DWORD err = GetLastError();
 
-                    char fakeName[MAX_PATH]; // name of the temp file that cannot be created/opened
+                    char fakeName[3 * MAX_PATH]; // name of the temp file that cannot be created/opened
                     if (tmpFileExists)
                     {
                         strcpy(fakeName, tmpFileName);
@@ -7836,8 +7854,16 @@ CONVERT_AGAIN:
                         char* s = tmpPath + strlen(tmpPath);
                         if (s > tmpPath && *(s - 1) == '\\')
                             s--;
-                        memcpy(fakeName, tmpPath, s - tmpPath);
-                        strcpy(fakeName + (s - tmpPath), "\\cnv0000.tmp");
+                        size_t fakeNamePrefixLen = (size_t)(s - tmpPath);
+                        const char* fakeNameSuffix = "\\cnv0000.tmp";
+                        size_t fakeNameSuffixLen = strlen(fakeNameSuffix);
+                        if (fakeNamePrefixLen + fakeNameSuffixLen < _countof(fakeName))
+                        {
+                            memcpy(fakeName, tmpPath, fakeNamePrefixLen);
+                            memcpy(fakeName + fakeNamePrefixLen, fakeNameSuffix, fakeNameSuffixLen + 1);
+                        }
+                        else
+                            lstrcpyn(fakeName, tmpPath, _countof(fakeName));
                     }
 
                     WaitForSingleObject(dlgData.WorkerNotSuspended, INFINITE); // if we should be in suspend mode, wait ...

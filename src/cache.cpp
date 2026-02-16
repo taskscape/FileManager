@@ -326,9 +326,16 @@ void CCacheData::PrematureDeleteByPlugin(CPluginInterfaceAbstract* ownDeletePlug
 
 CCacheDirData::CCacheDirData(const char* path) : Names(100, 50)
 {
+    Path[0] = 0;
+    PathLength = 0;
     int l = (int)strlen(path);
     if (l > 0 && path[l - 1] == '\\')
         l--;
+    if (l >= MAX_PATH - 1)
+    {
+        TRACE_E("CCacheDirData::CCacheDirData(): path is too long.");
+        return;
+    }
     memcpy(Path, path, l);
     if (l > 0)
         Path[l++] = '\\';
@@ -345,9 +352,11 @@ CCacheDirData::~CCacheDirData()
         delete name;
     }
     if (PathLength > 0)
+    {
         Path[PathLength - 1] = 0; // trimming a backslash
-    SetFileAttributesUtf8(Path, FILE_ATTRIBUTE_ARCHIVE);
-    RemoveDirectoryUtf8(Path);
+        SetFileAttributesUtf8(Path, FILE_ATTRIBUTE_ARCHIVE);
+        RemoveDirectoryUtf8(Path);
+    }
 }
 
 BOOL CCacheDirData::ContainTmpName(const char* tmpName, const char* rootTmpPath,
