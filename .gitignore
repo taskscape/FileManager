@@ -32,4 +32,11 @@ x86/
 *.dll
 
 # Patches and temp files
+.claude/settings.local.json
 *.patch
+*.bak
+*tmpclaude*
+*.log
+src/nul
+nul
+*.backup
