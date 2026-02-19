@@ -1228,12 +1228,14 @@ BOOL SalMoveFile(const char* srcName, const char* destName)
     // if name ends with space/dot, we must append '\\', otherwise MoveFile
     // will trim spaces/dots and work with different name
     char srcNameCopy[3 * MAX_PATH];
-    MakeCopyWithBackslashIfNeeded(srcName, srcNameCopy);
+    const char* srcNameToUse = srcName;
+    MakeCopyWithBackslashIfNeeded(srcNameToUse, srcNameCopy);
     char destNameCopy[3 * MAX_PATH];
-    MakeCopyWithBackslashIfNeeded(destName, destNameCopy);
+    const char* destNameToUse = destName;
+    MakeCopyWithBackslashIfNeeded(destNameToUse, destNameCopy);
 
-    CStrP srcNameW(ConvertAllocUtf8ToWide(srcName, -1));
-    CStrP destNameW(ConvertAllocUtf8ToWide(destName, -1));
+    CStrP srcNameW(ConvertAllocUtf8ToWide(srcNameToUse, -1));
+    CStrP destNameW(ConvertAllocUtf8ToWide(destNameToUse, -1));
     if (srcNameW == NULL || destNameW == NULL)
     {
         SetLastError(ERROR_NO_UNICODE_TRANSLATION);
@@ -1512,9 +1514,10 @@ DWORD SalGetFileAttributes(const char* fileName)
     // but still better than getting attributes of different file/directory (for "c:\\file.txt   "
     // works with name "c:\\file.txt")
     char fileNameCopy[3 * MAX_PATH];
-    MakeCopyWithBackslashIfNeeded(fileName, fileNameCopy);
+    const char* fileNameToUse = fileName;
+    MakeCopyWithBackslashIfNeeded(fileNameToUse, fileNameCopy);
 
-    CStrP fileNameW(ConvertAllocUtf8ToWide(fileName, -1));
+    CStrP fileNameW(ConvertAllocUtf8ToWide(fileNameToUse, -1));
     if (fileNameW == NULL)
     {
         SetLastError(ERROR_NO_UNICODE_TRANSLATION);
