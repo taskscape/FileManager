@@ -911,7 +911,7 @@ void DoDragFromArchiveOrFS(CFilesWindow* panel, BOOL& dropDone, char* targetPath
         // create "fake" directory
         char fakeRootDir[MAX_PATH];
         char* fakeName;
-        if (SalGetTempFileName(NULL, "SAL", fakeRootDir, FALSE))
+        if (SalGetTempFileName(NULL, "SAL", fakeRootDir, _countof(fakeRootDir), FALSE))
         {
             fakeName = fakeRootDir + strlen(fakeRootDir);
             // jr: I found a mention on the net "Did implementing "IPersistStream" and providing the undocumented
@@ -1325,7 +1325,7 @@ void ShellAction(CFilesWindow* panel, CShellAction action, BOOL useSelection,
                     // create "fake" directory
                     char fakeRootDir[MAX_PATH];
                     char* fakeName;
-                    if (SalGetTempFileName(NULL, "SAL", fakeRootDir, FALSE))
+                    if (SalGetTempFileName(NULL, "SAL", fakeRootDir, _countof(fakeRootDir), FALSE))
                     {
                         BOOL delFakeDir = TRUE;
                         fakeName = fakeRootDir + strlen(fakeRootDir);

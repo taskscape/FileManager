@@ -1450,7 +1450,7 @@ BOOL PackUniversalUncompress(HWND parent, const char* command, TPackErrorTable* 
 
     // Create the name of the temporary directory
     char tmpDirNameBuf[MAX_PATH];
-    if (!SalGetTempFileName(targetDir, "PACK", tmpDirNameBuf, FALSE))
+    if (!SalGetTempFileName(targetDir, "PACK", tmpDirNameBuf, _countof(tmpDirNameBuf), FALSE))
     {
         char buffer[1000];
         strcpy(buffer, "SalGetTempFileName: ");
@@ -1464,7 +1464,7 @@ BOOL PackUniversalUncompress(HWND parent, const char* command, TPackErrorTable* 
 
     // Create the name of the temporary file
     char tmpListNameBuf[MAX_PATH];
-    if (!SalGetTempFileName(NULL, "PACK", tmpListNameBuf, TRUE))
+    if (!SalGetTempFileName(NULL, "PACK", tmpListNameBuf, _countof(tmpListNameBuf), TRUE))
     {
         char buffer[1000];
         strcpy(buffer, "SalGetTempFileName: ");
@@ -1812,7 +1812,7 @@ BOOL PackUnpackOneFile(CFilesWindow* panel, const char* archiveFileName,
 
     // buffer for the full name of the temporary directory
     char tmpDirNameBuf[MAX_PATH];
-    if (!SalGetTempFileName(targetDir, "PACK", tmpDirNameBuf, FALSE))
+    if (!SalGetTempFileName(targetDir, "PACK", tmpDirNameBuf, _countof(tmpDirNameBuf), FALSE))
     {
         char buffer[1000];
         strcpy(buffer, "SalGetTempFileName: ");

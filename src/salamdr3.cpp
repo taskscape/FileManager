@@ -107,9 +107,10 @@ void SalPathRemoveExtension(char* path)
     }
 
     int len = (int)strlen(path);
-    char* iterator = path + len - 1;
-    while (iterator >= path)
+    char* iterator = path + len;
+    while (iterator > path)
     {
+        iterator--;
         if (*iterator == '.')
         {
             //      if (iterator != path && *(iterator - 1) != '\\')  // ".cvspass" in Windows is an extension ...
@@ -118,7 +119,6 @@ void SalPathRemoveExtension(char* path)
         }
         if (*iterator == '\\')
             break;
-        iterator--;
     }
 }
 
@@ -131,9 +131,10 @@ BOOL SalPathAddExtension(char* path, const char* extension, int pathSize)
     }
 
     int len = (int)strlen(path);
-    char* iterator = path + len - 1;
-    while (iterator >= path)
+    char* iterator = path + len;
+    while (iterator > path)
     {
+        iterator--;
         if (*iterator == '.')
         {
             //      if (iterator != path && *(iterator - 1) != '\\')  // ".cvspass" in Windows is an extension ...
@@ -142,7 +143,6 @@ BOOL SalPathAddExtension(char* path, const char* extension, int pathSize)
         }
         if (*iterator == '\\')
             break;
-        iterator--;
     }
 
     int extLen = (int)strlen(extension);
@@ -164,9 +164,10 @@ BOOL SalPathRenameExtension(char* path, const char* extension, int pathSize)
     }
 
     int len = (int)strlen(path);
-    char* iterator = path + len - 1;
-    while (iterator >= path)
+    char* iterator = path + len;
+    while (iterator > path)
     {
+        iterator--;
         if (*iterator == '.')
         {
             //      if (iterator != path && *(iterator - 1) != '\\')  // ".cvspass" in Windows is an extension ...
@@ -178,7 +179,6 @@ BOOL SalPathRenameExtension(char* path, const char* extension, int pathSize)
         }
         if (*iterator == '\\')
             break;
-        iterator--;
     }
 
     int extLen = (int)strlen(extension);
@@ -196,24 +196,32 @@ const char* SalPathFindFileName(const char* path)
     if (path == NULL)
     {
         TRACE_E("Unexpected situation in SalPathFindFileName()");
-        return NULL;
+        return "";
     }
 
     int len = (int)strlen(path);
-    const char* iterator = path + len - 2;
-    while (iterator >= path)
+    if (len <= 1)
+        return path;
+    const char* iterator = path + len - 1;
+    while (iterator > path)
     {
+        iterator--;
         if (*iterator == '\\')
             return iterator + 1;
-        iterator--;
     }
     return path;
 }
 
 // ****************************************************************************
 
-BOOL SalGetTempFileName(const char* path, const char* prefix, char* tmpName, BOOL file)
+BOOL SalGetTempFileName(const char* path, const char* prefix, char* tmpName, int tmpNameLen, BOOL file)
 {
+    if (tmpName == NULL || tmpNameLen <= 0)
+    {
+        SetLastError(ERROR_INVALID_PARAMETER);
+        return FALSE;
+    }
+
     WCHAR tmpDirW[MAX_PATH + 10];
     WCHAR* endW = tmpDirW + MAX_PATH + 10;
     if (path == NULL)
@@ -248,7 +256,15 @@ BOOL SalGetTempFileName(const char* path, const char* prefix, char* tmpName, BOO
 
     WCHAR* sW = tmpDirW + lstrlenW(tmpDirW);
     if (sW > tmpDirW && *(sW - 1) != L'\\')
+    {
+        if (sW >= endW)
+        {
+            TRACE_E("Too long path in SalGetTempFileName().");
+            SetLastError(ERROR_BUFFER_OVERFLOW);
+            return FALSE;
+        }
         *sW++ = L'\\';
+    }
 
     WCHAR prefixW[128];
     prefixW[0] = 0;
@@ -277,7 +293,7 @@ BOOL SalGetTempFileName(const char* path, const char* prefix, char* tmpName, BOO
                 if (h != INVALID_HANDLE_VALUE)
                 {
                     HANDLES(CloseHandle(h));
-                    if (ConvertWideToUtf8(tmpDirW, -1, tmpName, MAX_PATH) == 0)
+                    if (ConvertWideToUtf8(tmpDirW, -1, tmpName, tmpNameLen) == 0)
                     {
                         SetLastError(ERROR_NO_UNICODE_TRANSLATION);
                         return FALSE;
@@ -289,7 +305,7 @@ BOOL SalGetTempFileName(const char* path, const char* prefix, char* tmpName, BOO
             {
                 if (CreateDirectoryW(tmpDirW, NULL))
                 {
-                    if (ConvertWideToUtf8(tmpDirW, -1, tmpName, MAX_PATH) == 0)
+                    if (ConvertWideToUtf8(tmpDirW, -1, tmpName, tmpNameLen) == 0)
                     {
                         SetLastError(ERROR_NO_UNICODE_TRANSLATION);
                         return FALSE;
@@ -574,7 +590,7 @@ BOOL SalGetFullName(char* name, int* errTextID, const char* curDir, char* nextFo
                             while (*test != 0 && *test != '\\')
                                 test++;
                             if (*test == 0 && (int)strlen(name) < MAX_PATH)
-                                strcpy(nextFocus, name);
+                                lstrcpyn(nextFocus, name, MAX_PATH);
                         }
 
                         int l2 = (int)strlen(curDir);
@@ -997,11 +1013,15 @@ void _RemoveTemporaryDir(const char* dir)
     char path[MAX_PATH + 2];
     WIN32_FIND_DATAW fileW;
     WIN32_FIND_DATA file;
-    strcpy(path, dir);
+    int dirLen = (int)strlen(dir);
+    if (dirLen <= 0 || dirLen >= MAX_PATH)
+        return;
+    lstrcpyn(path, dir, _countof(path));
     char* end = path + strlen(path);
     if (*(end - 1) != '\\')
         *end++ = '\\';
-    strcpy(end, "*");
+    *end++ = '*';
+    *end = 0;
     CStrP pathW(ConvertAllocUtf8ToWide(path, -1));
     HANDLE find = pathW != NULL ? HANDLES_Q(FindFirstFileW(pathW, &fileW)) : INVALID_HANDLE_VALUE;
     if (find != INVALID_HANDLE_VALUE)
@@ -1012,7 +1032,7 @@ void _RemoveTemporaryDir(const char* dir)
             if (file.cFileName[0] != 0 && strcmp(file.cFileName, "..") && strcmp(file.cFileName, ".") &&
                 (end - path) + strlen(file.cFileName) < MAX_PATH)
             {
-                strcpy(end, file.cFileName);
+                lstrcpyn(end, file.cFileName, (int)(_countof(path) - (end - path)));
                 ClearReadOnlyAttr(path, file.dwFileAttributes);
                 if (file.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)
                     _RemoveTemporaryDir(path);
@@ -1061,11 +1081,15 @@ void _RemoveEmptyDirs(const char* dir)
     char path[MAX_PATH + 2];
     WIN32_FIND_DATAW fileW;
     WIN32_FIND_DATA file;
-    strcpy(path, dir);
+    int dirLen = (int)strlen(dir);
+    if (dirLen <= 0 || dirLen >= MAX_PATH)
+        return;
+    lstrcpyn(path, dir, _countof(path));
     char* end = path + strlen(path);
     if (*(end - 1) != '\\')
         *end++ = '\\';
-    strcpy(end, "*");
+    *end++ = '*';
+    *end = 0;
     CStrP pathW(ConvertAllocUtf8ToWide(path, -1));
     HANDLE find = pathW != NULL ? HANDLES_Q(FindFirstFileW(pathW, &fileW)) : INVALID_HANDLE_VALUE;
     if (find != INVALID_HANDLE_VALUE)
@@ -1078,7 +1102,7 @@ void _RemoveEmptyDirs(const char* dir)
                 if ((file.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) &&
                     (end - path) + strlen(file.cFileName) < MAX_PATH)
                 {
-                    strcpy(end, file.cFileName);
+                    lstrcpyn(end, file.cFileName, (int)(_countof(path) - (end - path)));
                     ClearReadOnlyAttr(path, file.dwFileAttributes);
                     _RemoveEmptyDirs(path);
                 }
@@ -1144,7 +1168,7 @@ AGAIN:
         GetRootPath(root, dir);
         if (dirLen <= (int)strlen(root)) // dir je root adresar
         {
-            sprintf(buf, LoadStr(IDS_CREATEDIRFAILED), dir);
+            _snprintf_s(buf, _countof(buf), _TRUNCATE, LoadStr(IDS_CREATEDIRFAILED), dir);
             if (errBuf != NULL)
                 strncpy_s(errBuf, errBufSize, buf, _TRUNCATE);
             else
@@ -1160,9 +1184,9 @@ AGAIN:
                 char title[100];
                 char text[MAX_PATH + 500];
                 char checkText[200];
-                sprintf(title, LoadStr(IDS_QUESTION));
-                sprintf(text, LoadStr(IDS_CREATEDIRECTORY), dir);
-                sprintf(checkText, LoadStr(IDS_DONTSHOWAGAINCD));
+                lstrcpyn(title, LoadStr(IDS_QUESTION), _countof(title));
+                _snprintf_s(text, _countof(text), _TRUNCATE, LoadStr(IDS_CREATEDIRECTORY), dir);
+                lstrcpyn(checkText, LoadStr(IDS_DONTSHOWAGAINCD), _countof(checkText));
                 BOOL dontShow = !Configuration.CnfrmCreateDir;
 
                 MSGBOXEX_PARAMS params;
@@ -1182,14 +1206,14 @@ AGAIN:
         }
         if (quiet || msgBoxRet == IDOK)
         {
-            strcpy(name, dir);
+            lstrcpyn(name, dir, _countof(name));
             char* s;
             while (1) // najdeme prvni existujici adresar
             {
                 s = strrchr(name, '\\');
                 if (s == NULL)
                 {
-                    sprintf(buf, LoadStr(IDS_CREATEDIRFAILED), dir);
+                    _snprintf_s(buf, _countof(buf), _TRUNCATE, LoadStr(IDS_CREATEDIRFAILED), dir);
                     if (errBuf != NULL)
                         strncpy_s(errBuf, errBufSize, buf, _TRUNCATE);
                     else
@@ -1200,7 +1224,7 @@ AGAIN:
                     *s = 0;
                 else
                 {
-                    strcpy(name, root);
+                    lstrcpyn(name, root, _countof(name));
                     break; // uz jsme na root-adresari
                 }
                 attrs = SalGetFileAttributes(name);
@@ -1210,7 +1234,7 @@ AGAIN:
                         break; // budeme stavet od tohoto adresare
                     else       // je to soubor, to by neslo ...
                     {
-                        sprintf(buf, LoadStr(IDS_NAMEUSEDFORFILE), name);
+                        _snprintf_s(buf, _countof(buf), _TRUNCATE, LoadStr(IDS_NAMEUSEDFORFILE), name);
                         if (errBuf != NULL)
                             strncpy_s(errBuf, errBufSize, buf, _TRUNCATE);
                         else
@@ -1257,7 +1281,7 @@ AGAIN:
                 if (invalidName || !CreateDirectoryUtf8(name, NULL))
                 {
                     DWORD lastErr = invalidName ? ERROR_INVALID_NAME : GetLastError();
-                    sprintf(buf, LoadStr(IDS_CREATEDIRFAILED), name);
+                    _snprintf_s(buf, _countof(buf), _TRUNCATE, LoadStr(IDS_CREATEDIRFAILED), name);
                     if (errBuf != NULL)
                         strncpy_s(errBuf, errBufSize, buf, _TRUNCATE);
                     else
@@ -1280,7 +1304,7 @@ AGAIN:
                 else
                 {
                     if (first && newDir != NULL)
-                        strcpy(newDir, name);
+                        lstrcpyn(newDir, name, MAX_PATH);
                     first = FALSE;
                 }
                 name[len++] = '\\';
@@ -1296,7 +1320,7 @@ AGAIN:
         return TRUE;
     else // soubor, to by neslo ...
     {
-        sprintf(buf, LoadStr(IDS_NAMEUSEDFORFILE), dir);
+        _snprintf_s(buf, _countof(buf), _TRUNCATE, LoadStr(IDS_NAMEUSEDFORFILE), dir);
         if (errBuf != NULL)
             strncpy_s(errBuf, errBufSize, buf, _TRUNCATE);
         else
@@ -1583,7 +1607,7 @@ BOOL CPathHistoryItem::Execute(CFilesWindow* panel)
                     {
                         if (failReason == CHPPFR_SHORTERPATH || failReason == CHPPFR_FILENAMEFOCUSED)
                         {
-                            sprintf(errBuf, LoadStr(IDS_PATHINARCHIVENOTFOUND), ArchivePathOrFSUserPart);
+                            _snprintf_s(errBuf, _countof(errBuf), _TRUNCATE, LoadStr(IDS_PATHINARCHIVENOTFOUND), ArchivePathOrFSUserPart);
                             SalMessageBox(panel->HWindow, errBuf, LoadStr(IDS_ERRORCHANGINGDIR),
                                           MB_OK | MB_ICONEXCLAMATION);
                         }
@@ -2152,7 +2176,12 @@ void CPathHistory::SaveToRegistry(HKEY hKey, const char* name, BOOL onlyClear)
                 {
                 case 0: // disk
                 {
-                    strcpy(path, item->PathOrArchiveOrFSName);
+                    if (strlen(item->PathOrArchiveOrFSName) >= _countof(path))
+                    {
+                        TRACE_E("CPathHistory::SaveToRegistry(): path is too long, skipping.");
+                        continue;
+                    }
+                    lstrcpyn(path, item->PathOrArchiveOrFSName, _countof(path));
                     break;
                 }
 
@@ -2161,7 +2190,12 @@ void CPathHistory::SaveToRegistry(HKEY hKey, const char* name, BOOL onlyClear)
                 case 1: // archive
                 case 2: // FS
                 {
-                    strcpy(path, item->PathOrArchiveOrFSName);
+                    if (strlen(item->PathOrArchiveOrFSName) >= _countof(path))
+                    {
+                        TRACE_E("CPathHistory::SaveToRegistry(): path is too long, skipping.");
+                        continue;
+                    }
+                    lstrcpyn(path, item->PathOrArchiveOrFSName, _countof(path));
                     StrNCat(path, ":", 2 * MAX_PATH);
                     if (item->ArchivePathOrFSUserPart != NULL)
                         StrNCat(path, item->ArchivePathOrFSUserPart, 2 * MAX_PATH);
@@ -2227,7 +2261,7 @@ void CPathHistory::LoadFromRegistry(HKEY hKey, const char* name)
                     else
                     {
                         // kandidat na FS path
-                        if (IsPluginFSPath(path, fsName, &archivePathOrFSUserPart))
+                        if (IsPluginFSPath(path, fsName, _countof(fsName), &archivePathOrFSUserPart))
                         {
                             pathOrArchiveOrFSName = fsName;
                             type = 2;
@@ -2634,6 +2668,11 @@ CUserMenuItem::~CUserMenuItem()
 
 BOOL CUserMenuItem::Set(char* name, char* umCommand, char* arguments, char* initDir, char* icon)
 {
+    if (name == NULL || umCommand == NULL || arguments == NULL || initDir == NULL || icon == NULL)
+    {
+        TRACE_E("CUserMenuItem::Set(): unexpected NULL parameter.");
+        return FALSE;
+    }
     char* itemName = (char*)malloc(strlen(name) + 1);
     char* commandName = (char*)malloc(strlen(umCommand) + 1);
     char* argumentsName = (char*)malloc(strlen(arguments) + 1);
@@ -2642,6 +2681,11 @@ BOOL CUserMenuItem::Set(char* name, char* umCommand, char* arguments, char* init
     if (itemName == NULL || commandName == NULL ||
         argumentsName == NULL || initDirName == NULL || iconName == NULL)
     {
+        free(itemName);
+        free(commandName);
+        free(argumentsName);
+        free(initDirName);
+        free(iconName);
         TRACE_E(LOW_MEMORY);
         return FALSE;
     }
@@ -3096,7 +3140,14 @@ BOOL CFileTimeStamps::AddFile(const char* zipFile, const char* zipRoot, const ch
                               const FILETIME& lastWrite, const CQuadWord& fileSize, DWORD attr)
 {
     if (ZIPFile[0] == 0)
-        strcpy(ZIPFile, zipFile);
+    {
+        if (strlen(zipFile) >= _countof(ZIPFile))
+        {
+            TRACE_E("CFileTimeStamps::AddFile(): ZIP file path is too long.");
+            return FALSE;
+        }
+        lstrcpyn(ZIPFile, zipFile, _countof(ZIPFile));
+    }
     else
     {
         if (strcmp(zipFile, ZIPFile) != 0)
@@ -3194,10 +3245,15 @@ void CFileTimeStamps::AddFilesToListBox(HWND list)
     for (i = 0; i < List.Count; i++)
     {
         char buf[MAX_PATH];
-        strcpy(buf, List[i]->ZIPRoot);
-        SalPathAppend(buf, List[i]->FileName, MAX_PATH);
-        SendMessage(list, LB_ADDSTRING, 0, (LPARAM)buf);
+        lstrcpyn(buf, List[i]->ZIPRoot, _countof(buf));
+        if (strlen(List[i]->ZIPRoot) < _countof(buf) && SalPathAppend(buf, List[i]->FileName, _countof(buf)))
+            SendMessage(list, LB_ADDSTRING, 0, (LPARAM)buf);
     }
+}
+
+BOOL SalGetTempFileName(const char* path, const char* prefix, char* tmpName, BOOL file)
+{
+    return SalGetTempFileName(path, prefix, tmpName, MAX_PATH, file);
 }
 
 void CFileTimeStamps::Remove(int* indexes, int count)
@@ -3265,13 +3321,15 @@ void CFileTimeStamps::CopyFilesTo(HWND parent, int* indexes, int count, const ch
             {
                 CFileTimeStampsItem* item = List[index];
                 char name[MAX_PATH];
-                strcpy(name, item->SourcePath);
-                tooLongName |= !SalPathAppend(name, item->FileName, MAX_PATH);
+                lstrcpyn(name, item->SourcePath, _countof(name));
+                tooLongName |= strlen(item->SourcePath) >= _countof(name);
+                tooLongName |= !SalPathAppend(name, item->FileName, _countof(name));
                 ok &= fromStr.Add(name, (int)strlen(name) + 1);
 
-                strcpy(name, path);
-                tooLongName |= !SalPathAppend(name, item->ZIPRoot, MAX_PATH);
-                tooLongName |= !SalPathAppend(name, item->FileName, MAX_PATH);
+                lstrcpyn(name, path, _countof(name));
+                tooLongName |= strlen(path) >= _countof(name);
+                tooLongName |= !SalPathAppend(name, item->ZIPRoot, _countof(name));
+                tooLongName |= !SalPathAppend(name, item->FileName, _countof(name));
                 ok &= toStr.Add(name, (int)strlen(name) + 1);
             }
         }
@@ -3322,10 +3380,16 @@ void CFileTimeStamps::CheckAndPackAndClear(HWND parent, BOOL* someFilesChanged, 
     for (i = List.Count - 1; i >= 0; i--)
     {
         CFileTimeStampsItem* item = List[i];
-        sprintf(buf, "%s\\%s", item->SourcePath, item->FileName);
         BOOL kill = TRUE;
-        CStrP bufW(ConvertAllocUtf8ToWide(buf, -1));
-        HANDLE find = bufW != NULL ? HANDLES_Q(FindFirstFileW(bufW, &dataW)) : INVALID_HANDLE_VALUE;
+        lstrcpyn(buf, item->SourcePath, _countof(buf));
+        if (strlen(item->SourcePath) >= _countof(buf) || !SalPathAppend(buf, item->FileName, _countof(buf)))
+            kill = FALSE; // keep the item, we cannot safely verify it with truncated path
+        HANDLE find = INVALID_HANDLE_VALUE;
+        if (kill)
+        {
+            CStrP bufW(ConvertAllocUtf8ToWide(buf, -1));
+            find = bufW != NULL ? HANDLES_Q(FindFirstFileW(bufW, &dataW)) : INVALID_HANDLE_VALUE;
+        }
         if (find != INVALID_HANDLE_VALUE)
         {
             HANDLES(FindClose(find));
@@ -3435,6 +3499,12 @@ void CFileTimeStamps::CheckAndPackAndClear(HWND parent, BOOL* someFilesChanged, 
 
 void CTopIndexMem::Push(const char* path, int topIndex)
 {
+    if (strlen(path) >= _countof(Path))
+    {
+        TRACE_E("CTopIndexMem::Push(): path is too long.");
+        Clear();
+        return;
+    }
     // zjistime, jestli path navazuje na Path (path==Path+"\\jmeno")
     const char* s = path + strlen(path);
     if (s > path && *(s - 1) == '\\')
@@ -3464,12 +3534,12 @@ void CTopIndexMem::Push(const char* path, int topIndex)
                 TopIndexes[i] = TopIndexes[i + 1];
             TopIndexesCount--;
         }
-        strcpy(Path, path);
+        lstrcpyn(Path, path, _countof(Path));
         TopIndexes[TopIndexesCount++] = topIndex;
     }
     else // nenavazuje -> prvni top-index v rade
     {
-        strcpy(Path, path);
+        lstrcpyn(Path, path, _countof(Path));
         TopIndexesCount = 1;
         TopIndexes[0] = topIndex;
     }
@@ -3590,12 +3660,15 @@ BOOL CFileHistory::FillPopupMenu(CMenuPopup* popup)
     mii.Type = MENU_TYPE_STRING;
     mii.String = name;
     int i;
+    int inserted = 0;
     for (i = 0; i < Files.Count; i++)
     {
         CFileHistoryItem* item = Files[i];
 
         // jmeno oddelime od cesty znakem '\t' - tim bude ve zvlastnim sloupci
-        lstrcpy(name, item->FileName);
+        lstrcpyn(name, item->FileName, _countof(name));
+        if (strlen(item->FileName) >= _countof(name))
+            continue;
         char* ptr = strrchr(name, '\\');
         if (ptr == NULL)
             return FALSE;
@@ -3620,11 +3693,14 @@ BOOL CFileHistory::FillPopupMenu(CMenuPopup* popup)
         default:
             TRACE_E("Unknown Type=" << item->Type);
         }
-        sprintf(name + lstrlen(name), "\t(%s)", text); // pripojime zpusob, jakym je soubor oteviran
+        StrNCat(name, "\t(", _countof(name));
+        StrNCat(name, text, _countof(name));
+        StrNCat(name, ")", _countof(name)); // pripojime zpusob, jakym je soubor oteviran
         mii.ID = i + 1;
         popup->InsertItem(-1, TRUE, &mii);
+        inserted++;
     }
-    if (i > 0)
+    if (inserted > 0)
     {
         popup->SetStyle(MENU_POPUP_THREECOLUMNS); // prvni dva sloupce jsou zarovnane doleva
         popup->AssignHotKeys();

@@ -1597,7 +1597,7 @@ CViewerWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                         }
                         else
                             strcpy(tmpFile, fileName);
-                        if (attr == 0xFFFFFFFF || SalGetTempFileName(path, "sal", tmpFile, TRUE))
+                        if (attr == 0xFFFFFFFF || SalGetTempFileName(path, "sal", tmpFile, _countof(tmpFile), TRUE))
                         {
                             HANDLE file = HANDLES_Q(CreateFileUtf8(tmpFile, GENERIC_WRITE,
                                                                FILE_SHARE_READ, NULL,

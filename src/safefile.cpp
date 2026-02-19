@@ -167,57 +167,64 @@ CSalamanderSafeFile::SafeFileCreate(const char* fileName,
                 {
                     // rename ("clean up") the file/directory with the conflicting DOS name to a temporary 8.3 name (which doesn’t require an extra DOS name)
                     char tmpName[MAX_PATH + 20];
-                    char origFullName[MAX_PATH];
-                    lstrcpyn(tmpName, fileName, MAX_PATH);
-                    CutDirectory(tmpName);
-                    SalPathAddBackslash(tmpName, MAX_PATH + 20);
-                    char* tmpNamePart = tmpName + strlen(tmpName);
-                    if (SalPathAppend(tmpName, data.cFileName, MAX_PATH))
+                    char origFullName[MAX_PATH + 20];
+                    if (strlen(fileName) >= _countof(tmpName))
                     {
-                        strcpy(origFullName, tmpName);
-                        DWORD num = (GetTickCount() / 10) % 0xFFF;
-                        while (1)
+                        TRACE_E("SafeFileCreate: name too long for DOS-name collision workaround: " << fileName);
+                    }
+                    else
+                    {
+                        lstrcpyn(tmpName, fileName, _countof(tmpName));
+                        CutDirectory(tmpName);
+                        SalPathAddBackslash(tmpName, _countof(tmpName));
+                        char* tmpNamePart = tmpName + strlen(tmpName);
+                        if (SalPathAppend(tmpName, data.cFileName, _countof(tmpName)))
                         {
-                            sprintf(tmpNamePart, "sal%03X", num++);
-                            if (::SalMoveFile(origFullName, tmpName))
-                                break;
-                            DWORD e = GetLastError();
-                            if (e != ERROR_FILE_EXISTS && e != ERROR_ALREADY_EXISTS)
+                            strcpy(origFullName, tmpName);
+                            DWORD num = (GetTickCount() / 10) % 0xFFF;
+                            while (1)
                             {
-                                tmpName[0] = 0;
-                                break;
-                            }
-                        }
-                        if (tmpName[0] != 0) // if we managed to "clean up" the conflicting file/directory, try creating the target
-                        {                    // file/directory and then restore the original name to the "cleaned" file/directory
-                            hFile = INVALID_HANDLE_VALUE;
-                            //              if (!isDir)   // file
-                            //              {       // add the handle to HANDLES at the end only if the SAFE_FILE structure is being filled
-                            hFile = NOHANDLES(CreateFileUtf8(fileName, dwDesiredAccess, dwShareMode, NULL,
-                                                         CREATE_NEW, dwFlagsAndAttributes, NULL));
-                            //              }
-                            //              else   // directory
-                            //              {
-                            //                if (CreateDirectory(fileName, NULL)) out = (void *)1;  // on success we must return something other than INVALID_HANDLE_VALUE
-                            //              }
-                            if (!::SalMoveFile(tmpName, origFullName))
-                            { // this can apparently happen; inexplicably, Windows creates a file named origFullName instead of 'fileName' (the DOS name)
-                                TRACE_I("Unexpected situation in CSalamanderGeneral::SafeCreateFile(): unable to rename file from tmp-name to original long file name! " << origFullName);
-
-                                if (hFile != INVALID_HANDLE_VALUE)
+                                sprintf(tmpNamePart, "sal%03X", num++);
+                                if (::SalMoveFile(origFullName, tmpName))
+                                    break;
+                                DWORD e = GetLastError();
+                                if (e != ERROR_FILE_EXISTS && e != ERROR_ALREADY_EXISTS)
                                 {
-                                    //                  if (!isDir)
-                                    CloseHandle(hFile);
-                                    hFile = INVALID_HANDLE_VALUE;
-                                    //                  if (!isDir)
-                                    DeleteFileUtf8(fileName);
-                                    //                  else RemoveDirectory(fileName);
-                                    if (!::SalMoveFile(tmpName, origFullName))
-                                        TRACE_E("Fatal unexpected situation in CSalamanderGeneral::SafeCreateFile(): unable to rename file from tmp-name to original long file name! " << origFullName);
+                                    tmpName[0] = 0;
+                                    break;
                                 }
                             }
-                            if (hFile != INVALID_HANDLE_VALUE)
-                                goto SUCCESS; // return only on success; errors are handled later (ignore the DOS-name conflict)
+                            if (tmpName[0] != 0) // if we managed to "clean up" the conflicting file/directory, try creating the target
+                            {                    // file/directory and then restore the original name to the "cleaned" file/directory
+                                hFile = INVALID_HANDLE_VALUE;
+                                //              if (!isDir)   // file
+                                //              {       // add the handle to HANDLES at the end only if the SAFE_FILE structure is being filled
+                                hFile = NOHANDLES(CreateFileUtf8(fileName, dwDesiredAccess, dwShareMode, NULL,
+                                                             CREATE_NEW, dwFlagsAndAttributes, NULL));
+                                //              }
+                                //              else   // directory
+                                //              {
+                                //                if (CreateDirectory(fileName, NULL)) out = (void *)1;  // on success we must return something other than INVALID_HANDLE_VALUE
+                                //              }
+                                if (!::SalMoveFile(tmpName, origFullName))
+                                { // this can apparently happen; inexplicably, Windows creates a file named origFullName instead of 'fileName' (the DOS name)
+                                    TRACE_I("Unexpected situation in CSalamanderGeneral::SafeCreateFile(): unable to rename file from tmp-name to original long file name! " << origFullName);
+
+                                    if (hFile != INVALID_HANDLE_VALUE)
+                                    {
+                                        //                  if (!isDir)
+                                        CloseHandle(hFile);
+                                        hFile = INVALID_HANDLE_VALUE;
+                                        //                  if (!isDir)
+                                        DeleteFileUtf8(fileName);
+                                        //                  else RemoveDirectory(fileName);
+                                        if (!::SalMoveFile(tmpName, origFullName))
+                                            TRACE_E("Fatal unexpected situation in CSalamanderGeneral::SafeCreateFile(): unable to rename file from tmp-name to original long file name! " << origFullName);
+                                    }
+                                }
+                                if (hFile != INVALID_HANDLE_VALUE)
+                                    goto SUCCESS; // return only on success; errors are handled later (ignore the DOS-name conflict)
+                            }
                         }
                     }
                 }
@@ -310,7 +317,7 @@ CSalamanderSafeFile::SafeFileCreate(const char* fileName,
                         HANDLES(CloseHandle(file2));
                     }
                     else
-                        strcpy(fibuffer, LoadStr(IDS_ERR_FILEOPEN));
+                        lstrcpyn(fibuffer, LoadStr(IDS_ERR_FILEOPEN), _countof(fibuffer));
                     if (srcFileName != NULL)
                     {
                         // CONFIRM FILE OVERWRITE: filename1+filedata1+filename2+filedata2, buttons yes/all/skip/skip all/cancel

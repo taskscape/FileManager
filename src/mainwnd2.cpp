@@ -3300,7 +3300,7 @@ BOOL CMainWindow::LoadConfig(BOOL importingOldConfig, const CCommandLineParams* 
                           &Configuration.IfPathIsInaccessibleGoToIsMyDocs, sizeof(DWORD)))
             {
                 char path[MAX_PATH];
-                GetIfPathIsInaccessibleGoTo(path, TRUE);
+                GetIfPathIsInaccessibleGoTo(path, _countof(path), TRUE);
                 if (IsTheSamePath(path, Configuration.IfPathIsInaccessibleGoTo)) // user wants to go to My Documents
                 {
                     Configuration.IfPathIsInaccessibleGoToIsMyDocs = TRUE;

@@ -1269,7 +1269,7 @@ void WINAPI InternalGetType()
         }
 
         if (TransferAssocIndex == -1)
-            GetCommonFileTypeStr(TransferBuffer, &TransferLen, TransferFileData->Ext);
+            GetCommonFileTypeStr(TransferBuffer, TRANSFER_BUFFER_MAX, &TransferLen, TransferFileData->Ext);
         else
         {
             InternalGetTypeAux1 = Associations[TransferAssocIndex].Type;
@@ -1279,7 +1279,7 @@ void WINAPI InternalGetType()
                 memcpy(TransferBuffer, InternalGetTypeAux1, TransferLen);
             }
             else
-                GetCommonFileTypeStr(TransferBuffer, &TransferLen, TransferFileData->Ext);
+                GetCommonFileTypeStr(TransferBuffer, TRANSFER_BUFFER_MAX, &TransferLen, TransferFileData->Ext);
         }
     }
 }
@@ -1820,12 +1820,17 @@ BOOL IsFileURLPath(const char* path)
     return *s == ':' && s - name == 4 && StrNICmp(name, "file", 4) == 0;
 }
 
-BOOL IsPluginFSPath(char* path, char* fsName, char** userPart)
+BOOL IsPluginFSPath(char* path, char* fsName, int fsNameBufSize, char** userPart)
 {
-    return IsPluginFSPath((const char*)path, fsName, (const char**)userPart);
+    return IsPluginFSPath((const char*)path, fsName, fsNameBufSize, (const char**)userPart);
 }
 
-BOOL IsPluginFSPath(const char* path, char* fsName, const char** userPart)
+BOOL IsPluginFSPath(char* path, char* fsName, char** userPart)
+{
+    return IsPluginFSPath(path, fsName, MAX_PATH, userPart);
+}
+
+BOOL IsPluginFSPath(const char* path, char* fsName, int fsNameBufSize, const char** userPart)
 {
     CALL_STACK_MESSAGE2("IsPluginFSPath(%s, ,)", path);
 
@@ -1846,6 +1851,18 @@ BOOL IsPluginFSPath(const char* path, char* fsName, const char** userPart)
         // copy the FS name
         if (fsName != NULL)
         {
+            if (fsNameBufSize <= 0)
+            {
+                TRACE_E("IsPluginFSPath(): invalid fsName buffer.");
+                return FALSE;
+            }
+            if ((int)(name - start) >= fsNameBufSize)
+            {
+                TRACE_E("IsPluginFSPath(): fsName buffer too small.");
+                if (fsNameBufSize > 0)
+                    fsName[0] = 0;
+                return FALSE;
+            }
             memmove(fsName, start, name - start);
             fsName[name - start] = 0;
         }
@@ -1856,4 +1873,9 @@ BOOL IsPluginFSPath(const char* path, char* fsName, const char** userPart)
     }
     else
         return FALSE;
+}
+
+BOOL IsPluginFSPath(const char* path, char* fsName, const char** userPart)
+{
+    return IsPluginFSPath(path, fsName, MAX_PATH, userPart);
 }

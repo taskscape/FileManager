@@ -493,7 +493,7 @@ RETRY:
             }
             if (drvType != DRIVE_REMOTE)
             {
-                GetCurrentLocalReparsePoint(path, CheckPathRootWithRetryMsgBox);
+                GetCurrentLocalReparsePoint(path, CheckPathRootWithRetryMsgBox, MAX_PATH);
                 if (strlen(CheckPathRootWithRetryMsgBox) > 3)
                 {
                     lstrcpyn(drive, CheckPathRootWithRetryMsgBox, MAX_PATH);
@@ -678,7 +678,7 @@ PARSE_AGAIN:
 
     char fsName[MAX_PATH];
     char* fsUserPart;
-    if (IsPluginFSPath(path, fsName, &fsUserPart)) // FS path
+    if (IsPluginFSPath(path, fsName, _countof(fsName), &fsUserPart)) // FS path
     {
         int index;
         int fsNameIndex;
@@ -1610,15 +1610,26 @@ BOOL IsNOVELLDrive(const char* path)
     return IsNetworkProviderDrive(path, WNNC_NET_NETWARE);
 }
 
-BOOL IsLantasticDrive(const char* path, char* lastLantasticCheckRoot, BOOL& lastIsLantasticPath)
+BOOL IsLantasticDrive(const char* path, char* lastLantasticCheckRoot, int lastLantasticCheckRootBufSize, BOOL& lastIsLantasticPath)
 {
+    if (path == NULL || lastLantasticCheckRoot == NULL || lastLantasticCheckRootBufSize <= 0)
+    {
+        TRACE_E("Unexpected parameters in IsLantasticDrive().");
+        return FALSE;
+    }
+
     if (lastLantasticCheckRoot[0] != 0 &&
         HasTheSameRootPath(lastLantasticCheckRoot, path))
     {
         return lastIsLantasticPath;
     }
 
-    GetRootPath(lastLantasticCheckRoot, path);
+    if (GetRootPath(lastLantasticCheckRoot, lastLantasticCheckRootBufSize, path) == 0)
+    {
+        TRACE_E("IsLantasticDrive(): unable to get root path.");
+        lastLantasticCheckRoot[0] = 0;
+        return FALSE;
+    }
     lastIsLantasticPath = FALSE;
     if (path[0] != '\\') // not UNC - may not be network path (that cannot be LANTASTIC)
     {
@@ -1627,6 +1638,11 @@ BOOL IsLantasticDrive(const char* path, char* lastLantasticCheckRoot, BOOL& last
     }
 
     return lastIsLantasticPath = IsNetworkProviderDrive(lastLantasticCheckRoot, WNNC_NET_LANTASTIC);
+}
+
+BOOL IsLantasticDrive(const char* path, char* lastLantasticCheckRoot, BOOL& lastIsLantasticPath)
+{
+    return IsLantasticDrive(path, lastLantasticCheckRoot, MAX_PATH, lastIsLantasticPath);
 }
 
 BOOL IsNetworkPath(const char* path)
@@ -1913,28 +1929,60 @@ void SetThreadNameInVCAndTrace(const char* name)
     SetThreadNameInVC(name);
 }
 
-BOOL GetOurPathInRoamingAPPDATA(char* buf)
+BOOL GetOurPathInRoamingAPPDATA(char* buf, int bufSize)
 {
-    return SHGetFolderPath(NULL, CSIDL_APPDATA, NULL, 0 /* SHGFP_TYPE_CURRENT */, buf) == S_OK &&
-           SalPathAppend(buf, "Open Salamander", MAX_PATH);
+    if (buf == NULL || bufSize <= 0)
+    {
+        TRACE_E("GetOurPathInRoamingAPPDATA(): invalid output buffer.");
+        return FALSE;
+    }
+
+    char appDataPath[MAX_PATH];
+    if (SHGetFolderPath(NULL, CSIDL_APPDATA, NULL, 0 /* SHGFP_TYPE_CURRENT */, appDataPath) != S_OK)
+        return FALSE;
+
+    if ((int)strlen(appDataPath) >= bufSize)
+    {
+        buf[0] = 0;
+        return FALSE;
+    }
+
+    lstrcpyn(buf, appDataPath, bufSize);
+    return SalPathAppend(buf, "Open Salamander", bufSize);
 }
 
-BOOL CreateOurPathInRoamingAPPDATA(char* buf)
+BOOL GetOurPathInRoamingAPPDATA(char* buf)
+{
+    return GetOurPathInRoamingAPPDATA(buf, MAX_PATH);
+}
+
+BOOL CreateOurPathInRoamingAPPDATA(char* buf, int bufSize)
 {
     static char path[MAX_PATH]; // called from exception handler, stack may be full
-    if (buf != NULL)
+    if (buf != NULL && bufSize > 0)
         buf[0] = 0;
     if (SHGetFolderPath(NULL, CSIDL_APPDATA, NULL, 0 /* SHGFP_TYPE_CURRENT */, path) == S_OK)
     {
-        if (SalPathAppend(path, "Open Salamander", MAX_PATH))
+        if (SalPathAppend(path, "Open Salamander", _countof(path)))
         {
             CreateDirectoryUtf8(path, NULL); // if it fails (e.g. already exists), we don't care...
             if (buf != NULL)
-                lstrcpyn(buf, path, MAX_PATH);
+            {
+                if (bufSize <= 0)
+                    return FALSE;
+                lstrcpyn(buf, path, bufSize);
+                if ((int)strlen(path) >= bufSize)
+                    return FALSE;
+            }
             return TRUE;
         }
     }
     return FALSE;
+}
+
+BOOL CreateOurPathInRoamingAPPDATA(char* buf)
+{
+    return CreateOurPathInRoamingAPPDATA(buf, MAX_PATH);
 }
 
 void SlashesToBackslashesAndRemoveDups(char* path)

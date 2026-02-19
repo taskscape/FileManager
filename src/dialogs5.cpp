@@ -1827,7 +1827,7 @@ void CCfgPageDrives::Transfer(CTransferInfo& ti)
     char newPath[MAX_PATH];
     if (ti.Type == ttDataToWindow)
     {
-        GetIfPathIsInaccessibleGoTo(path);
+        GetIfPathIsInaccessibleGoTo(path, _countof(path), FALSE);
         ti.EditLine(IDE_DRVSPEC_ONERRGOTO, path, MAX_PATH);
         IfPathIsInaccessibleGoToChanged = FALSE;
     }
@@ -1836,7 +1836,7 @@ void CCfgPageDrives::Transfer(CTransferInfo& ti)
         if (IfPathIsInaccessibleGoToChanged) // change only if the user actually edited the path
         {
             ti.EditLine(IDE_DRVSPEC_ONERRGOTO, newPath, MAX_PATH);
-            GetIfPathIsInaccessibleGoTo(path, TRUE);
+            GetIfPathIsInaccessibleGoTo(path, _countof(path), TRUE);
             if (IsTheSamePath(path, newPath)) // user wants to go to My Documents
             {
                 Configuration.IfPathIsInaccessibleGoToIsMyDocs = TRUE;

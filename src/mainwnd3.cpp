@@ -2847,7 +2847,7 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
 
             if (WindowsVistaAndLater)
             {
-                if (!CreateOurPathInRoamingAPPDATA(defDir))
+                if (!CreateOurPathInRoamingAPPDATA(defDir, _countof(defDir)))
                 {
                     TRACE_E("CM_EXPORTCONFIG: unexpected situation: unable to get our directory under CSIDL_APPDATA");
                     return 0;

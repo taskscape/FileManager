@@ -326,9 +326,16 @@ void CCacheData::PrematureDeleteByPlugin(CPluginInterfaceAbstract* ownDeletePlug
 
 CCacheDirData::CCacheDirData(const char* path) : Names(100, 50)
 {
+    Path[0] = 0;
+    PathLength = 0;
     int l = (int)strlen(path);
     if (l > 0 && path[l - 1] == '\\')
         l--;
+    if (l >= MAX_PATH - 1)
+    {
+        TRACE_E("CCacheDirData::CCacheDirData(): path is too long.");
+        return;
+    }
     memcpy(Path, path, l);
     if (l > 0)
         Path[l++] = '\\';
@@ -345,9 +352,11 @@ CCacheDirData::~CCacheDirData()
         delete name;
     }
     if (PathLength > 0)
+    {
         Path[PathLength - 1] = 0; // trimming a backslash
-    SetFileAttributesUtf8(Path, FILE_ATTRIBUTE_ARCHIVE);
-    RemoveDirectoryUtf8(Path);
+        SetFileAttributesUtf8(Path, FILE_ATTRIBUTE_ARCHIVE);
+        RemoveDirectoryUtf8(Path);
+    }
 }
 
 BOOL CCacheDirData::ContainTmpName(const char* tmpName, const char* rootTmpPath,
@@ -356,6 +365,8 @@ BOOL CCacheDirData::ContainTmpName(const char* tmpName, const char* rootTmpPath,
     CALL_STACK_MESSAGE2("CCacheDirData::ContainTmpName(%s, , ,)", tmpName);
 
     *canContainThisName = FALSE;
+    if (PathLength <= 0)
+        return FALSE;
     if (rootTmpPathLen < PathLength &&
         StrNICmp(Path, rootTmpPath, rootTmpPathLen) == 0)
     {
@@ -470,6 +481,8 @@ void CCacheDirData::RemoveEmptyTmpDirsOnlyFromDisk()
 {
     CALL_STACK_MESSAGE1("CCacheDirData::RemoveEmptyTmpDirsOnlyFromDisk()");
 
+    if (PathLength <= 0)
+        return;
     if (PathLength > 0)
         Path[PathLength - 1] = 0; // backslash trimming
     CStrP pathW(ConvertAllocUtf8ToWide(Path, -1));
@@ -486,6 +499,8 @@ BOOL CCacheDirData::GetName(CDiskCache* monitor, const char* name, BOOL* exists,
                             BOOL canBlock, BOOL onlyAdd, int* errorCode)
 {
     CALL_STACK_MESSAGE4("CCacheDirData::GetName(, %s, , , %d, %d,)", name, canBlock, onlyAdd);
+    if (PathLength <= 0)
+        return FALSE;
     int i;
     if (errorCode != NULL)
         *errorCode = DCGNE_SUCCESS;
@@ -508,6 +523,14 @@ CCacheDirData::GetName(const char* name, const char* tmpName, BOOL* exists, BOOL
     CALL_STACK_MESSAGE4("CCacheDirData::GetName(%s, %s, , %d, ,)", name, tmpName, ownDelete);
     if (errorCode != NULL)
         *errorCode = DCGNE_SUCCESS;
+    if (PathLength <= 0)
+    {
+        TRACE_E("CCacheDirData::GetName(): invalid tmp-directory path.");
+        *exists = TRUE;
+        if (errorCode != NULL)
+            *errorCode = DCGNE_TOOLONGNAME;
+        return NULL;
+    }
     char tmpFullName[MAX_PATH];
     memcpy(tmpFullName, Path, PathLength);
     if (PathLength + strlen(tmpName) + 1 <= MAX_PATH)
@@ -653,6 +676,8 @@ void CCacheDirData::AddVictimsToArray(TDirectArray<CCacheData*>& victArr)
 
 BOOL CCacheDirData::DetachTmpFile(const char* tmpName)
 {
+    if (PathLength <= 0)
+        return FALSE;
     if (StrNICmp(tmpName, Path, PathLength) == 0) // if there's a chance that this is our tmp-file
     {
         int i;
@@ -1182,7 +1207,7 @@ CDiskCache::GetName(const char* name, const char* tmpName, BOOL* exists, BOOL on
     if (rootTmpPath != NULL &&
             (SalCheckPath(TRUE, sysTmpDir, ERROR_SUCCESS, TRUE, MainWindow->HWindow) != ERROR_SUCCESS ||
              !CheckAndCreateDirectory(rootTmpPath, NULL, TRUE)) || // if it's not TEMP, tmp-root must be verified and created, if needed
-        !SalGetTempFileName(rootTmpPath, "SAL", newDirPath, FALSE))
+        !SalGetTempFileName(rootTmpPath, "SAL", newDirPath, _countof(newDirPath), FALSE))
     {
         *exists = TRUE; // fatal error
         Leave();

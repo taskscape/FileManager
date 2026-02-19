@@ -95,8 +95,10 @@ public:
 
 // because Windows GetTempFileName doesn't work, we wrote our own clone:
 // creates file/directory (based on 'file') at path 'path' (NULL -> Windows TEMP dir),
-// with prefix 'prefix', returns name of created file in 'tmpName' (min. size MAX_PATH),
+// with prefix 'prefix', returns name of created file in 'tmpName' (size in 'tmpNameLen'),
 // returns "success?" (on failure returns Windows error code via SetLastError - for compatibility)
+BOOL SalGetTempFileName(const char* path, const char* prefix, char* tmpName, int tmpNameLen, BOOL file);
+// legacy compatibility overload ('tmpName' must be at least MAX_PATH)
 BOOL SalGetTempFileName(const char* path, const char* prefix, char* tmpName, BOOL file);
 
 // because Windows MoveFile can't rename files with read-only attribute on Novell,
@@ -153,6 +155,8 @@ BOOL IsNOVELLDrive(const char* path);
 // whether file size check is needed after copying); for optimization
 // purposes uses 'lastLantasticCheckRoot' (for first call "", then don't change)
 // and 'lastIsLantasticPath' (result for 'lastLantasticCheckRoot')
+BOOL IsLantasticDrive(const char* path, char* lastLantasticCheckRoot, int lastLantasticCheckRootBufSize, BOOL& lastIsLantasticPath);
+// legacy compatibility overload ('lastLantasticCheckRoot' must be at least MAX_PATH)
 BOOL IsLantasticDrive(const char* path, char* lastLantasticCheckRoot, BOOL& lastIsLantasticPath);
 
 // returns TRUE for network paths
@@ -259,8 +263,12 @@ BOOL PathsAreOnTheSameVolume(const char* path1, const char* path2, BOOL* resIsOn
 BOOL IsTheSamePath(const char* path1, const char* path2);
 
 // determines if path is plugin FS type, 'path' is the path being checked, 'fsName' is
-// buffer of MAX_PATH characters for FS name (or NULL), returns 'userPart' (if != NULL) - pointer
-// into 'path' to first character of plugin-defined path (after first ':')
+// optional output buffer for FS name (size in 'fsNameBufSize', can be NULL),
+// returns 'userPart' (if != NULL) - pointer into 'path' to first character
+// of plugin-defined path (after first ':')
+BOOL IsPluginFSPath(const char* path, char* fsName, int fsNameBufSize, const char** userPart = NULL);
+BOOL IsPluginFSPath(char* path, char* fsName, int fsNameBufSize, char** userPart = NULL);
+// legacy compatibility overloads ('fsName' must be at least MAX_PATH if non-NULL)
 BOOL IsPluginFSPath(const char* path, char* fsName = NULL, const char** userPart = NULL);
 BOOL IsPluginFSPath(char* path, char* fsName = NULL, char** userPart = NULL);
 
@@ -272,8 +280,9 @@ BOOL IsFileURLPath(const char* path);
 int IsFileLink(const char* fileExtension);
 
 // gets both UNC and normal root path from 'path', returns path in 'root' in format 'C:\' or '\\SERVER\SHARE\',
-// returns number of characters in root path (without null-terminator); 'root' is buffer of at least MAX_PATH characters, for longer
-// UNC root paths truncates to MAX_PATH-2 characters and adds backslash (either way it's not 100% a root path)
+// returns number of characters in root path (without null-terminator)
+int GetRootPath(char* root, int rootBufSize, const char* path);
+// legacy compatibility overload ('root' must be at least MAX_PATH)
 int GetRootPath(char* root, const char* path);
 
 // returns pointer after root (more precisely to backslash right after root) of both UNC and normal path 'path'
@@ -883,8 +892,11 @@ BOOL ResolveSubsts(char* resPath);
 
 // Performs resolve of subst and reparse point for path 'path', then attempts to get GUID path
 // for the mount-point of the path (if missing, for the root of the path). Returns FALSE on failure.
-// On success, returns TRUE and sets 'mountPoint' and 'guidPath' (if different from NULL, must
-// point to buffers of size at least MAX_PATH; strings will be terminated with backslash).
+// On success, returns TRUE and sets 'mountPoint' and 'guidPath' (if non-NULL; sizes are in
+// 'mountPointBufSize' and 'guidPathBufSize'; strings are terminated with backslash).
+BOOL GetResolvedPathMountPointAndGUID(const char* path, char* mountPoint, int mountPointBufSize,
+                                      char* guidPath, int guidPathBufSize);
+// legacy compatibility overloads ('mountPoint'/'guidPath' must be at least MAX_PATH if non-NULL)
 BOOL GetResolvedPathMountPointAndGUID(const char* path, char* mountPoint, char* guidPath);
 
 // attempt to return correct values (also handles reparse points - complete path is specified instead of root)
@@ -921,6 +933,8 @@ BOOL GetReparsePointDestination(const char* repPointDir, char* repPointDstBuf, D
 // in 'currentReparsePoint' (at least MAX_PATH characters) returns current (last) local
 // reparse point, on failure returns classic root; returns FALSE on failure; if
 // 'error' is not NULL, TRUE is written to it on error
+BOOL GetCurrentLocalReparsePoint(const char* path, char* currentReparsePoint, int currentReparsePointBufSize, BOOL* error = NULL);
+// legacy compatibility overload ('currentReparsePoint' must be at least MAX_PATH)
 BOOL GetCurrentLocalReparsePoint(const char* path, char* currentReparsePoint, BOOL* error = NULL);
 
 // call only for paths 'path' whose root (after removing subst) is DRIVE_FIXED (elsewhere it makes no sense to search for
@@ -2369,8 +2383,10 @@ void ShellActionAux6(CFilesWindow* panel);
 
 //******************************************************************************
 
-// returns in 'path' (buffer at least MAX_PATH characters) the path Configuration.IfPathIsInaccessibleGoTo;
+// returns in 'path' the path Configuration.IfPathIsInaccessibleGoTo;
 // takes into account Configuration.IfPathIsInaccessibleGoToIsMyDocs setting
+void GetIfPathIsInaccessibleGoTo(char* path, int pathBufSize, BOOL forceIsMyDocs);
+// legacy compatibility overload ('path' must be at least 2 * MAX_PATH)
 void GetIfPathIsInaccessibleGoTo(char* path, BOOL forceIsMyDocs = FALSE);
 
 // loads icon overlay handler configuration from registry configuration
@@ -2399,19 +2415,25 @@ BOOL RestoreNetworkConnection(HWND parent, const char* name, const char* remoteN
                               LPNETRESOURCE lpNetResource = NULL);
 
 // constructs text for Type column in panel for unassociated file (e.g. "AAA File" or "File")
+void GetCommonFileTypeStr(char* buf, int bufSize, int* resLen, const char* ext);
+// legacy compatibility overload ('buf' must be at least TRANSFER_BUFFER_MAX)
 void GetCommonFileTypeStr(char* buf, int* resLen, const char* ext);
 
 // finds doubled separators and removes unnecessary ones (on Vista I encountered doubled
 // separators in context menu on .bar files)
 void RemoveUselessSeparatorsFromMenu(HMENU h);
 
-// returns "Open Salamander" directory on path CSIDL_APPDATA in 'buf' (buffer of size MAX_PATH)
+// returns "Open Salamander" directory on path CSIDL_APPDATA in 'buf'
+BOOL GetOurPathInRoamingAPPDATA(char* buf, int bufSize);
+// legacy compatibility overload ('buf' must be at least MAX_PATH)
 BOOL GetOurPathInRoamingAPPDATA(char* buf);
 
 // creates "Open Salamander" directory on path CSIDL_APPDATA; returns TRUE if path
 // fits in MAX_PATH (its existence is not guaranteed, CreateDirectory result is not checked);
-// if 'buf' is not NULL, it is buffer of size MAX_PATH, in which this path is returned
+// if 'buf' is not NULL, it is output buffer of size 'bufSize', in which this path is returned
 // WARNING: use only Vista+
+BOOL CreateOurPathInRoamingAPPDATA(char* buf, int bufSize);
+// legacy compatibility overload ('buf' must be at least MAX_PATH if non-NULL)
 BOOL CreateOurPathInRoamingAPPDATA(char* buf);
 
 #ifndef _WIN64
