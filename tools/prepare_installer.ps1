@@ -73,20 +73,34 @@ Copy-Item "convert\*" "$StagingDir\convert\" -Recurse
 Copy-Item "src\res\toolbars\*" "$StagingDir\toolbars\" -Recurse
 
 # 6. Copy plugins
-# Find all .spl files in Release_x64 directories
-$splFiles = Get-ChildItem -Path "src\plugins" -Recurse -Filter "*.spl" | Where-Object { $_.FullName -match "Release_x64" }
+# Find all .spl files in both src\plugins and BuildDir
+$splFiles = Get-ChildItem -Path "src\plugins", $BuildDir -Recurse -Filter "*.spl" -ErrorAction SilentlyContinue | 
+            Where-Object { $_.FullName -match "Release_x64" -and $_.FullName -notmatch "\\Intermediate\\" }
+
+# Use a hash set to avoid duplicates if same file is found in both places
+$processedSpl = New-Object System.Collections.Generic.HashSet[string]
+
 foreach ($file in $splFiles) {
-    # Extract plugin name from path (usually ...\plugins\<name>\<name>.spl)
-    $pluginName = $file.Directory.Name
+    if ($processedSpl.Contains($file.Name)) { continue }
+    $processedSpl.Add($file.Name) | Out-Null
+
+    # Extract plugin name from filename (e.g. 7zip.spl -> 7zip)
+    $pluginName = $file.BaseName
     $pluginDestDir = New-Item -ItemType Directory -Path "$StagingDir\plugins\$pluginName" -Force
     Copy-Item $file.FullName "$pluginDestDir\"
+    Write-Host "Found plugin $pluginName at: $($file.FullName)"
     
     # Copy plugin's lang files (only .slg, exclude Intermediate)
-    $pluginLangDir = Join-Path $file.DirectoryName "lang"
-    if (Test-Path $pluginLangDir) {
-        $stagedLangDir = New-Item -ItemType Directory -Path "$pluginDestDir\lang" -Force
-        Get-ChildItem -Path $pluginLangDir -Filter "*.slg" | Copy-Item -Destination "$stagedLangDir\"
-    }
+    # Search in the same directory as .spl and its subdirectories
+    $stagedLangDir = $null
+    Get-ChildItem -Path $file.DirectoryName -Filter "*.slg" -Recurse | 
+        Where-Object { $_.FullName -notmatch "\\Intermediate\\" } | ForEach-Object {
+            if ($null -eq $stagedLangDir) {
+                $stagedLangDir = New-Item -ItemType Directory -Path "$pluginDestDir\lang" -Force
+            }
+            Copy-Item $_.FullName "$stagedLangDir\"
+            Write-Host "  Found lang file: $($_.Name)"
+        }
 }
 
 # 7. Generate setup.inf
