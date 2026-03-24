@@ -17,10 +17,41 @@ Copy-Item "Installer\setup.exe" "$StagingDir\"
 Copy-Item "Installer\LICENSE" "$StagingDir\"
 Copy-Item "Installer\x64" "$StagingDir\"
 
-# 2. Copy main executables (from Release_x64)
-Copy-Item "src\vcxproj\salamander\Release_x64\salamand.exe" "$StagingDir\"
-Copy-Item "src\vcxproj\salmon\salamander\Release_x64\utils\salmon.exe" "$StagingDir\"
-Copy-Item "$BuildDir\remove\Release_x64\remove.exe" "$StagingDir\"
+# 2. Copy main executables
+function Copy-Exe($srcPatterns, $dest) {
+    foreach ($pattern in $srcPatterns) {
+        $found = Get-ChildItem -Path $pattern -ErrorAction SilentlyContinue | Select-Object -First 1
+        if ($found) {
+            Copy-Item $found.FullName $dest
+            return $true
+        }
+    }
+    return $false
+}
+
+$salamandCopied = Copy-Exe @(
+    "$BuildDir\salamander\Release_x64\salamand.exe",
+    "$BuildDir\Release_x64\salamand.exe",
+    "$BuildDir\salamand.exe",
+    "src\vcxproj\salamander\Release_x64\salamand.exe"
+) "$StagingDir\"
+
+$salmonCopied = Copy-Exe @(
+    "$BuildDir\salmon\Release_x64\utils\salmon.exe",
+    "$BuildDir\Release_x64\salmon.exe",
+    "$BuildDir\salmon.exe",
+    "src\vcxproj\salmon\salamander\Release_x64\utils\salmon.exe"
+) "$StagingDir\"
+
+$removeCopied = Copy-Exe @(
+    "$BuildDir\remove\Release_x64\remove.exe",
+    "$BuildDir\Release_x64\remove.exe",
+    "$BuildDir\remove.exe"
+) "$StagingDir\"
+
+if (-not $salamandCopied) { Write-Error "Could not find salamand.exe" }
+if (-not $salmonCopied) { Write-Error "Could not find salmon.exe" }
+if (-not $removeCopied) { Write-Error "Could not find remove.exe" }
 
 # 3. Copy lang (main app)
 Copy-Item "Installer\lang\*" "$StagingDir\lang\" -Recurse
