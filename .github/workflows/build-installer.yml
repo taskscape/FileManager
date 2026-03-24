@@ -1,0 +1,51 @@
+name: Build and Release Installer
+
+on:
+  push:
+    branches: ["main"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build Installer (x64 Release)
+    runs-on: windows-2022
+
+    env:
+      BUILD_CONFIGURATION: Release
+      SOLUTION_PATH: 'src\vcxproj\salamand.sln'
+      REMOVE_PROJ_PATH: 'src\vcxproj\setup\remove.vcxproj'
+      OPENSAL_BUILD_DIR: 'D:\a\FileManager\FileManager\build_stage\'
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup MSBuild in PATH (VS2022)
+        uses: microsoft/setup-msbuild@v2
+
+      - name: Build Solution (Release | x64)
+        run: |
+          New-Item -ItemType Directory -Force -Path $env:OPENSAL_BUILD_DIR
+          msbuild $env:SOLUTION_PATH /m /t:Build /p:Configuration=$env:BUILD_CONFIGURATION /p:Platform=x64 /p:PreferredToolArchitecture=x64
+
+      - name: Build Uninstaller (Release | x64)
+        run: |
+          msbuild $env:REMOVE_PROJ_PATH /m /t:Build /p:Configuration=$env:BUILD_CONFIGURATION /p:Platform=x64 /p:PreferredToolArchitecture=x64
+
+      - name: Prepare and Create Installer
+        run: |
+          powershell.exe -File tools\prepare_installer.ps1 -BuildDir $env:OPENSAL_BUILD_DIR -OutputPath "OpenSalamander_5.0.${{ github.run_number }}.exe"
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: 5.0.${{ github.run_number }}
+          name: Open Salamander 5.0.${{ github.run_number }}
+          files: OpenSalamander_5.0.${{ github.run_number }}.exe
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
