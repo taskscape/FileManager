@@ -17,7 +17,7 @@ jobs:
       BUILD_CONFIGURATION: Release
       SOLUTION_PATH: 'src\vcxproj\salamand.sln'
       REMOVE_PROJ_PATH: 'src\vcxproj\setup\remove.vcxproj'
-      # Important: Use a relative path within the workspace for reliability
+      # OPENSAL_BUILD_DIR MUST end with a backslash as expected by props files
       OPENSAL_BUILD_DIR: '${{ github.workspace }}\build_stage\'
 
     steps:
@@ -30,17 +30,17 @@ jobs:
       - name: Build Solution (Release | x64)
         run: |
           New-Item -ItemType Directory -Force -Path $env:OPENSAL_BUILD_DIR
-          msbuild $env:SOLUTION_PATH /m /t:Build /p:Configuration=$env:BUILD_CONFIGURATION /p:Platform=x64 /p:PreferredToolArchitecture=x64 /p:OutDir=$env:OPENSAL_BUILD_DIR
+          # We do NOT pass /p:OutDir here, we let the project props use OPENSAL_BUILD_DIR
+          msbuild $env:SOLUTION_PATH /m /t:Build /p:Configuration=$env:BUILD_CONFIGURATION /p:Platform=x64 /p:PreferredToolArchitecture=x64
 
       - name: Build Uninstaller (Release | x64)
         run: |
-          # OutDir for remove needs to be specific to avoid overwriting or missing files if not handled by the solution OutDir
-          msbuild $env:REMOVE_PROJ_PATH /m /t:Build /p:Configuration=$env:BUILD_CONFIGURATION /p:Platform=x64 /p:PreferredToolArchitecture=x64 /p:OutDir="${{ env.OPENSAL_BUILD_DIR }}remove\Release_x64\"
+          # remove.vcxproj also respects OPENSAL_BUILD_DIR
+          msbuild $env:REMOVE_PROJ_PATH /m /t:Build /p:Configuration=$env:BUILD_CONFIGURATION /p:Platform=x64 /p:PreferredToolArchitecture=x64
 
       - name: Prepare and Create Installer
         run: |
-          # We need to make sure the expected structure exists in build_stage for our script
-          # Some projects might not follow the global OutDir perfectly if they have hardcoded paths in props
+          # Our script is already robust and searches for files within OPENSAL_BUILD_DIR
           powershell.exe -File tools\prepare_installer.ps1 -BuildDir $env:OPENSAL_BUILD_DIR -OutputPath "OpenSalamander_5.0.${{ github.run_number }}.exe"
 
       - name: Create Release
