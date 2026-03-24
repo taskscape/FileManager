@@ -18,13 +18,22 @@ Copy-Item "Installer\LICENSE" "$StagingDir\"
 Copy-Item "Installer\x64" "$StagingDir\"
 
 # 2. Copy main executables
-function Copy-Exe($srcPatterns, $dest) {
+function Copy-Exe($srcPatterns, $exeName, $dest) {
     foreach ($pattern in $srcPatterns) {
         $found = Get-ChildItem -Path $pattern -ErrorAction SilentlyContinue | Select-Object -First 1
         if ($found) {
             Copy-Item $found.FullName $dest
+            Write-Host "Found $exeName at: $($found.FullName)"
             return $true
         }
+    }
+    # Fallback: search recursively in BuildDir
+    Write-Warning "$exeName not found in primary locations, searching recursively in $BuildDir..."
+    $found = Get-ChildItem -Path $BuildDir -Filter $exeName -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1
+    if ($found) {
+        Copy-Item $found.FullName $dest
+        Write-Host "Found $exeName (recursive) at: $($found.FullName)"
+        return $true
     }
     return $false
 }
@@ -34,20 +43,21 @@ $salamandCopied = Copy-Exe @(
     "$BuildDir\Release_x64\salamand.exe",
     "$BuildDir\salamand.exe",
     "src\vcxproj\salamander\Release_x64\salamand.exe"
-) "$StagingDir\"
+) "salamand.exe" "$StagingDir\"
 
 $salmonCopied = Copy-Exe @(
+    "$BuildDir\salamander\Release_x64\utils\salmon.exe",
     "$BuildDir\salmon\Release_x64\utils\salmon.exe",
     "$BuildDir\Release_x64\salmon.exe",
     "$BuildDir\salmon.exe",
     "src\vcxproj\salmon\salamander\Release_x64\utils\salmon.exe"
-) "$StagingDir\"
+) "salmon.exe" "$StagingDir\"
 
 $removeCopied = Copy-Exe @(
     "$BuildDir\remove\Release_x64\remove.exe",
     "$BuildDir\Release_x64\remove.exe",
     "$BuildDir\remove.exe"
-) "$StagingDir\"
+) "remove.exe" "$StagingDir\"
 
 if (-not $salamandCopied) { Write-Error "Could not find salamand.exe" }
 if (-not $salmonCopied) { Write-Error "Could not find salmon.exe" }
