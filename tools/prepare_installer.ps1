@@ -17,9 +17,9 @@ Copy-Item "Installer\setup.exe" "$StagingDir\"
 Copy-Item "Installer\LICENSE" "$StagingDir\"
 Copy-Item "Installer\x64" "$StagingDir\"
 
-# 2. Copy main executables (from Release_x64)
-Copy-Item "src\vcxproj\salamander\Release_x64\salamand.exe" "$StagingDir\"
-Copy-Item "src\vcxproj\salmon\salamander\Release_x64\utils\salmon.exe" "$StagingDir\"
+# 2. Copy main executables (from BuildDir)
+Copy-Item "$BuildDir\salamander\Release_x64\salamand.exe" "$StagingDir\"
+Copy-Item "$BuildDir\salmon\Release_x64\utils\salmon.exe" "$StagingDir\"
 Copy-Item "$BuildDir\remove\Release_x64\remove.exe" "$StagingDir\"
 
 # 3. Copy lang (main app)
