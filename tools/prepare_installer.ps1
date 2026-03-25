@@ -52,7 +52,6 @@ Copy-Exe @("$BuildDir\Release_x64\salextx64.dll", "$BuildDir\shellext\Release_x6
 Copy-Exe @("$BuildDir\Release_Win32\salextx86.dll", "$BuildDir\shellext\Release_Win32\salextx86.dll", "$BuildDir\Release_x64\salextx86.dll", "src\vcxproj\shellext\salamander\Release_x86\plugins\Intermediate\salextx86\salextx86.dll", "src\vcxproj\shellext\salamander\Release_x86\salextx86.dll") "salextx86.dll" "$StagingDir\"
 
 # Utils
-Copy-Exe @("$BuildDir\Release_x64\salpvenv.exe") "salpvenv.exe" "$StagingDir\"
 
 # OpenSSL
 $opensslCopied1 = Copy-Exe @("utils\libeay32.dll", "external\openssl\libeay32.dll", "libeay32.dll") "libeay32.dll" "$StagingDir\utils\"
@@ -118,7 +117,7 @@ function Add-FileToSetupInf($fileRelPath) {
     $script:setupInf += "`n$fileRelPath,%1\$fileRelPath,0"
 }
 
-$rootFiles = @("salextx64.dll", "salextx86.dll", "salopen.exe", "salspawn.exe", "tserver.exe", "sfx7zip.exe", "zip2sfx.exe", "salpvenv.exe", "translator.exe")
+$rootFiles = @("salextx64.dll", "salextx86.dll")
 foreach ($rf in $rootFiles) {
     if (Test-Path "$StagingDir\$rf") {
         Add-FileToSetupInf $rf
