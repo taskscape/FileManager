@@ -55,9 +55,9 @@ Name: "quicklaunchicon"; Description: "{cm:CreateQuickLaunchIcon}"; GroupDescrip
 Source: "{#SourcePath}\salamand.exe"; DestDir: "{app}"; Flags: ignoreversion
 Source: "{#SourcePath}\salmon.exe"; DestDir: "{app}"; Flags: ignoreversion
 
-; Shell extensions
-Source: "{#SourcePath}\salextx64.dll"; DestDir: "{app}"; Flags: ignoreversion regserver 64bit
-Source: "{#SourcePath}\salextx86.dll"; DestDir: "{app}"; Flags: ignoreversion regserver 32bit
+; Shell extensions live under utils and are registered by Salamander on first run.
+Source: "{#SourcePath}\utils\salextx64.dll"; DestDir: "{app}\utils"; Flags: ignoreversion
+Source: "{#SourcePath}\utils\salextx86.dll"; DestDir: "{app}\utils"; Flags: ignoreversion
 
 ; Utility executables (optional - only if present)
 Source: "{#SourcePath}\salopen.exe"; DestDir: "{app}"; Flags: ignoreversion skipifsourcedoesntexist
