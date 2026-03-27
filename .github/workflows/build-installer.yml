@@ -16,7 +16,6 @@ jobs:
     env:
       BUILD_CONFIGURATION: Release
       SOLUTION_PATH: 'src\vcxproj\salamand.sln'
-      REMOVE_PROJ_PATH: 'src\vcxproj\setup\remove.vcxproj'
       # OPENSAL_BUILD_DIR MUST end with a backslash as expected by props files
       OPENSAL_BUILD_DIR: '${{ github.workspace }}\build_stage\'
 
@@ -33,11 +32,6 @@ jobs:
           # We do NOT pass /p:OutDir here, we let the project props use OPENSAL_BUILD_DIR
           msbuild $env:SOLUTION_PATH /m /t:Build /p:Configuration=$env:BUILD_CONFIGURATION /p:Platform=x64 /p:PreferredToolArchitecture=x64
 
-      - name: Build Uninstaller (Release | x64)
-        run: |
-          # remove.vcxproj also respects OPENSAL_BUILD_DIR
-          msbuild $env:REMOVE_PROJ_PATH /m /t:Build /p:Configuration=$env:BUILD_CONFIGURATION /p:Platform=x64 /p:PreferredToolArchitecture=x64
-
       - name: Download OpenSSL Libraries
         run: |
           $opensslZip = "openssl.zip"
@@ -45,17 +39,29 @@ jobs:
           Expand-Archive -Path $opensslZip -DestinationPath "utils" -Force
           Remove-Item $opensslZip
 
-      - name: Prepare and Create Installer
+      - name: Install Inno Setup
         run: |
-          # Our script is already robust and searches for files within OPENSAL_BUILD_DIR
-          powershell.exe -File tools\prepare_installer.ps1 -BuildDir $env:OPENSAL_BUILD_DIR -OutputPath "OpenSalamander_5.0.${{ github.run_number }}.exe"
+          choco install innosetup -y --no-progress
+          # Add Inno Setup to PATH
+          $innoPath = "C:\Program Files (x86)\Inno Setup 6"
+          echo "$innoPath" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+
+      - name: Prepare Installer Files
+        run: |
+          # Stage files for Inno Setup
+          powershell.exe -File tools\prepare_installer.ps1 -BuildDir $env:OPENSAL_BUILD_DIR -StagingDir "Installer_Staging" -BuildNumber ${{ github.run_number }}
+
+      - name: Build Installer with Inno Setup
+        run: |
+          # Compile the Inno Setup script
+          iscc.exe /DSourcePath="Installer_Staging" /DBuildNumber=${{ github.run_number }} "Installer\setup.iss"
 
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: 5.0.${{ github.run_number }}
           name: Open Salamander 5.0.${{ github.run_number }}
-          files: OpenSalamander_5.0.${{ github.run_number }}.exe
+          files: Installer\Output\OpenSalamander_5.0.${{ github.run_number }}.exe
           draft: false
           prerelease: false
         env:

@@ -1,21 +1,29 @@
 param(
     [string]$BuildDir = "build_stage",
     [string]$StagingDir = "Installer_Staging",
-    [string]$OutputPath = "OpenSalamander_v5.exe"
+    [string]$BuildNumber = "0"
 )
 
-if (Test-Path $StagingDir) { Remove-Item $StagingDir -Recurse -Force }
-New-Item -ItemType Directory -Path $StagingDir
-New-Item -ItemType Directory -Path "$StagingDir\plugins"
-New-Item -ItemType Directory -Path "$StagingDir\lang"
-New-Item -ItemType Directory -Path "$StagingDir\convert"
-New-Item -ItemType Directory -Path "$StagingDir\toolbars"
-New-Item -ItemType Directory -Path "$StagingDir\utils"
+Write-Host "=== Open Salamander Installer Staging Script ===" -ForegroundColor Cyan
+Write-Host "Build Number: $BuildNumber" -ForegroundColor Cyan
+Write-Host "Staging files for Inno Setup..."
 
-# 1. Copy base installer files
-Copy-Item "Installer\setup.exe" "$StagingDir\" -ErrorAction SilentlyContinue
+if (Test-Path $StagingDir) { Remove-Item $StagingDir -Recurse -Force }
+New-Item -ItemType Directory -Path $StagingDir | Out-Null
+New-Item -ItemType Directory -Path "$StagingDir\plugins" | Out-Null
+New-Item -ItemType Directory -Path "$StagingDir\lang" | Out-Null
+New-Item -ItemType Directory -Path "$StagingDir\convert" | Out-Null
+New-Item -ItemType Directory -Path "$StagingDir\toolbars" | Out-Null
+New-Item -ItemType Directory -Path "$StagingDir\utils" | Out-Null
+
+# Write build info file for traceability
+@"
+Build Number: $BuildNumber
+Build Date: $(Get-Date -Format "yyyy-MM-dd HH:mm:ss UTC" -AsUTC)
+"@ | Out-File -FilePath "$StagingDir\build_info.txt" -Encoding utf8
+
+# 1. Copy license file
 Copy-Item "Installer\LICENSE" "$StagingDir\" -ErrorAction SilentlyContinue
-Copy-Item "Installer\x64" "$StagingDir\" -ErrorAction SilentlyContinue
 
 # 2. Copy main executables and DLLs
 function Copy-Exe($srcPatterns, $fileName, $dest) {
@@ -23,7 +31,7 @@ function Copy-Exe($srcPatterns, $fileName, $dest) {
         $found = Get-ChildItem -Path $pattern -ErrorAction SilentlyContinue | Select-Object -First 1
         if ($found) {
             Copy-Item $found.FullName $dest
-            Write-Host "Found $fileName at: $($found.FullName)"
+            Write-Host "Found $fileName at: $($found.FullName)" -ForegroundColor Green
             return $true
         }
     }
@@ -31,7 +39,7 @@ function Copy-Exe($srcPatterns, $fileName, $dest) {
     $found = Get-ChildItem -Path $BuildDir, "src" -Filter $fileName -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1
     if ($found) {
         Copy-Item $found.FullName $dest
-        Write-Host "Found $fileName (recursive) at: $($found.FullName)"
+        Write-Host "Found $fileName (recursive) at: $($found.FullName)" -ForegroundColor Green
         return $true
     }
     Write-Warning "$fileName not found in primary locations or recursively."
@@ -41,18 +49,23 @@ function Copy-Exe($srcPatterns, $fileName, $dest) {
 # Main exes
 $salamandCopied = Copy-Exe @("$BuildDir\Release_x64\salamand.exe", "src\vcxproj\salamander\Release_x64\salamand.exe") "salamand.exe" "$StagingDir\"
 $salmonCopied = Copy-Exe @("$BuildDir\Release_x64\salmon.exe", "src\vcxproj\salmon\salamander\Release_x64\utils\salmon.exe") "salmon.exe" "$StagingDir\"
-$removeCopied = Copy-Exe @("$BuildDir\Release_x64\remove.exe", "src\vcxproj\setup\remove\Release_x64\remove.exe") "remove.exe" "$StagingDir\"
 
 if (-not $salamandCopied) { Write-Error "Could not find salamand.exe" }
 if (-not $salmonCopied) { Write-Error "Could not find salmon.exe" }
-if (-not $removeCopied) { Write-Error "Could not find remove.exe" }
 
 # Shell extensions
 Copy-Exe @("$BuildDir\Release_x64\salextx64.dll", "$BuildDir\shellext\Release_x64\salextx64.dll", "src\vcxproj\shellext\salamander\Release_x64\plugins\Intermediate\salextx64\salextx64.dll", "src\vcxproj\shellext\salamander\Release_x64\salextx64.dll") "salextx64.dll" "$StagingDir\"
 Copy-Exe @("$BuildDir\Release_Win32\salextx86.dll", "$BuildDir\shellext\Release_Win32\salextx86.dll", "$BuildDir\Release_x64\salextx86.dll", "src\vcxproj\shellext\salamander\Release_x86\plugins\Intermediate\salextx86\salextx86.dll", "src\vcxproj\shellext\salamander\Release_x86\salextx86.dll") "salextx86.dll" "$StagingDir\"
 
-# Utils
-Copy-Exe @("$BuildDir\Release_x64\salpvenv.exe") "salpvenv.exe" "$StagingDir\"
+# Utils (Note: salpvenv.exe excluded - depends on proprietary PVW32Cnv.lib)
+Copy-Exe @("$BuildDir\Release_x64\salopen.exe") "salopen.exe" "$StagingDir\"
+Copy-Exe @("$BuildDir\Release_x64\salspawn.exe") "salspawn.exe" "$StagingDir\"
+Copy-Exe @("$BuildDir\Release_x64\tserver.exe", "$BuildDir\Release_Win32\tserver.exe") "tserver.exe" "$StagingDir\"
+Copy-Exe @("$BuildDir\Release_x64\sfx7zip.exe", "$BuildDir\Release_Win32\sfx7zip.exe") "sfx7zip.exe" "$StagingDir\"
+Copy-Exe @("$BuildDir\Release_x64\zip2sfx.exe", "$BuildDir\Release_Win32\zip2sfx.exe") "zip2sfx.exe" "$StagingDir\"
+Copy-Exe @("$BuildDir\Release_x64\translator.exe", "$BuildDir\Release_Win32\translator.exe") "translator.exe" "$StagingDir\"
+Copy-Exe @("$BuildDir\Release_x64\fcremote.exe") "fcremote.exe" "$StagingDir\"
+Copy-Exe @("$BuildDir\Release_x64\7zwrapper.exe") "7zwrapper.exe" "$StagingDir\"
 
 # OpenSSL
 $opensslCopied1 = Copy-Exe @("utils\libeay32.dll", "external\openssl\libeay32.dll", "libeay32.dll") "libeay32.dll" "$StagingDir\utils\"
@@ -84,7 +97,7 @@ foreach ($file in $splFiles) {
     $pluginName = $file.BaseName
     $pluginDestDir = New-Item -ItemType Directory -Path "$StagingDir\plugins\$pluginName" -Force
     Copy-Item $file.FullName "$pluginDestDir\"
-    Write-Host "Found plugin $pluginName at: $($file.FullName)"
+    Write-Host "Found plugin $pluginName at: $($file.FullName)" -ForegroundColor Green
     
     $stagedLangDir = $null
     Get-ChildItem -Path $file.DirectoryName -Filter "*.slg" -Recurse | 
@@ -93,69 +106,10 @@ foreach ($file in $splFiles) {
                 $stagedLangDir = New-Item -ItemType Directory -Path "$pluginDestDir\lang" -Force
             }
             Copy-Item $_.FullName "$stagedLangDir\"
-            Write-Host "  Found lang file: $($_.Name)"
+            Write-Host "  Found lang file: $($_.Name)" -ForegroundColor Gray
         }
 }
 
-# 7. Generate setup.inf
-$setupInf = @"
-[Private]
-ApplicationName=Open Salamander 5.0
-ApplicationNameVer=Open Salamander 5.0
-DefaultDirectory=%4%\Open Salamander 5.0
-LicenseFile=LICENSE
-SkipChooseDirectory=0
-SaveRemoveLog=%1%\uninstall.log
-UninstallRunProgramQuietPath=%1%\remove.exe
-
-[CopyFiles]
-salamand.exe,%1\salamand.exe,0
-salmon.exe,%1\salmon.exe,0
-remove.exe,%1\remove.exe,0
-"@
-
-function Add-FileToSetupInf($fileRelPath) {
-    $script:setupInf += "`n$fileRelPath,%1\$fileRelPath,0"
-}
-
-$rootFiles = @("salextx64.dll", "salextx86.dll", "salopen.exe", "salspawn.exe", "tserver.exe", "sfx7zip.exe", "zip2sfx.exe", "salpvenv.exe", "translator.exe")
-foreach ($rf in $rootFiles) {
-    if (Test-Path "$StagingDir\$rf") {
-        Add-FileToSetupInf $rf
-    }
-}
-
-function Add-ToSetupInf($path) {
-    if (Test-Path "$StagingDir\$path") {
-        $files = Get-ChildItem -Path "$StagingDir\$path" -File -Recurse
-        foreach ($f in $files) {
-            $relPath = $f.FullName.Substring((Get-Item $StagingDir).FullName.Length + 1)
-            if ($relPath -notmatch "\\Intermediate\\") {
-                Add-FileToSetupInf $relPath
-            }
-        }
-    }
-}
-
-Add-ToSetupInf "lang"
-Add-ToSetupInf "convert"
-Add-ToSetupInf "toolbars"
-Add-ToSetupInf "plugins"
-Add-ToSetupInf "utils"
-
-$setupInf += @"
-
-[CreateShortcuts]
-0,Open Salamander 5.0,%1\salamand.exe,
-1,Open Salamander 5.0,%1\salamand.exe,
-"@
-
-$setupInf | Out-File -FilePath "$StagingDir\setup.inf" -Encoding utf8
-
-# 8. Create SFX using the existing tool
-$ScriptRoot = Split-Path $MyInvocation.MyCommand.Path
-$SfxTool = Join-Path $ScriptRoot "Create-Sfx.ps1"
-
-powershell.exe -File "$SfxTool" -SourceDir "$StagingDir" -OutputPath "$OutputPath"
-
-Write-Host "Installer created: $OutputPath"
+Write-Host "`n=== Staging Complete ===" -ForegroundColor Cyan
+Write-Host "Files staged in: $StagingDir"
+Write-Host "Ready for Inno Setup compilation."
