@@ -48,24 +48,37 @@ Solution ```\src\vcxproj\salamand.sln``` may be built from within Visual Studio 
 
 Use ```\src\vcxproj\!populate_build_dir.cmd``` to populate build directory with files required to run Open Salamander.
 
-### Creating SFX Installer
+### Creating Installer
 
-To create a standalone self-extracting installer (EXE) for distribution:
+Open Salamander uses [Inno Setup](https://jrsoftware.org/isinfo.php) to create the installer. The installer script is located at `Installer\setup.iss`.
 
-1. **Prepare files:** Ensure the `Installer` directory contains the latest build of `salamand.exe`, `salmon.exe`, and other required files.
-2. **Run the script:** Use the provided PowerShell script in the `tools` directory.
+#### Building Locally
+
+1. Install [Inno Setup 6](https://jrsoftware.org/isdl.php) or later
+2. Build the solution in Release|x64 configuration
+3. Stage the files and compile the installer:
 
 ```powershell
-# Run from the project root
-.\tools\Create-Sfx.ps1 -SourceDir "Installer" -OutputPath "OpenSalamander_Setup.exe"
+# Stage files for the installer
+.\tools\prepare_installer.ps1 -BuildDir "build_stage" -StagingDir "Installer_Staging"
+
+# Compile the installer
+& "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" "Installer\setup.iss"
 ```
 
-The script automatically:
+The installer will be created in `Installer\Output\`.
 
-- Compiles a C# bootstrap (stub) for extraction.
-- Includes the latest SVG icons from `src\res\toolbars`.
-- Modifies `setup.inf` (internally in the package) if necessary to ensure icons are installed.
-- Produces a single `OpenSalamander_Setup.exe`.
+#### GitHub Actions CI/CD
+
+The repository includes a GitHub Actions workflow (`.github\workflows\build-installer.yml`) that automatically:
+
+1. Builds the solution using MSBuild
+2. Stages all required files (executables, plugins, language files, toolbars)
+3. Installs Inno Setup via Chocolatey
+4. Compiles the installer with build number versioning
+5. Creates a GitHub release with the installer attached
+
+The workflow is triggered on pushes to `master` and produces versioned installers named `OpenSalamander_5.0.{build_number}.exe`.
 
 ## Customization
 
