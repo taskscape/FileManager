@@ -2219,9 +2219,12 @@ C__Handles::LoadLibraryUtf8(LPCSTR lpLibFileName)
     else
     {
         ret = ::LoadLibraryW(fileNameW);
-        free(fileNameW);
     }
-    CheckCreate(ret != NULL, __htLibrary, __hoLoadLibrary, ret, GetLastError(), TRUE, lpLibFileName);
+    DWORD err = GetLastError();
+    CheckCreate(ret != NULL, __htLibrary, __hoLoadLibrary, ret, err, TRUE, NULL, lpLibFileName, fileNameW);
+    SetLastError(err);
+    if (fileNameW != NULL)
+        free(fileNameW);
     return ret;
 }
 
