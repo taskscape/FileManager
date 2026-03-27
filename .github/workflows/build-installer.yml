@@ -18,6 +18,7 @@ jobs:
       SOLUTION_PATH: 'src\vcxproj\salamand.sln'
       # OPENSAL_BUILD_DIR MUST end with a backslash as expected by props files
       OPENSAL_BUILD_DIR: '${{ github.workspace }}\build_stage\'
+      INSTALLER_STAGING_DIR: 'Installer\Installer_Staging'
 
     steps:
       - name: Checkout
@@ -71,12 +72,25 @@ jobs:
       - name: Prepare Installer Files
         run: |
           # Stage files for Inno Setup
-          powershell.exe -File tools\prepare_installer.ps1 -BuildDir $env:OPENSAL_BUILD_DIR -StagingDir "Installer_Staging" -BuildNumber ${{ github.run_number }}
+          powershell.exe -File tools\prepare_installer.ps1 -BuildDir $env:OPENSAL_BUILD_DIR -StagingDir $env:INSTALLER_STAGING_DIR -BuildNumber ${{ github.run_number }}
+
+          $requiredFiles = @(
+            (Join-Path $env:INSTALLER_STAGING_DIR 'salamand.exe')
+            (Join-Path $env:INSTALLER_STAGING_DIR 'salmon.exe')
+            (Join-Path $env:INSTALLER_STAGING_DIR 'LICENSE')
+          )
+
+          $missingFiles = $requiredFiles | Where-Object { -not (Test-Path $_) }
+          if ($missingFiles.Count -gt 0) {
+            $missingFiles | ForEach-Object { Write-Host "::error::Missing staged installer file: $_" }
+            throw "Installer staging is incomplete."
+          }
 
       - name: Build Installer with Inno Setup
         run: |
           # Compile the Inno Setup script
-          iscc.exe /DSourcePath="Installer_Staging" /DBuildNumber=${{ github.run_number }} "Installer\setup.iss"
+          $sourcePath = Split-Path -Leaf $env:INSTALLER_STAGING_DIR
+          iscc.exe /DSourcePath="$sourcePath" /DBuildNumber=${{ github.run_number }} "Installer\setup.iss"
 
       - name: Create Release
         uses: softprops/action-gh-release@v2
