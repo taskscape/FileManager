@@ -77,6 +77,9 @@ Source: "{#SourcePath}\utils\ssleay32.dll"; DestDir: "{app}\utils"; Flags: ignor
 ; License file
 Source: "{#SourcePath}\LICENSE"; DestDir: "{app}"; Flags: ignoreversion
 
+; Build info for traceability
+Source: "{#SourcePath}\build_info.txt"; DestDir: "{app}"; Flags: ignoreversion skipifsourcedoesntexist
+
 ; Language files for main application
 Source: "{#SourcePath}\lang\*.slg"; DestDir: "{app}\lang"; Flags: ignoreversion
 
@@ -118,23 +121,17 @@ Type: dirifempty; Name: "{app}"
 [Code]
 // Check if Open Salamander is currently running and offer to close it
 function InitializeSetup(): Boolean;
-var
-  ResultCode: Integer;
 begin
   Result := True;
   
-  // Check if salamand.exe is running
-  if CheckForMutexes('OpenSalamanderMutex') then
+  // Check if salamand.exe is running (uses process list mutex from src/tasklist.cpp)
+  while CheckForMutexes('TaskscapeLtdSalamander3bProcessListMutex') do
   begin
     if MsgBox('Open Salamander is currently running. Please close it before continuing installation.' + #13#10 + #13#10 + 
               'Click OK to retry or Cancel to exit setup.', mbError, MB_OKCANCEL) = IDCANCEL then
     begin
       Result := False;
-    end
-    else
-    begin
-      // Retry the check
-      Result := InitializeSetup();
+      Exit;
     end;
   end;
 end;
@@ -144,7 +141,7 @@ function InitializeUninstall(): Boolean;
 begin
   Result := True;
   
-  if CheckForMutexes('OpenSalamanderMutex') then
+  if CheckForMutexes('TaskscapeLtdSalamander3bProcessListMutex') then
   begin
     MsgBox('Open Salamander is currently running. Please close it before uninstalling.', mbError, MB_OK);
     Result := False;

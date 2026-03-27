@@ -5,6 +5,7 @@ param(
 )
 
 Write-Host "=== Open Salamander Installer Staging Script ===" -ForegroundColor Cyan
+Write-Host "Build Number: $BuildNumber" -ForegroundColor Cyan
 Write-Host "Staging files for Inno Setup..."
 
 if (Test-Path $StagingDir) { Remove-Item $StagingDir -Recurse -Force }
@@ -14,6 +15,12 @@ New-Item -ItemType Directory -Path "$StagingDir\lang" | Out-Null
 New-Item -ItemType Directory -Path "$StagingDir\convert" | Out-Null
 New-Item -ItemType Directory -Path "$StagingDir\toolbars" | Out-Null
 New-Item -ItemType Directory -Path "$StagingDir\utils" | Out-Null
+
+# Write build info file for traceability
+@"
+Build Number: $BuildNumber
+Build Date: $(Get-Date -Format "yyyy-MM-dd HH:mm:ss UTC" -AsUTC)
+"@ | Out-File -FilePath "$StagingDir\build_info.txt" -Encoding utf8
 
 # 1. Copy license file
 Copy-Item "Installer\LICENSE" "$StagingDir\" -ErrorAction SilentlyContinue
