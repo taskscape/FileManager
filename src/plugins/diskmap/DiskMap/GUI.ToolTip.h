@@ -109,6 +109,9 @@ protected:
 
     TCHAR _stitle[2 * MAX_PATH + 1];
     size_t _stitlelen;
+    // Wide version of _stitle for GDI rendering (path is UTF-8 internally)
+    wchar_t _stitleW[2 * MAX_PATH + 1];
+    size_t _stitlelenW;
     TCHAR _sftype[MAX_TYPELEN];
     size_t _sftypelen;
 
@@ -159,6 +162,8 @@ protected:
         {
             this->_stitle[0] = TEXT('\0');
             this->_stitlelen = 0;
+            this->_stitleW[0] = L'\0';
+            this->_stitlelenW = 0;
             return;
         }
 
@@ -189,6 +194,10 @@ protected:
         {
             this->_stitlelen = this->_file->GetFullName(this->_stitle, ARRAYSIZE(this->_stitle));
         }
+
+        // Convert the UTF-8 path title to wide for GDI rendering
+        this->_stitlelenW = (size_t)MultiByteToWideChar(CP_UTF8, 0, this->_stitle, (int)this->_stitlelen, this->_stitleW, ARRAYSIZE(this->_stitleW) - 1);
+        this->_stitleW[this->_stitlelenW] = L'\0';
     }
 
     void MakeDirty()
@@ -219,6 +228,8 @@ public:
         this->_sFormatter = NULL;
 
         this->_stitlelen = 0;
+        this->_stitleW[0] = L'\0';
+        this->_stitlelenW = 0;
         this->_sftypelen = 0;
 
         this->_headers[TT_LID_CREATETIME] = new CZResourceString(IDS_DISKMAP_TTIP_TIMECREATE);
@@ -414,7 +425,7 @@ public:
 
         HFONT hfold;
         hfold = SelectFont(hdc, this->_hftitle);
-        GetTextExtentPoint32(hdc, this->_stitle, (int)this->_stitlelen, &sz);
+        GetTextExtentPoint32W(hdc, this->_stitleW, (int)this->_stitlelenW, &sz);
         wsz.cx = max(sz.cx + 32 + TT_MARGIN_X + TT_MARGIN_X, wsz.cx);
         this->_headerheight += sz.cy;
 
@@ -563,7 +574,7 @@ public:
         int linepos = TT_MARGIN_Y + max(16, szc.cy + TT_MARGIN_Y / 2);
         RECT rct = oR;
         rct.bottom = linepos + 1;
-        ExtTextOut(hdc, TT_MARGIN_X + TT_MARGIN_X + 32 + TT_MARGIN_X / 2, TT_MARGIN_Y + 0, ETO_OPAQUE, &rct, this->_stitle, (UINT)this->_stitlelen, NULL);
+        ExtTextOutW(hdc, TT_MARGIN_X + TT_MARGIN_X + 32 + TT_MARGIN_X / 2, TT_MARGIN_Y + 0, ETO_OPAQUE, &rct, this->_stitleW, (UINT)this->_stitlelenW, NULL);
 
         //Dividing line
         MoveToEx(hdc, TT_MARGIN_X + TT_MARGIN_X + 32, linepos, NULL);

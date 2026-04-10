@@ -71,6 +71,18 @@ protected:
     // string for storing a copy of the path with an ellipsis
     TCHAR _pathtemp[MAX_PATH + 3];
 
+    // Wide-char versions of path fields for GDI rendering.
+    // Paths are stored internally as UTF-8 (char), but GDI ANSI functions
+    // use the system ANSI code page and cannot render UTF-8 correctly.
+    // These wide versions are kept in sync with _path/_rootLen and are used
+    // exclusively for measuring and drawing text via the W GDI variants.
+    wchar_t _pathW[MAX_PATH + 4];
+    int _pathWLen;
+    int _rootLenW;
+    wchar_t _pathtempW[MAX_PATH + 3];
+    wchar_t const* _pathstrW;
+    int _pathlenW;
+
     // Cached values - colors: active/inactive
     COLORREF _backColor;
     COLORREF _rootColor;
@@ -131,6 +143,13 @@ protected:
 
         this->_nodeCount = nodeid;
         this->_nodes[this->_nodeCount].xright = LAST_NODEX;
+
+        // Build wide-char version of path for GDI rendering (paths are UTF-8 internally)
+        this->_pathWLen = MultiByteToWideChar(CP_UTF8, 0, this->_path->GetString(), (int)this->_path->GetLength(), this->_pathW, ARRAYSIZE(this->_pathW) - 1);
+        if (this->_pathWLen < 0)
+            this->_pathWLen = 0;
+        this->_pathW[this->_pathWLen] = L'\0';
+        this->_rootLenW = MultiByteToWideChar(CP_UTF8, 0, this->_path->GetString(), this->_rootLen, NULL, 0);
 
         this->_sizeCached = FALSE;
         this->Repaint();
@@ -193,11 +212,13 @@ protected:
         SIZE sz;
         int sizewidth = 0;
         int pathwidth = 0;
+        // dx holds per-wide-char pixel positions; wide length <= UTF-8 byte length
         int dx[MAX_PATH + 3];
-        GetTextExtentExPoint(hdc, this->_path->GetString(), (int)this->_path->GetLength(), 0, NULL, dx, &sz);
+        GetTextExtentExPointW(hdc, this->_pathW, this->_pathWLen, 0, NULL, dx, &sz);
         pathwidth = sz.cx;
         if (this->_disksize >= 0)
         {
+            // Size strings are ASCII-only formatted numbers; ANSI call is correct here
             GetTextExtentPoint32(hdc, this->_sizestrlong->GetString(), (int)this->_sizestrlong->GetLength(), &sz);
             sizewidth = sz.cx + 2;
 
@@ -228,50 +249,60 @@ protected:
 			}*/
         }
 
+        // Map each node's UTF-8 byte offset to its wide-char position for dx indexing.
+        // Backslashes are always single-byte ASCII in UTF-8 so the positions differ only
+        // when non-ASCII characters appear before the backslash.
+        const char* utf8path = this->_path->GetString();
+        int nodeWPos[MAX_PATH / 2 + 1];
+        for (int i = 0; i < this->_nodeCount; i++)
+        {
+            nodeWPos[i] = MultiByteToWideChar(CP_UTF8, 0, utf8path, this->_nodes[i].strpos, NULL, 0);
+        }
+
         if (pathwidth <= width)
         {
-            this->_pathstr = this->_path->GetString();
-            this->_pathlen = (int)this->_path->GetLength();
+            this->_pathstrW = this->_pathW;
+            this->_pathlenW = this->_pathWLen;
 
-            this->_rootX = dx[this->_rootLen - 1] + rct.left;
+            this->_rootX = dx[this->_rootLenW - 1] + rct.left;
 
             for (int i = 0; i < this->_nodeCount; i++)
             {
-                int ppos = this->_nodes[i].strpos;
-                this->_nodes[i].xright = dx[ppos - 1] + rct.left;
+                int wpos = nodeWPos[i];
+                this->_nodes[i].xright = dx[wpos - 1] + rct.left;
             }
         }
         else
         {
-            TCHAR* ostr = this->_pathtemp;
+            wchar_t* ostr = this->_pathtempW;
             int ostrlen = 0;
             if (width > this->_dotsWidth)
             {
-                TCHAR const* str = this->_path->GetString();
-                int strlen = (int)this->_path->GetLength();
+                wchar_t const* str = this->_pathW;
+                int strlen = this->_pathWLen;
 
                 int remwidth = width - this->_dotsWidth;
 
                 int p = 0;
-                while (p < strlen && dx[p] <= remwidth && str[p] != TEXT('\\'))
+                while (p < strlen && dx[p] <= remwidth && str[p] != L'\\')
                 {
                     ostr[p] = str[p];
                     p++;
                     ostrlen++;
                 }
-                BOOL found = (str[p] == TEXT('\\'));
+                BOOL found = (str[p] == L'\\');
 
-                while (p < strlen && dx[p] <= remwidth && str[p] == TEXT('\\'))
+                while (p < strlen && dx[p] <= remwidth && str[p] == L'\\')
                 {
                     ostr[p] = str[p];
                     p++;
                     ostrlen++;
                 }
-                BOOL whole = (str[p] != TEXT('\\'));
+                BOOL whole = (str[p] != L'\\');
 
-                ostr[ostrlen++] = TEXT('.');
-                ostr[ostrlen++] = TEXT('.');
-                ostr[ostrlen++] = TEXT('.');
+                ostr[ostrlen++] = L'.';
+                ostr[ostrlen++] = L'.';
+                ostr[ostrlen++] = L'.';
 
                 if (found && whole)
                 {
@@ -287,9 +318,9 @@ protected:
                     {
                         ostr[ostrlen++] = str[i];
                     }
-                    if (this->_rootLen > rp)
+                    if (this->_rootLenW > rp)
                     {
-                        this->_rootX = dx[this->_rootLen - 1] + rct.left - dx[rp] + this->_dotsWidth + dx[p - 1];
+                        this->_rootX = dx[this->_rootLenW - 1] + rct.left - dx[rp] + this->_dotsWidth + dx[p - 1];
                     }
                     else
                     {
@@ -297,10 +328,10 @@ protected:
                     }
                     for (i = 0; i < this->_nodeCount; i++)
                     {
-                        int ppos = this->_nodes[i].strpos;
-                        if (ppos > rp)
+                        int wpos = nodeWPos[i];
+                        if (wpos > rp)
                         {
-                            this->_nodes[i].xright = dx[ppos - 1] + rct.left - dx[rp] + this->_dotsWidth + dx[p - 1];
+                            this->_nodes[i].xright = dx[wpos - 1] + rct.left - dx[rp] + this->_dotsWidth + dx[p - 1];
                         }
                         else
                         {
@@ -322,12 +353,12 @@ protected:
                 //TODO: node clean - nothing!
                 this->_nodes[0].xright = LAST_NODEX;
             }
-            ostr[ostrlen] = TEXT('\0');
-            this->_pathstr = ostr;
-            this->_pathlen = ostrlen;
+            ostr[ostrlen] = L'\0';
+            this->_pathstrW = ostr;
+            this->_pathlenW = ostrlen;
         }
 
-        if ((size_t)this->_rootLen == this->_path->GetLength())
+        if (this->_rootLenW == this->_pathWLen)
         {
             this->_rootX = -1;
         }
@@ -479,7 +510,7 @@ protected:
             {
                 //root string
                 trct.right = this->_rootX;
-                ExtTextOut(hdc, rct.left + 1, rct.top + texttop, ETO_OPAQUE | ETO_CLIPPED, &trct, this->_pathstr, this->_pathlen, NULL);
+                ExtTextOutW(hdc, rct.left + 1, rct.top + texttop, ETO_OPAQUE | ETO_CLIPPED, &trct, this->_pathstrW, this->_pathlenW, NULL);
                 trct.right = rct.right;
             }
             trct.left = this->_rootX;
@@ -496,27 +527,27 @@ protected:
                     int oR = trct.right;
                     int nr = this->_nodes[this->_mouseNode].xright;
                     trct.right = nr;
-                    ExtTextOut(hdc, rct.left + 1, rct.top + texttop, ETO_OPAQUE | ETO_CLIPPED, &trct, this->_pathstr, this->_pathlen, NULL);
+                    ExtTextOutW(hdc, rct.left + 1, rct.top + texttop, ETO_OPAQUE | ETO_CLIPPED, &trct, this->_pathstrW, this->_pathlenW, NULL);
                     trct.left = nr;
                     trct.right = oR;
                 }
                 else
                 {
                     //whole string highlighted
-                    ExtTextOut(hdc, rct.left + 1, rct.top + texttop, ETO_OPAQUE | ETO_CLIPPED, &trct, this->_pathstr, this->_pathlen, NULL);
+                    ExtTextOutW(hdc, rct.left + 1, rct.top + texttop, ETO_OPAQUE | ETO_CLIPPED, &trct, this->_pathstrW, this->_pathlenW, NULL);
                 }
             }
             if (!isLastNodeHighlighted)
             {
                 //normal - remaining part
                 SetTextColor(hdc, this->_textColor);
-                ExtTextOut(hdc, rct.left + 1, rct.top + texttop, ETO_OPAQUE | ETO_CLIPPED, &trct, this->_pathstr, this->_pathlen, NULL);
+                ExtTextOutW(hdc, rct.left + 1, rct.top + texttop, ETO_OPAQUE | ETO_CLIPPED, &trct, this->_pathstrW, this->_pathlenW, NULL);
             }
         }
         else
         {
             //root string only
-            ExtTextOut(hdc, rct.left + 1, rct.top + texttop, ETO_OPAQUE | ETO_CLIPPED, &rct, this->_pathstr, this->_pathlen, NULL);
+            ExtTextOutW(hdc, rct.left + 1, rct.top + texttop, ETO_OPAQUE | ETO_CLIPPED, &rct, this->_pathstrW, this->_pathlenW, NULL);
         }
 
         SelectFont(hdc, hfold);
@@ -617,6 +648,12 @@ public:
         this->_hfont = NULL;
         this->_dotsWidth = 0;
         this->_id = 0;
+
+        this->_pathW[0] = L'\0';
+        this->_pathWLen = 0;
+        this->_rootLenW = 0;
+        this->_pathstrW = this->_pathW;
+        this->_pathlenW = 0;
 
         this->_connector = NULL;
 
