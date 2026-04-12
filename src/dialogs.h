@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2023 Taskscape Ltd
+﻿// SPDX-FileCopyrightText: 2023 Taskscape Ltd
 // SPDX-License-Identifier: GPL-2.0-or-later
 // CommentsTranslationProject: TRANSLATED
 
@@ -705,13 +705,13 @@ protected:
 #define PASSWORD_MAXLEN (256 + 1)
 #define DOMAIN_MAXLEN (256 + 1)
 
-class CEnterPasswdDialog : public CCommonDialog
+class CPasswordDialog : public CCommonDialog
 {
 public:
     char Passwd[PASSWORD_MAXLEN];
     char User[USERNAME_MAXLEN];
 
-    CEnterPasswdDialog(HWND parent, const char* path, const char* user, CObjectOrigin origin = ooStandard);
+    CPasswordDialog(HWND parent, const char* path, const char* user, CObjectOrigin origin = ooStandard);
 
     virtual void Validate(CTransferInfo& ti);
     virtual void Transfer(CTransferInfo& ti);
@@ -797,10 +797,10 @@ protected:
 //
 // ****************************************************************************
 
-class CZIPSizeResultsDlg : public CCommonDialog
+class CZipSizeResultsDialog : public CCommonDialog
 {
 public:
-    CZIPSizeResultsDlg(HWND parent, const CQuadWord& size, int files, int dirs);
+    CZipSizeResultsDialog(HWND parent, const CQuadWord& size, int files, int dirs);
 
 protected:
     virtual INT_PTR DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam);

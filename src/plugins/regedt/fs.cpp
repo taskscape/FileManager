@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2023 Taskscape Ltd
+﻿// SPDX-FileCopyrightText: 2023 Taskscape Ltd
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "precomp.h"
@@ -119,12 +119,12 @@ void ReleaseFS()
 
 //****************************************************************************
 //
-// CTopIndexMem
+// CScrollPositionMemory
 //
 
-void CTopIndexMem::Push(LPCWSTR path, int topIndex)
+void CScrollPositionMemory::Push(LPCWSTR path, int topIndex)
 {
-    CALL_STACK_MESSAGE2("CTopIndexMem::Push(, %d)", topIndex);
+    CALL_STACK_MESSAGE2("CScrollPositionMemory::Push(, %d)", topIndex);
     // determine whether path continues Path (path==Path+"\\name")
     LPCWSTR s = path + wcslen(path);
     if (s > path && *(s - 1) == L'\\')
@@ -166,9 +166,9 @@ void CTopIndexMem::Push(LPCWSTR path, int topIndex)
     }
 }
 
-BOOL CTopIndexMem::FindAndPop(LPCWSTR path, int& topIndex)
+BOOL CScrollPositionMemory::FindAndPop(LPCWSTR path, int& topIndex)
 {
-    CALL_STACK_MESSAGE2("CTopIndexMem::FindAndPop(, %d)", topIndex);
+    CALL_STACK_MESSAGE2("CScrollPositionMemory::FindAndPop(, %d)", topIndex);
     // determine whether path matches Path (path==Path)
     int l1 = (int)wcslen(path);
     if (l1 > 0 && path[l1 - 1] == L'\\')

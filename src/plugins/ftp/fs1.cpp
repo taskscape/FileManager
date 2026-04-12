@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2023 Taskscape Ltd
+﻿// SPDX-FileCopyrightText: 2023 Taskscape Ltd
 // SPDX-License-Identifier: GPL-2.0-or-later
 // CommentsTranslationProject: TRANSLATED
 
@@ -742,10 +742,10 @@ void CPluginInterfaceForFS::ConvertPathToExternal(const char* fsName, int fsName
 
 //****************************************************************************
 //
-// CTopIndexMem
+// CScrollPositionMemory
 //
 
-void CTopIndexMem::Push(CFTPServerPathType type, const char* path, int topIndex)
+void CScrollPositionMemory::Push(CFTPServerPathType type, const char* path, int topIndex)
 {
     // determine whether path follows Path (path == Path+"/name")
     char testPath[FTP_MAX_PATH];
@@ -776,7 +776,7 @@ void CTopIndexMem::Push(CFTPServerPathType type, const char* path, int topIndex)
     }
 }
 
-BOOL CTopIndexMem::FindAndPop(CFTPServerPathType type, const char* path, int& topIndex)
+BOOL CScrollPositionMemory::FindAndPop(CFTPServerPathType type, const char* path, int& topIndex)
 {
     // determine whether path matches Path (path == Path)
     if (FTPIsTheSameServerPath(type, path, Path))

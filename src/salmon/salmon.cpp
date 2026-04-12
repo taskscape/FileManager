@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2023 Taskscape Ltd
+﻿// SPDX-FileCopyrightText: 2023 Taskscape Ltd
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "precomp.h"
@@ -39,20 +39,20 @@ static WCHAR* AllocUtf8ToWide(const char* text)
 
 // ****************************************************************************
 
-class C__StrCriticalSection
+class CStringResourceLock
 {
 public:
     CRITICAL_SECTION cs;
 
-    C__StrCriticalSection() { HANDLES(InitializeCriticalSection(&cs)); }
-    ~C__StrCriticalSection() { HANDLES(DeleteCriticalSection(&cs)); }
+    CStringResourceLock() { HANDLES(InitializeCriticalSection(&cs)); }
+    ~CStringResourceLock() { HANDLES(DeleteCriticalSection(&cs)); }
 };
 
 // ensure the critical section is constructed in time
 #pragma warning(disable : 4073)
 #pragma init_seg(lib)
-C__StrCriticalSection __StrCriticalSection;
-C__StrCriticalSection __StrCriticalSection2;
+CStringResourceLock __StrCriticalSection;
+CStringResourceLock __StrCriticalSection2;
 
 // ****************************************************************************
 

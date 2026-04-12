@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2023 Taskscape Ltd
+﻿// SPDX-FileCopyrightText: 2023 Taskscape Ltd
 // SPDX-License-Identifier: GPL-2.0-or-later
 // CommentsTranslationProject: TRANSLATED
 
@@ -1242,14 +1242,14 @@ public:
 
 //****************************************************************************
 //
-// CTopIndexMem
+// CScrollPositionMemory
 //
 // top-index memory of the list box in the panel - used by CPluginFSInterface for correct
 // behavior of ExecuteOnFS (preserving the top index after entering and leaving a subdirectory)
 
 #define TOP_INDEX_MEM_SIZE 50 // number of remembered top indices (levels), at least 1
 
-class CTopIndexMem
+class CScrollPositionMemory
 {
 protected:
     // path for the last remembered top index (note it is case-sensitive)
@@ -1258,7 +1258,7 @@ protected:
     int TopIndexesCount;                // number of remembered top indices
 
 public:
-    CTopIndexMem() { Clear(); }
+    CScrollPositionMemory() { Clear(); }
 
     // clears the memory
     void Clear()
@@ -1502,7 +1502,7 @@ protected:
 
     CFTPErrorState ErrorState;
     BOOL IsDetached;          // is this FS detached? (FALSE = it is in a panel)
-    CTopIndexMem TopIndexMem; // top-index memory for ExecuteOnFS()
+    CScrollPositionMemory TopIndexMem; // top-index memory for ExecuteOnFS()
 
     CControlConnectionSocket* ControlConnection; // "control connection" socket to the FTP server (NULL == never connected)
     char RescuePath[FTP_MAX_PATH];               // rescue path on FTP - try when ChangePath() can no longer shorten the path

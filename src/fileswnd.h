@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2023 Taskscape Ltd
+﻿// SPDX-FileCopyrightText: 2023 Taskscape Ltd
 // SPDX-License-Identifier: GPL-2.0-or-later
 // CommentsTranslationProject: TRANSLATED
 
@@ -153,9 +153,9 @@ extern CCopyMoveOptions CopyMoveOptions; // global variable holding the default 
 
 class CMainWindow;
 class COperations;
-class CFilesBox;
-class CHeaderLine;
-class CStatusWindow;
+class CFileListBox;
+class CFileListHeader;
+class CPanelStatusBar;
 class CFilesArray;
 struct CFileData;
 class CIconCache;
@@ -350,12 +350,12 @@ public:
 
 //****************************************************************************
 //
-// CTopIndexMem
+// CScrollPositionMemory
 //
 
 #define TOP_INDEX_MEM_SIZE 50 // number of remembered top indexes (levels), at least 1
 
-class CTopIndexMem
+class CScrollPositionMemory
 {
 protected:
     // path for the last remembered top index; the longest is archive + archive-path so 2 * MAX_PATH
@@ -364,7 +364,7 @@ protected:
     int TopIndexesCount;                // number of stored top indexes
 
 public:
-    CTopIndexMem() { Clear(); }
+    CScrollPositionMemory() { Clear(); }
     void Clear()
     {
         Path[0] = 0;
@@ -407,25 +407,25 @@ public:
 protected:
     int GetIndex(const char* name);
 
-    friend class CDirectorySizesHolder;
+    friend class CDirectorySizeCache;
 };
 
 //******************************************************************************
 //
-// CDirectorySizesHolder
+// CDirectorySizeCache
 //
 
 #define DIRECOTRY_SIZES_COUNT 20
 
-class CDirectorySizesHolder
+class CDirectorySizeCache
 {
 protected:
     CDirectorySizes* Items[DIRECOTRY_SIZES_COUNT];
     int ItemsCount; // number of valid items in the Items array
 
 public:
-    CDirectorySizesHolder();
-    ~CDirectorySizesHolder();
+    CDirectorySizeCache();
+    ~CDirectorySizeCache();
 
     // destroys all held data except for Path
     void Clean();
@@ -447,10 +447,10 @@ protected:
 
 //****************************************************************************
 //
-// CQuickRenameWindow
+// CInlineRenameEdit
 //
 
-class CQuickRenameWindow : public CWindow
+class CInlineRenameEdit : public CWindow
 {
 protected:
     CFilesWindow* FilesWindow;
@@ -458,7 +458,7 @@ protected:
     BOOL SkipNextCharacter;
 
 public:
-    CQuickRenameWindow();
+    CInlineRenameEdit();
 
     void SetPanel(CFilesWindow* filesWindow);
     void SetCloseEnabled(BOOL closeEnabled);
@@ -637,7 +637,7 @@ enum CCopyFocusedNameModeEnum
 
 // array for prioritizing icon and thumbnail loading by the icon reader according
 // to the current state of the panel and displayed items
-class CVisibleItemsArray
+class CVisibleFileItemsArray
 {
 protected:
     CRITICAL_SECTION Monitor; // section used to synchronize this object (monitor behavior)
@@ -655,8 +655,8 @@ protected:
     int LastVisibleItem;  // index of the last visible item
 
 public:
-    CVisibleItemsArray(BOOL surroundArr);
-    ~CVisibleItemsArray();
+    CVisibleFileItemsArray(BOOL surroundArr);
+    ~CVisibleFileItemsArray();
 
     // Returns TRUE if the array is filled and valid (matches the current state of thepanel
     // and visible items), also returns the number of the array version in 'versionNum'
@@ -751,8 +751,8 @@ public:
 
     int LastFocus; // to avoid unnecessary overwriting of the status line
 
-    CFilesBox* ListBox;
-    CStatusWindow *StatusLine,
+    CFileListBox* ListBox;
+    CPanelStatusBar *StatusLine,
         *DirectoryLine;
 
     BOOL StatusLineVisible;
@@ -773,7 +773,7 @@ public:
     char NextFocusName[2 * MAX_PATH]; // the name that will receive focus on the next refresh; 2x for UTF-8
     BOOL DontClearNextFocusName;  // TRUE = do not clear NextFocusName when the main Salamander window is activated
     BOOL FocusFirstNewItem;       // refresh: should the newly added item be selected? (for system New)
-    CTopIndexMem TopIndexMem;     // memory of top index for Execute()
+    CScrollPositionMemory TopIndexMem;     // memory of top index for Execute()
 
     int LastRefreshTime; // used to handle the chaos of directory change notifications
 
@@ -879,13 +879,13 @@ public:
     CNames OldSelection; // selection before the operation, intended for the Reselect command
     CNames HiddenNames;  // names of files and directories that the user has hidden via the Hide function (unrelated to the Hidden attribute)
 
-    CQuickRenameWindow QuickRenameWindow;
+    CInlineRenameEdit QuickRenameWindow;
     UINT_PTR QuickRenameTimer;
     int QuickRenameIndex;
     RECT QuickRenameRect;
 
-    CVisibleItemsArray VisibleItemsArray;         // array of items visible in the panel
-    CVisibleItemsArray VisibleItemsArraySurround; // array of items adjacent to the visible part of the panel
+    CVisibleFileItemsArray VisibleItemsArray;         // array of items visible in the panel
+    CVisibleFileItemsArray VisibleItemsArraySurround; // array of items adjacent to the visible part of the panel
 
     BOOL TemporarilySimpleIcons; // use simple icons until the next ReadDirectory()
 
@@ -1587,7 +1587,7 @@ public:
     // if the user changes the column width, this method will be called (after the dragging ends)
     void OnHeaderLineColWidthChanged();
 
-    CHeaderLine* GetHeaderLine();
+    CFileListHeader* GetHeaderLine();
 
     // sends focused/selected files using the default mail client
     void EmailFiles();
@@ -1666,7 +1666,7 @@ const char* WINAPI PanelEnumDiskSelection(HWND parent, int enumFiles, const char
 
 extern CNames GlobalSelection; // stored selection shared by both panels
 
-extern CDirectorySizesHolder DirectorySizesHolder; // holds the list of directory names and sizes with known size
+extern CDirectorySizeCache DirectorySizesHolder; // holds the list of directory names and sizes with known size
 
 extern CFilesWindow* DropSourcePanel; // prevents drag&drop from/to the same panel
 extern BOOL OurClipDataObject;        // TRUE when pasting our IDataObject

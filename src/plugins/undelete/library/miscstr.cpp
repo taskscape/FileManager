@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2023 Taskscape Ltd
+﻿// SPDX-FileCopyrightText: 2023 Taskscape Ltd
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "precomp.h"
@@ -19,18 +19,18 @@
 // LoadStr() - helper function for reading strings from resources
 //
 
-class C__StrCriticalSection
+class CStringResourceLock
 {
 public:
     CRITICAL_SECTION cs;
-    C__StrCriticalSection() { NOHANDLES(InitializeCriticalSection(&cs)); }
-    ~C__StrCriticalSection() { NOHANDLES(DeleteCriticalSection(&cs)); }
+    CStringResourceLock() { NOHANDLES(InitializeCriticalSection(&cs)); }
+    ~CStringResourceLock() { NOHANDLES(DeleteCriticalSection(&cs)); }
 };
 
 // ensure critical section is initialized in the beginning
 #pragma warning(disable : 4073)
 #pragma init_seg(lib)
-C__StrCriticalSection __StrCriticalSection;
+CStringResourceLock __StrCriticalSection;
 
 const unsigned short String<char>::STRBUFSIZE = 10240;
 char* String<char>::StringBuffer = NULL;

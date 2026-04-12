@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2023 Taskscape Ltd
+﻿// SPDX-FileCopyrightText: 2023 Taskscape Ltd
 // SPDX-License-Identifier: GPL-2.0-or-later
 // CommentsTranslationProject: TRANSLATED
 
@@ -2873,10 +2873,10 @@ void CFilesWindow::KillQuickRenameTimer()
 
 //****************************************************************************
 //
-// CQuickRenameWindow
+// CInlineRenameEdit
 //
 
-CQuickRenameWindow::CQuickRenameWindow()
+CInlineRenameEdit::CInlineRenameEdit()
 #ifdef _UNICODE
     : CWindow(ooStatic)
 #else
@@ -2888,23 +2888,23 @@ CQuickRenameWindow::CQuickRenameWindow()
     SkipNextCharacter = FALSE;
 }
 
-void CQuickRenameWindow::SetPanel(CFilesWindow* filesWindow)
+void CInlineRenameEdit::SetPanel(CFilesWindow* filesWindow)
 {
     FilesWindow = filesWindow;
 }
 
-void CQuickRenameWindow::SetCloseEnabled(BOOL closeEnabled)
+void CInlineRenameEdit::SetCloseEnabled(BOOL closeEnabled)
 {
     CloseEnabled = closeEnabled;
 }
 
-BOOL CQuickRenameWindow::GetCloseEnabled()
+BOOL CInlineRenameEdit::GetCloseEnabled()
 {
     return CloseEnabled;
 }
 
 LRESULT
-CQuickRenameWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
+CInlineRenameEdit::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 {
     switch (uMsg)
     {

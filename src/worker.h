@@ -526,3 +526,134 @@ BOOL CheckFileOrDirADS(const char* fileName, BOOL isDir, CQuadWord* adsSize, wch
                        int* streamNamesCount, BOOL* lowMemory, DWORD* winError,
                        DWORD bytesPerCluster, CQuadWord* adsOccupiedSpace,
                        BOOL* onlyDiscardableStreams);
+
+// Shared worker data structures (defined in async_copy.cpp, used in operations_core.cpp)
+
+struct CWorkerData
+{
+    COperations* Script;
+    HWND HProgressDlg;
+    void* Buffer;
+    BOOL BufferIsAllocated;
+    DWORD ClearReadonlyMask;
+    CConvertData* ConvertData;
+    HANDLE WContinue;
+
+    HANDLE WorkerNotSuspended;
+    BOOL* CancelWorker;
+    int* OperationProgress;
+    int* SummaryProgress;
+};
+
+struct CProgressDlgData
+{
+    HANDLE WorkerNotSuspended;
+    BOOL* CancelWorker;
+    int* OperationProgress;
+    int* SummaryProgress;
+
+    BOOL OverwriteAll;
+    BOOL OverwriteHiddenAll;
+    BOOL DeleteHiddenAll;
+    BOOL EncryptSystemAll;
+    BOOL DirOverwriteAll;
+    BOOL FileOutLossEncrAll;
+    BOOL DirCrLossEncrAll;
+
+    BOOL SkipAllFileWrite;
+    BOOL SkipAllFileRead;
+    BOOL SkipAllOverwrite;
+    BOOL SkipAllSystemOrHidden;
+    BOOL SkipAllFileOpenIn;
+    BOOL SkipAllFileOpenOut;
+    BOOL SkipAllOverwriteErr;
+    BOOL SkipAllMoveErrors;
+    BOOL SkipAllDeleteErr;
+    BOOL SkipAllDirCreate;
+    BOOL SkipAllDirCreateErr;
+    BOOL SkipAllChangeAttrs;
+    BOOL SkipAllEncryptSystem;
+    BOOL SkipAllFileADSOpenIn;
+    BOOL SkipAllFileADSOpenOut;
+    BOOL SkipAllGetFileTime;
+    BOOL SkipAllSetFileTime;
+    BOOL SkipAllFileADSRead;
+    BOOL SkipAllFileADSWrite;
+    BOOL SkipAllDirOver;
+    BOOL SkipAllFileOutLossEncr;
+    BOOL SkipAllDirCrLossEncr;
+
+    BOOL IgnoreAllADSReadErr;
+    BOOL IgnoreAllADSOpenOutErr;
+    BOOL IgnoreAllGetFileTimeErr;
+    BOOL IgnoreAllSetFileTimeErr;
+    BOOL IgnoreAllSetAttrsErr;
+    BOOL IgnoreAllCopyPermErr;
+    BOOL IgnoreAllCopyDirTimeErr;
+
+    int CnfrmFileOver;
+    int CnfrmDirOver;
+    int CnfrmSHFileOver;
+    int CnfrmSHFileDel;
+    int UseRecycleBin;
+    CMaskGroup RecycleMasks;
+
+    BOOL PrepareRecycleMasks(int& errorPos)
+    {
+        return RecycleMasks.PrepareMasks(errorPos);
+    }
+
+    BOOL AgreeRecycleMasks(const char* fileName, const char* fileExt)
+    {
+        return RecycleMasks.AgreeMasks(fileName, fileExt);
+    }
+};
+
+// Async copy parameter block (defined in async_copy.cpp, used in operations_core.cpp)
+struct CAsyncCopyParams
+{
+    void* Buffers[8];         // allocated buffers of size ASYNC_COPY_BUF_SIZE bytes
+    OVERLAPPED Overlapped[8]; // structures for asynchronous operations
+
+    BOOL UseAsyncAlg; // TRUE = use the asynchronous algorithm (data must be allocated), FALSE = old synchronous algorithm (allocate nothing)
+
+    BOOL HasFailed; // TRUE = failed to create an event for the Overlapped array, the structure is unusable
+
+    CAsyncCopyParams();
+    ~CAsyncCopyParams();
+
+    void Init(BOOL useAsyncAlg);
+
+    BOOL Failed() { return HasFailed; }
+
+    DWORD GetOverlappedFlag() { return UseAsyncAlg ? FILE_FLAG_OVERLAPPED : 0; }
+
+    OVERLAPPED* InitOverlapped(int i);
+    OVERLAPPED* InitOverlappedWithOffset(int i, const CQuadWord& offset);
+    OVERLAPPED* GetOverlapped(int i) { return &Overlapped[i]; }
+    void SetOverlappedToEOF(int i, const CQuadWord& offset);
+};
+
+int CaclProg(const CQuadWord& progressCurrent, const CQuadWord& progressTotal);
+void SetProgress(HWND hProgressDlg, int operation, int summary, CProgressDlgData& dlgData);
+void SetProgressDialog(HWND hProgressDlg, CProgressData* data, CProgressDlgData& dlgData);
+
+// File operation helpers (defined in async_copy.cpp, called from operations_core.cpp)
+BOOL DoCopyDirTime(HWND hProgressDlg, const char* targetName, FILETIME* modified, CProgressDlgData& dlgData, BOOL quiet);
+BOOL DoMoveFile(COperation* op, HWND hProgressDlg, void* buffer,
+                COperations* script, CQuadWord& totalDone, BOOL dir,
+                DWORD clearReadonlyMask, BOOL* novellRenamePatch, BOOL lantasticCheck,
+                int& mustDeleteFileBeforeOverwrite, int& allocWholeFileOnStart,
+                CProgressDlgData& dlgData, BOOL copyADS, BOOL copyAsEncrypted,
+                BOOL* setDirTimeAfterMove, CAsyncCopyParams*& asyncPar,
+                BOOL ignInvalidName);
+BOOL DoDeleteFile(HWND hProgressDlg, char* name, const CQuadWord& size, COperations* script,
+                  CQuadWord& totalDone, DWORD attr, CProgressDlgData& dlgData);
+BOOL DoCreateDir(HWND hProgressDlg, char* name, DWORD attr,
+                 DWORD clearReadonlyMask, CProgressDlgData& dlgData,
+                 CQuadWord& totalDone, CQuadWord& operTotal,
+                 const char* sourceDir, BOOL adsCopy, COperations* script,
+                 void* buffer, BOOL& skip, BOOL& alreadyExisted,
+                 BOOL createAsEncrypted, BOOL ignInvalidName);
+BOOL DoDeleteDir(HWND hProgressDlg, char* name, const CQuadWord& size, COperations* script,
+                 CQuadWord& totalDone, DWORD attr, BOOL dontUseRecycleBin, CProgressDlgData& dlgData);

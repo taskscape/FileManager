@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2023 Taskscape Ltd
+﻿// SPDX-FileCopyrightText: 2023 Taskscape Ltd
 // SPDX-License-Identifier: GPL-2.0-or-later
 // CommentsTranslationProject: TRANSLATED
 
@@ -2001,7 +2001,7 @@ void CFilesWindow::CalculateOccupiedZIPSpace(int countSizeMode)
             CSizeResultsDlg(HWindow, totalSize, CQuadWord(-1, -1), CQuadWord(-1, -1),
                             files, dirs, &sizes)
                 .Execute();
-            //      CZIPSizeResultsDlg(HWindow, totalSize, files, dirs).Execute();
+            //      CZipSizeResultsDialog(HWindow, totalSize, files, dirs).Execute();
         }
         if (selIndex != -1 && countSizeMode == 0)
         {

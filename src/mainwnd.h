@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2023 Taskscape Ltd
+﻿// SPDX-FileCopyrightText: 2023 Taskscape Ltd
 // SPDX-License-Identifier: GPL-2.0-or-later
 // CommentsTranslationProject: TRANSLATED
 
@@ -727,6 +727,10 @@ public:
 
     void ApplyCommandLineParams(const CCommandLineParams* params, BOOL setActivePanelAndPanelPaths = TRUE);
 
+    // Message-handler methods extracted from WindowProc for clarity.
+    LRESULT HandleWmCommand(WPARAM wParam, LPARAM lParam);
+    LRESULT HandleShutdown(UINT uMsg, WPARAM wParam, LPARAM lParam);
+
     void LockUI(BOOL lock, HWND hToolWnd, const char* lockReason);
     BOOL HasLockedUI() { return LockedUI; }
     void BringLockedUIToolWnd();
@@ -739,7 +743,7 @@ public:
 
 //
 // ****************************************************************************
-// C__MainWindowCS
+// CMainWindowLock
 //
 // ensures access to the MainWindow variable outside the main thread, usage:
 // if (MainWindowCS.LockIfNotClosed())
@@ -750,19 +754,19 @@ public:
 //   MainWindowCS.Unlock();
 // }
 
-class C__MainWindowCS
+class CMainWindowLock
 {
 protected:
     CRITICAL_SECTION cs;
     BOOL IsClosed;
 
 public:
-    C__MainWindowCS()
+    CMainWindowLock()
     {
         HANDLES(InitializeCriticalSection(&cs));
         IsClosed = FALSE;
     }
-    ~C__MainWindowCS() { HANDLES(DeleteCriticalSection(&cs)); }
+    ~CMainWindowLock() { HANDLES(DeleteCriticalSection(&cs)); }
 
     void SetClosed()
     {
@@ -783,7 +787,7 @@ public:
     void Unlock() { HANDLES(LeaveCriticalSection(&cs)); }
 };
 
-extern C__MainWindowCS MainWindowCS;
+extern CMainWindowLock MainWindowCS;
 
 //
 // ****************************************************************************

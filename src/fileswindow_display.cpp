@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2023 Taskscape Ltd
+﻿// SPDX-FileCopyrightText: 2023 Taskscape Ltd
 // SPDX-License-Identifier: GPL-2.0-or-later
 // CommentsTranslationProject: TRANSLATED
 
@@ -482,7 +482,7 @@ void DrawFocusRect(HDC hDC, const RECT* r, BOOL selected, BOOL editMode)
 // changes in item painting (layout) must be reflected in these locations:
 //
 // CFilesWindow::DrawItem(WPARAM wParam, LPARAM lParam)
-// CFilesBox::GetIndex(int x, int y)
+// CFileListBox::GetIndex(int x, int y)
 // CFilesMap::CreateMap()
 //
 

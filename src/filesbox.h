@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2023 Taskscape Ltd
+﻿// SPDX-FileCopyrightText: 2023 Taskscape Ltd
 // SPDX-License-Identifier: GPL-2.0-or-later
 // CommentsTranslationProject: TRANSLATED
 
@@ -7,7 +7,7 @@
 // ****************************************************************************
 
 class CFilesWindow;
-class CFilesBox;
+class CFileListBox;
 
 #define UPDATE_VERT_SCROLL 0x00000001
 #define UPDATE_HORZ_SCROLL 0x00000002
@@ -32,7 +32,7 @@ class CBottomBar : public CWindow
 protected:
     HWND HScrollBar;
     BOOL VertScrollSpace;   // reserve space for the vertical scrollbar
-    CFilesBox* RelayWindow; // used to relay messages
+    CFileListBox* RelayWindow; // used to relay messages
 
 public:
     CBottomBar();
@@ -43,12 +43,12 @@ protected:
 
     void LayoutChilds(); // computes rectangles and positions child windows
 
-    friend class CFilesBox;
+    friend class CFileListBox;
 };
 
 //****************************************************************************
 //
-// CHeaderLine
+// CFileListHeader
 //
 
 enum CHeaderHitTestEnum
@@ -58,10 +58,10 @@ enum CHeaderHitTestEnum
     hhtDivider, // divider of an item with adjustable width
 };
 
-class CHeaderLine : public CWindow
+class CFileListHeader : public CWindow
 {
 protected:
-    CFilesBox* Parent;
+    CFileListBox* Parent;
     TDirectArray<CColumn>* Columns; // pointer to the array held in CFilesWindow
     int Width;
     int Height;
@@ -74,8 +74,8 @@ protected:
     int OldDragColWidth; // column width before dragging started; used when resizing the column width
 
 public:
-    CHeaderLine();
-    ~CHeaderLine();
+    CFileListHeader();
+    ~CFileListHeader();
 
     // walks through the Columns array and sets minimal widths for columns
     // based on column names and whether sorting is possible by the column
@@ -97,16 +97,16 @@ protected:
     void PaintItem2(int index);
     void Cancel();
 
-    friend class CFilesBox;
+    friend class CFileListBox;
     friend class CFilesWindow;
 };
 
 //****************************************************************************
 //
-// CFilesBox
+// CFileListBox
 //
 
-class CFilesBox : public CWindow
+class CFileListBox : public CWindow
 {
 protected:
     CFilesWindow* Parent;
@@ -114,7 +114,7 @@ protected:
     HWND HVScrollBar;
     HWND HHScrollBar;
     CBottomBar BottomBar;
-    CHeaderLine HeaderLine;
+    CFileListHeader HeaderLine;
 
     RECT ClientRect;    // dimensions of the entire window
     RECT HeaderRect;    // position of the header control within ClientRect
@@ -149,7 +149,7 @@ protected:
     int MouseHWheelAccumulator; // horizontal
 
 public:
-    CFilesBox(CFilesWindow* parent);
+    CFileListBox(CFilesWindow* parent);
 
     // sets the number of items in the panel
     // count             - number of items in the panel
@@ -206,7 +206,7 @@ public:
     // items - used when prioritizing icon and thumbnail loading)
     void GetVisibleItems(int* firstIndex, int* count);
 
-    CHeaderLine* GetHeaderLine() { return &HeaderLine; }
+    CFileListHeader* GetHeaderLine() { return &HeaderLine; }
 
     // resets the accumulator used for mouse wheel detection; after reset, the next rotation starts from scratch
     // Microsoft recommends in Best Practices for Supporting Microsoft Mouse and Keyboard Devices (http://msdn.microsoft.com/en-us/library/ms997498.aspx)
@@ -233,5 +233,5 @@ protected:
     friend class CFilesMap;
     friend class CScrollPanel;
     friend class CBottomBar;
-    friend class CHeaderLine;
+    friend class CFileListHeader;
 };

@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2023 Taskscape Ltd
+﻿// SPDX-FileCopyrightText: 2023 Taskscape Ltd
 // SPDX-License-Identifier: GPL-2.0-or-later
 // CommentsTranslationProject: TRANSLATED
 
@@ -2340,7 +2340,7 @@ MENU_TEMPLATE_ITEM InfoLineMenu[] =
 
         if (hit == mwhteLeftHeaderLine || hit == mwhteRightHeaderLine)
         {
-            CHeaderLine* hdrLine = panel->GetHeaderLine();
+            CFileListHeader* hdrLine = panel->GetHeaderLine();
             if (hdrLine != NULL)
             {
                 // find out over which item of the header line the point is located

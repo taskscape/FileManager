@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2023 Taskscape Ltd
+﻿// SPDX-FileCopyrightText: 2023 Taskscape Ltd
 // SPDX-License-Identifier: GPL-2.0-or-later
 // CommentsTranslationProject: TRANSLATED
 
@@ -1104,10 +1104,10 @@ int CDirectorySizes::GetIndex(const char* name)
 
 //******************************************************************************
 //
-// CDirectorySizesHolder
+// CDirectorySizeCache
 //
 
-CDirectorySizesHolder::CDirectorySizesHolder()
+CDirectorySizeCache::CDirectorySizeCache()
 {
     int i;
     for (i = 0; i < DIRECOTRY_SIZES_COUNT; i++)
@@ -1115,12 +1115,12 @@ CDirectorySizesHolder::CDirectorySizesHolder()
     ItemsCount = 0;
 }
 
-CDirectorySizesHolder::~CDirectorySizesHolder()
+CDirectorySizeCache::~CDirectorySizeCache()
 {
     Clean();
 }
 
-void CDirectorySizesHolder::Clean()
+void CDirectorySizeCache::Clean()
 {
     int i;
     for (i = 0; i < DIRECOTRY_SIZES_COUNT; i++)
@@ -1135,7 +1135,7 @@ void CDirectorySizesHolder::Clean()
 }
 
 CDirectorySizes*
-CDirectorySizesHolder::Add(const char* path)
+CDirectorySizeCache::Add(const char* path)
 {
     // try to locate the requested path
     int index = GetIndex(path);
@@ -1177,7 +1177,7 @@ CDirectorySizesHolder::Add(const char* path)
 }
 
 CDirectorySizes*
-CDirectorySizesHolder::Get(const char* path)
+CDirectorySizeCache::Get(const char* path)
 {
     int index = GetIndex(path);
     if (index != -1)
@@ -1186,7 +1186,7 @@ CDirectorySizesHolder::Get(const char* path)
         return NULL;
 }
 
-int CDirectorySizesHolder::GetIndex(const char* path)
+int CDirectorySizeCache::GetIndex(const char* path)
 {
     int i;
     for (i = 0; i < ItemsCount; i++)
@@ -1197,7 +1197,7 @@ int CDirectorySizesHolder::GetIndex(const char* path)
     return -1;
 }
 
-BOOL CDirectorySizesHolder::Store(CFilesWindow* panel)
+BOOL CDirectorySizeCache::Store(CFilesWindow* panel)
 {
     CDirectorySizes* item = Add(panel->GetPath());
     if (item == NULL)
@@ -1224,7 +1224,7 @@ BOOL CDirectorySizesHolder::Store(CFilesWindow* panel)
     return TRUE;
 }
 
-void CDirectorySizesHolder::Restore(CFilesWindow* panel)
+void CDirectorySizeCache::Restore(CFilesWindow* panel)
 {
     int index = GetIndex(panel->GetPath());
     if (index == -1)

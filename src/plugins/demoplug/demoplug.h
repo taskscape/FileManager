@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2023 Taskscape Ltd
+﻿// SPDX-FileCopyrightText: 2023 Taskscape Ltd
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 //****************************************************************************
@@ -499,14 +499,14 @@ public:
 
 //****************************************************************************
 //
-// CTopIndexMem
+// CScrollPositionMemory
 //
 // memory for the listbox top index in the panel - used by CPluginFSInterface for proper
 // ExecuteOnFS behavior (preserves the top index when entering and leaving subdirectories)
 
 #define TOP_INDEX_MEM_SIZE 50 // number of remembered top indexes (levels), at least 1
 
-class CTopIndexMem
+class CScrollPositionMemory
 {
 protected:
     // path for the last remembered top index
@@ -515,7 +515,7 @@ protected:
     int TopIndexesCount;                // number of stored top indexes
 
 public:
-    CTopIndexMem() { Clear(); }
+    CScrollPositionMemory() { Clear(); }
     void Clear()
     {
         Path[0] = 0;
@@ -537,7 +537,7 @@ public:
     char Path[MAX_PATH];             // current path
     BOOL PathError;                  // TRUE if ListCurrentPath failed (path error); ChangePath will be called
     BOOL FatalError;                 // TRUE if ListCurrentPath failed (fatal error); ChangePath will be called
-    CTopIndexMem TopIndexMem;        // top-index cache used by ExecuteOnFS()
+    CScrollPositionMemory TopIndexMem;        // top-index cache used by ExecuteOnFS()
     BOOL CalledFromDisconnectDialog; // TRUE = the user wants to disconnect this FS from the Disconnect dialog (F12)
 
 public:

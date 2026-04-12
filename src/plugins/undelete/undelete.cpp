@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2023 Taskscape Ltd
+﻿// SPDX-FileCopyrightText: 2023 Taskscape Ltd
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 // ****************************************************************************
@@ -69,12 +69,12 @@ CLUSTER_MAP_I cluster_map;
 
 // ****************************************************************************
 //
-//  CTopIndexMem
+//  CScrollPositionMemory
 //
 
-void CTopIndexMem::Push(const char* path, int topIndex)
+void CScrollPositionMemory::Push(const char* path, int topIndex)
 {
-    CALL_STACK_MESSAGE3("CTopIndexMem::Push(%s, %d)", path, topIndex);
+    CALL_STACK_MESSAGE3("CScrollPositionMemory::Push(%s, %d)", path, topIndex);
 
     // detect if path continues after Path (path==Path+"\\name")
     const char* s = path + strlen(path);
@@ -116,9 +116,9 @@ void CTopIndexMem::Push(const char* path, int topIndex)
     }
 }
 
-BOOL CTopIndexMem::FindAndPop(const char* path, int& topIndex)
+BOOL CScrollPositionMemory::FindAndPop(const char* path, int& topIndex)
 {
-    CALL_STACK_MESSAGE3("CTopIndexMem::FindAndPop(%s, %d)", path, topIndex);
+    CALL_STACK_MESSAGE3("CScrollPositionMemory::FindAndPop(%s, %d)", path, topIndex);
 
     // detect if path match to Path (path==Path)
     int l1 = (int)strlen(path);

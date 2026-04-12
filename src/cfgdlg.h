@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2023 Taskscape Ltd
+﻿// SPDX-FileCopyrightText: 2023 Taskscape Ltd
 // SPDX-License-Identifier: GPL-2.0-or-later
 // CommentsTranslationProject: TRANSLATED
 
@@ -496,10 +496,10 @@ extern CLoadSaveToRegistryMutex LoadSaveToRegistryMutex; // mutex for synchroniz
 //
 // ****************************************************************************
 
-class CCfgPageGeneral : public CCommonPropSheetPage
+class CConfigPageGeneral : public CCommonPropSheetPage
 {
 public:
-    CCfgPageGeneral();
+    CConfigPageGeneral();
 
     virtual void Validate(CTransferInfo& ti);
     virtual void Transfer(CTransferInfo& ti);
@@ -513,14 +513,14 @@ protected:
 //
 // ****************************************************************************
 
-class CCfgPageRegional : public CCommonPropSheetPage
+class CConfigPageRegional : public CCommonPropSheetPage
 {
 public:
     char SLGName[MAX_PATH];
     char DirName[MAX_PATH];
 
 public:
-    CCfgPageRegional();
+    CConfigPageRegional();
 
     virtual void Transfer(CTransferInfo& ti);
 
@@ -535,7 +535,7 @@ protected:
 
 class CToolbarHeader;
 
-class CCfgPageView : public CCommonPropSheetPage
+class CConfigPageView : public CCommonPropSheetPage
 {
 protected:
     BOOL Dirty;
@@ -549,7 +549,7 @@ protected:
     int SelectIndex;
 
 public:
-    CCfgPageView(int index);
+    CConfigPageView(int index);
 
     virtual void Validate(CTransferInfo& ti);
     virtual void Transfer(CTransferInfo& ti);
@@ -1167,8 +1167,8 @@ public:
     CConfigurationDlg(HWND parent, CUserMenuItems* userMenuItems, int mode = 0, int param = 0);
 
 public:
-    CCfgPageGeneral PageGeneral;
-    CCfgPageView PageView;
+    CConfigPageGeneral PageGeneral;
+    CConfigPageView PageView;
     CCfgPageViewer PageViewer;
     CCfgPageUserMenu PageUserMenu;
     CCfgPageHotPath PageHotPath;
@@ -1183,7 +1183,7 @@ public:
     CCfgPageIconOvrls PageIconOvrls;
     CCfgPageAppearance PageAppear;
     CCfgPageMainWindow PageMainWindow;
-    CCfgPageRegional PageRegional;
+    CConfigPageRegional PageRegional;
     CCfgPageHistory PageHistory;
     CCfgPageChangeDrive PageChangeDrive;
     CCfgPagePanels PagePanels;

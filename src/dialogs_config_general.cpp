@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2023 Taskscape Ltd
+﻿// SPDX-FileCopyrightText: 2023 Taskscape Ltd
 // SPDX-License-Identifier: GPL-2.0-or-later
 // CommentsTranslationProject: TRANSLATED
 
@@ -776,15 +776,15 @@ void CConfigurationDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 
 //
 // ****************************************************************************
-// CCfgPageGeneral
+// CConfigPageGeneral
 //
 
-CCfgPageGeneral::CCfgPageGeneral()
+CConfigPageGeneral::CConfigPageGeneral()
     : CCommonPropSheetPage(NULL, HLanguage, IDD_CFGPAGE_GENERAL, IDD_CFGPAGE_GENERAL, PSP_USETITLE, NULL)
 {
 }
 
-void CCfgPageGeneral::Validate(CTransferInfo& ti)
+void CConfigPageGeneral::Validate(CTransferInfo& ti)
 {
     BOOL useTimeRes;
     ti.CheckBox(IDC_TIMERESOLUTION, useTimeRes);
@@ -801,7 +801,7 @@ void CCfgPageGeneral::Validate(CTransferInfo& ti)
     }
 }
 
-void CCfgPageGeneral::Transfer(CTransferInfo& ti)
+void CConfigPageGeneral::Transfer(CTransferInfo& ti)
 {
     ti.CheckBox(IDC_AUTOSAVE, Configuration.AutoSave);
     ti.CheckBox(IDC_CLOSESHELL, Configuration.CloseShell);
@@ -830,7 +830,7 @@ void CCfgPageGeneral::Transfer(CTransferInfo& ti)
         EnableControls();
 }
 
-void CCfgPageGeneral::EnableControls()
+void CConfigPageGeneral::EnableControls()
 {
     BOOL useTimeRes = IsDlgButtonChecked(HWindow, IDC_TIMERESOLUTION);
     EnableWindow(GetDlgItem(HWindow, IDE_TIMERESOLUTION), useTimeRes);
@@ -838,7 +838,7 @@ void CCfgPageGeneral::EnableControls()
 }
 
 INT_PTR
-CCfgPageGeneral::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
+CConfigPageGeneral::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 {
     switch (uMsg)
     {
@@ -854,17 +854,17 @@ CCfgPageGeneral::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 
 //
 // ****************************************************************************
-// CCfgPageRegional
+// CConfigPageRegional
 //
 
-CCfgPageRegional::CCfgPageRegional()
+CConfigPageRegional::CConfigPageRegional()
     : CCommonPropSheetPage(NULL, HLanguage, IDD_CFGPAGE_REGIONAL, IDD_CFGPAGE_REGIONAL, PSP_USETITLE, NULL)
 {
     lstrcpy(SLGName, Configuration.SLGName);
     lstrcpy(DirName, Configuration.ConversionTable);
 }
 
-void CCfgPageRegional::LoadControls()
+void CConfigPageRegional::LoadControls()
 {
     CLanguage language;
     if (language.Init(SLGName, NULL))
@@ -876,7 +876,7 @@ void CCfgPageRegional::LoadControls()
     }
 }
 
-void CCfgPageRegional::Transfer(CTransferInfo& ti)
+void CConfigPageRegional::Transfer(CTransferInfo& ti)
 {
     if (ti.Type == ttDataToWindow)
     {
@@ -905,7 +905,7 @@ void CCfgPageRegional::Transfer(CTransferInfo& ti)
 }
 
 INT_PTR
-CCfgPageRegional::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
+CConfigPageRegional::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 {
     switch (uMsg)
     {
@@ -954,7 +954,7 @@ CCfgPageRegional::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 
 //
 // ****************************************************************************
-// CCfgPageView
+// CConfigPageView
 //
 
 // used only to suppress quick search in the list view
@@ -983,7 +983,7 @@ protected:
     }
 };
 
-CCfgPageView::CCfgPageView(int index)
+CConfigPageView::CConfigPageView(int index)
     : CCommonPropSheetPage(NULL, HLanguage, IDD_CFGPAGE_VIEWS, IDD_CFGPAGE_VIEWS, PSP_USETITLE, NULL)
 {
     Dirty = FALSE;
@@ -998,12 +998,12 @@ CCfgPageView::CCfgPageView(int index)
     SelectIndex = index;
 }
 
-BOOL CCfgPageView::IsDirty()
+BOOL CConfigPageView::IsDirty()
 {
     return Dirty;
 }
 
-void CCfgPageView::Transfer(CTransferInfo& ti)
+void CConfigPageView::Transfer(CTransferInfo& ti)
 {
     if (ti.Type == ttDataToWindow)
     {
@@ -1068,7 +1068,7 @@ void CCfgPageView::Transfer(CTransferInfo& ti)
     }
 }
 
-void CCfgPageView::Validate(CTransferInfo& ti)
+void CConfigPageView::Validate(CTransferInfo& ti)
 {
 }
 
@@ -1076,7 +1076,7 @@ const int CFGP2ItemsCount = 8 /*9*/;
 const int CFGP2Flags[CFGP2ItemsCount] = {0, VIEW_SHOW_EXTENSION, VIEW_SHOW_DOSNAME, VIEW_SHOW_SIZE, VIEW_SHOW_TYPE, VIEW_SHOW_DATE, VIEW_SHOW_TIME, VIEW_SHOW_ATTRIBUTES /*, VIEW_SHOW_DESCRIPTION*/};
 const int CFGP2ResID[CFGP2ItemsCount] = {IDS_COLUMN_CFG_NAME, IDS_COLUMN_CFG_EXT, IDS_COLUMN_CFG_DOSNAME, IDS_COLUMN_CFG_SIZE, IDS_COLUMN_CFG_TYPE, IDS_COLUMN_CFG_DATE, IDS_COLUMN_CFG_TIME, IDS_COLUMN_CFG_ATTR /*,  IDS_COLUMN_CFG_DESC*/};
 
-void CCfgPageView::LoadControls()
+void CConfigPageView::LoadControls()
 {
     DisableNotification = TRUE;
     int index = ListView_GetNextItem(HListView, -1, LVNI_SELECTED);
@@ -1143,7 +1143,7 @@ void CCfgPageView::LoadControls()
     DisableNotification = FALSE;
 }
 
-void CCfgPageView::StoreControls()
+void CConfigPageView::StoreControls()
 {
     int index = ListView_GetNextItem(HListView, -1, LVNI_SELECTED);
     if (index >= 2)
@@ -1161,7 +1161,7 @@ void CCfgPageView::StoreControls()
     }
 }
 
-void CCfgPageView::EnableControls()
+void CConfigPageView::EnableControls()
 {
     int index = ListView_GetNextItem(HListView, -1, LVNI_SELECTED);
     BOOL enable = TRUE;
@@ -1204,7 +1204,7 @@ void CCfgPageView::EnableControls()
 }
 
 DWORD
-CCfgPageView::GetEnabledFunctions()
+CConfigPageView::GetEnabledFunctions()
 {
     DWORD mask = 0;
     if (!LabelEdit)
@@ -1226,12 +1226,12 @@ CCfgPageView::GetEnabledFunctions()
     return mask;
 }
 
-void CCfgPageView::EnableHeader()
+void CConfigPageView::EnableHeader()
 {
     Header->EnableToolbar(GetEnabledFunctions());
 }
 
-void CCfgPageView::OnModify()
+void CConfigPageView::OnModify()
 {
     if ((GetEnabledFunctions() & TLBHDRMASK_MODIFY) == 0)
         return;
@@ -1241,7 +1241,7 @@ void CCfgPageView::OnModify()
         PostMessage(HListView, LVM_EDITLABEL, index, 0);
 }
 
-void CCfgPageView::OnDelete()
+void CConfigPageView::OnDelete()
 {
     if ((GetEnabledFunctions() & TLBHDRMASK_DELETE) == 0)
         return;
@@ -1257,9 +1257,9 @@ void CCfgPageView::OnDelete()
     EnableHeader();
 }
 
-void CCfgPageView::OnMove(BOOL up)
+void CConfigPageView::OnMove(BOOL up)
 {
-    CALL_STACK_MESSAGE2("CCfgPageView::OnMove(%d)", up);
+    CALL_STACK_MESSAGE2("CConfigPageView::OnMove(%d)", up);
     DWORD mask = GetEnabledFunctions();
     if (up && (mask & TLBHDRMASK_UP) == 0 ||
         !up && (mask & TLBHDRMASK_DOWN) == 0)
@@ -1291,9 +1291,9 @@ void CCfgPageView::OnMove(BOOL up)
 }
 
 INT_PTR
-CCfgPageView::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
+CConfigPageView::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 {
-    CALL_STACK_MESSAGE4("CCfgPageView::DialogProc(0x%X, 0x%IX, 0x%IX)", uMsg, wParam, lParam);
+    CALL_STACK_MESSAGE4("CConfigPageView::DialogProc(0x%X, 0x%IX, 0x%IX)", uMsg, wParam, lParam);
     switch (uMsg)
     {
     case WM_INITDIALOG:

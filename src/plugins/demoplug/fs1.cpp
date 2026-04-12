@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2023 Taskscape Ltd
+﻿// SPDX-FileCopyrightText: 2023 Taskscape Ltd
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 //****************************************************************************
@@ -446,10 +446,10 @@ CPluginInterfaceForFS::ExecuteOnFS(int panel, CPluginFSInterfaceAbstract* plugin
 
 //****************************************************************************
 //
-// CTopIndexMem
+// CScrollPositionMemory
 //
 
-void CTopIndexMem::Push(const char* path, int topIndex)
+void CScrollPositionMemory::Push(const char* path, int topIndex)
 {
     // determine whether path follows Path (path == Path+"\\name")
     const char* s = path + strlen(path);
@@ -491,7 +491,7 @@ void CTopIndexMem::Push(const char* path, int topIndex)
     }
 }
 
-BOOL CTopIndexMem::FindAndPop(const char* path, int& topIndex)
+BOOL CScrollPositionMemory::FindAndPop(const char* path, int& topIndex)
 {
     // determine whether path matches Path (path == Path)
     int l1 = (int)strlen(path);
