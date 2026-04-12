@@ -128,6 +128,132 @@ A few Open Salamander 5.0 plugins are either not included or cannot be compiled.
 
 All the source code uses UTF-8-BOM encoding and is formatted with ```clang-format```. Refer to the ```\normalize.ps1``` script for more information.
 
+## Architecture and Code Structure
+
+### Overview
+
+Open Salamander is a pure WinAPI C++ application with no external UI frameworks (no MFC, ATL, or Qt). The architecture follows a layered design with a plugin-based extensibility model. The codebase targets Windows Vista+ (WINVER=0x0601) and supports both x86 and x64 builds.
+
+```
+┌─────────────────────────────────────────────────────────┐
+│                     UI Layer                            │
+│   Main Window · File Panels · Menus · Toolbars          │
+├─────────────────────────────────────────────────────────┤
+│                 Business Logic Layer                    │
+│   File Operations · Plugin Manager · Configuration      │
+├─────────────────────────────────────────────────────────┤
+│                  Service Layer                          │
+│   Worker Threads · Icon Cache · File System Access      │
+├─────────────────────────────────────────────────────────┤
+│                   Data Layer                            │
+│   Registry Storage · WinAPI File System · Plugin Data   │
+└─────────────────────────────────────────────────────────┘
+```
+
+### Core Components
+
+#### Main Window (`src/mainwnd*.cpp`, `src/mainwnd.h`)
+`CMainWindow` is the top-level window that hosts the entire application. It contains:
+- Two `CFilesWindow` instances (left and right panels)
+- Drive bars, toolbars (`CMainToolBar`, `CPluginsBar`, `CBottomToolBar`, `CUserMenuBar`, `CHotPathsBar`)
+- Menu system (`CMenuBar`, `CMenuPopup`, `CMenuNew`)
+- Status window (`CStatusWindow`) and tooltip window (`CToolTipWindow`)
+
+#### File Panels (`src/fileswn*.cpp`, `src/filesbx*.cpp`)
+`CFilesWindow` implements a single file panel. Key sub-components:
+- `CFilesBox` — the virtual list control that renders file entries
+- `CHeaderLine` — column headers with drag-to-resize
+- `CPathHistory` — forward/back navigation history
+- `CIconCache` — icon lookup cache to avoid redundant shell requests
+- `CFilesArray` / `CFileData` — in-memory directory listing
+
+Each panel operates in one of three modes driven by the path type: `ptDisk` (local/network drive), `ptZIPArchive` (archive root), or `ptPluginFS` (virtual file system provided by a plugin).
+
+#### File Operations (`src/worker.h`, `src/execute.cpp`)
+Long-running operations (copy, move, delete, rename) execute on dedicated worker threads so the UI remains responsive. The operation pipeline is:
+
+1. User triggers a command → `CCriteriaData` is built with masks, attributes, and speed limits.
+2. A `COperations` object is created and a worker thread is started.
+3. The worker processes each file, updates a `CProgressData` structure, and communicates back via Windows messages.
+4. On completion or cancellation, both source and target panels are refreshed.
+
+`CTransferSpeedMeter` and `CProgressSpeedMeter` measure throughput and estimate time remaining in real time.
+
+#### Plugin System (`src/plugins.h`, `src/plugins/`)
+Plugins are DLLs that export a well-known entry point. The core defines abstract interface classes that plugins implement:
+
+| Interface | Purpose |
+|-----------|---------|
+| `CPluginInterfaceAbstract` | Base interface; version negotiation |
+| `CPluginInterfaceForArchiverAbstract` | List/pack/unpack archives |
+| `CPluginInterfaceForViewerAbstract` | File preview/viewer |
+| `CPluginInterfaceForFileSystemAbstract` | Virtual file systems (e.g. FTP) |
+| `CPluginInterfaceForThumbLoaderAbstract` | Thumbnail generation |
+
+`CPluginInterfaceEncapsulation` wraps every plugin call with `EnterPlugin()` / `LeavePlugin()` guards for thread safety and call-stack tracking. Plugins are discovered from their subdirectories at startup, loaded with `LoadLibraryUtf8()`, and version-checked before activation.
+
+#### Common Library (`src/common/`)
+Shared infrastructure used by both the core and plugins:
+
+| File | Purpose |
+|------|---------|
+| `array.h` | `TIndirectArray<T>` — typed dynamic array template (~4900 lines) |
+| `handles.h/cpp` | Handle tracking and leak detection in debug builds |
+| `messages.h/cpp` | Typed message box helpers |
+| `allochan.h/cpp` | Allocation tracking wrappers |
+| `heap.h/cpp` | Custom heap management |
+| `crc32.h/cpp` | CRC-32 checksum |
+| `moore.h/cpp` | Boyer-Moore string search |
+| `multimon.cpp` | Multi-monitor layout support |
+
+#### Crash Reporting (`src/salmon/`)
+`SalmonInit()` is called before `WinMain` via `MyEntryPoint()` in `salamdr1.cpp`. It installs an unhandled-exception filter that captures a minidump and call-stack trace, enabling post-mortem analysis of field crashes.
+
+### Key Data Structures
+
+| Type | Description |
+|------|-------------|
+| `CFileData` | Metadata for one file or directory (name, size, time, attributes, plugin-specific data) |
+| `CSalamanderDirectory` | Holds the full listing for a directory |
+| `CCriteriaData` | Parameters for a copy/move operation: masks, date range, size limits, speed cap |
+| `CChangeCaseData` | Options for a batch rename-case operation |
+| `CAttrsData` | Parameters for changing file attributes in bulk |
+
+### Window Class Hierarchy
+
+All UI objects derive from a thin `CWindow` base that wraps a WinAPI `HWND` and routes messages through a virtual `WindowProc()`. There are no MFC `CWnd` semantics; message handling is done with explicit `WM_*` comparisons.
+
+```
+CWindow
+├── CMainWindow
+│   ├── CFilesWindow (×2, left/right panels)
+│   │   ├── CFilesBox
+│   │   └── CHeaderLine
+│   ├── CMenuBar
+│   ├── CMainToolBar / CPluginsBar / ...
+│   ├── CDriveBar
+│   └── CStatusWindow
+└── CDialog (modal/modeless dialogs)
+```
+
+### Build System
+
+The solution (`src/vcxproj/salamand.sln`) targets MSVC v143 (VS 2022). MSBuild property sheets layer the configuration:
+
+- `sal_base.props` — common defines, include paths, warning level
+- `sal_debug.props` / `sal_release.props` — optimization and debug flags
+- `x86.props` / `x64.props` — platform-specific settings
+
+The `OPENSAL_BUILD_DIR` environment variable controls where build artifacts are placed. `!populate_build_dir.cmd` stages executables, plugins, language files, and resources into a runnable layout.
+
+Each plugin is its own `.vcxproj` linked into the solution and produces a DLL placed alongside the main executable.
+
+### Diagnostics and Debugging
+
+- `CALL_STACK_MESSAGE*` macros maintain a lightweight call-stack log available in crash reports without requiring full debug symbols.
+- `HANDLES_ENABLE` (debug-only) activates `handles.h` tracking that asserts on leaked or double-closed WinAPI handles.
+- The Trace Server (`src/tserver/`) receives `TRACE_*` messages emitted throughout the codebase and displays them in a separate window; all trace calls are compiled out in release builds.
+
 ## Resources
 
 - [Open Salamander Website](https://www.opensalamander.org/)
