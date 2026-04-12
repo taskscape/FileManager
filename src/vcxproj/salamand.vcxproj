@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup Label="ProjectConfigurations">
     <ProjectConfiguration Include="Debug|Win32">
@@ -339,21 +339,21 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
       </PrecompiledHeader>
     </ClCompile>
-    <ClCompile Include="..\dialogs.cpp">
+    <ClCompile Include="..\dialogs_file_ops.cpp">
     </ClCompile>
-    <ClCompile Include="..\dialogs2.cpp">
+    <ClCompile Include="..\dialogs_rename.cpp">
     </ClCompile>
-    <ClCompile Include="..\dialogs3.cpp">
+    <ClCompile Include="..\dialogs_attributes.cpp">
     </ClCompile>
-    <ClCompile Include="..\dialogs4.cpp">
+    <ClCompile Include="..\dialogs_config_general.cpp">
     </ClCompile>
-    <ClCompile Include="..\dialogs5.cpp">
+    <ClCompile Include="..\dialogs_config_viewers.cpp">
     </ClCompile>
-    <ClCompile Include="..\dialogs6.cpp">
+    <ClCompile Include="..\dialogs_config_panels.cpp">
     </ClCompile>
-    <ClCompile Include="..\dialogse.cpp">
+    <ClCompile Include="..\dialogs_config_environment.cpp">
     </ClCompile>
-    <ClCompile Include="..\dialogsp.cpp">
+    <ClCompile Include="..\dialogs_config_packing.cpp">
     </ClCompile>
     <ClCompile Include="..\drivelst.cpp">
     </ClCompile>
@@ -363,47 +363,53 @@
     </ClCompile>
     <ClCompile Include="..\execute.cpp">
     </ClCompile>
-    <ClCompile Include="..\filesbx1.cpp">
+    <ClCompile Include="..\filesbox_rendering.cpp">
     </ClCompile>
-    <ClCompile Include="..\filesbx2.cpp">
+    <ClCompile Include="..\filesbox_input.cpp">
     </ClCompile>
     <ClCompile Include="..\filesmap.cpp">
     </ClCompile>
-    <ClCompile Include="..\fileswn0.cpp">
+    <ClCompile Include="..\fileswindow_quicksearch.cpp">
     </ClCompile>
-    <ClCompile Include="..\fileswn1.cpp">
+    <ClCompile Include="..\fileswindow_init.cpp">
     </ClCompile>
-    <ClCompile Include="..\fileswn2.cpp">
+    <ClCompile Include="..\fileswindow_execute.cpp">
     </ClCompile>
-    <ClCompile Include="..\fileswn3.cpp">
+    <ClCompile Include="..\fileswindow_navigation.cpp">
     </ClCompile>
-    <ClCompile Include="..\fileswn4.cpp">
+    <ClCompile Include="..\fileswindow_display.cpp">
     </ClCompile>
-    <ClCompile Include="..\fileswn5.cpp">
+    <ClCompile Include="..\fileswindow_file_actions.cpp">
     </ClCompile>
-    <ClCompile Include="..\fileswn6.cpp">
+    <ClCompile Include="..\fileswindow_operations.cpp">
     </ClCompile>
-    <ClCompile Include="..\fileswn7.cpp">
+    <ClCompile Include="..\fileswindow_archiving.cpp">
     </ClCompile>
-    <ClCompile Include="..\fileswn8.cpp">
+    <ClCompile Include="..\fileswindow_delete.cpp">
     </ClCompile>
-    <ClCompile Include="..\fileswn9.cpp">
+    <ClCompile Include="..\fileswindow_columns.cpp">
     </ClCompile>
-    <ClCompile Include="..\fileswna.cpp">
+    <ClCompile Include="..\fileswindow_dir_reading.cpp">
     </ClCompile>
-    <ClCompile Include="..\fileswnb.cpp">
+    <ClCompile Include="..\fileswindow_wndproc.cpp">
     </ClCompile>
     <ClCompile Include="..\filter.cpp">
     </ClCompile>
     <ClCompile Include="..\find.cpp">
     </ClCompile>
-    <ClCompile Include="..\finddlg1.cpp">
+    <ClCompile Include="..\find_results.cpp">
+    </ClCompile>
+    <ClCompile Include="..\find_dialog_ui.cpp">
     </ClCompile>
     <ClCompile Include="..\finddlg2.cpp">
     </ClCompile>
     <ClCompile Include="..\geticon.cpp">
     </ClCompile>
-    <ClCompile Include="..\gui.cpp">
+    <ClCompile Include="..\gui_progressbar.cpp">
+    </ClCompile>
+    <ClCompile Include="..\gui_statictext.cpp">
+    </ClCompile>
+    <ClCompile Include="..\gui_controls.cpp">
     </ClCompile>
     <ClCompile Include="..\icncache.cpp">
     </ClCompile>
@@ -415,15 +421,19 @@
     </ClCompile>
     <ClCompile Include="..\logo.cpp">
     </ClCompile>
-    <ClCompile Include="..\mainwnd1.cpp">
+    <ClCompile Include="..\mainwnd_init.cpp">
     </ClCompile>
-    <ClCompile Include="..\mainwnd2.cpp">
+    <ClCompile Include="..\mainwnd_config.cpp">
     </ClCompile>
-    <ClCompile Include="..\mainwnd3.cpp">
+        <ClCompile Include="..\mainwnd_help.cpp">
     </ClCompile>
-    <ClCompile Include="..\mainwnd4.cpp">
+    <ClCompile Include="..\mainwnd_shutdown.cpp">
     </ClCompile>
-    <ClCompile Include="..\mainwnd5.cpp">
+    <ClCompile Include="..\mainwnd_messages.cpp">
+    </ClCompile>
+    <ClCompile Include="..\mainwnd_commands.cpp">
+    </ClCompile>
+    <ClCompile Include="..\mainwnd_panels.cpp">
     </ClCompile>
     <ClCompile Include="..\mapi.cpp">
     </ClCompile>
@@ -431,13 +441,13 @@
     </ClCompile>
     <ClCompile Include="..\md5.cpp">
     </ClCompile>
-    <ClCompile Include="..\menu1.cpp">
+    <ClCompile Include="..\menu_window_queue.cpp">
     </ClCompile>
-    <ClCompile Include="..\menu2.cpp">
+    <ClCompile Include="..\menu_popup.cpp">
     </ClCompile>
-    <ClCompile Include="..\menu3.cpp">
+    <ClCompile Include="..\menu_shared_resources.cpp">
     </ClCompile>
-    <ClCompile Include="..\menu4.cpp">
+    <ClCompile Include="..\menu_templates.cpp">
     </ClCompile>
     <ClCompile Include="..\menubar.cpp">
     </ClCompile>
@@ -457,13 +467,13 @@
     </ClCompile>
     <ClCompile Include="..\packers.cpp">
     </ClCompile>
-    <ClCompile Include="..\plugins1.cpp">
+    <ClCompile Include="..\plugins_loading.cpp">
     </ClCompile>
-    <ClCompile Include="..\plugins2.cpp">
+    <ClCompile Include="..\plugins_interface.cpp">
     </ClCompile>
-    <ClCompile Include="..\plugins3.cpp">
+    <ClCompile Include="..\plugins_archiver.cpp">
     </ClCompile>
-    <ClCompile Include="..\plugins4.cpp">
+    <ClCompile Include="..\plugins_filesystem.cpp">
     </ClCompile>
     <ClCompile Include="..\plugins\shared\dbg.cpp">
     </ClCompile>
@@ -497,19 +507,21 @@
     </ClCompile>
     <ClCompile Include="..\safefile.cpp">
     </ClCompile>
-    <ClCompile Include="..\salamdr1.cpp">
+    <ClCompile Include="..\app_entry.cpp">
     </ClCompile>
-    <ClCompile Include="..\salamdr2.cpp">
+    <ClCompile Include="..\app_globals.cpp">
     </ClCompile>
-    <ClCompile Include="..\salamdr3.cpp">
+    <ClCompile Include="..\string_resources.cpp">
     </ClCompile>
-    <ClCompile Include="..\salamdr4.cpp">
+    <ClCompile Include="..\path_utils.cpp">
     </ClCompile>
-    <ClCompile Include="..\salamdr5.cpp">
+    <ClCompile Include="..\truncated_string.cpp">
     </ClCompile>
-    <ClCompile Include="..\salamdr6.cpp">
+    <ClCompile Include="..\path_checking.cpp">
     </ClCompile>
-    <ClCompile Include="..\salamdr7.cpp">
+    <ClCompile Include="..\file_enumeration.cpp">
+    </ClCompile>
+    <ClCompile Include="..\shell_environment.cpp">
     </ClCompile>
     <ClCompile Include="..\salbzip2.cpp">
     </ClCompile>
@@ -553,21 +565,21 @@
     </ClCompile>
     <ClCompile Include="..\thumbnl.cpp">
     </ClCompile>
-    <ClCompile Include="..\toolbar1.cpp">
+    <ClCompile Include="..\toolbar_core.cpp">
     </ClCompile>
-    <ClCompile Include="..\toolbar2.cpp">
+    <ClCompile Include="..\toolbar_rendering.cpp">
     </ClCompile>
-    <ClCompile Include="..\toolbar3.cpp">
+    <ClCompile Include="..\toolbar_dnd.cpp">
     </ClCompile>
-    <ClCompile Include="..\toolbar4.cpp">
+    <ClCompile Include="..\toolbar_button_defs.cpp">
     </ClCompile>
-    <ClCompile Include="..\toolbar5.cpp">
+    <ClCompile Include="..\toolbar_usermenu.cpp">
     </ClCompile>
-    <ClCompile Include="..\toolbar6.cpp">
+    <ClCompile Include="..\toolbar_drivebar.cpp">
     </ClCompile>
-    <ClCompile Include="..\toolbar7.cpp">
+    <ClCompile Include="..\toolbar_hotpaths.cpp">
     </ClCompile>
-    <ClCompile Include="..\toolbar8.cpp">
+    <ClCompile Include="..\toolbar_pluginsbar.cpp">
     </ClCompile>
     <ClCompile Include="..\tooltip.cpp">
     </ClCompile>
@@ -583,9 +595,21 @@
     </ClCompile>
     <ClCompile Include="..\worker.cpp">
     </ClCompile>
+    <ClCompile Include="..\transfer_speed.cpp">
+    </ClCompile>
+    <ClCompile Include="..\async_copy.cpp">
+    </ClCompile>
+    <ClCompile Include="..\operations_core.cpp">
+    </ClCompile>
     <ClCompile Include="..\iconpool.cpp">
     </ClCompile>
-    <ClCompile Include="..\zip.cpp">
+    <ClCompile Include="..\zip_progress.cpp">
+    </ClCompile>
+    <ClCompile Include="..\zip_general_api.cpp">
+    </ClCompile>
+    <ClCompile Include="..\zip_utilities.cpp">
+    </ClCompile>
+    <ClCompile Include="..\zip_directory.cpp">
     </ClCompile>
     <ClCompile Include="..\common\dep\zlib\adler32.c">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">

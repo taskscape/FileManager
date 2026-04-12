@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2023 Taskscape Ltd
+﻿// SPDX-FileCopyrightText: 2023 Taskscape Ltd
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "precomp.h"
@@ -13,19 +13,19 @@
 #ifdef PAK_DLL
 // ****************************************************************************
 
-class C__StrCriticalSection
+class CStringResourceLock
 {
 public:
     CRITICAL_SECTION cs;
 
-    C__StrCriticalSection() { InitializeCriticalSection(&cs); }
-    ~C__StrCriticalSection() { DeleteCriticalSection(&cs); }
+    CStringResourceLock() { InitializeCriticalSection(&cs); }
+    ~CStringResourceLock() { DeleteCriticalSection(&cs); }
 };
 
 // ensure timely construction of the critical section
 #pragma warning(disable : 4073)
 #pragma init_seg(lib)
-C__StrCriticalSection __StrCriticalSection;
+CStringResourceLock __StrCriticalSection;
 
 // ****************************************************************************
 

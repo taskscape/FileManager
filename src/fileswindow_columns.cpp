@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2023 Taskscape Ltd
+﻿// SPDX-FileCopyrightText: 2023 Taskscape Ltd
 // SPDX-License-Identifier: GPL-2.0-or-later
 // CommentsTranslationProject: TRANSLATED
 
@@ -2191,7 +2191,7 @@ void CFilesWindow::OnHeaderLineColWidthChanged()
     BuildColumnsTemplate();
 }
 
-CHeaderLine*
+CFileListHeader*
 CFilesWindow::GetHeaderLine()
 {
     if (ListBox == NULL)

@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2023 Taskscape Ltd
+﻿// SPDX-FileCopyrightText: 2023 Taskscape Ltd
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #pragma once
@@ -131,14 +131,14 @@ public:
 
 //****************************************************************************
 //
-// CTopIndexMem
+// CScrollPositionMemory
 //
 // panel listing top index memory - using CPluginFSInterface for correct behavior
 // of ExecuteOnFS (persistent top-index while entering / leaving directory)
 
 #define TOP_INDEX_MEM_SIZE 50 // count of stored top-index (levels), minimal 1
 
-class CTopIndexMem
+class CScrollPositionMemory
 {
 protected:
     // path for last stored top-index
@@ -147,7 +147,7 @@ protected:
     int TopIndexesCount;                // count of stored top-index
 
 public:
-    CTopIndexMem() { Clear(); }
+    CScrollPositionMemory() { Clear(); }
     void Clear()
     {
         Path[0] = 0;
@@ -245,7 +245,7 @@ protected:
     FILE_RECORD_I<char>* CurrentDir;
 
     BOOL FatalError;          // TRUE when ListCurrentPath failed (fatal error), ChangePath will be called
-    CTopIndexMem TopIndexMem; // top-index array for ExecuteOnFS()
+    CScrollPositionMemory TopIndexMem; // top-index array for ExecuteOnFS()
 
     BOOL IsSnapshotValid;
     CVolume<char> Volume;

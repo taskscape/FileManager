@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2023 Taskscape Ltd
+﻿// SPDX-FileCopyrightText: 2023 Taskscape Ltd
 // SPDX-License-Identifier: GPL-2.0-or-later
 // CommentsTranslationProject: TRANSLATED
 
@@ -1760,10 +1760,10 @@ CDriveInfo::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 
 //
 // ****************************************************************************
-// CEnterPasswdDialog
+// CPasswordDialog
 //
 
-CEnterPasswdDialog::CEnterPasswdDialog(HWND parent, const char* path, const char* user,
+CPasswordDialog::CPasswordDialog(HWND parent, const char* path, const char* user,
                                        CObjectOrigin origin)
     : CCommonDialog(HLanguage, IDD_ENTERPASSWD, IDD_ENTERPASSWD, parent, origin)
 {
@@ -1775,9 +1775,9 @@ CEnterPasswdDialog::CEnterPasswdDialog(HWND parent, const char* path, const char
     Passwd[0] = 0;
 }
 
-void CEnterPasswdDialog::Validate(CTransferInfo& ti)
+void CPasswordDialog::Validate(CTransferInfo& ti)
 {
-    CALL_STACK_MESSAGE1("CEnterPasswdDialog::Validate()");
+    CALL_STACK_MESSAGE1("CPasswordDialog::Validate()");
     /*  // empty user-name = default username
   HWND edit;
   if (ti.GetControl(edit, IDE_NETUSER) && ti.Type == ttDataFromWindow)
@@ -1792,14 +1792,14 @@ void CEnterPasswdDialog::Validate(CTransferInfo& ti)
 */
 }
 
-void CEnterPasswdDialog::Transfer(CTransferInfo& ti)
+void CPasswordDialog::Transfer(CTransferInfo& ti)
 {
     ti.EditLine(IDE_NETPASSWD, Passwd, PASSWORD_MAXLEN);
     ti.EditLine(IDE_NETUSER, User, USERNAME_MAXLEN);
 }
 
 INT_PTR
-CEnterPasswdDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
+CPasswordDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 {
     switch (uMsg)
     {
@@ -2142,10 +2142,10 @@ CUnpackDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 
 //
 // ****************************************************************************
-// CZIPSizeResultsDlg
+// CZipSizeResultsDialog
 //
 
-CZIPSizeResultsDlg::CZIPSizeResultsDlg(HWND parent, const CQuadWord& size, int files, int dirs)
+CZipSizeResultsDialog::CZipSizeResultsDialog(HWND parent, const CQuadWord& size, int files, int dirs)
     : CCommonDialog(HLanguage, IDD_ZIPSIZERESULTS, parent)
 {
     Size = size;
@@ -2154,7 +2154,7 @@ CZIPSizeResultsDlg::CZIPSizeResultsDlg(HWND parent, const CQuadWord& size, int f
 }
 
 INT_PTR
-CZIPSizeResultsDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
+CZipSizeResultsDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 {
     switch (uMsg)
     {

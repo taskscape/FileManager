@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2023 Taskscape Ltd
+﻿// SPDX-FileCopyrightText: 2023 Taskscape Ltd
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #pragma once
@@ -233,7 +233,7 @@ public:
 
 //****************************************************************************
 //
-// CTopIndexMem
+// CScrollPositionMemory
 //
 // listbox top-index cache in the panel - used by CPluginFSInterface to keep
 // ExecuteOnFS behavior correct (preserve the top index when entering and
@@ -241,7 +241,7 @@ public:
 
 #define TOP_INDEX_MEM_SIZE 50 // number of remembered top indexes (levels), at least 1
 
-class CTopIndexMem
+class CScrollPositionMemory
 {
 protected:
     // path for the last remembered top index
@@ -250,7 +250,7 @@ protected:
     int TopIndexesCount;                // number of cached top indexes
 
 public:
-    CTopIndexMem() { Clear(); }
+    CScrollPositionMemory() { Clear(); }
     void Clear()
     {
         Path[0] = L'\0';
@@ -299,7 +299,7 @@ class CPluginFSInterface : public CPluginFSInterfaceAbstract
 public:
     int CurrentKeyRoot;
     WCHAR CurrentKeyName[MAX_KEYNAME];
-    CTopIndexMem TopIndexMem; // top-index cache for ExecuteOnFS()
+    CScrollPositionMemory TopIndexMem; // top-index cache for ExecuteOnFS()
     BOOL FocusFirstNewItem;
 
 protected:

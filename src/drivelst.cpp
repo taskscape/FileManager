@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2023 Taskscape Ltd
+﻿// SPDX-FileCopyrightText: 2023 Taskscape Ltd
 // SPDX-License-Identifier: GPL-2.0-or-later
 // CommentsTranslationProject: TRANSLATED
 
@@ -503,7 +503,7 @@ BOOL RestoreNetworkConnection(HWND parent, const char* name, const char* remoteN
         }
     }
 
-    CEnterPasswdDialog dlg(parent, remoteName, userName);
+    CPasswordDialog dlg(parent, remoteName, userName);
 
     DWORD err;
     char* passwd = NULL;

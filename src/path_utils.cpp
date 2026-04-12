@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2023 Taskscape Ltd
+﻿// SPDX-FileCopyrightText: 2023 Taskscape Ltd
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "precomp.h"
@@ -3494,14 +3494,14 @@ void CFileTimeStamps::CheckAndPackAndClear(HWND parent, BOOL* someFilesChanged, 
 
 //****************************************************************************
 //
-// CTopIndexMem
+// CScrollPositionMemory
 //
 
-void CTopIndexMem::Push(const char* path, int topIndex)
+void CScrollPositionMemory::Push(const char* path, int topIndex)
 {
     if (strlen(path) >= _countof(Path))
     {
-        TRACE_E("CTopIndexMem::Push(): path is too long.");
+        TRACE_E("CScrollPositionMemory::Push(): path is too long.");
         Clear();
         return;
     }
@@ -3545,7 +3545,7 @@ void CTopIndexMem::Push(const char* path, int topIndex)
     }
 }
 
-BOOL CTopIndexMem::FindAndPop(const char* path, int& topIndex)
+BOOL CScrollPositionMemory::FindAndPop(const char* path, int& topIndex)
 {
     // zjistime, jestli path odpovida Path (path==Path)
     int l1 = (int)strlen(path);

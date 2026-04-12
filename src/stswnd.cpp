@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2023 Taskscape Ltd
+﻿// SPDX-FileCopyrightText: 2023 Taskscape Ltd
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "precomp.h"
@@ -182,10 +182,10 @@ static BOOL GetTextExtentExPointUtf8(HDC hdc, const char* text, int textLen, int
 
 //
 // ****************************************************************************
-// CStatusWindow
+// CPanelStatusBar
 //
 
-CStatusWindow::CStatusWindow(CFilesWindow* filesWindow, int border, CObjectOrigin origin) : CWindow(origin), HotTrackItems(10, 5)
+CPanelStatusBar::CPanelStatusBar(CFilesWindow* filesWindow, int border, CObjectOrigin origin) : CWindow(origin), HotTrackItems(10, 5)
 {
     CALL_STACK_MESSAGE_NONE
     Text = NULL;
@@ -231,9 +231,9 @@ CStatusWindow::CStatusWindow(CFilesWindow* filesWindow, int border, CObjectOrigi
     IDropTargetPtr = NULL;
 }
 
-CStatusWindow::~CStatusWindow()
+CPanelStatusBar::~CPanelStatusBar()
 {
-    CALL_STACK_MESSAGE1("CStatusWindow::~CStatusWindow()");
+    CALL_STACK_MESSAGE1("CPanelStatusBar::~CPanelStatusBar()");
     if (SubTexts != NULL)
         free(SubTexts);
     if (Text != NULL)
@@ -254,9 +254,9 @@ CStatusWindow::~CStatusWindow()
     }
 }
 
-BOOL CStatusWindow::SetSubTexts(DWORD* subTexts, DWORD subTextsCount)
+BOOL CPanelStatusBar::SetSubTexts(DWORD* subTexts, DWORD subTextsCount)
 {
-    CALL_STACK_MESSAGE2("CStatusWindow::SetSubTexts(, %u)", subTextsCount);
+    CALL_STACK_MESSAGE2("CPanelStatusBar::SetSubTexts(, %u)", subTextsCount);
     HotItem = NULL;
     LastHotItem = NULL;
     if (SubTexts != NULL)
@@ -283,9 +283,9 @@ BOOL CStatusWindow::SetSubTexts(DWORD* subTexts, DWORD subTextsCount)
     return TRUE;
 }
 
-BOOL CStatusWindow::SetText(const char* txt, int pathLen)
+BOOL CPanelStatusBar::SetText(const char* txt, int pathLen)
 {
-    CALL_STACK_MESSAGE3("CStatusWindow::SetText(%s, %d)", txt, pathLen);
+    CALL_STACK_MESSAGE3("CPanelStatusBar::SetText(%s, %d)", txt, pathLen);
     if (Text != NULL && strcmp(Text, txt) == 0)
     {
         PathLen = pathLen;
@@ -331,9 +331,9 @@ BOOL CStatusWindow::SetText(const char* txt, int pathLen)
     return TRUE;
 }
 
-void CStatusWindow::BuildHotTrackItems()
+void CPanelStatusBar::BuildHotTrackItems()
 {
-    CALL_STACK_MESSAGE1("CStatusWindow::BuildHotTrackItems()");
+    CALL_STACK_MESSAGE1("CPanelStatusBar::BuildHotTrackItems()");
 
     HDC dc = HANDLES(GetDC(HWindow));
     HFONT oldFont = (HFONT)SelectObject(dc, EnvFont);
@@ -468,9 +468,9 @@ void CStatusWindow::BuildHotTrackItems()
     HANDLES(ReleaseDC(HWindow, dc));
 }
 
-void CStatusWindow::DestroyWindow()
+void CPanelStatusBar::DestroyWindow()
 {
-    CALL_STACK_MESSAGE1("CStatusWindow::DestroyWindow()");
+    CALL_STACK_MESSAGE1("CPanelStatusBar::DestroyWindow()");
     if (ToolBar != NULL)
     {
         if (ToolBar->HWindow != NULL)
@@ -484,7 +484,7 @@ void CStatusWindow::DestroyWindow()
     ::DestroyWindow(HWindow);
 }
 
-void CStatusWindow::SetHidden(int hiddenFilesCount, int hiddenDirsCount)
+void CPanelStatusBar::SetHidden(int hiddenFilesCount, int hiddenDirsCount)
 {
     CALL_STACK_MESSAGE_NONE
     BOOL hidden = hiddenFilesCount != 0 || hiddenDirsCount != 0;
@@ -501,7 +501,7 @@ void CStatusWindow::SetHidden(int hiddenFilesCount, int hiddenDirsCount)
     }
 }
 
-void CStatusWindow::SetHistory(BOOL history)
+void CPanelStatusBar::SetHistory(BOOL history)
 {
     CALL_STACK_MESSAGE_NONE
     if (History != history)
@@ -515,7 +515,7 @@ void CStatusWindow::SetHistory(BOOL history)
     }
 }
 
-void CStatusWindow::SetThrobber(BOOL show, int delay, BOOL calledFromDestroyWindow)
+void CPanelStatusBar::SetThrobber(BOOL show, int delay, BOOL calledFromDestroyWindow)
 {
     CALL_STACK_MESSAGE_NONE
     if (!calledFromDestroyWindow)
@@ -525,9 +525,9 @@ void CStatusWindow::SetThrobber(BOOL show, int delay, BOOL calledFromDestroyWind
         if (DelayedThrobber) // ceka se na zobrazeni
         {
             if (HWindow == NULL)
-                TRACE_E("Unexpected situation in CStatusWindow::SetThrobber(): DelayedThrobber is TRUE but HWindow is NULL");
+                TRACE_E("Unexpected situation in CPanelStatusBar::SetThrobber(): DelayedThrobber is TRUE but HWindow is NULL");
             if (Throbber)
-                TRACE_E("Unexpected situation in CStatusWindow::SetThrobber(): DelayedThrobber and Throbber are both TRUE");
+                TRACE_E("Unexpected situation in CPanelStatusBar::SetThrobber(): DelayedThrobber and Throbber are both TRUE");
             KillTimer(HWindow, IDT_DELAYEDTHROBBER);
             if (Throbber /* jen korekce nekonzistentniho stavu */ ||
                 delay <= 0 || !SetTimer(HWindow, IDT_DELAYEDTHROBBER, delay, NULL))
@@ -559,7 +559,7 @@ void CStatusWindow::SetThrobber(BOOL show, int delay, BOOL calledFromDestroyWind
         if (DelayedThrobber) // ceka se na zobrazeni, ale throbber se ma schovat, konec cekani
         {
             if (HWindow == NULL)
-                TRACE_E("Unexpected situation 2 in CStatusWindow::SetThrobber(): DelayedThrobber is TRUE but HWindow is NULL");
+                TRACE_E("Unexpected situation 2 in CPanelStatusBar::SetThrobber(): DelayedThrobber is TRUE but HWindow is NULL");
             KillTimer(HWindow, IDT_DELAYEDTHROBBER);
             DelayedThrobber = FALSE;
         }
@@ -569,7 +569,7 @@ void CStatusWindow::SetThrobber(BOOL show, int delay, BOOL calledFromDestroyWind
     if (HWindow == NULL && Throbber)
     {
         Throbber = FALSE;
-        TRACE_E("Unexpected situation in CStatusWindow::SetThrobber(): Throbber is TRUE but HWindow is NULL");
+        TRACE_E("Unexpected situation in CPanelStatusBar::SetThrobber(): Throbber is TRUE but HWindow is NULL");
     }
     if (HWindow != NULL && !DelayedThrobber && Throbber != show)
     {
@@ -597,7 +597,7 @@ void CStatusWindow::SetThrobber(BOOL show, int delay, BOOL calledFromDestroyWind
     }
 }
 
-void CStatusWindow::SetThrobberTooltip(const char* throbberTooltip)
+void CPanelStatusBar::SetThrobberTooltip(const char* throbberTooltip)
 {
     if (ThrobberTooltip != NULL)
     {
@@ -608,7 +608,7 @@ void CStatusWindow::SetThrobberTooltip(const char* throbberTooltip)
         ThrobberTooltip = DupStr(throbberTooltip);
 }
 
-void CStatusWindow::SetSecurity(CSecurityIconState iconState)
+void CPanelStatusBar::SetSecurity(CSecurityIconState iconState)
 {
     CALL_STACK_MESSAGE_NONE
     if (Security != iconState)
@@ -622,7 +622,7 @@ void CStatusWindow::SetSecurity(CSecurityIconState iconState)
     }
 }
 
-void CStatusWindow::SetSecurityTooltip(const char* tooltip)
+void CPanelStatusBar::SetSecurityTooltip(const char* tooltip)
 {
     if (SecurityTooltip != NULL)
     {
@@ -633,7 +633,7 @@ void CStatusWindow::SetSecurityTooltip(const char* tooltip)
         SecurityTooltip = DupStr(tooltip);
 }
 
-int CStatusWindow::ChangeThrobberID()
+int CPanelStatusBar::ChangeThrobberID()
 {
     static int NewID = 0; // id throbberu musi byt unikatni (tzn. jediny counter pro oba panely)
     ThrobberID = NewID++;
@@ -642,7 +642,7 @@ int CStatusWindow::ChangeThrobberID()
     return ThrobberID;
 }
 
-void CStatusWindow::HideThrobberAndSecurityIcon()
+void CPanelStatusBar::HideThrobberAndSecurityIcon()
 {
     SetThrobber(FALSE);
     SetThrobberTooltip(NULL);
@@ -650,7 +650,7 @@ void CStatusWindow::HideThrobberAndSecurityIcon()
     SetSecurityTooltip(NULL);
 }
 
-void CStatusWindow::InvalidateIfNeeded()
+void CPanelStatusBar::InvalidateIfNeeded()
 {
     CALL_STACK_MESSAGE_NONE
     if (NeedToInvalidate)
@@ -661,7 +661,7 @@ void CStatusWindow::InvalidateIfNeeded()
     }
 }
 
-int CStatusWindow::GetNeededHeight()
+int CPanelStatusBar::GetNeededHeight()
 {
     CALL_STACK_MESSAGE_NONE
     int height = 2 + EnvFontCharHeight + 2;
@@ -678,7 +678,7 @@ int CStatusWindow::GetNeededHeight()
     return height;
 }
 
-void CStatusWindow::SetSize(const CQuadWord& size)
+void CPanelStatusBar::SetSize(const CQuadWord& size)
 {
     CALL_STACK_MESSAGE_NONE
     if (Size == NULL)
@@ -704,7 +704,7 @@ void CStatusWindow::SetSize(const CQuadWord& size)
         InvalidateRect(HWindow, NULL, FALSE);
 }
 
-void CStatusWindow::SetLeftPanel(BOOL left)
+void CPanelStatusBar::SetLeftPanel(BOOL left)
 {
     CALL_STACK_MESSAGE_NONE
     Left = left;
@@ -715,9 +715,9 @@ void CStatusWindow::SetLeftPanel(BOOL left)
     }
 }
 
-BOOL CStatusWindow::ToggleToolBar()
+BOOL CPanelStatusBar::ToggleToolBar()
 {
-    CALL_STACK_MESSAGE1("CStatusWindow::ToggleToolBar()");
+    CALL_STACK_MESSAGE1("CPanelStatusBar::ToggleToolBar()");
     if (ToolBar == NULL)
         return FALSE;
     if (ToolBar->HWindow != NULL)
@@ -740,7 +740,7 @@ BOOL CStatusWindow::ToggleToolBar()
     return TRUE;
 }
 
-BOOL CStatusWindow::SetDriveIcon(HICON hIcon)
+BOOL CPanelStatusBar::SetDriveIcon(HICON hIcon)
 {
     CALL_STACK_MESSAGE_NONE
     if (ToolBar != NULL && ToolBar->HWindow != NULL)
@@ -748,7 +748,7 @@ BOOL CStatusWindow::SetDriveIcon(HICON hIcon)
     return TRUE;
 }
 
-void CStatusWindow::SetDrivePressed(BOOL pressed)
+void CPanelStatusBar::SetDrivePressed(BOOL pressed)
 {
     CALL_STACK_MESSAGE_NONE
     if (ToolBar != NULL && ToolBar->HWindow != NULL)
@@ -761,7 +761,7 @@ void CStatusWindow::SetDrivePressed(BOOL pressed)
     }
 }
 
-void CStatusWindow::LayoutWindow()
+void CPanelStatusBar::LayoutWindow()
 {
     CALL_STACK_MESSAGE_NONE
     SendMessage(HWindow, WM_SIZE, 0, 0);
@@ -769,7 +769,7 @@ void CStatusWindow::LayoutWindow()
     UpdateWindow(HWindow);
 }
 
-void CStatusWindow::GetHotText(char* buffer, int bufSize)
+void CPanelStatusBar::GetHotText(char* buffer, int bufSize)
 {
     CALL_STACK_MESSAGE_NONE
     if (HotItem != NULL && Text != NULL)
@@ -783,7 +783,7 @@ void CStatusWindow::GetHotText(char* buffer, int bufSize)
         buffer[0] = 0;
 }
 
-BOOL CStatusWindow::FindHotTrackItem(int xPos, int& index)
+BOOL CPanelStatusBar::FindHotTrackItem(int xPos, int& index)
 {
     CALL_STACK_MESSAGE_NONE
     int i;
@@ -804,7 +804,7 @@ BOOL CStatusWindow::FindHotTrackItem(int xPos, int& index)
     return FALSE;
 }
 
-void CStatusWindow::FlashText(BOOL hotTrackOnly)
+void CPanelStatusBar::FlashText(BOOL hotTrackOnly)
 {
     CALL_STACK_MESSAGE_NONE
     Repaint(TRUE, hotTrackOnly);
@@ -845,7 +845,7 @@ void PaintSymbol(HDC hDC, HDC hMemDC, HBITMAP hBitmap, int xOffset, int width, i
     SelectObject(hMemDC, hOldBitmap);
 }
 
-void CStatusWindow::PaintThrobber(HDC hDC)
+void CPanelStatusBar::PaintThrobber(HDC hDC)
 {
     if ((Border & blTop) == 0)
         return;
@@ -866,7 +866,7 @@ void CStatusWindow::PaintThrobber(HDC hDC)
     ThrobberFrames->Draw(ThrobberFrame, hDC, x, y, fgClr, IL_DRAW_ASALPHA);
 }
 
-void CStatusWindow::PaintSecurity(HDC hDC)
+void CPanelStatusBar::PaintSecurity(HDC hDC)
 {
     if (Security == sisNone || (Border & blTop) == 0)
         return;
@@ -903,9 +903,9 @@ void CStatusWindow::PaintSecurity(HDC hDC)
 #define ZOOM_WIDTH 9
 #define ZOOM_HEIGHT 8
 
-void CStatusWindow::Paint(HDC hdc, BOOL highlightText, BOOL highlightHotTrackOnly)
+void CPanelStatusBar::Paint(HDC hdc, BOOL highlightText, BOOL highlightHotTrackOnly)
 {
-    CALL_STACK_MESSAGE3("CStatusWindow::Paint(, %d, %d)", highlightText, highlightHotTrackOnly);
+    CALL_STACK_MESSAGE3("CPanelStatusBar::Paint(, %d, %d)", highlightText, highlightHotTrackOnly);
     HDC dc = ItemBitmap.HMemDC;
 
     BOOL isDirectoryLine = (Border & blTop) != 0;
@@ -1354,7 +1354,7 @@ void CStatusWindow::Paint(HDC hdc, BOOL highlightText, BOOL highlightHotTrackOnl
            dc, ToolBarWidth, 0, SRCCOPY);
 }
 
-void CStatusWindow::Repaint(BOOL flashText, BOOL hotTrackOnly)
+void CPanelStatusBar::Repaint(BOOL flashText, BOOL hotTrackOnly)
 {
     CALL_STACK_MESSAGE_NONE
     if (HWindow == NULL)
@@ -1365,7 +1365,7 @@ void CStatusWindow::Repaint(BOOL flashText, BOOL hotTrackOnly)
 }
 /*
 void
-CStatusWindow::RepaintThrobber()
+CPanelStatusBar::RepaintThrobber()
 {
   CALL_STACK_MESSAGE_NONE
   if (HWindow == NULL)
@@ -1376,7 +1376,7 @@ CStatusWindow::RepaintThrobber()
 }
 */
 
-void CStatusWindow::InvalidateAndUpdate(BOOL update)
+void CPanelStatusBar::InvalidateAndUpdate(BOOL update)
 {
     CALL_STACK_MESSAGE_NONE
     if (HWindow == NULL)
@@ -1722,9 +1722,9 @@ public:
     }
 };
 
-void CStatusWindow::RegisterDragDrop()
+void CPanelStatusBar::RegisterDragDrop()
 {
-    CALL_STACK_MESSAGE1("CStatusWindow::RegisterDragDrop()");
+    CALL_STACK_MESSAGE1("CPanelStatusBar::RegisterDragDrop()");
     CTextDropTarget* dropTarget = new CTextDropTarget(FilesWindow);
     if (dropTarget != NULL)
     {
@@ -1738,7 +1738,7 @@ void CStatusWindow::RegisterDragDrop()
     }
 }
 
-void CStatusWindow::RevokeDragDrop()
+void CPanelStatusBar::RevokeDragDrop()
 {
     CALL_STACK_MESSAGE_NONE
     HANDLES(RevokeDragDrop(HWindow));
@@ -1747,9 +1747,9 @@ void CStatusWindow::RevokeDragDrop()
 #define BUTTON_OFFSET 0
 
 LRESULT
-CStatusWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
+CPanelStatusBar::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 {
-    SLOW_CALL_STACK_MESSAGE4("CStatusWindow::WindowProc(0x%X, 0x%IX, 0x%IX)", uMsg, wParam, lParam);
+    SLOW_CALL_STACK_MESSAGE4("CPanelStatusBar::WindowProc(0x%X, 0x%IX, 0x%IX)", uMsg, wParam, lParam);
     switch (uMsg)
     {
     case WM_CREATE:
@@ -2359,7 +2359,7 @@ CStatusWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
             else
             {
                 KillTimer(HWindow, IDT_DELAYEDTHROBBER);
-                TRACE_E("CStatusWindow::WindowProc(): Unexpected timer: IDT_DELAYEDTHROBBER");
+                TRACE_E("CPanelStatusBar::WindowProc(): Unexpected timer: IDT_DELAYEDTHROBBER");
             }
         }
         break;
@@ -2370,9 +2370,9 @@ CStatusWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 }
 
 HIMAGELIST
-CStatusWindow::CreateDragImage(const char* text, int& dxHotspot, int& dyHotspot, int& imgWidth, int& imgHeight)
+CPanelStatusBar::CreateDragImage(const char* text, int& dxHotspot, int& dyHotspot, int& imgWidth, int& imgHeight)
 {
-    CALL_STACK_MESSAGE6("CStatusWindow::CreateDragImage(%s, %d, %d, %d, %d)",
+    CALL_STACK_MESSAGE6("CPanelStatusBar::CreateDragImage(%s, %d, %d, %d, %d)",
                         text, dxHotspot, dyHotspot, imgWidth, imgHeight);
     int textLen = lstrlen(text);
     HDC hDC = ItemBitmap.HMemDC;
@@ -2406,7 +2406,7 @@ CStatusWindow::CreateDragImage(const char* text, int& dxHotspot, int& dyHotspot,
     return himl;
 }
 
-BOOL CStatusWindow::GetTextFrameRect(RECT* r)
+BOOL CPanelStatusBar::GetTextFrameRect(RECT* r)
 {
     CALL_STACK_MESSAGE_NONE
     if (HWindow == NULL)
@@ -2418,7 +2418,7 @@ BOOL CStatusWindow::GetTextFrameRect(RECT* r)
     return TRUE;
 }
 
-BOOL CStatusWindow::GetFilterFrameRect(RECT* r)
+BOOL CPanelStatusBar::GetFilterFrameRect(RECT* r)
 {
     CALL_STACK_MESSAGE_NONE
     if (HWindow == NULL)
@@ -2432,13 +2432,13 @@ BOOL CStatusWindow::GetFilterFrameRect(RECT* r)
     return TRUE;
 }
 
-void CStatusWindow::OnColorsChanged()
+void CPanelStatusBar::OnColorsChanged()
 {
     if (ToolBar != NULL)
         ToolBar->OnColorsChanged();
 }
 
-void CStatusWindow::SetFont()
+void CPanelStatusBar::SetFont()
 {
     // mohlo dojit ke zmene velikosti fontu
     InvalidateRect(HWindow, NULL, TRUE);

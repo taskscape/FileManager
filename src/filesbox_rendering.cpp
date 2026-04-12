@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2023 Taskscape Ltd
+﻿// SPDX-FileCopyrightText: 2023 Taskscape Ltd
 // SPDX-License-Identifier: GPL-2.0-or-later
 // CommentsTranslationProject: TRANSLATED
 
@@ -28,10 +28,10 @@ const char* CFILESBOX_CLASSNAME = "SalamanderItemsBox";
 
 //****************************************************************************
 //
-// CFilesBox
+// CFileListBox
 //
 
-CFilesBox::CFilesBox(CFilesWindow* parent)
+CFileListBox::CFileListBox(CFilesWindow* parent)
     : CWindow(ooStatic)
 {
     BottomBar.RelayWindow = this;
@@ -67,7 +67,7 @@ CFilesBox::CFilesBox(CFilesWindow* parent)
     ResetMouseWheelAccumulator();
 }
 
-void CFilesBox::SetItemsCount(int count, int xOffset, int topIndex, BOOL disableSBUpdate)
+void CFileListBox::SetItemsCount(int count, int xOffset, int topIndex, BOOL disableSBUpdate)
 {
     SetItemsCount2(count);
     XOffset = xOffset;
@@ -83,13 +83,13 @@ void CFilesBox::SetItemsCount(int count, int xOffset, int topIndex, BOOL disable
     Parent->VisibleItemsArraySurround.InvalidateArr();
 }
 
-void CFilesBox::SetItemsCount2(int count)
+void CFileListBox::SetItemsCount2(int count)
 {
     ItemsCount = count;
     UpdateInternalData();
 }
 
-void CFilesBox::SetMode(CViewModeEnum mode, BOOL headerLine)
+void CFileListBox::SetMode(CViewModeEnum mode, BOOL headerLine)
 {
     ViewMode = mode;
     HeaderLineVisible = headerLine;
@@ -99,7 +99,7 @@ void CFilesBox::SetMode(CViewModeEnum mode, BOOL headerLine)
         InvalidateRect(HWindow, &FilesRect, FALSE);
 }
 
-void CFilesBox::SetItemWidthHeight(int width, int height)
+void CFileListBox::SetItemWidthHeight(int width, int height)
 {
     if (height < 1)
     {
@@ -124,7 +124,7 @@ void CFilesBox::SetItemWidthHeight(int width, int height)
     }
 }
 
-void CFilesBox::UpdateInternalData()
+void CFileListBox::UpdateInternalData()
 {
     EntireItemsInColumn = (FilesRect.bottom - FilesRect.top) / ItemHeight;
     if (EntireItemsInColumn < 1)
@@ -165,17 +165,17 @@ void CFilesBox::UpdateInternalData()
     }
 }
 
-int CFilesBox::GetEntireItemsInColumn()
+int CFileListBox::GetEntireItemsInColumn()
 {
     return EntireItemsInColumn;
 }
 
-int CFilesBox::GetColumnsCount()
+int CFileListBox::GetColumnsCount()
 {
     return 1;
 }
 
-void CFilesBox::PaintAllItems(HRGN hUpdateRgn, DWORD drawFlags)
+void CFileListBox::PaintAllItems(HRGN hUpdateRgn, DWORD drawFlags)
 {
     int index = TopIndex;
 
@@ -450,7 +450,7 @@ void CFilesBox::PaintAllItems(HRGN hUpdateRgn, DWORD drawFlags)
         SelectClipRgn(HPrivateDC, NULL); // remove the clipping region if we set it
 }
 
-void CFilesBox::PaintItem(int index, DWORD drawFlags)
+void CFileListBox::PaintItem(int index, DWORD drawFlags)
 {
     RECT r;
     if (GetItemRect(index, &r))
@@ -514,7 +514,7 @@ void CFilesBox::PaintItem(int index, DWORD drawFlags)
     }
 }
 
-BOOL CFilesBox::GetItemRect(int index, RECT* rect)
+BOOL CFileListBox::GetItemRect(int index, RECT* rect)
 {
     switch (ViewMode)
     {
@@ -556,7 +556,7 @@ BOOL CFilesBox::GetItemRect(int index, RECT* rect)
     return IntersectRect(&dummy, rect, &FilesRect) != 0;
 }
 
-void CFilesBox::EnsureItemVisible(int index, BOOL forcePaint, BOOL scroll, BOOL selFocChangeOnly)
+void CFileListBox::EnsureItemVisible(int index, BOOL forcePaint, BOOL scroll, BOOL selFocChangeOnly)
 {
     if (index < 0 || index >= ItemsCount)
     {
@@ -724,7 +724,7 @@ void CFilesBox::EnsureItemVisible(int index, BOOL forcePaint, BOOL scroll, BOOL 
     }
 }
 
-void CFilesBox::GetVisibleItems(int* firstIndex, int* count)
+void CFileListBox::GetVisibleItems(int* firstIndex, int* count)
 {
     *firstIndex = *count = 0;
     switch (ViewMode)
@@ -770,7 +770,7 @@ void CFilesBox::GetVisibleItems(int* firstIndex, int* count)
 }
 
 // assumes scroll == TRUE - even a partially visible item counts as visible
-BOOL CFilesBox::IsItemVisible(int index, BOOL* isFullyVisible)
+BOOL CFileListBox::IsItemVisible(int index, BOOL* isFullyVisible)
 {
     if (isFullyVisible != NULL)
         *isFullyVisible = FALSE;
@@ -840,7 +840,7 @@ BOOL CFilesBox::IsItemVisible(int index, BOOL* isFullyVisible)
 }
 
 // assumes scroll == FALSE - the whole item will be visible
-int CFilesBox::PredictTopIndex(int index)
+int CFileListBox::PredictTopIndex(int index)
 {
     int newTopIndex = TopIndex;
     switch (ViewMode)
@@ -907,7 +907,7 @@ int CFilesBox::PredictTopIndex(int index)
     return newTopIndex;
 }
 
-void CFilesBox::EnsureItemVisible2(int newTopIndex, int index)
+void CFileListBox::EnsureItemVisible2(int newTopIndex, int index)
 {
     if (newTopIndex == TopIndex)
         return;
@@ -953,7 +953,7 @@ void CFilesBox::EnsureItemVisible2(int newTopIndex, int index)
     Parent->VisibleItemsArraySurround.InvalidateArr();
 }
 
-void CFilesBox::OnHScroll(int scrollCode, int pos)
+void CFileListBox::OnHScroll(int scrollCode, int pos)
 {
     if (Parent->DragBox && !Parent->ScrollingWindow) // dragging the cage - block mouse wheel scrolling
         return;
@@ -1100,7 +1100,7 @@ void CFilesBox::OnHScroll(int scrollCode, int pos)
     }
 }
 
-void CFilesBox::OnVScroll(int scrollCode, int pos)
+void CFileListBox::OnVScroll(int scrollCode, int pos)
 {
     if (Parent->DragBox && !Parent->ScrollingWindow) // dragging the cage - block mouse wheel scrolling
         return;
@@ -1256,9 +1256,9 @@ void CFilesBox::OnVScroll(int scrollCode, int pos)
 }
 
 LRESULT
-CFilesBox::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
+CFileListBox::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 {
-    SLOW_CALL_STACK_MESSAGE4("CFilesBox::WindowProc(0x%X, 0x%IX, 0x%IX)", uMsg, wParam, lParam);
+    SLOW_CALL_STACK_MESSAGE4("CFileListBox::WindowProc(0x%X, 0x%IX, 0x%IX)", uMsg, wParam, lParam);
     switch (uMsg)
     {
     case WM_CREATE:
@@ -1583,7 +1583,7 @@ CFilesBox::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         // to make the New submenu work we must also forward the message there
         if (Parent->ContextSubmenuNew != NULL && Parent->ContextSubmenuNew->MenuIsAssigned())
         {
-            CALL_STACK_MESSAGE1("CFilesBox::WindowProc::SafeHandleMenuNewMsg2");
+            CALL_STACK_MESSAGE1("CFileListBox::WindowProc::SafeHandleMenuNewMsg2");
             LRESULT lResult;
             Parent->SafeHandleMenuNewMsg2(uMsg, wParam, lParam, &lResult);
             return lResult;
@@ -1806,12 +1806,12 @@ CFilesBox::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
     return CWindow::WindowProc(uMsg, wParam, lParam);
 }
 
-int CFilesBox::GetIndex(int x, int y, BOOL nearest, RECT* labelRect)
+int CFileListBox::GetIndex(int x, int y, BOOL nearest, RECT* labelRect)
 {
-    CALL_STACK_MESSAGE4("CFilesBox::GetIndex(%d, %d, %d, )", x, y, nearest);
+    CALL_STACK_MESSAGE4("CFileListBox::GetIndex(%d, %d, %d, )", x, y, nearest);
 
     if (labelRect != NULL && nearest)
-        TRACE_E("CFilesBox::GetIndex nearest && labelRect");
+        TRACE_E("CFileListBox::GetIndex nearest && labelRect");
 
     if (ItemsCount == 0)
         return INT_MAX;
@@ -2139,7 +2139,7 @@ int CFilesBox::GetIndex(int x, int y, BOOL nearest, RECT* labelRect)
     return itemIndex;
 }
 
-BOOL CFilesBox::ShowHideChilds()
+BOOL CFileListBox::ShowHideChilds()
 {
     BOOL change = FALSE;
     if (HeaderLineVisible && ViewMode != vmDetailed)
@@ -2227,7 +2227,7 @@ BOOL CFilesBox::ShowHideChilds()
     return change;
 }
 
-void CFilesBox::SetupScrollBars(DWORD flags)
+void CFileListBox::SetupScrollBars(DWORD flags)
 {
     SCROLLINFO si;
     if (HHScrollBar != NULL && flags & UPDATE_HORZ_SCROLL)
@@ -2320,7 +2320,7 @@ void CFilesBox::SetupScrollBars(DWORD flags)
     }
 }
 
-void CFilesBox::CheckAndCorrectBoundaries()
+void CFileListBox::CheckAndCorrectBoundaries()
 {
     switch (ViewMode)
     {
@@ -2427,7 +2427,7 @@ void CFilesBox::CheckAndCorrectBoundaries()
     }
 }
 
-void CFilesBox::LayoutChilds(BOOL updateAndCheck)
+void CFileListBox::LayoutChilds(BOOL updateAndCheck)
 {
     GetClientRect(HWindow, &ClientRect);
     ItemBitmap.Enlarge(ClientRect.right - ClientRect.left, ItemHeight);
@@ -2585,7 +2585,7 @@ void CFilesBox::LayoutChilds(BOOL updateAndCheck)
     Parent->VisibleItemsArraySurround.InvalidateArr();
 }
 
-void CFilesBox::PaintHeaderLine()
+void CFileListBox::PaintHeaderLine()
 {
     if (HeaderLine.HWindow != NULL)
     {

@@ -150,56 +150,177 @@ Open Salamander is a pure WinAPI C++ application with no external UI frameworks 
 └─────────────────────────────────────────────────────────┘
 ```
 
+### Source File Organisation
+
+The codebase is organised into focused file groups. Each group uses a common prefix so related files sort together:
+
+| Prefix | Files | What it contains |
+|--------|-------|-----------------|
+| `mainwnd_*` | 7 | Main window: init, config, messages, commands, panels, shutdown, HTML help |
+| `fileswindow_*` | 12 | File panel implementation: navigation, display, operations, archiving, etc. |
+| `filesbox_*` | 2 | Virtual list-box rendering and keyboard/mouse input |
+| `dialogs_*` | 8 | All dialog boxes: file ops, rename, attributes, configuration pages |
+| `plugins_*` | 4 | Plugin loader, interface layer, archiver and file-system adapters |
+| `toolbar_*` | 8 | Toolbar core, rendering, drag-and-drop, drive bar, hot-paths, user menu |
+| `menu_*` | 4 | Popup menus, shared resources, templates, window queue |
+| `gui_*` | 3 | Reusable GUI controls: progress bar, static text, buttons and animations |
+| `zip_*` | 4 | ZIP/archive API: progress, general API, utilities, directory management |
+| `find_*` | 3 | Find dialog: result data structures, dialog UI, toolbar |
+| `app_*` | 2 | Application entry point and global variable definitions |
+| `transfer_speed`, `async_copy`, `operations_core`, `worker` | 4 | File-copy engine: speed meters, async copy, operation dispatch |
+
+**Rule of thumb adopted for new code:** one logical component or feature per file; aim for files under 1 500 lines.
+
 ### Core Components
 
-#### Main Window (`src/mainwnd*.cpp`, `src/mainwnd.h`)
-`CMainWindow` is the top-level window that hosts the entire application. It contains:
+#### Main Window (`src/mainwnd_*.cpp`, `src/mainwnd.h`)
+
+`CMainWindow` is the top-level window that hosts the entire application. Its implementation is split across seven focused files:
+
+| File | Contents |
+|------|----------|
+| `mainwnd_init.cpp` | Constructor, window creation, destruction, toolbar/panel layout |
+| `mainwnd_config.cpp` | Configuration load/save, registry persistence |
+| `mainwnd_messages.cpp` | `WindowProc` switch — delegates to the two extracted handlers below |
+| `mainwnd_commands.cpp` | `HandleWmCommand` — all `WM_COMMAND` menu and toolbar dispatch (~2 500 cases) |
+| `mainwnd_shutdown.cpp` | `HandleShutdown` — `WM_CLOSE`, `WM_ENDSESSION`, `WM_QUERYENDSESSION` |
+| `mainwnd_help.cpp` | `CSalamanderHelp`, `OpenHtmlHelp`, `MessageBoxHelpCallback` |
+| `mainwnd_panels.cpp` | Panel layout helpers, splitter, focus management |
+
+Key hosted objects:
 - Two `CFilesWindow` instances (left and right panels)
 - Drive bars, toolbars (`CMainToolBar`, `CPluginsBar`, `CBottomToolBar`, `CUserMenuBar`, `CHotPathsBar`)
 - Menu system (`CMenuBar`, `CMenuPopup`, `CMenuNew`)
-- Status window (`CStatusWindow`) and tooltip window (`CToolTipWindow`)
+- `CPanelStatusBar` (status bar below each panel) and `CToolTipWindow`
 
-#### File Panels (`src/fileswn*.cpp`, `src/filesbx*.cpp`)
-`CFilesWindow` implements a single file panel. Key sub-components:
-- `CFilesBox` — the virtual list control that renders file entries
-- `CHeaderLine` — column headers with drag-to-resize
-- `CPathHistory` — forward/back navigation history
-- `CIconCache` — icon lookup cache to avoid redundant shell requests
-- `CFilesArray` / `CFileData` — in-memory directory listing
+`CMainWindowLock` (declared in `mainwnd.h`) serialises access to the main window during shutdown; `extern CMainWindowLock MainWindowCS` is defined in `app_globals.cpp`.
+
+#### File Panels (`src/fileswindow_*.cpp`, `src/filesbox_*.cpp`, `src/fileswnd.h`)
+
+`CFilesWindow` implements a single file panel. Its implementation is split across twelve focused files:
+
+| File | Contents |
+|------|----------|
+| `fileswindow_init.cpp` | Constructor, creation, destruction |
+| `fileswindow_navigation.cpp` | `ReadDirectory`, `ChangeDir`, path history |
+| `fileswindow_display.cpp` | Painting: `SetFontAndColors`, `DrawIcon`, `DrawItem` |
+| `fileswindow_operations.cpp` | `MakeFileList`, `MoveFiles`, `BuildScriptMain` — copy/move scripting |
+| `fileswindow_archiving.cpp` | Pack, unpack, panel enumeration data |
+| `fileswindow_file_actions.cpp` | Convert, `ChangeAttr`, `FindFile`, `ViewFile` |
+| `fileswindow_execute.cpp` | Open/execute files, view-template selection |
+| `fileswindow_quicksearch.cpp` | Find-as-you-type quick search |
+| `fileswindow_columns.cpp` | Column configuration and management |
+| `fileswindow_delete.cpp` | `DeleteThroughRecycleBin`, `FilesAction` |
+| `fileswindow_dir_reading.cpp` | `CVisibleFileItemsArray`, directory reading |
+| `fileswindow_wndproc.cpp` | `WindowProc`, `LockUI`, `OpenDirHistory` |
+
+The virtual list-box rendering lives in `filesbox_rendering.cpp` (`CFileListBox`) and keyboard/mouse input in `filesbox_input.cpp` (`CFileListHeader`).
 
 Each panel operates in one of three modes driven by the path type: `ptDisk` (local/network drive), `ptZIPArchive` (archive root), or `ptPluginFS` (virtual file system provided by a plugin).
 
-#### File Operations (`src/worker.h`, `src/execute.cpp`)
-Long-running operations (copy, move, delete, rename) execute on dedicated worker threads so the UI remains responsive. The operation pipeline is:
+#### File Copy Engine (`src/worker.h`, `src/worker.cpp`, `src/async_copy.cpp`, `src/operations_core.cpp`, `src/transfer_speed.cpp`)
 
+Long-running operations (copy, move, delete, rename) execute on dedicated worker threads. The implementation is split across four files:
+
+| File | Contents |
+|------|----------|
+| `transfer_speed.cpp` | `CTransferSpeedMeter`, `CProgressSpeedMeter` — real-time throughput measurement |
+| `async_copy.cpp` | `CCopy_Context`, `DoCopyFile`, `DoMoveFile`, `DoDeleteFile`, `DoCreateDir` — the core async copy engine with overlapped I/O |
+| `operations_core.cpp` | `DoConvert`, `DoChangeAttrs`, `ThreadWorker`, `StartWorker`, `COperationsQueue` |
+| `worker.cpp` | `COperations` methods, UTF-8 file helpers, buffer-size heuristics |
+
+The operation pipeline:
 1. User triggers a command → `CCriteriaData` is built with masks, attributes, and speed limits.
-2. A `COperations` object is created and a worker thread is started.
-3. The worker processes each file, updates a `CProgressData` structure, and communicates back via Windows messages.
+2. A `COperations` object is created and a worker thread is started via `StartWorker`.
+3. The worker processes each file, updates `CProgressData`, and communicates back via Windows messages.
 4. On completion or cancellation, both source and target panels are refreshed.
 
-`CTransferSpeedMeter` and `CProgressSpeedMeter` measure throughput and estimate time remaining in real time.
+`CAsyncCopyParams` (declared in `worker.h`) manages overlapped-I/O buffers for the async path. `CWorkerData` and `CProgressDlgData` (also in `worker.h`) carry per-operation state across the four translation units.
 
-#### Plugin System (`src/plugins.h`, `src/plugins/`)
-Plugins are DLLs that export a well-known entry point. The core defines abstract interface classes that plugins implement:
+#### ZIP and Archive API (`src/zip_*.cpp`, `src/zip.h`)
+
+The plugin-facing archive API (`CSalamanderGeneral`, `CSalamanderDirectory`, etc.) is split into four files:
+
+| File | Contents |
+|------|----------|
+| `zip_progress.cpp` | `CZIPUnpackProgress` — progress dialog integration |
+| `zip_general_api.cpp` | `CSalamanderGeneral` — the main archive API surface (~3 000 lines) |
+| `zip_utilities.cpp` | `CSalamanderBMSearchDataImp`, `CSalamanderMD5Imp`, `CSalamanderPNG`, `CSalamanderCrypt` |
+| `zip_directory.cpp` | `CSalamanderDirectory`, `CSalamanderForOperations`, `TestFreeSpace` |
+
+#### Dialog Boxes (`src/dialogs_*.cpp`, `src/dialogs.h`)
+
+All dialogs are grouped by function:
+
+| File | Contents |
+|------|----------|
+| `dialogs_file_ops.cpp` | Copy, move, delete confirmation dialogs |
+| `dialogs_rename.cpp` | Rename and batch-rename dialogs |
+| `dialogs_attributes.cpp` | File-attribute dialogs, `CZipSizeResultsDialog`, `CPasswordDialog` |
+| `dialogs_config_general.cpp` | Configuration pages: `CConfigPageGeneral`, `CConfigPageRegional`, `CConfigPageView` |
+| `dialogs_config_viewers.cpp` | Configuration pages: Viewers, Associations |
+| `dialogs_config_panels.cpp` | Configuration pages: Panels, Colors |
+| `dialogs_config_environment.cpp` | Environment/paths configuration page |
+| `dialogs_config_packing.cpp` | Packing/archiving configuration page |
+
+#### Find Dialog (`src/find_*.cpp`, `src/find.h`)
+
+| File | Contents |
+|------|----------|
+| `find_results.cpp` | `CFindOptions`, `CFoundFilesData`, `CFoundFilesListView` — data model and list control |
+| `find_dialog_ui.cpp` | `CFindDialog` — search dialog UI and logic (~3 300 lines) |
+| `finddlg2.cpp` | `CFindDialog` continuation methods, `CFindTBHeader` toolbar |
+
+#### GUI Controls (`src/gui_*.cpp`, `src/gui.h`)
+
+Reusable custom controls shared across all dialogs and the main window:
+
+| File | Contents |
+|------|----------|
+| `gui_progressbar.cpp` | `CProgressBar` — animated, self-moving progress bar |
+| `gui_statictext.cpp` | `CStaticText` — text control with ellipsis, path compaction, tooltips |
+| `gui_controls.cpp` | `CButton`, `CColorArrowButton`, `CToolbarHeader`, `CAnimate`, layout helpers |
+
+`CGuiBitmap` (a memory-DC helper for flicker-free button drawing) is declared in `gui_bitmap.h` and shared by `gui_progressbar.cpp` and `gui_controls.cpp`.
+
+#### Plugin System (`src/plugins_*.cpp`, `src/plugins.h`, `src/plugins/`)
+
+| File | Contents |
+|------|----------|
+| `plugins_loading.cpp` | Discovery, `LoadLibraryUtf8`, version check, activation |
+| `plugins_interface.cpp` | `CPluginInterfaceEncapsulation` — thread-safety guards |
+| `plugins_archiver.cpp` | Archiver plugin adapter |
+| `plugins_filesystem.cpp` | Virtual file-system plugin adapter |
+
+Plugins implement abstract interface classes:
 
 | Interface | Purpose |
 |-----------|---------|
-| `CPluginInterfaceAbstract` | Base interface; version negotiation |
+| `CPluginInterfaceAbstract` | Base; version negotiation |
 | `CPluginInterfaceForArchiverAbstract` | List/pack/unpack archives |
 | `CPluginInterfaceForViewerAbstract` | File preview/viewer |
 | `CPluginInterfaceForFileSystemAbstract` | Virtual file systems (e.g. FTP) |
 | `CPluginInterfaceForThumbLoaderAbstract` | Thumbnail generation |
 
-`CPluginInterfaceEncapsulation` wraps every plugin call with `EnterPlugin()` / `LeavePlugin()` guards for thread safety and call-stack tracking. Plugins are discovered from their subdirectories at startup, loaded with `LoadLibraryUtf8()`, and version-checked before activation.
+Every call is wrapped with `EnterPlugin()` / `LeavePlugin()` guards for thread safety and call-stack tracking.
+
+#### Application Entry (`src/app_entry.cpp`, `src/app_globals.cpp`)
+
+| File | Contents |
+|------|----------|
+| `app_globals.cpp` | All global variable definitions — runtime flags, GDI handles, colour tables, enabler arrays, `CMainWindowLock MainWindowCS` |
+| `app_entry.cpp` | `MyEntryPoint`, `WinMain`, `WinMainBody`, locale init, graphics init, CRC-32 helpers |
 
 #### Common Library (`src/common/`)
-Shared infrastructure used by both the core and plugins:
+
+Shared infrastructure used by both the core and all plugins:
 
 | File | Purpose |
 |------|---------|
-| `array.h` | `TIndirectArray<T>` — typed dynamic array template (~4900 lines) |
+| `array.h` | `TIndirectArray<T>` — typed dynamic array template |
+| `strutils.h/cpp` | UTF-8 ↔ wide string conversion, `CreateFileUtf8`, `DeleteFileUtf8`, etc. |
 | `handles.h/cpp` | Handle tracking and leak detection in debug builds |
-| `messages.h/cpp` | Typed message box helpers |
+| `messages.h/cpp` | Typed message-box helpers |
 | `allochan.h/cpp` | Allocation tracking wrappers |
 | `heap.h/cpp` | Custom heap management |
 | `crc32.h/cpp` | CRC-32 checksum |
@@ -207,15 +328,20 @@ Shared infrastructure used by both the core and plugins:
 | `multimon.cpp` | Multi-monitor layout support |
 
 #### Crash Reporting (`src/salmon/`)
-`SalmonInit()` is called before `WinMain` via `MyEntryPoint()` in `salamdr1.cpp`. It installs an unhandled-exception filter that captures a minidump and call-stack trace, enabling post-mortem analysis of field crashes.
+
+`SalmonInit()` is called before `WinMain` via `MyEntryPoint()` in `app_entry.cpp`. It installs an unhandled-exception filter that captures a minidump and call-stack trace, enabling post-mortem analysis of field crashes.
 
 ### Key Data Structures
 
 | Type | Description |
 |------|-------------|
 | `CFileData` | Metadata for one file or directory (name, size, time, attributes, plugin-specific data) |
-| `CSalamanderDirectory` | Holds the full listing for a directory |
-| `CCriteriaData` | Parameters for a copy/move operation: masks, date range, size limits, speed cap |
+| `CSalamanderDirectory` | Full directory listing exposed to plugins via the archive API |
+| `CCriteriaData` | Parameters for a copy/move: masks, date range, size limits, speed cap |
+| `CAsyncCopyParams` | Overlapped-I/O buffer block for the async copy path (declared in `worker.h`) |
+| `CWorkerData` / `CProgressDlgData` | Per-operation worker state shared across the copy-engine translation units |
+| `CDirectorySizeCache` | Cached directory-size results (avoids redundant recursive scans) |
+| `CVisibleFileItemsArray` | Tracks which file items are currently visible in the panel for incremental refresh |
 | `CChangeCaseData` | Options for a batch rename-case operation |
 | `CAttrsData` | Parameters for changing file attributes in bulk |
 
@@ -227,14 +353,31 @@ All UI objects derive from a thin `CWindow` base that wraps a WinAPI `HWND` and 
 CWindow
 ├── CMainWindow
 │   ├── CFilesWindow (×2, left/right panels)
-│   │   ├── CFilesBox
-│   │   └── CHeaderLine
+│   │   ├── CFileListBox          (virtual list-box rendering)
+│   │   └── CFileListHeader       (column headers with drag-to-resize)
 │   ├── CMenuBar
-│   ├── CMainToolBar / CPluginsBar / ...
+│   ├── CMainToolBar / CPluginsBar / CBottomToolBar / ...
 │   ├── CDriveBar
-│   └── CStatusWindow
+│   └── CPanelStatusBar           (status bar below each panel)
 └── CDialog (modal/modeless dialogs)
+    ├── CFindDialog               (find dialog with CFoundFilesListView)
+    ├── CConfigPageGeneral / CConfigPageRegional / CConfigPageView / ...
+    ├── CPasswordDialog
+    ├── CZipSizeResultsDialog
+    └── CInlineRenameEdit         (in-place rename edit control)
 ```
+
+### Naming Conventions
+
+The codebase follows these conventions for new and refactored code:
+
+| Category | Convention | Example |
+|----------|-----------|---------|
+| Dialog classes | `C*Dialog` | `CPasswordDialog`, `CZipSizeResultsDialog` |
+| Window classes | `C*Window` | `CMainWindow`, `CFilesWindow` |
+| Data-holder structs | `C*Data` or `C*Info` | `CFileData`, `CCriteriaData` |
+| Manager / cache classes | `C*Manager` or `C*Cache` | `CDirectorySizeCache`, `CIconCache` |
+| Locks / critical sections | `C*Lock` | `CMainWindowLock`, `CStringResourceLock` |
 
 ### Build System
 

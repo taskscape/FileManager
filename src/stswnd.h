@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2023 Taskscape Ltd
+﻿// SPDX-FileCopyrightText: 2023 Taskscape Ltd
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #pragma once
@@ -56,7 +56,7 @@ struct CHotTrackItem
     WORD Pixels;       // jejich delka v bodech
 };
 
-class CStatusWindow : public CWindow
+class CPanelStatusBar : public CWindow
 {
 public:
     CMainToolBar* ToolBar;
@@ -129,8 +129,8 @@ protected:
     IDropTarget* IDropTargetPtr;
 
 public:
-    CStatusWindow(CFilesWindow* filesWindow, int border, CObjectOrigin origin = ooAllocated);
-    ~CStatusWindow();
+    CPanelStatusBar(CFilesWindow* filesWindow, int border, CObjectOrigin origin = ooAllocated);
+    ~CPanelStatusBar();
 
     BOOL SetSubTexts(DWORD* subTexts, DWORD subTextsCount);
     // nastavuje text 'text' do status-line, 'pathLen' urcuje delku cesty (zbytek je filter),

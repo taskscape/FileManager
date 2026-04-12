@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2023 Taskscape Ltd
+﻿// SPDX-FileCopyrightText: 2023 Taskscape Ltd
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "precomp.h"
@@ -988,14 +988,14 @@ CFilesWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         EnumFileNamesAddSourceUID(HWindow, &EnumFileNamesSourceUID);
 
         //---  create listbox with files and directories
-        ListBox = new CFilesBox(this);
+        ListBox = new CFileListBox(this);
         if (ListBox == NULL)
         {
             TRACE_E(LOW_MEMORY);
             return -1;
         }
         //---  create status line with information about current file
-        StatusLine = new CStatusWindow(this, blBottom, ooStatic);
+        StatusLine = new CPanelStatusBar(this, blBottom, ooStatic);
         if (StatusLine == NULL)
         {
             TRACE_E(LOW_MEMORY);
@@ -1003,7 +1003,7 @@ CFilesWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         }
         ToggleStatusLine();
         //---  create status line with information about current directory
-        DirectoryLine = new CStatusWindow(this, blTop, ooStatic);
+        DirectoryLine = new CPanelStatusBar(this, blTop, ooStatic);
         if (DirectoryLine == NULL)
         {
             TRACE_E(LOW_MEMORY);

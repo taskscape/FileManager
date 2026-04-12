@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2023 Taskscape Ltd
+﻿// SPDX-FileCopyrightText: 2023 Taskscape Ltd
 // SPDX-License-Identifier: GPL-2.0-or-later
 // CommentsTranslationProject: TRANSLATED
 
@@ -116,10 +116,10 @@ CBottomBar::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 
 //****************************************************************************
 //
-// CHeaderLine
+// CFileListHeader
 //
 
-CHeaderLine::CHeaderLine()
+CFileListHeader::CFileListHeader()
     : CWindow(ooStatic)
 {
     Parent = NULL;
@@ -133,13 +133,13 @@ CHeaderLine::CHeaderLine()
     OldDragColWidth = -1;
 }
 
-CHeaderLine::~CHeaderLine()
+CFileListHeader::~CFileListHeader()
 {
     if (HWindow != NULL)
         DetachWindow();
 }
 
-void CHeaderLine::PaintAllItems(HDC hDC, HRGN hUpdateRgn)
+void CFileListHeader::PaintAllItems(HDC hDC, HRGN hUpdateRgn)
 {
     if (hUpdateRgn != NULL)
         SelectClipRgn(hDC, hUpdateRgn);
@@ -187,11 +187,11 @@ void CHeaderLine::PaintAllItems(HDC hDC, HRGN hUpdateRgn)
 #define SORT_BITMAP_W 8 // width of the bitmap for sorting
 #define SORT_BITMAP_H 8 // height of the bitmap for sorting
 
-void CHeaderLine::PaintItem(HDC hDC, int index, int x)
+void CFileListHeader::PaintItem(HDC hDC, int index, int x)
 {
     if (index > Columns->Count)
     {
-        TRACE_E("CHeaderLine::PaintItem() index=" << index << " out of range! count=" << Columns->Count);
+        TRACE_E("CFileListHeader::PaintItem() index=" << index << " out of range! count=" << Columns->Count);
         return;
     }
 
@@ -332,14 +332,14 @@ void CHeaderLine::PaintItem(HDC hDC, int index, int x)
            ItemBitmap.HMemDC, 0, 0, SRCCOPY);
 }
 
-void CHeaderLine::PaintItem2(int index)
+void CFileListHeader::PaintItem2(int index)
 {
     HDC hDC = HANDLES(GetDC(HWindow));
     PaintItem(hDC, index);
     HANDLES(ReleaseDC(HWindow, hDC));
 }
 
-void CHeaderLine::SetMinWidths()
+void CFileListHeader::SetMinWidths()
 {
     int columnsCount = Columns->Count;
 
@@ -374,7 +374,7 @@ void CHeaderLine::SetMinWidths()
 }
 
 CHeaderHitTestEnum
-CHeaderLine::HitTest(int xPos, int yPos, int& index, BOOL& extInName)
+CFileListHeader::HitTest(int xPos, int yPos, int& index, BOOL& extInName)
 {
     extInName = FALSE;
     if (xPos < 0 || xPos > Width || yPos < 0 || yPos > Height)
@@ -420,7 +420,7 @@ CHeaderLine::HitTest(int xPos, int yPos, int& index, BOOL& extInName)
     return hhtNone;
 }
 
-void CHeaderLine::Cancel()
+void CFileListHeader::Cancel()
 {
     SetCurrentToolTip(NULL, 0);
     MouseIsTracked = FALSE;
@@ -447,7 +447,7 @@ void CHeaderLine::Cancel()
 }
 
 LRESULT
-CHeaderLine::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
+CFileListHeader::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 {
     switch (uMsg)
     {

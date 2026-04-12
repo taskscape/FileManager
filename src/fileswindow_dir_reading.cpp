@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2023 Taskscape Ltd
+﻿// SPDX-FileCopyrightText: 2023 Taskscape Ltd
 // SPDX-License-Identifier: GPL-2.0-or-later
 // CommentsTranslationProject: TRANSLATED
 
@@ -809,10 +809,10 @@ void CFilesWindow::DragDropToArcOrFS(CTmpDragDropOperData* data)
 
 //****************************************************************************
 //
-// CVisibleItemsArray
+// CVisibleFileItemsArray
 //
 
-CVisibleItemsArray::CVisibleItemsArray(BOOL surroundArr)
+CVisibleFileItemsArray::CVisibleFileItemsArray(BOOL surroundArr)
 {
     HANDLES(InitializeCriticalSection(&Monitor));
     ArrVersionNum = 0;
@@ -825,7 +825,7 @@ CVisibleItemsArray::CVisibleItemsArray(BOOL surroundArr)
     LastVisibleItem = -1;
 }
 
-CVisibleItemsArray::~CVisibleItemsArray()
+CVisibleFileItemsArray::~CVisibleFileItemsArray()
 {
     HANDLES(DeleteCriticalSection(&Monitor));
     if (ArrNamesAllocated > 0 && ArrNames != NULL)
@@ -834,10 +834,10 @@ CVisibleItemsArray::~CVisibleItemsArray()
     ArrNamesAllocated = 0;
 }
 
-BOOL CVisibleItemsArray::IsArrValid(int* versionNum)
+BOOL CVisibleFileItemsArray::IsArrValid(int* versionNum)
 {
     CALL_STACK_MESSAGE_NONE
-    //  CALL_STACK_MESSAGE1("CVisibleItemsArray::IsArrValid()");
+    //  CALL_STACK_MESSAGE1("CVisibleFileItemsArray::IsArrValid()");
     HANDLES(EnterCriticalSection(&Monitor));
     if (versionNum != NULL)
         *versionNum = ArrVersionNum;
@@ -846,9 +846,9 @@ BOOL CVisibleItemsArray::IsArrValid(int* versionNum)
     return ret;
 }
 
-void CVisibleItemsArray::InvalidateArr()
+void CVisibleFileItemsArray::InvalidateArr()
 {
-    CALL_STACK_MESSAGE1("CVisibleItemsArray::InvalidateArr()");
+    CALL_STACK_MESSAGE1("CVisibleFileItemsArray::InvalidateArr()");
     HANDLES(EnterCriticalSection(&Monitor));
     ArrIsValid = FALSE;
     ArrNamesCount = 0;
@@ -885,9 +885,9 @@ void SortNamesCS(char** names, int left, int right)
         SortNamesCS(names, i, right);
 }
 
-void CVisibleItemsArray::RefreshArr(CFilesWindow* panel)
+void CVisibleFileItemsArray::RefreshArr(CFilesWindow* panel)
 {
-    CALL_STACK_MESSAGE1("CVisibleItemsArray::RefreshArr()");
+    CALL_STACK_MESSAGE1("CVisibleFileItemsArray::RefreshArr()");
     HANDLES(EnterCriticalSection(&Monitor));
     int firstIndex, count;
     panel->ListBox->GetVisibleItems(&firstIndex, &count);
@@ -951,9 +951,9 @@ void CVisibleItemsArray::RefreshArr(CFilesWindow* panel)
     HANDLES(LeaveCriticalSection(&Monitor));
 }
 
-BOOL CVisibleItemsArray::ArrContains(const char* name, BOOL* isArrValid, int* versionNum)
+BOOL CVisibleFileItemsArray::ArrContains(const char* name, BOOL* isArrValid, int* versionNum)
 {
-    DEBUG_SLOW_CALL_STACK_MESSAGE1("CVisibleItemsArray::ArrContains()");
+    DEBUG_SLOW_CALL_STACK_MESSAGE1("CVisibleFileItemsArray::ArrContains()");
     HANDLES(EnterCriticalSection(&Monitor));
     if (versionNum != NULL)
         *versionNum = ArrVersionNum;
@@ -999,9 +999,9 @@ BOOL CVisibleItemsArray::ArrContains(const char* name, BOOL* isArrValid, int* ve
     }
 }
 
-BOOL CVisibleItemsArray::ArrContainsIndex(int index, BOOL* isArrValid, int* versionNum)
+BOOL CVisibleFileItemsArray::ArrContainsIndex(int index, BOOL* isArrValid, int* versionNum)
 {
-    DEBUG_SLOW_CALL_STACK_MESSAGE1("CVisibleItemsArray::ArrContainsIndex()");
+    DEBUG_SLOW_CALL_STACK_MESSAGE1("CVisibleFileItemsArray::ArrContainsIndex()");
     HANDLES(EnterCriticalSection(&Monitor));
     if (versionNum != NULL)
         *versionNum = ArrVersionNum;

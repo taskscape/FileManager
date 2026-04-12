@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2023 Open Salamander Authors
+﻿// SPDX-FileCopyrightText: 2023 Open Salamander Authors
 // SPDX-License-Identifier: GPL-2.0-or-later
 // CommentsTranslationProject: TRANSLATED
 
@@ -3228,7 +3228,7 @@ void CFilesWindow::SetQuickSearchCaretPos()
             }
             iconH += 3 + 2 - 1;
 
-            // ATTENTION: keep in sync with CFilesBox::GetIndex
+            // ATTENTION: keep in sync with CFileListBox::GetIndex
             char buff[1024];                           // target buffer for strings
             int maxWidth = ListBox->ItemWidth - 4 - 1; // -1, so they don't touch
             char* out1 = buff;
@@ -3251,7 +3251,7 @@ void CFilesWindow::SetQuickSearchCaretPos()
 
         case vmTiles:
         {
-            // ATTENTION: keep in sync with CFilesBox::GetIndex, see call to GetTileTexts
+            // ATTENTION: keep in sync with CFileListBox::GetIndex, see call to GetTileTexts
             //        int itemWidth = rect.right - rect.left; // item width
             int maxTextWidth = ListBox->ItemWidth - TILE_LEFT_MARGIN - IconSizes[ICONSIZE_48] - TILE_LEFT_MARGIN - 4;
             int widthNeeded = 0;

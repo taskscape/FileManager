@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2023 Taskscape Ltd
+﻿// SPDX-FileCopyrightText: 2023 Taskscape Ltd
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #pragma once
@@ -127,14 +127,14 @@ public:
 
 //****************************************************************************
 //
-// CTopIndexMem
+// CScrollPositionMemory
 //
 // top-index memory for the panel list box - used by CPluginFSInterface to keep
 // ExecuteOnFS behavior consistent (preserves the top index when entering and leaving a subdirectory)
 
 #define TOP_INDEX_MEM_SIZE 50 // number of remembered top indexes (levels), at least 1
 
-class CTopIndexMem
+class CScrollPositionMemory
 {
 protected:
     // path for the last remembered top index
@@ -143,7 +143,7 @@ protected:
     int TopIndexesCount;                // number of stored top indexes
 
 public:
-    CTopIndexMem() { Clear(); }
+    CScrollPositionMemory() { Clear(); }
     void Clear()
     {
         Path[0] = 0;
@@ -165,7 +165,7 @@ public:
     char Path[MAX_PATH];      // current path
     BOOL PathError;           // TRUE if ListCurrentPath failed (path error); triggers ChangePath
     BOOL FatalError;          // TRUE if ListCurrentPath failed (fatal error); triggers ChangePath
-    CTopIndexMem TopIndexMem; // stored top indexes for ExecuteOnFS()
+    CScrollPositionMemory TopIndexMem; // stored top indexes for ExecuteOnFS()
 
 public:
     CPluginFSInterface();
