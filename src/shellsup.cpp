@@ -2553,7 +2553,7 @@ void ExecuteAssociation(HWND hWindow, const char* path, const char* name)
                     CShellExecuteWnd shellExecuteWnd;
                     CMINVOKECOMMANDINFOEX ici = {};
                     ici.cbSize = sizeof(CMINVOKECOMMANDINFOEX);
-                    ici.fMask = unicodePathReady ? CMINVOKECOMMANDINFOEX_MASK_UNICODE : 0;
+                    ici.fMask = unicodePathReady ? 0x00010000L : 0; // CMINVOKECOMMANDINFOEX_MASK_UNICODE
                     ici.hwnd = shellExecuteWnd.Create(hWindow, "SEW: ExecuteAssociation cmd=%d", cmd);
                     ici.lpVerb = MAKEINTRESOURCE(cmd);
                     ici.lpVerbW = unicodePathReady ? MAKEINTRESOURCEW(cmd) : NULL;
@@ -2562,7 +2562,6 @@ void ExecuteAssociation(HWND hWindow, const char* path, const char* name)
                     ici.lpDirectory = path;
                     ici.lpDirectoryW = unicodePathReady ? wPath : NULL;
                     ici.nShow = SW_SHOWNORMAL;
-                    ici.nShowW = SW_SHOWNORMAL;
                     ici.dwHotKey = 0;
                     ici.hIcon = 0;
 

@@ -524,7 +524,7 @@ void DoExecuteAssociation(HWND hWindow, const char* path, const char* name)
 
                 CMINVOKECOMMANDINFOEX ici = {0};
                 ici.cbSize = sizeof(CMINVOKECOMMANDINFOEX);
-                ici.fMask = hasWPath ? CMINVOKECOMMANDINFOEX_MASK_UNICODE : 0;
+                ici.fMask = hasWPath ? 0x00010000L : 0; // CMINVOKECOMMANDINFOEX_MASK_UNICODE
                 ici.hwnd = hWindow;
                 ici.lpVerb = MAKEINTRESOURCE(cmd);
                 ici.lpVerbW = hasWPath ? MAKEINTRESOURCEW(cmd) : NULL;
@@ -533,7 +533,6 @@ void DoExecuteAssociation(HWND hWindow, const char* path, const char* name)
                 ici.lpDirectory = path;
                 ici.lpDirectoryW = hasWPath ? wPath : NULL;
                 ici.nShow = SW_SHOWNORMAL;
-                ici.nShowW = SW_SHOWNORMAL;
                 ici.dwHotKey = 0;
                 ici.hIcon = 0;
 
