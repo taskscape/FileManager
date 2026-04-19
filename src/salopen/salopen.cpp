@@ -101,7 +101,7 @@ int GetRootPath(char* root, const char* path)
 LPITEMIDLIST GetItemIdListForFileName(LPSHELLFOLDER folder, const char* fileName)
 {
     OLECHAR olePath[MAX_PATH];
-    MultiByteToWideChar(CP_ACP, MB_PRECOMPOSED, fileName, -1, olePath, MAX_PATH);
+    MultiByteToWideChar(CP_UTF8, 0, fileName, -1, olePath, MAX_PATH);
     olePath[MAX_PATH - 1] = 0;
 
     LPITEMIDLIST pidl;
@@ -519,18 +519,25 @@ void DoExecuteAssociation(HWND hWindow, const char* path, const char* name)
             }
             if (cmd != -1)
             {
-                CMINVOKECOMMANDINFO ici;
-                ici.cbSize = sizeof(CMINVOKECOMMANDINFO);
-                ici.fMask = 0;
+                OLECHAR wPath[MAX_PATH];
+                BOOL hasWPath = MultiByteToWideChar(CP_UTF8, 0, path, -1, wPath, MAX_PATH) > 0;
+
+                CMINVOKECOMMANDINFOEX ici = {0};
+                ici.cbSize = sizeof(CMINVOKECOMMANDINFOEX);
+                ici.fMask = hasWPath ? CMINVOKECOMMANDINFOEX_MASK_UNICODE : 0;
                 ici.hwnd = hWindow;
                 ici.lpVerb = MAKEINTRESOURCE(cmd);
+                ici.lpVerbW = hasWPath ? MAKEINTRESOURCEW(cmd) : NULL;
                 ici.lpParameters = NULL;
+                ici.lpParametersW = NULL;
                 ici.lpDirectory = path;
+                ici.lpDirectoryW = hasWPath ? wPath : NULL;
                 ici.nShow = SW_SHOWNORMAL;
+                ici.nShowW = SW_SHOWNORMAL;
                 ici.dwHotKey = 0;
                 ici.hIcon = 0;
 
-                menu->InvokeCommand(&ici);
+                menu->InvokeCommand((LPCMINVOKECOMMANDINFO)&ici);
             }
             DestroyMenu(h);
         }

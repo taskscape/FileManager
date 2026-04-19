@@ -2406,7 +2406,7 @@ const char* ReturnNameFromParam(int, void* param)
     return (const char*)param;
 }
 
-void ExecuteAssociationAux(IContextMenu2* menu, CMINVOKECOMMANDINFO& ici)
+void ExecuteAssociationAux(IContextMenu2* menu, LPCMINVOKECOMMANDINFO pici)
 {
     CALL_STACK_MESSAGE_NONE
 
@@ -2417,7 +2417,7 @@ void ExecuteAssociationAux(IContextMenu2* menu, CMINVOKECOMMANDINFO& ici)
 
     __try
     {
-        menu->InvokeCommand(&ici);
+        menu->InvokeCommand(pici);
     }
     __except (CCallStack::HandleException(GetExceptionInformation(), 21))
     {
@@ -2490,10 +2490,11 @@ void ExecuteAssociation(HWND hWindow, const char* path, const char* name)
         }
 
         // Attempt to use ShellExecuteExW (Unicode) first
-        wchar_t wPath[MAX_PATH];
-        wchar_t wName[MAX_PATH];
-        if (MultiByteToWideChar(CP_UTF8, 0, path, -1, wPath, MAX_PATH) > 0 &&
-            MultiByteToWideChar(CP_UTF8, 0, name, -1, wName, MAX_PATH) > 0)
+        wchar_t wPath[MAX_PATH] = {};
+        wchar_t wName[MAX_PATH] = {};
+        BOOL unicodePathReady = MultiByteToWideChar(CP_UTF8, 0, path, -1, wPath, MAX_PATH) > 0 &&
+                                 MultiByteToWideChar(CP_UTF8, 0, name, -1, wName, MAX_PATH) > 0;
+        if (unicodePathReady)
         {
             wchar_t wFullPath[MAX_PATH * 2];
             wcscpy(wFullPath, wPath);
@@ -2550,19 +2551,23 @@ void ExecuteAssociation(HWND hWindow, const char* path, const char* name)
                 if (cmd != -1)
                 {
                     CShellExecuteWnd shellExecuteWnd;
-                    CMINVOKECOMMANDINFO ici;
-                    ici.cbSize = sizeof(CMINVOKECOMMANDINFO);
-                    ici.fMask = 0;
+                    CMINVOKECOMMANDINFOEX ici = {};
+                    ici.cbSize = sizeof(CMINVOKECOMMANDINFOEX);
+                    ici.fMask = unicodePathReady ? CMINVOKECOMMANDINFOEX_MASK_UNICODE : 0;
                     ici.hwnd = shellExecuteWnd.Create(hWindow, "SEW: ExecuteAssociation cmd=%d", cmd);
                     ici.lpVerb = MAKEINTRESOURCE(cmd);
+                    ici.lpVerbW = unicodePathReady ? MAKEINTRESOURCEW(cmd) : NULL;
                     ici.lpParameters = NULL;
+                    ici.lpParametersW = NULL;
                     ici.lpDirectory = path;
+                    ici.lpDirectoryW = unicodePathReady ? wPath : NULL;
                     ici.nShow = SW_SHOWNORMAL;
+                    ici.nShowW = SW_SHOWNORMAL;
                     ici.dwHotKey = 0;
                     ici.hIcon = 0;
 
                     CALL_STACK_MESSAGE1("ExecuteAssociation::2");
-                    ExecuteAssociationAux(menu, ici);
+                    ExecuteAssociationAux(menu, (LPCMINVOKECOMMANDINFO)&ici);
                 }
                 DestroyMenu(h);
             }
