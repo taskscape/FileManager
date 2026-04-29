@@ -3237,7 +3237,11 @@ void CFilesWindow::SetQuickSearchCaretPos()
             char* out2 = buff + 512;
             int out2Len = 512;
             int out2Width;
-            SplitText(hDC, formatedFileName, file->NameLen, &maxWidth,
+            // formatedFileName is MAX_PATH bytes and AlterFileName(char*, ...) caps its
+            // output at MAX_PATH-1 bytes, so use the actual content length rather than
+            // file->NameLen — long Polish-diacritic names can exceed MAX_PATH in UTF-8.
+            int formatedLen = (int)strlen(formatedFileName);
+            SplitText(hDC, formatedFileName, formatedLen, &maxWidth,
                       out1, &out1Len, &out1Width,
                       out2, &out2Len, &out2Width);
             //maxWidth += 4;

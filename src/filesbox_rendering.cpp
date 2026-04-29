@@ -2009,6 +2009,12 @@ int CFileListBox::GetIndex(int x, int y, BOOL nearest, RECT* labelRect)
             AlterFileName(formatedFileName, f->Name, -1, Configuration.FileNameFormat, 0,
                           itemIndex < Parent->Dirs->Count);
 
+            // formatedFileName is MAX_PATH bytes and AlterFileName(char*, ...) caps its
+            // output at MAX_PATH-1 bytes. Use the actual content length, not f->NameLen,
+            // so SplitText doesn't read past the NUL terminator on long Polish-diacritic
+            // names where the UTF-8 byte count can exceed MAX_PATH.
+            int formatedLen = (int)strlen(formatedFileName);
+
             // NOTE: keep in sync with CFilesWindow::SetQuickSearchCaretPos
             char buff[1024];                  // destination buffer for strings
             int maxWidth = ItemWidth - 4 - 1; // -1 so they don't touch
@@ -2020,7 +2026,7 @@ int CFileListBox::GetIndex(int x, int y, BOOL nearest, RECT* labelRect)
             int out2Width;
             HDC hDC = ItemBitmap.HMemDC;
             HFONT hOldFont = (HFONT)SelectObject(hDC, Font);
-            SplitText(hDC, formatedFileName, f->NameLen, &maxWidth,
+            SplitText(hDC, formatedFileName, formatedLen, &maxWidth,
                       out1, &out1Len, &out1Width,
                       out2, &out2Len, &out2Width);
             SelectObject(hDC, hOldFont);

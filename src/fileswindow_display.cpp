@@ -754,9 +754,23 @@ void CFilesWindow::DrawBriefDetailedItem(HDC hTgtDC, int itemIndex, RECT* itemRe
                                     CStrP wName(ConvertAllocUtf8ToWide(TransferBuffer, -1));
                                     if (wName != NULL)
                                     {
-                                        if (fitChars > (int)wcslen(wName)) fitChars = (int)wcslen(wName);
-                                        wName[fitChars] = 0;
-                                        wcscat_s(wName, lstrlenW(wName) + 4, L"...");
+                                        // wName was allocated with capacity = origLen + 1 wchars
+                                        // (ConvertAllocUtf8ToWide sizes by MultiByteToWideChar, no slack).
+                                        // To safely append "..." we need room for fitChars + 3 + null,
+                                        // so clamp fitChars to origLen - 3 and pass the real capacity
+                                        // to wcscat_s. The previous code passed lstrlenW(wName) + 4
+                                        // which lied to wcscat_s about the buffer size and overran the
+                                        // heap by up to 3 wchars whenever fitChars was near origLen —
+                                        // the common case for Polish-diacritic names because fitChars
+                                        // is measured in UTF-8 bytes while wcslen(wName) is in wchars.
+                                        int origLen = (int)wcslen(wName);
+                                        if (origLen >= 3)
+                                        {
+                                            if (fitChars > origLen - 3) fitChars = origLen - 3;
+                                            if (fitChars < 0) fitChars = 0;
+                                            wName[fitChars] = 0;
+                                            wcscat_s(wName, origLen + 1, L"...");
+                                        }
                                         ConvertWideToUtf8(wName, -1, DrawItemBuff, 1024);
                                         totalCount = (int)strlen(DrawItemBuff);
                                     }
@@ -1055,7 +1069,10 @@ void SplitText(HDC hDC, const char* text, int textLen, int* maxWidth,
         int maxW = *maxWidth;
         int w = 0;
         int index = 0;
-        while (index < maxW) // this condition should not be applied
+        // bound by textLen as well: maxW is in pixels, index is a byte offset, so
+        // the original "index < maxW" alone could iterate past textLen and read
+        // stale DrawItemAlpDx values / past-end bytes from text (TransferBuffer).
+        while (index < textLen && index < maxW)
         {
             if (text[index] == ' ')
                 lastSpaceIndex = index;
@@ -1090,14 +1107,40 @@ void SplitText(HDC hDC, const char* text, int textLen, int* maxWidth,
 
             // append "..." at the end of the string
             int backTrackIndex = index - 1;
-            while (DrawItemAlpDx[backTrackIndex] + TextEllipsisWidth > maxW && backTrackIndex > 0)
+            // backTrackIndex must stay >= 0 to keep DrawItemAlpDx[backTrackIndex] valid.
+            // The previous code allowed backTrackIndex to be -1 when index == 0 (the
+            // outer loop broke on the very first char), causing an OOB read of
+            // DrawItemAlpDx[-1]. The "backTrackIndex > 0" loop guard also stopped at 0,
+            // so we never decremented further — but we still need to skip the loop body
+            // entirely when it starts negative.
+            while (backTrackIndex > 0 && DrawItemAlpDx[backTrackIndex] + TextEllipsisWidth > maxW)
                 backTrackIndex--;
 
-            *out1Len = min(*out1Len, backTrackIndex + 3);
-            *out1Width = DrawItemAlpDx[backTrackIndex - 1] + TextEllipsisWidth;
-            memmove(out1, text, *out1Len - 3);
-            if (*out1Len >= 3)
-                memmove(out1 + *out1Len - 3, "...", 3);
+            if (backTrackIndex >= 1)
+            {
+                *out1Len = min(*out1Len, backTrackIndex + 3);
+                *out1Width = DrawItemAlpDx[backTrackIndex - 1] + TextEllipsisWidth;
+                if (*out1Len >= 3)
+                {
+                    // Both copies are inside the *out1Len >= 3 guard. The previous code
+                    // ran the prefix memmove unguarded with size = *out1Len - 3; when
+                    // *out1Len was 0/1/2, the size_t underflow turned that into a ~SIZE_MAX
+                    // memmove that catastrophically overwrote memory.
+                    memmove(out1, text, *out1Len - 3);
+                    memmove(out1 + *out1Len - 3, "...", 3);
+                }
+                else
+                {
+                    *out1Len = 0;
+                    *out1Width = 0;
+                }
+            }
+            else
+            {
+                // not even one character fits before the ellipsis — emit nothing
+                *out1Len = 0;
+                *out1Width = 0;
+            }
 
             // look for a space where we can continue to the next line
             while (index < textLen)
@@ -1130,15 +1173,35 @@ void SplitText(HDC hDC, const char* text, int textLen, int* maxWidth,
             {
                 // the second line didn't fit completely; append an ellipsis
                 int backTrackIndex = index - 1;
-                while (DrawItemAlpDx[backTrackIndex] - offsetX + TextEllipsisWidth > maxW &&
-                       backTrackIndex > oldIndex)
+                // Guard the loop entry: when not even the first char of the second line
+                // fits, backTrackIndex == oldIndex - 1 and the original loop would still
+                // evaluate DrawItemAlpDx[backTrackIndex] once (OOB if oldIndex == 0).
+                while (backTrackIndex > oldIndex &&
+                       DrawItemAlpDx[backTrackIndex] - offsetX + TextEllipsisWidth > maxW)
                     backTrackIndex--;
 
-                *out2Len = min(*out2Len, backTrackIndex - oldIndex + 3);
-                *out2Width = DrawItemAlpDx[backTrackIndex - 1] - offsetX + TextEllipsisWidth;
-                memmove(out2, text + oldIndex, *out2Len - 3);
-                if (*out2Len >= 3)
-                    memmove(out2 + *out2Len - 3, "...", 3);
+                if (backTrackIndex > oldIndex)
+                {
+                    *out2Len = min(*out2Len, backTrackIndex - oldIndex + 3);
+                    *out2Width = DrawItemAlpDx[backTrackIndex - 1] - offsetX + TextEllipsisWidth;
+                    if (*out2Len >= 3)
+                    {
+                        // Same size_t-underflow fix as the first-line path: keep the
+                        // prefix memmove inside the *out2Len >= 3 guard.
+                        memmove(out2, text + oldIndex, *out2Len - 3);
+                        memmove(out2 + *out2Len - 3, "...", 3);
+                    }
+                    else
+                    {
+                        *out2Len = 0;
+                        *out2Width = 0;
+                    }
+                }
+                else
+                {
+                    *out2Len = 0;
+                    *out2Width = 0;
+                }
             }
             else
             {
@@ -1486,6 +1549,16 @@ void CFilesWindow::DrawIconThumbnailItem(HDC hTgtDC, int itemIndex, RECT* itemRe
 
         // format the name to the user-defined form
         AlterFileName(TransferBuffer, f->Name, -1, Configuration.FileNameFormat, 0, isDir);
+
+        // AlterFileName(char*, ...) routes through MAX_PATH-sized wide buffers and
+        // ConvertWideToUtf8(..., tgtName, MAX_PATH), so TransferBuffer's content is
+        // bounded to MAX_PATH-1 bytes regardless of f->NameLen. Sync nameLen with the
+        // actual buffer content length, otherwise SplitText would walk past the NUL
+        // terminator and feed garbage to the renderer (and to GetTextExtentExPoint /
+        // DrawItemAlpDx). Long Polish-diacritic names — where the UTF-8 byte length can
+        // exceed MAX_PATH while the wchar count still fits — are exactly the case
+        // that exposes this mismatch.
+        nameLen = (int)strlen(TransferBuffer);
 
         // maximum width available for the text
         int maxWidth = itemWidth - 4 - 1; // -1 so they don't touch
