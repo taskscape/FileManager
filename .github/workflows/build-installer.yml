@@ -8,6 +8,14 @@ on:
 permissions:
   contents: write
 
+env:
+  # Opt JavaScript actions (actions/checkout, microsoft/setup-msbuild,
+  # softprops/action-gh-release, ...) into the Node.js 24 runtime ahead of the
+  # June 2026 default switch. Silences the runner deprecation warning about
+  # Node.js 20 being removed on 2026-09-16. See:
+  # https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+
 jobs:
   build:
     name: Build Installer (x64 Release)

@@ -9,6 +9,12 @@ permissions:
   issues: write
   pull-requests: write
 
+env:
+  # Opt JavaScript actions into the Node.js 24 runtime ahead of the June 2026
+  # default switch; silences the runner's Node.js 20 deprecation warning. See:
+  # https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+
 jobs:
   label:
     runs-on: ubuntu-latest
