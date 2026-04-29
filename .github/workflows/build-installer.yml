@@ -33,7 +33,7 @@ jobs:
           $ErrorActionPreference = 'Stop'
 
           $opensslZip = Join-Path $env:RUNNER_TEMP "openssl.zip"
-          $uri = "https://taskscape.com/install/openssl-1.0.2u-x64_86-win64.zip"
+          $uri = "https://intelitech.home.pl/install/openssl-1.0.2u-x64_86-win64.zip"
 
           $resp = Invoke-WebRequest -Uri $uri -OutFile $opensslZip -MaximumRedirection 10 -PassThru
           Write-Host "HTTP status: $($resp.StatusCode)"
