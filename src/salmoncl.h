@@ -5,7 +5,7 @@
 
 // SalmonClient
 // Modul SALMON.EXE slouzi k out-of-process generovani minidumpu, jeho zabaleni a upload na server
-// SALMON musi bezet od startu Salamandera, aby mohl na pady reagovat. Pady pred spusteni SALMON
+// SALMON must run from Salamander startup so it can react to crashes. Crashes before SALMON starts
 // probehnou tise a SALMON je zpracuje "priste"
 //
 // tento header je sdileny mezi projekty SALMON a SALAMAND kvuli pameti, pres kterou komunikuji
@@ -36,16 +36,16 @@
 #pragma pack(4)
 struct CSalmonSharedMemory
 {
-    DWORD Version;           // SALMON_SHARED_MEMORY_VERSION (pokud nesouhlasi pro SALAM/SALMON, je rvat a nekomunikovat...)
+    DWORD Version;           // SALMON_SHARED_MEMORY_VERSION (if SALAM/SALMON disagree, yell and do not communicate...)
     HANDLE Process;          // Handle parent procesu (abychom mohli cekat na jeho terminovani); tutu proto hodnotu nechame leakovat
     DWORD ProcessId;         // ID padleho parent procesu
     DWORD ThreadId;          // ID padleho threadu
     HANDLE Fire;             // AS signalizuje SALMONu, ze ma odeslat reporty
-    HANDLE Done;             // SALMON vraci do AS, ze je hotovo
-    HANDLE SetSLG;           // AS signalizuje SALMONu, ze ma nacist SLG podle bufferu SLGName, ktery pred nasetovani eventu nastavi
-    HANDLE CheckBugs;        // AS signalizuje SALMONu, ze ma zkontrolvat adresar s bug reporty a pokud nejake najde (z nejakeho predesleho padu), nabidnout jejich upload
+    HANDLE Done;             // SALMON returns to AS that it is done
+    HANDLE SetSLG;           // AS signals SALMON to load SLG according to buffer SLGName, which it sets before setting the event
+    HANDLE CheckBugs;        // AS signals SALMON to check the bug report directory and, if it finds any (from a previous crash), offer their upload
     char SLGName[MAX_PATH];  // ma vyznam ve chvili, kdy AS nasetuje SetSLG a rika, ktere SLG se ma nacist
-    char BugPath[MAX_PATH];  // nastavuje Salamander, udava cestu kam budou padat bug reporty (cesta nemusi existovat, vytvari se az pri padu);
+    char BugPath[MAX_PATH];  // set by Salamander, specifies path where bug reports will land (path need not exist, created only on crash);
     char BugName[MAX_PATH];  // nastavuje Salamander, udava vnitrni nazev souboru minidumpu/bug reportu
     char BaseName[MAX_PATH]; // nastavuje salmon, jde o sestavu "UID-BugName-DATUM-CAS"; pro minidump ze za to pripoji ".DMP"
     DWORD64 UID;             // unikatni ID stroje, vytvari se xorem z GUID; uklada se v registry v Bug Reporter klici; nastavuje Salamander, salmon jen cte a vklada do nazvu bug reportu
@@ -64,7 +64,7 @@ void SalmonSetSLG(const char* slgName); // nastavi do salmon jazyk
 void SalmonCheckBugs();
 
 // ulozi do sdilene pameti info o exception a pozada salmon o vytvoreni minidumpu; potom ceka, az dobehne
-// vraci TRUE v pripade uspechu, FALSE pokud se nepodarilo z nejakeho duvodu Salmon zavolat
+// Returns TRUE on success, FALSE if Salmon could not be called for some reason.
 BOOL SalmonFireAndWait(const EXCEPTION_POINTERS* e, char* bugReportPath);
 
 #endif //INSIDE_SALAMANDER

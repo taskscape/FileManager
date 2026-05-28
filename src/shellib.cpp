@@ -156,7 +156,7 @@ void CImpDropTarget::SetDirectory(const char* path, DWORD grfKeyState, POINTL pt
             if (CurDirDropTarget != NULL && dataObject != NULL && effect != NULL)
             {
                 if (CurDirDropTarget->DragEnter(dataObject, grfKeyState, pt, effect) != S_OK)
-                { // chyba drop-targetu -> uvolnime ho
+                { // drop-target error -> release it
                     CurDirDropTarget->Release();
                     CurDirDropTarget = NULL;
                     CurDir[0] = 0;
@@ -759,11 +759,11 @@ STDMETHODIMP CImpDropTarget::DragEnter(IDataObject* pDataObject,
                     if ((*pdwEffect & DROPEFFECT_MOVE) != 0)
                         *pdwEffect = DROPEFFECT_MOVE;
                     else
-                        *pdwEffect = DROPEFFECT_NONE; // chyba drop-targetu
+                        *pdwEffect = DROPEFFECT_NONE; // drop-target error
                 }
             }
             if (*pdwEffect == DROPEFFECT_NONE)
-                pdwEffect = NULL; // chyba drop-targetu
+                pdwEffect = NULL; // drop-target error
             LastEffect = (pdwEffect != NULL) ? *pdwEffect : -1;
         }
         else
@@ -870,11 +870,11 @@ STDMETHODIMP CImpDropTarget::DragOver(DWORD grfKeyState, POINTL pt,
                     if ((*pdwEffect & DROPEFFECT_MOVE) != 0)
                         *pdwEffect = DROPEFFECT_MOVE;
                     else
-                        *pdwEffect = DROPEFFECT_NONE; // chyba drop-targetu
+                        *pdwEffect = DROPEFFECT_NONE; // drop-target error
                 }
             }
             if (*pdwEffect == DROPEFFECT_NONE)
-                pdwEffect = NULL; // chyba drop-targetu
+                pdwEffect = NULL; // drop-target error
             LastEffect = (pdwEffect != NULL) ? *pdwEffect : -1;
         }
         else
@@ -984,7 +984,7 @@ STDMETHODIMP CImpDropTarget::Drop(IDataObject* pDataObject, DWORD grfKeyState,
                         if ((origEffect & DROPEFFECT_MOVE) != 0)
                             defEffect = DROPEFFECT_MOVE;
                         else
-                            defEffect = 0; // chyba drop-targetu
+                            defEffect = 0; // drop-target error
                     }
                 }
             }
@@ -1024,7 +1024,7 @@ STDMETHODIMP CImpDropTarget::Drop(IDataObject* pDataObject, DWORD grfKeyState,
                     GetFSToFSDropEffect(OldDataObjectSrcFSPath, CurDir, *pdwEffect,
                                         origKeyState, &defEffect, GetFSToFSDropEffectParam);
                     if (defEffect == DROPEFFECT_NONE)
-                        defEffect = 0; // chyba drop-targetu
+                        defEffect = 0; // drop-target error
                     DragFromPluginFSEffectIsFromPlugin = TRUE;
                 }
                 else // z disku do archivu + z disku na FS: Copy ma prioritu
@@ -1177,7 +1177,7 @@ STDMETHODIMP CImpDropTarget::Drop(IDataObject* pDataObject, DWORD grfKeyState,
                     if ((origEffect & DROPEFFECT_MOVE) != 0)
                         *pdwEffect = DROPEFFECT_MOVE;
                     else
-                        *pdwEffect = DROPEFFECT_NONE; // chyba drop-targetu
+                        *pdwEffect = DROPEFFECT_NONE; // drop-target error
                 }
             }
 
@@ -1551,7 +1551,7 @@ ITEMIDLIST** CreateItemIdList(LPSHELLFOLDER folder, int files,
         if (pidl != NULL)
             list[i] = pidl;
         else
-            break; // nejaka chyba
+            break; // some error
     }
 
     if (pidl == NULL)
@@ -1928,7 +1928,7 @@ IDataObject* CreateIDataObject(HWND hOwnerWindow, const char* rootDir, int files
     {
         SHLExceptionHasOccured++;
     }
-    return NULL; // chyba
+    return NULL; // error
 }
 
 //*****************************************************************************
@@ -2003,7 +2003,7 @@ IContextMenu2* CreateIContextMenu2(HWND hOwnerWindow, const char* rootDir, int f
     {
         SHLExceptionHasOccured++;
     }
-    return NULL; // chyba
+    return NULL; // error
 }
 
 //*****************************************************************************
@@ -2057,7 +2057,7 @@ IContextMenu2* CreateIContextMenu2(HWND hOwnerWindow, const char* dir)
     {
         SHLExceptionHasOccured++;
     }
-    return NULL; // chyba
+    return NULL; // error
 }
 
 //*****************************************************************************
@@ -2145,7 +2145,7 @@ IDropTarget* CreateIDropTarget(HWND hOwnerWindow, const char* dir)
     {
         SHLExceptionHasOccured++;
     }
-    return NULL; // chyba
+    return NULL; // error
 }
 
 //*****************************************************************************
@@ -2389,7 +2389,7 @@ BOOL GetTargetDirectoryAux(HWND parent, HWND hCenterWindow,
     __except (EXCEPTION_EXECUTE_HANDLER)
     {
         GTDExceptionHasOccured++;
-        return FALSE; // chyba
+        return FALSE; // error
     }
 }
 
@@ -2414,7 +2414,7 @@ void ResolveNetHoodPath(char* path)
                                             NULL));
         if (hFile != INVALID_HANDLE_VALUE)
         {
-            if (GetFileSize(hFile, NULL) <= 1000) // zatim vsechny meli 92 bytu, takze 1000 bytu by melo bohate stacit
+            if (GetFileSize(hFile, NULL) <= 1000) // so far all had 92 bytes, so 1000 bytes should be more than enough
             {
                 char buf[1000];
                 DWORD read;
@@ -2897,7 +2897,7 @@ BOOL GetSHObjectName(ITEMIDLIST* pidl, DWORD flags, char* name, int nameSize, IM
         else
             TRACE_E("GetSHObjectName(): unable to get Desktop folder");
 
-        // oprava seznamu ('pidl') do puvodni velikosti
+        // restore list ('pidl') to original size
         lastID->mkid.cb = lastCB;
     }
     else

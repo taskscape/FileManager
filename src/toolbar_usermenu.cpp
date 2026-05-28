@@ -372,10 +372,10 @@ public:
                     char tmp[MAX_PATH];
                     BOOL shell = FALSE;
 
-                    // zmenil jsem metodu CMainWindow::UserMenu tak, ze pokud nespousti pres Shell,
+                    // changed CMainWindow::UserMenu so that if it does not launch through Shell,
                     // vola ShellExecuteEx misto CreateProcess; proto uz nejsou potreba uvozovky
                     /*
-            // pokud se nejedna o spustitelny soubor (.exe, .com, .bat, .pif),
+            // if this is not an executable file (.exe, .com, .bat, .pif),
             // soupnu nazev do uvozovek a spustim ho pres shell
             char *dot = strrchr(buff, '.');
             if (dot != NULL && *(dot + 1) != 0)
@@ -397,7 +397,7 @@ public:
             }
 */
 
-                    // pokud je v ceste znak $, musim ho nahradit $$
+                    // if the path contains $, replace it with $$
                     strcpy(tmp, buff);
                     char* iterS = tmp;
                     char* iterT = buff;
@@ -445,7 +445,7 @@ public:
                         CUserMenuIconDataArr* bkgndReaderData = new CUserMenuIconDataArr();
                         for (int i2 = 0; i2 < MainWindow->UserMenuItems->Count; i2++)
                             MainWindow->UserMenuItems->At(i2)->GetIconHandle(bkgndReaderData, FALSE);
-                        UserMenuIconBkgndReader.StartBkgndReadingIcons(bkgndReaderData); // POZOR: uvolni 'bkgndReaderData'
+                        UserMenuIconBkgndReader.StartBkgndReadingIcons(bkgndReaderData); // CAUTION: releases 'bkgndReaderData'
                     }
 
                     MainWindow->UMToolBar->CreateButtons();
@@ -514,7 +514,7 @@ CUserMenuBar::CUserMenuBar(HWND hNotifyWindow, CObjectOrigin origin)
     SetStyle(TLB_STYLE_IMAGE | (Configuration.UserMenuToolbarLabels ? TLB_STYLE_TEXT : 0));
 
     // naleju ikonky do vlastni toolbary
-    // vlozim pouze itemy a submenu z nejvyssi urovne; ostatni se bude rozbalovat jako submenu
+    // insert only top-level items and submenus; the rest will expand as submenu
     int level = 0;
     TLBI_ITEM_INFO2 tii;
     int i;

@@ -3,8 +3,8 @@
 
 #pragma once
 
-#define USRMNUARGS_MAXLEN 32772    // velikost bufferu (+1 proti maximalni delce stringu) (=32776 (Vista/Win7 pres .bat) - 5 ("C:\\a ") + 1)
-#define USRMNUCMDLINE_MAXLEN 32777 // velikost bufferu (+1 proti maximalni delce stringu)
+#define USRMNUARGS_MAXLEN 32772    // buffer size (+1 against maximum string length) (=32776 (Vista/Win7 through .bat) - 5 ("C:\\a ") + 1)
+#define USRMNUCMDLINE_MAXLEN 32777 // buffer size (+1 against maximum string length)
 
 //****************************************************************************
 //
@@ -13,11 +13,11 @@
 
 struct CUserMenuIconData
 {
-    char FileName[MAX_PATH];  // jmeno souboru, ze ktereho mame cist ikonu z indexu IconIndex (pres ExtractIconEx())
-    DWORD IconIndex;          // viz komentar k FileName
-    char UMCommand[MAX_PATH]; // jmeno souboru, ze ktereho mame cist ikonu (pres GetFileOrPathIconAux())
+    char FileName[MAX_PATH];  // file name from which to read the icon at index IconIndex (via ExtractIconEx())
+    DWORD IconIndex;          // see comment for FileName
+    char UMCommand[MAX_PATH]; // file name from which to read the icon (via GetFileOrPathIconAux())
 
-    HICON LoadedIcon; // NULL = nenactena ikona, jinak handle nactene ikony
+    HICON LoadedIcon; // NULL = icon not loaded, otherwise loaded icon handle
 
     CUserMenuIconData(const char* fileName, DWORD iconIndex, const char* umCommand);
     ~CUserMenuIconData();
@@ -28,7 +28,7 @@ struct CUserMenuIconData
 class CUserMenuIconDataArr : public TIndirectArray<CUserMenuIconData>
 {
 protected:
-    DWORD IRThreadID; // unikatni ID threadu pro nacitani techto ikon
+    DWORD IRThreadID; // unique thread ID for loading these icons
 
 public:
     CUserMenuIconDataArr() : TIndirectArray<CUserMenuIconData>(50, 50) { IRThreadID = 0; }
@@ -42,45 +42,45 @@ public:
 class CUserMenuIconBkgndReader
 {
 protected:
-    BOOL SysColorsChanged; // pomocna promenna pro zjisteni zmeny systemovych barev od okamziku otevreni cfg dialogu
+    BOOL SysColorsChanged; // helper variable for detecting system color changes since opening the cfg dialog
 
-    CRITICAL_SECTION CS;       // sekce pro pristup k datum objektu
-    DWORD IconReaderThreadUID; // generator unikatnich ID threadu pro cteni ikon
-    BOOL CurIRThreadIDIsValid; // TRUE = thread bezi a CurIRThreadID je platne
-    DWORD CurIRThreadID;       // unikatni ID threadu (viz IconReaderThreadUID), ve kterem se ctou ikony pro aktualni verzi user-menu
-    BOOL AlreadyStopped;       // TRUE = uz zadne cteni ikon, hlavni okno se zavrelo/zavira
+    CRITICAL_SECTION CS;       // section for access to object data
+    DWORD IconReaderThreadUID; // generator of unique thread IDs for reading icons
+    BOOL CurIRThreadIDIsValid; // TRUE = thread is running and CurIRThreadID is valid
+    DWORD CurIRThreadID;       // unique thread ID (see IconReaderThreadUID), in which icons for the current user-menu version are read
+    BOOL AlreadyStopped;       // TRUE = no more icon reading, main window has closed/is closing
 
-    int UserMenuIconsInUse;                            // > 0: ikony z user menu jsou prave v otevrenem menu, nemuzeme je hned updatnout na nove ikony; muze byt nejvys 2 (cfg Salama + Find: user menu)
-    CUserMenuIconDataArr* UserMenuIIU_BkgndReaderData; // uschovna novych ikon pri UserMenuIconsInUse > 0
-    DWORD UserMenuIIU_ThreadID;                        // uschovna ID threadu (pro zjisteni aktualnosti dat) pri UserMenuIconsInUse > 0
+    int UserMenuIconsInUse;                            // > 0: icons from user menu are currently in an open menu, cannot update to new icons immediately; can be at most 2 (Salam cfg + Find: user menu)
+    CUserMenuIconDataArr* UserMenuIIU_BkgndReaderData; // storage for new icons when UserMenuIconsInUse > 0
+    DWORD UserMenuIIU_ThreadID;                        // thread ID storage (for checking data freshness) when UserMenuIconsInUse > 0
 
 public:
     CUserMenuIconBkgndReader();
     ~CUserMenuIconBkgndReader();
 
-    // hlavni okno se zavira = uz nechceme prijimat zadna data o ikonach v user menu
+    // main window is closing = we no longer want to receive any user menu icon data
     void EndProcessing();
 
-    // POZOR: uvnitr se dealokuje 'bkgndReaderData'
+    // CAUTION: 'bkgndReaderData' is deallocated inside.
     void StartBkgndReadingIcons(CUserMenuIconDataArr* bkgndReaderData);
 
     BOOL IsCurrentIRThreadID(DWORD threadID);
 
     BOOL IsReadingIcons();
 
-    // POZOR: po volani teto funkce je za uvolneni 'bkgndReaderData' zodpovedny tento objekt
+    // CAUTION: after calling this function, this object is responsible for releasing 'bkgndReaderData'.
     void ReadingFinished(DWORD threadID, CUserMenuIconDataArr* bkgndReaderData);
 
-    // vstup/vystup do sekce, kde se pouzivaji ikony z user menu a tedy neni je mozne
-    // behem provadeni teto sekce updatit (hlavne jde o otevreni user menu)
+    // Enter/leave section where icons from user menu are used and therefore cannot be
+    // updated while this section is running (mainly opening user menu).
     void BeginUserMenuIconsInUse();
     void EndUserMenuIconsInUse();
 
-    // pokud se nacetly ikony pro jiz neaktualni user menu, vraci FALSE, jinak:
-    // pokud jsou ikony prave v otevrenem menu (viz UserMenuIconsInUse), vraci FALSE;
-    // pokud nejsou ikony prave v otevrenem menu, vraci TRUE a POZOR: neopusti CS,
-    // aby byl blokovany pristup z ostatnich threadu (hlavne pristup k user menu z threadu
-    // Findu), pro vystup z CS po updatu ikon se pouziva LeaveCSAfterUMIconsUpdate()
+    // If icons were loaded for an already obsolete user menu, returns FALSE, otherwise:
+    // if icons are currently in an open menu (see UserMenuIconsInUse), returns FALSE;
+    // if icons are not currently in an open menu, returns TRUE and CAUTION: does not leave CS,
+    // so access from other threads is blocked (mainly access to user menu from the Find thread);
+    // LeaveCSAfterUMIconsUpdate() is used to leave CS after updating icons.
     BOOL EnterCSIfCanUpdateUMIcons(CUserMenuIconDataArr** bkgndReaderData, DWORD threadID);
     void LeaveCSAfterUMIconsUpdate();
 
@@ -98,10 +98,10 @@ extern CUserMenuIconBkgndReader UserMenuIconBkgndReader;
 
 enum CUserMenuItemType
 {
-    umitItem,         // klasicka polozka
-    umitSubmenuBegin, // oznacuje zacatek popupu
-    umitSubmenuEnd,   // oznacuje konec popupu
-    umitSeparator     // oznacuje konec popupu
+    umitItem,         // classic item
+    umitSubmenuBegin, // marks popup start
+    umitSubmenuEnd,   // marks popup end
+    umitSeparator     // marks popup end
 };
 
 struct CUserMenuItem
@@ -131,17 +131,17 @@ struct CUserMenuItem
 
     ~CUserMenuItem();
 
-    // pokusi se vytahnout handle ikony v tomto poradi
-    // a) promenne Icon
+    // Tries to get the icon handle in this order:
+    // a) Icon variable
     // b) SHGetFileInfo
-    // c) veme default ze systemu
-    // cteni ikon na pozadi: je-li 'bkgndReaderData' NULL, cteme hned, jinak se ikony
-    // ctou na pozadi - je-li 'getIconsFromReader' FALSE, sbirame do 'bkgndReaderData',
-    // co nacist, je-li TRUE, ikony uz jsou nactene a jen prevezmeme handly nactenych
-    // ikon z 'bkgndReaderData'
+    // c) take default from the system
+    // background icon reading: if 'bkgndReaderData' is NULL, read immediately, otherwise icons
+    // are read in the background - if 'getIconsFromReader' is FALSE, collect what to load into
+    // 'bkgndReaderData'; if TRUE, icons are already loaded and we only take handles of loaded
+    // icons from 'bkgndReaderData'.
     BOOL GetIconHandle(CUserMenuIconDataArr* bkgndReaderData, BOOL getIconsFromReader);
 
-    // prohleda ItemName na & a vrati HotKey a TRUE kdyz ji najde
+    // Searches ItemName for & and returns HotKey and TRUE when found.
     BOOL GetHotKey(char* key);
 
     BOOL Set(char* name, char* umCommand, char* arguments, char* initDir, char* icon);
@@ -161,10 +161,10 @@ public:
     CUserMenuItems(DWORD base, DWORD delta, CDeleteType dt = dtDelete)
         : TIndirectArray<CUserMenuItem>(base, delta, dt) {}
 
-    // nakopci seznam ze 'source'
+    // Copies the list from 'source'.
     BOOL LoadUMI(CUserMenuItems& source, BOOL readNewIconsOnBkgnd);
 
-    // hleda posledni (zaviraci) polozku submenu adresovaneho promennou 'index'
-    // pokud ukonecni nenajde, vrati -1
+    // Searches for the last (closing) item of the submenu addressed by variable 'index'.
+    // If the terminator is not found, returns -1.
     int GetSubmenuEndIndex(int index);
 };

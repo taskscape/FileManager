@@ -87,7 +87,7 @@ try_again:
         !Read(&PEHead, sizeof(IMAGE_FILE_HEADER)) ||
         !Read(&OptHead, OPTHEAD_SIZE) ||
         !Read(OptHead.DataDirectory, OptHead.NumberOfRvaAndSizes * sizeof(IMAGE_DATA_DIRECTORY)) ||
-        OptHead.NumberOfRvaAndSizes <= IMAGE_DIRECTORY_ENTRY_RESOURCE) //zkontrolujeme jestli mame ressource dir
+        OptHead.NumberOfRvaAndSizes <= IMAGE_DIRECTORY_ENTRY_RESOURCE) // check whether we have resource dir
     {
         if (lastError == ERROR_INVALID_HANDLE && ++num_of_retries <= 10)
         {

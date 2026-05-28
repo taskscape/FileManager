@@ -5,16 +5,16 @@
 
 //******************************************************************************
 //
-// metody tridy CResEdit nahrazuji API funkce BeginUpdateResource, UpdateResource, EndUpdateResource
+// CResEdit class methods replace API functions BeginUpdateResource, UpdateResource, EndUpdateResource
 //
 // what is not yet handled:
 // - .rsrc section must exist in exe
 // - .rsrc section can only be at end of PE file, if not (e.g. in debug version of exe)
-//  dojde k prepsani zbytku exace
+//  the rest of the executable will be overwritten
 // -cannot delete resource from exe (in API this can be done by passing NULL value to 'lpData' parameter to
-//  funkce UpdateResource)
+//  UpdateResource function)
 // -cannot determine error more closely, all three methods do not set last error and in case of error
-//  vraceji pouze FALSE
+//  only return FALSE
 
 class CResEditRoot
 {

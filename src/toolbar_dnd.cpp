@@ -49,7 +49,7 @@ void CTBCustomizeDialog::DestroyItems()
     }
 }
 
-// naplni Items pole vsema tlacitkama, ktere muze toolbar obsahovat
+// Fills the Items array with all buttons the toolbar can contain.
 BOOL CTBCustomizeDialog::EnumButtons()
 {
     CALL_STACK_MESSAGE1("CTBCustomizeDialog::EnumButtons()");
@@ -140,7 +140,7 @@ void CTBCustomizeDialog::FillLists()
     SendMessage(HCurrentLB, LB_RESETCONTENT, 0, 0);
     int i;
     for (i = 0; i < AllItems.Count; i++)
-        if (i == 0 || !PresentInToolBar(AllItems[i].ID)) // pokud se nejedna o virtualni separator, kontrolujeme pritomnost v toolbare
+        if (i == 0 || !PresentInToolBar(AllItems[i].ID)) // if this is not a virtual separator, check toolbar presence
         {
             int ret = (int)SendMessage(HAvailableLB, LB_ADDSTRING, 0, 1); // 1 je dumy hodnota, obchazime chybu WinXP
             if (ret != LB_ERR)
@@ -203,7 +203,7 @@ void CTBCustomizeDialog::OnAdd()
             if (aIndex >= aCount - 1)
                 aIndex = aCount - 2;
         }
-        // fix: pokud byl seznam odrolovan dolu a odebiraly se polozky zespodu,
+        // fix: if the list was scrolled down and items were removed from the bottom,
         // zmensoval se scrollbar, ale neupravoval se topindex
         SendMessage(HAvailableLB, LB_SETCURSEL, 0, 0);
         SendMessage(HAvailableLB, LB_SETCURSEL, aIndex, 0);
@@ -229,7 +229,7 @@ void CTBCustomizeDialog::OnRemove()
         int data = (int)SendMessage(HCurrentLB, LB_GETITEMDATA, cIndex, 0);
         SendMessage(HCurrentLB, WM_SETREDRAW, FALSE, 0);
         SendMessage(HCurrentLB, LB_DELETESTRING, cIndex, 0);
-        // fix: pokud byl seznam odrolovan dolu a odebiraly se polozky zespodu,
+        // fix: if the list was scrolled down and items were removed from the bottom,
         // zmensoval se scrollbar, ale neupravoval se topindex
         SendMessage(HCurrentLB, LB_SETCURSEL, 0, 0);
         SendMessage(HCurrentLB, LB_SETCURSEL, cIndex, 0);

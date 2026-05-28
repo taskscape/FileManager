@@ -2592,13 +2592,13 @@ public:
     //   - "{!}director{y|1|ies}": for parameter values from 0 to 1 resulting string will be
     //     "directory" and for parameter values from 2 to infinity (2^64-1) resulting string
     //     will be "directories"
-    //   - "{!}%d soubor{u|0||1|y|4|u} a %d adresar{u|0||1|e|4|u}": it needs two parameters
+    //   - "{!}%d file{s|0||1|s|4|s} and %d director{y|1|ies}": it needs two parameters
     //     because there are two dependent texts in curly brackets, resulting string for
     //     choosen pairs of parameters (I believe it is not needed to show all possible variants):
-    //       0, 0: "%d souboru a %d adresaru"
-    //       1, 12: "%d soubor a %d adresaru"
-    //       3, 4: "%d soubory a %d adresare"
-    //       13, 1: "%d souboru a %d adresar"
+    //       0, 0: "%d files and %d directories"
+    //       1, 12: "%d file and %d directories"
+    //       3, 4: "%d files and %d directories"
+    //       13, 1: "%d files and %d directory"
     //
     // method can be called from any thread
     virtual int WINAPI ExpandPluralString(char* buffer, int bufferSize, const char* format,

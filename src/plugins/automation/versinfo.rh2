@@ -18,7 +18,7 @@
 
 #define VERSINFO_MAJOR       1
 #define VERSINFO_MINORA      7
-#define VERSINFO_MINORB      0  // POZOR: tady musi byt 0, jinak vyleti assert pri buildu
+#define VERSINFO_MINORB      0  // CAUTION: this must be 0, otherwise an assert triggers during build
 
 #include "spl_vers.h" // get version and build numbers
 

@@ -8,8 +8,8 @@ class CFilesWindow;
 extern HANDLE RefreshFinishedEvent;
 extern int SnooperSuspended;
 
-void AddDirectory(CFilesWindow* win, const char* path, BOOL registerDevNotification);                           // novy adresar pro cmuchala
-void ChangeDirectory(CFilesWindow* win, const char* newPath, BOOL registerDevNotification);                     // zmena zadaneho adresare
+void AddDirectory(CFilesWindow* win, const char* path, BOOL registerDevNotification);                           // new directory for snooper
+void ChangeDirectory(CFilesWindow* win, const char* newPath, BOOL registerDevNotification);                     // change of the specified directory
 void DetachDirectory(CFilesWindow* win, BOOL waitForHandleClosure = FALSE, BOOL closeDevNotifification = TRUE); // uz neni treba cmuchat
 
 BOOL InitializeThread();

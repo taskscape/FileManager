@@ -355,50 +355,50 @@ protected:
 class CAnimate: public CWindow
 {
   protected:
-    HBITMAP          HBitmap;             // bitmapa ze ktere tahame jednotliva policka animace
-    int              FramesCount;         // pocet policek v bitmape
-    int              FirstLoopFrame;      // pokud jedeme ve smycce, z konce prechazime na toto policko
-    SIZE             FrameSize;           // rozmer policka v bodech
-    CRITICAL_SECTION GDICriticalSection;  // kriticka sekce pro pristup ke GDI prostredkum
-    CRITICAL_SECTION DataCriticalSection; // kriticka sekce pro pristup k datum
+    HBITMAP          HBitmap;             // bitmap from which we take individual animation frames
+    int              FramesCount;         // number of frames in the bitmap
+    int              FirstLoopFrame;      // if looping, jump from the end back to this frame
+    SIZE             FrameSize;           // frame size in points
+    CRITICAL_SECTION GDICriticalSection;  // critical section for accessing GDI resources
+    CRITICAL_SECTION DataCriticalSection; // critical section for accessing data
     HANDLE           HThread;
-    HANDLE           HRunEvent;           // pokud je signed, animacni thread bezi
-    HANDLE           HTerminateEvent;     // pokud je signed, thread se ukonci
+    HANDLE           HRunEvent;           // if signaled, the animation thread is running
+    HANDLE           HTerminateEvent;     // if signaled, the thread terminates
     COLORREF         BkColor;
 
-    // ridici promenne, prijdou ke slovu kdyz HRunEvent signed
-    BOOL             SleepThread;         // thread se ma uspat, HRunEvent bude resetnut
+    // Control variables used when HRunEvent is signaled.
+    BOOL             SleepThread;         // the thread should sleep, HRunEvent will be reset
 
-    int              CurrentFrame;        // zero-based index prave zobrazeneho policka
+    int              CurrentFrame;        // zero-based index of the currently displayed frame
     int              NestedCount;
-    BOOL             MouseIsTracked;      // instalovali jsme hlidani opusteni mysi
+    BOOL             MouseIsTracked;      // mouse-leave tracking is installed
 
   public:
-    // 'hBitmap'          je bitmapa ze ktere vykreslujeme policka pri animaci; 
-    //                    policka musi byt pod sebou a musi mit konstantni vysku
-    // 'framesCount'      udava celkovy pocet policek v bitmape
-    // 'firstLoopFrame'   zero-based index policka, kam se pri cyklicke
-    //                    animaci vracime po dosazeni konce
+    // 'hBitmap'          is the bitmap from which animation frames are drawn;
+    //                    frames must be stacked vertically and have a constant height
+    // 'framesCount'      specifies the total number of frames in the bitmap
+    // 'firstLoopFrame'   zero-based frame index to return to after reaching the end
+    //                    during cyclic animation
     CAnimate(HBITMAP hBitmap, int framesCount, int firstLoopFrame, COLORREF bkColor, CObjectOrigin origin = ooAllocated);
-    BOOL IsGood();                // dopadnul dobre konstruktor?
+    BOOL IsGood();                // did the constructor succeed?
 
-    void Start();                 // pokud neanimujeme, zacneme
-    void Stop();                  // zastavi animaci a zobrazi uvodni policko
-    void GetFrameSize(SIZE *sz);  // vraci rozmer v bodech potrebny pro zobrazeni policka
+    void Start();                 // if not animating, start
+    void Stop();                  // stops animation and displays the initial frame
+    void GetFrameSize(SIZE *sz);  // returns the size in points needed to display the frame
 
   protected:
     virtual LRESULT WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam);
 
-    void Paint(HDC hdc = NULL);   // zobraz soucasne policko; pokud je hdc NULL, vytahni si DC okna
-    void FirstFrame();            // nastav Frame na uvodni policko
-    void NextFrame();             // nastav Frame na dalsi policko; preskakuj uvodni sekvenci
+    void Paint(HDC hdc = NULL);   // display the current frame; if hdc is NULL, obtain the window DC
+    void FirstFrame();            // set Frame to the initial frame
+    void NextFrame();             // set Frame to the next frame; skip the initial sequence
 
-    // tela threadu
+    // thread bodies
     static unsigned ThreadF(void *param);
     static unsigned AuxThreadEH(void *param);
     static DWORD WINAPI AuxThreadF(void *param);
 
-    // ThreadF bude friend, aby mohl pristupovat na nase data
+    // ThreadF is a friend so it can access our data
     friend static unsigned ThreadF(void *param);
 };
 */

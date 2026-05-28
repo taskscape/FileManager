@@ -8,7 +8,7 @@ void ReleaseShellIconOverlays();
 
 struct CSQLite3DynLoadBase
 {
-    BOOL OK; // TRUE pokud je SQLite3 uspesne nahrany a pripraveny k pouziti
+    BOOL OK; // TRUE if SQLite3 is loaded successfully and ready to use
     HINSTANCE SQLite3DLL;
 
     CSQLite3DynLoadBase()
@@ -25,11 +25,11 @@ struct CSQLite3DynLoadBase
 
 struct CShellIconOverlayItem
 {
-    char IconOverlayName[MAX_PATH];          // jmeno klice pod HKEY_LOCAL_MACHINE\Software\Microsoft\Windows\CurrentVersion\Explorer\ShellIconOverlayIdentifiers
-    IShellIconOverlayIdentifier* Identifier; // objekt IShellIconOverlayIdentifier, POZOR: da se pouzit jen v hlavnim threadu
-    CLSID IconOverlayIdCLSID;                // CLSID prislusneho objektu IShellIconOverlayIdentifier
-    int Priority;                            // priorita tohoto icon-overlaye (0-100, nejvyssi priorita je nula)
-    HICON IconOverlay[ICONSIZE_COUNT];       // icon-overlay ve vsech velikostech
+    char IconOverlayName[MAX_PATH];          // key name under HKEY_LOCAL_MACHINE\Software\Microsoft\Windows\CurrentVersion\Explorer\ShellIconOverlayIdentifiers
+    IShellIconOverlayIdentifier* Identifier; // IShellIconOverlayIdentifier object, CAUTION: can be used only in the main thread
+    CLSID IconOverlayIdCLSID;                // CLSID of the corresponding IShellIconOverlayIdentifier object
+    int Priority;                            // priority of this icon-overlay (0-100, highest priority is zero)
+    HICON IconOverlay[ICONSIZE_COUNT];       // icon-overlay in all sizes
     BOOL GoogleDriveOverlay;                 // TRUE = Google Drive handler (pada jim to, resime extra synchronizaci)
 
     void Cleanup();
@@ -41,12 +41,12 @@ struct CShellIconOverlayItem
 class CShellIconOverlays
 {
 protected:
-    TIndirectArray<CShellIconOverlayItem> Overlays; // prioritne serazeny seznam icon-overlays
-    CRITICAL_SECTION GD_CS;                         // pro GoogleDrive je potreba vzajemne vyloucit volani IsMemberOf z obou icon-readeru (jinak pada, corruptej si heap)
-    BOOL GetGDAlreadyCalled;                        // TRUE = uz se zjistovalo, kde je slozka pro Google Drive
-    char GoogleDrivePath[MAX_PATH];                 // slozka pro Google Drive (jinde jejich handler nezavolame, je nechutne pomaly a bez pridane synchronizace pada)
-    BOOL GoogleDrivePathIsFromCfg;                  // je slozka pro Google Drive vytazena z konfigurace Google Drive (FALSE = muze byt jen defaultni + Google Drive vubec nemusi byt instalovany)
-    BOOL GoogleDrivePathExists;                     // existuje na disku slozka pro Google Drive?
+    TIndirectArray<CShellIconOverlayItem> Overlays; // priority-sorted list of icon-overlays
+    CRITICAL_SECTION GD_CS;                         // for GoogleDrive, mutually exclude IsMemberOf calls from both icon-readers (otherwise it crashes and corrupts heap)
+    BOOL GetGDAlreadyCalled;                        // TRUE = already checked where the Google Drive folder is
+    char GoogleDrivePath[MAX_PATH];                 // Google Drive folder (do not call their handler elsewhere; it is very slow and crashes without added synchronization)
+    BOOL GoogleDrivePathIsFromCfg;                  // is the Google Drive folder taken from Google Drive configuration (FALSE = may be only default + Google Drive may not be installed at all)
+    BOOL GoogleDrivePathExists;                     // does the Google Drive folder exist on disk?
 
 public:
     CShellIconOverlays() : Overlays(1, 5)
@@ -59,20 +59,20 @@ public:
     }
     ~CShellIconOverlays() { HANDLES(DeleteCriticalSection(&GD_CS)); }
 
-    // prida (drive se chybne zarazovano podle 'priority') 'item' do pole
+    // Adds 'item' to the array (previously sorted incorrectly by 'priority').
     BOOL Add(CShellIconOverlayItem* item /*, int priority*/);
 
-    // uvolni vsechny icon-overlays
+    // Releases all icon-overlays.
     void Release() { Overlays.Destroy(); }
 
-    // alokuje pole objektu IShellIconOverlayIdentifier pro volajici thread (pouzivame COM v
-    // STA threading modelu, takze objekt musi byt vytvoren a pouzivan jen v jedinem threadu)
+    // Allocates an array of IShellIconOverlayIdentifier objects for the calling thread (we use COM in
+    // STA threading model, so the object must be created and used in only one thread).
     IShellIconOverlayIdentifier** CreateIconReadersIconOverlayIds();
 
-    // uvolni pole objektu IShellIconOverlayIdentifier
+    // Releases the array of IShellIconOverlayIdentifier objects.
     void ReleaseIconReadersIconOverlayIds(IShellIconOverlayIdentifier** iconReadersIconOverlayIds);
 
-    // vraci icon-overlay index pro soubor/adresar "wPath+name"
+    // Returns icon-overlay index for file/directory "wPath+name".
     DWORD GetIconOverlayIndex(WCHAR* wPath, WCHAR* wName, char* aPath, char* aName, char* name,
                               DWORD fileAttrs, int minPriority,
                               IShellIconOverlayIdentifier** iconReadersIconOverlayIds,
@@ -83,13 +83,13 @@ public:
         return Overlays[iconOverlayIndex]->IconOverlay[iconSize];
     }
 
-    // vola se pri zmene barevne hloubky displaye, vsechny ikonky overlayu se musi nacist znovu
-    // POZOR: mozne volat jen z hl. threadu
+    // Called when display color depth changes, all overlay icons must be loaded again.
+    // CAUTION: can be called only from the main thread.
     void ColorsChanged();
 
-    // pokud jsme to jeste nedelali, zjistime kde Google Drive bydli; 'sqlite3_Dyn_InOut'
-    // slouzi jako cache pro sqlite.dll (pokud uz je loadle, pouzijeme ho + pokud se loadne
-    // v teto funkci, vracime ho)
+    // If we have not done it yet, find where Google Drive lives; 'sqlite3_Dyn_InOut'
+    // serves as a cache for sqlite.dll (if it is already loaded, use it + if it is loaded
+    // in this function, return it).
     void InitGoogleDrivePath(CSQLite3DynLoadBase** sqlite3_Dyn_InOut, BOOL debugTestOverlays);
 
     BOOL HasGoogleDrivePath();
@@ -110,11 +110,11 @@ public:
     BOOL IsGoogleDrivePath(const char* path) { return GoogleDrivePath[0] != 0 && SalPathIsPrefix(GoogleDrivePath, path); }
 };
 
-struct CShellIconOverlayItem2 // jen seznam icon overlay handleru (pro konfiguracni dialog, stranku Icon Overlays)
+struct CShellIconOverlayItem2 // only list of icon overlay handlers (for configuration dialog, Icon Overlays page)
 {
-    char IconOverlayName[MAX_PATH];  // jmeno klice pod HKEY_LOCAL_MACHINE\Software\Microsoft\Windows\CurrentVersion\Explorer\ShellIconOverlayIdentifiers
-    char IconOverlayDescr[MAX_PATH]; // popis COM objektu icon overlay handleru
+    char IconOverlayName[MAX_PATH];  // key name under HKEY_LOCAL_MACHINE\Software\Microsoft\Windows\CurrentVersion\Explorer\ShellIconOverlayIdentifiers
+    char IconOverlayDescr[MAX_PATH]; // description of icon overlay handler COM object
 };
 
-extern CShellIconOverlays ShellIconOverlays;                           // pole vsech dostupnych icon-overlays
-extern TIndirectArray<CShellIconOverlayItem2> ListOfShellIconOverlays; // seznam vsech icon overlay handleru
+extern CShellIconOverlays ShellIconOverlays;                           // array of all available icon-overlays
+extern TIndirectArray<CShellIconOverlayItem2> ListOfShellIconOverlays; // list of all icon overlay handlers

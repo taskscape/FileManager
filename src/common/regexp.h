@@ -123,24 +123,24 @@ public:
     int SearchBackward(int length, int& foundLen);
 
     // replaces variables \1 ... \9 with text captured by corresponding parentheses
-    // 'pattern' je vzor kterym se nahrazuje nalezeny match, 'buffer' buffer
+    // 'pattern' is the pattern used to replace the found match, 'buffer' is the buffer
     // for output, 'bufSize' maximum text size including terminating NULL
-    // znaku, v promnene 'count' vraci pocet znaku zkopirovanych do bufferu
-    // vraci TRUE pokud se vyraz vesel cely do bufferu
+    // character; returns the number of characters copied to the buffer in 'count'
+    // returns TRUE if the whole expression fit into the buffer
     BOOL ExpandVariables(char* pattern, char* buffer,
                          int bufSize, int* count);
 
-    // navratove hodnoty
+    // Return values
     //
-    // 0 hledany text nebyl nalezen, do 'buffer' se nic nekopirovalo
-    // 1 text byl uspesne nahrazen
-    // 2 'buffer' je prilis maly
+    // 0 searched text was not found, nothing was copied to 'buffer'
+    // 1 text was replaced successfully
+    // 2 'buffer' is too small
     int ReplaceForward(int start, char* pattern, BOOL global,
                        char* buffer, int bufSize);
 
 protected:
-    // Obraci regularni vyraz - pro hledani od zadu
-    // VYRAZ MUSI BYT SYNTAKTICKY SPRAVNY ! JINAK NEFUNGUJE SPRAVNE !
-    // napr. "a)b(d)(" -> "((d)b)a" coz je chybne
+    // Reverses the regular expression for backward searching.
+    // THE EXPRESSION MUST BE SYNTACTICALLY CORRECT! OTHERWISE IT DOES NOT WORK CORRECTLY!
+    // e.g. "a)b(d)(" -> "((d)b)a", which is wrong
     void ReverseRegExp(char*& dstExpEnd, char* srcExp, char* srcExpEnd);
 };

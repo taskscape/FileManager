@@ -11,7 +11,7 @@
 
 #define MAX_LOADSTRING 100
 
-#define NOHANDLES(function) function // obrana proti zanaseni maker HANDLES do zdrojaku pomoci CheckHnd
+#define NOHANDLES(function) function // prevents CheckHnd from injecting HANDLES macros into the source
 
 // aby nedochazelo k problemum se stredniky v nize nadefinovanych makrech
 inline void __TraceEmptyFunction() {}
@@ -259,7 +259,7 @@ BOOL GetStringSid(LPTSTR* stringSid)
         return FALSE;
     }
 
-    // volajici musi uvolnit vracenou pamet pomoci LocalFree, viz MSDN
+    // The caller must free the returned memory with LocalFree, see MSDN.
     ConvertSidToStringSid(pTokenUser->User.Sid, stringSid);
 
     free(pTokenUser);
@@ -362,9 +362,9 @@ BOOL GetSidMD5(BYTE* sidMD5)
 */
 
 /*
-// podle http://forums.microsoft.com/msdn/ShowPost.aspx?PostID=748596&SiteID=1
-// by se pod vistou mel nastavit integrity level, ale nedokazal jsem problem na Viste/Serveru2008 navodit
-// takze zatim nechavam pouze v komentari, dokud na to nenarazime
+// According to http://forums.microsoft.com/msdn/ShowPost.aspx?PostID=748596&SiteID=1
+// the integrity level should be set under Vista, but I could not reproduce the problem on Vista/Server 2008
+// so for now I am leaving it only in the comment until we run into it
 //
 // Windows Integrity Mechanism Design
 // http://msdn.microsoft.com/en-us/library/bb625963.aspx
@@ -457,9 +457,9 @@ ErrorExit:
 
 //****************************************************************************
 //
-// GetProcessIntegrityLevel (vytazeno z MSDN)
-// V pripade uspechu vrati TRUE a naplni DWORD na ktery odkazuje 'integrityLevel'
-// jinak (pri selhani nebo pod OS strasima nez Vista) vrati FALSE
+// GetProcessIntegrityLevel (taken from MSDN)
+// On success returns TRUE and fills the DWORD referenced by 'integrityLevel'.
+// Otherwise (on failure or on OS versions older than Vista) returns FALSE.
 //
 
 #define SECURITY_MANDATORY_UNTRUSTED_RID (0x00000000L)

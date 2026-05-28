@@ -5,13 +5,13 @@
 
 // ****************************************************************************
 
-HINSTANCE DLLInstance = NULL; // handle k SPL-ku - jazykove nezavisle resourcy
-HINSTANCE HLanguage = NULL;   // handle k SLG-cku - jazykove zavisle resourcy
+HINSTANCE DLLInstance = NULL; // handle to SPL - language-independent resources
+HINSTANCE HLanguage = NULL;   // handle to SLG - language-dependent resources
 BOOL WindowsVistaAndLater;    // Windows Vista or later from NT family (6.0+)
 BOOL WindowsXP64AndLater;     // Windows XP 64, Vista or later (5.2+)
 
-// rozhrani Open Salamandera - platna od volani InitUtils() az do
-// ukonceni pluginu
+// Open Salamander interfaces - valid from InitUtils() call until
+// plugin termination
 CSalamanderGeneralAbstract* SG = NULL;
 CSalamanderGUIAbstract* SalGUI = NULL;
 

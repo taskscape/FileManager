@@ -79,7 +79,7 @@ BOOL CShrinkImage::Alloc(DWORD origWidth, DWORD origHeight,
     // preskocime koeficient pro prvni radek
     YCoeff++;
 
-    // pokud jedem odspodu, musime zacit poslednim radkem
+    // if processing from the bottom, start with the last row
     if (!ProcessTopDown)
         OutLine = outBuff + newWidth * (newHeight - 1);
     else
@@ -117,13 +117,13 @@ CShrinkImage::CreateCoeff(DWORD origLen, WORD newLen, DWORD& norm)
         sum += origLen;
         // vypocet pixelu, kterym prochazi nova hranice
         boundary = sum / newLen;
-        // kolik z predesle hranice bude v leve casti teto sekce
+        // how much of the previous boundary will be in the left part of this section
         lCoeff = norm - rCoeff;
         // a nakonec vaha pixelu u praveho okraje sekce
         modulo = sum % newLen;
         if (modulo == 0)
         {
-            // pokud nam hranice prochazi mezi pixely, uprednostnime levy pixel
+            // if the boundary passes between pixels, prefer the left pixel
             boundary--;
             rCoeff = norm;
         }
@@ -148,7 +148,7 @@ void CShrinkImage::ProcessRows(DWORD* inBuff, DWORD rowCount)
     BYTE r, g, b;
     DWORD rgb;
 
-    // jedem pres vsechny radky
+    // process all rows
     DWORD y;
     for (y = Y; y < Y + rowCount; y++)
     {
@@ -164,7 +164,7 @@ void CShrinkImage::ProcessRows(DWORD* inBuff, DWORD rowCount)
         xCoeff = *ptrXCoeff++;
 
         x2 = 0;
-        // rozdeleni podle polohy radku v sekci (stredni nebo posledni)
+        // split by row position in the section (middle or last)
         if (y == YBndr)
         {
             // vytahneme koeficient pro posledni radek
@@ -278,7 +278,7 @@ void CShrinkImage::ProcessRows(DWORD* inBuff, DWORD rowCount)
             currPix[2] = nextB + xNewCoeff * b;
             // mame hotovej celej radek
 
-            // pokud jedem odspodu, pokracujem o radek vys
+            // if processing from the bottom, continue one row up
             if (!ProcessTopDown)
                 OutLine -= NewWidth * 2;
         }
@@ -383,8 +383,8 @@ CSalamanderThumbnailMaker::~CSalamanderThumbnailMaker()
         free(AuxTransformBuffer);
 }
 
-// vycisteni objektu - vola se pred zpracovanim dalsiho thumbnailu nebo kdyz uz
-// neni potreba thumbnail (at uz hotovy nebo ne) z tohoto objektu
+// Object cleanup - called before processing the next thumbnail or when
+// a thumbnail (finished or not) from this object is no longer needed.
 void CSalamanderThumbnailMaker::Clear(int thumbnailMaxSize)
 {
     Error = FALSE;
@@ -402,7 +402,7 @@ void CSalamanderThumbnailMaker::Clear(int thumbnailMaxSize)
     {
         if (thumbnailMaxSize != ThumbnailMaxWidth || thumbnailMaxSize != ThumbnailMaxHeight)
         {
-            // pokud uzivatel zmenil velikost thumbnailu (v konfiguraci), musime nechat znovu
+            // if the user changed thumbnail size (in configuration), we must let it
             // naalokovat ThumbnailBuffer a AuxTransformBuffer
             if (ThumbnailBuffer != NULL)
             {
@@ -423,7 +423,7 @@ void CSalamanderThumbnailMaker::Clear(int thumbnailMaxSize)
     Shrinker.Destroy();
 }
 
-// vraci TRUE pokud je v tomto objektu pripraveny cely thumbnail (povedlo se
+// Returns TRUE if the complete thumbnail is ready in this object (it succeeded
 // jeho ziskani od pluginu)
 BOOL CSalamanderThumbnailMaker::ThumbnailReady()
 {
@@ -551,7 +551,7 @@ BOOL CSalamanderThumbnailMaker::RenderToThumbnailData(CThumbnailData* data)
     }
 
     // alokujeme buffer pro raw data bitmpay
-    // destrukce probehne v CIconCache::Destroy() nebo o par radku niz
+    // destruction happens in CIconCache::Destroy() or a few lines below
     // v pripade refreshe
 
     DWORD rawSize = bitmap.bmWidthBytes * bitmap.bmPlanes * bitmap.bmHeight;
@@ -576,7 +576,7 @@ BOOL CSalamanderThumbnailMaker::RenderToThumbnailData(CThumbnailData* data)
     // zahodime bitmapu
     HANDLES(DeleteObject(hBmp));
 
-    // pokud uz nejaka data drzime, musime je uvolnit pro nova
+    // if we already hold some data, free it for new data
     if (data->Bits != NULL)
         free(data->Bits);
 
@@ -636,7 +636,7 @@ BOOL CSalamanderThumbnailMaker::SetParameters(int picWidth, int picHeight, DWORD
     PictureFlags = flags;
     ProcessTopDown = (flags & SSTHUMB_MIRROR_VERT) == 0;
 
-    int maxWidth = ThumbnailMaxWidth; // maximalni velikost thumbnailu
+    int maxWidth = ThumbnailMaxWidth; // maximum thumbnail size
     int maxHeight = ThumbnailMaxHeight;
 
     if (maxWidth < 1 || maxHeight < 1)
@@ -721,7 +721,7 @@ BOOL CSalamanderThumbnailMaker::ProcessBuffer(void* buffer, int rowsCount)
     {
         if (!Window->ICStopWork)
             TRACE_E("CSalamanderThumbnailMaker::ProcessBuffer failed. Error=" << Error << " NextLine=" << NextLine << " OriginalHeight=" << OriginalHeight);
-        return FALSE; // budeme koncit (chyba, presah nebo sleep-icon-cache)
+        return FALSE; // we will finish (error, overflow, or sleep-icon-cache)
     }
     if (NextLine == -1)
     {

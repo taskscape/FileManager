@@ -310,7 +310,7 @@ RETRY:
                     }
                     else
                     {
-                        ThreadCheckState[freeThreadIndex] = ctsNotRunning; // chyba
+                        ThreadCheckState[freeThreadIndex] = ctsNotRunning; // error
                         TRACE_E("This should never happen!");
                     }
                 }
@@ -1420,7 +1420,7 @@ void CSystemPolicies::LoadFromRegistry()
     HKEY hKey;
     if (OpenKeyAux(NULL, HKEY_CURRENT_USER, "Software\\Microsoft\\Windows\\CurrentVersion\\Policies\\Explorer", hKey))
     {
-        // podle MSDN muzou byt hodnoty typu DWORD i BINARY:
+        // according to MSDN, values may be of type DWORD or BINARY:
         // It is a REG_DWORD or 4-byte REG_BINARY data value, found under the same key.
         GetValueDontCheckTypeAux(hKey, "NoRun", /*REG_DWORD,*/ &NoRun, sizeof(DWORD));
         GetValueDontCheckTypeAux(hKey, "NoDrives", /*REG_DWORD,*/ &NoDrives, sizeof(DWORD));

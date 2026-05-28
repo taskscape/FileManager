@@ -261,14 +261,14 @@ CLoadSaveToRegistryMutex LoadSaveToRegistryMutex;
 BOOL IsNotAlphaNorNum[256]; // array of TRUE/FALSE for characters (TRUE = not a letter or digit)
 BOOL IsAlpha[256];          // array of TRUE/FALSE for characters (TRUE = letter)
 
-// defaultni useruv charset pro fonty; pod W2K+ uz by stacilo DEFAULT_CHARSET
+// default user's charset for fonts; on W2K+ DEFAULT_CHARSET would be enough
 //
-// Pod WinXP lze v regionalnim nastaveni zvolit jako default napriklad cestinu,
-// ale na zalozce Advanced nenainstalovat ceske fotny. Potom pri konstrukci
-// fontu s kodovanim UserCharset operacni system vrati font s uplne
-// jinym nazvem (face name), hlavne aby mel pozadovane kodovani. Proto je DULEZITE pri
-// specifikaci parametru fontu spravne zvolit promennou lfPitchAndFamily,
-// kde si lze volit mezi FF_SWISS a FF_ROMAN fonty (bezpatkove/patkove).
+// On WinXP, regional settings can choose Czech as the default, for example,
+// without installing Czech fonts on the Advanced tab. Then, when constructing
+// a font with UserCharset encoding, the operating system returns a font with a
+// completely different face name, mainly to get the required encoding. Therefore
+// it is IMPORTANT to choose the lfPitchAndFamily variable correctly when specifying
+// font parameters, where FF_SWISS and FF_ROMAN fonts (sans-serif/serif) can be selected.
 int UserCharset = DEFAULT_CHARSET;
 
 DWORD AllocationGranularity = 1; // allocation granularity (needed for using memory-mapped files)
@@ -276,7 +276,7 @@ DWORD AllocationGranularity = 1; // allocation granularity (needed for using mem
 #ifdef USE_BETA_EXPIRATION_DATE
 
 // urcuje prvni den, kdy uz tato beta/PB verze nepobezi
-// beta/PB verze 4.0 beta 1 pojede pouze do 1. unora 2020
+// beta/PB version 4.0 beta 1 will run only until February 1, 2020
 //                                 YEAR  MONTH DAY
 SYSTEMTIME BETA_EXPIRATION_DATE = {2020, 2, 0, 1, 0, 0, 0, 0};
 #endif // USE_BETA_EXPIRATION_DATE

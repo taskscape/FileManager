@@ -523,9 +523,9 @@ uintptr_t __TRACE_beginthreadex(void* security, unsigned stack_size,
 
 // fatal-error-trace (CRASHING TRACE), manualne zadana pozice v souboru;
 // zastavime soft v debuggeru, pro snadne odladeni problemu, ktery prave vznikl,
-// release verze spadne a problem snad bude jasny z call-stacku v bug-reportu;
+// the release version crashes and the problem should hopefully be clear from the call stack in the bug report;
 // nepouzivame DebugBreak(), protoze pri crashi softu nejde vystopovat, kde
-// lezi volani DebugBreak(), protoze adresa exceptiony je kdesi v ntdll.dll
+// contains the DebugBreak() call, because the exception address is somewhere in ntdll.dll
 // and Stack Back Trace section of bug report may contain nonsense, if
 // funkce, ze ktere volame TRACE_C/MC, nepouziva stary jednoduchy model ukladani
 // a prace s EBP/ESP (to zalezi na kompileru a zaplych optimalizacich), proto
@@ -618,9 +618,9 @@ protected:
     DWORD BytesAllocatedForWriteToPipe; // kolik mista pro zapis je prave naalokovano v pipe
 
 #ifdef TRACE_TO_FILE
-    HANDLE HTraceFile; // soubor otevreny pro zapis v TEMPu, ukladaji se do nej vsechny message
+    HANDLE HTraceFile; // file opened for writing in TEMP, all messages are stored in it
 #ifdef __TRACESERVER
-    WCHAR TraceFileName[MAX_PATH]; // jmeno souboru HTraceFile
+    WCHAR TraceFileName[MAX_PATH]; // name of the HTraceFile file
 #endif // __TRACESERVER
 #endif // TRACE_TO_FILE
 

@@ -18,18 +18,18 @@
 struct CButtonData
 {
     unsigned int ImageIndex : 16;   // zero base index
-    unsigned int Shell32ResID : 8;  // 0: ikona z image listu; 1..254: resID ikony z shell32.dll; 255: pouze alokovat volny prostor
+    unsigned int Shell32ResID : 8;  // 0: icon from image list; 1..254: icon resID from shell32.dll; 255: only allocate free space
     unsigned int ToolTipResID : 16; // resID se stringem pro tooltip
     unsigned int ID : 16;           // univerzalni Command
     unsigned int LeftID : 16;       // Command pro levy panel
     unsigned int RightID : 16;      // Command pro pravy panel
-    unsigned int DropDown : 1;      // bude mit drop down?
-    unsigned int WholeDropDown : 1; // bude mit whole drop down?
+    unsigned int DropDown : 1;      // will it have drop down?
+    unsigned int WholeDropDown : 1; // will it have whole drop down?
     unsigned int Check : 1;         // jedna se o checkbox?
-    DWORD* Enabler;                 // ridici promenna pro enablovani tlacitka
-    DWORD* LeftEnabler;             // ridici promenna pro enablovani tlacitka
-    DWORD* RightEnabler;            // ridici promenna pro enablovani tlacitka
-    const char* SVGName;            // NULL pokud tlacitko nema SVG reprezentaci
+    DWORD* Enabler;                 // control variable for enabling the button
+    DWORD* LeftEnabler;             // control variable for enabling the button
+    DWORD* RightEnabler;            // control variable for enabling the button
+    const char* SVGName;            // NULL if the button has no SVG representation
 };
 
 //****************************************************************************
@@ -37,7 +37,7 @@ struct CButtonData
 // TBButtonEnum
 //
 // Unikatni indexy do pole ToolBarButton -  slouzi k adresaci tohoto pole.
-// Do tohoto pole lze pouze pridavat na konec.
+// Items may only be appended to the end of this array.
 //
 
 #define TBBE_CONNECT_NET 0
@@ -254,8 +254,8 @@ CButtonData ToolBarButtons[TBBE_TERMINATOR] =
 //
 // TopToolbar
 //
-// Vyjadruje vsechna mozna tlacitka, ktera muze obsahovat TopToolbar.
-// Poradi udava poradi tlacitek v konfiguracnim dialogu toolbary a muze
+// Represents all possible buttons that TopToolbar can contain.
+// Order defines button order in the toolbar configuration dialog and can
 // byt libovolne meneno.
 //
 
@@ -357,7 +357,7 @@ DWORD TopToolBarButtons[] =
         NIB2(TBBE_HELP_CONTENTS)
             NIB2(TBBE_HELP_CONTEXT)
 
-                TBBE_TERMINATOR // terminator - musi zde byt !
+                TBBE_TERMINATOR // terminator - must be here!
 };
 
 DWORD LeftToolBarButtons[] =
@@ -378,7 +378,7 @@ DWORD LeftToolBarButtons[] =
         TBBE_REFRESH,
         TBBE_SMART_COLUMN_MODE,
 
-        TBBE_TERMINATOR // terminator - musi zde byt !
+        TBBE_TERMINATOR // terminator - must be here!
 };
 
 DWORD RightToolBarButtons[] =
@@ -399,7 +399,7 @@ DWORD RightToolBarButtons[] =
         TBBE_REFRESH,
         TBBE_SMART_COLUMN_MODE,
 
-        TBBE_TERMINATOR // terminator - musi zde byt !
+        TBBE_TERMINATOR // terminator - must be here!
 };
 
 void GetSVGIconsMainToolbar(CSVGIcon** svgIcons, int* svgIconsCount)
@@ -724,7 +724,7 @@ void RenderSVGImages(HDC hDC, int iconSize, COLORREF bkColor, const CSVGIcon* sv
 // Vytahne z resID bitmapu, nakopiruje ji do nove bitmapy, ktera je
 // barevne kompatibilni s obrazovkou. Potom k teto bitmape pripoji
 // ikonky z shell32.dll. Cti transparentni barvu.
-// bkColorForAlpha udava barvu, ktera bude prosvitat pod pruhlednou casti ikon (WinXP)
+// bkColorForAlpha specifies the color that will show through under the transparent parts of icons (WinXP)
 //
 
 BOOL CreateToolbarBitmaps(HINSTANCE hInstance, int resID, COLORREF transparent, COLORREF bkColorForAlpha,
@@ -754,7 +754,7 @@ BOOL CreateToolbarBitmaps(HINSTANCE hInstance, int resID, COLORREF transparent, 
 
     // nactu zdrojovou bitmapu
     HBITMAP hSource;
-    if (resID == IDB_TOOLBAR_256) // dirty hack, chtelo by to detekci podle typu resourcu (RCDATA), pripadne podle PNG signatury
+    if (resID == IDB_TOOLBAR_256) // dirty hack, this should detect by resource type (RCDATA), or possibly by PNG signature
         hSource = LoadPNGBitmap(hInstance, MAKEINTRESOURCE(resID), 0);
     else
         hSource = HANDLES(LoadBitmap(hInstance, MAKEINTRESOURCE(resID)));
@@ -796,7 +796,7 @@ BOOL CreateToolbarBitmaps(HINSTANCE hInstance, int resID, COLORREF transparent, 
     iconCount = bi.bmiHeader.biWidth / 16 + tbbe_BMPCOUNT;
 
     //  hColorBitmap = HANDLES(CreateBitmap(width, height, bh.bV4Planes, bh.bV4BitCount, NULL));
-    //protoze je CreateBitmap() vhodne pouze pro vytvareni B&W bitmap (viz MSDN)
+    // because CreateBitmap() is suitable only for creating B&W bitmaps (see MSDN)
     //prechazime od sal 2.5b7 na rychlou CreateCompatibleBitmap()
     hColorBitmap = HANDLES(CreateCompatibleBitmap(hDC, iconSize * iconCount, iconSize));
 
@@ -810,7 +810,7 @@ BOOL CreateToolbarBitmaps(HINSTANCE hInstance, int resID, COLORREF transparent, 
     hTmpMemDC = HANDLES(CreateCompatibleDC(NULL));
     hOldTmpBitmap = (HBITMAP)SelectObject(hTmpMemDC, hTmpBitmap);
 
-    // prenesu do nove bitmapy bitmapu puvodni
+    // transfer the original bitmap into the new bitmap
     if (!StretchBlt(hTgtMemDC, 0, 0, (iconCount - tbbe_BMPCOUNT) * iconSize, iconSize,
                     hSrcMemDC, 0, 0, bi.bmiHeader.biWidth, bi.bmiHeader.biHeight,
                     SRCCOPY))
@@ -823,7 +823,7 @@ BOOL CreateToolbarBitmaps(HINSTANCE hInstance, int resID, COLORREF transparent, 
     SelectObject(hSrcMemDC, hOldSrcBitmap);
     hOldSrcBitmap = NULL;
 
-    // pokud mame SVG verzi, pouzijeme ji
+    // if we have an SVG version, use it
     if (svgIcons != NULL)
     {
         RenderSVGImages(hTgtMemDC, iconSize, bkColorForAlpha, svgIcons, svgIconsCount);
@@ -944,7 +944,7 @@ exitus:
 //
 // PrepareToolTipText
 //
-// Prohleda buff na prvni vyskyt znaku '\t'. Pokud je nastavena promenna
+// Searches buff for the first occurrence of character '\t'. If the variable is set
 // stripHotKey, vlozi na jeho misto terminator a vrati se. Jinak na jeho
 // misto vlozi mezeru, zbytek posunu o znak vpravo a ozavorkuje.
 //
@@ -1047,7 +1047,7 @@ BOOL CMainToolBar::FillTII(int tbbeIndex, TLBI_ITEM_INFO2* tii, BOOL fillName)
         if (fillName)
         {
             tii->Name = LoadStr(ToolBarButtons[tbbeIndex].ToolTipResID);
-            // retezec bude orezan, proto muzeme operaci provest nad bufferem z LoadStr
+            // string will be trimmed, so we can perform the operation on the buffer from LoadStr
             PrepareToolTipText(tii->Name, TRUE);
         }
     }
@@ -1203,7 +1203,7 @@ void CMainToolBar::SetType(CMainToolBarType type)
 // CBottomToolBar
 //
 
-#define BOTTOMTB_TEXT_MAX 15 // maximalni delka retezce pro jednu klavesu
+#define BOTTOMTB_TEXT_MAX 15 // maximum string length for one key
 struct CBottomTBData
 {
     DWORD Index;
@@ -1331,7 +1331,7 @@ CBottomToolBar::CBottomToolBar(HWND hNotifyWindow, CObjectOrigin origin)
 }
 
 // naplni v poli BottomTBData promennou 'Text', kterou vycte z resourcu
-// 'state' udava radek v poli BottomTBData a 'BottomTBData' oznacuje retezec s textama
+// 'state' specifies the row in the BottomTBData array and 'BottomTBData' denotes the string with texts
 // texty pro jednotlive klavesy jsou oddeleny znakem ';'
 BOOL CBottomToolBar::InitDataResRow(CBottomTBStateEnum state, int textResID)
 {
@@ -1479,7 +1479,7 @@ BOOL CBottomToolBar::SetState(CBottomTBStateEnum state)
         TLBI_ITEM_INFO2 tii;
         tii.Mask = TLBI_MASK_TEXT | TLBI_MASK_TEXTLEN | TLBI_MASK_ID | TLBI_MASK_ENABLER |
                    TLBI_MASK_STATE | TLBI_MASK_CUSTOMDATA;
-        tii.State = 0; // povolime command - bude volano UpdateItemsState(), ktere zakaze co je treba
+        tii.State = 0; // enable command - UpdateItemsState() will be called and will disable what is needed
         char emptyBuff[] = "";
         tii.Text = empty ? emptyBuff : BottomTBData[state][i].Text;
         tii.TextLen = empty ? 0 : BottomTBData[state][i].TextLen;

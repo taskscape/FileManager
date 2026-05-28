@@ -927,7 +927,7 @@ CFilesWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                     if (plSizeValid || sizeValid && (!isDir || f->SizeValid))
                         selectedSize += plSizeValid ? plSize : f->Size;
                     else
-                        displaySize = FALSE; // soubor nezname velikosti nebo adresar bez zname/vypocitane velikosti
+                        displaySize = FALSE; // file of unknown size or directory without known/computed size
                 }
             }
             if (files > 0 || dirs > 0)
@@ -1530,7 +1530,7 @@ void CFilesWindow::SetFont()
 {
     if (DirectoryLine != NULL)
         DirectoryLine->SetFont();
-    //if (ListBox != NULL)  // toto se nastavi z volani SetFont()
+    //if (ListBox != NULL)  // this is set from the SetFont() call
     //  ListBox->SetFont();
     if (StatusLine != NULL)
         StatusLine->SetFont();

@@ -26,11 +26,11 @@ void SortAttrNameExt(CFilesArray& files, int left, int right, BOOL reverse);
 
 typedef BOOL (*CLessFunction)(const CFileData&, const CFileData&, BOOL);
 
-// porovnani pro dva soubory, 1. klic jmeno, 2. klic pripona, vraci -1, 0, 1 ala strcmp
+// comparison for two files, 1st key name, 2nd key extension, returns -1, 0, 1 like strcmp
 int CmpNameExt(const CFileData& f1, const CFileData& f2);
 int CmpNameExtIgnCase(const CFileData& f1, const CFileData& f2); // ignore-case varianta
 
-// POZOR: sort-kody v RefreshDirectory, ChangeSortType a CompareDirectories si musi odpovidat!!!
+// CAUTION: sort-codes in RefreshDirectory, ChangeSortType and CompareDirectories must correspond!!!
 
 BOOL LessNameExt(const CFileData& f1, const CFileData& f2, BOOL reverse);
 BOOL LessNameExtIgnCase(const CFileData& f1, const CFileData& f2, BOOL reverse);
@@ -42,12 +42,12 @@ BOOL LessAttrNameExt(const CFileData& f1, const CFileData& f2, BOOL reverse);
 void IntSort(int array[], int left, int right);
 
 // StrICmp pro regional-settings-sort a detect-numbers-sort; v 'numericalyEqual' (neni-li
-// NULL) vraci TRUE, pokud jsou retezce numericky shodne (napr. "a01" a "a1")
+// NULL) returns TRUE if strings are numerically equal (e.g. "a01" and "a1")
 int RegSetStrICmp(const char* s1, const char* s2);
 int RegSetStrICmpEx(const char* s1, int l1, const char* s2, int l2, BOOL* numericalyEqual);
 
 // strcmp pro regional-settings-sort a detect-numbers-sort; v 'numericalyEqual' (neni-li
-// NULL) vraci TRUE, pokud jsou retezce numericky shodne (napr. "a01" a "a1")
+// NULL) returns TRUE if strings are numerically equal (e.g. "a01" and "a1")
 int RegSetStrCmp(const char* s1, const char* s2);
 int RegSetStrCmpEx(const char* s1, int l1, const char* s2, int l2, BOOL* numericalyEqual);
 

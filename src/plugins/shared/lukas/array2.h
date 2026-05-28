@@ -7,18 +7,18 @@
 // TDirectArray2:
 //  -array that dynamically grows/shrinks in blocks (no need to reallocate
 //   already occupied memory, only add another block)
-//  -pri mazani prvku z pole se vola metoda Destructor(index_prvku),
+//  -when deleting an element from the array, Destructor(element_index) is called,
 //   which does nothing in base object
 
 template <class DATA_TYPE>
 class TDirectArray2
 {
 protected:
-    DATA_TYPE** Blocks; // ukazatel na pole bloku
-    int BlockSize;      // velikost jednoho bloku
+    DATA_TYPE** Blocks; // pointer to array of blocks
+    int BlockSize;      // size of one block
 
 public:
-    int Count; // pocet prvku v poli
+    int Count; // number of elements in the array
 
     TDirectArray2<DATA_TYPE>(int blockSize)
     {
@@ -31,13 +31,13 @@ public:
 
     virtual void Destructor(int) {}
 
-    void Destroy();                    // vycisti pole
-    BOOL Add(const DATA_TYPE& member); // prida prvek na posledni pozici
-    BOOL Delete(int index);            // zrusi prvek na dane pozici, na jeho misto
-                                       // soupne prvek z posledniho mista a zmensi pole
+    void Destroy();                    // clears the array
+    BOOL Add(const DATA_TYPE& member); // adds element to the last position
+    BOOL Delete(int index);            // deletes element at the given position, moves
+                                       // the element from the last position there and shrinks the array
                                        /*
     CDynamicArray * const &operator[](float index); // function is never called, but when it is not here
-                                                    // tak dela MSVC strasny veci
+                                                    // otherwise MSVC does terrible things
 */
     DATA_TYPE& operator[](int index)   //returns element at position
     {

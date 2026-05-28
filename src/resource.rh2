@@ -9,7 +9,7 @@
 #define IDC_STATIC_1 1150
 #include "plugins\shared\statics.rh2"
 
-// virtualni IDcka - pouze pro vazbu mezi dialogem a helpem
+// Virtual IDs - only for binding between dialog and help.
 #define IDD_COPYDIALOG      105
 #define IDD_MOVEDIALOG      106
 #define IDD_EDITNEWDIALOG   107
@@ -45,7 +45,7 @@
 
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! FREESPACE
 
-#define IDS_ZIPLINE1        491      // IDS_ZIPLINE1 .. IDS_ZIPLINE5 musi byt zasebou
+#define IDS_ZIPLINE1        491      // IDS_ZIPLINE1 .. IDS_ZIPLINE5 must be consecutive
 #define IDS_ZIPLINE2        492
 #define IDS_ZIPLINE3        493
 #define IDS_ZIPLINE4        494
@@ -282,7 +282,7 @@
 
 #define CM_SEC_PERMISSIONS     921
 
-#define CM_DIRMENU             924        // otevre CtxMenu pro aktualni adresar aktivniho panelu
+#define CM_DIRMENU             924        // opens CtxMenu for the current directory of the active panel
 
 #define CM_CUSTOMIZE_HOTPATHS  925
 #define CM_CUSTOMIZE_USERMENU  926
@@ -452,16 +452,16 @@
 #define CM_LEFTVIEWMODE            2932
 #define CM_RIGHTVIEWMODE           2933
 
-#define CM_ACTIVEZOOMPANEL         2934  // maximalizuje aktivni panel nebo ho vraci zpet
+#define CM_ACTIVEZOOMPANEL         2934  // maximizes the active panel or restores it back
 #define CM_LEFTZOOMPANEL           2935
 #define CM_RIGHTZOOMPANEL          2936
 
-#define CM_FULLSCREEN              2937  // maximalizuje hlavni okno a vraci ho zpet
+#define CM_FULLSCREEN              2937  // maximizes the main window or restores it back
 
 #define CM_GOTO_PREV_SEL           2938
 #define CM_GOTO_NEXT_SEL           2939
 
-#define CM_OPEN_IN_OTHER_PANEL     2940  // otevre focusene jmeno v druhem panelu
+#define CM_OPEN_IN_OTHER_PANEL     2940  // opens the focused name in the other panel
 #define CM_OPEN_IN_OTHER_PANEL_ACT 2941  // zaroven aktivuje druhy panel
 
 // nechat rezervu
@@ -591,8 +591,8 @@
 #define CM_FILEEND            6057
 #define CM_LEFT               6058
 #define CM_RIGHT              6059
-#define CM_TO_HEX             6060   // pozor - musi byt o 1 mensi nez CM_TO_TEXT
-#define CM_TO_TEXT            6061   // pozor - musi byt o 1 vetsi nez CM_TO_HEX
+#define CM_TO_HEX             6060   // caution - must be 1 less than CM_TO_TEXT
+#define CM_TO_TEXT            6061   // caution - must be 1 greater than CM_TO_HEX
 #define CM_COPYTOCLIP         6062
 #define CM_FINDSET            6063
 #define CM_FINDNEXT           6064

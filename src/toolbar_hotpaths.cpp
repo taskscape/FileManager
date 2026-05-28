@@ -36,7 +36,7 @@ CHotPathsBar::CHotPathsBar(HWND hNotifyWindow, CObjectOrigin origin)
     SetStyle(TLB_STYLE_IMAGE | TLB_STYLE_TEXT);
 
     // naleju ikonky do vlastni toolbary
-    // vlozim pouze itemy a submenu z nejvyssi urovne; ostatni se bude rozbalovat jako submenu
+    // insert only top-level items and submenus; the rest will expand as submenu
     int level = 0;
     TLBI_ITEM_INFO2 tii;
     int i;

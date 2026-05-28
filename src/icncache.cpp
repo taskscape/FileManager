@@ -906,7 +906,7 @@ void CAssociations::ColorsChanged()
                 il->SetBkColor(bkColor);
         }
     }
-    // FIXME: stacilo by nastavovat pozadi pouze pro patricny iconlist
+    // FIXME: it would be enough to set the background only for the appropriate iconlist
     int i;
     for (i = 0; i < ICONSIZE_COUNT; i++)
         SimpleIconLists[i]->SetBkColor(bkColor);
@@ -1102,10 +1102,10 @@ void CAssociations::InsertData(const char* /*origin*/, int index, BOOL overwrite
     size -= (size & 0x3); // size % 4  (zarovnani po ctyrech bytech)
     int iLen = (int)strlen(iconLocation) + 1;
     data.ExtensionAndData = (char*)malloc(size + iLen);
-    memcpy(data.ExtensionAndData, e, size);                   // pripona + zarovnani nul +
+    memcpy(data.ExtensionAndData, e, size);                   // extension + zero padding +
     memcpy(data.ExtensionAndData + size, iconLocation, iLen); // icon-location
     if (type[0] != 0)
-        data.Type = DupStr(type); // chyba -> jen se neukaze file-type
+        data.Type = DupStr(type); // error -> file-type just will not be shown
     else
         data.Type = NULL;
     if (overwriteItem)
@@ -1205,7 +1205,7 @@ void CAssociations::ReadAssociations(BOOL showWaitWnd)
                         size = MAX_PATH;
                         if (SalRegQueryValueEx(extKey, "PerceivedType", NULL, NULL, (BYTE*)extType, (DWORD*)&size) == ERROR_SUCCESS && size > 1)
                         {
-                            extType[MAX_PATH - 1] = 0; // pro jistotu (hodnota nemusi byt typu string, pak muze chybet null-terminator)
+                            extType[MAX_PATH - 1] = 0; // just in case (value need not be string type, then null-terminator may be missing)
                             if (GetIconFromAssocAux(FALSE, systemFileAssoc, extType, (LONG)strlen(extType) + 1, data, iconLocation, NULL))
                                 addExt = TRUE;
                         }
@@ -1232,9 +1232,9 @@ void CAssociations::ReadAssociations(BOOL showWaitWnd)
             if (enumRet != ERROR_NO_MORE_ITEMS)
             {
                 // u jednoho usera (Bernard Vander Beken <Bernard.VanderBeken@deceuninck.com>) sem prijde
-                // jedna chyba ERROR_MORE_DATA, a pak spousta ERROR_OUTOFMEMORY, ma Microsoft Windows Server 2003,
-                // Standard Edition Service Pack 2 (Build 3790), zvetseni bufferu na 10000 nepomaha, nutne
-                // ukoncit enumeraci uz pri prvni chybe, jinak zacne cyklit a zarat pamet (zrejme jde
+                // one ERROR_MORE_DATA error, then many ERROR_OUTOFMEMORY errors; Microsoft Windows Server 2003,
+                // Standard Edition Service Pack 2 (Build 3790) has this, increasing buffer to 10000 does not help, must
+                // stop enumeration on the first error, otherwise it starts looping and eating memory (apparently
                 // o interni chybu Windowsu), nikdo dalsi to nehlasil, takze to dal neresime
                 _snprintf_s(errBuf, _TRUNCATE, LoadStr(IDS_UNABLETOGETASSOC), GetErrorText(enumRet));
                 SalMessageBox(parent, errBuf, LoadStr(IDS_UNABLETOGETASSOCTITLE), MB_OK | MB_ICONEXCLAMATION);
@@ -1279,9 +1279,9 @@ void CAssociations::ReadAssociations(BOOL showWaitWnd)
                 if (enumRet != ERROR_NO_MORE_ITEMS)
                 {
                     // u jednoho usera (Bernard Vander Beken <Bernard.VanderBeken@deceuninck.com>) sem prijde
-                    // jedna chyba ERROR_MORE_DATA, a pak spousta ERROR_OUTOFMEMORY, ma Microsoft Windows Server 2003,
-                    // Standard Edition Service Pack 2 (Build 3790), zvetseni bufferu na 10000 nepomaha, nutne
-                    // ukoncit enumeraci uz pri prvni chybe, jinak zacne cyklit a zrat pamet (zrejme jde
+                    // one ERROR_MORE_DATA error, then many ERROR_OUTOFMEMORY errors; Microsoft Windows Server 2003,
+                    // Standard Edition Service Pack 2 (Build 3790) has this, increasing buffer to 10000 does not help, must
+                    // stop enumeration on the first error, otherwise it starts looping and eating memory (apparently
                     // o interni chybu Windowsu), nikdo dalsi to nehlasil, takze to dal neresime
                     _snprintf_s(errBuf, _TRUNCATE, LoadStr(IDS_UNABLETOGETASSOC), GetErrorText(enumRet));
                     SalMessageBox(parent, errBuf, LoadStr(IDS_UNABLETOGETASSOCTITLE), MB_OK | MB_ICONEXCLAMATION);
@@ -1315,7 +1315,7 @@ void CAssociations::ReadAssociations(BOOL showWaitWnd)
                         size = MAX_PATH; // get association type
                         if (SalRegQueryValueEx(openKey, "Progid", NULL, NULL, (BYTE*)extType, (DWORD*)&size) == ERROR_SUCCESS && size > 1)
                         {
-                            extType[MAX_PATH - 1] = 0; // pro jistotu (hodnota nemusi byt typu string, pak muze chybet null-terminator)
+                            extType[MAX_PATH - 1] = 0; // just in case (value need not be string type, then null-terminator may be missing)
 
                             if (GetIconFromAssocAux(TRUE, HKEY_CLASSES_ROOT, extType, (LONG)strlen(extType) + 1, data, iconLocation, type))
                             {

@@ -482,7 +482,7 @@ BOOL C__Trace::Connect(BOOL onUserRequest)
     }
 #endif // TRACE_TO_FILE
 
-    if (HWritePipe != NULL) // test spojeni se serverem, jestli je down, HWritePipe se zavre a nasledne zkusime reconnect
+    if (HWritePipe != NULL) // test connection to the server; if it is down, HWritePipe closes and then we try reconnect
         TRACE_I("Connect request received when already connected to Trace Server.");
 
     BOOL ret = FALSE;
@@ -752,7 +752,7 @@ BOOL C__Trace::WritePipe(LPCVOID lpBuffer, DWORD nNumberOfBytesToWrite)
             BytesAllocatedForWriteToPipe += 1024;
         else
         {
-            if (res == WAIT_TIMEOUT) // timeout, zkontrolujem, jestli pipe na server jeste zije
+            if (res == WAIT_TIMEOUT) // timeout, check whether the pipe to the server is still alive
             {
                 if (!WriteFile(HWritePipe, lpBuffer, 0, &numberOfBytesWritten, NULL))
                     return FALSE;

@@ -532,7 +532,7 @@ void CPanelStatusBar::SetThrobber(BOOL show, int delay, BOOL calledFromDestroyWi
             if (Throbber /* jen korekce nekonzistentniho stavu */ ||
                 delay <= 0 || !SetTimer(HWindow, IDT_DELAYEDTHROBBER, delay, NULL))
             {
-                DelayedThrobber = FALSE; // ma se zobrazit hned nebo doslo k chybe pri nastavovani timeru, takze ho zobrazime hned
+                DelayedThrobber = FALSE; // should be shown immediately or timer setup failed, so show it now
                 DelayedThrobberShowTime = 0;
             }
             else
@@ -547,7 +547,7 @@ void CPanelStatusBar::SetThrobber(BOOL show, int delay, BOOL calledFromDestroyWi
             if (!Throbber && delay > 0)
             {
                 if (HWindow != NULL && SetTimer(HWindow, IDT_DELAYEDTHROBBER, delay, NULL))
-                    DelayedThrobber = TRUE; // neni zobrazen + ma se zobrazit se zpozdenim + okno je videt (pokud neni, napocita se jen DelayedThrobberShowTime)
+                    DelayedThrobber = TRUE; // not displayed + should be shown with delay + window is visible (if not, only DelayedThrobberShowTime is computed)
                 DelayedThrobberShowTime = GetTickCount() + delay;
                 if (DelayedThrobberShowTime == 0)
                     DelayedThrobberShowTime++; // 0 je neplatna hodnota
@@ -635,7 +635,7 @@ void CPanelStatusBar::SetSecurityTooltip(const char* tooltip)
 
 int CPanelStatusBar::ChangeThrobberID()
 {
-    static int NewID = 0; // id throbberu musi byt unikatni (tzn. jediny counter pro oba panely)
+    static int NewID = 0; // throbber id must be unique (i.e. a single counter for both panels)
     ThrobberID = NewID++;
     if (ThrobberID == -1)
         ThrobberID = NewID++;
@@ -791,7 +791,7 @@ BOOL CPanelStatusBar::FindHotTrackItem(int xPos, int& index)
     {
         CHotTrackItem* item = &HotTrackItems[i];
 
-        // pokud je za root slozkou vypustka, musime o ni posunout xPos
+        // if there is an ellipsis after the root folder, shift xPos by it
         if (i == 1 && EllipsedWidth != -1)
             xPos += EllipsedWidth - TextEllipsisWidthEnv;
 
@@ -947,7 +947,7 @@ void CPanelStatusBar::Paint(HDC hdc, BOOL highlightText, BOOL highlightHotTrackO
     EllipsedWidth = -1;
     if (Text != NULL)
     {
-        BOOL truncateEnd = TRUE; // zkracujeme konec (TRUE) nebo za root slozkou (FALSE)
+        BOOL truncateEnd = TRUE; // truncate the end (TRUE) or after the root folder (FALSE)
         int visibleChars = 0;
 
         SetBkMode(dc, TRANSPARENT);
@@ -961,7 +961,7 @@ void CPanelStatusBar::Paint(HDC hdc, BOOL highlightText, BOOL highlightHotTrackO
         tmpR.bottom = r.bottom - 3;
 
         WholeTextVisible = FALSE;
-        // vsechny plochy nastavim jako nulove
+        // set all areas to zero
         SecurityRect = tmpR;
         SecurityRect.right = SecurityRect.left;
 
@@ -1127,7 +1127,7 @@ void CPanelStatusBar::Paint(HDC hdc, BOOL highlightText, BOOL highlightHotTrackO
             myYOffset = 1;
         int textY = (tmpR.top + tmpR.bottom - EnvFontCharHeight + myYOffset) / 2;
 
-        // vypis hlavniho textu, pokud na nej mame nejaky prostor
+        // output main text if there is any space for it
         if (TextRect.right > TextRect.left)
         {
             // urcime si predem, ktera cast textu ma byt vykreslena vyrazne, tu kvuli cleartype
@@ -1163,13 +1163,13 @@ void CPanelStatusBar::Paint(HDC hdc, BOOL highlightText, BOOL highlightHotTrackO
                 lastClipChar = hotItem->Offset + hotItem->Chars;
             }
 
-            // vykreslime prvni cast textu (az do hotItem, pokud text zacina hotItem, nebudeme kreslit nic)
+            // draw the first part of the text (up to hotItem; if text starts with hotItem, draw nothing)
             if (firstClipChar != 0)
             {
                 if (truncateEnd)
-                { // bez zkraceni nebo ustrizen konec
+                { // without truncation or with end cut off
                     ExtTextOutUtf8(dc, TextRect.left, textY, 0, NULL, Text, min(visibleChars, firstClipChar), NULL);
-                    if (visibleChars < min(TextLen, firstClipChar)) // pokud byl ustrizen konec -> pripojime "..."
+                    if (visibleChars < min(TextLen, firstClipChar)) // if the end was cut off -> append "..."
                     {
                         int offset = (visibleChars > 0) ? AlpDX[visibleChars - 1] : 0;
                         ExtTextOut(dc, TextRect.left + offset, textY, 0, NULL, "...", 3, NULL);
@@ -1188,20 +1188,20 @@ void CPanelStatusBar::Paint(HDC hdc, BOOL highlightText, BOOL highlightHotTrackO
                 }
             }
 
-            // vykreslime druhou cast textu (za hotItem dal) -- zkracovani na konci
+            // draw the second part of the text (after hotItem) -- truncating at the end
             if (hotItem != NULL && truncateEnd && lastClipChar <= visibleChars)
             {
-                // bez zkraceni nebo ustrizen konec
+                // without truncation or with end cut off
                 int visibleChars2 = visibleChars - lastClipChar;
                 ExtTextOutUtf8(dc, TextRect.left + AlpDX[lastClipChar - 1], textY, 0, NULL, Text + lastClipChar, visibleChars2, NULL);
-                if (visibleChars < TextLen) // pokud byl ustrizen konec -> pripojime "..."
+                if (visibleChars < TextLen) // if the end was cut off -> append "..."
                 {
                     int offset = (visibleChars > 0) ? AlpDX[visibleChars - 1] : 0;
                     ExtTextOut(dc, TextRect.left + offset, textY, 0, NULL, "...", 3, NULL);
                 }
             }
             // vykreslime druhou cast textu (za hotItem dal) -- zkracovani uprosted
-            // takto se zkracuji pouze cesty v directory line (plati podminka !truncateEnd)
+            // only paths in the directory line are shortened this way (condition !truncateEnd applies)
             if (hotItem != NULL && !truncateEnd && lastClipChar <= TextLen)
             { // uriznuta cast za root slozkou
                 int rootChars = HotTrackItems[0].Chars;
@@ -1240,7 +1240,7 @@ void CPanelStatusBar::Paint(HDC hdc, BOOL highlightText, BOOL highlightHotTrackO
                     hOldFont = (HFONT)SelectObject(dc, EnvFontUL);
 
                 if (truncateEnd)
-                { // bez zkraceni nebo ustrizen konec
+                { // without truncation or with end cut off
                     int showChars = hotItem->Chars;
                     if (hotItem->Offset + showChars > visibleChars)
                     {
@@ -1392,7 +1392,7 @@ private:
     long RefCount;                    // zivotnost objektu
     IDataObject* DataObject;          // IDataObject, ktery vstoupil do dragu
     IDataObject* ForbiddenDataObject; // IDataObject, ktery nebereme (jsme jeho zdrojem)
-    BOOL UseUnicode;                  // je v DataObject unicode text? (jinak zkusime ANSI text)
+    BOOL UseUnicode;                  // is there Unicode text in DataObject? (otherwise try ANSI text)
     CFilesWindow* FilesWindow;        // panel, ke kteremu jsme asociovani
     char Buffer[2 * MAX_PATH];
 
@@ -1417,7 +1417,7 @@ public:
         ForbiddenDataObject = forbiddenDataObject;
     }
 
-    // vrati adresar (musi byt prave jeden)
+    // returns the directory (there must be exactly one)
     BOOL GetDirFromDataObject(IDataObject* pDataObject, char* path)
     {
         FORMATETC formatEtc;
@@ -1499,7 +1499,7 @@ public:
             DWORD attrs = SalGetFileAttributes(path);
             if (attrs == 0xFFFFFFFF)
                 ret = FALSE;
-            else if (!(attrs & FILE_ATTRIBUTE_DIRECTORY)) // nejedna se o adresar
+            else if (!(attrs & FILE_ATTRIBUTE_DIRECTORY)) // not a directory
                 ret = FALSE;
         }
         return ret;
@@ -1545,14 +1545,14 @@ public:
         DataObject = pDataObject;
         DataObject->AddRef();
 
-        // pokud je nas panel zaroven zdrojem, zakazu paste
+        // if our panel is also the source, disable paste
         if (DataObject == ForbiddenDataObject)
         {
             *pdwEffect = DROPEFFECT_NONE;
             return S_OK;
         }
 
-        // zjistime jestli je na clipboardu text
+        // find out whether there is text on the clipboard
         FORMATETC formatEtc;
         ZeroMemory(&formatEtc, sizeof(formatEtc));
         formatEtc.cfFormat = CF_UNICODETEXT;
@@ -1590,13 +1590,13 @@ public:
             ImageDragMove(pt.x, pt.y);
         if (DataObject != NULL)
         {
-            // pokud je nas panel zaroven zdrojem, zakazu paste
+            // if our panel is also the source, disable paste
             if (DataObject == ForbiddenDataObject)
             {
                 *pdwEffect = DROPEFFECT_NONE;
                 return S_OK;
             }
-            // zjistime jestli je na clipboardu text
+            // find out whether there is text on the clipboard
             FORMATETC formatEtc;
             ZeroMemory(&formatEtc, sizeof(formatEtc));
             formatEtc.cfFormat = UseUnicode ? CF_UNICODETEXT : CF_TEXT;
@@ -1667,14 +1667,14 @@ public:
                         int l = (int)strlen(Buffer);
                         if ((l != 2 || Buffer[0] != '\\' || Buffer[1] != '\\') && // nejde o cestu "\\\\" (Nethood root)
                             l > 0 && Buffer[l - 1] == '\\')
-                            Buffer[--l] = 0;             // '\\' na konci neni vitan
-                        if (l == 2 && Buffer[0] != '\\') // za neUNC root cestou musi byt '\\'
+                            Buffer[--l] = 0;             // trailing '\\' is not welcome
+                        if (l == 2 && Buffer[0] != '\\') // non-UNC root path must be followed by '\\'
                         {
                             Buffer[l++] = '\\';
                             Buffer[l] = 0;
                         }
                         if (l == 6 && Buffer[0] == '\\' && Buffer[1] == '\\' && Buffer[2] == '.' && Buffer[3] == '\\' &&
-                            Buffer[4] != 0 && Buffer[5] == ':') // za "\\.\C:\" root cestou musi byt '\\'
+                            Buffer[4] != 0 && Buffer[5] == ':') // "\\.\C:\" root path must be followed by '\\'
                         {
                             Buffer[l++] = '\\';
                             Buffer[l] = 0;
@@ -1700,8 +1700,8 @@ public:
                 {
                     int l = (int)strlen(Buffer);
                     if (l > 0 && Buffer[l - 1] == '\\')
-                        Buffer[--l] = 0;             // '\\' na konci neni vitan
-                    if (l == 2 && Buffer[0] != '\\') // za neUNC root cestou musi byt '\\'
+                        Buffer[--l] = 0;             // trailing '\\' is not welcome
+                    if (l == 2 && Buffer[0] != '\\') // non-UNC root path must be followed by '\\'
                     {
                         Buffer[l++] = '\\';
                         Buffer[l] = 0;
@@ -1780,7 +1780,7 @@ CPanelStatusBar::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
             int ti = DelayedThrobberShowTime == 0 /* neplatna hodnota */ ? 0 : DelayedThrobberShowTime - GetTickCount();
             if (ti < 0)
                 ti = 0;
-            DelayedThrobberShowTime = 0; // tuto hodnotu uz nepotrebujeme, pripadne si ji musi nastavit SetThrobber znovu, priradime neplatnou hodnotu
+            DelayedThrobberShowTime = 0; // this value is no longer needed; SetThrobber must set it again if necessary, assign an invalid value
             SetThrobber(TRUE, ti);       // mame take zapnout throbber
         }
 
@@ -2102,7 +2102,7 @@ CPanelStatusBar::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
             }
             if (isInSizeRect)
             {
-                // drive-info funguje jen pokud nejde o FS, ktery drive-info nepodporuje
+                // drive-info works only if this is not an FS that does not support drive-info
                 if (FilesWindow->Is(ptDisk) || FilesWindow->Is(ptZIPArchive) ||
                     FilesWindow->Is(ptPluginFS) && FilesWindow->GetPluginFS()->NotEmpty() &&
                         FilesWindow->GetPluginFS()->IsServiceSupported(FS_SERVICE_SHOWINFO))
@@ -2241,7 +2241,7 @@ CPanelStatusBar::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                         CHotTrackItem* lastItem = NULL;
                         if (HotTrackItems.Count > 0)
                             lastItem = &HotTrackItems[HotTrackItems.Count - 1];
-                        //if (HotItem->Chars != (int)TextLen) // tato podminka selhala pokud byl pripojen filtr
+                        //if (HotItem->Chars != (int)TextLen) // this condition failed when a filter was attached
                         if (HotItem != lastItem)
                         {
                             // zkraceni cesty
@@ -2331,7 +2331,7 @@ CPanelStatusBar::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
             SelectObject(dc, oldPen);
         }
 
-        // j.r. vsechny statusbary tahat pres jednu cache CBitmap
+        // j.r. draw all status bars through one CBitmap cache
 
         return TRUE;
     }

@@ -797,7 +797,7 @@ C__Handles::SetInfo(const char* file, int line, C__HandlesOutputType outputType)
     ::EnterCriticalSection(&CriticalSection);
     if (CriticalSection.RecursionCount > 1)
     {
-        DebugBreak(); // rekurzivni volani handles !!! zase nejaka maskovana message-loopa - viz call-stack
+        DebugBreak(); // recursive handles call !!! another masked message loop - see call stack
     }
     OutputType = outputType;
     TemporaryHandle.File = file;
@@ -1214,7 +1214,7 @@ HDC C__Handles::BeginPaint(HWND hwnd, LPPAINTSTRUCT lpPaint)
     C__HandlesData tmpTemporaryHandle = TemporaryHandle;
     ::LeaveCriticalSection(&CriticalSection);
 
-    HDC ret = ::BeginPaint(hwnd, lpPaint); // obsahuje message-loopu
+    HDC ret = ::BeginPaint(hwnd, lpPaint); // contains a message loop
 
     ::EnterCriticalSection(&CriticalSection);
     OutputType = tmpOutputType;
@@ -2044,8 +2044,8 @@ BOOL C__Handles::DuplicateHandle(HANDLE hSourceProcessHandle, HANDLE hSourceHand
                        MB_OK);
         }
 
-        // GetCurrentProcess vraci jakysi pseudohandle, takze tahle konstrukce
-        // neni spravna, meli by se porovnat ID procesu a ne jejich handly ...
+        // GetCurrentProcess returns a kind of pseudo-handle, so this construction
+        // is not correct; process IDs should be compared, not their handles ...
 
         if ((dwOptions & DUPLICATE_CLOSE_SOURCE) &&
             hSourceProcessHandle == GetCurrentProcess())
@@ -2283,7 +2283,7 @@ BOOL C__Handles::FreeLibrary(HMODULE hLibModule)
     C__HandlesData tmpTemporaryHandle = TemporaryHandle;
     ::LeaveCriticalSection(&CriticalSection);
 
-    BOOL ret = ::FreeLibrary(hLibModule); // obsahuje volani destruktoru globalek DLLka, muze obsahovat message-loopu
+    BOOL ret = ::FreeLibrary(hLibModule); // contains calls to DLL global destructors, can contain a message loop
 
     ::EnterCriticalSection(&CriticalSection);
     OutputType = tmpOutputType;
@@ -2299,7 +2299,7 @@ VOID C__Handles::FreeLibraryAndExitThread(HMODULE hLibModule, DWORD dwExitCode)
     C__HandlesData tmpTemporaryHandle = TemporaryHandle;
     ::LeaveCriticalSection(&CriticalSection);
 
-    ::FreeLibraryAndExitThread(hLibModule, dwExitCode); // obsahuje volani destruktoru globalek DLLka, muze obsahovat message-loopu
+    ::FreeLibraryAndExitThread(hLibModule, dwExitCode); // contains calls to DLL global destructors, can contain a message loop
 
     ::EnterCriticalSection(&CriticalSection);
     OutputType = tmpOutputType;
@@ -2379,7 +2379,7 @@ BOOL C__Handles::FindCloseChangeNotification(HANDLE hChangeHandle)
     C__HandlesData tmpTemporaryHandle = TemporaryHandle;
     ::LeaveCriticalSection(&CriticalSection);
 
-    BOOL ret = ::FindCloseChangeNotification(hChangeHandle); // muze se kousnout i na dost dlouho
+    BOOL ret = ::FindCloseChangeNotification(hChangeHandle); // can hang for quite a long time
 
     ::EnterCriticalSection(&CriticalSection);
     OutputType = tmpOutputType;
@@ -2552,7 +2552,7 @@ BOOL C__Handles::EndDeferWindowPos(HDWP hWinPosInfo)
     C__HandlesData tmpTemporaryHandle = TemporaryHandle;
     ::LeaveCriticalSection(&CriticalSection);
 
-    BOOL ret = ::EndDeferWindowPos(hWinPosInfo); // obsahuje message-loopu
+    BOOL ret = ::EndDeferWindowPos(hWinPosInfo); // contains a message loop
 
     ::EnterCriticalSection(&CriticalSection);
     OutputType = tmpOutputType;

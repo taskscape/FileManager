@@ -282,7 +282,7 @@ BOOL CTaskList::Init()
     if (FMOMutex == NULL) // we are the first Salamander 3.0 or newer in local session
     {
         //---  create system objects for communication, lock FMO
-        FMOMutex = NOHANDLES(CreateMutex(saPtr, TRUE, AS_PROCESSLIST_MUTEX_NAME)); // task list je platny pouze pro danou session, mutex patri do local namespace
+        FMOMutex = NOHANDLES(CreateMutex(saPtr, TRUE, AS_PROCESSLIST_MUTEX_NAME)); // task list is valid only for the given session, mutex belongs to local namespace
         if (FMOMutex == NULL)
             return FALSE; // fail
         FMO = NOHANDLES(CreateFileMapping(INVALID_HANDLE_VALUE, saPtr, PAGE_READWRITE | SEC_COMMIT,
@@ -748,7 +748,7 @@ BOOL CTaskList::RemoveKilledItems(BOOL* changed)
     ProcessList->ItemsCount = c;
 
     /*
-// neslape pod XP pokud jsou procesy v ramci jedne session spusteny pod ruznymi uzivateli
+// does not work under XP if processes within one session are started under different users
 // nemame pravo otevrit hande jineho procesu
 //---  vyhodime killnuty procesy
 int i;

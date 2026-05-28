@@ -173,7 +173,7 @@ CVersionInfo::LoadBlock(const BYTE*& ptr, CVersionBlock* parent)
         }
     }
 
-    // preskocime VERSIONINFO a retezec Key
+    // skip VERSIONINFO and Key string
     ptr += sizeof(VERSIONINFO) + sizeof(WCHAR) * wcslen(block->Key);
     // preskocime Padding
     ptr = ALIGN_DWORD(BYTE*, ptr);
@@ -489,7 +489,7 @@ BOOL CVersionInfo::SaveBlock(CVersionBlock* block, BYTE*& ptr, const BYTE* maxPt
     }
     }
 
-    // pokud nemam childy, ulozime velikost bez paddingu
+    // if there are no children, store size without padding
     if (block->Children.Count == 0)
         *wLength = (WORD)(ptr - oldPtr);
 
@@ -521,7 +521,7 @@ BOOL CVersionInfo::UpdateResource(HANDLE hUpdateRes, int resID)
         return FALSE;
     }
     memset(buff, 0, 50000);
-    BYTE* ptr = buff; // pozor, hodnota bude zmenena
+    BYTE* ptr = buff; // caution, value will be changed
     if (!SaveBlock(Root, ptr, ptr + 49999))
     {
         free(buff);

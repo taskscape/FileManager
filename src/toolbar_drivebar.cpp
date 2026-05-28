@@ -24,7 +24,7 @@ CDriveBar::CDriveBar(HWND hNotifyWindow, CObjectOrigin origin)
 {
     CALL_STACK_MESSAGE_NONE
     List = NULL;
-    // tato inicializace je take ve WM_DESTROY, protoze okno se pouze zhasina a rozsveci
+    // this initialization is also in WM_DESTROY because the window is only hidden and shown
     CheckedDrive[0] = 0;
     HDrivesIcons = NULL;
     HDrivesIconsGray = NULL;
@@ -147,8 +147,8 @@ void CDriveBar::Execute(DWORD id)
             case drvtMyDocuments:
             case drvtGoogleDrive:
             case drvtDropbox:
-            case drvtOneDrive:    // bud primo tlacitko nebo vybrane z drop down menu
-            case drvtOneDriveBus: // bud primo tlacitko nebo vybrane z drop down menu
+            case drvtOneDrive:    // either direct button or selected from drop down menu
+            case drvtOneDriveBus: // either direct button or selected from drop down menu
             {
                 panel->ChangePathToDrvType(HWindow, DriveType, DriveType == drvtOneDriveBus ? (const char*)DriveTypeParam : NULL);
                 if (DriveType == drvtOneDriveBus)

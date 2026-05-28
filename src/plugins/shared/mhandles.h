@@ -11,9 +11,9 @@
 
 #pragma once
 
-// makro MHANDLES_ENABLE - zapina monitorovani handlu
-// POZOR: volat HANDLES_CAN_USE_TRACE() tesne po inicializaci "dbg.h" modulu
-//        (po inicializaci SalamanderDebug a SalamanderVersion)
+// MHANDLES_ENABLE macro - enables handle monitoring
+// CAUTION: call HANDLES_CAN_USE_TRACE() immediately after initializing the "dbg.h" module
+//          (after initializing SalamanderDebug and SalamanderVersion)
 // WARNING: MHANDLES are initialized/destroyed at "lib" level, so if plugin
 //        uses "lib" (or "compiler") level, must ensure itself that at
 //        these levels it will not use MHANDLES (see #pragma init_seg (lib))
@@ -66,8 +66,8 @@ enum C__HandlesOutputType
 
 enum C__HandlesType
 {
-    __htHandle_comp_with_CloseHandle,  // handle kompatibilni s CloseHandle() a DuplicateHandle()
-    __htHandle_comp_with_DeleteObject, // handle kompatibilni s DeleteObject() a GetStockObject()
+    __htHandle_comp_with_CloseHandle,  // handle compatible with CloseHandle() and DuplicateHandle()
+    __htHandle_comp_with_DeleteObject, // handle compatible with DeleteObject() and GetStockObject()
     __htKey,
     __htIcon,
     __htGlobal,
@@ -302,8 +302,8 @@ public:
 
 protected:
     C_HandlesDataArray Handles;       // all monitored handles
-    C__HandlesData TemporaryHandle;   // pri vkladani nastaven z SetInfo()
-    C__HandlesOutputType OutputType;  // typ vystupu hlasek
+    C__HandlesData TemporaryHandle;   // set from SetInfo() when inserting
+    C__HandlesOutputType OutputType;  // message output type
     CRITICAL_SECTION CriticalSection; // for multi-thread synchronization
     BOOL CanUseTrace;                 // TRUE only after initialization of "dbg.h" module, when it will be possible to use TRACE_ macros
 
@@ -697,7 +697,7 @@ public:
     BOOL OpenProcessToken(HANDLE ProcessHandle, DWORD DesiredAccess, PHANDLE TokenHandle);
 
 protected:
-    void AddHandle(C__HandlesHandle handle); // prida TemporaryHandle
+    void AddHandle(C__HandlesHandle handle); // adds TemporaryHandle
 
     // removes handle, on success returns TRUE
     BOOL DeleteHandle(C__HandlesType& type, HANDLE handle,

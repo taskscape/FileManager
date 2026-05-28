@@ -229,7 +229,7 @@ int CToolBar::GetNeededHeight()
     {
         if (HasIconDirty)
         {
-            // koukneme, jestli drzime nejakou ikonu
+            // check whether we hold any icon
             HasIcon = FALSE;
             HasIconDirty = FALSE;
             int i;
@@ -487,14 +487,14 @@ BOOL CToolBar::SetItemInfo2(DWORD position, BOOL byPosition, const TLBI_ITEM_INF
             tii->Mask & TLBI_MASK_IMAGEINDEX || tii->Mask & TLBI_MASK_ICON ||
             (tii->Mask & TLBI_MASK_WIDTH && item->Style & TLBI_STYLE_FIXEDWIDTH))
         {
-            // tato zmena muze mit dopad na celou toolbaru
+            // this change can affect the whole toolbar
             DirtyItems = TRUE;
             if (HWindow != NULL)
                 InvalidateRect(HWindow, NULL, FALSE);
         }
         else
         {
-            // nechame prekreslit pouze jedno tlacitko, ktere se menilo
+            // repaint only the one button that changed
             if ((tii->Mask & TLBI_MASK_STATE) && HWindow != NULL)
             {
                 RECT r;

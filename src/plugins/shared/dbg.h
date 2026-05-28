@@ -391,14 +391,14 @@ inline void __TraceEmptyFunction() {}
 #define TRACE_MEW(file, line, str) __TraceEmptyFunction()
 #define TRACE_E(str) __TraceEmptyFunction()
 #define TRACE_EW(str) __TraceEmptyFunction()
-// pri crashi softu pres DebugBreak() nejde vystopovat, kde lezi volani
+// when crashing the software through DebugBreak(), it is not possible to trace where the call is
 // TRACE_C/TRACE_MC, because exception address is somewhere in ntdll.dll
 // and Stack Back Trace section of bug report may contain nonsense, if
 // function calling TRACE_C/TRACE_MC does not use old simple model
-// ukladani a prace s EBP/ESP, ovsem i v tom pripade je zde jen adresa
-// odkud byla tato funkce volana (ne primo adresa TRACE_C/TRACE_MC),
+// storing and working with EBP/ESP; however even in that case this is only the address
+// from where this function was called (not directly the TRACE_C/TRACE_MC address),
 // therefore at least for now we use old primitive crash method
-// zapisem na NULL
+// by writing to NULL
 //#define TRACE_MC(file, line, str) DebugBreak()
 //#define TRACE_MCW(file, line, str) DebugBreak()
 //#define TRACE_C(str) DebugBreak()
@@ -529,8 +529,8 @@ protected:
 
 public:
 #if (defined(_DEBUG) || defined(CALLSTK_MEASURETIMES)) && !defined(CALLSTK_DISABLEMEASURETIMES)
-    // 'doNotMeasureTimes'==TRUE = nemerit Push tohoto call-stack makra (zrejme dost zpomaluje, ale
-    // nechceme ho vyhodit, je prilis dulezite pro debugovani)
+    // 'doNotMeasureTimes'==TRUE = do not measure Push of this call-stack macro (apparently slows down a lot, but
+    // we do not want to remove it, it is too important for debugging)
 #ifdef __BORLANDC__
     CCallStackMessage(BOOL doNotMeasureTimes, const char* format, ...)
 #else  // __BORLANDC__
@@ -820,8 +820,8 @@ extern BOOL __CallStk_T; // always TRUE - just to check format string and type o
 // TraceAttachCurrentThread + SetThreadNameInVCAndTrace
 //
 
-// nepouzivat pokud uz se SalamanderDebug->TraceAttachThread pro tento thread volalo (primo
-// nebo napr. pri startu threadu pres CThreadQueue::StartThread)
+// do not use if SalamanderDebug->TraceAttachThread has already been called for this thread (directly
+// or for example when starting the thread through CThreadQueue::StartThread)
 inline void TraceAttachCurrentThread() { SalamanderDebug->TraceAttachThread(GetCurrentThread(), GetCurrentThreadId()); }
 
 inline void SetThreadNameInVCAndTrace(const char* name) { SalamanderDebug->SetThreadNameInVCAndTrace(name); }

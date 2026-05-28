@@ -3,7 +3,7 @@
 
 #pragma once
 
-// menu item skill level ALL (zahrnuje beginned, intermediate a advanced)
+// menu item skill level ALL (includes beginner, intermediate, and advanced)
 #define MNTS_ALL (MNTS_B | MNTS_I | MNTS_A)
 
 #ifndef QWORD
@@ -35,19 +35,19 @@ private: \
 // utilbase.cpp
 //
 
-extern HINSTANCE DLLInstance;     // handle k SPL-ku - jazykove nezavisle resourcy
-extern HINSTANCE HLanguage;       // handle k SLG-cku - jazykove zavisle resourcy
+extern HINSTANCE DLLInstance;     // handle to SPL - language-independent resources
+extern HINSTANCE HLanguage;       // handle to SLG - language-dependent resources
 extern BOOL WindowsVistaAndLater; // Windows Vista or later from NT series (6.0+)
 extern BOOL WindowsXP64AndLater;  // Windows XP 64, Vista or later (5.2+)
 
-// rozhrani Open Salamandera - platna od volani InitUtils() az do
-// ukonceni pluginu
+// Open Salamander interfaces - valid from InitUtils() call until
+// plugin termination
 extern CSalamanderGeneralAbstract* SG;
 extern CSalamanderGUIAbstract* SalGUI;
 
 // ****************************************************************************
 //
-// CCS -- samo-inicializujici se a samo-destruujici se kriticka sekce
+// CCS -- self-initializing and self-destructing critical section
 //
 
 struct CCS

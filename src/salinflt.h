@@ -38,7 +38,7 @@ struct CDecompressionObject
 
     char* OutputMem;     // buffer pro vybalena data
     char* OutputMemPtr;  // aktualni pozice v bufferu pro vybalena data
-    DWORD OutputMemSize; // velikost bufferu pro vybalena data
+    DWORD OutputMemSize; // buffer size for unpacked data
 
     //public fields, should be intialized before calling Inflate()
     uch* SlideWin;    //circular buffer

@@ -275,7 +275,7 @@ BOOL CToolBar::Refresh()
         }
         else
         {
-            // musime urcit sirku podle obsahu
+            // determine width from contents
 
             int textWidth = 0;
 
@@ -289,7 +289,7 @@ BOOL CToolBar::Refresh()
 
             if (!vertical && (Style & TLB_STYLE_TEXT) && (item->Style & TLBI_STYLE_SHOWTEXT) && item->Text != NULL && *item->Text != 0)
             {
-                // pokud polozka obsahuje text, omerime ho
+                // if the item contains text, measure it
                 RECT r;
                 r.left = 0;
                 r.top = 0;
@@ -404,7 +404,7 @@ void CToolBar::DrawItem(int index)
         return;
     }
     if (Refresh())
-        return; // pokud bylo prekresleno vse, nemusime uz nic delat
+        return; // if everything was repainted, nothing else needs to be done
 
     HDC hDC = HANDLES(GetDC(HWindow));
     DrawItem(hDC, index);
@@ -570,7 +570,7 @@ void CToolBar::DrawItem(HDC hDC, int index)
         {
             if (grayed)
             {
-                // kreslime bud s pozadim (rychlejsi) nebo v priade checked transparentne
+                // draw either with background (faster) or transparently when checked
                 int offset = bodyDown ? 1 : 0;
                 int x = item->IconX + offset;
                 int y = centerOffset + (item->Height - imgH) / 2 + offset;
@@ -588,7 +588,7 @@ void CToolBar::DrawItem(HDC hDC, int index)
             }
             else
             {
-                // kreslime bud s pozadim (rychlejsi) nebo v priade checked transparentne
+                // draw either with background (faster) or transparently when checked
                 int offset = bodyDown ? 1 : 0;
                 int x = item->IconX + offset;
                 int y = centerOffset + (item->Height - imgH) / 2 + offset;
@@ -657,7 +657,7 @@ void CToolBar::DrawItem(HDC hDC, int index)
                 int offset = 0;
                 if (!grayed && dropDown)
                     offset = 1;
-                // zde budeme posouvat pouze dolu - mame malo mista
+                // here we will only move down - there is little space
                 DrawDropDown(CacheBitmap->HMemDC, item->OutterX, y + offset, grayed);
             }
         }
@@ -677,7 +677,7 @@ void CToolBar::DrawAllItems(HDC hDC)
         return;
     }
     if (Refresh())
-        return; // pokud bylo prekresleno vse, nemusime uz nic delat
+        return; // if everything was repainted, nothing else needs to be done
 
     BOOL vertical = (Style & TLB_STYLE_VERTICAL) != 0;
 
@@ -723,7 +723,7 @@ void CToolBar::DrawAllItems(HDC hDC)
         }
         offset += length;
     }
-    // domazu zbytek na konci
+    // erase the rest at the end
     if (vertical)
     {
         if (offset < Height)

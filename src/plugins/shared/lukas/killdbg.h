@@ -52,5 +52,5 @@ inline void __TraceEmptyFunction() {}
 // SetThreadNameInVCAndTrace
 //
 
-// eliminace volani SetThreadNameInVCAndTrace
+// eliminate SetThreadNameInVCAndTrace calls
 inline void SetThreadNameInVCAndTrace(const char* name) {}

@@ -398,7 +398,7 @@ CPropSheetPage::CPropSheetPageProc(HWND hwndDlg, UINT uMsg, WPARAM wParam,
             dlg->HWindow = hwndDlg;
             dlg->Parent = ::GetParent(hwndDlg);
             //--- insert window by hwndDlg into window list
-            if (!WindowsManager.AddWindow(hwndDlg, dlg)) // chyba
+            if (!WindowsManager.AddWindow(hwndDlg, dlg)) // error
             {
                 TRACE_ET(_T("Unable to create dialog."));
                 return TRUE;
@@ -1340,7 +1340,7 @@ int CTreePropDialog::Execute(const TCHAR* buttonOK,
         *lpw++ = 0; // predefined dialog box class (by default)
         lpwsz = (LPWSTR)lpw;
         lpw += WinLibCopyText(lpwsz, Caption, 100); // title
-        *lpw++ = 8;                                 // velikost fontu
+        *lpw++ = 8;                                 // font size
         *lpw++ = FW_NORMAL;                         // font weight
         *(BYTE*)lpw = FALSE;                        // is font italic?
         *((BYTE*)lpw + 1) = ANSI_CHARSET;           // font charset

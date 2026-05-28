@@ -6,7 +6,7 @@
 // ****************************************************************************
 //
 // CBackbufferedDC -- DC with back buffer, for smooth drawing of more complex
-// grafickych celku
+// graphical units
 //
 
 class CBackbufferedDC
@@ -17,15 +17,15 @@ public:
     ~CBackbufferedDC();
     void Destroy();
 
-    // nastavi okno ke kteremu se DC vaze
+    // sets the window to which the DC is bound
     void SetWindow(HWND window);
 
-    // aktualizuje vnitrni data v zavislosti na zmene velikosti okna/rozliseni
-    // obrazovky apod; nevolat mezi BeginPaint a EndPaint
+    // updates internal data depending on window size/screen resolution changes,
+    // etc.; do not call between BeginPaint and EndPaint
     void Update();
 
     // starts drawing to window, _must_ pair with EndPaint, cannot be called
-    // opakovane
+    // repeatedly
     void BeginPaint();
 
     // ukonci kresleni a zkopiruje obsah back-bufferu na obrazovku

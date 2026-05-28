@@ -17,9 +17,9 @@ enum CBorderLines
 
 enum CSecurityIconState
 {
-    sisNone = 0x00,      // ikona neni zobrazena
-    sisUnsecured = 0x01, // zobrazena ikona odemceneho zamku
-    sisSecured = 0x02    // zobrazena ikona zamceneho zamku
+    sisNone = 0x00,      // icon is not displayed
+    sisUnsecured = 0x01, // unlocked lock icon is displayed
+    sisSecured = 0x02    // locked lock icon is displayed
 };
 
 /*
@@ -32,28 +32,28 @@ enum
 //
 // CHotTrackItem
 //
-// polozka obsahuje index prvniho znaku, pocet znaku, offset prvniho znaku v bodech
-// a jejich delku v bodech k zobrazene ceste se vytvori seznam techto polozek a drzi
-// se v poli
+// An item contains the first character index, character count, first character offset in pixels,
+// and their length in pixels. A list of these items is created for the displayed path and kept
+// in an array.
 //
-// pro cestu "\\john\c\winnt
+// For path "\\john\c\winnt
 //
-// se vytvori tyto polozky:
+// these items are created:
 //
-// (0, 9,  0, delka prvnich deviti znaku)   = \\john\c\
-// (0, 14, 0, delka 14 znaku)              = \\john\c\winnt
+// (0, 9,  0, length of the first nine characters) = \\john\c\
+// (0, 14, 0, length of 14 characters)             = \\john\c\winnt
 //
-// pro "DIR: 12"
+// For "DIR: 12"
 //
-// (0, 3, 0, delka tri znaku DIR)
-// (5, 2, bodovy offset "12", delka dvou znaku "12")
+// (0, 3, 0, length of three characters DIR)
+// (5, 2, pixel offset of "12", length of two characters "12")
 
 struct CHotTrackItem
 {
-    WORD Offset;       // offset prvniho znaku ve znacich
-    WORD Chars;        // pocet znaku
-    WORD PixelsOffset; // offset prvniho znaku v bodech
-    WORD Pixels;       // jejich delka v bodech
+    WORD Offset;       // offset of the first character in characters
+    WORD Chars;        // character count
+    WORD PixelsOffset; // offset of the first character in pixels
+    WORD Pixels;       // their length in pixels
 };
 
 class CPanelStatusBar : public CWindow
@@ -66,65 +66,65 @@ protected:
     TDirectArray<CHotTrackItem> HotTrackItems;
     BOOL HotTrackItemsMeasured;
 
-    int Border; // oddelovaci cara nahore/dole
+    int Border; // separator line at top/bottom
     char* Text;
-    int TextLen; // pocet znaku na ukazateli 'Text' bez terminatoru
+    int TextLen; // number of characters at the 'Text' pointer, excluding terminator
     char* Size;
-    int PathLen;          // -1 (cesta je cely Text), jinak delka cesty v Text (zbytek je filter)
-    BOOL History;         // zobrazovat sipku mezi textem a size?
-    BOOL Hidden;          // zobrazovat symbo filtru?
-    int HiddenFilesCount; // kolik je odfiltrovanych souboru
-    int HiddenDirsCount;  // a adresaru
+    int PathLen;          // -1 (path is the whole Text), otherwise path length in Text (the rest is the filter)
+    BOOL History;         // display the arrow between text and size?
+    BOOL Hidden;          // display the filter symbol?
+    int HiddenFilesCount; // how many files are filtered out
+    int HiddenDirsCount;  // and directories
     BOOL WholeTextVisible;
 
-    BOOL ShowThrobber;             // TRUE pokud se ma zobrazovat 'progress' throbber za textem/hidden filtrem (nezalezi na existenci okna)
-    BOOL DelayedThrobber;          // TRUE pokud uz bezi timer pro zobrazeni throbbera
-    DWORD DelayedThrobberShowTime; // kolik bude GetTickCount() v okamziku, kdy se ma zobrazit zpozdeny throbber (0 = nezobrazujeme se zpozdenim)
-    BOOL Throbber;                 // zobrazovat 'progress' throbber za textem/hidden filtrem? (TRUE jen pokud existuje okno)
-    int ThrobberFrame;             // index aktualniho policka animace
-    char* ThrobberTooltip;         // pokud je NULL, nebude zobrazen
-    int ThrobberID;                // identifikacni cislo throbbera (-1 = neplatne)
+    BOOL ShowThrobber;             // TRUE if the 'progress' throbber should be shown after the text/hidden filter (independent of window existence)
+    BOOL DelayedThrobber;          // TRUE if the timer for showing the throbber is already running
+    DWORD DelayedThrobberShowTime; // GetTickCount() value when the delayed throbber should be shown (0 = not showing with delay)
+    BOOL Throbber;                 // show the 'progress' throbber after the text/hidden filter? (TRUE only if the window exists)
+    int ThrobberFrame;             // current animation frame index
+    char* ThrobberTooltip;         // if NULL, it will not be displayed
+    int ThrobberID;                // throbber identification number (-1 = invalid)
 
     CSecurityIconState Security;
-    char* SecurityTooltip; // pokud je NULL, nebude zobrazen
+    char* SecurityTooltip; // if NULL, it will not be displayed
 
     int Allocated;
-    int* AlpDX; // pole delek (od nulteho do Xteho znaku v retezci)
+    int* AlpDX; // array of lengths (from the zero-th to the X-th character in the string)
     BOOL Left;
 
-    int ToolBarWidth; // aktualni sirka toolbary
+    int ToolBarWidth; // current toolbar width
 
-    int EllipsedChars; // pocet vypustenych znaku za rootem; jinak -1
-    int EllipsedWidth; // delka vypusteho retezce za rootem; jinak -1
+    int EllipsedChars; // number of omitted characters after the root; otherwise -1
+    int EllipsedWidth; // length of the omitted string after the root; otherwise -1
 
-    CHotTrackItem* HotItem;     // vysvicena polozka
-    CHotTrackItem* LastHotItem; // posledni vysvicena poozka
-    BOOL HotSize;               // vysvicena je polozka size
-    BOOL HotHistory;            // vysvicena je polozka history
-    BOOL HotZoom;               // vysvicena je polozka zoom
-    BOOL HotHidden;             // vysviceny je symbol filtru
-    BOOL HotSecurity;           // vysviceny je symbol zamku
+    CHotTrackItem* HotItem;     // highlighted item
+    CHotTrackItem* LastHotItem; // last highlighted item
+    BOOL HotSize;               // the size item is highlighted
+    BOOL HotHistory;            // the history item is highlighted
+    BOOL HotZoom;               // the zoom item is highlighted
+    BOOL HotHidden;             // the filter symbol is highlighted
+    BOOL HotSecurity;           // the lock symbol is highlighted
 
-    RECT TextRect;     // kam jsme vysmazili text
-    RECT HiddenRect;   // kam jsme vysmazili symbol filtru
-    RECT SizeRect;     // kam jsme vysmazili text size
-    RECT HistoryRect;  // kam jsme vysmazili drop down pro history
-    RECT ZoomRect;     // kam jsme vysmazili drop down pro history
-    RECT ThrobberRect; // kam jsme vysmazili throbber
-    RECT SecurityRect; // kam jsme vysmazili zamek
+    RECT TextRect;     // where we drew the text
+    RECT HiddenRect;   // where we drew the filter symbol
+    RECT SizeRect;     // where we drew the size text
+    RECT HistoryRect;  // where we drew the history drop down
+    RECT ZoomRect;     // where we drew the history drop down
+    RECT ThrobberRect; // where we drew the throbber
+    RECT SecurityRect; // where we drew the lock
     int MaxTextRight;
     BOOL MouseCaptured;
     BOOL RButtonDown;
     BOOL LButtonDown;
-    POINT LButtonDownPoint; // kde user stisknul LButton
+    POINT LButtonDownPoint; // where the user pressed LButton
 
     int Height;
-    int Width; // rozmery
+    int Width; // dimensions
 
-    BOOL NeedToInvalidate; // pro SetAutomatic() - nastala zmena, musime prekreslovat?
+    BOOL NeedToInvalidate; // for SetAutomatic() - a change occurred, do we need to repaint?
 
-    DWORD* SubTexts;     // pole DWORDU: LOWORD pozice, HIWORD delka
-    DWORD SubTextsCount; // pocet polozek v poli SubTexts
+    DWORD* SubTexts;     // DWORD array: LOWORD position, HIWORD length
+    DWORD SubTextsCount; // number of items in the SubTexts array
 
     IDropTarget* IDropTargetPtr;
 
@@ -133,12 +133,12 @@ public:
     ~CPanelStatusBar();
 
     BOOL SetSubTexts(DWORD* subTexts, DWORD subTextsCount);
-    // nastavuje text 'text' do status-line, 'pathLen' urcuje delku cesty (zbytek je filter),
-    // pokud se 'pathLen' nepouziva (cesta je kompletni 'text') je rovno -1
+    // Sets text 'text' into the status line, 'pathLen' determines the path length (the rest is the filter),
+    // if 'pathLen' is not used (the path is the complete 'text'), it is equal to -1.
     BOOL SetText(const char* text, int pathLen = -1);
 
-    // sestavi pole HotTrackItems: pro disky a rchivatory na zaklade zpetnych lomitek
-    // a pro FS se dopta pluginu
+    // Builds the HotTrackItems array: for disks and archivers based on backslashes,
+    // and asks the plugin for FS.
     void BuildHotTrackItems();
 
     void GetHotText(char* buffer, int bufSize);
@@ -151,11 +151,11 @@ public:
     void SetSize(const CQuadWord& size);
     void SetHidden(int hiddenFiles, int hiddenDirs);
     void SetHistory(BOOL history);
-    void SetThrobber(BOOL show, int delay = 0, BOOL calledFromDestroyWindow = FALSE); // volat pouze z hlavniho (GUI) threadu, stejne jako ostatni metody objektu
-    // nastavi text, ktery se bude zobrazovat jako tooltip po najeti mysi na throbber, objekt si udela kopii
-    // pokud je NULL, nebude tooltip zobrazen
+    void SetThrobber(BOOL show, int delay = 0, BOOL calledFromDestroyWindow = FALSE); // call only from the main (GUI) thread, like other object methods
+    // Sets text displayed as a tooltip when hovering over the throbber; the object makes a copy.
+    // If NULL, the tooltip will not be displayed.
     void SetThrobberTooltip(const char* throbberTooltip);
-    int ChangeThrobberID(); // zmeni ThrobberID a vrati jeho novou hodnotu
+    int ChangeThrobberID(); // changes ThrobberID and returns its new value
     BOOL IsThrobberVisible(int throbberID) { return ShowThrobber && ThrobberID == throbberID; }
     void HideThrobberAndSecurityIcon();
 
@@ -167,7 +167,7 @@ public:
     void LayoutWindow();
     void Paint(HDC hdc, BOOL highlightText = FALSE, BOOL highlightHotTrackOnly = FALSE);
     void Repaint(BOOL flashText = FALSE, BOOL hotTrackOnly = FALSE);
-    void InvalidateAndUpdate(BOOL update); // lze o volat i pro HWindow == NULL
+    void InvalidateAndUpdate(BOOL update); // can also be called for HWindow == NULL
     void FlashText(BOOL hotTrackOnly = FALSE);
 
     BOOL FindHotTrackItem(int xPos, int& index);
@@ -177,13 +177,13 @@ public:
 
     BOOL IsLeft() { return Left; }
 
-    BOOL SetDriveIcon(HICON hIcon);     // ikona se okopiruje do imagelistu - destrukci musi zajistit volajici kod
-    void SetDrivePressed(BOOL pressed); // zamackne drive ikonku
+    BOOL SetDriveIcon(HICON hIcon);     // icon is copied into the image list - caller code must ensure destruction
+    void SetDrivePressed(BOOL pressed); // presses the drive icon
 
-    BOOL GetTextFrameRect(RECT* r);   // vrati obdelnik kolem textu v souradnicich obrazovky
-    BOOL GetFilterFrameRect(RECT* r); // vrati obdelnik kolem symbolu filtru v souradnicich obrazovky
+    BOOL GetTextFrameRect(RECT* r);   // returns the rectangle around the text in screen coordinates
+    BOOL GetFilterFrameRect(RECT* r); // returns the rectangle around the filter symbol in screen coordinates
 
-    // mohlo dojit ke zmene barevne hloubky obrazovky; je treba prebuildit CacheBitmap
+    // The screen color depth may have changed; CacheBitmap must be rebuilt.
     void OnColorsChanged();
 
     void SetFont();
@@ -194,9 +194,9 @@ protected:
     void RegisterDragDrop();
     void RevokeDragDrop();
 
-    // vytvori imagelist s jednim prvkem, ktery bude pouzit pro zobrazovani prubehu tazeni
-    // po ukonceni tazeni je treba tento imagelist uvolnit
-    // vstupem je bod, ke kteremu se napocitaji offsety dxHotspot a dyHotspot
+    // Creates an image list with one item used to display drag progress.
+    // After dragging ends, this image list must be released.
+    // The input is a point for which dxHotspot and dyHotspot offsets are computed.
     HIMAGELIST CreateDragImage(const char* text, int& dxHotspot, int& dyHotspot, int& imgWidth, int& imgHeight);
 
     void PaintThrobber(HDC hDC);

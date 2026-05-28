@@ -121,7 +121,7 @@ BOOL CIconList::CreateOrEnlargeTmpImage(int width, int height)
         }
 
         if (HTmpImage != NULL)
-            HANDLES(DeleteObject(HTmpImage)); // pokud existuje stara bitmapa, zrusime ji
+            HANDLES(DeleteObject(HTmpImage)); // if an old bitmap exists, delete it
 
         HTmpImage = hBmp;
         TmpImageRaw = (DWORD*)lpBits;

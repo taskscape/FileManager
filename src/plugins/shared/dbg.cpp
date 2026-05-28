@@ -396,7 +396,7 @@ void* _sal_safe_memcpy(void* dest, const void* src, size_t count)
 
 // pasticka na vlastni definici techto "zakazanych" operatoru (aby fungovala kontrola
 // zakazanych kombinaci stringu WCHAR / char v TRACE makrech, nesmi byt nasledujici
-// operatory definovany v jinych modulech - jinak by linker neohlasil chybu - idea:
+// operators defined in other modules - otherwise the linker would not report an error - idea:
 // v DEBUG verzi chytame chyby linkeru, v RELEASE verzi chytame chyby vlastni definice
 // operatoru)
 #if !defined(_DEBUG) && !defined(INSIDE_SALAMANDER) && !defined(__BORLANDC__)

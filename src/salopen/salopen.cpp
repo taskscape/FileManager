@@ -14,7 +14,7 @@ HANDLE Heap = NULL;
 #define GET_X_LPARAM(lp) ((int)(short)LOWORD(lp))
 #define GET_Y_LPARAM(lp) ((int)(short)HIWORD(lp))
 
-// callback, ktery vraci jmena oznacenych souboru pro vytvareni nasl. interfacu
+// Callback that returns selected file names for creating the following interfaces.
 typedef const char* (*CEnumFileNamesFunction)(int index, void* param);
 
 void my_memcpy(void* dst, const void* src, int len)
@@ -160,7 +160,7 @@ LPITEMIDLIST* CreateItemIdList(LPSHELLFOLDER folder, int files,
         if (pidl != NULL)
             list[i] = pidl;
         else
-            break; // nejaka chyba
+            break; // some error
     }
 
     if (pidl == NULL)
@@ -186,7 +186,7 @@ BOOL GetShellFolder(const char* dir, IShellFolder*& shellFolderObj, LPITEMIDLIST
     {
         int rootFolder;
         if (dir[0] != '\\')
-            rootFolder = CSIDL_DRIVES; // normalni cesta
+            rootFolder = CSIDL_DRIVES; // normal path
         else
             rootFolder = CSIDL_NETWORK; // UNC - sitove zdroje
         LPITEMIDLIST rootFolderID;
@@ -197,7 +197,7 @@ BOOL GetShellFolder(const char* dir, IShellFolder*& shellFolderObj, LPITEMIDLIST
             {
                 char root[MAX_PATH];
                 GetRootPath(root, dir);
-                if (lstrlen(root) < lstrlen(dir)) // neni to root cesta
+                if (lstrlen(root) < lstrlen(dir)) // not a root path
                 {
                     lstrcpy(root, dir);
                     char* name = root + lstrlen(root);
@@ -278,7 +278,7 @@ BOOL GetShellFolder(const char* dir, IShellFolder*& shellFolderObj, LPITEMIDLIST
 
                                             if (name != NULL)
                                             {
-                                                if (lstrlen(name) <= 3 && StrNICmp(name, root, 2) == 0) // name = "c:" nebo "c:\"
+                                                if (lstrlen(name) <= 3 && StrNICmp(name, root, 2) == 0) // name = "c:" or "c:\"
                                                 {
                                                     pidlFolder = idList;
                                                     break; // pidl nalezen (ziskan)
@@ -298,7 +298,7 @@ BOOL GetShellFolder(const char* dir, IShellFolder*& shellFolderObj, LPITEMIDLIST
                     }
                     else
                     {
-                        if (rootFolder == CSIDL_NETWORK) // musime ziskat slozite pidl, jinak nechodi mapovani
+                        if (rootFolder == CSIDL_NETWORK) // must get complex pidl, otherwise mapping does not work
                         {
                             BOOL setWait = (GetCursor() != LoadCursor(NULL, IDC_WAIT)); // ceka uz ?
                             HCURSOR oldCur;
@@ -775,7 +775,7 @@ void WinMainCRTStartup()
         ExitProcess(1);
     }
 
-    // vytvorime skryte okno a z nej spustime menu
+    // create hidden window and launch menu from it
     // pod W2K+ uz asi neni potreba
     HINSTANCE hInstance = GetModuleHandle(NULL);
     WNDCLASS CWindowClass;

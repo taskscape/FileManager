@@ -469,7 +469,7 @@ public:
 class CPluginInterfaceAbstract
 {
 #ifdef INSIDE_SALAMANDER
-private: // ochrana proti nespravnemu primemu volani metod (viz CPluginInterfaceEncapsulation)
+private: // protection against incorrect direct method calls (see CPluginInterfaceEncapsulation)
     friend class CPluginInterfaceEncapsulation;
 #else  // INSIDE_SALAMANDER
 public:

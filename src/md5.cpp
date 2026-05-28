@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2023 Taskscape Ltd
 // SPDX-License-Identifier: GPL-2.0-or-later
 
-#include "precomp.h" // include slouzi pouze k prelozitelnosti v Salamanderu
+#include "precomp.h" // include used only to make this buildable in Salamander
 
 //#include <assert.h>
 //#include <string.h>

@@ -18,7 +18,7 @@ CSharesItem::CSharesItem(const char* localPath, const char* remoteName, const ch
         char buff[MAX_PATH];
         lstrcpyn(buff, localPath, MAX_PATH);
         SalPathAddBackslash(buff, MAX_PATH); // kdyby nahodou bylo jen "c:", tak aby vznikl root
-        if (SalGetFullName(buff))            // root "c:\\", ostatni bez '\\' na konci
+        if (SalGetFullName(buff))            // root "c:\\", others without trailing '\\'
         {
             LocalPath = DupStr(buff);
             RemoteName = DupStr(remoteName);
@@ -26,7 +26,7 @@ CSharesItem::CSharesItem(const char* localPath, const char* remoteName, const ch
             if (LocalPath != NULL && RemoteName != NULL && Comment != NULL)
             {
                 char* s = strrchr(LocalPath, '\\');
-                if (s == NULL || *(s + 1) == 0) // root cesta; s==NULL je pouze pro jistotu, ale nikdy nemuze vyjit
+                if (s == NULL || *(s + 1) == 0) // root path; s==NULL is only for safety, but can never happen
                     LocalName = LocalPath;
                 else
                     LocalName = s + 1;
@@ -118,7 +118,7 @@ void CShares::Refresh()
                             delete item;
                             Data.ResetState();
                             Data.DestroyMembers();
-                            break; // chyba, nema smysl pokracovat v enumu
+                            break; // error, no point continuing enumeration
                         }
                     }
                     if (item != NULL)
@@ -195,11 +195,11 @@ void CShares::PrepareSearch(const char* path)
     // vyprazdnime pole Wanted
     Wanted.DestroyMembers();
 
-    // zaradime do nej pouze ty shary, ktere lezi na pozadovane ceste
+    // include only shares located on the requested path
     char buff[MAX_PATH];
     lstrcpyn(buff, path, MAX_PATH);
-    if (buff[0] != 0)                        // pokud hledame shary z this_computer nesmime pripojit backslash
-        SalPathAddBackslash(buff, MAX_PATH); // na konci chceme backslash
+    if (buff[0] != 0)                        // if we are looking for shares from this_computer, we must not append a backslash
+        SalPathAddBackslash(buff, MAX_PATH); // we want a trailing backslash
     int pathLen = (int)strlen(buff);
 
     int i;
@@ -210,7 +210,7 @@ void CShares::PrepareSearch(const char* path)
         if (pathLen == itemNameLen && StrNICmp(item->LocalPath, buff, itemNameLen) == 0)
         {
             int index;
-            if (!GetWantedIndex(item->LocalName, index)) // odpovidajici share zaradime do pole Wanted jen pokud jiz tam neni
+            if (!GetWantedIndex(item->LocalName, index)) // add the matching share to Wanted only if it is not already there
             {
                 Wanted.Insert(index, item);
             }
@@ -233,7 +233,7 @@ BOOL CShares::GetUNCPath(const char* path, char* uncPath, int uncPathMax)
     HANDLES(EnterCriticalSection(&CS));
     char buff[MAX_PATH];
     lstrcpyn(buff, path, MAX_PATH);
-    SalPathAddBackslash(buff, MAX_PATH); // na konci chceme backslash
+    SalPathAddBackslash(buff, MAX_PATH); // we want a trailing backslash
 
     int longestIndex = -1; // index do pole Data, kde lezi nejdelsi vyhovujici share
 
@@ -260,8 +260,8 @@ BOOL CShares::GetUNCPath(const char* path, char* uncPath, int uncPathMax)
         strcat(unc, "\\");
         // pripojime nazev sharu
         strcat(unc, item->RemoteName);
-        SalPathAddBackslash(unc, 2 * MAX_PATH); // na konci chceme backslash
-        // z puvodni cesty pripojime adresare od sdileni dale
+        SalPathAddBackslash(unc, 2 * MAX_PATH); // we want a trailing backslash
+        // append directories after the share from the original path
         if (strlen(item->LocalPath) < strlen(path))
         {
             const char* s = path + strlen(item->LocalPath);
@@ -269,7 +269,7 @@ BOOL CShares::GetUNCPath(const char* path, char* uncPath, int uncPathMax)
                 s++; // preskocime pripadny backslash
             strcat(unc, s);
         }
-        if (!SalGetFullName(unc)) // root "c:\\", ostatni bez '\\' na konci
+        if (!SalGetFullName(unc)) // root "c:\\", others without trailing '\\'
         {
             TRACE_E("Unexpected path in CSharesItem::GetUNCPath()");
             HANDLES(LeaveCriticalSection(&CS));

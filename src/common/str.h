@@ -142,30 +142,30 @@ int StrNICmp(const char* s1, const char* s2, int n);
 //
 int MemICmp(const void* buf1, const void* buf2, int n);
 
-// rychlejsi strlen, jede po ctyrech znacich
-// do str se saha po ctyrech bytech -> nutny vetsi buffer
+// Faster strlen, processes four characters at a time.
+// str is accessed four bytes at a time -> a larger buffer is required.
 // int StrLen(const char *str);    // only 2x faster, unnecessary risk of accessing unaligned memory
 
 // copies text to newly allocated space, NULL = insufficient memory
 char* DupStr(const char* txt);
 
 // copies text to newly allocated space, NULL = insufficient memory,
-// navic pri nedostatku pameti nastavi 'err' na TRUE
+// also sets 'err' to TRUE on insufficient memory
 char* DupStrEx(const char* str, BOOL& err);
 
-// vraci prvni vyskyt 'pattern' v 'txt' nebo NULL, je case-insensitive
+// Returns the first occurrence of 'pattern' in 'txt' or NULL; case-insensitive.
 const char* StrIStr(const char* txt, const char* pattern);
 
-// vraci prvni vyskyt 'pattern' v 'txt' nebo NULL, je case-insensitive
+// Returns the first occurrence of 'pattern' in 'txt' or NULL; case-insensitive.
 const char* StrIStr(const char* txtStart, const char* txtEnd,
                     const char* patternStart, const char* patternEnd);
 
-// pripoji retezec 'src' za retezec 'dest', ale neprekroci delku 'dstSize'
-// retezec zakoncuje nulou, ktera spada do delky 'dstSize'
-// vraci 'dst'
+// Appends string 'src' after string 'dest', but does not exceed 'dstSize'.
+// Terminates the string with a null character that fits within 'dstSize'.
+// Returns 'dst'.
 char* StrNCat(char* dst, const char* src, int dstSize);
 
-// tento historicky kod uz nikdo nepouziva
+// This historical code is no longer used.
 /*
 #define CONVERT_TAB_CHARS     44
 #define CONVERT_TAB_MAX_CHARS 256
@@ -187,7 +187,7 @@ extern CConvertTab ConvertTab;
 //
 // SWPrintFToEnd_s
 //
-// jedina odlisnost od swprintf_s je, ze zapisuje az za text umisteny v bufferu
+// The only difference from swprintf_s is that it writes after the text already placed in the buffer.
 
 template <size_t _Size>
 inline int SWPrintFToEnd_s(WCHAR (&_Dst)[_Size], const WCHAR* _Format, ...)

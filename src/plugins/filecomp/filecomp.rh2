@@ -122,7 +122,7 @@
 
 //***********************************************************************************
 //
-// virtualni IDcka - pouze pro vazbu s helpem
+// Virtual IDs, used only for binding to help.
 //
 
 #define IDH_KEYBOARD        400

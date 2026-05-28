@@ -9,7 +9,7 @@
 #define IDC_STATIC_1 3000
 #include "statics.rh2"   // 3000 az 3039 jsou timto zabrane !!!
 
-// ikona pro hlavni okno
+// icon for the main window
 #define IDI_WINDOW_ICON       70
 #define IDI_SB_ANCHOR         71
 #define IDI_SB_CURSOR         72

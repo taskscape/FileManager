@@ -9,16 +9,16 @@
 //
 //****************************************************************************
 
-// "light" verze WinLibu
+// "light" version of WinLib
 
 #pragma once
 
 // macros for suppressing unnecessary parts of WinLibLT (easier compilation):
 // ENABLE_PROPERTYDIALOG - if defined, it is possible to use property sheet dialog (CPropertyDialog)
 
-// nastaveni vlastnich textu do WinLibu
-void SetWinLibStrings(const char* invalidNumber, // "neni cislo" (u transferbufferu cisel)
-                      const char* error);        // titulek "chyba" (u transferbufferu cisel)
+// setting custom texts for WinLib
+void SetWinLibStrings(const char* invalidNumber, // "not a number" (for number transfer buffer)
+                      const char* error);        // "error" title (for number transfer buffer)
 
 // must be called before using WinLib; 'pluginName' is plugin name (e.g. "DEMOPLUG"),
 // used to distinguish names of WinLib universal window classes (must differ between plugins,
@@ -26,7 +26,7 @@ void SetWinLibStrings(const char* invalidNumber, // "neni cislo" (u transferbuff
 // plugin); 'dllInstance' is plugin module (used when registering universal WinLib classes)
 BOOL InitializeWinLib(const char* pluginName, HINSTANCE dllInstance);
 // must be called after using WinLib; 'dllInstance' is plugin module (used when canceling
-// registrace univerzalnich trid WinLibu)
+// WinLib universal class registration)
 void ReleaseWinLib(HINSTANCE dllInstance);
 
 // callback type for connecting to HTML help
@@ -44,15 +44,15 @@ enum CWLS
     WLS_COUNT
 };
 
-extern char CWINDOW_CLASSNAME[100];  // jmeno tridy universalniho okna
-extern char CWINDOW_CLASSNAME2[100]; // jmeno tridy universalniho okna - nema CS_VREDRAW | CS_HREDRAW
+extern char CWINDOW_CLASSNAME[100];  // universal window class name
+extern char CWINDOW_CLASSNAME2[100]; // universal window class name - does not have CS_VREDRAW | CS_HREDRAW
 
 // ****************************************************************************
 
-enum CObjectOrigin // pouzito pri destrukci oken a dialogu
+enum CObjectOrigin // used when destroying windows and dialogs
 {
     ooAllocated, // will be deallocated on WM_DESTROY
-    ooStatic,    // pri WM_DESTROY se HWindow nastavi na NULL
+    ooStatic,    // HWindow is set to NULL on WM_DESTROY
     ooStandard   // for modal dlg =ooStatic, for modeless dlg =ooAllocated
 };
 
@@ -90,9 +90,9 @@ public:
         SetHelpID(helpID);
     }
 
-    virtual ~CWindowsObject() {} // aby se u potomku volal jejich destruktor
+    virtual ~CWindowsObject() {} // so descendants have their destructor called
 
-    virtual BOOL Is(int) { return FALSE; } // identifikace objektu
+    virtual BOOL Is(int) { return FALSE; } // object identification
     virtual int GetObjectType() { return otBase; }
 
     virtual BOOL IsAllocated() { return ObjectOrigin == ooAllocated; }
@@ -132,10 +132,10 @@ public:
     virtual BOOL Is(int type) { return type == otWindow; }
     virtual int GetObjectType() { return otWindow; }
 
-    // registruje univerzalni tridy WinLibu, vola se automaticky (registraci rusi tez automaticky)
+    // registers WinLib universal classes, called automatically (registration is also canceled automatically)
     static BOOL RegisterUniversalClass(HINSTANCE dllInstance);
 
-    // registrace vlastni univerzalni tridy; POZOR: pri unloadu pluginu je nutne zrusit registraci tridy,
+    // registration of a custom universal class; CAUTION: when unloading the plugin, class registration must be canceled,
     // otherwise repeated plugin load will result in registration error (conflict with old class)
     static BOOL RegisterUniversalClass(UINT style,
                                        int cbClsExtra,
@@ -158,7 +158,7 @@ public:
                 HWND hwndParent,        // handle of parent or owner window
                 HMENU hmenu,            // handle of menu or child-window identifier
                 HINSTANCE hinst,        // handle of application instance
-                LPVOID lpvParam);       // ukazatel na objekt vytvareneho okna
+                LPVOID lpvParam);       // pointer to the object of the created window
 
     HWND CreateEx(DWORD dwExStyle,        // extended window style
                   LPCTSTR lpszClassName,  // address of registered class name
@@ -171,7 +171,7 @@ public:
                   HWND hwndParent,        // handle of parent or owner window
                   HMENU hmenu,            // handle of menu or child-window identifier
                   HINSTANCE hinst,        // handle of application instance
-                  LPVOID lpvParam);       // ukazatel na objekt vytvareneho okna
+                  LPVOID lpvParam);       // pointer to the object of the created window
 
     void AttachToWindow(HWND hWnd);
     void AttachToControl(HWND dlg, int ctrlID);
@@ -190,8 +190,8 @@ protected:
 
 enum CTransferType
 {
-    ttDataToWindow,  // data jdou do okna
-    ttDataFromWindow // data jdou z okna
+    ttDataToWindow,  // data goes to window
+    ttDataFromWindow // data goes from window
 };
 
 // ****************************************************************************
@@ -235,8 +235,8 @@ class CDialog : public CWindowsObject
 {
 public:
 #ifdef ENABLE_PROPERTYDIALOG
-    CWindowsObject::HWindow;         // kvuli zkompilovatelnosti CPropSheetPage
-    CWindowsObject::SetObjectOrigin; // kvuli zkompilovatelnosti CPropSheetPage
+    CWindowsObject::HWindow;         // so CPropSheetPage can compile
+    CWindowsObject::SetObjectOrigin; // so CPropSheetPage can compile
 #endif                               // ENABLE_PROPERTYDIALOG
 
     CDialog(HINSTANCE modul, int resID, HWND parent,
@@ -268,8 +268,8 @@ public:
                                         (!Modal && ObjectOrigin == ooStandard); }
 
     void SetParent(HWND parent) { Parent = parent; }
-    INT_PTR Execute(); // modalni dialog
-    HWND Create();     // nemodalni dialog
+    INT_PTR Execute(); // modal dialog
+    HWND Create();     // modeless dialog
 
     static INT_PTR CALLBACK CDialogProc(HWND hwndDlg, UINT uMsg,
                                         WPARAM wParam, LPARAM lParam);
@@ -279,7 +279,7 @@ protected:
 
     virtual void NotifDlgJustCreated() {}
 
-    BOOL Modal; // kvuli zpusobu destrukce dialogu
+    BOOL Modal; // because of the dialog destruction method
     HINSTANCE Modul;
     int ResID;
     HWND Parent;
@@ -294,12 +294,12 @@ class CPropertyDialog;
 class CPropSheetPage : protected CDialog
 {
 public:
-    CDialog::HWindow; // HWindow zustane pristupne
+    CDialog::HWindow; // HWindow remains accessible
 
-    CDialog::SetObjectOrigin; // zpristupneni povolenych metod predku
+    CDialog::SetObjectOrigin; // expose allowed ancestor methods
     CDialog::Transfer;
 
-    // testovano s resourcem dialogu stranky se stylem:
+    // tested with a page dialog resource using style:
     // DS_CONTROL | DS_3DLOOK | WS_CHILD | WS_CAPTION;
     // if we want to use title directly from resources, just set 'title'==NULL and
     // 'flags'==0
@@ -332,7 +332,7 @@ protected:
     DWORD Flags;
     HICON Icon;
 
-    CPropertyDialog* ParentDialog; // vlastnik teto stranky
+    CPropertyDialog* ParentDialog; // owner of this page
 
     friend class CPropertyDialog;
 };
@@ -342,11 +342,11 @@ protected:
 class CPropertyDialog : public TIndirectArray<CPropSheetPage>
 {
 public:
-    // do tohoto objektu je idealni pridat objekty jednotlivych stranek
+    // it is ideal to add individual page objects to this object
     // and then add them as "static" (default choice) via Add method;
     // 'startPage' and 'lastPage' can be only single variable (value in/reference out);
-    // 'flags' viz help k 'PROPSHEETHEADER', pouzitelne hlavne konstanty
-    // PSH_NOAPPLYNOW, PSH_USECALLBACK a PSH_HASHELP (jinak staci 'flags'==0)
+    // 'flags' see help for 'PROPSHEETHEADER', mainly usable constants are
+    // PSH_NOAPPLYNOW, PSH_USECALLBACK, and PSH_HASHELP (otherwise 'flags'==0 is enough)
     CPropertyDialog(HWND parent, HINSTANCE modul, char* caption,
                     int startPage, DWORD flags, HICON icon = NULL,
                     DWORD* lastPage = NULL, PFNPROPSHEETCALLBACK callback = NULL)
@@ -368,7 +368,7 @@ public:
     virtual int GetCurSel();
 
 protected:
-    HWND Parent; // parametry pro vytvareni dialogu
+    HWND Parent; // parameters for creating the dialog
     HWND HWindow;
     HINSTANCE Modul;
     HICON Icon;
@@ -377,7 +377,7 @@ protected:
     DWORD Flags;
     PFNPROPSHEETCALLBACK Callback;
 
-    DWORD* LastPage; // posledni zvolena stranka (muze byt NULL, pokud nezajima)
+    DWORD* LastPage; // last selected page (can be NULL if not needed)
 
     friend class CPropSheetPage;
 };
@@ -389,7 +389,7 @@ protected:
 class CWindowsManager
 {
 public:
-    int WindowsCount; // pocet oken obsluhovanych WinLibem (aktualni stav)
+    int WindowsCount; // number of windows handled by WinLib (current state)
 
 public:
     CWindowsManager() { WindowsCount = 0; }
@@ -416,10 +416,10 @@ struct CWindowQueueItem
 class CWindowQueue
 {
 protected:
-    const char* QueueName; // jmeno fronty (jen pro debugovaci ucely)
+    const char* QueueName; // queue name (debugging purposes only)
     CWindowQueueItem* Head;
 
-    struct CCS // pristup z vice threadu -> nutna synchronizace
+    struct CCS // access from multiple threads -> synchronization required
     {
         CRITICAL_SECTION cs;
 
@@ -431,24 +431,24 @@ protected:
     } CS;
 
 public:
-    CWindowQueue(const char* queueName /* napr. "DemoPlug Viewers" */)
+    CWindowQueue(const char* queueName /* e.g. "DemoPlug Viewers" */)
     {
         QueueName = queueName;
         Head = NULL;
     }
     ~CWindowQueue();
 
-    BOOL Add(CWindowQueueItem* item); // prida polozku do fronty, vraci uspech
-    void Remove(HWND hWindow);        // odstrani polozku z fronty
-    BOOL Empty();                     // vraci TRUE pokud je fronta prazdna
+    BOOL Add(CWindowQueueItem* item); // adds item to the queue, returns success
+    void Remove(HWND hWindow);        // removes item from the queue
+    BOOL Empty();                     // returns TRUE if the queue is empty
 
-    // posle (PostMessage - okna muzou byt v ruznych threadech) vsem oknum zpravu
+    // sends a message to all windows (PostMessage - windows can be in different threads)
     void BroadcastMessage(DWORD uMsg, WPARAM wParam, LPARAM lParam);
 
-    // broadcastne WM_CLOSE, pak ceka na prazdnou frontu (max. cas dle 'force' bud 'forceWaitTime'
-    // nebo 'waitTime'); vraci TRUE pokud je fronta prazdna (vsechna okna se zavrela)
-    // nebo je 'force' TRUE; cas INFINITE = neomezene dlouhe cekani
-    // Poznamka: pri 'force' TRUE vraci vzdy TRUE, nema smysl na nic cekat, proto forceWaitTime = 0
+    // broadcasts WM_CLOSE, then waits for an empty queue (maximum time is either 'forceWaitTime'
+    // or 'waitTime' depending on 'force'); returns TRUE if the queue is empty (all windows closed)
+    // or if 'force' is TRUE; INFINITE means unlimited waiting
+    // Note: with 'force' TRUE always returns TRUE, there is no point in waiting, so forceWaitTime = 0
     BOOL CloseAllWindows(BOOL force, int waitTime = 1000, int forceWaitTime = 0);
 };
 

@@ -7,41 +7,41 @@
 //
 // CToolTip
 //
-// Tento tooltip ma odstranit zakladni nevyhodu puvodni koncepce tooltipu.
-// Kazde okno melo vytvoreny vlastni tooltip objekt. Druha nevyhoda byla,
-// ze bylo nutne tomuto objektu predavat seznam oblasti, nad kteryma se
-// maji tooltipy vybalit.
+// This tooltip is intended to remove the basic disadvantage of the original tooltip design.
+// Each window had its own tooltip object. Another disadvantage was
+// that the list of areas over which tooltips should open had to be passed
+// to this object.
 //
-// Nova koncepce: CMainWindow bude vlastnit pouze jeden tooltip (instanci objektu).
-// Okno tooltipu se vytvari az ve chvili kdy je potreba a to v threadu, ktery
-// o zobrazeni pozadal. Duvod: potrebujeme, aby okno tooltipu v tomto threadu bezelo,
-// do 2.6b6 vcetne bezelo okenko tooltipu v hlavnim threadu Salamandera a pokud
-// ten stal, tooltipy se nezobrazovaly.
-// Pri pohybu mysi nad controlem, ktery bude pouzivat tento tooltip, bude control
-// pri vstupu do nove oblasti volat metodu SetCurrentID.
+// New design: CMainWindow will own only one tooltip (object instance).
+// The tooltip window is created only when needed, in the thread that
+// requested it to be shown. Reason: we need the tooltip window to run in this thread;
+// up to and including 2.6b6 the tooltip window ran in Salamander's main thread, and if
+// that thread was blocked, tooltips were not displayed.
+// When the mouse moves over a control that uses this tooltip, the control
+// will call SetCurrentID when entering a new area.
 //
-// Rozhrani pro praci s tooltipem bude v const.h, aby bylo dostupnem vsem
-// controlum bez nutnosti includit mainwnd.h a tooltip.h.
+// The interface for working with the tooltip will be in const.h so it is available to all
+// controls without needing to include mainwnd.h and tooltip.h.
 //
 
-// Pouzivane zpravy:
-// WM_USER_TTGETTEXT - slouzi k dotazu na text s urcitym ID
-//   wParam = ID predany pri SetCurrentToolTip
-//   lParam = buffer (ukazuje do bufferu tooltipu) maxilmani pocet znaku je TOOLTIP_TEXT_MAX
-//            pred volanim teto message je na nulty znak vlozen terminator
-//            text muze obsahovat \n pro prechod na novy radek a \t pro vlozeni tabem
-// pokud okno zapise do bufferu retezec terminovany nulou, bude zobrazen v tooltipu
-// jinak nebude tooltip zobrazen
+// Used messages:
+// WM_USER_TTGETTEXT - queries text with a specific ID
+//   wParam = ID passed during SetCurrentToolTip
+//   lParam = buffer (points into the tooltip buffer); maximum character count is TOOLTIP_TEXT_MAX
+//            before calling this message, a terminator is placed at character zero
+//            text may contain \n to move to a new line and \t to insert a tab
+// if the window writes a null-terminated string to the buffer, it will be displayed in the tooltip
+// otherwise the tooltip will not be displayed
 //
 
 class CToolTip : public CWindow
 {
     enum TipTimerModeEnum
     {
-        ttmNone,         // nebezi zadny casovac
-        ttmWaitingOpen,  // ceka se na otevreni tool tipu
-        ttmWaitingClose, // ceka se na zavreni tool tipu
-        ttmWaitingKill,  // ceka se na vystup z rezimu zobrazovani
+        ttmNone,         // no timer is running
+        ttmWaitingOpen,  // waiting for the tooltip to open
+        ttmWaitingClose, // waiting for the tooltip to close
+        ttmWaitingKill,  // waiting to leave display mode
     };
 
 protected:
@@ -53,9 +53,9 @@ protected:
     DWORD HideCounter;
     DWORD HideCounterMax;
     POINT LastCursorPos;
-    BOOL IsModal;     // je prave vykonvana nase message loop?
-    BOOL ExitASAP;    // zavri se co nejdriv a prestan byt modalni
-    UINT_PTR TimerID; // vracene ze SetTimer, potrebujeme pro KillTimer
+    BOOL IsModal;     // is our message loop currently running?
+    BOOL ExitASAP;    // close as soon as possible and stop being modal
+    UINT_PTR TimerID; // returned by SetTimer, needed for KillTimer
 
 public:
     CToolTip(CObjectOrigin origin = ooStatic);
@@ -63,37 +63,37 @@ public:
 
     BOOL RegisterClass();
 
-    // hParent je nezbytny, aby se pri jeho zavreni zavrel take tooltip
-    // bez nej se nam delo, ze skoncil thread parenta, ale okno tooltipu zustalo
-    // otevrene, ale uz neslo zavrit (neexistoval jeho thread) -> pady pri
-    // ukonceni Salamandera (nastesti to bylo pred release 2.5b7)
+    // hParent is required so the tooltip also closes when the parent is closed.
+    // Without it, the parent thread could end while the tooltip window remained
+    // open but could no longer be closed (its thread no longer existed) -> crashes during
+    // Salamander shutdown (fortunately this was before release 2.5b7).
     BOOL Create(HWND hParent);
 
-    // Tato metoda spusti casovac a pokud do jeho vyprseni neni zavolana znovu
-    // pozada okno 'hNotifyWindow' o text pomoci zpravy WM_USER_TTGETTEXT,
-    // ktery pak zobrazi pod kurzor na jeho aktualnich souradnicich.
-    // Promenna 'id' slouzi k rozliseni oblasti pri komunikaci s oknem 'hNotifyWindow'.
-    // Pokud bude tato metoda zavolana vicekrat se stejnym parametrem 'id', budou
-    // se tyto dalsi volani ignorovat.
-    // Hodnota 0 parametru 'hNotifyWindow' je vyhrazena pro zhasnuti okna a preruseni
-    // beziciho casovace.
-    // parametr 'showDelay' ma vyznam pokud je 'hNotifyWindow' != NULL
-    // pokud je vetsi nebo roven 1, urcuje za jak dlouho dojde ke zobrazeni tooltipu v [ms]
-    // pokud je roven 0, pouzije se implicitni prodleva
-    // pokud je -1, casovac se vubec nenastartuje
+    // This method starts a timer and, if it is not called again before the timer expires,
+    // asks window 'hNotifyWindow' for text using the WM_USER_TTGETTEXT message,
+    // then displays it under the cursor at its current coordinates.
+    // Variable 'id' distinguishes the area when communicating with window 'hNotifyWindow'.
+    // If this method is called multiple times with the same 'id' parameter,
+    // the additional calls are ignored.
+    // Value 0 of parameter 'hNotifyWindow' is reserved for hiding the window and stopping
+    // the running timer.
+    // Parameter 'showDelay' has meaning if 'hNotifyWindow' != NULL.
+    // If it is greater than or equal to 1, it determines how long before the tooltip is shown in [ms].
+    // If it equals 0, the default delay is used.
+    // If it is -1, the timer is not started at all.
     void SetCurrentToolTip(HWND hNotifyWindow, DWORD id, int showDelay);
 
-    // potlaci zobrazeni tooltipu na aktualnich souradnicich mysi
-    // uzitecne volat pri aktivaci okna, ve kterem se tooltipy pouzivaji
-    // nebude tak dochazet k nechtenemu zobrazeni tooltipu
+    // Suppresses tooltip display at the current mouse coordinates.
+    // Useful to call when activating a window that uses tooltips.
+    // This prevents unwanted tooltip display.
     void SuppressToolTipOnCurrentMousePos();
 
-    // pokud se podari text zobrazit, vrati TRUE; pokud neni dodan novy text, vrati FALSE
-    // pokud je considerCursor==TRUE, omeri kurzor a posune tooltip pod nej
-    // pokud je modal==TRUE, spusti messageloop, ktera hlida zpravy pro zavreni tooltipu a vrati se az po jeho zhasnuti
+    // If the text is displayed successfully, returns TRUE; if no new text is supplied, returns FALSE.
+    // If considerCursor==TRUE, measures the cursor and moves the tooltip under it.
+    // If modal==TRUE, starts a message loop that watches for tooltip close messages and returns only after it is hidden.
     BOOL Show(int x, int y, BOOL considerCursor, BOOL modal, HWND hParent);
 
-    // zhasne tooltip
+    // Hides the tooltip.
     void Hide();
 
     void OnTimer();
@@ -104,7 +104,7 @@ protected:
     BOOL GetText();
     void GetNeededWindowSize(SIZE* sz);
 
-    void MessageLoop(); // pro modalni variantu tooltipu
+    void MessageLoop(); // for the modal tooltip variant
 
     void MySetTimer(DWORD elapse);
     void MyKillTimer();
