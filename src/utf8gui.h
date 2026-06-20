@@ -63,23 +63,6 @@ inline void ListViewSetItemTextUtf8(HWND hList, int item, int subItem, const cha
     SendMessageW(hList, LVM_SETITEMTEXTW, (WPARAM)item, (LPARAM)&lvi);
 }
 
-// Combo boxes / list boxes must be switched to Unicode format (CB/LB_SETUNICODEFORMAT)
-// before the ...W string messages take effect, because CB_ADDSTRING / LB_ADDSTRING are
-// below WM_USER and would otherwise be thunked back to ANSI by the system.
-inline LRESULT ComboAddStringUtf8(HWND hCombo, const char* text)
-{
-    SendMessageW(hCombo, CB_SETUNICODEFORMAT, TRUE, 0);
-    CStrP wide(ConvertAllocUtf8ToWide(text != NULL ? text : "", -1));
-    return SendMessageW(hCombo, CB_ADDSTRING, 0, (LPARAM)(wide != NULL ? wide.Ptr : L""));
-}
-
-inline LRESULT ListBoxAddStringUtf8(HWND hList, const char* text)
-{
-    SendMessageW(hList, LB_SETUNICODEFORMAT, TRUE, 0);
-    CStrP wide(ConvertAllocUtf8ToWide(text != NULL ? text : "", -1));
-    return SendMessageW(hList, LB_ADDSTRING, 0, (LPARAM)(wide != NULL ? wide.Ptr : L""));
-}
-
 inline int DrawTextUtf8(HDC hDC, const char* text, int textLen, LPRECT rect, UINT format)
 {
     if (text == NULL)
