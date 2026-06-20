@@ -45,6 +45,10 @@
 #define CB_SETUNICODEFORMAT 0x2005
 #endif
 
+#ifndef LB_SETUNICODEFORMAT
+#define LB_SETUNICODEFORMAT 0x0160
+#endif
+
 #pragma warning(pop)
 
 #pragma warning(3 : 4706) // warning C4706: assignment within conditional expression

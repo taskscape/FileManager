@@ -75,7 +75,7 @@ inline LRESULT ComboAddStringUtf8(HWND hCombo, const char* text)
 
 inline LRESULT ListBoxAddStringUtf8(HWND hList, const char* text)
 {
-    SendMessageW(hList, CCM_SETUNICODEFORMAT, TRUE, 0);
+    SendMessageW(hList, LB_SETUNICODEFORMAT, TRUE, 0);
     CStrP wide(ConvertAllocUtf8ToWide(text != NULL ? text : "", -1));
     return SendMessageW(hList, LB_ADDSTRING, 0, (LPARAM)(wide != NULL ? wide.Ptr : L""));
 }
