@@ -14,6 +14,7 @@
 #include "zip.h"
 #include "pack.h"
 #include "dialogs.h"
+#include "utf8gui.h"
 
 // header for saving a DIB to the registry
 
@@ -1052,14 +1053,14 @@ void CPlugins::AddNamesToListView(HWND hListView, BOOL setOnly, int* numOfLoaded
         lvi.iImage = orderIndex;
         ListView_SetItem(hListView, &lvi);
         // plugin name
-        ListView_SetItemText(hListView, i, 0, plugin->Name);
+        ListViewSetItemTextUtf8(hListView, i, 0, plugin->Name);
         // loaded
-        ListView_SetItemText(hListView, i, 1,
-                             LoadStr(plugin->GetLoaded() ? IDS_PLUGINS_LOADED_YES : IDS_PLUGINS_LOADED_NO));
+        ListViewSetItemTextUtf8(hListView, i, 1,
+                                LoadStr(plugin->GetLoaded() ? IDS_PLUGINS_LOADED_YES : IDS_PLUGINS_LOADED_NO));
         // version
-        ListView_SetItemText(hListView, i, 2, plugin->Version);
+        ListViewSetItemTextUtf8(hListView, i, 2, plugin->Version);
         // location
-        ListView_SetItemText(hListView, i, 3, plugin->DLLName);
+        ListViewSetItemTextUtf8(hListView, i, 3, plugin->DLLName);
     }
     *numOfLoaded = loaded;
 }

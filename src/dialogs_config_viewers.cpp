@@ -16,6 +16,7 @@
 #include "gui.h"
 #include "menu.h"
 #include "shellib.h"
+#include "utf8gui.h"
 
 static char LastSelectedPluginDLLName[MAX_PATH] = {0}; // after reopening Plugins Manager, select the last chosen plugin
 
@@ -106,7 +107,7 @@ void CPluginsDlg::RefreshListView(BOOL setOnly, int selIndex, const CPluginData*
         char buf[300];
         sprintf(buf, InstalledPluginsText, Plugins.GetCount(), numOfLoaded);
         SendMessage(Header->HWindow, WM_SETREDRAW, FALSE, 0);
-        SetWindowText(Header->HWindow, buf);
+        SetWindowTextUtf8(Header->HWindow, buf);
         SendMessage(Header->HWindow, WM_SETREDRAW, TRUE, 0);
         InvalidateRect(Header->HWindow, NULL, TRUE);
     }
@@ -221,15 +222,15 @@ void CPluginsDlg::OnSelChanged()
             ShowWindow(showInChDrv, SW_SHOW);
 
         // description
-        SetWindowText(GetDlgItem(HWindow, IDC_PLUGINDESCRIPTION), p->Description);
+        SetWindowTextUtf8(GetDlgItem(HWindow, IDC_PLUGINDESCRIPTION), p->Description);
         // copyright
-        SetWindowText(GetDlgItem(HWindow, IDC_PLUGINCOPYRIGHT), p->Copyright);
+        SetWindowTextUtf8(GetDlgItem(HWindow, IDC_PLUGINCOPYRIGHT), p->Copyright);
         // www
-        SetWindowText(GetDlgItem(HWindow, IDC_PLUGINWWW),
+        SetWindowTextUtf8(GetDlgItem(HWindow, IDC_PLUGINWWW),
                       p->PluginHomePageURL != NULL ? p->PluginHomePageURL : LoadStr(IDS_PLUGINURLNONE));
         Url->SetActionOpen(p->PluginHomePageURL != NULL ? p->PluginHomePageURL : "");
         // extension
-        SetWindowText(GetDlgItem(HWindow, IDC_PLUGINEXTENSIONS),
+        SetWindowTextUtf8(GetDlgItem(HWindow, IDC_PLUGINEXTENSIONS),
                       p->Extensions[0] == 0 ? LoadStr(IDS_PLUGINEXTNONE) : p->Extensions);
         // FS Name
         char buf[500];
@@ -242,7 +243,7 @@ void CPluginsDlg::OnSelChanged()
                         (i + 1 != p->FSNames.Count) ? "%s;" : "%s", p->FSNames[i]);
             remainingSize = (int)sizeof(buf) - (int)strlen(buf);
         }
-        SetWindowText(GetDlgItem(HWindow, IDC_PLUGINFSNAME),
+        SetWindowTextUtf8(GetDlgItem(HWindow, IDC_PLUGINFSNAME),
                       buf[0] == 0 ? LoadStr(IDS_PLUGINFSNONE) : buf);
         // Functions
         buf[0] = 0;
@@ -313,19 +314,19 @@ void CPluginsDlg::OnSelChanged()
                     strcat(buf, ",\n");
             }
             strcat(buf, LoadStr(IDS_PLUGINFUNCTHUMBLOADER));
-            SetWindowText(GetDlgItem(HWindow, IDC_PLUGINTHUMBNAILS), p->ThumbnailMasks.GetMasksString());
+            SetWindowTextUtf8(GetDlgItem(HWindow, IDC_PLUGINTHUMBNAILS), p->ThumbnailMasks.GetMasksString());
         }
         else
-            SetWindowText(GetDlgItem(HWindow, IDC_PLUGINTHUMBNAILS), LoadStr(IDS_PLUGINTHUMBNONE));
+            SetWindowTextUtf8(GetDlgItem(HWindow, IDC_PLUGINTHUMBNAILS), LoadStr(IDS_PLUGINTHUMBNONE));
 
-        SetWindowText(GetDlgItem(HWindow, IDC_PLUGINFUNCTIONS), buf);
+        SetWindowTextUtf8(GetDlgItem(HWindow, IDC_PLUGINFUNCTIONS), buf);
 
         char buff[MAX_PATH + 200];
         char pluginName[300];
         lstrcpyn(pluginName, p->Name, 299);
         DuplicateAmpersands(pluginName, 299); // plugin name may contain the '&' character
         sprintf(buff, ShowInBarText, pluginName);
-        SetWindowText(showInBar, buff);
+        SetWindowTextUtf8(showInBar, buff);
 
         char fsItemText[200];
         const char* itemText;
@@ -351,7 +352,7 @@ void CPluginsDlg::OnSelChanged()
             itemText = "FS";
 
         sprintf(buff, ShowInChDrvText, itemText);
-        SetWindowText(showInChDrv, buff);
+        SetWindowTextUtf8(showInChDrv, buff);
 
         int orderIndex = ListView_GetNextItem(HListView, -1, LVIS_FOCUSED);
         if (orderIndex != -1)
@@ -377,12 +378,12 @@ void CPluginsDlg::OnSelChanged()
     }
     else
     {
-        SetWindowText(GetDlgItem(HWindow, IDC_PLUGINDESCRIPTION), "");
-        SetWindowText(GetDlgItem(HWindow, IDC_PLUGINCOPYRIGHT), "");
-        SetWindowText(GetDlgItem(HWindow, IDC_PLUGINWWW), "");
+        SetWindowTextUtf8(GetDlgItem(HWindow, IDC_PLUGINDESCRIPTION), "");
+        SetWindowTextUtf8(GetDlgItem(HWindow, IDC_PLUGINCOPYRIGHT), "");
+        SetWindowTextUtf8(GetDlgItem(HWindow, IDC_PLUGINWWW), "");
         Url->SetActionOpen("");
-        SetWindowText(GetDlgItem(HWindow, IDC_PLUGINEXTENSIONS), "");
-        SetWindowText(GetDlgItem(HWindow, IDC_PLUGINFSNAME), "");
+        SetWindowTextUtf8(GetDlgItem(HWindow, IDC_PLUGINEXTENSIONS), "");
+        SetWindowTextUtf8(GetDlgItem(HWindow, IDC_PLUGINFSNAME), "");
         SetWindowText(GetDlgItem(HWindow, IDC_PLUGINTHUMBNAILS), "");
         SetWindowText(GetDlgItem(HWindow, IDC_PLUGINFUNCTIONS), "");
         /*if (IsWindowVisible(showInBar))*/ ShowWindow(showInBar, SW_HIDE);     // condition commented out because it misbehaves during WM_INITDIALOG (the dialog is not visible as a whole -> the check fails)
@@ -487,13 +488,13 @@ CPluginsDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
     case WM_INITDIALOG:
     {
         // copy the Show In Bar checkbox text into our buffer
-        GetDlgItemText(HWindow, IDC_PLUGINSHOWINBAR, ShowInBarText, 200);
+        GetDlgItemTextUtf8(HWindow, IDC_PLUGINSHOWINBAR, ShowInBarText, 200);
 
         // copy the Show In Change Drive Menu checkbox text into our buffer
-        GetDlgItemText(HWindow, IDC_PLUGINSHOWINCHDRV, ShowInChDrvText, 200);
+        GetDlgItemTextUtf8(HWindow, IDC_PLUGINSHOWINCHDRV, ShowInChDrvText, 200);
 
         // copy the "Installed Plugins:" text into our buffer
-        GetDlgItemText(HWindow, IDC_PLUGINHEADER, InstalledPluginsText, 200);
+        GetDlgItemTextUtf8(HWindow, IDC_PLUGINHEADER, InstalledPluginsText, 200);
 
         // Add will have a drop-down
         // new CButton(HWindow, IDB_PLUGINADD, BTF_DROPDOWN);
@@ -1088,10 +1089,10 @@ void CPluginKeys::RefreshListView(BOOL setOnly)
             }
         }
 
-        ListView_SetItemText(HListView, row, 0, buff);
+        ListViewSetItemTextUtf8(HListView, row, 0, buff);
         // shortcut key
         GetHotKeyText(LOWORD(HotKeys[i]), buff);
-        ListView_SetItemText(HListView, row, 1, buff);
+        ListViewSetItemTextUtf8(HListView, row, 1, buff);
         row++;
         if (item->Type == pmitStartSubmenu)
             level++;
@@ -1223,7 +1224,7 @@ void CPluginKeys::HandleConflictWarning()
             }
         }
     }
-    SetDlgItemText(HWindow, IDC_CONFLICT_WARNING, buff);
+    SetDlgItemTextUtf8(HWindow, IDC_CONFLICT_WARNING, buff);
 }
 
 INT_PTR
@@ -1237,9 +1238,9 @@ CPluginKeys::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         // dialog box title
         char buff[500];
         char buff2[500];
-        GetWindowText(HWindow, buff, 500);
+        GetWindowTextUtf8(HWindow, buff, 500);
         sprintf(buff2, buff, Plugin->Name);
-        SetWindowText(HWindow, buff2);
+        SetWindowTextUtf8(HWindow, buff2);
 
         // listview setup
         HListView = GetDlgItem(HWindow, IDL_COMMANDS);
@@ -1419,7 +1420,7 @@ CArchiveUpdateDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
     {
     case WM_INITDIALOG:
     {
-        SetDlgItemText(HWindow, IDT_ARCHIVENAME, FileStamps->GetZIPFile());
+        SetDlgItemTextUtf8(HWindow, IDT_ARCHIVENAME, FileStamps->GetZIPFile());
         HWND list = GetDlgItem(HWindow, IDL_UPDATEDFILES);
         FileStamps->AddFilesToListBox(list);
         SendMessage(list, LB_SETSEL, TRUE, -1);

@@ -796,6 +796,13 @@ protected:
 
     void SetTwoStatusParts(BOOL two, BOOL force = FALSE); // sets one or two status bar parts; sizes are adjusted according to the status bar length
 
+    // sets the text of a status bar part; 'part' is the part index optionally OR-ed with
+    // SBT_* flags. Our strings are kept as UTF-8, so the text must be passed through the
+    // Unicode SB_SETTEXTW message - the ANSI SB_SETTEXT would reinterpret the UTF-8 bytes
+    // via the system ANSI code page (e.g. the NBSP thousands separator 0xC2 0xA0 would show
+    // up as "Â ").
+    void SetStatusBarTextUtf8(WPARAM part, const char* text);
+
     void SetContentVisible(BOOL visible);
     void UpdateAdvancedText();
 

@@ -30,6 +30,33 @@ static int DrawTextUtf8(HDC hDC, const char* text, int textLen, LPRECT rect, UIN
     return DrawTextW(hDC, wideText, wideLen, rect, format);
 }
 
+static void SetWindowTextUtf8(HWND hWnd, const char* text)
+{
+    CStrP wide(ConvertAllocUtf8ToWide(text != NULL ? text : "", -1));
+    SendMessageW(hWnd, WM_SETTEXT, 0, (LPARAM)(wide != NULL ? wide.Ptr : L""));
+}
+
+static void SetDlgItemTextUtf8(HWND hWnd, int itemID, const char* text)
+{
+    SetWindowTextUtf8(GetDlgItem(hWnd, itemID), text);
+}
+
+static void GetDlgItemTextUtf8(HWND hWnd, int itemID, char* buf, int bufSize)
+{
+    if (buf == NULL || bufSize <= 0)
+        return;
+    buf[0] = 0;
+    HWND hCtrl = GetDlgItem(hWnd, itemID);
+    int len = GetWindowTextLengthW(hCtrl);
+    if (len <= 0)
+        return;
+    CStrP wide((WCHAR*)malloc(sizeof(WCHAR) * (len + 1)));
+    if (wide == NULL)
+        return;
+    GetWindowTextW(hCtrl, wide, len + 1);
+    ConvertWideToUtf8(wide, -1, buf, bufSize);
+}
+
 // helper object for sending Ctrl+C to the parent via the WM_COPY message
 class CKeyForwarderWindow : public CWindow
 {
@@ -340,7 +367,7 @@ BOOL CMessageBox::CopyToClipboard()
         if (ButtonsID[i] != 0)
         {
             char btnText[100];
-            GetDlgItemText(HWindow, ButtonsID[i], btnText, 100);
+            GetDlgItemTextUtf8(HWindow, ButtonsID[i], btnText, 100);
             btnText[99] = 0;
             RemoveAmpersands(btnText);
 
@@ -362,7 +389,7 @@ BOOL CMessageBox::CopyToClipboard()
     if (CheckText != NULL)
     {
         char chkText[300];
-        GetDlgItemText(HWindow, IDS_MSGBOX_CHECK, chkText, 300);
+        GetDlgItemTextUtf8(HWindow, IDS_MSGBOX_CHECK, chkText, 300);
         chkText[299] = 0;
         RemoveAmpersands(chkText);
         written = wsprintf(ptr, "[ ] %s\r\n%s", chkText, separator);
@@ -399,10 +426,10 @@ CMessageBox::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
             EnableMenuItem(GetSystemMenu(HWindow, FALSE), SC_CLOSE, MF_BYCOMMAND | MF_GRAYED);
 
         // set the window title and body text
-        SetWindowText(HWindow, Title);
+        SetWindowTextUtf8(HWindow, Title);
         if (Text.NeedTruncate())
             Text.TruncateText(GetDlgItem(HWindow, IDS_MSGBOX_TEXT), TRUE);
-        SetDlgItemText(HWindow, IDS_MSGBOX_TEXT, Text.Get());
+        SetDlgItemTextUtf8(HWindow, IDS_MSGBOX_TEXT, Text.Get());
 
         const char* urlText = NULL;
         if (URL != NULL)
@@ -410,7 +437,7 @@ CMessageBox::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
             CHyperLink* hl = new CHyperLink(HWindow, IDS_MSGBOX_URL);
             hl->SetActionOpen(URL);
             urlText = URLText != NULL ? URLText : URL;
-            SetDlgItemText(HWindow, IDS_MSGBOX_URL, urlText);
+            SetDlgItemTextUtf8(HWindow, IDS_MSGBOX_URL, urlText);
         }
         else
             DestroyWindow(GetDlgItem(HWindow, IDS_MSGBOX_URL));
@@ -453,7 +480,7 @@ CMessageBox::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                     CHyperLink* hl = new CHyperLink(HWindow, IDS_MSGBOX_HINT, STF_DOTUNDERLINE);
                     if (hl != NULL)
                     {
-                        SetDlgItemText(HWindow, IDS_MSGBOX_HINT, hintLabel);
+                        SetDlgItemTextUtf8(HWindow, IDS_MSGBOX_HINT, hintLabel);
                         hl->SetActionShowHint(hintText);
                         hintVisible = TRUE;
                     }
@@ -474,7 +501,7 @@ CMessageBox::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                 }
             }
 
-            SetDlgItemText(HWindow, IDS_MSGBOX_CHECK, CheckText);
+            SetDlgItemTextUtf8(HWindow, IDS_MSGBOX_CHECK, CheckText);
         }
         else
         {
@@ -614,7 +641,7 @@ CMessageBox::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
             {
                 tR.right = maxTextWidth;
                 DrawTextUtf8(hDC, newText, -1, &tR, DT_CALCRECT | DT_LEFT | DT_WORDBREAK | DT_EXPANDTABS | DT_NOPREFIX);
-                SetDlgItemText(HWindow, IDS_MSGBOX_TEXT, newText);
+                SetDlgItemTextUtf8(HWindow, IDS_MSGBOX_TEXT, newText);
                 free((void*)newText);
             }
         }
@@ -824,7 +851,7 @@ CMessageBox::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                         if (btnID[i] == id)
                         {
                             btnTextWasSet = TRUE;
-                            SetWindowText(hButton, aliasName);
+                            SetWindowTextUtf8(hButton, aliasName);
 
                             // measure whether the button needs to be expanded
                             char btnText2[300];
@@ -852,7 +879,7 @@ CMessageBox::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                     }
                 }
                 if (!btnTextWasSet)
-                    SetWindowText(hButton, LoadStr(btnText[i]));
+                    SetWindowTextUtf8(hButton, LoadStr(btnText[i]));
 
                 // request to receive Ctrl+C in the form of WM_COPY
                 CKeyForwarderWindow* wnd = new CKeyForwarderWindow(HWindow, btnID[i]);

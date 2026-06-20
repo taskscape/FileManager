@@ -108,6 +108,33 @@ static int DrawTextUtf8(HDC hDC, const char* text, int textLen, LPRECT rect, UIN
     return DrawTextW(hDC, wideText, wideLen, rect, format);
 }
 
+static void SetWindowTextUtf8(HWND hWnd, const char* text)
+{
+    CStrP wide(ConvertAllocUtf8ToWide(text != NULL ? text : "", -1));
+    SendMessageW(hWnd, WM_SETTEXT, 0, (LPARAM)(wide != NULL ? wide.Ptr : L""));
+}
+
+static void SetDlgItemTextUtf8(HWND hWnd, int itemID, const char* text)
+{
+    SetWindowTextUtf8(GetDlgItem(hWnd, itemID), text);
+}
+
+static void GetDlgItemTextUtf8(HWND hWnd, int itemID, char* buf, int bufSize)
+{
+    if (buf == NULL || bufSize <= 0)
+        return;
+    buf[0] = 0;
+    HWND hCtrl = GetDlgItem(hWnd, itemID);
+    int len = GetWindowTextLengthW(hCtrl);
+    if (len <= 0)
+        return;
+    CStrP wide((WCHAR*)malloc(sizeof(WCHAR) * (len + 1)));
+    if (wide == NULL)
+        return;
+    GetWindowTextW(hCtrl, wide, len + 1);
+    ConvertWideToUtf8(wide, -1, buf, bufSize);
+}
+
 // Helper function for PathCompactPath that handles UTF-8
 static BOOL PathCompactPathUtf8(HDC hDC, char* path, UINT dx)
 {
@@ -304,6 +331,18 @@ void CFindDialog::GetLayoutParams()
     FindTextY = ResultsY - FindTextH;
 }
 
+void CFindDialog::SetStatusBarTextUtf8(WPARAM part, const char* text)
+{
+    if (HStatusBar == NULL)
+        return;
+    if (text == NULL)
+        text = "";
+    WCHAR wide[4 * MAX_PATH];
+    if (ConvertUtf8ToWide(text, -1, wide, _countof(wide)) == 0)
+        wide[0] = 0;
+    SendMessageW(HStatusBar, SB_SETTEXTW, part, (LPARAM)wide);
+}
+
 void CFindDialog::SetTwoStatusParts(BOOL two, BOOL force)
 {
     int margin = HMargin - 4;
@@ -354,8 +393,8 @@ void CFindDialog::SetTwoStatusParts(BOOL two, BOOL force)
         TwoParts = two;
         SendMessage(HStatusBar, WM_SETREDRAW, FALSE, 0); // when redraw is enabled, the status bar ends up with a stray frame
         SendMessage(HStatusBar, SB_SETPARTS, 3, (LPARAM)parts);
-        SendMessage(HStatusBar, SB_SETTEXT, 0 | SBT_NOBORDERS, (LPARAM) "");
-        SendMessage(HStatusBar, SB_SETTEXT, 2 | SBT_NOBORDERS, (LPARAM) "");
+        SetStatusBarTextUtf8(0 | SBT_NOBORDERS, "");
+        SetStatusBarTextUtf8(2 | SBT_NOBORDERS, "");
         SendMessage(HStatusBar, WM_SETREDRAW, TRUE, 0);
         InvalidateRect(HStatusBar, NULL, TRUE);
     }
@@ -589,7 +628,7 @@ void CFindDialog::UpdateAdvancedText()
     char buff[200];
     BOOL dirty;
     Data.Criteria.GetAdvancedDescription(buff, 200, dirty);
-    SetDlgItemText(HWindow, IDC_FIND_ADVANCED_TEXT, buff);
+    SetDlgItemTextUtf8(HWindow, IDC_FIND_ADVANCED_TEXT, buff);
     EnableWindow(GetDlgItem(HWindow, IDC_FIND_ADVANCED_TEXT), dirty);
 }
 
@@ -600,11 +639,11 @@ void CFindDialog::LoadControls(int index)
 
     // if any edit line is empty, keep its previous value
     if (Data.NamedText[0] == 0)
-        GetDlgItemText(HWindow, IDC_FIND_NAMED, Data.NamedText, NAMED_TEXT_LEN);
+        GetDlgItemTextUtf8(HWindow, IDC_FIND_NAMED, Data.NamedText, NAMED_TEXT_LEN);
     if (Data.LookInText[0] == 0)
-        GetDlgItemText(HWindow, IDC_FIND_LOOKIN, Data.LookInText, LOOKIN_TEXT_LEN);
+        GetDlgItemTextUtf8(HWindow, IDC_FIND_LOOKIN, Data.LookInText, LOOKIN_TEXT_LEN);
     if (Data.GrepText[0] == 0)
-        GetDlgItemText(HWindow, IDC_FIND_CONTAINING, Data.GrepText, GREP_TEXT_LEN);
+        GetDlgItemTextUtf8(HWindow, IDC_FIND_CONTAINING, Data.GrepText, GREP_TEXT_LEN);
 
     TransferData(ttDataToWindow);
 
@@ -910,7 +949,7 @@ void CFindDialog::StartSearch(WORD command)
         flags &= ~BTF_DROPDOWN;
         OKButton->SetFlags(flags, FALSE);
     }
-    SetDlgItemText(HWindow, IDOK, LoadStr(IDS_FF_STOP));
+    SetDlgItemTextUtf8(HWindow, IDOK, LoadStr(IDS_FF_STOP));
 
     SearchInProgress = TRUE;
 
@@ -961,7 +1000,7 @@ void CFindDialog::StopSearch()
         flags |= BTF_DROPDOWN;
         OKButton->SetFlags(flags, FALSE);
     }
-    SetDlgItemText(HWindow, IDOK, FindNowText);
+    SetDlgItemTextUtf8(HWindow, IDOK, FindNowText);
 
     // stop the timer used for updating the text
     KillTimer(HWindow, IDT_REPAINT);
@@ -981,7 +1020,7 @@ void CFindDialog::StopSearch()
         if (items == 0)
         {
             int msgID = GrepData.FindDuplicates ? IDS_FIND_NO_DUPS_FOUND : IDS_FIND_NO_FILES_FOUND;
-            SendMessage(HStatusBar, SB_SETTEXT, 1 | SBT_NOBORDERS, (LPARAM)LoadStr(msgID));
+            SetStatusBarTextUtf8(1 | SBT_NOBORDERS, LoadStr(msgID));
         }
         else
             UpdateStatusBar = TRUE;
@@ -991,10 +1030,10 @@ void CFindDialog::StopSearch()
     }
     else
     {
-        SendMessage(HStatusBar, SB_SETTEXT, 1 | SBT_NOBORDERS, (LPARAM)LoadStr(IDS_STOPPED));
+        SetStatusBarTextUtf8(1 | SBT_NOBORDERS, LoadStr(IDS_STOPPED));
     }
 
-    SetWindowText(HWindow, LoadStr(IDS_FF_NAME));
+    SetWindowTextUtf8(HWindow, LoadStr(IDS_FF_NAME));
     if (GrepData.Refine != 0)
         FoundFilesListView->DestroyDataForRefine();
     UpdateListViewItems();
@@ -1178,7 +1217,7 @@ void CFindDialog::UpdateListViewItems()
             }
             else
                 lstrcpy(buf, LoadStr(IDS_FF_NAME));
-            SetWindowText(HWindow, buf);
+            SetWindowTextUtf8(HWindow, buf);
         }
 
         // used by the search thread to know when to notify us next
@@ -1614,7 +1653,7 @@ void CFindDialog::InsertDrives(HWND hEdit, BOOL network)
     }
     *iterator = '\0';
 
-    SetWindowText(hEdit, drives);
+    SetWindowTextUtf8(hEdit, drives);
     SendMessage(hEdit, EM_SETSEL, lstrlen(drives), lstrlen(drives));
 }
 
@@ -1737,7 +1776,7 @@ CFindDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
     {
         FindDialogQueue.Add(new CWindowQueueItem(HWindow));
 
-        GetDlgItemText(HWindow, IDOK, FindNowText, 100);
+        GetDlgItemTextUtf8(HWindow, IDOK, FindNowText, 100);
 
         UpdateAdvancedText();
 
@@ -1791,7 +1830,7 @@ CFindDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         }
 
         SetTwoStatusParts(FALSE, TRUE);
-        SendMessage(HStatusBar, SB_SETTEXT, 1 | SBT_NOBORDERS, (LPARAM)LoadStr(IDS_FIND_INIT_HINT));
+        SetStatusBarTextUtf8(1 | SBT_NOBORDERS, LoadStr(IDS_FIND_INIT_HINT));
 
         // assign a menu to the window
         MainMenu = new CMenuPopup;
@@ -1833,10 +1872,10 @@ CFindDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 
         ListView_SetItemCount(FoundFilesListView->HWindow, 0);
 
-        SetDlgItemText(HWindow, IDOK, FindNowText);
+        SetDlgItemTextUtf8(HWindow, IDOK, FindNowText);
         TBHeader->SetFoundCount(0);
 
-        SetWindowText(HWindow, LoadStr(IDS_FF_NAME));
+        SetWindowTextUtf8(HWindow, LoadStr(IDS_FF_NAME));
 
         int i;
         for (i = 0; i < FindOptions.GetCount(); i++)
@@ -1844,7 +1883,7 @@ CFindDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
             {
                 char buff[1024];
                 sprintf(buff, LoadStr(IDS_FF_AUTOLOAD), FindOptions.At(i)->ItemName);
-                SendMessage(HStatusBar, SB_SETTEXT, 1 | SBT_NOBORDERS, (LPARAM)buff);
+                SetStatusBarTextUtf8(1 | SBT_NOBORDERS, buff);
                 break;
             }
 
@@ -2085,7 +2124,7 @@ CFindDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
             char buff[MAX_PATH + 100];
             _snprintf_s(buff, _TRUNCATE, NORMAL_FINDING_CAPTION, LoadStr(IDS_FF_NAME), LoadStr(IDS_FF_NAMED),
                         SearchForData[0]->MasksGroup.GetMasksString());
-            SetWindowText(HWindow, buff);
+            SetWindowTextUtf8(HWindow, buff);
         }
 
         //      if (FirstWMSize)
@@ -2126,7 +2165,7 @@ CFindDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
             if (!Configuration.SearchFileContent)
             {
                 // grab the actual content of hidden elements
-                SetDlgItemText(HWindow, IDC_FIND_CONTAINING, "");
+                SetDlgItemTextUtf8(HWindow, IDC_FIND_CONTAINING, "");
                 CheckDlgButton(HWindow, IDC_FIND_HEX, FALSE);
                 CheckDlgButton(HWindow, IDC_FIND_CASE, FALSE);
                 CheckDlgButton(HWindow, IDC_FIND_WHOLE, FALSE);

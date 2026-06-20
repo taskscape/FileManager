@@ -20,6 +20,7 @@
 #include "shellib.h"
 #include "gui.h"
 #include "tasklist.h"
+#include "utf8gui.h"
 #include "olespy.h"
 #include "md5.h"
 #include "geticon.h"
@@ -387,9 +388,9 @@ CZIPUnpackProgress::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
     case WM_INITDIALOG:
     {
         if (ResID == IDD_ZIPUNPACKPROG && FileProgress) // it is necessary to replace the text "Total:" with "File:"
-            SetDlgItemText(HWindow, IDT_PROGTITLE, LoadStr(IDS_UNPACKFILEPROGRESS));
+            SetDlgItemTextUtf8(HWindow, IDT_PROGTITLE, LoadStr(IDS_UNPACKFILEPROGRESS));
 
-        SetWindowText(HWindow, Title);
+        SetWindowTextUtf8(HWindow, Title);
         // the entire object assumes that the allocations may have failed
         int i;
         for (i = 0; i < ZIP_UNPACK_NUMLINES; i++)

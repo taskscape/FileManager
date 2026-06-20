@@ -57,6 +57,15 @@ static void ComboAddStringUtf8(HWND hWnd, const char* text)
         SendMessageW(hWnd, CB_ADDSTRING, 0, (LPARAM)wide.Ptr);
 }
 
+static void ListViewSetItemTextUtf8(HWND hList, int item, int subItem, const char* text)
+{
+    CStrP wide(ConvertAllocUtf8ToWide(text != NULL ? text : "", -1));
+    LVITEMW lvi;
+    lvi.iSubItem = subItem;
+    lvi.pszText = (LPWSTR)(wide != NULL ? wide.Ptr : L"");
+    SendMessageW(hList, LVM_SETITEMTEXTW, (WPARAM)item, (LPARAM)&lvi);
+}
+
 // Helper function to draw UTF-8 text using Unicode API
 static int DrawTextUtf8(HDC hDC, const char* text, int textLen, LPRECT rect, UINT format)
 {
@@ -196,7 +205,7 @@ void CConvertFilesDlg::UpdateCodingText()
     // remove &
     RemoveAmpersands(buff);
 
-    SetDlgItemText(HWindow, IDC_CHC_CODING, buff);
+    SetDlgItemTextUtf8(HWindow, IDC_CHC_CODING, buff);
 }
 /*
 int CEOFTypes[4] =
@@ -214,7 +223,7 @@ CConvertFilesDlg::UpdateEOFText()
   // remove &
   RemoveAmpersands(p);
 
-  SetDlgItemText(HWindow, IDC_CHC_EOF, p);
+  SetDlgItemTextUtf8(HWindow, IDC_CHC_EOF, p);
 }
 */
 
@@ -823,7 +832,7 @@ void CCopyMoveMoreDialog::UpdateAdvancedText()
     char buff[200];
     BOOL dirty;
     Criteria->Advanced.GetAdvancedDescription(buff, 200, dirty);
-    SetDlgItemText(HWindow, IDC_CM_ADVANCED_INFO, buff);
+    SetDlgItemTextUtf8(HWindow, IDC_CM_ADVANCED_INFO, buff);
     EnableWindow(GetDlgItem(HWindow, IDC_CM_ADVANCED_INFO), dirty);
 }
 
@@ -1170,7 +1179,7 @@ MENU_TEMPLATE_ITEM CopyMoveMoreDialogMenu[] =
                 if (IsDlgButtonChecked(HWindow, IDC_CM_NAMED))
                     SendMessage(HWindow, WM_NEXTDLGCTL, FALSE, FALSE); // focus to the mask
                 else
-                    SetDlgItemText(HWindow, IDC_CM_NAMED_MASK, "*.*"); // default value for the mask
+                    SetDlgItemTextUtf8(HWindow, IDC_CM_NAMED_MASK, "*.*"); // default value for the mask
             }
 
             // if the user clicked at the speed-limit checkbox, they probably want to edit it
@@ -2824,14 +2833,14 @@ void CConversionTablesDialog::Transfer(CTransferInfo& ti)
             lvi.iSubItem = 0;
             ListView_InsertItem(HListView, &lvi);
 
-            ListView_SetItemText(HListView, index - 1, 0, (char*)winCodePageDescription);
+            ListViewSetItemTextUtf8(HListView, index - 1, 0, (char*)winCodePageDescription);
             sprintf(buff, "%u", winCodePageIdentifier);
-            ListView_SetItemText(HListView, index - 1, 1, buff);
+            ListViewSetItemTextUtf8(HListView, index - 1, 1, buff);
             sprintf(buff, "convert\\%s\\convert.cfg", dirName);
-            ListView_SetItemText(HListView, index - 1, 2, buff);
+            ListViewSetItemTextUtf8(HListView, index - 1, 2, buff);
         }
         sprintf(buff, "%u", GetACP());
-        SetDlgItemText(HWindow, IDC_CT_CODEPAGE, buff);
+        SetDlgItemTextUtf8(HWindow, IDC_CT_CODEPAGE, buff);
         if (bestIndex != -1)
         {
             DWORD state = LVIS_SELECTED | LVIS_FOCUSED;

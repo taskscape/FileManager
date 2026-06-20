@@ -998,7 +998,7 @@ void CPanelStatusBar::Paint(HDC hdc, BOOL highlightText, BOOL highlightHotTrackO
 
             if (Size != NULL)
             {
-                GetTextExtentPoint32(dc, Size, (int)strlen(Size), &s);
+                GetTextExtentPoint32Utf8(dc, Size, (int)strlen(Size), &s);
                 if (tmpR.right - tmpR.left < s.cx)
                     goto SKIP_MEASURING; // nevejde se ani size - vypadneme z mereni
 
@@ -1313,7 +1313,7 @@ void CPanelStatusBar::Paint(HDC hdc, BOOL highlightText, BOOL highlightHotTrackO
             HFONT hOldFont = NULL;
             if (Configuration.SingleClick && HotSize)
                 hOldFont = (HFONT)SelectObject(dc, EnvFontUL);
-            ExtTextOut(dc, SizeRect.left, textY, 0, NULL, Size, (UINT)strlen(Size), NULL);
+            ExtTextOutUtf8(dc, SizeRect.left, textY, 0, NULL, Size, (UINT)strlen(Size), NULL);
             if (hOldFont != NULL)
                 SelectObject(dc, hOldFont);
         }

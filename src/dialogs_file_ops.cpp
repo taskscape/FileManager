@@ -15,6 +15,7 @@
 #include "gui.h"
 #include "menu.h"
 #include "consts.h"
+#include "utf8gui.h"
 
 CConfiguration Configuration;
 
@@ -481,7 +482,7 @@ BOOL CProgressDialog::FlushCachedData()
             else
                 Source->SetTextToDblQuotesIfNeeded(SourceCache);
         }
-        SetWindowText(HPreposition, PrepositionCache);
+        SetWindowTextUtf8(HPreposition, PrepositionCache);
         if (Target != NULL)
             Target->SetTextToDblQuotesIfNeeded(TargetCache);
         CacheIsDirty = FALSE;
@@ -520,10 +521,10 @@ void CProgressDialog::SetDlgTitle(BOOL minimized)
             sprintf(buf, "(%s) %s", LoadStr(AutoPaused ? IDS_PROGDLGQUEUEPAUSED : IDS_PROGDLGPAUSED),
                     AutoPaused && Script != NULL && Script->WaitInQueueSubject != NULL ? Script->WaitInQueueSubject : Caption);
         char oldCaption[200];
-        ::GetWindowText(HWindow, oldCaption, 200);
+        GetWindowTextUtf8(HWindow, oldCaption, 200);
         oldCaption[199] = 0;
         if (strcmp(oldCaption, buf) != 0)
-            SetWindowText(HWindow, buf);
+            SetWindowTextUtf8(HWindow, buf);
     }
     else
     {
@@ -562,10 +563,10 @@ CProgressDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
     {
     case WM_INITDIALOG:
     {
-        SetDlgItemText(HWindow, IDB_PAUSERESUME, LoadStr(IDS_PROGDLGPAUSE));
+        SetDlgItemTextUtf8(HWindow, IDB_PAUSERESUME, LoadStr(IDS_PROGDLGPAUSE));
 
         if (!RunningInOwnThread)
-            SetWindowText(HWindow, Caption); // in the modal version of the dialog this is the only title setup
+            SetWindowTextUtf8(HWindow, Caption); // in the modal version of the dialog this is the only title setup
 
         SetWindowIcon();
 
@@ -655,7 +656,7 @@ CProgressDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                 AutoPaused = TRUE;
                 ResetEvent(WorkerNotSuspended);
                 ShowPause = FALSE;
-                SetDlgItemText(HWindow, IDB_PAUSERESUME, LoadStr(ShowPause ? IDS_PROGDLGPAUSE : IDS_PROGDLGRESUME));
+                SetDlgItemTextUtf8(HWindow, IDB_PAUSERESUME, LoadStr(ShowPause ? IDS_PROGDLGPAUSE : IDS_PROGDLGRESUME));
                 SetDlgTitle(IsIconic(RunningInOwnThread ? HWindow : MainWindow->HWindow));
 
                 if (Script->WaitInQueueFrom != NULL && Script->WaitInQueueTo != NULL)
@@ -664,7 +665,7 @@ CProgressDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                         OperationText->SetText(LoadStr(IDS_COPYINGFROM));
                     if (Source != NULL)
                         Source->SetTextToDblQuotesIfNeeded(Script->WaitInQueueFrom);
-                    SetWindowText(HPreposition, LoadStr(IDS_COPYINGTO));
+                    SetWindowTextUtf8(HPreposition, LoadStr(IDS_COPYINGTO));
                     if (Target != NULL)
                         Target->SetTextToDblQuotesIfNeeded(Script->WaitInQueueTo);
                 }
@@ -1149,7 +1150,7 @@ MENU_TEMPLATE_ITEM ProgressDialogMenu2[] =
                 OperationsQueue.AutoPauseOperation(HWindow, &activateOperDlg);
                 AutoPaused = TRUE;
                 ShowPause = FALSE;
-                SetDlgItemText(HWindow, IDB_PAUSERESUME, LoadStr(IDS_PROGDLGRESUME));
+                SetDlgItemTextUtf8(HWindow, IDB_PAUSERESUME, LoadStr(IDS_PROGDLGRESUME));
                 PostMessage(HWindow, WM_NEXTDLGCTL, (WPARAM)GetDlgItem(HWindow, IDB_MINIMIZE), TRUE);
                 PostMessage(HWindow, WM_COMMAND, IDB_MINIMIZE, 0); // minimize the "waiting" operation immediately (nothing to watch, saves one step for the user)
                 if (activateOperDlg != NULL)
@@ -1409,7 +1410,7 @@ MENU_TEMPLATE_ITEM ProgressDialogMenu2[] =
                 }
                 if (IsInQueue)
                     OperationsQueue.SetPaused(HWindow, !ShowPause ? 2 /* manually paused */ : 0 /* running */);
-                SetDlgItemText(HWindow, IDB_PAUSERESUME, LoadStr(ShowPause ? IDS_PROGDLGPAUSE : IDS_PROGDLGRESUME));
+                SetDlgItemTextUtf8(HWindow, IDB_PAUSERESUME, LoadStr(ShowPause ? IDS_PROGDLGPAUSE : IDS_PROGDLGRESUME));
                 SetDlgTitle(IsIconic(RunningInOwnThread ? HWindow : MainWindow->HWindow));
 
                 if (Status != NULL)
@@ -1554,7 +1555,7 @@ CFileErrorDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
     {
     case WM_INITDIALOG:
     {
-        SetWindowText(HWindow, Caption);
+        SetWindowTextUtf8(HWindow, Caption);
 
         CStaticText* name;
         if ((name = new CStaticText(HWindow, IDS_FILENAME, STF_PATH_ELLIPSIS)) != NULL)
@@ -1565,7 +1566,7 @@ CFileErrorDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         if (ResID == IDD_CANNOTOPENADS)
             new CButton(HWindow, IDB_IGNORE, BTF_DROPDOWN);
 
-        SetWindowText(GetDlgItem(HWindow, IDS_ERROR), Error);
+        SetWindowText(GetDlgItem(HWindow, IDS_ERROR), Error); // 'Error' comes from GetErrorText() (system code page) - keep the ANSI sink
         break;
     }
 
@@ -1679,8 +1680,8 @@ COverwriteDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         else
             TRACE_E(LOW_MEMORY);
 
-        SetWindowText(GetDlgItem(HWindow, IDS_SOURCEATTR), SourceAttr);
-        SetWindowText(GetDlgItem(HWindow, IDS_TARGETATTR), TargetAttr);
+        SetWindowTextUtf8(GetDlgItem(HWindow, IDS_SOURCEATTR), SourceAttr);
+        SetWindowTextUtf8(GetDlgItem(HWindow, IDS_TARGETATTR), TargetAttr);
         break;
     }
 
@@ -1724,7 +1725,7 @@ CHiddenOrSystemDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
     {
     case WM_INITDIALOG:
     {
-        SetWindowText(HWindow, Caption);
+        SetWindowTextUtf8(HWindow, Caption);
 
         CStaticText* name;
         if ((name = new CStaticText(HWindow, IDS_FILENAME, STF_PATH_ELLIPSIS)) != NULL)
@@ -1732,7 +1733,7 @@ CHiddenOrSystemDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         else
             TRACE_E(LOW_MEMORY);
 
-        SetWindowText(GetDlgItem(HWindow, IDS_ERROR), Error);
+        SetWindowText(GetDlgItem(HWindow, IDS_ERROR), Error); // 'Error' comes from GetErrorText() (system code page) - keep the ANSI sink
         break;
     }
 
@@ -1785,7 +1786,7 @@ CCannotMoveDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         else
             TRACE_E(LOW_MEMORY);
 
-        SetWindowText(GetDlgItem(HWindow, IDS_ERROR), Error);
+        SetWindowText(GetDlgItem(HWindow, IDS_ERROR), Error); // 'Error' comes from GetErrorText() (system code page) - keep the ANSI sink
         break;
     }
 
@@ -2054,7 +2055,7 @@ void CBetaExpiredDialog::OnTimer()
 {
     char buff[20];
     sprintf(buff, "%d", Count);
-    SetDlgItemText(HWindow, IDOK, buff);
+    SetDlgItemTextUtf8(HWindow, IDOK, buff);
     Count--;
 }
 
@@ -2080,11 +2081,11 @@ CBetaExpiredDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                 english ? "https://www.taskscape.com/salamander/downloads/eap" : "https://www.taskscape.com/cz/salamander/downloads/eap";
 #endif // THIS_IS_EAP_VERSION
 
-            SetDlgItemText(HWindow, IDC_BETAEXPIREDURL, url + 8);
+            SetDlgItemTextUtf8(HWindow, IDC_BETAEXPIREDURL, url + 8);
             hl->SetActionOpen(url);
         }
         char orig[200];
-        GetDlgItemText(HWindow, IDC_BETAEXPIREDDATE, orig, 200);
+        GetDlgItemTextUtf8(HWindow, IDC_BETAEXPIREDDATE, orig, 200);
 
         SYSTEMTIME st;
         GetLocalTime(&st);
@@ -2092,16 +2093,25 @@ CBetaExpiredDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         char buff[400];
         char today[100];
         char expired[100];
-        if (GetDateFormat(LOCALE_USER_DEFAULT, DATE_LONGDATE, &st, NULL, today, 100) == 0)
+        WCHAR todayW[100];
+        WCHAR expiredW[100];
+        // use the Unicode date formatting and convert to UTF-8 - GetDateFormatA would
+        // return the localized date in the system ANSI code page, which then mojibakes
+        // when handed to the UTF-8 controls (e.g. month names with diacritics)
+        if (GetDateFormatW(LOCALE_USER_DEFAULT, DATE_LONGDATE, &st, NULL, todayW, 100) == 0)
             sprintf(today, "%u.%u.%u", st.wDay, st.wMonth, st.wYear);
-        if (GetDateFormat(LOCALE_USER_DEFAULT, DATE_LONGDATE, &BETA_EXPIRATION_DATE, NULL, expired, 100) == 0)
+        else
+            ConvertWideToUtf8(todayW, -1, today, 100);
+        if (GetDateFormatW(LOCALE_USER_DEFAULT, DATE_LONGDATE, &BETA_EXPIRATION_DATE, NULL, expiredW, 100) == 0)
             sprintf(expired, "%u.%u.%u", BETA_EXPIRATION_DATE.wDay, BETA_EXPIRATION_DATE.wMonth, BETA_EXPIRATION_DATE.wYear);
+        else
+            ConvertWideToUtf8(expiredW, -1, expired, 100);
 
         sprintf(buff, orig, today, expired);
-        SetDlgItemText(HWindow, IDC_BETAEXPIREDDATE, buff);
+        SetDlgItemTextUtf8(HWindow, IDC_BETAEXPIREDDATE, buff);
 
         // the OK button will show numbers counting down, store the original text
-        GetDlgItemText(HWindow, IDOK, OldOK, 100);
+        GetDlgItemTextUtf8(HWindow, IDOK, OldOK, 100);
 
         EnableWindow(GetDlgItem(HWindow, IDOK), FALSE);
         OnTimer();
@@ -2116,7 +2126,7 @@ CBetaExpiredDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         if (Count == 0)
         {
             KillTimer(HWindow, 1);
-            SetDlgItemText(HWindow, IDOK, OldOK);
+            SetDlgItemTextUtf8(HWindow, IDOK, OldOK);
             EnableWindow(GetDlgItem(HWindow, IDOK), TRUE);
         }
         else

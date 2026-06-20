@@ -15,24 +15,7 @@
 #include "gui.h"
 #include "drivelst.h"
 #include "shiconov.h"
-
-// Helper function to draw UTF-8 text using Unicode API
-static int DrawTextUtf8(HDC hDC, const char* text, int textLen, LPRECT rect, UINT format)
-{
-    if (text == NULL)
-        return 0;
-    if (textLen == -1)
-        textLen = (int)strlen(text);
-    // Convert UTF-8 to wide characters
-    int wideLen = MultiByteToWideChar(CP_UTF8, 0, text, textLen, NULL, 0);
-    if (wideLen <= 0)
-        return DrawText(hDC, text, textLen, rect, format); // Fallback to ANSI
-    
-    wchar_t* wideText = (wchar_t*)_alloca((wideLen + 1) * sizeof(wchar_t));
-    MultiByteToWideChar(CP_UTF8, 0, text, textLen, wideText, wideLen + 1);
-    wideText[wideLen] = 0;
-    return DrawTextW(hDC, wideText, wideLen, rect, format);
-}
+#include "utf8gui.h" // DrawTextUtf8, SetWindowTextUtf8, SetDlgItemTextUtf8, ListViewSetItemTextUtf8, ...
 
 /*
 //****************************************************************************
@@ -524,8 +507,8 @@ void CSharesDialog::Refresh()
             lvi.pszText = (char*)remoteName;
             lvi.lParam = i; // for later sorting
             int index = ListView_InsertItem(HListView, &lvi);
-            ListView_SetItemText(HListView, index, 1, (char*)localPath);
-            ListView_SetItemText(HListView, index, 2, (char*)comment);
+            ListViewSetItemTextUtf8(HListView, index, 1, (char*)localPath);
+            ListViewSetItemTextUtf8(HListView, index, 2, (char*)comment);
         }
     }
     SortItems();
@@ -1313,7 +1296,7 @@ void CDisconnectDialog::Refresh()
         lvi.lParam = i; // for later sorting
         lvi.iIndent = (Connections[i].Type == citGroup) ? 0 : 1;
         int index = ListView_InsertItem(HListView, &lvi);
-        ListView_SetItemText(HListView, index, 1, Connections[i].Path);
+        ListViewSetItemTextUtf8(HListView, index, 1, Connections[i].Path);
         if (Connections[i].Default)
         {
             if (defaultIndex == -1)
@@ -2012,17 +1995,17 @@ CConfirmADSLossDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         else
             TRACE_E(LOW_MEMORY);
 
-        SetDlgItemText(HWindow, IDE_ALTSTREAMS, Streams);
+        SetDlgItemTextUtf8(HWindow, IDE_ALTSTREAMS, Streams);
 
         if (IsFile)
-            SetWindowText(GetDlgItem(HWindow, IDT_FILEORDIR), LoadStr(IDS_FILETITLE));
+            SetWindowTextUtf8(GetDlgItem(HWindow, IDT_FILEORDIR), LoadStr(IDS_FILETITLE));
 
         int resId;
         if (IsMove)
             resId = IsFile ? IDS_CONFADSLOSS_WARNING_MOVE_FILE : IDS_CONFADSLOSS_WARNING_MOVE_DIR;
         else
             resId = IsFile ? IDS_CONFADSLOSS_WARNING_COPY_FILE : IDS_CONFADSLOSS_WARNING_COPY_DIR;
-        SetWindowText(GetDlgItem(HWindow, IDS_ERROR), LoadStr(resId));
+        SetWindowTextUtf8(GetDlgItem(HWindow, IDS_ERROR), LoadStr(resId));
         break;
     }
 
@@ -2115,14 +2098,14 @@ CConfirmEncryptionLossDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
             TRACE_E(LOW_MEMORY);
 
         if (IsFile)
-            SetWindowText(GetDlgItem(HWindow, IDT_FILEORDIR), LoadStr(IDS_FILETITLE));
+            SetWindowTextUtf8(GetDlgItem(HWindow, IDT_FILEORDIR), LoadStr(IDS_FILETITLE));
 
         int resId;
         if (IsMove)
             resId = IsFile ? IDS_CONFENCLOSS_WARNING_MOVE_FILE : IDS_CONFENCLOSS_WARNING_MOVE_DIR;
         else
             resId = IsFile ? IDS_CONFENCLOSS_WARNING_COPY_FILE : IDS_CONFENCLOSS_WARNING_COPY_DIR;
-        SetWindowText(GetDlgItem(HWindow, IDS_ERROR), LoadStr(resId));
+        SetWindowTextUtf8(GetDlgItem(HWindow, IDS_ERROR), LoadStr(resId));
         break;
     }
 
@@ -2252,9 +2235,9 @@ CErrorSettingAttrsDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 
         char text[20];
         GetAttrsString(text, NeededAttrs);
-        SetWindowText(GetDlgItem(HWindow, IDS_NEEDEDATTRS), text);
+        SetWindowTextUtf8(GetDlgItem(HWindow, IDS_NEEDEDATTRS), text);
         GetAttrsString(text, CurrentAttrs);
-        SetWindowText(GetDlgItem(HWindow, IDS_CURRENTATTRS), text);
+        SetWindowTextUtf8(GetDlgItem(HWindow, IDS_CURRENTATTRS), text);
         break;
     }
 
@@ -2546,7 +2529,7 @@ void CCfgPageIconOvrls::Transfer(CTransferInfo& ti)
             lvi.pszText = item->IconOverlayName;
             ListView_InsertItem(HListView, &lvi);
 
-            ListView_SetItemText(HListView, i, 1, item->IconOverlayDescr);
+            ListViewSetItemTextUtf8(HListView, i, 1, item->IconOverlayDescr);
 
             UINT state = INDEXTOSTATEIMAGEMASK((!IsNameInListOfDisabledCustomIconOverlays(item->IconOverlayName) ? 2 : 1));
             ListView_SetItemState(HListView, i, state, LVIS_STATEIMAGEMASK);

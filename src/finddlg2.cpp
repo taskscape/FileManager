@@ -15,6 +15,7 @@
 #include "plugins.h"
 #include "fileswnd.h"
 #include "dialogs.h"
+#include "utf8gui.h"
 
 //****************************************************************************
 //
@@ -254,11 +255,11 @@ void CFindDialog::UpdateStatusText()
             ExpandPluralFilesDirs(text, 200, files, dirs, epfdmSelected, FALSE);
         else
             ExpandPluralBytesFilesDirs(text, 200, selectedSize, files, dirs, FALSE);
-        SendMessage(HStatusBar, SB_SETTEXT, 1 | SBT_NOBORDERS, (LPARAM)text);
+        SetStatusBarTextUtf8(1 | SBT_NOBORDERS, text);
     }
     else
     {
-        SendMessage(HStatusBar, SB_SETTEXT, 1 | SBT_NOBORDERS, (LPARAM) "");
+        SetStatusBarTextUtf8(1 | SBT_NOBORDERS, "");
     }
 }
 
@@ -422,7 +423,7 @@ void CFindTBHeader::SetFoundCount(int foundCount)
     if (foundCount != FoundCount)
     {
         char buff[200];
-        GetWindowText(HWindow, buff, 200);
+        GetWindowTextUtf8(HWindow, buff, 200);
         sprintf(Text, buff, foundCount);
 
         RECT r;
@@ -529,7 +530,7 @@ CFindTBHeader::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         HFONT hOldFont = (HFONT)SelectObject(hdc, (HFONT)SendMessage(HWindow, WM_GETFONT, 0, 0));
         int oldBkMode = SetBkMode(hdc, TRANSPARENT);
         FillRect(hdc, &r, (HBRUSH)(COLOR_3DFACE + 1));
-        DrawText(hdc, Text, -1, &tr, DT_SINGLELINE | DT_RIGHT | DT_VCENTER);
+        DrawTextUtf8(hdc, Text, -1, &tr, DT_SINGLELINE | DT_RIGHT | DT_VCENTER);
         SetBkMode(hdc, oldBkMode);
         SelectObject(hdc, hOldFont);
 
@@ -683,14 +684,14 @@ void CFindManageDialog::LoadControls()
         item = (CFindOptionsItem*)itemID;
     else
         item = (CFindOptionsItem*)CurrenOptionsItem;
-    SetDlgItemText(HWindow, IDC_FFS_NAMED, item->NamedText);
-    SetDlgItemText(HWindow, IDC_FFS_LOOKIN, item->LookInText);
-    SetDlgItemText(HWindow, IDC_FFS_SUBDIRS, item->SubDirectories ? LoadStr(IDS_INFODLGYES) : LoadStr(IDS_INFODLGNO));
-    SetDlgItemText(HWindow, IDC_FFS_CONTAINING, item->GrepText);
+    SetDlgItemTextUtf8(HWindow, IDC_FFS_NAMED, item->NamedText);
+    SetDlgItemTextUtf8(HWindow, IDC_FFS_LOOKIN, item->LookInText);
+    SetDlgItemTextUtf8(HWindow, IDC_FFS_SUBDIRS, item->SubDirectories ? LoadStr(IDS_INFODLGYES) : LoadStr(IDS_INFODLGNO));
+    SetDlgItemTextUtf8(HWindow, IDC_FFS_CONTAINING, item->GrepText);
     char buff[200];
     BOOL dirty;
     item->Criteria.GetAdvancedDescription(buff, 200, dirty);
-    SetDlgItemText(HWindow, IDC_FFS_ADVANCED, buff);
+    SetDlgItemTextUtf8(HWindow, IDC_FFS_ADVANCED, buff);
 
     EnableWindow(GetDlgItem(HWindow, IDC_FFS_AUTOLOAD), !empty);
     CheckDlgButton(HWindow, IDC_FFS_AUTOLOAD, item->AutoLoad);
@@ -1793,15 +1794,16 @@ void CFindLogDialog::Transfer(CTransferInfo& ti)
         // initialize columns
         int header[] = {IDS_FINDLOG_TYPE, IDS_FINDLOG_TEXT, IDS_FINDLOG_PATH, -1};
 
-        LV_COLUMN lvc;
+        LV_COLUMNW lvc;
         lvc.mask = LVCF_FMT | LVCF_TEXT | LVCF_SUBITEM;
         lvc.fmt = LVCFMT_LEFT;
         int i;
         for (i = 0; header[i] != -1; i++)
         {
-            lvc.pszText = LoadStr(header[i]);
+            CStrP colW(ConvertAllocUtf8ToWide(LoadStr(header[i]), -1));
+            lvc.pszText = (LPWSTR)(colW != NULL ? colW.Ptr : L"");
             lvc.iSubItem = i;
-            ListView_InsertColumn(HListView, i, &lvc);
+            SendMessageW(HListView, LVM_INSERTCOLUMNW, i, (LPARAM)&lvc);
         }
 
         // add items
@@ -1818,7 +1820,7 @@ void CFindLogDialog::Transfer(CTransferInfo& ti)
             lvi.iSubItem = 0;
             lvi.iImage = (item->Flags & FLI_ERROR) != 0 ? 0 : 1;
             ListView_InsertItem(HListView, &lvi);
-            ListView_SetItemText(HListView, i, 0, LoadStr((item->Flags & FLI_ERROR) != 0 ? IDS_FINDLOG_ERROR : IDS_FINDLOG_INFO));
+            ListViewSetItemTextUtf8(HListView, i, 0, LoadStr((item->Flags & FLI_ERROR) != 0 ? IDS_FINDLOG_ERROR : IDS_FINDLOG_INFO));
 
             // remove '\r' and '\n' characters from the text
             lstrcpyn(buff, item->Text, 4000);
@@ -1827,8 +1829,8 @@ void CFindLogDialog::Transfer(CTransferInfo& ti)
                 if (buff[j] == '\r' || buff[j] == '\n')
                     buff[j] = ' ';
 
-            ListView_SetItemText(HListView, i, 1, buff);
-            ListView_SetItemText(HListView, i, 2, item->Path);
+            ListViewSetItemTextUtf8(HListView, i, 1, buff);
+            ListViewSetItemTextUtf8(HListView, i, 2, item->Path);
         }
 
         if (Log->GetSkippedCount() > 0)
@@ -1839,8 +1841,8 @@ void CFindLogDialog::Transfer(CTransferInfo& ti)
             lvi.iSubItem = 0;
             lvi.iImage = 1; // question
             ListView_InsertItem(HListView, &lvi);
-            ListView_SetItemText(HListView, i, 0, LoadStr(IDS_FINDLOG_INFO));
-            ListView_SetItemText(HListView, i, 1, buff);
+            ListViewSetItemTextUtf8(HListView, i, 0, LoadStr(IDS_FINDLOG_INFO));
+            ListViewSetItemTextUtf8(HListView, i, 1, buff);
         }
 
         // select the first item

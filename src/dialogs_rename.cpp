@@ -25,6 +25,15 @@ static void SetDlgItemTextUtf8(HWND hWnd, int itemID, const char* text)
     SetWindowTextUtf8(GetDlgItem(hWnd, itemID), text);
 }
 
+static void ListViewSetItemTextUtf8(HWND hList, int item, int subItem, const char* text)
+{
+    CStrP wide(ConvertAllocUtf8ToWide(text != NULL ? text : "", -1));
+    LVITEMW lvi;
+    lvi.iSubItem = subItem;
+    lvi.pszText = (LPWSTR)(wide != NULL ? wide.Ptr : L"");
+    SendMessageW(hList, LVM_SETITEMTEXTW, (WPARAM)item, (LPARAM)&lvi);
+}
+
 //****************************************************************************
 //
 // CViewerMasksItem
@@ -845,10 +854,10 @@ void CLanguageSelectorDialog::FillControls()
     if (index != -1)
     {
         SetDlgItemTextW(HWindow, IDC_SLG_AUTHOR, Items[index].AuthorW);
-        SetDlgItemText(HWindow, IDC_SLG_WEB, Items[index].Web);
+        SetDlgItemTextUtf8(HWindow, IDC_SLG_WEB, Items[index].Web);
         SetDlgItemTextW(HWindow, IDC_SLG_COMMENT, Items[index].CommentW);
         if (PluginName == NULL)
-            SetDlgItemText(HWindow, IDC_SLG_HELPDIR, Items[index].HelpDir);
+            SetDlgItemTextUtf8(HWindow, IDC_SLG_HELPDIR, Items[index].HelpDir);
         if (Web != NULL)
         {
             char buff[300];
@@ -871,9 +880,9 @@ void CLanguageSelectorDialog::LoadListView()
         ListView_InsertItem(HListView, &lvi);
 
         Items[i].GetLanguageName(buff, 200);
-        ListView_SetItemText(HListView, i, 0, buff);
+        ListViewSetItemTextUtf8(HListView, i, 0, buff);
         sprintf(buff, "lang\\%s", Items[i].FileName);
-        ListView_SetItemText(HListView, i, 1, buff);
+        ListViewSetItemTextUtf8(HListView, i, 1, buff);
     }
 
     int preferredIndex = GetPreferredLanguageIndex(SLGName);
@@ -1042,7 +1051,7 @@ CLanguageSelectorDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
             }
         }
         if (!OpenedFromConfiguration && PluginName == NULL) // turn the Cancel button into Exit
-            SetDlgItemText(HWindow, IDCANCEL, ExitButtonLabel);
+            SetDlgItemTextUtf8(HWindow, IDCANCEL, ExitButtonLabel);
         if (PluginName != NULL) // disable closing
             EnableMenuItem(GetSystemMenu(HWindow, FALSE), SC_CLOSE, MF_BYCOMMAND | MF_GRAYED);
 
@@ -1222,8 +1231,8 @@ CCompareArgsDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         if (!ComparingFiles)
         {
             SetWindowText(HWindow, LoadStr(IDS_USERMENUCOMPAREARGSTITLE));
-            SetDlgItemText(HWindow, IDT_UMC_NAME1, LoadStr(IDS_USERMENUCOMPAREARG1));
-            SetDlgItemText(HWindow, IDT_UMC_NAME2, LoadStr(IDS_USERMENUCOMPAREARG2));
+            SetDlgItemTextUtf8(HWindow, IDT_UMC_NAME1, LoadStr(IDS_USERMENUCOMPAREARG1));
+            SetDlgItemTextUtf8(HWindow, IDT_UMC_NAME2, LoadStr(IDS_USERMENUCOMPAREARG2));
         }
         CHyperLink* hl = new CHyperLink(HWindow, IDT_UMC_HOWTOREVERT, STF_DOTUNDERLINE);
         if (hl != NULL)

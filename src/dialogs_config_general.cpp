@@ -18,6 +18,7 @@
 #include "viewer.h"
 #include "find.h"
 #include "gui.h"
+#include "utf8gui.h"
 
 //****************************************************************************
 //
@@ -871,7 +872,7 @@ void CConfigPageRegional::LoadControls()
     {
         char buff[200];
         language.GetLanguageName(buff, 200);
-        SetDlgItemText(HWindow, IDE_LANGUAGE, buff);
+        SetDlgItemTextUtf8(HWindow, IDE_LANGUAGE, buff);
         language.Free();
     }
 }
@@ -914,9 +915,9 @@ CConfigPageRegional::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         if (IsSLGIncomplete[0] != 0)
         {
             new CStaticText(HWindow, IDC_CFGREG_INCOMPLETE_TITLE, STF_BOLD);
-            SetDlgItemText(HWindow, IDC_CFGREG_INCOMPLETE_TITLE, LoadStr(IDS_SLGINCOMPLETE_TITLE));
-            SetDlgItemText(HWindow, IDC_CFGREG_INCOMPLETE_TEXT, LoadStr(IDS_SLGINCOMPLETE_TEXT));
-            SetDlgItemText(HWindow, IDC_CFGREG_INCOMPLETE_URL, IsSLGIncomplete);
+            SetDlgItemTextUtf8(HWindow, IDC_CFGREG_INCOMPLETE_TITLE, LoadStr(IDS_SLGINCOMPLETE_TITLE));
+            SetDlgItemTextUtf8(HWindow, IDC_CFGREG_INCOMPLETE_TEXT, LoadStr(IDS_SLGINCOMPLETE_TEXT));
+            SetDlgItemTextUtf8(HWindow, IDC_CFGREG_INCOMPLETE_URL, IsSLGIncomplete);
             CHyperLink* hl = new CHyperLink(HWindow, IDC_CFGREG_INCOMPLETE_URL);
             hl->SetActionOpen(IsSLGIncomplete);
         }
@@ -1043,10 +1044,10 @@ void CConfigPageView::Transfer(CTransferInfo& ti)
                 lstrcpy(buff, LoadStr(IDS_TILES_VIEW_NAME));
                 break;
             }
-            ListView_SetItemText(HListView, i, 1, buff);
+            ListViewSetItemTextUtf8(HListView, i, 1, buff);
 
             sprintf(buff, "Alt+%d", i < VIEW_TEMPLATES_COUNT - 1 ? i + 1 : 0);
-            ListView_SetItemText(HListView, i, 2, buff);
+            ListViewSetItemTextUtf8(HListView, i, 2, buff);
         }
         // set column widths
         ListView_SetColumnWidth(HListView, 0, LVSCW_AUTOSIZE_USEHEADER);
@@ -1251,7 +1252,7 @@ void CConfigPageView::OnDelete()
     {
         Config.Items[index].Name[0] = 0;
         char buff[] = "";
-        ListView_SetItemText(HListView, index, 0, buff);
+        ListViewSetItemTextUtf8(HListView, index, 0, buff);
         LoadControls();
     }
     EnableHeader();
@@ -1276,8 +1277,8 @@ void CConfigPageView::OnMove(BOOL up)
         index2 = index1 + 1;
     if (index2 != index1)
     {
-        ListView_SetItemText(HListView, index1, 0, Config.Items[index2].Name);
-        ListView_SetItemText(HListView, index2, 0, Config.Items[index1].Name);
+        ListViewSetItemTextUtf8(HListView, index1, 0, Config.Items[index2].Name);
+        ListViewSetItemTextUtf8(HListView, index2, 0, Config.Items[index1].Name);
         DWORD state1 = ListView_GetItemState(HListView, index1, LVIS_STATEIMAGEMASK);
         DWORD state2 = ListView_GetItemState(HListView, index2, LVIS_STATEIMAGEMASK);
         ListView_SetItemState(HListView, index1, state2, LVIS_STATEIMAGEMASK);
@@ -1515,7 +1516,7 @@ CConfigPageView::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                         Config.Items[index].Flags = 0;
                     lstrcpy(Config.Items[index].Name, name);
                     LoadControls();
-                    ListView_SetItemText(HListView, index, 0, name);
+                    ListViewSetItemTextUtf8(HListView, index, 0, name);
                     Dirty = TRUE;
                     break;
                 }
@@ -1768,7 +1769,7 @@ void CCfgPageViewer::LoadControls()
                 MulDiv(-origHeight, 72, GetDeviceCaps(hDC, LOGPIXELSY)),
                 LocalViewerLogFont.lfFaceName,
                 LoadStr(LocalUseCustomViewerFont ? IDS_FONTDESCRIPTION_CST : IDS_FONTDESCRIPTION_DEF));
-    SetWindowText(hEdit, buf);
+    SetWindowTextUtf8(hEdit, buf);
 
     HANDLES(ReleaseDC(HWindow, hDC));
 }
@@ -3359,7 +3360,7 @@ void CCfgPageColors::Transfer(CTransferInfo& ti)
 
         int labels[CFG_COLORS_BUTTONS] = {IDS_COLORLABEL_NORMAL, IDS_COLORLABEL_FOCUSED, IDS_COLORLABEL_SELECTED, IDS_COLORLABEL_FOCUSEDSELECTED, IDS_COLORLABEL_HIGHLIGHTED};
         for (i = 0; i < CFG_COLORS_BUTTONS; i++)
-            SetDlgItemText(HWindow, CConfigurationPage7Masks[i], LoadStr(labels[i]));
+            SetDlgItemTextUtf8(HWindow, CConfigurationPage7Masks[i], LoadStr(labels[i]));
 
         int index = 4; // custom
         if (CurrentColors == SalamanderColors)
@@ -3445,7 +3446,7 @@ void CCfgPageColors::LoadColors()
             label = LoadStr(subData->Label);
         else
             label = "";
-        SetDlgItemText(HWindow, CConfigurationPage7Items[i], label);
+        SetDlgItemTextUtf8(HWindow, CConfigurationPage7Items[i], label);
         if (subData->Label != 0)
         {
             if (subData->Flags & CFG7F_SINGLECOLOR)

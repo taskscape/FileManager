@@ -14,6 +14,7 @@
 #include "pack.h"
 #include "fileswnd.h"
 #include "edtlbwnd.h"
+#include "utf8gui.h"
 
 // item type in the packer extensions table
 struct SPackAssocItem
@@ -75,7 +76,7 @@ CPackACDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
             break;
         }
         // the Stop/Restart button becomes the Start button
-        SetDlgItemText(HWindow, IDB_ACSTOP, LoadStr(IDS_ACBUTTON_RESCAN));
+        SetDlgItemTextUtf8(HWindow, IDB_ACSTOP, LoadStr(IDS_ACBUTTON_RESCAN));
         // disable OK and enable Drives
         EnableWindow(GetDlgItem(HWindow, IDB_ACDRIVES), TRUE);
         EnableWindow(GetDlgItem(HWindow, IDOK), FALSE);
@@ -109,7 +110,7 @@ CPackACDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
             {
                 // Restart button
                 // the Stop/Restart button becomes the Stop button again
-                SetDlgItemText(HWindow, IDB_ACSTOP, LoadStr(IDS_ACBUTTON_STOP));
+                SetDlgItemTextUtf8(HWindow, IDB_ACSTOP, LoadStr(IDS_ACBUTTON_STOP));
                 // disable OK and Drives
                 EnableWindow(GetDlgItem(HWindow, IDB_ACDRIVES), FALSE);
                 EnableWindow(GetDlgItem(HWindow, IDOK), FALSE);
@@ -232,7 +233,7 @@ CPackACDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         if (((char*)wParam)[lstrlen((char*)wParam) - 1] == '\\')
             ((char*)wParam)[lstrlen((char*)wParam) - 1] = '\0';
         // display it
-        SetDlgItemText(HWindow, IDC_ACSTATUS, (char*)wParam);
+        SetDlgItemTextUtf8(HWindow, IDC_ACSTATUS, (char*)wParam);
         // and free the memory
         HANDLES(GlobalFree((HGLOBAL)wParam));
         return TRUE;
@@ -258,8 +259,8 @@ CPackACDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         else
         {
             // restore everything back to normal
-            SetDlgItemText(HWindow, IDB_ACSTOP, LoadStr(IDS_ACBUTTON_RESCAN));
-            SetDlgItemText(HWindow, IDC_ACSTATUS, LoadStr(IDS_ACSTATUSDONE));
+            SetDlgItemTextUtf8(HWindow, IDB_ACSTOP, LoadStr(IDS_ACBUTTON_RESCAN));
+            SetDlgItemTextUtf8(HWindow, IDC_ACSTATUS, LoadStr(IDS_ACSTATUSDONE));
             EnableWindow(GetDlgItem(HWindow, IDB_ACDRIVES), TRUE);
             EnableWindow(GetDlgItem(HWindow, IDOK), TRUE);
             // fix the default push button
