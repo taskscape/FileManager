@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Auto-imported by MSBuild for every project under src\.
+     Computes the build date (YYYYMMDD) once per build and injects it as a preprocessor
+     define for both the C/C++ compiler and the resource compiler. spl_vers.h turns it
+     into VERSINFO_SALAMANDER_BUILDDATE, so the About box, window title and the embedded
+     file/product version always reflect the actual build date (no more hand-edited date).
+     Override for reproducible builds by passing /p:SalamanderBuildDate=YYYYMMDD. -->
+<Project>
+  <PropertyGroup>
+    <SalamanderBuildDate Condition="'$(SalamanderBuildDate)' == ''">$([System.DateTime]::Now.ToString('yyyyMMdd'))</SalamanderBuildDate>
+  </PropertyGroup>
+  <ItemDefinitionGroup>
+    <ClCompile>
+      <PreprocessorDefinitions>VERSINFO_SALAMANDER_BUILDDATE_DYNAMIC=$(SalamanderBuildDate);%(PreprocessorDefinitions)</PreprocessorDefinitions>
+    </ClCompile>
+    <ResourceCompile>
+      <PreprocessorDefinitions>VERSINFO_SALAMANDER_BUILDDATE_DYNAMIC=$(SalamanderBuildDate);%(PreprocessorDefinitions)</PreprocessorDefinitions>
+    </ResourceCompile>
+  </ItemDefinitionGroup>
+</Project>

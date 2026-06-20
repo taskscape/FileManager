@@ -25,10 +25,17 @@
 #define VERSINFO_SALAMANDER_MINORA 0
 #define VERSINFO_SALAMANDER_MINORB 0
 
-// Version format: MAJOR.BUILDDATE  (e.g. "5.20260410")
+// Version format: MAJOR.BUILDDATE  (e.g. "5.20260620")
 // VERSINFO_SALAMANDER_BUILDDATE is the build date in YYYYMMDD format.
-// Update this define for each new build.
-#define VERSINFO_SALAMANDER_BUILDDATE "20260410"
+// It is normally injected by the build: src\Directory.Build.props computes the current
+// date and passes VERSINFO_SALAMANDER_BUILDDATE_DYNAMIC=YYYYMMDD to both the C/C++ and
+// resource compilers, so the version always reflects the actual build date. The literal
+// fallback is used only for builds that bypass that props file (e.g. ad-hoc compiles).
+#ifdef VERSINFO_SALAMANDER_BUILDDATE_DYNAMIC
+#define VERSINFO_SALAMANDER_BUILDDATE VERSINFO_xstr(VERSINFO_SALAMANDER_BUILDDATE_DYNAMIC)
+#else
+#define VERSINFO_SALAMANDER_BUILDDATE "20260620"
+#endif
 #define VERSINFO_SALAMANDER_VERSION VERSINFO_xstr(VERSINFO_SALAMANDER_MAJOR) "." VERSINFO_SALAMANDER_BUILDDATE VERSINFO_BETAVERSION_TXT
 #define VERSINFO_SAL_SHORT_VERSION VERSINFO_xstr(VERSINFO_SALAMANDER_MAJOR) VERSINFO_SALAMANDER_BUILDDATE VERSINFO_BETAVERSIONSHORT_TXT
 
