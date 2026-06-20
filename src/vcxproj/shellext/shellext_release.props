@@ -12,7 +12,10 @@
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <PreprocessorDefinitions>NDEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <FunctionLevelLinking>true</FunctionLevelLinking>
-      <WholeProgramOptimization>true</WholeProgramOptimization>
+      <!-- /GL is incompatible with the CRT-helper definitions in lstrfix.inc (LSTRFIX_WITHOUT_RTL):
+           MSVC 14.51 errors C2268 "library helpers are not supported with /GL". This is a tiny
+           CRT-free module, so whole-program optimization is not worth it. -->
+      <WholeProgramOptimization>false</WholeProgramOptimization>
     </ClCompile>
     <Link>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>

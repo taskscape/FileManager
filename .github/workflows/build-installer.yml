@@ -27,6 +27,13 @@ jobs:
       # OPENSAL_BUILD_DIR MUST end with a backslash as expected by props files
       OPENSAL_BUILD_DIR: '${{ github.workspace }}\build_stage\'
       INSTALLER_STAGING_DIR: 'Installer\Installer_Staging'
+      # The project files target the VS2026 v145 toolset for local development.
+      # GitHub-hosted runners only ship VS2022 (v143), and v145 (VS2026, prerelease)
+      # cannot be bolted onto VS2022, so CI pins the build to v143 via a global MSBuild
+      # property (overrides the per-project <PlatformToolset>v145</PlatformToolset>).
+      # The same sources build identically on both toolsets. Change to v145 only on a
+      # runner that has VS2026 installed.
+      PLATFORM_TOOLSET: v143
 
     steps:
       - name: Checkout
@@ -68,7 +75,7 @@ jobs:
         run: |
           New-Item -ItemType Directory -Force -Path $env:OPENSAL_BUILD_DIR
           # We do NOT pass /p:OutDir here, we let the project props use OPENSAL_BUILD_DIR
-          msbuild $env:SOLUTION_PATH /m /t:Build /p:Configuration=$env:BUILD_CONFIGURATION /p:Platform=x64 /p:PreferredToolArchitecture=x64
+          msbuild $env:SOLUTION_PATH /m /t:Build /p:Configuration=$env:BUILD_CONFIGURATION /p:Platform=x64 /p:PlatformToolset=$env:PLATFORM_TOOLSET /p:PreferredToolArchitecture=x64
 
       - name: Install Inno Setup
         run: |
