@@ -1571,6 +1571,10 @@ public:
     // in case mode==cfnmUNC, it tries to convert the path from "x:\" to UNC and if it fails, an error is displayed
     BOOL CopyFocusedNameToClipboard(CCopyFocusedNameModeEnum mode);
 
+    // places the name of the specified file or directory on the clipboard (optionally with full path or in UNC form)
+    // in case mode==cfnmUNC, it tries to convert the path from "x:\" to UNC and if it fails, an error is displayed
+    BOOL CopyItemNameToClipboard(int index, CCopyFocusedNameModeEnum mode);
+
     // places the full current path on the clipboard (active in the panel)
     BOOL CopyCurrentPathToClipboard();
 

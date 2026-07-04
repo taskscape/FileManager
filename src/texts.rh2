@@ -982,6 +982,7 @@
 #define IDS_FINDERRORS_DEFER         10770
 
 #define IDS_CONTEXTMENU_EXIT         10771
+#define IDS_CONTEXTMENU_COPYFULLPATH 10772
 
 // Always on Top prevents other application windows from open above Open Salamander windows. You will not be able to open these windows on top until you turn off Always on Top.
 #define IDS_WANTALWAYSONTOP          10779

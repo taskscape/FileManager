@@ -742,6 +742,8 @@ void SetClipCutCopyInfo(HWND hwnd, BOOL copy, BOOL salObject)
 // ShellAction
 //
 
+const UINT CM_CONTEXTMENU_COPYFULLPATH = 10002;
+
 const char* EnumFileNames(int index, void* param)
 {
     CTmpEnumData* data = (CTmpEnumData*)param;
@@ -897,6 +899,72 @@ void ShellActionAux7(IDataObject* dataObject, CImpIDropSource* dropSource)
     __except (EXCEPTION_EXECUTE_HANDLER)
     {
         RelExceptionHasOccured++;
+    }
+}
+
+BOOL IsMenuItemSeparator(HMENU hMenu, int pos)
+{
+    MENUITEMINFO mi;
+    memset(&mi, 0, sizeof(mi));
+    mi.cbSize = sizeof(mi);
+    mi.fMask = MIIM_TYPE;
+    return GetMenuItemInfo(hMenu, pos, TRUE, &mi) && (mi.fType & MFT_SEPARATOR) != 0;
+}
+
+void InsertCopyFullPathContextMenuItem(HMENU hMenu, IContextMenu2* contextMenu)
+{
+    int insertPos = GetMenuItemCount(hMenu);
+    BOOL insertSeparator = TRUE;
+
+    char cmdName[200];
+    char itemName[500];
+    int miCount = GetMenuItemCount(hMenu);
+    int i;
+    for (i = 0; i < miCount; i++)
+    {
+        MENUITEMINFO mi;
+        memset(&mi, 0, sizeof(mi));
+        mi.cbSize = sizeof(mi);
+        mi.fMask = MIIM_TYPE | MIIM_ID | MIIM_SUBMENU;
+        mi.dwTypeData = itemName;
+        mi.cch = 500;
+        if (GetMenuItemInfo(hMenu, i, TRUE, &mi) &&
+            mi.hSubMenu == NULL && (mi.fType & MFT_SEPARATOR) == 0 &&
+            AuxGetCommandString(contextMenu, mi.wID, GCS_VERB, NULL, cmdName, 200) == NOERROR &&
+            stricmp(cmdName, "copy") == 0)
+        {
+            insertPos = i + 1;
+            insertSeparator = FALSE;
+            break;
+        }
+    }
+
+    if (insertSeparator && (insertPos <= 0 || IsMenuItemSeparator(hMenu, insertPos - 1)))
+        insertSeparator = FALSE;
+    if (insertSeparator)
+    {
+        MENUITEMINFO mi;
+        memset(&mi, 0, sizeof(mi));
+        mi.cbSize = sizeof(mi);
+        mi.fMask = MIIM_TYPE;
+        mi.fType = MFT_SEPARATOR;
+        mi.dwTypeData = NULL;
+        if (InsertMenuItem(hMenu, insertPos, TRUE, &mi))
+            insertPos++;
+    }
+
+    MENUITEMINFO mi;
+    memset(&mi, 0, sizeof(mi));
+    mi.cbSize = sizeof(mi);
+    mi.fMask = MIIM_STATE | MIIM_ID | MIIM_TYPE;
+    mi.fType = MFT_STRING;
+    mi.fState = MFS_ENABLED;
+    mi.dwTypeData = LoadStr(IDS_CONTEXTMENU_COPYFULLPATH);
+    mi.wID = CM_CONTEXTMENU_COPYFULLPATH;
+    if (!InsertMenuItem(hMenu, insertPos, TRUE, &mi))
+    {
+        DWORD err = GetLastError();
+        TRACE_E("Unable to insert Copy full path command into context menu: " << GetErrorText(err));
     }
 }
 
@@ -1844,10 +1912,41 @@ void ShellAction(CFilesWindow* panel, CShellAction action, BOOL useSelection,
 
                 // necham nastavit stavy dle enableru a otevru menu
                 ArchiveMenu.UpdateItemsState();
+
+                int copyFullPathIndex = -1;
+                int copyFullPathItemPos = -1;
+                if (count == 0 || count == 1)
+                {
+                    copyFullPathIndex = count == 1 ? indexes[0] : index;
+                    if (copyFullPathIndex >= 0 &&
+                        copyFullPathIndex < panel->Dirs->Count + panel->Files->Count)
+                    {
+                        MENU_ITEM_INFO mii;
+                        memset(&mii, 0, sizeof(mii));
+                        mii.Mask = MENU_MASK_TYPE | MENU_MASK_STRING | MENU_MASK_ID | MENU_MASK_STATE;
+                        mii.Type = MENU_TYPE_STRING;
+                        mii.State = 0;
+                        mii.String = LoadStr(IDS_CONTEXTMENU_COPYFULLPATH);
+                        mii.ID = CM_CONTEXTMENU_COPYFULLPATH;
+
+                        copyFullPathItemPos = ArchiveMenu.FindItemPosition(CM_CLIPCOPY);
+                        if (copyFullPathItemPos != -1)
+                            copyFullPathItemPos++;
+                        else
+                            copyFullPathItemPos = ArchiveMenu.GetItemCount();
+                        if (!ArchiveMenu.InsertItem(copyFullPathItemPos, TRUE, &mii))
+                            copyFullPathItemPos = -1;
+                    }
+                }
+
                 DWORD cmd = ArchiveMenu.Track(MENU_TRACK_RETURNCMD | MENU_TRACK_RIGHTBUTTON,
                                               pt.x, pt.y, panel->GetListBoxHWND(), NULL);
+                if (copyFullPathItemPos != -1)
+                    ArchiveMenu.RemoveItemsRange(copyFullPathItemPos, copyFullPathItemPos);
                 // vysledek posleme hlavnimu oknu
-                if (cmd != 0)
+                if (cmd == CM_CONTEXTMENU_COPYFULLPATH)
+                    panel->CopyItemNameToClipboard(copyFullPathIndex, cfnmFull);
+                else if (cmd != 0)
                     PostMessage(MainWindow->HWindow, WM_COMMAND, cmd, 0);
             }
             else
@@ -1998,14 +2097,25 @@ void ShellAction(CFilesWindow* panel, CShellAction action, BOOL useSelection,
                 BOOL clipCopy = FALSE;     // jde o "nase copy"?
                 BOOL clipCut = FALSE;      // jde o "nase cut"?
                 BOOL cmdDelete = FALSE;    // jde o "nase delete"?
+                BOOL cmdCopyFullPath = FALSE;
                 BOOL cmdMapNetDrv = FALSE; // jde o "nase Map Network Drive"? (jen UNC root, nebudeme si komplikovat zivot)
                 DWORD cmd = 0;             // cislo prikazu pro kontext. menu (10000 = "nas paste")
+                int copyFullPathIndex = -1;
                 char pastePath[MAX_PATH];  // buffer pro cestu, na kterou se provede "nas paste" (nastane-li)
                 if (panel->ContextMenu != NULL && h != NULL)
                 {
                     if (!alreadyHaveContextMenu)
                         ShellActionAux5(flags, panel, h);
                     RemoveUselessSeparatorsFromMenu(h);
+                    if (useSelection && (count == 0 || count == 1))
+                    {
+                        copyFullPathIndex = count == 1 ? indexes[0] : index;
+                        if (copyFullPathIndex >= 0 &&
+                            copyFullPathIndex < panel->Dirs->Count + panel->Files->Count)
+                        {
+                            InsertCopyFullPathContextMenuItem(h, panel->ContextMenu);
+                        }
+                    }
 
                     char cmdName[2000]; // schvalne mame 2000 misto 200, shell-extensiony obcas zapisuji dvojnasobek (uvaha: unicode = 2 * "pocet znaku"), atp.
                     if (onlyPanelMenu)
@@ -2162,6 +2272,7 @@ MENU_TEMPLATE_ITEM PanelBkgndMenu[] =
                     if (cmd != 0)
                     {
                         CALL_STACK_MESSAGE1("ShellAction::context_menu::exec0");
+                        cmdName[0] = 0;
                         if (cmd < 5000)
                         {
                             if (AuxGetCommandString(panel->ContextMenu, cmd, GCS_VERB, NULL, cmdName, 200) != NOERROR)
@@ -2202,12 +2313,13 @@ MENU_TEMPLATE_ITEM PanelBkgndMenu[] =
                         clipCopy = (cmd < 5000 && stricmp(cmdName, "copy") == 0);
                         clipCut = (cmd < 5000 && stricmp(cmdName, "cut") == 0);
                         cmdDelete = useSelection && (cmd < 5000 && stricmp(cmdName, "delete") == 0);
+                        cmdCopyFullPath = cmd == CM_CONTEXTMENU_COPYFULLPATH;
 
                         // prikaz Map Network Drive je pod XP 40, pod W2K 43 a teprve pod Vistou ma definovane cmdName
                         cmdMapNetDrv = uncRootPath && (stricmp(cmdName, "connectNetworkDrive") == 0 ||
                                                        !WindowsVistaAndLater && cmd == 40);
 
-                        if (cmd != 10000 && cmd != 10001 && !clipCopy && !clipCut && !cmdDelete && !cmdMapNetDrv)
+                        if (cmd != 10000 && cmd != 10001 && !clipCopy && !clipCut && !cmdDelete && !cmdCopyFullPath && !cmdMapNetDrv)
                         {
                             if (cmd < 5000 && stricmp(cmdName, "rename") == 0)
                             {
@@ -2362,27 +2474,34 @@ MENU_TEMPLATE_ITEM PanelBkgndMenu[] =
                     }
                     else
                     {
-                        if (clipCopy) // nase vlastni "copy"
+                        if (cmdCopyFullPath)
                         {
-                            panel->ClipboardCopy(); // recursive ShellAction call
+                            panel->CopyItemNameToClipboard(copyFullPathIndex, cfnmFull);
                         }
                         else
                         {
-                            if (clipCut) // nase vlastni "cut"
+                            if (clipCopy) // nase vlastni "copy"
                             {
-                                panel->ClipboardCut(); // recursive ShellAction call
+                                panel->ClipboardCopy(); // recursive ShellAction call
                             }
                             else
                             {
-                                if (cmdDelete)
+                                if (clipCut) // nase vlastni "cut"
                                 {
-                                    PostMessage(MainWindow->HWindow, WM_COMMAND, CM_DELETEFILES, 0);
+                                    panel->ClipboardCut(); // recursive ShellAction call
                                 }
                                 else
                                 {
-                                    if (cmdMapNetDrv) // jde o "nase Map Network Drive"? (jen UNC root, nebudeme si komplikovat zivot)
+                                    if (cmdDelete)
                                     {
-                                        panel->ConnectNet(TRUE);
+                                        PostMessage(MainWindow->HWindow, WM_COMMAND, CM_DELETEFILES, 0);
+                                    }
+                                    else
+                                    {
+                                        if (cmdMapNetDrv) // jde o "nase Map Network Drive"? (jen UNC root, nebudeme si komplikovat zivot)
+                                        {
+                                            panel->ConnectNet(TRUE);
+                                        }
                                     }
                                 }
                             }

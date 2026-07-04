@@ -1872,10 +1872,17 @@ BOOL CFilesWindow::CopyFocusedNameToClipboard(CCopyFocusedNameModeEnum mode)
 {
     CALL_STACK_MESSAGE2("CFilesWindow::CopyFocusedNameToClipboard(%d)", mode);
 
-    if (FocusedIndex == 0 && FocusedIndex < Dirs->Count &&
+    return CopyItemNameToClipboard(FocusedIndex, mode);
+}
+
+BOOL CFilesWindow::CopyItemNameToClipboard(int index, CCopyFocusedNameModeEnum mode)
+{
+    CALL_STACK_MESSAGE3("CFilesWindow::CopyItemNameToClipboard(%d, %d)", index, mode);
+
+    if (index == 0 && index < Dirs->Count &&
         strcmp(Dirs->At(0).Name, "..") == 0)
         return FALSE; // do not accept up-directory entries
-    if (FocusedIndex < 0 || FocusedIndex >= Files->Count + Dirs->Count)
+    if (index < 0 || index >= Files->Count + Dirs->Count)
         return FALSE; // ignore an invalid index
 
     char buff[2 * MAX_PATH];
@@ -1891,11 +1898,11 @@ BOOL CFilesWindow::CopyFocusedNameToClipboard(CCopyFocusedNameModeEnum mode)
             GetGeneralPath(buff, 2 * MAX_PATH);
             SalPathAddBackslash(buff, 2 * MAX_PATH);
 
-            CFileData* item = (FocusedIndex < Dirs->Count) ? &Dirs->At(FocusedIndex) : &Files->At(FocusedIndex - Dirs->Count);
+            CFileData* item = (index < Dirs->Count) ? &Dirs->At(index) : &Files->At(index - Dirs->Count);
             char itemName[MAX_PATH];
-            AlterFileName(itemName, item->Name, -1, Configuration.FileNameFormat, 0, FocusedIndex < Dirs->Count);
+            AlterFileName(itemName, item->Name, -1, Configuration.FileNameFormat, 0, index < Dirs->Count);
 
-            if (CopyUNCPathToClipboard(buff, itemName, FocusedIndex < Dirs->Count, MainWindow->HWindow))
+            if (CopyUNCPathToClipboard(buff, itemName, index < Dirs->Count, MainWindow->HWindow))
                 return TRUE;
         }
         return FALSE;
@@ -1911,11 +1918,11 @@ BOOL CFilesWindow::CopyFocusedNameToClipboard(CCopyFocusedNameModeEnum mode)
         }
     }
 
-    CFileData* file = (FocusedIndex < Dirs->Count) ? &Dirs->At(FocusedIndex) : &Files->At(FocusedIndex - Dirs->Count);
+    CFileData* file = (index < Dirs->Count) ? &Dirs->At(index) : &Files->At(index - Dirs->Count);
     if (Is(ptDisk) || Is(ptZIPArchive) || Is(ptPluginFS) && mode == cfnmShort)
     {
         char fileName[MAX_PATH];
-        AlterFileName(fileName, file->Name, -1, Configuration.FileNameFormat, 0, FocusedIndex < Dirs->Count);
+        AlterFileName(fileName, file->Name, -1, Configuration.FileNameFormat, 0, index < Dirs->Count);
         int l = (int)strlen(buff);
         lstrcpyn(buff + l, fileName, 2 * MAX_PATH - l);
         return CopyTextToClipboard(buff);
@@ -1927,7 +1934,7 @@ BOOL CFilesWindow::CopyFocusedNameToClipboard(CCopyFocusedNameModeEnum mode)
             strcpy(buff, GetPluginFS()->GetPluginFSName());
             strcat(buff, ":");
             int l = (int)strlen(buff);
-            if (GetPluginFS()->GetFullName(*file, FocusedIndex < Dirs->Count ? 1 : 0, buff + l, 2 * MAX_PATH - l))
+            if (GetPluginFS()->GetFullName(*file, index < Dirs->Count ? 1 : 0, buff + l, 2 * MAX_PATH - l))
             {
                 GetPluginFS()->GetPluginInterfaceForFS()->ConvertPathToExternal(GetPluginFS()->GetPluginFSName(),
                                                                                 GetPluginFS()->GetPluginFSNameIndex(),
