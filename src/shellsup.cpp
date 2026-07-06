@@ -743,6 +743,7 @@ void SetClipCutCopyInfo(HWND hwnd, BOOL copy, BOOL salObject)
 //
 
 const UINT CM_CONTEXTMENU_COPYFULLPATH = 10002;
+static char CONTEXTMENU_COPYFULLPATH_TEXT[] = "Copy &path text";
 
 const char* EnumFileNames(int index, void* param)
 {
@@ -959,7 +960,7 @@ void InsertCopyFullPathContextMenuItem(HMENU hMenu, IContextMenu2* contextMenu)
     mi.fMask = MIIM_STATE | MIIM_ID | MIIM_TYPE;
     mi.fType = MFT_STRING;
     mi.fState = MFS_ENABLED;
-    mi.dwTypeData = LoadStr(IDS_CONTEXTMENU_COPYFULLPATH);
+    mi.dwTypeData = CONTEXTMENU_COPYFULLPATH_TEXT;
     mi.wID = CM_CONTEXTMENU_COPYFULLPATH;
     if (!InsertMenuItem(hMenu, insertPos, TRUE, &mi))
     {
@@ -1926,7 +1927,7 @@ void ShellAction(CFilesWindow* panel, CShellAction action, BOOL useSelection,
                         mii.Mask = MENU_MASK_TYPE | MENU_MASK_STRING | MENU_MASK_ID | MENU_MASK_STATE;
                         mii.Type = MENU_TYPE_STRING;
                         mii.State = 0;
-                        mii.String = LoadStr(IDS_CONTEXTMENU_COPYFULLPATH);
+                        mii.String = CONTEXTMENU_COPYFULLPATH_TEXT;
                         mii.ID = CM_CONTEXTMENU_COPYFULLPATH;
 
                         copyFullPathItemPos = ArchiveMenu.FindItemPosition(CM_CLIPCOPY);

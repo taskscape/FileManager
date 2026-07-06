@@ -1209,7 +1209,6 @@ STRINGTABLE
  IDS_CUSTOMIZE_HOTPATHS, "Customize..."
 
  IDS_CONTEXTMENU_EXIT, "Exit Open Salamander"
- IDS_CONTEXTMENU_COPYFULLPATH, "Copy &full path"
 
 // Directory and Status line Tooltips
  IDS_PANELFILTER, "Filter is on"
