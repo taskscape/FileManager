@@ -783,8 +783,8 @@ LRESULT CMainWindow::HandleShutdown(UINT uMsg, WPARAM wParam, LPARAM lParam)
             Configuration.AltPluginSLGName[0] = 0;
         }
 
-        if (Configuration.AutoSave)
-            SaveConfig();
+        // Commit any state changed during shutdown as a final safeguard; normal changes save earlier.
+        SaveConfig();
 
         if (uMsg == WM_ENDSESSION)
             LoadSaveToRegistryMutex.Leave(); // pairs with Enter() called when WM_QUERYENDSESSION was received

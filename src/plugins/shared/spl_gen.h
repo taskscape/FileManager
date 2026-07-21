@@ -423,7 +423,7 @@ struct CSalamanderPluginInternalViewerData : public CSalamanderPluginViewerData
 //
 // general parameters
 #define SALCFG_SELOPINCLUDEDIRS 1        // BOOL, select/deselect operations (num *, num +, num -) work also with directories
-#define SALCFG_SAVEONEXIT 2              // BOOL, save configuration on Salamander exit
+#define SALCFG_SAVEONEXIT 2              // BOOL, legacy compatibility parameter; always TRUE because configuration is persisted during the session
 #define SALCFG_MINBEEPWHENDONE 3         // BOOL, should it beep (play sound) after end of work in inactive window?
 #define SALCFG_HIDEHIDDENORSYSTEMFILES 4 // BOOL, should it hide system and/or hidden files?
 #define SALCFG_ALWAYSONTOP 6             // BOOL, main window is Always On Top?

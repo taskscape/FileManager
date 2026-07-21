@@ -1385,8 +1385,6 @@ void CCallStack::PrintBugReport(EXCEPTION_POINTERS* Exception, DWORD ThreadID, D
         PrintLine(param, buf, TRUE);
         sprintf(buf, "ReloadEnvVariables = %d", Configuration.ReloadEnvVariables);
         PrintLine(param, buf, TRUE);
-        sprintf(buf, "AutoSave = %d", Configuration.AutoSave);
-        PrintLine(param, buf, TRUE);
         sprintf(buf, "IfPathIsInaccessibleGoTo (isMyDocs = %d) = %s", Configuration.IfPathIsInaccessibleGoToIsMyDocs, Configuration.IfPathIsInaccessibleGoTo);
         PrintLine(param, buf, TRUE);
         sprintf(buf, "NoDrives = 0x%08X", SystemPolicies.GetNoDrives());

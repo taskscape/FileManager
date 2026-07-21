@@ -108,7 +108,6 @@
 #define IDC_ABOUT_OPENSAL               289
 #define IDC_ABOUT_LOGO                  290
 #define IDD_CFGPAGE_GENERAL             300
-#define IDC_AUTOSAVE                    301
 #define IDC_INCLUDEDIRS                 302
 #define IDC_MINBEEPWHENDONE             303
 #define IDC_CLEARREADONLY               304

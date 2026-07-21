@@ -3623,7 +3623,7 @@ int CPlugins::GetPluginSaveCount()
 {
     CALL_STACK_MESSAGE1("CPlugins::GetPluginSaveCount()");
     int loadedCount = 0;
-    if (::Configuration.AutoSave)
+    // Shutdown progress must include every loaded plug-in because persistence is no longer optional.
     {
         int i;
         for (i = 0; i < Data.Count; i++)

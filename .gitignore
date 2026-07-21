@@ -41,3 +41,4 @@ src/nul
 nul
 *.backup
 .claude
+.vscode

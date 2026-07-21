@@ -2445,7 +2445,8 @@ BOOL CSalamanderGeneral::GetConfigParameter(int paramID, void* buffer, int buffe
         *((DWORD*)auxBuf) = (DWORD)Configuration.IncludeDirs;
         break;
     case SALCFG_SAVEONEXIT:
-        *((DWORD*)auxBuf) = (DWORD)Configuration.AutoSave;
+        // Preserve the plug-in ABI while reporting the new invariant: configuration persistence is always enabled.
+        *((DWORD*)auxBuf) = TRUE;
         break;
     case SALCFG_MINBEEPWHENDONE:
         *((DWORD*)auxBuf) = (DWORD)Configuration.MinBeepWhenDone;

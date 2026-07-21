@@ -3062,14 +3062,11 @@ BOOL CPluginData::Unload(HWND parent, BOOL ask)
         { // the plugin is no longer used by Salamander; it can be unloaded
             char buf[MAX_PATH + 300];
             BOOL skipUnload = FALSE;
-            if (SupportLoadSave && ::Configuration.AutoSave)
-            { // ask if the user wants to save configuration when "save on exit" is on
-                sprintf(buf, LoadStr(IDS_PLUGINSAVECONFIG), Name);
-                if (!ask || SalMessageBox(parent, buf, LoadStr(IDS_QUESTION), MB_YESNO | MB_ICONQUESTION) == IDYES)
-                {
-                    LoadSaveToRegistryMutex.Enter();
-                    BOOL salKeyDoesNotExist = FALSE;
-                    HKEY salamander;
+            if (SupportLoadSave)
+            { // Persist plug-in state during unload because it can no longer be deferred by a user option.
+                LoadSaveToRegistryMutex.Enter();
+                BOOL salKeyDoesNotExist = FALSE;
+                HKEY salamander;
                     if (SALAMANDER_ROOT_REG != NULL &&
                         OpenKeyAux(NULL, HKEY_CURRENT_USER, SALAMANDER_ROOT_REG, salamander)) // check whether the Salamander key exists at all (otherwise nothing is saved)
                     {                                                                         // OpenKeyAux because we do not want a Load Configuration message
@@ -3117,12 +3114,11 @@ BOOL CPluginData::Unload(HWND parent, BOOL ask)
                         salKeyDoesNotExist = TRUE;
                     LoadSaveToRegistryMutex.Leave();
 
-                    if (ask && salKeyDoesNotExist)
-                    {
-                        sprintf(buf, LoadStr(IDS_PLUGINSAVEFAILED), Name);
-                        skipUnload = SalMessageBox(parent, buf, LoadStr(IDS_QUESTION),
-                                                   MB_YESNO | MB_ICONQUESTION | MB_DEFBUTTON2) == IDNO;
-                    }
+                if (ask && salKeyDoesNotExist)
+                {
+                    sprintf(buf, LoadStr(IDS_PLUGINSAVEFAILED), Name);
+                    skipUnload = SalMessageBox(parent, buf, LoadStr(IDS_QUESTION),
+                                               MB_YESNO | MB_ICONQUESTION | MB_DEFBUTTON2) == IDNO;
                 }
                 if (GlobalSaveWaitWindow != NULL)
                     GlobalSaveWaitWindow->SetProgressPos(++GlobalSaveWaitWindowProgress);

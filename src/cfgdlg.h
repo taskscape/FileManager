@@ -179,7 +179,6 @@ struct CConfiguration
     DWORD ConfigVersion;
 
     int IncludeDirs,            // select/deselect (*, +, -) directories as well
-        AutoSave,               // save on exit
         CloseShell,             // close the shell after launching the command line
         ShowGrepErrors,         // should the Find Files dialog show error messages?
         FindFullRowSelect,      // enable full row select in the Find dialog

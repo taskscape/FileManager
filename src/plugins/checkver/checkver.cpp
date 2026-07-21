@@ -26,7 +26,6 @@ BOOL PluginIsReleased = FALSE; // are we inside CPluginInterface::Release?
 BOOL LoadedOnSalamanderStart = FALSE;
 BOOL LoadedOnSalInstall = FALSE;
 
-BOOL SalSaveCfgOnExit = FALSE;
 
 HANDLE HMessageLoopThread = NULL; // used to verify that the thread has already finished
 HANDLE HDownloadThread = NULL;    // used to verify that the thread has already finished
@@ -165,10 +164,6 @@ CPluginInterfaceAbstract* WINAPI SalamanderPluginEntry(CSalamanderPluginEntryAbs
     int index = 0;
     char salModule[MAX_PATH];
     SalGeneral->EnumInstalledModules(&index, salModule, SalamanderTextVersion);
-
-    // find out whether the user disabled saving the configuration on exit, in that case
-    // the behaviour must differ in several places
-    SalGeneral->GetConfigParameter(SALCFG_SAVEONEXIT, &SalSaveCfgOnExit, sizeof(BOOL), NULL);
 
     return &PluginInterface;
 }
@@ -400,11 +395,8 @@ unsigned WINAPI ThreadMessageLoopBody(void* param)
     DestroyWindow(HMainDialog);
     HMainDialog = NULL;
 
-    // request the plugin to unload - it is no longer needed; exception: after a configuration change when saving the configuration is disabled
-    // we allow the user to save the configuration manually, because if we unloaded the plugin,
-    // the configuration changes would be discarded immediately and the user would not understand why their data are not saved after manual
-    // "save configuration"
-    if (dataAutoOpen && (!ConfigurationChanged || SalSaveCfgOnExit))
+    // Configuration changes are persisted during the session, so the auto-open plug-in can unload safely.
+    if (dataAutoOpen)
         SalGeneral->PostUnloadThisPlugin();
 
     TRACE_I("End");

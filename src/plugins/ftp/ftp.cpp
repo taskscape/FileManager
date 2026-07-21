@@ -887,10 +887,28 @@ void CPluginInterface::SaveConfiguration(HWND parent, HKEY regKey, CSalamanderRe
                        &CSimpleListPluginDataInterface::ListingColumnWidth, sizeof(DWORD));
 }
 
+// This callback keeps immediate user-commit saves on the host-managed plug-in registry path.
+static void WINAPI SaveFTPConfigurationAfterUserCommit(BOOL load, HKEY regKey,
+                                                       CSalamanderRegistryAbstract* registry, void* param)
+{
+    if (!load)
+        PluginInterface.SaveConfiguration((HWND)param, regKey, registry);
+}
+
+void PersistFTPConfigurationAfterUserCommit(HWND parent)
+{
+    // Save synchronously at the commit boundary so later crashes or critical shutdown do not wait for exit.
+    SalamanderGeneral->CallLoadOrSaveConfiguration(FALSE, SaveFTPConfigurationAfterUserCommit, parent);
+}
+
 void CPluginInterface::Configuration(HWND parent)
 {
     CALL_STACK_MESSAGE1("CPluginInterface::Configuration()");
-    CConfigDlg(parent).Execute();
+    if (CConfigDlg(parent).Execute() == IDOK)
+    {
+        // The FTP configuration dialog has committed its pages; persist instead of waiting for exit.
+        PersistFTPConfigurationAfterUserCommit(parent);
+    }
 }
 
 void CPluginInterface::Connect(HWND parent, CSalamanderConnectAbstract* salamander)

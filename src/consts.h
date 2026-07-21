@@ -1771,6 +1771,7 @@ DWORD CfgSkillLevelToMenu(BYTE cfgSkillLevel);
 #define IDT_THROBBER 949
 #define IDT_DELAYEDTHROBBER 950
 #define IDT_UPDATETASKLIST 951
+#define IDT_SAVECONFIG 952 // delayed commit of a user-visible configuration change
 
 // WARNING: almost all functions in this section display messages about LOAD / SAVE
 //          configuration on error, which makes them unsuitable for normal access to Registry,

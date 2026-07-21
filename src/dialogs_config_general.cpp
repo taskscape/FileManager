@@ -271,7 +271,6 @@ CConfiguration::CConfiguration()
 {
     ConfigVersion = 0;
     IncludeDirs = FALSE;
-    AutoSave = TRUE;
     CloseShell = FALSE;
     ShowGrepErrors = FALSE; // other search tools (FAR/WinCmd/PowerDesk/Windows Find) do not show errors
     FindFullRowSelect = FALSE;
@@ -804,7 +803,6 @@ void CConfigPageGeneral::Validate(CTransferInfo& ti)
 
 void CConfigPageGeneral::Transfer(CTransferInfo& ti)
 {
-    ti.CheckBox(IDC_AUTOSAVE, Configuration.AutoSave);
     ti.CheckBox(IDC_CLOSESHELL, Configuration.CloseShell);
     ti.CheckBox(IDC_CLEARREADONLY, Configuration.ClearReadOnly);
     //  ti.CheckBox(IDC_FASTDIRMOVE, Configuration.FastDirectoryMove);

@@ -101,9 +101,8 @@ STYLE DS_SETFONT | DS_FIXEDSYS | DS_CONTROL | WS_CHILD | WS_CAPTION
 CAPTION "General"
 FONT 8, "MS Shell Dlg", 400, 0, 0x1
 BEGIN
-    CONTROL         "&Save configuration on exit",IDC_AUTOSAVE,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,1,3,100,12
     CONTROL         "&Clear read-only attribute when copying from Compact Disc",IDC_CLEARREADONLY,
-                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,16,209,12
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,1,3,209,12
     CONTROL         "&Allow only one instance of Salamander at one time",IDC_ONLYONEINSTANCE,
                     "Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,29,182,12
     CONTROL         "&Use speaker beep to announce finishing of work in inactive window",IDC_MINBEEPWHENDONE,

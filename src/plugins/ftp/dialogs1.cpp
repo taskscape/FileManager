@@ -884,6 +884,7 @@ void CConnectDlg::Validate(CTransferInfo& ti)
 
 void CConnectDlg::Transfer(CTransferInfo& ti)
 {
+    BOOL bookmarkDataCommitted = FALSE;
     HWND list;
     if (ti.GetControl(list, IDL_BOOKMARKS))
     {
@@ -910,14 +911,20 @@ void CConnectDlg::Transfer(CTransferInfo& ti)
             if (i != LB_ERR)
                 Config.LastBookmark = i;
 
-            // copy the data back into the configuration (button: Connect or Close)
-            TmpFTPServerList.CopyMembersToList(Config.FTPServerList);
-            TmpFTPProxyServerList.CopyMembersToList(Config.FTPProxyServerList);
-            // verify that the "default" proxy server still exists
+            // Keep the established copy order, but persist only after both lists were copied successfully.
+            BOOL serverListCopied = TmpFTPServerList.CopyMembersToList(Config.FTPServerList);
+            BOOL proxyServerListCopied = TmpFTPProxyServerList.CopyMembersToList(Config.FTPProxyServerList);
+            bookmarkDataCommitted = serverListCopied && proxyServerListCopied;
+
+            // Verify that the "default" proxy server still exists after the list update.
             if (Config.DefaultProxySrvUID != -1 &&
                 !Config.FTPProxyServerList.IsValidUID(Config.DefaultProxySrvUID))
             {
                 Config.DefaultProxySrvUID = -1; // "not used"
+            }
+            if (!bookmarkDataCommitted)
+            {
+                TRACE_E("CConnectDlg::Transfer(): unable to commit bookmark data");
             }
         }
     }
@@ -934,6 +941,12 @@ void CConnectDlg::Transfer(CTransferInfo& ti)
     HistoryComboBox(HWindow, ti, IDE_INITIALPATH, buf, FTP_MAX_PATH,
                     INITIALPATH_HISTORY_SIZE, Config.InitPathHistory,
                     Config.LastBookmark != 0 /* store in history only during Quick Connect*/);
+
+    if (ti.IsGood() && ti.Type == ttDataFromWindow && bookmarkDataCommitted)
+    {
+        // A Connect or Close action committed bookmark edits, so save them before the next shutdown.
+        PersistFTPConfigurationAfterUserCommit(HWindow);
+    }
 }
 
 void AddToAdvancedStr(char* buf, int bufSize, const char* str)

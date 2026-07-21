@@ -366,7 +366,7 @@ const char* CONFIG_SELECTION_REG = "Select/Deselect Directories";
 const char* CONFIG_LONGNAMES_REG = "Use Long File Names";
 const char* CONFIG_RECYCLEBIN_REG = "Use Recycle Bin";
 const char* CONFIG_RECYCLEMASKS_REG = "Use Recycle Bin For";
-const char* CONFIG_SAVEONEXIT_REG = "Save Configuration On Exit";
+const char* LEGACY_CONFIG_SAVEONEXIT_REG = "Save Configuration On Exit";
 const char* CONFIG_SHOWGREPERRORS_REG = "Show Errors In Find Files";
 const char* CONFIG_FINDFULLROW_REG = "Show Full Row In Find Files";
 const char* CONFIG_MINBEEPWHENDONE_REG = "Use Speeker Beep";
@@ -1371,9 +1371,20 @@ void CMainWindow::SavePanelConfig(CFilesWindow* panel, HKEY hSalamander, const c
     }
 }
 
+void CMainWindow::ScheduleConfigSave()
+{
+    // A short debounce groups compound UI changes without relying on application shutdown for persistence.
+    if (HWindow != NULL && CanClose && !CriticalShutdown)
+        SetTimer(HWindow, IDT_SAVECONFIG, 250, NULL);
+}
+
 void CMainWindow::SaveConfig(HWND parent)
 {
     CALL_STACK_MESSAGE1("CMainWindow::SaveConfig()");
+
+    // A synchronous save satisfies any pending commit request, avoiding a redundant follow-up write.
+    if (HWindow != NULL)
+        KillTimer(HWindow, IDT_SAVECONFIG);
 
     if (parent == NULL)
         parent = HWindow;
@@ -1732,8 +1743,8 @@ void CMainWindow::SaveConfig(HWND parent)
                          &Configuration.UseRecycleBin, sizeof(DWORD));
                 SetValue(actKey, CONFIG_RECYCLEMASKS_REG, REG_SZ,
                          Configuration.RecycleMasks.GetMasksString(), -1);
-                SetValue(actKey, CONFIG_SAVEONEXIT_REG, REG_DWORD,
-                         &Configuration.AutoSave, sizeof(DWORD));
+                // Remove the obsolete opt-out so configuration persistence cannot be deferred until exit.
+                DeleteValue(actKey, LEGACY_CONFIG_SAVEONEXIT_REG);
                 SetValue(actKey, CONFIG_SHOWGREPERRORS_REG, REG_DWORD,
                          &Configuration.ShowGrepErrors, sizeof(DWORD));
                 SetValue(actKey, CONFIG_FINDFULLROW_REG, REG_DWORD,
@@ -3227,8 +3238,6 @@ BOOL CMainWindow::LoadConfig(BOOL importingOldConfig, const CCommandLineParams* 
             // a bit ugly: we provide MasksString, but the range is checked so it's fine
             GetValue(actKey, CONFIG_RECYCLEMASKS_REG, REG_SZ,
                      Configuration.RecycleMasks.GetWritableMasksString(), MAX_PATH);
-            GetValue(actKey, CONFIG_SAVEONEXIT_REG, REG_DWORD,
-                     &Configuration.AutoSave, sizeof(DWORD));
             GetValue(actKey, CONFIG_SHOWGREPERRORS_REG, REG_DWORD,
                      &Configuration.ShowGrepErrors, sizeof(DWORD));
             GetValue(actKey, CONFIG_FINDFULLROW_REG, REG_DWORD,

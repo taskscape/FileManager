@@ -1653,6 +1653,9 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
 
             // distribute this news among plugins as well
             Plugins.Event(PLUGINEVENT_CONFIGURATIONCHANGED, 0);
+
+            // Persist the accepted dialog changes now; exit-time saving is only a final safeguard.
+            SaveConfig();
         }
 
         EndStopRefresh(); // snooper starts again now
@@ -1745,6 +1748,9 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
     }
 
     case WM_COMMAND:
+        // Menu and accelerator commands commit settings; control notifications are excluded to avoid saves while typing.
+        if (lParam == 0)
+            ScheduleConfigSave();
         // Command dispatch extracted to HandleWmCommand() in mainwnd_commands.cpp.
         return HandleWmCommand(wParam, lParam);
 
@@ -2469,6 +2475,8 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
                 //          SplitPosition = (double)DragSplitX / (WindowWidth - splitWidth);
                 SplitPosition = DragSplitPosition;
                 LayoutWindows();
+                // The splitter position is configuration, so queue its persistence once the drag commits.
+                ScheduleConfigSave();
             }
             DragMode = FALSE;
             ReleaseCapture();
@@ -2590,6 +2598,8 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
         if (lphdr->code == RBN_LAYOUTCHANGED)
         {
             StoreBandsPos();
+            // Rebar layout changes are not commands; persist the positions through the shared debounce.
+            ScheduleConfigSave();
             return 0;
         }
 
@@ -2613,6 +2623,8 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
     case WM_WINDOWPOSCHANGED:
     {
         GetWindowRect(HWindow, &WindowRect);
+        // Persist the final window placement after interactive move/resize messages settle.
+        ScheduleConfigSave();
         break;
     }
 
@@ -3135,6 +3147,14 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
             break;
         }
 
+        case IDT_SAVECONFIG:
+        {
+            KillTimer(HWindow, IDT_SAVECONFIG);
+            // The debounce elapsed, so save the state committed by the preceding user interaction.
+            SaveConfig();
+            break;
+        }
+
         default:
         {
             TRACE_E("Unknown WM_TIMER wParam=" << wParam);
@@ -3149,6 +3169,8 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
         char buff[1000];
         sprintf(buff, "%s\n", LoadStr(IDS_SLGINCOMPLETE_TEXT));
         Configuration.ShowSLGIncomplete = FALSE;
+        // Dismissing the one-time language notice changes configuration outside the command dispatcher.
+        ScheduleConfigSave();
         CMessageBox(HWindow, MSGBOXEX_OK | MSGBOXEX_ESCAPEENABLED | MSGBOXEX_SILENT | MSGBOXEX_ICONINFORMATION,
                     LoadStr(IDS_SLGINCOMPLETE_TITLE), buff, NULL,
                     NULL, NULL, 0, NULL, NULL, IsSLGIncomplete, NULL)

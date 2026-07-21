@@ -730,6 +730,9 @@ void CPluginFSInterface::AddBookmark(HWND parent)
                                            0,
                                            Port))
         {
+            // The new bookmark already exists in the live list, so preserve it even if the organizer is cancelled.
+            PersistFTPConfigurationAfterUserCommit(parent);
+
             // bookmark added -> let the user place the new bookmark in the bookmark list
             CConnectDlg dlg(parent, 2);
             if (dlg.IsGood())

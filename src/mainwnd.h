@@ -530,6 +530,8 @@ public:
     void ClearPluginFSFromHistory(CPluginFSInterfaceAbstract* fs);
 
     void SaveConfig(HWND parent = NULL); // parent: NULL = MainWindow->HWindow
+    // Coalesces closely spaced user changes while ensuring they are persisted during the same session.
+    void ScheduleConfigSave();
     BOOL LoadConfig(BOOL importingOldConfig, const CCommandLineParams* cmdLineParams);
     void SavePanelConfig(CFilesWindow* panel, HKEY hSalamander, const char* reg);
     void LoadPanelConfig(char* panelPath, CFilesWindow* panel, HKEY hSalamander, const char* reg);
