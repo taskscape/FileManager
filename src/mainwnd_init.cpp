@@ -330,6 +330,9 @@ CMainWindow::CMainWindow() : ChangeNotifArray(3, 5)
     SaveCfgInEndSession = FALSE;
     WaitInEndSession = FALSE;
     DisableIdleProcessing = FALSE;
+    // These flags prevent a message processed by the background registry save from recursively starting another save.
+    ConfigSaveInProgress = FALSE;
+    ConfigSaveQueued = FALSE;
     strcpy(SelectionMask, "*.*");
     Created = FALSE;
     //  DrivesControlHWnd = NULL;

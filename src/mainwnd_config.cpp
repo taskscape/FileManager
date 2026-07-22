@@ -1375,16 +1375,29 @@ void CMainWindow::ScheduleConfigSave()
 {
     // A short debounce groups compound UI changes without relying on application shutdown for persistence.
     if (HWindow != NULL && CanClose && !CriticalShutdown)
-        SetTimer(HWindow, IDT_SAVECONFIG, 250, NULL);
+    {
+        // Registry-worker waits pump messages, so remember a newer commit instead of re-entering SaveConfig.
+        if (ConfigSaveInProgress)
+            ConfigSaveQueued = TRUE;
+        else
+            SetTimer(HWindow, IDT_SAVECONFIG, 250, NULL);
+    }
 }
 
 void CMainWindow::SaveConfig(HWND parent)
 {
     CALL_STACK_MESSAGE1("CMainWindow::SaveConfig()");
 
-    // A synchronous save satisfies any pending commit request, avoiding a redundant follow-up write.
+    // A save request satisfies any pending timer request, avoiding a redundant follow-up write.
     if (HWindow != NULL)
         KillTimer(HWindow, IDT_SAVECONFIG);
+
+    // A user action can be dispatched while the registry worker pumps messages; persist it after this snapshot finishes.
+    if (ConfigSaveInProgress)
+    {
+        ConfigSaveQueued = TRUE;
+        return;
+    }
 
     if (parent == NULL)
         parent = HWindow;
@@ -1395,22 +1408,10 @@ void CMainWindow::SaveConfig(HWND parent)
         return;
     }
 
-    HCURSOR hOldCursor = NULL;
-    if (GlobalSaveWaitWindow == NULL)
-        hOldCursor = SetCursor(LoadCursor(NULL, IDC_WAIT));
-    CWaitWindow analysing(parent, IDS_SAVINGCONFIGURATION, FALSE, ooStatic, TRUE);
-    int savingProgress = 0;
-    HWND oldPluginMsgBoxParent = PluginMsgBoxParent;
-    if (GlobalSaveWaitWindow == NULL)
-    {
-        //TRACE_I("analysing.SetProgressPos() savingProgress="<<savingProgress);
-        analysing.SetProgressMax(7 /* MUST BE SYNCHRONIZED with CMainWindow::WindowProc::WM_USER_CLOSE_MAINWND !!! */); // one less so they can enjoy looking at 100%
-        analysing.Create();
-        EnableWindow(parent, FALSE);
-
-        // SaveConfiguration plug-ins will be invoked as well -> set the parent for their message boxes
-        PluginMsgBoxParent = analysing.HWindow;
-    }
+    ConfigSaveInProgress = TRUE;
+    // Normal saves use the existing worker so registry I/O yields to the UI message loop without a modal wait window.
+    const BOOL registryWorkerStarted = GlobalSaveWaitWindow == NULL && !CriticalShutdown &&
+                                      RegistryWorkerThread.StartThread();
 
     LoadSaveToRegistryMutex.Enter();
 
@@ -1556,11 +1557,8 @@ void CMainWindow::SaveConfig(HWND parent)
                 CloseKey(configKey);
             }
 
-            if (GlobalSaveWaitWindow == NULL)
-                analysing.SetProgressPos(++savingProgress); // 1
-            else
+            if (GlobalSaveWaitWindow != NULL)
                 GlobalSaveWaitWindow->SetProgressPos(++GlobalSaveWaitWindowProgress); // 1
-            //TRACE_I("analysing.SetProgressPos() savingProgress="<<savingProgress);
 
             //---  Packers & Unpackers
             if (CreateKey(salamander, SALAMANDER_PACKANDUNPACK, actKey))
@@ -1594,11 +1592,8 @@ void CMainWindow::SaveConfig(HWND parent)
                     CloseKey(actSubKey);
                 }
 
-                if (GlobalSaveWaitWindow == NULL)
-                    analysing.SetProgressPos(++savingProgress); // 2
-                else
+                if (GlobalSaveWaitWindow != NULL)
                     GlobalSaveWaitWindow->SetProgressPos(++GlobalSaveWaitWindowProgress); // 2
-                //TRACE_I("analysing.SetProgressPos() savingProgress="<<savingProgress);
 
                 //---  Custom Unpackers
                 if (CreateKey(actKey, SALAMANDER_CUSTOMUNPACKERS, actSubKey))
@@ -1627,11 +1622,8 @@ void CMainWindow::SaveConfig(HWND parent)
                     CloseKey(actSubKey);
                 }
 
-                if (GlobalSaveWaitWindow == NULL)
-                    analysing.SetProgressPos(++savingProgress); // 3
-                else
+                if (GlobalSaveWaitWindow != NULL)
                     GlobalSaveWaitWindow->SetProgressPos(++GlobalSaveWaitWindowProgress); // 3
-                //TRACE_I("analysing.SetProgressPos() savingProgress="<<savingProgress);
 
                 //---  Predefined Packers
                 if (CreateKey(actKey, SALAMANDER_PREDPACKERS, actSubKey))
@@ -2056,11 +2048,8 @@ void CMainWindow::SaveConfig(HWND parent)
                 SetValue(actKey, CONFIG_USECUSTOMPANELFONT_REG, REG_DWORD, &UseCustomPanelFont, sizeof(DWORD));
                 SaveLogFont(actKey, CONFIG_PANELFONT_REG, &LogFont);
 
-                if (GlobalSaveWaitWindow == NULL)
-                    analysing.SetProgressPos(++savingProgress); // 4
-                else
+                if (GlobalSaveWaitWindow != NULL)
                     GlobalSaveWaitWindow->SetProgressPos(++GlobalSaveWaitWindowProgress); // 4
-                //TRACE_I("analysing.SetProgressPos() savingProgress="<<savingProgress);
 
                 SaveHistory(actKey, CONFIG_NAMEDHISTORY_REG, FindNamedHistory,
                             FIND_NAMED_HISTORY_SIZE, !Configuration.SaveHistory);
@@ -2075,11 +2064,8 @@ void CMainWindow::SaveConfig(HWND parent)
                 SaveHistory(actKey, CONFIG_CHANGEDIRHISTORY_REG, Configuration.ChangeDirHistory,
                             CHANGEDIR_HISTORY_SIZE, !Configuration.SaveHistory);
 
-                if (GlobalSaveWaitWindow == NULL)
-                    analysing.SetProgressPos(++savingProgress); // 5
-                else
+                if (GlobalSaveWaitWindow != NULL)
                     GlobalSaveWaitWindow->SetProgressPos(++GlobalSaveWaitWindowProgress); // 5
-                //TRACE_I("analysing.SetProgressPos() savingProgress="<<savingProgress);
 
                 SaveHistory(actKey, CONFIG_VIEWERHISTORY_REG, ViewerHistory,
                             VIEWER_HISTORY_SIZE, !Configuration.SaveHistory);
@@ -2101,11 +2087,8 @@ void CMainWindow::SaveConfig(HWND parent)
                 if (DirHistory != NULL)
                     DirHistory->SaveToRegistry(actKey, CONFIG_WORKDIRSHISTORY_REG, !Configuration.SaveWorkDirs);
 
-                if (GlobalSaveWaitWindow == NULL)
-                    analysing.SetProgressPos(++savingProgress); // 6
-                else
+                if (GlobalSaveWaitWindow != NULL)
                     GlobalSaveWaitWindow->SetProgressPos(++GlobalSaveWaitWindowProgress); // 6
-                //TRACE_I("analysing.SetProgressPos() savingProgress="<<savingProgress);
 
                 if (CreateKey(actKey, CONFIG_COPYMOVEOPTIONS_REG, actSubKey))
                 {
@@ -2256,11 +2239,8 @@ void CMainWindow::SaveConfig(HWND parent)
 
             SaveEditors(salamander, SALAMANDER_EDITORS_REG, EditorMasks);
 
-            if (GlobalSaveWaitWindow == NULL)
-                analysing.SetProgressPos(++savingProgress); // 7
-            else
+            if (GlobalSaveWaitWindow != NULL)
                 GlobalSaveWaitWindow->SetProgressPos(++GlobalSaveWaitWindowProgress); // 7
-            //TRACE_I("analysing.SetProgressPos() savingProgress="<<savingProgress);
 
             //---  colors
             if (CreateKey(salamander, SALAMANDER_CUSTOMCOLORS_REG, actKey))
@@ -2373,11 +2353,8 @@ void CMainWindow::SaveConfig(HWND parent)
                 CloseKey(actKey);
             }
 
-            if (GlobalSaveWaitWindow == NULL)
-                analysing.SetProgressPos(++savingProgress); // 8
-            else
+            if (GlobalSaveWaitWindow != NULL)
                 GlobalSaveWaitWindow->SetProgressPos(++GlobalSaveWaitWindowProgress); // 8
-            //TRACE_I("analysing.SetProgressPos() savingProgress="<<savingProgress);
 
             if (deleteSALAMANDER_SAVE_IN_PROGRESS)
             {
@@ -2390,12 +2367,16 @@ void CMainWindow::SaveConfig(HWND parent)
 
     LoadSaveToRegistryMutex.Leave();
 
-    if (GlobalSaveWaitWindow == NULL)
+    // Stop only the worker this in-session save started; shutdown owns and stops its shared worker separately.
+    if (registryWorkerStarted)
+        RegistryWorkerThread.StopThread();
+
+    ConfigSaveInProgress = FALSE;
+    if (ConfigSaveQueued && !CriticalShutdown)
     {
-        EnableWindow(parent, TRUE);
-        PluginMsgBoxParent = oldPluginMsgBoxParent;
-        DestroyWindow(analysing.HWindow);
-        SetCursor(hOldCursor);
+        // A later commit arrived while this save yielded to the UI, so debounce one follow-up snapshot.
+        ConfigSaveQueued = FALSE;
+        ScheduleConfigSave();
     }
 }
 

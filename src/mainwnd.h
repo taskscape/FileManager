@@ -425,6 +425,8 @@ public:
     BOOL SaveCfgInEndSession;         // TRUE = configuration should be saved in WM_ENDSESSION
     BOOL WaitInEndSession;            // TRUE = WM_ENDSESSION should wait for disk operations to finish
     BOOL DisableIdleProcessing;       // TRUE = skip idle processing (the app is shutting down and it would only slow things down)
+    BOOL ConfigSaveInProgress;        // TRUE while the responsive registry save is pumping messages
+    BOOL ConfigSaveQueued;            // TRUE when a message processed during a save commits newer settings
                                       //    CTipOfTheDayDialog *TipOfTheDayDialog;
 
     BOOL DragMode;
