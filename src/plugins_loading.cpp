@@ -2994,6 +2994,15 @@ void CPluginData::CallLoadOrSaveConfiguration(BOOL load,
     }
     else // save
     {
+        // The responsive host save pumps messages while registry calls run on its worker.  A plug-in
+        // commit delivered in that interval must join the host's follow-up save instead of modifying
+        // the same registry subtree through a nested CallLoadOrSaveConfiguration transaction.
+        if (MainWindow != NULL && MainWindow->ConfigSaveInProgress)
+        {
+            MainWindow->ScheduleConfigSave();
+            return;
+        }
+
         if (SupportLoadSave) // otherwise there is nowhere to save
         {
             LoadSaveToRegistryMutex.Enter();

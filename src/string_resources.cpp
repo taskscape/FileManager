@@ -144,27 +144,31 @@ RELOAD:
 
 char* GetErrorText(DWORD error)
 {
-    static char buffer[10 * MAX_PATH]; // buffer for many strings
+    // FormatMessageA returns text in the system ANSI code page, while application char strings are UTF-8.
+    // Reserve enough room for UTF-8 so system error messages retain localized characters in custom dialogs.
+    static char buffer[10 * (MAX_PATH * 3 + 20)]; // buffer for many UTF-8 strings
     static char* act = buffer;
+    const int errorTextBufferSize = MAX_PATH * 3 + 20;
 
     HANDLES(EnterCriticalSection(&__StrCriticalSection2.cs));
 
-    if (10 * MAX_PATH - (act - buffer) < MAX_PATH + 20)
+    if (sizeof(buffer) - (act - buffer) < errorTextBufferSize)
         act = buffer;
 
     char* ret = act;
     // NOTE: sprintf_s fills the entire buffer in the debug build, so we cannot pass it the whole buffer (it contains
     // other strings as well); either handle it via _CrtSetDebugFillThreshold or provide a smaller size)
     int l = sprintf(act, ((int)error < 0 ? "(%08X) " : "(%d) "), error);
+    WCHAR wideErrorText[MAX_PATH + 20];
     int fl;
-    if ((fl = FormatMessage(FORMAT_MESSAGE_FROM_SYSTEM,
-                            NULL,
-                            error,
-                            MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
-                            act + l,
-                            MAX_PATH + 20 - l,
-                            NULL)) == 0 ||
-        *(act + l) == 0)
+    if ((fl = FormatMessageW(FORMAT_MESSAGE_FROM_SYSTEM,
+                             NULL,
+                             error,
+                             MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
+                             wideErrorText,
+                             _countof(wideErrorText),
+                             NULL)) == 0 ||
+        *wideErrorText == 0)
     {
         if ((int)error < 0)
             act += sprintf(act, "System error %08X, text description is not available.", error) + 1;
@@ -172,7 +176,25 @@ char* GetErrorText(DWORD error)
             act += sprintf(act, "System error %u, text description is not available.", error) + 1;
     }
     else
-        act += l + fl + 1;
+    {
+        // Convert the localized Unicode system text to the UTF-8 convention used by SalMessageBox.
+        int utf8Length = WideCharToMultiByte(CP_UTF8, 0, wideErrorText, fl,
+                                              act + l, errorTextBufferSize - l - 1,
+                                              NULL, NULL);
+        if (utf8Length > 0)
+        {
+            act += l + utf8Length;
+            *act++ = 0;
+        }
+        else
+        {
+            // Keep the previous ASCII fallback when an unexpected conversion failure prevents UTF-8 output.
+            if ((int)error < 0)
+                act += sprintf(act, "System error %08X, text description is not available.", error) + 1;
+            else
+                act += sprintf(act, "System error %u, text description is not available.", error) + 1;
+        }
+    }
 
     HANDLES(LeaveCriticalSection(&__StrCriticalSection2.cs));
 
