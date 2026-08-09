@@ -4,6 +4,30 @@
 #pragma once
 
 #include "wide_path.h"
+#include <stdarg.h>
+
+// Result for bounded string operations. Callers must handle truncation and
+// conversion failures instead of continuing with an implicitly shortened value.
+enum EBoundedStringResult
+{
+    bsrSuccess,
+    bsrTruncated,
+    bsrInvalidParameter,
+    bsrEncodingError
+};
+
+// Copy or format into a caller-owned buffer. On every non-success result the
+// destination is an empty, null-terminated string when a destination exists.
+EBoundedStringResult CopyStringChecked(char* destination, size_t destinationCapacity, const char* source);
+EBoundedStringResult FormatStringCheckedV(char* destination, size_t destinationCapacity,
+                                          const char* format, va_list arguments);
+EBoundedStringResult FormatStringChecked(char* destination, size_t destinationCapacity,
+                                         const char* format, ...);
+
+// Strict UTF-16 to UTF-8 conversion for external-input boundaries. The result
+// distinguishes a destination that is too small from malformed UTF-16.
+EBoundedStringResult ConvertWideToUtf8Checked(const WCHAR* source, char* destination,
+                                               size_t destinationCapacity);
 
 // SAFE_ALLOC macro removes code that tests if memory allocation succeeded (see allochan.*)
 

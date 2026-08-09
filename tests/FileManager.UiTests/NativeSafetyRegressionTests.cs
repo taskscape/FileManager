@@ -11,6 +11,68 @@ namespace FileManager.UiTests;
 public sealed class NativeSafetyRegressionTests
 {
     [Test]
+    public void Unchecked_string_calls_are_ratchet_gated_and_external_boundaries_report_capacity_and_encoding_failures()
+    {
+        var root = FindRepositoryRoot();
+        var ratchet = File.ReadAllText(Path.Combine(root, "tools", "verify-no-new-unsafe-string-calls.ps1"));
+        var workflow = File.ReadAllText(Path.Combine(root, ".github", "workflows", "pr-msbuild.yml"));
+        var strings = File.ReadAllText(Path.Combine(root, "src", "common", "strutils.cpp"));
+        var declarations = File.ReadAllText(Path.Combine(root, "src", "common", "strutils.h"));
+        var startup = File.ReadAllText(Path.Combine(root, "src", "app_entry.cpp"));
+        var refactoring = File.ReadAllText(Path.Combine(root, "refactoring.md"));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(ratchet, Does.Contain("git diff --no-ext-diff --unified=0 $BaseCommit HEAD"));
+            Assert.That(ratchet, Does.Contain("'*.c' '*.cc' '*.cpp' '*.h' '*.hpp'"));
+            Assert.That(ratchet, Does.Contain("(?:strcpy|strcat|sprintf|lstrcpy"));
+            Assert.That(ratchet, Does.Contain("exit 1"));
+            Assert.That(workflow, Does.Contain("verify-no-new-unsafe-string-calls.ps1 -BaseCommit origin/"));
+            Assert.That(declarations, Does.Contain("enum EBoundedStringResult"));
+            Assert.That(declarations, Does.Contain("bsrTruncated"));
+            Assert.That(declarations, Does.Contain("bsrEncodingError"));
+            Assert.That(declarations, Does.Contain("FormatStringChecked"));
+            Assert.That(strings, Does.Contain("if (sourceLength >= destinationCapacity)"),
+                        "A string exactly filling the payload capacity must leave room for its terminator.");
+            Assert.That(strings, Does.Contain("if ((size_t)required >= destinationCapacity)"),
+                        "Formatting must reject a one-character overflow before writing a partial value.");
+            Assert.That(strings, Does.Contain("WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, source, -1, NULL, 0"),
+                        "UTF-8 capacity is measured after encoding expansion, not from UTF-16 character count.");
+            Assert.That(strings, Does.Contain("if ((size_t)required > destinationCapacity)"));
+            Assert.That(strings, Does.Contain("ConvertWideToUtf8Checked(src.cFileName"));
+            Assert.That(startup, Does.Contain("FormatStringChecked(languageFileName + 1"));
+            Assert.That(startup, Does.Not.Contain("sprintf(strrchr(path, '\\\\') + 1"));
+            Assert.That(refactoring, Does.Contain("### 37. Ratchet unchecked string-copy and formatting calls — Implemented"));
+        });
+    }
+
+    [Test]
+    public void New_fixed_max_path_buffers_are_rejected_by_the_changed_lines_ci_ratchet()
+    {
+        var root = FindRepositoryRoot();
+        var ratchet = File.ReadAllText(Path.Combine(root, "tools", "verify-no-new-max-path-buffers.ps1"));
+        var exemptions = File.ReadAllText(Path.Combine(root, "tools", "max-path-buffer-exemptions.md"));
+        var workflow = File.ReadAllText(Path.Combine(root, ".github", "workflows", "pr-msbuild.yml"));
+        var refactoring = File.ReadAllText(Path.Combine(root, "refactoring.md"));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(ratchet, Does.Contain("git diff --no-ext-diff --unified=0 $BaseCommit HEAD"));
+            Assert.That(ratchet, Does.Contain("'*.c' '*.cc' '*.cpp' '*.h' '*.hpp'"));
+            Assert.That(ratchet, Does.Contain("(?:char|WCHAR)"));
+            Assert.That(ratchet, Does.Contain("MAX_PATH-RATCHET-EXEMPT"));
+            Assert.That(ratchet, Does.Contain("Test-ApprovedExemption"));
+            Assert.That(ratchet, Does.Contain("- Reason:"));
+            Assert.That(ratchet, Does.Contain("- Removal:"));
+            Assert.That(ratchet, Does.Contain("exit 1"));
+            Assert.That(exemptions, Does.Contain("No exemptions are currently approved."));
+            Assert.That(exemptions, Does.Contain("MAX_PATH-RATCHET-EXEMPT: ID"));
+            Assert.That(workflow, Does.Contain("verify-no-new-max-path-buffers.ps1 -BaseCommit origin/"));
+            Assert.That(refactoring, Does.Contain("### 36. Ban new fixed `MAX_PATH` buffers — Implemented"));
+        });
+    }
+
+    [Test]
     public void Win32_path_boundaries_use_owned_wide_paths_and_extended_length_syntax()
     {
         var root = FindRepositoryRoot();

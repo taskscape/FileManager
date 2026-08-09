@@ -239,15 +239,18 @@ This document is the working record for a read-only stability and resilience aud
 - **Implemented:** `CWidePath` now owns dynamically sized UTF-16 display and Win32 API spellings at the common boundary. It retains the caller's UTF-8 display string, converts strictly with the existing compatibility fallback, and only resolves an absolute path when the consuming API requires it. Long drive and UNC paths are consistently emitted as `\\?\` and `\\?\UNC\` respectively. Core file, directory, attribute, enumeration, and secure DLL-loading wrappers now consume its API spelling, while diagnostics continue to use the display spelling.
 - **Verification:** `NativeSafetyRegressionTests.Win32_path_boundaries_use_owned_wide_paths_and_extended_length_syntax` guards dynamic conversion, display/API separation, dynamic full-path sizing, drive/UNC extended prefixes, and the migrated wrapper boundaries.
 
-### 36. Ban new fixed `MAX_PATH` buffers
+### 36. Ban new fixed `MAX_PATH` buffers — Implemented
 
 - **Justification:** A broad path rewrite is risky, but allowing new fixed buffers increases the backlog and perpetuates boundary bugs.
-- **Proposed solution:** Add a changed-lines CI ratchet for new `char/WCHAR [...MAX_PATH...]`, with narrow documented exemptions. Migrate one subsystem at a time behind compatibility adapters.
+- **Implemented:** Pull-request CI now runs `tools/verify-no-new-max-path-buffers.ps1`. It compares only native source lines added since the PR base and rejects new `char` or `WCHAR` arrays with bounds containing `MAX_PATH`; existing debt remains unchanged for incremental migration behind compatibility adapters.
+- **Exemptions:** No exception is currently approved. A future exception must use a trailing `MAX_PATH-RATCHET-EXEMPT` identifier and have a matching file, reason, and removal condition in `tools/max-path-buffer-exemptions.md`; an unregistered or incomplete exemption fails CI.
+- **Verification:** `NativeSafetyRegressionTests.New_fixed_max_path_buffers_are_rejected_by_the_changed_lines_ci_ratchet` guards the changed-lines scope, native-file coverage, rejection pattern, exemption contract, workflow wiring, and implementation status.
 
-### 37. Ratchet unchecked string-copy and formatting calls
+### 37. Ratchet unchecked string-copy and formatting calls — Implemented
 
 - **Justification:** `strcpy`, `strcat`, `sprintf`, `lstrcpy`, `lstrcat`, and `wsprintf` remain common. Input length assumptions are dispersed and hard to review.
-- **Proposed solution:** Ban new unsafe calls, introduce size-aware formatting returning truncation/error status, and migrate external-input boundaries first. Add tests that hit exact capacity, one-over, and encoding-expansion cases.
+- **Implemented:** Pull-request CI now runs `tools/verify-no-new-unsafe-string-calls.ps1`, a native changed-lines ratchet for the listed unchecked APIs. `CopyStringChecked`, `FormatStringChecked`, and `ConvertWideToUtf8Checked` return explicit success, truncation, invalid-argument, or encoding-error status and never leave a partial result for callers to consume. Filesystem names now use strict, measured UTF-8 conversion, and startup validates the persisted language-file name while constructing the load path and its error messages.
+- **Verification:** `NativeSafetyRegressionTests.Unchecked_string_calls_are_ratchet_gated_and_external_boundaries_report_capacity_and_encoding_failures` protects the CI wiring, API ban, exact-capacity terminator rule, one-over formatting rejection, measured UTF-8 expansion rule, and both migrated external-input boundaries.
 
 ### 38. Replace fixed buffers at trust boundaries first
 
