@@ -22,6 +22,7 @@ public abstract class FileManagerUiTestBase
     {
         UiTestSettings.RequireIsolatedProfile();
         Automation = new UIA3Automation();
+        BeforeFileManagerStarted();
         StartApplication();
     }
 
@@ -177,6 +178,12 @@ public abstract class FileManagerUiTestBase
     }
 
     protected virtual void OnAfterFileManagerStopped()
+    {
+    }
+
+    // Some native integration scenarios must arrange durable state before the
+    // executable reaches its startup reconciliation point.
+    protected virtual void BeforeFileManagerStarted()
     {
     }
 

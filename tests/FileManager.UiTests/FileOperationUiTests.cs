@@ -26,6 +26,69 @@ public sealed class FileOperationUiTests : FileOperationUiTestBase
     }
 
     [Test]
+    public void Copy_preserves_last_write_time_metadata()
+    {
+        var source = Workspace.SourcePath("copy-file.txt");
+        var expectedTimestamp = new DateTime(2024, 03, 21, 12, 34, 56, DateTimeKind.Utc);
+        File.SetLastWriteTimeUtc(source, expectedTimestamp);
+
+        ExecuteWithPath(NativeCommands.CopyFiles, "copy-file.txt", Workspace.TargetDirectory, commit: true);
+
+        var target = Workspace.TargetPath("copy-file.txt");
+        WaitForFileSystem(() => File.Exists(target), "Copy did not create the destination file.");
+        Assert.That(File.GetLastWriteTimeUtc(target), Is.EqualTo(File.GetLastWriteTimeUtc(source)),
+                    "Copy did not preserve the source last-write metadata.");
+    }
+
+    [Test]
+    public void Copy_overwrite_replaces_the_existing_target_only_after_the_user_confirms()
+    {
+        ExecuteWithPath(NativeCommands.CopyFiles, "overwrite-file.txt", Workspace.TargetDirectory, commit: true);
+        ChooseOperationPrompt(WaitForOperationPrompt(6), 6); // IDYES
+
+        WaitForFileSystem(() => File.ReadAllText(Workspace.TargetPath("overwrite-file.txt")) == "overwrite-source-content",
+                          "Confirmed overwrite did not replace the target content.");
+        Assert.That(File.ReadAllText(Workspace.SourcePath("overwrite-file.txt")), Is.EqualTo("overwrite-source-content"));
+    }
+
+    [Test]
+    public void Copy_overwrite_all_applies_the_choice_to_the_complete_conflicting_tree()
+    {
+        ExecuteWithPath(NativeCommands.CopyFiles, "overwrite-all-tree", Workspace.TargetDirectory, commit: true);
+        ChooseOperationPrompt(WaitForOperationPrompt(185), 185); // IDB_ALL
+
+        WaitForFileSystem(() => File.ReadAllText(Workspace.TargetPath("overwrite-all-tree\\nested\\first.txt")) == "overwrite-all-first-source" &&
+                                File.ReadAllText(Workspace.TargetPath("overwrite-all-tree\\nested\\second.txt")) == "overwrite-all-second-source",
+                          "Overwrite All did not reconcile every conflicting descendant.");
+    }
+
+    [Test]
+    public void Copy_skip_keeps_the_existing_target_and_the_source()
+    {
+        ExecuteWithPath(NativeCommands.CopyFiles, "skip-file.txt", Workspace.TargetDirectory, commit: true);
+        ChooseOperationPrompt(WaitForOperationPrompt(173), 173); // IDB_SKIP
+
+        WaitForFileSystem(() => File.ReadAllText(Workspace.TargetPath("skip-file.txt")) == "skip-target-content",
+                          "Skip unexpectedly modified the conflicting target.");
+        Assert.That(File.ReadAllText(Workspace.SourcePath("skip-file.txt")), Is.EqualTo("skip-source-content"));
+    }
+
+    [Test]
+    public void Copy_skip_all_keeps_the_existing_conflicting_tree()
+    {
+        ExecuteWithPath(NativeCommands.CopyFiles, "skip-all-tree", Workspace.TargetDirectory, commit: true);
+        ChooseOperationPrompt(WaitForOperationPrompt(174), 174); // IDB_SKIPALL
+
+        WaitForFileSystem(() => Directory.Exists(Workspace.TargetPath("skip-all-tree")), "Skip All removed the existing target directory.");
+        Assert.Multiple(() =>
+        {
+            Assert.That(File.ReadAllText(Workspace.TargetPath("skip-all-tree\\nested\\first.txt")), Is.EqualTo("skip-all-first-target"));
+            Assert.That(File.ReadAllText(Workspace.TargetPath("skip-all-tree\\nested\\second.txt")), Is.EqualTo("skip-all-second-target"));
+            Assert.That(File.Exists(Workspace.SourcePath("skip-all-tree\\nested\\first.txt")), Is.True);
+        });
+    }
+
+    [Test]
     public void Copy_file_persists_a_completed_recovery_journal_with_item_intent()
     {
         var source = Workspace.SourcePath("copy-file.txt");
@@ -82,8 +145,30 @@ public sealed class FileOperationUiTests : FileOperationUiTestBase
     }
 
     [Test]
+    public void Rename_overwrite_replaces_the_collision_without_losing_source_metadata()
+    {
+        var source = Workspace.SourcePath("rename-overwrite.txt");
+        var expectedTimestamp = new DateTime(2023, 11, 03, 08, 15, 00, DateTimeKind.Utc);
+        File.SetLastWriteTimeUtc(source, expectedTimestamp);
+
+        ExecuteWithPath(NativeCommands.RenameFile, "rename-overwrite.txt", "rename-overwrite-target.txt", commit: true);
+        ChooseOperationPrompt(WaitForOperationPrompt(6), 6); // IDYES
+
+        var target = Workspace.SourcePath("rename-overwrite-target.txt");
+        WaitForFileSystem(() => File.ReadAllText(target) == "rename-overwrite-source-content",
+                          "Confirmed rename overwrite did not replace the collision target.");
+        Assert.Multiple(() =>
+        {
+            Assert.That(File.Exists(source), Is.False);
+            Assert.That(File.GetLastWriteTimeUtc(target), Is.EqualTo(expectedTimestamp));
+        });
+    }
+
+    [Test]
     public void Move_file_moves_content_to_other_panel()
     {
+        Assert.That(Path.GetPathRoot(Workspace.SourceDirectory), Is.EqualTo(Path.GetPathRoot(Workspace.TargetDirectory)),
+                    "The default move fixture characterizes same-volume behavior.");
         ExecuteWithPath(NativeCommands.MoveFiles, "move-file.txt", Workspace.TargetDirectory, commit: true);
 
         var target = Workspace.TargetPath("move-file.txt");
@@ -121,6 +206,39 @@ public sealed class FileOperationUiTests : FileOperationUiTestBase
         ConfirmDeleteIfPrompted();
 
         WaitForFileSystem(() => !Directory.Exists(Workspace.SourcePath("delete-tree")), "Delete did not remove the selected directory tree.");
+    }
+
+    [Test]
+    [Category("RecycleBin")]
+    public void Delete_to_recycle_bin_removes_the_source_and_creates_a_recoverable_shell_item()
+    {
+        UiTestSettings.RequireRecycleBinTest();
+        var source = Workspace.SourcePath("recycle-file.txt");
+        var volumeRoot = Path.GetPathRoot(source)!;
+        var itemCountBefore = ShellRecycleBin.GetItemCount(volumeRoot);
+
+        SelectSourceItem("recycle-file.txt");
+        NativeCommands.Execute(MainWindow.Properties.NativeWindowHandle.Value, NativeCommands.DeleteFiles);
+        ConfirmDeleteIfPrompted();
+
+        WaitForFileSystem(() => !File.Exists(source), "Recycle-bin delete did not remove the source file.");
+        WaitForFileSystem(() => ShellRecycleBin.GetItemCount(volumeRoot) > itemCountBefore,
+                          "Delete did not create a recycle-bin item. Ensure the isolated profile uses the default recycle-bin setting.");
+    }
+
+    [Test]
+    public void Cancelling_an_in_progress_conflicting_copy_keeps_both_versions_and_records_cancellation()
+    {
+        var source = Workspace.SourcePath("cancel-conflict.txt");
+
+        ExecuteWithPath(NativeCommands.CopyFiles, "cancel-conflict.txt", Workspace.TargetDirectory, commit: true);
+        ChooseOperationPrompt(WaitForOperationPrompt(2), 2); // IDCANCEL
+
+        WaitForFileSystem(() => File.ReadAllText(Workspace.TargetPath("cancel-conflict.txt")) == "cancel-conflict-target-content",
+                          "Cancellation unexpectedly changed the target.");
+        Assert.That(File.ReadAllText(source), Is.EqualTo("cancel-conflict-source-content"));
+        WaitForFileSystem(() => FindJournalFor(source)?.Contains("OPERATION|cancelled", StringComparison.Ordinal) == true,
+                          "Cancellation was not recorded in the durable operation journal.");
     }
 
     [TestCase(NativeCommands.CreateDirectory, "", "cancelled-directory")]
