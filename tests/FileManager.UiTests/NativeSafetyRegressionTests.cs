@@ -125,6 +125,42 @@ public sealed class NativeSafetyRegressionTests
         });
     }
 
+    [Test]
+    public void Thumbnail_and_archive_metadata_use_the_restartable_parser_broker()
+    {
+        var root = FindRepositoryRoot();
+        var protocol = File.ReadAllText(Path.Combine(root, "src", "parserbroker_protocol.h"));
+        var client = File.ReadAllText(Path.Combine(root, "src", "parserbroker.cpp"));
+        var broker = File.ReadAllText(Path.Combine(root, "src", "parserbroker", "salbroker.cpp"));
+        var thumbnails = File.ReadAllText(Path.Combine(root, "src", "fileswindow_init.cpp"));
+        var archives = File.ReadAllText(Path.Combine(root, "src", "plugins_loading.cpp"));
+        var installer = File.ReadAllText(Path.Combine(root, "Installer", "setup.iss"));
+        var refactoring = File.ReadAllText(Path.Combine(root, "refactoring.md"));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(protocol, Does.Contain("PARSER_BROKER_VERSION = 1"));
+            Assert.That(protocol, Does.Contain("PARSER_BROKER_MAX_PAYLOAD"));
+            Assert.That(protocol, Does.Contain("CParserBrokerMessageHeader"));
+            Assert.That(protocol, Does.Contain("pbmtThumbnailRequest"));
+            Assert.That(protocol, Does.Contain("pbmtArchiveMetadataRequest"));
+            Assert.That(client, Does.Contain("CreateRestrictedToken"));
+            Assert.That(client, Does.Contain("JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE"));
+            Assert.That(client, Does.Contain("JOB_OBJECT_LIMIT_PROCESS_MEMORY"));
+            Assert.That(client, Does.Contain("CancelIoEx"));
+            Assert.That(client, Does.Contain("EnterCriticalSection(&Lock)"));
+            Assert.That(client, Does.Contain("for (int attempt = 0; attempt != 2; ++attempt)"));
+            Assert.That(client, Does.Contain("responseHeader.PayloadLength > responseCapacity"));
+            Assert.That(broker, Does.Contain("SHCreateItemFromParsingName"));
+            Assert.That(broker, Does.Contain("requestHeader.PayloadLength > PARSER_BROKER_MAX_PAYLOAD"));
+            Assert.That(thumbnails, Does.Contain("ParserBroker.LoadThumbnail"));
+            Assert.That(thumbnails, Does.Not.Contain("(*loader)->LoadThumbnail"));
+            Assert.That(archives, Does.Contain("ParserBroker.QueryArchiveMetadata"));
+            Assert.That(installer, Does.Contain("salbroker.exe"));
+            Assert.That(refactoring, Does.Contain("### 21. Move risky parsers and previewers out of process — Implemented"));
+        });
+    }
+
     private static string FindRepositoryRoot()
     {
         for (var directory = new DirectoryInfo(AppContext.BaseDirectory); directory is not null; directory = directory.Parent)

@@ -13,6 +13,7 @@
 #include "zip.h"
 #include "pack.h"
 #include "cache.h"
+#include "parserbroker.h"
 #include <uxtheme.h>
 #include "dialogs.h"
 #include "execlog.h"
@@ -3603,6 +3604,12 @@ BOOL CPluginData::ListArchive(CFilesWindow* panel, const char* archiveFileName, 
                               CPluginDataInterfaceAbstract*& pluginData)
 {
     CALL_STACK_MESSAGE4("CPluginData::ListArchive(, %s, ,) (%s v. %s)", archiveFileName, DLLName, Version);
+    CParserBrokerArchiveMetadata metadata;
+    if (!ParserBroker.QueryArchiveMetadata(archiveFileName, &metadata))
+    {
+        TRACE_E("Unable to obtain archive metadata in ParserBroker: " << archiveFileName);
+        return FALSE;
+    }
     BOOL ret = FALSE;
     if (InitDLL(MainWindow->HWindow))
     {

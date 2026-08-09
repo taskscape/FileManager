@@ -154,10 +154,10 @@ This document is the working record for a read-only stability and resilience aud
 
 ### High: fault containment and core correctness
 
-### 21. Move risky parsers and previewers out of process
+### 21. Move risky parsers and previewers out of process — Implemented
 
-- **Justification:** Archive, media, database, and preview plug-ins parse untrusted files inside the main process. Memory corruption or a hang in one parser can terminate the file manager and any active operations.
-- **Proposed solution:** Create a low-privilege broker process with a versioned, length-checked IPC contract, job-object resource limits, and kill/restart recovery. Start with thumbnail and archive metadata extraction.
+- **Delivered:** `salbroker.exe` is a restricted-token helper placed in a kill-on-close job with per-process memory and CPU limits. The host owns a local named pipe, validates a versioned and length-checked protocol on both sides, and kills/restarts the broker once after a timeout, malformed reply, or process failure.
+- **Initial scope:** Thumbnail requests no longer call thumbnail-loader plug-ins in the icon worker; the helper obtains the image through the Shell thumbnail provider and returns bounded pixels only. Archive-file metadata is also requested through the helper before archive handling. The v1 archive response deliberately carries only file metadata; format-specific archive navigation and extraction remain a separate migration because their plug-in data and callbacks cannot safely cross this ABI boundary.
 
 ### 22. Make plug-in entry bookkeeping exception-safe
 
