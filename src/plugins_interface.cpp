@@ -1890,6 +1890,28 @@ CPlugins::GetPluginData(const CPluginInterfaceForFSAbstract* plugin)
 }
 
 CPluginData*
+CPlugins::GetPluginData(const void* pluginInterface)
+{
+    if (pluginInterface != NULL)
+    {
+        for (int i = 0; i < Data.Count; i++)
+        {
+            CPluginData* data = Data[i];
+            if (data->GetPluginInterface()->GetInterface() == pluginInterface ||
+                data->GetPluginIfaceForArchiver()->GetInterface() == pluginInterface ||
+                data->GetPluginInterfaceForViewer()->GetInterface() == pluginInterface ||
+                data->GetPluginInterfaceForMenuExt()->GetInterface() == pluginInterface ||
+                data->GetPluginInterfaceForFS()->GetInterface() == pluginInterface ||
+                data->GetPluginInterfaceForThumbLoader()->GetInterface() == pluginInterface)
+            {
+                return data;
+            }
+        }
+    }
+    return NULL;
+}
+
+CPluginData*
 CPlugins::GetPluginData(const CPluginInterfaceAbstract* plugin, int* lastIndex)
 {
     if (plugin != NULL)

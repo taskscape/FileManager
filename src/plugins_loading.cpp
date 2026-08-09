@@ -168,6 +168,47 @@ BOOL IsInPlugin()
     return AlreadyInPlugin.load() > 0;
 }
 
+void HandlePluginCallbackFailure(const void* pluginInterface, const char* callback)
+{
+    CPluginData* plugin = Plugins.GetPluginData(pluginInterface);
+    if (plugin != NULL)
+    {
+        TRACE_E("Plug-in callback failed: " << callback << " (" << plugin->DLLName << " v. " << plugin->Version << ")");
+        plugin->LoadOnStart = FALSE;
+        plugin->ShouldUnload = TRUE;
+
+        // Unloading from an exception filter would free code still present on
+        // the stack.  The UI idle path owns the deferred, recoverable unload.
+        if (MainWindow != NULL)
+            PostMessage(MainWindow->HWindow, WM_USER_POSTCMDORUNLOADPLUGIN,
+                        (WPARAM)plugin->GetPluginInterface()->GetInterface(), 0);
+    }
+    else
+        TRACE_E("Plug-in callback failed: " << callback << " (owner not found)");
+}
+
+int WINAPI HandlePluginCallbackException(const void* pluginInterface, const char* callback,
+                                         EXCEPTION_POINTERS* exceptionInfo)
+{
+    CCallStack::HandleException(exceptionInfo);
+    HandlePluginCallbackFailure(pluginInterface, callback);
+    return EXCEPTION_EXECUTE_HANDLER;
+}
+
+BOOL CallPluginCallback(const void* pluginInterface, const char* callback,
+                        CPluginCallbackInvoker* invoker)
+{
+    __try
+    {
+        invoker->Invoke();
+        return TRUE;
+    }
+    __except (HandlePluginCallbackException(pluginInterface, callback, GetExceptionInformation()))
+    {
+        return FALSE;
+    }
+}
+
 //
 // ****************************************************************************
 // CPluginFSInterfaceEncapsulation
@@ -203,7 +244,8 @@ BOOL CPluginFSInterfaceEncapsulation::ListCurrentPath(CSalamanderDirectoryAbstra
     ExecLogFileListingStart(PluginFSName, TRUE, PluginFSName);
     EnterPlugin();
     //TRACE_I("list path: begin");
-    BOOL r = Interface->ListCurrentPath(dir, pluginData, iconsType, forceRefresh);
+    BOOL r = FALSE;
+    PLUGIN_CALLBACK(Iface, "ListCurrentPath", r = Interface->ListCurrentPath(dir, pluginData, iconsType, forceRefresh));
     //TRACE_I("list path: end");
     ExecLogFileListingResult(PluginFSName, r, -1, -1, TRUE, PluginFSName);
 #ifdef _DEBUG
@@ -217,7 +259,7 @@ BOOL CPluginFSInterfaceEncapsulation::ListCurrentPath(CSalamanderDirectoryAbstra
     }
 #endif // _DEBUG
     CALL_STACK_MESSAGE1("CPluginFSInterface::GetSupportedServices()");
-    SupportedServices = Interface->GetSupportedServices();
+    PLUGIN_CALLBACK(Iface, "GetSupportedServices", SupportedServices = Interface->GetSupportedServices());
     LeavePlugin();
     return r;
 }
@@ -230,7 +272,8 @@ BOOL CPluginFSInterfaceEncapsulation::GetChangeDriveOrDisconnectItem(const char*
     if (IsServiceSupported(FS_SERVICE_GETCHANGEDRIVEORDISCONNECTITEM))
     {
         EnterPlugin();
-        BOOL r = Interface->GetChangeDriveOrDisconnectItem(fsName, title, icon, destroyIcon);
+        BOOL r = FALSE;
+        PLUGIN_CALLBACK(Iface, "GetChangeDriveOrDisconnectItem", r = Interface->GetChangeDriveOrDisconnectItem(fsName, title, icon, destroyIcon));
         if (r && icon != NULL && destroyIcon) // add the handle for 'icon' to HANDLES
             HANDLES_ADD(__htIcon, __hoLoadImage, icon);
         LeavePlugin();
@@ -248,7 +291,8 @@ CPluginFSInterfaceEncapsulation::GetFSIcon(BOOL& destroyIcon)
     if (IsServiceSupported(FS_SERVICE_GETFSICON))
     {
         EnterPlugin();
-        HICON r = Interface->GetFSIcon(destroyIcon);
+        HICON r = NULL;
+        PLUGIN_CALLBACK(Iface, "GetFSIcon", r = Interface->GetFSIcon(destroyIcon));
         if (r != NULL && destroyIcon) // add the handle of the returned icon to HANDLES
             HANDLES_ADD(__htIcon, __hoLoadImage, r);
         LeavePlugin();
@@ -280,7 +324,7 @@ void CPluginInterfaceForFSEncapsulation::CloseFS(CPluginFSInterfaceAbstract* fs)
     CALL_STACK_MESSAGE3("CPluginInterfaceForFSEncapsulation::CloseFS() (%s v. %s)",
                         data->DLLName, data->Version);
     EnterPlugin();
-    Interface->CloseFS(fs);
+    PLUGIN_CALLBACK(Interface, "CloseFS", Interface->CloseFS(fs));
     Plugins.KillPluginFSTimer(fs, TRUE, 0); // we must remove timers of the closing FS (they wouldn't deliver and TRACE_E would appear)
     LeavePlugin();
 
@@ -297,7 +341,7 @@ void CPluginInterfaceForFSEncapsulation::CloseFS(CPluginFSInterfaceAbstract* fs)
 void CPluginInterfaceForFSEncapsulation::ExecuteChangeDriveMenuItem(int panel)
 {
     EnterPlugin();
-    Interface->ExecuteChangeDriveMenuItem(panel);
+    PLUGIN_CALLBACK(Interface, "ExecuteChangeDriveMenuItem", Interface->ExecuteChangeDriveMenuItem(panel));
     LeavePlugin();
 }
 
@@ -308,10 +352,11 @@ BOOL CPluginInterfaceForFSEncapsulation::ChangeDriveMenuItemContextMenu(HWND par
                                                                         BOOL& closeMenu, int& postCmd, void*& postCmdParam)
 {
     EnterPlugin();
-    BOOL r = Interface->ChangeDriveMenuItemContextMenu(parent, panel, x, y, pluginFS,
-                                                       pluginFSName, pluginFSNameIndex,
-                                                       isDetachedFS, refreshMenu,
-                                                       closeMenu, postCmd, postCmdParam);
+    BOOL r = FALSE;
+    PLUGIN_CALLBACK(Interface, "ChangeDriveMenuItemContextMenu", r = Interface->ChangeDriveMenuItemContextMenu(parent, panel, x, y, pluginFS,
+                                                                                                                    pluginFSName, pluginFSNameIndex,
+                                                                                                                    isDetachedFS, refreshMenu,
+                                                                                                                    closeMenu, postCmd, postCmdParam));
     LeavePlugin();
     return r;
 }
@@ -327,7 +372,7 @@ void CPluginInterfaceForFSEncapsulation::ExecuteChangeDrivePostCommand(int panel
     CALL_STACK_MESSAGE5("CPluginInterfaceForFSEncapsulation::ExecuteChangeDrivePostCommand(%d, %d, ) (%s v. %s)",
                         panel, postCmd, data->DLLName, data->Version);
     EnterPlugin();
-    Interface->ExecuteChangeDrivePostCommand(panel, postCmd, postCmdParam);
+    PLUGIN_CALLBACK(Interface, "ExecuteChangeDrivePostCommand", Interface->ExecuteChangeDrivePostCommand(panel, postCmd, postCmdParam));
     LeavePlugin();
 }
 
@@ -344,7 +389,7 @@ void CPluginInterfaceForFSEncapsulation::ExecuteOnFS(int panel, CPluginFSInterfa
     CALL_STACK_MESSAGE7("CPluginInterfaceForFSEncapsulation::ExecuteOnFS(%d, , %s, %d, , %d) (%s v. %s)",
                         panel, pluginFSName, pluginFSNameIndex, isDir, data->DLLName, data->Version);
     EnterPlugin();
-    Interface->ExecuteOnFS(panel, pluginFS, pluginFSName, pluginFSNameIndex, file, isDir);
+    PLUGIN_CALLBACK(Interface, "ExecuteOnFS", Interface->ExecuteOnFS(panel, pluginFS, pluginFSName, pluginFSNameIndex, file, isDir));
     LeavePlugin();
 }
 
@@ -361,7 +406,8 @@ BOOL CPluginInterfaceForFSEncapsulation::DisconnectFS(HWND parent, BOOL isInPane
     CALL_STACK_MESSAGE7("CPluginInterfaceForFSEncapsulation::DisconnectFS(, %d, %d, , %s, %d) (%s v. %s)",
                         isInPanel, panel, pluginFSName, pluginFSNameIndex, data->DLLName, data->Version);
     EnterPlugin();
-    BOOL ret = Interface->DisconnectFS(parent, isInPanel, panel, pluginFS, pluginFSName, pluginFSNameIndex);
+    BOOL ret = FALSE;
+    PLUGIN_CALLBACK(Interface, "DisconnectFS", ret = Interface->DisconnectFS(parent, isInPanel, panel, pluginFS, pluginFSName, pluginFSNameIndex));
     LeavePlugin();
     return ret;
 }
@@ -378,7 +424,7 @@ void CPluginInterfaceForFSEncapsulation::ConvertPathToInternal(const char* fsNam
     CALL_STACK_MESSAGE6("CPluginInterfaceForFSEncapsulation::ConvertPathToInternal(%s, %d, %s) (%s v. %s)",
                         fsName, fsNameIndex, fsUserPart, data->DLLName, data->Version);
     EnterPlugin();
-    Interface->ConvertPathToInternal(fsName, fsNameIndex, fsUserPart);
+    PLUGIN_CALLBACK(Interface, "ConvertPathToInternal", Interface->ConvertPathToInternal(fsName, fsNameIndex, fsUserPart));
     LeavePlugin();
 }
 
@@ -394,7 +440,7 @@ void CPluginInterfaceForFSEncapsulation::ConvertPathToExternal(const char* fsNam
     CALL_STACK_MESSAGE6("CPluginInterfaceForFSEncapsulation::ConvertPathToExternal(%s, %d, %s) (%s v. %s)",
                         fsName, fsNameIndex, fsUserPart, data->DLLName, data->Version);
     EnterPlugin();
-    Interface->ConvertPathToExternal(fsName, fsNameIndex, fsUserPart);
+    PLUGIN_CALLBACK(Interface, "ConvertPathToExternal", Interface->ConvertPathToExternal(fsName, fsNameIndex, fsUserPart));
     LeavePlugin();
 }
 
@@ -415,7 +461,7 @@ void CPluginInterfaceEncapsulation::ReleasePluginDataInterface(CPluginDataInterf
     CALL_STACK_MESSAGE3("CPluginInterfaceEncapsulation::ReleasePluginDataInterface() (%s v. %s)",
                         data->DLLName, data->Version);
     EnterPlugin();
-    Interface->ReleasePluginDataInterface(pluginData);
+    PLUGIN_CALLBACK(Interface, "ReleasePluginDataInterface", Interface->ReleasePluginDataInterface(pluginData));
     LeavePlugin();
 }
 
@@ -432,7 +478,7 @@ void CPluginDataInterfaceEncapsulation::ReleaseFilesOrDirs(CFilesArray* filesOrD
     int i;
     for (i = 0; i < filesOrDirs->Count; i++)
     {
-        Interface->ReleasePluginData(filesOrDirs->At(i), areDirs);
+        PLUGIN_CALLBACK(Plugin, "ReleasePluginData", Interface->ReleasePluginData(filesOrDirs->At(i), areDirs));
     }
     LeavePlugin();
 }
@@ -526,11 +572,11 @@ CSalamanderDebug::CallWithCallStackEH(unsigned(WINAPI* threadBody)(void*), void*
         return CallWithCallStackEHBody(DLLName, Version, threadBody, param);
 #ifndef CALLSTK_DISABLE
     }
-    __except (CCallStack::HandleException(GetExceptionInformation()))
+    __except (HandlePluginCallbackException(Plugins.GetPluginData(DLLName) != NULL ?
+                                                  Plugins.GetPluginData(DLLName)->GetPluginInterface()->GetInterface() : NULL,
+                                              "Plug-in thread", GetExceptionInformation()))
     {
-        TRACE_I("Thread address " << threadBody << ": calling ExitProcess(1).");
-        //    ExitProcess(1);
-        TerminateProcess(GetCurrentProcess(), 1); // harder exit (this call still performs some operations)
+        TRACE_I("Thread address " << threadBody << ": plug-in disabled after exception.");
         return 1;
     }
 #endif // CALLSTK_DISABLE
