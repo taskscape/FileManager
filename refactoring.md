@@ -199,10 +199,11 @@ This document is the working record for a read-only stability and resilience aud
 
 - **Delivered (2026-08-09):** The executable-level NUnit/FlaUI suite now characterizes native conflict decisions (`Yes`, `All`, `Skip`, and `Skip All`), same-volume copy/move/delete/rename metadata and cancellation behavior, and the durable cancellation journal. `CrossVolumeMoveCharacterizationUiTests` uses an explicitly supplied disposable second-volume root and verifies that a tree reaches its target before the source disappears. `OperationRecoveryCharacterizationUiTests` seeds a ready transactional sibling target and verifies the real startup recovery prompt commits it and marks the journal reconciled. The recycle-bin test uses `SHQueryRecycleBin` around a real delete and remains opt-in because it intentionally changes the isolated profile's shell recycle-bin contents.
 
-### 29. Add crash-consistency fault injection at every operation phase
+### 29. Add crash-consistency fault injection at every operation phase — Implemented (2026-08-09)
 
-- **Justification:** Happy-path tests cannot demonstrate the atomicity promised by a file manager. Failures must be explored between create, write, metadata, flush, replace, and source delete.
-- **Proposed solution:** Put Win32 file calls behind an injectable adapter in tests, fail each call deterministically, and assert the invariant: the original, the complete replacement, or a recoverable journal exists.
+- **Delivered:** `COperationExecutionFileSystem` is an execution-only, replaceable Win32 adapter. Native tests can install a deterministic fake with `SetOperationExecutionFileSystemForTests` and fail the exact create, write, metadata (`SetFileTime`), flush, replace/rename, or identity-guarded source-delete call without changing the operation plan, worker, or UI flow.
+- **Crash-consistency boundary:** Transactional copy routes sibling-target creation, synchronous and overlapped writes, metadata persistence, `FlushFileBuffers`, `ReplaceFileW`/write-through rename, and the `SetFileInformationByHandle` source deletion through that adapter. The existing append-only journal is written before an item begins and marks a fully flushed temporary target ready before replacement, so every injected failure leaves the original, the complete replacement, or durable recovery facts.
+- **Regression coverage:** `NativeSafetyRegressionTests.Transactional_copy_and_move_expose_each_durable_phase_to_a_deterministic_fault_adapter` locks the seam and every call-site boundary in place, including the durable journal transitions.
 
 ### 30. Implemented: add executable-level file-operation scenarios
 
