@@ -24,9 +24,9 @@ This document is the working record for a read-only stability and resilience aud
 2. **One shutdown sequence destroys synchronization primitives before workers are guaranteed stopped.** `ReleaseCheckThreads` in `src/path_checking.cpp` deletes critical sections before signaling and joining its threads.
 3. **Several UI/worker handshakes wait forever.** File-operation startup and worker suspension use `INFINITE` waits; worker code also uses synchronous `SendMessage` to the UI, creating circular-wait potential.
 4. **Cancellation state is shared through plain `BOOL` pointers and globals.** These accesses do not provide atomic visibility or an explicit state machine.
-5. **Overwrite is not transactional.** `src/async_copy.cpp` can delete an existing destination before recreation or truncate it with `CREATE_ALWAYS`; there is no sibling temporary file plus atomic replace commit.
+5. **Overwrite is transactional for native file copies.** Confirmed overwrites now copy to a uniquely reserved sibling temporary file and replace the requested destination only after a durable close and atomic same-volume commit.
 6. **Cross-volume move commits by deleting the source after copy success without a full post-copy integrity check.** Tail checks help retry logic but do not prove the entire destination is durable and identical.
-7. **Durability is not explicitly requested before destructive commit.** The core copy path does not use `FlushFileBuffers` or a write-through rename/replace protocol.
+7. **Direct-to-new-destination copies still lack an explicit durable completion point.** Transactional overwrites now flush and use a write-through replace/rename, but the non-overwrite path does not yet request the same durability boundary.
 8. **Legacy size and seek APIs are widespread.** `GetFileSize` and `SetFilePointer` retain sentinel/error ambiguity and complicate correct files larger than 4 GiB.
 9. **Path and string handling remains fixed-buffer heavy.** Thousands of `MAX_PATH` references and many unchecked copy/format calls make long paths and boundary inputs fragile.
 10. **Plug-ins execute in-process behind manually balanced global entry state.** A plug-in failure can skip cleanup, corrupt host bookkeeping, or terminate the file manager.
@@ -78,10 +78,9 @@ This document is the working record for a read-only stability and resilience aud
 - **Justification:** Cancellation is shared through plain `BOOL*` fields and globals such as `CPFirstTerminate`; this does not define memory visibility or distinguish cancel-requested, stopping, completed, and failed states.
 - **Delivered:** `COperations` now owns an interlocked lifecycle (`planned`, `running`, `cancel-requested`, `stopping`, `completed`, and `failed`) plus a manual-reset cancellation event. Dialog and worker paths make idempotent cancellation requests through that owner, worker completion records the terminal state, and debug builds break on invalid transitions. Existing low-level helper call sites use a compatibility view backed by this owner rather than sharing a `BOOL*`.
 
-### 6. Make destination overwrite transactional
+### 6. Implemented: make destination overwrite transactional
 
-- **Justification:** The copy path can delete the old destination before recreating it or open it with `CREATE_ALWAYS` (`src/async_copy.cpp:4452`). A crash, disk-full error, or power loss can destroy the only good copy.
-- **Proposed solution:** Copy to a uniquely named sibling temporary file, apply metadata, flush it, then commit with `ReplaceFileW` or an equivalent atomic same-volume rename. Preserve the original until commit succeeds and clean abandoned temporaries on recovery.
+- **Delivered:** After the existing overwrite and protected-file confirmations, `DoCopyFile` reserves a uniquely named sibling temporary file rather than deleting or truncating the destination. It applies the existing metadata pipeline to that temporary file, flushes the copied data before close, and commits with `ReplaceFileW(REPLACEFILE_WRITE_THROUGH)`. If another actor removed the destination after confirmation, a same-volume write-through `MoveFileExW` commits the temporary file instead. Retry, skip, cancel, low-space, and metadata-error paths delete only the temporary reservation; the original destination remains untouched until commit succeeds.
 
 ### 7. Define and enforce a durable copy commit point
 
