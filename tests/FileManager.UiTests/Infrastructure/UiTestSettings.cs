@@ -50,6 +50,20 @@ internal static class UiTestSettings
         return Path.GetFullPath(root);
     }
 
+    internal static string RequireUnsupportedAdsTargetRoot()
+    {
+        var root = Environment.GetEnvironmentVariable("FILEMANAGER_UI_ADS_UNSUPPORTED_TARGET_ROOT");
+        if (string.IsNullOrWhiteSpace(root) || !Directory.Exists(root))
+            Assert.Ignore("Set FILEMANAGER_UI_ADS_UNSUPPORTED_TARGET_ROOT to an existing dedicated directory on an ADS-unsupported volume to run this test.");
+
+        var sourceVolume = Path.GetPathRoot(Path.GetTempPath());
+        var targetVolume = Path.GetPathRoot(Path.GetFullPath(root));
+        if (string.Equals(sourceVolume, targetVolume, StringComparison.OrdinalIgnoreCase))
+            Assert.Ignore("FILEMANAGER_UI_ADS_UNSUPPORTED_TARGET_ROOT must be on a different volume from the temporary directory.");
+
+        return Path.GetFullPath(root);
+    }
+
     internal static void RequireRecycleBinTest()
     {
         if (!string.Equals(Environment.GetEnvironmentVariable("FILEMANAGER_UI_RECYCLE_BIN"), "1", StringComparison.Ordinal))

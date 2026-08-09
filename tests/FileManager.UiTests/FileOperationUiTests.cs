@@ -41,6 +41,91 @@ public sealed class FileOperationUiTests : FileOperationUiTestBase
     }
 
     [Test]
+    [Category("AlternateDataStreams")]
+    public void Copy_preserves_multiple_empty_large_and_edge_named_alternate_data_streams()
+    {
+        AlternateDataStreams.RequireSupportAt(Workspace.SourceDirectory);
+        AlternateDataStreams.RequireSupportAt(Workspace.TargetDirectory);
+
+        var source = Workspace.SourcePath("ads-copy.txt");
+        var target = Workspace.TargetPath("ads-copy.txt");
+        var large = CreateLargeStreamContent();
+        File.WriteAllText(source, "ads-copy-default-content");
+        AlternateDataStreams.Write(source, "notes", "named-stream-content"u8.ToArray());
+        AlternateDataStreams.Write(source, "empty", []);
+        AlternateDataStreams.Write(source, "large", large);
+        AlternateDataStreams.Write(source, "edge name.with.dots", "edge-stream-content"u8.ToArray());
+
+        ExecuteWithPath(NativeCommands.CopyFiles, "ads-copy.txt", Workspace.TargetDirectory, commit: true);
+
+        WaitForFileSystem(() => File.Exists(target), "Copy did not create the ADS test target.");
+        Assert.Multiple(() =>
+        {
+            Assert.That(File.ReadAllText(target), Is.EqualTo("ads-copy-default-content"));
+            AlternateDataStreams.AssertContent(target, "notes", "named-stream-content"u8.ToArray());
+            AlternateDataStreams.AssertContent(target, "empty", []);
+            AlternateDataStreams.AssertContent(target, "large", large);
+            AlternateDataStreams.AssertContent(target, "edge name.with.dots", "edge-stream-content"u8.ToArray());
+        });
+    }
+
+    [Test]
+    [Category("AlternateDataStreams")]
+    public void Copy_overwrite_replaces_target_streams_and_removes_stale_streams()
+    {
+        AlternateDataStreams.RequireSupportAt(Workspace.SourceDirectory);
+        AlternateDataStreams.RequireSupportAt(Workspace.TargetDirectory);
+
+        var source = Workspace.SourcePath("ads-overwrite.txt");
+        var target = Workspace.TargetPath("ads-overwrite.txt");
+        File.WriteAllText(source, "ads-overwrite-source");
+        File.WriteAllText(target, "ads-overwrite-target");
+        AlternateDataStreams.Write(source, "replacement", "replacement-stream-content"u8.ToArray());
+        AlternateDataStreams.Write(target, "replacement", "stale-replacement-content"u8.ToArray());
+        AlternateDataStreams.Write(target, "stale", "stale-stream-content"u8.ToArray());
+
+        ExecuteWithPath(NativeCommands.CopyFiles, "ads-overwrite.txt", Workspace.TargetDirectory, commit: true);
+        ChooseOperationPrompt(WaitForOperationPrompt(6), 6); // IDYES
+
+        WaitForFileSystem(() => File.ReadAllText(target) == "ads-overwrite-source",
+                          "Confirmed overwrite did not replace the ADS test target.");
+        Assert.Multiple(() =>
+        {
+            AlternateDataStreams.AssertContent(target, "replacement", "replacement-stream-content"u8.ToArray());
+            AlternateDataStreams.AssertAbsent(target, "stale");
+        });
+    }
+
+    [Test]
+    [Category("AlternateDataStreams")]
+    public void Copy_retries_a_temporarily_denied_alternate_data_stream_without_losing_it()
+    {
+        AlternateDataStreams.RequireSupportAt(Workspace.SourceDirectory);
+        AlternateDataStreams.RequireSupportAt(Workspace.TargetDirectory);
+
+        var source = Workspace.SourcePath("ads-retry.txt");
+        var target = Workspace.TargetPath("ads-retry.txt");
+        File.WriteAllText(source, "ads-retry-default-content");
+        AlternateDataStreams.Write(source, "temporarily-denied", "retry-stream-content"u8.ToArray());
+
+        var deniedStream = AlternateDataStreams.LockForRead(source, "temporarily-denied");
+        try
+        {
+            ExecuteWithPath(NativeCommands.CopyFiles, "ads-retry.txt", Workspace.TargetDirectory, commit: true);
+            var retryPrompt = WaitForOperationPrompt(4); // IDRETRY
+            deniedStream.Dispose();
+            ChooseOperationPrompt(retryPrompt, 4);
+        }
+        finally
+        {
+            deniedStream.Dispose();
+        }
+
+        WaitForFileSystem(() => File.Exists(target), "Retry did not complete the ADS copy.");
+        AlternateDataStreams.AssertContent(target, "temporarily-denied", "retry-stream-content"u8.ToArray());
+    }
+
+    [Test]
     public void Copy_overwrite_replaces_the_existing_target_only_after_the_user_confirms()
     {
         ExecuteWithPath(NativeCommands.CopyFiles, "overwrite-file.txt", Workspace.TargetDirectory, commit: true);
@@ -308,5 +393,14 @@ public sealed class FileOperationUiTests : FileOperationUiTestBase
         return Directory.EnumerateFiles(directory, "*.opj")
             .OrderByDescending(File.GetLastWriteTimeUtc)
             .FirstOrDefault(path => File.ReadAllText(path).Contains(source, StringComparison.Ordinal));
+    }
+
+    private static byte[] CreateLargeStreamContent()
+    {
+        var content = new byte[(3 * 1024 * 1024) + 17];
+        for (var index = 0; index < content.Length; index++)
+            content[index] = (byte)(index % 251);
+
+        return content;
     }
 }
