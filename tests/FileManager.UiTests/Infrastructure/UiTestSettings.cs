@@ -35,4 +35,24 @@ internal static class UiTestSettings
         if (!string.Equals(Environment.GetEnvironmentVariable("FILEMANAGER_UI_CONFIG_FAULT_INJECTION"), "1", StringComparison.Ordinal))
             Assert.Ignore("Set FILEMANAGER_UI_CONFIG_FAULT_INJECTION=1 to run the exhaustive configuration write-boundary recovery test.");
     }
+
+    internal static string RequireCrossVolumeRoot()
+    {
+        var root = Environment.GetEnvironmentVariable("FILEMANAGER_UI_CROSS_VOLUME_ROOT");
+        if (string.IsNullOrWhiteSpace(root) || !Directory.Exists(root))
+            Assert.Ignore("Set FILEMANAGER_UI_CROSS_VOLUME_ROOT to an existing dedicated directory on a second volume to run cross-volume move characterization tests.");
+
+        var sourceVolume = Path.GetPathRoot(Path.GetTempPath());
+        var targetVolume = Path.GetPathRoot(Path.GetFullPath(root));
+        if (string.Equals(sourceVolume, targetVolume, StringComparison.OrdinalIgnoreCase))
+            Assert.Ignore("FILEMANAGER_UI_CROSS_VOLUME_ROOT must be on a different volume from the temporary directory.");
+
+        return Path.GetFullPath(root);
+    }
+
+    internal static void RequireRecycleBinTest()
+    {
+        if (!string.Equals(Environment.GetEnvironmentVariable("FILEMANAGER_UI_RECYCLE_BIN"), "1", StringComparison.Ordinal))
+            Assert.Ignore("Set FILEMANAGER_UI_RECYCLE_BIN=1 in an isolated profile with the default recycle-bin setting enabled to run this test.");
+    }
 }

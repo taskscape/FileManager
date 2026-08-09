@@ -89,6 +89,38 @@ public sealed class NativeSafetyRegressionTests
     }
 
     [Test]
+    public void Native_destructive_operation_characterization_suite_retains_the_required_scenarios()
+    {
+        var root = FindRepositoryRoot();
+        var operations = File.ReadAllText(Path.Combine(root, "tests", "FileManager.UiTests", "FileOperationUiTests.cs"));
+        var crossVolume = File.ReadAllText(Path.Combine(root, "tests", "FileManager.UiTests", "CrossVolumeMoveCharacterizationUiTests.cs"));
+        var recovery = File.ReadAllText(Path.Combine(root, "tests", "FileManager.UiTests", "OperationRecoveryCharacterizationUiTests.cs"));
+        var workspace = File.ReadAllText(Path.Combine(root, "tests", "FileManager.UiTests", "Infrastructure", "FileOperationUiTestBase.cs"));
+        var settings = File.ReadAllText(Path.Combine(root, "tests", "FileManager.UiTests", "Infrastructure", "UiTestSettings.cs"));
+        var refactoring = File.ReadAllText(Path.Combine(root, "refactoring.md"));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(operations, Does.Contain("Copy_overwrite_replaces_the_existing_target_only_after_the_user_confirms"));
+            Assert.That(operations, Does.Contain("Copy_overwrite_all_applies_the_choice_to_the_complete_conflicting_tree"));
+            Assert.That(operations, Does.Contain("Copy_skip_keeps_the_existing_target_and_the_source"));
+            Assert.That(operations, Does.Contain("Copy_skip_all_keeps_the_existing_conflicting_tree"));
+            Assert.That(operations, Does.Contain("Rename_overwrite_replaces_the_collision_without_losing_source_metadata"));
+            Assert.That(operations, Does.Contain("The default move fixture characterizes same-volume behavior."));
+            Assert.That(operations, Does.Contain("Delete_to_recycle_bin_removes_the_source_and_creates_a_recoverable_shell_item"));
+            Assert.That(operations, Does.Contain("Cancelling_an_in_progress_conflicting_copy_keeps_both_versions_and_records_cancellation"));
+            Assert.That(crossVolume, Does.Contain("Move_across_volumes_copies_the_complete_tree_before_removing_the_source"));
+            Assert.That(crossVolume, Does.Contain("RequireCrossVolumeRoot"));
+            Assert.That(settings, Does.Contain("FILEMANAGER_UI_CROSS_VOLUME_ROOT"));
+            Assert.That(recovery, Does.Contain("Restart_reconciliation_commits_a_fully_written_transactional_target"));
+            Assert.That(recovery, Does.Contain("STATE|0|temporary-ready"));
+            Assert.That(workspace, Does.Contain("TargetVolumeRoot"));
+            Assert.That(workspace, Does.Contain("TargetWorkspaceDirectory"));
+            Assert.That(refactoring, Does.Contain("### 28. Build native characterization tests for copy, move, delete, and rename — Implemented"));
+        });
+    }
+
+    [Test]
     public void Crash_report_uploads_use_certificate_validated_https_with_explicit_consent()
     {
         var root = FindRepositoryRoot();
