@@ -3,6 +3,7 @@
 
 #include "precomp.h"
 
+#include "common/scoped_kernel_handle.h"
 #include "file_operation_filesystem.h"
 #include "worker.h"
 
@@ -73,12 +74,14 @@ BOOL CaptureFileIdentity(const char* path, COperation::CFileIdentity* identity, 
 {
     memset(identity, 0, sizeof(*identity));
     identity->State = FileIdentityNotCaptured;
-    HANDLE handle = HANDLES_Q(CreateFileUtf8(path, FILE_READ_ATTRIBUTES,
-                                              FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
-                                              NULL, OPEN_EXISTING,
-                                              FILE_FLAG_BACKUP_SEMANTICS | FILE_FLAG_OPEN_REPARSE_POINT,
-                                              NULL));
-    if (handle == INVALID_HANDLE_VALUE)
+    // Identity capture often exits through validation failures, so keep its
+    // tracked file handle owned until the complete record has been produced.
+    CScopedKernelHandle handle(HANDLES_Q(CreateFileUtf8(path, FILE_READ_ATTRIBUTES,
+                                                         FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+                                                         NULL, OPEN_EXISTING,
+                                                         FILE_FLAG_BACKUP_SEMANTICS | FILE_FLAG_OPEN_REPARSE_POINT,
+                                                         NULL)));
+    if (!handle.IsValid())
     {
         *error = GetLastError();
         if (allowAbsent && (*error == ERROR_FILE_NOT_FOUND || *error == ERROR_PATH_NOT_FOUND))
@@ -90,10 +93,11 @@ BOOL CaptureFileIdentity(const char* path, COperation::CFileIdentity* identity, 
         return FALSE;
     }
 
-    BOOL result = ReadFileIdentity(handle, identity, error);
-    if (!HANDLES(CloseHandle(handle)) && result)
+    BOOL result = ReadFileIdentity(handle.Get(), identity, error);
+    DWORD closeError;
+    if (!handle.Close(&closeError) && result)
     {
-        *error = GetLastError();
+        *error = closeError;
         result = FALSE;
     }
     return result;
@@ -110,33 +114,34 @@ BOOL SameFileIdentity(const COperation::CFileIdentity& left, const COperation::C
              left.FinalPathHash == right.FinalPathHash));
 }
 
-BOOL OpenVerifiedFileForDelete(const char* path, const COperation::CFileIdentity& expected, HANDLE* handle, DWORD* error)
+BOOL OpenVerifiedFileForDelete(const char* path, const COperation::CFileIdentity& expected,
+                               CScopedKernelHandle* handle, DWORD* error)
 {
-    *handle = INVALID_HANDLE_VALUE;
+    handle->Reset();
     if (expected.State != FileIdentityPresent)
     {
         *error = ERROR_INVALID_DATA;
         return FALSE;
     }
 
-    *handle = HANDLES_Q(CreateFileUtf8(path, DELETE | FILE_READ_ATTRIBUTES,
-                                        FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
-                                        NULL, OPEN_EXISTING,
-                                        FILE_FLAG_BACKUP_SEMANTICS | FILE_FLAG_OPEN_REPARSE_POINT,
-                                        NULL));
-    if (*handle == INVALID_HANDLE_VALUE)
+    // The output wrapper makes the verified handle's ownership transfer clear
+    // until deletion has either committed or returned a recoverable error.
+    handle->Reset(HANDLES_Q(CreateFileUtf8(path, DELETE | FILE_READ_ATTRIBUTES,
+                                           FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+                                           NULL, OPEN_EXISTING,
+                                           FILE_FLAG_BACKUP_SEMANTICS | FILE_FLAG_OPEN_REPARSE_POINT,
+                                           NULL)));
+    if (!handle->IsValid())
     {
         *error = GetLastError();
         return FALSE;
     }
 
     COperation::CFileIdentity actual;
-    if (!ReadFileIdentity(*handle, &actual, error) || !SameFileIdentity(expected, actual))
+    if (!ReadFileIdentity(handle->Get(), &actual, error) || !SameFileIdentity(expected, actual))
     {
         if (*error == ERROR_SUCCESS)
             *error = ERROR_INVALID_DATA;
-        HANDLES(CloseHandle(*handle));
-        *handle = INVALID_HANDLE_VALUE;
         return FALSE;
     }
     return TRUE;
@@ -201,31 +206,32 @@ BOOL VerifyFileHandleIdentity(HANDLE handle, const COperation::CFileIdentity& ex
 
 BOOL DeleteFileWithVerifiedIdentity(const char* path, const COperation::CFileIdentity& expected, DWORD* error)
 {
-    HANDLE handle;
+    CScopedKernelHandle handle;
     if (!OpenVerifiedFileForDelete(path, expected, &handle, error))
         return FALSE;
 
     FILE_DISPOSITION_INFO disposition;
     disposition.DeleteFile = TRUE;
-    BOOL result = OperationExecutionFileSystem().SetFileInformationByHandle(handle, FileDispositionInfo,
+    BOOL result = OperationExecutionFileSystem().SetFileInformationByHandle(handle.Get(), FileDispositionInfo,
                                                                              &disposition, sizeof(disposition));
     if (!result && GetLastError() == ERROR_ACCESS_DENIED)
     {
         FILE_BASIC_INFO basicInfo;
-        if (GetFileInformationByHandleEx(handle, FileBasicInfo, &basicInfo, sizeof(basicInfo)))
+        if (GetFileInformationByHandleEx(handle.Get(), FileBasicInfo, &basicInfo, sizeof(basicInfo)))
         {
             basicInfo.FileAttributes &= ~FILE_ATTRIBUTE_READONLY;
-            if (OperationExecutionFileSystem().SetFileInformationByHandle(handle, FileBasicInfo,
+            if (OperationExecutionFileSystem().SetFileInformationByHandle(handle.Get(), FileBasicInfo,
                                                                            &basicInfo, sizeof(basicInfo)))
-                result = OperationExecutionFileSystem().SetFileInformationByHandle(handle, FileDispositionInfo,
+                result = OperationExecutionFileSystem().SetFileInformationByHandle(handle.Get(), FileDispositionInfo,
                                                                                      &disposition, sizeof(disposition));
         }
     }
     if (!result)
         *error = GetLastError();
-    if (!HANDLES(CloseHandle(handle)) && result)
+    DWORD closeError;
+    if (!handle.Close(&closeError) && result)
     {
-        *error = GetLastError();
+        *error = closeError;
         result = FALSE;
     }
     return result;

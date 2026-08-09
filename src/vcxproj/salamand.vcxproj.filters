@@ -776,6 +776,9 @@
     <ClInclude Include="..\operation_result.h">
       <Filter>h</Filter>
     </ClInclude>
+    <ClInclude Include="..\common\scoped_kernel_handle.h">
+      <Filter>common</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Image Include="..\res\archive.ico">

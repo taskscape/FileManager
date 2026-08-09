@@ -270,10 +270,10 @@ This document is the working record for a read-only stability and resilience aud
 - **Resolution:** `COperationResult` now carries the complete outcome for durable copy verification and transactional overwrite commits. `ToLegacyBool` supplies the existing progress-dialog `BOOL`/Win32-error contract while further callers migrate.
 - **Verification:** `NativeSafetyRegressionTests.Transactional_copy_results_preserve_phase_error_paths_retryability_and_partial_effects_for_legacy_dialogs` checks the result contract, transactional call sites, compatibility adapter, and implementation ledger.
 
-### 41. Adopt RAII for kernel handles in touched code
+### 41. Adopt RAII for kernel handles in touched code — Implemented
 
-- **Justification:** Manual `CloseHandle` across numerous returns and exception paths makes leaks and double closes likely, especially during fault handling.
-- **Proposed solution:** Use the already-vendored WIL handle wrappers or a small project wrapper. Require new/touched functions to transfer ownership explicitly and delete manual cleanup ladders only after characterization.
+- **Implementation (2026-08-09):** `CScopedKernelHandle` is the small project wrapper for newly touched native code. It owns only valid kernel handles, preserves the existing `HANDLES` debug accounting on close, restores the caller's `GetLastError` during destructor cleanup, and requires an explicit `Reset` or `Release` for ownership replacement or transfer. The handle-identity capture and verified-delete boundary now use it, removing their raw `CloseHandle` cleanup paths while retaining the established close-failure result contract.
+- **Verification:** `NativeSafetyRegressionTests.Kernel_handle_ownership_is_scoped_and_preserves_legacy_close_failures` guards the non-copyable owner, explicit transfer operations, debug tracking, last-error preservation, migrated identity/delete paths, and this ledger entry.
 
 ### 42. Adopt RAII for memory, mappings, and critical sections
 

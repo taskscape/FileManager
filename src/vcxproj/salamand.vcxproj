@@ -897,6 +897,8 @@
     </ClInclude>
     <ClInclude Include="..\operation_result.h">
     </ClInclude>
+    <ClInclude Include="..\common\scoped_kernel_handle.h">
+    </ClInclude>
     <ClInclude Include="..\file_operation_filesystem.h">
     </ClInclude>
     <ClInclude Include="..\parserbroker.h">
