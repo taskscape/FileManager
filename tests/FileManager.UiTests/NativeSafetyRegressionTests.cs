@@ -74,6 +74,11 @@ public sealed class NativeSafetyRegressionTests
             Assert.That(upload, Does.Contain("WINHTTP_DISABLE_REDIRECTS"));
             Assert.That(upload, Does.Contain("WinHttpGetIEProxyConfigForCurrentUser"));
             Assert.That(upload, Does.Contain("/api/v1/crash-reports"));
+            Assert.That(upload, Does.Contain("Transfer-Encoding: chunked"));
+            Assert.That(upload, Does.Contain("WINHTTP_IGNORE_REQUEST_TOTAL_LENGTH"));
+            Assert.That(upload, Does.Contain("FinishChunkedRequest"));
+            Assert.That(upload, Does.Contain("CancelUploadThread"));
+            Assert.That(upload, Does.Not.Contain("DWORD totalLength"));
             Assert.That(upload, Does.Not.Contain("WINHTTP_OPTION_SECURITY_FLAGS"));
             Assert.That(upload, Does.Not.Contain("winsock2.h"));
             Assert.That(upload, Does.Not.Contain("http://"));
@@ -85,6 +90,7 @@ public sealed class NativeSafetyRegressionTests
             Assert.That(dialog, Does.Contain("over HTTPS"));
             Assert.That(reporting, Does.Contain("https://reports.taskscape.com/api/v1/crash-reports"));
             Assert.That(reporting, Does.Contain("http://reports.taskscape.com/upload.php"));
+            Assert.That(reporting, Does.Contain("Transfer-Encoding: chunked"));
             Assert.That(refactoring, Does.Contain("### 12. Replace the custom crash uploader with HTTPS WinHTTP — Implemented"));
         });
     }

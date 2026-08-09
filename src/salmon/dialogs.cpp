@@ -406,6 +406,7 @@ CMainDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 
     case WM_CLOSE:
     {
+        SendMessage(HWindow, WM_COMMAND, IDCANCEL, 0);
         return 0;
     }
 
@@ -491,9 +492,12 @@ CMainDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                 }
                 else
                 {
-                    char msg[2 * MAX_PATH];
-                    sprintf(msg, LoadStr(IDS_SALMON_UPLOADFAILED, HLanguage), UploadParams.ErrorMessage);
-                    MessageBox(HWindow, msg, LoadStr(IDS_SALMON_TITLE, HLanguage), MB_OK | MB_ICONEXCLAMATION | MB_SETFOREGROUND);
+                    if (!UploadParams.Cancelled)
+                    {
+                        char msg[2 * MAX_PATH];
+                        sprintf(msg, LoadStr(IDS_SALMON_UPLOADFAILED, HLanguage), UploadParams.ErrorMessage);
+                        MessageBox(HWindow, msg, LoadStr(IDS_SALMON_TITLE, HLanguage), MB_OK | MB_ICONEXCLAMATION | MB_SETFOREGROUND);
+                    }
                     CleanBugReportsDirectory(TRUE); // delete the reports, keep only the archives
                     OpenFolder(NULL, BugReportPath);
                     PostQuitMessage(0);
@@ -521,7 +525,12 @@ CMainDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 
         case IDCANCEL:
         {
-            if (Compressing || Uploading)
+            if (Uploading)
+            {
+                CancelUploadThread(&UploadParams);
+                return 0;
+            }
+            if (Compressing)
             {
                 MessageBox(HWindow, LoadStr(IDS_SALMON_WAITFORUPLOAD, HLanguage), LoadStr(IDS_SALMON_TITLE, HLanguage), MB_OK | MB_ICONINFORMATION | MB_SETFOREGROUND);
                 return 0;

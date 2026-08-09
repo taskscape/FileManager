@@ -7,9 +7,11 @@
 struct CUploadParams
 {
     BOOL Result;                     // TRUE if the operation completed successfully, otherwise FALSE
+    volatile LONG Cancelled;         // set when the user cancels the active upload
     char ErrorMessage[2 * MAX_PATH]; // if Result is FALSE, contains the error description
     char FileName[MAX_PATH];         // full path to the file that should be uploaded
 };
 
 BOOL StartUploadThread(CUploadParams* params);
 BOOL IsUploadThreadRunning();
+void CancelUploadThread(CUploadParams* params);
