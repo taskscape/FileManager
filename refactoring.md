@@ -142,10 +142,10 @@ This document is the working record for a read-only stability and resilience aud
 - **Justification:** `tools/prepare_installer.ps1:29-45` recursively selects the first matching binary from build and source trees, and several copies suppress errors. A release can silently mix stale architectures or builds.
 - **Proposed solution:** Generate a build-output manifest containing exact paths, architecture, version, commit, and hash; stage only those entries into a fresh directory. Reject duplicates, missing optionality declarations, wrong PE architecture, or unexpected files.
 
-### 19. Constrain DLL search paths
+### 19. Constrain DLL search paths — Implemented (2026-08-09)
 
-- **Justification:** `LoadLibraryUtf8` converts the name and calls `LoadLibraryW` without restricted search flags (`src/common/handles.cpp:2211`). Current-directory or PATH precedence can load unintended dependencies.
-- **Proposed solution:** Initialize `SetDefaultDllDirectories`, use absolute canonical plug-in paths with `LoadLibraryExW` and explicit `LOAD_LIBRARY_SEARCH_*` flags, and add only approved directories with `AddDllDirectory`.
+- **Delivered:** Startup now requires the Windows DLL-directory APIs (including the Windows 7 KB2533623 backport), sets the process default to the application directory, System32, and explicitly approved user directories, and registers only the application directory as a process-wide user directory.
+- **Load contract:** Both Debug and Release `LoadLibraryUtf8` implementations canonicalize their UTF-8 target with `GetFullPathNameW` and load it with `LoadLibraryExW` using `LOAD_LIBRARY_SEARCH_DLL_LOAD_DIR`, `LOAD_LIBRARY_SEARCH_SYSTEM32`, and `LOAD_LIBRARY_SEARCH_USER_DIRS`. Plug-in dependencies therefore resolve from the explicitly named plug-in directory, approved application directory, or System32—not the current directory or `PATH`.
 
 ### 20. Establish plug-in trust and quarantine policy
 
