@@ -263,10 +263,12 @@ This document is the working record for a read-only stability and resilience aud
 - **Delivered:** `src/common/checked_arithmetic.h` supplies checked add, multiply, and cast helpers for `uint64_t`, `size_t`, and Win32 `DWORD`. The crash uploader now validates network response, multipart, file-stream, and legacy parser lengths before combining or narrowing them. The parser broker validates external path and thumbnail dimensions/byte counts on both sides of its IPC boundary before they control a buffer or I/O request.
 - **Verification:** `NativeSafetyRegressionTests.External_size_fields_use_checked_arithmetic_before_allocation_or_io` protects the helpers and every current external uploader and parser-broker size field from reverting to unchecked arithmetic.
 
-### 40. Make operation result types explicit
+### 40. Make operation result types explicit — Implemented
 
 - **Justification:** Many paths combine `BOOL`, mutable out parameters, `GetLastError`, and log-only secondary failures. This makes it easy to lose the original cause or treat partial completion as success.
 - **Proposed solution:** Introduce a lightweight result type carrying phase, Win32/HRESULT code, source, destination, retryability, and partial-effect flags. Adapt it back to existing dialogs until callers migrate.
+- **Resolution:** `COperationResult` now carries the complete outcome for durable copy verification and transactional overwrite commits. `ToLegacyBool` supplies the existing progress-dialog `BOOL`/Win32-error contract while further callers migrate.
+- **Verification:** `NativeSafetyRegressionTests.Transactional_copy_results_preserve_phase_error_paths_retryability_and_partial_effects_for_legacy_dialogs` checks the result contract, transactional call sites, compatibility adapter, and implementation ledger.
 
 ### 41. Adopt RAII for kernel handles in touched code
 

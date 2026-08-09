@@ -895,6 +895,8 @@
     </ClInclude>
     <ClInclude Include="..\operation_plan.h">
     </ClInclude>
+    <ClInclude Include="..\operation_result.h">
+    </ClInclude>
     <ClInclude Include="..\file_operation_filesystem.h">
     </ClInclude>
     <ClInclude Include="..\parserbroker.h">

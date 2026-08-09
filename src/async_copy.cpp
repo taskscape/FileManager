@@ -6,6 +6,7 @@
 
 #include "cfgdlg.h"
 #include "file_operation_filesystem.h"
+#include "operation_result.h"
 #include "worker.h"
 #include "execlog.h"
 
@@ -2561,61 +2562,70 @@ static HANDLE OpenTransactionalTargetFile(const char* temporaryName, DWORD desir
 // ReplaceFileW preserves the previous destination until the file system commits the
 // replacement.  If another actor removed the destination after the overwrite prompt,
 // a write-through same-volume rename is the equivalent commit for a newly absent file.
-static BOOL CommitTransactionalTargetFile(const char* targetName, const char* temporaryName,
-                                          const COperation::CFileIdentity& expectedTargetIdentity, DWORD* error)
+static COperationResult CommitTransactionalTargetFile(const char* targetName, const char* temporaryName,
+                                                       const COperation::CFileIdentity& expectedTargetIdentity)
 {
     // A name can be swapped while the temporary copy is being written.  Reopen
     // it without following reparse points and compare both its object ID and
     // handle-resolved final path before ReplaceFileW can touch it.
-    if (!VerifyFileIdentity(targetName, expectedTargetIdentity, error))
-        return FALSE;
+    DWORD error = ERROR_SUCCESS;
+    if (!VerifyFileIdentity(targetName, expectedTargetIdentity, &error))
+        return COperationResult::Failure(orpVerifyDestinationIdentity, error, temporaryName, targetName,
+                                         IsRetryableOperationError(error), opeTemporaryTargetReady);
 
     if (OperationExecutionFileSystem().ReplaceFile(targetName, temporaryName))
-        return TRUE;
+        return COperationResult::Success(orpCommitTransactionalTarget, temporaryName, targetName,
+                                         opeTemporaryTargetReady | opeDestinationCommitted);
 
-    *error = GetLastError();
-    if (*error == ERROR_FILE_NOT_FOUND &&
+    error = GetLastError();
+    if (error == ERROR_FILE_NOT_FOUND &&
         OperationExecutionFileSystem().MoveFile(temporaryName, targetName))
     {
-        return TRUE;
+        return COperationResult::Success(orpCommitTransactionalTarget, temporaryName, targetName,
+                                         opeTemporaryTargetReady | opeDestinationCommitted);
     }
-    if (*error == ERROR_FILE_NOT_FOUND)
-        *error = GetLastError();
-    return FALSE;
+    if (error == ERROR_FILE_NOT_FOUND)
+        error = GetLastError();
+    return COperationResult::Failure(orpCommitTransactionalTarget, error, temporaryName, targetName,
+                                     IsRetryableOperationError(error), opeTemporaryTargetReady);
 }
 
 // A successful write is not a copy commit.  Reopen the closed destination and
 // verify its on-disk file metadata before reporting success, replacing an old
 // target, or allowing a cross-volume move to remove its source.
-static BOOL VerifyDurableCopyCommit(const char* targetName, const CQuadWord& expectedSize, DWORD* error)
+static COperationResult VerifyDurableCopyCommit(const char* targetName, const CQuadWord& expectedSize)
 {
     HANDLE target = HANDLES_Q(CreateFileUtf8(targetName, GENERIC_READ,
                                               FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, NULL,
                                               OPEN_EXISTING, FILE_FLAG_SEQUENTIAL_SCAN, NULL));
     if (target == INVALID_HANDLE_VALUE)
     {
-        *error = GetLastError();
-        return FALSE;
+        DWORD error = GetLastError();
+        return COperationResult::Failure(orpVerifyDurableCopy, error, NULL, targetName,
+                                         IsRetryableOperationError(error));
     }
 
     BY_HANDLE_FILE_INFORMATION information;
     BOOL verified = GetFileInformationByHandle(target, &information);
+    DWORD error = ERROR_SUCCESS;
     if (!verified)
-        *error = GetLastError();
+        error = GetLastError();
     else if ((information.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) != 0 ||
              information.nFileSizeLow != expectedSize.LoDWord ||
              information.nFileSizeHigh != expectedSize.HiDWord)
     {
-        *error = ERROR_WRITE_FAULT;
+        error = ERROR_WRITE_FAULT;
         verified = FALSE;
     }
 
     if (!HANDLES(CloseHandle(target)) && verified)
     {
-        *error = GetLastError();
+        error = GetLastError();
         verified = FALSE;
     }
-    return verified;
+    return verified ? COperationResult::Success(orpVerifyDurableCopy, NULL, targetName) :
+                      COperationResult::Failure(orpVerifyDurableCopy, error, NULL, targetName,
+                                                IsRetryableOperationError(error));
 }
 
 // A post-close size check establishes a durable destination, but it cannot
@@ -4829,7 +4839,8 @@ COPY_AGAIN:
                     }
 
                     DWORD verificationError = NO_ERROR;
-                    while (!VerifyDurableCopyCommit(op->TargetName, op->FileSize, &verificationError))
+                    COperationResult verificationResult = VerifyDurableCopyCommit(op->TargetName, op->FileSize);
+                    while (!verificationResult.ToLegacyBool(&verificationError))
                     {
                         TRACE_I("DoCopyFile(): durable copy commit verification failed for " << op->TargetName << ": " << GetErrorText(verificationError));
                         WaitForSingleObject(dlgData.WorkerNotSuspended, INFINITE); // if we should be in suspend mode, wait ...
@@ -4871,14 +4882,17 @@ COPY_AGAIN:
 
                     if (transactionalTarget)
                     {
-                        DWORD err;
+                        DWORD err = NO_ERROR;
                         if (!script->JournalMarkTemporaryReady())
                         {
                             err = ERROR_WRITE_FAULT;
                             goto COPY_ERROR_2;
                         }
-                        while (!CommitTransactionalTargetFile(requestedTargetName, op->TargetName,
-                                                              op->TargetIdentity, &err))
+                        // The dialog keeps its legacy BOOL/error contract while the
+                        // worker preserves the phase and temporary-target effect for migration.
+                        COperationResult commitResult = CommitTransactionalTargetFile(requestedTargetName, op->TargetName,
+                                                                                       op->TargetIdentity);
+                        while (!commitResult.ToLegacyBool(&err))
                         {
                             TRACE_I("DoCopyFile(): unable to commit transactional overwrite of " << requestedTargetName << ": " << GetErrorText(err));
                             WaitForSingleObject(dlgData.WorkerNotSuspended, INFINITE); // if we should be in suspend mode, wait ...
@@ -4898,6 +4912,8 @@ COPY_AGAIN:
                             switch (ret)
                             {
                             case IDRETRY:
+                                commitResult = CommitTransactionalTargetFile(requestedTargetName, op->TargetName,
+                                                                             op->TargetIdentity);
                                 break;
 
                             case IDB_SKIPALL:
