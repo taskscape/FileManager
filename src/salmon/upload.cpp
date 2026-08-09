@@ -3,89 +3,274 @@
 
 #include "precomp.h"
 
-#include <iostream>
-#define _WINSOCK_DEPRECATED_NO_WARNINGS
-#include <winsock2.h>
+#include <winhttp.h>
 #include <string>
+#include <vector>
 
-using namespace std;
+BOOL AnalyzeResponse(const char* str, int strLen, CUploadParams* uploadParams);
 
-const char* SERVER_NAME = "reports.taskscape.com";
-
-BOOL CreateHTTPOutput(CUploadParams* uploadParams, char** buffer, int* bufferSize)
+namespace
 {
-    BOOL ret = FALSE;
-    char fileNameOnly[MAX_PATH];
-    const char* p = strrchr(uploadParams->FileName, '\\');
-    if (p == NULL)
-        p = uploadParams->FileName;
-    else
-        p++;
-    lstrcpy(fileNameOnly, p);
+const wchar_t kServerName[] = L"reports.taskscape.com";
+const wchar_t kUploadPath[] = L"/api/v1/crash-reports";
+const char kMultipartBoundary[] = "---------------------------OpenSalamanderCrashReport";
+const DWORD kIoBufferSize = 64 * 1024;
+const size_t kMaximumResponseSize = 64 * 1024;
 
-    HANDLE hFile = CreateFile(uploadParams->FileName, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
-    if (hFile != INVALID_HANDLE_VALUE)
-    {
-        DWORD fileSize = GetFileSize(hFile, NULL);
-        if (fileSize != INVALID_FILE_SIZE)
-        {
-            int allocatedSize = (int)(fileSize + 2000); // reserve for HTTP strings
-            char* header = (char*)malloc(allocatedSize);
-            ZeroMemory(header, allocatedSize);
-            if (header != NULL)
-            {
-                char* s = header;
-                sprintf(s, "POST /upload.php HTTP/1.1\r\n");
-                s += strlen(s);
-                sprintf(s, "Host: %s\r\n", SERVER_NAME);
-                s += strlen(s);
-                sprintf(s, "Connection: Keep-Alive\r\n");
-                s += strlen(s);
-                sprintf(s, "Content-Type: multipart/form-data; boundary=---------------------------90721038027008\r\n");
-                s += strlen(s);
-                sprintf(s, "Content-Length: %d\r\n", allocatedSize);
-                s += strlen(s); // hopefully this imprecision will not cause trouble; we will see
-                sprintf(s, "\r\n");
-                s += strlen(s);
-                sprintf(s, "-----------------------------90721038027008\r\n");
-                s += strlen(s);
-                sprintf(s, "Content-Disposition: form-data; name=\"taskscapefile\"; filename=\"%s\"\r\n", fileNameOnly);
-                s += strlen(s); // "protechfile"
-                sprintf(s, "Content-Type: application/octet-stream\r\n");
-                s += strlen(s);
-                sprintf(s, "\r\n");
-                s += strlen(s);
-                int headerSize = (int)strlen(header);
-                DWORD dwBytesRead;
-                if (ReadFile(hFile, s, fileSize, &dwBytesRead, NULL) && dwBytesRead == fileSize)
-                {
-                    s += fileSize;
-                    sprintf(s, "\r\n");
-                    s += strlen(s);
-                    sprintf(s, "-----------------------------90721038027008--\r\n");
-                    s += strlen(s);
-
-                    *buffer = header;
-                    *bufferSize = (int)(s - header) - 1;
-                    ret = TRUE;
-                }
-                else
-                    sprintf(uploadParams->ErrorMessage, LoadStr(IDS_SALMON_READING_FILE, HLanguage), uploadParams->FileName);
-            }
-            else
-                sprintf(uploadParams->ErrorMessage, LoadStr(IDS_SALMON_OUT_OF_MEMORY, HLanguage));
-        }
-        else
-            sprintf(uploadParams->ErrorMessage, LoadStr(IDS_SALMON_FILE_SIZE, HLanguage), uploadParams->FileName);
-
-        CloseHandle(hFile);
-    }
-    else
-        sprintf(uploadParams->ErrorMessage, LoadStr(IDS_SALMON_FILE_OPEN, HLanguage), uploadParams->FileName);
-    return ret;
+void SetWinHttpError(CUploadParams* uploadParams, DWORD error)
+{
+    sprintf(uploadParams->ErrorMessage, LoadStr(IDS_SALMON_HTTP_ERROR, HLanguage), error);
 }
 
-// taken from PHP at http://php.net/manual/en/features.file-upload.errors.php
+void SetHttpStatusError(CUploadParams* uploadParams, DWORD status)
+{
+    sprintf(uploadParams->ErrorMessage, LoadStr(IDS_SALMON_HTTP_STATUS, HLanguage), status);
+}
+
+void FreeProxyConfig(WINHTTP_CURRENT_USER_IE_PROXY_CONFIG* proxyConfig)
+{
+    if (proxyConfig->lpszAutoConfigUrl != NULL)
+        GlobalFree(proxyConfig->lpszAutoConfigUrl);
+    if (proxyConfig->lpszProxy != NULL)
+        GlobalFree(proxyConfig->lpszProxy);
+    if (proxyConfig->lpszProxyBypass != NULL)
+        GlobalFree(proxyConfig->lpszProxyBypass);
+}
+
+// WinHTTP's default proxy configuration supports system-wide explicit proxy
+// settings.  This additionally honours an explicitly configured per-user
+// Internet Settings proxy; PAC and auto-detect settings remain WinHTTP's
+// normal responsibility and are deliberately not interpreted by this code.
+BOOL ConfigureExplicitProxy(HINTERNET session, DWORD* error)
+{
+    WINHTTP_CURRENT_USER_IE_PROXY_CONFIG proxyConfig;
+    ZeroMemory(&proxyConfig, sizeof(proxyConfig));
+    if (!WinHttpGetIEProxyConfigForCurrentUser(&proxyConfig))
+    {
+        DWORD proxyError = GetLastError();
+        if (proxyError == ERROR_FILE_NOT_FOUND)
+            return TRUE;
+        *error = proxyError;
+        return FALSE;
+    }
+
+    BOOL result = TRUE;
+    if (proxyConfig.lpszProxy != NULL && proxyConfig.lpszProxy[0] != L'\0')
+    {
+        WINHTTP_PROXY_INFO proxyInfo;
+        proxyInfo.dwAccessType = WINHTTP_ACCESS_TYPE_NAMED_PROXY;
+        proxyInfo.lpszProxy = proxyConfig.lpszProxy;
+        proxyInfo.lpszProxyBypass = proxyConfig.lpszProxyBypass;
+        result = WinHttpSetOption(session, WINHTTP_OPTION_PROXY, &proxyInfo, sizeof(proxyInfo));
+        if (!result)
+            *error = GetLastError();
+    }
+
+    FreeProxyConfig(&proxyConfig);
+    return result;
+}
+
+BOOL WriteRequestData(HINTERNET request, const void* data, DWORD size, DWORD* error)
+{
+    if (size == 0)
+        return TRUE;
+
+    DWORD written = 0;
+    if (!WinHttpWriteData(request, (LPVOID)data, size, &written) || written != size)
+    {
+        *error = GetLastError();
+        if (*error == ERROR_SUCCESS)
+            *error = ERROR_WRITE_FAULT;
+        return FALSE;
+    }
+    return TRUE;
+}
+
+BOOL ReadResponse(HINTERNET request, std::string* response, DWORD* error)
+{
+    for (;;)
+    {
+        DWORD available = 0;
+        if (!WinHttpQueryDataAvailable(request, &available))
+        {
+            *error = GetLastError();
+            return FALSE;
+        }
+        if (available == 0)
+            return TRUE;
+        if (available > kMaximumResponseSize || response->size() > kMaximumResponseSize - available)
+        {
+            *error = ERROR_INSUFFICIENT_BUFFER;
+            return FALSE;
+        }
+
+        std::vector<char> buffer(available);
+        DWORD read = 0;
+        if (!WinHttpReadData(request, buffer.data(), available, &read))
+        {
+            *error = GetLastError();
+            return FALSE;
+        }
+        response->append(buffer.data(), read);
+    }
+}
+
+BOOL UploadReport(CUploadParams* uploadParams)
+{
+    uploadParams->ErrorMessage[0] = 0;
+
+    const char* fileNameOnly = strrchr(uploadParams->FileName, '\\');
+    fileNameOnly = fileNameOnly == NULL ? uploadParams->FileName : fileNameOnly + 1;
+
+    char multipartPrefix[3 * MAX_PATH + 512];
+    sprintf_s(multipartPrefix, sizeof(multipartPrefix),
+              "--%s\r\n"
+              "Content-Disposition: form-data; name=\"taskscapefile\"; filename=\"%s\"\r\n"
+              "Content-Type: application/octet-stream\r\n\r\n",
+              kMultipartBoundary, fileNameOnly);
+    const char multipartSuffix[] = "\r\n--" "---------------------------OpenSalamanderCrashReport" "--\r\n";
+
+    HANDLE file = CreateFile(uploadParams->FileName, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+    if (file == INVALID_HANDLE_VALUE)
+    {
+        sprintf(uploadParams->ErrorMessage, LoadStr(IDS_SALMON_FILE_OPEN, HLanguage), uploadParams->FileName);
+        return FALSE;
+    }
+
+    BOOL result = FALSE;
+    LARGE_INTEGER fileSize;
+    if (!GetFileSizeEx(file, &fileSize) || fileSize.QuadPart < 0 ||
+        (unsigned __int64)fileSize.QuadPart > MAXDWORD - strlen(multipartPrefix) - strlen(multipartSuffix))
+    {
+        sprintf(uploadParams->ErrorMessage, LoadStr(IDS_SALMON_FILE_SIZE, HLanguage), uploadParams->FileName);
+    }
+    else
+    {
+        DWORD error = ERROR_SUCCESS;
+        HINTERNET session = WinHttpOpen(L"Open Salamander Bug Reporter/1.0", WINHTTP_ACCESS_TYPE_DEFAULT_PROXY,
+                                        WINHTTP_NO_PROXY_NAME, WINHTTP_NO_PROXY_BYPASS, 0);
+        if (session == NULL)
+        {
+            SetWinHttpError(uploadParams, GetLastError());
+        }
+        else
+        {
+            // Bound all network operations; normal certificate-chain and hostname
+            // validation are intentionally left enabled by not changing security flags.
+            WinHttpSetTimeouts(session, 15000, 15000, 30000, 30000);
+            if (!ConfigureExplicitProxy(session, &error))
+            {
+                SetWinHttpError(uploadParams, error);
+            }
+            else
+            {
+                HINTERNET connection = WinHttpConnect(session, kServerName, INTERNET_DEFAULT_HTTPS_PORT, 0);
+                if (connection == NULL)
+                {
+                    SetWinHttpError(uploadParams, GetLastError());
+                }
+                else
+                {
+                    HINTERNET request = WinHttpOpenRequest(connection, L"POST", kUploadPath, NULL, WINHTTP_NO_REFERER,
+                                                            WINHTTP_DEFAULT_ACCEPT_TYPES, WINHTTP_FLAG_SECURE);
+                    if (request == NULL)
+                    {
+                        SetWinHttpError(uploadParams, GetLastError());
+                    }
+                    else
+                    {
+                        // A fixed HTTPS endpoint never follows a redirect, so a server
+                        // cannot downgrade a report to plaintext HTTP.
+                        DWORD disabledFeatures = WINHTTP_DISABLE_REDIRECTS;
+                        if (!WinHttpSetOption(request, WINHTTP_OPTION_DISABLE_FEATURE, &disabledFeatures, sizeof(disabledFeatures)))
+                        {
+                            SetWinHttpError(uploadParams, GetLastError());
+                        }
+                        else
+                        {
+                            const wchar_t contentType[] = L"Content-Type: multipart/form-data; boundary=---------------------------OpenSalamanderCrashReport\r\n";
+                            DWORD totalLength = (DWORD)(strlen(multipartPrefix) + fileSize.QuadPart + strlen(multipartSuffix));
+                            if (!WinHttpSendRequest(request, contentType, (DWORD)-1L, WINHTTP_NO_REQUEST_DATA, 0, totalLength, 0))
+                            {
+                                SetWinHttpError(uploadParams, GetLastError());
+                            }
+                            else if (!WriteRequestData(request, multipartPrefix, (DWORD)strlen(multipartPrefix), &error))
+                            {
+                                SetWinHttpError(uploadParams, error);
+                            }
+                            else
+                            {
+                                std::vector<char> buffer(kIoBufferSize);
+                                BOOL writeSucceeded = TRUE;
+                                for (;;)
+                                {
+                                    DWORD read = 0;
+                                    if (!ReadFile(file, buffer.data(), (DWORD)buffer.size(), &read, NULL))
+                                    {
+                                        error = GetLastError();
+                                        writeSucceeded = FALSE;
+                                        break;
+                                    }
+                                    if (read == 0)
+                                        break;
+                                    if (!WriteRequestData(request, buffer.data(), read, &error))
+                                    {
+                                        writeSucceeded = FALSE;
+                                        break;
+                                    }
+                                }
+
+                                if (!writeSucceeded)
+                                {
+                                    SetWinHttpError(uploadParams, error);
+                                }
+                                else if (!WriteRequestData(request, multipartSuffix, (DWORD)strlen(multipartSuffix), &error))
+                                {
+                                    SetWinHttpError(uploadParams, error);
+                                }
+                                else if (!WinHttpReceiveResponse(request, NULL))
+                                {
+                                    SetWinHttpError(uploadParams, GetLastError());
+                                }
+                                else
+                                {
+                                    DWORD status = 0;
+                                    DWORD statusSize = sizeof(status);
+                                    if (!WinHttpQueryHeaders(request, WINHTTP_QUERY_STATUS_CODE | WINHTTP_QUERY_FLAG_NUMBER,
+                                                             WINHTTP_HEADER_NAME_BY_INDEX, &status, &statusSize, WINHTTP_NO_HEADER_INDEX))
+                                    {
+                                        SetWinHttpError(uploadParams, GetLastError());
+                                    }
+                                    else if (status < 200 || status >= 300)
+                                    {
+                                        SetHttpStatusError(uploadParams, status);
+                                    }
+                                    else
+                                    {
+                                        std::string response;
+                                        if (!ReadResponse(request, &response, &error))
+                                            SetWinHttpError(uploadParams, error);
+                                        else
+                                            result = AnalyzeResponse(response.c_str(), (int)response.size(), uploadParams);
+                                    }
+                                }
+                            }
+                        }
+                        WinHttpCloseHandle(request);
+                    }
+                    WinHttpCloseHandle(connection);
+                }
+            }
+            WinHttpCloseHandle(session);
+        }
+    }
+
+    CloseHandle(file);
+    return result;
+}
+} // namespace
+
+// Server response numeric status values retained for compatibility.
 #define UPLOAD_ERR_OK 0
 #define UPLOAD_ERR_INI_SIZE 1
 #define UPLOAD_ERR_FORM_SIZE 2
@@ -101,81 +286,62 @@ BOOL GetFilesError(int err, CUploadParams* uploadParams)
     switch (err)
     {
     case UPLOAD_ERR_OK:
-    {
         return TRUE;
-    }
 
     case UPLOAD_ERR_INI_SIZE:
     case UPLOAD_ERR_FORM_SIZE:
-    {
         sprintf(uploadParams->ErrorMessage, LoadStr(IDS_SALMON_ERR_INI_SIZE, HLanguage), err);
         break;
-    }
 
     case UPLOAD_ERR_PARTIAL:
-    {
         sprintf(uploadParams->ErrorMessage, LoadStr(IDS_SALMON_ERR_PARTIAL, HLanguage), err);
         break;
-    }
 
     case UPLOAD_ERR_NO_FILE:
-    {
         sprintf(uploadParams->ErrorMessage, LoadStr(IDS_SALMON_ERR_NO_FILE, HLanguage), err);
         break;
-    }
 
     case UPLOAD_ERR_NO_TMP_DIR:
-    {
         sprintf(uploadParams->ErrorMessage, LoadStr(IDS_SALMON_ERR_NO_TMP_DIR, HLanguage), err);
         break;
-    }
 
     case UPLOAD_ERR_CANT_WRITE:
-    {
         sprintf(uploadParams->ErrorMessage, LoadStr(IDS_SALMON_ERR_CANT_WRITE, HLanguage), err);
         break;
-    }
 
     case UPLOAD_ERR_EXTENSION:
-    {
         sprintf(uploadParams->ErrorMessage, LoadStr(IDS_SALMON_ERR_EXTENSION, HLanguage), err);
         break;
-    }
 
     default:
-    {
         sprintf(uploadParams->ErrorMessage, LoadStr(IDS_SALMON_ERR_UNKNOWN, HLanguage), err);
         break;
-    }
     }
     return FALSE;
 }
 
 BOOL AnalyzeResponse(const char* str, int strLen, CUploadParams* uploadParams)
 {
-    // find our response from the PHP script in the form <response>X</response>, where X is
-    // an error from http://php.net/manual/en/features.file-upload.errors.php
-    const char* TAG_OPEN = "<response>";
-    const char* TAG_CLOSE = "</response>";
-    const char* tagOpen = strstr(str, TAG_OPEN);
+    // The v1 endpoint returns <response>X</response>, where X matches the
+    // established upload-result values above.  The response body is bounded
+    // before this parser is called.
+    const char* tagOpen = strstr(str, "<response>");
     if (tagOpen != NULL)
     {
-        const char* numBegin = tagOpen + strlen(TAG_OPEN);
+        const char* numBegin = tagOpen + strlen("<response>");
         const char* num = numBegin;
         while (*num >= '0' && *num <= '9' && num - numBegin < 10 && *num != 0)
             num++;
         if (num > numBegin)
         {
-            const char* tagClose = strstr(num, TAG_CLOSE);
+            const char* tagClose = strstr(num, "</response>");
             if (tagClose == num)
             {
                 char buff[10];
                 lstrcpyn(buff, numBegin, (int)(num - numBegin + 1));
-                int number = atoi(buff);
-                return GetFilesError(number, uploadParams);
+                return GetFilesError(atoi(buff), uploadParams);
             }
-            else
-                sprintf(uploadParams->ErrorMessage, LoadStr(IDS_SALMON_SYNTAX_ERROR_CLOSE, HLanguage));
+            sprintf(uploadParams->ErrorMessage, LoadStr(IDS_SALMON_SYNTAX_ERROR_CLOSE, HLanguage));
         }
         else
             sprintf(uploadParams->ErrorMessage, LoadStr(IDS_SALMON_SYNTAX_ERROR_VALUE, HLanguage));
@@ -188,81 +354,7 @@ BOOL AnalyzeResponse(const char* str, int strLen, CUploadParams* uploadParams)
 DWORD WINAPI UploadThreadF(void* param)
 {
     CUploadParams* uploadParams = (CUploadParams*)param;
-    uploadParams->Result = FALSE;
-
-    char* buffer;
-    int bufferSize;
-    if (CreateHTTPOutput(uploadParams, &buffer, &bufferSize))
-    {
-        // initialize Winsock
-        WSADATA wsaData = {0};
-        int iResult = 0;
-        iResult = WSAStartup(MAKEWORD(2, 2), &wsaData);
-        if (iResult == 0)
-        {
-            // resolve host name
-            struct hostent* remoteHost;
-            remoteHost = gethostbyname(SERVER_NAME);
-            if (remoteHost != NULL)
-            {
-                struct sockaddr_in addr;
-                addr.sin_family = AF_INET;
-                addr.sin_port = htons(80);
-                addr.sin_addr.s_addr = *(unsigned long*)remoteHost->h_addr;
-
-                SOCKET connectSocket;
-                connectSocket = socket(AF_INET, SOCK_STREAM, 0);
-                if (connectSocket != INVALID_SOCKET)
-                {
-                    iResult = connect(connectSocket, (SOCKADDR*)&addr, sizeof(addr));
-                    if (iResult != SOCKET_ERROR)
-                    {
-                        iResult = send(connectSocket, buffer, bufferSize, 0);
-                        if (iResult != SOCKET_ERROR)
-                        {
-                            // shutdown the connection since no more data will be sent
-                            iResult = shutdown(connectSocket, SD_SEND);
-                            if (iResult != SOCKET_ERROR)
-                            {
-                                // Receive until the peer closes the connection
-                                char recvbuf[4096];
-                                ZeroMemory(recvbuf, sizeof(recvbuf));
-                                char* recvptr = recvbuf;
-                                do
-                                {
-                                    iResult = recv(connectSocket, recvptr, sizeof(recvbuf) - (int)(recvptr - recvbuf) - 1, 0);
-                                    if (iResult > 0)
-                                        recvptr += iResult;
-                                    else if (iResult == 0)
-                                        uploadParams->Result = AnalyzeResponse(recvbuf, (int)(recvptr - recvbuf), uploadParams);
-                                    else
-                                        sprintf(uploadParams->ErrorMessage, LoadStr(IDS_SALMON_SOCK_ERR_RECV, HLanguage), WSAGetLastError());
-                                } while (iResult > 0);
-                            }
-                            else
-                                sprintf(uploadParams->ErrorMessage, LoadStr(IDS_SALMON_SOCK_ERR_SHUTDOWN, HLanguage), WSAGetLastError());
-                        }
-                        else
-                            sprintf(uploadParams->ErrorMessage, LoadStr(IDS_SALMON_SOCK_ERR_SEND, HLanguage), WSAGetLastError());
-                    }
-                    else
-                        sprintf(uploadParams->ErrorMessage, LoadStr(IDS_SALMON_SOCK_ERR_CONNECT, HLanguage), WSAGetLastError());
-
-                    closesocket(connectSocket);
-                }
-                else
-                    sprintf(uploadParams->ErrorMessage, LoadStr(IDS_SALMON_SOCK_ERR_SOCKET, HLanguage), WSAGetLastError());
-            }
-            else
-                sprintf(uploadParams->ErrorMessage, LoadStr(IDS_SALMON_SOCK_ERR_HOST, HLanguage), WSAGetLastError());
-
-            WSACleanup();
-        }
-        else
-            sprintf(uploadParams->ErrorMessage, LoadStr(IDS_SALMON_SOCK_ERR_INIT, HLanguage), iResult);
-
-        free(buffer);
-    }
+    uploadParams->Result = UploadReport(uploadParams);
     return EXIT_SUCCESS;
 }
 

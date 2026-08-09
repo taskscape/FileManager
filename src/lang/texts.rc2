@@ -1925,6 +1925,8 @@ STRINGTABLE
  IDS_SALMON_BUGREPORT_PROBLEM "Some problem has occured during the bug report creation:\n%s"
  IDS_SALMON_MINIDUMP_CREATE "Cannot create minidump file %s. Code: %d."
  IDS_SALMON_MINIDUMP_CALL "Error during minidump creation. Code: %d."
+ IDS_SALMON_HTTP_ERROR "Cannot upload the report securely. Code: %d."
+ IDS_SALMON_HTTP_STATUS "The secure crash-report service returned HTTP status %d."
 
 // IDS_SALMON_FAILED, "Starting of Bug Reporter failed. Please pack following bug report using 7-Zip packer and send it to our email address support@taskscape.com.\n\nThank you for helping us improve Open Salamander."
  IDS_SALMON_NOT_RUNNING, "Open Salamander Bug Reporter (salmon.exe) is not running. Open Salamander will not be able to handle potential crashes. Please restart Open Salamander."

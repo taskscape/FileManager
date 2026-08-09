@@ -55,6 +55,40 @@ public sealed class NativeSafetyRegressionTests
         });
     }
 
+    [Test]
+    public void Crash_report_uploads_use_certificate_validated_https_with_explicit_consent()
+    {
+        var root = FindRepositoryRoot();
+        var upload = File.ReadAllText(Path.Combine(root, "src", "salmon", "upload.cpp"));
+        var project = File.ReadAllText(Path.Combine(root, "src", "vcxproj", "salmon", "salmon_base.props"));
+        var dialog = File.ReadAllText(Path.Combine(root, "src", "lang", "lang.rc"));
+        var reporting = File.ReadAllText(Path.Combine(root, "reporting.md"));
+        var refactoring = File.ReadAllText(Path.Combine(root, "refactoring.md"));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(upload, Does.Contain("WinHttpOpen("));
+            Assert.That(upload, Does.Contain("WinHttpConnect(session, kServerName, INTERNET_DEFAULT_HTTPS_PORT"));
+            Assert.That(upload, Does.Contain("WinHttpOpenRequest(connection, L\"POST\", kUploadPath"));
+            Assert.That(upload, Does.Contain("WINHTTP_FLAG_SECURE"));
+            Assert.That(upload, Does.Contain("WINHTTP_DISABLE_REDIRECTS"));
+            Assert.That(upload, Does.Contain("WinHttpGetIEProxyConfigForCurrentUser"));
+            Assert.That(upload, Does.Contain("/api/v1/crash-reports"));
+            Assert.That(upload, Does.Not.Contain("WINHTTP_OPTION_SECURITY_FLAGS"));
+            Assert.That(upload, Does.Not.Contain("winsock2.h"));
+            Assert.That(upload, Does.Not.Contain("http://"));
+            Assert.That(Regex.Matches(upload, @"(?m)^(?!\s*//).*?\b(gethostbyname|connect|send|recv)\s*\(").Count, Is.Zero,
+                        "The crash uploader must not reintroduce raw Winsock transport calls.");
+            Assert.That(project, Does.Contain("winhttp.lib"));
+            Assert.That(project, Does.Not.Contain("Ws2_32.lib"));
+            Assert.That(dialog, Does.Contain("Consent: Send Report uploads this crash archive"));
+            Assert.That(dialog, Does.Contain("over HTTPS"));
+            Assert.That(reporting, Does.Contain("https://reports.taskscape.com/api/v1/crash-reports"));
+            Assert.That(reporting, Does.Contain("http://reports.taskscape.com/upload.php"));
+            Assert.That(refactoring, Does.Contain("### 12. Replace the custom crash uploader with HTTPS WinHTTP — Implemented"));
+        });
+    }
+
     private static string FindRepositoryRoot()
     {
         for (var directory = new DirectoryInfo(AppContext.BaseDirectory); directory is not null; directory = directory.Parent)
