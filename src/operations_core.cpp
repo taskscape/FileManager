@@ -952,9 +952,11 @@ unsigned ThreadWorkerBody(void* parameter)
                                                     dlgData.IgnoreAllSetAttrsErr = dlgData.IgnoreAllCopyPermErr =
                                                         dlgData.IgnoreAllCopyDirTimeErr = dlgData.SkipAllFileOutLossEncr =
                                                             dlgData.FileOutLossEncrAll = dlgData.SkipAllDirCrLossEncr =
-                                                                dlgData.DirCrLossEncrAll = dlgData.IgnoreAllGetFileTimeErr =
-                                                                    dlgData.IgnoreAllSetFileTimeErr = dlgData.SkipAllGetFileTime =
-                                                                        dlgData.SkipAllSetFileTime = FALSE;
+                                                             dlgData.DirCrLossEncrAll = dlgData.IgnoreAllGetFileTimeErr =
+                                                                     dlgData.IgnoreAllSetFileTimeErr = dlgData.SkipAllGetFileTime =
+                                                                         dlgData.SkipAllSetFileTime = FALSE;
+    dlgData.MetadataLosses.Clear();
+    dlgData.KeepSourceAfterMetadataLoss = FALSE;
     dlgData.CnfrmFileOver = Configuration.CnfrmFileOver;
     dlgData.CnfrmDirOver = Configuration.CnfrmDirOver;
     dlgData.CnfrmSHFileOver = Configuration.CnfrmSHFileOver;
@@ -1233,6 +1235,18 @@ unsigned ThreadWorkerBody(void* parameter)
                 SetProgressDialog(hProgressDlg, &pd, dlgData);
 
                 SetProgress(hProgressDlg, 0, CaclProg(totalDone, script->TotalSize), dlgData);
+
+                if (script->IsCopyOrMoveOperation && !script->IsCopyOperation)
+                {
+                    RecordPlannedMetadataLosses(dlgData, script, op->SourceName, NULL);
+                    if (!ConfirmMetadataLossesBeforeSourceDeletion(hProgressDlg, dlgData, op->SourceName, NULL))
+                    {
+                        totalDone += op->Size;
+                        script->SetProgressSize(totalDone);
+                        SetProgress(hProgressDlg, 0, CaclProg(totalDone, script->TotalSize), dlgData);
+                        break; // the user chose to retain this move source
+                    }
+                }
 
                 if (op->Opcode == ocDeleteFile)
                 {

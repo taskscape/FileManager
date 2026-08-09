@@ -354,6 +354,7 @@ BOOL CFilesWindow::MoveFiles(const char* source, const char* target, const char*
                                         GetPathFlagsForCopyOp(targetDir, OPFL_TGTPATH_IS_NET, OPFL_TGTPATH_IS_FAST);
 
             script->TargetPathSupADS = targetSupADS;
+            script->TargetMetadataFileSystem = GetMetadataTargetFileSystem(targetDir);
             //      script->TargetPathSupEFS = targetSupEFS;
 
             DWORD d1, d2, d3, d4;
@@ -622,6 +623,7 @@ BOOL CFilesWindow::BuildScriptMain2(COperations* script, BOOL copy, char* target
     BOOL targetIsFAT32 /*, targetSupEFS*/;
     BOOL targetSupADS = IsPathOnVolumeSupADS(targetPath, &targetIsFAT32);
     script->TargetPathSupADS = targetSupADS;
+    script->TargetMetadataFileSystem = GetMetadataTargetFileSystem(targetPath);
     DWORD srcAndTgtPathsFlags = GetPathFlagsForCopyOp(targetPath, OPFL_TGTPATH_IS_NET, OPFL_TGTPATH_IS_FAST);
     //  script->TargetPathSupEFS = targetSupEFS;
     CTargetPathState targetPathState = GetTargetPathState(tpsUnknown, targetPath);
@@ -1254,6 +1256,7 @@ BOOL CFilesWindow::BuildScriptMain(COperations* script, CActionType type,
         targetSupADS = IsPathOnVolumeSupADS(targetPath, &targetIsFAT32);
         targetPathState = GetTargetPathState(targetPathState, targetPath);
         script->TargetPathSupADS = targetSupADS;
+        script->TargetMetadataFileSystem = GetMetadataTargetFileSystem(targetPath);
         //    script->TargetPathSupEFS = targetSupEFS;
         srcAndTgtPathsFlags |= GetPathFlagsForCopyOp(sourcePath, OPFL_SRCPATH_IS_NET, OPFL_SRCPATH_IS_FAST) |
                                GetPathFlagsForCopyOp(targetPath, OPFL_TGTPATH_IS_NET, OPFL_TGTPATH_IS_FAST);
@@ -1279,6 +1282,7 @@ BOOL CFilesWindow::BuildScriptMain(COperations* script, CActionType type,
                     UpdateWindow(MainWindow->HWindow);
                     if (res == IDNO || res == IDCANCEL) // user chose CANCEL or NO -> abort
                         return FALSE;
+                    script->PlannedMetadataLosses |= mmlSecurity;
                 }
             }
         }
@@ -1853,6 +1857,7 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
                         case IDB_ALL:
                             ConfirmADSLossAll = TRUE; // intentional fallthrough
                         case IDYES:
+                            script->PlannedMetadataLosses |= mmlAlternateDataStreams;
                             break; // we will ignore ADS, so they won't be copied/moved (and will be completely lost)
 
                         case IDB_SKIPALL:
@@ -2737,6 +2742,7 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
                         case IDB_ALL:
                             ConfirmADSLossAll = TRUE; // intentional fallthrough
                         case IDYES:
+                            script->PlannedMetadataLosses |= mmlAlternateDataStreams;
                             break; // we will ignore ADS, so they won't be copied/moved (and will be completely lost)
 
                         case IDB_SKIPALL:

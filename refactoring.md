@@ -210,10 +210,11 @@ This document is the working record for a read-only stability and resilience aud
 - **Delivered:** `tests/FileManager.UiTests/FileOperationUiTests.cs` launches the real executable with fresh source and target panel paths per case. It verifies nested directory creation; file and directory-tree copy, rename, move, and delete; cancelled operation dialogs; invalid destinations/names; and a locked-file delete failure. Assertions read the disposable filesystem directly, and fixture teardown terminates only the launched executable before deleting the workspace.
 - **Remaining scope:** Native fault injection, controlled mid-copy cancellation, cross-volume behavior, restart reconciliation, and metadata fidelity belong to improvements 28, 29, 31-33, and 85.
 
-### 31. Publish an explicit metadata preservation contract
+### 31. Publish an explicit metadata preservation contract — Implemented
 
-- **Justification:** Current code handles timestamps, attributes, some ACL data, and alternate streams, but behavior varies by operation and filesystem. Users cannot tell when fidelity is reduced.
-- **Proposed solution:** Define required, best-effort, and unsupported metadata per NTFS/ReFS/FAT/SMB operation, then make the engine record and display any losses before source deletion.
+- **Delivered:** `architecture.md` defines required, best-effort, and unsupported metadata for NTFS, ReFS, FAT-family, and SMB copy and move operations. `CMetadataPreservationContract` mirrors that taxonomy in the native worker, while the planner records accepted known ADS/ACL losses and the copy engine records actual timestamp, attribute, ACL, ADS, and compression/EFS losses.
+- **Source-deletion gate:** Cross-volume moves now aggregate unacknowledged losses in `CProgressDlgData::MetadataLosses` and display them immediately before every source-file or source-directory deletion. The default response retains the source and changes the remaining move into a copy; only an explicit confirmation permits deletion.
+- **Verification:** `NativeSafetyRegressionTests.Metadata_preservation_contract_records_losses_and_gates_move_source_deletion` checks the contract, planner records, worker gate, localized prompt, and refactoring status.
 
 ### 32. Test alternate data streams end to end
 
