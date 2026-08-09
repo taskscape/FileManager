@@ -442,81 +442,75 @@ HANDLE CreateFileUtf8(const char* fileName, DWORD desiredAccess, DWORD shareMode
                       LPSECURITY_ATTRIBUTES securityAttributes, DWORD creationDisposition,
                       DWORD flagsAndAttributes, HANDLE templateFile)
 {
-    // Use stack buffer for common case (paths under MAX_PATH), heap for long paths
-    WCHAR stackBuf[MAX_PATH];
-    CStrStackOrHeap fileNameW(fileName, stackBuf, MAX_PATH);
-    if (fileNameW == NULL)
+    CWidePath fileNameW(fileName);
+    const WCHAR* apiPath = fileNameW.GetPathForWin32Api();
+    if (apiPath == NULL)
     {
         SetLastError(ERROR_INVALID_PARAMETER);
         return INVALID_HANDLE_VALUE;
     }
-    return CreateFileW(fileNameW, desiredAccess, shareMode, securityAttributes,
+    return CreateFileW(apiPath, desiredAccess, shareMode, securityAttributes,
                        creationDisposition, flagsAndAttributes, templateFile);
 }
 
 BOOL DeleteFileUtf8(const char* fileName)
 {
-    // Use stack buffer for common case (paths under MAX_PATH), heap for long paths
-    WCHAR stackBuf[MAX_PATH];
-    CStrStackOrHeap fileNameW(fileName, stackBuf, MAX_PATH);
-    if (fileNameW == NULL)
+    CWidePath fileNameW(fileName);
+    const WCHAR* apiPath = fileNameW.GetPathForWin32Api();
+    if (apiPath == NULL)
     {
         SetLastError(ERROR_INVALID_PARAMETER);
         return FALSE;
     }
-    return DeleteFileW(fileNameW);
+    return DeleteFileW(apiPath);
 }
 
 BOOL CreateDirectoryUtf8(const char* dirName, LPSECURITY_ATTRIBUTES securityAttributes)
 {
-    // Use stack buffer for common case (paths under MAX_PATH), heap for long paths
-    WCHAR stackBuf[MAX_PATH];
-    CStrStackOrHeap dirNameW(dirName, stackBuf, MAX_PATH);
-    if (dirNameW == NULL)
+    CWidePath dirNameW(dirName);
+    const WCHAR* apiPath = dirNameW.GetPathForWin32Api();
+    if (apiPath == NULL)
     {
         SetLastError(ERROR_INVALID_PARAMETER);
         return FALSE;
     }
-    return CreateDirectoryW(dirNameW, securityAttributes);
+    return CreateDirectoryW(apiPath, securityAttributes);
 }
 
 BOOL RemoveDirectoryUtf8(const char* dirName)
 {
-    // Use stack buffer for common case (paths under MAX_PATH), heap for long paths
-    WCHAR stackBuf[MAX_PATH];
-    CStrStackOrHeap dirNameW(dirName, stackBuf, MAX_PATH);
-    if (dirNameW == NULL)
+    CWidePath dirNameW(dirName);
+    const WCHAR* apiPath = dirNameW.GetPathForWin32Api();
+    if (apiPath == NULL)
     {
         SetLastError(ERROR_INVALID_PARAMETER);
         return FALSE;
     }
-    return RemoveDirectoryW(dirNameW);
+    return RemoveDirectoryW(apiPath);
 }
 
 BOOL SetFileAttributesUtf8(const char* fileName, DWORD attrs)
 {
-    // Use stack buffer for common case (paths under MAX_PATH), heap for long paths
-    WCHAR stackBuf[MAX_PATH];
-    CStrStackOrHeap fileNameW(fileName, stackBuf, MAX_PATH);
-    if (fileNameW == NULL)
+    CWidePath fileNameW(fileName);
+    const WCHAR* apiPath = fileNameW.GetPathForWin32Api();
+    if (apiPath == NULL)
     {
         SetLastError(ERROR_INVALID_PARAMETER);
         return FALSE;
     }
-    return SetFileAttributesW(fileNameW, attrs);
+    return SetFileAttributesW(apiPath, attrs);
 }
 
 DWORD GetFileAttributesUtf8(const char* fileName)
 {
-    // Use stack buffer for common case (paths under MAX_PATH), heap for long paths
-    WCHAR stackBuf[MAX_PATH];
-    CStrStackOrHeap fileNameW(fileName, stackBuf, MAX_PATH);
-    if (fileNameW == NULL)
+    CWidePath fileNameW(fileName);
+    const WCHAR* apiPath = fileNameW.GetPathForWin32Api();
+    if (apiPath == NULL)
     {
         SetLastError(ERROR_INVALID_PARAMETER);
         return INVALID_FILE_ATTRIBUTES;
     }
-    return GetFileAttributesW(fileNameW);
+    return GetFileAttributesW(apiPath);
 }
 
 WCHAR* DupStr(const WCHAR* txt)

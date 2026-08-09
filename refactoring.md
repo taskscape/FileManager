@@ -233,10 +233,11 @@ This document is the working record for a read-only stability and resilience aud
 - **Deletion policy:** The existing identity-checked `FILE_FLAG_OPEN_REPARSE_POINT` delete path continues to target the link itself. `DoDeleteDirLinkAux` accepts only mount-point/junction and symbolic-link tags; unknown tags fail with `ERROR_REPARSE_TAG_MISMATCH`, never by resolving their target.
 - **Verification:** `ReparsePointTopologyUiTests` constructs disposable junctions with an outside target, a changed target, and a cycle before launch. It proves copying does not materialize or traverse either target and proves deletion removes only the junction. `NativeSafetyRegressionTests.Reparse_point_policy_never_traverses_or_hydrates_unselected_targets` ratchets the source policy, placeholder handling, unknown-tag refusal, topology coverage, and documentation.
 
-### 35. Introduce a dynamic wide-path abstraction
+### 35. Introduce a dynamic wide-path abstraction — Implemented
 
 - **Justification:** Core code contains thousands of `MAX_PATH` uses and repeated UTF-8-to-wide conversions into fixed buffers. Long, deeply nested, and multi-byte paths can fail or truncate unpredictably.
-- **Proposed solution:** Use dynamically sized UTF-16 paths at Win32 boundaries, preserve display strings separately, normalize only when required by a specific API, and support extended-length syntax consistently.
+- **Implemented:** `CWidePath` now owns dynamically sized UTF-16 display and Win32 API spellings at the common boundary. It retains the caller's UTF-8 display string, converts strictly with the existing compatibility fallback, and only resolves an absolute path when the consuming API requires it. Long drive and UNC paths are consistently emitted as `\\?\` and `\\?\UNC\` respectively. Core file, directory, attribute, enumeration, and secure DLL-loading wrappers now consume its API spelling, while diagnostics continue to use the display spelling.
+- **Verification:** `NativeSafetyRegressionTests.Win32_path_boundaries_use_owned_wide_paths_and_extended_length_syntax` guards dynamic conversion, display/API separation, dynamic full-path sizing, drive/UNC extended prefixes, and the migrated wrapper boundaries.
 
 ### 36. Ban new fixed `MAX_PATH` buffers
 

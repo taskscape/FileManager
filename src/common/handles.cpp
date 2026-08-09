@@ -16,24 +16,6 @@
 
 #ifdef HANDLES_ENABLE
 
-static WCHAR* Utf8AllocWideHandles(const char* src)
-{
-    if (src == NULL)
-        return NULL;
-    int len = MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, src, -1, NULL, 0);
-    if (len <= 0)
-        return NULL;
-    WCHAR* buf = (WCHAR*)malloc(len * sizeof(WCHAR));
-    if (buf == NULL)
-        return NULL;
-    if (MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, src, -1, buf, len) == 0)
-    {
-        free(buf);
-        return NULL;
-    }
-    return buf;
-}
-
 static BOOL ConvertFindDataWToUtf8Local(const WIN32_FIND_DATAW* src, WIN32_FIND_DATAA* dst)
 {
     if (dst == NULL || src == NULL)
@@ -1005,14 +987,15 @@ C__Handles::CreateFileUtf8(LPCSTR lpFileName, DWORD dwDesiredAccess,
                            HANDLE hTemplateFile)
 {
     HANDLE ret = INVALID_HANDLE_VALUE;
-    WCHAR* fileNameW = Utf8AllocWideHandles(lpFileName);
-    if (fileNameW == NULL)
+    CWidePath fileNameW(lpFileName);
+    const WCHAR* apiPath = fileNameW.GetPathForWin32Api();
+    if (apiPath == NULL)
     {
         SetLastError(ERROR_NO_UNICODE_TRANSLATION);
     }
     else
     {
-        ret = ::CreateFileW(fileNameW, dwDesiredAccess, dwShareMode,
+        ret = ::CreateFileW(apiPath, dwDesiredAccess, dwShareMode,
                             lpSecurityAttributes, dwCreationDisposition,
                             dwFlagsAndAttributes, hTemplateFile);
     }
@@ -1023,11 +1006,11 @@ C__Handles::CreateFileUtf8(LPCSTR lpFileName, DWORD dwDesiredAccess,
     if (ret == INVALID_HANDLE_VALUE)
     {
         DWORD err = GetLastError();
-        if (fileNameW != NULL)
+        if (fileNameW.IsValid())
         {
             _snwprintf_s(paramsWBuf, _TRUNCATE,
                          L"dwDesiredAccess=0x%X,\ndwShareMode=0x%X,\ndwCreationDisposition=0x%X,\ndwFlagsAndAttributes=0x%X,\nlpFileName=%s",
-                         dwDesiredAccess, dwShareMode, dwCreationDisposition, dwFlagsAndAttributes, fileNameW);
+                         dwDesiredAccess, dwShareMode, dwCreationDisposition, dwFlagsAndAttributes, fileNameW.GetDisplayPath());
             paramsW = paramsWBuf;
         }
         else
@@ -1040,8 +1023,6 @@ C__Handles::CreateFileUtf8(LPCSTR lpFileName, DWORD dwDesiredAccess,
         }
         SetLastError(err);
     }
-    if (fileNameW != NULL)
-        free(fileNameW);
     CheckCreate(ret != INVALID_HANDLE_VALUE, __htFile, __hoCreateFile, ret, GetLastError(), TRUE, NULL, paramsA, paramsW);
     return ret;
 }
@@ -2140,20 +2121,19 @@ HANDLE
 C__Handles::FindFirstFileUtf8(LPCSTR lpFileName, LPWIN32_FIND_DATAA lpFindFileData)
 {
     HANDLE ret = INVALID_HANDLE_VALUE;
-    WCHAR* fileNameW = Utf8AllocWideHandles(lpFileName);
-    if (fileNameW == NULL)
+    CWidePath fileNameW(lpFileName);
+    const WCHAR* apiPath = fileNameW.GetPathForWin32Api();
+    if (apiPath == NULL)
     {
         SetLastError(ERROR_NO_UNICODE_TRANSLATION);
     }
     else
     {
         WIN32_FIND_DATAW dataW;
-        ret = ::FindFirstFileW(fileNameW, &dataW);
+        ret = ::FindFirstFileW(apiPath, &dataW);
         if (ret != INVALID_HANDLE_VALUE && lpFindFileData != NULL)
             ConvertFindDataWToUtf8Local(&dataW, lpFindFileData);
     }
-    if (fileNameW != NULL)
-        free(fileNameW);
     CheckCreate(ret != INVALID_HANDLE_VALUE, __htFindFile, __hoFindFirstFile,
                 ret, GetLastError(), TRUE, NULL, lpFileName);
     return ret;
@@ -2211,45 +2191,22 @@ HINSTANCE
 C__Handles::LoadLibraryUtf8(LPCSTR lpLibFileName)
 {
     HINSTANCE ret = NULL;
-    WCHAR* fileNameW = Utf8AllocWideHandles(lpLibFileName);
-    if (fileNameW == NULL)
+    CWidePath fileNameW(lpLibFileName);
+    const WCHAR* fullPath = fileNameW.GetFullPathForWin32Api();
+    if (fullPath == NULL)
     {
         SetLastError(ERROR_NO_UNICODE_TRANSLATION);
     }
     else
     {
-        DWORD fullPathLength = GetFullPathNameW(fileNameW, 0, NULL, NULL);
-        if (fullPathLength != 0)
-        {
-            WCHAR* fullPath = (WCHAR*)malloc(fullPathLength * sizeof(WCHAR));
-            if (fullPath == NULL)
-            {
-                SetLastError(ERROR_NOT_ENOUGH_MEMORY);
-            }
-            else
-            {
-                DWORD copiedLength = GetFullPathNameW(fileNameW, fullPathLength, fullPath, NULL);
-                if (copiedLength == 0 || copiedLength >= fullPathLength)
-                {
-                    if (copiedLength >= fullPathLength)
-                        SetLastError(ERROR_INSUFFICIENT_BUFFER);
-                }
-                else
-                {
-                    const DWORD loadFlags = LOAD_LIBRARY_SEARCH_DLL_LOAD_DIR |
-                                            LOAD_LIBRARY_SEARCH_SYSTEM32 |
-                                            LOAD_LIBRARY_SEARCH_USER_DIRS;
-                    ret = ::LoadLibraryExW(fullPath, NULL, loadFlags);
-                }
-                free(fullPath);
-            }
-        }
+        const DWORD loadFlags = LOAD_LIBRARY_SEARCH_DLL_LOAD_DIR |
+                                LOAD_LIBRARY_SEARCH_SYSTEM32 |
+                                LOAD_LIBRARY_SEARCH_USER_DIRS;
+        ret = ::LoadLibraryExW(fullPath, NULL, loadFlags);
     }
     DWORD err = GetLastError();
-    CheckCreate(ret != NULL, __htLibrary, __hoLoadLibrary, ret, err, TRUE, NULL, lpLibFileName, fileNameW);
+    CheckCreate(ret != NULL, __htLibrary, __hoLoadLibrary, ret, err, TRUE, NULL, lpLibFileName, fileNameW.GetDisplayPath());
     SetLastError(err);
-    if (fileNameW != NULL)
-        free(fileNameW);
     return ret;
 }
 
