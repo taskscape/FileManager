@@ -28,4 +28,11 @@ internal static class UiTestSettings
         if (string.IsNullOrWhiteSpace(ExecutablePath) || !File.Exists(ExecutablePath))
             Assert.Ignore("Set FILEMANAGER_UI_EXE to an existing FileManager executable before running UI tests.");
     }
+
+    internal static void RequireConfigurationFaultInjection()
+    {
+        RequireIsolatedProfile();
+        if (!string.Equals(Environment.GetEnvironmentVariable("FILEMANAGER_UI_CONFIG_FAULT_INJECTION"), "1", StringComparison.Ordinal))
+            Assert.Ignore("Set FILEMANAGER_UI_CONFIG_FAULT_INJECTION=1 to run the exhaustive configuration write-boundary recovery test.");
+    }
 }

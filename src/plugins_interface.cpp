@@ -141,9 +141,11 @@ BOOL SaveIconList(HKEY hKey, const char* valueName, CIconList* iconList)
     DWORD rawPNGSize;
     if (iconList->SaveToPNG(&rawPNG, &rawPNGSize))
     {
-        LONG res = RegSetValueEx(hKey, valueName, 0, REG_BINARY, rawPNG, rawPNGSize);
+        // Route through the host registry boundary so transactional configuration saves
+        // retain their normal error handling and fault-injection coverage for this value.
+        BOOL saved = SetValue(hKey, valueName, REG_BINARY, rawPNG, rawPNGSize);
         free(rawPNG);
-        return TRUE;
+        return saved;
     }
     else
         return FALSE;

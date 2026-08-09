@@ -22,6 +22,7 @@
 #include "logo.h"
 #include "tasklist.h"
 #include "pwdmngr.h"
+#include "regwork.h"
 
 //
 // ConfigVersion - version number of the loaded configuration
@@ -716,11 +717,11 @@ static BOOL CommitConfigurationTransaction(HKEY storeKey, HKEY generationKey, DW
                               &checksum, sizeof(checksum)) &&
                      SetValue(generationKey, CONFIGURATION_TRANSACTION_COMPLETE_REG, REG_DWORD,
                               &complete, sizeof(complete)) &&
-                     RegFlushKey(generationKey) == ERROR_SUCCESS &&
+                     FlushConfigurationRegistryKey(generationKey) == ERROR_SUCCESS &&
                      IsCommittedConfigurationGeneration(generationKey) &&
                      SetValue(storeKey, CONFIGURATION_ACTIVE_GENERATION_REG, REG_DWORD,
                               &generation, sizeof(generation)) &&
-                     RegFlushKey(storeKey) == ERROR_SUCCESS;
+                     FlushConfigurationRegistryKey(storeKey) == ERROR_SUCCESS;
     if (committed)
     {
         _snprintf_s(ActiveConfigurationRoot, _TRUNCATE, "%s\\%s\\%s", ConfigurationStoreRoot,
@@ -1858,6 +1859,7 @@ void CMainWindow::SaveConfig(HWND parent)
     }
 
     ConfigSaveInProgress = TRUE;
+    BeginConfigurationWriteFaultInjection();
     // Normal saves use the existing worker so registry I/O yields to the UI message loop without a modal wait window.
     const BOOL registryWorkerStarted = GlobalSaveWaitWindow == NULL && !CriticalShutdown &&
                                       RegistryWorkerThread.StartThread();
@@ -2805,6 +2807,7 @@ void CMainWindow::SaveConfig(HWND parent)
         RegistryWorkerThread.StopThread();
 
     ConfigSaveInProgress = FALSE;
+    EndConfigurationWriteFaultInjection();
     if (ConfigSaveQueued && !CriticalShutdown)
     {
         // A later commit arrived while this save yielded to the UI, so debounce one follow-up snapshot.
