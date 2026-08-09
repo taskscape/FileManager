@@ -558,8 +558,9 @@ LRESULT CMainWindow::HandleShutdown(UINT uMsg, WPARAM wParam, LPARAM lParam)
 
         if (uMsg == WM_QUERYENDSESSION && (lParam & ENDSESSION_CRITICAL) != 0) // this applies to Vista+
         {
-            BOOL cfgOK = FALSE;
-            if (SALAMANDER_ROOT_REG != NULL)
+            const BOOL transactionalConfig = UsesTransactionalConfigurationStore();
+            BOOL cfgOK = transactionalConfig;
+            if (SALAMANDER_ROOT_REG != NULL && !transactionalConfig)
             {
                 // ensure exclusive access to the configuration in the registry
                 LoadSaveToRegistryMutex.Enter();
@@ -579,8 +580,8 @@ LRESULT CMainWindow::HandleShutdown(UINT uMsg, WPARAM wParam, LPARAM lParam)
                                                      // NOTE: LoadSaveToRegistryMutex.Leave() is called again in WM_ENDSESSION after saving the config (see below)
             }
 
-            BOOL backupOK = FALSE;
-            if (cfgOK) // old configuration seems OK; back it up in case saving the new configuration fails
+            BOOL backupOK = transactionalConfig;
+            if (cfgOK && !transactionalConfig) // old configuration seems OK; back it up in case saving the new configuration fails
             {
                 char backup[200];
                 sprintf_s(backup, "%s.backup.63A7CD13", SALAMANDER_ROOT_REG); // "63A7CD13" prevents the key name from matching a user key
