@@ -54,6 +54,7 @@ Name: "quicklaunchicon"; Description: "{cm:CreateQuickLaunchIcon}"; GroupDescrip
 ; Main executables
 Source: "{#SourcePath}\salamand.exe"; DestDir: "{app}"; Flags: ignoreversion
 Source: "{#SourcePath}\salmon.exe"; DestDir: "{app}"; Flags: ignoreversion
+Source: "{#SourcePath}\salbroker.exe"; DestDir: "{app}"; Flags: ignoreversion
 
 ; Shell extensions live under utils and are registered by Salamander on first run.
 Source: "{#SourcePath}\utils\salextx64.dll"; DestDir: "{app}\utils"; Flags: ignoreversion

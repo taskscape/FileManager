@@ -152,6 +152,8 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "salextx64", "shellext\salex
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "salopen", "salopen\salopen.vcxproj", "{0606C52C-9DA4-468B-B7A6-5C53A360EA91}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "salbroker", "salbroker\salbroker.vcxproj", "{D9FB52B1-6B50-4F11-9880-9BAA0E099B16}"
+EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "salspawn", "salspawn\salspawn.vcxproj", "{C610C287-BC1E-4FAE-9BF4-A1CB68986746}"
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "zip2sfx", "..\plugins\zip\vcxproj\zip2sfx\zip2sfx.vcxproj", "{53D8DB2B-C867-4B87-AB47-68E0ACEB691B}"
@@ -972,6 +974,14 @@ Global
 		{53D8DB2B-C867-4B87-AB47-68E0ACEB691B}.Utils (Release)|Win32.Build.0 = Release|Win32
 		{53D8DB2B-C867-4B87-AB47-68E0ACEB691B}.Utils (Release)|x64.ActiveCfg = Release|Win32
 		{53D8DB2B-C867-4B87-AB47-68E0ACEB691B}.Utils (Release)|x64.Build.0 = Release|Win32
+		{D9FB52B1-6B50-4F11-9880-9BAA0E099B16}.Debug|Win32.ActiveCfg = Debug|Win32
+		{D9FB52B1-6B50-4F11-9880-9BAA0E099B16}.Debug|Win32.Build.0 = Debug|Win32
+		{D9FB52B1-6B50-4F11-9880-9BAA0E099B16}.Debug|x64.ActiveCfg = Debug|x64
+		{D9FB52B1-6B50-4F11-9880-9BAA0E099B16}.Debug|x64.Build.0 = Debug|x64
+		{D9FB52B1-6B50-4F11-9880-9BAA0E099B16}.Release|Win32.ActiveCfg = Release|Win32
+		{D9FB52B1-6B50-4F11-9880-9BAA0E099B16}.Release|Win32.Build.0 = Release|Win32
+		{D9FB52B1-6B50-4F11-9880-9BAA0E099B16}.Release|x64.ActiveCfg = Release|x64
+		{D9FB52B1-6B50-4F11-9880-9BAA0E099B16}.Release|x64.Build.0 = Release|x64
 		{41909C30-FBE0-46CD-8B37-362D5A1F8329}.Debug|Win32.ActiveCfg = Debug|Win32
 		{41909C30-FBE0-46CD-8B37-362D5A1F8329}.Debug|Win32.Build.0 = Debug|Win32
 		{41909C30-FBE0-46CD-8B37-362D5A1F8329}.Debug|x64.ActiveCfg = Debug|x64

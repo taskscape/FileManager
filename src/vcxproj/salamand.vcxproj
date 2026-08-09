@@ -373,6 +373,8 @@
     </ClCompile>
     <ClCompile Include="..\fileswindow_init.cpp">
     </ClCompile>
+    <ClCompile Include="..\parserbroker.cpp">
+    </ClCompile>
     <ClCompile Include="..\fileswindow_execute.cpp">
     </ClCompile>
     <ClCompile Include="..\fileswindow_navigation.cpp">
@@ -887,6 +889,10 @@
     </ClInclude>
     <ClInclude Include="..\operation_journal.h">
     </ClInclude>
+    <ClInclude Include="..\parserbroker.h">
+    </ClInclude>
+    <ClInclude Include="..\parserbroker_protocol.h">
+    </ClInclude>
     <ClInclude Include="..\zip.h">
     </ClInclude>
   </ItemGroup>
@@ -977,12 +983,19 @@
     </ResourceCompile>
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="salbroker\salbroker.vcxproj">
+      <Project>{d9fb52b1-6b50-4f11-9880-9baa0e099b16}</Project>
+      <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
+    </ProjectReference>
     <ProjectReference Include="lang.vcxproj">
       <Project>{7c7059ba-1fce-4c36-b0b3-d095779cf89f}</Project>
       <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
     </ProjectReference>
   </ItemGroup>
   <ItemDefinitionGroup>
+    <Link>
+      <AdditionalDependencies>advapi32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+    </Link>
     <PostBuildEvent>
       <Command>robocopy ..\res\toolbars "$(OutDir)toolbars" /E /XO /NP /NJS /NJH
 if %errorlevel% leq 1 exit 0 else exit %errorlevel%</Command>

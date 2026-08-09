@@ -16,6 +16,7 @@
 #include "shellib.h"
 #include "pack.h"
 #include "thumbnl.h"
+#include "parserbroker.h"
 #include "geticon.h"
 #include "shiconov.h"
 
@@ -896,31 +897,24 @@ unsigned IconThreadThreadFBody(void* parameter)
                                             shi.hIcon = NULL; // precaution against incorrect icon deallocation (none is created here)
 
                                             char* s = iconData->NameAndData;
-                                            int len = (int)strlen(s);
-                                            int size = len + 4;
-                                            size -= (size & 0x3); // size % 4 (alignment to four bytes)
                                             if (strlen(s) + (name - path) < MAX_PATH)
                                             {
                                                 strcpy(name, s);
 
                                                 //                          TRACE_I("Load thumbnail for: " << name << "...");
-                                                CPluginInterfaceForThumbLoaderEncapsulation** loader;
-                                                loader = (CPluginInterfaceForThumbLoaderEncapsulation**)(s + size + sizeof(CQuadWord) + sizeof(FILETIME));
-                                                while (*loader != NULL)
+                                                int thumbnailSize = window->GetThumbnailSize();
+                                                thumbMaker.Clear(thumbnailSize);
+                                                CALL_STACK_MESSAGE3("IconThreadThreadFBody::LoadThumbnailInBroker(%s, %d)", path, wanted == 4);
+                                                // Thumbnail providers parse attacker-controlled bytes. Do not fall
+                                                // back to their in-process SDK callback when the broker is unavailable:
+                                                // a missing thumbnail is recoverable, a corrupted host is not.
+                                                if (ParserBroker.LoadThumbnail(path, thumbnailSize, thumbnailSize, wanted == 4, &thumbMaker))
                                                 {
-                                                    int thumbnailSize = window->GetThumbnailSize();
-                                                    thumbMaker.Clear(thumbnailSize);
-                                                    CALL_STACK_MESSAGE3("IconThreadThreadFBody::LoadThumbnail(%s, %d)", path, wanted == 4);
-                                                    if ((*loader)->LoadThumbnail(path, thumbnailSize, thumbnailSize, &thumbMaker, wanted == 4))
-                                                    {
-                                                        thumbnailFlag = wanted == 4 /* first thumbnail loading round */ ? (thumbMaker.IsOnlyPreview() ? 6 /* low-quality/smaller */ : 5 /* quality */) : 5 /* in the second round all obtained thumbnails are quality */;
-                                                        thumbMaker.HandleIncompleteImages();
-                                                        break; // the thumbnail may be loaded; do not try another plug-in
-                                                    }
-                                                    loader++; // try the next plug-in in line, it might load the thumbnail
+                                                    thumbnailFlag = wanted == 4 /* first thumbnail loading round */ ? (thumbMaker.IsOnlyPreview() ? 6 /* low-quality/smaller */ : 5 /* quality */) : 5 /* in the second round all obtained thumbnails are quality */;
+                                                    thumbMaker.HandleIncompleteImages();
                                                 }
-                                                if (*loader == NULL)
-                                                    thumbMaker.Clear(); // failed thumbnail -> clean it up
+                                                else
+                                                    thumbMaker.Clear(); // failed broker job -> clean it up
                                                                         //                          TRACE_I("Load thumbnail is done.");
                                             }
                                             else
