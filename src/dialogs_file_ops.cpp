@@ -1046,6 +1046,14 @@ CProgressDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
             *(int*)data[0] = (int)dlg.Execute();
             break;
         }
+
+        case 13:
+        {
+            *(int*)data[0] = SalMessageBox(HWindow, data[1], LoadStr(IDS_QUESTION),
+                                            MB_YESNO | MB_DEFBUTTON2 | MB_ICONEXCLAMATION |
+                                                MSGBOXEX_ESCAPEENABLED);
+            break;
+        }
         }
 
         StatusPaused = FALSE; // now time-left and speed can be displayed again

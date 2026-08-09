@@ -384,6 +384,61 @@ public sealed class NativeSafetyRegressionTests
         });
     }
 
+    [Test]
+    public void Metadata_preservation_contract_records_losses_and_gates_move_source_deletion()
+    {
+        var root = FindRepositoryRoot();
+        var workerHeader = File.ReadAllText(Path.Combine(root, "src", "worker.h"));
+        var worker = File.ReadAllText(Path.Combine(root, "src", "worker.cpp"));
+        var planner = File.ReadAllText(Path.Combine(root, "src", "fileswindow_operations.cpp"));
+        var copy = File.ReadAllText(Path.Combine(root, "src", "async_copy.cpp"));
+        var operations = File.ReadAllText(Path.Combine(root, "src", "operations_core.cpp"));
+        var dialogs = File.ReadAllText(Path.Combine(root, "src", "dialogs_file_ops.cpp"));
+        var strings = File.ReadAllText(Path.Combine(root, "src", "lang", "texts.rc2"));
+        var architecture = File.ReadAllText(Path.Combine(root, "architecture.md"));
+        var refactoring = File.ReadAllText(Path.Combine(root, "refactoring.md"));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(workerHeader, Does.Contain("enum EMetadataPreservation"));
+            Assert.That(workerHeader, Does.Contain("mpRequired"));
+            Assert.That(workerHeader, Does.Contain("mpBestEffort"));
+            Assert.That(workerHeader, Does.Contain("mpUnsupported"));
+            Assert.That(workerHeader, Does.Contain("enum EMetadataTargetFileSystem"));
+            Assert.That(workerHeader, Does.Contain("mtfsNtfs"));
+            Assert.That(workerHeader, Does.Contain("mtfsRefs"));
+            Assert.That(workerHeader, Does.Contain("mtfsFat"));
+            Assert.That(workerHeader, Does.Contain("mtfsSmb"));
+            Assert.That(workerHeader, Does.Contain("struct CMetadataLossRecord"));
+            Assert.That(workerHeader, Does.Contain("CMetadataLossRecord MetadataLosses"));
+            Assert.That(worker, Does.Contain("PlannedMetadataLosses = mmlNone"));
+            Assert.That(planner, Does.Contain("GetMetadataTargetFileSystem(targetPath)"));
+            Assert.That(planner, Does.Contain("script->PlannedMetadataLosses |= mmlAlternateDataStreams"));
+            Assert.That(planner, Does.Contain("script->PlannedMetadataLosses |= mmlSecurity"));
+            Assert.That(copy, Does.Contain("GetMetadataPreservationContract(EMetadataOperation operation"));
+            Assert.That(copy, Does.Contain("RecordMetadataLoss(dlgData, mmlAlternateDataStreams"));
+            Assert.That(copy, Does.Contain("RecordMetadataLoss(dlgData, mmlLastWriteTime"));
+            Assert.That(copy, Does.Contain("RecordMetadataLoss(dlgData, mmlSecurity"));
+            Assert.That(copy, Does.Contain("RecordPlannedMetadataLosses(dlgData, script, op->SourceName, op->TargetName)"));
+            Assert.That(copy, Does.Contain("ConfirmMetadataLossesBeforeSourceDeletion(hProgressDlg, dlgData, op->SourceName, op->TargetName)"));
+            Assert.That(copy.IndexOf("ConfirmMetadataLossesBeforeSourceDeletion(hProgressDlg, dlgData, op->SourceName, op->TargetName)", StringComparison.Ordinal),
+                        Is.LessThan(copy.IndexOf("DeleteFileWithVerifiedIdentity(op->SourceName", StringComparison.Ordinal)),
+                        "A cross-volume move must ask about recorded metadata loss before deleting its source.");
+            Assert.That(operations, Does.Contain("RecordPlannedMetadataLosses(dlgData, script, op->SourceName, NULL)"));
+            Assert.That(operations, Does.Contain("ConfirmMetadataLossesBeforeSourceDeletion(hProgressDlg, dlgData, op->SourceName, NULL)"));
+            Assert.That(dialogs, Does.Contain("case 13:"));
+            Assert.That(dialogs, Does.Contain("MB_YESNO | MB_DEFBUTTON2"));
+            Assert.That(strings, Does.Contain("IDS_METADATALOSS_BEFORESOURCEDELETE"));
+            Assert.That(architecture, Does.Contain("#### 5.2.1 Metadata preservation contract"));
+            Assert.That(architecture, Does.Contain("Copy to NTFS"));
+            Assert.That(architecture, Does.Contain("Copy to ReFS"));
+            Assert.That(architecture, Does.Contain("Copy to FAT/FAT32/exFAT"));
+            Assert.That(architecture, Does.Contain("Copy to SMB"));
+            Assert.That(architecture, Does.Contain("only an explicit **Yes** allows source deletion"));
+            Assert.That(refactoring, Does.Contain("### 31. Publish an explicit metadata preservation contract — Implemented"));
+        });
+    }
+
     private static string FindRepositoryRoot()
     {
         for (var directory = new DirectoryInfo(AppContext.BaseDirectory); directory is not null; directory = directory.Parent)

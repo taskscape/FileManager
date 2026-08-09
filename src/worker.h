@@ -291,6 +291,73 @@ public:
 #define OPFL_TGTPATH_IS_FAST 0x00000040      // the target path is a disk, USB disk, flash drive, flash-card reader, CD, DVD, or RAM disk (not a network or floppy)
 #define OPFL_IGNORE_INVALID_NAME 0x00000080  // skip the name validity test (for directories: unchanged name = do not flag as invalid)
 
+// The preservation contract is intentionally kept close to the operation
+// model.  A cross-volume move is a copy followed by a destructive step, so
+// the worker must retain an auditable account of any metadata it could not
+// preserve until that step has been explicitly approved.
+enum EMetadataPreservation
+{
+    mpRequired,
+    mpBestEffort,
+    mpUnsupported
+};
+
+enum EMetadataTargetFileSystem
+{
+    mtfsUnknown,
+    mtfsNtfs,
+    mtfsRefs,
+    mtfsFat,
+    mtfsSmb
+};
+
+enum EMetadataOperation
+{
+    moCopy,
+    moSameVolumeMove,
+    moCrossVolumeMove
+};
+
+enum EMetadataLoss
+{
+    mmlNone = 0,
+    mmlLastWriteTime = 0x00000001,
+    mmlCreationAndAccessTimes = 0x00000002,
+    mmlAttributes = 0x00000004,
+    mmlSecurity = 0x00000008,
+    mmlAlternateDataStreams = 0x00000010,
+    mmlCompressionAndEncryption = 0x00000020
+};
+
+struct CMetadataPreservationContract
+{
+    EMetadataPreservation Content;
+    EMetadataPreservation LastWriteTime;
+    EMetadataPreservation CreationAndAccessTimes;
+    EMetadataPreservation Attributes;
+    EMetadataPreservation Security;
+    EMetadataPreservation AlternateDataStreams;
+    EMetadataPreservation CompressionAndEncryption;
+};
+
+struct CMetadataLossRecord
+{
+    DWORD LossMask;
+    DWORD AcknowledgedLossMask;
+    EMetadataTargetFileSystem TargetFileSystem;
+    char FirstSourceName[MAX_PATH];
+    char FirstTargetName[MAX_PATH];
+
+    void Clear()
+    {
+        LossMask = mmlNone;
+        AcknowledgedLossMask = mmlNone;
+        TargetFileSystem = mtfsUnknown;
+        FirstSourceName[0] = 0;
+        FirstTargetName[0] = 0;
+    }
+};
+
 struct COperation
 {
     COperationCode Opcode;
@@ -351,7 +418,9 @@ public:
     BOOL CanUseRecycleBin;      // can we use the Recycle Bin? (only local fixed drives)
     BOOL SameRootButDiffVolume; // TRUE if this is a Move between paths with the same root but different volumes (at least one path contains a junction point)
     BOOL TargetPathSupADS;      // TRUE if the copy/move target supports ADS (delete the file's ADS (or the whole files) before overwriting)
-                                //    BOOL TargetPathSupEFS;       // TRUE if the copy/move target supports EFS (or less generally: it is NTFS rather than FAT)
+                                 //    BOOL TargetPathSupEFS;       // TRUE if the copy/move target supports EFS (or less generally: it is NTFS rather than FAT)
+    EMetadataTargetFileSystem TargetMetadataFileSystem; // filesystem used to select the explicit preservation contract
+    DWORD PlannedMetadataLosses; // known losses accepted while building the copy/move script
 
     // for Copy/Move operations
     BOOL IsCopyOrMoveOperation; // TRUE = this is a Copy/Move operation (add it to the queue of disk Copy/Move operations)
@@ -747,6 +816,9 @@ struct CProgressDlgData
     BOOL IgnoreAllCopyPermErr;
     BOOL IgnoreAllCopyDirTimeErr;
 
+    CMetadataLossRecord MetadataLosses;
+    BOOL KeepSourceAfterMetadataLoss;
+
     int CnfrmFileOver;
     int CnfrmDirOver;
     int CnfrmSHFileOver;
@@ -764,6 +836,18 @@ struct CProgressDlgData
         return RecycleMasks.AgreeMasks(fileName, fileExt);
     }
 };
+
+// Metadata preservation helpers are implemented in async_copy.cpp.  They are
+// shared by the worker's file and directory source-deletion paths.
+EMetadataTargetFileSystem GetMetadataTargetFileSystem(const char* targetPath);
+CMetadataPreservationContract GetMetadataPreservationContract(EMetadataOperation operation,
+                                                               EMetadataTargetFileSystem targetFileSystem);
+void RecordMetadataLoss(CProgressDlgData& dlgData, DWORD lossMask,
+                        const char* sourceName, const char* targetName);
+void RecordPlannedMetadataLosses(CProgressDlgData& dlgData, const COperations* script,
+                                 const char* sourceName, const char* targetName);
+BOOL ConfirmMetadataLossesBeforeSourceDeletion(HWND hProgressDlg, CProgressDlgData& dlgData,
+                                               const char* sourceName, const char* targetName);
 
 // Async copy parameter block (defined in async_copy.cpp, used in operations_core.cpp)
 struct CAsyncCopyParams

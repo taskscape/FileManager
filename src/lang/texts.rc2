@@ -1615,6 +1615,14 @@ STRINGTABLE
  IDS_ERRORGETTINGFILETIME, "Error Getting File Time"
  IDS_ERRORSETTINGFILETIME, "Error Setting File Time"
 
+ IDS_METADATALOSS_BEFORESOURCEDELETE, "The cross-volume move cannot preserve all metadata on %s.\n\nSource: %s\n\nThe following metadata is lost or could not be verified:\n%s\n\nYes deletes the source and completes the move. No keeps the source and continues copying."
+ IDS_METADATALOSS_LASTWRITETIME, "Last-write timestamp"
+ IDS_METADATALOSS_CREATIONANDACCESSTIMES, "Creation and last-access timestamps"
+ IDS_METADATALOSS_ATTRIBUTES, "File attributes"
+ IDS_METADATALOSS_SECURITY, "Owner, group, and access-control list"
+ IDS_METADATALOSS_ADS, "Alternate data streams"
+ IDS_METADATALOSS_COMPRESSIONANDENCRYPTION, "NTFS compression or EFS encryption"
+
  IDS_USERMENUERROR, "User Menu Error"
  IDS_TOOLONGLISTOFSELNAMES, "List of selected names is too long. Please unselect some names. Maximal length is 32771 characters."
  IDS_EMPTYLISTOFSELNAMES, "List of selected names is empty. Please select some names or focus some name."

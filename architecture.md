@@ -309,6 +309,22 @@ The high-level panel code plans work before mutating the filesystem:
 
 `src/async_copy.cpp` contains the lower-level copy engine: synchronous/overlapped decisions, buffer sizing, alternate data streams, compression/encryption/security metadata, overwrite and retry policy, cancellation, and progress updates. A native copy reaches its durable commit point only after the output was opened with write-through where supported, `FlushFileBuffers` and `CloseHandle` both succeed, and the closed destination can be reopened with its file metadata and size verified. An overwrite then uses the write-through replace/rename commit; a cross-volume move may delete its source only after this boundary. Each `COperations` instance owns an interlocked lifecycle (`planned`, `running`, `cancel-requested`, `stopping`, `completed`, or `failed`) and a manual-reset cancellation event. The dialog and worker make idempotent requests and state transitions through this owner; debug builds stop on invalid transitions. `COperationsQueue` tracks disk operation windows and their paused/running state.
 
+#### 5.2.1 Metadata preservation contract
+
+The engine distinguishes three preservation levels. **Required** metadata must pass the operation's durable-copy/identity checks before a cross-volume move can delete its source. **Best effort** metadata is copied or repaired when the target and current privilege allow it; a verified failure is recorded. **Unsupported** metadata is not represented by the target or is not copied by this engine; it is recorded as a known loss. The contract applies to native disk copy and move operations only; archive and virtual-filesystem plug-ins retain their own capability contracts.
+
+| Operation and target | Required | Best effort | Unsupported |
+|---|---|---|---|
+| Copy to NTFS | Default data stream | Last-write time; displayed attributes when requested; owner/group/DACL when requested and permitted; ADS; NTFS compression/EFS | Creation and last-access times |
+| Copy to ReFS | Default data stream | Last-write time; displayed attributes when requested; owner/group/DACL when requested and permitted; ADS | Creation and last-access times; NTFS compression/EFS |
+| Copy to FAT/FAT32/exFAT | Default data stream | Last-write time and the supported attribute subset | Creation and last-access times; owner/group/DACL; ADS; NTFS compression/EFS |
+| Copy to SMB | Default data stream | Last-write time, attributes, owner/group/DACL, ADS, and compression/EFS subject to server/share policy | Creation and last-access times |
+| Same-volume move on NTFS/ReFS/FAT | The same filesystem object is renamed, so its data and supported metadata remain attached to that object | None | None introduced by the move |
+| Same-volume move on SMB | Default data stream | All other metadata, subject to server/share rename semantics | None introduced by the engine |
+| Cross-volume move | The target must pass the copy durable-commit check before source deletion | The target's corresponding copy row | The target's corresponding copy row |
+
+For a cross-volume move, the worker records planned losses accepted while building the script (for example ADS or ACL loss), plus actual ADS, timestamp, attribute, ACL, and compression/EFS losses. Immediately before every source-file or source-directory deletion it displays any unacknowledged losses. The default **No** retains the source and lets the remaining move continue as a copy; only an explicit **Yes** allows source deletion. The account is held in `CProgressDlgData::MetadataLosses`, so a directory cleanup path cannot bypass a loss already found while copying a child.
+
 ```mermaid
 sequenceDiagram
     actor User

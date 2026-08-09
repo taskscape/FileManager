@@ -130,6 +130,8 @@ COperations::COperations(int base, int delta, char* waitInQueueSubject, char* wa
     SameRootButDiffVolume = FALSE;
     TargetPathSupADS = FALSE;
     //  TargetPathSupEFS = FALSE;
+    TargetMetadataFileSystem = mtfsUnknown;
+    PlannedMetadataLosses = mmlNone;
     IsCopyOrMoveOperation = FALSE;
     OverwriteOlder = FALSE;
     CopySecurity = FALSE;
