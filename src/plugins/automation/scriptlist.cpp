@@ -12,6 +12,7 @@
 */
 
 #include "precomp.h"
+#include "../../common/scoped_native_resources.h"
 #include "scriptlist.h"
 #include "scriptsite.h"
 #include "aututils.h"
@@ -289,7 +290,10 @@ HRESULT CScriptInfo::LoadOleStringFromFile(PCTSTR pszFileName, __out LPOLESTR& s
         return hr;
     }
 
-    pszCodeA = (char*)MapViewOfFile(hMapping, FILE_MAP_READ, 0, 0, 0);
+    // The mapped source is local conversion input, so no script-load return
+    // path may retain its view after the caller receives its owned text.
+    CScopedMappingView codeView(MapViewOfFile(hMapping, FILE_MAP_READ, 0, 0, 0));
+    pszCodeA = (char*)codeView.Get();
     hr = HRESULT_FROM_WIN32(GetLastError());
     CloseHandle(hMapping);
     if (pszCodeA == NULL)
@@ -301,20 +305,17 @@ HRESULT CScriptInfo::LoadOleStringFromFile(PCTSTR pszFileName, __out LPOLESTR& s
     if (cchRequired <= 0)
     {
         hr = HRESULT_FROM_WIN32(GetLastError());
-        UnmapViewOfFile(pszCodeA);
         return hr;
     }
 
     s = (LPOLESTR)malloc((cchRequired + 1) * sizeof(WCHAR));
     if (s == NULL)
     {
-        UnmapViewOfFile(pszCodeA);
         return E_OUTOFMEMORY;
     }
 
     cchConverted = MultiByteToWideChar(CP_ACP, 0, pszCodeA, cbSize, s, cchRequired);
     hr = HRESULT_FROM_WIN32(GetLastError());
-    UnmapViewOfFile(pszCodeA);
     if (cchConverted <= 0)
     {
         free(s);

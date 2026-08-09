@@ -4,6 +4,7 @@
 #include "precomp.h"
 
 #include "common\\checked_arithmetic.h"
+#include "common\\scoped_native_resources.h"
 #include "parserbroker.h"
 #include "thumbnl.h"
 
@@ -205,7 +206,7 @@ BOOL CParserBrokerClient::Invoke(WORD type, const void* request, DWORD requestLe
 {
     // A pipe response is correlated with one request, so serialize access from
     // the icon workers and archive navigation threads.
-    EnterCriticalSection(&Lock);
+    CScopedCriticalSection lock(&Lock);
     BOOL completed = FALSE;
     for (int attempt = 0; attempt != 2; ++attempt)
     {
@@ -216,7 +217,6 @@ BOOL CParserBrokerClient::Invoke(WORD type, const void* request, DWORD requestLe
         }
         Stop(); // timeout, malformed response, or crash: kill and recreate the untrusted process.
     }
-    LeaveCriticalSection(&Lock);
     return completed;
 }
 
