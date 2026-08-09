@@ -1262,6 +1262,7 @@ BOOL FindLanguageFromPrevVerOfSal(char* slgName);                               
 void SetConfigurationStoreRoot(const char* root);
 BOOL SelectCommittedConfigurationGeneration();
 BOOL UsesTransactionalConfigurationStore();
+const char* GetConfigurationSchemaDiagnostic();
 
 // creates and attaches a special class to the edit line/combobox 'ctrlID' that enables
 // capturing keys and sending the WM_USER_KEYDOWN message to the dialog 'hDialog'

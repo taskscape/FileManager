@@ -176,10 +176,10 @@ This document is the working record for a read-only stability and resilience aud
 - **Justification:** Shutdown backup logic exists, but ordinary `SaveConfig` paths write many values into the active settings tree. Interruption can leave a partially updated configuration.
 - **Implementation (2026-08-09):** `SaveConfig` now serializes every host and plug-in setting into the inactive slot beneath `Configuration Generations`, computes and verifies a recursive checksum, writes a completion marker, flushes the slot, and changes the root `Active Generation` DWORD only after validation succeeds. Startup validates the selected slot before exposing it to existing readers and automatically falls back to the other verified slot if the selected one is incomplete or corrupt. The prior slot is retained until the next successful startup; legacy direct trees are read unchanged and migrate on their next automatic save. Plug-in commits such as FTP site-bookmark edits now invoke the complete host transaction rather than writing their private subkey in place.
 
-### 25. Version and validate the complete configuration schema
+### 25. Version and validate the complete configuration schema — Implemented (2026-08-09)
 
 - **Justification:** A large evolving setting surface makes partial, malformed, or future-version data a stability risk. Individual defaulting does not prove cross-field invariants.
-- **Proposed solution:** Store a schema version, validate ranges and dependent fields before applying anything, run explicit idempotent migrations, and fall back to a known-good profile with a user-visible diagnostic.
+- **Implementation (2026-08-09):** Each committed host snapshot now carries `Configuration Schema Version` and is accepted only after an explicit, idempotent schema migration and complete-profile validation. The gate rejects future schemas/configurations, missing required sections, invalid window geometry, out-of-range display/viewer values, and incompatible visible/separated drive masks before `LoadConfig` can expose settings to global state. Invalid active generations fall back to the last verified generation; if neither generation validates, the default profile is used and startup displays a diagnostic. The schema version is excluded from the snapshot checksum solely so pre-schema transactional snapshots can receive the metadata-only v0-to-v1 migration without rewriting user data; all actual settings remain checksum-protected.
 
 ### 26. Test backup restoration and interrupted configuration writes
 

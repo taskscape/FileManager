@@ -254,6 +254,36 @@ public sealed class NativeSafetyRegressionTests
         });
     }
 
+    [Test]
+    public void Configuration_profiles_are_schema_versioned_migrated_and_validated_before_loading()
+    {
+        var root = FindRepositoryRoot();
+        var configuration = File.ReadAllText(Path.Combine(root, "src", "mainwnd_config.cpp"));
+        var startup = File.ReadAllText(Path.Combine(root, "src", "app_entry.cpp"));
+        var architecture = File.ReadAllText(Path.Combine(root, "architecture.md"));
+        var refactoring = File.ReadAllText(Path.Combine(root, "refactoring.md"));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(configuration, Does.Contain("Configuration Schema Version"));
+            Assert.That(configuration, Does.Contain("CONFIGURATION_SCHEMA_VERSION = 1"));
+            Assert.That(configuration, Does.Contain("MigrateConfigurationSchema"));
+            Assert.That(configuration, Does.Contain("ValidateCompleteConfigurationSchema"));
+            Assert.That(configuration, Does.Contain("ValidateWindowConfigurationSchema"));
+            Assert.That(configuration, Does.Contain("schemaVersion > CONFIGURATION_SCHEMA_VERSION"));
+            Assert.That(configuration, Does.Contain("configVersion == THIS_CONFIG_VERSION"));
+            Assert.That(configuration, Does.Contain("left < right && top < bottom"));
+            Assert.That(configuration, Does.Contain("(separatedDrives & ~visibleDrives) == 0"));
+            Assert.That(configuration, Does.Contain("ValidateRequiredDwordRange(viewerKey, \"Tabelator Size\", 1, 30)"));
+            Assert.That(configuration, Does.Contain("GetConfigurationSchemaDiagnostic"));
+            Assert.That(configuration, Does.Contain("The default profile will be used."));
+            Assert.That(startup, Does.Contain("GetConfigurationSchemaDiagnostic()"));
+            Assert.That(startup, Does.Contain("Open Salamander Configuration"));
+            Assert.That(architecture, Does.Contain("Each transactional generation has a schema version."));
+            Assert.That(refactoring, Does.Contain("### 25. Version and validate the complete configuration schema — Implemented"));
+        });
+    }
+
     private static string FindRepositoryRoot()
     {
         for (var directory = new DirectoryInfo(AppContext.BaseDirectory); directory is not null; directory = directory.Parent)

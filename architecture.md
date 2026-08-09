@@ -390,6 +390,7 @@ Persistence has several coordination mechanisms:
 - `SaveConfig` prevents reentrant saves and remembers when another save is requested during the current one.
 - `SaveConfig` writes the full snapshot to the inactive one of two `Configuration Generations`, verifies a checksum and completion marker, flushes it, then switches the root's `Active Generation` DWORD. That one value write is the commit point; the previous verified generation remains available until the next successful startup.
 - Startup validates the selected generation before exposing it to the existing host and plug-in readers, and falls back to the other verified generation if the selected one is incomplete or has a checksum mismatch. Legacy direct trees remain readable and are migrated on their next save.
+- Each transactional generation has a schema version. Startup runs the idempotent metadata migration, then validates required sections, supported configuration/schema versions, value ranges, and cross-field invariants before `LoadConfig` applies the profile. A rejected active generation falls back to the other verified profile; if neither profile is valid, the application uses defaults and reports the recovery to the user.
 - The legacy `Save In Progress` and backup `Copy Is OK` markers remain only for recognising/recovering pre-transactional configuration trees.
 - a `config.reg` beside the application can seed/import configuration.
 

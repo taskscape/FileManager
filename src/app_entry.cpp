@@ -3484,6 +3484,9 @@ FIND_NEW_SLG_FILE:
     // All existing configuration readers continue to use SALAMANDER_ROOT_REG.
     SetConfigurationStoreRoot(SALAMANDER_ROOT_REG);
     SelectCommittedConfigurationGeneration();
+    const char* configurationDiagnostic = GetConfigurationSchemaDiagnostic();
+    if (configurationDiagnostic != NULL)
+        MessageBox(NULL, configurationDiagnostic, "Open Salamander Configuration", MB_OK | MB_ICONWARNING);
 
     // if the user does not want more instances, only activate the previous one
     if (!currentCfgDoesNotExist &&
