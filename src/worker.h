@@ -625,6 +625,20 @@ struct CWorkerData
     int* SummaryProgress;
 };
 
+// This result is transferred to CProgressDialog through
+// WM_USER_PROGRDLG_WORKERCOMPLETE.  It deliberately contains only data the UI
+// needs after the worker has released the operation script, so delivery does
+// not keep worker-owned state alive or require an acknowledgement event.
+struct CWorkerCompletion
+{
+    BOOL Cancelled;
+
+    CWorkerCompletion(BOOL cancelled)
+        : Cancelled(cancelled)
+    {
+    }
+};
+
 struct CProgressDlgData
 {
     HANDLE WorkerNotSuspended;

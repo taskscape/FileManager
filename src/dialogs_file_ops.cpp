@@ -1369,6 +1369,43 @@ MENU_TEMPLATE_ITEM ProgressDialogMenu2[] =
         return TRUE; // message processed
     }
 
+    case WM_USER_PROGRDLG_WORKERCOMPLETE:
+    {
+        // The worker has already released Script and is not waiting for this
+        // handler.  This message is therefore safe to process after a modal
+        // path, a user cancel, or shutdown cancellation has delayed the UI.
+        CWorkerCompletion* completion = (CWorkerCompletion*)lParam;
+        if (!IsWindowEnabled(HWindow)) // if a modal dialog is open we must locate and close it
+            CloseAllOwnedEnabledDialogs(HWindow);
+
+        Script = NULL; // it was freed by the worker before posting this message
+        BOOL cancelled = completion != NULL ? completion->Cancelled : (BOOL)wParam;
+        if (completion == NULL)
+            TRACE_E("CProgressDialog: worker completion result could not be allocated.");
+        delete completion; // ownership was transferred by PostMessage
+
+        // The worker no longer depends on the UI.  Joining it here is only
+        // handle cleanup and cannot recreate the old worker-to-UI circular wait.
+        if (Worker != NULL)
+        {
+            WaitForSingleObject(Worker, INFINITE);
+            HANDLES(CloseHandle(Worker));
+            Worker = NULL;
+        }
+        HANDLES(CloseHandle(WorkerNotSuspended));
+        WorkerNotSuspended = NULL;
+        HANDLES(CloseHandle(WContinue));
+        WContinue = NULL;
+        if (RunningInOwnThread)
+            ProgressDlgArray.ClearDlgWindow(HWindow);
+        wParam = cancelled ? IDCANCEL : IDOK;
+
+        if (!DoNotBeepOnClose && Configuration.MinBeepWhenDone && GetForegroundWindow() != HWindow)
+            MessageBeep(0);
+        PostMessage(HWindow, WM_USER_PROGRDLGEND, wParam, 0); // delay ending the dialog a bit
+        return TRUE;
+    }
+
     case WM_USER_PROGRDLG_UPDATEICON:
     {
         SetWindowIcon();
@@ -1458,32 +1495,6 @@ MENU_TEMPLATE_ITEM ProgressDialogMenu2[] =
 
         switch (LOWORD(wParam))
         {
-        case IDOK: // operation finished, called only by the worker, must not come from the dialog
-        {
-            if (!IsWindowEnabled(HWindow)) // if a modal dialog is open we must locate and close it
-                CloseAllOwnedEnabledDialogs(HWindow);
-            if (InSendMessage())
-                ReplyMessage(0);                   // let the worker continue
-            Script = NULL;                         // script is freed in the worker thread, so we must not use it here anymore
-            SetEvent(WContinue);                   // worker may start deleting the script
-            WaitForSingleObject(Worker, INFINITE); // wait until it finishes and exits
-            HANDLES(CloseHandle(Worker));
-            Worker = NULL;
-            HANDLES(CloseHandle(WorkerNotSuspended));
-            WorkerNotSuspended = NULL;
-            HANDLES(CloseHandle(WContinue));
-            WContinue = NULL;
-            if (RunningInOwnThread)
-                ProgressDlgArray.ClearDlgWindow(HWindow);
-            if (CancelWorker)
-                wParam = IDCANCEL;
-
-            if (!DoNotBeepOnClose && Configuration.MinBeepWhenDone && GetForegroundWindow() != HWindow)
-                MessageBeep(0);
-            PostMessage(HWindow, WM_USER_PROGRDLGEND, wParam, lParam); // probably needless on W2K+: delay ending the dialog a bit
-            return TRUE;
-        }
-
         case IDCANCEL: // abort
         {
             if (CanClose && !CancelWorker)

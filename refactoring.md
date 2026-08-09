@@ -69,10 +69,9 @@ This document is the working record for a read-only stability and resilience aud
 - **Justification:** The UI passes stack-backed startup data to a new thread and waits forever for its continuation event (`src/dialogs_file_ops.cpp:350`). A creation, initialization, or exception-path failure can freeze the UI.
 - **Implemented:** Startup state now lives in a reference-counted owned object with copied startup inputs and duplicated event handles. The UI waits at most ten seconds while dispatching only paint messages; the dialog reports ready or failed, and a timeout signals cancellation. If the thread has already accepted the script, it owns and cancels/frees it rather than allowing the caller to release memory still in use.
 
-### 4. Remove the worker-to-UI circular wait at operation completion
+### 4. Implemented: remove the worker-to-UI circular wait at operation completion
 
-- **Justification:** The worker synchronously sends `WM_COMMAND` to the progress window and then waits indefinitely for the UI (`src/operations_core.cpp:1331`). If the UI is waiting on that worker or handling a modal path, both sides can deadlock.
-- **Proposed solution:** Post a typed completion message carrying an owned result, let the UI acknowledge asynchronously, and make worker cleanup independent of UI responsiveness. Cover close, cancel, and shutdown races with deterministic tests.
+- **Delivered:** The worker now frees its operation script and posts `WM_USER_PROGRDLG_WORKERCOMPLETE` with an owned `CWorkerCompletion` result. The progress dialog consumes that result asynchronously, then joins the already-independent worker only to close its handle. Completion no longer uses synchronous `WM_COMMAND`, `ReplyMessage`, or a UI-controlled continuation event, so modal, cancel, close, and shutdown paths cannot hold worker cleanup hostage. `tools/verify-operation-completion-protocol.ps1`, run by pull-request CI, deterministically guards the close, cancel, and shutdown protocol invariants.
 
 ### 5. Model file-operation cancellation as atomic state
 

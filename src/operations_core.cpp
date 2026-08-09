@@ -1328,11 +1328,23 @@ unsigned ThreadWorkerBody(void* parameter)
         free(tgtBuffer);
     if (bufferIsAllocated)
         free(buffer);
-    *dlgData.CancelWorker = Error;                  // if this was triggered by Cancel, make that obvious ...
-    SendMessage(hProgressDlg, WM_COMMAND, IDOK, 0); // we're done ...
-    WaitForSingleObject(wContinue, INFINITE);       // we need to stop the main thread
+    *dlgData.CancelWorker = Error; // if this was triggered by Cancel, make that obvious ...
 
-    FreeScript(script); // calls delete, so the main thread cannot be running
+    // The progress dialog must never be part of worker shutdown.  In
+    // particular, it can be blocked in an owned modal dialog or waiting for
+    // this thread while a close/shutdown cancellation is in progress.  Release
+    // all worker-owned data first, then transfer the small, self-contained
+    // result to the UI by a posted message.
+    CWorkerCompletion* completion = new CWorkerCompletion(Error);
+    FreeScript(script);
+    if (!PostMessage(hProgressDlg, WM_USER_PROGRDLG_WORKERCOMPLETE,
+                     (WPARAM)Error, (LPARAM)completion))
+    {
+        // PostMessage can fail only when the progress window has already gone
+        // away.  The worker is still fully cleaned up, and remains responsible
+        // for the result which was not transferred to the UI.
+        delete completion;
+    }
 
     TRACE_I("End");
     return 0;
