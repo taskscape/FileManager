@@ -5,6 +5,7 @@
 #include <shobjidl.h>
 #include <shellapi.h>
 
+#include "../common/checked_arithmetic.h"
 #include "../parserbroker_protocol.h"
 
 static BOOL ReadExact(HANDLE pipe, void* buffer, DWORD length)
@@ -93,9 +94,15 @@ static EParserBrokerStatus MakeThumbnail(const BYTE* request, DWORD requestLengt
         DeleteObject(bitmap);
         return pbsFailed;
     }
-    DWORD pixels = bitmapInfo.bmWidth * bitmapInfo.bmHeight;
-    DWORD pixelBytes = pixels * sizeof(DWORD);
-    if (sizeof(CParserBrokerThumbnailResponse) + pixelBytes > responseCapacity)
+    DWORD pixels;
+    DWORD pixelBytes;
+    DWORD packedResponseLength;
+    // Shell-returned dimensions still cross an isolation boundary.  Guard the
+    // packed response arithmetic before its size controls the output buffer.
+    if (!CheckedMultiplyDword((DWORD)bitmapInfo.bmWidth, (DWORD)bitmapInfo.bmHeight, &pixels) ||
+        !CheckedMultiplyDword(pixels, (DWORD)sizeof(DWORD), &pixelBytes) ||
+        !CheckedAddDword((DWORD)sizeof(CParserBrokerThumbnailResponse), pixelBytes, &packedResponseLength) ||
+        packedResponseLength > responseCapacity)
     {
         DeleteObject(bitmap);
         return pbsResourceLimit;
@@ -120,7 +127,7 @@ static EParserBrokerStatus MakeThumbnail(const BYTE* request, DWORD requestLengt
     thumbnailResponse->Width = bitmapInfo.bmWidth;
     thumbnailResponse->Height = bitmapInfo.bmHeight;
     thumbnailResponse->PixelBytes = pixelBytes;
-    *responseLength = sizeof(*thumbnailResponse) + pixelBytes;
+    *responseLength = packedResponseLength;
     return pbsOk;
 }
 

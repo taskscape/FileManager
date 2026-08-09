@@ -258,10 +258,10 @@ This document is the working record for a read-only stability and resilience aud
 - **Implemented:** The crash uploader's HTTP response reader already keeps responses in a bounded dynamic `std::string`; FTP control replies now retain their dynamic read buffer only up to 64 KiB and fail the connection with `WSAEMSGSIZE` when a server has not completed a reply within that limit. Configuration-fault environment controls now query their required size and retain an owned `std::string` only up to the documented 32,767-character environment limit, so a changing or oversized value is never silently truncated. Crash-reporter shared-memory fields and module/dump paths are copied into bounded dynamic strings before they are parsed or composed. The fixed shared-memory and UI error arrays remain only compatibility boundaries: unterminated, oversized, or non-representable fields produce explicit `ERROR_INVALID_DATA` or `ERROR_INSUFFICIENT_BUFFER` failures instead of partial values.
 - **Verification:** `NativeSafetyRegressionTests.Trust_boundary_text_uses_bounded_owned_storage_and_explicit_capacity_failures` guards the HTTP, FTP, environment, and crash-reporter limits; owned storage; shared-memory terminator checks; compatibility-only report-name API; and removal of the old fixed dump/path assembly.
 
-### 39. Use checked arithmetic for sizes, offsets, and allocations
+### 39. Use checked arithmetic for sizes, offsets, and allocations — Implemented (2026-08-09)
 
-- **Justification:** The crash uploader demonstrates a file-size-plus-overhead cast into `int`; similar arithmetic in parsers and progress calculations can wrap before allocation or I/O.
-- **Proposed solution:** Standardize checked add/multiply/cast helpers for `uint64_t`, `size_t`, and Win32 `DWORD`, reject impossible values, and fuzz every external size field.
+- **Delivered:** `src/common/checked_arithmetic.h` supplies checked add, multiply, and cast helpers for `uint64_t`, `size_t`, and Win32 `DWORD`. The crash uploader now validates network response, multipart, file-stream, and legacy parser lengths before combining or narrowing them. The parser broker validates external path and thumbnail dimensions/byte counts on both sides of its IPC boundary before they control a buffer or I/O request.
+- **Verification:** `NativeSafetyRegressionTests.External_size_fields_use_checked_arithmetic_before_allocation_or_io` protects the helpers and every current external uploader and parser-broker size field from reverting to unchecked arithmetic.
 
 ### 40. Make operation result types explicit
 

@@ -3,6 +3,7 @@
 
 #include "precomp.h"
 
+#include "common\\checked_arithmetic.h"
 #include "parserbroker.h"
 #include "thumbnl.h"
 
@@ -259,13 +260,20 @@ static BOOL BrokerMakePathPayload(const char* path, const void* prefix, DWORD pr
     int chars = MultiByteToWideChar(CP_ACP, MB_ERR_INVALID_CHARS, path, -1, NULL, 0);
     if (chars <= 1)
         return FALSE;
-    DWORD pathBytes = (chars - 1) * sizeof(WCHAR);
-    if (pathBytes > PARSER_BROKER_MAX_PATH_BYTES || prefixLength + pathBytes > payloadCapacity)
+    uint64_t pathBytes64;
+    DWORD pathBytes;
+    DWORD totalPayloadLength;
+    // The conversion result describes external path storage; reject an
+    // impossible multiply or packed-message length before writing the buffer.
+    if (!CheckedMultiplyUInt64((uint64_t)(chars - 1), (uint64_t)sizeof(WCHAR), &pathBytes64) ||
+        !CheckedCastUInt64ToDword(pathBytes64, &pathBytes) ||
+        !CheckedAddDword(prefixLength, pathBytes, &totalPayloadLength) ||
+        pathBytes > PARSER_BROKER_MAX_PATH_BYTES || totalPayloadLength > payloadCapacity)
         return FALSE;
     memcpy(payload, prefix, prefixLength);
     if (MultiByteToWideChar(CP_ACP, MB_ERR_INVALID_CHARS, path, -1, (WCHAR*)(payload + prefixLength), chars) != chars)
         return FALSE;
-    *payloadLength = prefixLength + pathBytes;
+    *payloadLength = totalPayloadLength;
     return TRUE;
 }
 
@@ -292,10 +300,17 @@ BOOL CParserBrokerClient::LoadThumbnail(const char* path, int width, int height,
                 response, sizeof(response), &responseLength) || responseLength < sizeof(CParserBrokerThumbnailResponse))
         return FALSE;
     const CParserBrokerThumbnailResponse* thumbnail = (const CParserBrokerThumbnailResponse*)response;
-    ULONGLONG expectedPixelBytes = (ULONGLONG)thumbnail->Width * thumbnail->Height * sizeof(DWORD);
+    uint64_t expectedPixelBytes;
+    DWORD expectedResponseLength;
+    // Width, height, and PixelBytes arrive over IPC.  Calculate both the
+    // pixel allocation and enclosing response length without wraparound.
+    if (!CheckedMultiplyUInt64(thumbnail->Width, thumbnail->Height, &expectedPixelBytes) ||
+        !CheckedMultiplyUInt64(expectedPixelBytes, (uint64_t)sizeof(DWORD), &expectedPixelBytes) ||
+        !CheckedAddDword((DWORD)sizeof(*thumbnail), thumbnail->PixelBytes, &expectedResponseLength))
+        return FALSE;
     if (thumbnail->Width == 0 || thumbnail->Height == 0 || thumbnail->Width > PARSER_BROKER_MAX_THUMBNAIL_DIMENSION ||
         thumbnail->Height > PARSER_BROKER_MAX_THUMBNAIL_DIMENSION || thumbnail->PixelBytes != expectedPixelBytes ||
-        responseLength != sizeof(*thumbnail) + thumbnail->PixelBytes ||
+        responseLength != expectedResponseLength ||
         !maker->SetParameters((int)thumbnail->Width, (int)thumbnail->Height, 0))
         return FALSE;
     return maker->ProcessBuffer(response + sizeof(*thumbnail), (int)thumbnail->Height);
