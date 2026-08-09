@@ -4533,6 +4533,11 @@ COPY_AGAIN:
                     if (transactionalTarget)
                     {
                         DWORD err;
+                        if (!script->JournalMarkTemporaryReady())
+                        {
+                            err = ERROR_WRITE_FAULT;
+                            goto COPY_ERROR_2;
+                        }
                         while (!CommitTransactionalTargetFile(requestedTargetName, op->TargetName, &err))
                         {
                             TRACE_I("DoCopyFile(): unable to commit transactional overwrite of " << requestedTargetName << ": " << GetErrorText(err));
@@ -4788,6 +4793,11 @@ COPY_AGAIN:
                                     if (!CreateTransactionalTargetFileName(requestedTargetName, transactionalTargetName, _countof(transactionalTargetName)))
                                     {
                                         err = GetLastError();
+                                        goto NORMAL_ERROR;
+                                    }
+                                    if (!script->JournalSetTemporaryPath(transactionalTargetName))
+                                    {
+                                        err = ERROR_WRITE_FAULT;
                                         goto NORMAL_ERROR;
                                     }
                                     op->TargetName = transactionalTargetName;

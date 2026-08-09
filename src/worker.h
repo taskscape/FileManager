@@ -58,6 +58,7 @@ struct CConvertData // data used by ocConvert
 
 class COperations;
 struct CProgressDlgArrItem;
+class COperationJournal;
 
 enum EOperationState
 {
@@ -378,6 +379,7 @@ private:
     // OperationState makes the complete lifecycle observable and atomic.
     HANDLE CancellationEvent;
     volatile LONG OperationState;
+    COperationJournal* Journal;
 
     // for the status line in the progress dialog (Copy and Move only)
     CRITICAL_SECTION StatusCS;              // critical section protecting TransferSpeedMeter, ProgressSpeedMeter, and
@@ -403,12 +405,7 @@ private:
 
 public:
     COperations(int base, int delta, char* waitInQueueSubject, char* waitInQueueFrom, char* waitInQueueTo);
-    ~COperations()
-    {
-        if (CancellationEvent != NULL)
-            HANDLES(CloseHandle(CancellationEvent));
-        HANDLES(DeleteCriticalSection(&StatusCS));
-    }
+    ~COperations();
 
     BOOL Start();
     BOOL RequestCancellation();
@@ -418,6 +415,13 @@ public:
     BOOL IsCancellationRequested() const;
     EOperationState GetOperationState() const;
     HANDLE GetCancellationEvent() const { return CancellationEvent; }
+
+    BOOL BeginJournal();
+    BOOL JournalBeginItem(int itemIndex, const COperation* operation);
+    BOOL JournalSetTemporaryPath(const char* temporaryPath);
+    BOOL JournalMarkTemporaryReady();
+    void JournalCompleteItem(BOOL succeeded);
+    void FinishJournal(BOOL failed, BOOL cancelled);
 
     void SetWorkPath1(const char* path, BOOL inclSubDirs)
     {
