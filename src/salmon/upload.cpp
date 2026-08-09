@@ -16,6 +16,11 @@ const wchar_t kUploadPath[] = L"/api/v1/crash-reports";
 const char kMultipartBoundary[] = "---------------------------OpenSalamanderCrashReport";
 const DWORD kIoBufferSize = 64 * 1024;
 const size_t kMaximumResponseSize = 64 * 1024;
+const int kUploadRetryCount = 1;
+
+CRITICAL_SECTION UploadRequestLock;
+BOOL UploadRequestLockInitialized = FALSE;
+HINTERNET ActiveUploadRequest = NULL;
 
 void SetWinHttpError(CUploadParams* uploadParams, DWORD error)
 {
@@ -70,17 +75,67 @@ BOOL ConfigureExplicitProxy(HINTERNET session, DWORD* error)
     return result;
 }
 
+BOOL IsUploadCancelled(const CUploadParams* uploadParams)
+{
+    return InterlockedCompareExchange((volatile LONG*)&uploadParams->Cancelled, 0, 0) != 0;
+}
+
+void SetUploadError(CUploadParams* uploadParams, DWORD error)
+{
+    if (IsUploadCancelled(uploadParams))
+    {
+        uploadParams->Cancelled = TRUE;
+        error = ERROR_CANCELLED;
+    }
+    SetWinHttpError(uploadParams, error);
+}
+
+void RegisterActiveUploadRequest(HINTERNET request)
+{
+    EnterCriticalSection(&UploadRequestLock);
+    ActiveUploadRequest = request;
+    LeaveCriticalSection(&UploadRequestLock);
+}
+
+void CloseActiveUploadRequest(HINTERNET request)
+{
+    EnterCriticalSection(&UploadRequestLock);
+    if (ActiveUploadRequest == request)
+    {
+        ActiveUploadRequest = NULL;
+        WinHttpCloseHandle(request);
+    }
+    LeaveCriticalSection(&UploadRequestLock);
+}
+
 BOOL WriteRequestData(HINTERNET request, const void* data, DWORD size, DWORD* error)
 {
-    if (size == 0)
-        return TRUE;
+    const BYTE* bytes = (const BYTE*)data;
+    while (size != 0)
+    {
+        DWORD written = 0;
+        if (!WinHttpWriteData(request, bytes, size, &written))
+        {
+            *error = GetLastError();
+            return FALSE;
+        }
+        if (written == 0)
+        {
+            *error = ERROR_WRITE_FAULT;
+            return FALSE;
+        }
+        bytes += written;
+        size -= written;
+    }
+    return TRUE;
+}
 
+BOOL FinishChunkedRequest(HINTERNET request, DWORD* error)
+{
     DWORD written = 0;
-    if (!WinHttpWriteData(request, (LPVOID)data, size, &written) || written != size)
+    if (!WinHttpWriteData(request, NULL, 0, &written))
     {
         *error = GetLastError();
-        if (*error == ERROR_SUCCESS)
-            *error = ERROR_WRITE_FAULT;
         return FALSE;
     }
     return TRUE;
@@ -88,6 +143,7 @@ BOOL WriteRequestData(HINTERNET request, const void* data, DWORD size, DWORD* er
 
 BOOL ReadResponse(HINTERNET request, std::string* response, DWORD* error)
 {
+    std::vector<char> buffer(kIoBufferSize);
     for (;;)
     {
         DWORD available = 0;
@@ -104,20 +160,25 @@ BOOL ReadResponse(HINTERNET request, std::string* response, DWORD* error)
             return FALSE;
         }
 
-        std::vector<char> buffer(available);
+        DWORD bytesToRead = available < buffer.size() ? available : (DWORD)buffer.size();
         DWORD read = 0;
-        if (!WinHttpReadData(request, buffer.data(), available, &read))
+        if (!WinHttpReadData(request, buffer.data(), bytesToRead, &read))
         {
             *error = GetLastError();
+            return FALSE;
+        }
+        if (read == 0)
+        {
+            *error = ERROR_CONNECTION_ABORTED;
             return FALSE;
         }
         response->append(buffer.data(), read);
     }
 }
 
-BOOL UploadReport(CUploadParams* uploadParams)
+BOOL UploadReportAttempt(CUploadParams* uploadParams, BOOL* retryable)
 {
-    uploadParams->ErrorMessage[0] = 0;
+    *retryable = FALSE;
 
     const char* fileNameOnly = strrchr(uploadParams->FileName, '\\');
     fileNameOnly = fileNameOnly == NULL ? uploadParams->FileName : fileNameOnly + 1;
@@ -139,8 +200,7 @@ BOOL UploadReport(CUploadParams* uploadParams)
 
     BOOL result = FALSE;
     LARGE_INTEGER fileSize;
-    if (!GetFileSizeEx(file, &fileSize) || fileSize.QuadPart < 0 ||
-        (unsigned __int64)fileSize.QuadPart > MAXDWORD - strlen(multipartPrefix) - strlen(multipartSuffix))
+    if (!GetFileSizeEx(file, &fileSize) || fileSize.QuadPart < 0)
     {
         sprintf(uploadParams->ErrorMessage, LoadStr(IDS_SALMON_FILE_SIZE, HLanguage), uploadParams->FileName);
     }
@@ -157,17 +217,20 @@ BOOL UploadReport(CUploadParams* uploadParams)
         {
             // Bound all network operations; normal certificate-chain and hostname
             // validation are intentionally left enabled by not changing security flags.
-            WinHttpSetTimeouts(session, 15000, 15000, 30000, 30000);
-            if (!ConfigureExplicitProxy(session, &error))
+            if (!WinHttpSetTimeouts(session, 15000, 15000, 30000, 30000))
             {
-                SetWinHttpError(uploadParams, error);
+                SetUploadError(uploadParams, GetLastError());
+            }
+            else if (!ConfigureExplicitProxy(session, &error))
+            {
+                SetUploadError(uploadParams, error);
             }
             else
             {
                 HINTERNET connection = WinHttpConnect(session, kServerName, INTERNET_DEFAULT_HTTPS_PORT, 0);
                 if (connection == NULL)
                 {
-                    SetWinHttpError(uploadParams, GetLastError());
+                    SetUploadError(uploadParams, GetLastError());
                 }
                 else
                 {
@@ -175,44 +238,77 @@ BOOL UploadReport(CUploadParams* uploadParams)
                                                             WINHTTP_DEFAULT_ACCEPT_TYPES, WINHTTP_FLAG_SECURE);
                     if (request == NULL)
                     {
-                        SetWinHttpError(uploadParams, GetLastError());
+                        SetUploadError(uploadParams, GetLastError());
                     }
                     else
                     {
+                        RegisterActiveUploadRequest(request);
                         // A fixed HTTPS endpoint never follows a redirect, so a server
                         // cannot downgrade a report to plaintext HTTP.
                         DWORD disabledFeatures = WINHTTP_DISABLE_REDIRECTS;
-                        if (!WinHttpSetOption(request, WINHTTP_OPTION_DISABLE_FEATURE, &disabledFeatures, sizeof(disabledFeatures)))
+                        if (IsUploadCancelled(uploadParams))
                         {
-                            SetWinHttpError(uploadParams, GetLastError());
+                            SetUploadError(uploadParams, ERROR_CANCELLED);
+                        }
+                        else if (!WinHttpSetOption(request, WINHTTP_OPTION_DISABLE_FEATURE, &disabledFeatures, sizeof(disabledFeatures)))
+                        {
+                            SetUploadError(uploadParams, GetLastError());
                         }
                         else
                         {
-                            const wchar_t contentType[] = L"Content-Type: multipart/form-data; boundary=---------------------------OpenSalamanderCrashReport\r\n";
-                            DWORD totalLength = (DWORD)(strlen(multipartPrefix) + fileSize.QuadPart + strlen(multipartSuffix));
-                            if (!WinHttpSendRequest(request, contentType, (DWORD)-1L, WINHTTP_NO_REQUEST_DATA, 0, totalLength, 0))
+                            // WinHTTP owns the Transfer-Encoding framing.  This avoids a
+                            // lossy DWORD Content-Length calculation and permits reports
+                            // larger than 4 GiB without allocating them in memory.
+                            const wchar_t contentType[] = L"Content-Type: multipart/form-data; boundary=---------------------------OpenSalamanderCrashReport\r\nTransfer-Encoding: chunked\r\n";
+                            if (!WinHttpSendRequest(request, contentType, (DWORD)-1L, WINHTTP_NO_REQUEST_DATA, 0,
+                                                    WINHTTP_IGNORE_REQUEST_TOTAL_LENGTH, 0))
                             {
-                                SetWinHttpError(uploadParams, GetLastError());
+                                error = GetLastError();
+                                // No multipart bytes have been written yet, so this is the
+                                // one point at which repeating a POST cannot duplicate a
+                                // committed crash report.
+                                *retryable = !IsUploadCancelled(uploadParams);
+                                SetUploadError(uploadParams, error);
                             }
                             else if (!WriteRequestData(request, multipartPrefix, (DWORD)strlen(multipartPrefix), &error))
                             {
-                                SetWinHttpError(uploadParams, error);
+                                SetUploadError(uploadParams, error);
                             }
                             else
                             {
                                 std::vector<char> buffer(kIoBufferSize);
                                 BOOL writeSucceeded = TRUE;
-                                for (;;)
+                                unsigned __int64 remaining = (unsigned __int64)fileSize.QuadPart;
+                                while (remaining != 0)
                                 {
+                                    if (IsUploadCancelled(uploadParams))
+                                    {
+                                        error = ERROR_CANCELLED;
+                                        writeSucceeded = FALSE;
+                                        break;
+                                    }
+
                                     DWORD read = 0;
-                                    if (!ReadFile(file, buffer.data(), (DWORD)buffer.size(), &read, NULL))
+                                    DWORD bytesToRead = remaining < buffer.size() ? (DWORD)remaining : (DWORD)buffer.size();
+                                    if (!ReadFile(file, buffer.data(), bytesToRead, &read, NULL))
                                     {
                                         error = GetLastError();
                                         writeSucceeded = FALSE;
                                         break;
                                     }
                                     if (read == 0)
+                                    {
+                                        error = ERROR_HANDLE_EOF;
+                                        writeSucceeded = FALSE;
                                         break;
+                                    }
+                                    if (read > remaining)
+                                    {
+                                        error = ERROR_ARITHMETIC_OVERFLOW;
+                                        writeSucceeded = FALSE;
+                                        break;
+                                    }
+                                    remaining -= read;
                                     if (!WriteRequestData(request, buffer.data(), read, &error))
                                     {
                                         writeSucceeded = FALSE;
@@ -222,15 +318,19 @@ BOOL UploadReport(CUploadParams* uploadParams)
 
                                 if (!writeSucceeded)
                                 {
-                                    SetWinHttpError(uploadParams, error);
+                                    SetUploadError(uploadParams, error);
                                 }
                                 else if (!WriteRequestData(request, multipartSuffix, (DWORD)strlen(multipartSuffix), &error))
                                 {
-                                    SetWinHttpError(uploadParams, error);
+                                    SetUploadError(uploadParams, error);
+                                }
+                                else if (!FinishChunkedRequest(request, &error))
+                                {
+                                    SetUploadError(uploadParams, error);
                                 }
                                 else if (!WinHttpReceiveResponse(request, NULL))
                                 {
-                                    SetWinHttpError(uploadParams, GetLastError());
+                                    SetUploadError(uploadParams, GetLastError());
                                 }
                                 else
                                 {
@@ -239,7 +339,7 @@ BOOL UploadReport(CUploadParams* uploadParams)
                                     if (!WinHttpQueryHeaders(request, WINHTTP_QUERY_STATUS_CODE | WINHTTP_QUERY_FLAG_NUMBER,
                                                              WINHTTP_HEADER_NAME_BY_INDEX, &status, &statusSize, WINHTTP_NO_HEADER_INDEX))
                                     {
-                                        SetWinHttpError(uploadParams, GetLastError());
+                                        SetUploadError(uploadParams, GetLastError());
                                     }
                                     else if (status < 200 || status >= 300)
                                     {
@@ -249,14 +349,14 @@ BOOL UploadReport(CUploadParams* uploadParams)
                                     {
                                         std::string response;
                                         if (!ReadResponse(request, &response, &error))
-                                            SetWinHttpError(uploadParams, error);
+                                            SetUploadError(uploadParams, error);
                                         else
                                             result = AnalyzeResponse(response.c_str(), (int)response.size(), uploadParams);
                                     }
                                 }
                             }
                         }
-                        WinHttpCloseHandle(request);
+                        CloseActiveUploadRequest(request);
                     }
                     WinHttpCloseHandle(connection);
                 }
@@ -267,6 +367,21 @@ BOOL UploadReport(CUploadParams* uploadParams)
 
     CloseHandle(file);
     return result;
+}
+
+BOOL UploadReport(CUploadParams* uploadParams)
+{
+    uploadParams->ErrorMessage[0] = 0;
+
+    for (int attempt = 0; attempt <= kUploadRetryCount; attempt++)
+    {
+        BOOL retryable = FALSE;
+        if (UploadReportAttempt(uploadParams, &retryable))
+            return TRUE;
+        if (!retryable || IsUploadCancelled(uploadParams))
+            break;
+    }
+    return FALSE;
 }
 } // namespace
 
@@ -364,9 +479,32 @@ BOOL StartUploadThread(CUploadParams* params)
 {
     if (HUploadThread != NULL)
         return FALSE;
+    if (!UploadRequestLockInitialized)
+    {
+        InitializeCriticalSection(&UploadRequestLock);
+        UploadRequestLockInitialized = TRUE;
+    }
+    InterlockedExchange(&params->Cancelled, FALSE);
     DWORD id;
     HUploadThread = CreateThread(NULL, 0, UploadThreadF, params, 0, &id);
     return HUploadThread != NULL;
+}
+
+void CancelUploadThread(CUploadParams* params)
+{
+    if (params == NULL || HUploadThread == NULL)
+        return;
+
+    InterlockedExchange(&params->Cancelled, TRUE);
+
+    EnterCriticalSection(&UploadRequestLock);
+    if (ActiveUploadRequest != NULL)
+    {
+        HINTERNET request = ActiveUploadRequest;
+        ActiveUploadRequest = NULL;
+        WinHttpCloseHandle(request);
+    }
+    LeaveCriticalSection(&UploadRequestLock);
 }
 
 BOOL IsUploadThreadRunning()
