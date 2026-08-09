@@ -554,7 +554,8 @@ BOOL GetBugReportNames()
                 *strrchr(tmpName, '.') = 0; // cut it out inside the name
             strcat(tmpName, "-");
             strcat(tmpName, SalmonSharedMemory->BugName);
-            GetReportBaseName(newName, sizeof(newName), BugReportPath, tmpName, SalmonSharedMemory->UID, lt);
+            GetReportBaseName(newName, sizeof(newName), BugReportPath, sizeof(BugReportPath),
+                              tmpName, sizeof(tmpName), SalmonSharedMemory->UID, lt);
             strcat(newName, extName);
 
             // new name in the array

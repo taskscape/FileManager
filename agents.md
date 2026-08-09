@@ -6,6 +6,10 @@ Visual Studio 2026 is installed and builds this solution successfully. Treat the
 
 Do not infer that C++ builds are unavailable merely because a separate Build Tools installation lacks Visual C++ targets. When a build is needed, use the installed Visual Studio 2026 environment and report the exact configuration and result.
 
+## Source-change documentation
+
+Every source-code change must include a concise nearby comment that documents the change's intent. Keep the comment focused on the reason for the change, invariant, or compatibility constraint it preserves rather than restating the code.
+
 ## Suggested local commands
 
 The following paths and command are examples verified on one development machine only. They are suggested starting points, not portable requirements: they may be absent or different on another filesystem or computer.

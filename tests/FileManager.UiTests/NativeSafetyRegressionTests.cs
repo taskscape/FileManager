@@ -73,6 +73,44 @@ public sealed class NativeSafetyRegressionTests
     }
 
     [Test]
+    public void Trust_boundary_text_uses_bounded_owned_storage_and_explicit_capacity_failures()
+    {
+        var root = FindRepositoryRoot();
+        var upload = File.ReadAllText(Path.Combine(root, "src", "salmon", "upload.cpp"));
+        var controlHeader = File.ReadAllText(Path.Combine(root, "src", "plugins", "ftp", "ctrlcon.h"));
+        var controlConnection = File.ReadAllText(Path.Combine(root, "src", "plugins", "ftp", "ctrlcon2.cpp"));
+        var registry = File.ReadAllText(Path.Combine(root, "src", "regwork.cpp"));
+        var minidump = File.ReadAllText(Path.Combine(root, "src", "salmon", "minidump.cpp"));
+        var salmonHeader = File.ReadAllText(Path.Combine(root, "src", "salmon", "salmon.h"));
+        var refactoring = File.ReadAllText(Path.Combine(root, "refactoring.md"));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(upload, Does.Contain("const size_t kMaximumResponseSize = 64 * 1024"));
+            Assert.That(upload, Does.Contain("response->size() > kMaximumResponseSize - available"));
+            Assert.That(controlHeader, Does.Contain("CRTLCON_MAXIMUM_REPLY_SIZE (64 * 1024)"));
+            Assert.That(controlConnection, Does.Contain("if (newSize > CRTLCON_MAXIMUM_REPLY_SIZE)"));
+            Assert.That(controlConnection, Does.Contain("err = WSAEMSGSIZE"));
+            Assert.That(registry, Does.Contain("std::string ConfigurationWriteFaultReport"));
+            Assert.That(registry, Does.Contain("ConfigurationFaultEnvironmentMaximum = 32767"));
+            Assert.That(registry, Does.Contain("GetEnvironmentVariableA(name, NULL, 0)"));
+            Assert.That(registry, Does.Contain("return cferTooLarge"));
+            Assert.That(registry, Does.Contain("CreateFileA(ConfigurationWriteFaultReport.c_str()"));
+            Assert.That(minidump, Does.Contain("CopyBoundedExternalText"));
+            Assert.That(minidump, Does.Contain("memchr(source, 0, sourceCapacity)"));
+            Assert.That(minidump, Does.Contain("kMaximumCrashReportPathLength = 32767"));
+            Assert.That(minidump, Does.Contain("std::vector<char> buffer(capacity)"));
+            Assert.That(minidump, Does.Contain("std::string dumpFileName"));
+            Assert.That(minidump, Does.Contain("ERROR_INVALID_DATA"));
+            Assert.That(minidump, Does.Not.Contain("char szFileName[MAX_PATH]"));
+            Assert.That(minidump, Does.Not.Contain("static char findPath[MAX_PATH]"));
+            Assert.That(salmonHeader, Does.Contain("int targetPathSize"));
+            Assert.That(salmonHeader, Does.Contain("int shortNameSize"));
+            Assert.That(refactoring, Does.Contain("### 38. Replace fixed buffers at trust boundaries first — Implemented"));
+        });
+    }
+
+    [Test]
     public void Win32_path_boundaries_use_owned_wide_paths_and_extended_length_syntax()
     {
         var root = FindRepositoryRoot();

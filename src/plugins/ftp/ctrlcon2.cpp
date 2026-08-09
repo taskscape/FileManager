@@ -841,16 +841,29 @@ void CControlConnectionSocket::ReceiveNetEvent(LPARAM lParam, int index)
                     {
                         int newSize = ReadBytesCount + CRTLCON_BYTESTOREADONSOCKET +
                                       CRTLCON_BYTESTOREADONSOCKETPREALLOC;
-                        char* newBuf = (char*)realloc(ReadBytes, newSize);
-                        if (newBuf != NULL)
+                        if (newSize > CRTLCON_MAXIMUM_REPLY_SIZE)
                         {
-                            ReadBytes = newBuf;
-                            ReadBytesAllocatedSize = newSize;
-                        }
-                        else // not enough memory to store data in our buffer (only TRACE reports the error)
-                        {
-                            TRACE_E(LOW_MEMORY);
+                            // A server reply is external input. The parser has not
+                            // found a complete reply before the accepted limit, so
+                            // surface an explicit socket error instead of retaining
+                            // an unbounded dynamic buffer.
+                            err = WSAEMSGSIZE;
+                            genEvent = TRUE;
                             lowMem = TRUE;
+                        }
+                        else
+                        {
+                            char* newBuf = (char*)realloc(ReadBytes, newSize);
+                            if (newBuf != NULL)
+                            {
+                                ReadBytes = newBuf;
+                                ReadBytesAllocatedSize = newSize;
+                            }
+                            else // not enough memory to store data in our buffer (only TRACE reports the error)
+                            {
+                                TRACE_E(LOW_MEMORY);
+                                lowMem = TRUE;
+                            }
                         }
                     }
                 }
