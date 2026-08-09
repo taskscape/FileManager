@@ -3324,7 +3324,15 @@ FIND_NEW_SLG_FILE:
     char path[MAX_PATH];
     char errorText[MAX_PATH + 200];
     GetModuleFileName(NULL, path, MAX_PATH);
-    sprintf(strrchr(path, '\\') + 1, "lang\\%s", Configuration.SLGName);
+    char* languageFileName = strrchr(path, '\\');
+    if (languageFileName == NULL ||
+        FormatStringChecked(languageFileName + 1, _countof(path) - (languageFileName + 1 - path),
+                            "lang\\%s", Configuration.SLGName) != bsrSuccess)
+    {
+        MessageBox(NULL, "The selected language-file path is too long or invalid.",
+                   SALAMANDER_TEXT_VERSION, MB_OK | MB_ICONERROR);
+        goto EXIT_1a;
+    }
     HLanguage = HANDLES(LoadLibraryUtf8(path));
     LanguageID = 0;
     if (HLanguage == NULL || !IsSLGFileValid(HInstance, HLanguage, LanguageID, IsSLGIncomplete))
@@ -3333,18 +3341,22 @@ FIND_NEW_SLG_FILE:
             HANDLES(FreeLibrary(HLanguage));
         if (!newSLGFile) // remembered .SLG file probably stopped existing, try to find another one
         {
-            sprintf(errorText, "File %s was not found or is not valid language file.\nOpen Salamander "
-                               "will try to search for some other language file (.SLG).",
-                    path);
+            if (FormatStringChecked(errorText, _countof(errorText),
+                                    "File %s was not found or is not valid language file.\nOpen Salamander "
+                                    "will try to search for some other language file (.SLG).",
+                                    path) != bsrSuccess)
+                CopyStringChecked(errorText, _countof(errorText), "The selected language file is invalid.");
             MessageBox(NULL, errorText, SALAMANDER_TEXT_VERSION, MB_OK | MB_ICONERROR);
             Configuration.SLGName[0] = 0;
             goto FIND_NEW_SLG_FILE;
         }
         else // should never happen - .SLG file was already tested
         {
-            sprintf(errorText, "File %s was not found or is not valid language file.\n"
-                               "Please run Open Salamander again and try to choose some other language file.",
-                    path);
+            if (FormatStringChecked(errorText, _countof(errorText),
+                                    "File %s was not found or is not valid language file.\n"
+                                    "Please run Open Salamander again and try to choose some other language file.",
+                                    path) != bsrSuccess)
+                CopyStringChecked(errorText, _countof(errorText), "The selected language file is invalid.");
             MessageBox(NULL, errorText, "Open Salamander", MB_OK | MB_ICONERROR);
             goto EXIT_1a;
         }

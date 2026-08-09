@@ -10,7 +10,7 @@
         "projectUniqueName": "C:\\Projects\\FileManager\\tests\\FileManager.UiTests\\FileManager.UiTests.csproj",
         "projectName": "FileManager.UiTests",
         "projectPath": "C:\\Projects\\FileManager\\tests\\FileManager.UiTests\\FileManager.UiTests.csproj",
-        "packagesPath": "C:\\Users\\mzag\\.nuget\\packages\\",
+        "packagesPath": "C:\\Users\\TaskscapeLtd\\.nuget\\packages\\",
         "outputPath": "C:\\Projects\\FileManager\\tests\\FileManager.UiTests\\obj\\",
         "projectStyle": "PackageReference",
         "fallbackFolders": [
@@ -18,7 +18,7 @@
           "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages"
         ],
         "configFilePaths": [
-          "C:\\Users\\mzag\\AppData\\Roaming\\NuGet\\NuGet.Config",
+          "C:\\Users\\TaskscapeLtd\\AppData\\Roaming\\NuGet\\NuGet.Config",
           "C:\\Program Files (x86)\\NuGet\\Config\\DevExpress 24.1.config",
           "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.FallbackLocation.config",
           "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.Offline.config"
@@ -29,7 +29,7 @@
         "sources": {
           "C:\\Program Files (x86)\\Microsoft SDKs\\NuGetPackages\\": {},
           "C:\\Program Files\\DevExpress 24.1\\Components\\System\\Components\\Packages": {},
-          "c:\\program files\\dotnet\\library-packs": {},
+          "C:\\Program Files\\dotnet\\library-packs": {},
           "https://api.nuget.org/v3/index.json": {}
         },
         "frameworks": {
@@ -90,7 +90,7 @@
               "privateAssets": "all"
             }
           },
-          "runtimeIdentifierGraphPath": "c:\\program files\\dotnet\\sdk\\10.0.400-preview.0.26322.102/PortableRuntimeIdentifierGraph.json"
+          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\10.0.400-preview.0.26322.102/PortableRuntimeIdentifierGraph.json"
         }
       }
     }

@@ -4,10 +4,110 @@
 #include "precomp.h"
 
 #include <windows.h>
+#include <errno.h>
 
 #pragma warning(3 : 4706) // warning C4706: assignment within conditional expression
 
 #include "strutils.h"
+
+EBoundedStringResult CopyStringChecked(char* destination, size_t destinationCapacity, const char* source)
+{
+    if (destination == NULL || destinationCapacity == 0 || source == NULL)
+    {
+        if (destination != NULL && destinationCapacity != 0)
+            destination[0] = 0;
+        SetLastError(ERROR_INVALID_PARAMETER);
+        return bsrInvalidParameter;
+    }
+
+    size_t sourceLength = strlen(source);
+    if (sourceLength >= destinationCapacity)
+    {
+        destination[0] = 0;
+        SetLastError(ERROR_INSUFFICIENT_BUFFER);
+        return bsrTruncated;
+    }
+
+    memcpy(destination, source, sourceLength + 1);
+    return bsrSuccess;
+}
+
+EBoundedStringResult FormatStringCheckedV(char* destination, size_t destinationCapacity,
+                                          const char* format, va_list arguments)
+{
+    if (destination == NULL || destinationCapacity == 0 || format == NULL)
+    {
+        if (destination != NULL && destinationCapacity != 0)
+            destination[0] = 0;
+        SetLastError(ERROR_INVALID_PARAMETER);
+        return bsrInvalidParameter;
+    }
+
+    va_list measuredArguments;
+    va_copy(measuredArguments, arguments);
+    int required = _vscprintf(format, measuredArguments);
+    va_end(measuredArguments);
+    if (required < 0)
+    {
+        destination[0] = 0;
+        SetLastError(ERROR_NO_UNICODE_TRANSLATION);
+        return bsrEncodingError;
+    }
+    if ((size_t)required >= destinationCapacity)
+    {
+        destination[0] = 0;
+        SetLastError(ERROR_INSUFFICIENT_BUFFER);
+        return bsrTruncated;
+    }
+
+    int written = vsnprintf_s(destination, destinationCapacity, _TRUNCATE, format, arguments);
+    if (written != required)
+    {
+        destination[0] = 0;
+        SetLastError(ERROR_NO_UNICODE_TRANSLATION);
+        return bsrEncodingError;
+    }
+    return bsrSuccess;
+}
+
+EBoundedStringResult FormatStringChecked(char* destination, size_t destinationCapacity,
+                                         const char* format, ...)
+{
+    va_list arguments;
+    va_start(arguments, format);
+    EBoundedStringResult result = FormatStringCheckedV(destination, destinationCapacity, format, arguments);
+    va_end(arguments);
+    return result;
+}
+
+EBoundedStringResult ConvertWideToUtf8Checked(const WCHAR* source, char* destination,
+                                               size_t destinationCapacity)
+{
+    if (destination == NULL || destinationCapacity == 0 || source == NULL)
+    {
+        if (destination != NULL && destinationCapacity != 0)
+            destination[0] = 0;
+        SetLastError(ERROR_INVALID_PARAMETER);
+        return bsrInvalidParameter;
+    }
+
+    destination[0] = 0;
+    int required = WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, source, -1, NULL, 0, NULL, NULL);
+    if (required == 0)
+        return bsrEncodingError;
+    if ((size_t)required > destinationCapacity)
+    {
+        SetLastError(ERROR_INSUFFICIENT_BUFFER);
+        return bsrTruncated;
+    }
+    if (WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, source, -1, destination,
+                            (int)destinationCapacity, NULL, NULL) != required)
+    {
+        destination[0] = 0;
+        return bsrEncodingError;
+    }
+    return bsrSuccess;
+}
 
 int ConvertU2A(const WCHAR* src, int srcLen, char* buf, int bufSize, BOOL compositeCheck, UINT codepage)
 {
@@ -431,10 +531,10 @@ BOOL ConvertFindDataWToUtf8(const WIN32_FIND_DATAW& src, WIN32_FIND_DATAA* dst)
     dst->nFileSizeLow = src.nFileSizeLow;
     dst->dwReserved0 = src.dwReserved0;
     dst->dwReserved1 = src.dwReserved1;
-    if (ConvertWideToUtf8(src.cFileName, -1, dst->cFileName, _countof(dst->cFileName)) == 0)
-        dst->cFileName[0] = 0;
-    if (ConvertWideToUtf8(src.cAlternateFileName, -1, dst->cAlternateFileName, _countof(dst->cAlternateFileName)) == 0)
-        dst->cAlternateFileName[0] = 0;
+    if (ConvertWideToUtf8Checked(src.cFileName, dst->cFileName, _countof(dst->cFileName)) != bsrSuccess ||
+        ConvertWideToUtf8Checked(src.cAlternateFileName, dst->cAlternateFileName,
+                                  _countof(dst->cAlternateFileName)) != bsrSuccess)
+        return FALSE;
     return TRUE;
 }
 
