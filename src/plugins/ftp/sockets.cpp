@@ -188,8 +188,8 @@ BOOL CSocket::Shutdown(DWORD* error)
     {
         if (SSLConn)
         {
-            int err = SSLLib.SSL_shutdown(SSLConn);
-            SSLLib.SSL_free(SSLConn);
+            int err = SSLShutdown(SSLConn);
+            SSLFree(SSLConn);
             SSLConn = NULL;
         }
         if (shutdown(Socket, SD_SEND) != SOCKET_ERROR)
@@ -224,8 +224,8 @@ BOOL CSocket::CloseSocket(DWORD* error)
     {
         if (SSLConn)
         {
-            int err = SSLLib.SSL_shutdown(SSLConn);
-            SSLLib.SSL_free(SSLConn);
+            int err = SSLShutdown(SSLConn);
+            SSLFree(SSLConn);
             SSLConn = NULL;
         }
         if (closesocket(Socket) != SOCKET_ERROR)
@@ -1089,7 +1089,7 @@ void CSocket::ProxySendBytes(const char* buf, int bufLen, int index, BOOL* csLef
         {
             while (1) // loop necessary because of the 'send' function (if a "would block" error occurs, it reports it only in the next iteration)
             {
-                int sentLen = SSLLib.SSL_write(SSLConn, buf + len, bufLen - len);
+                int sentLen = SSLWrite(SSLConn, buf + len, bufLen - len);
                 if (sentLen > 0) // at least something was sent successfully (or rather accepted by Windows, delivery is uncertain)
                 {
                     len += sentLen;
@@ -1100,7 +1100,7 @@ void CSocket::ProxySendBytes(const char* buf, int bufLen, int index, BOOL* csLef
                 {
                     ProxyErrorCode = pecSendingBytes;
                     // if WSAEWOULDBLOCK -> nothing else can be sent (Windows no longer has buffer space), send the rest after FD_WRITE (not implemented yet, hopefully unnecessary)
-                    ProxyWinError = SSLtoWS2Error(SSLLib.SSL_get_error(SSLConn, sentLen));
+                    ProxyWinError = SSLtoWS2Error(SSLGetError(SSLConn, sentLen));
                     SocketState = isConnect ? ssConnectFailed : ssListenFailed;
                     HANDLES(LeaveCriticalSection(&SocketCritSect));
                     if (isConnect)
@@ -2228,7 +2228,7 @@ void CSocket::ReceiveNetEvent(LPARAM lParam, int index)
                 {
                     while (1)
                     {
-                        int r = SSLLib.SSL_read(SSLConn, buf, 500);
+                        int r = SSLRead(SSLConn, buf, 500);
                         if (r <= 0)
                             break; // loop until an error or zero (0 = gracefully closed)
                         else
@@ -3147,7 +3147,7 @@ CSocketsThread::Body()
         WaitForSingleObject(CanEndThread, INFINITE);
     }
 
-    // Petr: if this thread used OpenSSL, we must release memory with the following call
+    // Kept for the historic socket-thread shutdown protocol; SChannel has no thread-local cleanup.
     SSLThreadLocalCleanup();
 
     TRACE_I("End");

@@ -116,10 +116,11 @@ This document is the working record for a read-only stability and resilience aud
 - **Justification:** The uploader casts file size into `int`, allocates the entire request, knowingly writes an imprecise `Content-Length`, assumes one `send` transmits everything, and has no robust timeouts (`src/salmon/upload.cpp:29-69`, `220-240`).
 - **Proposed solution:** Use 64-bit checked arithmetic, stream fixed-size chunks, let WinHTTP frame the body, set connect/send/receive deadlines, support cancellation, cap response size, and retry only idempotent pre-commit failures.
 
-### 14. Replace OpenSSL 1.0.2u with a supported TLS implementation
+### 14. Replace OpenSSL 1.0.2u with a supported TLS implementation — Implemented (2026-08-09)
 
-- **Justification:** The release downloads OpenSSL 1.0.2u and ships legacy `libeay32.dll`/`ssleay32.dll` (`.github/workflows/build-installer.yml:45`, `tools/prepare_installer.ps1:70`). An obsolete TLS stack increases security and interoperability failures.
-- **Proposed solution:** Prefer Windows SChannel to reduce bundled attack surface; otherwise move to a supported OpenSSL branch with a documented compatibility plan. Add TLS 1.2/1.3 integration tests, certificate-failure tests, and an upgrade cadence.
+- **Delivered:** The FTP plug-in uses the Windows SChannel stream security package with TLS 1.2 and TLS 1.3 enabled; it no longer loads OpenSSL or ships `libeay32.dll`/`ssleay32.dll`. Certificate-chain, hostname, validity, and revocation checks still use the Windows certificate APIs, preserving the existing explicit, per-connection user exception flow.
+- **Verification:** `SChannelTlsIntegrationTests` negotiates local TLS 1.2 and TLS 1.3 servers and proves that a self-signed certificate is rejected without an explicit exception. The release workflow and installer staging have no TLS runtime download or DLL copy.
+- **Cadence:** SChannel updates arrive through supported Windows servicing. Before each supported-Windows baseline change and each quarterly release, run the TLS integration tests on the oldest supported Windows release and Windows Server 2022 or newer, confirm TLS 1.2 and TLS 1.3 negotiation, and review Windows TLS/security advisories. Treat a failed certificate-rejection test or a newly disabled protocol as a release blocker.
 
 ### 15. Gate releases on the complete verification suite
 

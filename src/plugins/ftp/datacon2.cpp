@@ -497,9 +497,9 @@ void CKeepAliveDataConSocket::ReceiveNetEvent(LPARAM lParam, int index)
                         len = recv(Socket, buf, KEEPALIVEDATACON_READBUFSIZE, 0);
                     else
                     {
-                        if (SSLLib.SSL_pending(SSLConn) > 0) // if the internal SSL buffer is not empty recv() is not called and no further FD_READ arrives, so we must post it ourselves or the data transfer stops
+                        if (SSLPending(SSLConn) > 0) // if the internal TLS buffer is not empty recv() is not called and no further FD_READ arrives, so we must post it ourselves or the data transfer stops
                             PostMessage(SocketsThread->GetHiddenWindow(), Msg, (WPARAM)Socket, FD_READ);
-                        len = SSLLib.SSL_read(SSLConn, buf, KEEPALIVEDATACON_READBUFSIZE);
+                        len = SSLRead(SSLConn, buf, KEEPALIVEDATACON_READBUFSIZE);
                     }
                     if (len >= 0 /*!= SOCKET_ERROR*/) // we may have read something (0 = the connection is already closed)
                     {
@@ -511,7 +511,7 @@ void CKeepAliveDataConSocket::ReceiveNetEvent(LPARAM lParam, int index)
                         }
                         else if (SSLConn)
                         {
-                            if ((WSAGETSELECTEVENT(lParam) == FD_READ) && (6 /*SSL_ERROR_ZERO_RETURN*/ == SSLLib.SSL_get_error(SSLConn, 0)))
+                            if ((WSAGETSELECTEVENT(lParam) == FD_READ) && (SSL_ERROR_ZERO_RETURN == SSLGetError(SSLConn, 0)))
                             {
                                 // seen at ftps://ftp.smartftp.com
                                 // SSL_ERROR_ZERO_RETURN: The TLS/SSL connection has been closed.
@@ -526,7 +526,7 @@ void CKeepAliveDataConSocket::ReceiveNetEvent(LPARAM lParam, int index)
                     }
                     else
                     {
-                        DWORD err = !SSLConn ? WSAGetLastError() : SSLtoWS2Error(SSLLib.SSL_get_error(SSLConn, len));
+                        DWORD err = !SSLConn ? WSAGetLastError() : SSLtoWS2Error(SSLGetError(SSLConn, len));
                         ;
                         if (err != WSAEWOULDBLOCK)
                         {
@@ -1182,7 +1182,7 @@ void CUploadDataConnectionSocket::ReceiveNetEvent(LPARAM lParam, int index)
                                 if (!SSLConn)
                                     sentLen = send(Socket, BytesToWrite + BytesToWriteOffset, paketSize, 0);
                                 else
-                                    sentLen = SSLLib.SSL_write(SSLConn, BytesToWrite + BytesToWriteOffset, paketSize);
+                                    sentLen = SSLWrite(SSLConn, BytesToWrite + BytesToWriteOffset, paketSize);
 
                                 if (sentLen >= 0 /*!= SOCKET_ERROR*/) // at least something was successfully sent (or rather accepted by Windows; actual delivery is anyone's guess)
                                 {
@@ -1281,7 +1281,7 @@ void CUploadDataConnectionSocket::ReceiveNetEvent(LPARAM lParam, int index)
                                 }
                                 else
                                 {
-                                    DWORD err = !SSLConn ? WSAGetLastError() : SSLtoWS2Error(SSLLib.SSL_get_error(SSLConn, sentLen));
+                                    DWORD err = !SSLConn ? WSAGetLastError() : SSLtoWS2Error(SSLGetError(SSLConn, sentLen));
                                     if (err == WSAEWOULDBLOCK)       // nothing else can be sent (Windows has no buffer space left)
                                         WaitingForWriteEvent = TRUE; // stop sending and wait for another FD_WRITE
                                     else                             // a different error occurred - report it

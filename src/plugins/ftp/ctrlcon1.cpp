@@ -1639,7 +1639,7 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
                                                                                                  LoadStr(IDS_FTPPLUGINTITLE), MB_OK | MB_ICONSTOP);
                                                                 state = sccsDone;
                                                                 allBytesWritten = TRUE;      // no longer important, the socket is going to be closed
-                                                                SSLInitSequence = sslisNone; // do not attempt to load OpenSSL libs
+                                                                SSLInitSequence = sslisNone; // do not attempt to negotiate TLS
                                                             }
                                                             else
                                                             {
@@ -1816,7 +1816,7 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
                                                         }
                                                     }
                                                 }
-                                                else // Error! OpenSSL libs not found? Or not W2K+?
+                                                else // Windows TLS services are unavailable.
                                                 {
                                                     allBytesWritten = TRUE; // no longer important, the socket will be closed
                                                     state = sccsFatalError;

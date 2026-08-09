@@ -70,10 +70,6 @@ Source: "{#SourcePath}\salpvenv.exe"; DestDir: "{app}"; Flags: ignoreversion ski
 Source: "{#SourcePath}\fcremote.exe"; DestDir: "{app}"; Flags: ignoreversion skipifsourcedoesntexist
 Source: "{#SourcePath}\7zwrapper.exe"; DestDir: "{app}"; Flags: ignoreversion skipifsourcedoesntexist
 
-; OpenSSL libraries for FTP encryption support
-Source: "{#SourcePath}\utils\libeay32.dll"; DestDir: "{app}\utils"; Flags: ignoreversion skipifsourcedoesntexist
-Source: "{#SourcePath}\utils\ssleay32.dll"; DestDir: "{app}\utils"; Flags: ignoreversion skipifsourcedoesntexist
-
 ; License file
 Source: "{#SourcePath}\LICENSE"; DestDir: "{app}"; Flags: ignoreversion
 
