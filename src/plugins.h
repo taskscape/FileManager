@@ -23,6 +23,54 @@ void EnterPlugin();
 void LeavePlugin();
 BOOL IsInPlugin();
 
+// Every host-to-plug-in call must use this boundary.  The exception filter restores
+// the EnterPlugin invariants, records the owning plug-in and queues a safe unload.
+// Callers initialize result variables before the macro so a failed callback always
+// returns a valid conservative value.
+int WINAPI HandlePluginCallbackException(const void* pluginInterface, const char* callback,
+                                         EXCEPTION_POINTERS* exceptionInfo);
+void HandlePluginCallbackFailure(const void* pluginInterface, const char* callback);
+
+class CPluginCallbackInvoker
+{
+public:
+    virtual void Invoke() = 0;
+};
+
+// Defined in plugins_loading.cpp so that the SEH frame never shares a function
+// with C++ objects that require unwinding.
+BOOL CallPluginCallback(const void* pluginInterface, const char* callback,
+                        CPluginCallbackInvoker* invoker);
+
+template <class T>
+class CPluginCallbackInvokerImpl : public CPluginCallbackInvoker
+{
+public:
+    CPluginCallbackInvokerImpl(T& callback) : Callback(callback) {}
+    virtual void Invoke() { Callback(); }
+
+private:
+    T& Callback;
+};
+
+#define PLUGIN_CALLBACK(pluginInterface, callback, call)                                             \
+    do                                                                                                \
+    {                                                                                                 \
+        auto pluginCallbackLambda = [&]()                                                            \
+        {                                                                                             \
+            try                                                                                       \
+            {                                                                                         \
+                call;                                                                                 \
+            }                                                                                         \
+            catch (...)                                                                               \
+            {                                                                                         \
+                HandlePluginCallbackFailure(pluginInterface, callback);                              \
+            }                                                                                         \
+        };                                                                                            \
+        CPluginCallbackInvokerImpl<decltype(pluginCallbackLambda)> pluginCallbackInvoker(pluginCallbackLambda); \
+        CallPluginCallback(pluginInterface, callback, &pluginCallbackInvoker);                      \
+    } while (0)
+
 class CPluginInterfaceForArchiverEncapsulation
 {
 protected:
@@ -411,14 +459,15 @@ public:
     void About(HWND parent)
     {
         EnterPlugin();
-        Interface->About(parent);
+        PLUGIN_CALLBACK(Interface, "About", Interface->About(parent));
         LeavePlugin();
     }
 
     BOOL Release(HWND parent, BOOL force)
     {
         EnterPlugin();
-        BOOL r = Interface->Release(parent, force);
+        BOOL r = FALSE;
+        PLUGIN_CALLBACK(Interface, "Release", r = Interface->Release(parent, force));
         LeavePlugin();
         return r;
     }
@@ -426,28 +475,28 @@ public:
     void LoadConfiguration(HWND parent, HKEY regKey, CSalamanderRegistryAbstract* registry)
     {
         EnterPlugin();
-        Interface->LoadConfiguration(parent, regKey, registry);
+        PLUGIN_CALLBACK(Interface, "LoadConfiguration", Interface->LoadConfiguration(parent, regKey, registry));
         LeavePlugin();
     }
 
     void SaveConfiguration(HWND parent, HKEY regKey, CSalamanderRegistryAbstract* registry)
     {
         EnterPlugin();
-        Interface->SaveConfiguration(parent, regKey, registry);
+        PLUGIN_CALLBACK(Interface, "SaveConfiguration", Interface->SaveConfiguration(parent, regKey, registry));
         LeavePlugin();
     }
 
     void Configuration(HWND parent)
     {
         EnterPlugin();
-        Interface->Configuration(parent);
+        PLUGIN_CALLBACK(Interface, "Configuration", Interface->Configuration(parent));
         LeavePlugin();
     }
 
     void Connect(HWND parent, CSalamanderConnectAbstract* salamander)
     {
         EnterPlugin();
-        Interface->Connect(parent, salamander);
+        PLUGIN_CALLBACK(Interface, "Connect", Interface->Connect(parent, salamander));
         LeavePlugin();
     }
 
@@ -457,7 +506,8 @@ public:
     CPluginInterfaceForArchiverAbstract* GetInterfaceForArchiver()
     {
         EnterPlugin();
-        CPluginInterfaceForArchiverAbstract* r = Interface->GetInterfaceForArchiver();
+        CPluginInterfaceForArchiverAbstract* r = NULL;
+        PLUGIN_CALLBACK(Interface, "GetInterfaceForArchiver", r = Interface->GetInterfaceForArchiver());
         LeavePlugin();
         return r;
     }
@@ -465,7 +515,8 @@ public:
     CPluginInterfaceForViewerAbstract* GetInterfaceForViewer()
     {
         EnterPlugin();
-        CPluginInterfaceForViewerAbstract* r = Interface->GetInterfaceForViewer();
+        CPluginInterfaceForViewerAbstract* r = NULL;
+        PLUGIN_CALLBACK(Interface, "GetInterfaceForViewer", r = Interface->GetInterfaceForViewer());
         LeavePlugin();
         return r;
     }
@@ -473,7 +524,8 @@ public:
     CPluginInterfaceForMenuExtAbstract* GetInterfaceForMenuExt()
     {
         EnterPlugin();
-        CPluginInterfaceForMenuExtAbstract* r = Interface->GetInterfaceForMenuExt();
+        CPluginInterfaceForMenuExtAbstract* r = NULL;
+        PLUGIN_CALLBACK(Interface, "GetInterfaceForMenuExt", r = Interface->GetInterfaceForMenuExt());
         LeavePlugin();
         return r;
     }
@@ -481,7 +533,8 @@ public:
     CPluginInterfaceForFSAbstract* GetInterfaceForFS()
     {
         EnterPlugin();
-        CPluginInterfaceForFSAbstract* r = Interface->GetInterfaceForFS();
+        CPluginInterfaceForFSAbstract* r = NULL;
+        PLUGIN_CALLBACK(Interface, "GetInterfaceForFS", r = Interface->GetInterfaceForFS());
         LeavePlugin();
         return r;
     }
@@ -489,7 +542,8 @@ public:
     CPluginInterfaceForThumbLoaderAbstract* GetInterfaceForThumbLoader()
     {
         EnterPlugin();
-        CPluginInterfaceForThumbLoaderAbstract* r = Interface->GetInterfaceForThumbLoader();
+        CPluginInterfaceForThumbLoaderAbstract* r = NULL;
+        PLUGIN_CALLBACK(Interface, "GetInterfaceForThumbLoader", r = Interface->GetInterfaceForThumbLoader());
         LeavePlugin();
         return r;
     }
@@ -497,28 +551,28 @@ public:
     void Event(int event, DWORD param)
     {
         EnterPlugin();
-        Interface->Event(event, param);
+        PLUGIN_CALLBACK(Interface, "Event", Interface->Event(event, param));
         LeavePlugin();
     }
 
     void ClearHistory(HWND parent)
     {
         EnterPlugin();
-        Interface->ClearHistory(parent);
+        PLUGIN_CALLBACK(Interface, "ClearHistory", Interface->ClearHistory(parent));
         LeavePlugin();
     }
 
     void AcceptChangeOnPathNotification(const char* path, BOOL includingSubdirs)
     {
         EnterPlugin();
-        Interface->AcceptChangeOnPathNotification(path, includingSubdirs);
+        PLUGIN_CALLBACK(Interface, "AcceptChangeOnPathNotification", Interface->AcceptChangeOnPathNotification(path, includingSubdirs));
         LeavePlugin();
     }
 
     void PasswordManagerEvent(HWND parent, int event)
     {
         EnterPlugin();
-        Interface->PasswordManagerEvent(parent, event);
+        PLUGIN_CALLBACK(Interface, "PasswordManagerEvent", Interface->PasswordManagerEvent(parent, event));
         LeavePlugin();
     }
 };
@@ -2960,6 +3014,10 @@ public:
     // returns the CPluginData containing iface 'plugin', or NULL if it does not exist
     // NOTE: the pointer is valid only until the number of plugins changes (the array expands or shrinks)
     CPluginData* GetPluginData(const CPluginInterfaceForFSAbstract* plugin);
+
+    // Finds the plug-in that owns any SDK interface.  Failure handling uses
+    // this instead of trusting a callback's data pointers after an exception.
+    CPluginData* GetPluginData(const void* pluginInterface);
 
     // returns the CPluginData with iface 'plugin', or NULL if none exists
     // NOTE: the pointer is valid only until the number of plugins changes (the array expands or shrinks)

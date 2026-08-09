@@ -192,6 +192,33 @@ public sealed class NativeSafetyRegressionTests
         });
     }
 
+    [Test]
+    public void Plugin_callbacks_are_contained_and_the_failing_plugin_is_deferred_for_unload()
+    {
+        var root = FindRepositoryRoot();
+        var header = File.ReadAllText(Path.Combine(root, "src", "plugins.h"));
+        var loader = File.ReadAllText(Path.Combine(root, "src", "plugins_loading.cpp"));
+        var registry = File.ReadAllText(Path.Combine(root, "src", "plugins_interface.cpp"));
+        var refactoring = File.ReadAllText(Path.Combine(root, "refactoring.md"));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(header, Does.Contain("#define PLUGIN_CALLBACK"));
+            Assert.That(header, Does.Contain("HandlePluginCallbackException"));
+            Assert.That(header, Does.Contain("PLUGIN_CALLBACK(Interface, \"Connect\""));
+            Assert.That(header, Does.Contain("PLUGIN_CALLBACK(Interface, \"GetInterfaceForFS\""));
+            Assert.That(loader, Does.Contain("PLUGIN_CALLBACK(Iface, \"ListCurrentPath\""));
+            Assert.That(loader, Does.Contain("PLUGIN_CALLBACK(Interface, \"CloseFS\""));
+            Assert.That(loader, Does.Contain("PLUGIN_CALLBACK(Plugin, \"ReleasePluginData\""));
+            Assert.That(loader, Does.Contain("plugin->LoadOnStart = FALSE"));
+            Assert.That(loader, Does.Contain("plugin->ShouldUnload = TRUE"));
+            Assert.That(loader, Does.Contain("WM_USER_POSTCMDORUNLOADPLUGIN"));
+            Assert.That(loader, Does.Not.Contain("TerminateProcess(GetCurrentProcess(), 1)"));
+            Assert.That(registry, Does.Contain("CPlugins::GetPluginData(const void* pluginInterface)"));
+            Assert.That(refactoring, Does.Contain("### 23. Add failure barriers around every plug-in callback — Implemented"));
+        });
+    }
+
     private static string FindRepositoryRoot()
     {
         for (var directory = new DirectoryInfo(AppContext.BaseDirectory); directory is not null; directory = directory.Parent)

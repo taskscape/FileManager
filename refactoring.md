@@ -165,10 +165,11 @@ This document is the working record for a read-only stability and resilience aud
 - **Synchronization:** The process-wide plug-in nesting counter is now atomic, and its first-entry/last-exit transitions are serialized with an SRW lock. Shutdown and notification callers query it through `IsInPlugin()` rather than reading mutable state directly.
 - **Verification:** `NativeSafetyRegressionTests.Plugin_entry_scope_restores_host_state_after_an_unwinding_entry_point` guards the scope, placeholder cleanup, synchronization, callers, and this ledger entry.
 
-### 23. Add failure barriers around every plug-in callback
+### 23. Add failure barriers around every plug-in callback — Implemented
 
 - **Justification:** Host-to-plug-in calls are numerous and not governed by one recovery contract; at least one plug-in thread exception path terminates the process. A single extension fault should not take down unrelated file operations.
 - **Proposed solution:** Route callbacks through a common boundary that records the plug-in identity, validates results, restores host invariants, disables the failing extension, and reports a recoverable error. Use process isolation where recovery from memory corruption cannot be trusted.
+- **Implementation (2026-08-09):** The shared `PLUGIN_CALLBACK` SEH boundary now covers the base, file-system, and plug-in-data callback facades. It records the owner, returns conservative initialized results after a fault, restores refresh/directory invariants through the caller's normal `LeavePlugin`, prevents reload at startup, and queues the extension for deferred unload. The plug-in thread wrapper now follows the same recovery path instead of terminating `salamand.exe`. Existing out-of-process parser brokering remains the isolation boundary for untrusted parser/preview work where in-process recovery cannot be trusted.
 
 ### 24. Make configuration saves transactional
 
