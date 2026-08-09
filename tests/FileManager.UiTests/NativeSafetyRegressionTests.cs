@@ -11,6 +11,39 @@ namespace FileManager.UiTests;
 public sealed class NativeSafetyRegressionTests
 {
     [Test]
+    public void Win32_path_boundaries_use_owned_wide_paths_and_extended_length_syntax()
+    {
+        var root = FindRepositoryRoot();
+        var widePath = File.ReadAllText(Path.Combine(root, "src", "common", "wide_path.h"));
+        var strings = File.ReadAllText(Path.Combine(root, "src", "common", "strutils.cpp"));
+        var handles = File.ReadAllText(Path.Combine(root, "src", "common", "handles.cpp"));
+        var navigation = File.ReadAllText(Path.Combine(root, "src", "fileswindow_navigation.cpp"));
+        var refactoring = File.ReadAllText(Path.Combine(root, "refactoring.md"));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(widePath, Does.Contain("class CWidePath"));
+            Assert.That(widePath, Does.Contain("GetDisplayPath"));
+            Assert.That(widePath, Does.Contain("GetPathForWin32Api"));
+            Assert.That(widePath, Does.Contain("GetFullPathForWin32Api"));
+            Assert.That(widePath, Does.Contain("GetFullPathNameW(DisplayPath, 0, NULL, NULL)"));
+            Assert.That(widePath, Does.Contain("extendedUncPrefix"));
+            Assert.That(widePath, Does.Contain("PrefixExtendedLengthPathIfNeeded"));
+            Assert.That(widePath, Does.Contain("MB_ERR_INVALID_CHARS"));
+            Assert.That(widePath, Does.Contain("display spelling separate from the API spelling"));
+            Assert.That(strings, Does.Contain("CWidePath fileNameW(fileName)"));
+            Assert.That(strings, Does.Contain("GetPathForWin32Api"));
+            Assert.That(strings, Does.Not.Contain("CStrStackOrHeap"));
+            Assert.That(handles, Does.Contain("CWidePath fileNameW(lpFileName)"));
+            Assert.That(handles, Does.Contain("GetFullPathForWin32Api"));
+            Assert.That(handles, Does.Not.Contain("Utf8AllocWideHandles"));
+            Assert.That(navigation, Does.Contain("CWidePath pathW(path)"));
+            Assert.That(navigation, Does.Not.Contain("CStrStackOrHeap"));
+            Assert.That(refactoring, Does.Contain("### 35. Introduce a dynamic wide-path abstraction — Implemented"));
+        });
+    }
+
+    [Test]
     public void Destructive_operations_keep_the_handle_identity_guard()
     {
         var root = FindRepositoryRoot();
@@ -246,6 +279,7 @@ public sealed class NativeSafetyRegressionTests
         var startup = File.ReadAllText(Path.Combine(root, "src", "app_entry.cpp"));
         var releaseHandles = File.ReadAllText(Path.Combine(root, "src", "common", "handles.h"));
         var debugHandles = File.ReadAllText(Path.Combine(root, "src", "common", "handles.cpp"));
+        var widePath = File.ReadAllText(Path.Combine(root, "src", "common", "wide_path.h"));
         var refactoring = File.ReadAllText(Path.Combine(root, "refactoring.md"));
 
         Assert.Multiple(() =>
@@ -256,7 +290,9 @@ public sealed class NativeSafetyRegressionTests
             Assert.That(startup, Does.Contain("LOAD_LIBRARY_SEARCH_APPLICATION_DIR"));
             Assert.That(startup, Does.Contain("LOAD_LIBRARY_SEARCH_SYSTEM32"));
             Assert.That(startup, Does.Contain("LOAD_LIBRARY_SEARCH_USER_DIRS"));
-            Assert.That(releaseHandles, Does.Contain("GetFullPathNameW"));
+            Assert.That(widePath, Does.Contain("GetFullPathNameW"));
+            Assert.That(releaseHandles, Does.Contain("GetFullPathForWin32Api"));
+            Assert.That(debugHandles, Does.Contain("GetFullPathForWin32Api"));
             Assert.That(releaseHandles, Does.Contain("::LoadLibraryExW(fullPath, NULL, loadFlags)"));
             Assert.That(debugHandles, Does.Contain("::LoadLibraryExW(fullPath, NULL, loadFlags)"));
             Assert.That(releaseHandles, Does.Contain("LOAD_LIBRARY_SEARCH_DLL_LOAD_DIR"));

@@ -4,6 +4,8 @@
 
 #pragma once
 
+#include "wide_path.h"
+
 // These flags were made available to Windows 7 through KB2533623. Keep the
 // definitions here because older SDKs omit them for the Windows 7 target.
 #ifndef LOAD_LIBRARY_SEARCH_DLL_LOAD_DIR
@@ -24,58 +26,22 @@
 // to avoid problems with semicolons in the macros defined below
 inline void __HandlesEmptyFunction() {}
 
-// UTF-8 to wide string conversion helper for Release mode
-inline WCHAR* Utf8AllocWideHandlesRelease(const char* src)
-{
-    if (src == NULL)
-        return NULL;
-    int len = MultiByteToWideChar(CP_UTF8, 0, src, -1, NULL, 0);
-    if (len <= 0)
-        return NULL;
-    WCHAR* dst = (WCHAR*)malloc(len * sizeof(WCHAR));
-    if (dst != NULL)
-        MultiByteToWideChar(CP_UTF8, 0, src, -1, dst, len);
-    return dst;
-}
-
 // LoadLibraryUtf8 for Release mode (when HANDLES_ENABLE is not defined)
 inline HINSTANCE LoadLibraryUtf8(LPCSTR lpLibFileName)
 {
     HINSTANCE ret = NULL;
-    WCHAR* fileNameW = Utf8AllocWideHandlesRelease(lpLibFileName);
-    if (fileNameW == NULL)
+    CWidePath fileNameW(lpLibFileName);
+    const WCHAR* fullPath = fileNameW.GetFullPathForWin32Api();
+    if (fullPath == NULL)
     {
         SetLastError(ERROR_NO_UNICODE_TRANSLATION);
     }
     else
     {
-        DWORD fullPathLength = GetFullPathNameW(fileNameW, 0, NULL, NULL);
-        if (fullPathLength != 0)
-        {
-            WCHAR* fullPath = (WCHAR*)malloc(fullPathLength * sizeof(WCHAR));
-            if (fullPath == NULL)
-            {
-                SetLastError(ERROR_NOT_ENOUGH_MEMORY);
-            }
-            else
-            {
-                DWORD copiedLength = GetFullPathNameW(fileNameW, fullPathLength, fullPath, NULL);
-                if (copiedLength == 0 || copiedLength >= fullPathLength)
-                {
-                    if (copiedLength >= fullPathLength)
-                        SetLastError(ERROR_INSUFFICIENT_BUFFER);
-                }
-                else
-                {
-                    const DWORD loadFlags = LOAD_LIBRARY_SEARCH_DLL_LOAD_DIR |
-                                            LOAD_LIBRARY_SEARCH_SYSTEM32 |
-                                            LOAD_LIBRARY_SEARCH_USER_DIRS;
-                    ret = ::LoadLibraryExW(fullPath, NULL, loadFlags);
-                }
-                free(fullPath);
-            }
-        }
-        free(fileNameW);
+        const DWORD loadFlags = LOAD_LIBRARY_SEARCH_DLL_LOAD_DIR |
+                                LOAD_LIBRARY_SEARCH_SYSTEM32 |
+                                LOAD_LIBRARY_SEARCH_USER_DIRS;
+        ret = ::LoadLibraryExW(fullPath, NULL, loadFlags);
     }
     return ret;
 }
