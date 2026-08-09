@@ -450,6 +450,47 @@ public sealed class NativeSafetyRegressionTests
         });
     }
 
+    [Test]
+    public void Security_descriptor_copy_uses_the_privilege_aware_preservation_matrix()
+    {
+        var root = FindRepositoryRoot();
+        var copy = File.ReadAllText(Path.Combine(root, "src", "async_copy.cpp"));
+        var architecture = File.ReadAllText(Path.Combine(root, "architecture.md"));
+        var refactoring = File.ReadAllText(Path.Combine(root, "refactoring.md"));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(copy, Does.Contain("GetNamedSecurityInfoW(targetNameSecW, SE_FILE_OBJECT,"));
+            Assert.That(copy, Does.Contain("PSID previousOwner = NULL"));
+            Assert.That(copy, Does.Contain("GainWriteOwnerAccess()"));
+            Assert.That(copy, Does.Contain("BOOL changingOwnerOrGroup"));
+            Assert.That(copy, Does.Contain("else if (!changingOwnerOrGroup)"));
+            Assert.That(copy, Does.Contain("ERROR_PRIVILEGE_NOT_HELD"));
+            Assert.That(copy, Does.Contain("BOOL attemptedWrite = FALSE"));
+            Assert.That(copy, Does.Contain("if (!attemptedWrite)"));
+            Assert.That(copy, Does.Contain("SetDaclWithInheritance(targetNameSecW, srcDACL, inheritedDacl)"));
+            Assert.That(copy, Does.Contain("IsSecurityDescriptorPreserved("));
+            Assert.That(copy, Does.Contain("AreEqualExplicitAces("));
+            Assert.That(copy, Does.Contain("INHERITED_ACE"));
+            Assert.That(copy, Does.Contain("a NULL DACL grants full access and must never be approximated"));
+            Assert.That(copy, Does.Contain("inaccessible source descriptor: report a best-effort metadata loss without touching the target"));
+            Assert.That(copy, Does.Contain("inaccessible target descriptor: do not attempt a blind, partial repair"));
+            Assert.That(copy, Does.Contain("unable to restore the target descriptor after a partial update"));
+            Assert.That(copy, Does.Not.Contain("AddAccessAllowedAce(allowChPermDACL"),
+                        "The former temporary permissive DACL fallback must not return.");
+            Assert.That(copy.IndexOf("PSID previousOwner = NULL", StringComparison.Ordinal),
+                        Is.LessThan(copy.IndexOf("    GainWriteOwnerAccess();", StringComparison.Ordinal)),
+                        "The target descriptor must be snapshotted before privilege-dependent mutation.");
+            Assert.That(architecture, Does.Contain("##### Security descriptor privilege matrix"));
+            Assert.That(architecture, Does.Contain("`SeRestorePrivilege` enabled"));
+            Assert.That(architecture, Does.Contain("explicit deny ACEs"));
+            Assert.That(architecture, Does.Contain("Source or target descriptor inaccessible"));
+            Assert.That(architecture, Does.Contain("FAT/FAT32/exFAT target"));
+            Assert.That(architecture, Does.Contain("restore the target snapshot"));
+            Assert.That(refactoring, Does.Contain("### 33. Verify ACL and ownership preservation under privilege variation — Implemented"));
+        });
+    }
+
     private static string FindRepositoryRoot()
     {
         for (var directory = new DirectoryInfo(AppContext.BaseDirectory); directory is not null; directory = directory.Parent)
