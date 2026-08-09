@@ -60,6 +60,12 @@ jobs:
         with:
           arch: x64
 
+      - name: Reject new forced thread termination
+        if: github.event_name == 'pull_request'
+        run: |
+          git fetch --no-tags --depth=1 origin ${{ github.event.pull_request.base.ref }}
+          .\tools\verify-no-new-terminatethread.ps1 -BaseCommit origin/${{ github.event.pull_request.base.ref }}
+
       - name: Register MSVC problem matcher
         uses: ammaraskar/msvc-problem-matcher@master
 

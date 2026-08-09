@@ -757,9 +757,14 @@ unsigned ThreadCacheHandlesBody(void* param)
     SetThreadNameInVCAndTrace("DiskCache");
     TRACE_I("Begin");
 
-    Sleep(300); // so that Salamander can start
-
     CCacheHandles* handles = (CCacheHandles*)param;
+    // Keep the startup delay interruptible so shutdown never has to force-kill this worker.
+    if (WaitForSingleObject(handles->Terminate, 300) == WAIT_OBJECT_0)
+    {
+        TRACE_I("End");
+        return 0;
+    }
+
     while (1)
     {
         HANDLE handle;
@@ -779,8 +784,8 @@ unsigned ThreadCacheHandlesBody(void* param)
                 {
                     TRACE_E("ThreadCacheHandles(): Unable to receive data from the box.");
                     CALL_STACK_MESSAGE1("ThreadCacheHandlesBody::Unable_to_receive_box");
-                    while (1)
-                        Sleep(1000); // we will stuck on purpose ;-)
+                    while (WaitForSingleObject(handles->Terminate, 1000) == WAIT_TIMEOUT)
+                        ; // retain the diagnostic state, but allow orderly shutdown
                 }
             }
             else
@@ -796,8 +801,8 @@ unsigned ThreadCacheHandlesBody(void* param)
                     {
                         TRACE_E("Unexpected situation in ThreadCacheHandles().");
                         CALL_STACK_MESSAGE1("ThreadCacheHandlesBody::NULL");
-                        while (1)
-                            Sleep(1000); // we will stuck on purpose ;-)
+                        while (WaitForSingleObject(handles->Terminate, 1000) == WAIT_TIMEOUT)
+                            ; // retain the diagnostic state, but allow orderly shutdown
                     }
                 }
             }
@@ -897,13 +902,16 @@ CCacheHandles::CCacheHandles() : Handles(100, 50), Owners(100, 50)
 void CCacheHandles::Destroy()
 {
     CALL_STACK_MESSAGE1("CCacheHandles::Destroy()");
-    if (Thread != NULL) // thread termination is required
+    if (Thread != NULL)
     {
         SetEvent(Terminate);                                   // "you should end now"
-        if (WaitForSingleObject(Thread, 1000) == WAIT_TIMEOUT) // let's give it 1 second
+        if (WaitForSingleObject(Thread, 1000) == WAIT_TIMEOUT)
         {
-            TerminateThread(Thread, 666);          // it doesn't want to end, we will kill it
-            WaitForSingleObject(Thread, INFINITE); // we will wait until the thread really ends, sometimes it takes a while
+            // The worker may be in a kernel call that cannot be interrupted immediately.
+            // Do not destroy its synchronization state or force-kill it: record the deadline
+            // breach and keep joining until the worker has released its own state.
+            TRACE_E("Cache-handles thread did not stop within the shutdown deadline; waiting for a safe join.");
+            WaitForSingleObject(Thread, INFINITE);
         }
         HANDLES(CloseHandle(Thread));
         Thread = NULL;
@@ -951,8 +959,9 @@ void CCacheHandles::WaitForObjects(HANDLE* handle, CCacheData** owner, int* inde
     {
         TRACE_E("CCacheHandles::WaitForObjects(): Deadlock!");
         CALL_STACK_MESSAGE1("CCacheHandles::WaitForObjects::Deadlock");
-        while (1)
-            Sleep(1000); // we will stuck on purpose ;-)
+        while (WaitForSingleObject(Terminate, 1000) == WAIT_TIMEOUT)
+            ; // retain the diagnostic state, but allow orderly shutdown
+        *handle = Terminate;
         return;
     }
     BOOL showError = TRUE;
@@ -988,8 +997,9 @@ void CCacheHandles::WaitForObjects(HANDLE* handle, CCacheData** owner, int* inde
 #endif // (defined(_DEBUG) || defined(CALLSTK_MEASURETIMES)) && !defined(CALLSTK_DISABLEMEASURETIMES)
                 }
 #endif // CALLSTK_DISABLE
-                while (1)
-                    Sleep(1000); // we will stuck on purpose ;-)
+                while (WaitForSingleObject(Terminate, 1000) == WAIT_TIMEOUT)
+                    ; // retain the diagnostic state, but allow orderly shutdown
+                *handle = Terminate;
                 return;
             }
             else
@@ -1007,8 +1017,10 @@ void CCacheHandles::WaitForObjects(HANDLE* handle, CCacheData** owner, int* inde
                         else
                         {
                             CALL_STACK_MESSAGE2("CCacheHandles::WaitForObjects::WaitForMultipleObjects_res=%X", res);
-                            while (1)
-                                Sleep(1000); // we will stuck on purpose ;-)
+                            while (WaitForSingleObject(Terminate, 1000) == WAIT_TIMEOUT)
+                                ; // retain the diagnostic state, but allow orderly shutdown
+                            *handle = Terminate;
+                            return;
                         }
                     }
                     *handle = (HANDLE)Handles[*index];

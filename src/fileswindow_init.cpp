@@ -434,14 +434,25 @@ unsigned IconThreadThreadFBody(void* parameter)
             //       icon overlays (e.g., Tortoise SVN) flickered even more than they do now
             // give the main thread some time to draw and to quickly interrupt when changing directories
             // (now used only as a "pause" during which RefreshDirectory() can push new icons into the cache, see 'WaitBeforeReadingIcons')
-            if (window->WaitBeforeReadingIcons > 0)
-                Sleep(window->WaitBeforeReadingIcons);
+            if (window->WaitBeforeReadingIcons > 0 &&
+                WaitForSingleObject(window->ICEventTerminate, window->WaitBeforeReadingIcons) == WAIT_OBJECT_0)
+            {
+                run = FALSE;
+                break;
+            }
             if (window->WaitOneTimeBeforeReadingIcons > 0)
             {
                 DWORD time = window->WaitOneTimeBeforeReadingIcons;
                 window->WaitOneTimeBeforeReadingIcons = 0;
-                Sleep(time); // wait before starting to read icon overlays; during this wait all notifications about changes from Tortoise SVN should arrive (see IconOverlaysChangedOnPath())
+                if (WaitForSingleObject(window->ICEventTerminate, time) == WAIT_OBJECT_0)
+                {
+                    run = FALSE;
+                    break;
+                }
             }
+
+            if (!run)
+                break;
 
             HANDLES(EnterCriticalSection(&window->ICSleepSection));
 
@@ -732,7 +743,12 @@ unsigned IconThreadThreadFBody(void* parameter)
                                                 {
                                                     waitBeforeFirstReadIcon = FALSE;
                                                     //                            TRACE_I("Waiting 500ms before reading first icon in second round to have bigger chance to succeed.");
-                                                    Sleep(500); // let's pause for a moment (before the second attempt to load the icon)
+                                                    if (WaitForSingleObject(window->ICEventTerminate, 500) == WAIT_OBJECT_0)
+                                                    {
+                                                        HANDLES(EnterCriticalSection(&window->ICSleepSection));
+                                                        run = FALSE;
+                                                        goto GO_SLEEP_MODE;
+                                                    }
                                                 }
 
                                                 // let the icon be loaded from the file; the icon reader may enter sleep mode during loading
@@ -828,7 +844,12 @@ unsigned IconThreadThreadFBody(void* parameter)
                                             {
                                                 waitBeforeFirstReadIcon = FALSE;
                                                 //                          TRACE_I("Waiting 500ms before reading first icon in second round to have bigger chance to succeed.");
-                                                Sleep(500); // take a short break before the second attempt to load the icon
+                                                if (WaitForSingleObject(window->ICEventTerminate, 500) == WAIT_OBJECT_0)
+                                                {
+                                                    HANDLES(EnterCriticalSection(&window->ICSleepSection));
+                                                    run = FALSE;
+                                                    goto GO_SLEEP_MODE;
+                                                }
                                             }
 
                                             if (doExtractIcons)
@@ -1477,10 +1498,12 @@ CFilesWindow::~CFilesWindow()
     {
         SetEvent(ICEventTerminate); // icon reader, terminate yourself!
         if (WaitForSingleObject(IconCacheThread, 1000) == WAIT_TIMEOUT)
-        { // it has one second to exit gracefully, then a kill is necessary (the window is being deallocated)
-            TRACE_E("Terminating Icon Thread");
-            TerminateThread(IconCacheThread, 666);
-            WaitForSingleObject(IconCacheThread, INFINITE); // wait until the thread really ends; sometimes it takes quite a while
+        {
+            // Shell icon handlers can be slow or uncooperative. Keep this panel alive
+            // until its worker leaves rather than corrupting process-wide state with
+            // forced termination.
+            TRACE_E("Icon reader did not stop within the shutdown deadline; waiting for a safe join.");
+            WaitForSingleObject(IconCacheThread, INFINITE);
         }
         HANDLES(CloseHandle(IconCacheThread));
     }

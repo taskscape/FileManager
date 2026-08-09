@@ -26,8 +26,8 @@ DWORD ThreadLastError;                     // result of active thread
 CRITICAL_SECTION CheckPathCS; // critical section for check-path, necessary due to calls from multiple threads (not just main)
 
 // optimization: first check-path thread does not terminate - used repeatedly
-BOOL CPFirstFree = FALSE;      // is it possible to use first check-path thread?
-BOOL CPFirstTerminate = FALSE; // should the first check-path thread terminate?
+BOOL CPFirstFree = FALSE;       // is it possible to use first check-path thread?
+volatile LONG CPFirstTerminate; // should the first check-path thread terminate?
 HANDLE CPFirstStart = NULL;    // event for starting the first check-path thread
 HANDLE CPFirstEnd = NULL;      // event for testing completion of the first check-path thread
 DWORD CPFirstExit;             // replacement for exit code of first check-path thread (does not terminate)
@@ -55,6 +55,7 @@ BOOL InitializeCheckThread()
     CALL_STACK_MESSAGE_NONE
     HANDLES(InitializeCriticalSection(&CheckPathCS));
     HANDLES(InitializeCriticalSection(&ReadCDVolNameCS));
+    InterlockedExchange(&CPFirstTerminate, FALSE);
 
     int i;
     for (i = 0; i < NUM_OF_CHECKTHREADS; i++)
@@ -85,26 +86,24 @@ BOOL InitializeCheckThread()
 void ReleaseCheckThreads()
 {
     CALL_STACK_MESSAGE_NONE
-    HANDLES(DeleteCriticalSection(&ReadCDVolNameCS));
-    HANDLES(DeleteCriticalSection(&CheckPathCS));
 
     if (CPFirstStart != NULL)
     {
-        CPFirstTerminate = TRUE; // let the first check-path thread terminate
+        InterlockedExchange(&CPFirstTerminate, TRUE); // let the first check-path thread terminate
         SetEvent(CPFirstStart);
-        Sleep(100); // give it a chance to react
     }
+
     int i;
     for (i = 0; i < NUM_OF_CHECKTHREADS; i++)
     {
         if (ThreadCheckPath[i] != NULL)
         {
-            DWORD code;
-            if (GetExitCodeThread(ThreadCheckPath[i], &code) && code == STILL_ACTIVE)
-            { // nothing left to do, terminate it
-                TerminateThread(ThreadCheckPath[i], 666);
-                WaitForSingleObject(ThreadCheckPath[i], INFINITE); // wait until thread actually finishes, sometimes it takes quite a while
-            }
+            if (WaitForSingleObject(ThreadCheckPath[i], 1000) == WAIT_TIMEOUT)
+                TRACE_E("Check-path thread did not stop within the shutdown deadline; waiting for a safe join.");
+
+            // A network attribute query can be slow, but the worker may still use the
+            // shared state. Never release that state until it has finished naturally.
+            WaitForSingleObject(ThreadCheckPath[i], INFINITE);
             ThreadCheckState[i] = ctsNotRunning;
             HANDLES(CloseHandle(ThreadCheckPath[i]));
             ThreadCheckPath[i] = NULL;
@@ -120,6 +119,9 @@ void ReleaseCheckThreads()
         HANDLES(CloseHandle(CPFirstEnd));
         CPFirstEnd = NULL;
     }
+
+    HANDLES(DeleteCriticalSection(&ReadCDVolNameCS));
+    HANDLES(DeleteCriticalSection(&CheckPathCS));
 }
 
 unsigned ThreadCheckPathFBody(void* param) // test directory accessibility
@@ -141,7 +143,7 @@ CPF_AGAIN:
         WaitForSingleObject(CPFirstStart, INFINITE); // wait for start or termination
                                                      //    TRACE_I("First check-path thread: Wait satisfied");
         CPFirstFree = FALSE;
-        if (CPFirstTerminate) // termination
+        if (InterlockedCompareExchange(&CPFirstTerminate, FALSE, FALSE)) // termination
         {
             //      TRACE_I("First check-path thread: End");
             return 0;
@@ -404,11 +406,8 @@ RETRY:
                             {
                                 exit = 1;
                                 ThreadCheckState[freeThreadIndex] &= ~ctsActive;
-                                // thread cannot be terminated immediately, usually the system waits for completion
-                                // of the last system call - if it's a network, it takes a few seconds
-                                // therefore it's pointless to call TerminateThread at all, thread will finish just as fast on its own
-                                //                TerminateThread(ThreadCheckPath[freeThreadIndex], exit);
-                                //                WaitForSingleObject(ThreadCheckPath[freeThreadIndex], INFINITE);  // wait for thread to actually finish, sometimes it takes a while
+                                // The thread must finish its current system call naturally. Its result
+                                // is ignored once cancellation has been requested.
                                 break;
                             }
                         }
