@@ -30,7 +30,8 @@ BOOL GetBugReportNames();
 
 int GetUniqueBugReportCount();
 
-void GetReportBaseName(char* name, int nameSize, const char* targetPath, const char* shortName, DWORD64 uid, SYSTEMTIME lt);
+BOOL GetReportBaseName(char* name, int nameSize, const char* targetPath, int targetPathSize,
+                       const char* shortName, int shortNameSize, DWORD64 uid, SYSTEMTIME lt);
 
 BOOL SaveDescriptionAndEmail();
 

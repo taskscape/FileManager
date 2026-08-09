@@ -3,21 +3,130 @@
 
 #include "precomp.h"
 
+#include <stdarg.h>
+#include <string>
+#include <vector>
+
 #pragma warning(push)
 #pragma warning(disable : 4091) // disable typedef warning without variable declaration
 #include <dbghelp.h>
 #pragma warning(pop)
 
+namespace
+{
+const size_t kMaximumCrashReportFieldLength = MAX_PATH - 1;
+const size_t kMaximumCrashReportPathLength = 32767;
+
+void SetMiniDumpError(CMinidumpParams* minidumpParams, const char* format, ...)
+{
+    va_list arguments;
+    va_start(arguments, format);
+    int written = _vsnprintf_s(minidumpParams->ErrorMessage, sizeof(minidumpParams->ErrorMessage),
+                               _TRUNCATE, format, arguments);
+    va_end(arguments);
+    if (written < 0)
+        _snprintf_s(minidumpParams->ErrorMessage, sizeof(minidumpParams->ErrorMessage), _TRUNCATE,
+                    "Crash report error could not be formatted.");
+}
+
+BOOL CopyBoundedExternalText(const char* source, size_t sourceCapacity, size_t maximumAcceptedLength,
+                             std::string* destination)
+{
+    destination->clear();
+    if (source == NULL || sourceCapacity == 0)
+    {
+        SetLastError(ERROR_INVALID_PARAMETER);
+        return FALSE;
+    }
+
+    const char* terminator = (const char*)memchr(source, 0, sourceCapacity);
+    if (terminator == NULL)
+    {
+        SetLastError(ERROR_INVALID_DATA);
+        return FALSE;
+    }
+
+    size_t length = terminator - source;
+    if (length > maximumAcceptedLength)
+    {
+        SetLastError(ERROR_INSUFFICIENT_BUFFER);
+        return FALSE;
+    }
+    destination->assign(source, length);
+    return TRUE;
+}
+
+BOOL GetModuleFileNameOwned(std::string* moduleFileName)
+{
+    DWORD capacity = MAX_PATH;
+    for (;;)
+    {
+        std::vector<char> buffer(capacity);
+        DWORD length = GetModuleFileNameA(NULL, &buffer[0], capacity);
+        if (length == 0)
+            return FALSE;
+        if (length < capacity && buffer[length] == 0)
+        {
+            moduleFileName->assign(&buffer[0], length);
+            return TRUE;
+        }
+        if (capacity >= kMaximumCrashReportPathLength + 1)
+            break;
+        DWORD nextCapacity = capacity * 2;
+        capacity = nextCapacity > kMaximumCrashReportPathLength + 1
+                       ? (DWORD)(kMaximumCrashReportPathLength + 1)
+                       : nextCapacity;
+    }
+    SetLastError(ERROR_INSUFFICIENT_BUFFER);
+    return FALSE;
+}
+
+BOOL BuildMiniDumpFileName(CSalmonSharedMemory* mem, std::string* dumpFileName)
+{
+    std::string bugPath;
+    std::string baseName;
+    if (!CopyBoundedExternalText(mem->BugPath, sizeof(mem->BugPath), kMaximumCrashReportFieldLength, &bugPath) ||
+        !CopyBoundedExternalText(mem->BaseName, sizeof(mem->BaseName), kMaximumCrashReportFieldLength, &baseName) ||
+        baseName.empty())
+    {
+        return FALSE;
+    }
+
+    dumpFileName->assign(bugPath);
+    if (!dumpFileName->empty() && (*dumpFileName)[dumpFileName->size() - 1] != '\\')
+        dumpFileName->append("\\");
+    dumpFileName->append(baseName);
+    dumpFileName->append(".DMP");
+    if (dumpFileName->size() > kMaximumCrashReportPathLength)
+    {
+        dumpFileName->clear();
+        SetLastError(ERROR_INSUFFICIENT_BUFFER);
+        return FALSE;
+    }
+    return TRUE;
+}
+}
+
 BOOL GenerateMiniDump(CMinidumpParams* minidumpParams, CSalmonSharedMemory* mem, BOOL smallMinidump, BOOL* overSize)
 {
     BOOL ret = FALSE;
     *overSize = FALSE;
-    char szPath[MAX_PATH];
-    ::GetModuleFileName(NULL, szPath, MAX_PATH);
-    *(strrchr(szPath, '\\')) = 0;      // we are running from utils\\salmon.exe
-    strcat_s(szPath, "\\dbghelp.dll"); // we want a newer version, at least 6.1, which older W2K/XP do not have
+    std::string moduleFileName;
+    if (!GetModuleFileNameOwned(&moduleFileName))
+    {
+        SetMiniDumpError(minidumpParams, "Unable to determine the crash reporter path (%lu).", GetLastError());
+        return FALSE;
+    }
+    std::string::size_type slash = moduleFileName.find_last_of('\\');
+    if (slash == std::string::npos)
+    {
+        SetLastError(ERROR_INVALID_DATA);
+        SetMiniDumpError(minidumpParams, "The crash reporter path is invalid.");
+        return FALSE;
+    }
+    std::string dbgHelpPath = moduleFileName.substr(0, slash + 1) + "dbghelp.dll";
     static HMODULE hDbgHelp;
-    hDbgHelp = LoadLibrary(szPath);
+    hDbgHelp = LoadLibraryA(dbgHelpPath.c_str());
     if (hDbgHelp != NULL)
     {
         typedef BOOL(WINAPI * MiniDumpWriteDump_t)(HANDLE, DWORD, HANDLE, MINIDUMP_TYPE, CONST PMINIDUMP_EXCEPTION_INFORMATION,
@@ -29,19 +138,19 @@ BOOL GenerateMiniDump(CMinidumpParams* minidumpParams, CSalmonSharedMemory* mem,
         funcMakeSureDirectoryPathExists = (MakeSureDirectoryPathExists_t)GetProcAddress(hDbgHelp, "MakeSureDirectoryPathExists");
         if (funcMiniDumpWriteDump != NULL && funcMakeSureDirectoryPathExists != NULL)
         {
-            char szFileName[MAX_PATH];
-            strcpy(szFileName, mem->BugPath); // the path ends with a trailing backslash
-            int bugPathLen = (int)strlen(mem->BugPath);
-            if (bugPathLen > 0 && mem->BugPath[bugPathLen - 1] != '\\')
-                strcat(szFileName, "\\");
-            strcat(szFileName, mem->BaseName);
-            strcat(szFileName, ".DMP");
+            std::string dumpFileName;
+            if (!BuildMiniDumpFileName(mem, &dumpFileName))
+            {
+                SetMiniDumpError(minidumpParams, "Crash report fields are invalid or exceed the accepted size (%lu).",
+                                 GetLastError());
+                return FALSE;
+            }
 
             // the path may not exist yet - create it
-            funcMakeSureDirectoryPathExists(szFileName); // the file name is ignored
+            funcMakeSureDirectoryPathExists(dumpFileName.c_str()); // the file name is ignored
 
             HANDLE hDumpFile;
-            hDumpFile = CreateFile(szFileName, GENERIC_READ | GENERIC_WRITE,
+            hDumpFile = CreateFileA(dumpFileName.c_str(), GENERIC_READ | GENERIC_WRITE,
                                    FILE_SHARE_WRITE | FILE_SHARE_READ, 0, CREATE_ALWAYS, 0, 0);
             if (hDumpFile != INVALID_HANDLE_VALUE)
             {
@@ -89,7 +198,7 @@ BOOL GenerateMiniDump(CMinidumpParams* minidumpParams, CSalmonSharedMemory* mem,
                 {
                     // generation fails on W7 with the x64/Debug build launched from MSVC; if I run it outside MSVC, everything works fine
                     DWORD err = GetLastError();
-                    sprintf(minidumpParams->ErrorMessage, LoadStr(IDS_SALMON_MINIDUMP_CALL, HLanguage), err);
+                    SetMiniDumpError(minidumpParams, LoadStr(IDS_SALMON_MINIDUMP_CALL, HLanguage), err);
                 }
                 // regardless of whether minidump generation returned TRUE or FALSE, check the size of the produced dump
                 DWORD sizeHigh = 0;
@@ -101,17 +210,18 @@ BOOL GenerateMiniDump(CMinidumpParams* minidumpParams, CSalmonSharedMemory* mem,
             else
             {
                 DWORD err = GetLastError();
-                sprintf(minidumpParams->ErrorMessage, LoadStr(IDS_SALMON_MINIDUMP_CREATE, HLanguage), szFileName, err);
+                SetMiniDumpError(minidumpParams, LoadStr(IDS_SALMON_MINIDUMP_CREATE, HLanguage),
+                                 dumpFileName.c_str(), err);
             }
         }
         else
         {
-            sprintf(minidumpParams->ErrorMessage, LoadStr(IDS_SALMON_LOAD_FAILED, HLanguage), szPath);
+            SetMiniDumpError(minidumpParams, LoadStr(IDS_SALMON_LOAD_FAILED, HLanguage), dbgHelpPath.c_str());
         }
     }
     else
     {
-        sprintf(minidumpParams->ErrorMessage, LoadStr(IDS_SALMON_LOAD_FAILED, HLanguage), szPath);
+        SetMiniDumpError(minidumpParams, LoadStr(IDS_SALMON_LOAD_FAILED, HLanguage), dbgHelpPath.c_str());
     }
 
     return ret;
@@ -120,49 +230,97 @@ BOOL GenerateMiniDump(CMinidumpParams* minidumpParams, CSalmonSharedMemory* mem,
 extern BOOL DirExists(const char* dirName);
 
 // based on the current time and the short Salamander version, generate a name (without an extension)
-// from which the names for the text bug report and for the minidump are derived
-void GetReportBaseName(char* name, int nameSize, const char* targetPath, const char* shortName, DWORD64 uid, SYSTEMTIME lt)
+// from which the names for the text bug report and for the minidump are derived. The output array is
+// a compatibility boundary; parsing and collision probing remain in owned, bounded dynamic strings.
+BOOL GetReportBaseName(char* name, int nameSize, const char* targetPath, int targetPathSize,
+                       const char* shortName, int shortNameSize, DWORD64 uid, SYSTEMTIME lt)
 {
-    static char year[10];
-    static WORD y;
-
-    y = lt.wYear;
-    if (y >= 2000 && y < 2100)
-        sprintf_s(year, "%02u", (BYTE)(y - 2000));
-    else
-        sprintf_s(year, "%04u", y);
-
-    sprintf_s(name, nameSize, "%I64X-%s-%s%02u%02u-%02u%02u%02u",
-              uid, shortName, year, lt.wMonth, lt.wDay, lt.wHour, lt.wMinute, lt.wSecond);
-    CharUpperBuff(name, nameSize); // x64/x86 is lowercase, we want everything uppercased
-
-    // if the target path exists, there could be a collision (unlikely thanks to the timestamp in the name)
-    if (targetPath != NULL && DirExists(targetPath))
+    if (name == NULL || nameSize <= 0)
     {
-        static char findPath[MAX_PATH];
-        static char findMask[MAX_PATH];
+        SetLastError(ERROR_INVALID_PARAMETER);
+        return FALSE;
+    }
+    name[0] = 0;
+
+    if (shortNameSize <= 0 || targetPath != NULL && targetPathSize <= 0)
+    {
+        SetLastError(ERROR_INVALID_PARAMETER);
+        return FALSE;
+    }
+
+    std::string boundedTargetPath;
+    std::string boundedShortName;
+    if ((targetPath != NULL &&
+         !CopyBoundedExternalText(targetPath, targetPathSize, kMaximumCrashReportFieldLength, &boundedTargetPath)) ||
+        !CopyBoundedExternalText(shortName, shortNameSize, kMaximumCrashReportFieldLength, &boundedShortName))
+    {
+        return FALSE;
+    }
+
+    char year[5];
+    if (lt.wYear >= 2000 && lt.wYear < 2100)
+        sprintf_s(year, "%02u", (BYTE)(lt.wYear - 2000));
+    else
+        sprintf_s(year, "%04u", lt.wYear);
+
+    char uidText[17];
+    char timestamp[16];
+    sprintf_s(uidText, "%I64X", uid);
+    sprintf_s(timestamp, "%s%02u%02u-%02u%02u%02u", year, lt.wMonth, lt.wDay,
+              lt.wHour, lt.wMinute, lt.wSecond);
+    std::string baseName = std::string(uidText) + "-" + boundedShortName + "-" + timestamp;
+    if (baseName.size() > kMaximumCrashReportPathLength)
+    {
+        SetLastError(ERROR_INSUFFICIENT_BUFFER);
+        return FALSE;
+    }
+    CharUpperBuffA(&baseName[0], (DWORD)baseName.size()); // x64/x86 is lowercase, we want everything uppercased
+
+    // If the target path exists, there could be a collision (unlikely thanks to the timestamp in the name).
+    if (!boundedTargetPath.empty() && DirExists(boundedTargetPath.c_str()))
+    {
         int i;
         for (i = 0; i < 100; i++) // cover 1 - 99, then give up
         {
-            strcpy(findMask, name);
+            std::string findMask(baseName);
             if (i > 0)
-                wsprintf(findMask + strlen(findMask), "-%d", i);
-            lstrcat(findMask, "*");
-            lstrcpy(findPath, targetPath);
-            int findPathLen = lstrlen(findPath);
-            if (findPathLen > 0 && findPath[findPathLen - 1] != '\\')
-                lstrcat(findPath, "\\");
-            lstrcat(findPath, findMask);
+            {
+                char suffix[5];
+                sprintf_s(suffix, "-%d", i);
+                findMask.append(suffix);
+            }
+            findMask.append("*");
+            std::string findPath(boundedTargetPath);
+            if (findPath[findPath.size() - 1] != '\\')
+                findPath.append("\\");
+            findPath.append(findMask);
+            if (findPath.size() > kMaximumCrashReportPathLength)
+            {
+                SetLastError(ERROR_INSUFFICIENT_BUFFER);
+                return FALSE;
+            }
             WIN32_FIND_DATA find;
-            HANDLE hFind = NOHANDLES(FindFirstFile(findPath, &find));
+            HANDLE hFind = NOHANDLES(FindFirstFileA(findPath.c_str(), &find));
             if (hFind != INVALID_HANDLE_VALUE)
                 NOHANDLES(FindClose(hFind));
             else
                 break; // no conflict found
         }
         if (i > 0)
-            sprintf(name + strlen(name), "-%d", i);
+        {
+            char suffix[5];
+            sprintf_s(suffix, "-%d", i);
+            baseName.append(suffix);
+        }
     }
+
+    if (baseName.size() >= (size_t)nameSize)
+    {
+        SetLastError(ERROR_INSUFFICIENT_BUFFER);
+        return FALSE;
+    }
+    memcpy(name, baseName.c_str(), baseName.size() + 1);
+    return TRUE;
 }
 
 DWORD WINAPI MinidumpThreadF(void* param)
@@ -172,23 +330,32 @@ DWORD WINAPI MinidumpThreadF(void* param)
     SYSTEMTIME lt;
     GetLocalTime(&lt);
 
-    // char baseName[MAX_PATH];
-    GetReportBaseName(SalmonSharedMemory->BaseName, sizeof(SalmonSharedMemory->BaseName),
-                      SalmonSharedMemory->BugPath, SalmonSharedMemory->BugName,
-                      SalmonSharedMemory->UID, lt);
-
-    // generate the minidump
-    BOOL overSize;
-    BOOL ret = GenerateMiniDump(minidumpParams, SalmonSharedMemory, FALSE, &overSize);
-
-    if (!ret || overSize)
+    BOOL overSize = FALSE;
+    BOOL ret = FALSE;
+    if (!GetReportBaseName(SalmonSharedMemory->BaseName, sizeof(SalmonSharedMemory->BaseName),
+                           SalmonSharedMemory->BugPath, sizeof(SalmonSharedMemory->BugPath),
+                           SalmonSharedMemory->BugName, sizeof(SalmonSharedMemory->BugName),
+                           SalmonSharedMemory->UID, lt))
     {
-        GetReportBaseName(SalmonSharedMemory->BaseName, sizeof(SalmonSharedMemory->BaseName),
-                          SalmonSharedMemory->BugPath, SalmonSharedMemory->BugName,
-                          SalmonSharedMemory->UID, lt);
-
+        SetMiniDumpError(minidumpParams, "Crash report fields are invalid or exceed the accepted size (%lu).",
+                         GetLastError());
+    }
+    else
+    {
         // generate the minidump
-        ret = GenerateMiniDump(minidumpParams, SalmonSharedMemory, TRUE, &overSize);
+        ret = GenerateMiniDump(minidumpParams, SalmonSharedMemory, FALSE, &overSize);
+
+        if (!ret || overSize)
+        {
+            if (GetReportBaseName(SalmonSharedMemory->BaseName, sizeof(SalmonSharedMemory->BaseName),
+                                  SalmonSharedMemory->BugPath, sizeof(SalmonSharedMemory->BugPath),
+                                  SalmonSharedMemory->BugName, sizeof(SalmonSharedMemory->BugName),
+                                  SalmonSharedMemory->UID, lt))
+            {
+                // generate the minidump
+                ret = GenerateMiniDump(minidumpParams, SalmonSharedMemory, TRUE, &overSize);
+            }
+        }
     }
 
     // let Salamander know that the minidump has been created

@@ -80,6 +80,7 @@ const char* GetOperationFatalErrorTxt(int opFatalError, char* errBuf);
 #define CRTLCON_BYTESTOWRITEONSOCKETPREALLOC 512 // how many bytes to preallocate for writing (so the next write does not allocate unnecessarily, for example due to a 1-byte overflow)
 #define CRTLCON_BYTESTOREADONSOCKET 1024         // the minimum number of bytes to read from the socket at once (also allocate the buffer for the read data)
 #define CRTLCON_BYTESTOREADONSOCKETPREALLOC 512  // how many bytes to preallocate for reading (so the next read does not immediately allocate again)
+#define CRTLCON_MAXIMUM_REPLY_SIZE (64 * 1024)   // reject an unterminated server reply before it can grow the dynamic buffer indefinitely
 
 // response codes for the 1st digit of the FTP reply code
 #define FTP_D1_MAYBESUCCESS 1   // possible success (the client must wait for the next reply)

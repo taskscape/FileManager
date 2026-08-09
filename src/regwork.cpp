@@ -5,6 +5,7 @@
 #include "precomp.h"
 
 #include "mainwnd.h"
+#include <string>
 
 CRegistryWorkerThread RegistryWorkerThread;
 
@@ -15,13 +16,66 @@ CRegistryWorkerThread RegistryWorkerThread;
 static volatile LONG ConfigurationWriteFaultInjectionActive = 0;
 static volatile LONG ConfigurationWriteFaultAfter = 0;
 static volatile LONG ConfigurationWriteCount = 0;
-static char ConfigurationWriteFaultReport[MAX_PATH] = {};
+static std::string ConfigurationWriteFaultReport;
+
+// Environment variables are external input.  Query their required length first
+// and retain an owned value only when it fits the documented Win32 limit.
+// Callers deliberately treat malformed or oversized test controls as disabled.
+const DWORD ConfigurationFaultEnvironmentMaximum = 32767;
+
+enum EConfigurationFaultEnvironmentResult
+{
+    cferSuccess,
+    cferNotFound,
+    cferTooLarge,
+    cferReadError
+};
+
+static EConfigurationFaultEnvironmentResult ReadConfigurationFaultEnvironment(const char* name,
+                                                                                std::string* value)
+{
+    value->clear();
+    for (;;)
+    {
+        SetLastError(ERROR_SUCCESS);
+        DWORD required = GetEnvironmentVariableA(name, NULL, 0);
+        if (required == 0)
+        {
+            DWORD error = GetLastError();
+            if (error == ERROR_ENVVAR_NOT_FOUND)
+                return cferNotFound;
+            return error == ERROR_SUCCESS ? cferSuccess : cferReadError;
+        }
+        if (required > ConfigurationFaultEnvironmentMaximum)
+        {
+            SetLastError(ERROR_INSUFFICIENT_BUFFER);
+            return cferTooLarge;
+        }
+
+        std::string buffer(required, '\0');
+        DWORD copied = GetEnvironmentVariableA(name, &buffer[0], required);
+        if (copied < required)
+        {
+            buffer.resize(copied);
+            value->swap(buffer);
+            return cferSuccess;
+        }
+        if (copied > ConfigurationFaultEnvironmentMaximum)
+        {
+            SetLastError(ERROR_INSUFFICIENT_BUFFER);
+            return cferTooLarge;
+        }
+        // The process environment may change between the measuring and copy
+        // calls. Retry with the newly reported required size rather than use a
+        // truncated value.
+    }
+}
 
 static BOOL IsIsolatedConfigurationFaultTest()
 {
-    char isolated[8];
-    return GetEnvironmentVariableA("FILEMANAGER_UI_ISOLATED", isolated, sizeof(isolated)) > 0 &&
-           strcmp(isolated, "1") == 0;
+    std::string isolated;
+    return ReadConfigurationFaultEnvironment("FILEMANAGER_UI_ISOLATED", &isolated) == cferSuccess &&
+           isolated == "1";
 }
 
 static void RecordConfigurationWrite()
@@ -39,21 +93,21 @@ void BeginConfigurationWriteFaultInjection()
 {
     InterlockedExchange(&ConfigurationWriteCount, 0);
     InterlockedExchange(&ConfigurationWriteFaultAfter, 0);
-    ConfigurationWriteFaultReport[0] = 0;
+    ConfigurationWriteFaultReport.clear();
 
     if (!IsIsolatedConfigurationFaultTest())
         return;
 
-    char value[32];
-    if (GetEnvironmentVariableA("FILEMANAGER_CONFIG_FAULT_AFTER_WRITE", value, sizeof(value)) > 0)
+    std::string value;
+    if (ReadConfigurationFaultEnvironment("FILEMANAGER_CONFIG_FAULT_AFTER_WRITE", &value) == cferSuccess &&
+        !value.empty())
     {
         char* end;
-        LONG parsed = strtol(value, &end, 10);
-        if (end != value && *end == 0 && parsed > 0)
+        LONG parsed = strtol(value.c_str(), &end, 10);
+        if (end != value.c_str() && *end == 0 && parsed > 0)
             InterlockedExchange(&ConfigurationWriteFaultAfter, parsed);
     }
-    GetEnvironmentVariableA("FILEMANAGER_CONFIG_FAULT_REPORT", ConfigurationWriteFaultReport,
-                            sizeof(ConfigurationWriteFaultReport));
+    ReadConfigurationFaultEnvironment("FILEMANAGER_CONFIG_FAULT_REPORT", &ConfigurationWriteFaultReport);
     InterlockedExchange(&ConfigurationWriteFaultInjectionActive, 1);
 }
 
@@ -62,9 +116,9 @@ void EndConfigurationWriteFaultInjection()
     if (InterlockedExchange(&ConfigurationWriteFaultInjectionActive, 0) == 0)
         return;
 
-    if (ConfigurationWriteFaultReport[0] != 0)
+    if (!ConfigurationWriteFaultReport.empty())
     {
-        HANDLE report = CreateFileA(ConfigurationWriteFaultReport, GENERIC_WRITE, 0, NULL,
+        HANDLE report = CreateFileA(ConfigurationWriteFaultReport.c_str(), GENERIC_WRITE, 0, NULL,
                                     CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
         if (report != INVALID_HANDLE_VALUE)
         {
