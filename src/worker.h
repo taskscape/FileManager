@@ -59,6 +59,16 @@ struct CConvertData // data used by ocConvert
 class COperations;
 struct CProgressDlgArrItem;
 
+enum EOperationState
+{
+    opsPlanned,
+    opsRunning,
+    opsCancelRequested,
+    opsStopping,
+    opsCompleted,
+    opsFailed
+};
+
 struct CStartProgressDialogData
 {
     enum EStartupState
@@ -363,6 +373,12 @@ public:
     char* WaitInQueueTo;      // text for the "waiting in queue" state: bottom line (To)
 
 private:
+    // Cancellation is intentionally owned by the operation rather than by the
+    // progress dialog.  The event makes a request visible to wait-based code;
+    // OperationState makes the complete lifecycle observable and atomic.
+    HANDLE CancellationEvent;
+    volatile LONG OperationState;
+
     // for the status line in the progress dialog (Copy and Move only)
     CRITICAL_SECTION StatusCS;              // critical section protecting TransferSpeedMeter, ProgressSpeedMeter, and
     CTransferSpeedMeter TransferSpeedMeter; // meter for data transfers (Read/WriteFile)
@@ -387,7 +403,21 @@ private:
 
 public:
     COperations(int base, int delta, char* waitInQueueSubject, char* waitInQueueFrom, char* waitInQueueTo);
-    ~COperations() { HANDLES(DeleteCriticalSection(&StatusCS)); }
+    ~COperations()
+    {
+        if (CancellationEvent != NULL)
+            HANDLES(CloseHandle(CancellationEvent));
+        HANDLES(DeleteCriticalSection(&StatusCS));
+    }
+
+    BOOL Start();
+    BOOL RequestCancellation();
+    BOOL BeginStopping();
+    BOOL Complete(BOOL failed);
+    BOOL Fail();
+    BOOL IsCancellationRequested() const;
+    EOperationState GetOperationState() const;
+    HANDLE GetCancellationEvent() const { return CancellationEvent; }
 
     void SetWorkPath1(const char* path, BOOL inclSubDirs)
     {
@@ -426,6 +456,28 @@ public:
 
     void SetSpeedLimit(BOOL useSpeedLimit, DWORD speedLimit);
     void GetSpeedLimit(BOOL* useSpeedLimit, DWORD* speedLimit);
+};
+
+// Existing copy/delete helpers use the historical '*CancelWorker' spelling.
+// Keep that source compatibility while routing every read and request through
+// COperations; no shared BOOL storage is exposed across threads.
+class COperationCancellation
+{
+private:
+    COperations* Operations;
+
+public:
+    COperationCancellation() : Operations(NULL) {}
+    void Bind(COperations* operations) { Operations = operations; }
+    COperationCancellation& operator*() { return *this; }
+    const COperationCancellation& operator*() const { return *this; }
+    operator BOOL() const { return Operations != NULL && Operations->IsCancellationRequested(); }
+    COperationCancellation& operator=(BOOL requested)
+    {
+        if (requested && Operations != NULL)
+            Operations->RequestCancellation();
+        return *this;
+    }
 };
 
 class COperationsQueue // queue of disk Copy/Move operations
@@ -478,7 +530,7 @@ extern COperationsQueue OperationsQueue; // queue of disk Copy/Move operations
 
 HANDLE StartWorker(COperations* script, HWND hDlg, CChangeAttrsData* attrsData,
                    CConvertData* convertData, HANDLE wContinue, HANDLE workerNotSuspended,
-                   BOOL* cancelWorker, int* operationProgress, int* summaryProgress);
+                   int* operationProgress, int* summaryProgress);
 
 void FreeScript(COperations* script);
 
@@ -620,7 +672,6 @@ struct CWorkerData
     HANDLE WContinue;
 
     HANDLE WorkerNotSuspended;
-    BOOL* CancelWorker;
     int* OperationProgress;
     int* SummaryProgress;
 };
@@ -631,10 +682,11 @@ struct CWorkerData
 // not keep worker-owned state alive or require an acknowledgement event.
 struct CWorkerCompletion
 {
-    BOOL Cancelled;
+    EOperationState State;
+    BOOL CancellationRequested;
 
-    CWorkerCompletion(BOOL cancelled)
-        : Cancelled(cancelled)
+    CWorkerCompletion(EOperationState state, BOOL cancellationRequested)
+        : State(state), CancellationRequested(cancellationRequested)
     {
     }
 };
@@ -642,7 +694,7 @@ struct CWorkerCompletion
 struct CProgressDlgData
 {
     HANDLE WorkerNotSuspended;
-    BOOL* CancelWorker;
+    COperationCancellation CancelWorker;
     int* OperationProgress;
     int* SummaryProgress;
 

@@ -330,7 +330,6 @@ protected:
     HANDLE Worker;                // worker thread associated with this dialog (NULL if it doesn't exist yet/any more)
     HANDLE WContinue;             // multi-purpose event
     HANDLE WorkerNotSuspended;    // non-signaled == the worker should enter suspend mode
-    BOOL CancelWorker;            // if TRUE, the worker thread will terminate
     int OperationProgress;        // progress value shared with the worker thread
     int SummaryProgress;          // progress value shared with the worker thread
     BOOL ShowPause;               // the "pause" button text: TRUE = pause, FALSE = resume

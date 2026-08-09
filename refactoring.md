@@ -73,10 +73,10 @@ This document is the working record for a read-only stability and resilience aud
 
 - **Delivered:** The worker now frees its operation script and posts `WM_USER_PROGRDLG_WORKERCOMPLETE` with an owned `CWorkerCompletion` result. The progress dialog consumes that result asynchronously, then joins the already-independent worker only to close its handle. Completion no longer uses synchronous `WM_COMMAND`, `ReplyMessage`, or a UI-controlled continuation event, so modal, cancel, close, and shutdown paths cannot hold worker cleanup hostage. `tools/verify-operation-completion-protocol.ps1`, run by pull-request CI, deterministically guards the close, cancel, and shutdown protocol invariants.
 
-### 5. Model file-operation cancellation as atomic state
+### 5. Implemented: model file-operation cancellation as atomic state
 
 - **Justification:** Cancellation is shared through plain `BOOL*` fields and globals such as `CPFirstTerminate`; this does not define memory visibility or distinguish cancel-requested, stopping, completed, and failed states.
-- **Proposed solution:** Introduce an interlocked/atomic operation state plus a cancellation event. Centralize transitions, make them idempotent, and assert invalid transitions in debug builds.
+- **Delivered:** `COperations` now owns an interlocked lifecycle (`planned`, `running`, `cancel-requested`, `stopping`, `completed`, and `failed`) plus a manual-reset cancellation event. Dialog and worker paths make idempotent cancellation requests through that owner, worker completion records the terminal state, and debug builds break on invalid transitions. Existing low-level helper call sites use a compatibility view backed by this owner rather than sharing a `BOOL*`.
 
 ### 6. Make destination overwrite transactional
 
