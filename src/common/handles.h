@@ -4,6 +4,15 @@
 
 #pragma once
 
+// These flags were made available to Windows 7 through KB2533623. Keep the
+// definitions here because older SDKs omit them for the Windows 7 target.
+#ifndef LOAD_LIBRARY_SEARCH_DLL_LOAD_DIR
+#define LOAD_LIBRARY_SEARCH_DLL_LOAD_DIR 0x00000100
+#define LOAD_LIBRARY_SEARCH_APPLICATION_DIR 0x00000200
+#define LOAD_LIBRARY_SEARCH_USER_DIRS 0x00000400
+#define LOAD_LIBRARY_SEARCH_SYSTEM32 0x00000800
+#endif
+
 // HANDLES_ENABLE macro - enables handle monitoring
 // _DEBUG or __HANDLES_DEBUG macro - outputs debug messages to TRACE
 // MULTITHREADED_HANDLES_ENABLE macro - prepares handles for multi-threaded applications
@@ -40,7 +49,32 @@ inline HINSTANCE LoadLibraryUtf8(LPCSTR lpLibFileName)
     }
     else
     {
-        ret = ::LoadLibraryW(fileNameW);
+        DWORD fullPathLength = GetFullPathNameW(fileNameW, 0, NULL, NULL);
+        if (fullPathLength != 0)
+        {
+            WCHAR* fullPath = (WCHAR*)malloc(fullPathLength * sizeof(WCHAR));
+            if (fullPath == NULL)
+            {
+                SetLastError(ERROR_NOT_ENOUGH_MEMORY);
+            }
+            else
+            {
+                DWORD copiedLength = GetFullPathNameW(fileNameW, fullPathLength, fullPath, NULL);
+                if (copiedLength == 0 || copiedLength >= fullPathLength)
+                {
+                    if (copiedLength >= fullPathLength)
+                        SetLastError(ERROR_INSUFFICIENT_BUFFER);
+                }
+                else
+                {
+                    const DWORD loadFlags = LOAD_LIBRARY_SEARCH_DLL_LOAD_DIR |
+                                            LOAD_LIBRARY_SEARCH_SYSTEM32 |
+                                            LOAD_LIBRARY_SEARCH_USER_DIRS;
+                    ret = ::LoadLibraryExW(fullPath, NULL, loadFlags);
+                }
+                free(fullPath);
+            }
+        }
         free(fileNameW);
     }
     return ret;

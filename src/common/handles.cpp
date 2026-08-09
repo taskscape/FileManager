@@ -2218,7 +2218,32 @@ C__Handles::LoadLibraryUtf8(LPCSTR lpLibFileName)
     }
     else
     {
-        ret = ::LoadLibraryW(fileNameW);
+        DWORD fullPathLength = GetFullPathNameW(fileNameW, 0, NULL, NULL);
+        if (fullPathLength != 0)
+        {
+            WCHAR* fullPath = (WCHAR*)malloc(fullPathLength * sizeof(WCHAR));
+            if (fullPath == NULL)
+            {
+                SetLastError(ERROR_NOT_ENOUGH_MEMORY);
+            }
+            else
+            {
+                DWORD copiedLength = GetFullPathNameW(fileNameW, fullPathLength, fullPath, NULL);
+                if (copiedLength == 0 || copiedLength >= fullPathLength)
+                {
+                    if (copiedLength >= fullPathLength)
+                        SetLastError(ERROR_INSUFFICIENT_BUFFER);
+                }
+                else
+                {
+                    const DWORD loadFlags = LOAD_LIBRARY_SEARCH_DLL_LOAD_DIR |
+                                            LOAD_LIBRARY_SEARCH_SYSTEM32 |
+                                            LOAD_LIBRARY_SEARCH_USER_DIRS;
+                    ret = ::LoadLibraryExW(fullPath, NULL, loadFlags);
+                }
+                free(fullPath);
+            }
+        }
     }
     DWORD err = GetLastError();
     CheckCreate(ret != NULL, __htLibrary, __hoLoadLibrary, ret, err, TRUE, NULL, lpLibFileName, fileNameW);

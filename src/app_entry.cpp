@@ -52,6 +52,53 @@ extern "C"
 
 #pragma comment(lib, "UxTheme.lib")
 
+typedef BOOL(WINAPI* FSetDefaultDllDirectories)(DWORD directoryFlags);
+typedef PVOID(WINAPI* FAddDllDirectory)(PCWSTR newDirectory);
+
+// Restrict process-wide DLL resolution before any optional module is loaded.
+// Windows 7 requires KB2533623 for these APIs; continuing without it would
+// restore the unsafe current-directory and PATH search behavior.
+static BOOL InitializeDllSearchPaths()
+{
+    HMODULE kernel32 = GetModuleHandle(TEXT("kernel32.dll"));
+    FSetDefaultDllDirectories setDefaultDllDirectories =
+        kernel32 == NULL ? NULL : (FSetDefaultDllDirectories)GetProcAddress(kernel32, "SetDefaultDllDirectories");
+    FAddDllDirectory addDllDirectory =
+        kernel32 == NULL ? NULL : (FAddDllDirectory)GetProcAddress(kernel32, "AddDllDirectory");
+    if (setDefaultDllDirectories == NULL || addDllDirectory == NULL)
+    {
+        SetLastError(ERROR_CALL_NOT_IMPLEMENTED);
+        return FALSE;
+    }
+
+    const DWORD defaultDirectoryFlags = LOAD_LIBRARY_SEARCH_APPLICATION_DIR |
+                                        LOAD_LIBRARY_SEARCH_SYSTEM32 |
+                                        LOAD_LIBRARY_SEARCH_USER_DIRS;
+    if (!setDefaultDllDirectories(defaultDirectoryFlags))
+        return FALSE;
+
+    WCHAR applicationPath[MAX_PATH];
+    DWORD applicationPathLength = GetModuleFileNameW(NULL, applicationPath, _countof(applicationPath));
+    if (applicationPathLength == 0 || applicationPathLength >= _countof(applicationPath))
+    {
+        if (applicationPathLength >= _countof(applicationPath))
+            SetLastError(ERROR_INSUFFICIENT_BUFFER);
+        return FALSE;
+    }
+
+    WCHAR* fileName = wcsrchr(applicationPath, L'\\');
+    if (fileName == NULL)
+    {
+        SetLastError(ERROR_BAD_PATHNAME);
+        return FALSE;
+    }
+    *fileName = L'\0';
+
+    // This is the sole process-wide user directory. Plug-ins use their own
+    // canonical DLL path and LOAD_LIBRARY_SEARCH_DLL_LOAD_DIR instead.
+    return addDllDirectory(applicationPath) != NULL;
+}
+
 // expose the original entry point of the application
 extern "C" int WinMainCRTStartup();
 
@@ -2971,6 +3018,17 @@ int WinMainBody(HINSTANCE hInstance, HINSTANCE /*hPrevInstance*/, LPSTR cmdLine,
 
     //--- nechci zadne kriticke chyby jako "no disk in drive A:"
     SetErrorMode(SetErrorMode(0) | SEM_FAILCRITICALERRORS);
+
+    if (!InitializeDllSearchPaths())
+    {
+        char errorText[300];
+        _snprintf_s(errorText, _TRUNCATE,
+                    "Open Salamander cannot enable secure DLL loading (error %lu).\n"
+                    "Install the Windows security update required for SetDefaultDllDirectories and try again.",
+                    GetLastError());
+        MessageBox(NULL, errorText, SALAMANDER_TEXT_VERSION, MB_OK | MB_ICONERROR);
+        return myExitCode;
+    }
 
     // seed generatoru nahodnych cisel
     srand((unsigned)time(NULL) ^ (unsigned)_getpid());

@@ -95,6 +95,36 @@ public sealed class NativeSafetyRegressionTests
         });
     }
 
+    [Test]
+    public void Dynamic_library_loads_use_restricted_search_paths()
+    {
+        var root = FindRepositoryRoot();
+        var startup = File.ReadAllText(Path.Combine(root, "src", "app_entry.cpp"));
+        var releaseHandles = File.ReadAllText(Path.Combine(root, "src", "common", "handles.h"));
+        var debugHandles = File.ReadAllText(Path.Combine(root, "src", "common", "handles.cpp"));
+        var refactoring = File.ReadAllText(Path.Combine(root, "refactoring.md"));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(startup, Does.Contain("InitializeDllSearchPaths()"));
+            Assert.That(startup, Does.Contain("SetDefaultDllDirectories"));
+            Assert.That(startup, Does.Contain("AddDllDirectory"));
+            Assert.That(startup, Does.Contain("LOAD_LIBRARY_SEARCH_APPLICATION_DIR"));
+            Assert.That(startup, Does.Contain("LOAD_LIBRARY_SEARCH_SYSTEM32"));
+            Assert.That(startup, Does.Contain("LOAD_LIBRARY_SEARCH_USER_DIRS"));
+            Assert.That(releaseHandles, Does.Contain("GetFullPathNameW"));
+            Assert.That(releaseHandles, Does.Contain("::LoadLibraryExW(fullPath, NULL, loadFlags)"));
+            Assert.That(debugHandles, Does.Contain("::LoadLibraryExW(fullPath, NULL, loadFlags)"));
+            Assert.That(releaseHandles, Does.Contain("LOAD_LIBRARY_SEARCH_DLL_LOAD_DIR"));
+            Assert.That(debugHandles, Does.Contain("LOAD_LIBRARY_SEARCH_DLL_LOAD_DIR"));
+            Assert.That(Regex.Matches(releaseHandles, @"(?m)^(?!\s*//).*?\bLoadLibraryW\s*\(").Count, Is.Zero,
+                        "Release builds must not restore unrestricted LoadLibraryW calls.");
+            Assert.That(Regex.Matches(debugHandles, @"(?m)^(?!\s*//).*?\bLoadLibraryW\s*\(").Count, Is.Zero,
+                        "Debug builds must not restore unrestricted LoadLibraryW calls.");
+            Assert.That(refactoring, Does.Contain("### 19. Constrain DLL search paths — Implemented"));
+        });
+    }
+
     private static string FindRepositoryRoot()
     {
         for (var directory = new DirectoryInfo(AppContext.BaseDirectory); directory is not null; directory = directory.Parent)
