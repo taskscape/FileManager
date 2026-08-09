@@ -21,6 +21,7 @@
 // functions called before and after invoking any plugin method
 void EnterPlugin();
 void LeavePlugin();
+BOOL IsInPlugin();
 
 class CPluginInterfaceForArchiverEncapsulation
 {
@@ -3405,8 +3406,6 @@ public:
 };
 
 extern CPlugins Plugins;
-extern int AlreadyInPlugin;
-
 // internal function for handling plugin icons
 BOOL CreateGrayscaleDIB(HBITMAP hSource, COLORREF transparent, HBITMAP& hGrayscale);
 //HICON GetIconFromDIB(HBITMAP hBitmap, int index);

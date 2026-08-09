@@ -161,6 +161,37 @@ public sealed class NativeSafetyRegressionTests
         });
     }
 
+    [Test]
+    public void Plugin_entry_scope_restores_host_state_after_an_unwinding_entry_point()
+    {
+        var root = FindRepositoryRoot();
+        var loader = File.ReadAllText(Path.Combine(root, "src", "plugins_loading.cpp"));
+        var header = File.ReadAllText(Path.Combine(root, "src", "plugins.h"));
+        var messages = File.ReadAllText(Path.Combine(root, "src", "mainwnd_messages.cpp"));
+        var shutdown = File.ReadAllText(Path.Combine(root, "src", "mainwnd_shutdown.cpp"));
+        var pathUtilities = File.ReadAllText(Path.Combine(root, "src", "path_utils.cpp"));
+        var refactoring = File.ReadAllText(Path.Combine(root, "refactoring.md"));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(loader, Does.Contain("class CPluginEntryScope"));
+            Assert.That(loader, Does.Contain("~CPluginEntryScope()"));
+            Assert.That(loader, Does.Contain("CPluginDataLock dataLock"));
+            Assert.That(loader, Does.Contain("PluginIface.Init(NULL, 0)"));
+            Assert.That(loader, Does.Contain("LeavePlugin();\n        SalamanderGeneral.Init(PluginIface.GetInterface());"));
+            Assert.That(loader, Does.Contain("CPluginEntryScope pluginEntry(PluginIface, SalamanderGeneral, BuiltForVersion)"));
+            Assert.That(loader, Does.Contain("pluginEntry.SetReturnedInterface(resIface)"));
+            Assert.That(loader, Does.Not.Contain("EnterPlugin(); // for the plugin entry point"));
+            Assert.That(loader, Does.Contain("static SRWLOCK PluginNestingStateLock = SRWLOCK_INIT"));
+            Assert.That(loader, Does.Contain("static std::atomic<int> AlreadyInPlugin(0)"));
+            Assert.That(header, Does.Contain("BOOL IsInPlugin();"));
+            Assert.That(messages, Does.Contain("IsInPlugin() || StopRefresh > 0"));
+            Assert.That(shutdown, Does.Contain("!endAfterCleanup && IsInPlugin()"));
+            Assert.That(pathUtilities, Does.Contain("!IsInPlugin()"));
+            Assert.That(refactoring, Does.Contain("### 22. Implemented: make plug-in entry bookkeeping exception-safe"));
+        });
+    }
+
     private static string FindRepositoryRoot()
     {
         for (var directory = new DirectoryInfo(AppContext.BaseDirectory); directory is not null; directory = directory.Parent)

@@ -1759,7 +1759,7 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
     {
         if (LastDispachChangeNotifTime < lParam) // not an outdated message
         {
-            if (AlreadyInPlugin || StopRefresh > 0)
+            if (IsInPlugin() || StopRefresh > 0)
                 NeedToResentDispachChangeNotif = TRUE;
             else
             {
