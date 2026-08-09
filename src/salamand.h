@@ -1257,6 +1257,11 @@ extern const char* SalamanderConfigurationRoots[];                              
 BOOL GetUpgradeInfo(BOOL* autoImportConfig, char* autoImportConfigFromKey, int autoImportConfigFromKeySize); // description in mainwnd2.cpp
 BOOL FindLatestConfiguration(BOOL* deleteConfigurations, const char*& loadConfiguration);                    // description in mainwnd2.cpp
 BOOL FindLanguageFromPrevVerOfSal(char* slgName);                                                            // description in mainwnd2.cpp
+// Configuration is stored as two complete generations below this root.  Call this after
+// selecting a version root so all existing configuration readers use the committed generation.
+void SetConfigurationStoreRoot(const char* root);
+BOOL SelectCommittedConfigurationGeneration();
+BOOL UsesTransactionalConfigurationStore();
 
 // creates and attaches a special class to the edit line/combobox 'ctrlID' that enables
 // capturing keys and sending the WM_USER_KEYDOWN message to the dialog 'hDialog'

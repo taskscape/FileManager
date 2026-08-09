@@ -380,7 +380,7 @@ For archive and virtual-filesystem sources, content is normally materialized int
 
 ### 5.6 Configuration and registry persistence
 
-`CConfiguration` (`src/cfgdlg.h:176`) is the central settings aggregate. `CMainWindow::LoadConfig` and `SaveConfig` (`src/mainwnd_config.cpp:2511`, `:1387`) serialize application state to the registry, apply defaults, and migrate older `ConfigVersion` layouts. Plug-ins receive private registry subkeys and use their own `LoadConfiguration`/`SaveConfiguration` callbacks.
+`CConfiguration` (`src/cfgdlg.h:176`) is the central settings aggregate. `CMainWindow::LoadConfig` and `SaveConfig` (`src/mainwnd_config.cpp`) serialize application state to the registry, apply defaults, and migrate older `ConfigVersion` layouts. Plug-ins receive private registry subkeys and use their own `LoadConfiguration`/`SaveConfiguration` callbacks.
 
 Persistence has several coordination mechanisms:
 
@@ -388,7 +388,9 @@ Persistence has several coordination mechanisms:
 - `CRegistryWorkerThread` performs registry work while the UI side continues pumping messages.
 - `ScheduleConfigSave` debounces ordinary changes by 250 ms.
 - `SaveConfig` prevents reentrant saves and remembers when another save is requested during the current one.
-- `Save In Progress` and backup `Copy Is OK` markers help detect and recover from interrupted writes.
+- `SaveConfig` writes the full snapshot to the inactive one of two `Configuration Generations`, verifies a checksum and completion marker, flushes it, then switches the root's `Active Generation` DWORD. That one value write is the commit point; the previous verified generation remains available until the next successful startup.
+- Startup validates the selected generation before exposing it to the existing host and plug-in readers, and falls back to the other verified generation if the selected one is incomplete or has a checksum mismatch. Legacy direct trees remain readable and are migrated on their next save.
+- The legacy `Save In Progress` and backup `Copy Is OK` markers remain only for recognising/recovering pre-transactional configuration trees.
 - a `config.reg` beside the application can seed/import configuration.
 
 Configuration is therefore a versioned state snapshot, not a collection of independent repositories. Changes to the aggregate, UI transfer code, defaults, migration, and persistence keys must remain synchronized.
@@ -467,8 +469,8 @@ Disk panels use directory-snooper threads based on `FindFirstChangeNotification`
 2. On acceptance, `Validate` checks input and `Transfer` writes the new values to `CConfiguration` or a feature-owned object.
 3. The affected subsystem is updated immediately where appropriate.
 4. `ScheduleConfigSave` coalesces repeated mutations.
-5. The registry worker obtains the cross-process mutex and writes the versioned snapshot plus plug-in configuration.
-6. Completion clears the in-progress marker; an interrupted marker is evaluated during a later startup.
+5. The registry worker obtains the cross-process mutex and writes the versioned host snapshot plus plug-in configuration into the inactive generation.
+6. The host computes and validates the staged generation's checksum, writes its completion marker, flushes it, and atomically changes `Active Generation`. An interrupted stage never becomes visible; the prior generation is retained until a successful startup.
 
 ### 6.7 Second-instance command forwarding
 

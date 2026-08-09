@@ -219,6 +219,41 @@ public sealed class NativeSafetyRegressionTests
         });
     }
 
+    [Test]
+    public void Configuration_saves_stage_validate_and_atomically_select_a_generation()
+    {
+        var root = FindRepositoryRoot();
+        var configuration = File.ReadAllText(Path.Combine(root, "src", "mainwnd_config.cpp"));
+        var plugins = File.ReadAllText(Path.Combine(root, "src", "plugins_loading.cpp"));
+        var startup = File.ReadAllText(Path.Combine(root, "src", "app_entry.cpp"));
+        var architecture = File.ReadAllText(Path.Combine(root, "architecture.md"));
+        var refactoring = File.ReadAllText(Path.Combine(root, "refactoring.md"));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(configuration, Does.Contain("Configuration Generations"));
+            Assert.That(configuration, Does.Contain("Active Generation"));
+            Assert.That(configuration, Does.Contain("Transaction Complete"));
+            Assert.That(configuration, Does.Contain("Transaction Checksum"));
+            Assert.That(configuration, Does.Contain("CalculateConfigurationChecksum"));
+            Assert.That(configuration, Does.Contain("IsCommittedConfigurationGeneration"));
+            Assert.That(configuration, Does.Contain("BeginConfigurationTransaction"));
+            Assert.That(configuration, Does.Contain("CommitConfigurationTransaction"));
+            Assert.That(configuration, Does.Contain("RegFlushKey(generationKey)"));
+            Assert.That(configuration, Does.Contain("SetValue(storeKey, CONFIGURATION_ACTIVE_GENERATION_REG"));
+            Assert.That(configuration, Does.Contain("RetirePreviousConfigurationGenerationAfterSuccessfulStartup"));
+            Assert.That(configuration, Does.Contain("OpenCommittedConfigurationGeneration(storeKey, fallbackGeneration"));
+            Assert.That(startup, Does.Contain("SetConfigurationStoreRoot(SALAMANDER_ROOT_REG)"));
+            Assert.That(startup, Does.Contain("SelectCommittedConfigurationGeneration()"));
+            Assert.That(plugins, Does.Contain("MainWindow->SaveConfig();"));
+            Assert.That(plugins, Does.Contain("MainWindow->SaveConfig(parent);"));
+            Assert.That(plugins, Does.Not.Contain("CreateKey(HKEY_CURRENT_USER, SALAMANDER_ROOT_REG"),
+                        "Plug-in commits must not mutate the checksum-protected active generation.");
+            Assert.That(refactoring, Does.Contain("### 24. Make configuration saves transactional — Implemented"));
+            Assert.That(architecture, Does.Contain("the root's `Active Generation` DWORD"));
+        });
+    }
+
     private static string FindRepositoryRoot()
     {
         for (var directory = new DirectoryInfo(AppContext.BaseDirectory); directory is not null; directory = directory.Parent)

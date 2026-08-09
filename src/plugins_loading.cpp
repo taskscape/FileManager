@@ -2952,48 +2952,12 @@ BOOL CPluginData::Remove(HWND parent, int index, BOOL canDelPluginRegKey)
         }
         PackerFormatConfig.BuildArray();
 
-        if (SupportLoadSave && canDelPluginRegKey) // if the plugin supports load/save configuration + we can delete its registry key (not an import of the configuration from an older version of Salamander)
-        {                                          // try to open the private registry key; if successful, delete it, it's no longer needed
-            BOOL shouldDelete = FALSE;
-            LoadSaveToRegistryMutex.Enter();
-            HKEY salamander;
-            if (SALAMANDER_ROOT_REG != NULL &&
-                OpenKey(HKEY_CURRENT_USER, SALAMANDER_ROOT_REG, salamander))
-            {
-                HKEY actKey;
-                if (OpenKey(salamander, SALAMANDER_PLUGINSCONFIG, actKey))
-                {
-                    HKEY regKey;
-                    if (OpenKey(actKey, RegKeyName, regKey))
-                    {
-                        shouldDelete = TRUE;
-                        CloseKey(regKey);
-                    }
-                    CloseKey(actKey);
-                }
-                CloseKey(salamander);
-            }
-            if (shouldDelete)
-            {
-                if (SALAMANDER_ROOT_REG != NULL &&
-                    CreateKey(HKEY_CURRENT_USER, SALAMANDER_ROOT_REG, salamander)) // ensure write permissions
-                {
-                    HKEY actKey;
-                    if (CreateKey(salamander, SALAMANDER_PLUGINSCONFIG, actKey))
-                    {
-                        HKEY regKey;
-                        if (CreateKey(actKey, RegKeyName, regKey))
-                        {
-                            ClearKey(regKey);
-                            CloseKey(regKey);
-                        }
-                        DeleteKey(actKey, RegKeyName);
-                        CloseKey(actKey);
-                    }
-                    CloseKey(salamander);
-                }
-            }
-            LoadSaveToRegistryMutex.Leave();
+        if (SupportLoadSave && canDelPluginRegKey && MainWindow != NULL)
+        {
+            // This plug-in is about to leave the host collection.  The following
+            // debounced full snapshot is built after that removal, so its private key
+            // disappears without modifying the checksum-protected active generation.
+            MainWindow->ScheduleConfigSave();
         }
         return TRUE;
     }
@@ -3116,70 +3080,11 @@ void CPluginData::CallLoadOrSaveConfiguration(BOOL load,
     }
     else // save
     {
-        // The responsive host save pumps messages while registry calls run on its worker.  A plug-in
-        // commit delivered in that interval must join the host's follow-up save instead of modifying
-        // the same registry subtree through a nested CallLoadOrSaveConfiguration transaction.
-        if (MainWindow != NULL && MainWindow->ConfigSaveInProgress)
-        {
-            MainWindow->ScheduleConfigSave();
-            return;
-        }
-
-        if (SupportLoadSave) // otherwise there is nowhere to save
-        {
-            LoadSaveToRegistryMutex.Enter();
-            HKEY salamander;
-            if (SALAMANDER_ROOT_REG != NULL &&
-                OpenKeyAux(NULL, HKEY_CURRENT_USER, SALAMANDER_ROOT_REG, salamander)) // check whether the Salamander key exists at all (otherwise nothing is saved)
-            {                                                                         // OpenKeyAux, because we do not want a Load Configuration message
-                CloseKeyAux(salamander);
-                if (CreateKey(HKEY_CURRENT_USER, SALAMANDER_ROOT_REG, salamander))
-                {
-                    BOOL cfgIsOK = TRUE;
-                    BOOL deleteSALAMANDER_SAVE_IN_PROGRESS = !IsSetSALAMANDER_SAVE_IN_PROGRESS;
-                    if (deleteSALAMANDER_SAVE_IN_PROGRESS)
-                    {
-                        DWORD saveInProgress = 1;
-                        if (GetValueAux(NULL, salamander, SALAMANDER_SAVE_IN_PROGRESS, REG_DWORD, &saveInProgress, sizeof(DWORD)))
-                        {                    // GetValueAux, because we do not want a Load Configuration message
-                            cfgIsOK = FALSE; // corrupted configuration; saving won't fix it (not all data is stored)
-                            TRACE_E("CPluginData::CallLoadOrSaveConfiguration(): unable to save configuration, configuration key in registry is corrupted, plugin: " << Name);
-                        }
-                        else
-                        {
-                            saveInProgress = 1;
-                            SetValue(salamander, SALAMANDER_SAVE_IN_PROGRESS, REG_DWORD, &saveInProgress, sizeof(DWORD));
-                            IsSetSALAMANDER_SAVE_IN_PROGRESS = TRUE;
-                        }
-                    }
-                    if (cfgIsOK)
-                    {
-                        HKEY actKey;
-                        if (CreateKey(salamander, SALAMANDER_PLUGINSCONFIG, actKey))
-                        {
-                            HKEY regKey;
-                            if (CreateKey(actKey, RegKeyName, regKey))
-                            {
-                                CSalamanderRegistry registry;
-                                {
-                                    CALL_STACK_MESSAGE1("3.CPluginData::CallLoadOrSaveConfiguration::loadOrSaveFunc()");
-                                    loadOrSaveFunc(load, regKey, &registry, param);
-                                }
-                                CloseKey(regKey);
-                            }
-                            CloseKey(actKey);
-                        }
-                        if (deleteSALAMANDER_SAVE_IN_PROGRESS)
-                        {
-                            DeleteValue(salamander, SALAMANDER_SAVE_IN_PROGRESS);
-                            IsSetSALAMANDER_SAVE_IN_PROGRESS = FALSE;
-                        }
-                    }
-                    CloseKey(salamander);
-                }
-            }
-            LoadSaveToRegistryMutex.Leave();
-        }
+        // A plug-in commit (for example, an FTP bookmark edit) is a host configuration
+        // change.  Rebuild the complete staged generation so the plug-in cannot tear the
+        // active tree with a private in-place write.
+        if (SupportLoadSave && MainWindow != NULL)
+            MainWindow->SaveConfig();
     }
 }
 
@@ -3194,63 +3099,9 @@ BOOL CPluginData::Unload(HWND parent, BOOL ask)
             char buf[MAX_PATH + 300];
             BOOL skipUnload = FALSE;
             if (SupportLoadSave)
-            { // Persist plug-in state during unload because it can no longer be deferred by a user option.
-                LoadSaveToRegistryMutex.Enter();
-                BOOL salKeyDoesNotExist = FALSE;
-                HKEY salamander;
-                    if (SALAMANDER_ROOT_REG != NULL &&
-                        OpenKeyAux(NULL, HKEY_CURRENT_USER, SALAMANDER_ROOT_REG, salamander)) // check whether the Salamander key exists at all (otherwise nothing is saved)
-                    {                                                                         // OpenKeyAux because we do not want a Load Configuration message
-                        CloseKeyAux(salamander);
-                        if (CreateKey(HKEY_CURRENT_USER, SALAMANDER_ROOT_REG, salamander))
-                        {
-                            BOOL cfgIsOK = TRUE;
-                            BOOL deleteSALAMANDER_SAVE_IN_PROGRESS = !IsSetSALAMANDER_SAVE_IN_PROGRESS;
-                            if (deleteSALAMANDER_SAVE_IN_PROGRESS)
-                            {
-                                DWORD saveInProgress = 1;
-                                if (GetValueAux(NULL, salamander, SALAMANDER_SAVE_IN_PROGRESS, REG_DWORD, &saveInProgress, sizeof(DWORD)))
-                                {                    // GetValueAux because we do not want a Load Configuration message
-                                    cfgIsOK = FALSE; // corrupted configuration; saving won't fix it (not all data is stored)
-                                    salKeyDoesNotExist = TRUE;
-                                    TRACE_E("CPluginData::Unload(): unable to save configuration, configuration key in registry is corrupted, plugin: " << Name);
-                                }
-                                else
-                                {
-                                    saveInProgress = 1;
-                                    SetValue(salamander, SALAMANDER_SAVE_IN_PROGRESS, REG_DWORD, &saveInProgress, sizeof(DWORD));
-                                    IsSetSALAMANDER_SAVE_IN_PROGRESS = TRUE;
-                                }
-                            }
-                            if (cfgIsOK)
-                            {
-                                HKEY actKey;
-                                if (CreateKey(salamander, SALAMANDER_PLUGINSCONFIG, actKey))
-                                {
-                                    Save(parent, actKey);
-                                    CloseKey(actKey);
-                                }
-                                if (deleteSALAMANDER_SAVE_IN_PROGRESS)
-                                {
-                                    DeleteValue(salamander, SALAMANDER_SAVE_IN_PROGRESS);
-                                    IsSetSALAMANDER_SAVE_IN_PROGRESS = FALSE;
-                                }
-                            }
-                            CloseKey(salamander);
-                        }
-                        else
-                            salKeyDoesNotExist = TRUE;
-                    }
-                    else
-                        salKeyDoesNotExist = TRUE;
-                    LoadSaveToRegistryMutex.Leave();
-
-                if (ask && salKeyDoesNotExist)
-                {
-                    sprintf(buf, LoadStr(IDS_PLUGINSAVEFAILED), Name);
-                    skipUnload = SalMessageBox(parent, buf, LoadStr(IDS_QUESTION),
-                                               MB_YESNO | MB_ICONQUESTION | MB_DEFBUTTON2) == IDNO;
-                }
+            { // Persist plug-in state before release as one complete host generation.
+                if (MainWindow != NULL)
+                    MainWindow->SaveConfig(parent);
                 if (GlobalSaveWaitWindow != NULL)
                     GlobalSaveWaitWindow->SetProgressPos(++GlobalSaveWaitWindowProgress);
             }

@@ -171,10 +171,10 @@ This document is the working record for a read-only stability and resilience aud
 - **Proposed solution:** Route callbacks through a common boundary that records the plug-in identity, validates results, restores host invariants, disables the failing extension, and reports a recoverable error. Use process isolation where recovery from memory corruption cannot be trusted.
 - **Implementation (2026-08-09):** The shared `PLUGIN_CALLBACK` SEH boundary now covers the base, file-system, and plug-in-data callback facades. It records the owner, returns conservative initialized results after a fault, restores refresh/directory invariants through the caller's normal `LeavePlugin`, prevents reload at startup, and queues the extension for deferred unload. The plug-in thread wrapper now follows the same recovery path instead of terminating `salamand.exe`. Existing out-of-process parser brokering remains the isolation boundary for untrusted parser/preview work where in-process recovery cannot be trusted.
 
-### 24. Make configuration saves transactional
+### 24. Make configuration saves transactional — Implemented (2026-08-09)
 
 - **Justification:** Shutdown backup logic exists, but ordinary `SaveConfig` paths write many values into the active settings tree. Interruption can leave a partially updated configuration.
-- **Proposed solution:** Serialize to a staging key/file, validate it, write a completion marker and checksum, then atomically switch the active generation. Retain the last known-good generation until the next successful startup.
+- **Implementation (2026-08-09):** `SaveConfig` now serializes every host and plug-in setting into the inactive slot beneath `Configuration Generations`, computes and verifies a recursive checksum, writes a completion marker, flushes the slot, and changes the root `Active Generation` DWORD only after validation succeeds. Startup validates the selected slot before exposing it to existing readers and automatically falls back to the other verified slot if the selected one is incomplete or corrupt. The prior slot is retained until the next successful startup; legacy direct trees are read unchanged and migrate on their next automatic save. Plug-in commits such as FTP site-bookmark edits now invoke the complete host transaction rather than writing their private subkey in place.
 
 ### 25. Version and validate the complete configuration schema
 

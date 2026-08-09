@@ -3480,6 +3480,11 @@ FIND_NEW_SLG_FILE:
     BOOL currentCfgDoesNotExist = autoImportConfig || SALAMANDER_ROOT_REG != SalamanderConfigurationRoots[0];
     BOOL saveNewConfig = currentCfgDoesNotExist;
 
+    // Preserve the version root separately, then resolve it to its last committed generation.
+    // All existing configuration readers continue to use SALAMANDER_ROOT_REG.
+    SetConfigurationStoreRoot(SALAMANDER_ROOT_REG);
+    SelectCommittedConfigurationGeneration();
+
     // if the user does not want more instances, only activate the previous one
     if (!currentCfgDoesNotExist &&
         CheckOnlyOneInstance(&cmdLineParams))
@@ -3804,8 +3809,9 @@ FIND_NEW_SLG_FILE:
                         if (Configuration.ConfigVersion < 45) // zavedeni password manageru
                             Plugins.LoadAll(MainWindow->HWindow);
 
-                        // save uz pujde do nejnovejsiho klice
-                        SALAMANDER_ROOT_REG = SalamanderConfigurationRoots[0];
+                        // Save into a new generation below the newest version root.
+                        SetConfigurationStoreRoot(SalamanderConfigurationRoots[0]);
+                        SelectCommittedConfigurationGeneration();
                         // save configuration immediately while it is a clean conversion of the old version -- user may
                         // have "Save Cfg on Exit" disabled and if something changes during Salamander run, they do not want to save it at the end
                         if (saveNewConfig)
