@@ -181,10 +181,10 @@ This document is the working record for a read-only stability and resilience aud
 - **Justification:** A large evolving setting surface makes partial, malformed, or future-version data a stability risk. Individual defaulting does not prove cross-field invariants.
 - **Implementation (2026-08-09):** Each committed host snapshot now carries `Configuration Schema Version` and is accepted only after an explicit, idempotent schema migration and complete-profile validation. The gate rejects future schemas/configurations, missing required sections, invalid window geometry, out-of-range display/viewer values, and incompatible visible/separated drive masks before `LoadConfig` can expose settings to global state. Invalid active generations fall back to the last verified generation; if neither generation validates, the default profile is used and startup displays a diagnostic. The schema version is excluded from the snapshot checksum solely so pre-schema transactional snapshots can receive the metadata-only v0-to-v1 migration without rewriting user data; all actual settings remain checksum-protected.
 
-### 26. Test backup restoration and interrupted configuration writes
+### 26. Test backup restoration and interrupted configuration writes — Implemented (2026-08-09)
 
 - **Justification:** Existing backup behavior is valuable but is only resilient if restoration works after failure at every write boundary.
-- **Proposed solution:** Add fault-injection tests that stop writes after each registry/file operation, restart the executable, and assert either the old or complete new configuration appears—never a mixture.
+- **Implementation (2026-08-09):** The registry-worker boundary now has an isolated-profile-only crash hook scoped to `SaveConfig`. The `FaultInjection` executable test first measures the exact mutation count for a complete configuration commit, then terminates a fresh process after every successful registry mutation, including generation cleanup, staging, completion markers, and both flush/selector commit boundaries. It restarts the executable after each interruption and accepts only the complete baseline profile or complete candidate profile; any mixed, defaulted, or unvalidated state fails the test. The opt-in lane is documented in `tests/FileManager.UiTests/README.md` because it deliberately launches and terminates the executable once per write boundary.
 
 ### 27. Extract a testable file-operation planning seam
 

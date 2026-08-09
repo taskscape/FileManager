@@ -43,13 +43,13 @@ public abstract class FileManagerUiTestBase
             Automation.Dispose();
     }
 
-    protected void RestartFileManager()
+    protected void RestartFileManager(IReadOnlyDictionary<string, string>? environment = null)
     {
         // Restart coverage verifies that the application remains launchable after a committed configuration dialog.
         if (!Application.HasExited)
             Application.Kill();
 
-        StartApplication();
+        StartApplication(environment);
     }
 
     protected Window OpenConfigurationDialog()
@@ -66,6 +66,30 @@ public abstract class FileManagerUiTestBase
         Assert.That(button, Is.Not.Null, $"Configuration dialog did not expose button {buttonId}.");
         button!.Invoke();
         WaitForWindowToClose(dialog);
+    }
+
+    protected void CommitConfigurationDialogWithoutWaiting(Window dialog)
+    {
+        // Fault injection terminates the process during the deferred native save, so waiting for
+        // the dialog's normal close is not meaningful.  The caller waits for the process instead.
+        var button = dialog.FindFirstDescendant(cf => cf.ByAutomationId("1"))?.AsButton();
+        Assert.That(button, Is.Not.Null, "Configuration dialog did not expose its OK button.");
+        button!.Invoke();
+    }
+
+    protected int WaitForFileManagerExit(TimeSpan timeout)
+    {
+        var deadline = DateTime.UtcNow + timeout;
+        while (DateTime.UtcNow < deadline)
+        {
+            if (Application.HasExited)
+                return Application.ExitCode;
+
+            Thread.Sleep(50);
+        }
+
+        Assert.Fail("FileManager did not terminate at the requested configuration write boundary.");
+        return 0;
     }
 
     protected bool ToggleFirstConfigurationCheckBox(Window dialog)
@@ -156,12 +180,17 @@ public abstract class FileManagerUiTestBase
     {
     }
 
-    private void StartApplication()
+    private void StartApplication(IReadOnlyDictionary<string, string>? environment = null)
     {
         var startInfo = new ProcessStartInfo(UiTestSettings.ExecutablePath, ApplicationArguments)
         {
             UseShellExecute = false,
         };
+        if (environment is not null)
+        {
+            foreach (var (name, value) in environment)
+                startInfo.Environment[name] = value;
+        }
 
         Application = FlaUI.Core.Application.Launch(startInfo);
         launchedApplications.Add(Application);

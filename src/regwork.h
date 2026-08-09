@@ -18,6 +18,16 @@ BOOL DeleteKeyAux(HKEY hKey, const char* name);
 // does not check the type, so it reads REG_DWORD the same as a 4-byte REG_BINARY
 BOOL GetValueDontCheckTypeAux(HKEY hKey, const char* name, void* buffer, DWORD bufferSize);
 
+// Test-only crash injection for the transactional configuration writer.  The scope is
+// inert unless FILEMANAGER_UI_ISOLATED=1 is present, so ordinary application launches
+// cannot accidentally enable it.  FILEMANAGER_CONFIG_FAULT_AFTER_WRITE terminates the
+// process immediately after that successful registry mutation; FILEMANAGER_CONFIG_FAULT_REPORT
+// receives the number of mutations in a completed save.
+void BeginConfigurationWriteFaultInjection();
+void EndConfigurationWriteFaultInjection();
+LONG FlushConfigurationRegistryKey(HKEY key);
+const DWORD CONFIGURATION_WRITE_FAULT_EXIT_CODE = 121;
+
 enum CRegistryWorkType
 {
     rwtNone,

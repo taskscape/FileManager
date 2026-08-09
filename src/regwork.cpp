@@ -8,6 +8,84 @@
 
 CRegistryWorkerThread RegistryWorkerThread;
 
+// The injector deliberately lives at the registry boundary rather than in SaveConfig's
+// individual sections.  That keeps the test matrix complete when a new subkey/value is
+// added to the snapshot and covers work performed by the registry worker as well as
+// synchronous calls made while it is already in use.
+static volatile LONG ConfigurationWriteFaultInjectionActive = 0;
+static volatile LONG ConfigurationWriteFaultAfter = 0;
+static volatile LONG ConfigurationWriteCount = 0;
+static char ConfigurationWriteFaultReport[MAX_PATH] = {};
+
+static BOOL IsIsolatedConfigurationFaultTest()
+{
+    char isolated[8];
+    return GetEnvironmentVariableA("FILEMANAGER_UI_ISOLATED", isolated, sizeof(isolated)) > 0 &&
+           strcmp(isolated, "1") == 0;
+}
+
+static void RecordConfigurationWrite()
+{
+    if (InterlockedCompareExchange(&ConfigurationWriteFaultInjectionActive, 0, 0) == 0)
+        return;
+
+    LONG writeNumber = InterlockedIncrement(&ConfigurationWriteCount);
+    LONG failAfter = InterlockedCompareExchange(&ConfigurationWriteFaultAfter, 0, 0);
+    if (failAfter > 0 && writeNumber == failAfter)
+        TerminateProcess(GetCurrentProcess(), CONFIGURATION_WRITE_FAULT_EXIT_CODE);
+}
+
+void BeginConfigurationWriteFaultInjection()
+{
+    InterlockedExchange(&ConfigurationWriteCount, 0);
+    InterlockedExchange(&ConfigurationWriteFaultAfter, 0);
+    ConfigurationWriteFaultReport[0] = 0;
+
+    if (!IsIsolatedConfigurationFaultTest())
+        return;
+
+    char value[32];
+    if (GetEnvironmentVariableA("FILEMANAGER_CONFIG_FAULT_AFTER_WRITE", value, sizeof(value)) > 0)
+    {
+        char* end;
+        LONG parsed = strtol(value, &end, 10);
+        if (end != value && *end == 0 && parsed > 0)
+            InterlockedExchange(&ConfigurationWriteFaultAfter, parsed);
+    }
+    GetEnvironmentVariableA("FILEMANAGER_CONFIG_FAULT_REPORT", ConfigurationWriteFaultReport,
+                            sizeof(ConfigurationWriteFaultReport));
+    InterlockedExchange(&ConfigurationWriteFaultInjectionActive, 1);
+}
+
+void EndConfigurationWriteFaultInjection()
+{
+    if (InterlockedExchange(&ConfigurationWriteFaultInjectionActive, 0) == 0)
+        return;
+
+    if (ConfigurationWriteFaultReport[0] != 0)
+    {
+        HANDLE report = CreateFileA(ConfigurationWriteFaultReport, GENERIC_WRITE, 0, NULL,
+                                    CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+        if (report != INVALID_HANDLE_VALUE)
+        {
+            char text[32];
+            int length = _snprintf_s(text, _countof(text), _TRUNCATE, "%ld", ConfigurationWriteCount);
+            DWORD written;
+            if (length > 0)
+                WriteFile(report, text, (DWORD)length, &written, NULL);
+            CloseHandle(report);
+        }
+    }
+}
+
+LONG FlushConfigurationRegistryKey(HKEY key)
+{
+    LONG result = RegFlushKey(key);
+    if (result == ERROR_SUCCESS)
+        RecordConfigurationWrite();
+    return result;
+}
+
 // ****************************************************************************
 
 BOOL ClearKeyAux(HKEY key)
@@ -22,6 +100,7 @@ BOOL ClearKeyAux(HKEY key)
             HANDLES(RegCloseKey(subKey));
             if (!ret || RegDeleteKey(key, name) != ERROR_SUCCESS)
                 return FALSE;
+            RecordConfigurationWrite();
         }
         else
             return FALSE;
@@ -35,7 +114,10 @@ BOOL ClearKeyAux(HKEY key)
             break;
         }
         else
+        {
+            RecordConfigurationWrite();
             size = MAX_PATH;
+        }
 
     return TRUE;
 }
@@ -49,7 +131,10 @@ BOOL CreateKeyAux(HWND parent, HKEY hKey, const char* name, HKEY& createdKey, BO
                                       KEY_READ | KEY_WRITE, NULL, &createdKey,
                                       &createType));
     if (res == ERROR_SUCCESS)
+    {
+        RecordConfigurationWrite();
         return TRUE;
+    }
     else
     {
         if (!quiet)
@@ -106,7 +191,10 @@ void CloseKeyAux(HKEY hKey)
 
 BOOL DeleteKeyAux(HKEY hKey, const char* name)
 {
-    return RegDeleteKey(hKey, name) == ERROR_SUCCESS;
+    LONG result = RegDeleteKey(hKey, name);
+    if (result == ERROR_SUCCESS)
+        RecordConfigurationWrite();
+    return result == ERROR_SUCCESS;
 }
 
 // ****************************************************************************
@@ -214,7 +302,10 @@ BOOL SetValueAux(HWND parent, HKEY hKey, const char* name, DWORD type,
         dataSize = (DWORD)strlen((char*)data) + 1;
     LONG res = RegSetValueEx(hKey, name, 0, type, (CONST BYTE*)data, dataSize);
     if (res == ERROR_SUCCESS)
+    {
+        RecordConfigurationWrite();
         return TRUE;
+    }
     else
     {
         if (!quiet)
@@ -238,7 +329,10 @@ BOOL SetValueAux(HWND parent, HKEY hKey, const char* name, DWORD type,
 
 BOOL DeleteValueAux(HKEY hKey, const char* name)
 {
-    return RegDeleteValue(hKey, name) == ERROR_SUCCESS;
+    LONG result = RegDeleteValue(hKey, name);
+    if (result == ERROR_SUCCESS)
+        RecordConfigurationWrite();
+    return result == ERROR_SUCCESS;
 }
 
 // ****************************************************************************

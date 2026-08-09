@@ -10,6 +10,7 @@ Set these environment variables before running:
 - `FILEMANAGER_UI_EXE` — absolute path to `salamand.exe` or a debug build of the executable.
 - `FILEMANAGER_UI_ARGUMENTS` — optional command-line arguments, for example a test-only `-c` configuration file.
 - `FILEMANAGER_UI_FTP_ORGANIZE_COMMAND` — runtime command ID allocated by FileManager for the FTP Client **Organize Bookmarks** menu command. This enables the 10 FTP bookmark persistence cases; without it, only those cases are skipped with an explicit message.
+- `FILEMANAGER_UI_CONFIG_FAULT_INJECTION=1` — explicitly enables the exhaustive transactional-configuration crash-recovery lane described below.
 
 Run the suite on an interactive Windows desktop session:
 
@@ -22,3 +23,16 @@ The configuration dialog is opened through its stable native command ID only to 
 File-operation cases create a fresh disposable directory tree under the system temporary directory for every test, start the left and right panels with `-l`/`-r`, and use the host's stable native command IDs. They verify files and nested directory trees after normal operations, cancelled operation dialogs, destination/name failures, and a locked-file delete failure. The tests never use a caller-supplied directory as their mutation target.
 
 The FTP plug-in menu command has no compile-time host command ID: FileManager allocates it while loading plug-ins. Keep the value in the isolated test environment rather than hard-coding it into the test project. The dialog controls themselves are located by their stable plug-in resource IDs and their persistence is asserted through UIA3 after a full application restart.
+
+## Transactional configuration fault injection
+
+The `FaultInjection` category first measures the exact registry-write count of a real configuration commit, then starts a fresh executable for every write boundary. The native test hook terminates that process immediately after the selected successful registry mutation. A clean restart must show either the complete baseline setting or the complete candidate setting; the test fails if the process did not terminate at the requested boundary or if restart exposes a mixture.
+
+Run this separately on the disposable profile because it intentionally terminates the executable many times:
+
+```powershell
+$env:FILEMANAGER_UI_CONFIG_FAULT_INJECTION = '1'
+dotnet test tests/FileManager.UiTests/FileManager.UiTests.csproj --filter TestCategory=FaultInjection
+```
+
+The executable honors `FILEMANAGER_CONFIG_FAULT_AFTER_WRITE` and `FILEMANAGER_CONFIG_FAULT_REPORT` only while `FILEMANAGER_UI_ISOLATED=1` is present. The test supplies those two variables to its child executable processes; users should not need to set them manually.
