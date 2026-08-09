@@ -773,6 +773,9 @@
     <ClInclude Include="..\common\multimon.h">
       <Filter>common</Filter>
     </ClInclude>
+    <ClInclude Include="..\operation_result.h">
+      <Filter>h</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Image Include="..\res\archive.ico">

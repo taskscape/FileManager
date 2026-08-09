@@ -147,6 +147,42 @@ public sealed class NativeSafetyRegressionTests
     }
 
     [Test]
+    public void Transactional_copy_results_preserve_phase_error_paths_retryability_and_partial_effects_for_legacy_dialogs()
+    {
+        var root = FindRepositoryRoot();
+        var result = File.ReadAllText(Path.Combine(root, "src", "operation_result.h"));
+        var copy = File.ReadAllText(Path.Combine(root, "src", "async_copy.cpp"));
+        var refactoring = File.ReadAllText(Path.Combine(root, "refactoring.md"));
+
+        // The native worker keeps the complete outcome until this adapter feeds an
+        // unchanged BOOL/error pair to the pre-existing progress dialog.
+        Assert.Multiple(() =>
+        {
+            Assert.That(result, Does.Contain("enum EOperationResultPhase"));
+            Assert.That(result, Does.Contain("orpVerifyDurableCopy"));
+            Assert.That(result, Does.Contain("orpVerifyDestinationIdentity"));
+            Assert.That(result, Does.Contain("orpCommitTransactionalTarget"));
+            Assert.That(result, Does.Contain("DWORD Win32Error"));
+            Assert.That(result, Does.Contain("HRESULT HResult"));
+            Assert.That(result, Does.Contain("const char* Source"));
+            Assert.That(result, Does.Contain("const char* Destination"));
+            Assert.That(result, Does.Contain("BOOL Retryable"));
+            Assert.That(result, Does.Contain("DWORD PartialEffects"));
+            Assert.That(result, Does.Contain("opeTemporaryTargetReady"));
+            Assert.That(result, Does.Contain("opeDestinationCommitted"));
+            Assert.That(result, Does.Contain("HRESULT_FROM_WIN32(error)"));
+            Assert.That(result, Does.Contain("BOOL ToLegacyBool(DWORD* error) const"));
+            Assert.That(copy, Does.Contain("static COperationResult CommitTransactionalTargetFile"));
+            Assert.That(copy, Does.Contain("static COperationResult VerifyDurableCopyCommit"));
+            Assert.That(copy, Does.Contain("COperationResult verificationResult = VerifyDurableCopyCommit"));
+            Assert.That(copy, Does.Contain("while (!verificationResult.ToLegacyBool(&verificationError))"));
+            Assert.That(copy, Does.Contain("COperationResult commitResult = CommitTransactionalTargetFile"));
+            Assert.That(copy, Does.Contain("while (!commitResult.ToLegacyBool(&err))"));
+            Assert.That(refactoring, Does.Contain("### 40. Make operation result types explicit — Implemented"));
+        });
+    }
+
+    [Test]
     public void Win32_path_boundaries_use_owned_wide_paths_and_extended_length_syntax()
     {
         var root = FindRepositoryRoot();
