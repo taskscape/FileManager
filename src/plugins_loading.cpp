@@ -25,11 +25,86 @@ DWORD CPluginFSInterfaceEncapsulation::PluginFSTime = 1; // zero is used as the 
 
 // ****************************************************************************
 
-int AlreadyInPlugin = 0;
+// This counter represents a process-wide UI restriction, so its transitions must be
+// serialized.  Readers use IsInPlugin() because notifications and shutdown checks
+// can run outside the thread that entered a plug-in callback.
+static std::atomic<int> AlreadyInPlugin(0);
+static SRWLOCK PluginNestingStateLock = SRWLOCK_INIT;
+
+class CPluginNestingStateLock
+{
+public:
+    CPluginNestingStateLock() { AcquireSRWLockExclusive(&PluginNestingStateLock); }
+    ~CPluginNestingStateLock() { ReleaseSRWLockExclusive(&PluginNestingStateLock); }
+
+private:
+    CPluginNestingStateLock(const CPluginNestingStateLock&);
+    CPluginNestingStateLock& operator=(const CPluginNestingStateLock&);
+};
+
+class CPluginDataLock
+{
+public:
+    CPluginDataLock() { Plugins.EnterDataCS(); }
+    ~CPluginDataLock() { Plugins.LeaveDataCS(); }
+
+private:
+    CPluginDataLock(const CPluginDataLock&);
+    CPluginDataLock& operator=(const CPluginDataLock&);
+};
+
+// Covers the one callback made before a plug-in interface exists.  The entry
+// point needs temporary -1 sentinels, but it must never leave them installed
+// when the entry point unwinds.
+class CPluginEntryScope
+{
+public:
+    CPluginEntryScope(CPluginInterfaceEncapsulation& pluginIface,
+                      CSalamanderGeneral& salamanderGeneral, int builtForVersion)
+        : PluginIface(pluginIface), SalamanderGeneral(salamanderGeneral), BuiltForVersion(builtForVersion),
+          EntryReturned(FALSE)
+    {
+        EnterPlugin();
+        CPluginDataLock dataLock;
+        PluginIface.Init((CPluginInterfaceAbstract*)-1, BuiltForVersion);
+        SalamanderGeneral.Init((CPluginInterfaceAbstract*)-1);
+    }
+
+    ~CPluginEntryScope()
+    {
+        if (!EntryReturned)
+        {
+            // An exception or an early exit cannot leave the loading-only
+            // interface placeholder visible to the rest of the host.
+            CPluginDataLock dataLock;
+            PluginIface.Init(NULL, 0);
+        }
+
+        LeavePlugin();
+        SalamanderGeneral.Init(PluginIface.GetInterface());
+    }
+
+    void SetReturnedInterface(CPluginInterfaceAbstract* pluginIface)
+    {
+        CPluginDataLock dataLock;
+        PluginIface.Init(pluginIface, BuiltForVersion);
+        EntryReturned = TRUE;
+    }
+
+private:
+    CPluginEntryScope(const CPluginEntryScope&);
+    CPluginEntryScope& operator=(const CPluginEntryScope&);
+
+    CPluginInterfaceEncapsulation& PluginIface;
+    CSalamanderGeneral& SalamanderGeneral;
+    int BuiltForVersion;
+    BOOL EntryReturned;
+};
 
 void EnterPlugin()
 {
-    if (AlreadyInPlugin == 0)
+    CPluginNestingStateLock stateLock;
+    if (AlreadyInPlugin.load() == 0)
     {
 #ifdef _DEBUG
         // verification code for the CSalamanderGeneral::GetMsgBoxParent() method
@@ -44,18 +119,20 @@ void EnterPlugin()
 
         AllowChangeDirectory(FALSE); // we do not want the current directory to change automatically
         BeginStopRefresh(TRUE);      // we do not want panels to refresh while a plug-in is running
-        AlreadyInPlugin = 1;
+        AlreadyInPlugin.store(1);
     }
     else
     {
         //    TRACE_I("Warning! Plugin was entered multiple times.");
-        AlreadyInPlugin++;
+        AlreadyInPlugin.fetch_add(1);
     }
 }
 
 void LeavePlugin()
 {
-    if (AlreadyInPlugin == 1)
+    CPluginNestingStateLock stateLock;
+    int nestingLevel = AlreadyInPlugin.load();
+    if (nestingLevel == 1)
     {
         // precaution to avoid interrupting panel listing after each ESC in the plugin (mainly
         // when closing modal dialogs)
@@ -63,7 +140,7 @@ void LeavePlugin()
 
         EndStopRefresh(TRUE, TRUE);
         AllowChangeDirectory(TRUE);
-        AlreadyInPlugin = 0;
+        AlreadyInPlugin.store(0);
 
         if (MainWindow != NULL && MainWindow->NeedToResentDispachChangeNotif &&
             StopRefresh == 0) // if we haven't left stop-refresh mode yet, sending the message is pointless
@@ -79,11 +156,16 @@ void LeavePlugin()
     }
     else
     {
-        if (AlreadyInPlugin == 0)
+        if (nestingLevel == 0)
             TRACE_E("Unmatched call to LeavePlugin()!");
         else
-            AlreadyInPlugin--;
+            AlreadyInPlugin.store(nestingLevel - 1);
     }
+}
+
+BOOL IsInPlugin()
+{
+    return AlreadyInPlugin.load() > 0;
 }
 
 //
@@ -2276,20 +2358,13 @@ BOOL CPluginData::InitDLL(HWND parent, BOOL quiet, BOOL waitCursor, BOOL showUns
                     PluginIsNethood = FALSE;
                     PluginUsesPasswordManager = FALSE;
 
-                    EnterPlugin(); // for the plugin entry point
-                    Plugins.EnterDataCS();
-                    PluginIface.Init((CPluginInterfaceAbstract*)-1, BuiltForVersion); // so SetFlagLoadOnSalamanderStart can be used from the entry point
-                    Plugins.LeaveDataCS();
-                    SalamanderGeneral.Init((CPluginInterfaceAbstract*)-1); // so SetFlagLoadOnSalamanderStart can be used from the entry point
+                    {
+                        CPluginEntryScope pluginEntry(PluginIface, SalamanderGeneral, BuiltForVersion);
 
-                    // !!! CALLING PLUGIN ENTRY-POINT !!!
-                    CPluginInterfaceAbstract* resIface = entry(&salamander);
-
-                    Plugins.EnterDataCS();
-                    PluginIface.Init(resIface, BuiltForVersion);
-                    Plugins.LeaveDataCS();
-                    LeavePlugin();
-                    SalamanderGeneral.Init(PluginIface.GetInterface());
+                        // !!! CALLING PLUGIN ENTRY-POINT !!!
+                        CPluginInterfaceAbstract* resIface = entry(&salamander);
+                        pluginEntry.SetReturnedInterface(resIface);
+                    }
 
                     if (!PluginIface.NotEmpty())
                     {

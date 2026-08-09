@@ -897,7 +897,7 @@ pokud bude jeste nekdy potreba ozivit tenhle kod, vyuzit toho, ze lze nahradit (
             }
 
             if (MainWindow != NULL && MainWindow->NeedToResentDispachChangeNotif &&
-                !AlreadyInPlugin) // if it is still in the plug-in, sending the message makes no sense
+                !IsInPlugin()) // if it is still in the plug-in, sending the message makes no sense
             {
                 MainWindow->NeedToResentDispachChangeNotif = FALSE;
 

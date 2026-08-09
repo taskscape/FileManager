@@ -22,6 +22,7 @@
 #include <crtdbg.h>
 #include <winioctl.h>
 #include <winnetwk.h>
+#include <atomic>
 #include <ostream>
 #include <limits.h>
 #include <commctrl.h>

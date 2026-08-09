@@ -159,10 +159,11 @@ This document is the working record for a read-only stability and resilience aud
 - **Delivered:** `salbroker.exe` is a restricted-token helper placed in a kill-on-close job with per-process memory and CPU limits. The host owns a local named pipe, validates a versioned and length-checked protocol on both sides, and kills/restarts the broker once after a timeout, malformed reply, or process failure.
 - **Initial scope:** Thumbnail requests no longer call thumbnail-loader plug-ins in the icon worker; the helper obtains the image through the Shell thumbnail provider and returns bounded pixels only. Archive-file metadata is also requested through the helper before archive handling. The v1 archive response deliberately carries only file metadata; format-specific archive navigation and extraction remain a separate migration because their plug-in data and callbacks cannot safely cross this ABI boundary.
 
-### 22. Make plug-in entry bookkeeping exception-safe
+### 22. Implemented: make plug-in entry bookkeeping exception-safe
 
-- **Justification:** `EnterPlugin`/`LeavePlugin` manually balance a global counter around a direct plug-in entry call (`src/plugins_loading.cpp:2278-2290`). An exception or early exit can permanently leave the host in “inside plug-in” state.
-- **Proposed solution:** Add an RAII scope guard that restores plug-in state, locks, and interface placeholders on every exit. Make nesting state thread-local or explicitly synchronized.
+- **Delivered:** `CPluginEntryScope` now owns the direct `SalamanderPluginEntry` call. Its destructor always releases the plug-in entry state, restores `SalamanderGeneral`, and clears the temporary `-1` interface placeholder if the entry point unwinds or exits before returning an interface. The scope uses an RAII data lock for every interface transition.
+- **Synchronization:** The process-wide plug-in nesting counter is now atomic, and its first-entry/last-exit transitions are serialized with an SRW lock. Shutdown and notification callers query it through `IsInPlugin()` rather than reading mutable state directly.
+- **Verification:** `NativeSafetyRegressionTests.Plugin_entry_scope_restores_host_state_after_an_unwinding_entry_point` guards the scope, placeholder cleanup, synchronization, callers, and this ledger entry.
 
 ### 23. Add failure barriers around every plug-in callback
 

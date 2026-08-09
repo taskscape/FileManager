@@ -307,7 +307,7 @@ LRESULT CMainWindow::HandleShutdown(UINT uMsg, WPARAM wParam, LPARAM lParam)
             }
         }
 
-        if (!endAfterCleanup && AlreadyInPlugin > 0)
+        if (!endAfterCleanup && IsInPlugin())
         {
             TRACE_E("WM_USER_CLOSE_MAINWND: AlreadyInPlugin > 0!");
             if (uMsg == WM_QUERYENDSESSION)
