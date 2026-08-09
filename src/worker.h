@@ -60,6 +60,8 @@ class COperations;
 struct CProgressDlgArrItem;
 class COperationJournal;
 
+#include "operation_plan.h"
+
 enum EOperationState
 {
     opsPlanned,
@@ -278,22 +280,6 @@ public:
     // transferred in 'time'; 'maxPacketSize' is the largest amount expected
     // before the next BytesReceived() call
     void BytesReceived(DWORD count, DWORD time, DWORD maxPacketSize);
-};
-
-enum COperationCode
-{
-    ocCopyFile,
-    ocMoveFile,
-    ocDeleteFile,
-    ocCreateDir,
-    ocMoveDir,
-    ocDeleteDir,
-    ocDeleteDirLink,
-    ocChangeAttrs, // WARNING: requested attributes are stored in TargetName (applies to every type; treat it as a DWORD)
-    ocCountSize,
-    ocConvert,
-    ocLabelForSkipOfCreateDir, // label to jump to when the script skips on ocCreateDirXXX; WARNING: SourceName and TargetName store the LO- and HI-DWORD of the total file sizes (including ADS) contained in the skipped directory; WARNING: Attr stores the ocCreateDirXXX index in the COperations array for that directory
-    ocCopyDirTime,             // Move/Copy: when filterCriteria->PreserveDirTime==TRUE copy the directory timestamps; WARNING: lastWrite is stored in SourceName and Attr (applies to every type; just two DWORDs)
 };
 
 #define OPFL_OVERWROLDERALRTESTED 0x00000001 // the "overwrite older, skip other existing" test has already been performed

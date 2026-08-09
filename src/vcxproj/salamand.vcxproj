@@ -605,6 +605,10 @@
     </ClCompile>
     <ClCompile Include="..\operation_journal.cpp">
     </ClCompile>
+    <ClCompile Include="..\operation_plan.cpp">
+    </ClCompile>
+    <ClCompile Include="..\file_operation_filesystem.cpp">
+    </ClCompile>
     <ClCompile Include="..\file_identity.cpp">
     </ClCompile>
     <ClCompile Include="..\iconpool.cpp">
@@ -888,6 +892,10 @@
     <ClInclude Include="..\worker.h">
     </ClInclude>
     <ClInclude Include="..\operation_journal.h">
+    </ClInclude>
+    <ClInclude Include="..\operation_plan.h">
+    </ClInclude>
+    <ClInclude Include="..\file_operation_filesystem.h">
     </ClInclude>
     <ClInclude Include="..\parserbroker.h">
     </ClInclude>

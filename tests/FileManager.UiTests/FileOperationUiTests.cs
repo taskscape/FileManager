@@ -37,8 +37,13 @@ public sealed class FileOperationUiTests : FileOperationUiTestBase
                           "Copy did not persist a durable operation journal.");
         var journal = FindJournalFor(source)!;
         var content = File.ReadAllText(journal);
+        var planItem = content.Split(new[] { "\r\n", "\n" }, StringSplitOptions.RemoveEmptyEntries)
+            .Single(line => line.StartsWith("PLANITEM|0|copy-file|", StringComparison.Ordinal));
 
         Assert.That(content, Does.Contain($"ITEM|").And.Contain("|copy-file|").And.Contain(source).And.Contain(target));
+        Assert.That(content, Does.Contain("PLAN|1|items="));
+        Assert.That(planItem, Does.Contain($"source={source}|target={target}"),
+                    "The immutable plan snapshot must preserve the generated copy intent before execution.");
         Assert.That(content, Does.Contain("STATE|").And.Contain("|prepared"));
         Assert.That(content, Does.Contain("|committed"));
         Assert.That(content, Does.Contain("OPERATION|completed"));

@@ -12,6 +12,7 @@
 #include "fileswnd.h"
 #include "dialogs.h"
 #include "worker.h"
+#include "file_operation_filesystem.h"
 #include "cache.h"
 #include "pack.h"
 #include "shellib.h"
@@ -356,11 +357,11 @@ BOOL CFilesWindow::MoveFiles(const char* source, const char* target, const char*
             //      script->TargetPathSupEFS = targetSupEFS;
 
             DWORD d1, d2, d3, d4;
-            if (MyGetDiskFreeSpace(targetDir, &d1, &d2, &d3, &d4))
+            if (FileOperationFileSystem().GetDiskFreeSpace(targetDir, &d1, &d2, &d3, &d4))
             {
                 script->BytesPerCluster = d1 * d2;
                 // W2K and later: the product d1 * d2 * d3 didn't work on DFS trees, reported by Ludek.Vydra@k2atmitec.cz
-                script->FreeSpace = MyGetDiskFreeSpace(targetDir);
+                script->FreeSpace = FileOperationFileSystem().QueryFreeSpace(targetDir);
             }
 
             BOOL scriptOK = TRUE; // result of script creation, success?
@@ -631,11 +632,11 @@ BOOL CFilesWindow::BuildScriptMain2(COperations* script, BOOL copy, char* target
         usedNames = new TIndirectArray<char>(100, 50);
 
     DWORD d1, d2, d3, d4;
-    if (MyGetDiskFreeSpace(targetPath, &d1, &d2, &d3, &d4))
+    if (FileOperationFileSystem().GetDiskFreeSpace(targetPath, &d1, &d2, &d3, &d4))
     {
         script->BytesPerCluster = d1 * d2;
         // W2K and later: the product d1 * d2 * d3 did not work on DFS trees, reported by Ludek.Vydra@k2atmitec.cz
-        script->FreeSpace = MyGetDiskFreeSpace(targetPath);
+        script->FreeSpace = FileOperationFileSystem().QueryFreeSpace(targetPath);
     }
 
     int i;
@@ -644,7 +645,7 @@ BOOL CFilesWindow::BuildScriptMain2(COperations* script, BOOL copy, char* target
         char* fileName = data->At(i)->FileName;
         char* mapName = data->At(i)->MapName;
 
-        DWORD attrs = SalGetFileAttributes(fileName);
+        DWORD attrs = FileOperationFileSystem().GetAttributes(fileName);
         if (attrs != 0xFFFFFFFF)
         {
             char* s = fileName + strlen(fileName);
@@ -670,7 +671,7 @@ BOOL CFilesWindow::BuildScriptMain2(COperations* script, BOOL copy, char* target
                     BOOL isKnown;
                     // mapName must be NULL here, otherwise data->MakeCopyOfName could not be TRUE
                     if ((isKnown = ContainsString(usedNames, targetName)) != 0 ||
-                        SalGetFileAttributes(targetPath) != 0xFFFFFFFF)
+                        FileOperationFileSystem().GetAttributes(targetPath) != 0xFFFFFFFF)
                     { // name already exists, we must generate a new one
                         if (!isKnown)
                             AddStringToNames(usedNames, targetName);
@@ -765,7 +766,7 @@ BOOL CFilesWindow::BuildScriptMain2(COperations* script, BOOL copy, char* target
                             if (strlen(targetName) < MAX_PATH) // name assembly succeeded, otherwise we ignore the result
                             {
                                 if ((isKnown = ContainsString(usedNames, targetName)) != 0 ||
-                                    SalGetFileAttributes(targetPath) != 0xFFFFFFFF)
+                                    FileOperationFileSystem().GetAttributes(targetPath) != 0xFFFFFFFF)
                                 {
                                     if (!isKnown)
                                         AddStringToNames(usedNames, targetName);
@@ -798,7 +799,7 @@ BOOL CFilesWindow::BuildScriptMain2(COperations* script, BOOL copy, char* target
                                     if (strlen(targetName) < MAX_PATH)                                                            // name assembly succeeded, otherwise we ignore the result
                                     {
                                         if ((isKnown = ContainsString(usedNames, targetName)) != 0 ||
-                                            SalGetFileAttributes(targetPath) != 0xFFFFFFFF)
+                                            FileOperationFileSystem().GetAttributes(targetPath) != 0xFFFFFFFF)
                                         {
                                             if (!isKnown)
                                                 AddStringToNames(usedNames, targetName);
@@ -853,7 +854,7 @@ BOOL CFilesWindow::BuildScriptMain2(COperations* script, BOOL copy, char* target
                                     if (strlen(targetName) < MAX_PATH) // name assembly succeeded, otherwise we ignore the result
                                     {
                                         if ((isKnown = ContainsString(usedNames, targetName)) != 0 ||
-                                            SalGetFileAttributes(targetPath) != 0xFFFFFFFF)
+                                            FileOperationFileSystem().GetAttributes(targetPath) != 0xFFFFFFFF)
                                         {
                                             if (!isKnown)
                                                 AddStringToNames(usedNames, targetName);
@@ -887,7 +888,7 @@ BOOL CFilesWindow::BuildScriptMain2(COperations* script, BOOL copy, char* target
                                 if (strlen(targetName) < MAX_PATH)                                                        // name assembly succeeded, otherwise we ignore the result
                                 {
                                     if ((isKnown = ContainsString(usedNames, targetName)) != 0 ||
-                                        SalGetFileAttributes(targetPath) != 0xFFFFFFFF)
+                                        FileOperationFileSystem().GetAttributes(targetPath) != 0xFFFFFFFF)
                                     {
                                         if (!isKnown)
                                             AddStringToNames(usedNames, targetName);
@@ -1298,13 +1299,13 @@ BOOL CFilesWindow::BuildScriptMain(COperations* script, CActionType type,
         strcpy(s, oneFile->Name);
         // try whether the file name is valid; if not, try its DOS name
         // (handles files accessible only via Unicode or DOS names)
-        if (SalGetFileAttributes(sourcePath) == 0xffffffff)
+        if (FileOperationFileSystem().GetAttributes(sourcePath) == 0xffffffff)
         {
             DWORD err = GetLastError();
             if (err == ERROR_FILE_NOT_FOUND || err == ERROR_INVALID_NAME)
             {
                 strcpy(s, oneFile->DosName);
-                if (SalGetFileAttributes(sourcePath) != 0xffffffff)
+                if (FileOperationFileSystem().GetAttributes(sourcePath) != 0xffffffff)
                 {
                     useName = oneFile->DosName;
                     useDOSName = NULL;
@@ -1319,11 +1320,11 @@ BOOL CFilesWindow::BuildScriptMain(COperations* script, CActionType type,
         if (type == atMove || type == atCopy) // outside Copy and Move it makes no sense to check
         {
             DWORD d1, d2, d3, d4;
-            if (MyGetDiskFreeSpace(targetPath, &d1, &d2, &d3, &d4))
+            if (FileOperationFileSystem().GetDiskFreeSpace(targetPath, &d1, &d2, &d3, &d4))
             {
                 script->BytesPerCluster = d1 * d2;
                 // W2K and later: the product d1 * d2 * d3 did not work on DFS trees, reported by Ludek.Vydra@k2atmitec.cz
-                script->FreeSpace = MyGetDiskFreeSpace(targetPath);
+                script->FreeSpace = FileOperationFileSystem().QueryFreeSpace(targetPath);
             }
         }
 
@@ -2903,7 +2904,7 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
         if (script->BytesPerCluster == 0) // no space-estimate risk
         {
             DWORD d1, d2, d3, d4;
-            if (MyGetDiskFreeSpace(sourcePath, &d1, &d2, &d3, &d4))
+            if (FileOperationFileSystem().GetDiskFreeSpace(sourcePath, &d1, &d2, &d3, &d4))
                 script->BytesPerCluster = d1 * d2;
         }
 
@@ -3015,7 +3016,7 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
         {
             return skip;
         }
-        op.TargetName = (char*)(DWORD_PTR)((SalGetFileAttributes(op.SourceName) & attrsData->AttrAnd) | attrsData->AttrOr);
+        op.TargetName = (char*)(DWORD_PTR)((FileOperationFileSystem().GetAttributes(op.SourceName) & attrsData->AttrAnd) | attrsData->AttrOr);
         script->Add(op);
         if (!script->IsGood())
         {
