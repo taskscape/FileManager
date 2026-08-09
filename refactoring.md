@@ -96,10 +96,10 @@ This document is the working record for a read-only stability and resilience aud
 - **Delivered:** `src/operation_journal.cpp` creates a write-through, append-only journal for every native operation script in `%APPDATA%\\Open Salamander\\operation-journals`. It records each mutating item’s source, destination, captured handle identity, transactional temporary path, and `prepared`/`temporary-ready`/`committed` transitions. Journal writes happen before each mutating item and are flushed before the operation continues.
 - **Recovery:** Startup detects journals without a terminal record. The user may resume only a fully-written sibling transactional target, roll back journaled uncommitted temporary targets, or leave files untouched. Every recovery choice produces a reconciliation report containing the original journal records and unresolved-item count; ordinary incomplete direct writes are reported rather than replayed automatically.
 
-### 10. Revalidate file identity immediately before destructive actions
+### 10. Implemented: revalidate file identity immediately before destructive actions
 
-- **Justification:** The code checks reparse points in several paths, but reviewed core code does not bind decisions to handle-based file identity. Names can be swapped between validation and delete/replace, especially in writable or network directories.
-- **Proposed solution:** Open with reparse-aware flags, record volume serial and file ID, resolve the final path by handle, and re-check identity before commit or deletion. Refuse the action if the target changed.
+- **Delivered:** `src/file_identity.cpp` captures the source and destination identity as each worker item begins, before any confirmation or I/O delay. It opens with `FILE_FLAG_OPEN_REPARSE_POINT | FILE_FLAG_BACKUP_SEMANTICS`, records the volume serial and file ID, and fingerprints `GetFinalPathNameByHandleW` output. Transactional overwrite checks that captured identity immediately before `ReplaceFileW`/`MoveFileExW` can run and refuses a changed or newly introduced target.
+- **Deletion:** Direct file and empty-directory deletion now reopens and rechecks the recorded identity, then applies `FileDispositionInfo` to that verified handle. This binds the destructive operation to the opened object instead of a subsequently re-resolved name and preserves reparse-point behavior. Recycle Bin requests are still delegated to the shell but retain the same pre-action identity capture for the native direct-delete path.
 
 ### 11. Replace legacy file-size and seek APIs in operation code
 

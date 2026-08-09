@@ -78,7 +78,7 @@ struct TMN_REPARSE_DATA_BUFFER
   return FALSE;
 */
 
-BOOL DoDeleteDirLinkAux(const char* nameDelLink, DWORD* err)
+BOOL DoDeleteDirLinkAux(const char* nameDelLink, const COperation::CFileIdentity& expectedIdentity, DWORD* err)
 {
     // remove the reparse point from directory 'nameDelLink'
     if (err != NULL)
@@ -87,14 +87,18 @@ BOOL DoDeleteDirLinkAux(const char* nameDelLink, DWORD* err)
     DWORD attr = GetFileAttributesUtf8(nameDelLink);
     if (attr != INVALID_FILE_ATTRIBUTES && (attr & FILE_ATTRIBUTE_REPARSE_POINT))
     {
-        HANDLE dir = HANDLES_Q(CreateFileUtf8(nameDelLink, GENERIC_WRITE /* | GENERIC_READ */, 0, 0, OPEN_EXISTING,
-                                          FILE_FLAG_BACKUP_SEMANTICS | FILE_FLAG_OPEN_REPARSE_POINT, NULL));
+        HANDLE dir = HANDLES_Q(CreateFileUtf8(nameDelLink, GENERIC_WRITE | DELETE | FILE_READ_ATTRIBUTES, 0, 0, OPEN_EXISTING,
+                                           FILE_FLAG_BACKUP_SEMANTICS | FILE_FLAG_OPEN_REPARSE_POINT, NULL));
         if (dir != INVALID_HANDLE_VALUE)
         {
             DWORD dummy;
             char buf[MAXIMUM_REPARSE_DATA_BUFFER_SIZE];
             REPARSE_GUID_DATA_BUFFER* juncData = (REPARSE_GUID_DATA_BUFFER*)buf;
-            if (DeviceIoControl(dir, FSCTL_GET_REPARSE_POINT, NULL, 0, juncData,
+            if (!VerifyFileHandleIdentity(dir, expectedIdentity, err))
+            {
+                ok = FALSE;
+            }
+            else if (DeviceIoControl(dir, FSCTL_GET_REPARSE_POINT, NULL, 0, juncData,
                                 MAXIMUM_REPARSE_DATA_BUFFER_SIZE, &dummy, NULL) == 0)
             {
                 if (err != NULL)
@@ -115,8 +119,11 @@ BOOL DoDeleteDirLinkAux(const char* nameDelLink, DWORD* err)
                     rgdb.ReparseTag = juncData->ReparseTag;
 
                     DWORD dwBytes;
+                    FILE_DISPOSITION_INFO disposition;
+                    disposition.DeleteFile = TRUE;
                     if (DeviceIoControl(dir, FSCTL_DELETE_REPARSE_POINT, &rgdb, REPARSE_GUID_DATA_BUFFER_HEADER_SIZE,
-                                        NULL, 0, &dwBytes, 0) != 0)
+                                        NULL, 0, &dwBytes, 0) != 0 &&
+                        SetFileInformationByHandle(dir, FileDispositionInfo, &disposition, sizeof(disposition)))
                     {
                         ok = TRUE;
                     }
@@ -136,16 +143,7 @@ BOOL DoDeleteDirLinkAux(const char* nameDelLink, DWORD* err)
         }
     }
     else
-        ok = TRUE; // the reparse point is apparently gone; all that remains is to delete the empty directory...
-    // remove the empty directory (that remained after deleting the reparse point)
-    if (ok)
-        ClearReadOnlyAttr(nameDelLink, attr); // ensure it can be deleted even with the read-only attribute
-    if (ok && !RemoveDirectoryUtf8(nameDelLink))
-    {
-        ok = FALSE;
-        if (err != NULL)
-            *err = GetLastError();
-    }
+        ok = TRUE; // the reparse point is already gone
     return ok;
 }
 
@@ -157,12 +155,19 @@ BOOL DeleteDirLink(const char* name, DWORD* err)
     char nameDelLinkCopy[3 * MAX_PATH];
     MakeCopyWithBackslashIfNeeded(nameDelLink, nameDelLinkCopy);
 
-    return DoDeleteDirLinkAux(nameDelLink, err);
+    COperation operation;
+    memset(&operation, 0, sizeof(operation));
+    operation.Opcode = ocDeleteDirLink;
+    operation.SourceName = (char*)nameDelLink;
+    if (!CaptureOperationFileIdentities(&operation, err))
+        return FALSE;
+    return DoDeleteDirLinkAux(nameDelLink, operation.SourceIdentity, err);
 }
 
-BOOL DoDeleteDirLink(HWND hProgressDlg, char* name, const CQuadWord& size, COperations* script,
+BOOL DoDeleteDirLink(HWND hProgressDlg, COperation* operation, const CQuadWord& size, COperations* script,
                      CQuadWord& totalDone, CProgressDlgData& dlgData)
 {
+    char* name = operation->SourceName;
     // if the path ends with a space/dot, we must append '\\'; otherwise CreateFile
     // and RemoveDirectory trim the spaces/dots and operate on a different path
     const char* nameDelLink = name;
@@ -172,7 +177,7 @@ BOOL DoDeleteDirLink(HWND hProgressDlg, char* name, const CQuadWord& size, COper
     while (1)
     {
         DWORD err;
-        BOOL ok = DoDeleteDirLinkAux(nameDelLink, &err);
+        BOOL ok = DoDeleteDirLinkAux(nameDelLink, operation->SourceIdentity, &err);
 
         if (ok)
         {
@@ -1025,6 +1030,14 @@ unsigned ThreadWorkerBody(void* parameter)
         {
             COperation* op = &script->At(i);
 
+            DWORD identityError;
+            if (!CaptureOperationFileIdentities(op, &identityError))
+            {
+                TRACE_E("Unable to capture handle identity before file-operation item " << i << ": " << GetErrorText(identityError));
+                Error = TRUE;
+                break;
+            }
+
             if (!script->JournalBeginItem(i, op))
             {
                 TRACE_E("Unable to persist file-operation journal transition before item " << i);
@@ -1223,21 +1236,21 @@ unsigned ThreadWorkerBody(void* parameter)
 
                 if (op->Opcode == ocDeleteFile)
                 {
-                    Error = !DoDeleteFile(hProgressDlg, op->SourceName, op->Size,
+                    Error = !DoDeleteFile(hProgressDlg, op, op->Size,
                                           script, totalDone, op->Attr, dlgData);
                 }
                 else
                 {
                     if (op->Opcode == ocDeleteDir)
                     {
-                        Error = !DoDeleteDir(hProgressDlg, op->SourceName, op->Size,
-                                             script, totalDone, op->Attr, (DWORD)(DWORD_PTR)op->TargetName != -1,
+                        Error = !DoDeleteDir(hProgressDlg, op, op->Size,
+                                              script, totalDone, op->Attr, (DWORD)(DWORD_PTR)op->TargetName != -1,
                                              dlgData);
                     }
                     else
                     {
-                        Error = !DoDeleteDirLink(hProgressDlg, op->SourceName, op->Size,
-                                                 script, totalDone, dlgData);
+                        Error = !DoDeleteDirLink(hProgressDlg, op, op->Size,
+                                                  script, totalDone, dlgData);
                     }
                 }
                 ExecLogFileOperationResult(opName, op->SourceName, "", !Error);
