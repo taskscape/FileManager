@@ -111,6 +111,42 @@ public sealed class NativeSafetyRegressionTests
     }
 
     [Test]
+    public void External_size_fields_use_checked_arithmetic_before_allocation_or_io()
+    {
+        var root = FindRepositoryRoot();
+        var arithmetic = File.ReadAllText(Path.Combine(root, "src", "common", "checked_arithmetic.h"));
+        var upload = File.ReadAllText(Path.Combine(root, "src", "salmon", "upload.cpp"));
+        var client = File.ReadAllText(Path.Combine(root, "src", "parserbroker.cpp"));
+        var broker = File.ReadAllText(Path.Combine(root, "src", "parserbroker", "salbroker.cpp"));
+        var refactoring = File.ReadAllText(Path.Combine(root, "refactoring.md"));
+
+        // These assertions pin the overflow boundaries that adversarial file,
+        // HTTP, and IPC lengths must traverse before touching a buffer.
+        Assert.Multiple(() =>
+        {
+            Assert.That(arithmetic, Does.Contain("CheckedAddUInt64"));
+            Assert.That(arithmetic, Does.Contain("CheckedMultiplyUInt64"));
+            Assert.That(arithmetic, Does.Contain("CheckedAddSize"));
+            Assert.That(arithmetic, Does.Contain("CheckedMultiplySize"));
+            Assert.That(arithmetic, Does.Contain("CheckedCastUInt64ToDword"));
+            Assert.That(arithmetic, Does.Contain("CheckedCastSizeToDword"));
+            Assert.That(arithmetic, Does.Contain("CheckedCastSizeToInt"));
+            Assert.That(upload, Does.Contain("CheckedCastDwordToSize(available, &availableSize)"));
+            Assert.That(upload, Does.Contain("CheckedAddSize(response->size(), availableSize, &responseSize)"));
+            Assert.That(upload, Does.Contain("CheckedCastSizeToDword(strlen(multipartPrefix), &multipartPrefixLength)"));
+            Assert.That(upload, Does.Contain("CheckedCastUInt64ToDword(remaining, &bytesToRead)"));
+            Assert.That(upload, Does.Contain("CheckedCastSizeToInt(response.size(), &responseLength)"));
+            Assert.That(client, Does.Contain("CheckedMultiplyUInt64((uint64_t)(chars - 1), (uint64_t)sizeof(WCHAR), &pathBytes64)"));
+            Assert.That(client, Does.Contain("CheckedAddDword(prefixLength, pathBytes, &totalPayloadLength)"));
+            Assert.That(client, Does.Contain("CheckedMultiplyUInt64(thumbnail->Width, thumbnail->Height, &expectedPixelBytes)"));
+            Assert.That(client, Does.Contain("CheckedAddDword((DWORD)sizeof(*thumbnail), thumbnail->PixelBytes, &expectedResponseLength)"));
+            Assert.That(broker, Does.Contain("CheckedMultiplyDword((DWORD)bitmapInfo.bmWidth, (DWORD)bitmapInfo.bmHeight, &pixels)"));
+            Assert.That(broker, Does.Contain("CheckedAddDword((DWORD)sizeof(CParserBrokerThumbnailResponse), pixelBytes, &packedResponseLength)"));
+            Assert.That(refactoring, Does.Contain("### 39. Use checked arithmetic for sizes, offsets, and allocations — Implemented"));
+        });
+    }
+
+    [Test]
     public void Win32_path_boundaries_use_owned_wide_paths_and_extended_length_syntax()
     {
         var root = FindRepositoryRoot();

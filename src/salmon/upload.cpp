@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "precomp.h"
+#include "..\\common\\checked_arithmetic.h"
 
 #include <winhttp.h>
 #include <string>
@@ -144,6 +145,12 @@ BOOL FinishChunkedRequest(HINTERNET request, DWORD* error)
 BOOL ReadResponse(HINTERNET request, std::string* response, DWORD* error)
 {
     std::vector<char> buffer(kIoBufferSize);
+    DWORD bufferSize;
+    if (!CheckedCastSizeToDword(buffer.size(), &bufferSize))
+    {
+        *error = ERROR_ARITHMETIC_OVERFLOW;
+        return FALSE;
+    }
     for (;;)
     {
         DWORD available = 0;
@@ -154,13 +161,19 @@ BOOL ReadResponse(HINTERNET request, std::string* response, DWORD* error)
         }
         if (available == 0)
             return TRUE;
-        if (available > kMaximumResponseSize || response->size() > kMaximumResponseSize - available)
+        size_t availableSize;
+        size_t responseSize;
+        // Network-provided byte counts must be representable before they are
+        // combined with owned storage or handed back to a legacy int parser.
+        if (!CheckedCastDwordToSize(available, &availableSize) ||
+            !CheckedAddSize(response->size(), availableSize, &responseSize) ||
+            responseSize > kMaximumResponseSize)
         {
             *error = ERROR_INSUFFICIENT_BUFFER;
             return FALSE;
         }
 
-        DWORD bytesToRead = available < buffer.size() ? available : (DWORD)buffer.size();
+        DWORD bytesToRead = available < bufferSize ? available : bufferSize;
         DWORD read = 0;
         if (!WinHttpReadData(request, buffer.data(), bytesToRead, &read))
         {
@@ -190,6 +203,16 @@ BOOL UploadReportAttempt(CUploadParams* uploadParams, BOOL* retryable)
               "Content-Type: application/octet-stream\r\n\r\n",
               kMultipartBoundary, fileNameOnly);
     const char multipartSuffix[] = "\r\n--" "---------------------------OpenSalamanderCrashReport" "--\r\n";
+    DWORD multipartPrefixLength;
+    DWORD multipartSuffixLength;
+    // The multipart framing is sent through DWORD-based WinHTTP APIs, so do
+    // not allow a future dynamic framing change to truncate its length.
+    if (!CheckedCastSizeToDword(strlen(multipartPrefix), &multipartPrefixLength) ||
+        !CheckedCastSizeToDword(strlen(multipartSuffix), &multipartSuffixLength))
+    {
+        SetUploadError(uploadParams, ERROR_ARITHMETIC_OVERFLOW);
+        return FALSE;
+    }
 
     HANDLE file = CreateFile(uploadParams->FileName, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
     if (file == INVALID_HANDLE_VALUE)
@@ -270,7 +293,7 @@ BOOL UploadReportAttempt(CUploadParams* uploadParams, BOOL* retryable)
                                 *retryable = !IsUploadCancelled(uploadParams);
                                 SetUploadError(uploadParams, error);
                             }
-                            else if (!WriteRequestData(request, multipartPrefix, (DWORD)strlen(multipartPrefix), &error))
+                            else if (!WriteRequestData(request, multipartPrefix, multipartPrefixLength, &error))
                             {
                                 SetUploadError(uploadParams, error);
                             }
@@ -278,7 +301,13 @@ BOOL UploadReportAttempt(CUploadParams* uploadParams, BOOL* retryable)
                             {
                                 std::vector<char> buffer(kIoBufferSize);
                                 BOOL writeSucceeded = TRUE;
-                                unsigned __int64 remaining = (unsigned __int64)fileSize.QuadPart;
+                                uint64_t remaining = (uint64_t)fileSize.QuadPart;
+                                DWORD bufferSize;
+                                if (!CheckedCastSizeToDword(buffer.size(), &bufferSize))
+                                {
+                                    error = ERROR_ARITHMETIC_OVERFLOW;
+                                    writeSucceeded = FALSE;
+                                }
                                 while (remaining != 0)
                                 {
                                     if (IsUploadCancelled(uploadParams))
@@ -289,7 +318,13 @@ BOOL UploadReportAttempt(CUploadParams* uploadParams, BOOL* retryable)
                                     }
 
                                     DWORD read = 0;
-                                    DWORD bytesToRead = remaining < buffer.size() ? (DWORD)remaining : (DWORD)buffer.size();
+                                    DWORD bytesToRead = bufferSize;
+                                    if (remaining < bufferSize && !CheckedCastUInt64ToDword(remaining, &bytesToRead))
+                                    {
+                                        error = ERROR_ARITHMETIC_OVERFLOW;
+                                        writeSucceeded = FALSE;
+                                        break;
+                                    }
                                     if (!ReadFile(file, buffer.data(), bytesToRead, &read, NULL))
                                     {
                                         error = GetLastError();
@@ -320,7 +355,7 @@ BOOL UploadReportAttempt(CUploadParams* uploadParams, BOOL* retryable)
                                 {
                                     SetUploadError(uploadParams, error);
                                 }
-                                else if (!WriteRequestData(request, multipartSuffix, (DWORD)strlen(multipartSuffix), &error))
+                                else if (!WriteRequestData(request, multipartSuffix, multipartSuffixLength, &error))
                                 {
                                     SetUploadError(uploadParams, error);
                                 }
@@ -351,7 +386,13 @@ BOOL UploadReportAttempt(CUploadParams* uploadParams, BOOL* retryable)
                                         if (!ReadResponse(request, &response, &error))
                                             SetUploadError(uploadParams, error);
                                         else
-                                            result = AnalyzeResponse(response.c_str(), (int)response.size(), uploadParams);
+                                        {
+                                            int responseLength;
+                                            if (!CheckedCastSizeToInt(response.size(), &responseLength))
+                                                SetUploadError(uploadParams, ERROR_ARITHMETIC_OVERFLOW);
+                                            else
+                                                result = AnalyzeResponse(response.c_str(), responseLength, uploadParams);
+                                        }
                                     }
                                 }
                             }
