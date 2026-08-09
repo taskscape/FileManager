@@ -10,6 +10,9 @@
 
 #include <Aclapi.h>
 #include <Ntsecapi.h>
+#include <bcrypt.h>
+
+#pragma comment(lib, "bcrypt.lib")
 
 // CreateFileUtf8 / DeleteFileUtf8 / SetFileAttributesUtf8 / RemoveDirectoryUtf8
 // are globally declared in common/strutils.h and defined in common/strutils.cpp.
@@ -2275,6 +2278,101 @@ static BOOL VerifyDurableCopyCommit(const char* targetName, const CQuadWord& exp
     return verified;
 }
 
+// A post-close size check establishes a durable destination, but it cannot
+// distinguish two equally sized byte streams.  Cross-volume moves retain the
+// source until this comparison succeeds after a copy path has had suspicious
+// I/O retries.
+static BOOL CalculateFileSha256(const char* fileName, BYTE digest[32], DWORD* error)
+{
+    BCRYPT_ALG_HANDLE algorithm = NULL;
+    BCRYPT_HASH_HANDLE hash = NULL;
+    PUCHAR hashObject = NULL;
+    BYTE* buffer = NULL;
+    HANDLE file = INVALID_HANDLE_VALUE;
+    DWORD hashObjectLength = 0;
+    DWORD resultLength = 0;
+    BOOL calculated = FALSE;
+
+    if (BCryptOpenAlgorithmProvider(&algorithm, BCRYPT_SHA256_ALGORITHM, NULL, 0) != 0 ||
+        BCryptGetProperty(algorithm, BCRYPT_OBJECT_LENGTH, (PUCHAR)&hashObjectLength,
+                          sizeof(hashObjectLength), &resultLength, 0) != 0 ||
+        (hashObject = (PUCHAR)malloc(hashObjectLength)) == NULL ||
+        BCryptCreateHash(algorithm, &hash, hashObject, hashObjectLength, NULL, 0, 0) != 0)
+    {
+        *error = ERROR_NOT_SUPPORTED;
+        goto CLEANUP;
+    }
+
+    if ((file = HANDLES_Q(CreateFileUtf8(fileName, GENERIC_READ,
+                                         FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+                                         NULL, OPEN_EXISTING, FILE_FLAG_SEQUENTIAL_SCAN, NULL))) == INVALID_HANDLE_VALUE)
+    {
+        *error = GetLastError();
+        goto CLEANUP;
+    }
+    if ((buffer = (BYTE*)malloc(64 * 1024)) == NULL)
+    {
+        *error = ERROR_NOT_ENOUGH_MEMORY;
+        goto CLEANUP;
+    }
+
+    while (1)
+    {
+        DWORD bytesRead;
+        if (!ReadFile(file, buffer, 64 * 1024, &bytesRead, NULL))
+        {
+            *error = GetLastError();
+            goto CLEANUP;
+        }
+        if (bytesRead == 0)
+            break;
+        if (BCryptHashData(hash, buffer, bytesRead, 0) != 0)
+        {
+            *error = ERROR_READ_FAULT;
+            goto CLEANUP;
+        }
+    }
+    if (BCryptFinishHash(hash, digest, 32, 0) != 0)
+    {
+        *error = ERROR_READ_FAULT;
+        goto CLEANUP;
+    }
+    calculated = TRUE;
+
+CLEANUP:
+    if (file != INVALID_HANDLE_VALUE && !HANDLES(CloseHandle(file)) && calculated)
+    {
+        *error = GetLastError();
+        calculated = FALSE;
+    }
+    if (buffer != NULL)
+        free(buffer);
+    if (hash != NULL)
+        BCryptDestroyHash(hash);
+    if (hashObject != NULL)
+        free(hashObject);
+    if (algorithm != NULL)
+        BCryptCloseAlgorithmProvider(algorithm, 0);
+    return calculated;
+}
+
+static BOOL VerifyFullFileContentSha256(const char* sourceName, const char* targetName, DWORD* error)
+{
+    BYTE sourceDigest[32];
+    BYTE targetDigest[32];
+    if (!CalculateFileSha256(sourceName, sourceDigest, error) ||
+        !CalculateFileSha256(targetName, targetDigest, error))
+    {
+        return FALSE;
+    }
+    if (memcmp(sourceDigest, targetDigest, sizeof(sourceDigest)) != 0)
+    {
+        *error = ERROR_CRC;
+        return FALSE;
+    }
+    return TRUE;
+}
+
 BOOL SyncOrAsyncDeviceIoControl(CAsyncCopyParams* asyncPar, HANDLE hDevice, DWORD dwIoControlCode,
                                 LPVOID lpInBuffer, DWORD nInBufferSize, LPVOID lpOutBuffer,
                                 DWORD nOutBufferSize, LPDWORD lpBytesReturned, DWORD* err)
@@ -3682,8 +3780,10 @@ BOOL DoCopyFile(COperation* op, HWND hProgressDlg, void* buffer,
                 DWORD clearReadonlyMask, BOOL* skip, BOOL lantasticCheck,
                 int& mustDeleteFileBeforeOverwrite, int& allocWholeFileOnStart,
                 CProgressDlgData& dlgData, BOOL copyADS, BOOL copyAsEncrypted,
-                BOOL isMove, CAsyncCopyParams*& asyncPar)
+                BOOL isMove, CAsyncCopyParams*& asyncPar, BOOL* suspiciousIoRetry)
 {
+    if (suspiciousIoRetry != NULL)
+        *suspiciousIoRetry = FALSE;
     char* const requestedTargetName = op->TargetName;
     char transactionalTargetName[3 * MAX_PATH];
     BOOL transactionalTarget = FALSE;
@@ -4067,7 +4167,11 @@ COPY_AGAIN:
                         return TRUE;
                     }
                     if (copyAgain)
+                    {
+                        if (suspiciousIoRetry != NULL)
+                            *suspiciousIoRetry = TRUE;
                         goto COPY_AGAIN;
+                    }
 
                     if (lantasticCheck)
                     {
@@ -4094,6 +4198,8 @@ COPY_AGAIN:
                             {
                             case IDRETRY:
                             {
+                                if (suspiciousIoRetry != NULL)
+                                    *suspiciousIoRetry = TRUE;
                                 operationDone = CQuadWord(0, 0);
                                 script->SetTFSandProgressSize(lastTransferredFileSize, totalDone);
                                 SetProgress(hProgressDlg, 0, CaclProg(totalDone, script->TotalSize), dlgData);
@@ -4283,6 +4389,8 @@ COPY_AGAIN:
                             {
                             case IDRETRY:
                             {
+                                if (suspiciousIoRetry != NULL)
+                                    *suspiciousIoRetry = TRUE;
                                 if (DeleteFileUtf8(op->TargetName) == 0)
                                 {
                                     DWORD err2 = GetLastError();
@@ -4402,6 +4510,8 @@ COPY_AGAIN:
                         switch (ret)
                         {
                         case IDRETRY:
+                            if (suspiciousIoRetry != NULL)
+                                *suspiciousIoRetry = TRUE;
                             ClearReadOnlyAttr(op->TargetName);
                             if (DeleteFileUtf8(op->TargetName) == 0)
                             {
@@ -5507,12 +5617,49 @@ BOOL DoMoveFile(COperation* op, HWND hProgressDlg, void* buffer,
         }
 
         BOOL skip;
+        BOOL suspiciousIoRetry;
+        DWORD err = NO_ERROR;
         BOOL notError = DoCopyFile(op, hProgressDlg, buffer, script, totalDone,
                                    clearReadonlyMask, &skip, lantasticCheck,
                                    mustDeleteFileBeforeOverwrite, allocWholeFileOnStart,
-                                   dlgData, copyADS, copyAsEncrypted, TRUE, asyncPar);
+                                   dlgData, copyADS, copyAsEncrypted, TRUE, asyncPar, &suspiciousIoRetry);
         if (notError && !skip) // still need to clean up the file from the source
         {
+            // Retry-resume and retry-copy paths are evidence that the I/O path
+            // was unstable.  Re-read both closed files and compare their full
+            // SHA-256 digests before this move is allowed to delete its source.
+            while (suspiciousIoRetry && !VerifyFullFileContentSha256(op->SourceName, op->TargetName, &err))
+            {
+                TRACE_I("DoMoveFile(): full SHA-256 verification failed for " << op->TargetName << ": " << GetErrorText(err));
+                WaitForSingleObject(dlgData.WorkerNotSuspended, INFINITE);
+                if (*dlgData.CancelWorker)
+                    return FALSE;
+
+                if (dlgData.SkipAllDeleteErr)
+                    return TRUE; // retain the source; the verified delete precondition was not met
+
+                int ret = IDCANCEL;
+                char* data[4];
+                data[0] = (char*)&ret;
+                data[1] = LoadStr(IDS_ERRORDELETINGFILE);
+                data[2] = op->SourceName;
+                data[3] = GetErrorText(err);
+                SendMessage(hProgressDlg, WM_USER_DIALOG, 0, (LPARAM)data);
+                switch (ret)
+                {
+                case IDRETRY:
+                    break;
+
+                case IDB_SKIPALL:
+                    dlgData.SkipAllDeleteErr = TRUE;
+                case IDB_SKIP:
+                    return TRUE; // retain the source; the verified delete precondition was not met
+
+                case IDCANCEL:
+                    return FALSE;
+                }
+            }
+
             ClearReadOnlyAttr(op->SourceName); // ensure it can be deleted
             while (1)
             {
