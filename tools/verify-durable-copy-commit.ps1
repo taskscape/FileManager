@@ -38,9 +38,17 @@ if ($flush -ge $close -or $close -ge $verify -or $verify -ge $replace) {
 
 $moveBody = $copyEngine.Substring($moveStart)
 $copyThenDelete = $moveBody.IndexOf('BOOL notError = DoCopyFile(', [StringComparison]::Ordinal)
+$fullHash = $moveBody.IndexOf('while (suspiciousIoRetry && !VerifyFullFileContentSha256(op->SourceName, op->TargetName, &err))', [StringComparison]::Ordinal)
 $deleteSource = $moveBody.IndexOf('if (DeleteFileUtf8(op->SourceName))', [StringComparison]::Ordinal)
-if ($copyThenDelete -lt 0 -or $deleteSource -lt 0 -or $copyThenDelete -ge $deleteSource) {
-    throw 'Cross-volume move no longer deletes its source only after the durable copy path returns.'
+if ($copyThenDelete -lt 0 -or $fullHash -lt 0 -or $deleteSource -lt 0 -or
+    $copyThenDelete -ge $fullHash -or $fullHash -ge $deleteSource) {
+    throw 'Cross-volume move no longer verifies a retried copy before deleting its source.'
 }
 
-Write-Host 'Durable copy commit checks passed.'
+if ($copyEngine -notmatch 'static BOOL VerifyFullFileContentSha256\(' -or
+    $copyEngine -notmatch 'BCRYPT_SHA256_ALGORITHM' -or
+    $copyEngine -notmatch '\*suspiciousIoRetry\s*=\s*TRUE') {
+    throw 'Cross-volume move full SHA-256 verification is incomplete.'
+}
+
+Write-Host 'Durable copy and cross-volume move verification checks passed.'

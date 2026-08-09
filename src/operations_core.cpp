@@ -28,7 +28,7 @@ BOOL DoCopyFile(COperation* op, HWND hProgressDlg, void* buffer,
                 DWORD clearReadonlyMask, BOOL* skip, BOOL lantasticCheck,
                 int& mustDeleteFileBeforeOverwrite, int& allocWholeFileOnStart,
                 CProgressDlgData& dlgData, BOOL copyADS, BOOL copyAsEncrypted,
-                BOOL isMove, CAsyncCopyParams*& asyncPar);
+                BOOL isMove, CAsyncCopyParams*& asyncPar, BOOL* suspiciousIoRetry);
 
 struct TMN_REPARSE_DATA_BUFFER
 {
@@ -1046,7 +1046,7 @@ unsigned ThreadWorkerBody(void* parameter)
                                     allocWholeFileOnStart, dlgData,
                                     (op->OpFlags & OPFL_COPY_ADS) != 0,
                                     (op->OpFlags & OPFL_AS_ENCRYPTED) != 0,
-                                    FALSE, asyncPar);
+                                    FALSE, asyncPar, NULL);
                 ExecLogFileOperationResult(opName, op->SourceName, op->TargetName, !Error);
                 break;
             }

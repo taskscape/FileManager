@@ -25,7 +25,7 @@ This document is the working record for a read-only stability and resilience aud
 3. **Several UI/worker handshakes wait forever.** File-operation startup and worker suspension use `INFINITE` waits; worker code also uses synchronous `SendMessage` to the UI, creating circular-wait potential.
 4. **Cancellation state is shared through plain `BOOL` pointers and globals.** These accesses do not provide atomic visibility or an explicit state machine.
 5. **Overwrite is transactional for native file copies.** Confirmed overwrites now copy to a uniquely reserved sibling temporary file and replace the requested destination only after the durable copy commit point and an atomic same-volume commit.
-6. **Cross-volume moves lack a full post-copy integrity check.** They now wait for the durable copy commit point, including closed-output size/metadata verification, before deleting the source. Tail checks and that metadata check still do not prove the entire destination has identical content.
+6. **Implemented: cross-volume moves verify retried copies before source deletion.** They wait for the durable copy commit point, including closed-output size/metadata verification. When the copy path needed an I/O retry, the closed source and destination are fully re-read and compared with SHA-256 before deletion; a failure leaves the source intact.
 7. **Implemented: direct-to-new-destination copies have a durable completion point.** All core copies now request write-through, flush and successfully close the output, then reopen it to verify its file metadata and size before reporting success.
 8. **Legacy size and seek APIs are widespread.** `GetFileSize` and `SetFilePointer` retain sentinel/error ambiguity and complicate correct files larger than 4 GiB.
 9. **Path and string handling remains fixed-buffer heavy.** Thousands of `MAX_PATH` references and many unchecked copy/format calls make long paths and boundary inputs fragile.
@@ -87,10 +87,9 @@ This document is the working record for a read-only stability and resilience aud
 - **Delivered:** Every core native copy opens the output with `FILE_FLAG_WRITE_THROUGH` where supported, calls `FlushFileBuffers`, and treats a failed flush or close as a copy failure. After closing, it reopens the destination and validates that it is a file with the expected size metadata. This is the durable copy commit point: UI success, write-through replacement of an existing destination, and cross-volume move-source deletion occur only after it passes.
 - **Guardrail:** `tools/verify-durable-copy-commit.ps1`, run by pull-request CI, verifies the ordering of write-through creation, flush, close, post-close metadata verification, replacement, and move-source deletion.
 
-### 8. Verify cross-volume moves before deleting the source
+### 8. Implemented: verify retried cross-volume moves before deleting the source
 
-- **Justification:** Cross-volume move falls back to copy then source deletion (`src/async_copy.cpp:5280`), while the existing tail check is a retry aid rather than whole-file proof. Silent storage or filter-driver corruption can turn a move into data loss.
-- **Proposed solution:** Require durable destination close plus size and metadata validation; offer full BLAKE3/SHA-256 verification for high-assurance moves and automatically use it after suspicious I/O retries. Delete the source only after verification passes.
+- **Delivered:** Cross-volume moves still require the durable destination close plus closed-output size/metadata validation already enforced by `DoCopyFile`. If a retry-resume, Lantastic mismatch retry, flush/close retry, or durable-copy verification retry occurred, `DoMoveFile` reopens the still-present source and committed destination and compares full SHA-256 digests before it calls `DeleteFileUtf8` on the source. A mismatch or hashing failure offers retry/skip/cancel; skip and cancel retain the source. `tools/verify-durable-copy-commit.ps1`, run in pull-request CI, checks that the SHA-256 gate remains between the copy and source deletion.
 
 ### 9. Add a recoverable journal for multi-item file operations
 
