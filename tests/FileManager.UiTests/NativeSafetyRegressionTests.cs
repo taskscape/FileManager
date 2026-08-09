@@ -31,6 +31,39 @@ public sealed class NativeSafetyRegressionTests
     }
 
     [Test]
+    public void Reparse_point_policy_never_traverses_or_hydrates_unselected_targets()
+    {
+        var root = FindRepositoryRoot();
+        var planner = File.ReadAllText(Path.Combine(root, "src", "fileswindow_operations.cpp"));
+        var deletion = File.ReadAllText(Path.Combine(root, "src", "operations_core.cpp"));
+        var navigation = File.ReadAllText(Path.Combine(root, "src", "fileswindow_navigation.cpp"));
+        var topologyTests = File.ReadAllText(Path.Combine(root, "tests", "FileManager.UiTests", "ReparsePointTopologyUiTests.cs"));
+        var architecture = File.ReadAllText(Path.Combine(root, "architecture.md"));
+        var refactoring = File.ReadAllText(Path.Combine(root, "refactoring.md"));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(planner, Does.Contain("REPARSE_POINT_POLICY: Directory reparse points are operation"));
+            Assert.That(planner, Does.Contain("skipping directory reparse point without traversal"));
+            Assert.That(planner, Does.Contain("containing source directory cannot be removed as part of"));
+            Assert.That(planner, Does.Contain("REPARSE_POINT_POLICY: File reparse points are not opened by planning"));
+            Assert.That(planner, Does.Contain("skipping file reparse point without hydration"));
+            Assert.That(planner, Does.Not.Contain("CConfirmLinkTgtCopyDlg(HWindow, sourcePath"),
+                        "The legacy link-content path would follow a target outside the operation root.");
+            Assert.That(deletion, Does.Contain("juncData->ReparseTag != IO_REPARSE_TAG_MOUNT_POINT"));
+            Assert.That(deletion, Does.Contain("juncData->ReparseTag != IO_REPARSE_TAG_SYMLINK"));
+            Assert.That(deletion, Does.Contain("ERROR_REPARSE_TAG_MISMATCH"));
+            Assert.That(navigation, Does.Contain("IO_REPARSE_TAG_FILE_PLACEHOLDER"));
+            Assert.That(topologyTests, Does.Contain("changed-junction"));
+            Assert.That(topologyTests, Does.Contain("cycle-junction"));
+            Assert.That(topologyTests, Does.Contain("outside-symlink"));
+            Assert.That(topologyTests, Does.Contain("Delete_junction_removes_only_the_link_and_never_its_target"));
+            Assert.That(architecture, Does.Contain("Reparse-point operation policy"));
+            Assert.That(refactoring, Does.Contain("### 34. Exercise junction, symlink, mount-point, and cloud-placeholder cases — Implemented"));
+        });
+    }
+
+    [Test]
     public void Copy_engine_uses_unambiguous_64_bit_file_size_and_seek_wrappers()
     {
         var root = FindRepositoryRoot();

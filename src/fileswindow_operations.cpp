@@ -1686,6 +1686,21 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
         else
             return TRUE;
     }
+    if (sourceDirAttr & FILE_ATTRIBUTE_REPARSE_POINT)
+    {
+        // REPARSE_POINT_POLICY: Directory reparse points are operation
+        // boundaries.  Do not enumerate them for copy, move, count, convert,
+        // or attribute operations: their target can be outside the selected
+        // operation root, can form a cycle, or can change after planning.
+        // Deletes took the dedicated link-only path above.  Unknown tags are
+        // therefore never followed and cloud directories are never hydrated
+        // merely because the planner inspected their parent tree.
+        TRACE_I("BuildScriptDir(): skipping directory reparse point without traversal: " << sourcePath);
+        *sourceEnd = 0; // restoring sourcePath
+        if (targetEnd != NULL)
+            *targetEnd = 0; // restoring targetPath
+        return TRUE;
+    }
     //---
     if (type == atDelete && Configuration.CnfrmSHDirDel &&
         (sourceDirAttr & (FILE_ATTRIBUTE_HIDDEN | FILE_ATTRIBUTE_SYSTEM)))
@@ -2028,71 +2043,10 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
         }
     }
 
-    BOOL copyMoveDirIsLink = FALSE;
-    BOOL copyMoveSkipLinkContent = FALSE;
-    if ((type == atCopy || type == atMove) && // if it's a link, determine whether to skip or copy its content
-        (sourceDirAttr & FILE_ATTRIBUTE_REPARSE_POINT))
-    {
-        copyMoveDirIsLink = TRUE;
-        int res;
-        if (ConfirmCopyLinkContentAll)
-            res = IDYES;
-        else
-        {
-            if (ConfirmCopyLinkContentSkipAll)
-                res = IDB_SKIP;
-            else
-            {
-                char detailsTxt[MAX_PATH + 200];
-                char junctionOrSymlinkTgt[MAX_PATH];
-                int repPointType;
-                if (GetReparsePointDestination(sourcePath, junctionOrSymlinkTgt, MAX_PATH, &repPointType, FALSE))
-                {
-                    if (repPointType == 1 /* MOUNT POINT */)
-                        strcpy_s(detailsTxt, LoadStr(IDS_VOLMOUNTPOINT));
-                    else
-                    {
-                        sprintf_s(detailsTxt, LoadStr(repPointType == 2 /* JUNCTION POINT */ ? IDS_INFODLGTYPE9 : IDS_INFODLGTYPE10),
-                                  junctionOrSymlinkTgt);
-                        int len = (int)strlen(detailsTxt);
-                        if (detailsTxt[0] == '(')
-                            memmove(detailsTxt, detailsTxt + 1, --len + 1);
-                        if (len > 0 && detailsTxt[len - 1] == ')')
-                            detailsTxt[--len] = 0;
-                    }
-                }
-                else
-                    strcpy_s(detailsTxt, LoadStr(IDS_UNABLETORESOLVELINK));
-
-                res = (int)CConfirmLinkTgtCopyDlg(HWindow, sourcePath, detailsTxt).Execute();
-            }
-        }
-        switch (res)
-        {
-        case IDB_ALL:
-            ConfirmCopyLinkContentAll = TRUE; // intentional fallthrough
-        case IDYES:
-            break; // copy the link content to the target
-
-        case IDB_SKIPALL:
-            ConfirmCopyLinkContentSkipAll = TRUE; // intentionalfallthrough
-        case IDB_SKIP:
-            copyMoveSkipLinkContent = TRUE;
-            break; // skip the link content (do not copy)
-
-        case IDCANCEL:
-        {
-            *sourceEnd = 0; // restoring sourcePath
-            *targetEnd = 0; // restoring targetPath
-            return FALSE;
-        }
-        }
-    }
     //---  build the path to sourceDirName and start searching for contained files
     BOOL delDirectory = TRUE;       // delete a non-empty directory?
     BOOL delDirectoryReturn = TRUE; // return value when a non-empty directory isn't removed
     BOOL canDelDirAfterMove = TRUE; // Move only: FALSE if not everything is moved (filter skipped something), source directory can't be removed (won't be empty)
-    if (!copyMoveDirIsLink || !copyMoveSkipLinkContent)
     {
         WIN32_FIND_DATAW fW;
         WIN32_FIND_DATA f;
@@ -2219,9 +2173,17 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
                 }
 
                 //---  build a directory or file
+                if (type == atMove && (f.dwFileAttributes & FILE_ATTRIBUTE_REPARSE_POINT))
+                {
+                    // The reparse entry is deliberately skipped below, so the
+                    // containing source directory cannot be removed as part of
+                    // this move.  This keeps the skipped link intact rather
+                    // than turning a safe no-traversal decision into data loss.
+                    canDelDirAfterMove = FALSE;
+                }
                 if (f.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)
                 {
-                    if (!BuildScriptDir(script, copyMoveDirIsLink ? atCopy : type, sourcePath, sourcePathSupADS, targetPath,
+                    if (!BuildScriptDir(script, type, sourcePath, sourcePathSupADS, targetPath,
                                         targetPathState, targetPathSupADS, targetPathIsFAT32,
                                         NULL, f.cFileName,
                                         f.cAlternateFileName[0] != 0 ? f.cAlternateFileName : NULL,
@@ -2241,7 +2203,7 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
                 {
                     if (filterCriteria == NULL || filterCriteria->AgreeMasksAndAdvanced(&f))
                     {
-                        if (!BuildScriptFile(script, copyMoveDirIsLink ? atCopy : type, sourcePath, sourcePathSupADS, targetPath,
+                        if (!BuildScriptFile(script, type, sourcePath, sourcePathSupADS, targetPath,
                                              targetPathState, targetPathSupADS, targetPathIsFAT32,
                                              NULL, f.cFileName,
                                              f.cAlternateFileName[0] != 0 ? f.cAlternateFileName : NULL,
@@ -2300,12 +2262,6 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
             }
         }
     }
-    else
-    {
-        *sourceEnd = 0; // restoring sourcePath
-        if (targetEnd != NULL)
-            *targetEnd = 0; // restoring targetPath
-    }
     //---  change-case: rename only after operations inside are complete
     if (type == atChangeCase)
     {
@@ -2342,13 +2298,11 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
         }
     }
     // if this directory contains a skipped item, the parent directory cannot be deleted
-    // if it's just a link to a directory, delete it regardless of remaining content
-    if (!copyMoveDirIsLink && canDelUpperDirAfterMove != NULL && !canDelDirAfterMove)
+    if (canDelUpperDirAfterMove != NULL && !canDelDirAfterMove)
         *canDelUpperDirAfterMove = FALSE;
     // if nothing inside the directory was copied or moved and we are transferring only files,
-    // cancel creation of the directory (an unnecessary empty directory). If it was a link to a directory,
-    // this rule does not apply (it's a link, not a real directory)
-    if (!copyMoveDirIsLink && (type == atCopy || type == atMove) && filterCriteria != NULL &&
+    // cancel creation of the directory (an unnecessary empty directory)
+    if ((type == atCopy || type == atMove) && filterCriteria != NULL &&
         filterCriteria->SkipEmptyDirs && createDirIndex >= 0 &&
         createDirIndex == script->Count - 1)
     {
@@ -2387,15 +2341,14 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
         }
 
         // if we need to delete the directory or a link to it at sourcePath + dirName (delete and move)
-        if (copyMoveDirIsLink && type == atMove ||                                          // for a link canDelDirAfterMove is irrelevant (a link can always be removed)
-            !copyMoveDirIsLink && type == atMove && canDelDirAfterMove || type == atDelete) // delete the source directory or the link to the directory
+        if (type == atMove && canDelDirAfterMove || type == atDelete) // delete the source directory
         {
             if (type == atDelete && !delDirectory)
                 return delDirectoryReturn; // CANCEL / NO
 
-            op.Opcode = copyMoveDirIsLink && type == atMove ? ocDeleteDirLink : ocDeleteDir;
+            op.Opcode = ocDeleteDir;
             op.OpFlags = 0;
-            op.Size = copyMoveDirIsLink && type == atMove ? DELETE_DIRLINK_SIZE : DELETE_DIR_SIZE;
+            op.Size = DELETE_DIR_SIZE;
             op.Attr = sourceDirAttr;
             BOOL skip;
             BOOL skipTooLongSrcNameErr = FALSE;
@@ -2512,6 +2465,17 @@ BOOL CFilesWindow::BuildScriptFile(COperations* script, CActionType type, char* 
     CQuadWord fileSizeLoc = fileSize;
     char message[2 * MAX_PATH + 200];
     COperation op;
+
+    if (type != atDelete && (sourceFileAttr & FILE_ATTRIBUTE_REPARSE_POINT))
+    {
+        // REPARSE_POINT_POLICY: File reparse points are not opened by planning
+        // copy/move/count/convert/attribute work.  In particular, this keeps a
+        // cloud placeholder offline; opening it without FILE_FLAG_OPEN_REPARSE_POINT
+        // could hydrate provider data as an unintended side effect.  Delete has
+        // its own handle-first identity-checked path and targets the link.
+        TRACE_I("BuildScriptFile(): skipping file reparse point without hydration: " << sourcePath << "\\" << fileName);
+        return TRUE;
+    }
     switch (type)
     {
     case atCopy:
