@@ -1183,6 +1183,7 @@ struct COpenViewerData
 //#define WM_USER_RENAME_NEXT_ITEM       WM_APP + 407 // [next, 0] - posted after pressing (Shift)Tab in inplace QuickRename to move to (previous) next item; inspired by Vista; 'next' is TRUE for next and FALSE for previous
 
 #define WM_USER_PROGRDLG_UPDATEICON WM_APP + 408 // [0, 0] - CProgressDlgArray: after delivery of this message to CProgressDialog new dialog icon setting occurs
+#define WM_USER_PROGRDLG_WORKERCOMPLETE WM_APP + 413 // [0, CWorkerCompletion*] - CProgressDialog: worker-owned completion result; the dialog consumes it asynchronously
 
 #define WM_USER_FORCECLOSE_MAINWND WM_APP + 409 // [0, 0] - forced closing of Salamander main window
 
