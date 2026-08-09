@@ -381,6 +381,9 @@
     <ClCompile Include="..\operation_journal.cpp">
       <Filter>cpp</Filter>
     </ClCompile>
+    <ClCompile Include="..\file_identity.cpp">
+      <Filter>cpp</Filter>
+    </ClCompile>
     <ClCompile Include="..\zip.cpp">
       <Filter>cpp</Filter>
     </ClCompile>

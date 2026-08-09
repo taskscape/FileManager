@@ -603,6 +603,8 @@
     </ClCompile>
     <ClCompile Include="..\operation_journal.cpp">
     </ClCompile>
+    <ClCompile Include="..\file_identity.cpp">
+    </ClCompile>
     <ClCompile Include="..\iconpool.cpp">
     </ClCompile>
     <ClCompile Include="..\zip_progress.cpp">

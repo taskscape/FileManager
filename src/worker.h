@@ -314,7 +314,27 @@ struct COperation
         *TargetName;
     DWORD Attr;
     DWORD OpFlags; // combination of OPFL_xxx, see above
+    // These values are captured when the worker starts this item, before any
+    // confirmation dialog can delay its destructive phase.  They are never
+    // derived from a path string: the helper records the opened object's
+    // volume serial, file ID, and final handle-resolved path fingerprint.
+    struct CFileIdentity
+    {
+        DWORD State; // 0 = not captured, 1 = absent, 2 = present
+        DWORD VolumeSerialNumber;
+        DWORD FileIndexHigh;
+        DWORD FileIndexLow;
+        unsigned __int64 FinalPathHash;
+    } SourceIdentity, TargetIdentity;
 };
+
+// Handle-based identity helpers implemented in file_identity.cpp.  The
+// capture/recheck pairing protects the decision made for a script item from
+// path replacement while the progress dialog or copy transfer is running.
+BOOL CaptureOperationFileIdentities(COperation* operation, DWORD* error);
+BOOL VerifyFileIdentity(const char* path, const COperation::CFileIdentity& expected, DWORD* error);
+BOOL VerifyFileHandleIdentity(HANDLE handle, const COperation::CFileIdentity& expected, DWORD* error);
+BOOL DeleteFileWithVerifiedIdentity(const char* path, const COperation::CFileIdentity& expected, DWORD* error);
 
 class COperations : public TDirectArray<COperation>
 {
@@ -797,7 +817,7 @@ BOOL DoMoveFile(COperation* op, HWND hProgressDlg, void* buffer,
                 CProgressDlgData& dlgData, BOOL copyADS, BOOL copyAsEncrypted,
                 BOOL* setDirTimeAfterMove, CAsyncCopyParams*& asyncPar,
                 BOOL ignInvalidName);
-BOOL DoDeleteFile(HWND hProgressDlg, char* name, const CQuadWord& size, COperations* script,
+BOOL DoDeleteFile(HWND hProgressDlg, COperation* operation, const CQuadWord& size, COperations* script,
                   CQuadWord& totalDone, DWORD attr, CProgressDlgData& dlgData);
 BOOL DoCreateDir(HWND hProgressDlg, char* name, DWORD attr,
                  DWORD clearReadonlyMask, CProgressDlgData& dlgData,
@@ -805,5 +825,5 @@ BOOL DoCreateDir(HWND hProgressDlg, char* name, DWORD attr,
                  const char* sourceDir, BOOL adsCopy, COperations* script,
                  void* buffer, BOOL& skip, BOOL& alreadyExisted,
                  BOOL createAsEncrypted, BOOL ignInvalidName);
-BOOL DoDeleteDir(HWND hProgressDlg, char* name, const CQuadWord& size, COperations* script,
+BOOL DoDeleteDir(HWND hProgressDlg, COperation* operation, const CQuadWord& size, COperations* script,
                  CQuadWord& totalDone, DWORD attr, BOOL dontUseRecycleBin, CProgressDlgData& dlgData);

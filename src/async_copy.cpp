@@ -2220,8 +2220,15 @@ static HANDLE OpenTransactionalTargetFile(const char* temporaryName, DWORD desir
 // ReplaceFileW preserves the previous destination until the file system commits the
 // replacement.  If another actor removed the destination after the overwrite prompt,
 // a write-through same-volume rename is the equivalent commit for a newly absent file.
-static BOOL CommitTransactionalTargetFile(const char* targetName, const char* temporaryName, DWORD* error)
+static BOOL CommitTransactionalTargetFile(const char* targetName, const char* temporaryName,
+                                          const COperation::CFileIdentity& expectedTargetIdentity, DWORD* error)
 {
+    // A name can be swapped while the temporary copy is being written.  Reopen
+    // it without following reparse points and compare both its object ID and
+    // handle-resolved final path before ReplaceFileW can touch it.
+    if (!VerifyFileIdentity(targetName, expectedTargetIdentity, error))
+        return FALSE;
+
     CStrP targetNameW(ConvertAllocUtf8ToWide(targetName, -1));
     CStrP temporaryNameW(ConvertAllocUtf8ToWide(temporaryName, -1));
     if (targetNameW == NULL || temporaryNameW == NULL)
@@ -4538,7 +4545,8 @@ COPY_AGAIN:
                             err = ERROR_WRITE_FAULT;
                             goto COPY_ERROR_2;
                         }
-                        while (!CommitTransactionalTargetFile(requestedTargetName, op->TargetName, &err))
+                        while (!CommitTransactionalTargetFile(requestedTargetName, op->TargetName,
+                                                              op->TargetIdentity, &err))
                         {
                             TRACE_I("DoCopyFile(): unable to commit transactional overwrite of " << requestedTargetName << ": " << GetErrorText(err));
                             WaitForSingleObject(dlgData.WorkerNotSuspended, INFINITE); // if we should be in suspend mode, wait ...
@@ -5147,7 +5155,11 @@ BOOL DoMoveFile(COperation* op, HWND hProgressDlg, void* buffer,
             dirTimeModifiedIsValid = GetDirTime(sourceNameMvDir, &dirTimeModified);
         while (1)
         {
-            if (!invalidName && !*novellRenamePatch && SalMoveFile(sourceNameMvDir, targetNameMvDir))
+            DWORD identityError = ERROR_SUCCESS;
+            BOOL identitiesMatch = !invalidName &&
+                                   VerifyFileIdentity(sourceNameMvDir, op->SourceIdentity, &identityError) &&
+                                   VerifyFileIdentity(targetNameMvDir, op->TargetIdentity, &identityError);
+            if (identitiesMatch && !*novellRenamePatch && SalMoveFile(sourceNameMvDir, targetNameMvDir))
             {
                 if (script->CopyAttrs && (op->Attr & FILE_ATTRIBUTE_ARCHIVE) == 0) // Archive attribute was not set, MoveFile turned it on, clear it again
                     SetFileAttributesUtf8(targetNameMvDir, op->Attr);                  // leave without handling or retry, not important (it normally toggles chaotically)
@@ -5256,7 +5268,7 @@ BOOL DoMoveFile(COperation* op, HWND hProgressDlg, void* buffer,
             }
             else
             {
-                DWORD err = GetLastError();
+                DWORD err = identitiesMatch ? GetLastError() : identityError;
                 if (invalidName)
                     err = ERROR_INVALID_NAME;
                 // Novell patch - before calling MoveFile we need to drop the read-only attribute
@@ -5264,7 +5276,9 @@ BOOL DoMoveFile(COperation* op, HWND hProgressDlg, void* buffer,
                 {
                     DWORD attr = SalGetFileAttributes(sourceNameMvDir);
                     BOOL setAttr = ClearReadOnlyAttr(sourceNameMvDir, attr);
-                    if (SalMoveFile(sourceNameMvDir, targetNameMvDir))
+                    if (VerifyFileIdentity(sourceNameMvDir, op->SourceIdentity, &err) &&
+                        VerifyFileIdentity(targetNameMvDir, op->TargetIdentity, &err) &&
+                        SalMoveFile(sourceNameMvDir, targetNameMvDir))
                     {
                         if (!*novellRenamePatch)
                             *novellRenamePatch = TRUE; // the next operations will go straight through here
@@ -5516,14 +5530,14 @@ BOOL DoMoveFile(COperation* op, HWND hProgressDlg, void* buffer,
                         }
                     }
 
-                    ClearReadOnlyAttr(op->TargetName, attr); // make sure it can be deleted ...
                     while (1)
                     {
-                        if (DeleteFileUtf8(op->TargetName))
+                        DWORD identityError;
+                        if (DeleteFileWithVerifiedIdentity(op->TargetName, op->TargetIdentity, &identityError))
                             break;
                         else
                         {
-                            DWORD err2 = GetLastError();
+                            DWORD err2 = identityError;
                             if (err2 == ERROR_FILE_NOT_FOUND)
                                 break; // if the user already deleted the file manually, everything is fine
 
@@ -5670,14 +5684,11 @@ BOOL DoMoveFile(COperation* op, HWND hProgressDlg, void* buffer,
                 }
             }
 
-            ClearReadOnlyAttr(op->SourceName); // ensure it can be deleted
-            while (1)
-            {
-                if (DeleteFileUtf8(op->SourceName))
+                    while (1)
+                    {
+                if (DeleteFileWithVerifiedIdentity(op->SourceName, op->SourceIdentity, &err))
                     break;
                 {
-                    DWORD err = GetLastError();
-
                     WaitForSingleObject(dlgData.WorkerNotSuspended, INFINITE); // if we should be in suspend mode, wait ...
                     if (*dlgData.CancelWorker)
                         return FALSE;
@@ -5710,9 +5721,10 @@ BOOL DoMoveFile(COperation* op, HWND hProgressDlg, void* buffer,
     }
 }
 
-BOOL DoDeleteFile(HWND hProgressDlg, char* name, const CQuadWord& size, COperations* script,
+BOOL DoDeleteFile(HWND hProgressDlg, COperation* operation, const CQuadWord& size, COperations* script,
                   CQuadWord& totalDone, DWORD attr, CProgressDlgData& dlgData)
 {
+    char* name = operation->SourceName;
     // if the path ends with a space/dot it is invalid and we must not delete it,
     // DeleteFile would trim the spaces/dots and remove a different file
     BOOL invalidName = FileNameIsInvalid(name, TRUE);
@@ -5757,8 +5769,6 @@ BOOL DoDeleteFile(HWND hProgressDlg, char* name, const CQuadWord& size, COperati
                     }
                 }
             }
-            ClearReadOnlyAttr(name, attr); // ensure it can be deleted
-
             err = ERROR_SUCCESS;
             BOOL useRecycleBin;
             switch (dlgData.UseRecycleBin)
@@ -5802,6 +5812,12 @@ BOOL DoDeleteFile(HWND hProgressDlg, char* name, const CQuadWord& size, COperati
             }
             if (useRecycleBin)
             {
+                // The shell accepts only a name, so it cannot consume our
+                // verified handle. Recheck immediately before handing that
+                // name to the shell and only then adjust its attributes.
+                if (!VerifyFileIdentity(name, operation->SourceIdentity, &err))
+                    goto DELETE_READY;
+                ClearReadOnlyAttr(name, attr);
                 if (!PathContainsValidComponents((char*)name, FALSE))
                 {
                     err = ERROR_INVALID_NAME;
@@ -5844,9 +5860,9 @@ BOOL DoDeleteFile(HWND hProgressDlg, char* name, const CQuadWord& size, COperati
             }
             else
             {
-                if (DeleteFileUtf8(name) == 0)
-                    err = GetLastError();
+                DeleteFileWithVerifiedIdentity(name, operation->SourceIdentity, &err);
             }
+        DELETE_READY:
         }
         else
         {
@@ -6450,9 +6466,10 @@ BOOL DoCreateDir(HWND hProgressDlg, char* name, DWORD attr,
     }
 }
 
-BOOL DoDeleteDir(HWND hProgressDlg, char* name, const CQuadWord& size, COperations* script,
+BOOL DoDeleteDir(HWND hProgressDlg, COperation* operation, const CQuadWord& size, COperations* script,
                  CQuadWord& totalDone, DWORD attr, BOOL dontUseRecycleBin, CProgressDlgData& dlgData)
 {
+    char* name = operation->SourceName;
     DWORD err;
     int AutoRetryCounter = 0;
     DWORD startTime = GetTickCount();
@@ -6465,14 +6482,15 @@ BOOL DoDeleteDir(HWND hProgressDlg, char* name, const CQuadWord& size, COperatio
 
     while (1)
     {
-        ClearReadOnlyAttr(nameRmDir, attr); // ensure it can be deleted
-
         err = ERROR_SUCCESS;
         if (script->CanUseRecycleBin && !dontUseRecycleBin &&
             (script->InvertRecycleBin && dlgData.UseRecycleBin == 0 ||
              !script->InvertRecycleBin && dlgData.UseRecycleBin == 1) &&
             IsDirectoryEmpty(name)) // subdirectory must not contain any files!!!
         {
+            if (!VerifyFileIdentity(nameRmDir, operation->SourceIdentity, &err))
+                goto DELETE_DIR_READY;
+            ClearReadOnlyAttr(nameRmDir, attr);
             if (!PathContainsValidComponents((char*)name, FALSE))
             {
                 err = ERROR_INVALID_NAME;
@@ -6515,10 +6533,10 @@ BOOL DoDeleteDir(HWND hProgressDlg, char* name, const CQuadWord& size, COperatio
         }
         else
         {
-            if (RemoveDirectoryUtf8(nameRmDir) == 0)
-                err = GetLastError();
+            DeleteFileWithVerifiedIdentity(nameRmDir, operation->SourceIdentity, &err);
         }
 
+    DELETE_DIR_READY:
         if (err == ERROR_SUCCESS)
         {
             script->AddBytesToSpeedMetersAndTFSandPS((DWORD)size.Value, TRUE, 0, NULL, MAX_OP_FILESIZE);
