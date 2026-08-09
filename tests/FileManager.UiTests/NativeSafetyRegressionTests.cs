@@ -89,6 +89,41 @@ public sealed class NativeSafetyRegressionTests
     }
 
     [Test]
+    public void Transactional_copy_and_move_expose_each_durable_phase_to_a_deterministic_fault_adapter()
+    {
+        var root = FindRepositoryRoot();
+        var executionHeader = File.ReadAllText(Path.Combine(root, "src", "file_operation_filesystem.h"));
+        var executionAdapter = File.ReadAllText(Path.Combine(root, "src", "file_operation_filesystem.cpp"));
+        var copy = File.ReadAllText(Path.Combine(root, "src", "async_copy.cpp"));
+        var identities = File.ReadAllText(Path.Combine(root, "src", "file_identity.cpp"));
+        var journal = File.ReadAllText(Path.Combine(root, "src", "operation_journal.cpp"));
+        var refactoring = File.ReadAllText(Path.Combine(root, "refactoring.md"));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(executionHeader, Does.Contain("class COperationExecutionFileSystem"));
+            Assert.That(executionHeader, Does.Contain("virtual HANDLE CreateFile"));
+            Assert.That(executionHeader, Does.Contain("virtual BOOL WriteFile"));
+            Assert.That(executionHeader, Does.Contain("virtual BOOL SetFileTime"));
+            Assert.That(executionHeader, Does.Contain("virtual BOOL FlushFileBuffers"));
+            Assert.That(executionHeader, Does.Contain("virtual BOOL ReplaceFile"));
+            Assert.That(executionHeader, Does.Contain("virtual BOOL SetFileInformationByHandle"));
+            Assert.That(executionHeader, Does.Contain("SetOperationExecutionFileSystemForTests"));
+            Assert.That(executionAdapter, Does.Contain("CWin32OperationExecutionFileSystem"));
+            Assert.That(copy, Does.Contain("OperationExecutionFileSystem().CreateFile"));
+            Assert.That(copy, Does.Contain("OperationExecutionFileSystem().WriteFile"));
+            Assert.That(copy, Does.Contain("OperationExecutionFileSystem().SetFileTime"));
+            Assert.That(copy, Does.Contain("OperationExecutionFileSystem().FlushFileBuffers"));
+            Assert.That(copy, Does.Contain("OperationExecutionFileSystem().ReplaceFile"));
+            Assert.That(copy, Does.Contain("OperationExecutionFileSystem().MoveFile"));
+            Assert.That(identities, Does.Contain("OperationExecutionFileSystem().SetFileInformationByHandle"));
+            Assert.That(journal, Does.Contain("STATE|%d|prepared"));
+            Assert.That(journal, Does.Contain("STATE|%d|temporary-ready"));
+            Assert.That(refactoring, Does.Contain("### 29. Add crash-consistency fault injection at every operation phase — Implemented"));
+        });
+    }
+
+    [Test]
     public void Native_destructive_operation_characterization_suite_retains_the_required_scenarios()
     {
         var root = FindRepositoryRoot();

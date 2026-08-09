@@ -5,6 +5,7 @@
 #include "precomp.h"
 
 #include "cfgdlg.h"
+#include "file_operation_filesystem.h"
 #include "worker.h"
 #include "execlog.h"
 
@@ -1628,7 +1629,7 @@ COPY_ADS_AGAIN:
 
                                     while (1)
                                     {
-                                        if (WriteFile(out, buffer, read, &written, NULL) && read == written)
+            if (OperationExecutionFileSystem().WriteFile(out, buffer, read, &written, NULL) && read == written)
                                             break;
 
                                     WRITE_ERROR_ADS:
@@ -2203,13 +2204,18 @@ static BOOL CreateTransactionalTargetFileName(const char* targetName, char* temp
 static HANDLE OpenTransactionalTargetFile(const char* temporaryName, DWORD desiredAccess,
                                           DWORD flagsAndAttributes, BOOL* encryptionNotSupported)
 {
-    HANDLE out = HANDLES_Q(CreateFileUtf8(temporaryName, desiredAccess, 0, NULL, CREATE_ALWAYS, flagsAndAttributes, NULL));
+    HANDLE out = OperationExecutionFileSystem().CreateFile(temporaryName, desiredAccess, 0,
+                                                            CREATE_ALWAYS, flagsAndAttributes);
+    if (out != INVALID_HANDLE_VALUE)
+        HANDLES_ADD(__htFile, __hoCreateFile, out);
     if (out == INVALID_HANDLE_VALUE && (flagsAndAttributes & FILE_ATTRIBUTE_ENCRYPTED))
     {
-        out = HANDLES_Q(CreateFileUtf8(temporaryName, desiredAccess, 0, NULL, CREATE_ALWAYS,
-                                       flagsAndAttributes & ~(FILE_ATTRIBUTE_ENCRYPTED | FILE_ATTRIBUTE_READONLY), NULL));
+        out = OperationExecutionFileSystem().CreateFile(temporaryName, desiredAccess, 0,
+                                                         CREATE_ALWAYS,
+                                                         flagsAndAttributes & ~(FILE_ATTRIBUTE_ENCRYPTED | FILE_ATTRIBUTE_READONLY));
         if (out != INVALID_HANDLE_VALUE)
         {
+            HANDLES_ADD(__htFile, __hoCreateFile, out);
             *encryptionNotSupported = TRUE;
             HANDLES(CloseHandle(out));
             out = INVALID_HANDLE_VALUE;
@@ -2230,20 +2236,12 @@ static BOOL CommitTransactionalTargetFile(const char* targetName, const char* te
     if (!VerifyFileIdentity(targetName, expectedTargetIdentity, error))
         return FALSE;
 
-    CStrP targetNameW(ConvertAllocUtf8ToWide(targetName, -1));
-    CStrP temporaryNameW(ConvertAllocUtf8ToWide(temporaryName, -1));
-    if (targetNameW == NULL || temporaryNameW == NULL)
-    {
-        *error = ERROR_NO_UNICODE_TRANSLATION;
-        return FALSE;
-    }
-
-    if (ReplaceFileW(targetNameW, temporaryNameW, NULL, REPLACEFILE_WRITE_THROUGH, NULL, NULL))
+    if (OperationExecutionFileSystem().ReplaceFile(targetName, temporaryName))
         return TRUE;
 
     *error = GetLastError();
     if (*error == ERROR_FILE_NOT_FOUND &&
-        MoveFileExW(temporaryNameW, targetNameW, MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH))
+        OperationExecutionFileSystem().MoveFile(temporaryName, targetName))
     {
         return TRUE;
     }
@@ -2551,7 +2549,7 @@ void DoCopyFileLoopOrig(HANDLE& in, HANDLE& out, void* buffer, int& limitBufferS
 
             while (1)
             {
-                if (WriteFile(out, buffer, read, &written, NULL) &&
+                if (OperationExecutionFileSystem().WriteFile(out, buffer, read, &written, NULL) &&
                     read == written)
                 {
                     break;
@@ -2994,7 +2992,7 @@ BOOL CCopy_Context::StartWriting(int blkIndex, DWORD* err)
     TRACE_I(sss);
 #endif // ASYNC_COPY_DEBUG_MSG
 
-    if (!WriteFile(*Out, AsyncPar->Buffers[blkIndex], BlockDataLen[blkIndex], NULL,
+    if (!OperationExecutionFileSystem().WriteFile(*Out, AsyncPar->Buffers[blkIndex], BlockDataLen[blkIndex], NULL,
                    AsyncPar->InitOverlappedWithOffset(blkIndex, WriteOffset)) &&
         GetLastError() != ERROR_IO_PENDING)
     { // a write error occurred; handle it
@@ -4314,7 +4312,7 @@ COPY_AGAIN:
                         {
                             BOOL ignoreSetFileTimeErr = FALSE;
                             while (!ignoreSetFileTimeErr &&
-                                   !SetFileTime(out, NULL /*&creation*/, NULL /*&lastAccess*/, &lastWrite))
+                                    !OperationExecutionFileSystem().SetFileTime(out, NULL /*&creation*/, NULL /*&lastAccess*/, &lastWrite))
                             {
                                 DWORD err = GetLastError();
 
@@ -4365,7 +4363,7 @@ COPY_AGAIN:
                         // This is the durable copy commit boundary.  It applies to new
                         // destinations too: DoMoveFile may delete the source only after
                         // DoCopyFile returns success from this boundary.
-                        if (!FlushFileBuffers(out))
+                        if (!OperationExecutionFileSystem().FlushFileBuffers(out))
                             closeOrFlushError = GetLastError();
                         if (!HANDLES(CloseHandle(out)) && closeOrFlushError == NO_ERROR)
                             closeOrFlushError = GetLastError();

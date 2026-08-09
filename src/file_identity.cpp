@@ -3,6 +3,7 @@
 
 #include "precomp.h"
 
+#include "file_operation_filesystem.h"
 #include "worker.h"
 
 namespace
@@ -206,15 +207,18 @@ BOOL DeleteFileWithVerifiedIdentity(const char* path, const COperation::CFileIde
 
     FILE_DISPOSITION_INFO disposition;
     disposition.DeleteFile = TRUE;
-    BOOL result = SetFileInformationByHandle(handle, FileDispositionInfo, &disposition, sizeof(disposition));
+    BOOL result = OperationExecutionFileSystem().SetFileInformationByHandle(handle, FileDispositionInfo,
+                                                                             &disposition, sizeof(disposition));
     if (!result && GetLastError() == ERROR_ACCESS_DENIED)
     {
         FILE_BASIC_INFO basicInfo;
         if (GetFileInformationByHandleEx(handle, FileBasicInfo, &basicInfo, sizeof(basicInfo)))
         {
             basicInfo.FileAttributes &= ~FILE_ATTRIBUTE_READONLY;
-            if (SetFileInformationByHandle(handle, FileBasicInfo, &basicInfo, sizeof(basicInfo)))
-                result = SetFileInformationByHandle(handle, FileDispositionInfo, &disposition, sizeof(disposition));
+            if (OperationExecutionFileSystem().SetFileInformationByHandle(handle, FileBasicInfo,
+                                                                           &basicInfo, sizeof(basicInfo)))
+                result = OperationExecutionFileSystem().SetFileInformationByHandle(handle, FileDispositionInfo,
+                                                                                     &disposition, sizeof(disposition));
         }
     }
     if (!result)
