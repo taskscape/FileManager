@@ -601,6 +601,8 @@
     </ClCompile>
     <ClCompile Include="..\operations_core.cpp">
     </ClCompile>
+    <ClCompile Include="..\operation_journal.cpp">
+    </ClCompile>
     <ClCompile Include="..\iconpool.cpp">
     </ClCompile>
     <ClCompile Include="..\zip_progress.cpp">
@@ -880,6 +882,8 @@
     <ClInclude Include="..\viewer.h">
     </ClInclude>
     <ClInclude Include="..\worker.h">
+    </ClInclude>
+    <ClInclude Include="..\operation_journal.h">
     </ClInclude>
     <ClInclude Include="..\zip.h">
     </ClInclude>

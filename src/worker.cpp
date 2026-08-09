@@ -7,6 +7,7 @@
 #include "cfgdlg.h"
 #include "worker.h"
 #include "execlog.h"
+#include "operation_journal.h"
 
 #include <Aclapi.h>
 #include <Ntsecapi.h>
@@ -116,6 +117,7 @@ COperations::COperations(int base, int delta, char* waitInQueueSubject, char* wa
     if (CancellationEvent == NULL)
         TRACE_E("Unable to create file-operation cancellation event.");
     OperationState = opsPlanned;
+    Journal = NULL;
     TotalSize = CQuadWord(0, 0);
     CompressedSize = CQuadWord(0, 0);
     OccupiedSpace = CQuadWord(0, 0);
@@ -169,6 +171,56 @@ COperations::COperations(int base, int delta, char* waitInQueueSubject, char* wa
     LastProgBufLimTestTime = GetTickCount() - 1000;
     LastFileBlockCount = 0;
     LastFileStartTime = GetTickCount();
+}
+
+COperations::~COperations()
+{
+    delete Journal;
+    if (CancellationEvent != NULL)
+        HANDLES(CloseHandle(CancellationEvent));
+    HANDLES(DeleteCriticalSection(&StatusCS));
+}
+
+BOOL COperations::BeginJournal()
+{
+    if (Journal != NULL)
+        return FALSE;
+    Journal = new COperationJournal;
+    if (Journal == NULL || !Journal->Begin(*this))
+    {
+        delete Journal;
+        Journal = NULL;
+        TRACE_E("Unable to create durable file-operation journal.");
+        return FALSE;
+    }
+    return TRUE;
+}
+
+BOOL COperations::JournalBeginItem(int itemIndex, const COperation* operation)
+{
+    return Journal == NULL || Journal->BeginItem(itemIndex, operation);
+}
+
+BOOL COperations::JournalSetTemporaryPath(const char* temporaryPath)
+{
+    return Journal == NULL || Journal->SetTemporaryPath(temporaryPath);
+}
+
+BOOL COperations::JournalMarkTemporaryReady()
+{
+    return Journal == NULL || Journal->MarkTemporaryReady();
+}
+
+void COperations::JournalCompleteItem(BOOL succeeded)
+{
+    if (Journal != NULL)
+        Journal->CompleteItem(succeeded);
+}
+
+void COperations::FinishJournal(BOOL failed, BOOL cancelled)
+{
+    if (Journal != NULL)
+        Journal->Finish(failed, cancelled);
 }
 
 static void AssertOperationTransition(BOOL valid, EOperationState from, EOperationState to)

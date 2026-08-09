@@ -26,6 +26,25 @@ public sealed class FileOperationUiTests : FileOperationUiTestBase
     }
 
     [Test]
+    public void Copy_file_persists_a_completed_recovery_journal_with_item_intent()
+    {
+        var source = Workspace.SourcePath("copy-file.txt");
+        var target = Workspace.TargetPath("copy-file.txt");
+
+        ExecuteWithPath(NativeCommands.CopyFiles, "copy-file.txt", Workspace.TargetDirectory, commit: true);
+
+        WaitForFileSystem(() => FindJournalFor(source) is not null,
+                          "Copy did not persist a durable operation journal.");
+        var journal = FindJournalFor(source)!;
+        var content = File.ReadAllText(journal);
+
+        Assert.That(content, Does.Contain($"ITEM|").And.Contain("|copy-file|").And.Contain(source).And.Contain(target));
+        Assert.That(content, Does.Contain("STATE|").And.Contain("|prepared"));
+        Assert.That(content, Does.Contain("|committed"));
+        Assert.That(content, Does.Contain("OPERATION|completed"));
+    }
+
+    [Test]
     public void Copy_directory_copies_all_descendants_to_other_panel()
     {
         ExecuteWithPath(NativeCommands.CopyFiles, "copy-tree", Workspace.TargetDirectory, commit: true);
@@ -154,5 +173,17 @@ public sealed class FileOperationUiTests : FileOperationUiTestBase
         ConfirmDeleteIfPrompted();
 
         WaitForFileSystem(() => File.Exists(Workspace.SourcePath("delete-locked.txt")), "A failed delete removed the locked source file.");
+    }
+
+    private static string? FindJournalFor(string source)
+    {
+        var directory = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+                                     "Open Salamander", "operation-journals");
+        if (!Directory.Exists(directory))
+            return null;
+
+        return Directory.EnumerateFiles(directory, "*.opj")
+            .OrderByDescending(File.GetLastWriteTimeUtc)
+            .FirstOrDefault(path => File.ReadAllText(path).Contains(source, StringComparison.Ordinal));
     }
 }

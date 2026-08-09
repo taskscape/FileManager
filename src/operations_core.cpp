@@ -1025,6 +1025,13 @@ unsigned ThreadWorkerBody(void* parameter)
         {
             COperation* op = &script->At(i);
 
+            if (!script->JournalBeginItem(i, op))
+            {
+                TRACE_E("Unable to persist file-operation journal transition before item " << i);
+                Error = TRUE;
+                break;
+            }
+
             switch (op->Opcode)
             {
             case ocCopyFile:
@@ -1295,6 +1302,7 @@ unsigned ThreadWorkerBody(void* parameter)
             case ocLabelForSkipOfCreateDir:
                 break; // no action
             }
+            script->JournalCompleteItem(!Error);
             if (Error)
                 break;
             WaitForSingleObject(dlgData.WorkerNotSuspended, INFINITE); // if we should be in suspend mode, wait ...
@@ -1328,6 +1336,7 @@ unsigned ThreadWorkerBody(void* parameter)
         free(tgtBuffer);
     if (bufferIsAllocated)
         free(buffer);
+    script->FinishJournal(Error, script->IsCancellationRequested());
     script->BeginStopping();
     script->Complete(Error);
     EOperationState finalState = script->GetOperationState();
@@ -1409,8 +1418,18 @@ HANDLE StartWorker(COperations* script, HWND hDlg, CChangeAttrsData* attrsData,
     }
     DWORD threadID;
     ResetEvent(wContinue);
-    if (!script->Start())
+    if (!script->BeginJournal())
+    {
+        if (data.BufferIsAllocated)
+            free(data.Buffer);
+        script->Fail();
         return NULL;
+    }
+    if (!script->Start())
+    {
+        script->FinishJournal(TRUE, FALSE);
+        return NULL;
+    }
 
     // if (Worker != NULL) HANDLES(CloseHandle(Worker));  // was probably unnecessary
     HANDLE worker = HANDLES(CreateThread(NULL, 0, ThreadWorker, &data, 0, &threadID));
@@ -1419,6 +1438,7 @@ HANDLE StartWorker(COperations* script, HWND hDlg, CChangeAttrsData* attrsData,
         if (data.BufferIsAllocated)
             free(data.Buffer);
         TRACE_E("Unable to start Worker thread.");
+        script->FinishJournal(TRUE, FALSE);
         script->Fail();
         return NULL;
     }

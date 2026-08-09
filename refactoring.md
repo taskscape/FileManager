@@ -91,10 +91,10 @@ This document is the working record for a read-only stability and resilience aud
 
 - **Delivered:** Cross-volume moves still require the durable destination close plus closed-output size/metadata validation already enforced by `DoCopyFile`. If a retry-resume, Lantastic mismatch retry, flush/close retry, or durable-copy verification retry occurred, `DoMoveFile` reopens the still-present source and committed destination and compares full SHA-256 digests before it calls `DeleteFileUtf8` on the source. A mismatch or hashing failure offers retry/skip/cancel; skip and cancel retain the source. `tools/verify-durable-copy-commit.ps1`, run in pull-request CI, checks that the SHA-256 gate remains between the copy and source deletion.
 
-### 9. Add a recoverable journal for multi-item file operations
+### 9. Implemented: add a recoverable journal for multi-item file operations
 
-- **Justification:** A long copy/move/delete sequence has many irreversible steps but no persisted operation intent and commit record. A process or machine crash leaves the user to infer what completed.
-- **Proposed solution:** Persist an append-only per-operation journal with source, destination, identity, temporary path, and state transitions. On restart, detect incomplete operations and offer resume, rollback where possible, or a precise reconciliation report.
+- **Delivered:** `src/operation_journal.cpp` creates a write-through, append-only journal for every native operation script in `%APPDATA%\\Open Salamander\\operation-journals`. It records each mutating item’s source, destination, captured handle identity, transactional temporary path, and `prepared`/`temporary-ready`/`committed` transitions. Journal writes happen before each mutating item and are flushed before the operation continues.
+- **Recovery:** Startup detects journals without a terminal record. The user may resume only a fully-written sibling transactional target, roll back journaled uncommitted temporary targets, or leave files untouched. Every recovery choice produces a reconciliation report containing the original journal records and unresolved-item count; ordinary incomplete direct writes are reported rather than replayed automatically.
 
 ### 10. Revalidate file identity immediately before destructive actions
 

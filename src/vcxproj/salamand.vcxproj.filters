@@ -378,6 +378,9 @@
     <ClCompile Include="..\worker.cpp">
       <Filter>cpp</Filter>
     </ClCompile>
+    <ClCompile Include="..\operation_journal.cpp">
+      <Filter>cpp</Filter>
+    </ClCompile>
     <ClCompile Include="..\zip.cpp">
       <Filter>cpp</Filter>
     </ClCompile>
@@ -690,6 +693,9 @@
       <Filter>h</Filter>
     </ClInclude>
     <ClInclude Include="..\worker.h">
+      <Filter>h</Filter>
+    </ClInclude>
+    <ClInclude Include="..\operation_journal.h">
       <Filter>h</Filter>
     </ClInclude>
     <ClInclude Include="..\zip.h">

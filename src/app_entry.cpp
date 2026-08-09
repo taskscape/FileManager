@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "precomp.h"
+#include "operation_journal.h"
 #include <time.h>
 //#ifdef MSVC_RUNTIME_CHECKS
 #include <rtcapi.h>
@@ -3704,6 +3705,7 @@ FIND_NEW_SLG_FILE:
                     MainWindow->CanClose = TRUE; // ted teprve povolime zavreni hl. okna
                     // aby soubory nevyskakovali postupne (jak se nacitaji jejich ikony)
                     UpdateWindow(MainWindow->HWindow);
+                    COperationJournal::OfferRecovery(MainWindow->HWindow);
 
                     BOOL doNotDeleteImportedCfg = FALSE;
                     if (autoImportConfig && // find out whether the new version has fewer plugins than the old one and part of old configuration would not transfer because of that
