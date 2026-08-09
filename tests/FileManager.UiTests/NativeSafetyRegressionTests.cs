@@ -87,7 +87,10 @@ public sealed class NativeSafetyRegressionTests
         Assert.Multiple(() =>
         {
             Assert.That(upload, Does.Contain("const size_t kMaximumResponseSize = 64 * 1024"));
-            Assert.That(upload, Does.Contain("response->size() > kMaximumResponseSize - available"));
+            // Checked addition rejects both integer wraparound and a response
+            // beyond the explicit cap before the owned buffer is extended.
+            Assert.That(upload, Does.Contain("!CheckedAddSize(response->size(), availableSize, &responseSize)"));
+            Assert.That(upload, Does.Contain("responseSize > kMaximumResponseSize"));
             Assert.That(controlHeader, Does.Contain("CRTLCON_MAXIMUM_REPLY_SIZE (64 * 1024)"));
             Assert.That(controlConnection, Does.Contain("if (newSize > CRTLCON_MAXIMUM_REPLY_SIZE)"));
             Assert.That(controlConnection, Does.Contain("err = WSAEMSGSIZE"));
@@ -214,6 +217,43 @@ public sealed class NativeSafetyRegressionTests
     }
 
     [Test]
+    public void Scoped_native_resources_protect_file_operations_and_plugin_boundaries()
+    {
+        var root = FindRepositoryRoot();
+        var resources = File.ReadAllText(Path.Combine(root, "src", "common", "scoped_native_resources.h"));
+        var copy = File.ReadAllText(Path.Combine(root, "src", "async_copy.cpp"));
+        var broker = File.ReadAllText(Path.Combine(root, "src", "parserbroker.cpp"));
+        var scripts = File.ReadAllText(Path.Combine(root, "src", "plugins", "automation", "scriptlist.cpp"));
+        var refactoring = File.ReadAllText(Path.Combine(root, "refactoring.md"));
+
+        // These source checks pin cleanup at operation and plug-in seams where
+        // future returns or callbacks would otherwise bypass a manual pair.
+        Assert.Multiple(() =>
+        {
+            Assert.That(resources, Does.Contain("class CScopedHeapBuffer"));
+            Assert.That(resources, Does.Contain("class CScopedMappingView"));
+            Assert.That(resources, Does.Contain("class CScopedCriticalSection"));
+            Assert.That(resources, Does.Contain("CScopedHeapBuffer(const CScopedHeapBuffer&)"));
+            Assert.That(resources, Does.Contain("CScopedMappingView(const CScopedMappingView&)"));
+            Assert.That(resources, Does.Contain("CScopedCriticalSection(const CScopedCriticalSection&)"));
+            Assert.That(resources, Does.Contain("free(Buffer)"));
+            Assert.That(resources, Does.Contain("UnmapViewOfFile(View)"));
+            Assert.That(resources, Does.Contain("EnterCriticalSection(CriticalSection)"));
+            Assert.That(resources, Does.Contain("LeaveCriticalSection(CriticalSection)"));
+            Assert.That(resources, Does.Contain("const DWORD error = GetLastError()"));
+            Assert.That(copy, Does.Contain("CScopedHeapBuffer inputBuffer(malloc(ASYNC_COPY_BUF_SIZE))"));
+            Assert.That(copy, Does.Contain("CScopedHeapBuffer outputBuffer(malloc(ASYNC_COPY_BUF_SIZE))"));
+            Assert.That(copy, Does.Not.Contain("free(bufIn);"));
+            Assert.That(copy, Does.Not.Contain("free(bufOut);"));
+            Assert.That(broker, Does.Contain("CScopedCriticalSection lock(&Lock)"));
+            Assert.That(broker, Does.Not.Contain("LeaveCriticalSection(&Lock);"));
+            Assert.That(scripts, Does.Contain("CScopedMappingView codeView(MapViewOfFile"));
+            Assert.That(scripts, Does.Not.Contain("UnmapViewOfFile(pszCodeA)"));
+            Assert.That(refactoring, Does.Contain("### 42. Adopt RAII for memory, mappings, and critical sections — Implemented"));
+        });
+    }
+
+    [Test]
     public void Win32_path_boundaries_use_owned_wide_paths_and_extended_length_syntax()
     {
         var root = FindRepositoryRoot();
@@ -261,9 +301,11 @@ public sealed class NativeSafetyRegressionTests
             Assert.That(helper, Does.Contain("FILE_FLAG_OPEN_REPARSE_POINT"));
             Assert.That(helper, Does.Contain("GetFileInformationByHandle"));
             Assert.That(helper, Does.Contain("GetFinalPathNameByHandleW"));
-            Assert.That(helper, Does.Contain("SetFileInformationByHandle(handle.Get(), FileDispositionInfo"));
+            Assert.That(helper, Does.Contain("OperationExecutionFileSystem().SetFileInformationByHandle(handle.Get(), FileDispositionInfo"));
             Assert.That(operations, Does.Contain("CaptureOperationFileIdentities(op, &identityError)"));
-            Assert.That(copy, Does.Contain("VerifyFileIdentity(targetName, expectedTargetIdentity, error)"));
+            // Verification reports its failure through the local address before
+            // the typed result preserves that code for the legacy dialog path.
+            Assert.That(copy, Does.Contain("VerifyFileIdentity(targetName, expectedTargetIdentity, &error)"));
             Assert.That(copy, Does.Contain("DeleteFileWithVerifiedIdentity(name, operation->SourceIdentity, &err)"));
         });
     }
@@ -533,7 +575,9 @@ public sealed class NativeSafetyRegressionTests
             Assert.That(client, Does.Contain("JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE"));
             Assert.That(client, Does.Contain("JOB_OBJECT_LIMIT_PROCESS_MEMORY"));
             Assert.That(client, Does.Contain("CancelIoEx"));
-            Assert.That(client, Does.Contain("EnterCriticalSection(&Lock)"));
+            // Request serialization is now scope-owned so callback unwinding
+            // cannot strand the broker lock.
+            Assert.That(client, Does.Contain("CScopedCriticalSection lock(&Lock)"));
             Assert.That(client, Does.Contain("for (int attempt = 0; attempt != 2; ++attempt)"));
             Assert.That(client, Does.Contain("responseHeader.PayloadLength > responseCapacity"));
             Assert.That(broker, Does.Contain("SHCreateItemFromParsingName"));
@@ -609,6 +653,7 @@ public sealed class NativeSafetyRegressionTests
     {
         var root = FindRepositoryRoot();
         var configuration = File.ReadAllText(Path.Combine(root, "src", "mainwnd_config.cpp"));
+        var registryWork = File.ReadAllText(Path.Combine(root, "src", "regwork.cpp"));
         var plugins = File.ReadAllText(Path.Combine(root, "src", "plugins_loading.cpp"));
         var startup = File.ReadAllText(Path.Combine(root, "src", "app_entry.cpp"));
         var architecture = File.ReadAllText(Path.Combine(root, "architecture.md"));
@@ -624,7 +669,10 @@ public sealed class NativeSafetyRegressionTests
             Assert.That(configuration, Does.Contain("IsCommittedConfigurationGeneration"));
             Assert.That(configuration, Does.Contain("BeginConfigurationTransaction"));
             Assert.That(configuration, Does.Contain("CommitConfigurationTransaction"));
-            Assert.That(configuration, Does.Contain("RegFlushKey(generationKey)"));
+            // The wrapper retains RegFlushKey durability while counting writes
+            // for transactional-save fault injection.
+            Assert.That(configuration, Does.Contain("FlushConfigurationRegistryKey(generationKey) == ERROR_SUCCESS"));
+            Assert.That(registryWork, Does.Contain("LONG result = RegFlushKey(key)"));
             Assert.That(configuration, Does.Contain("SetValue(storeKey, CONFIGURATION_ACTIVE_GENERATION_REG"));
             Assert.That(configuration, Does.Contain("RetirePreviousConfigurationGenerationAfterSuccessfulStartup"));
             Assert.That(configuration, Does.Contain("OpenCommittedConfigurationGeneration(storeKey, fallbackGeneration"));
@@ -700,7 +748,9 @@ public sealed class NativeSafetyRegressionTests
             Assert.That(planner, Does.Contain("GetMetadataTargetFileSystem(targetPath)"));
             Assert.That(planner, Does.Contain("script->PlannedMetadataLosses |= mmlAlternateDataStreams"));
             Assert.That(planner, Does.Contain("script->PlannedMetadataLosses |= mmlSecurity"));
-            Assert.That(copy, Does.Contain("GetMetadataPreservationContract(EMetadataOperation operation"));
+            // The contract must consider the target filesystem as well as the
+            // operation type before it decides which losses are acceptable.
+            Assert.That(copy, Does.Contain("GetMetadataPreservationContract(EMetadataOperation operation,"));
             Assert.That(copy, Does.Contain("RecordMetadataLoss(dlgData, mmlAlternateDataStreams"));
             Assert.That(copy, Does.Contain("RecordMetadataLoss(dlgData, mmlLastWriteTime"));
             Assert.That(copy, Does.Contain("RecordMetadataLoss(dlgData, mmlSecurity"));
@@ -714,7 +764,9 @@ public sealed class NativeSafetyRegressionTests
             Assert.That(dialogs, Does.Contain("case 13:"));
             Assert.That(dialogs, Does.Contain("MB_YESNO | MB_DEFBUTTON2"));
             Assert.That(strings, Does.Contain("IDS_METADATALOSS_BEFORESOURCEDELETE"));
-            Assert.That(architecture, Does.Contain("#### 5.2.1 Metadata preservation contract"));
+            // Reparse policy precedes this contract, so the documented section
+            // number advances while the preservation matrix remains required.
+            Assert.That(architecture, Does.Contain("#### 5.2.2 Metadata preservation contract"));
             Assert.That(architecture, Does.Contain("Copy to NTFS"));
             Assert.That(architecture, Does.Contain("Copy to ReFS"));
             Assert.That(architecture, Does.Contain("Copy to FAT/FAT32/exFAT"));

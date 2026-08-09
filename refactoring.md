@@ -275,10 +275,11 @@ This document is the working record for a read-only stability and resilience aud
 - **Implementation (2026-08-09):** `CScopedKernelHandle` is the small project wrapper for newly touched native code. It owns only valid kernel handles, preserves the existing `HANDLES` debug accounting on close, restores the caller's `GetLastError` during destructor cleanup, and requires an explicit `Reset` or `Release` for ownership replacement or transfer. The handle-identity capture and verified-delete boundary now use it, removing their raw `CloseHandle` cleanup paths while retaining the established close-failure result contract.
 - **Verification:** `NativeSafetyRegressionTests.Kernel_handle_ownership_is_scoped_and_preserves_legacy_close_failures` guards the non-copyable owner, explicit transfer operations, debug tracking, last-error preservation, migrated identity/delete paths, and this ledger entry.
 
-### 42. Adopt RAII for memory, mappings, and critical sections
+### 42. Adopt RAII for memory, mappings, and critical sections — Implemented
 
-- **Justification:** Raw `new/delete`, `malloc/free`, mapping views, and manual lock pairing amplify early-return and callback risks.
-- **Proposed solution:** Introduce scoped buffers, view guards, and lock guards compatible with the current compiler and ABI. Start at plug-in and file-operation boundaries, where cleanup failures are most costly.
+- **Implementation (2026-08-09):** `CScopedHeapBuffer`, `CScopedMappingView`, and `CScopedCriticalSection` are small non-copyable guards that preserve the existing allocator and Win32 ABI contracts. File-operation tail verification now owns its two scratch buffers through scope, the automation plug-in owns its mapped script view through all conversion exits, and parser-broker requests hold their critical section through scope.
+- **Compatibility:** Returned automation script text retains its existing `FreeOleString` ownership contract; only local temporary resources are scoped. Guard destructors preserve `GetLastError` so existing caller result paths remain authoritative.
+- **Verification:** `NativeSafetyRegressionTests.Scoped_native_resources_protect_file_operations_and_plugin_boundaries` checks the non-copyable guards, cleanup behavior, migrated memory/mapping/lock seams, and this ledger entry.
 
 ### 43. Standardize thread creation and ownership
 

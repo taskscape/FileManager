@@ -5,6 +5,7 @@
 #include "precomp.h"
 
 #include "cfgdlg.h"
+#include "common/scoped_native_resources.h"
 #include "file_operation_filesystem.h"
 #include "operation_result.h"
 #include "worker.h"
@@ -1601,8 +1602,17 @@ void CheckTailOfOutFileShowErr(const char* txt, DWORD err = GetLastError())
 BOOL CheckTailOfOutFile(CAsyncCopyParams* asyncPar, HANDLE in, HANDLE out, const CQuadWord& offset,
                         const CQuadWord& curInOffset, BOOL ignoreReadErrOnOut)
 {
-    char* bufIn = (char*)malloc(ASYNC_COPY_BUF_SIZE);
-    char* bufOut = (char*)malloc(ASYNC_COPY_BUF_SIZE);
+    CScopedHeapBuffer inputBuffer(malloc(ASYNC_COPY_BUF_SIZE));
+    CScopedHeapBuffer outputBuffer(malloc(ASYNC_COPY_BUF_SIZE));
+    char* bufIn = (char*)inputBuffer.Get();
+    char* bufOut = (char*)outputBuffer.Get();
+    if (bufIn == NULL || bufOut == NULL)
+    {
+        // Tail verification must fail cleanly when its temporary comparison
+        // buffers cannot be owned, rather than leaking one buffer or crashing.
+        TRACE_E("CheckTailOfOutFile(): unable to allocate verification buffers.");
+        return FALSE;
+    }
 
     DWORD startTime = GetTickCount();
     DWORD rutineStartTime = startTime;
@@ -1776,8 +1786,6 @@ BOOL CheckTailOfOutFile(CAsyncCopyParams* asyncPar, HANDLE in, HANDLE out, const
         TRACE_I("CheckTailOfOutFile(): " << (offset.Value - lastOffset.Value) / 1024.0 << " KB tested in " << (GetTickCount() - rutineStartTime) / 1000.0 << " secs (clear read time: " << (GetTickCount() - startTime) / 1000.0 << " secs).");
     }
 #endif // WORKER_COPY_DEBUG_MSG
-    free(bufIn);
-    free(bufOut);
     return ok;
 }
 
