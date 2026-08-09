@@ -183,6 +183,37 @@ public sealed class NativeSafetyRegressionTests
     }
 
     [Test]
+    public void Kernel_handle_ownership_is_scoped_and_preserves_legacy_close_failures()
+    {
+        var root = FindRepositoryRoot();
+        var scopedHandle = File.ReadAllText(Path.Combine(root, "src", "common", "scoped_kernel_handle.h"));
+        var identity = File.ReadAllText(Path.Combine(root, "src", "file_identity.cpp"));
+        var refactoring = File.ReadAllText(Path.Combine(root, "refactoring.md"));
+
+        // These source checks pin the RAII seam that protects verified delete
+        // handles across identity mismatch, mutation failure, and future returns.
+        Assert.Multiple(() =>
+        {
+            Assert.That(scopedHandle, Does.Contain("class CScopedKernelHandle"));
+            Assert.That(scopedHandle, Does.Contain("CScopedKernelHandle(const CScopedKernelHandle&)"));
+            Assert.That(scopedHandle, Does.Contain("HANDLE Release()"));
+            Assert.That(scopedHandle, Does.Contain("void Reset(HANDLE handle = INVALID_HANDLE_VALUE)"));
+            Assert.That(scopedHandle, Does.Contain("BOOL Close(DWORD* error)"));
+            Assert.That(scopedHandle, Does.Contain("HANDLES(CloseHandle(handle))"));
+            Assert.That(scopedHandle, Does.Contain("const DWORD error = GetLastError()"));
+            Assert.That(scopedHandle, Does.Contain("SetLastError(error)"));
+            Assert.That(identity, Does.Contain("#include \"common/scoped_kernel_handle.h\""));
+            Assert.That(identity, Does.Contain("CScopedKernelHandle handle(HANDLES_Q(CreateFileUtf8"));
+            Assert.That(identity, Does.Contain("CScopedKernelHandle* handle, DWORD* error"));
+            Assert.That(identity, Does.Contain("handle->Reset(HANDLES_Q(CreateFileUtf8"));
+            Assert.That(identity, Does.Contain("handle->Get()"));
+            Assert.That(identity, Does.Contain("handle.Close(&closeError)"));
+            Assert.That(identity, Does.Not.Contain("CloseHandle(handle)"));
+            Assert.That(refactoring, Does.Contain("### 41. Adopt RAII for kernel handles in touched code — Implemented"));
+        });
+    }
+
+    [Test]
     public void Win32_path_boundaries_use_owned_wide_paths_and_extended_length_syntax()
     {
         var root = FindRepositoryRoot();
@@ -223,12 +254,14 @@ public sealed class NativeSafetyRegressionTests
         var operations = File.ReadAllText(Path.Combine(root, "src", "operations_core.cpp"));
         var copy = File.ReadAllText(Path.Combine(root, "src", "async_copy.cpp"));
 
+        // The mutation API borrows the RAII owner's handle; it must not receive
+        // or retain ownership of the verified delete handle itself.
         Assert.Multiple(() =>
         {
             Assert.That(helper, Does.Contain("FILE_FLAG_OPEN_REPARSE_POINT"));
             Assert.That(helper, Does.Contain("GetFileInformationByHandle"));
             Assert.That(helper, Does.Contain("GetFinalPathNameByHandleW"));
-            Assert.That(helper, Does.Contain("SetFileInformationByHandle(handle, FileDispositionInfo"));
+            Assert.That(helper, Does.Contain("SetFileInformationByHandle(handle.Get(), FileDispositionInfo"));
             Assert.That(operations, Does.Contain("CaptureOperationFileIdentities(op, &identityError)"));
             Assert.That(copy, Does.Contain("VerifyFileIdentity(targetName, expectedTargetIdentity, error)"));
             Assert.That(copy, Does.Contain("DeleteFileWithVerifiedIdentity(name, operation->SourceIdentity, &err)"));
