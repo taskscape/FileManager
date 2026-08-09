@@ -132,6 +132,8 @@ public sealed class NativeSafetyRegressionTests
         var recovery = File.ReadAllText(Path.Combine(root, "tests", "FileManager.UiTests", "OperationRecoveryCharacterizationUiTests.cs"));
         var workspace = File.ReadAllText(Path.Combine(root, "tests", "FileManager.UiTests", "Infrastructure", "FileOperationUiTestBase.cs"));
         var settings = File.ReadAllText(Path.Combine(root, "tests", "FileManager.UiTests", "Infrastructure", "UiTestSettings.cs"));
+        var ads = File.ReadAllText(Path.Combine(root, "tests", "FileManager.UiTests", "Infrastructure", "AlternateDataStreams.cs"));
+        var unsupportedAds = File.ReadAllText(Path.Combine(root, "tests", "FileManager.UiTests", "AlternateDataStreamsUnsupportedTargetUiTests.cs"));
         var refactoring = File.ReadAllText(Path.Combine(root, "refactoring.md"));
 
         Assert.Multiple(() =>
@@ -146,12 +148,21 @@ public sealed class NativeSafetyRegressionTests
             Assert.That(operations, Does.Contain("Cancelling_an_in_progress_conflicting_copy_keeps_both_versions_and_records_cancellation"));
             Assert.That(crossVolume, Does.Contain("Move_across_volumes_copies_the_complete_tree_before_removing_the_source"));
             Assert.That(crossVolume, Does.Contain("RequireCrossVolumeRoot"));
+            Assert.That(operations, Does.Contain("Copy_preserves_multiple_empty_large_and_edge_named_alternate_data_streams"));
+            Assert.That(operations, Does.Contain("Copy_overwrite_replaces_target_streams_and_removes_stale_streams"));
+            Assert.That(operations, Does.Contain("Copy_retries_a_temporarily_denied_alternate_data_stream_without_losing_it"));
+            Assert.That(crossVolume, Does.Contain("Move_across_ADS_capable_volumes_preserves_multiple_streams_before_removing_the_source"));
+            Assert.That(unsupportedAds, Does.Contain("Cross_volume_move_to_an_ADS_unsupported_target_keeps_the_source_when_metadata_loss_is_declined"));
+            Assert.That(ads, Does.Contain("RequireSupportAt"));
+            Assert.That(ads, Does.Contain("RequireUnsupportedAt"));
             Assert.That(settings, Does.Contain("FILEMANAGER_UI_CROSS_VOLUME_ROOT"));
+            Assert.That(settings, Does.Contain("FILEMANAGER_UI_ADS_UNSUPPORTED_TARGET_ROOT"));
             Assert.That(recovery, Does.Contain("Restart_reconciliation_commits_a_fully_written_transactional_target"));
             Assert.That(recovery, Does.Contain("STATE|0|temporary-ready"));
             Assert.That(workspace, Does.Contain("TargetVolumeRoot"));
             Assert.That(workspace, Does.Contain("TargetWorkspaceDirectory"));
             Assert.That(refactoring, Does.Contain("### 28. Build native characterization tests for copy, move, delete, and rename — Implemented"));
+            Assert.That(refactoring, Does.Contain("### 32. Test alternate data streams end to end — Implemented"));
         });
     }
 

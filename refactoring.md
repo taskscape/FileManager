@@ -216,10 +216,10 @@ This document is the working record for a read-only stability and resilience aud
 - **Source-deletion gate:** Cross-volume moves now aggregate unacknowledged losses in `CProgressDlgData::MetadataLosses` and display them immediately before every source-file or source-directory deletion. The default response retains the source and changes the remaining move into a copy; only an explicit confirmation permits deletion.
 - **Verification:** `NativeSafetyRegressionTests.Metadata_preservation_contract_records_losses_and_gates_move_source_deletion` checks the contract, planner records, worker gate, localized prompt, and refactoring status.
 
-### 32. Test alternate data streams end to end
+### 32. Test alternate data streams end to end — Implemented
 
 - **Justification:** ADS handling has specialized buffer and retry paths in `src/async_copy.cpp`; uncommon branches are high-regression territory and can silently lose content.
-- **Proposed solution:** Create files with multiple named streams, empty streams, large streams, denied streams, and stream-name edge cases. Verify same-volume, cross-volume, resume, overwrite, and unsupported-target behavior.
+- **Resolution:** Added executable-level ADS characterization tests covering same-volume copy of named, empty, large, and edge-named streams; overwrite replacement and stale-stream removal; retry after a temporarily denied stream; cross-volume preservation on ADS-capable targets; and source retention when an ADS-unsupported target reports metadata loss. ADS-dependent lanes self-skip when their explicitly configured filesystem capability is unavailable.
 
 ### 33. Verify ACL and ownership preservation under privilege variation
 

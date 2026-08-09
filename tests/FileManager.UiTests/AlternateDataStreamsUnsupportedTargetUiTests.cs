@@ -1,0 +1,40 @@
+using FileManager.UiTests.Infrastructure;
+using NUnit.Framework;
+
+namespace FileManager.UiTests;
+
+// This fixture needs a caller-supplied FAT/FAT32/exFAT-like volume. It creates
+// and removes only a GUID child below that dedicated root.
+[TestFixture]
+public sealed class AlternateDataStreamsUnsupportedTargetUiTests : FileOperationUiTestBase
+{
+    protected override string? TargetVolumeRoot => UiTestSettings.RequireUnsupportedAdsTargetRoot();
+
+    [Test]
+    [Category("CrossVolume")]
+    [Category("AlternateDataStreams")]
+    public void Cross_volume_move_to_an_ADS_unsupported_target_keeps_the_source_when_metadata_loss_is_declined()
+    {
+        Assert.That(Path.GetPathRoot(Workspace.SourceDirectory), Is.Not.EqualTo(Path.GetPathRoot(Workspace.TargetDirectory)),
+                    "The unsupported-target fixture must use different source and target volumes.");
+        AlternateDataStreams.RequireSupportAt(Workspace.SourceDirectory);
+        AlternateDataStreams.RequireUnsupportedAt(Workspace.TargetDirectory);
+
+        var source = Workspace.SourcePath("ads-unsupported-target.txt");
+        var target = Workspace.TargetPath("ads-unsupported-target.txt");
+        File.WriteAllText(source, "ads-unsupported-default-content");
+        AlternateDataStreams.Write(source, "must-not-silently-disappear", "source-stream-content"u8.ToArray());
+
+        ExecuteWithPath(NativeCommands.MoveFiles, "ads-unsupported-target.txt", Workspace.TargetDirectory, commit: true);
+        ChooseOperationPrompt(WaitForOperationPrompt(7), 7); // IDNO: retain the source when ADS loss is reported
+
+        WaitForFileSystem(() => File.Exists(target), "The unsupported target did not receive the default data stream.");
+        Assert.Multiple(() =>
+        {
+            Assert.That(File.ReadAllText(target), Is.EqualTo("ads-unsupported-default-content"));
+            Assert.That(File.Exists(source), Is.True, "Declining metadata loss deleted the ADS-bearing source.");
+            AlternateDataStreams.AssertContent(source, "must-not-silently-disappear", "source-stream-content"u8.ToArray());
+            AlternateDataStreams.AssertAbsent(target, "must-not-silently-disappear");
+        });
+    }
+}
