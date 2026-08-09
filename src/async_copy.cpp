@@ -2180,6 +2180,67 @@ HANDLE SalCreateFileEx(const char* fileName, DWORD desiredAccess,
     return out;
 }
 
+// Reserve a unique file in the destination directory.  The reservation is opened with
+// CREATE_ALWAYS by DoCopyFile and is never visible under the requested target name.
+// Keeping the temporary file beside its final name guarantees that ReplaceFileW is a
+// same-volume commit.
+static BOOL CreateTransactionalTargetFileName(const char* targetName, char* temporaryName, int temporaryNameLen)
+{
+    char targetDirectory[3 * MAX_PATH];
+    lstrcpyn(targetDirectory, targetName, _countof(targetDirectory));
+    if (!CutDirectory(targetDirectory))
+    {
+        SetLastError(ERROR_INVALID_NAME);
+        return FALSE;
+    }
+    return SalGetTempFileName(targetDirectory, "SALCP", temporaryName, temporaryNameLen, TRUE);
+}
+
+static HANDLE OpenTransactionalTargetFile(const char* temporaryName, DWORD desiredAccess,
+                                          DWORD flagsAndAttributes, BOOL* encryptionNotSupported)
+{
+    HANDLE out = HANDLES_Q(CreateFileUtf8(temporaryName, desiredAccess, 0, NULL, CREATE_ALWAYS, flagsAndAttributes, NULL));
+    if (out == INVALID_HANDLE_VALUE && (flagsAndAttributes & FILE_ATTRIBUTE_ENCRYPTED))
+    {
+        out = HANDLES_Q(CreateFileUtf8(temporaryName, desiredAccess, 0, NULL, CREATE_ALWAYS,
+                                       flagsAndAttributes & ~(FILE_ATTRIBUTE_ENCRYPTED | FILE_ATTRIBUTE_READONLY), NULL));
+        if (out != INVALID_HANDLE_VALUE)
+        {
+            *encryptionNotSupported = TRUE;
+            HANDLES(CloseHandle(out));
+            out = INVALID_HANDLE_VALUE;
+        }
+    }
+    return out;
+}
+
+// ReplaceFileW preserves the previous destination until the file system commits the
+// replacement.  If another actor removed the destination after the overwrite prompt,
+// a write-through same-volume rename is the equivalent commit for a newly absent file.
+static BOOL CommitTransactionalTargetFile(const char* targetName, const char* temporaryName, DWORD* error)
+{
+    CStrP targetNameW(ConvertAllocUtf8ToWide(targetName, -1));
+    CStrP temporaryNameW(ConvertAllocUtf8ToWide(temporaryName, -1));
+    if (targetNameW == NULL || temporaryNameW == NULL)
+    {
+        *error = ERROR_NO_UNICODE_TRANSLATION;
+        return FALSE;
+    }
+
+    if (ReplaceFileW(targetNameW, temporaryNameW, NULL, REPLACEFILE_WRITE_THROUGH, NULL, NULL))
+        return TRUE;
+
+    *error = GetLastError();
+    if (*error == ERROR_FILE_NOT_FOUND &&
+        MoveFileExW(temporaryNameW, targetNameW, MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH))
+    {
+        return TRUE;
+    }
+    if (*error == ERROR_FILE_NOT_FOUND)
+        *error = GetLastError();
+    return FALSE;
+}
+
 BOOL SyncOrAsyncDeviceIoControl(CAsyncCopyParams* asyncPar, HANDLE hDevice, DWORD dwIoControlCode,
                                 LPVOID lpInBuffer, DWORD nInBufferSize, LPVOID lpOutBuffer,
                                 DWORD nOutBufferSize, LPDWORD lpBytesReturned, DWORD* err)
@@ -3589,6 +3650,36 @@ BOOL DoCopyFile(COperation* op, HWND hProgressDlg, void* buffer,
                 CProgressDlgData& dlgData, BOOL copyADS, BOOL copyAsEncrypted,
                 BOOL isMove, CAsyncCopyParams*& asyncPar)
 {
+    char* const requestedTargetName = op->TargetName;
+    char transactionalTargetName[3 * MAX_PATH];
+    BOOL transactionalTarget = FALSE;
+    BOOL transactionalTargetCommitted = FALSE;
+    struct CRestoreRequestedTargetName
+    {
+        COperation* Operation;
+        char* RequestedTargetName;
+        CRestoreRequestedTargetName(COperation* operation, char* requestedTargetName)
+            : Operation(operation), RequestedTargetName(requestedTargetName) {}
+        ~CRestoreRequestedTargetName() { Operation->TargetName = RequestedTargetName; }
+    } RestoreRequestedTargetName(op, requestedTargetName);
+    struct CCleanupTransactionalTarget
+    {
+        char* TargetName;
+        BOOL* IsTransactionalTarget;
+        BOOL* IsCommitted;
+        CCleanupTransactionalTarget(char* targetName, BOOL* isTransactionalTarget, BOOL* isCommitted)
+            : TargetName(targetName), IsTransactionalTarget(isTransactionalTarget), IsCommitted(isCommitted) {}
+        ~CCleanupTransactionalTarget()
+        {
+            if (*IsTransactionalTarget && !*IsCommitted)
+            {
+                ClearReadOnlyAttr(TargetName);
+                if (!DeleteFileUtf8(TargetName))
+                    TRACE_I("DoCopyFile(): unable to remove uncommitted transactional target " << TargetName << ": " << GetErrorText(GetLastError()));
+            }
+        }
+    } CleanupTransactionalTarget(transactionalTargetName, &transactionalTarget, &transactionalTargetCommitted);
+
     if (script->CopyAttrs && copyAsEncrypted)
         TRACE_E("DoCopyFile(): unexpected parameter value: copyAsEncrypted is TRUE when script->CopyAttrs is TRUE!");
 
@@ -3742,9 +3833,17 @@ COPY_AGAIN:
                 if (!invalidTgtName)
                 {
                     // GENERIC_READ for 'out' slows asynchronous copying from disk to network (measured 95 MB/s instead of 111 MB/s on Win7 x64 GLAN)
-                    out = SalCreateFileEx(op->TargetName, GENERIC_WRITE | (script->CopyAttrs ? GENERIC_READ : 0), 0, fileAttrs, &encryptionNotSupported);
+                    if (transactionalTarget)
+                        out = OpenTransactionalTargetFile(op->TargetName, GENERIC_WRITE | (script->CopyAttrs ? GENERIC_READ : 0), fileAttrs, &encryptionNotSupported);
+                    else
+                        out = SalCreateFileEx(op->TargetName, GENERIC_WRITE | (script->CopyAttrs ? GENERIC_READ : 0), 0, fileAttrs, &encryptionNotSupported);
                     if (!encryptionNotSupported && script->CopyAttrs && out == INVALID_HANDLE_VALUE) // in case read access to the directory is not allowed (we added it only for setting the Compressed attribute), try creating a write-only file
-                        out = SalCreateFileEx(op->TargetName, GENERIC_WRITE, 0, fileAttrs, &encryptionNotSupported);
+                    {
+                        if (transactionalTarget)
+                            out = OpenTransactionalTargetFile(op->TargetName, GENERIC_WRITE, fileAttrs, &encryptionNotSupported);
+                        else
+                            out = SalCreateFileEx(op->TargetName, GENERIC_WRITE, 0, fileAttrs, &encryptionNotSupported);
+                    }
 
                     if (out == INVALID_HANDLE_VALUE && encryptionNotSupported && dlgData.FileOutLossEncrAll && !lossEncryptionAttr)
                     { // the user agreed to lose the Encrypted attribute for all problematic files, so make that happen here
@@ -4119,10 +4218,15 @@ COPY_AGAIN:
                                 }
                             }
                         }
-                        if (!HANDLES(CloseHandle(out)))
+                        DWORD closeOrFlushError = NO_ERROR;
+                        if (transactionalTarget && !FlushFileBuffers(out))
+                            closeOrFlushError = GetLastError();
+                        if (!HANDLES(CloseHandle(out)) && closeOrFlushError == NO_ERROR)
+                            closeOrFlushError = GetLastError();
+                        if (closeOrFlushError != NO_ERROR)
                         {
                             out = NULL;
-                            DWORD err = GetLastError();
+                            DWORD err = closeOrFlushError;
                             WaitForSingleObject(dlgData.WorkerNotSuspended, INFINITE); // if we should be in suspend mode, wait ...
                             if (*dlgData.CancelWorker)
                                 goto COPY_ERROR;
@@ -4237,6 +4341,43 @@ COPY_AGAIN:
                                 goto COPY_ERROR_2;
                             }
                         }
+                    }
+
+                    if (transactionalTarget)
+                    {
+                        DWORD err;
+                        while (!CommitTransactionalTargetFile(requestedTargetName, op->TargetName, &err))
+                        {
+                            TRACE_I("DoCopyFile(): unable to commit transactional overwrite of " << requestedTargetName << ": " << GetErrorText(err));
+                            WaitForSingleObject(dlgData.WorkerNotSuspended, INFINITE); // if we should be in suspend mode, wait ...
+                            if (*dlgData.CancelWorker)
+                                goto COPY_ERROR_2;
+
+                            if (dlgData.SkipAllFileWrite)
+                                goto SKIP_COPY;
+
+                            int ret = IDCANCEL;
+                            char* data[4];
+                            data[0] = (char*)&ret;
+                            data[1] = LoadStr(IDS_ERRORWRITINGFILE);
+                            data[2] = requestedTargetName;
+                            data[3] = GetErrorText(err);
+                            SendMessage(hProgressDlg, WM_USER_DIALOG, 0, (LPARAM)data);
+                            switch (ret)
+                            {
+                            case IDRETRY:
+                                break;
+
+                            case IDB_SKIPALL:
+                                dlgData.SkipAllFileWrite = TRUE;
+                            case IDB_SKIP:
+                                goto SKIP_COPY;
+
+                            case IDCANCEL:
+                                goto COPY_ERROR_2;
+                            }
+                        }
+                        transactionalTargetCommitted = TRUE;
                     }
 
                     totalDone += op->Size;
@@ -4452,6 +4593,21 @@ COPY_AGAIN:
                             BOOL targetCannotOpenForWrite = FALSE;
                             while (1)
                             {
+                                if (!transactionalTarget)
+                                {
+                                    // The overwrite decision has been made.  From this point on write only
+                                    // to a sibling reservation, so retry, low-space, cancellation, and
+                                    // metadata failures can remove that file without touching the old target.
+                                    if (!CreateTransactionalTargetFileName(requestedTargetName, transactionalTargetName, _countof(transactionalTargetName)))
+                                    {
+                                        err = GetLastError();
+                                        goto NORMAL_ERROR;
+                                    }
+                                    op->TargetName = transactionalTargetName;
+                                    transactionalTarget = TRUE;
+                                    goto OPEN_TGT_FILE;
+                                }
+
                                 if (targetCannotOpenForWrite || mustDeleteFileBeforeOverwrite == 1 /* yes */)
                                 { // the file must be deleted first
                                     BOOL chAttr = ClearReadOnlyAttr(op->TargetName, attr);
