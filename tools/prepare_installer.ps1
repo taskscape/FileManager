@@ -67,14 +67,6 @@ Copy-Exe @("$BuildDir\Release_x64\translator.exe", "$BuildDir\Release_Win32\tran
 Copy-Exe @("$BuildDir\Release_x64\fcremote.exe") "fcremote.exe" "$StagingDir\"
 Copy-Exe @("$BuildDir\Release_x64\7zwrapper.exe") "7zwrapper.exe" "$StagingDir\"
 
-# OpenSSL
-$opensslCopied1 = Copy-Exe @("utils\libeay32.dll", "external\openssl\libeay32.dll", "libeay32.dll") "libeay32.dll" "$StagingDir\utils\"
-$opensslCopied2 = Copy-Exe @("utils\ssleay32.dll", "external\openssl\ssleay32.dll", "ssleay32.dll") "ssleay32.dll" "$StagingDir\utils\"
-
-if (-not $opensslCopied1 -or -not $opensslCopied2) {
-    Write-Warning "OpenSSL DLLs not found. FTP encryption might not work."
-}
-
 # 3. Copy lang (main app)
 Copy-Item "Installer\lang\*" "$StagingDir\lang\" -Recurse -ErrorAction SilentlyContinue
 

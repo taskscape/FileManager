@@ -978,9 +978,9 @@ void CDataConnectionSocket::ReceiveNetEvent(LPARAM lParam, int index)
                                                    ReadBytesAllocatedSize - ValidBytesInReadBytesBuf, 0);
                                     else
                                     {
-                                        if (SSLLib.SSL_pending(SSLConn) > 0) // if the internal SSL buffer is not empty, recv() is not called and no further FD_READ arrives, so we must post it ourselves, otherwise the data transfer stops
+                                        if (SSLPending(SSLConn) > 0) // if the internal TLS buffer is not empty, recv() is not called and no further FD_READ arrives, so we must post it ourselves, otherwise the data transfer stops
                                             PostMessage(SocketsThread->GetHiddenWindow(), Msg, (WPARAM)Socket, FD_READ);
-                                        len = SSLLib.SSL_read(SSLConn, ReadBytes + ValidBytesInReadBytesBuf,
+                                        len = SSLRead(SSLConn, ReadBytes + ValidBytesInReadBytesBuf,
                                                               ReadBytesAllocatedSize - ValidBytesInReadBytesBuf);
                                     }
                                     if (len >= 0) // we may have read something (0 = the connection is already closed)
@@ -1057,7 +1057,7 @@ void CDataConnectionSocket::ReceiveNetEvent(LPARAM lParam, int index)
                                         }
                                         else
                                         {
-                                            if (SSLConn && (WSAGETSELECTEVENT(lParam) == FD_READ) && (6 /*SSL_ERROR_ZERO_RETURN*/ == SSLLib.SSL_get_error(SSLConn, 0)))
+                                            if (SSLConn && (WSAGETSELECTEVENT(lParam) == FD_READ) && (SSL_ERROR_ZERO_RETURN == SSLGetError(SSLConn, 0)))
                                             {
                                                 // seen at ftps://ftp.smartftp.com
                                                 // SSL_ERROR_ZERO_RETURN: The TLS/SSL connection has been closed.
@@ -1072,7 +1072,7 @@ void CDataConnectionSocket::ReceiveNetEvent(LPARAM lParam, int index)
                                     }
                                     else
                                     {
-                                        DWORD err = !SSLConn ? WSAGetLastError() : SSLtoWS2Error(SSLLib.SSL_get_error(SSLConn, len));
+                                        DWORD err = !SSLConn ? WSAGetLastError() : SSLtoWS2Error(SSLGetError(SSLConn, len));
                                         if (err != WSAEWOULDBLOCK)
                                         {
                                             NetEventLastError = err; // an error occurred
@@ -1137,9 +1137,9 @@ void CDataConnectionSocket::ReceiveNetEvent(LPARAM lParam, int index)
                                                ReadBytesAllocatedSize - ValidBytesInReadBytesBuf, 0);
                                 else
                                 {
-                                    if (SSLLib.SSL_pending(SSLConn) > 0) // if the internal SSL buffer is not empty, recv() is not called and no further FD_READ arrives, so we must post it ourselves, otherwise the data transfer stops
+                                    if (SSLPending(SSLConn) > 0) // if the internal TLS buffer is not empty, recv() is not called and no further FD_READ arrives, so we must post it ourselves, otherwise the data transfer stops
                                         PostMessage(SocketsThread->GetHiddenWindow(), Msg, (WPARAM)Socket, FD_READ);
-                                    len = SSLLib.SSL_read(SSLConn, ReadBytes + ValidBytesInReadBytesBuf,
+                                    len = SSLRead(SSLConn, ReadBytes + ValidBytesInReadBytesBuf,
                                                           ReadBytesAllocatedSize - ValidBytesInReadBytesBuf);
                                 }
                                 if (len >= 0) // we may have read something (0 = the connection is already closed)
@@ -1160,7 +1160,7 @@ void CDataConnectionSocket::ReceiveNetEvent(LPARAM lParam, int index)
                                     }
                                     else
                                     {
-                                        if (SSLConn && (WSAGETSELECTEVENT(lParam) == FD_READ) && (6 /*SSL_ERROR_ZERO_RETURN*/ == SSLLib.SSL_get_error(SSLConn, 0)))
+                                        if (SSLConn && (WSAGETSELECTEVENT(lParam) == FD_READ) && (SSL_ERROR_ZERO_RETURN == SSLGetError(SSLConn, 0)))
                                         {
                                             // seen at ftps://ftp.smartftp.com
                                             // SSL_ERROR_ZERO_RETURN: The TLS/SSL connection has been closed.
@@ -1175,7 +1175,7 @@ void CDataConnectionSocket::ReceiveNetEvent(LPARAM lParam, int index)
                                 }
                                 else
                                 {
-                                    DWORD err = !SSLConn ? WSAGetLastError() : SSLtoWS2Error(SSLLib.SSL_get_error(SSLConn, len));
+                                    DWORD err = !SSLConn ? WSAGetLastError() : SSLtoWS2Error(SSLGetError(SSLConn, len));
                                     if (err != WSAEWOULDBLOCK)
                                     {
                                         NetEventLastError = err; // an error occurred

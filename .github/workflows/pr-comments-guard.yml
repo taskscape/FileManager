@@ -206,7 +206,6 @@ jobs:
               'src/plugins/automation/generated',
               'src/plugins/shared/lukas',
               'src/plugins/ftp',
-              'src/plugins/ftp/openssl',
               'src/plugins/ieviewer/cmark-gfm/build/src',
               'src/plugins/ieviewer/cmark-gfm/build/extensions',
               'src/plugins/ieviewer/cmark-gfm/extensions',

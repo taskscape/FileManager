@@ -42,40 +42,14 @@ jobs:
       - name: Setup MSBuild in PATH (VS2022)
         uses: microsoft/setup-msbuild@v2
 
-      - name: Download OpenSSL Libraries
-        shell: pwsh
-        run: |
-          $ErrorActionPreference = 'Stop'
-
-          $opensslZip = Join-Path $env:RUNNER_TEMP "openssl.zip"
-          $uri = "https://intelitech.home.pl/install/openssl-1.0.2u-x64_86-win64.zip"
-
-          $resp = Invoke-WebRequest -Uri $uri -OutFile $opensslZip -MaximumRedirection 10 -PassThru
-          Write-Host "HTTP status: $($resp.StatusCode)"
-          Write-Host "Content-Type: $($resp.Headers.'Content-Type')"
-          Write-Host "Downloaded bytes: $((Get-Item $opensslZip).Length)"
-
-          # Validate: ZIP files start with 'PK' (0x50 0x4B).
-          $bytes = [System.IO.File]::ReadAllBytes($opensslZip)
-          if ($bytes.Length -lt 2) {
-            throw "OpenSSL download is unexpectedly short."
-          }
-
-          if ($bytes[0] -ne 0x50 -or $bytes[1] -ne 0x4B) {
-            Write-Host "First bytes: $('{0:X2} {1:X2}' -f $bytes[0], $bytes[1])"
-            Write-Host "File head (as text):"
-            Get-Content -Path $opensslZip -TotalCount 20 | ForEach-Object { $_ }
-            throw "OpenSSL download is not a ZIP (likely received HTML). URL may have changed or requires different source."
-          }
-
-          Expand-Archive -Path $opensslZip -DestinationPath "utils" -Force
-          Remove-Item $opensslZip
-
       - name: Build Solution (Release | x64)
         run: |
           New-Item -ItemType Directory -Force -Path $env:OPENSAL_BUILD_DIR
           # We do NOT pass /p:OutDir here, we let the project props use OPENSAL_BUILD_DIR
           msbuild $env:SOLUTION_PATH /m /t:Build /p:Configuration=$env:BUILD_CONFIGURATION /p:Platform=x64 /p:PlatformToolset=$env:PLATFORM_TOOLSET /p:PreferredToolArchitecture=x64
+
+      - name: Verify Windows TLS policy
+        run: dotnet test tests\FileManager.UiTests\FileManager.UiTests.csproj --filter FullyQualifiedName~SChannelTlsIntegrationTests
 
       - name: Install Inno Setup
         run: |

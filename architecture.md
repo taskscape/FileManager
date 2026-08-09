@@ -85,7 +85,7 @@ The common MSBuild policy is defined in `src/vcxproj/sal_base.props`:
 - Win32 and x64 builds are separated by platform-specific property sheets and output directories.
 - The checked-in projects currently select toolset `v145`; CI intentionally overrides that to `v143`, so the effective toolset is environment-dependent.
 
-The pull-request workflow compiles Debug Win32 and x64 configurations and treats warnings as errors. The release workflow builds x64 Release, acquires OpenSSL runtime dependencies, stages the installer tree, and publishes artifacts. Installer scripts collect the executable, helper processes, shell extensions, language modules, toolbar assets, conversion tables, and plug-ins. Consequently, successful compilation of `salamand.exe` alone does not prove a distributable installation is complete.
+The pull-request workflow compiles Debug Win32 and x64 configurations and treats warnings as errors. The release workflow builds x64 Release, stages the installer tree, and publishes artifacts. FTPS uses Windows SChannel rather than a bundled TLS runtime, so the installer does not download or ship OpenSSL DLLs. Installer scripts collect the executable, helper processes, shell extensions, language modules, toolbar assets, conversion tables, and plug-ins. Consequently, successful compilation of `salamand.exe` alone does not prove a distributable installation is complete.
 
 ### 1.2 Runtime processes and load boundaries
 

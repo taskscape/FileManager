@@ -68,10 +68,6 @@ PNGLite Library Copyright (C) 2007 Daniel Karling
 Portion of UnISO plugin utilizes ISZ SDK.
 ISZ SDK Copyright (C) 2002-2006 EZB Systems, Inc., All Rights Reserved.
 
-=== OpenSSL Project === 
-The FTP Client plugin can utilize OpenSSL library.
-Copyright (c) 1998-2019 The OpenSSL Project.  All rights reserved.
-
 === SQLite === 
 Open Salamander uses SQLite. SQLite is in the Public Domain.
 

@@ -174,7 +174,6 @@ EXCLUDED_DIRS = _normalize_excluded(
         "src/plugins/7zip/7za/cpp",
         "src/plugins/automation/generated",
         "src/plugins/checksum/tomcrypt",
-        "src/plugins/ftp/openssl",
         "src/plugins/ieviewer/cmark-gfm",
         "src/plugins/mmviewer/ogg/vorbis",
         "src/plugins/mmviewer/wma/wmsdk",

@@ -668,7 +668,7 @@ BOOL CControlConnectionSocket::Write(const char* buffer, int bytesToWrite, DWORD
                     // WARNING: if the TELNET protocol is ever introduced again, sending IAC+IP before aborting
                     // a command in the SendFTPCommand() method must be adjusted
 
-                    int sentLen = SSLLib.SSL_write(SSLConn, buffer + len, bytesToWrite - len);
+                    int sentLen = SSLWrite(SSLConn, buffer + len, bytesToWrite - len);
                     if (sentLen >= 0) // at least something was sent successfully (or rather taken over by Windows; delivery is uncertain)
                     {
                         len += sentLen;
@@ -680,7 +680,7 @@ BOOL CControlConnectionSocket::Write(const char* buffer, int bytesToWrite, DWORD
                     }
                     else
                     {
-                        DWORD err = SSLtoWS2Error(SSLLib.SSL_get_error(SSLConn, sentLen));
+                        DWORD err = SSLtoWS2Error(SSLGetError(SSLConn, sentLen));
                         if (err == WSAEWOULDBLOCK) // nothing else can be sent (Windows no longer have buffer space)
                         {
                             ret = TRUE;
@@ -881,9 +881,9 @@ void CControlConnectionSocket::ReceiveNetEvent(LPARAM lParam, int index)
                     }
                     else
                     {
-                        if (SSLLib.SSL_pending(SSLConn) > 0) // if the internal SSL buffer is not empty, recv() is not called at all and no FD_READ arrives, so post it ourselves to avoid stalling the transfer
+                        if (SSLPending(SSLConn) > 0) // if the internal TLS buffer is not empty, recv() is not called at all and no FD_READ arrives, so post it ourselves to avoid stalling the transfer
                             PostMessage(SocketsThread->GetHiddenWindow(), Msg, (WPARAM)Socket, FD_READ);
-                        int len = SSLLib.SSL_read(SSLConn, ReadBytes + ReadBytesCount, ReadBytesAllocatedSize - ReadBytesCount);
+                        int len = SSLRead(SSLConn, ReadBytes + ReadBytesCount, ReadBytesAllocatedSize - ReadBytesCount);
                         if (len >= 0) // we may have read something (0 = the connection is already closed)
                         {
                             if (len > 0)
@@ -897,7 +897,7 @@ void CControlConnectionSocket::ReceiveNetEvent(LPARAM lParam, int index)
                         }
                         else
                         {
-                            err = SSLtoWS2Error(SSLLib.SSL_get_error(SSLConn, len));
+                            err = SSLtoWS2Error(SSLGetError(SSLConn, len));
                             ;
                             if (err != WSAEWOULDBLOCK)
                                 genEvent = TRUE; // we will generate an event with the error
@@ -1126,7 +1126,7 @@ void CControlConnectionSocket::ReceiveNetEvent(LPARAM lParam, int index)
                     {
                         while (1) // loop needed because 'send' does not post FD_WRITE when 'sentLen' < 'bytesToWrite'
                         {
-                            int sentLen = SSLLib.SSL_write(SSLConn, BytesToWrite + BytesToWriteOffset + len,
+                            int sentLen = SSLWrite(SSLConn, BytesToWrite + BytesToWriteOffset + len,
                                                            BytesToWriteCount - BytesToWriteOffset - len);
                             if (sentLen >= 0) // at least something was sent successfully (or rather taken over by Windows; delivery is uncertain)
                             {
@@ -1139,7 +1139,7 @@ void CControlConnectionSocket::ReceiveNetEvent(LPARAM lParam, int index)
                             }
                             else
                             {
-                                err = SSLtoWS2Error(SSLLib.SSL_get_error(SSLConn, sentLen));
+                                err = SSLtoWS2Error(SSLGetError(SSLConn, sentLen));
                                 if (err == WSAEWOULDBLOCK) // nothing else can be sent (Windows no longer have buffer space)
                                 {
                                     ret = TRUE;

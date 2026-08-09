@@ -1485,7 +1485,7 @@ BOOL CFTPWorker::Write(const char* buffer, int bytesToWrite, DWORD* error, BOOL*
                     }
                     else
                     {
-                        int sentLen = SSLLib.SSL_write(SSLConn, buffer + len, bytesToWrite - len);
+                        int sentLen = SSLWrite(SSLConn, buffer + len, bytesToWrite - len);
                         if (sentLen >= 0) // at least something was successfully sent (or rather accepted by Windows; delivery is uncertain)
                         {
                             len += sentLen;
@@ -1497,7 +1497,7 @@ BOOL CFTPWorker::Write(const char* buffer, int bytesToWrite, DWORD* error, BOOL*
                         }
                         else
                         {
-                            DWORD err = SSLtoWS2Error(SSLLib.SSL_get_error(SSLConn, sentLen));
+                            DWORD err = SSLtoWS2Error(SSLGetError(SSLConn, sentLen));
                             if (err == WSAEWOULDBLOCK) // nothing else can be sent (Windows no longer has buffer space)
                             {
                                 ret = TRUE;
@@ -1520,7 +1520,7 @@ BOOL CFTPWorker::Write(const char* buffer, int bytesToWrite, DWORD* error, BOOL*
                     // WARNING: if the TELNET protocol is introduced again, sending IAC+IP must be reworked
                     // before aborting the command in SendFTPCommand()
 
-                    int sentLen = SSLLib.SSL_write(SSLConn, buffer + len, bytesToWrite - len);
+                    int sentLen = SSLWrite(SSLConn, buffer + len, bytesToWrite - len);
                     if (sentLen > 0) // at least something was successfully sent (or rather accepted by Windows; delivery is uncertain)
                     {
                         len += sentLen;
@@ -1532,7 +1532,7 @@ BOOL CFTPWorker::Write(const char* buffer, int bytesToWrite, DWORD* error, BOOL*
                     }
                     else
                     {
-                        DWORD err = SSLtoWS2Error(SSLLib.SSL_get_error(SSLConn, sentLen));
+                        DWORD err = SSLtoWS2Error(SSLGetError(SSLConn, sentLen));
                         if (err == WSAEWOULDBLOCK) // nothing else can be sent (Windows no longer has buffer space)
                         {
                             ret = TRUE;
@@ -1718,9 +1718,9 @@ void CFTPWorker::ReceiveNetEvent(LPARAM lParam, int index)
                     }
                     else
                     {
-                        if (SSLLib.SSL_pending(SSLConn) > 0) // if the internal SSL buffer is not empty recv() is never called, so no additional FD_READ arrives; post it ourselves, otherwise the transfer stops
+                        if (SSLPending(SSLConn) > 0) // if the internal TLS buffer is not empty recv() is never called, so no additional FD_READ arrives; post it ourselves, otherwise the transfer stops
                             PostMessage(SocketsThread->GetHiddenWindow(), Msg, (WPARAM)Socket, FD_READ);
-                        int len = SSLLib.SSL_read(SSLConn, ReadBytes + ReadBytesCount, ReadBytesAllocatedSize - ReadBytesCount);
+                        int len = SSLRead(SSLConn, ReadBytes + ReadBytesCount, ReadBytesAllocatedSize - ReadBytesCount);
                         if (len >= 0) // we may have read something (0 = connection already closed)
                         {
                             if (len > 0)
@@ -1734,7 +1734,7 @@ void CFTPWorker::ReceiveNetEvent(LPARAM lParam, int index)
                         }
                         else
                         {
-                            err = SSLtoWS2Error(SSLLib.SSL_get_error(SSLConn, len));
+                            err = SSLtoWS2Error(SSLGetError(SSLConn, len));
                             if (err != WSAEWOULDBLOCK)
                                 genEvent = TRUE; // generate an event with the error
                         }
@@ -1829,7 +1829,7 @@ void CFTPWorker::ReceiveNetEvent(LPARAM lParam, int index)
                     {
                         while (1) // loop needed because 'send' does not emit FD_WRITE when 'sentLen' < 'bytesToWrite'
                         {
-                            int sentLen = SSLLib.SSL_write(SSLConn, BytesToWrite + BytesToWriteOffset + len,
+                            int sentLen = SSLWrite(SSLConn, BytesToWrite + BytesToWriteOffset + len,
                                                            BytesToWriteCount - BytesToWriteOffset - len);
                             if (sentLen >= 0) // at least something was successfully sent (or rather accepted by Windows; delivery is uncertain)
                             {
@@ -1842,7 +1842,7 @@ void CFTPWorker::ReceiveNetEvent(LPARAM lParam, int index)
                             }
                             else
                             {
-                                err = SSLtoWS2Error(SSLLib.SSL_get_error(SSLConn, sentLen));
+                                err = SSLtoWS2Error(SSLGetError(SSLConn, sentLen));
                                 if (err == WSAEWOULDBLOCK) // nothing else can be sent (Windows no longer has buffer space)
                                 {
                                     ret = TRUE;
