@@ -101,10 +101,10 @@ This document is the working record for a read-only stability and resilience aud
 - **Delivered:** `src/file_identity.cpp` captures the source and destination identity as each worker item begins, before any confirmation or I/O delay. It opens with `FILE_FLAG_OPEN_REPARSE_POINT | FILE_FLAG_BACKUP_SEMANTICS`, records the volume serial and file ID, and fingerprints `GetFinalPathNameByHandleW` output. Transactional overwrite checks that captured identity immediately before `ReplaceFileW`/`MoveFileExW` can run and refuses a changed or newly introduced target.
 - **Deletion:** Direct file and empty-directory deletion now reopens and rechecks the recorded identity, then applies `FileDispositionInfo` to that verified handle. This binds the destructive operation to the opened object instead of a subsequently re-resolved name and preserves reparse-point behavior. Recycle Bin requests are still delegated to the shell but retain the same pre-action identity capture for the native direct-delete path.
 
-### 11. Replace legacy file-size and seek APIs in operation code
+### 11. Replace legacy file-size and seek APIs in operation code — Implemented (2026-08-09)
 
-- **Justification:** `GetFileSize` and `SetFilePointer` are used broadly, including the overwrite path (`src/async_copy.cpp:4486`), retaining sentinel/error ambiguity and fragile 64-bit handling.
-- **Proposed solution:** Add characterized wrappers around `GetFileSizeEx` and `SetFilePointerEx`, migrate the copy/move engine first, and then ratchet remaining callers. Return a typed result containing either the 64-bit value or the captured Win32 error.
+- **Implementation:** `CFileOffsetResult` carries a 64-bit value, success state, and the Win32 error captured by `SalGetFileSizeEx` or `SalSetFilePointerEx`. The copy/move engine, including ADS, retry, allocation, truncation, and overwrite checks, now uses these wrappers.
+- **Follow-up:** Other legacy callers remain subject to the planned ratchet; the regression test prevents raw `GetFileSize` or `SetFilePointer` calls from returning to `src/async_copy.cpp`.
 
 ### 12. Replace the custom crash uploader with HTTPS WinHTTP
 

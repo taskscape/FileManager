@@ -1,4 +1,5 @@
 using NUnit.Framework;
+using System.Text.RegularExpressions;
 
 namespace FileManager.UiTests;
 
@@ -26,6 +27,31 @@ public sealed class NativeSafetyRegressionTests
             Assert.That(operations, Does.Contain("CaptureOperationFileIdentities(op, &identityError)"));
             Assert.That(copy, Does.Contain("VerifyFileIdentity(targetName, expectedTargetIdentity, error)"));
             Assert.That(copy, Does.Contain("DeleteFileWithVerifiedIdentity(name, operation->SourceIdentity, &err)"));
+        });
+    }
+
+    [Test]
+    public void Copy_engine_uses_unambiguous_64_bit_file_size_and_seek_wrappers()
+    {
+        var root = FindRepositoryRoot();
+        var declarations = File.ReadAllText(Path.Combine(root, "src", "consts.h"));
+        var wrappers = File.ReadAllText(Path.Combine(root, "src", "path_checking.cpp"));
+        var copy = File.ReadAllText(Path.Combine(root, "src", "async_copy.cpp"));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(declarations, Does.Contain("struct CFileOffsetResult"));
+            Assert.That(declarations, Does.Contain("CFileOffsetResult SalGetFileSizeEx"));
+            Assert.That(declarations, Does.Contain("CFileOffsetResult SalSetFilePointerEx"));
+            Assert.That(wrappers, Does.Contain("GetFileSizeEx(file, &size)"));
+            Assert.That(wrappers, Does.Contain("SetFilePointerEx(file, input, &output, moveMethod)"));
+            Assert.That(wrappers, Does.Contain("CFileOffsetResult(GetLastError())"));
+            Assert.That(copy, Does.Contain("SalGetFileSizeEx("));
+            Assert.That(copy, Does.Contain("SalSetFilePointerEx("));
+            Assert.That(Regex.Matches(copy, @"(?m)^(?!\s*//).*?\bGetFileSize\s*\(").Count, Is.Zero,
+                        "The copy engine must not reintroduce raw GetFileSize calls.");
+            Assert.That(Regex.Matches(copy, @"(?m)^(?!\s*//).*?\bSetFilePointer\s*\(").Count, Is.Zero,
+                        "The copy engine must not reintroduce raw SetFilePointer calls.");
         });
     }
 
