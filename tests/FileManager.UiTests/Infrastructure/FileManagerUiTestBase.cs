@@ -15,6 +15,8 @@ public abstract class FileManagerUiTestBase
     protected Application Application { get; private set; } = null!;
     protected Window MainWindow { get; private set; } = null!;
 
+    protected virtual string ApplicationArguments => UiTestSettings.Arguments;
+
     [SetUp]
     public void StartFileManager()
     {
@@ -33,6 +35,8 @@ public abstract class FileManagerUiTestBase
                 application.Kill();
             application.Dispose();
         }
+
+        OnAfterFileManagerStopped();
 
         // Setup can intentionally skip before UIA3 is created when the isolated profile opt-in is absent.
         if (Automation is not null)
@@ -148,9 +152,13 @@ public abstract class FileManagerUiTestBase
         WaitForWindowToClose(bookmarksDialog);
     }
 
+    protected virtual void OnAfterFileManagerStopped()
+    {
+    }
+
     private void StartApplication()
     {
-        var startInfo = new ProcessStartInfo(UiTestSettings.ExecutablePath, UiTestSettings.Arguments)
+        var startInfo = new ProcessStartInfo(UiTestSettings.ExecutablePath, ApplicationArguments)
         {
             UseShellExecute = false,
         };
@@ -162,7 +170,7 @@ public abstract class FileManagerUiTestBase
                      throw new AssertionException("FileManager did not expose a UI Automation main window.");
     }
 
-    private Window WaitForWindow(Func<Window, bool> predicate)
+    protected Window WaitForWindow(Func<Window, bool> predicate)
     {
         var timeout = DateTime.UtcNow + TimeSpan.FromSeconds(10);
         while (DateTime.UtcNow < timeout)
@@ -178,7 +186,7 @@ public abstract class FileManagerUiTestBase
         return null!;
     }
 
-    private static void WaitForWindowToClose(Window dialog)
+    protected static void WaitForWindowToClose(Window dialog)
     {
         var timeout = DateTime.UtcNow + TimeSpan.FromSeconds(10);
         while (DateTime.UtcNow < timeout)

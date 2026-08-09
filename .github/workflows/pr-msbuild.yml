@@ -69,6 +69,9 @@ jobs:
       - name: Verify asynchronous operation completion protocol
         run: .\tools\verify-operation-completion-protocol.ps1
 
+      - name: Verify durable copy commit protocol
+        run: .\tools\verify-durable-copy-commit.ps1
+
       - name: Register MSVC problem matcher
         uses: ammaraskar/msvc-problem-matcher@master
 

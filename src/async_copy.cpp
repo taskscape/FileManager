@@ -2241,6 +2241,40 @@ static BOOL CommitTransactionalTargetFile(const char* targetName, const char* te
     return FALSE;
 }
 
+// A successful write is not a copy commit.  Reopen the closed destination and
+// verify its on-disk file metadata before reporting success, replacing an old
+// target, or allowing a cross-volume move to remove its source.
+static BOOL VerifyDurableCopyCommit(const char* targetName, const CQuadWord& expectedSize, DWORD* error)
+{
+    HANDLE target = HANDLES_Q(CreateFileUtf8(targetName, GENERIC_READ,
+                                              FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, NULL,
+                                              OPEN_EXISTING, FILE_FLAG_SEQUENTIAL_SCAN, NULL));
+    if (target == INVALID_HANDLE_VALUE)
+    {
+        *error = GetLastError();
+        return FALSE;
+    }
+
+    BY_HANDLE_FILE_INFORMATION information;
+    BOOL verified = GetFileInformationByHandle(target, &information);
+    if (!verified)
+        *error = GetLastError();
+    else if ((information.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) != 0 ||
+             information.nFileSizeLow != expectedSize.LoDWord ||
+             information.nFileSizeHigh != expectedSize.HiDWord)
+    {
+        *error = ERROR_WRITE_FAULT;
+        verified = FALSE;
+    }
+
+    if (!HANDLES(CloseHandle(target)) && verified)
+    {
+        *error = GetLastError();
+        verified = FALSE;
+    }
+    return verified;
+}
+
 BOOL SyncOrAsyncDeviceIoControl(CAsyncCopyParams* asyncPar, HANDLE hDevice, DWORD dwIoControlCode,
                                 LPVOID lpInBuffer, DWORD nInBufferSize, LPVOID lpOutBuffer,
                                 DWORD nOutBufferSize, LPDWORD lpBytesReturned, DWORD* err)
@@ -3827,7 +3861,7 @@ COPY_AGAIN:
             OPEN_TGT_FILE:
 
                 BOOL encryptionNotSupported = FALSE;
-                DWORD fileAttrs = asyncPar->GetOverlappedFlag() | FILE_FLAG_SEQUENTIAL_SCAN |
+                DWORD fileAttrs = asyncPar->GetOverlappedFlag() | FILE_FLAG_SEQUENTIAL_SCAN | FILE_FLAG_WRITE_THROUGH |
                                   (!lossEncryptionAttr && copyAsEncrypted ? FILE_ATTRIBUTE_ENCRYPTED : 0) |
                                   (script->CopyAttrs ? (op->Attr & (FILE_ATTRIBUTE_COMPRESSED | (lossEncryptionAttr ? 0 : FILE_ATTRIBUTE_ENCRYPTED))) : 0);
                 if (!invalidTgtName)
@@ -4219,10 +4253,14 @@ COPY_AGAIN:
                             }
                         }
                         DWORD closeOrFlushError = NO_ERROR;
-                        if (transactionalTarget && !FlushFileBuffers(out))
+                        // This is the durable copy commit boundary.  It applies to new
+                        // destinations too: DoMoveFile may delete the source only after
+                        // DoCopyFile returns success from this boundary.
+                        if (!FlushFileBuffers(out))
                             closeOrFlushError = GetLastError();
                         if (!HANDLES(CloseHandle(out)) && closeOrFlushError == NO_ERROR)
                             closeOrFlushError = GetLastError();
+                        out = NULL;
                         if (closeOrFlushError != NO_ERROR)
                         {
                             out = NULL;
@@ -4340,6 +4378,45 @@ COPY_AGAIN:
                             case IDCANCEL:
                                 goto COPY_ERROR_2;
                             }
+                        }
+                    }
+
+                    DWORD verificationError = NO_ERROR;
+                    while (!VerifyDurableCopyCommit(op->TargetName, op->FileSize, &verificationError))
+                    {
+                        TRACE_I("DoCopyFile(): durable copy commit verification failed for " << op->TargetName << ": " << GetErrorText(verificationError));
+                        WaitForSingleObject(dlgData.WorkerNotSuspended, INFINITE); // if we should be in suspend mode, wait ...
+                        if (*dlgData.CancelWorker)
+                            goto COPY_ERROR_2;
+
+                        if (dlgData.SkipAllFileWrite)
+                            goto SKIP_COPY;
+
+                        int ret = IDCANCEL;
+                        char* data[4];
+                        data[0] = (char*)&ret;
+                        data[1] = LoadStr(IDS_ERRORWRITINGFILE);
+                        data[2] = op->TargetName;
+                        data[3] = GetErrorText(verificationError);
+                        SendMessage(hProgressDlg, WM_USER_DIALOG, 0, (LPARAM)data);
+                        switch (ret)
+                        {
+                        case IDRETRY:
+                            ClearReadOnlyAttr(op->TargetName);
+                            if (DeleteFileUtf8(op->TargetName) == 0)
+                            {
+                                DWORD err = GetLastError();
+                                TRACE_E("DoCopyFile(): Unable to remove unverified copy target: " << op->TargetName << ", error: " << GetErrorText(err));
+                            }
+                            goto COPY_AGAIN;
+
+                        case IDB_SKIPALL:
+                            dlgData.SkipAllFileWrite = TRUE;
+                        case IDB_SKIP:
+                            goto SKIP_COPY;
+
+                        case IDCANCEL:
+                            goto COPY_ERROR_2;
                         }
                     }
 

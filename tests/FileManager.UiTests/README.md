@@ -1,6 +1,6 @@
 # FileManager UI tests
 
-This project contains 100 basic, parameterized FlaUI/UIA3 NUnit cases for the native FileManager UI. The cases cover application launch, accessibility-tree discovery, Configuration dialog cancel/commit/restart flows, a committed setting verified after restart, and FTP bookmark creation plus edit verified after restart.
+This project contains 100 basic, parameterized FlaUI/UIA3 NUnit cases plus focused file-operation integration cases for the native FileManager UI. The cases cover application launch, accessibility-tree discovery, Configuration dialog cancel/commit/restart flows, a committed setting verified after restart, FTP bookmark creation plus edit verified after restart, and native disk create/copy/rename/move/delete commands.
 
 The tests intentionally refuse to run unless `FILEMANAGER_UI_ISOLATED=1` is set. The application persists configuration under the current user registry hive, so run them under a dedicated Windows test account or another isolated user profile.
 
@@ -18,5 +18,7 @@ dotnet test tests/FileManager.UiTests/FileManager.UiTests.csproj --filter TestCa
 ```
 
 The configuration dialog is opened through its stable native command ID only to avoid locale-dependent menu text. All window discovery, control inspection, focus, dialog lifecycle, and restart assertions use FlaUI/UIA3.
+
+File-operation cases create a fresh disposable directory tree under the system temporary directory for every test, start the left and right panels with `-l`/`-r`, and use the host's stable native command IDs. They verify files and nested directory trees after normal operations, cancelled operation dialogs, destination/name failures, and a locked-file delete failure. The tests never use a caller-supplied directory as their mutation target.
 
 The FTP plug-in menu command has no compile-time host command ID: FileManager allocates it while loading plug-ins. Keep the value in the isolated test environment rather than hard-coding it into the test project. The dialog controls themselves are located by their stable plug-in resource IDs and their persistence is asserted through UIA3 after a full application restart.

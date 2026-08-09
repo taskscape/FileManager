@@ -307,7 +307,7 @@ The high-level panel code plans work before mutating the filesystem:
 5. `ThreadWorkerBody` (`src/operations_core.cpp:921`) interprets opcodes and invokes `DoCopyFile`, `DoMoveFile`, `DoCreateDir`, `DoDeleteFile`, attribute/conversion, or count-size handlers.
 6. Completion updates panels and posts path-change notifications.
 
-`src/async_copy.cpp` contains the lower-level copy engine: synchronous/overlapped decisions, buffer sizing, alternate data streams, compression/encryption/security metadata, overwrite and retry policy, cancellation, and progress updates. Each `COperations` instance owns an interlocked lifecycle (`planned`, `running`, `cancel-requested`, `stopping`, `completed`, or `failed`) and a manual-reset cancellation event. The dialog and worker make idempotent requests and state transitions through this owner; debug builds stop on invalid transitions. `COperationsQueue` tracks disk operation windows and their paused/running state.
+`src/async_copy.cpp` contains the lower-level copy engine: synchronous/overlapped decisions, buffer sizing, alternate data streams, compression/encryption/security metadata, overwrite and retry policy, cancellation, and progress updates. A native copy reaches its durable commit point only after the output was opened with write-through where supported, `FlushFileBuffers` and `CloseHandle` both succeed, and the closed destination can be reopened with its file metadata and size verified. An overwrite then uses the write-through replace/rename commit; a cross-volume move may delete its source only after this boundary. Each `COperations` instance owns an interlocked lifecycle (`planned`, `running`, `cancel-requested`, `stopping`, `completed`, or `failed`) and a manual-reset cancellation event. The dialog and worker make idempotent requests and state transitions through this owner; debug builds stop on invalid transitions. `COperationsQueue` tracks disk operation windows and their paused/running state.
 
 ```mermaid
 sequenceDiagram
@@ -459,7 +459,7 @@ Disk panels use directory-snooper threads based on `FindFirstChangeNotification`
 4. Native transfers build a `COperations` script and start progress/worker threads.
 5. The worker processes items, marshaling overwrite, retry, skip, pause, cancellation, and error decisions to the progress UI.
 6. Speed and byte/item totals are protected by `StatusCS` and displayed by the progress dialog.
-7. On completion, affected paths receive notifications and visible panels refresh.
+7. A native copy reports success only after its durable commit point; affected paths then receive notifications and visible panels refresh.
 
 ### 6.6 Configuration change and persistence
 
@@ -549,17 +549,18 @@ The repository's prioritized stability recommendations are documented separately
 
 The checked-in automated test suite is executable-level rather than native unit-level. `tests/FileManager.UiTests` uses NUnit and FlaUI UIA3 against a real built `salamand.exe`. Tests are non-parallel because they manipulate shared desktop and per-user application state.
 
-The suite covers roughly 100 parameterized scenarios in seven families, including:
+The suite covers roughly 118 scenarios in eight families, including:
 
 - main-window startup and basic commands;
 - accessibility/control discovery;
 - configuration cancel versus commit;
 - persistence within the running process and after restart;
 - FTP bookmark persistence.
+- native create/copy/rename/move/delete commands for files and nested directory trees, including cancelled dialogs and expected failure paths.
 
 Stable command/control IDs are the automation seam. `FILEMANAGER_UI_ISOLATED=1` is required so test launches use an isolated configuration context, and teardown kills only processes launched by the fixture. These tests validate user-visible integration across the native executable, registry persistence, and UI Automation tree.
 
-There are currently no checked-in native unit-test projects for panel algorithms, operation scripts, plug-in ABI contracts, or worker failure paths. CI build coverage and executable UI scenarios are therefore the principal automated safety net; manual and plug-in-specific testing remain important for filesystem mutation and unusual OS integrations.
+There are currently no checked-in native unit-test projects for panel algorithms, operation scripts, plug-in ABI contracts, or worker failure paths. CI build coverage and executable UI scenarios are therefore the principal automated safety net; manual and plug-in-specific testing remain important for crash consistency, storage fault injection, and unusual OS integrations.
 
 ## 11. Extension and maintenance guides
 
