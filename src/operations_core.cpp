@@ -929,7 +929,7 @@ unsigned ThreadWorkerBody(void* parameter)
     HANDLE wContinue = data->WContinue;
     CProgressDlgData dlgData;
     dlgData.WorkerNotSuspended = data->WorkerNotSuspended;
-    dlgData.CancelWorker = data->CancelWorker;
+    dlgData.CancelWorker.Bind(data->Script);
     dlgData.OperationProgress = data->OperationProgress;
     dlgData.SummaryProgress = data->SummaryProgress;
     dlgData.OverwriteAll = dlgData.OverwriteHiddenAll = dlgData.DeleteHiddenAll =
@@ -1328,14 +1328,17 @@ unsigned ThreadWorkerBody(void* parameter)
         free(tgtBuffer);
     if (bufferIsAllocated)
         free(buffer);
-    *dlgData.CancelWorker = Error; // if this was triggered by Cancel, make that obvious ...
+    script->BeginStopping();
+    script->Complete(Error);
+    EOperationState finalState = script->GetOperationState();
+    BOOL cancellationRequested = script->IsCancellationRequested();
 
     // The progress dialog must never be part of worker shutdown.  In
     // particular, it can be blocked in an owned modal dialog or waiting for
     // this thread while a close/shutdown cancellation is in progress.  Release
     // all worker-owned data first, then transfer the small, self-contained
     // result to the UI by a posted message.
-    CWorkerCompletion* completion = new CWorkerCompletion(Error);
+    CWorkerCompletion* completion = new CWorkerCompletion(finalState, cancellationRequested);
     FreeScript(script);
     if (!PostMessage(hProgressDlg, WM_USER_PROGRDLG_WORKERCOMPLETE,
                      (WPARAM)Error, (LPARAM)completion))
@@ -1377,11 +1380,10 @@ DWORD WINAPI ThreadWorker(void* param)
 
 HANDLE StartWorker(COperations* script, HWND hDlg, CChangeAttrsData* attrsData,
                    CConvertData* convertData, HANDLE wContinue, HANDLE workerNotSuspended,
-                   BOOL* cancelWorker, int* operationProgress, int* summaryProgress)
+                   int* operationProgress, int* summaryProgress)
 {
     CWorkerData data;
     data.WorkerNotSuspended = workerNotSuspended;
-    data.CancelWorker = cancelWorker;
     data.OperationProgress = operationProgress;
     data.SummaryProgress = summaryProgress;
     data.WContinue = wContinue;
@@ -1401,12 +1403,14 @@ HANDLE StartWorker(COperations* script, HWND hDlg, CChangeAttrsData* attrsData,
         if (data.Buffer == NULL)
         {
             TRACE_E(LOW_MEMORY);
+            script->Fail();
             return NULL;
         }
     }
     DWORD threadID;
     ResetEvent(wContinue);
-    *cancelWorker = FALSE;
+    if (!script->Start())
+        return NULL;
 
     // if (Worker != NULL) HANDLES(CloseHandle(Worker));  // was probably unnecessary
     HANDLE worker = HANDLES(CreateThread(NULL, 0, ThreadWorker, &data, 0, &threadID));
@@ -1415,6 +1419,7 @@ HANDLE StartWorker(COperations* script, HWND hDlg, CChangeAttrsData* attrsData,
         if (data.BufferIsAllocated)
             free(data.Buffer);
         TRACE_E("Unable to start Worker thread.");
+        script->Fail();
         return NULL;
     }
     //  SetThreadPriority(Worker, THREAD_PRIORITY_HIGHEST);

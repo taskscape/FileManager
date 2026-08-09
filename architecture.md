@@ -307,7 +307,7 @@ The high-level panel code plans work before mutating the filesystem:
 5. `ThreadWorkerBody` (`src/operations_core.cpp:921`) interprets opcodes and invokes `DoCopyFile`, `DoMoveFile`, `DoCreateDir`, `DoDeleteFile`, attribute/conversion, or count-size handlers.
 6. Completion updates panels and posts path-change notifications.
 
-`src/async_copy.cpp` contains the lower-level copy engine: synchronous/overlapped decisions, buffer sizing, alternate data streams, compression/encryption/security metadata, overwrite and retry policy, cancellation, and progress updates. `COperationsQueue` tracks disk operation windows and their paused/running state.
+`src/async_copy.cpp` contains the lower-level copy engine: synchronous/overlapped decisions, buffer sizing, alternate data streams, compression/encryption/security metadata, overwrite and retry policy, cancellation, and progress updates. Each `COperations` instance owns an interlocked lifecycle (`planned`, `running`, `cancel-requested`, `stopping`, `completed`, or `failed`) and a manual-reset cancellation event. The dialog and worker make idempotent requests and state transitions through this owner; debug builds stop on invalid transitions. `COperationsQueue` tracks disk operation windows and their paused/running state.
 
 ```mermaid
 sequenceDiagram

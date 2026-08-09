@@ -112,6 +112,10 @@ int GetOptimalSyncCopyBufferSize(COperations* script, DWORD opFlags)
 COperations::COperations(int base, int delta, char* waitInQueueSubject, char* waitInQueueFrom,
                          char* waitInQueueTo) : TDirectArray<COperation>(base, delta), Sizes(1, 400)
 {
+    CancellationEvent = HANDLES(CreateEvent(NULL, TRUE, FALSE, NULL));
+    if (CancellationEvent == NULL)
+        TRACE_E("Unable to create file-operation cancellation event.");
+    OperationState = opsPlanned;
     TotalSize = CQuadWord(0, 0);
     CompressedSize = CQuadWord(0, 0);
     OccupiedSpace = CQuadWord(0, 0);
@@ -165,6 +169,108 @@ COperations::COperations(int base, int delta, char* waitInQueueSubject, char* wa
     LastProgBufLimTestTime = GetTickCount() - 1000;
     LastFileBlockCount = 0;
     LastFileStartTime = GetTickCount();
+}
+
+static void AssertOperationTransition(BOOL valid, EOperationState from, EOperationState to)
+{
+#ifdef _DEBUG
+    if (!valid)
+    {
+        TRACE_E("Invalid file-operation state transition: " << from << " -> " << to);
+        DebugBreak();
+    }
+#else
+    UNREFERENCED_PARAMETER(valid);
+    UNREFERENCED_PARAMETER(from);
+    UNREFERENCED_PARAMETER(to);
+#endif
+}
+
+EOperationState COperations::GetOperationState() const
+{
+    return (EOperationState)InterlockedCompareExchange(const_cast<volatile LONG*>(&OperationState), opsPlanned, opsPlanned);
+}
+
+BOOL COperations::IsCancellationRequested() const
+{
+    return CancellationEvent != NULL && WaitForSingleObject(CancellationEvent, 0) == WAIT_OBJECT_0 ||
+           GetOperationState() == opsCancelRequested;
+}
+
+BOOL COperations::Start()
+{
+    LONG state = InterlockedCompareExchange(&OperationState, opsRunning, opsPlanned);
+    AssertOperationTransition(state == opsPlanned, (EOperationState)state, opsRunning);
+    return state == opsPlanned;
+}
+
+BOOL COperations::RequestCancellation()
+{
+    for (;;)
+    {
+        LONG state = InterlockedCompareExchange(&OperationState, opsPlanned, opsPlanned);
+        if (state == opsCancelRequested || state == opsStopping)
+        {
+            if (CancellationEvent != NULL)
+                SetEvent(CancellationEvent);
+            return FALSE; // already requested: deliberately idempotent
+        }
+        if (state == opsCompleted || state == opsFailed)
+            return FALSE;
+        if (state != opsPlanned && state != opsRunning)
+        {
+            AssertOperationTransition(FALSE, (EOperationState)state, opsCancelRequested);
+            return FALSE;
+        }
+        if (InterlockedCompareExchange(&OperationState, opsCancelRequested, state) == state)
+        {
+            if (CancellationEvent != NULL)
+                SetEvent(CancellationEvent);
+            return TRUE;
+        }
+    }
+}
+
+BOOL COperations::BeginStopping()
+{
+    for (;;)
+    {
+        LONG state = InterlockedCompareExchange(&OperationState, opsPlanned, opsPlanned);
+        if (state == opsStopping)
+            return TRUE;
+        if (state != opsRunning && state != opsCancelRequested)
+        {
+            AssertOperationTransition(FALSE, (EOperationState)state, opsStopping);
+            return FALSE;
+        }
+        if (InterlockedCompareExchange(&OperationState, opsStopping, state) == state)
+            return TRUE;
+    }
+}
+
+BOOL COperations::Complete(BOOL failed)
+{
+    EOperationState target = failed ? opsFailed : opsCompleted;
+    LONG state = InterlockedCompareExchange(&OperationState, target, opsStopping);
+    AssertOperationTransition(state == opsStopping, (EOperationState)state, target);
+    return state == opsStopping;
+}
+
+BOOL COperations::Fail()
+{
+    for (;;)
+    {
+        LONG state = InterlockedCompareExchange(&OperationState, opsPlanned, opsPlanned);
+        if (state == opsFailed)
+            return TRUE;
+        if (state == opsCompleted)
+        {
+            AssertOperationTransition(FALSE, (EOperationState)state, opsFailed);
+            return FALSE;
+        }
+        if (InterlockedCompareExchange(&OperationState, opsFailed, state) == state)
+            return TRUE;
+    }
 }
 
 void COperations::SetTFS(const CQuadWord& TFS)

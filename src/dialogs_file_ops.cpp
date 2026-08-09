@@ -527,7 +527,6 @@ CProgressDialog::CProgressDialog(HWND parent, COperations* script, const char* c
     Worker = NULL;
     WContinue = NULL;
     WorkerNotSuspended = NULL;
-    CancelWorker = FALSE;
     OperationProgress = 0;
     SummaryProgress = 0;
     strcpy(Caption, caption);
@@ -817,7 +816,7 @@ CProgressDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         }
 
         Worker = StartWorker(Script, HWindow, AttrsData, ConvertData, WContinue,
-                             WorkerNotSuspended, &CancelWorker, &OperationProgress,
+                             WorkerNotSuspended, &OperationProgress,
                              &SummaryProgress);
         if (Worker == NULL)
         {
@@ -842,7 +841,7 @@ CProgressDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                     {
                         // The UI reached its deadline after handing us the script. The
                         // worker exists now, so cancel it through the normal dialog path.
-                        CancelWorker = TRUE;
+                        Script->RequestCancellation();
                         SetEvent(WorkerNotSuspended);
                         if (!startupReady)
                             ProgrDlgData->ReportStartupFailed();
@@ -910,7 +909,7 @@ CProgressDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         //--- worker request to show a dialog
     case WM_USER_DIALOG:
     {
-        if (CancelWorker)
+        if (Script != NULL && Script->IsCancellationRequested())
             return TRUE; // should terminate, it should not request anything
 
         BOOL canFlash = RunningInOwnThread;
@@ -1215,7 +1214,7 @@ CProgressDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 
     case WM_USER_BUTTONDROPDOWN:
     {
-        if (!AcceptCommands || !CanClose || CancelWorker || Script == NULL)
+        if (!AcceptCommands || !CanClose || Script == NULL || Script->IsCancellationRequested())
             return 0;
 
         Script->ChangeSpeedLimit = TRUE; // the speed limit may change, let the worker stop at an "appropriate" point
@@ -1360,7 +1359,8 @@ MENU_TEMPLATE_ITEM ProgressDialogMenu2[] =
         {
             if (!IsWindowEnabled(HWindow)) // there is a modal dialog above this dialog (a message box asking about operation canceling or reporting an error)
                 CloseAllOwnedEnabledDialogs(HWindow);
-            CancelWorker = TRUE; // set worker cancel
+            if (Script != NULL)
+                Script->RequestCancellation();
             EnableWindow(GetDlgItem(HWindow, IDB_PAUSERESUME), FALSE);
             if (WorkerNotSuspended != NULL)
                 SetEvent(WorkerNotSuspended); // so that Cancel proceeds even after Pause is pressed
@@ -1379,7 +1379,8 @@ MENU_TEMPLATE_ITEM ProgressDialogMenu2[] =
             CloseAllOwnedEnabledDialogs(HWindow);
 
         Script = NULL; // it was freed by the worker before posting this message
-        BOOL cancelled = completion != NULL ? completion->Cancelled : (BOOL)wParam;
+        BOOL cancelled = completion != NULL ? completion->CancellationRequested : (BOOL)wParam;
+        BOOL failed = completion != NULL ? completion->State == opsFailed : (BOOL)wParam;
         if (completion == NULL)
             TRACE_E("CProgressDialog: worker completion result could not be allocated.");
         delete completion; // ownership was transferred by PostMessage
@@ -1398,7 +1399,7 @@ MENU_TEMPLATE_ITEM ProgressDialogMenu2[] =
         WContinue = NULL;
         if (RunningInOwnThread)
             ProgressDlgArray.ClearDlgWindow(HWindow);
-        wParam = cancelled ? IDCANCEL : IDOK;
+        wParam = cancelled || failed ? IDCANCEL : IDOK;
 
         if (!DoNotBeepOnClose && Configuration.MinBeepWhenDone && GetForegroundWindow() != HWindow)
             MessageBeep(0);
@@ -1497,7 +1498,7 @@ MENU_TEMPLATE_ITEM ProgressDialogMenu2[] =
         {
         case IDCANCEL: // abort
         {
-            if (CanClose && !CancelWorker)
+            if (CanClose && Script != NULL && !Script->IsCancellationRequested())
             {
                 ResetEvent(WorkerNotSuspended);
 
@@ -1527,7 +1528,7 @@ MENU_TEMPLATE_ITEM ProgressDialogMenu2[] =
 
                 if (ret == IDYES)
                 {
-                    CancelWorker = TRUE; // set cancel of the worker
+                    Script->RequestCancellation();
                     EnableWindow(GetDlgItem(HWindow, IDB_PAUSERESUME), FALSE);
                 }
                 else
@@ -1540,7 +1541,7 @@ MENU_TEMPLATE_ITEM ProgressDialogMenu2[] =
                             Script->InitSpeedMeters(TRUE);
                     }
                 }
-                if ((CancelWorker || ShowPause) && // only if it's Cancel or the operation isn't paused
+                if ((Script->IsCancellationRequested() || ShowPause) && // only if it's Cancel or the operation isn't paused
                     WorkerNotSuspended != NULL)
                 {
                     SetEvent(WorkerNotSuspended); // may be NULL if the message box was closed from IDOK via WM_CLOSE
@@ -1552,7 +1553,7 @@ MENU_TEMPLATE_ITEM ProgressDialogMenu2[] =
         case CM_RESUMEOPER:   // resume posted from the operations queue
         case IDB_PAUSERESUME: // pause/resume
         {
-            if ((LOWORD(wParam) == CM_RESUMEOPER || AcceptCommands) && CanClose && !CancelWorker)
+            if ((LOWORD(wParam) == CM_RESUMEOPER || AcceptCommands) && CanClose && Script != NULL && !Script->IsCancellationRequested())
             {
                 AutoPaused = FALSE; // this may be a manual pause/resume or an automatic resume
                 BOOL speedMetersInitCalled = FALSE;
