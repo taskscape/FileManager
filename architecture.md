@@ -325,6 +325,20 @@ The engine distinguishes three preservation levels. **Required** metadata must p
 
 For a cross-volume move, the worker records planned losses accepted while building the script (for example ADS or ACL loss), plus actual ADS, timestamp, attribute, ACL, and compression/EFS losses. Immediately before every source-file or source-directory deletion it displays any unacknowledged losses. The default **No** retains the source and lets the remaining move continue as a copy; only an explicit **Yes** allows source deletion. The account is held in `CProgressDlgData::MetadataLosses`, so a directory cleanup path cannot bypass a loss already found while copying a child.
 
+##### Security descriptor privilege matrix
+
+Security preservation is best effort on NTFS, ReFS, and SMB, and unsupported on FAT-family targets. The copy engine reads the complete owner/group/DACL descriptor before changing the target. It preserves the DACL protection bit (and therefore whether inheritance is enabled) and compares every explicit ACE after the write; this includes explicit deny ACEs. Inherited ACEs may differ when the target has a different parent, but they must remain inherited rather than becoming new explicit permissions.
+
+| Source/target descriptor and token capability | Owner and group | DACL, inheritance, and explicit allow/deny ACEs | Result under the metadata contract |
+|---|---|---|---|
+| Descriptor readable; `SeRestorePrivilege` enabled | Apply and then verify | Apply and then verify | Success only after all components verify; otherwise restore the target snapshot and report a security metadata loss. |
+| Descriptor readable; no restore privilege; target owner/group already match | Leave unchanged | Apply and then verify | Success only after DACL protection and explicit ACEs verify; a failure restores the prior DACL and reports a security metadata loss. |
+| Descriptor readable; no restore privilege; owner or group differs | Do not change | Do not change | Do not take temporary ownership or install a permissive DACL. Report a security metadata loss and use the normal copy-permissions warning. |
+| Source or target descriptor inaccessible | Do not change | Do not change | Report a security metadata loss; the normal warning can cancel, retry, or continue the copy without claiming ACL preservation. |
+| FAT/FAT32/exFAT target | Unsupported | Unsupported | Record the known loss during planning; a cross-volume move requires the explicit metadata-loss confirmation before source deletion. |
+
+An ACL write is never considered successful merely because `SetNamedSecurityInfoW` returns success. The post-write comparison prevents a partial component update from being represented as preserved. If restoration itself fails, the operation reports that error instead of silently treating the descriptor as copied.
+
 ```mermaid
 sequenceDiagram
     actor User

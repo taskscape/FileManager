@@ -221,10 +221,11 @@ This document is the working record for a read-only stability and resilience aud
 - **Justification:** ADS handling has specialized buffer and retry paths in `src/async_copy.cpp`; uncommon branches are high-regression territory and can silently lose content.
 - **Resolution:** Added executable-level ADS characterization tests covering same-volume copy of named, empty, large, and edge-named streams; overwrite replacement and stale-stream removal; retry after a temporarily denied stream; cross-volume preservation on ADS-capable targets; and source retention when an ADS-unsupported target reports metadata loss. ADS-dependent lanes self-skip when their explicitly configured filesystem capability is unavailable.
 
-### 33. Verify ACL and ownership preservation under privilege variation
+### 33. Verify ACL and ownership preservation under privilege variation — Implemented
 
-- **Justification:** Security descriptor copying behaves differently with and without backup/restore privileges and across filesystems. Partial success can leave unexpectedly permissive or inaccessible output.
-- **Proposed solution:** Add a privilege-aware matrix for owner, group, DACL, inheritance, deny ACEs, and inaccessible descriptors. Fail or warn according to the published metadata contract.
+- **Delivered:** `DoCopySecurity` now snapshots both descriptors, uses a complete owner/group/DACL update only when `SeRestorePrivilege` is available, and otherwise changes only a DACL whose owner and group already match. It verifies owner, group, DACL protection/inheritance, and the complete multiset of explicit ACEs, including deny ACEs. A failed verification restores the prior descriptor (or prior DACL in the no-privilege branch) rather than accepting a partial security update.
+- **Contract behavior:** `architecture.md` publishes the NTFS/ReFS/SMB and FAT-family privilege matrix. Unreadable descriptors and unavailable privilege do not mutate the target; they take the existing best-effort permission-warning path and are recorded as `mmlSecurity`, so a cross-volume move retains its source unless the user explicitly accepts the loss.
+- **Verification:** `NativeSafetyRegressionTests.Security_descriptor_copy_uses_the_privilege_aware_preservation_matrix` covers the source-level guard, post-write verification, rollback, explicit-ACE/inheritance checks, inaccessible-descriptor behavior, published matrix, and implementation status.
 
 ### 34. Exercise junction, symlink, mount-point, and cloud-placeholder cases
 

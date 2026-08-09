@@ -567,6 +567,149 @@ struct CSrcSecurity // helper structure for keeping security info for MoveFile (
     }
 };
 
+// Security descriptors cannot be treated as a single best-effort SetNamedSecurityInfo
+// call.  Windows may accept one component and reject another (in particular when
+// SeRestorePrivilege is absent), which can leave a copied file with a more open or
+// less accessible DACL than either the source or the pre-copy target.  Keep the
+// comparison deliberately at the components covered by the metadata contract:
+// owner, group, DACL protection/inheritance, and every explicit ACE (including
+// explicit ACCESS_DENIED ACEs).
+static BOOL AreEqualSids(PSID first, PSID second)
+{
+    return first == second || (first != NULL && second != NULL && EqualSid(first, second));
+}
+
+static BOOL GetDaclProtection(PSECURITY_DESCRIPTOR securityDescriptor, BOOL* protectedDacl)
+{
+    SECURITY_DESCRIPTOR_CONTROL control;
+    DWORD revision;
+    if (!GetSecurityDescriptorControl(securityDescriptor, &control, &revision))
+        return FALSE;
+    *protectedDacl = (control & SE_DACL_PROTECTED) != 0;
+    return TRUE;
+}
+
+static BOOL AreEqualExplicitAces(PACL first, PACL second)
+{
+    if (first == NULL || second == NULL)
+        return first == second; // a NULL DACL grants full access and must never be approximated
+
+    ACL_SIZE_INFORMATION firstInfo;
+    ACL_SIZE_INFORMATION secondInfo;
+    if (!GetAclInformation(first, &firstInfo, sizeof(firstInfo), AclSizeInformation) ||
+        !GetAclInformation(second, &secondInfo, sizeof(secondInfo), AclSizeInformation))
+    {
+        return FALSE;
+    }
+
+    // Compare each explicit ACE as a multiset.  Inherited entries can legitimately
+    // differ after a copy into a different directory, but an explicit allow or deny
+    // entry is part of the source descriptor and must survive byte-for-byte.
+    for (DWORD firstIndex = 0; firstIndex < firstInfo.AceCount; firstIndex++)
+    {
+        PVOID firstAce = NULL;
+        if (!GetAce(first, firstIndex, &firstAce))
+            return FALSE;
+        ACE_HEADER* firstHeader = (ACE_HEADER*)firstAce;
+        if ((firstHeader->AceFlags & INHERITED_ACE) != 0)
+            continue;
+
+        DWORD firstCount = 0;
+        DWORD secondCount = 0;
+        for (DWORD index = 0; index < firstInfo.AceCount; index++)
+        {
+            PVOID ace = NULL;
+            if (!GetAce(first, index, &ace))
+                return FALSE;
+            ACE_HEADER* header = (ACE_HEADER*)ace;
+            if ((header->AceFlags & INHERITED_ACE) == 0 && header->AceSize == firstHeader->AceSize &&
+                memcmp(header, firstHeader, firstHeader->AceSize) == 0)
+            {
+                firstCount++;
+            }
+        }
+        for (DWORD index = 0; index < secondInfo.AceCount; index++)
+        {
+            PVOID ace = NULL;
+            if (!GetAce(second, index, &ace))
+                return FALSE;
+            ACE_HEADER* header = (ACE_HEADER*)ace;
+            if ((header->AceFlags & INHERITED_ACE) == 0 && header->AceSize == firstHeader->AceSize &&
+                memcmp(header, firstHeader, firstHeader->AceSize) == 0)
+            {
+                secondCount++;
+            }
+        }
+        if (firstCount != secondCount)
+            return FALSE;
+    }
+
+    // The loop above detects missing source ACEs.  Repeat in the other direction
+    // so a target's pre-existing explicit allow cannot make the output permissive.
+    for (DWORD secondIndex = 0; secondIndex < secondInfo.AceCount; secondIndex++)
+    {
+        PVOID secondAce = NULL;
+        if (!GetAce(second, secondIndex, &secondAce))
+            return FALSE;
+        ACE_HEADER* secondHeader = (ACE_HEADER*)secondAce;
+        if ((secondHeader->AceFlags & INHERITED_ACE) != 0)
+            continue;
+
+        DWORD firstCount = 0;
+        DWORD secondCount = 0;
+        for (DWORD index = 0; index < firstInfo.AceCount; index++)
+        {
+            PVOID ace = NULL;
+            if (!GetAce(first, index, &ace))
+                return FALSE;
+            ACE_HEADER* header = (ACE_HEADER*)ace;
+            if ((header->AceFlags & INHERITED_ACE) == 0 && header->AceSize == secondHeader->AceSize &&
+                memcmp(header, secondHeader, secondHeader->AceSize) == 0)
+            {
+                firstCount++;
+            }
+        }
+        for (DWORD index = 0; index < secondInfo.AceCount; index++)
+        {
+            PVOID ace = NULL;
+            if (!GetAce(second, index, &ace))
+                return FALSE;
+            ACE_HEADER* header = (ACE_HEADER*)ace;
+            if ((header->AceFlags & INHERITED_ACE) == 0 && header->AceSize == secondHeader->AceSize &&
+                memcmp(header, secondHeader, secondHeader->AceSize) == 0)
+            {
+                secondCount++;
+            }
+        }
+        if (firstCount != secondCount)
+            return FALSE;
+    }
+    return TRUE;
+}
+
+static BOOL IsSecurityDescriptorPreserved(PSID sourceOwner, PSID sourceGroup, PACL sourceDacl,
+                                          PSECURITY_DESCRIPTOR sourceDescriptor,
+                                          PSID targetOwner, PSID targetGroup, PACL targetDacl,
+                                          PSECURITY_DESCRIPTOR targetDescriptor)
+{
+    BOOL sourceProtected;
+    BOOL targetProtected;
+    return AreEqualSids(sourceOwner, targetOwner) &&
+           AreEqualSids(sourceGroup, targetGroup) &&
+           GetDaclProtection(sourceDescriptor, &sourceProtected) &&
+           GetDaclProtection(targetDescriptor, &targetProtected) &&
+           sourceProtected == targetProtected &&
+           AreEqualExplicitAces(sourceDacl, targetDacl);
+}
+
+static DWORD SetDaclWithInheritance(const WCHAR* targetName, PACL dacl, BOOL inheritedDacl)
+{
+    return SetNamedSecurityInfoW((LPWSTR)targetName, SE_FILE_OBJECT,
+                                 DACL_SECURITY_INFORMATION |
+                                     (inheritedDacl ? UNPROTECTED_DACL_SECURITY_INFORMATION : PROTECTED_DACL_SECURITY_INFORMATION),
+                                 NULL, NULL, dacl, NULL);
+}
+
 BOOL DoCopySecurity(const char* sourceName, const char* targetName, DWORD* err, CSrcSecurity* srcSecurity)
 {
     // if the path ends with a space or dot, we must append '\\', otherwise
@@ -606,146 +749,142 @@ BOOL DoCopySecurity(const char* sourceName, const char* targetName, DWORD* err, 
             *err = ERROR_NO_UNICODE_TRANSLATION;
         }
     }
-    BOOL ret = *err == ERROR_SUCCESS;
-
-    if (ret)
+    if (*err != ERROR_SUCCESS)
     {
-        SECURITY_DESCRIPTOR_CONTROL srcSDControl;
-        DWORD srcSDRevision;
-        if (!GetSecurityDescriptorControl(srcSD, &srcSDControl, &srcSDRevision))
-        {
-            *err = GetLastError();
-            ret = FALSE;
-        }
-        else
-        {
-            CStrP targetNameSecW(ConvertAllocUtf8ToWide(targetNameSec, -1));
-            if (targetNameSecW == NULL)
-            {
-                *err = ERROR_NO_UNICODE_TRANSLATION;
-                ret = FALSE;
-            }
-            else
-            {
-                BOOL inheritedDACL = /*(srcSDControl & SE_DACL_AUTO_INHERITED) != 0 &&*/ (srcSDControl & SE_DACL_PROTECTED) == 0; // SE_DACL_AUTO_INHERITED unfortunately is not always set (for example Total Commander clears it after moving a file, so we ignore it)
-                DWORD attr = GetFileAttributesUtf8(targetNameSec);
-                *err = SetNamedSecurityInfoW(targetNameSecW, SE_FILE_OBJECT,
-                                            DACL_SECURITY_INFORMATION | GROUP_SECURITY_INFORMATION | OWNER_SECURITY_INFORMATION |
-                                                (inheritedDACL ? UNPROTECTED_DACL_SECURITY_INFORMATION : PROTECTED_DACL_SECURITY_INFORMATION),
-                                            srcOwner, srcGroup, srcDACL, NULL);
-                ret = *err == ERROR_SUCCESS;
-
-                if (!ret)
-                {
-                    // if the owner and group cannot be changed (we do not have the rights in the directory - for example we only have "change" rights),
-                    // check whether the owner and group are already set (that would not be an error)
-                    PSID tgtOwner = NULL;
-                    PSID tgtGroup = NULL;
-                    PACL tgtDACL = NULL;
-                    PSECURITY_DESCRIPTOR tgtSD = NULL;
-                    BOOL tgtRead = GetNamedSecurityInfoW(targetNameSecW, SE_FILE_OBJECT,
-                                                        DACL_SECURITY_INFORMATION | GROUP_SECURITY_INFORMATION | OWNER_SECURITY_INFORMATION,
-                                                        &tgtOwner, &tgtGroup, &tgtDACL, NULL, &tgtSD) == ERROR_SUCCESS;
-                    // if the owner of the target file is not the current user, try to set it ("take ownership") - only
-                // provided we have the right to write the owner so that we can write back the original owner afterwards
-                BOOL ownerOfFile = FALSE;
-                if (!tgtRead ||         // if the security info cannot be read from the target, the owner is most likely not the current user (the owner has unblocked read rights)
-                    tgtOwner == NULL || // probably nonsense, the file must have some owner; if it happens, try to set the owner to the current user
-                    CurrentProcessTokenUserValid && CurrentProcessTokenUser->User.Sid != NULL &&
-                        !EqualSid(tgtOwner, CurrentProcessTokenUser->User.Sid))
-                {
-                    if (HaveWriteOwnerRight &&
-                        CurrentProcessTokenUserValid && CurrentProcessTokenUser->User.Sid != NULL &&
-                        SetNamedSecurityInfoW(targetNameSecW, SE_FILE_OBJECT, OWNER_SECURITY_INFORMATION,
-                                             CurrentProcessTokenUser->User.Sid, NULL, NULL, NULL) == ERROR_SUCCESS)
-                    { // setting succeeded; we must retrieve 'tgtSD' again
-                        ownerOfFile = TRUE;
-                        if (tgtSD != NULL)
-                            LocalFree(tgtSD);
-                        tgtOwner = NULL;
-                        tgtGroup = NULL;
-                        tgtDACL = NULL;
-                        tgtSD = NULL;
-                        tgtRead = GetNamedSecurityInfoW(targetNameSecW, SE_FILE_OBJECT,
-                                                       DACL_SECURITY_INFORMATION | GROUP_SECURITY_INFORMATION | OWNER_SECURITY_INFORMATION,
-                                                       &tgtOwner, &tgtGroup, &tgtDACL, NULL, &tgtSD) == ERROR_SUCCESS;
-                    }
-                }
-                else
-                {
-                    ownerOfFile = tgtRead && tgtOwner != NULL && CurrentProcessTokenUserValid &&
-                                  CurrentProcessTokenUser->User.Sid != NULL;
-                }
-                BOOL daclOK = FALSE;
-                BOOL ownerOK = FALSE;
-                BOOL groupOK = FALSE;
-                if (ownerOfFile && CurrentProcessTokenUserValid && CurrentProcessTokenUser->User.Sid != NULL)
-                { // we are the file owner -> the DACL can be written; try to allow owner/group/DACL write and set the required values
-                    int allowChPermDACLSize = sizeof(ACL) + sizeof(ACCESS_ALLOWED_ACE) - sizeof(ACCESS_ALLOWED_ACE().SidStart) +
-                                              GetLengthSid(CurrentProcessTokenUser->User.Sid) + 200 /* +200 bytes is just paranoia */;
-                    char buff3[500];
-                    PACL allowChPermDACL;
-                    if (allowChPermDACLSize > 500)
-                        allowChPermDACL = (PACL)malloc(allowChPermDACLSize);
-                    else
-                        allowChPermDACL = (PACL)buff3;
-                    if (allowChPermDACL != NULL && InitializeAcl(allowChPermDACL, allowChPermDACLSize, ACL_REVISION) &&
-                        AddAccessAllowedAce(allowChPermDACL, ACL_REVISION, READ_CONTROL | WRITE_DAC | WRITE_OWNER,
-                                            CurrentProcessTokenUser->User.Sid) &&
-                        SetNamedSecurityInfoW(targetNameSecW, SE_FILE_OBJECT,
-                                             DACL_SECURITY_INFORMATION | PROTECTED_DACL_SECURITY_INFORMATION,
-                                             NULL, NULL, allowChPermDACL, NULL) == ERROR_SUCCESS)
-                    {
-                        ownerOK = SetNamedSecurityInfoW(targetNameSecW, SE_FILE_OBJECT,
-                                                       OWNER_SECURITY_INFORMATION,
-                                                       srcOwner, NULL, NULL, NULL) == ERROR_SUCCESS;
-                        groupOK = SetNamedSecurityInfoW(targetNameSecW, SE_FILE_OBJECT,
-                                                       GROUP_SECURITY_INFORMATION,
-                                                       NULL, srcGroup, NULL, NULL) == ERROR_SUCCESS;
-                        daclOK = SetNamedSecurityInfoW(targetNameSecW, SE_FILE_OBJECT, DACL_SECURITY_INFORMATION | (inheritedDACL ? UNPROTECTED_DACL_SECURITY_INFORMATION : PROTECTED_DACL_SECURITY_INFORMATION),
-                                                      NULL, NULL, srcDACL, NULL) == ERROR_SUCCESS;
-                    }
-                    if (allowChPermDACL != (PACL)buff3 && allowChPermDACL != NULL)
-                        free(allowChPermDACL);
-                }
-                if (!ownerOK &&
-                    (SetNamedSecurityInfoW(targetNameSecW, SE_FILE_OBJECT, OWNER_SECURITY_INFORMATION,
-                                          srcOwner, NULL, NULL, NULL) == ERROR_SUCCESS ||
-                     tgtRead && (srcOwner == NULL && tgtOwner == NULL || // if the owner is already set, ignore a potential error while setting
-                                 srcOwner != NULL && tgtOwner != NULL && EqualSid(srcOwner, tgtOwner))))
-                {
-                    ownerOK = TRUE;
-                }
-                if (!groupOK &&
-                    (SetNamedSecurityInfoW(targetNameSecW, SE_FILE_OBJECT, GROUP_SECURITY_INFORMATION,
-                                          NULL, srcGroup, NULL, NULL) == ERROR_SUCCESS ||
-                     tgtRead && (srcGroup == NULL && tgtGroup == NULL || // if the group is already set, ignore a potential error while setting
-                                 srcGroup != NULL && tgtGroup != NULL && EqualSid(srcGroup, tgtGroup))))
-                {
-                    groupOK = TRUE;
-                }
-                if (!daclOK && // the DACL must be set last because it depends on the owner (CREATOR OWNER is replaced with the real owner, etc.)
-                    SetNamedSecurityInfoW(targetNameSecW, SE_FILE_OBJECT, DACL_SECURITY_INFORMATION | (inheritedDACL ? UNPROTECTED_DACL_SECURITY_INFORMATION : PROTECTED_DACL_SECURITY_INFORMATION),
-                                         NULL, NULL, srcDACL, NULL) == ERROR_SUCCESS)
-                {
-                    daclOK = TRUE;
-                }
-                if (ownerOK && groupOK && daclOK)
-                {
-                    ret = TRUE; // all three components are OK -> the whole thing is OK
-                    *err = NO_ERROR;
-                }
-                if (tgtSD != NULL)
-                    LocalFree(tgtSD);
-            }
-            if (attr != INVALID_FILE_ATTRIBUTES)
-                SetFileAttributesUtf8(targetNameSec, attr);
-            }
-        }
+        if (srcSD != NULL)
+            LocalFree(srcSD);
+        return FALSE; // inaccessible source descriptor: report a best-effort metadata loss without touching the target
     }
-    if (srcSD != NULL)
+
+    CStrP targetNameSecW(ConvertAllocUtf8ToWide(targetNameSec, -1));
+    if (targetNameSecW == NULL)
+    {
+        *err = ERROR_NO_UNICODE_TRANSLATION;
         LocalFree(srcSD);
-    return ret;
+        return FALSE;
+    }
+
+    PSID previousOwner = NULL;
+    PSID previousGroup = NULL;
+    PACL previousDacl = NULL;
+    PSECURITY_DESCRIPTOR previousDescriptor = NULL;
+    *err = GetNamedSecurityInfoW(targetNameSecW, SE_FILE_OBJECT,
+                                 DACL_SECURITY_INFORMATION | GROUP_SECURITY_INFORMATION | OWNER_SECURITY_INFORMATION,
+                                 &previousOwner, &previousGroup, &previousDacl, NULL, &previousDescriptor);
+    if (*err != ERROR_SUCCESS)
+    {
+        LocalFree(srcSD);
+        return FALSE; // inaccessible target descriptor: do not attempt a blind, partial repair
+    }
+
+    BOOL sourceProtectedDacl;
+    if (!GetDaclProtection(srcSD, &sourceProtectedDacl))
+    {
+        *err = GetLastError();
+        LocalFree(previousDescriptor);
+        LocalFree(srcSD);
+        return FALSE;
+    }
+    BOOL inheritedDacl = !sourceProtectedDacl;
+    if (IsSecurityDescriptorPreserved(srcOwner, srcGroup, srcDACL, srcSD,
+                                      previousOwner, previousGroup, previousDacl, previousDescriptor))
+    {
+        LocalFree(previousDescriptor);
+        LocalFree(srcSD);
+        return TRUE;
+    }
+
+    GainWriteOwnerAccess();
+    BOOL changingOwnerOrGroup = !AreEqualSids(srcOwner, previousOwner) || !AreEqualSids(srcGroup, previousGroup);
+    DWORD setError;
+    BOOL attemptedWrite = FALSE;
+    if (HaveWriteOwnerRight)
+    {
+        // SeRestorePrivilege authorizes a complete descriptor update.  It still
+        // needs post-write verification because SetNamedSecurityInfo may report a
+        // component-specific failure after accepting another component.
+        attemptedWrite = TRUE;
+        setError = SetNamedSecurityInfoW(targetNameSecW, SE_FILE_OBJECT,
+                                         DACL_SECURITY_INFORMATION | GROUP_SECURITY_INFORMATION | OWNER_SECURITY_INFORMATION |
+                                             (inheritedDacl ? UNPROTECTED_DACL_SECURITY_INFORMATION : PROTECTED_DACL_SECURITY_INFORMATION),
+                                         srcOwner, srcGroup, srcDACL, NULL);
+    }
+    else if (!changingOwnerOrGroup)
+    {
+        // Without restore privilege it is safe to repair only the DACL when the
+        // target already has the requested owner and group.  Never take ownership
+        // temporarily: that was the source of partially copied descriptors.
+        attemptedWrite = TRUE;
+        setError = SetDaclWithInheritance(targetNameSecW, srcDACL, inheritedDacl);
+    }
+    else
+    {
+        setError = ERROR_PRIVILEGE_NOT_HELD;
+    }
+
+    PSID appliedOwner = NULL;
+    PSID appliedGroup = NULL;
+    PACL appliedDacl = NULL;
+    PSECURITY_DESCRIPTOR appliedDescriptor = NULL;
+    BOOL appliedRead = GetNamedSecurityInfoW(targetNameSecW, SE_FILE_OBJECT,
+                                             DACL_SECURITY_INFORMATION | GROUP_SECURITY_INFORMATION | OWNER_SECURITY_INFORMATION,
+                                             &appliedOwner, &appliedGroup, &appliedDacl, NULL, &appliedDescriptor) == ERROR_SUCCESS;
+    BOOL preserved = setError == ERROR_SUCCESS && appliedRead &&
+                     IsSecurityDescriptorPreserved(srcOwner, srcGroup, srcDACL, srcSD,
+                                                   appliedOwner, appliedGroup, appliedDacl, appliedDescriptor);
+    if (appliedDescriptor != NULL)
+        LocalFree(appliedDescriptor);
+    if (preserved)
+    {
+        LocalFree(previousDescriptor);
+        LocalFree(srcSD);
+        *err = ERROR_SUCCESS;
+        return TRUE;
+    }
+
+    if (!attemptedWrite)
+    {
+        // Owner/group differ and no restore privilege was available.  No target
+        // mutation was attempted, so surface the best-effort warning directly.
+        LocalFree(previousDescriptor);
+        LocalFree(srcSD);
+        *err = setError;
+        return FALSE;
+    }
+
+    // A failed verification must not leave the output with a partial descriptor.
+    // Restore privilege lets us restore the complete snapshot; otherwise only the
+    // DACL was changed, so restoring that component cannot alter owner or group.
+    DWORD rollbackError;
+    if (HaveWriteOwnerRight)
+    {
+        BOOL previousProtectedDacl;
+        rollbackError = GetDaclProtection(previousDescriptor, &previousProtectedDacl) ?
+                            SetNamedSecurityInfoW(targetNameSecW, SE_FILE_OBJECT,
+                                                  DACL_SECURITY_INFORMATION | GROUP_SECURITY_INFORMATION | OWNER_SECURITY_INFORMATION |
+                                                      (previousProtectedDacl ? PROTECTED_DACL_SECURITY_INFORMATION : UNPROTECTED_DACL_SECURITY_INFORMATION),
+                                                  previousOwner, previousGroup, previousDacl, NULL) :
+                            GetLastError();
+    }
+    else
+    {
+        BOOL previousProtectedDacl;
+        rollbackError = GetDaclProtection(previousDescriptor, &previousProtectedDacl) ?
+                            SetDaclWithInheritance(targetNameSecW, previousDacl, !previousProtectedDacl) :
+                            GetLastError();
+    }
+    if (rollbackError != ERROR_SUCCESS)
+    {
+        TRACE_E("DoCopySecurity(): unable to restore the target descriptor after a partial update: " << GetErrorText(rollbackError));
+        *err = rollbackError;
+    }
+    else
+    {
+        *err = setError != ERROR_SUCCESS ? setError : ERROR_INVALID_SECURITY_DESCR;
+    }
+    LocalFree(previousDescriptor);
+    LocalFree(srcSD);
+    return FALSE;
 }
 
 EMetadataTargetFileSystem GetMetadataTargetFileSystem(const char* targetPath)
