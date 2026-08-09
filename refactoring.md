@@ -106,10 +106,10 @@ This document is the working record for a read-only stability and resilience aud
 - **Implementation:** `CFileOffsetResult` carries a 64-bit value, success state, and the Win32 error captured by `SalGetFileSizeEx` or `SalSetFilePointerEx`. The copy/move engine, including ADS, retry, allocation, truncation, and overwrite checks, now uses these wrappers.
 - **Follow-up:** Other legacy callers remain subject to the planned ratchet; the regression test prevents raw `GetFileSize` or `SetFilePointer` calls from returning to `src/async_copy.cpp`.
 
-### 12. Replace the custom crash uploader with HTTPS WinHTTP
+### 12. Replace the custom crash uploader with HTTPS WinHTTP — Implemented (2026-08-09)
 
-- **Justification:** `src/salmon/upload.cpp:13` sends crash dumps over raw HTTP port 80. Reports and potentially sensitive dump contents are exposed to interception and modification.
-- **Proposed solution:** Use WinHTTP over TLS with normal certificate and hostname validation, a versioned HTTPS endpoint, explicit proxy support, and a clear consent screen. Refuse downgrade to plaintext.
+- **Delivered:** `src/salmon/upload.cpp` now streams the existing crash-report archive through WinHTTP to `https://reports.taskscape.com/api/v1/crash-reports`. It uses the secure-request flag and default SChannel certificate-chain/hostname validation, supports explicit Windows/Internet Settings proxies, bounds network I/O, and rejects all redirects so HTTPS cannot be downgraded to HTTP.
+- **Consent and reporting:** The crash-report dialog now explicitly states that Send Report transmits the dump archive, optional description, and optional email to `reports.taskscape.com` over HTTPS, and points users to View Report and Do Not Send Report. `reporting.md` records the exact archive contents, protocol, expected endpoint, configured endpoint, and legacy address.
 
 ### 13. Stream crash uploads with correct framing and bounded I/O
 

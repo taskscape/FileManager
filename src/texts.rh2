@@ -2660,6 +2660,8 @@
 #define IDS_SALMON_BUGREPORT_PROBLEM    14073
 #define IDS_SALMON_MINIDUMP_CREATE      14074
 #define IDS_SALMON_MINIDUMP_CALL        14075
+#define IDS_SALMON_HTTP_ERROR            14076
+#define IDS_SALMON_HTTP_STATUS           14077
 
 // salmon.exe is not running
 #define IDS_SALMON_NOT_RUNNING          14100
