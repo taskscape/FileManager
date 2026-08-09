@@ -285,6 +285,55 @@ BOOL COperationJournal::Append(const char* text)
     return File != INVALID_HANDLE_VALUE && WriteAll(File, text) && FlushFileBuffers(File);
 }
 
+BOOL COperationJournal::AppendPlanOperand(EOperationPlanOperandKind kind, const char* path, DWORD value)
+{
+    switch (kind)
+    {
+    case opokNone:
+        return Append("");
+    case opokPath:
+        return Append(path == NULL ? "" : path);
+    case opokDWORD:
+    {
+        char text[16];
+        _snprintf_s(text, _countof(text), _TRUNCATE, "0x%08lX", value);
+        return Append(text);
+    }
+    }
+    return FALSE;
+}
+
+BOOL COperationJournal::AppendGoldenMasterPlan(COperations& operations)
+{
+    COperationPlan plan;
+    if (!plan.Capture(operations))
+        return FALSE;
+
+    char header[64];
+    _snprintf_s(header, _countof(header), _TRUNCATE, "PLAN|1|items=%d\r\n", plan.GetCount());
+    if (!Append(header))
+        return FALSE;
+
+    for (int index = 0; index < plan.GetCount(); ++index)
+    {
+        const COperationPlanItem& item = plan.At(index);
+        char prefix[192];
+        _snprintf_s(prefix, _countof(prefix), _TRUNCATE,
+                    "PLANITEM|%d|%s|size=%08lX:%08lX|file-size=%08lX:%08lX|attr=0x%08lX|flags=0x%08lX|source=",
+                    index, COperationPlan::GetOpcodeName(item.Opcode),
+                    item.Size.HiDWord, item.Size.LoDWord,
+                    item.FileSize.HiDWord, item.FileSize.LoDWord,
+                    item.Attr, item.OpFlags);
+        if (!Append(prefix) ||
+            !AppendPlanOperand(item.SourceKind, item.SourcePath, item.SourceValue) ||
+            !Append("|target=") ||
+            !AppendPlanOperand(item.TargetKind, item.TargetPath, item.TargetValue) ||
+            !Append("\r\n"))
+            return FALSE;
+    }
+    return TRUE;
+}
+
 BOOL COperationJournal::Begin(COperations& operations)
 {
     char directory[MAX_PATH];
@@ -296,7 +345,7 @@ BOOL COperationJournal::Begin(COperations& operations)
     if (File == INVALID_HANDLE_VALUE) return FALSE;
     char line[128];
     _snprintf_s(line, _countof(line), _TRUNCATE, "FORMAT|1\r\nOPERATION|planned|items=%d\r\n", operations.Count);
-    if (!Append(line)) return FALSE;
+    if (!Append(line) || !AppendGoldenMasterPlan(operations)) return FALSE;
     int i;
     for (i = 0; i < operations.Count; i++)
     {

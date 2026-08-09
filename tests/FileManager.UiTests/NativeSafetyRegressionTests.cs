@@ -56,6 +56,39 @@ public sealed class NativeSafetyRegressionTests
     }
 
     [Test]
+    public void File_operation_planning_uses_an_immutable_plan_and_narrow_filesystem_adapter()
+    {
+        var root = FindRepositoryRoot();
+        var planHeader = File.ReadAllText(Path.Combine(root, "src", "operation_plan.h"));
+        var plan = File.ReadAllText(Path.Combine(root, "src", "operation_plan.cpp"));
+        var fileSystem = File.ReadAllText(Path.Combine(root, "src", "file_operation_filesystem.h"));
+        var nativeFileSystem = File.ReadAllText(Path.Combine(root, "src", "file_operation_filesystem.cpp"));
+        var planner = File.ReadAllText(Path.Combine(root, "src", "fileswindow_operations.cpp"));
+        var journal = File.ReadAllText(Path.Combine(root, "src", "operation_journal.cpp"));
+        var refactoring = File.ReadAllText(Path.Combine(root, "refactoring.md"));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(planHeader, Does.Contain("class COperationPlan"));
+            Assert.That(planHeader, Does.Contain("BOOL Capture(COperations& operations)"));
+            Assert.That(plan, Does.Contain("snapshots are immutable once exposed to the execution boundary"));
+            Assert.That(plan, Does.Contain("DuplicatePlanPath"));
+            Assert.That(plan, Does.Not.Contain("CreateFile("));
+            Assert.That(plan, Does.Not.Contain("DeleteFile("));
+            Assert.That(fileSystem, Does.Contain("class CFileOperationFileSystem"));
+            Assert.That(fileSystem, Does.Contain("GetAttributes"));
+            Assert.That(fileSystem, Does.Contain("GetDiskFreeSpace"));
+            Assert.That(fileSystem, Does.Contain("SetFileOperationFileSystemForTests"));
+            Assert.That(nativeFileSystem, Does.Contain("CWin32FileOperationFileSystem"));
+            Assert.That(planner, Does.Contain("FileOperationFileSystem().GetAttributes"));
+            Assert.That(planner, Does.Contain("FileOperationFileSystem().GetDiskFreeSpace"));
+            Assert.That(journal, Does.Contain("AppendGoldenMasterPlan"));
+            Assert.That(journal, Does.Contain("PLANITEM|%d|%s"));
+            Assert.That(refactoring, Does.Contain("### 27. Extract a testable file-operation planning seam — Implemented"));
+        });
+    }
+
+    [Test]
     public void Crash_report_uploads_use_certificate_validated_https_with_explicit_consent()
     {
         var root = FindRepositoryRoot();

@@ -186,10 +186,11 @@ This document is the working record for a read-only stability and resilience aud
 - **Justification:** Existing backup behavior is valuable but is only resilient if restoration works after failure at every write boundary.
 - **Implementation (2026-08-09):** The registry-worker boundary now has an isolated-profile-only crash hook scoped to `SaveConfig`. The `FaultInjection` executable test first measures the exact mutation count for a complete configuration commit, then terminates a fresh process after every successful registry mutation, including generation cleanup, staging, completion markers, and both flush/selector commit boundaries. It restarts the executable after each interruption and accepts only the complete baseline profile or complete candidate profile; any mixed, defaulted, or unvalidated state fails the test. The opt-in lane is documented in `tests/FileManager.UiTests/README.md` because it deliberately launches and terminates the executable once per write boundary.
 
-### 27. Extract a testable file-operation planning seam
+### 27. Extract a testable file-operation planning seam — Implemented
 
 - **Justification:** Planning, prompting, progress, execution, and Win32 I/O are intertwined across very large source files, making the most dangerous logic difficult to characterize without UI automation.
 - **Proposed solution:** Introduce a pure operation-plan model and a narrow filesystem adapter while preserving behavior. Golden-master the generated plans before changing execution semantics.
+- **Implementation (2026-08-09):** `COperationPlan` now deep-captures every generated script instruction and its operands before the worker begins; it owns no dialog, progress, worker, or Win32 I/O state. `CFileOperationFileSystem` isolates the planning-time attribute and free-space facts behind a replaceable read-only adapter, while the production implementation retains the existing Win32-backed helpers. The durable operation journal persists the immutable `PLAN|1`/`PLANITEM` snapshot before item preparation, and the executable copy scenario asserts its exact source/target intent as the golden-master contract. Execution continues to interpret the existing `COperations` script unchanged.
 
 ### 28. Build native characterization tests for copy, move, delete, and rename
 

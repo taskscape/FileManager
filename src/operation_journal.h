@@ -3,6 +3,8 @@
 
 #pragma once
 
+#include "operation_plan.h"
+
 class COperations;
 struct COperation;
 
@@ -18,6 +20,8 @@ private:
     int CurrentItem;
 
     BOOL Append(const char* text);
+    BOOL AppendPlanOperand(EOperationPlanOperandKind kind, const char* path, DWORD value);
+    BOOL AppendGoldenMasterPlan(COperations& operations);
 
 public:
     COperationJournal();
