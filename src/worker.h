@@ -61,15 +61,95 @@ struct CProgressDlgArrItem;
 
 struct CStartProgressDialogData
 {
+    enum EStartupState
+    {
+        spsPending,
+        spsStarting,
+        spsReady,
+        spsFailed,
+        spsCancelled
+    };
+
     COperations* Script;
-    const char* Caption;
+    char Caption[50];
+    CChangeAttrsData AttrsDataCopy;
+    CConvertData ConvertDataCopy;
     CChangeAttrsData* AttrsData;
     CConvertData* ConvertData;
     CProgressDlgArrItem* NewDlg;
-    BOOL OperationWasStarted;
-    HANDLE ContEvent;
+    HANDLE ReadyEvent;
+    HANDLE FailedEvent;
+    HANDLE CancelEvent;
+    volatile LONG StartupState;
+    volatile LONG CallerOwnsScript;
+    volatile LONG ReferenceCount;
     RECT MainWndRectClipR; // coordinates used to center the parentless progress dialog (background operations)
     RECT MainWndRectByR;   // coordinates used to center the parentless progress dialog (background operations)
+
+    CStartProgressDialogData()
+    {
+        Script = NULL;
+        Caption[0] = 0;
+        AttrsData = NULL;
+        ConvertData = NULL;
+        NewDlg = NULL;
+        ReadyEvent = NULL;
+        FailedEvent = NULL;
+        CancelEvent = NULL;
+        StartupState = spsPending;
+        CallerOwnsScript = TRUE;
+        ReferenceCount = 1;
+    }
+
+    ~CStartProgressDialogData()
+    {
+        if (ReadyEvent != NULL)
+            CloseHandle(ReadyEvent);
+        if (FailedEvent != NULL)
+            CloseHandle(FailedEvent);
+        if (CancelEvent != NULL)
+            CloseHandle(CancelEvent);
+    }
+
+    BOOL IsCancellationRequested() const
+    {
+        return WaitForSingleObject(CancelEvent, 0) == WAIT_OBJECT_0;
+    }
+
+    BOOL BeginStartup()
+    {
+        return InterlockedCompareExchange(&StartupState, spsStarting, spsPending) == spsPending;
+    }
+
+    BOOL ReportStartupReady()
+    {
+        if (InterlockedCompareExchange(&StartupState, spsReady, spsStarting) == spsStarting)
+        {
+            SetEvent(ReadyEvent);
+            return TRUE;
+        }
+        return FALSE;
+    }
+
+    void ReportStartupFailed()
+    {
+        LONG state = InterlockedCompareExchange(&StartupState, spsFailed, spsPending);
+        if (state == spsStarting)
+            InterlockedCompareExchange(&StartupState, spsFailed, spsStarting);
+        if (InterlockedCompareExchange(&StartupState, spsPending, spsPending) != spsReady)
+            SetEvent(FailedEvent);
+    }
+
+    void AddRef()
+    {
+        InterlockedIncrement(&ReferenceCount);
+    }
+
+    void Release()
+    {
+        if (InterlockedDecrement(&ReferenceCount) == 0)
+            delete this;
+    }
 };
 
 struct CProgressData

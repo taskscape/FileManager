@@ -64,10 +64,10 @@ This document is the working record for a read-only stability and resilience aud
 - **Justification:** `ReleaseCheckThreads` deletes `ReadCDVolNameCS` and `CheckPathCS` before it signals or joins their users (`src/path_checking.cpp:85`). A worker that wakes or is still running can touch destroyed synchronization state.
 - **Proposed solution:** Set a stop flag atomically, signal all wait events, join every thread, close thread/event handles, and only then destroy the critical sections. Add a repeated startup/shutdown test under Application Verifier.
 
-### 3. Replace infinite progress-dialog startup waits with a bounded protocol
+### 3. Replace infinite progress-dialog startup waits with a bounded protocol — Implemented
 
 - **Justification:** The UI passes stack-backed startup data to a new thread and waits forever for its continuation event (`src/dialogs_file_ops.cpp:350`). A creation, initialization, or exception-path failure can freeze the UI.
-- **Proposed solution:** Move startup state into an owned object, require the worker to signal either ready or failed, wait with a deadline while pumping only safe messages, and cancel/close cleanly on timeout.
+- **Implemented:** Startup state now lives in a reference-counted owned object with copied startup inputs and duplicated event handles. The UI waits at most ten seconds while dispatching only paint messages; the dialog reports ready or failed, and a timeout signals cancellation. If the thread has already accepted the script, it owns and cancels/frees it rather than allowing the caller to release memory still in use.
 
 ### 4. Remove the worker-to-UI circular wait at operation completion
 

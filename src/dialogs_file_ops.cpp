@@ -20,6 +20,7 @@
 CConfiguration Configuration;
 
 #define IDT_UPDATESTATUS_PERIOD 500 // interval for updating progress dialog status
+#define PROGRESS_DIALOG_STARTUP_TIMEOUT 10000
 
 //
 // ****************************************************************************
@@ -294,6 +295,22 @@ unsigned ThreadProgressDlgBody(void* parameter)
     SetThreadNameInVCAndTrace("ProgrDlg");
     TRACE_I("Begin");
     CStartProgressDialogData* data = (CStartProgressDialogData*)parameter;
+    // Claim the script before reading any of its fields. A timeout may otherwise let
+    // the caller free it while this new thread is still being scheduled.
+    if (!data->BeginStartup())
+    {
+        data->ReportStartupFailed();
+        data->Release();
+        TRACE_I("End (cancelled before startup)");
+        return 0;
+    }
+    if (data->IsCancellationRequested())
+    {
+        data->ReportStartupFailed();
+        data->Release();
+        TRACE_I("End (cancelled during startup)");
+        return 0;
+    }
     CChangeAttrsData attrsDataCopy;
     if (data->AttrsData != NULL)
         attrsDataCopy = *data->AttrsData;
@@ -310,14 +327,17 @@ unsigned ThreadProgressDlgBody(void* parameter)
     BOOL workPath2InclSubDirs = data->Script->WorkPath2InclSubDirs;
 
     CProgressDialog dlg(NULL, data->Script, data->Caption, attrsData, convertData, TRUE, data);
-    INT_PTR res = dlg.Execute();
-    if (res == 0 || res == -1 || res == IDABORT) // failed to open the dialog or worker thread
-        SetEvent(data->ContEvent);               // let the main thread continue (opening the dialog or starting the operation failed)
+    dlg.Execute();
+    data->ReportStartupFailed(); // no-op after the worker has reported ready
 
     if (workPath1[0] != 0)
         MainWindow->PostChangeOnPathNotification(workPath1, workPath1InclSubDirs);
     if (workPath2[0] != 0)
         MainWindow->PostChangeOnPathNotification(workPath2, workPath2InclSubDirs);
+    if (data->StartupState != CStartProgressDialogData::spsReady &&
+        InterlockedCompareExchange(&data->CallerOwnsScript, TRUE, TRUE) == FALSE)
+        FreeScript(data->Script);
+    data->Release();
     TRACE_I("End");
     return 0;
 }
@@ -333,12 +353,47 @@ unsigned ThreadProgressDlgEH(void* param)
     }
     __except (CCallStack::HandleException(GetExceptionInformation()))
     {
+        CStartProgressDialogData* data = (CStartProgressDialogData*)param;
+        data->ReportStartupFailed();
         TRACE_I("Thread Progress Dlg: calling ExitProcess(1).");
         //    ExitProcess(1);
         TerminateProcess(GetCurrentProcess(), 1); // harder exit (this one still calls some operations)
         return 1;
     }
 #endif // CALLSTK_DISABLE
+}
+
+static BOOL DuplicateStartupHandle(HANDLE source, HANDLE* target)
+{
+    return DuplicateHandle(GetCurrentProcess(), source, GetCurrentProcess(), target,
+                           0, FALSE, DUPLICATE_SAME_ACCESS);
+}
+
+// While startup is in progress, dispatch only paint messages. Command/input messages
+// stay queued so this short synchronization step cannot re-enter file operations.
+static DWORD WaitForProgressDialogStartup(HANDLE readyEvent, HANDLE failedEvent)
+{
+    HANDLE events[] = {readyEvent, failedEvent};
+    DWORD startedAt = GetTickCount();
+    for (;;)
+    {
+        DWORD elapsed = GetTickCount() - startedAt;
+        if (elapsed >= PROGRESS_DIALOG_STARTUP_TIMEOUT)
+            return WAIT_TIMEOUT;
+
+        DWORD wait = MsgWaitForMultipleObjects(2, events, FALSE,
+                                                PROGRESS_DIALOG_STARTUP_TIMEOUT - elapsed,
+                                                QS_PAINT);
+        if (wait == WAIT_OBJECT_0 || wait == WAIT_OBJECT_0 + 1 ||
+            wait == WAIT_TIMEOUT || wait == WAIT_FAILED)
+            return wait;
+        if (wait == WAIT_OBJECT_0 + 2)
+        {
+            MSG msg;
+            while (PeekMessage(&msg, NULL, WM_PAINT, WM_PAINT, PM_REMOVE))
+                DispatchMessage(&msg);
+        }
+    }
 }
 
 DWORD WINAPI ThreadProgressDlg(void* param)
@@ -352,46 +407,113 @@ BOOL StartProgressDialog(COperations* script, const char* caption,
 {
     BOOL ret = FALSE;
     ProgressDlgArray.RemoveFinishedDlgs();
-    HANDLE contEvent = HANDLES(CreateEvent(NULL, FALSE, FALSE, NULL)); // "nonsignaled" state, auto
-    if (contEvent != NULL)
+    HANDLE readyEvent = HANDLES(CreateEvent(NULL, TRUE, FALSE, NULL));
+    HANDLE failedEvent = HANDLES(CreateEvent(NULL, TRUE, FALSE, NULL));
+    HANDLE cancelEvent = HANDLES(CreateEvent(NULL, TRUE, FALSE, NULL));
+    CStartProgressDialogData* startupData = NULL;
+    if (readyEvent != NULL && failedEvent != NULL && cancelEvent != NULL)
     {
         CProgressDlgArrItem* newDlg = ProgressDlgArray.PrepareNewDlg();
         if (newDlg != NULL)
         {
-            CStartProgressDialogData data;
-            data.Script = script;
-            data.Caption = caption;
-            data.AttrsData = attrsData;
-            data.ConvertData = convertData;
-            data.NewDlg = newDlg;
-            data.OperationWasStarted = FALSE;
-            data.ContEvent = contEvent;
-            MultiMonGetClipRectByWindow(MainWindow->HWindow, &data.MainWndRectClipR, NULL);
-            if (!IsIconic(MainWindow->HWindow))
-                GetWindowRect(MainWindow->HWindow, &data.MainWndRectByR);
-            else
-                data.MainWndRectByR = data.MainWndRectClipR;
-
-            DWORD threadID;
-            HANDLE dlgThread = HANDLES(CreateThread(NULL, 0, ThreadProgressDlg, &data, 0, &threadID));
-            if (dlgThread != NULL)
+            CStartProgressDialogData* data = new CStartProgressDialogData;
+            if (data != NULL &&
+                DuplicateStartupHandle(readyEvent, &data->ReadyEvent) &&
+                DuplicateStartupHandle(failedEvent, &data->FailedEvent) &&
+                DuplicateStartupHandle(cancelEvent, &data->CancelEvent))
             {
-                // wait until the dialog thread takes the data, opens the dialog and starts the worker thread and
-                // passes the data to it
-                WaitForSingleObject(contEvent, INFINITE);
-                ProgressDlgArray.SetDlgData(newDlg, dlgThread, NULL);
-                ret = data.OperationWasStarted;
+                data->Script = script;
+                lstrcpyn(data->Caption, caption, _countof(data->Caption));
+                if (attrsData != NULL)
+                {
+                    data->AttrsDataCopy = *attrsData;
+                    data->AttrsData = &data->AttrsDataCopy;
+                }
+                if (convertData != NULL)
+                {
+                    data->ConvertDataCopy = *convertData;
+                    data->ConvertData = &data->ConvertDataCopy;
+                }
+                data->NewDlg = newDlg;
+                MultiMonGetClipRectByWindow(MainWindow->HWindow, &data->MainWndRectClipR, NULL);
+                if (!IsIconic(MainWindow->HWindow))
+                    GetWindowRect(MainWindow->HWindow, &data->MainWndRectByR);
+                else
+                    data->MainWndRectByR = data->MainWndRectClipR;
+
+                DWORD threadID;
+                data->AddRef(); // the dialog thread releases this reference on exit
+                HANDLE dlgThread = HANDLES(CreateThread(NULL, 0, ThreadProgressDlg, data, 0, &threadID));
+                if (dlgThread != NULL)
+                {
+                    startupData = data;
+                    ProgressDlgArray.SetDlgData(newDlg, dlgThread, NULL);
+                    DWORD wait = WaitForProgressDialogStartup(readyEvent, failedEvent);
+                    if (wait == WAIT_OBJECT_0)
+                        ret = TRUE;
+                    else if (wait == WAIT_TIMEOUT)
+                    {
+                        // Do not leave a delayed startup able to consume a script that the caller
+                        // is about to free. If handoff has already begun, the dialog thread owns it.
+                        if (InterlockedCompareExchange(&data->StartupState, CStartProgressDialogData::spsCancelled,
+                                                       CStartProgressDialogData::spsPending) == CStartProgressDialogData::spsPending)
+                        {
+                            TRACE_E("StartProgressDialog(): progress dialog startup timed out; cancelling.");
+                            SetEvent(cancelEvent);
+                        }
+                        else if (data->StartupState == CStartProgressDialogData::spsReady)
+                            ret = TRUE;
+                        else if (data->StartupState == CStartProgressDialogData::spsStarting)
+                        {
+                            TRACE_E("StartProgressDialog(): startup timed out after handoff; cancelling.");
+                            InterlockedExchange(&data->CallerOwnsScript, FALSE);
+                            SetEvent(cancelEvent);
+                            ret = TRUE;
+                        }
+                    }
+                    else if (wait == WAIT_FAILED)
+                    {
+                        TRACE_E("StartProgressDialog(): unable to wait for progress dialog startup; cancelling.");
+                        LONG state = InterlockedCompareExchange(&data->StartupState,
+                                                                 CStartProgressDialogData::spsCancelled,
+                                                                 CStartProgressDialogData::spsPending);
+                        if (state == CStartProgressDialogData::spsStarting)
+                        {
+                            InterlockedExchange(&data->CallerOwnsScript, FALSE);
+                            ret = TRUE;
+                        }
+                        else if (state == CStartProgressDialogData::spsReady)
+                            ret = TRUE;
+                        SetEvent(cancelEvent);
+                    }
+                }
+                else
+                {
+                    TRACE_E("StartProgressDialog(): unable to start progress dialog thread!");
+                    data->Release(); // reference reserved for the thread
+                    data->Release(); // caller's reference
+                    ProgressDlgArray.RemoveDlg(newDlg);
+                }
             }
             else
             {
-                TRACE_E("StartProgressDialog(): unable to start progress dialog thread!");
+                TRACE_E("StartProgressDialog(): unable to allocate or initialize progress dialog startup data!");
+                if (data != NULL)
+                    data->Release();
                 ProgressDlgArray.RemoveDlg(newDlg);
             }
         }
-        HANDLES(CloseHandle(contEvent));
     }
     else
-        TRACE_E("StartProgressDialog(): unable to create 'contEvent' system event!");
+        TRACE_E("StartProgressDialog(): unable to create progress dialog startup events!");
+    if (startupData != NULL)
+        startupData->Release();
+    if (readyEvent != NULL)
+        HANDLES(CloseHandle(readyEvent));
+    if (failedEvent != NULL)
+        HANDLES(CloseHandle(failedEvent));
+    if (cancelEvent != NULL)
+        HANDLES(CloseHandle(cancelEvent));
     return ret;
 }
 
@@ -630,6 +752,13 @@ CProgressDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 
     case WM_USER_PROGRDLGSTART: // probably needless on W2K+: just a delayed worker thread start
     {
+        if (RunningInOwnThread && ProgrDlgData != NULL && ProgrDlgData->IsCancellationRequested())
+        {
+            ProgrDlgData->ReportStartupFailed();
+            ProgrDlgData = NULL;
+            EndDialog(HWindow, IDABORT);
+            return TRUE;
+        }
         //--- creation of synchronization objects
         WContinue = HANDLES(CreateEvent(NULL, FALSE, FALSE, NULL));
         if (WContinue == NULL)
@@ -672,6 +801,21 @@ CProgressDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
             }
         }
 
+        if (RunningInOwnThread && ProgrDlgData != NULL && ProgrDlgData->IsCancellationRequested())
+        {
+            if (IsInQueue)
+                OperationsQueue.OperationEnded(HWindow, TRUE, NULL);
+            IsInQueue = FALSE;
+            HANDLES(CloseHandle(WorkerNotSuspended));
+            WorkerNotSuspended = NULL;
+            HANDLES(CloseHandle(WContinue));
+            WContinue = NULL;
+            ProgrDlgData->ReportStartupFailed();
+            ProgrDlgData = NULL;
+            EndDialog(HWindow, IDABORT);
+            return TRUE;
+        }
+
         Worker = StartWorker(Script, HWindow, AttrsData, ConvertData, WContinue,
                              WorkerNotSuspended, &CancelWorker, &OperationProgress,
                              &SummaryProgress);
@@ -693,8 +837,16 @@ CProgressDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                 if (ProgrDlgData != NULL)
                 {
                     ProgressDlgArray.SetDlgData(ProgrDlgData->NewDlg, NULL, HWindow);
-                    ProgrDlgData->OperationWasStarted = TRUE;
-                    SetEvent(ProgrDlgData->ContEvent); // let the main thread continue (it waits for the dialog to open and the operation to start)
+                    BOOL startupReady = ProgrDlgData->ReportStartupReady();
+                    if (!startupReady || ProgrDlgData->IsCancellationRequested())
+                    {
+                        // The UI reached its deadline after handing us the script. The
+                        // worker exists now, so cancel it through the normal dialog path.
+                        CancelWorker = TRUE;
+                        SetEvent(WorkerNotSuspended);
+                        if (!startupReady)
+                            ProgrDlgData->ReportStartupFailed();
+                    }
                     ProgrDlgData = NULL;
                 }
                 if (Configuration.AlwaysOnTop) // handle always-on-top at least "statically" (not in the system menu)

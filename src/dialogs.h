@@ -298,10 +298,12 @@ class CStaticText;
 class CProgressBar;
 struct CStartProgressDialogData;
 
-// returns FALSE if the progress dialog could not be opened in the new thread or 
-// if starting an operation in the worker thread failed in this dialog; when FALSE 
+// returns FALSE if the progress dialog could not be opened in the new thread or
+// if starting an operation in the worker thread failed in this dialog; when FALSE
 // is returned the caller must free the script 'script' manually (otherwise the script
-// is freed after the operation in the worker thread finishes)
+// is freed after the operation in the worker thread finishes). A startup timeout after
+// the dialog thread has accepted the script returns TRUE; that thread cancels and frees
+// the script if it cannot start the worker.
 BOOL StartProgressDialog(COperations* script, const char* caption,
                          CChangeAttrsData* attrsData, CConvertData* convertData);
 
@@ -323,7 +325,7 @@ protected:
 
 protected:
     BOOL RunningInOwnThread;                // TRUE/FALSE = dialog runs in its own thread ("background") / dialog runs in the main thread and is modal to its parent (usually one of the panels)
-    CStartProgressDialogData* ProgrDlgData; // non-NULL only if the dialog runs in its own thread and the main thread hasn't been resumed yet (waiting for dialog opening and operation start)
+    CStartProgressDialogData* ProgrDlgData; // non-NULL only if the dialog runs in its own thread and startup has not yet reported ready or failed
 
     HANDLE Worker;                // worker thread associated with this dialog (NULL if it doesn't exist yet/any more)
     HANDLE WContinue;             // multi-purpose event
