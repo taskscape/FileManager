@@ -1456,27 +1456,51 @@ void CSystemPolicies::LoadFromRegistry()
     }
 }
 
+CFileOffsetResult SalGetFileSizeEx(HANDLE file)
+{
+    CALL_STACK_MESSAGE1("SalGetFileSizeEx()");
+    if (file == NULL || file == INVALID_HANDLE_VALUE)
+    {
+        TRACE_E("SalGetFileSizeEx(): file handle is invalid!");
+        return CFileOffsetResult(ERROR_INVALID_HANDLE);
+    }
+
+    LARGE_INTEGER size;
+    if (!GetFileSizeEx(file, &size))
+        return CFileOffsetResult(GetLastError());
+
+    CQuadWord value;
+    value.SetUI64((unsigned __int64)size.QuadPart);
+    return CFileOffsetResult(value);
+}
+
+CFileOffsetResult SalSetFilePointerEx(HANDLE file, const CQuadWord& distance, DWORD moveMethod)
+{
+    CALL_STACK_MESSAGE1("SalSetFilePointerEx()");
+    if (file == NULL || file == INVALID_HANDLE_VALUE)
+    {
+        TRACE_E("SalSetFilePointerEx(): file handle is invalid!");
+        return CFileOffsetResult(ERROR_INVALID_HANDLE);
+    }
+
+    LARGE_INTEGER input;
+    input.QuadPart = (__int64)distance.Value;
+    LARGE_INTEGER output;
+    if (!SetFilePointerEx(file, input, &output, moveMethod))
+        return CFileOffsetResult(GetLastError());
+
+    CQuadWord value;
+    value.SetUI64((unsigned __int64)output.QuadPart);
+    return CFileOffsetResult(value);
+}
+
 BOOL SalGetFileSize(HANDLE file, CQuadWord& size, DWORD& err)
 {
     CALL_STACK_MESSAGE1("SalGetFileSize(, ,)");
-    if (file == NULL || file == INVALID_HANDLE_VALUE)
-    {
-        TRACE_E("SalGetFileSize(): file handle is invalid!");
-        err = ERROR_INVALID_HANDLE;
-        size.Set(0, 0);
-        return FALSE;
-    }
-
-    BOOL ret = FALSE;
-    size.LoDWord = GetFileSize(file, &size.HiDWord);
-    if ((size.LoDWord != INVALID_FILE_SIZE || (err = GetLastError()) == NO_ERROR))
-    {
-        ret = TRUE;
-        err = NO_ERROR;
-    }
-    else
-        size.Set(0, 0);
-    return ret;
+    CFileOffsetResult result = SalGetFileSizeEx(file);
+    size = result.Value;
+    err = result.Error;
+    return result.Succeeded;
 }
 
 BOOL SalGetFileSize2(const char* fileName, CQuadWord& size, DWORD* err)

@@ -106,9 +106,27 @@ BOOL SalGetTempFileName(const char* path, const char* prefix, char* tmpName, BOO
 // and then set it back)
 BOOL SalMoveFile(const char* srcName, const char* destName);
 
-// variant of Windows GetFileSize (has simpler error handling); 'file' is opened
-// file for GetFileSize() call; returns obtained file size in 'size'; returns success,
-// on FALSE (error) 'err' contains Windows error code and 'size' is zero
+// Result of a 64-bit file size or seek operation. On failure Value is zero and
+// Error is the Win32 error captured immediately after the failing API call.
+struct CFileOffsetResult
+{
+    CQuadWord Value;
+    DWORD Error;
+    BOOL Succeeded;
+
+    CFileOffsetResult(const CQuadWord& value) : Value(value), Error(NO_ERROR), Succeeded(TRUE) {}
+    CFileOffsetResult(DWORD error) : Error(error), Succeeded(FALSE) { Value.Set(0, 0); }
+};
+
+// Unambiguous 64-bit wrappers for file size and position. They never require
+// callers to inspect GetLastError after receiving a sentinel value.
+CFileOffsetResult SalGetFileSizeEx(HANDLE file);
+CFileOffsetResult SalSetFilePointerEx(HANDLE file, const CQuadWord& distance, DWORD moveMethod);
+
+// Legacy compatibility adapter for existing callers. Prefer SalGetFileSizeEx
+// in new operation code.
+// 'file' is opened file for the size query; on FALSE (error) 'err' contains
+// the captured Windows error code and 'size' is zero.
 BOOL SalGetFileSize(HANDLE file, CQuadWord& size, DWORD& err);
 BOOL SalGetFileSize2(const char* fileName, CQuadWord& size, DWORD* err); // 'err' can be NULL if we don't care
 

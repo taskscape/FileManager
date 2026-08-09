@@ -1256,21 +1256,11 @@ void DoLongName(char* buf, const char* name, int bufSize)
         _snprintf_s(buf, bufSize, _TRUNCATE, "\\\\?\\%s", name); // standard path
 }
 
-BOOL SalSetFilePointer(HANDLE file, const CQuadWord& offset)
-{
-    LONG lo = offset.LoDWord;
-    LONG hi = offset.HiDWord;
-    lo = SetFilePointer(file, lo, &hi, FILE_BEGIN);
-    return (lo != INVALID_SET_FILE_POINTER || GetLastError() == NO_ERROR) &&
-           lo == (LONG)offset.LoDWord && hi == (LONG)offset.HiDWord;
-}
-
 #define RETRYCOPY_TAIL_MINSIZE (32 * 1024) // at least two blocks of this size are verified at the end of the file tested in CheckTailOfOutFile(); afterwards the block size grows up to ASYNC_COPY_BUF_SIZE (if reading is fast enough); NOTE: must be <= ASYNC_COPY_BUF_SIZE
 #define RETRYCOPY_TESTINGTIME 3000         // duration of the CheckTailOfOutFile() test in [ms]
 
-void CheckTailOfOutFileShowErr(const char* txt)
+void CheckTailOfOutFileShowErr(const char* txt, DWORD err = GetLastError())
 {
-    DWORD err = GetLastError();
     TRACE_I("CheckTailOfOutFile(): " << txt << " Error: " << GetErrorText(err));
 }
 
@@ -1306,9 +1296,11 @@ BOOL CheckTailOfOutFile(CAsyncCopyParams* asyncPar, HANDLE in, HANDLE out, const
 #endif // WORKER_COPY_DEBUG_MSG
         if (asyncPar == NULL)
         {
-            if (SalSetFilePointer(in, start))
+            CFileOffsetResult inSeek = SalSetFilePointerEx(in, start, FILE_BEGIN);
+            if (inSeek.Succeeded)
             { // set the 'start' offset in the input
-                if (SalSetFilePointer(out, start))
+                CFileOffsetResult outSeek = SalSetFilePointerEx(out, start, FILE_BEGIN);
+                if (outSeek.Succeeded)
                 { // set the 'start' offset in the output
                     DWORD read;
                     if (ReadFile(out, bufOut, size, &read, NULL) && read == size)
@@ -1336,10 +1328,10 @@ BOOL CheckTailOfOutFile(CAsyncCopyParams* asyncPar, HANDLE in, HANDLE out, const
                     }
                 }
                 else
-                    CheckTailOfOutFileShowErr("Unable to set file pointer to start offset in OUT file.");
+                    CheckTailOfOutFileShowErr("Unable to set file pointer to start offset in OUT file.", outSeek.Error);
             }
             else
-                CheckTailOfOutFileShowErr("Unable to set file pointer to start offset in IN file.");
+                CheckTailOfOutFileShowErr("Unable to set file pointer to start offset in IN file.", inSeek.Error);
         }
         else
         {
@@ -1426,15 +1418,20 @@ BOOL CheckTailOfOutFile(CAsyncCopyParams* asyncPar, HANDLE in, HANDLE out, const
 
     if (ok && asyncPar == NULL) // reposition input/output to required offsets
     {
-        if (!SalSetFilePointer(in, curInOffset))
+        CFileOffsetResult inSeek = SalSetFilePointerEx(in, curInOffset, FILE_BEGIN);
+        if (!inSeek.Succeeded)
         {
-            CheckTailOfOutFileShowErr("Unable to set file pointer back to current offset in IN file.");
+            CheckTailOfOutFileShowErr("Unable to set file pointer back to current offset in IN file.", inSeek.Error);
             ok = FALSE;
         }
-        if (ok && !SalSetFilePointer(out, offset))
+        if (ok)
         {
-            CheckTailOfOutFileShowErr("Unable to set file pointer back to current offset in OUT file.");
-            ok = FALSE;
+            CFileOffsetResult outSeek = SalSetFilePointerEx(out, offset, FILE_BEGIN);
+            if (!outSeek.Succeeded)
+            {
+                CheckTailOfOutFileShowErr("Unable to set file pointer back to current offset in OUT file.", outSeek.Error);
+                ok = FALSE;
+            }
         }
     }
 #ifdef WORKER_COPY_DEBUG_MSG
@@ -1522,12 +1519,11 @@ COPY_ADS_AGAIN:
                                __hoCreateFile, in, GetLastError(), TRUE);
                 if (in != INVALID_HANDLE_VALUE)
                 {
-                    CQuadWord fileSize;
-                    fileSize.LoDWord = GetFileSize(in, &fileSize.HiDWord);
-                    if (fileSize.LoDWord == INVALID_FILE_SIZE && GetLastError() != NO_ERROR)
+                    CFileOffsetResult fileSizeResult = SalGetFileSizeEx(in);
+                    CQuadWord fileSize = fileSizeResult.Value;
+                    if (!fileSizeResult.Succeeded)
                     {
-                        DWORD err = GetLastError();
-                        TRACE_E("GetFileSize(some ADS of " << sourceName << "): unexpected error: " << GetErrorText(err));
+                        TRACE_E("SalGetFileSizeEx(some ADS of " << sourceName << "): unexpected error: " << GetErrorText(fileSizeResult.Error));
                         fileSize.SetUI64(0);
                     }
 
@@ -1552,32 +1548,39 @@ COPY_ADS_AGAIN:
                             {
                                 BOOL fatal = TRUE;
                                 BOOL ignoreErr = FALSE;
-                                if (SalSetFilePointer(out, fileSize))
+                                DWORD allocationError = NO_ERROR;
+                                CFileOffsetResult allocationSeek = SalSetFilePointerEx(out, fileSize, FILE_BEGIN);
+                                if (allocationSeek.Succeeded)
                                 {
                                     if (SetEndOfFile(out))
                                     {
-                                        if (SetFilePointer(out, 0, NULL, FILE_BEGIN) == 0)
+                                        CFileOffsetResult rewind = SalSetFilePointerEx(out, CQuadWord(0, 0), FILE_BEGIN);
+                                        if (rewind.Succeeded)
                                         {
                                             fatal = FALSE;
                                             wholeFileAllocated = TRUE;
                                         }
+                                        else
+                                            allocationError = rewind.Error;
                                     }
                                     else
                                     {
-                                        if (GetLastError() == ERROR_DISK_FULL)
+                                        allocationError = GetLastError();
+                                        if (allocationError == ERROR_DISK_FULL)
                                             ignoreErr = TRUE; // low disk space
                                     }
                                 }
+                                else
+                                    allocationError = allocationSeek.Error;
                                 if (fatal)
                                 {
                                     if (!ignoreErr)
                                     {
-                                        DWORD err = GetLastError();
-                                        TRACE_E("DoCopyADS(): unable to allocate whole file size before copy operation, please report under what conditions this occurs! GetLastError(): " << GetErrorText(err));
+                                        TRACE_E("DoCopyADS(): unable to allocate whole file size before copy operation, please report under what conditions this occurs! Error: " << GetErrorText(allocationError));
                                     }
 
                                     // try truncating the file to zero so closing it does not trigger unnecessary writes
-                                    SetFilePointer(out, 0, NULL, FILE_BEGIN);
+                                    SalSetFilePointerEx(out, CQuadWord(0, 0), FILE_BEGIN);
                                     SetEndOfFile(out);
 
                                     HANDLES(CloseHandle(out));
@@ -1674,10 +1677,9 @@ COPY_ADS_AGAIN:
                                                            __hoCreateFile, out, GetLastError(), TRUE);
                                             if (out != INVALID_HANDLE_VALUE) // opened successfully; now adjust the offset
                                             {
-                                                LONG lo, hi;
-                                                lo = GetFileSize(out, (DWORD*)&hi);
-                                                if (lo == INVALID_FILE_SIZE && GetLastError() != NO_ERROR ||
-                                                    CQuadWord(lo, hi) < operationDone ||
+                                                CFileOffsetResult outputSize = SalGetFileSizeEx(out);
+                                                if (!outputSize.Succeeded ||
+                                                    outputSize.Value < operationDone ||
                                                     !CheckTailOfOutFile(NULL, in, out, operationDone, operationDone + CQuadWord(read, 0), FALSE))
                                                 { // cannot determine the size or the file is too small; restart the entire copy
                                                     HANDLES(CloseHandle(in));
@@ -1780,10 +1782,9 @@ COPY_ADS_AGAIN:
                                                        __hoCreateFile, in, GetLastError(), TRUE);
                                         if (in != INVALID_HANDLE_VALUE) // opened successfully; now adjust the offset
                                         {
-                                            LONG lo, hi;
-                                            lo = GetFileSize(in, (DWORD*)&hi);
-                                            if (lo == INVALID_FILE_SIZE && GetLastError() != NO_ERROR ||
-                                                CQuadWord(lo, hi) < operationDone ||
+                                            CFileOffsetResult inputSize = SalGetFileSizeEx(in);
+                                            if (!inputSize.Succeeded ||
+                                                inputSize.Value < operationDone ||
                                                 !CheckTailOfOutFile(NULL, in, out, operationDone, operationDone, TRUE))
                                             { // cannot obtain size or the file is too small; restart the entire operation
                                                 HANDLES(CloseHandle(in));
@@ -2598,12 +2599,11 @@ void DoCopyFileLoopOrig(HANDLE& in, HANDLE& out, void* buffer, int& limitBufferS
                                                OPEN_ALWAYS, FILE_FLAG_SEQUENTIAL_SCAN, NULL));
                     if (out != INVALID_HANDLE_VALUE) // opened successfully; now adjust the offset
                     {
-                        LONG lo, hi;
-                        lo = GetFileSize(out, (DWORD*)&hi);
-                        if (lo == INVALID_FILE_SIZE && GetLastError() != NO_ERROR || // cannot obtain the size
-                            CQuadWord(lo, hi) < operationDone ||                     // file is too small
-                            wholeFileAllocated && CQuadWord(lo, hi) > fileSize &&
-                                CQuadWord(lo, hi) > operationDone + CQuadWord(read, 0) || // pre-allocated file is too large (beyond the reserved size and beyond the written portion including the current block) = extra bytes were appended (allocWholeFileOnStart should be 0 /* need-test */)
+                        CFileOffsetResult outputSize = SalGetFileSizeEx(out);
+                        if (!outputSize.Succeeded || // cannot obtain the size
+                            outputSize.Value < operationDone ||                     // file is too small
+                            wholeFileAllocated && outputSize.Value > fileSize &&
+                                outputSize.Value > operationDone + CQuadWord(read, 0) || // pre-allocated file is too large (beyond the reserved size and beyond the written portion including the current block) = extra bytes were appended (allocWholeFileOnStart should be 0 /* need-test */)
                             !CheckTailOfOutFile(NULL, in, out, operationDone, operationDone + CQuadWord(read, 0), FALSE))
                         { // restart the whole operation
                             HANDLES(CloseHandle(in));
@@ -2704,10 +2704,9 @@ void DoCopyFileLoopOrig(HANDLE& in, HANDLE& out, void* buffer, int& limitBufferS
                                           OPEN_EXISTING, FILE_FLAG_SEQUENTIAL_SCAN, NULL));
                 if (in != INVALID_HANDLE_VALUE) // opened successfully; now adjust the offset
                 {
-                    LONG lo, hi;
-                    lo = GetFileSize(in, (DWORD*)&hi);
-                    if (lo == INVALID_FILE_SIZE && GetLastError() != NO_ERROR ||
-                        CQuadWord(lo, hi) < operationDone ||
+                    CFileOffsetResult inputSize = SalGetFileSizeEx(in);
+                    if (!inputSize.Succeeded ||
+                        inputSize.Value < operationDone ||
                         !CheckTailOfOutFile(NULL, in, out, operationDone, operationDone, TRUE))
                     { // cannot obtain the size or the file is too small; restart the whole operation
                         HANDLES(CloseHandle(in));
@@ -2757,30 +2756,27 @@ void DoCopyFileLoopOrig(HANDLE& in, HANDLE& out, void* buffer, int& limitBufferS
 
         if (allocWholeFileOnStart == 0 /* need-test */)
         {
-            CQuadWord curFileSize;
-            curFileSize.LoDWord = GetFileSize(out, &curFileSize.HiDWord);
-            BOOL getFileSizeSuccess = (curFileSize.LoDWord != INVALID_FILE_SIZE || GetLastError() == NO_ERROR);
-            if (getFileSizeSuccess && curFileSize == operationDone)
+            CFileOffsetResult currentSize = SalGetFileSizeEx(out);
+            if (currentSize.Succeeded && currentSize.Value == operationDone)
             { // verify that no extra bytes were appended at the end and that truncation works
                 allocWholeFileOnStart = 1 /* yes */;
             }
             else
             {
 #ifdef _DEBUG
-                if (getFileSizeSuccess)
+                if (currentSize.Succeeded)
                 {
                     char num1[50];
                     char num2[50];
                     TRACE_E("DoCopyFileLoopOrig(): unable to allocate whole file size before copy operation, please report "
                             "under what conditions this occurs! Error: different file sizes: target="
-                            << NumberToStr(num1, curFileSize) << " bytes, source=" << NumberToStr(num2, operationDone) << " bytes");
+                            << NumberToStr(num1, currentSize.Value) << " bytes, source=" << NumberToStr(num2, operationDone) << " bytes");
                 }
                 else
                 {
-                    DWORD err = GetLastError();
                     TRACE_E("DoCopyFileLoopOrig(): unable to test result of allocation of whole file size before copy operation, please report "
-                            "under what conditions this occurs! GetFileSize("
-                            << op->TargetName << ") error: " << GetErrorText(err));
+                            "under what conditions this occurs! SalGetFileSizeEx("
+                            << op->TargetName << ") error: " << GetErrorText(currentSize.Error));
                 }
 #endif
                 allocWholeFileOnStart = 2 /* no */; // skip further attempts on this target disk
@@ -3071,15 +3067,15 @@ void CCopy_Context::DiscardBlocksBehindEOF(const CQuadWord& fileSize, int exclud
 
 void CCopy_Context::GetNewFileSize(const char* fileName, HANDLE file, CQuadWord* fileSize, const CQuadWord& minFileSize)
 {
-    fileSize->LoDWord = GetFileSize(file, &fileSize->HiDWord);
-    if (fileSize->LoDWord == INVALID_FILE_SIZE && GetLastError() != NO_ERROR)
+    CFileOffsetResult currentSize = SalGetFileSizeEx(file);
+    if (!currentSize.Succeeded)
     {
-        DWORD err = GetLastError();
-        TRACE_E("CCopy_Context::GetNewFileSize(): GetFileSize(" << fileName << "): unexpected error: " << GetErrorText(err));
+        TRACE_E("CCopy_Context::GetNewFileSize(): SalGetFileSizeEx(" << fileName << "): unexpected error: " << GetErrorText(currentSize.Error));
         *fileSize = minFileSize;
     }
     else
     {
+        *fileSize = currentSize.Value;
         if (*fileSize < minFileSize) // if GetFileSize happened to return a shorter length than already read
             *fileSize = minFileSize;
     }
@@ -3175,10 +3171,10 @@ void CCopy_Context::CancelOpPhase2(int errBlkIndex)
     // used to prevent fragmentation)
     if (*Out != NULL) // only if the target file was not closed meanwhile
     {
-        if (!SalSetFilePointer(*Out, WriteOffset))
+        CFileOffsetResult seekResult = SalSetFilePointerEx(*Out, WriteOffset, FILE_BEGIN);
+        if (!seekResult.Succeeded)
         {
-            DWORD err = GetLastError();
-            TRACE_E("CCopy_Context::CancelOpPhase2(): unable to set file pointer in OUT file, error: " << GetErrorText(err));
+            TRACE_E("CCopy_Context::CancelOpPhase2(): unable to set file pointer in OUT file, error: " << GetErrorText(seekResult.Error));
         }
     }
 }
@@ -3192,9 +3188,8 @@ BOOL CCopy_Context::RetryCopyReadErr(DWORD* err, BOOL* copyAgain, BOOL* errAgain
                                OPEN_EXISTING, AsyncPar->GetOverlappedFlag() | FILE_FLAG_SEQUENTIAL_SCAN, NULL));
     if (*In != INVALID_HANDLE_VALUE) // opened successfully; now adjust the offset
     {
-        CQuadWord size;
-        size.LoDWord = GetFileSize(*In, (DWORD*)&size.HiDWord);
-        if ((size.LoDWord != INVALID_FILE_SIZE || GetLastError() == NO_ERROR) && size >= ReadOffset)
+        CFileOffsetResult inputSize = SalGetFileSizeEx(*In);
+        if (inputSize.Succeeded && inputSize.Value >= ReadOffset)
         { // size obtained and the file is large enough
             // if the source is on a network: disable local client-side in-memory caching
             // http://msdn.microsoft.com/en-us/library/ee210753%28v=vs.85%29.aspx
@@ -3323,11 +3318,10 @@ BOOL CCopy_Context::RetryCopyWriteErr(DWORD* err, BOOL* copyAgain, BOOL* errAgai
     if (*Out != INVALID_HANDLE_VALUE) // opened successfully; now adjust the offset
     {
         BOOL ok = TRUE;
-        CQuadWord size;
-        size.LoDWord = GetFileSize(*Out, (DWORD*)&size.HiDWord);
-        if (size.LoDWord == INVALID_FILE_SIZE && GetLastError() != NO_ERROR ||   // cannot obtain the size
-            size < WriteOffset ||                                                // file is too small
-            WholeFileAllocated && size > allocFileSize && size > maxWriteOffset) // pre-allocated file is too large (greater than the pre-allocated size and the written portion including the current block) = extra bytes appended (allocWholeFileOnStart should be 0 /* need-test */)
+        CFileOffsetResult outputSize = SalGetFileSizeEx(*Out);
+        if (!outputSize.Succeeded || // cannot obtain the size
+            outputSize.Value < WriteOffset ||                                                // file is too small
+            WholeFileAllocated && outputSize.Value > allocFileSize && outputSize.Value > maxWriteOffset) // pre-allocated file is too large (greater than the pre-allocated size and the written portion including the current block) = extra bytes appended (allocWholeFileOnStart should be 0 /* need-test */)
         {                                                                        // restart the entire thing
             ok = FALSE;
         }
@@ -3711,15 +3705,14 @@ void DoCopyFileLoopAsync(CAsyncCopyParams* asyncPar, HANDLE& in, HANDLE& out, vo
         {
             while (1)
             {
-                CQuadWord off = ctx.WriteOffset;
-                off.LoDWord = SetFilePointer(out, off.LoDWord, (LONG*)&(off.HiDWord), FILE_BEGIN);
-                if (off.LoDWord == INVALID_SET_FILE_POINTER && GetLastError() != NO_ERROR ||
-                    off != ctx.WriteOffset ||
+                CFileOffsetResult seekResult = SalSetFilePointerEx(out, ctx.WriteOffset, FILE_BEGIN);
+                if (!seekResult.Succeeded ||
+                    seekResult.Value != ctx.WriteOffset ||
                     !SetEndOfFile(out))
                 {
-                    DWORD err2 = GetLastError();
-                    if ((off.LoDWord != INVALID_SET_FILE_POINTER || err2 == NO_ERROR) && off != ctx.WriteOffset)
-                        err2 = ERROR_INVALID_FUNCTION; // successful SetFilePointer, but off != ctx.WriteOffset: will probably never happen, included for completeness
+                    DWORD err2 = !seekResult.Succeeded ? seekResult.Error : GetLastError();
+                    if (seekResult.Succeeded && seekResult.Value != ctx.WriteOffset)
+                        err2 = ERROR_INVALID_FUNCTION; // successful seek, but it reached an unexpected offset
                     if (!ctx.HandleWritingErr(-1, err2, &copyError, &skipCopy, &copyAgain, allocFileSize, CQuadWord(0, 0)))
                         return; // cancel/skip(skip-all)/retry-complete
                                 // retry-resume
@@ -3731,30 +3724,27 @@ void DoCopyFileLoopAsync(CAsyncCopyParams* asyncPar, HANDLE& in, HANDLE& out, vo
 
         if (allocWholeFileOnStart == 0 /* need-test */)
         {
-            CQuadWord curFileSize;
-            curFileSize.LoDWord = GetFileSize(out, &curFileSize.HiDWord);
-            BOOL getFileSizeSuccess = (curFileSize.LoDWord != INVALID_FILE_SIZE || GetLastError() == NO_ERROR);
-            if (getFileSizeSuccess && curFileSize == operationDone)
+            CFileOffsetResult currentSize = SalGetFileSizeEx(out);
+            if (currentSize.Succeeded && currentSize.Value == operationDone)
             { // verify that no extra bytes were appended to the end of the file + that we can truncate the file
                 allocWholeFileOnStart = 1 /* yes */;
             }
             else
             {
 #ifdef _DEBUG
-                if (getFileSizeSuccess)
+                if (currentSize.Succeeded)
                 {
                     char num1[50];
                     char num2[50];
                     TRACE_E("DoCopyFileLoopAsync(): unable to allocate whole file size before copy operation, please report "
                             "under what conditions this occurs! Error: different file sizes: target="
-                            << NumberToStr(num1, curFileSize) << " bytes, source=" << NumberToStr(num2, operationDone) << " bytes");
+                            << NumberToStr(num1, currentSize.Value) << " bytes, source=" << NumberToStr(num2, operationDone) << " bytes");
                 }
                 else
                 {
-                    DWORD err2 = GetLastError();
                     TRACE_E("DoCopyFileLoopAsync(): unable to test result of allocation of whole file size before copy operation, please report "
-                            "under what conditions this occurs! GetFileSize("
-                            << op->TargetName << ") error: " << GetErrorText(err2));
+                            "under what conditions this occurs! SalGetFileSizeEx("
+                            << op->TargetName << ") error: " << GetErrorText(currentSize.Error));
                 }
 #endif
                 allocWholeFileOnStart = 2 /* no */; // skip further attempts on this target disk
@@ -4075,33 +4065,40 @@ COPY_AGAIN:
                     {
                         BOOL fatal = TRUE;
                         BOOL ignoreErr = FALSE;
-                        if (SalSetFilePointer(out, fileSize))
+                        DWORD allocationError = NO_ERROR;
+                        CFileOffsetResult allocationSeek = SalSetFilePointerEx(out, fileSize, FILE_BEGIN);
+                        if (allocationSeek.Succeeded)
                         {
                             if (SetEndOfFile(out))
                             {
-                                if (SetFilePointer(out, 0, NULL, FILE_BEGIN) == 0)
+                                CFileOffsetResult rewind = SalSetFilePointerEx(out, CQuadWord(0, 0), FILE_BEGIN);
+                                if (rewind.Succeeded)
                                 {
                                     fatal = FALSE;
                                     wholeFileAllocated = TRUE;
                                 }
+                                else
+                                    allocationError = rewind.Error;
                             }
                             else
                             {
-                                if (GetLastError() == ERROR_DISK_FULL)
+                                allocationError = GetLastError();
+                                if (allocationError == ERROR_DISK_FULL)
                                     ignoreErr = TRUE; // not enough space on the disk
                             }
                         }
+                        else
+                            allocationError = allocationSeek.Error;
                         if (fatal)
                         {
                             if (!ignoreErr)
                             {
-                                DWORD err = GetLastError();
-                                TRACE_E("DoCopyFile(): unable to allocate whole file size before copy operation, please report under what conditions this occurs! GetLastError(): " << GetErrorText(err));
+                                TRACE_E("DoCopyFile(): unable to allocate whole file size before copy operation, please report under what conditions this occurs! Error: " << GetErrorText(allocationError));
                                 allocWholeFileOnStart = 2 /* no */; // we will forego further attempts on this target disk
                             }
 
                             // try truncating the file to zero so closing it does not trigger any unnecessary writes
-                            SetFilePointer(out, 0, NULL, FILE_BEGIN);
+                            SalSetFilePointerEx(out, CQuadWord(0, 0), FILE_BEGIN);
                             SetEndOfFile(out);
 
                             HANDLES(CloseHandle(out));
@@ -4182,10 +4179,9 @@ COPY_AGAIN:
 
                     if (lantasticCheck)
                     {
-                        CQuadWord inSize, outSize;
-                        inSize.LoDWord = GetFileSize(in, &inSize.HiDWord);
-                        outSize.LoDWord = GetFileSize(out, &outSize.HiDWord);
-                        if (inSize != outSize)
+                        CFileOffsetResult inSize = SalGetFileSizeEx(in);
+                        CFileOffsetResult outSize = SalGetFileSizeEx(out);
+                        if (!inSize.Succeeded || !outSize.Succeeded || inSize.Value != outSize.Value)
                         {                                                              // Lantastic 7.0: everything seems fine, but the result is wrong
                             WaitForSingleObject(dlgData.WorkerNotSuspended, INFINITE); // if we should be in suspend mode, wait ...
                             if (*dlgData.CancelWorker)
@@ -4210,8 +4206,8 @@ COPY_AGAIN:
                                 operationDone = CQuadWord(0, 0);
                                 script->SetTFSandProgressSize(lastTransferredFileSize, totalDone);
                                 SetProgress(hProgressDlg, 0, CaclProg(totalDone, script->TotalSize), dlgData);
-                                SetFilePointer(in, 0, NULL, FILE_BEGIN);  // read again
-                                SetFilePointer(out, 0, NULL, FILE_BEGIN); // write again
+                                SalSetFilePointerEx(in, CQuadWord(0, 0), FILE_BEGIN);  // read again
+                                SalSetFilePointerEx(out, CQuadWord(0, 0), FILE_BEGIN); // write again
                                 SetEndOfFile(out);                        // truncate the output file
                                 goto COPY;
                             }
@@ -4844,8 +4840,9 @@ COPY_AGAIN:
                                                                    OPEN_EXISTING, 0, NULL));
                                         if (out != INVALID_HANDLE_VALUE)
                                         {
-                                            origFileSize.LoDWord = GetFileSize(out, &origFileSize.HiDWord);
-                                            if (origFileSize.LoDWord == INVALID_FILE_SIZE && GetLastError() == NO_ERROR)
+                                            CFileOffsetResult originalSize = SalGetFileSizeEx(out);
+                                            origFileSize = originalSize.Value;
+                                            if (!originalSize.Succeeded)
                                                 origFileSize.Set(0, 0); // error => set the size to zero and test it on another file
                                             HANDLES(CloseHandle(out));
                                         }
@@ -4911,8 +4908,9 @@ COPY_AGAIN:
                                             continue;
                                         }
                                         CQuadWord newFileSize(0, 0); // file size after truncation
-                                        newFileSize.LoDWord = GetFileSize(out, &newFileSize.HiDWord);
-                                        if ((newFileSize.LoDWord != INVALID_FILE_SIZE || GetLastError() == NO_ERROR) && // we have the new size
+                                        CFileOffsetResult currentSize = SalGetFileSizeEx(out);
+                                        newFileSize = currentSize.Value;
+                                        if (currentSize.Succeeded && // we have the new size
                                             newFileSize == CQuadWord(0, 0))                                             // file really has 0 bytes
                                         {
                                             if (origFileSize != CQuadWord(0, 0))            // truncation can only be tested on a non-zero file
