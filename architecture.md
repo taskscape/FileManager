@@ -309,7 +309,15 @@ The high-level panel code plans work before mutating the filesystem:
 
 `src/async_copy.cpp` contains the lower-level copy engine: synchronous/overlapped decisions, buffer sizing, alternate data streams, compression/encryption/security metadata, overwrite and retry policy, cancellation, and progress updates. A native copy reaches its durable commit point only after the output was opened with write-through where supported, `FlushFileBuffers` and `CloseHandle` both succeed, and the closed destination can be reopened with its file metadata and size verified. An overwrite then uses the write-through replace/rename commit; a cross-volume move may delete its source only after this boundary. Each `COperations` instance owns an interlocked lifecycle (`planned`, `running`, `cancel-requested`, `stopping`, `completed`, or `failed`) and a manual-reset cancellation event. The dialog and worker make idempotent requests and state transitions through this owner; debug builds stop on invalid transitions. `COperationsQueue` tracks disk operation windows and their paused/running state.
 
-#### 5.2.1 Metadata preservation contract
+#### 5.2.1 Reparse-point operation policy
+
+The operation planner treats every directory reparse point as a hard operation boundary. Copy, move, count, convert, and recursive attribute work do not enumerate a junction, symbolic link, mount point, cloud directory, or unknown directory tag. This prevents a target outside the selected root, a changed target, and an in-tree cycle from becoming part of the script. Reparse files are likewise not opened while planning non-delete work, so a cloud placeholder remains offline rather than being hydrated by an incidental metadata or size read.
+
+Delete uses a separate handle-first path with `FILE_FLAG_OPEN_REPARSE_POINT` and the captured file identity. Directory deletion accepts only the mount-point and symbolic-link tags (a junction is a mount-point tag); an unknown tag fails with `ERROR_REPARSE_TAG_MISMATCH` instead of deleting or resolving its destination. The current conservative copy/move policy skips reparse entries rather than recreating them: preserving a link is a future explicit feature, not a reason to follow its target.
+
+The UI integration suite builds disposable junction topologies with a target outside the selected root, a changed target, and a cycle. It verifies that copying preserves ordinary in-root content without materializing either target, and that deleting a junction deletes only the link. The native regression test also ratchets the no-hydration and unknown-tag rules; provider-owned cloud placeholders and volume mount points require an appropriate host/provider for live end-to-end setup.
+
+#### 5.2.2 Metadata preservation contract
 
 The engine distinguishes three preservation levels. **Required** metadata must pass the operation's durable-copy/identity checks before a cross-volume move can delete its source. **Best effort** metadata is copied or repaired when the target and current privilege allow it; a verified failure is recorded. **Unsupported** metadata is not represented by the target or is not copied by this engine; it is recorded as a known loss. The contract applies to native disk copy and move operations only; archive and virtual-filesystem plug-ins retain their own capability contracts.
 

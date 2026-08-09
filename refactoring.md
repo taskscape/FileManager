@@ -227,10 +227,11 @@ This document is the working record for a read-only stability and resilience aud
 - **Contract behavior:** `architecture.md` publishes the NTFS/ReFS/SMB and FAT-family privilege matrix. Unreadable descriptors and unavailable privilege do not mutate the target; they take the existing best-effort permission-warning path and are recorded as `mmlSecurity`, so a cross-volume move retains its source unless the user explicitly accepts the loss.
 - **Verification:** `NativeSafetyRegressionTests.Security_descriptor_copy_uses_the_privilege_aware_preservation_matrix` covers the source-level guard, post-write verification, rollback, explicit-ACE/inheritance checks, inaccessible-descriptor behavior, published matrix, and implementation status.
 
-### 34. Exercise junction, symlink, mount-point, and cloud-placeholder cases
+### 34. Exercise junction, symlink, mount-point, and cloud-placeholder cases — Implemented (2026-08-09)
 
-- **Justification:** Reparse tags alter whether an operation targets the link or its destination. A mistake can recurse outside the selected tree or delete unintended data.
-- **Proposed solution:** Build disposable reparse topologies, include cycles and changed targets, and assert no traversal outside the operation root. Add explicit policies for unknown tags and cloud hydration.
+- **Implementation:** `BuildScriptDir` now makes every directory reparse point a hard planning boundary. Copy, move, count, convert, and recursive attribute work skip it rather than enumerating its target; reparse files are also skipped before a planner read can hydrate a cloud placeholder. This deliberately replaces the legacy “copy link target content” route. The link itself is not recreated by copy/move until that behavior can be implemented as a separate handle-first feature.
+- **Deletion policy:** The existing identity-checked `FILE_FLAG_OPEN_REPARSE_POINT` delete path continues to target the link itself. `DoDeleteDirLinkAux` accepts only mount-point/junction and symbolic-link tags; unknown tags fail with `ERROR_REPARSE_TAG_MISMATCH`, never by resolving their target.
+- **Verification:** `ReparsePointTopologyUiTests` constructs disposable junctions with an outside target, a changed target, and a cycle before launch. It proves copying does not materialize or traverse either target and proves deletion removes only the junction. `NativeSafetyRegressionTests.Reparse_point_policy_never_traverses_or_hydrates_unselected_targets` ratchets the source policy, placeholder handling, unknown-tag refusal, topology coverage, and documentation.
 
 ### 35. Introduce a dynamic wide-path abstraction
 
