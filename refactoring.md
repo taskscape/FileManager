@@ -15,7 +15,7 @@ This document is the working record for a read-only stability and resilience aud
 
 - The product is a large Win32 C/C++ solution: 93 Visual C++ projects, approximately 958 `.cpp`, 1,134 `.h`, and 212 `.c` files.
 - Several central implementation files exceed 4,000 lines, including `src/async_copy.cpp`, `src/mainwnd_commands.cpp`, `src/fileswindow_execute.cpp`, `src/app_entry.cpp`, and `src/path_utils.cpp`.
-- Automated tests currently consist primarily of `tests/FileManager.UiTests`, an NUnit/FlaUI suite. Its 100 cases repeat seven scenario families and do not exercise destructive file operations.
+- Automated tests currently consist primarily of `tests/FileManager.UiTests`, an NUnit/FlaUI suite. Its 100 repeated lifecycle cases plus 18 focused file-operation cases cover normal, cancelled, and deliberately blocked create/copy/rename/move/delete flows against disposable directory trees.
 - Pull-request CI compiles Debug Win32/x64 but does not run tests. The release workflow builds Release x64 and publishes directly from pushes to `main`.
 
 ### Confirmed high-risk findings
@@ -24,9 +24,9 @@ This document is the working record for a read-only stability and resilience aud
 2. **One shutdown sequence destroys synchronization primitives before workers are guaranteed stopped.** `ReleaseCheckThreads` in `src/path_checking.cpp` deletes critical sections before signaling and joining its threads.
 3. **Several UI/worker handshakes wait forever.** File-operation startup and worker suspension use `INFINITE` waits; worker code also uses synchronous `SendMessage` to the UI, creating circular-wait potential.
 4. **Cancellation state is shared through plain `BOOL` pointers and globals.** These accesses do not provide atomic visibility or an explicit state machine.
-5. **Overwrite is transactional for native file copies.** Confirmed overwrites now copy to a uniquely reserved sibling temporary file and replace the requested destination only after a durable close and atomic same-volume commit.
-6. **Cross-volume move commits by deleting the source after copy success without a full post-copy integrity check.** Tail checks help retry logic but do not prove the entire destination is durable and identical.
-7. **Direct-to-new-destination copies still lack an explicit durable completion point.** Transactional overwrites now flush and use a write-through replace/rename, but the non-overwrite path does not yet request the same durability boundary.
+5. **Overwrite is transactional for native file copies.** Confirmed overwrites now copy to a uniquely reserved sibling temporary file and replace the requested destination only after the durable copy commit point and an atomic same-volume commit.
+6. **Cross-volume moves lack a full post-copy integrity check.** They now wait for the durable copy commit point, including closed-output size/metadata verification, before deleting the source. Tail checks and that metadata check still do not prove the entire destination has identical content.
+7. **Implemented: direct-to-new-destination copies have a durable completion point.** All core copies now request write-through, flush and successfully close the output, then reopen it to verify its file metadata and size before reporting success.
 8. **Legacy size and seek APIs are widespread.** `GetFileSize` and `SetFilePointer` retain sentinel/error ambiguity and complicate correct files larger than 4 GiB.
 9. **Path and string handling remains fixed-buffer heavy.** Thousands of `MAX_PATH` references and many unchecked copy/format calls make long paths and boundary inputs fragile.
 10. **Plug-ins execute in-process behind manually balanced global entry state.** A plug-in failure can skip cleanup, corrupt host bookkeeping, or terminate the file manager.
@@ -39,7 +39,7 @@ This document is the working record for a read-only stability and resilience aud
 17. **Installer staging can select stale or mismatched binaries.** `tools/prepare_installer.ps1` recursively falls back to the first matching output and suppresses some errors.
 18. **Several bundled libraries are substantially old.** Reviewed versions include OpenSSL 1.0.2u, bzip2 1.0.6, SQLite 3.28.0, zlib 1.2.11, 7-Zip 16.04, and cmark-gfm 0.29.0.gfm.0.
 19. **Compiler hardening and static-analysis lanes are limited.** The common project properties use warning level 3 and disable secure-CRT warnings; no repository CI lane for ASan, CodeQL, clang-cl, or `/analyze` was found.
-20. **The safety net is shallow for the product's highest-risk behavior.** There are no native characterization tests, parser fuzzers, disk-full/sharing-violation fault tests, crash-consistency tests, or automated copy/move/delete recovery scenarios.
+20. **The safety net remains shallow for the product's highest-risk behavior.** Executable UI coverage now exercises normal, cancelled, and deliberately blocked create/copy/rename/move/delete operations, but there are no native characterization tests, parser fuzzers, disk-full fault tests, crash-consistency tests, or automated copy/move/delete recovery scenarios.
 
 ### Working prioritization rules
 
@@ -82,10 +82,10 @@ This document is the working record for a read-only stability and resilience aud
 
 - **Delivered:** After the existing overwrite and protected-file confirmations, `DoCopyFile` reserves a uniquely named sibling temporary file rather than deleting or truncating the destination. It applies the existing metadata pipeline to that temporary file, flushes the copied data before close, and commits with `ReplaceFileW(REPLACEFILE_WRITE_THROUGH)`. If another actor removed the destination after confirmation, a same-volume write-through `MoveFileExW` commits the temporary file instead. Retry, skip, cancel, low-space, and metadata-error paths delete only the temporary reservation; the original destination remains untouched until commit succeeds.
 
-### 7. Define and enforce a durable copy commit point
+### 7. Implemented: define and enforce a durable copy commit point
 
-- **Justification:** Successful writes are treated as completion without an explicit data flush in the core copy path. Buffered data can be lost even though the UI reports success.
-- **Proposed solution:** Before replacing an existing destination or deleting a move source, call `FlushFileBuffers`, close the output successfully, re-open/verify required metadata, and use a write-through commit where supported. Document that this boundary is the point after which success may be reported.
+- **Delivered:** Every core native copy opens the output with `FILE_FLAG_WRITE_THROUGH` where supported, calls `FlushFileBuffers`, and treats a failed flush or close as a copy failure. After closing, it reopens the destination and validates that it is a file with the expected size metadata. This is the durable copy commit point: UI success, write-through replacement of an existing destination, and cross-volume move-source deletion occur only after it passes.
+- **Guardrail:** `tools/verify-durable-copy-commit.ps1`, run by pull-request CI, verifies the ordering of write-through creation, flush, close, post-close metadata verification, replacement, and move-source deletion.
 
 ### 8. Verify cross-volume moves before deleting the source
 
@@ -199,10 +199,10 @@ This document is the working record for a read-only stability and resilience aud
 - **Justification:** Happy-path tests cannot demonstrate the atomicity promised by a file manager. Failures must be explored between create, write, metadata, flush, replace, and source delete.
 - **Proposed solution:** Put Win32 file calls behind an injectable adapter in tests, fail each call deterministically, and assert the invariant: the original, the complete replacement, or a recoverable journal exists.
 
-### 30. Add executable-level file-operation scenarios
+### 30. Implemented: add executable-level file-operation scenarios
 
-- **Justification:** UIA tests prove dialogs and persistence but not real disk outcomes (`tests/FileManager.UiTests/README.md:3`). Unit seams alone will not catch command routing or UI/worker lifecycle faults.
-- **Proposed solution:** Drive the real executable against disposable trees, invoke copy/move/delete through UIA, cancel at controlled checkpoints, and verify files, metadata, messages, and process health after restart.
+- **Delivered:** `tests/FileManager.UiTests/FileOperationUiTests.cs` launches the real executable with fresh source and target panel paths per case. It verifies nested directory creation; file and directory-tree copy, rename, move, and delete; cancelled operation dialogs; invalid destinations/names; and a locked-file delete failure. Assertions read the disposable filesystem directly, and fixture teardown terminates only the launched executable before deleting the workspace.
+- **Remaining scope:** Native fault injection, controlled mid-copy cancellation, cross-volume behavior, restart reconciliation, and metadata fidelity belong to improvements 28, 29, 31-33, and 85.
 
 ### 31. Publish an explicit metadata preservation contract
 
@@ -465,7 +465,7 @@ This document is the working record for a read-only stability and resilience aud
 
 ### 82. Replace repetition-based “100 cases” with a risk-based scenario matrix
 
-- **Justification:** The README describes 100 parameterized cases across a few launch/configuration/FTP flows (`tests/FileManager.UiTests/README.md:3`). Repetition can improve flake detection but not behavioral coverage.
+- **Justification:** The suite now adds focused file-operation cases to the 100 parameterized launch/configuration/FTP flows. Repetition can improve flake detection but does not replace coverage of conflict dialogs, long paths, recovery, network loss, and installer lifecycle.
 - **Proposed solution:** Keep a smaller repetition soak separately and make the main suite distinct: file operations, conflict dialogs, cancellation, long paths, plug-in failure, recovery, network loss, and installer lifecycle.
 
 ### 83. Add native unit tests for paths, masks, and serialization
