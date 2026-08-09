@@ -333,6 +333,9 @@ static const char* CONFIGURATION_GENERATIONS_REG = "Configuration Generations";
 static const char* CONFIGURATION_ACTIVE_GENERATION_REG = "Active Generation";
 static const char* CONFIGURATION_TRANSACTION_COMPLETE_REG = "Transaction Complete";
 static const char* CONFIGURATION_TRANSACTION_CHECKSUM_REG = "Transaction Checksum";
+static const char* CONFIGURATION_SCHEMA_VERSION_REG = "Configuration Schema Version";
+static const DWORD CONFIGURATION_SCHEMA_VERSION = 1;
+static char ConfigurationSchemaDiagnostic[256] = {};
 
 static const char* GetConfigurationGenerationName(DWORD generation)
 {
@@ -372,7 +375,8 @@ static BOOL CalculateConfigurationChecksum(HKEY key, DWORD& checksum)
         name[nameSize] = 0;
 
         if (strcmp(name, CONFIGURATION_TRANSACTION_COMPLETE_REG) != 0 &&
-            strcmp(name, CONFIGURATION_TRANSACTION_CHECKSUM_REG) != 0)
+            strcmp(name, CONFIGURATION_TRANSACTION_CHECKSUM_REG) != 0 &&
+            strcmp(name, CONFIGURATION_SCHEMA_VERSION_REG) != 0)
         {
             result = RegQueryValueEx(key, name, NULL, &type, NULL, &dataSize);
             if (result != ERROR_SUCCESS)
@@ -418,6 +422,131 @@ static BOOL CalculateConfigurationChecksum(HKEY key, DWORD& checksum)
     return TRUE;
 }
 
+static BOOL GetRequiredDword(HKEY key, const char* valueName, DWORD& value)
+{
+    return GetValueAux(NULL, key, valueName, REG_DWORD, &value, sizeof(value));
+}
+
+static BOOL GetRequiredInt(HKEY key, const char* valueName, int& value)
+{
+    DWORD rawValue;
+    if (!GetRequiredDword(key, valueName, rawValue))
+        return FALSE;
+    value = (int)rawValue;
+    return TRUE;
+}
+
+static BOOL ValidateRequiredDwordRange(HKEY key, const char* valueName, DWORD minimum, DWORD maximum)
+{
+    DWORD value;
+    return GetRequiredDword(key, valueName, value) && value >= minimum && value <= maximum;
+}
+
+static BOOL ValidateRequiredPercentage(HKEY key, const char* valueName)
+{
+    char value[20];
+    char extra;
+    double percentage;
+    return GetValueAux(NULL, key, valueName, REG_SZ, value, sizeof(value)) &&
+           sscanf(value, "%lf%c", &percentage, &extra) == 1 &&
+           percentage >= 0.0 && percentage <= 100.0;
+}
+
+static BOOL ValidateWindowConfigurationSchema(HKEY generationKey)
+{
+    HKEY windowKey = NULL;
+    int left, right, top, bottom;
+    BOOL valid = OpenKeyAux(NULL, generationKey, "Window", windowKey) &&
+                 GetRequiredInt(windowKey, "Left", left) &&
+                 GetRequiredInt(windowKey, "Right", right) &&
+                 GetRequiredInt(windowKey, "Top", top) &&
+                 GetRequiredInt(windowKey, "Bottom", bottom) &&
+                 left < right && top < bottom &&
+                 ValidateRequiredDwordRange(windowKey, "Show", 0, 11) &&
+                 ValidateRequiredPercentage(windowKey, "Split Position") &&
+                 ValidateRequiredPercentage(windowKey, "Before Zoom Split Position");
+    if (windowKey != NULL)
+        CloseKeyAux(windowKey);
+    return valid;
+}
+
+// This is the schema gate for a complete saved host profile.  The transaction checksum
+// protects every persisted value; the checks below reject values that are individually
+// well-formed but unsafe together before LoadConfig exposes the snapshot to global state.
+static BOOL ValidateCompleteConfigurationSchema(HKEY generationKey)
+{
+    DWORD schemaVersion;
+    DWORD configVersion;
+    DWORD visibleDrives;
+    DWORD separatedDrives;
+    HKEY versionKey = NULL;
+    HKEY configKey = NULL;
+    HKEY viewerKey = NULL;
+    BOOL valid = GetRequiredDword(generationKey, CONFIGURATION_SCHEMA_VERSION_REG, schemaVersion) &&
+                 schemaVersion == CONFIGURATION_SCHEMA_VERSION &&
+                 OpenKeyAux(NULL, generationKey, "Version", versionKey) &&
+                 GetRequiredDword(versionKey, "Config Version", configVersion) &&
+                 configVersion == THIS_CONFIG_VERSION &&
+                 OpenKeyAux(NULL, generationKey, "Configuration", configKey) &&
+                 ValidateRequiredDwordRange(configKey, "Size Format", SIZE_FORMAT_BYTES, SIZE_FORMAT_MIXED) &&
+                 ValidateRequiredDwordRange(configKey, "Thumbnail Size", THUMBNAIL_SIZE_MIN, THUMBNAIL_SIZE_MAX) &&
+                 ValidateRequiredDwordRange(configKey, "Title bar mode", TITLE_BAR_MODE_DIRECTORY, TITLE_BAR_MODE_FULLPATH) &&
+                 ValidateRequiredDwordRange(configKey, "Make File List Destination", 0, 2) &&
+                 ValidateRequiredDwordRange(configKey, "Time Resolution", 0, 3600) &&
+                 ValidateRequiredDwordRange(configKey, "DragDrop Min Time", 0, 60000) &&
+                 GetRequiredDword(configKey, "Visible Drives", visibleDrives) &&
+                 GetRequiredDword(configKey, "Separated Drives", separatedDrives) &&
+                 (visibleDrives & ~DRIVES_MASK) == 0 &&
+                 (separatedDrives & ~DRIVES_MASK) == 0 &&
+                 (separatedDrives & ~visibleDrives) == 0 &&
+                 OpenKeyAux(NULL, generationKey, "Viewer", viewerKey) &&
+                 ValidateRequiredDwordRange(viewerKey, "Tabelator Size", 1, 30) &&
+                 ValidateRequiredDwordRange(viewerKey, "Default Mode", 0, 2) &&
+                 ValidateWindowConfigurationSchema(generationKey);
+    if (viewerKey != NULL)
+        CloseKeyAux(viewerKey);
+    if (configKey != NULL)
+        CloseKeyAux(configKey);
+    if (versionKey != NULL)
+        CloseKeyAux(versionKey);
+    return valid;
+}
+
+// Schema migrations are explicit and idempotent.  Schema version 0 is the original
+// transactional snapshot format; adding its version marker is safe because that marker
+// is intentionally excluded from the content checksum above.
+static BOOL MigrateConfigurationSchema(HKEY generationKey)
+{
+    DWORD schemaVersion = 0;
+    DWORD valueType = 0;
+    DWORD valueSize = sizeof(schemaVersion);
+    LONG readResult = RegQueryValueEx(generationKey, CONFIGURATION_SCHEMA_VERSION_REG, NULL,
+                                      &valueType, (BYTE*)&schemaVersion, &valueSize);
+    if (readResult == ERROR_FILE_NOT_FOUND)
+        schemaVersion = 0;
+    else if (readResult != ERROR_SUCCESS || valueType != REG_DWORD || valueSize != sizeof(schemaVersion))
+        return FALSE;
+    if (schemaVersion > CONFIGURATION_SCHEMA_VERSION)
+        return FALSE;
+
+    while (schemaVersion < CONFIGURATION_SCHEMA_VERSION)
+    {
+        switch (schemaVersion)
+        {
+        case 0:
+            schemaVersion = 1;
+            if (!SetValue(generationKey, CONFIGURATION_SCHEMA_VERSION_REG, REG_DWORD,
+                          &schemaVersion, sizeof(schemaVersion)))
+                return FALSE;
+            break;
+
+        default:
+            return FALSE;
+        }
+    }
+    return TRUE;
+}
+
 static BOOL IsCommittedConfigurationGeneration(HKEY generationKey)
 {
     DWORD complete = 0;
@@ -458,10 +587,17 @@ static BOOL OpenCommittedConfigurationGeneration(HKEY storeKey, DWORD generation
         return FALSE;
     }
     CloseKeyAux(generationsKey);
-    if (IsCommittedConfigurationGeneration(generationKey))
+    if (IsCommittedConfigurationGeneration(generationKey) &&
+        MigrateConfigurationSchema(generationKey) &&
+        ValidateCompleteConfigurationSchema(generationKey))
         return TRUE;
     CloseKeyAux(generationKey);
     return FALSE;
+}
+
+const char* GetConfigurationSchemaDiagnostic()
+{
+    return ConfigurationSchemaDiagnostic[0] == 0 ? NULL : ConfigurationSchemaDiagnostic;
 }
 
 void SetConfigurationStoreRoot(const char* root)
@@ -482,6 +618,7 @@ BOOL SelectCommittedConfigurationGeneration()
     if (!OpenKeyAux(NULL, HKEY_CURRENT_USER, ConfigurationStoreRoot, storeKey))
         return FALSE;
 
+    ConfigurationSchemaDiagnostic[0] = 0;
     DWORD activeGeneration;
     BOOL selected = FALSE;
     if (GetValueAux(NULL, storeKey, CONFIGURATION_ACTIVE_GENERATION_REG, REG_DWORD,
@@ -505,7 +642,14 @@ BOOL SelectCommittedConfigurationGeneration()
                 CloseKeyAux(generationKey);
                 activeGeneration = fallbackGeneration;
                 selected = TRUE;
+                lstrcpyn(ConfigurationSchemaDiagnostic,
+                         "Open Salamander ignored an invalid configuration profile and restored the last verified profile.",
+                         sizeof(ConfigurationSchemaDiagnostic));
             }
+            else
+                lstrcpyn(ConfigurationSchemaDiagnostic,
+                         "Open Salamander could not validate the saved configuration. The default profile will be used.",
+                         sizeof(ConfigurationSchemaDiagnostic));
         }
     }
     CloseKeyAux(storeKey);
@@ -565,7 +709,9 @@ static BOOL CommitConfigurationTransaction(HKEY storeKey, HKEY generationKey, DW
 {
     DWORD checksum = 2166136261u;
     DWORD complete = 1;
-    BOOL committed = CalculateConfigurationChecksum(generationKey, checksum) &&
+    BOOL committed = MigrateConfigurationSchema(generationKey) &&
+                     ValidateCompleteConfigurationSchema(generationKey) &&
+                     CalculateConfigurationChecksum(generationKey, checksum) &&
                      SetValue(generationKey, CONFIGURATION_TRANSACTION_CHECKSUM_REG, REG_DWORD,
                               &checksum, sizeof(checksum)) &&
                      SetValue(generationKey, CONFIGURATION_TRANSACTION_COMPLETE_REG, REG_DWORD,
