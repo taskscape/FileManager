@@ -111,6 +111,7 @@ BOOL GetGoogleDrivePath(char* gdPath, int gdPathMax, CSQLite3DynLoadBase** sqlit
                 if (ConvertA2U(sDbPath, -1, widePath, _countof(widePath)) &&
                     ConvertU2A(widePath, -1, mbPath, _countof(mbPath), FALSE, CP_UTF8))
                 {
+                    // Google Drive owns this database, so its data is never a FileManager recovery or write target.
                     int iSts = sqlite3_Dyn->open_v2(mbPath, &pDb, SQLITE_OPEN_READONLY, NULL);
                     if (!iSts)
                     {

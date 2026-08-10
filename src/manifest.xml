@@ -1,10 +1,11 @@
 ﻿<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <assembly xmlns="urn:schemas-microsoft-com:asm.v1" manifestVersion="1.0">
+<!-- The assembly identity tracks the product major; generated build metadata remains in VERSIONINFO. -->
 <assemblyIdentity
     name="Open.Salamander.OpenSalamander"
     processorArchitecture="*"
     type="win32"
-    version="5.0.0.0">
+    version="6.0.0.0">
 </assemblyIdentity>
 <description>Open Salamander File Manager</description>
 <dependency>

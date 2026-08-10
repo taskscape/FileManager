@@ -417,10 +417,10 @@ This document is the working record for a read-only stability and resilience aud
 - **Implementation (2026-08-10):** Replaced the patched 16.04 source tree with upstream 7-Zip 26.02 and updated `7za.dll`, the crash-report `7zwrapper`, and the in-process `7zip.spl` COM callbacks to current interface conventions. The retryable input/output adapters now compose 26.02's final file streams, retaining the host retry prompts and stream capabilities. `src/plugins/7zip/doc/upgrade-26.02.md` pins the upstream artifact and records the mandatory corpus, fuzz, and extraction-snapshot gate for subsequent upgrades.
 - **Verification:** `NativeSafetyRegressionTests.Bundled_7zip_uses_26_02_and_preserves_upgrade_compatibility_contract` guards the version, source-integrity record, callback/stream compatibility seams, and build inputs. Visual Studio 2026 Debug x64 builds of the aggregate `7zip.vcxproj` succeeded with 0 warnings and 0 errors, producing `7zip.spl`.
 
-### 62. Upgrade SQLite and define database recovery behavior
+### 62. Upgrade SQLite and define database recovery behavior — Implemented
 
-- **Justification:** The vendored SQLite reports 3.28.0. Old storage code misses later correctness, corruption-detection, and platform fixes.
-- **Proposed solution:** Upgrade to a current supported amalgamation, record compile options, enable integrity checks for owned databases, use WAL/transaction settings intentionally, and test interrupted writes and corrupt pages.
+- **Resolution:** Upgraded the verified SQLite amalgamation and public header from 3.28.0 to 3.53.4, recorded the archive and source SHA3-256 values, and made the durability/API-validation compile options explicit. The product currently has no owned SQLite database; its sole use reads Google Drive's configuration database with `SQLITE_OPEN_READONLY`, so it is deliberately outside FileManager recovery behavior. The vendor record defines the mandatory WAL, full-synchronous transaction, integrity-check, preservation, and explicit-recovery contract for any future owned database.
+- **Verification:** `tools/test-sqlite-recovery.ps1` runs against the Debug x64 `sqlite.dll` in CI. It verifies WAL settings, interruption of an uncommitted `BEGIN IMMEDIATE` transaction, reopen/integrity success for committed data, and integrity-check failure after a controlled b-tree-page corruption. `NativeSafetyRegressionTests.Bundled_sqlite_uses_a_verified_current_amalgamation_and_exercises_the_owned_database_recovery_contract` keeps the version, source ID, compile options, ownership boundary, recovery probe, and workflow hook from drifting.
 
 ### 63. Upgrade zlib
 

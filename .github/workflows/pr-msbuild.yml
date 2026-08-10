@@ -123,6 +123,11 @@ jobs:
             exit $LASTEXITCODE
           }
 
+      - name: Exercise SQLite WAL recovery and corrupt-page detection
+        # The native DLL must be built first; this x64 probe owns only a GUID-named temporary database.
+        if: matrix.platform == 'x64'
+        run: .\tools\test-sqlite-recovery.ps1 -SqliteDll .\src\vcxproj\sqlite\salamander\Debug_x64\utils\sqlite.dll
+
       - name: Upload build logs
         if: always()
         uses: actions/upload-artifact@v4

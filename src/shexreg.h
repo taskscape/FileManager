@@ -102,8 +102,9 @@ DEFINE_GUID(CLSID_ShellExtension, 0xc78b614fL, 0xf3ea, 0x11d2, 0x94, 0xa1, 0x00,
 // Open Salamander 4.0 beta 1               - 400B1_2 (second attempt to ship "4.0 beta 1")
 // Open Salamander 4.0                      - 400
 // Open Salamander 5.0                       - 500
+// Open Salamander 6.0                       - 600
 
-#define SALSHEXT_SHAREDNAMESAPPENDIX "500"
+#define SALSHEXT_SHAREDNAMESAPPENDIX "600"
 
 #ifdef ENABLE_SH_MENU_EXT
 

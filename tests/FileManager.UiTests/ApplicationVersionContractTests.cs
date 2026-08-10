@@ -1,4 +1,5 @@
 using NUnit.Framework;
+using System.Xml.Linq;
 
 namespace FileManager.UiTests;
 
@@ -16,7 +17,10 @@ public sealed class ApplicationVersionContractTests
         var workflow = File.ReadAllText(Path.Combine(root, ".github", "workflows", "build-installer.yml"));
         var configuration = File.ReadAllText(Path.Combine(root, "src", "mainwnd_config.cpp"));
         var constants = File.ReadAllText(Path.Combine(root, "src", "consts.h"));
-        var manifest = File.ReadAllText(Path.Combine(root, "src", "manifest.xml"));
+        var manifestPath = Path.Combine(root, "src", "manifest.xml");
+        var manifest = XDocument.Load(manifestPath);
+        XNamespace assemblyNamespace = "urn:schemas-microsoft-com:asm.v1";
+        var assemblyVersion = manifest.Root?.Element(assemblyNamespace + "assemblyIdentity")?.Attribute("version")?.Value;
         var shellExtension = File.ReadAllText(Path.Combine(root, "src", "shellext", "shellext.rc"));
         var shellRegistration = File.ReadAllText(Path.Combine(root, "src", "shexreg.h"));
         var readme = File.ReadAllText(Path.Combine(root, "README.md"));
@@ -39,7 +43,7 @@ public sealed class ApplicationVersionContractTests
             Assert.That(configuration, Does.Contain("\"Software\\\\Open Salamander\\\\6.0\","));
             Assert.That(configuration, Does.Contain("\"Software\\\\Open Salamander\\\\5.0\","));
             Assert.That(constants, Does.Contain("#define SALCFG_ROOTS_COUNT 84"));
-            Assert.That(manifest, Does.Contain("version=\"6.0.0.0\""));
+            Assert.That(assemblyVersion, Is.EqualTo("6.0.0.0"));
             Assert.That(shellExtension, Does.Contain("#define FILE_SALVER \"6.0\""));
             Assert.That(shellRegistration, Does.Contain("#define SALSHEXT_SHAREDNAMESAPPENDIX \"600\""));
             Assert.That(readme, Does.Contain("OpenSalamander_6.0.{build_number}.exe"));
