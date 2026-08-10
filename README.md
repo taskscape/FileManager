@@ -78,7 +78,7 @@ The repository includes a GitHub Actions workflow (`.github\workflows\build-inst
 4. Compiles the installer with build number versioning
 5. Creates a GitHub release with the installer attached
 
-The workflow is triggered on pushes to `main` and produces versioned installers named `OpenSalamander_5.0.{build_number}.exe`.
+The workflow is triggered on pushes to `main` and produces versioned installers named `OpenSalamander_6.0.{build_number}.exe`.
 
 ## Customization
 

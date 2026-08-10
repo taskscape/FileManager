@@ -84,9 +84,10 @@ jobs:
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: 5.0.${{ github.run_number }}
-          name: Open Salamander 5.0.${{ github.run_number }}
-          files: Installer\Output\OpenSalamander_5.0.${{ github.run_number }}.exe
+          # Keep the release-managed major separate from GitHub's automatic run number.
+          tag_name: 6.0.${{ github.run_number }}
+          name: Open Salamander 6.0.${{ github.run_number }}
+          files: Installer\Output\OpenSalamander_6.0.${{ github.run_number }}.exe
           draft: false
           prerelease: false
         env:

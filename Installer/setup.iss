@@ -2,12 +2,12 @@
 ; This installer maintains all features from the previous custom installer
 
 #define MyAppName "Open Salamander"
-#define MyAppVersion "5.0"
+#define MyAppVersion "6.0"
 #define MyAppPublisher "Taskscape Ltd"
 #define MyAppURL "https://www.opensalamander.com/"
 #define MyAppExeName "salamand.exe"
 
-; Build number will be passed from command line during CI build
+; The product major is release-managed; the build number remains supplied by CI.
 #ifndef BuildNumber
   #define BuildNumber "0"
 #endif

@@ -13,7 +13,8 @@
     <ClCompile>
       <AdditionalOptions>/wd4456 %(AdditionalOptions)</AdditionalOptions>
       <AdditionalIncludeDirectories>..\..\common\dep\sqlite;..\..\common;..\..\common\dep;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
-      <PreprocessorDefinitions>_MT;WIN32;_WINDOWS;_USRDLL;WINVER=0x0601;_WIN32_WINNT=0x0601;_WIN32_IE=0x0800;SQLITE_API=extern __declspec(dllexport);SQLITE_WIN32_GETVERSIONEX=0;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <!-- Keep SQLite's durability and input-validation defaults visible in the build so an owned store cannot silently inherit weaker settings. -->
+      <PreprocessorDefinitions>_MT;WIN32;_WINDOWS;_USRDLL;WINVER=0x0601;_WIN32_WINNT=0x0601;_WIN32_IE=0x0800;SQLITE_API=extern __declspec(dllexport);SQLITE_WIN32_GETVERSIONEX=0;SQLITE_DQS=0;SQLITE_ENABLE_API_ARMOR;SQLITE_DEFAULT_SYNCHRONOUS=2;SQLITE_DEFAULT_WAL_SYNCHRONOUS=2;SQLITE_DEFAULT_WAL_AUTOCHECKPOINT=1000;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
       <BufferSecurityCheck>false</BufferSecurityCheck>
       <WarningLevel>Level3</WarningLevel>

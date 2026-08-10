@@ -1559,6 +1559,47 @@ public sealed class NativeSafetyRegressionTests
         });
     }
 
+    [Test]
+    public void Bundled_sqlite_uses_a_verified_current_amalgamation_and_exercises_the_owned_database_recovery_contract()
+    {
+        var root = FindRepositoryRoot();
+        var amalgamation = File.ReadAllText(Path.Combine(root, "src", "common", "dep", "sqlite", "sqlite3.c"));
+        var header = File.ReadAllText(Path.Combine(root, "src", "plugins", "shared", "sqlite", "sqlite3.h"));
+        var project = File.ReadAllText(Path.Combine(root, "src", "vcxproj", "sqlite", "sqlite_base.props"));
+        var policy = File.ReadAllText(Path.Combine(root, "src", "common", "dep", "sqlite", "readme.txt"));
+        var externalReader = File.ReadAllText(Path.Combine(root, "src", "shiconov.cpp"));
+        var recoveryTest = File.ReadAllText(Path.Combine(root, "tools", "test-sqlite-recovery.ps1"));
+        var workflow = File.ReadAllText(Path.Combine(root, ".github", "workflows", "pr-msbuild.yml"));
+        var refactoring = File.ReadAllText(Path.Combine(root, "refactoring.md"));
+
+        // Keep the vendored binary, ownership boundary, and executable recovery probe aligned after future upgrades.
+        Assert.Multiple(() =>
+        {
+            Assert.That(amalgamation, Does.Contain("#define SQLITE_VERSION        \"3.53.4\""));
+            Assert.That(amalgamation, Does.Contain("bf7c7f30031888f4e796e429ab3978879485813aaca6f641c7b33e4e09459bcc"));
+            Assert.That(header, Does.Contain("#define SQLITE_VERSION        \"3.53.4\""));
+            Assert.That(header, Does.Contain("bf7c7f30031888f4e796e429ab3978879485813aaca6f641c7b33e4e09459bcc"));
+            Assert.That(project, Does.Contain("SQLITE_DQS=0"));
+            Assert.That(project, Does.Contain("SQLITE_ENABLE_API_ARMOR"));
+            Assert.That(project, Does.Contain("SQLITE_DEFAULT_SYNCHRONOUS=2"));
+            Assert.That(project, Does.Contain("SQLITE_DEFAULT_WAL_SYNCHRONOUS=2"));
+            Assert.That(project, Does.Contain("SQLITE_DEFAULT_WAL_AUTOCHECKPOINT=1000"));
+            Assert.That(policy, Does.Contain("628a44cfe82c66aed1ccbbe85a562d2e33ebe64b3288981ed76285612227934e"));
+            Assert.That(policy, Does.Contain("PRAGMA integrity_check"));
+            Assert.That(policy, Does.Contain("BEGIN IMMEDIATE"));
+            Assert.That(policy, Does.Contain("FileManager must not run\nintegrity checks, checkpoints, migrations, or recovery writes against it."));
+            Assert.That(externalReader, Does.Contain("SQLITE_OPEN_READONLY"));
+            Assert.That(externalReader, Does.Contain("never a FileManager recovery or write target"));
+            Assert.That(recoveryTest, Does.Contain("PRAGMA journal_mode=WAL"));
+            Assert.That(recoveryTest, Does.Contain("BEGIN IMMEDIATE"));
+            Assert.That(recoveryTest, Does.Contain("PRAGMA integrity_check"));
+            Assert.That(recoveryTest, Does.Contain("sqlite3_compileoption_used"));
+            Assert.That(recoveryTest, Does.Contain("CorruptPage"));
+            Assert.That(workflow, Does.Contain("test-sqlite-recovery.ps1"));
+            Assert.That(refactoring, Does.Contain("### 62. Upgrade SQLite and define database recovery behavior — Implemented"));
+        });
+    }
+
     private static string FindRepositoryRoot()
     {
         for (var directory = new DirectoryInfo(AppContext.BaseDirectory); directory is not null; directory = directory.Parent)

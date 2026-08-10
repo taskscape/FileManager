@@ -21,11 +21,12 @@
 #define VERSINFO_xstr(s) VERSINFO_str(s)
 #define VERSINFO_str(s) #s
 
-#define VERSINFO_SALAMANDER_MAJOR 5
+// The release-managed major stays separate from the automatically injected build date.
+#define VERSINFO_SALAMANDER_MAJOR 6
 #define VERSINFO_SALAMANDER_MINORA 0
 #define VERSINFO_SALAMANDER_MINORB 0
 
-// Version format: MAJOR.BUILDDATE  (e.g. "5.20260620")
+// Version format: MAJOR.BUILDDATE  (e.g. "6.20260620")
 // VERSINFO_SALAMANDER_BUILDDATE is the build date in YYYYMMDD format.
 // It is normally injected by the build: src\Directory.Build.props computes the current
 // date and passes VERSINFO_SALAMANDER_BUILDDATE_DYNAMIC=YYYYMMDD to both the C/C++ and
