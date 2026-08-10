@@ -2627,14 +2627,20 @@ static COperationResult VerifyDurableCopyCommit(const char* targetName, const CQ
         verified = FALSE;
     }
 
-    if (!HANDLES(CloseHandle(target)) && verified)
+    // Capture the verification result before CloseHandle can replace GetLastError.
+    COperationResult result = verified ? COperationResult::Success(orpVerifyDurableCopy, NULL, targetName) :
+                                         COperationResult::Failure(orpVerifyDurableCopy, error, NULL, targetName,
+                                                                   IsRetryableOperationError(error));
+    if (!HANDLES(CloseHandle(target)))
     {
-        error = GetLastError();
-        verified = FALSE;
+        DWORD cleanupError = GetLastError();
+        if (result.Succeeded())
+            result = COperationResult::Failure(orpVerifyDurableCopy, cleanupError, NULL, targetName,
+                                               IsRetryableOperationError(cleanupError));
+        else
+            result.AppendCleanupError(orcpCloseVerificationHandle, cleanupError, targetName);
     }
-    return verified ? COperationResult::Success(orpVerifyDurableCopy, NULL, targetName) :
-                      COperationResult::Failure(orpVerifyDurableCopy, error, NULL, targetName,
-                                                IsRetryableOperationError(error));
+    return result;
 }
 
 // A post-close size check establishes a durable destination, but it cannot
@@ -4866,11 +4872,17 @@ COPY_AGAIN:
                             goto SKIP_COPY;
 
                         int ret = IDCANCEL;
+                        char diagnosticSummary[2 * 3 * MAX_PATH + 512];
+                        char diagnosticText[2 * 3 * MAX_PATH + 768];
+                        verificationResult.BuildDiagnosticSummary(diagnosticSummary, _countof(diagnosticSummary));
+                        _snprintf_s(diagnosticText, _countof(diagnosticText), _TRUNCATE,
+                                    "%s\r\n\r\nDiagnostic (copy with Ctrl+C):\r\n%s",
+                                    GetErrorText(verificationError), diagnosticSummary);
                         char* data[4];
                         data[0] = (char*)&ret;
                         data[1] = LoadStr(IDS_ERRORWRITINGFILE);
                         data[2] = op->TargetName;
-                        data[3] = GetErrorText(verificationError);
+                        data[3] = diagnosticText;
                         SendMessage(hProgressDlg, WM_USER_DIALOG, 0, (LPARAM)data);
                         switch (ret)
                         {
@@ -4881,6 +4893,7 @@ COPY_AGAIN:
                             if (DeleteFileUtf8(op->TargetName) == 0)
                             {
                                 DWORD err = GetLastError();
+                                verificationResult.AppendCleanupError(orcpDeleteUnverifiedTarget, err, op->TargetName);
                                 TRACE_E("DoCopyFile(): Unable to remove unverified copy target: " << op->TargetName << ", error: " << GetErrorText(err));
                             }
                             goto COPY_AGAIN;
@@ -4918,11 +4931,17 @@ COPY_AGAIN:
                                 goto SKIP_COPY;
 
                             int ret = IDCANCEL;
+                            char diagnosticSummary[2 * 3 * MAX_PATH + 512];
+                            char diagnosticText[2 * 3 * MAX_PATH + 768];
+                            commitResult.BuildDiagnosticSummary(diagnosticSummary, _countof(diagnosticSummary));
+                            _snprintf_s(diagnosticText, _countof(diagnosticText), _TRUNCATE,
+                                        "%s\r\n\r\nDiagnostic (copy with Ctrl+C):\r\n%s",
+                                        GetErrorText(err), diagnosticSummary);
                             char* data[4];
                             data[0] = (char*)&ret;
                             data[1] = LoadStr(IDS_ERRORWRITINGFILE);
                             data[2] = requestedTargetName;
-                            data[3] = GetErrorText(err);
+                            data[3] = diagnosticText;
                             SendMessage(hProgressDlg, WM_USER_DIALOG, 0, (LPARAM)data);
                             switch (ret)
                             {
