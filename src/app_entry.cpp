@@ -3016,6 +3016,10 @@ int WinMainBody(HINSTANCE hInstance, HINSTANCE /*hPrevInstance*/, LPSTR cmdLine,
 {
     int myExitCode = 1;
 
+    // Register before normal startup allocations so the first OOM can leave a
+    // fixed-buffer recovery marker even if the main window is not yet available.
+    SetAllocEmergencyRecoveryCallback(COperationJournal::PersistEmergencyShutdownState);
+
     //--- nechci zadne kriticke chyby jako "no disk in drive A:"
     SetErrorMode(SetErrorMode(0) | SEM_FAILCRITICALERRORS);
 
@@ -3710,6 +3714,8 @@ FIND_NEW_SLG_FILE:
             {
                 SetMessagesParent(MainWindow->HWindow);
                 PluginMsgBoxParent = MainWindow->HWindow;
+                // Route an OOM raised by a worker back to the normal shutdown protocol.
+                SetAllocEmergencyExitWindow(MainWindow->HWindow, WM_USER_FORCECLOSE_MAINWND);
 
                 // vytahneme z registry Group Policy
                 IfExistSetSplashScreenText(LoadStr(IDS_STARTUP_POLICY));

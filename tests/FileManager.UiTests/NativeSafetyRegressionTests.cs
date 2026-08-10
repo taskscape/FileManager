@@ -950,6 +950,42 @@ public sealed class NativeSafetyRegressionTests
     }
 
     [Test]
+    public void Allocation_emergency_releases_the_reserve_persists_recovery_and_stops_new_operations()
+    {
+        var root = FindRepositoryRoot();
+        var allocatorHeader = File.ReadAllText(Path.Combine(root, "src", "common", "allochan.h"));
+        var allocator = File.ReadAllText(Path.Combine(root, "src", "common", "allochan.cpp"));
+        var journal = File.ReadAllText(Path.Combine(root, "src", "operation_journal.cpp"));
+        var operations = File.ReadAllText(Path.Combine(root, "src", "operations_core.cpp"));
+        var startup = File.ReadAllText(Path.Combine(root, "src", "app_entry.cpp"));
+        var refactoring = File.ReadAllText(Path.Combine(root, "refactoring.md"));
+
+        // OOM cannot be safely synthesized in the executable; these source-level
+        // checks pin the allocation-free first-failure contract and its handoff.
+        Assert.Multiple(() =>
+        {
+            Assert.That(allocatorHeader, Does.Contain("SetAllocEmergencyRecoveryCallback"));
+            Assert.That(allocatorHeader, Does.Contain("SetAllocEmergencyExitWindow"));
+            Assert.That(allocatorHeader, Does.Contain("IsAllocationEmergencyActive"));
+            Assert.That(allocator, Does.Contain("const SIZE_T AllocEmergencyReserveSize = 64 * 1024"));
+            Assert.That(allocator, Does.Contain("HeapAlloc(GetProcessHeap(), 0, AllocEmergencyReserveSize)"));
+            Assert.That(allocator, Does.Contain("InterlockedCompareExchange(&AllocEmergencyActive, TRUE, FALSE)"));
+            Assert.That(allocator, Does.Contain("InterlockedExchangePointer((PVOID volatile*)&AllocEmergencyReserve, NULL)"));
+            Assert.That(allocator, Does.Contain("HeapFree(GetProcessHeap(), 0, reserve)"));
+            Assert.That(allocator, Does.Contain("NotifyAllocationEmergency()"));
+            Assert.That(allocator, Does.Contain("ActivateAllocationEmergency();"));
+            Assert.That(journal, Does.Contain("void COperationJournal::PersistEmergencyShutdownState()"));
+            Assert.That(journal, Does.Contain("OPERATION|memory-pressure"));
+            Assert.That(journal, Does.Contain("FILE_FLAG_WRITE_THROUGH"));
+            Assert.That(startup, Does.Contain("SetAllocEmergencyRecoveryCallback(COperationJournal::PersistEmergencyShutdownState)"));
+            Assert.That(startup, Does.Contain("SetAllocEmergencyExitWindow(MainWindow->HWindow, WM_USER_FORCECLOSE_MAINWND)"));
+            Assert.That(operations, Does.Contain("if (IsAllocationEmergencyActive())"));
+            Assert.That(operations, Does.Contain("COperationsQueue::AddOperation"));
+            Assert.That(refactoring, Does.Contain("### 52. Reserve memory for graceful out-of-memory handling — Implemented"));
+        });
+    }
+
+    [Test]
     public void Background_producers_bound_non_durable_work_and_report_backpressure()
     {
         var root = FindRepositoryRoot();

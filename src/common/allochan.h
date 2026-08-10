@@ -3,6 +3,8 @@
 
 #pragma once
 
+#include <windows.h>
+
 // Installs a handler to handle situations when memory runs out during operator new
 // or malloc calls (which are used by calloc, realloc and others, see help). Ensures
 // that neither operator new nor malloc will ever return NULL without user knowledge.
@@ -30,3 +32,10 @@
 // Do you really want to terminate this application?\n\nWARNING: All unsaved data will be lost!
 void SetAllocHandlerMessage(const TCHAR* message, const TCHAR* title,
                             const TCHAR* warningIgnore, const TCHAR* warningAbort);
+
+// The first allocation failure releases this reserve before any recovery path
+// runs, so fixed-buffer recovery and orderly shutdown still have working memory.
+typedef void(__cdecl* TAllocEmergencyRecoveryCallback)(void);
+void SetAllocEmergencyRecoveryCallback(TAllocEmergencyRecoveryCallback callback);
+void SetAllocEmergencyExitWindow(HWND window, UINT message);
+BOOL IsAllocationEmergencyActive();

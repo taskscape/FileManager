@@ -412,6 +412,23 @@ void COperationJournal::Finish(BOOL failed, BOOL cancelled)
     }
 }
 
+void COperationJournal::PersistEmergencyShutdownState()
+{
+    // The normal journal remains authoritative for individual items; this
+    // small marker explains why a later recovery scan found it unfinished.
+    char directory[MAX_PATH];
+    if (!GetJournalDirectory(directory, _countof(directory), TRUE)) return;
+    char path[3 * MAX_PATH];
+    _snprintf_s(path, _countof(path), _TRUNCATE, "%s\\memory-pressure-%08lX-%08lX.opj",
+                directory, GetCurrentProcessId(), GetTickCount());
+    HANDLE file = HANDLES_Q(CreateFileUtf8(path, GENERIC_WRITE, FILE_SHARE_READ, NULL, CREATE_NEW,
+                                            FILE_ATTRIBUTE_NORMAL | FILE_FLAG_WRITE_THROUGH, NULL));
+    if (file == INVALID_HANDLE_VALUE) return;
+    WriteAll(file, "FORMAT|1\r\nOPERATION|memory-pressure\r\n");
+    FlushFileBuffers(file);
+    HANDLES(CloseHandle(file));
+}
+
 void COperationJournal::OfferRecovery(HWND parent)
 {
     char directory[MAX_PATH];
