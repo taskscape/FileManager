@@ -789,7 +789,7 @@ public sealed class NativeSafetyRegressionTests
     }
 
     [Test]
-    public void Plugin_entry_scope_restores_host_state_after_an_unwinding_entry_point()
+    public void Plugin_entry_scope_and_callback_state_restore_host_state_after_an_unwinding_entry_point()
     {
         var root = FindRepositoryRoot();
         var loader = File.ReadAllText(Path.Combine(root, "src", "plugins_loading.cpp"));
@@ -805,17 +805,28 @@ public sealed class NativeSafetyRegressionTests
             Assert.That(loader, Does.Contain("~CPluginEntryScope()"));
             Assert.That(loader, Does.Contain("CPluginDataLock dataLock"));
             Assert.That(loader, Does.Contain("PluginIface.Init(NULL, 0)"));
-            Assert.That(loader, Does.Contain("LeavePlugin();\n        SalamanderGeneral.Init(PluginIface.GetInterface());"));
-            Assert.That(loader, Does.Contain("CPluginEntryScope pluginEntry(PluginIface, SalamanderGeneral, BuiltForVersion)"));
+            Assert.That(loader, Does.Contain("CallbackState.Leave();\n        SalamanderGeneral.Init(PluginIface.GetInterface());"));
+            Assert.That(loader, Does.Contain("CPluginEntryScope pluginEntry(Plugins.GetCallbackState(), PluginIface,"));
             Assert.That(loader, Does.Contain("pluginEntry.SetReturnedInterface(resIface)"));
             Assert.That(loader, Does.Not.Contain("EnterPlugin(); // for the plugin entry point"));
-            Assert.That(loader, Does.Contain("static SRWLOCK PluginNestingStateLock = SRWLOCK_INIT"));
-            Assert.That(loader, Does.Contain("static std::atomic<int> AlreadyInPlugin(0)"));
+            // Callback state must stay owned by CPlugins while the loading scope
+            // receives only the narrow reference it needs for balanced entry/exit.
+            Assert.That(header, Does.Contain("class CPluginCallbackState"));
+            Assert.That(header, Does.Contain("std::atomic<int> CallbackDepth"));
+            Assert.That(header, Does.Contain("SRWLOCK TransitionLock"));
+            Assert.That(header, Does.Contain("CPluginCallbackState CallbackState"));
+            Assert.That(header, Does.Contain("CPluginCallbackState& GetCallbackState()"));
+            Assert.That(loader, Does.Contain("void CPluginCallbackState::Enter()"));
+            Assert.That(loader, Does.Contain("void CPluginCallbackState::Leave()"));
+            Assert.That(loader, Does.Contain("Plugins.GetCallbackState().Enter()"));
+            Assert.That(loader, Does.Not.Contain("AlreadyInPlugin"));
+            Assert.That(loader, Does.Not.Contain("PluginNestingStateLock"));
             Assert.That(header, Does.Contain("BOOL IsInPlugin();"));
             Assert.That(messages, Does.Contain("IsInPlugin() || StopRefresh > 0"));
             Assert.That(shutdown, Does.Contain("!endAfterCleanup && IsInPlugin()"));
             Assert.That(pathUtilities, Does.Contain("!IsInPlugin()"));
             Assert.That(refactoring, Does.Contain("### 22. Implemented: make plug-in entry bookkeeping exception-safe"));
+            Assert.That(refactoring, Does.Contain("### 48. Reduce unowned global mutable state — Implemented"));
         });
     }
 
