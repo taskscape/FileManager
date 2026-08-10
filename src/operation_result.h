@@ -3,6 +3,8 @@
 
 #pragma once
 
+#include "retry_policy.h"
+
 // File-operation failures cross worker, journal, and dialog boundaries.  Keep
 // the original phase and effect state together so a later compatibility adapter
 // cannot accidentally replace the causal error with a cleanup-side failure.
@@ -135,12 +137,9 @@ struct COperationResult
     }
 };
 
-// Retries are only suggested for transient contention or transport states;
-// callers retain the final decision because a commit may still be destructive.
+// Reuse the central transient classification; callers still retain the final
+// decision because a retryable error can occur after a destructive commit.
 inline BOOL IsRetryableOperationError(DWORD error)
 {
-    return error == ERROR_SHARING_VIOLATION || error == ERROR_LOCK_VIOLATION ||
-           error == ERROR_BUSY || error == ERROR_NETWORK_BUSY ||
-           error == ERROR_NOT_READY || error == ERROR_SEM_TIMEOUT ||
-           error == ERROR_TIMEOUT;
+    return IsTransientOperationError(error);
 }
