@@ -307,10 +307,11 @@ This document is the working record for a read-only stability and resilience aud
 - **Implementation (2026-08-10):** The reusable check-path worker now waits on its work and owner-cancellation events together, so shutdown wakes the idle thread without a synthetic request. Slot exhaustion waits for actual worker-completion events instead of polling every 100 ms. The grace and retry delays are waitable-timer deadline handles with explicit work-completed versus deadline-elapsed outcomes; no `Sleep` polling remains in `src/path_checking.cpp`.
 - **Verification:** `NativeSafetyRegressionTests.Check_path_workers_use_signaled_work_cancellation_and_deadline_waits` guards the multi-handle cancellation wait, completion-driven slot handoff, waitable deadline protocol, and removal of `Sleep` from the check-path implementation.
 
-### 47. Document and verify lock ordering
+### 47. Document and verify lock ordering — Implemented
 
 - **Justification:** Thousands of critical-section enter/leave sites and cross-thread UI calls make lock inversion difficult to reason about.
-- **Proposed solution:** Assign lock ranks, wrap acquisition with debug assertions, record owner/waiter information on timeout, and run Application Verifier deadlock checks in a nightly stress lane.
+- **Implementation (2026-08-10):** `CLockRank` defines the process-lifetime through external-broker order, and ranked `CScopedCriticalSection` acquisitions delegate to `LockOrderEnter`/`LockOrderLeave`. Debug builds retain a per-thread acquisition stack, assert on a non-recursive lower/equal rank, and, after ten seconds of contention, emit the requested lock, waiter thread, owner, recursion count, and held rank before preserving the existing blocking behavior. `CParserBrokerClient::Lock` is the first migration point at `lkrExternalBroker`; the architecture guide defines the rank families and explicitly prohibits holding a ranked lock across synchronous UI calls.
+- **Verification:** `NativeSafetyRegressionTests.Lock_ordering_has_rank_assertions_timeout_diagnostics_and_a_nightly_verifier_lane` guards the rank API, inversion assertion, timeout diagnostics, parser-broker migration, documentation, and delivery workflow. `nightly-lock-stress.yml` runs the repeated isolated-profile UI lifecycle scenarios with Application Verifier's `Locks` layer and always clears its process-persistent configuration afterward.
 
 ### 48. Reduce unowned global mutable state
 

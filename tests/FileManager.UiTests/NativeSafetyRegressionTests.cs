@@ -245,11 +245,56 @@ public sealed class NativeSafetyRegressionTests
             Assert.That(copy, Does.Contain("CScopedHeapBuffer outputBuffer(malloc(ASYNC_COPY_BUF_SIZE))"));
             Assert.That(copy, Does.Not.Contain("free(bufIn);"));
             Assert.That(copy, Does.Not.Contain("free(bufOut);"));
-            Assert.That(broker, Does.Contain("CScopedCriticalSection lock(&Lock)"));
+            Assert.That(broker, Does.Contain("CScopedCriticalSection lock(&Lock, lkrExternalBroker, \"ParserBroker.Lock\")"));
             Assert.That(broker, Does.Not.Contain("LeaveCriticalSection(&Lock);"));
             Assert.That(scripts, Does.Contain("CScopedMappingView codeView(MapViewOfFile"));
             Assert.That(scripts, Does.Not.Contain("UnmapViewOfFile(pszCodeA)"));
             Assert.That(refactoring, Does.Contain("### 42. Adopt RAII for memory, mappings, and critical sections — Implemented"));
+        });
+    }
+
+    [Test]
+    public void Lock_ordering_has_rank_assertions_timeout_diagnostics_and_a_nightly_verifier_lane()
+    {
+        var root = FindRepositoryRoot();
+        var ordering = File.ReadAllText(Path.Combine(root, "src", "common", "lock_ordering.cpp"));
+        var orderingHeader = File.ReadAllText(Path.Combine(root, "src", "common", "lock_ordering.h"));
+        var scopedResources = File.ReadAllText(Path.Combine(root, "src", "common", "scoped_native_resources.h"));
+        var broker = File.ReadAllText(Path.Combine(root, "src", "parserbroker.cpp"));
+        var project = File.ReadAllText(Path.Combine(root, "src", "vcxproj", "salamand.vcxproj"));
+        var architecture = File.ReadAllText(Path.Combine(root, "architecture.md"));
+        var workflow = File.ReadAllText(Path.Combine(root, ".github", "workflows", "nightly-lock-stress.yml"));
+        var stressRunner = File.ReadAllText(Path.Combine(root, "tools", "run-lock-verifier-stress.ps1"));
+        var refactoring = File.ReadAllText(Path.Combine(root, "refactoring.md"));
+
+        // Pin the wrapper, implementation, build registration, runtime lane, and ledger so the rank scheme cannot become documentation-only.
+        Assert.Multiple(() =>
+        {
+            Assert.That(orderingHeader, Does.Contain("enum CLockRank"));
+            Assert.That(orderingHeader, Does.Contain("lkrExternalBroker = 70"));
+            Assert.That(orderingHeader, Does.Contain("void LockOrderEnter"));
+            Assert.That(scopedResources, Does.Contain("LockOrderEnter(CriticalSection, Rank, LockName)"));
+            Assert.That(scopedResources, Does.Contain("LockOrderLeave(CriticalSection, Rank, LockName)"));
+            Assert.That(ordering, Does.Contain("_ASSERTE(rank > LockOrderStack[LockOrderStackCount - 1].Rank)"));
+            Assert.That(ordering, Does.Contain("IsRecursiveAcquisition(criticalSection, rank)"));
+            Assert.That(ordering, Does.Contain("TryEnterCriticalSection(criticalSection)"));
+            Assert.That(ordering, Does.Contain("GetTickCount64() - waitStarted >= timeoutMilliseconds"));
+            Assert.That(ordering, Does.Contain("LockOrderStack[LockOrderStackCount - 1]"));
+            Assert.That(ordering, Does.Contain("EnterCriticalSection(criticalSection)"));
+            Assert.That(ordering, Does.Contain("waiter=%lu"));
+            Assert.That(ordering, Does.Contain("owner=%lu"));
+            Assert.That(ordering, Does.Contain("OutputDebugStringA(message)"));
+            Assert.That(broker, Does.Contain("lkrExternalBroker, \"ParserBroker.Lock\""));
+            Assert.That(project, Does.Contain("..\\common\\lock_ordering.cpp"));
+            Assert.That(architecture, Does.Contain("### 7.1 Lock ordering contract"));
+            Assert.That(workflow, Does.Contain("tools\\run-lock-verifier-stress.ps1"));
+            Assert.That(workflow, Does.Contain("self-hosted"));
+            Assert.That(stressRunner, Does.Contain("-enable Locks -for"));
+            Assert.That(stressRunner, Does.Contain("-delete settings -for"));
+            Assert.That(stressRunner, Does.Contain("TestCategory=LockStress"));
+            Assert.That(stressRunner, Does.Contain("finally"));
+            Assert.That(stressRunner, Does.Contain("LogOutputDirectory"));
+            Assert.That(refactoring, Does.Contain("### 47. Document and verify lock ordering — Implemented"));
         });
     }
 
@@ -728,9 +773,9 @@ public sealed class NativeSafetyRegressionTests
             Assert.That(client, Does.Contain("JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE"));
             Assert.That(client, Does.Contain("JOB_OBJECT_LIMIT_PROCESS_MEMORY"));
             Assert.That(client, Does.Contain("CancelIoEx"));
-            // Request serialization is now scope-owned so callback unwinding
-            // cannot strand the broker lock.
-            Assert.That(client, Does.Contain("CScopedCriticalSection lock(&Lock)"));
+            // Request serialization is scope-owned and ranked so callback unwinding
+            // cannot strand the broker lock or obscure its acquisition order.
+            Assert.That(client, Does.Contain("CScopedCriticalSection lock(&Lock, lkrExternalBroker, \"ParserBroker.Lock\")"));
             Assert.That(client, Does.Contain("for (int attempt = 0; attempt != 2; ++attempt)"));
             Assert.That(client, Does.Contain("responseHeader.PayloadLength > responseCapacity"));
             Assert.That(broker, Does.Contain("SHCreateItemFromParsingName"));

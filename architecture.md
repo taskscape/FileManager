@@ -543,6 +543,24 @@ Important concurrency invariants are:
 - Plug-in unload is deferred until active callbacks, windows, filesystems, and plug-in-owned data are no longer in use.
 - Shutdown stops producers before releasing the global objects and handles they use.
 
+### 7.1 Lock ordering contract
+
+New or migrated shared `CRITICAL_SECTION` acquisitions use the ranked `CScopedCriticalSection` form and must progress from a lower rank to a higher rank. Re-entering the same critical section is permitted; acquiring a different critical section at the same or lower rank is not. Do not hold a ranked lock across a cross-thread `SendMessage`, modal UI, or an operation that can synchronously call back into the UI.
+
+| Rank | Lock family | Examples and rule |
+|---:|---|---|
+| 10 | Process lifetime | Startup/shutdown state; acquire before every other ranked lock. |
+| 20 | Configuration | Registry/configuration state. |
+| 30 | Plug-in registry | Plug-in registration and lifetime bookkeeping. |
+| 40 | Worker queue | Background queue and dispatcher state. |
+| 50 | Operation state | Copy/move/delete and progress state. |
+| 60 | UI state | Panel/window state; never use while making a synchronous cross-thread UI call. |
+| 70 | External broker | `CParserBrokerClient::Lock`; it serializes one broker request at a time and is the first migrated ranked lock. |
+
+In Debug builds, `LockOrderEnter` maintains a per-thread rank stack and asserts if a non-recursive acquisition does not increase the rank. It first attempts the critical section without blocking; after ten seconds of contention it writes the requested lock name/rank, waiter thread ID, current owner, recursion count, and already-held rank to the debugger before preserving the existing blocking acquisition behavior. This deliberately keeps Release locking and legacy unranked call sites compatible while each owner is migrated at its subsystem boundary.
+
+The `Nightly Lock Stress` workflow runs the repeated UI lifecycle suite on an isolated desktop runner with Application Verifier's `Locks` layer enabled for `salamand.exe`. The runner removes the verifier's process-persistent settings in a `finally` block and uploads AppVerifier logs, so a failed lane cannot affect later jobs on that machine.
+
 The design does not use a single scheduler or futures abstraction. Each subsystem owns its thread/event/message protocol, so callers must learn that protocol before changing lifecycle or error handling.
 
 ## 8. Architectural and implementation patterns

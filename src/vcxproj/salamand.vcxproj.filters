@@ -417,6 +417,9 @@
     <ClCompile Include="..\common\trace.cpp">
       <Filter>common</Filter>
     </ClCompile>
+    <ClCompile Include="..\common\lock_ordering.cpp">
+      <Filter>common</Filter>
+    </ClCompile>
     <ClCompile Include="..\common\winlib.cpp">
       <Filter>common</Filter>
     </ClCompile>
@@ -780,6 +783,9 @@
       <Filter>common</Filter>
     </ClInclude>
     <ClInclude Include="..\common\thread_owner.h">
+      <Filter>common</Filter>
+    </ClInclude>
+    <ClInclude Include="..\common\lock_ordering.h">
       <Filter>common</Filter>
     </ClInclude>
   </ItemGroup>

@@ -375,6 +375,8 @@
     </ClCompile>
     <ClCompile Include="..\parserbroker.cpp">
     </ClCompile>
+    <ClCompile Include="..\common\lock_ordering.cpp">
+    </ClCompile>
     <ClCompile Include="..\fileswindow_execute.cpp">
     </ClCompile>
     <ClCompile Include="..\fileswindow_navigation.cpp">
@@ -900,6 +902,8 @@
     <ClInclude Include="..\common\scoped_kernel_handle.h">
     </ClInclude>
     <ClInclude Include="..\common\scoped_native_resources.h">
+    </ClInclude>
+    <ClInclude Include="..\common\lock_ordering.h">
     </ClInclude>
     <ClInclude Include="..\common\thread_owner.h">
     </ClInclude>

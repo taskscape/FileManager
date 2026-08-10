@@ -1,0 +1,77 @@
+name: Nightly Lock Stress
+
+on:
+  schedule:
+    - cron: '17 2 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+  BUILD_CONFIGURATION: Debug
+  SOLUTION_PATH: 'src\\vcxproj\\salamand.sln'
+  PLATFORM_TOOLSET: v145
+  OPENSAL_BUILD_DIR: '${{ github.workspace }}\\build_stage\\'
+
+jobs:
+  verifier-lock-stress:
+    # FlaUI needs an unlocked desktop and an isolated profile; this label is deliberately not a hosted runner.
+    runs-on: [self-hosted, windows, filemanager-ui]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup MSBuild
+        uses: microsoft/setup-msbuild@v2
+
+      - name: Setup MSVC Developer Command Prompt (x64 toolchain)
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
+
+      - name: Build Debug x64 executable
+        shell: pwsh
+        run: |
+          msbuild $env:SOLUTION_PATH /m /t:Build /p:Configuration=$env:BUILD_CONFIGURATION /p:Platform=x64 /p:PlatformToolset=$env:PLATFORM_TOOLSET /p:PreferredToolArchitecture=x64 /nr:false
+
+      - name: Run Application Verifier lock stress
+        shell: pwsh
+        run: |
+          $appVerifier = Get-Command appverif.exe -ErrorAction SilentlyContinue
+          if ($null -eq $appVerifier) {
+            $appVerifier = Get-ChildItem 'C:\Program Files (x86)\Windows Kits\10\Debuggers' -Filter appverif.exe -Recurse -ErrorAction SilentlyContinue |
+              Select-Object -First 1
+          }
+          if ($null -eq $appVerifier) {
+            throw 'Application Verifier is required on the filemanager-ui runner.'
+          }
+          $appVerifierPath = if ($appVerifier -is [System.Management.Automation.CommandInfo]) {
+            $appVerifier.Source
+          } else {
+            $appVerifier.FullName
+          }
+
+          $executable = Get-ChildItem $env:OPENSAL_BUILD_DIR -Filter salamand.exe -Recurse |
+            Where-Object { $_.FullName -like '*Debug_x64*' } |
+            Select-Object -First 1
+          if ($null -eq $executable) {
+            throw 'The Debug x64 salamand.exe build output was not found.'
+          }
+
+          # The self-hosted runner account is dedicated to this lane, which makes profile-mutating UI tests safe.
+          $env:FILEMANAGER_UI_ISOLATED = '1'
+          $env:FILEMANAGER_UI_EXE = $executable.FullName
+          .\tools\run-lock-verifier-stress.ps1 -ExecutablePath $executable.FullName `
+            -TestProject '.\tests\FileManager.UiTests\FileManager.UiTests.csproj' -AppVerifierPath $appVerifierPath `
+            -LogOutputDirectory '.\application-verifier-logs'
+
+      - name: Upload Application Verifier logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: application-verifier-lock-logs
+          path: application-verifier-logs
+          if-no-files-found: warn
