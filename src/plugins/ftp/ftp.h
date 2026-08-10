@@ -1157,8 +1157,8 @@ public:
 
 extern CConfiguration Config; // global configuration of the FTP client
 
-// Persists the FTP plug-in configuration after a completed user action so bookmarks are
-// not dependent on the application's exit-time configuration save.
+// Persists the FTP plug-in configuration after a completed user action so bookmarks and
+// explicitly remembered certificate exceptions are not dependent on exit-time saving.
 void PersistFTPConfigurationAfterUserCommit(HWND parent);
 
 //

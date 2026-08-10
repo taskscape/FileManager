@@ -597,6 +597,9 @@ void CPluginInterface::LoadConfiguration(HWND parent, HKEY regKey, CSalamanderRe
 
         registry->GetValue(regKey, CONFIG_LASTBOOKMARK, REG_DWORD, &Config.LastBookmark, sizeof(DWORD));
 
+        // Certificate exceptions are independent of bookmark identity but remain in the plug-in's transactional profile.
+        LoadCertificateExceptions(regKey, registry);
+
         if (ConfigVersion != 1) // when moving from version 1 to 2 the server-types and ftp-servers lists in the registry are ignored
         {
             if (ConfigVersion < 2 || ConfigVersion >= RELOAD_PARSERS_BEFORE_CONFIG_VERSION)
@@ -787,6 +790,9 @@ void CPluginInterface::SaveConfiguration(HWND parent, HKEY regKey, CSalamanderRe
     registry->SetValue(regKey, CONFIG_UPLOADASCIITRMODEFORBIN, REG_DWORD, &Config.UploadAsciiTrModeButBinFile, sizeof(DWORD));
 
     registry->SetValue(regKey, CONFIG_LASTBOOKMARK, REG_DWORD, &Config.LastBookmark, sizeof(DWORD));
+
+    // Persist only explicitly remembered pins; session decisions never survive a process restart.
+    SaveCertificateExceptions(regKey, registry);
 
     Config.LockServerTypeList()->Save(parent, regKey, registry);
     Config.UnlockServerTypeList();

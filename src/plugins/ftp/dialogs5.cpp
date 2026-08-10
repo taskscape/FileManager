@@ -1262,12 +1262,13 @@ void COperationDlg::SolveErrorOnConnection(int index)
             char errBuf2[300];
             if (!unverifiedCertificate->CheckCertificate(errBuf2, 300)) // revalidate the certificate and obtain the corresponding error message
             {
+                CCertificateErrDialog certificateDialog(HWindow, errBuf2);
                 INT_PTR dlgRes;
                 do
                 {
                     CurrentFlashWnd = SalamanderGeneral->GetWndToFlash(HWindow);
                     DlgWillCloseIfOpFinWithSkips = FALSE;
-                    dlgRes = CCertificateErrDialog(HWindow, errBuf2).Execute();
+                    dlgRes = certificateDialog.Execute();
                     DlgWillCloseIfOpFinWithSkips = (IsDlgButtonChecked(HWindow, IDC_OPCLOSEWINWHENDONE) == BST_CHECKED);
                     if (CurrentFlashWnd != NULL)
                     {
@@ -1280,6 +1281,10 @@ void COperationDlg::SolveErrorOnConnection(int index)
                     {
                         LastActivityTime = GetTickCount() - OPERDLG_SHOWERRMINIDLETIME; // simulate "idle" so the next error can appear immediately
                         Oper->SetCertificate(unverifiedCertificate);
+                        // A worker may reuse the decision only through the certificate's host, port, pin, and expiry scope.
+                        if (unverifiedCertificate->RememberException(certificateDialog.RememberException() ? cesPersistent : cesSession) &&
+                            certificateDialog.RememberException())
+                            PersistFTPConfigurationAfterUserCommit(HWindow);
                         // notify all workers with a connection error
                         WorkersList->PostLoginChanged(-1);
                         break;

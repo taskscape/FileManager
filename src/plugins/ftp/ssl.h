@@ -24,10 +24,18 @@
 #define SSL_ERROR_SYSCALL 5
 #define SSL_ERROR_ZERO_RETURN 6
 
+// Scope is explicit so accepting an invalid chain never becomes durable without a second user choice.
+enum CCertificateExceptionScope
+{
+    cesSession = 1,
+    cesPersistent = 2,
+};
+
 class CCertificate
 {
 public:
-    CCertificate(BYTE* pDERCert, int DERCertLen, BYTE* pPKCS7Cert, int PKCS7CertLen, bool bValid, LPCSTR host);
+    CCertificate(BYTE* pDERCert, int DERCertLen, BYTE* pPKCS7Cert, int PKCS7CertLen, bool bValid, LPCSTR host,
+                 unsigned short port);
     LONG AddRef();
     LONG Release();
     void ShowCertificate(HWND hParent);
@@ -37,6 +45,9 @@ public:
     void SetVerified(bool verified) { bVerified = verified; };
 
     bool IsSame(BYTE* pDERCert, int DERCertLen, BYTE* pPKCS7Cert, int PKCS7CertLen);
+    bool MatchesEndpoint(LPCSTR host, unsigned short port) const;
+    bool RememberException(CCertificateExceptionScope scope) const;
+    bool IsCurrentException() const;
     bool IsVerified() { return bVerified; };
     LPCWSTR GetHostName() { return Host; };
 
@@ -48,6 +59,8 @@ private:
     int nDERDataLen, nPKCS7DataLen;
     bool bVerified;
     LPWSTR Host;
+    LPSTR HostAddress;
+    unsigned short Port;
 };
 
 class CCertificateErrDialog : public CCenteredDialog
@@ -57,10 +70,17 @@ protected:
 
 public:
     CCertificateErrDialog(HWND hParent, const char* errorStr);
+    bool RememberException() const { return RememberedException; }
 
 protected:
     virtual INT_PTR DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam);
+
+    // Retain the explicit choice so the caller can distinguish session trust from persisted trust.
+    bool RememberedException;
 };
+
+void LoadCertificateExceptions(HKEY regKey, CSalamanderRegistryAbstract* registry);
+void SaveCertificateExceptions(HKEY regKey, CSalamanderRegistryAbstract* registry);
 
 // SChannel is a stream security package.  Keeping this opaque type behind the
 // historic SSL name limits the migration to the TLS adapter and its call sites.
