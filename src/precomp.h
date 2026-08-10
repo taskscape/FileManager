@@ -57,6 +57,7 @@
 #include "trace.h"
 #include "messages.h"
 #include "handles.h"
+#include "common/thread_owner.h"
 
 #include "heap.h"
 #include "array.h"

@@ -901,6 +901,8 @@
     </ClInclude>
     <ClInclude Include="..\common\scoped_native_resources.h">
     </ClInclude>
+    <ClInclude Include="..\common\thread_owner.h">
+    </ClInclude>
     <ClInclude Include="..\file_operation_filesystem.h">
     </ClInclude>
     <ClInclude Include="..\parserbroker.h">

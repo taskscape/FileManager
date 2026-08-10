@@ -254,6 +254,45 @@ public sealed class NativeSafetyRegressionTests
     }
 
     [Test]
+    public void Thread_owners_keep_worker_lifetime_stop_completion_naming_com_and_exception_policy_together()
+    {
+        var root = FindRepositoryRoot();
+        var owner = File.ReadAllText(Path.Combine(root, "src", "common", "thread_owner.h"));
+        var checkPath = File.ReadAllText(Path.Combine(root, "src", "path_checking.cpp"));
+        var ratchet = File.ReadAllText(Path.Combine(root, "tools", "verify-no-new-raw-thread-creation.ps1"));
+        var workflow = File.ReadAllText(Path.Combine(root, ".github", "workflows", "pr-msbuild.yml"));
+        var refactoring = File.ReadAllText(Path.Combine(root, "refactoring.md"));
+
+        // These source contracts preserve the worker boundary where shutdown and
+        // completion ordering cannot be deterministically driven through the UI.
+        Assert.Multiple(() =>
+        {
+            Assert.That(owner, Does.Contain("class CThreadOwner"));
+            Assert.That(owner, Does.Contain("CThreadOwnerEntry"));
+            Assert.That(owner, Does.Contain("_beginthreadex"));
+            Assert.That(owner, Does.Contain("StopEvent"));
+            Assert.That(owner, Does.Contain("CompletionEvent"));
+            Assert.That(owner, Does.Contain("SetThreadNameInVCAndTrace"));
+            Assert.That(owner, Does.Contain("CoInitializeEx"));
+            Assert.That(owner, Does.Contain("CoUninitialize"));
+            Assert.That(owner, Does.Contain("catch (...)"));
+            Assert.That(owner, Does.Contain("SetEvent(launch->CompletionEvent)"));
+            Assert.That(owner, Does.Contain("StopAndJoin(INFINITE)"));
+            Assert.That(owner, Does.Contain("caller keeps parameter alive"));
+            Assert.That(checkPath, Does.Contain("CThreadOwner ThreadCheckPath"));
+            Assert.That(checkPath, Does.Contain("ThreadCheckPathOwnedF"));
+            Assert.That(checkPath, Does.Contain("StopAndJoin(1000)"));
+            Assert.That(checkPath, Does.Not.Contain("CreateThread("));
+            Assert.That(checkPath, Does.Not.Contain("SetThreadNameInVCAndTrace(\"CheckPath\")"));
+            Assert.That(ratchet, Does.Contain("git diff --no-ext-diff --unified=0 $BaseCommit HEAD"));
+            Assert.That(ratchet, Does.Contain("CThreadOwner"));
+            Assert.That(ratchet, Does.Contain("CreateThread|_beginthreadex"));
+            Assert.That(workflow, Does.Contain("verify-no-new-raw-thread-creation.ps1 -BaseCommit origin/"));
+            Assert.That(refactoring, Does.Contain("### 43. Standardize thread creation and ownership — Implemented"));
+        });
+    }
+
+    [Test]
     public void Win32_path_boundaries_use_owned_wide_paths_and_extended_length_syntax()
     {
         var root = FindRepositoryRoot();
