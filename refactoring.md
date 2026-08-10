@@ -335,10 +335,11 @@ This document is the working record for a read-only stability and resilience aud
 
 ### Important: resource limits, diagnostics, network, and dependencies
 
-### 51. Set resource budgets for directory enumeration
+### 51. Set resource budgets for directory enumeration — Implemented (2026-08-10)
 
 - **Justification:** Very large directories and slow shares can monopolize memory/UI update traffic even when each individual call succeeds.
-- **Proposed solution:** Enumerate in bounded batches, virtualize UI insertion, cap cached metadata, and yield/cancel between batches. Stress with millions of synthetic entries and high-latency enumeration.
+- **Implementation (2026-08-10):** Disk-panel enumeration now uses fixed 256-entry checkpoints. Each checkpoint yields to the safe-wait window's cancellation thread and probes cancellation, while the existing time-based probe remains for high-latency individual Win32 calls. The list control remains count-based: it receives one final item count and invalidates only its visible-item arrays instead of accepting a per-entry UI-insertion message stream. The panel retains at most 100,000 file/directory metadata records (with one reserved parent-directory record); on reaching that ceiling it stops enumeration, preserves the usable partial listing, and explains that the path or filter must be refined.
+- **Verification:** `NativeSafetyRegressionTests.Directory_listing_uses_bounded_checkpoints_and_a_retained_metadata_budget` simulates one million entries to pin the checkpoint cadence and guards the native batch boundary, cancellation probe, metadata ceiling, count-based list virtualization, user-facing limit text, and this implementation ledger. High-latency shares remain covered by the independent 200 ms cancellation probe between `FindNextFileW` returns.
 
 ### 52. Reserve memory for graceful out-of-memory handling
 
