@@ -174,6 +174,11 @@ public sealed class NativeSafetyRegressionTests
             Assert.That(result, Does.Contain("opeTemporaryTargetReady"));
             Assert.That(result, Does.Contain("opeDestinationCommitted"));
             Assert.That(result, Does.Contain("HRESULT_FROM_WIN32(error)"));
+            Assert.That(result, Does.Contain("enum EOperationCleanupPhase"));
+            Assert.That(result, Does.Contain("COperationCleanupError CleanupErrors[2]"));
+            Assert.That(result, Does.Contain("void AppendCleanupError"));
+            Assert.That(result, Does.Contain("void BuildDiagnosticSummary"));
+            Assert.That(result, Does.Contain("Cleanup is secondary evidence"));
             Assert.That(result, Does.Contain("BOOL ToLegacyBool(DWORD* error) const"));
             Assert.That(copy, Does.Contain("static COperationResult CommitTransactionalTargetFile"));
             Assert.That(copy, Does.Contain("static COperationResult VerifyDurableCopyCommit"));
@@ -182,6 +187,29 @@ public sealed class NativeSafetyRegressionTests
             Assert.That(copy, Does.Contain("COperationResult commitResult = CommitTransactionalTargetFile"));
             Assert.That(copy, Does.Contain("while (!commitResult.ToLegacyBool(&err))"));
             Assert.That(refactoring, Does.Contain("### 40. Make operation result types explicit — Implemented"));
+        });
+    }
+
+    [Test]
+    public void File_operation_failures_capture_the_primary_error_before_cleanup_and_offer_copyable_context()
+    {
+        var root = FindRepositoryRoot();
+        var result = File.ReadAllText(Path.Combine(root, "src", "operation_result.h"));
+        var copy = File.ReadAllText(Path.Combine(root, "src", "async_copy.cpp"));
+        var refactoring = File.ReadAllText(Path.Combine(root, "refactoring.md"));
+
+        // Keep the primary cause, cleanup evidence, and copyable dialog text coupled at the native boundary.
+        Assert.Multiple(() =>
+        {
+            Assert.That(result, Does.Contain("orcpCloseVerificationHandle"));
+            Assert.That(result, Does.Contain("orcpDeleteUnverifiedTarget"));
+            Assert.That(result, Does.Contain("CleanupErrorCount < _countof(CleanupErrors)"));
+            Assert.That(result, Does.Contain("BuildDiagnosticSummary"));
+            Assert.That(copy, Does.Contain("Capture the verification result before CloseHandle can replace GetLastError."));
+            Assert.That(copy, Does.Contain("result.AppendCleanupError(orcpCloseVerificationHandle, cleanupError, targetName)"));
+            Assert.That(copy, Does.Contain("verificationResult.AppendCleanupError(orcpDeleteUnverifiedTarget, err, op->TargetName)"));
+            Assert.That(copy, Does.Contain("Diagnostic (copy with Ctrl+C):"));
+            Assert.That(refactoring, Does.Contain("### 56. Preserve the first actionable error and its context — Implemented"));
         });
     }
 

@@ -370,10 +370,12 @@ This document is the working record for a read-only stability and resilience aud
 - **Implementation:** `COperations` creates an immutable process/tick/dispatch-sequence ID. Plans, worker startup/completion, visible progress-dialog titles, journals, and debug execution-log records retain that ID. The journal and logs also record each item sequence and initial or retried attempt; synchronous retry dialogs and automatic retry paths advance the attempt.
 - **Verification:** `FileOperationUiTests.Copy_file_persists_a_completed_recovery_journal_with_item_intent` checks durable plan/item correlation, and `NativeSafetyRegressionTests.File_operation_correlation_ids_cross_plan_worker_ui_journal_and_log_boundaries` pins every handoff.
 
-### 56. Preserve the first actionable error and its context
+### 56. Preserve the first actionable error and its context — Implemented (2026-08-10)
 
 - **Justification:** Repeated cleanup calls can overwrite `GetLastError`, while log-only failures lose the operation phase and affected path.
 - **Proposed solution:** Capture errors immediately into the explicit result type, append cleanup errors without replacing the primary cause, and present a copyable diagnostic summary.
+- **Implementation (2026-08-10):** `COperationResult` now retains the initial phase/error/path outcome and records up to two named cleanup failures as secondary evidence. Durable-copy verification captures its result before closing the target handle, so a close failure cannot replace an earlier metadata or size failure; retry cleanup likewise records a failed deletion of an unverified target. The existing progress dialog now renders a fixed-buffer phase/error/source/destination/effects summary after the localized error text; users can copy the whole message with its established Ctrl+C behavior.
+- **Verification:** `NativeSafetyRegressionTests.File_operation_failures_capture_the_primary_error_before_cleanup_and_offer_copyable_context` pins the cleanup phases, bounded append-only evidence, capture-before-close ordering, retry-cleanup recording, copyable dialog text, and this implementation ledger entry.
 
 ### 57. Centralize retry policy
 
