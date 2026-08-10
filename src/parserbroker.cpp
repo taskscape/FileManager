@@ -205,8 +205,8 @@ BOOL CParserBrokerClient::Invoke(WORD type, const void* request, DWORD requestLe
                                  DWORD* responseLength)
 {
     // A pipe response is correlated with one request, so serialize access from
-    // the icon workers and archive navigation threads.
-    CScopedCriticalSection lock(&Lock);
+    // the icon workers and archive navigation threads at the documented broker rank.
+    CScopedCriticalSection lock(&Lock, lkrExternalBroker, "ParserBroker.Lock");
     BOOL completed = FALSE;
     for (int attempt = 0; attempt != 2; ++attempt)
     {

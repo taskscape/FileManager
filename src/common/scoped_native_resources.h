@@ -6,6 +6,8 @@
 #include <windows.h>
 #include <stdlib.h>
 
+#include "lock_ordering.h"
+
 // Keeps malloc-owned scratch storage on the stack so callback failures and
 // early returns cannot bypass the allocator paired with the legacy ABI.
 class CScopedHeapBuffer
@@ -96,20 +98,26 @@ private:
     void* View;
 };
 
-// Pairs a CRITICAL_SECTION acquisition at callback boundaries so future
-// returns or unwinding cannot strand other operation or plug-in callers.
+// Pairs a ranked CRITICAL_SECTION acquisition at callback boundaries so future
+// returns or unwinding cannot strand callers or bypass the lock-order checks.
 class CScopedCriticalSection
 {
 public:
-    explicit CScopedCriticalSection(CRITICAL_SECTION* criticalSection)
-        : CriticalSection(criticalSection)
+    CScopedCriticalSection(CRITICAL_SECTION* criticalSection, CLockRank rank = lkrNone, const char* lockName = NULL)
+        : CriticalSection(criticalSection), Rank(rank), LockName(lockName)
     {
-        EnterCriticalSection(CriticalSection);
+        if (Rank != lkrNone)
+            LockOrderEnter(CriticalSection, Rank, LockName);
+        else
+            EnterCriticalSection(CriticalSection);
     }
 
     ~CScopedCriticalSection()
     {
-        LeaveCriticalSection(CriticalSection);
+        if (Rank != lkrNone)
+            LockOrderLeave(CriticalSection, Rank, LockName);
+        else
+            LeaveCriticalSection(CriticalSection);
     }
 
 private:
@@ -118,4 +126,6 @@ private:
 
 private:
     CRITICAL_SECTION* CriticalSection;
+    CLockRank Rank;
+    const char* LockName;
 };

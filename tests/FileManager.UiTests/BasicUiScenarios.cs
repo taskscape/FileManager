@@ -21,11 +21,12 @@ internal static class BasicUiScenarios
     {
         get
         {
-            // Repeating the core lifecycle flows exposes leaked windows, stale handles, and restart regressions.
+            // The nightly lock stress lane reuses these lifecycle repeats to expose leaked windows, stale handles, and lock defects.
             foreach (var scenario in CreateScenarios())
                 yield return new TestCaseData(scenario)
                     .SetName($"UI_{scenario.Number:000}_{scenario.Kind}_{scenario.Description}")
-                    .SetCategory("UI");
+                    .SetCategory("UI")
+                    .SetCategory("LockStress");
         }
     }
 
