@@ -1597,11 +1597,67 @@ CDeleteManager::CDeleteManager() : Data(10, 50)
     HANDLES(InitializeCriticalSection(&CS));
     WaitingForProcessing = FALSE;
     BlockDataProcessing = FALSE;
+    // Start invalid so startup workers cannot target a window before it has registered itself.
+    CallbackWindow = NULL;
+    CallbackGeneration = 0;
 }
 
 CDeleteManager::~CDeleteManager()
 {
     HANDLES(DeleteCriticalSection(&CS));
+}
+
+BOOL CDeleteManager::PostProcessMessageLocked()
+{
+    if (CallbackWindow == NULL)
+        return FALSE;
+
+    // Carry the registration generation so a recycled HWND cannot consume a stale worker notification.
+    return PostMessage(CallbackWindow, WM_USER_PROCESSDELETEMAN, (WPARAM)CallbackGeneration, 0);
+}
+
+void CDeleteManager::RegisterCallbackWindow(HWND hWindow)
+{
+    HANDLES(EnterCriticalSection(&CS));
+    CallbackWindow = hWindow;
+    CallbackGeneration++;
+    if (CallbackGeneration == 0)
+        CallbackGeneration++;
+
+    // A worker may have queued work before the main window finished creating; wake this generation now.
+    if (Data.Count > 0)
+    {
+        WaitingForProcessing = TRUE;
+        if (!PostProcessMessageLocked())
+        {
+            WaitingForProcessing = FALSE;
+            TRACE_E("Unable to post delete-manager notification to the registered main window.");
+        }
+    }
+    HANDLES(LeaveCriticalSection(&CS));
+}
+
+void CDeleteManager::InvalidateCallbackWindow(HWND hWindow)
+{
+    HANDLES(EnterCriticalSection(&CS));
+    if (CallbackWindow == hWindow)
+    {
+        // Invalidate before DestroyWindow completes so workers cannot post to a closing or reused HWND.
+        CallbackWindow = NULL;
+        CallbackGeneration++;
+        if (CallbackGeneration == 0)
+            CallbackGeneration++;
+    }
+    HANDLES(LeaveCriticalSection(&CS));
+}
+
+BOOL CDeleteManager::IsCurrentCallbackWindow(HWND hWindow, DWORD generation)
+{
+    HANDLES(EnterCriticalSection(&CS));
+    // The receiver verifies both values because an HWND can be recycled after an asynchronous post.
+    BOOL isCurrent = CallbackWindow == hWindow && CallbackGeneration == generation;
+    HANDLES(LeaveCriticalSection(&CS));
+    return isCurrent;
 }
 
 void CDeleteManager::AddFile(const char* fileName, CPluginInterfaceAbstract* plugin)
@@ -1619,10 +1675,12 @@ void CDeleteManager::AddFile(const char* fileName, CPluginInterfaceAbstract* plu
             if (!WaitingForProcessing) // if needed, we will ensure processing of new data
             {
                 WaitingForProcessing = TRUE;
-                if (MainWindow != NULL && MainWindow->HWindow != NULL)
-                    PostMessage(MainWindow->HWindow, WM_USER_PROCESSDELETEMAN, 0, 0);
-                else
-                    TRACE_E("Unexpected situation in CDeleteManager::AddFile().");
+                // Post only through the generation-checked registration, never through MainWindow's raw HWND.
+                if (!PostProcessMessageLocked())
+                {
+                    WaitingForProcessing = FALSE;
+                    TRACE_E("Unable to post delete-manager notification; the main window is not registered.");
+                }
             }
         }
         else

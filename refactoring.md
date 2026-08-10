@@ -319,10 +319,11 @@ This document is the working record for a read-only stability and resilience aud
 - **Implementation (2026-08-10):** The plug-in callback nesting counter and transition lock now live in `CPluginCallbackState`, owned for the plug-in subsystem lifetime by `CPlugins`. The main application thread owns construction and teardown; callback threads may enter, leave, and query the state through its atomic depth and SRW-locked transitions. Legacy `EnterPlugin`/`LeavePlugin`/`IsInPlugin` functions remain compatibility delegates, while the loader's `CPluginEntryScope` receives only `CPlugins::GetCallbackState()` so its exception cleanup does not depend on translation-unit global state. Further worker-state migrations remain deliberately subsystem-scoped.
 - **Verification:** `NativeSafetyRegressionTests.Plugin_entry_scope_and_callback_state_restore_host_state_after_an_unwinding_entry_point` guards ownership by `CPlugins`, atomic/locked synchronization, removal of the former globals, narrow scope injection, compatibility delegates, and this implementation ledger.
 
-### 49. Protect window and callback lifetimes
+### 49. Protect window and callback lifetimes — Implemented
 
 - **Justification:** Background workers retain HWNDs and pointers while dialogs and panels can close. Posting or sending after destruction risks reuse of stale window handles or memory.
-- **Proposed solution:** Pair callbacks with generation tokens/weak registrations, invalidate them before window destruction, and discard messages whose operation generation no longer matches.
+- **Implementation (2026-08-10):** `CDeleteManager` now owns a lock-protected callback registration instead of reading `MainWindow->HWindow` from worker threads. Main-window creation registers the target and a nonzero generation; each worker notification carries that generation. `WM_USER_PROCESSDELETEMAN` processes only the current `(HWND, generation)` pair, and `WM_DESTROY` invalidates the registration before child teardown, so a late post cannot activate a recycled window handle. Work queued before registration is notified when the window registers, while failed or invalidated registrations are discarded safely.
+- **Verification:** `NativeSafetyRegressionTests.Delete_manager_callback_registration_invalidates_before_window_teardown_and_rejects_stale_generations` asserts the guarded registration, generated worker post, dispatch check, destruction ordering, and implementation ledger.
 
 ### 50. Bound background work queues
 
