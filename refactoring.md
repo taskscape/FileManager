@@ -301,10 +301,11 @@ This document is the working record for a read-only stability and resilience aud
 - **Compatibility:** Existing `GetTickCount` values that are part of Win32 message fields or name-generation entropy remain bounded compatibility values; they are not used by the migrated timer queue for timeout decisions.
 - **Verification:** `NativeSafetyRegressionTests.Monotonic_64_bit_timers_cross_the_32_bit_boundary_and_reject_backward_samples` exercises the former wrap boundary and a synthetic backward sample, and pins the native queue to the centralized clock seam.
 
-### 46. Replace `Sleep` polling with signaled waits
+### 46. Implemented: replace `Sleep` polling with signaled waits
 
-- **Justification:** Polling delays cancellation, wastes time, and creates schedule-sensitive tests; `ReleaseCheckThreads` even sleeps before force-killing (`src/path_checking.cpp:95`).
-- **Proposed solution:** Wait on work, cancellation, and deadline handles together. Where periodic work is required, use waitable timers and make each wake reason explicit.
+- **Justification:** Fixed-delay polling delayed cancellation, wasted time, and made check-path completion tests schedule-sensitive. The shutdown path has already been migrated to cooperative safe joins; this change removes the remaining check-path polling waits.
+- **Implementation (2026-08-10):** The reusable check-path worker now waits on its work and owner-cancellation events together, so shutdown wakes the idle thread without a synthetic request. Slot exhaustion waits for actual worker-completion events instead of polling every 100 ms. The grace and retry delays are waitable-timer deadline handles with explicit work-completed versus deadline-elapsed outcomes; no `Sleep` polling remains in `src/path_checking.cpp`.
+- **Verification:** `NativeSafetyRegressionTests.Check_path_workers_use_signaled_work_cancellation_and_deadline_waits` guards the multi-handle cancellation wait, completion-driven slot handoff, waitable deadline protocol, and removal of `Sleep` from the check-path implementation.
 
 ### 47. Document and verify lock ordering
 

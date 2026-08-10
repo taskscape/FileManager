@@ -157,6 +157,13 @@ public:
         return StopEvent;
     }
 
+    // Exposes the owner's completion signal so a coordinator can wait for
+    // work without repeatedly probing the thread exit code.
+    HANDLE GetCompletionEvent() const
+    {
+        return CompletionEvent;
+    }
+
     DWORD WaitForCompletion(DWORD timeout) const
     {
         return CompletionEvent != NULL ? WaitForSingleObject(CompletionEvent, timeout) : WAIT_OBJECT_0;

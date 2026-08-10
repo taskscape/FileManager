@@ -335,6 +335,42 @@ public sealed class NativeSafetyRegressionTests
     }
 
     [Test]
+    public void Check_path_workers_use_signaled_work_cancellation_and_deadline_waits()
+    {
+        var root = FindRepositoryRoot();
+        var owner = File.ReadAllText(Path.Combine(root, "src", "common", "thread_owner.h"));
+        var checkPath = File.ReadAllText(Path.Combine(root, "src", "path_checking.cpp"));
+        var safeWait = File.ReadAllText(Path.Combine(root, "src", "string_resources.cpp"));
+        var waitWindow = File.ReadAllText(Path.Combine(root, "src", "dialogs_attributes.cpp"));
+        var refactoring = File.ReadAllText(Path.Combine(root, "refactoring.md"));
+
+        // These source contracts keep cancellation, work completion, and retry
+        // deadlines as independently signaled wake reasons rather than timing guesses.
+        Assert.Multiple(() =>
+        {
+            Assert.That(owner, Does.Contain("HANDLE GetCompletionEvent() const"));
+            Assert.That(checkPath, Does.Contain("HANDLE waits[] = {CPFirstStart, stopEvent}"));
+            Assert.That(checkPath, Does.Contain("WaitForMultipleObjects(2, waits, FALSE, INFINITE)"));
+            Assert.That(checkPath, Does.Contain("ThreadCheckPath[0].RequestStop()"));
+            Assert.That(checkPath, Does.Contain("WaitForAvailableCheckPathWorker"));
+            Assert.That(checkPath, Does.Contain("WaitForMultipleObjects(completionCount, completions, FALSE, INFINITE)"));
+            Assert.That(checkPath, Does.Contain("CreateWaitableTimer(NULL, TRUE, NULL)"));
+            Assert.That(checkPath, Does.Contain("SetWaitableTimer(deadlineTimer.Get()"));
+            Assert.That(checkPath, Does.Contain("cpwrWorkCompleted"));
+            Assert.That(checkPath, Does.Contain("cpwrUserCancelled"));
+            Assert.That(checkPath, Does.Contain("cpwrDeadlineElapsed"));
+            Assert.That(checkPath, Does.Contain("GetSafeWaitWindowCancelEvent()"));
+            Assert.That(checkPath, Does.Not.Contain("Sleep("));
+            Assert.That(checkPath, Does.Not.Contain("CPFirstTerminate"));
+            Assert.That(safeWait, Does.Contain("HANDLE GetSafeWaitWindowCancelEvent()"));
+            Assert.That(safeWait, Does.Contain("DuplicateHandle(GetCurrentProcess(), SafeWaitWindowCancelEvent"));
+            Assert.That(safeWait, Does.Contain("void SignalSafeWaitWindowCancellation()"));
+            Assert.That(waitWindow, Does.Contain("SignalSafeWaitWindowCancellation();"));
+            Assert.That(refactoring, Does.Contain("### 46. Implemented: replace `Sleep` polling with signaled waits"));
+        });
+    }
+
+    [Test]
     public void Monotonic_64_bit_timers_cross_the_32_bit_boundary_and_reject_backward_samples()
     {
         var root = FindRepositoryRoot();

@@ -627,6 +627,12 @@ void ShowSafeWaitWindow(BOOL show);
 BOOL GetSafeWaitWindowClosePressed();
 // returns TRUE if user presses ESC or clicked mouse on Close button
 BOOL UserWantsToCancelSafeWaitWindow();
+// Returns a caller-owned duplicate that is signaled when its safe-wait Close
+// button is pressed; it remains valid until the caller closes the duplicate.
+HANDLE GetSafeWaitWindowCancelEvent();
+// The wait-window UI signals cancellation through this helper to avoid racing
+// its event lifetime with the owner that is waiting on a duplicate.
+void SignalSafeWaitWindowCancellation();
 // serves for additional text change in window
 // WARNING: no new window layout occurs and if text expands significantly
 // it will be truncated; use for example for countdown: 60s, 55s, 50s, ...

@@ -2749,7 +2749,12 @@ CWaitWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         {
             // if the user clicked the Close button, set the global variable
             if (CWindow::WindowProc(WM_NCHITTEST, NULL, GetMessagePos()) == HTCLOSE)
+            {
                 SafeWaitWindowClosePressed = TRUE;
+                // Wake operations waiting on the close action without making
+                // them depend on a periodic timeout to observe cancellation.
+                SignalSafeWaitWindowCancellation();
+            }
         }
         return 0;
     }
