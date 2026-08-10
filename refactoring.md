@@ -281,10 +281,10 @@ This document is the working record for a read-only stability and resilience aud
 - **Compatibility:** Returned automation script text retains its existing `FreeOleString` ownership contract; only local temporary resources are scoped. Guard destructors preserve `GetLastError` so existing caller result paths remain authoritative.
 - **Verification:** `NativeSafetyRegressionTests.Scoped_native_resources_protect_file_operations_and_plugin_boundaries` checks the non-copyable guards, cleanup behavior, migrated memory/mapping/lock seams, and this ledger entry.
 
-### 43. Standardize thread creation and ownership
+### 43. Standardize thread creation and ownership — Implemented (2026-08-09)
 
 - **Justification:** Dozens of raw `CreateThread` calls distribute handle ownership, parameter lifetime, COM initialization, exception policy, and naming across the codebase.
-- **Proposed solution:** Provide one thread wrapper using `_beginthreadex` where CRT state is used, owning the handle and stop event, naming the thread, initializing COM when declared, and guaranteeing a completion signal.
+- **Implementation (2026-08-09):** `CThreadOwner` is the common CRT-backed worker boundary. It owns the thread, manual-reset stop event, completion event, and copied launch record; names each worker, optionally establishes and balances a declared COM apartment, contains C++ exceptions, and always signals completion after normal callback execution. The check-path workers now use it end-to-end, including bounded shutdown diagnostics followed by a safe join. `tools/verify-no-new-raw-thread-creation.ps1`, run in pull-request CI, ratchets all newly changed first-party thread starts onto this boundary while legacy call sites are migrated by their owning subsystem work.
 
 ### 44. Define bounded shutdown deadlines without unsafe escalation
 

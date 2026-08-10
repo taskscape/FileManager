@@ -17,7 +17,9 @@ const int ctsNotRunning = 0x00;   // can be started
 const int ctsActive = 0x01;       // this thread is active/just finishing
 const int ctsCanTerminate = 0x02; // can be terminated - already initialized from global data
 
-HANDLE ThreadCheckPath[NUM_OF_CHECKTHREADS];
+// Each check worker owns its thread and completion state so shutdown cannot
+// close a running worker handle or free the data it still observes.
+CThreadOwner ThreadCheckPath[NUM_OF_CHECKTHREADS];
 int ThreadCheckState[NUM_OF_CHECKTHREADS]; // state of individual threads
 char ThreadPath[MAX_PATH];                 // input of active thread
 BOOL ThreadValid;                          // result of active thread
@@ -36,6 +38,7 @@ char CheckPathRootWithRetryMsgBox[MAX_PATH] = ""; // root of drive (including UN
 HWND LastDriveSelectErrDlgHWnd = NULL;            // "drive not ready" dialog with Retry+Cancel buttons (used for automatic Retry after inserting media into drive)
 
 DWORD WINAPI ThreadCheckPathF(void* param);
+DWORD WINAPI ThreadCheckPathOwnedF(void* param, HANDLE stopEvent);
 
 CRITICAL_SECTION OpenHtmlHelpCS; // critical section for OpenHtmlHelp()
 
@@ -60,7 +63,6 @@ BOOL InitializeCheckThread()
     int i;
     for (i = 0; i < NUM_OF_CHECKTHREADS; i++)
     {
-        ThreadCheckPath[i] = NULL;
         ThreadCheckState[i] = ctsNotRunning;
     }
 
@@ -73,9 +75,7 @@ BOOL InitializeCheckThread()
     }
 
     // try to start the first check-path thread
-    DWORD ThreadID;
-    ThreadCheckPath[0] = HANDLES(CreateThread(NULL, 0, ThreadCheckPathF, (void*)0, 0, &ThreadID));
-    if (ThreadCheckPath[0] == NULL) // failed, but it doesn't matter ...
+    if (!ThreadCheckPath[0].Start(ThreadCheckPathOwnedF, (void*)0, "CheckPath")) // failed, but it doesn't matter ...
     {
         TRACE_E("Unable to start the first CheckPath thread.");
     }
@@ -96,17 +96,11 @@ void ReleaseCheckThreads()
     int i;
     for (i = 0; i < NUM_OF_CHECKTHREADS; i++)
     {
-        if (ThreadCheckPath[i] != NULL)
+        if (ThreadCheckPath[i].HasThread())
         {
-            if (WaitForSingleObject(ThreadCheckPath[i], 1000) == WAIT_TIMEOUT)
+            if (ThreadCheckPath[i].StopAndJoin(1000) == WAIT_TIMEOUT)
                 TRACE_E("Check-path thread did not stop within the shutdown deadline; waiting for a safe join.");
-
-            // A network attribute query can be slow, but the worker may still use the
-            // shared state. Never release that state until it has finished naturally.
-            WaitForSingleObject(ThreadCheckPath[i], INFINITE);
             ThreadCheckState[i] = ctsNotRunning;
-            HANDLES(CloseHandle(ThreadCheckPath[i]));
-            ThreadCheckPath[i] = NULL;
         }
     }
     if (CPFirstStart != NULL)
@@ -130,7 +124,6 @@ unsigned ThreadCheckPathFBody(void* param) // test directory accessibility
     int i = (int)(INT_PTR)param;
     char threadPath[MAX_PATH + 5];
 
-    SetThreadNameInVCAndTrace("CheckPath");
     //  if (i == 0) TRACE_I("First check-path thread: Begin");
     //  else TRACE_I("Begin");
 
@@ -193,7 +186,6 @@ CPF_AGAIN:
 
     if (!threadValid && error != ERROR_SUCCESS)
     {
-        //    SetThreadNameInVCAndTrace("CheckPath");
         //    TRACE_I("Error: " << GetErrorText(error));
     }
 
@@ -251,6 +243,14 @@ DWORD WINAPI ThreadCheckPathF(void* param)
     return ThreadCheckPathFEH(param);
 }
 
+DWORD WINAPI ThreadCheckPathOwnedF(void* param, HANDLE stopEvent)
+{
+    // CheckPath has a legacy global stop protocol; retaining this adapter keeps
+    // its cooperative state machine intact while the owner controls lifetime.
+    (void)stopEvent;
+    return ThreadCheckPathF(param);
+}
+
 DWORD SalCheckPath(BOOL echo, const char* path, DWORD err, BOOL postRefresh, HWND parent)
 {
     CALL_STACK_MESSAGE5("SalCheckPath(%d, %s, 0x%X, %d, )", echo, path, err, postRefresh);
@@ -297,15 +297,13 @@ RETRY:
                 {
                     if (ThreadCheckState[freeThreadIndex] & ctsActive)
                         continue;
-                    else if (ThreadCheckPath[freeThreadIndex] != NULL)
+                    else if (ThreadCheckPath[freeThreadIndex].HasThread())
                     {
                         DWORD exit;
-                        if (!GetExitCodeThread(ThreadCheckPath[freeThreadIndex], &exit) ||
+                        if (!ThreadCheckPath[freeThreadIndex].GetExitCode(&exit) ||
                             exit != STILL_ACTIVE) // already finished
                         {
                             ThreadCheckState[freeThreadIndex] = ctsNotRunning;
-                            HANDLES(CloseHandle(ThreadCheckPath[freeThreadIndex]));
-                            ThreadCheckPath[freeThreadIndex] = NULL;
                             runThread = TRUE;
                             break;
                         }
@@ -346,7 +344,6 @@ RETRY:
         }
         else
         {
-            DWORD ThreadID;
             BOOL success = TRUE;
             ThreadCheckState[freeThreadIndex] = ctsActive;
             if (freeThreadIndex == 0) // odstartujeme prvni check-path thread
@@ -356,10 +353,9 @@ RETRY:
             }
             else // start ostatnich
             {
-                ThreadCheckPath[freeThreadIndex] = HANDLES(CreateThread(NULL, 0, ThreadCheckPathF,
-                                                                        (void*)(INT_PTR)freeThreadIndex,
-                                                                        0, &ThreadID));
-                if (ThreadCheckPath[freeThreadIndex] == NULL)
+                if (!ThreadCheckPath[freeThreadIndex].Start(ThreadCheckPathOwnedF,
+                                                            (void*)(INT_PTR)freeThreadIndex,
+                                                            "CheckPath"))
                 {
                     TRACE_E("Unable to start CheckPath thread.");
                     ThreadCheckState[freeThreadIndex] = ctsNotRunning;
@@ -387,8 +383,8 @@ RETRY:
                 }
                 else
                 {
-                    WaitForSingleObject(ThreadCheckPath[freeThreadIndex], 200); // 200 ms - doba hajeni
-                    if (!GetExitCodeThread(ThreadCheckPath[freeThreadIndex], &exit))
+                    ThreadCheckPath[freeThreadIndex].WaitForCompletion(200); // 200 ms - doba hajeni
+                    if (!ThreadCheckPath[freeThreadIndex].GetExitCode(&exit))
                         exit = STILL_ACTIVE;
                 }
                 if (exit == STILL_ACTIVE) // take care of kill via ESC
@@ -423,8 +419,8 @@ RETRY:
                         }
                         else
                         {
-                            WaitForSingleObject(ThreadCheckPath[freeThreadIndex], 200); // 200 ms pred dalsim testem
-                            if (!GetExitCodeThread(ThreadCheckPath[freeThreadIndex], &exit))
+                            ThreadCheckPath[freeThreadIndex].WaitForCompletion(200); // 200 ms pred dalsim testem
+                            if (!ThreadCheckPath[freeThreadIndex].GetExitCode(&exit))
                                 exit = STILL_ACTIVE;
                         }
                         if (exit != STILL_ACTIVE)
@@ -439,8 +435,7 @@ RETRY:
                     ThreadCheckState[freeThreadIndex] = ctsNotRunning;
                     if (freeThreadIndex != 0)
                     {
-                        HANDLES(CloseHandle(ThreadCheckPath[freeThreadIndex]));
-                        ThreadCheckPath[freeThreadIndex] = NULL;
+                        ThreadCheckPath[freeThreadIndex].StopAndJoin(0);
                     }
                 }
                 else // was terminated, let it finish
