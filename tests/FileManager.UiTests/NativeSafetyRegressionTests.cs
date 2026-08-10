@@ -862,6 +862,92 @@ public sealed class NativeSafetyRegressionTests
     }
 
     [Test]
+    public void Icon_work_pool_bounds_memory_and_prioritizes_visible_current_generation_work()
+    {
+        var root = FindRepositoryRoot();
+        var header = File.ReadAllText(Path.Combine(root, "src", "iconpool.h"));
+        var implementation = File.ReadAllText(Path.Combine(root, "src", "iconpool.cpp"));
+        var refactoring = File.ReadAllText(Path.Combine(root, "refactoring.md"));
+
+        // The queue contract prevents directory-sized background warming from
+        // retaining unbounded work or delaying the currently visible panel.
+        Assert.Multiple(() =>
+        {
+            Assert.That(header, Does.Contain("#define ICON_POOL_QUEUE_SIZE 64"));
+            Assert.That(header, Does.Contain("enum EIconWorkPriority"));
+            Assert.That(header, Does.Contain("iwpVisible"));
+            Assert.That(header, Does.Contain("DWORD Generation"));
+            Assert.That(header, Does.Contain("volatile LONG InProgress"));
+            Assert.That(header, Does.Contain("struct CIconQueueMetrics"));
+            Assert.That(header, Does.Contain("BackpressureRejected"));
+            Assert.That(header, Does.Contain("VisiblePreemptions"));
+            Assert.That(header, Does.Contain("DWORD BeginGeneration()"));
+            Assert.That(header, Does.Contain("CancelObsoleteGenerations"));
+            Assert.That(header, Does.Contain("CIconQueueMetrics GetMetrics()"));
+            Assert.That(implementation, Does.Contain("IsSameWorkItem(queued, *item)"));
+            Assert.That(implementation, Does.Contain("item->Priority == iwpVisible"));
+            Assert.That(implementation, Does.Contain("Visible work may reclaim only dormant background slots"));
+            Assert.That(implementation, Does.Contain("CancelObsoleteGenerations(DWORD currentGeneration)"));
+            Assert.That(implementation, Does.Contain("candidate.Priority > WorkQueue[selected].Priority"));
+            Assert.That(implementation, Does.Contain("AllWorkCompletedEvent"));
+            Assert.That(implementation, Does.Contain("WaitForSingleObject(AllWorkCompletedEvent, timeoutMs)"));
+            Assert.That(implementation, Does.Not.Contain("QueueHead"));
+            Assert.That(implementation, Does.Not.Contain("QueueTail"));
+            Assert.That(implementation, Does.Not.Contain("Sleep(1)"));
+            Assert.That(refactoring, Does.Contain("### 50. Bound background work queues — Implemented"));
+        });
+    }
+
+    [Test]
+    public void Background_producers_bound_non_durable_work_and_report_backpressure()
+    {
+        var root = FindRepositoryRoot();
+        var findHeader = File.ReadAllText(Path.Combine(root, "src", "find.h"));
+        var find = File.ReadAllText(Path.Combine(root, "src", "find.cpp"));
+        var findUi = File.ReadAllText(Path.Combine(root, "src", "find_dialog_ui.cpp"));
+        var brokerHeader = File.ReadAllText(Path.Combine(root, "src", "parserbroker.h"));
+        var broker = File.ReadAllText(Path.Combine(root, "src", "parserbroker.cpp"));
+        var ftpHeader = File.ReadAllText(Path.Combine(root, "src", "plugins", "ftp", "operats.h"));
+        var ftpQueue = File.ReadAllText(Path.Combine(root, "src", "plugins", "ftp", "operats1.cpp"));
+        var ftpDisk = File.ReadAllText(Path.Combine(root, "src", "plugins", "ftp", "operats5.cpp"));
+        var snooperHeader = File.ReadAllText(Path.Combine(root, "src", "snooper.h"));
+        var snooper = File.ReadAllText(Path.Combine(root, "src", "snooper.cpp"));
+        var refactoring = File.ReadAllText(Path.Combine(root, "refactoring.md"));
+
+        // Each producer uses a policy appropriate to its semantics: discovery work
+        // may stop or fall back, while durable FTP intent is rejected atomically.
+        Assert.Multiple(() =>
+        {
+            Assert.That(findHeader, Does.Contain("ResultLimitReached"));
+            Assert.That(findHeader, Does.Contain("DirectoryStackHighWaterMark"));
+            Assert.That(find, Does.Contain("#define FIND_MAX_RESULTS 100000"));
+            Assert.That(find, Does.Contain("#define FIND_MAX_DEFERRED_DIRECTORIES 4096"));
+            Assert.That(find, Does.Contain("Find result budget reached"));
+            Assert.That(find, Does.Contain("dirStackCount < FIND_MAX_DEFERRED_DIRECTORIES"));
+            Assert.That(find, Does.Contain("DirectoryStackFallbacks++"));
+            Assert.That(findUi, Does.Contain("GrepData.ResultLimitReached = FALSE"));
+            Assert.That(brokerHeader, Does.Contain("struct CParserBrokerQueueMetrics"));
+            Assert.That(brokerHeader, Does.Contain("GetQueueMetrics()"));
+            Assert.That(broker, Does.Contain("#define PARSER_BROKER_MAX_PENDING_REQUESTS 8"));
+            Assert.That(broker, Does.Contain("pending > PARSER_BROKER_MAX_PENDING_REQUESTS"));
+            Assert.That(broker, Does.Contain("InterlockedDecrement(&PendingRequests)"));
+            Assert.That(ftpHeader, Does.Contain("#define FTP_OPERATION_QUEUE_LIMIT 100000"));
+            Assert.That(ftpHeader, Does.Contain("#define FTP_DISK_WORK_QUEUE_LIMIT 512"));
+            Assert.That(ftpHeader, Does.Contain("GetQueueMetrics"));
+            Assert.That(ftpHeader, Does.Contain("GetWorkQueueMetrics"));
+            Assert.That(ftpQueue, Does.Contain("Items.Count >= FTP_OPERATION_QUEUE_LIMIT"));
+            Assert.That(ftpQueue, Does.Contain("bounded operation queue rejected expansion"));
+            Assert.That(ftpDisk, Does.Contain("Work.Count >= FTP_DISK_WORK_QUEUE_LIMIT"));
+            Assert.That(ftpDisk, Does.Contain("bounded disk queue rejected work"));
+            Assert.That(snooperHeader, Does.Contain("struct CDirectoryRefreshMetrics"));
+            Assert.That(snooper, Does.Contain("GetDirectoryRefreshMetrics()"));
+            Assert.That(snooper, Does.Contain("SnooperRefreshWaits"));
+            Assert.That(snooper, Does.Contain("at most one live snooper refresh outstanding"));
+            Assert.That(refactoring, Does.Contain("Parser broker admission is capped at eight"));
+        });
+    }
+
+    [Test]
     public void Plugin_callbacks_are_contained_and_the_failing_plugin_is_deferred_for_unload()
     {
         var root = FindRepositoryRoot();

@@ -6,6 +6,10 @@
 #include "common\\checked_arithmetic.h"
 #include "common\\scoped_native_resources.h"
 #include "parserbroker.h"
+
+// A broker owns one pipe response at a time; retaining more callers only turns
+// a slow untrusted parser into unbounded host-thread pressure.
+#define PARSER_BROKER_MAX_PENDING_REQUESTS 8
 #include "thumbnl.h"
 
 CParserBrokerClient ParserBroker;
@@ -82,6 +86,10 @@ CParserBrokerClient::CParserBrokerClient()
     InitializeCriticalSection(&Lock);
     NextCorrelationId = 1;
     PipeName[0] = 0;
+    PendingRequests = 0;
+    AcceptedRequests = 0;
+    RejectedRequests = 0;
+    HighWaterMark = 0;
 }
 
 CParserBrokerClient::~CParserBrokerClient()
@@ -204,6 +212,21 @@ BOOL CParserBrokerClient::Invoke(WORD type, const void* request, DWORD requestLe
                                  WORD responseType, void* response, DWORD responseCapacity,
                                  DWORD* responseLength)
 {
+    LONG pending = InterlockedIncrement(&PendingRequests);
+    if (pending > PARSER_BROKER_MAX_PENDING_REQUESTS)
+    {
+        InterlockedDecrement(&PendingRequests);
+        InterlockedIncrement64(&RejectedRequests);
+        TRACE_I("CParserBrokerClient::Invoke(): bounded broker queue rejected request type " << type);
+        return FALSE;
+    }
+    InterlockedIncrement64(&AcceptedRequests);
+    for (LONGLONG observed = InterlockedCompareExchange64(&HighWaterMark, 0, 0);
+         pending > observed && InterlockedCompareExchange64(&HighWaterMark, pending, observed) != observed;
+         observed = InterlockedCompareExchange64(&HighWaterMark, 0, 0))
+    {
+    }
+
     // A pipe response is correlated with one request, so serialize access from
     // the icon workers and archive navigation threads at the documented broker rank.
     CScopedCriticalSection lock(&Lock, lkrExternalBroker, "ParserBroker.Lock");
@@ -217,7 +240,19 @@ BOOL CParserBrokerClient::Invoke(WORD type, const void* request, DWORD requestLe
         }
         Stop(); // timeout, malformed response, or crash: kill and recreate the untrusted process.
     }
+    InterlockedDecrement(&PendingRequests);
     return completed;
+}
+
+CParserBrokerQueueMetrics CParserBrokerClient::GetQueueMetrics()
+{
+    CParserBrokerQueueMetrics metrics;
+    metrics.Capacity = PARSER_BROKER_MAX_PENDING_REQUESTS;
+    metrics.Pending = InterlockedCompareExchange(&PendingRequests, 0, 0);
+    metrics.Accepted = InterlockedCompareExchange64(&AcceptedRequests, 0, 0);
+    metrics.Rejected = InterlockedCompareExchange64(&RejectedRequests, 0, 0);
+    metrics.HighWaterMark = InterlockedCompareExchange64(&HighWaterMark, 0, 0);
+    return metrics;
 }
 
 BOOL CParserBrokerClient::InvokeOnce(WORD type, const void* request, DWORD requestLength,

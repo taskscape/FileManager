@@ -8,6 +8,17 @@ class CFilesWindow;
 extern HANDLE RefreshFinishedEvent;
 extern int SnooperSuspended;
 
+// Refresh notifications are deliberately admitted one at a time; expose that
+// pressure so a slow panel can be distinguished from missed directory events.
+struct CDirectoryRefreshMetrics
+{
+    LONGLONG Posted;
+    LONGLONG Awaited;
+    LONGLONG SuspendBatched;
+};
+
+CDirectoryRefreshMetrics GetDirectoryRefreshMetrics();
+
 void AddDirectory(CFilesWindow* win, const char* path, BOOL registerDevNotification);                           // new directory for snooper
 void ChangeDirectory(CFilesWindow* win, const char* newPath, BOOL registerDevNotification);                     // change of the specified directory
 void DetachDirectory(CFilesWindow* win, BOOL waitForHandleClosure = FALSE, BOOL closeDevNotifification = TRUE); // uz neni treba cmuchat

@@ -501,6 +501,10 @@ public:
 // CFTPQueue
 //
 
+// These retain durable transfer intent within a predictable per-operation budget.
+#define FTP_OPERATION_QUEUE_LIMIT 100000
+#define FTP_DISK_WORK_QUEUE_LIMIT 512
+
 class CFTPQueue
 {
 protected:
@@ -533,15 +537,23 @@ protected:
     DWORD LastErrorOccurenceTime;      // "time" when the last error occurred (initialized to -1)
     DWORD LastFoundErrorOccurenceTime; // "time" of the last found item with an error or the "time" before which no item with an error exists anymore
 
+    // Transfer planning is durable user intent, so admission rejects expansion
+    // explicitly instead of silently dropping pending copy or delete items.
+    int RejectedItemCount;
+    int HighWaterMark;
+
 public:
     CFTPQueue();
     ~CFTPQueue();
 
-    // adds a new item to the queue; returns TRUE on success
+    // adds a new item to the queue; returns FALSE for allocation or explicit capacity backpressure
     BOOL AddItem(CFTPQueueItem* newItem);
 
     // returns the number of items in the queue
     int GetCount();
+
+    // Reports explicit expansion backpressure for the operation UI and diagnostics.
+    void GetQueueMetrics(int* count, int* rejected, int* highWaterMark);
 
     // helper method: adjusts the counters ExploreAndResolveItemsCount, DoneOrSkippedItemsCount
     // and WaitingOrProcessingOrDelayedItemsCount according to the item 'item'; 'add' is
@@ -873,6 +885,8 @@ protected:
     TIndirectArray<CFTPFileToClose> FilesToClose;
     BOOL ShouldTerminate;  // TRUE = the thread should terminate
     BOOL WorkIsInProgress; // TRUE = processing of item Work[0] is in progress
+    int WorkRejectedCount; // bounded admission protects a slow local disk from remote producers
+    int WorkHighWaterMark;
 
     int NextFileCloseIndex; // sequence number of the next file close operation
     int DoneFileCloseIndex; // sequence number of the last completed file close (-1 = none closed yet)
@@ -889,8 +903,11 @@ public:
     void Terminate();
 
     // adds work to the thread, the pointer 'work' must remain valid until the result message is received
-    // or until CancelWork() is called; returns success
+    // or until CancelWork() is called; returns FALSE for explicit capacity backpressure
     BOOL AddWork(CFTPDiskWork* work);
+
+    // Reports queue pressure without exposing the work array across its lock.
+    void GetWorkQueueMetrics(int* count, int* rejected, int* highWaterMark);
 
     // cancels the work 'work' added to the thread; returns TRUE if the work has not started yet
     // or if it can still be interrupted (it is in progress and after finishing the opposite

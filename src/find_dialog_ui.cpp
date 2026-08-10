@@ -929,6 +929,10 @@ void CFindDialog::StartSearch(WORD command)
     GrepData.FoundFilesListView = FoundFilesListView;
     GrepData.FoundVisibleCount = 0;
     GrepData.FoundVisibleTick = GetTickCount();
+    // Each search starts a fresh bounded-work generation for results and deferred directories.
+    GrepData.ResultLimitReached = FALSE;
+    GrepData.DirectoryStackHighWaterMark = 0;
+    GrepData.DirectoryStackFallbacks = 0;
 
     GrepData.SearchingText = &SearchingText;
     GrepData.SearchingText2 = &SearchingText2;

@@ -878,6 +878,8 @@ CFTPDiskThread::CFTPDiskThread() : CThread("FTP Disk Thread"), Work(20, 50, dtNo
         TRACE_E("CFTPDiskThread::CFTPDiskThread(): Unable to create synchronization event object.");
     ShouldTerminate = FALSE;
     WorkIsInProgress = FALSE;
+    WorkRejectedCount = 0;
+    WorkHighWaterMark = 0;
     NextFileCloseIndex = 0;
     DoneFileCloseIndex = -1;
     FileClosedEvent = HANDLES(CreateEvent(NULL, TRUE, FALSE, NULL)); // manual, nonsignaled
@@ -918,16 +920,40 @@ BOOL CFTPDiskThread::AddWork(CFTPDiskWork* work)
     CALL_STACK_MESSAGE1("CFTPDiskThread::AddWork()");
     HANDLES(EnterCriticalSection(&DiskCritSect));
     BOOL ret = TRUE;
-    Work.Add(work);
-    if (!Work.IsGood())
+    // Remote producers must receive backpressure before a slow local disk retains an unbounded backlog.
+    if (Work.Count >= FTP_DISK_WORK_QUEUE_LIMIT)
     {
-        Work.ResetState();
+        WorkRejectedCount++;
+        TRACE_I("CFTPDiskThread::AddWork(): bounded disk queue rejected work");
         ret = FALSE;
+    }
+    else
+    {
+        Work.Add(work);
+        if (!Work.IsGood())
+        {
+            Work.ResetState();
+            ret = FALSE;
+        }
+        else if (Work.Count > WorkHighWaterMark)
+            WorkHighWaterMark = Work.Count;
     }
     if (Work.Count == 1)
         SetEvent(ContEvent);
     HANDLES(LeaveCriticalSection(&DiskCritSect));
     return ret;
+}
+
+void CFTPDiskThread::GetWorkQueueMetrics(int* count, int* rejected, int* highWaterMark)
+{
+    HANDLES(EnterCriticalSection(&DiskCritSect));
+    if (count != NULL)
+        *count = Work.Count;
+    if (rejected != NULL)
+        *rejected = WorkRejectedCount;
+    if (highWaterMark != NULL)
+        *highWaterMark = WorkHighWaterMark;
+    HANDLES(LeaveCriticalSection(&DiskCritSect));
 }
 
 BOOL CFTPDiskThread::CancelWork(const CFTPDiskWork* work, BOOL* workIsInProgress)

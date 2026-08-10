@@ -167,6 +167,9 @@ struct CGrepData
     int FoundVisibleCount;  // number of items displayed in the list view
     DWORD FoundVisibleTick; // when it was last displayed
     BOOL NeedRefresh;       // need to refresh the display (an item was added without being shown)
+    BOOL ResultLimitReached; // prevents a huge match set from retaining every result indefinitely
+    LONG DirectoryStackHighWaterMark; // records bounded deferred-directory pressure for diagnostics
+    LONG DirectoryStackFallbacks; // directories searched depth-first after the deferred budget fills
 
     CSearchingString* SearchingText;  // synchronized "Searching" text in the Find status bar
     CSearchingString* SearchingText2; // [optional] second text on the right; used for "Total: 35%"

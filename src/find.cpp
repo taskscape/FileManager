@@ -34,6 +34,11 @@ const char* FINDOPTIONSITEM_GREP_REG = "Grep";
 const char* FINDIGNOREITEM_PATH_REG = "Path";
 const char* FINDIGNOREITEM_ENABLED_REG = "Enabled";
 
+// Search results and deferred directories are background work, not a mandate
+// to retain every discovered entry when a giant tree exceeds interactive memory.
+#define FIND_MAX_RESULTS 100000
+#define FIND_MAX_DEFERRED_DIRECTORIES 4096
+
 // following variable was used up to Open Salamander 2.5,
 // where we switched to CFilterCriteria with its Save/Load
 const char* OLD_FINDOPTIONSITEM_EXCLUDEMASK_REG = "ExcludeMask";
@@ -1448,6 +1453,23 @@ BOOL AddFoundItem(const char* path, const char* name, DWORD sizeLow, DWORD sizeH
     if (duplicateCandidates != NULL && isDir) // directories are irrelevant to us when searching for duplicates
         return TRUE;
 
+    if (duplicateCandidates == NULL && data->FoundFilesListView->GetCount() >= FIND_MAX_RESULTS)
+    {
+        // Stop rather than silently dropping matches: a partial result set must be explicit to the user.
+        if (!data->ResultLimitReached)
+        {
+            FIND_LOG_ITEM log;
+            log.Flags = FLI_ERROR;
+            log.Text = LoadStr(IDS_CANTSHOWRESULTS);
+            log.Path = NULL;
+            SendMessage(data->HWindow, WM_USER_ADDLOG, (WPARAM)&log, 0);
+            TRACE_I("Find result budget reached: " << FIND_MAX_RESULTS << " items");
+            data->ResultLimitReached = TRUE;
+        }
+        data->StopSearch = TRUE;
+        return FALSE;
+    }
+
     CFoundFilesData* foundData = new CFoundFilesData;
     if (foundData != NULL)
     {
@@ -1650,7 +1672,7 @@ void SearchDirectory(char (&path)[MAX_PATH], char* end, int startPathLen,
                     {
                         BOOL searchNow = TRUE;
 
-                        if (dirStack != NULL)
+                        if (dirStack != NULL && dirStackCount < FIND_MAX_DEFERRED_DIRECTORIES)
                         {
                             // just store for later search
                             char* newFileName = new char[l + 1];
@@ -1662,6 +1684,8 @@ void SearchDirectory(char (&path)[MAX_PATH], char* end, int startPathLen,
                                     // no need to assign an item - we have space
                                     dirStack->At(dirStackCount) = newFileName;
                                     dirStackCount++;
+                                    if (dirStackCount > data->DirectoryStackHighWaterMark)
+                                        data->DirectoryStackHighWaterMark = dirStackCount;
                                     searchNow = FALSE;
                                 }
                                 else
@@ -1671,6 +1695,8 @@ void SearchDirectory(char (&path)[MAX_PATH], char* end, int startPathLen,
                                     if (dirStack->IsGood())
                                     {
                                         dirStackCount++;
+                                        if (dirStackCount > data->DirectoryStackHighWaterMark)
+                                            data->DirectoryStackHighWaterMark = dirStackCount;
                                         searchNow = FALSE;
                                     }
                                     else
@@ -1684,7 +1710,9 @@ void SearchDirectory(char (&path)[MAX_PATH], char* end, int startPathLen,
 
                         if (searchNow)
                         {
-                            // out of memory - we will not use dirStack
+                            // The deferred queue is full, so retain no more names and continue depth-first.
+                            if (dirStack != NULL)
+                                data->DirectoryStackFallbacks++;
                             strcpy_s(end, _countof(path) - (end - path), file.cFileName);
                             strcat_s(end, _countof(path) - (end - path), "\\");
                             l++;
