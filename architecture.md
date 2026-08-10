@@ -594,6 +594,7 @@ Most native APIs return `BOOL`, handles, or error codes. The code typically capt
 Built-in diagnostic facilities include:
 
 - `TRACE` and `CALL_STACK_MESSAGE` instrumentation;
+- a fixed, allocation-free release diagnostic ring of sanitized operation transitions, waits, retries, and plug-in DLL leaf names; it is written into the locally viewable crash report and therefore enters an archive only when the user elects to send that report;
 - Debug handle wrappers and `HANDLES_ENABLE` leak/misuse tracking;
 - custom allocation-failure handling and heap diagnostics;
 - `tserver.exe` for cross-process trace collection;

@@ -8,6 +8,7 @@
 #include "worker.h"
 #include "execlog.h"
 #include "common/allochan.h"
+#include "release_diagnostics.h"
 
 #include <Aclapi.h>
 #include <Ntsecapi.h>
@@ -1478,7 +1479,9 @@ HANDLE StartWorker(COperations* script, HWND hDlg, CChangeAttrsData* attrsData,
         return NULL;
     }
     //  SetThreadPriority(Worker, THREAD_PRIORITY_HIGHEST);
-    WaitForSingleObject(wContinue, INFINITE); // wait until it copies the data (they are on the stack)
+    DWORD copiedStartupData = WaitForSingleObject(wContinue, INFINITE); // wait until it copies the data (they are on the stack)
+    // This wait is intentionally label-only; the ring must not retain script data from the stack.
+    RecordReleaseDiagnosticWait("worker_startup", copiedStartupData);
     return worker;
 }
 

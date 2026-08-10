@@ -16,6 +16,7 @@
 #include "menu.h"
 #include "consts.h"
 #include "utf8gui.h"
+#include "release_diagnostics.h"
 
 CConfiguration Configuration;
 
@@ -384,6 +385,8 @@ static DWORD WaitForProgressDialogStartup(HANDLE readyEvent, HANDLE failedEvent)
         DWORD wait = MsgWaitForMultipleObjects(2, events, FALSE,
                                                 PROGRESS_DIALOG_STARTUP_TIMEOUT - elapsed,
                                                 QS_PAINT);
+        // Startup waits are retained as a compact sequence for post-failure diagnosis.
+        RecordReleaseDiagnosticWait("progress_dialog_startup", wait);
         if (wait == WAIT_OBJECT_0 || wait == WAIT_OBJECT_0 + 1 ||
             wait == WAIT_TIMEOUT || wait == WAIT_FAILED)
             return wait;

@@ -10,6 +10,7 @@
 #include "operation_result.h"
 #include "worker.h"
 #include "execlog.h"
+#include "release_diagnostics.h"
 
 #include <Aclapi.h>
 #include <Ntsecapi.h>
@@ -3029,6 +3030,8 @@ void DoCopyFileLoopOrig(HANDLE& in, HANDLE& out, void* buffer, int& limitBufferS
 
             if (err == ERROR_NETNAME_DELETED && ++autoRetryAttemptsSNAP <= 3)
             { // on SNAP server reading sometimes randomly fails with ERROR_NETNAME_DELETED; Retry button reportedly helps, so trigger it automatically
+                // Record the retry kind, but never the source path that caused it.
+                RecordReleaseDiagnosticRetry("copy_network_read");
                 Sleep(100);
                 goto RETRY_COPY;
             }
@@ -3045,6 +3048,8 @@ void DoCopyFileLoopOrig(HANDLE& in, HANDLE& out, void* buffer, int& limitBufferS
             {
             case IDRETRY:
             {
+                // User-approved reports need the retry edge, not the file name or error text.
+                RecordReleaseDiagnosticRetry("copy_read");
             RETRY_COPY:
 
                 if (in != NULL)

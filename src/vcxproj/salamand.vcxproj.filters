@@ -42,6 +42,9 @@
     <ClCompile Include="..\callstk.cpp">
       <Filter>cpp</Filter>
     </ClCompile>
+    <ClCompile Include="..\release_diagnostics.cpp">
+      <Filter>cpp</Filter>
+    </ClCompile>
     <ClCompile Include="..\codetbl.cpp">
       <Filter>cpp</Filter>
     </ClCompile>
@@ -516,6 +519,9 @@
       <Filter>h</Filter>
     </ClInclude>
     <ClInclude Include="..\callstk.h">
+      <Filter>h</Filter>
+    </ClInclude>
+    <ClInclude Include="..\release_diagnostics.h">
       <Filter>h</Filter>
     </ClInclude>
     <ClInclude Include="..\cfgdlg.h">

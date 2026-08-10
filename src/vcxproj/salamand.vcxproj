@@ -239,6 +239,8 @@
     </ClCompile>
     <ClCompile Include="..\callstk.cpp">
     </ClCompile>
+    <ClCompile Include="..\release_diagnostics.cpp">
+    </ClCompile>
     <ClCompile Include="..\codetbl.cpp">
     </ClCompile>
     <ClCompile Include="..\color.cpp">
@@ -726,6 +728,8 @@
     <ClInclude Include="..\cache.h">
     </ClInclude>
     <ClInclude Include="..\callstk.h">
+    </ClInclude>
+    <ClInclude Include="..\release_diagnostics.h">
     </ClInclude>
     <ClInclude Include="..\cfgdlg.h">
     </ClInclude>
