@@ -281,6 +281,7 @@
 #define IDD_CERTIFICATE                 940
 #define IDT_CERTIFICATE_ERROR           941
 #define IDB_CERTIFICATE_VIEW            942
+#define IDB_CERTIFICATE_REMEMBER        943
 
 // Next default values for new objects
 // 

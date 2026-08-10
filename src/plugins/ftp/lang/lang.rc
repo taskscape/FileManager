@@ -1068,7 +1068,7 @@ BEGIN
     PUSHBUTTON      "Help",IDHELP,173,210,50,14
 END
 
-IDD_CERTIFICATE DIALOGEX 10, 24, 270, 120
+IDD_CERTIFICATE DIALOGEX 10, 24, 270, 138
 STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
 CAPTION "Server Identity Problem"
 FONT 8, "MS Shell Dlg", 400, 0, 0x1
@@ -1078,10 +1078,12 @@ BEGIN
     GROUPBOX        " Certificate verification summary ",IDC_STATIC_2,9,21,252,54
     LTEXT           "",IDT_CERTIFICATE_ERROR,16,32,238,40
     LTEXT           "Accepting the certificate is potentially dangerous and not recommended.",IDC_STATIC_3,7,80,258,8,NOT WS_GROUP
-    LTEXT           "",IDC_STATIC_4,5,95,261,1,SS_ETCHEDHORZ | WS_GROUP
-    PUSHBUTTON      "&View Certificate",IDB_CERTIFICATE_VIEW,10,100,80,14,WS_GROUP
-    PUSHBUTTON      "&Accept Certificate",IDOK,95,100,80,14
-    DEFPUSHBUTTON   "Cancel",IDCANCEL,180,100,80,14
+    CONTROL         "Remember this exception for 30 days (this host, port, and certificate only)",IDB_CERTIFICATE_REMEMBER,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,10,93,250,10
+    LTEXT           "",IDC_STATIC_4,5,112,261,1,SS_ETCHEDHORZ | WS_GROUP
+    PUSHBUTTON      "&View Certificate",IDB_CERTIFICATE_VIEW,10,118,80,14,WS_GROUP
+    PUSHBUTTON      "&Accept Certificate",IDOK,95,118,80,14
+    DEFPUSHBUTTON   "Cancel",IDCANCEL,180,118,80,14
 END
 
 

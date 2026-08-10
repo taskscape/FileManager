@@ -7,6 +7,273 @@
 #define MAX_DER_CERT_SIZE 5120
 #define SizeOf(x) (sizeof(x) / sizeof(x[0]))
 
+#define FTP_CERTIFICATE_EXCEPTION_LIMIT 64
+#define FTP_CERTIFICATE_FINGERPRINT_SIZE 32
+#define FTP_CERTIFICATE_SESSION_EXCEPTION_HOURS 8
+#define FTP_CERTIFICATE_PERSISTENT_EXCEPTION_DAYS 30
+
+static const char* FTP_CERTIFICATE_EXCEPTIONS_KEY = "Certificate Exceptions";
+static const char* FTP_CERTIFICATE_EXCEPTION_HOST = "Host";
+static const char* FTP_CERTIFICATE_EXCEPTION_PORT = "Port";
+static const char* FTP_CERTIFICATE_EXCEPTION_SPKI = "SPKI SHA-256";
+static const char* FTP_CERTIFICATE_EXCEPTION_CERTIFICATE = "Certificate SHA-256";
+static const char* FTP_CERTIFICATE_EXCEPTION_SCOPE = "Scope";
+static const char* FTP_CERTIFICATE_EXCEPTION_EXPIRY = "Expiry";
+
+struct CCertificateExceptionRecord
+{
+    char Host[HOST_MAX_SIZE];
+    unsigned short Port;
+    BYTE SPKIFingerprint[FTP_CERTIFICATE_FINGERPRINT_SIZE];
+    BYTE CertificateFingerprint[FTP_CERTIFICATE_FINGERPRINT_SIZE];
+    FILETIME ExpiresAt;
+    DWORD Scope;
+};
+
+static bool IsExpired(const FILETIME& expiresAt)
+{
+    FILETIME now;
+    GetSystemTimeAsFileTime(&now);
+    ULARGE_INTEGER nowValue = {};
+    ULARGE_INTEGER expiryValue = {};
+    nowValue.LowPart = now.dwLowDateTime;
+    nowValue.HighPart = now.dwHighDateTime;
+    expiryValue.LowPart = expiresAt.dwLowDateTime;
+    expiryValue.HighPart = expiresAt.dwHighDateTime;
+    return expiryValue.QuadPart <= nowValue.QuadPart;
+}
+
+static FILETIME CertificateExceptionExpiry(CCertificateExceptionScope scope)
+{
+    FILETIME now;
+    GetSystemTimeAsFileTime(&now);
+    ULARGE_INTEGER expiry = {};
+    expiry.LowPart = now.dwLowDateTime;
+    expiry.HighPart = now.dwHighDateTime;
+    const ULONGLONG hours = scope == cesPersistent ? FTP_CERTIFICATE_PERSISTENT_EXCEPTION_DAYS * 24ULL
+                                                    : FTP_CERTIFICATE_SESSION_EXCEPTION_HOURS;
+    expiry.QuadPart += hours * 60ULL * 60ULL * 10000000ULL;
+    FILETIME result = {expiry.LowPart, expiry.HighPart};
+    return result;
+}
+
+static bool GetCertificateFingerprints(const BYTE* der, int derLength, BYTE* spkiFingerprint,
+                                       BYTE* certificateFingerprint)
+{
+    if (der == NULL || derLength <= 0)
+        return false;
+
+    PCCERT_CONTEXT certificate = CertCreateCertificateContext(X509_ASN_ENCODING | PKCS_7_ASN_ENCODING, der, derLength);
+    if (certificate == NULL)
+        return false;
+
+    DWORD fingerprintLength = FTP_CERTIFICATE_FINGERPRINT_SIZE;
+    bool ok = CryptHashCertificate(0, CALG_SHA_256, 0, der, derLength, certificateFingerprint, &fingerprintLength) &&
+              fingerprintLength == FTP_CERTIFICATE_FINGERPRINT_SIZE;
+    fingerprintLength = FTP_CERTIFICATE_FINGERPRINT_SIZE;
+    ok = ok && CryptHashPublicKeyInfo(0, CALG_SHA_256, 0, X509_ASN_ENCODING,
+                                      &certificate->pCertInfo->SubjectPublicKeyInfo, spkiFingerprint,
+                                      &fingerprintLength) &&
+         fingerprintLength == FTP_CERTIFICATE_FINGERPRINT_SIZE;
+    CertFreeCertificateContext(certificate);
+    return ok;
+}
+
+class CCertificateExceptionStore
+{
+public:
+    CCertificateExceptionStore() : Count(0)
+    {
+        // Certificate decisions can be consulted by connection and operation workers concurrently.
+        HANDLES(InitializeCriticalSection(&CriticalSection));
+    }
+
+    ~CCertificateExceptionStore() { HANDLES(DeleteCriticalSection(&CriticalSection)); }
+
+    bool Remember(const char* host, unsigned short port, const BYTE* der, int derLength,
+                  CCertificateExceptionScope scope)
+    {
+        CCertificateExceptionRecord record = {};
+        if (host == NULL || host[0] == 0 || !GetCertificateFingerprints(der, derLength, record.SPKIFingerprint,
+                                                                          record.CertificateFingerprint))
+            return false;
+
+        lstrcpynA(record.Host, host, SizeOf(record.Host));
+        record.Port = port;
+        record.Scope = scope;
+        record.ExpiresAt = CertificateExceptionExpiry(scope);
+
+        HANDLES(EnterCriticalSection(&CriticalSection));
+        int replace = -1;
+        for (int i = 0; i < Count; ++i)
+        {
+            if (_stricmp(Records[i].Host, record.Host) == 0 && Records[i].Port == record.Port &&
+                memcmp(Records[i].CertificateFingerprint, record.CertificateFingerprint,
+                       FTP_CERTIFICATE_FINGERPRINT_SIZE) == 0)
+            {
+                replace = i;
+                break;
+            }
+        }
+        if (replace == -1)
+        {
+            // A fixed store prevents repeated hostile certificates from growing configuration without bound.
+            replace = Count < FTP_CERTIFICATE_EXCEPTION_LIMIT ? Count++ : 0;
+        }
+        Records[replace] = record;
+        HANDLES(LeaveCriticalSection(&CriticalSection));
+        return true;
+    }
+
+    bool IsAccepted(const char* host, unsigned short port, const BYTE* der, int derLength, bool* endpointKnown)
+    {
+        BYTE spkiFingerprint[FTP_CERTIFICATE_FINGERPRINT_SIZE];
+        BYTE certificateFingerprint[FTP_CERTIFICATE_FINGERPRINT_SIZE];
+        if (endpointKnown)
+            *endpointKnown = false;
+        if (host == NULL || host[0] == 0 ||
+            !GetCertificateFingerprints(der, derLength, spkiFingerprint, certificateFingerprint))
+            return false;
+
+        bool accepted = false;
+        HANDLES(EnterCriticalSection(&CriticalSection));
+        for (int i = Count - 1; i >= 0;)
+        {
+            if (IsExpired(Records[i].ExpiresAt))
+            {
+                Records[i] = Records[--Count];
+                continue;
+            }
+            if (_stricmp(Records[i].Host, host) == 0 && Records[i].Port == port)
+            {
+                if (endpointKnown)
+                    *endpointKnown = true;
+                // Both pins must match: preserving an SPKI across renewal does not silently approve a new certificate.
+                if (memcmp(Records[i].SPKIFingerprint, spkiFingerprint, FTP_CERTIFICATE_FINGERPRINT_SIZE) == 0 &&
+                    memcmp(Records[i].CertificateFingerprint, certificateFingerprint,
+                           FTP_CERTIFICATE_FINGERPRINT_SIZE) == 0)
+                {
+                    accepted = true;
+                    break;
+                }
+            }
+            --i;
+        }
+        HANDLES(LeaveCriticalSection(&CriticalSection));
+        return accepted;
+    }
+
+    void Load(HKEY regKey, CSalamanderRegistryAbstract* registry)
+    {
+        ClearPersistent();
+        HKEY exceptionsKey;
+        if (!registry->OpenKey(regKey, FTP_CERTIFICATE_EXCEPTIONS_KEY, exceptionsKey))
+            return;
+
+        for (int i = 1; i <= FTP_CERTIFICATE_EXCEPTION_LIMIT; ++i)
+        {
+            char keyName[12];
+            HKEY entryKey;
+            _itoa(i, keyName, 10);
+            if (!registry->OpenKey(exceptionsKey, keyName, entryKey))
+                continue;
+
+            CCertificateExceptionRecord record = {};
+            DWORD port = 0;
+            bool valid = registry->GetValue(entryKey, FTP_CERTIFICATE_EXCEPTION_HOST, REG_SZ, record.Host,
+                                            SizeOf(record.Host)) &&
+                         registry->GetValue(entryKey, FTP_CERTIFICATE_EXCEPTION_PORT, REG_DWORD, &port, sizeof(port)) &&
+                         registry->GetValue(entryKey, FTP_CERTIFICATE_EXCEPTION_SPKI, REG_BINARY, record.SPKIFingerprint,
+                                            sizeof(record.SPKIFingerprint)) &&
+                         registry->GetValue(entryKey, FTP_CERTIFICATE_EXCEPTION_CERTIFICATE, REG_BINARY,
+                                            record.CertificateFingerprint, sizeof(record.CertificateFingerprint)) &&
+                         registry->GetValue(entryKey, FTP_CERTIFICATE_EXCEPTION_SCOPE, REG_DWORD, &record.Scope,
+                                            sizeof(record.Scope)) &&
+                         registry->GetValue(entryKey, FTP_CERTIFICATE_EXCEPTION_EXPIRY, REG_BINARY, &record.ExpiresAt,
+                                            sizeof(record.ExpiresAt));
+            registry->CloseKey(entryKey);
+            record.Port = (unsigned short)port;
+            if (valid && record.Host[0] != 0 && port <= USHRT_MAX && record.Scope == cesPersistent && !IsExpired(record.ExpiresAt))
+                RememberLoaded(record);
+        }
+        registry->CloseKey(exceptionsKey);
+    }
+
+    void Save(HKEY regKey, CSalamanderRegistryAbstract* registry)
+    {
+        HKEY exceptionsKey;
+        if (!registry->CreateKey(regKey, FTP_CERTIFICATE_EXCEPTIONS_KEY, exceptionsKey))
+            return;
+
+        registry->ClearKey(exceptionsKey);
+        HANDLES(EnterCriticalSection(&CriticalSection));
+        int saved = 0;
+        for (int i = 0; i < Count; ++i)
+        {
+            const CCertificateExceptionRecord& record = Records[i];
+            if (record.Scope != cesPersistent || IsExpired(record.ExpiresAt))
+                continue;
+            char keyName[12];
+            HKEY entryKey;
+            _itoa(++saved, keyName, 10);
+            if (registry->CreateKey(exceptionsKey, keyName, entryKey))
+            {
+                DWORD port = record.Port;
+                registry->SetValue(entryKey, FTP_CERTIFICATE_EXCEPTION_HOST, REG_SZ, record.Host, -1);
+                registry->SetValue(entryKey, FTP_CERTIFICATE_EXCEPTION_PORT, REG_DWORD, &port, sizeof(port));
+                registry->SetValue(entryKey, FTP_CERTIFICATE_EXCEPTION_SPKI, REG_BINARY, record.SPKIFingerprint,
+                                   sizeof(record.SPKIFingerprint));
+                registry->SetValue(entryKey, FTP_CERTIFICATE_EXCEPTION_CERTIFICATE, REG_BINARY,
+                                   record.CertificateFingerprint, sizeof(record.CertificateFingerprint));
+                registry->SetValue(entryKey, FTP_CERTIFICATE_EXCEPTION_SCOPE, REG_DWORD, &record.Scope,
+                                   sizeof(record.Scope));
+                registry->SetValue(entryKey, FTP_CERTIFICATE_EXCEPTION_EXPIRY, REG_BINARY, &record.ExpiresAt,
+                                   sizeof(record.ExpiresAt));
+                registry->CloseKey(entryKey);
+            }
+        }
+        HANDLES(LeaveCriticalSection(&CriticalSection));
+        registry->CloseKey(exceptionsKey);
+    }
+
+private:
+    void ClearPersistent()
+    {
+        // A configuration reload must not retain a remembered exception deleted from the profile.
+        HANDLES(EnterCriticalSection(&CriticalSection));
+        for (int i = Count - 1; i >= 0; --i)
+        {
+            if (Records[i].Scope == cesPersistent)
+                Records[i] = Records[--Count];
+        }
+        HANDLES(LeaveCriticalSection(&CriticalSection));
+    }
+
+    void RememberLoaded(const CCertificateExceptionRecord& record)
+    {
+        HANDLES(EnterCriticalSection(&CriticalSection));
+        if (Count < FTP_CERTIFICATE_EXCEPTION_LIMIT)
+            Records[Count++] = record;
+        HANDLES(LeaveCriticalSection(&CriticalSection));
+    }
+
+    CRITICAL_SECTION CriticalSection;
+    CCertificateExceptionRecord Records[FTP_CERTIFICATE_EXCEPTION_LIMIT];
+    int Count;
+};
+
+static CCertificateExceptionStore CertificateExceptions;
+
+void LoadCertificateExceptions(HKEY regKey, CSalamanderRegistryAbstract* registry)
+{
+    CertificateExceptions.Load(regKey, registry);
+}
+
+void SaveCertificateExceptions(HKEY regKey, CSalamanderRegistryAbstract* registry)
+{
+    CertificateExceptions.Save(regKey, registry);
+}
+
 #ifndef SP_PROT_TLS1_2_CLIENT
 #define SP_PROT_TLS1_2_CLIENT 0x00000800
 #endif
@@ -709,7 +976,10 @@ BOOL CSocket::EncryptSocket(int logUID, int* sslErrorOccured, CCertificate** unv
     }
 
     bool accepted = false;
-    if (pCertificate && pCertificate->IsSame(der, derLength, NULL, 0))
+    // Reconnects must recheck exception expiry; data sockets intentionally inherit the already pinned control identity.
+    if (pCertificate && pCertificate->IsSame(der, derLength, NULL, 0) &&
+        (pCertificate->IsVerified() || pCertificate->IsCurrentException()) &&
+        (IsDataConnection || pCertificate->MatchesEndpoint(HostAddress, HostPort)))
     {
         Logs.LogMessage(logUID, LoadStr(pCertificate->IsVerified() ? IDS_SSL_LOG_CERTVERIFIED : IDS_SSL_LOG_CERTACCEPTED), -1, TRUE);
         accepted = true;
@@ -723,14 +993,29 @@ BOOL CSocket::EncryptSocket(int logUID, int* sslErrorOccured, CCertificate** unv
     if (!accepted && CheckCertificate(der, derLength, errorBuf, errorBufLen, HostAddress, NULL))
     {
         Logs.LogMessage(logUID, LoadStr(IDS_SSL_LOG_CERTVERIFIED), -1, TRUE);
-        pCertificate = new CCertificate(der, derLength, NULL, 0, true, HostAddress);
+        pCertificate = new CCertificate(der, derLength, NULL, 0, true, HostAddress, HostPort);
         accepted = true;
+    }
+    if (!accepted)
+    {
+        bool endpointKnown = false;
+        if (CertificateExceptions.IsAccepted(HostAddress, HostPort, der, derLength, &endpointKnown))
+        {
+            Logs.LogMessage(logUID, LoadStr(IDS_SSL_LOG_CERTACCEPTED), -1, TRUE);
+            pCertificate = new CCertificate(der, derLength, NULL, 0, false, HostAddress, HostPort);
+            accepted = true;
+        }
+        else if (endpointKnown)
+        {
+            // A stored exception exists for this endpoint but its pin or lifetime no longer matches; prompt again.
+            Logs.LogMessage(logUID, LoadStr(IDS_SSL_LOG_CERTCHANGED), -1, TRUE);
+        }
     }
     if (!accepted)
     {
         Logs.LogMessage(logUID, LoadStr(IDS_SSL_LOG_CERTNOTVERIFIED), -1, TRUE);
         if (unverifiedCert)
-            *unverifiedCert = new CCertificate(der, derLength, NULL, 0, false, HostAddress);
+            *unverifiedCert = new CCertificate(der, derLength, NULL, 0, false, HostAddress, HostPort);
         else
         {
             SSLShutdown(connection);
@@ -751,7 +1036,7 @@ BOOL CSocket::EncryptSocket(int logUID, int* sslErrorOccured, CCertificate** unv
 }
 
 CCertificateErrDialog::CCertificateErrDialog(HWND hParent, const char* errorStr)
-    : CCenteredDialog(HLanguage, IDD_CERTIFICATE, hParent), ErrorStr(errorStr)
+    : CCenteredDialog(HLanguage, IDD_CERTIFICATE, hParent), ErrorStr(errorStr), RememberedException(false)
 {
 }
 
@@ -763,6 +1048,8 @@ INT_PTR CCertificateErrDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lPara
         SetDlgItemText(HWindow, IDT_CERTIFICATE_ERROR, ErrorStr);
         break;
     case WM_COMMAND:
+        if (LOWORD(wParam) == IDOK)
+            RememberedException = IsDlgButtonChecked(HWindow, IDB_CERTIFICATE_REMEMBER) == BST_CHECKED;
         if (LOWORD(wParam) == IDB_CERTIFICATE_VIEW && HIWORD(wParam) == BN_CLICKED)
             EndDialog(HWindow, IDB_CERTIFICATE_VIEW);
         break;
@@ -770,8 +1057,10 @@ INT_PTR CCertificateErrDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lPara
     return CCenteredDialog::DialogProc(uMsg, wParam, lParam);
 }
 
-CCertificate::CCertificate(BYTE* derCert, int derCertLen, BYTE* pkcs7Cert, int pkcs7CertLen, bool valid, LPCSTR host)
-    : nRefCount(1), pDERData(NULL), pPKCS7Data(NULL), nDERDataLen(0), nPKCS7DataLen(0), bVerified(valid), Host(NULL)
+CCertificate::CCertificate(BYTE* derCert, int derCertLen, BYTE* pkcs7Cert, int pkcs7CertLen, bool valid, LPCSTR host,
+                           unsigned short port)
+    : nRefCount(1), pDERData(NULL), pPKCS7Data(NULL), nDERDataLen(0), nPKCS7DataLen(0), bVerified(valid), Host(NULL),
+      HostAddress(NULL), Port(port)
 {
     if (derCertLen > 0 && (pDERData = (BYTE*)malloc(derCertLen)) != NULL)
     {
@@ -785,6 +1074,7 @@ CCertificate::CCertificate(BYTE* derCert, int derCertLen, BYTE* pkcs7Cert, int p
     }
     if (host)
     {
+        HostAddress = _strdup(host);
         int length = MultiByteToWideChar(CP_ACP, 0, host, -1, NULL, 0);
         if (length > 0 && (Host = (LPWSTR)malloc(length * sizeof(WCHAR))) != NULL)
             MultiByteToWideChar(CP_ACP, 0, host, -1, Host, length);
@@ -794,6 +1084,7 @@ CCertificate::CCertificate(BYTE* derCert, int derCertLen, BYTE* pkcs7Cert, int p
 CCertificate::~CCertificate()
 {
     free(Host);
+    free(HostAddress);
     free(pDERData);
     free(pPKCS7Data);
 }
@@ -816,4 +1107,20 @@ bool CCertificate::IsSame(BYTE* derCert, int derCertLen, BYTE* pkcs7Cert, int pk
     return derCertLen == nDERDataLen && pkcs7CertLen == nPKCS7DataLen &&
            (derCertLen == 0 || memcmp(pDERData, derCert, derCertLen) == 0) &&
            (pkcs7CertLen == 0 || memcmp(pPKCS7Data, pkcs7Cert, pkcs7CertLen) == 0);
+}
+
+bool CCertificate::MatchesEndpoint(LPCSTR host, unsigned short port) const
+{
+    return HostAddress != NULL && host != NULL && _stricmp(HostAddress, host) == 0 && Port == port;
+}
+
+bool CCertificate::RememberException(CCertificateExceptionScope scope) const
+{
+    return CertificateExceptions.Remember(HostAddress, Port, pDERData, nDERDataLen, scope);
+}
+
+bool CCertificate::IsCurrentException() const
+{
+    // Data sockets inherit the control certificate, so validate the stored control endpoint rather than their ephemeral port.
+    return CertificateExceptions.IsAccepted(HostAddress, Port, pDERData, nDERDataLen, NULL);
 }

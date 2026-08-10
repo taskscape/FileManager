@@ -1470,6 +1470,52 @@ public sealed class NativeSafetyRegressionTests
         });
     }
 
+    [Test]
+    public void Ftp_certificate_exceptions_are_endpoint_bound_expiring_and_pinned()
+    {
+        var root = FindRepositoryRoot();
+        var tlsHeader = File.ReadAllText(Path.Combine(root, "src", "plugins", "ftp", "ssl.h"));
+        var tls = File.ReadAllText(Path.Combine(root, "src", "plugins", "ftp", "ssl.cpp"));
+        var control = File.ReadAllText(Path.Combine(root, "src", "plugins", "ftp", "ctrlcon1.cpp"));
+        var operationDialog = File.ReadAllText(Path.Combine(root, "src", "plugins", "ftp", "dialogs5.cpp"));
+        var configuration = File.ReadAllText(Path.Combine(root, "src", "plugins", "ftp", "ftp.cpp"));
+        var dialogResource = File.ReadAllText(Path.Combine(root, "src", "plugins", "ftp", "lang", "lang.rc"));
+        var refactoring = File.ReadAllText(Path.Combine(root, "refactoring.md"));
+
+        // Pin every trust dimension so chain failures can be explicitly accepted without making the decision reusable.
+        Assert.Multiple(() =>
+        {
+            Assert.That(tlsHeader, Does.Contain("enum CCertificateExceptionScope"));
+            Assert.That(tlsHeader, Does.Contain("cesSession"));
+            Assert.That(tlsHeader, Does.Contain("cesPersistent"));
+            Assert.That(tlsHeader, Does.Contain("MatchesEndpoint(LPCSTR host, unsigned short port) const"));
+            Assert.That(tlsHeader, Does.Contain("RememberException(CCertificateExceptionScope scope) const"));
+            Assert.That(tlsHeader, Does.Contain("IsCurrentException() const"));
+            Assert.That(tls, Does.Contain("#define FTP_CERTIFICATE_EXCEPTION_LIMIT 64"));
+            Assert.That(tls, Does.Contain("#define FTP_CERTIFICATE_SESSION_EXCEPTION_HOURS 8"));
+            Assert.That(tls, Does.Contain("#define FTP_CERTIFICATE_PERSISTENT_EXCEPTION_DAYS 30"));
+            Assert.That(tls, Does.Contain("FTP_CERTIFICATE_EXCEPTION_SPKI"));
+            Assert.That(tls, Does.Contain("FTP_CERTIFICATE_EXCEPTION_CERTIFICATE"));
+            Assert.That(tls, Does.Contain("CryptHashPublicKeyInfo"));
+            Assert.That(tls, Does.Contain("CryptHashCertificate(0, CALG_SHA_256"));
+            Assert.That(tls, Does.Contain("_stricmp(Records[i].Host, host) == 0 && Records[i].Port == port"));
+            Assert.That(tls, Does.Contain("memcmp(Records[i].SPKIFingerprint, spkiFingerprint"));
+            Assert.That(tls, Does.Contain("memcmp(Records[i].CertificateFingerprint, certificateFingerprint"));
+            Assert.That(tls, Does.Contain("IsExpired(Records[i].ExpiresAt)"));
+            Assert.That(tls, Does.Contain("record.Scope == cesPersistent"));
+            Assert.That(tls, Does.Contain("pCertificate->IsVerified() || pCertificate->IsCurrentException()"));
+            Assert.That(tls, Does.Contain("IsDataConnection || pCertificate->MatchesEndpoint(HostAddress, HostPort)"));
+            Assert.That(tls, Does.Contain("CertificateExceptions.IsAccepted(HostAddress, HostPort, der, derLength, &endpointKnown)"));
+            Assert.That(tls, Does.Contain("else if (endpointKnown)"));
+            Assert.That(control, Does.Contain("unverifiedCert->RememberException(certificateDialog.RememberException() ? cesPersistent : cesSession)"));
+            Assert.That(operationDialog, Does.Contain("unverifiedCertificate->RememberException(certificateDialog.RememberException() ? cesPersistent : cesSession)"));
+            Assert.That(configuration, Does.Contain("LoadCertificateExceptions(regKey, registry)"));
+            Assert.That(configuration, Does.Contain("SaveCertificateExceptions(regKey, registry)"));
+            Assert.That(dialogResource, Does.Contain("Remember this exception for 30 days"));
+            Assert.That(refactoring, Does.Contain("### 60. Strengthen FTP certificate exception storage — Implemented"));
+        });
+    }
+
     private static string FindRepositoryRoot()
     {
         for (var directory = new DirectoryInfo(AppContext.BaseDirectory); directory is not null; directory = directory.Parent)

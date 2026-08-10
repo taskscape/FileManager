@@ -1785,16 +1785,21 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
                                                             fastRetry = TRUE; // user-induced delay, some servers do not like it (ftp.novell.com - kills after 20s)
                                                             waitWnd.Show(FALSE);
 
+                                                            CCertificateErrDialog certificateDialog(parent, errBuf);
                                                             INT_PTR dlgRes;
                                                             do
                                                             {
-                                                                dlgRes = CCertificateErrDialog(parent, errBuf).Execute();
+                                                                dlgRes = certificateDialog.Execute();
                                                                 switch (dlgRes)
                                                                 {
                                                                 case IDOK: // accept once
                                                                 {
                                                                     Logs.LogMessage(logUID, LoadStr(IDS_SSL_LOG_CERTACCEPTED), -1, TRUE);
                                                                     SetCertificate(unverifiedCert);
+                                                                    // Remembered exceptions are opt-in and remain pinned to this endpoint and certificate.
+                                                                    if (unverifiedCert->RememberException(certificateDialog.RememberException() ? cesPersistent : cesSession) &&
+                                                                        certificateDialog.RememberException())
+                                                                        PersistFTPConfigurationAfterUserCommit(parent);
                                                                     break;
                                                                 }
 

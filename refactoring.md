@@ -401,10 +401,13 @@ This document is the working record for a read-only stability and resilience aud
 - **Implementation:** Viewer/cache downloads now write to a sibling `.ftp-incomplete` file and a write-through `.meta` sidecar that records the remote host, path, name, byte size, and available last-write time. Only an exact metadata match, a binary transfer, and a staged length no greater than the remote size can issue `REST`; a refused response discards that prefix rather than appending to it. The staged file is flushed, checked against the expected size, and promoted with `MoveFileExW(MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH)` only after the final FTP success response and data flush. Interrupted or validation-failed data stay marked as incomplete and the visible cache name is untouched.
 - **Verification:** `NativeSafetyRegressionTests.Ftp_downloads_stage_identity_validate_resume_and_publish_only_after_a_durable_commit` guards the persisted identity, binary-only resume offset check, `REST` response gate, append offset, size verification, write-through rename, incomplete suffix, and this ledger entry.
 
-### 60. Strengthen FTP certificate exception storage
+### 60. Strengthen FTP certificate exception storage — Implemented (2026-08-10)
 
 - **Justification:** Certificate checking exists, but resilience depends on binding any user exception to the intended host and certificate lifecycle rather than a broadly reusable approval.
 - **Proposed solution:** Store hostname, port, SPKI/certificate fingerprint, decision scope, and expiry; warn on change; and test hostname mismatch, expiry, chain failure, and renewed certificates.
+
+- **Implementation (2026-08-10):** FTPS exceptions now use a bounded, synchronized plug-in store. Each decision records the case-insensitive hostname, control port, SHA-256 SPKI and leaf-certificate fingerprints, explicit session or remembered scope, and expiry. The dialog defaults to an eight-hour session exception; the new opt-in “Remember” checkbox persists a 30-day exception in the FTP profile immediately. A reused exception requires the exact host, port, SPKI, certificate fingerprint, and unexpired lifetime. An endpoint record with a changed or renewed certificate is logged as changed and falls back to the warning dialog; ordinary Windows chain and hostname validation still runs before any exception lookup.
+- **Verification:** `NativeSafetyRegressionTests.Ftp_certificate_exceptions_are_endpoint_bound_expiring_and_pinned` guards endpoint matching, fingerprint dual-pinning, scope/expiry persistence, chain-failure exception routing, renewed-certificate warning, and the implementation ledger. `SChannelTlsIntegrationTests` continues to verify that a self-signed chain fails without an explicit exception.
 
 ### 61. Upgrade the bundled 7-Zip code
 
