@@ -524,7 +524,9 @@ void TerminateThread()
     if (Thread != NULL) // terminovani threadu cmuchala
     {
         SetEvent(TerminateEvent);              // pozadame cmuchala o ukonceni cinnosti
-        WaitForSingleObject(Thread, INFINITE); // pockame az chcipne
+        // Directory notifications can be delayed by a provider, so retain the
+        // event and shared counters through cancellation and recovery phases.
+        CThreadShutdownDeadline("directory snooper").WaitForSafeJoin(Thread);
         HANDLES(CloseHandle(Thread));          // zavreme handle threadu
     }
     if (DataUsageMutex != NULL)
@@ -547,13 +549,11 @@ void TerminateThread()
 
     if (SafeFindCloseThread != NULL)
     {
-        SafeFindCloseTerminate = TRUE; // zakilujeme thread
+        SafeFindCloseTerminate = TRUE; // request that the closer exits after its current work
         SetEvent(SafeFindCloseStart);
-        if (WaitForSingleObject(SafeFindCloseThread, 1000) == WAIT_TIMEOUT) // pockame az se ukonci
-        {
-            TerminateThread(SafeFindCloseThread, 666);          // nepovedlo se, zabijeme ho natvrdo
-            WaitForSingleObject(SafeFindCloseThread, INFINITE); // pockame az thread skutecne skonci, nekdy mu to dost trva
-        }
+        // The closer owns its critical section until its callback returns; a
+        // deadline reports a stuck provider but never tears down that state.
+        CThreadShutdownDeadline("safe notification-handle closer").WaitForSafeJoin(SafeFindCloseThread);
         HANDLES(CloseHandle(SafeFindCloseThread));
     }
     if (SafeFindCloseStart != NULL)

@@ -281,7 +281,7 @@ public sealed class NativeSafetyRegressionTests
             Assert.That(owner, Does.Contain("caller keeps parameter alive"));
             Assert.That(checkPath, Does.Contain("CThreadOwner ThreadCheckPath"));
             Assert.That(checkPath, Does.Contain("ThreadCheckPathOwnedF"));
-            Assert.That(checkPath, Does.Contain("StopAndJoin(1000)"));
+            Assert.That(checkPath, Does.Contain("StopAndJoin(CThreadShutdownDeadline(\"check-path worker\"))"));
             Assert.That(checkPath, Does.Not.Contain("CreateThread("));
             Assert.That(checkPath, Does.Not.Contain("SetThreadNameInVCAndTrace(\"CheckPath\")"));
             Assert.That(ratchet, Does.Contain("git diff --no-ext-diff --unified=0 $BaseCommit HEAD"));
@@ -289,6 +289,48 @@ public sealed class NativeSafetyRegressionTests
             Assert.That(ratchet, Does.Contain("CreateThread|_beginthreadex"));
             Assert.That(workflow, Does.Contain("verify-no-new-raw-thread-creation.ps1 -BaseCommit origin/"));
             Assert.That(refactoring, Does.Contain("### 43. Standardize thread creation and ownership — Implemented"));
+        });
+    }
+
+    [Test]
+    public void Shutdown_deadlines_report_named_phases_and_preserve_shared_state_until_safe_join()
+    {
+        var root = FindRepositoryRoot();
+        var owner = File.ReadAllText(Path.Combine(root, "src", "common", "thread_owner.h"));
+        var checkPath = File.ReadAllText(Path.Combine(root, "src", "path_checking.cpp"));
+        var cache = File.ReadAllText(Path.Combine(root, "src", "cache.cpp"));
+        var icons = File.ReadAllText(Path.Combine(root, "src", "fileswindow_init.cpp"));
+        var snooper = File.ReadAllText(Path.Combine(root, "src", "snooper.cpp"));
+        var callStack = File.ReadAllText(Path.Combine(root, "src", "callstk.cpp"));
+        var auxiliary = File.ReadAllText(Path.Combine(root, "src", "path_utils.cpp"));
+        var appEntry = File.ReadAllText(Path.Combine(root, "src", "app_entry.cpp"));
+        var refactoring = File.ReadAllText(Path.Combine(root, "refactoring.md"));
+
+        // These contracts make stalled shutdown observable without letting a
+        // caller release shared state while a legacy worker can still use it.
+        Assert.Multiple(() =>
+        {
+            Assert.That(owner, Does.Contain("class CThreadShutdownDeadline"));
+            Assert.That(owner, Does.Contain("DWORD cancellationDeadline = 5000"));
+            Assert.That(owner, Does.Contain("DWORD recoveryDeadline = 30000"));
+            Assert.That(owner, Does.Contain("TraceDeadlineBreach(\"cancellation\""));
+            Assert.That(owner, Does.Contain("TraceDeadlineBreach(\"operation recovery\""));
+            Assert.That(owner, Does.Contain("GetExitCodeThread(worker, &exitCode)"));
+            Assert.That(owner, Does.Contain("Keeping the process alive for a safe join."));
+            Assert.That(owner, Does.Contain("WaitForSingleObject(worker, INFINITE)"));
+            Assert.That(owner, Does.Contain("StopAndJoin(const CThreadShutdownDeadline& deadline)"));
+            Assert.That(checkPath, Does.Contain("CThreadShutdownDeadline(\"check-path worker\")"));
+            Assert.That(cache, Does.Contain("CThreadShutdownDeadline(\"cache-handles worker\")"));
+            Assert.That(icons, Does.Contain("CThreadShutdownDeadline(\"panel icon reader\")"));
+            Assert.That(snooper, Does.Contain("CThreadShutdownDeadline(\"directory snooper\")"));
+            Assert.That(snooper, Does.Contain("CThreadShutdownDeadline(\"safe notification-handle closer\")"));
+            Assert.That(callStack, Does.Contain("CThreadShutdownDeadline(\"call-stack bug report\")"));
+            Assert.That(auxiliary, Does.Contain("struct CAuxThread"));
+            Assert.That(auxiliary, Does.Contain("CThreadShutdownDeadline(auxiliary.Description).WaitForSafeJoin(t)"));
+            Assert.That(auxiliary, Does.Not.Contain("TerminateThread(t, 666)"));
+            Assert.That(appEntry, Does.Contain("ShutdownAuxThreads()"));
+            Assert.That(appEntry, Does.Not.Contain("TerminateAuxThreads()"));
+            Assert.That(refactoring, Does.Contain("### 44. Define bounded shutdown deadlines without unsafe escalation — Implemented"));
         });
     }
 

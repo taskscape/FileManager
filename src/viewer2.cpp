@@ -204,7 +204,8 @@ BOOL OpenViewer(const char* name, CViewType mode, int left, int top, int width, 
         {
             //      SetThreadPriority(loop, THREAD_PRIORITY_HIGHEST);
         }
-        AddAuxThread(loop);                            // register the thread among existing viewers (terminate it on exit)
+        // The viewer loop closes before teardown; its handle remains tracked for a safe join.
+        AddAuxThread(loop, FALSE, "viewer message loop");
         WaitForSingleObject(ViewerContinue, INFINITE); // wait until the thread finishes its startup
         if (!data.Success)
             goto ERROR_TV_CREATE;

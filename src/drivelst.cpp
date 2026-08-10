@@ -1798,7 +1798,8 @@ BOOL CDrivesList::BuildData(BOOL noTimeout, TDirectArray<CDriveData>* copyDrives
                     else
                         volumeName[0] = 0;
                     if (thread != NULL)
-                        AddAuxThread(thread, TRUE); // if the thread is not finished, we will kill it before closing the software
+                        // The probe reads shared volume-name storage during its safe shutdown join.
+                        AddAuxThread(thread, TRUE, "removable-drive volume probe");
                     if (volumeName[0] == 0)
                         strcpy(volumeName, LoadStr(IDS_COMPACT_DISK));
                     else
@@ -2650,7 +2651,8 @@ BOOL CDrivesList::GetDriveBarToolTip(int index, char* text)
         else
             volumeName[0] = 0;
         if (thread != NULL)
-            AddAuxThread(thread, TRUE); // if the thread is still running, we will kill it before closing the program
+            // The probe reads shared volume-name storage during its safe shutdown join.
+            AddAuxThread(thread, TRUE, "removable-drive volume probe");
         if (volumeName[0] == 0)
             strcpy(volumeName, LoadStr(IDS_COMPACT_DISK));
 

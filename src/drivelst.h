@@ -223,7 +223,8 @@ struct CNBWNetAC3Thread
     {
         if (Thread != NULL)
         {
-            AddAuxThread(Thread, TRUE); // thread can run only during shutdown, we will kill it by this
+            // Network browsing can access its owner while it unwinds, so retain it for a safe join.
+            AddAuxThread(Thread, TRUE, "network-browser worker");
             Thread = NULL;
         }
         if (shutdown)

@@ -905,14 +905,9 @@ void CCacheHandles::Destroy()
     if (Thread != NULL)
     {
         SetEvent(Terminate);                                   // "you should end now"
-        if (WaitForSingleObject(Thread, 1000) == WAIT_TIMEOUT)
-        {
-            // The worker may be in a kernel call that cannot be interrupted immediately.
-            // Do not destroy its synchronization state or force-kill it: record the deadline
-            // breach and keep joining until the worker has released its own state.
-            TRACE_E("Cache-handles thread did not stop within the shutdown deadline; waiting for a safe join.");
-            WaitForSingleObject(Thread, INFINITE);
-        }
+        // Cache cleanup may be waiting on filesystem I/O, so preserve its
+        // recovery state through the named cancellation/recovery deadline.
+        CThreadShutdownDeadline("cache-handles worker").WaitForSafeJoin(Thread);
         HANDLES(CloseHandle(Thread));
         Thread = NULL;
     }

@@ -286,10 +286,12 @@ This document is the working record for a read-only stability and resilience aud
 - **Justification:** Dozens of raw `CreateThread` calls distribute handle ownership, parameter lifetime, COM initialization, exception policy, and naming across the codebase.
 - **Implementation (2026-08-09):** `CThreadOwner` is the common CRT-backed worker boundary. It owns the thread, manual-reset stop event, completion event, and copied launch record; names each worker, optionally establishes and balances a declared COM apartment, contains C++ exceptions, and always signals completion after normal callback execution. The check-path workers now use it end-to-end, including bounded shutdown diagnostics followed by a safe join. `tools/verify-no-new-raw-thread-creation.ps1`, run in pull-request CI, ratchets all newly changed first-party thread starts onto this boundary while legacy call sites are migrated by their owning subsystem work.
 
-### 44. Define bounded shutdown deadlines without unsafe escalation
+### 44. Define bounded shutdown deadlines without unsafe escalation — Implemented (2026-08-10)
 
 - **Justification:** One-second waits followed by thread killing are arbitrary, while infinite waits can hang shutdown forever. Neither behavior explains what the worker is doing.
-- **Proposed solution:** Give worker phases explicit cancellation deadlines, emit diagnostics on deadline breach, detach only components proven not to access destroyed state, and keep the process alive long enough to preserve operation recovery data.
+- **Implementation (2026-08-10):** `CThreadShutdownDeadline` gives every migrated worker a five-second cancellation phase and a thirty-second operation-recovery phase. A breach logs the named worker, phase, duration, and live thread state before the owner performs its mandatory safe join. The check-path, cache, panel-icon, directory-snooper, safe-handle-closer, and call-stack report workers now use that contract; the legacy auxiliary-worker drain also records a component label for each handle and applies it after each subsystem has requested closure.
+- **Safety:** No migrated worker is detached: each can still observe panel, global, synchronization, or crash-recovery state. The process therefore remains alive until its worker joins and only then releases that state, rather than using `TerminateThread` or closing objects still in use.
+- **Verification:** `NativeSafetyRegressionTests.Shutdown_deadlines_report_named_phases_and_preserve_shared_state_until_safe_join` guards the two deadlines, diagnostics, mandatory join, named auxiliary tracking, removal of the former forced termination paths, and this ledger entry.
 
 ### 45. Replace wrap-prone time calculations with monotonic 64-bit time
 

@@ -257,7 +257,8 @@ BOOL SimpleMAPISendMail(CSimpleMAPI* mapi)
         return FALSE;
     }
 
-    AddAuxThread(thread); // add the thread among existing viewers (killed on exit)
+    // MAPI may be inside provider code, so shutdown waits rather than ending it unsafely.
+    AddAuxThread(thread, FALSE, "Simple MAPI sender");
     SetCursor(hOldCur);
     return TRUE;
 }
