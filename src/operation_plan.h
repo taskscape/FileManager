@@ -5,6 +5,10 @@
 
 class COperations;
 
+// A script owns this stable identifier from command dispatch through all
+// asynchronous handoffs, so concurrent operations cannot share a trace.
+#define OPERATION_CORRELATION_ID_LENGTH 32
+
 // The operation plan is deliberately separate from the live worker state.  It
 // contains only the deterministic instructions produced by the planner, so it
 // can be captured, compared, or persisted before a worker starts prompting or
@@ -57,6 +61,8 @@ class COperationPlan
 {
 private:
     TDirectArray<COperationPlanItem> Items;
+    // Retain the dispatch ID with the immutable snapshot for post-crash matching.
+    char OperationId[OPERATION_CORRELATION_ID_LENGTH];
 
 public:
     COperationPlan();
@@ -67,6 +73,7 @@ public:
 
     int GetCount() const { return Items.Count; }
     const COperationPlanItem& At(int index) { return Items.At(index); }
+    const char* GetOperationId() const { return OperationId; }
 
     static const char* GetOpcodeName(COperationCode opcode);
 };

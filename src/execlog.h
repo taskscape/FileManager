@@ -12,8 +12,11 @@ void ExecLogFileListingStart(const char* path, BOOL isPlugin, const char* fsName
 void ExecLogFileListingResult(const char* path, BOOL success, int fileCount, int dirCount,
                               BOOL isPlugin, const char* fsName);
 
-void ExecLogFileOperationStart(const char* operation, const char* source, const char* target);
-void ExecLogFileOperationResult(const char* operation, const char* source, const char* target, BOOL success);
+void ExecLogFileOperationStart(const char* operationId, int itemSequence, int attempt,
+                               const char* operation, const char* source, const char* target);
+void ExecLogFileOperationResult(const char* operationId, int itemSequence, int attempt,
+                                const char* operation, const char* source, const char* target, BOOL success);
+void ExecLogFileOperationRetry(const char* operationId, int itemSequence, int attempt);
 
 void ExecLogFeatureStart(const char* feature, const char* detail);
 void ExecLogFeatureResult(const char* feature, const char* detail, BOOL success);
@@ -51,18 +54,32 @@ inline void ExecLogFileListingResult(const char* path, BOOL success, int fileCou
     (void)fsName;
 }
 
-inline void ExecLogFileOperationStart(const char* operation, const char* source, const char* target)
+inline void ExecLogFileOperationStart(const char* operationId, int itemSequence, int attempt,
+                                      const char* operation, const char* source, const char* target)
 {
+    (void)operationId;
+    (void)itemSequence;
+    (void)attempt;
     (void)operation;
     (void)source;
     (void)target;
 }
-inline void ExecLogFileOperationResult(const char* operation, const char* source, const char* target, BOOL success)
+inline void ExecLogFileOperationResult(const char* operationId, int itemSequence, int attempt,
+                                       const char* operation, const char* source, const char* target, BOOL success)
 {
+    (void)operationId;
+    (void)itemSequence;
+    (void)attempt;
     (void)operation;
     (void)source;
     (void)target;
     (void)success;
+}
+inline void ExecLogFileOperationRetry(const char* operationId, int itemSequence, int attempt)
+{
+    (void)operationId;
+    (void)itemSequence;
+    (void)attempt;
 }
 
 inline void ExecLogFeatureStart(const char* feature, const char* detail)

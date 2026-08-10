@@ -18,6 +18,7 @@ private:
     HANDLE File;
     char Path[3 * MAX_PATH];
     int CurrentItem;
+    int CurrentAttempt;
 
     BOOL Append(const char* text);
     BOOL AppendPlanOperand(EOperationPlanOperandKind kind, const char* path, DWORD value);
@@ -28,7 +29,8 @@ public:
     ~COperationJournal();
 
     BOOL Begin(COperations& operations);
-    BOOL BeginItem(int itemIndex, const COperation* operation);
+    BOOL BeginItem(int itemIndex, const COperation* operation, int attempt);
+    void RecordRetry(int attempt);
     BOOL SetTemporaryPath(const char* temporaryPath);
     BOOL MarkTemporaryReady();
     void CompleteItem(BOOL succeeded);

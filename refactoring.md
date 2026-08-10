@@ -362,10 +362,13 @@ This document is the working record for a read-only stability and resilience aud
 - **Implementation:** `release_diagnostics.cpp` provides a 128-entry, allocation-free ring with per-entry publication markers. Worker lifecycle, startup waits, copy retries, and plug-in DLL leaf names record only sanitized labels. The crash text report renders the ring before `End.` and writes a local `.OPS` sidecar, which Salmon packages/uploads only after the user selects **Send Report**.
 - **Verification:** `NativeSafetyRegressionTests.Release_diagnostic_ring_is_bounded_sanitized_and_reported_only_through_the_existing_consent_flow` pins the capacity, publication protocol, safe fields, producer coverage, report attachment, local-view documentation, project registration, and implemented ledger entry.
 
-### 55. Assign correlation IDs to operations and workers
+### 55. Assign correlation IDs to operations and workers — Implemented
 
 - **Justification:** Parallel copies, dialogs, callbacks, and retries otherwise produce ambiguous traces, especially after a crash or cancellation race.
 - **Proposed solution:** Generate an operation ID at command dispatch and propagate it through plan, worker, UI, journal, and log records. Include item sequence and attempt number.
+
+- **Implementation:** `COperations` creates an immutable process/tick/dispatch-sequence ID. Plans, worker startup/completion, visible progress-dialog titles, journals, and debug execution-log records retain that ID. The journal and logs also record each item sequence and initial or retried attempt; synchronous retry dialogs and automatic retry paths advance the attempt.
+- **Verification:** `FileOperationUiTests.Copy_file_persists_a_completed_recovery_journal_with_item_intent` checks durable plan/item correlation, and `NativeSafetyRegressionTests.File_operation_correlation_ids_cross_plan_worker_ui_journal_and_log_boundaries` pins every handoff.
 
 ### 56. Preserve the first actionable error and its context
 

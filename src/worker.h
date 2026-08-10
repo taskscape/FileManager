@@ -439,6 +439,8 @@ public:
 
     BOOL SkipAllCountSizeErrors; // should all subsequent count-size errors be skipped?
 
+    char CorrelationId[OPERATION_CORRELATION_ID_LENGTH];
+
     char WorkPath1[MAX_PATH];  // when non-empty string first path processed (used for change notifications)
     BOOL WorkPath1InclSubDirs; // TRUE/FALSE = with/without subdirectories (first path)
     char WorkPath2[MAX_PATH];  // when non-empty string second path processed (used for change notifications)
@@ -455,6 +457,8 @@ private:
     HANDLE CancellationEvent;
     volatile LONG OperationState;
     COperationJournal* Journal;
+    int CurrentItemSequence;
+    int CurrentItemAttempt;
 
     // for the status line in the progress dialog (Copy and Move only)
     CRITICAL_SECTION StatusCS;              // critical section protecting TransferSpeedMeter, ProgressSpeedMeter, and
@@ -492,11 +496,15 @@ public:
     HANDLE GetCancellationEvent() const { return CancellationEvent; }
 
     BOOL BeginJournal();
-    BOOL JournalBeginItem(int itemIndex, const COperation* operation);
+    int BeginItemAttempt(int itemIndex);
+    int RecordItemRetry();
+    BOOL JournalBeginItem(int itemIndex, const COperation* operation, int attempt);
     BOOL JournalSetTemporaryPath(const char* temporaryPath);
     BOOL JournalMarkTemporaryReady();
     void JournalCompleteItem(BOOL succeeded);
     void FinishJournal(BOOL failed, BOOL cancelled);
+    const char* GetCorrelationId() const { return CorrelationId; }
+    int GetCurrentItemAttempt() const { return CurrentItemAttempt; }
 
     void SetWorkPath1(const char* path, BOOL inclSubDirs)
     {
@@ -743,6 +751,8 @@ BOOL CheckFileOrDirADS(const char* fileName, BOOL isDir, CQuadWord* adsSize, wch
 struct CWorkerData
 {
     COperations* Script;
+    // Preserve the dispatch context independently of the caller's startup data.
+    char CorrelationId[OPERATION_CORRELATION_ID_LENGTH];
     HWND HProgressDlg;
     void* Buffer;
     BOOL BufferIsAllocated;
@@ -763,10 +773,12 @@ struct CWorkerCompletion
 {
     EOperationState State;
     BOOL CancellationRequested;
+    char CorrelationId[OPERATION_CORRELATION_ID_LENGTH];
 
-    CWorkerCompletion(EOperationState state, BOOL cancellationRequested)
+    CWorkerCompletion(EOperationState state, BOOL cancellationRequested, const char* correlationId)
         : State(state), CancellationRequested(cancellationRequested)
     {
+        lstrcpyn(CorrelationId, correlationId, _countof(CorrelationId));
     }
 };
 
