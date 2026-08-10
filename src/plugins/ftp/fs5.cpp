@@ -447,8 +447,19 @@ void CPluginFSInterface::ViewFile(const char* fsName, HWND parent,
         if (dataIface == NULL || !dataIface->GetSize(file, fileSizeInBytes, sizeInBytes) || !sizeInBytes)
             fileSizeInBytes.Set(-1, -1); // the file size is unknown
 
+        // Keep the listing timestamp with the cached transfer so a changed remote file cannot resume an old prefix.
+        BOOL remoteDateAndTimeValid = FALSE;
+        CFTPDate remoteDate;
+        CFTPTime remoteTime;
+        memset(&remoteDate, 0, sizeof(remoteDate));
+        memset(&remoteTime, 0, sizeof(remoteTime));
+        remoteTime.Hour = 24;
+        if (dataIface != NULL)
+            dataIface->GetLastWriteDateAndTime(file, &remoteDateAndTimeValid, &remoteDate, &remoteTime);
+
         ControlConnection->DownloadOneFile(parent, file.Name, fileSizeInBytes, asciiMode, Path,
-                                           tmpFileName, &newFileCreated, &newFileIncomplete, &newFileSize,
+                                           tmpFileName, remoteDateAndTimeValid, &remoteDate, &remoteTime,
+                                           &newFileCreated, &newFileIncomplete, &newFileSize,
                                            &TotalConnectAttemptNum, panel, notInPanel,
                                            User, USER_MAX_SIZE);
     }

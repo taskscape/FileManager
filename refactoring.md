@@ -393,10 +393,13 @@ This document is the working record for a read-only stability and resilience aud
 - **Implementation (2026-08-10):** CheckVer now applies 15-second DNS/connect and send deadlines plus a 30-second receive deadline to its WinINet session. Its single cancellation token closes the currently active session or URL handle, so dismissing the dialog or unloading the plug-in interrupts a blocked network phase instead of merely detaching its thread. The existing nonblocking FTP transport now names its DNS, TCP-connect, and FTP/TLS protocol deadlines separately, bounds the temporary blocking SChannel handshake with socket send/receive deadlines, and retains its established socket-close cancellation path plus distinct resolve/connect/reply errors. Salmon retains its bounded WinHTTP phases, now registers both the session and request against the upload token, closes both on cancellation, and reports timeout, authentication, and protocol/TLS failures distinctly.
 - **Verification:** `NativeSafetyRegressionTests.Network_operations_have_phase_deadlines_cancellation_and_failure_classification` pins the timeout settings, cancellation-handle closure, FTP phase boundaries, failure classification, and this implementation ledger entry.
 
-### 59. Make FTP transfers transactional and resumable safely
+### 59. Make FTP transfers transactional and resumable safely — Implemented (2026-08-10)
 
 - **Justification:** Network interruption and resume logic can leave a destination that looks complete but contains stale or duplicated bytes.
 - **Proposed solution:** Download to a side file with persisted remote identity/size/time, validate resume offsets and server responses, flush and atomically rename on success, and keep incomplete files clearly marked.
+
+- **Implementation:** Viewer/cache downloads now write to a sibling `.ftp-incomplete` file and a write-through `.meta` sidecar that records the remote host, path, name, byte size, and available last-write time. Only an exact metadata match, a binary transfer, and a staged length no greater than the remote size can issue `REST`; a refused response discards that prefix rather than appending to it. The staged file is flushed, checked against the expected size, and promoted with `MoveFileExW(MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH)` only after the final FTP success response and data flush. Interrupted or validation-failed data stay marked as incomplete and the visible cache name is untouched.
+- **Verification:** `NativeSafetyRegressionTests.Ftp_downloads_stage_identity_validate_resume_and_publish_only_after_a_durable_commit` guards the persisted identity, binary-only resume offset check, `REST` response gate, append offset, size verification, write-through rename, incomplete suffix, and this ledger entry.
 
 ### 60. Strengthen FTP certificate exception storage
 

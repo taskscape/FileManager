@@ -1026,13 +1026,15 @@ public:
     // whether ESC was pressed in this window and not, for example, in another application; in the main
     // thread this is SalamanderGeneral->GetMsgBoxParent() or a dialog opened by the plugin); 'parent'
     // is also the parent of any error message boxes; 'workPath' is the working directory; 'tgtFileName'
-    // is the target file name (where the download is stored); 'newFileCreated' returns TRUE if at least
+    // is the target file name (where the download is stored); remote date/time identify the resumable
+    // staged copy and must come from the same listing as 'fileSizeInBytes'; 'newFileCreated' returns TRUE if at least
     // part of the file was downloaded (something exists on disk); 'newFileIncomplete' returns TRUE if
     // the file was not downloaded completely; if 'newFileCreated' is TRUE, 'newFileSize' returns the
     // file size on disk; 'totalAttemptNum', 'panel', 'notInPanel', 'userBuf', and 'userBufSize' are
     // parameters for ReconnectIfNeeded()
     void DownloadOneFile(HWND parent, const char* fileName, CQuadWord const& fileSizeInBytes,
                          BOOL asciiMode, const char* workPath, const char* tgtFileName,
+                         BOOL remoteDateAndTimeValid, const CFTPDate* remoteDate, const CFTPTime* remoteTime,
                          BOOL* newFileCreated, BOOL* newFileIncomplete, CQuadWord* newFileSize,
                          int* totalAttemptNum, int panel, BOOL notInPanel, char* userBuf,
                          int userBufSize);

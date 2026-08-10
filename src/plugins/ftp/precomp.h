@@ -155,6 +155,25 @@ static BOOL MoveFileUtf8Local(const char* srcName, const char* destName)
     return ok;
 }
 
+static BOOL MoveFileExUtf8Local(const char* srcName, const char* destName, DWORD flags)
+{
+    BOOL ok = FALSE;
+    WCHAR* srcNameW = Utf8AllocWide(srcName);
+    WCHAR* destNameW = Utf8AllocWide(destName);
+    if (srcNameW == NULL || destNameW == NULL)
+    {
+        free(srcNameW);
+        free(destNameW);
+        SetLastError(ERROR_INVALID_PARAMETER);
+        return FALSE;
+    }
+    // A staged download must become visible as one write-through namespace change.
+    ok = MoveFileExW(srcNameW, destNameW, flags);
+    free(srcNameW);
+    free(destNameW);
+    return ok;
+}
+
 static BOOL CopyFileUtf8Local(const char* existingFileName, const char* newFileName, BOOL failIfExists)
 {
     BOOL ok = FALSE;

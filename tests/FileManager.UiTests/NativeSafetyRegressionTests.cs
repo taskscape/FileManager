@@ -1436,6 +1436,40 @@ public sealed class NativeSafetyRegressionTests
         });
     }
 
+    [Test]
+    public void Ftp_downloads_stage_identity_validate_resume_and_publish_only_after_a_durable_commit()
+    {
+        var root = FindRepositoryRoot();
+        var control = File.ReadAllText(Path.Combine(root, "src", "plugins", "ftp", "ctrlcon5.cpp"));
+        var dataConnection = File.ReadAllText(Path.Combine(root, "src", "plugins", "ftp", "datacon1.cpp"));
+        var disk = File.ReadAllText(Path.Combine(root, "src", "plugins", "ftp", "operats5.cpp"));
+        var refactoring = File.ReadAllText(Path.Combine(root, "refactoring.md"));
+
+        // Network loss must leave an explicitly incomplete side file; only a fully verified transfer can replace the cache entry.
+        Assert.Multiple(() =>
+        {
+            Assert.That(control, Does.Contain("FtpIncompleteSuffix[] = \".ftp-incomplete\""));
+            Assert.That(control, Does.Contain("CFTPTransactionalDownloadMetadata"));
+            Assert.That(control, Does.Contain("RemoteSize"));
+            Assert.That(control, Does.Contain("RemoteDateAndTimeValid"));
+            Assert.That(control, Does.Contain("WriteTransactionalDownloadMetadata"));
+            Assert.That(control, Does.Contain("FILE_FLAG_WRITE_THROUGH"));
+            Assert.That(control, Does.Contain("memcmp(&actual, &expected, sizeof(actual)) == 0"));
+            Assert.That(control, Does.Contain("size.QuadPart < 0 || (unsigned __int64)size.QuadPart > expected.RemoteSize"));
+            Assert.That(control, Does.Contain("!asciiMode && fileSizeInBytes != CQuadWord(-1, -1)"));
+            Assert.That(control, Does.Contain("ftpcmdRestartTransfer"));
+            Assert.That(control, Does.Contain("FTP_D1_PARTIALSUCCESS"));
+            Assert.That(control, Does.Contain("CommitTransactionalDownload(stagedTargetName, tgtFileName, metadataName"));
+            Assert.That(control, Does.Contain("FlushFileBuffers(stagedFile)"));
+            Assert.That(control, Does.Contain("MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH"));
+            Assert.That(dataConnection, Does.Contain("TgtDiskFileResumeOffset = resumeOffset"));
+            Assert.That(dataConnection, Does.Contain("DiskWork.AppendToFile = TgtDiskFile == NULL && TgtDiskFileAppend"));
+            Assert.That(disk, Does.Contain("localWork.AppendToFile ? OPEN_ALWAYS : CREATE_ALWAYS"));
+            Assert.That(disk, Does.Contain("SetFilePointerEx(f, offset, NULL, FILE_BEGIN)"));
+            Assert.That(refactoring, Does.Contain("### 59. Make FTP transfers transactional and resumable safely — Implemented"));
+        });
+    }
+
     private static string FindRepositoryRoot()
     {
         for (var directory = new DirectoryInfo(AppContext.BaseDirectory); directory is not null; directory = directory.Parent)
