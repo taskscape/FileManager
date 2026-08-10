@@ -8,6 +8,7 @@
 #include <stdlib.h>
 #include <assert.h>
 #include <stdio.h>
+#include <limits.h>
 
 #include "cmark_ctype.h"
 #include "syntax_extension.h"
@@ -25,6 +26,14 @@
 
 #define CODE_INDENT 4
 #define TAB_STOP 4
+
+/**
+ * Very deeply nested lists can cause quadratic performance issues.
+ * This constant is used in open_new_blocks() to limit the nesting
+ * depth. It is unlikely that a non-contrived markdown document will
+ * be nested this deeply.
+ */
+#define MAX_LIST_DEPTH 100
 
 #ifndef MIN
 #define MIN(x, y) ((x < y) ? x : y)
@@ -468,7 +477,6 @@ static void process_footnotes(cmark_parser *parser) {
   while ((ev_type = cmark_iter_next(iter)) != CMARK_EVENT_DONE) {
     cur = cmark_iter_get_node(iter);
     if (ev_type == CMARK_EVENT_EXIT && cur->type == CMARK_NODE_FOOTNOTE_DEFINITION) {
-      cmark_node_unlink(cur);
       cmark_footnote_create(map, cur);
     }
   }
@@ -484,6 +492,15 @@ static void process_footnotes(cmark_parser *parser) {
       if (footnote) {
         if (!footnote->ix)
           footnote->ix = ++ix;
+
+        // store a reference to this footnote reference's footnote definition
+        // this is used by renderers when generating label ids
+        cur->parent_footnote_def = footnote->node;
+
+        // keep track of a) count of how many times this footnote def has been
+        // referenced, and b) which reference index this footnote ref is at.
+        // this is used by renderers when generating links and backreferences.
+        cur->footnote.ref_ix = ++footnote->node->footnote.def_count;
 
         char n[32];
         snprintf(n, sizeof(n), "%d", footnote->ix);
@@ -515,13 +532,16 @@ static void process_footnotes(cmark_parser *parser) {
     qsort(map->sorted, map->size, sizeof(cmark_map_entry *), sort_footnote_by_ix);
     for (unsigned int i = 0; i < map->size; ++i) {
       cmark_footnote *footnote = (cmark_footnote *)map->sorted[i];
-      if (!footnote->ix)
+      if (!footnote->ix) {
+        cmark_node_unlink(footnote->node);
         continue;
+      }
       cmark_node_append_child(parser->root, footnote->node);
       footnote->node = NULL;
     }
   }
 
+  cmark_unlink_footnotes_map(map);
   cmark_map_free(map);
 }
 
@@ -628,6 +648,14 @@ static cmark_node *finalize_document(cmark_parser *parser) {
   }
 
   finalize(parser, parser->root);
+
+  // Limit total size of extra content created from reference links to
+  // document size to avoid superlinear growth. Always allow 100KB.
+  if (parser->total_size > 100000)
+    parser->refmap->max_ref_size = parser->total_size;
+  else
+    parser->refmap->max_ref_size = 100000;
+
   process_inlines(parser, parser->refmap, parser->options);
   if (parser->options & CMARK_OPT_FOOTNOTES)
     process_footnotes(parser);
@@ -686,6 +714,11 @@ static void S_parser_feed(cmark_parser *parser, const unsigned char *buffer,
                           size_t len, bool eof) {
   const unsigned char *end = buffer + len;
   static const uint8_t repl[] = {239, 191, 189};
+
+  if (len > UINT_MAX - parser->total_size)
+    parser->total_size = UINT_MAX;
+  else
+    parser->total_size += len;
 
   if (parser->last_buffer_ended_with_cr && *buffer == '\n') {
     // skip NL if last buffer ended with CR ; see #117
@@ -1094,10 +1127,11 @@ static void open_new_blocks(cmark_parser *parser, cmark_node **container,
   bool has_content;
   int save_offset;
   int save_column;
+  size_t depth = 0;
 
   while (cont_type != CMARK_NODE_CODE_BLOCK &&
          cont_type != CMARK_NODE_HTML_BLOCK) {
-
+    depth++;
     S_find_first_nonspace(parser, input);
     indented = parser->indent >= CODE_INDENT;
 
@@ -1183,14 +1217,16 @@ static void open_new_blocks(cmark_parser *parser, cmark_node **container,
                              parser->first_nonspace + 1);
       S_advance_offset(parser, input, input->len - 1 - parser->offset, false);
     } else if (!indented &&
-               parser->options & CMARK_OPT_FOOTNOTES &&
+               (parser->options & CMARK_OPT_FOOTNOTES) &&
+               depth < MAX_LIST_DEPTH &&
                (matched = scan_footnote_definition(input, parser->first_nonspace))) {
       cmark_chunk c = cmark_chunk_dup(input, parser->first_nonspace + 2, matched - 2);
-      cmark_chunk_to_cstr(parser->mem, &c);
 
       while (c.data[c.len - 1] != ']')
         --c.len;
       --c.len;
+
+      cmark_chunk_to_cstr(parser->mem, &c);
 
       S_advance_offset(parser, input, parser->first_nonspace + matched - parser->offset, false);
       *container = add_child(parser, *container, CMARK_NODE_FOOTNOTE_DEFINITION, parser->first_nonspace + matched + 1);
@@ -1199,6 +1235,7 @@ static void open_new_blocks(cmark_parser *parser, cmark_node **container,
       (*container)->internal_offset = matched;
     } else if ((!indented || cont_type == CMARK_NODE_LIST) &&
 	       parser->indent < 4 &&
+               depth < MAX_LIST_DEPTH &&
                (matched = parse_list_marker(
                     parser->mem, input, parser->first_nonspace,
                     (*container)->type == CMARK_NODE_PARAGRAPH, &data))) {

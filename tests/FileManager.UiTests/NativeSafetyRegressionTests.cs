@@ -1631,6 +1631,49 @@ public sealed class NativeSafetyRegressionTests
         });
     }
 
+    [Test]
+    public void Bundled_cmark_gfm_uses_the_verified_release_and_the_viewer_rejects_unsafe_or_unbounded_rendering()
+    {
+        var root = FindRepositoryRoot();
+        var version = File.ReadAllText(Path.Combine(root, "src", "plugins", "ieviewer", "cmark-gfm", "build", "src", "cmark-gfm_version.h"));
+        var vendorRecord = File.ReadAllText(Path.Combine(root, "src", "plugins", "ieviewer", "cmark-gfm", "VENDOR.md"));
+        var renderer = File.ReadAllText(Path.Combine(root, "src", "plugins", "ieviewer", "markdown_rendering.cpp"));
+        var rendererHeader = File.ReadAllText(Path.Combine(root, "src", "plugins", "ieviewer", "markdown_rendering.h"));
+        var viewer = File.ReadAllText(Path.Combine(root, "src", "plugins", "ieviewer", "markdown.cpp"));
+        var probe = File.ReadAllText(Path.Combine(root, "tools", "cmark_gfm_hardening_probe.cpp"));
+        var harness = File.ReadAllText(Path.Combine(root, "tools", "test-cmark-gfm-hardening.ps1"));
+        var workflow = File.ReadAllText(Path.Combine(root, ".github", "workflows", "pr-msbuild.yml"));
+        var refactoring = File.ReadAllText(Path.Combine(root, "refactoring.md"));
+
+        // Pin the vendor identity, safe default, bounded tree/output seam, and CI fuzz gate together.
+        Assert.Multiple(() =>
+        {
+            Assert.That(version, Does.Contain("CMARK_GFM_VERSION_STRING \"0.29.0.gfm.13\""));
+            Assert.That(vendorRecord, Does.Contain("5abc61798ebd9de5660bc076443c07abad2b8d15dbc11094a3a79644b8ad243a"));
+            Assert.That(vendorRecord, Does.Contain("CMARK_OPT_UNSAFE"));
+            Assert.That(rendererHeader, Does.Contain("MarkdownMaximumInputBytes = 1024 * 1024"));
+            Assert.That(rendererHeader, Does.Contain("MarkdownMaximumNodeCount = 100000"));
+            Assert.That(rendererHeader, Does.Contain("MarkdownMaximumTreeDepth = 128"));
+            Assert.That(rendererHeader, Does.Contain("MarkdownMaximumOutputBytes = 4 * 1024 * 1024"));
+            Assert.That(renderer, Does.Contain("CMARK_OPT_SAFE | CMARK_OPT_VALIDATE_UTF8"));
+            Assert.That(renderer, Does.Not.Match("const int options[^;]*CMARK_OPT_UNSAFE"));
+            Assert.That(renderer, Does.Contain("cmark_parser_new(options)"));
+            Assert.That(renderer, Does.Contain("cmark_render_html(document, options, cmark_parser_get_syntax_extensions(parser))"));
+            Assert.That(renderer, Does.Contain("CheckTreeBudget"));
+            Assert.That(viewer, Does.Contain("mmeAllViewerExtensions"));
+            Assert.That(viewer, Does.Contain("bytes > MarkdownMaximumInputBytes - markdown.size()"));
+            Assert.That(viewer, Does.Contain("RenderMarkdownToSafeHtml"));
+            Assert.That(probe, Does.Contain("RunExtensionCombinationFuzz"));
+            Assert.That(probe, Does.Contain("mrrOutputTooLarge"));
+            Assert.That(File.Exists(Path.Combine(root, "tests", "cmark-gfm", "snapshots", "basic.html")), Is.True);
+            Assert.That(File.Exists(Path.Combine(root, "tests", "cmark-gfm", "snapshots", "strikethrough.html")), Is.True);
+            Assert.That(harness, Does.Contain("markdown_rendering.cpp"));
+            Assert.That(harness, Does.Contain("cmark_gfm_hardening_probe.cpp"));
+            Assert.That(workflow, Does.Contain("test-cmark-gfm-hardening.ps1"));
+            Assert.That(refactoring, Does.Contain("### 65. Upgrade cmark-gfm and harden rendered-content defaults — Implemented"));
+        });
+    }
+
     private static string FindRepositoryRoot()
     {
         for (var directory = new DirectoryInfo(AppContext.BaseDirectory); directory is not null; directory = directory.Parent)

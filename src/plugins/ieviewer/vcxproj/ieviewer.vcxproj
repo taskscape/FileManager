@@ -401,6 +401,13 @@
     </ClCompile>
     <ClCompile Include="..\markdown.cpp">
     </ClCompile>
+    <ClCompile Include="..\markdown_rendering.cpp">
+      <!-- The testable renderer must also build without the plugin's Windows PCH. -->
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
+    </ClCompile>
     <ClCompile Include="..\precomp.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Create</PrecompiledHeader>
@@ -432,6 +439,8 @@
     <ClInclude Include="..\ieviewer.h">
     </ClInclude>
     <ClInclude Include="..\markdown.h">
+    </ClInclude>
+    <ClInclude Include="..\markdown_rendering.h">
     </ClInclude>
     <ClInclude Include="..\precomp.h">
     </ClInclude>

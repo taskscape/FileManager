@@ -3,12 +3,13 @@
 
 #include "precomp.h"
 
-#include "cmark-gfm.h"
-#include "cmark-gfm-core-extensions.h"
 #include "registry.h"
 
 #include "ieviewer.h"
 #include "dbg.h"
+#include "markdown_rendering.h"
+
+#include <vector>
 
 // TODO: MD viewer doesn't display images, one solution is documented in:
 // https://blog.kowalczyk.info/article/g9ne/showing-html-from-memory-in-embedded-web-control-on-windows.html
@@ -44,61 +45,53 @@ FILE* OpenMarkdownCSS()
     return fp;
 }
 
-const char* extension_names[] = {
-    "autolink",
-    "strikethrough",
-    "table",
-    "tagfilter",
-    "tasklist",
-    NULL,
-};
-
 IStream* ConvertMarkdownToHTML(const char* name)
 {
-    cmark_gfm_core_extensions_ensure_registered();
-
-    int options = CMARK_OPT_DEFAULT; // Default options
-    cmark_parser* parser = cmark_parser_new(options);
-
-    for (const char** it = extension_names; *it; ++it)
-    {
-        const char* extension_name = *it;
-        cmark_syntax_extension* syntax_extension = cmark_find_syntax_extension(extension_name);
-        if (!syntax_extension)
-        {
-            TRACE_E("Invalid syntax extension: " << extension_name);
-            cmark_release_plugins();
-            return NULL;
-        }
-        cmark_parser_attach_syntax_extension(parser, syntax_extension);
-    }
-
-    FILE* fp = fopen(name, "r");
+    FILE* fp = fopen(name, "rb");
     if (fp == NULL)
     {
         TRACE_E("fopen failed");
-        cmark_release_plugins();
         return NULL;
     }
 
-    size_t bytes;
+    std::vector<char> markdown;
     char buffer[10000];
+    size_t bytes;
+    BOOL readFailed = FALSE;
     while ((bytes = fread(buffer, 1, sizeof(buffer), fp)) > 0)
     {
-        cmark_parser_feed(parser, buffer, bytes);
-        if (bytes < sizeof(buffer))
+        // Reject before extending the owned input so a growing file cannot
+        // bypass the Markdown input budget between the size check and read.
+        if (bytes > MarkdownMaximumInputBytes - markdown.size())
         {
+            readFailed = TRUE;
             break;
         }
+        markdown.insert(markdown.end(), buffer, buffer + bytes);
+        if (bytes < sizeof(buffer))
+            break;
     }
+    if (ferror(fp))
+        readFailed = TRUE;
     fclose(fp);
 
-    cmark_node* doc = cmark_parser_finish(parser);
+    if (readFailed)
+    {
+        TRACE_E("Markdown input is unreadable or exceeds the preview limit");
+        return NULL;
+    }
 
-    char* html = cmark_render_html(doc, options, NULL);
-
-    cmark_node_free(doc);
-    cmark_parser_free(parser);
+    char* html = NULL;
+    size_t htmlLength = 0;
+    const char* markdownBytes = markdown.empty() ? "" : markdown.data();
+    EMarkdownRenderResult renderResult = RenderMarkdownToSafeHtml(markdownBytes, markdown.size(),
+                                                                    mmeAllViewerExtensions, &html, &htmlLength);
+    ReleaseMarkdownRendererPlugins();
+    if (renderResult != mrrOk)
+    {
+        TRACE_E("Markdown preview rejected by renderer policy: " << renderResult);
+        return NULL;
+    }
 
     IStream* oStream = NULL;
     DWORD written;
@@ -106,8 +99,7 @@ IStream* ConvertMarkdownToHTML(const char* name)
     if (FAILED(hr))
     {
         TRACE_E("CreateStreamOnHGlobal() failed");
-        free(html);
-        cmark_release_plugins();
+        FreeRenderedMarkdownHtml(html);
         return NULL;
     }
 
@@ -130,7 +122,7 @@ IStream* ConvertMarkdownToHTML(const char* name)
 
     sprintf_s(buff, "</style></head><body><article class=\"markdown-body\">\n");
     oStream->Write(buff, (ULONG)strlen(buff), &written);
-    oStream->Write(html, (ULONG)strlen(html), &written);
+    oStream->Write(html, (ULONG)htmlLength, &written);
     sprintf_s(buff, "</article></body></html>\n");
     oStream->Write(buff, (ULONG)strlen(buff), &written);
 
@@ -139,8 +131,7 @@ IStream* ConvertMarkdownToHTML(const char* name)
     seek.QuadPart = 0;
     oStream->Seek(seek, STREAM_SEEK_SET, NULL);
 
-    free(html);
-    cmark_release_plugins();
+    FreeRenderedMarkdownHtml(html);
 
     return oStream;
 }

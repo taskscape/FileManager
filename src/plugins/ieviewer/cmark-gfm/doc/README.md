@@ -1,8 +1,7 @@
 cmark-gfm
 =========
 
-[![Build Status]](https://travis-ci.org/github/cmark-gfm)
-[![Windows Build Status]](https://ci.appveyor.com/project/github/cmark)
+![Actions CI](https://github.com/github/cmark-gfm/actions/workflows/ci.yml/badge.svg)
 
 `cmark-gfm` is an extended version of the C reference implementation of
 [CommonMark], a rationalized version of Markdown syntax with a spec.  This
@@ -66,6 +65,7 @@ There are also libraries that wrap `libcmark` for
 [Perl](https://metacpan.org/release/CommonMark),
 [Python](https://pypi.python.org/pypi/paka.cmark),
 [R](https://cran.r-project.org/package=commonmark),
+[Tcl](https://github.com/apnadkarni/tcl-cmark),
 [Scala](https://github.com/sparsetech/cmark-scala) and
 [Node.js](https://github.com/killa123/node-cmark).
 
@@ -204,4 +204,3 @@ most of the C library's API and its test harness.
 [Windows Build Status]: https://ci.appveyor.com/api/projects/status/wv7ifhqhv5itm3d5?svg=true
 [american fuzzy lop]: http://lcamtuf.coredump.cx/afl/
 [libFuzzer]: http://llvm.org/docs/LibFuzzer.html
-

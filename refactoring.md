@@ -37,7 +37,7 @@ This document is the working record for a read-only stability and resilience aud
 15. **Release dependency acquisition is weakly verified.** The OpenSSL archive is accepted after a ZIP-magic check rather than a pinned cryptographic digest or signature.
 16. **Release signing is not implemented in the repository workflow.** `tools/codesign/sign_with_retry.cmd` is a placeholder, and the installer script does not define signing steps.
 17. **Installer staging can select stale or mismatched binaries.** `tools/prepare_installer.ps1` recursively falls back to the first matching output and suppresses some errors.
-18. **Several bundled libraries are substantially old.** Reviewed versions include OpenSSL 1.0.2u, bzip2 1.0.6, and cmark-gfm 0.29.0.gfm.0. SQLite has been upgraded to 3.53.4 and zlib to 1.3.2 with recorded review cadences; 7-Zip is now 26.02.
+18. **Several bundled libraries are substantially old.** Reviewed versions include OpenSSL 1.0.2u and bzip2 1.0.6. cmark-gfm has been upgraded to 0.29.0.gfm.13, SQLite to 3.53.4, zlib to 1.3.2, and 7-Zip to 26.02 with recorded review cadences.
 19. **Compiler hardening and static-analysis lanes are limited.** The common project properties use warning level 3 and disable secure-CRT warnings; no repository CI lane for ASan, CodeQL, clang-cl, or `/analyze` was found.
 20. **The safety net remains shallow for the product's highest-risk behavior.** Executable UI coverage now exercises normal, cancelled, and deliberately blocked create/copy/rename/move/delete operations, but there are no native characterization tests, parser fuzzers, disk-full fault tests, crash-consistency tests, or automated copy/move/delete recovery scenarios.
 
@@ -438,10 +438,10 @@ This document is the working record for a read-only stability and resilience aud
 - **Justification:** Vendored bzip2 1.0.6 dates from 2010 (`src/common/dep/bzip2/decompress.c:11`), increasing maintenance and parser risk.
 - **Proposed solution:** Update to the current maintained release or replace it behind the archive adapter, then run golden archives, truncation cases, and fuzz corpus replay.
 
-### 65. Upgrade cmark-gfm and harden rendered-content defaults
+### 65. Upgrade cmark-gfm and harden rendered-content defaults — Implemented
 
-- **Justification:** The bundled cmark-gfm 0.29.0.gfm.0 is old, and Markdown may include adversarial links, nesting, or large inputs.
-- **Proposed solution:** Upgrade behind snapshot tests, enable safe rendering defaults, cap input/tree/output sizes, and fuzz extension combinations used by the application.
+- **Resolution:** Updated the IE Viewer’s vendored cmark-gfm source to verified upstream 0.29.0.gfm.13. Markdown rendering explicitly retains cmark’s safe default, validates UTF-8, and rejects inputs above 1 MiB, trees above 100,000 nodes or 128 levels, and generated HTML above 4 MiB. The renderer passes its complete enabled extension list to cmark so `autolink`, `strikethrough`, `table`, `tagfilter`, and `tasklist` remain consistent at parse and render time.
+- **Verification:** `tools/test-cmark-gfm-hardening.ps1` compiles the production renderer with the vendored sources, checks retained output snapshots and unsafe-link/raw-HTML handling, exercises each extension combination with deterministic fuzz inputs, and proves input, nesting, and output-expansion limits. The x64 pull-request lane runs this probe and `NativeSafetyRegressionTests` guards the vendor, policy, artifacts, and CI hook.
 
 ### 66. Maintain a machine-readable dependency inventory and SBOM
 

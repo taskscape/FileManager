@@ -1,3 +1,105 @@
+[0.29.0.gfm.13]
+  * Normalized marker row vs. delimiter row nomenclature (#273)
+  * Exposed CMARK_NODE_FOOTNOTE_DEFINITION literal value (#336)
+  * Fix format specifier for printing a size_t (#340)
+
+[0.29.0.gfm.12]
+
+  * Fixed polynomial time complexity issues per
+  https://github.com/github/cmark-gfm/security/advisories/GHSA-w4qg-3vf7-m9x5
+  * Added CodeQL project integration (#337)
+  * Addressed const qualifier discard compiler warnings (#330, #331)
+
+[0.29.0.gfm.11]
+
+  * Improved fixes for polynomial time complexity issues per
+  https://github.com/github/cmark-gfm/security/advisories/GHSA-66g8-4hjf-77xh
+  (#323, #324)
+  * Added fuzzing target for bracketed patterns (#318)
+  * Fixed bug in list numbering introduced in
+  763587e8775350b8cb4a2aa0f4cec3685aa96e8b (#322) which caused list numbers
+  to increment by 2
+  * Fixed strict prototype clang warning (#310)
+  * Fixed regression test (#312)
+  * Added additional output formats to quadratic fuzzer (#327)
+  * Fixed buffer overflow in fuzzing harness (#326)
+  
+  Note: these changes may lead to minor changes in expected output on plaintext 
+  rendering of list items. Notably, blank lines may no longer delineate the start 
+  of a list when rendering to plaintext due to changes in how the tight list status 
+  is calculated.
+  
+[0.29.0.gfm.10]
+
+  * Fixed polynomial time complexity issue per
+  https://github.com/github/cmark-gfm/security/advisories/GHSA-r8vr-c48j-fcc5
+  * Fixed polynomial time complexity issues per
+  https://github.com/github/cmark-gfm/security/advisories/GHSA-66g8-4hjf-77xh
+
+  Note: these changes remove redundant bold tag nesting which may result
+  in existing rendering tests failing, e.g. rendering "____bold____" to html
+  will no longer yield "<p><strong><strong>bold</strong></strong></p>".
+
+[0.29.0.gfm.9]
+
+  * Cleanup: Use of a private header was cleaned up (#248)
+  * Cleanup: Man page was updated (#255)
+  * Cleanup: Warnings for -Wstrict-prototypes were cleaned up (#285)
+  * Cleanup: We avoid header duplication (#289)
+
+  * We now store positioning info for url_match (#201)
+  * We now expose cmark_parent_footnote_def for non-C renderers (#254)
+  * Footnote aria-label text now reference the specific footnote backref, and we include a data-footnote-backref-idx attribute so the label can be internationalized in a downstream filter (#307)
+
+[0.29.0.gfm.8]
+
+  * We restored backwards compatibility by deprecating the `cmark_init_standard_node_flags()` requirement, which is now a noop (#305)
+  * We added a quadratic complexity fuzzing target (#304)
+
+[0.29.0.gfm.7]
+
+  * Fixed a polynomial time complexity issue per
+    https://github.com/github/cmark-gfm/security/advisories/GHSA-r572-jvj2-3m8p
+  * Fixed an issue in which crafted markdown document could trigger an
+    out-of-bounds read in the validate_protocol function per
+    https://github.com/github/cmark-gfm/security/advisories/GHSA-c944-cv5f-hpvr
+  * Fixed a polynomial time complexity issue
+    https://github.com/github/cmark-gfm/security/advisories/GHSA-24f7-9frr-5h2r
+  * Fixed several polynomial time complexity issues per
+    https://github.com/github/cmark-gfm/security/advisories/GHSA-29g3-96g3-jg6c
+  * We removed an unneeded .DS_Store file (#291)
+  * We added a test for domains with underscores and fix roundtrip behavior (#292)
+  * We now use an up-to-date clang-format (#294)
+  * We made a variety of implicit integer trunctions explicit by moving to
+    size_t as our standard size integer type (#302)
+
+[0.29.0.gfm.6]
+  * Fixed polynomial time complexity DoS vulnerability in autolink extension
+  
+[0.29.0.gfm.5]
+  * Added xmpp: and mailto: support to the autolink extension
+
+[0.29.0.gfm.4]
+  * Remove `source` from list of HTML blocks
+
+[0.29.0.gfm.3]
+  * Fixed heap memory corruption vulnerabiliy via integer overflow per https://github.com/github/cmark-gfm/security/advisories/GHSA-mc3g-88wq-6f4x
+
+[0.29.0.gfm.2]
+  * Fixed issues with footnote rendering when used with the autolinker (#121),
+    and when footnotes are adjacent (#139).
+  * We now allow footnotes to be referenced from inside a footnote definition,
+    we use the footnote label for the fnref href text when rendering html, and
+    we insert multiple backrefs when a footnote has been referenced multiple
+    times (#229, #230)
+  * We added new data- attributes to footnote html rendering to make them
+    easier to style (#234)
+
+[0.29.0.gfm.1]
+
+  * Fixed denial of service bug in GFM's table extension
+    per https://github.com/github/cmark-gfm/security/advisories/GHSA-7gc6-9qr5-hc85
+
 [0.29.0]
 
   * Update spec to 0.29.
