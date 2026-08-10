@@ -10,6 +10,7 @@
 #include "pack.h"
 #include "codetbl.h"
 #include "dialogs.h"
+#include "common/scoped_kernel_handle.h"
 
 CSystemPolicies SystemPolicies;
 
@@ -29,7 +30,6 @@ CRITICAL_SECTION CheckPathCS; // critical section for check-path, necessary due 
 
 // optimization: first check-path thread does not terminate - used repeatedly
 BOOL CPFirstFree = FALSE;       // is it possible to use first check-path thread?
-volatile LONG CPFirstTerminate; // should the first check-path thread terminate?
 HANDLE CPFirstStart = NULL;    // event for starting the first check-path thread
 HANDLE CPFirstEnd = NULL;      // event for testing completion of the first check-path thread
 DWORD CPFirstExit;             // replacement for exit code of first check-path thread (does not terminate)
@@ -37,7 +37,7 @@ DWORD CPFirstExit;             // replacement for exit code of first check-path 
 char CheckPathRootWithRetryMsgBox[MAX_PATH] = ""; // root of drive (including UNC), for which a "drive not ready" messagebox with Retry+Cancel buttons is displayed (used for automatic Retry after inserting media into drive)
 HWND LastDriveSelectErrDlgHWnd = NULL;            // "drive not ready" dialog with Retry+Cancel buttons (used for automatic Retry after inserting media into drive)
 
-DWORD WINAPI ThreadCheckPathF(void* param);
+DWORD WINAPI ThreadCheckPathF(void* param, HANDLE stopEvent);
 DWORD WINAPI ThreadCheckPathOwnedF(void* param, HANDLE stopEvent);
 
 CRITICAL_SECTION OpenHtmlHelpCS; // critical section for OpenHtmlHelp()
@@ -58,8 +58,6 @@ BOOL InitializeCheckThread()
     CALL_STACK_MESSAGE_NONE
     HANDLES(InitializeCriticalSection(&CheckPathCS));
     HANDLES(InitializeCriticalSection(&ReadCDVolNameCS));
-    InterlockedExchange(&CPFirstTerminate, FALSE);
-
     int i;
     for (i = 0; i < NUM_OF_CHECKTHREADS; i++)
     {
@@ -89,8 +87,9 @@ void ReleaseCheckThreads()
 
     if (CPFirstStart != NULL)
     {
-        InterlockedExchange(&CPFirstTerminate, TRUE); // let the first check-path thread terminate
-        SetEvent(CPFirstStart);
+        // The reusable worker waits on its owner stop event, so shutdown wakes
+        // it immediately without manufacturing a work request.
+        ThreadCheckPath[0].RequestStop();
     }
 
     int i;
@@ -120,7 +119,7 @@ void ReleaseCheckThreads()
     HANDLES(DeleteCriticalSection(&CheckPathCS));
 }
 
-unsigned ThreadCheckPathFBody(void* param) // test directory accessibility
+unsigned ThreadCheckPathFBody(void* param, HANDLE stopEvent) // test directory accessibility
 {
     CALL_STACK_MESSAGE1("ThreadCheckPathFBody()");
     int i = (int)(INT_PTR)param;
@@ -134,15 +133,22 @@ CPF_AGAIN:
     if (i == 0) // first check-path thread (optimization: runs continuously)
     {
         CPFirstFree = TRUE;                          // for thread entry, otherwise unnecessary safeguard ;-)
-                                                     //    TRACE_I("First check-path thread: Wait for start");
-        WaitForSingleObject(CPFirstStart, INFINITE); // wait for start or termination
-                                                     //    TRACE_I("First check-path thread: Wait satisfied");
-        CPFirstFree = FALSE;
-        if (InterlockedCompareExchange(&CPFirstTerminate, FALSE, FALSE)) // termination
-        {
-            //      TRACE_I("First check-path thread: End");
+        // A request starts work; the owner stop event is a distinct shutdown
+        // wake reason, so the idle worker never needs polling to terminate.
+        HANDLE waits[] = {CPFirstStart, stopEvent};
+        DWORD wait = WaitForMultipleObjects(2, waits, FALSE, INFINITE);
+        if (wait == WAIT_OBJECT_0 + 1)
             return 0;
+        if (wait != WAIT_OBJECT_0)
+        {
+            TRACE_E("CheckPath worker wait failed: " << GetErrorText(GetLastError()));
+            return 1;
         }
+        // Prefer shutdown when a request and stop race, preserving the former
+        // terminate-flag behaviour without running one last stale request.
+        if (WaitForSingleObject(stopEvent, 0) == WAIT_OBJECT_0)
+            return 0;
+        CPFirstFree = FALSE;
     }
     //  TRACE_I("Testing path " << ThreadPath);
 
@@ -216,14 +222,14 @@ CPF_AGAIN:
     return ret;
 }
 
-unsigned ThreadCheckPathFEH(void* param)
+unsigned ThreadCheckPathFEH(void* param, HANDLE stopEvent)
 {
     CALL_STACK_MESSAGE_NONE
 #ifndef CALLSTK_DISABLE
     __try
     {
 #endif // CALLSTK_DISABLE
-        return ThreadCheckPathFBody(param);
+        return ThreadCheckPathFBody(param, stopEvent);
 #ifndef CALLSTK_DISABLE
     }
     __except (CCallStack::HandleException(GetExceptionInformation()))
@@ -236,21 +242,114 @@ unsigned ThreadCheckPathFEH(void* param)
 #endif // CALLSTK_DISABLE
 }
 
-DWORD WINAPI ThreadCheckPathF(void* param)
+DWORD WINAPI ThreadCheckPathF(void* param, HANDLE stopEvent)
 {
     CALL_STACK_MESSAGE_NONE
 #ifndef CALLSTK_DISABLE
     CCallStack stack;
 #endif // CALLSTK_DISABLE
-    return ThreadCheckPathFEH(param);
+    return ThreadCheckPathFEH(param, stopEvent);
 }
 
 DWORD WINAPI ThreadCheckPathOwnedF(void* param, HANDLE stopEvent)
 {
-    // CheckPath has a legacy global stop protocol; retaining this adapter keeps
-    // its cooperative state machine intact while the owner controls lifetime.
-    (void)stopEvent;
-    return ThreadCheckPathF(param);
+    // Forward the owner cancellation signal into the reusable-worker wait.
+    return ThreadCheckPathF(param, stopEvent);
+}
+
+enum CCheckPathWaitReason
+{
+    cpwrWorkCompleted,
+    cpwrUserCancelled,
+    cpwrDeadlineElapsed,
+    cpwrFailed
+};
+
+static CCheckPathWaitReason WaitForCheckPathCompletionOrDeadline(HANDLE completionEvent,
+                                                                  HANDLE cancellationEvent,
+                                                                  DWORD deadlineMilliseconds)
+{
+    CScopedKernelHandle deadlineTimer(HANDLES(CreateWaitableTimer(NULL, TRUE, NULL)));
+    if (!deadlineTimer.IsValid())
+    {
+        TRACE_E("Unable to create CheckPath deadline timer: " << GetErrorText(GetLastError()));
+        return cpwrFailed;
+    }
+
+    LARGE_INTEGER dueTime;
+    dueTime.QuadPart = -((LONGLONG)deadlineMilliseconds * 10000);
+    if (!SetWaitableTimer(deadlineTimer.Get(), &dueTime, 0, NULL, NULL, FALSE))
+    {
+        TRACE_E("Unable to set CheckPath deadline timer: " << GetErrorText(GetLastError()));
+        return cpwrFailed;
+    }
+
+    if (completionEvent == NULL && cancellationEvent == NULL)
+    {
+        // Retry-only waits have no work producer; the timer is their explicit
+        // deadline signal and preserves the former bounded delay.
+        return WaitForSingleObject(deadlineTimer.Get(), INFINITE) == WAIT_OBJECT_0
+                   ? cpwrDeadlineElapsed
+                   : cpwrFailed;
+    }
+
+    // Work, user cancellation, and the deadline are independent wake reasons;
+    // no fixed delay stands in for a worker state change or a Close action.
+    HANDLE waits[] = {completionEvent, cancellationEvent, deadlineTimer.Get()};
+    DWORD waitCount = cancellationEvent != NULL ? 3 : 2;
+    if (cancellationEvent == NULL)
+        waits[1] = deadlineTimer.Get();
+    DWORD wait = WaitForMultipleObjects(waitCount, waits, FALSE, INFINITE);
+    if (wait == WAIT_OBJECT_0)
+        return cpwrWorkCompleted;
+    if (cancellationEvent != NULL && wait == WAIT_OBJECT_0 + 1)
+        return cpwrUserCancelled;
+    if (wait == WAIT_OBJECT_0 + waitCount - 1)
+        return cpwrDeadlineElapsed;
+
+    TRACE_E("CheckPath completion/deadline wait failed: " << GetErrorText(GetLastError()));
+    return cpwrFailed;
+}
+
+static BOOL WaitForAvailableCheckPathWorker()
+{
+    HANDLE completions[NUM_OF_CHECKTHREADS];
+    DWORD completionCount = 0;
+
+    if (!CPFirstFree && CPFirstEnd != NULL)
+        completions[completionCount++] = CPFirstEnd;
+
+    for (int i = 1; i < NUM_OF_CHECKTHREADS; i++)
+    {
+        if ((ThreadCheckState[i] & ctsActive) && ThreadCheckPath[i].HasThread())
+        {
+            HANDLE completion = ThreadCheckPath[i].GetCompletionEvent();
+            if (completion != NULL)
+                completions[completionCount++] = completion;
+        }
+    }
+
+    if (completionCount == 0)
+    {
+        TRACE_E("CheckPath found no active worker to await.");
+        return FALSE;
+    }
+
+    // Waiting on the actual completion events releases the caller as soon as
+    // a slot opens instead of imposing the former 100 ms polling latency.
+    DWORD wait = WaitForMultipleObjects(completionCount, completions, FALSE, INFINITE);
+    if (wait >= WAIT_OBJECT_0 && wait < WAIT_OBJECT_0 + completionCount)
+        return TRUE;
+
+    TRACE_E("CheckPath worker-availability wait failed: " << GetErrorText(GetLastError()));
+    return FALSE;
+}
+
+static void WaitForCheckPathRetryDeadline(DWORD deadlineMilliseconds)
+{
+    // A retry is periodic work, so its only wake reason is an explicit timer
+    // deadline rather than a scheduler-dependent Sleep call.
+    WaitForCheckPathCompletionOrDeadline(NULL, NULL, deadlineMilliseconds);
 }
 
 DWORD SalCheckPath(BOOL echo, const char* path, DWORD err, BOOL postRefresh, HWND parent)
@@ -340,8 +439,11 @@ RETRY:
             }
             else // je sitovy -> do jednoho z vedl. threadu
             {
-                Sleep(100); // let's take a short break and test again
-                goto TEST_AGAIN;
+                if (WaitForAvailableCheckPathWorker())
+                    goto TEST_AGAIN;
+
+                valid = (SalGetFileAttributes(path) != 0xFFFFFFFF);
+                lastError = valid ? ERROR_SUCCESS : GetLastError();
             }
         }
         else
@@ -376,7 +478,7 @@ RETRY:
                 GetAsyncKeyState(VK_ESCAPE); // init GetAsyncKeyState - viz help
                 if (freeThreadIndex == 0)    // prvni check-path thread, kontrola dokonceni
                 {
-                    if (WaitForSingleObject(CPFirstEnd, 200) != WAIT_TIMEOUT) // 200 ms - doba hajeni
+                    if (WaitForCheckPathCompletionOrDeadline(CPFirstEnd, NULL, 200) == cpwrWorkCompleted)
                     {
                         exit = CPFirstExit; // nahrada navratove hodnoty
                     }
@@ -385,7 +487,7 @@ RETRY:
                 }
                 else
                 {
-                    ThreadCheckPath[freeThreadIndex].WaitForCompletion(200); // 200 ms - doba hajeni
+                    WaitForCheckPathCompletionOrDeadline(ThreadCheckPath[freeThreadIndex].GetCompletionEvent(), NULL, 200);
                     if (!ThreadCheckPath[freeThreadIndex].GetExitCode(&exit))
                         exit = STILL_ACTIVE;
                 }
@@ -395,36 +497,38 @@ RETRY:
                     char buf[MAX_PATH + 100];
                     sprintf(buf, LoadStr(IDS_CHECKINGPATHESC), path);
                     CreateSafeWaitWindow(buf, NULL, 4800 + 200, TRUE, NULL);
+                    CScopedKernelHandle cancellationEvent(GetSafeWaitWindowCancelEvent());
 
                     while (1)
                     {
-                        if (ThreadCheckState[freeThreadIndex] & ctsCanTerminate)
+                        CCheckPathWaitReason waitReason;
+                        if (freeThreadIndex == 0)
+                            waitReason = WaitForCheckPathCompletionOrDeadline(CPFirstEnd, cancellationEvent.Get(), 200);
+                        else
+                            waitReason = WaitForCheckPathCompletionOrDeadline(
+                                ThreadCheckPath[freeThreadIndex].GetCompletionEvent(), cancellationEvent.Get(), 200);
+
+                        if (waitReason == cpwrUserCancelled ||
+                            (waitReason == cpwrDeadlineElapsed && UserWantsToCancelSafeWaitWindow()))
                         {
-                            if (UserWantsToCancelSafeWaitWindow())
-                            {
-                                exit = 1;
-                                ThreadCheckState[freeThreadIndex] &= ~ctsActive;
-                                // The thread must finish its current system call naturally. Its result
-                                // is ignored once cancellation has been requested.
-                                break;
-                            }
+                            exit = 1;
+                            ThreadCheckState[freeThreadIndex] &= ~ctsActive;
+                            // The thread must finish its current system call naturally. Its result
+                            // is ignored once cancellation has been requested.
+                            break;
                         }
 
-                        if (freeThreadIndex == 0) // prvni check-path thread, kontrola dokonceni
+                        if (waitReason == cpwrWorkCompleted && freeThreadIndex == 0)
                         {
-                            if (WaitForSingleObject(CPFirstEnd, 200) != WAIT_TIMEOUT) // 200 ms pred dalsim testem
-                            {
-                                exit = CPFirstExit; // nahrada navratove hodnoty
-                            }
-                            else
-                                exit = STILL_ACTIVE; // still running
+                            exit = CPFirstExit; // nahrada navratove hodnoty
                         }
-                        else
+                        else if (waitReason == cpwrWorkCompleted)
                         {
-                            ThreadCheckPath[freeThreadIndex].WaitForCompletion(200); // 200 ms pred dalsim testem
                             if (!ThreadCheckPath[freeThreadIndex].GetExitCode(&exit))
                                 exit = STILL_ACTIVE;
                         }
+                        else
+                            exit = STILL_ACTIVE;
                         if (exit != STILL_ACTIVE)
                             break;
                     }
@@ -612,7 +716,7 @@ _CHECK_AGAIN:
         if (err == ERROR_SEM_TIMEOUT && !semTimeoutOccured)
         { // Vista: pri zmene fyzickeho pripojeni (napr. Wi-Fi a pak LAN) to nepochopitelne hlasi tuto chybu a na podruhe uz je vse OK, takze tenhle opruz delame za uzivatele
             semTimeoutOccured = TRUE;
-            Sleep(300);
+            WaitForCheckPathRetryDeadline(300);
             continue;
         }
         if (err == ERROR_USER_TERMINATED)
@@ -1694,7 +1798,7 @@ void WaitForESCRelease()
     {
         if ((GetAsyncKeyState(VK_ESCAPE) & 0x8001) == 0)
             break;
-        Sleep(10);
+        WaitForCheckPathRetryDeadline(10);
     }
 }
 

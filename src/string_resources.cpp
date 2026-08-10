@@ -272,6 +272,7 @@ CRITICAL_SECTION SafeWaitMessageTextSection; // for synchronizing access to Safe
 BOOL SafeWaitMessageCallerSet = FALSE;
 unsigned SafeWaitMessageCallerID = 0;
 BOOL SafeWaitWindowClosePressed = FALSE;
+HANDLE SafeWaitWindowCancelEvent = NULL;
 
 class C__SafeWaitMessageCallerSetSection
 {
@@ -500,6 +501,16 @@ void CreateSafeWaitWindow(const char* message, const char* caption,
     if (!SafeWaitMessageCallerSet) // only one message (check for availability)
     {
         SafeWaitMessageCallerSet = TRUE;
+        // The UI owns the original event while callers wait on duplicated
+        // handles, preventing a close-button click from racing teardown.
+        SafeWaitWindowCancelEvent = HANDLES(CreateEvent(NULL, TRUE, FALSE, NULL));
+        if (SafeWaitWindowCancelEvent == NULL)
+        {
+            SafeWaitMessageCallerSet = FALSE;
+            HANDLES(LeaveCriticalSection(&SafeWaitMessageCallerSetSection.cs));
+            TRACE_E("Unable to create SafeWait cancellation event.");
+            return;
+        }
         HANDLES(LeaveCriticalSection(&SafeWaitMessageCallerSetSection.cs));
         SafeWaitWindowClosePressed = FALSE;
         SafeWaitMessageCallerID = GetCurrentThreadId();
@@ -509,6 +520,12 @@ void CreateSafeWaitWindow(const char* message, const char* caption,
                                                  (void*)(UINT_PTR)showCloseButton, 0, &SafeWaitMessageThreadID));
             if (thread == NULL)
             {
+                HANDLES(EnterCriticalSection(&SafeWaitMessageCallerSetSection.cs));
+                SafeWaitMessageCallerSet = FALSE;
+                HANDLE cancelEvent = SafeWaitWindowCancelEvent;
+                SafeWaitWindowCancelEvent = NULL;
+                HANDLES(LeaveCriticalSection(&SafeWaitMessageCallerSetSection.cs));
+                HANDLES(CloseHandle(cancelEvent));
                 TRACE_E("Unable to start ThreadSafeWaitWindow thread.");
                 return;
             }
@@ -551,8 +568,13 @@ void DestroySafeWaitWindow(BOOL killThread)
             SafeWaitMessageCallerID == GetCurrentThreadId()) // this is the thread that opened it
     {
         SafeWaitMessageCallerSet = FALSE;
+        HANDLE cancelEvent = SafeWaitWindowCancelEvent;
+        SafeWaitWindowCancelEvent = NULL;
         HANDLES(LeaveCriticalSection(&SafeWaitMessageCallerSetSection.cs));
         SafeWaitMessageCallerID = 0;
+
+        if (cancelEvent != NULL)
+            HANDLES(CloseHandle(cancelEvent));
 
         if (SafeWaitMessageThreadStarted) // the thread is running; hide the window and possibly destroy it
         {
@@ -590,6 +612,40 @@ BOOL GetSafeWaitWindowClosePressed()
 BOOL UserWantsToCancelSafeWaitWindow()
 {
     return (GetAsyncKeyState(VK_ESCAPE) & 0x8001) && SalamanderActive() || GetSafeWaitWindowClosePressed();
+}
+
+HANDLE GetSafeWaitWindowCancelEvent()
+{
+    HANDLE duplicate = NULL;
+    HANDLES(EnterCriticalSection(&SafeWaitMessageCallerSetSection.cs));
+    if (SafeWaitMessageCallerSet &&
+        SafeWaitMessageCallerID == GetCurrentThreadId() &&
+        SafeWaitWindowCancelEvent != NULL)
+    {
+        // The duplicate gives the caller a stable cancellation handle even if
+        // its wait window is destroyed while the caller is unwinding.
+        if (!HANDLES(DuplicateHandle(GetCurrentProcess(), SafeWaitWindowCancelEvent,
+                                     GetCurrentProcess(), &duplicate, SYNCHRONIZE,
+                                     FALSE, 0)))
+        {
+            TRACE_E("Unable to duplicate SafeWait cancellation event: " << GetErrorText(GetLastError()));
+            duplicate = NULL;
+        }
+    }
+    HANDLES(LeaveCriticalSection(&SafeWaitMessageCallerSetSection.cs));
+    return duplicate;
+}
+
+void SignalSafeWaitWindowCancellation()
+{
+    HANDLES(EnterCriticalSection(&SafeWaitMessageCallerSetSection.cs));
+    if (SafeWaitWindowCancelEvent != NULL)
+    {
+        // Preserve close-button compatibility while waking signaled waiters
+        // immediately instead of waiting for their next deadline.
+        SetEvent(SafeWaitWindowCancelEvent);
+    }
+    HANDLES(LeaveCriticalSection(&SafeWaitMessageCallerSetSection.cs));
 }
 
 void ShowSafeWaitWindow(BOOL show)
