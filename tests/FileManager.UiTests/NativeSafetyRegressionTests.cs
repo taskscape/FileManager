@@ -950,7 +950,7 @@ public sealed class NativeSafetyRegressionTests
     }
 
     [Test]
-    public void Allocation_emergency_releases_the_reserve_persists_recovery_and_stops_new_operations()
+    public void Allocation_emergency_is_noninteractive_and_defers_recovery_to_the_ui_thread()
     {
         var root = FindRepositoryRoot();
         var allocatorHeader = File.ReadAllText(Path.Combine(root, "src", "common", "allochan.h"));
@@ -958,14 +958,15 @@ public sealed class NativeSafetyRegressionTests
         var journal = File.ReadAllText(Path.Combine(root, "src", "operation_journal.cpp"));
         var operations = File.ReadAllText(Path.Combine(root, "src", "operations_core.cpp"));
         var startup = File.ReadAllText(Path.Combine(root, "src", "app_entry.cpp"));
+        var mainWindowMessages = File.ReadAllText(Path.Combine(root, "src", "mainwnd_messages.cpp"));
+        var constants = File.ReadAllText(Path.Combine(root, "src", "consts.h"));
         var refactoring = File.ReadAllText(Path.Combine(root, "refactoring.md"));
 
         // OOM cannot be safely synthesized in the executable; these source-level
-        // checks pin the allocation-free first-failure contract and its handoff.
+        // checks pin the non-interactive handler and its pre-registered UI handoff.
         Assert.Multiple(() =>
         {
-            Assert.That(allocatorHeader, Does.Contain("SetAllocEmergencyRecoveryCallback"));
-            Assert.That(allocatorHeader, Does.Contain("SetAllocEmergencyExitWindow"));
+            Assert.That(allocatorHeader, Does.Contain("SetAllocEmergencyNotificationWindow"));
             Assert.That(allocatorHeader, Does.Contain("IsAllocationEmergencyActive"));
             Assert.That(allocator, Does.Contain("const SIZE_T AllocEmergencyReserveSize = 64 * 1024"));
             Assert.That(allocator, Does.Contain("HeapAlloc(GetProcessHeap(), 0, AllocEmergencyReserveSize)"));
@@ -974,14 +975,26 @@ public sealed class NativeSafetyRegressionTests
             Assert.That(allocator, Does.Contain("HeapFree(GetProcessHeap(), 0, reserve)"));
             Assert.That(allocator, Does.Contain("NotifyAllocationEmergency()"));
             Assert.That(allocator, Does.Contain("ActivateAllocationEmergency();"));
+            Assert.That(allocator, Does.Contain("PostMessage(window, message, 0, 0)"));
+            Assert.That(allocator, Does.Contain("return 0;"));
+            Assert.That(allocator, Does.Not.Contain("MessageBox("));
+            Assert.That(allocator, Does.Not.Contain("Sleep("));
+            Assert.That(allocator, Does.Not.Contain("while ("));
+            Assert.That(allocator, Does.Not.Contain("EnterCriticalSection("));
+            Assert.That(allocator, Does.Not.Contain("TAllocEmergencyRecoveryCallback"));
+            Assert.That(allocator, Does.Not.Contain("TerminateProcess("));
             Assert.That(journal, Does.Contain("void COperationJournal::PersistEmergencyShutdownState()"));
             Assert.That(journal, Does.Contain("OPERATION|memory-pressure"));
             Assert.That(journal, Does.Contain("FILE_FLAG_WRITE_THROUGH"));
-            Assert.That(startup, Does.Contain("SetAllocEmergencyRecoveryCallback(COperationJournal::PersistEmergencyShutdownState)"));
-            Assert.That(startup, Does.Contain("SetAllocEmergencyExitWindow(MainWindow->HWindow, WM_USER_FORCECLOSE_MAINWND)"));
+            Assert.That(startup, Does.Contain("SetAllocEmergencyNotificationWindow(MainWindow->HWindow, WM_USER_ALLOCATION_EMERGENCY)"));
+            Assert.That(constants, Does.Contain("#define WM_USER_ALLOCATION_EMERGENCY WM_APP + 416"));
+            Assert.That(mainWindowMessages, Does.Contain("case WM_USER_ALLOCATION_EMERGENCY:"));
+            Assert.That(mainWindowMessages, Does.Contain("COperationJournal::PersistEmergencyShutdownState();"));
+            Assert.That(mainWindowMessages, Does.Contain("PostMessage(HWindow, WM_USER_FORCECLOSE_MAINWND, 0, 0);"));
             Assert.That(operations, Does.Contain("if (IsAllocationEmergencyActive())"));
             Assert.That(operations, Does.Contain("COperationsQueue::AddOperation"));
             Assert.That(refactoring, Does.Contain("### 52. Reserve memory for graceful out-of-memory handling — Implemented"));
+            Assert.That(refactoring, Does.Contain("### 53. Remove modal UI and retry loops from the global allocation handler — Implemented"));
         });
     }
 

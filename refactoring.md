@@ -345,13 +345,15 @@ This document is the working record for a read-only stability and resilience aud
 
 - **Justification:** When allocation fails, even constructing an error or journal record may fail, leaving no safe way to cancel an operation.
 - **Proposed solution:** Allocate a small emergency reserve at startup, release it on first OOM, stop accepting work, persist minimal recovery state, and offer a controlled exit.
-- **Implementation (2026-08-10):** The allocation handler precommits a 64 KiB process-heap reserve. Its first failure atomically releases that reserve, records an append-only `memory-pressure` operation-recovery marker with fixed buffers and write-through I/O, rejects new queued or starting file operations, and posts the established forced-close message once the main window is registered. Existing operations retain their individual journals for normal reconciliation.
-- **Verification:** `NativeSafetyRegressionTests.Allocation_emergency_releases_the_reserve_persists_recovery_and_stops_new_operations` pins reserve ownership, one-time activation, recovery persistence, shutdown handoff, operation admission guards, and this ledger entry without trying to exhaust the test machine's memory.
+- **Implementation (2026-08-10):** The allocation handler precommits a 64 KiB process-heap reserve. Its first failure atomically releases that reserve, then its pre-registered UI notification persists an append-only `memory-pressure` operation-recovery marker with fixed buffers and write-through I/O, rejects new queued or starting file operations, and begins controlled shutdown. Existing operations retain their individual journals for normal reconciliation.
+- **Verification:** `NativeSafetyRegressionTests.Allocation_emergency_is_noninteractive_and_defers_recovery_to_the_ui_thread` pins reserve ownership, one-time activation, recovery persistence, shutdown handoff, operation admission guards, and this ledger entry without trying to exhaust the test machine's memory.
 
-### 53. Remove modal UI and retry loops from the global allocation handler
+### 53. Remove modal UI and retry loops from the global allocation handler — Implemented (2026-08-10)
 
 - **Justification:** `src/common/allochan.cpp` serializes allocation failure handling and can display message boxes or sleep while the failing thread holds unrelated locks, creating deadlock and re-entrancy risks.
 - **Proposed solution:** Make the handler allocation-free and non-interactive: release the reserve, set an atomic fatal-pressure state, and notify the UI through a preallocated channel. Never loop indefinitely inside allocator recovery.
+- **Implementation:** `TaskscapeLtdNewHandler` now releases the 64 KiB reserve once, records fatal pressure atomically, and immediately returns failure. It no longer serializes callers, formats diagnostics, displays modal UI, sleeps, retries, or invokes recovery callbacks. The pre-registered `WM_USER_ALLOCATION_EMERGENCY` channel transfers journal persistence and the existing controlled-close request to the main UI thread.
+- **Verification:** `NativeSafetyRegressionTests.Allocation_emergency_is_noninteractive_and_defers_recovery_to_the_ui_thread` protects the reserve/state transition and window handoff while rejecting modal dialogs, sleeps, allocator-thread locking, and recovery callbacks.
 
 ### 54. Add a bounded release-build diagnostic ring buffer
 

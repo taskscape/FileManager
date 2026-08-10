@@ -562,9 +562,8 @@ WinMain(HINSTANCE hInstance, HINSTANCE /*hPrevInstance*/, LPSTR cmdLine, int cmd
     TRACE_I("Begin.");
     HInstance = hInstance;
 
-    // configure localized messages for the ALLOCHAN module (used to report out-of-memory issues
-    // to the user, offer Retry, and fall back to Cancel if termination is required)
-    SetAllocHandlerMessage(NULL, FRAMEWINDOW_NAME, NULL, NULL);
+    // Allocation failures now propagate immediately; a modal retry here could
+    // deadlock while the failed allocation still holds a subsystem lock.
 
     SetWinLibStrings("Invalid number!", FRAMEWINDOW_NAME);
 

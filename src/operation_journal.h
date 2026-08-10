@@ -34,8 +34,8 @@ public:
     void CompleteItem(BOOL succeeded);
     void Finish(BOOL failed, BOOL cancelled);
 
-    // Uses only fixed buffers and synchronous Win32 I/O so the allocator's
-    // emergency path can leave an auditable recovery marker without allocating.
+    // Runs after the allocator's posted UI notification, keeping filesystem I/O
+    // out of the failing allocation thread while retaining an auditable marker.
     static void PersistEmergencyShutdownState();
     static void OfferRecovery(HWND parent);
 };
