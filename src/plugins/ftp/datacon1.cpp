@@ -425,6 +425,8 @@ CDataConnectionSocket::CDataConnectionSocket(BOOL flushData, CFTPProxyForDataCon
     TgtDiskFileCreated = FALSE;
     TgtFileLastError = NO_ERROR;
     TgtDiskFileSize.Set(0, 0);
+    TgtDiskFileResumeOffset.Set(0, 0);
+    TgtDiskFileAppend = FALSE;
     CurrentTransferMode = ctrmUnknown;
     AsciiTrModeForBinFileProblemOccured = FALSE;
     AsciiTrModeForBinFileHowToSolve = 0 /* ask the user */;
@@ -706,6 +708,8 @@ void CDataConnectionSocket::DirectFlushData()
                     DiskWork.FlushDataBuffer = flushBuffer;
                     DiskWork.ValidBytesInFlushDataBuffer = validBytesInFlushBuffer;
                     DiskWork.WorkFile = TgtDiskFile;
+                    DiskWork.AppendToFile = TgtDiskFile == NULL && TgtDiskFileAppend;
+                    DiskWork.WriteOrReadFromOffset = TgtDiskFileResumeOffset;
                     if (FTPDiskThread->AddWork(&DiskWork))
                         DiskWorkIsUsed = TRUE;
                     else // unable to flush the data, cannot continue with the download
@@ -1349,13 +1353,18 @@ void CDataConnectionSocket::SetPostMessagesToWorker(BOOL post, int msg, int uid,
     HANDLES(LeaveCriticalSection(&SocketCritSect));
 }
 
-void CDataConnectionSocket::SetDirectFlushParams(const char* tgtFileName, CCurrentTransferMode currentTransferMode)
+void CDataConnectionSocket::SetDirectFlushParams(const char* tgtFileName, CCurrentTransferMode currentTransferMode,
+                                                  const CQuadWord& resumeOffset)
 {
     CALL_STACK_MESSAGE1("CDataConnectionSocket::SetDirectFlushParams()");
 
     HANDLES(EnterCriticalSection(&SocketCritSect));
     lstrcpyn(TgtDiskFileName, tgtFileName, MAX_PATH);
     CurrentTransferMode = currentTransferMode;
+    // Only the identity-validated binary prefix may survive an interrupted direct download.
+    TgtDiskFileResumeOffset = resumeOffset;
+    TgtDiskFileAppend = resumeOffset != CQuadWord(0, 0);
+    TgtDiskFileSize = resumeOffset;
     HANDLES(LeaveCriticalSection(&SocketCritSect));
 }
 

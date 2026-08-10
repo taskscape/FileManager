@@ -841,6 +841,7 @@ struct CFTPDiskWork
     int ValidBytesInFlushDataBuffer;
     int EOLsInFlushDataBuffer;
     HANDLE WorkFile;
+    BOOL AppendToFile; // direct staged download: preserve only a verified prefix before the first write
 
     // the result of the disk operation is returned in the following variables:
     DWORD ProblemID;                               // if not ITEMPR_OK, this is the error that occurred

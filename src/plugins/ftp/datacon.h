@@ -208,11 +208,13 @@ protected:
 
     CQuadWord DataTotalSize; // total size of the transferred data in bytes: -1 = unknown
 
-    char TgtDiskFileName[MAX_PATH];           // if not "", this is the full name of the disk file to which data should be flushed (the file is overwritten; no resumes are performed here)
+    char TgtDiskFileName[MAX_PATH];           // if not "", this is the full name of the disk file to which data should be flushed
     HANDLE TgtDiskFile;                       // target disk file for flushing data (NULL = we have not opened it yet)
     BOOL TgtDiskFileCreated;                  // TRUE if the target disk file for flushing data was created
     DWORD TgtFileLastError;                   // code of the last error reported by the disk thread when writing to the TgtDiskFileName file
     CQuadWord TgtDiskFileSize;                // current size of the disk file used for flushing data
+    CQuadWord TgtDiskFileResumeOffset;        // verified staged bytes retained before a binary REST download
+    BOOL TgtDiskFileAppend;                   // TRUE only while the first flush must open at TgtDiskFileResumeOffset
     CCurrentTransferMode CurrentTransferMode; // current transfer mode (ASCII/binary)
     BOOL AsciiTrModeForBinFileProblemOccured; // TRUE = the "ASCII mode for binary file" error was detected
     int AsciiTrModeForBinFileHowToSolve;      // how to solve the "ASCII mode for binary file" problem: 0 = ask the user, 1 = download again in binary mode, 2 = interrupt the file download (cancel), 3 = ignore (finish the download in ASCII mode)
@@ -284,7 +286,8 @@ public:
 
     // sets TgtDiskFileName and CurrentTransferMode, while also enabling flushing data
     // directly into the TgtDiskFileName file (uses FTPDiskThread)
-    void SetDirectFlushParams(const char* tgtFileName, CCurrentTransferMode currentTransferMode);
+    void SetDirectFlushParams(const char* tgtFileName, CCurrentTransferMode currentTransferMode,
+                              const CQuadWord& resumeOffset);
 
     // returns the state of the target file when flushing data directly to the TgtDiskFileName file;
     // in 'fileCreated' it returns TRUE if the file was created; in 'fileSize' it returns the size

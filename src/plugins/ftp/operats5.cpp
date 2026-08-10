@@ -858,6 +858,7 @@ void CFTPDiskWork::CopyFrom(CFTPDiskWork* work)
     ValidBytesInFlushDataBuffer = work->ValidBytesInFlushDataBuffer;
     EOLsInFlushDataBuffer = work->EOLsInFlushDataBuffer;
     WorkFile = work->WorkFile;
+    AppendToFile = work->AppendToFile;
 
     ProblemID = work->ProblemID;
     WinError = work->WinError;
@@ -2008,11 +2009,29 @@ void DoCreateAndWriteFile(CFTPDiskWork& localWork, BOOL& needCopyBack, BOOL& wor
         SetFileAttributesUtf8Local(localWork.Name, FILE_ATTRIBUTE_NORMAL); // to allow overwriting a read-only file as well
         HANDLE f = HANDLES_Q(CreateFileUtf8Local(localWork.Name, GENERIC_WRITE,
                                         FILE_SHARE_READ, NULL,
-                                        CREATE_ALWAYS,
+                                        localWork.AppendToFile ? OPEN_ALWAYS : CREATE_ALWAYS,
                                         FILE_FLAG_SEQUENTIAL_SCAN,
                                         NULL));
         if (f != INVALID_HANDLE_VALUE)
         {
+            if (localWork.AppendToFile)
+            {
+                LARGE_INTEGER offset;
+                offset.QuadPart = localWork.WriteOrReadFromOffset.Value;
+                // The REST offset was derived from durable metadata and must remain the write offset.
+                LARGE_INTEGER existingSize;
+                BOOL haveExistingSize = GetFileSizeEx(f, &existingSize);
+                if (!haveExistingSize || existingSize.QuadPart < offset.QuadPart ||
+                    !SetFilePointerEx(f, offset, NULL, FILE_BEGIN))
+                {
+                    localWork.State = sqisFailed;
+                    localWork.WinError = !haveExistingSize ? GetLastError() :
+                                             (existingSize.QuadPart < offset.QuadPart ? ERROR_INVALID_DATA : GetLastError());
+                    HANDLES(CloseHandle(f));
+                    needCopyBack = TRUE;
+                    return;
+                }
+            }
             file = f;
             localWork.OpenedFile = f;
             workDone = TRUE;     // if cancelled, close the file handle and delete the file

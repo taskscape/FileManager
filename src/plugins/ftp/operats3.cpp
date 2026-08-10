@@ -347,6 +347,8 @@ void CFTPWorker::InitDiskWork(DWORD msgID, CFTPDiskWorkType type, const char* pa
         DiskWork.WorkFile = NULL;
     }
     DiskWork.EOLsInFlushDataBuffer = 0;
+    // Non-direct work must never inherit the direct-download append marker from a reused work record.
+    DiskWork.AppendToFile = FALSE;
 }
 
 void CFTPWorker::GetListViewData(LVITEM* itemData, char* buf, int bufSize)
