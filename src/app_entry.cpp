@@ -4218,8 +4218,9 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
     //---
     DestroySafeWaitWindow(TRUE); // povel "terminate" safe-wait-message threadu
     Sleep(1000);                 // nechame vsem threadum viewru cas, aby se ukoncili
-    NBWNetAC3Thread.Close(TRUE); // bezici thread nechame zabit (presun do AuxThreads), dalsi akce zablokujeme
-    TerminateAuxThreads();       // zbytek nasilne terminujeme
+    // Transfer the network-browser worker to the deadline-aware shutdown owner.
+    NBWNetAC3Thread.Close(TRUE);
+    ShutdownAuxThreads(); // retain shared state until legacy workers have joined
                                  //---
     TerminateThread();
     ReleaseFileNamesEnumForViewers();

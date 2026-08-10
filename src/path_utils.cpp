@@ -671,16 +671,29 @@ BOOL SalGetFullName(char* name, int* errTextID, const char* curDir, char* nextFo
 
 // ****************************************************************************
 
-TDirectArray<HANDLE> AuxThreads(10, 5);
+struct CAuxThread
+{
+    HANDLE Thread;
+    LPCSTR Description;
 
-void AuxThreadBody(BOOL add, HANDLE thread, BOOL testIfFinished)
+    CAuxThread(HANDLE thread, LPCSTR description)
+        : Thread(thread), Description(description)
+    {
+    }
+};
+
+// Keep a purpose beside each legacy handle so a shutdown deadline tells the
+// operator which component is still preventing resource teardown.
+TDirectArray<CAuxThread> AuxThreads(10, 5);
+
+void AuxThreadBody(BOOL add, HANDLE thread, BOOL testIfFinished, LPCSTR description)
 {
     // Prevent re-entrance
     static CCriticalSection cs;
     CEnterCriticalSection enterCS(cs);
 
     static BOOL finished = FALSE;
-    if (!finished) // after calling TerminateAuxThreads() we no longer accept anything
+    if (!finished) // after calling ShutdownAuxThreads() we no longer accept anything
     {
         if (add)
         {
@@ -688,9 +701,9 @@ void AuxThreadBody(BOOL add, HANDLE thread, BOOL testIfFinished)
             for (int i = 0; i < AuxThreads.Count; i++)
             {
                 DWORD code;
-                if (!GetExitCodeThread(AuxThreads[i], &code) || code != STILL_ACTIVE)
+                if (!GetExitCodeThread(AuxThreads[i].Thread, &code) || code != STILL_ACTIVE)
                 { // thread uz dobehl
-                    HANDLES(CloseHandle(AuxThreads[i]));
+                    HANDLES(CloseHandle(AuxThreads[i].Thread));
                     AuxThreads.Delete(i);
                     i--;
                 }
@@ -707,37 +720,39 @@ void AuxThreadBody(BOOL add, HANDLE thread, BOOL testIfFinished)
             }
             // pridame novy thread
             if (!skipAdd)
-                AuxThreads.Add(thread);
+                AuxThreads.Add(CAuxThread(thread, description));
         }
         else
         {
             finished = TRUE;
             for (int i = 0; i < AuxThreads.Count; i++)
             {
-                HANDLE t = AuxThreads[i];
+                CAuxThread& auxiliary = AuxThreads[i];
+                HANDLE t = auxiliary.Thread;
                 DWORD code;
                 if (GetExitCodeThread(t, &code) && code == STILL_ACTIVE)
-                { // thread stale bezi, terminujeme ho
-                    TerminateThread(t, 666);
-                    WaitForSingleObject(t, INFINITE); // pockame az thread skutecne skonci, nekdy mu to dost trva
-                }
+                    // These legacy workers may still reference host globals, so
+                    // deadline breach is diagnostic and cannot justify detaching.
+                    CThreadShutdownDeadline(auxiliary.Description).WaitForSafeJoin(t);
                 HANDLES(CloseHandle(t));
             }
             AuxThreads.DestroyMembers();
         }
     }
     else
-        TRACE_E("AuxThreadBody(): calling after TerminateAuxThreads() is not supported! add=" << add);
+        TRACE_E("AuxThreadBody(): calling after ShutdownAuxThreads() is not supported! add=" << add);
 }
 
-void AddAuxThread(HANDLE thread, BOOL testIfFinished)
+void AddAuxThread(HANDLE thread, BOOL testIfFinished, LPCSTR description)
 {
-    AuxThreadBody(TRUE, thread, testIfFinished);
+    // Preserve a stable component label for deadline diagnostics at process exit.
+    AuxThreadBody(TRUE, thread, testIfFinished, description);
 }
 
-void TerminateAuxThreads()
+void ShutdownAuxThreads()
 {
-    AuxThreadBody(FALSE, NULL, FALSE);
+    // Final teardown cannot release globals until every legacy worker is joined.
+    AuxThreadBody(FALSE, NULL, FALSE, NULL);
 }
 
 // ****************************************************************************
@@ -2454,7 +2469,8 @@ void CUserMenuIconBkgndReader::StartBkgndReadingIcons(CUserMenuIconDataArr* bkgn
             bkgndReaderData = NULL; // jsou predana v threadu, nebudeme je uvolnovat zde
             CurIRThreadIDIsValid = TRUE;
             CurIRThreadID = newThreadID;
-            AddAuxThread(thread); // if the thread does not finish in time, kill it before closing the application
+            // The reader uses shared menu state, so shutdown tracks it to a safe join.
+            AddAuxThread(thread, FALSE, "user-menu icon reader");
         }
         else
             TRACE_E("CUserMenuIconBkgndReader::StartBkgndReadingIcons(): unable to start thread for reading user menu icons.");

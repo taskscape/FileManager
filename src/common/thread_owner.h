@@ -17,6 +17,59 @@ void SetThreadNameInVCAndTrace(const char* name);
 // until the callback has returned and the thread has been joined.
 typedef DWORD(WINAPI* CThreadOwnerEntry)(void* parameter, HANDLE stopEvent);
 
+// Shutdown has two observable phases: a worker first gets time to observe its
+// cancellation request, then a longer recovery window to persist/close work.
+// A breach is never permission to terminate the thread because its callback
+// can still hold application-owned state.
+class CThreadShutdownDeadline
+{
+public:
+    CThreadShutdownDeadline(LPCSTR workerName,
+                            DWORD cancellationDeadline = 5000,
+                            DWORD recoveryDeadline = 30000)
+        : WorkerName(workerName != NULL ? workerName : "unnamed worker"),
+          CancellationDeadline(cancellationDeadline),
+          RecoveryDeadline(recoveryDeadline)
+    {
+    }
+
+    // Returns WAIT_TIMEOUT when either diagnostic deadline was breached, even
+    // though the final safe join below has completed.
+    DWORD WaitForSafeJoin(HANDLE worker) const
+    {
+        DWORD waitResult = WaitForSingleObject(worker, CancellationDeadline);
+        if (waitResult != WAIT_TIMEOUT)
+            return waitResult;
+
+        TraceDeadlineBreach("cancellation", CancellationDeadline, worker);
+        waitResult = WaitForSingleObject(worker, RecoveryDeadline);
+        if (waitResult != WAIT_TIMEOUT)
+            return WAIT_TIMEOUT;
+
+        TraceDeadlineBreach("operation recovery", RecoveryDeadline, worker);
+        // This worker has not been proven independent of process state, so it
+        // must finish before shutdown frees the state it can still reference.
+        WaitForSingleObject(worker, INFINITE);
+        return WAIT_TIMEOUT;
+    }
+
+private:
+    void TraceDeadlineBreach(LPCSTR phase, DWORD deadline, HANDLE worker) const
+    {
+        DWORD exitCode = STILL_ACTIVE;
+        if (!GetExitCodeThread(worker, &exitCode))
+            exitCode = GetLastError();
+        TRACE_E("Shutdown " << phase << " deadline breached for " << WorkerName
+                            << " after " << deadline << " ms; thread state=" << exitCode
+                            << ". Keeping the process alive for a safe join.");
+    }
+
+private:
+    LPCSTR WorkerName;
+    DWORD CancellationDeadline;
+    DWORD RecoveryDeadline;
+};
+
 class CThreadOwner
 {
 public:
@@ -135,6 +188,19 @@ public:
         RequestStop();
         const DWORD completion = WaitForCompletion(timeout);
         WaitForSingleObject(Thread, INFINITE);
+        CloseOwnedHandles();
+        return completion;
+    }
+
+    // The declared shutdown policy makes cancellation and recovery delays
+    // visible while retaining the owner until the callback has returned.
+    DWORD StopAndJoin(const CThreadShutdownDeadline& deadline)
+    {
+        if (Thread == NULL)
+            return WAIT_OBJECT_0;
+
+        RequestStop();
+        const DWORD completion = deadline.WaitForSafeJoin(Thread);
         CloseOwnedHandles();
         return completion;
     }

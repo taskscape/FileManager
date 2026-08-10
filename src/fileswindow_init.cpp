@@ -1491,14 +1491,9 @@ CFilesWindow::~CFilesWindow()
     if (IconCacheThread != NULL)
     {
         SetEvent(ICEventTerminate); // icon reader, terminate yourself!
-        if (WaitForSingleObject(IconCacheThread, 1000) == WAIT_TIMEOUT)
-        {
-            // Shell icon handlers can be slow or uncooperative. Keep this panel alive
-            // until its worker leaves rather than corrupting process-wide state with
-            // forced termination.
-            TRACE_E("Icon reader did not stop within the shutdown deadline; waiting for a safe join.");
-            WaitForSingleObject(IconCacheThread, INFINITE);
-        }
+        // Shell handlers can take time to return; panel state stays alive until
+        // the worker has completed its bounded recovery phase and safe join.
+        CThreadShutdownDeadline("panel icon reader").WaitForSafeJoin(IconCacheThread);
         HANDLES(CloseHandle(IconCacheThread));
     }
 

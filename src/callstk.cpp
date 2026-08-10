@@ -406,7 +406,9 @@ CCallStack::~CCallStack()
         {
             // by ending this thread, the code enters here one more time because CCallStack exited for it as well
             SetEvent(TBRData.TerminateEvent);           // terminate the bug report thread
-            WaitForSingleObject(BugReportThread, 1000); // wait at most one second for the thread to finish
+            // The report may be preserving crash-recovery evidence, so retain
+            // its events until cancellation and recovery phases have completed.
+            CThreadShutdownDeadline("call-stack bug report").WaitForSafeJoin(BugReportThread);
             NOHANDLES(CloseHandle(BugReportThread));
             BugReportThread = NULL;
             NOHANDLES(CloseHandle(TBRData.TerminateEvent));

@@ -98,8 +98,10 @@ void ReleaseCheckThreads()
     {
         if (ThreadCheckPath[i].HasThread())
         {
-            if (ThreadCheckPath[i].StopAndJoin(1000) == WAIT_TIMEOUT)
-                TRACE_E("Check-path thread did not stop within the shutdown deadline; waiting for a safe join.");
+            // Attribute queries can block in redirectors, so give cancellation
+            // and recovery separate deadlines before the mandatory safe join.
+            if (ThreadCheckPath[i].StopAndJoin(CThreadShutdownDeadline("check-path worker")) == WAIT_TIMEOUT)
+                TRACE_E("Check-path worker missed a shutdown deadline and completed only after the diagnostic wait.");
             ThreadCheckState[i] = ctsNotRunning;
         }
     }

@@ -513,7 +513,8 @@ void CreateSafeWaitWindow(const char* message, const char* caption,
                 return;
             }
             SetThreadPriority(thread, THREAD_PRIORITY_ABOVE_NORMAL); // so it actually wins against the main thread
-            AddAuxThread(thread);
+            // The message thread owns UI resources that must outlive its safe join.
+            AddAuxThread(thread, FALSE, "safe-wait message loop");
             HANDLES(InitializeCriticalSection(&SafeWaitMessageTextSection));
             SafeWaitMessageThreadStarted = TRUE;
         }

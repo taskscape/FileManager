@@ -1023,10 +1023,10 @@ BOOL CheckAndConnectUNCNetworkPath(HWND parent, const char* UNCPath, BOOL& pathI
 // we unsuccessfully tried to establish connection (e.g., "credentials conflict")
 BOOL CheckAndRestoreNetworkConnection(HWND parent, const char drive, BOOL& pathInvalid);
 
-// functions for thread management, when terminating the process these threads should close,
-// if they don't do it themselves, they must be terminated
-void AddAuxThread(HANDLE view, BOOL testIfFinished = FALSE);
-void TerminateAuxThreads();
+// Auxiliary workers are tracked until their named shutdown deadline and final
+// safe join; they are never force-terminated while they may use host state.
+void AddAuxThread(HANDLE view, BOOL testIfFinished = FALSE, LPCSTR description = "legacy auxiliary worker");
+void ShutdownAuxThreads();
 
 // returns TRUE if the specified file exists; otherwise returns FALSE
 extern "C" BOOL FileExists(const char* fileName);

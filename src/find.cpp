@@ -2213,7 +2213,8 @@ BOOL OpenFindDialog(HWND hCenterAgainst, const char* initPath)
             HANDLES(CloseHandle(loop));
             goto ERROR_TFD_CREATE;
         }
-        AddAuxThread(loop); // add the thread among existing viewers (killed on exit)
+        // The modeless loop receives its close request before global shutdown joins it.
+        AddAuxThread(loop, FALSE, "Find dialog message loop");
         SetCursor(hOldCur);
         return TRUE;
     }
