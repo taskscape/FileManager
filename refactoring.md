@@ -37,7 +37,7 @@ This document is the working record for a read-only stability and resilience aud
 15. **Release dependency acquisition is weakly verified.** The OpenSSL archive is accepted after a ZIP-magic check rather than a pinned cryptographic digest or signature.
 16. **Release signing is not implemented in the repository workflow.** `tools/codesign/sign_with_retry.cmd` is a placeholder, and the installer script does not define signing steps.
 17. **Installer staging can select stale or mismatched binaries.** `tools/prepare_installer.ps1` recursively falls back to the first matching output and suppresses some errors.
-18. **Several bundled libraries are substantially old.** Reviewed versions include OpenSSL 1.0.2u, bzip2 1.0.6, SQLite 3.28.0, zlib 1.2.11, and cmark-gfm 0.29.0.gfm.0. 7-Zip is now 26.02.
+18. **Several bundled libraries are substantially old.** Reviewed versions include OpenSSL 1.0.2u, bzip2 1.0.6, and cmark-gfm 0.29.0.gfm.0. SQLite has been upgraded to 3.53.4 and zlib to 1.3.2 with recorded review cadences; 7-Zip is now 26.02.
 19. **Compiler hardening and static-analysis lanes are limited.** The common project properties use warning level 3 and disable secure-CRT warnings; no repository CI lane for ASan, CodeQL, clang-cl, or `/analyze` was found.
 20. **The safety net remains shallow for the product's highest-risk behavior.** Executable UI coverage now exercises normal, cancelled, and deliberately blocked create/copy/rename/move/delete operations, but there are no native characterization tests, parser fuzzers, disk-full fault tests, crash-consistency tests, or automated copy/move/delete recovery scenarios.
 
@@ -422,10 +422,16 @@ This document is the working record for a read-only stability and resilience aud
 - **Resolution:** Upgraded the verified SQLite amalgamation and public header from 3.28.0 to 3.53.4, recorded the archive and source SHA3-256 values, and made the durability/API-validation compile options explicit. The product currently has no owned SQLite database; its sole use reads Google Drive's configuration database with `SQLITE_OPEN_READONLY`, so it is deliberately outside FileManager recovery behavior. The vendor record defines the mandatory WAL, full-synchronous transaction, integrity-check, preservation, and explicit-recovery contract for any future owned database.
 - **Verification:** `tools/test-sqlite-recovery.ps1` runs against the Debug x64 `sqlite.dll` in CI. It verifies WAL settings, interruption of an uncommitted `BEGIN IMMEDIATE` transaction, reopen/integrity success for committed data, and integrity-check failure after a controlled b-tree-page corruption. `NativeSafetyRegressionTests.Bundled_sqlite_uses_a_verified_current_amalgamation_and_exercises_the_owned_database_recovery_contract` keeps the version, source ID, compile options, ownership boundary, recovery probe, and workflow hook from drifting.
 
-### 63. Upgrade zlib
+### 63. Upgrade zlib — Implemented
 
-- **Justification:** Vendored zlib 1.2.11 is obsolete and used on untrusted compressed data paths.
-- **Proposed solution:** Upgrade to a supported version, run compression/decompression compatibility vectors, retain corrupt-input regression files, and include it in the dependency update cadence.
+- **Resolution:** Upgraded the direct-build zlib vendor source from 1.2.11 to
+  1.3.2, including the complete in-memory API source set. `src/common/dep/zlib/VENDOR.md`
+  records the official archive, SHA-256, no-local-patch policy, and quarterly plus
+  security-release review cadence.
+- **Verification:** `tools/test-zlib-compatibility.ps1` compiles the checked-in
+  native sources and verifies both compression and decompression against the
+  retained 1.2.11 vector. It also proves that the truncated, bad-checksum, and
+  invalid-deflate regression fixtures are rejected, and runs in pull-request CI.
 
 ### 64. Upgrade bzip2
 

@@ -73,6 +73,37 @@ public sealed class NativeSafetyRegressionTests
     }
 
     [Test]
+    public void Bundled_zlib_is_current_has_retained_compatibility_vectors_and_runs_in_ci()
+    {
+        var root = FindRepositoryRoot();
+        var vendorRecord = File.ReadAllText(Path.Combine(root, "src", "common", "dep", "zlib", "VENDOR.md"));
+        var header = File.ReadAllText(Path.Combine(root, "src", "common", "dep", "zlib", "zlib.h"));
+        var project = File.ReadAllText(Path.Combine(root, "src", "vcxproj", "salamand.vcxproj"));
+        var probe = File.ReadAllText(Path.Combine(root, "tools", "zlib_compatibility_probe.c"));
+        var workflow = File.ReadAllText(Path.Combine(root, ".github", "workflows", "pr-msbuild.yml"));
+        var refactoring = File.ReadAllText(Path.Combine(root, "refactoring.md"));
+
+        // Keep the vendor provenance, hostile streams, and build path coupled to the production C sources.
+        Assert.Multiple(() =>
+        {
+            Assert.That(header, Does.Contain("#define ZLIB_VERSION \"1.3.2\""));
+            Assert.That(vendorRecord, Does.Contain("e8bf55f3017aa181690990cb58a994e77885da140609fc8f94abe9b65d2cae28"));
+            Assert.That(vendorRecord, Does.Contain("every calendar quarter"));
+            Assert.That(vendorRecord, Does.Contain("security advisory or release"));
+            Assert.That(project, Does.Contain("..\\common\\dep\\zlib\\infback.c"));
+            Assert.That(project, Does.Contain("..\\common\\dep\\zlib\\uncompr.c"));
+            Assert.That(probe, Does.Contain("zlib 1.2.11 output"));
+            Assert.That(probe, Does.Contain("VerifyRejectedStream"));
+            Assert.That(File.Exists(Path.Combine(root, "tests", "zlib-vectors", "legacy-zlib-1.2.11.hex")), Is.True);
+            Assert.That(File.Exists(Path.Combine(root, "tests", "zlib-vectors", "truncated-zlib-stream.hex")), Is.True);
+            Assert.That(File.Exists(Path.Combine(root, "tests", "zlib-vectors", "bad-adler32-zlib-stream.hex")), Is.True);
+            Assert.That(File.Exists(Path.Combine(root, "tests", "zlib-vectors", "invalid-deflate-zlib-stream.hex")), Is.True);
+            Assert.That(workflow, Does.Contain("test-zlib-compatibility.ps1"));
+            Assert.That(refactoring, Does.Contain("### 63. Upgrade zlib — Implemented"));
+        });
+    }
+
+    [Test]
     public void Trust_boundary_text_uses_bounded_owned_storage_and_explicit_capacity_failures()
     {
         var root = FindRepositoryRoot();
