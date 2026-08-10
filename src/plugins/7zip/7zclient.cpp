@@ -5,7 +5,7 @@
 #include <assert.h>
 #include "dbg.h"
 
-#include "Common/MyInitGuid.h"
+// 7zip.cpp is the single owner of 26.02 interface GUID definitions in this plug-in binary.
 
 #include "7zip.h"
 #include "7zclient.h"
@@ -95,7 +95,8 @@ BOOL C7zClient::CreateObject(const GUID* interfaceID, void** object)
     if (!Load(dllPath))
         return Error(IDS_CANT_LOAD_LIBRARY);
 
-    TCreateObjectFunc createObjectFunc = (TCreateObjectFunc)GetProc("CreateObject");
+    // 26.02 exposes the native module handle instead of the retired CLibrary::GetProc helper.
+    TCreateObjectFunc createObjectFunc = (TCreateObjectFunc)::GetProcAddress(Get_HMODULE(), "CreateObject");
     if (createObjectFunc == 0)
         return Error(IDS_CANT_GET_CRATEOBJECT);
 
@@ -1015,6 +1016,7 @@ C7zClient::SetCompressionParams(IOutArchive* outArchive, CCompressParams* compre
         if (compressParams->CompressLevel != COMPRESS_LEVEL_STORE)
         {
             char dictSizeStr[32];
+            // 26.02 reserves signed scalar variants; plug-in settings are non-negative by contract.
             NWindows::NCOM::CPropVariant prop;
             switch (compressParams->Method)
             {
@@ -1030,7 +1032,7 @@ C7zClient::SetCompressionParams(IOutArchive* outArchive, CCompressParams* compre
 
                 // set word size
                 names.Add(L"0fb");
-                prop = compressParams->WordSize;
+                prop = (UInt32)compressParams->WordSize;
                 values.push_back(prop);
                 break;
 
@@ -1046,7 +1048,7 @@ C7zClient::SetCompressionParams(IOutArchive* outArchive, CCompressParams* compre
 
                 // set word size
                 names.Add(L"0fb");
-                prop = compressParams->WordSize;
+                prop = (UInt32)compressParams->WordSize;
                 values.push_back(prop);
                 break;
 
@@ -1062,13 +1064,13 @@ C7zClient::SetCompressionParams(IOutArchive* outArchive, CCompressParams* compre
 
                 // set word size
                 names.Add(L"0o");
-                prop = compressParams->WordSize;
+                prop = (UInt32)compressParams->WordSize;
                 values.push_back(prop);
                 break;
             } // switch
         }
 
-        RINOK(setProperties->SetProperties(&names.Front(), &values.front(), names.Size()));
+        RINOK(setProperties->SetProperties(&names[0], &values.front(), names.Size()));
     }
 
     return S_OK;

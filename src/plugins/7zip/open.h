@@ -15,23 +15,12 @@ class CArchiveOpenCallbackImp : public IArchiveOpenCallback,
                                 public CMyUnknownImp
 {
 public:
-    MY_UNKNOWN_IMP1(ICryptoGetTextPassword)
+    // Use 26.02's COM declarations so the plug-in advertises each legacy callback interface correctly.
+    Z7_IFACES_IMP_UNK_3(IArchiveOpenCallback,
+                        IArchiveOpenVolumeCallback,
+                        ICryptoGetTextPassword)
 
-    // IArchiveOpenCallback
-    STDMETHOD(SetTotal)
-    (const UInt64* files, const UInt64* bytes);
-    STDMETHOD(SetCompleted)
-    (const UInt64* files, const UInt64* bytes);
-
-    // ICryptoGetTextPassword
-    STDMETHOD(CryptoGetTextPassword)
-    (BSTR* password);
-
-    // IArchiveOpenVolumeCallback
-    STDMETHOD(GetProperty)
-    (PROPID propID, PROPVARIANT* value);
-    STDMETHOD(GetStream)
-    (const wchar_t* name, IInStream** inStream);
+public:
 
 private:
     UString& Password;

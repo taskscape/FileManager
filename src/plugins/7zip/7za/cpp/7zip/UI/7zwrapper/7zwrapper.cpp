@@ -63,6 +63,12 @@ static void PrintString(const AString &s)
   _snprintf_s(OutputBuffer + strlen(OutputBuffer), OutputBufferSize - strlen(OutputBuffer), _TRUNCATE, "%s", (LPCSTR)s);
 }
 
+// Keep the crash-report wrapper's byte-oriented output ABI stable across 7-Zip string changes.
+static void PrintString(const char *s)
+{
+  PrintString(AString(s));
+}
+
 static void PrintNewLine()
 {
   _snprintf_s(OutputBuffer + strlen(OutputBuffer), OutputBufferSize - strlen(OutputBuffer), _TRUNCATE, "\n");
@@ -87,6 +93,11 @@ static void PrintError(const AString &s)
   PrintNewLine();
   PrintString(s);
   PrintNewLine();
+}
+
+static void PrintError(const char *s)
+{
+  PrintError(AString(s));
 }
 
 static HRESULT IsArchiveItemProp(IInArchive *archive, UInt32 index, PROPID propID, bool &result)
@@ -121,12 +132,7 @@ class CArchiveOpenCallback:
   public CMyUnknownImp
 {
 public:
-  MY_UNKNOWN_IMP1(ICryptoGetTextPassword)
-
-  STDMETHOD(SetTotal)(const UInt64 *files, const UInt64 *bytes);
-  STDMETHOD(SetCompleted)(const UInt64 *files, const UInt64 *bytes);
-
-  STDMETHOD(CryptoGetTextPassword)(BSTR *password);
+  Z7_IFACES_IMP_UNK_2(IArchiveOpenCallback, ICryptoGetTextPassword)
 
   bool PasswordIsDefined;
   UString Password;
@@ -176,19 +182,8 @@ class CArchiveExtractCallback:
   public CMyUnknownImp
 {
 public:
-  MY_UNKNOWN_IMP1(ICryptoGetTextPassword)
-
-  // IProgress
-  STDMETHOD(SetTotal)(UInt64 size);
-  STDMETHOD(SetCompleted)(const UInt64 *completeValue);
-
-  // IArchiveExtractCallback
-  STDMETHOD(GetStream)(UInt32 index, ISequentialOutStream **outStream, Int32 askExtractMode);
-  STDMETHOD(PrepareOperation)(Int32 askExtractMode);
-  STDMETHOD(SetOperationResult)(Int32 resultEOperationResult);
-
-  // ICryptoGetTextPassword
-  STDMETHOD(CryptoGetTextPassword)(BSTR *aPassword);
+  Z7_IFACES_IMP_UNK_2(IArchiveExtractCallback, ICryptoGetTextPassword)
+  Z7_IFACE_COM7_IMP(IProgress)
 
 private:
   CMyComPtr<IInArchive> _archiveHandler;
@@ -340,7 +335,7 @@ STDMETHODIMP CArchiveExtractCallback::GetStream(UInt32 index,
     
     _outFileStreamSpec = new COutFileStream;
     CMyComPtr<ISequentialOutStream> outStreamLoc(_outFileStreamSpec);
-    if (!_outFileStreamSpec->Open(fullProcessedPath, CREATE_ALWAYS))
+    if (!_outFileStreamSpec->Create_ALWAYS(fullProcessedPath))
     {
       PrintError("Can not open output file", fullProcessedPath);
       return E_ABORT;
@@ -446,23 +441,9 @@ class CArchiveUpdateCallback:
   public CMyUnknownImp
 {
 public:
-  MY_UNKNOWN_IMP2(IArchiveUpdateCallback2, ICryptoGetTextPassword2)
-
-  // IProgress
-  STDMETHOD(SetTotal)(UInt64 size);
-  STDMETHOD(SetCompleted)(const UInt64 *completeValue);
-
-  // IUpdateCallback2
-  STDMETHOD(EnumProperties)(IEnumSTATPROPSTG **enumerator);
-  STDMETHOD(GetUpdateItemInfo)(UInt32 index,
-      Int32 *newData, Int32 *newProperties, UInt32 *indexInArchive);
-  STDMETHOD(GetProperty)(UInt32 index, PROPID propID, PROPVARIANT *value);
-  STDMETHOD(GetStream)(UInt32 index, ISequentialInStream **inStream);
-  STDMETHOD(SetOperationResult)(Int32 operationResult);
-  STDMETHOD(GetVolumeSize)(UInt32 index, UInt64 *size);
-  STDMETHOD(GetVolumeStream)(UInt32 index, ISequentialOutStream **volumeStream);
-
-  STDMETHOD(CryptoGetTextPassword2)(Int32 *passwordIsDefined, BSTR *password);
+  Z7_IFACES_IMP_UNK_2(IArchiveUpdateCallback2, ICryptoGetTextPassword2)
+  Z7_IFACE_COM7_IMP(IProgress)
+  Z7_IFACE_COM7_IMP(IArchiveUpdateCallback)
 
 public:
   CRecordVector<UInt64> VolumesSizes;
@@ -505,11 +486,6 @@ STDMETHODIMP CArchiveUpdateCallback::SetCompleted(const UInt64 * /* completeValu
   return S_OK;
 }
 
-
-STDMETHODIMP CArchiveUpdateCallback::EnumProperties(IEnumSTATPROPSTG ** /* enumerator */)
-{
-  return E_NOTIMPL;
-}
 
 STDMETHODIMP CArchiveUpdateCallback::GetUpdateItemInfo(UInt32 /* index */,
       Int32 *newData, Int32 *newProperties, UInt32 *indexInArchive)
@@ -631,7 +607,7 @@ STDMETHODIMP CArchiveUpdateCallback::GetVolumeStream(UInt32 index, ISequentialOu
   fileName += VolExt;
   COutFileStream *streamSpec = new COutFileStream;
   CMyComPtr<ISequentialOutStream> streamLoc(streamSpec);
-  if (!streamSpec->Create(us2fs(fileName), false))
+  if (!streamSpec->Create_ALWAYS(us2fs(fileName)))
     return ::GetLastError();
   *volumeStream = streamLoc.Detach();
   return S_OK;
@@ -699,7 +675,7 @@ BOOL WINAPI CompressFiles(const char* archiveName7z, const char* sourceDir, cons
     PrintError("Can not load 7-zip library");
     return FALSE;
   }
-  CreateObjectFunc createObjectFunc = (CreateObjectFunc)lib.GetProc("CreateObject");
+  CreateObjectFunc createObjectFunc = (CreateObjectFunc)::GetProcAddress(lib.Get_HMODULE(), "CreateObject");
   if (createObjectFunc == 0)
   {
     PrintError("Can not get CreateObject");
@@ -743,7 +719,7 @@ BOOL WINAPI CompressFiles(const char* archiveName7z, const char* sourceDir, cons
 
   COutFileStream *outFileStreamSpec = new COutFileStream;
   CMyComPtr<IOutStream> outFileStream = outFileStreamSpec;
-  if (!outFileStreamSpec->Create(archiveName, false))
+  if (!outFileStreamSpec->Create_ALWAYS(archiveName))
   {
     PrintError("Can't create archive file");
     return FALSE;
