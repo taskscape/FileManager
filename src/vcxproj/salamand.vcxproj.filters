@@ -444,10 +444,16 @@
     <ClCompile Include="..\common\dep\zlib\inflate.c">
       <Filter>zlib</Filter>
     </ClCompile>
+    <ClCompile Include="..\common\dep\zlib\infback.c">
+      <Filter>zlib</Filter>
+    </ClCompile>
     <ClCompile Include="..\common\dep\zlib\inftrees.c">
       <Filter>zlib</Filter>
     </ClCompile>
     <ClCompile Include="..\common\dep\zlib\trees.c">
+      <Filter>zlib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\common\dep\zlib\uncompr.c">
       <Filter>zlib</Filter>
     </ClCompile>
     <ClCompile Include="..\common\dep\zlib\zutil.c">
