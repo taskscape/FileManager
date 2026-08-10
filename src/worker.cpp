@@ -8,6 +8,7 @@
 #include "worker.h"
 #include "execlog.h"
 #include "operation_journal.h"
+#include "release_diagnostics.h"
 
 #include <Aclapi.h>
 #include <Ntsecapi.h>
@@ -254,6 +255,9 @@ BOOL COperations::IsCancellationRequested() const
 BOOL COperations::Start()
 {
     LONG state = InterlockedCompareExchange(&OperationState, opsRunning, opsPlanned);
+    // Retain the lifecycle edge in release reports without capturing operation paths.
+    if (state == opsPlanned)
+        RecordReleaseDiagnosticOperationTransition(state, opsRunning);
     AssertOperationTransition(state == opsPlanned, (EOperationState)state, opsRunning);
     return state == opsPlanned;
 }
@@ -278,6 +282,8 @@ BOOL COperations::RequestCancellation()
         }
         if (InterlockedCompareExchange(&OperationState, opsCancelRequested, state) == state)
         {
+            // Cancellation ordering is often the missing clue in a field hang.
+            RecordReleaseDiagnosticOperationTransition(state, opsCancelRequested);
             if (CancellationEvent != NULL)
                 SetEvent(CancellationEvent);
             return TRUE;
@@ -298,7 +304,11 @@ BOOL COperations::BeginStopping()
             return FALSE;
         }
         if (InterlockedCompareExchange(&OperationState, opsStopping, state) == state)
+        {
+            // Preserve only the state transition, never the affected file names.
+            RecordReleaseDiagnosticOperationTransition(state, opsStopping);
             return TRUE;
+        }
     }
 }
 
@@ -306,6 +316,9 @@ BOOL COperations::Complete(BOOL failed)
 {
     EOperationState target = failed ? opsFailed : opsCompleted;
     LONG state = InterlockedCompareExchange(&OperationState, target, opsStopping);
+    // Completion is retained so reports show whether a worker reached its terminal state.
+    if (state == opsStopping)
+        RecordReleaseDiagnosticOperationTransition(state, target);
     AssertOperationTransition(state == opsStopping, (EOperationState)state, target);
     return state == opsStopping;
 }
@@ -323,7 +336,11 @@ BOOL COperations::Fail()
             return FALSE;
         }
         if (InterlockedCompareExchange(&OperationState, opsFailed, state) == state)
+        {
+            // Failure transitions are safe context for an approved diagnostic report.
+            RecordReleaseDiagnosticOperationTransition(state, opsFailed);
             return TRUE;
+        }
     }
 }
 

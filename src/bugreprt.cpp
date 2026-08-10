@@ -17,6 +17,7 @@
 #include "worker.h"
 #include "snooper.h"
 #include "gui.h"
+#include "release_diagnostics.h"
 
 char BugReportReasonBreak[BUG_REPORT_REASON_MAX]; // if not empty, displayed below the "Break" message
 
@@ -2550,6 +2551,8 @@ void CCallStack::PrintBugReport(EXCEPTION_POINTERS* Exception, DWORD ThreadID, D
         PrintLine(param, "", FALSE);
     }
 
+    // The existing report file is locally viewable and uploaded only after consent.
+    PrintReleaseDiagnosticRingBuffer(PrintLine, param);
     PrintLine(param, "End.", FALSE); // for detecting a complete bug report
 
     if (Exception != NULL)

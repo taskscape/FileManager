@@ -1243,6 +1243,54 @@ public sealed class NativeSafetyRegressionTests
         });
     }
 
+    [Test]
+    public void Release_diagnostic_ring_is_bounded_sanitized_and_reported_only_through_the_existing_consent_flow()
+    {
+        var root = FindRepositoryRoot();
+        var diagnostics = File.ReadAllText(Path.Combine(root, "src", "release_diagnostics.cpp"));
+        var diagnosticsHeader = File.ReadAllText(Path.Combine(root, "src", "release_diagnostics.h"));
+        var worker = File.ReadAllText(Path.Combine(root, "src", "worker.cpp"));
+        var operations = File.ReadAllText(Path.Combine(root, "src", "operations_core.cpp"));
+        var copy = File.ReadAllText(Path.Combine(root, "src", "async_copy.cpp"));
+        var plugins = File.ReadAllText(Path.Combine(root, "src", "plugins_loading.cpp"));
+        var callStack = File.ReadAllText(Path.Combine(root, "src", "callstk.cpp"));
+        var bugReport = File.ReadAllText(Path.Combine(root, "src", "bugreprt.cpp"));
+        var project = File.ReadAllText(Path.Combine(root, "src", "vcxproj", "salamand.vcxproj"));
+        var reporting = File.ReadAllText(Path.Combine(root, "reporting.md"));
+        var refactoring = File.ReadAllText(Path.Combine(root, "refactoring.md"));
+
+        // Pin the bounded storage, safe publication, producer coverage, and
+        // consent-gated local sidecar so release diagnostics cannot regress to debug-only traces.
+        Assert.Multiple(() =>
+        {
+            Assert.That(diagnostics, Does.Contain("kReleaseDiagnosticCapacity = 128"));
+            Assert.That(diagnostics, Does.Contain("CReleaseDiagnosticEntry ReleaseDiagnosticEntries[kReleaseDiagnosticCapacity]"));
+            Assert.That(diagnostics, Does.Contain("InterlockedCompareExchange(&entry.Sequence, -sequence, published)"));
+            Assert.That(diagnostics, Does.Contain("MemoryBarrier()"));
+            Assert.That(diagnostics, Does.Contain("InterlockedCompareExchange(&entry.Sequence, sequence, -sequence)"));
+            Assert.That(diagnostics, Does.Contain("CopySanitizedLabel"));
+            Assert.That(diagnostics, Does.Contain("BOOL WriteDiagnosticText"));
+            Assert.That(diagnostics, Does.Contain("*scan == '\\\\' || *scan == '/'"));
+            Assert.That(diagnostics, Does.Contain("RecordReleaseDiagnosticOperationTransition"));
+            Assert.That(diagnostics, Does.Contain("RecordReleaseDiagnosticWait"));
+            Assert.That(diagnostics, Does.Contain("RecordReleaseDiagnosticRetry"));
+            Assert.That(diagnostics, Does.Contain("RecordReleaseDiagnosticPluginIdentity"));
+            Assert.That(diagnosticsHeader, Does.Contain("ExportReleaseDiagnosticRingBuffer"));
+            Assert.That(worker, Does.Contain("RecordReleaseDiagnosticOperationTransition"));
+            Assert.That(operations, Does.Contain("RecordReleaseDiagnosticWait(\"worker_startup\""));
+            Assert.That(copy, Does.Contain("RecordReleaseDiagnosticRetry(\"copy_network_read\")"));
+            Assert.That(plugins, Does.Contain("RecordReleaseDiagnosticPluginIdentity(DLLName)"));
+            Assert.That(bugReport, Does.Contain("PrintReleaseDiagnosticRingBuffer(PrintLine, param)"));
+            Assert.That(callStack, Does.Contain("lstrcpyn(extension, \".OPS\""));
+            Assert.That(callStack, Does.Contain("ExportReleaseDiagnosticRingBuffer(diagnosticPath)"));
+            Assert.That(project, Does.Contain("..\\release_diagnostics.cpp"));
+            Assert.That(project, Does.Contain("..\\release_diagnostics.h"));
+            Assert.That(reporting, Does.Contain("Release diagnostic ring (`.OPS`)"));
+            Assert.That(reporting, Does.Contain("View Report** provides the local export without sending it"));
+            Assert.That(refactoring, Does.Contain("### 54. Add a bounded release-build diagnostic ring buffer — Implemented"));
+        });
+    }
+
     private static string FindRepositoryRoot()
     {
         for (var directory = new DirectoryInfo(AppContext.BaseDirectory); directory is not null; directory = directory.Parent)

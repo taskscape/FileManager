@@ -17,6 +17,7 @@
 #include <uxtheme.h>
 #include "dialogs.h"
 #include "execlog.h"
+#include "release_diagnostics.h"
 
 CPlugins Plugins;
 
@@ -2439,6 +2440,8 @@ BOOL CPluginData::InitDLL(HWND parent, BOOL quiet, BOOL waitCursor, BOOL showUns
                         // !!! CALLING PLUGIN ENTRY-POINT !!!
                         CPluginInterfaceAbstract* resIface = entry(&salamander);
                         pluginEntry.SetReturnedInterface(resIface);
+                        // Keep only a sanitized DLL leaf name for approved field reports.
+                        RecordReleaseDiagnosticPluginIdentity(DLLName);
                     }
 
                     if (!PluginIface.NotEmpty())

@@ -355,10 +355,12 @@ This document is the working record for a read-only stability and resilience aud
 - **Implementation:** `TaskscapeLtdNewHandler` now releases the 64 KiB reserve once, records fatal pressure atomically, and immediately returns failure. It no longer serializes callers, formats diagnostics, displays modal UI, sleeps, retries, or invokes recovery callbacks. The pre-registered `WM_USER_ALLOCATION_EMERGENCY` channel transfers journal persistence and the existing controlled-close request to the main UI thread.
 - **Verification:** `NativeSafetyRegressionTests.Allocation_emergency_is_noninteractive_and_defers_recovery_to_the_ui_thread` protects the reserve/state transition and window handoff while rejecting modal dialogs, sleeps, allocator-thread locking, and recovery callbacks.
 
-### 54. Add a bounded release-build diagnostic ring buffer
+### 54. Add a bounded release-build diagnostic ring buffer — Implemented
 
 - **Justification:** Much operational logging is debug-only, so field deadlocks and intermittent I/O failures lack the event sequence needed for diagnosis.
 - **Proposed solution:** Keep a low-overhead in-memory ring of sanitized operation transitions, waits, retries, and plug-in identities. Attach it to user-approved reports and allow local export.
+- **Implementation:** `release_diagnostics.cpp` provides a 128-entry, allocation-free ring with per-entry publication markers. Worker lifecycle, startup waits, copy retries, and plug-in DLL leaf names record only sanitized labels. The crash text report renders the ring before `End.` and writes a local `.OPS` sidecar, which Salmon packages/uploads only after the user selects **Send Report**.
+- **Verification:** `NativeSafetyRegressionTests.Release_diagnostic_ring_is_bounded_sanitized_and_reported_only_through_the_existing_consent_flow` pins the capacity, publication protocol, safe fields, producer coverage, report attachment, local-view documentation, project registration, and implemented ledger entry.
 
 ### 55. Assign correlation IDs to operations and workers
 

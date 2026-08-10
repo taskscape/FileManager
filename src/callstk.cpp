@@ -3,6 +3,7 @@
 // CommentsTranslationProject: TRANSLATED
 
 #include "precomp.h"
+#include "release_diagnostics.h"
 
 #include "mainwnd.h"
 #include "usermenu.h"
@@ -773,6 +774,16 @@ BOOL CCallStack::CreateBugReportFile(EXCEPTION_POINTERS* Exception, DWORD thread
                 }
 
                 NOHANDLES(CloseHandle(file));
+
+                char diagnosticPath[MAX_PATH];
+                lstrcpyn(diagnosticPath, bugReportFileName, _countof(diagnosticPath));
+                char* extension = strrchr(diagnosticPath, '.');
+                if (extension != NULL)
+                {
+                    // The sidecar is a local export and joins an archive only after report consent.
+                    lstrcpyn(extension, ".OPS", (int)(_countof(diagnosticPath) - (extension - diagnosticPath)));
+                    ExportReleaseDiagnosticRingBuffer(diagnosticPath);
+                }
             }
         }
     }
