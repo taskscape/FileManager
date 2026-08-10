@@ -831,6 +831,37 @@ public sealed class NativeSafetyRegressionTests
     }
 
     [Test]
+    public void Delete_manager_callback_registration_invalidates_before_window_teardown_and_rejects_stale_generations()
+    {
+        var root = FindRepositoryRoot();
+        var cacheHeader = File.ReadAllText(Path.Combine(root, "src", "cache.h"));
+        var cache = File.ReadAllText(Path.Combine(root, "src", "cache.cpp"));
+        var messages = File.ReadAllText(Path.Combine(root, "src", "mainwnd_messages.cpp"));
+        var refactoring = File.ReadAllText(Path.Combine(root, "refactoring.md"));
+
+        Assert.Multiple(() =>
+        {
+            // The delete-manager lock makes target invalidation atomic with worker notification posting.
+            Assert.That(cacheHeader, Does.Contain("HWND CallbackWindow"));
+            Assert.That(cacheHeader, Does.Contain("DWORD CallbackGeneration"));
+            Assert.That(cacheHeader, Does.Contain("RegisterCallbackWindow(HWND hWindow)"));
+            Assert.That(cacheHeader, Does.Contain("InvalidateCallbackWindow(HWND hWindow)"));
+            Assert.That(cache, Does.Contain("PostMessage(CallbackWindow, WM_USER_PROCESSDELETEMAN, (WPARAM)CallbackGeneration, 0)"));
+            Assert.That(cache, Does.Contain("CallbackWindow = NULL;"));
+            Assert.That(cache, Does.Contain("CallbackGeneration++"));
+            Assert.That(cache, Does.Contain("CallbackWindow == hWindow && CallbackGeneration == generation"));
+            Assert.That(cache, Does.Not.Contain("PostMessage(MainWindow->HWindow, WM_USER_PROCESSDELETEMAN, 0, 0)"));
+            // Dispatch must reject stale messages, and destruction must invalidate before the window tears down children.
+            Assert.That(messages, Does.Contain("DeleteManager.RegisterCallbackWindow(HWindow);"));
+            Assert.That(messages, Does.Contain("DeleteManager.IsCurrentCallbackWindow(HWindow, (DWORD)wParam)"));
+            Assert.That(messages, Does.Contain("DeleteManager.InvalidateCallbackWindow(HWindow);"));
+            Assert.That(messages.IndexOf("DeleteManager.InvalidateCallbackWindow(HWindow);", StringComparison.Ordinal),
+                        Is.LessThan(messages.IndexOf("SHChangeNotifyRelease();", StringComparison.Ordinal)));
+            Assert.That(refactoring, Does.Contain("### 49. Protect window and callback lifetimes — Implemented"));
+        });
+    }
+
+    [Test]
     public void Plugin_callbacks_are_contained_and_the_failing_plugin_is_deferred_for_unload()
     {
         var root = FindRepositoryRoot();

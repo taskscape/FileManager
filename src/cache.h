@@ -506,6 +506,11 @@ protected:
     BOOL WaitingForProcessing; // TRUE = message to the main window is on the way or the data
                                // processing is in progress (the added item will be processed immediately)
     BOOL BlockDataProcessing;  // TRUE = do not process data (ProcessData() does nothing)
+    // This registration is protected by CS so workers never retain MainWindow's raw HWND across teardown.
+    HWND CallbackWindow;
+    DWORD CallbackGeneration;
+
+    BOOL PostProcessMessageLocked();
 
 public:
     CDeleteManager();
@@ -517,6 +522,11 @@ public:
     // directory when loading/unloading (TEMP will be cleaned by Salamander)
     // can be called from any thread
     void AddFile(const char* fileName, CPluginInterfaceAbstract* plugin);
+
+    // The main window owns this short-lived registration and invalidates it before destroying its HWND.
+    void RegisterCallbackWindow(HWND hWindow);
+    void InvalidateCallbackWindow(HWND hWindow);
+    BOOL IsCurrentCallbackWindow(HWND hWindow, DWORD generation);
 
     // called from the main thread (calls main window after receiving the message WM_USER_PROCESSDELETEMAN);
     // processing of new data - deleting files in plugins

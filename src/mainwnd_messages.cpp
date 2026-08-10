@@ -718,6 +718,8 @@ CMainWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
     {
     case WM_CREATE:
     {
+        // Register before creating worker-facing services so their notifications carry this window generation.
+        DeleteManager.RegisterCallbackWindow(HWindow);
         SHChangeNotifyInitialize(); // request receiving Shell Notifications
         ExecLogStartupPhase("main window create");
 
@@ -1204,6 +1206,9 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
 
     case WM_USER_PROCESSDELETEMAN:
     {
+        // A queued worker notification is valid only for the still-registered main-window generation.
+        if (!DeleteManager.IsCurrentCallbackWindow(HWindow, (DWORD)wParam))
+            return 0;
         // delay data processing due to the main window activation after ESC from the viewer on WinXP;
         // without this hack, it somehow did not catch up - the main window stayed inactive and the safe-wait window never appeared
         if (!SetTimer(HWindow, IDT_DELETEMNGR_PROCESS, 200, NULL))
@@ -3369,6 +3374,8 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
 
     case WM_DESTROY:
     {
+        // Invalidate before child teardown so concurrent workers cannot target this closing HWND.
+        DeleteManager.InvalidateCallbackWindow(HWindow);
         if (!CanDestroyMainWindow)
         {
             // some crazy shell extension has just called DestroyWindow on Salamander's main window
