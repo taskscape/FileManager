@@ -409,14 +409,13 @@ This document is the working record for a read-only stability and resilience aud
 - **Implementation (2026-08-10):** FTPS exceptions now use a bounded, synchronized plug-in store. Each decision records the case-insensitive hostname, control port, SHA-256 SPKI and leaf-certificate fingerprints, explicit session or remembered scope, and expiry. The dialog defaults to an eight-hour session exception; the new opt-in “Remember” checkbox persists a 30-day exception in the FTP profile immediately. A reused exception requires the exact host, port, SPKI, certificate fingerprint, and unexpired lifetime. An endpoint record with a changed or renewed certificate is logged as changed and falls back to the warning dialog; ordinary Windows chain and hostname validation still runs before any exception lookup.
 - **Verification:** `NativeSafetyRegressionTests.Ftp_certificate_exceptions_are_endpoint_bound_expiring_and_pinned` guards endpoint matching, fingerprint dual-pinning, scope/expiry persistence, chain-failure exception routing, renewed-certificate warning, and the implementation ledger. `SChannelTlsIntegrationTests` continues to verify that a self-signed chain fails without an explicit exception.
 
-### 61. Upgrade the bundled 7-Zip code — In progress
+### 61. Upgrade the bundled 7-Zip code — Implemented
 
 - **Justification:** The vendored 7-Zip version is 16.04, leaving years of parser, format, and robustness fixes unapplied in a component that handles untrusted archives.
 - **Proposed solution:** Move through supported releases with corpus differential tests, fuzz regression cases, and extraction compatibility snapshots before enabling the new version by default.
 
-- **Implementation (2026-08-10):** Replaced the patched 16.04 source tree with upstream 7-Zip 26.02 and updated `7za.dll` plus the crash-report `7zwrapper` to current dependencies and COM conventions. `src/plugins/7zip/doc/upgrade-26.02.md` pins the upstream artifact and records the mandatory corpus, fuzz, and extraction-snapshot gate for subsequent upgrades.
-- **Remaining work:** Port the in-process `7zip.spl` callback and retryable-stream adapters from the 16.04 COM/file-stream API before enabling 26.02 as the product default.
-- **Verification:** `NativeSafetyRegressionTests.Bundled_7zip_uses_26_02_and_preserves_upgrade_compatibility_contract` guards the version, source-integrity record, compatibility seams, and build inputs. Debug x64 builds of `7za.dll` and `7zwrapper` succeed with Visual Studio 2026; the aggregate 7-Zip plug-in build remains the porting gate.
+- **Implementation (2026-08-10):** Replaced the patched 16.04 source tree with upstream 7-Zip 26.02 and updated `7za.dll`, the crash-report `7zwrapper`, and the in-process `7zip.spl` COM callbacks to current interface conventions. The retryable input/output adapters now compose 26.02's final file streams, retaining the host retry prompts and stream capabilities. `src/plugins/7zip/doc/upgrade-26.02.md` pins the upstream artifact and records the mandatory corpus, fuzz, and extraction-snapshot gate for subsequent upgrades.
+- **Verification:** `NativeSafetyRegressionTests.Bundled_7zip_uses_26_02_and_preserves_upgrade_compatibility_contract` guards the version, source-integrity record, callback/stream compatibility seams, and build inputs. Visual Studio 2026 Debug x64 builds of the aggregate `7zip.vcxproj` succeeded with 0 warnings and 0 errors, producing `7zip.spl`.
 
 ### 62. Upgrade SQLite and define database recovery behavior
 

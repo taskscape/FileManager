@@ -1,5 +1,6 @@
+<!-- Fluent Color Essentials: restrained semantic color and rounded geometry stay legible at 16 px. -->
 <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-<path d="M2 5.5C2 4.94772 2.44772 4.5 3 4.5H13C13.5523 4.5 14 4.94772 14 5.5V11.5C14 12.0523 13.5523 12.5 13 12.5H3C2.44772 12.5 2 12.0523 2 11.5V5.5Z" fill="#E1E1E1" stroke="#999999" stroke-width="1"/>
-<path d="M4 8.5H12" stroke="#999999" stroke-width="1" stroke-linecap="round"/>
+<path d="M2 5.5C2 4.94772 2.44772 4.5 3 4.5H13C13.5523 4.5 14 4.94772 14 5.5V11.5C14 12.0523 13.5523 12.5 13 12.5H3C2.44772 12.5 2 12.0523 2 11.5V5.5Z" fill="#F3F2F1" stroke="#616161" stroke-width="1"/>
+<path d="M4 8.5H12" stroke="#616161" stroke-width="1" stroke-linecap="round"/>
 <circle cx="11" cy="6.5" r="0.5" fill="#107C10"/>
 </svg>

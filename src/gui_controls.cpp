@@ -1458,7 +1458,8 @@ CToolbarHeader::CToolbarHeader(HWND hDlg, int ctrlID, HWND hAlignWindow, DWORD b
 
     CSVGIcon svgIcons[TLBHDR_COUNT] = {
         {0, "Modify"},
-        {1, "New_Insert"},
+        // Reuse the shared Fluent New glyph so dialog toolbars cannot drift visually.
+        {1, "New"},
         {2, "Delete"},
         {3, "SortByName"},
         {4, "MoveItemUp"},
@@ -1556,7 +1557,8 @@ void CToolbarHeader::CreateImageLists(HIMAGELIST* enabled, HIMAGELIST* disabled)
 
     NSVGrasterizer* rast = nsvgCreateRasterizer();
     // JRYFIXME: temporarily reading from a file, switch to a shared storage with toolbars
-    const char* svgNames[] = {"Modify", "New_Insert", "Delete", "SortByName", "MoveItemUp", "MoveItemDown"};
+    // Reuse the shared Fluent New glyph so dialog toolbars cannot drift visually.
+    const char* svgNames[] = {"Modify", "New", "Delete", "SortByName", "MoveItemUp", "MoveItemDown"};
     for (int j = 0; j < 2; j++)
     {
         DWORD* p = (DWORD*)lpBits;

@@ -1,7 +1,8 @@
+<!-- Fluent Color Essentials: restrained semantic color and rounded geometry stay legible at 16 px. -->
 <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-<path d="M3 4H13" stroke="#C42B1C" stroke-width="1.5" stroke-linecap="round"/>
-<path d="M6 4V2.5C6 2.2 6.2 2 6.5 2H9.5C9.8 2 10 2.2 10 2.5V4" stroke="#C42B1C" stroke-width="1.5" stroke-linejoin="round"/>
-<path d="M4 4L5 13.5C5 13.8 5.2 14 5.5 14H10.5C10.8 14 11 13.8 11 13.5L12 4" fill="white" stroke="#C42B1C" stroke-width="1.5" stroke-linejoin="round"/>
-<path d="M7 7V11" stroke="#C42B1C" stroke-width="1" stroke-linecap="round"/>
-<path d="M9 7V11" stroke="#C42B1C" stroke-width="1" stroke-linecap="round"/>
+<path d="M3 4H13" stroke="#C50F1F" stroke-width="1.5" stroke-linecap="round"/>
+<path d="M6 4V2.5C6 2.2 6.2 2 6.5 2H9.5C9.8 2 10 2.2 10 2.5V4" stroke="#C50F1F" stroke-width="1.5" stroke-linejoin="round"/>
+<path d="M4 4L5 13.5C5 13.8 5.2 14 5.5 14H10.5C10.8 14 11 13.8 11 13.5L12 4" fill="white" stroke="#C50F1F" stroke-width="1.5" stroke-linejoin="round"/>
+<path d="M7 7V11" stroke="#C50F1F" stroke-width="1" stroke-linecap="round"/>
+<path d="M9 7V11" stroke="#C50F1F" stroke-width="1" stroke-linecap="round"/>
 </svg>

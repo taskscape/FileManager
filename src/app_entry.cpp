@@ -1779,11 +1779,13 @@ BOOL InitializeGraphics(BOOL colorsOnly)
         HBITMAP hTmpMaskBitmap;
         HBITMAP hTmpGrayBitmap;
         HBITMAP hTmpColorBitmap;
+        // Keep menu state glyphs in the same Fluent color language as command icons.
+        CSVGIcon menuMarkIcons[] = {{0, "MenuCheck"}, {1, "MenuRadio"}};
         if (!CreateToolbarBitmaps(HInstance,
                                   IDB_MENU,
                                   RGB(255, 0, 255), GetSysColor(COLOR_BTNFACE),
                                   hTmpMaskBitmap, hTmpGrayBitmap, hTmpColorBitmap,
-                                  FALSE, NULL, 0))
+                                  FALSE, menuMarkIcons, _countof(menuMarkIcons)))
             return FALSE;
         HMenuMarkImageList = ImageList_Create(iconSize, iconSize, ILC_MASK | ILC_COLORDDB, 2, 1);
         ImageList_Add(HMenuMarkImageList, hTmpColorBitmap, hTmpMaskBitmap);
