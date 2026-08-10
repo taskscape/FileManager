@@ -34,6 +34,21 @@ int DeltaForTotalCount(int total)
     return delta;
 }
 
+// A panel owns this many retained names and metadata records at most. The
+// list box is count-based and paints only its visible range, so retaining more
+// records would consume memory without making a large directory more usable.
+#define DIRECTORY_ENUMERATION_MAX_CACHED_ITEMS 100000
+
+// Check cancellation and give the safe-wait window's thread a scheduling
+// opportunity at this cadence; a slow share must not defer cancellation until
+// the next time-based ESC probe happens to run.
+#define DIRECTORY_ENUMERATION_BATCH_SIZE 256
+
+static BOOL IsDirectoryEnumerationBatchBoundary(int enumeratedItems)
+{
+    return enumeratedItems > 0 && enumeratedItems % DIRECTORY_ENUMERATION_BATCH_SIZE == 0;
+}
+
 static BOOL ConvertFindDataWToA(const WIN32_FIND_DATAW& src, WIN32_FIND_DATAA& dst)
 {
     ZeroMemory(&dst, sizeof(dst));
@@ -362,6 +377,8 @@ BOOL CFilesWindow::ReadDirectory(HWND parent, BOOL isRefresh)
         file.IconOverlayIndex = ICONOVERLAYINDEX_NOTUSED;
         file.IconOverlayDone = 0;
         int len;
+        // This spans the shared ADD_ITEM label used by synthesized parent entries.
+        BOOL atBatchBoundary = FALSE;
 #ifndef _WIN64
         int foundWin64RedirectedDirs = 0;
         BOOL isWin64RedirectedDir = FALSE;
@@ -387,6 +404,7 @@ BOOL CFilesWindow::ReadDirectory(HWND parent, BOOL isRefresh)
         WIN32_FIND_DATAW fileDataW;
         WIN32_FIND_DATAA fileData;
         HANDLE search;
+        BOOL directoryEnumerationLimitReached = FALSE;
 
         CWidePath fileNameW(fileName);
         const WCHAR* fileNameApiPath = fileNameW.GetPathForWin32Api();
@@ -498,8 +516,17 @@ BOOL CFilesWindow::ReadDirectory(HWND parent, BOOL isRefresh)
             {
                 NumberOfItemsInCurDir++;
 
-                // test ESC - doesn't user want to interrupt reading?
-                if (GetTickCount() - lastEscCheckTime >= 200) // 5 times per second
+                atBatchBoundary = IsDirectoryEnumerationBatchBoundary(NumberOfItemsInCurDir);
+                if (atBatchBoundary)
+                {
+                    // Yield only between bounded batches, preserving the synchronous
+                    // panel ownership model while allowing the cancellation UI to run.
+                    Sleep(0);
+                }
+
+                // Test ESC at least once per batch; retain the time-based probe for
+                // sparse, high-latency enumeration calls that do not reach a batch.
+                if (atBatchBoundary || GetTickCount() - lastEscCheckTime >= 200)
                 {
                     if (UserWantsToCancelSafeWaitWindow())
                     {
@@ -595,6 +622,17 @@ BOOL CFilesWindow::ReadDirectory(HWND parent, BOOL isRefresh)
                 }
 
             ADD_ITEM: // to add ".."
+
+                // Reserve one record for a synthesized parent entry so that a
+                // capped listing never traps the user in the displayed directory.
+                if (!isUpDir && Files->Count + Dirs->Count >= DIRECTORY_ENUMERATION_MAX_CACHED_ITEMS - 1)
+                {
+                    // Stop at the metadata budget instead of retaining an
+                    // unbounded directory-sized cache on a slow or huge share.
+                    directoryEnumerationLimitReached = TRUE;
+                    testFindNextErr = FALSE;
+                    break;
+                }
 
                 //--- name
                 file.Name = FileNamesArena.AllocString(st, len); // allocation from arena
@@ -1075,7 +1113,9 @@ BOOL CFilesWindow::ReadDirectory(HWND parent, BOOL isRefresh)
 
         SetCurrentDirectoryToSystem();
 
-        if (Files->Count + Dirs->Count == 0)
+        if (directoryEnumerationLimitReached)
+            StatusLine->SetText(LoadStr(IDS_DIRECTORYENUMERATIONLIMIT));
+        else if (Files->Count + Dirs->Count == 0)
             StatusLine->SetText(LoadStr(IDS_NOFILESFOUND));
 
         // sorting of Files and Dirs according to the current sorting method

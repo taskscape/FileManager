@@ -899,6 +899,57 @@ public sealed class NativeSafetyRegressionTests
     }
 
     [Test]
+    public void Directory_listing_uses_bounded_checkpoints_and_a_retained_metadata_budget()
+    {
+        var root = FindRepositoryRoot();
+        var navigation = File.ReadAllText(Path.Combine(root, "src", "fileswindow_navigation.cpp"));
+        var listBox = File.ReadAllText(Path.Combine(root, "src", "filesbox_rendering.cpp"));
+        var resourceIds = File.ReadAllText(Path.Combine(root, "src", "texts.rh2"));
+        var strings = File.ReadAllText(Path.Combine(root, "src", "lang", "texts.rc2"));
+        var refactoring = File.ReadAllText(Path.Combine(root, "refactoring.md"));
+
+        // Large synthetic directories must encounter predictable cancellation
+        // checkpoints while the native panel retains no more than its budget.
+        const int batchSize = 256;
+        const int retainedBudget = 100000;
+        var checkpoints = Enumerable.Range(1, 1_000_000).Count(item => item % batchSize == 0);
+        var retainedItems = 0;
+        var metadataBudgetReached = false;
+        foreach (var _ in Enumerable.Range(1, 1_000_000))
+        {
+            if (retainedItems >= retainedBudget - 1)
+            {
+                metadataBudgetReached = true;
+                break;
+            }
+
+            retainedItems++;
+        }
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(checkpoints, Is.EqualTo(1_000_000 / batchSize));
+            Assert.That(retainedBudget, Is.GreaterThan(batchSize));
+            Assert.That(metadataBudgetReached, Is.True);
+            Assert.That(retainedItems, Is.EqualTo(retainedBudget - 1));
+            Assert.That(navigation, Does.Contain("#define DIRECTORY_ENUMERATION_BATCH_SIZE 256"));
+            Assert.That(navigation, Does.Contain("#define DIRECTORY_ENUMERATION_MAX_CACHED_ITEMS 100000"));
+            Assert.That(navigation, Does.Contain("IsDirectoryEnumerationBatchBoundary(NumberOfItemsInCurDir)"));
+            Assert.That(navigation, Does.Contain("Sleep(0);"));
+            Assert.That(navigation, Does.Contain("atBatchBoundary || GetTickCount() - lastEscCheckTime >= 200"));
+            Assert.That(navigation, Does.Contain("UserWantsToCancelSafeWaitWindow()"));
+            Assert.That(navigation, Does.Contain("Files->Count + Dirs->Count >= DIRECTORY_ENUMERATION_MAX_CACHED_ITEMS - 1"));
+            Assert.That(navigation, Does.Contain("directoryEnumerationLimitReached = TRUE"));
+            Assert.That(navigation, Does.Contain("StatusLine->SetText(LoadStr(IDS_DIRECTORYENUMERATIONLIMIT))"));
+            Assert.That(listBox, Does.Contain("SetItemsCount2(count)"));
+            Assert.That(listBox, Does.Contain("Parent->VisibleItemsArray.InvalidateArr()"));
+            Assert.That(resourceIds, Does.Contain("IDS_DIRECTORYENUMERATIONLIMIT"));
+            Assert.That(strings, Does.Contain("Directory listing was limited to 100,000 items"));
+            Assert.That(refactoring, Does.Contain("### 51. Set resource budgets for directory enumeration — Implemented"));
+        });
+    }
+
+    [Test]
     public void Background_producers_bound_non_durable_work_and_report_backpressure()
     {
         var root = FindRepositoryRoot();

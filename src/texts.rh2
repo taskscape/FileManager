@@ -2711,6 +2711,9 @@
 // shutdown: wait window: Closing Find windows, please wait...
 #define IDS_CLOSINGFINDWINDOWS          14195
 
+// Directory listing retained only the bounded, currently usable metadata cache.
+#define IDS_DIRECTORYENUMERATIONLIMIT    14196
+
 //#define CM_TEXTS_MAX                  18000    // maximal texts id
 
 #endif // __TEXTS_RH2

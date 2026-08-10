@@ -1104,6 +1104,7 @@ STRINGTABLE
 
  IDS_READDIRTERMINATED, "If you want to cancel listing (the list of files and directories will be incomplete), press the Yes button. If you want to continue with listing and temporarily suppress use of automatic refresh for current path, press the No button. If you want to continue with listing, press the Cancel button."
  IDS_READINGPATHESC, "Listing path ""%s"", press the ESC key to cancel..."
+ IDS_DIRECTORYENUMERATIONLIMIT, "Directory listing was limited to 100,000 items to keep the panel responsive. Refine the path or filter to see additional items."
 
 // ViewWith, EditWith:
  IDS_VIEWWITH_EXTERNAL, "External Viewer [%s]"
