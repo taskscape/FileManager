@@ -1,0 +1,6 @@
+<!-- Fluent Color Essentials: the desktop stays front-facing with a single blue content plane. -->
+<svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+<rect x="2" y="2.5" width="12" height="8.5" rx="1.5" fill="white" stroke="#616161" stroke-width="1.5"/>
+<rect x="4" y="4.5" width="8" height="4.5" rx="0.5" fill="#DDEBF7"/>
+<path d="M8 11V13.5M5.5 13.5H10.5" stroke="#0F6CBD" stroke-width="1.5" stroke-linecap="round"/>
+</svg>

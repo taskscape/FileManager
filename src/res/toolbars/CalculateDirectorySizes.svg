@@ -1,8 +1,9 @@
+<!-- Fluent Color Essentials: restrained semantic color and rounded geometry stay legible at 16 px. -->
 <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-<rect x="3.5" y="1.5" width="9" height="13" rx="1" fill="#E1E1E1" stroke="#666" stroke-width="1"/>
-<path d="M5 3.5H11" stroke="#333" stroke-width="2" stroke-linecap="round"/>
-<rect x="5" y="7" width="2" height="2" fill="#999999"/>
-<rect x="9" y="7" width="2" height="2" fill="#999999"/>
-<rect x="5" y="10" width="2" height="2" fill="#999999"/>
-<rect x="9" y="10" width="2" height="2" fill="#FCD164"/>
+<rect x="3.5" y="1.5" width="9" height="13" rx="1" fill="#F3F2F1" stroke="#616161" stroke-width="1"/>
+<path d="M5 3.5H11" stroke="#424242" stroke-width="2" stroke-linecap="round"/>
+<rect x="5" y="7" width="2" height="2" fill="#616161"/>
+<rect x="9" y="7" width="2" height="2" fill="#616161"/>
+<rect x="5" y="10" width="2" height="2" fill="#616161"/>
+<rect x="9" y="10" width="2" height="2" fill="#FFD666"/>
 </svg>

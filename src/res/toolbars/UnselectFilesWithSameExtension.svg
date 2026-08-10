@@ -1,0 +1,6 @@
+<!-- Fluent Color Essentials: matched file endings use a blue minus without destructive red. -->
+<svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+<path d="M2.5 2.5H7.5L9.5 4.5V12.5H2.5V2.5Z" fill="white" stroke="#616161"/>
+<path d="M7.5 2.5V4.5H9.5" stroke="#616161"/>
+<path d="M4 10H8M10.5 9.5H14" stroke="#0F6CBD" stroke-width="1.5" stroke-linecap="round"/>
+</svg>

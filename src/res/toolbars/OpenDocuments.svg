@@ -1,0 +1,6 @@
+<!-- Fluent Color Essentials: a white page with blue content preserves the familiar Documents metaphor. -->
+<svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+<path d="M3 2.5H9.5L13 6V13.5H3V2.5Z" fill="white" stroke="#616161" stroke-width="1.5" stroke-linejoin="round"/>
+<path d="M9.5 2.5V6H13" stroke="#616161" stroke-linejoin="round"/>
+<path d="M5 8.5H11M5 11H10" stroke="#0F6CBD" stroke-width="1.5" stroke-linecap="round"/>
+</svg>

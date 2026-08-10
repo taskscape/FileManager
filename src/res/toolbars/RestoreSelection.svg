@@ -1,0 +1,5 @@
+<!-- Fluent Color Essentials: refresh motion around a marquee distinguishes restore from load. -->
+<svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+<rect x="3" y="4" width="8" height="8" rx="1" stroke="#616161" stroke-dasharray="2 1.5"/>
+<path d="M12.8 6.2A5.5 5.5 0 1 0 13 10M12.8 6.2V3.5M12.8 6.2H10.2" stroke="#0F6CBD" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

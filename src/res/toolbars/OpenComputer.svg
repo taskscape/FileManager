@@ -1,0 +1,7 @@
+<!-- Fluent Color Essentials: a neutral computer silhouette receives one Windows-blue detail. -->
+<svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+<rect x="2" y="2.5" width="9" height="7" rx="1.25" fill="white" stroke="#616161" stroke-width="1.5"/>
+<path d="M6.5 9.5V12M4.5 12H8.5" stroke="#616161" stroke-width="1.5" stroke-linecap="round"/>
+<rect x="10" y="6" width="4" height="7.5" rx="1" fill="#DDEBF7" stroke="#0F6CBD"/>
+<circle cx="12" cy="11.5" r="0.6" fill="#0F6CBD"/>
+</svg>

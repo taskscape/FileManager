@@ -1,0 +1,5 @@
+<!-- Fluent Color Essentials: typography is the essential metaphor, kept to two clear letterforms. -->
+<svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+<path d="M2.5 13L6.5 3L10.5 13M4 9.5H9" stroke="#424242" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M10 8.5C10.7 7.8 13.5 7.8 13.5 10V13M13.5 10.5C11 10 10 10.8 10 12C10 13.5 12.5 13.5 13.5 12" stroke="#0F6CBD" stroke-width="1.25" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>
