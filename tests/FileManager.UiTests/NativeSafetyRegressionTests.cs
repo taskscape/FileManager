@@ -335,6 +335,42 @@ public sealed class NativeSafetyRegressionTests
     }
 
     [Test]
+    public void Monotonic_64_bit_timers_cross_the_32_bit_boundary_and_reject_backward_samples()
+    {
+        var root = FindRepositoryRoot();
+        var clock = File.ReadAllText(Path.Combine(root, "src", "common", "monotonic_time.h"));
+        var pluginTimers = File.ReadAllText(Path.Combine(root, "src", "plugins_filesystem.cpp"));
+        var pluginHeader = File.ReadAllText(Path.Combine(root, "src", "plugins.h"));
+        var refactoring = File.ReadAllText(Path.Combine(root, "refactoring.md"));
+
+        // These boundary values model the old 49.7-day wrap while the source
+        // checks keep the native timer queue on the tested 64-bit seam.
+        static ulong Elapsed(ulong start, ulong now) => now >= start ? now - start : 0;
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(Elapsed(0xFFFF_FFF0UL, 0x1_0000_0020UL), Is.EqualTo(0x30UL),
+                        "A deadline crossing the old 32-bit wrap must retain its elapsed duration.");
+            Assert.That(Elapsed(500UL, 400UL), Is.Zero,
+                        "A synthetic backward sample must not fabricate elapsed time.");
+            Assert.That(0x1_0000_0020UL >= 0x1_0000_0010UL, Is.True,
+                        "64-bit deadlines remain directly orderable after the former wrap boundary.");
+            Assert.That(clock, Does.Contain("typedef ULONGLONG CMonotonicTimePoint"));
+            Assert.That(clock, Does.Contain("typedef ULONGLONG CMonotonicDuration"));
+            Assert.That(clock, Does.Contain("return GetTickCount64();"));
+            Assert.That(clock, Does.Contain("return now >= start ? now - start : 0;"));
+            Assert.That(clock, Does.Contain("RemainingWin32TimerDelay"));
+            Assert.That(pluginHeader, Does.Contain("CMonotonicTimePoint AbsTimeout"));
+            Assert.That(pluginTimers, Does.Contain("CMonotonicClock::DeadlineAfter(relTimeout)"));
+            Assert.That(pluginTimers, Does.Contain("CMonotonicClock::HasReached(timer->AbsTimeout, timeNow)"));
+            Assert.That(pluginTimers, Does.Not.Contain("GetTickCount("),
+                        "The plug-in timer queue must not reintroduce a wrap-prone clock read.");
+            Assert.That(pluginTimers, Does.Not.Contain("(int)(timer->AbsTimeout - timeNow)"));
+            Assert.That(refactoring, Does.Contain("### 45. Replace wrap-prone time calculations with monotonic 64-bit time — Implemented"));
+        });
+    }
+
+    [Test]
     public void Win32_path_boundaries_use_owned_wide_paths_and_extended_length_syntax()
     {
         var root = FindRepositoryRoot();

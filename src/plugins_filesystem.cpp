@@ -234,26 +234,20 @@ void CPlugins::SetShowInChDrv(int index, BOOL showInChDrv)
         plugin->ChDrvMenuFSItemVisible = showInChDrv;
 }
 
-int CPlugins::FindIndexForNewPluginFSTimer(DWORD timeoutAbs)
+int CPlugins::FindIndexForNewPluginFSTimer(CMonotonicTimePoint timeoutAbs)
 {
     if (PluginFSTimers.Count == 0)
         return 0;
 
-    // all times must refer to the nearest timeout, because only then
-    // can we sort timeouts that exceed 0xFFFFFFFF
-    DWORD timeoutAbsBase = PluginFSTimers[0]->AbsTimeout;
-    if ((int)(timeoutAbs - timeoutAbsBase) < 0)
-        timeoutAbsBase = timeoutAbs;
-    timeoutAbs -= timeoutAbsBase;
-
+    // 64-bit monotonic deadlines sort directly; no wrap-relative base is needed.
     int l = 0, r = PluginFSTimers.Count - 1, m;
     while (1)
     {
         m = (l + r) / 2;
-        DWORD actTimeoutAbs = PluginFSTimers[m]->AbsTimeout - timeoutAbsBase;
+        CMonotonicTimePoint actTimeoutAbs = PluginFSTimers[m]->AbsTimeout;
         if (actTimeoutAbs == timeoutAbs)
         {
-            while (++m < PluginFSTimers.Count && PluginFSTimers[m]->AbsTimeout - timeoutAbsBase == timeoutAbs)
+            while (++m < PluginFSTimers.Count && PluginFSTimers[m]->AbsTimeout == timeoutAbs)
                 ;     // return the index after the last identical timer
             return m; // found
         }
@@ -275,7 +269,8 @@ int CPlugins::FindIndexForNewPluginFSTimer(DWORD timeoutAbs)
 BOOL CPlugins::AddPluginFSTimer(DWORD relTimeout, CPluginFSInterfaceAbstract* timerOwner, DWORD timerParam)
 {
     BOOL ret = FALSE;
-    CPluginFSTimer* timer = new CPluginFSTimer(GetTickCount() + relTimeout, timerOwner, timerParam, TimerTimeCounter++);
+    // Keep plug-in callbacks ordered by a 64-bit deadline instead of wrapping tick arithmetic.
+    CPluginFSTimer* timer = new CPluginFSTimer(CMonotonicClock::DeadlineAfter(relTimeout), timerOwner, timerParam, TimerTimeCounter++);
     if (timer != NULL)
     {
         int index = FindIndexForNewPluginFSTimer(timer->AbsTimeout);
@@ -286,15 +281,14 @@ BOOL CPlugins::AddPluginFSTimer(DWORD relTimeout, CPluginFSInterfaceAbstract* ti
 
             if (index == 0) // the nearest timeout changed, adjust the Windows timer
             {
-                DWORD ti = timer->AbsTimeout - GetTickCount();
-                if ((int)ti > 0) // if the new timer hasn't already timed out (the difference can even be negative), adjust or start the Windows timer
+                DWORD ti = CMonotonicClock::RemainingWin32TimerDelay(timer->AbsTimeout, CMonotonicClock::Now());
+                if (ti > 0) // if the new timer has not already timed out, adjust or start the Windows timer
                 {
                     SetTimer(MainWindow->HWindow, IDT_PLUGINFSTIMERS, ti, NULL);
                 }
                 else
                 {
-                    if ((int)ti < 0)
-                        TRACE_E("CPlugins::AddPluginFSTimer(): expired timer was added (" << (int)ti << " ms)");
+                    TRACE_E("CPlugins::AddPluginFSTimer(): expired timer was added");
                     KillTimer(MainWindow->HWindow, IDT_PLUGINFSTIMERS);                // cancel any Windows timer, it's not needed
                     PostMessage(MainWindow->HWindow, WM_TIMER, IDT_PLUGINFSTIMERS, 0); // process the next timeout as soon as possible
                 }
@@ -331,8 +325,8 @@ int CPlugins::KillPluginFSTimer(CPluginFSInterfaceAbstract* timerOwner, BOOL all
     {
         if (PluginFSTimers.Count > 0)
         {
-            DWORD ti = PluginFSTimers[0]->AbsTimeout - GetTickCount();
-            if ((int)ti > 0) // if the new timer hasn't already timed out (the difference can even be negative), adjust or start the Windows timer
+            DWORD ti = CMonotonicClock::RemainingWin32TimerDelay(PluginFSTimers[0]->AbsTimeout, CMonotonicClock::Now());
+            if (ti > 0) // if the new timer has not already timed out, adjust or start the Windows timer
             {
                 SetTimer(MainWindow->HWindow, IDT_PLUGINFSTIMERS, ti, NULL);
             }
@@ -359,13 +353,13 @@ void CPlugins::HandlePluginFSTimers()
     {
         StopTimerHandlerRecursion = TRUE;
         DWORD startTimerTimeCounter = TimerTimeCounter;
-        DWORD timeNow = GetTickCount();
+        CMonotonicTimePoint timeNow = CMonotonicClock::Now();
 
         int i;
         for (i = 0; i < PluginFSTimers.Count; i++)
         {
             CPluginFSTimer* timer = PluginFSTimers[i];
-            if ((int)(timer->AbsTimeout - timeNow) <= 0 &&     // the timer timed out
+            if (CMonotonicClock::HasReached(timer->AbsTimeout, timeNow) && // the timer timed out
                 timer->TimerAddedTime < startTimerTimeCounter) // it's an "old" timer (to prevent an infinite loop, we block newly added timers)
             {
                 PluginFSTimers.Detach(i--); // detach the timer from the array (its timeout occurred = it's "handled")
@@ -410,8 +404,8 @@ void CPlugins::HandlePluginFSTimers()
 
         if (PluginFSTimers.Count > 0)
         {
-            DWORD ti = PluginFSTimers[0]->AbsTimeout - GetTickCount();
-            if ((int)ti > 0) // if the new timer hasn't already timed out (the difference can even be negative), adjust or start the Windows timer
+            DWORD ti = CMonotonicClock::RemainingWin32TimerDelay(PluginFSTimers[0]->AbsTimeout, CMonotonicClock::Now());
+            if (ti > 0) // if the new timer has not already timed out, adjust or start the Windows timer
                 SetTimer(MainWindow->HWindow, IDT_PLUGINFSTIMERS, ti, NULL);
             else
                 PostMessage(MainWindow->HWindow, WM_TIMER, IDT_PLUGINFSTIMERS, 0); // process the next timeout as soon as possible
