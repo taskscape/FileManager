@@ -37,7 +37,7 @@ This document is the working record for a read-only stability and resilience aud
 15. **Release dependency acquisition is weakly verified.** The OpenSSL archive is accepted after a ZIP-magic check rather than a pinned cryptographic digest or signature.
 16. **Release signing is not implemented in the repository workflow.** `tools/codesign/sign_with_retry.cmd` is a placeholder, and the installer script does not define signing steps.
 17. **Installer staging can select stale or mismatched binaries.** `tools/prepare_installer.ps1` recursively falls back to the first matching output and suppresses some errors.
-18. **Several bundled libraries are substantially old.** Reviewed versions include OpenSSL 1.0.2u, bzip2 1.0.6, SQLite 3.28.0, zlib 1.2.11, 7-Zip 16.04, and cmark-gfm 0.29.0.gfm.0.
+18. **Several bundled libraries are substantially old.** Reviewed versions include OpenSSL 1.0.2u, bzip2 1.0.6, SQLite 3.28.0, zlib 1.2.11, and cmark-gfm 0.29.0.gfm.0. 7-Zip is now 26.02.
 19. **Compiler hardening and static-analysis lanes are limited.** The common project properties use warning level 3 and disable secure-CRT warnings; no repository CI lane for ASan, CodeQL, clang-cl, or `/analyze` was found.
 20. **The safety net remains shallow for the product's highest-risk behavior.** Executable UI coverage now exercises normal, cancelled, and deliberately blocked create/copy/rename/move/delete operations, but there are no native characterization tests, parser fuzzers, disk-full fault tests, crash-consistency tests, or automated copy/move/delete recovery scenarios.
 
@@ -409,10 +409,14 @@ This document is the working record for a read-only stability and resilience aud
 - **Implementation (2026-08-10):** FTPS exceptions now use a bounded, synchronized plug-in store. Each decision records the case-insensitive hostname, control port, SHA-256 SPKI and leaf-certificate fingerprints, explicit session or remembered scope, and expiry. The dialog defaults to an eight-hour session exception; the new opt-in “Remember” checkbox persists a 30-day exception in the FTP profile immediately. A reused exception requires the exact host, port, SPKI, certificate fingerprint, and unexpired lifetime. An endpoint record with a changed or renewed certificate is logged as changed and falls back to the warning dialog; ordinary Windows chain and hostname validation still runs before any exception lookup.
 - **Verification:** `NativeSafetyRegressionTests.Ftp_certificate_exceptions_are_endpoint_bound_expiring_and_pinned` guards endpoint matching, fingerprint dual-pinning, scope/expiry persistence, chain-failure exception routing, renewed-certificate warning, and the implementation ledger. `SChannelTlsIntegrationTests` continues to verify that a self-signed chain fails without an explicit exception.
 
-### 61. Upgrade the bundled 7-Zip code
+### 61. Upgrade the bundled 7-Zip code — In progress
 
 - **Justification:** The vendored 7-Zip version is 16.04, leaving years of parser, format, and robustness fixes unapplied in a component that handles untrusted archives.
 - **Proposed solution:** Move through supported releases with corpus differential tests, fuzz regression cases, and extraction compatibility snapshots before enabling the new version by default.
+
+- **Implementation (2026-08-10):** Replaced the patched 16.04 source tree with upstream 7-Zip 26.02 and updated `7za.dll` plus the crash-report `7zwrapper` to current dependencies and COM conventions. `src/plugins/7zip/doc/upgrade-26.02.md` pins the upstream artifact and records the mandatory corpus, fuzz, and extraction-snapshot gate for subsequent upgrades.
+- **Remaining work:** Port the in-process `7zip.spl` callback and retryable-stream adapters from the 16.04 COM/file-stream API before enabling 26.02 as the product default.
+- **Verification:** `NativeSafetyRegressionTests.Bundled_7zip_uses_26_02_and_preserves_upgrade_compatibility_contract` guards the version, source-integrity record, compatibility seams, and build inputs. Debug x64 builds of `7za.dll` and `7zwrapper` succeed with Visual Studio 2026; the aggregate 7-Zip plug-in build remains the porting gate.
 
 ### 62. Upgrade SQLite and define database recovery behavior
 

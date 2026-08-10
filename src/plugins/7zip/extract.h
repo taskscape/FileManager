@@ -34,25 +34,12 @@ class CExtractCallbackImp : public IArchiveExtractCallback,
                             public CMyUnknownImp
 {
 public:
-    MY_UNKNOWN_IMP1(ICryptoGetTextPassword)
+    // Keep callback ABI declarations generated from the 26.02 interfaces, including inherited IProgress.
+    Z7_IFACES_IMP_UNK_2(IArchiveExtractCallback,
+                        ICryptoGetTextPassword)
+    Z7_IFACE_COM7_IMP(IProgress)
 
-    // IProgress
-    STDMETHOD(SetTotal)
-    (UINT64 size);
-    STDMETHOD(SetCompleted)
-    (const UINT64* completeValue);
-
-    // IExtractCallback200
-    STDMETHOD(GetStream)
-    (UINT32 index, ISequentialOutStream** outStream, INT32 askExtractMode);
-    STDMETHOD(PrepareOperation)
-    (INT32 askExtractMode);
-    STDMETHOD(SetOperationResult)
-    (INT32 resultEOperationResult);
-
-    // ICryptoGetTextPassword
-    STDMETHOD(CryptoGetTextPassword)
-    (BSTR* password);
+public:
 
 private:
     CQuadWord Total;

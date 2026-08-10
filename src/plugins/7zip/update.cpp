@@ -54,11 +54,6 @@ STDMETHODIMP CArchiveUpdateCallback::SetCompleted(const UInt64* completeValue)
     return S_OK;
 }
 
-STDMETHODIMP CArchiveUpdateCallback::EnumProperties(IEnumSTATPROPSTG** enumerator)
-{
-    return E_NOTIMPL;
-}
-
 STDMETHODIMP CArchiveUpdateCallback::GetUpdateItemInfo(UInt32 index,
                                                        Int32* newData, Int32* newProperties, UInt32* indexInArchive)
 {

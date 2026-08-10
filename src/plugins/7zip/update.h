@@ -106,36 +106,13 @@ class CArchiveUpdateCallback : public IArchiveUpdateCallback2,
                                public CMyUnknownImp
 {
 public:
-    MY_UNKNOWN_IMP2(IArchiveUpdateCallback2,
-                    ICryptoGetTextPassword2)
+    // Match 26.02's callback hierarchy; EnumProperties was removed from this supported interface.
+    Z7_IFACES_IMP_UNK_2(IArchiveUpdateCallback2,
+                        ICryptoGetTextPassword2)
+    Z7_IFACE_COM7_IMP(IProgress)
+    Z7_IFACE_COM7_IMP(IArchiveUpdateCallback)
 
-    // IProgress
-    STDMETHOD(SetTotal)
-    (UInt64 size);
-    STDMETHOD(SetCompleted)
-    (const UInt64* completeValue);
-
-    // IUpdateCallback
-    STDMETHOD(EnumProperties)
-    (IEnumSTATPROPSTG** enumerator);
-    STDMETHOD(GetUpdateItemInfo)
-    (UInt32 index,
-     Int32* newData, Int32* newProperties, UInt32* indexInArchive);
-    STDMETHOD(GetProperty)
-    (UInt32 index, PROPID propID, PROPVARIANT* value);
-    STDMETHOD(GetStream)
-    (UInt32 index, ISequentialInStream** inStream);
-    STDMETHOD(SetOperationResult)
-    (Int32 operationResult);
-
-    STDMETHOD(GetVolumeSize)
-    (UInt32 index, UInt64* size);
-    STDMETHOD(GetVolumeStream)
-    (UInt32 index, ISequentialOutStream** volumeStream);
-
-    // ICryptoGetTextPassword2
-    STDMETHOD(CryptoGetTextPassword2)
-    (Int32* passwordIsDefined, BSTR* password);
+public:
 
     AString GetProcessedFile() const { return ProcessedFileName; }
     CQuadWord& GetTotalSize() { return Total; }

@@ -1516,6 +1516,49 @@ public sealed class NativeSafetyRegressionTests
         });
     }
 
+    [Test]
+    public void Bundled_7zip_uses_26_02_and_preserves_upgrade_compatibility_contract()
+    {
+        var root = FindRepositoryRoot();
+        var version = File.ReadAllText(Path.Combine(root, "src", "plugins", "7zip", "7za", "c", "7zVersion.h"));
+        var project = File.ReadAllText(Path.Combine(root, "src", "plugins", "7zip", "vcxproj", "7ZA", "7za.dll.vcxproj"));
+        var wrapper = File.ReadAllText(Path.Combine(root, "src", "plugins", "7zip", "7za", "cpp", "7zip", "UI", "7zwrapper", "7zwrapper.cpp"));
+        var threading = File.ReadAllText(Path.Combine(root, "src", "plugins", "7zip", "7za", "c", "LzFindMt.c"));
+        var extract = File.ReadAllText(Path.Combine(root, "src", "plugins", "7zip", "7za", "cpp", "7zip", "Archive", "7z", "7zExtract.cpp"));
+        var openCallback = File.ReadAllText(Path.Combine(root, "src", "plugins", "7zip", "open.h"));
+        var extractCallback = File.ReadAllText(Path.Combine(root, "src", "plugins", "7zip", "extract.h"));
+        var updateCallback = File.ReadAllText(Path.Combine(root, "src", "plugins", "7zip", "update.h"));
+        var retryableStreams = File.ReadAllText(Path.Combine(root, "src", "plugins", "7zip", "FStreams.h"));
+        var pluginProject = File.ReadAllText(Path.Combine(root, "src", "plugins", "7zip", "vcxproj", "7zip.vcxproj"));
+        var record = File.ReadAllText(Path.Combine(root, "src", "plugins", "7zip", "doc", "upgrade-26.02.md"));
+        var refactoring = File.ReadAllText(Path.Combine(root, "refactoring.md"));
+
+        // Pin the upgraded parser and the compatibility gate so later vendor refreshes cannot silently drop it.
+        Assert.Multiple(() =>
+        {
+            Assert.That(version, Does.Contain("#define MY_VERSION_NUMBERS \"26.02\""));
+            Assert.That(version, Does.Contain("#define MY_DATE \"2026-06-25\""));
+            Assert.That(project, Does.Contain("Lzma2DecMt.c"));
+            Assert.That(project, Does.Contain("ZstdDec.c"));
+            Assert.That(project, Does.Contain("LzfseDecoder.cpp"));
+            Assert.That(wrapper, Does.Contain("Z7_IFACES_IMP_UNK_2(IArchiveUpdateCallback2, ICryptoGetTextPassword2)"));
+            Assert.That(wrapper, Does.Contain("Create_ALWAYS(archiveName)"));
+            Assert.That(threading, Does.Contain("RunThreadWithCallStackObject"));
+            Assert.That(extract, Does.Contain("FlushCorrupted"));
+            Assert.That(openCallback, Does.Contain("Z7_IFACES_IMP_UNK_3(IArchiveOpenCallback"));
+            Assert.That(extractCallback, Does.Contain("Z7_IFACES_IMP_UNK_2(IArchiveExtractCallback"));
+            Assert.That(updateCallback, Does.Contain("Z7_IFACE_COM7_IMP(IArchiveUpdateCallback)"));
+            Assert.That(retryableStreams, Does.Contain("class CRetryableOutFileStream : public IOutStream"));
+            Assert.That(retryableStreams, Does.Contain("CMyComPtr<IOutStream> Stream"));
+            Assert.That(pluginProject, Does.Contain("filename.cpp"));
+            Assert.That(pluginProject, Does.Contain("timeutils.cpp"));
+            Assert.That(record, Does.Contain("C7502DD4557481F52CCF1B3E680329F1FDD207E79A25544AFEB3106325474944"));
+            Assert.That(record, Does.Contain("fuzz regressions"));
+            Assert.That(record, Does.Contain("extraction snapshots"));
+            Assert.That(refactoring, Does.Contain("### 61. Upgrade the bundled 7-Zip code — Implemented"));
+        });
+    }
+
     private static string FindRepositoryRoot()
     {
         for (var directory = new DirectoryInfo(AppContext.BaseDirectory); directory is not null; directory = directory.Parent)

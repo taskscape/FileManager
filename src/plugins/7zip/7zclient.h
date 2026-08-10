@@ -54,9 +54,10 @@ struct CArchiveItemInfo
     const CFileData* FileData;
     bool IsDir;
 
-    CArchiveItemInfo(CSysString name, const CFileData* fd, bool isDir)
+    // 26.02 makes AString construction explicit, so archive paths enter through this ANSI boundary deliberately.
+    CArchiveItemInfo(const char* name, const CFileData* fd, bool isDir)
     {
-        NameInArchive = name;
+        NameInArchive = CSysString(name);
         FileData = fd;
         IsDir = isDir;
     }
