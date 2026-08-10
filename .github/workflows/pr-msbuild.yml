@@ -94,6 +94,10 @@ jobs:
         if: matrix.platform == 'x64'
         run: .\tools\test-zlib-compatibility.ps1
 
+      - name: Exercise bzip2 golden archives, truncation, and fuzz corpus
+        if: matrix.platform == 'x64'
+        run: .\tools\test-bzip2-compatibility.ps1
+
       - name: Exercise cmark-gfm snapshots, limits, and extension fuzz combinations
         if: matrix.platform == 'x64'
         run: .\tools\test-cmark-gfm-hardening.ps1

@@ -104,6 +104,43 @@ public sealed class NativeSafetyRegressionTests
     }
 
     [Test]
+    public void Bundled_bzip2_uses_the_verified_release_and_replays_archive_parser_regressions()
+    {
+        var root = FindRepositoryRoot();
+        var vendorRecord = File.ReadAllText(Path.Combine(root, "src", "common", "dep", "bzip2", "VENDOR.md"));
+        var header = File.ReadAllText(Path.Combine(root, "src", "common", "dep", "bzip2", "bzlib.h"));
+        var decoder = File.ReadAllText(Path.Combine(root, "src", "common", "dep", "bzip2", "decompress.c"));
+        var project = File.ReadAllText(Path.Combine(root, "src", "vcxproj", "salamand.vcxproj"));
+        var adapter = File.ReadAllText(Path.Combine(root, "src", "salbzip2.cpp"));
+        var probe = File.ReadAllText(Path.Combine(root, "tools", "bzip2_compatibility_probe.c"));
+        var harness = File.ReadAllText(Path.Combine(root, "tools", "test-bzip2-compatibility.ps1"));
+        var workflow = File.ReadAllText(Path.Combine(root, ".github", "workflows", "pr-msbuild.yml"));
+        var refactoring = File.ReadAllText(Path.Combine(root, "refactoring.md"));
+
+        // Pin the vendor identity, streaming adapter, retained corpus, and CI gate as one parser boundary.
+        Assert.Multiple(() =>
+        {
+            Assert.That(header, Does.Contain("bzip2/libbzip2 version 1.0.8 of 13 July 2019"));
+            Assert.That(decoder, Does.Contain("if (groupNo >= nSelectors)"));
+            Assert.That(vendorRecord, Does.Contain("083f5e675d73f3233c7930ebe20425a533feedeaaa9d8cc86831312a6581cefbe6ed0d08d2fa89be81082f2a5abdabca8b3c080bf97218a1bd59dc118a30b9f3"));
+            Assert.That(vendorRecord, Does.Contain("every calendar quarter"));
+            Assert.That(project, Does.Contain("<DisableSpecificWarnings>4244;%(DisableSpecificWarnings)</DisableSpecificWarnings>"));
+            Assert.That(adapter, Does.Contain("BZ2_bzDecompress(strm)"));
+            Assert.That(adapter, Does.Contain("buffer ownership and result contract"));
+            Assert.That(probe, Does.Contain("1.0.8, 13-Jul-2019"));
+            Assert.That(probe, Does.Contain("BZ_STREAM_END"));
+            Assert.That(File.Exists(Path.Combine(root, "tests", "bzip2-vectors", "golden-stream.hex")), Is.True);
+            Assert.That(File.Exists(Path.Combine(root, "tests", "bzip2-vectors", "legacy-stream.hex")), Is.True);
+            Assert.That(File.Exists(Path.Combine(root, "tests", "bzip2-vectors", "truncated-stream.hex")), Is.True);
+            Assert.That(Directory.GetFiles(Path.Combine(root, "tests", "bzip2-vectors", "fuzz"), "*.hex").Length, Is.GreaterThanOrEqualTo(5));
+            Assert.That(harness, Does.Contain("/DBZ_NO_STDIO"));
+            Assert.That(harness, Does.Contain("Get-ChildItem -LiteralPath (Join-Path $fixtureDirectory 'fuzz')"));
+            Assert.That(workflow, Does.Contain("test-bzip2-compatibility.ps1"));
+            Assert.That(refactoring, Does.Contain("### 64. Upgrade bzip2 — Implemented"));
+        });
+    }
+
+    [Test]
     public void Trust_boundary_text_uses_bounded_owned_storage_and_explicit_capacity_failures()
     {
         var root = FindRepositoryRoot();

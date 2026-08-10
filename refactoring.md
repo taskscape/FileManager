@@ -433,10 +433,13 @@ This document is the working record for a read-only stability and resilience aud
   retained 1.2.11 vector. It also proves that the truncated, bad-checksum, and
   invalid-deflate regression fixtures are rejected, and runs in pull-request CI.
 
-### 64. Upgrade bzip2
+### 64. Upgrade bzip2 — Implemented
 
 - **Justification:** Vendored bzip2 1.0.6 dates from 2010 (`src/common/dep/bzip2/decompress.c:11`), increasing maintenance and parser risk.
 - **Proposed solution:** Update to the current maintained release or replace it behind the archive adapter, then run golden archives, truncation cases, and fuzz corpus replay.
+
+- **Implementation (2026-08-10):** Replaced the `BZ_NO_STDIO` vendored library source with verified upstream bzip2 1.0.8. The existing `CSalamanderBZIP2Abstract` streaming adapter remains the only host integration boundary. `src/common/dep/bzip2/VENDOR.md` pins the upstream SHA-512, no-local-patch policy, and review cadence.
+- **Verification:** `tools/test-bzip2-compatibility.ps1` compiles the checked-in parser sources and uses its streaming API to decode two golden archives, reject a truncation fixture, and replay five malformed-input fuzz fixtures. The Debug x64 pull-request lane runs the probe, while `NativeSafetyRegressionTests.Bundled_bzip2_uses_the_verified_release_and_replays_archive_parser_regressions` prevents the version, vendor record, adapter, corpus, or CI hook from drifting.
 
 ### 65. Upgrade cmark-gfm and harden rendered-content defaults — Implemented
 
