@@ -3032,6 +3032,7 @@ void DoCopyFileLoopOrig(HANDLE& in, HANDLE& out, void* buffer, int& limitBufferS
             { // on SNAP server reading sometimes randomly fails with ERROR_NETNAME_DELETED; Retry button reportedly helps, so trigger it automatically
                 // Record the retry kind, but never the source path that caused it.
                 RecordReleaseDiagnosticRetry("copy_network_read");
+                script->RecordItemRetry(); // automatic retries need the same correlation history as dialog retries
                 Sleep(100);
                 goto RETRY_COPY;
             }
@@ -3610,6 +3611,7 @@ BOOL CCopy_Context::HandleReadingErr(int blkIndex, DWORD err, BOOL* copyError, B
         int ret = IDCANCEL;
         if (err == ERROR_NETNAME_DELETED && ++AutoRetryAttemptsSNAP <= 3)
         { // SNAP servers occasionally return ERROR_NETNAME_DELETED while reading; Retry button reportedly helps, so trigger it automatically
+            Script->RecordItemRetry(); // record a new correlated attempt even without a UI prompt
             Sleep(100);
             ret = IDRETRY;
         }
@@ -5962,6 +5964,7 @@ BOOL DoMoveFile(COperation* op, HWND hProgressDlg, void* buffer,
 
                     if (err == ERROR_SHARING_VIOLATION && ++autoRetryAttempts <= 2)
                     {               // auto-retry added to handle move errors while directory icons are being read (SHGetFileInfo running in parallel with MoveFile)
+                        script->RecordItemRetry(); // preserve the automatic retry in the journal and debug trace
                         Sleep(100); // wait a moment before the next attempt
                     }
                     else
@@ -6934,6 +6937,7 @@ BOOL DoDeleteDir(HWND hProgressDlg, COperation* operation, const CQuadWord& size
             { // add auto-retry to handle this case: I have directories 1\2\3, deleting 1 including subdirectories while 3 is shown in a panel (watching for changes) -> removing 2 reports "directory not empty" because 3 stays in a transitional state due to change notifications (it is deleted, so it cannot be listed, but it still exists on disk briefly; quite a mess)
                 //        TRACE_I("DoDeleteDir(): err: " << GetErrorText(err));
                 AutoRetryCounter++;
+                script->RecordItemRetry(); // distinguish this cleanup retry from a duplicate delete callback
                 Sleep(AutoRetryCounter * 100);
                 //        TRACE_I("DoDeleteDir(): " << AutoRetryCounter << ". retry, delay is " << AutoRetryCounter * 100 << "ms");
             }

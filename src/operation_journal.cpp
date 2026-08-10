@@ -273,7 +273,7 @@ BOOL WriteReconciliationReport(char* reportPath, int reportPathLen, TDirectArray
 }
 } // namespace
 
-COperationJournal::COperationJournal() : File(INVALID_HANDLE_VALUE), CurrentItem(-1) { Path[0] = 0; }
+COperationJournal::COperationJournal() : File(INVALID_HANDLE_VALUE), CurrentItem(-1), CurrentAttempt(0) { Path[0] = 0; }
 
 COperationJournal::~COperationJournal()
 {
@@ -309,8 +309,9 @@ BOOL COperationJournal::AppendGoldenMasterPlan(COperations& operations)
     if (!plan.Capture(operations))
         return FALSE;
 
-    char header[64];
-    _snprintf_s(header, _countof(header), _TRUNCATE, "PLAN|1|items=%d\r\n", plan.GetCount());
+    char header[128];
+    _snprintf_s(header, _countof(header), _TRUNCATE, "PLAN|1|operation=%s|items=%d\r\n",
+                plan.GetOperationId(), plan.GetCount());
     if (!Append(header))
         return FALSE;
 
@@ -343,8 +344,11 @@ BOOL COperationJournal::Begin(COperations& operations)
     File = HANDLES_Q(CreateFileUtf8(Path, GENERIC_WRITE, FILE_SHARE_READ, NULL, CREATE_NEW,
                                     FILE_ATTRIBUTE_NORMAL | FILE_FLAG_WRITE_THROUGH, NULL));
     if (File == INVALID_HANDLE_VALUE) return FALSE;
-    char line[128];
-    _snprintf_s(line, _countof(line), _TRUNCATE, "FORMAT|1\r\nOPERATION|planned|items=%d\r\n", operations.Count);
+    char line[160];
+    // Persist the ID independently of filenames so recovery matches an unfinished journal to diagnostics.
+    _snprintf_s(line, _countof(line), _TRUNCATE,
+                "FORMAT|1\r\nCORRELATION|operation=%s\r\nOPERATION|planned|items=%d\r\n",
+                operations.GetCorrelationId(), operations.Count);
     if (!Append(line) || !AppendGoldenMasterPlan(operations)) return FALSE;
     int i;
     for (i = 0; i < operations.Count; i++)
@@ -356,22 +360,39 @@ BOOL COperationJournal::Begin(COperations& operations)
         const char* target = operation->TargetName;
         char identity[80];
         GetPathIdentity(source, identity, _countof(identity));
-        char prefix[96];
+        char prefix[160];
+        char sequence[16];
         _snprintf_s(prefix, _countof(prefix), _TRUNCATE, "ITEM|%d|%s|", i, opcode);
+        _snprintf_s(sequence, _countof(sequence), _TRUNCATE, "%d", i);
         if (!Append(prefix) || !Append(source == NULL ? "" : source) || !Append("|") ||
-            !Append(target == NULL ? "" : target) || !Append("|") || !Append(identity) || !Append("|\r\n"))
+            !Append(target == NULL ? "" : target) || !Append("|") || !Append(identity) ||
+            !Append("|operation=") || !Append(operations.GetCorrelationId()) ||
+            !Append("|sequence=") || !Append(sequence) || !Append("|attempt=1\r\n"))
             return FALSE;
     }
     return TRUE;
 }
 
-BOOL COperationJournal::BeginItem(int itemIndex, const COperation* operation)
+BOOL COperationJournal::BeginItem(int itemIndex, const COperation* operation, int attempt)
 {
     if (OpcodeName(operation->Opcode) == NULL) return TRUE;
     CurrentItem = itemIndex;
-    char line[64];
-    _snprintf_s(line, _countof(line), _TRUNCATE, "STATE|%d|prepared\r\n", CurrentItem);
+    CurrentAttempt = attempt;
+    char line[96];
+    _snprintf_s(line, _countof(line), _TRUNCATE, "STATE|%d|prepared|attempt=%d\r\n", CurrentItem, CurrentAttempt);
     return Append(line);
+}
+
+void COperationJournal::RecordRetry(int attempt)
+{
+    if (CurrentItem >= 0)
+    {
+        CurrentAttempt = attempt;
+        char line[80];
+        // Retry history distinguishes another attempt from a duplicate callback after cancellation.
+        _snprintf_s(line, _countof(line), _TRUNCATE, "RETRY|%d|attempt=%d\r\n", CurrentItem, CurrentAttempt);
+        Append(line);
+    }
 }
 
 BOOL COperationJournal::SetTemporaryPath(const char* temporaryPath)
@@ -394,11 +415,12 @@ void COperationJournal::CompleteItem(BOOL succeeded)
 {
     if (CurrentItem >= 0)
     {
-        char line[80];
-        _snprintf_s(line, _countof(line), _TRUNCATE, "STATE|%d|%s\r\n", CurrentItem,
-                    succeeded ? "committed" : "failed");
+        char line[96];
+        _snprintf_s(line, _countof(line), _TRUNCATE, "STATE|%d|%s|attempt=%d\r\n", CurrentItem,
+                    succeeded ? "committed" : "failed", CurrentAttempt);
         Append(line);
         CurrentItem = -1;
+        CurrentAttempt = 0;
     }
 }
 

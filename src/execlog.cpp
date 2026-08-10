@@ -90,23 +90,36 @@ void ExecLogFileListingResult(const char* path, BOOL success, int fileCount, int
     ExecLogWrite(success, message);
 }
 
-void ExecLogFileOperationStart(const char* operation, const char* source, const char* target)
+void ExecLogFileOperationStart(const char* operationId, int itemSequence, int attempt,
+                               const char* operation, const char* source, const char* target)
 {
     char message[512];
+    // Every operation log line carries dispatch and retry context for interleaved workers.
     _snprintf_s(message, _TRUNCATE,
-                "op start: op=%s, source=%s, target=%s",
-                ExecLogSafeStr(operation), ExecLogSafeStr(source), ExecLogSafeStr(target));
+                "op start: operation=%s, item=%d, attempt=%d, op=%s, source=%s, target=%s",
+                ExecLogSafeStr(operationId), itemSequence, attempt, ExecLogSafeStr(operation),
+                ExecLogSafeStr(source), ExecLogSafeStr(target));
     ExecLogWrite(TRUE, message);
 }
 
-void ExecLogFileOperationResult(const char* operation, const char* source, const char* target, BOOL success)
+void ExecLogFileOperationResult(const char* operationId, int itemSequence, int attempt,
+                                const char* operation, const char* source, const char* target, BOOL success)
 {
     char message[512];
     _snprintf_s(message, _TRUNCATE,
-                "op result: op=%s, source=%s, target=%s, success=%d",
-                ExecLogSafeStr(operation), ExecLogSafeStr(source), ExecLogSafeStr(target),
-                success ? 1 : 0);
+                "op result: operation=%s, item=%d, attempt=%d, op=%s, source=%s, target=%s, success=%d",
+                ExecLogSafeStr(operationId), itemSequence, attempt, ExecLogSafeStr(operation),
+                ExecLogSafeStr(source), ExecLogSafeStr(target), success ? 1 : 0);
     ExecLogWrite(success, message);
+}
+
+void ExecLogFileOperationRetry(const char* operationId, int itemSequence, int attempt)
+{
+    char message[256];
+    _snprintf_s(message, _TRUNCATE,
+                "op retry: operation=%s, item=%d, attempt=%d",
+                ExecLogSafeStr(operationId), itemSequence, attempt);
+    ExecLogWrite(TRUE, message);
 }
 
 void ExecLogFeatureStart(const char* feature, const char* detail)

@@ -532,8 +532,9 @@ CProgressDialog::CProgressDialog(HWND parent, COperations* script, const char* c
     WorkerNotSuspended = NULL;
     OperationProgress = 0;
     SummaryProgress = 0;
-    strcpy(Caption, caption);
     Script = script;
+    // Keep the operation ID visible at the UI boundary where users resolve retries and cancellations.
+    _snprintf_s(Caption, _countof(Caption), _TRUNCATE, "%s [#%s]", caption, script->GetCorrelationId());
     AttrsData = attrsData;
     AcceptCommands = TRUE;
     CanClose = TRUE;
@@ -1058,6 +1059,11 @@ CProgressDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
             break;
         }
         }
+
+        // The response is synchronous with the worker, making this the single
+        // place to count every user-approved retry across operation dialogs.
+        if (wParam != 5 && Script != NULL && *(int*)data[0] == IDRETRY)
+            Script->RecordItemRetry();
 
         StatusPaused = FALSE; // now time-left and speed can be displayed again
 

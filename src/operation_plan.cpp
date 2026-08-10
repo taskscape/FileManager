@@ -85,12 +85,16 @@ BOOL COperationPlanItem::IsGood() const
 
 COperationPlan::COperationPlan() : Items(16, 16)
 {
+    OperationId[0] = 0;
 }
 
 BOOL COperationPlan::Capture(COperations& operations)
 {
     if (Items.Count != 0)
         return FALSE; // snapshots are immutable once exposed to the execution boundary
+
+    // Capture the command-dispatch ID before copying items and releasing the live script.
+    lstrcpyn(OperationId, operations.GetCorrelationId(), _countof(OperationId));
 
     for (int index = 0; index < operations.Count; ++index)
     {

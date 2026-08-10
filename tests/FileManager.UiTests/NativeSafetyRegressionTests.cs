@@ -600,6 +600,36 @@ public sealed class NativeSafetyRegressionTests
     }
 
     [Test]
+    public void File_operation_correlation_ids_cross_plan_worker_ui_journal_and_log_boundaries()
+    {
+        var root = FindRepositoryRoot();
+        var workerHeader = File.ReadAllText(Path.Combine(root, "src", "worker.h"));
+        var worker = File.ReadAllText(Path.Combine(root, "src", "worker.cpp"));
+        var workerBody = File.ReadAllText(Path.Combine(root, "src", "operations_core.cpp"));
+        var plan = File.ReadAllText(Path.Combine(root, "src", "operation_plan.cpp"));
+        var journal = File.ReadAllText(Path.Combine(root, "src", "operation_journal.cpp"));
+        var dialogs = File.ReadAllText(Path.Combine(root, "src", "dialogs_file_ops.cpp"));
+        var log = File.ReadAllText(Path.Combine(root, "src", "execlog.cpp"));
+        var refactoring = File.ReadAllText(Path.Combine(root, "refactoring.md"));
+
+        // This source-level characterization pins the handoffs that cannot be deterministically faulted from UIA.
+        Assert.Multiple(() =>
+        {
+            Assert.That(workerHeader, Does.Contain("OPERATION_CORRELATION_ID_LENGTH"));
+            Assert.That(worker, Does.Contain("CreateOperationCorrelationId"));
+            Assert.That(plan, Does.Contain("operations.GetCorrelationId()"));
+            Assert.That(workerBody, Does.Contain("Worker-%s"));
+            Assert.That(workerBody, Does.Contain("BeginItemAttempt(i)"));
+            Assert.That(dialogs, Does.Contain("%s [#%s]"));
+            Assert.That(dialogs, Does.Contain("Script->RecordItemRetry()"));
+            Assert.That(journal, Does.Contain("CORRELATION|operation=%s"));
+            Assert.That(journal, Does.Contain("RETRY|%d|attempt=%d"));
+            Assert.That(log, Does.Contain("operation=%s, item=%d, attempt=%d"));
+            Assert.That(refactoring, Does.Contain("### 55. Assign correlation IDs to operations and workers — Implemented"));
+        });
+    }
+
+    [Test]
     public void Transactional_copy_and_move_expose_each_durable_phase_to_a_deterministic_fault_adapter()
     {
         var root = FindRepositoryRoot();

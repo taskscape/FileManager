@@ -19,6 +19,19 @@ NTFSCONTROLFILE DynNtFsControlFile = NULL;
 
 COperationsQueue OperationsQueue; // queue of disk operations
 
+namespace
+{
+volatile LONG NextOperationCorrelationSequence = 0;
+
+void CreateOperationCorrelationId(char* destination, int destinationLen)
+{
+    // Process, monotonic tick, and an atomic dispatch ordinal stay unique when commands share a tick.
+    _snprintf_s(destination, destinationLen, _TRUNCATE, "%08lX-%08lX-%08lX",
+                GetCurrentProcessId(), GetTickCount(),
+                (DWORD)InterlockedIncrement(&NextOperationCorrelationSequence));
+}
+}
+
 WCHAR* SafeConvertAllocUtf8ToWide(const char* src, int len)
 {
     __try {
@@ -119,6 +132,9 @@ COperations::COperations(int base, int delta, char* waitInQueueSubject, char* wa
         TRACE_E("Unable to create file-operation cancellation event.");
     OperationState = opsPlanned;
     Journal = NULL;
+    CurrentItemSequence = -1;
+    CurrentItemAttempt = 0;
+    CreateOperationCorrelationId(CorrelationId, _countof(CorrelationId));
     TotalSize = CQuadWord(0, 0);
     CompressedSize = CQuadWord(0, 0);
     OccupiedSpace = CQuadWord(0, 0);
@@ -199,9 +215,28 @@ BOOL COperations::BeginJournal()
     return TRUE;
 }
 
-BOOL COperations::JournalBeginItem(int itemIndex, const COperation* operation)
+int COperations::BeginItemAttempt(int itemIndex)
 {
-    return Journal == NULL || Journal->BeginItem(itemIndex, operation);
+    CurrentItemSequence = itemIndex;
+    CurrentItemAttempt = 1;
+    return CurrentItemAttempt;
+}
+
+int COperations::RecordItemRetry()
+{
+    if (CurrentItemSequence < 0)
+        return 0;
+    ++CurrentItemAttempt;
+    // A synchronous dialog response is part of the worker's item attempt, not a new operation.
+    if (Journal != NULL)
+        Journal->RecordRetry(CurrentItemAttempt);
+    ExecLogFileOperationRetry(CorrelationId, CurrentItemSequence, CurrentItemAttempt);
+    return CurrentItemAttempt;
+}
+
+BOOL COperations::JournalBeginItem(int itemIndex, const COperation* operation, int attempt)
+{
+    return Journal == NULL || Journal->BeginItem(itemIndex, operation, attempt);
 }
 
 BOOL COperations::JournalSetTemporaryPath(const char* temporaryPath)

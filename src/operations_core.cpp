@@ -928,10 +928,12 @@ BOOL DoChangeAttrs(HWND hProgressDlg, char* name, const CQuadWord& size, DWORD a
 unsigned ThreadWorkerBody(void* parameter)
 {
     CALL_STACK_MESSAGE1("ThreadWorkerBody()");
-    SetThreadNameInVCAndTrace("Worker");
-    TRACE_I("Begin");
-
     CWorkerData* data = (CWorkerData*)parameter;
+    char workerName[64];
+    // Put the dispatch ID in the worker name so debugger and trace threads match the owning dialog.
+    _snprintf_s(workerName, _countof(workerName), _TRUNCATE, "Worker-%s", data->CorrelationId);
+    SetThreadNameInVCAndTrace(workerName);
+    TRACE_I("Begin operation=" << data->CorrelationId);
     //--- create a local copy of the data
     HANDLE wContinue = data->WContinue;
     CProgressDlgData dlgData;
@@ -1033,6 +1035,7 @@ unsigned ThreadWorkerBody(void* parameter)
         for (i = 0; !*dlgData.CancelWorker && i < script->Count; i++)
         {
             COperation* op = &script->At(i);
+            int attempt = script->BeginItemAttempt(i);
 
             DWORD identityError;
             if (!CaptureOperationFileIdentities(op, &identityError))
@@ -1042,7 +1045,7 @@ unsigned ThreadWorkerBody(void* parameter)
                 break;
             }
 
-            if (!script->JournalBeginItem(i, op))
+            if (!script->JournalBeginItem(i, op, attempt))
             {
                 TRACE_E("Unable to persist file-operation journal transition before item " << i);
                 Error = TRUE;
@@ -1054,7 +1057,7 @@ unsigned ThreadWorkerBody(void* parameter)
             case ocCopyFile:
             {
                 const char* opName = "copy file";
-                ExecLogFileOperationStart(opName, op->SourceName, op->TargetName);
+                ExecLogFileOperationStart(script->GetCorrelationId(), i, attempt, opName, op->SourceName, op->TargetName);
                 pd.Operation = opStrCopying;
                 pd.Source = op->SourceName;
                 pd.Preposition = opStrCopyingPrep;
@@ -1071,7 +1074,7 @@ unsigned ThreadWorkerBody(void* parameter)
                                     (op->OpFlags & OPFL_COPY_ADS) != 0,
                                     (op->OpFlags & OPFL_AS_ENCRYPTED) != 0,
                                     FALSE, asyncPar, NULL);
-                ExecLogFileOperationResult(opName, op->SourceName, op->TargetName, !Error);
+                ExecLogFileOperationResult(script->GetCorrelationId(), i, script->GetCurrentItemAttempt(), opName, op->SourceName, op->TargetName, !Error);
                 break;
             }
 
@@ -1079,7 +1082,7 @@ unsigned ThreadWorkerBody(void* parameter)
             case ocMoveFile:
             {
                 const char* opName = op->Opcode == ocMoveDir ? "move dir" : "move file";
-                ExecLogFileOperationStart(opName, op->SourceName, op->TargetName);
+                ExecLogFileOperationStart(script->GetCorrelationId(), i, attempt, opName, op->SourceName, op->TargetName);
                 pd.Operation = opStrMoving;
                 pd.Source = op->SourceName;
                 pd.Preposition = opStrMovingPrep;
@@ -1098,14 +1101,14 @@ unsigned ThreadWorkerBody(void* parameter)
                                     (op->OpFlags & OPFL_COPY_ADS) != 0,
                                     (op->OpFlags & OPFL_AS_ENCRYPTED) != 0,
                                     &setDirTimeAfterMove, asyncPar, ignInvalidName);
-                ExecLogFileOperationResult(opName, op->SourceName, op->TargetName, !Error);
+                ExecLogFileOperationResult(script->GetCorrelationId(), i, script->GetCurrentItemAttempt(), opName, op->SourceName, op->TargetName, !Error);
                 break;
             }
 
             case ocCreateDir:
             {
                 const char* opName = "create dir";
-                ExecLogFileOperationStart(opName, op->TargetName, "");
+                ExecLogFileOperationStart(script->GetCorrelationId(), i, attempt, opName, op->TargetName, "");
                 BOOL copyADS = (op->OpFlags & OPFL_COPY_ADS) != 0;
                 BOOL crAsEncrypted = (op->OpFlags & OPFL_AS_ENCRYPTED) != 0;
                 BOOL ignInvalidName = (op->OpFlags & OPFL_IGNORE_INVALID_NAME) != 0;
@@ -1121,7 +1124,7 @@ unsigned ThreadWorkerBody(void* parameter)
                 Error = !DoCreateDir(hProgressDlg, op->TargetName, op->Attr, clearReadonlyMask, dlgData,
                                      totalDone, op->Size, op->SourceName, copyADS, script, buffer, skip,
                                      alreadyExisted, crAsEncrypted, ignInvalidName);
-                ExecLogFileOperationResult(opName, op->TargetName, "", !Error);
+                ExecLogFileOperationResult(script->GetCorrelationId(), i, script->GetCurrentItemAttempt(), opName, op->TargetName, "", !Error);
                 if (!Error)
                 {
                     if (skip) // skip directory creation
@@ -1229,7 +1232,7 @@ unsigned ThreadWorkerBody(void* parameter)
             case ocDeleteDirLink:
             {
                 const char* opName = op->Opcode == ocDeleteFile ? "delete file" : (op->Opcode == ocDeleteDir ? "delete dir" : "delete dir link");
-                ExecLogFileOperationStart(opName, op->SourceName, "");
+                ExecLogFileOperationStart(script->GetCorrelationId(), i, attempt, opName, op->SourceName, "");
                 pd.Operation = opStrDeleting;
                 pd.Source = op->SourceName;
                 pd.Preposition = "";
@@ -1269,14 +1272,14 @@ unsigned ThreadWorkerBody(void* parameter)
                                                   script, totalDone, dlgData);
                     }
                 }
-                ExecLogFileOperationResult(opName, op->SourceName, "", !Error);
+                ExecLogFileOperationResult(script->GetCorrelationId(), i, script->GetCurrentItemAttempt(), opName, op->SourceName, "", !Error);
                 break;
             }
 
             case ocConvert:
             {
                 const char* opName = "convert file";
-                ExecLogFileOperationStart(opName, op->SourceName, "");
+                ExecLogFileOperationStart(script->GetCorrelationId(), i, attempt, opName, op->SourceName, "");
                 // output buffer - the conversion will be performed in it (in the worst case,
                 // when the input file contains only CR or LF and we translate them to CRLF,
                 // this buffer is twice the size of sourceBuffer) and afterwards we will write from it
@@ -1301,14 +1304,14 @@ unsigned ThreadWorkerBody(void* parameter)
 
                 Error = !DoConvert(hProgressDlg, op->SourceName, (char*)buffer, tgtBuffer, op->Size, script,
                                    totalDone, convertData, dlgData);
-                ExecLogFileOperationResult(opName, op->SourceName, "", !Error);
+                ExecLogFileOperationResult(script->GetCorrelationId(), i, script->GetCurrentItemAttempt(), opName, op->SourceName, "", !Error);
                 break;
             }
 
             case ocChangeAttrs:
             {
                 const char* opName = "change attrs";
-                ExecLogFileOperationStart(opName, op->SourceName, "");
+                ExecLogFileOperationStart(script->GetCorrelationId(), i, attempt, opName, op->SourceName, "");
                 pd.Operation = opChangAttrs;
                 pd.Source = op->SourceName;
                 pd.Preposition = "";
@@ -1324,7 +1327,7 @@ unsigned ThreadWorkerBody(void* parameter)
                                        attrsData->ChangeTimeAccessed ? &attrsData->TimeAccessed : NULL,
                                        attrsData->ChangeCompression, attrsData->ChangeEncryption,
                                        op->Attr, dlgData);
-                ExecLogFileOperationResult(opName, op->SourceName, "", !Error);
+                ExecLogFileOperationResult(script->GetCorrelationId(), i, script->GetCurrentItemAttempt(), opName, op->SourceName, "", !Error);
                 break;
             }
 
@@ -1376,7 +1379,7 @@ unsigned ThreadWorkerBody(void* parameter)
     // this thread while a close/shutdown cancellation is in progress.  Release
     // all worker-owned data first, then transfer the small, self-contained
     // result to the UI by a posted message.
-    CWorkerCompletion* completion = new CWorkerCompletion(finalState, cancellationRequested);
+    CWorkerCompletion* completion = new CWorkerCompletion(finalState, cancellationRequested, script->GetCorrelationId());
     FreeScript(script);
     if (!PostMessage(hProgressDlg, WM_USER_PROGRDLG_WORKERCOMPLETE,
                      (WPARAM)Error, (LPARAM)completion))
@@ -1434,6 +1437,7 @@ HANDLE StartWorker(COperations* script, HWND hDlg, CChangeAttrsData* attrsData,
     data.WContinue = wContinue;
     data.ConvertData = convertData;
     data.Script = script;
+    lstrcpyn(data.CorrelationId, script->GetCorrelationId(), _countof(data.CorrelationId));
     data.HProgressDlg = hDlg;
     data.ClearReadonlyMask = script->ClearReadonlyMask;
     if (attrsData != NULL)

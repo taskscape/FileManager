@@ -1,5 +1,6 @@
 using FileManager.UiTests.Infrastructure;
 using NUnit.Framework;
+using System.Text.RegularExpressions;
 
 namespace FileManager.UiTests;
 
@@ -187,9 +188,15 @@ public sealed class FileOperationUiTests : FileOperationUiTestBase
         var content = File.ReadAllText(journal);
         var planItem = content.Split(new[] { "\r\n", "\n" }, StringSplitOptions.RemoveEmptyEntries)
             .Single(line => line.StartsWith("PLANITEM|0|copy-file|", StringComparison.Ordinal));
+        var correlation = Regex.Match(content, @"CORRELATION\|operation=(?<id>[0-9A-F]{8}-[0-9A-F]{8}-[0-9A-F]{8})",
+                                      RegexOptions.CultureInvariant);
 
         Assert.That(content, Does.Contain($"ITEM|").And.Contain("|copy-file|").And.Contain(source).And.Contain(target));
-        Assert.That(content, Does.Contain("PLAN|1|items="));
+        // A completed copy must retain one dispatch ID in the plan, item, and attempt records for recovery triage.
+        Assert.That(correlation.Success, Is.True, "The journal must persist a command-dispatch correlation ID.");
+        Assert.That(content, Does.Contain($"PLAN|1|operation={correlation.Groups["id"].Value}|"));
+        Assert.That(content, Does.Contain($"|operation={correlation.Groups["id"].Value}|sequence=0|attempt=1"));
+        Assert.That(content, Does.Contain("PLAN|1|operation="));
         Assert.That(planItem, Does.Contain($"source={source}|target={target}"),
                     "The immutable plan snapshot must preserve the generated copy intent before execution.");
         Assert.That(content, Does.Contain("STATE|").And.Contain("|prepared"));

@@ -347,7 +347,7 @@ protected:
         *Target,
         *Status;
     COperations* Script;
-    char Caption[50];
+    char Caption[100]; // includes the dispatch ID shown in concurrent operation dialogs
     CChangeAttrsData* AttrsData;
     CConvertData* ConvertData;
     BOOL AcceptCommands;
