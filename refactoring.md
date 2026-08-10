@@ -377,10 +377,13 @@ This document is the working record for a read-only stability and resilience aud
 - **Implementation (2026-08-10):** `COperationResult` now retains the initial phase/error/path outcome and records up to two named cleanup failures as secondary evidence. Durable-copy verification captures its result before closing the target handle, so a close failure cannot replace an earlier metadata or size failure; retry cleanup likewise records a failed deletion of an unverified target. The existing progress dialog now renders a fixed-buffer phase/error/source/destination/effects summary after the localized error text; users can copy the whole message with its established Ctrl+C behavior.
 - **Verification:** `NativeSafetyRegressionTests.File_operation_failures_capture_the_primary_error_before_cleanup_and_offer_copyable_context` pins the cleanup phases, bounded append-only evidence, capture-before-close ordering, retry-cleanup recording, copyable dialog text, and this implementation ledger entry.
 
-### 57. Centralize retry policy
+### 57. Centralize retry policy — Implemented (2026-08-10)
 
 - **Justification:** Ad hoc retry prompts and delays can repeat permanent failures, overload network shares, or duplicate side effects.
 - **Proposed solution:** Classify transient Win32/network errors, use capped exponential backoff with jitter, honor cancellation, and never automatically retry a destructive commit unless idempotency is proven.
+
+- **Implementation (2026-08-10):** `retry_policy.h` is now the shared authority for transient Win32/network classification, a maximum of three exponential retries (100 ms, 200 ms, 400 ms before bounded jitter), and cancellation-event waits. Synchronous and asynchronous source-read recovery use it; move and directory-delete commit paths are classified as destructive, so the policy rejects automatic retries and leaves the existing Retry/Skip/Cancel prompt as the decision boundary. `COperationResult` uses the same classification for its retryability field.
+- **Verification:** `NativeSafetyRegressionTests.Central_retry_policy_bounds_transient_read_retries_and_blocks_destructive_commits` pins the common classification, cap, jittered cancellation-aware delay, copy call sites, destructive classifications, absence of the former ad hoc sleeps, and this ledger entry.
 
 ### 58. Apply deadlines and cancellation to all network operations
 

@@ -658,6 +658,38 @@ public sealed class NativeSafetyRegressionTests
     }
 
     [Test]
+    public void Central_retry_policy_bounds_transient_read_retries_and_blocks_destructive_commits()
+    {
+        var root = FindRepositoryRoot();
+        var policy = File.ReadAllText(Path.Combine(root, "src", "retry_policy.h"));
+        var result = File.ReadAllText(Path.Combine(root, "src", "operation_result.h"));
+        var copy = File.ReadAllText(Path.Combine(root, "src", "async_copy.cpp"));
+        var refactoring = File.ReadAllText(Path.Combine(root, "refactoring.md"));
+
+        // Source characterization keeps retry pacing and destructive-operation safety independently reviewable.
+        Assert.Multiple(() =>
+        {
+            Assert.That(policy, Does.Contain("enum ERetryOperationKind"));
+            Assert.That(policy, Does.Contain("rokReadOnly"));
+            Assert.That(policy, Does.Contain("rokDestructiveCommit"));
+            Assert.That(policy, Does.Contain("ERROR_NETNAME_DELETED"));
+            Assert.That(policy, Does.Contain("kAutomaticRetryLimit = 3"));
+            Assert.That(policy, Does.Contain("GetAutomaticRetryDelay"));
+            Assert.That(policy, Does.Contain("GetTickCount()"));
+            Assert.That(policy, Does.Contain("WaitForSingleObject(cancellationEvent, delay)"));
+            Assert.That(policy, Does.Contain("kind == rokDestructiveCommit"));
+            Assert.That(result, Does.Contain("return IsTransientOperationError(error);"));
+            Assert.That(copy, Does.Contain("PrepareAutomaticRetry(err, &autoRetryAttemptsSNAP, rokReadOnly"));
+            Assert.That(copy, Does.Contain("PrepareAutomaticRetry(err, &AutoRetryAttemptsSNAP, rokReadOnly"));
+            Assert.That(copy, Does.Contain("PrepareAutomaticRetry(err, &autoRetryAttempts, rokDestructiveCommit"));
+            Assert.That(copy, Does.Contain("PrepareAutomaticRetry(err, &AutoRetryCounter, rokDestructiveCommit"));
+            Assert.That(copy, Does.Not.Contain("Sleep(100);"));
+            Assert.That(copy, Does.Not.Contain("Sleep(AutoRetryCounter * 100);"));
+            Assert.That(refactoring, Does.Contain("### 57. Centralize retry policy — Implemented"));
+        });
+    }
+
+    [Test]
     public void Transactional_copy_and_move_expose_each_durable_phase_to_a_deterministic_fault_adapter()
     {
         var root = FindRepositoryRoot();

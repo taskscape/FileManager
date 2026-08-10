@@ -8,6 +8,7 @@
 #include "common/scoped_native_resources.h"
 #include "file_operation_filesystem.h"
 #include "operation_result.h"
+#include "retry_policy.h"
 #include "worker.h"
 #include "execlog.h"
 #include "release_diagnostics.h"
@@ -3034,12 +3035,18 @@ void DoCopyFileLoopOrig(HANDLE& in, HANDLE& out, void* buffer, int& limitBufferS
                 return;
             }
 
-            if (err == ERROR_NETNAME_DELETED && ++autoRetryAttemptsSNAP <= 3)
-            { // on SNAP server reading sometimes randomly fails with ERROR_NETNAME_DELETED; Retry button reportedly helps, so trigger it automatically
+            DWORD retryDelay;
+            if (PrepareAutomaticRetry(err, &autoRetryAttemptsSNAP, rokReadOnly,
+                                      script->GetCancellationEvent(), &retryDelay))
+            { // Read retries have no commit side effect, so the central policy can pace them safely.
                 // Record the retry kind, but never the source path that caused it.
                 RecordReleaseDiagnosticRetry("copy_network_read");
                 script->RecordItemRetry(); // automatic retries need the same correlation history as dialog retries
-                Sleep(100);
+                if (!WaitForAutomaticRetry(script->GetCancellationEvent(), retryDelay))
+                {
+                    copyError = TRUE;
+                    return;
+                }
                 goto RETRY_COPY;
             }
 
@@ -3615,10 +3622,17 @@ BOOL CCopy_Context::HandleReadingErr(int blkIndex, DWORD err, BOOL* copyError, B
         }
 
         int ret = IDCANCEL;
-        if (err == ERROR_NETNAME_DELETED && ++AutoRetryAttemptsSNAP <= 3)
-        { // SNAP servers occasionally return ERROR_NETNAME_DELETED while reading; Retry button reportedly helps, so trigger it automatically
+        DWORD retryDelay;
+        if (PrepareAutomaticRetry(err, &AutoRetryAttemptsSNAP, rokReadOnly,
+                                  Script->GetCancellationEvent(), &retryDelay))
+        { // Asynchronous reads use the same cancelable policy as synchronous reads.
             Script->RecordItemRetry(); // record a new correlated attempt even without a UI prompt
-            Sleep(100);
+            if (!WaitForAutomaticRetry(Script->GetCancellationEvent(), retryDelay))
+            {
+                CancelOpPhase2(blkIndex);
+                *copyError = TRUE;
+                return FALSE;
+            }
             ret = IDRETRY;
         }
         else
@@ -5981,10 +5995,13 @@ BOOL DoMoveFile(COperation* op, HWND hProgressDlg, void* buffer,
                     if (dlgData.SkipAllMoveErrors)
                         goto SKIP_MOVE_ERROR;
 
-                    if (err == ERROR_SHARING_VIOLATION && ++autoRetryAttempts <= 2)
-                    {               // auto-retry added to handle move errors while directory icons are being read (SHGetFileInfo running in parallel with MoveFile)
-                        script->RecordItemRetry(); // preserve the automatic retry in the journal and debug trace
-                        Sleep(100); // wait a moment before the next attempt
+                    DWORD retryDelay;
+                    if (PrepareAutomaticRetry(err, &autoRetryAttempts, rokDestructiveCommit,
+                                              script->GetCancellationEvent(), &retryDelay))
+                    { // The policy currently rejects this branch: move commit idempotency is not proven.
+                        script->RecordItemRetry();
+                        if (!WaitForAutomaticRetry(script->GetCancellationEvent(), retryDelay))
+                            return FALSE;
                     }
                     else
                     {
@@ -6869,7 +6886,6 @@ BOOL DoDeleteDir(HWND hProgressDlg, COperation* operation, const CQuadWord& size
     char* name = operation->SourceName;
     DWORD err;
     int AutoRetryCounter = 0;
-    DWORD startTime = GetTickCount();
 
     // if the path ends with a space/dot, we must append '\\'; otherwise SetFileAttributes
     // and RemoveDirectory trim the spaces/dots and operate on a different path
@@ -6951,14 +6967,13 @@ BOOL DoDeleteDir(HWND hProgressDlg, COperation* operation, const CQuadWord& size
             if (dlgData.SkipAllDeleteErr)
                 goto SKIP_DELETE;
 
-            if (AutoRetryCounter < 4 && GetTickCount() - startTime + (AutoRetryCounter + 1) * 100 <= 2000 &&
-                (err == ERROR_DIR_NOT_EMPTY || err == ERROR_SHARING_VIOLATION))
-            { // add auto-retry to handle this case: I have directories 1\2\3, deleting 1 including subdirectories while 3 is shown in a panel (watching for changes) -> removing 2 reports "directory not empty" because 3 stays in a transitional state due to change notifications (it is deleted, so it cannot be listed, but it still exists on disk briefly; quite a mess)
-                //        TRACE_I("DoDeleteDir(): err: " << GetErrorText(err));
-                AutoRetryCounter++;
-                script->RecordItemRetry(); // distinguish this cleanup retry from a duplicate delete callback
-                Sleep(AutoRetryCounter * 100);
-                //        TRACE_I("DoDeleteDir(): " << AutoRetryCounter << ". retry, delay is " << AutoRetryCounter * 100 << "ms");
+            DWORD retryDelay;
+            if (PrepareAutomaticRetry(err, &AutoRetryCounter, rokDestructiveCommit,
+                                      script->GetCancellationEvent(), &retryDelay))
+            { // Directory deletion has no idempotency proof, so the central policy rejects automatic retries.
+                script->RecordItemRetry();
+                if (!WaitForAutomaticRetry(script->GetCancellationEvent(), retryDelay))
+                    return FALSE;
             }
             else
             {
