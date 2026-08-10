@@ -293,10 +293,13 @@ This document is the working record for a read-only stability and resilience aud
 - **Safety:** No migrated worker is detached: each can still observe panel, global, synchronization, or crash-recovery state. The process therefore remains alive until its worker joins and only then releases that state, rather than using `TerminateThread` or closing objects still in use.
 - **Verification:** `NativeSafetyRegressionTests.Shutdown_deadlines_report_named_phases_and_preserve_shared_state_until_safe_join` guards the two deadlines, diagnostics, mandatory join, named auxiliary tracking, removal of the former forced termination paths, and this ledger entry.
 
-### 45. Replace wrap-prone time calculations with monotonic 64-bit time
+### 45. Replace wrap-prone time calculations with monotonic 64-bit time — Implemented
 
 - **Justification:** `GetTickCount` is used hundreds of times; its 32-bit wrap and ad hoc subtraction can break timeouts and throttles after long uptime.
 - **Proposed solution:** Centralize monotonic timing on `GetTickCount64` or `QueryUnbiasedInterruptTime`, use duration types, and add wrap/clock-jump tests for remaining compatibility code.
+- **Implementation:** `CMonotonicClock` supplies named 64-bit monotonic time points and durations from `GetTickCount64`, including elapsed/deadline helpers and the one saturating conversion required by Win32's `DWORD` timer API. The host-owned plug-in filesystem timer queue now stores and sorts those deadlines directly, so callback scheduling no longer depends on signed 32-bit wrap arithmetic.
+- **Compatibility:** Existing `GetTickCount` values that are part of Win32 message fields or name-generation entropy remain bounded compatibility values; they are not used by the migrated timer queue for timeout decisions.
+- **Verification:** `NativeSafetyRegressionTests.Monotonic_64_bit_timers_cross_the_32_bit_boundary_and_reject_backward_samples` exercises the former wrap boundary and a synthetic backward sample, and pins the native queue to the centralized clock seam.
 
 ### 46. Replace `Sleep` polling with signaled waits
 

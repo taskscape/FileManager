@@ -2821,13 +2821,14 @@ struct CPluginOrder
 
 struct CPluginFSTimer
 {
-    DWORD AbsTimeout;                       // absolute timeout value for the timer
+    // Plugin timer deadlines must survive host uptimes longer than 49.7 days.
+    CMonotonicTimePoint AbsTimeout;
     CPluginFSInterfaceAbstract* TimerOwner; // FS object that should receive the timer timeout
     DWORD TimerParam;                       // timer parameter (plugin data)
 
     DWORD TimerAddedTime; // "time" the timer was added (prevents endless loops inside CPlugins::HandlePluginFSTimers())
 
-    CPluginFSTimer(DWORD absTimeout, CPluginFSInterfaceAbstract* timerOwner, DWORD timerParam, DWORD timerAddedTime)
+    CPluginFSTimer(CMonotonicTimePoint absTimeout, CPluginFSInterfaceAbstract* timerOwner, DWORD timerParam, DWORD timerAddedTime)
     {
         AbsTimeout = absTimeout;
         TimerOwner = timerOwner;
@@ -3190,8 +3191,7 @@ public:
     BOOL GetShowInChDrv(int index);
     void SetShowInChDrv(int index, BOOL showInChDrv);
 
-    // adds a new timer to the PluginFSTimers array; the absolute timeout is GetTickCount() + 'relTimeout'.
-    // Once GetTickCount() returns a value greater than or equal to that timeout,
+    // Adds a timer using the process monotonic 64-bit clock. Once its deadline has passed,
     // the FS object's Event() method is called with FSE_TIMER and 'timerParam'.
     // Returns TRUE on success (timer successfully added)
     BOOL AddPluginFSTimer(DWORD relTimeout, CPluginFSInterfaceAbstract* timerOwner, DWORD timerParam);
@@ -3272,7 +3272,7 @@ protected:
     BOOL PluginVisibleInBar(const char* dllName);
 
     // helper function: finds the index position for inserting a timer with 'timeoutAbs' into the PluginFSTimers array
-    int FindIndexForNewPluginFSTimer(DWORD timeoutAbs);
+    int FindIndexForNewPluginFSTimer(CMonotonicTimePoint timeoutAbs);
 };
 
 //
