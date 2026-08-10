@@ -341,10 +341,12 @@ This document is the working record for a read-only stability and resilience aud
 - **Implementation (2026-08-10):** Disk-panel enumeration now uses fixed 256-entry checkpoints. Each checkpoint yields to the safe-wait window's cancellation thread and probes cancellation, while the existing time-based probe remains for high-latency individual Win32 calls. The list control remains count-based: it receives one final item count and invalidates only its visible-item arrays instead of accepting a per-entry UI-insertion message stream. The panel retains at most 100,000 file/directory metadata records (with one reserved parent-directory record); on reaching that ceiling it stops enumeration, preserves the usable partial listing, and explains that the path or filter must be refined.
 - **Verification:** `NativeSafetyRegressionTests.Directory_listing_uses_bounded_checkpoints_and_a_retained_metadata_budget` simulates one million entries to pin the checkpoint cadence and guards the native batch boundary, cancellation probe, metadata ceiling, count-based list virtualization, user-facing limit text, and this implementation ledger. High-latency shares remain covered by the independent 200 ms cancellation probe between `FindNextFileW` returns.
 
-### 52. Reserve memory for graceful out-of-memory handling
+### 52. Reserve memory for graceful out-of-memory handling — Implemented
 
 - **Justification:** When allocation fails, even constructing an error or journal record may fail, leaving no safe way to cancel an operation.
 - **Proposed solution:** Allocate a small emergency reserve at startup, release it on first OOM, stop accepting work, persist minimal recovery state, and offer a controlled exit.
+- **Implementation (2026-08-10):** The allocation handler precommits a 64 KiB process-heap reserve. Its first failure atomically releases that reserve, records an append-only `memory-pressure` operation-recovery marker with fixed buffers and write-through I/O, rejects new queued or starting file operations, and posts the established forced-close message once the main window is registered. Existing operations retain their individual journals for normal reconciliation.
+- **Verification:** `NativeSafetyRegressionTests.Allocation_emergency_releases_the_reserve_persists_recovery_and_stops_new_operations` pins reserve ownership, one-time activation, recovery persistence, shutdown handoff, operation admission guards, and this ledger entry without trying to exhaust the test machine's memory.
 
 ### 53. Remove modal UI and retry loops from the global allocation handler
 

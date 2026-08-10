@@ -7,6 +7,7 @@
 #include "cfgdlg.h"
 #include "worker.h"
 #include "execlog.h"
+#include "common/allochan.h"
 
 #include <Aclapi.h>
 #include <Ntsecapi.h>
@@ -1418,6 +1419,13 @@ HANDLE StartWorker(COperations* script, HWND hDlg, CChangeAttrsData* attrsData,
                    CConvertData* convertData, HANDLE wContinue, HANDLE workerNotSuspended,
                    int* operationProgress, int* summaryProgress)
 {
+    // Do not allocate worker buffers or start a destructive script after the
+    // allocator has declared the process unsafe for additional work.
+    if (IsAllocationEmergencyActive())
+    {
+        script->Fail();
+        return NULL;
+    }
     CWorkerData data;
     data.WorkerNotSuspended = workerNotSuspended;
     data.OperationProgress = operationProgress;
@@ -1499,6 +1507,11 @@ void FreeScript(COperations* script)
 BOOL COperationsQueue::AddOperation(HWND dlg, BOOL startOnIdle, BOOL* startPaused)
 {
     CALL_STACK_MESSAGE1("COperationsQueue::AddOperation()");
+
+    // Queued work may allocate or outlive the recovery marker, so reject it
+    // once OOM has requested the controlled shutdown path.
+    if (IsAllocationEmergencyActive())
+        return FALSE;
 
     HANDLES(EnterCriticalSection(&QueueCritSect));
 

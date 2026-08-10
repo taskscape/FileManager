@@ -3,6 +3,9 @@
 
 #include "precomp.h"
 
+// Keep the emergency callback declarations synchronized with this allocator implementation.
+#include "allochan.h"
+
 #include <windows.h>
 #include <ostream>
 #include <tchar.h>
@@ -48,6 +51,39 @@ void Initialize__Allochan()
 
 #pragma init_seg(".i_alc$m")
 
+const SIZE_T AllocEmergencyReserveSize = 64 * 1024;
+volatile PVOID AllocEmergencyReserve = NULL;
+volatile LONG AllocEmergencyActive = FALSE;
+volatile PVOID AllocEmergencyRecoveryCallback = NULL;
+volatile PVOID AllocEmergencyExitWindow = NULL;
+volatile LONG AllocEmergencyExitMessage = 0;
+
+void NotifyAllocationEmergency()
+{
+    TAllocEmergencyRecoveryCallback callback = (TAllocEmergencyRecoveryCallback)InterlockedCompareExchangePointer(
+        (PVOID volatile*)&AllocEmergencyRecoveryCallback, NULL, NULL);
+    if (callback != NULL)
+        callback();
+
+    HWND window = (HWND)InterlockedCompareExchangePointer((PVOID volatile*)&AllocEmergencyExitWindow, NULL, NULL);
+    UINT message = (UINT)InterlockedCompareExchange(&AllocEmergencyExitMessage, 0, 0);
+    if (window != NULL && message != 0)
+        PostMessage(window, message, 0, 0);
+}
+
+void ActivateAllocationEmergency()
+{
+    if (InterlockedCompareExchange(&AllocEmergencyActive, TRUE, FALSE) != FALSE)
+        return;
+
+    // Free the precommitted reserve before touching recovery code because the
+    // failing allocation may otherwise leave no memory for its last-safe state.
+    PVOID reserve = InterlockedExchangePointer((PVOID volatile*)&AllocEmergencyReserve, NULL);
+    if (reserve != NULL)
+        HeapFree(GetProcessHeap(), 0, reserve);
+    NotifyAllocationEmergency();
+}
+
 class C__AllocHandlerInit
 {
 public:
@@ -55,6 +91,8 @@ public:
 
     C__AllocHandlerInit()
     {
+        // Allocate outside the CRT allocator so its failure cannot recurse into this handler.
+        AllocEmergencyReserve = HeapAlloc(GetProcessHeap(), 0, AllocEmergencyReserveSize);
         InitializeCriticalSection(&CriticalSection);
         OldNewHandler = _set_new_handler(TaskscapeLtdNewHandler); // operator new should call our new-handler on insufficient memory
         OldNewMode = _set_new_mode(1);                     // malloc should call our new-handler on insufficient memory
@@ -63,6 +101,9 @@ public:
     {
         _set_new_mode(OldNewMode);
         _set_new_handler(OldNewHandler);
+        PVOID reserve = InterlockedExchangePointer((PVOID volatile*)&AllocEmergencyReserve, NULL);
+        if (reserve != NULL)
+            HeapFree(GetProcessHeap(), 0, reserve);
         DeleteCriticalSection(&CriticalSection);
     }
 
@@ -95,8 +136,32 @@ void SetAllocHandlerMessage(const TCHAR* message, const TCHAR* title, const TCHA
         lstrcpyn(__AllocHandlerWarningAbort, warningAbort, 200);
 }
 
+void SetAllocEmergencyRecoveryCallback(TAllocEmergencyRecoveryCallback callback)
+{
+    // Late registration is required during startup: an earlier OOM must still
+    // obtain its minimal recovery record once the operation subsystem is ready.
+    InterlockedExchangePointer((PVOID volatile*)&AllocEmergencyRecoveryCallback, (PVOID)callback);
+    if (callback != NULL && IsAllocationEmergencyActive())
+        callback();
+}
+
+void SetAllocEmergencyExitWindow(HWND window, UINT message)
+{
+    // Do not lose an OOM raised before the main HWND existed; notify it on registration.
+    InterlockedExchange(&AllocEmergencyExitMessage, (LONG)message);
+    InterlockedExchangePointer((PVOID volatile*)&AllocEmergencyExitWindow, window);
+    if (window != NULL && message != 0 && IsAllocationEmergencyActive())
+        PostMessage(window, message, 0, 0);
+}
+
+BOOL IsAllocationEmergencyActive()
+{
+    return InterlockedCompareExchange(&AllocEmergencyActive, FALSE, FALSE) != FALSE;
+}
+
 int C__AllocHandlerInit::TaskscapeLtdNewHandler(size_t size)
 {
+    ActivateAllocationEmergency();
     TRACE_ET(_T("TaskscapeLtdNewHandler: not enough memory to allocate ") << size << _T(" bytes!"));
     int ret = 1;
     int ti = GetTickCount();
