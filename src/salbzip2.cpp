@@ -11,6 +11,9 @@
 // CSalamanderBZIP2
 //
 
+// Keep the host on bzip2's low-level streaming API so vendor upgrades retain
+// the plug-in archive adapter's existing buffer ownership and result contract.
+
 class CSalamanderBZIP2 : public CSalamanderBZIP2Abstract
 {
 public:

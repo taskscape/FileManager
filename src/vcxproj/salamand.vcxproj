@@ -150,6 +150,8 @@
       </PrecompiledHeader>
     </ClCompile>
     <ClCompile Include="..\common\dep\bzip2\compress.c">
+      <!-- Upstream bzip2's portable counter conversion is intentional; scope the MSVC-only warning to this vendored unit. -->
+      <DisableSpecificWarnings>4244;%(DisableSpecificWarnings)</DisableSpecificWarnings>
       <PreprocessorDefinitions Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">BZ_NO_STDIO;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
       </PrecompiledHeader>
