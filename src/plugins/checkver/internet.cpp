@@ -15,6 +15,127 @@ const char* SCRIPT_URL_HTTP = "https://www.taskscape.com/salupdate40/";
 const char* SCRIPT_URL_HTTP_AFTERINSTALL = "https://www.taskscape.com/salupdatenew40/";
 
 const char* AGENT_NAME = "Open Salamander CheckVer Plugin";
+const char* GetInetErrorText(DWORD dError);
+
+namespace
+{
+// WinINet applies the connect deadline while resolving the host as well, so
+// these values keep each remote phase bounded without changing user settings.
+const DWORD kResolveAndConnectTimeoutMs = 15000;
+const DWORD kSendTimeoutMs = 15000;
+const DWORD kReceiveTimeoutMs = 30000;
+
+CRITICAL_SECTION DownloadHandleLock;
+BOOL DownloadHandleLockInitialized = FALSE;
+HINTERNET ActiveDownloadSession = NULL;
+HINTERNET ActiveDownloadRequest = NULL;
+volatile LONG DownloadCancelled = FALSE;
+volatile LONG DownloadThreadActive = FALSE;
+
+BOOL IsDownloadCancelled()
+{
+    return InterlockedCompareExchange(&DownloadCancelled, FALSE, FALSE) != FALSE;
+}
+
+BOOL RegisterActiveDownloadSession(HINTERNET session)
+{
+    BOOL registered = FALSE;
+    EnterCriticalSection(&DownloadHandleLock);
+    if (!IsDownloadCancelled())
+    {
+        ActiveDownloadSession = session;
+        registered = TRUE;
+    }
+    LeaveCriticalSection(&DownloadHandleLock);
+
+    if (!registered)
+        InternetCloseHandle(session);
+    return registered;
+}
+
+BOOL RegisterActiveDownloadRequest(HINTERNET request)
+{
+    BOOL registered = FALSE;
+    EnterCriticalSection(&DownloadHandleLock);
+    if (!IsDownloadCancelled())
+    {
+        ActiveDownloadRequest = request;
+        registered = TRUE;
+    }
+    LeaveCriticalSection(&DownloadHandleLock);
+
+    if (!registered)
+        InternetCloseHandle(request);
+    return registered;
+}
+
+void CloseOwnedDownloadRequest(HINTERNET request)
+{
+    BOOL closeHandle = TRUE;
+    EnterCriticalSection(&DownloadHandleLock);
+    if (ActiveDownloadRequest == request)
+        ActiveDownloadRequest = NULL;
+    else if (IsDownloadCancelled())
+        closeHandle = FALSE; // cancellation already closed the sole active handle
+    LeaveCriticalSection(&DownloadHandleLock);
+
+    if (closeHandle)
+        InternetCloseHandle(request);
+}
+
+void CloseOwnedDownloadSession(HINTERNET session)
+{
+    BOOL closeHandle = TRUE;
+    EnterCriticalSection(&DownloadHandleLock);
+    if (ActiveDownloadSession == session)
+        ActiveDownloadSession = NULL;
+    else if (IsDownloadCancelled())
+        closeHandle = FALSE; // cancellation already closed the active session
+    LeaveCriticalSection(&DownloadHandleLock);
+
+    if (closeHandle)
+        InternetCloseHandle(session);
+}
+
+BOOL SetDownloadTimeouts(HINTERNET session, DWORD* error)
+{
+    // Keep DNS/connect, request write, and response read failures independently bounded.
+    DWORD resolveAndConnectTimeout = kResolveAndConnectTimeoutMs;
+    DWORD sendTimeout = kSendTimeoutMs;
+    DWORD receiveTimeout = kReceiveTimeoutMs;
+    if (!InternetSetOption(session, INTERNET_OPTION_CONNECT_TIMEOUT, &resolveAndConnectTimeout, sizeof(resolveAndConnectTimeout)) ||
+        !InternetSetOption(session, INTERNET_OPTION_SEND_TIMEOUT, &sendTimeout, sizeof(sendTimeout)) ||
+        !InternetSetOption(session, INTERNET_OPTION_RECEIVE_TIMEOUT, &receiveTimeout, sizeof(receiveTimeout)) ||
+        !InternetSetOption(session, INTERNET_OPTION_DATA_RECEIVE_TIMEOUT, &receiveTimeout, sizeof(receiveTimeout)))
+    {
+        *error = GetLastError();
+        return FALSE;
+    }
+    return TRUE;
+}
+
+const char* GetInetFailureKind(DWORD error)
+{
+    if (error == ERROR_INTERNET_TIMEOUT)
+        return "Network timeout";
+    if (error == ERROR_INTERNET_LOGIN_FAILURE || error == ERROR_INTERNET_INCORRECT_PASSWORD)
+        return "Authentication failure";
+    if (error == ERROR_INTERNET_INVALID_URL || error == ERROR_INTERNET_PROTOCOL_NOT_FOUND ||
+        error == ERROR_INTERNET_SEC_CERT_CN_INVALID || error == ERROR_INTERNET_SEC_CERT_DATE_INVALID ||
+        error == ERROR_INTERNET_INVALID_CA)
+        return "Protocol or TLS failure";
+    return NULL;
+}
+
+void GetInetFailureText(DWORD error, char* buffer, int bufferSize)
+{
+    const char* kind = GetInetFailureKind(error);
+    if (kind != NULL)
+        _snprintf_s(buffer, bufferSize, _TRUNCATE, "%s (%lu)", kind, error);
+    else
+        lstrcpyn(buffer, GetInetErrorText(error), bufferSize);
+}
+} // namespace
 
 // limitation - may be called from only one thread; otherwise buffer overwrites are not handled
 const char* GetInetErrorText(DWORD dError)
@@ -145,32 +266,35 @@ DWORD WINAPI ThreadDownload(void* param)
     {
         AddLogLine(LoadStr(IDS_INET_PROTOCOL), FALSE);
         AddLogLine(LoadStr(IDS_INET_INIT), FALSE);
-        errorCode = InternetAttemptConnect(0);
-        if (errorCode != ERROR_SUCCESS)
-        {
-            EnterCriticalSection(&MainDialogIDSection);
-            if (dialogID == MainDialogID)
-            {
-                char buff2[1024];
-                sprintf(buff2, LoadStr(IDS_INET_INIT_FAILED), GetInetErrorText(errorCode));
-                AddLogLine(buff2, TRUE);
-            }
-            LeaveCriticalSection(&MainDialogIDSection);
-            exit = TRUE;
-        }
     }
 
     if (dialogID == GetMainDialogID() && !exit)
     {
         hSession = InternetOpen(AGENT_NAME, INTERNET_OPEN_TYPE_PRECONFIG, NULL, NULL, 0);
-        if (hSession == NULL)
+        if (hSession == NULL || !RegisterActiveDownloadSession(hSession))
         {
             EnterCriticalSection(&MainDialogIDSection);
-            if (dialogID == MainDialogID)
+            if (dialogID == MainDialogID && !IsDownloadCancelled())
             {
                 DWORD err = GetLastError();
+                char errorText[1024];
                 char buff2[1024];
-                sprintf(buff2, LoadStr(IDS_INET_INIT_FAILED), GetInetErrorText(err));
+                GetInetFailureText(err, errorText, sizeof(errorText));
+                sprintf(buff2, LoadStr(IDS_INET_INIT_FAILED), errorText);
+                AddLogLine(buff2, TRUE);
+            }
+            LeaveCriticalSection(&MainDialogIDSection);
+            exit = TRUE;
+        }
+        else if (!SetDownloadTimeouts(hSession, &errorCode))
+        {
+            EnterCriticalSection(&MainDialogIDSection);
+            if (dialogID == MainDialogID && !IsDownloadCancelled())
+            {
+                char errorText[1024];
+                char buff2[1024];
+                GetInetFailureText(errorCode, errorText, sizeof(errorText));
+                sprintf(buff2, LoadStr(IDS_INET_INIT_FAILED), errorText);
                 AddLogLine(buff2, TRUE);
             }
             LeaveCriticalSection(&MainDialogIDSection);
@@ -217,14 +341,16 @@ DWORD WINAPI ThreadDownload(void* param)
         }
         }
 
-        if (hUrl == NULL)
+        if (hUrl == NULL || !RegisterActiveDownloadRequest(hUrl))
         {
             EnterCriticalSection(&MainDialogIDSection);
-            if (dialogID == MainDialogID)
+            if (dialogID == MainDialogID && !IsDownloadCancelled())
             {
                 DWORD err = GetLastError();
+                char errorText[1024];
                 char buff2[1024];
-                sprintf(buff2, LoadStr(IDS_INET_CONNECT_FAILED), GetInetErrorText(err));
+                GetInetFailureText(err, errorText, sizeof(errorText));
+                sprintf(buff2, LoadStr(IDS_INET_CONNECT_FAILED), errorText);
                 AddLogLine(buff2, TRUE);
             }
             LeaveCriticalSection(&MainDialogIDSection);
@@ -239,11 +365,13 @@ DWORD WINAPI ThreadDownload(void* param)
         if (!bResult)
         {
             EnterCriticalSection(&MainDialogIDSection);
-            if (dialogID == MainDialogID)
+            if (dialogID == MainDialogID && !IsDownloadCancelled())
             {
                 DWORD err = GetLastError();
+                char errorText[1024];
                 char buff2[1024];
-                sprintf(buff2, LoadStr(IDS_INET_READ_FAILED), GetInetErrorText(err));
+                GetInetFailureText(err, errorText, sizeof(errorText));
+                sprintf(buff2, LoadStr(IDS_INET_READ_FAILED), errorText);
                 AddLogLine(buff2, TRUE);
             }
             LeaveCriticalSection(&MainDialogIDSection);
@@ -252,9 +380,9 @@ DWORD WINAPI ThreadDownload(void* param)
     }
 
     if (hUrl != NULL)
-        InternetCloseHandle(hUrl);
+        CloseOwnedDownloadRequest(hUrl);
     if (hSession != NULL)
-        InternetCloseHandle(hSession);
+        CloseOwnedDownloadSession(hSession);
 
     EnterCriticalSection(&MainDialogIDSection);
     DWORD id = MainDialogID;
@@ -268,6 +396,7 @@ DWORD WINAPI ThreadDownload(void* param)
         else
             LoadedScriptSize = 0;
         PostMessage(HMainDialog, WM_USER_DOWNLOADTHREAD_EXIT, !exit, 0); // thread ends; data are loaded
+        InterlockedExchange(&DownloadThreadActive, FALSE);
         FreeLibrary(hLock);                                              // release the lock
         LeaveCriticalSection(&MainDialogIDSection);
         return 0; // let the thread die naturally
@@ -278,6 +407,7 @@ DWORD WINAPI ThreadDownload(void* param)
         // we were killed from the outside - after FreeLibrary the last lock on the SPL may be removed
         // (Salamander may no longer be running) and there would be nowhere to return to,
         // therefore call this function:
+        InterlockedExchange(&DownloadThreadActive, FALSE);
         FreeLibraryAndExitThread(hLock, 3666);
         return 0; // we never return here, but the compiler cannot know that :-)
     }
@@ -286,6 +416,11 @@ DWORD WINAPI ThreadDownload(void* param)
 HANDLE
 StartDownloadThread(BOOL firstLoadAfterInstall)
 {
+    // Do not recycle the shared cancellation token until a detached worker has
+    // observed it and released its WinINet handles.
+    if (InterlockedCompareExchange(&DownloadThreadActive, TRUE, FALSE) != FALSE)
+        return NULL;
+
     CTDData data;
     data.MainDialogID = GetMainDialogID();
     data.FirstLoadAfterInstall = firstLoadAfterInstall;
@@ -294,17 +429,50 @@ StartDownloadThread(BOOL firstLoadAfterInstall)
     if (data.Continue == NULL)
     {
         TRACE_E("Unable to create Continue event.");
+        InterlockedExchange(&DownloadThreadActive, FALSE);
         return NULL;
     }
+
+    if (!DownloadHandleLockInitialized)
+    {
+        // A single token owns the active WinINet handle for this one-at-a-time download.
+        InitializeCriticalSection(&DownloadHandleLock);
+        DownloadHandleLockInitialized = TRUE;
+    }
+    InterlockedExchange(&DownloadCancelled, FALSE);
 
     DWORD threadID;
     HANDLE hThread = CreateThread(NULL, 0, ThreadDownload, &data, 0, &threadID);
     if (hThread == NULL)
+    {
         TRACE_E("Unable to create Check Version Download thread.");
+        InterlockedExchange(&DownloadThreadActive, FALSE);
+    }
     else // wait until the thread takes the data
         WaitForSingleObject(data.Continue, INFINITE);
 
     CloseHandle(data.Continue);
 
     return hThread;
+}
+
+void CancelDownloadThread()
+{
+    InterlockedExchange(&DownloadCancelled, TRUE);
+
+    HINTERNET session = NULL;
+    HINTERNET request = NULL;
+    EnterCriticalSection(&DownloadHandleLock);
+    session = ActiveDownloadSession;
+    request = ActiveDownloadRequest;
+    ActiveDownloadSession = NULL;
+    ActiveDownloadRequest = NULL;
+    LeaveCriticalSection(&DownloadHandleLock);
+
+    // Closing both WinINet levels interrupts a DNS/connect/read wait; the
+    // worker sees the same token before it can begin a later phase.
+    if (request != NULL)
+        InternetCloseHandle(request);
+    if (session != NULL)
+        InternetCloseHandle(session);
 }

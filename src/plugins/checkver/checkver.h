@@ -133,6 +133,7 @@ void GetFutureTime(SYSTEMTIME* tgtTime, DWORD days);
 // script loading
 BOOL LoadScripDataFromFile(const char* fileName);
 HANDLE StartDownloadThread(BOOL firstLoadAfterInstall); // returns the thread handle or NULL
+void CancelDownloadThread(); // signals the download token and closes the active WinINet handle
 
 // log output
 void ModulesCreateLog(BOOL* moduleWasFound, BOOL rereadModules);

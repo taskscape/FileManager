@@ -558,9 +558,17 @@ BOOL CControlConnectionSocket::StartControlConnection(HWND parent, char* user, i
     char retryBuf[700];
 
     const DWORD showWaitWndTime = WAITWND_STARTCON; // show time of the wait window
-    int serverTimeout = Config.GetServerRepliesTimeout() * 1000;
-    if (serverTimeout < 1000)
-        serverTimeout = 1000; // at least one second
+    // DNS, TCP connect, and FTP/TLS reply waits have distinct failure modes,
+    // even though legacy configuration intentionally supplies their common value.
+    int resolveTimeout = Config.GetServerRepliesTimeout() * 1000;
+    int connectTimeout = Config.GetServerRepliesTimeout() * 1000;
+    int protocolTimeout = Config.GetServerRepliesTimeout() * 1000;
+    if (resolveTimeout < 1000)
+        resolveTimeout = 1000; // at least one second
+    if (connectTimeout < 1000)
+        connectTimeout = 1000; // at least one second
+    if (protocolTimeout < 1000)
+        protocolTimeout = 1000; // at least one second
 
     // store the focus from 'parent' (if the focus is not from 'parent', store NULL)
     HWND focusedWnd = GetFocus();
@@ -693,9 +701,9 @@ RETRY_LABEL:
                     CControlConnectionSocketEvent event;
                     DWORD data1, data2;
                     DWORD now = GetTickCount();
-                    if (now - start > (DWORD)serverTimeout)
-                        now = start + (DWORD)serverTimeout;
-                    WaitForEventOrESC(parent, &event, &data1, &data2, serverTimeout - (now - start),
+                    if (now - start > (DWORD)resolveTimeout)
+                        now = start + (DWORD)resolveTimeout;
+                    WaitForEventOrESC(parent, &event, &data1, &data2, resolveTimeout - (now - start),
                                       &waitWnd, NULL, FALSE);
                     switch (event)
                     {
@@ -856,9 +864,9 @@ RETRY_LABEL:
                     CControlConnectionSocketEvent event;
                     DWORD data1, data2;
                     DWORD now = GetTickCount();
-                    if (now - start > (DWORD)serverTimeout)
-                        now = start + (DWORD)serverTimeout;
-                    WaitForEventOrESC(parent, &event, &data1, &data2, serverTimeout - (now - start),
+                    if (now - start > (DWORD)connectTimeout)
+                        now = start + (DWORD)connectTimeout;
+                    WaitForEventOrESC(parent, &event, &data1, &data2, connectTimeout - (now - start),
                                       &waitWnd, NULL, FALSE);
                     switch (event)
                     {
@@ -1180,9 +1188,9 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
                 CControlConnectionSocketEvent event;
                 DWORD data1, data2;
                 DWORD now = GetTickCount();
-                if (now - start > (DWORD)serverTimeout)
-                    now = start + (DWORD)serverTimeout;
-                WaitForEventOrESC(parent, &event, &data1, &data2, serverTimeout - (now - start),
+                if (now - start > (DWORD)protocolTimeout)
+                    now = start + (DWORD)protocolTimeout;
+                WaitForEventOrESC(parent, &event, &data1, &data2, protocolTimeout - (now - start),
                                   &waitWnd, NULL, FALSE);
                 switch (event)
                 {
@@ -1532,9 +1540,9 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
                                     CControlConnectionSocketEvent event;
                                     DWORD data1, data2;
                                     DWORD now = GetTickCount();
-                                    if (now - start > (DWORD)serverTimeout)
-                                        now = start + (DWORD)serverTimeout;
-                                    WaitForEventOrESC(parent, &event, &data1, &data2, serverTimeout - (now - start),
+                                    if (now - start > (DWORD)protocolTimeout)
+                                        now = start + (DWORD)protocolTimeout;
+                                    WaitForEventOrESC(parent, &event, &data1, &data2, protocolTimeout - (now - start),
                                                       &waitWnd, NULL, FALSE);
                                     switch (event)
                                     {

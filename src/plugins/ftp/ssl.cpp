@@ -634,17 +634,29 @@ BOOL CSocket::EncryptSocket(int logUID, int* sslErrorOccured, CCertificate** unv
     WSAAsyncSelect(Socket, window, 0, 0);
     u_long blocking = 0;
     ioctlsocket(Socket, FIONBIO, &blocking);
+    // SChannel drives this legacy handshake through blocking send/recv calls;
+    // bound that narrow phase so a silent TLS peer cannot prevent shutdown.
+    DWORD tlsHandshakeTimeout = Config.GetServerRepliesTimeout() * 1000;
+    if (tlsHandshakeTimeout < 1000)
+        tlsHandshakeTimeout = 1000;
+    setsockopt(Socket, SOL_SOCKET, SO_RCVTIMEO, (const char*)&tlsHandshakeTimeout, sizeof(tlsHandshakeTimeout));
+    setsockopt(Socket, SOL_SOCKET, SO_SNDTIMEO, (const char*)&tlsHandshakeTimeout, sizeof(tlsHandshakeTimeout));
     DWORD socketError = NO_ERROR;
     SECURITY_STATUS securityError = SEC_E_OK;
     bool connected = CompleteHandshake(connection, HostAddress, &socketError, &securityError);
 
+    DWORD noSocketDeadline = 0;
+    setsockopt(Socket, SOL_SOCKET, SO_RCVTIMEO, (const char*)&noSocketDeadline, sizeof(noSocketDeadline));
+    setsockopt(Socket, SOL_SOCKET, SO_SNDTIMEO, (const char*)&noSocketDeadline, sizeof(noSocketDeadline));
     u_long nonBlocking = 1;
     ioctlsocket(Socket, FIONBIO, &nonBlocking);
     WSAAsyncSelect(Socket, window, Msg, FD_READ | FD_CLOSE | FD_WRITE);
     if (!connected)
     {
         char message[256];
-        if (socketError != NO_ERROR)
+        if (socketError == WSAETIMEDOUT)
+            lstrcpyn(message, "TLS handshake deadline expired.", SizeOf(message));
+        else if (socketError != NO_ERROR)
             lstrcpyn(message, SalamanderGeneral->GetErrorText(socketError), SizeOf(message));
         else
             SecurityStatusText(securityError, message, SizeOf(message));
@@ -655,6 +667,9 @@ BOOL CSocket::EncryptSocket(int logUID, int* sslErrorOccured, CCertificate** unv
         Logs.LogMessage(logUID, "TLS ERROR: ", -1, TRUE);
         Logs.LogMessage(logUID, message, -1, TRUE);
         Logs.LogMessage(logUID, "\r\n", -1, TRUE);
+        // A timed-out or failed handshake cannot become usable later; closing it
+        // also releases any pending socket operation before retry/error handling.
+        CloseSocket(NULL);
         SSLFree(connection);
         if (sslErrorOccured)
             *sslErrorOccured = SSLCONERR_CANRETRY;

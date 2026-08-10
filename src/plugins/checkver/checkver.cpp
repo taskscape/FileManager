@@ -222,6 +222,7 @@ BOOL CPluginInterface::Release(HWND parent, BOOL force)
             {
                 IncMainDialogID(); // detach the running session - it will not send anything else and
                                    // will finish as soon as possible
+                CancelDownloadThread(); // release WinINet waits before the plug-in can unload
                 CloseHandle(HDownloadThread);
                 HDownloadThread = NULL;
                 ModulesCleanup();

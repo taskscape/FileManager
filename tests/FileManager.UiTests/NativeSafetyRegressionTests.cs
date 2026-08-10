@@ -1381,6 +1381,61 @@ public sealed class NativeSafetyRegressionTests
         });
     }
 
+    [Test]
+    public void Network_operations_have_phase_deadlines_cancellation_and_failure_classification()
+    {
+        var root = FindRepositoryRoot();
+        var checkver = File.ReadAllText(Path.Combine(root, "src", "plugins", "checkver", "internet.cpp"));
+        var checkverHeader = File.ReadAllText(Path.Combine(root, "src", "plugins", "checkver", "checkver.h"));
+        var checkverPlugin = File.ReadAllText(Path.Combine(root, "src", "plugins", "checkver", "checkver.cpp"));
+        var checkverDialog = File.ReadAllText(Path.Combine(root, "src", "plugins", "checkver", "dialogs.cpp"));
+        var ftp = File.ReadAllText(Path.Combine(root, "src", "plugins", "ftp", "ctrlcon1.cpp"));
+        var ftpTls = File.ReadAllText(Path.Combine(root, "src", "plugins", "ftp", "ssl.cpp"));
+        var upload = File.ReadAllText(Path.Combine(root, "src", "salmon", "upload.cpp"));
+        var refactoring = File.ReadAllText(Path.Combine(root, "refactoring.md"));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(checkver, Does.Contain("kResolveAndConnectTimeoutMs = 15000"));
+            Assert.That(checkver, Does.Contain("kSendTimeoutMs = 15000"));
+            Assert.That(checkver, Does.Contain("kReceiveTimeoutMs = 30000"));
+            Assert.That(checkver, Does.Contain("INTERNET_OPTION_CONNECT_TIMEOUT"));
+            Assert.That(checkver, Does.Contain("INTERNET_OPTION_SEND_TIMEOUT"));
+            Assert.That(checkver, Does.Contain("INTERNET_OPTION_DATA_RECEIVE_TIMEOUT"));
+            Assert.That(checkverHeader, Does.Contain("void CancelDownloadThread()"));
+            Assert.That(checkver, Does.Contain("InterlockedExchange(&DownloadCancelled, TRUE)"));
+            Assert.That(checkver, Does.Contain("HINTERNET ActiveDownloadSession = NULL"));
+            Assert.That(checkver, Does.Contain("HINTERNET ActiveDownloadRequest = NULL"));
+            Assert.That(checkver, Does.Contain("InternetCloseHandle(request)"));
+            Assert.That(checkver, Does.Contain("InternetCloseHandle(session)"));
+            Assert.That(checkverPlugin, Does.Contain("CancelDownloadThread(); // release WinINet waits"));
+            Assert.That(checkverDialog, Does.Contain("CancelDownloadThread(); // close the active network handle"));
+            Assert.That(checkver, Does.Contain("ERROR_INTERNET_TIMEOUT"));
+            Assert.That(checkver, Does.Contain("ERROR_INTERNET_LOGIN_FAILURE"));
+            Assert.That(checkver, Does.Contain("Protocol or TLS failure"));
+            Assert.That(ftp, Does.Contain("int resolveTimeout"));
+            Assert.That(ftp, Does.Contain("int connectTimeout"));
+            Assert.That(ftp, Does.Contain("int protocolTimeout"));
+            Assert.That(ftp, Does.Contain("IDS_GETIPTIMEOUT"));
+            Assert.That(ftp, Does.Contain("IDS_OPENCONTIMEOUT"));
+            Assert.That(ftp, Does.Contain("CloseSocket(NULL)"));
+            Assert.That(ftpTls, Does.Contain("DWORD tlsHandshakeTimeout = Config.GetServerRepliesTimeout() * 1000"));
+            Assert.That(ftpTls, Does.Contain("SO_RCVTIMEO"));
+            Assert.That(ftpTls, Does.Contain("SO_SNDTIMEO"));
+            Assert.That(ftpTls, Does.Contain("TLS handshake deadline expired."));
+            Assert.That(upload, Does.Contain("WinHttpSetTimeouts(session, 15000, 15000, 30000, 30000)"));
+            Assert.That(upload, Does.Contain("HINTERNET ActiveUploadSession = NULL"));
+            Assert.That(upload, Does.Contain("RegisterActiveUploadSession(session, uploadParams)"));
+            Assert.That(upload, Does.Contain("InterlockedExchange(&params->Cancelled, TRUE)"));
+            Assert.That(upload, Does.Contain("WinHttpCloseHandle(request)"));
+            Assert.That(upload, Does.Contain("WinHttpCloseHandle(session)"));
+            Assert.That(upload, Does.Contain("Network timeout"));
+            Assert.That(upload, Does.Contain("Authentication failure"));
+            Assert.That(upload, Does.Contain("Protocol or TLS failure"));
+            Assert.That(refactoring, Does.Contain("### 58. Apply deadlines and cancellation to all network operations — Implemented"));
+        });
+    }
+
     private static string FindRepositoryRoot()
     {
         for (var directory = new DirectoryInfo(AppContext.BaseDirectory); directory is not null; directory = directory.Parent)

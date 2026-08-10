@@ -718,6 +718,7 @@ MENU_TEMPLATE_ITEM AppendToSystemMenu[] =
                     IncMainDialogID(); // detach the running session - it will not send anything else and
                                        // will finish as soon as possible
 
+                    CancelDownloadThread(); // close the active network handle before detaching the worker
                     CloseHandle(HDownloadThread);
                     HDownloadThread = NULL;
                     ModulesCleanup();
@@ -758,6 +759,7 @@ MENU_TEMPLATE_ITEM AppendToSystemMenu[] =
                 {
                     IncMainDialogID(); // detach the running session - it will not send anything else and
                                        // will finish as soon as possible
+                    CancelDownloadThread(); // close the active network handle before detaching the worker
                     CloseHandle(HDownloadThread);
                     HDownloadThread = NULL;
                     ModulesCleanup();

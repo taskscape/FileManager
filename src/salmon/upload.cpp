@@ -22,14 +22,40 @@ const int kUploadRetryCount = 1;
 CRITICAL_SECTION UploadRequestLock;
 BOOL UploadRequestLockInitialized = FALSE;
 HINTERNET ActiveUploadRequest = NULL;
+HINTERNET ActiveUploadSession = NULL;
 
 void SetWinHttpError(CUploadParams* uploadParams, DWORD error)
 {
+    // Preserve actionable failure classes instead of presenting every network
+    // failure as a generic transport error to the crash-report dialog.
+    if (error == ERROR_WINHTTP_TIMEOUT)
+    {
+        sprintf(uploadParams->ErrorMessage, "Network timeout (%lu).", error);
+        return;
+    }
+    if (error == ERROR_WINHTTP_LOGIN_FAILURE)
+    {
+        sprintf(uploadParams->ErrorMessage, "Authentication failure (%lu).", error);
+        return;
+    }
+    if (error == ERROR_WINHTTP_INVALID_SERVER_RESPONSE || error == ERROR_WINHTTP_HEADER_NOT_FOUND ||
+        error == ERROR_WINHTTP_SECURE_FAILURE || error == ERROR_WINHTTP_REDIRECT_FAILED)
+    {
+        sprintf(uploadParams->ErrorMessage, "Protocol or TLS failure (%lu).", error);
+        return;
+    }
     sprintf(uploadParams->ErrorMessage, LoadStr(IDS_SALMON_HTTP_ERROR, HLanguage), error);
 }
 
 void SetHttpStatusError(CUploadParams* uploadParams, DWORD status)
 {
+    // HTTP authentication and a malformed/server-rejected protocol response
+    // must remain distinguishable from a deadline so retry advice is sound.
+    if (status == HTTP_STATUS_DENIED || status == HTTP_STATUS_PROXY_AUTH_REQ)
+    {
+        sprintf(uploadParams->ErrorMessage, "Authentication failure (HTTP %lu).", status);
+        return;
+    }
     sprintf(uploadParams->ErrorMessage, LoadStr(IDS_SALMON_HTTP_STATUS, HLanguage), status);
 }
 
@@ -91,22 +117,66 @@ void SetUploadError(CUploadParams* uploadParams, DWORD error)
     SetWinHttpError(uploadParams, error);
 }
 
-void RegisterActiveUploadRequest(HINTERNET request)
+BOOL RegisterActiveUploadSession(HINTERNET session, const CUploadParams* uploadParams)
 {
+    BOOL registered = FALSE;
     EnterCriticalSection(&UploadRequestLock);
-    ActiveUploadRequest = request;
+    if (!IsUploadCancelled(uploadParams))
+    {
+        ActiveUploadSession = session;
+        registered = TRUE;
+    }
     LeaveCriticalSection(&UploadRequestLock);
+
+    if (!registered)
+        WinHttpCloseHandle(session);
+    return registered;
+}
+
+BOOL RegisterActiveUploadRequest(HINTERNET request, const CUploadParams* uploadParams)
+{
+    BOOL registered = FALSE;
+    EnterCriticalSection(&UploadRequestLock);
+    if (!IsUploadCancelled(uploadParams))
+    {
+        ActiveUploadRequest = request;
+        registered = TRUE;
+    }
+    LeaveCriticalSection(&UploadRequestLock);
+
+    if (!registered)
+        WinHttpCloseHandle(request);
+    return registered;
 }
 
 void CloseActiveUploadRequest(HINTERNET request)
 {
+    BOOL closeRequest = FALSE;
     EnterCriticalSection(&UploadRequestLock);
     if (ActiveUploadRequest == request)
     {
         ActiveUploadRequest = NULL;
-        WinHttpCloseHandle(request);
+        closeRequest = TRUE;
     }
     LeaveCriticalSection(&UploadRequestLock);
+
+    if (closeRequest)
+        WinHttpCloseHandle(request);
+}
+
+void CloseActiveUploadSession(HINTERNET session)
+{
+    BOOL closeSession = FALSE;
+    EnterCriticalSection(&UploadRequestLock);
+    if (ActiveUploadSession == session)
+    {
+        ActiveUploadSession = NULL;
+        closeSession = TRUE;
+    }
+    LeaveCriticalSection(&UploadRequestLock);
+
+    if (closeSession)
+        WinHttpCloseHandle(session);
 }
 
 BOOL WriteRequestData(HINTERNET request, const void* data, DWORD size, DWORD* error)
@@ -236,6 +306,10 @@ BOOL UploadReportAttempt(CUploadParams* uploadParams, BOOL* retryable)
         {
             SetWinHttpError(uploadParams, GetLastError());
         }
+        else if (!RegisterActiveUploadSession(session, uploadParams))
+        {
+            SetUploadError(uploadParams, ERROR_CANCELLED);
+        }
         else
         {
             // Bound all network operations; normal certificate-chain and hostname
@@ -265,40 +339,41 @@ BOOL UploadReportAttempt(CUploadParams* uploadParams, BOOL* retryable)
                     }
                     else
                     {
-                        RegisterActiveUploadRequest(request);
-                        // A fixed HTTPS endpoint never follows a redirect, so a server
-                        // cannot downgrade a report to plaintext HTTP.
-                        DWORD disabledFeatures = WINHTTP_DISABLE_REDIRECTS;
-                        if (IsUploadCancelled(uploadParams))
+                        if (!RegisterActiveUploadRequest(request, uploadParams))
                         {
                             SetUploadError(uploadParams, ERROR_CANCELLED);
                         }
-                        else if (!WinHttpSetOption(request, WINHTTP_OPTION_DISABLE_FEATURE, &disabledFeatures, sizeof(disabledFeatures)))
-                        {
-                            SetUploadError(uploadParams, GetLastError());
-                        }
                         else
                         {
-                            // WinHTTP owns the Transfer-Encoding framing.  This avoids a
-                            // lossy DWORD Content-Length calculation and permits reports
-                            // larger than 4 GiB without allocating them in memory.
-                            const wchar_t contentType[] = L"Content-Type: multipart/form-data; boundary=---------------------------OpenSalamanderCrashReport\r\nTransfer-Encoding: chunked\r\n";
-                            if (!WinHttpSendRequest(request, contentType, (DWORD)-1L, WINHTTP_NO_REQUEST_DATA, 0,
-                                                    WINHTTP_IGNORE_REQUEST_TOTAL_LENGTH, 0))
+                            // A fixed HTTPS endpoint never follows a redirect, so a server
+                            // cannot downgrade a report to plaintext HTTP.
+                            DWORD disabledFeatures = WINHTTP_DISABLE_REDIRECTS;
+                            if (!WinHttpSetOption(request, WINHTTP_OPTION_DISABLE_FEATURE, &disabledFeatures, sizeof(disabledFeatures)))
                             {
-                                error = GetLastError();
-                                // No multipart bytes have been written yet, so this is the
-                                // one point at which repeating a POST cannot duplicate a
-                                // committed crash report.
-                                *retryable = !IsUploadCancelled(uploadParams);
-                                SetUploadError(uploadParams, error);
-                            }
-                            else if (!WriteRequestData(request, multipartPrefix, multipartPrefixLength, &error))
-                            {
-                                SetUploadError(uploadParams, error);
+                                SetUploadError(uploadParams, GetLastError());
                             }
                             else
                             {
+                                // WinHTTP owns the Transfer-Encoding framing.  This avoids a
+                                // lossy DWORD Content-Length calculation and permits reports
+                                // larger than 4 GiB without allocating them in memory.
+                                const wchar_t contentType[] = L"Content-Type: multipart/form-data; boundary=---------------------------OpenSalamanderCrashReport\r\nTransfer-Encoding: chunked\r\n";
+                                if (!WinHttpSendRequest(request, contentType, (DWORD)-1L, WINHTTP_NO_REQUEST_DATA, 0,
+                                                    WINHTTP_IGNORE_REQUEST_TOTAL_LENGTH, 0))
+                                {
+                                    error = GetLastError();
+                                    // No multipart bytes have been written yet, so this is the
+                                    // one point at which repeating a POST cannot duplicate a
+                                    // committed crash report.
+                                    *retryable = !IsUploadCancelled(uploadParams);
+                                    SetUploadError(uploadParams, error);
+                                }
+                                else if (!WriteRequestData(request, multipartPrefix, multipartPrefixLength, &error))
+                                {
+                                    SetUploadError(uploadParams, error);
+                                }
+                                else
+                                {
                                 std::vector<char> buffer(kIoBufferSize);
                                 BOOL writeSucceeded = TRUE;
                                 uint64_t remaining = (uint64_t)fileSize.QuadPart;
@@ -395,6 +470,7 @@ BOOL UploadReportAttempt(CUploadParams* uploadParams, BOOL* retryable)
                                         }
                                     }
                                 }
+                                }
                             }
                         }
                         CloseActiveUploadRequest(request);
@@ -402,7 +478,7 @@ BOOL UploadReportAttempt(CUploadParams* uploadParams, BOOL* retryable)
                     WinHttpCloseHandle(connection);
                 }
             }
-            WinHttpCloseHandle(session);
+            CloseActiveUploadSession(session);
         }
     }
 
@@ -525,6 +601,11 @@ BOOL StartUploadThread(CUploadParams* params)
         InitializeCriticalSection(&UploadRequestLock);
         UploadRequestLockInitialized = TRUE;
     }
+    // Each upload owns a fresh cancellation scope and no handles from a prior run.
+    EnterCriticalSection(&UploadRequestLock);
+    ActiveUploadRequest = NULL;
+    ActiveUploadSession = NULL;
+    LeaveCriticalSection(&UploadRequestLock);
     InterlockedExchange(&params->Cancelled, FALSE);
     DWORD id;
     HUploadThread = CreateThread(NULL, 0, UploadThreadF, params, 0, &id);
@@ -538,14 +619,21 @@ void CancelUploadThread(CUploadParams* params)
 
     InterlockedExchange(&params->Cancelled, TRUE);
 
+    HINTERNET request = NULL;
+    HINTERNET session = NULL;
     EnterCriticalSection(&UploadRequestLock);
-    if (ActiveUploadRequest != NULL)
-    {
-        HINTERNET request = ActiveUploadRequest;
-        ActiveUploadRequest = NULL;
-        WinHttpCloseHandle(request);
-    }
+    request = ActiveUploadRequest;
+    session = ActiveUploadSession;
+    ActiveUploadRequest = NULL;
+    ActiveUploadSession = NULL;
     LeaveCriticalSection(&UploadRequestLock);
+
+    // Closing both WinHTTP layers interrupts any current request and prevents
+    // a pending resolve/connect phase from delaying dialog shutdown.
+    if (request != NULL)
+        WinHttpCloseHandle(request);
+    if (session != NULL)
+        WinHttpCloseHandle(session);
 }
 
 BOOL IsUploadThreadRunning()
