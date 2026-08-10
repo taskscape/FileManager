@@ -4,6 +4,8 @@
 
 #pragma once
 
+#include <atomic>
+
 // when changing this header search for "BuiltForVersion" - tests for older plugin versions will no longer make sense and should be removed
 #define PLUGIN_REQVER 103 // ("5.0") load only plugins that return at least this required Salamander version
 
@@ -22,6 +24,26 @@
 void EnterPlugin();
 void LeavePlugin();
 BOOL IsInPlugin();
+
+// The main application thread owns creation and teardown through CPlugins.  Plug-in
+// callbacks may arrive on host worker threads, so the depth is atomic and the
+// first-entry/last-exit transitions are serialized by the state object.
+class CPluginCallbackState
+{
+public:
+    CPluginCallbackState();
+
+    void Enter();
+    void Leave();
+    BOOL IsEntered() const;
+
+private:
+    CPluginCallbackState(const CPluginCallbackState&);
+    CPluginCallbackState& operator=(const CPluginCallbackState&);
+
+    std::atomic<int> CallbackDepth;
+    SRWLOCK TransitionLock;
+};
 
 // Every host-to-plug-in call must use this boundary.  The exception filter restores
 // the EnterPlugin invariants, records the owning plug-in and queues a safe unload.
@@ -2840,6 +2862,9 @@ struct CPluginFSTimer
 class CPlugins
 {
 protected:
+    // Keeps callback lifetime state with its plug-in owner instead of in a
+    // translation-unit global shared with shutdown and re-entrant callbacks.
+    CPluginCallbackState CallbackState;
     TIndirectArray<CPluginData> Data;
     CRITICAL_SECTION DataCS; // critical section used only to synchronize data accessed by GetIndex() method
 
@@ -2885,6 +2910,10 @@ public:
 
     void EnterDataCS() { HANDLES(EnterCriticalSection(&DataCS)); }
     void LeaveDataCS() { HANDLES(LeaveCriticalSection(&DataCS)); }
+
+    // Compatibility entry points retain the legacy call surface while callers
+    // that manage one callback scope can receive this narrow state reference.
+    CPluginCallbackState& GetCallbackState() { return CallbackState; }
 
     // loads the object from registry key 'regKey' or default values (if regKey==NULL) (ZIP + TAR + PAK)
     // 'parent' is the parent window for message boxes (may be NULL)
