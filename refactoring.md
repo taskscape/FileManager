@@ -385,10 +385,13 @@ This document is the working record for a read-only stability and resilience aud
 - **Implementation (2026-08-10):** `retry_policy.h` is now the shared authority for transient Win32/network classification, a maximum of three exponential retries (100 ms, 200 ms, 400 ms before bounded jitter), and cancellation-event waits. Synchronous and asynchronous source-read recovery use it; move and directory-delete commit paths are classified as destructive, so the policy rejects automatic retries and leaves the existing Retry/Skip/Cancel prompt as the decision boundary. `COperationResult` uses the same classification for its retryability field.
 - **Verification:** `NativeSafetyRegressionTests.Central_retry_policy_bounds_transient_read_retries_and_blocks_destructive_commits` pins the common classification, cap, jittered cancellation-aware delay, copy call sites, destructive classifications, absence of the former ad hoc sleeps, and this ledger entry.
 
-### 58. Apply deadlines and cancellation to all network operations
+### 58. Apply deadlines and cancellation to all network operations — Implemented (2026-08-10)
 
 - **Justification:** FTP, update, and report paths can block on DNS, connect, TLS, send, or receive while shutdown waits on their threads.
 - **Proposed solution:** Define phase-specific timeouts, propagate one cancellation token, close sockets/requests to interrupt blocking I/O, and distinguish timeout from authentication or protocol failure.
+
+- **Implementation (2026-08-10):** CheckVer now applies 15-second DNS/connect and send deadlines plus a 30-second receive deadline to its WinINet session. Its single cancellation token closes the currently active session or URL handle, so dismissing the dialog or unloading the plug-in interrupts a blocked network phase instead of merely detaching its thread. The existing nonblocking FTP transport now names its DNS, TCP-connect, and FTP/TLS protocol deadlines separately, bounds the temporary blocking SChannel handshake with socket send/receive deadlines, and retains its established socket-close cancellation path plus distinct resolve/connect/reply errors. Salmon retains its bounded WinHTTP phases, now registers both the session and request against the upload token, closes both on cancellation, and reports timeout, authentication, and protocol/TLS failures distinctly.
+- **Verification:** `NativeSafetyRegressionTests.Network_operations_have_phase_deadlines_cancellation_and_failure_classification` pins the timeout settings, cancellation-handle closure, FTP phase boundaries, failure classification, and this implementation ledger entry.
 
 ### 59. Make FTP transfers transactional and resumable safely
 
