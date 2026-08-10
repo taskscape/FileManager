@@ -14,6 +14,17 @@ struct CParserBrokerArchiveMetadata
     DWORD ItemCount;
 };
 
+// Broker admission stays bounded even when slow thumbnail or metadata callers
+// arrive from several panel and navigation workers at once.
+struct CParserBrokerQueueMetrics
+{
+    LONG Capacity;
+    LONG Pending;
+    LONGLONG Accepted;
+    LONGLONG Rejected;
+    LONGLONG HighWaterMark;
+};
+
 class CParserBrokerClient
 {
 private:
@@ -23,6 +34,10 @@ private:
     CRITICAL_SECTION Lock;
     DWORD NextCorrelationId;
     WCHAR PipeName[MAX_PATH];
+    volatile LONG PendingRequests;
+    volatile LONGLONG AcceptedRequests;
+    volatile LONGLONG RejectedRequests;
+    volatile LONGLONG HighWaterMark;
 
     BOOL Start();
     void Stop();
@@ -40,6 +55,9 @@ public:
     BOOL LoadThumbnail(const char* path, int width, int height, BOOL fastThumbnail,
                        CSalamanderThumbnailMakerAbstract* maker);
     BOOL QueryArchiveMetadata(const char* path, CParserBrokerArchiveMetadata* metadata);
+
+    // Exposes broker backpressure without retaining callers behind the serialized pipe.
+    CParserBrokerQueueMetrics GetQueueMetrics();
 };
 
 extern CParserBrokerClient ParserBroker;

@@ -732,6 +732,8 @@ CFTPQueue::CFTPQueue() : Items(100, 500)
     CopyUnknownSizeCountIfUnknownBlockSize = 0;
     LastErrorOccurenceTime = -1;
     LastFoundErrorOccurenceTime = -1;
+    RejectedItemCount = 0;
+    HighWaterMark = 0;
 }
 
 CFTPQueue::~CFTPQueue()
@@ -894,20 +896,44 @@ BOOL CFTPQueue::AddItem(CFTPQueueItem* newItem)
 
     HANDLES(EnterCriticalSection(&QueueCritSect));
     BOOL ret = TRUE;
-    Items.Add(newItem);
-    if (Items.IsGood())
+    // A recursive remote listing may otherwise retain one operation object per entry indefinitely.
+    if (Items.Count >= FTP_OPERATION_QUEUE_LIMIT)
     {
-        UpdateCounters(newItem, TRUE);
-        if (newItem->IsItemInSimpleErrorState())
-            newItem->ErrorOccurenceTime = GiveLastErrorOccurenceTime();
+        RejectedItemCount++;
+        TRACE_I("CFTPQueue::AddItem(): bounded operation queue rejected a new item");
+        ret = FALSE;
     }
     else
     {
-        Items.ResetState();
-        ret = FALSE;
+        Items.Add(newItem);
+        if (Items.IsGood())
+        {
+            UpdateCounters(newItem, TRUE);
+            if (Items.Count > HighWaterMark)
+                HighWaterMark = Items.Count;
+            if (newItem->IsItemInSimpleErrorState())
+                newItem->ErrorOccurenceTime = GiveLastErrorOccurenceTime();
+        }
+        else
+        {
+            Items.ResetState();
+            ret = FALSE;
+        }
     }
     HANDLES(LeaveCriticalSection(&QueueCritSect));
     return ret;
+}
+
+void CFTPQueue::GetQueueMetrics(int* count, int* rejected, int* highWaterMark)
+{
+    HANDLES(EnterCriticalSection(&QueueCritSect));
+    if (count != NULL)
+        *count = Items.Count;
+    if (rejected != NULL)
+        *rejected = RejectedItemCount;
+    if (highWaterMark != NULL)
+        *highWaterMark = HighWaterMark;
+    HANDLES(LeaveCriticalSection(&QueueCritSect));
 }
 
 BOOL CFTPQueue::ReplaceItemWithListOfItems(int itemUID, CFTPQueueItem** items, int itemsCount)
@@ -920,27 +946,39 @@ BOOL CFTPQueue::ReplaceItemWithListOfItems(int itemUID, CFTPQueueItem** items, i
     {
         if (itemsCount > 1)
         {
-            Items.Insert(LastFoundIndex + 1, items + 1, itemsCount - 1);
-            if (Items.IsGood())
+            if (itemsCount > FTP_OPERATION_QUEUE_LIMIT ||
+                Items.Count > FTP_OPERATION_QUEUE_LIMIT - (itemsCount - 1))
             {
-                UpdateCounters(Items[LastFoundIndex], FALSE);
-                delete Items[LastFoundIndex];
-                Items[LastFoundIndex] = *items;
-                LastFoundUID = (*items)->UID;
-                int i;
-                for (i = LastFoundIndex; i < LastFoundIndex + itemsCount; i++)
-                {
-                    CFTPQueueItem* item = Items[i];
-                    UpdateCounters(item, TRUE);
-                    if (item->IsItemInSimpleErrorState())
-                        item->ErrorOccurenceTime = GiveLastErrorOccurenceTime();
-                }
-                ret = TRUE;
-                HandleFirstWaitingItemIndex(TRUE, // instead of searching the array we expect the worst case - an explore item at the first position in the array
-                                            LastFoundIndex);
+                // Expansion must fail atomically so callers retain the original durable item to report it.
+                RejectedItemCount += itemsCount - 1;
+                TRACE_I("CFTPQueue::ReplaceItemWithListOfItems(): bounded operation queue rejected expansion");
             }
             else
-                Items.ResetState();
+            {
+                Items.Insert(LastFoundIndex + 1, items + 1, itemsCount - 1);
+                if (Items.IsGood())
+                {
+                    UpdateCounters(Items[LastFoundIndex], FALSE);
+                    delete Items[LastFoundIndex];
+                    Items[LastFoundIndex] = *items;
+                    LastFoundUID = (*items)->UID;
+                    int i;
+                    for (i = LastFoundIndex; i < LastFoundIndex + itemsCount; i++)
+                    {
+                        CFTPQueueItem* item = Items[i];
+                        UpdateCounters(item, TRUE);
+                        if (item->IsItemInSimpleErrorState())
+                            item->ErrorOccurenceTime = GiveLastErrorOccurenceTime();
+                    }
+                    ret = TRUE;
+                    if (Items.Count > HighWaterMark)
+                        HighWaterMark = Items.Count;
+                    HandleFirstWaitingItemIndex(TRUE, // instead of searching the array we expect the worst case - an explore item at the first position in the array
+                                                LastFoundIndex);
+                }
+                else
+                    Items.ResetState();
+            }
         }
         else
         {

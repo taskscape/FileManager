@@ -23,6 +23,10 @@ HANDLE SharesEvent = NULL;          // will be signaled if LanMan Shares change
 
 int SnooperSuspended = 0;
 
+volatile LONGLONG SnooperRefreshPosts = 0;
+volatile LONGLONG SnooperRefreshWaits = 0;
+volatile LONGLONG SnooperSuspendRefreshPosts = 0;
+
 CRITICAL_SECTION TimeCounterSection; // for synchronizing access to MyTimeCounter
 int MyTimeCounter = 0;               // current time
 
@@ -248,6 +252,8 @@ unsigned ThreadSnooperBody(void* /*param*/) // don't call main thread functions 
                     HWND wnd = refreshPanels[i];
                     if (IsWindow(wnd))
                     {
+                        // Suspended panels are emitted as one batch, never as an unbounded retry stream.
+                        InterlockedIncrement64(&SnooperSuspendRefreshPosts);
                         PostMessage(wnd, WM_USER_S_REFRESH_DIR, FALSE, MyTimeCounter++);
                     }
                 }
@@ -324,6 +330,8 @@ unsigned ThreadSnooperBody(void* /*param*/) // don't call main thread functions 
                     MainWindowCS.Unlock();
                 }
                 HANDLES(EnterCriticalSection(&TimeCounterSection));
+                // The following acknowledgement wait keeps at most one live snooper refresh outstanding.
+                InterlockedIncrement64(&SnooperRefreshPosts);
                 PostMessage(WindowArray[index]->HWindow, WM_USER_REFRESH_DIR, TRUE, MyTimeCounter++);
                 HANDLES(LeaveCriticalSection(&TimeCounterSection));
                 FindNextChangeNotification((HANDLE)ObjectArray[index]); // stornujem tuto zmenu
@@ -337,6 +345,7 @@ unsigned ThreadSnooperBody(void* /*param*/) // don't call main thread functions 
                 objects[3] = RefreshFinishedEvent; // zprava od hl. threadu o ukonceni r.
 
                 BOOL refreshNotFinished = TRUE;
+                InterlockedIncrement64(&SnooperRefreshWaits);
                 while (refreshNotFinished) // pockame na zpracovani
                 {                          // osetreni vseho krome zmen v adresarich
                     res = WaitForMultipleObjects(4, objects, FALSE, INFINITE);
@@ -370,6 +379,7 @@ unsigned ThreadSnooperBody(void* /*param*/) // don't call main thread functions 
                             sameHandle = NULL;
 
                             HANDLES(EnterCriticalSection(&TimeCounterSection));
+                            InterlockedIncrement64(&SnooperRefreshPosts);
                             PostMessage(WindowArray[index]->HWindow, WM_USER_REFRESH_DIR, TRUE, MyTimeCounter++);
                             HANDLES(LeaveCriticalSection(&TimeCounterSection));
 
@@ -397,6 +407,15 @@ unsigned ThreadSnooperBody(void* /*param*/) // don't call main thread functions 
         HANDLES(RegCloseKey(sharesKey));
     TRACE_I("End");
     return 0;
+}
+
+CDirectoryRefreshMetrics GetDirectoryRefreshMetrics()
+{
+    CDirectoryRefreshMetrics metrics;
+    metrics.Posted = InterlockedCompareExchange64(&SnooperRefreshPosts, 0, 0);
+    metrics.Awaited = InterlockedCompareExchange64(&SnooperRefreshWaits, 0, 0);
+    metrics.SuspendBatched = InterlockedCompareExchange64(&SnooperSuspendRefreshPosts, 0, 0);
+    return metrics;
 }
 
 unsigned ThreadSnooperEH(void* param)

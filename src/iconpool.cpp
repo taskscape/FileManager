@@ -9,6 +9,7 @@
 #include "fileswnd.h"
 #include "geticon.h"
 #include "iconpool.h"
+#include "common/thread_owner.h"
 
 // Global icon thread pool instance
 CIconThreadPool IconPool;
@@ -26,15 +27,23 @@ CIconThreadPool::CIconThreadPool()
 {
     memset(Workers, 0, sizeof(Workers));
     WorkerCount = 0;
-    QueueHead = 0;
-    QueueTail = 0;
     QueueCount = 0;
+    ActiveCount = 0;
+    CurrentGeneration = 1;
     memset(WorkQueue, 0, sizeof(WorkQueue));
     WorkAvailableEvent = NULL;
     TerminateEvent = NULL;
+    AllWorkCompletedEvent = NULL;
     ResultCallback = NULL;
     CallbackContext = NULL;
     NextRequestId = 1;
+    SubmittedCount = 0;
+    CompletedCount = 0;
+    DeduplicatedCount = 0;
+    CancelledCount = 0;
+    BackpressureRejectedCount = 0;
+    VisiblePreemptionCount = 0;
+    HighWaterMark = 0;
     Initialized = FALSE;
 }
 
@@ -55,7 +64,8 @@ BOOL CIconThreadPool::Initialize(int numWorkers)
     
     HANDLES(InitializeCriticalSection(&QueueLock));
     
-    WorkAvailableEvent = HANDLES(CreateEvent(NULL, FALSE, FALSE, NULL)); // auto-reset
+    // A manual-reset event wakes enough workers to drain every ready fixed slot.
+    WorkAvailableEvent = HANDLES(CreateEvent(NULL, TRUE, FALSE, NULL));
     if (WorkAvailableEvent == NULL)
     {
         HANDLES(DeleteCriticalSection(&QueueLock));
@@ -65,6 +75,18 @@ BOOL CIconThreadPool::Initialize(int numWorkers)
     TerminateEvent = HANDLES(CreateEvent(NULL, TRUE, FALSE, NULL)); // manual-reset
     if (TerminateEvent == NULL)
     {
+        HANDLES(CloseHandle(WorkAvailableEvent));
+        WorkAvailableEvent = NULL;
+        HANDLES(DeleteCriticalSection(&QueueLock));
+        return FALSE;
+    }
+
+    // Waiting on this event replaces polling and includes in-flight work.
+    AllWorkCompletedEvent = HANDLES(CreateEvent(NULL, TRUE, TRUE, NULL));
+    if (AllWorkCompletedEvent == NULL)
+    {
+        HANDLES(CloseHandle(TerminateEvent));
+        TerminateEvent = NULL;
         HANDLES(CloseHandle(WorkAvailableEvent));
         WorkAvailableEvent = NULL;
         HANDLES(DeleteCriticalSection(&QueueLock));
@@ -95,6 +117,8 @@ BOOL CIconThreadPool::Initialize(int numWorkers)
         TerminateEvent = NULL;
         HANDLES(CloseHandle(WorkAvailableEvent));
         WorkAvailableEvent = NULL;
+        HANDLES(CloseHandle(AllWorkCompletedEvent));
+        AllWorkCompletedEvent = NULL;
         HANDLES(DeleteCriticalSection(&QueueLock));
         return FALSE;
     }
@@ -109,6 +133,9 @@ void CIconThreadPool::Shutdown()
     if (!Initialized)
         return;
     
+    // Obsolete requests must not extend shutdown after the owner starts teardown.
+    CancelAllPending();
+
     // Signal all workers to terminate
     SetEvent(TerminateEvent);
     
@@ -116,11 +143,9 @@ void CIconThreadPool::Shutdown()
     for (int i = 0; i < WorkerCount; i++)
         SetEvent(WorkAvailableEvent);
     
-    // Wait for all workers to finish
-    if (WorkerCount > 0)
-    {
-        WaitForMultipleObjects(WorkerCount, Workers, TRUE, 5000);
-    }
+    // A diagnostic deadline is not permission to free queue state a worker may still use.
+    for (int i = 0; i < WorkerCount; i++)
+        CThreadShutdownDeadline("icon work pool").WaitForSafeJoin(Workers[i]);
     
     // Close worker handles
     for (int i = 0; i < WorkerCount; i++)
@@ -144,19 +169,18 @@ void CIconThreadPool::Shutdown()
         HANDLES(CloseHandle(WorkAvailableEvent));
         WorkAvailableEvent = NULL;
     }
-    
-    HANDLES(DeleteCriticalSection(&QueueLock));
-    
-    // Destroy any remaining icons in the queue
-    for (int i = 0; i < ICON_POOL_QUEUE_SIZE; i++)
+    if (AllWorkCompletedEvent != NULL)
     {
-        if (WorkQueue[i].ResultIcon != NULL)
-        {
-            DestroyIcon(WorkQueue[i].ResultIcon);
-            WorkQueue[i].ResultIcon = NULL;
-        }
+        HANDLES(CloseHandle(AllWorkCompletedEvent));
+        AllWorkCompletedEvent = NULL;
     }
     
+    // Every slot owns its result until a callback consumes it synchronously.
+    for (int i = 0; i < ICON_POOL_QUEUE_SIZE; i++)
+        ClearWorkItemLocked(WorkQueue[i]);
+
+    HANDLES(DeleteCriticalSection(&QueueLock));
+
     Initialized = FALSE;
     TRACE_I("CIconThreadPool::Shutdown(): Thread pool shut down");
 }
@@ -169,18 +193,61 @@ void CIconThreadPool::SetResultCallback(IconPoolResultCallback callback, void* c
 
 DWORD CIconThreadPool::SubmitWorkItem(CIconWorkItem* item)
 {
-    if (!Initialized)
+    if (!Initialized || item == NULL)
         return 0;
-    
+
     HANDLES(EnterCriticalSection(&QueueLock));
-    
+
+    item->Generation = item->Generation != 0 ? item->Generation : CurrentGeneration;
+    item->Priority = item->Priority == iwpVisible ? iwpVisible : iwpBackground;
+
+    // Coalescing identical requests prevents repeated paints from multiplying work.
+    for (int i = 0; i < ICON_POOL_QUEUE_SIZE; i++)
+    {
+        CIconWorkItem& queued = WorkQueue[i];
+        if (queued.RequestId != 0 && !queued.Cancelled && IsSameWorkItem(queued, *item))
+        {
+            if (item->Priority > queued.Priority)
+                queued.Priority = item->Priority;
+            InterlockedIncrement64(&DeduplicatedCount);
+            DWORD requestId = queued.RequestId;
+            HANDLES(LeaveCriticalSection(&QueueLock));
+            return requestId;
+        }
+    }
+
     if (QueueCount >= ICON_POOL_QUEUE_SIZE)
     {
-        HANDLES(LeaveCriticalSection(&QueueLock));
-        TRACE_I("CIconThreadPool::SubmitWorkItem(): Queue full");
-        return 0; // Queue full
+        int preemptedSlot = -1;
+        if (item->Priority == iwpVisible)
+        {
+            // Visible work may reclaim only dormant background slots; active I/O stays cooperative.
+            for (int i = 0; i < ICON_POOL_QUEUE_SIZE; i++)
+            {
+                if (WorkQueue[i].RequestId != 0 && !WorkQueue[i].InProgress &&
+                    !WorkQueue[i].Cancelled && WorkQueue[i].Priority == iwpBackground)
+                {
+                    preemptedSlot = i;
+                    break;
+                }
+            }
+        }
+
+        if (preemptedSlot >= 0)
+        {
+            CancelWorkItemLocked(WorkQueue[preemptedSlot]);
+            DiscardCancelledWorkItemsLocked();
+            InterlockedIncrement64(&VisiblePreemptionCount);
+        }
+        else
+        {
+            InterlockedIncrement64(&BackpressureRejectedCount);
+            HANDLES(LeaveCriticalSection(&QueueLock));
+            TRACE_I("CIconThreadPool::SubmitWorkItem(): bounded queue rejected work");
+            return 0;
+        }
     }
-    
+
     DWORD requestId = InterlockedIncrement(&NextRequestId);
     if (requestId == 0)
         requestId = InterlockedIncrement(&NextRequestId); // Skip 0
@@ -189,48 +256,77 @@ DWORD CIconThreadPool::SubmitWorkItem(CIconWorkItem* item)
     item->ResultIcon = NULL;
     item->Completed = 0;
     item->Cancelled = 0;
-    
-    // Copy to queue
-    int slot = QueueHead;
+    item->InProgress = 0;
+
+    int slot = -1;
+    for (int i = 0; i < ICON_POOL_QUEUE_SIZE; i++)
+    {
+        if (WorkQueue[i].RequestId == 0)
+        {
+            slot = i;
+            break;
+        }
+    }
+    if (slot < 0)
+    {
+        // This should be unreachable after the capacity/preemption branch, but remains bounded if corrupted.
+        InterlockedIncrement64(&BackpressureRejectedCount);
+        HANDLES(LeaveCriticalSection(&QueueLock));
+        return 0;
+    }
+
     memcpy(&WorkQueue[slot], item, sizeof(CIconWorkItem));
-    QueueHead = (QueueHead + 1) % ICON_POOL_QUEUE_SIZE;
     InterlockedIncrement(&QueueCount);
-    
+    InterlockedIncrement64(&SubmittedCount);
+    LONG highWater = InterlockedCompareExchange(&QueueCount, 0, 0);
+    for (LONGLONG observed = InterlockedCompareExchange64(&HighWaterMark, 0, 0);
+         highWater > observed && InterlockedCompareExchange64(&HighWaterMark, highWater, observed) != observed;
+         observed = InterlockedCompareExchange64(&HighWaterMark, 0, 0))
+    {
+    }
+    ResetEvent(AllWorkCompletedEvent);
+    UpdateWorkAvailableSignalLocked();
     HANDLES(LeaveCriticalSection(&QueueLock));
-    
-    // Signal that work is available
-    SetEvent(WorkAvailableEvent);
-    
+
     return requestId;
 }
 
-DWORD CIconThreadPool::SubmitGetFileIcon(const char* path, CIconSizeEnum iconSize)
+DWORD CIconThreadPool::SubmitGetFileIcon(const char* path, CIconSizeEnum iconSize, DWORD generation, BOOL visible)
 {
     CIconWorkItem item;
+    memset(&item, 0, sizeof(item));
     item.Type = iwtGetFileIcon;
     lstrcpynA(item.Path, path, MAX_PATH);
     item.Index = 0;
     item.IconSize = iconSize;
+    item.Generation = generation;
+    item.Priority = visible ? iwpVisible : iwpBackground;
     return SubmitWorkItem(&item);
 }
 
-DWORD CIconThreadPool::SubmitExtractIcon(const char* path, int index, CIconSizeEnum iconSize)
+DWORD CIconThreadPool::SubmitExtractIcon(const char* path, int index, CIconSizeEnum iconSize, DWORD generation, BOOL visible)
 {
     CIconWorkItem item;
+    memset(&item, 0, sizeof(item));
     item.Type = iwtExtractIcon;
     lstrcpynA(item.Path, path, MAX_PATH);
     item.Index = index;
     item.IconSize = iconSize;
+    item.Generation = generation;
+    item.Priority = visible ? iwpVisible : iwpBackground;
     return SubmitWorkItem(&item);
 }
 
-DWORD CIconThreadPool::SubmitLoadImageIcon(const char* path, CIconSizeEnum iconSize)
+DWORD CIconThreadPool::SubmitLoadImageIcon(const char* path, CIconSizeEnum iconSize, DWORD generation, BOOL visible)
 {
     CIconWorkItem item;
+    memset(&item, 0, sizeof(item));
     item.Type = iwtLoadImageIcon;
     lstrcpynA(item.Path, path, MAX_PATH);
     item.Index = 0;
     item.IconSize = iconSize;
+    item.Generation = generation;
+    item.Priority = visible ? iwpVisible : iwpBackground;
     return SubmitWorkItem(&item);
 }
 
@@ -244,34 +340,88 @@ int CIconThreadPool::GetPendingCount()
     return QueueCount;
 }
 
+CIconQueueMetrics CIconThreadPool::GetMetrics()
+{
+    CIconQueueMetrics metrics;
+    memset(&metrics, 0, sizeof(metrics));
+    metrics.Capacity = ICON_POOL_QUEUE_SIZE;
+
+    if (Initialized)
+    {
+        HANDLES(EnterCriticalSection(&QueueLock));
+        metrics.Queued = QueueCount - ActiveCount;
+        metrics.Active = ActiveCount;
+        HANDLES(LeaveCriticalSection(&QueueLock));
+    }
+
+    metrics.Submitted = InterlockedCompareExchange64(&SubmittedCount, 0, 0);
+    metrics.Completed = InterlockedCompareExchange64(&CompletedCount, 0, 0);
+    metrics.Deduplicated = InterlockedCompareExchange64(&DeduplicatedCount, 0, 0);
+    metrics.Cancelled = InterlockedCompareExchange64(&CancelledCount, 0, 0);
+    metrics.BackpressureRejected = InterlockedCompareExchange64(&BackpressureRejectedCount, 0, 0);
+    metrics.VisiblePreemptions = InterlockedCompareExchange64(&VisiblePreemptionCount, 0, 0);
+    metrics.HighWaterMark = InterlockedCompareExchange64(&HighWaterMark, 0, 0);
+    return metrics;
+}
+
 void CIconThreadPool::CancelAllPending()
 {
     HANDLES(EnterCriticalSection(&QueueLock));
-    
-    // Mark all pending items as cancelled
+
+    // Cancellation frees dormant slots immediately while active providers observe it cooperatively.
+    for (int i = 0; i < ICON_POOL_QUEUE_SIZE; i++)
+        CancelWorkItemLocked(WorkQueue[i]);
+    DiscardCancelledWorkItemsLocked();
+    UpdateWorkAvailableSignalLocked();
+    UpdateCompletionSignalLocked();
+    HANDLES(LeaveCriticalSection(&QueueLock));
+}
+
+void CIconThreadPool::CancelObsoleteGenerations(DWORD currentGeneration)
+{
+    if (!Initialized || currentGeneration == 0)
+        return;
+
+    HANDLES(EnterCriticalSection(&QueueLock));
+    if (currentGeneration > CurrentGeneration)
+        CurrentGeneration = currentGeneration;
     for (int i = 0; i < ICON_POOL_QUEUE_SIZE; i++)
     {
-        if (WorkQueue[i].RequestId != 0 && WorkQueue[i].Completed == 0)
-        {
-            InterlockedExchange(&WorkQueue[i].Cancelled, 1);
-        }
+        if (WorkQueue[i].RequestId != 0 && WorkQueue[i].Generation < CurrentGeneration)
+            CancelWorkItemLocked(WorkQueue[i]);
     }
-    
+    DiscardCancelledWorkItemsLocked();
+    UpdateWorkAvailableSignalLocked();
+    UpdateCompletionSignalLocked();
     HANDLES(LeaveCriticalSection(&QueueLock));
+}
+
+DWORD CIconThreadPool::BeginGeneration()
+{
+    if (!Initialized)
+        return 0;
+
+    HANDLES(EnterCriticalSection(&QueueLock));
+    CurrentGeneration++;
+    if (CurrentGeneration == 0)
+        CurrentGeneration = 1;
+    DWORD generation = CurrentGeneration;
+    for (int i = 0; i < ICON_POOL_QUEUE_SIZE; i++)
+    {
+        if (WorkQueue[i].RequestId != 0 && WorkQueue[i].Generation < generation)
+            CancelWorkItemLocked(WorkQueue[i]);
+    }
+    DiscardCancelledWorkItemsLocked();
+    UpdateWorkAvailableSignalLocked();
+    UpdateCompletionSignalLocked();
+    HANDLES(LeaveCriticalSection(&QueueLock));
+    return generation;
 }
 
 BOOL CIconThreadPool::WaitForCompletion(DWORD timeoutMs)
 {
-    DWORD startTime = GetTickCount();
-    while (QueueCount > 0)
-    {
-        DWORD elapsed = GetTickCount() - startTime;
-        if (timeoutMs != INFINITE && elapsed >= timeoutMs)
-            return FALSE;
-        
-        Sleep(1);
-    }
-    return TRUE;
+    return AllWorkCompletedEvent != NULL &&
+           WaitForSingleObject(AllWorkCompletedEvent, timeoutMs) == WAIT_OBJECT_0;
 }
 
 DWORD WINAPI CIconThreadPool::WorkerThreadProc(LPVOID param)
@@ -294,52 +444,53 @@ DWORD WINAPI CIconThreadPool::WorkerThreadProc(LPVOID param)
     
     while (TRUE)
     {
-        DWORD wait = WaitForMultipleObjects(2, handles, FALSE, 100); // 100ms timeout for periodic check
+        DWORD wait = WaitForMultipleObjects(2, handles, FALSE, INFINITE);
         
         if (wait == WAIT_OBJECT_0) // Terminate event
             break;
+
+        if (wait != WAIT_OBJECT_0 + 1)
+            continue;
         
-        // Try to get a work item
+        // Select a ready fixed slot under the lock so no two workers process it.
         CIconWorkItem* workItem = NULL;
         
         HANDLES(EnterCriticalSection(&pool->QueueLock));
-        
-        if (pool->QueueCount > 0)
+
+        int slot = pool->FindReadyWorkItemLocked();
+        if (slot >= 0)
         {
-            workItem = &pool->WorkQueue[pool->QueueTail];
-            
-            // Check if already processed or cancelled
-            if (workItem->Completed || workItem->Cancelled)
-            {
-                // Clear the slot and move on
-                workItem->RequestId = 0;
-                pool->QueueTail = (pool->QueueTail + 1) % ICON_POOL_QUEUE_SIZE;
-                InterlockedDecrement(&pool->QueueCount);
-                workItem = NULL;
-            }
+            workItem = &pool->WorkQueue[slot];
+            InterlockedExchange(&workItem->InProgress, 1);
+            InterlockedIncrement(&pool->ActiveCount);
         }
-        
+        pool->UpdateWorkAvailableSignalLocked();
         HANDLES(LeaveCriticalSection(&pool->QueueLock));
         
-        if (workItem != NULL && !workItem->Cancelled)
+        if (workItem != NULL)
         {
-            // Process the work item
-            pool->ProcessWorkItem(workItem);
-            
-            // Mark as completed
-            InterlockedExchange(&workItem->Completed, 1);
-            
-            // Call result callback if set
-            if (pool->ResultCallback != NULL)
+            if (!workItem->Cancelled)
             {
-                pool->ResultCallback(workItem, pool->CallbackContext);
+                // Process the work item
+                pool->ProcessWorkItem(workItem);
+
+                // Mark as completed
+                InterlockedExchange(&workItem->Completed, 1);
+
+                // The callback runs before slot reuse; it must copy the icon to retain it.
+                if (!workItem->Cancelled && pool->ResultCallback != NULL)
+                    pool->ResultCallback(workItem, pool->CallbackContext);
             }
             
-            // Remove from queue
+            // Release this fixed slot only after the worker and synchronous callback are done.
             HANDLES(EnterCriticalSection(&pool->QueueLock));
-            workItem->RequestId = 0;
-            pool->QueueTail = (pool->QueueTail + 1) % ICON_POOL_QUEUE_SIZE;
+            if (!workItem->Cancelled)
+                InterlockedIncrement64(&pool->CompletedCount);
+            pool->ClearWorkItemLocked(*workItem);
             InterlockedDecrement(&pool->QueueCount);
+            InterlockedDecrement(&pool->ActiveCount);
+            pool->UpdateWorkAvailableSignalLocked();
+            pool->UpdateCompletionSignalLocked();
             HANDLES(LeaveCriticalSection(&pool->QueueLock));
         }
     }
@@ -401,6 +552,73 @@ void CIconThreadPool::ProcessWorkItem(CIconWorkItem* item)
         }
         break;
     }
+}
+
+BOOL CIconThreadPool::IsSameWorkItem(const CIconWorkItem& left, const CIconWorkItem& right) const
+{
+    return left.Type == right.Type && left.Index == right.Index &&
+           left.IconSize == right.IconSize && left.Generation == right.Generation &&
+           lstrcmpiA(left.Path, right.Path) == 0;
+}
+
+int CIconThreadPool::FindReadyWorkItemLocked() const
+{
+    int selected = -1;
+    for (int i = 0; i < ICON_POOL_QUEUE_SIZE; i++)
+    {
+        const CIconWorkItem& candidate = WorkQueue[i];
+        if (candidate.RequestId == 0 || candidate.Cancelled || candidate.InProgress)
+            continue;
+        if (selected < 0 || candidate.Priority > WorkQueue[selected].Priority ||
+            (candidate.Priority == WorkQueue[selected].Priority && candidate.RequestId < WorkQueue[selected].RequestId))
+            selected = i;
+    }
+    return selected;
+}
+
+void CIconThreadPool::CancelWorkItemLocked(CIconWorkItem& item)
+{
+    if (item.RequestId != 0 && !item.Completed && !item.Cancelled)
+    {
+        InterlockedExchange(&item.Cancelled, 1);
+        InterlockedIncrement64(&CancelledCount);
+    }
+}
+
+void CIconThreadPool::DiscardCancelledWorkItemsLocked()
+{
+    for (int i = 0; i < ICON_POOL_QUEUE_SIZE; i++)
+    {
+        CIconWorkItem& item = WorkQueue[i];
+        if (item.RequestId != 0 && item.Cancelled && !item.InProgress)
+        {
+            ClearWorkItemLocked(item);
+            InterlockedDecrement(&QueueCount);
+        }
+    }
+}
+
+void CIconThreadPool::ClearWorkItemLocked(CIconWorkItem& item)
+{
+    if (item.ResultIcon != NULL)
+        DestroyIcon(item.ResultIcon);
+    memset(&item, 0, sizeof(item));
+}
+
+void CIconThreadPool::UpdateWorkAvailableSignalLocked()
+{
+    if (FindReadyWorkItemLocked() >= 0)
+        SetEvent(WorkAvailableEvent);
+    else
+        ResetEvent(WorkAvailableEvent);
+}
+
+void CIconThreadPool::UpdateCompletionSignalLocked()
+{
+    if (QueueCount == 0)
+        SetEvent(AllWorkCompletedEvent);
+    else
+        ResetEvent(AllWorkCompletedEvent);
 }
 
 //
