@@ -38,6 +38,7 @@ extern "C"
 #include "worker.h"
 #include "find.h"
 #include "viewer.h"
+#include "operation_journal.h"
 
 // variables used when saving configuration during shutdown, log-off or restart
 // we must pump messages so the system does not kill us as "not responding"
@@ -3295,6 +3296,13 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
     case WM_USER_FORCECLOSE_MAINWND:
         // Shutdown handling extracted to HandleShutdown() in mainwnd_shutdown.cpp.
         return HandleShutdown(uMsg, wParam, lParam);
+
+    case WM_USER_ALLOCATION_EMERGENCY:
+        // The allocator only posted this pre-registered message; now that the
+        // UI thread owns execution it may write recovery state and close safely.
+        COperationJournal::PersistEmergencyShutdownState();
+        PostMessage(HWindow, WM_USER_FORCECLOSE_MAINWND, 0, 0);
+        return 0;
 
 
     case WM_ERASEBKGND:

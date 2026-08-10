@@ -1220,6 +1220,7 @@ struct COpenViewerData
 #define WM_USER_SLGINCOMPLETE WM_APP + 414 // [0, 0] - warning that SLG is not completely translated, motivational text to get involved
 
 #define WM_USER_USERMENUICONS_READY WM_APP + 415 // [bkgndReaderData, threadID] - notification for main window that icon reading for User Menu in thread with ID 'threadID' has completed
+#define WM_USER_ALLOCATION_EMERGENCY WM_APP + 416 // [0, 0] - pre-registered allocation-failure notification; recovery runs on the UI thread
 
 // states for Shift+F1 help mode
 #define HELP_INACTIVE 0 // not in Shift+F1 help mode (must be 0)

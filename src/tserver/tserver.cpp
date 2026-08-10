@@ -940,8 +940,8 @@ wWinMain(HINSTANCE hInstance, HINSTANCE /*hPrevInstance*/, LPWSTR /*cmdLine*/, i
     //SetTraceProcessNameW(MAINWINDOW_NAME);
     //SetTraceThreadNameW(L"Main");
 
-    // configure localized messages for the ALLOCHAN module (handles out-of-memory reporting to the user + Retry button + Cancel when everything fails to terminate the software)
-    SetAllocHandlerMessage(NULL, MAINWINDOW_NAME, NULL, NULL);
+    // The shared allocator reports failure without a modal retry, which keeps
+    // this logging process from blocking while a failing thread owns a lock.
 
     HWND hPrevWindow = FindWindow(WC_MAINWINDOW, MAINWINDOW_NAME);
     if (hPrevWindow != NULL)
