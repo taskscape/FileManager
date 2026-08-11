@@ -401,6 +401,9 @@ CMainDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
     case WM_DESTROY:
     {
         KillTimer(HWindow, 666);
+        // The dialog owns CompressParams, so do not release it until its worker
+        // has observed cancellation and joined through the shared deadline policy.
+        StopCompressThread();
         break;
     }
 
