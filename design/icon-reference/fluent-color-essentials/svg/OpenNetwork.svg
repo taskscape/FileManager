@@ -1,0 +1,8 @@
+<!-- Reference master: 64 px inspection size with the production 16 px design grid preserved. -->
+<!-- Fluent Color Essentials: three balanced nodes form a compact network metaphor. -->
+<svg width="64" height="64" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+<path d="M8 5V8M4 11L8 8L12 11" stroke="#616161" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+<circle cx="8" cy="3.5" r="2" fill="#DDEBF7" stroke="#0F6CBD"/>
+<circle cx="3.5" cy="12" r="2" fill="white" stroke="#616161"/>
+<circle cx="12.5" cy="12" r="2" fill="white" stroke="#616161"/>
+</svg>
