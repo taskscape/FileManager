@@ -863,6 +863,8 @@ const char* CONFIG_TOPTOOLBAR_REG = "Top ToolBar";
 const char* CONFIG_MIDDLETOOLBAR_REG = "Middle ToolBar";
 const char* CONFIG_LEFTTOOLBAR_REG = "Left ToolBar";
 const char* CONFIG_RIGHTTOOLBAR_REG = "Right ToolBar";
+// Store the logical size rather than the DPI-scaled bitmap dimension.
+const char* CONFIG_TOOLBARICONSIZE_REG = "ToolBar Icon Size";
 const char* CONFIG_TOPTOOLBARVISIBLE_REG = "Show Top ToolBar";
 const char* CONFIG_PLGTOOLBARVISIBLE_REG = "Show Plugins Bar";
 const char* CONFIG_MIDDLETOOLBARVISIBLE_REG = "Show Middle ToolBar";
@@ -2439,6 +2441,9 @@ void CMainWindow::SaveConfig(HWND parent)
 
                 SetValue(actKey, CONFIG_LEFTTOOLBAR_REG, REG_SZ, Configuration.LeftToolBar, -1);
                 SetValue(actKey, CONFIG_RIGHTTOOLBAR_REG, REG_SZ, Configuration.RightToolBar, -1);
+                // Persist one shared size for all configurable command toolbars.
+                SetValue(actKey, CONFIG_TOOLBARICONSIZE_REG, REG_DWORD,
+                         &Configuration.ToolbarIconSize, sizeof(DWORD));
 
                 SetValue(actKey, CONFIG_TOPTOOLBARVISIBLE_REG, REG_DWORD,
                          &Configuration.TopToolBarVisible, sizeof(DWORD));
@@ -3972,6 +3977,11 @@ BOOL CMainWindow::LoadConfig(BOOL importingOldConfig, const CCommandLineParams* 
                      Configuration.LeftToolBar, 100);
             GetValue(actKey, CONFIG_RIGHTTOOLBAR_REG, REG_SZ,
                      Configuration.RightToolBar, 100);
+            GetValue(actKey, CONFIG_TOOLBARICONSIZE_REG, REG_DWORD,
+                     &Configuration.ToolbarIconSize, sizeof(DWORD));
+            // Missing or damaged values fall back to the historical 16-pixel toolbar.
+            if (!IsValidToolbarIconSize(Configuration.ToolbarIconSize))
+                Configuration.ToolbarIconSize = TOOLBAR_ICON_SIZE_SMALL;
             // there used to be only one change drive button - now we introduce two buttons
             // and merge all bitmaps into one
 

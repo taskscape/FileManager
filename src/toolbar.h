@@ -147,6 +147,9 @@ public:
     virtual void WINAPI SetPadding(const TOOLBAR_PADDING* padding);
     virtual void WINAPI GetPadding(TOOLBAR_PADDING* padding);
 
+    // Applies the proportional Fluent-family spacing used by configurable main-toolbar icon sizes.
+    void ApplyConfiguredIconSpacing();
+
     // goes through all items and if they have 'EnablerData' pointer set
     // compares values (it points to) with actual item state.
     // If state differs, changes it.
@@ -221,11 +224,13 @@ protected:
     DWORD DragNotify;
     TBCDDragMode DragMode;
     int DragIndex;
+    int SelectedIconSize; // staged until the modal dialog closes so its preview image list remains valid
 
 public:
     CTBCustomizeDialog(CToolBar* toolBar);
     ~CTBCustomizeDialog();
     BOOL Execute();
+    int GetSelectedIconSize() const { return SelectedIconSize; }
 
 protected:
     virtual INT_PTR DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam);

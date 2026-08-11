@@ -314,6 +314,7 @@ struct CConfiguration
     char MiddleToolBar[400];
     char LeftToolBar[200];
     char RightToolBar[200];
+    int ToolbarIconSize; // logical pixels; only the supported Small/Medium/Large values are persisted
 
     int UseRecycleBin;       // 0 - do not use, 1 - for all, 2 - for RecycleMasks
     CMaskGroup RecycleMasks; // mask array determining what is sent to the Recycle Bin

@@ -1474,7 +1474,8 @@ CToolbarHeader::CToolbarHeader(HWND hDlg, int ctrlID, HWND hAlignWindow, DWORD b
                          IDB_EDTLBTB,
                          RGB(255, 0, 255), GetSysColor(COLOR_BTNFACE),
                          hTmpMaskBitmap, hTmpGrayBitmap, hTmpColorBitmap,
-                         FALSE, svgIcons, TLBHDR_COUNT);
+                         FALSE, svgIcons, TLBHDR_COUNT,
+                         iconSize); // Embedded edit controls intentionally remain compact.
     HHotImageList = ImageList_Create(iconSize, iconSize, ILC_MASK | ILC_COLORDDB, TLBHDR_COUNT, 1);
     HGrayImageList = ImageList_Create(iconSize, iconSize, ILC_MASK | ILC_COLORDDB, TLBHDR_COUNT, 1);
     ImageList_Add(HHotImageList, hTmpColorBitmap, hTmpMaskBitmap);

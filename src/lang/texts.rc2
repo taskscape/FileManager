@@ -684,6 +684,10 @@ STRINGTABLE
  IDS_GRIPSINTOOLBAR,     "&Lock the Toolbars"
  IDS_MIDDLETOOLBAR,      "&Middle Toolbar"
  IDS_CHANGEDIRECTORY,    "Change &Directory...\tShift+F7"
+ // Keep the logical pixel dimensions visible when choosing a toolbar size.
+ IDS_TOOLBAR_ICON_SIZE_SMALL,  "Small (16x16 pixels)"
+ IDS_TOOLBAR_ICON_SIZE_MEDIUM, "Medium (24x24 pixels)"
+ IDS_TOOLBAR_ICON_SIZE_LARGE,  "Large (32x32 pixels)"
 
  IDS_HDR_ELASTIC,        "Automatic Column Width"
  IDS_HDR_SMARTMODE,      "Smart Column Mode\tCtrl+N"

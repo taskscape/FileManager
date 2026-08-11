@@ -434,6 +434,68 @@ public sealed class NativeSafetyRegressionTests
     }
 
     [Test]
+    public void Shared_plugin_thread_queue_uses_owned_cooperative_shutdown_without_forced_termination()
+    {
+        var root = FindRepositoryRoot();
+        var queue = File.ReadAllText(Path.Combine(root, "src", "plugins", "shared", "auxtools.cpp"));
+        var queueHeader = File.ReadAllText(Path.Combine(root, "src", "plugins", "shared", "auxtools.h"));
+        var owner = File.ReadAllText(Path.Combine(root, "src", "plugins", "shared", "plugin_thread_owner.h"));
+        var ftpConsumer = File.ReadAllText(Path.Combine(root, "src", "plugins", "ftp", "fs1.cpp"));
+        var ratchet = File.ReadAllText(Path.Combine(root, "tools", "verify-no-new-raw-thread-creation.ps1"));
+        var refactoring = File.ReadAllText(Path.Combine(root, "refactoring.md"));
+
+        // The shared queue is compiled into many plug-ins, so preserve its API
+        // while pinning the cooperative ownership boundary and safe-join order.
+        Assert.Multiple(() =>
+        {
+            Assert.That(queueHeader, Does.Contain("CPluginThreadOwner* Owner"));
+            Assert.That(queueHeader, Does.Contain("CThreadQueueStopBody"));
+            Assert.That(queueHeader, Does.Contain("CScopedQueueLock"));
+            Assert.That(owner, Does.Contain("class CPluginThreadOwner"));
+            Assert.That(owner, Does.Contain("StopEvent"));
+            Assert.That(owner, Does.Contain("CompletionEvent"));
+            Assert.That(owner, Does.Contain("catch (...)"));
+            Assert.That(owner, Does.Contain("StopAndJoin(INFINITE)"));
+            Assert.That(queue, Does.Contain("CPluginThreadShutdownDeadline"));
+            Assert.That(queue, Does.Contain("WaitForSafeJoin(thread)"));
+            Assert.That(queue, Does.Contain("GetTickCount64()"));
+            Assert.That(queue, Does.Contain("SetEvent(data->Accepted)"));
+            Assert.That(queue, Does.Not.Contain("TerminateThread("));
+            Assert.That(queue, Does.Not.Contain("Sleep("));
+            Assert.That(queue, Does.Not.Contain("CreateThread("));
+            Assert.That(ftpConsumer, Does.Contain("CThreadQueue AuxThreadQueue(\"FTP Aux\")"));
+            Assert.That(ftpConsumer, Does.Contain("AuxThreadQueue.KillAll(TRUE, 0, 0)"));
+            Assert.That(ratchet, Does.Contain("src/plugins/shared/plugin_thread_owner.h"));
+            Assert.That(refactoring, Does.Contain("`CPluginThreadOwner` adapts the shared plug-in queue"));
+        });
+    }
+
+    [Test]
+    public void Seven_zip_task_dispatch_owns_worker_completion_cancellation_and_progress_subclass_lifetime()
+    {
+        var root = FindRepositoryRoot();
+        var threads = File.ReadAllText(Path.Combine(root, "src", "plugins", "7zip", "7zthreads.cpp"));
+        var pluginOwner = File.ReadAllText(Path.Combine(root, "src", "plugins", "shared", "plugin_thread_owner.h"));
+
+        // Archive callbacks synchronously consult the dialog, so keep their
+        // message pump while pinning the owned asynchronous completion boundary.
+        Assert.Multiple(() =>
+        {
+            Assert.That(threads, Does.Contain("CPluginThreadOwner Worker"));
+            Assert.That(threads, Does.Contain("WM_7ZIP_TASKCOMPLETE"));
+            Assert.That(threads, Does.Contain("PostMessage(operation->ProgressWindow, WM_7ZIP, WM_7ZIP_TASKCOMPLETE"));
+            Assert.That(threads, Does.Contain("CProgressDialogSubclassScope"));
+            Assert.That(threads, Does.Contain("SetWindowLongPtr(Window, GWLP_WNDPROC, (LONG_PTR)PreviousProcedure)"));
+            Assert.That(threads, Does.Contain("RequestCancellation"));
+            Assert.That(threads, Does.Contain("SEVEN_ZIP_TASK_CANCEL_DEADLINE"));
+            Assert.That(threads, Does.Contain("continuing to pump until its owned completion arrives"));
+            Assert.That(threads, Does.Not.Contain("::CreateThread("));
+            Assert.That(threads, Does.Not.Contain("MsgWaitForMultipleObjects(1, &hThread, FALSE, INFINITE"));
+            Assert.That(pluginOwner, Does.Contain("class CPluginThreadOwner"));
+        });
+    }
+
+    [Test]
     public void Shutdown_deadlines_report_named_phases_and_preserve_shared_state_until_safe_join()
     {
         var root = FindRepositoryRoot();

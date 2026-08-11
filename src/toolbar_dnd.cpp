@@ -11,6 +11,13 @@
 // CTBCustomizeDialog
 //
 
+// Combo order is kept in one table so display strings cannot drift from persisted pixel values.
+static const int CustomizeToolbarIconSizes[] = {
+    TOOLBAR_ICON_SIZE_SMALL,
+    TOOLBAR_ICON_SIZE_MEDIUM,
+    TOOLBAR_ICON_SIZE_LARGE,
+};
+
 CTBCustomizeDialog::CTBCustomizeDialog(CToolBar* toolBar)
     : CCommonDialog(HLanguage, IDD_CUSTOMIZETOOLBAR, IDD_CUSTOMIZETOOLBAR, toolBar->HWindow), AllItems(50, 20)
 {
@@ -19,6 +26,9 @@ CTBCustomizeDialog::CTBCustomizeDialog(CToolBar* toolBar)
     DragNotify = 0;
     DragMode = tbcdDragNone;
     DragIndex = -1;
+    SelectedIconSize = IsValidToolbarIconSize(Configuration.ToolbarIconSize) ?
+                           Configuration.ToolbarIconSize :
+                           TOOLBAR_ICON_SIZE_SMALL;
 }
 
 CTBCustomizeDialog::~CTBCustomizeDialog()
@@ -398,24 +408,40 @@ CTBCustomizeDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         MakeDragList(HCurrentLB);
         DragNotify = RegisterWindowMessage(DRAGLISTMSGSTRING);
 
+        // Populate localized choices while retaining logical pixel values in the fixed table above.
+        HWND hIconSize = GetDlgItem(HWindow, IDC_CTB_ICON_SIZE);
+        int sizeStringIDs[] = {
+            IDS_TOOLBAR_ICON_SIZE_SMALL,
+            IDS_TOOLBAR_ICON_SIZE_MEDIUM,
+            IDS_TOOLBAR_ICON_SIZE_LARGE,
+        };
+        int selectedSizeIndex = 0;
+        for (int i = 0; i < _countof(CustomizeToolbarIconSizes); i++)
+        {
+            SendMessage(hIconSize, CB_ADDSTRING, 0, (LPARAM)LoadStr(sizeStringIDs[i]));
+            if (CustomizeToolbarIconSizes[i] == SelectedIconSize)
+                selectedSizeIndex = i;
+        }
+        SendMessage(hIconSize, CB_SETCURSEL, selectedSizeIndex, 0);
+
         // vytahneme tlacitka
         EnumButtons();
         FillLists();
         EnableControls();
 
-        // napocitame vysku radku
-        int iconSize = GetIconSizeForSystemDPI(ICONSIZE_16);
-        int minHeight = max(iconSize, ToolBar->ImageHeight);
+        // Give Customize Toolbar previews the same proportional breathing room as live buttons.
+        int iconSize = max(GetIconSizeForSystemDPI(ICONSIZE_16), ToolBar->ImageHeight);
+        int edgeSpacing = max(1, (iconSize + 3) / 4);
+        int minHeight = iconSize + 2 * edgeSpacing;
         HFONT hFont = (HFONT)SendMessage(HAvailableLB, WM_GETFONT, 0, 0);
         HDC hDC = HANDLES(GetDC(HWindow));
         SelectObject(hDC, hFont);
         TEXTMETRIC tm;
         HFONT hOldFont = (HFONT)SelectObject(hDC, hFont);
         GetTextMetrics(hDC, &tm);
-        minHeight = max(tm.tmHeight, minHeight);
+        minHeight = max(tm.tmHeight + 2 * edgeSpacing, minHeight);
         SelectObject(hDC, hOldFont);
         HANDLES(ReleaseDC(HWindow, hDC));
-        minHeight += 2;
         // nastavime oba listboxy
         SendMessage(HAvailableLB, LB_SETITEMHEIGHT, 0, minHeight);
         SendMessage(HCurrentLB, LB_SETITEMHEIGHT, 0, minHeight);
@@ -424,6 +450,14 @@ CTBCustomizeDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 
     case WM_COMMAND:
     {
+        if (LOWORD(wParam) == IDC_CTB_ICON_SIZE && HIWORD(wParam) == CBN_SELCHANGE)
+        {
+            int selectedIndex = (int)SendMessage((HWND)lParam, CB_GETCURSEL, 0, 0);
+            // Ignore an invalid transient selection instead of corrupting the persisted preference.
+            if (selectedIndex >= 0 && selectedIndex < _countof(CustomizeToolbarIconSizes))
+                SelectedIconSize = CustomizeToolbarIconSizes[selectedIndex];
+            return 0;
+        }
         if (HIWORD(wParam) == LBN_SELCHANGE)
         {
             EnableControls();
@@ -480,15 +514,17 @@ CTBCustomizeDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         else
             text = AllItems[index].Name;
 
-        int iconSize = GetIconSizeForSystemDPI(ICONSIZE_16);
-        int imageWidth = max(iconSize, ToolBar->ImageWidth);
-        imageWidth += 5;
+        // Direct HICON items are scaled to the same dimensions as image-list-backed commands.
+        int iconSize = ToolBar->ImageHeight > 0 ? ToolBar->ImageHeight : GetToolbarIconSizeForSystemDPI();
+        int edgeSpacing = max(1, (iconSize + 3) / 4);
+        int imageWidth = max(iconSize, ToolBar->ImageWidth) + 2 * edgeSpacing;
+        int iconY = r.top + max(0, (r.bottom - r.top - iconSize) / 2);
         if (!separator)
         {
             if ((AllItems[index].Mask & TLBI_MASK_ICON) && AllItems[index].HIcon != NULL)
-                DrawIconEx(hDC, r.left + 2, r.top + 1, AllItems[index].HIcon, iconSize, iconSize, 0, NULL, DI_NORMAL);
+                DrawIconEx(hDC, r.left + edgeSpacing, iconY, AllItems[index].HIcon, iconSize, iconSize, 0, NULL, DI_NORMAL);
             if ((AllItems[index].Mask & TLBI_MASK_IMAGEINDEX) && AllItems[index].ImageIndex != -1)
-                ImageList_Draw(ToolBar->HImageList, AllItems[index].ImageIndex, hDC, r.left + 2, r.top + 1, ILD_TRANSPARENT);
+                ImageList_Draw(ToolBar->HImageList, AllItems[index].ImageIndex, hDC, r.left + edgeSpacing, iconY, ILD_TRANSPARENT);
         }
 
         r.left += imageWidth;
@@ -538,10 +574,21 @@ void CToolBar::Customize()
     CTBCustomizeDialog dialog(this);
     dialog.Execute();
 
+    // Commit the staged size only after the dialog stops drawing from the current image list.
+    BOOL iconSizeChanged = Configuration.ToolbarIconSize != dialog.GetSelectedIconSize();
+    if (iconSizeChanged)
+        Configuration.ToolbarIconSize = dialog.GetSelectedIconSize();
+
     // vratime se k puvodnimu nastaveni tlacitek
     Customizing = FALSE;
     InvalidateRect(HWindow, NULL, FALSE);
 
     // posleme notifikaci o ukonceni konfigurace
     SendMessage(HNotifyWindow, WM_USER_TBENDADJUST, (WPARAM)HWindow, 0);
+
+    if (iconSizeChanged)
+    {
+        // Rebuild full-color SVG image lists and reattach them to every open toolbar.
+        ColorsChanged(TRUE, FALSE, FALSE);
+    }
 }

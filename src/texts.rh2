@@ -1109,6 +1109,11 @@
 // This link is volume mount point. Unable to show it in panel.\nPath: %s
 #define IDS_DIRLINK_MOUNT_POINT       10875
 
+// Customize Toolbar uses explicit dimensions so translated labels preserve the size contract.
+#define IDS_TOOLBAR_ICON_SIZE_SMALL   10876
+#define IDS_TOOLBAR_ICON_SIZE_MEDIUM  10877
+#define IDS_TOOLBAR_ICON_SIZE_LARGE   10878
+
 
 // Find File Advanced Dialog
 #define IDS_FFA_SECONDS               10880

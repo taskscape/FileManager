@@ -28,6 +28,48 @@
 #include "dbg.h"
 #include "auxtools.h"
 
+// Plug-in workers may still be executing plug-in code during release. A
+// deadline makes a slow cooperative shutdown diagnosable without reviving the
+// unsafe forced-termination path.
+class CPluginThreadShutdownDeadline
+{
+public:
+    CPluginThreadShutdownDeadline(const char* workerName)
+        : WorkerName(workerName != NULL ? workerName : "unnamed plug-in worker")
+    {
+    }
+
+    DWORD WaitForSafeJoin(HANDLE worker) const
+    {
+        DWORD wait = WaitForSingleObject(worker, 5000);
+        if (wait != WAIT_TIMEOUT)
+            return wait;
+
+        TraceBreach("cancellation", 5000, worker);
+        wait = WaitForSingleObject(worker, 30000);
+        if (wait != WAIT_TIMEOUT)
+            return WAIT_TIMEOUT;
+
+        TraceBreach("operation recovery", 30000, worker);
+        WaitForSingleObject(worker, INFINITE);
+        return WAIT_TIMEOUT;
+    }
+
+private:
+    void TraceBreach(const char* phase, DWORD milliseconds, HANDLE worker) const
+    {
+        DWORD exitCode = STILL_ACTIVE;
+        if (!GetExitCodeThread(worker, &exitCode))
+            exitCode = GetLastError();
+        TRACE_E("Plug-in queue " << WorkerName << " breached " << phase << " deadline after "
+                                  << milliseconds << " ms; thread state=" << exitCode
+                                  << ". Keeping the process alive for a safe join.");
+    }
+
+private:
+    const char* WorkerName;
+};
+
 //
 // ****************************************************************************
 // CThreadQueue
@@ -37,16 +79,29 @@ CThreadQueue::CThreadQueue(const char* queueName)
 {
     QueueName = queueName;
     Head = NULL;
-    Continue = CreateEvent(NULL, FALSE, FALSE, NULL);
 }
 
 CThreadQueue::~CThreadQueue()
 {
-    ClearFinishedThreads(); // section not needed, only one thread should be using it now
-    if (Continue != NULL)
-        CloseHandle(Continue);
+    // The queue owns callback state, so workers must be joined before the
+    // critical section is destroyed by the containing queue object.
+    KillAll(TRUE, 0, 0);
     if (Head != NULL)
-        TRACE_E("Some thread is still in " << QueueName << " queue!"); // after terminating thread that waits for (or is currently terminating) another thread from queue, otherwise should not happen...
+        TRACE_E("Some thread is still in " << QueueName << " queue!");
+}
+
+CThreadQueueItem::CThreadQueueItem(CPluginThreadOwner* owner, DWORD tid)
+{
+    Owner = owner;
+    Thread = owner != NULL ? owner->GetThreadHandle() : NULL;
+    ThreadID = tid;
+    Next = NULL;
+    Locks = 0;
+}
+
+CThreadQueueItem::~CThreadQueueItem()
+{
+    delete Owner;
 }
 
 void CThreadQueue::ClearFinishedThreads()
@@ -55,14 +110,12 @@ void CThreadQueue::ClearFinishedThreads()
     CThreadQueueItem* act = Head;
     while (act != NULL)
     {
-        DWORD ec;
-        if (act->Locks == 0 && (!GetExitCodeThread(act->Thread, &ec) || ec != STILL_ACTIVE))
+        if (act->Locks == 0 && act->Owner->WaitForCompletion(0) != WAIT_TIMEOUT)
         { // tento thread neni zamceny + uz skoncil, vyhodime ho ze seznamu
             if (last != NULL)
                 last->Next = act->Next;
             else
                 Head = act->Next;
-            CloseHandle(act->Thread);
             delete act;
             act = (last != NULL ? last->Next : Head);
         }
@@ -91,7 +144,7 @@ BOOL CThreadQueue::Add(CThreadQueueItem* item)
 
 BOOL CThreadQueue::FindAndLockItem(HANDLE thread)
 {
-    CS.Enter();
+    CScopedQueueLock lock(CS);
 
     CThreadQueueItem* act = Head; // zkusime najit otevreny handle threadu
     while (act != NULL)
@@ -104,14 +157,12 @@ BOOL CThreadQueue::FindAndLockItem(HANDLE thread)
         act = act->Next;
     }
 
-    CS.Leave();
-
     return act != NULL; // NULL = nenalezeno
 }
 
 void CThreadQueue::UnlockItem(HANDLE thread, BOOL deleteIfUnlocked)
 {
-    CS.Enter();
+    CScopedQueueLock lock(CS);
 
     CThreadQueueItem* last = NULL;
     CThreadQueueItem* act = Head; // zkusime najit otevreny handle threadu
@@ -134,7 +185,6 @@ void CThreadQueue::UnlockItem(HANDLE thread, BOOL deleteIfUnlocked)
                     last->Next = act->Next;
                 else
                     Head = act->Next;
-                CloseHandle(act->Thread);
                 delete act;
             }
         }
@@ -142,7 +192,6 @@ void CThreadQueue::UnlockItem(HANDLE thread, BOOL deleteIfUnlocked)
     else
         TRACE_E("CThreadQueue::UnlockItem(): unable to find thread!"); // to nebyl zamknuty, ze je smazany?
 
-    CS.Leave();
 }
 
 BOOL CThreadQueue::WaitForExit(HANDLE thread, int milliseconds)
@@ -153,7 +202,16 @@ BOOL CThreadQueue::WaitForExit(HANDLE thread, int milliseconds)
     {
         if (FindAndLockItem(thread)) // thread handle found and locked - we can wait for it, then delete it
         {
-            ret = WaitForSingleObject(thread, milliseconds) != WAIT_TIMEOUT;
+            CPluginThreadOwner* owner = NULL;
+            {
+                CScopedQueueLock lock(CS);
+                CThreadQueueItem* item = Head;
+                while (item != NULL && item->Thread != thread)
+                    item = item->Next;
+                if (item != NULL)
+                    owner = item->Owner;
+            }
+            ret = owner != NULL && owner->WaitForCompletion(milliseconds) != WAIT_TIMEOUT;
 
             UnlockItem(thread, ret);
         }
@@ -166,12 +224,25 @@ BOOL CThreadQueue::WaitForExit(HANDLE thread, int milliseconds)
 void CThreadQueue::KillThread(HANDLE thread, DWORD exitCode)
 {
     CALL_STACK_MESSAGE2("CThreadQueue::KillThread(, %d)", exitCode);
+    (void)exitCode; // Compatibility parameter: force no longer permits unsafe thread termination.
     if (thread != NULL)
     {
-        if (FindAndLockItem(thread)) // thread handle found and locked - we can terminate it, then delete it
+        if (FindAndLockItem(thread)) // thread handle found and locked - request stop before deletion
         {
-            TerminateThread(thread, exitCode);
-            WaitForSingleObject(thread, INFINITE); // pockame az thread skutecne skonci, nekdy mu to dost trva
+            CPluginThreadOwner* owner = NULL;
+            {
+                CScopedQueueLock lock(CS);
+                CThreadQueueItem* item = Head;
+                while (item != NULL && item->Thread != thread)
+                    item = item->Next;
+                if (item != NULL)
+                    owner = item->Owner;
+            }
+            if (owner != NULL)
+            {
+                owner->RequestStop();
+                CPluginThreadShutdownDeadline(QueueName).WaitForSafeJoin(thread);
+            }
 
             UnlockItem(thread, TRUE);
         }
@@ -183,179 +254,166 @@ void CThreadQueue::KillThread(HANDLE thread, DWORD exitCode)
 BOOL CThreadQueue::KillAll(BOOL force, int waitTime, int forceWaitTime, DWORD exitCode)
 {
     CALL_STACK_MESSAGE5("CThreadQueue::KillAll(%d, %d, %d, %d)", force, waitTime, forceWaitTime, exitCode);
-    DWORD ti = GetTickCount();
-    DWORD w = force ? forceWaitTime : waitTime;
+    (void)exitCode; // Compatibility parameter: cooperative joins replace forced termination.
+    const DWORD initialWait = force ? forceWaitTime : waitTime;
+    const ULONGLONG deadline = initialWait == INFINITE ? 0 : GetTickCount64() + initialWait;
 
-    CS.Enter();
-
-    // kill all threads that do not intend to finish themselves
-    CThreadQueueItem* prevItem = NULL;
-    CThreadQueueItem* item = Head;
-    while (item != NULL)
+    for (;;)
     {
-        BOOL leaveCS = FALSE;
-        DWORD ec;
-        if (GetExitCodeThread(item->Thread, &ec) && ec == STILL_ACTIVE)
-        { // thread jeste nejspis bezi
-            DWORD t = GetTickCount() - ti;
-            if (w == INFINITE || t < w) // mame jeste cekat
-            {
-                // release queue for other threads (so they can e.g. wait for thread termination from queue and then terminate themselves)
-                CS.Leave();
-
-                if (w == INFINITE || 50 < w - t)
-                    Sleep(50);
-                else
-                {
-                    Sleep(w - t);
-                    ti -= w; // next time we exclude the wait test
-                }
-
-                CS.Enter();
-                item = Head;
-                prevItem = NULL;
-                continue; // zacneme pekne od zacatku (podminka cyklu se otestuje)
-            }
-            if (force) // zabijeme ho
-            {
-                TRACE_E("Thread has not ended itself, we must terminate it (" << QueueName << " queue).");
-                TerminateThread(item->Thread, exitCode);
-                WaitForSingleObject(item->Thread, INFINITE); // pockame az thread skutecne skonci, nekdy mu to dost trva
-                // if any thread is waiting for termination of just killed thread, we release for it for a moment
-                // the queue, otherwise it will remain stuck in UnlockItem()
-                leaveCS = item->Locks > 0;
-            }
-            else // without 'force', only report that something is still running
-            {
-                TRACE_I("KillAll(): At least one thread is still running in " << QueueName << " queue.");
-                ClearFinishedThreads(); // just for clarity when debugging
-                CS.Leave();
-                return FALSE;
-            }
-        }
-        CThreadQueueItem* delItem = item;
-        item = item->Next;
-        if (delItem->Locks == 0) // handle can be closed, item can be deleted
+        HANDLE thread = NULL;
+        CPluginThreadOwner* owner = NULL;
         {
-            if (Head == delItem)
-                Head = item;
-            else
-                prevItem->Next = item;
-            CloseHandle(delItem->Thread);
-            delete delItem;
-        }
-        else
-            prevItem = delItem; // handle must be left alone, so the item too
+            CScopedQueueLock lock(CS);
+            ClearFinishedThreads();
+            if (Head == NULL)
+                return TRUE;
 
-        if (leaveCS)
+            CThreadQueueItem* item = Head;
+            while (item != NULL && item->Owner->WaitForCompletion(0) != WAIT_TIMEOUT)
+                item = item->Next;
+            if (item == NULL)
+                continue;
+
+            item->Locks++;
+            thread = item->Thread;
+            owner = item->Owner;
+        }
+
+        const ULONGLONG now = GetTickCount64();
+        const DWORD remaining = initialWait == INFINITE ? INFINITE :
+            (now >= deadline ? 0 : (DWORD)(deadline - now));
+        if (remaining != 0 && owner->WaitForCompletion(remaining) != WAIT_TIMEOUT)
         {
-            // release queue for other threads (so they can e.g. wait for thread termination from queue and then terminate themselves)
-            CS.Leave();
-
-            Sleep(50); // moment to take over the queue and possibly let the thread finish (before killing it like all the others)
-
-            CS.Enter();
-            item = Head;
-            prevItem = NULL;
-            continue; // start from the beginning (loop condition will be tested)
+            UnlockItem(thread, TRUE);
+            continue;
         }
+
+        if (!force)
+        {
+            UnlockItem(thread, FALSE);
+            TRACE_I("KillAll(): At least one thread is still running in " << QueueName << " queue.");
+            return FALSE;
+        }
+
+        // Force now means request cancellation and log its bounded phases; it
+        // never permits destruction of a plug-in callback while it is running.
+        owner->RequestStop();
+        CPluginThreadShutdownDeadline(QueueName).WaitForSafeJoin(thread);
+        UnlockItem(thread, TRUE);
     }
-
-    CS.Leave();
-    return TRUE;
 }
 
-struct CThreadBaseData
+struct CThreadQueue::CThreadQueueLaunchData
 {
-    unsigned(WINAPI* Body)(void*);
-    void* Param;
-    HANDLE Continue;
+    unsigned(WINAPI* LegacyBody)(void*);
+    CThreadQueueStopBody StopBody;
+    void* Parameter;
+    HANDLE Accepted;
 };
 
-DWORD WINAPI
-CThreadQueue::ThreadBase(void* param)
+DWORD WINAPI CThreadQueue::ThreadBase(void* param, HANDLE stopEvent)
 {
-    CThreadBaseData* d = (CThreadBaseData*)param;
+    CThreadQueueLaunchData* data = (CThreadQueueLaunchData*)param;
+    unsigned(WINAPI * legacyBody)(void*) = data->LegacyBody;
+    CThreadQueueStopBody stopBody = data->StopBody;
+    void* threadParam = data->Parameter;
+    SetEvent(data->Accepted); // The caller may release stack-backed arguments after this copy.
+    delete data;
 
-    // back up data on the stack ('d' stops being valid after 'Continue')
-    unsigned(WINAPI * threadBody)(void*) = d->Body;
-    void* threadParam = d->Param;
-
-    SetEvent(d->Continue); // let the main thread continue
-    d = NULL;
-
-    // start our thread
-    return SalamanderDebug->CallWithCallStack(threadBody, threadParam);
+    if (stopBody != NULL)
+        return stopBody(threadParam, stopEvent);
+    return legacyBody != NULL ? SalamanderDebug->CallWithCallStack(legacyBody, threadParam) : ERROR_INVALID_PARAMETER;
 }
 
-HANDLE
-CThreadQueue::StartThread(unsigned(WINAPI* body)(void*), void* param, unsigned stack_size,
-                          HANDLE* threadHandle, DWORD* threadID)
+void WINAPI CThreadQueue::NameThread(const char* name)
 {
-    CALL_STACK_MESSAGE2("CThreadQueue::StartThread(, , %d, ,)", stack_size);
+    SalamanderDebug->SetThreadNameInVCAndTrace(name);
+}
+
+HANDLE CThreadQueue::StartThreadInternal(unsigned(WINAPI* legacyBody)(void*), CThreadQueueStopBody stopBody,
+                                         void* param, unsigned stackSize, HANDLE* threadHandle, DWORD* threadID)
+{
     if (threadHandle != NULL)
         *threadHandle = NULL;
     if (threadID != NULL)
         *threadID = 0;
-    if (Continue == NULL)
+
+    // Hold the queue lock until the worker has copied its launch record. This
+    // retains the legacy stack-argument guarantee without a shared hand-off event.
+    CScopedQueueLock lock(CS);
+    CPluginThreadOwner* owner = new CPluginThreadOwner;
+    CThreadQueueLaunchData* data = new CThreadQueueLaunchData;
+    if (owner == NULL || data == NULL)
     {
-        TRACE_E("Unable to start thread, because Continue event was not created.");
+        delete data;
+        delete owner;
+        SetLastError(ERROR_NOT_ENOUGH_MEMORY);
         return NULL;
     }
 
-    CS.Enter();
-
-    CThreadBaseData data;
-    data.Body = body;
-    data.Param = param;
-    data.Continue = Continue;
-
-    // start the thread; do not use _beginthreadex(), because since VC2015 it has a side effect
-    // of loading this module (plugin) again, which is released again on normal termination,
-    // but if TerminateThread() is used, the module stays loaded until the Salamander process
-    // terminates; only then are global object destructors run, which can lead to unexpected
-    // crashes because all plugin interfaces have already been released (for example
-    // SalamanderDebug)
-    DWORD tid;
-    HANDLE thread = CreateThread(NULL, stack_size, CThreadQueue::ThreadBase, &data, CREATE_SUSPENDED, &tid);
-    if (thread == NULL)
+    data->LegacyBody = legacyBody;
+    data->StopBody = stopBody;
+    data->Parameter = param;
+    data->Accepted = CreateEvent(NULL, TRUE, FALSE, NULL);
+    HANDLE accepted = data->Accepted;
+    if (accepted == NULL || !owner->Start(ThreadBase, data, QueueName, NameThread, stackSize))
     {
-        TRACE_E("Unable to start thread.");
-
-        CS.Leave();
-
+        if (accepted != NULL)
+            CloseHandle(accepted);
+        delete data;
+        delete owner;
         return NULL;
     }
-    else
+
+    CThreadQueueItem* item = new CThreadQueueItem(owner, owner->GetThreadID());
+    if (item == NULL)
     {
-        // add thread to this plugin's thread queue
-        if (!Add(new CThreadQueueItem(thread, tid)))
-        {
-            TRACE_E("Unable to add thread to the queue.");
-            TerminateThread(thread, 666);          // it is suspended, so it will not be in any critical section, etc.
-            WaitForSingleObject(thread, INFINITE); // wait until the thread really ends; sometimes it takes quite a while
-            CloseHandle(thread);
-
-            CS.Leave();
-
-            return NULL;
-        }
-
-        // write while thread is not running (guarantees it has not finished and its object is not deallocated)
-        if (threadHandle != NULL)
-            *threadHandle = thread;
-        if (threadID != NULL)
-            *threadID = tid;
-
-        SalamanderDebug->TraceAttachThread(thread, tid);
-        ResumeThread(thread);
-
-        WaitForSingleObject(Continue, INFINITE); // wait for data handoff to CThreadQueue::ThreadBase
-
-        CS.Leave();
-
-        return thread;
+        TRACE_E("Unable to add thread to the " << QueueName << " queue.");
+        owner->StopAndJoin(INFINITE); // Do not orphan a started callback when queue allocation fails.
+        CloseHandle(accepted);
+        return NULL;
     }
+    if (!Add(item))
+    {
+        TRACE_E("Unable to add thread to the " << QueueName << " queue.");
+        delete item; // Its owner requests stop and safely joins before releasing launch state.
+        CloseHandle(accepted);
+        return NULL;
+    }
+
+    HANDLE thread = item->Thread;
+    if (WaitForSingleObject(accepted, 10000) == WAIT_TIMEOUT)
+    {
+        // Never return while a legacy callback could still dereference the caller's stack data.
+        TRACE_E("Timed out transferring startup data to " << QueueName << " queue worker.");
+        owner->RequestStop();
+        CPluginThreadShutdownDeadline(QueueName).WaitForSafeJoin(thread);
+        CloseHandle(accepted);
+        ClearFinishedThreads();
+        return NULL;
+    }
+    CloseHandle(accepted);
+
+    SalamanderDebug->TraceAttachThread(thread, item->ThreadID);
+    if (threadHandle != NULL)
+        *threadHandle = thread;
+    if (threadID != NULL)
+        *threadID = item->ThreadID;
+    return thread;
+}
+
+HANDLE CThreadQueue::StartThread(unsigned(WINAPI* body)(void*), void* param, unsigned stackSize,
+                                 HANDLE* threadHandle, DWORD* threadID)
+{
+    CALL_STACK_MESSAGE2("CThreadQueue::StartThread(, , %d, ,)", stackSize);
+    return StartThreadInternal(body, NULL, param, stackSize, threadHandle, threadID);
+}
+
+HANDLE CThreadQueue::StartThread(CThreadQueueStopBody body, void* param, unsigned stackSize,
+                                 HANDLE* threadHandle, DWORD* threadID)
+{
+    CALL_STACK_MESSAGE2("CThreadQueue::StartThread(stop-aware, , %d, ,)", stackSize);
+    return StartThreadInternal(NULL, body, param, stackSize, threadHandle, threadID);
 }
 
 //

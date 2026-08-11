@@ -1496,8 +1496,11 @@ enum CSymbolsImageListIndexes
 
 extern HIMAGELIST HFindSymbolsImageList; // symbols for find
 extern HIMAGELIST HMenuMarkImageList;    // check marks for menu
-extern HIMAGELIST HGrayToolBarImageList; // toolbar and menu in gray version (calculated from color)
-extern HIMAGELIST HHotToolBarImageList;  // toolbar and menu in color version
+// Keep command menus on the established small size while toolbar image lists follow the user preference.
+extern HIMAGELIST HGrayMenuImageList;
+extern HIMAGELIST HHotMenuImageList;
+extern HIMAGELIST HGrayToolBarImageList; // toolbar in gray version (calculated from color)
+extern HIMAGELIST HHotToolBarImageList;  // toolbar in color version
 extern HIMAGELIST HBottomTBImageList;    // bottom toolbar (F1 - F12)
 extern HIMAGELIST HHotBottomTBImageList; // bottom toolbar (F1 - F12)
 
@@ -1865,9 +1868,20 @@ struct CSVGIcon
     const char* SVGName;
 };
 
+// Logical toolbar sizes are persisted as pixels so the values remain stable across DPI changes.
+enum CToolbarIconSize
+{
+    TOOLBAR_ICON_SIZE_SMALL = 16,
+    TOOLBAR_ICON_SIZE_MEDIUM = 24,
+    TOOLBAR_ICON_SIZE_LARGE = 32,
+};
+
+BOOL IsValidToolbarIconSize(int iconSize);
+int GetToolbarIconSizeForSystemDPI();
+
 BOOL CreateToolbarBitmaps(HINSTANCE hInstance, int resID, COLORREF transparent, COLORREF bkColorForAlpha,
                           HBITMAP& hMaskBitmap, HBITMAP& hGrayBitmap, HBITMAP& hColorBitmap, BOOL appendIcons,
-                          const CSVGIcon* svgIcons, int svgIconsCount);
+                          const CSVGIcon* svgIcons, int svgIconsCount, int iconSize);
 
 //****************************************************************************
 //

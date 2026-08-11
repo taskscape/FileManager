@@ -1614,6 +1614,23 @@ int GetIconSizeForSystemDPI(CIconSizeEnum iconSize)
     return (baseIconSize[iconSize] * scale) / 100;
 }
 
+BOOL IsValidToolbarIconSize(int iconSize)
+{
+    // Reject corrupted or future registry values instead of creating an unexpectedly large image list.
+    return iconSize == TOOLBAR_ICON_SIZE_SMALL ||
+           iconSize == TOOLBAR_ICON_SIZE_MEDIUM ||
+           iconSize == TOOLBAR_ICON_SIZE_LARGE;
+}
+
+int GetToolbarIconSizeForSystemDPI()
+{
+    // Scale the persisted logical size with the same system-DPI policy used by existing icons.
+    int logicalSize = IsValidToolbarIconSize(Configuration.ToolbarIconSize) ?
+                          Configuration.ToolbarIconSize :
+                          TOOLBAR_ICON_SIZE_SMALL;
+    return (logicalSize * GetScaleForSystemDPI()) / 100;
+}
+
 void GetSystemDPI(HDC hDC)
 {
     HDC hTmpDC;
@@ -1775,7 +1792,9 @@ BOOL InitializeGraphics(BOOL colorsOnly)
         ImageList_SetImageCount(HFindSymbolsImageList, 2); // inicializace
                                                            //    ImageList_SetBkColor(HFindSymbolsImageList, GetSysColor(COLOR_WINDOW)); // aby pod XP chodily pruhledne ikonky
 
-        int iconSize = IconSizes[ICONSIZE_16];
+        int menuIconSize = IconSizes[ICONSIZE_16];
+        int toolbarIconSize = GetToolbarIconSizeForSystemDPI();
+        int iconSize = menuIconSize;
         HBITMAP hTmpMaskBitmap;
         HBITMAP hTmpGrayBitmap;
         HBITMAP hTmpColorBitmap;
@@ -1785,9 +1804,9 @@ BOOL InitializeGraphics(BOOL colorsOnly)
                                   IDB_MENU,
                                   RGB(255, 0, 255), GetSysColor(COLOR_BTNFACE),
                                   hTmpMaskBitmap, hTmpGrayBitmap, hTmpColorBitmap,
-                                  FALSE, menuMarkIcons, _countof(menuMarkIcons)))
+                                  FALSE, menuMarkIcons, _countof(menuMarkIcons), menuIconSize))
             return FALSE;
-        HMenuMarkImageList = ImageList_Create(iconSize, iconSize, ILC_MASK | ILC_COLORDDB, 2, 1);
+        HMenuMarkImageList = ImageList_Create(menuIconSize, menuIconSize, ILC_MASK | ILC_COLORDDB, 2, 1);
         ImageList_Add(HMenuMarkImageList, hTmpColorBitmap, hTmpMaskBitmap);
         HANDLES(DeleteObject(hTmpMaskBitmap));
         HANDLES(DeleteObject(hTmpGrayBitmap));
@@ -1796,14 +1815,35 @@ BOOL InitializeGraphics(BOOL colorsOnly)
         CSVGIcon* svgIcons;
         int svgIconsCount;
         GetSVGIconsMainToolbar(&svgIcons, &svgIconsCount);
+        // Render a compact command set for menus before creating the independently sized toolbar set.
         if (!CreateToolbarBitmaps(HInstance,
                                   Use256ColorsBitmap() ? IDB_TOOLBAR_256 : IDB_TOOLBAR_16,
                                   RGB(255, 0, 255), GetSysColor(COLOR_BTNFACE),
                                   hTmpMaskBitmap, hTmpGrayBitmap, hTmpColorBitmap,
-                                  TRUE, svgIcons, svgIconsCount))
+                                  TRUE, svgIcons, svgIconsCount, menuIconSize))
             return FALSE;
-        HHotToolBarImageList = ImageList_Create(iconSize, iconSize, ILC_MASK | ILC_COLORDDB, IDX_TB_COUNT, 1);
-        HGrayToolBarImageList = ImageList_Create(iconSize, iconSize, ILC_MASK | ILC_COLORDDB, IDX_TB_COUNT, 1);
+        HHotMenuImageList = ImageList_Create(menuIconSize, menuIconSize, ILC_MASK | ILC_COLORDDB, IDX_TB_COUNT, 1);
+        HGrayMenuImageList = ImageList_Create(menuIconSize, menuIconSize, ILC_MASK | ILC_COLORDDB, IDX_TB_COUNT, 1);
+        ImageList_Add(HHotMenuImageList, hTmpColorBitmap, hTmpMaskBitmap);
+        ImageList_Add(HGrayMenuImageList, hTmpGrayBitmap, hTmpMaskBitmap);
+        HANDLES(DeleteObject(hTmpMaskBitmap));
+        HANDLES(DeleteObject(hTmpGrayBitmap));
+        HANDLES(DeleteObject(hTmpColorBitmap));
+
+        if (HHotMenuImageList == NULL || HGrayMenuImageList == NULL)
+        {
+            TRACE_E("Unable to create image list.");
+            return FALSE;
+        }
+
+        if (!CreateToolbarBitmaps(HInstance,
+                                  Use256ColorsBitmap() ? IDB_TOOLBAR_256 : IDB_TOOLBAR_16,
+                                  RGB(255, 0, 255), GetSysColor(COLOR_BTNFACE),
+                                  hTmpMaskBitmap, hTmpGrayBitmap, hTmpColorBitmap,
+                                  TRUE, svgIcons, svgIconsCount, toolbarIconSize))
+            return FALSE;
+        HHotToolBarImageList = ImageList_Create(toolbarIconSize, toolbarIconSize, ILC_MASK | ILC_COLORDDB, IDX_TB_COUNT, 1);
+        HGrayToolBarImageList = ImageList_Create(toolbarIconSize, toolbarIconSize, ILC_MASK | ILC_COLORDDB, IDX_TB_COUNT, 1);
         ImageList_Add(HHotToolBarImageList, hTmpColorBitmap, hTmpMaskBitmap);
         ImageList_Add(HGrayToolBarImageList, hTmpGrayBitmap, hTmpMaskBitmap);
         HANDLES(DeleteObject(hTmpMaskBitmap));
@@ -1916,6 +1956,9 @@ BOOL InitializeGraphics(BOOL colorsOnly)
 
     ImageList_SetBkColor(HHotToolBarImageList, GetSysColor(COLOR_BTNFACE));
     ImageList_SetBkColor(HGrayToolBarImageList, GetSysColor(COLOR_BTNFACE));
+    // Menu image lists use the same background while retaining their compact dimensions.
+    ImageList_SetBkColor(HHotMenuImageList, GetSysColor(COLOR_BTNFACE));
+    ImageList_SetBkColor(HGrayMenuImageList, GetSysColor(COLOR_BTNFACE));
 
     if (SystemParametersInfo(SPI_GETMOUSEHOVERTIME, 0, &MouseHoverTime, FALSE) == 0)
     {
@@ -2194,6 +2237,17 @@ void ReleaseGraphics(BOOL colorsOnly)
         {
             ImageList_Destroy(HGrayToolBarImageList);
             HGrayToolBarImageList = NULL;
+        }
+        // Menu lists are owned by the graphics lifecycle alongside toolbar lists.
+        if (HHotMenuImageList != NULL)
+        {
+            ImageList_Destroy(HHotMenuImageList);
+            HHotMenuImageList = NULL;
+        }
+        if (HGrayMenuImageList != NULL)
+        {
+            ImageList_Destroy(HGrayMenuImageList);
+            HGrayMenuImageList = NULL;
         }
         if (HBottomTBImageList != NULL)
         {

@@ -411,6 +411,8 @@ CConfiguration::CConfiguration()
     strcpy(MiddleToolBar, DefMiddleToolBar);
     strcpy(LeftToolBar, DefLeftToolBar);
     strcpy(RightToolBar, DefRightToolBar);
+    // Preserve the historical 16-pixel appearance for existing and fresh profiles.
+    ToolbarIconSize = TOOLBAR_ICON_SIZE_SMALL;
 
     SkillLevel = SKILL_LEVEL_ADVANCED; // try to present as many options as possible
 
