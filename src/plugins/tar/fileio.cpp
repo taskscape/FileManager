@@ -136,10 +136,16 @@ CDecompressFile::CDecompressFile(const char* filename, HANDLE file, unsigned cha
 
     if (CQuadWord(0, 0) == inputSize)
     {
-        // determine the file size
-        DWORD SizeLow, SizeHigh;
-        SizeLow = GetFileSize(File, &SizeHigh);
-        InputSize.Set(SizeLow, SizeHigh);
+        // Preserve a successful 0xFFFFFFFF low word and capture a size-query failure before parsing offsets.
+        CFileOffsetResult sizeResult = SalGetPluginFileSizeEx(SalamanderGeneral, File);
+        if (!sizeResult.Succeeded)
+        {
+            Ok = FALSE;
+            ErrorCode = IDS_ERR_FREAD;
+            LastError = sizeResult.Error;
+        }
+        else
+            InputSize = sizeResult.Value;
     }
     else
     {
@@ -204,7 +210,16 @@ CDecompressFile::FReadBlock(unsigned int number)
     {
         DWORD read = (DWORD)(Buffer + BUFSIZE - DataEnd);
 
-        if (StreamPos.Value + read > InputSize.Value)
+        // Reject an invalid stream position before subtracting it from the 64-bit input length.
+        if (StreamPos.Value > InputSize.Value)
+        {
+            Ok = FALSE;
+            ErrorCode = IDS_ERR_EOF;
+            LastError = 0;
+            return NULL;
+        }
+        // Compare the remaining 64-bit length without adding to the current offset and wrapping it.
+        if (read > InputSize.Value - StreamPos.Value)
         {
             read = (DWORD)(InputSize.Value - StreamPos.Value);
         }

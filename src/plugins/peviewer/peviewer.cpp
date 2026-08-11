@@ -279,7 +279,7 @@ CPluginInterface::GetInterfaceForViewer()
 //
 
 BOOL MapFileToMemory(LPCTSTR name, HANDLE& hFile, HANDLE& hFileMapping,
-                     LPVOID& lpFileBase, DWORD& fileSize, BOOL quietMode)
+                     LPVOID& lpFileBase, CQuadWord& fileSize, BOOL quietMode)
 {
     hFile = CreateFileUtf8Local(name, GENERIC_READ, FILE_SHARE_READ, NULL,
                        OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, 0);
@@ -296,8 +296,8 @@ BOOL MapFileToMemory(LPCTSTR name, HANDLE& hFile, HANDLE& hFileMapping,
         return FALSE;
     }
 
-    fileSize = GetFileSize(hFile, NULL);
-    if (fileSize == -1)
+    CFileOffsetResult sizeResult = SalGetPluginFileSizeEx(SalGeneral, hFile);
+    if (!sizeResult.Succeeded)
     {
         if (!quietMode)
         {
@@ -310,7 +310,23 @@ BOOL MapFileToMemory(LPCTSTR name, HANDLE& hFile, HANDLE& hFileMapping,
         return FALSE;
     }
 
-    hFileMapping = CreateFileMapping(hFile, NULL, PAGE_READONLY, 0, 0, NULL);
+    fileSize = sizeResult.Value;
+    // The PE parser stores its validated byte offsets in DWORD fields, so do not silently truncate a larger mapping.
+    if (fileSize.HiDWord != 0)
+    {
+        if (!quietMode)
+        {
+            TCHAR buff[2000];
+            _stprintf(buff, LoadStr(IDS_ERR_OPEN_FILE), name);
+            SalGeneral->SalMessageBox(SalGeneral->GetMsgBoxParent(), buff,
+                                      LoadStr(IDS_PLUGIN_NAME), MB_OK | MB_ICONEXCLAMATION);
+        }
+        CloseHandle(hFile);
+        return FALSE;
+    }
+
+    // Keep the native mapping length in its original 64-bit representation even at the DWORD parser boundary.
+    hFileMapping = CreateFileMapping(hFile, NULL, PAGE_READONLY, fileSize.HiDWord, fileSize.LoDWord, NULL);
     if (hFileMapping == 0)
     {
         if (!quietMode)
@@ -365,7 +381,7 @@ BOOL CPluginInterfaceForViewer::ViewFile(LPCTSTR name, int left, int top, int wi
     HANDLE hFile;
     HANDLE hFileMapping;
     LPVOID lpFileBase;
-    DWORD fileSize;
+    CQuadWord fileSize;
 
     HCURSOR hOldCur = SetCursor(LoadCursor(NULL, IDC_WAIT));
 
@@ -385,7 +401,7 @@ BOOL CPluginInterfaceForViewer::ViewFile(LPCTSTR name, int left, int top, int wi
 
         // Create a temporary file and pour the module dump into it.
         FILE* outStream = _tfopen(tempFileName, _T("w"));
-        if (!DumpFileInfo(lpFileBase, fileSize, outStream))
+        if (!DumpFileInfo(lpFileBase, fileSize.LoDWord, outStream))
         {
             TCHAR buff[2000];
             SetCursor(hOldCur);
@@ -428,14 +444,14 @@ BOOL CPluginInterfaceForViewer::CanViewFile(LPCTSTR name)
     HANDLE hFile;
     HANDLE hFileMapping;
     LPVOID lpFileBase;
-    DWORD fileSize;
+    CQuadWord fileSize;
 
     // Try to map the file into memory (silently -- no error messages).
     if (!MapFileToMemory(name, hFile, hFileMapping, lpFileBase, fileSize, TRUE))
         return FALSE;
 
     // Extract the header type.
-    CPEFile PEFile(lpFileBase, fileSize);
+    CPEFile PEFile(lpFileBase, fileSize.LoDWord);
     DWORD imageType = PEFile.ImageFileType(NULL);
 
     // Unmap the file from memory.

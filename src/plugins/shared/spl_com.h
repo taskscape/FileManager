@@ -195,6 +195,18 @@ struct CQuadWord
     }
 };
 
+// Preserve both the 64-bit value and the captured failure code whenever a plug-in
+// obtains an external file size; DWORD sentinels cannot represent that contract.
+struct CFileOffsetResult
+{
+    CQuadWord Value;
+    DWORD Error;
+    BOOL Succeeded;
+
+    CFileOffsetResult(const CQuadWord& value) : Value(value), Error(NO_ERROR), Succeeded(TRUE) {}
+    CFileOffsetResult(DWORD error) : Error(error), Succeeded(FALSE) { Value.Set(0, 0); }
+};
+
 #define QW_MAX CQuadWord(0xFFFFFFFF, 0xFFFFFFFF)
 
 #define ICONOVERLAYINDEX_NOTUSED 15 // value for CFileData::IconOverlayIndex in case icon has no overlay

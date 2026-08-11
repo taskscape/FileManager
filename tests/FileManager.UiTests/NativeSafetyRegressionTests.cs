@@ -732,15 +732,16 @@ public sealed class NativeSafetyRegressionTests
     public void Copy_engine_uses_unambiguous_64_bit_file_size_and_seek_wrappers()
     {
         var root = FindRepositoryRoot();
-        var declarations = File.ReadAllText(Path.Combine(root, "src", "consts.h"));
+        var declarations = File.ReadAllText(Path.Combine(root, "src", "plugins", "shared", "spl_com.h"));
+        var api = File.ReadAllText(Path.Combine(root, "src", "consts.h"));
         var wrappers = File.ReadAllText(Path.Combine(root, "src", "path_checking.cpp"));
         var copy = File.ReadAllText(Path.Combine(root, "src", "async_copy.cpp"));
 
         Assert.Multiple(() =>
         {
             Assert.That(declarations, Does.Contain("struct CFileOffsetResult"));
-            Assert.That(declarations, Does.Contain("CFileOffsetResult SalGetFileSizeEx"));
-            Assert.That(declarations, Does.Contain("CFileOffsetResult SalSetFilePointerEx"));
+            Assert.That(api, Does.Contain("CFileOffsetResult SalGetFileSizeEx"));
+            Assert.That(api, Does.Contain("CFileOffsetResult SalSetFilePointerEx"));
             Assert.That(wrappers, Does.Contain("GetFileSizeEx(file, &size)"));
             Assert.That(wrappers, Does.Contain("SetFilePointerEx(file, input, &output, moveMethod)"));
             Assert.That(wrappers, Does.Contain("CFileOffsetResult(GetLastError())"));
@@ -750,6 +751,39 @@ public sealed class NativeSafetyRegressionTests
                         "The copy engine must not reintroduce raw GetFileSize calls.");
             Assert.That(Regex.Matches(copy, @"(?m)^(?!\s*//).*?\bSetFilePointer\s*\(").Count, Is.Zero,
                         "The copy engine must not reintroduce raw SetFilePointer calls.");
+        });
+    }
+
+    [TestCase(0xFFFFFFFFUL, true, 0xFFFFFFFFUL, true)]
+    [TestCase(0xFFFFFFFFUL, true, 100000UL, false)]
+    [TestCase(0x100000000UL, true, 0xFFFFFFFFUL, false)]
+    [TestCase(0UL, false, 0xFFFFFFFFUL, false)]
+    public void Plugin_readers_preserve_full_file_sizes_and_reject_only_their_explicit_caps(
+        ulong size, bool succeeded, ulong cap, bool expectedAccepted)
+    {
+        // Exercise the maximum DWORD, successful sentinel value, over-cap, and failed-query contracts independently.
+        Assert.That(succeeded && size <= cap, Is.EqualTo(expectedAccepted));
+
+        var root = FindRepositoryRoot();
+        var sdk = File.ReadAllText(Path.Combine(root, "src", "plugins", "shared", "spl_gen.h"));
+        var checkver = File.ReadAllText(Path.Combine(root, "src", "plugins", "checkver", "data.cpp"));
+        var peviewer = File.ReadAllText(Path.Combine(root, "src", "plugins", "peviewer", "peviewer.cpp"));
+        var tar = File.ReadAllText(Path.Combine(root, "src", "plugins", "tar", "fileio.cpp"));
+        var nethood = File.ReadAllText(Path.Combine(root, "src", "plugins", "nethood", "cache.cpp"));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(sdk, Does.Contain("CFileOffsetResult SalGetPluginFileSizeEx"));
+            Assert.That(checkver, Does.Contain("!sizeResult.Succeeded || sizeResult.Value.Value == 0 || sizeResult.Value.Value > LOADED_SCRIPT_MAX"));
+            Assert.That(peviewer, Does.Contain("CQuadWord& fileSize"));
+            Assert.That(peviewer, Does.Contain("fileSize.HiDWord != 0"));
+            Assert.That(peviewer, Does.Contain("fileSize.HiDWord, fileSize.LoDWord"));
+            Assert.That(tar, Does.Contain("SalGetPluginFileSizeEx(SalamanderGeneral, File)"));
+            Assert.That(tar, Does.Contain("StreamPos.Value > InputSize.Value"));
+            Assert.That(tar, Does.Contain("read > InputSize.Value - StreamPos.Value"));
+            Assert.That(nethood, Does.Contain("sizeResult.Succeeded && sizeResult.Value.Value <= 1000"));
+            Assert.That(Regex.Matches(checkver + peviewer + tar + nethood, @"(?m)^(?!\s*//).*?\bGetFileSize\s*\(").Count, Is.Zero,
+                        "Bounded plug-in readers must not reintroduce sentinel-ambiguous GetFileSize calls.");
         });
     }
 

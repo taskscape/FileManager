@@ -987,14 +987,17 @@ BOOL LoadScripDataFromFile(const char* fileName)
         return FALSE;
     }
 
-    DWORD size = GetFileSize(hFile, NULL);
-    if (size == 0xFFFFFFFF || size == 0 || size > LOADED_SCRIPT_MAX)
+    CFileOffsetResult sizeResult = SalGetPluginFileSizeEx(SalGeneral, hFile);
+    // The script buffer is deliberately fixed, so reject the full 64-bit size before narrowing it for ReadFile.
+    if (!sizeResult.Succeeded || sizeResult.Value.Value == 0 || sizeResult.Value.Value > LOADED_SCRIPT_MAX)
     {
         sprintf(buff, LoadStr(IDS_FILE_OPENERROR), fileName);
         AddLogLine(buff, TRUE);
         CloseHandle(hFile);
         return FALSE;
     }
+
+    DWORD size = (DWORD)sizeResult.Value.Value;
 
     DWORD read;
     if (!ReadFile(hFile, LoadedScript, size, &read, NULL) || read != size)

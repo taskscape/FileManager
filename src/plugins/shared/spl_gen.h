@@ -3451,6 +3451,17 @@ public:
     virtual void WINAPI CloseAllOwnedEnabledDialogs(HWND parent, DWORD tid = 0) = 0;
 };
 
+// Adapt the stable plug-in ABI's success/error out parameters to the shared
+// result type so plug-ins do not revive raw GetFileSize sentinel handling.
+inline CFileOffsetResult SalGetPluginFileSizeEx(CSalamanderGeneralAbstract* salamander, HANDLE file)
+{
+    CQuadWord size;
+    DWORD error;
+    if (!salamander->SalGetFileSize(file, size, error))
+        return CFileOffsetResult(error);
+    return CFileOffsetResult(size);
+}
+
 #ifdef _MSC_VER
 #pragma pack(pop, enter_include_spl_gen)
 #endif // _MSC_VER
