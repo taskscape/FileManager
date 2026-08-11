@@ -609,6 +609,8 @@
 #define IDB_CTB_RESET                   2745
 #define IDB_CTB_UP                      2746
 #define IDB_CTB_DOWN                    2747
+// Stable automation identity for the toolbar-size preference control.
+#define IDC_CTB_ICON_SIZE               2748
 #define IDD_FIND_DUPLICATE              2750
 #define IDC_FD_SAME_NAME                2751
 #define IDC_FD_SAME_SIZE                2752

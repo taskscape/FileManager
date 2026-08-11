@@ -11,25 +11,185 @@
 #include "7zip.rh"
 #include "7zip.rh2"
 #include "lang\lang.rh"
+#include "..\shared\plugin_thread_owner.h"
 
 WNDPROC OldProgressDlgProc;
 
 CSalamanderForOperationsAbstract* Salamander;
 
+// The completion notification is private to the temporary progress-dialog
+// subclass, so it cannot collide with the host's progress-dialog protocol.
+const WPARAM WM_7ZIP_TASKCOMPLETE = WM_7ZIP_PASSWORD + 1;
+const DWORD SEVEN_ZIP_TASK_PUMP_WAIT = 250;
+const DWORD SEVEN_ZIP_TASK_CANCEL_DEADLINE = 5000;
+
+class C7ZipTaskOperation;
+static C7ZipTaskOperation* Active7ZipTaskOperation = NULL;
+
+struct C7ZipTaskCompletion
+{
+    C7ZipTaskOperation* Operation;
+    HRESULT Result;
+};
+
+// This object owns the worker and retains the caller's arguments until the
+// UI has consumed the posted result, preventing a late archive callback from
+// observing state released by LaunchAndDo7ZipTask.
+class C7ZipTaskOperation
+{
+public:
+    C7ZipTaskOperation(HWND progressWindow, LPTHREAD_START_ROUTINE threadProc, LPVOID arguments)
+        : ProgressWindow(progressWindow), ThreadProc(threadProc), Arguments(arguments),
+          CancellationRequested(FALSE), CompletionDelivered(FALSE), CompletionPostFailed(FALSE),
+          CancellationDeadlineReported(FALSE), CancellationStartedAt(0), Result(E_FAIL)
+    {
+    }
+
+    BOOL Start()
+    {
+        return Worker.Start(WorkerProc, this, "7-Zip archive task", NULL, 0);
+    }
+
+    void RequestCancellation()
+    {
+        if (InterlockedExchange(&CancellationRequested, TRUE) == FALSE)
+        {
+            CancellationStartedAt = GetTickCount64();
+            Worker.RequestStop();
+        }
+    }
+
+    BOOL IsCancellationRequested() const
+    {
+        return InterlockedCompareExchange((volatile LONG*)&CancellationRequested, FALSE, FALSE) != FALSE;
+    }
+
+    void DeliverCompletion(HRESULT result)
+    {
+        Result = result;
+        InterlockedExchange(&CompletionDelivered, TRUE);
+    }
+
+    BOOL HasCompletion() const
+    {
+        return InterlockedCompareExchange((volatile LONG*)&CompletionDelivered, FALSE, FALSE) != FALSE;
+    }
+
+    BOOL WorkerFinished() const
+    {
+        return Worker.WaitForCompletion(0) != WAIT_TIMEOUT;
+    }
+
+    HRESULT GetResult() const
+    {
+        return Result;
+    }
+
+    BOOL CompletionCouldNotBePosted() const
+    {
+        return InterlockedCompareExchange((volatile LONG*)&CompletionPostFailed, FALSE, FALSE) != FALSE;
+    }
+
+    void ReportCancellationDeadline()
+    {
+        if (!IsCancellationRequested() ||
+            GetTickCount64() - CancellationStartedAt < SEVEN_ZIP_TASK_CANCEL_DEADLINE ||
+            InterlockedExchange(&CancellationDeadlineReported, TRUE) != FALSE)
+        {
+            return;
+        }
+
+        TRACE_E("7-Zip archive task did not stop within " << SEVEN_ZIP_TASK_CANCEL_DEADLINE
+                                                            << " ms; continuing to pump until its owned completion arrives.");
+    }
+
+private:
+    static DWORD WINAPI WorkerProc(void* parameter, HANDLE stopEvent)
+    {
+        C7ZipTaskOperation* operation = (C7ZipTaskOperation*)parameter;
+        HRESULT result = E_ABORT;
+
+        if (WaitForSingleObject(stopEvent, 0) != WAIT_OBJECT_0)
+        {
+            try
+            {
+                result = (HRESULT)operation->ThreadProc(operation->Arguments);
+            }
+            catch (...)
+            {
+                result = E_UNEXPECTED;
+            }
+        }
+        if (WaitForSingleObject(stopEvent, 0) == WAIT_OBJECT_0 && SUCCEEDED(result))
+            result = E_ABORT;
+
+        operation->Result = result;
+        C7ZipTaskCompletion* completion = new C7ZipTaskCompletion;
+        if (completion == NULL)
+        {
+            InterlockedExchange(&operation->CompletionPostFailed, TRUE);
+            return result;
+        }
+
+        completion->Operation = operation;
+        completion->Result = result;
+        if (!PostMessage(operation->ProgressWindow, WM_7ZIP, WM_7ZIP_TASKCOMPLETE, (LPARAM)completion))
+        {
+            delete completion;
+            InterlockedExchange(&operation->CompletionPostFailed, TRUE);
+        }
+        return result;
+    }
+
+private:
+    HWND ProgressWindow;
+    LPTHREAD_START_ROUTINE ThreadProc;
+    LPVOID Arguments;
+    CPluginThreadOwner Worker;
+    volatile LONG CancellationRequested;
+    volatile LONG CompletionDelivered;
+    volatile LONG CompletionPostFailed;
+    volatile LONG CancellationDeadlineReported;
+    ULONGLONG CancellationStartedAt;
+    HRESULT Result;
+};
+
 BOOL CALLBACK SubClassedProgressDlgProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 {
+    if (uMsg == WM_COMMAND && LOWORD(wParam) == IDCANCEL && Active7ZipTaskOperation != NULL)
+    {
+        // Preserve the dialog's cancel behavior while also waking the owned worker.
+        Active7ZipTaskOperation->RequestCancellation();
+    }
+
     if (WM_7ZIP == uMsg)
     {
         switch (wParam)
         {
         case WM_7ZIP_PROGRESS:
+            if (Active7ZipTaskOperation != NULL && Active7ZipTaskOperation->IsCancellationRequested())
+                return E_ABORT;
             if (!Salamander->ProgressSetSize(*(CQuadWord*)lParam, CQuadWord(-1, -1), TRUE))
             { // Canceled by the user
+                if (Active7ZipTaskOperation != NULL)
+                    Active7ZipTaskOperation->RequestCancellation();
                 Salamander->ProgressDialogAddText(LoadStr(IDS_CANCELING_OPERATION), FALSE);
                 Salamander->ProgressEnableCancel(FALSE);
                 return E_ABORT;
             }
             return S_OK;
+
+        case WM_7ZIP_TASKCOMPLETE:
+        {
+            C7ZipTaskCompletion* completion = (C7ZipTaskCompletion*)lParam;
+            if (completion != NULL)
+            {
+                if (completion->Operation == Active7ZipTaskOperation)
+                    Active7ZipTaskOperation->DeliverCompletion(completion->Result);
+                delete completion;
+            }
+            return S_OK;
+        }
 
         case WM_7ZIP_SETTOTAL:
             Salamander->ProgressSetTotalSize(*(CQuadWord*)lParam, CQuadWord(-1, -1));
@@ -84,6 +244,59 @@ BOOL CALLBACK SubClassedProgressDlgProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPA
     return (BOOL)CallWindowProc(OldProgressDlgProc, hWnd, uMsg, wParam, lParam);
 }
 
+// Restoring the original procedure is mandatory even when worker startup or a
+// later wait fails; otherwise subsequent progress dialogs call a stale hook.
+class CProgressDialogSubclassScope
+{
+public:
+    CProgressDialogSubclassScope(HWND window, C7ZipTaskOperation* operation)
+        : Window(window), Operation(operation), PreviousProcedure(NULL), SavedOldProcedure(NULL),
+          PreviousOperation(NULL), Installed(FALSE)
+    {
+    }
+
+    BOOL Install()
+    {
+        SetLastError(ERROR_SUCCESS);
+        PreviousProcedure = (WNDPROC)GetWindowLongPtr(Window, GWLP_WNDPROC);
+        if (PreviousProcedure == NULL && GetLastError() != ERROR_SUCCESS)
+            return FALSE;
+
+        SavedOldProcedure = OldProgressDlgProc;
+        PreviousOperation = Active7ZipTaskOperation;
+        OldProgressDlgProc = PreviousProcedure;
+        Active7ZipTaskOperation = Operation;
+
+        SetLastError(ERROR_SUCCESS);
+        SetWindowLongPtr(Window, GWLP_WNDPROC, (LONG_PTR)SubClassedProgressDlgProc);
+        if (GetLastError() != ERROR_SUCCESS)
+        {
+            OldProgressDlgProc = SavedOldProcedure;
+            Active7ZipTaskOperation = PreviousOperation;
+            return FALSE;
+        }
+
+        Installed = TRUE;
+        return TRUE;
+    }
+
+    ~CProgressDialogSubclassScope()
+    {
+        if (Installed && IsWindow(Window))
+            SetWindowLongPtr(Window, GWLP_WNDPROC, (LONG_PTR)PreviousProcedure);
+        Active7ZipTaskOperation = PreviousOperation;
+        OldProgressDlgProc = SavedOldProcedure;
+    }
+
+private:
+    HWND Window;
+    C7ZipTaskOperation* Operation;
+    WNDPROC PreviousProcedure;
+    WNDPROC SavedOldProcedure;
+    C7ZipTaskOperation* PreviousOperation;
+    BOOL Installed;
+};
+
 //
 // worker threads
 //
@@ -104,40 +317,43 @@ DWORD WINAPI DecompressThreadProc(LPVOID lpParameter)
 
 HRESULT LaunchAndDo7ZipTask(LPTHREAD_START_ROUTINE threadProc, LPVOID args)
 {
-    DWORD threadId;
-    HANDLE hThread;
+    HWND progressWindow = Salamander->ProgressGetHWND();
+    C7ZipTaskOperation operation(progressWindow, threadProc, args);
+    CProgressDialogSubclassScope subclassScope(progressWindow, &operation);
 
-    OldProgressDlgProc = (WNDPROC)GetWindowLongPtr(Salamander->ProgressGetHWND(), GWLP_WNDPROC);
-    SetWindowLongPtr(Salamander->ProgressGetHWND(), GWLP_WNDPROC, (LONG_PTR)SubClassedProgressDlgProc);
-
-    hThread = ::CreateThread(NULL, 0, threadProc, args, 0, &threadId);
-
-    if (!hThread)
-    {
+    if (!subclassScope.Install())
         return GetLastError();
-    }
+    if (!operation.Start())
+        return GetLastError();
 
-    for (;;)
+    // Do not release the caller's archive arguments until both the UI payload
+    // and the owner's completion signal confirm that no worker can use them.
+    while (!operation.HasCompletion() || !operation.WorkerFinished())
     {
-        if (WAIT_OBJECT_0 == MsgWaitForMultipleObjects(1, &hThread, FALSE, INFINITE, QS_ALLEVENTS | QS_SENDMESSAGE))
-        {
-            // Thread exited
-            DWORD exitCode;
-
-            GetExitCodeThread(hThread, &exitCode);
-            CloseHandle(hThread);
-            return exitCode; // Our thread body func returns HRESULT
-        }
+        DWORD waitResult = MsgWaitForMultipleObjects(0, NULL, FALSE, SEVEN_ZIP_TASK_PUMP_WAIT,
+                                                      QS_ALLEVENTS | QS_SENDMESSAGE);
+        if (waitResult == WAIT_FAILED)
+            return HRESULT_FROM_WIN32(GetLastError());
 
         MSG msg;
-        while (PeekMessage(&msg, SalamanderGeneral->GetMainWindowHWND(), 0, 0, PM_REMOVE))
+        while (PeekMessage(&msg, NULL, 0, 0, PM_REMOVE))
         {
             TranslateMessage(&msg);
             DispatchMessage(&msg);
         }
+
+        if (!operation.HasCompletion() && operation.WorkerFinished() && operation.CompletionCouldNotBePosted())
+        {
+            // A destroyed dialog cannot accept the payload, but the owner has
+            // already retained the final result and safe worker lifetime.
+            TRACE_E("7-Zip archive task could not post its completion to the progress dialog.");
+            return operation.GetResult();
+        }
+
+        operation.ReportCancellationDeadline();
     }
 
-    return S_OK;
+    return operation.GetResult();
 }
 
 HRESULT DoDecompress(CSalamanderForOperationsAbstract* salamander, CDecompressParamObject* dpo)

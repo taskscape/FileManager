@@ -14,7 +14,6 @@
 
 #define TB_SP_WIDTH 6 // sirka separatoru
 
-#define TB_ICON_TB 3 // pocet bodu nad a pod ikonou, vcetne ramecku
 #define TB_TEXT_TB 3
 
 void CToolBar::SetFont()
@@ -121,6 +120,9 @@ BOOL CToolBar::HitTest(int xPos, int yPos, int& index, BOOL& dropDown)
     }
     BOOL vertical = (Style & TLB_STYLE_VERTICAL) != 0;
     Refresh();
+    // Keep the dropdown hit target synchronized with its size-dependent visual inset.
+    int separatedDropPadding = max(2, (int)Padding.IconLeft / 2);
+    int separatedDropWidth = SVGArrowDropDown.GetWidth() + 2 * separatedDropPadding;
     if (xPos >= 0 && xPos <= Width && yPos >= 0 && yPos < Height)
     {
         int i;
@@ -136,7 +138,7 @@ BOOL CToolBar::HitTest(int xPos, int yPos, int& index, BOOL& dropDown)
                     xPos >= xOffset && xPos < xOffset + item->Width)
                 {
                     if ((item->Style & TLBI_STYLE_SEPARATEDROPDOWN) &&
-                        xPos >= item->Offset + item->Width - SVGArrowDropDown.GetWidth() - 4)
+                        xPos >= item->Offset + item->Width - separatedDropWidth)
                         dropDown = TRUE;
                     else
                         dropDown = FALSE;
@@ -153,7 +155,7 @@ BOOL CToolBar::HitTest(int xPos, int yPos, int& index, BOOL& dropDown)
                     yPos >= yOffset && yPos < yOffset + item->Height)
                 {
                     if ((item->Style & TLBI_STYLE_SEPARATEDROPDOWN) &&
-                        xPos >= item->Offset + item->Width - SVGArrowDropDown.GetWidth() - 4)
+                        xPos >= item->Offset + item->Width - separatedDropWidth)
                         dropDown = TRUE;
                     else
                         dropDown = FALSE;
@@ -256,6 +258,10 @@ BOOL CToolBar::Refresh()
     if (!DirtyItems || HWindow == NULL)
         return FALSE;
     BOOL vertical = (Style & TLB_STYLE_VERTICAL) != 0;
+    // Derive every surrounding gap from the icon inset so all three configured sizes share one visual rhythm.
+    int separatorWidth = max(TB_SP_WIDTH, 2 * (int)Padding.IconLeft);
+    int iconVerticalPadding = (int)Padding.IconLeft + 1;
+    int separatedDropPadding = max(2, (int)Padding.IconLeft / 2);
     int offset = 0;
     int maxWidth = 0;
     int maxHeight = 0;
@@ -269,9 +275,9 @@ BOOL CToolBar::Refresh()
         if (item->Style & TLBI_STYLE_SEPARATOR)
         {
             if (vertical)
-                item->Height = TB_SP_WIDTH;
+                item->Height = separatorWidth;
             else
-                item->Width = TB_SP_WIDTH;
+                item->Width = separatorWidth;
         }
         else
         {
@@ -316,12 +322,13 @@ BOOL CToolBar::Refresh()
                 width += Padding.IconLeft;
                 item->IconX = width;
 
-                int iconSize = GetIconSizeForSystemDPI(ICONSIZE_16);
-                int imgW = item->HIcon != NULL ? iconSize : ImageWidth;
-                int imgH = item->HIcon != NULL ? iconSize : ImageHeight;
+                // Direct icons use the same established cell dimensions as image-index-backed buttons.
+                int defaultIconSize = GetIconSizeForSystemDPI(ICONSIZE_16);
+                int imgW = item->HIcon != NULL ? (ImageWidth > 0 ? ImageWidth : defaultIconSize) : ImageWidth;
+                int imgH = item->HIcon != NULL ? (ImageHeight > 0 ? ImageHeight : defaultIconSize) : ImageHeight;
 
                 width += imgW + Padding.IconRight;
-                height = max(height, TB_ICON_TB + imgH + TB_ICON_TB);
+                height = max(height, iconVerticalPadding + imgH + iconVerticalPadding);
             }
 
             if (textPresent)
@@ -354,11 +361,11 @@ BOOL CToolBar::Refresh()
             {
                 if (!(item->Style & TLBI_STYLE_FIXEDWIDTH))
                 {
-                    item->OutterX = width + 2;
-                    width += 2 + SVGArrowDropDown.GetWidth() + 2;
+                    item->OutterX = width + separatedDropPadding;
+                    width += separatedDropPadding + SVGArrowDropDown.GetWidth() + separatedDropPadding;
                 }
                 else
-                    item->OutterX = width - (2 + SVGArrowDropDown.GetWidth() + 2); // ukousneme s sirky polozky
+                    item->OutterX = width - (separatedDropPadding + SVGArrowDropDown.GetWidth() + separatedDropPadding); // ukousneme s sirky polozky
             }
 
             if (!(item->Style & TLBI_STYLE_FIXEDWIDTH))
@@ -492,9 +499,10 @@ void CToolBar::DrawItem(HDC hDC, int index)
             iconPresent = TRUE;
             if (item->HIcon != NULL)
             {
-                int iconSize = GetIconSizeForSystemDPI(ICONSIZE_16);
-                imgW = iconSize;
-                imgH = iconSize;
+                // Direct icons scale with this toolbar's image list, falling back only for list-less controls.
+                int defaultIconSize = GetIconSizeForSystemDPI(ICONSIZE_16);
+                imgW = ImageWidth > 0 ? ImageWidth : defaultIconSize;
+                imgH = ImageHeight > 0 ? ImageHeight : defaultIconSize;
             }
             else
             {
@@ -511,6 +519,10 @@ void CToolBar::DrawItem(HDC hDC, int index)
             innerDropPresent = TRUE;
         if (!vertical && (item->Style & TLBI_STYLE_SEPARATEDROPDOWN))
             outterDropPresent = TRUE;
+
+        // Use the same scalable dropdown width for layout, hit testing, and pressed-state borders.
+        int separatedDropPadding = max(2, (int)Padding.IconLeft / 2);
+        int separatedDropWidth = SVGArrowDropDown.GetWidth() + 2 * separatedDropPadding;
 
         RECT r;
         r.left = 0;
@@ -529,7 +541,7 @@ void CToolBar::DrawItem(HDC hDC, int index)
         if (!grayed && ((HotIndex == index || item->State & TLBI_STATE_CHECKED) || (item->State & TLBI_STATE_PRESSED)))
         {
             if (outterDropPresent)
-                r.right -= 2 + SVGArrowDropDown.GetWidth() + 2;
+                r.right -= separatedDropWidth;
 
             bodyDown = !Customizing && ((item->State & TLBI_STATE_PRESSED) || (item->State & TLBI_STATE_CHECKED));
             dropDown = !Customizing && (item->State & TLBI_STATE_DROPDOWNPRESSED);
@@ -574,9 +586,8 @@ void CToolBar::DrawItem(HDC hDC, int index)
                 int offset = bodyDown ? 1 : 0;
                 int x = item->IconX + offset;
                 int y = centerOffset + (item->Height - imgH) / 2 + offset;
-                int iconSize = GetIconSizeForSystemDPI(ICONSIZE_16);
                 if (item->HIcon != NULL)
-                    DrawIconEx(CacheBitmap->HMemDC, x, y, item->HIcon, iconSize, iconSize, 0, NULL, DI_NORMAL);
+                    DrawIconEx(CacheBitmap->HMemDC, x, y, item->HIcon, imgW, imgH, 0, NULL, DI_NORMAL);
                 else
                 {
                     HIMAGELIST hImageList = HImageList;
@@ -584,7 +595,7 @@ void CToolBar::DrawItem(HDC hDC, int index)
                                    x, y, checked ? ILD_TRANSPARENT : ILD_NORMAL);
                 }
                 if (item->HOverlay != NULL)
-                    DrawIconEx(CacheBitmap->HMemDC, x, y, item->HOverlay, iconSize, iconSize, 0, NULL, DI_NORMAL);
+                    DrawIconEx(CacheBitmap->HMemDC, x, y, item->HOverlay, imgW, imgH, 0, NULL, DI_NORMAL);
             }
             else
             {
@@ -592,9 +603,8 @@ void CToolBar::DrawItem(HDC hDC, int index)
                 int offset = bodyDown ? 1 : 0;
                 int x = item->IconX + offset;
                 int y = centerOffset + (item->Height - imgH) / 2 + offset;
-                int iconSize = GetIconSizeForSystemDPI(ICONSIZE_16);
                 if (item->HIcon != NULL)
-                    DrawIconEx(CacheBitmap->HMemDC, x, y, item->HIcon, iconSize, iconSize, 0, NULL, DI_NORMAL);
+                    DrawIconEx(CacheBitmap->HMemDC, x, y, item->HIcon, imgW, imgH, 0, NULL, DI_NORMAL);
                 else
                 {
                     HIMAGELIST hImageList = HHotImageList ? HHotImageList : HImageList;
@@ -609,7 +619,7 @@ void CToolBar::DrawItem(HDC hDC, int index)
                     //          }
                 }
                 if (item->HOverlay != NULL)
-                    DrawIconEx(CacheBitmap->HMemDC, x, y, item->HOverlay, iconSize, iconSize, 0, NULL, DI_NORMAL);
+                    DrawIconEx(CacheBitmap->HMemDC, x, y, item->HOverlay, imgW, imgH, 0, NULL, DI_NORMAL);
             }
         }
 

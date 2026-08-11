@@ -851,12 +851,8 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
         TopToolBar->SetImageList(HGrayToolBarImageList);
         TopToolBar->SetHotImageList(HHotToolBarImageList);
         TopToolBar->SetStyle(TLB_STYLE_IMAGE | TLB_STYLE_ADJUSTABLE);
-        TOOLBAR_PADDING padding;
-        TopToolBar->GetPadding(&padding);
-        padding.ToolBarVertical = 1;
-        padding.IconLeft = 2;
-        padding.IconRight = 3;
-        TopToolBar->SetPadding(&padding);
+        // Initialize the main command bar with the Fluent inset for the configured icon size.
+        TopToolBar->ApplyConfiguredIconSpacing();
 
         MiddleToolBar = new CMainToolBar(HWindow, mtbtMiddle);
         if (MiddleToolBar == NULL)
@@ -867,11 +863,8 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
         MiddleToolBar->SetImageList(HGrayToolBarImageList);
         MiddleToolBar->SetHotImageList(HHotToolBarImageList);
         MiddleToolBar->SetStyle(TLB_STYLE_IMAGE | TLB_STYLE_ADJUSTABLE | TLB_STYLE_VERTICAL);
-        MiddleToolBar->GetPadding(&padding);
-        padding.ToolBarVertical = 1;
-        padding.IconLeft = 2;
-        padding.IconRight = 3;
-        MiddleToolBar->SetPadding(&padding);
+        // Match the vertical main toolbar to the same size-dependent Fluent spacing.
+        MiddleToolBar->ApplyConfiguredIconSpacing();
 
         PluginsBar = new CPluginsBar(HWindow);
         if (PluginsBar == NULL)
@@ -897,6 +890,7 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
             TRACE_E(LOW_MEMORY);
             return -1;
         }
+        TOOLBAR_PADDING padding;
         UMToolBar->GetPadding(&padding);
         padding.IconLeft = 2;
         padding.IconRight = 3;
@@ -1928,6 +1922,8 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
         // some toolbar was configured - force an update
         IdleForceRefresh = TRUE;
         IdleRefreshStates = TRUE;
+        // Toolbar contents and icon size are user preferences, so persist them through the shared debounce.
+        ScheduleConfigSave();
         return 0;
     }
 

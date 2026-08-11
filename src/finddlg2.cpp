@@ -267,8 +267,9 @@ void CFindDialog::OnColorsChange()
 {
     if (MainMenu != NULL)
     {
-        MainMenu->SetImageList(HGrayToolBarImageList, TRUE);
-        MainMenu->SetHotImageList(HHotToolBarImageList, TRUE);
+        // Find menus retain compact rows while the command toolbar follows the shared preference.
+        MainMenu->SetImageList(HGrayMenuImageList, TRUE);
+        MainMenu->SetHotImageList(HHotMenuImageList, TRUE);
     }
     if (TBHeader != NULL)
         TBHeader->OnColorsChange();

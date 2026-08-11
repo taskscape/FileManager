@@ -6,6 +6,8 @@ internal static class NativeCommands
 {
     // CM_CONFIGURATION is the stable native command used by the Options > Configuration menu item.
     internal const int Configuration = 686;
+    // CM_CUSTOMIZETOP opens the shared Customize Toolbar dialog without depending on translated menu text.
+    internal const int CustomizeTopToolbar = 804;
     internal const int CopyFiles = 727;
     internal const int MoveFiles = 728;
     internal const int DeleteFiles = 729;

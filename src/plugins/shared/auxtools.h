@@ -11,6 +11,10 @@
 
 #pragma once
 
+#include "plugin_thread_owner.h"
+
+typedef DWORD(WINAPI* CThreadQueueStopBody)(void* parameter, HANDLE stopEvent);
+
 //
 // ****************************************************************************
 // CThreadQueue
@@ -19,17 +23,13 @@
 struct CThreadQueueItem
 {
     HANDLE Thread;
+    CPluginThreadOwner* Owner;
     DWORD ThreadID; // only for debugging purposes (finding thread in thread list in debugger)
     int Locks;      // number of locks; if > 0, 'Thread' must not be closed
     CThreadQueueItem* Next;
 
-    CThreadQueueItem(HANDLE thread, DWORD tid)
-    {
-        Thread = thread;
-        ThreadID = tid;
-        Next = NULL;
-        Locks = 0;
-    }
+    CThreadQueueItem(CPluginThreadOwner* owner, DWORD tid);
+    ~CThreadQueueItem();
 };
 
 class CThreadQueue
@@ -37,8 +37,6 @@ class CThreadQueue
 protected:
     const char* QueueName; // queue name (only for debugging purposes)
     CThreadQueueItem* Head;
-    HANDLE Continue; // we must wait for data transfer to started thread
-
     struct CCS // access from multiple threads -> synchronization required
     {
         CRITICAL_SECTION cs;
@@ -50,6 +48,17 @@ protected:
         void Leave() { LeaveCriticalSection(&cs); }
     } CS;
 
+    // Queue mutations must release the lock on every timeout/error path so a
+    // cooperative shutdown never strands later waiters behind stale ownership.
+    class CScopedQueueLock
+    {
+    public:
+        CScopedQueueLock(CCS& section) : Section(section) { Section.Enter(); }
+        ~CScopedQueueLock() { Section.Leave(); }
+    private:
+        CCS& Section;
+    };
+
 public:
     CThreadQueue(const char* queueName /* e.g. "DemoPlug Viewers" */);
     ~CThreadQueue();
@@ -60,10 +69,8 @@ public:
     // (if not NULL), use returned thread handle only for NULL tests and for calling
     // CThreadQueue methods: WaitForExit() and KillThread(); closing the thread handle is handled
     // by this queue object
-    // WARNING: -thread may start with delay after return from StartThread()
-    //         (if 'param' is a pointer to a structure stored on the stack, it is necessary to
-    //          synchronize data transfer from 'param' - main thread must wait
-    //          for the new thread to take over the data)
+    // WARNING: -the legacy callback cannot observe cancellation; migrate it to
+    //          the stop-aware overload before relying on prompt shutdown
     //        -returned thread handle may already be closed if thread finishes before
     //         return from StartThread() and StartThread() is called from another thread or
     //         KillAll()
@@ -71,21 +78,24 @@ public:
     HANDLE StartThread(unsigned(WINAPI* body)(void*), void* param, unsigned stack_size = 0,
                        HANDLE* threadHandle = NULL, DWORD* threadID = NULL);
 
+    // New callbacks receive a manual-reset stop event owned until their safe
+    // join, allowing plug-ins to migrate without changing the queue surface.
+    HANDLE StartThread(CThreadQueueStopBody body, void* param, unsigned stack_size = 0,
+                       HANDLE* threadHandle = NULL, DWORD* threadID = NULL);
+
     // waits for thread termination from this queue; 'thread' is thread handle, which may already
     // be closed (this object closes it when calling StartThread and KillAll); if
     // waits for thread termination, removes the thread from the queue, and closes its handle
     BOOL WaitForExit(HANDLE thread, int milliseconds = INFINITE);
 
-    // kills a thread from this queue (via TerminateThread()); 'thread' is the thread handle,
-    // which may already be closed (this object closes it when calling StartThread and KillAll);
-    // if thread is found, kills it, removes from queue and closes its handle (thread object
-    // is not deallocated, because its state is unknown, possibly inconsistent)
+    // Requests cooperative stop and safely joins this queue entry. Legacy
+    // callbacks may take longer because they do not yet consume the stop event.
     void KillThread(HANDLE thread, DWORD exitCode = 666);
 
     // verifies that all threads have finished; if 'force' is TRUE and some thread is still running,
-    // waits 'forceWaitTime' (in ms) for all threads to finish, then kills running threads
-    // (their objects are not deallocated, because their state is unknown, possibly inconsistent);
-    // returns TRUE, if all threads are terminated, with 'force' TRUE always returns TRUE;
+    // waits 'forceWaitTime' (in ms) for all threads to finish, then requests
+    // cooperative stop and safely joins running threads; returns TRUE with
+    // force TRUE only after every callback has exited;
     // if 'force' is FALSE and some thread is still running, waits 'waitTime' (in ms) for termination
     // of all threads, if something is still running then, returns FALSE; time INFINITE = unlimited
     // waiting
@@ -97,7 +107,11 @@ protected:                                                 // internal unsynchro
     BOOL FindAndLockItem(HANDLE thread);                   // finds item for 'thread' in queue and locks it
     void UnlockItem(HANDLE thread, BOOL deleteIfUnlocked); // unlocks item for 'thread' in queue, optionally deletes it
     void ClearFinishedThreads();                           // removes already finished threads from the queue
-    static DWORD WINAPI ThreadBase(void* param);           // universal thread body
+    struct CThreadQueueLaunchData;
+    static DWORD WINAPI ThreadBase(void* param, HANDLE stopEvent);
+    static void WINAPI NameThread(const char* name);
+    HANDLE StartThreadInternal(unsigned(WINAPI* legacyBody)(void*), CThreadQueueStopBody stopBody,
+                               void* param, unsigned stackSize, HANDLE* threadHandle, DWORD* threadID);
 };
 
 //

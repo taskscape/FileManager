@@ -370,18 +370,19 @@ MENU_TEMPLATE_ITEM ArchivePanelMenuTemplate[] =
 BOOL BuildSalamanderMenus()
 {
     CALL_STACK_MESSAGE1("BuildSalamanderMenus()");
-    // main window`s menu
-    MainMenu.LoadFromTemplate(HLanguage, MainMenuTemplate, NULL, HGrayToolBarImageList, HHotToolBarImageList);
+    // Menus deliberately use compact command lists even when toolbar icons are enlarged.
+    MainMenu.LoadFromTemplate(HLanguage, MainMenuTemplate, NULL, HGrayMenuImageList, HHotMenuImageList);
     // context menu in archives
-    ArchiveMenu.LoadFromTemplate(HLanguage, ArchiveMenuTemplate, NULL, HGrayToolBarImageList, HHotToolBarImageList);
-    ArchivePanelMenu.LoadFromTemplate(HLanguage, ArchivePanelMenuTemplate, NULL, HGrayToolBarImageList, HHotToolBarImageList);
+    ArchiveMenu.LoadFromTemplate(HLanguage, ArchiveMenuTemplate, NULL, HGrayMenuImageList, HHotMenuImageList);
+    ArchivePanelMenu.LoadFromTemplate(HLanguage, ArchivePanelMenuTemplate, NULL, HGrayMenuImageList, HHotMenuImageList);
     return TRUE;
 }
 
 BOOL BuildFindMenu(CMenuPopup* popup)
 {
     CALL_STACK_MESSAGE1("BuildFindMenu()");
-    return popup->LoadFromTemplate(HLanguage, FindMenuTemplate, NULL, HGrayToolBarImageList, HHotToolBarImageList);
+    // Find menus follow the same compact menu sizing invariant as the main window.
+    return popup->LoadFromTemplate(HLanguage, FindMenuTemplate, NULL, HGrayMenuImageList, HHotMenuImageList);
 }
 
 DWORD

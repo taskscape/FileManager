@@ -186,8 +186,9 @@ int CToolBar::GetNeededWidth()
                 width = max(width, Padding.IconLeft + ImageWidth + Padding.IconRight);
             if (HasIcon)
             {
-                int iconSize = GetIconSizeForSystemDPI(ICONSIZE_16);
-                width = max(width, Padding.IconLeft + iconSize + Padding.IconRight);
+                // Direct HICON items follow the toolbar's configured image width when a list establishes it.
+                int iconWidth = ImageWidth > 0 ? ImageWidth : GetIconSizeForSystemDPI(ICONSIZE_16);
+                width = max(width, Padding.IconLeft + iconWidth + Padding.IconRight);
             }
         }
         Refresh();
@@ -246,10 +247,16 @@ int CToolBar::GetNeededHeight()
             height = 3 + FontHeight + 3;
         if (Style & TLB_STYLE_IMAGE)
         {
+            // Couple vertical breathing room to the same inset that surrounds the icon horizontally.
+            int iconVerticalPadding = (int)Padding.IconLeft + 1;
             if (HImageList != NULL)
-                height = max(height, 3 + ImageHeight + 3);
+                height = max(height, iconVerticalPadding + ImageHeight + iconVerticalPadding);
             if (HasIcon)
-                height = max(height, 3 + GetIconSizeForSystemDPI(ICONSIZE_16) + 3);
+            {
+                // Match HICON button height to the configured image-list cell without affecting list-less toolbars.
+                int iconHeight = ImageHeight > 0 ? ImageHeight : GetIconSizeForSystemDPI(ICONSIZE_16);
+                height = max(height, iconVerticalPadding + iconHeight + iconVerticalPadding);
+            }
         }
 
         height += 2 * Padding.ToolBarVertical;
@@ -780,6 +787,24 @@ void CToolBar::SetPadding(const TOOLBAR_PADDING* padding)
     DirtyItems = TRUE;
     if (HWindow != NULL)
         InvalidateRect(HWindow, NULL, FALSE);
+}
+
+void CToolBar::ApplyConfiguredIconSpacing()
+{
+    CALL_STACK_MESSAGE1("CToolBar::ApplyConfiguredIconSpacing()");
+
+    // A one-quarter-icon inset preserves the Fluent proposal's density at 16, 24, and 32 pixels and scales with DPI.
+    int iconDimension = max(ImageWidth, ImageHeight);
+    if (iconDimension <= 0)
+        iconDimension = GetToolbarIconSizeForSystemDPI();
+    int edgeSpacing = max(1, (iconDimension + 3) / 4);
+
+    TOOLBAR_PADDING padding = Padding;
+    padding.ToolBarVertical = 0;
+    padding.IconLeft = (WORD)edgeSpacing;
+    padding.IconRight = (WORD)edgeSpacing;
+    padding.TextRight = (WORD)edgeSpacing;
+    SetPadding(&padding);
 }
 
 /*

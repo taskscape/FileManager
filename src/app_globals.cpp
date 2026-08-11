@@ -198,6 +198,9 @@ HBITMAP HHeaderSort = NULL;
 
 HIMAGELIST HFindSymbolsImageList = NULL;
 HIMAGELIST HMenuMarkImageList = NULL;
+// Menu commands retain compact rows independently of the configurable toolbar size.
+HIMAGELIST HGrayMenuImageList = NULL;
+HIMAGELIST HHotMenuImageList = NULL;
 HIMAGELIST HGrayToolBarImageList = NULL;
 HIMAGELIST HHotToolBarImageList = NULL;
 HIMAGELIST HBottomTBImageList = NULL;

@@ -28,13 +28,13 @@ foreach ($line in $diff) {
         continue
     }
     if ($addedCode -match '\b(?:CreateThread|_beginthreadex)\s*\(' -and
-        $currentFile -notin @('src/common/thread_owner.h', 'src/common/handles.cpp', 'src/common/handles.h')) {
+        $currentFile -notin @('src/common/thread_owner.h', 'src/plugins/shared/plugin_thread_owner.h', 'src/common/handles.cpp', 'src/common/handles.h')) {
         $violations += "${currentFile}: $addedCode"
     }
 }
 
 if ($violations.Count -ne 0) {
-    Write-Error 'New raw CreateThread and _beginthreadex calls are prohibited. Use CThreadOwner so handle, stop, completion, naming, COM, and exception policy stay together.'
+    Write-Error 'New raw CreateThread and _beginthreadex calls are prohibited. Use CThreadOwner or CPluginThreadOwner so handle, stop, completion, naming, and exception policy stay together.'
     $violations | ForEach-Object { Write-Error $_ }
     exit 1
 }

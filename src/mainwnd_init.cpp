@@ -2174,8 +2174,9 @@ void CMainWindow::OnWmContextMenu(HWND hWnd, int xPos, int yPos)
     // create the menu
     CMenuPopup menu;
 
-    menu.SetImageList(HGrayToolBarImageList, TRUE);
-    menu.SetHotImageList(HHotToolBarImageList, TRUE);
+    // Context menus stay compact regardless of the selected toolbar icon size.
+    menu.SetImageList(HGrayMenuImageList, TRUE);
+    menu.SetHotImageList(HHotMenuImageList, TRUE);
 
     // prepare a separator item
     MENU_ITEM_INFO miiSep;
@@ -3166,6 +3167,8 @@ void CMainWindow::OnColorsChanged(BOOL reloadUMIcons)
     {
         TopToolBar->SetImageList(HGrayToolBarImageList);
         TopToolBar->SetHotImageList(HHotToolBarImageList);
+        // Recompute proportional spacing when Customize Toolbar replaces the image-list size.
+        TopToolBar->ApplyConfiguredIconSpacing();
         TopToolBar->OnColorsChanged();
     }
 
@@ -3174,6 +3177,8 @@ void CMainWindow::OnColorsChanged(BOOL reloadUMIcons)
     {
         MiddleToolBar->SetImageList(HGrayToolBarImageList);
         MiddleToolBar->SetHotImageList(HHotToolBarImageList);
+        // Keep the vertical toolbar synchronized with the same live icon-size change.
+        MiddleToolBar->ApplyConfiguredIconSpacing();
         MiddleToolBar->OnColorsChanged();
     }
 
@@ -3230,15 +3235,15 @@ void CMainWindow::OnColorsChanged(BOOL reloadUMIcons)
         BottomToolBar->OnColorsChanged();
     }
 
-    // main menu
-    MainMenu.SetImageList(HGrayToolBarImageList, TRUE);
-    MainMenu.SetHotImageList(HHotToolBarImageList, TRUE);
+    // Main and archive menu row sizes remain independent from toolbar preferences.
+    MainMenu.SetImageList(HGrayMenuImageList, TRUE);
+    MainMenu.SetHotImageList(HHotMenuImageList, TRUE);
 
     // archive menu
-    ArchiveMenu.SetImageList(HGrayToolBarImageList, TRUE);
-    ArchiveMenu.SetHotImageList(HHotToolBarImageList, TRUE);
-    ArchivePanelMenu.SetImageList(HGrayToolBarImageList, TRUE);
-    ArchivePanelMenu.SetHotImageList(HHotToolBarImageList, TRUE);
+    ArchiveMenu.SetImageList(HGrayMenuImageList, TRUE);
+    ArchiveMenu.SetHotImageList(HHotMenuImageList, TRUE);
+    ArchivePanelMenu.SetImageList(HGrayMenuImageList, TRUE);
+    ArchivePanelMenu.SetHotImageList(HHotMenuImageList, TRUE);
 
     // left/right panel
     if (LeftPanel != NULL)
@@ -3250,6 +3255,24 @@ void CMainWindow::OnColorsChanged(BOOL reloadUMIcons)
     {
         RightPanel->OnColorsChanged();
     }
+
+    // Rebar child metrics and panel geometry must follow a newly selected toolbar image height immediately.
+    if (HTopRebar != NULL && TopToolBar != NULL && TopToolBar->HWindow != NULL)
+    {
+        int index = (int)SendMessage(HTopRebar, RB_IDTOINDEX, BANDID_TOPTOOLBAR, 0);
+        if (index != -1)
+        {
+            REBARBANDINFO rbbi;
+            ZeroMemory(&rbbi, sizeof(rbbi));
+            rbbi.cbSize = sizeof(rbbi);
+            rbbi.fMask = RBBIM_CHILDSIZE;
+            rbbi.cxMinChild = 10;
+            rbbi.cyMinChild = TopToolBar->GetNeededHeight();
+            SendMessage(HTopRebar, RB_SETBANDINFO, index, (LPARAM)&rbbi);
+        }
+    }
+    if (HWindow != NULL)
+        LayoutWindows();
 }
 
 void CMainWindow::StartAnimate()

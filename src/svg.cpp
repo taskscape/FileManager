@@ -157,8 +157,13 @@ void RenderSVGImage(NSVGrasterizer* rast, HDC hDC, int x, int y, const char* svg
                 }
             }
 
-            float scale = sysDPIScale / 100;
-            nsvgRasterize(rast, image, 0, 0, scale, (BYTE*)lpMemBits, iconSize, iconSize, iconSize * 4);
+            // Fit the vector artwork to the requested image-list cell; DPI is already reflected in iconSize.
+            float scaleX = (float)iconSize / image->width;
+            float scaleY = (float)iconSize / image->height;
+            float scale = min(scaleX, scaleY);
+            float xOffset = (iconSize - image->width * scale) / 2;
+            float yOffset = (iconSize - image->height * scale) / 2;
+            nsvgRasterize(rast, image, xOffset, yOffset, scale, (BYTE*)lpMemBits, iconSize, iconSize, iconSize * 4);
             nsvgDelete(image);
 
             BLENDFUNCTION bf;
