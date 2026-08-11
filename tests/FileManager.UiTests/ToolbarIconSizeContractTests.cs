@@ -127,6 +127,36 @@ public sealed class ToolbarIconSizeContractTests
         });
     }
 
+    [Test]
+    public void High_fidelity_reference_catalog_contains_every_runtime_toolbar_icon()
+    {
+        var root = FindRepositoryRoot();
+        var runtimeDirectory = Path.Combine(root, "src", "res", "toolbars");
+        var referenceDirectory = Path.Combine(root, "design", "icon-reference", "fluent-color-essentials");
+        var referenceSvgDirectory = Path.Combine(referenceDirectory, "svg");
+        var runtimeNames = Directory.GetFiles(runtimeDirectory, "*.svg").Select(Path.GetFileName).Order().ToArray();
+        var referenceNames = Directory.GetFiles(referenceSvgDirectory, "*.svg").Select(Path.GetFileName).Order().ToArray();
+
+        // The archival set must remain a complete, scalable mirror rather than a hand-picked presentation subset.
+        Assert.That(referenceNames, Is.EqualTo(runtimeNames));
+        Assert.That(referenceNames, Has.Length.EqualTo(91));
+        foreach (var name in referenceNames)
+        {
+            var svg = File.ReadAllText(Path.Combine(referenceSvgDirectory, name!));
+            Assert.That(svg, Does.Contain("width=\"64\" height=\"64\" viewBox=\"0 0 16 16\""), name);
+        }
+
+        var catalogPath = Path.Combine(referenceDirectory, "fluent-color-essentials-icon-catalog.png");
+        var pngHeader = File.ReadAllBytes(catalogPath).Take(24).ToArray();
+        int width = (pngHeader[16] << 24) | (pngHeader[17] << 16) | (pngHeader[18] << 8) | pngHeader[19];
+        int height = (pngHeader[20] << 24) | (pngHeader[21] << 16) | (pngHeader[22] << 8) | pngHeader[23];
+        Assert.Multiple(() =>
+        {
+            Assert.That(width, Is.EqualTo(3840));
+            Assert.That(height, Is.EqualTo(3440));
+        });
+    }
+
     private static string FindRepositoryRoot()
     {
         var current = new DirectoryInfo(TestContext.CurrentContext.TestDirectory);

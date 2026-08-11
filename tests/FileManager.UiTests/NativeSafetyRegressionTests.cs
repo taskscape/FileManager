@@ -434,6 +434,35 @@ public sealed class NativeSafetyRegressionTests
     }
 
     [Test]
+    public void Crash_report_compression_uses_the_restricted_loader_owned_worker_and_shutdown_contract()
+    {
+        var root = FindRepositoryRoot();
+        var compression = File.ReadAllText(Path.Combine(root, "src", "salmon", "compress.cpp"));
+        var compressionHeader = File.ReadAllText(Path.Combine(root, "src", "salmon", "compress.h"));
+        var dialog = File.ReadAllText(Path.Combine(root, "src", "salmon", "dialogs.cpp"));
+
+        // This crash-path contract prevents diagnostics from depending on CWD,
+        // raw thread handles, or an unbounded worker during dialog teardown.
+        Assert.Multiple(() =>
+        {
+            Assert.That(compression, Does.Contain("CWidePath wideWrapperPath"));
+            Assert.That(compression, Does.Contain("LoadLibraryExW(fullPath, NULL, loadFlags)"));
+            Assert.That(compression, Does.Contain("LOAD_LIBRARY_SEARCH_DLL_LOAD_DIR"));
+            Assert.That(compression, Does.Contain("LOAD_LIBRARY_SEARCH_SYSTEM32"));
+            Assert.That(compression, Does.Contain("LOAD_LIBRARY_SEARCH_USER_DIRS"));
+            Assert.That(compression, Does.Contain("CThreadOwner Thread"));
+            Assert.That(compression, Does.Contain("CThreadShutdownDeadline(\"crash-report compression\")"));
+            Assert.That(compression, Does.Contain("CorrelationId"));
+            Assert.That(compression, Does.Contain("GetModuleFileNameOwned"));
+            Assert.That(compression, Does.Contain("std::string archive"));
+            Assert.That(compression, Does.Not.Contain("HCompressThread"));
+            Assert.That(Regex.Matches(compression, @"(?m)^(?!\s*//).*?\b(?:CreateThread|SetCurrentDirectory|strcpy|strcat)\s*\(").Count, Is.Zero);
+            Assert.That(compressionHeader, Does.Contain("void StopCompressThread()"));
+            Assert.That(dialog, Does.Contain("StopCompressThread();"));
+        });
+    }
+
+    [Test]
     public void Shared_plugin_thread_queue_uses_owned_cooperative_shutdown_without_forced_termination()
     {
         var root = FindRepositoryRoot();

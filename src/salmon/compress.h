@@ -7,8 +7,10 @@
 struct CCompressParams
 {
     BOOL Result;                     // TRUE if the operation completed successfully, otherwise FALSE
+    DWORD CorrelationId;              // identifies one owned crash-compression attempt in diagnostics
     char ErrorMessage[2 * MAX_PATH]; // if Result is FALSE, contains the error description
 };
 
 BOOL StartCompressThread(CCompressParams* params);
 BOOL IsCompressThreadRunning();
+void StopCompressThread();
