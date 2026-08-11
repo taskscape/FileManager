@@ -2459,7 +2459,9 @@ BOOL CNethoodCacheEnumerationThread::ResolveNetShortcut(
                                             NULL));
         if (hFile != INVALID_HANDLE_VALUE)
         {
-            if (GetFileSize(hFile, NULL) <= 1000) // so far all had 92 bytes, so 1000 bytes should be more than enough
+            CFileOffsetResult sizeResult = SalGetPluginFileSizeEx(SalamanderGeneral, hFile);
+            // desktop.ini is intentionally bounded by the fixed scan buffer; inspect the complete size before reading it.
+            if (sizeResult.Succeeded && sizeResult.Value.Value <= 1000) // so far all had 92 bytes, so 1000 bytes should be more than enough
             {
                 char buf[1000];
                 DWORD read;

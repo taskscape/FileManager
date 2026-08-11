@@ -106,18 +106,6 @@ BOOL SalGetTempFileName(const char* path, const char* prefix, char* tmpName, BOO
 // and then set it back)
 BOOL SalMoveFile(const char* srcName, const char* destName);
 
-// Result of a 64-bit file size or seek operation. On failure Value is zero and
-// Error is the Win32 error captured immediately after the failing API call.
-struct CFileOffsetResult
-{
-    CQuadWord Value;
-    DWORD Error;
-    BOOL Succeeded;
-
-    CFileOffsetResult(const CQuadWord& value) : Value(value), Error(NO_ERROR), Succeeded(TRUE) {}
-    CFileOffsetResult(DWORD error) : Error(error), Succeeded(FALSE) { Value.Set(0, 0); }
-};
-
 // Unambiguous 64-bit wrappers for file size and position. They never require
 // callers to inspect GetLastError after receiving a sentinel value.
 CFileOffsetResult SalGetFileSizeEx(HANDLE file);
