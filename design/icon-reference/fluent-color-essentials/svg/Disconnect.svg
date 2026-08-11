@@ -1,0 +1,8 @@
+<!-- Reference master: 64 px inspection size with the production 16 px design grid preserved. -->
+<!-- Fluent Color Essentials: restrained semantic color and rounded geometry stay legible at 16 px. -->
+<svg width="64" height="64" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+<rect x="2.5" y="8.5" width="8" height="5" rx="1" fill="#F3F2F1" stroke="#616161" stroke-width="1"/>
+<path d="M2.5 11.5H10.5" stroke="#616161" stroke-width="1"/>
+<path d="M5.5 10.5H7.5" stroke="#424242" stroke-width="1"/>
+<path d="M10 3L14 7M14 3L10 7" stroke="#C50F1F" stroke-width="1.5" stroke-linecap="round"/>
+</svg>

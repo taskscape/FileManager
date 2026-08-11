@@ -1,0 +1,8 @@
+<!-- Reference master: 64 px inspection size with the production 16 px design grid preserved. -->
+<!-- Fluent Color Essentials: a neutral drive gains one blue change affordance. -->
+<svg width="64" height="64" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+<rect x="2.5" y="3.5" width="11" height="8" rx="1.5" fill="white" stroke="#616161" stroke-width="1.5"/>
+<path d="M3 8.5H13" stroke="#616161"/>
+<circle cx="5" cy="10" r="0.75" fill="#0F6CBD"/>
+<path d="M8 6H12M10.5 4.5L12 6L10.5 7.5" stroke="#0F6CBD" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

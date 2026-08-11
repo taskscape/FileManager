@@ -1,0 +1,7 @@
+<!-- Reference master: 64 px inspection size with the production 16 px design grid preserved. -->
+<!-- Fluent Color Essentials: matching name lines use the non-destructive blue minus action. -->
+<svg width="64" height="64" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+<path d="M2.5 2.5H7.5L9.5 4.5V12.5H2.5V2.5Z" fill="white" stroke="#616161"/>
+<path d="M7.5 2.5V4.5H9.5M4 7H8M4 9H7" stroke="#616161" stroke-linecap="round"/>
+<path d="M10.5 9.5H14" stroke="#0F6CBD" stroke-width="1.5" stroke-linecap="round"/>
+</svg>

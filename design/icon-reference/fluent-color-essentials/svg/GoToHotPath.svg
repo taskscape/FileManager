@@ -1,0 +1,6 @@
+<!-- Reference master: 64 px inspection size with the production 16 px design grid preserved. -->
+<!-- Fluent Color Essentials: a compact bookmark on a folder denotes a saved destination without the literal flame metaphor. -->
+<svg width="64" height="64" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+<path d="M2 4.5C2 3.94772 2.44772 3.5 3 3.5H6.5L8.5 5.5H13C13.5523 5.5 14 5.94772 14 6.5V12.5C14 13.0523 13.5523 13.5 13 13.5H3C2.44772 13.5 2 13.0523 2 12.5V4.5Z" fill="#FFD666" stroke="#D89B00" stroke-width="1" stroke-linejoin="round"/>
+<path d="M10 3.5C10 3.22386 10.2239 3 10.5 3H12C12.2761 3 12.5 3.22386 12.5 3.5V9L11.25 8.25L10 9V3.5Z" fill="#0F6CBD" stroke="white" stroke-width="1" stroke-linejoin="round"/>
+</svg>

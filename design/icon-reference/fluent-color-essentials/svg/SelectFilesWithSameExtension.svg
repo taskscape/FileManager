@@ -1,0 +1,8 @@
+<!-- Reference master: 64 px inspection size with the production 16 px design grid preserved. -->
+<!-- Fluent Color Essentials: matched file endings share one blue terminal marker. -->
+<svg width="64" height="64" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+<path d="M2.5 2.5H7.5L9.5 4.5V12.5H2.5V2.5Z" fill="white" stroke="#616161"/>
+<path d="M7.5 2.5V4.5H9.5" stroke="#616161"/>
+<path d="M4 10H8" stroke="#0F6CBD" stroke-width="1.5" stroke-linecap="round"/>
+<path d="M10 8.5L11.5 10L14 7.5" stroke="#107C10" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

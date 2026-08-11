@@ -1,0 +1,8 @@
+<!-- Reference master: 64 px inspection size with the production 16 px design grid preserved. -->
+<!-- Fluent Color Essentials: the familiar printer metaphor is simplified for 16 px clarity. -->
+<svg width="64" height="64" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+<rect x="4" y="2" width="8" height="4" rx="1" fill="white" stroke="#616161"/>
+<rect x="2" y="5" width="12" height="6" rx="1.5" fill="#F3F2F1" stroke="#616161" stroke-width="1.5"/>
+<rect x="4" y="8.5" width="8" height="5" rx="0.75" fill="white" stroke="#0F6CBD"/>
+<circle cx="11.5" cy="7" r="0.6" fill="#0F6CBD"/>
+</svg>
