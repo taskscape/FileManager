@@ -788,6 +788,32 @@ public sealed class NativeSafetyRegressionTests
     }
 
     [Test]
+    public void Split_combine_stages_and_verifies_output_before_publishing_it()
+    {
+        // Keep the plug-in from reintroducing a direct, partial write to the requested destination.
+        var root = FindRepositoryRoot();
+        var combine = File.ReadAllText(Path.Combine(root, "src", "plugins", "splitcbn", "combine.cpp"));
+        var combineFiles = combine[..combine.IndexOf("//  CalculateFileCRC", StringComparison.Ordinal)];
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(combine, Does.Contain("SalGetPluginFileSizeEx(SalamanderGeneral"));
+            Assert.That(Regex.Matches(combineFiles, @"(?m)^(?!\s*//).*?\bGetFileSize\s*\(").Count, Is.Zero,
+                        "Combine totals and progress must not revive sentinel-ambiguous GetFileSize calls.");
+            Assert.That(combine, Does.Contain("std::unique_ptr<char, decltype(&free)>"));
+            Assert.That(combine, Does.Contain("SalGetTempFileName(targetDirectory, \"SCB\""));
+            Assert.That(combine, Does.Contain("FILE_FLAG_WRITE_THROUGH"));
+            Assert.That(combine, Does.Contain("FlushFileBuffers(outfile.Get()->HFile)"));
+            Assert.That(combine, Does.Contain("VerifyCombinedOutput(temporaryOutput.GetName(), totalSize)"));
+            Assert.That(combine, Does.Contain("GetFileInformationByHandle(output, &information)"));
+            Assert.That(combine, Does.Contain("ReplaceFileW(targetNameW, stagedNameW, NULL, REPLACEFILE_WRITE_THROUGH"));
+            Assert.That(combine, Does.Contain("MoveFileExW(stagedNameW, targetNameW, MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH)"));
+            Assert.That(combine, Does.Contain("COperationResult"));
+            Assert.That(combine, Does.Contain("result.ToLegacyBool(&error)"));
+        });
+    }
+
+    [Test]
     public void File_operation_planning_uses_an_immutable_plan_and_narrow_filesystem_adapter()
     {
         var root = FindRepositoryRoot();
