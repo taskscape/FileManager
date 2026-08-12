@@ -9,6 +9,9 @@
 #include "lang\lang.rh"
 #include "combine.h"
 #include "dialogs.h"
+#include "..\..\operation_result.h"
+
+#include <memory>
 
 // *****************************************************************************
 //
@@ -16,6 +19,157 @@
 //
 
 #define BUFSIZE (512 * 1024)
+
+namespace
+{
+// Keep staged output beside the requested name so promotion never degrades into
+// a cross-volume copy that could expose a partial destination.
+static BOOL PromoteFileUtf8Local(const char* stagedName, const char* targetName)
+{
+    WCHAR* stagedNameW = Utf8AllocWide(stagedName);
+    WCHAR* targetNameW = Utf8AllocWide(targetName);
+    if (stagedNameW == NULL || targetNameW == NULL)
+    {
+        free(stagedNameW);
+        free(targetNameW);
+        SetLastError(ERROR_INVALID_PARAMETER);
+        return FALSE;
+    }
+
+    // ReplaceFile preserves destination metadata; MoveFileEx handles a target removed after selection.
+    BOOL ok = ReplaceFileW(targetNameW, stagedNameW, NULL, REPLACEFILE_WRITE_THROUGH, NULL, NULL);
+    DWORD error = ok ? ERROR_SUCCESS : GetLastError();
+    if (!ok && error == ERROR_FILE_NOT_FOUND)
+    {
+        ok = MoveFileExW(stagedNameW, targetNameW, MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH);
+        error = ok ? ERROR_SUCCESS : GetLastError();
+    }
+    free(stagedNameW);
+    free(targetNameW);
+    if (!ok)
+        SetLastError(error);
+    return ok;
+}
+
+class CScopedSafeFile
+{
+public:
+    CScopedSafeFile() : IsOpen(FALSE) { ZeroMemory(&File, sizeof(File)); }
+    ~CScopedSafeFile() { Close(); }
+
+    SAFE_FILE* Get() { return &File; }
+    void Opened() { IsOpen = TRUE; }
+    void Close()
+    {
+        if (IsOpen)
+        {
+            SalamanderSafeFile->SafeFileClose(&File);
+            IsOpen = FALSE;
+        }
+    }
+
+private:
+    SAFE_FILE File;
+    BOOL IsOpen;
+};
+
+class CCombineTemporaryOutput
+{
+public:
+    CCombineTemporaryOutput() : Reserved(FALSE) { Name[0] = 0; }
+    ~CCombineTemporaryOutput()
+    {
+        if (Reserved)
+            DeleteFileUtf8Local(Name);
+    }
+
+    COperationResult Reserve(const char* targetName)
+    {
+        char targetDirectory[MAX_PATH];
+        strncpy_s(targetDirectory, targetName, _TRUNCATE);
+        if (!SalamanderGeneral->CutDirectory(targetDirectory))
+            return COperationResult::Failure(orpPrepareTransactionalTarget, ERROR_INVALID_NAME, NULL, targetName, FALSE);
+
+        DWORD error = ERROR_SUCCESS;
+        // SalGetTempFileName creates the reservation, closing the race before the writer opens it.
+        if (!SalamanderGeneral->SalGetTempFileName(targetDirectory, "SCB", Name, TRUE, &error))
+            return COperationResult::Failure(orpPrepareTransactionalTarget,
+                                             error != ERROR_SUCCESS ? error : ERROR_WRITE_FAULT,
+                                             NULL, targetName, FALSE);
+
+        Reserved = TRUE;
+        return COperationResult::Success(orpPrepareTransactionalTarget, Name, targetName, opeTemporaryTargetReady);
+    }
+
+    const char* GetName() const { return Name; }
+    void Commit() { Reserved = FALSE; }
+
+    void Cleanup(COperationResult* result)
+    {
+        if (Reserved && !DeleteFileUtf8Local(Name))
+        {
+            // The primary combine failure remains actionable even if temporary cleanup also fails.
+            result->AppendCleanupError(orcpDeleteUnverifiedTarget, GetLastError(), Name);
+            return;
+        }
+        Reserved = FALSE;
+    }
+
+private:
+    char Name[MAX_PATH];
+    BOOL Reserved;
+};
+
+static COperationResult VerifyCombinedOutput(const char* outputName, const CQuadWord& expectedSize)
+{
+    HANDLE output = NOHANDLES(CreateFileUtf8Local(outputName, GENERIC_READ,
+                                                    FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+                                                    NULL, OPEN_EXISTING, FILE_FLAG_SEQUENTIAL_SCAN, NULL));
+    if (output == INVALID_HANDLE_VALUE)
+        return COperationResult::Failure(orpVerifyDurableCopy, GetLastError(), NULL, outputName, FALSE,
+                                         opeTemporaryTargetReady);
+
+    BY_HANDLE_FILE_INFORMATION information;
+    BOOL verified = GetFileInformationByHandle(output, &information);
+    DWORD error = verified ? ERROR_SUCCESS : GetLastError();
+    if (verified && ((information.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) != 0 ||
+                     information.nFileSizeLow != expectedSize.LoDWord ||
+                     information.nFileSizeHigh != expectedSize.HiDWord))
+    {
+        verified = FALSE;
+        error = ERROR_WRITE_FAULT;
+    }
+
+    // Capture verification before closing; CloseHandle is only cleanup evidence on failure.
+    COperationResult result = verified ? COperationResult::Success(orpVerifyDurableCopy, NULL, outputName,
+                                                                    opeTemporaryTargetReady) :
+                                         COperationResult::Failure(orpVerifyDurableCopy, error, NULL, outputName,
+                                                                   FALSE, opeTemporaryTargetReady);
+    if (!NOHANDLES(CloseHandle(output)))
+    {
+        DWORD closeError = GetLastError();
+        if (result.Succeeded())
+            result = COperationResult::Failure(orpVerifyDurableCopy, closeError, NULL, outputName, FALSE,
+                                               opeTemporaryTargetReady);
+        else
+            result.AppendCleanupError(orcpCloseVerificationHandle, closeError, outputName);
+    }
+    return result;
+}
+
+static BOOL ReportCombineFailure(const COperationResult& result, int idTitle, int idMessage)
+{
+    DWORD error = ERROR_SUCCESS;
+    result.ToLegacyBool(&error); // The plug-in keeps its BOOL contract while retaining the causal Win32 error.
+    SetLastError(error);
+
+    char diagnostic[512];
+    result.BuildDiagnosticSummary(diagnostic, _countof(diagnostic));
+    TRACE_E("CombineFiles(): " << diagnostic);
+    SalamanderGeneral->ShowMessageBox(LoadStr(idMessage), LoadStr(idTitle), MSGBOX_ERROR);
+    return FALSE;
+}
+}
 
 BOOL CombineFiles(TIndirectArray<char>& files, LPTSTR targetName,
                   BOOL bOnlyCrc, BOOL bTestCrc, UINT32& Crc,
@@ -32,22 +186,34 @@ BOOL CombineFiles(TIndirectArray<char>& files, LPTSTR targetName,
 
     int idTitle = bOnlyCrc ? IDS_CRCTITLE : IDS_COMBINE;
 
-    // sum sizes of all partial files (while simultaneously checking their accessibility)
+    // Sum checked 64-bit sizes while simultaneously checking each partial file's accessibility.
     CQuadWord totalSize = CQuadWord(0, 0);
     char text[MAX_PATH + 50];
     int i;
     for (i = 0; i < files.Count; i++)
     {
-        SAFE_FILE file;
-        if (!SalamanderSafeFile->SafeFileOpen(&file, files[i], GENERIC_READ, FILE_SHARE_READ, OPEN_EXISTING,
+        CScopedSafeFile file;
+        if (!SalamanderSafeFile->SafeFileOpen(file.Get(), files[i], GENERIC_READ, FILE_SHARE_READ, OPEN_EXISTING,
                                               0, parent, BUTTONS_RETRYCANCEL, NULL, NULL))
         {
             return FALSE;
         }
-        CQuadWord size;
-        size.LoDWord = GetFileSize(file.HFile, &size.HiDWord);
+        file.Opened();
+        CFileOffsetResult sizeResult = SalGetPluginFileSizeEx(SalamanderGeneral, file.Get()->HFile);
+        if (!sizeResult.Succeeded)
+        {
+            COperationResult result = COperationResult::Failure(orpVerifyDurableCopy, sizeResult.Error,
+                                                                 files[i], targetName, FALSE);
+            return ReportCombineFailure(result, idTitle, IDS_READERROR);
+        }
+        CQuadWord size = sizeResult.Value;
+        if (size.Value > (~(unsigned __int64)0) - totalSize.Value)
+        {
+            COperationResult result = COperationResult::Failure(orpVerifyDurableCopy, ERROR_ARITHMETIC_OVERFLOW,
+                                                                 files[i], targetName, FALSE);
+            return ReportCombineFailure(result, idTitle, IDS_READERROR);
+        }
         totalSize += size;
-        SalamanderSafeFile->SafeFileClose(&file);
     }
 
     // check available free space
@@ -60,24 +226,26 @@ BOOL CombineFiles(TIndirectArray<char>& files, LPTSTR targetName,
             return FALSE;
     }
 
-    // create the output file
-    SAFE_FILE outfile;
+    CCombineTemporaryOutput temporaryOutput;
+    CScopedSafeFile outfile;
     if (!bOnlyCrc)
     {
-        if (SalamanderSafeFile->SafeFileCreate(targetName, GENERIC_WRITE, FILE_SHARE_READ, FILE_ATTRIBUTE_NORMAL,
-                                               FALSE, parent, NULL, NULL, NULL, FALSE, NULL, NULL, 0, NULL, &outfile) == INVALID_HANDLE_VALUE)
-        {
+        COperationResult reserveResult = temporaryOutput.Reserve(targetName);
+        if (!reserveResult.Succeeded())
+            return ReportCombineFailure(reserveResult, idTitle, IDS_WRITEERROR);
+
+        if (!SalamanderSafeFile->SafeFileOpen(outfile.Get(), temporaryOutput.GetName(), GENERIC_WRITE, FILE_SHARE_READ,
+                                              OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL | FILE_FLAG_SEQUENTIAL_SCAN | FILE_FLAG_WRITE_THROUGH,
+                                              parent, BUTTONS_RETRYCANCEL, NULL, NULL))
             return FALSE;
-        }
+        outfile.Opened();
     }
 
-    // merge the files
-    char* pBuffer = new char[BUFSIZE];
-    if (pBuffer == NULL)
+    // The buffer is owned for every return path, including cancellation during a SafeFile retry dialog.
+    std::unique_ptr<char, decltype(&free)> pBuffer(static_cast<char*>(malloc(BUFSIZE)), free);
+    if (pBuffer.get() == NULL)
     {
         SalamanderGeneral->ShowMessageBox(LoadStr(IDS_OUTOFMEM), LoadStr(idTitle), MSGBOX_ERROR);
-        if (!bOnlyCrc)
-            SalamanderSafeFile->SafeFileClose(&outfile);
         return FALSE;
     }
 
@@ -90,64 +258,131 @@ BOOL CombineFiles(TIndirectArray<char>& files, LPTSTR targetName,
     CQuadWord totalProgress = CQuadWord(0, 0);
 
     int ret = TRUE;
+    BOOL reportFailure = FALSE;
+    COperationResult result = COperationResult::Success(orpVerifyDurableCopy, NULL,
+                                                         bOnlyCrc ? NULL : temporaryOutput.GetName(),
+                                                         bOnlyCrc ? opeNone : opeTemporaryTargetReady);
     int j;
     for (j = 0; j < files.Count; j++)
     {
         sprintf(text, "%s %s...", LoadStr(IDS_PROCESSING), files[j]);
         salamander->ProgressDialogAddText(text, TRUE);
 
-        SAFE_FILE file;
-        if (!SalamanderSafeFile->SafeFileOpen(&file, files[j], GENERIC_READ, FILE_SHARE_READ, OPEN_EXISTING,
+        CScopedSafeFile file;
+        if (!SalamanderSafeFile->SafeFileOpen(file.Get(), files[j], GENERIC_READ, FILE_SHARE_READ, OPEN_EXISTING,
                                               FILE_FLAG_SEQUENTIAL_SCAN, parent, BUTTONS_RETRYCANCEL, NULL, NULL))
         {
+            result = COperationResult::Failure(orpVerifyDurableCopy, ERROR_CANCELLED, files[j],
+                                               bOnlyCrc ? NULL : temporaryOutput.GetName(), FALSE,
+                                               bOnlyCrc ? opeNone : opeTemporaryTargetReady);
             ret = FALSE;
             break;
         }
+        file.Opened();
 
         DWORD numread, numwr;
-        CQuadWord currentProgress = CQuadWord(0, 0), size;
-        size.LoDWord = GetFileSize(file.HFile, &size.HiDWord);
+        CQuadWord currentProgress = CQuadWord(0, 0);
+        CFileOffsetResult sizeResult = SalGetPluginFileSizeEx(SalamanderGeneral, file.Get()->HFile);
+        if (!sizeResult.Succeeded)
+        {
+            result = COperationResult::Failure(orpVerifyDurableCopy, sizeResult.Error, files[j],
+                                               bOnlyCrc ? NULL : temporaryOutput.GetName(), FALSE,
+                                               bOnlyCrc ? opeNone : opeTemporaryTargetReady);
+            reportFailure = TRUE;
+            ret = FALSE;
+            break;
+        }
+        CQuadWord size = sizeResult.Value;
         salamander->ProgressSetTotalSize(size, CQuadWord(-1, -1));
         salamander->ProgressSetSize(CQuadWord(0, 0), CQuadWord(-1, -1), TRUE);
         do
         {
-            if (!SalamanderSafeFile->SafeFileRead(&file, pBuffer, BUFSIZE, &numread, parent, BUTTONS_RETRYCANCEL, NULL, NULL))
+            if (!SalamanderSafeFile->SafeFileRead(file.Get(), pBuffer.get(), BUFSIZE, &numread, parent, BUTTONS_RETRYCANCEL, NULL, NULL))
             {
+                result = COperationResult::Failure(orpVerifyDurableCopy, ERROR_CANCELLED, files[j],
+                                                   bOnlyCrc ? NULL : temporaryOutput.GetName(), FALSE,
+                                                   bOnlyCrc ? opeNone : opeTemporaryTargetReady);
                 ret = FALSE;
                 break;
             }
             if (!bOnlyCrc && numread)
             {
-                if (!SalamanderSafeFile->SafeFileWrite(&outfile, pBuffer, numread, &numwr, parent, BUTTONS_RETRYCANCEL, NULL, NULL))
+                if (!SalamanderSafeFile->SafeFileWrite(outfile.Get(), pBuffer.get(), numread, &numwr,
+                                                       parent, BUTTONS_RETRYCANCEL, NULL, NULL))
                 {
+                    result = COperationResult::Failure(orpVerifyDurableCopy, ERROR_CANCELLED, files[j],
+                                                       temporaryOutput.GetName(), FALSE, opeTemporaryTargetReady);
                     ret = FALSE;
                     break;
                 }
             }
-            CrcVal = SalamanderGeneral->UpdateCrc32(pBuffer, numread, CrcVal);
+            CrcVal = SalamanderGeneral->UpdateCrc32(pBuffer.get(), numread, CrcVal);
             currentProgress += CQuadWord(numread, 0);
             if (!salamander->ProgressSetSize(currentProgress, totalProgress + currentProgress, TRUE))
             {
+                result = COperationResult::Failure(orpVerifyDurableCopy, ERROR_CANCELLED, files[j],
+                                                   bOnlyCrc ? NULL : temporaryOutput.GetName(), FALSE,
+                                                   bOnlyCrc ? opeNone : opeTemporaryTargetReady);
                 ret = FALSE;
                 break;
             }
         } while (numread == BUFSIZE);
 
         totalProgress += currentProgress;
-        SalamanderSafeFile->SafeFileClose(&file);
         if (ret == FALSE)
             break;
     }
 
     salamander->CloseProgressDialog();
-    delete[] pBuffer;
     if (!bOnlyCrc)
     {
+        // Reject a known-bad assembly while it is still staged, before it can replace the destination.
+        if (ret && bTestCrc && Crc != CrcVal)
+        {
+            SalamanderGeneral->ShowMessageBox(LoadStr(IDS_CRCERROR), LoadStr(idTitle), MSGBOX_ERROR);
+            result = COperationResult::Failure(orpVerifyDurableCopy, ERROR_CRC, NULL, temporaryOutput.GetName(),
+                                               FALSE, opeTemporaryTargetReady);
+            ret = FALSE;
+        }
+        if (ret && bTime && !SetFileTime(outfile.Get()->HFile, NULL, NULL, origTime))
+        {
+            DWORD error = GetLastError();
+            result = COperationResult::Failure(orpVerifyDurableCopy, error != ERROR_SUCCESS ? error : ERROR_WRITE_FAULT,
+                                               NULL, temporaryOutput.GetName(),
+                                               FALSE, opeTemporaryTargetReady);
+            reportFailure = TRUE;
+            ret = FALSE;
+        }
+        if (ret && !FlushFileBuffers(outfile.Get()->HFile))
+        {
+            DWORD error = GetLastError();
+            result = COperationResult::Failure(orpVerifyDurableCopy, error != ERROR_SUCCESS ? error : ERROR_WRITE_FAULT,
+                                               NULL, temporaryOutput.GetName(),
+                                               FALSE, opeTemporaryTargetReady);
+            reportFailure = TRUE;
+            ret = FALSE;
+        }
+        // Closing before reopening prevents a successful buffered write from becoming a premature commit.
+        outfile.Close();
         if (ret)
         {
-            if (bTime)
-                SetFileTime(outfile.HFile, NULL, NULL, origTime);
-            SalamanderSafeFile->SafeFileClose(&outfile);
+            result = VerifyCombinedOutput(temporaryOutput.GetName(), totalSize);
+            ret = result.Succeeded();
+            reportFailure = !ret;
+        }
+        if (ret && !PromoteFileUtf8Local(temporaryOutput.GetName(), targetName))
+        {
+            DWORD error = GetLastError();
+            result = COperationResult::Failure(orpCommitTransactionalTarget,
+                                               error != ERROR_SUCCESS ? error : ERROR_WRITE_FAULT,
+                                               temporaryOutput.GetName(), targetName, FALSE,
+                                               opeTemporaryTargetReady);
+            reportFailure = TRUE;
+            ret = FALSE;
+        }
+        if (ret)
+        {
+            temporaryOutput.Commit();
 
             char* name = (char*)SalamanderGeneral->SalPathFindFileName(targetName);
             if (name > targetName)
@@ -158,20 +393,13 @@ BOOL CombineFiles(TIndirectArray<char>& files, LPTSTR targetName,
         }
         else
         {
-            SalamanderSafeFile->SafeFileClose(&outfile);
-            DeleteFileUtf8Local(targetName);
+            temporaryOutput.Cleanup(&result);
+            if (reportFailure)
+                ReportCombineFailure(result, idTitle, IDS_WRITEERROR);
         }
     }
 
-    if (!bOnlyCrc)
-    {
-        if (ret && bTestCrc && Crc != CrcVal)
-        {
-            SalamanderGeneral->ShowMessageBox(LoadStr(IDS_CRCERROR), LoadStr(idTitle), MSGBOX_ERROR);
-            ret = FALSE;
-        }
-    }
-    else
+    if (bOnlyCrc)
         Crc = CrcVal;
 
     return ret;

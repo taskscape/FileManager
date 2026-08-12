@@ -6,11 +6,12 @@
 #include "retry_policy.h"
 
 // File-operation failures cross worker, journal, and dialog boundaries.  Keep
-// the original phase and effect state together so a later compatibility adapter
-// cannot accidentally replace the causal error with a cleanup-side failure.
+// reservation, verification, and commit phases with their effect state so a
+// later compatibility adapter cannot replace the causal error with a cleanup-side failure.
 enum EOperationResultPhase
 {
     orpNone,
+    orpPrepareTransactionalTarget,
     orpVerifyDurableCopy,
     orpVerifyDestinationIdentity,
     orpCommitTransactionalTarget
@@ -88,6 +89,7 @@ struct COperationResult
     {
         switch (phase)
         {
+        case orpPrepareTransactionalTarget: return "prepare-transactional-target";
         case orpVerifyDurableCopy: return "verify-durable-copy";
         case orpVerifyDestinationIdentity: return "verify-destination-identity";
         case orpCommitTransactionalTarget: return "commit-transactional-target";
