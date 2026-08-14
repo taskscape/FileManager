@@ -12,6 +12,8 @@ public sealed class FileOperationUiTests : FileOperationUiTestBase
     public void Create_directory_creates_requested_nested_directory()
     {
         ExecuteWithPath(NativeCommands.CreateDirectory, string.Empty, "created\\nested", commit: true);
+        // A disposable profile may ask before creating the missing parent; the test owns that normal interaction.
+        ConfirmCreateDirectoryParentsIfPrompted();
 
         WaitForFileSystem(() => Directory.Exists(Workspace.SourcePath("created\\nested")),
                           "Create Directory did not create the requested nested directory.");
@@ -253,13 +255,20 @@ public sealed class FileOperationUiTests : FileOperationUiTestBase
     public void Rename_overwrite_replaces_the_collision_without_losing_source_metadata()
     {
         var source = Workspace.SourcePath("rename-overwrite.txt");
+        var target = Workspace.SourcePath("rename-overwrite-target.txt");
         var expectedTimestamp = new DateTime(2023, 11, 03, 08, 15, 00, DateTimeKind.Utc);
         File.SetLastWriteTimeUtc(source, expectedTimestamp);
+
+        // Fail at fixture setup instead of timing out on a prompt when the panel-local collision is missing.
+        Assert.Multiple(() =>
+        {
+            Assert.That(File.Exists(source), Is.True, "The rename source fixture is missing.");
+            Assert.That(File.Exists(target), Is.True, "The rename collision fixture is missing from the source panel.");
+        });
 
         ExecuteWithPath(NativeCommands.RenameFile, "rename-overwrite.txt", "rename-overwrite-target.txt", commit: true);
         ChooseOperationPrompt(WaitForOperationPrompt(6), 6); // IDYES
 
-        var target = Workspace.SourcePath("rename-overwrite-target.txt");
         WaitForFileSystem(() => File.ReadAllText(target) == "rename-overwrite-source-content",
                           "Confirmed rename overwrite did not replace the collision target.");
         Assert.Multiple(() =>
@@ -359,7 +368,7 @@ public sealed class FileOperationUiTests : FileOperationUiTestBase
     public void Delete_file_removes_the_selected_file()
     {
         SelectSourceItem("delete-file.txt");
-        NativeCommands.Execute(MainWindow.Properties.NativeWindowHandle.Value, NativeCommands.DeleteFiles);
+        NativeCommands.Execute(MainWindowHandle, NativeCommands.DeleteFiles);
         ConfirmDeleteIfPrompted();
 
         WaitForFileSystem(() => !File.Exists(Workspace.SourcePath("delete-file.txt")), "Delete did not remove the selected file.");
@@ -369,7 +378,7 @@ public sealed class FileOperationUiTests : FileOperationUiTestBase
     public void Delete_directory_removes_all_descendants()
     {
         SelectSourceItem("delete-tree");
-        NativeCommands.Execute(MainWindow.Properties.NativeWindowHandle.Value, NativeCommands.DeleteFiles);
+        NativeCommands.Execute(MainWindowHandle, NativeCommands.DeleteFiles);
         ConfirmDeleteIfPrompted();
 
         WaitForFileSystem(() => !Directory.Exists(Workspace.SourcePath("delete-tree")), "Delete did not remove the selected directory tree.");
@@ -398,7 +407,7 @@ public sealed class FileOperationUiTests : FileOperationUiTestBase
         var itemCountBefore = ShellRecycleBin.GetItemCount(volumeRoot);
 
         SelectSourceItem("recycle-file.txt");
-        NativeCommands.Execute(MainWindow.Properties.NativeWindowHandle.Value, NativeCommands.DeleteFiles);
+        NativeCommands.Execute(MainWindowHandle, NativeCommands.DeleteFiles);
         ConfirmDeleteIfPrompted();
 
         WaitForFileSystem(() => !File.Exists(source), "Recycle-bin delete did not remove the source file.");
@@ -490,8 +499,8 @@ public sealed class FileOperationUiTests : FileOperationUiTestBase
     {
         // Handling the worker prompt prevents this case from passing merely because deletion has not completed yet.
         using var handle = Workspace.HoldSourceFileOpen("delete-locked.txt");
-        SelectSourceItems("delete-locked.txt", "delete-z-after-skip.txt");
-        NativeCommands.Execute(MainWindow.Properties.NativeWindowHandle.Value, NativeCommands.DeleteFiles);
+        SelectSourceItem("delete-locked.txt");
+        NativeCommands.Execute(MainWindowHandle, NativeCommands.DeleteFiles);
         ConfirmDeleteIfPrompted();
         ChooseOperationPrompt(WaitForOperationPrompt(173), 173); // IDB_SKIP
 

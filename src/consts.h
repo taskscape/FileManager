@@ -1209,6 +1209,12 @@ struct COpenViewerData
 
 #define WM_USER_USERMENUICONS_READY WM_APP + 415 // [bkgndReaderData, threadID] - notification for main window that icon reading for User Menu in thread with ID 'threadID' has completed
 #define WM_USER_ALLOCATION_EMERGENCY WM_APP + 416 // [0, 0] - pre-registered allocation-failure notification; recovery runs on the UI thread
+// The isolated UI runner uses these private messages to avoid racing startup or blocking on modal command handlers.
+#define WM_USER_UI_TEST_READY WM_APP + 417   // [0, 0] returns TRUE only after startup reaches the running state
+#define WM_USER_UI_TEST_COMMAND WM_APP + 418 // [command ID, 0] queues WM_COMMAND only for an isolated ready process
+#define WM_USER_UI_TEST_CONFIG_GENERATION WM_APP + 419 // [0, 0] returns completed Configuration-handler count
+#define WM_USER_UI_TEST_CONFIG_FAULT WM_APP + 420 // [write boundary, 0] arms only the next isolated configuration save
+#define WM_USER_UI_TEST_FTP_ORGANIZE_COMMAND WM_APP + 421 // [0, 0] resolves the loaded FTP plug-in's host command ID
 
 // states for Shift+F1 help mode
 #define HELP_INACTIVE 0 // not in Shift+F1 help mode (must be 0)
@@ -1702,6 +1708,7 @@ extern int RelExceptionHasOccured;     // has any call of IUnknown method Releas
 
 extern BOOL SalamanderBusy;          // is Salamander busy?
 extern DWORD LastSalamanderIdleTime; // GetTickCount() from the moment when SalamanderBusy last transitioned to TRUE
+extern BOOL FileManagerUiStartupReady; // TRUE only after all synchronous startup and plug-in initialization is complete
 
 extern int PasteLinkIsRunning; // if greater than zero, Past Shortcuts command is running in one of the panels
 

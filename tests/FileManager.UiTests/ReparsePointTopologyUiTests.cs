@@ -20,8 +20,6 @@ public sealed class ReparsePointTopologyUiTests : FileOperationUiTestBase
 
     protected override void BeforeFileManagerStarted()
     {
-        base.BeforeFileManagerStarted();
-
         operationRoot = Workspace.SourcePath("reparse-operation-root");
         firstOutsideTarget = Path.Combine(Workspace.RootDirectory, "outside-first-target");
         changedOutsideTarget = Path.Combine(Workspace.RootDirectory, "outside-changed-target");
@@ -50,10 +48,9 @@ public sealed class ReparsePointTopologyUiTests : FileOperationUiTestBase
             Directory.CreateSymbolicLink(Path.Combine(operationRoot, "outside-symlink"), changedOutsideTarget);
             directorySymlinkAvailable = true;
         }
-        catch (UnauthorizedAccessException)
+        catch (Exception exception) when (IsSymbolicLinkPrivilegeUnavailable(exception))
         {
-            // Junction coverage remains available on hosts that have not
-            // enabled the Windows symbolic-link developer privilege.
+            // Junction coverage remains available when Windows reports ERROR_PRIVILEGE_NOT_HELD as IOException or access denied.
         }
     }
 
@@ -80,7 +77,7 @@ public sealed class ReparsePointTopologyUiTests : FileOperationUiTestBase
     public void Delete_junction_removes_only_the_link_and_never_its_target()
     {
         SelectSourceItem("delete-junction");
-        NativeCommands.Execute(MainWindow.Properties.NativeWindowHandle.Value, NativeCommands.DeleteFiles);
+        NativeCommands.Execute(MainWindowHandle, NativeCommands.DeleteFiles);
         ConfirmDeleteIfPrompted();
 
         WaitForFileSystem(() => !Directory.Exists(Workspace.SourcePath("delete-junction")),
@@ -119,5 +116,12 @@ public sealed class ReparsePointTopologyUiTests : FileOperationUiTestBase
         process!.WaitForExit();
         Assert.That(process.ExitCode, Is.Zero, "Creating the disposable junction failed.");
         Assert.That(Directory.Exists(linkPath), Is.True, "The disposable junction was not created.");
+    }
+
+    private static bool IsSymbolicLinkPrivilegeUnavailable(Exception exception)
+    {
+        // .NET maps CreateSymbolicLink privilege failures differently across Windows runtime versions.
+        return exception is UnauthorizedAccessException ||
+               exception is IOException && (exception.HResult & 0xFFFF) == 1314; // ERROR_PRIVILEGE_NOT_HELD
     }
 }

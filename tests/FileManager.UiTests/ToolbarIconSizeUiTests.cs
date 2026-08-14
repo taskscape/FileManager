@@ -25,7 +25,8 @@ public sealed class ToolbarIconSizeUiTests : FileManagerUiTestBase
         // Closing between choices exercises the native image-list rebuild and layout path for every supported size.
         for (var index = 0; index < 3; index++)
         {
-            combo.Items[index].Select();
+            NativeCommands.SelectComboBoxItem(dialog.Properties.NativeWindowHandle.Value,
+                                               combo.Properties.NativeWindowHandle.Value, index);
             CloseCustomizeToolbarDialog(dialog);
             dialog = OpenCustomizeToolbarDialog();
             combo = GetIconSizeCombo(dialog);
@@ -42,15 +43,16 @@ public sealed class ToolbarIconSizeUiTests : FileManagerUiTestBase
             "The large toolbar icon preference was not restored after restarting the executable.");
 
         // Restore the disposable profile to its incoming setting so repeated UI runs remain independent.
-        combo.Items[originalIndex].Select();
+        NativeCommands.SelectComboBoxItem(dialog.Properties.NativeWindowHandle.Value,
+                                           combo.Properties.NativeWindowHandle.Value, originalIndex);
         CloseCustomizeToolbarDialog(dialog);
         Thread.Sleep(500);
     }
 
     private Window OpenCustomizeToolbarDialog()
     {
-        NativeCommands.Execute(MainWindow.Properties.NativeWindowHandle.Value, NativeCommands.CustomizeTopToolbar);
-        return WaitForWindow(window => window.Properties.NativeWindowHandle.Value != MainWindow.Properties.NativeWindowHandle.Value);
+        NativeCommands.Execute(MainWindowHandle, NativeCommands.CustomizeTopToolbar);
+        return WaitForWindow(window => window.Properties.NativeWindowHandle.Value != MainWindowHandle);
     }
 
     private static ComboBox GetIconSizeCombo(Window dialog)
@@ -63,8 +65,8 @@ public sealed class ToolbarIconSizeUiTests : FileManagerUiTestBase
 
     private static int GetSelectedIndex(ComboBox combo)
     {
-        var items = combo.Items;
-        var selected = Array.FindIndex(items, item => item.IsSelected);
+        // Native selection is authoritative because Win32 UIA providers may cache SelectionItem state.
+        var selected = NativeCommands.GetComboBoxSelection(combo.Properties.NativeWindowHandle.Value);
         Assert.That(selected, Is.GreaterThanOrEqualTo(0), "The icon-size selector had no selected item.");
         return selected;
     }
