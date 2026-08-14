@@ -107,7 +107,8 @@ BOOL BuildMiniDumpFileName(CSalmonSharedMemory* mem, std::string* dumpFileName)
 }
 }
 
-BOOL GenerateMiniDump(CMinidumpParams* minidumpParams, CSalmonSharedMemory* mem, BOOL smallMinidump, BOOL* overSize)
+// The dump policy is fixed at this boundary so callers cannot accidentally request sensitive-memory capture.
+BOOL GenerateMiniDump(CMinidumpParams* minidumpParams, CSalmonSharedMemory* mem, BOOL* overSize)
 {
     BOOL ret = FALSE;
     *overSize = FALSE;
@@ -162,28 +163,12 @@ BOOL GenerateMiniDump(CMinidumpParams* minidumpParams, CSalmonSharedMemory* mem,
                 expParam.ExceptionPointers = &ePtrs;
                 expParam.ClientPointers = FALSE;
 
-                // great explanation of the flags (better than on MSDN): http://www.debuginfo.com/articles/effminidumps.html#minidumptypes
-                static MINIDUMP_TYPE dumpType;
-                // some of the flags require dbghelp.dll 6.1 - that is why Salamander ships its own copy
-                if (smallMinidump)
-                {
-                    dumpType = (MINIDUMP_TYPE)(MiniDumpWithProcessThreadData |
-                                               MiniDumpWithDataSegs |
-                                               MiniDumpWithFullMemoryInfo |
-                                               MiniDumpWithThreadInfo |
-                                               MiniDumpWithUnloadedModules |
-                                               MiniDumpIgnoreInaccessibleMemory); // under no circumstances do we want the function to fail
-                }
-                else
-                {
-                    dumpType = (MINIDUMP_TYPE)(MiniDumpWithPrivateReadWriteMemory |
-                                               MiniDumpWithDataSegs |
-                                               MiniDumpWithHandleData |
-                                               MiniDumpWithFullMemoryInfo |
-                                               MiniDumpWithThreadInfo |
-                                               MiniDumpWithUnloadedModules |
-                                               MiniDumpIgnoreInaccessibleMemory); // under no circumstances do we want the function to fail
-                }
+                // Keep crash reports diagnostically useful without serializing arbitrary private writable memory.
+                static MINIDUMP_TYPE dumpType = (MINIDUMP_TYPE)(MiniDumpWithProcessThreadData |
+                                                                MiniDumpWithFullMemoryInfo |
+                                                                MiniDumpWithThreadInfo |
+                                                                MiniDumpWithUnloadedModules |
+                                                                MiniDumpIgnoreInaccessibleMemory);
 
                 BOOL bMiniDumpSuccessful;
                 bMiniDumpSuccessful = funcMiniDumpWriteDump(mem->Process, mem->ProcessId,
@@ -342,20 +327,8 @@ DWORD WINAPI MinidumpThreadF(void* param)
     }
     else
     {
-        // generate the minidump
-        ret = GenerateMiniDump(minidumpParams, SalmonSharedMemory, FALSE, &overSize);
-
-        if (!ret || overSize)
-        {
-            if (GetReportBaseName(SalmonSharedMemory->BaseName, sizeof(SalmonSharedMemory->BaseName),
-                                  SalmonSharedMemory->BugPath, sizeof(SalmonSharedMemory->BugPath),
-                                  SalmonSharedMemory->BugName, sizeof(SalmonSharedMemory->BugName),
-                                  SalmonSharedMemory->UID, lt))
-            {
-                // generate the minidump
-                ret = GenerateMiniDump(minidumpParams, SalmonSharedMemory, TRUE, &overSize);
-            }
-        }
+        // Privacy is the default: never retry a failed minimal dump with a memory-rich variant.
+        ret = GenerateMiniDump(minidumpParams, SalmonSharedMemory, &overSize);
     }
 
     // let Salamander know that the minidump has been created

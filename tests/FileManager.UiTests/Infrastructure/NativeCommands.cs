@@ -12,10 +12,15 @@ internal static class NativeCommands
     internal const int MoveFiles = 728;
     internal const int DeleteFiles = 729;
     internal const int CreateDirectory = 730;
+    // These stable host commands cover the three distinct file-discovery and file-opening paths.
+    internal const int FindFiles = 741;
+    internal const int ViewFile = 742;
+    internal const int EditFile = 743;
     internal const int RenameFile = 754;
     private const uint WmCommand = 0x0111;
     private const uint WmChar = 0x0102;
     private const uint WmKeyDown = 0x0100;
+    private const uint LvmGetItemCount = 0x1004;
     private const int VkEscape = 0x1B;
 
     [DllImport("user32.dll", SetLastError = true)]
@@ -48,5 +53,18 @@ internal static class NativeCommands
         SendMessage(listHandle, WmKeyDown, VkEscape, 0);
         foreach (var character in name)
             SendMessage(listHandle, WmChar, character, 1);
+    }
+
+    internal static void ToggleFocusedSelection(nint listHandle)
+    {
+        // Insert is the native panel gesture that selects the focused item while preserving prior selections.
+        SetFocus(listHandle);
+        SendMessage(listHandle, WmKeyDown, 0x2D, 0); // VK_INSERT
+    }
+
+    internal static int GetListViewItemCount(nint listHandle)
+    {
+        // LVM_GETITEMCOUNT crosses process boundaries without caller-owned buffers and works for the virtual Find list.
+        return checked((int)SendMessage(listHandle, LvmGetItemCount, 0, 0));
     }
 }

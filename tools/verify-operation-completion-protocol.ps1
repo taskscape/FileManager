@@ -32,7 +32,9 @@ function Get-CaseBody {
 # A close/cancel request must only request worker cancellation.  The dialog stays
 # alive for the posted completion message, so it cannot destroy worker-owned state.
 $cancelCase = Get-CaseBody $progressDialog 'case WM_USER_CANCELPROGRDLG:' 'case WM_USER_PROGRDLG_WORKERCOMPLETE:'
-if ($cancelCase -notmatch 'CancelWorker\s*=\s*TRUE' -or
+# Cancellation now flows through the operation object so the atomic state and
+# cancellation event remain synchronized instead of exposing a shared BOOL.
+if ($cancelCase -notmatch 'Script->RequestCancellation\(\)' -or
     $cancelCase -notmatch 'SetEvent\(WorkerNotSuspended\)' -or
     $cancelCase -match 'EndDialog\(|DestroyWindow\(') {
     throw 'Cancel/close no longer preserves the asynchronous completion lifecycle.'
@@ -63,7 +65,9 @@ if ($freeScript -lt 0 -or $postCompletion -lt 0 -or $freeScript -gt $postComplet
 # the normal delayed close, and never opens the old continuation gate.
 $completionCase = Get-CaseBody $progressDialog 'case WM_USER_PROGRDLG_WORKERCOMPLETE:' 'case WM_USER_PROGRDLG_UPDATEICON:'
 if ($completionCase -notmatch 'delete completion' -or
-    $completionCase -notmatch 'wParam\s*=\s*cancelled\s*\?\s*IDCANCEL\s*:\s*IDOK' -or
+    # Failed operations follow the cancellation close path while successful
+    # completion remains the only route that acknowledges the dialog with IDOK.
+    $completionCase -notmatch 'wParam\s*=\s*cancelled\s*\|\|\s*failed\s*\?\s*IDCANCEL\s*:\s*IDOK' -or
     $completionCase -notmatch 'PostMessage\(HWindow, WM_USER_PROGRDLGEND' -or
     $completionCase -match 'SetEvent\(WContinue\)' -or
     $completionCase -match 'ReplyMessage\(') {
