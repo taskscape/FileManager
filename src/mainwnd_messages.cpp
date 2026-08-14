@@ -72,6 +72,16 @@ const int MIN_WIN_WIDTH = 2; // minimal panel width
 extern BOOL CacheNextSetFocus;
 
 BOOL MainFrameIsActive = FALSE;
+// Isolated UI tests use this generation to wait through persistence after Configuration dialog teardown.
+static LONG FileManagerUiConfigurationGeneration = 0;
+
+static BOOL IsFileManagerUiTestControlEnabled()
+{
+    // Keep the private automation protocol inert for ordinary application launches.
+    char isolated[2];
+    DWORD length = GetEnvironmentVariableA("FILEMANAGER_UI_ISOLATED", isolated, _countof(isolated));
+    return length == 1 && isolated[0] == '1';
+}
 
 // code for testing time losses
 /*
@@ -1659,6 +1669,8 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
         }
 
         EndStopRefresh(); // snooper starts again now
+        // Publish only after accepted changes have completed their synchronous SaveConfig call.
+        InterlockedIncrement(&FileManagerUiConfigurationGeneration);
         return 0;
     }
 
@@ -1753,6 +1765,43 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
             ScheduleConfigSave();
         // Command dispatch extracted to HandleWmCommand() in mainwnd_commands.cpp.
         return HandleWmCommand(wParam, lParam);
+
+    case WM_USER_UI_TEST_READY:
+        // The synchronous query acknowledges the exact native startup boundary to the isolated runner.
+        return IsFileManagerUiTestControlEnabled() && FileManagerUiStartupReady;
+
+    case WM_USER_UI_TEST_COMMAND:
+        // Queue modal commands on the UI thread after acknowledging them, avoiding a cross-process SendMessage deadlock.
+        if (IsFileManagerUiTestControlEnabled() && FileManagerUiStartupReady)
+        {
+            // A left-panel refresh is non-modal and must complete before tests quick-search for newly created files.
+            if (lParam == 1 && wParam == CM_LEFTREFRESH)
+            {
+                SendMessage(HWindow, WM_COMMAND, wParam, 0);
+                return TRUE; // WM_COMMAND returns zero even when the synchronous refresh succeeds.
+            }
+            return PostMessage(HWindow, WM_COMMAND, wParam, lParam);
+        }
+        return FALSE;
+
+    case WM_USER_UI_TEST_CONFIG_GENERATION:
+        // Expose completion only to the isolated runner; ordinary processes retain no automation surface.
+        return IsFileManagerUiTestControlEnabled() ? FileManagerUiConfigurationGeneration : 0;
+
+    case WM_USER_UI_TEST_CONFIG_FAULT:
+        // Arm after startup so only the explicit recovery-test commit consumes the requested write boundary.
+        if (IsFileManagerUiTestControlEnabled() && FileManagerUiStartupReady && wParam > 0 && wParam <= LONG_MAX)
+        {
+            ArmNextConfigurationWriteFault((LONG)wParam);
+            return TRUE;
+        }
+        return FALSE;
+
+    case WM_USER_UI_TEST_FTP_ORGANIZE_COMMAND:
+        // Resolve FTP's private command 7 through the host allocator only for an isolated, fully started test process.
+        if (IsFileManagerUiTestControlEnabled() && FileManagerUiStartupReady)
+            return Plugins.ResolveMenuItemCommandForTests(HWindow, "ftp\\ftp.spl", 7);
+        return 0;
 
 
     case WM_USER_DISPACHCHANGENOTIF:

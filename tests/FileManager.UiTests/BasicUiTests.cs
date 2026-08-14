@@ -55,7 +55,7 @@ public sealed class BasicUiTests : FileManagerUiTestBase
         // Basic visibility and focus checks verify that UIA3 attached to the native top-level window.
         Assert.Multiple(() =>
         {
-            Assert.That(MainWindow.Properties.NativeWindowHandle.Value, Is.Not.EqualTo(nint.Zero));
+            Assert.That(MainWindowHandle, Is.Not.EqualTo(nint.Zero));
             Assert.That(MainWindow.Title, Is.Not.Empty);
             Assert.That(MainWindow.IsEnabled, Is.True);
             Assert.That(MainWindow.BoundingRectangle.Width, Is.GreaterThan(0));
@@ -85,10 +85,18 @@ public sealed class BasicUiTests : FileManagerUiTestBase
 
         RestartFileManager();
         var reloadedDialog = OpenConfigurationDialog();
-        Assert.That(IsFirstConfigurationCheckBoxChecked(reloadedDialog), Is.EqualTo(!originalState),
-                    "The configuration value was not retained after a committed dialog and restart.");
-        ToggleFirstConfigurationCheckBox(reloadedDialog);
-        CloseConfigurationDialog(reloadedDialog, commit: true);
+        try
+        {
+            Assert.That(IsFirstConfigurationCheckBoxChecked(reloadedDialog), Is.EqualTo(!originalState),
+                        "The configuration value was not retained after a committed dialog and restart.");
+        }
+        finally
+        {
+            // Restore the incoming profile even when the persistence assertion fails, preventing repetition cascades.
+            if (IsFirstConfigurationCheckBoxChecked(reloadedDialog) != originalState)
+                ToggleFirstConfigurationCheckBox(reloadedDialog);
+            CloseConfigurationDialog(reloadedDialog, commit: true);
+        }
     }
 
     private void AssertFtpBookmarkCreationPersistsAfterRestart(int scenarioNumber)
