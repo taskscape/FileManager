@@ -50,15 +50,15 @@ Use ```\src\vcxproj\!populate_build_dir.cmd``` to populate build directory with 
 
 ### Running automated tests
 
-No source-code changes are required to start the automated tests. Run the commands below from the repository root. The repository scripts may be blocked by the local PowerShell execution policy, so these examples use a process-scoped `Bypass`; they do not change the machine-wide policy.
+No source-code changes are required to start the automated tests. Run the commands below from the repository root using **64-bit PowerShell 7.4 or newer** (`pwsh.exe`). Windows PowerShell 5.1 is not a supported test host; in particular, the SQLite recovery probe uses modern .NET APIs and requires PowerShell 7 when exercising an x64 DLL. The repository scripts may be blocked by the local PowerShell execution policy, so these examples use a process-scoped `Bypass`; they do not change the machine-wide policy. Confirm the active host before running the suite with `pwsh --version` and `[Environment]::Is64BitProcess`.
 
 Run the source-contract and native compatibility checks:
 
 ```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\verify-operation-completion-protocol.ps1
-powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\verify-durable-copy-commit.ps1
-powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\test-zlib-compatibility.ps1
-powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\test-bzip2-compatibility.ps1
+pwsh -NoProfile -ExecutionPolicy Bypass -File .\tools\verify-operation-completion-protocol.ps1
+pwsh -NoProfile -ExecutionPolicy Bypass -File .\tools\verify-durable-copy-commit.ps1
+pwsh -NoProfile -ExecutionPolicy Bypass -File .\tools\test-zlib-compatibility.ps1
+pwsh -NoProfile -ExecutionPolicy Bypass -File .\tools\test-bzip2-compatibility.ps1
 ```
 
 The cmark-gfm hardening probe invokes `cl.exe`. Start it through the installed Visual Studio 2026 developer environment so the compiler, headers, and libraries are available:
@@ -66,7 +66,7 @@ The cmark-gfm hardening probe invokes `cl.exe`. Start it through the installed V
 ```powershell
 $vsDevCmd = 'C:\Program Files\Microsoft Visual Studio\18\Community\Common7\Tools\VsDevCmd.bat'
 $command = 'call "' + $vsDevCmd + '" -arch=x64 -host_arch=x64 && ' +
-           'powershell -NoProfile -ExecutionPolicy Bypass ' +
+           'pwsh -NoProfile -ExecutionPolicy Bypass ' +
            '-File "' + (Join-Path $PWD 'tools\test-cmark-gfm-hardening.ps1') + '"'
 & $env:ComSpec /d /s /c $command
 ```
@@ -79,11 +79,10 @@ The NUnit project targets .NET 8. Restore its declared packages, then run it as 
 dotnet restore .\tests\FileManager.UiTests\FileManager.UiTests.csproj
 dotnet test .\tests\FileManager.UiTests\FileManager.UiTests.csproj `
   --no-restore `
-  -p:IsTestProject=true `
   --logger "console;verbosity=minimal"
 ```
 
-The `IsTestProject` command-line property is currently required because `FileManager.UiTests.csproj` does not declare `<IsTestProject>true</IsTestProject>`. Without the override, newer .NET SDKs may finish successfully without discovering or running any tests.
+`FileManager.UiTests.csproj` explicitly declares `<IsTestProject>true</IsTestProject>`, so test discovery works across supported .NET SDK versions without an MSBuild command-line override.
 
 If the normal .NET or NuGet user directories are unavailable, redirect their generated state to writable directories before restoring. These directories contain only generated package and CLI state and should not be committed:
 
@@ -96,7 +95,6 @@ $env:DOTNET_NOLOGO = '1'
 dotnet restore .\tests\FileManager.UiTests\FileManager.UiTests.csproj
 dotnet test .\tests\FileManager.UiTests\FileManager.UiTests.csproj `
   --no-restore `
-  -p:IsTestProject=true `
   --logger "console;verbosity=minimal"
 ```
 
@@ -107,7 +105,6 @@ $env:FILEMANAGER_UI_ISOLATED = '1'
 $env:FILEMANAGER_UI_EXE = 'C:\path\to\salamand.exe'
 
 dotnet test .\tests\FileManager.UiTests\FileManager.UiTests.csproj `
-  -p:IsTestProject=true `
   --filter 'TestCategory=UI'
 ```
 
@@ -116,7 +113,7 @@ See [`tests/FileManager.UiTests/README.md`](tests/FileManager.UiTests/README.md)
 The SQLite recovery probe depends on the Debug x64 native SQLite DLL. Build that target with Visual Studio 2026 first, then run:
 
 ```powershell
-powershell -NoProfile -ExecutionPolicy Bypass `
+pwsh -NoProfile -ExecutionPolicy Bypass `
   -File .\tools\test-sqlite-recovery.ps1 `
   -SqliteDll .\src\vcxproj\sqlite\salamander\Debug_x64\utils\sqlite.dll
 ```

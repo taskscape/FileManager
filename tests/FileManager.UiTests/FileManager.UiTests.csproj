@@ -2,6 +2,8 @@
   <PropertyGroup>
     <!-- UI Automation must run on Windows because the application under test is native Win32. -->
     <TargetFramework>net8.0-windows</TargetFramework>
+    <!-- Explicit test identity keeps discovery enabled across .NET SDK versions without command-line overrides. -->
+    <IsTestProject>true</IsTestProject>
     <IsPackable>false</IsPackable>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
