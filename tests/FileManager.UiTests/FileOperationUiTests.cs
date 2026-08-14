@@ -1,4 +1,5 @@
 using FileManager.UiTests.Infrastructure;
+using FlaUI.Core.AutomationElements;
 using NUnit.Framework;
 using System.Text.RegularExpressions;
 
@@ -237,6 +238,18 @@ public sealed class FileOperationUiTests : FileOperationUiTestBase
     }
 
     [Test]
+    public void Rename_case_only_change_preserves_the_file_and_updates_its_displayed_name()
+    {
+        // The native rename path treats a case-only target as the same identity rather than an overwrite collision.
+        ExecuteWithPath(NativeCommands.RenameFile, "rename-case.txt", "RENAME-CASE.txt", commit: true);
+
+        WaitForFileSystem(() => Directory.EnumerateFiles(Workspace.SourceDirectory)
+                                      .Any(path => Path.GetFileName(path) == "RENAME-CASE.txt"),
+                          "Case-only rename did not persist the requested directory-entry casing.");
+        Assert.That(File.ReadAllText(Workspace.SourcePath("RENAME-CASE.txt")), Is.EqualTo("rename-case-content"));
+    }
+
+    [Test]
     public void Rename_overwrite_replaces_the_collision_without_losing_source_metadata()
     {
         var source = Workspace.SourcePath("rename-overwrite.txt");
@@ -281,6 +294,68 @@ public sealed class FileOperationUiTests : FileOperationUiTestBase
     }
 
     [Test]
+    public void Move_overwrite_replaces_the_existing_target_and_removes_the_source()
+    {
+        // Move must apply the confirmed overwrite before deleting the source identity.
+        ExecuteWithPath(NativeCommands.MoveFiles, "move-overwrite.txt", Workspace.TargetDirectory, commit: true);
+        ChooseOperationPrompt(WaitForOperationPrompt(6), 6); // IDYES
+
+        WaitForFileSystem(() => File.ReadAllText(Workspace.TargetPath("move-overwrite.txt")) == "move-overwrite-source-content",
+                          "Confirmed move overwrite did not replace the target content.");
+        Assert.That(File.Exists(Workspace.SourcePath("move-overwrite.txt")), Is.False,
+                    "Confirmed move overwrite retained the source file.");
+    }
+
+    [Test]
+    public void Move_skip_keeps_the_existing_target_and_the_unmoved_source()
+    {
+        // A skipped move collision must retain both versions because no target commit occurred.
+        ExecuteWithPath(NativeCommands.MoveFiles, "move-skip.txt", Workspace.TargetDirectory, commit: true);
+        ChooseOperationPrompt(WaitForOperationPrompt(173), 173); // IDB_SKIP
+
+        WaitForFileSystem(() => File.ReadAllText(Workspace.TargetPath("move-skip.txt")) == "move-skip-target-content",
+                          "Skipped move unexpectedly modified the conflicting target.");
+        Assert.That(File.ReadAllText(Workspace.SourcePath("move-skip.txt")), Is.EqualTo("move-skip-source-content"));
+    }
+
+    [Test]
+    public void Move_overwrite_all_replaces_every_conflict_before_removing_the_source_tree()
+    {
+        // Overwrite All must commit every destination before the move removes the complete source tree.
+        ExecuteWithPath(NativeCommands.MoveFiles, "move-overwrite-all-tree", Workspace.TargetDirectory, commit: true);
+        ChooseOperationPrompt(WaitForOperationPrompt(185), 185); // IDB_ALL
+
+        WaitForFileSystem(() => File.ReadAllText(Workspace.TargetPath("move-overwrite-all-tree\\nested\\first.txt")) ==
+                                    "move-overwrite-all-first-source" &&
+                                File.ReadAllText(Workspace.TargetPath("move-overwrite-all-tree\\nested\\second.txt")) ==
+                                    "move-overwrite-all-second-source",
+                          "Move Overwrite All did not replace every conflicting descendant.");
+        Assert.That(Directory.Exists(Workspace.SourcePath("move-overwrite-all-tree")), Is.False,
+                    "Move Overwrite All retained the fully committed source tree.");
+    }
+
+    [Test]
+    public void Move_skip_all_retains_conflicting_sources_but_moves_nonconflicting_siblings()
+    {
+        // Skip All suppresses later conflict prompts without retaining independently committed siblings.
+        ExecuteWithPath(NativeCommands.MoveFiles, "move-skip-all-tree", Workspace.TargetDirectory, commit: true);
+        ChooseOperationPrompt(WaitForOperationPrompt(174), 174); // IDB_SKIPALL
+
+        WaitForFileSystem(() => File.Exists(Workspace.TargetPath("move-skip-all-tree\\nested\\unique.txt")),
+                          "Move Skip All did not continue with a nonconflicting sibling.");
+        Assert.Multiple(() =>
+        {
+            Assert.That(File.ReadAllText(Workspace.TargetPath("move-skip-all-tree\\nested\\first.txt")),
+                        Is.EqualTo("move-skip-all-first-target"));
+            Assert.That(File.ReadAllText(Workspace.TargetPath("move-skip-all-tree\\nested\\second.txt")),
+                        Is.EqualTo("move-skip-all-second-target"));
+            Assert.That(File.Exists(Workspace.SourcePath("move-skip-all-tree\\nested\\first.txt")), Is.True);
+            Assert.That(File.Exists(Workspace.SourcePath("move-skip-all-tree\\nested\\second.txt")), Is.True);
+            Assert.That(File.Exists(Workspace.SourcePath("move-skip-all-tree\\nested\\unique.txt")), Is.False);
+        });
+    }
+
+    [Test]
     public void Delete_file_removes_the_selected_file()
     {
         SelectSourceItem("delete-file.txt");
@@ -298,6 +373,19 @@ public sealed class FileOperationUiTests : FileOperationUiTestBase
         ConfirmDeleteIfPrompted();
 
         WaitForFileSystem(() => !Directory.Exists(Workspace.SourcePath("delete-tree")), "Delete did not remove the selected directory tree.");
+    }
+
+    [Test]
+    public void Delete_mixed_selection_removes_the_selected_file_and_directory_tree()
+    {
+        // Mixed selection verifies that the delete plan retains both file and recursive-directory intents.
+        SelectSourceItems("delete-mixed-file.txt", "delete-mixed-tree");
+        NativeCommands.Execute(MainWindow.Properties.NativeWindowHandle.Value, NativeCommands.DeleteFiles);
+        ConfirmDeleteIfPrompted();
+
+        WaitForFileSystem(() => !File.Exists(Workspace.SourcePath("delete-mixed-file.txt")) &&
+                                !Directory.Exists(Workspace.SourcePath("delete-mixed-tree")),
+                          "Delete did not remove every item in the mixed selection.");
     }
 
     [Test]
@@ -371,23 +459,46 @@ public sealed class FileOperationUiTests : FileOperationUiTestBase
     }
 
     [Test]
-    public void Rename_collision_keeps_the_original_file_and_existing_target()
+    public void Rename_overwrite_decline_keeps_the_original_file_and_existing_target()
     {
-        SubmitInvalidPathAndCancel(NativeCommands.RenameFile, "rename-file.txt", "rename-collision.txt");
+        // IDNO is the rename-specific skip path and must return to the rename dialog without changing either file.
+        ExecuteWithPath(NativeCommands.RenameFile, "rename-file.txt", "rename-collision.txt", commit: true);
+        ChooseOperationPrompt(WaitForOperationPrompt(7), 7); // IDNO
+        var reopenedRenameDialog = WaitForWindow(window =>
+            window.Properties.NativeWindowHandle.Value != MainWindow.Properties.NativeWindowHandle.Value &&
+            window.FindFirstDescendant(cf => cf.ByAutomationId("2"))?.AsButton() is not null);
+        CloseDialog(reopenedRenameDialog, commit: false);
 
         Assert.That(File.ReadAllText(Workspace.SourcePath("rename-file.txt")), Is.EqualTo("rename-file-content"));
         Assert.That(File.ReadAllText(Workspace.SourcePath("rename-collision.txt")), Is.EqualTo("collision-content"));
     }
 
     [Test]
-    public void Delete_failure_for_locked_file_keeps_the_file()
+    public void Rename_directory_collision_keeps_both_directory_trees()
     {
+        // Directory collisions are rejected rather than offered the file-only overwrite path.
+        SubmitInvalidPathAndCancel(NativeCommands.RenameFile, "rename-collision-source", "rename-collision-target");
+
+        Assert.That(File.ReadAllText(Workspace.SourcePath("rename-collision-source\\payload.txt")),
+                    Is.EqualTo("rename-collision-source-content"));
+        Assert.That(File.ReadAllText(Workspace.SourcePath("rename-collision-target\\payload.txt")),
+                    Is.EqualTo("rename-collision-target-content"));
+    }
+
+    [Test]
+    public void Delete_skip_for_locked_file_keeps_it_and_continues_with_later_items()
+    {
+        // Handling the worker prompt prevents this case from passing merely because deletion has not completed yet.
         using var handle = Workspace.HoldSourceFileOpen("delete-locked.txt");
-        SelectSourceItem("delete-locked.txt");
+        SelectSourceItems("delete-locked.txt", "delete-z-after-skip.txt");
         NativeCommands.Execute(MainWindow.Properties.NativeWindowHandle.Value, NativeCommands.DeleteFiles);
         ConfirmDeleteIfPrompted();
+        ChooseOperationPrompt(WaitForOperationPrompt(173), 173); // IDB_SKIP
 
-        WaitForFileSystem(() => File.Exists(Workspace.SourcePath("delete-locked.txt")), "A failed delete removed the locked source file.");
+        WaitForFileSystem(() => !File.Exists(Workspace.SourcePath("delete-z-after-skip.txt")),
+                          "Delete did not continue with later items after skipping the locked file.");
+        Assert.That(File.Exists(Workspace.SourcePath("delete-locked.txt")), Is.True,
+                    "Skipping a delete error removed the locked source file.");
     }
 
     private static string? FindJournalFor(string source)

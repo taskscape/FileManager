@@ -18,6 +18,13 @@ public:
     {
     }
 
+    // Legacy plug-ins may create their worker before registering it; adopting
+    // the handle preserves single ownership while their existing abort path remains external.
+    CPluginThreadOwner(HANDLE thread, DWORD threadID)
+        : Thread(thread), StopEvent(NULL), CompletionEvent(NULL), ThreadID(threadID)
+    {
+    }
+
     ~CPluginThreadOwner()
     {
         StopAndJoin(INFINITE);
@@ -77,7 +84,11 @@ public:
     HANDLE GetStopEvent() const { return StopEvent; }
     DWORD WaitForCompletion(DWORD timeout) const
     {
-        return CompletionEvent != NULL ? WaitForSingleObject(CompletionEvent, timeout) : WAIT_OBJECT_0;
+        // Adopted legacy workers have no private completion event, so their
+        // owned thread handle is the authoritative completion signal.
+        if (CompletionEvent != NULL)
+            return WaitForSingleObject(CompletionEvent, timeout);
+        return Thread != NULL ? WaitForSingleObject(Thread, timeout) : WAIT_OBJECT_0;
     }
 
     void RequestStop()

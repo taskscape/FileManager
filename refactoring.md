@@ -57,12 +57,14 @@ This document is the working record for a read-only stability and resilience aud
 ### 1. Implemented: eliminate `TerminateThread` from cache and icon-worker shutdown
 
 - **Delivered:** The cache-handle and icon-reader workers use their termination events as cooperative cancellation signals. Their startup and retry delays are interruptible, shutdown waits for a measured one-second deadline, and a deadline breach is logged before a safe join continues. The owning cache/panel state is therefore not destroyed while its worker can still access it.
+- **Plug-in workers:** `CPluginThreadOwner` adapts the shared plug-in queue to own worker handles, completion signals, stop requests, and safe joins. Legacy DiskMap workers transfer their handles into that same ownership boundary while retaining their established external abort protocol.
 - **Guardrail:** Pull-request CI runs `tools/verify-no-new-terminatethread.ps1`, which rejects newly added `TerminateThread` calls in native source while retaining the reviewed legacy baseline. Remaining call sites are to be removed by their owning subsystem changes, beginning with the check-path teardown in improvement 2.
 
-### 2. Correct the check-path worker teardown order
+### 2. Correct the check-path worker teardown order — Implemented (2026-08-14)
 
 - **Justification:** `ReleaseCheckThreads` deletes `ReadCDVolNameCS` and `CheckPathCS` before it signals or joins their users (`src/path_checking.cpp:85`). A worker that wakes or is still running can touch destroyed synchronization state.
 - **Proposed solution:** Set a stop flag atomically, signal all wait events, join every thread, close thread/event handles, and only then destroy the critical sections. Add a repeated startup/shutdown test under Application Verifier.
+- **Delivered:** `ReleaseCheckThreads` now stops and joins workers before it closes their events and destroys `ReadCDVolNameCS` and `CheckPathCS`; the verifier lane exercises its shutdown alongside the native UI suite.
 
 ### 3. Replace infinite progress-dialog startup waits with a bounded protocol — Implemented
 
@@ -111,10 +113,11 @@ This document is the working record for a read-only stability and resilience aud
 - **Delivered:** `src/salmon/upload.cpp` now streams the existing crash-report archive through WinHTTP to `https://reports.taskscape.com/api/v1/crash-reports`. It uses the secure-request flag and default SChannel certificate-chain/hostname validation, supports explicit Windows/Internet Settings proxies, bounds network I/O, and rejects all redirects so HTTPS cannot be downgraded to HTTP.
 - **Consent and reporting:** The crash-report dialog now explicitly states that Send Report transmits the dump archive, optional description, and optional email to `reports.taskscape.com` over HTTPS, and points users to View Report and Do Not Send Report. `reporting.md` records the exact archive contents, protocol, expected endpoint, configured endpoint, and legacy address.
 
-### 13. Stream crash uploads with correct framing and bounded I/O
+### 13. Stream crash uploads with correct framing and bounded I/O — Implemented (2026-08-14)
 
 - **Justification:** The uploader casts file size into `int`, allocates the entire request, knowingly writes an imprecise `Content-Length`, assumes one `send` transmits everything, and has no robust timeouts (`src/salmon/upload.cpp:29-69`, `220-240`).
 - **Proposed solution:** Use 64-bit checked arithmetic, stream fixed-size chunks, let WinHTTP frame the body, set connect/send/receive deadlines, support cancellation, cap response size, and retry only idempotent pre-commit failures.
+- **Delivered:** `upload.cpp` uses checked 64-bit sizing, fixed-size WinHTTP streaming, bounded response reading, deadlines, cancellation, and only retries a pre-commit request failure.
 
 ### 14. Replace OpenSSL 1.0.2u with a supported TLS implementation — Implemented (2026-08-09)
 
@@ -122,20 +125,20 @@ This document is the working record for a read-only stability and resilience aud
 - **Verification:** `SChannelTlsIntegrationTests` negotiates local TLS 1.2 and TLS 1.3 servers and proves that a self-signed certificate is rejected without an explicit exception. The release workflow and installer staging have no TLS runtime download or DLL copy.
 - **Cadence:** SChannel updates arrive through supported Windows servicing. Before each supported-Windows baseline change and each quarterly release, run the TLS integration tests on the oldest supported Windows release and Windows Server 2022 or newer, confirm TLS 1.2 and TLS 1.3 negotiation, and review Windows TLS/security advisories. Treat a failed certificate-rejection test or a newly disabled protocol as a release blocker.
 
-### 15. Gate releases on the complete verification suite
+### 15. Gate releases on the complete verification suite — Implemented (2026-08-14)
 
-- **Justification:** Every push to `main` builds and immediately publishes a non-draft release (`.github/workflows/build-installer.yml:3`, `110-117`) without a test job.
-- **Proposed solution:** Split build, test, package, sign, and publish into dependent jobs. Publish only immutable artifacts from a protected tag after native tests, UI smoke tests, installer tests, and security checks pass.
+- **Delivered:** Main-push release runs now execute the complete `runtests.ps1 -FailOnSkipped` inventory on the dedicated isolated UI runner before packaging. A Release build can start only after that gate, and the `production`-protected publish job can release only the immutable installer artifact uploaded by the successful build job. Build and test jobs are read-only; only publish receives `contents: write`.
+- **Operator prerequisite:** The repository's `production` environment must require the intended release approvers. This policy is intentionally repository-managed, rather than encoded in a workflow that could relax its own gate.
 
 ### 16. Authenticode-sign every executable, DLL, plug-in, and installer
 
 - **Justification:** `tools/codesign/sign_with_retry.cmd:1` is a placeholder and no installer signing directive is present. Unsigned artifacts are harder to authenticate and more likely to be blocked or replaced unnoticed.
 - **Proposed solution:** Use a hardware-backed or managed certificate, timestamp signatures, verify every staged PE before packaging, sign the installer last, and fail release if any required signature or timestamp is invalid.
 
-### 17. Cryptographically pin all downloaded release inputs
+### 17. Cryptographically pin all downloaded release inputs — Implemented (2026-08-14)
 
-- **Justification:** The OpenSSL download is accepted after checking only the first `PK` bytes (`.github/workflows/build-installer.yml:50-71`). Any ZIP from that endpoint satisfies the check.
-- **Proposed solution:** Store an approved SHA-256 digest and provenance for each dependency, verify before extraction, and prefer an authenticated package registry or checked-in lock manifest. Treat digest changes as reviewed dependency updates.
+- **Delivered:** The obsolete OpenSSL runtime download remains removed. `tools/release-inputs.json` locks Inno Setup to version 6.7.3, its immutable GitHub release URL, SHA-256, and expected Authenticode publisher. The release workflow downloads it directly, verifies both the digest and signature before silent installation, then verifies the installed compiler version. Every GitHub Action in repository workflows is pinned to a reviewed full commit SHA instead of a mutable tag or branch.
+- **Update protocol:** Any release-input change must update the lock manifest's version, immutable URL, SHA-256, and publisher in one review; a digest mismatch is a hard release failure.
 
 ### 18. Make installer staging manifest-driven and fail-closed
 
@@ -154,7 +157,7 @@ This document is the working record for a read-only stability and resilience aud
 
 ### High: fault containment and core correctness
 
-### 21. Move risky parsers and previewers out of process — Implemented
+### 21. Move risky parsers and previewers out of process — Partially implemented
 
 - **Delivered:** `salbroker.exe` is a restricted-token helper placed in a kill-on-close job with per-process memory and CPU limits. The host owns a local named pipe, validates a versioned and length-checked protocol on both sides, and kills/restarts the broker once after a timeout, malformed reply, or process failure.
 - **Initial scope:** Thumbnail requests no longer call thumbnail-loader plug-ins in the icon worker; the helper obtains the image through the Shell thumbnail provider and returns bounded pixels only. Archive-file metadata is also requested through the helper before archive handling. The v1 archive response deliberately carries only file metadata; format-specific archive navigation and extraction remain a separate migration because their plug-in data and callbacks cannot safely cross this ABI boundary.
@@ -192,14 +195,14 @@ This document is the working record for a read-only stability and resilience aud
 - **Proposed solution:** Introduce a pure operation-plan model and a narrow filesystem adapter while preserving behavior. Golden-master the generated plans before changing execution semantics.
 - **Implementation (2026-08-09):** `COperationPlan` now deep-captures every generated script instruction and its operands before the worker begins; it owns no dialog, progress, worker, or Win32 I/O state. `CFileOperationFileSystem` isolates the planning-time attribute and free-space facts behind a replaceable read-only adapter, while the production implementation retains the existing Win32-backed helpers. The durable operation journal persists the immutable `PLAN|1`/`PLANITEM` snapshot before item preparation, and the executable copy scenario asserts its exact source/target intent as the golden-master contract. Execution continues to interpret the existing `COperations` script unchanged.
 
-### 28. Build native characterization tests for copy, move, delete, and rename — Implemented
+### 28. Build native characterization tests for copy, move, delete, and rename — Partially implemented
 
 - **Justification:** The current UI suite does not cover core destructive operations, so regressions in conflict handling, metadata, cancellation, and rollback can escape.
 - **Proposed solution:** Add native integration tests using disposable directories and volumes. Cover overwrite choices, skip/all choices, same- and cross-volume moves, recycle-bin behavior, cancellation, and restart reconciliation.
 
 - **Delivered (2026-08-09):** The executable-level NUnit/FlaUI suite now characterizes native conflict decisions (`Yes`, `All`, `Skip`, and `Skip All`), same-volume copy/move/delete/rename metadata and cancellation behavior, and the durable cancellation journal. `CrossVolumeMoveCharacterizationUiTests` uses an explicitly supplied disposable second-volume root and verifies that a tree reaches its target before the source disappears. `OperationRecoveryCharacterizationUiTests` seeds a ready transactional sibling target and verifies the real startup recovery prompt commits it and marks the journal reconciled. The recycle-bin test uses `SHQueryRecycleBin` around a real delete and remains opt-in because it intentionally changes the isolated profile's shell recycle-bin contents.
 
-### 29. Add crash-consistency fault injection at every operation phase — Implemented (2026-08-09)
+### 29. Add crash-consistency fault injection at every operation phase — Partially implemented
 
 - **Delivered:** `COperationExecutionFileSystem` is an execution-only, replaceable Win32 adapter. Native tests can install a deterministic fake with `SetOperationExecutionFileSystemForTests` and fail the exact create, write, metadata (`SetFileTime`), flush, replace/rename, or identity-guarded source-delete call without changing the operation plan, worker, or UI flow.
 - **Crash-consistency boundary:** Transactional copy routes sibling-target creation, synchronous and overlapped writes, metadata persistence, `FlushFileBuffers`, `ReplaceFileW`/write-through rename, and the `SetFileInformationByHandle` source deletion through that adapter. The existing append-only journal is written before an item begins and marks a fully flushed temporary target ready before replacement, so every injected failure leaves the original, the complete replacement, or durable recovery facts.
@@ -258,12 +261,12 @@ This document is the working record for a read-only stability and resilience aud
 - **Implemented:** The crash uploader's HTTP response reader already keeps responses in a bounded dynamic `std::string`; FTP control replies now retain their dynamic read buffer only up to 64 KiB and fail the connection with `WSAEMSGSIZE` when a server has not completed a reply within that limit. Configuration-fault environment controls now query their required size and retain an owned `std::string` only up to the documented 32,767-character environment limit, so a changing or oversized value is never silently truncated. Crash-reporter shared-memory fields and module/dump paths are copied into bounded dynamic strings before they are parsed or composed. The fixed shared-memory and UI error arrays remain only compatibility boundaries: unterminated, oversized, or non-representable fields produce explicit `ERROR_INVALID_DATA` or `ERROR_INSUFFICIENT_BUFFER` failures instead of partial values.
 - **Verification:** `NativeSafetyRegressionTests.Trust_boundary_text_uses_bounded_owned_storage_and_explicit_capacity_failures` guards the HTTP, FTP, environment, and crash-reporter limits; owned storage; shared-memory terminator checks; compatibility-only report-name API; and removal of the old fixed dump/path assembly.
 
-### 39. Use checked arithmetic for sizes, offsets, and allocations — Implemented (2026-08-09)
+### 39. Use checked arithmetic for sizes, offsets, and allocations — Partially implemented
 
 - **Delivered:** `src/common/checked_arithmetic.h` supplies checked add, multiply, and cast helpers for `uint64_t`, `size_t`, and Win32 `DWORD`. The crash uploader now validates network response, multipart, file-stream, and legacy parser lengths before combining or narrowing them. The parser broker validates external path and thumbnail dimensions/byte counts on both sides of its IPC boundary before they control a buffer or I/O request.
 - **Verification:** `NativeSafetyRegressionTests.External_size_fields_use_checked_arithmetic_before_allocation_or_io` protects the helpers and every current external uploader and parser-broker size field from reverting to unchecked arithmetic.
 
-### 40. Make operation result types explicit — Implemented
+### 40. Make operation result types explicit — Partially implemented
 
 - **Justification:** Many paths combine `BOOL`, mutable out parameters, `GetLastError`, and log-only secondary failures. This makes it easy to lose the original cause or treat partial completion as success.
 - **Proposed solution:** Introduce a lightweight result type carrying phase, Win32/HRESULT code, source, destination, retryability, and partial-effect flags. Adapt it back to existing dialogs until callers migrate.
@@ -281,7 +284,7 @@ This document is the working record for a read-only stability and resilience aud
 - **Compatibility:** Returned automation script text retains its existing `FreeOleString` ownership contract; only local temporary resources are scoped. Guard destructors preserve `GetLastError` so existing caller result paths remain authoritative.
 - **Verification:** `NativeSafetyRegressionTests.Scoped_native_resources_protect_file_operations_and_plugin_boundaries` checks the non-copyable guards, cleanup behavior, migrated memory/mapping/lock seams, and this ledger entry.
 
-### 43. Standardize thread creation and ownership — Implemented (2026-08-09)
+### 43. Standardize thread creation and ownership — Partially implemented
 
 - **Justification:** Dozens of raw `CreateThread` calls distribute handle ownership, parameter lifetime, COM initialization, exception policy, and naming across the codebase.
 - **Implementation (2026-08-09):** `CThreadOwner` is the common CRT-backed worker boundary. It owns the thread, manual-reset stop event, completion event, and copied launch record; names each worker, optionally establishes and balances a declared COM apartment, contains C++ exceptions, and always signals completion after normal callback execution. The check-path workers now use it end-to-end, including bounded shutdown diagnostics followed by a safe join. `tools/verify-no-new-raw-thread-creation.ps1`, run in pull-request CI, ratchets all newly changed first-party thread starts onto this boundary while legacy call sites are migrated by their owning subsystem work.
@@ -293,7 +296,7 @@ This document is the working record for a read-only stability and resilience aud
 - **Safety:** No migrated worker is detached: each can still observe panel, global, synchronization, or crash-recovery state. The process therefore remains alive until its worker joins and only then releases that state, rather than using `TerminateThread` or closing objects still in use.
 - **Verification:** `NativeSafetyRegressionTests.Shutdown_deadlines_report_named_phases_and_preserve_shared_state_until_safe_join` guards the two deadlines, diagnostics, mandatory join, named auxiliary tracking, removal of the former forced termination paths, and this ledger entry.
 
-### 45. Replace wrap-prone time calculations with monotonic 64-bit time — Implemented
+### 45. Replace wrap-prone time calculations with monotonic 64-bit time — Partially implemented
 
 - **Justification:** `GetTickCount` is used hundreds of times; its 32-bit wrap and ad hoc subtraction can break timeouts and throttles after long uptime.
 - **Proposed solution:** Centralize monotonic timing on `GetTickCount64` or `QueryUnbiasedInterruptTime`, use duration types, and add wrap/clock-jump tests for remaining compatibility code.
@@ -307,25 +310,25 @@ This document is the working record for a read-only stability and resilience aud
 - **Implementation (2026-08-10):** The reusable check-path worker now waits on its work and owner-cancellation events together, so shutdown wakes the idle thread without a synthetic request. Slot exhaustion waits for actual worker-completion events instead of polling every 100 ms. The grace and retry delays are waitable-timer deadline handles with explicit work-completed versus deadline-elapsed outcomes; no `Sleep` polling remains in `src/path_checking.cpp`.
 - **Verification:** `NativeSafetyRegressionTests.Check_path_workers_use_signaled_work_cancellation_and_deadline_waits` guards the multi-handle cancellation wait, completion-driven slot handoff, waitable deadline protocol, and removal of `Sleep` from the check-path implementation.
 
-### 47. Document and verify lock ordering — Implemented
+### 47. Document and verify lock ordering — Partially implemented
 
 - **Justification:** Thousands of critical-section enter/leave sites and cross-thread UI calls make lock inversion difficult to reason about.
 - **Implementation (2026-08-10):** `CLockRank` defines the process-lifetime through external-broker order, and ranked `CScopedCriticalSection` acquisitions delegate to `LockOrderEnter`/`LockOrderLeave`. Debug builds retain a per-thread acquisition stack, assert on a non-recursive lower/equal rank, and, after ten seconds of contention, emit the requested lock, waiter thread, owner, recursion count, and held rank before preserving the existing blocking behavior. `CParserBrokerClient::Lock` is the first migration point at `lkrExternalBroker`; the architecture guide defines the rank families and explicitly prohibits holding a ranked lock across synchronous UI calls.
 - **Verification:** `NativeSafetyRegressionTests.Lock_ordering_has_rank_assertions_timeout_diagnostics_and_a_nightly_verifier_lane` guards the rank API, inversion assertion, timeout diagnostics, parser-broker migration, documentation, and delivery workflow. `nightly-lock-stress.yml` runs the repeated isolated-profile UI lifecycle scenarios with Application Verifier's `Locks` layer and always clears its process-persistent configuration afterward.
 
-### 48. Reduce unowned global mutable state — Implemented
+### 48. Reduce unowned global mutable state — Partially implemented
 
 - **Justification:** Globals such as plug-in entry state and worker flags obscure thread affinity and lifetime. A shutdown or re-entrant callback can mutate them from an unexpected context.
 - **Implementation (2026-08-10):** The plug-in callback nesting counter and transition lock now live in `CPluginCallbackState`, owned for the plug-in subsystem lifetime by `CPlugins`. The main application thread owns construction and teardown; callback threads may enter, leave, and query the state through its atomic depth and SRW-locked transitions. Legacy `EnterPlugin`/`LeavePlugin`/`IsInPlugin` functions remain compatibility delegates, while the loader's `CPluginEntryScope` receives only `CPlugins::GetCallbackState()` so its exception cleanup does not depend on translation-unit global state. Further worker-state migrations remain deliberately subsystem-scoped.
 - **Verification:** `NativeSafetyRegressionTests.Plugin_entry_scope_and_callback_state_restore_host_state_after_an_unwinding_entry_point` guards ownership by `CPlugins`, atomic/locked synchronization, removal of the former globals, narrow scope injection, compatibility delegates, and this implementation ledger.
 
-### 49. Protect window and callback lifetimes — Implemented
+### 49. Protect window and callback lifetimes — Partially implemented
 
 - **Justification:** Background workers retain HWNDs and pointers while dialogs and panels can close. Posting or sending after destruction risks reuse of stale window handles or memory.
 - **Implementation (2026-08-10):** `CDeleteManager` now owns a lock-protected callback registration instead of reading `MainWindow->HWindow` from worker threads. Main-window creation registers the target and a nonzero generation; each worker notification carries that generation. `WM_USER_PROCESSDELETEMAN` processes only the current `(HWND, generation)` pair, and `WM_DESTROY` invalidates the registration before child teardown, so a late post cannot activate a recycled window handle. Work queued before registration is notified when the window registers, while failed or invalidated registrations are discarded safely.
 - **Verification:** `NativeSafetyRegressionTests.Delete_manager_callback_registration_invalidates_before_window_teardown_and_rejects_stale_generations` asserts the guarded registration, generated worker post, dispatch check, destruction ordering, and implementation ledger.
 
-### 50. Bound background work queues — Implemented (2026-08-10)
+### 50. Bound background work queues — Partially implemented
 
 - **Justification:** Icon, thumbnail, directory, and plug-in work can grow with directory size or slow consumers, increasing memory pressure and shutdown latency.
 - **Implementation (2026-08-10):** `CIconThreadPool` now keeps its icon-provider requests in 64 fixed slots instead of an unbounded producer backlog. It coalesces matching type/path/index/size requests within a listing generation, chooses visible-panel work before background warming, and lets visible work evict only dormant background work when the capacity is reached. `BeginGeneration` and `CancelObsoleteGenerations` discard queued work from superseded panel listings while active providers remain cooperatively cancellable and retain their fixed slot until they return. The same generation/metrics contract is the required boundary for the remaining thumbnail, directory, and plug-in producers as they are moved onto the shared queue.
@@ -370,14 +373,14 @@ This document is the working record for a read-only stability and resilience aud
 - **Implementation:** `COperations` creates an immutable process/tick/dispatch-sequence ID. Plans, worker startup/completion, visible progress-dialog titles, journals, and debug execution-log records retain that ID. The journal and logs also record each item sequence and initial or retried attempt; synchronous retry dialogs and automatic retry paths advance the attempt.
 - **Verification:** `FileOperationUiTests.Copy_file_persists_a_completed_recovery_journal_with_item_intent` checks durable plan/item correlation, and `NativeSafetyRegressionTests.File_operation_correlation_ids_cross_plan_worker_ui_journal_and_log_boundaries` pins every handoff.
 
-### 56. Preserve the first actionable error and its context — Implemented (2026-08-10)
+### 56. Preserve the first actionable error and its context — Partially implemented
 
 - **Justification:** Repeated cleanup calls can overwrite `GetLastError`, while log-only failures lose the operation phase and affected path.
 - **Proposed solution:** Capture errors immediately into the explicit result type, append cleanup errors without replacing the primary cause, and present a copyable diagnostic summary.
 - **Implementation (2026-08-10):** `COperationResult` now retains the initial phase/error/path outcome and records up to two named cleanup failures as secondary evidence. Durable-copy verification captures its result before closing the target handle, so a close failure cannot replace an earlier metadata or size failure; retry cleanup likewise records a failed deletion of an unverified target. The existing progress dialog now renders a fixed-buffer phase/error/source/destination/effects summary after the localized error text; users can copy the whole message with its established Ctrl+C behavior.
 - **Verification:** `NativeSafetyRegressionTests.File_operation_failures_capture_the_primary_error_before_cleanup_and_offer_copyable_context` pins the cleanup phases, bounded append-only evidence, capture-before-close ordering, retry-cleanup recording, copyable dialog text, and this implementation ledger entry.
 
-### 57. Centralize retry policy — Implemented (2026-08-10)
+### 57. Centralize retry policy — Partially implemented
 
 - **Justification:** Ad hoc retry prompts and delays can repeat permanent failures, overload network shares, or duplicate side effects.
 - **Proposed solution:** Classify transient Win32/network errors, use capped exponential backoff with jitter, honor cancellation, and never automatically retry a destructive commit unless idempotency is proven.
@@ -393,7 +396,7 @@ This document is the working record for a read-only stability and resilience aud
 - **Implementation (2026-08-10):** CheckVer now applies 15-second DNS/connect and send deadlines plus a 30-second receive deadline to its WinINet session. Its single cancellation token closes the currently active session or URL handle, so dismissing the dialog or unloading the plug-in interrupts a blocked network phase instead of merely detaching its thread. The existing nonblocking FTP transport now names its DNS, TCP-connect, and FTP/TLS protocol deadlines separately, bounds the temporary blocking SChannel handshake with socket send/receive deadlines, and retains its established socket-close cancellation path plus distinct resolve/connect/reply errors. Salmon retains its bounded WinHTTP phases, now registers both the session and request against the upload token, closes both on cancellation, and reports timeout, authentication, and protocol/TLS failures distinctly.
 - **Verification:** `NativeSafetyRegressionTests.Network_operations_have_phase_deadlines_cancellation_and_failure_classification` pins the timeout settings, cancellation-handle closure, FTP phase boundaries, failure classification, and this implementation ledger entry.
 
-### 59. Make FTP transfers transactional and resumable safely — Implemented (2026-08-10)
+### 59. Make FTP transfers transactional and resumable safely — Partially implemented
 
 - **Justification:** Network interruption and resume logic can leave a destination that looks complete but contains stale or duplicated bytes.
 - **Proposed solution:** Download to a side file with persisted remote identity/size/time, validate resume offsets and server responses, flush and atomically rename on success, and keep incomplete files clearly marked.
@@ -409,7 +412,7 @@ This document is the working record for a read-only stability and resilience aud
 - **Implementation (2026-08-10):** FTPS exceptions now use a bounded, synchronized plug-in store. Each decision records the case-insensitive hostname, control port, SHA-256 SPKI and leaf-certificate fingerprints, explicit session or remembered scope, and expiry. The dialog defaults to an eight-hour session exception; the new opt-in “Remember” checkbox persists a 30-day exception in the FTP profile immediately. A reused exception requires the exact host, port, SPKI, certificate fingerprint, and unexpired lifetime. An endpoint record with a changed or renewed certificate is logged as changed and falls back to the warning dialog; ordinary Windows chain and hostname validation still runs before any exception lookup.
 - **Verification:** `NativeSafetyRegressionTests.Ftp_certificate_exceptions_are_endpoint_bound_expiring_and_pinned` guards endpoint matching, fingerprint dual-pinning, scope/expiry persistence, chain-failure exception routing, renewed-certificate warning, and the implementation ledger. `SChannelTlsIntegrationTests` continues to verify that a self-signed chain fails without an explicit exception.
 
-### 61. Upgrade the bundled 7-Zip code — Implemented
+### 61. Upgrade the bundled 7-Zip code — Partially implemented
 
 - **Justification:** The vendored 7-Zip version is 16.04, leaving years of parser, format, and robustness fixes unapplied in a component that handles untrusted archives.
 - **Proposed solution:** Move through supported releases with corpus differential tests, fuzz regression cases, and extraction compatibility snapshots before enabling the new version by default.
@@ -528,10 +531,9 @@ This document is the working record for a read-only stability and resilience aud
 - **Justification:** The suite refuses to run without `FILEMANAGER_UI_ISOLATED=1` and an interactive profile (`tests/FileManager.UiTests/README.md:5-17`), and current workflows never invoke it.
 - **Proposed solution:** Provision a dedicated ephemeral runner account/VM, install the built artifact, run UIA tests with artifacts and screenshots, and destroy the profile after each job.
 
-### 82. Replace repetition-based “100 cases” with a risk-based scenario matrix
+### 82. Replace repetition-based “100 cases” with a risk-based scenario matrix — Implemented (2026-08-14)
 
-- **Justification:** The suite now adds focused file-operation cases to the 100 parameterized launch/configuration/FTP flows. Repetition can improve flake detection but does not replace coverage of conflict dialogs, long paths, recovery, network loss, and installer lifecycle.
-- **Proposed solution:** Keep a smaller repetition soak separately and make the main suite distinct: file operations, conflict dialogs, cancellation, long paths, plug-in failure, recovery, network loss, and installer lifecycle.
+- **Delivered:** `BasicUiScenarios` now contains seven named, non-repeating lifecycle risks: cold start, owner-drawn accessibility, discarded and committed configuration, persistence across restart, clean restart, and plug-in profile persistence. The focused operation, recovery, topology, ADS, configuration-fault, and network suites remain the behavior matrix; the compact lifecycle matrix is retained as the input to the separately scheduled verifier soak.
 
 ### 83. Add native unit tests for paths, masks, and serialization
 
@@ -563,10 +565,10 @@ This document is the working record for a read-only stability and resilience aud
 - **Justification:** Manual handles, GDI objects, threads, and plug-in lifecycles commonly leak only after many reopen cycles.
 - **Proposed solution:** Loop clean and loaded-profile startup/shutdown hundreds of times, track process handle/GDI/USER counts and private bytes, and fail on statistically significant growth.
 
-### 89. Add Application Verifier and PageHeap lanes
+### 89. Add Application Verifier and PageHeap lanes — Partially implemented (2026-08-14)
 
-- **Justification:** Heap misuse, invalid handles, lock problems, and unsafe shutdown ordering may not crash under normal allocation and timing.
-- **Proposed solution:** Run focused executable scenarios with Heaps, Handles, Locks, and Exceptions checks; use full PageHeap for targeted nightly tests and archive verifier logs.
+- **Delivered:** The nightly native-verifier runner now enables Application Verifier's Heaps, Handles, Locks, and Exceptions layers, enables full PageHeap through `gflags`, runs the complete `UI` test category, uploads logs, and removes every process-persistent setting in `finally`.
+- **Remaining:** The runner account is dedicated but persistent. A separately provisioned and destroyed Windows profile/VM is still required to complete improvement 81's isolation requirement.
 
 ### 90. Add a parallel-operation cancellation soak
 
@@ -588,15 +590,15 @@ This document is the working record for a read-only stability and resilience aud
 - **Justification:** Mixed UTF-8/UTF-16 code and fixed buffers can mishandle surrogate pairs, combining characters, trailing dots/spaces, case collisions, and extended paths.
 - **Proposed solution:** Test creation, display, selection, copy, archive, rename, and deletion across NTFS/SMB with representative scripts and normalization forms; compare identities by handle rather than normalized display text.
 
-### 94. Retain symbols and map every crash to an exact build
+### 94. Retain symbols and map every crash to an exact build — Partially implemented (2026-08-14)
 
-- **Justification:** A dump is much less useful if the matching PDB, compiler flags, dependency set, and source revision cannot be recovered.
-- **Proposed solution:** Publish private symbol artifacts indexed by product version and PE identifiers, embed commit/build metadata, enforce retention, and validate symbolization during release.
+- **Delivered:** The release build now retains an immutable, private PDB artifact named with the exact source commit for 180 days; PDBs are not attached to public releases.
+- **Remaining:** A private symbol server/index, build metadata embedded in every binary, an enforced retention policy beyond GitHub artifact retention, and a release-time symbolization probe remain to be implemented.
 
-### 95. Minimize, encrypt, and govern crash-dump data
+### 95. Minimize, encrypt, and govern crash-dump data — Partially implemented (2026-08-14)
 
-- **Justification:** Full dumps include private read/write memory and data segments (`src/salmon/minidump.cpp:56-83`), which may contain paths, credentials, document contents, or network data.
-- **Proposed solution:** Default to the smallest useful dump, filter sensitive ranges/modules with callbacks, require informed consent, encrypt in transit and at rest, impose local/server retention, and provide delete/export controls.
+- **Delivered:** Minidumps now always use the minimal process/thread/module/exception set and explicitly omit `MiniDumpWithPrivateReadWriteMemory`, `MiniDumpWithDataSegs`, and `MiniDumpWithHandleData`; a failed minimal dump never falls back to a memory-rich retry. HTTPS transport and explicit consent remain in place, and `reporting.md` now enumerates the minimized payload.
+- **Remaining:** Memory-range/module filtering callbacks, local at-rest encryption, retention/deletion controls, and controlled export/server governance require product and service-side policy work.
 
 ### 96. Register Windows application restart and recovery callbacks
 

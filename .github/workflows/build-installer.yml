@@ -6,7 +6,8 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  # Release write access is granted only to the protected publish job below.
+  contents: read
 
 env:
   # Opt JavaScript actions (actions/checkout, microsoft/setup-msbuild,
@@ -17,9 +18,94 @@ env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
 
 jobs:
+  release-tests:
+    name: Complete automated release gate
+    # Every UI fixture mutates profile state, so the release gate uses the same
+    # dedicated unlocked desktop as the existing Application Verifier lane.
+    runs-on: [self-hosted, windows, filemanager-ui]
+    permissions:
+      contents: read
+
+    env:
+      BUILD_CONFIGURATION: Debug
+      SOLUTION_PATH: 'src\vcxproj\salamand.sln'
+      PLATFORM_TOOLSET: v145
+      OPENSAL_BUILD_DIR: '${{ github.workspace }}\build_stage\'
+      FILEMANAGER_UI_ISOLATED: '1'
+      FILEMANAGER_UI_CONFIG_FAULT_INJECTION: '1'
+      FILEMANAGER_UI_RECYCLE_BIN: '1'
+      # Dedicated-volume roots and the runtime FTP command are configured as
+      # repository variables; strict skip handling blocks release if any is absent.
+      FILEMANAGER_UI_CROSS_VOLUME_ROOT: '${{ vars.FILEMANAGER_UI_CROSS_VOLUME_ROOT }}'
+      FILEMANAGER_UI_ADS_UNSUPPORTED_TARGET_ROOT: '${{ vars.FILEMANAGER_UI_ADS_UNSUPPORTED_TARGET_ROOT }}'
+      FILEMANAGER_UI_FTP_ORGANIZE_COMMAND: '${{ vars.FILEMANAGER_UI_FTP_ORGANIZE_COMMAND }}'
+
+    steps:
+      - name: Checkout complete history
+        # Pin actions by reviewed commit to keep the release input graph immutable.
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          fetch-depth: 0
+
+      - name: Setup MSBuild
+        uses: microsoft/setup-msbuild@6fb02220983dee41ce7ae257b6f4d8f9bf5ed4ce # v2
+
+      - name: Setup MSVC Developer Command Prompt (x64 toolchain)
+        uses: ilammy/msvc-dev-cmd@0b201ec74fa43914dc39ae48a89fd1d8cb592756 # v1
+        with:
+          arch: x64
+
+      - name: Build Debug x64 test artifacts
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path $env:OPENSAL_BUILD_DIR | Out-Null
+          msbuild $env:SOLUTION_PATH /m /t:Build /p:Configuration=$env:BUILD_CONFIGURATION /p:Platform=x64 /p:PlatformToolset=$env:PLATFORM_TOOLSET /p:PreferredToolArchitecture=x64 /nr:false
+
+      - name: Resolve strict runner inputs
+        shell: pwsh
+        env:
+          PUSH_BASE_COMMIT: '${{ github.event.before }}'
+        run: |
+          # Push events provide the exact pre-push revision; manual releases
+          # compare with the first parent of the explicitly selected revision.
+          $baseCommit = $env:PUSH_BASE_COMMIT
+          if ([string]::IsNullOrWhiteSpace($baseCommit) -or $baseCommit -match '^0+$') {
+            $baseCommit = 'HEAD^'
+          }
+          git rev-parse --verify "$baseCommit^{commit}" | Out-Null
+
+          $sqlite = Get-ChildItem $env:OPENSAL_BUILD_DIR -Filter sqlite.dll -Recurse |
+            Where-Object { $_.FullName -like '*Debug_x64*' } | Select-Object -First 1
+          $executable = Get-ChildItem $env:OPENSAL_BUILD_DIR -Filter salamand.exe -Recurse |
+            Where-Object { $_.FullName -like '*Debug_x64*' } | Select-Object -First 1
+          if ($null -eq $sqlite -or $null -eq $executable) {
+            throw 'The strict release runner requires Debug x64 sqlite.dll and salamand.exe artifacts.'
+          }
+
+          "RELEASE_BASE_COMMIT=$baseCommit" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
+          "SQLITE_TEST_DLL=$($sqlite.FullName)" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
+          "FILEMANAGER_UI_EXE=$($executable.FullName)" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
+
+      - name: Run every automated test without skips
+        shell: pwsh
+        run: .\runtests.ps1 -BaseCommit $env:RELEASE_BASE_COMMIT -SqliteDll $env:SQLITE_TEST_DLL -FailOnSkipped
+
+      - name: Upload Application Verifier logs
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: release-application-verifier-logs
+          path: TestResults\application-verifier-logs
+          if-no-files-found: warn
+
   build:
     name: Build Installer (x64 Release)
+    # Publishing cannot begin until the unified runner has executed every test
+    # and rejected both failures and missing prerequisites.
+    needs: release-tests
     runs-on: windows-2022
+    permissions:
+      contents: read
 
     env:
       BUILD_CONFIGURATION: Release
@@ -37,10 +123,11 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        # Pin actions by reviewed commit to keep the release input graph immutable.
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
 
       - name: Setup MSBuild in PATH (VS2022)
-        uses: microsoft/setup-msbuild@v2
+        uses: microsoft/setup-msbuild@6fb02220983dee41ce7ae257b6f4d8f9bf5ed4ce # v2
 
       - name: Build Solution (Release | x64)
         run: |
@@ -48,15 +135,30 @@ jobs:
           # We do NOT pass /p:OutDir here, we let the project props use OPENSAL_BUILD_DIR
           msbuild $env:SOLUTION_PATH /m /t:Build /p:Configuration=$env:BUILD_CONFIGURATION /p:Platform=x64 /p:PlatformToolset=$env:PLATFORM_TOOLSET /p:PreferredToolArchitecture=x64
 
-      - name: Verify Windows TLS policy
-        run: dotnet test tests\FileManager.UiTests\FileManager.UiTests.csproj --filter FullyQualifiedName~SChannelTlsIntegrationTests
-
-      - name: Install Inno Setup
+      - name: Install pinned Inno Setup
+        shell: pwsh
         run: |
-          choco install innosetup -y --no-progress
-          # Add Inno Setup to PATH
-          $innoPath = "C:\Program Files (x86)\Inno Setup 6"
-          echo "$innoPath" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+          # The lock file makes a tool update an explicit reviewed source change.
+          $input = (Get-Content tools\release-inputs.json -Raw | ConvertFrom-Json).inputs.innoSetup
+          $installer = Join-Path $env:RUNNER_TEMP 'innosetup-installer.exe'
+          Invoke-WebRequest -Uri $input.url -OutFile $installer
+          $actualHash = (Get-FileHash -LiteralPath $installer -Algorithm SHA256).Hash.ToLowerInvariant()
+          if ($actualHash -ne $input.sha256) {
+            throw "Pinned Inno Setup SHA-256 mismatch: expected $($input.sha256), got $actualHash."
+          }
+          $signature = Get-AuthenticodeSignature -LiteralPath $installer
+          if ($signature.Status -ne 'Valid' -or $signature.SignerCertificate.Subject -notlike "*CN=$($input.publisher)*") {
+            throw "Pinned Inno Setup Authenticode verification failed: $($signature.Status) $($signature.SignerCertificate.Subject)"
+          }
+          & $installer /VERYSILENT /SUPPRESSMSGBOXES /NORESTART /SP-
+          if ($LASTEXITCODE -ne 0) { throw "Inno Setup installation failed with exit code $LASTEXITCODE." }
+          $innoPath = 'C:\Program Files (x86)\Inno Setup 6'
+          $iscc = Join-Path $innoPath 'ISCC.exe'
+          if (-not (Test-Path -LiteralPath $iscc)) { throw "Pinned Inno Setup did not install $iscc." }
+          if ((Get-Item -LiteralPath $iscc).VersionInfo.ProductVersion -notmatch '^6\.7\.3') {
+            throw "Installed Inno Setup version does not match the locked version $($input.version)."
+          }
+          $innoPath | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
 
       - name: Prepare Installer Files
         run: |
@@ -81,8 +183,40 @@ jobs:
           $sourcePath = Split-Path -Leaf $env:INSTALLER_STAGING_DIR
           iscc.exe /DSourcePath="$sourcePath" /DBuildNumber=${{ github.run_number }} "Installer\setup.iss"
 
+      - name: Preserve verified installer for the publish job
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          # Artifact immutability prevents publish from receiving a rebuilt installer.
+          name: release-installer-${{ github.sha }}
+          path: Installer\Output\OpenSalamander_6.0.${{ github.run_number }}.exe
+          if-no-files-found: error
+
+      - name: Preserve private symbols for crash analysis
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          # Keep PDBs out of the public release while retaining exact-build diagnostics.
+          name: private-symbols-${{ github.sha }}
+          path: ${{ env.OPENSAL_BUILD_DIR }}\**\*.pdb
+          if-no-files-found: error
+          retention-days: 180
+
+  publish:
+    name: Publish verified installer
+    needs: build
+    runs-on: windows-2022
+    environment: production
+    permissions:
+      contents: write
+
+    steps:
+      - name: Retrieve the immutable installer
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: release-installer-${{ github.sha }}
+          path: Installer\Output
+
       - name: Create Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@e5f48c3b7b613b7a911e58a617b757074c4c790d # v2.0.2
         with:
           # Keep the release-managed major separate from GitHub's automatic run number.
           tag_name: 6.0.${{ github.run_number }}

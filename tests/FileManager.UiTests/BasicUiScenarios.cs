@@ -32,21 +32,16 @@ internal static class BasicUiScenarios
 
     private static IEnumerable<UiScenario> CreateScenarios()
     {
-        var number = 1;
-        // The distribution keeps the suite at exactly 100 cases while giving persistence paths dedicated coverage.
-        foreach (var (kind, runs) in new[]
-                 {
-                     (UiScenarioKind.MainWindow, 15),
-                     (UiScenarioKind.AccessibilityTree, 15),
-                     (UiScenarioKind.ConfigurationCancel, 15),
-                     (UiScenarioKind.ConfigurationCommit, 15),
-                     (UiScenarioKind.ConfigurationPersistence, 15),
-                     (UiScenarioKind.RestartAfterCommit, 15),
-                     (UiScenarioKind.FtpBookmarkCreationPersists, 10),
-                 })
+        // The main gate samples distinct lifecycle risks once; prolonged repetition belongs to a separately scheduled soak.
+        return new[]
         {
-            for (var repetition = 1; repetition <= runs; repetition++)
-                yield return new UiScenario(number++, kind, $"Run_{repetition:00}");
-        }
+            new UiScenario(1, UiScenarioKind.MainWindow, "Cold_start"),
+            new UiScenario(2, UiScenarioKind.AccessibilityTree, "Owner_drawn_accessibility"),
+            new UiScenario(3, UiScenarioKind.ConfigurationCancel, "Discarded_settings"),
+            new UiScenario(4, UiScenarioKind.ConfigurationCommit, "Committed_settings"),
+            new UiScenario(5, UiScenarioKind.ConfigurationPersistence, "Persisted_settings_restart"),
+            new UiScenario(6, UiScenarioKind.RestartAfterCommit, "Restart_after_settings_commit"),
+            new UiScenario(7, UiScenarioKind.FtpBookmarkCreationPersists, "Plugin_profile_persistence"),
+        };
     }
 }

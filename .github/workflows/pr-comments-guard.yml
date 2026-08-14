@@ -64,7 +64,8 @@ jobs:
 
       - name: Checkout PR
         if: steps.label_check.outputs.should-skip != 'true'
-        uses: actions/checkout@v4
+        # Pin checkout because this pull_request_target job reads untrusted PR content.
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 0

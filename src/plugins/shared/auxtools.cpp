@@ -99,6 +99,17 @@ CThreadQueueItem::CThreadQueueItem(CPluginThreadOwner* owner, DWORD tid)
     Locks = 0;
 }
 
+CThreadQueueItem::CThreadQueueItem(HANDLE thread, DWORD tid)
+{
+    // DiskMap creates workers directly, but the queue must still become the
+    // sole handle owner so waits and final cleanup follow the shared invariant.
+    Owner = new CPluginThreadOwner(thread, tid);
+    Thread = thread;
+    ThreadID = tid;
+    Next = NULL;
+    Locks = 0;
+}
+
 CThreadQueueItem::~CThreadQueueItem()
 {
     delete Owner;

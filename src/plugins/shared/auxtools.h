@@ -29,6 +29,9 @@ struct CThreadQueueItem
     CThreadQueueItem* Next;
 
     CThreadQueueItem(CPluginThreadOwner* owner, DWORD tid);
+    // Compatibility registration transfers a legacy worker handle into the
+    // same queue ownership model without requiring a second thread wrapper.
+    CThreadQueueItem(HANDLE thread, DWORD tid);
     ~CThreadQueueItem();
 };
 

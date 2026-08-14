@@ -22,12 +22,32 @@ bool ReadFile(const char* path, std::string* contents)
     return true;
 }
 
+void NormalizeSnapshotLineEndings(std::string* contents)
+{
+    // Git may materialize golden text with CRLF on Windows while cmark emits
+    // canonical LF, so compare content independently of checkout convention.
+    size_t output = 0;
+    for (size_t input = 0; input != contents->size(); ++input)
+    {
+        char value = (*contents)[input];
+        if (value == '\r')
+        {
+            if (input + 1 != contents->size() && (*contents)[input + 1] == '\n')
+                ++input;
+            value = '\n';
+        }
+        (*contents)[output++] = value;
+    }
+    contents->resize(output);
+}
+
 bool RunSnapshot(const char* markdownPath, const char* htmlPath)
 {
     std::string markdown;
     std::string expectedHtml;
     if (!ReadFile(markdownPath, &markdown) || !ReadFile(htmlPath, &expectedHtml))
         return false;
+    NormalizeSnapshotLineEndings(&expectedHtml);
 
     char* html = NULL;
     size_t htmlLength = 0;

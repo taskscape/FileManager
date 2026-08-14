@@ -11,6 +11,46 @@ namespace FileManager.UiTests;
 public sealed class NativeSafetyRegressionTests
 {
     [Test]
+    public void Root_test_runner_collects_every_documented_automated_test_layer()
+    {
+        var root = FindRepositoryRoot();
+        var runner = File.ReadAllText(Path.Combine(root, "runtests.ps1"));
+        var releaseWorkflow = File.ReadAllText(Path.Combine(root, ".github", "workflows", "build-installer.yml"));
+
+        // The root command is the advertised entry point, so pin every
+        // independently executable probe and the complete NUnit/UI collector.
+        Assert.Multiple(() =>
+        {
+            Assert.That(runner, Does.Contain("verify-operation-completion-protocol.ps1"));
+            Assert.That(runner, Does.Contain("verify-durable-copy-commit.ps1"));
+            Assert.That(runner, Does.Contain("test-zlib-compatibility.ps1"));
+            Assert.That(runner, Does.Contain("test-bzip2-compatibility.ps1"));
+            Assert.That(runner, Does.Contain("foreach ($architecture in @('x64', 'x86'))"));
+            Assert.That(runner, Does.Contain("test-cmark-gfm-hardening.ps1"));
+            Assert.That(runner, Does.Contain("test-sqlite-recovery.ps1"));
+            Assert.That(runner, Does.Contain("verify-no-new-terminatethread.ps1"));
+            Assert.That(runner, Does.Contain("verify-no-new-raw-thread-creation.ps1"));
+            Assert.That(runner, Does.Contain("verify-no-new-max-path-buffers.ps1"));
+            Assert.That(runner, Does.Contain("verify-no-new-unsafe-string-calls.ps1"));
+            Assert.That(runner, Does.Contain("verify-fluent-icon-coverage.ps1"));
+            Assert.That(runner, Does.Contain("FileManager.UiTests (complete NUnit project)"));
+            Assert.That(runner, Does.Contain("run-lock-verifier-stress.ps1"));
+            Assert.That(runner, Does.Contain("FailOnSkipped"));
+            Assert.That(runner, Does.Contain("@outcome='NotExecuted'"));
+            // The release workflow must consume the root inventory rather than
+            // maintaining a second list that can silently lose coverage.
+            Assert.That(releaseWorkflow, Does.Contain("name: Complete automated release gate"));
+            Assert.That(releaseWorkflow, Does.Contain(".\\runtests.ps1 -BaseCommit $env:RELEASE_BASE_COMMIT -SqliteDll $env:SQLITE_TEST_DLL -FailOnSkipped"));
+            Assert.That(releaseWorkflow, Does.Contain("needs: release-tests"));
+            Assert.That(releaseWorkflow, Does.Contain("fetch-depth: 0"));
+            Assert.That(releaseWorkflow, Does.Contain("FILEMANAGER_UI_CONFIG_FAULT_INJECTION: '1'"));
+            Assert.That(releaseWorkflow, Does.Contain("FILEMANAGER_UI_CROSS_VOLUME_ROOT"));
+            Assert.That(releaseWorkflow, Does.Contain("FILEMANAGER_UI_ADS_UNSUPPORTED_TARGET_ROOT"));
+            Assert.That(releaseWorkflow, Does.Contain("FILEMANAGER_UI_FTP_ORGANIZE_COMMAND"));
+        });
+    }
+
+    [Test]
     public void Unchecked_string_calls_are_ratchet_gated_and_external_boundaries_report_capacity_and_encoding_failures()
     {
         var root = FindRepositoryRoot();
@@ -213,7 +253,7 @@ public sealed class NativeSafetyRegressionTests
             Assert.That(client, Does.Contain("CheckedAddDword((DWORD)sizeof(*thumbnail), thumbnail->PixelBytes, &expectedResponseLength)"));
             Assert.That(broker, Does.Contain("CheckedMultiplyDword((DWORD)bitmapInfo.bmWidth, (DWORD)bitmapInfo.bmHeight, &pixels)"));
             Assert.That(broker, Does.Contain("CheckedAddDword((DWORD)sizeof(CParserBrokerThumbnailResponse), pixelBytes, &packedResponseLength)"));
-            Assert.That(refactoring, Does.Contain("### 39. Use checked arithmetic for sizes, offsets, and allocations — Implemented"));
+            Assert.That(refactoring, Does.Contain("### 39. Use checked arithmetic for sizes, offsets, and allocations — Partially implemented"));
         });
     }
 
@@ -254,7 +294,7 @@ public sealed class NativeSafetyRegressionTests
             Assert.That(copy, Does.Contain("while (!verificationResult.ToLegacyBool(&verificationError))"));
             Assert.That(copy, Does.Contain("COperationResult commitResult = CommitTransactionalTargetFile"));
             Assert.That(copy, Does.Contain("while (!commitResult.ToLegacyBool(&err))"));
-            Assert.That(refactoring, Does.Contain("### 40. Make operation result types explicit — Implemented"));
+            Assert.That(refactoring, Does.Contain("### 40. Make operation result types explicit — Partially implemented"));
         });
     }
 
@@ -277,7 +317,7 @@ public sealed class NativeSafetyRegressionTests
             Assert.That(copy, Does.Contain("result.AppendCleanupError(orcpCloseVerificationHandle, cleanupError, targetName)"));
             Assert.That(copy, Does.Contain("verificationResult.AppendCleanupError(orcpDeleteUnverifiedTarget, err, op->TargetName)"));
             Assert.That(copy, Does.Contain("Diagnostic (copy with Ctrl+C):"));
-            Assert.That(refactoring, Does.Contain("### 56. Preserve the first actionable error and its context — Implemented"));
+            Assert.That(refactoring, Does.Contain("### 56. Preserve the first actionable error and its context — Partially implemented"));
         });
     }
 
@@ -385,12 +425,15 @@ public sealed class NativeSafetyRegressionTests
             Assert.That(architecture, Does.Contain("### 7.1 Lock ordering contract"));
             Assert.That(workflow, Does.Contain("tools\\run-lock-verifier-stress.ps1"));
             Assert.That(workflow, Does.Contain("self-hosted"));
-            Assert.That(stressRunner, Does.Contain("-enable Locks -for"));
+            // The verifier lane must retain the full diagnostic layers rather than regress to lock-only coverage.
+            Assert.That(stressRunner, Does.Contain("-enable @layers -for"));
+            Assert.That(stressRunner, Does.Contain("@('Heaps', 'Handles', 'Locks', 'Exceptions')"));
+            Assert.That(stressRunner, Does.Contain("/p /enable $targetName /full"));
             Assert.That(stressRunner, Does.Contain("-delete settings -for"));
             Assert.That(stressRunner, Does.Contain("TestCategory=LockStress"));
             Assert.That(stressRunner, Does.Contain("finally"));
             Assert.That(stressRunner, Does.Contain("LogOutputDirectory"));
-            Assert.That(refactoring, Does.Contain("### 47. Document and verify lock ordering — Implemented"));
+            Assert.That(refactoring, Does.Contain("### 47. Document and verify lock ordering — Partially implemented"));
         });
     }
 
@@ -429,7 +472,7 @@ public sealed class NativeSafetyRegressionTests
             Assert.That(ratchet, Does.Contain("CThreadOwner"));
             Assert.That(ratchet, Does.Contain("CreateThread|_beginthreadex"));
             Assert.That(workflow, Does.Contain("verify-no-new-raw-thread-creation.ps1 -BaseCommit origin/"));
-            Assert.That(refactoring, Does.Contain("### 43. Standardize thread creation and ownership — Implemented"));
+            Assert.That(refactoring, Does.Contain("### 43. Standardize thread creation and ownership — Partially implemented"));
         });
     }
 
@@ -634,7 +677,7 @@ public sealed class NativeSafetyRegressionTests
             Assert.That(pluginTimers, Does.Not.Contain("GetTickCount("),
                         "The plug-in timer queue must not reintroduce a wrap-prone clock read.");
             Assert.That(pluginTimers, Does.Not.Contain("(int)(timer->AbsTimeout - timeNow)"));
-            Assert.That(refactoring, Does.Contain("### 45. Replace wrap-prone time calculations with monotonic 64-bit time — Implemented"));
+            Assert.That(refactoring, Does.Contain("### 45. Replace wrap-prone time calculations with monotonic 64-bit time — Partially implemented"));
         });
     }
 
@@ -904,7 +947,7 @@ public sealed class NativeSafetyRegressionTests
             Assert.That(copy, Does.Contain("PrepareAutomaticRetry(err, &AutoRetryCounter, rokDestructiveCommit"));
             Assert.That(copy, Does.Not.Contain("Sleep(100);"));
             Assert.That(copy, Does.Not.Contain("Sleep(AutoRetryCounter * 100);"));
-            Assert.That(refactoring, Does.Contain("### 57. Centralize retry policy — Implemented"));
+            Assert.That(refactoring, Does.Contain("### 57. Centralize retry policy — Partially implemented"));
         });
     }
 
@@ -939,7 +982,7 @@ public sealed class NativeSafetyRegressionTests
             Assert.That(identities, Does.Contain("OperationExecutionFileSystem().SetFileInformationByHandle"));
             Assert.That(journal, Does.Contain("STATE|%d|prepared"));
             Assert.That(journal, Does.Contain("STATE|%d|temporary-ready"));
-            Assert.That(refactoring, Does.Contain("### 29. Add crash-consistency fault injection at every operation phase — Implemented"));
+            Assert.That(refactoring, Does.Contain("### 29. Add crash-consistency fault injection at every operation phase — Partially implemented"));
         });
     }
 
@@ -948,6 +991,8 @@ public sealed class NativeSafetyRegressionTests
     {
         var root = FindRepositoryRoot();
         var operations = File.ReadAllText(Path.Combine(root, "tests", "FileManager.UiTests", "FileOperationUiTests.cs"));
+        // File access commands live separately from destructive operations but remain part of the required UI characterization set.
+        var access = File.ReadAllText(Path.Combine(root, "tests", "FileManager.UiTests", "FileAccessUiTests.cs"));
         var crossVolume = File.ReadAllText(Path.Combine(root, "tests", "FileManager.UiTests", "CrossVolumeMoveCharacterizationUiTests.cs"));
         var recovery = File.ReadAllText(Path.Combine(root, "tests", "FileManager.UiTests", "OperationRecoveryCharacterizationUiTests.cs"));
         var workspace = File.ReadAllText(Path.Combine(root, "tests", "FileManager.UiTests", "Infrastructure", "FileOperationUiTestBase.cs"));
@@ -963,7 +1008,18 @@ public sealed class NativeSafetyRegressionTests
             Assert.That(operations, Does.Contain("Copy_skip_keeps_the_existing_target_and_the_source"));
             Assert.That(operations, Does.Contain("Copy_skip_all_keeps_the_existing_conflicting_tree"));
             Assert.That(operations, Does.Contain("Rename_overwrite_replaces_the_collision_without_losing_source_metadata"));
+            Assert.That(operations, Does.Contain("Rename_overwrite_decline_keeps_the_original_file_and_existing_target"));
+            Assert.That(operations, Does.Contain("Rename_case_only_change_preserves_the_file_and_updates_its_displayed_name"));
             Assert.That(operations, Does.Contain("The default move fixture characterizes same-volume behavior."));
+            Assert.That(operations, Does.Contain("Move_overwrite_replaces_the_existing_target_and_removes_the_source"));
+            Assert.That(operations, Does.Contain("Move_skip_keeps_the_existing_target_and_the_unmoved_source"));
+            Assert.That(operations, Does.Contain("Move_overwrite_all_replaces_every_conflict_before_removing_the_source_tree"));
+            Assert.That(operations, Does.Contain("Move_skip_all_retains_conflicting_sources_but_moves_nonconflicting_siblings"));
+            Assert.That(operations, Does.Contain("Delete_mixed_selection_removes_the_selected_file_and_directory_tree"));
+            Assert.That(operations, Does.Contain("Delete_skip_for_locked_file_keeps_it_and_continues_with_later_items"));
+            Assert.That(access, Does.Contain("Find_files_searches_subdirectories_from_the_active_panel"));
+            Assert.That(access, Does.Contain("View_file_opens_the_selected_file_in_the_internal_viewer"));
+            Assert.That(access, Does.Contain("Edit_file_opens_the_selected_file_in_the_configured_editor"));
             Assert.That(operations, Does.Contain("Delete_to_recycle_bin_removes_the_source_and_creates_a_recoverable_shell_item"));
             Assert.That(operations, Does.Contain("Cancelling_an_in_progress_conflicting_copy_keeps_both_versions_and_records_cancellation"));
             Assert.That(crossVolume, Does.Contain("Move_across_volumes_copies_the_complete_tree_before_removing_the_source"));
@@ -981,7 +1037,7 @@ public sealed class NativeSafetyRegressionTests
             Assert.That(recovery, Does.Contain("STATE|0|temporary-ready"));
             Assert.That(workspace, Does.Contain("TargetVolumeRoot"));
             Assert.That(workspace, Does.Contain("TargetWorkspaceDirectory"));
-            Assert.That(refactoring, Does.Contain("### 28. Build native characterization tests for copy, move, delete, and rename — Implemented"));
+            Assert.That(refactoring, Does.Contain("### 28. Build native characterization tests for copy, move, delete, and rename — Partially implemented"));
             Assert.That(refactoring, Does.Contain("### 32. Test alternate data streams end to end — Implemented"));
         });
     }
@@ -1023,6 +1079,25 @@ public sealed class NativeSafetyRegressionTests
             Assert.That(reporting, Does.Contain("http://reports.taskscape.com/upload.php"));
             Assert.That(reporting, Does.Contain("Transfer-Encoding: chunked"));
             Assert.That(refactoring, Does.Contain("### 12. Replace the custom crash uploader with HTTPS WinHTTP — Implemented"));
+        });
+    }
+
+    [Test]
+    public void Crash_minidumps_default_to_metadata_without_private_memory_or_data_segments()
+    {
+        var root = FindRepositoryRoot();
+        var minidump = File.ReadAllText(Path.Combine(root, "src", "salmon", "minidump.cpp"));
+        var reporting = File.ReadAllText(Path.Combine(root, "reporting.md"));
+
+        // Keep the privacy default visible in both the executable policy and user-facing report inventory.
+        Assert.Multiple(() =>
+        {
+            Assert.That(minidump, Does.Contain("Keep crash reports diagnostically useful without serializing arbitrary private writable memory."));
+            Assert.That(minidump, Does.Not.Contain("MiniDumpWithPrivateReadWriteMemory"));
+            Assert.That(minidump, Does.Not.Contain("MiniDumpWithDataSegs"));
+            Assert.That(minidump, Does.Not.Contain("MiniDumpWithHandleData"));
+            Assert.That(minidump, Does.Contain("Privacy is the default: never retry a failed minimal dump with a memory-rich variant."));
+            Assert.That(reporting, Does.Contain("intentionally excludes private writable memory, module data segments, and handle data"));
         });
     }
 
@@ -1093,7 +1168,7 @@ public sealed class NativeSafetyRegressionTests
             Assert.That(thumbnails, Does.Not.Contain("(*loader)->LoadThumbnail"));
             Assert.That(archives, Does.Contain("ParserBroker.QueryArchiveMetadata"));
             Assert.That(installer, Does.Contain("salbroker.exe"));
-            Assert.That(refactoring, Does.Contain("### 21. Move risky parsers and previewers out of process — Implemented"));
+            Assert.That(refactoring, Does.Contain("### 21. Move risky parsers and previewers out of process — Partially implemented"));
         });
     }
 
@@ -1114,7 +1189,9 @@ public sealed class NativeSafetyRegressionTests
             Assert.That(loader, Does.Contain("~CPluginEntryScope()"));
             Assert.That(loader, Does.Contain("CPluginDataLock dataLock"));
             Assert.That(loader, Does.Contain("PluginIface.Init(NULL, 0)"));
-            Assert.That(loader, Does.Contain("CallbackState.Leave();\n        SalamanderGeneral.Init(PluginIface.GetInterface());"));
+            // This ordering contract spans lines, so accept both Git checkout
+            // conventions while still requiring the two calls to remain adjacent.
+            Assert.That(loader, Does.Match(@"CallbackState\.Leave\(\);\r?\n        SalamanderGeneral\.Init\(PluginIface\.GetInterface\(\)\);"));
             Assert.That(loader, Does.Contain("CPluginEntryScope pluginEntry(Plugins.GetCallbackState(), PluginIface,"));
             Assert.That(loader, Does.Contain("pluginEntry.SetReturnedInterface(resIface)"));
             Assert.That(loader, Does.Not.Contain("EnterPlugin(); // for the plugin entry point"));
@@ -1135,7 +1212,7 @@ public sealed class NativeSafetyRegressionTests
             Assert.That(shutdown, Does.Contain("!endAfterCleanup && IsInPlugin()"));
             Assert.That(pathUtilities, Does.Contain("!IsInPlugin()"));
             Assert.That(refactoring, Does.Contain("### 22. Implemented: make plug-in entry bookkeeping exception-safe"));
-            Assert.That(refactoring, Does.Contain("### 48. Reduce unowned global mutable state — Implemented"));
+            Assert.That(refactoring, Does.Contain("### 48. Reduce unowned global mutable state — Partially implemented"));
         });
     }
 
@@ -1166,7 +1243,7 @@ public sealed class NativeSafetyRegressionTests
             Assert.That(messages, Does.Contain("DeleteManager.InvalidateCallbackWindow(HWindow);"));
             Assert.That(messages.IndexOf("DeleteManager.InvalidateCallbackWindow(HWindow);", StringComparison.Ordinal),
                         Is.LessThan(messages.IndexOf("SHChangeNotifyRelease();", StringComparison.Ordinal)));
-            Assert.That(refactoring, Does.Contain("### 49. Protect window and callback lifetimes — Implemented"));
+            Assert.That(refactoring, Does.Contain("### 49. Protect window and callback lifetimes — Partially implemented"));
         });
     }
 
@@ -1203,7 +1280,7 @@ public sealed class NativeSafetyRegressionTests
             Assert.That(implementation, Does.Not.Contain("QueueHead"));
             Assert.That(implementation, Does.Not.Contain("QueueTail"));
             Assert.That(implementation, Does.Not.Contain("Sleep(1)"));
-            Assert.That(refactoring, Does.Contain("### 50. Bound background work queues — Implemented"));
+            Assert.That(refactoring, Does.Contain("### 50. Bound background work queues — Partially implemented"));
         });
     }
 
@@ -1685,7 +1762,7 @@ public sealed class NativeSafetyRegressionTests
             Assert.That(dataConnection, Does.Contain("DiskWork.AppendToFile = TgtDiskFile == NULL && TgtDiskFileAppend"));
             Assert.That(disk, Does.Contain("localWork.AppendToFile ? OPEN_ALWAYS : CREATE_ALWAYS"));
             Assert.That(disk, Does.Contain("SetFilePointerEx(f, offset, NULL, FILE_BEGIN)"));
-            Assert.That(refactoring, Does.Contain("### 59. Make FTP transfers transactional and resumable safely — Implemented"));
+            Assert.That(refactoring, Does.Contain("### 59. Make FTP transfers transactional and resumable safely — Partially implemented"));
         });
     }
 
@@ -1774,7 +1851,7 @@ public sealed class NativeSafetyRegressionTests
             Assert.That(record, Does.Contain("C7502DD4557481F52CCF1B3E680329F1FDD207E79A25544AFEB3106325474944"));
             Assert.That(record, Does.Contain("fuzz regressions"));
             Assert.That(record, Does.Contain("extraction snapshots"));
-            Assert.That(refactoring, Does.Contain("### 61. Upgrade the bundled 7-Zip code — Implemented"));
+            Assert.That(refactoring, Does.Contain("### 61. Upgrade the bundled 7-Zip code — Partially implemented"));
         });
     }
 
@@ -1806,7 +1883,9 @@ public sealed class NativeSafetyRegressionTests
             Assert.That(policy, Does.Contain("628a44cfe82c66aed1ccbbe85a562d2e33ebe64b3288981ed76285612227934e"));
             Assert.That(policy, Does.Contain("PRAGMA integrity_check"));
             Assert.That(policy, Does.Contain("BEGIN IMMEDIATE"));
-            Assert.That(policy, Does.Contain("FileManager must not run\nintegrity checks, checkpoints, migrations, or recovery writes against it."));
+            // The policy sentence spans lines; tolerate CRLF without weakening
+            // the exact prohibition guarded by this contract test.
+            Assert.That(policy, Does.Match("FileManager must not run\\r?\\nintegrity checks, checkpoints, migrations, or recovery writes against it\\."));
             Assert.That(externalReader, Does.Contain("SQLITE_OPEN_READONLY"));
             Assert.That(externalReader, Does.Contain("never a FileManager recovery or write target"));
             Assert.That(recoveryTest, Does.Contain("PRAGMA journal_mode=WAL"));

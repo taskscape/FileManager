@@ -60,7 +60,7 @@ creates the archive from every file matching the selected report base name
 
 | Data | Source | When included |
 |---|---|---|
-| Windows minidump (`.DMP`) | `MiniDumpWriteDump` for the crashed Open Salamander process | Created for the crash; it can contain process memory, loaded-module, thread, handle, and exception data. This can include sensitive data that happened to be in process memory. |
+| Windows minidump (`.DMP`) | `MiniDumpWriteDump` for the crashed Open Salamander process | Created for the crash; it contains process/thread/module/exception metadata and intentionally excludes private writable memory, module data segments, and handle data. |
 | Crash text report (`.TXT`) | The main application writes its crash/call-stack report after Salmon signals dump completion | Created for the crash; it identifies the crash and contains diagnostic text. |
 | Release diagnostic ring (`.OPS`) | A fixed in-memory ring is rendered into the crash text report and a local `.OPS` sidecar | Contains only sanitized operation transitions, wait results, retry labels, and plug-in DLL leaf names; it excludes paths, file names, and document data. **View Report** provides the local export without sending it. |
 | User report (`.INF`) | The bug reporter writes `Email: <optional contact email>` followed by the optional “Last action” description | Created only when the user presses Send Report. The contact email and description are optional, but both are included verbatim when supplied. |
