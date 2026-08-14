@@ -30,6 +30,8 @@
 
 BOOL SalamanderBusy = TRUE;       // je Salamander busy?
 DWORD LastSalamanderIdleTime = 0; // GetTickCount() z okamziku, kdy SalamanderBusy naposledy presel na TRUE
+// UI tests need a deterministic boundary later than main-window creation and first-run plug-in loading.
+BOOL FileManagerUiStartupReady = FALSE;
 
 int PasteLinkIsRunning = 0; // if greater than zero, Past Shortcuts command is currently running in one of the panels
 

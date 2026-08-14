@@ -10,15 +10,6 @@ internal static class UiTestSettings
     internal static string Arguments =>
         Environment.GetEnvironmentVariable("FILEMANAGER_UI_ARGUMENTS") ?? string.Empty;
 
-    internal static int RequireFtpOrganizeCommand()
-    {
-        // Plug-in menu command IDs are allocated by the host at runtime, so the isolated test runner supplies this ID.
-        if (!int.TryParse(Environment.GetEnvironmentVariable("FILEMANAGER_UI_FTP_ORGANIZE_COMMAND"), out var command) || command <= 0)
-            Assert.Ignore("Set FILEMANAGER_UI_FTP_ORGANIZE_COMMAND to the FTP plug-in's runtime Organize Bookmarks command ID to run FTP persistence tests.");
-
-        return command;
-    }
-
     internal static void RequireIsolatedProfile()
     {
         // UI tests save FileManager configuration, so prevent accidental execution against a developer profile.
@@ -34,6 +25,33 @@ internal static class UiTestSettings
         RequireIsolatedProfile();
         if (!string.Equals(Environment.GetEnvironmentVariable("FILEMANAGER_UI_CONFIG_FAULT_INJECTION"), "1", StringComparison.Ordinal))
             Assert.Ignore("Set FILEMANAGER_UI_CONFIG_FAULT_INJECTION=1 to run the exhaustive configuration write-boundary recovery test.");
+    }
+
+    internal static int LimitConfigurationFaultBoundaries(int measuredCount)
+    {
+        // Optional smoke runs may cap the matrix; the unset default remains exhaustive for the dedicated recovery lane.
+        return int.TryParse(Environment.GetEnvironmentVariable("FILEMANAGER_UI_CONFIG_FAULT_BOUNDARY_LIMIT"), out var limit) && limit > 0
+            ? Math.Min(measuredCount, limit)
+            : measuredCount;
+    }
+
+    internal static void RequireZipPlugin()
+    {
+        RequireIsolatedProfile();
+        // The opt-in confirms both deployment and enablement because a disabled plug-in is indistinguishable through the public UI.
+        if (!string.Equals(Environment.GetEnvironmentVariable("FILEMANAGER_UI_ZIP_PLUGIN"), "1", StringComparison.Ordinal))
+            Assert.Ignore("Install and enable the Zip plug-in, then set FILEMANAGER_UI_ZIP_PLUGIN=1 to run ZIP navigation characterization.");
+    }
+
+    internal static (string SearchTerm, string ExpectedResult) RequireHelpSearchFixture()
+    {
+        RequireIsolatedProfile();
+        var term = Environment.GetEnvironmentVariable("FILEMANAGER_UI_HELP_SEARCH_TERM");
+        var expected = Environment.GetEnvironmentVariable("FILEMANAGER_UI_HELP_EXPECTED_RESULT");
+        if (string.IsNullOrWhiteSpace(term) || string.IsNullOrWhiteSpace(expected))
+            Assert.Ignore("Deploy salamand.chm and set FILEMANAGER_UI_HELP_SEARCH_TERM plus FILEMANAGER_UI_HELP_EXPECTED_RESULT for its language.");
+
+        return (term!, expected!);
     }
 
     internal static string RequireCrossVolumeRoot()

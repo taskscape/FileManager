@@ -16,6 +16,7 @@ CRegistryWorkerThread RegistryWorkerThread;
 static volatile LONG ConfigurationWriteFaultInjectionActive = 0;
 static volatile LONG ConfigurationWriteFaultAfter = 0;
 static volatile LONG ConfigurationWriteCount = 0;
+static volatile LONG ConfigurationWriteFaultNextSaveAfter = 0;
 static std::string ConfigurationWriteFaultReport;
 
 // Environment variables are external input.  Query their required length first
@@ -98,17 +99,18 @@ void BeginConfigurationWriteFaultInjection()
     if (!IsIsolatedConfigurationFaultTest())
         return;
 
-    std::string value;
-    if (ReadConfigurationFaultEnvironment("FILEMANAGER_CONFIG_FAULT_AFTER_WRITE", &value) == cferSuccess &&
-        !value.empty())
-    {
-        char* end;
-        LONG parsed = strtol(value.c_str(), &end, 10);
-        if (end != value.c_str() && *end == 0 && parsed > 0)
-            InterlockedExchange(&ConfigurationWriteFaultAfter, parsed);
-    }
+    // A UI-test command can arm the explicit commit after startup and cancel-dialog saves have completed.
+    LONG armedBoundary = InterlockedExchange(&ConfigurationWriteFaultNextSaveAfter, 0);
+    if (armedBoundary > 0)
+        InterlockedExchange(&ConfigurationWriteFaultAfter, armedBoundary);
     ReadConfigurationFaultEnvironment("FILEMANAGER_CONFIG_FAULT_REPORT", &ConfigurationWriteFaultReport);
     InterlockedExchange(&ConfigurationWriteFaultInjectionActive, 1);
+}
+
+void ArmNextConfigurationWriteFault(LONG writeBoundary)
+{
+    // The private UI protocol validates isolation; one-shot state keeps unrelated later saves safe.
+    InterlockedExchange(&ConfigurationWriteFaultNextSaveAfter, writeBoundary > 0 ? writeBoundary : 0);
 }
 
 void EndConfigurationWriteFaultInjection()
