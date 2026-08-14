@@ -48,6 +48,79 @@ Solution ```\src\vcxproj\salamand.sln``` may be built from within Visual Studio 
 
 Use ```\src\vcxproj\!populate_build_dir.cmd``` to populate build directory with files required to run Open Salamander.
 
+### Running automated tests
+
+No source-code changes are required to start the automated tests. Run the commands below from the repository root. The repository scripts may be blocked by the local PowerShell execution policy, so these examples use a process-scoped `Bypass`; they do not change the machine-wide policy.
+
+Run the source-contract and native compatibility checks:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\verify-operation-completion-protocol.ps1
+powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\verify-durable-copy-commit.ps1
+powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\test-zlib-compatibility.ps1
+powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\test-bzip2-compatibility.ps1
+```
+
+The cmark-gfm hardening probe invokes `cl.exe`. Start it through the installed Visual Studio 2026 developer environment so the compiler, headers, and libraries are available:
+
+```powershell
+$vsDevCmd = 'C:\Program Files\Microsoft Visual Studio\18\Community\Common7\Tools\VsDevCmd.bat'
+$command = 'call "' + $vsDevCmd + '" -arch=x64 -host_arch=x64 && ' +
+           'powershell -NoProfile -ExecutionPolicy Bypass ' +
+           '-File "' + (Join-Path $PWD 'tools\test-cmark-gfm-hardening.ps1') + '"'
+& $env:ComSpec /d /s /c $command
+```
+
+Adjust `$vsDevCmd` if Visual Studio is installed in another edition or directory. Visual Studio 2026 and its developer-command environment are the authoritative native build environment for this repository.
+
+The NUnit project targets .NET 8. Restore its declared packages, then run it as follows:
+
+```powershell
+dotnet restore .\tests\FileManager.UiTests\FileManager.UiTests.csproj
+dotnet test .\tests\FileManager.UiTests\FileManager.UiTests.csproj `
+  --no-restore `
+  -p:IsTestProject=true `
+  --logger "console;verbosity=minimal"
+```
+
+The `IsTestProject` command-line property is currently required because `FileManager.UiTests.csproj` does not declare `<IsTestProject>true</IsTestProject>`. Without the override, newer .NET SDKs may finish successfully without discovering or running any tests.
+
+If the normal .NET or NuGet user directories are unavailable, redirect their generated state to writable directories before restoring. These directories contain only generated package and CLI state and should not be committed:
+
+```powershell
+$env:DOTNET_CLI_HOME = Join-Path $PWD '.dotnet-cli'
+$env:NUGET_PACKAGES = Join-Path $PWD '.nuget-packages'
+$env:DOTNET_SKIP_FIRST_TIME_EXPERIENCE = '1'
+$env:DOTNET_NOLOGO = '1'
+
+dotnet restore .\tests\FileManager.UiTests\FileManager.UiTests.csproj
+dotnet test .\tests\FileManager.UiTests\FileManager.UiTests.csproj `
+  --no-restore `
+  -p:IsTestProject=true `
+  --logger "console;verbosity=minimal"
+```
+
+Most UI tests intentionally skip unless they run in an interactive disposable Windows profile. Configure at least the isolation confirmation and an existing built executable before running the UI category:
+
+```powershell
+$env:FILEMANAGER_UI_ISOLATED = '1'
+$env:FILEMANAGER_UI_EXE = 'C:\path\to\salamand.exe'
+
+dotnet test .\tests\FileManager.UiTests\FileManager.UiTests.csproj `
+  -p:IsTestProject=true `
+  --filter 'TestCategory=UI'
+```
+
+See [`tests/FileManager.UiTests/README.md`](tests/FileManager.UiTests/README.md) for optional FTP, fault-injection, cross-volume, alternate-data-stream, and recycle-bin settings. Never set `FILEMANAGER_UI_ISOLATED=1` in a normal developer profile because the tests persist configuration and expect the profile to be disposable.
+
+The SQLite recovery probe depends on the Debug x64 native SQLite DLL. Build that target with Visual Studio 2026 first, then run:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass `
+  -File .\tools\test-sqlite-recovery.ps1 `
+  -SqliteDll .\src\vcxproj\sqlite\salamander\Debug_x64\utils\sqlite.dll
+```
+
 ### Creating Installer
 
 Open Salamander uses [Inno Setup](https://jrsoftware.org/isinfo.php) to create the installer. The installer script is located at `Installer\setup.iss`.
