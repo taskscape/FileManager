@@ -406,7 +406,10 @@ BOOL CFTPListingPluginDataInterface::GetInfoLineContent(int panel, const CFileDa
                 else
                 {
                     if (FormatUserDateTimeAnsi(&st, 0, buf, 1000, FALSE) == 0)
-                        sprintf(buf, "%u:%02u:%02u", st.wHour, st.wMinute, st.wSecond);
+                    {
+                        // The locale fallback must fit the fixed column-rendering scratch buffer.
+                        _snprintf_s(buf, 1000, _TRUNCATE, "%u:%02u:%02u", st.wHour, st.wMinute, st.wSecond);
+                    }
                 }
                 AddStrAux(s, end, buf);
                 if (hot < hotEnd && beg < s)

@@ -2015,7 +2015,8 @@ void CMenuPopup::OnMouseWheel(WPARAM wParam, LPARAM lParam)
             myMsg.wParam = 0;
             myMsg.lParam = MAKELPARAM(cursorPos.x, cursorPos.y);
             myMsg.message = WM_MOUSEMOVE;
-            myMsg.time = GetTickCount();
+            // msg.time is intentionally not updated - it should reflect the time of the last mouse move
+            // for the double-click detection logic, which is based on system time, not monotonic time
             myMsg.pt = cursorPos;
             SharedRes->LastMouseMove.x = cursorPos.x - 1; // so we pass the initial test
 

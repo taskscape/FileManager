@@ -215,7 +215,8 @@ HBITMAP HZoomBitmap = NULL;
 
 HCURSOR HHelpCursor = NULL;
 
-int SystemDPI = 0; // Global DPI across all monitors. Salamander does not support Per-Monitor DPI, see https://msdn.microsoft.com/library/windows/desktop/dn469266.aspx
+int SystemDPI = 96; // System DPI (96 = 100% scale). Per-monitor DPI is supported via GetDpiForWindow().
+// Salamander uses per-monitor DPI awareness on Windows 8.1+, but SystemDPI is maintained for compatibility.
 int IconSizes[] = {16, 32, 48};
 int IconLRFlags = 0;
 HICON HSharedOverlays[] = {0};

@@ -1257,6 +1257,9 @@ extern const char* SalamanderConfigurationRoots[];                              
 BOOL GetUpgradeInfo(BOOL* autoImportConfig, char* autoImportConfigFromKey, int autoImportConfigFromKeySize); // description in mainwnd2.cpp
 BOOL FindLatestConfiguration(BOOL* deleteConfigurations, const char*& loadConfiguration);                    // description in mainwnd2.cpp
 BOOL FindLanguageFromPrevVerOfSal(char* slgName);                                                            // description in mainwnd2.cpp
+// The UI harness selects a suffixed configuration root before startup migration can inspect the user's profile.
+BOOL ConfigureFileManagerUiTestConfigurationStore();
+BOOL IsFileManagerUiTestConfigurationStore();
 // Configuration is stored as two complete generations below this root.  Call this after
 // selecting a version root so all existing configuration readers use the committed generation.
 void SetConfigurationStoreRoot(const char* root);

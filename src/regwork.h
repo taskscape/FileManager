@@ -19,8 +19,8 @@ BOOL DeleteKeyAux(HKEY hKey, const char* name);
 BOOL GetValueDontCheckTypeAux(HKEY hKey, const char* name, void* buffer, DWORD bufferSize);
 
 // Test-only crash injection for the transactional configuration writer.  The scope is
-// inert unless FILEMANAGER_UI_ISOLATED=1 is present, so ordinary application launches
-// cannot accidentally enable it.  FILEMANAGER_CONFIG_FAULT_AFTER_WRITE terminates the
+// inert unless FILEMANAGER_UI_CONFIG_ROOT selects the suffixed test key, so ordinary
+// application launches cannot accidentally enable it.  FILEMANAGER_CONFIG_FAULT_AFTER_WRITE terminates the
 // process immediately after that successful registry mutation; FILEMANAGER_CONFIG_FAULT_REPORT
 // receives the number of mutations in a completed save.
 void BeginConfigurationWriteFaultInjection();

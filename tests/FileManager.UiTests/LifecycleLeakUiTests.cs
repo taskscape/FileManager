@@ -11,7 +11,7 @@ public sealed class LifecycleLeakUiTests : FileManagerUiTestBase
     [Test]
     public void Repeated_clean_startup_and_shutdown_does_not_accumulate_process_resources()
     {
-        UiTestSettings.RequireIsolatedProfile();
+        UiTestSettings.RequireTestSandbox();
         var samples = new List<ProcessResourceSnapshot>();
         var cycles = UiTestSettings.RequireLeakLifecycleCycles();
 

@@ -17,7 +17,17 @@ public:
     // GetTickCount64 is monotonic and is not affected by wall-clock changes.
     static CMonotonicTimePoint Now()
     {
+#if _WIN32_WINNT < 0x0600
+        // The portable-device plug-in retains an XP SDK target, where GetTickCount64 is not declared.
+        LARGE_INTEGER frequency;
+        LARGE_INTEGER counter;
+        if (!QueryPerformanceFrequency(&frequency) || !QueryPerformanceCounter(&counter) || frequency.QuadPart <= 0)
+            return 0;
+        return (CMonotonicTimePoint)(counter.QuadPart / frequency.QuadPart) * 1000 +
+               (CMonotonicTimePoint)(counter.QuadPart % frequency.QuadPart) * 1000 / frequency.QuadPart;
+#else
         return GetTickCount64();
+#endif
     }
 
     static CMonotonicTimePoint DeadlineAfter(CMonotonicDuration duration)

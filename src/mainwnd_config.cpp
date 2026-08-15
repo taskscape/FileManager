@@ -329,6 +329,8 @@ const char* SalamanderConfigurationVersions[SALCFG_ROOTS_COUNT] =
         "1.52"};
 
 const char* SALAMANDER_ROOT_REG = NULL; // will be set in salamdr1.cpp
+static const char* const FileManagerUiTestConfigurationRoot = "Software\\Open Salamander\\6.0-filemanager-testdata";
+static BOOL FileManagerUiTestConfigurationStore = FALSE;
 
 // The public root remains the path that existing host and plug-in code opens.  Once a
 // transactional configuration has been committed it points at the selected generation;
@@ -341,6 +343,34 @@ static const char* CONFIGURATION_TRANSACTION_COMPLETE_REG = "Transaction Complet
 static const char* CONFIGURATION_TRANSACTION_CHECKSUM_REG = "Transaction Checksum";
 static const char* CONFIGURATION_SCHEMA_VERSION_REG = "Configuration Schema Version";
 static const DWORD CONFIGURATION_SCHEMA_VERSION = 1;
+
+BOOL ConfigureFileManagerUiTestConfigurationStore()
+{
+    FileManagerUiTestConfigurationStore = FALSE;
+    if (!IsFileManagerUiTestSandboxRequested())
+        return TRUE;
+
+    char testDataRoot[MAX_PATH];
+    char requestedRoot[200];
+    DWORD length = GetEnvironmentVariableA("FILEMANAGER_UI_CONFIG_ROOT", requestedRoot, _countof(requestedRoot));
+    if (!GetFileManagerUiTestDataRoot(testDataRoot, _countof(testDataRoot)) ||
+        length == 0 || length >= _countof(requestedRoot) ||
+        _stricmp(requestedRoot, FileManagerUiTestConfigurationRoot) != 0)
+    {
+        // Refuse a malformed sandbox rather than letting a test launch read or write the user's real configuration.
+        TRACE_E("ConfigureFileManagerUiTestConfigurationStore(): invalid UI-test sandbox configuration.");
+        return FALSE;
+    }
+
+    SalamanderConfigurationRoots[0] = FileManagerUiTestConfigurationRoot;
+    FileManagerUiTestConfigurationStore = TRUE;
+    return TRUE;
+}
+
+BOOL IsFileManagerUiTestConfigurationStore()
+{
+    return FileManagerUiTestConfigurationStore;
+}
 static char ConfigurationSchemaDiagnostic[256] = {};
 
 static const char* GetConfigurationGenerationName(DWORD generation)
@@ -1250,6 +1280,12 @@ BOOL GetUpgradeInfo(BOOL* autoImportConfig, char* autoImportConfigFromKey, int a
     BOOL doNotExit = TRUE;
     if (autoImportConfigFromKeySize > 0)
         *autoImportConfigFromKey = 0;
+    if (IsFileManagerUiTestConfigurationStore())
+    {
+        // Test configuration must start clean and must never import an older user-profile configuration.
+        *autoImportConfig = FALSE;
+        return TRUE;
+    }
     LoadSaveToRegistryMutex.Enter();
     int rounds = 0; // prevent infinite loops
     *autoImportConfig = FALSE;
@@ -1436,7 +1472,7 @@ BOOL FindLanguageFromPrevVerOfSal(char* slgName)
             return found;
         }
         rootIndex++;
-    } while (rootIndex < SALCFG_ROOTS_COUNT);
+    } while (rootIndex < (IsFileManagerUiTestConfigurationStore() ? 1 : SALCFG_ROOTS_COUNT));
 
     LoadSaveToRegistryMutex.Leave();
     return FALSE;

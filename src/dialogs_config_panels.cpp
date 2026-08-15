@@ -51,12 +51,12 @@ CTipOfTheDayWindow::CTipOfTheDayWindow()
   lf.lfClipPrecision = CLIP_DEFAULT_PRECIS;
   lf.lfQuality = DEFAULT_QUALITY;
   lf.lfPitchAndFamily = VARIABLE_PITCH | FF_SWISS;
-  lstrcpy(lf.lfFaceName, "Times New Roman");
+  StringCchCopyA(lf.lfFaceName, _countof(lf.lfFaceName), "Times New Roman");
   HHeadingFont = HANDLES(CreateFontIndirect(&lf));
 
   lf.lfHeight = (int)(srcLF.lfHeight * 1.2);
   lf.lfWeight = FW_NORMAL;
-  lstrcpy(lf.lfFaceName, "Arial");
+  StringCchCopyA(lf.lfFaceName, _countof(lf.lfFaceName), "Arial");
   HBodyFont = HANDLES(CreateFontIndirect(&lf));
 
 }

@@ -21,7 +21,7 @@ powershell -NoProfile -ExecutionPolicy Bypass `
   -File .\runtests.ps1
 ```
 
-`runtests.ps1` collects all PowerShell/native probes, both x64 and x86 compatibility variants, the built 7-Zip wrapper/oracle corpus gate, the complete NUnit project, and the optional Application Verifier lane. It runs every collected check even after a failure and prints passed, failed, and explicitly skipped checks. The 7-Zip gate requires a `7z.exe`-compatible independent oracle; strict release runs fail if it is unavailable. It never manufactures `FILEMANAGER_UI_ISOLATED`: the complete UI project runs only when the caller has supplied a disposable profile and its filesystem topology; otherwise that project is explicitly skipped while independent checks continue.
+`runtests.ps1` collects all PowerShell/native probes, both x64 and x86 compatibility variants, the built 7-Zip wrapper/oracle corpus gate, the complete NUnit project, and the optional Application Verifier lane. It runs every collected check even after a failure and prints passed, failed, and explicitly skipped checks. The 7-Zip gate requires a `7z.exe`-compatible independent oracle; strict release runs fail if it is unavailable. The runner creates only the guarded `filemanager-testdata` directory and the suffixed current-user configuration key before executing the complete UI project.
 
 Each run removes its own GUID-named `TestResults\runtests-build-*` directory, including after a failure. Pass `-KeepBuildArtifacts` only when the isolated native build outputs are needed for diagnosis.
 
@@ -77,17 +77,18 @@ These directories contain generated package and CLI state and must not be commit
 
 ### Native UI tests
 
-UI tests intentionally skip unless they run in an interactive disposable Windows profile with a built executable:
+UI tests run against the interactive current user only after selecting the guarded test-data and registry boundaries:
 
 ```powershell
-$env:FILEMANAGER_UI_ISOLATED = '1'
+$env:FILEMANAGER_UI_TESTDATA_ROOT = "$env:USERPROFILE\filemanager-testdata"
+$env:FILEMANAGER_UI_CONFIG_ROOT = 'Software\Open Salamander\6.0-filemanager-testdata'
 $env:FILEMANAGER_UI_EXE = 'C:\path\to\salamand.exe'
 
 dotnet test .\tests\FileManager.UiTests\FileManager.UiTests.csproj `
   --filter 'TestCategory=UI'
 ```
 
-Never set `FILEMANAGER_UI_ISOLATED=1` in a normal developer profile. These tests persist configuration, launch an editor, perform native file operations, and expect the Windows profile to be disposable.
+The harness creates and removes only `filemanager-testdata` and its subfolders, and creates then removes only `HKCU\Software\Open Salamander\6.0-filemanager-testdata`. Recycle-bin tests inspect the current user's bin but never empty or remove it.
 
 Optional UI settings:
 
@@ -99,7 +100,7 @@ Optional UI settings:
 | `FILEMANAGER_UI_CONFIG_FAULT_INJECTION=1` | Exhaustive configuration-write crash recovery. |
 | `FILEMANAGER_UI_CROSS_VOLUME_ROOT` | Cross-volume move tests using only a GUID child below the supplied dedicated root. |
 | `FILEMANAGER_UI_ADS_UNSUPPORTED_TARGET_ROOT` | Metadata-loss behavior on a different FAT/FAT32/exFAT-like volume. |
-| `FILEMANAGER_UI_RECYCLE_BIN=1` | Recycle-bin deletion in an isolated profile using the default recycle-bin setting. |
+| `FILEMANAGER_UI_RECYCLE_BIN=1` | Recycle-bin deletion using the current user's default recycle-bin setting; the test never empties or removes the bin. |
 | `FILEMANAGER_UI_LEAK_CYCLES` | Lifecycle resource samples (5–200; default 20, nightly 100) for handles, GDI, USER, and private bytes. |
 
 Run a specialized lane by category after setting its required environment:
@@ -263,7 +264,7 @@ These tests do not drive the FileManager UI and can run in a normal developer pr
 
 ### Native UI and filesystem characterization tests
 
-All fixtures in this section require `FILEMANAGER_UI_ISOLATED=1`, `FILEMANAGER_UI_EXE`, and an interactive desktop unless a stricter requirement is stated.
+All fixtures in this section require the guarded `FILEMANAGER_UI_TESTDATA_ROOT`, `FILEMANAGER_UI_CONFIG_ROOT`, `FILEMANAGER_UI_EXE`, and an interactive desktop unless a stricter requirement is stated.
 
 #### `BasicUiTests` — risk-based lifecycle matrix
 

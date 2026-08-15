@@ -63,6 +63,6 @@ public sealed class OperationRecoveryCharacterizationUiTests : FileOperationUiTe
         }
     }
 
-    private static string GetJournalDirectory() => Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "Open Salamander", "operation-journals");
+    // The application redirects its roaming data into the same root that owns this recovery fixture.
+    private static string GetJournalDirectory() => UiTestSettings.JournalDirectory;
 }

@@ -2088,7 +2088,8 @@ BOOL ViewFileInPluginViewer(const char* pluginSPL,
         {
             // Keep the existing cache-key shape while folding the 64-bit uptime past the old tick-wrap boundary.
             const CMonotonicTimePoint timeSeed = CMonotonicClock::Now();
-            sprintf(viewUniqueName, "ViewFile %X", (DWORD)(timeSeed ^ (timeSeed >> 32)));
+            // The cache key has a fixed local buffer, so preserve its format with bounded output.
+            _snprintf_s(viewUniqueName, _countof(viewUniqueName), _TRUNCATE, "ViewFile %X", (DWORD)(timeSeed ^ (timeSeed >> 32)));
             BOOL exists;
             fileName = DiskCache.GetName(viewUniqueName, fileNameInCache, &exists, TRUE, rootTmpPath, FALSE, NULL, NULL);
             if (fileName == NULL) // error (if 'exists' is TRUE -> fatal, otherwise "file already exists")

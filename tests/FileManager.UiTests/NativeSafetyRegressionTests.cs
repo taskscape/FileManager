@@ -42,7 +42,8 @@ public sealed class NativeSafetyRegressionTests
             Assert.That(runner, Does.Contain("run-lock-verifier-stress.ps1"));
             Assert.That(runner, Does.Contain("FailOnSkipped"));
             Assert.That(runner, Does.Contain("@outcome='NotExecuted'"));
-            Assert.That(runner, Does.Contain("must run from a disposable Windows profile"));
+            // The runner must select explicit data and registry boundaries before driving the current user's desktop.
+            Assert.That(runner, Does.Contain("FILEMANAGER_UI_TESTDATA_ROOT"));
             Assert.That(runner, Does.Contain("$uiTestEnvironmentSkipReason = $_.Exception.Message"));
             // The release workflow must consume the root inventory rather than
             // maintaining a second list that can silently lose coverage.
@@ -1299,7 +1300,8 @@ public sealed class NativeSafetyRegressionTests
             Assert.That(policy, Does.Contain("ERROR_NETNAME_DELETED"));
             Assert.That(policy, Does.Contain("kAutomaticRetryLimit = 3"));
             Assert.That(policy, Does.Contain("GetAutomaticRetryDelay"));
-            Assert.That(policy, Does.Contain("GetTickCount()"));
+            // Retry jitter must use the non-wrapping clock that replaced the legacy tick sample.
+            Assert.That(policy, Does.Contain("CMonotonicClock::Now()"));
             Assert.That(policy, Does.Contain("WaitForSingleObject(cancellationEvent, delay)"));
             Assert.That(policy, Does.Contain("kind == rokDestructiveCommit"));
             Assert.That(result, Does.Contain("return IsTransientOperationError(error);"));
@@ -1934,7 +1936,8 @@ public sealed class NativeSafetyRegressionTests
             Assert.That(navigation, Does.Contain("#define DIRECTORY_ENUMERATION_MAX_CACHED_ITEMS 100000"));
             Assert.That(navigation, Does.Contain("IsDirectoryEnumerationBatchBoundary(NumberOfItemsInCurDir)"));
             Assert.That(navigation, Does.Contain("Sleep(0);"));
-            Assert.That(navigation, Does.Contain("atBatchBoundary || GetTickCount() - lastEscCheckTime >= 200"));
+            // Directory cancellation must retain the batch checkpoint while avoiding the 32-bit tick wrap.
+            Assert.That(navigation, Does.Contain("atBatchBoundary || CMonotonicClock::HasElapsed(lastEscCheckTime, 200"));
             Assert.That(navigation, Does.Contain("UserWantsToCancelSafeWaitWindow()"));
             Assert.That(navigation, Does.Contain("Files->Count + Dirs->Count >= DIRECTORY_ENUMERATION_MAX_CACHED_ITEMS - 1"));
             Assert.That(navigation, Does.Contain("directoryEnumerationLimitReached = TRUE"));
@@ -2135,7 +2138,8 @@ public sealed class NativeSafetyRegressionTests
             Assert.That(loader, Does.Contain("CSalamanderConnect::SetBitmapWithIcons(): invalid plug-in icon bitmap!"));
             Assert.That(loader, Does.Contain("bmp.bmHeight != 16"));
             Assert.That(pluginHeader, Does.Contain("hotTextsCount < 0 || hotTextsCount > 100"));
-            Assert.That(pluginHeader, Does.Contain("memchr(buffer, 0, 1000) == NULL"));
+            // The cached terminator pointer validates the fixed SDK output buffer without rescanning it.
+            Assert.That(pluginHeader, Does.Contain("textEnd == NULL"));
             Assert.That(pluginHeader, Does.Contain("hotTextLength > textLength - hotTextStart"));
             Assert.That(pluginHeader, Does.Contain("invalid plug-in output count, span, or unterminated text"));
             Assert.That(pluginHeader, Does.Contain("offset < 0 || offset > pathLen"));
@@ -2368,7 +2372,8 @@ public sealed class NativeSafetyRegressionTests
             Assert.That(copy, Does.Contain("RecordReleaseDiagnosticRetry(\"copy_network_read\")"));
             Assert.That(plugins, Does.Contain("RecordReleaseDiagnosticPluginIdentity(DLLName)"));
             Assert.That(bugReport, Does.Contain("PrintReleaseDiagnosticRingBuffer(PrintLine, param)"));
-            Assert.That(callStack, Does.Contain("lstrcpyn(extension, \".OPS\""));
+            // The bounded StringCch copy prevents the diagnostic sidecar suffix from overrunning its path.
+            Assert.That(callStack, Does.Contain("StringCchCopyA(extension"));
             Assert.That(callStack, Does.Contain("ExportReleaseDiagnosticRingBuffer(diagnosticPath)"));
             Assert.That(project, Does.Contain("..\\release_diagnostics.cpp"));
             Assert.That(project, Does.Contain("..\\release_diagnostics.h"));

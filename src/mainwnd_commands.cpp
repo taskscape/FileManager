@@ -817,7 +817,8 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
 
             // Keep the existing cache-key shape while folding the 64-bit uptime past the old tick-wrap boundary.
             const CMonotonicTimePoint timeSeed = CMonotonicClock::Now();
-            sprintf(batUniqueName, "Usermenu %X", (DWORD)(timeSeed ^ (timeSeed >> 32)));
+            // The cache key has a fixed local buffer, so preserve its format with bounded output.
+            _snprintf_s(batUniqueName, _countof(batUniqueName), _TRUNCATE, "Usermenu %X", (DWORD)(timeSeed ^ (timeSeed >> 32)));
             if (buildBat)
             {
                 BOOL exists;

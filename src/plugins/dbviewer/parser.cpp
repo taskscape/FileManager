@@ -302,10 +302,17 @@ BOOL CParserInterfaceDBF::GetFileInfo(HWND hEdit)
         FileTimeToSystemTime(&ft, &st);
 
         if (!FormatDBViewerDateTimeAnsi(&st, DATE_LONGDATE, buff2, ARRAYSIZE(buff2), TRUE))
-            sprintf(buff2, "%u.%u.%u", st.wDay, st.wMonth, st.wYear);
+        {
+            // A locale fallback must remain bounded before the time suffix is appended.
+            _snprintf_s(buff2, ARRAYSIZE(buff2), _TRUNCATE, "%u.%u.%u", st.wDay, st.wMonth, st.wYear);
+        }
         strcat(buff2, ", ");
         if (!FormatDBViewerDateTimeAnsi(&st, LOCALE_NOUSEROVERRIDE, buff2 + strlen(buff2), (int)(ARRAYSIZE(buff2) - strlen(buff2)), FALSE))
-            sprintf(buff2 + strlen(buff2), "%u:%02u:%02u", st.wHour, st.wMinute, st.wSecond);
+        {
+            size_t used = strlen(buff2);
+            if (used < ARRAYSIZE(buff2))
+                _snprintf_s(buff2 + used, ARRAYSIZE(buff2) - used, _TRUNCATE, "%u:%02u:%02u", st.wHour, st.wMinute, st.wSecond);
+        }
         sprintf(buff, "%s:\t%s\r\n", LoadStr(IDS_FINFO_MODIFIED), buff2);
         SendMessage(hEdit, EM_REPLACESEL, FALSE, (LPARAM)buff);
 
@@ -1020,10 +1027,17 @@ BOOL CParserInterfaceCSV::GetFileInfo(HWND hEdit)
         FileTimeToSystemTime(&ft, &st);
 
         if (!FormatDBViewerDateTimeAnsi(&st, DATE_LONGDATE, buff2, ARRAYSIZE(buff2), TRUE))
-            sprintf(buff2, "%u.%u.%u", st.wDay, st.wMonth, st.wYear);
+        {
+            // Keep the second viewer path under the same bounded fallback contract.
+            _snprintf_s(buff2, ARRAYSIZE(buff2), _TRUNCATE, "%u.%u.%u", st.wDay, st.wMonth, st.wYear);
+        }
         strcat(buff2, ", ");
         if (!FormatDBViewerDateTimeAnsi(&st, LOCALE_NOUSEROVERRIDE, buff2 + strlen(buff2), (int)(ARRAYSIZE(buff2) - strlen(buff2)), FALSE))
-            sprintf(buff2 + strlen(buff2), "%u:%02u:%02u", st.wHour, st.wMinute, st.wSecond);
+        {
+            size_t used = strlen(buff2);
+            if (used < ARRAYSIZE(buff2))
+                _snprintf_s(buff2 + used, ARRAYSIZE(buff2) - used, _TRUNCATE, "%u:%02u:%02u", st.wHour, st.wMinute, st.wSecond);
+        }
         sprintf(buff, "%s:\t%s\r\n", LoadStr(IDS_FINFO_MODIFIED), buff2);
         SendMessage(hEdit, EM_REPLACESEL, FALSE, (LPARAM)buff);
 
