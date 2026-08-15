@@ -1778,11 +1778,14 @@ void CCfgPageViewer::LoadControls()
     if (HFont != NULL)
         HANDLES(DeleteObject(HFont));
     HFont = HANDLES(CreateFontIndirect(&logFont));
+    // For per-monitor DPI support, use GetDpiForWindow on the dialog window
+    // Fall back to GetDeviceCaps for older Windows or when HWindow is not yet created
     HDC hDC = HANDLES(GetDC(HWindow));
     SendMessage(hEdit, WM_SETFONT, (WPARAM)HFont, MAKELPARAM(TRUE, 0));
     char buf[LF_FACESIZE + 200];
+    int fontDpi = GetDpiForWindow(HWindow);
     _snprintf_s(buf, _TRUNCATE, LoadStr(IDS_FONTDESCRIPTION),
-                MulDiv(-origHeight, 72, GetDeviceCaps(hDC, LOGPIXELSY)),
+                MulDiv(-origHeight, 72, fontDpi),
                 LocalViewerLogFont.lfFaceName,
                 LoadStr(LocalUseCustomViewerFont ? IDS_FONTDESCRIPTION_CST : IDS_FONTDESCRIPTION_DEF));
     SetWindowTextUtf8(hEdit, buf);

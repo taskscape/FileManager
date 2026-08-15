@@ -18,6 +18,7 @@
 #include <windows.h>
 #include <tchar.h>
 #include <shlobj.h>
+#include <shobjidl.h> // IFileOpenDialog, IFileDialog, IShellItem
 #include <dbt.h>
 #include <crtdbg.h>
 #include <winioctl.h>

@@ -727,7 +727,7 @@ CPluginInterfaceForMenuExt::HelpForMenuItem(HWND parent, int id)
     return helpID != 0;
 }
 
-char* PrintDiskSize(char* buf, CQuadWord size)
+char* PrintDiskSize(char* buf, size_t bufSize, CQuadWord size)
 {
     CALL_STACK_MESSAGE2("PrintDiskSize(, %g)", size.GetDouble());
     buf[0] = 0;
@@ -738,8 +738,10 @@ char* PrintDiskSize(char* buf, CQuadWord size)
     if (size.GetDouble() >= 1023.5)
     {
         char num2[100];
-        // The formatted size label is terminated before its optional display suffix is appended.
-        sprintf(buf + strlen(buf), " (%s)", SalamanderGeneral->PrintDiskSize(num2, size, 0));
+        // The caller supplies the capacity so the optional display suffix cannot overrun the dialog buffer.
+        size_t used = strlen(buf);
+        if (used < bufSize)
+            _snprintf_s(buf + used, bufSize - used, _TRUNCATE, " (%s)", SalamanderGeneral->PrintDiskSize(num2, size, 0));
     }
     return buf;
 }
@@ -759,9 +761,9 @@ INT_PTR WINAPI OptimizeDlgProc(HWND hDlg, UINT uMsg, WPARAM wParam, LPARAM lPara
             SendMessage(hDlg, DM_SETDEFID, IDCANCEL, 0);
         }
         char buf[100];
-        SetDlgItemText(hDlg, IDC_VALIDSIZE, PrintDiskSize(buf, CQuadWord(((COptDlgData*)lParam)->ValData, 0)));
-        SetDlgItemText(hDlg, IDC_TOTALSIZE, PrintDiskSize(buf, CQuadWord(((COptDlgData*)lParam)->PakSize, 0)));
-        SetDlgItemText(hDlg, IDC_WASTEDSPACE, PrintDiskSize(buf, CQuadWord(((COptDlgData*)lParam)->PakSize - ((COptDlgData*)lParam)->ValData, 0)));
+        SetDlgItemText(hDlg, IDC_VALIDSIZE, PrintDiskSize(buf, _countof(buf), CQuadWord(((COptDlgData*)lParam)->ValData, 0)));
+        SetDlgItemText(hDlg, IDC_TOTALSIZE, PrintDiskSize(buf, _countof(buf), CQuadWord(((COptDlgData*)lParam)->PakSize, 0)));
+        SetDlgItemText(hDlg, IDC_WASTEDSPACE, PrintDiskSize(buf, _countof(buf), CQuadWord(((COptDlgData*)lParam)->PakSize - ((COptDlgData*)lParam)->ValData, 0)));
 
         HWND hParent = GetParent(hDlg);
         if (hParent != NULL)

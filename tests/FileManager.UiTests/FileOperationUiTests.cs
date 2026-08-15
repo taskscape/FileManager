@@ -461,7 +461,7 @@ public sealed class FileOperationUiTests : FileOperationUiTestBase
 
         WaitForFileSystem(() => !File.Exists(source), "Recycle-bin delete did not remove the source file.");
         WaitForFileSystem(() => ShellRecycleBin.GetItemCount(volumeRoot) > itemCountBefore,
-                          "Delete did not create a recycle-bin item. Ensure the isolated profile uses the default recycle-bin setting.");
+                          "Delete did not create a recycle-bin item. Ensure the current user uses the default recycle-bin setting.");
     }
 
     [Test]
@@ -561,8 +561,8 @@ public sealed class FileOperationUiTests : FileOperationUiTestBase
 
     private static string? FindJournalFor(string source)
     {
-        var directory = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-                                     "Open Salamander", "operation-journals");
+        // Durable-operation evidence is redirected to the guarded test-data root with the application itself.
+        var directory = UiTestSettings.JournalDirectory;
         if (!Directory.Exists(directory))
             return null;
 

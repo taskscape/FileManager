@@ -1,4 +1,6 @@
 using System.Diagnostics;
+using System.Runtime.InteropServices;
+using Microsoft.Win32;
 using FlaUI.Core;
 using FlaUI.Core.AutomationElements;
 using FlaUI.UIA3;
@@ -10,6 +12,7 @@ namespace FileManager.UiTests.Infrastructure;
 public abstract class FileManagerUiTestBase
 {
     private readonly List<Application> launchedApplications = [];
+    private readonly HashSet<int> launchedCrashReporterIds = [];
 
     protected UIA3Automation Automation { get; private set; } = null!;
     protected Application Application { get; private set; } = null!;
@@ -20,7 +23,8 @@ public abstract class FileManagerUiTestBase
     [SetUp]
     public void StartFileManager()
     {
-        UiTestSettings.RequireIsolatedProfile();
+        UiTestSettings.RequireTestSandbox();
+        UiTestSandbox.EnsureInitialized();
         Automation = new UIA3Automation();
         BeforeFileManagerStarted();
         StartApplication();
@@ -32,14 +36,38 @@ public abstract class FileManagerUiTestBase
         // Killing only processes launched by this fixture prevents a failed UI test from leaking instances.
         foreach (var application in launchedApplications)
         {
-            if (!application.HasExited)
-                application.Kill();
+            try
+            {
+                if (!application.HasExited)
+                    application.Kill();
+                // The native single-instance gate can otherwise hand the next test's launch to a process still shutting down.
+                WaitForApplicationExit(application);
+            }
+            catch (InvalidOperationException)
+            {
+                // A failed launch can detach FlaUI's Process object; it is already unavailable to this fixture.
+            }
             application.Dispose();
         }
 
+        foreach (var crashReporterId in launchedCrashReporterIds)
+        {
+            try
+            {
+                using var crashReporter = Process.GetProcessById(crashReporterId);
+                if (!crashReporter.HasExited)
+                    crashReporter.Kill();
+            }
+            catch (ArgumentException)
+            {
+                // The reporter already stopped with its FileManager parent.
+            }
+        }
+        launchedCrashReporterIds.Clear();
+
         OnAfterFileManagerStopped();
 
-        // Setup can intentionally skip before UIA3 is created when the isolated profile opt-in is absent.
+        // Setup can intentionally skip before UIA3 is created when the test sandbox is not configured.
         if (Automation is not null)
             Automation.Dispose();
     }
@@ -48,7 +76,11 @@ public abstract class FileManagerUiTestBase
     {
         // Restart coverage verifies that the application remains launchable after a committed configuration dialog.
         if (!Application.HasExited)
+        {
             Application.Kill();
+            // Do not let the next launch race the process-wide single-instance mutex.
+            WaitForApplicationExit(Application);
+        }
 
         StartApplication(environment);
     }
@@ -56,16 +88,14 @@ public abstract class FileManagerUiTestBase
     protected Window OpenConfigurationDialog()
     {
         NativeCommands.OpenConfiguration(MainWindow.Properties.NativeWindowHandle.Value);
-        return WaitForWindow(window => window.Properties.NativeWindowHandle.Value != MainWindow.Properties.NativeWindowHandle.Value);
+        // The localized configuration page keeps the stable property-sheet caption in the English test language.
+        return WaitForWindow(window => string.Equals(window.Title, "Configuration", StringComparison.Ordinal));
     }
 
     protected void CloseConfigurationDialog(Window dialog, bool commit)
     {
-        // Standard Win32 property sheets expose IDOK as automation ID 1 and IDCANCEL as automation ID 2.
-        var buttonId = commit ? "1" : "2";
-        var button = dialog.FindFirstDescendant(cf => cf.ByAutomationId(buttonId))?.AsButton();
-        Assert.That(button, Is.Not.Null, $"Configuration dialog did not expose button {buttonId}.");
-        button!.Invoke();
+        // Standard Win32 property sheets retain IDOK/IDCANCEL even when their buttons are absent from the legacy UIA tree.
+        NativeCommands.CloseStandardDialog(dialog.Properties.NativeWindowHandle.Value, commit);
         WaitForWindowToClose(dialog);
     }
 
@@ -73,9 +103,7 @@ public abstract class FileManagerUiTestBase
     {
         // Fault injection terminates the process during the deferred native save, so waiting for
         // the dialog's normal close is not meaningful.  The caller waits for the process instead.
-        var button = dialog.FindFirstDescendant(cf => cf.ByAutomationId("1"))?.AsButton();
-        Assert.That(button, Is.Not.Null, "Configuration dialog did not expose its OK button.");
-        button!.Invoke();
+        NativeCommands.CloseStandardDialog(dialog.Properties.NativeWindowHandle.Value, commit: true);
     }
 
     protected int WaitForFileManagerExit(TimeSpan timeout)
@@ -95,30 +123,33 @@ public abstract class FileManagerUiTestBase
 
     protected bool ToggleFirstConfigurationCheckBox(Window dialog)
     {
-        // Toggling a visible option gives the persistence test a real user commit without relying on translated labels.
-        var checkBox = dialog.FindAllDescendants()
-            .FirstOrDefault(element => element.ControlType == FlaUI.Core.Definitions.ControlType.CheckBox)
-            ?.AsCheckBox();
-        Assert.That(checkBox, Is.Not.Null, "Configuration dialog did not expose a check box through UI Automation.");
-
-        var originalState = checkBox!.IsChecked;
-        // A three-state check box would not have a deterministic inverse for this basic persistence assertion.
-        Assert.That(originalState, Is.Not.Null, "Configuration persistence test requires a two-state check box.");
-        checkBox.Toggle();
-        return originalState!.Value;
+        // This legacy property sheet omits checkbox UIA patterns, so use its stable General-page control ID for the persistence mutation.
+        return NativeCommands.ToggleConfigurationClearReadOnlyCheckBox(dialog.Properties.NativeWindowHandle.Value);
     }
 
     protected bool IsFirstConfigurationCheckBoxChecked(Window dialog)
     {
-        // The same visible control is inspected after relaunch to prove the committed value was read from persisted settings.
-        var checkBox = dialog.FindAllDescendants()
-            .FirstOrDefault(element => element.ControlType == FlaUI.Core.Definitions.ControlType.CheckBox)
-            ?.AsCheckBox();
-        Assert.That(checkBox, Is.Not.Null, "Configuration dialog did not expose a check box through UI Automation.");
-        var currentState = checkBox!.IsChecked;
-        // Match the toggle helper so both sides of the restart assertion use a two-state value.
-        Assert.That(currentState, Is.Not.Null, "Configuration persistence test requires a two-state check box.");
-        return currentState!.Value;
+        // Read the same native control used for the mutation to prove the committed value was reloaded after restart.
+        return NativeCommands.IsConfigurationClearReadOnlyCheckBoxChecked(dialog.Properties.NativeWindowHandle.Value);
+    }
+
+    protected void WaitForConfigurationClearReadOnlyPersistence(bool expectedValue)
+    {
+        var timeout = DateTime.UtcNow + TimeSpan.FromSeconds(10);
+        while (DateTime.UtcNow < timeout)
+        {
+            using var root = Registry.CurrentUser.OpenSubKey(UiTestSettings.ConfigurationRegistryRoot);
+            if (root?.GetValue("Active Generation") is int generation && generation is >= 0 and <= 1)
+            {
+                using var configuration = root.OpenSubKey($"Configuration Generations\\Generation {generation}\\Configuration");
+                if (configuration?.GetValue("Clear Readonly Attribute") is int value && (value != 0) == expectedValue)
+                    return;
+            }
+
+            Thread.Sleep(50);
+        }
+
+        Assert.Fail("The accepted Configuration dialog did not commit its isolated registry generation before restart.");
     }
 
     protected Window OpenFtpBookmarksDialog()
@@ -208,10 +239,16 @@ public abstract class FileManagerUiTestBase
 
     private void StartApplication(IReadOnlyDictionary<string, string>? environment = null)
     {
+        var reportersBeforeLaunch = GetTestCrashReporterIds();
         var startInfo = new ProcessStartInfo(UiTestSettings.ExecutablePath, ApplicationArguments)
         {
             UseShellExecute = false,
         };
+        // Every child process receives the same data and configuration boundaries as the test host.
+        startInfo.Environment["FILEMANAGER_UI_TESTDATA_ROOT"] = UiTestSettings.TestDataRoot;
+        startInfo.Environment["FILEMANAGER_UI_CONFIG_ROOT"] = UiTestSettings.ConfigurationRegistryRoot;
+        startInfo.Environment["TEMP"] = Path.Combine(UiTestSettings.TestDataRoot, "temp");
+        startInfo.Environment["TMP"] = Path.Combine(UiTestSettings.TestDataRoot, "temp");
         if (environment is not null)
         {
             foreach (var (name, value) in environment)
@@ -220,9 +257,78 @@ public abstract class FileManagerUiTestBase
 
         Application = FlaUI.Core.Application.Launch(startInfo);
         launchedApplications.Add(Application);
-        Application.WaitWhileMainHandleIsMissing(TimeSpan.FromSeconds(20));
-        MainWindow = Application.GetMainWindow(Automation) ??
-                     throw new AssertionException("FileManager did not expose a UI Automation main window.");
+        MainWindow = WaitForNativeMainWindow();
+        // A Debug FileManager starts salmon.exe beside itself; track only new sibling reporters for fixture teardown.
+        launchedCrashReporterIds.UnionWith(GetTestCrashReporterIds().Except(reportersBeforeLaunch));
+    }
+
+    private static HashSet<int> GetTestCrashReporterIds()
+    {
+        var directory = Path.GetDirectoryName(UiTestSettings.ExecutablePath);
+        if (string.IsNullOrWhiteSpace(directory))
+            return [];
+        var expectedPath = Path.Combine(directory, "salmon.exe");
+        var reporterIds = new HashSet<int>();
+        foreach (var process in Process.GetProcessesByName("salmon"))
+        {
+            try
+            {
+                if (string.Equals(process.MainModule?.FileName, expectedPath, StringComparison.OrdinalIgnoreCase))
+                    reporterIds.Add(process.Id);
+            }
+            catch (InvalidOperationException)
+            {
+                // A reporter that exited during enumeration cannot be owned by the active fixture anymore.
+            }
+            finally
+            {
+                process.Dispose();
+            }
+        }
+        return reporterIds;
+    }
+
+    private Window WaitForNativeMainWindow()
+    {
+        var timeout = DateTime.UtcNow + TimeSpan.FromSeconds(20);
+        while (DateTime.UtcNow < timeout)
+        {
+            // UIA's application view can omit a modal Win32 error window, so acknowledge the known open-source plug-in notice natively.
+            NativeCommands.DismissKnownStartupErrorDialogs(Application.ProcessId);
+            var windows = Application.GetAllTopLevelWindows(Automation);
+            Window? languageDialog = null;
+            foreach (var window in windows)
+            {
+                try
+                {
+                    if (string.Equals(window.Properties.ClassName.ValueOrDefault, "SalamanderMainWindowVer25", StringComparison.Ordinal))
+                    {
+                        // Do not return while startup still owns a modal child; every caller expects an interactive main window.
+                        if (window.IsEnabled)
+                            return window;
+                        continue;
+                    }
+
+                    if (string.Equals(window.Properties.ClassName.ValueOrDefault, "#32770", StringComparison.Ordinal) &&
+                        string.Equals(window.Title, "Open Salamander", StringComparison.Ordinal))
+                        languageDialog = window;
+
+                }
+                catch (COMException)
+                {
+                    // Restart/fault-injection tests can enumerate a window after its UIA provider has gone stale.
+                }
+            }
+            if (languageDialog is not null)
+            {
+                // A fresh test registry deliberately prompts for its bundled default language before creating the versioned main window.
+                NativeCommands.AcceptStartupLanguage(languageDialog.Properties.NativeWindowHandle.Value);
+            }
+
+            Thread.Sleep(100);
+        }
+
+        throw new AssertionException("FileManager did not expose its SalamanderMainWindowVer25 UI Automation main window.");
     }
 
     protected Window WaitForWindow(Func<Window, bool> predicate)
@@ -230,7 +336,10 @@ public abstract class FileManagerUiTestBase
         var timeout = DateTime.UtcNow + TimeSpan.FromSeconds(10);
         while (DateTime.UtcNow < timeout)
         {
-            var dialog = Application.GetAllTopLevelWindows(Automation).FirstOrDefault(predicate);
+            // Convert native top-level handles back into UIA elements so legacy property sheets remain testable.
+            var dialog = NativeCommands.GetTopLevelWindows(Application.ProcessId)
+                .Select(windowHandle => Automation.FromHandle(windowHandle).AsWindow())
+                .FirstOrDefault(predicate);
             if (dialog is not null)
                 return dialog;
 
@@ -243,15 +352,39 @@ public abstract class FileManagerUiTestBase
 
     protected static void WaitForWindowToClose(Window dialog)
     {
+        // Capture the native handle before closing because legacy UIA providers can time out while reading stale properties.
+        nint dialogHandle;
+        try
+        {
+            dialogHandle = dialog.Properties.NativeWindowHandle.Value;
+        }
+        catch (COMException)
+        {
+            // A viewer can destroy its UIA provider before Close returns; its unavailable handle is already closed.
+            return;
+        }
         var timeout = DateTime.UtcNow + TimeSpan.FromSeconds(10);
         while (DateTime.UtcNow < timeout)
         {
-            if (!dialog.IsAvailable)
+            if (!NativeCommands.WindowExists(dialogHandle))
                 return;
 
             Thread.Sleep(100);
         }
 
         Assert.Fail("Timed out waiting for the configuration dialog to close.");
+    }
+
+    private static void WaitForApplicationExit(Application application)
+    {
+        try
+        {
+            using var process = Process.GetProcessById(application.ProcessId);
+            process.WaitForExit(10_000);
+        }
+        catch (ArgumentException)
+        {
+            // A process that has already exited has released the single-instance gate needed by the next test.
+        }
     }
 }

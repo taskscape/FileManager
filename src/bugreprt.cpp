@@ -427,8 +427,9 @@ BOOL PrintSystemVersion(FPrintLine PrintLine, void* param, char* buf, char* avbu
     ZeroMemory(&osvi, sizeof(OSVERSIONINFOEX));
     // The VerifyVersionInfo-based helper remains diagnostic-only and avoids the deprecated version-query API.
     SalGetVersionEx(&osvi, FALSE);
-    sprintf(buf, "Compatibility version probe %u.%u (Build %u)", osvi.dwMajorVersion,
-            osvi.dwMinorVersion, osvi.dwBuildNumber & 0xFFFF);
+    // Keep version diagnostics bounded before appending the remaining system fields.
+    _snprintf_s(buf, BUFSIZE, _TRUNCATE, "Compatibility version probe %u.%u (Build %u)", osvi.dwMajorVersion,
+                osvi.dwMinorVersion, osvi.dwBuildNumber & 0xFFFF);
     sprintf(buf + strlen(buf), " SP %u.%u, SMask %u, PType %u, PlatId %u", osvi.wServicePackMajor,
             osvi.wServicePackMinor, osvi.wSuiteMask, osvi.wProductType, osvi.dwPlatformId);
     PrintLine(param, buf, TRUE);
@@ -1528,34 +1529,43 @@ void CCallStack::PrintBugReport(EXCEPTION_POINTERS* Exception, DWORD ThreadID, D
                     sprintf(buf, "FSPath = %s:", panel->GetPluginFS()->GetPluginFSName());
                     __try
                     {
+                        size_t bufLen = strlen(buf);
                         if (!panel->GetPluginFS()->NotEmpty() ||
-                            !panel->GetPluginFS()->GetCurrentPath(buf + lstrlen(buf)))
+                            !panel->GetPluginFS()->GetCurrentPath(buf + bufLen))
                         {
-                            lstrcat(buf, !panel->GetPluginFS()->NotEmpty() ? "(empty)" : "(error)");
+                            StringCchCatA(buf, _countof(buf), !panel->GetPluginFS()->NotEmpty() ? "(empty)" : "(error)");
                         }
                     }
                     __except (EXCEPTION_EXECUTE_HANDLER)
                     {
-                        lstrcat(buf, "(exception)");
+                        StringCchCatA(buf, _countof(buf), "(exception)");
                     }
                     PrintLine(param, buf, TRUE);
-                    sprintf(buf, "Plugin DLL is ");
+                    // Start with a bounded prefix because plug-in metadata is appended from an extension boundary.
+                    StringCchCopyA(buf, _countof(buf), "Plugin DLL is ");
                     __try
                     {
                         if (panel->GetPluginFS()->NotEmpty())
                         {
                             CPluginData* data = Plugins.GetPluginData(panel->GetPluginFS()->GetPluginInterfaceForFS()->GetInterface());
                             if (data != NULL)
-                                sprintf(buf + lstrlen(buf), "%s v. %s", data->DLLName, data->Version);
+                            {
+                                size_t bufLen = strlen(buf);
+                                _snprintf_s(buf + bufLen, _countof(buf) - bufLen, _TRUNCATE, "%s v. %s", data->DLLName, data->Version);
+                            }
                             else
-                                lstrcat(buf, "(error)");
+                            {
+                                StringCchCatA(buf, _countof(buf), "(error)");
+                            }
                         }
                         else
-                            lstrcat(buf, "(empty)");
+                        {
+                            StringCchCatA(buf, _countof(buf), "(empty)");
+                        }
                     }
                     __except (EXCEPTION_EXECUTE_HANDLER)
                     {
-                        lstrcat(buf, "(exception)");
+                        StringCchCatA(buf, _countof(buf), "(exception)");
                     }
                     PrintLine(param, buf, TRUE);
                     sprintf(buf, "Dirs = %d", panel->Dirs != NULL ? panel->Dirs->Count : -1);
@@ -1614,11 +1624,13 @@ void CCallStack::PrintBugReport(EXCEPTION_POINTERS* Exception, DWORD ThreadID, D
                         static char modulePath[MAX_PATH];
                         if (module.dwSize == sizeof(module))
                         {
-                            lstrcpy(modulePath, module.szExePath);
+                            StringCchCopyA(modulePath, _countof(modulePath), module.szExePath);
                         }
                         else
-                            lstrcpy(modulePath, "(unknown)");
-                        lstrcpy(nameBuf, module.szModule);
+                        {
+                            StringCchCopyA(modulePath, _countof(modulePath), "(unknown)");
+                        }
+                        StringCchCopyA(nameBuf, _countof(nameBuf), module.szModule);
                         static char ver[100];
                         GetModuleVersion((HINSTANCE)module.modBaseAddr, ver, 100);
                         sprintf(buf, "0x%p (size: 0x%X) (ver: %s): %s (%s)", module.modBaseAddr, module.modBaseSize, ver,
@@ -1659,7 +1671,8 @@ void CCallStack::PrintBugReport(EXCEPTION_POINTERS* Exception, DWORD ThreadID, D
             {
                 if (GlobalModulesStore[i] != NULL)
                 {
-                    sprintf(buf, "(%llu ms) %s", (unsigned long long)(GlobalModulesListTimeStore[i] - SalamanderStartTime), GlobalModulesStore[i]);
+                    // Module names originate outside the process, so truncate the diagnostic line instead of overflowing it.
+                    _snprintf_s(buf, _countof(buf), _TRUNCATE, "(%llu ms) %s", (unsigned long long)(GlobalModulesListTimeStore[i] - SalamanderStartTime), GlobalModulesStore[i]);
                     PrintLine(param, buf, TRUE);
                     unloadedModuleExist = TRUE;
                 }
@@ -1715,21 +1728,22 @@ void CCallStack::PrintBugReport(EXCEPTION_POINTERS* Exception, DWORD ThreadID, D
                 st.wDay, st.wMonth, st.wYear, st.wHour, st.wMinute, st.wSecond);
         PrintLine(param, buf, FALSE);
         ULONGLONG ti = SalamanderExceptionTime - SalamanderStartTime;
-        sprintf(buf, "Salamander Started Before: %llu:%02llu:%02llu:%02llu.%03llu",
-                (unsigned long long)(ti / (24ull * 60 * 60 * 1000)),
-                (unsigned long long)((ti / (60ull * 60 * 1000)) % 24),
-                (unsigned long long)((ti / (60ull * 1000)) % 60),
-                (unsigned long long)((ti / 1000) % 60), (unsigned long long)(ti % 1000));
+        // The uptime report is diagnostic-only, so preserve its format while bounding the report buffer.
+        _snprintf_s(buf, _countof(buf), _TRUNCATE, "Salamander Started Before: %llu:%02llu:%02llu:%02llu.%03llu",
+                    (unsigned long long)(ti / (24ull * 60 * 60 * 1000)),
+                    (unsigned long long)((ti / (60ull * 60 * 1000)) % 24),
+                    (unsigned long long)((ti / (60ull * 1000)) % 60),
+                    (unsigned long long)((ti / 1000) % 60), (unsigned long long)(ti % 1000));
         PrintLine(param, buf, FALSE);
         // System uptime is diagnostic-only, so retain all 64 bits instead of wrapping its displayed duration.
         const ULONGLONG systemUptime = GetTickCount64();
-        sprintf(buf, "System Started Before: %llu:%02llu:%02llu:%02llu",
-                systemUptime / (24ULL * 60 * 60 * 1000), (systemUptime / (60ULL * 60 * 1000)) % 24,
-                (systemUptime / (60ULL * 1000)) % 60, (systemUptime / 1000) % 60);
+        _snprintf_s(buf, _countof(buf), _TRUNCATE, "System Started Before: %llu:%02llu:%02llu:%02llu",
+                    systemUptime / (24ULL * 60 * 60 * 1000), (systemUptime / (60ULL * 60 * 1000)) % 24,
+                    (systemUptime / (60ULL * 1000)) % 60, (systemUptime / 1000) % 60);
         PrintLine(param, buf, FALSE);
         PrintLine(param, "", FALSE);
 
-        lstrcpy(buf, "Module Name: ");
+        StringCchCopyA(buf, _countof(buf), "Module Name: ");
         GetModuleFileName(HInstance, buf + strlen(buf), 1000);
         PrintLine(param, buf, FALSE);
 
@@ -1740,21 +1754,21 @@ void CCallStack::PrintBugReport(EXCEPTION_POINTERS* Exception, DWORD ThreadID, D
         sprintf(buf, "Built: %s", __DATE__ ", " __TIME__);
         PrintLine(param, buf, FALSE);
 
-        lstrcpy(buf, "Country: ");
+        StringCchCopyA(buf, _countof(buf), "Country: ");
         GetUserLocaleInfoUtf8(LOCALE_ICOUNTRY, buf + strlen(buf), 100);
-        lstrcat(buf, " (");
+        StringCchCatA(buf, _countof(buf), " (");
         GetUserLocaleInfoUtf8(LOCALE_SENGCOUNTRY, buf + strlen(buf), 100);
-        lstrcat(buf, ")");
+        StringCchCatA(buf, _countof(buf), ")");
         PrintLine(param, buf, FALSE);
 
-        lstrcpy(buf, "Language: ");
+        StringCchCopyA(buf, _countof(buf), "Language: ");
         GetUserLocaleInfoUtf8(LOCALE_ILANGUAGE, buf + strlen(buf), 100);
-        lstrcat(buf, " (");
+        StringCchCatA(buf, _countof(buf), " (");
         GetUserLocaleInfoUtf8(LOCALE_SENGLANGUAGE, buf + strlen(buf), 100);
-        lstrcat(buf, ")");
+        StringCchCatA(buf, _countof(buf), ")");
         PrintLine(param, buf, FALSE);
 
-        lstrcpy(buf, "Code Page: ");
+        StringCchCopyA(buf, _countof(buf), "Code Page: ");
         GetUserLocaleInfoUtf8(LOCALE_IDEFAULTANSICODEPAGE, buf + strlen(buf), 100);
         PrintLine(param, buf, FALSE);
 
@@ -1851,7 +1865,7 @@ void CCallStack::PrintBugReport(EXCEPTION_POINTERS* Exception, DWORD ThreadID, D
             static char buffer[LS_BUFSIZE];
             buffer[0] = 0;
 
-            lstrcpy(buf, "LiteStep");
+            StringCchCopyA(buf, _countof(buf), "LiteStep");
 
             int msgflags = 0;
             msgflags |= (LS_BUFSIZE << 4);
@@ -1864,14 +1878,14 @@ void CCallStack::PrintBugReport(EXCEPTION_POINTERS* Exception, DWORD ThreadID, D
                 while (*p != 0 && *p != '\n')
                     p++;
                 *p = 0;
-                lstrcat(buf, " ");
-                lstrcat(buf, buffer);
+                StringCchCatA(buf, _countof(buf), " ");
+                StringCchCatA(buf, _countof(buf), buffer);
                 // Do whatever
             }
             else
             {
                 // it failed - at least report it is running
-                lstrcat(buf, " is present");
+                StringCchCatA(buf, _countof(buf), " is present");
             }
             PrintLine(param, buf, TRUE);
         }
@@ -2680,11 +2694,13 @@ void AddNewlyLoadedModulesToGlobalModulesStore()
                         char modulePath[MAX_PATH];
                         if (module.dwSize == sizeof(module))
                         {
-                            lstrcpy(modulePath, module.szExePath);
+                            StringCchCopyA(modulePath, _countof(modulePath), module.szExePath);
                         }
                         else
-                            lstrcpy(modulePath, "(unknown)");
-                        lstrcpy(moduleName, module.szModule);
+                        {
+                            StringCchCopyA(modulePath, _countof(modulePath), "(unknown)");
+                        }
+                        StringCchCopyA(moduleName, _countof(moduleName), module.szModule);
                         char ver[100];
                         GetModuleVersion((HINSTANCE)module.modBaseAddr, ver, 100);
                         sprintf(buf, "0x%p (size: 0x%X) (ver: %s): %s (%s)", module.modBaseAddr, module.modBaseSize, ver,

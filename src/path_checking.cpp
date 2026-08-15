@@ -2080,9 +2080,19 @@ BOOL GetOurPathInRoamingAPPDATA(char* buf, int bufSize)
     }
 
     char appDataPath[MAX_PATH];
-    // Use Known Folders so application data resolution remains on the supported shell API.
-    if (!GetKnownFolderPathToAnsi(FOLDERID_RoamingAppData, appDataPath, _countof(appDataPath)))
-        return FALSE;
+    if (IsFileManagerUiTestSandboxRequested())
+    {
+        // A test launch must never fall back to the user's AppData tree when its disposable root is malformed.
+        if (!GetFileManagerUiTestDataRoot(appDataPath, _countof(appDataPath)) ||
+            !SalPathAppend(appDataPath, "appdata", _countof(appDataPath)))
+            return FALSE;
+    }
+    else
+    {
+        // Use Known Folders so application data resolution remains on the supported shell API.
+        if (!GetKnownFolderPathToAnsi(FOLDERID_RoamingAppData, appDataPath, _countof(appDataPath)))
+            return FALSE;
+    }
 
     if ((int)strlen(appDataPath) >= bufSize)
     {
@@ -2104,30 +2114,61 @@ BOOL GetOurPathInRoamingAPPDATA(char* buf)
     return GetOurPathInRoamingAPPDATA(buf, MAX_PATH);
 }
 
+BOOL IsFileManagerUiTestSandboxRequested()
+{
+    char value[2];
+    return GetEnvironmentVariableA("FILEMANAGER_UI_TESTDATA_ROOT", value, _countof(value)) != 0;
+}
+
+BOOL GetFileManagerUiTestDataRoot(char* buf, int bufSize)
+{
+    if (buf == NULL || bufSize <= 0)
+        return FALSE;
+
+    char requested[MAX_PATH];
+    DWORD length = GetEnvironmentVariableA("FILEMANAGER_UI_TESTDATA_ROOT", requested, _countof(requested));
+    if (length == 0 || length >= _countof(requested))
+        return FALSE;
+
+    char fullPath[MAX_PATH];
+    DWORD fullLength = GetFullPathNameA(requested, _countof(fullPath), fullPath, NULL);
+    if (fullLength == 0 || fullLength >= _countof(fullPath))
+        return FALSE;
+    while (fullLength > 3 && (fullPath[fullLength - 1] == '\\' || fullPath[fullLength - 1] == '/'))
+        fullPath[--fullLength] = 0;
+
+    char* leaf = strrchr(fullPath, '\\');
+    if (leaf == NULL || _stricmp(leaf + 1, "filemanager-testdata") != 0)
+        return FALSE;
+
+    // Keep every test-created file below an explicit drive-rooted directory with a recognizable cleanup boundary.
+    return SUCCEEDED(StringCchCopyA(buf, bufSize, fullPath));
+}
+
 BOOL CreateOurPathInRoamingAPPDATA(char* buf, int bufSize)
 {
     static char path[MAX_PATH]; // called from exception handler, stack may be full
     if (buf != NULL && bufSize > 0)
         buf[0] = 0;
-    // The static exception-path buffer still receives a bounded result from the modern shell API.
-    if (GetKnownFolderPathToAnsi(FOLDERID_RoamingAppData, path, _countof(path)))
+    // The static exception-path buffer must use the same sandbox decision as normal roaming-data callers.
+    if ((IsFileManagerUiTestSandboxRequested()
+             ? GetFileManagerUiTestDataRoot(path, _countof(path)) && SalPathAppend(path, "appdata", _countof(path))
+             : GetKnownFolderPathToAnsi(FOLDERID_RoamingAppData, path, _countof(path))) &&
+        SalPathAppend(path, "Open Salamander", _countof(path)))
     {
-        if (SalPathAppend(path, "Open Salamander", _countof(path)))
+        CreateDirectoryUtf8(path, NULL); // if it fails (e.g. already exists), we don't care...
+        if (buf != NULL)
         {
-            CreateDirectoryUtf8(path, NULL); // if it fails (e.g. already exists), we don't care...
-            if (buf != NULL)
+            if (bufSize <= 0)
+                return FALSE;
+            // Do not return a partial exception-reporting directory to the caller.
+            if (FAILED(StringCchCopyA(buf, bufSize, path)))
             {
-                if (bufSize <= 0)
-                    return FALSE;
-                // Do not return a partial exception-reporting directory to the caller.
-                if (FAILED(StringCchCopyA(buf, bufSize, path)))
-                {
-                    buf[0] = 0;
-                    return FALSE;
-                }
+                buf[0] = 0;
+                return FALSE;
             }
-            return TRUE;
         }
+        return TRUE;
     }
     return FALSE;
 }

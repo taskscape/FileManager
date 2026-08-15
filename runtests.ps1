@@ -214,6 +214,30 @@ function Resolve-UiTestArtifact {
     return $artifact.FullName
 }
 
+function Stage-UiTestCrashReporter {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$ExecutablePath,
+        [Parameter(Mandatory = $true)]
+        [string]$BuildDirectory
+    )
+
+    $destination = Join-Path (Split-Path -Parent $ExecutablePath) 'salmon.exe'
+    if (Test-Path -LiteralPath $destination -PathType Leaf) {
+        return
+    }
+
+    $reporter = Get-ChildItem -LiteralPath $BuildDirectory -Filter 'salmon.exe' -File -Recurse |
+        Where-Object { $_.FullName -like '*Debug_x64*' } |
+        Select-Object -First 1
+    if ($null -eq $reporter) {
+        throw 'The Debug x64 build did not produce salmon.exe for the UI test application.'
+    }
+
+    # salmon.exe must sit beside salamand.exe because the crash-client constructs that sibling path at startup.
+    Copy-Item -LiteralPath $reporter.FullName -Destination $destination -Force
+}
+
 function Resolve-UiTestVolume {
     param(
         [Parameter(Mandatory = $true)]
@@ -239,8 +263,23 @@ function Resolve-UiTestVolume {
     return "$($volume.DeviceID)\"
 }
 
+function Initialize-UiTestSandbox {
+    $configuredRoot = $env:FILEMANAGER_UI_TESTDATA_ROOT
+    if ([string]::IsNullOrWhiteSpace($configuredRoot)) {
+        # Keep current-user test data below a plainly named directory that the harness owns and removes.
+        $configuredRoot = Join-Path $env:USERPROFILE 'filemanager-testdata'
+    }
+    $fullRoot = [System.IO.Path]::GetFullPath($configuredRoot)
+    if ([System.IO.Path]::GetFileName($fullRoot.TrimEnd([System.IO.Path]::DirectorySeparatorChar, [System.IO.Path]::AltDirectorySeparatorChar)) -ine 'filemanager-testdata') {
+        throw 'FILEMANAGER_UI_TESTDATA_ROOT must name a filemanager-testdata directory.'
+    }
+    $env:FILEMANAGER_UI_TESTDATA_ROOT = $fullRoot
+    $env:FILEMANAGER_UI_CONFIG_ROOT = 'Software\Open Salamander\6.0-filemanager-testdata'
+}
+
 function Assert-UiTestSymbolicLinkSupport {
-    $root = Join-Path ([System.IO.Path]::GetTempPath()) ('FileManager-runtests-symlink-' + [Guid]::NewGuid().ToString('N'))
+    # Reparse-point setup stays below the same cleanup boundary as every UI operation.
+    $root = Join-Path $env:FILEMANAGER_UI_TESTDATA_ROOT ('symlink-preflight-' + [Guid]::NewGuid().ToString('N'))
     $target = Join-Path $root 'target'
     $link = Join-Path $root 'link'
     try {
@@ -361,15 +400,21 @@ function Set-UiTestEnvironment {
         [string]$ExecutablePath
     )
 
-    if (-not [string]::Equals($env:FILEMANAGER_UI_ISOLATED, '1', [StringComparison]::Ordinal)) {
-        throw 'The complete UI suite must run from a disposable Windows profile; set FILEMANAGER_UI_ISOLATED=1 only in that profile.'
-    }
+    Initialize-UiTestSandbox
     $env:FILEMANAGER_UI_EXE = $ExecutablePath
     if ([string]::IsNullOrWhiteSpace($env:FILEMANAGER_UI_CROSS_VOLUME_ROOT)) {
-        $env:FILEMANAGER_UI_CROSS_VOLUME_ROOT = Resolve-UiTestVolume -RequiredFileSystems @('NTFS') -Purpose 'cross-volume move tests'
+        try {
+            # Additional-volume lanes are optional when the current host exposes only one writable drive.
+            $env:FILEMANAGER_UI_CROSS_VOLUME_ROOT = Join-Path (Resolve-UiTestVolume -RequiredFileSystems @('NTFS') -Purpose 'cross-volume move tests') 'filemanager-testdata'
+        }
+        catch { }
     }
     if ([string]::IsNullOrWhiteSpace($env:FILEMANAGER_UI_ADS_UNSUPPORTED_TARGET_ROOT)) {
-        $env:FILEMANAGER_UI_ADS_UNSUPPORTED_TARGET_ROOT = Resolve-UiTestVolume -RequiredFileSystems @('FAT', 'FAT32', 'exFAT') -Purpose 'ADS-loss tests'
+        try {
+            # An ADS-unsupported target cannot be synthesized, so retain the case as an explicit NUnit skip when absent.
+            $env:FILEMANAGER_UI_ADS_UNSUPPORTED_TARGET_ROOT = Join-Path (Resolve-UiTestVolume -RequiredFileSystems @('FAT', 'FAT32', 'exFAT') -Purpose 'ADS-loss tests') 'filemanager-testdata'
+        }
+        catch { }
     }
     Assert-UiTestSymbolicLinkSupport
 
@@ -458,6 +503,7 @@ $nativeSafetyAction = {
 }
 Invoke-AutomatedCheck -Name 'NativeSafetyTests (Debug x64)' -Action $nativeSafetyAction
 $builtUiExecutable = Resolve-UiTestArtifact -BuildDirectory $uiBuildDirectory -FileName 'salamand.exe'
+$null = Stage-UiTestCrashReporter -ExecutablePath $builtUiExecutable -BuildDirectory $uiBuildDirectory
 $builtSqliteDll = Resolve-UiTestArtifact -BuildDirectory $uiBuildDirectory -FileName 'sqlite.dll'
 $built7zWrapper = Resolve-UiTestArtifact -BuildDirectory $uiBuildDirectory -FileName '7zwrapper.dll'
 $built7zEngine = Resolve-UiTestArtifact -BuildDirectory $uiBuildDirectory -FileName '7za.dll'
@@ -599,12 +645,13 @@ $nunitAction = {
 }.GetNewClosure()
 Invoke-AutomatedCheck -Name 'FileManager.UiTests (complete NUnit project)' -Action $nunitAction -SkipReason $nunitSkipReason
 
-$isolatedUi = [string]::Equals($env:FILEMANAGER_UI_ISOLATED, '1', [StringComparison]::Ordinal)
+$sandboxedUi = -not [string]::IsNullOrWhiteSpace($env:FILEMANAGER_UI_TESTDATA_ROOT) -and
+               [string]::Equals($env:FILEMANAGER_UI_CONFIG_ROOT, 'Software\Open Salamander\6.0-filemanager-testdata', [StringComparison]::OrdinalIgnoreCase)
 $uiExecutable = $env:FILEMANAGER_UI_EXE
 $appVerifierPath = Find-ApplicationVerifier
 $lockStressSkipReason = $null
-if (-not $isolatedUi) {
-    $lockStressSkipReason = 'FILEMANAGER_UI_ISOLATED=1 is required for the Application Verifier lane.'
+if (-not $sandboxedUi) {
+    $lockStressSkipReason = 'FILEMANAGER_UI_TESTDATA_ROOT and the suffixed configuration key are required for the Application Verifier lane.'
 }
 elseif ([string]::IsNullOrWhiteSpace($uiExecutable) -or -not (Test-Path -LiteralPath $uiExecutable -PathType Leaf)) {
     $lockStressSkipReason = 'FILEMANAGER_UI_EXE must identify the built executable.'

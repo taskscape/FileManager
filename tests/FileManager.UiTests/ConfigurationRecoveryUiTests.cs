@@ -16,7 +16,8 @@ public sealed class ConfigurationRecoveryUiTests : FileManagerUiTestBase
     {
         UiTestSettings.RequireConfigurationFaultInjection();
 
-        var reportPath = Path.Combine(Path.GetTempPath(), $"filemanager-config-writes-{Guid.NewGuid():N}.txt");
+        // The fault-injection report is disposable test data, not a file in the user's normal temp directory.
+        var reportPath = Path.Combine(UiTestSettings.TestDataRoot, $"filemanager-config-writes-{Guid.NewGuid():N}.txt");
         try
         {
             var baseline = ReadFirstConfigurationCheckBox();

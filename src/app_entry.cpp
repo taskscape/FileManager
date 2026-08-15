@@ -1,4 +1,4 @@
-﻿// SPDX-FileCopyrightText: 2023 Taskscape Ltd
+// SPDX-FileCopyrightText: 2023 Taskscape Ltd
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "precomp.h"
@@ -522,7 +522,7 @@ char* BuildName(char* path, char* name, char* dosName, BOOL* skip, BOOL* skipAll
                 char aliasBtnNames[200];
                 /* slouzi pro skript export_mnu.py, ktery generuje salmenu.mnu pro Translator
    nechame pro tlacitka msgboxu resit kolize hotkeys tim, ze simulujeme, ze jde o menu
-MENU_TEMPLATE_ITEM MsgBoxButtons[] = 
+MENU_TEMPLATE_ITEM MsgBoxButtons[] =
 {
   {MNTT_PB, 0
   {MNTT_IT, IDS_MSGBOXBTN_SKIP
@@ -1434,7 +1434,7 @@ BOOL GetShortcutOverlay()
         }
     }
 
-    /*  
+    /*
   //#include <CommonControls.h>
 
   // cteni ikon overlayu ze systemoveho image-listu, zbytecne pomale, nacteme je primo z imageres.dll
@@ -1642,6 +1642,8 @@ int GetToolbarIconSizeForSystemDPI()
 
 void GetSystemDPI(HDC hDC)
 {
+    // For system-wide DPI (legacy compatibility), use GetDeviceCaps
+    // For per-monitor DPI (modern), use GetDpiForWindow() on a window handle
     HDC hTmpDC;
     if (hDC == NULL)
         hTmpDC = GetDC(NULL);
@@ -1654,6 +1656,71 @@ void GetSystemDPI(HDC hDC)
 #endif
     if (hDC == NULL)
         ReleaseDC(NULL, hTmpDC);
+}
+
+// Per-monitor DPI support functions
+
+int GetDpiForWindow(HWND hwnd)
+{
+    // Windows 8.1+ supports per-monitor DPI
+    // For older Windows or if GetDpiForWindow fails, fall back to SystemDPI
+    typedef UINT(WINAPI *GetDpiForWindowFunc)(HWND);
+    static GetDpiForWindowFunc fnGetDpiForWindow = NULL;
+    static BOOL initialized = FALSE;
+
+    if (!initialized) {
+        // This non-UNICODE target binds the generic API to ANSI, so use the
+        // matching literal while resolving the optional Windows 10 export.
+        HMODULE user32 = GetModuleHandle("user32.dll");
+        if (user32) {
+            fnGetDpiForWindow = (GetDpiForWindowFunc)GetProcAddress(user32, "GetDpiForWindow");
+        }
+        initialized = TRUE;
+    }
+
+    if (fnGetDpiForWindow && hwnd) {
+        return fnGetDpiForWindow(hwnd);
+    }
+    return SystemDPI;
+}
+
+int GetScaleForWindow(HWND hwnd)
+{
+    int dpi = GetDpiForWindow(hwnd);
+    return GetScaleForDpi(dpi);
+}
+
+int GetScaleForDpi(int dpi)
+{
+    int scale;
+    if (dpi <= 96)
+        scale = 100;
+    else if (dpi <= 120)
+        scale = 125;
+    else if (dpi <= 144)
+        scale = 150;
+    else if (dpi <= 192)
+        scale = 200;
+    else if (dpi <= 240)
+        scale = 250;
+    else if (dpi <= 288)
+        scale = 300;
+    else if (dpi <= 384)
+        scale = 400;
+    else if (dpi <= 480)
+        scale = 500;
+    else
+        scale = dpi * 100 / 96;  // Fallback for unusual DPI values
+    return scale;
+}
+
+int GetSystemMetricsForDpi(int nIndex, int dpi)
+{
+    // Get system metrics scaled for specific DPI
+    // This is a simplified implementation; for full support use GetSystemMetricsForDpi on Windows 10
+    int baseValue = GetSystemMetrics(nIndex);
+    // Scale based on DPI ratio
+    return MulDiv(baseValue, dpi, 96);
 }
 
 BOOL InitializeGraphics(BOOL colorsOnly)
@@ -2801,7 +2868,7 @@ BOOL FindPluginsWithoutImportedCfg(BOOL* doNotDeleteImportedCfg)
         char aliasBtnNames[200];
         /* slouzi pro skript export_mnu.py, ktery generuje salmenu.mnu pro Translator
    nechame pro tlacitka msgboxu resit kolize hotkeys tim, ze simulujeme, ze jde o menu
-MENU_TEMPLATE_ITEM MsgBoxButtons[] = 
+MENU_TEMPLATE_ITEM MsgBoxButtons[] =
 {
   {MNTT_PB, 0
   {MNTT_IT, IDS_STARTWITHOUTMISSINGPLUGINS
@@ -3265,6 +3332,12 @@ int WinMainBody(HINSTANCE hInstance, HINSTANCE /*hPrevInstance*/, LPSTR cmdLine,
 
     LoadSaveToRegistryMutex.Init();
 
+    if (!ConfigureFileManagerUiTestConfigurationStore())
+    {
+        // Invalid test routing is fatal because continuing would risk the current user's live configuration.
+        goto EXIT_1;
+    }
+
     // zkusime z aktualni konfigurace vytahnout hodnotu "AutoImportConfig" -> existuje v pripade, ze provadime UPGRADE
     BOOL autoImportConfig = FALSE;
     char autoImportConfigFromKey[200];
@@ -3521,6 +3594,11 @@ FIND_NEW_SLG_FILE:
     // nactena (NULL -> zadna; pouziji se default hodnoty)
     if (autoImportConfig)
         SALAMANDER_ROOT_REG = autoImportConfigFromKey; // pri UPGRADE nema hledani konfigurace smysl
+    else if (IsFileManagerUiTestConfigurationStore())
+    {
+        // The dedicated root deliberately bypasses migration discovery across normal-version configuration keys.
+        SALAMANDER_ROOT_REG = SalamanderConfigurationRoots[0];
+    }
     else
     {
         if (!FindLatestConfiguration(deleteConfigurations, SALAMANDER_ROOT_REG))
@@ -3532,15 +3610,17 @@ FIND_NEW_SLG_FILE:
 
     InitializeShellib(); // OLE je treba inicializovat pred otevrenim HTML helpu - CSalamanderEvaluation
 
-    // if the new configuration key does not exist yet, create it before possible deletion
-    // starych klicu
-    BOOL currentCfgDoesNotExist = autoImportConfig || SALAMANDER_ROOT_REG != SalamanderConfigurationRoots[0];
-    BOOL saveNewConfig = currentCfgDoesNotExist;
+    // Retain the migration result before selecting a transactional generation, which replaces the public root path.
+    BOOL selectedPreviousConfigurationRoot = SALAMANDER_ROOT_REG != SalamanderConfigurationRoots[0];
 
     // Preserve the version root separately, then resolve it to its last committed generation.
     // All existing configuration readers continue to use SALAMANDER_ROOT_REG.
     SetConfigurationStoreRoot(SALAMANDER_ROOT_REG);
-    SelectCommittedConfigurationGeneration();
+    BOOL hasCommittedConfiguration = SelectCommittedConfigurationGeneration();
+    // A sandbox is new only until its first complete generation exists; later starts must reload its own saved settings.
+    BOOL currentCfgDoesNotExist = autoImportConfig || selectedPreviousConfigurationRoot ||
+                                   (IsFileManagerUiTestConfigurationStore() && !hasCommittedConfiguration);
+    BOOL saveNewConfig = currentCfgDoesNotExist;
     const char* configurationDiagnostic = GetConfigurationSchemaDiagnostic();
     if (configurationDiagnostic != NULL)
         MessageBox(NULL, configurationDiagnostic, "Open Salamander Configuration", MB_OK | MB_ICONWARNING);
@@ -3908,7 +3988,7 @@ FIND_NEW_SLG_FILE:
                             char aliasBtnNames[200];
                             /* slouzi pro skript export_mnu.py, ktery generuje salmenu.mnu pro Translator
    nechame pro tlacitka msgboxu resit kolize hotkeys tim, ze simulujeme, ze jde o menu
-MENU_TEMPLATE_ITEM MsgBoxButtons[] = 
+MENU_TEMPLATE_ITEM MsgBoxButtons[] =
 {
   {MNTT_PB, 0
   {MNTT_IT, IDS_SELLANGEXITBUTTON
@@ -3958,6 +4038,7 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
                             msg.message != WM_USER_CLOSE_MAINWND && msg.message != WM_USER_FORCECLOSE_MAINWND)
                         { // except "connect", "shutdown", "do-paste" and "close-main-wnd" messages, all are the start of BUSY mode
                             SalamanderBusy = TRUE;
+                            // This public plug-in ABI timestamp is a DWORD, not a monotonic-time value.
                             LastSalamanderIdleTime = GetTickCount();
                         }
 
@@ -4052,8 +4133,11 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
                                     // tesne pred vstupem do kriticke sekce mohlo dojit k timeoutu v control threadu, overime ze jeste stoji o vysledek
                                     // also verify that the request has not expired (calling thread waits only until TASKLIST_TODO_TIMEOUT and then waiting
                                     // vzda a spusti novou instanci Salamander; nechceme v takovem pripade pozadavek vyplnit)
+                                    // RequestTimestamp is a fixed-width shared-memory field used by
+                                    // older instances, so retain its 32-bit wrap-aware comparison.
                                     DWORD tickCount = GetTickCount();
-                                    if (CommandLineParams.RequestUID != 0 && tickCount - CommandLineParams.RequestTimestamp < TASKLIST_TODO_TIMEOUT)
+                                    if (CommandLineParams.RequestUID != 0 &&
+                                        tickCount - CommandLineParams.RequestTimestamp < TASKLIST_TODO_TIMEOUT)
                                     {
                                         memcpy(&paramsCopy, &CommandLineParams, sizeof(CCommandLineParams));
                                         applyParams = TRUE;
@@ -4114,7 +4198,7 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
                                             msg.message = WM_COMMAND;
                                             msg.wParam = (DWORD)LOWORD(wmCmd); // radsi orizneme horni WORD (0 - cmd z menu)
                                             msg.lParam = 0;
-                                            msg.time = GetTickCount();
+                                            // msg.time is intentionally not updated - see related comment in menu_popup.cpp
                                             GetCursorPos(&msg.pt);
 
                                             haveMSG = TRUE; // we have a message, process it (without calling GetMessage())

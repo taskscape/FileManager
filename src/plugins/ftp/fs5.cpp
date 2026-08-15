@@ -393,7 +393,14 @@ void CPluginFSInterface::ViewFile(const char* fsName, HWND parent,
         {
             // Preserve the fixed cache-key shape while preventing the seed from repeating at the 32-bit tick boundary.
             const CMonotonicTimePoint timeSeed = CMonotonicClock::Now();
-            sprintf(uniqueFileName + len, "%08X", (DWORD)(timeSeed ^ (timeSeed >> 32)));
+            // The random suffix needs eight digits plus a terminator; reject truncation instead of aliasing cache entries.
+            if (len < 0 || len > (int)sizeof(uniqueFileName) - 9 ||
+                _snprintf_s(uniqueFileName + len, sizeof(uniqueFileName) - len, _TRUNCATE, "%08X",
+                            (DWORD)(timeSeed ^ (timeSeed >> 32))) != 8)
+            {
+                TRACE_E("CPluginFSInterface::ViewFile(): cache key suffix does not fit!");
+                return;
+            }
         }
         tmpFileName = salamander->AllocFileNameInCache(parent, uniqueFileName, nameInCache, NULL, fileExists);
         if (tmpFileName == NULL)

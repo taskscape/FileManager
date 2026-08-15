@@ -71,11 +71,12 @@ static EConfigurationFaultEnvironmentResult ReadConfigurationFaultEnvironment(co
     }
 }
 
-static BOOL IsIsolatedConfigurationFaultTest()
+static BOOL IsSandboxedConfigurationFaultTest()
 {
-    std::string isolated;
-    return ReadConfigurationFaultEnvironment("FILEMANAGER_UI_ISOLATED", &isolated) == cferSuccess &&
-           isolated == "1";
+    std::string root;
+    // Fault injection may terminate a process only when the dedicated configuration key is explicitly selected.
+    return ReadConfigurationFaultEnvironment("FILEMANAGER_UI_CONFIG_ROOT", &root) == cferSuccess &&
+           root == "Software\\Open Salamander\\6.0-filemanager-testdata";
 }
 
 static void RecordConfigurationWrite()
@@ -95,7 +96,7 @@ void BeginConfigurationWriteFaultInjection()
     InterlockedExchange(&ConfigurationWriteFaultAfter, 0);
     ConfigurationWriteFaultReport.clear();
 
-    if (!IsIsolatedConfigurationFaultTest())
+    if (!IsSandboxedConfigurationFaultTest())
         return;
 
     std::string value;

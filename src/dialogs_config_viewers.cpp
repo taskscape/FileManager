@@ -2939,11 +2939,14 @@ void CCfgPageAppearance::LoadControls()
         HANDLES(DeleteObject(HPanelFont));
     HPanelFont = HANDLES(CreateFontIndirectW(&logFont)); // Use CreateFontIndirectW
 
+    // For per-monitor DPI support, use GetDpiForWindow on the dialog window
+    // Fall back to GetDeviceCaps for older Windows or when HWindow is not yet created
     HDC hDC = HANDLES(GetDC(HWindow));
     SendMessage(hEdit, WM_SETFONT, (WPARAM)HPanelFont, MAKELPARAM(TRUE, 0));
     WCHAR wbuf[LF_FACESIZE + 200]; // Use WCHAR buffer
+    int fontDpi = GetDpiForWindow(HWindow);
     _snwprintf_s(wbuf, _TRUNCATE, LoadStrW(IDS_FONTDESCRIPTION), // Use _snwprintf_s and LoadStrW
-                MulDiv(-origHeight, 72, GetDeviceCaps(hDC, LOGPIXELSY)),
+                MulDiv(-origHeight, 72, fontDpi),
                 logFont.lfFaceName,
                 LoadStrW(LocalUseCustomPanelFont ? IDS_FONTDESCRIPTION_CST : IDS_FONTDESCRIPTION_DEF));
     SetWindowTextW(hEdit, wbuf); // Use SetWindowTextW

@@ -1566,6 +1566,7 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
         if (!SalamanderBusy)
         {
             SalamanderBusy = TRUE; // now BUSY
+            // Preserve the DWORD timestamp exposed through the plug-in ABI.
             LastSalamanderIdleTime = GetTickCount();
         }
 
@@ -2983,6 +2984,7 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
                 {
                     SalamanderBusy = TRUE;
                     SalShExtPastedData.SetLock(TRUE);
+                    // Preserve the DWORD timestamp exposed through the plug-in ABI.
                     LastSalamanderIdleTime = GetTickCount();
                     SalShExtSharedMemView->SalBusyState = 1 /* Salamander is not busy and now is waiting for a paste operation */;
                     SalShExtSharedMemView->PasteDone = FALSE;
@@ -3016,6 +3018,7 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
             if (tmpPasteDone && operation == SALSHEXT_COPY && SalShExtPastedData.GetDataID() == dataID) // perform the Paste operation
             {
                 SalamanderBusy = TRUE;
+                // Preserve the DWORD timestamp exposed through the plug-in ABI.
                 LastSalamanderIdleTime = GetTickCount();
                 //          TRACE_I("WM_USER_SALSHEXT_PASTE: calling SalShExtPastedData.DoPasteOperation");
                 ProgressDialogActivateDrop = LastWndFromPasteGetData;

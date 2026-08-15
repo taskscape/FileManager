@@ -58,7 +58,7 @@ public sealed class FileAccessUiTests : FileOperationUiTestBase
 
         var editor = WaitForDesktopWindow(window =>
                 window.Properties.ProcessId.ValueOrDefault != Application.ProcessId &&
-                window.Name.Contains("edit-file.txt", StringComparison.OrdinalIgnoreCase),
+                window.Properties.Name.ValueOrDefault?.Contains("edit-file.txt", StringComparison.OrdinalIgnoreCase) == true,
             "Configured editor did not open the selected file.");
         editor.Close();
         WaitForWindowToClose(editor);

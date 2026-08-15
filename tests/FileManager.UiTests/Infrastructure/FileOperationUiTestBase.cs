@@ -5,7 +5,7 @@ using NUnit.Framework;
 namespace FileManager.UiTests.Infrastructure;
 
 [NonParallelizable]
-// Every derived fixture needs the interactive disposable-profile lane selected by the documented UI filter.
+// Every derived fixture uses the guarded current-user test-data and configuration boundaries.
 [Category("UI")]
 public abstract class FileOperationUiTestBase : FileManagerUiTestBase
 {
@@ -14,7 +14,7 @@ public abstract class FileOperationUiTestBase : FileManagerUiTestBase
     protected FileOperationWorkspace Workspace => workspace ??= new FileOperationWorkspace(TargetVolumeRoot);
 
     // A characterization fixture can opt into a dedicated second volume.  The
-    // default keeps source and target under one disposable temporary root.
+    // The default keeps source and target under one guarded test-data root.
     protected virtual string? TargetVolumeRoot => null;
 
     protected override string ApplicationArguments =>
@@ -22,13 +22,25 @@ public abstract class FileOperationUiTestBase : FileManagerUiTestBase
 
     protected override void OnAfterFileManagerStopped()
     {
-        workspace?.Dispose();
+        try
+        {
+            workspace?.Dispose();
+        }
+        finally
+        {
+            // NUnit reuses fixture instances, so each test must receive a newly seeded disposable workspace.
+            workspace = null;
+        }
     }
 
     protected void SelectSourceItem(string name)
     {
         var list = FindSourceList();
         NativeCommands.QuickSearch(list!.Properties.NativeWindowHandle.Value, name);
+        // The owner-drawn panel applies quick-search selection asynchronously; wait before dispatching a selection-sensitive command.
+        Thread.Sleep(250);
+        // Mark the focused match explicitly so Copy/Move/Delete observe the same selected-item state as an interactive user.
+        NativeCommands.ToggleFocusedSelection(list.Properties.NativeWindowHandle.Value);
     }
 
     protected void SelectSourceItems(params string[] names)
@@ -47,7 +59,7 @@ public abstract class FileOperationUiTestBase : FileManagerUiTestBase
         if (sourceName.Length != 0)
             SelectSourceItem(sourceName);
         NativeCommands.Execute(MainWindow.Properties.NativeWindowHandle.Value, command);
-        var dialog = WaitForWindow(window => window.Properties.NativeWindowHandle.Value != MainWindow.Properties.NativeWindowHandle.Value);
+        var dialog = WaitForOperationDialog();
         SetDialogPath(dialog, path);
         CloseDialog(dialog, commit);
         return dialog;
@@ -57,21 +69,20 @@ public abstract class FileOperationUiTestBase : FileManagerUiTestBase
     {
         SelectSourceItem(sourceName);
         NativeCommands.Execute(MainWindow.Properties.NativeWindowHandle.Value, command);
-        return WaitForWindow(window => window.Properties.NativeWindowHandle.Value != MainWindow.Properties.NativeWindowHandle.Value);
+        return WaitForOperationDialog();
     }
 
     protected Window WaitForOperationPrompt(int buttonId)
     {
         return WaitForWindow(window =>
             window.Properties.NativeWindowHandle.Value != MainWindow.Properties.NativeWindowHandle.Value &&
-            window.FindFirstDescendant(cf => cf.ByAutomationId(buttonId.ToString()))?.AsButton() is not null);
+            NativeCommands.HasDialogButton(window.Properties.NativeWindowHandle.Value, buttonId));
     }
 
     protected static void ChooseOperationPrompt(Window dialog, int buttonId)
     {
-        var button = dialog.FindFirstDescendant(cf => cf.ByAutomationId(buttonId.ToString()))?.AsButton();
-        Assert.That(button, Is.Not.Null, $"The operation prompt did not expose button {buttonId}.");
-        button!.Invoke();
+        // Native button IDs are stable while this application's legacy UIA provider can omit action patterns.
+        NativeCommands.ClickDialogButton(dialog.Properties.NativeWindowHandle.Value, buttonId);
         WaitForWindowToClose(dialog);
     }
 
@@ -110,9 +121,8 @@ public abstract class FileOperationUiTestBase : FileManagerUiTestBase
 
     protected static void CloseDialog(Window dialog, bool commit)
     {
-        var button = dialog.FindFirstDescendant(cf => cf.ByAutomationId(commit ? "1" : "2"))?.AsButton();
-        Assert.That(button, Is.Not.Null, $"The operation dialog did not expose its {(commit ? "OK" : "Cancel")} button.");
-        button!.Invoke();
+        // Native standard IDs keep operation submission independent of incomplete Button UIA patterns.
+        NativeCommands.ClickDialogButton(dialog.Properties.NativeWindowHandle.Value, commit ? 1 : 2);
         WaitForWindowToClose(dialog);
     }
 
@@ -162,13 +172,8 @@ public abstract class FileOperationUiTestBase : FileManagerUiTestBase
 
     private static void SetDialogPath(Window dialog, string path)
     {
-        var input = dialog.FindAllDescendants()
-            .FirstOrDefault(element => element.ControlType is ControlType.Edit or ControlType.ComboBox);
-        Assert.That(input, Is.Not.Null, "The operation dialog did not expose its destination/name input.");
-        if (input!.ControlType == ControlType.ComboBox)
-            input.AsComboBox().Value = path;
-        else
-            input.AsTextBox().Text = path;
+        // IDE_PATH is shared by the native create/copy/move/rename templates and bypasses their incomplete UIA children.
+        NativeCommands.SetOperationPath(dialog.Properties.NativeWindowHandle.Value, path);
     }
 
     private Window ExecuteWithPathWithoutWaitingForClose(int command, string sourceName, string path)
@@ -176,12 +181,16 @@ public abstract class FileOperationUiTestBase : FileManagerUiTestBase
         if (sourceName.Length != 0)
             SelectSourceItem(sourceName);
         NativeCommands.Execute(MainWindow.Properties.NativeWindowHandle.Value, command);
-        var dialog = WaitForWindow(window => window.Properties.NativeWindowHandle.Value != MainWindow.Properties.NativeWindowHandle.Value);
+        var dialog = WaitForOperationDialog();
         SetDialogPath(dialog, path);
-        var ok = dialog.FindFirstDescendant(cf => cf.ByAutomationId("1"))?.AsButton();
-        Assert.That(ok, Is.Not.Null, "The operation dialog did not expose its OK button.");
-        ok!.Invoke();
+        NativeCommands.ClickDialogButton(dialog.Properties.NativeWindowHandle.Value, 1);
         return dialog;
+    }
+
+    private Window WaitForOperationDialog()
+    {
+        // Filter native top-level windows by IDE_PATH so ComboLBox helpers and progress prompts cannot be mistaken for the input dialog.
+        return WaitForWindow(window => NativeCommands.HasOperationPathControl(window.Properties.NativeWindowHandle.Value));
     }
 }
 
@@ -189,11 +198,12 @@ public sealed class FileOperationWorkspace : IDisposable
 {
     public FileOperationWorkspace(string? targetVolumeRoot = null)
     {
-        RootDirectory = Path.Combine(Path.GetTempPath(), "FileManager.UiTests", Guid.NewGuid().ToString("N"));
+        // Every filesystem operation stays below the test-run-owned filemanager-testdata directory.
+        RootDirectory = Path.Combine(UiTestSettings.TestDataRoot, Guid.NewGuid().ToString("N"));
         SourceDirectory = Path.Combine(RootDirectory, "source");
         TargetWorkspaceDirectory = targetVolumeRoot is null
             ? RootDirectory
-            : Path.Combine(targetVolumeRoot, "FileManager.UiTests", Guid.NewGuid().ToString("N"));
+            : Path.Combine(targetVolumeRoot, Guid.NewGuid().ToString("N"));
         TargetDirectory = Path.Combine(TargetWorkspaceDirectory, "target");
         Directory.CreateDirectory(SourceDirectory);
         Directory.CreateDirectory(TargetDirectory);
@@ -268,11 +278,35 @@ public sealed class FileOperationWorkspace : IDisposable
 
     public void Dispose()
     {
-        if (Directory.Exists(RootDirectory))
-            Directory.Delete(RootDirectory, recursive: true);
+        DeleteDirectoryTree(RootDirectory);
         if (!string.Equals(TargetWorkspaceDirectory, RootDirectory, StringComparison.OrdinalIgnoreCase) &&
             Directory.Exists(TargetWorkspaceDirectory))
-            Directory.Delete(TargetWorkspaceDirectory, recursive: true);
+            DeleteDirectoryTree(TargetWorkspaceDirectory);
+    }
+
+    internal static void DeleteDirectoryTree(string path)
+    {
+        if (!Directory.Exists(path))
+            return;
+
+        foreach (var child in Directory.EnumerateFileSystemEntries(path))
+        {
+            var attributes = File.GetAttributes(child);
+            if ((attributes & FileAttributes.ReparsePoint) != 0)
+            {
+                // Delete the link itself without recursively following a junction or symbolic-link target.
+                if ((attributes & FileAttributes.Directory) != 0)
+                    Directory.Delete(child);
+                else
+                    File.Delete(child);
+            }
+            else if ((attributes & FileAttributes.Directory) != 0)
+                DeleteDirectoryTree(child);
+            else
+                File.Delete(child);
+        }
+
+        Directory.Delete(path);
     }
 
     private void WriteSourceFile(string relativePath, string content)

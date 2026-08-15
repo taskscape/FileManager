@@ -45,3 +45,4 @@ nul
 .dotnet-cli
 .nuget-packages
 tests/FileManager.UiTests/obj
+*.trx
