@@ -161,8 +161,12 @@ BOOL UnscramblePassword(char* password)
         password[0] = 0; // some error occured; clear the password
         TRACE_E("Unable to unscramble password! scrambled=" << backup);
     }
-    memset(backup, 0, lstrlen(backup)); // wipe the memory that contained the password
-    free(backup);
+    if (backup != NULL)
+    {
+        // Keep scrambled password data out of released heap memory, including its terminator.
+        SecureZeroMemory(backup, strlen(backup) + 1);
+        free(backup);
+    }
     return ok;
 }
 
@@ -544,8 +548,10 @@ BOOL CPasswordManager::EncryptPassword(const char* plainPassword, BYTE** encrypt
     }
 
     // always scramble the password to mitigate the risk of a short password length
-    char* scrambledPassword = (char*)malloc(lstrlen(plainPassword) + SCRAMBLE_LENGTH_EXTENSION); // reserve room for scrambling (the password becomes longer)
-    lstrcpy(scrambledPassword, plainPassword);
+    size_t plainPasswordLength = strlen(plainPassword);
+    char* scrambledPassword = (char*)malloc(plainPasswordLength + SCRAMBLE_LENGTH_EXTENSION); // reserve room for scrambling (the password becomes longer)
+    // The allocation reserves the original terminator before ScramblePassword expands the value.
+    memcpy(scrambledPassword, plainPassword, plainPasswordLength + 1);
     ScramblePassword(scrambledPassword);
     int scrambledPasswordLen = (int)strlen(scrambledPassword);
 

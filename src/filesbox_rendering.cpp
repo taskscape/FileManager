@@ -4,6 +4,8 @@
 
 #include "precomp.h"
 
+#include <strsafe.h>
+
 #include "filesbox.h"
 #include "cfgdlg.h"
 #include "plugins.h"
@@ -21,7 +23,8 @@ static int DrawTextUtf8(HDC hdc, const char* text, int len, RECT* rect, UINT for
     CStrP textW(ConvertAllocUtf8ToWide(text, -1));
     if (textW == NULL)
         return DrawTextW(hdc, L"?", 1, rect, format);
-    return DrawTextW(hdc, textW, lstrlenW(textW), rect, format);
+    // The UTF-8 conversion produces a terminated wide string; DrawTextW only needs its measured character count.
+    return DrawTextW(hdc, textW, static_cast<int>(wcslen(textW)), rect, format);
 }
 
 const char* CFILESBOX_CLASSNAME = "SalamanderItemsBox";
@@ -414,7 +417,9 @@ void CFileListBox::PaintAllItems(HRGN hUpdateRgn, DWORD drawFlags)
         if (!Parent->Is(ptPluginFS) || !Parent->GetPluginFS()->NotEmpty() ||
             !Parent->GetPluginFS()->GetNoItemsInPanelText(textBuf, 300))
         {
-            lstrcpyn(textBuf, LoadStr(IDS_NOITEMSINPANEL), 300);
+            // Do not render a partially copied localized label into the fixed empty-panel buffer.
+            if (FAILED(StringCchCopyA(textBuf, _countof(textBuf), LoadStr(IDS_NOITEMSINPANEL))))
+                textBuf[0] = 0;
         }
         RECT textR = FilesRect;
         textR.bottom = textR.top + FontCharHeight + 4;
@@ -1643,10 +1648,12 @@ CFileListBox::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         // and then route it so that it is delivered to the window under the cursor, as we always did
 
         // if the message arrived "recently" through the other channel, ignore this one
-        if (MouseWheelMSGThroughHook && MouseWheelMSGTime != 0 && (GetTickCount() - MouseWheelMSGTime < MOUSEWHEELMSG_VALID))
+        const CMonotonicTimePoint mouseWheelNow = CMonotonicClock::Now();
+        if (MouseWheelMSGThroughHook && MouseWheelMSGTime != 0 &&
+            !CMonotonicClock::HasElapsed(MouseWheelMSGTime, MOUSEWHEELMSG_VALID, mouseWheelNow))
             return 0;
         MouseWheelMSGThroughHook = FALSE;
-        MouseWheelMSGTime = GetTickCount();
+        MouseWheelMSGTime = mouseWheelNow;
 
         MSG msg;
         DWORD pos = GetMessagePos();

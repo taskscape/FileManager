@@ -6,8 +6,9 @@
 
 #include "execlog.h"
 
-DWORD SalamanderStartTime = 0;
-DWORD SalamanderExceptionTime = 0;
+// These timestamps are internal to the core and must not wrap during a long-running session.
+ULONGLONG SalamanderStartTime = 0;
+ULONGLONG SalamanderExceptionTime = 0;
 
 // The MS_INIT module ensures static object constructors are called in the proper order
 // and at the "lib" level (before "user")
@@ -57,7 +58,7 @@ void Initialize__CallStk();
 
 C__MSInit::C__MSInit()
 {
-    SalamanderStartTime = GetTickCount();
+    SalamanderStartTime = GetTickCount64();
     SYSTEMTIME st;
     GetLocalTime(&st);
 

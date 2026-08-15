@@ -86,7 +86,8 @@ inline BOOL ExtTextOutUtf8(HDC hdc, int x, int y, UINT options, const RECT* lprc
     CStrP textW(ConvertAllocUtf8ToWide(text, (int)len));
     if (textW == NULL)
         return ExtTextOutW(hdc, x, y, options, lprc, L"?", 1, NULL);
-    int wlen = lstrlenW(textW);
+    // UTF-8 conversion returns an owned terminated Unicode buffer for this GDI call.
+    int wlen = static_cast<int>(wcslen(textW));
     return ExtTextOutW(hdc, x, y, options, lprc, textW, wlen, dx);
 }
 
@@ -99,6 +100,7 @@ inline BOOL GetTextExtentPoint32Utf8(HDC hdc, const char* text, int len, SIZE* s
     CStrP textW(ConvertAllocUtf8ToWide(text, len));
     if (textW == NULL)
         return GetTextExtentPoint32(hdc, text, len, size); // fallback to ANSI on conversion failure
-    int wlen = lstrlenW(textW);
+    // UTF-8 conversion returns an owned terminated Unicode buffer for this GDI measurement.
+    int wlen = static_cast<int>(wcslen(textW));
     return GetTextExtentPoint32W(hdc, textW, wlen, size);
 }

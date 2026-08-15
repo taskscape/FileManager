@@ -4,6 +4,8 @@
 
 #include "precomp.h"
 
+#include <strsafe.h>
+
 //
 // ****************************************************************************
 // CSimpleDlgControlWindow
@@ -1230,7 +1232,7 @@ CListWaitWindow::CListWaitWindow(HWND hParent, CDataConnectionSocket* dataConnec
 
     LastTimeEstimation = -1;
     ElapsedTime = 0;
-    LastTickCountForElapsedTime = -1;
+    LastTickCountForElapsedTime = 0;
 }
 
 CListWaitWindow::~CListWaitWindow()
@@ -1331,7 +1333,7 @@ HWND CListWaitWindow::Create(DWORD showTime)
     HasRefreshStatusTimer = FALSE;
 
     ElapsedTime = 0;
-    LastTickCountForElapsedTime = GetTickCount();
+    LastTickCountForElapsedTime = CMonotonicClock::Now();
 
     CreateEx(WS_EX_DLGMODALFRAME /*| WS_EX_TOOLWINDOW*/,
              SAVEBITS_CLASSNAME,
@@ -1525,12 +1527,14 @@ void CListWaitWindow::RefreshTimeAndStatusAndProgress(BOOL fromTimer)
         OperStatusText->SetText(Status);
     }
 
-    DWORD ti = GetTickCount();
-    if (ti - LastTickCountForElapsedTime >= 1000)
+    const CMonotonicTimePoint now = CMonotonicClock::Now();
+    const CMonotonicDuration elapsed = CMonotonicClock::Elapsed(LastTickCountForElapsedTime, now);
+    if (elapsed >= 1000)
     {
-        ti = (ti - LastTickCountForElapsedTime) / 1000;
-        ElapsedTime += ti;
-        LastTickCountForElapsedTime += ti * 1000;
+        // Keep the prior whole-second carry while calculating it from a non-wrapping duration.
+        const DWORD elapsedSeconds = (DWORD)(elapsed / 1000);
+        ElapsedTime += elapsedSeconds;
+        LastTickCountForElapsedTime += (CMonotonicDuration)elapsedSeconds * 1000;
     }
     SalamanderGeneral->PrintTimeLeft(buf, CQuadWord(ElapsedTime, 0));
     if (ElapsedTimeText != NULL && strcmp(TimeElapsed, buf) != 0)
@@ -1572,7 +1576,11 @@ void CListWaitWindow::RefreshTimeAndStatusAndProgress(BOOL fromTimer)
         LastTimeEstimation = secs;
     }
     else
-        lstrcpyn(buf, LoadStr(IDS_LISTWNDESTIMTIMEUNKNOWN), 20);
+    {
+        // The downstream time-left field is deliberately limited to this 20-byte display value.
+        if (FAILED(StringCchCopyNA(buf, 20, LoadStr(IDS_LISTWNDESTIMTIMEUNKNOWN), 19)))
+            buf[19] = 0;
+    }
     if (EstimatedTimeText != NULL && strcmp(TimeLeft, buf) != 0)
     {
         strcpy(TimeLeft, buf);

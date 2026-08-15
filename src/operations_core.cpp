@@ -12,6 +12,7 @@
 
 #include <Aclapi.h>
 #include <Ntsecapi.h>
+#include <strsafe.h>
 
 // CreateFileUtf8 / DeleteFileUtf8 / SetFileAttributesUtf8 / RemoveDirectoryUtf8
 // are globally declared in common/strutils.h and defined in common/strutils.cpp.
@@ -672,7 +673,10 @@ CONVERT_AGAIN:
                             memcpy(fakeName + fakeNamePrefixLen, fakeNameSuffix, fakeNameSuffixLen + 1);
                         }
                         else
-                            lstrcpyn(fakeName, tmpPath, _countof(fakeName));
+                        {
+                            // Error reporting may clip this display-only fallback name, never the actual temp identity.
+                            StringCchCopyNA(fakeName, _countof(fakeName), tmpPath, _countof(fakeName) - 1);
+                        }
                     }
 
                     WaitForSingleObject(dlgData.WorkerNotSuspended, INFINITE); // if we should be in suspend mode, wait ...
@@ -1015,21 +1019,22 @@ unsigned ThreadWorkerBody(void* parameter)
     {
         // prefetch strings so we do not load them for every operation individually (fills the LoadStr buffer quickly + throttles)
         char opStrCopying[50];
-        lstrcpyn(opStrCopying, LoadStr(IDS_COPYING), 50);
+        // Operation labels are fixed progress-display fields.
+        StringCchCopyNA(opStrCopying, _countof(opStrCopying), LoadStr(IDS_COPYING), _countof(opStrCopying) - 1);
         char opStrCopyingPrep[50];
-        lstrcpyn(opStrCopyingPrep, LoadStr(IDS_COPYINGPREP), 50);
+        StringCchCopyNA(opStrCopyingPrep, _countof(opStrCopyingPrep), LoadStr(IDS_COPYINGPREP), _countof(opStrCopyingPrep) - 1);
         char opStrMoving[50];
-        lstrcpyn(opStrMoving, LoadStr(IDS_MOVING), 50);
+        StringCchCopyNA(opStrMoving, _countof(opStrMoving), LoadStr(IDS_MOVING), _countof(opStrMoving) - 1);
         char opStrMovingPrep[50];
-        lstrcpyn(opStrMovingPrep, LoadStr(IDS_MOVINGPREP), 50);
+        StringCchCopyNA(opStrMovingPrep, _countof(opStrMovingPrep), LoadStr(IDS_MOVINGPREP), _countof(opStrMovingPrep) - 1);
         char opStrCreatingDir[50];
-        lstrcpyn(opStrCreatingDir, LoadStr(IDS_CREATINGDIR), 50);
+        StringCchCopyNA(opStrCreatingDir, _countof(opStrCreatingDir), LoadStr(IDS_CREATINGDIR), _countof(opStrCreatingDir) - 1);
         char opStrDeleting[50];
-        lstrcpyn(opStrDeleting, LoadStr(IDS_DELETING), 50);
+        StringCchCopyNA(opStrDeleting, _countof(opStrDeleting), LoadStr(IDS_DELETING), _countof(opStrDeleting) - 1);
         char opStrConverting[50];
-        lstrcpyn(opStrConverting, LoadStr(IDS_CONVERTING), 50);
+        StringCchCopyNA(opStrConverting, _countof(opStrConverting), LoadStr(IDS_CONVERTING), _countof(opStrConverting) - 1);
         char opChangAttrs[50];
-        lstrcpyn(opChangAttrs, LoadStr(IDS_CHANGINGATTRS), 50);
+        StringCchCopyNA(opChangAttrs, _countof(opChangAttrs), LoadStr(IDS_CHANGINGATTRS), _countof(opChangAttrs) - 1);
 
         int i;
         for (i = 0; !*dlgData.CancelWorker && i < script->Count; i++)
@@ -1413,13 +1418,15 @@ unsigned ThreadWorkerEH(void* param)
 #endif // CALLSTK_DISABLE
 }
 
-DWORD WINAPI ThreadWorker(void* param)
+DWORD WINAPI ThreadWorkerOwned(void* param, HANDLE stopEvent)
 {
+    // Disk operations retain their legacy cancellation object; the owner event only provides common lifetime ownership.
+    UNREFERENCED_PARAMETER(stopEvent);
     CCallStack stack;
     return ThreadWorkerEH(param);
 }
 
-HANDLE StartWorker(COperations* script, HWND hDlg, CChangeAttrsData* attrsData,
+CThreadOwner* StartWorker(COperations* script, HWND hDlg, CChangeAttrsData* attrsData,
                    CConvertData* convertData, HANDLE wContinue, HANDLE workerNotSuspended,
                    int* operationProgress, int* summaryProgress)
 {
@@ -1437,7 +1444,9 @@ HANDLE StartWorker(COperations* script, HWND hDlg, CChangeAttrsData* attrsData,
     data.WContinue = wContinue;
     data.ConvertData = convertData;
     data.Script = script;
-    lstrcpyn(data.CorrelationId, script->GetCorrelationId(), _countof(data.CorrelationId));
+    // Worker correlation IDs must remain complete so diagnostics join the right operation.
+    if (FAILED(StringCchCopyA(data.CorrelationId, _countof(data.CorrelationId), script->GetCorrelationId())))
+        data.CorrelationId[0] = 0;
     data.HProgressDlg = hDlg;
     data.ClearReadonlyMask = script->ClearReadonlyMask;
     if (attrsData != NULL)
@@ -1456,7 +1465,6 @@ HANDLE StartWorker(COperations* script, HWND hDlg, CChangeAttrsData* attrsData,
             return NULL;
         }
     }
-    DWORD threadID;
     ResetEvent(wContinue);
     if (!script->BeginJournal())
     {
@@ -1471,10 +1479,11 @@ HANDLE StartWorker(COperations* script, HWND hDlg, CChangeAttrsData* attrsData,
         return NULL;
     }
 
-    // if (Worker != NULL) HANDLES(CloseHandle(Worker));  // was probably unnecessary
-    HANDLE worker = HANDLES(CreateThread(NULL, 0, ThreadWorker, &data, 0, &threadID));
-    if (worker == NULL)
+    CThreadOwner* worker = new CThreadOwner;
+    if (worker == NULL || !worker->Start(ThreadWorkerOwned, &data, "operation worker"))
     {
+        if (worker != NULL)
+            delete worker;
         if (data.BufferIsAllocated)
             free(data.Buffer);
         TRACE_E("Unable to start Worker thread.");
@@ -1530,31 +1539,48 @@ BOOL COperationsQueue::AddOperation(HWND dlg, BOOL startOnIdle, BOOL* startPause
     BOOL ret = FALSE;
     if (i == OperDlgs.Count) // the operation can be added
     {
-        OperDlgs.Add(dlg);
-        if (OperDlgs.IsGood())
+        if (OperDlgs.Count >= DISK_OPERATION_QUEUE_LIMIT)
         {
-            if (startOnIdle)
-            {
-                int j;
-                for (j = 0; j < OperPaused.Count && OperPaused[j] == 1 /* auto-paused */; j++)
-                    ; // if another operation is already running or was paused manually, start this one as "auto-paused"
-                *startPaused = j < OperPaused.Count;
-            }
-            else
-                *startPaused = FALSE;
-            OperPaused.Add(*startPaused ? 1 /* auto-paused */ : 0 /* running */);
-            if (!OperPaused.IsGood())
-            {
-                OperPaused.ResetState();
-                OperDlgs.Delete(OperDlgs.Count - 1);
-                if (!OperDlgs.IsGood())
-                    OperDlgs.ResetState();
-            }
-            else
-                ret = TRUE;
+            // Reject before allocating so queued scripts and dialog handles stay within the shutdown budget.
+            RejectedSubmissions++;
+            TRACE_E("COperationsQueue::AddOperation(): bounded operation queue rejected admission.");
         }
         else
-            OperDlgs.ResetState();
+        {
+            OperDlgs.Add(dlg);
+            if (OperDlgs.IsGood())
+            {
+                if (startOnIdle)
+                {
+                    int j;
+                    for (j = 0; j < OperPaused.Count && OperPaused[j] == 1 /* auto-paused */; j++)
+                        ; // if another operation is already running or was paused manually, start this one as "auto-paused"
+                    *startPaused = j < OperPaused.Count;
+                }
+                else
+                    *startPaused = FALSE;
+                OperPaused.Add(*startPaused ? 1 /* auto-paused */ : 0 /* running */);
+                if (!OperPaused.IsGood())
+                {
+                    OperPaused.ResetState();
+                    OperDlgs.Delete(OperDlgs.Count - 1);
+                    if (!OperDlgs.IsGood())
+                        OperDlgs.ResetState();
+                    RejectedSubmissions++;
+                }
+                else
+                {
+                    if (OperDlgs.Count > HighWaterMark)
+                        HighWaterMark = OperDlgs.Count;
+                    ret = TRUE;
+                }
+            }
+            else
+            {
+                OperDlgs.ResetState();
+                RejectedSubmissions++;
+            }
+        }
     }
     else
         TRACE_E("COperationsQueue::AddOperation(): this operation has already been added!");
@@ -1684,6 +1710,20 @@ int COperationsQueue::GetNumOfOperations()
     int c = OperDlgs.Count;
     HANDLES(LeaveCriticalSection(&QueueCritSect));
     return c;
+}
+
+COperationsQueueMetrics COperationsQueue::GetQueueMetrics()
+{
+    CALL_STACK_MESSAGE1("COperationsQueue::GetQueueMetrics()");
+
+    HANDLES(EnterCriticalSection(&QueueCritSect));
+    COperationsQueueMetrics metrics;
+    metrics.Capacity = DISK_OPERATION_QUEUE_LIMIT;
+    metrics.Queued = OperDlgs.Count;
+    metrics.HighWaterMark = HighWaterMark;
+    metrics.RejectedSubmissions = RejectedSubmissions;
+    HANDLES(LeaveCriticalSection(&QueueCritSect));
+    return metrics;
 }
 
 

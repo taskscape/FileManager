@@ -317,7 +317,8 @@ BOOL CToolTip::GetText()
     {
         Text[0] = 0;
         SendMessage(HNotifyWindow, WM_USER_TTGETTEXT, LastID, (LPARAM)Text);
-        TextLen = lstrlen(Text);
+        // The tooltip protocol writes a terminated local buffer before its display length is cached.
+        TextLen = static_cast<int>(strlen(Text));
     }
     if (TextLen == 0)
     {

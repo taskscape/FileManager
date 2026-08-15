@@ -82,7 +82,8 @@ private:
     char** RegEndp;   /* Ditto for endp. */
 
     // RegExec()'s friends
-    static DWORD WINAPI RegExecThread(void* data);
+    static DWORD WINAPI RegExecThread(void* data, HANDLE stopEvent); // owner retains the caller's match state until the worker exits
+    static BOOL RegExecInOwnedThread(void* data, DWORD* result); // isolates RAII ownership from RegExec's stack-overflow SEH frame
     int RegTry(char* string);
     int RegMatch(char* prog);
     int RegRepeat(char* p);

@@ -123,6 +123,9 @@ public:
     CIconList();
     ~CIconList();
 
+    // Callers validate externally supplied image indexes before any drawing path consumes them.
+    int GetImageCount() const { return ImageCount; }
+
     virtual BOOL WINAPI Create(int imageWidth, int imageHeight, int imageCount);
     virtual BOOL WINAPI CreateFromImageList(HIMAGELIST hIL, int requiredImageSize = -1);          // if 'requiredImageSize' is -1, geometry from hIL is used
     virtual BOOL WINAPI CreateFromPNG(HINSTANCE hInstance, LPCTSTR lpBitmapName, int imageWidth); // loads PNG from resource, must be a long strip one row high

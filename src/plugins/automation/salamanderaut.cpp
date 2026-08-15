@@ -247,7 +247,8 @@ HRESULT CSalamanderAutomation::GetPanel(int nPanel, ISalamanderPanel** ppPanel)
 
     if (!salGetVersionExCached)
     {
-        SalGetVersionEx(&osver, TRUE); // !!! SLOW, original GetVersionEx() is deprecated !!!
+        // The compatibility helper avoids the retired GetVersionEx API while preserving Automation's version contract.
+        SalGetVersionEx(&osver, TRUE);
         salGetVersionExCached = TRUE;
     }
 
@@ -873,7 +874,8 @@ static void CALLBACK ShowQuestionDialogProc(void* pContext)
     TCHAR szPath[MAX_PATH];
 
     // validate input
-    if (lstrlen(pathT) >= MAX_PATH)
+    // The automation contract keeps this path in a fixed MAX_PATH buffer.
+    if (strlen(pathT) >= MAX_PATH)
     {
         return E_INVALIDARG;
     }

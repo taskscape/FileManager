@@ -45,7 +45,7 @@ CISZFile::CISZFile(HANDLE hFile, BOOL quiet)
 {
     CALL_STACK_MESSAGE2("CISZFile::CISZFile(%p,)", hFile);
     ISZHeader header;
-    DWORD dwBytesRead, posLo, size;
+    DWORD dwBytesRead, size;
     UInt64 inPos, outPos;
     UInt8 *pChunks, *pCurChunk;
 
@@ -57,7 +57,13 @@ CISZFile::CISZFile(HANDLE hFile, BOOL quiet)
     CurrentPos = FileSize = 0;
     MRUCachedBlock = 0;
 
-    posLo = SetFilePointer(hFile, 0, NULL, FILE_BEGIN);
+    LARGE_INTEGER seekDistance = {};
+    // ISZ offsets are DWORD fields, but seek failures must not collide with a valid legacy return value.
+    if (!SetFilePointerEx(hFile, seekDistance, NULL, FILE_BEGIN))
+    {
+        Error(IDS_ERR_BF_SEEK, quiet, 0);
+        return;
+    }
     if (!ReadFile(hFile, &header, sizeof(header), &dwBytesRead, NULL) || (sizeof(header) != dwBytesRead))
     {
         // Too short file
@@ -81,8 +87,10 @@ CISZFile::CISZFile(HANDLE hFile, BOOL quiet)
         Error(IDS_ERR_ISZ_SEGMENTED, quiet);
         return;
     }
-    posLo = SetFilePointer(hFile, header.ptr_offs, NULL, FILE_BEGIN);
-    if (posLo != header.ptr_offs)
+    seekDistance.QuadPart = header.ptr_offs;
+    LARGE_INTEGER newPosition;
+    if (!SetFilePointerEx(hFile, seekDistance, &newPosition, FILE_BEGIN) ||
+        newPosition.QuadPart != header.ptr_offs)
     {
         Error(IDS_ERR_BF_SEEK, quiet, header.ptr_offs);
         return;

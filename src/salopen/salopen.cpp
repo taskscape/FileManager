@@ -4,7 +4,8 @@
 #include <windows.h>
 #include <shlobj.h>
 
-#include "lstrfix.h"
+#include <strsafe.h>
+#include <string.h>
 
 #pragma warning(3 : 4706) // warning C4706: assignment within conditional expression
 
@@ -180,27 +181,39 @@ BOOL GetShellFolder(const char* dir, IShellFolder*& shellFolderObj, LPITEMIDLIST
 {
     shellFolderObj = NULL;
     pidlFolder = NULL;
+    // Shell parsing below uses MAX_PATH local identities, so reject values it cannot represent completely.
+    if (dir == NULL || strlen(dir) >= MAX_PATH)
+        return FALSE;
     HRESULT ret;
     LPSHELLFOLDER desktop;
     if (SUCCEEDED((ret = SHGetDesktopFolder(&desktop))))
     {
-        int rootFolder;
+        BOOL isComputerFolder;
+        const KNOWNFOLDERID* rootFolder;
         if (dir[0] != '\\')
-            rootFolder = CSIDL_DRIVES; // normal path
+        {
+            rootFolder = &FOLDERID_ComputerFolder; // normal path
+            isComputerFolder = TRUE;
+        }
         else
-            rootFolder = CSIDL_NETWORK; // UNC - sitove zdroje
+        {
+            rootFolder = &FOLDERID_NetworkFolder; // UNC - sitove zdroje
+            isComputerFolder = FALSE;
+        }
         LPITEMIDLIST rootFolderID;
-        if (SUCCEEDED((ret = SHGetSpecialFolderLocation(NULL, rootFolder, &rootFolderID))))
+        // The Shell namespace roots are provided as Known Folder PIDLs rather than CSIDL values.
+        if (SUCCEEDED((ret = SHGetKnownFolderIDList(*rootFolder, KF_FLAG_DEFAULT, NULL, &rootFolderID))))
         {
             if (SUCCEEDED((ret = desktop->BindToObject(rootFolderID, NULL,
                                                        IID_IShellFolder, (LPVOID*)&shellFolderObj))))
             {
                 char root[MAX_PATH];
                 GetRootPath(root, dir);
-                if (lstrlen(root) < lstrlen(dir)) // not a root path
+                if (strlen(root) < strlen(dir)) // not a root path
                 {
-                    lstrcpy(root, dir);
-                    char* name = root + lstrlen(root);
+                    // The entry guard proves this fixed parent-path copy is complete.
+                    StringCchCopyA(root, _countof(root), dir);
+                    char* name = root + strlen(root);
                     if (*--name == '\\')
                         *name = 0;
                     else
@@ -231,7 +244,7 @@ BOOL GetShellFolder(const char* dir, IShellFolder*& shellFolderObj, LPITEMIDLIST
                 }
                 else
                 {
-                    if (rootFolder == CSIDL_DRIVES)
+                    if (isComputerFolder)
                     {
                         LPENUMIDLIST enumIDList;
                         if (SUCCEEDED((ret = shellFolderObj->EnumObjects(NULL, SHCONTF_FOLDERS | SHCONTF_INCLUDEHIDDEN,
@@ -278,7 +291,7 @@ BOOL GetShellFolder(const char* dir, IShellFolder*& shellFolderObj, LPITEMIDLIST
 
                                             if (name != NULL)
                                             {
-                                                if (lstrlen(name) <= 3 && StrNICmp(name, root, 2) == 0) // name = "c:" or "c:\"
+                                                if (strlen(name) <= 3 && StrNICmp(name, root, 2) == 0) // name = "c:" or "c:\"
                                                 {
                                                     pidlFolder = idList;
                                                     break; // pidl nalezen (ziskan)
@@ -298,14 +311,14 @@ BOOL GetShellFolder(const char* dir, IShellFolder*& shellFolderObj, LPITEMIDLIST
                     }
                     else
                     {
-                        if (rootFolder == CSIDL_NETWORK) // must get complex pidl, otherwise mapping does not work
+                        if (!isComputerFolder) // must get complex pidl, otherwise mapping does not work
                         {
                             BOOL setWait = (GetCursor() != LoadCursor(NULL, IDC_WAIT)); // ceka uz ?
                             HCURSOR oldCur;
                             if (setWait)
                                 oldCur = SetCursor(LoadCursor(NULL, IDC_WAIT));
 
-                            *(root + lstrlen(root) - 1) = 0;
+                            *(root + strlen(root) - 1) = 0;
                             dir = root;
                             char* s = root + 2;
                             while (*s != '\\')
@@ -363,8 +376,8 @@ BOOL GetShellFolder(const char* dir, IShellFolder*& shellFolderObj, LPITEMIDLIST
 
                                                     if (name != NULL)
                                                     {
-                                                        if (*(name + lstrlen(name) - 1) == '\\')
-                                                            *(name + lstrlen(name) - 1) = 0;
+                                                        if (*(name + strlen(name) - 1) == '\\')
+                                                            *(name + strlen(name) - 1) = 0;
                                                         if (StrICmp(name, root) == 0)
                                                         {
                                                             pidlFolder = idList;
@@ -405,13 +418,8 @@ BOOL GetShellFolder(const char* dir, IShellFolder*& shellFolderObj, LPITEMIDLIST
                 // shellFolderObj + pidlFolder  -> dohromady "dir" folder
             }
             //      else TRACE_E("BindToObject error: " << hex << ret);
-            IMalloc* alloc;
-            if (SUCCEEDED(CoGetMalloc(1, &alloc)))
-            {
-                if (alloc->DidAlloc(rootFolderID) == 1)
-                    alloc->Free(rootFolderID);
-                alloc->Release();
-            }
+            if (rootFolderID != NULL)
+                CoTaskMemFree(rootFolderID);
         }
         //    else TRACE_E("SHGetSpecialFolderLocation error: " << hex << ret);
         desktop->Release();
@@ -778,7 +786,8 @@ void WinMainCRTStartup()
     // create hidden window and launch menu from it
     // pod W2K+ uz asi neni potreba
     HINSTANCE hInstance = GetModuleHandle(NULL);
-    WNDCLASS CWindowClass;
+    WNDCLASSEX CWindowClass;
+    CWindowClass.cbSize = sizeof(CWindowClass);
     CWindowClass.style = CS_DBLCLKS | CS_HREDRAW | CS_VREDRAW;
     CWindowClass.lpfnWndProc = MyWindowProc;
     CWindowClass.cbClsExtra = 0;
@@ -789,7 +798,9 @@ void WinMainCRTStartup()
     CWindowClass.hbrBackground = (HBRUSH)(COLOR_WINDOW + 1);
     CWindowClass.lpszMenuName = NULL;
     CWindowClass.lpszClassName = MY_WINDOW_CLASSNAME;
-    RegisterClass(&CWindowClass);
+    CWindowClass.hIconSm = CWindowClass.hIcon;
+    // The hidden command window also supplies a small icon through the extended class contract.
+    RegisterClassEx(&CWindowClass);
 
     HWND HWindow = CreateWindow(MY_WINDOW_CLASSNAME,
                                 "SalOpen",

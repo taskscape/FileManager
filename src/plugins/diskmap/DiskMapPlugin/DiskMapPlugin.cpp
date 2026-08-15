@@ -9,6 +9,8 @@
 
 #include "../DiskMap/GUI.MainWindow.h"
 
+#include <strsafe.h>
+
 //for plugin registration... not translatable?
 #define PLUGIN_NAME_EN "DiskMap" //non-translated plugin name, used before loading the language module + for debug purposes
 #define PLUGIN_FILE "DISKMAP"    //registry key
@@ -68,12 +70,24 @@ class CSalamanderCallback : public CSalamanderCallbackAbstract
 {
     TCHAR FocusPathBuf[MAX_PATH];
 
+    BOOL SetFocusPath(const TCHAR* path)
+    {
+        // A truncated handoff could focus a different item after the panel switch.
+        if (FAILED(StringCchCopy(FocusPathBuf, _countof(FocusPathBuf), path)))
+        {
+            FocusPathBuf[0] = 0;
+            return FALSE;
+        }
+        return TRUE;
+    }
+
 public:
     BOOL FocusFile(TCHAR const* fileName)
     {
         if (SalamanderGeneral->SalamanderIsNotBusy(NULL))
         {
-            lstrcpyn(FocusPathBuf, fileName, MAX_PATH);
+            if (!SetFocusPath(fileName))
+                return FALSE;
             SalamanderGeneral->PostMenuExtCommand(MENUCMD_FAKE_FOCUS, TRUE);
             Sleep(500);          // the switch to the panel happens, so this wait occurs in the viewer's inactive window and therefore does not matter
             FocusPathBuf[0] = 0; // after 0.5 second we no longer care about the focus (handles the case where we hit the beginning of Salamander's BUSY mode)
@@ -85,7 +99,8 @@ public:
     BOOL DoFocusFile()
     {
         char focusPath[MAX_PATH];
-        lstrcpyn(focusPath, FocusPathBuf, MAX_PATH);
+        if (FAILED(StringCchCopy(focusPath, _countof(focusPath), FocusPathBuf)))
+            focusPath[0] = 0;
         FocusPathBuf[0] = 0;
         if (focusPath[0] != 0) // only if we were not unlucky (we did not hit the beginning of Salamander's BUSY mode)
         {
@@ -102,7 +117,8 @@ public:
     BOOL DoOpenFolder()
     {
         char focusPath[MAX_PATH];
-        lstrcpyn(focusPath, FocusPathBuf, MAX_PATH);
+        if (FAILED(StringCchCopy(focusPath, _countof(focusPath), FocusPathBuf)))
+            focusPath[0] = 0;
         FocusPathBuf[0] = 0;
         if (focusPath[0] != 0) // only if we were not unlucky (we did not hit the beginning of Salamander's BUSY mode)
         {
@@ -117,7 +133,8 @@ public:
     {
         if (SalamanderGeneral->SalamanderIsNotBusy(NULL))
         {
-            lstrcpyn(FocusPathBuf, path, MAX_PATH);
+            if (!SetFocusPath(path))
+                return FALSE;
             SalamanderGeneral->PostMenuExtCommand(MENUCMD_FAKE_OPEN, TRUE);
             Sleep(500);          // the switch to the panel happens, so this wait occurs in the viewer's inactive window and therefore does not matter
             FocusPathBuf[0] = 0; // after 0.5 second we no longer care about the focus (handles the case where we hit the beginning of Salamander's BUSY mode)

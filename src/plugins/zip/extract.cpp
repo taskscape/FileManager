@@ -30,10 +30,130 @@
 #include "crypt.h"
 #include "add_del.h"
 #include "dialogs.h"
+#include "..\\..\\common\\checked_arithmetic.h"
 
 // Used in CZipUnpack::ExtractFiles & CZipUnpack::ExtractSingleFile when testing archive. For simplicity reasons we assume this is enough ;-)
 
 #define ZIP_MAX_PATH 1024
+
+// Archive entry names are untrusted; reject every spelling that Win32 could resolve outside the selected root.
+static BOOL IsUnsafeArchiveEntryPath(const char* entryPath)
+{
+    if (entryPath == NULL || *entryPath == 0 || *entryPath == '\\' || *entryPath == '/')
+        return TRUE;
+
+    const char* component = entryPath;
+    for (const char* cursor = entryPath;; cursor++)
+    {
+        if (*cursor == ':')
+            return TRUE; // Drive-qualified paths and alternate streams are never archive-relative names.
+
+        if (*cursor != '\\' && *cursor != '/' && *cursor != 0)
+            continue;
+
+        size_t componentLength = (size_t)(cursor - component);
+        if (componentLength == 0 ||
+            componentLength == 1 && component[0] == '.' ||
+            componentLength == 2 && component[0] == '.' && component[1] == '.')
+            return TRUE;
+
+        // Win32 device aliases bypass normal directory traversal even when a component looks relative.
+        while (componentLength != 0 && (component[componentLength - 1] == '.' || component[componentLength - 1] == ' '))
+            componentLength--;
+        size_t baseLength = 0;
+        while (baseLength < componentLength && component[baseLength] != '.')
+            baseLength++;
+        if ((baseLength == 3 && (_strnicmp(component, "CON", 3) == 0 || _strnicmp(component, "PRN", 3) == 0 ||
+                                 _strnicmp(component, "AUX", 3) == 0 || _strnicmp(component, "NUL", 3) == 0)) ||
+            (baseLength == 4 && ((_strnicmp(component, "COM", 3) == 0 || _strnicmp(component, "LPT", 3) == 0) &&
+                                 component[3] >= '1' && component[3] <= '9')))
+            return TRUE;
+
+        if (*cursor == 0)
+            return FALSE;
+        component = cursor + 1;
+    }
+}
+
+static BOOL IsReparsePointExtractionRoot(const char* targetDir)
+{
+    // A junction/symlink root makes later relative path checks meaningless because it can redirect the entire extraction.
+    DWORD attributes = targetDir != NULL ? GetFileAttributesA(targetDir) : INVALID_FILE_ATTRIBUTES;
+    return attributes != INVALID_FILE_ATTRIBUTES && (attributes & FILE_ATTRIBUTE_REPARSE_POINT) != 0;
+}
+
+static BOOL HasReparsePointInExtractionPath(char* targetPath, int rootLength)
+{
+    // Recheck every existing prefix because an attacker can redirect a child after the root was approved.
+    if (targetPath == NULL || rootLength < 0)
+        return TRUE;
+
+    for (char* componentEnd = targetPath + rootLength;; componentEnd++)
+    {
+        if (*componentEnd != '\\' && *componentEnd != '/' && *componentEnd != 0)
+            continue;
+
+        const char saved = *componentEnd;
+        *componentEnd = 0;
+        const DWORD attributes = GetFileAttributesA(targetPath);
+        const DWORD error = attributes == INVALID_FILE_ATTRIBUTES ? GetLastError() : ERROR_SUCCESS;
+        *componentEnd = saved;
+
+        if (attributes == INVALID_FILE_ATTRIBUTES)
+        {
+            // Missing suffixes will be created by the extraction operation; inaccessible prefixes are unsafe to trust.
+            return error == ERROR_FILE_NOT_FOUND || error == ERROR_PATH_NOT_FOUND ? FALSE : TRUE;
+        }
+        if ((attributes & FILE_ATTRIBUTE_REPARSE_POINT) != 0)
+            return TRUE;
+        if (saved == 0)
+            return FALSE;
+    }
+}
+
+class CExtractionRootHandle
+{
+public:
+    CExtractionRootHandle(const char* targetDir) : Handle(INVALID_HANDLE_VALUE)
+    {
+        // Hold the original directory object so path replacement cannot make a later string check trust a new root.
+        Handle = CreateFileA(targetDir, FILE_READ_ATTRIBUTES,
+                             FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, NULL, OPEN_EXISTING,
+                             FILE_FLAG_BACKUP_SEMANTICS | FILE_FLAG_OPEN_REPARSE_POINT, NULL);
+    }
+
+    ~CExtractionRootHandle()
+    {
+        if (Handle != INVALID_HANDLE_VALUE)
+            CloseHandle(Handle);
+    }
+
+    BOOL IsValid() const
+    {
+        return Handle != INVALID_HANDLE_VALUE;
+    }
+
+    BOOL Contains(HANDLE outputHandle) const
+    {
+        char rootPath[ZIP_MAX_PATH + 8];
+        char outputPath[ZIP_MAX_PATH + 8];
+        DWORD rootLength = GetFinalPathNameByHandleA(Handle, rootPath, _countof(rootPath), FILE_NAME_NORMALIZED);
+        DWORD outputLength = GetFinalPathNameByHandleA(outputHandle, outputPath, _countof(outputPath), FILE_NAME_NORMALIZED);
+        if (rootLength == 0 || rootLength >= _countof(rootPath) ||
+            outputLength == 0 || outputLength >= _countof(outputPath))
+            return FALSE;
+
+        while (rootLength != 0 && (rootPath[rootLength - 1] == '\\' || rootPath[rootLength - 1] == '/'))
+            rootLength--;
+        // Compare final object paths, not input spellings, so a junction swap cannot escape the held root.
+        return outputLength > rootLength &&
+               _strnicmp(rootPath, outputPath, rootLength) == 0 &&
+               (outputPath[rootLength] == '\\' || outputPath[rootLength] == '/');
+    }
+
+private:
+    HANDLE Handle;
+};
 
 CZipUnpack::CZipUnpack(const char* zipName, const char* zipRoot, CSalamanderForOperationsAbstract* salamander,
                        TIndirectArray2<char>* archiveVolumes) : CZipCommon(zipName, zipRoot, salamander, archiveVolumes), Passwords(8)
@@ -109,9 +229,14 @@ int CZipUnpack::UnpackArchive(const char* targetDir, SalEnumSelection next, void
                 {
                     QuickSortHeaders(0, extrFiles.Count - 1, extrFiles);
                 }
-                if (*OriginalCurrentDir)
-                    SetCurrentDirectory(targetDir);
-                ErrorID = ExtractFiles(targetDir);
+                if (IsReparsePointExtractionRoot(targetDir))
+                    ErrorID = IDS_UNSAFEEXTRACTPATH;
+                else
+                {
+                    if (*OriginalCurrentDir)
+                        SetCurrentDirectory(targetDir);
+                    ErrorID = ExtractFiles(targetDir);
+                }
             }
         }
     }
@@ -142,7 +267,10 @@ int CZipUnpack::UnpackOneFile(const char* nameInZip, const CFileData* fileData, 
     ErrorID = CheckZip();
     if (!ErrorID && !ZeroZip)
     {
-        ErrorID = FindFile(nameInZip, &fileInfo, zipFileData->ItemNumber);
+        if (IsReparsePointExtractionRoot(targetPath))
+            ErrorID = IDS_UNSAFEEXTRACTPATH;
+        else
+            ErrorID = FindFile(nameInZip, &fileInfo, zipFileData->ItemNumber);
         if (!ErrorID)
         {
             lstrcpy(targetDir, targetPath);
@@ -262,9 +390,14 @@ int CZipUnpack::UnpackWholeArchive(const char* mask, const char* targetDir)
                 {
                     QuickSortHeaders(0, extrFiles.Count - 1, extrFiles);
                 }
-                if (*OriginalCurrentDir && !Test)
-                    SetCurrentDirectory(targetDir);
-                ErrorID = ExtractFiles(targetDir);
+                if (IsReparsePointExtractionRoot(targetDir))
+                    ErrorID = IDS_UNSAFEEXTRACTPATH;
+                else
+                {
+                    if (*OriginalCurrentDir && !Test)
+                        SetCurrentDirectory(targetDir);
+                    ErrorID = ExtractFiles(targetDir);
+                }
             }
         }
     }
@@ -293,7 +426,13 @@ int CZipUnpack::FindFile(LPCTSTR name, CFileInfo* fileInfo, int nItem)
             free(tempName);
         return IDS_LOWMEM;
     }
-    readOffset = CentrDirOffs + ExtraBytes;
+    // Refuse a wrapped central-directory cursor before archive names drive extraction selection.
+    if (!CheckedAddUInt64(CentrDirOffs, ExtraBytes, &readOffset))
+    {
+        free(centralHeader);
+        free(tempName);
+        return IDS_ERRFORMAT;
+    }
     readSize = 0;
     if (DiskNum != CentrDirStartDisk && MultiVol)
     {
@@ -425,7 +564,13 @@ int CZipUnpack::MatchFilesToMask(TIndirectArray2<char>& maskArray)
             free(tempName);
         return IDS_LOWMEM;
     }
-    readOffset = CentrDirOffs + ExtraBytes;
+    // Mask matching uses the same untrusted central-directory cursor as single-file lookup.
+    if (!CheckedAddUInt64(CentrDirOffs, ExtraBytes, &readOffset))
+    {
+        free(centralHeader);
+        free(tempName);
+        return IDS_ERRFORMAT;
+    }
     readSize = 0;
     if (DiskNum != CentrDirStartDisk && MultiVol)
     {
@@ -458,7 +603,15 @@ int CZipUnpack::MatchFilesToMask(TIndirectArray2<char>& maskArray)
                 }
                 ProcessHeader(centralHeader, fileInfo);
                 fileInfo->NameLen = tempNameLen;
-                fileInfo->Name = (char*)malloc(tempNameLen + 1);
+                size_t nameAllocationSize;
+                // Normalized archive names still need a checked terminator allocation before they become persistent records.
+                if (!CheckedAddSize((size_t)tempNameLen, 1, &nameAllocationSize))
+                {
+                    delete fileInfo;
+                    errorID = IDS_ERRFORMAT;
+                    break;
+                }
+                fileInfo->Name = (char*)malloc(nameAllocationSize);
                 if (!fileInfo->Name)
                 {
                     delete fileInfo;
@@ -575,6 +728,32 @@ int ExtractFlush(unsigned bytes, CDecompressionObject* decompress)
         return 1; //error
 }
 
+int CZipUnpack::GetCompressedPayloadSize(CFileInfo* fileInfo, QWORD* payloadSize, int* errorID)
+{
+    const QWORD encryptionOverhead = Encrypted
+                                        ? (AESContextValid ? SAL_AES_SALT_LENGTH(AESContext.mode) + SAL_AES_PWD_VER_LENGTH + AES_MAXHMAC
+                                                           : ENCRYPT_HEADER_SIZE)
+                                        : 0;
+    if (fileInfo->CompSize >= encryptionOverhead)
+    {
+        *payloadSize = fileInfo->CompSize - encryptionOverhead;
+        return DEC_NOERROR;
+    }
+
+    // The compressed size is archive input; never let an undersized encrypted entry underflow into a huge decoder read.
+    switch (ProcessError(IDS_ERRCOMPDATA, 0, FileNameDisp, PE_NORETRY | DialogFlags, &SkipAllDataErr))
+    {
+    case ERR_SKIP:
+        return DEC_SKIP;
+    case ERR_CANCEL:
+        *errorID = IDS_NODISPLAY;
+        return DEC_CANCEL;
+    default:
+        *errorID = IDS_NODISPLAY;
+        return DEC_CANCEL;
+    }
+}
+
 int CZipUnpack::InflateFile(CFileInfo* fileInfo, BOOL deflate64, int* errorID)
 {
     CALL_STACK_MESSAGE1("CZipUnpack::InflateFile(, )");
@@ -584,10 +763,9 @@ int CZipUnpack::InflateFile(CFileInfo* fileInfo, BOOL deflate64, int* errorID)
     int exitCode = DEC_NOERROR;
     //int                  result;
 
+    if ((exitCode = GetCompressedPayloadSize(fileInfo, &BytesLeft, errorID)) != DEC_NOERROR)
+        return exitCode;
     ZipFile->FilePointer = fileInfo->DataOffset;
-    BytesLeft = fileInfo->CompSize;
-    if (Encrypted)
-        BytesLeft -= AESContextValid ? SAL_AES_SALT_LENGTH(AESContext.mode) + SAL_AES_PWD_VER_LENGTH + AES_MAXHMAC : ENCRYPT_HEADER_SIZE;
     Crc = INIT_CRC;
     input.NextByte = (__UINT8*)InputBuffer;
     input.BytesLeft = 0;
@@ -701,10 +879,9 @@ int CZipUnpack::UnStoreFile(CFileInfo* fileInfo, int* errorID)
     QWORD bytesLeft;
     int result;
 
+    if ((exitCode = GetCompressedPayloadSize(fileInfo, &bytesLeft, errorID)) != DEC_NOERROR)
+        return exitCode;
     ZipFile->FilePointer = fileInfo->DataOffset;
-    bytesLeft = fileInfo->CompSize;
-    if (Encrypted)
-        bytesLeft -= AESContextValid ? SAL_AES_SALT_LENGTH(AESContext.mode) + SAL_AES_PWD_VER_LENGTH + AES_MAXHMAC : ENCRYPT_HEADER_SIZE;
     Crc = INIT_CRC;
     while (bytesLeft && !UserBreak)
     {
@@ -828,10 +1005,9 @@ int CZipUnpack::ExplodeFile(CFileInfo* fileInfo, int* errorID)
     CInputManager input;
     int exitCode = DEC_NOERROR;
 
+    if ((exitCode = GetCompressedPayloadSize(fileInfo, &BytesLeft, errorID)) != DEC_NOERROR)
+        return exitCode;
     ZipFile->FilePointer = fileInfo->DataOffset;
-    BytesLeft = fileInfo->CompSize;
-    if (Encrypted)
-        BytesLeft -= AESContextValid ? SAL_AES_SALT_LENGTH(AESContext.mode) + SAL_AES_PWD_VER_LENGTH + AES_MAXHMAC : ENCRYPT_HEADER_SIZE;
     decompress.csize = BytesLeft;
     Crc = INIT_CRC;
     input.NextByte = (__UINT8*)InputBuffer;
@@ -921,10 +1097,9 @@ int CZipUnpack::UnShrinkFile(CFileInfo* fileInfo, int* errorID)
     int exitCode = DEC_NOERROR;
     //int                  result;
 
+    if ((exitCode = GetCompressedPayloadSize(fileInfo, &BytesLeft, errorID)) != DEC_NOERROR)
+        return exitCode;
     ZipFile->FilePointer = fileInfo->DataOffset;
-    BytesLeft = fileInfo->CompSize;
-    if (Encrypted)
-        BytesLeft -= AESContextValid ? SAL_AES_SALT_LENGTH(AESContext.mode) + SAL_AES_PWD_VER_LENGTH + AES_MAXHMAC : ENCRYPT_HEADER_SIZE;
     decompress.CompBytesLeft = BytesLeft;
     Crc = INIT_CRC;
     input.NextByte = (__UINT8*)InputBuffer;
@@ -1004,10 +1179,9 @@ int CZipUnpack::UnReduceFile(CFileInfo* fileInfo, int* errorID)
     CInputManager input;
     int exitCode = DEC_NOERROR;
 
+    if ((exitCode = GetCompressedPayloadSize(fileInfo, &BytesLeft, errorID)) != DEC_NOERROR)
+        return exitCode;
     ZipFile->FilePointer = fileInfo->DataOffset;
-    BytesLeft = fileInfo->CompSize;
-    if (Encrypted)
-        BytesLeft -= AESContextValid ? SAL_AES_SALT_LENGTH(AESContext.mode) + SAL_AES_PWD_VER_LENGTH + AES_MAXHMAC : ENCRYPT_HEADER_SIZE;
     decompress.CompBytesLeft = BytesLeft;
     Crc = INIT_CRC;
     input.NextByte = (__UINT8*)InputBuffer;
@@ -1076,10 +1250,9 @@ int CZipUnpack::UnBZIP2File(CFileInfo* fileInfo, int* errorID)
     int ret, exitCode = DEC_NOERROR;
 
     memset(&decompress, 0, sizeof(decompress));
+    if ((exitCode = GetCompressedPayloadSize(fileInfo, &BytesLeft, errorID)) != DEC_NOERROR)
+        return exitCode;
     ZipFile->FilePointer = fileInfo->DataOffset;
-    BytesLeft = fileInfo->CompSize;
-    if (Encrypted)
-        BytesLeft -= AESContextValid ? SAL_AES_SALT_LENGTH(AESContext.mode) + SAL_AES_PWD_VER_LENGTH + AES_MAXHMAC : ENCRYPT_HEADER_SIZE;
     decompress.CompBytesLeft = BytesLeft;
     Crc = INIT_CRC;
     input.NextByte = (__UINT8*)InputBuffer;
@@ -1182,6 +1355,21 @@ int CZipUnpack::ExtractSingleFile(char* targetDir, int targetDirLen,
     AESContextValid = FALSE; // initialization
     if (success)
         *success = FALSE;
+    const char* entryPath = fileInfo->Name + RootLen + (RootLen ? 1 : 0);
+    const int extractionRootLength = targetDirLen;
+    if (IsUnsafeArchiveEntryPath(entryPath))
+    {
+        // Validate before appending anything to targetDir so a hostile name never reaches a filesystem API.
+        TRACE_E("Refusing archive entry outside extraction root: " << entryPath);
+        return IDS_UNSAFEEXTRACTPATH;
+    }
+    CExtractionRootHandle extractionRoot(targetDir);
+    if (!extractionRoot.IsValid())
+    {
+        // Fail closed when the original root cannot be pinned for post-open containment verification.
+        TRACE_E("Unable to hold archive extraction root for containment verification: " << targetDir);
+        return IDS_UNSAFEEXTRACTPATH;
+    }
     localHeader = (CLocalFileHeader*)malloc(MAX_HEADER_SIZE);
     pathBuf = (LPTSTR)malloc(sizeof(TCHAR) * (ZIP_MAX_PATH + 1));
     if (!localHeader || !pathBuf)
@@ -1203,9 +1391,16 @@ int CZipUnpack::ExtractSingleFile(char* targetDir, int targetDirLen,
         errorID = ReadLocalHeader(localHeader, fileInfo->LocHeaderOffs);
         if (!errorID)
         {
-            ProcessLocalHeader(localHeader, fileInfo, &aesExtraField);
+            if (!ProcessLocalHeader(localHeader, fileInfo, &aesExtraField))
+            {
+                // Restore the caller buffer before returning the malformed archive boundary failure.
+                *(targetDir + --targetDirLen) = 0;
+                free(localHeader);
+                free(pathBuf);
+                return IDS_ERRFORMAT;
+            }
             path = pathBuf;
-            SplitPath(&path, &name, fileInfo->Name + RootLen + (RootLen ? 1 : 0));
+            SplitPath(&path, &name, entryPath);
             if (newFileName)
                 name = (LPTSTR)newFileName;
             sour = path;
@@ -1229,7 +1424,9 @@ int CZipUnpack::ExtractSingleFile(char* targetDir, int targetDirLen,
                     do
                     {
                         retry = false;
-                        if (!SalamanderGeneral->CheckAndCreateDirectory(targetDir, NULL, TRUE, errBuf, 128))
+                        if (HasReparsePointInExtractionPath(targetDir, extractionRootLength))
+                            errorID = IDS_UNSAFEEXTRACTPATH;
+                        else if (!SalamanderGeneral->CheckAndCreateDirectory(targetDir, NULL, TRUE, errBuf, 128))
                         {
                             switch (ProcessError(IDS_ERRCREATEDIR, 0, targetDir, DialogFlags,
                                                  &SkipAllIOErrors, errBuf))
@@ -1242,6 +1439,8 @@ int CZipUnpack::ExtractSingleFile(char* targetDir, int targetDirLen,
                             }
                         }
                     } while (retry);
+                    if (!errorID && HasReparsePointInExtractionPath(targetDir, extractionRootLength))
+                        errorID = IDS_UNSAFEEXTRACTPATH;
                     if (!errorID)
                     {
                         SetFileAttributes(targetDir, fileInfo->FileAttr & FILE_ATTTRIBUTE_MASK);
@@ -1266,7 +1465,9 @@ int CZipUnpack::ExtractSingleFile(char* targetDir, int targetDirLen,
                     do
                     {
                         retry = false;
-                        if (!SalamanderGeneral->CheckAndCreateDirectory(targetDir, NULL, TRUE, errBuf, 128))
+                        if (HasReparsePointInExtractionPath(targetDir, extractionRootLength))
+                            errorID = IDS_UNSAFEEXTRACTPATH;
+                        else if (!SalamanderGeneral->CheckAndCreateDirectory(targetDir, NULL, TRUE, errBuf, 128))
                         {
                             switch (ProcessError(IDS_ERRCREATEDIR, 0, targetDir, DialogFlags,
                                                  &SkipAllIOErrors, errBuf))
@@ -1280,6 +1481,8 @@ int CZipUnpack::ExtractSingleFile(char* targetDir, int targetDirLen,
                         }
                     } while (retry);
                 }
+                if (!errorID && !Test && HasReparsePointInExtractionPath(targetDir, extractionRootLength))
+                    errorID = IDS_UNSAFEEXTRACTPATH;
                 if (!errorID)
                 {
                     sour = name;
@@ -1327,8 +1530,16 @@ int CZipUnpack::ExtractSingleFile(char* targetDir, int targetDirLen,
                                     // AES v2 doesn't store CRC, seems to be created by TC
                                     if (AES_VERSION_2 == aesExtraField.Version)
                                         bCheckCRC = false;
-                                    ZipFile->FilePointer = fileInfo->DataOffset;
-                                    errorID = SafeRead(salt, SAL_AES_SALT_LENGTH(aesExtraField.Strength), NULL);
+                                    QWORD aesPayloadOffset;
+                                    const QWORD aesHeaderSize = SAL_AES_SALT_LENGTH(aesExtraField.Strength) + sizeof(pwdVer);
+                                    // Archive-controlled local offsets must not wrap while skipping the AES salt and verifier.
+                                    if (!CheckedAddUInt64(fileInfo->DataOffset, aesHeaderSize, &aesPayloadOffset))
+                                        errorID = IDS_ERRFORMAT;
+                                    else
+                                    {
+                                        ZipFile->FilePointer = fileInfo->DataOffset;
+                                        errorID = SafeRead(salt, SAL_AES_SALT_LENGTH(aesExtraField.Strength), NULL);
+                                    }
                                     if (!errorID)
                                         SafeRead(&pwdVerFile, sizeof(pwdVerFile), NULL);
                                     if (!errorID)
@@ -1343,8 +1554,7 @@ int CZipUnpack::ExtractSingleFile(char* targetDir, int targetDirLen,
                                             {
                                                 if (memcmp(&pwdVer, &pwdVerFile, sizeof(pwdVerFile)) == 0)
                                                 {
-                                                    fileInfo->DataOffset +=
-                                                        SAL_AES_SALT_LENGTH(aesExtraField.Strength) + sizeof(pwdVer);
+                                                    fileInfo->DataOffset = aesPayloadOffset;
                                                     Encrypted = true;
                                                     AESContextValid = TRUE;
                                                     fileInfo->Method = aesExtraField.Method;
@@ -1374,8 +1584,7 @@ int CZipUnpack::ExtractSingleFile(char* targetDir, int targetDirLen,
                                                         if (memcmp(&pwdVer, &pwdVerFile, sizeof(pwdVerFile)) == 0)
                                                         {
                                                             Passwords.Add(_strdup(pwd));
-                                                            fileInfo->DataOffset +=
-                                                                SAL_AES_SALT_LENGTH(aesExtraField.Strength) + sizeof(pwdVer);
+                                                            fileInfo->DataOffset = aesPayloadOffset;
                                                             Encrypted = true;
                                                             AESContextValid = TRUE;
                                                             fileInfo->Method = aesExtraField.Method;
@@ -1425,8 +1634,15 @@ int CZipUnpack::ExtractSingleFile(char* targetDir, int targetDirLen,
                                 char header[ENCRYPT_HEADER_SIZE];
                                 bool repeat;
 
-                                ZipFile->FilePointer = fileInfo->DataOffset;
-                                errorID = SafeRead(header, ENCRYPT_HEADER_SIZE, NULL);
+                                QWORD encryptedPayloadOffset;
+                                // Legacy encryption has a fixed header, but its base offset still originates in the archive.
+                                if (!CheckedAddUInt64(fileInfo->DataOffset, ENCRYPT_HEADER_SIZE, &encryptedPayloadOffset))
+                                    errorID = IDS_ERRFORMAT;
+                                else
+                                {
+                                    ZipFile->FilePointer = fileInfo->DataOffset;
+                                    errorID = SafeRead(header, ENCRYPT_HEADER_SIZE, NULL);
+                                }
                                 if (!errorID)
                                 {
                                     check = fileInfo->Flag & GPF_DATADESCR ? localHeader->Time >> 8 : fileInfo->Crc >> 24;
@@ -1435,7 +1651,7 @@ int CZipUnpack::ExtractSingleFile(char* targetDir, int targetDirLen,
                                     for (i = 0; i < Passwords.Count; i++)
                                         if (!InitKeys(Passwords[i], header, check, Keys))
                                         {
-                                            fileInfo->DataOffset += ENCRYPT_HEADER_SIZE;
+                                            fileInfo->DataOffset = encryptedPayloadOffset;
                                             Encrypted = bFound = true;
                                             break;
                                         }
@@ -1455,7 +1671,7 @@ int CZipUnpack::ExtractSingleFile(char* targetDir, int targetDirLen,
                                                 else
                                                 {
                                                     Passwords.Add(_strdup(pwd));
-                                                    fileInfo->DataOffset += ENCRYPT_HEADER_SIZE;
+                                                    fileInfo->DataOffset = encryptedPayloadOffset;
                                                     Encrypted = true;
                                                 }
                                                 break;
@@ -1490,16 +1706,26 @@ int CZipUnpack::ExtractSingleFile(char* targetDir, int targetDirLen,
                             *(buf + len++) = '\\';
                             lstrcpyn(buf + len, fileInfo->Name, MAX_PATH - len);
                             GetInfo(attr, &fileInfo->LastWrite, fileInfo->Size);
-                            result = SafeCreateCFile(&OutputFile, targetDir, buf, attr, GENERIC_WRITE,
-                                                     FILE_SHARE_READ, fileInfo->FileAttr & ~FILE_ATTRIBUTE_READONLY | FILE_FLAG_SEQUENTIAL_SCAN,
-                                                     DialogFlags, &Silent, &SkipAllIOErrors, fileInfo->Size);
+                            if (HasReparsePointInExtractionPath(targetDir, extractionRootLength))
+                                errorID = IDS_UNSAFEEXTRACTPATH;
+                            else
+                                result = SafeCreateCFile(&OutputFile, targetDir, buf, attr, GENERIC_WRITE,
+                                                         FILE_SHARE_READ, fileInfo->FileAttr & ~FILE_ATTRIBUTE_READONLY | FILE_FLAG_SEQUENTIAL_SCAN,
+                                                         DialogFlags, &Silent, &SkipAllIOErrors, fileInfo->Size);
+                            if (!errorID && !result && !extractionRoot.Contains(OutputFile->File))
+                            {
+                                // Do not write archive bytes when the opened object resolved outside the pinned root.
+                                CloseCFile(OutputFile);
+                                OutputFile = NULL;
+                                errorID = IDS_UNSAFEEXTRACTPATH;
+                            }
                         }
                         else
                         {
                             result = 0;
                             ExtractedBytes = 0;
                         }
-                        if (result)
+                        if (!errorID && result)
                         {
                             switch (result)
                             {
@@ -1513,7 +1739,7 @@ int CZipUnpack::ExtractSingleFile(char* targetDir, int targetDirLen,
                                 errorID = IDS_NODISPLAY;
                             }
                         }
-                        else
+                        else if (!errorID)
                         {
                             switch (fileInfo->Method)
                             {
@@ -1864,22 +2090,22 @@ int CZipUnpack::SafeCreateCFile(CFile** file, const char* fileName, const char* 
     int result; //temp variable
     int errorID = 0;
     int lastError; //value returned by GetLastError()
-    int len = lstrlen(fileName);
     BOOL toSkip = FALSE;
     int flagsNoRetry;
+    size_t fileNameBytes;
 
-    if ((*file = (CFile*)malloc(sizeof(CFile))) == NULL ||
-        ((*file)->FileName = (char*)malloc(len + 1)) == NULL)
+    // The output name may include an archive entry; prove its terminator allocation before creating any file state.
+    if (fileName == NULL || !CheckedAddSize(strlen(fileName), 1, &fileNameBytes))
+        return ERR_LOWMEM;
+
+    *file = (CFile*)malloc(sizeof(CFile));
+    if (*file == NULL)
+        return ERR_LOWMEM;
+    (*file)->FileName = (char*)malloc(fileNameBytes);
+    if ((*file)->FileName == NULL)
     {
-        if ((*file)->FileName)
-        {
-            free((*file)->FileName);
-        }
-        if (*file)
-        {
-            free(*file);
-            *file = NULL;
-        }
+        free(*file);
+        *file = NULL;
         return ERR_LOWMEM;
     }
     (*file)->OutputBuffer = NULL;

@@ -72,7 +72,7 @@ public:
     BOOL Error(int error, ...);
 
     BOOL WINAPI ChangeVolProc(char* volName, char* prevName, int mode);
-    BOOL SafeSeek(DWORD position);
+    BOOL SafeSeek(const LARGE_INTEGER& position);
     BOOL WINAPI ProcessDataProc(const void* buffer, DWORD size);
     BOOL WINAPI ErrorProc(int error, BOOL flags);
     void SwitchToFirstVol(const char* arcName);

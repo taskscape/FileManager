@@ -13,6 +13,8 @@
 
 #pragma once
 
+#include "..\\..\\common\\monotonic_time.h"
+
 class CScriptInfo
 {
 public:
@@ -91,7 +93,7 @@ private:
 
     bool ExecuteWorker(__inout EXECUTION_INFO* info);
     bool ExecuteInSeparateThread(__inout EXECUTION_INFO* info);
-    static DWORD WINAPI ExecuteEntryProc(void* arg);
+    static DWORD WINAPI ExecuteEntryProc(void* arg, HANDLE stopEvent); // owner supplies cancellation while the legacy loop controls completion
 
     void InitializeDebugger(DEBUG_INFO* dbgInfo);
     void UninitializeDebugger(DEBUG_INFO* dbgInfo);
@@ -268,7 +270,7 @@ private:
     CScriptInfo* m_apHashBins[37];
     int m_cScriptsTotal;
     bool m_bModified;
-    DWORD m_dwLastRefreshTime;
+    CMonotonicTimePoint m_dwLastRefreshTime;
 
     enum
     {

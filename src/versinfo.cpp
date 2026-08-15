@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "precomp.h"
+#include <strsafe.h>
 
 #include "versinfo.h"
 
@@ -281,7 +282,9 @@ CVersionInfo::FindBlock(const char* block)
     }
 
     char tmp[2048];
-    lstrcpyn(tmp, block, 2048);
+    // Resource query hierarchy must fit before tokenization; a clipped path could select another block.
+    if (FAILED(StringCchCopyA(tmp, _countof(tmp), block)))
+        return NULL;
 
     if (strcmp(tmp, "\\") == 0)
         return Root;
@@ -358,7 +361,10 @@ BOOL CVersionInfo::QueryString(const char* block, char* buffer, DWORD maxSize, W
     if (QueryValue(block, &bf, &sz))
     {
         if (maxSizeW > 0 && bufferW != NULL)
-            lstrcpynW(bufferW, (WCHAR*)bf, min(sz + 1, maxSizeW));
+        {
+            // Query output is caller-sized display text, with an explicit Unicode clip limit.
+            StringCchCopyNW(bufferW, maxSizeW, (WCHAR*)bf, min(sz, maxSizeW - 1));
+        }
 
         if (maxSize > 0 && buffer != NULL)
         {

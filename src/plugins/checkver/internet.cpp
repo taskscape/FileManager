@@ -3,6 +3,7 @@
 
 #include "precomp.h"
 #include <wininet.h>
+#include <strsafe.h>
 
 #include "checkver.h"
 #include "checkver.rh"
@@ -129,11 +130,19 @@ const char* GetInetFailureKind(DWORD error)
 
 void GetInetFailureText(DWORD error, char* buffer, int bufferSize)
 {
+    if (buffer == NULL || bufferSize <= 0)
+        return;
     const char* kind = GetInetFailureKind(error);
     if (kind != NULL)
-        _snprintf_s(buffer, bufferSize, _TRUNCATE, "%s (%lu)", kind, error);
+    {
+        if (FAILED(StringCchPrintfA(buffer, bufferSize, "%s (%lu)", kind, error)))
+            buffer[0] = 0;
+    }
     else
-        lstrcpyn(buffer, GetInetErrorText(error), bufferSize);
+    {
+        // Preserve the existing clipped diagnostic policy without lstrcpyn semantics.
+        StringCchCopyNA(buffer, bufferSize, GetInetErrorText(error), bufferSize - 1);
+    }
 }
 } // namespace
 
@@ -157,60 +166,8 @@ const char* GetInetErrorText(DWORD dError)
         }
     }
     else
-        lstrcpy(tempErrorText, "Unable to get error message");
+        StringCchCopyA(tempErrorText, _countof(tempErrorText), "Unable to get error message");
     return tempErrorText;
-    /*
-  // hopefully we will not need this (considering the trivial internet usage)
-  sprintf(szTemp, "%s error code: %d\nMessage: %s\n", szCallFunc, dError, strName);
-  int response;
-
-  if (dError == ERROR_INTERNET_EXTENDED_ERROR)
-  {
-    InternetGetLastResponseInfo(&dwIntError, NULL, &dwLength);
-    if (dwLength)
-    {
-      if (!(szBuffer = (char *) LocalAlloc(LPTR, dwLength)))
-      {
-        lstrcat(szTemp, "Unable to allocate memory to display Internet error code. Error code: ");
-        lstrcat(szTemp, _itoa(GetLastError(), szBuffer, 10));
-        lstrcat(szTemp, "\n");
-
-        response = MessageBox(hErr, (LPSTR)szTemp,"Error", MB_OK);
-        return FALSE;
-      }
-
-      if (!InternetGetLastResponseInfo (&dwIntError, (LPTSTR) szBuffer, &dwLength))
-      {
-        lstrcat(szTemp, "Unable to get Internet error. Error code: ");
-        lstrcat(szTemp, _itoa(GetLastError(), szBuffer, 10));
-        lstrcat(szTemp, "\n");
-        response = MessageBox(hErr, (LPSTR)szTemp, "Error", MB_OK);
-        return FALSE;
-      }
-
-      if (!(szBufferFinal = (char *) LocalAlloc(LPTR, (strlen(szBuffer) + strlen(szTemp) + 1))))
-      {
-        lstrcat(szTemp, "Unable to allocate memory. Error code: ");
-        lstrcat(szTemp, _itoa (GetLastError(), szBuffer, 10));
-        lstrcat(szTemp, "\n");
-        response = MessageBox(hErr, (LPSTR)szTemp, "Error", MB_OK);
-        return FALSE;
-      }
-
-      lstrcpy(szBufferFinal, szTemp);
-      lstrcat(szBufferFinal, szBuffer);
-      LocalFree(szBuffer);
-      response = MessageBox(hErr, (LPSTR)szBufferFinal, "Error", MB_OK);
-      LocalFree(szBufferFinal);
-    }
-  }
-  else
-  {
-    response = MessageBox(hErr, (LPSTR)szTemp,"Error",MB_OK);
-  }
-
-  return response;
-*/
 }
 
 void IncMainDialogID()

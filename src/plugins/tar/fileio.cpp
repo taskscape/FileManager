@@ -40,7 +40,10 @@ CDecompressFile::CreateInstance(LPCTSTR fileName, DWORD inputOffset, CQuadWord i
     }
     if (inputOffset != 0)
     {
-        if (SetFilePointer(file, inputOffset, NULL, FILE_BEGIN) == INVALID_SET_FILE_POINTER)
+        LARGE_INTEGER seekDistance;
+        seekDistance.QuadPart = inputOffset;
+        // TAR's current offset ABI is DWORD, but the OS seek must report failure unambiguously.
+        if (!SetFilePointerEx(file, seekDistance, NULL, FILE_BEGIN))
         {
             char txtbuf[1000];
             int err = GetLastError();

@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "precomp.h"
+#include <strsafe.h>
 #include <crtdbg.h>
 #include <stdio.h>
 
@@ -108,10 +109,11 @@ const char* SFX_PROGFILES_REGVAL =
 int StrNICmp(const char* str1, const char* str2, int max)
 {
     CALL_STACK_MESSAGE_NONE
-    int l1 = lstrlen(str1);
+    // CompareString receives explicit lengths from these terminated SFX parser strings.
+    int l1 = static_cast<int>(strlen(str1));
     if (l1 > max)
         l1 = max;
-    int l2 = lstrlen(str2);
+    int l2 = static_cast<int>(strlen(str2));
     if (l2 > max)
         l2 = max;
     return CompareString(LOCALE_USER_DEFAULT, NORM_IGNORECASE, str1, max, str2, max) - 2;
@@ -298,7 +300,12 @@ void HandlePathRelativeToZip2Sfx(char* path, const char* zip2sfxDir)
         if (path[0] == '\\')
             GetRootPath(joinedPath, zip2sfxDir);
         else
-            lstrcpyn(joinedPath, zip2sfxDir, MAX_PATH);
+            // Relative SFX package resolution must start from a complete fixed zip2sfx directory path.
+            if (FAILED(StringCchCopyA(joinedPath, _countof(joinedPath), zip2sfxDir)))
+            {
+                path[0] = 0;
+                return;
+            }
         int len = (int)strlen(joinedPath);
         const char* pathAux = path[0] == '\\' ? path + 1 : path;
         if (strlen(pathAux) + len < MAX_PATH)
@@ -595,7 +602,8 @@ int ImportSFXSettings(const char* textData, CSfxSettings* settings, const char* 
         }
     }
     // trim trailing spaces
-    char* iterator = settings->TargetDir + lstrlen(settings->TargetDir);
+    // TargetDir is a terminated settings field before trailing-space normalization.
+    char* iterator = settings->TargetDir + strlen(settings->TargetDir);
     while (--iterator >= settings->TargetDir && *iterator == ' ')
         ;
     iterator[1] = 0;
@@ -705,7 +713,7 @@ ParseTargetDir(const char* path, unsigned* targetDir, const char** subDir,
                     if (dirSpecLeft)
                         *dirSpecLeft = SFX_PROGFILES_REGVAL;
                     if (dirSpecRight)
-                        *dirSpecRight = SFX_PROGFILES_REGVAL + lstrlen(SFX_PROGFILES_REGVAL);
+                        *dirSpecRight = SFX_PROGFILES_REGVAL + strlen(SFX_PROGFILES_REGVAL);
                     goto L_KEYS_OK;
                 }
                 if (StrNICmp(path, SFX_TDWINDIR, (int)(iterator - path)) == 0)
@@ -740,7 +748,7 @@ ParseTargetDir(const char* path, unsigned* targetDir, const char** subDir,
                     int i, l;
                     for (i = 0; HKeys[i].Name; i++)
                     {
-                        l = lstrlen(HKeys[i].Name);
+                        l = static_cast<int>(strlen(HKeys[i].Name));
                         if (StrNICmp(path, HKeys[i].Name, l) == 0 &&
                             (path[l] == '>' || path[l] == '\\'))
                             break;
@@ -931,6 +939,8 @@ BOOL CZipPack::ExportSFXSettings(CFile* outFile, CSfxSettings* settings)
     CALL_STACK_MESSAGE1("CZipPack::ExportSFXSettings(, )");
     char buf1[2048];
     char buf2[2048];
+    // The self-extractor format stores the exact ANSI byte count of each terminated setting string.
+    const auto writeSfxString = [this](CFile* file, const char* text) { return Write(file, text, static_cast<unsigned>(strlen(text)), NULL); };
     //header
     if (WriteSFXComment(outFile, SFX_COMMENT_HEAD))
         return FALSE;
@@ -938,73 +948,73 @@ BOOL CZipPack::ExportSFXSettings(CFile* outFile, CSfxSettings* settings)
     if (WriteSFXComment(outFile, SFX_COMMENT_VERSION))
         return FALSE;
     sprintf(buf1, "%s=%d\r\n", SFX_VERSION, SFX_SET_CURRENTVERSION);
-    if (Write(outFile, buf1, lstrlen(buf1), NULL))
+    if (writeSfxString(outFile, buf1))
         return FALSE;
 
     if (WriteSFXComment(outFile, SFX_COMMENT_TARGDIR))
         return FALSE;
     sprintf(buf1, "%s=\"%s\"\r\n", SFX_TARGETDIR, ExportString(buf2, settings->TargetDir));
-    if (Write(outFile, buf1, lstrlen(buf1), NULL))
+    if (writeSfxString(outFile, buf1))
         return FALSE;
 
     if (WriteSFXComment(outFile, SFX_COMMENT_ALLOWCHANGE))
         return FALSE;
     sprintf(buf1, "%s=%d\r\n", SFX_ALLOWCHANGE, settings->Flags & SE_NOTALLOWCHANGE ? 0 : 1);
-    if (Write(outFile, buf1, lstrlen(buf1), NULL))
+    if (writeSfxString(outFile, buf1))
         return FALSE;
 
     if (WriteSFXComment(outFile, SFX_COMMENT_REMOVE))
         return FALSE;
     sprintf(buf1, "%s=%d\r\n", SFX_REMOVETEMP, settings->Flags & SE_REMOVEAFTER ? 1 : 0);
-    if (Write(outFile, buf1, lstrlen(buf1), NULL))
+    if (writeSfxString(outFile, buf1))
         return FALSE;
 
     if (WriteSFXComment(outFile, SFX_COMMENT_WAITFOR))
         return FALSE;
     sprintf(buf1, "%s=\"%s\"\r\n", SFX_WAITFOR, ExportString(buf2, settings->WaitFor));
-    if (Write(outFile, buf1, lstrlen(buf1), NULL))
+    if (writeSfxString(outFile, buf1))
         return FALSE;
 
     if (WriteSFXComment(outFile, SFX_COMMENT_AUTO))
         return FALSE;
     sprintf(buf1, "%s=%d\r\n", SFX_AUTOSTART, settings->Flags & SE_AUTO ? 1 : 0);
-    if (Write(outFile, buf1, lstrlen(buf1), NULL))
+    if (writeSfxString(outFile, buf1))
         return FALSE;
 
     if (WriteSFXComment(outFile, SFX_COMMENT_SUMMARY))
         return FALSE;
     sprintf(buf1, "%s=%d\r\n", SFX_SHOWSUMARY, settings->Flags & SE_SHOWSUMARY ? 1 : 0);
-    if (Write(outFile, buf1, lstrlen(buf1), NULL))
+    if (writeSfxString(outFile, buf1))
         return FALSE;
 
     if (WriteSFXComment(outFile, SFX_COMMENT_HIDE))
         return FALSE;
     sprintf(buf1, "%s=%d\r\n", SFX_HIDEMAINDLG, settings->Flags & SE_HIDEMAINDLG ? 1 : 0);
-    if (Write(outFile, buf1, lstrlen(buf1), NULL))
+    if (writeSfxString(outFile, buf1))
         return FALSE;
 
     if (WriteSFXComment(outFile, SFX_COMMENT_OVERWRITE))
         return FALSE;
     sprintf(buf1, "%s=%d\r\n", SFX_OVEWRITEALL, settings->Flags & SE_OVEWRITEALL ? 1 : 0);
-    if (Write(outFile, buf1, lstrlen(buf1), NULL))
+    if (writeSfxString(outFile, buf1))
         return FALSE;
 
     if (WriteSFXComment(outFile, SFX_COMMENT_AUTODIR))
         return FALSE;
     sprintf(buf1, "%s=%d\r\n", SFX_AUTODIR, settings->Flags & SE_AUTODIR ? 1 : 0);
-    if (Write(outFile, buf1, lstrlen(buf1), NULL))
+    if (writeSfxString(outFile, buf1))
         return FALSE;
 
     if (WriteSFXComment(outFile, SFX_COMMENT_COMMAND))
         return FALSE;
     sprintf(buf1, "%s=\"%s\"\r\n", SFX_COMMAND, ExportString(buf2, settings->Command));
-    if (Write(outFile, buf1, lstrlen(buf1), NULL))
+    if (writeSfxString(outFile, buf1))
         return FALSE;
 
     if (WriteSFXComment(outFile, SFX_COMMENT_PACKAGE))
         return FALSE;
     sprintf(buf1, "%s=\"%s\"\r\n", SFX_PACKAGE, ExportString(buf2, settings->SfxFile));
-    if (Write(outFile, buf1, lstrlen(buf1), NULL))
+    if (writeSfxString(outFile, buf1))
         return FALSE;
 
     if (WriteSFXComment(outFile, SFX_COMMENT_MBUT))
@@ -1045,7 +1055,7 @@ BOOL CZipPack::ExportSFXSettings(CFile* outFile, CSfxSettings* settings)
             break;
         }
     }
-    if (Write(outFile, buf1, lstrlen(buf1), NULL))
+    if (writeSfxString(outFile, buf1))
         return FALSE;
 
     if (WriteSFXComment(outFile, SFX_COMMENT_MICO))
@@ -1075,69 +1085,69 @@ BOOL CZipPack::ExportSFXSettings(CFile* outFile, CSfxSettings* settings)
             break;
         }
     }
-    if (Write(outFile, buf1, lstrlen(buf1), NULL))
+    if (writeSfxString(outFile, buf1))
         return FALSE;
 
     if (WriteSFXComment(outFile, SFX_COMMENT_MBOX))
         return FALSE;
     const char* str = settings->MBoxText ? settings->MBoxText : "";
     sprintf(buf1, "%s=\"", SFX_MBOXTEXT);
-    if (Write(outFile, buf1, lstrlen(buf1), NULL))
+    if (writeSfxString(outFile, buf1))
         return FALSE;
     if (!ExportLongString(outFile, str))
         return FALSE;
-    if (Write(outFile, "\"\r\n", lstrlen("\"\r\n"), NULL))
+    if (writeSfxString(outFile, "\"\r\n"))
         return FALSE;
     sprintf(buf1, "%s=\"%s\"\r\n", SFX_MBOXTITLE, ExportString(buf2, settings->MBoxTitle));
-    if (Write(outFile, buf1, lstrlen(buf1), NULL))
+    if (writeSfxString(outFile, buf1))
         return FALSE;
 
     if (WriteSFXComment(outFile, SFX_COMMENT_TEXT))
         return FALSE;
     sprintf(buf1, "%s=\"%s\"\r\n", SFX_TEXT, ExportString(buf2, settings->Text));
-    if (Write(outFile, buf1, lstrlen(buf1), NULL))
+    if (writeSfxString(outFile, buf1))
         return FALSE;
 
     if (WriteSFXComment(outFile, SFX_COMMENT_TITLE))
         return FALSE;
     sprintf(buf1, "%s=\"%s\"\r\n", SFX_TITLE, ExportString(buf2, settings->Title));
-    if (Write(outFile, buf1, lstrlen(buf1), NULL))
+    if (writeSfxString(outFile, buf1))
         return FALSE;
 
     if (WriteSFXComment(outFile, SFX_COMMENT_BUTTON))
         return FALSE;
     sprintf(buf1, "%s=\"%s\"\r\n", SFX_EXTRBTNTEXT, ExportString(buf2, settings->ExtractBtnText));
-    if (Write(outFile, buf1, lstrlen(buf1), NULL))
+    if (writeSfxString(outFile, buf1))
         return FALSE;
 
     if (WriteSFXComment(outFile, SFX_COMMENT_VENDOR))
         return FALSE;
     sprintf(buf1, "%s=\"%s\"\r\n", SFX_VENDOR, ExportString(buf2, settings->Vendor));
-    if (Write(outFile, buf1, lstrlen(buf1), NULL))
+    if (writeSfxString(outFile, buf1))
         return FALSE;
 
     if (WriteSFXComment(outFile, SFX_COMMENT_WWW))
         return FALSE;
     sprintf(buf1, "%s=\"%s\"\r\n", SFX_WWW, ExportString(buf2, settings->WWW));
-    if (Write(outFile, buf1, lstrlen(buf1), NULL))
+    if (writeSfxString(outFile, buf1))
         return FALSE;
 
     if (WriteSFXComment(outFile, SFX_COMMENT_ICOFILE))
         return FALSE;
     sprintf(buf1, "%s=\"%s\"\r\n", SFX_ICONFILE, ExportString(buf2, settings->IconFile));
-    if (Write(outFile, buf1, lstrlen(buf1), NULL))
+    if (writeSfxString(outFile, buf1))
         return FALSE;
 
     if (WriteSFXComment(outFile, SFX_COMMENT_ICOINDEX))
         return FALSE;
     sprintf(buf1, "%s=%u\r\n", SFX_ICONINDEX, settings->IconIndex);
-    if (Write(outFile, buf1, lstrlen(buf1), NULL))
+    if (writeSfxString(outFile, buf1))
         return FALSE;
 
     if (WriteSFXComment(outFile, SFX_COMMENT_REQUIRESADMIN))
         return FALSE;
     sprintf(buf1, "%s=%d\r\n", SFX_REQUIRESADMIN, settings->Flags & SE_REQUIRESADMIN ? 1 : 0);
-    if (Write(outFile, buf1, lstrlen(buf1), NULL))
+    if (writeSfxString(outFile, buf1))
         return FALSE;
 
     if (Flush(outFile, outFile->OutputBuffer, outFile->BufferPosition, NULL))

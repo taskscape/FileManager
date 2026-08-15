@@ -3,6 +3,7 @@
 
 #include "precomp.h"
 #include <lm.h>
+#include <strsafe.h>
 
 //****************************************************************************
 //
@@ -16,7 +17,9 @@ CSharesItem::CSharesItem(const char* localPath, const char* remoteName, const ch
     if (localPath != NULL && localPath[0] != 0 && localPath[1] == ':')
     {
         char buff[MAX_PATH];
-        lstrcpyn(buff, localPath, MAX_PATH);
+        // Ignore a share path that cannot retain a complete local identity.
+        if (FAILED(StringCchCopyA(buff, _countof(buff), localPath)))
+            return;
         SalPathAddBackslash(buff, MAX_PATH); // kdyby nahodou bylo jen "c:", tak aby vznikl root
         if (SalGetFullName(buff))            // root "c:\\", others without trailing '\\'
         {
@@ -197,7 +200,12 @@ void CShares::PrepareSearch(const char* path)
 
     // include only shares located on the requested path
     char buff[MAX_PATH];
-    lstrcpyn(buff, path, MAX_PATH);
+    // A truncated search prefix could select a different share, so leave Wanted empty.
+    if (FAILED(StringCchCopyA(buff, _countof(buff), path)))
+    {
+        HANDLES(LeaveCriticalSection(&CS));
+        return;
+    }
     if (buff[0] != 0)                        // if we are looking for shares from this_computer, we must not append a backslash
         SalPathAddBackslash(buff, MAX_PATH); // we want a trailing backslash
     int pathLen = (int)strlen(buff);
@@ -232,7 +240,12 @@ BOOL CShares::GetUNCPath(const char* path, char* uncPath, int uncPathMax)
 {
     HANDLES(EnterCriticalSection(&CS));
     char buff[MAX_PATH];
-    lstrcpyn(buff, path, MAX_PATH);
+    // Do not map a truncated local path to a possibly unrelated network share.
+    if (FAILED(StringCchCopyA(buff, _countof(buff), path)))
+    {
+        HANDLES(LeaveCriticalSection(&CS));
+        return FALSE;
+    }
     SalPathAddBackslash(buff, MAX_PATH); // we want a trailing backslash
 
     int longestIndex = -1; // index do pole Data, kde lezi nejdelsi vyhovujici share
@@ -276,7 +289,12 @@ BOOL CShares::GetUNCPath(const char* path, char* uncPath, int uncPathMax)
             return FALSE;
         }
 
-        lstrcpyn(uncPath, unc, uncPathMax);
+        // Return a UNC identity only when the caller supplied enough output space.
+        if (uncPathMax <= 0 || FAILED(StringCchCopyA(uncPath, uncPathMax, unc)))
+        {
+            HANDLES(LeaveCriticalSection(&CS));
+            return FALSE;
+        }
         HANDLES(LeaveCriticalSection(&CS));
         return TRUE;
     }

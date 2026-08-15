@@ -3,6 +3,38 @@
 
 #include "precomp.h"
 
+#include <strsafe.h>
+
+int FormatUserDateTimeAnsi(const SYSTEMTIME* time, DWORD flags, const char* format,
+                           char* buffer, int bufferSize, BOOL isDate)
+{
+    // Renamer expressions retain ANSI format strings, so bridge both format and output around the named-locale API.
+    if (buffer == NULL || bufferSize <= 0)
+        return 0;
+    WCHAR localeName[LOCALE_NAME_MAX_LENGTH];
+    if (GetUserDefaultLocaleName(localeName, ARRAYSIZE(localeName)) == 0)
+        return 0;
+    WCHAR* wideFormat = NULL;
+    if (format != NULL)
+    {
+        int formatLength = MultiByteToWideChar(CP_ACP, 0, format, -1, NULL, 0);
+        if (formatLength == 0)
+            return 0;
+        wideFormat = new WCHAR[formatLength];
+        if (wideFormat == NULL || MultiByteToWideChar(CP_ACP, 0, format, -1, wideFormat, formatLength) == 0)
+        {
+            delete[] wideFormat;
+            return 0;
+        }
+    }
+    WCHAR formatted[1024];
+    int result = isDate
+                     ? GetDateFormatEx(localeName, flags, time, wideFormat, formatted, ARRAYSIZE(formatted), NULL)
+                     : GetTimeFormatEx(localeName, flags, time, wideFormat, formatted, ARRAYSIZE(formatted));
+    delete[] wideFormat;
+    return result != 0 ? WideCharToMultiByte(CP_ACP, 0, formatted, -1, buffer, bufferSize, NULL, NULL) : 0;
+}
+
 void LoadHistory(HKEY regKey, const char* keyPattern, char** history,
                  char* buffer, int bufferSize, CSalamanderRegistryAbstract* registry)
 {
@@ -116,9 +148,9 @@ char* GetFileData(const char* file, char* buffer)
 
         char number[50];
         char date[50], time[50];
-        if (GetTimeFormat(LOCALE_USER_DEFAULT, 0, &st, NULL, time, 50) == 0)
+        if (FormatUserDateTimeAnsi(&st, 0, NULL, time, 50, FALSE) == 0)
             sprintf(time, "%u:%02u:%02u", st.wHour, st.wMinute, st.wSecond);
-        if (GetDateFormat(LOCALE_USER_DEFAULT, DATE_SHORTDATE, &st, NULL, date, 50) == 0)
+        if (FormatUserDateTimeAnsi(&st, DATE_SHORTDATE, NULL, date, 50, TRUE) == 0)
             sprintf(date, "%u.%u.%u", st.wDay, st.wMonth, st.wYear);
         if (fd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)
             strcpy(number, LoadStr(IDS_DIRTEXT));
@@ -651,7 +683,9 @@ BOOL GetOpenFileName(HWND parent, const char* title, const char* filter, char* b
     CALL_STACK_MESSAGE4("GetOpenFileName(, %s, %s, , %d)", title, filter, save);
     OPENFILENAME ofn;
     char buf[200];
-    lstrcpyn(buf, filter, 200);
+    // The legacy dialog filter carries embedded separators, so reject rather than corrupt an oversized filter.
+    if (FAILED(StringCchCopyA(buf, _countof(buf), filter)))
+        return FALSE;
     Replace(buf, '\t', '\0');
 
     memset(&ofn, 0, sizeof(OPENFILENAME));

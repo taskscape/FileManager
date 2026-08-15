@@ -774,7 +774,6 @@ CPreviewWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 //     case WM_SETFOCUS:
 //     {
 //       RePaint();
-//       if (GetWindowLong(HWindow, GWL_STYLE) & BS_NOTIFY) NotifyParent(BN_SETFOCUS);
 //       return 0;
 //     }
 //
@@ -792,7 +791,6 @@ CPreviewWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 //         Highlighted = FALSE;
 //       }
 //       RePaint();
-//       if (GetWindowLong(HWindow, GWL_STYLE) & BS_NOTIFY) NotifyParent(BN_KILLFOCUS);
 //       return 0;
 //     }
 //

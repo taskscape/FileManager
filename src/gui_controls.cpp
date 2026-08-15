@@ -10,6 +10,8 @@
 #include "toolbar.h"
 #include "menu.h"
 #include "tooltip.h"
+
+#include <strsafe.h>
 #include <uxtheme.h>
 #include <vssym32.h>
 
@@ -40,7 +42,9 @@ CHyperLink::CHyperLink(HWND hDlg, int ctrlID, DWORD flags)
 void CHyperLink::SetActionOpen(const char* file)
 {
     EnableHintToolTip(FALSE);
-    lstrcpyn(File, file, MAX_PATH);
+    // Shell actions must not retain a clipped target path or URL.
+    if (FAILED(StringCchCopyA(File, _countof(File), file)))
+        File[0] = 0;
 }
 
 void CHyperLink::SetActionPostCommand(WORD command)
@@ -439,7 +443,7 @@ CButton::CButton(HWND hDlg, int ctrlID, DWORD flags, CObjectOrigin origin)
     ToolTipID = 0;
     Hot = FALSE;
     GetClientRect(HWindow, &ClientRect);
-    DropDownUpTime = GetTickCount();
+    DropDownUpTime = CMonotonicClock::Now();
     UIState = (WORD)SendMessage(HWindow, WM_QUERYUISTATE, 0, 0);
 }
 
@@ -474,7 +478,8 @@ void CButton::RePaint()
 
 void CButton::NotifyParent(WORD notify)
 {
-    int id = GetWindowLong(HWindow, GWL_ID);
+    // The Ptr API keeps these control metadata reads valid on both x86 and x64.
+    int id = (int)GetWindowLongPtr(HWindow, GWL_ID);
     PostMessage(GetParent(HWindow), WM_COMMAND,
                 (WPARAM)(id | ((WPARAM)notify << 16)), (LPARAM)HWindow);
 }
@@ -1106,7 +1111,7 @@ CButton::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
     {
         // if the click arrived within 25ms of releasing the drop-down, ignore it
         // to prevent an unnecessary new press
-        if (GetTickCount() - DropDownUpTime <= 25)
+        if (!CMonotonicClock::HasElapsed(DropDownUpTime, 26, CMonotonicClock::Now()))
             return 0;
 
         if (ToolTipAssigned())
@@ -1144,7 +1149,7 @@ CButton::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                 Captured = FALSE;
                 ReleaseCapture();
                 RePaint();
-                DropDownUpTime = GetTickCount();
+                DropDownUpTime = CMonotonicClock::Now();
             }
             else
             {
@@ -1255,7 +1260,12 @@ CButton::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
     case WM_USER_TTGETTEXT:
     {
         if (ToolTipText != NULL)
-            lstrcpyn((char*)lParam, ToolTipText, TOOLTIP_TEXT_MAX);
+        {
+            // The shared tooltip protocol supplies this exact capacity; never return a partial label.
+            if (lParam == 0 || FAILED(StringCchCopyA((char*)lParam, TOOLTIP_TEXT_MAX, ToolTipText)))
+                if (lParam != 0)
+                    ((char*)lParam)[0] = 0;
+        }
         return 0;
     }
 
@@ -1685,7 +1695,10 @@ CToolbarHeader::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
     case WM_USER_TBGETTOOLTIP:
     {
         TOOLBAR_TOOLTIP* tt = (TOOLBAR_TOOLTIP*)lParam;
-        lstrcpy(tt->Buffer, LoadStr(TlbHdrTooltips[tt->ID - 1]));
+        // Toolbar tooltips share the fixed protocol capacity with the core tooltip window.
+        if (tt != NULL && tt->Buffer != NULL &&
+            FAILED(StringCchCopyA(tt->Buffer, TOOLTIP_TEXT_MAX, LoadStr(TlbHdrTooltips[tt->ID - 1]))))
+            tt->Buffer[0] = 0;
         return TRUE;
     }
 
@@ -1959,7 +1972,8 @@ CAnimate::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
     case WM_USER_TTGETTEXT:
     {
       char *text = (char *)lParam;
-      lstrcpy(text, "(CAnimate class)\nClick to Start animate, click again to Stop animate.\n\t1\nTab\t2");
+      // WM_USER_TTGETTEXT guarantees TOOLTIP_TEXT_MAX bytes for this protocol buffer.
+      StringCchCopyA(text, TOOLTIP_TEXT_MAX, "(CAnimate class)\nClick to Start animate, click again to Stop animate.\n\t1\nTab\t2");
       return TRUE;
     }
 
@@ -2192,7 +2206,7 @@ BOOL CALLBACK FindHorizLines(HWND hwnd, LPARAM lParam)
     GetClientRect(hwnd, &r);
     if (r.bottom == 0) // horizontal line 0 points high
     {
-        LONG style = GetWindowLong(hwnd, GWL_STYLE);
+        LONG_PTR style = GetWindowLongPtr(hwnd, GWL_STYLE);
         if ((style & SS_TYPEMASK) == SS_ETCHEDHORZ)
         {
             char className[300];
@@ -2205,7 +2219,7 @@ BOOL CALLBACK FindHorizLines(HWND hwnd, LPARAM lParam)
 
 BOOL CALLBACK FindGroupBoxes(HWND hwnd, LPARAM lParam)
 {
-    LONG style = GetWindowLong(hwnd, GWL_STYLE);
+    LONG_PTR style = GetWindowLongPtr(hwnd, GWL_STYLE);
     if ((style & BS_TYPEMASK) == BS_GROUPBOX)
     {
         char className[300];
@@ -2239,7 +2253,7 @@ BOOL CALLBACK FindHorizLineLabel(HWND hwnd, LPARAM lParam)
                 char className[300];
                 if (GetClassName(hwnd, className, _countof(className)))
                 {
-                    LONG style = GetWindowLong(hwnd, GWL_STYLE);
+                    LONG_PTR style = GetWindowLongPtr(hwnd, GWL_STYLE);
                     if (stricmp(className, "Static") == 0) // it's a left-aligned static text
                     {
                         if ((style & SS_TYPEMASK) == SS_LEFT ||
@@ -2304,7 +2318,7 @@ BOOL CALLBACK FindGroupBoxLabel(HWND hwnd, LPARAM lParam)
             if (GetClassName(hwnd, className, _countof(className)) &&
                 stricmp(className, "Button") == 0) // it's a button (check box, radio button, or push button)
             {
-                LONG style = GetWindowLong(hwnd, GWL_STYLE);
+                LONG_PTR style = GetWindowLongPtr(hwnd, GWL_STYLE);
                 if (((style & BS_TYPEMASK) == BS_CHECKBOX ||
                      (style & BS_TYPEMASK) == BS_AUTOCHECKBOX ||
                      (style & BS_TYPEMASK) == BS_AUTO3STATE ||

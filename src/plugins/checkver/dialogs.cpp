@@ -3,6 +3,8 @@
 
 #include "precomp.h"
 
+#include <strsafe.h>
+
 #include "checkver.h"
 #include "checkver.rh"
 #include "checkver.rh2"
@@ -516,10 +518,10 @@ MENU_TEMPLATE_ITEM AppendToSystemMenu[] =
         // attach our control to the static control
         HWND hLogWnd = GetDlgItem(hWindow, IDC_MAIN_LOG);
         InitializeLogWindow(hLogWnd);
-        // give it a thin border
-        LONG exStyle = GetWindowLong(hLogWnd, GWL_EXSTYLE);
+        // Use pointer-width access so this style update remains safe if the index changes to pointer data.
+        LONG_PTR exStyle = GetWindowLongPtr(hLogWnd, GWL_EXSTYLE);
         exStyle = (exStyle & ~WS_EX_CLIENTEDGE) | WS_EX_STATICEDGE;
-        SetWindowLong(hLogWnd, GWL_EXSTYLE, exStyle);
+        SetWindowLongPtr(hLogWnd, GWL_EXSTYLE, exStyle);
         SetWindowPos(hLogWnd, 0, 0, 0, 100, 100, SWP_NOSIZE | SWP_NOMOVE | SWP_NOZORDER | SWP_FRAMECHANGED);
 
         char buff[500];
@@ -530,7 +532,12 @@ MENU_TEMPLATE_ITEM AppendToSystemMenu[] =
         if (LastCheckTime.wYear != 0)
         {
             char date[50];
-            if (GetDateFormat(LOCALE_USER_DEFAULT, DATE_LONGDATE, &LastCheckTime, NULL, date, 50) == 0)
+            // CheckVer's log is ANSI, so convert after the named-locale formatter produces its bounded UTF-16 date.
+            WCHAR localeName[LOCALE_NAME_MAX_LENGTH];
+            WCHAR formatted[100];
+            if (GetUserDefaultLocaleName(localeName, ARRAYSIZE(localeName)) == 0 ||
+                GetDateFormatEx(localeName, DATE_LONGDATE, &LastCheckTime, NULL, formatted, ARRAYSIZE(formatted), NULL) == 0 ||
+                WideCharToMultiByte(CP_ACP, 0, formatted, -1, date, ARRAYSIZE(date), NULL, NULL) == 0)
                 sprintf(date, "%u.%u.%u", LastCheckTime.wDay, LastCheckTime.wMonth, LastCheckTime.wYear);
             sprintf(buff, LoadStr(IDS_LAST_CHECK), date);
             AddLogLine(buff, FALSE);
@@ -614,7 +621,9 @@ MENU_TEMPLATE_ITEM AppendToSystemMenu[] =
         if (LOWORD(wParam) == CM_OPENFILE)
         {
             char file[MAX_PATH];
-            lstrcpy(file, "salupdate_en.txt");
+            // Keep the legacy dialog's caller-owned filename buffer explicitly bounded.
+            if (FAILED(StringCchCopyA(file, _countof(file), "salupdate_en.txt")))
+                return 0;
             OPENFILENAME ofn;
             memset(&ofn, 0, sizeof(OPENFILENAME));
             ofn.lStructSize = sizeof(OPENFILENAME);

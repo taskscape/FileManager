@@ -16,6 +16,8 @@ extern "C"
 }
 #include "salshlib.h"
 
+#include <strsafe.h>
+
 // mutex for access to shared memory
 HANDLE SalShExtSharedMemMutex = NULL;
 // shared memory - see CSalShExtSharedMem structure
@@ -97,8 +99,9 @@ void InitSalShLib()
 
     if (psidEveryone != NULL)
         FreeSid(psidEveryone);
+    // The shared-memory mutex has copied the descriptor; the backing ACL remains process-heap owned.
     if (paclNewDacl != NULL)
-        LocalFree(paclNewDacl);
+        HeapFree(GetProcessHeap(), 0, paclNewDacl);
 }
 
 void ReleaseSalShLib()
@@ -193,7 +196,9 @@ BOOL IsFakeDataObject(IDataObject* pDataObject, int* fakeType, char* srcFSPathBu
                         char* data = (char*)HANDLES(GlobalLock(stgMedium.hGlobal));
                         if (data != NULL)
                         {
-                            lstrcpyn(srcFSPathBuf, data, srcFSPathBufSize);
+                            // A fake source FS path is an operation identity, so omit it when the caller field is too small.
+                            if (FAILED(StringCchCopyA(srcFSPathBuf, srcFSPathBufSize, data)))
+                                srcFSPathBuf[0] = 0;
                             HANDLES(GlobalUnlock(stgMedium.hGlobal));
                         }
                     }
@@ -381,12 +386,15 @@ CFakeCopyPasteDataObject::Release(void)
                 ReleaseMutex(SalShExtSharedMemMutex);
             }
             char dir[MAX_PATH];
-            lstrcpyn(dir, FakeDir, MAX_PATH);
-            //      TRACE_I("CFakeCopyPasteDataObject::Release(): removedir");
-            char* cutDir;
-            if (CutDirectory(dir, &cutDir) && cutDir != NULL && strcmp(cutDir, "CLIPFAKE") == 0)
-            { // just to be safe, check that we're really only deleting fake-dir
-                RemoveTemporaryDir(dir);
+            // Remove only a complete temporary-directory identity.
+            if (SUCCEEDED(StringCchCopyA(dir, _countof(dir), FakeDir)))
+            {
+                //      TRACE_I("CFakeCopyPasteDataObject::Release(): removedir");
+                char* cutDir;
+                if (CutDirectory(dir, &cutDir) && cutDir != NULL && strcmp(cutDir, "CLIPFAKE") == 0)
+                { // just to be safe, check that we're really only deleting fake-dir
+                    RemoveTemporaryDir(dir);
+                }
             }
             //      TRACE_I("CFakeCopyPasteDataObject::Release(): posting WM_USER_SALSHEXT_TRYRELDATA");
             if (MainWindow != NULL)
@@ -472,8 +480,13 @@ BOOL CSalShExtPastedData::SetData(const char* archiveFileName, const char* pathI
 
     LastWndFromPasteGetData = NULL; // for first Paste we'll set to null here
 
-    lstrcpyn(ArchiveFileName, archiveFileName, MAX_PATH);
-    lstrcpyn(PathInArchive, pathInArchive, MAX_PATH);
+    // Clipboard-paste state must retain complete archive and internal path identities.
+    if (FAILED(StringCchCopyA(ArchiveFileName, _countof(ArchiveFileName), archiveFileName)) ||
+        FAILED(StringCchCopyA(PathInArchive, _countof(PathInArchive), pathInArchive)))
+    {
+        Clear();
+        return FALSE;
+    }
     SelFilesAndDirs.SetCaseSensitive(namesAreCaseSensitive);
     int i;
     for (i = 0; i < selIndexesCount; i++)
@@ -821,30 +834,39 @@ void CSalShExtPastedData::DoPasteOperation(BOOL copy, const char* tgtPath)
                     data.EnumLastIndex = -1;
 
                     char pathBuf[MAX_PATH];
-                    lstrcpyn(pathBuf, tgtPath, MAX_PATH);
-                    int l = (int)strlen(pathBuf);
-                    if (l > 3 && pathBuf[l - 1] == '\\')
-                        pathBuf[l - 1] = 0; // except "c:\" remove trailing backslash
+                    // Do not dispatch archive extraction to a truncated clipboard target path.
+                    if (FAILED(StringCchCopyA(pathBuf, _countof(pathBuf), tgtPath)))
+                    {
+                        TRACE_E("CSalShExtPastedData::DoPasteOperation(): target path is too long.");
+                    }
+                    else
+                    {
+                        int l = (int)strlen(pathBuf);
+                        if (l > 3 && pathBuf[l - 1] == '\\')
+                            pathBuf[l - 1] = 0; // except "c:\" remove trailing backslash
 
-                    // actual unpacking
-                    SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_NORMAL);
-                    PackUncompress(MainWindow->HWindow, MainWindow->GetActivePanel(), ArchiveFileName,
-                                   pluginData, pathBuf, PathInArchive, PanelSalEnumSelection, &data);
-                    SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_ABOVE_NORMAL);
+                        // actual unpacking
+                        SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_NORMAL);
+                        PackUncompress(MainWindow->HWindow, MainWindow->GetActivePanel(), ArchiveFileName,
+                                       pluginData, pathBuf, PathInArchive, PanelSalEnumSelection, &data);
+                        SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_ABOVE_NORMAL);
 
-                    //if (GetForegroundWindow() == MainWindow->HWindow)  // for incomprehensible reasons focus disappears from panel during drag&drop to Explorer, return it there
-                    //  RestoreFocusInSourcePanel();
+                        //if (GetForegroundWindow() == MainWindow->HWindow)  // for incomprehensible reasons focus disappears from panel during drag&drop to Explorer, return it there
+                        //  RestoreFocusInSourcePanel();
 
-                    // refresh non-automatically refreshed directories
-                    // change on target path and their subdirectories (creating new directories and unpacking
-                    // files/directories)
-                    MainWindow->PostChangeOnPathNotification(pathBuf, TRUE);
-                    // change in directory where archive is located (shouldn't happen during unpack, but better refresh anyway)
-                    lstrcpyn(pathBuf, ArchiveFileName, MAX_PATH);
-                    CutDirectory(pathBuf);
-                    MainWindow->PostChangeOnPathNotification(pathBuf, FALSE);
+                        // refresh non-automatically refreshed directories
+                        // change on target path and their subdirectories (creating new directories and unpacking
+                        // files/directories)
+                        MainWindow->PostChangeOnPathNotification(pathBuf, TRUE);
+                        // Change the archive directory only when its complete path fits the refresh field.
+                        if (SUCCEEDED(StringCchCopyA(pathBuf, _countof(pathBuf), ArchiveFileName)))
+                        {
+                            CutDirectory(pathBuf);
+                            MainWindow->PostChangeOnPathNotification(pathBuf, FALSE);
+                        }
 
-                    UpdateWindow(MainWindow->HWindow);
+                        UpdateWindow(MainWindow->HWindow);
+                    }
                 }
             }
         }

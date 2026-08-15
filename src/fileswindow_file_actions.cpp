@@ -4,6 +4,8 @@
 
 #include "precomp.h"
 
+#include <strsafe.h>
+
 #include "cfgdlg.h"
 #include "mainwnd.h"
 #include "plugins.h"
@@ -390,7 +392,8 @@ void CFilesWindow::ChangeAttr(BOOL setCompress, BOOL compressed, BOOL setEncrypt
                         BOOL isDir = index < Dirs->Count;
                         CFileData* f = isDir ? &Dirs->At(index) : &Files->At(index - Dirs->Count);
                         AlterFileName(path, f->Name, -1, Configuration.FileNameFormat, 0, index < Dirs->Count);
-                        lstrcpy(expanded, LoadStr(isDir ? IDS_QUESTION_DIRECTORY : IDS_QUESTION_FILE));
+                        // The confirmation label is a fixed dialog presentation field.
+                        StringCchCopyNA(expanded, _countof(expanded), LoadStr(isDir ? IDS_QUESTION_DIRECTORY : IDS_QUESTION_FILE), _countof(expanded) - 1);
                     }
                     int resTextID;
                     int resTitleID;
@@ -742,7 +745,7 @@ void CFilesWindow::ViewFile(char* name, BOOL altView, DWORD handlerID, int enumF
             {
                 if (enumFileNamesLastFileIndex == -1)
                     enumFileNamesLastFileIndex = i - Dirs->Count;
-                lstrcpyn(path, GetPath(), MAX_PATH);
+                StringCchCopyA(path, _countof(path), GetPath());
                 if (GetPath()[strlen(GetPath()) - 1] != '\\')
                     strcat(path, "\\");
                 char* s = path + strlen(path);
@@ -845,7 +848,8 @@ void CFilesWindow::ViewFile(char* name, BOOL altView, DWORD handlerID, int enumF
                     validTmpName[0] = 0;
                     if (!SalIsValidFileNameComponent(f->Name))
                     {
-                        lstrcpyn(validTmpName, f->Name, MAX_PATH);
+                        // Filename normalization retains the fixed component buffer limit.
+                        StringCchCopyNA(validTmpName, _countof(validTmpName), f->Name, _countof(validTmpName) - 1);
                         SalMakeValidFileNameComponent(validTmpName);
                     }
                     name = (char*)DiskCache.GetName(dcFileName,
@@ -983,7 +987,7 @@ BOOL ViewFileInt(HWND parent, const char* name, BOOL altView, DWORD handlerID, B
     const char* tmpExt = strrchr(namePart, '.');
     //if (tmpExt == NULL || tmpExt == namePart) tmpExt = namePart + lstrlen(namePart); // ".cvspass" is not an extension...
     if (tmpExt == NULL)
-        tmpExt = namePart + lstrlen(namePart); // ".cvspass" is treated as an extension in Windows...
+        tmpExt = namePart + strlen(namePart); // ".cvspass" is treated as an extension in Windows...
     else
         tmpExt++;
 
@@ -1103,7 +1107,7 @@ BOOL ViewFileInt(HWND parent, const char* name, BOOL altView, DWORD handlerID, B
                 si.wShowWindow = SW_SHOWNORMAL;
 
                 char cmdLine[2 * MAX_PATH];
-                lstrcpyn(cmdLine, expCommand, 2 * MAX_PATH);
+                StringCchCopyA(cmdLine, _countof(cmdLine), expCommand);
                 AddDoubleQuotesIfNeeded(cmdLine, 2 * MAX_PATH); // CreateProcess wants the name with spaces in quotes (otherwise it tries various variants, see help)
                 int len = (int)strlen(cmdLine);
                 int lArgs = (int)strlen(expArguments);
@@ -1266,7 +1270,7 @@ void CFilesWindow::EditFile(char* name, DWORD handlerID)
             CFileData* f = &Files->At(i - Dirs->Count);
             if (Is(ptDisk))
             {
-                lstrcpyn(path, GetPath(), MAX_PATH);
+                StringCchCopyA(path, _countof(path), GetPath());
                 if (GetPath()[strlen(GetPath()) - 1] != '\\')
                     strcat(path, "\\");
                 char* s = path + strlen(path);
@@ -1330,7 +1334,7 @@ void CFilesWindow::EditFile(char* name, DWORD handlerID)
     char* tmpExt = strrchr(namePart, '.');
     //if (tmpExt == NULL || tmpExt == namePart) tmpExt = namePart + lstrlen(namePart); // ".cvspass" is not an extension...
     if (tmpExt == NULL)
-        tmpExt = namePart + lstrlen(namePart); // ".cvspass" is treated as an extension in Windows...
+        tmpExt = namePart + strlen(namePart); // ".cvspass" is treated as an extension in Windows...
     else
         tmpExt++;
 
@@ -1426,7 +1430,7 @@ void CFilesWindow::EditFile(char* name, DWORD handlerID)
             si.wShowWindow = SW_SHOWNORMAL;
 
             char cmdLine[2 * MAX_PATH];
-            lstrcpyn(cmdLine, expCommand, 2 * MAX_PATH);
+            StringCchCopyA(cmdLine, _countof(cmdLine), expCommand);
             AddDoubleQuotesIfNeeded(cmdLine, 2 * MAX_PATH); // CreateProcess wants the name with spaces in quotes (otherwise it tries various variants, see help)
             int len = (int)strlen(cmdLine);
             int lArgs = (int)strlen(expArguments);
@@ -1483,9 +1487,9 @@ void CFilesWindow::EditNewFile()
 
     char path[MAX_PATH];
     if (Configuration.UseEditNewFileDefault)
-        lstrcpyn(path, Configuration.EditNewFileDefault, MAX_PATH);
+        StringCchCopyA(path, _countof(path), Configuration.EditNewFileDefault);
     else
-        lstrcpyn(path, LoadStr(IDS_EDITNEWFILE_DEFAULTNAME), MAX_PATH);
+        StringCchCopyNA(path, _countof(path), LoadStr(IDS_EDITNEWFILE_DEFAULTNAME), _countof(path) - 1);
     CTruncatedString subject;
     subject.Set(LoadStr(IDS_NEWFILENAME), NULL);
 
@@ -1610,18 +1614,24 @@ void CFilesWindow::FillViewWithMenu(CMenuPopup* popup)
         CViewerMasksItem* item = items[i];
 
         int imgIndex = -1; // no icon
+        HRESULT textResult = E_FAIL;
         if (item->ViewerType < 0)
         {
             int pluginIndex = -item->ViewerType - 1;
             CPluginData* plugin = Plugins.Get(pluginIndex);
-            lstrcpy(buff, plugin->Name);
+            textResult = StringCchCopyA(buff, _countof(buff), plugin->Name);
             if (plugin->PluginIconIndex != -1) // the plugin has an icon
                 imgIndex = pluginIndex;
         }
         if (item->ViewerType == VIEWER_EXTERNAL)
-            sprintf(buff, LoadStr(IDS_VIEWWITH_EXTERNAL), item->Command);
+            textResult = StringCchPrintfA(buff, _countof(buff), LoadStr(IDS_VIEWWITH_EXTERNAL), item->Command);
         if (item->ViewerType == VIEWER_INTERNAL)
-            lstrcpy(buff, LoadStr(IDS_VIEWWITH_INTERNAL));
+            textResult = StringCchCopyA(buff, _countof(buff), LoadStr(IDS_VIEWWITH_INTERNAL));
+        if (FAILED(textResult))
+        {
+            // Do not show a truncated command label that could select the wrong viewer.
+            continue;
+        }
 
         mii.Mask = MENU_MASK_TYPE | MENU_MASK_STRING | MENU_MASK_ID | MENU_MASK_IMAGEINDEX;
         mii.Type = MENU_TYPE_STRING;
@@ -2094,7 +2104,7 @@ void CFilesWindow::CreateDir(CFilesWindow* target)
 
                 if (ret && !cancel) // operation completed successfully
                 {
-                    lstrcpyn(NextFocusName, newName, MAX_PATH); // ensure focus of the new name after refresh
+                    StringCchCopyA(NextFocusName, _countof(NextFocusName), newName); // ensure focus of the new name after refresh
                 }
             }
 
@@ -2205,7 +2215,7 @@ void CFilesWindow::RenameFileInternal(CFileData* f, const char* formatedFileName
                         {
                             // rename ("clean up") the file/directory with the conflicting DOS name to a temporary 8.3 name (no extra DOS name needed)
                             char tmpName[MAX_PATH + 20];
-                            lstrcpyn(tmpName, tgtPath, MAX_PATH);
+                            StringCchCopyA(tmpName, _countof(tmpName), tgtPath);
                             CutDirectory(tmpName);
                             SalPathAddBackslash(tmpName, MAX_PATH + 20);
                             char* tmpNamePart = tmpName + strlen(tmpName);
@@ -2213,7 +2223,9 @@ void CFilesWindow::RenameFileInternal(CFileData* f, const char* formatedFileName
                             if (SalPathAppend(tmpName, data.cFileName, MAX_PATH))
                             {
                                 strcpy(origFullName, tmpName);
-                                DWORD num = (GetTickCount() / 10) % 0xFFF;
+                                // Fold the 64-bit uptime so the collision-checked temporary-name seed varies after 32-bit tick wrap.
+                                const CMonotonicTimePoint timeSeed = CMonotonicClock::Now();
+                                DWORD num = (DWORD)((timeSeed ^ (timeSeed >> 32)) / 10) % 0xFFF;
                                 while (1)
                                 {
                                     sprintf(tmpNamePart, "sal%03X", num++);
@@ -2372,7 +2384,7 @@ void CFilesWindow::RenameFile(int specialIndex)
         if (Windows64Bit && isDir)
         {
             char path[MAX_PATH];
-            lstrcpyn(path, GetPath(), MAX_PATH);
+            StringCchCopyA(path, _countof(path), GetPath());
             if (SalPathAppend(path, f->Name, MAX_PATH) && IsWin64RedirectedDir(path, NULL, FALSE))
             {
                 char msg[300 + MAX_PATH];

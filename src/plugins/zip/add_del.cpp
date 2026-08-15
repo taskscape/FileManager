@@ -7,6 +7,7 @@
 #include <ostream>
 #include <stdio.h>
 #include <commctrl.h>
+#include <strsafe.h>
 
 #include "spl_com.h"
 #include "spl_base.h"
@@ -30,7 +31,35 @@
 #include "deflate.h"
 #include "crypt.h"
 #include "dialogs.h"
+#include "..\\..\\common\\checked_arithmetic.h"
 //#include "sfxmake/sfxmake.h"
+
+static void CopyMeasuredZipName(char* destination, const char* source, int length)
+{
+    // The caller owns an allocation sized for the measured archive name and its terminator.
+    memcpy(destination, source, length);
+    destination[length] = 0;
+}
+
+template<size_t capacity>
+static bool CopyZipSetting(char (&destination)[capacity], const char* source)
+{
+    // SFX settings are complete values; clear a malformed oversized source instead of keeping a prefix.
+    if (FAILED(StringCchCopyA(destination, capacity, source != NULL ? source : "")))
+    {
+        destination[0] = 0;
+        return false;
+    }
+    return true;
+}
+
+template<size_t capacity>
+static void CopyZipDisplayText(char (&destination)[capacity], const char* source)
+{
+    // The existing About label is deliberately clipped to its serialized display field.
+    if (FAILED(StringCchCopyNA(destination, capacity, source != NULL ? source : "", capacity - 1)))
+        destination[capacity - 1] = 0;
+}
 
 int CZipPack::PackToArchive(BOOL move, const char* sourcePath,
                             SalEnumSelection2 next, void* param)
@@ -89,7 +118,8 @@ int CZipPack::PackToArchive(BOOL move, const char* sourcePath,
         return ErrorID = IDS_MULTISTORED;
 
     SourcePath = sourcePath;
-    SourceLen = lstrlen(SourcePath);
+    // The selected source root is a terminated local path supplied by the caller.
+    SourceLen = static_cast<int>(strlen(SourcePath));
     if (*(SourcePath + SourceLen - 1) == '\\')
         SourceLen--;
     SkipAllIOErrors = false;
@@ -221,11 +251,11 @@ int CZipPack::DeleteFromArchive(SalEnumSelection next, void* param)
                                         rootDir.Size = 0;
                                         rootDir.StartDisk = 0;
                                         TempFile->FilePointer = /*EONewCentrDir.*/ NewCentrDirOffs;
-                                        rootDir.Name = (char*)malloc(lstrlen(ZipRoot) + 1);
+                                        rootDir.Name = (char*)malloc(strlen(ZipRoot) + 1);
                                         buffer = (char*)malloc(MAX_HEADER_SIZE);
                                         if (buffer && rootDir.Name)
                                         {
-                                            lstrcpy(rootDir.Name, ZipRoot);
+                                            CopyMeasuredZipName(rootDir.Name, ZipRoot, RootLen);
                                             rootDir.NameLen = RootLen;
                                             ErrorID = WriteLocalHeader(&rootDir, buffer);
                                             /*EONewCentrDir.*/ NewCentrDirOffs = /*(unsigned) */ TempFile->FilePointer;
@@ -240,7 +270,7 @@ int CZipPack::DeleteFromArchive(SalEnumSelection next, void* param)
                                         {
                                             if (RootLen && !Config.NoEmptyDirs && filesDeleted == filesInRoot && !exist)
                                             {
-                                                lstrcpy(rootDir.Name, ZipRoot);
+                                                CopyMeasuredZipName(rootDir.Name, ZipRoot, RootLen);
                                                 ErrorID = WriteCentralHeader(&rootDir, buffer, TRUE, FPR_NORMAL);
                                             }
                                             if (!ErrorID)
@@ -323,7 +353,8 @@ BOOL CZipPack::LoadDefaults()
             delete DefLanguage;
             DefLanguage = NULL;
         }
-        lstrcpy(Options.SfxSettings.SfxFile, Config.DefSfxFile);
+        if (!CopyZipSetting(Options.SfxSettings.SfxFile, Config.DefSfxFile))
+            return FALSE;
         char file[MAX_PATH];
         GetModuleFileName(DLLInstance, file, MAX_PATH);
         SalamanderGeneral->CutDirectory(file);
@@ -334,23 +365,25 @@ BOOL CZipPack::LoadDefaults()
             char err[512];
             sprintf(err, LoadStr(IDS_UNABLEREADSFX2), file);
             SalamanderGeneral->ShowMessageBox(err, LoadStr(IDS_ERROR), MSGBOX_ERROR);
-            lstrcpy(Options.SfxSettings.Text, LoadStr(IDS_DEFAULTTEXT));
-            lstrcpy(Options.SfxSettings.Title, LoadStr(IDS_DEFSFXTITLE));
-            lstrcpy(Options.About, "Version 1.40");
-            lstrcpy(Options.SfxSettings.ExtractBtnText, LoadStr(IDS_DEFEXTRBUTTON));
-            lstrcpy(Options.SfxSettings.Vendor, "Self-Extractor © 2000-2023 Taskscape Ltd");
-            lstrcpy(Options.SfxSettings.WWW, "https://www.taskscape.com");
+            if (!CopyZipSetting(Options.SfxSettings.Text, LoadStr(IDS_DEFAULTTEXT)) ||
+                !CopyZipSetting(Options.SfxSettings.Title, LoadStr(IDS_DEFSFXTITLE)) ||
+                !CopyZipSetting(Options.About, "Version 1.40") ||
+                !CopyZipSetting(Options.SfxSettings.ExtractBtnText, LoadStr(IDS_DEFEXTRBUTTON)) ||
+                !CopyZipSetting(Options.SfxSettings.Vendor, "Self-Extractor © 2000-2023 Taskscape Ltd") ||
+                !CopyZipSetting(Options.SfxSettings.WWW, "https://www.taskscape.com"))
+                return FALSE;
         }
         else
         {
-            lstrcpy(Options.SfxSettings.Text, DefLanguage->DlgText);
-            lstrcpy(Options.SfxSettings.Title, DefLanguage->DlgTitle);
-            lstrcpyn(Options.About, DefLanguage->AboutLicenced, SE_MAX_ABOUT);
-            lstrcpy(Options.SfxSettings.ExtractBtnText, DefLanguage->ButtonText);
-            lstrcpy(Options.SfxSettings.Vendor, DefLanguage->Vendor);
-            lstrcpy(Options.SfxSettings.WWW, DefLanguage->WWW);
+            if (!CopyZipSetting(Options.SfxSettings.Text, DefLanguage->DlgText) ||
+                !CopyZipSetting(Options.SfxSettings.Title, DefLanguage->DlgTitle) ||
+                !CopyZipSetting(Options.SfxSettings.ExtractBtnText, DefLanguage->ButtonText) ||
+                !CopyZipSetting(Options.SfxSettings.Vendor, DefLanguage->Vendor) ||
+                !CopyZipSetting(Options.SfxSettings.WWW, DefLanguage->WWW))
+                return FALSE;
+            CopyZipDisplayText(Options.About, DefLanguage->AboutLicenced);
         }
-        lstrcpy(Options.SfxSettings.TargetDir, "");
+        CopyZipSetting(Options.SfxSettings.TargetDir, "");
 
         GetModuleFileName(DLLInstance, Options.SfxSettings.IconFile, MAX_PATH);
         Options.SfxSettings.IconIndex = -IDI_SFXICON;
@@ -413,7 +446,7 @@ int CZipPack::LoadExPackOptions(unsigned flags)
     {
         LastUsedSfxSet.Settings = Options.SfxSettings;
         // this name is only needed internally (it is checked for "" somewhere else)
-        lstrcpy(LastUsedSfxSet.Name, "Last Used");
+        CopyZipSetting(LastUsedSfxSet.Name, "Last Used");
     }
     return 0;
 }
@@ -433,7 +466,8 @@ int CZipPack::CreateSFX()
     if (!LoadDefaults())
         return ErrorID = IDS_NODISPLAY;
 
-    lstrcpy(exeName, ZipName);
+    if (!CopyZipSetting(exeName, ZipName))
+        return ErrorID = IDS_TOOLONGZIPNAME;
     SalamanderGeneral->SalPathRenameExtension(exeName, ".exe", MAX_PATH);
     CCreateSFXDialog dlg(SalamanderGeneral->GetMainWindowHWND(), ZipName, exeName, &Options, this);
     if (dlg.Proceed() != IDOK)
@@ -441,7 +475,7 @@ int CZipPack::CreateSFX()
 
     LastUsedSfxSet.Settings = Options.SfxSettings;
     // this name is only needed internally (it is checked for "" somewhere else)
-    lstrcpy(LastUsedSfxSet.Name, "Last Used");
+    CopyZipSetting(LastUsedSfxSet.Name, "Last Used");
 
     if (Options.SfxSettings.Flags & SE_AUTO)
         Options.SfxSettings.Flags |= SE_NOTALLOWCHANGE;
@@ -482,7 +516,13 @@ int CZipPack::CreateSFX()
     ErrorID = WriteSfxExecutable(exeName, Options.SfxSettings.SfxFile, FALSE, 1);
     if (!ErrorID)
     {
-        if (!WriteSFXHeader("", unsigned(EOCentrDirOffs + ExtraBytes), (unsigned)ZipFile->Size))
+        QWORD sfxCentralDirectoryOffset;
+        DWORD sfxArchiveSize;
+        // Existing ZIP64 inputs cannot be represented by the legacy SFX header's DWORD archive-size field.
+        if (!CheckedAddUInt64(EOCentrDirOffs, ExtraBytes, &sfxCentralDirectoryOffset) ||
+            !CheckedCastUInt64ToDword(ZipFile->Size, &sfxArchiveSize))
+            ErrorID = IDS_TOOBIG2;
+        else if (!WriteSFXHeader("", sfxCentralDirectoryOffset, sfxArchiveSize))
             ErrorID = IDS_NODISPLAY;
         else
         {

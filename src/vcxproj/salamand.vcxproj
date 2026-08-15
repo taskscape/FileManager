@@ -615,6 +615,10 @@
     </ClCompile>
     <ClCompile Include="..\file_operation_filesystem.cpp">
     </ClCompile>
+    <ClCompile Include="..\operation_execution_filesystem.cpp">
+      <!-- This linkable test seam deliberately has no precompiled-header dependency. -->
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+    </ClCompile>
     <ClCompile Include="..\file_identity.cpp">
     </ClCompile>
     <ClCompile Include="..\iconpool.cpp">

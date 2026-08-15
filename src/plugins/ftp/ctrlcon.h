@@ -4,6 +4,8 @@
 
 #pragma once
 
+#include "..\\..\\common\\monotonic_time.h"
+
 // ***************************************************************************
 // functions:
 
@@ -640,7 +642,8 @@ protected:
     int ReadBytesOffset;        // number of bytes already processed (skipped) in the 'ReadBytes' buffer
     int ReadBytesAllocatedSize; // allocated size of the 'ReadBytes' buffer
 
-    DWORD StartTime; // start time of the tracked operation (used to compute timeouts and wait windows)
+    // A 64-bit start avoids silently shortening operation UI timeouts after system tick wrap.
+    CMonotonicTimePoint StartTime;
 
     int LogUID; // log UID for this connection (-1 until the log is created)
 
@@ -698,9 +701,13 @@ public:
     // methods for tracking the duration of an operation with the socket:
     // WARNING: not synchronized - use from one thread or apply other synchronization
     //
-    // sets the start time of the operation (time step approx. 10 ms - uses GetTickCount)
-    void SetStartTime(BOOL setOldTime = FALSE) { StartTime = GetTickCount() - (setOldTime ? 60000 : 0); }
-    // returns the number of ms since the operation started (maximum duration is roughly 50 days)
+    // The compatibility "old" start remains one minute back while the stored clock stays monotonic.
+    void SetStartTime(BOOL setOldTime = FALSE)
+    {
+        const CMonotonicTimePoint now = CMonotonicClock::Now();
+        StartTime = setOldTime && now >= 60000 ? now - 60000 : now;
+    }
+    // returns the number of ms since the operation started, saturated only for its DWORD UI caller
     DWORD GetTimeFromStart();
     // subtracts the time since the operation started from 'showTime', returns at least 0 ms (no negative numbers)
     DWORD GetWaitTime(DWORD showTime);

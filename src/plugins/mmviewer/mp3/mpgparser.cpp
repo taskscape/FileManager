@@ -3,6 +3,8 @@
 
 #include "precomp.h"
 
+#include <strsafe.h>
+
 #ifdef _MPG_SUPPORT_
 
 #include "mpgparser.h"
@@ -128,10 +130,11 @@ CParserMPG::GetFileInfo(COutputInterface* output)
                 }
 
                 DWORD length_sec = mpeginfo.length_msec / 1000;
-                if (length_sec / 3600)
-                    lstrcpy(mpeginfo.str_time, FStr("%02lu:%02lu:%02lu", length_sec / 3600, length_sec / 60 % 60, length_sec % 60));
-                else
-                    lstrcpy(mpeginfo.str_time, FStr("%02lu:%02lu", length_sec / 60 % 60, length_sec % 60));
+                const char* formattedTime = length_sec / 3600 ? FStr("%02lu:%02lu:%02lu", length_sec / 3600, length_sec / 60 % 60, length_sec % 60)
+                                                               : FStr("%02lu:%02lu", length_sec / 60 % 60, length_sec % 60);
+                // A failed display-label copy must not expose a partial duration.
+                if (FAILED(StringCchCopyA(mpeginfo.str_time, _countof(mpeginfo.str_time), formattedTime)))
+                    mpeginfo.str_time[0] = 0;
             }
         }
         else

@@ -26,24 +26,27 @@ void FreeRegion(void * region)
 
 CDelRegion::CDelRegion(const char* descript, DWORD offset, DWORD size, const char* fileName)
 {
+    Description = NULL;
+    FileName = NULL;
+
     if (descript)
     {
-        Description = (char*)malloc(lstrlen(descript) + 1);
+        const size_t descriptionLength = strlen(descript) + 1;
+        Description = (char*)malloc(descriptionLength);
         if (Description)
-            lstrcpy(Description, descript);
+            // The allocation is sized from this source, so copy its exact byte range without a legacy string API.
+            memcpy(Description, descript, descriptionLength);
     }
-    else
-        Description = NULL;
     Offset = offset;
     Size = size;
     if (fileName)
     {
-        FileName = (char*)malloc(lstrlen(fileName) + 1);
+        const size_t fileNameLength = strlen(fileName) + 1;
+        FileName = (char*)malloc(fileNameLength);
         if (FileName)
-            lstrcpy(FileName, fileName);
+            // The allocation is sized from this source, so copy its exact byte range without a legacy string API.
+            memcpy(FileName, fileName, fileNameLength);
     }
-    else
-        FileName = NULL;
 }
 
 CDelRegion::~CDelRegion()
@@ -336,6 +339,7 @@ BOOL CPakIface::AddFile(const char* fileName, DWORD size)
     char buffer[IOBUFSIZE];
     const char* sour = fileName;
     char* dest = PakDir[DirSize].FileName;
+    const size_t parentDirectoryLength = strlen(PAK_UPDIR);
 
     while (*sour)
     {
@@ -347,9 +351,10 @@ BOOL CPakIface::AddFile(const char* fileName, DWORD size)
             sour++;
             continue;
         }
-        if (strncmp(sour, PAK_UPDIR, lstrlen(PAK_UPDIR)) == 0)
+        if (strncmp(sour, PAK_UPDIR, parentDirectoryLength) == 0)
         {
-            sour = sour + lstrlen(PAK_UPDIR);
+            // Use the one measured constant length for both recognition and consumption of the parent marker.
+            sour += parentDirectoryLength;
             *dest++ = '.';
             *dest++ = '.';
             continue;

@@ -4,6 +4,8 @@
 
 #include "precomp.h"
 
+#include <strsafe.h>
+
 #include "mainwnd.h"
 #include "usermenu.h"
 #include "edtlbwnd.h"
@@ -227,8 +229,9 @@ void CLoadSaveToRegistryMutex::Init()
 
     if (psidEveryone != NULL)
         FreeSid(psidEveryone);
+    // CreateMutex has consumed the descriptor, so release the process-heap ACL backing it.
     if (paclNewDacl != NULL)
-        LocalFree(paclNewDacl);
+        HeapFree(GetProcessHeap(), 0, paclNewDacl);
 
     DebugCheck = 0;
 }
@@ -861,8 +864,11 @@ CConfigPageGeneral::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 CConfigPageRegional::CConfigPageRegional()
     : CCommonPropSheetPage(NULL, HLanguage, IDD_CFGPAGE_REGIONAL, IDD_CFGPAGE_REGIONAL, PSP_USETITLE, NULL)
 {
-    lstrcpy(SLGName, Configuration.SLGName);
-    lstrcpy(DirName, Configuration.ConversionTable);
+    // Invalid persisted paths must fall back to the dialog's empty selection state.
+    if (FAILED(StringCchCopyA(SLGName, _countof(SLGName), Configuration.SLGName)))
+        SLGName[0] = 0;
+    if (FAILED(StringCchCopyA(DirName, _countof(DirName), Configuration.ConversionTable)))
+        DirName[0] = 0;
 }
 
 void CConfigPageRegional::LoadControls()
@@ -889,13 +895,15 @@ void CConfigPageRegional::Transfer(CTransferInfo& ti)
         {
             SalMessageBox(HWindow, LoadStr(IDS_LANGUAGE_CHANGE), LoadStr(IDS_INFOTITLE),
                           MB_OK | MB_ICONINFORMATION);
-            lstrcpy(Configuration.SLGName, SLGName);
+            if (FAILED(StringCchCopyA(Configuration.SLGName, _countof(Configuration.SLGName), SLGName)))
+                Configuration.SLGName[0] = 0;
             Configuration.ShowSLGIncomplete = TRUE; // if the language is not complete, show a message at startup (recruit translators)
         }
         // if the table has changed and the old one is already loaded we need to restart Salamander
         if (stricmp(Configuration.ConversionTable, DirName) != 0)
         {
-            lstrcpy(Configuration.ConversionTable, DirName);
+            if (FAILED(StringCchCopyA(Configuration.ConversionTable, _countof(Configuration.ConversionTable), DirName)))
+                Configuration.ConversionTable[0] = 0;
             if (CodeTables.IsLoaded())
             {
                 SalMessageBox(HWindow, LoadStr(IDS_CONVERSION_CHANGE), LoadStr(IDS_INFOTITLE),
@@ -1023,30 +1031,34 @@ void CConfigPageView::Transfer(CTransferInfo& ti)
             lvi.pszText = Config.Items[i].Name;
             ListView_InsertItem(HListView, &lvi);
 
+            const char* modeName = NULL;
             switch (Config.Items[i].Mode)
             {
             case VIEW_MODE_TREE:
-                lstrcpy(buff, LoadStr(IDS_TREE_VIEW_NAME));
+                modeName = LoadStr(IDS_TREE_VIEW_NAME);
                 break;
             case VIEW_MODE_BRIEF:
-                lstrcpy(buff, LoadStr(IDS_BRIEF_VIEW_NAME));
+                modeName = LoadStr(IDS_BRIEF_VIEW_NAME);
                 break;
             case VIEW_MODE_DETAILED:
-                lstrcpy(buff, LoadStr(IDS_DETAILED_VIEW_NAME));
+                modeName = LoadStr(IDS_DETAILED_VIEW_NAME);
                 break;
             case VIEW_MODE_ICONS:
-                lstrcpy(buff, LoadStr(IDS_ICONS_VIEW_NAME));
+                modeName = LoadStr(IDS_ICONS_VIEW_NAME);
                 break;
             case VIEW_MODE_THUMBNAILS:
-                lstrcpy(buff, LoadStr(IDS_THUMBNAILS_VIEW_NAME));
+                modeName = LoadStr(IDS_THUMBNAILS_VIEW_NAME);
                 break;
             case VIEW_MODE_TILES:
-                lstrcpy(buff, LoadStr(IDS_TILES_VIEW_NAME));
+                modeName = LoadStr(IDS_TILES_VIEW_NAME);
                 break;
             }
+            if (modeName == NULL || FAILED(StringCchCopyA(buff, _countof(buff), modeName)))
+                buff[0] = 0;
             ListViewSetItemTextUtf8(HListView, i, 1, buff);
 
-            sprintf(buff, "Alt+%d", i < VIEW_TEMPLATES_COUNT - 1 ? i + 1 : 0);
+            if (FAILED(StringCchPrintfA(buff, _countof(buff), "Alt+%d", i < VIEW_TEMPLATES_COUNT - 1 ? i + 1 : 0)))
+                buff[0] = 0;
             ListViewSetItemTextUtf8(HListView, i, 2, buff);
         }
         // set column widths
@@ -1214,7 +1226,7 @@ CConfigPageView::GetEnabledFunctions()
         if (index > 6)
         {
             mask |= TLBHDRMASK_MODIFY;
-            if (lstrlen(Config.Items[index].Name) > 0)
+            if (strlen(Config.Items[index].Name) > 0)
             {
                 mask |= TLBHDRMASK_DELETE;
                 if (index > 7)
@@ -1509,12 +1521,14 @@ CConfigPageView::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                 if (nmhd->item.pszText != NULL)
                 {
                     char name[VIEW_NAME_MAX];
-                    lstrcpyn(name, nmhd->item.pszText, VIEW_NAME_MAX);
+                    // Retain the existing bounded-edit prefix rather than overflowing view-template metadata.
+                    StringCchCopyNA(name, _countof(name), nmhd->item.pszText, _countof(name) - 1);
                     Config.CleanName(name);
                     int index = nmhd->item.iItem;
-                    if (lstrlen(Config.Items[index].Name) == 0)
+                    if (strlen(Config.Items[index].Name) == 0)
                         Config.Items[index].Flags = 0;
-                    lstrcpy(Config.Items[index].Name, name);
+                    if (FAILED(StringCchCopyA(Config.Items[index].Name, _countof(Config.Items[index].Name), name)))
+                        Config.Items[index].Name[0] = 0;
                     LoadControls();
                     ListViewSetItemTextUtf8(HListView, index, 0, name);
                     Dirty = TRUE;
@@ -1649,7 +1663,8 @@ void CCfgPageViewer::Validate(CTransferInfo& ti)
     char buf[MAX_PATH];
     if (ti.IsGood())
     {
-        lstrcpyn(buf, Configuration.TextModeMasks.GetMasksString(), MAX_PATH); // backup of TextModeMasks
+        // Mask storage is constrained to MAX_PATH; preserve the complete value for validation rollback.
+        StringCchCopyA(buf, _countof(buf), Configuration.TextModeMasks.GetMasksString());
         // provide MasksString, there is range checking, nothing serious
         ti.EditLine(IDC_VIEW_INTEXT, Configuration.TextModeMasks.GetWritableMasksString(), MAX_PATH);
         int errorPos;
@@ -1667,7 +1682,8 @@ void CCfgPageViewer::Validate(CTransferInfo& ti)
 
     if (ti.IsGood())
     {
-        lstrcpyn(buf, Configuration.HexModeMasks.GetMasksString(), MAX_PATH); // backup of HexModeMasks
+        // Mask storage is constrained to MAX_PATH; preserve the complete value for validation rollback.
+        StringCchCopyA(buf, _countof(buf), Configuration.HexModeMasks.GetMasksString());
         // provide MasksString, there is range checking, nothing serious
         ti.EditLine(IDC_VIEW_INHEX, (char*)Configuration.HexModeMasks.GetWritableMasksString(), MAX_PATH);
         int errorPos;
@@ -3083,7 +3099,8 @@ CCfgPageHotPath::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                 if (nmhd->item.pszText != NULL)
                 {
                     char name[MAX_PATH];
-                    lstrcpyn(name, nmhd->item.pszText, MAX_PATH);
+                    // Hot-path labels retain their fixed editable display field.
+                    StringCchCopyNA(name, _countof(name), nmhd->item.pszText, _countof(name) - 1);
                     Config->CleanName(name);
                     int index = nmhd->item.iItem;
                     char path[HOTPATHITEM_MAXPATH];
@@ -3176,7 +3193,8 @@ void CCfgPageSystem::Validate(CTransferInfo& ti)
     if (useRecycle == 2)
     {
         char buf[MAX_PATH];
-        lstrcpyn(buf, Configuration.RecycleMasks.GetMasksString(), MAX_PATH); // backup of RecycleBinMasks
+        // Mask storage is constrained to MAX_PATH; preserve the complete value for validation rollback.
+        StringCchCopyA(buf, _countof(buf), Configuration.RecycleMasks.GetMasksString());
         // provide MasksString, there is range checking, nothing serious
         ti.EditLine(IDE_RECYCLEMASKS, Configuration.RecycleMasks.GetWritableMasksString(), MAX_PATH);
         int errorPos;
@@ -3917,7 +3935,9 @@ MENU_TEMPLATE_ITEM CfgPageColorsMenu3[] =
                 EDTLB_DISPINFO* dispInfo = (EDTLB_DISPINFO*)lParam;
                 if (dispInfo->ToDo == edtlbGetData)
                 {
-                    lstrcpyn(dispInfo->Buffer, ((CHighlightMasksItem*)dispInfo->ItemID)->Masks->GetMasksString(), MAX_PATH);
+                    // The edit-list control supplies a MAX_PATH display field for mask text.
+                    StringCchCopyNA(dispInfo->Buffer, MAX_PATH,
+                                    ((CHighlightMasksItem*)dispInfo->ItemID)->Masks->GetMasksString(), MAX_PATH - 1);
                     SetWindowLongPtr(HWindow, DWLP_MSGRESULT, FALSE);
                     return TRUE;
                 }

@@ -7,6 +7,7 @@
 #include <crtdbg.h>
 #include <ostream>
 #include <commctrl.h> // potrebuju LPCOLORMAP
+#include <strsafe.h>
 
 #if defined(_DEBUG) && defined(_MSC_VER) // without passing file+line to 'new' operator, list of memory leaks shows only 'crtdbg.h(552)'
 #define new new (_NORMAL_BLOCK, __FILE__, __LINE__)
@@ -100,8 +101,18 @@ char* DupStrEx(const char* str, BOOL& err)
 
 char* StrNCat(char* dst, const char* src, int dstSize)
 {
-    int i = lstrlenA(dst);
-    lstrcpynA(dst + i, src, dstSize - i);
+    // This helper deliberately clips appends, but only after confirming the existing field is terminated.
+    if (dst == NULL || src == NULL || dstSize <= 0)
+        return dst;
+
+    size_t destinationLength;
+    if (FAILED(StringCchLengthA(dst, static_cast<size_t>(dstSize), &destinationLength)))
+    {
+        dst[0] = 0;
+        return dst;
+    }
+    StringCchCopyNA(dst + destinationLength, static_cast<size_t>(dstSize) - destinationLength,
+                    src, static_cast<size_t>(dstSize) - destinationLength - 1);
     return dst;
 }
 

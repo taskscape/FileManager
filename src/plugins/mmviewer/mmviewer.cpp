@@ -14,6 +14,8 @@
 #include "buffer.h"
 #include "parser.h"
 
+#include <strsafe.h>
+
 // plugin interface object, its methods are called from Salamander
 CPluginInterface PluginInterface;
 // part of the CPluginInterface interface for the viewer
@@ -1083,7 +1085,12 @@ CViewerWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
     case WM_USER_TBGETTOOLTIP:
     {
         TOOLBAR_TOOLTIP* tt = (TOOLBAR_TOOLTIP*)lParam;
-        lstrcpy(tt->Buffer, LoadStr(ToolBarButtons[tt->Index].ToolTipResID));
+        // The host toolbar owns a fixed reply buffer, so do not truncate a localized tooltip.
+        if (tt == NULL || tt->Buffer == NULL)
+            return TRUE;
+        if (FAILED(StringCchCopyA(tt->Buffer, TOOLTIP_TEXT_MAX,
+                                  LoadStr(ToolBarButtons[tt->Index].ToolTipResID))))
+            tt->Buffer[0] = 0;
         SalamanderGUI->PrepareToolTipText(tt->Buffer, FALSE);
         return TRUE;
     }

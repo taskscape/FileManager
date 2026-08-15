@@ -3,6 +3,7 @@
 // CommentsTranslationProject: TRANSLATED
 
 #include "precomp.h"
+#include <strsafe.h>
 
 #include "cfgdlg.h"
 #include "dialogs.h"
@@ -833,8 +834,8 @@ BOOL CLanguageSelectorDialog::GetSLGName(char* path, int index)
 {
     if (index >= Items.Count)
         return FALSE;
-    lstrcpy(path, Items[index].FileName);
-    return TRUE;
+    // Language module names are later reopened, so do not return a clipped identity.
+    return path != NULL && SUCCEEDED(StringCchCopyA(path, MAX_PATH, Items[index].FileName));
 }
 
 BOOL CLanguageSelectorDialog::SLGNameExists(const char* slgName)
@@ -913,11 +914,12 @@ void CLanguageSelectorDialog::Transfer(CTransferInfo& ti)
         int index = ListView_GetNextItem(HListView, -1, LVIS_FOCUSED);
         if (index != -1)
         {
-            lstrcpy(SLGName, Items[index].FileName);
+            if (FAILED(StringCchCopyA(SLGName, MAX_PATH, Items[index].FileName)))
+                return;
             if (PluginName != NULL) // store the alternative language name only when selecting an alternative language for a plug-in
             {
                 if (Configuration.UseAsAltSLGInOtherPlugins)
-                    lstrcpy(Configuration.AltPluginSLGName, SLGName);
+                    StringCchCopyA(Configuration.AltPluginSLGName, _countof(Configuration.AltPluginSLGName), SLGName);
                 else
                     Configuration.AltPluginSLGName[0] = 0;
             }
@@ -933,7 +935,11 @@ BOOL CLanguageSelectorDialog::Initialize(const char* slgSearchPath, HINSTANCE pl
         GetModuleFileNameW(NULL, pathW, MAX_PATH);
         WCHAR* pathEnd = wcsrchr(pathW, L'\\');
         if (pathEnd != NULL)
-            lstrcpyW(pathEnd + 1, L"lang\\*.slg");
+        {
+            // Keep the module directory only when the language search leaf fits in the remaining field.
+            if (FAILED(StringCchCopyW(pathEnd + 1, _countof(pathW) - (pathEnd + 1 - pathW), L"lang\\*.slg")))
+                pathW[0] = 0;
+        }
     }
     else
     {

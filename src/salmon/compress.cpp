@@ -52,6 +52,12 @@ BOOL CopyBoundedCrashReportText(const char* source, size_t sourceCapacity, std::
     return TRUE;
 }
 
+BOOL IsSafeCrashReportBaseName(const std::string& reportName)
+{
+    // Report names come from a shared report directory; delimiters must not widen the wrapper's explicit file list.
+    return !reportName.empty() && reportName.find_first_of("\\/:*?\"<>|") == std::string::npos;
+}
+
 BOOL GetModuleFileNameOwned(std::wstring* moduleFileName)
 {
     DWORD capacity = MAX_PATH;
@@ -266,7 +272,16 @@ BOOL CompresBugReports(CCompressParams* compressParams, HANDLE stopEvent)
                     return FALSE;
                 }
 
-                std::string mask = reportName + ".*";
+                if (!IsSafeCrashReportBaseName(reportName))
+                {
+                    SetLastError(ERROR_INVALID_NAME);
+                    SetCompressionError(compressParams, "Crash report name contains an unsafe path or filter character.");
+                    return FALSE;
+                }
+
+                // Archive only documented report artifacts; a wildcard could export unrelated same-prefix files.
+                std::string filter = reportName + ".DMP|" + reportName + ".TXT|" +
+                                     reportName + ".INF|" + reportName + ".OPS";
                 std::string archive = sourceDirectory;
                 if (archive[archive.size() - 1] != '\\')
                     archive.append("\\");
@@ -289,8 +304,14 @@ BOOL CompresBugReports(CCompressParams* compressParams, HANDLE stopEvent)
                 DeleteFileW(archiveApiPath); // so the subsequent compression does not fail
 
                 error[0] = 0;
-                BOOL res = CompressFiles(archive.c_str(), sourceDirectory.c_str(), mask.c_str(), &error[0], (int)error.size());
+                BOOL res = CompressFiles(archive.c_str(), sourceDirectory.c_str(), filter.c_str(), &error[0], (int)error.size());
                 error[error.size() - 1] = 0;
+                if (res && !EnsureCrashReportDirectoryEncrypted(archive.c_str()))
+                {
+                    // Do not claim a successful report archive when its enclosing at-rest protection was lost.
+                    SetCompressionError(compressParams, "Unable to encrypt the crash-report directory (%lu).", GetLastError());
+                    return FALSE;
+                }
                 if (!res)
                     lstrcpyn(compressParams->ErrorMessage, &error[0], _countof(compressParams->ErrorMessage));
                 ret &= res;

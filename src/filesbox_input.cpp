@@ -14,6 +14,8 @@
 #include "shellib.h"
 #include "snooper.h"
 
+#include <wchar.h>
+
 static BOOL TextOutUtf8(HDC hdc, int x, int y, const char* text, int len)
 {
     if (text == NULL || len <= 0)
@@ -21,7 +23,8 @@ static BOOL TextOutUtf8(HDC hdc, int x, int y, const char* text, int len)
     CStrP textW(ConvertAllocUtf8ToWide(text, -1));
     if (textW == NULL)
         return TextOutW(hdc, x, y, L"?", 1);
-    return TextOutW(hdc, x, y, textW, lstrlenW(textW));
+    // Converted display text is terminated by the UTF-8 conversion helper.
+    return TextOutW(hdc, x, y, textW, (int)wcslen(textW));
 }
 
 //****************************************************************************
@@ -236,7 +239,8 @@ void CFileListHeader::PaintItem(HDC hDC, int index, int x)
         HFONT hOldFont = (HFONT)SelectObject(ItemBitmap.HMemDC, hot1 && Configuration.SingleClick ? FontUL : Font);
         int oldMode = SetBkMode(ItemBitmap.HMemDC, TRANSPARENT);
         COLORREF oldColor = SetTextColor(ItemBitmap.HMemDC, hot1 ? GetCOLORREF(CurrentColors[HOT_PANEL]) : GetSysColor(COLOR_BTNTEXT));
-        int nameLen = lstrlen(column->Name);
+        // Column names are owned terminated display strings.
+        int nameLen = (int)strlen(column->Name);
         TextOutUtf8(ItemBitmap.HMemDC, r.left + 3, (r.bottom - FontCharHeight) / 2, column->Name, nameLen);
 
         SIZE sz;
@@ -351,7 +355,8 @@ void CFileListHeader::SetMinWidths()
     for (i = 0; i < columnsCount; i++)
     {
         CColumn* column = &Columns->At(i);
-        GetTextExtentPoint32(hDC, column->Name, lstrlen(column->Name), &sz);
+        // Column names are owned terminated display strings.
+        GetTextExtentPoint32(hDC, column->Name, (int)strlen(column->Name), &sz);
         column->MinWidth = 1 + 3 + sz.cx + 3 + 1;
 
         // if the column is sortable, add width of the bitmap and the spacing around it
@@ -408,7 +413,8 @@ CFileListHeader::HitTest(int xPos, int yPos, int& index, BOOL& extInName)
                 // measure the base text
                 SIZE sz;
                 HFONT hOldFont = (HFONT)SelectObject(ItemBitmap.HMemDC, Font);
-                GetTextExtentPoint32(ItemBitmap.HMemDC, column->Name, lstrlen(column->Name), &sz);
+                // Column names are owned terminated display strings.
+                GetTextExtentPoint32(ItemBitmap.HMemDC, column->Name, (int)strlen(column->Name), &sz);
                 SelectObject(ItemBitmap.HMemDC, hOldFont);
                 if (xPos - left >= 1 + 3 + sz.cx + 3 * SORT_BITMAP_W)
                     extInName = TRUE;

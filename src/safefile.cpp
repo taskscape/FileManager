@@ -13,7 +13,17 @@
 #include "zip.h"
 #include "spl_file.h"
 
+#include <strsafe.h>
+
 CSalamanderSafeFile SalSafeFile;
+
+// A skipped path is later used as an identity; never return a silently truncated value to the caller.
+static void SetSkippedPath(char* skipPath, int skipPathMax, const char* fileName)
+{
+    if (skipPath != NULL && skipPathMax > 0 &&
+        FAILED(StringCchCopyA(skipPath, skipPathMax, fileName)))
+        skipPath[0] = 0;
+}
 
 static HANDLE CreateFileUtf8(const char* fileName, DWORD dwDesiredAccess, DWORD dwShareMode,
                              LPSECURITY_ATTRIBUTES lpSecurityAttributes, DWORD dwCreationDisposition,
@@ -174,14 +184,18 @@ CSalamanderSafeFile::SafeFileCreate(const char* fileName,
                     }
                     else
                     {
-                        lstrcpyn(tmpName, fileName, _countof(tmpName));
+                        // The DOS-name workaround starts only from a complete original file identity.
+                        if (FAILED(StringCchCopyA(tmpName, _countof(tmpName), fileName)))
+                            continue;
                         CutDirectory(tmpName);
                         SalPathAddBackslash(tmpName, _countof(tmpName));
                         char* tmpNamePart = tmpName + strlen(tmpName);
                         if (SalPathAppend(tmpName, data.cFileName, _countof(tmpName)))
                         {
                             strcpy(origFullName, tmpName);
-                            DWORD num = (GetTickCount() / 10) % 0xFFF;
+                            // Fold the 64-bit uptime so the collision-checked temporary-name seed varies after 32-bit tick wrap.
+                            const CMonotonicTimePoint timeSeed = CMonotonicClock::Now();
+                            DWORD num = (DWORD)((timeSeed ^ (timeSeed >> 32)) / 10) % 0xFFF;
                             while (1)
                             {
                                 sprintf(tmpNamePart, "sal%03X", num++);
@@ -290,8 +304,7 @@ CSalamanderSafeFile::SafeFileCreate(const char* fileName,
                 case DIALOG_SKIP:
                     if (skipped != NULL)
                         *skipped = TRUE;
-                    if (skipPath != NULL)
-                        lstrcpyn(skipPath, fileName, skipPathMax); // the user wants to return the skipped path
+                    SetSkippedPath(skipPath, skipPathMax, fileName); // the user wants to return the skipped path
                     return INVALID_HANDLE_VALUE;
                 case DIALOG_CANCEL:
                 case DIALOG_FAIL:
@@ -317,7 +330,10 @@ CSalamanderSafeFile::SafeFileCreate(const char* fileName,
                         HANDLES(CloseHandle(file2));
                     }
                     else
-                        lstrcpyn(fibuffer, LoadStr(IDS_ERR_FILEOPEN), _countof(fibuffer));
+                    {
+                        // Error text remains a deliberately bounded overwrite-dialog display field.
+                        StringCchCopyNA(fibuffer, _countof(fibuffer), LoadStr(IDS_ERR_FILEOPEN), _countof(fibuffer) - 1);
+                    }
                     if (srcFileName != NULL)
                     {
                         // CONFIRM FILE OVERWRITE: filename1+filedata1+filename2+filedata2, buttons yes/all/skip/skip all/cancel
@@ -425,8 +441,8 @@ CSalamanderSafeFile::SafeFileCreate(const char* fileName,
             {
                 if (skipped != NULL)
                     *skipped = TRUE;
-                if (isDir && skipPath != NULL)
-                    lstrcpyn(skipPath, fileName, skipPathMax); // the user wants to retrieve the skipped path
+                if (isDir)
+                    SetSkippedPath(skipPath, skipPathMax, fileName); // the user wants to retrieve the skipped path
             }
             }
             return INVALID_HANDLE_VALUE;
@@ -471,8 +487,7 @@ CSalamanderSafeFile::SafeFileCreate(const char* fileName,
                     case DIALOG_SKIP:
                         if (skipped != NULL)
                             *skipped = TRUE;
-                        if (skipPath != NULL)
-                            lstrcpyn(skipPath, namecopy, skipPathMax); // the user wants to return the skipped path
+                        SetSkippedPath(skipPath, skipPathMax, namecopy); // the user wants to return the skipped path
                         return INVALID_HANDLE_VALUE;
                     case DIALOG_CANCEL:
                     case DIALOG_FAIL:
@@ -506,8 +521,7 @@ CSalamanderSafeFile::SafeFileCreate(const char* fileName,
             case DIALOG_SKIP:
                 if (skipped != NULL)
                     *skipped = TRUE;
-                if (skipPath != NULL)
-                    lstrcpyn(skipPath, namecopy, skipPathMax); // the user wants to return the skipped path
+                SetSkippedPath(skipPath, skipPathMax, namecopy); // the user wants to return the skipped path
             }
             return INVALID_HANDLE_VALUE;
         }
@@ -536,8 +550,7 @@ CSalamanderSafeFile::SafeFileCreate(const char* fileName,
                 case DIALOG_SKIP:
                     if (skipped != NULL)
                         *skipped = TRUE;
-                    if (skipPath != NULL)
-                        lstrcpyn(skipPath, namecpy2, skipPathMax); // the user wants to retrieve the skipped path
+                    SetSkippedPath(skipPath, skipPathMax, namecpy2); // the user wants to retrieve the skipped path
                 }
                 return INVALID_HANDLE_VALUE;
             }
@@ -573,8 +586,7 @@ CSalamanderSafeFile::SafeFileCreate(const char* fileName,
                         case DIALOG_SKIP:
                             if (skipped != NULL)
                                 *skipped = TRUE;
-                            if (skipPath != NULL)
-                                lstrcpyn(skipPath, namecpy2, skipPathMax); // the user wants to return the skipped path
+                            SetSkippedPath(skipPath, skipPathMax, namecpy2); // the user wants to return the skipped path
                             return INVALID_HANDLE_VALUE;
                         case DIALOG_CANCEL:
                         case DIALOG_FAIL:
@@ -636,8 +648,7 @@ CSalamanderSafeFile::SafeFileCreate(const char* fileName,
                 case DIALOG_SKIP:
                     if (skipped != NULL)
                         *skipped = TRUE;
-                    if (skipPath != NULL)
-                        lstrcpyn(skipPath, namecpy2, skipPathMax); // the user wants to return the skipped path
+                    SetSkippedPath(skipPath, skipPathMax, namecpy2); // the user wants to return the skipped path
                     return INVALID_HANDLE_VALUE;
 
                 case DIALOG_CANCEL:
@@ -715,13 +726,14 @@ CREATE_FILE:
                 TRACE_E("SafeFileCreate: (WARNING) allocateWholeFile less than 2");
 
         SET_SIZE_AGAIN:
-            CQuadWord off = *allocateWholeFile;
-            off.LoDWord = SetFilePointer(hFile, off.LoDWord, (LONG*)&(off.HiDWord), FILE_BEGIN);
-            if ((off.LoDWord != INVALID_SET_FILE_POINTER || GetLastError() == NO_ERROR) && off == *allocateWholeFile)
+            // Keep preallocation offsets on the same unambiguous 64-bit contract as normal safe-file I/O.
+            CFileOffsetResult seekResult = SalSetFilePointerEx(hFile, *allocateWholeFile, FILE_BEGIN);
+            if (seekResult.Succeeded && seekResult.Value == *allocateWholeFile)
             {
                 if (SetEndOfFile(hFile))
                 {
-                    if (SetFilePointer(hFile, 0, NULL, FILE_BEGIN) == 0)
+                    CFileOffsetResult resetResult = SalSetFilePointerEx(hFile, CQuadWord(0, 0), FILE_BEGIN);
+                    if (resetResult.Succeeded && resetResult.Value == CQuadWord(0, 0))
                     {
                         if (needWholeAllocTest)
                         {
@@ -730,9 +742,8 @@ CREATE_FILE:
                             {
                                 if (SetEndOfFile(hFile)) // try truncating the file to one byte
                                 {
-                                    CQuadWord size;
-                                    size.LoDWord = GetFileSize(hFile, &size.HiDWord);
-                                    if (size == CQuadWord(1, 0))
+                                    CFileOffsetResult sizeResult = SalGetFileSizeEx(hFile);
+                                    if (sizeResult.Succeeded && sizeResult.Value == CQuadWord(1, 0))
                                     { // check whether the written byte was appended to the end of the file and whether we can truncate the file
                                         needWholeAllocTest = FALSE;
                                         goto SET_SIZE_AGAIN; // we have to set the full file size again
@@ -765,7 +776,7 @@ CREATE_FILE:
                     *allocateWholeFile = CQuadWord(0, 0); // the file could not be prepared, but we will try again next time
 
                 // also try truncating the file to zero to avoid unnecessary writing when closing the file
-                SetFilePointer(hFile, 0, NULL, FILE_BEGIN);
+                SalSetFilePointerEx(hFile, CQuadWord(0, 0), FILE_BEGIN);
                 SetEndOfFile(hFile);
 
                 CloseHandle(hFile);
@@ -825,24 +836,15 @@ BOOL CSalamanderSafeFile::SafeFileSeek(SAFE_FILE* file, CQuadWord* distance, DWO
         return FALSE;
     }
 
-    LARGE_INTEGER li;
-    li.QuadPart = distance->Value;
-
-    LONG lo = li.LowPart;
-    LONG hi = li.HighPart;
-
-    lo = SetFilePointer(file->HFile, lo, &hi, moveMethod);
-
-    if (lo == 0xFFFFFFFF && GetLastError() != NO_ERROR)
+    // Preserve the requested 64-bit offset and its explicit error code rather than relying on a DWORD sentinel.
+    CFileOffsetResult result = SalSetFilePointerEx(file->HFile, *distance, moveMethod);
+    if (!result.Succeeded)
     {
         if (error != NULL)
-            *error = GetLastError();
+            *error = result.Error;
         return FALSE;
     }
-
-    li.LowPart = lo;
-    li.HighPart = hi;
-    distance->Value = li.QuadPart;
+    *distance = result.Value;
     return TRUE;
 }
 
@@ -909,11 +911,15 @@ BOOL CSalamanderSafeFile::SafeFileRead(SAFE_FILE* file, LPVOID lpBuffer,
         TRACE_E("CSalamanderSafeFile::SafeFileRead() HFile==NULL");
         return FALSE;
     }
-    // obtain the current seek position in the file
-    long currentSeekHi = 0;
-    DWORD currentSeekLo = SetFilePointer(file->HFile, 0, &currentSeekHi, FILE_CURRENT);
-    if (currentSeekLo == 0xFFFFFFFF && GetLastError() != NO_ERROR)
+    // Obtain the complete current offset once so retry can restore it without reconstructing DWORD halves.
+    CQuadWord currentSeek(0, 0);
+    CFileOffsetResult currentSeekResult = SalSetFilePointerEx(file->HFile, CQuadWord(0, 0), FILE_CURRENT);
+    if (!currentSeekResult.Succeeded)
+    {
+        SetLastError(currentSeekResult.Error);
         goto READ_ERROR; // cannot set the offset, try again
+    }
+    currentSeek = currentSeekResult.Value;
 
     while (TRUE)
     {
@@ -976,12 +982,13 @@ BOOL CSalamanderSafeFile::SafeFileRead(SAFE_FILE* file, LPVOID lpBuffer,
                 if (file->HFile != INVALID_HANDLE_VALUE) // opened; now set the offset
                 {
                 SEEK:
-                    LONG lo = currentSeekLo;
-                    LONG hi = currentSeekHi;
-                    lo = SetFilePointer(file->HFile, lo, &hi, FILE_BEGIN);
-                    if (lo == 0xFFFFFFFF && GetLastError() != NO_ERROR)
+                    CFileOffsetResult restoreResult = SalSetFilePointerEx(file->HFile, currentSeek, FILE_BEGIN);
+                    if (!restoreResult.Succeeded)
+                    {
+                        SetLastError(restoreResult.Error);
                         goto READ_ERROR; // cannot set the offset, try again
-                    if (lo != (long)currentSeekLo || hi != currentSeekHi)
+                    }
+                    if (restoreResult.Value != currentSeek)
                     {
                         SetLastError(ERROR_SEEK_ON_DEVICE);
                         goto READ_ERROR; // cannot set the offset (the file may already be smaller), try again
@@ -1019,11 +1026,15 @@ BOOL CSalamanderSafeFile::SafeFileWrite(SAFE_FILE* file, LPVOID lpBuffer,
         TRACE_E("CSalamanderSafeFile::SafeFileWrite() HFile==NULL");
         return FALSE;
     }
-    // obtain the current seek position in the file
-    long currentSeekHi = 0;
-    DWORD currentSeekLo = SetFilePointer(file->HFile, 0, &currentSeekHi, FILE_CURRENT);
-    if (currentSeekLo == 0xFFFFFFFF && GetLastError() != NO_ERROR)
+    // Obtain the complete current offset once so retry can restore it without reconstructing DWORD halves.
+    CQuadWord currentSeek(0, 0);
+    CFileOffsetResult currentSeekResult = SalSetFilePointerEx(file->HFile, CQuadWord(0, 0), FILE_CURRENT);
+    if (!currentSeekResult.Succeeded)
+    {
+        SetLastError(currentSeekResult.Error);
         goto WRITE_ERROR; // cannot set the offset, try again
+    }
+    currentSeek = currentSeekResult.Value;
 
     while (TRUE)
     {
@@ -1060,12 +1071,13 @@ BOOL CSalamanderSafeFile::SafeFileWrite(SAFE_FILE* file, LPVOID lpBuffer,
                 if (file->HFile != INVALID_HANDLE_VALUE) // opened; now set the offset
                 {
                     //SEEK:
-                    LONG lo = currentSeekLo;
-                    LONG hi = currentSeekHi;
-                    lo = SetFilePointer(file->HFile, lo, &hi, FILE_BEGIN);
-                    if (lo == 0xFFFFFFFF && GetLastError() != NO_ERROR)
+                    CFileOffsetResult restoreResult = SalSetFilePointerEx(file->HFile, currentSeek, FILE_BEGIN);
+                    if (!restoreResult.Succeeded)
+                    {
+                        SetLastError(restoreResult.Error);
                         goto WRITE_ERROR; // cannot set the offset, try again
-                    if (lo != (long)currentSeekLo || hi != currentSeekHi)
+                    }
+                    if (restoreResult.Value != currentSeek)
                     {
                         SetLastError(ERROR_SEEK_ON_DEVICE);
                         goto WRITE_ERROR; // cannot set the offset (the file may already be smaller), try again

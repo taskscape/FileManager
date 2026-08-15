@@ -370,8 +370,9 @@ COutWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         SendMessageW(HListView, LVM_INSERTCOLUMNW, 0, (LPARAM)&lvc);
         ListView_SetColumnWidth(HListView, 0, 3000);
 
-        DefListViewWndProc = (WNDPROC)GetWindowLongW(HListView, GWL_WNDPROC);
-        SetWindowLongW(HListView, GWL_WNDPROC, (LONG)ListViewWindowProcW);
+        // Keep the Unicode subclass procedure pointer intact when this dialog is built for x64.
+        DefListViewWndProc = (WNDPROC)GetWindowLongPtrW(HListView, GWLP_WNDPROC);
+        SetWindowLongPtrW(HListView, GWLP_WNDPROC, (LONG_PTR)ListViewWindowProcW);
 
         HMENU hMenu = GetSystemMenu(HWindow, FALSE);
         if (hMenu != NULL)

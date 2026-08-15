@@ -19,7 +19,8 @@ static BOOL ExtTextOutUtf8(HDC hdc, int x, int y, UINT options, const RECT* lprc
     CStrP textW(ConvertAllocUtf8ToWide(text, (int)len));
     if (textW == NULL)
         return ExtTextOutW(hdc, x, y, options, lprc, L"?", 1, NULL);
-    int wlen = lstrlenW(textW);
+    // Converted UTF-8 text is an owned terminated Unicode buffer for this GDI call.
+    int wlen = static_cast<int>(wcslen(textW));
     return ExtTextOutW(hdc, x, y, options, lprc, textW, wlen, NULL);
 }
 
@@ -32,7 +33,8 @@ static BOOL GetTextExtentPoint32Utf8(HDC hdc, const char* text, int len, SIZE* s
     CStrP textW(ConvertAllocUtf8ToWide(text, len));
     if (textW == NULL)
         return GetTextExtentPoint32(hdc, text, len, size);
-    int wlen = lstrlenW(textW);
+    // Converted UTF-8 text is an owned terminated Unicode buffer for this GDI measurement.
+    int wlen = static_cast<int>(wcslen(textW));
     return GetTextExtentPoint32W(hdc, textW, wlen, size);
 }
 
@@ -348,6 +350,12 @@ void CFilesWindow::DrawIcon(HDC hDC, CFileData* f, BOOL isDir, BOOL isItemUpDir,
 
                     iconList = SimplePluginIcons;
                     iconListIndex = GetPluginIconIndex();
+                    // Plug-in callbacks select an image-list entry; reject invalid indexes before drawing host-owned pixels.
+                    if (iconList == NULL || iconListIndex < 0 || iconListIndex >= iconList->GetImageCount())
+                    {
+                        TRACE_E("Invalid plug-in simple-icon index=" << iconListIndex);
+                        drawSimpleSymbol = TRUE;
+                    }
                 }
             }
 
@@ -1783,7 +1791,7 @@ void GetTileTexts(CFileData* f, int isDir,
     {
         if (validDate)
         {
-            out2LenA = GetDateFormat(LOCALE_USER_DEFAULT, DATE_SHORTDATE, &st, NULL, out2, 500) - 1;
+            out2LenA = FormatUserDateTimeUtf8(&st, DATE_SHORTDATE, out2, 500, TRUE) - 1;
             if (out2LenA < 0)
                 out2LenA = sprintf(out2, "%u.%u.%u", st.wDay, st.wMonth, st.wYear);
         }
@@ -1799,7 +1807,7 @@ void GetTileTexts(CFileData* f, int isDir,
     {
         if (validTime)
         {
-            out2LenB = GetTimeFormat(LOCALE_USER_DEFAULT, 0, &st, NULL, out2 + out2LenA, 500 - out2LenA) - 1;
+            out2LenB = FormatUserDateTimeUtf8(&st, 0, out2 + out2LenA, 500 - out2LenA, FALSE) - 1;
             if (out2LenB < 0)
                 out2LenB = sprintf(out2 + out2LenA, "%u:%02u:%02u", st.wHour, st.wMinute, st.wSecond);
         }

@@ -24,6 +24,7 @@
 #include "chicon.h"
 #include "common.h"
 #include "list.h"
+#include "..\\..\\common\\checked_arithmetic.h"
 
 int CZipList::ListArchive(CSalamanderDirectoryAbstract* dir, BOOL& haveFiles)
 {
@@ -76,7 +77,12 @@ START_LIST:
     // TRACE_I("zip listing started");
 
     haveFiles = FALSE;
-    readOffset = CentrDirOffs + ExtraBytes;
+    // Do not let a ZIP64 offset wrap into a different central-directory listing position.
+    if (!CheckedAddUInt64(CentrDirOffs, ExtraBytes, &readOffset))
+    {
+        free(centralHeader);
+        return IDS_ERRFORMAT;
+    }
     if (DiskNum != CentrDirStartDisk && MultiVol)
     {
         DiskNum = CentrDirStartDisk;

@@ -42,6 +42,8 @@ extern "C"
 #include "find.h"
 #include "viewer.h"
 
+#include <strsafe.h>
+
 //****************************************************************************
 //
 // HtmlHelp support
@@ -80,6 +82,12 @@ typedef struct tagHH_LAST_ERROR
     BSTR description;
 } HH_LAST_ERROR;
 
+static BOOL CopyHelpPath(char* destination, size_t destinationCount, const char* source)
+{
+    // Help locations are filesystem identities; callers must not append to a truncated base path.
+    return SUCCEEDED(StringCchCopyA(destination, destinationCount, source));
+}
+
 BOOL OpenHtmlHelp(char* helpFileName, HWND parent, CHtmlHelpCommand command, DWORD_PTR dwData, BOOL quiet)
 {
     //  SalMessageBox(parent, "This beta version doesn't contain help.\nPlease wait for the next beta version.",
@@ -95,7 +103,8 @@ BOOL OpenHtmlHelp(char* helpFileName, HWND parent, CHtmlHelpCommand command, DWO
         CLanguage language;
         if (language.Init(Configuration.LoadedSLGName, NULL))
         {
-            lstrcpyn(helpSubdir, language.HelpDir, MAX_PATH);
+            if (!CopyHelpPath(helpSubdir, _countof(helpSubdir), language.HelpDir))
+                helpSubdir[0] = 0;
             language.Free();
         }
         if (helpSubdir[0] == 0)
@@ -109,17 +118,17 @@ BOOL OpenHtmlHelp(char* helpFileName, HWND parent, CHtmlHelpCommand command, DWO
             SalPathAppend(CurrentHelpDir, "help", MAX_PATH) &&
             DirExists(CurrentHelpDir))
         {
-            lstrcpyn(helpPath, CurrentHelpDir, MAX_PATH);
-            if (!SalPathAppend(helpPath, helpSubdir, MAX_PATH) ||
+            if (!CopyHelpPath(helpPath, _countof(helpPath), CurrentHelpDir) ||
+                !SalPathAppend(helpPath, helpSubdir, MAX_PATH) ||
                 !DirExists(helpPath))
             { // the directory from the current .slg file does not exist
-                lstrcpyn(helpPath, CurrentHelpDir, MAX_PATH);
-                if (_stricmp(helpSubdir, "english") == 0 || // we already tested "english" and it does not exist so no point in trying again
+                if (!CopyHelpPath(helpPath, _countof(helpPath), CurrentHelpDir) ||
+                    _stricmp(helpSubdir, "english") == 0 || // we already tested "english" and it does not exist so no point in trying again
                     !SalPathAppend(helpPath, "english", MAX_PATH) ||
                     !DirExists(helpPath))
                 { // the ENGLISH directory does not exist
-                    lstrcpyn(helpPath, CurrentHelpDir, MAX_PATH);
-                    if (SalPathAppend(helpPath, "*", MAX_PATH))
+                    if (CopyHelpPath(helpPath, _countof(helpPath), CurrentHelpDir) &&
+                        SalPathAppend(helpPath, "*", MAX_PATH))
                     { // try to find at least some other directory
                         WIN32_FIND_DATAW dataW;
                         WIN32_FIND_DATA data;
@@ -133,8 +142,8 @@ BOOL OpenHtmlHelp(char* helpFileName, HWND parent, CHtmlHelpCommand command, DWO
                                 if (strcmp(data.cFileName, ".") != 0 && strcmp(data.cFileName, "..") != 0 &&
                                     (data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) != 0) // only if it is a directory
                                 {
-                                    lstrcpyn(helpPath, CurrentHelpDir, MAX_PATH);
-                                    if (SalPathAppend(helpPath, data.cFileName, MAX_PATH))
+                                    if (CopyHelpPath(helpPath, _countof(helpPath), CurrentHelpDir) &&
+                                        SalPathAppend(helpPath, data.cFileName, MAX_PATH))
                                     {
                                         ok = TRUE;
                                         break;
@@ -151,7 +160,7 @@ BOOL OpenHtmlHelp(char* helpFileName, HWND parent, CHtmlHelpCommand command, DWO
             else
                 ok = TRUE;
             if (ok)
-                lstrcpyn(CurrentHelpDir, helpPath, MAX_PATH);
+                ok = CopyHelpPath(CurrentHelpDir, _countof(CurrentHelpDir), helpPath);
         }
         if (!ok)
         {
@@ -216,8 +225,8 @@ BOOL OpenHtmlHelp(char* helpFileName, HWND parent, CHtmlHelpCommand command, DWO
     if (helpFileName != NULL) // plugin help: to open the window in the right position
     {                         // with remembered Favorites, we must open "salamand.chm" first (then
                               // the plugin help opens in this same window)
-        lstrcpyn(helpPath, CurrentHelpDir, MAX_PATH);
-        if (SalPathAppend(helpPath, "salamand.chm", MAX_PATH) &&
+        if (CopyHelpPath(helpPath, _countof(helpPath), CurrentHelpDir) &&
+            SalPathAppend(helpPath, "salamand.chm", MAX_PATH) &&
             FileExists(helpPath))
         {
             HtmlHelp(NULL, helpPath, HH_DISPLAY_TOC, 0); // ignore potential error
@@ -226,8 +235,8 @@ BOOL OpenHtmlHelp(char* helpFileName, HWND parent, CHtmlHelpCommand command, DWO
 
     BOOL ret = FALSE;
 
-    lstrcpyn(helpPath, CurrentHelpDir, MAX_PATH);
-    if (SalPathAppend(helpPath, helpFileName == NULL ? "salamand.chm" : helpFileName, MAX_PATH) &&
+    if (CopyHelpPath(helpPath, _countof(helpPath), CurrentHelpDir) &&
+        SalPathAppend(helpPath, helpFileName == NULL ? "salamand.chm" : helpFileName, MAX_PATH) &&
         FileExists(helpPath))
     {
         if (HtmlHelp(NULL, helpPath, uCommand, dwData) == NULL)

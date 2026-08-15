@@ -3,6 +3,7 @@
 // CommentsTranslationProject: TRANSLATED
 
 #include "precomp.h"
+#include <strsafe.h>
 
 #include "cfgdlg.h"
 #include "viewer.h"
@@ -26,12 +27,15 @@ void CViewerWindow::SetViewerCaption()
     if (Caption == NULL)
     {
         if (FileName != NULL)
-            lstrcpyn(caption, FileName, MAX_PATH); // caption according to the file
+        {
+            // Viewer captions retain their compact display field before suffixes are added.
+            StringCchCopyNA(caption, _countof(caption), FileName, MAX_PATH - 1);
+        }
         else
             caption[0] = 0;
     }
     else
-        lstrcpyn(caption, Caption, MAX_PATH); // caption according to the plug-in request
+        StringCchCopyNA(caption, _countof(caption), Caption, MAX_PATH - 1); // caption according to the plug-in request
     if (Caption == NULL || !WholeCaption)
     {
         if (caption[0] != 0)
@@ -1659,10 +1663,13 @@ CViewerWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                                 }
 
                                 // notify the change on the path (our file has appeared)
-                                lstrcpyn(path, fileName, MAX_PATH);
-                                CutDirectory(path);
-                                if (MainWindow != NULL)
-                                    MainWindow->PostChangeOnPathNotification(path, FALSE);
+                                // Panel notifications must identify the complete containing directory.
+                                if (SUCCEEDED(StringCchCopyA(path, _countof(path), fileName)))
+                                {
+                                    CutDirectory(path);
+                                    if (MainWindow != NULL)
+                                        MainWindow->PostChangeOnPathNotification(path, FALSE);
+                                }
 
                                 if (fatalErr)
                                     FatalFileErrorOccured();

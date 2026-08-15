@@ -3,6 +3,8 @@
 
 #include "precomp.h"
 
+#include <strsafe.h>
+
 #include "checkver.h"
 #include "checkver.rh"
 #include "checkver.rh2"
@@ -235,7 +237,8 @@ void FiltersFillListBox(HWND hListBox)
     int i;
     for (i = 0; i < Filters.Count; i++)
     {
-        lstrcpyn(item, Filters[i], 1024);
+        // The list box preserves its historical clipped display of long filters.
+        StringCchCopyNA(item, _countof(item), Filters[i], _countof(item) - 1);
         char* itemVer = strchr(item, '|');
         if (itemVer != NULL)
             *itemVer = ' ';
@@ -556,7 +559,7 @@ BOOL CSalModuleInfo::SetVersion(const char* version)
     {
         // calculate the ResolvedVersion, ResolvedBeta and ResolvedSpecialBuild variables
         char buff[100];
-        lstrcpyn(buff, Version, 100);
+        StringCchCopyNA(buff, _countof(buff), Version, _countof(buff) - 1);
         _strlwr(buff);
         char* p = buff;
         while (*p != 0 && *p != '(')
@@ -582,7 +585,7 @@ BOOL CSalModuleInfo::SetVersion(const char* version)
         char partR[100]; // part of the version after "beta"
         if (!beta)
         {
-            lstrcpyn(partL, buff, 100);
+            StringCchCopyNA(partL, _countof(partL), buff, _countof(partL) - 1);
             partR[0] = 0;
         }
         else
@@ -590,20 +593,28 @@ BOOL CSalModuleInfo::SetVersion(const char* version)
             char* lp = p - 1;
             while (lp > buff && *lp == ' ')
                 lp--;
-            lstrcpyn(partL, buff, (int)(lp - buff + 2));
+            StringCchCopyNA(partL, _countof(partL), buff, (size_t)(lp - buff + 1));
 
             p += 4;
             while (*p != 0 && *p == ' ')
                 p++;
-            lstrcpyn(partR, p, 100);
+            StringCchCopyNA(partR, _countof(partR), p, _countof(partR) - 1);
             // if it has the shape "6b", convert it to "6.1"
 
-            int len = lstrlen(partR);
+            // partR is an ANSI parser buffer maintained as a terminated string.
+            int len = static_cast<int>(strlen(partR));
             if (len > 0)
             {
                 int ch = partR[len - 1];
                 if (ch >= 'a' && ch <= 'z')
-                    sprintf(partR + len - 1, ".%d", ch - 'a' + 1);
+                {
+                    if (FAILED(StringCchPrintfA(partR + len - 1, _countof(partR) - len + 1,
+                                                ".%d", ch - 'a' + 1)))
+                    {
+                        // Preserve a parseable prefix when the legacy suffix expansion cannot fit.
+                        partR[len - 1] = 0;
+                    }
+                }
             }
         }
         // compose the version

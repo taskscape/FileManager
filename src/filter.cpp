@@ -4,6 +4,8 @@
 
 #include "precomp.h"
 
+#include <strsafe.h>
+
 // Attributes
 const char* FILTERCRITERIA_ATTRIBUTESMASK_REG = "Attributes Mask";
 const char* FILTERCRITERIA_ATTRIBUTESVALUE_REG = "Attributes Value";
@@ -423,50 +425,54 @@ BOOL CFilterCriteria::Test(DWORD attributes, const CQuadWord* size, const FILETI
 BOOL CFilterCriteria::GetAdvancedDescription(char* buffer, int maxLen, BOOL& dirty)
 {
     char buff[300];
+    HRESULT textResult = StringCchCopyA(buff, _countof(buff), LoadStr(IDS_FFA_OPTIONS));
+    const auto appendText = [&buff, &textResult](const char* text)
+    {
+        if (SUCCEEDED(textResult))
+            textResult = StringCchCatA(buff, _countof(buff), text);
+    };
 
     int count = 1;
 
     PrepareForTest();
 
-    lstrcpy(buff, LoadStr(IDS_FFA_OPTIONS));
-
     if (AttributesMask != 0)
     {
-        lstrcat(buff, LoadStr(IDS_FFA_ATTRIBUTES));
-        lstrcat(buff, ": ");
+        appendText(LoadStr(IDS_FFA_ATTRIBUTES));
+        appendText(": ");
         if (AttributesMask & FILE_ATTRIBUTE_ARCHIVE)
-            lstrcat(buff, AttributesValue & FILE_ATTRIBUTE_ARCHIVE ? "+A" : "-A");
+            appendText(AttributesValue & FILE_ATTRIBUTE_ARCHIVE ? "+A" : "-A");
         if (AttributesMask & FILE_ATTRIBUTE_READONLY)
-            lstrcat(buff, AttributesValue & FILE_ATTRIBUTE_READONLY ? "+R" : "-R");
+            appendText(AttributesValue & FILE_ATTRIBUTE_READONLY ? "+R" : "-R");
         if (AttributesMask & FILE_ATTRIBUTE_HIDDEN)
-            lstrcat(buff, AttributesValue & FILE_ATTRIBUTE_HIDDEN ? "+H" : "-H");
+            appendText(AttributesValue & FILE_ATTRIBUTE_HIDDEN ? "+H" : "-H");
         if (AttributesMask & FILE_ATTRIBUTE_SYSTEM)
-            lstrcat(buff, AttributesValue & FILE_ATTRIBUTE_SYSTEM ? "+S" : "-S");
+            appendText(AttributesValue & FILE_ATTRIBUTE_SYSTEM ? "+S" : "-S");
         if (AttributesMask & FILE_ATTRIBUTE_COMPRESSED)
-            lstrcat(buff, AttributesValue & FILE_ATTRIBUTE_COMPRESSED ? "+C" : "-C");
+            appendText(AttributesValue & FILE_ATTRIBUTE_COMPRESSED ? "+C" : "-C");
         if (AttributesMask & FILE_ATTRIBUTE_ENCRYPTED)
-            lstrcat(buff, AttributesValue & FILE_ATTRIBUTE_ENCRYPTED ? "+E" : "-E");
+            appendText(AttributesValue & FILE_ATTRIBUTE_ENCRYPTED ? "+E" : "-E");
         if (AttributesMask & FILE_ATTRIBUTE_DIRECTORY)
-            lstrcat(buff, AttributesValue & FILE_ATTRIBUTE_DIRECTORY ? "+D" : "-D");
+            appendText(AttributesValue & FILE_ATTRIBUTE_DIRECTORY ? "+D" : "-D");
         count++;
     }
 
     if (UseMinSize || UseMaxSize)
     {
         if (count > 1)
-            lstrcat(buff, ", ");
-        lstrcat(buff, LoadStr(IDS_FFA_SIZE));
+            appendText(", ");
+        appendText(LoadStr(IDS_FFA_SIZE));
         count++;
     }
 
     if (TimeMode != fctmIgnore)
     {
         if (count > 1)
-            lstrcat(buff, ", ");
+            appendText(", ");
         if (TimeMode == fctmFromTo || DuringTimeUnits >= fctuDays)
-            lstrcat(buff, LoadStr(IDS_FFA_DATE));
+            appendText(LoadStr(IDS_FFA_DATE));
         else
-            lstrcat(buff, LoadStr(IDS_FFA_TIME));
+            appendText(LoadStr(IDS_FFA_TIME));
         count++;
     }
 
@@ -474,17 +480,23 @@ BOOL CFilterCriteria::GetAdvancedDescription(char* buffer, int maxLen, BOOL& dir
         (UseFromTime || UseToTime))
     {
         if (count > 1)
-            lstrcat(buff, ", ");
-        lstrcat(buff, LoadStr(IDS_FFA_TIME));
+            appendText(", ");
+        appendText(LoadStr(IDS_FFA_TIME));
         count++;
     }
 
     if (count == 1)
-        lstrcpy(buff, LoadStr(IDS_FFA_NONE));
+        textResult = StringCchCopyA(buff, _countof(buff), LoadStr(IDS_FFA_NONE));
 
-    lstrcpyn(buffer, buff, maxLen);
     dirty = count > 1;
-    return maxLen > lstrlen(buff) + 1;
+    // The summary must not expose a partial localized filter description.
+    if (FAILED(textResult) || maxLen <= 0)
+    {
+        if (buffer != NULL && maxLen > 0)
+            buffer[0] = 0;
+        return FALSE;
+    }
+    return SUCCEEDED(StringCchCopyA(buffer, maxLen, buff));
 }
 
 BOOL CFilterCriteria::Save(HKEY hKey)

@@ -3,6 +3,8 @@
 
 #pragma once
 
+#include <strsafe.h>
+
 #define PROGRESS_STATE_UNTRANSLATED 0x0000
 #define PROGRESS_STATE_TRANSLATED 0x0001
 
@@ -571,12 +573,13 @@ public:
     void Clean()
     {
         LanguageID = 0x0409;
-        lstrcpyW(Author, L"Open Salamander");
-        lstrcpyW(Web, L"www.taskscape.com");
-        lstrcpyW(Comment, L"");
-        lstrcpyW(HelpDir, L"");
-        lstrcpyW(SLGIncomplete, L"");
-        lstrcpyW(CRCofImpSLT, L"not found");
+        // Signature defaults must remain fully formed before they are saved to resource fields.
+        StringCchCopyW(Author, _countof(Author), L"Open Salamander");
+        StringCchCopyW(Web, _countof(Web), L"www.taskscape.com");
+        StringCchCopyW(Comment, _countof(Comment), L"");
+        StringCchCopyW(HelpDir, _countof(HelpDir), L"");
+        StringCchCopyW(SLGIncomplete, _countof(SLGIncomplete), L"");
+        StringCchCopyW(CRCofImpSLT, _countof(CRCofImpSLT), L"not found");
         HelpDirExist = FALSE;
         SLGIncompleteExist = FALSE;
     }
@@ -584,7 +587,7 @@ public:
     void SLTDataChanged()
     {
         if (wcscmp(CRCofImpSLT, L"none") == 0) // convert "official EN version" to "modified version that has not gone through SLT"
-            lstrcpyW(CRCofImpSLT, L"");
+            StringCchCopyW(CRCofImpSLT, _countof(CRCofImpSLT), L"");
         else
         {
             int len = wcslen(CRCofImpSLT);
@@ -602,7 +605,11 @@ public:
     void SetCRCofImpSLTIfFound(wchar_t* crc)
     {
         if (wcscmp(CRCofImpSLT, L"not found") != 0) // update the stored value when the variable exists in the SLG
-            lstrcpynW(CRCofImpSLT, crc, _countof(CRCofImpSLT));
+        {
+            // CRC state is used to decide overwrite behavior, so do not retain a clipped value.
+            if (FAILED(StringCchCopyW(CRCofImpSLT, _countof(CRCofImpSLT), crc)))
+                CRCofImpSLT[0] = 0;
+        }
     }
 
     BOOL IsSLTDataChanged()
@@ -730,10 +737,12 @@ public:
         }
         if (templateName != NULL)
         {
-            TemplateName = (char*)malloc(strlen(templateName) + 1);
+            const size_t templateNameLength = strlen(templateName);
+            TemplateName = (char*)malloc(templateNameLength + 1);
             if (TemplateName == NULL)
                 return FALSE;
-            lstrcpy(TemplateName, templateName);
+            // This allocation exactly owns the measured template name and its terminator.
+            memcpy(TemplateName, templateName, templateNameLength + 1);
         }
         return TRUE;
     }

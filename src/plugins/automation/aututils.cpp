@@ -327,7 +327,8 @@ HRESULT DispPropGet(IDispatch* pdisp, PCWSTR name, VARIANT* result)
         0,
     };
     UINT argerr = 0;
-    LCID lcid = GetUserDefaultLCID();
+    // IDispatch requires an LCID, so choose the documented user-default constant instead of reading ambient thread state.
+    LCID lcid = LOCALE_USER_DEFAULT;
 
     hr = pdisp->GetIDsOfNames(IID_NULL, (LPOLESTR*)&name, 1, lcid, &dispid);
     if (FAILED(hr))

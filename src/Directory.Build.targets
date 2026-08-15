@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Imported after each project so the Release PE baseline cannot be accidentally weakened by a project property sheet. -->
+<Project>
+  <ItemDefinitionGroup Condition="'$(Configuration)' == 'Debug'">
+    <ClCompile>
+      <!-- Legacy projects share compiler PDB paths while /MP is enabled; serialize writes to keep clean aggregate builds deterministic. -->
+      <AdditionalOptions>/FS %(AdditionalOptions)</AdditionalOptions>
+    </ClCompile>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)' == 'Release'">
+    <ClCompile>
+      <!-- These compiler protections apply to every first-party Release translation unit. -->
+      <BufferSecurityCheck>true</BufferSecurityCheck>
+      <SDLCheck>true</SDLCheck>
+      <!-- Legacy /GL emits C4703 at link time despite /WX-; retain /sdl while
+           tracking that pre-existing warning debt separately from the binary baseline. -->
+      <DisableSpecificWarnings>4703;%(DisableSpecificWarnings)</DisableSpecificWarnings>
+      <ControlFlowGuard>Guard</ControlFlowGuard>
+    </ClCompile>
+    <Link>
+      <!-- Keep exploit mitigations consistent across the executable, utilities, extensions, and plug-ins. -->
+      <RandomizedBaseAddress>true</RandomizedBaseAddress>
+      <DataExecutionPrevention>true</DataExecutionPrevention>
+      <HighEntropyVA>true</HighEntropyVA>
+      <ControlFlowGuard>Guard</ControlFlowGuard>
+      <!-- MSBuild omits HighEntropyVA for some legacy project shapes, so pass its linker switch explicitly. -->
+      <AdditionalOptions>/CETCOMPAT /HIGHENTROPYVA %(AdditionalOptions)</AdditionalOptions>
+    </Link>
+  </ItemDefinitionGroup>
+</Project>

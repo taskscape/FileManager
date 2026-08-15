@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "precomp.h"
+#include <strsafe.h>
 
 #include "wndtree.h"
 #include "wndframe.h"
@@ -167,7 +168,9 @@ void CTreeWindow::OnContextMenu(LPARAM lParam, int x, int y)
         return;
 
     char itemText[500];
-    lstrcpyn(itemText, DataRH.GetIdentifier(id, FALSE), 499);
+    // Clipboard actions must use a complete identifier instead of an ambiguous clipped label.
+    if (FAILED(StringCchCopyA(itemText, _countof(itemText), DataRH.GetIdentifier(id, FALSE))))
+        itemText[0] = 0;
 
     HMENU hMenu = CreatePopupMenu();
 

@@ -3,6 +3,7 @@
 // CommentsTranslationProject: TRANSLATED
 
 #include "precomp.h"
+#include <strsafe.h>
 
 #include "dialogs.h"
 #include "stswnd.h"
@@ -309,6 +310,22 @@ char* DuplicateStrAndInsertEOLs(const char* src, HDC hDC, int maxWidth)
     return NULL;
 }
 
+static BOOL AppendClipboardText(char** cursor, char* end, const char* format, ...)
+{
+    // Clipboard text is assembled incrementally; each fragment must leave a terminating byte in the allocated buffer.
+    ptrdiff_t remaining = end - *cursor;
+    if (remaining <= 0)
+        return FALSE;
+    va_list args;
+    va_start(args, format);
+    int written = _vsnprintf_s(*cursor, (size_t)remaining, _TRUNCATE, format, args);
+    va_end(args);
+    if (written < 0)
+        return FALSE;
+    *cursor += written;
+    return TRUE;
+}
+
 BOOL CMessageBox::CopyToClipboard()
 {
     const char* separator = "---------------------------\r\n";
@@ -338,8 +355,21 @@ BOOL CMessageBox::CopyToClipboard()
         return FALSE;
     }
 
-    DWORD written = wsprintf(buff, "%s%s\r\n%s", separator, Title, separator);
-    char* ptr = buff + written;
+    char* ptr = buff;
+    char* end = buff + buffSize;
+    BOOL ret;
+    if (!AppendClipboardText(&ptr, end, "%s%s\r\n%s", separator, Title, separator))
+    {
+        free(buff);
+        return FALSE;
+    }
+
+    // Reserve the whole normalized message before bytewise conversion so the fixed clipboard buffer always retains its terminator.
+    size_t messageBytes = 0;
+    for (const char* textCursor = text; *textCursor != 0; textCursor++)
+        messageBytes += *textCursor == '\n' ? 2 : 1;
+    if ((size_t)(end - ptr) <= messageBytes)
+        goto COPY_FAILED;
 
     // convert '\n' -> "\r\n"
     while (*text != 0)
@@ -351,14 +381,19 @@ BOOL CMessageBox::CopyToClipboard()
 
     if (URL != NULL)
     {
-        ptr += wsprintf(ptr, "\r\n");
+        if (!AppendClipboardText(&ptr, end, "\r\n"))
+            goto COPY_FAILED;
         if (URLText != NULL)
-            ptr += wsprintf(ptr, "%s ", URLText);
-        ptr += wsprintf(ptr, "%s", URL);
+        {
+            if (!AppendClipboardText(&ptr, end, "%s ", URLText))
+                goto COPY_FAILED;
+        }
+        if (!AppendClipboardText(&ptr, end, "%s", URL))
+            goto COPY_FAILED;
     }
 
-    written = wsprintf(ptr, "\r\n%s", separator);
-    ptr += written;
+    if (!AppendClipboardText(&ptr, end, "\r\n%s", separator))
+        goto COPY_FAILED;
 
     // append list of buttons, remove '&'
     int i;
@@ -371,19 +406,18 @@ BOOL CMessageBox::CopyToClipboard()
             btnText[99] = 0;
             RemoveAmpersands(btnText);
 
-            written = wsprintf(ptr, "[%s]", btnText);
-            ptr += written;
+            if (!AppendClipboardText(&ptr, end, "[%s]", btnText))
+                goto COPY_FAILED;
             if (i < MESSAGEBOX_MAXBUTTONS - 1 && ButtonsID[i + 1] != 0)
             {
-                *ptr++ = ' ';
-                *ptr++ = ' ';
-                *ptr++ = ' ';
+                if (!AppendClipboardText(&ptr, end, "   "))
+                    goto COPY_FAILED;
             }
         }
     }
 
-    written = wsprintf(ptr, "\r\n%s", separator);
-    ptr += written;
+    if (!AppendClipboardText(&ptr, end, "\r\n%s", separator))
+        goto COPY_FAILED;
 
     // if a checkbox exists, append its text (strip the '&')
     if (CheckText != NULL)
@@ -392,19 +426,23 @@ BOOL CMessageBox::CopyToClipboard()
         GetDlgItemTextUtf8(HWindow, IDS_MSGBOX_CHECK, chkText, 300);
         chkText[299] = 0;
         RemoveAmpersands(chkText);
-        written = wsprintf(ptr, "[ ] %s\r\n%s", chkText, separator);
+        if (!AppendClipboardText(&ptr, end, "[ ] %s\r\n%s", chkText, separator))
+            goto COPY_FAILED;
         BOOL checked = IsDlgButtonChecked(HWindow, IDS_MSGBOX_CHECK) == BST_CHECKED;
         if (checked)
             ptr[1] = 'x';
-        ptr += written;
     }
 
     *ptr = 0; // terminator
 
-    BOOL ret = CopyTextToClipboard(buff);
+    ret = CopyTextToClipboard(buff);
     free(buff);
 
     return ret;
+
+COPY_FAILED:
+    free(buff);
+    return FALSE;
 }
 
 INT_PTR
@@ -839,43 +877,48 @@ CMessageBox::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                 {
                     char tmpBuff[1000];
                     char seps[] = "\t";
-                    if (i == 0 && strlen(AliasBtnNames) > 999)
-                        TRACE_E("AliasBtnNames is too long");
-                    lstrcpyn(tmpBuff, AliasBtnNames, 1000);
-
-                    char* aliasID = strtok(tmpBuff, seps);
-                    char* aliasName = strtok(NULL, seps);
-                    while (aliasID != NULL && aliasName != NULL)
+                    // Alias records affect button identity, so never parse a clipped specification.
+                    if (FAILED(StringCchCopyA(tmpBuff, _countof(tmpBuff), AliasBtnNames)))
                     {
-                        int id = atoi(aliasID);
-                        if (btnID[i] == id)
+                        if (i == 0)
+                            TRACE_E("AliasBtnNames is too long");
+                    }
+                    else
+                    {
+                        char* aliasID = strtok(tmpBuff, seps);
+                        char* aliasName = strtok(NULL, seps);
+                        while (aliasID != NULL && aliasName != NULL)
                         {
-                            btnTextWasSet = TRUE;
-                            SetWindowTextUtf8(hButton, aliasName);
-
-                            // measure whether the button needs to be expanded
-                            char btnText2[300];
-                            lstrcpyn(btnText2, aliasName, 300);
-                            RemoveAmpersands(btnText2);
-                            HFONT hFont = (HFONT)SendMessage(hButton, WM_GETFONT, 0, 0);
-                            SIZE sz;
-                            HDC hDC2 = HANDLES(GetDC(HWindow));
-                            HFONT hOldFont2 = (HFONT)SelectObject(hDC2, hFont);
-                            GetTextExtentPoint32(hDC2, btnText2, (int)strlen(btnText2), &sz);
-                            SelectObject(hDC2, hOldFont2);
-                            HANDLES(ReleaseDC(HWindow, hDC2));
-
-                            int neededBtnWidth = sz.cx + btnWidth / 2;
-                            if (neededBtnWidth > btnWidth)
+                            int id = atoi(aliasID);
+                            if (btnID[i] == id)
                             {
-                                btnAddedWidth += neededBtnWidth - btnWidth;
-                                SetWindowPos(hButton, NULL, 0, 0, neededBtnWidth, btnHeight,
-                                             SWP_NOACTIVATE | SWP_NOZORDER | SWP_NOMOVE);
+                                btnTextWasSet = TRUE;
+                                SetWindowTextUtf8(hButton, aliasName);
+
+                                // Measure only the visible preview of an arbitrarily long alias label.
+                                char btnText2[300];
+                                StringCchCopyNA(btnText2, _countof(btnText2), aliasName, _countof(btnText2) - 1);
+                                RemoveAmpersands(btnText2);
+                                HFONT hFont = (HFONT)SendMessage(hButton, WM_GETFONT, 0, 0);
+                                SIZE sz;
+                                HDC hDC2 = HANDLES(GetDC(HWindow));
+                                HFONT hOldFont2 = (HFONT)SelectObject(hDC2, hFont);
+                                GetTextExtentPoint32(hDC2, btnText2, (int)strlen(btnText2), &sz);
+                                SelectObject(hDC2, hOldFont2);
+                                HANDLES(ReleaseDC(HWindow, hDC2));
+
+                                int neededBtnWidth = sz.cx + btnWidth / 2;
+                                if (neededBtnWidth > btnWidth)
+                                {
+                                    btnAddedWidth += neededBtnWidth - btnWidth;
+                                    SetWindowPos(hButton, NULL, 0, 0, neededBtnWidth, btnHeight,
+                                                 SWP_NOACTIVATE | SWP_NOZORDER | SWP_NOMOVE);
+                                }
+                                break;
                             }
-                            break;
+                            aliasID = strtok(NULL, seps);
+                            aliasName = strtok(NULL, seps);
                         }
-                        aliasID = strtok(NULL, seps);
-                        aliasName = strtok(NULL, seps);
                     }
                 }
                 if (!btnTextWasSet)
@@ -1078,7 +1121,8 @@ CMessageBox::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         {
             HDC hdcStatic = (HDC)wParam;
             HWND hwndStatic = (HWND)lParam;
-            int resID = GetWindowLong(hwndStatic, GWL_ID);
+            // Control IDs use the pointer-width accessor so this dialog code remains x64-safe.
+            int resID = (int)GetWindowLongPtr(hwndStatic, GWL_ID);
             if (resID == IDI_MSGBOX_ICON || resID == IDS_MSGBOX_TEXT || resID == IDS_MSGBOX_URL)
             {
                 COLORREF textClr = GetSysColor(COLOR_WINDOWTEXT);

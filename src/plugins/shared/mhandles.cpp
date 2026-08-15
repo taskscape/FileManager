@@ -280,7 +280,9 @@ const char* spf(const char* formatString, ...)
 
 const char* err(DWORD error)
 {
-    wsprintf(__ErrorBuffer, "(%d) ", error);
+    // Preserve room for the system message after its numeric prefix in the shared diagnostics buffer.
+    if (sprintf_s(__ErrorBuffer, _countof(__ErrorBuffer), "(%lu) ", error) < 0)
+        __ErrorBuffer[0] = 0;
     int len = (int)strlen(__ErrorBuffer);
     FormatMessage(FORMAT_MESSAGE_FROM_SYSTEM,
                   NULL,

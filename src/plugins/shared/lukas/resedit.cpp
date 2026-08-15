@@ -29,8 +29,10 @@
 BOOL CResEditRoot::Seek(DWORD offset)
 {
     CALL_STACK_MESSAGE_NONE
-    LONG dummy = 0;
-    if (SetFilePointer(File, offset, &dummy, FILE_BEGIN) == 0xFFFFFFFF)
+    // Resource offsets are DWORD-format values, but SetFilePointerEx keeps seek failure unambiguous.
+    LARGE_INTEGER seekOffset;
+    seekOffset.QuadPart = offset;
+    if (!SetFilePointerEx(File, seekOffset, NULL, FILE_BEGIN))
         return FALSE;
     return TRUE;
 }

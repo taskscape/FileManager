@@ -3,6 +3,7 @@
 // CommentsTranslationProject: TRANSLATED
 
 #include "precomp.h"
+#include "..\\..\\common\\monotonic_time.h"
 
 const char* LogsSeparator = "\r\n=================\r\n\r\n";
 
@@ -313,7 +314,9 @@ void CControlConnectionSocket::CloseControlConnection(HWND parent)
             waitWnd.SetText(buf);
             waitWnd.Create(GetWaitTime(showWaitWndTime));
 
-            DWORD start = GetTickCount();
+            const CMonotonicDuration closeTimeoutMilliseconds = serverTimeout > 0 ? (CMonotonicDuration)serverTimeout : 0;
+            // Keep disconnect bounded even when partial replies repeatedly wake the event loop.
+            const CMonotonicTimePoint closeDeadline = CMonotonicClock::DeadlineAfter(closeTimeoutMilliseconds);
             BOOL shutdownCalled = FALSE;
             BOOL run = TRUE;
             while (run)
@@ -321,10 +324,8 @@ void CControlConnectionSocket::CloseControlConnection(HWND parent)
                 // Wait for either a socket event (server reply) or ESC
                 CControlConnectionSocketEvent event;
                 DWORD data1, data2;
-                DWORD now = GetTickCount();
-                if (now - start > (DWORD)serverTimeout)
-                    now = start + (DWORD)serverTimeout;
-                WaitForEventOrESC(parent, &event, &data1, &data2, serverTimeout - (now - start),
+                const DWORD remainingWait = CMonotonicClock::RemainingWin32TimerDelay(closeDeadline, CMonotonicClock::Now());
+                WaitForEventOrESC(parent, &event, &data1, &data2, remainingWait,
                                   NULL, NULL, FALSE);
                 switch (event)
                 {

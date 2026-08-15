@@ -2,6 +2,8 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "precomp.h"
+
+#include <strsafe.h>
 #include "dbg.h"
 
 #include "chmlib/types.h"
@@ -13,6 +15,19 @@
 #include "unchm.rh2"
 #include "lang\lang.rh"
 
+static BOOL FormatChmDateTimeAnsi(const SYSTEMTIME* time, DWORD flags, char* buffer, int bufferSize, BOOL isDate)
+{
+    // UnCHM retains an ANSI metadata display, so perform its sole conversion after named-locale formatting.
+    WCHAR localeName[LOCALE_NAME_MAX_LENGTH];
+    WCHAR formatted[100];
+    if (GetUserDefaultLocaleName(localeName, ARRAYSIZE(localeName)) == 0)
+        return FALSE;
+    int length = isDate
+                     ? GetDateFormatEx(localeName, flags, time, NULL, formatted, ARRAYSIZE(formatted), NULL)
+                     : GetTimeFormatEx(localeName, flags, time, NULL, formatted, ARRAYSIZE(formatted));
+    return length != 0 && WideCharToMultiByte(CP_ACP, 0, formatted, -1, buffer, bufferSize, NULL, NULL) != 0;
+}
+
 void GetInfo(char* buffer, FILETIME* lastWrite, CQuadWord size)
 {
     CALL_STACK_MESSAGE2("GetInfo(, , 0x%I64X)", size.Value);
@@ -23,9 +38,9 @@ void GetInfo(char* buffer, FILETIME* lastWrite, CQuadWord size)
     FileTimeToSystemTime(&ft, &st);
 
     char date[50], time[50], number[50];
-    if (GetTimeFormat(LOCALE_USER_DEFAULT, 0, &st, NULL, time, 50) == 0)
+    if (!FormatChmDateTimeAnsi(&st, 0, time, ARRAYSIZE(time), FALSE))
         sprintf(time, "%u:%02u:%02u", st.wHour, st.wMinute, st.wSecond);
-    if (GetDateFormat(LOCALE_USER_DEFAULT, DATE_SHORTDATE, &st, NULL, date, 50) == 0)
+    if (!FormatChmDateTimeAnsi(&st, DATE_SHORTDATE, date, ARRAYSIZE(date), TRUE))
         sprintf(date, "%u.%u.%u", st.wDay, st.wMonth, st.wYear);
     sprintf(buffer, "%s, %s, %s", SalamanderGeneral->NumberToStr(number, size), date, time);
 }
@@ -77,9 +92,16 @@ BOOL CCHMFile::Open(const char* fileName, BOOL quiet /* = FALSE*/)
     CALL_STACK_MESSAGE3("CCHMFile::Open(%s, %d)", fileName, quiet);
 
     char dllPath[MAX_PATH];
-    if (!GetModuleFileName(DLLInstance, dllPath, MAX_PATH))
+    DWORD dllPathLength = GetModuleFileName(DLLInstance, dllPath, _countof(dllPath));
+    if (dllPathLength == 0 || dllPathLength >= _countof(dllPath))
         return FALSE;
-    lstrcpy(strrchr(dllPath, '\\') + 1, "chmlib.dll");
+    char* dllName = strrchr(dllPath, '\\');
+    if (dllName == NULL ||
+        FAILED(StringCchCopyA(dllName + 1, _countof(dllPath) - (dllName + 1 - dllPath), "chmlib.dll")))
+    {
+        // Loading the companion library requires a complete module directory and leaf name.
+        return FALSE;
+    }
 
     HMODULE hDLL = LoadLibrary(dllPath);
     if (hDLL != NULL)

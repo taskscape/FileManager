@@ -19,6 +19,8 @@ extern "C"
 #include "tasklist.h"
 //#include "drivelst.h"
 
+#include <strsafe.h>
+
 //
 // ****************************************************************************
 // UseOwnRutine
@@ -143,7 +145,12 @@ BOOL DoCopyMove(BOOL copy, char* targetDir, CCopyMoveData* data, void* param)
     if (tmp != NULL)
     {
         tmp->Copy = copy;
-        lstrcpyn(tmp->TargetPath, targetDir, 2 * MAX_PATH);
+        // Deferred drop targets are operation identities and must not be queued truncated.
+        if (FAILED(StringCchCopyA(tmp->TargetPath, _countof(tmp->TargetPath), targetDir)))
+        {
+            delete tmp;
+            return FALSE;
+        }
         tmp->Data = data;
         PostMessage(panel->HWindow, WM_USER_DROPCOPYMOVE, (WPARAM)tmp, 0);
         return TRUE;
@@ -195,12 +202,17 @@ void DoDragDropOper(BOOL copy, BOOL toArchive, const char* archiveOrFSName, cons
         }
         if (ok)
         {
-            lstrcpyn(tmp->ArchiveOrFSName, archiveOrFSName, 2 * MAX_PATH);
-            lstrcpyn(tmp->ArchivePathOrUserPart, archivePathOrUserPart, 2 * MAX_PATH);
-            tmp->Data = data;
-            PostMessage(panel->HWindow, WM_USER_DROPTOARCORFS, (WPARAM)tmp, 0);
-            data = NULL;
-            tmp = NULL;
+            // Archive/FS drop routing needs both complete source identities.
+            if (FAILED(StringCchCopyA(tmp->ArchiveOrFSName, _countof(tmp->ArchiveOrFSName), archiveOrFSName)) ||
+                FAILED(StringCchCopyA(tmp->ArchivePathOrUserPart, _countof(tmp->ArchivePathOrUserPart), archivePathOrUserPart)))
+                ok = FALSE;
+            if (ok)
+            {
+                tmp->Data = data;
+                PostMessage(panel->HWindow, WM_USER_DROPTOARCORFS, (WPARAM)tmp, 0);
+                data = NULL;
+                tmp = NULL;
+            }
         }
     }
     else
@@ -614,7 +626,8 @@ const char* GetCurrentDirClipboard(POINTL& pt, void* param, DWORD* effect, BOOL 
 int CountNumberOfItemsOnPath(const char* path)
 {
     char s[MAX_PATH + 10];
-    lstrcpyn(s, path, MAX_PATH + 10);
+    // Enumeration probes keep a bounded shell-search path rather than overflowing its fixed buffer.
+    StringCchCopyNA(s, _countof(s), path, _countof(s) - 1);
     if (SalPathAppend(s, "*.*", MAX_PATH + 10))
     {
         WIN32_FIND_DATAW fileDataW;
@@ -1011,7 +1024,9 @@ void DoDragFromArchiveOrFS(CFilesWindow* panel, BOOL& dropDone, char* targetPath
                                     TRACE_E("Drag&drop from archive/FS: SalShExtSharedMemView->DoDragDropFromSalamander is TRUE, this should never happen here!");
                                 SalShExtSharedMemView->DoDragDropFromSalamander = TRUE;
                                 *fakeName = '\\';
-                                lstrcpyn(SalShExtSharedMemView->DragDropFakeDirName, fakeRootDir, MAX_PATH);
+                                // Publish a complete fake-directory identity to the shell extension.
+                                if (FAILED(StringCchCopyA(SalShExtSharedMemView->DragDropFakeDirName, MAX_PATH, fakeRootDir)))
+                                    SalShExtSharedMemView->DragDropFakeDirName[0] = 0;
                                 SalShExtSharedMemView->DropDone = FALSE;
                             }
                             ReleaseMutex(SalShExtSharedMemMutex);
@@ -1038,7 +1053,9 @@ void DoDragFromArchiveOrFS(CFilesWindow* panel, BOOL& dropDone, char* targetPath
                                     SalShExtSharedMemView->DoDragDropFromSalamander = FALSE;
                                     if (dropDone)
                                     {
-                                        lstrcpyn(targetPath, SalShExtSharedMemView->TargetPath, 2 * MAX_PATH);
+                                        // The drop target is consumed as an operation identity after releasing the mutex.
+                                        if (FAILED(StringCchCopyA(targetPath, 2 * MAX_PATH, SalShExtSharedMemView->TargetPath)))
+                                            targetPath[0] = 0;
                                         if (leftMouseButton && dragFromPluginFSWithCopyAndMove)
                                             operation = (dropSource->LastEffect & DROPEFFECT_MOVE) ? SALSHEXT_MOVE : SALSHEXT_COPY;
                                         else // archives + FS with Copy or Move (not both) + FS with Copy+Move when dragging with right button, where result from right button menu is not affected by mouse cursor change (trick with Copy cursor for Move effect), so we take result from copy-hook (SalShExtSharedMemView->Operation)
@@ -1350,7 +1367,9 @@ void ShellAction(CFilesWindow* panel, CShellAction action, BOOL useSelection,
             if (i >= 0 && i < panel->Dirs->Count)
             {
                 realDraggedPath[0] = 'D';
-                lstrcpyn(realDraggedPath + 1, panel->GetZIPArchive(), 2 * MAX_PATH);
+                // The drag payload uses a complete archive identity following its type byte.
+                if (FAILED(StringCchCopyA(realDraggedPath + 1, 2 * MAX_PATH, panel->GetZIPArchive())))
+                    realDraggedPath[0] = 0;
                 SalPathAppend(realDraggedPath, panel->GetZIPPath(), 2 * MAX_PATH);
                 SalPathAppend(realDraggedPath, panel->Dirs->At(i).Name, 2 * MAX_PATH);
             }
@@ -1359,7 +1378,9 @@ void ShellAction(CFilesWindow* panel, CShellAction action, BOOL useSelection,
                 if (i >= 0 && i >= panel->Dirs->Count && i < panel->Dirs->Count + panel->Files->Count)
                 {
                     realDraggedPath[0] = 'F';
-                    lstrcpyn(realDraggedPath + 1, panel->GetZIPArchive(), 2 * MAX_PATH);
+                    // The drag payload uses a complete archive identity following its type byte.
+                    if (FAILED(StringCchCopyA(realDraggedPath + 1, 2 * MAX_PATH, panel->GetZIPArchive())))
+                        realDraggedPath[0] = 0;
                     SalPathAppend(realDraggedPath, panel->GetZIPPath(), 2 * MAX_PATH);
                     SalPathAppend(realDraggedPath, panel->Files->At(i - panel->Dirs->Count).Name, 2 * MAX_PATH);
                 }
@@ -1454,7 +1475,9 @@ void ShellAction(CFilesWindow* panel, CShellAction action, BOOL useSelection,
                                                             SalShExtSharedMemView->DoPasteFromSalamander = TRUE;
                                                             SalShExtSharedMemView->ClipDataObjLastGetDataTime = GetTickCount() - 60000; // inicializujeme na 1 minutu pred zalozenim data-objektu
                                                             *fakeName = '\\';
-                                                            lstrcpyn(SalShExtSharedMemView->PasteFakeDirName, fakeRootDir, MAX_PATH);
+                                                            // Publish a complete fake-directory identity for the paste cleanup path.
+                                                            if (FAILED(StringCchCopyA(SalShExtSharedMemView->PasteFakeDirName, MAX_PATH, fakeRootDir)))
+                                                                SalShExtSharedMemView->PasteFakeDirName[0] = 0;
                                                             SalShExtSharedMemView->SalamanderMainWndPID = GetCurrentProcessId();
                                                             SalShExtSharedMemView->SalamanderMainWndTID = GetCurrentThreadId();
                                                             SalShExtSharedMemView->SalamanderMainWnd = (UINT64)(DWORD_PTR)MainWindow->HWindow;
@@ -1462,8 +1485,11 @@ void ShellAction(CFilesWindow* panel, CShellAction action, BOOL useSelection,
                                                             SalShExtPastedData.SetDataID(SalShExtSharedMemView->PastedDataID);
                                                             clearSalShExtPastedData = FALSE;
                                                             SalShExtSharedMemView->PasteDone = FALSE;
-                                                            lstrcpyn(SalShExtSharedMemView->ArcUnableToPaste1, LoadStr(IDS_ARCUNABLETOPASTE1), 300);
-                                                            lstrcpyn(SalShExtSharedMemView->ArcUnableToPaste2, LoadStr(IDS_ARCUNABLETOPASTE2), 300);
+                                                            // Shared paste errors are fixed presentation fields consumed by the extension UI.
+                                                            StringCchCopyNA(SalShExtSharedMemView->ArcUnableToPaste1, 300,
+                                                                            LoadStr(IDS_ARCUNABLETOPASTE1), 299);
+                                                            StringCchCopyNA(SalShExtSharedMemView->ArcUnableToPaste2, 300,
+                                                                            LoadStr(IDS_ARCUNABLETOPASTE2), 299);
 
                                                             delFakeDir = FALSE; // vse je OK, fake-dir se uzije
                                                             fakeDataObject->SetCutOrCopyDone();
@@ -1727,7 +1753,11 @@ void ShellAction(CFilesWindow* panel, CShellAction action, BOOL useSelection,
                         // vynutime otevreni zalozky Security; bohuzel je treba predavat string pro danou lokalizaci OS
                         ici.lpParameters = pageName;
                         if (!GetACLUISecurityPageName(pageName, 200))
-                            lstrcpy(pageName, "Security"); // if the name cannot be extracted, use English "Security" and silently do nothing in localized versions
+                        {
+                            // The shell-property fallback stays within the fixed parameter buffer.
+                            if (FAILED(StringCchCopyA(pageName, _countof(pageName), "Security")))
+                                pageName[0] = 0;
+                        }
                     }
                     ici.lpDirectory = panel->GetPath();
                     ici.nShow = SW_SHOWNORMAL;

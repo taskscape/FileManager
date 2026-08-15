@@ -370,11 +370,12 @@ void CFTPOperation::SendHeaderToLog(int logUID)
 
         SYSTEMTIME st;
         GetLocalTime(&st);
-        if (GetDateFormat(LOCALE_USER_DEFAULT, DATE_SHORTDATE, &st, NULL, timeBuf, 50) == 0)
+        if (FormatUserDateTimeAnsi(&st, DATE_SHORTDATE, timeBuf, 50, TRUE) == 0)
             sprintf(timeBuf, "%u.%u.%u", st.wDay, st.wMonth, st.wYear);
         strcat(timeBuf, " - ");
-        if (GetTimeFormat(LOCALE_USER_DEFAULT, 0, &st, NULL, timeBuf + strlen(timeBuf), 50) == 0)
-            sprintf(timeBuf + strlen(timeBuf), "%u:%02u:%02u", st.wHour, st.wMinute, st.wSecond);
+        size_t timeOffset = strlen(timeBuf);
+        if (timeOffset < 50 && FormatUserDateTimeAnsi(&st, 0, timeBuf + timeOffset, 50 - (int)timeOffset, FALSE) == 0)
+            _snprintf_s(timeBuf + timeOffset, 50 - timeOffset, _TRUNCATE, "%u:%02u:%02u", st.wHour, st.wMinute, st.wSecond);
         sprintf(buf, LoadStr(IDS_WORKERLOGHEADER), Host, Port, logUID, timeBuf);
         Logs.LogMessage(logUID, buf, -1);
     }

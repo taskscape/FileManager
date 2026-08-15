@@ -279,8 +279,8 @@ BOOL CData::LoadIgnoreLst(const char* fileName)
         return FALSE;
     }
 
-    DWORD ignoreLstDataSize = GetFileSize(hFile, NULL);
-    if (ignoreLstDataSize == 0xFFFFFFFF)
+    DWORD ignoreLstDataSize;
+    if (!GetFileSizeDwordLocal(hFile, &ignoreLstDataSize))
     {
         char buf[MAX_PATH + 100];
         sprintf_s(buf, "Error reading file %s.", fileName);

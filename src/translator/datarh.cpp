@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "precomp.h"
+#include <strsafe.h>
 
 #include "wndrh.h"
 #include "wndout.h"
@@ -11,6 +12,29 @@
 #include "oe_data.h"
 
 CDataRH DataRH;
+
+template<size_t capacity>
+static BOOL CopyRHToken(char (&destination)[capacity], const char* source, size_t sourceLength)
+{
+    // Parser tokens must remain whole; a clipped identifier could bind to another symbol.
+    if (source == NULL || sourceLength >= capacity)
+    {
+        destination[0] = 0;
+        return FALSE;
+    }
+    memcpy(destination, source, sourceLength);
+    destination[sourceLength] = 0;
+    return TRUE;
+}
+
+template<size_t capacity>
+static void CopyRHDisplayText(char (&destination)[capacity], const char* source, size_t sourceLength)
+{
+    // Diagnostics and list rows intentionally retain only the visible field capacity.
+    const size_t copiedLength = min(sourceLength, capacity - 1);
+    memcpy(destination, source, copiedLength);
+    destination[copiedLength] = 0;
+}
 
 // integration with OPENEDIT for opening files in MSVC
 
@@ -53,8 +77,13 @@ void GotoEditor(const char* fileName, int row)
         }
 
         COpenEditPacket packet; // packet with information for the server
-        lstrcpyn(packet.File, fileName, MAX_PATH);
-        packet.File[MAX_PATH - 1] = 0;
+        // The receiving editor must not navigate to an ambiguous clipped file path.
+        if (FAILED(StringCchCopyA(packet.File, _countof(packet.File), fileName)))
+        {
+            TRACE_E("Editor path is too long for the mail-slot packet");
+            CloseHandle(mailSlot);
+            return;
+        }
         packet.Line = row;
         packet.Column = 0;
         DWORD written;
@@ -620,7 +649,7 @@ BOOL CDataRH::ProcessLine(const char* line, const char* lineEnd, int row)
                             {
                                 wchar_t buffW[2 * MAX_PATH];
                                 char nameBuf[1000];
-                                lstrcpyn(nameBuf, name, nameLen + 1);
+                                CopyRHDisplayText(nameBuf, name, static_cast<size_t>(nameLen));
                                 swprintf_s(buffW, L"SYMBOLS file: invalid ID (%hs) on row %d", nameBuf, row);
                                 OutWindow.AddLine(buffW, mteError);
                             }
@@ -790,7 +819,11 @@ BOOL CompileRule(const char*& rh, const char* rhEnd, int* line, int* errorResID)
     char ident1[100];
     char ident2[100];
 
-    lstrcpyn(ident1, beg, min(100, rh - beg + 1));
+    if (!CopyRHToken(ident1, beg, static_cast<size_t>(rh - beg)))
+    {
+        *errorResID = IDS_ERR_MISSINGFUNCORVAR;
+        return FALSE;
+    }
     if (!SkipWSAndEOLAndCmnt(rh, rhEnd, line) || (*rh != '=' && *rh != '('))
     {
         *errorResID = IDS_ERR_MISSINGFUNCPARS;
@@ -814,7 +847,11 @@ BOOL CompileRule(const char*& rh, const char* rhEnd, int* line, int* errorResID)
         beg = rh;
         if (!SkipIdentifier(rh, rhEnd, errorResID, IDS_ERR_MISSINGFUNCORVAR))
             return FALSE;
-        lstrcpyn(ident2, beg, min(100, rh - beg + 1));
+        if (!CopyRHToken(ident2, beg, static_cast<size_t>(rh - beg)))
+        {
+            *errorResID = IDS_ERR_MISSINGFUNCORVAR;
+            return FALSE;
+        }
 
         result = ident1;
         function = ident2;
@@ -869,11 +906,9 @@ BOOL CompileRule(const char*& rh, const char* rhEnd, int* line, int* errorResID)
             else
             {
                 // otherwise it should be an identifier
-                char par1[100];
                 beg = rh;
                 if (!SkipIdentifier(rh, rhEnd, errorResID, IDS_ERR_MISSINGFUNCPAR))
                     return FALSE;
-                lstrcpyn(par1, beg, min(100, rh - beg + 1));
                 lastItem = 1;
             }
         }
@@ -942,7 +977,11 @@ BOOL CompileLayout(const char*& rh, const char* rhEnd, int* line, int* errorResI
                 if (SkipIdentifier(rh, rhEnd, errorResID, IDS_ERR_MISSINGFUNCPARS))
                 {
                     char dlgName[100];
-                    lstrcpyn(dlgName, beg, min(100, rh - beg + 1));
+                    if (!CopyRHToken(dlgName, beg, static_cast<size_t>(rh - beg)))
+                    {
+                        *errorResID = IDS_ERR_MISSINGFUNCPARS;
+                        return FALSE;
+                    }
 
                     // ensure the identifier is defined
                     if (!DataRH.GetIDForIdentifier(dlgName, NULL))
@@ -988,7 +1027,11 @@ BOOL CompileSlash(const char*& rh, const char* rhEnd, int* line, int* errorResID
                         if (SkipIdentifier(rh, rhEnd, errorResID, IDS_ERR_LAYOUTEXPECTED))
                         {
                             char functionName[100];
-                            lstrcpyn(functionName, beg, min(100, rh - beg + 1));
+                            if (!CopyRHToken(functionName, beg, static_cast<size_t>(rh - beg)))
+                            {
+                                *errorResID = IDS_ERR_LAYOUTEXPECTED;
+                                return FALSE;
+                            }
                             if (strcmp(functionName, "Layout") == 0)
                                 return CompileLayout(rh, rhEnd, line, errorResID);
                             else
@@ -1008,6 +1051,9 @@ BOOL CompileSlash(const char*& rh, const char* rhEnd, int* line, int* errorResID
 
 BOOL CDataRH::GetOriginalFile(int line, char* originalFile, int buffSize, int* originalFileLine)
 {
+    if (originalFile == NULL || buffSize <= 0)
+        return FALSE;
+
     CDataRHItem* lastMark = NULL;
     for (int i = 0; i < FileMarks.Count; i++)
     {
@@ -1022,8 +1068,9 @@ BOOL CDataRH::GetOriginalFile(int line, char* originalFile, int buffSize, int* o
     }
     else
     {
-        lstrcpyn(originalFile, lastMark->Name, buffSize);
-        originalFile[buffSize - 1] = 0;
+        // Original-file names are diagnostic text, so retain explicit display clipping.
+        StringCchCopyNA(originalFile, static_cast<size_t>(buffSize), lastMark->Name,
+                         static_cast<size_t>(buffSize) - 1);
         *originalFileLine = line - lastMark->Row;
     }
     return TRUE;
@@ -1050,8 +1097,8 @@ BOOL CDataRH::Load(const char* fileName)
         return FALSE;
     }
 
-    DWORD size = GetFileSize(hFile, NULL);
-    if (size == 0xFFFFFFFF)
+    DWORD size;
+    if (!GetFileSizeDwordLocal(hFile, &size))
     {
         char buf[MAX_PATH + 100];
         sprintf_s(buf, "Error reading file %s.", fileName);
@@ -1249,7 +1296,7 @@ void CDataRH::FillListBox()
         while (*lineEnd != '\r' && *lineEnd != '\n' && lineEnd < Data + DataSize)
             lineEnd++;
 
-        lstrcpyn(buff, lineStart, min(lineEnd - lineStart + 1, 2000));
+        CopyRHDisplayText(buff, lineStart, static_cast<size_t>(lineEnd - lineStart));
 
         int count = ListView_GetItemCount(hListBox);
         LVITEM lvi;

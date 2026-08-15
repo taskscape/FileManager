@@ -10,6 +10,7 @@
 #include <limits.h>
 #include <commctrl.h> // need LPCOLORMAP
 #include <tchar.h>
+#include <strsafe.h>
 
 #if defined(_DEBUG) && defined(_MSC_VER) // without passing file+line to 'new' operator, list of memory leaks shows only 'crtdbg.h(552)'
 #define new new (_NORMAL_BLOCK, __FILE__, __LINE__)
@@ -52,8 +53,11 @@ TCHAR WinLibStrings[WLS_COUNT][101] = {
 
 void SetWinLibStrings(const TCHAR* invalidNumber, const TCHAR* error)
 {
-    lstrcpyn(WinLibStrings[WLS_INVALID_NUMBER], invalidNumber, 101);
-    lstrcpyn(WinLibStrings[WLS_ERROR], error, 101);
+    // WinLib stores localized error labels in fixed presentation fields.
+    StringCchCopyN(WinLibStrings[WLS_INVALID_NUMBER], _countof(WinLibStrings[WLS_INVALID_NUMBER]),
+                   invalidNumber, _countof(WinLibStrings[WLS_INVALID_NUMBER]) - 1);
+    StringCchCopyN(WinLibStrings[WLS_ERROR], _countof(WinLibStrings[WLS_ERROR]),
+                   error, _countof(WinLibStrings[WLS_ERROR]) - 1);
 }
 
 BOOL InitializeWinLib()
@@ -476,7 +480,8 @@ CWindow::CWindowProcInt(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam, BOOL
 
 BOOL CWindow::RegisterUniversalClass()
 {
-    WNDCLASS CWindowClass;
+    WNDCLASSEX CWindowClass;
+    CWindowClass.cbSize = sizeof(CWindowClass);
     CWindowClass.style = CS_DBLCLKS | CS_HREDRAW | CS_VREDRAW;
     CWindowClass.lpfnWndProc = CWindow::CWindowProc;
     CWindowClass.cbClsExtra = 0;
@@ -487,19 +492,22 @@ BOOL CWindow::RegisterUniversalClass()
     CWindowClass.hbrBackground = (HBRUSH)(COLOR_WINDOW + 1);
     CWindowClass.lpszMenuName = NULL;
     CWindowClass.lpszClassName = CWINDOW_CLASSNAME;
+    CWindowClass.hIconSm = CWindowClass.hIcon;
 
-    BOOL ret = RegisterClass(&CWindowClass) != 0;
+    // RegisterClassEx retains the small icon required by modern shell/UI surfaces.
+    BOOL ret = RegisterClassEx(&CWindowClass) != 0;
     if (ret)
     {
         CWindowClass.style = CS_DBLCLKS;
         CWindowClass.lpszClassName = CWINDOW_CLASSNAME2;
-        ret = RegisterClass(&CWindowClass) != 0;
+        ret = RegisterClassEx(&CWindowClass) != 0;
     }
 
 #ifndef _UNICODE
     if (ret)
     {
-        WNDCLASSW CWindowClassW;
+        WNDCLASSEXW CWindowClassW;
+        CWindowClassW.cbSize = sizeof(CWindowClassW);
         CWindowClassW.style = CS_DBLCLKS | CS_HREDRAW | CS_VREDRAW;
         CWindowClassW.lpfnWndProc = CWindow::CWindowProcW;
         CWindowClassW.cbClsExtra = 0;
@@ -510,13 +518,14 @@ BOOL CWindow::RegisterUniversalClass()
         CWindowClassW.hbrBackground = (HBRUSH)(COLOR_WINDOW + 1);
         CWindowClassW.lpszMenuName = NULL;
         CWindowClassW.lpszClassName = CWINDOW_CLASSNAMEW;
+        CWindowClassW.hIconSm = CWindowClassW.hIcon;
 
-        BOOL ret = RegisterClassW(&CWindowClassW) != 0;
+        BOOL ret = RegisterClassExW(&CWindowClassW) != 0;
         if (ret)
         {
             CWindowClassW.style = CS_DBLCLKS;
             CWindowClassW.lpszClassName = CWINDOW_CLASSNAME2W;
-            ret = RegisterClassW(&CWindowClassW) != 0;
+            ret = RegisterClassExW(&CWindowClassW) != 0;
         }
     }
 #endif // _UNICODE

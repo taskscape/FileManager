@@ -129,11 +129,12 @@ INT_PTR WINAPI SfxPreviewDlgProc(HWND dlg, UINT uMsg, WPARAM wParam, LPARAM lPar
         ShowWindow(GetDlgItem(dlg, IDC_PROGRESS), SW_HIDE);
         ShowWindow(GetDlgItem(dlg, IDC_FILENAME), SW_HIDE);
         SetDlgItemText(dlg, IDC_TEXT, data->Settings->Text);
-        LONG style = GetWindowLong(GetDlgItem(dlg, IDC_WEBLINK), GWL_STYLE);
+        // Pointer-width access keeps this legacy dialog's control style portable to x64.
+        LONG_PTR style = GetWindowLongPtr(GetDlgItem(dlg, IDC_WEBLINK), GWL_STYLE);
         if (style)
         {
             style = style | SS_NOTIFY;
-            SetWindowLong(GetDlgItem(dlg, IDC_WEBLINK), GWL_STYLE, style);
+            SetWindowLongPtr(GetDlgItem(dlg, IDC_WEBLINK), GWL_STYLE, style);
         }
         SetDlgItemText(dlg, IDC_ABOUTTEXT, data->About);
         SalamanderGeneral->MultiMonCenterWindow(dlg, NULL, FALSE); // center it relative to the desktop

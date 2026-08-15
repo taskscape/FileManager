@@ -147,6 +147,7 @@ public:
     static int HandleException(EXCEPTION_POINTERS* e, DWORD shellExtCrashID = -1,
                                const char* iconOvrlsHanName = NULL); // called from the exception handler
     static DWORD WINAPI ThreadBugReportF(void* exitProcess);         // thread that opens the bug report dialog
+    static DWORD WINAPI ThreadBugReportOwnedF(void* parameter, HANDLE stopEvent); // adapts the legacy event protocol to CThreadOwner
     // calls PrintBugReport into the bug report
     static BOOL CreateBugReportFile(EXCEPTION_POINTERS* Exception, DWORD ThreadID, DWORD ShellExtCrashID, const char* bugReportFileName);
 

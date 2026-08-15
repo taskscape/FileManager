@@ -8,6 +8,7 @@
 #include <limits.h>
 #include <stdio.h>
 #include <commctrl.h> // need LPCOLORMAP
+#include <strsafe.h>
 
 #include "lstrfix.h"
 #include "trace.h"
@@ -354,7 +355,8 @@ BOOL CRegLogFont::Load(HKEY hKey, const WCHAR* name, void* data, BOOL* notFound)
     if (*p == L';')
     {
         p++;
-        lstrcpyn(lf.lfFaceName, p, _countof(lf.lfFaceName));
+        // LOGFONT persists a compact face-name field from this registry value.
+        StringCchCopyNW(lf.lfFaceName, _countof(lf.lfFaceName), p, _countof(lf.lfFaceName) - 1);
     }
     else
         lf.lfFaceName[0] = 0;

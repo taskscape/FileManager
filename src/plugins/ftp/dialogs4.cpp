@@ -770,7 +770,7 @@ void CSrvTypeTestParserDlg::ParseListingToListView()
                 {
                     FileTimeToLocalFileTime(&file.LastWrite, &ft);
                     FileTimeToSystemTime(&ft, &st);
-                    if (GetDateFormat(LOCALE_USER_DEFAULT, DATE_SHORTDATE, &st, NULL, buf, 100) == 0)
+                    if (FormatUserDateTimeAnsi(&st, DATE_SHORTDATE, buf, 100, TRUE) == 0)
                         sprintf(buf, "%u.%u.%u", st.wDay, st.wMonth, st.wYear);
                     value = buf;
                     break;
@@ -781,7 +781,7 @@ void CSrvTypeTestParserDlg::ParseListingToListView()
                     dataIface.GetDateFromColumn(file, j, &stDateVal);
                     if (stDateVal.wDay != 0) // should not display ""
                     {
-                        if (GetDateFormat(LOCALE_USER_DEFAULT, DATE_SHORTDATE, &stDateVal, NULL, buf, 100) == 0)
+                        if (FormatUserDateTimeAnsi(&stDateVal, DATE_SHORTDATE, buf, 100, TRUE) == 0)
                             sprintf(buf, "%u.%u.%u", stDateVal.wDay, stDateVal.wMonth, stDateVal.wYear);
                         value = buf;
                     }
@@ -792,7 +792,7 @@ void CSrvTypeTestParserDlg::ParseListingToListView()
                 {
                     FileTimeToLocalFileTime(&file.LastWrite, &ft);
                     FileTimeToSystemTime(&ft, &st);
-                    if (GetTimeFormat(LOCALE_USER_DEFAULT, 0, &st, NULL, buf, 100) == 0)
+                    if (FormatUserDateTimeAnsi(&st, 0, buf, 100, FALSE) == 0)
                         sprintf(buf, "%u:%02u:%02u", st.wHour, st.wMinute, st.wSecond);
                     value = buf;
                     break;
@@ -803,7 +803,7 @@ void CSrvTypeTestParserDlg::ParseListingToListView()
                     dataIface.GetTimeFromColumn(file, j, &stTimeVal);
                     if (stTimeVal.wHour != 24) // should not display ""
                     {
-                        if (GetTimeFormat(LOCALE_USER_DEFAULT, 0, &stTimeVal, NULL, buf, 100) == 0)
+                        if (FormatUserDateTimeAnsi(&stTimeVal, 0, buf, 100, FALSE) == 0)
                             sprintf(buf, "%u:%02u:%02u", stTimeVal.wHour, stTimeVal.wMinute, stTimeVal.wSecond);
                         value = buf;
                     }

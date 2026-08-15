@@ -3,6 +3,7 @@
 // CommentsTranslationProject: TRANSLATED
 
 #include "precomp.h"
+#include "..\\..\\common\\monotonic_time.h"
 
 //
 // ****************************************************************************
@@ -31,6 +32,13 @@ enum CSendFTPCmdStates // states of the automaton for CControlConnectionSocket::
     // method finished (success or failure indicated by the TRUE/FALSE value of 'ret')
     sfcsDone
 };
+
+static DWORD GetWaitWindowElapsed(CMonotonicTimePoint start)
+{
+    const CMonotonicDuration elapsed = CMonotonicClock::Elapsed(start, CMonotonicClock::Now());
+    // The legacy wait-window interface accepts DWORD milliseconds, so saturate only at that UI boundary.
+    return elapsed > MAXDWORD ? MAXDWORD : (DWORD)elapsed;
+}
 
 // **************************************************************************************
 // helper object CSendCmdUserIfaceWaitWnd for CControlConnectionSocket::SendFTPCommand()
@@ -125,7 +133,7 @@ BOOL CControlConnectionSocket::SendFTPCommand(HWND parent, const char* ftpCmd, c
                         resetCurrentTransferModeCache, retryMsgBufSize);
 
     parent = FindPopupParent(parent);
-    DWORD startTime = GetTickCount(); // start time of the operation
+    const CMonotonicTimePoint operationStart = CMonotonicClock::Now();
     if (canRetry != NULL)
         *canRetry = FALSE;
     if (retryMsgBufSize > 0)
@@ -192,7 +200,7 @@ BOOL CControlConnectionSocket::SendFTPCommand(HWND parent, const char* ftpCmd, c
     {
         // wait for the keep-alive command to finish (if it is in progress) + set
         // keep-alive to 'kamForbidden' (a normal command is running)
-        DWORD waitTime = GetTickCount() - startTime;
+        DWORD waitTime = GetWaitWindowElapsed(operationStart);
         WaitForEndOfKeepAlive(parent, waitTime < (DWORD)waitWndTime ? waitWndTime - waitTime : 0);
     }
 
@@ -298,8 +306,10 @@ BOOL CControlConnectionSocket::SendFTPCommand(HWND parent, const char* ftpCmd, c
                 }
                 Logs.LogMessage(logUID, !aborting ? logCmd : errBuf, -1);
 
-                DWORD start = GetTickCount();
-                DWORD waitTime = start - startTime;
+                CMonotonicTimePoint commandDeadline = CMonotonicClock::DeadlineAfter(serverTimeout > 0 ? (CMonotonicDuration)serverTimeout : 0);
+                // The specialized data-connection callback still exposes a DWORD tick pointer; seed its compatibility value from the monotonic clock.
+                DWORD timeoutStart = (DWORD)CMonotonicClock::Now();
+                DWORD waitTime = GetWaitWindowElapsed(operationStart);
                 userIface->AfterWrite(aborting, waitTime < (DWORD)waitWndTime ? waitWndTime - waitTime : 0);
 
                 BOOL isCanceled = FALSE;
@@ -308,10 +318,9 @@ BOOL CControlConnectionSocket::SendFTPCommand(HWND parent, const char* ftpCmd, c
                     // wait for an event on the socket (server reply) or ESC
                     CControlConnectionSocketEvent event;
                     DWORD data1, data2;
-                    DWORD now = GetTickCount();
-                    if (now - start > (DWORD)serverTimeout)
-                        now = start + (DWORD)serverTimeout;
-                    WaitForEventOrESC(parent, &event, &data1, &data2, serverTimeout - (now - start),
+                    // Retain one server-reply deadline while write and partial-reply events wake this loop.
+                    const DWORD remainingWait = CMonotonicClock::RemainingWin32TimerDelay(commandDeadline, CMonotonicClock::Now());
+                    WaitForEventOrESC(parent, &event, &data1, &data2, remainingWait,
                                       NULL, userIface, FALSE);
                     switch (event)
                     {
@@ -339,11 +348,16 @@ BOOL CControlConnectionSocket::SendFTPCommand(HWND parent, const char* ftpCmd, c
                     case ccsevTimeout:
                     {
                         int errorTextID = IDS_SNDORABORCMDTIMEOUT;
-                        if (userIface->IsTimeout(&start, serverTimeout, &errorTextID, errBuf, 300))
+                        if (userIface->IsTimeout(&timeoutStart, serverTimeout, &errorTextID, errBuf, 300))
                         {
                             fatalErrorTextID = errorTextID;
                             state = sfcsFatalError;
                             allBytesWritten = TRUE; // no longer important now, the socket will be closed
+                        }
+                        else
+                        {
+                            // A live data transfer retains the legacy extension policy without losing the 64-bit wait source.
+                            commandDeadline = CMonotonicClock::DeadlineAfter(serverTimeout > 0 ? (CMonotonicDuration)serverTimeout : 0);
                         }
                         break;
                     }
@@ -471,12 +485,13 @@ BOOL CControlConnectionSocket::SendFTPCommand(HWND parent, const char* ftpCmd, c
                     BOOL calledBeforeWaitingForFinish = FALSE;
                     BOOL useTimeout = FALSE;    // TRUE = use the 'serverTimeout2' timeout while waiting for the data connection to finish
                     int serverTimeout2 = 10000; // timeout for finishing the data connection when LIST returns an error or the connection has not been opened yet is 10 seconds
-                    DWORD start2 = GetTickCount();
+                    CMonotonicTimePoint finishDeadline = CMonotonicClock::DeadlineAfter(serverTimeout2);
+                    // The callback ABI still carries a DWORD activity sample; timeout ownership remains monotonic here.
+                    DWORD start2 = (DWORD)CMonotonicClock::Now();
                     while (!userIface->CanFinishSending(*ftpReplyCode, &useTimeout))
                     {
                         if (!calledBeforeWaitingForFinish) // call only the first time
                         {
-                            DWORD waitTime2 = GetTickCount() - startTime;
                             userIface->BeforeWaitingForFinish(*ftpReplyCode, &useTimeout);
                             calledBeforeWaitingForFinish = TRUE;
                         }
@@ -484,11 +499,9 @@ BOOL CControlConnectionSocket::SendFTPCommand(HWND parent, const char* ftpCmd, c
                         // wait for the user interface to close, for a timeout, or for ESC
                         CControlConnectionSocketEvent event;
                         DWORD data1, data2;
-                        DWORD now = GetTickCount();
-                        if (now - start2 > (DWORD)serverTimeout2)
-                            now = start2 + (DWORD)serverTimeout2;
                         WaitForEventOrESC(parent, &event, &data1, &data2,
-                                          useTimeout ? serverTimeout2 - (now - start2) : INFINITE,
+                                          useTimeout ? CMonotonicClock::RemainingWin32TimerDelay(finishDeadline,
+                                                                                                   CMonotonicClock::Now()) : INFINITE,
                                           NULL, userIface, TRUE);
                         switch (event)
                         {
@@ -498,7 +511,13 @@ BOOL CControlConnectionSocket::SendFTPCommand(HWND parent, const char* ftpCmd, c
                         case ccsevTimeout:
                         {
                             if (useTimeout)
+                            {
+                                DWORD previousStart = start2;
                                 userIface->HandleDataConTimeout(&start2);
+                                // A newer legacy activity sample extends the monotonic deadline without reintroducing wrap arithmetic.
+                                if (start2 != previousStart)
+                                    finishDeadline = CMonotonicClock::DeadlineAfter(serverTimeout2);
+                            }
                             else
                                 TRACE_E("Unexpected event ccsevTimeout!");
                             break;

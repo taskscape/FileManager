@@ -288,7 +288,10 @@ int main(int argc, char* argv[])
     //write default text to package
     printf("Writing texts...\n");
     int offset = sizeof(CSfxFileHeader);
-    if (SetFilePointer(SfxFile, offset, NULL, FILE_BEGIN) == 0xFFFFFFFF)
+    // The package layout retains this fixed header offset, while the seek reports failure independently.
+    LARGE_INTEGER textOffset;
+    textOffset.QuadPart = offset;
+    if (!SetFilePointerEx(SfxFile, textOffset, NULL, FILE_BEGIN))
         return Error("Unable to seek SFX package file.");
 
     // prepare the strings in the buffer
@@ -297,7 +300,8 @@ int main(int argc, char* argv[])
     {
         if (!GetNextString(textFile, Buffer + size))
             return Error("Unable to read texts file.");
-        header.TextLen[i] = lstrlen(Buffer + size);
+        // The package header stores each terminated text length in its existing DWORD field.
+        header.TextLen[i] = static_cast<DWORD>(strlen(Buffer + size));
         size += header.TextLen[i];
     }
 
@@ -339,11 +343,13 @@ int main(int argc, char* argv[])
         return Error("Unable to open sfxsmall.exe.");
 
     header.SmallSfxOffset = offset;
-    size = GetFileSize(file, NULL);
-    if (size == 0xFFFFFFFF)
+    LARGE_INTEGER fileSize;
+    if (!GetFileSizeEx(file, &fileSize))
         return Error("Unable to get sfxsmall.exe file size.");
-    if (size > 64 * 1024)
+    if (fileSize.QuadPart < 0 || fileSize.QuadPart > 64 * 1024)
         return Error("Unable continue, sfxsmall.exe is to big.");
+    // The SFX package format reserves a 64 KiB input buffer, so only narrow a verified 64-bit size.
+    size = (DWORD)fileSize.QuadPart;
 
     if (!Read(file, Buffer, size))
         return Error("Unable to sfxsmall.exe.");
@@ -380,11 +386,12 @@ int main(int argc, char* argv[])
         return Error("Unable to open sfxbig.exe.");
 
     header.BigSfxOffset = offset;
-    size = GetFileSize(file, NULL);
-    if (size == 0xFFFFFFFF)
+    if (!GetFileSizeEx(file, &fileSize))
         return Error("Unable to get sfxbig.exe. file size.");
-    if (size > 64 * 1024)
+    if (fileSize.QuadPart < 0 || fileSize.QuadPart > 64 * 1024)
         return Error("Unable continue, sfxbig.exe. is to big.");
+    // Preserve the same fixed-buffer constraint for the large SFX executable before narrowing the size.
+    size = (DWORD)fileSize.QuadPart;
 
     if (!Read(file, Buffer, size))
         return Error("Unable to sfxbig.exe.");
@@ -418,7 +425,9 @@ int main(int argc, char* argv[])
     //write package header
     header.HeaderCRC = UpdateCrc((__UINT8*)&header, sizeof(CSfxFileHeader) - sizeof(DWORD), INIT_CRC, StaticCrcTab);
     printf("Writing package header...\n");
-    if (SetFilePointer(SfxFile, 0, NULL, FILE_BEGIN) == 0xFFFFFFFF)
+    // Rewind with SetFilePointerEx so a valid zero offset is not subject to sentinel interpretation.
+    LARGE_INTEGER startOffset = {};
+    if (!SetFilePointerEx(SfxFile, startOffset, NULL, FILE_BEGIN))
         return Error("Unable to seek SFX package file.");
     if (!Write(SfxFile, &header, sizeof(CSfxFileHeader)))
         return Error("Unable to write SFX package file.");

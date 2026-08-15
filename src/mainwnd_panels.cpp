@@ -4,6 +4,8 @@
 
 #include "precomp.h"
 
+#include <strsafe.h>
+
 #include "plugins.h"
 #include "fileswnd.h"
 #include "mainwnd.h"
@@ -334,7 +336,8 @@ BOOL CompareFilesByContent(HWND hWindow, CCmpDirProgressDialog* progressDlg,
                     // load the next part from 'file1' into 'buffer1'
                     // read the entire buffer in 32KB blocks from one file (on W2K and XP this is fastest when both files are on one physical disk; on Vista it's only slightly slower than sequential reading)
                     read1 = 0;
-                    DWORD readBegTime = GetTickCount();
+                    // Long comparisons must retain their slow-read threshold across the legacy tick wrap.
+                    CMonotonicTimePoint readBegTime = CMonotonicClock::Now();
                     for (int block = 0; block < blockCount;)
                     {
                         DWORD locRead;
@@ -364,7 +367,7 @@ BOOL CompareFilesByContent(HWND hWindow, CCmpDirProgressDialog* progressDlg,
                         read1 += locRead;
                         if (locRead != readBlockSize)
                             break; // EOF
-                        if (GetTickCount() - readBegTime > 200)
+                        if (CMonotonicClock::HasElapsed(readBegTime, 200, CMonotonicClock::Now()))
                         { // slow reading (probably a slow network disk (VPN) or floppy) - reduce the buffer, at worst we'll compare block by block
                             blockCount = block + (canReadGroup ? COMPARE_BLOCK_GROUP : 1);
                             bufSize = blockCount * COMPARE_BLOCK_SIZE;
@@ -375,7 +378,7 @@ BOOL CompareFilesByContent(HWND hWindow, CCmpDirProgressDialog* progressDlg,
                     if (readErr || *canceled)
                         break;
                     readingIsFast1 = WindowsVistaAndLater &&                                                                                           // on W2K/XP this should not speed things up, so we will not tempt fate
-                                     GetTickCount() - readBegTime < (DWORD)(((unsigned __int64)read1 * COMPARE_BUF_TIME_LIMIT) / COMPARE_BUFFER_SIZE); // measure the speed so it is over 1 MB/s
+                                     CMonotonicClock::Elapsed(readBegTime, CMonotonicClock::Now()) < ((unsigned __int64)read1 * COMPARE_BUF_TIME_LIMIT) / COMPARE_BUFFER_SIZE; // measure the speed so it is over 1 MB/s
                                                                                                                                                        /*
           // read the entire buffer at once from one file (on Vista, when both files are on the same physical disk and the buffer is large, this is slightly faster than reading in 32KB blocks)
           if (!ReadFile(hFile1, buffer1, bufSize, &read1, NULL))
@@ -395,7 +398,7 @@ BOOL CompareFilesByContent(HWND hWindow, CCmpDirProgressDialog* progressDlg,
                     // load the next part from 'file2' into 'buffer2'
                     // read the whole buffer in blocks from one file (on W2K and XP this is fastest when both files are on one physical disk; on Vista it's only slightly slower than sequential reading)
                     read2 = 0;
-                    readBegTime = GetTickCount();
+                    readBegTime = CMonotonicClock::Now();
                     for (int block = 0; block < blockCount;)
                     {
                         DWORD locRead;
@@ -438,7 +441,7 @@ BOOL CompareFilesByContent(HWND hWindow, CCmpDirProgressDialog* progressDlg,
                         }
                         block += canReadGroup ? COMPARE_BLOCK_GROUP : 1;
                         if (readingIsFast2 &&
-                            GetTickCount() - readBegTime > (DWORD)(((unsigned __int64)read2 * COMPARE_BUF_TIME_LIMIT) / COMPARE_BUFFER_SIZE))
+                            CMonotonicClock::Elapsed(readBegTime, CMonotonicClock::Now()) > ((unsigned __int64)read2 * COMPARE_BUF_TIME_LIMIT) / COMPARE_BUFFER_SIZE)
                         {
                             // detecting slowdown, continue block by block to keep progress smooth and allow canceling
                             readingIsFast2 = FALSE;
@@ -447,7 +450,7 @@ BOOL CompareFilesByContent(HWND hWindow, CCmpDirProgressDialog* progressDlg,
                     if (readErr || ret || *canceled)
                         break;
                     readingIsFast2 = WindowsVistaAndLater &&                                                                                           // on W2K/XP this should not speed things up, so we will not tempt fate
-                                     GetTickCount() - readBegTime < (DWORD)(((unsigned __int64)read2 * COMPARE_BUF_TIME_LIMIT) / COMPARE_BUFFER_SIZE); // measure the speed so it is over 1 MB/s
+                                     CMonotonicClock::Elapsed(readBegTime, CMonotonicClock::Now()) < ((unsigned __int64)read2 * COMPARE_BUF_TIME_LIMIT) / COMPARE_BUFFER_SIZE; // measure the speed so it is over 1 MB/s
                                                                                                                                                        /*
           // read the entire buffer at once from one file (on Vista, when both files are on the same physical disk and the buffer is large, this is slightly faster than reading in 32KB blocks)
           if (!ReadFile(hFile2, buffer2, bufSize, &read2, NULL))
@@ -555,8 +558,8 @@ BOOL ReadDirsAndFilesAux(HWND hWindow, DWORD flags, CCmpDirProgressDialog* progr
 
     if (panel->Is(ptDisk))
     {
-        BOOL pathAppended = TRUE;
-        lstrcpyn(path, panel->GetPath(), MAX_PATH);
+        // The comparison root must fit before any child suffix is appended.
+        BOOL pathAppended = SUCCEEDED(StringCchCopyA(path, _countof(path), panel->GetPath()));
         pathAppended &= SalPathAppend(path, subPath, MAX_PATH);
         pathAppended &= SalPathAppend(path, "*", MAX_PATH);
         if (!pathAppended)

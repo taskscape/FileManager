@@ -3,6 +3,8 @@
 
 #pragma once
 
+#include "..\\..\\common\\monotonic_time.h"
+
 class CSnapshotProgressDlg : public CDialog
 {
 protected:
@@ -27,7 +29,8 @@ protected:
     CGUIStaticTextAbstract *Label1, *Label2;
     BOOL WantCancel;
     char SrcName[MAX_PATH], DestName[MAX_PATH];
-    DWORD LastTick, FileProgress, TotalProgress;
+    CMonotonicTimePoint LastTick;
+    DWORD FileProgress, TotalProgress;
     BOOL Changed[4];
 
 public:

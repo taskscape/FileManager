@@ -3,6 +3,8 @@
 
 #pragma once
 
+#include "common/monotonic_time.h"
+
 //
 // ****************************************************************************
 
@@ -79,7 +81,7 @@ protected:
 
     BOOL ShowThrobber;             // TRUE if the 'progress' throbber should be shown after the text/hidden filter (independent of window existence)
     BOOL DelayedThrobber;          // TRUE if the timer for showing the throbber is already running
-    DWORD DelayedThrobberShowTime; // GetTickCount() value when the delayed throbber should be shown (0 = not showing with delay)
+    CMonotonicTimePoint DelayedThrobberShowTime; // 64-bit deadline for delayed throbber display (0 = not delayed)
     BOOL Throbber;                 // show the 'progress' throbber after the text/hidden filter? (TRUE only if the window exists)
     int ThrobberFrame;             // current animation frame index
     char* ThrobberTooltip;         // if NULL, it will not be displayed

@@ -1437,7 +1437,8 @@ void COperationDlg::CorrectLookOfPrevFocusedDisabledButton(HWND prevFocus)
         char className[31];
         if (GetClassName(prevFocus, className, 31) && _stricmp(className, "button") == 0)
         {
-            LONG style = GetWindowLong(prevFocus, GWL_STYLE);
+            // Preserve pointer-width window metadata access while checking button style flags.
+            LONG_PTR style = GetWindowLongPtr(prevFocus, GWL_STYLE);
             if ((style & BS_CHECKBOX) == 0 && (style & BS_DEFPUSHBUTTON) != 0)
                 SendMessage(prevFocus, BM_SETSTYLE, BS_PUSHBUTTON, TRUE);
         }

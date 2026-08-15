@@ -3,6 +3,9 @@
 
 #include "precomp.h"
 
+// Use StrSafe for bounded formatting of resource-controlled dialog text.
+#include <strsafe.h>
+
 #include "dialogs.h"
 #include "output.h"
 #include "renderer.h"
@@ -65,8 +68,9 @@ CAboutDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         char buff[1000];
         char buff2[1000];
         GetDlgItemText(HWindow, IDC_ABOUT_TITLE, buff, 1000);
-        wsprintf(buff2, buff, VERSINFO_VERSION);
-        SetDlgItemText(HWindow, IDC_ABOUT_TITLE, buff2);
+        // Keep the original dialog text if its localized format cannot fit the fixed buffer.
+        if (SUCCEEDED(StringCchPrintfA(buff2, ARRAYSIZE(buff2), buff, VERSINFO_VERSION)))
+            SetDlgItemText(HWindow, IDC_ABOUT_TITLE, buff2);
         SetDlgItemText(HWindow, IDC_ABOUT_COPYRIGHT, VERSINFO_COPYRIGHT);
         // the plugin name and version will be bold
         SalamanderGUI->AttachStaticText(HWindow, IDC_ABOUT_TITLE, STF_BOLD);

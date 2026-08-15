@@ -300,8 +300,13 @@ char* NumberToStr(char* buffer, const __int64 number)
 {
     char ThousandsSeparator[5];
     int ThousandsSeparatorLen;
-    if ((ThousandsSeparatorLen = GetLocaleInfoA(LOCALE_USER_DEFAULT, LOCALE_STHOUSAND, ThousandsSeparator, 5)) == 0 ||
-        ThousandsSeparatorLen > 5)
+    WCHAR localeName[LOCALE_NAME_MAX_LENGTH];
+    WCHAR thousandsSeparatorW[5];
+    if (GetUserDefaultLocaleName(localeName, _countof(localeName)) == 0 ||
+        GetLocaleInfoEx(localeName, LOCALE_STHOUSAND, thousandsSeparatorW, _countof(thousandsSeparatorW)) == 0 ||
+        (ThousandsSeparatorLen = WideCharToMultiByte(CP_ACP, 0, thousandsSeparatorW, -1,
+                                                      ThousandsSeparator, _countof(ThousandsSeparator), NULL, NULL)) == 0 ||
+        ThousandsSeparatorLen > (int)_countof(ThousandsSeparator))
     {
         ThousandsSeparator[0] = ' ';
         ThousandsSeparator[1] = 0;
@@ -309,6 +314,7 @@ char* NumberToStr(char* buffer, const __int64 number)
     }
     else
     {
+        // Keep the formatter's ANSI buffer, but derive the separator from the explicit named user locale.
         ThousandsSeparatorLen--;
         ThousandsSeparator[ThousandsSeparatorLen] = 0; // ensure the terminator stays in place
     }
@@ -538,7 +544,7 @@ DWORD SalGetFileAttributes(const char* fileName)
     }
 }
 
-void GetInfo(char* buffer, FILETIME* lastWrite, unsigned size)
+void GetInfo(char* buffer, size_t bufferSize, FILETIME* lastWrite, __int64 size)
 {
     SYSTEMTIME st;
     FILETIME ft;
@@ -546,11 +552,19 @@ void GetInfo(char* buffer, FILETIME* lastWrite, unsigned size)
     FileTimeToSystemTime(&ft, &st);
 
     char date[50], time[50], number[50];
-    if (GetTimeFormat(LOCALE_USER_DEFAULT, 0, &st, NULL, time, 50) == 0)
-        wsprintf(time, "%d:%02d:%02d", st.wHour, st.wMinute, st.wSecond);
-    if (GetDateFormat(LOCALE_USER_DEFAULT, DATE_SHORTDATE, &st, NULL, date, 50) == 0)
-        wsprintf(date, "%d.%d.%d", st.wDay, st.wMonth, st.wYear);
-    wsprintf(buffer, "%s, %s, %s", NumberToStr(number, size), date, time);
+    if (!SelfExtrFormatUserDateTime(&st, 0, time, ARRAYSIZE(time), FALSE))
+    {
+        if (!SelfExtrFormat(time, ARRAYSIZE(time), "%d:%02d:%02d", st.wHour, st.wMinute, st.wSecond))
+            time[0] = 0;
+    }
+    if (!SelfExtrFormatUserDateTime(&st, DATE_SHORTDATE, date, ARRAYSIZE(date), TRUE))
+    {
+        if (!SelfExtrFormat(date, ARRAYSIZE(date), "%d.%d.%d", st.wDay, st.wMonth, st.wYear))
+            date[0] = 0;
+    }
+    // Overwrite-dialog descriptions have an explicit caller-provided capacity, so formatting cannot overrun them.
+    if (!SelfExtrFormat(buffer, bufferSize, "%s, %s, %s", NumberToStr(number, size), date, time))
+        buffer[0] = 0;
 }
 
 HANDLE SafeCreateFile(char* name, DWORD attr, FILETIME* time, unsigned size)
@@ -611,8 +625,11 @@ HANDLE SafeCreateFile(char* name, DWORD attr, FILETIME* time, unsigned size)
                 else
                 {
                     GetFileTime(file, NULL, NULL, &ft);
-                    GetInfo(attr2, &ft, GetFileSize(file, NULL));
-                    GetInfo(attr1, time, size);
+                    LARGE_INTEGER existingFileSize;
+                    __int64 existingSize = GetFileSizeEx(file, &existingFileSize) ? existingFileSize.QuadPart : 0;
+                    // The overwrite prompt is informational, so display the complete 64-bit size when available.
+                    GetInfo(attr2, ARRAYSIZE(attr2), &ft, existingSize);
+                    GetInfo(attr1, ARRAYSIZE(attr1), time, size);
                     CloseHandle(file);
                     char buf[MAX_PATH * 2];
                     GetModuleFileName(NULL, buf, MAX_PATH);
@@ -649,16 +666,15 @@ int SafeWrite(HANDLE file, const unsigned char* buffer, unsigned size)
 {
     unsigned long bytesWritten; //number of butes read by ReadFile()
     bool retry;
-    unsigned filePos;
-    LONG dummy;
+    LARGE_INTEGER filePos;
 
     if (!size)
         return 0;
     while (1)
     {
-        dummy = 0;
-        filePos = SetFilePointer(file, 0, &dummy, FILE_CURRENT);
-        if (filePos == 0xFFFFFFFF)
+        // Preserve the full retry position and avoid the legacy API's ambiguous error sentinel.
+        LARGE_INTEGER zero = {};
+        if (!SetFilePointerEx(file, zero, &filePos, FILE_CURRENT))
         {
             HandleError(STR_ERROR_ACCES, GetLastError(), TargetPath, &retry, SF_WRITEFILE);
             if (!retry)
@@ -669,8 +685,7 @@ int SafeWrite(HANDLE file, const unsigned char* buffer, unsigned size)
     }
     while (1)
     {
-        dummy = 0;
-        if (SetFilePointer(file, filePos, &dummy, FILE_BEGIN) == 0xFFFFFFFF)
+        if (!SetFilePointerEx(file, filePos, NULL, FILE_BEGIN))
         {
             HandleError(STR_ERROR_ACCES, GetLastError(), TargetPath, &retry, SF_WRITEFILE);
             if (!retry)

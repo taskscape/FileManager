@@ -40,6 +40,8 @@ private:
     volatile LONGLONG HighWaterMark;
 
     BOOL Start();
+    // Start and Invoke already own Lock; keep teardown private so it cannot race a serialized pipe transaction.
+    void StopLocked();
     void Stop();
     BOOL Invoke(WORD type, const void* request, DWORD requestLength,
                 WORD responseType, void* response, DWORD responseCapacity,

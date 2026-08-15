@@ -38,35 +38,74 @@ protected:
 
         return ret;
     }
+
+    int GetLocaleInfoForLcid(LCTYPE type, TCHAR* buffer, int bufferSize)
+    {
+        WCHAR localeName[LOCALE_NAME_MAX_LENGTH];
+        if (LCIDToLocaleName(this->_lcid, localeName, ARRAYSIZE(localeName), 0) == 0)
+            return 0;
+#ifdef UNICODE
+        return GetLocaleInfoEx(localeName, type, buffer, bufferSize);
+#else
+        WCHAR value[80];
+        if (GetLocaleInfoEx(localeName, type, value, ARRAYSIZE(value)) == 0)
+            return 0;
+        // DiskMap's formatter is TCHAR-based; convert only at its ANSI compatibility boundary.
+        return WideCharToMultiByte(CP_ACP, 0, value, -1, buffer, bufferSize, NULL, NULL);
+#endif
+    }
+
+    int GetUserDateTime(const SYSTEMTIME* time, DWORD flags, TCHAR* buffer, int bufferSize, BOOL isDate)
+    {
+        // DiskMap preserves its TCHAR formatter while resolving user-visible dates through locale names.
+        WCHAR localeName[LOCALE_NAME_MAX_LENGTH];
+        WCHAR formatted[256];
+        if (GetUserDefaultLocaleName(localeName, ARRAYSIZE(localeName)) == 0)
+            return 0;
+        int length = isDate
+                         ? GetDateFormatEx(localeName, flags, time, NULL, formatted, ARRAYSIZE(formatted), NULL)
+                         : GetTimeFormatEx(localeName, flags, time, NULL, formatted, ARRAYSIZE(formatted));
+        if (length == 0)
+            return 0;
+#ifdef UNICODE
+        if (length > bufferSize)
+            return 0;
+        memcpy(buffer, formatted, length * sizeof(WCHAR));
+        return length;
+#else
+        return WideCharToMultiByte(CP_ACP, 0, formatted, -1, buffer, bufferSize, NULL, NULL);
+#endif
+    }
+
     // Fills the default NUMBERFMT structure for a given locale.
     BOOL LoadDefaultFormat()
     {
         TCHAR szBuf[80];
 
-        int ret = ::GetLocaleInfo(this->_lcid, LOCALE_IDIGITS, szBuf, ARRAYSIZE(szBuf));
+        int ret = GetLocaleInfoForLcid(LOCALE_IDIGITS, szBuf, ARRAYSIZE(szBuf));
         if (ret == 0)
             return FALSE;
         this->_defformat.NumDigits = _tcstol(szBuf, NULL, 10);
 
-        ret = ::GetLocaleInfo(this->_lcid, LOCALE_ILZERO, szBuf, ARRAYSIZE(szBuf));
+        ret = GetLocaleInfoForLcid(LOCALE_ILZERO, szBuf, ARRAYSIZE(szBuf));
         if (ret == 0)
             return FALSE;
         this->_defformat.LeadingZero = _tcstol(szBuf, NULL, 10);
 
-        ret = ::GetLocaleInfo(this->_lcid, LOCALE_SGROUPING, szBuf, ARRAYSIZE(szBuf));
+        ret = GetLocaleInfoForLcid(LOCALE_SGROUPING, szBuf, ARRAYSIZE(szBuf));
         if (ret == 0)
             return FALSE;
         this->_defformat.Grouping = GroupingStrToUint(szBuf);
 
-        ret = ::GetLocaleInfo(this->_lcid, LOCALE_SDECIMAL, this->_defformat.lpDecimalSep, 5);
+        ret = GetLocaleInfoForLcid(LOCALE_SDECIMAL, this->_defformat.lpDecimalSep, 5);
         if (ret == 0)
             return FALSE;
 
-        ret = ::GetLocaleInfo(this->_lcid, LOCALE_STHOUSAND, this->_defformat.lpThousandSep, 5);
+        ret = GetLocaleInfoForLcid(LOCALE_STHOUSAND, this->_defformat.lpThousandSep, 5);
         if (ret == 0)
             return FALSE;
 
-        ret = ::GetLocaleInfo(this->_lcid, LOCALE_INEGNUMBER, szBuf, ARRAYSIZE(szBuf));
+        ret = GetLocaleInfoForLcid(LOCALE_INEGNUMBER, szBuf, ARRAYSIZE(szBuf));
         if (ret == 0)
             return FALSE;
         this->_defformat.NegativeOrder = _tcstol(szBuf, NULL, 10);
@@ -99,7 +138,7 @@ public:
     size_t FormatLongDate(TCHAR* s, size_t slen, SYSTEMTIME* st)
     {
         size_t len = 0;
-        size_t l = GetDateFormat(LOCALE_USER_DEFAULT, DATE_LONGDATE, st, NULL, s, (int)slen);
+        size_t l = GetUserDateTime(st, DATE_LONGDATE, s, (int)slen, TRUE);
         if (l == 0)
         {
             if (slen >= 2 + 1 + 2 + 1 + 4)
@@ -124,7 +163,7 @@ public:
     size_t FormatTime(TCHAR* s, size_t slen, SYSTEMTIME* st)
     {
         size_t len = 0;
-        size_t l = GetTimeFormat(LOCALE_USER_DEFAULT, 0, st, NULL, s, (int)slen);
+        size_t l = GetUserDateTime(st, 0, s, (int)slen, FALSE);
         if (l == 0)
         {
             if (slen >= 2 + 1 + 2 + 1 + 2)

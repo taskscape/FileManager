@@ -4,6 +4,8 @@
 
 #include "precomp.h"
 
+#include <strsafe.h>
+
 #include "menu.h"
 #include "cfgdlg.h"
 #include "mainwnd.h"
@@ -23,6 +25,14 @@
 //
 // CFindTBHeader
 //
+
+// Find-result paths are operation identities; comparisons and enumerator output require a complete combined name.
+static BOOL BuildFindResultPath(char (&path)[MAX_PATH], const CFoundFilesData* file)
+{
+    return file != NULL && file->Path != NULL && file->Name != NULL &&
+           SUCCEEDED(StringCchCopyA(path, _countof(path), file->Path)) &&
+           SalPathAppend(path, file->Name, _countof(path));
+}
 
 void CFindOptions::InitMenu(CMenuPopup* popup, BOOL enabled, int originalCount)
 {
@@ -114,7 +124,7 @@ char* CFoundFilesData::GetText(int i, char* text, int fileNameFormat)
         if (FileTimeToLocalFileTime(&LastWrite, &ft) &&
             FileTimeToSystemTime(&ft, &st))
         {
-            if (GetDateFormat(LOCALE_USER_DEFAULT, DATE_SHORTDATE, &st, NULL, text, 50) == 0)
+            if (FormatUserDateTimeUtf8(&st, DATE_SHORTDATE, text, 50, TRUE) == 0)
                 sprintf(text, "%u.%u.%u", st.wDay, st.wMonth, st.wYear);
         }
         else
@@ -129,7 +139,7 @@ char* CFoundFilesData::GetText(int i, char* text, int fileNameFormat)
         if (FileTimeToLocalFileTime(&LastWrite, &ft) &&
             FileTimeToSystemTime(&ft, &st))
         {
-            if (GetTimeFormat(LOCALE_USER_DEFAULT, 0, &st, NULL, text, 50) == 0)
+            if (FormatUserDateTimeUtf8(&st, 0, text, 50, FALSE) == 0)
                 sprintf(text, "%u:%02u:%02u", st.wHour, st.wMinute, st.wSecond);
         }
         else
@@ -262,10 +272,10 @@ CFoundFilesListView::GetSelectedListSize()
         if (index != -1)
         {
             CFoundFilesData* ptr = Data[index];
-            int pathLen = lstrlen(ptr->Path);
+            int pathLen = (int)strlen(ptr->Path);
             if (ptr->Path[pathLen - 1] != '\\')
                 pathLen++; // if the path does not contain a backslash, reserve space for it
-            int nameLen = lstrlen(ptr->Name);
+            int nameLen = (int)strlen(ptr->Name);
             size += pathLen + nameLen + 1; // reserve space for the terminator
         }
     } while (index != -1);
@@ -287,7 +297,7 @@ BOOL CFoundFilesListView::GetSelectedList(char* list, DWORD maxSize)
         if (index != -1)
         {
             CFoundFilesData* ptr = Data[index];
-            int pathLen = lstrlen(ptr->Path);
+            int pathLen = (int)strlen(ptr->Path);
             if (ptr->Path[pathLen - 1] != '\\')
                 size++; // if the path does not contain a backslash, reserve space for it
             size += pathLen;
@@ -300,7 +310,7 @@ BOOL CFoundFilesListView::GetSelectedList(char* list, DWORD maxSize)
             list += pathLen;
             if (ptr->Path[pathLen - 1] != '\\')
                 *list++ = '\\';
-            int nameLen = lstrlen(ptr->Name);
+            int nameLen = (int)strlen(ptr->Name);
             size += nameLen + 1; // reserve space for the terminator
             if (size > maxSize)
             {
@@ -348,15 +358,13 @@ void CFoundFilesListView::CheckAndRemoveSelectedItems(BOOL forceRemove, int last
             if (!forceRemove)
             {
                 char fullPath[MAX_PATH];
-                int pathLen = lstrlen(ptr->Path);
-                memmove(fullPath, ptr->Path, pathLen + 1);
-                if (ptr->Path[pathLen - 1] != '\\')
-                {
-                    fullPath[pathLen] = '\\';
-                    fullPath[pathLen + 1] = '\0';
-                }
-                lstrcat(fullPath, ptr->Name);
-                remove = (SalGetFileAttributes(fullPath) == -1);
+                HRESULT pathResult = StringCchCopyA(fullPath, _countof(fullPath), ptr->Path);
+                if (SUCCEEDED(pathResult) && fullPath[0] != 0 && fullPath[strlen(fullPath) - 1] != '\\')
+                    pathResult = StringCchCatA(fullPath, _countof(fullPath), "\\");
+                if (SUCCEEDED(pathResult))
+                    pathResult = StringCchCatA(fullPath, _countof(fullPath), ptr->Name);
+                // Never discard a result based on a truncated path assembled during cleanup.
+                remove = SUCCEEDED(pathResult) && SalGetFileAttributes(fullPath) == -1;
             }
             if (remove)
             {
@@ -918,10 +926,8 @@ CFoundFilesListView::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                     BOOL ok = FALSE;
                     CFoundFilesData* f = (index >= 0 && index < count) ? Data[index] : NULL;
                     char fileName[MAX_PATH];
-                    if (f != NULL && f->Path != NULL && f->Name != NULL)
+                    if (BuildFindResultPath(fileName, f))
                     {
-                        lstrcpyn(fileName, f->Path, MAX_PATH);
-                        SalPathAppend(fileName, f->Name, MAX_PATH);
                         if (StrICmp(fileName, FileNamesEnumData.LastFileName) == 0)
                         {
                             ok = TRUE;
@@ -934,10 +940,8 @@ CFoundFilesListView::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                         for (i = 0; i < count; i++)
                         {
                             f = Data[i];
-                            if (f->Path != NULL && f->Name != NULL)
+                            if (BuildFindResultPath(fileName, f))
                             {
-                                lstrcpyn(fileName, f->Path, MAX_PATH);
-                                SalPathAppend(fileName, f->Name, MAX_PATH);
                                 if (StrICmp(fileName, FileNamesEnumData.LastFileName) == 0)
                                     break;
                             }
@@ -1086,10 +1090,8 @@ CFoundFilesListView::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
             if (FileNamesEnumData.Found)
             {
                 CFoundFilesData* f = Data[index];
-                if (f->Path != NULL && f->Name != NULL)
+                if (BuildFindResultPath(FileNamesEnumData.FileName, f))
                 {
-                    lstrcpyn(FileNamesEnumData.FileName, f->Path, MAX_PATH);
-                    SalPathAppend(FileNamesEnumData.FileName, f->Name, MAX_PATH);
                     FileNamesEnumData.LastFileIndex = index;
                 }
                 else // should never happen
@@ -1149,10 +1151,10 @@ BOOL CFoundFilesListView::InitColumns()
     st.wHour = 10;   // morning (not sure whether AM or PM will be shorter, so try both)
     st.wMinute = 59; // the longest possible value
     st.wSecond = 59; // the longest possible value
-    if (GetTimeFormat(LOCALE_USER_DEFAULT, 0, &st, NULL, format1, 200) == 0)
+    if (FormatUserDateTimeUtf8(&st, 0, format1, _countof(format1), FALSE) == 0)
         sprintf(format1, "%u:%02u:%02u", st.wHour, st.wMinute, st.wSecond);
     st.wHour = 20; // afternoon
-    if (GetTimeFormat(LOCALE_USER_DEFAULT, 0, &st, NULL, format2, 200) == 0)
+    if (FormatUserDateTimeUtf8(&st, 0, format2, _countof(format2), FALSE) == 0)
         sprintf(format2, "%u:%02u:%02u", st.wHour, st.wMinute, st.wSecond);
 
     int maxWidth = ListView_GetStringWidth(HWindow, format1);
@@ -1162,7 +1164,7 @@ BOOL CFoundFilesListView::InitColumns()
     ListView_SetColumnWidth(HWindow, 4, maxWidth + 20);
 
     maxWidth = 0;
-    if (GetDateFormat(LOCALE_USER_DEFAULT, DATE_SHORTDATE, &st, NULL, format1, 200) == 0)
+    if (FormatUserDateTimeUtf8(&st, DATE_SHORTDATE, format1, _countof(format1), TRUE) == 0)
         sprintf(format1, "%u.%u.%u", st.wDay, st.wMonth, st.wYear);
     else
     {
@@ -1180,7 +1182,7 @@ BOOL CFoundFilesListView::InitColumns()
             {
                 st.wDay = sats[mo];
                 st.wMonth = 1 + mo;
-                if (GetDateFormat(LOCALE_USER_DEFAULT, DATE_SHORTDATE, &st, NULL, format1, 200) != 0)
+                if (FormatUserDateTimeUtf8(&st, DATE_SHORTDATE, format1, _countof(format1), TRUE) != 0)
                 {
                     w = ListView_GetStringWidth(HWindow, format1);
                     if (w > maxWidth)
@@ -1195,7 +1197,7 @@ BOOL CFoundFilesListView::InitColumns()
                 st.wMonth = maxMonth;
                 for (st.wDay = 21; st.wDay < 28; st.wDay++) // all possible weekdays (doesn't have to start on Monday)
                 {
-                    if (GetDateFormat(LOCALE_USER_DEFAULT, DATE_SHORTDATE, &st, NULL, format1, 200) != 0)
+                    if (FormatUserDateTimeUtf8(&st, DATE_SHORTDATE, format1, _countof(format1), TRUE) != 0)
                     {
                         w = ListView_GetStringWidth(HWindow, format1);
                         if (w > maxWidth)

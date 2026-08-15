@@ -4,6 +4,8 @@
 
 #pragma once
 
+#include "..\\..\\common\\monotonic_time.h"
+
 #define WM_APP_ACTIVATEPARENT WM_APP + 1 // [0, 0] - activate parent (used by all wait-windows)
 #define WM_APP_STATUSCHANGED WM_APP + 2  // [0, 0] - status change of "data connection" (used by list-wait-window)
 
@@ -545,8 +547,9 @@ protected:
     BOOL NeedDelayedUpdate;     // TRUE = a delayed update is needed
 
     DWORD LastTimeEstimation;          // -1==invalid, otherwise rounded number of seconds until the end of the operation
-    DWORD ElapsedTime;                 // time since the start of the operation in seconds
-    DWORD LastTickCountForElapsedTime; // -1==invalid, otherwise GetTickCount of the last ElapsedTime update
+    DWORD ElapsedTime; // time since the start of the operation in seconds
+    // The wait window updates this field only on its UI thread, so elapsed-time sampling can be wrap-safe.
+    CMonotonicTimePoint LastTickCountForElapsedTime;
 
 public:
     // 'dataConnection' is the monitored "data connection"; 'aborted' (must not be NULL)
@@ -1056,7 +1059,8 @@ public:
 
     BOOL Scrolling; // TRUE/FALSE = the user is currently using/not using the scrollbar
 
-    DWORD LastLButtonDownTime;
+    // This UI-thread click synthesizer has no shared DWORD timestamp contract.
+    CMonotonicTimePoint LastLButtonDownTime;
     LPARAM LastLButtonDownLParam;
 
 public:

@@ -3,6 +3,8 @@
 
 #include "precomp.h"
 
+#include <strsafe.h>
+
 #include "dumpmem.h"
 #include "array2.h"
 
@@ -59,6 +61,13 @@ BOOL WINAPI DllMain(HINSTANCE hinstDLL, DWORD fdwReason, LPVOID lpvReserved)
 char* LoadStr(int resID)
 {
     return SalamanderGeneral->LoadStr(HLanguage, resID);
+}
+
+static void CopyPakErrorPrefix(char* buffer, size_t bufferCapacity, int stringId)
+{
+    // FormatMessage appends to this buffer, so an oversized localized prefix must leave a valid empty destination.
+    if (FAILED(StringCchCopyA(buffer, bufferCapacity, LoadStr(stringId))))
+        buffer[0] = 0;
 }
 
 int WINAPI SalamanderPluginGetReqVer()
@@ -158,8 +167,12 @@ CPluginInterfaceAbstract* WINAPI SalamanderPluginEntry(CSalamanderPluginEntryAbs
 CFileInfo::CFileInfo(const char* name, DWORD status, DWORD dirDepth, DWORD size)
 {
     CALL_STACK_MESSAGE_NONE
-    if ((Name = (char*)malloc(lstrlen(name) + 1)) != NULL)
-        lstrcpy(Name, name);
+    const size_t nameLength = strlen(name);
+    if ((Name = (char*)malloc(nameLength + 1)) != NULL)
+    {
+        // This owned entry allocation is sized from the source name, so copy the exact byte range.
+        memcpy(Name, name, nameLength + 1);
+    }
     Status = status;
     DirDepth = dirDepth;
     Size = size;
@@ -295,26 +308,28 @@ BOOL CPluginInterfaceForArchiver::ListArchive(CSalamanderForOperationsAbstract* 
                 }
                 else
                     path = "";
-                fileData.Name = (char*)malloc(lstrlen(name) + 1);
+                const size_t nameLength = strlen(name);
+                fileData.Name = (char*)malloc(nameLength + 1);
                 if (!fileData.Name)
                 {
                     SalamanderGeneral->ShowMessageBox(LoadStr(IDS_LOWMEM), LoadStr(IDS_PLUGINNAME), MSGBOX_ERROR);
                     ret = FALSE;
                     break;
                 }
-                lstrcpy(fileData.Name, name);
+                // The owned archive entry allocation is measured from this source field.
+                memcpy(fileData.Name, name, nameLength + 1);
                 fileData.Ext = strrchr(fileData.Name, '.');
                 if (fileData.Ext != NULL)
                     fileData.Ext++; // ".cvspass" is an extension in Windows
                 else
-                    fileData.Ext = fileData.Name + lstrlen(fileData.Name);
+                    fileData.Ext = fileData.Name + nameLength;
                 fileData.Size = CQuadWord(size, 0);
                 fileData.Attr = FILE_ATTRIBUTE_NORMAL;
                 fileData.Hidden = 0;
                 fileData.PluginData = -1; // unnecessary, just for form's sake
                 PakIFace->GetPakTime(&fileData.LastWrite);
                 fileData.DosName = NULL;
-                fileData.NameLen = lstrlen(fileData.Name);
+                fileData.NameLen = static_cast<int>(nameLength);
                 fileData.IsLink = SalamanderGeneral->IsFileLink(fileData.Ext);
                 fileData.IsOffline = 0;
                 if (!dir->AddFile(path, fileData, NULL))
@@ -361,9 +376,11 @@ BOOL CPluginInterfaceForArchiver::MakeFileList(TIndirectArray2<CFileInfo>& files
 
     while ((nextName = next(NULL, 0, &isDir, NULL, NULL, nextParam, NULL)) != NULL)
     {
-        lstrcpy(nextFull, archiveRoot);
-        SalamanderGeneral->SalPathAppend(nextFull, nextName, PAK_MAXPATH);
-        len = lstrlen(nextFull);
+        // Selection matching must use the complete fixed PAK path, not a truncated root or leaf name.
+        if (FAILED(StringCchCopyA(nextFull, _countof(nextFull), archiveRoot)) ||
+            !SalamanderGeneral->SalPathAppend(nextFull, nextName, _countof(nextFull)))
+            return FALSE;
+        len = static_cast<int>(strlen(nextFull));
         if (!PakIFace->GetFirstFile(file, &size))
             return FALSE;
         while (*file)
@@ -420,10 +437,15 @@ BOOL CPluginInterfaceForArchiver::UnpackFiles(TIndirectArray2<CFileInfo>& files,
                 continue;
             if (CompareString(LOCALE_USER_DEFAULT, NORM_IGNORECASE, info->Name, -1, file, -1) == CSTR_EQUAL)
             {
-                lstrcpy(message, LoadStr(IDS_EXTRACTING));
-                lstrcat(message, file);
+                // Omit only the progress label when the localized prefix and archive name exceed its display buffer.
+                if (FAILED(StringCchCopyA(message, _countof(message), LoadStr(IDS_EXTRACTING))) ||
+                    FAILED(StringCchCatA(message, _countof(message), file)))
+                    message[0] = 0;
                 Salamander->ProgressDialogAddText(message, TRUE);
-                if (lstrlen(targetDir) + lstrlen(file) - rootLen >= MAX_PATH)
+                const size_t targetDirLength = strlen(targetDir);
+                const size_t fileLength = strlen(file);
+                if (rootLen < 0 || static_cast<size_t>(rootLen) > fileLength ||
+                    targetDirLength + fileLength - static_cast<size_t>(rootLen) >= MAX_PATH)
                 {
                     if (Silent & SF_LONGNAMES)
                         goto l_next;
@@ -439,12 +461,15 @@ BOOL CPluginInterfaceForArchiver::UnpackFiles(TIndirectArray2<CFileInfo>& files,
                     }
                 }
                 char targetName[MAX_PATH];
-                lstrcpy(targetName, targetDir);
-                SalamanderGeneral->SalPathAppend(targetName, file + rootLen, MAX_PATH);
+                // Output creation requires the complete destination path and archive-relative filename.
+                if (FAILED(StringCchCopyA(targetName, _countof(targetName), targetDir)) ||
+                    !SalamanderGeneral->SalPathAppend(targetName, file + rootLen, _countof(targetName)))
+                    return FALSE;
                 IOFileName = targetName;
                 char arcName[MAX_PATH + PAK_MAXPATH];
-                lstrcpy(arcName, arcFile);
-                SalamanderGeneral->SalPathAppend(arcName, file, MAX_PATH + PAK_MAXPATH);
+                if (FAILED(StringCchCopyA(arcName, _countof(arcName), arcFile)) ||
+                    !SalamanderGeneral->SalPathAppend(arcName, file, _countof(arcName)))
+                    return FALSE;
                 FILETIME ft;
                 PakIFace->GetPakTime(&ft);
                 char buf[100];
@@ -536,7 +561,7 @@ BOOL CPluginInterfaceForArchiver::UnpackArchive(CSalamanderForOperationsAbstract
             else
             {
                 Salamander->ProgressDialogAddText(LoadStr(IDS_EXTRACTFILES), FALSE);
-                if (!UnpackFiles(files, fileName, lstrlen(arcRoot), targetDir))
+                if (!UnpackFiles(files, fileName, static_cast<int>(strlen(arcRoot)), targetDir))
                     ret = FALSE;
             }
         }
@@ -592,37 +617,45 @@ BOOL CPluginInterfaceForArchiver::UnpackOneFile(CSalamanderForOperationsAbstract
                 name++;
             else
                 name = nameInArchive;
-            if (lstrlen(targetDir) + lstrlen(name) + 1 >= MAX_PATH)
+            if (strlen(targetDir) + strlen(name) + 1 >= MAX_PATH)
             {
                 SalamanderGeneral->ShowMessageBox(LoadStr(IDS_TOOLONGNAME), LoadStr(IDS_PLUGINNAME), MSGBOX_ERROR);
             }
             else
             {
-                lstrcpy(targetName, targetDir);
-                SalamanderGeneral->SalPathAppend(targetName, name, MAX_PATH);
-                IOFileName = targetName;
-                IOFile = CreateFileUtf8Local(targetName, GENERIC_WRITE, FILE_SHARE_READ, NULL, CREATE_ALWAYS,
-                                    FILE_ATTRIBUTE_NORMAL, NULL);
-                if (IOFile == INVALID_HANDLE_VALUE)
+                // A one-file extraction must not use a truncated target path.
+                if (FAILED(StringCchCopyA(targetName, _countof(targetName), targetDir)) ||
+                    !SalamanderGeneral->SalPathAppend(targetName, name, _countof(targetName)))
                 {
-                    char buf[1024];
-
-                    lstrcpy(buf, LoadStr(IDS_ERROPEN));
-                    FormatMessage(FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS, NULL,
-                                  GetLastError(), MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), buf + lstrlen(buf), 1024 - lstrlen(buf), NULL);
-                    SalamanderGeneral->ShowMessageBox(buf, LoadStr(IDS_PLUGINNAME), MSGBOX_ERROR);
+                    SalamanderGeneral->ShowMessageBox(LoadStr(IDS_TOOLONGNAME), LoadStr(IDS_PLUGINNAME), MSGBOX_ERROR);
                 }
                 else
                 {
-                    BOOL r = PakIFace->ExtractFile();
-                    FILETIME ft;
-                    PakIFace->GetPakTime(&ft);
-                    SetFileTime(IOFile, NULL, NULL, &ft);
-                    CloseHandle(IOFile);
-                    if (r)
-                        ret = TRUE;
+                    IOFileName = targetName;
+                    IOFile = CreateFileUtf8Local(targetName, GENERIC_WRITE, FILE_SHARE_READ, NULL, CREATE_ALWAYS,
+                                                  FILE_ATTRIBUTE_NORMAL, NULL);
+                    if (IOFile == INVALID_HANDLE_VALUE)
+                    {
+                        char buf[1024];
+
+                        CopyPakErrorPrefix(buf, _countof(buf), IDS_ERROPEN);
+                        const DWORD prefixLength = static_cast<DWORD>(strlen(buf)); // buf is bounded to 1,024 bytes for FormatMessage.
+                        FormatMessage(FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS, NULL,
+                                      GetLastError(), MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), buf + prefixLength, _countof(buf) - prefixLength, NULL);
+                        SalamanderGeneral->ShowMessageBox(buf, LoadStr(IDS_PLUGINNAME), MSGBOX_ERROR);
+                    }
                     else
-                        DeleteFileUtf8Local(targetName);
+                    {
+                        BOOL r = PakIFace->ExtractFile();
+                        FILETIME ft;
+                        PakIFace->GetPakTime(&ft);
+                        SetFileTime(IOFile, NULL, NULL, &ft);
+                        CloseHandle(IOFile);
+                        if (r)
+                            ret = TRUE;
+                        else
+                            DeleteFileUtf8Local(targetName);
+                    }
                 }
             }
         }
@@ -840,7 +873,8 @@ BOOL CPakCallbacks::HandleError(DWORD flags, int errorID, va_list arglist)
 {
     CALL_STACK_MESSAGE3("CPakCallbacks::HandleError(0x%X, %d, )", flags, errorID);
     char buffer[1024];
-    Plugin->PakIFace->FormatMessage(buffer, errorID, arglist);
+    // Pass the buffer capacity across the DLL boundary so error formatting remains bounded.
+    Plugin->PakIFace->FormatMessage(buffer, ARRAYSIZE(buffer), errorID, arglist);
     if (flags & HE_RETRY)
     {
         if (SalamanderGeneral->DialogError(SalamanderGeneral->GetMsgBoxParent(), BUTTONS_RETRYCANCEL, Plugin->PakFileName, buffer, NULL) == DIALOG_RETRY)
@@ -856,14 +890,23 @@ BOOL CPakCallbacks::HandleError(DWORD flags, int errorID, va_list arglist)
 BOOL CPakCallbacks::SafeSeek(DWORD position)
 {
     CALL_STACK_MESSAGE2("CPakCallbacks::SafeSeek(0x%X)", position);
+    LARGE_INTEGER seekDistance;
+    seekDistance.QuadPart = position;
+    return SafeSeek64(seekDistance);
+}
+
+BOOL CPakCallbacks::SafeSeek64(const LARGE_INTEGER& position)
+{
     char buf[1024];
     while (1)
     {
-        if (SetFilePointer(Plugin->IOFile, position, NULL, FILE_BEGIN) != 0xFFFFFFFF)
+        // The plug-in's retry path needs an unambiguous result even at a valid 0xFFFFFFFF offset.
+        if (SetFilePointerEx(Plugin->IOFile, position, NULL, FILE_BEGIN))
             return TRUE;
-        lstrcpy(buf, LoadStr(IDS_UNABLESEEK));
+        CopyPakErrorPrefix(buf, _countof(buf), IDS_UNABLESEEK);
+        const DWORD prefixLength = static_cast<DWORD>(strlen(buf)); // buf is bounded to 1,024 bytes for FormatMessage.
         FormatMessage(FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS, NULL,
-                      GetLastError(), MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), buf + lstrlen(buf), 1024 - lstrlen(buf), NULL);
+                      GetLastError(), MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), buf + prefixLength, _countof(buf) - prefixLength, NULL);
         if (Plugin->Silent & SF_IOERRORS)
         {
             Plugin->Abort = FALSE;
@@ -889,15 +932,17 @@ BOOL CPakCallbacks::Write(void* buffer, DWORD size)
     if (size == 0)
         return TRUE;
     char buf[1024];
-    DWORD pos;
+    LARGE_INTEGER pos;
     while (1)
     {
-        pos = SetFilePointer(Plugin->IOFile, 0, NULL, FILE_CURRENT);
-        if (pos != 0xFFFFFFFF)
+        LARGE_INTEGER zero = {};
+        // Retain the complete retry location for output files that outgrow the PAK format's input offsets.
+        if (SetFilePointerEx(Plugin->IOFile, zero, &pos, FILE_CURRENT))
             break;
-        lstrcpy(buf, LoadStr(IDS_UNABLEGETFIELPOS));
+        CopyPakErrorPrefix(buf, _countof(buf), IDS_UNABLEGETFIELPOS);
+        const DWORD prefixLength = static_cast<DWORD>(strlen(buf)); // buf is bounded to 1,024 bytes for FormatMessage.
         FormatMessage(FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS, NULL,
-                      GetLastError(), MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), buf + lstrlen(buf), 1024 - lstrlen(buf), NULL);
+                      GetLastError(), MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), buf + prefixLength, _countof(buf) - prefixLength, NULL);
         if (Plugin->Silent & SF_IOERRORS)
         {
             Plugin->Abort = FALSE;
@@ -920,9 +965,10 @@ BOOL CPakCallbacks::Write(void* buffer, DWORD size)
     {
         if (WriteFile(Plugin->IOFile, buffer, size, &written, NULL))
             return TRUE;
-        lstrcpy(buf, LoadStr(IDS_UNABLEWRITE));
+        CopyPakErrorPrefix(buf, _countof(buf), IDS_UNABLEWRITE);
+        const DWORD prefixLength = static_cast<DWORD>(strlen(buf)); // buf is bounded to 1,024 bytes for FormatMessage.
         FormatMessage(FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS, NULL,
-                      GetLastError(), MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), buf + lstrlen(buf), 1024 - lstrlen(buf), NULL);
+                      GetLastError(), MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), buf + prefixLength, _countof(buf) - prefixLength, NULL);
         if (Plugin->Silent & SF_IOERRORS)
         {
             Plugin->Abort = FALSE;
@@ -939,7 +985,7 @@ BOOL CPakCallbacks::Write(void* buffer, DWORD size)
         case DIALOG_FAIL:
             return FALSE;
         }
-        if (!SafeSeek(pos))
+        if (!SafeSeek64(pos))
             return FALSE;
     }
     return TRUE;
@@ -974,9 +1020,16 @@ void GetInfo(char* buffer, FILETIME* lastWrite, unsigned size)
     FileTimeToSystemTime(&ft, &st);
 
     char date[50], time[50], number[50];
-    if (GetTimeFormat(LOCALE_USER_DEFAULT, 0, &st, NULL, time, 50) == 0)
+    WCHAR localeName[LOCALE_NAME_MAX_LENGTH];
+    WCHAR formattedValue[50];
+    // Format through the locale-name APIs, converting only at PAK's ANSI presentation boundary.
+    if (!GetUserDefaultLocaleName(localeName, ARRAYSIZE(localeName)) ||
+        GetTimeFormatEx(localeName, 0, &st, NULL, formattedValue, ARRAYSIZE(formattedValue)) == 0 ||
+        WideCharToMultiByte(CP_ACP, 0, formattedValue, -1, time, ARRAYSIZE(time), NULL, NULL) == 0)
         sprintf(time, "%u:%02u:%02u", st.wHour, st.wMinute, st.wSecond);
-    if (GetDateFormat(LOCALE_USER_DEFAULT, DATE_SHORTDATE, &st, NULL, date, 50) == 0)
+    if (!GetUserDefaultLocaleName(localeName, ARRAYSIZE(localeName)) ||
+        GetDateFormatEx(localeName, DATE_SHORTDATE, &st, NULL, formattedValue, ARRAYSIZE(formattedValue), NULL) == 0 ||
+        WideCharToMultiByte(CP_ACP, 0, formattedValue, -1, date, ARRAYSIZE(date), NULL, NULL) == 0)
         sprintf(date, "%u.%u.%u", st.wDay, st.wMonth, st.wYear);
     sprintf(buffer, "%s, %s, %s", SalamanderGeneral->NumberToStr(number, CQuadWord(size, 0)), date, time);
 }

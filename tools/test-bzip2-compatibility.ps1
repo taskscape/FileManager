@@ -1,7 +1,9 @@
 [CmdletBinding()]
 param(
     [ValidateSet('x64', 'x86')]
-    [string]$Architecture = 'x64'
+    [string]$Architecture = 'x64',
+    [ValidateRange(1, 10000)]
+    [int]$Iterations = 1
 )
 
 $ErrorActionPreference = 'Stop'
@@ -48,13 +50,16 @@ try {
     }
 
     $fuzzFixtures = Get-ChildItem -LiteralPath (Join-Path $fixtureDirectory 'fuzz') -Filter '*.hex' | Sort-Object Name | Select-Object -ExpandProperty FullName
-    & $probeExecutable `
-        (Join-Path $fixtureDirectory 'golden-stream.hex') `
-        (Join-Path $fixtureDirectory 'legacy-stream.hex') `
-        (Join-Path $fixtureDirectory 'truncated-stream.hex') `
-        $fuzzFixtures
-    if ($LASTEXITCODE -ne 0) {
-        throw "bzip2 compatibility probe failed with exit code $LASTEXITCODE."
+    for ($iteration = 1; $iteration -le $Iterations; $iteration++) {
+        # Reuse the one verified parser build so scheduled fuzz soaking measures parsing, not compiler churn.
+        & $probeExecutable `
+            (Join-Path $fixtureDirectory 'golden-stream.hex') `
+            (Join-Path $fixtureDirectory 'legacy-stream.hex') `
+            (Join-Path $fixtureDirectory 'truncated-stream.hex') `
+            $fuzzFixtures
+        if ($LASTEXITCODE -ne 0) {
+            throw "bzip2 compatibility probe failed on iteration $iteration with exit code $LASTEXITCODE."
+        }
     }
 }
 finally {

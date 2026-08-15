@@ -56,9 +56,12 @@ char* ReadSVGFile(const char* fileName)
                                         NULL));
     if (hFile != INVALID_HANDLE_VALUE)
     {
-        DWORD size = GetFileSize(hFile, NULL);
-        if (size != INVALID_FILE_SIZE)
+        LARGE_INTEGER fileSize;
+        // SVG input is stored in a DWORD-sized buffer, so reject a size that cannot be represented safely.
+        if (GetFileSizeEx(hFile, &fileSize) && fileSize.QuadPart >= 0 &&
+            (ULONGLONG)fileSize.QuadPart < MAXDWORD)
         {
+            DWORD size = (DWORD)fileSize.QuadPart;
             buff = (char*)malloc(size + 1);
             DWORD read;
             if (ReadFile(hFile, buff, size, &read, NULL) && read == size)
@@ -74,7 +77,7 @@ char* ReadSVGFile(const char* fileName)
         }
         else
         {
-            TRACE_E("ReadSVGFile(): GetFileSize() failed on " << fileName);
+            TRACE_E("ReadSVGFile(): cannot obtain a representable file size for " << fileName);
         }
         HANDLES(CloseHandle(hFile));
     }

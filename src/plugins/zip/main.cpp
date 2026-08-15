@@ -7,6 +7,7 @@
 #include <ostream>
 #include <commctrl.h>
 #include <stdio.h>
+#include <strsafe.h>
 
 #include "versinfo.rh2"
 
@@ -32,6 +33,18 @@
 #include "dialogs.h"
 #include "main.h"
 #include "zip.rh"
+
+template<size_t capacity>
+static bool CopyZipFixedText(char (&destination)[capacity], const char* source)
+{
+    // Persisted ZIP fields are complete values; do not retain a prefix when their capacity is exceeded.
+    if (FAILED(StringCchCopyA(destination, capacity, source != NULL ? source : "")))
+    {
+        destination[0] = 0;
+        return false;
+    }
+    return true;
+}
 #include "zip.rh2"
 #include "lang\lang.rh"
 
@@ -215,13 +228,24 @@ void ValidateDefSfxFile()
     SalamanderGeneral->CutDirectory(path);
     SalamanderGeneral->SalPathAppend(path, "sfx", MAX_PATH);
     SalamanderGeneral->SalPathAddBackslash(path, MAX_PATH);
-    file = path + lstrlen(path);
-    lstrcpy(file, Config.DefSfxFile);
+    const size_t pathLength = strlen(path);
+    if (pathLength >= _countof(path) ||
+        FAILED(StringCchCopyA(path + pathLength, _countof(path) - pathLength, Config.DefSfxFile)))
+    {
+        // A partial default package name would probe a different SFX file.
+        *Config.DefSfxFile = 0;
+        return;
+    }
+    file = path + pathLength;
     DWORD attr = SalamanderGeneral->SalGetFileAttributes(path);
     if (attr == 0xFFFFFFFF || attr & FILE_ATTRIBUTE_DIRECTORY)
     {
         WIN32_FIND_DATA fd;
-        lstrcpy(file, "*.sfx");
+        if (FAILED(StringCchCopyA(file, _countof(path) - pathLength, "*.sfx")))
+        {
+            *Config.DefSfxFile = 0;
+            return;
+        }
         HANDLE find = FindFirstFile(path, &fd);
         while (find != INVALID_HANDLE_VALUE && fd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)
         {
@@ -235,7 +259,7 @@ void ValidateDefSfxFile()
             *Config.DefSfxFile = 0;
         else
         {
-            lstrcpy(Config.DefSfxFile, fd.cFileName);
+            CopyZipFixedText(Config.DefSfxFile, fd.cFileName);
             FindClose(find);
         }
     }
@@ -281,7 +305,7 @@ void CPluginInterface::LoadConfiguration(HWND parent, HKEY regKey, CSalamanderRe
             if (registry->GetValue(regKey, key1, REG_SZ, size, MAX_VOL_STR) &&
                 registry->GetValue(regKey, key2, REG_DWORD, &units, sizeof(DWORD)))
             {
-                lstrcpy(Config.VolSizeCache[i], size);
+                CopyZipFixedText(Config.VolSizeCache[i], size);
                 Config.VolSizeUnits[i] = units;
             }
             else
@@ -305,21 +329,30 @@ void CPluginInterface::LoadConfiguration(HWND parent, HKEY regKey, CSalamanderRe
         char* buffer = NULL;
         DWORD allocated = 0;
         DWORD siz;
+        // Registry values are editable external input; cap the serialized settings before any heap reservation.
+        const DWORD maxSerializedSfxSettingsSize = 1024 * 1024;
 
         // load last used sfx settings
         *LastUsedSfxSet.Name = 0;
-        if (registry->GetValue(regKey, CONFIG_SFXLASTSIZE, REG_DWORD, &siz, sizeof(DWORD)))
+        if (registry->GetValue(regKey, CONFIG_SFXLASTSIZE, REG_DWORD, &siz, sizeof(DWORD)) &&
+            siz <= maxSerializedSfxSettingsSize)
         {
             if (siz > allocated)
             {
-                allocated = max(siz, allocated * 2);
-                buffer = (char*)realloc(buffer, allocated);
+                char* resized = (char*)realloc(buffer, siz);
+                if (resized == NULL)
+                    siz = 0;
+                else
+                {
+                    buffer = resized;
+                    allocated = siz;
+                }
             }
-            if (registry->GetValue(regKey, CONFIG_SFXLAST, REG_BINARY, buffer, siz))
+            if (siz != 0 && registry->GetValue(regKey, CONFIG_SFXLAST, REG_BINARY, buffer, siz))
             {
                 if (ExpandSfxSettings(&LastUsedSfxSet.Settings, buffer, siz) == siz)
                 {
-                    lstrcpy(LastUsedSfxSet.Name, "Last Used");
+                    CopyZipFixedText(LastUsedSfxSet.Name, "Last Used");
                 }
             }
         }
@@ -337,15 +370,22 @@ void CPluginInterface::LoadConfiguration(HWND parent, HKEY regKey, CSalamanderRe
                 for (i = 0; i < count; i++)
                 {
                     sprintf(key, CONFIG_SFXFAVSIZE, i + 1);
-                    if (registry->GetValue(favKey, key, REG_DWORD, &siz, sizeof(DWORD)))
+                    if (registry->GetValue(favKey, key, REG_DWORD, &siz, sizeof(DWORD)) &&
+                        siz <= maxSerializedSfxSettingsSize)
                     {
                         if (siz > allocated)
                         {
-                            allocated = max(siz, allocated * 2);
-                            buffer = (char*)realloc(buffer, allocated);
+                            char* resized = (char*)realloc(buffer, siz);
+                            if (resized == NULL)
+                                siz = 0;
+                            else
+                            {
+                                buffer = resized;
+                                allocated = siz;
+                            }
                         }
                         sprintf(key, CONFIG_SFXFAVDATA, i + 1);
-                        if (registry->GetValue(favKey, key, REG_BINARY, buffer, siz))
+                        if (siz != 0 && registry->GetValue(favKey, key, REG_BINARY, buffer, siz))
                         {
                             if (ExpandSfxSettings(&temp.Settings, buffer, siz) == siz)
                             {
@@ -635,7 +675,7 @@ BOOL CPluginInterfaceForMenuExt::ExecuteMenuItem(CSalamanderForOperationsAbstrac
     if (!arch)
     {
         SalamanderGeneral->SalPathAddBackslash(zipFile, MAX_PATH);
-        fileName = zipFile + lstrlen(zipFile);
+        fileName = zipFile + strlen(zipFile);
         selFiles = eventMask & MENU_EVENT_FILES_SELECTED;
     }
 
@@ -655,7 +695,11 @@ BOOL CPluginInterfaceForMenuExt::ExecuteMenuItem(CSalamanderForOperationsAbstrac
                 fileData = SalamanderGeneral->GetPanelFocusedItem(PANEL_SOURCE, NULL);
             if (!fileData)
                 break; // end of enumeration, or an error (for GetFocusedItem)
-            lstrcpy(fileName, fileData->Name);
+            const size_t directoryLength = static_cast<size_t>(fileName - zipFile);
+            // Menu commands must never operate on a truncated selected path.
+            if (directoryLength >= _countof(zipFile) ||
+                FAILED(StringCchCopyA(fileName, _countof(zipFile) - directoryLength, fileData->Name)))
+                return FALSE;
             DWORD attr = SalamanderGeneral->SalGetFileAttributes(zipFile);
             if (attr != 0xFFFFFFFF && attr & FILE_ATTRIBUTE_DIRECTORY)
                 continue;

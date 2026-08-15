@@ -3,6 +3,7 @@
 // CommentsTranslationProject: TRANSLATED
 
 #include "precomp.h"
+#include <strsafe.h>
 
 #include "cfgdlg.h"
 #include "plugins.h"
@@ -931,7 +932,9 @@ BOOL CPackerConfig::Load(HKEY hKey)
         if (Configuration.ConfigVersion < 44) // convert extension to lowercase
         {
             char extAux[MAX_PATH + 2];
-            lstrcpyn(extAux, ext, MAX_PATH + 2);
+            // Persisted extension sets must remain complete before compatibility normalization.
+            if (FAILED(StringCchCopyA(extAux, _countof(extAux), ext)))
+                return FALSE;
             StrICpy(ext, extAux);
         }
         ret &= SetPacker(index, (int)type, title, ext, Configuration.ConfigVersion < 6,
@@ -1537,7 +1540,9 @@ BOOL CUnpackerConfig::Load(HKEY hKey)
         if (Configuration.ConfigVersion < 44) // convert extensions to lowercase
         {
             char extAux[MAX_PATH + 2];
-            lstrcpyn(extAux, ext, MAX_PATH + 2);
+            // Persisted extension sets must remain complete before compatibility normalization.
+            if (FAILED(StringCchCopyA(extAux, _countof(extAux), ext)))
+                return FALSE;
             StrICpy(ext, extAux);
         }
         ret &= SetUnpacker(index, (int)type, title, ext, Configuration.ConfigVersion < 6,

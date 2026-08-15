@@ -5,6 +5,7 @@
 
 #include <windows.h>
 #include <crtdbg.h>
+#include <strsafe.h>
 
 #define __MODUL_MESSAGES_CPP
 
@@ -60,6 +61,7 @@ void Initialize__Messages()
 
 #include "trace.h"
 #include "messages.h"
+#include "thread_owner.h"
 
 char __ResourceStringBuffer[__RESOURCE_STRING_BUFFER_SIZE] = "";
 WCHAR __ResourceStringBufferW[__RESOURCE_STRING_BUFFER_SIZE] = L"";
@@ -181,6 +183,13 @@ int CALLBACK __MessagesMessageBoxThreadF(C__MessageBoxData* data)
     return 0;
 }
 
+static DWORD WINAPI MessagesMessageBoxOwnedThreadF(void* parameter, HANDLE stopEvent)
+{
+    // MessageBox has no cancellation API; ownership still keeps the caller's stack data valid until dismissal.
+    UNREFERENCED_PARAMETER(stopEvent);
+    return (DWORD)__MessagesMessageBoxThreadF((C__MessageBoxData*)parameter);
+}
+
 int C__Messages::MessageBoxT(const char* lpCaption, UINT uType)
 {
     C__MessageBoxData data;
@@ -195,11 +204,12 @@ int C__Messages::MessageBoxT(const char* lpCaption, UINT uType)
     MessagesStringBuf.erase(); // preparation for next message
 #else                          // MULTITHREADED_MESSAGES_ENABLE
     int len = (int)MessagesStringBuf.length() + 1;
-    HGLOBAL message = GlobalAlloc(GMEM_FIXED, len); // backup of text
+    // The copied text is private to this call, so use the process heap instead of a movable-memory API.
+    char* message = (char*)HeapAlloc(GetProcessHeap(), 0, len); // backup of text
     if (message != NULL)
     {
         memcpy((char*)message, MessagesStringBuf.c_str(), len); // it's FIXED -> HANDLE==PTR
-        data.Text = (char*)message;
+        data.Text = message;
     }
     else
         data.Text = __MessagesLowMemory;
@@ -207,20 +217,18 @@ int C__Messages::MessageBoxT(const char* lpCaption, UINT uType)
     LeaveMessagesModul();      // now other threads and message loops can start interfering
 #endif                         // MULTITHREADED_MESSAGES_ENABLE
 
-    // show MessageBox in new thread so it doesn't dispatch messages for this thread
-    DWORD threadID;
-    HANDLE thread = CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)__MessagesMessageBoxThreadF, &data, 0, &threadID);
-    if (thread != NULL)
+    // Keep the stack-owned message data alive through a named owner rather than an unowned raw handle.
+    CThreadOwner messageBoxOwner;
+    if (messageBoxOwner.Start(MessagesMessageBoxOwnedThreadF, &data, "AnsiMessageBox"))
     {
-        WaitForSingleObject(thread, INFINITE); // wait until user dismisses it
-        CloseHandle(thread);
+        messageBoxOwner.StopAndJoin(INFINITE); // wait until user dismisses it
     }
     else
         TRACE_E("Unable to show MessageBox: " << data.Caption << ": " << data.Text);
 
 #ifdef MULTITHREADED_MESSAGES_ENABLE
     if (message != NULL)
-        GlobalFree(message);
+        HeapFree(GetProcessHeap(), 0, message);
 #endif // MULTITHREADED_MESSAGES_ENABLE
 
     return data.Return;
@@ -238,9 +246,10 @@ int C__Messages::MessageBox(HWND hWnd, const char* lpCaption, UINT uType)
     MessagesStringBuf.erase(); // preparation for next message
 #else                          // MULTITHREADED_MESSAGES_ENABLE
     size_t len = MessagesStringBuf.length() + 1;
-    HGLOBAL message = GlobalAlloc(GMEM_FIXED, len); // backup of text
+    // The copied text is private to this call, so use the process heap instead of a movable-memory API.
+    char* message = (char*)HeapAlloc(GetProcessHeap(), 0, len); // backup of text
     char* txt;
-    txt = (char*)message; // it's FIXED -> HANDLE==PTR
+    txt = message;
     if (txt != NULL)
         memcpy(txt, MessagesStringBuf.c_str(), len);
     else
@@ -253,7 +262,7 @@ int C__Messages::MessageBox(HWND hWnd, const char* lpCaption, UINT uType)
     ret = ::MessageBoxA(hWnd, txt, lpCaption, uType);
 
     if (message != NULL)
-        GlobalFree(message);
+        HeapFree(GetProcessHeap(), 0, message);
 #endif                         // MULTITHREADED_MESSAGES_ENABLE
 
     return ret;
@@ -301,6 +310,13 @@ int CALLBACK __MessagesWMessageBoxThreadF(C__MessageBoxDataW* data)
     return 0;
 }
 
+static DWORD WINAPI MessagesWMessageBoxOwnedThreadF(void* parameter, HANDLE stopEvent)
+{
+    // MessageBoxW has no cancellation API; the owner protects its stack-backed input for the whole modal call.
+    UNREFERENCED_PARAMETER(stopEvent);
+    return (DWORD)__MessagesWMessageBoxThreadF((C__MessageBoxDataW*)parameter);
+}
+
 int C__MessagesW::MessageBoxT(const WCHAR* lpCaption, UINT uType)
 {
     C__MessageBoxDataW data;
@@ -315,11 +331,12 @@ int C__MessagesW::MessageBoxT(const WCHAR* lpCaption, UINT uType)
     MessagesStringBuf.erase(); // preparation for next message
 #else                          // MULTITHREADED_MESSAGES_ENABLE
     int len = (int)MessagesStringBuf.length() + 1;
-    HGLOBAL message = GlobalAlloc(GMEM_FIXED, sizeof(WCHAR) * len); // backup of text
+    // The copied text is private to this call, so use the process heap instead of a movable-memory API.
+    WCHAR* message = (WCHAR*)HeapAlloc(GetProcessHeap(), 0, sizeof(WCHAR) * len); // backup of text
     if (message != NULL)
     {
         memcpy((WCHAR*)message, MessagesStringBuf.c_str(), sizeof(WCHAR) * len); // it's FIXED -> HANDLE==PTR
-        data.Text = (WCHAR*)message;
+        data.Text = message;
     }
     else
         data.Text = __MessagesLowMemoryW;
@@ -327,20 +344,18 @@ int C__MessagesW::MessageBoxT(const WCHAR* lpCaption, UINT uType)
     LeaveMessagesModul();      // now other threads and message loops can start interfering
 #endif                         // MULTITHREADED_MESSAGES_ENABLE
 
-    // show MessageBox in new thread so it does not dispatch messages for this thread
-    DWORD threadID;
-    HANDLE thread = CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)__MessagesWMessageBoxThreadF, &data, 0, &threadID);
-    if (thread != NULL)
+    // Keep the stack-owned Unicode message data alive through the standard worker owner.
+    CThreadOwner messageBoxOwner;
+    if (messageBoxOwner.Start(MessagesWMessageBoxOwnedThreadF, &data, "UnicodeMessageBox"))
     {
-        WaitForSingleObject(thread, INFINITE); // wait until user dismisses it
-        CloseHandle(thread);
+        messageBoxOwner.StopAndJoin(INFINITE); // wait until user dismisses it
     }
     else
         TRACE_EW(L"Unable to show MessageBox: " << data.Caption << L": " << data.Text);
 
 #ifdef MULTITHREADED_MESSAGES_ENABLE
     if (message != NULL)
-        GlobalFree(message);
+        HeapFree(GetProcessHeap(), 0, message);
 #endif // MULTITHREADED_MESSAGES_ENABLE
 
     return data.Return;
@@ -358,9 +373,10 @@ int C__MessagesW::MessageBox(HWND hWnd, const WCHAR* lpCaption, UINT uType)
     MessagesStringBuf.erase(); // preparation for next message
 #else                          // MULTITHREADED_MESSAGES_ENABLE
     size_t len = MessagesStringBuf.length() + 1;
-    HGLOBAL message = GlobalAlloc(GMEM_FIXED, sizeof(WCHAR) * len); // backup of text
+    // The copied text is private to this call, so use the process heap instead of a movable-memory API.
+    WCHAR* message = (WCHAR*)HeapAlloc(GetProcessHeap(), 0, sizeof(WCHAR) * len); // backup of text
     WCHAR* txt;
-    txt = (WCHAR*)message; // it's FIXED -> HANDLE==PTR
+    txt = message;
     if (txt != NULL)
         memcpy(txt, MessagesStringBuf.c_str(), sizeof(WCHAR) * len);
     else
@@ -373,7 +389,7 @@ int C__MessagesW::MessageBox(HWND hWnd, const WCHAR* lpCaption, UINT uType)
     ret = ::MessageBoxW(hWnd, txt, lpCaption, uType);
 
     if (message != NULL)
-        GlobalFree(message);
+        HeapFree(GetProcessHeap(), 0, message);
 #endif                         // MULTITHREADED_MESSAGES_ENABLE
 
     return ret;
@@ -554,7 +570,8 @@ const char* err(DWORD error)
         __MessagesOwnerThreadID == GetCurrentThreadId())
     {
 #endif // MULTITHREADED_MESSAGES_ENABLE
-        wsprintfA(__ErrorBuffer, "(%d) ", error);
+        // Keep the error prefix bounded before appending the system message.
+        _snprintf_s(__ErrorBuffer, _countof(__ErrorBuffer), _TRUNCATE, "(%d) ", error);
         int len = (int)strlen(__ErrorBuffer);
         FormatMessageA(FORMAT_MESSAGE_FROM_SYSTEM,
                        NULL,
@@ -583,7 +600,8 @@ const WCHAR* errW(DWORD error)
         __MessagesOwnerThreadID == GetCurrentThreadId())
     {
 #endif // MULTITHREADED_MESSAGES_ENABLE
-        wsprintfW(__ErrorBufferW, L"(%d) ", error);
+        // Keep the error prefix bounded before appending the system message.
+        _snwprintf_s(__ErrorBufferW, _countof(__ErrorBufferW), _TRUNCATE, L"(%d) ", error);
         int len = (int)wcslen(__ErrorBufferW);
         FormatMessageW(FORMAT_MESSAGE_FROM_SYSTEM,
                        NULL,
@@ -612,7 +630,8 @@ const WCHAR* errW(DWORD error)
 
 void SetMessagesTitle(const char* title)
 {
-    lstrcpynA(__MessagesTitleBuf, title, _countof(__MessagesTitleBuf));
+    // Message titles are bounded presentation fields; retain their explicit clip before conversion.
+    StringCchCopyNA(__MessagesTitleBuf, _countof(__MessagesTitleBuf), title, _countof(__MessagesTitleBuf) - 1);
     __MessagesTitle = __MessagesTitleBuf;
     MultiByteToWideChar(CP_ACP, MB_PRECOMPOSED, __MessagesTitleBuf, -1,
                         __MessagesTitleBufW, _countof(__MessagesTitleBufW));
@@ -622,7 +641,8 @@ void SetMessagesTitle(const char* title)
 
 void SetMessagesTitleW(const WCHAR* title)
 {
-    lstrcpynW(__MessagesTitleBufW, title, _countof(__MessagesTitleBufW));
+    // Keep the Unicode title within the shared presentation buffer before ANSI conversion.
+    StringCchCopyNW(__MessagesTitleBufW, _countof(__MessagesTitleBufW), title, _countof(__MessagesTitleBufW) - 1);
     __MessagesTitleW = __MessagesTitleBufW;
     WideCharToMultiByte(CP_ACP, 0, __MessagesTitleBufW, -1,
                         __MessagesTitleBuf, _countof(__MessagesTitleBuf), NULL, NULL);

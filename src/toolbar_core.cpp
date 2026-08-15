@@ -43,7 +43,8 @@ BOOL CToolBarItem::SetText(const char* text, int len)
 {
     CALL_STACK_MESSAGE_NONE
     if (text != NULL && len == -1)
-        len = lstrlen(text);
+        // A negative length selects the normal terminated-string input contract.
+        len = static_cast<int>(strlen(text));
 
     if (Text != NULL)
     {
@@ -108,7 +109,7 @@ CToolBar::CToolBar(HWND hNotifyWindow, CObjectOrigin origin)
     InserMarkIndex = -1;
     InserMarkAfter = FALSE;
     MouseIsTracked = FALSE;
-    DropDownUpTime = GetTickCount();
+    DropDownUpTime = CMonotonicClock::Now();
     HelpMode = FALSE;
 }
 
@@ -1016,7 +1017,7 @@ CToolBar::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
     {
         // if click came within 25ms after releasing drop down, discard it to avoid
         // unnecessary new press
-        if (GetTickCount() - DropDownUpTime <= 25)
+        if (!CMonotonicClock::HasElapsed(DropDownUpTime, 26, CMonotonicClock::Now()))
             break;
 
         SetCurrentToolTip(NULL, 0); // vykopneme tooltip
@@ -1067,7 +1068,8 @@ CToolBar::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                     if (HotIndex == index)
                         DrawItem(HotIndex); // if no change occurred, must redraw state
                     RelayToolTip = TRUE;
-                    DropDownUpTime = GetTickCount();
+                    // Preserve the legacy inclusive 25 ms click-suppression interval without tick wrap.
+                    DropDownUpTime = CMonotonicClock::Now();
                 }
             }
         }

@@ -14,6 +14,10 @@ class CMenuPopup;
 class CMenuBar;
 class CBitmap;
 
+// A distinct sentinel lets the popup loop represent "no submenu deadline"
+// without confusing the first valid monotonic clock sample with an expiry.
+static const CMonotonicTimePoint MENU_CHANGE_TICK_NONE = (CMonotonicTimePoint)-1;
+
 /*
 Sent messages:
   WM_INITMENUPOPUP
@@ -113,7 +117,7 @@ public:
     HWND HParent;          // window from which menu was invoked
     int TextItemHeight;    // height of text item
     BOOL BitmapsZoom;      // multiple of original bitmap size
-    DWORD ChangeTickCount; // GetTickCount value from time when selected item changed
+    CMonotonicTimePoint ChangeTickCount; // monotonic time when the selected item changed
     POINT LastMouseMove;
     CMenuBar* MenuBar; // window is activated from MenuBar; otherwise equals NULL
     DWORD SkillLevel;  // value for popup chain -- determines which items will be displayed

@@ -91,8 +91,7 @@ public:
     }
 };
 
-CWin32OperationExecutionFileSystem Win32OperationExecutionFileSystem;
-COperationExecutionFileSystem* TestOperationExecutionFileSystem = NULL;
+CWin32OperationExecutionFileSystem DefaultOperationExecutionFileSystem;
 }
 
 CFileOperationFileSystem& FileOperationFileSystem()
@@ -105,12 +104,7 @@ void SetFileOperationFileSystemForTests(CFileOperationFileSystem* replacement)
     TestFileOperationFileSystem = replacement;
 }
 
-COperationExecutionFileSystem& OperationExecutionFileSystem()
+COperationExecutionFileSystem& Win32OperationExecutionFileSystem()
 {
-    return TestOperationExecutionFileSystem != NULL ? *TestOperationExecutionFileSystem : Win32OperationExecutionFileSystem;
-}
-
-void SetOperationExecutionFileSystemForTests(COperationExecutionFileSystem* replacement)
-{
-    TestOperationExecutionFileSystem = replacement;
+    return DefaultOperationExecutionFileSystem;
 }

@@ -15,6 +15,8 @@
 #include "dialogs.h"
 #include "undelete.h"
 
+#include <strsafe.h>
+
 // FS-name assigned by Salamanderem after plugin is loaded
 char AssignedFSName[MAX_PATH] = "";
 
@@ -220,8 +222,10 @@ CPluginFSDataInterface::SetupView(BOOL leftPanel, CSalamanderViewAbstract* view,
         int sizeIndex = view->GetColumnsCount();
 
         CColumn column;
-        lstrcpy(column.Name, String<char>::LoadStr(IDS_CONDITION));
-        lstrcpy(column.Description, String<char>::LoadStr(IDS_CONDITIONDESC));
+        // Do not register a column whose fixed SDK metadata was truncated.
+        if (FAILED(StringCchCopyA(column.Name, _countof(column.Name), String<char>::LoadStr(IDS_CONDITION))) ||
+            FAILED(StringCchCopyA(column.Description, _countof(column.Description), String<char>::LoadStr(IDS_CONDITIONDESC))))
+            return;
         column.GetText = GetSzText;
         column.SupportSorting = 0;
         column.LeftAlignment = 1;

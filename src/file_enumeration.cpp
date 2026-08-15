@@ -13,6 +13,8 @@
 #include "tasklist.h"
 #include "md5.h"
 
+#include <strsafe.h>
+
 CProgressDlgArray ProgressDlgArray; // array of disk operation dialogs (only dialogs running in their own threads)
 
 // section for calling GetNextFileNameForViewer, GetPreviousFileNameForViewer,
@@ -32,6 +34,20 @@ HANDLE FileNamesEnumDone;
 int NextRequestUID = 0;
 // next free UID of a source
 int NextSourceUID = 0;
+
+void CancelFileNamesEnumRequestLocked(int sourceUID)
+{
+    if (FileNamesEnumData.WaitingForResult && FileNamesEnumData.SrcUID == sourceUID)
+    {
+        // A panel can disappear after a worker snapshots its HWND; wake that
+        // worker before the HWND can be recycled by a different window.
+        FileNamesEnumData.TimedOut = TRUE;
+        FileNamesEnumData.SrcBusy = TRUE;
+        FileNamesEnumData.WaitingForResult = FALSE;
+        if (FileNamesEnumDone != NULL)
+            SetEvent(FileNamesEnumDone);
+    }
+}
 
 HWND GetWndToFlash(HWND parent)
 {
@@ -57,7 +73,8 @@ HWND GetWndToFlash(HWND parent)
 BOOL CALLBACK CloseAllOwnedEnabledDialogsEnumProc(HWND wnd, LPARAM lParam)
 {
     HWND parent = (HWND)lParam;
-    LONG style = GetWindowLong(wnd, GWL_STYLE);
+    // Styles are bitmasks here, but the Ptr API preserves correct window-data access on x64.
+    LONG_PTR style = GetWindowLongPtr(wnd, GWL_STYLE);
     if ((style & WS_CHILD) == 0 && IsWindowEnabled(wnd) && IsWindowVisible(wnd))
     {
         char clsName[200];
@@ -165,9 +182,13 @@ BOOL GetFileNameForViewer(CFileNamesEnumRequestType requestType, int srcUID, int
     HANDLES(EnterCriticalSection(&FileNamesEnumDataSect));
     int reqUID = FileNamesEnumData.RequestUID = NextRequestUID++;
     FileNamesEnumData.RequestType = requestType;
+    FileNamesEnumData.WaitingForResult = TRUE;
     FileNamesEnumData.SrcUID = srcUID;
     FileNamesEnumData.LastFileIndex = *lastFileIndex;
-    lstrcpyn(FileNamesEnumData.LastFileName, lastFileName != NULL ? lastFileName : "", MAX_PATH);
+    // Never send a truncated previous-name identity to the asynchronous enumerator.
+    if (FAILED(StringCchCopyA(FileNamesEnumData.LastFileName, _countof(FileNamesEnumData.LastFileName),
+                              lastFileName != NULL ? lastFileName : "")))
+        FileNamesEnumData.LastFileName[0] = 0;
     FileNamesEnumData.PreferSelected = preferSelected;
     FileNamesEnumData.OnlyAssociatedExtensions = onlyAssociatedExtensions;
     FileNamesEnumData.Plugin = plugin;
@@ -194,22 +215,36 @@ BOOL GetFileNameForViewer(CFileNamesEnumRequestType requestType, int srcUID, int
 
     if (hWnd != NULL)
     {
-        PostMessage(hWnd, WM_USER_ENUMFILENAMES, reqUID, 0);
+        if (!PostMessage(hWnd, WM_USER_ENUMFILENAMES, reqUID, 0))
+        {
+            HANDLES(EnterCriticalSection(&FileNamesEnumDataSect));
+            // A failed post has the same safety contract as source teardown:
+            // do not wait for a window that can no longer receive this request.
+            CancelFileNamesEnumRequestLocked(srcUID);
+            HANDLES(LeaveCriticalSection(&FileNamesEnumDataSect));
+        }
 
         DWORD waitRes = WaitForSingleObject(FileNamesEnumDone, FILENAMESENUM_TIMEOUT);
         if (waitRes == WAIT_OBJECT_0) // done
         {
             HANDLES(EnterCriticalSection(&FileNamesEnumDataSect));
             *lastFileIndex = FileNamesEnumData.LastFileIndex;
+            BOOL fileNameFits = TRUE;
             if (fileName != NULL)
-                lstrcpyn(fileName, FileNamesEnumData.FileName, MAX_PATH);
+            {
+                // A completed enumeration result must retain its full file-name identity.
+                fileNameFits = SUCCEEDED(StringCchCopyA(fileName, MAX_PATH, FileNamesEnumData.FileName));
+                if (!fileNameFits)
+                    fileName[0] = 0;
+            }
             if (noMoreFiles != NULL)
                 *noMoreFiles = FileNamesEnumData.NoMoreFiles;
             if (srcBusy != NULL)
                 *srcBusy = FileNamesEnumData.SrcBusy;
             if (isFileSelected != NULL)
                 *isFileSelected = FileNamesEnumData.IsFileSelected;
-            ret = FileNamesEnumData.Found;
+            ret = FileNamesEnumData.Found && fileNameFits;
+            FileNamesEnumData.WaitingForResult = FALSE;
             HANDLES(LeaveCriticalSection(&FileNamesEnumDataSect));
         }
         else // maybe a timeout
@@ -219,24 +254,39 @@ BOOL GetFileNameForViewer(CFileNamesEnumRequestType requestType, int srcUID, int
             if (waitRes == WAIT_OBJECT_0) // done (the timeout was a false alarm; the message was delivered, the name lookup just was not finished)
             {
                 *lastFileIndex = FileNamesEnumData.LastFileIndex;
+                BOOL fileNameFits = TRUE;
                 if (fileName != NULL)
-                    lstrcpyn(fileName, FileNamesEnumData.FileName, MAX_PATH);
+                {
+                    // A completed enumeration result must retain its full file-name identity.
+                    fileNameFits = SUCCEEDED(StringCchCopyA(fileName, MAX_PATH, FileNamesEnumData.FileName));
+                    if (!fileNameFits)
+                        fileName[0] = 0;
+                }
                 if (noMoreFiles != NULL)
                     *noMoreFiles = FileNamesEnumData.NoMoreFiles;
                 if (srcBusy != NULL)
                     *srcBusy = FileNamesEnumData.SrcBusy;
                 if (isFileSelected != NULL)
                     *isFileSelected = FileNamesEnumData.IsFileSelected;
-                ret = FileNamesEnumData.Found;
+                ret = FileNamesEnumData.Found && fileNameFits;
+                FileNamesEnumData.WaitingForResult = FALSE;
             }
             else // a real timeout (timed out while delivering the message to the source)
             {
                 FileNamesEnumData.TimedOut = TRUE;
+                FileNamesEnumData.WaitingForResult = FALSE;
                 if (srcBusy != NULL)
                     *srcBusy = TRUE;
             }
             HANDLES(LeaveCriticalSection(&FileNamesEnumDataSect));
         }
+    }
+    else
+    {
+        HANDLES(EnterCriticalSection(&FileNamesEnumDataSect));
+        // No registration means no receiver can complete this request.
+        FileNamesEnumData.WaitingForResult = FALSE;
+        HANDLES(LeaveCriticalSection(&FileNamesEnumDataSect));
     }
 
     HANDLES(LeaveCriticalSection(&FileNamesEnumSect));
@@ -291,6 +341,7 @@ void EnumFileNamesChangeSourceUID(HWND hWnd, int* srcUID)
     {
         if (FileNamesEnumSources[i] == hWnd)
         {
+            CancelFileNamesEnumRequestLocked((int)(UINT_PTR)FileNamesEnumSources[i - 1]);
             FileNamesEnumSources[i - 1] = (HWND)(UINT_PTR)*srcUID;
             break;
         }
@@ -331,6 +382,7 @@ void EnumFileNamesRemoveSourceUID(HWND hWnd)
     {
         if (FileNamesEnumSources[i] == hWnd)
         {
+            CancelFileNamesEnumRequestLocked((int)(UINT_PTR)FileNamesEnumSources[i - 1]);
             FileNamesEnumSources.Delete(i);
             if (!FileNamesEnumSources.IsGood())
                 FileNamesEnumSources.ResetState();
@@ -1757,12 +1809,18 @@ void GetIfPathIsInaccessibleGoTo(char* path, int pathBufSize, BOOL forceIsMyDocs
             if (GetWindowsDirectory(winPath, MAX_PATH) != 0)
                 GetRootPath(path, pathBufSize, winPath);
             else
-                lstrcpyn(path, "C:\\", pathBufSize);
+            {
+                // Do not return a partial fallback root to a caller-sized output field.
+                if (FAILED(StringCchCopyA(path, pathBufSize, "C:\\")))
+                    path[0] = 0;
+            }
         }
     }
     else
     {
-        lstrcpyn(path, Configuration.IfPathIsInaccessibleGoTo, pathBufSize);
+        // Preserve the configured fallback only when it fits the caller's complete path field.
+        if (FAILED(StringCchCopyA(path, pathBufSize, Configuration.IfPathIsInaccessibleGoTo)))
+            path[0] = 0;
         if (path[0] != 0 && path[1] == ':')
         {
             path[0] = UpperCase[path[0]];
@@ -2084,10 +2142,11 @@ SECURITY_ATTRIBUTES* CreateAccessableSecurityAttributes(SECURITY_ATTRIBUTES* sa,
     }
 
     nAclSize = GetLengthSid(psidEveryone) * 2 + sizeof(ACCESS_ALLOWED_ACE) + sizeof(ACCESS_DENIED_ACE) + sizeof(ACL);
-    *paclNewDacl = (PACL)LocalAlloc(LPTR, nAclSize);
+    // The ACL is application-owned and only borrowed while the kernel object is created.
+    *paclNewDacl = (PACL)HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, nAclSize);
     if (*paclNewDacl == NULL)
     {
-        TRACE_E("CreateAccessableSecurityAttributes(): LocalAlloc() failed!");
+        TRACE_E("CreateAccessableSecurityAttributes(): HeapAlloc() failed!");
         goto ErrorExit;
     }
     if (!InitializeAcl(*paclNewDacl, nAclSize, ACL_REVISION))
@@ -2123,7 +2182,7 @@ SECURITY_ATTRIBUTES* CreateAccessableSecurityAttributes(SECURITY_ATTRIBUTES* sa,
 ErrorExit:
     if (*paclNewDacl != NULL)
     {
-        LocalFree(*paclNewDacl);
+        HeapFree(GetProcessHeap(), 0, *paclNewDacl);
         *paclNewDacl = NULL;
     }
     if (*psidEveryone != NULL)
@@ -2165,7 +2224,8 @@ BOOL GetProcessIntegrityLevel(DWORD* integrityLevel)
                 dwError = GetLastError();
                 if (dwError == ERROR_INSUFFICIENT_BUFFER)
                 {
-                    pTIL = (PTOKEN_MANDATORY_LABEL)LocalAlloc(0, dwLengthNeeded);
+                    // Token information is copied into this short-lived private buffer.
+                    pTIL = (PTOKEN_MANDATORY_LABEL)HeapAlloc(GetProcessHeap(), 0, dwLengthNeeded);
                     if (pTIL != NULL)
                     {
                         if (GetTokenInformation(hToken, (_TOKEN_INFORMATION_CLASS)25 /*TokenIntegrityLevel*/, pTIL, dwLengthNeeded, &dwLengthNeeded))
@@ -2197,7 +2257,7 @@ BOOL GetProcessIntegrityLevel(DWORD* integrityLevel)
               }
               */
                         }
-                        LocalFree(pTIL);
+                        HeapFree(GetProcessHeap(), 0, pTIL);
                     }
                 }
             }

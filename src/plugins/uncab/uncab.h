@@ -157,6 +157,7 @@ public:
     UINT Write(INT_PTR hf, void* pv, UINT cb);
     int Close(INT_PTR hf);
     long SafeSeek(CFile* file, DWORD distance, DWORD method);
+    BOOL SafeSeekAbsolute(CFile* file, const LARGE_INTEGER& position);
     long Seek(INT_PTR hf, long dist, int seektype);
     INT_PTR Notify(FDINOTIFICATIONTYPE fdint, PFDINOTIFICATION pfdin);
 };

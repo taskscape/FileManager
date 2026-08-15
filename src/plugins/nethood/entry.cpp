@@ -46,15 +46,7 @@ DllMain(
         DisableThreadLibraryCalls(hModule);
 //		_CrtSetDbgFlag(_CRTDBG_ALLOC_MEM_DF | _CRTDBG_LEAK_CHECK_DF);  // Petr: Salamander handles this, it does not belong here
 #if (_MSC_VER >= 1500)
-        //		OSVERSIONINFO osver = {sizeof(OSVERSIONINFO), };
-        //		if (GetVersionEx(&osver))
-        //		{
-        //			_winmajor = osver.dwMajorVersion;
-        //			_winminor = osver.dwMinorVersion;
-        //			_osplatform = osver.dwPlatformId;
-        //		}
-
-        // Petr: I need to avoid calling GetVersionEx (obsolete) + I need _winmajor,
+        // Petr: I need to avoid obsolete version probing while retaining _winmajor,
         // _winminor and _osplatform (GetOsSpecificData uses them), so for the purposes of Nethood
         // I will obtain them in a completely primitive way, see the following code
 

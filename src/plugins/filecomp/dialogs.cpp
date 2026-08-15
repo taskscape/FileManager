@@ -91,7 +91,9 @@ void CCompareFilesDialog::Validate(CTransferInfo& ti)
         {
             TCHAR buf2[300 + MAX_PATH];
 
-            wsprintf(buf2, LoadStr(IDS_FILEDOESNOTEXIST), buffer);
+            // Keep the localized missing-file detail bounded before presenting it to the user.
+            if (_stprintf_s(buf2, _countof(buf2), LoadStr(IDS_FILEDOESNOTEXIST), buffer) < 0)
+                _tcsncpy_s(buf2, _countof(buf2), LoadStr(IDS_MISSINGPATH), _TRUNCATE);
             SG->SalMessageBox(HWindow, buf2, LoadStr(IDS_ERROR), MB_ICONERROR);
             ti.ErrorOn(IDE_PATH1 + i);
             return;

@@ -3,6 +3,9 @@
 
 #include "precomp.h"
 
+#include <shobjidl.h>
+#include <strsafe.h>
+
 #include "wndframe.h"
 #include "translator.h"
 #include "wndrh.h"
@@ -201,7 +204,7 @@ BOOL CopyHTextToClipboard(HGLOBAL hGlobalText, int textLen)
                 if (text != NULL)
                 {
                     if (textLen == -1)
-                        textLen = lstrlen(text);
+                        textLen = static_cast<int>(strlen(text));
                     err = AddUnicodeToClipboard(text, textLen); // store the text in Unicode first (NT only)
                     HANDLES(GlobalUnlock(hGlobalText));
                 }
@@ -233,7 +236,7 @@ BOOL CopyTextToClipboard(const char* text, int textLen)
     DWORD err = ERROR_SUCCESS;
 
     if (textLen == -1)
-        textLen = lstrlen(text);
+        textLen = static_cast<int>(strlen(text));
 
     HGLOBAL hglbCopy = NOHANDLES(GlobalAlloc(GMEM_MOVEABLE | GMEM_DDESHARE, textLen + 1));
     if (hglbCopy != NULL)
@@ -267,130 +270,61 @@ BOOL CopyTextToClipboard(const char* text, int textLen)
 //
 //  returns TRUE when 'path' contains a valid new location
 
-struct CBrowseData
-{
-    const char* Title;
-    const char* InitDir;
-    HWND HCenterWindow;
-};
-
-int CALLBACK DirectoryBrowse(HWND hwnd, UINT uMsg, LPARAM lParam, LPARAM lpData)
-{
-    if (uMsg == BFFM_INITIALIZED)
-    {
-        // try to center the dialog relative to the reference window
-        RECT centerRect;
-        GetWindowRect(((CBrowseData*)lpData)->HCenterWindow, &centerRect);
-        int centerW = centerRect.right - centerRect.left;
-        int centerH = centerRect.bottom - centerRect.top;
-        int centerX = centerRect.left;
-        int centerY = centerRect.top;
-        RECT r;
-        GetWindowRect(hwnd, &r);
-        int w = r.right - r.left;
-        int h = r.bottom - r.top;
-
-        int x = centerX + (centerW - w) / 2;
-        int y = centerY + (centerH - h) / 2;
-
-        RECT workArea;
-        SystemParametersInfo(SPI_GETWORKAREA, 0, &workArea, FALSE);
-        // ensure the dialog remains fully visible
-        if (x < workArea.left)
-            x = workArea.left;
-        if (y < workArea.top)
-            y = workArea.top;
-        if (x + w > workArea.right)
-            x = workArea.right - w;
-        if (y + h > workArea.bottom)
-            y = workArea.bottom - h;
-
-        // position the dialog
-        SetWindowPos(hwnd, HWND_TOP, x, y, 0, 0, SWP_NOSIZE);
-
-        // set the caption
-        SetWindowText(hwnd, ((CBrowseData*)lpData)->Title);
-        if (((CBrowseData*)lpData)->InitDir != NULL)
-        {
-            char path[MAX_PATH];
-            GetRootPath(path, ((CBrowseData*)lpData)->InitDir);
-            if (strlen(path) < strlen(((CBrowseData*)lpData)->InitDir)) // not a root directory
-            {
-                strcpy_s(path, ((CBrowseData*)lpData)->InitDir);
-                char& ch = path[strlen(path) - 1];
-                if (ch == '\\')
-                    ch = 0;
-            }
-            SendMessage(hwnd, BFFM_SETSELECTION, TRUE, (LPARAM)path);
-        }
-    }
-    if (uMsg == BFFM_SELCHANGED)
-    {
-        if ((ITEMIDLIST*)lParam != NULL)
-        {
-            char path[MAX_PATH];
-            BOOL ret = SHGetPathFromIDList((ITEMIDLIST*)lParam, path);
-            SendMessage(hwnd, BFFM_ENABLEOK, 0, ret);
-        }
-    }
-    return 0;
-}
-
-BOOL GetTargetDirectoryAux(HWND parent, HWND hCenterWindow,
-                           const char* title, const char* comment,
-                           char* path, BOOL onlyNet, const char* initDir)
-{
-    __try
-    {
-        ITEMIDLIST* pidl; // select the root folder
-        if (onlyNet)
-            SHGetSpecialFolderLocation(parent, CSIDL_NETWORK, &pidl);
-        else
-            pidl = NULL;
-
-        // open the dialog
-        char display[MAX_PATH];
-        BROWSEINFO bi;
-        bi.hwndOwner = parent;
-        bi.pidlRoot = pidl;
-        bi.pszDisplayName = display;
-        bi.lpszTitle = comment;
-        bi.ulFlags = BIF_RETURNONLYFSDIRS;
-        bi.lpfn = DirectoryBrowse;
-        CBrowseData bd;
-        bd.Title = title;
-        bd.InitDir = initDir;
-        bd.HCenterWindow = hCenterWindow;
-        bi.lParam = (LPARAM)&bd;
-        ITEMIDLIST* res = SHBrowseForFolder(&bi);
-        BOOL ret = FALSE; // return value
-        if (res != NULL)
-        {
-            SHGetPathFromIDList(res, path);
-            ret = TRUE;
-        }
-        // release the item-id lists
-        IMalloc* alloc;
-        if (SUCCEEDED(CoGetMalloc(1, &alloc)))
-        {
-            if (alloc->DidAlloc(pidl) == 1)
-                alloc->Free(pidl);
-            if (alloc->DidAlloc(res) == 1)
-                alloc->Free(res);
-            alloc->Release();
-        }
-        return ret;
-    }
-    __except (EXCEPTION_EXECUTE_HANDLER)
-    {
-        return FALSE; // propagate the error
-    }
-}
-
 BOOL GetTargetDirectory(HWND parent, const char* title, const char* comment,
                         char* path, const char* initDir)
 {
-    return GetTargetDirectoryAux(parent, parent, title, comment, path, FALSE, initDir);
+    HRESULT initializeResult = CoInitializeEx(NULL, COINIT_APARTMENTTHREADED);
+    if (FAILED(initializeResult))
+        return FALSE;
+
+    IFileDialog* dialog = NULL;
+    HRESULT result = CoCreateInstance(CLSID_FileOpenDialog, NULL, CLSCTX_INPROC_SERVER,
+                                      IID_PPV_ARGS(&dialog));
+    if (SUCCEEDED(result))
+    {
+        DWORD options;
+        // The modern dialog supplies filesystem folders directly, eliminating PIDL and fixed-dialog callback handling.
+        if (SUCCEEDED(dialog->GetOptions(&options)))
+            dialog->SetOptions(options | FOS_PICKFOLDERS | FOS_FORCEFILESYSTEM);
+
+        WCHAR titleW[MAX_PATH];
+        if (ConvertA2U(title != NULL ? title : comment, -1, titleW, _countof(titleW)))
+            dialog->SetTitle(titleW);
+
+        if (initDir != NULL && initDir[0] != 0)
+        {
+            WCHAR initialPathW[MAX_PATH];
+            IShellItem* initialFolder = NULL;
+            if (ConvertA2U(initDir, -1, initialPathW, _countof(initialPathW)) &&
+                SUCCEEDED(SHCreateItemFromParsingName(initialPathW, NULL, IID_PPV_ARGS(&initialFolder))))
+            {
+                dialog->SetFolder(initialFolder);
+                initialFolder->Release();
+            }
+        }
+
+        result = dialog->Show(parent);
+        if (SUCCEEDED(result))
+        {
+            IShellItem* selectedFolder = NULL;
+            result = dialog->GetResult(&selectedFolder);
+            if (SUCCEEDED(result))
+            {
+                PWSTR selectedPathW = NULL;
+                result = selectedFolder->GetDisplayName(SIGDN_FILESYSPATH, &selectedPathW);
+                if (SUCCEEDED(result))
+                {
+                    result = ConvertU2A(selectedPathW, -1, path, MAX_PATH) != 0 ? S_OK : E_FAIL;
+                    CoTaskMemFree(selectedPathW);
+                }
+                selectedFolder->Release();
+            }
+        }
+        dialog->Release();
+    }
+
+    CoUninitialize();
+    return SUCCEEDED(result);
 }
 
 HWND GetMsgParent()
@@ -531,7 +465,8 @@ void GetFixedLogFont(LOGFONT* lf)
     lf->lfClipPrecision = CLIP_DEFAULT_PRECIS;
     lf->lfQuality = DEFAULT_QUALITY;
     lf->lfPitchAndFamily = FIXED_PITCH | FF_DONTCARE;
-    lstrcpy(lf->lfFaceName, "Consolas");
+    // LOGFONT owns a fixed face-name field, so keep the chosen family complete.
+    StringCchCopyA(lf->lfFaceName, _countof(lf->lfFaceName), "Consolas");
 }
 
 //*****************************************************************************

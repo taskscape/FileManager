@@ -3,6 +3,7 @@
 // CommentsTranslationProject: TRANSLATED
 
 #include "precomp.h"
+#include "common\monotonic_time.h"
 
 #include "menu.h"
 #include "cfgdlg.h"
@@ -215,6 +216,7 @@ CFindDialog::CFindDialog(HWND hCenterAgainst, const char* initPath)
     SearchInProgress = FALSE;
     StateOfFindCloseQuery = sofcqNotUsed;
     CanClose = TRUE;
+    GrepThreadOwner = NULL;
     GrepThread = NULL;
     char buf[100];
     sprintf(buf, "%s ", LoadStr(IDS_FF_SEARCHING));
@@ -247,7 +249,10 @@ CFindDialog::CFindDialog(HWND hCenterAgainst, const char* initPath)
 
     // data for controls
     if (Data.NamedText[0] == 0)
-        lstrcpy(Data.NamedText, "*.*");
+    {
+        // The default find mask belongs to the fixed dialog field.
+        StringCchCopyA(Data.NamedText, _countof(Data.NamedText), "*.*");
+    }
     if (Data.LookInText[0] == 0)
     {
         const char* s = initPath;
@@ -727,7 +732,9 @@ void CFindDialog::BuildSerchForData()
     SearchForData.DestroyMembers();
 
     char path[MAX_PATH];
-    lstrcpy(path, Data.LookInText);
+    // Search roots are navigation identities and must not be truncated before enumeration.
+    if (FAILED(StringCchCopyA(path, _countof(path), Data.LookInText)))
+        return;
     begin = path;
     do
     {
@@ -928,7 +935,8 @@ void CFindDialog::StartSearch(WORD command)
 
     GrepData.FoundFilesListView = FoundFilesListView;
     GrepData.FoundVisibleCount = 0;
-    GrepData.FoundVisibleTick = GetTickCount();
+    // Publish redraw time atomically because the search worker reads it while adding results.
+    InterlockedExchange64(&GrepData.FoundVisibleTick, (LONGLONG)CMonotonicClock::Now());
     // Each search starts a fresh bounded-work generation for results and deferred directories.
     GrepData.ResultLimitReached = FALSE;
     GrepData.DirectoryStackHighWaterMark = 0;
@@ -937,10 +945,17 @@ void CFindDialog::StartSearch(WORD command)
     GrepData.SearchingText = &SearchingText;
     GrepData.SearchingText2 = &SearchingText2;
 
-    DWORD threadId;
-    GrepThread = HANDLES(CreateThread(NULL, 0, GrepThreadF, &GrepData, 0, &threadId));
-    if (GrepThread == NULL)
+    GrepThreadOwner = new CThreadOwner;
+    if (GrepThreadOwner != NULL &&
+        GrepThreadOwner->Start(GrepThreadF, &GrepData, "Find grep worker"))
     {
+        // The raw handle remains only for the existing nested message-loop wait.
+        GrepThread = GrepThreadOwner->GetThreadHandle();
+    }
+    else
+    {
+        delete GrepThreadOwner;
+        GrepThreadOwner = NULL;
         TRACE_E("Unable to start GrepThread thread.");
         if (GrepData.Refine != 0)
             FoundFilesListView->DestroyDataForRefine();
@@ -993,8 +1008,14 @@ void CFindDialog::StopSearch()
         if (WaitForSingleObject(GrepThread, 100) != WAIT_TIMEOUT)
             break;
     }
-    if (GrepThread != NULL)
-        HANDLES(CloseHandle(GrepThread));
+    if (GrepThreadOwner != NULL)
+    {
+        // The dialog has observed the cooperative stop, so releasing the owner
+        // cannot free GrepData while the worker still posts results.
+        GrepThreadOwner->StopAndJoin(0);
+        delete GrepThreadOwner;
+        GrepThreadOwner = NULL;
+    }
     GrepThread = NULL;
 
     SearchInProgress = FALSE;
@@ -1220,13 +1241,15 @@ void CFindDialog::UpdateListViewItems()
                             LoadStr(IDS_FF_NAME), LoadStr(IDS_FF_NAMED), SearchForData[0]->MasksGroup.GetMasksString());
             }
             else
-                lstrcpy(buf, LoadStr(IDS_FF_NAME));
+                // The title buffer is a bounded dialog presentation field.
+                StringCchCopyNA(buf, _countof(buf), LoadStr(IDS_FF_NAME), _countof(buf) - 1);
             SetWindowTextUtf8(HWindow, buf);
         }
 
         // used by the search thread to know when to notify us next
         GrepData.FoundVisibleCount = count;
-        GrepData.FoundVisibleTick = GetTickCount();
+        // Keep the worker's throttle deadline monotonic even after the 32-bit tick counter wraps.
+        InterlockedExchange64(&GrepData.FoundVisibleTick, (LONGLONG)CMonotonicClock::Now());
 
         EnableToolBar();
     }
@@ -1273,7 +1296,9 @@ BOOL CFindDialog::GetFocusedFile(char* buffer, int bufferLen, int* viewedIndex)
         longName[len++] = '\\';
     strcpy(longName + len, data->Name);
 
-    lstrcpyn(buffer, longName, bufferLen);
+    // Result display uses the caller-provided bounded output field.
+    if (bufferLen > 0)
+        StringCchCopyNA(buffer, bufferLen, longName, bufferLen - 1);
     return TRUE;
 }
 
@@ -1508,7 +1533,9 @@ void CFindDialog::OnUserMenu()
                 }
                 CFoundFilesData* file = FoundFilesListView->At(findItem);
                 char fullName[MAX_PATH];
-                lstrcpyn(fullName, file->Path, MAX_PATH);
+                // Result-list paths are operation identities; never append to a partial base path.
+                if (FAILED(StringCchCopyA(fullName, _countof(fullName), file->Path)))
+                    break;
                 if (!SalPathAppend(fullName, file->Name, MAX_PATH) ||
                     !AddToListOfNames(&listFull, listFullEnd, fullName, (int)strlen(fullName)))
                     break;
@@ -1550,7 +1577,9 @@ void CFindDialog::OnUserMenu()
         {
             CFoundFilesData* file = FoundFilesListView->At(comp1);
             userMenuAdvancedData.CompareNamesAreDirs = file->IsDir;
-            lstrcpyn(userMenuAdvancedData.CompareName1, file->Path, MAX_PATH);
+            // Advanced compare receives complete result identities only.
+            if (FAILED(StringCchCopyA(userMenuAdvancedData.CompareName1, _countof(userMenuAdvancedData.CompareName1), file->Path)))
+                userMenuAdvancedData.CompareName1[0] = 0;
             if (!SalPathAppend(userMenuAdvancedData.CompareName1, file->Name, MAX_PATH))
                 userMenuAdvancedData.CompareName1[0] = 0;
         }
@@ -1560,7 +1589,9 @@ void CFindDialog::OnUserMenu()
         {
             CFoundFilesData* file = FoundFilesListView->At(comp2);
             userMenuAdvancedData.CompareNamesAreDirs = file->IsDir;
-            lstrcpyn(userMenuAdvancedData.CompareName2, file->Path, MAX_PATH);
+            // Advanced compare receives complete result identities only.
+            if (FAILED(StringCchCopyA(userMenuAdvancedData.CompareName2, _countof(userMenuAdvancedData.CompareName2), file->Path)))
+                userMenuAdvancedData.CompareName2[0] = 0;
             if (!SalPathAppend(userMenuAdvancedData.CompareName2, file->Name, MAX_PATH))
                 userMenuAdvancedData.CompareName2[0] = 0;
         }
@@ -1658,7 +1689,7 @@ void CFindDialog::InsertDrives(HWND hEdit, BOOL network)
     *iterator = '\0';
 
     SetWindowTextUtf8(hEdit, drives);
-    SendMessage(hEdit, EM_SETSEL, lstrlen(drives), lstrlen(drives));
+    SendMessage(hEdit, EM_SETSEL, strlen(drives), strlen(drives));
 }
 
 BOOL CFindDialog::CanCloseWindow()
@@ -2453,7 +2484,8 @@ MENU_TEMPLATE_ITEM FindLookInBrowseMenu[] =
                     SendMessage(EditLine->HWindow, WM_GETTEXT, (WPARAM)1024, (LPARAM)buff);
                     path[0] = 0;
                     if (start < end)
-                        lstrcpyn(path, buff + start, end - start + 1);
+                        // The selected edit fragment remains bounded before directory browsing.
+                        StringCchCopyNA(path, _countof(path), buff + start, min((int)_countof(path) - 1, (int)(end - start)));
                     if (GetTargetDirectory(HWindow, HWindow, LoadStr(IDS_CHANGE_DIRECTORY),
                                            LoadStr(IDS_BROWSECHANGEDIRTEXT), path, FALSE, path))
                     {
@@ -2472,7 +2504,7 @@ MENU_TEMPLATE_ITEM FindLookInBrowseMenu[] =
                         int rightIndex = -1; // first character after the inserted text
                         if (start > 0)
                             leftIndex = start - 1;
-                        if (end < (DWORD)lstrlen(buff))
+                        if (end < (DWORD)strlen(buff))
                             rightIndex = end;
                         if (leftIndex != -1)
                         {
@@ -2481,13 +2513,13 @@ MENU_TEMPLATE_ITEM FindLookInBrowseMenu[] =
                                 s--;
                             if ((((buff + leftIndex) - s) & 1) == 0)
                             {
-                                memmove(path + 2, path, lstrlen(path) + 1);
+                                memmove(path + 2, path, strlen(path) + 1);
                                 path[0] = ';';
                                 path[1] = ' ';
                             }
                         }
                         if (rightIndex != -1 && (buff[rightIndex] != ';' || buff[rightIndex + 1] == ';'))
-                            lstrcat(path, "; ");
+                            StringCchCatA(path, _countof(path), "; ");
 
                         EditLine->ReplaceText(path);
                     }

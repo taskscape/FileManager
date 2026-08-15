@@ -14,9 +14,23 @@
   */
 #include "precomp.h"
 
+#include "../../common/checked_arithmetic.h"
+
 #if defined(PICTVIEW_DLL_IN_SEPARATE_PROCESS) || defined(BUILD_ENVELOPE)
 
 #include "Thumbnailer.h"
+
+static BOOL GetThumbnailBufferBytes(int width, int height, size_t* bytes)
+{
+    size_t pixels;
+
+    // Image dimensions arrive from decoders and preferences; reject a wrapped
+    // product before it can become a smaller pixel allocation or row copy.
+    return width > 0 && height > 0 &&
+           CheckedMultiplySize((size_t)width, (size_t)height, &pixels) &&
+           CheckedMultiplySize(pixels, sizeof(DWORD), bytes) &&
+           *bytes <= INT_MAX;
+}
 
 /*#include "plugins.h"
 #include "fileswnd.h"
@@ -68,11 +82,18 @@ BOOL CShrinkImage::Alloc(DWORD origWidth, DWORD origHeight,
         TRACE_E("origWidth == 0 || origHeight == 0 || newWidth == 0 || newHeight == 0");
         return FALSE;
     }
+    size_t bufferBytes;
+    if (!CheckedMultiplySize((size_t)newWidth, 3 * sizeof(DWORD), &bufferBytes))
+    {
+        TRACE_E("CShrinkImage::Alloc(): coefficient buffer size overflow");
+        return FALSE;
+    }
+
     // allocate and initialize the coefficients
     RowCoeff = CreateCoeff(origWidth, newWidth, NormCoeffX);
     ColCoeff = CreateCoeff(origHeight, newHeight, NormCoeffY);
     // allocate and clear the buffer
-    Buff = (DWORD*)malloc(3 * newWidth * sizeof(DWORD));
+    Buff = (DWORD*)malloc(bufferBytes);
     if (RowCoeff == NULL || ColCoeff == NULL || Buff == NULL)
     {
         TRACE_E(IDS_LOWMEMORY);
@@ -80,7 +101,7 @@ BOOL CShrinkImage::Alloc(DWORD origWidth, DWORD origHeight,
         return FALSE;
     }
 
-    ZeroMemory(Buff, 3 * newWidth * sizeof(DWORD));
+    ZeroMemory(Buff, bufferBytes);
 
     OrigHeight = origHeight;
     NewWidth = newWidth;
@@ -117,7 +138,12 @@ void CShrinkImage::Destroy()
 DWORD*
 CShrinkImage::CreateCoeff(DWORD origLen, WORD newLen, DWORD& norm)
 {
-    DWORD* res = (DWORD*)malloc(3 * newLen * sizeof(DWORD));
+    size_t allocationBytes;
+    if (newLen == 0 || origLen > MAXDWORD / newLen ||
+        !CheckedMultiplySize((size_t)newLen, 3 * sizeof(DWORD), &allocationBytes))
+        return NULL;
+
+    DWORD* res = (DWORD*)malloc(allocationBytes);
     if (res == NULL)
         return NULL;
     DWORD* coeff = res;
@@ -143,7 +169,7 @@ CShrinkImage::CreateCoeff(DWORD origLen, WORD newLen, DWORD& norm)
             rCoeff = norm;
         }
         else
-            rCoeff = (modulo << 12) / origLen;
+            rCoeff = (DWORD)(((uint64_t)modulo << 12) / origLen);
         // and store it in the array - first comes the boundary coordinate
         *coeff++ = boundary;
         // next is the weight of the pixel at the left edge
@@ -609,7 +635,7 @@ CSalamanderThumbnailMaker::RenderToThumbnailData(CThumbnailData *data)
 void CSalamanderThumbnailMaker::HandleIncompleteImages()
 {
     if (!Error && NextLine < OriginalHeight && ThumbnailRealHeight > 0 &&
-        NextLine >= (3 * OriginalHeight / ThumbnailRealHeight) &&
+        (uint64_t)NextLine * (uint64_t)ThumbnailRealHeight >= 3ULL * (uint64_t)OriginalHeight &&
         /*!Window->ICStopWork && */ OriginalWidth > 0)
     {
         if (GetBuffer(1) != NULL)
@@ -655,9 +681,11 @@ BOOL CSalamanderThumbnailMaker::SetParameters(int picWidth, int picHeight, DWORD
     int maxWidth = ThumbnailMaxWidth; // maximum thumbnail size
     int maxHeight = ThumbnailMaxHeight;
 
-    if (maxWidth < 1 || maxHeight < 1)
+    size_t thumbnailBytes;
+    if (maxWidth < 1 || maxHeight < 1 || maxWidth > USHRT_MAX || maxHeight > USHRT_MAX ||
+        !GetThumbnailBufferBytes(maxWidth, maxHeight, &thumbnailBytes))
     {
-        TRACE_E("CSalamanderThumbnailMaker::SetParameters invalid parameters: ThumbnailMaxWidth=" << maxWidth << " or ThumbnailMaxHeight=" << maxHeight);
+        TRACE_E("CSalamanderThumbnailMaker::SetParameters invalid thumbnail dimensions or allocation size");
         Error = TRUE;
         return FALSE;
     }
@@ -665,9 +693,9 @@ BOOL CSalamanderThumbnailMaker::SetParameters(int picWidth, int picHeight, DWORD
     ShrinkImage = CalculateThumbnailSize(OriginalWidth, OriginalHeight, maxWidth, maxHeight, ThumbnailRealWidth, ThumbnailRealHeight);
 
     if (ThumbnailBuffer == NULL)
-        ThumbnailBuffer = (DWORD*)malloc(maxWidth * maxHeight * sizeof(DWORD));
+        ThumbnailBuffer = (DWORD*)malloc(thumbnailBytes);
     if (AuxTransformBuffer == NULL)
-        AuxTransformBuffer = (DWORD*)malloc(maxWidth * maxHeight * sizeof(DWORD));
+        AuxTransformBuffer = (DWORD*)malloc(thumbnailBytes);
     if (ThumbnailBuffer == NULL || AuxTransformBuffer == NULL)
     {
         if (ThumbnailBuffer != NULL)
@@ -753,14 +781,12 @@ BOOL CSalamanderThumbnailMaker::ProcessBuffer(void* buffer, int rowsCount)
         TRACE_E("Call SetParameters before ProcessBuffer!");
         return FALSE;
     }
-#ifdef _DEBUG
-    if (NextLine + rowsCount > OriginalHeight)
+    if (rowsCount < 0 || rowsCount > OriginalHeight - NextLine)
     {
-        TRACE_E("CSalamanderThumbnailMaker::ProcessBuffer(): Too much rows (" << rowsCount << ") to process (they overlap picture)!");
+        TRACE_E("CSalamanderThumbnailMaker::ProcessBuffer(): invalid row count " << rowsCount);
         Error = TRUE;
         return FALSE;
     }
-#endif // _DEBUG
     if (buffer == NULL)
     {
         buffer = Buffer;
@@ -809,7 +835,18 @@ void* CSalamanderThumbnailMaker::GetBuffer(int rowsCount)
         TRACE_E("CSalamanderThumbnailMaker::GetBuffer(): Error == TRUE");
         return NULL;
     }
-    int required = rowsCount * OriginalWidth * sizeof(DWORD);
+    if (rowsCount == 0)
+        return Buffer; // Preserve the legacy no-allocation probe.
+    size_t requiredBytes;
+    int required;
+    if (rowsCount < 0 || !GetThumbnailBufferBytes(OriginalWidth, rowsCount, &requiredBytes) ||
+        !CheckedCastSizeToInt(requiredBytes, &required))
+    {
+        // Decoder-controlled row counts must not wrap the legacy int buffer-size field.
+        TRACE_E("CSalamanderThumbnailMaker::GetBuffer(): invalid row allocation size");
+        Error = TRUE;
+        return NULL;
+    }
     if (required > BufferSize)
     {
         if (Buffer != NULL)

@@ -32,8 +32,8 @@ void WINAPI GetTextFromGeneralDateColumn()
         GlobalGeneralDateTimeStruct.wMonth = date->Month;
         GlobalGeneralDateTimeStruct.wYear = date->Year;
         int len;
-        if ((len = GetDateFormat(LOCALE_USER_DEFAULT, DATE_SHORTDATE, &GlobalGeneralDateTimeStruct,
-                                 NULL, TransferBuffer, TRANSFER_BUFFER_MAX)) == 0)
+        if ((len = FormatUserDateTimeAnsi(&GlobalGeneralDateTimeStruct, DATE_SHORTDATE,
+                                          TransferBuffer, TRANSFER_BUFFER_MAX, TRUE)) == 0)
         {
             len = 1 + sprintf(TransferBuffer, "%u.%u.%u", GlobalGeneralDateTimeStruct.wDay,
                               GlobalGeneralDateTimeStruct.wMonth, GlobalGeneralDateTimeStruct.wYear);
@@ -54,8 +54,8 @@ void WINAPI GetTextFromGeneralTimeColumn()
         GlobalGeneralDateTimeStruct.wSecond = time->Second;
         GlobalGeneralDateTimeStruct.wMilliseconds = time->Millisecond;
         int len;
-        if ((len = GetTimeFormat(LOCALE_USER_DEFAULT, 0, &GlobalGeneralDateTimeStruct,
-                                 NULL, TransferBuffer, TRANSFER_BUFFER_MAX)) == 0)
+        if ((len = FormatUserDateTimeAnsi(&GlobalGeneralDateTimeStruct, 0,
+                                          TransferBuffer, TRANSFER_BUFFER_MAX, FALSE)) == 0)
         {
             len = 1 + sprintf(TransferBuffer, "%u:%02u:%02u", GlobalGeneralDateTimeStruct.wHour,
                               GlobalGeneralDateTimeStruct.wMinute, GlobalGeneralDateTimeStruct.wSecond);
@@ -400,13 +400,13 @@ BOOL CFTPListingPluginDataInterface::GetInfoLineContent(int panel, const CFileDa
                 beg = s;
                 if (Columns->At(i)->Type == stctDate)
                 {
-                    if (GetDateFormat(LOCALE_USER_DEFAULT, DATE_SHORTDATE, &st, NULL, buf, 1000) == 0)
+                    if (FormatUserDateTimeAnsi(&st, DATE_SHORTDATE, buf, 1000, TRUE) == 0)
                         sprintf(buf, "%u.%u.%u", st.wDay, st.wMonth, st.wYear);
                 }
                 else
                 {
-                    if (GetDateFormat(LOCALE_USER_DEFAULT, DATE_SHORTDATE, &st, NULL, buf, 1000) == 0)
-                        sprintf(buf, "%u.%u.%u", st.wDay, st.wMonth, st.wYear);
+                    if (FormatUserDateTimeAnsi(&st, 0, buf, 1000, FALSE) == 0)
+                        sprintf(buf, "%u:%02u:%02u", st.wHour, st.wMinute, st.wSecond);
                 }
                 AddStrAux(s, end, buf);
                 if (hot < hotEnd && beg < s)
@@ -446,8 +446,8 @@ BOOL CFTPListingPluginDataInterface::GetInfoLineContent(int panel, const CFileDa
                     GlobalGeneralDateTimeStruct.wDay = date->Day;
                     GlobalGeneralDateTimeStruct.wMonth = date->Month;
                     GlobalGeneralDateTimeStruct.wYear = date->Year;
-                    if (GetDateFormat(LOCALE_USER_DEFAULT, DATE_SHORTDATE, &GlobalGeneralDateTimeStruct,
-                                      NULL, buf, 1000) == 0)
+                    if (FormatUserDateTimeAnsi(&GlobalGeneralDateTimeStruct, DATE_SHORTDATE,
+                                                buf, 1000, TRUE) == 0)
                     {
                         sprintf(buf, "%u.%u.%u", GlobalGeneralDateTimeStruct.wDay,
                                 GlobalGeneralDateTimeStruct.wMonth, GlobalGeneralDateTimeStruct.wYear);
@@ -473,8 +473,8 @@ BOOL CFTPListingPluginDataInterface::GetInfoLineContent(int panel, const CFileDa
                     GlobalGeneralDateTimeStruct.wMinute = time->Minute;
                     GlobalGeneralDateTimeStruct.wSecond = time->Second;
                     GlobalGeneralDateTimeStruct.wMilliseconds = time->Millisecond;
-                    if (GetTimeFormat(LOCALE_USER_DEFAULT, 0, &GlobalGeneralDateTimeStruct,
-                                      NULL, buf, 1000) == 0)
+                    if (FormatUserDateTimeAnsi(&GlobalGeneralDateTimeStruct, 0,
+                                                buf, 1000, FALSE) == 0)
                     {
                         sprintf(buf, "%u:%02u:%02u", GlobalGeneralDateTimeStruct.wHour,
                                 GlobalGeneralDateTimeStruct.wMinute, GlobalGeneralDateTimeStruct.wSecond);

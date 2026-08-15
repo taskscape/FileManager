@@ -3,6 +3,8 @@
 
 #include "precomp.h"
 
+#include <strsafe.h>
+
 LPWSTR PatternHistory[MAX_HISTORY_ENTRIES];
 LPWSTR LookInHistory[MAX_HISTORY_ENTRIES];
 
@@ -82,7 +84,8 @@ void CStatusBar::SetBase(LPCWSTR text, BOOL updateInIdle)
     CALL_STACK_MESSAGE_NONE
     //  CALL_STACK_MESSAGE2("CStatusBar::SetBase(, %d)", updateInIdle);
     Section.Enter();
-    lstrcpynW(Text, text, MAX_FULL_KEYNAME + 50);
+    // The status bar intentionally clips long keys to its fixed display field.
+    StringCchCopyNW(Text, _countof(Text), text, _countof(Text) - 1);
     BaseLen = (int)wcslen(Text);
     // do not wait for a repaint
     if (!Dirty)
@@ -106,7 +109,9 @@ void CStatusBar::Set(LPCWSTR text, BOOL updateInIdle)
     CALL_STACK_MESSAGE_NONE
     //  CALL_STACK_MESSAGE2("CStatusBar::Set(, %d)", updateInIdle);
     Section.Enter();
-    lstrcpynW(Text + BaseLen, text, MAX_FULL_KEYNAME + 49 - BaseLen);
+    const size_t remainingTextCapacity = _countof(Text) - BaseLen;
+    // The status bar intentionally clips the suffix to the remaining fixed display field.
+    StringCchCopyNW(Text + BaseLen, remainingTextCapacity, text, remainingTextCapacity - 1);
     // do not wait for a repaint
     if (!Dirty)
     {
@@ -953,7 +958,8 @@ CFoundFilesListView::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         if (next != NULL)
         {
             char className[30];
-            WORD wl = LOWORD(GetWindowLong(next, GWL_STYLE)); // jen BS_...
+            // Use pointer-width access while retaining the historical low-word BS_ style check.
+            WORD wl = LOWORD(GetWindowLongPtr(next, GWL_STYLE)); // jen BS_...
             nextIsButton = (GetClassName(next, className, 30) != 0 &&
                             SG->StrICmp(className, "BUTTON") == 0 &&
                             (wl == BS_PUSHBUTTON || wl == BS_DEFPUSHBUTTON));
@@ -1268,10 +1274,11 @@ BOOL CFindThread::ScanKeyAux(int root, LPWSTR key, BOOL& skip, BOOL& skipAllErro
     //  CALL_STACK_MESSAGE4("CFindThread::ScanKeyAux(%d, , %d, %d, , )", root, skip,
     //                           skipAllErrors);
     // status text
-    if ((int)(GetTickCount() - NextStatusUpdate) > 0)
+    if (CMonotonicClock::HasReached(NextStatusUpdate, CMonotonicClock::Now()))
     {
         FindDialog->StatusBar->Set(key);
-        NextStatusUpdate = GetTickCount() + 1;
+        // The former strict greater-than check refreshed after at least two millisecond ticks.
+        NextStatusUpdate = CMonotonicClock::DeadlineAfter(2);
     }
 
     // check for cancellation by the user
@@ -1576,7 +1583,8 @@ BOOL CFindThread::Init()
             }
         }
     }
-    NextStatusUpdate = GetTickCount();
+    // Keep the old strict immediate deadline behavior without relying on a wrapping tick count.
+    NextStatusUpdate = CMonotonicClock::DeadlineAfter(1);
     return TRUE;
 }
 

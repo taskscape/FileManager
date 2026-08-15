@@ -98,3 +98,16 @@
 #include "lang\lang.rh"
 #include "salamand.rh"
 #include "resource.rh2"
+
+static int FormatUserDateTimeUtf8(const SYSTEMTIME* time, DWORD flags, char* buffer, int bufferSize, BOOL isDate)
+{
+    // The core stores UI text as UTF-8, so convert only after locale-name formatting.
+    WCHAR localeName[LOCALE_NAME_MAX_LENGTH];
+    WCHAR formatted[200];
+    if (GetUserDefaultLocaleName(localeName, _countof(localeName)) == 0)
+        return 0;
+    int length = isDate
+                     ? GetDateFormatEx(localeName, flags, time, NULL, formatted, _countof(formatted), NULL)
+                     : GetTimeFormatEx(localeName, flags, time, NULL, formatted, _countof(formatted));
+    return length != 0 ? ConvertWideToUtf8(formatted, -1, buffer, bufferSize) : 0;
+}

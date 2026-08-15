@@ -3,6 +3,8 @@
 
 #pragma once
 
+#include <strsafe.h>
+
 // Mutex for access to shared memory.
 extern HANDLE SalShExtSharedMemMutex;
 // Shared memory - see CSalShExtSharedMem structure.
@@ -69,9 +71,14 @@ public:
         RefCount = 1;
         WinDataObject = winDataObject;
         WinDataObject->AddRef();
-        lstrcpyn(RealPath, realPath, 2 * MAX_PATH);
+        // Drag/drop paths are operation identities and must not be retained truncated.
+        if (FAILED(StringCchCopyA(RealPath, _countof(RealPath), realPath)))
+            RealPath[0] = 0;
         if (srcFSPath != NULL && srcType == 2 /* FS */)
-            lstrcpyn(SrcFSPath, srcFSPath, 2 * MAX_PATH);
+        {
+            if (FAILED(StringCchCopyA(SrcFSPath, _countof(SrcFSPath), srcFSPath)))
+                SrcFSPath[0] = 0;
+        }
         else
             SrcFSPath[0] = 0;
         SrcType = srcType;
@@ -248,7 +255,9 @@ public:
         RefCount = 1;
         WinDataObject = winDataObject;
         WinDataObject->AddRef();
-        lstrcpyn(FakeDir, fakeDir, MAX_PATH);
+        // Clipboard cleanup must use a complete temporary-directory identity.
+        if (FAILED(StringCchCopyA(FakeDir, _countof(FakeDir), fakeDir)))
+            FakeDir[0] = 0;
         CFSalFakeRealPath = RegisterClipboardFormat(SALCF_FAKE_REALPATH);
         CFIdList = RegisterClipboardFormat(CFSTR_SHELLIDLIST);
         LastGetDataCallTime = GetTickCount() - 60000; // initialize to 1 minute before object creation

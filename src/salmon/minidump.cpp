@@ -2,6 +2,8 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "precomp.h"
+// The crash-dialog parameters remain valid until the dump callback completes.
+#include "..\\common\\thread_owner.h"
 
 #include <stdarg.h>
 #include <string>
@@ -105,6 +107,25 @@ BOOL BuildMiniDumpFileName(CSalmonSharedMemory* mem, std::string* dumpFileName)
     }
     return TRUE;
 }
+
+BOOL CALLBACK FilterMiniDumpCallback(PVOID, const PMINIDUMP_CALLBACK_INPUT input,
+                                    PMINIDUMP_CALLBACK_OUTPUT output)
+{
+    // Keep DbgHelp callbacks aligned with the minimal dump policy even when a
+    // future dump type starts requesting VM ranges or module data segments.
+    switch (input->CallbackType)
+    {
+    case IncludeVmRegionCallback:
+        return FALSE;
+
+    case ModuleCallback:
+        output->ModuleWriteFlags &= ~(ModuleWriteDataSeg | ModuleWriteTlsData);
+        return TRUE;
+
+    default:
+        return TRUE;
+    }
+}
 }
 
 // The dump policy is fixed at this boundary so callers cannot accidentally request sensitive-memory capture.
@@ -150,6 +171,12 @@ BOOL GenerateMiniDump(CMinidumpParams* minidumpParams, CSalmonSharedMemory* mem,
             // the path may not exist yet - create it
             funcMakeSureDirectoryPathExists(dumpFileName.c_str()); // the file name is ignored
 
+            if (!EnsureCrashReportDirectoryEncrypted(dumpFileName.c_str()))
+            {
+                SetMiniDumpError(minidumpParams, "Unable to encrypt the crash-report directory (%lu).", GetLastError());
+                return FALSE;
+            }
+
             HANDLE hDumpFile;
             hDumpFile = CreateFileA(dumpFileName.c_str(), GENERIC_READ | GENERIC_WRITE,
                                    FILE_SHARE_WRITE | FILE_SHARE_READ, 0, CREATE_ALWAYS, 0, 0);
@@ -169,12 +196,15 @@ BOOL GenerateMiniDump(CMinidumpParams* minidumpParams, CSalmonSharedMemory* mem,
                                                                 MiniDumpWithThreadInfo |
                                                                 MiniDumpWithUnloadedModules |
                                                                 MiniDumpIgnoreInaccessibleMemory);
+                MINIDUMP_CALLBACK_INFORMATION callbackInfo;
+                callbackInfo.CallbackRoutine = FilterMiniDumpCallback;
+                callbackInfo.CallbackParam = NULL;
 
                 BOOL bMiniDumpSuccessful;
                 bMiniDumpSuccessful = funcMiniDumpWriteDump(mem->Process, mem->ProcessId,
                                                             hDumpFile, dumpType,
                                                             &expParam,
-                                                            NULL, NULL);
+                                                            NULL, &callbackInfo);
                 if (bMiniDumpSuccessful)
                 {
                     ret = TRUE;
@@ -185,10 +215,9 @@ BOOL GenerateMiniDump(CMinidumpParams* minidumpParams, CSalmonSharedMemory* mem,
                     DWORD err = GetLastError();
                     SetMiniDumpError(minidumpParams, LoadStr(IDS_SALMON_MINIDUMP_CALL, HLanguage), err);
                 }
-                // regardless of whether minidump generation returned TRUE or FALSE, check the size of the produced dump
-                DWORD sizeHigh = 0;
-                DWORD sizeLow = GetFileSize(hDumpFile, &sizeHigh);
-                if (sizeLow != INVALID_FILE_SIZE && (sizeHigh > 0 || sizeLow > 50 * 1000 * 1024))
+                // Keep the dump-size policy on the complete 64-bit value, including dumps beyond the old DWORD boundary.
+                LARGE_INTEGER dumpSize;
+                if (GetFileSizeEx(hDumpFile, &dumpSize) && dumpSize.QuadPart > 50LL * 1000 * 1024)
                     *overSize = TRUE; // if the result exceeds 50 MB, report it so a smaller version can be tried
                 CloseHandle(hDumpFile);
             }
@@ -308,8 +337,11 @@ BOOL GetReportBaseName(char* name, int nameSize, const char* targetPath, int tar
     return TRUE;
 }
 
-DWORD WINAPI MinidumpThreadF(void* param)
+DWORD WINAPI MinidumpThreadF(void* param, HANDLE stopEvent)
 {
+    // Dump generation must finish its Done/process handshake; the owner event
+    // therefore governs handle lifetime only and cannot skip that protocol.
+    (void)stopEvent;
     CMinidumpParams* minidumpParams = (CMinidumpParams*)param;
 
     SYSTEMTIME lt;
@@ -342,15 +374,25 @@ DWORD WINAPI MinidumpThreadF(void* param)
     return EXIT_SUCCESS;
 }
 
+// The owner retains the actual handle while the dialog keeps this borrowed
+// completion probe for its existing running-state API.
+CThreadOwner* MinidumpThreadOwner = NULL;
 HANDLE HMinidumpThread = NULL;
 
 BOOL StartMinidumpThread(CMinidumpParams* params)
 {
     if (HMinidumpThread != NULL)
         return FALSE;
-    DWORD id;
-    HMinidumpThread = CreateThread(NULL, 0, MinidumpThreadF, params, 0, &id);
-    return HMinidumpThread != NULL;
+    MinidumpThreadOwner = new CThreadOwner;
+    if (MinidumpThreadOwner == NULL ||
+        !MinidumpThreadOwner->Start(MinidumpThreadF, params, "crash-report minidump"))
+    {
+        delete MinidumpThreadOwner;
+        MinidumpThreadOwner = NULL;
+        return FALSE;
+    }
+    HMinidumpThread = MinidumpThreadOwner->GetThreadHandle();
+    return TRUE;
 }
 
 BOOL IsMinidumpThreadRunning()
@@ -360,7 +402,10 @@ BOOL IsMinidumpThreadRunning()
     DWORD res = WaitForSingleObject(HMinidumpThread, 0);
     if (res != WAIT_TIMEOUT)
     {
-        CloseHandle(HMinidumpThread);
+        // The completion poll guarantees the dump no longer accesses dialog data.
+        MinidumpThreadOwner->StopAndJoin(0);
+        delete MinidumpThreadOwner;
+        MinidumpThreadOwner = NULL;
         HMinidumpThread = NULL;
         return FALSE;
     }

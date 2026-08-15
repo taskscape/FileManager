@@ -7,6 +7,7 @@
 #include <ostream>
 #include <commctrl.h>
 #include <stdio.h>
+#include <strsafe.h>
 
 #include "spl_com.h"
 #include "spl_base.h"
@@ -27,6 +28,7 @@
 #include "crypt.h"
 #include "iosfxset.h"
 #include "sfxmake/sfxmake.h"
+#include "..\\..\\common\\checked_arithmetic.h"
 
 #ifndef SSZIP
 #include "zip.rh"
@@ -42,6 +44,31 @@
         *(type*)extra64 = val; \
         extra64 += sizeof(type); \
     }
+
+static int ZipStringLength(const char* text)
+{
+    // ZIP/SFX records store terminated ANSI string lengths in existing integer-sized fields.
+    return static_cast<int>(strlen(text));
+}
+
+static void CopyMeasuredZipString(char* destination, const char* source, int length)
+{
+    // Callers allocate one byte beyond the measured source length before constructing archive names.
+    memcpy(destination, source, length);
+    destination[length] = 0;
+}
+
+template<size_t capacity>
+static bool CopyZipPath(char (&destination)[capacity], const char* source)
+{
+    // Fixed Win32 path buffers must not retain a truncated archive identity.
+    if (FAILED(StringCchCopyA(destination, capacity, source)))
+    {
+        destination[0] = 0;
+        return false;
+    }
+    return true;
+}
 
 void* LoadRCData(int id, DWORD& size)
 {
@@ -238,7 +265,8 @@ int CZipPack::PackMultiVol(SalEnumSelection2 next, void* param)
         Salamander->ProgressDialogAddText(LoadStr(IDS_WRITINGEXE), FALSE);
 
         char name[MAX_PATH];
-        lstrcpy(name, ZipName);
+        if (!CopyZipPath(name, ZipName))
+            return IDS_TOOLONGZIPNAME;
         if (!SalamanderGeneral->SalPathRenameExtension(name, ".exe", MAX_PATH))
         {
             Salamander->CloseProgressDialog();
@@ -268,14 +296,18 @@ int CZipPack::PackMultiVol(SalEnumSelection2 next, void* param)
         if (!ErrorID)
         {
             char archName[MAX_PATH];
-            MakeFileName(1, Options.SeqNames, SalamanderGeneral->SalPathFindFileName(ZipName), archName,
-                         false);
-            CharToOem(archName, archName);
-            if (!WriteSFXHeader(archName, 0, 0) ||
-                Write(TempFile, &EONewCentrDir, sizeof(CEOCentrDirRecord), NULL) || // just as a placeholder, we update it later
-                Flush(TempFile, TempFile->OutputBuffer, TempFile->BufferPosition, NULL))
+            if (MakeFileName(1, Options.SeqNames, SalamanderGeneral->SalPathFindFileName(ZipName), archName,
+                             _countof(archName), false) < 0)
+                ErrorID = IDS_TOOLONGZIPNAME;
+            else
             {
-                ErrorID = IDS_NODISPLAY;
+                CharToOem(archName, archName);
+                if (!WriteSFXHeader(archName, 0, 0) ||
+                    Write(TempFile, &EONewCentrDir, sizeof(CEOCentrDirRecord), NULL) || // just as a placeholder, we update it later
+                    Flush(TempFile, TempFile->OutputBuffer, TempFile->BufferPosition, NULL))
+                {
+                    ErrorID = IDS_NODISPLAY;
+                }
             }
         }
         ecrecOffs = TempFile->FilePointer - sizeof(CEOCentrDirRecord);
@@ -947,7 +979,7 @@ int CZipPack::EnumFiles2(SalEnumSelection2 next, void* param)
             errorID = IDS_LOWMEM;
             break;
         }
-        newFile->NameLen = lstrlen(nextName) + SourceLen + 1;
+        newFile->NameLen = ZipStringLength(nextName) + SourceLen + 1;
         newFile->Name = (char*)malloc(newFile->NameLen + 1);
         if (!newFile->Name)
         {
@@ -955,9 +987,10 @@ int CZipPack::EnumFiles2(SalEnumSelection2 next, void* param)
             errorID = IDS_LOWMEM;
             break;
         }
-        lstrcpy(newFile->Name, SourcePath);
+        CopyMeasuredZipString(newFile->Name, SourcePath, SourceLen);
         *(newFile->Name + SourceLen) = '\\';
-        lstrcpy(newFile->Name + SourceLen + 1, nextName);
+        CopyMeasuredZipString(newFile->Name + SourceLen + 1, nextName,
+                              newFile->NameLen - SourceLen - 1);
         newFile->IsDir = isDir ? true : false;
         newFile->Size = size;
         newFile->Action = AF_ADD;
@@ -1060,7 +1093,14 @@ int CZipPack::MatchFiles(int& count)
     }
     if (RootLen)
     {
-        lstrcpy(destNameBuf, ZipRoot);
+        // The comparison buffer must retain the whole archive root and separator.
+        if (RootLen + 1 >= MAX_HEADER_SIZE)
+        {
+            free(inZip);
+            free(destNameBuf);
+            return IDS_ERRADDFILE_TOOLONG;
+        }
+        CopyMeasuredZipString(destNameBuf, ZipRoot, RootLen);
         *(destNameBuf + RootLen) = '\\';
         destName = destNameBuf + RootLen + 1;
     }
@@ -1127,8 +1167,16 @@ int CZipPack::MatchFiles(int& count)
                 if (!Unix || next->Action != AF_NOADD)
                     continue;
             }
-            lstrcpy(destName, next->Name + SourceLen + 1);
-            destLen = RootLen + next->NameLen - SourceLen - (RootLen ? 0 : 1);
+            const int sourceTailLength = next->NameLen - SourceLen - 1;
+            const int requiredDestinationLength = RootLen + (RootLen ? 1 : 0) + sourceTailLength;
+            // Matching must compare a complete entry name; reject data that exceeds the shared archive buffer.
+            if (sourceTailLength < 0 || requiredDestinationLength >= MAX_HEADER_SIZE)
+            {
+                errorID = IDS_ERRADDFILE_TOOLONG;
+                break;
+            }
+            CopyMeasuredZipString(destName, next->Name + SourceLen + 1, sourceTailLength);
+            destLen = requiredDestinationLength;
             if (next->Action == AF_NOADD && next->IsDir) // this may already apply to directories; files are skipped above
                 if (Move)
                 {
@@ -1186,15 +1234,15 @@ int CZipPack::MatchFiles(int& count)
                             char* buffer;
                             int len;
 
-                            len = lstrlen(ZipFile->FileName);
+                            len = ZipStringLength(ZipFile->FileName);
                             buffer = (char*)malloc(len + 1 + inZipLen + 1);
                             if (!buffer)
                                 errorID = IDS_LOWMEM;
                             else
                             {
-                                lstrcpy(buffer, ZipFile->FileName);
+                                CopyMeasuredZipString(buffer, ZipFile->FileName, len);
                                 *(buffer + len) = '\\';
-                                lstrcpy(buffer + len + 1, inZip);
+                                CopyMeasuredZipString(buffer + len + 1, inZip, static_cast<int>(inZipLen));
                                 GetInfo(attr1, &file.LastWrite, file.Size);
                                 GetFileTime(sourFile->File, NULL, NULL, &ft);
                                 GetInfo(attr2, &ft, sourFile->Size);
@@ -1248,7 +1296,7 @@ int CZipPack::MatchFiles(int& count)
                             errorID = IDS_LOWMEM;
                             break;
                         }
-                        lstrcpy(newFile->Name, inZip);
+                        CopyMeasuredZipString(newFile->Name, inZip, static_cast<int>(inZipLen));
                         MatchedTotalSize += CQuadWord().SetUI64(newFile->CompSize);
                         DelFiles.Add(newFile);
 
@@ -1423,10 +1471,11 @@ int CZipPack::PackFiles()
         return IDS_LOWMEM;
     }
     sour = LoadStr(IDS_ADDING);
-    progrText = progrTextBuf;
-    while (*sour)
-        *progrText++ = *sour++;
-    progrPrefixLen = (int)(progrText - progrTextBuf);
+    // The localized prefix shares a fixed status field with the file name, so clip it before appending.
+    if (FAILED(StringCchCopyNA(progrTextBuf, _countof(progrTextBuf), sour, _countof(progrTextBuf) - 1)))
+        progrTextBuf[_countof(progrTextBuf) - 1] = 0;
+    progrPrefixLen = ZipStringLength(progrTextBuf);
+    progrText = progrTextBuf + progrPrefixLen;
     Salamander->ProgressDialogAddText(LoadStr(IDS_ADDFILES), FALSE);
     if ((Options.Action & (PA_SELFEXTRACT | PA_MULTIVOL)) == PA_SELFEXTRACT)
         writePos = ArchiveDataOffs;
@@ -1438,7 +1487,11 @@ int CZipPack::PackFiles()
         if (next->Action != AF_ADD && next->Action != AF_OVERWRITE)
             continue;
         //TRACE_I("Packing file: " << next->Name);
-        lstrcpyn(progrText, next->Name + SourceLen + 1, MAX_PATH + 32 - progrPrefixLen);
+        // This is a fixed progress-label field, so intentionally clip only its presentation text.
+        const size_t remainingProgressText = _countof(progrTextBuf) - progrPrefixLen;
+        if (FAILED(StringCchCopyNA(progrText, remainingProgressText,
+                                   next->Name + SourceLen + 1, remainingProgressText - 1)))
+            progrText[remainingProgressText - 1] = 0;
         Salamander->ProgressDialogAddText(progrTextBuf, TRUE);
         if (!Salamander->ProgressSetSize(CQuadWord(0, 0), CQuadWord(-1, -1), TRUE))
         {
@@ -1455,10 +1508,11 @@ int CZipPack::PackFiles()
         }
         if (RootLen)
         {
-            lstrcpy(file.Name, ZipRoot);
+            CopyMeasuredZipString(file.Name, ZipRoot, RootLen);
             *(file.Name + RootLen) = '\\';
         }
-        lstrcpy(file.Name + RootLen + (RootLen ? 1 : 0), next->Name + SourceLen + 1);
+        CopyMeasuredZipString(file.Name + RootLen + (RootLen ? 1 : 0), next->Name + SourceLen + 1,
+                              file.NameLen - RootLen - (RootLen ? 1 : 0));
         if (next->IsDir)
         {
             ret = GetDirInfo(next->Name, &next->FileAttr, &next->LastWrite);
@@ -1877,14 +1931,14 @@ int CZipPack::FinishPack(int reason)
       header.Flags = Options.SfxSettings.Flags;
       header.EOCentrDirOffs = TempFile->FilePointer - ArchiveDataOffs;
       header.ArchiveSize = header.EOCentrDirOffs + sizeof(CEOCentrDirRecord);
-      header.CommandLen = lstrlen(Options.SfxSettings.Command);
+      header.CommandLen = ZipStringLength(Options.SfxSettings.Command);
       if (header.CommandLen) header.CommandLen++;
-      header.TextLen = lstrlen(Options.SfxSettings.Text) + 1;
+      header.TextLen = ZipStringLength(Options.SfxSettings.Text) + 1;
       //if (header.TextLen) header.QuestionLen++;
-      header.TitleLen = lstrlen(Options.SfxSettings.Title) + 1;
-      header.SubDirLen = lstrlen(Options.SfxSettings.SubDir) + 1;
-      header.AboutLen = lstrlen(Options.About) + 1;
-      header.ExtractBtnTextLen = lstrlen(Options.SfxSettings.ExtractBtnText) + 1;
+      header.TitleLen = ZipStringLength(Options.SfxSettings.Title) + 1;
+      header.SubDirLen = ZipStringLength(Options.SfxSettings.SubDir) + 1;
+      header.AboutLen = ZipStringLength(Options.About) + 1;
+      header.ExtractBtnTextLen = ZipStringLength(Options.SfxSettings.ExtractBtnText) + 1;
       header.ArchiveNameLen = 1;
       TempFile->FilePointer = ArchiveHeaderOffs;
       if (Write(TempFile, &header, sizeof(CSelfExtrHeader), NULL)) return IDS_NODISPLAY;
@@ -1898,7 +1952,13 @@ int CZipPack::FinishPack(int reason)
       if (Write(TempFile, "", header.ArchiveNameLen, NULL)) return IDS_NODISPLAY;
       */
             QWORD offs = TempFile->FilePointer - ArchiveDataOffs;
-            if (!WriteSFXHeader("", offs, (unsigned)(offs + sizeof(CEOCentrDirRecord))))
+            QWORD archiveEnd;
+            DWORD sfxArchiveSize;
+            // SFX metadata has a DWORD archive-size field; never truncate a ZIP64 output to fit it.
+            if (!CheckedAddUInt64(offs, sizeof(CEOCentrDirRecord), &archiveEnd) ||
+                !CheckedCastUInt64ToDword(archiveEnd, &sfxArchiveSize))
+                return IDS_TOOBIG2;
+            if (!WriteSFXHeader("", offs, sfxArchiveSize))
                 return IDS_NODISPLAY;
             TempFile->FilePointer = ArchiveDataOffs + offs;
             /*EONewCentrDir.*/ NewCentrDirOffs -= ArchiveDataOffs;
@@ -1947,15 +2007,18 @@ int CZipPack::IsDirectoryEmpty(const char* name)
 {
     CALL_STACK_MESSAGE2("CZipPack::IsDirectoryEmpty(%s)", name);
     char buf[MAX_PATH + 1];
-    int len;
     HANDLE search;
     WIN32_FIND_DATA data;
     int lastError;
     BOOL ret;
 
-    lstrcpyn(buf, name, MAX_PATH + 1);
-    len = lstrlen(buf);
-    lstrcpyn(buf + len, "\\*.*", MAX_PATH + 1 - len);
+    // Enumeration must use the complete directory name; a prefix would probe a different folder.
+    if (FAILED(StringCchCopyA(buf, _countof(buf), name)) ||
+        FAILED(StringCchCatA(buf, _countof(buf), "\\*.*")))
+    {
+        ProcessError(IDS_ERRACCESDIR, ERROR_FILENAME_EXCED_RANGE, name, PE_NORETRY | PE_NOSKIP, NULL);
+        return 1; // treat a path that cannot be represented like the existing enumeration failure
+    }
     search = FindFirstFile(buf, &data);
     if (search == INVALID_HANDLE_VALUE)
     {
@@ -2145,8 +2208,9 @@ int CZipPack::CreateNextFile(bool firstSfxDisk)
     char* dummy;
     bool testSpace = true;
 
-    MakeFileName(DiskNum + 1, Options.SeqNames, ZipName, TempName,
-                 Config.WinZipNames && !(Options.Action & PA_SELFEXTRACT));
+    if (MakeFileName(DiskNum + 1, Options.SeqNames, ZipName, TempName, MAX_PATH,
+                     Config.WinZipNames && !(Options.Action & PA_SELFEXTRACT)) < 0)
+        return IDS_TOOLONGZIPNAME;
     if (SeccondPass)
     {
         switch (CreateCFile(&TempFile, TempName, GENERIC_WRITE, FILE_SHARE_READ,
@@ -2162,7 +2226,7 @@ int CZipPack::CreateNextFile(bool firstSfxDisk)
         }
     }
     if ((TempFile = (CFile*)malloc(sizeof(CFile))) == NULL ||
-        (TempFile->FileName = (char*)malloc(lstrlen(TempName) + 1)) == NULL ||
+        (TempFile->FileName = (char*)malloc(ZipStringLength(TempName) + 1)) == NULL ||
         (TempFile->OutputBuffer = (char*)malloc(OUTPUT_BUFFER_SIZE)) == NULL)
     {
         if (TempFile)
@@ -2276,7 +2340,7 @@ int CZipPack::CreateNextFile(bool firstSfxDisk)
                                                 FILE_ATTRIBUTE_NORMAL | FILE_FLAG_SEQUENTIAL_SCAN, NULL);
                     if (TempFile->File != INVALID_HANDLE_VALUE)
                     {
-                        lstrcpy(TempFile->FileName, TempName);
+                        // FileName already owns the same TempName allocation made before this retry loop.
                         TempFile->FilePointer = 0;
                         TempFile->Flags = PE_NOSKIP;
                         TempFile->RealFilePointer = 0;
@@ -2580,11 +2644,11 @@ int CZipPack::WriteSfxExecutable(const char* sfxFile, const char* sfxPackage, BO
     //compute data offset
     ArchiveHeaderOffs = (unsigned)TempFile->Size;
     ArchiveDataOffs = ArchiveHeaderOffs + sizeof(CSelfExtrHeader);
-    int l = lstrlen(Options.SfxSettings.Command);
+    int l = ZipStringLength(Options.SfxSettings.Command);
     ArchiveDataOffs += l ? ++l : 0;
-    l = lstrlen(Options.SfxSettings.Text);
+    l = ZipStringLength(Options.SfxSettings.Text);
     ArchiveDataOffs += ++l;
-    l = lstrlen(Options.SfxSettings.Title);
+    l = ZipStringLength(Options.SfxSettings.Title);
     ArchiveDataOffs += ++l;
 
     unsigned td;
@@ -2593,18 +2657,18 @@ int CZipPack::WriteSfxExecutable(const char* sfxFile, const char* sfxPackage, BO
     const char* sdr;
     // we do not recheck the return value; it was already verified earlier
     ParseTargetDir(Options.SfxSettings.TargetDir, &td, &sd, &sdl, &sdr, NULL);
-    l = lstrlen(sd);
+    l = ZipStringLength(sd);
     ArchiveDataOffs += ++l;
-    l = lstrlen(Options.About);
+    l = ZipStringLength(Options.About);
     ArchiveDataOffs += ++l;
-    l = lstrlen(Options.SfxSettings.ExtractBtnText);
+    l = ZipStringLength(Options.SfxSettings.ExtractBtnText);
     ArchiveDataOffs += ++l;
-    l = lstrlen(Options.SfxSettings.Vendor);
+    l = ZipStringLength(Options.SfxSettings.Vendor);
     ArchiveDataOffs += ++l;
-    l = lstrlen(Options.SfxSettings.WWW);
+    l = ZipStringLength(Options.SfxSettings.WWW);
     ArchiveDataOffs += ++l;
 
-    ArchiveDataOffs++; // we assume ArchiveName is ""; if it differs, lstrlen(ArchiveName) is added later
+    ArchiveDataOffs++; // we assume ArchiveName is ""; if it differs, its measured length is added later
 
     ArchiveDataOffs += (sdr - sdl) + 1;
     if (td == SE_REGVALUE)
@@ -2614,16 +2678,16 @@ int CZipPack::WriteSfxExecutable(const char* sfxFile, const char* sfxPackage, BO
         if (!bs)
             ArchiveDataOffs += 1; // add a character to separate the subkey and value
     }
-    l = lstrlen(Options.SfxSettings.MBoxTitle);
+    l = ZipStringLength(Options.SfxSettings.MBoxTitle);
     ArchiveDataOffs += ++l;
     if (Options.SfxSettings.MBoxText)
     {
-        l = lstrlen(Options.SfxSettings.MBoxText);
+        l = ZipStringLength(Options.SfxSettings.MBoxText);
         ArchiveDataOffs += ++l;
     }
     else
         ArchiveDataOffs++;
-    l = lstrlen(Options.SfxSettings.WaitFor);
+    l = ZipStringLength(Options.SfxSettings.WaitFor);
     ArchiveDataOffs += Options.SfxSettings.Flags & SE_REMOVEAFTER ? ++l : 1;
     /*
   if (Options.Action & PA_MULTIVOL)
@@ -2632,21 +2696,21 @@ int CZipPack::WriteSfxExecutable(const char* sfxFile, const char* sfxPackage, BO
     char archname[MAX_PATH];
 
     MakeFileName(1, Options.SeqNames, PathFindFileName(ZipName), archname);
-    header.ArchiveNameLen = lstrlen(archname) + 1;
+    header.ArchiveNameLen = ZipStringLength(archname) + 1;
     ArchiveDataOffs += header.ArchiveNameLen;
     header.Signature = SELFEXTR_SIG;
     header.HeaderSize = ArchiveDataOffs - ArchiveHeaderOffs;
     header.Flags = Options.SfxSettings.Flags | SE_MULTVOL | (Options.SeqNames ? SE_SEQNAMES : 0);
     header.EOCentrDirOffs = 0;
     header.ArchiveSize = 0;
-    header.CommandLen = lstrlen(Options.SfxSettings.Command);
+    header.CommandLen = ZipStringLength(Options.SfxSettings.Command);
     if (header.CommandLen) header.CommandLen++;
-    header.TextLen = lstrlen(Options.SfxSettings.Text) + 1;
+    header.TextLen = ZipStringLength(Options.SfxSettings.Text) + 1;
     //if (header.TextLen) header.QuestionLen++;
-    header.TitleLen = lstrlen(Options.SfxSettings.Title) + 1;
-    header.SubDirLen = lstrlen(Options.SfxSettings.SubDir) + 1;
-    header.AboutLen = lstrlen(Options.About) + 1;
-    header.ExtractBtnTextLen = lstrlen(Options.SfxSettings.ExtractBtnText) + 1;
+    header.TitleLen = ZipStringLength(Options.SfxSettings.Title) + 1;
+    header.SubDirLen = ZipStringLength(Options.SfxSettings.SubDir) + 1;
+    header.AboutLen = ZipStringLength(Options.About) + 1;
+    header.ExtractBtnTextLen = ZipStringLength(Options.SfxSettings.ExtractBtnText) + 1;
     TempFile->FilePointer = ArchiveHeaderOffs;
     if (Write(TempFile, &header, sizeof(CSelfExtrHeader), NULL)) return IDS_NODISPLAY;
     if (header.CommandLen &&
@@ -2670,7 +2734,7 @@ BOOL CZipPack::WriteSFXHeader(const char* archName, QWORD eoCentrDirOffs, DWORD 
     CSelfExtrHeader header;
     int offs = sizeof(CSelfExtrHeader);
 
-    int l = lstrlen(Options.SfxSettings.Command);
+    int l = ZipStringLength(Options.SfxSettings.Command);
     if (l)
     {
         header.CommandOffs = offs;
@@ -2679,10 +2743,10 @@ BOOL CZipPack::WriteSFXHeader(const char* archName, QWORD eoCentrDirOffs, DWORD 
     else
         header.CommandOffs = 0;
     header.TextOffs = offs;
-    l = lstrlen(Options.SfxSettings.Text);
+    l = ZipStringLength(Options.SfxSettings.Text);
     offs += ++l;
     header.TitleOffs = offs;
-    l = lstrlen(Options.SfxSettings.Title);
+    l = ZipStringLength(Options.SfxSettings.Title);
     offs += ++l;
     header.SubDirOffs = offs;
 
@@ -2693,22 +2757,22 @@ BOOL CZipPack::WriteSFXHeader(const char* archName, QWORD eoCentrDirOffs, DWORD 
     HKEY key;
     // we do not recheck the return value; it was already verified earlier
     ParseTargetDir(Options.SfxSettings.TargetDir, &td, &sd, &sdl, &sdr, &key);
-    l = lstrlen(sd);
+    l = ZipStringLength(sd);
     offs += ++l;
     header.AboutOffs = offs;
-    l = lstrlen(Options.About);
+    l = ZipStringLength(Options.About);
     offs += ++l;
     header.ExtractBtnTextOffs = offs;
-    l = lstrlen(Options.SfxSettings.ExtractBtnText);
+    l = ZipStringLength(Options.SfxSettings.ExtractBtnText);
     offs += ++l;
     header.VendorOffs = offs;
-    l = lstrlen(Options.SfxSettings.Vendor);
+    l = ZipStringLength(Options.SfxSettings.Vendor);
     offs += ++l;
     header.WWWOffs = offs;
-    l = lstrlen(Options.SfxSettings.WWW);
+    l = ZipStringLength(Options.SfxSettings.WWW);
     offs += ++l;
     header.ArchiveNameOffs = offs;
-    l = lstrlen(archName);
+    l = ZipStringLength(archName);
     ArchiveDataOffs += l; // we did not count this earlier
     offs += ++l;
     header.TargetDirSpecOffs = offs;
@@ -2720,23 +2784,23 @@ BOOL CZipPack::WriteSFXHeader(const char* archName, QWORD eoCentrDirOffs, DWORD 
         if (!bs)
             offs += 1; // add a character to separate the subkey and value
     }
-    header.MBoxStyle = (lstrlen(Options.SfxSettings.MBoxTitle) ||
-                        Options.SfxSettings.MBoxText && lstrlen(Options.SfxSettings.MBoxText))
+    header.MBoxStyle = (ZipStringLength(Options.SfxSettings.MBoxTitle) ||
+                        Options.SfxSettings.MBoxText && ZipStringLength(Options.SfxSettings.MBoxText))
                            ? Options.SfxSettings.MBoxStyle
                            : -1;
     header.MBoxTitleOffs = offs;
-    l = lstrlen(Options.SfxSettings.MBoxTitle);
+    l = ZipStringLength(Options.SfxSettings.MBoxTitle);
     offs += ++l;
     header.MBoxTextOffs = offs;
     if (Options.SfxSettings.MBoxText)
     {
-        l = lstrlen(Options.SfxSettings.MBoxText);
+        l = ZipStringLength(Options.SfxSettings.MBoxText);
         offs += ++l;
     }
     else
         offs++;
     header.WaitForOffs = offs;
-    l = lstrlen(Options.SfxSettings.WaitFor);
+    l = ZipStringLength(Options.SfxSettings.WaitFor);
     offs += Options.SfxSettings.Flags & SE_REMOVEAFTER ? ++l : 1;
 
     header.Signature = SELFEXTR_SIG;
@@ -2752,25 +2816,25 @@ BOOL CZipPack::WriteSFXHeader(const char* archName, QWORD eoCentrDirOffs, DWORD 
     TempFile->FilePointer = ArchiveHeaderOffs;
     if (Write(TempFile, &header, sizeof(CSelfExtrHeader), NULL))
         return FALSE;
-    l = lstrlen(Options.SfxSettings.Command);
+    l = ZipStringLength(Options.SfxSettings.Command);
     if (l &&
         Write(TempFile, Options.SfxSettings.Command, ++l, NULL))
         return FALSE;
-    if (Write(TempFile, Options.SfxSettings.Text, lstrlen(Options.SfxSettings.Text) + 1, NULL))
+    if (Write(TempFile, Options.SfxSettings.Text, ZipStringLength(Options.SfxSettings.Text) + 1, NULL))
         return FALSE;
-    if (Write(TempFile, Options.SfxSettings.Title, lstrlen(Options.SfxSettings.Title) + 1, NULL))
+    if (Write(TempFile, Options.SfxSettings.Title, ZipStringLength(Options.SfxSettings.Title) + 1, NULL))
         return FALSE;
-    if (Write(TempFile, (void*)sd, lstrlen(sd) + 1, NULL))
+    if (Write(TempFile, (void*)sd, ZipStringLength(sd) + 1, NULL))
         return FALSE;
-    if (Write(TempFile, Options.About, lstrlen(Options.About) + 1, NULL))
+    if (Write(TempFile, Options.About, ZipStringLength(Options.About) + 1, NULL))
         return FALSE;
-    if (Write(TempFile, Options.SfxSettings.ExtractBtnText, lstrlen(Options.SfxSettings.ExtractBtnText) + 1, NULL))
+    if (Write(TempFile, Options.SfxSettings.ExtractBtnText, ZipStringLength(Options.SfxSettings.ExtractBtnText) + 1, NULL))
         return FALSE;
-    if (Write(TempFile, Options.SfxSettings.Vendor, lstrlen(Options.SfxSettings.Vendor) + 1, NULL))
+    if (Write(TempFile, Options.SfxSettings.Vendor, ZipStringLength(Options.SfxSettings.Vendor) + 1, NULL))
         return FALSE;
-    if (Write(TempFile, Options.SfxSettings.WWW, lstrlen(Options.SfxSettings.WWW) + 1, NULL))
+    if (Write(TempFile, Options.SfxSettings.WWW, ZipStringLength(Options.SfxSettings.WWW) + 1, NULL))
         return FALSE;
-    if (Write(TempFile, archName, lstrlen(archName) + 1, NULL))
+    if (Write(TempFile, archName, ZipStringLength(archName) + 1, NULL))
         return FALSE;
     if (td == SE_REGVALUE)
     {
@@ -2811,13 +2875,13 @@ BOOL CZipPack::WriteSFXHeader(const char* archName, QWORD eoCentrDirOffs, DWORD 
         if (Write(TempFile, "", 1, NULL))
             return FALSE;
     }
-    if (Write(TempFile, Options.SfxSettings.MBoxTitle, lstrlen(Options.SfxSettings.MBoxTitle) + 1, NULL))
+    if (Write(TempFile, Options.SfxSettings.MBoxTitle, ZipStringLength(Options.SfxSettings.MBoxTitle) + 1, NULL))
         return FALSE;
     const char* str = Options.SfxSettings.MBoxText ? Options.SfxSettings.MBoxText : "";
-    if (Write(TempFile, str, lstrlen(str) + 1, NULL))
+    if (Write(TempFile, str, ZipStringLength(str) + 1, NULL))
         return FALSE;
     str = Options.SfxSettings.Flags & SE_REMOVEAFTER ? Options.SfxSettings.WaitFor : "";
-    if (Write(TempFile, str, lstrlen(str) + 1, NULL))
+    if (Write(TempFile, str, ZipStringLength(str) + 1, NULL))
         return FALSE;
     return TRUE;
 }
@@ -3016,7 +3080,8 @@ int CZipPack::WriteSFXECRec(QWORD offset)
     DiskNum = 0;
 
     char name[MAX_PATH];
-    lstrcpy(name, ZipName);
+    if (!CopyZipPath(name, ZipName))
+        return IDS_TOOLONGZIPNAME;
     if (!SalamanderGeneral->SalPathRenameExtension(name, ".exe", MAX_PATH))
     {
         Salamander->CloseProgressDialog();

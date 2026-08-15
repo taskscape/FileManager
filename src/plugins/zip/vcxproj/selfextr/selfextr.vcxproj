@@ -59,6 +59,7 @@
   </ImportGroup>
   <PropertyGroup Label="UserMacros">
   </PropertyGroup>
+  <!-- sfxmake.bat supplies a code page for localized builds; IDE builds must not emit an empty compiler switch. -->
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='ReleaseEx|Win32'">
     <OutDir>ReleaseEx\</OutDir>
     <IntDir>$(OutDir)Intermediate\</IntDir>
@@ -85,7 +86,8 @@
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='ReleaseEx|Win32'">
     <ClCompile>
       <Optimization>MinSpace</Optimization>
-      <PreprocessorDefinitions>WIN32;NDEBUG;_WINDOWS;EXT_VER;$(SALAMANDER_SFX_LANGUAGE);WINVER=0x0500;_WIN32_IE=0x0501;_WIN32_WINNT=0x0500;_CRT_SECURE_NO_WARNINGS;_SCL_SECURE_NO_WARNINGS;_CRT_SECURE_CPP_OVERLOAD_STANDARD_NAMES;_CRT_SECURE_CPP_OVERLOAD_STANDARD_NAMES_COUNT;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <!-- IFileDialog requires the product's Windows 7 baseline instead of the former Windows 2000 header target. -->
+      <PreprocessorDefinitions>WIN32;NDEBUG;_WINDOWS;EXT_VER;$(SALAMANDER_SFX_LANGUAGE);WINVER=0x0601;_WIN32_IE=0x0800;_WIN32_WINNT=0x0601;_CRT_SECURE_NO_WARNINGS;_SCL_SECURE_NO_WARNINGS;_CRT_SECURE_CPP_OVERLOAD_STANDARD_NAMES;_CRT_SECURE_CPP_OVERLOAD_STANDARD_NAMES_COUNT;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <BufferSecurityCheck>false</BufferSecurityCheck>
       <FunctionLevelLinking>true</FunctionLevelLinking>
@@ -93,10 +95,11 @@
       <PrecompiledHeaderFile>windows.h</PrecompiledHeaderFile>
       <PrecompiledHeaderOutputFile>$(IntDir)selfextr.pch</PrecompiledHeaderOutputFile>
       <WarningLevel>Level3</WarningLevel>
-      <AdditionalOptions>/execution-charset:$(SALAMANDER_SFX_CODEPAGE) %(AdditionalOptions)</AdditionalOptions>
+      <AdditionalOptions Condition="'$(SALAMANDER_SFX_CODEPAGE)' != ''">/execution-charset:$(SALAMANDER_SFX_CODEPAGE) %(AdditionalOptions)</AdditionalOptions>
+      <AdditionalOptions Condition="'$(SALAMANDER_SFX_CODEPAGE)' == ''">%(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
     <ResourceCompile>
-      <PreprocessorDefinitions>NDEBUG;WINVER=0x0500;EXT_VER;$(SALAMANDER_SFX_LANGUAGE);%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>NDEBUG;WINVER=0x0601;EXT_VER;$(SALAMANDER_SFX_LANGUAGE);%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <Culture>0x0409</Culture>
     </ResourceCompile>
     <ProjectReference>
@@ -118,7 +121,8 @@
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
       <Optimization>Disabled</Optimization>
-      <PreprocessorDefinitions>WIN32;_DEBUG;_WINDOWS;EXT_VER;ENGLISH_VERSION;WINVER=0x0500;_WIN32_IE=0x0501;_WIN32_WINNT=0x0500;_CRT_SECURE_NO_WARNINGS;_SCL_SECURE_NO_WARNINGS;_CRT_SECURE_CPP_OVERLOAD_STANDARD_NAMES;_CRT_SECURE_CPP_OVERLOAD_STANDARD_NAMES_COUNT;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <!-- IFileDialog requires the product's Windows 7 baseline instead of the former Windows 2000 header target. -->
+      <PreprocessorDefinitions>WIN32;_DEBUG;_WINDOWS;EXT_VER;ENGLISH_VERSION;WINVER=0x0601;_WIN32_IE=0x0800;_WIN32_WINNT=0x0601;_CRT_SECURE_NO_WARNINGS;_SCL_SECURE_NO_WARNINGS;_CRT_SECURE_CPP_OVERLOAD_STANDARD_NAMES;_CRT_SECURE_CPP_OVERLOAD_STANDARD_NAMES_COUNT;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
       <BufferSecurityCheck>false</BufferSecurityCheck>
       <PrecompiledHeader>Use</PrecompiledHeader>
@@ -126,10 +130,11 @@
       <PrecompiledHeaderOutputFile>$(IntDir)selfextr.pch</PrecompiledHeaderOutputFile>
       <WarningLevel>Level3</WarningLevel>
       <BasicRuntimeChecks>Default</BasicRuntimeChecks>
-      <AdditionalOptions>/execution-charset:$(SALAMANDER_SFX_CODEPAGE) %(AdditionalOptions)</AdditionalOptions>
+      <AdditionalOptions Condition="'$(SALAMANDER_SFX_CODEPAGE)' != ''">/execution-charset:$(SALAMANDER_SFX_CODEPAGE) %(AdditionalOptions)</AdditionalOptions>
+      <AdditionalOptions Condition="'$(SALAMANDER_SFX_CODEPAGE)' == ''">%(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
     <ResourceCompile>
-      <PreprocessorDefinitions>_DEBUG;WINVER=0x0500;EXT_VER;ENGLISH_VERSION;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>_DEBUG;WINVER=0x0601;EXT_VER;ENGLISH_VERSION;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <Culture>0x0409</Culture>
     </ResourceCompile>
     <ProjectReference>
@@ -150,7 +155,8 @@
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <ClCompile>
       <Optimization>MinSpace</Optimization>
-      <PreprocessorDefinitions>WIN32;NDEBUG;_WINDOWS;$(SALAMANDER_SFX_LANGUAGE);WINVER=0x0500;_WIN32_IE=0x0501;_WIN32_WINNT=0x0500;_CRT_SECURE_NO_WARNINGS;_SCL_SECURE_NO_WARNINGS;_CRT_SECURE_CPP_OVERLOAD_STANDARD_NAMES;_CRT_SECURE_CPP_OVERLOAD_STANDARD_NAMES_COUNT;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <!-- IFileDialog requires the product's Windows 7 baseline instead of the former Windows 2000 header target. -->
+      <PreprocessorDefinitions>WIN32;NDEBUG;_WINDOWS;$(SALAMANDER_SFX_LANGUAGE);WINVER=0x0601;_WIN32_IE=0x0800;_WIN32_WINNT=0x0601;_CRT_SECURE_NO_WARNINGS;_SCL_SECURE_NO_WARNINGS;_CRT_SECURE_CPP_OVERLOAD_STANDARD_NAMES;_CRT_SECURE_CPP_OVERLOAD_STANDARD_NAMES_COUNT;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <BufferSecurityCheck>false</BufferSecurityCheck>
       <FunctionLevelLinking>true</FunctionLevelLinking>
@@ -158,10 +164,11 @@
       <PrecompiledHeaderFile>windows.h</PrecompiledHeaderFile>
       <PrecompiledHeaderOutputFile>$(IntDir)selfextr.pch</PrecompiledHeaderOutputFile>
       <WarningLevel>Level3</WarningLevel>
-      <AdditionalOptions>/execution-charset:$(SALAMANDER_SFX_CODEPAGE) %(AdditionalOptions)</AdditionalOptions>
+      <AdditionalOptions Condition="'$(SALAMANDER_SFX_CODEPAGE)' != ''">/execution-charset:$(SALAMANDER_SFX_CODEPAGE) %(AdditionalOptions)</AdditionalOptions>
+      <AdditionalOptions Condition="'$(SALAMANDER_SFX_CODEPAGE)' == ''">%(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
     <ResourceCompile>
-      <PreprocessorDefinitions>NDEBUG;WINVER=0x0500;$(SALAMANDER_SFX_LANGUAGE);%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>NDEBUG;WINVER=0x0601;$(SALAMANDER_SFX_LANGUAGE);%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <Culture>0x0409</Culture>
     </ResourceCompile>
     <ProjectReference>

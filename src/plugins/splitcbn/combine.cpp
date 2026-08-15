@@ -10,6 +10,7 @@
 #include "combine.h"
 #include "dialogs.h"
 #include "..\..\operation_result.h"
+#include "..\..\common\checked_arithmetic.h"
 
 #include <memory>
 
@@ -207,13 +208,15 @@ BOOL CombineFiles(TIndirectArray<char>& files, LPTSTR targetName,
             return ReportCombineFailure(result, idTitle, IDS_READERROR);
         }
         CQuadWord size = sizeResult.Value;
-        if (size.Value > (~(unsigned __int64)0) - totalSize.Value)
+        unsigned __int64 combinedSize;
+        // Part sizes come from external files; use the shared guard before the progress/free-space total can wrap.
+        if (!CheckedAddUInt64(totalSize.Value, size.Value, &combinedSize))
         {
             COperationResult result = COperationResult::Failure(orpVerifyDurableCopy, ERROR_ARITHMETIC_OVERFLOW,
                                                                  files[i], targetName, FALSE);
             return ReportCombineFailure(result, idTitle, IDS_READERROR);
         }
-        totalSize += size;
+        totalSize.Value = combinedSize;
     }
 
     // check available free space
@@ -439,7 +442,12 @@ BOOL CombineFiles(TIndirectArray<char>& files, LPTSTR targetName,
   Crc = 0;
 
   salamander->OpenProgressDialog(LoadStr(IDS_CALCCRC), FALSE, NULL, FALSE);
-  salamander->ProgressSetTotalSize(CQuadWord(GetFileSize(hFile, NULL), 0), CQuadWord(-1, -1));
+  LARGE_INTEGER fileSize;
+  CQuadWord totalSize(-1, -1);
+  if (GetFileSizeEx(hFile, &fileSize))
+    totalSize.SetUI64((unsigned __int64)fileSize.QuadPart);
+  // Report an unknown total on lookup failure instead of treating the legacy sentinel as a real byte count.
+  salamander->ProgressSetTotalSize(totalSize, CQuadWord(-1, -1));
 
   DWORD numread;
   int ret = TRUE;
@@ -593,14 +601,16 @@ static void AnalyzeFile(LPTSTR fileName, LPTSTR origName, UINT32& origCrc, FILET
     if ((hFile = CreateFileUtf8Local(fileName, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING,
                             FILE_FLAG_SEQUENTIAL_SCAN, NULL)) == INVALID_HANDLE_VALUE)
         return;
-    DWORD size = GetFileSize(hFile, NULL), numread;
-    // j.r. 21.1.2003: when splitting to 999 parts I received a batch of 30KB
-    //  if (size > 10000) { CloseHandle(hFile); return; } // skip such large files
-    if (size > 200000)
+    LARGE_INTEGER fileSize;
+    if (!GetFileSizeEx(hFile, &fileSize) || fileSize.QuadPart < 0 || fileSize.QuadPart > 200000)
     {
         CloseHandle(hFile);
         return;
-    } // skip such large files
+    }
+    // AnalyzeFile allocates a DWORD-sized text buffer only for its intentionally small batch-file heuristic.
+    DWORD size = (DWORD)fileSize.QuadPart, numread;
+    // j.r. 21.1.2003: when splitting to 999 parts I received a batch of 30KB
+    //  if (size > 10000) { CloseHandle(hFile); return; } // skip such large files
     char* text = new char[size + 1];
     char* text_locase = new char[size + 1];
     if (text == NULL || text_locase == NULL)
@@ -751,7 +761,10 @@ BOOL CombineCommand(DWORD eventMask, HWND parent, CSalamanderForOperationsAbstra
                 }
             }
 
-            lstrcpyn(name1, pfd->Name, (int)(ext - pfd->Name + 2));
+            const size_t namePrefixLength = ext - pfd->Name + 1;
+            // The extension pointer defines the exact prefix we need; terminate that counted copy explicitly.
+            memcpy(name1, pfd->Name, namePrefixLength);
+            name1[namePrefixLength] = 0;
             strcpy(companionFile, sourceDir);
             if (!SalamanderGeneral->SalPathAppend(companionFile, name1, MAX_PATH))
             {

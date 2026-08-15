@@ -59,12 +59,8 @@ PTOKEN_USER GetProcessUser(DWORD pid)
     HANDLE hProcess = OpenProcess(PROCESS_QUERY_INFORMATION, FALSE, pid);
 
 #ifdef SHEXT_LOG_ENABLED
-    {
-        char xxx[200];
-        wsprintf(xxx, "GetProcessUser: PID=%d, OpenProcess error=%d", pid,
-                 (hProcess == NULL ? GetLastError() : 0));
-        WriteToLog(xxx);
-    }
+    // Logging is diagnostic-only; fixed messages avoid an unbounded formatter in the CRT-free extension.
+    WriteToLog(hProcess != NULL ? "GetProcessUser: OpenProcess succeeded" : "GetProcessUser: OpenProcess failed");
 #endif // SHEXT_LOG_ENABLED
 
     if (hProcess != NULL)
@@ -88,7 +84,8 @@ PTOKEN_USER GetProcessUser(DWORD pid)
 
                 WriteToLog("GetProcessUser: GetTokenInformation");
 
-                pTokenUser = (PTOKEN_USER)GlobalAlloc(GMEM_FIXED, dwBufferSize);
+                // Token information is copied into extension-owned storage, not returned with an API allocator contract.
+                pTokenUser = (PTOKEN_USER)HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, dwBufferSize);
                 if (pTokenUser != NULL)
                 {
                     MyZeroMemory(pTokenUser, dwBufferSize);
@@ -104,7 +101,7 @@ PTOKEN_USER GetProcessUser(DWORD pid)
                         pTokenUser = NULL;
                     }
                     if (pTokenUser != NULL)
-                        GlobalFree(pTokenUser);
+                        HeapFree(GetProcessHeap(), 0, pTokenUser);
                 }
             }
             CloseHandle(hToken);
@@ -128,9 +125,9 @@ BOOL AreNotProcessesOfTheSameUser(DWORD pid1, DWORD pid2)
             user1 != NULL && user2 != NULL && !EqualSid(user1->User.Sid, user2->User.Sid))
             ret = TRUE;
         if (user1 != NULL)
-            GlobalFree(user1);
+            HeapFree(GetProcessHeap(), 0, user1);
         if (user2 != NULL)
-            GlobalFree(user2);
+            HeapFree(GetProcessHeap(), 0, user2);
         return ret;
     }
 }
@@ -239,12 +236,7 @@ CH_CopyCallback(THIS_ HWND hwnd, UINT wFunc, UINT wFlags,
                         }
 
 #ifdef SHEXT_LOG_ENABLED
-                        {
-                            char xxx[200];
-                            wsprintf(xxx, "CH_CopyCallback: time from last GetData()=%d",
-                                     GetTickCount() - salShExtSharedMemView->ClipDataObjLastGetDataTime);
-                            WriteToLog(xxx);
-                        }
+                        WriteToLog("CH_CopyCallback: observed time from last GetData");
 #endif // SHEXT_LOG_ENABLED
 
                         if (salShExtSharedMemView->DoPasteFromSalamander &&

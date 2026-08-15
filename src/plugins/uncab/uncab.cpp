@@ -3,6 +3,8 @@
 
 #include "precomp.h"
 
+#include <strsafe.h>
+
 #include "array2.h"
 
 #include "fdi.h"
@@ -41,6 +43,13 @@ DWORD Options;
 const SYSTEMTIME MinTime = {1980, 01, 2, 01, 00, 00, 00, 000};
 
 const char* CONFIG_OPTIONS = "Options";
+
+static void CopyUncabErrorPrefix(char* buffer, size_t bufferCapacity, int stringId)
+{
+    // FormatMessage appends to this buffer, so a failed prefix copy must leave a valid empty destination.
+    if (FAILED(StringCchCopyA(buffer, bufferCapacity, LoadStr(stringId))))
+        buffer[0] = 0;
+}
 
 BOOL WINAPI DllMain(HINSTANCE hinstDLL, DWORD fdwReason, LPVOID lpvReserved)
 {
@@ -761,28 +770,40 @@ BOOL CPluginInterfaceForArchiver::MakeFilesList(TIndirectArray2<char>& files, Sa
     int dirLen;
     int errorOccured;
 
-    lstrcpy(dir, targetDir);
-    addDir = dir + lstrlen(dir);
+    const size_t targetDirLength = strlen(targetDir);
+    if (FAILED(StringCchCopyA(dir, _countof(dir), targetDir)) || targetDirLength == 0)
+    {
+        // A manifest path must not be assembled from an incomplete destination directory.
+        return Error(IDS_TOOLONGNAME);
+    }
+    addDir = dir + targetDirLength;
     if (*(addDir - 1) != '\\')
     {
+        if (targetDirLength + 2 > _countof(dir))
+        {
+            // Reserve both the separator and terminator before extending the destination path.
+            return Error(IDS_TOOLONGNAME);
+        }
         *addDir++ = '\\';
         *addDir = 0;
     }
-    dirLen = lstrlen(dir);
+    dirLen = (int)strlen(dir);
 
     ProgressTotal = CQuadWord(0, 0);
     while ((nextName = next(SalamanderGeneral->GetMsgBoxParent(), 1, &isDir, &size, NULL, nextParam, &errorOccured)) != NULL)
     {
         if (!isDir)
         {
-            char* str = new char[RootLen + lstrlen(nextName) + 2];
+            const size_t nextNameLength = strlen(nextName);
+            char* str = new char[RootLen + nextNameLength + 2];
             if (!str)
                 return Error(IDS_LOWMEM);
-            lstrcpy(str, ArcRoot);
+            // This allocation is sized for both counted components and the final terminator.
+            memcpy(str, ArcRoot, RootLen);
             char* ptr = str + RootLen;
             if (RootLen && *(ptr - 1) != '\\')
                 *ptr++ = '\\';
-            lstrcpy(ptr, nextName);
+            memcpy(ptr, nextName, nextNameLength + 1);
             if (!files.Add(str))
             {
                 delete str;
@@ -1007,8 +1028,14 @@ CPluginInterfaceForArchiver::UnpackFile(char* fileName, DWORD size, WORD date, W
         return 0;
 
     char message[MAX_PATH + 32];
-    lstrcpy(message, LoadStr(IDS_EXTRACTING));
-    lstrcat(message, fileName);
+    HRESULT messageResult = StringCchCopyA(message, _countof(message), LoadStr(IDS_EXTRACTING));
+    if (SUCCEEDED(messageResult))
+        messageResult = StringCchCatA(message, _countof(message), fileName);
+    if (FAILED(messageResult))
+    {
+        // Progress text must not report an incomplete extracted-file name.
+        message[0] = 0;
+    }
     if (Action != CA_UNPACK_ONE_FILE)
         Salamander->ProgressDialogAddText(message, TRUE);
 
@@ -1184,7 +1211,14 @@ CPluginInterfaceForArchiver::Open(char* pszFile, int oflag, int pmode)
         ret->Handle = CreateFile((LPTSTR)pszFile, fileaccess, FILE_SHARE_READ, NULL, filecreate, fileattrib, NULL);
         if (ret->Handle != INVALID_HANDLE_VALUE)
         {
-            lstrcpyn(ret->FileName, pszFile, MAX_PATH);
+            if (FAILED(StringCchCopyA(ret->FileName, _countof(ret->FileName), pszFile)))
+            {
+                // Retry and error reporting must not use a truncated archive filename.
+                CloseHandle(ret->Handle);
+                delete ret;
+                Error(IDS_TOOLONGNAME);
+                return -1;
+            }
             ret->Flags = 0;
             IOError = FALSE;
             ret->cabOffset = 0;
@@ -1224,7 +1258,7 @@ CPluginInterfaceForArchiver::Open(char* pszFile, int oflag, int pmode)
             return (INT_PTR)ret; //sucess
         }
         char buf[1024];
-        lstrcpy(buf, LoadStr(IDS_UNABLECREATE));
+        CopyUncabErrorPrefix(buf, _countof(buf), IDS_UNABLECREATE);
         FormatMessage(FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS, NULL,
                       GetLastError(), MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), buf + lstrlen(buf), 1024 - lstrlen(buf), NULL);
         if (SalamanderGeneral->DialogError(SalamanderGeneral->GetMsgBoxParent(), BUTTONS_RETRYCANCEL, pszFile, buf, NULL) != DIALOG_RETRY)
@@ -1246,13 +1280,14 @@ UINT CPluginInterfaceForArchiver::Read(INT_PTR hf, void* pv, UINT cb)
         return -1;
     IOError = TRUE;
     char buf[1024];
-    DWORD pos;
+    LARGE_INTEGER pos;
     while (1)
     {
-        pos = SetFilePointer(file->Handle, 0, NULL, FILE_CURRENT);
-        if (pos != 0xFFFFFFFF)
+        LARGE_INTEGER zero = {};
+        // Preserve the full retry location; a valid legacy DWORD position can equal 0xFFFFFFFF.
+        if (SetFilePointerEx(file->Handle, zero, &pos, FILE_CURRENT))
             break;
-        lstrcpy(buf, LoadStr(IDS_UNABLEGETFIELPOS));
+        CopyUncabErrorPrefix(buf, _countof(buf), IDS_UNABLEGETFIELPOS);
         FormatMessage(FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS, NULL,
                       GetLastError(), MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), buf + lstrlen(buf), 1024 - lstrlen(buf), NULL);
 
@@ -1284,7 +1319,7 @@ UINT CPluginInterfaceForArchiver::Read(INT_PTR hf, void* pv, UINT cb)
             IOError = FALSE;
             return read; //success
         }
-        lstrcpy(buf, LoadStr(IDS_UNABLEREAD));
+        CopyUncabErrorPrefix(buf, _countof(buf), IDS_UNABLEREAD);
         FormatMessage(FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS, NULL,
                       GetLastError(), MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), buf + lstrlen(buf), 1024 - lstrlen(buf), NULL);
 
@@ -1307,7 +1342,7 @@ UINT CPluginInterfaceForArchiver::Read(INT_PTR hf, void* pv, UINT cb)
             Abort = TRUE;
             return -1;
         }
-        if (SafeSeek(file, pos - file->cabOffset, FILE_BEGIN) == -1)
+        if (!SafeSeekAbsolute(file, pos))
             return -1;
     }
     return -1;
@@ -1329,13 +1364,14 @@ UINT CPluginInterfaceForArchiver::Write(INT_PTR hf, void* pv, UINT cb)
         return cb;
     }
     char buf[1024];
-    DWORD pos;
+    LARGE_INTEGER pos;
     while (1)
     {
-        pos = SetFilePointer(file->Handle, 0, NULL, FILE_CURRENT);
-        if (pos != 0xFFFFFFFF)
+        LARGE_INTEGER zero = {};
+        // Preserve the full retry location; a valid legacy DWORD position can equal 0xFFFFFFFF.
+        if (SetFilePointerEx(file->Handle, zero, &pos, FILE_CURRENT))
             break;
-        lstrcpy(buf, LoadStr(IDS_UNABLEGETFIELPOS));
+        CopyUncabErrorPrefix(buf, _countof(buf), IDS_UNABLEGETFIELPOS);
         FormatMessage(FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS, NULL,
                       GetLastError(), MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), buf + lstrlen(buf), 1024 - lstrlen(buf), NULL);
 
@@ -1397,7 +1433,7 @@ UINT CPluginInterfaceForArchiver::Write(INT_PTR hf, void* pv, UINT cb)
             return written; // sucess
         }
 
-        lstrcpy(buf, LoadStr(IDS_UNABLEWRITE));
+        CopyUncabErrorPrefix(buf, _countof(buf), IDS_UNABLEWRITE);
         FormatMessage(FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS, NULL,
                       GetLastError(), MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), buf + lstrlen(buf), 1024 - lstrlen(buf), NULL);
 
@@ -1445,7 +1481,7 @@ UINT CPluginInterfaceForArchiver::Write(INT_PTR hf, void* pv, UINT cb)
             Abort = TRUE;
             return -1;
         }
-        if (SafeSeek(file, pos - file->cabOffset, FILE_BEGIN) == -1)
+        if (!SafeSeekAbsolute(file, pos))
             return -1;
     }
     return -1;
@@ -1471,13 +1507,20 @@ long CPluginInterfaceForArchiver::SafeSeek(CFile* file, DWORD distance, DWORD me
     char buf[1024];
     while (1)
     {
-        DWORD pos;
+        LARGE_INTEGER seekDistance;
+        LARGE_INTEGER pos;
+        // Keep the CAB library's DWORD-relative ABI, but let the OS seek report failures unambiguously.
+        seekDistance.QuadPart = (LONG)distance;
         if (method == FILE_BEGIN)
-            distance += file->cabOffset;
-        pos = SetFilePointer(file->Handle, distance, NULL, method);
-        if (pos != 0xFFFFFFFF)
-            return pos - file->cabOffset; //success
-        lstrcpy(buf, LoadStr(IDS_UNABLESEEK));
+            seekDistance.QuadPart += file->cabOffset;
+        if (SetFilePointerEx(file->Handle, seekDistance, &pos, method))
+        {
+            const LONGLONG cabPosition = pos.QuadPart - file->cabOffset;
+            if (cabPosition >= LONG_MIN && cabPosition <= LONG_MAX)
+                return (long)cabPosition; // success
+            SetLastError(ERROR_ARITHMETIC_OVERFLOW);
+        }
+        CopyUncabErrorPrefix(buf, _countof(buf), IDS_UNABLESEEK);
         FormatMessage(FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS, NULL,
                       GetLastError(), MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), buf + lstrlen(buf), 1024 - lstrlen(buf), NULL);
 
@@ -1510,6 +1553,45 @@ long CPluginInterfaceForArchiver::SafeSeek(CFile* file, DWORD distance, DWORD me
         case DIALOG_FAIL:
             Abort = TRUE;
             return -1;
+        }
+    }
+}
+
+BOOL CPluginInterfaceForArchiver::SafeSeekAbsolute(CFile* file, const LARGE_INTEGER& position)
+{
+    char buf[1024];
+    while (1)
+    {
+        // Retry I/O from the exact physical file position rather than narrowing it through CAB-relative offsets.
+        if (SetFilePointerEx(file->Handle, position, NULL, FILE_BEGIN))
+            return TRUE;
+        CopyUncabErrorPrefix(buf, _countof(buf), IDS_UNABLESEEK);
+        FormatMessage(FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS, NULL,
+                      GetLastError(), MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), buf + lstrlen(buf), 1024 - lstrlen(buf), NULL);
+
+        if (Silent & SF_IOERRORS && file->Flags & FF_EXTRFILE)
+        {
+            file->Flags |= FF_SKIPFILE;
+            return FALSE;
+        }
+
+        int ret;
+        if (file->Flags & FF_EXTRFILE)
+            ret = SalamanderGeneral->DialogError(SalamanderGeneral->GetMsgBoxParent(), BUTTONS_RETRYSKIPCANCEL, file->FileName, buf, NULL);
+        else
+            ret = SalamanderGeneral->DialogError(SalamanderGeneral->GetMsgBoxParent(), BUTTONS_RETRYCANCEL, file->FileName, buf, NULL);
+        switch (ret)
+        {
+        case DIALOG_SKIPALL:
+            Silent |= SF_IOERRORS;
+        case DIALOG_SKIP:
+            if (file->Flags & FF_EXTRFILE)
+                file->Flags |= FF_SKIPFILE;
+            return FALSE;
+        case DIALOG_CANCEL:
+        case DIALOG_FAIL:
+            Abort = TRUE;
+            return FALSE;
         }
     }
 }
@@ -1683,9 +1765,16 @@ void GetInfo(char* buffer, FILETIME* lastWrite, unsigned size)
     FileTimeToSystemTime(&ft, &st);
 
     char date[50], time[50], number[50];
-    if (GetTimeFormat(LOCALE_USER_DEFAULT, 0, &st, NULL, time, 50) == 0)
+    WCHAR localeName[LOCALE_NAME_MAX_LENGTH];
+    WCHAR formattedValue[50];
+    // CAB metadata is displayed through an ANSI plug-in interface, after Unicode locale formatting.
+    if (!GetUserDefaultLocaleName(localeName, ARRAYSIZE(localeName)) ||
+        GetTimeFormatEx(localeName, 0, &st, NULL, formattedValue, ARRAYSIZE(formattedValue)) == 0 ||
+        WideCharToMultiByte(CP_ACP, 0, formattedValue, -1, time, ARRAYSIZE(time), NULL, NULL) == 0)
         sprintf(time, "%u:%02u:%02u", st.wHour, st.wMinute, st.wSecond);
-    if (GetDateFormat(LOCALE_USER_DEFAULT, DATE_SHORTDATE, &st, NULL, date, 50) == 0)
+    if (!GetUserDefaultLocaleName(localeName, ARRAYSIZE(localeName)) ||
+        GetDateFormatEx(localeName, DATE_SHORTDATE, &st, NULL, formattedValue, ARRAYSIZE(formattedValue), NULL) == 0 ||
+        WideCharToMultiByte(CP_ACP, 0, formattedValue, -1, date, ARRAYSIZE(date), NULL, NULL) == 0)
         sprintf(date, "%u.%u.%u", st.wDay, st.wMonth, st.wYear);
     sprintf(buffer, "%s, %s, %s", SalamanderGeneral->NumberToStr(number, CQuadWord(size, 0)), date, time);
 }

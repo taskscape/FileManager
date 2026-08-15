@@ -8,6 +8,8 @@
 #include "dialogs.h"
 #include "histwnd.h"
 
+#include <strsafe.h>
+
 enum
 {
     IDX_TB_OTHERCHANNELS = 28,
@@ -17,6 +19,16 @@ enum
     IDX_TB_BLUE,
     IDX_TB_RGBSUM,
 };
+
+static BOOL CopyHistogramToolTip(TOOLBAR_TOOLTIP* toolTip, int resourceId)
+{
+    // Histogram tooltips use the host-owned fixed reply buffer and must not be silently shortened.
+    if (toolTip == NULL || toolTip->Buffer == NULL)
+        return FALSE;
+    if (FAILED(StringCchCopyA(toolTip->Buffer, TOOLTIP_TEXT_MAX, LoadStr(resourceId))))
+        toolTip->Buffer[0] = 0;
+    return TRUE;
+}
 
 // menu item skill level ALL (covers beginner, intermediate, and advanced)
 #define MNTS_ALL (MNTS_B | MNTS_I | MNTS_A)
@@ -509,26 +521,26 @@ CHistogramWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         TOOLBAR_TOOLTIP* tt = (TOOLBAR_TOOLTIP*)lParam;
         if (tt->ID == cmdOtherChannels)
         {
-            _tcscpy(tt->Buffer, LoadStr(IDS_HIST_TIP_OTHERCHANELS));
+            CopyHistogramToolTip(tt, IDS_HIST_TIP_OTHERCHANELS);
             return TRUE;
         }
         else
             switch (Histogram.GetChannel())
             {
             case CHistogramControl::Luminosity:
-                _tcscpy(tt->Buffer, LoadStr(IDS_HIST_TIP_LUMINOSITY));
+                CopyHistogramToolTip(tt, IDS_HIST_TIP_LUMINOSITY);
                 return TRUE;
             case CHistogramControl::RGBSum:
-                _tcscpy(tt->Buffer, LoadStr(IDS_HIST_TIP_RGBSUM));
+                CopyHistogramToolTip(tt, IDS_HIST_TIP_RGBSUM);
                 return TRUE;
             case CHistogramControl::Red:
-                _tcscpy(tt->Buffer, LoadStr(IDS_HIST_TIP_RED));
+                CopyHistogramToolTip(tt, IDS_HIST_TIP_RED);
                 return TRUE;
             case CHistogramControl::Green:
-                _tcscpy(tt->Buffer, LoadStr(IDS_HIST_TIP_GREEN));
+                CopyHistogramToolTip(tt, IDS_HIST_TIP_GREEN);
                 return TRUE;
             case CHistogramControl::Blue:
-                _tcscpy(tt->Buffer, LoadStr(IDS_HIST_TIP_BLUE));
+                CopyHistogramToolTip(tt, IDS_HIST_TIP_BLUE);
                 return TRUE;
             }
         break;

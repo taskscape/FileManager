@@ -3,6 +3,8 @@
 
 #include "precomp.h"
 
+#include <strsafe.h>
+
 HIMAGELIST HSymbolsImageList = NULL;
 char DirText[100];
 
@@ -254,7 +256,8 @@ char* CPreviewWindow::GetItemText(int index, int subItem)
         {
         case rsFileName:
         {
-            lstrcpyn(TextBuffer, item->FullName, _countof(TextBuffer));
+            // This preview intentionally keeps a fixed-width prefix before deciding whether to remove the directory.
+            StringCchCopyNA(TextBuffer, _countof(TextBuffer), item->FullName, _countof(TextBuffer) - 1);
             if (item->NameLen < _countof(TextBuffer) ||
                 strchr(item->FullName + _countof(TextBuffer) - 1, '\\') == NULL)
             {
@@ -290,7 +293,7 @@ char* CPreviewWindow::GetItemText(int index, int subItem)
         // TODO: what time do we get from Salamander? what time do we get from FindXXFile?
         SYSTEMTIME st;
         FileTimeToSystemTime(&item->LastWrite, &st);
-        if (!GetDateFormat(LOCALE_USER_DEFAULT, DATE_SHORTDATE, &st, NULL, TextBuffer, 100))
+        if (!FormatUserDateTimeAnsi(&st, DATE_SHORTDATE, NULL, TextBuffer, 100, TRUE))
             SalPrintf(TextBuffer, 100, "%u.%u.%u", st.wDay, st.wMonth, st.wYear);
         ret = TextBuffer;
         break;
@@ -300,7 +303,7 @@ char* CPreviewWindow::GetItemText(int index, int subItem)
     {
         SYSTEMTIME st;
         FileTimeToSystemTime(&item->LastWrite, &st);
-        if (!GetTimeFormat(LOCALE_USER_DEFAULT, 0, &st, NULL, TextBuffer, 100))
+        if (!FormatUserDateTimeAnsi(&st, 0, NULL, TextBuffer, 100, FALSE))
             SalPrintf(TextBuffer, 100, "%d:%d:%d", st.wHour, st.wMinute, st.wSecond);
         ret = TextBuffer;
         break;

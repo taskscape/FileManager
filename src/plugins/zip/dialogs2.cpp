@@ -2,10 +2,12 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "precomp.h"
+#include "..\\..\\common\\checked_arithmetic.h"
 #include <crtdbg.h>
 #include <ostream>
 #include <commctrl.h>
 #include <stdio.h>
+#include <strsafe.h>
 
 #include "spl_com.h"
 #include "spl_base.h"
@@ -32,6 +34,26 @@
 
 TIndirectArray2<CFavoriteSfx> Favorities(8);
 CFavoriteSfx LastUsedSfxSet;
+
+template<size_t capacity>
+static bool CopySfxSetting(char (&destination)[capacity], const char* source)
+{
+    // Configuration fields must be complete; discard an oversized value instead of preserving a prefix.
+    if (FAILED(StringCchCopyA(destination, capacity, source != NULL ? source : "")))
+    {
+        destination[0] = 0;
+        return false;
+    }
+    return true;
+}
+
+template<size_t capacity>
+static void CopySfxDisplayText(char (&destination)[capacity], const char* source)
+{
+    // This About field is intentionally clipped for its existing fixed presentation format.
+    if (FAILED(StringCchCopyNA(destination, capacity, source != NULL ? source : "", capacity - 1)))
+        destination[capacity - 1] = 0;
+}
 
 //******************************************************************************
 //
@@ -261,12 +283,13 @@ void CAdvancedSEDialog::ResetValueControls()
         if (id == IDC_SPECDIR || id == IDC_WAITFOR || id == IDC_TEXTS || id == IDC_CHANGEICON ||
             id == IDCANCEL || id == IDHELP)
         {
-            LONG style = GetWindowLong(wnd, GWL_STYLE);
-            SetWindowLong(wnd, GWL_STYLE, (style & ~BS_DEFPUSHBUTTON) | BS_PUSHBUTTON);
+            // Use pointer-width access for button-style transitions on x64.
+            LONG_PTR style = GetWindowLongPtr(wnd, GWL_STYLE);
+            SetWindowLongPtr(wnd, GWL_STYLE, (style & ~BS_DEFPUSHBUTTON) | BS_PUSHBUTTON);
             wnd = GetDlgItem(Dlg, IDOK);
-            style = GetWindowLong(wnd, GWL_STYLE);
+            style = GetWindowLongPtr(wnd, GWL_STYLE);
             if (style)
-                SetWindowLong(wnd, GWL_STYLE, (style & ~BS_PUSHBUTTON) | BS_DEFPUSHBUTTON);
+                SetWindowLongPtr(wnd, GWL_STYLE, (style & ~BS_PUSHBUTTON) | BS_DEFPUSHBUTTON);
         }
     }
     SendDlgItemMessage(Dlg, IDC_TARGETDIR, EM_SETLIMITTEXT, 2 * MAX_PATH - 1, 0);
@@ -361,7 +384,8 @@ BOOL CAdvancedSEDialog::OnTargetDir(WORD wNotifyCode, WORD wID, HWND hwndCtl)
         char buffer[2 * MAX_PATH];
         SendDlgItemMessage(Dlg, IDC_TARGETDIR, WM_GETTEXT, 2 * MAX_PATH, (LPARAM)buffer);
         // trim trailing spaces
-        char* sour = buffer + lstrlen(buffer);
+        // The dialog returns a terminated local buffer, so no Win32 length helper is needed.
+        char* sour = buffer + strlen(buffer);
         while (--sour >= buffer && *sour == ' ')
             ;
         sour[1] = 0;
@@ -438,13 +462,14 @@ BOOL CAdvancedSEDialog::OnSpecDirMenu(WORD itemID)
     }
     SetFocus(GetDlgItem(Dlg, IDC_TARGETDIR));
     HWND button = GetDlgItem(Dlg, IDC_SPECDIR);
-    LONG style = GetWindowLong(button, GWL_STYLE);
+    // Use pointer-width access for button-style transitions on x64.
+    LONG_PTR style = GetWindowLongPtr(button, GWL_STYLE);
     if (style)
-        SetWindowLong(button, GWL_STYLE, (style & ~BS_DEFPUSHBUTTON) | BS_PUSHBUTTON);
+        SetWindowLongPtr(button, GWL_STYLE, (style & ~BS_DEFPUSHBUTTON) | BS_PUSHBUTTON);
     button = GetDlgItem(Dlg, IDOK);
-    style = GetWindowLong(button, GWL_STYLE);
+    style = GetWindowLongPtr(button, GWL_STYLE);
     if (style)
-        SetWindowLong(button, GWL_STYLE, (style & ~BS_PUSHBUTTON) | BS_DEFPUSHBUTTON);
+        SetWindowLongPtr(button, GWL_STYLE, (style & ~BS_PUSHBUTTON) | BS_DEFPUSHBUTTON);
     return TRUE;
 }
 
@@ -530,7 +555,7 @@ BOOL CAdvancedSEDialog::OnChangeIcon(WORD wNotifyCode, WORD wID, HWND hwndCtl)
             DWORD index = TmpSfxSettings.IconIndex;
             WCHAR wfile[MAX_PATH];
 
-            lstrcpy(file, TmpSfxSettings.IconFile);
+            CopySfxSetting(file, TmpSfxSettings.IconFile);
             MultiByteToWideChar(CP_ACP, 0, file, -1, wfile, MAX_PATH);
             wfile[MAX_PATH - 1] = 0;
 
@@ -558,7 +583,7 @@ BOOL CAdvancedSEDialog::OnChangeIcon(WORD wNotifyCode, WORD wID, HWND hwndCtl)
                 char buf[MAX_PATH];
                 DWORD ret = ExpandEnvironmentStrings(file, buf, MAX_PATH);
                 if (ret != 0 && ret <= MAX_PATH)
-                    lstrcpy(file, buf);
+                    CopySfxSetting(file, buf);
 
                 HICON iconLarge, iconSmall;
                 CIcon* icons;
@@ -582,7 +607,7 @@ BOOL CAdvancedSEDialog::OnChangeIcon(WORD wNotifyCode, WORD wID, HWND hwndCtl)
                 {
                     if (ExtractIconEx(file, index, &iconLarge, &iconSmall, 1))
                     {
-                        lstrcpy(TmpSfxSettings.IconFile, file);
+                        CopySfxSetting(TmpSfxSettings.IconFile, file);
                         TmpSfxSettings.IconIndex = index;
                         if (SmallIcon)
                             DestroyIcon(SmallIcon);
@@ -691,7 +716,7 @@ BOOL CAdvancedSEDialog::OnOK(WORD wNotifyCode, WORD wID, HWND hwndCtl)
                 if (strcmp(TmpSfxSettings.Vendor, lang->Vendor) != 0 || strcmp(TmpSfxSettings.WWW, lang->WWW) != 0)
                     sprintf(buffer, "%s\r\n%s\r\n\r\n", lang->Vendor, lang->WWW);
                 strcat_s(buffer, lang->AboutLicenced);
-                lstrcpyn(PackOptions->About, buffer, SE_MAX_ABOUT);
+                CopySfxDisplayText(PackOptions->About, buffer);
             }
         }
 
@@ -711,7 +736,8 @@ BOOL CAdvancedSEDialog::GetSettings(CSfxSettings* sfxSettings)
     settings.Flags = 0;
     SendDlgItemMessage(Dlg, IDC_TARGETDIR, WM_GETTEXT, 2 * MAX_PATH, (LPARAM)settings.TargetDir);
     // trim trailing spaces
-    char* sour = settings.TargetDir + lstrlen(settings.TargetDir);
+    // The editable setting is a terminated local buffer at this validation boundary.
+    char* sour = settings.TargetDir + strlen(settings.TargetDir);
     while (--sour >= settings.TargetDir && *sour == ' ')
         ;
     sour[1] = 0;
@@ -756,7 +782,7 @@ BOOL CAdvancedSEDialog::GetSettings(CSfxSettings* sfxSettings)
         CSfxLang* lang = (CSfxLang*)SendDlgItemMessage(Dlg, IDC_LANGUAGE, CB_GETITEMDATA, i, 0);
         if ((LRESULT)lang != CB_ERR)
         {
-            lstrcpy(settings.SfxFile, lang->FileName);
+            CopySfxSetting(settings.SfxFile, lang->FileName);
         }
     }
     if (SendDlgItemMessage(Dlg, IDC_HIDEMAINDLG, BM_GETCHECK, 0, 0) == BST_CHECKED)
@@ -933,7 +959,8 @@ BOOL CAdvancedSEDialog::CreateFavoritesMenu()
         mi.fState = MFS_DISABLED;
         mi.wID = CM_SFX_FAVORITE;
         mi.dwTypeData = LoadStr(IDS_EMPTY);
-        mi.cch = lstrlen(mi.dwTypeData);
+        // Menu labels are terminated resource strings; retain their character count for InsertMenuItem.
+        mi.cch = static_cast<UINT>(strlen(mi.dwTypeData));
         InsertMenuItem(FavoritiesMenu, 0, TRUE, &mi);
     }
     else
@@ -952,7 +979,8 @@ BOOL CAdvancedSEDialog::CreateFavoritesMenu()
             mi.wID = CM_SFX_FAVORITE + i;
             mi.dwItemData = (ULONG_PTR)fav;
             mi.dwTypeData = fav->Name;
-            mi.cch = lstrlen(mi.dwTypeData);
+            // Favorite names are terminated menu-label strings.
+            mi.cch = static_cast<UINT>(strlen(mi.dwTypeData));
             InsertMenuItem(FavoritiesMenu, i, TRUE, &mi);
         }
         memset(&mi, 0, sizeof(mi));
@@ -967,7 +995,8 @@ BOOL CAdvancedSEDialog::CreateFavoritesMenu()
         mi.fType = MFT_STRING;
         mi.wID = CM_SFX_MANAGE;
         mi.dwTypeData = LoadStr(IDS_MANAGE);
-        mi.cch = lstrlen(mi.dwTypeData);
+        // Menu labels are terminated resource strings; retain their character count for InsertMenuItem.
+        mi.cch = static_cast<UINT>(strlen(mi.dwTypeData));
         InsertMenuItem(FavoritiesMenu, Favorities.Count + 1 /*i*/, TRUE, &mi);
     }
 
@@ -983,6 +1012,7 @@ BOOL CAdvancedSEDialog::CreateFavoritesMenu()
 
 #define SFX_SET_SIGNATURE 0x53584653
 #define SFX_SET_CURRENTVERSION 1
+#define SFX_SETTINGS_IMPORT_MAX_BYTES (1024 * 1024)
 
 struct CSettingsHeader
 {
@@ -1029,22 +1059,35 @@ BOOL CAdvancedSEDialog::OnImport()
             return TRUE;
         }
 
-        char* buffer = (char*)malloc((unsigned)file->Size + 1);
-        if (!buffer)
+        size_t importSize;
+        size_t allocationSize;
+        DWORD readSize;
+        // Imported settings are text, not an archive payload: keep their allocation and Win32 read size bounded.
+        if (!CheckedCastUInt64ToSize(file->Size, &importSize) ||
+            importSize > SFX_SETTINGS_IMPORT_MAX_BYTES ||
+            !CheckedAddSize(importSize, 1, &allocationSize) ||
+            !CheckedCastSizeToDword(importSize, &readSize))
         {
-            SalamanderGeneral->SalMessageBox(Dlg, LoadStr(IDS_LOWMEM), LoadStr(IDS_ERROR), MB_OK | MB_ICONEXCLAMATION);
+            SalamanderGeneral->SalMessageBox(Dlg, LoadStr(IDS_TOOBIG2), LoadStr(IDS_ERROR), MB_OK | MB_ICONEXCLAMATION);
         }
         else
         {
-            if (!PackObject->Read(file, buffer, (unsigned)file->Size, NULL, NULL))
+            char* buffer = (char*)malloc(allocationSize);
+            if (!buffer)
             {
-                buffer[file->Size] = 0;
+                SalamanderGeneral->SalMessageBox(Dlg, LoadStr(IDS_LOWMEM), LoadStr(IDS_ERROR), MB_OK | MB_ICONEXCLAMATION);
+            }
+            else
+            {
+                if (!PackObject->Read(file, buffer, readSize, NULL, NULL))
+                {
+                    buffer[importSize] = 0;
                 CSfxSettings settings;
 
                 memset(&settings, 0, sizeof(CSfxSettings));
                 settings.Flags = SE_SHOWSUMARY;
                 if (DefLanguage)
-                    lstrcpy(settings.SfxFile, DefLanguage->FileName);
+                    CopySfxSetting(settings.SfxFile, DefLanguage->FileName);
                 else
                 {
                     TRACE_E("CAdvancedSEDialog::OnImport(), DefLanguage not loaded");
@@ -1084,11 +1127,11 @@ BOOL CAdvancedSEDialog::OnImport()
                     else
                     {
                         settings.Flags = SE_SHOWSUMARY;
-                        lstrcpy(settings.Text, lang->DlgText);
-                        lstrcpy(settings.Title, lang->DlgTitle);
-                        lstrcpy(settings.ExtractBtnText, lang->ButtonText);
-                        lstrcpy(settings.Vendor, lang->Vendor);
-                        lstrcpy(settings.WWW, lang->WWW);
+                        CopySfxSetting(settings.Text, lang->DlgText);
+                        CopySfxSetting(settings.Title, lang->DlgTitle);
+                        CopySfxSetting(settings.ExtractBtnText, lang->ButtonText);
+                        CopySfxSetting(settings.Vendor, lang->Vendor);
+                        CopySfxSetting(settings.WWW, lang->WWW);
                         GetModuleFileName(DLLInstance, settings.IconFile, MAX_PATH);
                         settings.IconIndex = -IDI_SFXICON;
                         // load them a second time to get the texts (these parameters are optional)
@@ -1108,8 +1151,8 @@ BOOL CAdvancedSEDialog::OnImport()
                         if (LoadFavSettings(&settings))
                         {
                             ResetValueControls();
-                            lstrcpy(PackObject->Config.LastExportPath, fileName);
-                            SalamanderGeneral->CutDirectory(PackObject->Config.LastExportPath);
+                            if (CopySfxSetting(PackObject->Config.LastExportPath, fileName))
+                                SalamanderGeneral->CutDirectory(PackObject->Config.LastExportPath);
                         }
                     }
                 }
@@ -1148,8 +1191,9 @@ BOOL CAdvancedSEDialog::OnImport()
                     SalamanderGeneral->SalMessageBox(Dlg, LoadStr(errID), LoadStr(IDS_ERROR),
                                                      MB_OK | MB_ICONEXCLAMATION);
                 }
+                }
+                free(buffer);
             }
-            free(buffer);
         }
         PackObject->CloseCFile(file);
     }
@@ -1168,7 +1212,7 @@ BOOL CAdvancedSEDialog::OnExport()
     SalamanderGeneral->CutDirectory(fullPath);
     SalamanderGeneral->SalPathAppend(fullPath, "sfx", MAX_PATH);
     SalamanderGeneral->SalPathAppend(fullPath, settings.SfxFile, MAX_PATH);
-    lstrcpy(settings.SfxFile, fullPath);
+    CopySfxSetting(settings.SfxFile, fullPath);
     //lstrcpy(settings.IconFile, TmpSfxSettings.IconFile);
     //settings.IconIndex = TmpSfxSettings.IconIndex;
 
@@ -1213,8 +1257,8 @@ BOOL CAdvancedSEDialog::OnExport()
             if (PackObject->ExportSFXSettings(file, &settings))
             {
                 PackObject->CloseCFile(file);
-                lstrcpy(PackObject->Config.LastExportPath, fileName);
-                SalamanderGeneral->CutDirectory(PackObject->Config.LastExportPath);
+                if (CopySfxSetting(PackObject->Config.LastExportPath, fileName))
+                    SalamanderGeneral->CutDirectory(PackObject->Config.LastExportPath);
                 // notify the change on the path
                 SalamanderGeneral->PostChangeOnPathNotification(PackObject->Config.LastExportPath, FALSE);
             }
@@ -1248,7 +1292,7 @@ BOOL CAdvancedSEDialog::OnPreview()
             if (strcmp(TmpSfxSettings.Vendor, lang->Vendor) != 0 || strcmp(TmpSfxSettings.WWW, lang->WWW) != 0)
                 sprintf(buffer, "%s\r\n%s\r\n\r\n", lang->Vendor, lang->WWW);
             strcat_s(buffer, lang->AboutLicenced);
-            lstrcpyn(PackOptions->About, buffer, SE_MAX_ABOUT);
+            CopySfxDisplayText(PackOptions->About, buffer);
         }
     }
 
@@ -1340,7 +1384,7 @@ BOOL CAdvancedSEDialog::OnResetValues()
     // the icon, which might then become invalid
     TmpSfxSettings.Flags = DefOptions.SfxSettings.Flags;
     *TmpSfxSettings.Command = 0;
-    lstrcpy(TmpSfxSettings.TargetDir, DefOptions.SfxSettings.TargetDir);
+    CopySfxSetting(TmpSfxSettings.TargetDir, DefOptions.SfxSettings.TargetDir);
     TmpSfxSettings.MBoxStyle = DefOptions.SfxSettings.MBoxStyle;
     *TmpSfxSettings.MBoxTitle = 0;
     TmpSfxSettings.SetMBoxText("");
@@ -1355,7 +1399,7 @@ BOOL CAdvancedSEDialog::OnResetValues()
     {
         CurrentSfxLang = DefLanguage;
         char langName[128];
-        if (GetLocaleInfo(MAKELCID(MAKELANGID(DefLanguage->LangID, SUBLANG_NEUTRAL), SORT_DEFAULT), LOCALE_SLANGUAGE, langName, 128))
+        if (GetLanguageNameFromLangId(DefLanguage->LangID, langName, _countof(langName)))
         {
             char* c = strchr(langName, ' ');
             if (c)
@@ -1365,7 +1409,7 @@ BOOL CAdvancedSEDialog::OnResetValues()
                 SendDlgItemMessage(Dlg, IDC_LANGUAGE, CB_SETCURSEL, 0, 0);
             }
         }
-        lstrcpy(TmpSfxSettings.SfxFile, DefLanguage->FileName);
+        CopySfxSetting(TmpSfxSettings.SfxFile, DefLanguage->FileName);
 
         HICON iconLarge, iconSmall;
         CIcon* icons;
@@ -1392,7 +1436,7 @@ BOOL CAdvancedSEDialog::OnResetValues()
         {
             if (ExtractIconEx(file, -IDI_SFXICON, &iconLarge, &iconSmall, 1))
             {
-                lstrcpy(TmpSfxSettings.IconFile, file);
+                CopySfxSetting(TmpSfxSettings.IconFile, file);
                 TmpSfxSettings.IconIndex = -IDI_SFXICON;
                 if (SmallIcon)
                     DestroyIcon(SmallIcon);
@@ -1439,11 +1483,11 @@ BOOL CAdvancedSEDialog::OnResetTexts()
             TmpSfxSettings.MBoxStyle = MB_OK;
             TmpSfxSettings.SetMBoxText("");
             *TmpSfxSettings.MBoxTitle = 0;
-            lstrcpy(TmpSfxSettings.Text, lang->DlgText);
-            lstrcpy(TmpSfxSettings.Title, lang->DlgTitle);
-            lstrcpy(TmpSfxSettings.ExtractBtnText, lang->ButtonText);
-            lstrcpy(TmpSfxSettings.Vendor, lang->Vendor);
-            lstrcpy(TmpSfxSettings.WWW, lang->WWW);
+            CopySfxSetting(TmpSfxSettings.Text, lang->DlgText);
+            CopySfxSetting(TmpSfxSettings.Title, lang->DlgTitle);
+            CopySfxSetting(TmpSfxSettings.ExtractBtnText, lang->ButtonText);
+            CopySfxSetting(TmpSfxSettings.Vendor, lang->Vendor);
+            CopySfxSetting(TmpSfxSettings.WWW, lang->WWW);
         }
     }
 
@@ -1623,7 +1667,7 @@ BOOL CAdvancedSEDialog::LoadFavSettings(CSfxSettings* sfxSettings)
     }
 
     char langName[128];
-    if (GetLocaleInfo(MAKELCID(MAKELANGID(lang->LangID, SUBLANG_NEUTRAL), SORT_DEFAULT), LOCALE_SLANGUAGE, langName, 128))
+    if (GetLanguageNameFromLangId(lang->LangID, langName, _countof(langName)))
     {
         char* c = strchr(langName, ' ');
         if (c)
@@ -1633,18 +1677,18 @@ BOOL CAdvancedSEDialog::LoadFavSettings(CSfxSettings* sfxSettings)
     }
 
     TmpSfxSettings.Flags = sfxSettings->Flags;
-    lstrcpy(TmpSfxSettings.Command, sfxSettings->Command);
-    lstrcpy(TmpSfxSettings.SfxFile, sfxSettings->SfxFile);
-    lstrcpy(TmpSfxSettings.Text, sfxSettings->Text);
-    lstrcpy(TmpSfxSettings.Title, sfxSettings->Title);
+    CopySfxSetting(TmpSfxSettings.Command, sfxSettings->Command);
+    CopySfxSetting(TmpSfxSettings.SfxFile, sfxSettings->SfxFile);
+    CopySfxSetting(TmpSfxSettings.Text, sfxSettings->Text);
+    CopySfxSetting(TmpSfxSettings.Title, sfxSettings->Title);
     TmpSfxSettings.MBoxStyle = sfxSettings->MBoxStyle;
     TmpSfxSettings.SetMBoxText(sfxSettings->MBoxText);
-    lstrcpy(TmpSfxSettings.MBoxTitle, sfxSettings->MBoxTitle);
-    lstrcpy(TmpSfxSettings.TargetDir, sfxSettings->TargetDir);
-    lstrcpy(TmpSfxSettings.ExtractBtnText, sfxSettings->ExtractBtnText);
-    lstrcpy(TmpSfxSettings.Vendor, sfxSettings->Vendor);
-    lstrcpy(TmpSfxSettings.WWW, sfxSettings->WWW);
-    lstrcpy(TmpSfxSettings.WaitFor, sfxSettings->WaitFor);
+    CopySfxSetting(TmpSfxSettings.MBoxTitle, sfxSettings->MBoxTitle);
+    CopySfxSetting(TmpSfxSettings.TargetDir, sfxSettings->TargetDir);
+    CopySfxSetting(TmpSfxSettings.ExtractBtnText, sfxSettings->ExtractBtnText);
+    CopySfxSetting(TmpSfxSettings.Vendor, sfxSettings->Vendor);
+    CopySfxSetting(TmpSfxSettings.WWW, sfxSettings->WWW);
+    CopySfxSetting(TmpSfxSettings.WaitFor, sfxSettings->WaitFor);
 
     HICON iconLarge, iconSmall;
     CIcon* icons;
@@ -1669,7 +1713,7 @@ BOOL CAdvancedSEDialog::LoadFavSettings(CSfxSettings* sfxSettings)
     {
         if (ExtractIconEx(sfxSettings->IconFile, sfxSettings->IconIndex, &iconLarge, &iconSmall, 1))
         {
-            lstrcpy(TmpSfxSettings.IconFile, sfxSettings->IconFile);
+            CopySfxSetting(TmpSfxSettings.IconFile, sfxSettings->IconFile);
             TmpSfxSettings.IconIndex = sfxSettings->IconIndex;
             if (SmallIcon)
                 DestroyIcon(SmallIcon);
@@ -1933,21 +1977,24 @@ BOOL CSfxTextsDialog::OnOK(WORD wNotifyCode, WORD wID, HWND hwndCtl)
     settings.MBoxText = (char*)realloc(settings.MBoxText, l);
     SendDlgItemMessage(Dlg, IDC_MBOXTEXT, WM_GETTEXT, l, (LPARAM)settings.MBoxText);
     SendDlgItemMessage(Dlg, IDC_MBOXTITLE, WM_GETTEXT, SE_MAX_TITLE, (LPARAM)settings.MBoxTitle);
-    if (!lstrlen(settings.MBoxTitle) && lstrlen(settings.MBoxText))
+    // These dialog fields are terminated settings buffers after WM_GETTEXT.
+    if (!strlen(settings.MBoxTitle) && strlen(settings.MBoxText))
     {
         SalamanderGeneral->SalMessageBox(Dlg, LoadStr(IDS_ERRBADMBOXTITLE), LoadStr(IDS_ERROR), MB_OK | MB_ICONEXCLAMATION);
         return TRUE;
     }
 
     SendDlgItemMessage(Dlg, IDC_TITLE, WM_GETTEXT, SE_MAX_TITLE, (LPARAM)settings.Title);
-    if (!lstrlen(settings.Title))
+    // The title field is a terminated settings buffer after WM_GETTEXT.
+    if (!strlen(settings.Title))
     {
         SalamanderGeneral->SalMessageBox(Dlg, LoadStr(IDS_ERRBADTITLE), LoadStr(IDS_ERROR), MB_OK | MB_ICONEXCLAMATION);
         return TRUE;
     }
     SendDlgItemMessage(Dlg, IDC_TEXT, WM_GETTEXT, SE_MAX_TEXT, (LPARAM)settings.Text);
     SendDlgItemMessage(Dlg, IDC_BUTTONTEXT, WM_GETTEXT, SE_MAX_EXTRBTN, (LPARAM)settings.ExtractBtnText);
-    if (!lstrlen(settings.ExtractBtnText))
+    // The button label is a terminated settings buffer after WM_GETTEXT.
+    if (!strlen(settings.ExtractBtnText))
     {
         SalamanderGeneral->SalMessageBox(Dlg, LoadStr(IDS_BADBUTTONTEXT), LoadStr(IDS_ERROR), MB_OK | MB_ICONEXCLAMATION);
         return TRUE;

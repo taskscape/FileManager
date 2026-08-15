@@ -307,6 +307,8 @@ struct CStartProgressDialogData;
 BOOL StartProgressDialog(COperations* script, const char* caption,
                          CChangeAttrsData* attrsData, CConvertData* convertData);
 
+class CThreadOwner;
+
 class CProgressDialog : public CCommonDialog
 {
 public:
@@ -327,7 +329,8 @@ protected:
     BOOL RunningInOwnThread;                // TRUE/FALSE = dialog runs in its own thread ("background") / dialog runs in the main thread and is modal to its parent (usually one of the panels)
     CStartProgressDialogData* ProgrDlgData; // non-NULL only if the dialog runs in its own thread and startup has not yet reported ready or failed
 
-    HANDLE Worker;                // worker thread associated with this dialog (NULL if it doesn't exist yet/any more)
+    HANDLE Worker;                // borrowed worker handle for legacy priority/UI checks; WorkerOwner closes it
+    CThreadOwner* WorkerOwner;    // retains the worker until completion so dialog teardown cannot orphan its launch state
     HANDLE WContinue;             // multi-purpose event
     HANDLE WorkerNotSuspended;    // non-signaled == the worker should enter suspend mode
     int OperationProgress;        // progress value shared with the worker thread
@@ -336,7 +339,7 @@ protected:
     BOOL IsInQueue;               // TRUE = the operation is queued (requested by the user and successfully added)
     BOOL AutoPaused;              // TRUE if the operation is queued and therefore paused
     BOOL StatusPaused;            // TRUE = the operation is stopped, e.g. when querying Cancel (+ other dialogs)
-    DWORD NextTimeLeftUpdateTime; // time of the next allowed time-left update (frequent updates hurt for long times)
+    CMonotonicTimePoint NextTimeLeftUpdateTime; // 64-bit deadline for throttling expensive time-left updates
     CQuadWord TimeLeftLastValue;  // last displayed time-left value
     CITaskBarList3 TaskBarList3;  // controls taskbar progress since Windows 7
 
@@ -1495,7 +1498,7 @@ protected:
     CQuadWord TotalSize;
     CQuadWord ActualTotalSize;
 
-    DWORD LastTickCount; // used to detect when the date must be redrawn
+    ULONGLONG LastTickCount; // monotonic timestamp used to detect when the data must be redrawn
 
     CITaskBarList3* TaskBarList3; // pointer to the interface owned by the Salamander main window
 

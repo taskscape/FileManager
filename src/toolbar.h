@@ -3,6 +3,8 @@
 
 #pragma once
 
+#include "common/monotonic_time.h"
+
 //*****************************************************************************
 //
 // CToolBarItem
@@ -94,7 +96,7 @@ protected:
     int InserMarkIndex; // -1 = none
     BOOL InserMarkAfter;
     BOOL MouseIsTracked;  // is mouse tracked using TrackMouseEvent?
-    DWORD DropDownUpTime; // time in [ms] when drop down was released, for protection against new press
+    CMonotonicTimePoint DropDownUpTime; // 64-bit release time for the post-dropdown click guard
     BOOL HelpMode;        // Salamander is in Shift+F1 (ctx help) mode and toolbar should highlight even disabled items under cursor
 
 public:

@@ -64,17 +64,18 @@ private:
     };
 
 public:
-    // allocate new character array and setup pointers in base class
+    // Keep the trace buffer on the process heap; it is private plug-in state and is never shared through a legacy global handle.
     C__StringStreamBuf()
     {
-        char* ptr = static_cast<char*>(GlobalAlloc(GMEM_FIXED, STARTSIZE));
-        setp(ptr, ptr + STARTSIZE);
+        char* ptr = static_cast<char*>(HeapAlloc(GetProcessHeap(), 0, STARTSIZE));
+        setp(ptr, ptr != NULL ? ptr + STARTSIZE : NULL);
     }
 
     // discard any allocated buffer and clear pointers
     virtual ~C__StringStreamBuf()
     {
-        GlobalFree(pbase());
+        if (pbase() != NULL)
+            HeapFree(GetProcessHeap(), 0, pbase());
         setp(0, 0);
     }
 
@@ -129,7 +130,7 @@ protected:
 
             // allocate new character array
             newsize += inc;
-            char* ptr = static_cast<char*>(GlobalAlloc(GMEM_FIXED, newsize));
+            char* ptr = static_cast<char*>(HeapAlloc(GetProcessHeap(), 0, newsize));
             if (ptr == 0)
                 return traits_type::eof();
 
@@ -141,7 +142,7 @@ protected:
 #else  // __BORLANDC__
                 traits_type::_Copy_s(ptr, newsize, pbase(), oldsize);
 #endif // __BORLANDC__
-                GlobalFree(pbase());
+                HeapFree(GetProcessHeap(), 0, pbase());
             }
 
             // update pointers
@@ -173,17 +174,18 @@ private:
     };
 
 public:
-    // allocate new character array and setup pointers in base class
+    // Keep the wide trace buffer on the process heap for the same private-ownership invariant as the narrow buffer.
     C__StringStreamBufW()
     {
-        wchar_t* ptr = static_cast<wchar_t*>(GlobalAlloc(GMEM_FIXED, sizeof(wchar_t) * STARTSIZE));
-        setp(ptr, ptr + STARTSIZE);
+        wchar_t* ptr = static_cast<wchar_t*>(HeapAlloc(GetProcessHeap(), 0, sizeof(wchar_t) * STARTSIZE));
+        setp(ptr, ptr != NULL ? ptr + STARTSIZE : NULL);
     }
 
     // discard any allocated buffer and clear pointers
     virtual ~C__StringStreamBufW()
     {
-        GlobalFree(pbase());
+        if (pbase() != NULL)
+            HeapFree(GetProcessHeap(), 0, pbase());
         setp(0, 0);
     }
 
@@ -238,7 +240,7 @@ protected:
 
             // allocate new character array
             newsize += inc;
-            wchar_t* ptr = static_cast<wchar_t*>(GlobalAlloc(GMEM_FIXED, sizeof(wchar_t) * newsize));
+            wchar_t* ptr = static_cast<wchar_t*>(HeapAlloc(GetProcessHeap(), 0, sizeof(wchar_t) * newsize));
             if (ptr == 0)
                 return traits_type::eof();
 
@@ -250,7 +252,7 @@ protected:
 #else  // __BORLANDC__
                 traits_type::_Copy_s(ptr, newsize, pbase(), oldsize);
 #endif // __BORLANDC__
-                GlobalFree(pbase());
+                HeapFree(GetProcessHeap(), 0, pbase());
             }
 
             // update pointers

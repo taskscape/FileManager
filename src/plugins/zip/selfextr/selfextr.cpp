@@ -30,7 +30,6 @@ bool SafeToEnd = true;
 CStringIndex MapFile(const char* name, HANDLE* file, HANDLE* mapping,
                      const unsigned char** data, unsigned long* size, int* err)
 {
-    DWORD sizeHigh;
     *file = CreateFile(name, GENERIC_READ, FILE_SHARE_READ, NULL,
                        OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
     if (*file == INVALID_HANDLE_VALUE)
@@ -39,18 +38,21 @@ CStringIndex MapFile(const char* name, HANDLE* file, HANDLE* mapping,
         return STR_ERROR_FOPEN;
     }
 
-    if ((*size = GetFileSize(*file, &sizeHigh)) == 0xFFFFFFFF)
+    LARGE_INTEGER fileSize;
+    if (!GetFileSizeEx(*file, &fileSize))
     {
         *err = GetLastError();
         CloseHandle(*file);
         return STR_ERROR_FSIZE;
     }
-    if (sizeHigh != 0)
+    if (fileSize.QuadPart < 0 || (ULONGLONG)fileSize.QuadPart > MAXDWORD)
     {
         *err = 0;
         CloseHandle(*file);
         return STR_ERROR_MAXSIZE;
     }
+    // The mapped self-extractor parser records offsets as unsigned long, so reject oversize images before narrowing.
+    *size = (unsigned long)fileSize.QuadPart;
     *mapping = CreateFileMapping(*file, NULL, PAGE_READONLY, 0, 0, NULL);
     if (mapping == NULL)
     {
@@ -279,25 +281,27 @@ int InitExtraction(const char* name)
     if (ret)
         return HandleError(ret, err);
 #else
-    unsigned long sizeHigh;
     ArchiveFile = CreateFile(name, GENERIC_READ, FILE_SHARE_READ, NULL,
                              OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
     if (ArchiveFile == INVALID_HANDLE_VALUE)
         return HandleError(STR_ERROR_FOPEN, GetLastError());
 
     offset = 0;
-    if ((Size = GetFileSize(ArchiveFile, &sizeHigh)) == 0xFFFFFFFF)
+    LARGE_INTEGER archiveSize;
+    if (!GetFileSizeEx(ArchiveFile, &archiveSize))
     {
         HandleError(STR_ERROR_FSIZE, GetLastError());
         CloseHandle(ArchiveFile);
         return 1;
     }
-    if (sizeHigh != 0)
+    if (archiveSize.QuadPart < 0 || (ULONGLONG)archiveSize.QuadPart > MAXDWORD)
     {
         HandleError(STR_ERROR_MAXSIZE, 0);
         CloseHandle(ArchiveFile);
         return 1;
     }
+    // This non-extended parser uses unsigned-long archive offsets, so only accept a representable 64-bit size.
+    Size = (unsigned long)archiveSize.QuadPart;
     ArchiveMapping = CreateFileMapping(ArchiveFile, NULL, PAGE_READONLY, 0, 0, NULL);
     if (ArchiveMapping == NULL)
     {
@@ -706,12 +710,17 @@ int MyWinMain()
         char skipped[100];
 
         if (SkippedFiles)
-            wsprintf(skipped, StringTable[STR_SKIPPED], SkippedFiles);
+            SelfExtrFormat(skipped, ARRAYSIZE(skipped), StringTable[STR_SKIPPED], SkippedFiles);
         else
             *skipped = 0;
 
-        wsprintf(message, StringTable[ExtractedFiles ? STR_STATOK : STR_STATNOTCOMPLETE],
-                 ExtractedFiles, skipped, NumberToStr(num, ExtractedMB));
+        if (!SelfExtrFormat(message, ARRAYSIZE(message), StringTable[ExtractedFiles ? STR_STATOK : STR_STATNOTCOMPLETE],
+                            ExtractedFiles, skipped, NumberToStr(num, ExtractedMB)))
+        {
+            size_t fallbackLength = 0;
+            message[0] = 0;
+            SelfExtrAppendText(message, ARRAYSIZE(message), &fallbackLength, "Extraction status formatting failed.");
+        }
         MessageBox(NULL, message, Title, MB_OK | MB_ICONINFORMATION | MB_SETFOREGROUND);
     }
     if (!i && ArchiveStart->CommandOffs)
@@ -727,7 +736,8 @@ int MyWinMain()
 
         if (lstrcmpi(exeName + len - 4, ".inf") == 0)
         {
-            wsprintf(buf, "setupapi,InstallHinfSection DefaultInstall 132 %s", exeName);
+            if (!SelfExtrFormat(buf, ARRAYSIZE(buf), "setupapi,InstallHinfSection DefaultInstall 132 %s", exeName))
+                return HandleError(STR_ERROR_EXECSHELL, ERROR_INSUFFICIENT_BUFFER, exeName, NULL, 0, true);
             GetRunDLL(exeName);
             parameters = buf;
         }
@@ -762,7 +772,8 @@ int MyWinMain()
             int e = GetLastError();
             if (e == ERROR_NO_ASSOCIATION && !RemoveTemp)
             {
-                wsprintf(buf, "shell32.dll,OpenAs_RunDLL %s", exeName);
+                if (!SelfExtrFormat(buf, ARRAYSIZE(buf), "shell32.dll,OpenAs_RunDLL %s", exeName))
+                    return HandleError(STR_ERROR_EXECSHELL, ERROR_INSUFFICIENT_BUFFER, exeName, NULL, 0, true);
                 GetRunDLL(exeName);
                 info.lpParameters = buf;
                 goto execute;
@@ -774,14 +785,16 @@ int MyWinMain()
         {
             if (RemoveTemp)
             {
-                WNDCLASS wc;
-                MemZero(&wc, sizeof(WNDCLASS));
+                WNDCLASSEX wc;
+                MemZero(&wc, sizeof(WNDCLASSEX));
+                wc.cbSize = sizeof(wc);
                 wc.lpfnWndProc = MainWindowWndProc;
                 wc.hInstance = HInstance;
                 wc.hbrBackground = (HBRUSH)(COLOR_BACKGROUND + 1);
                 const char* wndClassName = "MainWindowWndClass";
                 wc.lpszClassName = wndClassName;
-                RegisterClass(&wc);
+                // Use the extended registration contract for the temporary process-wait window.
+                RegisterClassEx(&wc);
                 TRACE2("process handle %X", (HANDLE)info.hProcess)
                 CreateWindow(wndClassName, "", WS_OVERLAPPED, CW_USEDEFAULT, CW_USEDEFAULT, CW_USEDEFAULT, CW_USEDEFAULT, NULL, NULL, HInstance, (LPVOID)&info.hProcess);
                 BOOL wait = TRUE;
@@ -882,14 +895,21 @@ LONG WINAPI MyExceptionFilter(_EXCEPTION_POINTERS* exception)
 
 #ifdef _DEBUG
 HANDLE TraceLogFile = NULL;
+
 void Trace(char* message, ...)
 {
     va_list arglist;
     va_start(arglist, message);
     char buf[1024];
-    wvsprintf(buf, message, arglist);
+    // Trace output must remain bounded even when diagnostics include an unexpectedly long path or message.
+    BOOL formatted = SelfExtrVFormat(buf, ARRAYSIZE(buf), message, arglist);
     va_end(arglist);
-    lstrcat(buf, "\r\n");
+    size_t used = lstrlen(buf);
+    if (!formatted || !SelfExtrAppendText(buf, ARRAYSIZE(buf), &used, "\r\n"))
+    {
+        used = 0;
+        SelfExtrAppendText(buf, ARRAYSIZE(buf), &used, "Trace message formatting failed.\r\n");
+    }
     DWORD dummy;
     if (TraceLogFile)
         WriteFile(TraceLogFile, buf, lstrlen(buf), &dummy, NULL);

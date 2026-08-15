@@ -842,7 +842,7 @@ void CPluginFSInterface::SendUserFTPCommand(HWND parent)
                             // the path in the panel (assumption: the server returns the same working path string)
                             char newUserPart[FTP_USERPART_SIZE];
                             MakeUserPart(newUserPart, FTP_USERPART_SIZE, newPath);
-                            ChangePathOnlyGetCurPathTime = GetTickCount(); // optimize ChangePath() called right after obtaining the working path
+                            ChangePathOnlyGetCurPathTime = CMonotonicClock::Now(); // optimize ChangePath() called right after obtaining the working path
                             SalamanderGeneral->ChangePanelPathToPluginFS(panel, fsName, newUserPart);
                         }
                     }

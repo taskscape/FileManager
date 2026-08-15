@@ -3,6 +3,8 @@
 // CommentsTranslationProject: TRANSLATED
 
 #include "precomp.h"
+
+#include <strsafe.h>
 #include <ShObjIdl.h>
 #include "versinfo.rh2"
 #include "jumplist.h"
@@ -167,9 +169,14 @@ HRESULT CreateShellLink(const char* path, const char* name, IShellLink** psl)
             ret->SetPath(pathName);
             ret->SetArguments(params);
             char desc[MAX_PATH];
-            lstrcpyn(desc, path, _countof(desc));
             if (strlen(path) >= _countof(desc))
-                strcpy(desc + _countof(desc) - 4, "..."); // indicates the path has been truncated
+            {
+                // Preserve the visible truncation marker without relying on an unbounded compatibility copy.
+                StringCchCopyNA(desc, _countof(desc), path, _countof(desc) - 4);
+                StringCchCatA(desc, _countof(desc), "...");
+            }
+            else
+                StringCchCopyA(desc, _countof(desc), path);
             ret->SetDescription(desc);                    // MAX_PATH+1 is the limit (at least on Windows 7 where I'm testing now); longer = the jump list won't show at all
             ret->SetIconLocation("shell32.dll", -319);    // this icon exists from Windows XP onwards
 

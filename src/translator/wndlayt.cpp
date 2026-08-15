@@ -342,7 +342,8 @@ void RemoveDialogAmpersands(HWND hDialog)
                 char className[300];
                 if (GetClassName(hChild, className, _countof(className)) && _stricmp(className, "Static") == 0)
                 {
-                    LONG style = GetWindowLong(hChild, GWL_STYLE);
+                    // Use pointer-width window access while preserving the existing Static-control style test.
+                    LONG_PTR style = GetWindowLongPtr(hChild, GWL_STYLE);
                     if (style & SS_NOPREFIX)
                         continue; // Do not strip ampersands from SS_NOPREFIX statics; it would change their text
                 }

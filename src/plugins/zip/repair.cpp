@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "precomp.h"
+#include <strsafe.h>
 /*
 #include <crtdbg.h>
 #include <ostream>
@@ -65,9 +66,12 @@ CZipRepair::RepeairArchive()
 
   char targetName[MAX_PATH];
 
-  lstrcpy(targetName, ZipName);
+  // The repair target must contain the full archive name before its suffix is replaced.
+  if (FAILED(StringCchCopyA(targetName, _countof(targetName), ZipName)))
+    return ErrorID = IDS_TOOLONGZIPNAME;
   PathRemoveExtension(targetName);
-  lstrcat(targetName, "_.zip");
+  if (FAILED(StringCchCatA(targetName, _countof(targetName), "_.zip")))
+    return ErrorID = IDS_TOOLONGZIPNAME;
   CCreateSFXDialog dlg(SalCalls->GetMainWindowHWND(), ZipName, targetName, NULL, NULL);
   if (dlg.Proceed() != IDOK) return ErrorID = IDS_NODISPLAY;
 

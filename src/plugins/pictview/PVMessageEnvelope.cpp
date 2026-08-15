@@ -6,6 +6,7 @@
 #include "PVMessage.h"
 #include "PixelAccess.h"
 #include "Thumbnailer.h"
+#include "..\\..\\common\\checked_arithmetic.h"
 
 class PVWrapperImageHandle
 {
@@ -159,7 +160,13 @@ bool PVMessage::HandleMessage(DWORD dataSize, DWORD id, HANDLE hEvent)
         CloseHandle(hFileMap);
         return false;
     }
-    _ASSERTE(pHdr->cbSize == dataSize);
+    // The posted DWORD is untrusted across the process boundary; do not dispatch a truncated or mismatched header.
+    if (dataSize < sizeof(PVMessageHeader) || pHdr->cbSize != dataSize)
+    {
+        UnmapViewOfFile(pHdr);
+        CloseHandle(hFileMap);
+        return false;
+    }
     PVMessage* pMessage = GetPVMessage(pHdr, hEvent);
     if (pMessage)
     {
@@ -208,20 +215,33 @@ bool PVMessage_InitTexts::HandleRequest()
     {
         return false;
     }
-    // Duplioate the entire buffer
-    int size = pHdr->cbSize - sizeof(PVMessage) - sizeof(pHdr->TextsCount);
-    StringsBuf = (char*)malloc(size);
+    const size_t textsOffset = (const char*)pHdr->Texts - (const char*)pHdr;
+    size_t textBytes;
+    // Reject a malformed variable record before subtraction, allocation, or string scanning can escape the mapping.
+    if (pHdr->TextsCount < 0 || pHdr->TextsCount > (int)SizeOf(Strings) ||
+        pHdr->cbSize < textsOffset || !CheckedAddSize(0, pHdr->cbSize - textsOffset, &textBytes))
+        return false;
+    StringsBuf = (char*)malloc(textBytes);
     if (!StringsBuf)
     {
         return false;
     }
-    memcpy(StringsBuf, pHdr->Texts, size);
+    memcpy(StringsBuf, pHdr->Texts, textBytes);
     // Init strings pointers to point inside the buffer
     const char* str = StringsBuf;
-    for (int i = 0; i < min((int)(SizeOf(Strings)), pHdr->TextsCount); i++)
+    const char* const stringsEnd = StringsBuf + textBytes;
+    for (int i = 0; i < pHdr->TextsCount; i++)
     {
+        // Every advertised string must terminate before the copied payload boundary.
+        const char* terminator = (const char*)memchr(str, 0, stringsEnd - str);
+        if (terminator == NULL)
+        {
+            free(StringsBuf);
+            StringsBuf = NULL;
+            return false;
+        }
         Strings[i] = str;
-        str += strlen(str) + 1;
+        str = terminator + 1;
     }
     pHdr->ResultCode = PVC_OK;
     return true;

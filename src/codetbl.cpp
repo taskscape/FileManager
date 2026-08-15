@@ -7,7 +7,24 @@
 #include "codetbl.h"
 #include "cfgdlg.h"
 
+#include <strsafe.h>
+
 CCodeTables CodeTables;
+
+static BOOL GetFileSizeDword(HANDLE file, DWORD& size)
+{
+    LARGE_INTEGER largeSize;
+    // The conversion-table parser stores offsets as DWORDs, so reject oversized files instead of truncating a 64-bit result.
+    if (!GetFileSizeEx(file, &largeSize))
+        return FALSE;
+    if (largeSize.QuadPart < 0 || (ULONGLONG)largeSize.QuadPart > MAXDWORD)
+    {
+        SetLastError(ERROR_FILE_TOO_LARGE);
+        return FALSE;
+    }
+    size = (DWORD)largeSize.QuadPart;
+    return TRUE;
+}
 
 //
 //*****************************************************************************
@@ -25,7 +42,8 @@ char* ReadTable(const char* fileName, char* table)
                                         NULL));
     if (hFile != INVALID_HANDLE_VALUE)
     {
-        if (GetFileSize(hFile, NULL) == 256)
+        DWORD fileSize;
+        if (GetFileSizeDword(hFile, fileSize) && fileSize == 256)
         {
             char buf[256];
             DWORD read;
@@ -331,8 +349,8 @@ CCodeTable::CCodeTable(HWND hWindow, const char* dirName)
     {
         char textBuf[MAX_PATH + 500];
         DWORD err = NO_ERROR;
-        DWORD fileSize = GetFileSize(hFile, NULL);
-        if (fileSize != 0xFFFFFFFF)
+        DWORD fileSize;
+        if (GetFileSizeDword(hFile, fileSize))
         {
             HANDLE mFile = HANDLES(CreateFileMapping(hFile, NULL, PAGE_READONLY,
                                                      0, 0, NULL));
@@ -367,7 +385,8 @@ CCodeTable::CCodeTable(HWND hWindow, const char* dirName)
     }
     else // if convert\\xxx\\convert.cfg is missing, "load" the default configuration
     {
-        lstrcpyn(WinCodePage, LoadStr(IDS_VIEWERANSICODEPAGE), 101); // "ANSI" code page
+        // The default localized code-page label remains a bounded configuration/display field.
+        StringCchCopyNA(WinCodePage, _countof(WinCodePage), LoadStr(IDS_VIEWERANSICODEPAGE), _countof(WinCodePage) - 1); // "ANSI" code page
         int i;
         for (i = 0; i < 2; i++)
         {
@@ -455,7 +474,12 @@ void CCodeTables::PreloadAllConversions()
     GetModuleFileNameW(NULL, pathW, MAX_PATH);
     WCHAR* pathEnd = wcsrchr(pathW, L'\\');
     if (pathEnd != NULL)
-        lstrcpyW(pathEnd + 1, L"convert\\*.*");
+    {
+        // Preserve the fixed search-path buffer when appending the conversion wildcard.
+        if (FAILED(StringCchCopyW(pathEnd + 1, _countof(pathW) - (pathEnd + 1 - pathW),
+                                  L"convert\\*.*")))
+            pathW[0] = 0;
+    }
 
     WIN32_FIND_DATAW findW;
     WIN32_FIND_DATA find;
@@ -911,7 +935,7 @@ void CCodeTables::RecognizeFileType(const char* pattern, int patternLen, BOOL fo
                 {
                     // remove '&' characters, they would interfere with comparison
                     char buf3[200];
-                    lstrcpyn(buf3, n, 200);
+                    StringCchCopyNA(buf3, _countof(buf3), n, _countof(buf3) - 1);
                     RemoveAmpersands(buf3);
                     n = buf3;
 
@@ -1109,7 +1133,7 @@ int CCodeTables::GetConversionToWinCodePage(const char* codePage)
 
     // remove '&' characters; they would interfere with comparison
     char buf2[200];
-    lstrcpyn(buf2, codePage, 200);
+    StringCchCopyNA(buf2, _countof(buf2), codePage, _countof(buf2) - 1);
     RemoveAmpersands(buf2);
     codePage = buf2;
 
@@ -1126,7 +1150,7 @@ int CCodeTables::GetConversionToWinCodePage(const char* codePage)
             {
                 // remove '&' characters; they would interfere with comparison
                 char buf3[200];
-                lstrcpyn(buf3, n, 200);
+                StringCchCopyNA(buf3, _countof(buf3), n, _countof(buf3) - 1);
                 RemoveAmpersands(buf3);
                 n = buf3;
 

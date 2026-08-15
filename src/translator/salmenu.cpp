@@ -11,6 +11,19 @@
 #include "wndout.h"
 #include "datarh.h"
 
+static BOOL CopySalMenuToken(char* destination, size_t destinationCapacity, const char* begin, const char* end)
+{
+    // Parsed menu identifiers must fit completely; truncation could select a different resource ID.
+    if (destination == NULL || destinationCapacity == 0 || begin == NULL || end < begin ||
+        static_cast<size_t>(end - begin) >= destinationCapacity)
+        return FALSE;
+
+    const size_t tokenLength = static_cast<size_t>(end - begin);
+    memcpy(destination, begin, tokenLength);
+    destination[tokenLength] = 0;
+    return TRUE;
+}
+
 /* Description of the salmenu.mnu format
 MainMenuTemplate=             -- template name
 {
@@ -93,7 +106,8 @@ BOOL CData::ProcessSalMenuLine(const char* line, const char* lineEnd, int row, C
             // No template is open; expect a line that starts one.
             if (*(lineEnd - 1) != '=')
                 return FALSE;
-            lstrcpyn(parserState->TemplateName, p, min(500 - 1, (lineEnd - p)));
+            if (!CopySalMenuToken(parserState->TemplateName, _countof(parserState->TemplateName), p, lineEnd - 1))
+                return FALSE;
             parserState->State = esmpsTemplateName;
         }
         break;
@@ -145,7 +159,8 @@ BOOL CData::ProcessSalMenuLine(const char* line, const char* lineEnd, int row, C
                     else
                     {
                         parserState->State = esmpsSectionDialog;
-                        lstrcpyn(buff, p + 7, (lineEnd - (p + 7) + 1));
+                        if (!CopySalMenuToken(buff, _countof(buff), p + 7, lineEnd))
+                            return FALSE;
                         WORD dlgID;
                         if (!DataRH.GetIDForIdentifier(StripWS(buff), &dlgID))
                         {
@@ -170,7 +185,8 @@ BOOL CData::ProcessSalMenuLine(const char* line, const char* lineEnd, int row, C
                         else
                         {
                             parserState->State = esmpsSectionControl;
-                            lstrcpyn(buff, p + 8, (lineEnd - (p + 8) + 1));
+                            if (!CopySalMenuToken(buff, _countof(buff), p + 8, lineEnd))
+                                return FALSE;
                             StripWS(buff);
                             char* controlID = strchr(buff, ' ');
                             if (controlID == NULL)
@@ -200,7 +216,8 @@ BOOL CData::ProcessSalMenuLine(const char* line, const char* lineEnd, int row, C
                     }
                     else
                     {
-                        lstrcpyn(buff, p, min(500 - 1, (lineEnd - p + 1)));
+                        if (!CopySalMenuToken(buff, _countof(buff), p, lineEnd))
+                            return FALSE;
                         WORD strID;
                         if (!DataRH.GetIDForIdentifier(buff, &strID))
                         {
@@ -278,8 +295,8 @@ BOOL CData::LoadSalMenu(const char* fileName)
         return FALSE;
     }
 
-    DWORD salMenuDataSize = GetFileSize(hFile, NULL);
-    if (salMenuDataSize == 0xFFFFFFFF)
+    DWORD salMenuDataSize;
+    if (!GetFileSizeDwordLocal(hFile, &salMenuDataSize))
     {
         char buf[MAX_PATH + 100];
         sprintf_s(buf, "Error reading file %s.", fileName);

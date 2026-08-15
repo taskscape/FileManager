@@ -288,41 +288,51 @@ void CMainWindow::MakeFileList()
                                                 NULL));
             if (hFile != INVALID_HANDLE_VALUE)
             {
-                // position the file pointer
-                SetFilePointer(hFile, 0, NULL, append ? FILE_END : FILE_BEGIN);
-
                 // fill the file with data -- insert one entry for each file or directory
                 BOOL deleteFile = TRUE;
-                if (panel->MakeFileList(hFile))
+                LARGE_INTEGER filePosition = {};
+                // The file-list command must use a 64-bit seek so append mode cannot inherit a 32-bit sentinel failure.
+                if (!SetFilePointerEx(hFile, filePosition, NULL, append ? FILE_END : FILE_BEGIN))
                 {
-                    panel->SetSel(FALSE, -1, TRUE);                        // force redraw
-                    PostMessage(panel->HWindow, WM_USER_SELCHANGED, 0, 0); // sel-change notify
-                    deleteFile = FALSE;
+                    DWORD err = GetLastError();
+                    SalMessageBox(HWindow, GetErrorText(err), LoadStr(IDS_ERRORTITLE), MB_OK | MB_ICONEXCLAMATION);
                 }
-
-                if (!deleteFile && Configuration.FileListDestination == 0) // clipboard
+                else
                 {
-                    DWORD fileSize = GetFileSize(hFile, NULL);
-                    if (fileSize != INVALID_FILE_SIZE && fileSize > 0)
+                    if (panel->MakeFileList(hFile))
                     {
-                        SetFilePointer(hFile, 0, NULL, FILE_BEGIN);
-                        char* buff = (char*)malloc(fileSize);
-                        if (buff != NULL)
+                        panel->SetSel(FALSE, -1, TRUE);                        // force redraw
+                        PostMessage(panel->HWindow, WM_USER_SELCHANGED, 0, 0); // sel-change notify
+                        deleteFile = FALSE;
+                    }
+
+                    if (!deleteFile && Configuration.FileListDestination == 0) // clipboard
+                    {
+                        LARGE_INTEGER fileSize;
+                        // The clipboard path remains DWORD-sized, so reject a larger temporary file instead of truncating it.
+                        if (GetFileSizeEx(hFile, &fileSize) && fileSize.QuadPart > 0 &&
+                            (ULONGLONG)fileSize.QuadPart <= MAXDWORD &&
+                            SetFilePointerEx(hFile, filePosition, NULL, FILE_BEGIN))
                         {
-                            DWORD read;
-                            if (ReadFile(hFile, buff, fileSize, &read, NULL))
+                            DWORD bytesToRead = (DWORD)fileSize.QuadPart;
+                            char* buff = (char*)malloc(bytesToRead);
+                            if (buff != NULL)
                             {
-                                CopyTextToClipboard(buff, fileSize, FALSE, NULL);
+                                DWORD read;
+                                if (ReadFile(hFile, buff, bytesToRead, &read, NULL))
+                                {
+                                    CopyTextToClipboard(buff, bytesToRead, FALSE, NULL);
+                                }
+                                else
+                                {
+                                    DWORD err = GetLastError();
+                                    SalMessageBox(HWindow, GetErrorText(err), LoadStr(IDS_ERRORTITLE), MB_OK | MB_ICONEXCLAMATION);
+                                }
+                                free(buff);
                             }
                             else
-                            {
-                                DWORD err = GetLastError();
-                                SalMessageBox(HWindow, GetErrorText(err), LoadStr(IDS_ERRORTITLE), MB_OK | MB_ICONEXCLAMATION);
-                            }
-                            free(buff);
+                                TRACE_E(LOW_MEMORY);
                         }
-                        else
-                            TRACE_E(LOW_MEMORY);
                     }
                 }
                 HANDLES(CloseHandle(hFile));
@@ -340,7 +350,8 @@ void CMainWindow::MakeFileList()
                         viewerData.FileName = fileName;
                         viewerData.Mode = 0; // text mode
                         char title[200];
-                        lstrcpyn(title, LoadStr(IDS_MAKEFILELIST_OUTPUT), 200);
+                        // Viewer captions retain their fixed presentation allocation.
+                        StringCchCopyNA(title, _countof(title), LoadStr(IDS_MAKEFILELIST_OUTPUT), _countof(title) - 1);
                         viewerData.Caption = title;
                         viewerData.WholeCaption = TRUE;
                         int error;
@@ -508,7 +519,7 @@ BOOL ExpandCommand2(HWND parent,
             char dosName[MAX_PATH];
             if (longName[0] != 0)
             {
-                if (l + 1 + lstrlen(longName) > MAX_PATH - 1)
+                if (l + 1 + strlen(longName) > MAX_PATH - 1)
                 {
                     SalMessageBox(parent, LoadStr(IDS_TOOLONGNAME), LoadStr(IDS_ERRORTITLE),
                                   MB_OK | MB_ICONEXCLAMATION);
@@ -769,9 +780,14 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
                     if (swapNames)
                     {
                         char swap[MAX_PATH];
-                        lstrcpyn(swap, userMenuAdvancedData->CompareName1, MAX_PATH);
-                        lstrcpyn(userMenuAdvancedData->CompareName1, userMenuAdvancedData->CompareName2, MAX_PATH);
-                        lstrcpyn(userMenuAdvancedData->CompareName2, swap, MAX_PATH);
+                        // Compare targets are filesystem identities and must never be swapped in truncated form.
+                        if (FAILED(StringCchCopyA(swap, _countof(swap), userMenuAdvancedData->CompareName1)) ||
+                            FAILED(StringCchCopyA(userMenuAdvancedData->CompareName1, _countof(userMenuAdvancedData->CompareName1), userMenuAdvancedData->CompareName2)) ||
+                            FAILED(StringCchCopyA(userMenuAdvancedData->CompareName2, _countof(userMenuAdvancedData->CompareName2), swap)))
+                        {
+                            userMenuAdvancedData->CompareName1[0] = 0;
+                            userMenuAdvancedData->CompareName2[0] = 0;
+                        }
                     }
                 }
                 if (Configuration.CnfrmShowNamesToCompare ||
@@ -795,10 +811,13 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
             HANDLE file;
             char batUniqueName[50]; // we need a unique name for the batch file in the cache
             DWORD lastErr;
+            CQuadWord batFileSize;
 
         _TRY_AGAIN:
 
-            sprintf(batUniqueName, "Usermenu %X", GetTickCount());
+            // Keep the existing cache-key shape while folding the 64-bit uptime past the old tick-wrap boundary.
+            const CMonotonicTimePoint timeSeed = CMonotonicClock::Now();
+            sprintf(batUniqueName, "Usermenu %X", (DWORD)(timeSeed ^ (timeSeed >> 32)));
             if (buildBat)
             {
                 BOOL exists;
@@ -934,11 +953,13 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
             if (buildBat)
             {
                 lastErr = GetLastError();
-                DWORD size;
-                size = GetFileSize(file, NULL);
+                batFileSize.Set(0, 0);
+                DWORD sizeError;
+                // The disk cache records the full generated batch-file size instead of a truncated DWORD result.
+                SalGetFileSize(file, batFileSize, sizeError); // size is advisory here, so keep zero when the query fails.
                 HANDLES(CloseHandle(file));
 
-                DiskCache.NamePrepared(batUniqueName, CQuadWord(size, 0));
+                DiskCache.NamePrepared(batUniqueName, batFileSize);
 
                 if (!error) // run the .bat
                 {
@@ -2068,8 +2089,10 @@ void CMainWindow::PostFocusNameInPanel(int panel, const char* path, const char* 
     {
         static char pathBackup[MAX_PATH + 200];
         static char nameBackup[MAX_PATH + 200];
-        lstrcpyn(pathBackup, path, MAX_PATH + 200);
-        lstrcpyn(nameBackup, name, MAX_PATH + 200);
+        // Deferred focus messages require complete path and file-name identities.
+        if (FAILED(StringCchCopyA(pathBackup, _countof(pathBackup), path)) ||
+            FAILED(StringCchCopyA(nameBackup, _countof(nameBackup), name)))
+            return;
         PostMessage(p->HWindow, WM_USER_FOCUSFILE, (WPARAM)nameBackup, (LPARAM)pathBackup);
     }
 }
@@ -2382,8 +2405,9 @@ LRESULT CMainWindow::HandleWmCommand(WPARAM wParam, LPARAM lParam)
                                 else
                                     break;
                             }
-                            lstrcpyn(fullName, activePanel->GetPath(), MAX_PATH);
-                            if (!SalPathAppend(fullName, file->Name, MAX_PATH) ||
+                            // Selected-file lists must contain complete filesystem identities.
+                            if (FAILED(StringCchCopyA(fullName, _countof(fullName), activePanel->GetPath())) ||
+                                !SalPathAppend(fullName, file->Name, MAX_PATH) ||
                                 !AddToListOfNames(&listFull, listFullEnd, fullName, (int)strlen(fullName)))
                                 break;
                         }
@@ -2403,8 +2427,9 @@ LRESULT CMainWindow::HandleWmCommand(WPARAM wParam, LPARAM lParam)
                         (index != 0 || !subDir))
                     {
                         CFileData* file = (index < activePanel->Dirs->Count) ? &activePanel->Dirs->At(index) : &activePanel->Files->At(index - activePanel->Dirs->Count);
-                        lstrcpyn(fullName, activePanel->GetPath(), MAX_PATH);
-                        if (!SalPathAppend(fullName, file->Name, MAX_PATH) ||
+                        // The focused-item list follows the same complete-path invariant.
+                        if (FAILED(StringCchCopyA(fullName, _countof(fullName), activePanel->GetPath())) ||
+                            !SalPathAppend(fullName, file->Name, MAX_PATH) ||
                             !AddToListOfNames(&listFull, listFullEnd, fullName, (int)strlen(fullName)))
                         {
                             smallBuf = TRUE;
@@ -2424,16 +2449,18 @@ LRESULT CMainWindow::HandleWmCommand(WPARAM wParam, LPARAM lParam)
 
                 if (LeftPanel->Is(ptDisk))
                 {
-                    lstrcpyn(userMenuAdvancedData.FullPathLeft, LeftPanel->GetPath(), MAX_PATH);
-                    if (!SalPathAddBackslash(userMenuAdvancedData.FullPathLeft, MAX_PATH))
+                    // User-menu paths are execution identities and must remain complete.
+                    if (FAILED(StringCchCopyA(userMenuAdvancedData.FullPathLeft, _countof(userMenuAdvancedData.FullPathLeft), LeftPanel->GetPath())) ||
+                        !SalPathAddBackslash(userMenuAdvancedData.FullPathLeft, MAX_PATH))
                         userMenuAdvancedData.FullPathLeft[0] = 0;
                 }
                 else
                     userMenuAdvancedData.FullPathLeft[0] = 0;
                 if (RightPanel->Is(ptDisk))
                 {
-                    lstrcpyn(userMenuAdvancedData.FullPathRight, RightPanel->GetPath(), MAX_PATH);
-                    if (!SalPathAddBackslash(userMenuAdvancedData.FullPathRight, MAX_PATH))
+                    // User-menu paths are execution identities and must remain complete.
+                    if (FAILED(StringCchCopyA(userMenuAdvancedData.FullPathRight, _countof(userMenuAdvancedData.FullPathRight), RightPanel->GetPath())) ||
+                        !SalPathAddBackslash(userMenuAdvancedData.FullPathRight, MAX_PATH))
                         userMenuAdvancedData.FullPathRight[0] = 0;
                 }
                 else
@@ -2526,15 +2553,17 @@ LRESULT CMainWindow::HandleWmCommand(WPARAM wParam, LPARAM lParam)
                 }
                 if (f1 != NULL)
                 {
-                    lstrcpyn(userMenuAdvancedData.CompareName1, activePanel->GetPath(), MAX_PATH);
-                    if (!SalPathAppend(userMenuAdvancedData.CompareName1, f1->Name, MAX_PATH))
+                    // Comparison inputs must be complete before the filename is appended.
+                    if (FAILED(StringCchCopyA(userMenuAdvancedData.CompareName1, _countof(userMenuAdvancedData.CompareName1), activePanel->GetPath())) ||
+                        !SalPathAppend(userMenuAdvancedData.CompareName1, f1->Name, MAX_PATH))
                         userMenuAdvancedData.CompareName1[0] = 0;
                 }
                 if (f2 != NULL)
                 {
-                    lstrcpyn(userMenuAdvancedData.CompareName2,
-                             (f2FromInactPanel ? inactivePanel : activePanel)->GetPath(), MAX_PATH);
-                    if (!SalPathAppend(userMenuAdvancedData.CompareName2, f2->Name, MAX_PATH))
+                    // Comparison inputs must be complete before the filename is appended.
+                    if (FAILED(StringCchCopyA(userMenuAdvancedData.CompareName2, _countof(userMenuAdvancedData.CompareName2),
+                                              (f2FromInactPanel ? inactivePanel : activePanel)->GetPath())) ||
+                        !SalPathAppend(userMenuAdvancedData.CompareName2, f2->Name, MAX_PATH))
                         userMenuAdvancedData.CompareName2[0] = 0;
                     else
                     {
@@ -2864,18 +2893,21 @@ LRESULT CMainWindow::HandleWmCommand(WPARAM wParam, LPARAM lParam)
             if (focusPlugin[0] != 0)
             {
                 char newPath[MAX_PATH];
-                lstrcpyn(newPath, focusPlugin, MAX_PATH);
-                const char* newName;
-                char* p = strrchr(newPath, '\\');
-                if (p != NULL)
+                // Panel focus uses a complete path and filename pair from the plugin dialog.
+                if (SUCCEEDED(StringCchCopyA(newPath, _countof(newPath), focusPlugin)))
                 {
-                    p++;
-                    *p = 0;
-                    newName = focusPlugin + int(p - newPath);
+                    const char* newName;
+                    char* p = strrchr(newPath, '\\');
+                    if (p != NULL)
+                    {
+                        p++;
+                        *p = 0;
+                        newName = focusPlugin + int(p - newPath);
+                    }
+                    else
+                        newName = "";
+                    SendMessage(GetActivePanel()->HWindow, WM_USER_FOCUSFILE, (WPARAM)newName, (LPARAM)newPath);
                 }
-                else
-                    newName = "";
-                SendMessage(GetActivePanel()->HWindow, WM_USER_FOCUSFILE, (WPARAM)newName, (LPARAM)newPath);
             }
 
             EndStopRefresh(); // snooper starts again now
@@ -3004,7 +3036,9 @@ LRESULT CMainWindow::HandleWmCommand(WPARAM wParam, LPARAM lParam)
                 if (path != NULL)
                 {
                     char newPath[MAX_PATH];
-                    lstrcpyn(newPath, path, MAX_PATH);
+                    // Share focus uses a complete path and filename pair from the dialog.
+                    if (FAILED(StringCchCopyA(newPath, _countof(newPath), path)))
+                        break;
                     const char* newName;
                     char* p = strrchr(newPath, '\\');
                     if (p != NULL)
@@ -4389,9 +4423,10 @@ LRESULT CMainWindow::HandleWmCommand(WPARAM wParam, LPARAM lParam)
             RightPanel = swap;
             // swap toolbar records
             char buff[1024];
-            lstrcpy(buff, Configuration.LeftToolBar);
-            lstrcpy(Configuration.LeftToolBar, Configuration.RightToolBar);
-            lstrcpy(Configuration.RightToolBar, buff);
+            // Toolbar layouts are fixed persisted presentation records during the panel swap.
+            StringCchCopyNA(buff, _countof(buff), Configuration.LeftToolBar, _countof(buff) - 1);
+            StringCchCopyNA(Configuration.LeftToolBar, _countof(Configuration.LeftToolBar), Configuration.RightToolBar, _countof(Configuration.LeftToolBar) - 1);
+            StringCchCopyNA(Configuration.RightToolBar, _countof(Configuration.RightToolBar), buff, _countof(Configuration.RightToolBar) - 1);
             // set panel variables and load the toolbars
             LeftPanel->DirectoryLine->SetLeftPanel(TRUE);
             RightPanel->DirectoryLine->SetLeftPanel(FALSE);

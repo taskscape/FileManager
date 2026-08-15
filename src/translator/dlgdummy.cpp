@@ -38,7 +38,8 @@ void SetIconWithDummyValue(HWND hWnd)
 void FillControlWithDummyValue(HWND hWnd)
 {
     // WORD id = (WORD)GetMenu(hWnd);
-    DWORD wStyle = GetWindowLong(hWnd, GWL_STYLE);
+    // This window style is a DWORD mask, obtained through the pointer-width accessor for x64 compatibility.
+    DWORD wStyle = (DWORD)GetWindowLongPtr(hWnd, GWL_STYLE);
     wchar_t wClass[200];
     RealGetWindowClassW(hWnd, wClass, 200);
     wchar_t wText[2000];

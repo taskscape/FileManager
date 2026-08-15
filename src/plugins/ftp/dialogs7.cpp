@@ -1037,7 +1037,7 @@ COperDlgListView::COperDlgListView() : CWindow(ooStatic)
     LastWidth = 0;
     ConsOrItems = FALSE;
     Scrolling = FALSE;
-    LastLButtonDownTime = GetTickCount() - 2000;
+    LastLButtonDownTime = CMonotonicClock::AtLeastDurationAgo(2000);
     LastLButtonDownLParam = -1;
 }
 
@@ -1103,14 +1103,17 @@ COperDlgListView::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
     {
         if (uMsg == WM_LBUTTONDOWN)
         {
-            if (LastLButtonDownLParam == lParam &&                                       // mouse is in the same place
-                (int)(GetTickCount() - LastLButtonDownTime) < (int)GetDoubleClickTime()) // click within the limit for a double-click
+            const CMonotonicTimePoint now = CMonotonicClock::Now();
+            if (LastLButtonDownLParam == lParam &&                                           // mouse is in the same place
+                CMonotonicClock::Elapsed(LastLButtonDownTime, now) < GetDoubleClickTime()) // click within the limit for a double-click
             {                                                                            // we generate WM_LBUTTONDBLCLK (needed on Vista)
                 uMsg = WM_LBUTTONDBLCLK;
-                LastLButtonDownTime = GetTickCount() - 2000; // so that one WM_LBUTTONDOWN is not enough for the next double-click
+                // Clear the matching location as well as the timestamp to force a new first click.
+                LastLButtonDownTime = CMonotonicClock::AtLeastDurationAgo(2000);
+                LastLButtonDownLParam = -1;
                 break;
             }
-            LastLButtonDownTime = GetTickCount(); // remember the time of the first click
+            LastLButtonDownTime = now;           // remember the time of the first click
             LastLButtonDownLParam = lParam;       // remember the location of the first click
         }
         if (HToolTip != NULL)
@@ -1355,9 +1358,10 @@ CGetDiskFreeSpaceThread::Body()
             break; // we are done...
 
         CQuadWord freeSpace;
-        DWORD ti = GetTickCount();
+        // A disk query may span the 32-bit tick wrap, so keep its elapsed-time sample 64-bit.
+        const CMonotonicTimePoint queryStarted = CMonotonicClock::Now();
         SalamanderGeneral->GetDiskFreeSpace(&freeSpace, path, NULL);
-        if (GetTickCount() - ti > 10000)
+        if (CMonotonicClock::HasElapsed(queryStarted, 10000, CMonotonicClock::Now()))
             freeSpace.Set(-1, -1); // discard results older than ten seconds (the situation is completely different anyway)
 
         HANDLES(EnterCriticalSection(&GetFreeSpaceCritSect));

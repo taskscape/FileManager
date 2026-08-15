@@ -11,6 +11,8 @@
 
 #include "precomp.h"
 
+#include <strsafe.h>
+
 #define GET_X_LPARAM(lp) ((int)(short)LOWORD(lp))
 #define GET_Y_LPARAM(lp) ((int)(short)HIWORD(lp))
 
@@ -322,7 +324,9 @@ protected:
         {
             DWORD id = (DWORD)wParam;
             char* text = (char*)lParam;
-            lstrcpyn(text, "ToolTip", TOOLTIP_TEXT_MAX);
+            // The host owns this fixed tooltip buffer, so retain an empty label on an invalid request.
+            if (text != NULL && FAILED(StringCchCopyA(text, TOOLTIP_TEXT_MAX, "ToolTip")))
+                text[0] = 0;
             return 0;
         }
         }
@@ -469,8 +473,11 @@ CCtrlExampleDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
     {
         Progress2->SetProgress(-1, NULL);
         char buff[300];
-        DWORD ticks = GetTickCount();
-        wsprintf(buff, StringTemplate, ticks);
+        // The formatted count is presentation-only; use the full monotonic sample for refresh timing.
+        const CMonotonicTimePoint ticks = CMonotonicClock::Now();
+        // This localized timer template is editable, so never let an expanded value overrun the control buffer.
+        if (_snprintf_s(buff, _countof(buff), _TRUNCATE, StringTemplate, (DWORD)ticks) < 0)
+            return 0;
         int i;
         for (i = 0; i < 50; i++) // emphasize the blinking effect
         {
@@ -482,7 +489,7 @@ CCtrlExampleDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         ProgressNumber += 1;
 
         // update the progress bar every 100 ms
-        if (ticks - LastTickCount > 100)
+        if (CMonotonicClock::HasElapsed(LastTickCount, 101, ticks))
         {
             LastTickCount = ticks;
 

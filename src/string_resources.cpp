@@ -485,8 +485,10 @@ void ThreadSafeWaitWindowFEH(BOOL showCloseButton)
 #endif // CALLSTK_DISABLE
 }
 
-DWORD WINAPI ThreadSafeWaitWindowF(void* param)
+DWORD WINAPI ThreadSafeWaitWindowFOwned(void* param, HANDLE stopEvent)
 {
+    // The thread exits through its posted destroy message; the owner event is lifetime-only.
+    UNREFERENCED_PARAMETER(stopEvent);
 #ifndef CALLSTK_DISABLE
     CCallStack stack;
 #endif // CALLSTK_DISABLE
@@ -516,10 +518,12 @@ void CreateSafeWaitWindow(const char* message, const char* caption,
         SafeWaitMessageCallerID = GetCurrentThreadId();
         if (!SafeWaitMessageThreadStarted) // the thread is not running
         {
-            HANDLE thread = HANDLES(CreateThread(NULL, 0, ThreadSafeWaitWindowF,
-                                                 (void*)(UINT_PTR)showCloseButton, 0, &SafeWaitMessageThreadID));
-            if (thread == NULL)
+            CThreadOwner* thread = new CThreadOwner;
+            if (thread == NULL || !thread->Start(ThreadSafeWaitWindowFOwned,
+                                                  (void*)(UINT_PTR)showCloseButton, "safe-wait message loop"))
             {
+                if (thread != NULL)
+                    delete thread;
                 HANDLES(EnterCriticalSection(&SafeWaitMessageCallerSetSection.cs));
                 SafeWaitMessageCallerSet = FALSE;
                 HANDLE cancelEvent = SafeWaitWindowCancelEvent;
@@ -529,9 +533,10 @@ void CreateSafeWaitWindow(const char* message, const char* caption,
                 TRACE_E("Unable to start ThreadSafeWaitWindow thread.");
                 return;
             }
-            SetThreadPriority(thread, THREAD_PRIORITY_ABOVE_NORMAL); // so it actually wins against the main thread
-            // The message thread owns UI resources that must outlive its safe join.
-            AddAuxThread(thread, FALSE, "safe-wait message loop");
+            SetThreadPriority(thread->GetThreadHandle(), THREAD_PRIORITY_ABOVE_NORMAL); // so it actually wins against the main thread
+            // The owner keeps UI resources alive through the safe join while this loop receives posted messages.
+            SafeWaitMessageThreadID = GetThreadId(thread->GetThreadHandle());
+            AddOwnedAuxThread(thread, "safe-wait message loop");
             HANDLES(InitializeCriticalSection(&SafeWaitMessageTextSection));
             SafeWaitMessageThreadStarted = TRUE;
         }
@@ -814,7 +819,8 @@ BOOL DoExpandVarString(HWND msgParent, const char* varText, BOOL validateOnly, i
                                             if (s3 == s) // only digits
                                             {
                                                 char widthBuff[5];
-                                                lstrcpyn(widthBuff, s2, tmpLen + 1);
+                                                // The formatter accepts at most four numeric width digits.
+                                                StringCchCopyNA(widthBuff, _countof(widthBuff), s2, tmpLen);
                                                 varWidth = atoi(widthBuff);
                                                 validNum = (varWidth >= 1);
                                             }
@@ -1148,7 +1154,9 @@ CQuadWord MyGetDiskFreeSpace(const char* path, CQuadWord* total)
         *total = CQuadWord(-1, -1);
     ULARGE_INTEGER availBytes, totalBytes, freeBytes;
     char ourPath[MAX_PATH + 200];
-    lstrcpyn(ourPath, path, MAX_PATH + 200);
+    // Disk-space queries require a complete input path.
+    if (FAILED(StringCchCopyA(ourPath, _countof(ourPath), path)))
+        return ret;
     SalPathAddBackslash(ourPath, MAX_PATH + 200);
     if (GetDiskFreeSpaceEx(ourPath, &availBytes, &totalBytes, &freeBytes))
     {
@@ -1246,7 +1254,7 @@ BOOL ResolveSubsts(char* resPath)
                 tgt[2] = '\\';
                 tgt[3] = 0;
             }
-            lstrcpyn(resPath, tgt, MAX_PATH);
+            StringCchCopyA(resPath, MAX_PATH, tgt);
         }
         else
             break;
@@ -1258,7 +1266,8 @@ void ResolveLocalPathWithReparsePoints(char* resPath, const char* path, BOOL* cu
                                        BOOL* rootOrCurReparsePointSet, char* rootOrCurReparsePoint,
                                        char* junctionOrSymlinkTgt, int* linkType, char* netPath)
 {
-    lstrcpyn(resPath, path, MAX_PATH);
+    // Reparse traversal must start from the complete caller-supplied path.
+    StringCchCopyA(resPath, MAX_PATH, path);
     ResolveSubsts(resPath);
     if (!SalPathAddBackslash(resPath, MAX_PATH))
         TRACE_E("ResolveLocalPathWithReparsePoints(): too long path");
@@ -1283,7 +1292,7 @@ void ResolveLocalPathWithReparsePoints(char* resPath, const char* path, BOOL* cu
                             if (!SalPathAppend(rootOrCurReparsePoint, repPointPath + strlen(resPath), MAX_PATH))
                             {
                                 TRACE_E("ResolveLocalPathWithReparsePoints(): unexpected situation: too long path for substed path");
-                                lstrcpyn(rootOrCurReparsePoint, repPointPath, MAX_PATH);
+                                StringCchCopyA(rootOrCurReparsePoint, MAX_PATH, repPointPath);
                             }
                             else
                                 SalPathAddBackslash(rootOrCurReparsePoint, MAX_PATH);
@@ -1291,12 +1300,12 @@ void ResolveLocalPathWithReparsePoints(char* resPath, const char* path, BOOL* cu
                         else
                         {
                             TRACE_E("ResolveLocalPathWithReparsePoints(): unexpected prefix of resolved path");
-                            lstrcpyn(rootOrCurReparsePoint, repPointPath, MAX_PATH);
+                            StringCchCopyA(rootOrCurReparsePoint, MAX_PATH, repPointPath);
                         }
                     }
                     *rootOrCurReparsePointSet = TRUE;
                 }
-                lstrcpyn(resPath, repPointPath, MAX_PATH);
+                StringCchCopyA(resPath, MAX_PATH, repPointPath);
                 if (!SalPathAddBackslash(resPath, MAX_PATH))
                     TRACE_E("ResolveLocalPathWithReparsePoints(): too long path");
                 int repPointType;
@@ -1306,7 +1315,7 @@ void ResolveLocalPathWithReparsePoints(char* resPath, const char* path, BOOL* cu
                     if (firstRepPoint)
                     {
                         if (junctionOrSymlinkTgt != NULL)
-                            lstrcpyn(junctionOrSymlinkTgt, repPointPath, MAX_PATH);
+                            StringCchCopyA(junctionOrSymlinkTgt, MAX_PATH, repPointPath);
                         if (linkType != NULL)
                             *linkType = repPointType;
                     }
@@ -1317,7 +1326,7 @@ void ResolveLocalPathWithReparsePoints(char* resPath, const char* path, BOOL* cu
                 if (getRepPointDestRes && (IsUNCPath(repPointPath) || drvType == DRIVE_REMOTE)) // symlink to a UNC or mapped network path (available since Vista)
                 {                                                                               // it only makes sense to look for reparse points on fixed disks, so stop here (network paths are a problem because their reparse points will return "local paths" (C:\...), which, if used on this machine (instead of the remote one they come from), it will lead to nonsensical results)
                     if (netPath != NULL)
-                        lstrcpyn(netPath, repPointPath, MAX_PATH);
+                        StringCchCopyA(netPath, MAX_PATH, repPointPath);
                     GetRootPath(resPath, repPointPath);
                     break;
                 }
@@ -1328,7 +1337,7 @@ void ResolveLocalPathWithReparsePoints(char* resPath, const char* path, BOOL* cu
                 }
                 if (allowedDepth-- == 0) // looks like an endless loop
                 {
-                    lstrcpyn(resPath, path, MAX_PATH); // let the system handle it on its own
+                    StringCchCopyA(resPath, MAX_PATH, path); // let the system handle it on its own
                     ResolveSubsts(resPath);
                     if (!SalPathAddBackslash(resPath, MAX_PATH))
                         TRACE_E("ResolveLocalPathWithReparsePoints(): too long path");
@@ -1340,7 +1349,7 @@ void ResolveLocalPathWithReparsePoints(char* resPath, const char* path, BOOL* cu
                         *linkType = 0 /* UNKNOWN */;
                     break;
                 }
-                lstrcpyn(resPath, repPointPath, MAX_PATH);
+                StringCchCopyA(resPath, MAX_PATH, repPointPath);
                 if (!SalPathAddBackslash(resPath, MAX_PATH))
                 {
                     TRACE_E("ResolveLocalPathWithReparsePoints(): too long path");
@@ -1360,7 +1369,8 @@ BOOL MyGetDiskFreeSpace(const char* path, LPDWORD lpSectorsPerCluster,
     CALL_STACK_MESSAGE2("MyGetDiskFreeSpace(%s, , , , )", path);
     char ourPath[MAX_PATH];
     char resPath[MAX_PATH];
-    lstrcpyn(resPath, path, MAX_PATH);
+    // Disk queries resolve a complete path before inspecting its root.
+    StringCchCopyA(resPath, MAX_PATH, path);
     ResolveSubsts(resPath);
     GetRootPath(ourPath, resPath);
     if (!IsUNCPath(ourPath) && GetDriveType(ourPath) == DRIVE_FIXED) // reparse points only make sense to look for on fixed disks
@@ -1397,7 +1407,8 @@ BOOL MyGetVolumeInformation(const char* path, char* rootOrCurReparsePoint, char*
     if (linkType != NULL)
         *linkType = 0;
     char resPath[MAX_PATH];
-    lstrcpyn(resPath, path, MAX_PATH);
+    // Drive type checks resolve a complete path before inspecting its root.
+    StringCchCopyA(resPath, MAX_PATH, path);
     ResolveSubsts(resPath);
     GetRootPath(ourPath, resPath);
     if (!IsUNCPath(ourPath) && GetDriveType(ourPath) == DRIVE_FIXED) // reparse points only make sense to look for on fixed disks
@@ -1432,7 +1443,8 @@ BOOL MyGetVolumeInformation(const char* path, char* rootOrCurReparsePoint, char*
                     if (!SalPathAppend(rootOrCurReparsePoint, ourPath + strlen(resPath), MAX_PATH))
                     {
                         TRACE_E("MyGetVolumeInformation(): unexpected situation: too long path for substed path");
-                        lstrcpyn(rootOrCurReparsePoint, ourPath, MAX_PATH);
+                        // Preserve the complete resolved reparse-point fallback.
+                        StringCchCopyA(rootOrCurReparsePoint, MAX_PATH, ourPath);
                     }
                     else
                         SalPathAddBackslash(rootOrCurReparsePoint, MAX_PATH);
@@ -1440,7 +1452,7 @@ BOOL MyGetVolumeInformation(const char* path, char* rootOrCurReparsePoint, char*
                 else
                 {
                     TRACE_E("MyGetVolumeInformation(): unexpected prefix of resolved path");
-                    lstrcpyn(rootOrCurReparsePoint, ourPath, MAX_PATH);
+                    StringCchCopyA(rootOrCurReparsePoint, MAX_PATH, ourPath);
                 }
             }
             int l = (int)strlen(rootOrCurReparsePoint);
@@ -1530,20 +1542,21 @@ BOOL GetReparsePointDestination(const char* repPointDir, char* repPointDstBuf, D
     int myType = 0;
     if (juncData->ReparseTag == IO_REPARSE_TAG_MOUNT_POINT)
     {
-        lstrcpynW(substName, (WCHAR*)((char*)juncData->PathBuffer + juncData->SubstituteNameOffset),
-                  min(juncData->SubstituteNameLength / sizeof(WCHAR) + 1, 1000));
-        lstrcpynW(printName, (WCHAR*)((char*)juncData->PathBuffer + juncData->PrintNameOffset),
-                  min(juncData->PrintNameLength / sizeof(WCHAR) + 1, 1000));
+        // Reparse payload names are counted; copy only their bounded UTF-16 payload.
+        StringCchCopyNW(substName, _countof(substName), (WCHAR*)((char*)juncData->PathBuffer + juncData->SubstituteNameOffset),
+                         min(juncData->SubstituteNameLength / sizeof(WCHAR), _countof(substName) - 1));
+        StringCchCopyNW(printName, _countof(printName), (WCHAR*)((char*)juncData->PathBuffer + juncData->PrintNameOffset),
+                         min(juncData->PrintNameLength / sizeof(WCHAR), _countof(printName) - 1));
         myType = _wcsnicmp(substName, L"\\??\\Volume", 10) == 0 ? 1 /* MOUNT POINT */ : 2 /* JUNCTION POINT */;
     }
     else
     {
         if (juncData->ReparseTag == IO_REPARSE_TAG_SYMLINK)
         {
-            lstrcpynW(substName, (WCHAR*)((char*)juncData->PathBuffer + 4 /* ULONG Flags */ + juncData->SubstituteNameOffset),
-                      min(juncData->SubstituteNameLength / sizeof(WCHAR) + 1, 1000));
-            lstrcpynW(printName, (WCHAR*)((char*)juncData->PathBuffer + 4 /* ULONG Flags */ + juncData->PrintNameOffset),
-                      min(juncData->PrintNameLength / sizeof(WCHAR) + 1, 1000));
+            StringCchCopyNW(substName, _countof(substName), (WCHAR*)((char*)juncData->PathBuffer + 4 /* ULONG Flags */ + juncData->SubstituteNameOffset),
+                             min(juncData->SubstituteNameLength / sizeof(WCHAR), _countof(substName) - 1));
+            StringCchCopyNW(printName, _countof(printName), (WCHAR*)((char*)juncData->PathBuffer + 4 /* ULONG Flags */ + juncData->PrintNameOffset),
+                             min(juncData->PrintNameLength / sizeof(WCHAR), _countof(printName) - 1));
             myType = 3 /* SYMBOLIC LINK */;
         }
         else
@@ -1580,7 +1593,7 @@ BOOL GetReparsePointDestination(const char* repPointDir, char* repPointDstBuf, D
             symlinkAbsPath[0] = (WCHAR)(unsigned char)repPointDir[0]; // a bit of a hack (we rely on a fact that 'a-zA-Z' convert to Unicode 1:1)
             symlinkAbsPath[1] = L':';
             if (*s == L'\\')
-                lstrcpynW(symlinkAbsPath + 2, s, 1000 - 2);
+                StringCchCopyNW(symlinkAbsPath + 2, _countof(symlinkAbsPath) - 2, s, _countof(symlinkAbsPath) - 3);
             else
             {
                 if (MultiByteToWideChar(CP_ACP, 0, repPointDir + 2, -1, symlinkAbsPath + 2, 1000 - 2) == 0)
@@ -1590,7 +1603,7 @@ BOOL GetReparsePointDestination(const char* repPointDir, char* repPointDstBuf, D
                     return FALSE;
                 }
                 symlinkAbsPath[1000 - 1] = 0;
-                int len = lstrlenW(symlinkAbsPath);
+                int len = (int)wcslen(symlinkAbsPath);
                 if (symlinkAbsPath[len - 1] == L'\\')
                     symlinkAbsPath[len - 1] = 0;
                 WCHAR* lastComp = wcsrchr(symlinkAbsPath, L'\\');
@@ -1599,7 +1612,8 @@ BOOL GetReparsePointDestination(const char* repPointDir, char* repPointDstBuf, D
                     TRACE_E("GetReparsePointDestination(): Unexpected format of symbolic link name (it does not contain backslash): " << repPointDir);
                     return FALSE;
                 }
-                lstrcpynW(lastComp + 1, s, (int)(1000 - ((lastComp + 1) - symlinkAbsPath)));
+                StringCchCopyNW(lastComp + 1, _countof(symlinkAbsPath) - ((lastComp + 1) - symlinkAbsPath), s,
+                                 _countof(symlinkAbsPath) - ((lastComp + 1) - symlinkAbsPath) - 1);
             }
             s = symlinkAbsPath;
         }
@@ -1627,7 +1641,8 @@ BOOL GetCurrentLocalReparsePoint(const char* path, char* currentReparsePoint, in
         return FALSE;
     }
 
-    lstrcpyn(currentReparsePoint, path, currentReparsePointBufSize);
+    // The subsequent explicit length check rejects a path that cannot fit completely.
+    StringCchCopyA(currentReparsePoint, currentReparsePointBufSize, path);
     if ((int)strlen(path) >= currentReparsePointBufSize)
     {
         TRACE_E("GetCurrentLocalReparsePoint(): path does not fit in output buffer.");
@@ -1687,7 +1702,8 @@ UINT MyGetDriveType(const char* path)
 {
     char ourPath[MAX_PATH];
     char resPath[MAX_PATH];
-    lstrcpyn(resPath, path, MAX_PATH);
+    // Volume information resolves a complete path before finding its root.
+    StringCchCopyA(resPath, MAX_PATH, path);
     ResolveSubsts(resPath);
     GetRootPath(ourPath, resPath);
     UINT ret = DRIVE_UNKNOWN;
@@ -1747,14 +1763,14 @@ BOOL GetSubstInformation(BYTE driveNum, char* path, int pathMax)
             if (((target[4] >= 'a' && target[4] <= 'z') || (target[4] >= 'A' && target[4] <= 'Z')) &&
                 target[5] == ':')
             {
-                lstrcpyn(path, target + 4, pathMax);
+                StringCchCopyA(path, pathMax, target + 4);
                 return TRUE;
             }
             if (memcmp(target + 4, "UNC\\", 4) == 0)
             {
-                lstrcpyn(path, "\\", pathMax);
+                StringCchCopyA(path, pathMax, "\\");
                 if (pathMax > 2)
-                    lstrcpyn(path + 1, target + 7, pathMax - 1);
+                    StringCchCopyA(path + 1, pathMax - 1, target + 7);
                 return TRUE;
             }
         }
@@ -2526,7 +2542,8 @@ BOOL LoadViewers(HKEY hKey, const char* name, CViewerMasks* viewerMasks)
                 if (Configuration.ConfigVersion < 44) // convert extensions to lowercase
                 {
                     char masksAux[MAX_PATH];
-                    lstrcpyn(masksAux, masks, MAX_PATH);
+                    // Registry mask migration retains its fixed configuration field.
+                    StringCchCopyNA(masksAux, _countof(masksAux), masks, _countof(masksAux) - 1);
                     StrICpy(masks, masksAux);
                 }
                 CViewerMasksItem* item = new CViewerMasksItem(masks, command, arguments,
@@ -2625,7 +2642,8 @@ BOOL LoadEditors(HKEY hKey, const char* name, CEditorMasks* editorMasks)
                 if (Configuration.ConfigVersion < 44) // convert extensions to lowercase
                 {
                     char masksAux[MAX_PATH];
-                    lstrcpyn(masksAux, masks, MAX_PATH);
+                    // Registry mask migration retains its fixed configuration field.
+                    StringCchCopyNA(masksAux, _countof(masksAux), masks, _countof(masksAux) - 1);
                     StrICpy(masks, masksAux);
                 }
                 CEditorMasksItem* item = new CEditorMasksItem(masks, command, arguments, initDir);
@@ -3140,9 +3158,19 @@ BOOL CLanguage::Init(const char* fileName, HINSTANCE modul)
 
 BOOL CLanguage::GetLanguageName(char* buffer, int bufferSize)
 {
-    if (GetLocaleInfo(MAKELCID(LanguageID, SORT_DEFAULT), LOCALE_SLANGUAGE, buffer, bufferSize) == 0)
+    WCHAR localeName[LOCALE_NAME_MAX_LENGTH];
+    WCHAR languageName[LOCALE_NAME_MAX_LENGTH];
+    if (bufferSize <= 0 ||
+        LCIDToLocaleName(MAKELCID(LanguageID, SORT_DEFAULT), localeName, _countof(localeName), 0) == 0 ||
+        GetLocaleInfoEx(localeName, LOCALE_SLANGUAGE, languageName, _countof(languageName)) == 0 ||
+        WideCharToMultiByte(CP_ACP, 0, languageName, -1, buffer, bufferSize, NULL, NULL) == 0)
     {
-        lstrcpyn(buffer, "?", bufferSize);
+        if (bufferSize > 0)
+        {
+            // The language-name fallback is a bounded presentation field.
+            StringCchCopyA(buffer, bufferSize, "?");
+        }
     }
+    // Language-pack names remain ANSI at this boundary, but resolve their LCID through the locale-name API first.
     return TRUE;
 }

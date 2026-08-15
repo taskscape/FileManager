@@ -233,9 +233,6 @@ namespace split
             OnComboSelChange();
             SetFocus(h);
 
-            /*HWND h = GetDlgItem(hWnd, IDC_EDITNUMBER);
-      LONG style = GetWindowLong(h, GWL_STYLE);
-      SetWindowLong(h, GWL_STYLE, style | WS_VSCROLL);*/
             return FALSE;
         }
 
@@ -430,8 +427,9 @@ namespace combine
     static HWND ClearDefaultStyle(int id)
     {
         HWND hCtrl = GetDlgItem(hDialog, id);
-        LONG style = GetWindowLong(hCtrl, GWL_STYLE);
-        SetWindowLong(hCtrl, GWL_STYLE, style & ~BS_DEFPUSHBUTTON);
+        // The pointer-width pair preserves this button-style update on x64 builds.
+        LONG_PTR style = GetWindowLongPtr(hCtrl, GWL_STYLE);
+        SetWindowLongPtr(hCtrl, GWL_STYLE, style & ~BS_DEFPUSHBUTTON);
         InvalidateRect(hCtrl, NULL, FALSE);
         return hCtrl;
     }

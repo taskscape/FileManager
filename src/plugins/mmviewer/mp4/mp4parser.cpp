@@ -3,6 +3,8 @@
 
 #include "precomp.h"
 
+#include <strsafe.h>
+
 #ifdef _MP4_SUPPORT_
 
 #include "mp4parser.h"
@@ -92,10 +94,11 @@ CParserMP4::GetFileInfo(COutputInterface* output)
 
         char str_time[64];
         DWORD length_sec = head.length / 1000;
-        if (length_sec / 3600)
-            lstrcpy(str_time, FStr("%02lu:%02lu:%02lu", length_sec / 3600, length_sec / 60 % 60, length_sec % 60));
-        else
-            lstrcpy(str_time, FStr("%02lu:%02lu", length_sec / 60 % 60, length_sec % 60));
+        const char* formattedTime = length_sec / 3600 ? FStr("%02lu:%02lu:%02lu", length_sec / 3600, length_sec / 60 % 60, length_sec % 60)
+                                                       : FStr("%02lu:%02lu", length_sec / 60 % 60, length_sec % 60);
+        // A failed display-label copy must not expose a partial duration.
+        if (FAILED(StringCchCopyA(str_time, _countof(str_time), formattedTime)))
+            str_time[0] = 0;
         output->AddItem(LoadStr(IDS_MP4_DURATION), FStr("%d", str_time));
 
         output->AddItem(LoadStr(IDS_MP4_CHANNELS), FStr("%d", head.channels));

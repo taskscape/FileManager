@@ -4,6 +4,8 @@
 
 #include "precomp.h"
 
+#include <strsafe.h>
+
 #include "menu.h"
 
 #define UPDOWN_TIMER_ID 1  // timer id
@@ -676,9 +678,12 @@ BOOL CMenuPopup::GetItemInfo(DWORD position, BOOL byPosition, MENU_ITEM_INFO* mi
     if (mii->Mask & MENU_MASK_STRING)
     {
         if (mii->String == NULL && item->String != NULL)
-            mii->StringLen = lstrlen(item->String);
-        else
-            lstrcpyn(mii->String, item->String, mii->StringLen);
+            mii->StringLen = (DWORD)strlen(item->String);
+        else if (mii->String != NULL && mii->StringLen > 0)
+        {
+            // Preserve the caller-declared menu-label display limit explicitly.
+            StringCchCopyNA(mii->String, mii->StringLen, item->String, mii->StringLen - 1);
+        }
     }
 
     if (mii->Mask & MENU_MASK_BITMAP)
@@ -1250,7 +1255,8 @@ BOOL CMenuPopup::LoadFromTemplate2(HINSTANCE hInstance, const MENU_TEMPLATE_ITEM
                        MENU_MASK_SKILLLEVEL;
             mii.Type = MENU_TYPE_STRING;
             mii.ID = row->ID;
-            lstrcpy(stringBuff, LoadStr(row->TextResID, hInstance));
+            // Template labels use a fixed presentation buffer with an explicit clipping limit.
+            StringCchCopyNA(stringBuff, _countof(stringBuff), LoadStr(row->TextResID, hInstance), _countof(stringBuff) - 1);
             mii.ImageIndex = row->ImageIndex;
             mii.State = row->State;
             mii.SkillLevel = row->SkillLevel;
@@ -1299,7 +1305,8 @@ BOOL CMenuPopup::LoadFromTemplate2(HINSTANCE hInstance, const MENU_TEMPLATE_ITEM
                        MENU_MASK_ENABLER | MENU_MASK_SKILLLEVEL;
             mii.Type = MENU_TYPE_STRING;
             mii.ID = row->ID;
-            lstrcpy(stringBuff, LoadStr(row->TextResID, hInstance));
+            // Template labels use a fixed presentation buffer with an explicit clipping limit.
+            StringCchCopyNA(stringBuff, _countof(stringBuff), LoadStr(row->TextResID, hInstance), _countof(stringBuff) - 1);
             mii.ImageIndex = row->ImageIndex;
             mii.SubMenu = subMenu;
             mii.State = row->State;
@@ -2212,7 +2219,7 @@ void CMenuPopup::DoDispatchMessage(MSG* msg, BOOL* leaveMenu, DWORD* retValue, B
                     }
                 }
             }
-            SharedRes->ChangeTickCount = INFINITE; // we do not want the menu to unfold after a timeout
+            SharedRes->ChangeTickCount = MENU_CHANGE_TICK_NONE; // do not unfold the menu after this key action
             break;
         }
 
@@ -2423,18 +2430,8 @@ void CMenuPopup::DoDispatchMessage(MSG* msg, BOOL* leaveMenu, DWORD* retValue, B
         if (popup != NULL && (newItemIndex != popup->SelectedItemIndex))
         {
             popup->SelectNewItemIndex(newItemIndex, TRUE);
-            /*
-        if (popup->OpenedSubMenu != NULL)
-        {
-          // if a submenu is open, set the time only for the first change
-          if (SharedRes->ChangeTickCount == INFINITE)
-            SharedRes->ChangeTickCount = GetTickCount();
-        }
-        else
-          SharedRes->ChangeTickCount = GetTickCount();
-        */
-            // John: classic menu behaves like this.
-            SharedRes->ChangeTickCount = GetTickCount();
+            // Match classic-menu selection behavior without a 32-bit uptime wrap.
+            SharedRes->ChangeTickCount = CMonotonicClock::Now();
         }
         return;
     }
@@ -3136,25 +3133,25 @@ CMenuPopup::TrackInternal(DWORD trackFlags, int x, int y, HWND hwnd, const RECT*
                 else
                 {
                     DWORD timeOut = INFINITE;
-                    if (SharedRes->ChangeTickCount != INFINITE)
+                    CMonotonicTimePoint changeDeadline = MENU_CHANGE_TICK_NONE;
+                    if (SharedRes->ChangeTickCount != MENU_CHANGE_TICK_NONE)
                     {
-                        DWORD delta = GetTickCount() - SharedRes->ChangeTickCount;
                         DWORD delay;
                         if (SystemParametersInfo(SPI_GETMENUSHOWDELAY, 0, &delay, FALSE) == 0)
                             delay = 400;
-                        if (delta > delay)
-                            timeOut = 0;
-                        else
-                            timeOut = delay - delta;
+                        changeDeadline = SharedRes->ChangeTickCount + (CMonotonicDuration)delay;
+                        // Convert only the final wait duration to the Win32 DWORD API.
+                        timeOut = CMonotonicClock::RemainingWin32TimerDelay(changeDeadline,
+                                                                             CMonotonicClock::Now());
                     }
 
                     DWORD ret = MsgWaitForMultipleObjects(1, &SharedRes->HCloseEvent, FALSE, timeOut, QS_ALLINPUT);
                     if (ret != 0xFFFFFFFF)
                     {
                         if (timeOut != INFINITE &&
-                            (ret == WAIT_TIMEOUT || GetTickCount() - SharedRes->ChangeTickCount > timeOut))
+                            (ret == WAIT_TIMEOUT || CMonotonicClock::HasReached(changeDeadline, CMonotonicClock::Now())))
                         {
-                            SharedRes->ChangeTickCount = INFINITE;
+                            SharedRes->ChangeTickCount = MENU_CHANGE_TICK_NONE;
                             OnTimerTimeout();
                         }
                     }

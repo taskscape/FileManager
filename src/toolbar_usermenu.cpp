@@ -10,6 +10,9 @@
 #include "cfgdlg.h"
 #include "execute.h"
 #include "plugins.h"
+
+#include <strsafe.h>
+
 extern "C"
 {
 #include "shexreg.h"
@@ -162,7 +165,8 @@ public:
                     if (data->fWide)
                     {
                         const wchar_t* fileW = (wchar_t*)(((char*)data) + data->pFiles);
-                        int l = lstrlenW(fileW);
+                        // CF_HDROP supplies a terminated wide filename before the trailing-list check.
+                        int l = static_cast<int>(wcslen(fileW));
                         if (*(fileW + l + 1) == 0)
                         {
                             WideCharToMultiByte(CP_ACP, 0, fileW, l + 1, path, l + 1, NULL, NULL);
@@ -551,7 +555,8 @@ CUserMenuBar::CUserMenuBar(HWND hNotifyWindow, CObjectOrigin origin)
                 if (item->Type == umitSubmenuBegin)
                     tii.Style |= TLBI_STYLE_WHOLEDROPDOWN | TLBI_STYLE_DROPDOWN;
                 char buff[80];
-                lstrcpyn(buff, item->ItemName, 80);
+                // User-menu toolbar captions retain their compact display allocation.
+                StringCchCopyNA(buff, _countof(buff), item->ItemName, _countof(buff) - 1);
                 RemoveAmpersands(buff);
                 tii.Text = buff;
                 tii.HIcon = item->UMIcon;
@@ -640,10 +645,18 @@ void CUserMenuBar::OnGetToolTip(LPARAM lParam)
         {
             char umCommand[MAX_PATH];
             if (ExpandCommand(MainWindow->HWindow, item->UMCommand, umCommand, MAX_PATH, TRUE))
-                lstrcpy(tt->Buffer, umCommand);
+            {
+                // The toolbar protocol fixes the reply capacity; do not shorten a user command silently.
+                if (FAILED(StringCchCopyA(tt->Buffer, TOOLTIP_TEXT_MAX, umCommand)))
+                    tt->Buffer[0] = 0;
+            }
         }
         else
-            lstrcpy(tt->Buffer, item->ItemName);
+        {
+            // Preserve the same all-or-empty policy for the configured menu label.
+            if (FAILED(StringCchCopyA(tt->Buffer, TOOLTIP_TEXT_MAX, item->ItemName)))
+                tt->Buffer[0] = 0;
+        }
     }
 }
 

@@ -3,6 +3,8 @@
 
 #include "precomp.h"
 
+#include "..\\..\\common\\monotonic_time.h"
+
 void CFilecompWorker::CompareBinaryFiles()
 {
     CCachedFile cf[2];
@@ -122,7 +124,9 @@ int CFilecompWorker::CompareBinaryFilesAux(CCachedFile (&cf)[2], QWORD& changeOf
 {
     CALL_STACK_MESSAGE_NONE
     unsigned int blokSize = cf[0].GetMinViewSize();
-    DWORD size, tickCount = GetTickCount() - 1000;
+    DWORD size;
+    // Progress throttling is worker-local, so keep its clock sample 64-bit across long comparisons.
+    CMonotonicTimePoint tickCount = CMonotonicClock::AtLeastDurationAgo(1000);
     QWORD remain = __min(Files[0].Size, Files[1].Size);
     QWORD offset = 0, totalSize;
     LPBYTE ptr0, ptr1, start, end;
@@ -138,9 +142,9 @@ int CFilecompWorker::CompareBinaryFilesAux(CCachedFile (&cf)[2], QWORD& changeOf
 
         if (pct != newPct)
         {
-            if ((GetTickCount() - tickCount) > 500)
+            if (CMonotonicClock::HasElapsed(tickCount, 500, CMonotonicClock::Now()))
             {
-                tickCount = GetTickCount();
+                tickCount = CMonotonicClock::Now();
                 pct = newPct;
                 SendMessage(MainWindow, WM_USER_WORKERNOTIFIES, WN_SET_PROGRESS, MAKELPARAM(pct, 0));
             }
@@ -211,7 +215,8 @@ int CFilecompWorker::FindDifferencesBody(CCachedFile (&cf)[2], QWORD changeOffs,
     QWORD lenghtSave;
     int pct = 0;
     DWORD lastChangesSize = -1;
-    DWORD tickCount = GetTickCount() - 1000;
+    // Progress throttling is worker-local, so keep its clock sample 64-bit across long comparisons.
+    CMonotonicTimePoint tickCount = CMonotonicClock::AtLeastDurationAgo(1000);
 
     totalSize = __min(Files[0].Size, Files[1].Size);
 
@@ -228,9 +233,9 @@ int CFilecompWorker::FindDifferencesBody(CCachedFile (&cf)[2], QWORD changeOffs,
 
             if (pct != newPct || lastChangesSize != changes.size())
             {
-                if ((GetTickCount() - tickCount) > 500)
+                if (CMonotonicClock::HasElapsed(tickCount, 500, CMonotonicClock::Now()))
                 {
-                    tickCount = GetTickCount();
+                    tickCount = CMonotonicClock::Now();
                     pct = newPct;
                     lastChangesSize = (DWORD)changes.size();
                     SendMessage(MainWindow, WM_USER_WORKERNOTIFIES, WN_SET_PROGRESS, MAKELPARAM(pct, lastChangesSize));
@@ -322,9 +327,9 @@ int CFilecompWorker::FindDifferencesBody(CCachedFile (&cf)[2], QWORD changeOffs,
 
             if (pct != newPct || lastChangesSize != changes.size())
             {
-                if ((GetTickCount() - tickCount) > 500)
+                if (CMonotonicClock::HasElapsed(tickCount, 500, CMonotonicClock::Now()))
                 {
-                    tickCount = GetTickCount();
+                    tickCount = CMonotonicClock::Now();
                     pct = newPct;
                     lastChangesSize = (DWORD)changes.size();
                     SendMessage(MainWindow, WM_USER_WORKERNOTIFIES, WN_SET_PROGRESS, MAKELPARAM(pct, lastChangesSize));

@@ -155,8 +155,19 @@ BOOL CIconList::Create(int imageWidth, int imageHeight, int imageCount)
     }
     ZeroMemory(ImageFlags, sizeof(BYTE) * imageCount); // without alpha channel
 
-    int bmpWidth = imageWidth * min(imageCount, IL_ITEMS_IN_ROW);
-    int bmpHeight = imageHeight * ((imageCount + IL_ITEMS_IN_ROW - 1) / IL_ITEMS_IN_ROW);
+    int imageColumns = min(imageCount, IL_ITEMS_IN_ROW);
+    int imageRows = (imageCount - 1) / IL_ITEMS_IN_ROW + 1;
+    // Reject dimensions that would wrap before they become signed DIB dimensions or allocation geometry.
+    if (imageWidth > INT_MAX / imageColumns || imageHeight > INT_MAX / imageRows)
+    {
+        TRACE_E("CIconList::Create: Image geometry is too large!");
+        free(ImageFlags);
+        ImageFlags = NULL;
+        HANDLES(LeaveCriticalSection(&CriticalSection));
+        return FALSE;
+    }
+    int bmpWidth = imageWidth * imageColumns;
+    int bmpHeight = imageHeight * imageRows;
 
     // helper DC so we can create compatible bitmap
     HDC hDC = HANDLES(GetDC(NULL));

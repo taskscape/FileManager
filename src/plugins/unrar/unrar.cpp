@@ -3,6 +3,8 @@
 
 #include "precomp.h"
 
+#include <strsafe.h>
+
 // ****************************************************************************
 
 HINSTANCE DLLInstance = NULL; // handle to SPL - language-independent resources
@@ -67,6 +69,13 @@ BOOL WINAPI DllMain(HINSTANCE hinstDLL, DWORD fdwReason, LPVOID lpvReserved)
 LPCTSTR LoadStr(int resID)
 {
     return SalamanderGeneral->LoadStr(HLanguage, resID);
+}
+
+static void CopyRarErrorPrefix(char* buffer, size_t bufferCapacity, int stringId)
+{
+    // FormatMessage appends to this buffer, so a prefix that cannot fit must leave a valid empty destination.
+    if (FAILED(StringCchCopyA(buffer, bufferCapacity, LoadStr(stringId))))
+        buffer[0] = 0;
 }
 
 int WINAPI SalamanderPluginGetReqVer()
@@ -298,7 +307,8 @@ BOOL CPluginInterfaceForArchiver::ListArchive(CSalamanderForOperationsAbstract* 
             }
             else
                 path = "";
-            fileData.NameLen = lstrlen(name);
+            // Archive entry names are terminated by the RAR reader before this owned allocation is sized.
+            fileData.NameLen = static_cast<int>(_tcslen(name));
             fileData.Name = (LPTSTR)SalamanderGeneral->Alloc((fileData.NameLen + 1) * sizeof(TCHAR));
             if (!fileData.Name)
             {
@@ -306,7 +316,8 @@ BOOL CPluginInterfaceForArchiver::ListArchive(CSalamanderForOperationsAbstract* 
                 ret = FALSE;
                 break;
             }
-            lstrcpy(fileData.Name, name);
+            // Allocation includes NameLen characters and the terminator for this archive entry.
+            memcpy(fileData.Name, name, (fileData.NameLen + 1) * sizeof(TCHAR));
             fileData.Ext = _tcsrchr(fileData.Name, '.');
             if (fileData.Ext)
                 fileData.Ext++; // ".cvspass" is considered an extension on Windows
@@ -417,7 +428,7 @@ BOOL CPluginInterfaceForArchiver::UnpackArchive(CSalamanderForOperationsAbstract
     ArcRoot = archiveRoot ? archiveRoot : "";
     if (*ArcRoot == '\\')
         ArcRoot++;
-    RootLen = lstrlen(ArcRoot);
+    RootLen = static_cast<int>(_tcslen(ArcRoot));
     TIndirectArray2<CRARExtractInfo> files(256);
     PluginData = (CPluginDataInterface*)pluginDataPar;
 
@@ -584,7 +595,13 @@ BOOL CPluginInterfaceForArchiver::UnpackOneFile(CSalamanderForOperationsAbstract
     AllocateWholeFile = TRUE;
     TestAllocateWholeFile = TRUE;
     TCHAR justName[MAX_PATH];
-    lstrcpy(justName, nameInArchive);
+    // Single-file extraction retains only a complete leaf name for its fixed target-path buffer.
+    if (FAILED(StringCchCopy(justName, _countof(justName), nameInArchive)))
+    {
+        Error(IDS_TOOLONGNAME);
+        Salamander = NULL;
+        return FALSE;
+    }
     SalamanderGeneral->SalPathStripPath(justName);
     PluginData = (CPluginDataInterface*)pluginDataPar;
 
@@ -896,7 +913,8 @@ BOOL CPluginInterfaceForArchiver::Error(int error, ...)
     va_end(arglist);
     if (lastErr != ERROR_SUCCESS)
     {
-        int l = lstrlen(buf);
+        // The formatted localized error is terminated before the system detail is appended.
+        int l = static_cast<int>(_tcslen(buf));
         FormatMessage(FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS, NULL, lastErr,
                       MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), buf + l, 1024 - l, NULL);
     }
@@ -1061,12 +1079,17 @@ BOOL CPluginInterfaceForArchiver::ReadHeader(CFileHeader* header)
         // e.g. the Ellipsis character 0x2026
         if (headerData.FileNameW[0])
         {
-            WideCharToMultiByte(CP_ACP, WC_COMPOSITECHECK, headerData.FileNameW, -1, header->FileName,
-                                sizeof(header->FileName), NULL, NULL);
+            // The RAR SDK filename must fit the plug-in's header field completely before it can be listed or extracted.
+            if (WideCharToMultiByte(CP_ACP, WC_COMPOSITECHECK, headerData.FileNameW, -1, header->FileName,
+                                    _countof(header->FileName), NULL, NULL) == 0)
+                return Error(IDS_TOOLONGNAME);
         }
         else
         {
-            lstrcpy(header->FileName, headerData.FileName + (headerData.FileName[0] == '\\' ? 1 : 0));
+            const char* sourceName = headerData.FileName + (headerData.FileName[0] == '\\' ? 1 : 0);
+            // Keep the OEM conversion within the same complete fixed header-name boundary.
+            if (FAILED(StringCchCopyA(header->FileName, _countof(header->FileName), sourceName)))
+                return Error(IDS_TOOLONGNAME);
             OemToChar(header->FileName, header->FileName);
         }
         header->Size = CQuadWord(headerData.UnpSize, headerData.UnpSizeHigh);
@@ -1237,13 +1260,16 @@ BOOL CPluginInterfaceForArchiver::SafeSeek(CQuadWord position)
     char buf[1024];
     while (1)
     {
-        CQuadWord pos = position;
-        if (SetFilePointer(TargetFile, pos.LoDWord, LPLONG(&pos.HiDWord), FILE_BEGIN) != 0xFFFFFFFF ||
-            GetLastError() == NO_ERROR)
+        // Keep the complete archive offset while using the unambiguous BOOL result of SetFilePointerEx.
+        LARGE_INTEGER pos;
+        pos.LowPart = position.LoDWord;
+        pos.HighPart = static_cast<LONG>(position.HiDWord);
+        if (SetFilePointerEx(TargetFile, pos, NULL, FILE_BEGIN))
             return TRUE; // success
-        lstrcpy(buf, LoadStr(IDS_UNABLESEEK));
+        CopyRarErrorPrefix(buf, _countof(buf), IDS_UNABLESEEK);
+        const DWORD prefixLength = static_cast<DWORD>(strlen(buf)); // buf is bounded to 1,024 bytes for FormatMessage.
         FormatMessage(FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS, NULL,
-                      GetLastError(), MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), buf + lstrlen(buf), 1024 - lstrlen(buf), NULL);
+                      GetLastError(), MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), buf + prefixLength, _countof(buf) - prefixLength, NULL);
 
         if (PluginData->Silent & SF_IOERRORS)
             return FALSE;
@@ -1277,12 +1303,19 @@ int CPluginInterfaceForArchiver::ProcessDataProc(unsigned char* addr, int size)
     CQuadWord pos = CQuadWord(0, 0);
     while (1)
     {
-        pos.LoDWord = SetFilePointer(TargetFile, 0, LPLONG(&pos.HiDWord), FILE_CURRENT);
-        if (pos.LoDWord != 0xFFFFFFFF || GetLastError() == NO_ERROR)
+        // Preserve the full retry position instead of interpreting 0xFFFFFFFF as a possible success value.
+        LARGE_INTEGER zero = {};
+        LARGE_INTEGER currentPosition;
+        if (SetFilePointerEx(TargetFile, zero, &currentPosition, FILE_CURRENT))
+        {
+            pos.LoDWord = currentPosition.LowPart;
+            pos.HiDWord = static_cast<DWORD>(currentPosition.HighPart);
             break;
-        lstrcpy(buf, LoadStr(IDS_UNABLEGETFIELPOS));
+        }
+        CopyRarErrorPrefix(buf, _countof(buf), IDS_UNABLEGETFIELPOS);
+        const DWORD prefixLength = static_cast<DWORD>(strlen(buf)); // buf is bounded to 1,024 bytes for FormatMessage.
         FormatMessage(FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS, NULL,
-                      GetLastError(), MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), buf + lstrlen(buf), 1024 - lstrlen(buf), NULL);
+                      GetLastError(), MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), buf + prefixLength, _countof(buf) - prefixLength, NULL);
 
         if (PluginData->Silent & SF_IOERRORS)
             return -1;
@@ -1312,9 +1345,10 @@ int CPluginInterfaceForArchiver::ProcessDataProc(unsigned char* addr, int size)
             Success = TRUE;
             return 1; // sucess
         }
-        lstrcpy(buf, LoadStr(IDS_UNABLEWRITE));
+        CopyRarErrorPrefix(buf, _countof(buf), IDS_UNABLEWRITE);
+        const DWORD prefixLength = static_cast<DWORD>(strlen(buf)); // buf is bounded to 1,024 bytes for FormatMessage.
         FormatMessage(FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS, NULL,
-                      GetLastError(), MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), buf + lstrlen(buf), 1024 - lstrlen(buf), NULL);
+                      GetLastError(), MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), buf + prefixLength, _countof(buf) - prefixLength, NULL);
 
         if (PluginData->Silent & SF_IOERRORS)
             return -1;
@@ -1355,29 +1389,37 @@ int CPluginInterfaceForArchiver::NeedPassword(char* password, int size)
             return -1;
         }
     }
-    lstrcpyn(password, PluginData->Password, size);
+    // A truncated password changes the credential, so reject it instead of passing a partial value to the RAR callback.
+    if (size <= 0 || FAILED(StringCchCopyA(password, static_cast<size_t>(size), PluginData->Password)))
+    {
+        Abort = TRUE;
+        return -1;
+    }
     return 1;
 }
 
 BOOL CPluginInterfaceForArchiver::SwitchToFirstVol(LPCTSTR arcName, BOOL* saveFirstVolume)
 {
     CALL_STACK_MESSAGE2("CPluginInterfaceForArchiver::SwitchToFirstVol(%s)", arcName);
-    lstrcpy(ArcFileName, arcName);
+    // Volume probing must use a complete archive path, not a truncated fixed-field copy.
+    if (FAILED(StringCchCopy(ArcFileName, _countof(ArcFileName), arcName)))
+        return FALSE;
     LPTSTR ext = PathFindExtension(ArcFileName);
     if (!ext)
         return TRUE;
-    if (lstrlen(ext) > 3 &&
+    if (_tcslen(ext) > 3 &&
         isdigit(ext[2]) && isdigit(ext[3]))
     {
         TCHAR oldExt[MAX_PATH];
-        lstrcpy(oldExt, ext);
+        const size_t extensionCapacity = _countof(ArcFileName) - static_cast<size_t>(ext - ArcFileName);
+        StringCchCopy(oldExt, _countof(oldExt), ext);
         if (isdigit(ext[1]))
         {
-            lstrcpy(ext, _T(".001")); // .001, .002, .003, etc.
+            StringCchCopy(ext, extensionCapacity, _T(".001")); // .001, .002, .003, etc.
         }
         else
         {
-            lstrcpy(ext, _T(".rar")); // .rar, .r00, .r01, etc.
+            StringCchCopy(ext, extensionCapacity, _T(".rar")); // .rar, .r00, .r01, etc.
         }
         DWORD attr = SalamanderGeneral->SalGetFileAttributes(ArcFileName);
         if (attr == -1 || attr & FILE_ATTRIBUTE_DIRECTORY)
@@ -1393,7 +1435,7 @@ BOOL CPluginInterfaceForArchiver::SwitchToFirstVol(LPCTSTR arcName, BOOL* saveFi
             }
             else
             {
-                lstrcpy(ext, oldExt);
+                StringCchCopy(ext, extensionCapacity, oldExt);
                 return FALSE;
             }
         }
@@ -1458,21 +1500,27 @@ BOOL CPluginInterfaceForArchiver::MakeFilesList(TIndirectArray2<CRARExtractInfo>
     const CFileData* pFileData;
     int errorOccured;
 
-    lstrcpy(dir, targetDir);
-    addDir = dir + lstrlen(dir);
+    // Directory creation appends selected names to this fixed buffer, so begin only with a complete target root.
+    if (FAILED(StringCchCopy(dir, _countof(dir), targetDir)))
+        return Error(IDS_TOOLONGNAME);
+    addDir = dir + _tcslen(dir);
+    if (addDir == dir)
+        return Error(IDS_TOOLONGNAME);
     if (*(addDir - 1) != '\\')
     {
+        if (static_cast<size_t>(addDir - dir) + 1 >= _countof(dir))
+            return Error(IDS_TOOLONGNAME);
         *addDir++ = '\\';
         *addDir = 0;
     }
-    dirLen = lstrlen(dir);
+    dirLen = static_cast<int>(_tcslen(dir));
 
     ProgressTotal = CQuadWord(0, 0);
     while ((nextName = next(SalamanderGeneral->GetMsgBoxParent(), 1, &isDir, &size, &pFileData, nextParam, &errorOccured)) != NULL)
     {
         if (isDir)
         {
-            if (dirLen + lstrlen(nextName) + 1 >= MAX_PATH)
+            if (dirLen + static_cast<int>(_tcslen(nextName)) + 1 >= MAX_PATH)
             {
                 if (PluginData->Silent & SF_LONGNAMES)
                     continue;
@@ -1487,7 +1535,9 @@ BOOL CPluginInterfaceForArchiver::MakeFilesList(TIndirectArray2<CRARExtractInfo>
                     return FALSE;
                 }
             }
-            lstrcpy(addDir, nextName);
+            // The length check above reserves the terminator for the directory leaf.
+            if (FAILED(StringCchCopy(addDir, _countof(dir) - static_cast<size_t>(addDir - dir), nextName)))
+                return Error(IDS_TOOLONGNAME);
             DestroyIllegalChars(addDir);
             BOOL skip;
             if (SalamanderSafeFile->SafeFileCreate(dir, 0, 0, 0, TRUE, SalamanderGeneral->GetMsgBoxParent(), NULL, NULL,
@@ -1498,14 +1548,17 @@ BOOL CPluginInterfaceForArchiver::MakeFilesList(TIndirectArray2<CRARExtractInfo>
         }
         else
         {
-            CRARExtractInfo* ei = (CRARExtractInfo*)malloc(sizeof(CRARExtractInfo) + RootLen + lstrlen(nextName) + 2);
+            const size_t nextNameLength = _tcslen(nextName);
+            const size_t rootLength = static_cast<size_t>(RootLen);
+            CRARExtractInfo* ei = (CRARExtractInfo*)malloc(sizeof(CRARExtractInfo) + rootLength + nextNameLength + 2);
             if (!ei)
                 return Error(IDS_LOWMEM);
-            lstrcpy(ei->FileName, ArcRoot);
+            // The flexible allocation is measured for both source components and the terminator.
+            memcpy(ei->FileName, ArcRoot, rootLength);
             LPTSTR ptr = ei->FileName + RootLen;
             if (RootLen && *(ptr - 1) != '\\')
                 *ptr++ = '\\';
-            lstrcpy(ptr, nextName);
+            memcpy(ptr, nextName, nextNameLength + 1);
             CRARFileData* rarFileData = (CRARFileData*)pFileData->PluginData;
             ei->ItemNumber = rarFileData ? rarFileData->ItemNumber : -1;
             if (!files.Add(ei))
@@ -1526,8 +1579,10 @@ BOOL CPluginInterfaceForArchiver::DoThisFile(CFileHeader* header, const char* ar
                         targetDir);
     char message[MAX_PATH + 32];
 
-    lstrcpy(message, LoadStr(IDS_EXTRACTING));
-    lstrcat(message, header->FileName);
+    // Progress text may be omitted when a localized prefix plus an archive name cannot fit its display buffer.
+    if (FAILED(StringCchCopyA(message, _countof(message), LoadStr(IDS_EXTRACTING))) ||
+        FAILED(StringCchCatA(message, _countof(message), header->FileName)))
+        message[0] = 0;
     Salamander->ProgressDialogAddText(message, TRUE);
     if (header->Flags & RHDF_SPLITBEFORE)
     {
@@ -1559,8 +1614,12 @@ BOOL CPluginInterfaceForArchiver::DoThisFile(CFileHeader* header, const char* ar
         }
         RARSetPassword(ArcHandle, PluginData->Password);
     }
-    strncpy_s(TargetName, targetDir, _TRUNCATE);
-    if (!SalamanderGeneral->SalPathAppend(TargetName, header->FileName + RootLen, MAX_PATH))
+    const size_t headerNameLength = strlen(header->FileName);
+    // Output creation requires a valid archive-root offset and complete destination path; do not retain a truncated intermediate copy.
+    if (RootLen < 0 || static_cast<size_t>(RootLen) > headerNameLength)
+        return Error(IDS_TOOLONGNAME);
+    if (FAILED(StringCchCopyA(TargetName, _countof(TargetName), targetDir)) ||
+        !SalamanderGeneral->SalPathAppend(TargetName, header->FileName + RootLen, _countof(TargetName)))
     {
         TargetName[0] = 0;
         if (PluginData->Silent & SF_LONGNAMES)
@@ -1578,8 +1637,9 @@ BOOL CPluginInterfaceForArchiver::DoThisFile(CFileHeader* header, const char* ar
         }
     }
     char nameInArc[MAX_PATH + MAX_PATH];
-    lstrcpy(nameInArc, arcName);
-    SalamanderGeneral->SalPathAppend(nameInArc, header->FileName, MAX_PATH + MAX_PATH);
+    if (FAILED(StringCchCopyA(nameInArc, _countof(nameInArc), arcName)) ||
+        !SalamanderGeneral->SalPathAppend(nameInArc, header->FileName, _countof(nameInArc)))
+        return Error(IDS_TOOLONGNAME);
     char buf[100];
     GetInfo(buf, &header->Time, header->Size);
     DestroyIllegalChars(TargetName + 2);
@@ -1749,6 +1809,19 @@ BOOL CPluginInterfaceForArchiver::UnpackWholeArchiveCalculateProgress(TIndirectA
 
 // ****************************************************************************
 
+static BOOL FormatUserDateTimeAnsi(const SYSTEMTIME* time, DWORD flags, char* buffer, int bufferSize, BOOL isDate)
+{
+    // Locale-name APIs avoid LCID defaults while retaining UnRAR's existing bounded ANSI plug-in boundary.
+    WCHAR localeName[LOCALE_NAME_MAX_LENGTH];
+    WCHAR formatted[100];
+    if (GetUserDefaultLocaleName(localeName, ARRAYSIZE(localeName)) == 0)
+        return FALSE;
+    int length = isDate
+                     ? GetDateFormatEx(localeName, flags, time, NULL, formatted, ARRAYSIZE(formatted), NULL)
+                     : GetTimeFormatEx(localeName, flags, time, NULL, formatted, ARRAYSIZE(formatted));
+    return length != 0 && WideCharToMultiByte(CP_ACP, 0, formatted, -1, buffer, bufferSize, NULL, NULL) != 0;
+}
+
 void GetInfo(char* buffer, FILETIME* lastWrite, CQuadWord& size)
 {
     CALL_STACK_MESSAGE2("GetInfo(, , 0x%I64X)", size.Value);
@@ -1758,9 +1831,9 @@ void GetInfo(char* buffer, FILETIME* lastWrite, CQuadWord& size)
     FileTimeToSystemTime(&ft, &st);
 
     char date[50], time[50], number[50];
-    if (GetTimeFormat(LOCALE_USER_DEFAULT, 0, &st, NULL, time, 50) == 0)
+    if (!FormatUserDateTimeAnsi(&st, 0, time, ARRAYSIZE(time), FALSE))
         sprintf(time, "%u:%02u:%02u", st.wHour, st.wMinute, st.wSecond);
-    if (GetDateFormat(LOCALE_USER_DEFAULT, DATE_SHORTDATE, &st, NULL, date, 50) == 0)
+    if (!FormatUserDateTimeAnsi(&st, DATE_SHORTDATE, date, ARRAYSIZE(date), TRUE))
         sprintf(date, "%u.%u.%u", st.wDay, st.wMonth, st.wYear);
     sprintf(buffer, "%s, %s, %s", SalamanderGeneral->NumberToStr(number, size), date, time);
 }
@@ -1778,7 +1851,8 @@ LPTSTR PathFindExtension(LPTSTR pszPath)
         TRACE_E("pszPath == NULL");
         return NULL;
     }
-    int len = lstrlen(pszPath);
+    // The extension parser advances over this terminated plug-in string without changing its storage.
+    int len = static_cast<int>(_tcslen(pszPath));
     LPTSTR iterator = pszPath + len - 1;
     while (iterator >= pszPath)
     {

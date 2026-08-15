@@ -3,6 +3,7 @@
 // CommentsTranslationProject: TRANSLATED
 
 #include "precomp.h"
+#include <strsafe.h>
 
 #include "viewer.h"
 
@@ -594,15 +595,14 @@ CViewerWindow::CViewerWindow(const char* fileName, CViewType type, const char* c
     else
     {
         char name[MAX_PATH];
-        lstrcpyn(name, fileName, MAX_PATH);
-        if (SalGetFullName(name))
+        // File access must start from a complete fixed-buffer path.
+        FileName = NULL;
+        if (SUCCEEDED(StringCchCopyA(name, _countof(name), fileName)) && SalGetFullName(name))
         {
             FileName = (char*)malloc(strlen(name) + 1);
             if (FileName != NULL)
                 strcpy(FileName, name);
         }
-        else
-            FileName = NULL;
     }
     Buffer = (unsigned char*)malloc(VIEW_BUFFER_SIZE);
     Seek = 0;

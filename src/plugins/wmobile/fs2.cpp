@@ -1170,13 +1170,13 @@ static void GetFileData(const char* name, char (&buf)[100])
     FileTimeToLocalFileTime(&data.ftLastWriteTime, &time);
     FileTimeToSystemTime(&time, &st);
 
-    if (!GetDateFormat(LOCALE_USER_DEFAULT, DATE_SHORTDATE, &st, NULL, tmp, 50))
+    if (!FormatUserDateAnsi(&st, DATE_SHORTDATE, tmp, ARRAYSIZE(tmp)))
         sprintf(tmp, "%u.%u.%u", st.wDay, st.wMonth, st.wYear);
 
     strcat(buf, ", ");
     strcat(buf, tmp);
 
-    if (!GetTimeFormat(LOCALE_USER_DEFAULT, 0, &st, NULL, tmp, 50))
+    if (!FormatUserTimeAnsi(&st, 0, tmp, ARRAYSIZE(tmp)))
         sprintf(tmp, "%u:%u:%u", st.wHour, st.wMinute, st.wSecond);
 
     strcat(buf, ", ");

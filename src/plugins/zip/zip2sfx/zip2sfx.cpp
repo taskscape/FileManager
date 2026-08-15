@@ -228,9 +228,12 @@ BOOL LoadSettings()
         return Error(STR_ERROPEN, Param + 1);
 
     BOOL ret = TRUE;
-    DWORD fsiz = GetFileSize(file, NULL);
-    if (fsiz != 0xFFFFFFFF)
+    LARGE_INTEGER fileSize;
+    BOOL gotFileSize = GetFileSizeEx(file, &fileSize);
+    if (gotFileSize && fileSize.QuadPart >= 0 && (ULONGLONG)fileSize.QuadPart < MAXDWORD)
     {
+        // The settings reader allocates and reads a DWORD-sized buffer, so reject oversized 64-bit values before narrowing.
+        DWORD fsiz = (DWORD)fileSize.QuadPart;
         SettingsTextData = (char*)malloc(fsiz + 1);
         if (SettingsTextData)
         {
@@ -282,7 +285,11 @@ BOOL LoadSettings()
             ret = Error(STR_LOWMEM);
     }
     else
+    {
+        if (gotFileSize)
+            SetLastError(ERROR_FILE_TOO_LARGE);
         ret = Error(STR_ERRACCESS, Param + 1);
+    }
 
     CloseHandle(file);
 

@@ -3,6 +3,9 @@
 
 #include "precomp.h"
 
+// Use StrSafe for bounded formatting of resource-controlled dialog text.
+#include <strsafe.h>
+
 #include "lib/pvw32dll.h"
 #include "renderer.h"
 #include "pictview.h"
@@ -101,8 +104,9 @@ CAboutDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 
         SendDlgItemMessage(HWindow, IDC_ABOUT_ICON, STM_SETIMAGE, IMAGE_ICON, (LPARAM)LoadIcon(DLLInstance, MAKEINTRESOURCE(IDI_WINDOW_ICON)));
         GetDlgItemText(HWindow, IDC_ABOUT_TITLE, buff, 1000);
-        wsprintf(buff2, buff, VERSINFO_VERSION);
-        SetDlgItemText(HWindow, IDC_ABOUT_TITLE, buff2);
+        // The resource format must not overflow the fixed dialog-text buffer.
+        if (SUCCEEDED(StringCchPrintf(buff2, ARRAYSIZE(buff2), buff, VERSINFO_VERSION)))
+            SetDlgItemText(HWindow, IDC_ABOUT_TITLE, buff2);
         SetDlgItemText(HWindow, IDC_ABOUT_COPYRIGHT, VERSINFO_COPYRIGHT);
 
         // plugin name and version will be bold
@@ -111,19 +115,20 @@ CAboutDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         // hyperlinks
         CGUIHyperLinkAbstract* hl;
 
-        // ensure the frame is sunken (our old resource workshop cannot cope with newer styles)
+        // Pointer-width style access keeps this resource-compatibility adjustment safe on x64.
         HWND hChild = GetDlgItem(HWindow, IDC_ABOUT_FRAME);
-        DWORD style = GetWindowLong(hChild, GWL_EXSTYLE);
+        LONG_PTR style = GetWindowLongPtr(hChild, GWL_EXSTYLE);
         style |= WS_EX_CLIENTEDGE;
-        SetWindowLong(hChild, GWL_EXSTYLE, style);
+        SetWindowLongPtr(hChild, GWL_EXSTYLE, style);
         RECT r;
         GetWindowRect(hChild, &r);
         SetWindowPos(hChild, NULL, 0, 0, r.right - r.left, r.bottom - r.top + 1, SWP_NOMOVE | SWP_NOZORDER);
         SetWindowPos(hChild, NULL, 0, 0, r.right - r.left, r.bottom - r.top, SWP_NOMOVE | SWP_NOZORDER);
 
         GetDlgItemText(HWindow, IDC_ABOUT_PVW32, buff, 1000);
-        wsprintf(buff2, buff, PVW32DLL.Version);
-        SetDlgItemText(HWindow, IDC_ABOUT_PVW32, buff2);
+        // The resource format must not overflow the fixed dialog-text buffer.
+        if (SUCCEEDED(StringCchPrintf(buff2, ARRAYSIZE(buff2), buff, PVW32DLL.Version)))
+            SetDlgItemText(HWindow, IDC_ABOUT_PVW32, buff2);
         // PVW32 will be bold
         SalamanderGUI->AttachStaticText(HWindow, IDC_ABOUT_PVW32, STF_BOLD);
 

@@ -3,6 +3,8 @@
 
 #include "precomp.h"
 
+#include <strsafe.h>
+
 char LastExportPath[MAX_PATH];
 
 BOOL ExportKey(LPWSTR fullName)
@@ -139,9 +141,14 @@ BOOL ExportKey(LPWSTR fullName)
 
         // announce the change on the path (our file was added)
         char changedPath[MAX_PATH];
-        lstrcpyn(changedPath, file, MAX_PATH);
-        SG->CutDirectory(changedPath);
-        SG->PostChangeOnPathNotification(changedPath, FALSE);
+        // Change notifications require a complete directory identifier, so omit them rather than post a truncated path.
+        if (SUCCEEDED(StringCchCopyA(changedPath, _countof(changedPath), file)))
+        {
+            SG->CutDirectory(changedPath);
+            SG->PostChangeOnPathNotification(changedPath, FALSE);
+        }
+        else
+            TRACE_E("ExportKey(): export path is too long for the change-notification buffer.");
 
         break;
     }

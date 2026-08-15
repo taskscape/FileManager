@@ -14,6 +14,14 @@
 
 #define INF_BUFFER_SIZE 5000
 
+static BOOL SeekCabinetFile(HANDLE file, LONGLONG distance, DWORD moveMethod)
+{
+    // PE and embedded-archive offsets must use the Boolean seek contract rather than a DWORD sentinel.
+    LARGE_INTEGER seekDistance;
+    seekDistance.QuadPart = distance;
+    return SetFilePointerEx(file, seekDistance, NULL, moveMethod);
+}
+
 static WCHAR* AllocWideFromUtf8(const char* src)
 {
     if (src == NULL)
@@ -127,7 +135,7 @@ int InitExtraction(const char* name, struct SCabinet* cabinet)
             RETURN_ERROR(HandleErrorW(ERROR_TITLE, ERROR_INFREAD, GetLastError(), nameW));
     if (((IMAGE_DOS_HEADER*)data)->e_magic != ('M' + ('Z' << 8)))
         RETURN_ERROR(HandleErrorW(ERROR_TITLE, ARC_NOEXESIG, 0, nameW));
-    if (SetFilePointer(cabinet->file, ((IMAGE_DOS_HEADER*)data)->e_lfanew, NULL, FILE_BEGIN) == 0xFFFFFFFF)
+    if (!SeekCabinetFile(cabinet->file, (LONGLONG)((IMAGE_DOS_HEADER*)data)->e_lfanew, FILE_BEGIN))
         RETURN_ERROR(HandleErrorW(ERROR_TITLE, ERROR_INFSEEK, GetLastError(), nameW));
     // read the headers
     if (!ReadFile(cabinet->file, data, sizeof(unsigned long) + sizeof(IMAGE_FILE_HEADER) + 24 * 4, &read, NULL) ||
@@ -143,7 +151,7 @@ int InitExtraction(const char* name, struct SCabinet* cabinet)
     // number of directory entries
     direntries = ((IMAGE_OPTIONAL_HEADER*)(data + sizeof(unsigned long) + sizeof(IMAGE_FILE_HEADER)))->NumberOfRvaAndSizes;
     // skip the directory entries
-    if (SetFilePointer(cabinet->file, direntries * sizeof(IMAGE_DATA_DIRECTORY), NULL, FILE_CURRENT) == 0xFFFFFFFF)
+    if (!SeekCabinetFile(cabinet->file, (LONGLONG)direntries * sizeof(IMAGE_DATA_DIRECTORY), FILE_CURRENT))
         RETURN_ERROR(HandleErrorW(ERROR_TITLE, ERROR_INFSEEK, GetLastError(), nameW));
     sectionOffset = 0;
     sectionSize = 0;
@@ -163,7 +171,7 @@ int InitExtraction(const char* name, struct SCabinet* cabinet)
         }
     }
     // jump to the start of the archive
-    if (SetFilePointer(cabinet->file, sectionOffset + sectionSize, NULL, FILE_BEGIN) == 0xFFFFFFFF)
+    if (!SeekCabinetFile(cabinet->file, (LONGLONG)sectionOffset + sectionSize, FILE_BEGIN))
         RETURN_ERROR(HandleErrorW(ERROR_TITLE, ERROR_INFSEEK, GetLastError(), nameW));
     //
     // Prepare decompression

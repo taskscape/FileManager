@@ -18,6 +18,8 @@
 #include "processlist.h"
 #include "lang\lang.rh"
 
+#include <strsafe.h>
+
 extern CSalamanderGeneralAbstract* SalamanderGeneral;
 extern CSalamanderGUIAbstract* SalamanderGUI;
 extern HINSTANCE g_hInstance;
@@ -54,7 +56,12 @@ LRESULT CScriptAbortPaletteWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM l
     case WM_USER_TBGETTOOLTIP:
     {
         TOOLBAR_TOOLTIP* tt = (TOOLBAR_TOOLTIP*)lParam;
-        lstrcpy(tt->Buffer, SalamanderGeneral->LoadStr(g_hLangInst, IDS_ABORTTIP));
+        // The host toolbar provides a fixed reply buffer; do not truncate a localized action label.
+        if (tt == NULL || tt->Buffer == NULL)
+            return 0;
+        if (FAILED(StringCchCopyA(tt->Buffer, TOOLTIP_TEXT_MAX,
+                                  SalamanderGeneral->LoadStr(g_hLangInst, IDS_ABORTTIP))))
+            tt->Buffer[0] = 0;
         SalamanderGUI->PrepareToolTipText(tt->Buffer, FALSE);
         return 0;
     }
@@ -126,8 +133,9 @@ void CScriptAbortPaletteWindow::OnCreate()
     rc.top = 0;
     rc.right = cx;
     rc.bottom = cy;
-    AdjustWindowRectEx(&rc, GetWindowLong(HWindow, GWL_STYLE), FALSE, // FIXME_X64 - replace GetWindowLong -> GetWindowLongPtr (across the entire Salamander package); this warning will be removed by Honza Rysavy, please keep it
-                       GetWindowLong(HWindow, GWL_EXSTYLE));
+    // AdjustWindowRectEx consumes 32-bit style masks, so narrow only after obtaining them through the x64-safe accessor.
+    AdjustWindowRectEx(&rc, (DWORD)GetWindowLongPtr(HWindow, GWL_STYLE), FALSE,
+                       (DWORD)GetWindowLongPtr(HWindow, GWL_EXSTYLE));
 
     SetWindowPos(m_pToolBar->GetHWND(), NULL, 0, 0, cx, cy,
                  SWP_SHOWWINDOW | SWP_NOACTIVATE | SWP_NOZORDER);

@@ -55,8 +55,9 @@ because a `POST` might then have reached the service.
 
 The upload contains exactly one `.7Z` file. Its multipart filename is the
 archive filename and its payload is the archive bytes. The crash reporter
-creates the archive from every file matching the selected report base name
-(`BaseName.*`), so the report may contain the following files:
+creates the archive from an explicit allowlist for the selected report base name;
+an unrelated file that merely shares the base-name prefix is never exported. The report may contain
+the following files:
 
 | Data | Source | When included |
 |---|---|---|
@@ -64,7 +65,6 @@ creates the archive from every file matching the selected report base name
 | Crash text report (`.TXT`) | The main application writes its crash/call-stack report after Salmon signals dump completion | Created for the crash; it identifies the crash and contains diagnostic text. |
 | Release diagnostic ring (`.OPS`) | A fixed in-memory ring is rendered into the crash text report and a local `.OPS` sidecar | Contains only sanitized operation transitions, wait results, retry labels, and plug-in DLL leaf names; it excludes paths, file names, and document data. **View Report** provides the local export without sending it. |
 | User report (`.INF`) | The bug reporter writes `Email: <optional contact email>` followed by the optional “Last action” description | Created only when the user presses Send Report. The contact email and description are optional, but both are included verbatim when supplied. |
-| Other files with the same base name | Existing crash-report collection in the configured crash-report directory | Included only if present for that report base name. |
 
 The multipart request itself additionally exposes the archive filename, the
 standard HTTPS request metadata needed to deliver it, and the destination
@@ -78,6 +78,12 @@ identifier is visible in the archive filename.
 Reports are assembled in the crash-report directory supplied by the main
 application. The **View Report** button opens that folder so the user can
 inspect the files before choosing to send. **Do Not Send Report** skips network
-transmission and follows the dialog's deletion flow. A failed or cancelled
+transmission and follows the dialog's deletion flow, which removes only the selected report's
+`.DMP`, `.TXT`, `.INF`, `.OPS`, and (when appropriate) `.7Z` artifacts. A failed or cancelled
 transmission keeps the `.7Z` archive and shows its folder so it can be sent
-through another channel or deleted by the user.
+through another channel or deleted by the user. Before a dump or archive is
+created, the reporter enables Windows EFS on that directory; if EFS cannot be
+enabled, the report operation fails rather than leaving a cleartext crash
+artifact at rest. On startup, the reporter deletes only recognized crash-artifact
+extensions (`.DMP`, `.TXT`, `.INF`, `.OPS`, and `.7Z`) older than 30 days; it
+does not remove arbitrary files from the report directory.

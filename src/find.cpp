@@ -4,6 +4,10 @@
 
 #include "precomp.h"
 
+#include <strsafe.h>
+#include "common\thread_owner.h"
+#include "common\monotonic_time.h"
+
 #include "cfgdlg.h"
 #include "find.h"
 #include "md5.h"
@@ -146,7 +150,8 @@ CFindOptionsItem&
 CFindOptionsItem::operator=(const CFindOptionsItem& s)
 {
     // Internal
-    lstrcpy(ItemName, s.ItemName);
+    if (FAILED(StringCchCopyA(ItemName, _countof(ItemName), s.ItemName)))
+        ItemName[0] = 0;
 
     memmove(&Criteria, &s.Criteria, sizeof(Criteria));
 
@@ -159,17 +164,25 @@ CFindOptionsItem::operator=(const CFindOptionsItem& s)
 
     AutoLoad = s.AutoLoad;
 
-    lstrcpy(NamedText, s.NamedText);
-    lstrcpy(LookInText, s.LookInText);
-    lstrcpy(GrepText, s.GrepText);
+    // Preserve a valid empty setting rather than retaining a truncated search criterion.
+    if (FAILED(StringCchCopyA(NamedText, _countof(NamedText), s.NamedText)))
+        NamedText[0] = 0;
+    if (FAILED(StringCchCopyA(LookInText, _countof(LookInText), s.LookInText)))
+        LookInText[0] = 0;
+    if (FAILED(StringCchCopyA(GrepText, _countof(GrepText), s.GrepText)))
+        GrepText[0] = 0;
 
     return *this;
 }
 
 void CFindOptionsItem::BuildItemName()
 {
-    sprintf(ItemName, "\"%s\" %s \"%s\"",
-            NamedText, LoadStr(IDS_FF_IN), LookInText);
+    if (FAILED(StringCchPrintfA(ItemName, _countof(ItemName), "\"%s\" %s \"%s\"",
+                                NamedText, LoadStr(IDS_FF_IN), LookInText)))
+    {
+        // An incomplete title must not misidentify a saved search item.
+        ItemName[0] = 0;
+    }
 }
 
 BOOL CFindOptionsItem::Save(HKEY hKey)
@@ -829,8 +842,10 @@ BOOL CDuplicateCandidates::GetMD5Digest(CGrepData* data, CFoundFilesData* file,
 {
     // build full path to the file
     char fullPath[MAX_PATH];
-    lstrcpyn(fullPath, file->Path, MAX_PATH);
-    SalPathAppend(fullPath, file->Name, MAX_PATH);
+    // Hash only a complete path; a clipped path could identify a different file.
+    if (FAILED(StringCchCopyA(fullPath, _countof(fullPath), file->Path)) ||
+        !SalPathAppend(fullPath, file->Name, _countof(fullPath)))
+        return FALSE;
 
     data->SearchingText->Set(fullPath); // set the current file
 
@@ -1493,8 +1508,9 @@ BOOL AddFoundItem(const char* path, const char* name, DWORD sizeLow, DWORD sizeH
                     // request a listview redraw after every 100 added items
                     // also after 0.5 seconds has passed since the last redraw
                     // we also call update for each item when grepping
+                    const CMonotonicTimePoint lastVisible = (CMonotonicTimePoint)InterlockedCompareExchange64(&data->FoundVisibleTick, 0, 0);
                     if (data->FoundFilesListView->GetCount() >= data->FoundVisibleCount + 100 ||
-                        GetTickCount() - data->FoundVisibleTick >= 500
+                        CMonotonicClock::HasElapsed(lastVisible, 500, CMonotonicClock::Now())
                         /* || data->Grep*/) // a half-second update interval is enough even for grepping
                     {
                         SendMessage(data->HWindow, WM_USER_ADDFILE, 0, 0);
@@ -1603,11 +1619,12 @@ void SearchDirectory(char (&path)[MAX_PATH], char* end, int startPathLen,
             ConvertFindDataWToUtf8(fileW, &file);
             BOOL isDir = (file.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) != 0;
             BOOL ignoreDir = isDir && (lstrcmp(file.cFileName, ".") == 0 || lstrcmp(file.cFileName, "..") == 0);
-            if (ignoreDir || (end - path) + lstrlen(file.cFileName) < _countof(path))
+            if (ignoreDir || (end - path) + strlen(file.cFileName) < _countof(path))
             {
                 // after finding an item without displaying it and once 0.5 s have passed since the last redraw,
                 // we request the listview to redraw
-                if (data->NeedRefresh && GetTickCount() - data->FoundVisibleTick >= 500)
+                const CMonotonicTimePoint lastVisible = (CMonotonicTimePoint)InterlockedCompareExchange64(&data->FoundVisibleTick, 0, 0);
+                if (data->NeedRefresh && CMonotonicClock::HasElapsed(lastVisible, 500, CMonotonicClock::Now()))
                 {
                     SendMessage(data->HWindow, WM_USER_ADDFILE, 0, 0);
                     data->NeedRefresh = FALSE;
@@ -2030,8 +2047,11 @@ unsigned GrepThreadFEH(void* param)
 #endif // CALLSTK_DISABLE
 }
 
-DWORD WINAPI GrepThreadF(void* param)
+DWORD WINAPI GrepThreadF(void* param, HANDLE stopEvent)
 {
+    // Grep cancellation is the dialog-owned StopSearch flag, which preserves
+    // its existing result and UI completion ordering.
+    (void)stopEvent;
 #ifndef CALLSTK_DISABLE
     CCallStack stack;
 #endif // CALLSTK_DISABLE
@@ -2059,7 +2079,8 @@ CSearchingString::~CSearchingString()
 void CSearchingString::SetBase(const char* buf)
 {
     HANDLES(EnterCriticalSection(&Section));
-    lstrcpyn(Buffer, buf, MAX_PATH + 50);
+    // Searching status is a compact presentation field, so retain its deliberate clipping bound.
+    StringCchCopyNA(Buffer, _countof(Buffer), buf, _countof(Buffer) - 1);
     BaseLen = (int)strlen(Buffer);
     HANDLES(LeaveCriticalSection(&Section));
 }
@@ -2067,7 +2088,8 @@ void CSearchingString::SetBase(const char* buf)
 void CSearchingString::Set(const char* buf)
 {
     HANDLES(EnterCriticalSection(&Section));
-    lstrcpyn(Buffer + BaseLen, buf, MAX_PATH + 50 - BaseLen);
+    // Append only within the remaining status-display field.
+    StringCchCopyNA(Buffer + BaseLen, _countof(Buffer) - BaseLen, buf, _countof(Buffer) - BaseLen - 1);
     Dirty = TRUE;
     HANDLES(LeaveCriticalSection(&Section));
 }
@@ -2075,7 +2097,9 @@ void CSearchingString::Set(const char* buf)
 void CSearchingString::Get(char* buf, int bufSize)
 {
     HANDLES(EnterCriticalSection(&Section));
-    lstrcpyn(buf, Buffer, bufSize);
+    // Preserve the caller-provided compact display field without legacy truncation helpers.
+    if (buf != NULL && bufSize > 0)
+        StringCchCopyNA(buf, bufSize, Buffer, bufSize - 1);
     HANDLES(LeaveCriticalSection(&Section));
 }
 
@@ -2184,10 +2208,9 @@ unsigned ThreadFindDialogMessageLoopBody(void* parameter)
     }
 
 #ifndef CALLSTK_DISABLE
-    CCallStack::ReleaseBeforeExitThread(); // before exiting the thread, we must release call-stack data (still in protected section - generating our bug report)
+    CCallStack::ReleaseBeforeExitThread(); // release call-stack data before the common owner signals completion
 #endif                                     // CALLSTK_DISABLE
-    _endthreadex(ok ? 0 : 1);
-    return ok ? 0 : 1; // dead code to keep the compiler happy
+    return ok ? 0 : 1;
 }
 
 unsigned ThreadFindDialogMessageLoopEH(void* param)
@@ -2215,6 +2238,13 @@ DWORD WINAPI ThreadFindDialogMessageLoop(void* param)
     return ThreadFindDialogMessageLoopEH(param);
 }
 
+static DWORD WINAPI ThreadFindDialogMessageLoopOwnedF(void* parameter, HANDLE stopEvent)
+{
+    // The modeless dialog retains its own close protocol; the owner preserves initialization data and handle lifetime.
+    UNREFERENCED_PARAMETER(stopEvent);
+    return ThreadFindDialogMessageLoop(parameter);
+}
+
 BOOL OpenFindDialog(HWND hCenterAgainst, const char* initPath)
 {
     CALL_STACK_MESSAGE3("OpenFindDialog(0x%p, %s)", hCenterAgainst, initPath);
@@ -2227,10 +2257,10 @@ BOOL OpenFindDialog(HWND hCenterAgainst, const char* initPath)
         CTFDData data;
         data.FindDialog = findDlg;
 
-        DWORD ThreadID;
-        HANDLE loop = HANDLES(CreateThread(NULL, 0, ThreadFindDialogMessageLoop, &data, 0, &ThreadID));
-        if (loop == NULL)
+        CThreadOwner* loop = new CThreadOwner;
+        if (loop == NULL || !loop->Start(ThreadFindDialogMessageLoopOwnedF, &data, "Find dialog message loop"))
         {
+            delete loop;
             TRACE_E("Unable to start ThreadFindDialogMessageLoop thread.");
             goto ERROR_TFD_CREATE;
         }
@@ -2238,11 +2268,12 @@ BOOL OpenFindDialog(HWND hCenterAgainst, const char* initPath)
         WaitForSingleObject(FindDialogContinue, INFINITE); // wait until the thread starts
         if (!data.Success)
         {
-            HANDLES(CloseHandle(loop));
+            loop->StopAndJoin(INFINITE);
+            delete loop;
             goto ERROR_TFD_CREATE;
         }
         // The modeless loop receives its close request before global shutdown joins it.
-        AddAuxThread(loop, FALSE, "Find dialog message loop");
+        AddOwnedAuxThread(loop, "Find dialog message loop");
         SetCursor(hOldCur);
         return TRUE;
     }

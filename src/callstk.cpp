@@ -13,6 +13,8 @@
 #include "tasklist.h"
 #include "salmoncl.h"
 
+#include <strsafe.h>
+
 #ifndef CALLSTK_DISABLE
 
 // The order here is important.
@@ -55,8 +57,6 @@ LARGE_INTEGER CCallStack::SavedPerfFreq = {1};
 DWORD CCallStack::SpeedBenchmark = 0;
 BOOL __CallStk_T = TRUE;
 #endif // (defined(_DEBUG) || defined(CALLSTK_MEASURETIMES)) && !defined(CALLSTK_DISABLEMEASURETIMES)
-
-CCallStack MainThreadStack; // ensure the call-stack object is created before constructors run in the main thread
 
 //
 // ****************************************************************************
@@ -162,8 +162,10 @@ struct CTBRData
 };
 
 CTBRData TBRData = {0};
-HANDLE BugReportThread = NULL;
-DWORD BugReportThreadID;
+// The owner retains the helper handle until its existing termination handshake has completed.
+CThreadOwner BugReportThreadOwner;
+// The global stack must start after its bug-report dependencies so shutdown can join and close them.
+CCallStack MainThreadStack; // ensure the call-stack object is created before constructors run in the main thread
 
 void BenchmarkCallStkTestFunction(int counter, const char* string)
 {
@@ -242,13 +244,12 @@ CCallStack::CCallStack(BOOL dontSuspend)
             TRACE_E("Error during creating events.");
         else // start the thread only if the events were created successfully
         {
-            BugReportThread = NOHANDLES(CreateThread(NULL, 0, ThreadBugReportF, &TBRData, 0, &BugReportThreadID));
-            if (BugReportThread == NULL)
+            if (!BugReportThreadOwner.Start(ThreadBugReportOwnedF, &TBRData, "BugReport"))
                 TRACE_E("CreateThread failed!");
             else
-                SetThreadPriority(BugReportThread, THREAD_PRIORITY_ABOVE_NORMAL);
+                SetThreadPriority(BugReportThreadOwner.GetThreadHandle(), THREAD_PRIORITY_ABOVE_NORMAL);
         }
-        if (BugReportThread == NULL)
+        if (!BugReportThreadOwner.HasThread())
         {
             TRACE_E("Unable to start BugReport thread. Error: " << _sys_errlist[errno]);
         }
@@ -403,15 +404,13 @@ CCallStack::~CCallStack()
     {
         SetUnhandledExceptionFilter(OldUnhandledExceptionFilter);
 
-        if (BugReportThread != NULL)
+        if (BugReportThreadOwner.HasThread())
         {
             // by ending this thread, the code enters here one more time because CCallStack exited for it as well
             SetEvent(TBRData.TerminateEvent);           // terminate the bug report thread
             // The report may be preserving crash-recovery evidence, so retain
             // its events until cancellation and recovery phases have completed.
-            CThreadShutdownDeadline("call-stack bug report").WaitForSafeJoin(BugReportThread);
-            NOHANDLES(CloseHandle(BugReportThread));
-            BugReportThread = NULL;
+            BugReportThreadOwner.StopAndJoin(CThreadShutdownDeadline("call-stack bug report"));
             NOHANDLES(CloseHandle(TBRData.TerminateEvent));
             NOHANDLES(CloseHandle(TBRData.Event));
             NOHANDLES(CloseHandle(TBRData.EventProcessed));
@@ -506,7 +505,9 @@ void CCallStack::Push(const char* format, va_list args)
             {
                 strcpy(backup, "vsprintf error in: ");
                 int len = (int)strlen(backup);
-                lstrcpyn(backup + len, format, STACK_CALLS_MAX_MESSAGE_LEN + 1 - len);
+                // Keep fallback diagnostic records within the fixed call-stack message field.
+                StringCchCopyNA(backup + len, STACK_CALLS_MAX_MESSAGE_LEN + 1 - len,
+                                format, STACK_CALLS_MAX_MESSAGE_LEN - len);
                 ret = (int)strlen(backup);
                 End = backup + ret + 1;
             }
@@ -515,7 +516,9 @@ void CCallStack::Push(const char* format, va_list args)
         {
             strcpy(backup, "exception in: ");
             int len = (int)strlen(backup);
-            lstrcpyn(backup + len, format, STACK_CALLS_MAX_MESSAGE_LEN + 1 - len);
+            // Keep fallback diagnostic records within the fixed call-stack message field.
+            StringCchCopyNA(backup + len, STACK_CALLS_MAX_MESSAGE_LEN + 1 - len,
+                            format, STACK_CALLS_MAX_MESSAGE_LEN - len);
             ret = (int)strlen(backup);
             End = backup + ret + 1;
         }
@@ -718,13 +721,19 @@ CCallStack::ThreadBugReportF(void* param)
     return 0;
 }
 
+DWORD WINAPI CCallStack::ThreadBugReportOwnedF(void* parameter, HANDLE)
+{
+    // The legacy helper observes TBRData.TerminateEvent; the owner still supplies join and handle lifetime.
+    return ThreadBugReportF(parameter);
+}
+
 void PrintBugReportLine(void* param, const char* txt, BOOL tab)
 {
     static int called = 0;
     static DWORD d;
     if (tab)
         WriteFile((HANDLE)param, "  ", 2, &d, NULL);
-    WriteFile((HANDLE)param, txt, lstrlen(txt), &d, NULL);
+    WriteFile((HANDLE)param, txt, (DWORD)strlen(txt), &d, NULL);
     WriteFile((HANDLE)param, "\r\n", 2, &d, NULL);
     if (++called % 5 == 0)
         FlushFileBuffers((HANDLE)param);
@@ -776,13 +785,16 @@ BOOL CCallStack::CreateBugReportFile(EXCEPTION_POINTERS* Exception, DWORD thread
                 NOHANDLES(CloseHandle(file));
 
                 char diagnosticPath[MAX_PATH];
-                lstrcpyn(diagnosticPath, bugReportFileName, _countof(diagnosticPath));
-                char* extension = strrchr(diagnosticPath, '.');
-                if (extension != NULL)
+                // Export the sidecar only when the generated report path remains complete.
+                if (SUCCEEDED(StringCchCopyA(diagnosticPath, _countof(diagnosticPath), bugReportFileName)))
                 {
-                    // The sidecar is a local export and joins an archive only after report consent.
-                    lstrcpyn(extension, ".OPS", (int)(_countof(diagnosticPath) - (extension - diagnosticPath)));
-                    ExportReleaseDiagnosticRingBuffer(diagnosticPath);
+                    char* extension = strrchr(diagnosticPath, '.');
+                    if (extension != NULL &&
+                        SUCCEEDED(StringCchCopyA(extension, _countof(diagnosticPath) - (extension - diagnosticPath), ".OPS")))
+                    {
+                        // The sidecar is a local export and joins an archive only after report consent.
+                        ExportReleaseDiagnosticRingBuffer(diagnosticPath);
+                    }
                 }
             }
         }
@@ -813,7 +825,8 @@ int CCallStack::HandleException(EXCEPTION_POINTERS* e, DWORD shellExtCrashID, co
     SalmonFireAndWait(e, bugReportPath);
 
     // Although delayed after the minidump, it is more reliable, it increases the chance of having a valid dump
-    SalamanderExceptionTime = GetTickCount();
+    // Keep the crash timestamp non-wrapping so the report can describe long-running sessions accurately.
+    SalamanderExceptionTime = GetTickCount64();
 
     static DWORD curThreadID;
     curThreadID = GetCurrentThreadId();
@@ -847,7 +860,7 @@ int CCallStack::HandleException(EXCEPTION_POINTERS* e, DWORD shellExtCrashID, co
     // if the bug-report thread is running, attempt generation there
     BOOL reportInThisThread = TRUE;
 
-    if (BugReportThread != NULL)
+    if (BugReportThreadOwner.HasThread())
     {
         ResetEvent(TBRData.EventProcessed);
         SetEvent(TBRData.Event);
@@ -868,14 +881,14 @@ int CCallStack::HandleException(EXCEPTION_POINTERS* e, DWORD shellExtCrashID, co
     {
         // Concurrent generation of two reports caused issues (with a 200 ms
         // timeout both .BUG and .DMP were incomplete) - suspend the background thread
-        if (BugReportThread)
-            SuspendThread(BugReportThread);
+        if (BugReportThreadOwner.GetThreadHandle() != NULL)
+            SuspendThread(BugReportThreadOwner.GetThreadHandle());
 
         // Try to generate the report in this thread
         CreateBugReportFile(e, curThreadID, shellExtCrashID, bugReportPath); // create an on-disk record of the error
 
-        if (BugReportThread)
-            ResumeThread(BugReportThread);
+        if (BugReportThreadOwner.GetThreadHandle() != NULL)
+            ResumeThread(BugReportThreadOwner.GetThreadHandle());
     }
 
     TerminateProcess(GetCurrentProcess(), 1); // stronger exit (this still performs some calls)

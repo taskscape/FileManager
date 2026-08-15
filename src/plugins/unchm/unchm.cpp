@@ -2,6 +2,8 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "precomp.h"
+
+#include <strsafe.h>
 #include "dbg.h"
 
 #include "chmlib/types.h"
@@ -419,14 +421,14 @@ BOOL CPluginInterfaceForArchiver::UnpackOneFile(CSalamanderForOperationsAbstract
     salamander->ProgressSetTotalSize(fileData->Size + CQuadWord(1, 0), CQuadWord(-1, -1));
 
     char name[MAX_PATH];
-    strcpy(name, targetDir);
+    const BOOL targetNameFits = SUCCEEDED(StringCchCopyA(name, _countof(name), targetDir));
     const char* lastComp = strrchr(nameInArchive, '\\');
     if (lastComp != NULL)
         lastComp++;
     else
         lastComp = nameInArchive;
 
-    if (SalamanderGeneral->SalPathAppend(name, lastComp, MAX_PATH))
+    if (targetNameFits && SalamanderGeneral->SalPathAppend(name, lastComp, _countof(name)))
     {
         DWORD silent = 0;
         BOOL toSkip = FALSE;
@@ -434,14 +436,26 @@ BOOL CPluginInterfaceForArchiver::UnpackOneFile(CSalamanderForOperationsAbstract
         salamander->ProgressDialogAddText(name, TRUE); // delayedPaint==TRUE so we do not slow down
 
         char srcPath[MAX_PATH];
-        lstrcpy(srcPath, nameInArchive);
-        char* lComp = strrchr(srcPath, '\\');
-        if (lComp != NULL)
-            *lComp = '\0';
+        if (SUCCEEDED(StringCchCopyA(srcPath, _countof(srcPath), nameInArchive)))
+        {
+            char* lComp = strrchr(srcPath, '\\');
+            if (lComp != NULL)
+                *lComp = '\0';
 
-        chm.ButtonFlags = BUTTONS_OK;
-        ret = chm.ExtractObject(salamander, srcPath, targetDir, fileData, silent, toSkip);
-    } // if
+            chm.ButtonFlags = BUTTONS_OK;
+            ret = chm.ExtractObject(salamander, srcPath, targetDir, fileData, silent, toSkip);
+        }
+        else
+        {
+            // Extraction must not resolve a CHM object from a truncated archive path.
+            ret = FALSE;
+        }
+    }
+    else
+    {
+        // Output creation requires a complete target directory and archive leaf.
+        ret = FALSE;
+    }
 
     salamander->CloseProgressDialog();
 
@@ -520,12 +534,19 @@ BOOL CPluginInterfaceForArchiver::UnpackWholeArchive(CSalamanderForOperationsAbs
                 DWORD silent = 0;
                 BOOL toSkip = FALSE;
                 char strTarget[MAX_PATH];
-                lstrcpy(strTarget, targetDir);
                 char srcPath[MAX_PATH];
                 srcPath[0] = '\0';
 
-                chm.ButtonFlags = BUTTONS_SKIPCANCEL;
-                ret = chm.ExtractAllObjects(salamander, srcPath, dir, modmask, strTarget, MAX_PATH, silent, toSkip) != UNPACK_CANCEL;
+                if (SUCCEEDED(StringCchCopyA(strTarget, _countof(strTarget), targetDir)))
+                {
+                    chm.ButtonFlags = BUTTONS_SKIPCANCEL;
+                    ret = chm.ExtractAllObjects(salamander, srcPath, dir, modmask, strTarget, _countof(strTarget), silent, toSkip) != UNPACK_CANCEL;
+                }
+                else
+                {
+                    // Whole-archive extraction must not begin from a truncated destination directory.
+                    ret = FALSE;
+                }
             }
 
             salamander->CloseProgressDialog();

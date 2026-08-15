@@ -17,11 +17,12 @@
 CPluginFSInterface::CPluginFSInterface()
 {
     // Desktop -> CurrentPIDL
-    if (FAILED(SHGetSpecialFolderLocation(NULL, CSIDL_DESKTOP, &CurrentPIDL)))
+    // The namespace root is still a PIDL, but Known Folders supplies it without a CSIDL lookup.
+    if (FAILED(SHGetKnownFolderIDList(FOLDERID_Desktop, KF_FLAG_DEFAULT, NULL, &CurrentPIDL)))
     {
         // the Desktop PIDL is empty, but we obtain it cleanly
         CurrentPIDL = NULL;
-        TRACE_E("SHGetSpecialFolderLocation failed on CSIDL_DESKTOP");
+        TRACE_E("SHGetKnownFolderIDList failed on FOLDERID_Desktop");
     }
 
     // Desktop -> CurrentFolder
@@ -447,7 +448,7 @@ CPluginFSInterface::ShowProperties(const char* fsName, HWND parent, int panel,
 
             contextMenu->Release();
         }
-        LocalFree(pidlArray);
+        HeapFree(GetProcessHeap(), 0, (void*)pidlArray);
     }
 }
 
@@ -507,7 +508,7 @@ CPluginFSInterface::ContextMenu(const char* fsName, HWND parent, int menuX, int 
                 DestroyMenu(hMenu);
                 contextMenu2->Release();
             }
-            LocalFree(pidlArray);
+            HeapFree(GetProcessHeap(), 0, (void*)pidlArray);
         }
     }
 }
@@ -535,7 +536,9 @@ BOOL CPluginFSInterface::CreateIDListFromSelection(int panel, int selectedFiles,
     int index = 0;
 
     int itemsCount = focused ? 1 : (selectedFiles + selectedDirs);
-    *pidlArray = (LPCITEMIDLIST*)LocalAlloc(LPTR, sizeof(LPCITEMIDLIST) * itemsCount);
+    // This is a plugin-owned pointer array, not shell-allocated PIDL storage.
+    *pidlArray = (LPCITEMIDLIST*)HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY,
+                                            sizeof(LPCITEMIDLIST) * itemsCount);
     if (*pidlArray == NULL)
         return FALSE;
 

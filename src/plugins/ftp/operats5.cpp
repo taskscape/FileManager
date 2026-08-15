@@ -4,6 +4,27 @@
 
 #include "precomp.h"
 
+#include "..\\..\\common\\monotonic_time.h"
+
+static BOOL GetFileSizeQuadWord(HANDLE file, CQuadWord* size)
+{
+    LARGE_INTEGER fileSize;
+    if (!GetFileSizeEx(file, &fileSize))
+        return FALSE;
+    // FTP transfer offsets use CQuadWord, so retain the full file size instead of rebuilding DWORD halves.
+    size->SetUI64((unsigned __int64)fileSize.QuadPart);
+    return TRUE;
+}
+
+static BOOL SeekFileToQuadWord(HANDLE file, const CQuadWord& offset)
+{
+    // FTP resume offsets are CQuadWord values, so pass both halves to the unambiguous Boolean seek API.
+    LARGE_INTEGER seekOffset;
+    seekOffset.LowPart = offset.LoDWord;
+    seekOffset.HighPart = static_cast<LONG>(offset.HiDWord);
+    return SetFilePointerEx(file, seekOffset, NULL, FILE_BEGIN);
+}
+
 //
 // ****************************************************************************
 // CFTPWorkersList
@@ -1027,7 +1048,9 @@ BOOL CFTPDiskThread::AddFileToClose(const char* path, const char* name, HANDLE f
 BOOL CFTPDiskThread::WaitForFileClose(int fileCloseIndex, DWORD timeout)
 {
     CALL_STACK_MESSAGE3("CFTPDiskThread::WaitForFileClose(%d, %u)", fileCloseIndex, timeout);
-    DWORD ti = GetTickCount();
+    // The timeout is a Win32 boundary, while elapsed-time accounting stays private and non-wrapping.
+    const CMonotonicTimePoint started = CMonotonicClock::Now();
+    const CMonotonicTimePoint deadline = timeout == INFINITE ? 0 : started + timeout;
     BOOL closed = FALSE;
     while (1)
     {
@@ -1037,10 +1060,11 @@ BOOL CFTPDiskThread::WaitForFileClose(int fileCloseIndex, DWORD timeout)
         HANDLES(LeaveCriticalSection(&DiskCritSect));
         if (closed)
             break;
-        DWORD elapsed = GetTickCount() - ti;
+        const CMonotonicTimePoint now = CMonotonicClock::Now();
         if (FileClosedEvent != NULL)
         {
-            DWORD res = WaitForSingleObject(FileClosedEvent, timeout == INFINITE ? INFINITE : (elapsed < timeout ? timeout - elapsed : 0));
+            DWORD res = WaitForSingleObject(FileClosedEvent,
+                                            timeout == INFINITE ? INFINITE : CMonotonicClock::RemainingWin32TimerDelay(deadline, now));
             if (res != WAIT_OBJECT_0)
             {
                 TRACE_I("CFTPDiskThread::WaitForFileClose(): waiting for file closure has timed out!");
@@ -1049,9 +1073,9 @@ BOOL CFTPDiskThread::WaitForFileClose(int fileCloseIndex, DWORD timeout)
         }
         else // always false (only if creating FileClosedEvent failed) -> use "active" waiting
         {
-            if (timeout != INFINITE && elapsed >= timeout)
+            if (timeout != INFINITE && CMonotonicClock::HasReached(deadline, now))
                 break; // timeout
-            Sleep(100);
+            Sleep(timeout == INFINITE ? 100 : min(100UL, CMonotonicClock::RemainingWin32TimerDelay(deadline, now)));
         }
     }
     return closed;
@@ -1730,8 +1754,7 @@ void DoCreateFileUtf8Local(CFTPDiskWork& localWork, char* fullName, BOOL& workDo
             {
                 denyOverwrite = TRUE; // the file was opened successfully; no point overwriting it if determining its size fails
                 CQuadWord size;
-                size.LoDWord = GetFileSize(file, &size.HiDWord);
-                if (size.LoDWord != INVALID_FILE_SIZE || (winErr = GetLastError()) == NO_ERROR)
+                if (GetFileSizeQuadWord(file, &size))
                 {
                     BOOL ok = TRUE;
                     if (reduceFileSize) // we still need to shorten the file, so let's do it
@@ -1743,10 +1766,7 @@ void DoCreateFileUtf8Local(CFTPDiskWork& localWork, char* fullName, BOOL& workDo
                             resumeOverlap = (DWORD)size.Value;
                         size -= CQuadWord(resumeOverlap, 0);
 
-                        CQuadWord curSeek = size;
-                        curSeek.LoDWord = SetFilePointer(file, curSeek.LoDWord, (LONG*)&curSeek.HiDWord, FILE_BEGIN);
-                        if (curSeek.LoDWord == INVALID_SET_FILE_POINTER && GetLastError() != NO_ERROR ||
-                            curSeek != size)
+                        if (!SeekFileToQuadWord(file, size))
                         { // error: cannot set seek in the file
                             ok = FALSE;
                             winErr = GetLastError();
@@ -1762,10 +1782,8 @@ void DoCreateFileUtf8Local(CFTPDiskWork& localWork, char* fullName, BOOL& workDo
                             }
                             else
                             {
-                                curSeek.Set(0, 0);
-                                curSeek.LoDWord = SetFilePointer(file, curSeek.LoDWord, (LONG*)&curSeek.HiDWord, FILE_BEGIN);
-                                if (curSeek.LoDWord == INVALID_SET_FILE_POINTER && GetLastError() != NO_ERROR ||
-                                    curSeek != CQuadWord(0, 0))
+                                CQuadWord startOffset(0, 0);
+                                if (!SeekFileToQuadWord(file, startOffset))
                                 { // error: cannot seek back to the start of the file
                                     ok = FALSE;
                                     winErr = GetLastError();
@@ -1788,6 +1806,7 @@ void DoCreateFileUtf8Local(CFTPDiskWork& localWork, char* fullName, BOOL& workDo
                 }
                 else // error when determining the file size, close the file and finish with an error
                 {
+                    winErr = GetLastError();
                     HANDLES(CloseHandle(file)); // no need to delete the file because it existed a moment ago (it likely hasn't disappeared => we did not create it)
                 }
             }
@@ -1868,8 +1887,7 @@ void DoCheckOrWriteToFile(CFTPDiskWork& localWork, BOOL& needCopyBack)
     if (localWork.WorkFile != NULL)
     {
         CQuadWord fileSize;
-        fileSize.LoDWord = GetFileSize(localWork.WorkFile, &fileSize.HiDWord);
-        if (fileSize.LoDWord == INVALID_FILE_SIZE && GetLastError() != NO_ERROR)
+        if (!GetFileSizeQuadWord(localWork.WorkFile, &fileSize))
         { // error: cannot determine the file size
             localWork.State = sqisFailed;
             localWork.ProblemID = ITEMPR_TGTFILEREADERROR;
@@ -1892,10 +1910,7 @@ void DoCheckOrWriteToFile(CFTPDiskWork& localWork, BOOL& needCopyBack)
                 }
                 else // set the seek position in the file
                 {
-                    CQuadWord curSeek = localWork.CheckFromOffset;
-                    curSeek.LoDWord = SetFilePointer(localWork.WorkFile, curSeek.LoDWord, (LONG*)&curSeek.HiDWord, FILE_BEGIN);
-                    if (curSeek.LoDWord == INVALID_SET_FILE_POINTER && GetLastError() != NO_ERROR ||
-                        curSeek != localWork.CheckFromOffset)
+                    if (!SeekFileToQuadWord(localWork.WorkFile, localWork.CheckFromOffset))
                     { // error: cannot set seek in the file
                         localWork.State = sqisFailed;
                         localWork.ProblemID = ITEMPR_TGTFILEREADERROR;
@@ -1955,10 +1970,7 @@ void DoCheckOrWriteToFile(CFTPDiskWork& localWork, BOOL& needCopyBack)
                 {
                     if (!skipSetSeekForWrite)
                     {
-                        CQuadWord curSeek = localWork.WriteOrReadFromOffset;
-                        curSeek.LoDWord = SetFilePointer(localWork.WorkFile, curSeek.LoDWord, (LONG*)&curSeek.HiDWord, FILE_BEGIN);
-                        if (curSeek.LoDWord == INVALID_SET_FILE_POINTER && GetLastError() != NO_ERROR ||
-                            curSeek != localWork.WriteOrReadFromOffset)
+                        if (!SeekFileToQuadWord(localWork.WorkFile, localWork.WriteOrReadFromOffset))
                         { // error: cannot set seek in the file
                             localWork.State = sqisFailed;
                             localWork.ProblemID = ITEMPR_TGTFILEWRITEERROR;
@@ -2235,8 +2247,7 @@ void DoOpenFileForReading(CFTPDiskWork& localWork, BOOL& needCopyBack)
         if (in != INVALID_HANDLE_VALUE)
         {
             CQuadWord size;
-            size.LoDWord = GetFileSize(in, &size.HiDWord);
-            if (size.LoDWord == INVALID_FILE_SIZE && GetLastError() != NO_ERROR)
+            if (!GetFileSizeQuadWord(in, &size))
             {
                 winError = GetLastError();
                 HANDLES(CloseHandle(in));
@@ -2268,10 +2279,7 @@ void DoReadFile(CFTPDiskWork& localWork, BOOL& needCopyBack, BOOL isASCIITrMode)
     localWork.EOLsInFlushDataBuffer = 0;
     if (localWork.WorkFile != NULL)
     {
-        CQuadWord curSeek = localWork.WriteOrReadFromOffset;
-        curSeek.LoDWord = SetFilePointer(localWork.WorkFile, curSeek.LoDWord, (LONG*)&curSeek.HiDWord, FILE_BEGIN);
-        if (curSeek.LoDWord == INVALID_SET_FILE_POINTER && GetLastError() != NO_ERROR ||
-            curSeek != localWork.WriteOrReadFromOffset)
+        if (!SeekFileToQuadWord(localWork.WorkFile, localWork.WriteOrReadFromOffset))
         { // error: cannot set seek in the file
             localWork.State = sqisFailed;
             localWork.ProblemID = ITEMPR_SRCFILEREADERROR;
@@ -2431,8 +2439,8 @@ CFTPDiskThread::Body()
             {
                 if (fileToClose->DeleteIfEmpty)
                 {
-                    size.LoDWord = GetFileSize(fileToClose->File, &size.HiDWord);
-                    delFile = (size == CQuadWord(0, 0)); // if GetFileSize fails the file is not deleted
+                    delFile = GetFileSizeQuadWord(fileToClose->File, &size) &&
+                              size == CQuadWord(0, 0); // do not delete when the size query fails
                 }
             }
             if (!delFile && fileToClose->SetDateAndTime &&
@@ -2478,15 +2486,11 @@ CFTPDiskThread::Body()
             }
             if (!delFile && fileToClose->EndOfFile != CQuadWord(-1, -1))
             {
-                size.LoDWord = GetFileSize(fileToClose->File, &size.HiDWord);
-                if (size.LoDWord != INVALID_FILE_SIZE || GetLastError() == NO_ERROR)
+                if (GetFileSizeQuadWord(fileToClose->File, &size))
                 {
                     if (fileToClose->EndOfFile <= size)
                     {
-                        CQuadWord curSeek = fileToClose->EndOfFile;
-                        curSeek.LoDWord = SetFilePointer(fileToClose->File, curSeek.LoDWord, (LONG*)&curSeek.HiDWord, FILE_BEGIN);
-                        if ((curSeek.LoDWord != INVALID_SET_FILE_POINTER || GetLastError() == NO_ERROR) &&
-                            curSeek == fileToClose->EndOfFile)
+                        if (SeekFileToQuadWord(fileToClose->File, fileToClose->EndOfFile))
                         {
                             if (SetEndOfFile(fileToClose->File) == 0)
                             {
@@ -2497,7 +2501,7 @@ CFTPDiskThread::Body()
                         else
                         {
                             DWORD err = GetLastError();
-                            TRACE_E("CFTPDiskThread::Body(): SetFilePointer failed: " << FTPGetErrorText(err, errBuf, 300));
+                            TRACE_E("CFTPDiskThread::Body(): SetFilePointerEx failed: " << FTPGetErrorText(err, errBuf, 300));
                         }
                     }
                     else

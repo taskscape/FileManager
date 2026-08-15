@@ -12,6 +12,8 @@ extern "C"
 }
 #include "salshlib.h"
 
+#include <strsafe.h>
+
 // original location in fileswnd.h (here only for MakeCopyOfName in CImpDropTarget::ProcessClipboardData)
 extern BOOL OurClipDataObject; // TRUE during "paste" of our IDataObject
                                // (detection of our own copy/move routine with foreign data)
@@ -1189,11 +1191,14 @@ STDMETHODIMP CImpDropTarget::Drop(IDataObject* pDataObject, DWORD grfKeyState,
                     WaitForSingleObject(SalShExtSharedMemMutex, INFINITE);
                     if (SalShExtSharedMemView->DoDragDropFromSalamander)
                     {
-                        SalShExtSharedMemView->DropDone = TRUE;
-                        SalShExtSharedMemView->PasteDone = FALSE;
-                        lstrcpyn(SalShExtSharedMemView->TargetPath, CurDir, MAX_PATH); // only disk path, MAX_PATH is enough
-                        SalShExtSharedMemView->Operation = *pdwEffect == DROPEFFECT_COPY ? SALSHEXT_COPY : SALSHEXT_MOVE;
-                        success = TRUE;
+                        // The shared-memory target is an operation identity and must never be published truncated.
+                        if (SUCCEEDED(StringCchCopyA(SalShExtSharedMemView->TargetPath, MAX_PATH, CurDir)))
+                        {
+                            SalShExtSharedMemView->DropDone = TRUE;
+                            SalShExtSharedMemView->PasteDone = FALSE;
+                            SalShExtSharedMemView->Operation = *pdwEffect == DROPEFFECT_COPY ? SALSHEXT_COPY : SALSHEXT_MOVE;
+                            success = TRUE;
+                        }
                     }
                     ReleaseMutex(SalShExtSharedMemMutex);
                 }
@@ -1267,10 +1272,13 @@ STDMETHODIMP CImpDropTarget::Drop(IDataObject* pDataObject, DWORD grfKeyState,
                         WaitForSingleObject(SalShExtSharedMemMutex, INFINITE);
                         if (SalShExtSharedMemView->DoDragDropFromSalamander)
                         {
-                            SalShExtSharedMemView->DropDone = TRUE;
-                            SalShExtSharedMemView->PasteDone = FALSE;
-                            lstrcpyn(SalShExtSharedMemView->TargetPath, CurDir, 2 * MAX_PATH); // full FS path, need 2 * MAX_PATH
-                            SalShExtSharedMemView->Operation = *pdwEffect == DROPEFFECT_COPY ? SALSHEXT_COPY : SALSHEXT_MOVE;
+                            // The shared-memory target is an operation identity and must never be published truncated.
+                            if (SUCCEEDED(StringCchCopyA(SalShExtSharedMemView->TargetPath, 2 * MAX_PATH, CurDir)))
+                            {
+                                SalShExtSharedMemView->DropDone = TRUE;
+                                SalShExtSharedMemView->PasteDone = FALSE;
+                                SalShExtSharedMemView->Operation = *pdwEffect == DROPEFFECT_COPY ? SALSHEXT_COPY : SALSHEXT_MOVE;
+                            }
                         }
                         ReleaseMutex(SalShExtSharedMemMutex);
                     }
@@ -1586,13 +1594,21 @@ BOOL GetShellFolder(const char* dir, IShellFolder*& shellFolderObj, LPITEMIDLIST
     {
         if (SUCCEEDED((ret = SHGetDesktopFolder(&desktop))))
         {
-            int rootFolder;
+            BOOL isComputerFolder;
+            const KNOWNFOLDERID* rootFolder;
             if (dir[0] != '\\')
-                rootFolder = CSIDL_DRIVES; // normal path
+            {
+                rootFolder = &FOLDERID_ComputerFolder; // normal path
+                isComputerFolder = TRUE;
+            }
             else
-                rootFolder = CSIDL_NETWORK; // UNC - sitove zdroje
+            {
+                rootFolder = &FOLDERID_NetworkFolder; // UNC - sitove zdroje
+                isComputerFolder = FALSE;
+            }
             LPITEMIDLIST rootFolderID;
-            if (SUCCEEDED((ret = SHGetSpecialFolderLocation(NULL, rootFolder, &rootFolderID))))
+            // The shell-folder resolver needs a namespace PIDL, which Known Folders provides without a CSIDL lookup.
+            if (SUCCEEDED((ret = SHGetKnownFolderIDList(*rootFolder, KF_FLAG_DEFAULT, NULL, &rootFolderID))))
             {
                 if (SUCCEEDED((ret = desktop->BindToObject(rootFolderID, NULL,
                                                            IID_IShellFolder,
@@ -1635,7 +1651,7 @@ BOOL GetShellFolder(const char* dir, IShellFolder*& shellFolderObj, LPITEMIDLIST
                     }
                     else
                     {
-                        if (rootFolder == CSIDL_DRIVES)
+                        if (isComputerFolder)
                         {
                             LPENUMIDLIST enumIDList;
                             if (SUCCEEDED((ret = shellFolderObj->EnumObjects(NULL, SHCONTF_FOLDERS | SHCONTF_INCLUDEHIDDEN,
@@ -1701,7 +1717,7 @@ BOOL GetShellFolder(const char* dir, IShellFolder*& shellFolderObj, LPITEMIDLIST
                         }
                         else
                         {
-                            if (rootFolder == CSIDL_NETWORK) // we must get complex pidl, otherwise mapping doesn't work
+                            if (!isComputerFolder) // we must get complex pidl, otherwise mapping doesn't work
                             {
                                 *(root + strlen(root) - 1) = 0;
                                 dir = root;
@@ -1828,13 +1844,8 @@ BOOL GetShellFolder(const char* dir, IShellFolder*& shellFolderObj, LPITEMIDLIST
                 }
                 else
                     TRACE_E("BindToObject error: 0x" << std::hex << ret << std::dec);
-                IMalloc* alloc;
-                if (rootFolderID != NULL && SUCCEEDED(CoGetMalloc(1, &alloc)))
-                {
-                    if (alloc->DidAlloc(rootFolderID) == 1)
-                        alloc->Free(rootFolderID);
-                    alloc->Release();
-                }
+                if (rootFolderID != NULL)
+                    CoTaskMemFree(rootFolderID);
             }
             else
                 TRACE_E("SHGetSpecialFolderLocation error: 0x" << std::hex << ret << std::dec);
@@ -2153,11 +2164,51 @@ IDropTarget* CreateIDropTarget(HWND hOwnerWindow, const char* dir)
 // OpenSpecFolder
 //
 
+static const KNOWNFOLDERID* GetKnownFolderForLegacyCsidl(int specFolder)
+{
+    // This command surface accepts a fixed historical CSIDL set; map each command to its explicit Known Folder.
+    switch (specFolder)
+    {
+    case CSIDL_BITBUCKET:
+        return &FOLDERID_RecycleBinFolder;
+    case CSIDL_CONTROLS:
+        return &FOLDERID_ControlPanelFolder;
+    case CSIDL_DESKTOP:
+    case CSIDL_DESKTOPDIRECTORY:
+        return &FOLDERID_Desktop;
+    case CSIDL_DRIVES:
+        return &FOLDERID_ComputerFolder;
+    case CSIDL_FONTS:
+        return &FOLDERID_Fonts;
+    case CSIDL_NETWORK:
+        return &FOLDERID_NetworkFolder;
+    case CSIDL_PRINTERS:
+        return &FOLDERID_PrintersFolder;
+    case CSIDL_PERSONAL:
+        return &FOLDERID_Documents;
+    case CSIDL_PROGRAMS:
+        return &FOLDERID_Programs;
+    case CSIDL_RECENT:
+        return &FOLDERID_Recent;
+    case CSIDL_SENDTO:
+        return &FOLDERID_SendTo;
+    case CSIDL_STARTMENU:
+        return &FOLDERID_StartMenu;
+    case CSIDL_STARTUP:
+        return &FOLDERID_Startup;
+    case CSIDL_TEMPLATES:
+        return &FOLDERID_Templates;
+    default:
+        return NULL;
+    }
+}
+
 void OpenSpecFolder(HWND hOwnerWindow, int specFolder)
 {
     CALL_STACK_MESSAGE2("OpenSpecFolder(, %d)", specFolder);
+    const KNOWNFOLDERID* knownFolder = GetKnownFolderForLegacyCsidl(specFolder);
     ITEMIDLIST* pidl;
-    if (SHGetSpecialFolderLocation(NULL, specFolder, &pidl) == NOERROR && pidl != NULL)
+    if (knownFolder != NULL && SUCCEEDED(SHGetKnownFolderIDList(*knownFolder, KF_FLAG_DEFAULT, NULL, &pidl)) && pidl != NULL)
     {
         CShellExecuteWnd shellExecuteWnd;
         SHELLEXECUTEINFO se;
@@ -2170,13 +2221,7 @@ void OpenSpecFolder(HWND hOwnerWindow, int specFolder)
         se.lpIDList = pidl;
         ShellExecuteEx(&se);
 
-        IMalloc* alloc;
-        if (SUCCEEDED(CoGetMalloc(1, &alloc)))
-        {
-            if (pidl != NULL && alloc->DidAlloc(pidl) == 1)
-                alloc->Free(pidl);
-            alloc->Release();
-        }
+        CoTaskMemFree(pidl);
     }
 }
 
@@ -2283,50 +2328,58 @@ void OpenFolderAndFocusItem(HWND hOwnerWindow, const char* dir, const char* item
 //
 //  returns TRUE if path is a valid new path
 
-struct CBrowseData
+static BOOL GetTargetDirectoryAuxImpl(HWND parent, HWND hCenterWindow,
+                                      const char* title, const char* comment,
+                                      char* path, BOOL onlyNet, const char* initDir)
 {
-    const char* Title;
-    const char* InitDir;
-    HWND HCenterWindow;
-};
+    // IFileDialog owns its placement; retain this argument for the stable public helper signature.
+    UNREFERENCED_PARAMETER(hCenterWindow);
+    IFileOpenDialog* dialog = NULL;
+    HRESULT result = CoCreateInstance(CLSID_FileOpenDialog, NULL, CLSCTX_INPROC_SERVER,
+                                      IID_PPV_ARGS(&dialog));
+    if (FAILED(result))
+        return FALSE;
 
-int CALLBACK DirectoryBrowse(HWND hwnd, UINT uMsg, LPARAM lParam, LPARAM lpData)
-{
-    CALL_STACK_MESSAGE4("DirectoryBrowse(, 0x%X, 0x%IX, 0x%IX)", uMsg, lParam, lpData);
-    if (uMsg == BFFM_INITIALIZED)
-    {
-        MultiMonCenterWindow(hwnd, ((CBrowseData*)lpData)->HCenterWindow, FALSE);
+    FILEOPENDIALOGOPTIONS options = 0;
+    result = dialog->GetOptions(&options);
+    if (SUCCEEDED(result))
+        result = dialog->SetOptions(options | FOS_PICKFOLDERS | FOS_FORCEFILESYSTEM);
+    CStrP titleW(ConvertAllocUtf8ToWide(title != NULL ? title : comment, -1));
+    if (SUCCEEDED(result) && titleW != NULL)
+        result = dialog->SetTitle(titleW);
 
-        // nastavim header
-        CStrP titleW(ConvertAllocUtf8ToWide(((CBrowseData*)lpData)->Title, -1));
-        if (titleW != NULL)
-            SetWindowTextW(hwnd, titleW);
-        if (((CBrowseData*)lpData)->InitDir != NULL)
-        {
-            char path[MAX_PATH];
-            GetRootPath(path, ((CBrowseData*)lpData)->InitDir);
-            if (strlen(path) < strlen(((CBrowseData*)lpData)->InitDir)) // it's not a root-dir
-            {
-                strcpy(path, ((CBrowseData*)lpData)->InitDir);
-                char& ch = path[strlen(path) - 1];
-                if (ch == '\\')
-                    ch = 0;
-            }
-            CStrP pathW(ConvertAllocUtf8ToWide(path, -1));
-            if (pathW != NULL)
-                SendMessageW(hwnd, BFFM_SETSELECTIONW, TRUE, (LPARAM)pathW.Ptr);
-        }
-    }
-    if (uMsg == BFFM_SELCHANGED)
+    IShellItem* initialFolder = NULL;
+    if (SUCCEEDED(result) && initDir != NULL)
     {
-        if ((ITEMIDLIST*)lParam != NULL)
-        {
-            WCHAR pathW[MAX_PATH];
-            BOOL ret = SHGetPathFromIDListW((ITEMIDLIST*)lParam, pathW);
-            SendMessage(hwnd, BFFM_ENABLEOK, 0, ret);
-        }
+        CStrP initDirW(ConvertAllocUtf8ToWide(initDir, -1));
+        if (initDirW != NULL)
+            result = SHCreateItemFromParsingName(initDirW, NULL, IID_PPV_ARGS(&initialFolder));
     }
-    return 0;
+    else if (SUCCEEDED(result) && onlyNet)
+    {
+        // The named Network folder replaces the legacy CSIDL_NETWORK PIDL root.
+        result = SHGetKnownFolderItem(FOLDERID_NetworkFolder, KF_FLAG_DEFAULT, NULL, IID_PPV_ARGS(&initialFolder));
+    }
+    if (SUCCEEDED(result) && initialFolder != NULL)
+        result = dialog->SetFolder(initialFolder);
+    if (initialFolder != NULL)
+        initialFolder->Release();
+
+    if (SUCCEEDED(result))
+        result = dialog->Show(parent);
+    IShellItem* selectedFolder = NULL;
+    if (SUCCEEDED(result))
+        result = dialog->GetResult(&selectedFolder);
+    PWSTR selectedPath = NULL;
+    if (SUCCEEDED(result))
+        result = selectedFolder->GetDisplayName(SIGDN_FILESYSPATH, &selectedPath);
+    BOOL ret = SUCCEEDED(result) && ConvertWideToUtf8(selectedPath, -1, path, MAX_PATH) != 0;
+    if (selectedPath != NULL)
+        CoTaskMemFree(selectedPath);
+    if (selectedFolder != NULL)
+        selectedFolder->Release();
+    dialog->Release();
+    return ret;
 }
 
 BOOL GetTargetDirectoryAux(HWND parent, HWND hCenterWindow,
@@ -2335,56 +2388,8 @@ BOOL GetTargetDirectoryAux(HWND parent, HWND hCenterWindow,
 {
     __try
     {
-        ITEMIDLIST* pidl; // vyber root-folderu
-        if (onlyNet)
-            SHGetSpecialFolderLocation(parent, CSIDL_NETWORK, &pidl);
-        else
-            pidl = NULL;
-
-        // otevreni dialogu
-        WCHAR display[MAX_PATH];
-        BROWSEINFOW bi;
-        ZeroMemory(&bi, sizeof(bi));
-        bi.hwndOwner = parent;
-        bi.pidlRoot = pidl;
-        bi.pszDisplayName = display;
-        WCHAR* commentW = ConvertAllocUtf8ToWide(comment, -1);
-        bi.lpszTitle = commentW != NULL ? commentW : L"";
-        bi.ulFlags = BIF_RETURNONLYFSDIRS;
-        /* j.r.: pod W2K se po otevreni focus stavi na OK misto do treeview (jak to bylo drive); navic nefunguje ensure_visible; proste HNUS, vracime se ke stare verzi dialogu; pripadne ho muzem casem prepsat
-    if (!onlyNet)  // Petr: dialog Network only works in old version - new one cannot ask user for login to server (situation when current login is not sufficient)
-      bi.ulFlags |= BIF_NEWDIALOGSTYLE; // larger and resizable dialog
-    */
-        bi.lpfn = DirectoryBrowse;
-        CBrowseData bd;
-        bd.Title = title;
-        bd.InitDir = initDir;
-        bd.HCenterWindow = hCenterWindow;
-        bi.lParam = (LPARAM)&bd;
-        LPITEMIDLIST res = SHBrowseForFolderW(&bi);
-        BOOL ret = FALSE; // return value
-        if (res != NULL)
-        {
-            WCHAR pathW[MAX_PATH];
-            if (SHGetPathFromIDListW(res, pathW))
-            {
-                ConvertWideToUtf8(pathW, -1, path, MAX_PATH);
-                ret = TRUE;
-            }
-        }
-        if (commentW != NULL)
-            free(commentW);
-        // releasing item-id-list
-        IMalloc* alloc;
-        if ((pidl != NULL || res != NULL) && SUCCEEDED(CoGetMalloc(1, &alloc)))
-        {
-            if (pidl != NULL && alloc->DidAlloc(pidl) == 1)
-                alloc->Free(pidl);
-            if (res != NULL && alloc->DidAlloc(res) == 1)
-                alloc->Free(res);
-            alloc->Release();
-        }
-        return ret;
+        // The public helper keeps its historical SEH boundary around the modern dialog implementation.
+        return GetTargetDirectoryAuxImpl(parent, hCenterWindow, title, comment, path, onlyNet, initDir);
     }
     __except (EXCEPTION_EXECUTE_HANDLER)
     {
@@ -2404,7 +2409,9 @@ void ResolveNetHoodPath(char* path)
         return; // not a local fixed path -> cannot be NetHood
 
     BOOL tryTarget = FALSE; // if TRUE, it's worth trying to find file "target.lnk"
-    lstrcpyn(name, path, MAX_PATH);
+    // NetHood sidecar names must be formed from the complete local path identity.
+    if (FAILED(StringCchCopyA(name, _countof(name), path)))
+        return;
     if (SalPathAppend(name, "desktop.ini", MAX_PATH))
     {
         HANDLE hFile = HANDLES_Q(CreateFileUtf8(name, GENERIC_READ,
@@ -2414,7 +2421,9 @@ void ResolveNetHoodPath(char* path)
                                             NULL));
         if (hFile != INVALID_HANDLE_VALUE)
         {
-            if (GetFileSize(hFile, NULL) <= 1000) // so far all had 92 bytes, so 1000 bytes should be more than enough
+            CFileOffsetResult sizeResult = SalGetFileSizeEx(hFile);
+            // The desktop.ini parser is deliberately bounded; a failed or oversized query must not be treated as a tiny file.
+            if (sizeResult.Succeeded && sizeResult.Value <= CQuadWord(1000, 0)) // so far all had 92 bytes, so 1000 bytes should be more than enough
             {
                 char buf[1000];
                 DWORD read;
@@ -2451,7 +2460,9 @@ void ResolveNetHoodPath(char* path)
 
     if (tryTarget)
     {
-        lstrcpyn(name, path, MAX_PATH);
+        // Restore the complete base path before probing the target sidecar.
+        if (FAILED(StringCchCopyA(name, _countof(name), path)))
+            return;
         if (SalPathAppend(name, "target.lnk", MAX_PATH))
         {
             WIN32_FIND_DATAW dataW;
@@ -2765,37 +2776,22 @@ BOOL GetMyDocumentsOrDesktopPath(char* path, int pathLen)
     char buff[2 * MAX_PATH];
 
     BOOL ret = FALSE;
-    ITEMIDLIST* pidl = NULL;
-    if (SHGetSpecialFolderLocation(NULL, CSIDL_PERSONAL, &pidl) == NOERROR)
-    {
-        if (SHGetPathFromIDList(pidl, buff))
-            ret = TRUE;
-        IMalloc* alloc;
-        if (SUCCEEDED(CoGetMalloc(1, &alloc)))
-        {
-            alloc->Free(pidl);
-            alloc->Release();
-        }
-    }
-    if (!ret && SHGetSpecialFolderLocation(NULL, CSIDL_DESKTOP, &pidl) == NOERROR)
-    {
-        if (SHGetPathFromIDList(pidl, buff))
-            ret = TRUE;
-        IMalloc* alloc;
-        if (SUCCEEDED(CoGetMalloc(1, &alloc)))
-        {
-            alloc->Free(pidl);
-            alloc->Release();
-        }
-    }
+    // Documents and Desktop are known folders, so avoid creating and converting special-folder PIDLs.
+    if (GetKnownFolderPathToAnsi(FOLDERID_Documents, buff, _countof(buff)))
+        ret = TRUE;
+    if (!ret && GetKnownFolderPathToAnsi(FOLDERID_Desktop, buff, _countof(buff)))
+        ret = TRUE;
 
-    if (ret)
+    if (ret && path != NULL && pathLen > 0)
     {
         if ((int)strlen(buff) >= pathLen)
             TRACE_E("GetMyDocumentsOrDesktopPath() Buffer too small!");
 
-        lstrcpyn(path, buff, pathLen);
+        // This public helper promises a terminated, bounded output even when the caller requests a short field.
+        StringCchCopyNA(path, pathLen, buff, pathLen - 1);
     }
+    else if (ret)
+        ret = FALSE;
 
     return ret;
 }
@@ -2856,10 +2852,14 @@ BOOL GetSHObjectName(ITEMIDLIST* pidl, DWORD flags, char* name, int nameSize, IM
                     switch (str.uType)
                     {
                     case STRRET_CSTR:
-                        lstrcpyn(name, str.cStr, nameSize);
+                        // Shell display names retain the caller-supplied bounded output width.
+                        if (nameSize > 0)
+                            StringCchCopyNA(name, nameSize, str.cStr, nameSize - 1);
                         break;
                     case STRRET_OFFSET:
-                        lstrcpyn(name, (char*)lastID + str.uOffset, nameSize);
+                        // Shell display names retain the caller-supplied bounded output width.
+                        if (nameSize > 0)
+                            StringCchCopyNA(name, nameSize, (char*)lastID + str.uOffset, nameSize - 1);
                         break;
 
                     case STRRET_WSTR:

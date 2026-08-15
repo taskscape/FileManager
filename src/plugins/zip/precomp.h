@@ -65,6 +65,22 @@ static BOOL WideToUtf8Buffer(const WCHAR* src, char* dst, int dstSize)
     return len != 0;
 }
 
+// ZIP metadata stores LANGIDs, while the modern locale APIs require a locale name; preserve the plug-in's ANSI UI boundary.
+static BOOL GetLanguageNameFromLangId(DWORD languageId, char* dst, int dstSize)
+{
+    WCHAR localeName[LOCALE_NAME_MAX_LENGTH];
+    WCHAR languageName[LOCALE_NAME_MAX_LENGTH];
+    LANGID primaryLanguage = (LANGID)languageId; // SFX metadata historically stores LANGIDs in DWORD fields.
+    LCID languageLcid = MAKELCID(MAKELANGID(primaryLanguage, SUBLANG_NEUTRAL), SORT_DEFAULT);
+
+    if (dst == NULL || dstSize <= 0)
+        return FALSE;
+    dst[0] = 0;
+    return LCIDToLocaleName(languageLcid, localeName, _countof(localeName), 0) != 0 &&
+           GetLocaleInfoEx(localeName, LOCALE_SLANGUAGE, languageName, _countof(languageName)) != 0 &&
+           WideCharToMultiByte(CP_ACP, 0, languageName, -1, dst, dstSize, NULL, NULL) != 0;
+}
+
 static BOOL ConvertFindDataWToUtf8Local(const WIN32_FIND_DATAW* src, WIN32_FIND_DATAA* dst)
 {
     if (dst == NULL || src == NULL)

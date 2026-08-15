@@ -528,6 +528,19 @@ BOOL CArchive::DoUnpackArchive(const char* targetPath, const char* archiveRoot, 
     }
 }
 
+static BOOL FormatArchiveDateTimeAnsi(const SYSTEMTIME* time, DWORD flags, char* buffer, int bufferSize, BOOL isDate)
+{
+    // TAR's UI remains ANSI, so make the one bounded conversion after locale-name formatting in UTF-16.
+    WCHAR localeName[LOCALE_NAME_MAX_LENGTH];
+    WCHAR formatted[100];
+    if (GetUserDefaultLocaleName(localeName, ARRAYSIZE(localeName)) == 0)
+        return FALSE;
+    int length = isDate
+                     ? GetDateFormatEx(localeName, flags, time, NULL, formatted, ARRAYSIZE(formatted), NULL)
+                     : GetTimeFormatEx(localeName, flags, time, NULL, formatted, ARRAYSIZE(formatted));
+    return length != 0 && WideCharToMultiByte(CP_ACP, 0, formatted, -1, buffer, bufferSize, NULL, NULL) != 0;
+}
+
 void CArchive::MakeFileInfo(const SCommonHeader& header, char* arcfiledata, char* arcfilename)
 {
     CALL_STACK_MESSAGE1("CArchive::MakeFileInfo( , , )");
@@ -546,9 +559,9 @@ void CArchive::MakeFileInfo(const SCommonHeader& header, char* arcfiledata, char
         SYSTEMTIME st;
         FileTimeToSystemTime(&ft, &st);
         char date[50], time[50], number[50];
-        if (GetTimeFormat(LOCALE_USER_DEFAULT, 0, &st, NULL, time, 50) == 0)
+        if (!FormatArchiveDateTimeAnsi(&st, 0, time, ARRAYSIZE(time), FALSE))
             sprintf(time, "%u:%02u:%02u", st.wHour, st.wMinute, st.wSecond);
-        if (GetDateFormat(LOCALE_USER_DEFAULT, DATE_SHORTDATE, &st, NULL, date, 50) == 0)
+        if (!FormatArchiveDateTimeAnsi(&st, DATE_SHORTDATE, date, ARRAYSIZE(date), TRUE))
             sprintf(date, "%u.%u.%u", st.wDay, st.wMonth, st.wYear);
         sprintf(arcfiledata, "%s, %s, %s", SalamanderGeneral->NumberToStr(number, header.FileInfo.Size), date, time);
         // filename

@@ -3,6 +3,8 @@
 
 #pragma once
 
+#include "..\\..\\common\\monotonic_time.h"
+
 #include "lib/pvw32dll.h"
 
 // Path to focus, used by menu File/Focus
@@ -102,7 +104,7 @@ public:
     eTool CurrTool;
     BOOL HiddenCursor;       // relevant in FullScreen, TRUE when the cursor faded after a timeout
     BOOL CanHideCursor;      // TRUE = the cursor may be hidden (FALSE e.g. while opening Save As so the cursor stays visible)
-    DWORD LastMoveTickCount; // tick count at the last mouse movement
+    CMonotonicTimePoint LastMoveTickCount; // last mouse movement time must remain ordered across long fullscreen sessions
     RECT ClientRect;
 
 protected:

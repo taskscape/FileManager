@@ -91,6 +91,8 @@ public:
     int UnShrinkFile(CFileInfo* fileInfo, int* errorID);
     int UnReduceFile(CFileInfo* fileInfo, int* errorID);
     int UnBZIP2File(CFileInfo* fileInfo, int* errorID);
+    // Validates archive-declared encryption overhead before a decoder receives a remaining-byte count.
+    int GetCompressedPayloadSize(CFileInfo* fileInfo, QWORD* payloadSize, int* errorID);
     int ExtractFiles(const char* targetDir);
     int ExtractSingleFile(char* targetDir, int targetDirLen,
                           CFileInfo* fileInfo, BOOL* success, const char* newFileName = NULL);

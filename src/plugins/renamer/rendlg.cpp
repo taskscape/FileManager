@@ -535,16 +535,27 @@ BOOL GetCounterParamFormat(HWND parent, char* buffer)
     return CAddCounterDialog(parent, buffer).Execute() == IDOK;
 }
 
+static BOOL GetUserLocaleInfoAnsi(LCTYPE type, char* buffer, int bufferSize)
+{
+    WCHAR localeName[LOCALE_NAME_MAX_LENGTH];
+    WCHAR value[1024];
+    if (GetUserDefaultLocaleName(localeName, _countof(localeName)) == 0 ||
+        GetLocaleInfoEx(localeName, type, value, _countof(value)) == 0)
+        return FALSE;
+    // Renamer expressions are ANSI strings, so convert only after the modern named-locale query succeeds.
+    return WideCharToMultiByte(CP_ACP, 0, value, -1, buffer, bufferSize, NULL, NULL) != 0;
+}
+
 BOOL GetTimeParamFormat(HWND parent, char* buffer)
 {
     CALL_STACK_MESSAGE_NONE
-    return GetLocaleInfo(LOCALE_USER_DEFAULT, LOCALE_STIMEFORMAT, buffer, 1024);
+    return GetUserLocaleInfoAnsi(LOCALE_STIMEFORMAT, buffer, 1024);
 }
 
 BOOL GetDateParamFormat(HWND parent, char* buffer)
 {
     CALL_STACK_MESSAGE_NONE
-    return GetLocaleInfo(LOCALE_USER_DEFAULT, LOCALE_SSHORTDATE, buffer, 1024);
+    return GetUserLocaleInfoAnsi(LOCALE_SSHORTDATE, buffer, 1024);
 }
 
 BOOL GetLowerCaseParam(HWND parent, char* buffer)
@@ -1204,7 +1215,7 @@ void CRenamerDialog::ReloadSourceFiles()
     TRACE_I("start reading files");
     GetAsyncKeyState(VK_ESCAPE); // init GetAsyncKeyState
     int dirs = 0;
-    LastUpdateTime = GetTickCount();
+    LastUpdateTime = CMonotonicClock::Now();
     int i, j;
     for (i = j = 0;
          ProcessRenamed && i < RenamedFiles.Count ||
@@ -1243,7 +1254,6 @@ void CRenamerDialog::ReloadSourceFiles()
             break;
         }
     }
-    LastUpdateTime = GetTickCount() - LastUpdateTime;
     TRACE_I("finished reading files");
 
     if (success)
@@ -1372,7 +1382,7 @@ BOOL CRenamerDialog::LoadSubdir(char* path, const char* subdir)
             break;
         }
 
-        if (GetTickCount() - LastUpdateTime > 2000)
+        if (CMonotonicClock::HasElapsed(LastUpdateTime, 2001, CMonotonicClock::Now()))
         {
             Preview->SetItemCount(0, 0, 3);
         }

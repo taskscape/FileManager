@@ -438,6 +438,7 @@ BOOL GetSizeAux(HWND parent, HKEY hKey, const char* name, DWORD type, DWORD& buf
 
 CRegistryWorkerThread::CRegistryWorkerThread()
 {
+    ThreadOwner = NULL;
     Thread = NULL;
     OwnerTID = 0; // invalid TID
     StopWorkerSkipCount = 0;
@@ -487,10 +488,13 @@ BOOL CRegistryWorkerThread::StartThread()
             ResetEvent(WorkDone);
             WorkType = rwtNone;
 
-            DWORD threadID;
-            Thread = HANDLES(CreateThread(NULL, 0, CRegistryWorkerThread::ThreadBody, (void*)this, 0, &threadID));
-            if (Thread != NULL)
+            ThreadOwner = new CThreadOwner;
+            if (ThreadOwner != NULL &&
+                ThreadOwner->Start(CRegistryWorkerThread::ThreadBodyOwned, this, "registry worker"))
             {
+                // The owner closes this borrowed handle only after the stop
+                // work item has made the worker independent of registry state.
+                Thread = ThreadOwner->GetThreadHandle();
                 OwnerTID = GetCurrentThreadId(); // enable usage for this thread
                 StopWorkerSkipCount = 0;
                 int level = GetThreadPriority(GetCurrentThread());
@@ -498,7 +502,11 @@ BOOL CRegistryWorkerThread::StartThread()
                 ret = TRUE; // success!
             }
             else
+            {
+                delete ThreadOwner;
+                ThreadOwner = NULL;
                 TRACE_E("CRegistryWorkerThread::StartThread(): unable to start registry-worker thread!");
+            }
         }
         else
             TRACE_E("CRegistryWorkerThread::StartThread(): unable to start thread, neccessary event-objects are not OK!");
@@ -531,8 +539,11 @@ void CRegistryWorkerThread::StopThread()
                     WorkType = rwtStopWorker;
 
                     WaitForWorkDoneWithMessageLoop();
-                    WaitForSingleObject(Thread, INFINITE);
-                    HANDLES(CloseHandle(Thread));
+                    // WorkDone means Body has returned, so this join cannot
+                    // release the owner while registry operation data is live.
+                    ThreadOwner->StopAndJoin(0);
+                    delete ThreadOwner;
+                    ThreadOwner = NULL;
                     Thread = NULL;
                     OwnerTID = 0; // invalid TID
                 }
@@ -856,13 +867,15 @@ CRegistryWorkerThread::ThreadBodyFEH(void* param)
 }
 
 DWORD WINAPI
-CRegistryWorkerThread::ThreadBody(void* param)
+CRegistryWorkerThread::ThreadBodyOwned(void* param, HANDLE stopEvent)
 {
+    // Stop remains a queued registry work item; the generic stop event must
+    // not bypass the existing message-loop completion protocol.
+    (void)stopEvent;
 #ifndef CALLSTK_DISABLE
     CCallStack stack;
 #endif // CALLSTK_DISABLE
-    ThreadBodyFEH(param);
-    return 0;
+    return ThreadBodyFEH(param);
 }
 
 CRegistryWorkerThread::CInUseHandler::~CInUseHandler()

@@ -42,7 +42,8 @@ protected:
     BOOL MoveBarRight;   // is rectangle moving to the right?
     DWORD SelfMoveTime;  // 0: after calling SetProgress(-1) the rectangle moves only one notch (0 is the default value)
                          // more than 0: time in [ms] for which we will continue moving after calling SetProgress(-1)
-    DWORD SelfMoveTicks; // stored GetTickCount() value during last call to SetSelfMoveTime()
+    // Store the self-animation start as a 64-bit point so its stop deadline cannot wrap.
+    CMonotonicTimePoint SelfMoveTicks;
     DWORD SelfMoveSpeed; // rectangle movement speed: value is in [ms] and indicates the time after which the rectangle moves
                          // minimum is 10ms, default value is 50ms -- thus 20 movements per second
                          // beware of low values, the animation itself can noticeably stress the processor
@@ -241,7 +242,8 @@ protected:
     char* ToolTipText;    // string that will be displayed as our tooltip
     HWND HToolTipNW;      // notification window
     DWORD ToolTipID;      // ID under which the tooltip should query for text
-    DWORD DropDownUpTime; // time in [ms] when drop down was released, to protect against new press
+    // Keep the short post-dropdown click guard correct after the legacy 32-bit tick wrap.
+    CMonotonicTimePoint DropDownUpTime;
     // XP Theme support
     BOOL Hot;
     WORD UIState; // accelerator display

@@ -116,13 +116,19 @@ int _tmain(int argc, TCHAR* argv[])
         _tprintf(_T("Error %d: Could not open %s\n"), errno, argv[1]);
         return 1;
     }
-    size = GetFileSize(hFile, NULL);
-    if (0xFFFFFFFF == size)
+    LARGE_INTEGER fileSize;
+    BOOL gotFileSize = GetFileSizeEx(hFile, &fileSize);
+    if (!gotFileSize || fileSize.QuadPart < 0 ||
+        (ULONGLONG)fileSize.QuadPart > MAXDWORD - sizeof(WCHAR))
     {
+        if (gotFileSize)
+            SetLastError(ERROR_FILE_TOO_LARGE);
         printf("Error %d: Could not obtain input file size\n", GetLastError());
         CloseHandle(hFile);
         return 2;
     }
+    // The registry parser appends a WCHAR sentinel to its DWORD-sized input buffer, so validate before narrowing.
+    size = (DWORD)fileSize.QuadPart;
     buf = (LPTSTR)malloc(size + sizeof(WCHAR));
     if (!buf)
     {

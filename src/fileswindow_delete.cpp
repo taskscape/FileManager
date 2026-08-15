@@ -4,6 +4,9 @@
 
 #include "precomp.h"
 
+#include <shobjidl.h>
+#include <strsafe.h>
+
 #include "cfgdlg.h"
 #include "mainwnd.h"
 #include "plugins.h"
@@ -19,17 +22,35 @@
 // CFilesWindow
 //
 
-int DeleteThroughRecycleBinAux(SHFILEOPSTRUCTW* fo)
+static HRESULT QueueUtf8DeleteItems(IFileOperation* operation, const char* paths)
 {
-    __try
+    for (const char* path = paths; *path != 0; path += strlen(path) + 1)
     {
-        return SHFileOperationW(fo);
+        int pathLength = MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, path, -1, NULL, 0);
+        if (pathLength == 0)
+            return HRESULT_FROM_WIN32(GetLastError());
+
+        WCHAR* pathW = (WCHAR*)malloc(pathLength * sizeof(WCHAR));
+        if (pathW == NULL)
+            return E_OUTOFMEMORY;
+        if (MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, path, -1, pathW, pathLength) == 0)
+        {
+            HRESULT result = HRESULT_FROM_WIN32(GetLastError());
+            free(pathW);
+            return result;
+        }
+
+        IShellItem* item = NULL;
+        HRESULT result = SHCreateItemFromParsingName(pathW, NULL, IID_PPV_ARGS(&item));
+        free(pathW);
+        if (FAILED(result))
+            return result;
+        result = operation->DeleteItem(item, NULL);
+        item->Release();
+        if (FAILED(result))
+            return result;
     }
-    __except (CCallStack::HandleException(GetExceptionInformation(), 5))
-    {
-        FGIExceptionHasOccured++;
-    }
-    return 1; // != 0
+    return S_OK;
 }
 
 BOOL PathContainsValidComponents(char* path, BOOL cutPath)
@@ -98,29 +119,26 @@ BOOL CFilesWindow::DeleteThroughRecycleBin(int* selection, int selCount, CFileDa
 
     SetCurrentDirectory(GetPath()); // for faster operation
 
-    CShellExecuteWnd shellExecuteWnd;
-    SHFILEOPSTRUCTW fo;
-    fo.hwnd = shellExecuteWnd.Create(MainWindow->HWindow, "SEW: CFilesWindow::DeleteThroughRecycleBin");
-    fo.wFunc = FO_DELETE;
-
-    // Convert names to Wide (it's already double-null terminated in UTF-8 sense)
-    // MultiByteToWideChar with -1 won't work because of multiple nulls.
-    // Use names.Length + 1 to include the double-null.
-    int namesLenW = MultiByteToWideChar(CP_UTF8, 0, names.Text, names.Length + 1, NULL, 0);
-    WCHAR* namesW = (WCHAR*)malloc(namesLenW * sizeof(WCHAR));
-    if (namesW != NULL)
+    IFileOperation* operation = NULL;
+    HRESULT result = CoCreateInstance(CLSID_FileOperation, NULL, CLSCTX_INPROC_SERVER,
+                                      IID_PPV_ARGS(&operation));
+    if (SUCCEEDED(result))
     {
-        MultiByteToWideChar(CP_UTF8, 0, names.Text, names.Length + 1, namesW, namesLenW);
-        fo.pFrom = namesW;
-        fo.pTo = NULL;
-        fo.fFlags = FOF_ALLOWUNDO;
-        fo.fAnyOperationsAborted = FALSE;
-        fo.hNameMappings = NULL;
-        fo.lpszProgressTitle = L"";
-        // Perform the actual deletion - wonderfully simple, unfortunately it sometimes crashes ;-)
-        CALL_STACK_MESSAGE1("CFilesWindow::DeleteThroughRecycleBin::SHFileOperation");
-        DeleteThroughRecycleBinAux(&fo);
-        free(namesW);
+        // IFileOperation owns shell item lifetime and recycle-bin behavior without a fragile double-NUL path list.
+        result = operation->SetOwnerWindow(MainWindow->HWindow);
+        if (SUCCEEDED(result))
+            result = operation->SetOperationFlags(FOF_ALLOWUNDO);
+        if (SUCCEEDED(result))
+            result = QueueUtf8DeleteItems(operation, names.Text);
+        if (SUCCEEDED(result))
+            result = operation->PerformOperations();
+        if (SUCCEEDED(result))
+        {
+            BOOL aborted = FALSE;
+            if (SUCCEEDED(operation->GetAnyOperationsAborted(&aborted)) && aborted)
+                TRACE_I("Recycle Bin deletion was cancelled by the Shell.");
+        }
+        operation->Release();
     }
 
     SetCurrentDirectoryToSystem();
@@ -391,20 +409,27 @@ void CFilesWindow::FilesAction(CActionType type, CFilesWindow* target, int count
                 expanded[0] = 0;
                 if (type == atDelete && recycle != 1 && (f->Attr & FILE_ATTRIBUTE_REPARSE_POINT))
                 { // it's a link (junction, symlink or volume mount point)
-                    lstrcpyn(formatedFileName, GetPath(), MAX_PATH + 200);
-                    ResolveSubsts(formatedFileName);
-                    int repPointType;
-                    if (SalPathAppend(formatedFileName, f->Name, MAX_PATH + 200) &&
-                        GetReparsePointDestination(formatedFileName, NULL, 0, &repPointType, TRUE))
+                    // Resolve a reparse target only from a complete display path.
+                    if (SUCCEEDED(StringCchCopyA(formatedFileName, _countof(formatedFileName), GetPath())))
                     {
-                        lstrcpy(expanded, LoadStr(repPointType == 1 /* MOUNT POINT */ ? IDS_QUESTION_VOLMOUNTPOINT : repPointType == 2 /* JUNCTION POINT */ ? IDS_QUESTION_JUNCTION
-                                                                                                                                                            : IDS_QUESTION_SYMLINK));
-                        deleteLink = TRUE;
+                        ResolveSubsts(formatedFileName);
+                        int repPointType;
+                        if (SalPathAppend(formatedFileName, f->Name, _countof(formatedFileName)) &&
+                            GetReparsePointDestination(formatedFileName, NULL, 0, &repPointType, TRUE))
+                        {
+                            // The confirmation label intentionally uses its fixed display field.
+                            StringCchCopyNA(expanded, _countof(expanded), LoadStr(repPointType == 1 /* MOUNT POINT */ ? IDS_QUESTION_VOLMOUNTPOINT : repPointType == 2 /* JUNCTION POINT */ ? IDS_QUESTION_JUNCTION
+                                                                                                                                                                : IDS_QUESTION_SYMLINK), _countof(expanded) - 1);
+                            deleteLink = TRUE;
+                        }
                     }
                 }
                 AlterFileName(formatedFileName, f->Name, -1, Configuration.FileNameFormat, 0, isDir);
                 if (expanded[0] == 0)
-                    lstrcpy(expanded, LoadStr(isDir ? IDS_QUESTION_DIRECTORY : IDS_QUESTION_FILE));
+                {
+                    // The confirmation label intentionally uses its fixed display field.
+                    StringCchCopyNA(expanded, _countof(expanded), LoadStr(isDir ? IDS_QUESTION_DIRECTORY : IDS_QUESTION_FILE), _countof(expanded) - 1);
+                }
             }
             else
                 expanded[0] = 0; // not used
@@ -580,7 +605,14 @@ void CFilesWindow::FilesAction(CActionType type, CFilesWindow* target, int count
                             data.Dirs = Dirs;
                             data.Files = Files;
                             data.ArchiveDir = GetArchiveDir();
-                            lstrcpyn(data.WorkPath, GetPath(), MAX_PATH);
+                            // Return to the destination dialog instead of enumerating from a truncated source path.
+                            if (FAILED(StringCchCopyA(data.WorkPath, _countof(data.WorkPath), GetPath())))
+                            {
+                                SalMessageBox(HWindow, LoadStr(IDS_TOOLONGPATH),
+                                              (type == atCopy) ? LoadStr(IDS_ERRORCOPY) : LoadStr(IDS_ERRORMOVE),
+                                              MB_OK | MB_ICONEXCLAMATION);
+                                continue;
+                            }
                             data.EnumLastDir = NULL;
                             data.EnumLastIndex = -1;
 
@@ -758,7 +790,14 @@ void CFilesWindow::FilesAction(CActionType type, CFilesWindow* target, int count
                                 data.Dirs = Dirs;
                                 data.Files = Files;
                                 data.ArchiveDir = GetArchiveDir();
-                                lstrcpyn(data.WorkPath, GetPath(), MAX_PATH);
+                                // Return to the destination dialog instead of enumerating from a truncated source path.
+                                if (FAILED(StringCchCopyA(data.WorkPath, _countof(data.WorkPath), GetPath())))
+                                {
+                                    SalMessageBox(HWindow, LoadStr(IDS_TOOLONGPATH),
+                                                  (type == atCopy) ? LoadStr(IDS_ERRORCOPY) : LoadStr(IDS_ERRORMOVE),
+                                                  MB_OK | MB_ICONEXCLAMATION);
+                                    continue;
+                                }
                                 data.EnumLastDir = NULL;
                                 data.EnumLastIndex = -1;
 
@@ -792,7 +831,12 @@ void CFilesWindow::FilesAction(CActionType type, CFilesWindow* target, int count
                                         fs->IsFSNameFromSamePluginAsThisFS(fsName, fsNameIndex)) // the FS name comes from the same plugin (otherwise there's no point in trying)
                                     {
                                         BOOL invalidPathOrCancel;
-                                        lstrcpyn(targetPath, path, 2 * MAX_PATH); // risk of exceeding 2 * MAX_PATH
+                                        // Keep the external target intact before the plug-in rewrites its path portion.
+                                        if (FAILED(StringCchCopyA(targetPath, _countof(targetPath), path)))
+                                        {
+                                            invalidPath = TRUE;
+                                            break;
+                                        }
                                         // convert the path to internal format
                                         fs->GetPluginInterfaceForFS()->ConvertPathToInternal(fsName, fsNameIndex,
                                                                                              targetPath + strlen(fsName) + 1);
@@ -841,31 +885,38 @@ void CFilesWindow::FilesAction(CActionType type, CFilesWindow* target, int count
                                             {
                                                 Plugins.SetWorkingPluginFS(&pluginFS);
                                                 BOOL invalidPathOrCancel;
-                                                lstrcpyn(targetPath, path, 2 * MAX_PATH); // risk of exceeding 2 * MAX_PATH
-                                                // convert the path to internal format
-                                                pluginFS.GetPluginInterfaceForFS()->ConvertPathToInternal(fsName, fsNameIndex,
-                                                                                                          targetPath + strlen(fsName) + 1);
-                                                if (pluginFS.CopyOrMoveFromDiskToFS(type == atCopy, 2,
-                                                                                    pluginFS.GetPluginFSName(),
-                                                                                    HWindow, GetPath(),
-                                                                                    PanelEnumDiskSelection, &data,
-                                                                                    selFiles, selDirs, targetPath,
-                                                                                    &invalidPathOrCancel))
-                                                { // done/cancel
-                                                    unselect = !invalidPathOrCancel;
-                                                }
-                                                else // syntax error/plugin error
+                                                // Keep the external target intact before the new plug-in rewrites its path portion.
+                                                if (FAILED(StringCchCopyA(targetPath, _countof(targetPath), path)))
                                                 {
-                                                    if (invalidPathOrCancel)
-                                                    {
-                                                        // convert the path to external format (before displaying it in the dialog)
-                                                        PluginFSConvertPathToExternal(targetPath);
-                                                        strcpy(path, targetPath);
-                                                        invalidPath = TRUE; // we must go back to the Copy/Move dialog
+                                                    invalidPath = TRUE;
+                                                }
+                                                else
+                                                {
+                                                    // convert the path to internal format
+                                                    pluginFS.GetPluginInterfaceForFS()->ConvertPathToInternal(fsName, fsNameIndex,
+                                                                                                              targetPath + strlen(fsName) + 1);
+                                                    if (pluginFS.CopyOrMoveFromDiskToFS(type == atCopy, 2,
+                                                                                        pluginFS.GetPluginFSName(),
+                                                                                        HWindow, GetPath(),
+                                                                                        PanelEnumDiskSelection, &data,
+                                                                                        selFiles, selDirs, targetPath,
+                                                                                        &invalidPathOrCancel))
+                                                    { // done/cancel
+                                                        unselect = !invalidPathOrCancel;
                                                     }
-                                                    else // plugin error (new FS, but returns "requested operation cannot be performed on this FS" error)
+                                                    else // syntax error/plugin error
                                                     {
-                                                        TRACE_E("CopyOrMoveFromDiskToFS on new (empty) FS may not return error 'unable to process operation'.");
+                                                        if (invalidPathOrCancel)
+                                                        {
+                                                            // convert the path to external format (before displaying it in the dialog)
+                                                            PluginFSConvertPathToExternal(targetPath);
+                                                            strcpy(path, targetPath);
+                                                            invalidPath = TRUE; // we must go back to the Copy/Move dialog
+                                                        }
+                                                        else // plugin error (new FS, but returns "requested operation cannot be performed on this FS" error)
+                                                        {
+                                                            TRACE_E("CopyOrMoveFromDiskToFS on new (empty) FS may not return error 'unable to process operation'.");
+                                                        }
                                                     }
                                                 }
 
@@ -916,7 +967,7 @@ void CFilesWindow::FilesAction(CActionType type, CFilesWindow* target, int count
         case atDelete:
         {
             if (Configuration.CnfrmFileDirDel && recycle != 1)
-            {                                                                                                           // ask only if requested and if we don't use the SHFileOperation API for deletion
+            {                                                                                                           // Ask only for permanent deletes; IFileOperation owns the Recycle Bin confirmation.
                 HICON hIcon = (HICON)HANDLES(LoadImage(Shell32DLL, MAKEINTRESOURCE(WindowsVistaAndLater ? 16777 : 161), // delete icon
                                                        IMAGE_ICON, 32, 32, IconLRFlags));
                 int myRes = CMessageBox(HWindow, MSGBOXEX_YESNO | MSGBOXEX_ESCAPEENABLED | MSGBOXEX_SILENT,
@@ -1019,7 +1070,8 @@ void CFilesWindow::FilesAction(CActionType type, CFilesWindow* target, int count
                     if (criteriaPtr != NULL && criteriaPtr->UseSpeedLimit)
                         script->SetSpeedLimit(TRUE, criteriaPtr->SpeedLimit);
                     char captionBuf[50];
-                    lstrcpyn(captionBuf, caption, 50); // otherwise the LoadStr buffer gets overwritten before being copied to the dialog's local buffer
+                    // Preserve the dialog's compact caption field before the shared resource buffer changes.
+                    StringCchCopyNA(captionBuf, _countof(captionBuf), caption, _countof(captionBuf) - 1);
                     caption = captionBuf;
                     HWND hFocusedWnd = GetFocus();
                     CreateSafeWaitWindow(LoadStr(IDS_ANALYSINGDIRTREEESC), NULL, 1000, TRUE, MainWindow->HWindow);
@@ -1429,7 +1481,8 @@ BOOL CFilesWindow::OpenFocusedInOtherPanel(BOOL activate)
         {
             SalPathAddBackslash(buff, 2 * MAX_PATH);
             int l = (int)strlen(buff);
-            lstrcpyn(buff + l, file->Name, 2 * MAX_PATH - l);
+            // Append the focused name only within the remaining combined-path field.
+            StringCchCopyNA(buff + l, _countof(buff) - l, file->Name, _countof(buff) - l - 1);
         }
     }
     else if (Is(ptPluginFS) && GetPluginFS()->NotEmpty())
@@ -1486,9 +1539,9 @@ void CFilesWindow::ChangePathToOtherPanelPath()
             if (panel->Is(ptPluginFS))
             {
                 char path[2 * MAX_PATH];
-                lstrcpyn(path, panel->GetPluginFS()->GetPluginFSName(), MAX_PATH - 1);
-                strcat(path, ":");
-                if (panel->GetPluginFS()->GetCurrentPath(path + strlen(path)))
+                // Form the plug-in prefix atomically before asking it for the current path.
+                if (SUCCEEDED(StringCchPrintfA(path, _countof(path), "%s:", panel->GetPluginFS()->GetPluginFSName())) &&
+                    panel->GetPluginFS()->GetCurrentPath(path + strlen(path)))
                     ChangeDir(path, -1, NULL, 3 /*change-dir*/, NULL, FALSE);
             }
         }

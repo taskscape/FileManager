@@ -7,6 +7,8 @@
 #include "plugins.h"
 #include "toolbar.h"
 
+#include <strsafe.h>
+
 //*****************************************************************************
 //
 // CPluginsBar
@@ -106,5 +108,9 @@ void CPluginsBar::OnGetToolTip(LPARAM lParam)
     tt->Buffer[0] = 0;
     CPluginData* plugin = Plugins.Get(index);
     if (plugin != NULL)
-        lstrcpy(tt->Buffer, plugin->Name);
+    {
+        // The toolbar owns a fixed reply buffer, so do not truncate a plug-in name into a tooltip.
+        if (FAILED(StringCchCopyA(tt->Buffer, TOOLTIP_TEXT_MAX, plugin->Name)))
+            tt->Buffer[0] = 0;
+    }
 }

@@ -6,6 +6,7 @@ Run all commands from the repository root. The test suite has four layers:
 - NUnit source-contract and local TLS integration tests.
 - FlaUI/UIA3 tests that drive the native Windows application.
 - Optional fault-injection, filesystem-topology, and cross-volume characterization lanes.
+- Loopback FTP, FTPS, and HTTP protocol fixtures for fragmented replies, disconnects, TLS, and stalls.
 
 Visual Studio 2026 and its developer-command environment are the authoritative native build environment. Most scripts support Windows PowerShell 5.1. The SQLite recovery probe is the exception: use 64-bit PowerShell 7.4 or newer (`pwsh.exe`) for an x64 DLL.
 
@@ -20,7 +21,11 @@ powershell -NoProfile -ExecutionPolicy Bypass `
   -File .\runtests.ps1
 ```
 
-`runtests.ps1` collects all PowerShell/native probes, both x64 and x86 compatibility variants, the complete NUnit project, and the optional Application Verifier lane. It runs every collected check even after a failure and prints passed, failed, and explicitly skipped checks. UI fixtures remain protected by their isolated-profile requirements.
+`runtests.ps1` collects all PowerShell/native probes, both x64 and x86 compatibility variants, the built 7-Zip wrapper/oracle corpus gate, the complete NUnit project, and the optional Application Verifier lane. It runs every collected check even after a failure and prints passed, failed, and explicitly skipped checks. The 7-Zip gate requires a `7z.exe`-compatible independent oracle; strict release runs fail if it is unavailable. It never manufactures `FILEMANAGER_UI_ISOLATED`: the complete UI project runs only when the caller has supplied a disposable profile and its filesystem topology; otherwise that project is explicitly skipped while independent checks continue.
+
+Each run removes its own GUID-named `TestResults\runtests-build-*` directory, including after a failure. Pass `-KeepBuildArtifacts` only when the isolated native build outputs are needed for diagnosis.
+
+`-PlatformToolset v143|v145` selects the toolset used for both the built executable and native safety target (default `v145`). CI supplies `-NUnitTrxPath` only for toolset-parity jobs; that explicit path retains the complete executable result inventory for comparison instead of deleting the caller-owned TRX.
 
 The runner uses the CI pull-request base for changed-line ratchets or accepts `-BaseCommit` explicitly; it does not guess from a potentially stale local tracking branch. It discovers an existing Debug or Release x64 SQLite DLL when possible. Supply prerequisites explicitly or require a fully provisioned run with:
 
@@ -90,10 +95,12 @@ Optional UI settings:
 | --- | --- |
 | `FILEMANAGER_UI_ARGUMENTS` | Extra application arguments, such as a test-only `-c` configuration file. |
 | `FILEMANAGER_UI_FTP_ORGANIZE_COMMAND` | The runtime command ID for FTP **Organize Bookmarks** persistence cases. |
+| `FILEMANAGER_UI_FTP_CONNECT_COMMAND` | Optional runtime Connect to FTP Server command ID for protocol UI fixture runs outside `runtests.ps1`; the runner discovers it from the freshly built menu. |
 | `FILEMANAGER_UI_CONFIG_FAULT_INJECTION=1` | Exhaustive configuration-write crash recovery. |
 | `FILEMANAGER_UI_CROSS_VOLUME_ROOT` | Cross-volume move tests using only a GUID child below the supplied dedicated root. |
 | `FILEMANAGER_UI_ADS_UNSUPPORTED_TARGET_ROOT` | Metadata-loss behavior on a different FAT/FAT32/exFAT-like volume. |
 | `FILEMANAGER_UI_RECYCLE_BIN=1` | Recycle-bin deletion in an isolated profile using the default recycle-bin setting. |
+| `FILEMANAGER_UI_LEAK_CYCLES` | Lifecycle resource samples (5–200; default 20, nightly 100) for handles, GDI, USER, and private bytes. |
 
 Run a specialized lane by category after setting its required environment:
 
@@ -140,6 +147,7 @@ The changed-line ratchets require the pull request base commit:
 ```powershell
 .\tools\verify-no-new-terminatethread.ps1 -BaseCommit origin/main
 .\tools\verify-no-new-raw-thread-creation.ps1 -BaseCommit origin/main
+.\tools\verify-no-new-gettickcount.ps1 -BaseCommit origin/main
 .\tools\verify-no-new-max-path-buffers.ps1 -BaseCommit origin/main
 .\tools\verify-no-new-unsafe-string-calls.ps1 -BaseCommit origin/main
 ```
@@ -159,12 +167,19 @@ The toolbar icon coverage check has no parameters:
 | `verify-operation-completion-protocol.ps1` | Verifies that cancellation requests do not destroy worker-owned state, workers publish owned completion records, and the UI resumes and closes operations through the asynchronous completion protocol. |
 | `verify-durable-copy-commit.ps1` | Checks write-through creation, flush/close/verification ordering, transactional replacement, retry paths, and deterministic filesystem fault boundaries for durable copy commits. |
 | `test-release-input-pinning.ps1` | Checks that release inputs have a complete lock record, all workflow actions use reviewed immutable commits, and publication consumes the gated immutable installer artifact. |
+| `audit-pe-hardening.ps1` | Inspects linked Release PE headers for ASLR, DEP/NX, CFG, CET compatibility, and high-entropy VA. The release workflow runs it after the Release build. |
+| `compare-vstest-trx.ps1` | Rejects mismatched discovered-test inventories or outcomes between v143 and v145 native-regression and complete executable UI results. |
+| `test-unsafe-api-baseline.ps1` | Compares every repository unsafe API fingerprint with the reviewed generated baseline and rejects new or duplicated unsafe calls. |
+| `new-toolset-pe-manifest.ps1` / `compare-toolset-pe-manifests.ps1` | Record v143/v145 Release PE inventories and compare path, architecture, and version identity while retaining output hashes for provenance. |
 | `test-zlib-compatibility.ps1` | Compiles the checked-in zlib sources and replays the retained legacy, checksum-error, invalid-deflate, and truncated-stream vectors. Supports `-Architecture x64` and `x86`. |
 | `test-bzip2-compatibility.ps1` | Compiles the checked-in bzip2 sources and checks golden and legacy streams, truncation rejection, and the malformed fuzz-vector corpus. Supports `-Architecture x64` and `x86`. |
 | `test-cmark-gfm-hardening.ps1` | Compiles the production Markdown renderer, compares retained snapshots, checks safe link and raw-HTML behavior, exercises extension combinations, and enforces input, nesting, node, and output limits. |
+| `test-7zip-compatibility.ps1` | Archives the retained corpus through the exact built wrapper/library pair, compares independent-oracle extraction manifests, and rejects named header, payload, and footer corruption regressions. |
 | `test-sqlite-recovery.ps1` | Exercises the supplied SQLite DLL with WAL/FULL settings, interrupted transactions, committed-row recovery, integrity checks, and controlled b-tree corruption detection. |
+| `DeterministicNetworkFixtureTests` | Runs local HTTP, FTP, and FTPS fixtures in every profile for fragmented replies, controlled disconnect, TLS negotiation, and deadlines; with an isolated profile, it also drives the native FTP quick-connect dialog through its fragmented greeting and login boundary. |
 | `verify-no-new-terminatethread.ps1` | Rejects newly added native `TerminateThread` calls while leaving legacy debt to dedicated migrations. |
 | `verify-no-new-raw-thread-creation.ps1` | Rejects new first-party `CreateThread` or `_beginthreadex` calls outside the reviewed thread-owner boundaries. |
+| `verify-no-new-gettickcount.ps1` | Rejects new wrap-prone `GetTickCount` calls so timeout and scheduling code uses the 64-bit monotonic clock. |
 | `verify-no-new-max-path-buffers.ps1` | Rejects newly added native fixed arrays whose bounds contain `MAX_PATH` unless a documented exemption applies. |
 | `verify-no-new-unsafe-string-calls.ps1` | Rejects newly added unchecked `strcpy`, `strcat`, `sprintf`, `lstrcpy`, `lstrcat`, and `wsprintf` calls. |
 | `verify-fluent-icon-coverage.ps1` | Ensures every mapped toolbar command has an SVG, core rows no longer use shell fallbacks, SVG colors stay in the approved palette, and the application icon remains separate. |
@@ -284,6 +299,7 @@ All fixtures in this section require `FILEMANAGER_UI_ISOLATED=1`, `FILEMANAGER_U
 - `Copy_skip_all_keeps_the_existing_conflicting_tree` — applies Skip All without changing conflicting targets.
 - `Copy_file_persists_a_completed_recovery_journal_with_item_intent` — verifies the completed durable journal, immutable plan, states, and correlation ID.
 - `Copy_directory_copies_all_descendants_to_other_panel` — copies a complete nested directory tree.
+- `Unicode_normalization_surrogate_and_long_path_operations_preserve_distinct_entries` — copies composed/decomposed Unicode and surrogate-pair names plus a >260-character descendant path, then renames and deletes distinct normalization forms.
 - `Rename_file_renames_without_changing_content` — renames a file and preserves content.
 - `Rename_directory_preserves_all_descendants` — renames a directory and retains its tree.
 - `Rename_case_only_change_preserves_the_file_and_updates_its_displayed_name` — verifies a case-only directory-entry rename.
@@ -317,10 +333,11 @@ All fixtures in this section require `FILEMANAGER_UI_ISOLATED=1`, `FILEMANAGER_U
 - `ReparsePointTopologyUiTests.Delete_junction_removes_only_the_link_and_never_its_target` — verifies deleting a junction preserves its target.
 - `ReparsePointTopologyUiTests.Copy_does_not_traverse_a_directory_symbolic_link_outside_the_operation_root` — verifies copy ignores an external directory symlink; skips when the host lacks symlink privileges.
 - `ToolbarIconSizeUiTests.Customize_toolbar_cycles_all_icon_sizes_and_persists_the_choice_after_restart` — exercises all three icon sizes, verifies live persistence, restarts, and restores the incoming setting.
+- `LifecycleLeakUiTests.Repeated_clean_startup_and_shutdown_does_not_accumulate_process_resources` — starts fresh native processes repeatedly and rejects excessive Handle/GDI/USER/private-byte spread.
 
 ## Continuous-integration coverage
 
-Pull-request CI runs the four changed-line ratchets, operation-completion and durable-copy contracts, zlib and bzip2 probes, cmark-gfm hardening, and the SQLite recovery probe after its Debug x64 build.
+Pull-request CI runs the four changed-line ratchets, operation-completion and durable-copy contracts, zlib and bzip2 probes, cmark-gfm hardening, and the SQLite recovery probe after its Debug x64 build. The root runner additionally executes the built 7-Zip wrapper/oracle compatibility corpus whenever a `7z.exe`-compatible oracle is available; the release gate requires it.
 
 The release workflow gates installer publication on the complete root runner using the dedicated `filemanager-ui` self-hosted environment. It supplies the built executable and SQLite DLL, enables configuration fault injection and Recycle Bin coverage, obtains its two dedicated filesystem roots and FTP command ID from repository variables, and uses `-FailOnSkipped`. The release therefore fails if any runner check fails, any external prerequisite is missing, or any NUnit case reports `Assert.Ignore`/`NotExecuted`. It retrieves Inno Setup only through [`tools/release-inputs.json`](tools/release-inputs.json), checks the locked SHA-256 and Authenticode publisher before installation, then passes an immutable uploaded installer artifact to the `production`-protected publish job. Private PDB artifacts are retained for 180 days and are never attached to the public release.
 

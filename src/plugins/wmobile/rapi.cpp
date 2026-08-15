@@ -490,7 +490,8 @@ DWORD
 CRAPI::WaitAndDispatch(DWORD nCount, HANDLE* phWait, DWORD dwTimeout, BOOL bOnlySendMessage)
 {
     DWORD dwObj;
-    DWORD dwStart = GetTickCount();
+    const CMonotonicTimePoint start = CMonotonicClock::Now();
+    const CMonotonicTimePoint deadline = start + dwTimeout;
     DWORD dwTimeLeft = dwTimeout;
 
     for (;;)
@@ -526,9 +527,11 @@ CRAPI::WaitAndDispatch(DWORD nCount, HANDLE* phWait, DWORD dwTimeout, BOOL bOnly
 
         if (INFINITE != dwTimeout)
         {
-            dwTimeLeft = dwTimeout - (GetTickCount() - dwStart);
-            if ((int)dwTimeLeft < 0)
+            const CMonotonicTimePoint now = CMonotonicClock::Now();
+            // Only the wait API retains a DWORD delay; elapsed-time arithmetic must not wrap after 49.7 days.
+            if (CMonotonicClock::HasReached(deadline, now))
                 break;
+            dwTimeLeft = CMonotonicClock::RemainingWin32TimerDelay(deadline, now);
         }
     }
 
@@ -793,9 +796,16 @@ CRAPI::CopyFileToCE(LPCTSTR lpExistingFileName, LPCTSTR lpNewFileName, BOOL bFai
     if (srcHandle == INVALID_HANDLE_VALUE)
         goto ONERROR_SRC;
 
-    size = ::GetFileSize(srcHandle, NULL); // JR REVIEW: Files larger than 4 GB likely won't exist on Windows Mobile
-    if (size == 0xFFFFFFFF)
+    LARGE_INTEGER sourceSize;
+    if (!GetFileSizeEx(srcHandle, &sourceSize))
         goto ONERROR_SRC;
+    if (sourceSize.QuadPart < 0 || (ULONGLONG)sourceSize.QuadPart > MAXDWORD)
+    {
+        SetLastError(ERROR_FILE_TOO_LARGE);
+        goto ONERROR_SRC;
+    }
+    // The CE copy protocol accepts DWORD chunk totals, so reject a local source that cannot cross that boundary.
+    size = (DWORD)sourceSize.QuadPart;
 
     if (totalSize < totalCopied + size)
         totalSize = totalCopied + size;
@@ -1190,13 +1200,13 @@ void CRAPI::GetFileData(const char* name, char (&buf)[100])
     FileTimeToLocalFileTime(&data.ftLastWriteTime, &time);
     FileTimeToSystemTime(&time, &st);
 
-    if (!GetDateFormat(LOCALE_USER_DEFAULT, DATE_SHORTDATE, &st, NULL, tmp, 50))
+    if (!FormatUserDateAnsi(&st, DATE_SHORTDATE, tmp, ARRAYSIZE(tmp)))
         sprintf(tmp, "%u.%u.%u", st.wDay, st.wMonth, st.wYear);
 
     strcat(buf, ", ");
     strcat(buf, tmp);
 
-    if (!GetTimeFormat(LOCALE_USER_DEFAULT, 0, &st, NULL, tmp, 50))
+    if (!FormatUserTimeAnsi(&st, 0, tmp, ARRAYSIZE(tmp)))
         sprintf(tmp, "%u:%u:%u", st.wHour, st.wMinute, st.wSecond);
 
     strcat(buf, ", ");

@@ -165,7 +165,8 @@ void CFilecompWorker::CException::Raise(int error, int lastError, ...)
     va_end(arglist);
     if (lastError != ERROR_SUCCESS)
     {
-        int l = lstrlen(buf);
+        // buf is a terminated local diagnostic buffer before FormatMessage appends the system text.
+        int l = static_cast<int>(strlen(buf));
         FormatMessage(FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS, NULL, lastError,
                       MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), buf + l, 1024 - l, NULL);
     }

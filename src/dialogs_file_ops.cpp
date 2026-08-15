@@ -4,6 +4,8 @@
 
 #include "precomp.h"
 
+#include <strsafe.h>
+
 #include "mainwnd.h"
 #include "plugins.h"
 #include "fileswnd.h"
@@ -17,6 +19,7 @@
 #include "consts.h"
 #include "utf8gui.h"
 #include "release_diagnostics.h"
+#include "common\\monotonic_time.h"
 
 CConfiguration Configuration;
 
@@ -321,10 +324,18 @@ unsigned ThreadProgressDlgBody(void* parameter)
         convertDataCopy = *data->ConvertData;
     CConvertData* convertData = (data->ConvertData != NULL ? &convertDataCopy : NULL);
     char workPath1[MAX_PATH];
-    lstrcpyn(workPath1, data->Script->WorkPath1, MAX_PATH);
+    if (FAILED(StringCchCopyA(workPath1, _countof(workPath1), data->Script->WorkPath1)))
+    {
+        // Do not send a change notification for a path whose identity was truncated.
+        workPath1[0] = 0;
+    }
     BOOL workPath1InclSubDirs = data->Script->WorkPath1InclSubDirs;
     char workPath2[MAX_PATH];
-    lstrcpyn(workPath2, data->Script->WorkPath2, MAX_PATH);
+    if (FAILED(StringCchCopyA(workPath2, _countof(workPath2), data->Script->WorkPath2)))
+    {
+        // Do not send a change notification for a path whose identity was truncated.
+        workPath2[0] = 0;
+    }
     BOOL workPath2InclSubDirs = data->Script->WorkPath2InclSubDirs;
 
     CProgressDialog dlg(NULL, data->Script, data->Caption, attrsData, convertData, TRUE, data);
@@ -375,15 +386,16 @@ static BOOL DuplicateStartupHandle(HANDLE source, HANDLE* target)
 static DWORD WaitForProgressDialogStartup(HANDLE readyEvent, HANDLE failedEvent)
 {
     HANDLE events[] = {readyEvent, failedEvent};
-    DWORD startedAt = GetTickCount();
+    // A single absolute deadline keeps paint-message dispatch from extending startup across a clock wrap.
+    const CMonotonicTimePoint deadline = CMonotonicClock::DeadlineAfter(PROGRESS_DIALOG_STARTUP_TIMEOUT);
     for (;;)
     {
-        DWORD elapsed = GetTickCount() - startedAt;
-        if (elapsed >= PROGRESS_DIALOG_STARTUP_TIMEOUT)
+        const DWORD remaining = CMonotonicClock::RemainingWin32TimerDelay(deadline, CMonotonicClock::Now());
+        if (remaining == 0)
             return WAIT_TIMEOUT;
 
         DWORD wait = MsgWaitForMultipleObjects(2, events, FALSE,
-                                                PROGRESS_DIALOG_STARTUP_TIMEOUT - elapsed,
+                                                remaining,
                                                 QS_PAINT);
         // Startup waits are retained as a compact sequence for post-failure diagnosis.
         RecordReleaseDiagnosticWait("progress_dialog_startup", wait);
@@ -426,7 +438,8 @@ BOOL StartProgressDialog(COperations* script, const char* caption,
                 DuplicateStartupHandle(cancelEvent, &data->CancelEvent))
             {
                 data->Script = script;
-                lstrcpyn(data->Caption, caption, _countof(data->Caption));
+                // Retain the progress window's established bounded caption display.
+                StringCchCopyNA(data->Caption, _countof(data->Caption), caption, _countof(data->Caption) - 1);
                 if (attrsData != NULL)
                 {
                     data->AttrsDataCopy = *attrsData;
@@ -528,6 +541,7 @@ CProgressDialog::CProgressDialog(HWND parent, COperations* script, const char* c
     RunningInOwnThread = runningInOwnThread;
     ProgrDlgData = progrDlgData;
     Worker = NULL;
+    WorkerOwner = NULL;
     WContinue = NULL;
     WorkerNotSuspended = NULL;
     OperationProgress = 0;
@@ -556,13 +570,13 @@ CProgressDialog::CProgressDialog(HWND parent, COperations* script, const char* c
     IsInQueue = FALSE;
     AutoPaused = FALSE;
     StatusPaused = FALSE;
-    NextTimeLeftUpdateTime = GetTickCount();
+    NextTimeLeftUpdateTime = CMonotonicClock::Now();
     TimeLeftLastValue.SetUI64(0);
 }
 
 CProgressDialog::~CProgressDialog()
 {
-    if (Worker != NULL)
+    if (WorkerOwner != NULL)
         TRACE_E("Unexpected situation in CProgressDialog::~CProgressDialog(): worker thread is still alive!");
 }
 
@@ -780,7 +794,19 @@ CProgressDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
             break;
         }
         BOOL startPaused = FALSE;
-        if (Script->IsCopyOrMoveOperation && OperationsQueue.AddOperation(HWindow, Script->StartOnIdle, &startPaused))
+        if (Script->IsCopyOrMoveOperation && !OperationsQueue.AddOperation(HWindow, Script->StartOnIdle, &startPaused))
+        {
+            // Never start a copy/move outside the bounded queue: that would bypass its ordering and shutdown ownership.
+            TRACE_E("Progress dialog could not enter the bounded disk operation queue.");
+            HANDLES(CloseHandle(WorkerNotSuspended));
+            WorkerNotSuspended = NULL;
+            HANDLES(CloseHandle(WContinue));
+            WContinue = NULL;
+            SalMessageBox(HWindow, LoadStr(IDS_OPERATIONQUEUEFULL), LoadStr(IDS_ERRORTITLE), MB_OK | MB_ICONEXCLAMATION);
+            EndDialog(HWindow, IDABORT);
+            return TRUE;
+        }
+        if (Script->IsCopyOrMoveOperation)
         {
             IsInQueue = TRUE;
             if (startPaused)
@@ -819,10 +845,11 @@ CProgressDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
             return TRUE;
         }
 
-        Worker = StartWorker(Script, HWindow, AttrsData, ConvertData, WContinue,
-                             WorkerNotSuspended, &OperationProgress,
-                             &SummaryProgress);
-        if (Worker == NULL)
+        WorkerOwner = StartWorker(Script, HWindow, AttrsData, ConvertData, WContinue,
+                                  WorkerNotSuspended, &OperationProgress,
+                                  &SummaryProgress);
+        Worker = WorkerOwner != NULL ? WorkerOwner->GetThreadHandle() : NULL;
+        if (WorkerOwner == NULL)
         {
             if (IsInQueue)
                 OperationsQueue.OperationEnded(HWindow, TRUE, NULL);
@@ -861,7 +888,7 @@ CProgressDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
             }
             if (!startPaused && Status != NULL)
             {
-                NextTimeLeftUpdateTime = GetTickCount();
+                NextTimeLeftUpdateTime = CMonotonicClock::Now();
                 SetTimer(HWindow, IDT_UPDATESTATUS, IDT_UPDATESTATUS_PERIOD, NULL);
             }
         }
@@ -875,10 +902,11 @@ CProgressDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         if (data != NULL)
         {
             // do not draw data immediately, only on the timer
-            lstrcpyn(OperationCache, data->Operation, 100);
-            lstrcpyn(PrepositionCache, data->Preposition, 100);
-            lstrcpyn(SourceCache, data->Source, 2 * MAX_PATH);
-            lstrcpyn(TargetCache, data->Target, 2 * MAX_PATH);
+            // These are presentation caches; retain their historical clipped display bounds explicitly.
+            StringCchCopyNA(OperationCache, _countof(OperationCache), data->Operation, _countof(OperationCache) - 1);
+            StringCchCopyNA(PrepositionCache, _countof(PrepositionCache), data->Preposition, _countof(PrepositionCache) - 1);
+            StringCchCopyNA(SourceCache, _countof(SourceCache), data->Source, _countof(SourceCache) - 1);
+            StringCchCopyNA(TargetCache, _countof(TargetCache), data->Target, _countof(TargetCache) - 1);
             CacheIsDirty = TRUE;
         }
 
@@ -1069,7 +1097,7 @@ CProgressDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 
         if (Status != NULL && ShowPause)
         { // the operation continues, show the status again
-            NextTimeLeftUpdateTime = GetTickCount();
+            NextTimeLeftUpdateTime = CMonotonicClock::Now();
             SetTimer(HWindow, IDT_UPDATESTATUS, IDT_UPDATESTATUS_PERIOD, NULL);
             if (Script != NULL)
                 Script->InitSpeedMeters(TRUE);
@@ -1143,7 +1171,7 @@ CProgressDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                         len = (int)strlen(buf);
                     }
 
-                    DWORD ti = GetTickCount();
+                    CMonotonicTimePoint ti = CMonotonicClock::Now();
                     if (!StatusPaused && ShowPause && progressSpeed.Value > 0 && Script->TotalSize > progressSize)
                     {
                         if (len > 0)
@@ -1186,23 +1214,25 @@ CProgressDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                             dif *= CQuadWord(60, 0);
                         secs = ((secs + dif / CQuadWord(2, 0)) / dif) * dif; // round 'secs' to 'dif' seconds
 
-                        if ((int)(ti - NextTimeLeftUpdateTime) >= 0 ||                         // time to display a new value
+                        if (CMonotonicClock::HasReached(NextTimeLeftUpdateTime, ti) ||          // time to display a new value
                             (secs > (TimeLeftLastValue * CQuadWord(3, 0)) / CQuadWord(2, 0) || // or the new value differs by more than 50%
                              secs < TimeLeftLastValue / CQuadWord(2, 0)))
                         {
                             TimeLeftLastValue = secs;
                             // slow down updating the time-left information based on the calculated time (the longer the time, the fewer the updates)
+                            CMonotonicDuration nextTimeLeftUpdateDelay;
                             if (secs.Value <= 10)
-                                NextTimeLeftUpdateTime = 500;
+                                nextTimeLeftUpdateDelay = 500;
                             else if (secs.Value <= 30)
-                                NextTimeLeftUpdateTime = 1000;
+                                nextTimeLeftUpdateDelay = 1000;
                             else if (secs.Value <= 60)
-                                NextTimeLeftUpdateTime = 2000;
+                                nextTimeLeftUpdateDelay = 2000;
                             else if (secs.Value <= 300)
-                                NextTimeLeftUpdateTime = 5000;
+                                nextTimeLeftUpdateDelay = 5000;
                             else
-                                NextTimeLeftUpdateTime = 10000;
-                            NextTimeLeftUpdateTime += ti - IDT_UPDATESTATUS_PERIOD / 2;
+                                nextTimeLeftUpdateDelay = 10000;
+                            // Preserve the legacy half-tick early wake-up without unsigned wraparound.
+                            NextTimeLeftUpdateTime = ti + nextTimeLeftUpdateDelay - IDT_UPDATESTATUS_PERIOD / 2;
                         }
                         else
                             secs = TimeLeftLastValue; // otherwise show the old value (to keep the time-left estimate from changing too often)
@@ -1356,7 +1386,7 @@ MENU_TEMPLATE_ITEM ProgressDialogMenu2[] =
 
         if (Status != NULL && ShowPause)
         { // the operation continues, show the status again
-            NextTimeLeftUpdateTime = GetTickCount();
+            NextTimeLeftUpdateTime = CMonotonicClock::Now();
             SetTimer(HWindow, IDT_UPDATESTATUS, IDT_UPDATESTATUS_PERIOD, NULL);
             if (Script != NULL)
                 Script->InitSpeedMeters(TRUE);
@@ -1404,10 +1434,12 @@ MENU_TEMPLATE_ITEM ProgressDialogMenu2[] =
 
         // The worker no longer depends on the UI.  Joining it here is only
         // handle cleanup and cannot recreate the old worker-to-UI circular wait.
-        if (Worker != NULL)
+        if (WorkerOwner != NULL)
         {
-            WaitForSingleObject(Worker, INFINITE);
-            HANDLES(CloseHandle(Worker));
+            // The owner joins only after the completion post, so closing this dialog cannot orphan worker launch state.
+            WorkerOwner->StopAndJoin(0);
+            delete WorkerOwner;
+            WorkerOwner = NULL;
             Worker = NULL;
         }
         HANDLES(CloseHandle(WorkerNotSuspended));
@@ -1552,7 +1584,7 @@ MENU_TEMPLATE_ITEM ProgressDialogMenu2[] =
                 {
                     if (Status != NULL && ShowPause)
                     { // the operation continues, show the status again
-                        NextTimeLeftUpdateTime = GetTickCount();
+                        NextTimeLeftUpdateTime = CMonotonicClock::Now();
                         SetTimer(HWindow, IDT_UPDATESTATUS, IDT_UPDATESTATUS_PERIOD, NULL);
                         if (Script != NULL)
                             Script->InitSpeedMeters(TRUE);
@@ -1598,7 +1630,7 @@ MENU_TEMPLATE_ITEM ProgressDialogMenu2[] =
                 {
                     if (ShowPause)
                     {
-                        NextTimeLeftUpdateTime = GetTickCount();
+                        NextTimeLeftUpdateTime = CMonotonicClock::Now();
                         SetTimer(HWindow, IDT_UPDATESTATUS, IDT_UPDATESTATUS_PERIOD, NULL);
                         if (!speedMetersInitCalled && Script != NULL)
                             Script->InitSpeedMeters(TRUE);
@@ -1747,7 +1779,8 @@ CFileErrorDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         if (ResID == IDD_CANNOTOPENADS)
             new CButton(HWindow, IDB_IGNORE, BTF_DROPDOWN);
 
-        SetWindowText(GetDlgItem(HWindow, IDS_ERROR), Error); // 'Error' comes from GetErrorText() (system code page) - keep the ANSI sink
+        // GetErrorText returns UTF-8, so use the UTF-8 setter to preserve localized system error text.
+        SetWindowTextUtf8(GetDlgItem(HWindow, IDS_ERROR), Error);
         break;
     }
 
@@ -1914,7 +1947,8 @@ CHiddenOrSystemDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         else
             TRACE_E(LOW_MEMORY);
 
-        SetWindowText(GetDlgItem(HWindow, IDS_ERROR), Error); // 'Error' comes from GetErrorText() (system code page) - keep the ANSI sink
+        // GetErrorText returns UTF-8, so use the UTF-8 setter to preserve localized system error text.
+        SetWindowTextUtf8(GetDlgItem(HWindow, IDS_ERROR), Error);
         break;
     }
 
@@ -1967,7 +2001,8 @@ CCannotMoveDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         else
             TRACE_E(LOW_MEMORY);
 
-        SetWindowText(GetDlgItem(HWindow, IDS_ERROR), Error); // 'Error' comes from GetErrorText() (system code page) - keep the ANSI sink
+        // GetErrorText returns UTF-8, so use the UTF-8 setter to preserve localized system error text.
+        SetWindowTextUtf8(GetDlgItem(HWindow, IDS_ERROR), Error);
         break;
     }
 
@@ -2274,21 +2309,15 @@ CBetaExpiredDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         char buff[400];
         char today[100];
         char expired[100];
-        WCHAR todayW[100];
-        WCHAR expiredW[100];
-        // use the Unicode date formatting and convert to UTF-8 - GetDateFormatA would
-        // return the localized date in the system ANSI code page, which then mojibakes
-        // when handed to the UTF-8 controls (e.g. month names with diacritics)
-        if (GetDateFormatW(LOCALE_USER_DEFAULT, DATE_LONGDATE, &st, NULL, todayW, 100) == 0)
-            sprintf(today, "%u.%u.%u", st.wDay, st.wMonth, st.wYear);
-        else
-            ConvertWideToUtf8(todayW, -1, today, 100);
-        if (GetDateFormatW(LOCALE_USER_DEFAULT, DATE_LONGDATE, &BETA_EXPIRATION_DATE, NULL, expiredW, 100) == 0)
-            sprintf(expired, "%u.%u.%u", BETA_EXPIRATION_DATE.wDay, BETA_EXPIRATION_DATE.wMonth, BETA_EXPIRATION_DATE.wYear);
-        else
-            ConvertWideToUtf8(expiredW, -1, expired, 100);
+        // UI controls store UTF-8, so keep date formatting on the locale-name Unicode path.
+        if (FormatUserDateTimeUtf8(&st, DATE_LONGDATE, today, _countof(today), TRUE) == 0)
+            _snprintf_s(today, _countof(today), _TRUNCATE, "%u.%u.%u", st.wDay, st.wMonth, st.wYear);
+        if (FormatUserDateTimeUtf8(&BETA_EXPIRATION_DATE, DATE_LONGDATE, expired, _countof(expired), TRUE) == 0)
+            _snprintf_s(expired, _countof(expired), _TRUNCATE, "%u.%u.%u", BETA_EXPIRATION_DATE.wDay, BETA_EXPIRATION_DATE.wMonth, BETA_EXPIRATION_DATE.wYear);
 
-        sprintf(buff, orig, today, expired);
+        // A malformed or oversized localized template must not overrun the dialog-text buffer.
+        if (_snprintf_s(buff, _countof(buff), _TRUNCATE, orig, today, expired) < 0)
+            strncpy_s(buff, _countof(buff), orig, _TRUNCATE);
         SetDlgItemTextUtf8(HWindow, IDC_BETAEXPIREDDATE, buff);
 
         // the OK button will show numbers counting down, store the original text

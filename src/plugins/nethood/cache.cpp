@@ -13,6 +13,8 @@
 */
 
 #include "precomp.h"
+
+#include <strsafe.h>
 #include "nethood.h"
 #include "nethoodfs.h"
 #include "cache.h"
@@ -369,14 +371,15 @@ void CNethoodCacheNode::Invalidate(__in bool bRecursive)
 void CNethoodCacheNode::SetStandbyTimeout(__in UINT uTimeout)
 {
     m_uStandbyTimeout = uTimeout;
-    m_uStandbyTimestamp = (uTimeout != 0) ? GetTickCount() : 0;
+    // The standby timestamp is private cache state, so it can remain valid beyond the 32-bit tick wrap.
+    m_uStandbyTimestamp = (uTimeout != 0) ? CMonotonicClock::Now() : 0;
 }
 
 bool CNethoodCacheNode::IsStandbyPeriodOver()
 {
     assert(m_uStandbyTimestamp != 0);
     assert(m_uStandbyTimeout != 0);
-    return (GetTickCount() - m_uStandbyTimestamp) >= m_uStandbyTimeout;
+    return CMonotonicClock::HasElapsed(m_uStandbyTimestamp, m_uStandbyTimeout, CMonotonicClock::Now());
 }
 
 void CNethoodCacheNode::SetStatus(__in Status status)
@@ -2409,9 +2412,20 @@ DWORD CNethoodCacheEnumerationThread::EnumHiddenShares(__in PCTSTR pszServerName
 #endif
 }
 
-BOOL CNethoodCacheEnumerationThread::GetShortcutsDir(__out PTSTR pszPath)
+BOOL CNethoodCacheEnumerationThread::GetShortcutsDir(__out_ecount(MAX_PATH) PTSTR pszPath)
 {
-    return SHGetSpecialFolderPath(NULL, pszPath, CSIDL_NETHOOD, FALSE);
+    PWSTR widePath = NULL;
+    // Resolve Network Shortcuts through Known Folders, then preserve this ANSI plug-in's fixed buffer contract.
+    if (FAILED(SHGetKnownFolderPath(FOLDERID_NetHood, KF_FLAG_DEFAULT, NULL, &widePath)) || widePath == NULL)
+        return FALSE;
+
+#ifdef UNICODE
+    BOOL copied = SUCCEEDED(StringCchCopyW(pszPath, MAX_PATH, widePath));
+#else
+    BOOL copied = WideCharToMultiByte(CP_ACP, 0, widePath, -1, pszPath, MAX_PATH, NULL, NULL) != 0;
+#endif
+    CoTaskMemFree(widePath);
+    return copied;
 }
 
 BOOL CNethoodCacheEnumerationThread::AddNetworkShortcut(
@@ -2449,8 +2463,9 @@ BOOL CNethoodCacheEnumerationThread::ResolveNetShortcut(
         return FALSE; // not a local fixed path -> not a NetHood location
 
     BOOL tryTarget = FALSE; // if TRUE, it is worth trying to find the "target.lnk" file
-    lstrcpyn(name, path, MAX_PATH);
-    if (SalamanderGeneral->SalPathAppend(name, "desktop.ini", MAX_PATH))
+    // Discovery children must be appended only to the complete candidate location.
+    if (SUCCEEDED(StringCchCopyA(name, _countof(name), path)) &&
+        SalamanderGeneral->SalPathAppend(name, "desktop.ini", _countof(name)))
     {
         HANDLE hFile = HANDLES_Q(CreateFileUtf8Local(name, GENERIC_READ,
                                             FILE_SHARE_WRITE | FILE_SHARE_READ, NULL,
@@ -2500,8 +2515,8 @@ BOOL CNethoodCacheEnumerationThread::ResolveNetShortcut(
 
     if (tryTarget)
     {
-        lstrcpyn(name, path, MAX_PATH);
-        if (SalamanderGeneral->SalPathAppend(name, "target.lnk", MAX_PATH))
+        if (SUCCEEDED(StringCchCopyA(name, _countof(name), path)) &&
+            SalamanderGeneral->SalPathAppend(name, "target.lnk", _countof(name)))
         {
             WIN32_FIND_DATA data;
             HANDLE find = HANDLES_Q(FindFirstFileUtf8Local(name, &data));

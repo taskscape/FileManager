@@ -11,24 +11,13 @@
 #include "uniso.rh2"
 #include "lang\lang.rh"
 
-#ifndef INVALID_SET_FILE_POINTER
-#define INVALID_SET_FILE_POINTER 0xFFFFFFFF
-#endif // INVALID_SET_FILE_POINTER
-
 __int64 FileSeek(HANDLE hf, __int64 distance, DWORD moveMethod)
 {
     LARGE_INTEGER li;
 
     li.QuadPart = distance;
-
-    li.LowPart = ::SetFilePointer(hf, li.LowPart, &li.HighPart, moveMethod);
-
-    if (li.LowPart == INVALID_SET_FILE_POINTER && GetLastError() != NO_ERROR)
-    {
-        li.QuadPart = -1;
-    }
-
-    return li.QuadPart;
+    // The ISO reader uses signed 64-bit offsets, so return the extended seek result without legacy sentinel ambiguity.
+    return SetFilePointerEx(hf, li, &li, moveMethod) ? li.QuadPart : -1;
 }
 
 BOOL SafeReadFile(HANDLE hFile, LPVOID lpBuffer, DWORD nBytesToRead, DWORD* pnBytesRead, const char* fileName, HWND parent)
@@ -185,9 +174,12 @@ BOOL CBufferedFile::Read(LPVOID lpBuffer, DWORD nBytesToRead, DWORD* pnBytesRead
             if (nToRead <= 0)
             {
                 DWORD read;
-                LONG offsetHigh = 0;
-                BufferStart = ::SetFilePointer(File, 0, &offsetHigh, FILE_CURRENT);
-                BufferStart += ((__int64)(DWORD)offsetHigh) << 32;
+                LARGE_INTEGER offset;
+                offset.QuadPart = 0;
+                if (!SetFilePointerEx(File, offset, &offset, FILE_CURRENT))
+                    return FALSE;
+                // BufferStart records a 64-bit file offset, so use the extended query rather than joining DWORD halves.
+                BufferStart = offset.QuadPart;
                 ret = SafeReadFile(File, Buffer, BufferSize, &read, fileName, parent);
                 BufferFilled = read;
                 BufferPos = 0;
@@ -238,9 +230,12 @@ BOOL CBufferedFile::Write(LPCVOID lpBuffer, DWORD nBytesToWrite, DWORD* pnBytesW
             lpSrc += nToWrite;
             *pnBytesWritten += nToWrite;
 
-            LONG offsetHigh = 0;
-            BufferStart = ::SetFilePointer(File, 0, &offsetHigh, FILE_CURRENT);
-            BufferStart += ((__int64)(DWORD)offsetHigh) << 32;
+            LARGE_INTEGER offset;
+            offset.QuadPart = 0;
+            if (!SetFilePointerEx(File, offset, &offset, FILE_CURRENT))
+                return FALSE;
+            // Preserve the complete current offset before flushing the buffered write.
+            BufferStart = offset.QuadPart;
             DWORD nWritten;
             if (!SafeWriteFile(File, Buffer, BufferSize, &nWritten, fileName, parent))
             {
@@ -281,5 +276,11 @@ BOOL CFile::GetFileTime(LPFILETIME lpCreationTime, LPFILETIME lpLastAccessTime, 
 
 DWORD CBufferedFile::GetFileSize(LPDWORD lpFileSizeHigh)
 {
-    return ::GetFileSize(File, lpFileSizeHigh);
+    LARGE_INTEGER fileSize;
+    if (!GetFileSizeEx(File, &fileSize))
+        return INVALID_FILE_SIZE;
+    if (lpFileSizeHigh != NULL)
+        *lpFileSizeHigh = fileSize.HighPart;
+    // Preserve the DWORD-half plug-in ABI while querying the underlying file through the unambiguous 64-bit API.
+    return fileSize.LowPart;
 }

@@ -22,6 +22,39 @@ unsigned long ProgressPos;
 unsigned char CurrentName[101];
 unsigned char tmpName[MAX_PATH];
 HWND DlgWin;
+
+static BOOL AppendText(char* buffer, size_t bufferSize, const char* text)
+{
+    // This CRT-free SFX target still needs a capacity-aware way to build process command lines.
+    size_t used = lstrlen(buffer);
+    size_t textLength = lstrlen(text);
+    if (used >= bufferSize || textLength >= bufferSize - used)
+        return FALSE;
+    for (size_t i = 0; i <= textLength; i++)
+        buffer[used + i] = text[i];
+    return TRUE;
+}
+
+static BOOL AppendDwordHex(char* buffer, size_t bufferSize, DWORD value)
+{
+    static const char digits[] = "0123456789ABCDEF";
+    char text[9];
+    int length = 0;
+    do
+    {
+        text[length++] = digits[value & 0xF];
+        value >>= 4;
+    } while (value != 0);
+    for (int i = 0; i < length / 2; i++)
+    {
+        char digit = text[i];
+        text[i] = text[length - 1 - i];
+        text[length - 1 - i] = digit;
+    }
+    text[length] = 0;
+    return AppendText(buffer, bufferSize, text);
+}
+
 #ifdef FOR_SALAMANDER_SETUP
 BOOL WaitingForExit = FALSE;
 #endif // FOR_SALAMANDER_SETUP
@@ -291,23 +324,15 @@ void* memset(void* dest, int val, size_t len)
 
 #ifdef FOR_SALAMANDER_SETUP
 
-BOOL GetSpecialFolderPath(int folder, char* path)
+BOOL GetKnownFolderPathUtf8(const KNOWNFOLDERID* folder, char* path)
 {
-    ITEMIDLIST* pidl; // select the root folder
     *path = 0;
-    if (SUCCEEDED(SHGetSpecialFolderLocation(NULL, folder, &pidl)))
+    PWSTR pathW = NULL;
+    // The installer needs a filesystem path, so skip the legacy CSIDL-to-PIDL round trip.
+    if (SUCCEEDED(SHGetKnownFolderPath(folder, KF_FLAG_DEFAULT, NULL, &pathW)))
     {
-        IMalloc* alloc;
-        WCHAR pathW[MAX_PATH];
-        BOOL ret = SHGetPathFromIDListW(pidl, pathW);
-        if (ret)
-            WideToUtf8Simple(pathW, path, MAX_PATH);
-        if (SUCCEEDED(CoGetMalloc(1, &alloc)))
-        {
-            if (alloc->lpVtbl->DidAlloc(alloc, pidl) == 1)
-                alloc->lpVtbl->Free(alloc, pidl);
-            alloc->lpVtbl->Release(alloc);
-        }
+        BOOL ret = WideToUtf8Simple(pathW, path, MAX_PATH);
+        CoTaskMemFree(pathW);
         return ret;
     }
     return FALSE;
@@ -355,13 +380,8 @@ BOOL IsUserAdmin()
 BOOL CreateParamsFileIfNeeded(const char* path, char* name)
 {
     BOOL ret = FALSE;
-    OSVERSIONINFO os;
-    os.dwOSVersionInfoSize = sizeof(OSVERSIONINFO);
-    GetVersionEx(&os);
-    if (os.dwPlatformId == VER_PLATFORM_WIN32_NT && os.dwMajorVersion >= 6 ||                 // Vista or later
-        os.dwPlatformId == VER_PLATFORM_WIN32_NT && os.dwMajorVersion == 5 && !IsUserAdmin()) // W2K and XP: when started on limited/restricted account, system offers to run setup.exe as Admin, so params.txt file is needed too
-    {
-        int len;
+    // Windows 7 is the supported baseline, so this former Vista version gate is always applicable.
+    int len;
         lstrcpyn(name, path, MAX_PATH);
         len = lstrlen(name);
         if (len > 0 && name[len - 1] != '\\')
@@ -375,13 +395,13 @@ BOOL CreateParamsFileIfNeeded(const char* path, char* name)
             {
                 char userPaths[7][MAX_PATH];
                 ret = TRUE;
-                ret &= GetSpecialFolderPath(CSIDL_COMMON_DESKTOPDIRECTORY, userPaths[0]);
-                ret &= GetSpecialFolderPath(CSIDL_DESKTOPDIRECTORY, userPaths[1]);
-                ret &= GetSpecialFolderPath(CSIDL_COMMON_STARTMENU, userPaths[2]);
-                ret &= GetSpecialFolderPath(CSIDL_STARTMENU, userPaths[3]);
-                ret &= GetSpecialFolderPath(CSIDL_COMMON_PROGRAMS, userPaths[4]);
-                ret &= GetSpecialFolderPath(CSIDL_PROGRAMS, userPaths[5]);
-                ret &= GetSpecialFolderPath(CSIDL_APPDATA, userPaths[6]);
+                ret &= GetKnownFolderPathUtf8(&FOLDERID_PublicDesktop, userPaths[0]);
+                ret &= GetKnownFolderPathUtf8(&FOLDERID_Desktop, userPaths[1]);
+                ret &= GetKnownFolderPathUtf8(&FOLDERID_CommonStartMenu, userPaths[2]);
+                ret &= GetKnownFolderPathUtf8(&FOLDERID_StartMenu, userPaths[3]);
+                ret &= GetKnownFolderPathUtf8(&FOLDERID_CommonPrograms, userPaths[4]);
+                ret &= GetKnownFolderPathUtf8(&FOLDERID_Programs, userPaths[5]);
+                ret &= GetKnownFolderPathUtf8(&FOLDERID_RoamingAppData, userPaths[6]);
                 if (ret)
                 {
                     DWORD written;
@@ -403,7 +423,6 @@ BOOL CreateParamsFileIfNeeded(const char* path, char* name)
                 CloseHandle(file);
             }
         }
-    }
     return ret;
 }
 
@@ -432,10 +451,24 @@ void MyCreateProcess(const char* fileName, BOOL parseCurDir, BOOL addQuotes, con
 
     if (addQuotes)
     {
+        // The command line joins two MAX_PATH inputs, so retain its explicit fixed-buffer capacity.
+        buf2[0] = 0;
         if (salReadmeFile != NULL)
-            wsprintf(buf2, "\"%s\" -run_notepad \"%s\"", fileName, salReadmeFile);
+        {
+            if (!AppendText(buf2, ARRAYSIZE(buf2), "\"") ||
+                !AppendText(buf2, ARRAYSIZE(buf2), fileName) ||
+                !AppendText(buf2, ARRAYSIZE(buf2), "\" -run_notepad \"") ||
+                !AppendText(buf2, ARRAYSIZE(buf2), salReadmeFile) ||
+                !AppendText(buf2, ARRAYSIZE(buf2), "\""))
+                return;
+        }
         else
-            wsprintf(buf2, "\"%s\"", fileName);
+        {
+            if (!AppendText(buf2, ARRAYSIZE(buf2), "\"") ||
+                !AppendText(buf2, ARRAYSIZE(buf2), fileName) ||
+                !AppendText(buf2, ARRAYSIZE(buf2), "\""))
+                return;
+        }
     }
     else
     {
@@ -452,11 +485,12 @@ void ProcessResultsInParamsFile(const char* name, BOOL* waitForExec)
     HANDLE file = CreateFileUtf8Local(name, GENERIC_READ, 0, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
     if (file != INVALID_HANDLE_VALUE)
     {
-        DWORD sizeLo, sizeHi;
-        sizeLo = GetFileSize(file, &sizeHi);
-        if ((sizeLo != INVALID_FILE_SIZE || GetLastError() == NO_ERROR) &&
-            sizeHi == 0 && sizeLo <= 3000)
+        LARGE_INTEGER paramsFileSize;
+        // The fixed parser accepts only a small parameter file, so obtain the full size before narrowing it.
+        if (GetFileSizeEx(file, &paramsFileSize) &&
+            paramsFileSize.QuadPart >= 0 && paramsFileSize.QuadPart <= 3000)
         {
+            DWORD sizeLo = (DWORD)paramsFileSize.QuadPart;
             char buf[3001];
             DWORD read;
             if (ReadFile(file, buf, sizeLo, &read, NULL) && read == sizeLo)
@@ -545,8 +579,12 @@ void ProcessResultsInParamsFile(const char* name, BOOL* waitForExec)
                     }
                     else // launching only Notepad
                     {
-                        wsprintf(buf, "notepad.exe \"%s\"", readmeFile);
-                        MyCreateProcess(buf, FALSE, FALSE, NULL);
+                        // The parameter-file parser bounds readmeFile, but keep the launch command bounded as well.
+                        buf[0] = 0;
+                        if (AppendText(buf, ARRAYSIZE(buf), "notepad.exe \"") &&
+                            AppendText(buf, ARRAYSIZE(buf), readmeFile) &&
+                            AppendText(buf, ARRAYSIZE(buf), "\""))
+                            MyCreateProcess(buf, FALSE, FALSE, NULL);
                     }
                 }
                 else
@@ -564,16 +602,7 @@ void ProcessResultsInParamsFile(const char* name, BOOL* waitForExec)
 
 BOOL CheckWindows2000AndLater()
 {
-    OSVERSIONINFO os;
-    os.dwOSVersionInfoSize = sizeof(OSVERSIONINFO);
-    GetVersionEx(&os);
-    if (os.dwPlatformId == VER_PLATFORM_WIN32s ||
-        os.dwPlatformId == VER_PLATFORM_WIN32_WINDOWS ||
-        os.dwPlatformId == VER_PLATFORM_WIN32_NT && os.dwMajorVersion <= 4)
-    {
-        MessageBox(NULL, "This program cannot run on Windows 95/98/Me/NT.", "Information", MB_OK | MB_ICONEXCLAMATION);
-        return FALSE;
-    }
+    // The product's Windows 7 baseline makes a version-number launch gate obsolete; capability checks occur at use sites.
     return TRUE;
 }
 
@@ -812,8 +841,14 @@ int MyWinMain(struct SCabinet* cabinet)
                 // W2K and XP: when started on limited/restricted account, system offers to run setup.exe as Admin, so params.txt file is needed too
                 if (CreateParamsFileIfNeeded(tmpName, paramsFileName))
                 {
-                    wsprintf(ptr, "/runbysfx 0x%X ", (DWORD)DlgWin);
-                    ptr += lstrlen(ptr);
+                    // ptr starts at tmpArgs, whose complete capacity is available for the optional setup argument.
+                    ptr[0] = 0;
+                    if (AppendText((char*)ptr, ARRAYSIZE(tmpArgs), "/runbysfx 0x") &&
+                        AppendDwordHex((char*)ptr, ARRAYSIZE(tmpArgs), (DWORD)DlgWin) &&
+                        AppendText((char*)ptr, ARRAYSIZE(tmpArgs), " "))
+                        ptr += lstrlen((char*)ptr);
+                    else
+                        paramsFileName[0] = 0;
                 }
                 else
                     paramsFileName[0] = 0;
@@ -881,7 +916,8 @@ int MyWinMain(struct SCabinet* cabinet)
                 if (waitForExec) // only wait when something will actually be launched; otherwise exit immediately
                 {
                     // process messages until the launched application becomes active, then exit (otherwise activation of the launched apps misbehaves)
-                    DWORD ti = GetTickCount();
+                    // This private launch grace period must remain valid during long-running setup sessions.
+                    ULONGLONG ti = GetTickCount64();
                     if (!IsWindowVisible(DlgWin))
                         ShowWindow(DlgWin, SW_SHOW); // just to be safe
                     do
@@ -895,7 +931,7 @@ int MyWinMain(struct SCabinet* cabinet)
                             }
                         }
                         Sleep(100);
-                    } while (DlgWin != NULL && GetTickCount() - ti < 10000);
+                    } while (DlgWin != NULL && GetTickCount64() - ti < 10000);
                 }
             }
 #endif // FOR_SALAMANDER_SETUP

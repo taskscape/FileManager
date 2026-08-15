@@ -3,6 +3,8 @@
 
 #include "precomp.h"
 
+#include <strsafe.h>
+
 #include "operation_plan.h"
 #include "worker.h"
 
@@ -93,8 +95,9 @@ BOOL COperationPlan::Capture(COperations& operations)
     if (Items.Count != 0)
         return FALSE; // snapshots are immutable once exposed to the execution boundary
 
-    // Capture the command-dispatch ID before copying items and releasing the live script.
-    lstrcpyn(OperationId, operations.GetCorrelationId(), _countof(OperationId));
+    // A truncated correlation ID could join this immutable plan to a different operation, so reject it.
+    if (FAILED(StringCchCopyA(OperationId, _countof(OperationId), operations.GetCorrelationId())))
+        return FALSE;
 
     for (int index = 0; index < operations.Count; ++index)
     {

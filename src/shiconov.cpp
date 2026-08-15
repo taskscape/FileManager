@@ -3,6 +3,7 @@
 // CommentsTranslationProject: TRANSLATED
 
 #include "precomp.h"
+#include <strsafe.h>
 
 #include "cfgdlg.h"
 #include "geticon.h"
@@ -83,7 +84,8 @@ BOOL GetGoogleDrivePath(char* gdPath, int gdPathMax, CSQLite3DynLoadBase** sqlit
     WCHAR widePath[MAX_PATH]; // longer paths are not supported anyway
     char mbPath[MAX_PATH];    // ANSI or UTF8 path
     char sDbPath[MAX_PATH];
-    if (SHGetFolderPath(NULL, CSIDL_LOCAL_APPDATA, NULL, 0 /* SHGFP_TYPE_CURRENT */, sDbPath) == S_OK)
+    // Google Drive configuration lookup uses the supported Known Folders API before ANSI conversion.
+    if (GetKnownFolderPathToAnsi(FOLDERID_LocalAppData, sDbPath, _countof(sDbPath)))
     {
         BOOL pathOK = FALSE;
         char* sDbPathEnd = sDbPath + strlen(sDbPath);
@@ -168,8 +170,8 @@ BOOL GetGoogleDrivePath(char* gdPath, int gdPathMax, CSQLite3DynLoadBase** sqlit
 
     if (!ret)
     {
-        if (SHGetFolderPath(NULL, WindowsVistaAndLater ? CSIDL_PROFILE : CSIDL_MYDOCUMENTS,
-                            NULL, 0 /* SHGFP_TYPE_CURRENT */, mbPath) == S_OK &&
+        // Windows 7 is the supported baseline, so the profile Known Folder replaces the CSIDL fallback.
+        if (GetKnownFolderPathToAnsi(FOLDERID_Profile, mbPath, _countof(mbPath)) &&
             SalPathAppend(mbPath, "Google Drive", MAX_PATH) &&
             (int)strlen(mbPath) < gdPathMax)
         {
@@ -286,7 +288,9 @@ void InitShellIconOverlaysAuxAux(CLSID* clsid, const char* name)
                             item->Priority = priority;
                             item->Identifier = iconOverlayIdentifier;
                             item->IconOverlayIdCLSID = *clsid;
-                            lstrcpyn(item->IconOverlayName, name, MAX_PATH);
+                            // Overlay labels are retained in fixed discovery/UI records.
+                            StringCchCopyNA(item->IconOverlayName, _countof(item->IconOverlayName), name,
+                                            _countof(item->IconOverlayName) - 1);
                             item->GoogleDriveOverlay = isGoogleDrive;
                             iconOverlayIdentifier = NULL;
                             for (x = 0; x < ICONSIZE_COUNT; x++)
@@ -437,8 +441,11 @@ void InitShellIconOverlays()
                                 ListOfShellIconOverlays.Add(item2);
                                 if (ListOfShellIconOverlays.IsGood())
                                 {
-                                    lstrcpyn(item2->IconOverlayName, keyNames[s], MAX_PATH);
-                                    lstrcpyn(item2->IconOverlayDescr, descr, MAX_PATH);
+                                    // Registry-derived overlay text retains its bounded discovery/UI record.
+                                    StringCchCopyNA(item2->IconOverlayName, _countof(item2->IconOverlayName), keyNames[s],
+                                                    _countof(item2->IconOverlayName) - 1);
+                                    StringCchCopyNA(item2->IconOverlayDescr, _countof(item2->IconOverlayDescr), descr,
+                                                    _countof(item2->IconOverlayDescr) - 1);
                                 }
                                 else
                                 {

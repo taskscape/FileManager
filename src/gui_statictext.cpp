@@ -4,6 +4,8 @@
 
 #include "precomp.h"
 
+#include <strsafe.h>
+
 #include "svg.h"
 #include "gui.h"
 #include "toolbar.h"
@@ -746,7 +748,11 @@ CStaticText::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
     case WM_USER_TTGETTEXT:
     {
         if (ToolTipText != NULL)
-            lstrcpyn((char*)lParam, ToolTipText, TOOLTIP_TEXT_MAX);
+        {
+            // The tooltip protocol supplies this fixed capacity, so never expose a partial or unterminated label.
+            if (FAILED(StringCchCopyA((char*)lParam, TOOLTIP_TEXT_MAX, ToolTipText)))
+                ((char*)lParam)[0] = 0;
+        }
         return 0;
     }
 

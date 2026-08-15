@@ -230,7 +230,8 @@ LRESULT CMainWindow::HandleShutdown(UINT uMsg, WPARAM wParam, LPARAM lParam)
     {
         CALL_STACK_MESSAGE1("WM_USER_CLOSE_MAINWND::1");
 
-        DWORD msgArrivalTime = GetTickCount(); // critical shutdown lasts 5s + 5s; if exceeded, we are killed, so we measure the time
+        // Critical shutdown deadlines must remain valid if the process crosses a legacy tick wrap.
+        CMonotonicTimePoint msgArrivalTime = CMonotonicClock::Now();
 
         if (uMsg == WM_QUERYENDSESSION)
         {
@@ -377,7 +378,7 @@ LRESULT CMainWindow::HandleShutdown(UINT uMsg, WPARAM wParam, LPARAM lParam)
         { // always true: uMsg == WM_QUERYENDSESSION && (lParam & ENDSESSION_CRITICAL) != 0
             // wait up to five seconds from receiving WM_QUERYENDSESSION for disk operations to finish
             while (ProgressDlgArray.RemoveFinishedDlgs() > 0 &&
-                   GetTickCount() - msgArrivalTime <= QUERYENDSESSION_TIMEOUT - 200)
+                   !CMonotonicClock::HasElapsed(msgArrivalTime, QUERYENDSESSION_TIMEOUT - 200, CMonotonicClock::Now()))
                 Sleep(200);
             WaitInEndSession = TRUE;
             return TRUE; // continue to WM_ENDSESSION where we will either finish or be killed while waiting
@@ -549,7 +550,7 @@ LRESULT CMainWindow::HandleShutdown(UINT uMsg, WPARAM wParam, LPARAM lParam)
             // always true: uMsg == WM_QUERYENDSESSION && (lParam & ENDSESSION_CRITICAL) != 0
             // wait up to five seconds from WM_QUERYENDSESSION for disk operations to finish
             while (ProgressDlgArray.RemoveFinishedDlgs() > 0 &&
-                   GetTickCount() - msgArrivalTime <= QUERYENDSESSION_TIMEOUT - 200)
+                   !CMonotonicClock::HasElapsed(msgArrivalTime, QUERYENDSESSION_TIMEOUT - 200, CMonotonicClock::Now()))
                 Sleep(200);
 
             WaitInEndSession = TRUE;
@@ -609,7 +610,7 @@ LRESULT CMainWindow::HandleShutdown(UINT uMsg, WPARAM wParam, LPARAM lParam)
 
             // wait up to five seconds from WM_QUERYENDSESSION for disk operations to finish
             while (ProgressDlgArray.RemoveFinishedDlgs() > 0 &&
-                   GetTickCount() - msgArrivalTime <= QUERYENDSESSION_TIMEOUT - 200)
+                   !CMonotonicClock::HasElapsed(msgArrivalTime, QUERYENDSESSION_TIMEOUT - 200, CMonotonicClock::Now()))
                 Sleep(200);
 
             if (backupOK)                   // backup done, configuration will be saved in WM_ENDSESSION,

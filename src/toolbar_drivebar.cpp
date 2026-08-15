@@ -3,6 +3,8 @@
 
 #include "precomp.h"
 
+#include <strsafe.h>
+
 #include "mainwnd.h"
 #include "usermenu.h"
 #include "toolbar.h"
@@ -210,7 +212,10 @@ void CDriveBar::SetCheckedDrive(CFilesWindow* panel, BOOL force)
     if (!force && isDiskOrArchive && strnicmp(CheckedDrive, panel->GetPath(), 2) == 0) // cache
         return;
     if (isDiskOrArchive)
-        lstrcpyn(CheckedDrive, panel->GetPath(), 3);
+    {
+        // This cache intentionally contains only the drive/UNC prefix, never a truncated path.
+        StringCchCopyNA(CheckedDrive, _countof(CheckedDrive), panel->GetPath(), _countof(CheckedDrive) - 1);
+    }
     else
         CheckedDrive[0] = 0; // pro FS tato cache nefunguje
     DWORD index;

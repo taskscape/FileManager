@@ -335,16 +335,14 @@ void CMainWindow::ExportAllMessages()
                     maxTName = wcslen(buff);
 
                 //Date
-                GetDateFormat(LOCALE_USER_DEFAULT, DATE_SHORTDATE,
-                              &Data.Messages[i].Time, NULL, buff,
-                              1000);
+                FormatTestServerDateTime(&Data.Messages[i].Time, DATE_SHORTDATE,
+                                         NULL, buff, 1000, TRUE);
                 if (wcslen(buff) > maxDate)
                     maxDate = wcslen(buff);
 
                 //Time
-                GetTimeFormat(LOCALE_USER_DEFAULT, TIME_FORCE24HOURFORMAT,
-                              &Data.Messages[i].Time,
-                              L"hh':'mm':'ss", buff, 1000);
+                FormatTestServerDateTime(&Data.Messages[i].Time, TIME_FORCE24HOURFORMAT,
+                                         L"hh':'mm':'ss", buff, 1000, FALSE);
                 SWPrintFToEnd_s(buff, L".%03d", Data.Messages[i].Time.wMilliseconds);
                 if (wcslen(buff) > maxTime)
                     maxTime = wcslen(buff);
@@ -530,16 +528,14 @@ void CMainWindow::ExportAllMessages()
                 wcscat_s(line, L"|");
 
                 //Date
-                GetDateFormat(LOCALE_USER_DEFAULT, DATE_SHORTDATE,
-                              &Data.Messages[i].Time, NULL, buff,
-                              1000);
+                FormatTestServerDateTime(&Data.Messages[i].Time, DATE_SHORTDATE,
+                                         NULL, buff, 1000, TRUE);
                 AddChars(line, maxDate - wcslen(buff));
                 SWPrintFToEnd_s(line, L"%s|", buff);
 
                 //Time
-                GetTimeFormat(LOCALE_USER_DEFAULT, TIME_FORCE24HOURFORMAT,
-                              &Data.Messages[i].Time,
-                              L"hh':'mm':'ss", buff, 1000);
+                FormatTestServerDateTime(&Data.Messages[i].Time, TIME_FORCE24HOURFORMAT,
+                                         L"hh':'mm':'ss", buff, 1000, FALSE);
                 SWPrintFToEnd_s(buff, L".%03d", Data.Messages[i].Time.wMilliseconds);
                 AddChars(line, maxTime - wcslen(buff));
                 SWPrintFToEnd_s(line, L"%s|", buff);

@@ -40,6 +40,8 @@
 #include "arraylt.h"
 #include "winliblt.h"
 #include "auxtools.h"
+// The RAPI message pump can run indefinitely, so use the shared non-wrapping clock for timeouts.
+#include "../../common/monotonic_time.h"
 
 namespace RapiNS
 {
@@ -91,6 +93,28 @@ static BOOL WideToUtf8Buffer(const WCHAR* src, char* dst, int dstSize)
     if (len == 0)
         dst[0] = 0;
     return len != 0;
+}
+
+static BOOL FormatUserDateAnsi(const SYSTEMTIME* time, DWORD flags, char* buffer, int bufferSize)
+{
+    WCHAR localeName[LOCALE_NAME_MAX_LENGTH];
+    WCHAR formattedValue[80];
+    if (!GetUserDefaultLocaleName(localeName, ARRAYSIZE(localeName)) ||
+        GetDateFormatEx(localeName, flags, time, NULL, formattedValue, ARRAYSIZE(formattedValue), NULL) == 0)
+        return FALSE;
+    // The Windows Mobile UI is ANSI at this boundary, while the locale APIs remain Unicode.
+    return WideCharToMultiByte(CP_ACP, 0, formattedValue, -1, buffer, bufferSize, NULL, NULL) != 0;
+}
+
+static BOOL FormatUserTimeAnsi(const SYSTEMTIME* time, DWORD flags, char* buffer, int bufferSize)
+{
+    WCHAR localeName[LOCALE_NAME_MAX_LENGTH];
+    WCHAR formattedValue[80];
+    if (!GetUserDefaultLocaleName(localeName, ARRAYSIZE(localeName)) ||
+        GetTimeFormatEx(localeName, flags, time, NULL, formattedValue, ARRAYSIZE(formattedValue)) == 0)
+        return FALSE;
+    // The Windows Mobile UI is ANSI at this boundary, while the locale APIs remain Unicode.
+    return WideCharToMultiByte(CP_ACP, 0, formattedValue, -1, buffer, bufferSize, NULL, NULL) != 0;
 }
 
 static BOOL ConvertFindDataWToUtf8Local(const WIN32_FIND_DATAW* src, WIN32_FIND_DATAA* dst)

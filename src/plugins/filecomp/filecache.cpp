@@ -5,6 +5,8 @@
 
 #include <assert.h>
 
+#include "..\\..\\common\\monotonic_time.h"
+
 #define SECTOR_SIZE 4096              // We seek at offsets being multiples of SECTOR_SIZE
 #define BUFFER_SIZE (2 * 1024 * 1024) // We read at most this amount from a file at a sequence of BLOCK_READ_SIZE reads
 #define BLOCK_READ_SIZE (32 * 1024)   // Atomic size of one ReadFile. BUFFER_SIZE must be a multiple of BLOCK_READ_SIZE
@@ -75,22 +77,21 @@ LPBYTE CCachedFile::ReadBuffer(QWORD offset, DWORD size, const int& CancelFlag)
     {
         LARGE_INTEGER li;
         ;
-        DWORD err;
-
         // Space for optimization: Instead of dummy SetFilePointer and possibly partially rereading
         // what we already have, we can do some memcpy. But then we might not read from sector boundary
         BufferOffset = offset / SECTOR_SIZE * SECTOR_SIZE; // Align to "cluster" size
         li.QuadPart = BufferOffset;
         DataInBufSize = 0;
-        err = SetFilePointer(File, li.LowPart, &li.HighPart, FILE_BEGIN);
-        if ((0xFFFFFFFF == err) && (GetLastError() != NO_ERROR))
+        // Preserve the QWORD cache offset through the 64-bit file-position API.
+        if (!SetFilePointerEx(File, li, NULL, FILE_BEGIN))
         {
             return NULL;
         }
 
         size_t nOfs = 0;
         DWORD nTotalToRead = (DWORD)__max(size + (offset - BufferOffset), (DWORD)__min(BufferSize, FileSize - BufferOffset));
-        DWORD initialTicks = GetTickCount();
+        // Slow network cutoffs must not reset when the legacy 32-bit tick value wraps.
+        const CMonotonicTimePoint initialTicks = CMonotonicClock::Now();
 
         // Reading 32KB chunks bases on code for File Compare in Salamand.exe
         // Reading 2MB in 32KB blocks is reportedly the fastest approach on W2K & WXP,
@@ -100,7 +101,7 @@ LPBYTE CCachedFile::ReadBuffer(QWORD offset, DWORD size, const int& CancelFlag)
         while (nTotalToRead > 0)
         {
             DWORD nBytesRead, nBytesToRead = __min(nTotalToRead, BLOCK_READ_SIZE);
-            DWORD ticks = GetTickCount();
+            const CMonotonicTimePoint readStartedAt = CMonotonicClock::Now();
             if (!ReadFile(File, Buffer + nOfs, nBytesToRead, &nBytesRead, NULL) || (nBytesRead != nBytesToRead))
             {
                 return NULL;
@@ -112,7 +113,10 @@ LPBYTE CCachedFile::ReadBuffer(QWORD offset, DWORD size, const int& CancelFlag)
             {
                 return NULL;
             }
-            if ((GetTickCount() - ticks > 200) || (GetTickCount() - initialTicks > 2000))
+            // Preserve the existing per-read and total-read limits on the monotonic clock.
+            const CMonotonicTimePoint readFinishedAt = CMonotonicClock::Now();
+            if (CMonotonicClock::HasElapsed(readStartedAt, 200, readFinishedAt) ||
+                CMonotonicClock::HasElapsed(initialTicks, 2000, readFinishedAt))
             {
                 // Too slow network (or FDD or ...)
                 // We have read enough -> break

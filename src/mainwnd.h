@@ -4,6 +4,8 @@
 
 #pragma once
 
+#include <strsafe.h>
+
 #define HOT_PATHS_COUNT 30
 
 #define TASKBAR_ICON_ID 0x0000
@@ -174,7 +176,11 @@ public:
         else
         {
             if (bufferSize > 0)
-                lstrcpyn(buffer, Items[index].Name, bufferSize);
+            {
+                // Caller-sized hot-path labels retain their explicit bounded output contract.
+                StringCchCopyNA(buffer, static_cast<size_t>(bufferSize), Items[index].Name,
+                                static_cast<size_t>(bufferSize) - 1);
+            }
         }
     }
 
@@ -188,14 +194,18 @@ public:
         else
         {
             if (bufferSize > 0)
-                lstrcpyn(buffer, Items[index].Path, bufferSize);
+            {
+                // Caller-sized hot-path paths retain their explicit bounded output contract.
+                StringCchCopyNA(buffer, static_cast<size_t>(bufferSize), Items[index].Path,
+                                static_cast<size_t>(bufferSize) - 1);
+            }
         }
     }
 
     int GetNameLen(int index)
     {
         if (index >= 0 && index < HOT_PATHS_COUNT && Items[index].Name != NULL)
-            return lstrlen(Items[index].Name);
+            return static_cast<int>(strlen(Items[index].Name));
         else
             return 0;
     }
@@ -203,7 +213,7 @@ public:
     int GetPathLen(int index)
     {
         if (index >= 0 && index < HOT_PATHS_COUNT && Items[index].Path != NULL)
-            return lstrlen(Items[index].Path);
+            return static_cast<int>(strlen(Items[index].Path));
         else
             return 0;
     }

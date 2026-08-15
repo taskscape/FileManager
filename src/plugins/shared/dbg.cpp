@@ -222,11 +222,13 @@ DWORD WINAPI __TraceMsgBoxThread(void* param)
 {
     C__TraceMsgBoxThreadData* data = (C__TraceMsgBoxThreadData*)param;
     char msg[1000];
-    wsprintf(msg, "TRACE_C message received!\n\n"
-                  "File: %s\n"
-                  "Line: %d\n\n"
-                  "Message: ",
-             data->File, data->Line);
+    // A diagnostic source path can be arbitrarily long, so do not lose the trace process to its message box.
+    if (_snprintf_s(msg, _countof(msg), _TRUNCATE, "TRACE_C message received!\n\n"
+                                                "File: %s\n"
+                                                "Line: %d\n\n"
+                                                "Message: ",
+                    data->File, data->Line) < 0)
+        return 0;
     const char* appendix = "\n\nTRACE_C message means that fatal error has occured. "
                            "Application will be crashed by \"access violation\" exception after "
                            "clicking OK. Please send us bug report to help us fix this problem. "
@@ -248,11 +250,13 @@ DWORD WINAPI __TraceMsgBoxThreadW(void* param)
 {
     C__TraceMsgBoxThreadDataW* data = (C__TraceMsgBoxThreadDataW*)param;
     WCHAR msg[1000];
-    wsprintfW(msg, L"TRACE_C message received!\n\n"
-                   L"File: %s\n"
-                   L"Line: %d\n\n"
-                   L"Message: ",
-              data->File, data->Line);
+    // Keep the Unicode diagnostic path bounded before appending the user-visible crash explanation.
+    if (_snwprintf_s(msg, _countof(msg), _TRUNCATE, L"TRACE_C message received!\n\n"
+                                                  L"File: %s\n"
+                                                  L"Line: %d\n\n"
+                                                  L"Message: ",
+                     data->File, data->Line) < 0)
+        return 0;
     const WCHAR* appendix = L"\n\nTRACE_C message means that fatal error has occured. "
                             L"Application will be crashed by \"access violation\" exception after "
                             L"clicking OK. Please send us bug report to help us fix this problem. "
@@ -313,7 +317,8 @@ void C__Trace::SendMessageToServer(BOOL information, BOOL unicode, BOOL crash)
         {
             if (unicode)
             {
-                threadDataW.Msg = (WCHAR*)GlobalAlloc(GMEM_FIXED, sizeof(WCHAR) * (TraceStringBufW.length() + 1));
+                // The message thread consumes only this private copy, so no movable global allocation is needed.
+                threadDataW.Msg = (WCHAR*)HeapAlloc(GetProcessHeap(), 0, sizeof(WCHAR) * (TraceStringBufW.length() + 1));
                 if (threadDataW.Msg != NULL)
                 {
                     lstrcpynW(threadDataW.Msg, TraceStringBufW.c_str(), (int)(TraceStringBufW.length() + 1));
@@ -324,7 +329,8 @@ void C__Trace::SendMessageToServer(BOOL information, BOOL unicode, BOOL crash)
             }
             else
             {
-                threadData.Msg = (char*)GlobalAlloc(GMEM_FIXED, TraceStringBuf.length() + 1);
+                // The message thread consumes only this private copy, so no movable global allocation is needed.
+                threadData.Msg = (char*)HeapAlloc(GetProcessHeap(), 0, TraceStringBuf.length() + 1);
                 if (threadData.Msg != NULL)
                 {
                     lstrcpyn(threadData.Msg, TraceStringBuf.c_str(), (int)TraceStringBuf.length() + 1);
@@ -362,7 +368,7 @@ void C__Trace::SendMessageToServer(BOOL information, BOOL unicode, BOOL crash)
                 CloseHandle(msgBoxThread);
             }
             msgBoxOpened = FALSE;
-            GlobalFree(unicode ? (HGLOBAL)threadDataW.Msg : (HGLOBAL)threadData.Msg);
+            HeapFree(GetProcessHeap(), 0, unicode ? (void*)threadDataW.Msg : (void*)threadData.Msg);
             // pad softu vyvolame primo v kodu, kde je umisteny TRACE_C/TRACE_MC, aby
             // bylo v bug reportu videt presne kde makra lezi; padacka tedy nasleduje
             // po dokonceni teto metody

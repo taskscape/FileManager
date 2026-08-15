@@ -1063,7 +1063,7 @@ const char* WINAPI FileDataExpFileDate(HWND msgParent, void* param)
         FileTimeToLocalFileTime(&data->FileData->LastWrite, &ft) &&
             FileTimeToSystemTime(&ft, &st))
     {
-        if (GetDateFormat(LOCALE_USER_DEFAULT, DATE_SHORTDATE, &st, NULL, data->Buffer, 50) == 0)
+        if (FormatUserDateTimeUtf8(&st, DATE_SHORTDATE, data->Buffer, 50, TRUE) == 0)
             sprintf(data->Buffer, "%u.%u.%u", st.wDay, st.wMonth, st.wYear);
     }
     else
@@ -1087,7 +1087,7 @@ const char* WINAPI FileDataExpFileDateOnlyForDisk(HWND msgParent, void* param)
     }
     if (stIsReady)
     {
-        if (GetDateFormat(LOCALE_USER_DEFAULT, DATE_SHORTDATE, &st, NULL, data->Buffer, 50) == 0)
+        if (FormatUserDateTimeUtf8(&st, DATE_SHORTDATE, data->Buffer, 50, TRUE) == 0)
             sprintf(data->Buffer, "%u.%u.%u", st.wDay, st.wMonth, st.wYear);
     }
     else
@@ -1118,7 +1118,7 @@ const char* WINAPI FileDataExpFileTime(HWND msgParent, void* param)
         FileTimeToLocalFileTime(&data->FileData->LastWrite, &ft) &&
             FileTimeToSystemTime(&ft, &st))
     {
-        if (GetTimeFormat(LOCALE_USER_DEFAULT, 0, &st, NULL, data->Buffer, 50) == 0)
+        if (FormatUserDateTimeUtf8(&st, 0, data->Buffer, 50, FALSE) == 0)
             sprintf(data->Buffer, "%u:%02u:%02u", st.wHour, st.wMinute, st.wSecond);
     }
     else
@@ -1142,7 +1142,7 @@ const char* WINAPI FileDataExpFileTimeOnlyForDisk(HWND msgParent, void* param)
     }
     if (stIsReady)
     {
-        if (GetTimeFormat(LOCALE_USER_DEFAULT, 0, &st, NULL, data->Buffer, 50) == 0)
+        if (FormatUserDateTimeUtf8(&st, 0, data->Buffer, 50, FALSE) == 0)
             sprintf(data->Buffer, "%u:%02u:%02u", st.wHour, st.wMinute, st.wSecond);
     }
     else
@@ -2063,7 +2063,9 @@ TrackExecuteMenu(HWND hParent, int buttonResID, int editlineResID,
         if (item->Flags & EIF_REPLACE_ALL)
         {
             SendMessage(hEdit, WM_SETTEXT, 0, (LPARAM)buff);
-            SendMessage(hEdit, EM_SETSEL, lstrlen(buff), lstrlen(buff));
+            // The replacement text is terminated locally; use its CRT length for the edit-control caret position.
+            const int buffLength = static_cast<int>(strlen(buff));
+            SendMessage(hEdit, EM_SETSEL, buffLength, buffLength);
         }
         else
         {
@@ -2087,7 +2089,8 @@ TrackExecuteMenu(HWND hParent, int buttonResID, int editlineResID,
                 int delta = 1;
                 if (item->Flags & EIF_CURSOR_2)
                     delta = 2;
-                if (delta > lstrlen(buff))
+                // The cursor adjustment is bounded by the terminated replacement text.
+                if (delta > static_cast<int>(strlen(buff)))
                 {
                     TRACE_E("delta > strlen(buff)");
                     delta = (int)strlen(buff);

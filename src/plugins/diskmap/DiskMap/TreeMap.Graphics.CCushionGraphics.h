@@ -48,7 +48,7 @@ public:
     BOOL LoadFromFile(TCHAR const* filename)
     {
         HANDLE fa;
-        DWORD read, lo, hi;
+        DWORD read, lo;
         DWORD err;
         BYTE* tbs;
         BOOL val;
@@ -60,14 +60,16 @@ public:
             //errlen = FormatMessage(FORMAT_MESSAGE_FROM_SYSTEM, NULL, err, 0, errbuff, 400, NULL);
             return FALSE;
         }
-        lo = GetFileSize(fa, &hi);
-        if ((hi > 0) || (lo > 1024 * 1024))
+        LARGE_INTEGER fileSize;
+        if (!GetFileSizeEx(fa, &fileSize) || fileSize.QuadPart < 0 || fileSize.QuadPart > 1024 * 1024)
         {
             CloseHandle(fa);
             //_tcscpy(errbuff, TEXT("Internal error: Too big data"));
             //errlen = _tcslen(errbuff);
             return FALSE;
         }
+        // Cushion graphics are intentionally limited to the 1 MiB in-memory decoder buffer before narrowing.
+        lo = (DWORD)fileSize.QuadPart;
         tbs = (BYTE*)malloc(lo);
 
         ReadFile(fa, tbs, lo, &read, NULL);

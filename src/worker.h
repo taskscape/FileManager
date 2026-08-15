@@ -4,6 +4,8 @@
 
 #pragma once
 
+#include <strsafe.h>
+
 #define CREATE_DIR_SIZE CQuadWord(4096, 0) // operation cost estimates (uncached measurements based on worker thread runtimes)
 #define MOVE_DIR_SIZE CQuadWord(5050, 0)
 #define DELETE_DIR_SIZE CQuadWord(2400, 0)
@@ -15,6 +17,9 @@
 #define DELETE_FILE_SIZE CQuadWord(2300, 0)
 #define CHATTRS_FILE_SIZE CQuadWord(500, 0)
 #define MAX_OP_FILESIZE 6500 // WARNING: highest allowed value in this group
+
+// Keep queued operation dialogs bounded so a burst cannot retain unbounded scripts and HWNDs.
+#define DISK_OPERATION_QUEUE_LIMIT 64
 
 // 4/2012 - increased the buffer to ten times the old size; large files over the network now reach speeds 
 // comparable to Total Commander and finish 2-3x faster than with the previous one-tenth buffer
@@ -508,13 +513,17 @@ public:
 
     void SetWorkPath1(const char* path, BOOL inclSubDirs)
     {
-        lstrcpyn(WorkPath1, path, MAX_PATH);
+        // Background work must retain a complete source identity.
+        if (FAILED(StringCchCopyA(WorkPath1, _countof(WorkPath1), path)))
+            WorkPath1[0] = 0;
         WorkPath1InclSubDirs = inclSubDirs;
     }
 
     void SetWorkPath2(const char* path, BOOL inclSubDirs)
     {
-        lstrcpyn(WorkPath2, path, MAX_PATH);
+        // Background work must retain a complete target identity.
+        if (FAILED(StringCchCopyA(WorkPath2, _countof(WorkPath2), path)))
+            WorkPath2[0] = 0;
         WorkPath2InclSubDirs = inclSubDirs;
     }
 
@@ -567,6 +576,14 @@ public:
     }
 };
 
+struct COperationsQueueMetrics
+{
+    int Capacity;
+    int Queued;
+    int HighWaterMark;
+    DWORD RejectedSubmissions;
+};
+
 class COperationsQueue // queue of disk Copy/Move operations
 {
 protected:
@@ -575,9 +592,11 @@ protected:
     // OperDlgs and OperPaused arrays have the same number of elements and share indices (each operation uses the same index in both arrays)
     TDirectArray<HWND> OperDlgs;    // array of HWND handles: dialogs of operations in the queue
     TDirectArray<DWORD> OperPaused; // int array describing queue operation state: 2/1/0 = "manually-paused"/"auto-paused"/"running"
+    int HighWaterMark;
+    DWORD RejectedSubmissions;
 
 public:
-    COperationsQueue() : OperDlgs(5, 10), OperPaused(5, 10)
+    COperationsQueue() : OperDlgs(5, 10), OperPaused(5, 10), HighWaterMark(0), RejectedSubmissions(0)
     {
         HANDLES(InitializeCriticalSection(&QueueCritSect));
     }
@@ -588,7 +607,7 @@ public:
         HANDLES(DeleteCriticalSection(&QueueCritSect));
     }
 
-    // adds an operation to the queue; returns TRUE on success, otherwise the addition failed (not enough memory);
+    // Adds an operation to the queue; returns FALSE when resources or the bounded capacity reject admission.
     // 'dlg' is the handle of the operation dialog window; 'startOnIdle' is TRUE if the operation should start
     // only when nothing else is running; in 'startPaused' (must not be NULL) it returns TRUE when
     // the added operation should start "paused", otherwise it starts "running"
@@ -611,11 +630,16 @@ public:
 
     // returns the current number of operations in the queue
     int GetNumOfOperations();
+
+    // Returns the backpressure counters while retaining ownership of the queue arrays.
+    COperationsQueueMetrics GetQueueMetrics();
 };
 
 extern COperationsQueue OperationsQueue; // queue of disk Copy/Move operations
 
-HANDLE StartWorker(COperations* script, HWND hDlg, CChangeAttrsData* attrsData,
+class CThreadOwner;
+
+CThreadOwner* StartWorker(COperations* script, HWND hDlg, CChangeAttrsData* attrsData,
                    CConvertData* convertData, HANDLE wContinue, HANDLE workerNotSuspended,
                    int* operationProgress, int* summaryProgress);
 
@@ -778,7 +802,9 @@ struct CWorkerCompletion
     CWorkerCompletion(EOperationState state, BOOL cancellationRequested, const char* correlationId)
         : State(state), CancellationRequested(cancellationRequested)
     {
-        lstrcpyn(CorrelationId, correlationId, _countof(CorrelationId));
+        // Completion telemetry must not attach a truncated correlation identity.
+        if (FAILED(StringCchCopyA(CorrelationId, _countof(CorrelationId), correlationId)))
+            CorrelationId[0] = 0;
     }
 };
 

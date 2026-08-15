@@ -3,6 +3,8 @@
 
 #include "precomp.h"
 
+#include <strsafe.h>
+
 #include "lib\\pvw32dll.h"
 #include "renderer.h"
 #include "pictview.h"
@@ -85,7 +87,9 @@ void SafeSetStatusBarText(HWND hStatusBar, int part, LPCTSTR text)
     LRESULT ret = SendMessage(hStatusBar, SB_GETTEXT, part & 0xff, (LPARAM)buff);
     if (_tcscmp(buff, text) != NULL || HIWORD(ret) != (part & 0xffffff00))
     {
-        lstrcpyn(buff, text, 500);
+        // Status-bar text is a fixed presentation buffer; do not send a partial label.
+        if (FAILED(StringCchCopy(buff, _countof(buff), text)))
+            buff[0] = 0;
         SendMessage(hStatusBar, SB_SETTEXT, part, (LPARAM)buff);
     }
 }

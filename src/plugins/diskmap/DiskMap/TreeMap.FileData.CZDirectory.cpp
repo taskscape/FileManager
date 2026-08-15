@@ -3,6 +3,7 @@
 
 #include "precomp.h"
 #include <stdio.h>
+#include "..\\..\\..\\common\\monotonic_time.h"
 #include "TreeMap.FileData.CZDirectory.h"
 #include "TreeMap.FileData.CZRoot.h"
 
@@ -179,7 +180,8 @@ INT64 CZDirectory::PopulateDir(CWorkerThread* mythread, TCHAR* path, int pos, si
     }
     else
     {
-        DWORD lastTime = GetTickCount();
+        // Directory enumeration owns this reporting throttle, so it can remain correct after long uptimes.
+        CMonotonicTimePoint lastTime = CMonotonicClock::Now();
         do
         {
             if (FindFileData.cFileName[0] == '.' && (FindFileData.cFileName[1] == '\0' || (FindFileData.cFileName[1] == '.' && FindFileData.cFileName[2] == '\0')))
@@ -293,11 +295,11 @@ INT64 CZDirectory::PopulateDir(CWorkerThread* mythread, TCHAR* path, int pos, si
                 }
                 this->_files->At(fre) = f;
             }
-            //if (((filecount + dircount) > MAXREPORTEDFILES) || (GetTickCount() - lastTime > 500)) //either many files or 0.5 sec elapsed
-            if ((GetTickCount() - lastTime > 250) && (filecount + dircount) > 0) //if 0.25 sec elapsed and at least something new was found
+            if (CMonotonicClock::HasElapsed(lastTime, 251, CMonotonicClock::Now()) &&
+                (filecount + dircount) > 0) // if 0.25 sec elapsed and at least something new was found
             {
                 this->_root->IncStats(filecount, dircount, tsize);
-                lastTime = GetTickCount();
+                lastTime = CMonotonicClock::Now();
                 dircount = 0;
                 filecount = 0;
                 tsize = 0;

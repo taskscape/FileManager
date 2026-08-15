@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "precomp.h"
+#include <strsafe.h>
 
 #include "translator.h"
 #include "wndrh.h"
@@ -51,19 +52,23 @@ BOOL PathAppend(char* path, const char* name, int pathSize)
 
 int GetRootPath(char* root, const char* path);
 
-void GetFullPath(char* tgt, const char* name)
+BOOL GetFullPath(char* tgt, size_t tgtCapacity, const char* name)
 {
+    // Project files must retain a complete absolute identity before loading.
+    if (tgt == NULL || tgtCapacity == 0 || name == NULL)
+        return FALSE;
     if (*name == '\\' && *(name + 1) == '\\' || *name != 0 && *(name + 1) == ':')
-        lstrcpyn(tgt, name, MAX_PATH);
+        return SUCCEEDED(StringCchCopyA(tgt, tgtCapacity, name));
     else
     {
         char curDir[MAX_PATH];
-        GetCurrentDirectory(MAX_PATH, curDir);
+        if (GetCurrentDirectory(_countof(curDir), curDir) == 0)
+            return FALSE;
         if (*name == '\\')
             GetRootPath(tgt, curDir);
-        else
-            lstrcpyn(tgt, curDir, MAX_PATH);
-        PathAppend(tgt, name, MAX_PATH);
+        else if (FAILED(StringCchCopyA(tgt, tgtCapacity, curDir)))
+            return FALSE;
+        return PathAppend(tgt, name, static_cast<int>(tgtCapacity));
     }
 }
 
@@ -382,7 +387,7 @@ BOOL CFrameWindow::OpenProject(const char* importSubPath)
         { // loading finished without errors; import translation properties
             showOutro = FALSE;
             char importPath[MAX_PATH];
-            lstrcpy(importPath, Data.ProjectFile);
+            StringCchCopyA(importPath, _countof(importPath), Data.ProjectFile);
             int backSlashCount = 0;
             char* p = importPath + strlen(importPath) - 1;
             while (p >= importPath && backSlashCount < 1)
@@ -414,7 +419,7 @@ BOOL CFrameWindow::OpenProject(const char* importSubPath)
         { // loading finished without errors; continue with importing the legacy translation
             showOutro = FALSE;
             char importPath[MAX_PATH];
-            lstrcpy(importPath, Data.ProjectFile);
+            StringCchCopyA(importPath, _countof(importPath), Data.ProjectFile);
             int backSlashCount = 0;
             char* p = importPath + strlen(importPath) - 1;
             while (p >= importPath && backSlashCount <= 3)
@@ -480,10 +485,10 @@ BOOL CFrameWindow::OpenProject(const char* importSubPath)
             char fullSLTPath[MAX_PATH];
             BOOL isAbsolutePath = strlen(sltPath) > 2 && ((sltPath[0] == '\\' && sltPath[1] == '\\') || (sltPath[1] == ':'));
             if (isAbsolutePath)
-                lstrcpy(fullSLTPath, sltPath);
+                StringCchCopyA(fullSLTPath, _countof(fullSLTPath), sltPath);
             else
             {
-                lstrcpy(fullSLTPath, Data.ProjectFile);
+                StringCchCopyA(fullSLTPath, _countof(fullSLTPath), Data.ProjectFile);
                 *strrchr(fullSLTPath, '\\') = 0;
                 PathAppend(fullSLTPath, sltPath, MAX_PATH);
             }
@@ -619,26 +624,34 @@ void CFrameWindow::ProcessCmdLineParams(char* argv[], int p)
             if (_stricmp(argv[0], "-quiet-import") == 0 ||
                 _stricmp(argv[0], "-quiet-import-only-dialog-layout") == 0)
             {
-                lstrcpy(QuietImport, argv[1]);
+                if (FAILED(StringCchCopyA(QuietImport, _countof(QuietImport), argv[1])))
+                    return;
                 QuietImportOnlyDlgLayout = _stricmp(argv[0], "-quiet-import-only-dialog-layout") == 0;
             }
             if (_stricmp(argv[0], "-quiet-import-trlprop") == 0)
-                lstrcpy(QuietImportTrlProp, argv[1]);
+                if (FAILED(StringCchCopyA(QuietImportTrlProp, _countof(QuietImportTrlProp), argv[1])))
+                    return;
             QuietExportSLTForDiff = _stricmp(argv[0], "-quiet-export-slt-for-diff") == 0;
             if (_stricmp(argv[0], "-quiet-export-slt") == 0 || QuietExportSLTForDiff)
-                lstrcpy(QuietExportSLT, argv[1]);
+                if (FAILED(StringCchCopyA(QuietExportSLT, _countof(QuietExportSLT), argv[1])))
+                    return;
             if (_stricmp(argv[0], "-quiet-export-sizes") == 0)
-                lstrcpy(QuietExportSDC, argv[1]);
+                if (FAILED(StringCchCopyA(QuietExportSDC, _countof(QuietExportSDC), argv[1])))
+                    return;
             if (_stricmp(argv[0], "-quiet-import-slt") == 0)
-                lstrcpy(QuietImportSLT, argv[1]);
+                if (FAILED(StringCchCopyA(QuietImportSLT, _countof(QuietImportSLT), argv[1])))
+                    return;
             if (_stricmp(argv[0], "-quiet-export-spellcheck") == 0)
-                lstrcpy(QuietExportSpellChecker, argv[1]);
+                if (FAILED(StringCchCopyA(QuietExportSpellChecker, _countof(QuietExportSpellChecker), argv[1])))
+                    return;
             if (_stricmp(argv[0], "-open-layout-editor") == 0)
-                lstrcpy(OpenLayoutEditorDialogID, argv[1]);
+                if (FAILED(StringCchCopyA(OpenLayoutEditorDialogID, _countof(OpenLayoutEditorDialogID), argv[1])))
+                    return;
         }
     }
     char file[MAX_PATH];
-    GetFullPath(file, argv[p - 1]);
+    if (!GetFullPath(file, _countof(file), argv[p - 1]))
+        return;
     CloseChildWindows();
     Data.Clean();
     SetTitle();
@@ -1195,9 +1208,12 @@ CFrameWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         case ID_HELP_SHOWREADME:
         {
             char readmePath[MAX_PATH];
-            GetModuleFileName(NULL, readmePath, MAX_PATH);
-            lstrcpy(strrchr(readmePath, '\\') + 1, "readme.txt");
-            ShellExecute(HWindow, "open", readmePath, "", "", SW_SHOWNORMAL);
+            const DWORD readmePathLength = GetModuleFileName(NULL, readmePath, _countof(readmePath));
+            char* readmeName = strrchr(readmePath, '\\');
+            // Preserve the module directory only when the replacement name has room to fit.
+            if (readmePathLength != 0 && readmePathLength < _countof(readmePath) && readmeName != NULL &&
+                SUCCEEDED(StringCchCopyA(readmeName + 1, _countof(readmePath) - (readmeName + 1 - readmePath), "readme.txt")))
+                ShellExecute(HWindow, "open", readmePath, "", "", SW_SHOWNORMAL);
             return 0;
         }
 

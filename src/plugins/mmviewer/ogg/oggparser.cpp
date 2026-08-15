@@ -3,6 +3,8 @@
 
 #include "precomp.h"
 
+#include <strsafe.h>
+
 #ifdef _OGG_SUPPORT_
 
 #include "oggparser.h"
@@ -138,10 +140,11 @@ CParserOGG::GetFileInfo(COutputInterface* output)
         vi = ov_info(&vf, -1);
 
         int s = (int)ov_time_total(&vf, -1); // (s) Total time.
-        if (s / 3600)
-            lstrcpy(time, FStr("%02lu:%02lu:%02lu", s / 3600, s / 60 % 60, s % 60));
-        else
-            lstrcpy(time, FStr("%02lu:%02lu", s / 60 % 60, s % 60));
+        const char* formattedTime = s / 3600 ? FStr("%02lu:%02lu:%02lu", s / 3600, s / 60 % 60, s % 60)
+                                             : FStr("%02lu:%02lu", s / 60 % 60, s % 60);
+        // A failed display-label copy must not expose a partial duration.
+        if (FAILED(StringCchCopyA(time, _countof(time), formattedTime)))
+            time[0] = 0;
 
         vc = ov_comment(&vf, -1);
         if (vc)

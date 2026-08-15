@@ -12,6 +12,8 @@
 #include "zip.h"
 #include "pack.h"
 
+#include <strsafe.h>
+
 //
 // ****************************************************************************
 // CFilesWindow
@@ -462,7 +464,10 @@ void CFilesWindow::UnpackZIPArchive(CFilesWindow* target, BOOL deleteOp, const c
                 BOOL isDir = index < Dirs->Count;
                 CFileData* f = isDir ? &Dirs->At(index) : &Files->At(index - Dirs->Count);
                 AlterFileName(path, f->Name, -1, Configuration.FileNameFormat, 0, index < Dirs->Count);
-                lstrcpy(expanded, LoadStr(isDir ? IDS_QUESTION_DIRECTORY : IDS_QUESTION_FILE));
+                // The localized confirmation label has a fixed presentation buffer; do not silently truncate it.
+                if (FAILED(StringCchCopyA(expanded, _countof(expanded),
+                                          LoadStr(isDir ? IDS_QUESTION_DIRECTORY : IDS_QUESTION_FILE))))
+                    expanded[0] = 0;
             }
         }
     }
@@ -501,7 +506,16 @@ void CFilesWindow::UnpackZIPArchive(CFilesWindow* target, BOOL deleteOp, const c
         if (tgtPath != NULL || dlg.Execute() == IDOK)
         {
             if (tgtPath != NULL)
-                lstrcpyn(path, tgtPath, MAX_PATH);
+            {
+                // Noninteractive archive-copy targets must fit the dialog's complete path contract.
+                if (FAILED(StringCchCopyA(path, MAX_PATH, tgtPath)))
+                {
+                    TRACE_E("CFilesWindow::UnpackZIPArchive(): target path is too long.");
+                    delete[] (data.Indexes);
+                    EndStopRefresh();
+                    return;
+                }
+            }
             UpdateWindow(MainWindow->HWindow);
             //---  for disk paths, convert '/' to '\\' and remove duplicate '\\'
             if (!IsPluginFSPath(path) &&
@@ -888,10 +902,11 @@ BOOL _ReadDirectoryTree(HWND parent, char (&path)[MAX_PATH], char* name, CSalama
                     (file.cFileName[1] == 0 || (file.cFileName[1] == '.' && file.cFileName[2] == 0)))
                 continue; // "." a ".."
 
-            static DWORD lastBreakCheck = 0;
-            if (containsDirLinks != NULL && GetTickCount() - lastBreakCheck > 200)
+            // The long recursive walk must keep its cancellation cadence across the legacy 32-bit tick wrap.
+            static CMonotonicTimePoint lastBreakCheck = 0;
+            if (containsDirLinks != NULL && CMonotonicClock::HasElapsed(lastBreakCheck, 200, CMonotonicClock::Now()))
             {
-                lastBreakCheck = GetTickCount();
+                lastBreakCheck = CMonotonicClock::Now();
                 if (UserWantsToCancelSafeWaitWindow())
                 {
                     *containsDirLinks = 2; // after interruption simulate an error to ensure the search immediately ends
@@ -1388,7 +1403,13 @@ void CFilesWindow::Pack(CFilesWindow* target, int pluginIndex, const char* plugi
     data.Dirs = Dirs;
     data.Files = Files;
     data.ArchiveDir = GetArchiveDir();
-    lstrcpyn(data.WorkPath, GetPath(), MAX_PATH);
+    // Packing must enumerate from a complete source path, never a clipped panel identity.
+    if (FAILED(StringCchCopyA(data.WorkPath, _countof(data.WorkPath), GetPath())))
+    {
+        delete[] (data.Indexes);
+        EndStopRefresh(); // the snooper resumes now
+        return;
+    }
     data.EnumLastDir = NULL;
     data.EnumLastIndex = -1;
 
@@ -1711,7 +1732,10 @@ void CFilesWindow::Unpack(CFilesWindow* target, int pluginIndex, const char* plu
             }
         }
         if (unpackMask != NULL)
-            lstrcpyn(mask, unpackMask, MAX_PATH);
+        {
+            // Keep the unpack mask's fixed dialog presentation field explicit.
+            StringCchCopyNA(mask, _countof(mask), unpackMask, _countof(mask) - 1);
+        }
         else
             strcpy(mask, "*.*");
         CTruncatedString str;
@@ -2027,8 +2051,13 @@ void CFilesWindow::AcceptChangeOnPathNotification(const char* path, BOOL includi
         // FS paths in 'path' are automatically excluded because they can never match GetPath())
         char path1[MAX_PATH];
         char path2[MAX_PATH];
-        lstrcpyn(path1, path, MAX_PATH);
-        lstrcpyn(path2, GetPath(), MAX_PATH); // for archives this is the path to the archive
+        // Do not compare truncated notification paths; they can refresh an unrelated panel.
+        if (FAILED(StringCchCopyA(path1, _countof(path1), path)) ||
+            FAILED(StringCchCopyA(path2, _countof(path2), GetPath())))
+        {
+            TRACE_E("CFilesWindow::AcceptChangeOnPathNotification(): path is too long.");
+            return;
+        }
         SalPathRemoveBackslash(path1);
         SalPathRemoveBackslash(path2);
         int len1 = (int)strlen(path1);
@@ -2074,19 +2103,23 @@ void CFilesWindow::AcceptChangeOnPathNotification(const char* path, BOOL includi
 
 void CFilesWindow::IconOverlaysChangedOnPath(const char* path)
 {
-    //  if ((int)(GetTickCount() - NextIconOvrRefreshTime) < 0)
+    //  if (!CMonotonicClock::HasReached(NextIconOvrRefreshTime, CMonotonicClock::Now()))
     //    TRACE_I("CFilesWindow::IconOverlaysChangedOnPath: skipping notification for: " << path);
-    if ((int)(GetTickCount() - NextIconOvrRefreshTime) >= 0 &&             // refresh of icon overlays occurs at NextIconOvrRefreshTime; before that it makes no sense to track changes
+    const CMonotonicTimePoint overlayNow = CMonotonicClock::Now();
+    if (CMonotonicClock::HasReached(NextIconOvrRefreshTime, overlayNow) && // refresh of icon overlays occurs at NextIconOvrRefreshTime; before that it makes no sense to track changes
         !IconOvrRefreshTimerSet && !NeedIconOvrRefreshAfterIconsReading && // icon overlay refresh not scheduled yet
         Configuration.EnableCustomIconOverlays && Is(ptDisk) &&
         (UseSystemIcons || UseThumbnails) && IconCache != NULL &&
         IsTheSamePath(path, GetPath()))
     {
-        DWORD elapsed = GetTickCount() - LastIconOvrRefreshTime;
+        CMonotonicDuration elapsed = CMonotonicClock::Elapsed(LastIconOvrRefreshTime, overlayNow);
         if (elapsed < ICONOVR_REFRESH_PERIOD) // wait before the next icon overlay refresh so we do not refresh too often
         {
             // TRACE_I("CFilesWindow::IconOverlaysChangedOnPath: setting timer for refresh");
-            if (SetTimer(HWindow, IDT_ICONOVRREFRESH, max(200, ICONOVR_REFRESH_PERIOD - elapsed), NULL))
+            DWORD delay = (DWORD)(ICONOVR_REFRESH_PERIOD - elapsed);
+            if (delay < 200)
+                delay = 200;
+            if (SetTimer(HWindow, IDT_ICONOVRREFRESH, delay, NULL))
             {
                 IconOvrRefreshTimerSet = TRUE;
                 return;
@@ -2104,8 +2137,9 @@ void CFilesWindow::IconOverlaysChangedOnPath(const char* path)
             // TRACE_I("CFilesWindow::IconOverlaysChangedOnPath: doing refresh: sleeping icon reader");
             SleepIconCacheThread();
             WaitOneTimeBeforeReadingIcons = 200; // during this time the icon reader waits before starting overlay loading; subsequent notifications from Tortoise SVN within 200 ms can be ignored
-            LastIconOvrRefreshTime = GetTickCount();
-            NextIconOvrRefreshTime = LastIconOvrRefreshTime + WaitOneTimeBeforeReadingIcons;
+            // A single 64-bit sample keeps refresh and post-refresh suppression on the same clock.
+            LastIconOvrRefreshTime = overlayNow;
+            NextIconOvrRefreshTime = overlayNow + WaitOneTimeBeforeReadingIcons;
             WakeupIconCacheThread();
             // TRACE_I("CFilesWindow::IconOverlaysChangedOnPath: doing refresh: icon reader is awake again");
         }

@@ -102,8 +102,14 @@ char* GetType(char* buffer, DWORD id, int level)
     }
     else
     {
-        if (id && GetLocaleInfoA(MAKELCID(MAKELANGID(id, SUBLANG_NEUTRAL), SORT_DEFAULT), LOCALE_SLANGUAGE, langName, 128))
+        WCHAR localeName[LOCALE_NAME_MAX_LENGTH];
+        WCHAR languageName[128];
+        LCID languageLcid = MAKELCID(MAKELANGID(id, SUBLANG_NEUTRAL), SORT_DEFAULT);
+        if (id && LCIDToLocaleName(languageLcid, localeName, _countof(localeName), 0) != 0 &&
+            GetLocaleInfoEx(localeName, LOCALE_SLANGUAGE, languageName, _countof(languageName)) != 0 &&
+            WideCharToMultiByte(CP_ACP, 0, languageName, -1, langName, _countof(langName), NULL, NULL) != 0)
             str = langName;
+        // Resource language IDs remain LCIDs in the PE format, but their display labels use the locale-name API.
     }
     if (str)
     {

@@ -1042,11 +1042,11 @@ INT_PTR CPrintDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
     {
     case WM_INITDIALOG:
     {
-        // add the CLIENTEDGE style to the static control
+        // Pointer-width access avoids narrowing window data on x64 while retaining the preview frame behavior.
         HWND hChild = GetDlgItem(HWindow, IDC_PRINT_PREVIEW);
-        DWORD style = GetWindowLong(hChild, GWL_EXSTYLE);
+        LONG_PTR style = GetWindowLongPtr(hChild, GWL_EXSTYLE);
         style |= WS_EX_CLIENTEDGE;
-        SetWindowLong(hChild, GWL_EXSTYLE, style);
+        SetWindowLongPtr(hChild, GWL_EXSTYLE, style);
         SetWindowPos(hChild, 0, 0, 0, 100, 100, SWP_NOSIZE | SWP_NOMOVE | SWP_NOZORDER | SWP_FRAMECHANGED);
 
         if ((Preview = new CPreviewWnd(HWindow, IDC_PRINT_PREVIEW, this)) == NULL)

@@ -2,6 +2,8 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "precomp.h"
+
+#include "..\\..\\common\\monotonic_time.h"
 #include <zmouse.h>
 #include <shlobj.h>
 
@@ -63,38 +65,38 @@ static PVFS_FTYPE fs_comptypes[] = {
 void GetMyDocumentsPath(LPTSTR initDir)
 {
     initDir[0] = 0;
-    ITEMIDLIST* pidl = NULL;
-    if (SHGetSpecialFolderLocation(NULL, CSIDL_PERSONAL, &pidl) == NOERROR)
+    PWSTR pathW = NULL;
+    // Resolve Documents directly through Known Folders instead of allocating a legacy special-folder PIDL.
+    if (SUCCEEDED(SHGetKnownFolderPath(FOLDERID_Documents, KF_FLAG_DEFAULT, NULL, &pathW)) && pathW != NULL)
     {
-        if (!SHGetPathFromIDList(pidl, initDir))
-            initDir[0] = 0;
-        IMalloc* alloc;
-        if (SUCCEEDED(CoGetMalloc(1, &alloc)))
-        {
-            alloc->Free(pidl);
-            alloc->Release();
-        }
+#ifdef UNICODE
+        wcsncpy_s(initDir, MAX_PATH, pathW, _TRUNCATE);
+#else
+        WideToUtf8Buffer(pathW, initDir, MAX_PATH);
+#endif
+        CoTaskMemFree(pathW);
     }
 }
 
 typedef struct tagProgBarInfo
 {
     CViewerWindow* pViewer;
-    DWORD lastUpdateTicks;
-    DWORD lastCheckTicks;
+    CMonotonicTimePoint lastUpdateTicks;
+    CMonotonicTimePoint lastCheckTicks;
 } sProgBarInfo, *psProgBarInfo;
 
 BOOL WINAPI SaveProgressProcedure(int done, void* data)
 {
-    DWORD ticks = GetTickCount();
+    // The conversion callback can run for an extended save, so its UI throttles use a non-wrapping clock.
+    const CMonotonicTimePoint ticks = CMonotonicClock::Now();
 
-    if ((ticks - ((psProgBarInfo)data)->lastUpdateTicks > 100) || (done > 95))
+    if (CMonotonicClock::HasElapsed(((psProgBarInfo)data)->lastUpdateTicks, 100, ticks) || done > 95)
     {
         // for performance reasons, do it just 3 times a second
         ((psProgBarInfo)data)->pViewer->SetProgress(done);
         ((psProgBarInfo)data)->lastUpdateTicks = ticks;
     }
-    if (ticks - ((psProgBarInfo)data)->lastCheckTicks > 500)
+    if (CMonotonicClock::HasElapsed(((psProgBarInfo)data)->lastCheckTicks, 500, ticks))
     {
         // for performance reasons, do it just twice a second
         MSG msg;
@@ -1028,7 +1030,8 @@ int CRendererWindow::SaveImage(LPCTSTR fileName, DWORD format, SAVEAS_INFO_PTR p
 
     Viewer->InitProgressBar();
     pbi.pViewer = Viewer;
-    pbi.lastCheckTicks = pbi.lastUpdateTicks = GetTickCount();
+    // Initialize both callback throttles from the same 64-bit sample.
+    pbi.lastCheckTicks = pbi.lastUpdateTicks = CMonotonicClock::Now();
 #ifdef _UNICODE
     char fileNameA[_MAX_PATH];
 

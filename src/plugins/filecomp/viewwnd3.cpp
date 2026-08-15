@@ -1182,7 +1182,8 @@ CHexFileViewWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         strcpy(buf, LoadStr(IDS_ACCESFILE2));
         if (lParam != ERROR_SUCCESS)
         {
-            int l = lstrlen(buf);
+            // buf is a terminated local diagnostic buffer before FormatMessage appends the system text.
+            int l = static_cast<int>(strlen(buf));
             FormatMessage(FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS, NULL, DWORD(lParam),
                           MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), buf + l, 1024 - l, NULL);
         }

@@ -555,9 +555,17 @@ void OpenArcFile()
     }
     while (1)
     {
-        ArcFileSize = GetFileSize(ArcFile, NULL);
-        if (ArcFileSize != 0xFFFFFFFF)
+        LARGE_INTEGER fileSize;
+        BOOL gotFileSize = GetFileSizeEx(ArcFile, &fileSize);
+        if (gotFileSize && fileSize.QuadPart >= 0 &&
+            (ULONGLONG)fileSize.QuadPart <= MAXDWORD)
+        {
+            // The ARJ parser stores archive positions as DWORD values, so retain only representable 64-bit sizes.
+            ArcFileSize = (DWORD)fileSize.QuadPart;
             break; // ok   // there used to be a test for 0xFFFFFFF here, which is not -1
+        }
+        if (gotFileSize)
+            SetLastError(ERROR_FILE_TOO_LARGE);
         if (!ErrorProc(AE_ACCESS, EF_RETRY))
         {
             CloseHandle(ArcFile);
@@ -579,9 +587,12 @@ void OpenArcFile()
 void SafeSeek(DWORD position)
 {
     CALL_STACK_MESSAGE2("SafeSeek(0x%X)", position);
+    LARGE_INTEGER seekDistance;
+    seekDistance.QuadPart = position;
     while (1)
     {
-        if (SetFilePointer(ArcFile, position, NULL, FILE_BEGIN) != 0xFFFFFFFF)
+        // The parser retains DWORD positions, but the OS seek itself must report failure unambiguously.
+        if (SetFilePointerEx(ArcFile, seekDistance, NULL, FILE_BEGIN))
             break;
         if (!ErrorProc(AE_ACCESS, EF_RETRY))
             throw 0;
@@ -593,14 +604,6 @@ void __fastcall FillInputBuffer()
 {
     CALL_STACK_MESSAGE1("FillInputBuffer()");
     DWORD toRead = INBUFSIZ;
-    /*DWORD pos;
-  while (1)
-  {
-    pos = SetFilePointer(ArcFile, 0, NULL, FILE_CURRENT);
-    if (pos != 0xFFFFFFFF) break;
-    if (!ErrorProc(AE_ACCESS, EF_RETRY)) throw 0;
-  }
-  */
     if (ArcFilePos == ArcFileSize)
         Error(AE_EOF);
     if (ArcFilePos + toRead > ArcFileSize)

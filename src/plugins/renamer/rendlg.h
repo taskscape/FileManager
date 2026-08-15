@@ -3,6 +3,8 @@
 
 #pragma once
 
+#include "..\\..\\common\\monotonic_time.h"
+
 #define OPERATION_BUFFER 16348 // buffer pro Copy
 
 extern int DialogWidth;
@@ -89,7 +91,8 @@ protected:
     TIndirectArray<CSourceFile> SourceFiles;
     BOOL SourceFilesValid;
     BOOL SourceFilesNeedUpdate;
-    DWORD LastUpdateTime;
+    // The reload loop pumps messages synchronously, so its private refresh timestamp can be wrap-safe.
+    CMonotonicTimePoint LastUpdateTime;
     char Root[MAX_PATH];
     int RootLen;
 

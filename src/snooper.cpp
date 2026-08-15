@@ -12,6 +12,7 @@ CWindowArray WindowArray(10, 5);
 CObjectArray ObjectArray(10, 5);
 
 HANDLE Thread = NULL;
+CThreadOwner* SnooperThreadOwner = NULL; // owns the legacy snooper handle through its final event-driven join
 HANDLE DataUsageMutex = NULL;       // because of arrays with data for thread and process
 HANDLE RefreshFinishedEvent = NULL; // because of "PostMessage", waits for processing
 HANDLE WantDataEvent = NULL;        // main thread wants to access shared data
@@ -31,6 +32,7 @@ CRITICAL_SECTION TimeCounterSection; // for synchronizing access to MyTimeCounte
 int MyTimeCounter = 0;               // current time
 
 HANDLE SafeFindCloseThread = NULL;              // thread "safe handle killer"
+CThreadOwner* SafeFindCloseThreadOwner = NULL; // retains the closer until its provider callback has returned
 TDirectArray<HANDLE> SafeFindCloseCNArr(10, 5); // safe (non-hanging) closing of change-notify handles
 CRITICAL_SECTION SafeFindCloseCS;               // critical section for access to handle array
 BOOL SafeFindCloseTerminate = FALSE;            // for thread termination
@@ -38,6 +40,8 @@ HANDLE SafeFindCloseStart = NULL;               // thread "starter" - if non-sig
 HANDLE SafeFindCloseFinished = NULL;            // signaled -> thread has already closed all handles
 
 DWORD WINAPI ThreadFindCloseChangeNotification(void* param);
+DWORD WINAPI ThreadSnooperOwned(void* param, HANDLE stopEvent);
+DWORD WINAPI ThreadFindCloseChangeNotificationOwned(void* param, HANDLE stopEvent);
 
 void DoWantDataEvent()
 {
@@ -86,15 +90,16 @@ unsigned ThreadSnooperBody(void* /*param*/) // don't call main thread functions 
         ObjectArray.Add(SharesEvent);
 
         BOOL ignoreRefreshes = FALSE;        // TRUE = ignore refreshes (changes in directories), otherwise function normally
-        DWORD ignoreRefreshesAbsTimeout = 0; // when (int)(GetTickCount() - ignoreRefreshesAbsTimeout) >= 0, switch ignoreRefreshes to FALSE
+        // Refresh suppression can span the legacy tick wrap, so retain a monotonic deadline.
+        CMonotonicTimePoint ignoreRefreshesDeadline = 0;
         BOOL notEnd = TRUE;
         while (notEnd)
         {
-            int timeout = ignoreRefreshes ? (int)(ignoreRefreshesAbsTimeout - GetTickCount()) : INFINITE;
-            if (ignoreRefreshes && timeout <= 0)
+            DWORD timeout = ignoreRefreshes ? CMonotonicClock::RemainingWin32TimerDelay(ignoreRefreshesDeadline, CMonotonicClock::Now()) : INFINITE;
+            if (ignoreRefreshes && timeout == 0)
             {
                 ignoreRefreshes = FALSE;
-                ignoreRefreshesAbsTimeout = 0;
+                ignoreRefreshesDeadline = 0;
                 timeout = INFINITE;
             }
             //      TRACE_I("Snooper is waiting for: " << (ignoreRefreshes ? min(4, ObjectArray.Count) : ObjectArray.Count) << " events");
@@ -124,11 +129,11 @@ unsigned ThreadSnooperBody(void* /*param*/) // don't call main thread functions 
                 BOOL suspendNotFinished = TRUE;
                 while (suspendNotFinished) // wait for end of suspend mode
                 {                          // handling everything except changes in directories
-                    timeout = ignoreRefreshes ? (int)(ignoreRefreshesAbsTimeout - GetTickCount()) : INFINITE;
-                    if (ignoreRefreshes && timeout <= 0)
+                    timeout = ignoreRefreshes ? CMonotonicClock::RemainingWin32TimerDelay(ignoreRefreshesDeadline, CMonotonicClock::Now()) : INFINITE;
+                    if (ignoreRefreshes && timeout == 0)
                     {
                         ignoreRefreshes = FALSE;
-                        ignoreRefreshesAbsTimeout = 0;
+                        ignoreRefreshesDeadline = 0;
                         timeout = INFINITE;
                     }
                     res = WaitForMultipleObjects(ignoreRefreshes ? min(4, ObjectArray.Count) : ObjectArray.Count,
@@ -273,7 +278,8 @@ unsigned ThreadSnooperBody(void* /*param*/) // don't call main thread functions 
                 {
                     // take a break so system doesn't get overwhelmed
                     ignoreRefreshes = TRUE;
-                    ignoreRefreshesAbsTimeout = GetTickCount() + REFRESH_PAUSE;
+                    // Preserve the refresh dampening interval through the old 32-bit wrap boundary.
+                    ignoreRefreshesDeadline = CMonotonicClock::DeadlineAfter(REFRESH_PAUSE);
                 }
                 break;
             }
@@ -395,7 +401,8 @@ unsigned ThreadSnooperBody(void* /*param*/) // don't call main thread functions 
 
                 // dame si prestavku, aby se nezahltil system
                 ignoreRefreshes = TRUE;
-                ignoreRefreshesAbsTimeout = GetTickCount() + REFRESH_PAUSE;
+                // The post-refresh pause must use the same monotonic deadline as suspend mode.
+                ignoreRefreshesDeadline = CMonotonicClock::DeadlineAfter(REFRESH_PAUSE);
 
                 break;
             }
@@ -443,6 +450,12 @@ DWORD WINAPI ThreadSnooper(void* param)
     CCallStack stack;
 #endif // CALLSTK_DISABLE
     return ThreadSnooperEH(param);
+}
+
+DWORD WINAPI ThreadSnooperOwned(void* param, HANDLE /*stopEvent*/)
+{
+    // TerminateEvent is the established cancellation protocol; the owner supplies lifetime and joining only.
+    return ThreadSnooper(param);
 }
 
 BOOL InitializeThread()
@@ -512,25 +525,30 @@ BOOL InitializeThread()
     }
 
     HANDLES(InitializeCriticalSection(&TimeCounterSection));
-    //---  start threadu cmuchala
-    DWORD ThreadID;
-    Thread = HANDLES(CreateThread(NULL, 0, ThreadSnooper, NULL, 0, &ThreadID));
-    if (Thread == NULL)
+    // Keep the legacy termination event while moving the raw thread handle to the shared ownership boundary.
+    SnooperThreadOwner = new CThreadOwner;
+    if (SnooperThreadOwner == NULL || !SnooperThreadOwner->Start(ThreadSnooperOwned, NULL, "Snooper"))
     {
+        delete SnooperThreadOwner;
+        SnooperThreadOwner = NULL;
         TRACE_E("Unable to start Snooper thread.");
         return FALSE;
     }
+    Thread = SnooperThreadOwner->GetThreadHandle();
     //  SetThreadPriority(Thread, THREAD_PRIORITY_LOWEST);
     WaitForSingleObject(ContinueEvent, INFINITE); // pockame na zabrani dat cmuchalem
 
     HANDLES(InitializeCriticalSection(&SafeFindCloseCS));
-    //---  start threadu "safe handle killer"
-    SafeFindCloseThread = HANDLES(CreateThread(NULL, 0, ThreadFindCloseChangeNotification, NULL, 0, &ThreadID));
-    if (SafeFindCloseThread == NULL)
+    // The closer retains its event protocol but its handle must stay owned until the callback is finished.
+    SafeFindCloseThreadOwner = new CThreadOwner;
+    if (SafeFindCloseThreadOwner == NULL || !SafeFindCloseThreadOwner->Start(ThreadFindCloseChangeNotificationOwned, NULL, "SafeHandleKiller"))
     {
+        delete SafeFindCloseThreadOwner;
+        SafeFindCloseThreadOwner = NULL;
         TRACE_E("Unable to start safe-handle-killer thread.");
         return FALSE;
     }
+    SafeFindCloseThread = SafeFindCloseThreadOwner->GetThreadHandle();
     // priority must be raised so it runs before the main thread (main thread
     // potrebuje mit zavrene handly okamzite, pri chybe nedochazi k aktivnimu cekani, pohoda)
     SetThreadPriority(SafeFindCloseThread, THREAD_PRIORITY_HIGHEST);
@@ -545,8 +563,10 @@ void TerminateThread()
         SetEvent(TerminateEvent);              // pozadame cmuchala o ukonceni cinnosti
         // Directory notifications can be delayed by a provider, so retain the
         // event and shared counters through cancellation and recovery phases.
-        CThreadShutdownDeadline("directory snooper").WaitForSafeJoin(Thread);
-        HANDLES(CloseHandle(Thread));          // zavreme handle threadu
+        SnooperThreadOwner->StopAndJoin(CThreadShutdownDeadline("directory snooper"));
+        Thread = NULL;
+        delete SnooperThreadOwner;
+        SnooperThreadOwner = NULL;
     }
     if (DataUsageMutex != NULL)
         HANDLES(CloseHandle(DataUsageMutex));
@@ -572,8 +592,10 @@ void TerminateThread()
         SetEvent(SafeFindCloseStart);
         // The closer owns its critical section until its callback returns; a
         // deadline reports a stuck provider but never tears down that state.
-        CThreadShutdownDeadline("safe notification-handle closer").WaitForSafeJoin(SafeFindCloseThread);
-        HANDLES(CloseHandle(SafeFindCloseThread));
+        SafeFindCloseThreadOwner->StopAndJoin(CThreadShutdownDeadline("safe notification-handle closer"));
+        SafeFindCloseThread = NULL;
+        delete SafeFindCloseThreadOwner;
+        SafeFindCloseThreadOwner = NULL;
     }
     if (SafeFindCloseStart != NULL)
         HANDLES(CloseHandle(SafeFindCloseStart));
@@ -699,6 +721,12 @@ DWORD WINAPI ThreadFindCloseChangeNotification(void* param)
     CCallStack stack;
 #endif // CALLSTK_DISABLE
     return ThreadFindCloseChangeNotificationEH(param);
+}
+
+DWORD WINAPI ThreadFindCloseChangeNotificationOwned(void* param, HANDLE /*stopEvent*/)
+{
+    // SafeFindCloseStart and SafeFindCloseTerminate remain the compatibility cancellation contract for this worker.
+    return ThreadFindCloseChangeNotification(param);
 }
 
 void ChangeDirectory(CFilesWindow* win, const char* newPath, BOOL registerDevNotification)

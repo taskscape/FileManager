@@ -7,10 +7,31 @@
 
 #include <objbase.h>
 #include <process.h>
+#include <strsafe.h>
 
-// precomp.h declares this later through consts.h; keep the worker seam usable
-// by focused sources that include it before the application declarations.
-void SetThreadNameInVCAndTrace(const char* name);
+// Keep this header linkable by utility executables that intentionally omit the
+// application's trace subsystem while still exposing a debugger thread name.
+inline void SetThreadOwnerDebuggerName(const char* name)
+{
+    if (name == NULL || *name == 0)
+        return;
+
+    struct CThreadNameInfo
+    {
+        DWORD Type;
+        LPCSTR Name;
+        DWORD ThreadID;
+        DWORD Flags;
+    } info = {0x1000, name, (DWORD)-1, 0};
+
+    __try
+    {
+        RaiseException(0x406D1388, 0, sizeof(info) / sizeof(ULONG_PTR), (ULONG_PTR*)&info);
+    }
+    __except (EXCEPTION_CONTINUE_EXECUTION)
+    {
+    }
+}
 
 // Centralizes the lifetime contract for newly touched CRT-backed workers: the
 // owner retains their handle, stop request, launch data, and completion signal
@@ -134,7 +155,9 @@ public:
         launch->CompletionEvent = CompletionEvent;
         launch->InitializeCOM = initializeCOM;
         launch->CoInit = coInit;
-        lstrcpynA(launch->Name, name != NULL ? name : "OpenSalamanderWorker", sizeof(launch->Name));
+        // This name is debugger metadata only, so retain its bounded launch-record display field.
+        StringCchCopyNA(launch->Name, _countof(launch->Name),
+                        name != NULL ? name : "OpenSalamanderWorker", _countof(launch->Name) - 1);
 
         unsigned threadID = 0;
         Thread = (HANDLE)HANDLES(_beginthreadex(NULL, 0, ThreadMain, launch, 0, &threadID));
@@ -162,6 +185,12 @@ public:
     HANDLE GetCompletionEvent() const
     {
         return CompletionEvent;
+    }
+
+    // Callers may adjust priority or invoke legacy diagnostics while ownership remains with this boundary.
+    HANDLE GetThreadHandle() const
+    {
+        return Thread;
     }
 
     DWORD WaitForCompletion(DWORD timeout) const
@@ -232,7 +261,7 @@ private:
         BOOL comInitialized = FALSE;
 
         if (launch->Name[0] != 0)
-            SetThreadNameInVCAndTrace(launch->Name);
+            SetThreadOwnerDebuggerName(launch->Name);
 
         if (launch->InitializeCOM)
         {

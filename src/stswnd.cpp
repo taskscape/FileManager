@@ -12,10 +12,21 @@
 #include "shellib.h"
 #include "svg.h"
 
+#include <strsafe.h>
+#include <wchar.h>
+
 //
 // ****************************************************************************
 // UTF-8-aware text drawing helper functions
 //
+
+static void CopyStatusToolTipText(char* destination, const char* source)
+{
+    // WM_USER_TTGETTEXT always supplies this capacity; do not expose a truncated status label.
+    if (destination != NULL &&
+        FAILED(StringCchCopyA(destination, TOOLTIP_TEXT_MAX, source != NULL ? source : "")))
+        destination[0] = 0;
+}
 
 static BOOL ExtTextOutUtf8(HDC hdc, int x, int y, UINT options, const RECT* lprc,
                            const char* text, UINT len, const INT* dx)
@@ -25,7 +36,7 @@ static BOOL ExtTextOutUtf8(HDC hdc, int x, int y, UINT options, const RECT* lprc
     CStrP textW(ConvertAllocUtf8ToWide(text, (int)len));
     if (textW == NULL)
         return ExtTextOutW(hdc, x, y, options, lprc, L"?", 1, NULL);
-    int wlen = lstrlenW(textW);
+    int wlen = (int)wcslen(textW);
     return ExtTextOutW(hdc, x, y, options, lprc, textW, wlen, NULL);
 }
 
@@ -38,7 +49,7 @@ static BOOL GetTextExtentPoint32Utf8(HDC hdc, const char* text, int len, SIZE* s
     CStrP textW(ConvertAllocUtf8ToWide(text, len));
     if (textW == NULL)
         return GetTextExtentPoint32(hdc, text, len, size);
-    int wlen = lstrlenW(textW);
+    int wlen = (int)wcslen(textW);
     return GetTextExtentPoint32W(hdc, textW, wlen, size);
 }
 
@@ -53,7 +64,7 @@ static int DrawTextUtf8(HDC hdc, const char* text, int textLen, RECT* lprc, UINT
     CStrP textW(ConvertAllocUtf8ToWide(text, textLen));
     if (textW == NULL)
         return DrawText(hdc, text, textLen, lprc, format);
-    int wlen = lstrlenW(textW);
+    int wlen = (int)wcslen(textW);
     return DrawTextW(hdc, textW, wlen, lprc, format);
 }
 
@@ -80,7 +91,7 @@ static BOOL GetTextExtentExPointUtf8(HDC hdc, const char* text, int textLen, int
         // Fall back to ANSI version if conversion fails
         return GetTextExtentExPoint(hdc, text, textLen, maxWidth, lpnFit, alpDx, lpSize);
     }
-    int wlen = lstrlenW(textW);
+    int wlen = (int)wcslen(textW);
 
     // Handle empty wide string case
     if (wlen == 0)
@@ -537,9 +548,8 @@ void CPanelStatusBar::SetThrobber(BOOL show, int delay, BOOL calledFromDestroyWi
             }
             else
             {
-                DelayedThrobberShowTime = GetTickCount() + delay;
-                if (DelayedThrobberShowTime == 0)
-                    DelayedThrobberShowTime++; // 0 je neplatna hodnota
+                // A 64-bit deadline keeps a delayed indicator correct after the legacy tick wrap.
+                DelayedThrobberShowTime = CMonotonicClock::DeadlineAfter((CMonotonicDuration)delay);
             }
         }
         else
@@ -548,9 +558,7 @@ void CPanelStatusBar::SetThrobber(BOOL show, int delay, BOOL calledFromDestroyWi
             {
                 if (HWindow != NULL && SetTimer(HWindow, IDT_DELAYEDTHROBBER, delay, NULL))
                     DelayedThrobber = TRUE; // not displayed + should be shown with delay + window is visible (if not, only DelayedThrobberShowTime is computed)
-                DelayedThrobberShowTime = GetTickCount() + delay;
-                if (DelayedThrobberShowTime == 0)
-                    DelayedThrobberShowTime++; // 0 je neplatna hodnota
+                DelayedThrobberShowTime = CMonotonicClock::DeadlineAfter((CMonotonicDuration)delay);
             }
         }
     }
@@ -774,7 +782,9 @@ void CPanelStatusBar::GetHotText(char* buffer, int bufSize)
     CALL_STACK_MESSAGE_NONE
     if (HotItem != NULL && Text != NULL)
     {
-        lstrcpyn(buffer, Text + HotItem->Offset, min(HotItem->Chars + 1, bufSize));
+        // Hot-path text keeps the caller-provided plugin callback capacity.
+        if (bufSize > 0)
+            StringCchCopyNA(buffer, bufSize, Text + HotItem->Offset, min(HotItem->Chars, bufSize - 1));
         // u Directory Line s pluginovym FS je jeste potreba umoznit pluginu posledni upravy cesty (pridani ']' u VMS cest u FTP)
         if ((Border & blTop) && FilesWindow->Is(ptPluginFS) && FilesWindow->GetPluginFS()->NotEmpty())
             FilesWindow->GetPluginFS()->CompleteDirectoryLineHotPath(buffer, bufSize);
@@ -1441,7 +1451,9 @@ public:
                 if (data != NULL)
                 {
                     if (data[0] == 'D')
-                        lstrcpyn(path, data + 1, MAX_PATH);
+                        // Clipboard directory paths are later navigated, so reject a partial identity.
+                        if (FAILED(StringCchCopyA(path, MAX_PATH, data + 1)))
+                            path[0] = 0;
                     HANDLES(GlobalUnlock(stgMedium.hGlobal));
                 }
             }
@@ -1470,7 +1482,7 @@ public:
                     if (data->fWide)
                     {
                         const wchar_t* fileW = (wchar_t*)(((char*)data) + data->pFiles);
-                        int l = lstrlenW(fileW);
+                        int l = (int)wcslen(fileW);
                         if (*(fileW + l + 1) == 0)
                         {
                             WideCharToMultiByte(CP_ACP, 0, fileW, l + 1, path, l + 1, NULL, NULL);
@@ -1660,7 +1672,9 @@ public:
                 if (path != NULL)
                 {
                     // zmenim cestu
-                    lstrcpyn(Buffer, path, _countof(Buffer));
+                    // The status-bar path is navigated immediately and must be complete.
+                    if (FAILED(StringCchCopyA(Buffer, _countof(Buffer), path)))
+                        Buffer[0] = 0;
 
                     if (!IsPluginFSPath(Buffer))
                     {
@@ -1777,9 +1791,10 @@ CPanelStatusBar::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 
         if (ShowThrobber)
         {
-            int ti = DelayedThrobberShowTime == 0 /* neplatna hodnota */ ? 0 : DelayedThrobberShowTime - GetTickCount();
-            if (ti < 0)
-                ti = 0;
+            DWORD remainingDelay = DelayedThrobberShowTime == 0 /* neplatna hodnota */
+                                       ? 0
+                                       : CMonotonicClock::RemainingWin32TimerDelay(DelayedThrobberShowTime, CMonotonicClock::Now());
+            int ti = remainingDelay > INT_MAX ? INT_MAX : (int)remainingDelay;
             DelayedThrobberShowTime = 0; // this value is no longer needed; SetThrobber must set it again if necessary, assign an invalid value
             SetThrobber(TRUE, ti);       // mame take zapnout throbber
         }
@@ -1835,7 +1850,7 @@ CPanelStatusBar::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 
         case 2:
         {
-            lstrcpy(text, LoadStr(IDS_PANELFILTER));
+            CopyStatusToolTipText(text, LoadStr(IDS_PANELFILTER));
             break;
         }
 
@@ -1862,37 +1877,37 @@ CPanelStatusBar::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
             if (str == NULL)
                 text[0] = 0;
             else
-                lstrcpy(text, str);
+                CopyStatusToolTipText(text, str);
             break;
         }
 
         case 5:
         {
-            lstrcpy(text, LoadStr(IDS_DIRHISTORY));
+            CopyStatusToolTipText(text, LoadStr(IDS_DIRHISTORY));
             break;
         }
 
         case 6:
         {
-            lstrcpy(text, LoadStr(IDS_FREESPACE));
+            CopyStatusToolTipText(text, LoadStr(IDS_FREESPACE));
             break;
         }
 
         case 7:
         {
-            lstrcpy(text, LoadStr(IDS_ZOOMPANEL));
+            CopyStatusToolTipText(text, LoadStr(IDS_ZOOMPANEL));
             break;
         }
 
         case 8:
         {
-            lstrcpyn(text, ThrobberTooltip != NULL ? ThrobberTooltip : "", TOOLTIP_TEXT_MAX);
+            CopyStatusToolTipText(text, ThrobberTooltip);
             break;
         }
 
         case 9:
         {
-            lstrcpyn(text, SecurityTooltip != NULL ? SecurityTooltip : "", TOOLTIP_TEXT_MAX);
+            CopyStatusToolTipText(text, SecurityTooltip);
             break;
         }
 
@@ -1966,7 +1981,8 @@ CPanelStatusBar::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                     int hotChars = HotTrackItems[index].Chars;
                     if (hotChars + 1 > MAX_PATH)
                         hotChars = MAX_PATH - 1;
-                    lstrcpyn(buffer, Text + HotTrackItems[index].Offset, hotChars + 1);
+                    // Preserve the fixed hot-track presentation limit before plugin decoration.
+                    StringCchCopyNA(buffer, _countof(buffer), Text + HotTrackItems[index].Offset, hotChars);
                     // u Directory Line s pluginovym FS je jeste potreba umoznit pluginu posledni upravy cesty (pridani ']' u VMS cest u FTP)
                     if ((Border & blTop) && FilesWindow->Is(ptPluginFS) && FilesWindow->GetPluginFS()->NotEmpty())
                     {
@@ -2374,7 +2390,7 @@ CPanelStatusBar::CreateDragImage(const char* text, int& dxHotspot, int& dyHotspo
 {
     CALL_STACK_MESSAGE6("CPanelStatusBar::CreateDragImage(%s, %d, %d, %d, %d)",
                         text, dxHotspot, dyHotspot, imgWidth, imgHeight);
-    int textLen = lstrlen(text);
+    int textLen = (int)strlen(text);
     HDC hDC = ItemBitmap.HMemDC;
     HFONT hOldFont = (HFONT)SelectObject(hDC, Font);
     SIZE sz;

@@ -2,11 +2,26 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "precomp.h"
+#include <strsafe.h>
 
 #include "wndtree.h"
 #include "wndtext.h"
 #include "wndprev.h"
 #include "datarh.h"
+
+static void CopyTreeDisplayText(char* destination, size_t destinationCapacity, const char* source)
+{
+    // Tree labels are presentation-only, so keep their clipping explicit and terminated.
+    if (destinationCapacity != 0)
+        StringCchCopyNA(destination, destinationCapacity, source, destinationCapacity - 1);
+}
+
+static void CopyListDisplayText(wchar_t* destination, size_t destinationCapacity, const wchar_t* source)
+{
+    // List-view fields are bounded display buffers; preserve that limit without legacy helpers.
+    if (destinationCapacity != 0)
+        StringCchCopyNW(destination, destinationCapacity, source, destinationCapacity - 1);
+}
 
 void CData::FillTree()
 {
@@ -62,7 +77,7 @@ void CData::FillTree()
             tvis2.item.iSelectedImage = tvis2.item.iImage;
 
             char buff[1000];
-            lstrcpyn(buff, DataRH.GetIdentifier(DlgData[i]->ID), 1000);
+            CopyTreeDisplayText(buff, _countof(buff), DataRH.GetIdentifier(DlgData[i]->ID));
             tvis2.item.pszText = buff;
             tvis2.item.cChildren = 0;
             tvis2.item.lParam = TREE_TYPE_DIALOG | DlgData[i]->ID;
@@ -103,7 +118,7 @@ void CData::FillTree()
             tvis2.item.iSelectedImage = tvis2.item.iImage;
 
             char buff[1000];
-            lstrcpyn(buff, DataRH.GetIdentifier(MenuData[i]->ID), 1000);
+            CopyTreeDisplayText(buff, _countof(buff), DataRH.GetIdentifier(MenuData[i]->ID));
             tvis2.item.pszText = buff;
             tvis2.item.cChildren = 0;
             tvis2.item.lParam = TREE_TYPE_MENU | MenuData[i]->ID;
@@ -214,11 +229,11 @@ void CData::FillTexts(DWORD lParam)
 
                     lvi.mask = LVIF_TEXT;
                     lvi.pszText = buffW;
-                    lstrcpynW(buffW, data->TStrings[i], 9999);
+                    CopyListDisplayText(buffW, _countof(buffW), data->TStrings[i]);
                     lvi.iSubItem = 1;
                     SendMessageW(hListView, LVM_SETITEMW, 0, (LPARAM)&lvi);
 
-                    lstrcpynW(buffW, data->OStrings[i], 9999);
+                    CopyListDisplayText(buffW, _countof(buffW), data->OStrings[i]);
                     lvi.iSubItem = 2;
                     SendMessageW(hListView, LVM_SETITEMW, 0, (LPARAM)&lvi);
                 }
@@ -277,11 +292,11 @@ void CData::FillTexts(DWORD lParam)
                 lvi.mask = LVIF_TEXT;
                 lvi.pszText = buffW;
 
-                lstrcpynW(buffW, control->TWindowName, 9999);
+                CopyListDisplayText(buffW, _countof(buffW), control->TWindowName);
                 lvi.iSubItem = 1;
                 SendMessageW(hListView, LVM_SETITEMW, 0, (LPARAM)&lvi);
 
-                lstrcpynW(buffW, control->OWindowName, 9999);
+                CopyListDisplayText(buffW, _countof(buffW), control->OWindowName);
                 lvi.iSubItem = 2;
                 SendMessageW(hListView, LVM_SETITEMW, 0, (LPARAM)&lvi);
 
@@ -340,18 +355,16 @@ void CData::FillTexts(DWORD lParam)
                 lvi.pszText = buffW;
 
                 // indent nested submenu entries
-                int j = 0;
-                while (j < data->Items[i].Level * 5) // keep five spaces reserved for each indentation level
-                {
-                    buffW[j] = ' ';
-                    j++;
-                }
+                const size_t indent = data->Items[i].Level > 0
+                                          ? min(static_cast<size_t>(data->Items[i].Level), (_countof(buffW) - 1) / 5) * 5
+                                          : 0;
+                wmemset(buffW, L' ', indent); // reserve five display columns per nested menu level
 
-                lstrcpynW(buffW + j, data->Items[i].TString, 9999);
+                CopyListDisplayText(buffW + indent, _countof(buffW) - indent, data->Items[i].TString);
                 lvi.iSubItem = 1;
                 SendMessageW(hListView, LVM_SETITEMW, 0, (LPARAM)&lvi);
 
-                lstrcpynW(buffW + j, data->Items[i].OString, 9999);
+                CopyListDisplayText(buffW + indent, _countof(buffW) - indent, data->Items[i].OString);
                 lvi.iSubItem = 2;
                 SendMessageW(hListView, LVM_SETITEMW, 0, (LPARAM)&lvi);
 

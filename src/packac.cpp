@@ -129,9 +129,19 @@ CPackACDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                 StopSearch = HANDLES(CreateEvent(NULL, TRUE, FALSE, NULL));
                 // and start the searching thread
                 SearchRunning = TRUE;
-                DWORD threadID;
                 if (StopSearch != NULL)
-                    HSearchThread = HANDLES_Q(CreateThread(NULL, 0, PackACDiskSearchThread, this, 0, &threadID));
+                {
+                    // The existing stop event remains the search cancellation contract; the owner retains the thread handle.
+                    SearchThreadOwner = new CThreadOwner;
+                    if (SearchThreadOwner != NULL && SearchThreadOwner->Start(PackACDiskSearchThreadOwned, this, "pack-acquisition search"))
+                        HSearchThread = SearchThreadOwner->GetThreadHandle();
+                    else
+                    {
+                        delete SearchThreadOwner;
+                        SearchThreadOwner = NULL;
+                        HSearchThread = NULL;
+                    }
+                }
                 else
                 {
                     TRACE_E("Unable to create stop searching event, so also cannot create searching thread.");
@@ -230,21 +240,27 @@ CPackACDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
     case WM_USER_ACSEARCHING:
     {
         // the searching thread sent us a new path it is working on, so we trim the trailing slash
-        if (((char*)wParam)[lstrlen((char*)wParam) - 1] == '\\')
-            ((char*)wParam)[lstrlen((char*)wParam) - 1] = '\0';
+        char* statusPath = (char*)wParam;
+        const size_t statusPathLength = strlen(statusPath);
+        // An empty worker status has no trailing byte to trim.
+        if (statusPathLength != 0 && statusPath[statusPathLength - 1] == '\\')
+            statusPath[statusPathLength - 1] = '\0';
         // display it
         SetDlgItemTextUtf8(HWindow, IDC_ACSTATUS, (char*)wParam);
         // and free the memory
-        HANDLES(GlobalFree((HGLOBAL)wParam));
+        // The search worker posts a private process-heap status copy for this window to release.
+        HeapFree(GetProcessHeap(), 0, (void*)wParam);
         return TRUE;
     }
     case WM_USER_ACFINDFINISHED:
     {
         // wait for the searching thread to really finish and clean up
-        if (HSearchThread != NULL)
+        if (SearchThreadOwner != NULL)
         {
-            WaitForSingleObject(HSearchThread, INFINITE);
-            HANDLES(CloseHandle(HSearchThread));
+            // Completion posts only after the search stops touching dialog-owned state.
+            SearchThreadOwner->StopAndJoin(0);
+            delete SearchThreadOwner;
+            SearchThreadOwner = NULL;
             HSearchThread = NULL;
         }
         // release the signaling event
@@ -405,6 +421,14 @@ void CPackACDialog::LayoutControls()
     ListView->SetColumnWidth();
 }
 
+static BOOL SeekFileToBinaryHeaderOffset(HANDLE file, LONGLONG offset)
+{
+    LARGE_INTEGER distance;
+    distance.QuadPart = offset;
+    // Header probes use signed PE offsets, so retain their full range and SetFilePointerEx's unambiguous failure result.
+    return SetFilePointerEx(file, distance, NULL, FILE_BEGIN);
+}
+
 BOOL CPackACDialog::MyGetBinaryType(LPCSTR filename, LPDWORD lpBinaryType)
 {
     CALL_STACK_MESSAGE2("CPackACDialog::MyGetBinaryType(%s, )", filename);
@@ -417,7 +441,7 @@ BOOL CPackACDialog::MyGetBinaryType(LPCSTR filename, LPDWORD lpBinaryType)
         IMAGE_DOS_HEADER mz_header;
         DWORD len;
         // Seek to the start of the file and read the DOS header information.
-        if (SetFilePointer(hfile, 0, NULL, FILE_BEGIN) != -1 &&
+        if (SeekFileToBinaryHeaderOffset(hfile, 0) &&
             ReadFile(hfile, &mz_header, sizeof(mz_header), &len, NULL) &&
             len == sizeof(mz_header))
         {
@@ -435,7 +459,7 @@ BOOL CPackACDialog::MyGetBinaryType(LPCSTR filename, LPDWORD lpBinaryType)
                     if ((mz_header.e_crlc == 0) ||
                         (mz_header.e_lfarlc >= sizeof(IMAGE_DOS_HEADER)))
                         if (mz_header.e_lfanew >= sizeof(IMAGE_DOS_HEADER) &&
-                            SetFilePointer(hfile, mz_header.e_lfanew, NULL, FILE_BEGIN) != -1 &&
+                            SeekFileToBinaryHeaderOffset(hfile, mz_header.e_lfanew) &&
                             ReadFile(hfile, magic, sizeof(magic), &len, NULL) &&
                             len == sizeof(magic))
                             lfanewValid = TRUE;
@@ -461,7 +485,7 @@ BOOL CPackACDialog::MyGetBinaryType(LPCSTR filename, LPDWORD lpBinaryType)
                         // header."  This can mean either a 16-bit OS/2 or a 16-bit Windows or even a DOS program
                         // (running under a DOS extender).  To decide which, we'll have to read the NE header.
                         IMAGE_OS2_HEADER ne;
-                        if (SetFilePointer(hfile, mz_header.e_lfanew, NULL, FILE_BEGIN) != -1 &&
+                        if (SeekFileToBinaryHeaderOffset(hfile, mz_header.e_lfanew) &&
                             ReadFile(hfile, &ne, sizeof(ne), &len, NULL) &&
                             len == sizeof(ne))
                         {
@@ -484,17 +508,18 @@ BOOL CPackACDialog::MyGetBinaryType(LPCSTR filename, LPDWORD lpBinaryType)
                                 LPWORD modtab = NULL;
                                 LPSTR nametab = NULL;
 
+                                // Parsed executable tables are private buffers and do not require HGLOBAL ownership.
                                 // read modref table
-                                if ((SetFilePointer(hfile, mz_header.e_lfanew + ne.ne_modtab, NULL, FILE_BEGIN) == -1) ||
-                                    ((modtab = (LPWORD)HANDLES(GlobalAlloc(GMEM_FIXED, ne.ne_cmod * sizeof(WORD)))) == NULL) ||
+                                if ((!SeekFileToBinaryHeaderOffset(hfile, (LONGLONG)mz_header.e_lfanew + ne.ne_modtab)) ||
+                                    ((modtab = (LPWORD)HeapAlloc(GetProcessHeap(), 0, ne.ne_cmod * sizeof(WORD))) == NULL) ||
                                     (!(ReadFile(hfile, modtab, ne.ne_cmod * sizeof(WORD), &len, NULL))) ||
                                     (len != ne.ne_cmod * sizeof(WORD)))
                                     ret = FALSE;
                                 else
                                 {
                                     // read imported names table
-                                    if ((SetFilePointer(hfile, mz_header.e_lfanew + ne.ne_imptab, NULL, FILE_BEGIN) == -1) ||
-                                        ((nametab = (LPSTR)HANDLES(GlobalAlloc(GMEM_FIXED, ne.ne_enttab - ne.ne_imptab))) == NULL) ||
+                                    if ((!SeekFileToBinaryHeaderOffset(hfile, (LONGLONG)mz_header.e_lfanew + ne.ne_imptab)) ||
+                                        ((nametab = (LPSTR)HeapAlloc(GetProcessHeap(), 0, ne.ne_enttab - ne.ne_imptab)) == NULL) ||
                                         (!(ReadFile(hfile, nametab, ne.ne_enttab - ne.ne_imptab, &len, NULL))) ||
                                         (len != (WORD)(ne.ne_enttab - ne.ne_imptab)))
                                         ret = FALSE;
@@ -515,9 +540,9 @@ BOOL CPackACDialog::MyGetBinaryType(LPCSTR filename, LPDWORD lpBinaryType)
                                     }
                                 }
                                 if (modtab != NULL)
-                                    HANDLES(GlobalFree(modtab));
+                                    HeapFree(GetProcessHeap(), 0, modtab);
                                 if (nametab != NULL)
-                                    HANDLES(GlobalFree(nametab));
+                                    HeapFree(GetProcessHeap(), 0, nametab);
                             }
                             break;
                             }
@@ -571,7 +596,8 @@ BOOL CPackACDialog::DirectorySearch(char* path)
 
     // report to the boss what we are working on
     DWORD pathLen = (DWORD)strlen(path);
-    char* workName = (char*)HANDLES(GlobalAlloc(GMEM_FIXED, pathLen + 1));
+    // Search status and path masks are private buffers, so keep their ownership on the process heap.
+    char* workName = (char*)HeapAlloc(GetProcessHeap(), 0, pathLen + 1);
     if (workName == NULL)
     {
         SendMessage(HWindow, WM_USER_ACERROR, (WPARAM)LoadStr(IDS_PACKERR_NOMEM), NULL);
@@ -582,10 +608,10 @@ BOOL CPackACDialog::DirectorySearch(char* path)
     // send the name; the receiver will free the memory
     if (!PostMessage(HWindow, WM_USER_ACSEARCHING, (WPARAM)workName, 0))
         // if it failed, never mind...
-        HANDLES(GlobalFree((HGLOBAL)workName));
+        HeapFree(GetProcessHeap(), 0, workName);
 
     // allocate the buffer for the search mask
-    char* fileName = (char*)HANDLES(GlobalAlloc(GMEM_FIXED, pathLen + 3 + 1));
+    char* fileName = (char*)HeapAlloc(GetProcessHeap(), 0, pathLen + 3 + 1);
     if (fileName == NULL)
     {
         SendMessage(HWindow, WM_USER_ACERROR, (WPARAM)LoadStr(IDS_PACKERR_NOMEM), NULL);
@@ -647,7 +673,7 @@ BOOL CPackACDialog::DirectorySearch(char* path)
                     pathLen + 1 + nameLen < MAX_PATH)
                 {
                     // create the directory name to search
-                    char* newPath = (char*)HANDLES(GlobalAlloc(GMEM_FIXED, pathLen + 1 + nameLen + 1));
+                    char* newPath = (char*)HeapAlloc(GetProcessHeap(), 0, pathLen + 1 + nameLen + 1);
                     if (newPath == NULL)
                     {
                         SendMessage(HWindow, WM_USER_ACERROR, (WPARAM)LoadStr(IDS_PACKERR_NOMEM), NULL);
@@ -661,7 +687,7 @@ BOOL CPackACDialog::DirectorySearch(char* path)
                         strcat(newPath, "\\");
                         // and search it recursively
                         DirectorySearch(newPath);
-                        HANDLES(GlobalFree((HGLOBAL)newPath));
+                        HeapFree(GetProcessHeap(), 0, newPath);
                     }
                 }
             }
@@ -672,7 +698,7 @@ BOOL CPackACDialog::DirectorySearch(char* path)
         } while (FindNextFileW(fileFind, &findDataW) && !mustStop);
         HANDLES(FindClose(fileFind));
     }
-    HANDLES(GlobalFree((HGLOBAL)fileName));
+    HeapFree(GetProcessHeap(), 0, fileName);
     // and done
     return mustStop;
 }
@@ -735,10 +761,11 @@ CPackACDialog::PackACDiskSearchThreadEH(void* instance)
 #endif // CALLSTK_DISABLE
 }
 
-// wrapper for the wrapper for searching - this time a static function called from CreateThread
+// Owner adapter preserves the search's existing stop event while providing common worker lifetime handling.
 DWORD WINAPI
-CPackACDialog::PackACDiskSearchThread(void* param)
+CPackACDialog::PackACDiskSearchThreadOwned(void* param, HANDLE stopEvent)
 {
+    UNREFERENCED_PARAMETER(stopEvent);
 #ifndef CALLSTK_DISABLE
     CCallStack stack;
 #endif // CALLSTK_DISABLE
@@ -1224,7 +1251,8 @@ int CPackACPacker::CheckAndInsert(const char* path, const char* fileName, FILETI
     }
     // the extension has been checked already; now verify if we are at the end of the string
     // and whether other requirements are met (currently only the type, we will see in the future...)
-    if (*ref == '\0' && act == &fileName[lstrlen(fileName) - 4] &&
+    const size_t fileNameLength = strlen(fileName);
+    if (*ref == '\0' && fileNameLength >= 4 && act == &fileName[fileNameLength - 4] &&
         exeType == Type)
     {
         char* fullName = (char*)malloc(strlen(path) + strlen(fileName) + 1);
@@ -1619,7 +1647,7 @@ char* CPackACFound::GetText(int column)
         if (FileTimeToLocalFileTime(&LastWrite, &ft) &&
             FileTimeToSystemTime(&ft, &st))
         {
-            if (GetDateFormat(LOCALE_USER_DEFAULT, DATE_SHORTDATE, &st, NULL, text, 100) == 0)
+            if (FormatUserDateTimeUtf8(&st, DATE_SHORTDATE, text, _countof(text), TRUE) == 0)
                 sprintf(text, "%u.%u.%u", st.wDay, st.wMonth, st.wYear);
         }
         else
@@ -1634,7 +1662,7 @@ char* CPackACFound::GetText(int column)
         if (FileTimeToLocalFileTime(&LastWrite, &ft) &&
             FileTimeToSystemTime(&ft, &st))
         {
-            if (GetTimeFormat(LOCALE_USER_DEFAULT, 0, &st, NULL, text, 100) == 0)
+            if (FormatUserDateTimeUtf8(&st, 0, text, _countof(text), FALSE) == 0)
                 sprintf(text, "%u:%02u:%02u", st.wHour, st.wMinute, st.wSecond);
         }
         else
@@ -1906,8 +1934,9 @@ void CPackACDrives::Transfer(CTransferInfo& ti)
                 if (*((char*)itemID + pathlen - 1) != '\\')
                     len++;
             }
-            HANDLES(GlobalFree((HGLOBAL)*DrivesList));
-            *DrivesList = (char*)HANDLES(GlobalAlloc(GMEM_FIXED, len + 1));
+            // The dialog owns this editable drive-list buffer for its complete lifetime.
+            HeapFree(GetProcessHeap(), 0, *DrivesList);
+            *DrivesList = (char*)HeapAlloc(GetProcessHeap(), 0, len + 1);
             if (*DrivesList == NULL)
                 TRACE_E(LOW_MEMORY);
             else
@@ -1949,15 +1978,16 @@ void PackAutoconfig(HWND parent)
     BeginStopRefresh();
     // determine the buffer needed for drives to search
     DWORD size = GetLogicalDriveStrings(0, NULL);
-    char* sysDrives = (char*)HANDLES(GlobalAlloc(GMEM_FIXED, size));
-    char* drives = (char*)HANDLES(GlobalAlloc(GMEM_FIXED, size));
+    // These drive lists remain private to the auto-configuration workflow.
+    char* sysDrives = (char*)HeapAlloc(GetProcessHeap(), 0, size);
+    char* drives = (char*)HeapAlloc(GetProcessHeap(), 0, size);
     if (sysDrives == NULL || drives == NULL)
     {
         TRACE_E(LOW_MEMORY);
         if (sysDrives != NULL)
-            HANDLES(GlobalFree((HGLOBAL)sysDrives));
+            HeapFree(GetProcessHeap(), 0, sysDrives);
         if (drives != NULL)
-            HANDLES(GlobalFree((HGLOBAL)drives));
+            HeapFree(GetProcessHeap(), 0, drives);
     }
     else
     {
@@ -1982,11 +2012,11 @@ void PackAutoconfig(HWND parent)
                 srcDrive += strlen(srcDrive) + 1;
             }
             *dstDrive = '\0';
-            HANDLES(GlobalFree((HGLOBAL)sysDrives));
+            HeapFree(GetProcessHeap(), 0, sysDrives);
             // open the search dialog
             CPackACDialog(HLanguage, IDD_AUTOCONF, IDD_AUTOCONF, parent, &ArchiverConfig, &drives).Execute();
         }
-        HANDLES(GlobalFree((HGLOBAL)drives));
+        HeapFree(GetProcessHeap(), 0, drives);
     }
     // dialog closed, the main window resumes refreshing
     EndStopRefresh();

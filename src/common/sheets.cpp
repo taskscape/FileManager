@@ -5,6 +5,7 @@
 
 #include <windows.h>
 #include <crtdbg.h>
+#include <strsafe.h>
 #include <tchar.h>
 #include <ostream>
 #include <uxtheme.h>
@@ -1179,7 +1180,10 @@ WORD* CTreePropDialog::lpdwAlign(WORD* lpIn)
 int WinLibCopyText(WCHAR* buf, const TCHAR* text, int bufLen)
 {
 #ifdef UNICODE
-    lstrcpyn(buf, text, bufLen);
+    // This conversion helper intentionally returns the clipped display length.
+    if (buf == NULL || text == NULL || bufLen <= 0)
+        return 0;
+    StringCchCopyNW(buf, static_cast<size_t>(bufLen), text, static_cast<size_t>(bufLen) - 1);
     return (int)wcslen(buf) + 1;
 #else  // UNICODE
     return MultiByteToWideChar(CP_ACP, 0, text, -1, buf, bufLen);
@@ -1288,7 +1292,8 @@ int CTreePropDialog::Execute(const TCHAR* buttonOK,
                 if (len > 1)
                 {
 #ifdef UNICODE
-                    lstrcpyn(At(i)->Title, dlgTitle, len);
+                    // The title allocation was measured above, so retain the complete dialog title.
+                    StringCchCopyW(At(i)->Title, static_cast<size_t>(len), dlgTitle);
 #else  // UNICODE
                     WideCharToMultiByte(CP_ACP, 0, dlgTitle, -1, At(i)->Title, len, NULL, NULL);
 #endif // UNICODE
@@ -1313,14 +1318,14 @@ int CTreePropDialog::Execute(const TCHAR* buttonOK,
         // build dialog template: DLG or DLGEX, according to page format, must be the same,
         // otherwise controls are clipped and fonts differ between pages and rest of tree property dialog
 
-        HGLOBAL hgbl;
-
+        LPWORD templateBuffer;
         LPWORD lpw;
         LPWSTR lpwsz;
-        hgbl = GlobalAlloc(GMEM_ZEROINIT, 1024);
-        if (!hgbl)
+        // CreateDialogIndirectParam consumes this private template synchronously, so it does not require an HGLOBAL.
+        templateBuffer = (LPWORD)HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, 1024);
+        if (!templateBuffer)
             return -1;
-        lpw = (LPWORD)GlobalLock(hgbl); // Define a dialog box.
+        lpw = templateBuffer;
         *lpw++ = 1;
         *lpw++ = 0xffff;  // DLGEX
         *(DWORD*)lpw = 0; // helpID
@@ -1384,9 +1389,10 @@ int CTreePropDialog::Execute(const TCHAR* buttonOK,
                   0, 0, 0, 0,
                   WS_CHILD | WS_VISIBLE | WS_CLIPSIBLINGS | WS_CLIPCHILDREN | SBS_SIZEBOX | SBS_SIZEBOXBOTTOMRIGHTALIGN, 0, _T(""));
 
-        GlobalUnlock(hgbl);
-
-        return Dialog.ExecuteIndirect((LPDLGTEMPLATE)hgbl);
+        int result = Dialog.ExecuteIndirect((LPDLGTEMPLATE)templateBuffer);
+        // The modal dialog is closed, so the private template buffer can no longer be referenced.
+        HeapFree(GetProcessHeap(), 0, templateBuffer);
+        return result;
     }
     else
     {

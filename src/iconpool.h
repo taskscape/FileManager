@@ -71,11 +71,14 @@ struct CIconQueueMetrics
 // copy ResultIcon if it needs to retain it because the queue owns and destroys it.
 typedef void (*IconPoolResultCallback)(CIconWorkItem* item, void* context);
 
+class CThreadOwner;
+
 class CIconThreadPool
 {
 protected:
-    // Worker threads
-    HANDLE Workers[ICON_POOL_MAX_WORKERS];
+    // Each owner retains its worker handle until the pool has stopped using
+    // the queue and synchronization objects that the callback can reference.
+    CThreadOwner* Workers[ICON_POOL_MAX_WORKERS];
     int WorkerCount;
     
     // Fixed work slots bound memory while workers keep their selected slot stable.
@@ -160,7 +163,7 @@ public:
 
 protected:
     // Worker thread function
-    static DWORD WINAPI WorkerThreadProc(LPVOID param);
+    static DWORD WINAPI WorkerThreadProc(void* param, HANDLE stopEvent);
     
     // Process a single work item
     void ProcessWorkItem(CIconWorkItem* item);

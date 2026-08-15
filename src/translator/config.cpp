@@ -3,6 +3,8 @@
 
 #include "precomp.h"
 
+#include <strsafe.h>
+
 #include "wndframe.h"
 #include "config.h"
 #include "translator.h"
@@ -739,28 +741,34 @@ BOOL CConfiguration::Load()
 
 void CConfiguration::AddRecentProject(const char* fileName)
 {
+    size_t fileNameLength;
+    // Recent-project entries are reopened later, so never retain a clipped path identity.
+    if (FAILED(StringCchLengthA(fileName, MAX_PATH, &fileNameLength)))
+        return;
+
     int index = FindRecentProject(fileName);
     if (index != -1)
     {
         if (index == 0)
             return;
         for (int i = index; i > 0; i--)
-            lstrcpy(RecentProjects[i], RecentProjects[i - 1]);
+            StringCchCopyA(RecentProjects[i], _countof(RecentProjects[i]), RecentProjects[i - 1]);
     }
     else
     {
         for (int i = RECENT_PROJECTS_COUNT - 1; i > 0; i--)
-            lstrcpy(RecentProjects[i], RecentProjects[i - 1]);
+            StringCchCopyA(RecentProjects[i], _countof(RecentProjects[i]), RecentProjects[i - 1]);
     }
-    lstrcpy(RecentProjects[0], fileName);
+    StringCchCopyA(RecentProjects[0], _countof(RecentProjects[0]), fileName);
 }
 
 void CConfiguration::RemoveRecentProject(int index)
 {
     if (index >= 0 && index < RECENT_PROJECTS_COUNT)
     {
-        for (int i = index; i < RECENT_PROJECTS_COUNT; i++)
-            lstrcpy(RecentProjects[i], RecentProjects[i + 1]);
+        // Stop at the penultimate slot; the final slot has no successor to copy.
+        for (int i = index; i < RECENT_PROJECTS_COUNT - 1; i++)
+            StringCchCopyA(RecentProjects[i], _countof(RecentProjects[i]), RecentProjects[i + 1]);
         RecentProjects[RECENT_PROJECTS_COUNT - 1][0] = 0;
     }
 }

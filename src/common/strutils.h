@@ -4,6 +4,7 @@
 #pragma once
 
 #include "wide_path.h"
+#include <shlobj.h>
 #include <stdarg.h>
 
 // Result for bounded string operations. Callers must handle truncation and
@@ -28,6 +29,10 @@ EBoundedStringResult FormatStringChecked(char* destination, size_t destinationCa
 // distinguishes a destination that is too small from malformed UTF-16.
 EBoundedStringResult ConvertWideToUtf8Checked(const WCHAR* source, char* destination,
                                                size_t destinationCapacity);
+
+// Resolves a Known Folder through the UTF-16 shell API and converts its result
+// into the ANSI buffer used by the legacy application boundary.
+BOOL GetKnownFolderPathToAnsi(REFKNOWNFOLDERID folderId, char* destination, int destinationCapacity);
 
 // SAFE_ALLOC macro removes code that tests if memory allocation succeeded (see allochan.*)
 

@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "precomp.h"
+#include <strsafe.h>
 
 #include "cfgdlg.h"
 #include "dialogs.h"
@@ -708,7 +709,8 @@ BOOL ReadDirectoryIconAndTypeAux(CIconList* iconList, int index, CIconSizeEnum i
         }
         if (SHGetFileInfo(systemDir, 0, &shi, sizeof(shi), SHGFI_TYPENAME) != 0)
         {
-            lstrcpyn(FolderTypeName, shi.szTypeName, sizeof(FolderTypeName));
+            // Folder type is a fixed presentation label, so keep its intentional bounded form.
+            StringCchCopyNA(FolderTypeName, _countof(FolderTypeName), shi.szTypeName, _countof(FolderTypeName) - 1);
             FolderTypeNameLen = (int)strlen(FolderTypeName);
         }
         return TRUE;
@@ -731,7 +733,11 @@ BOOL GetIconFromAssocAux(BOOL initFlagAndIndexes, HKEY root, const char* keyName
     }
     iconLocation[0] = 0;
     char keyNameBuf[MAX_PATH];
-    lstrcpyn(keyNameBuf, keyName, min(size, MAX_PATH));
+    // Association suffix probes must start from a complete counted registry key.
+    if (keyName == NULL || size <= 0 || size > MAX_PATH)
+        return FALSE;
+    memcpy(keyNameBuf, keyName, static_cast<size_t>(size));
+    keyNameBuf[size - 1] = 0;
     HKEY openKey;
 
     if (type != NULL)

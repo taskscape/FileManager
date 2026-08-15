@@ -65,6 +65,8 @@ jobs:
           # The self-hosted runner account is dedicated to this lane, which makes profile-mutating UI tests safe.
           $env:FILEMANAGER_UI_ISOLATED = '1'
           $env:FILEMANAGER_UI_EXE = $executable.FullName
+          # Nightly has the time budget for the longer lifecycle resource-growth sample.
+          $env:FILEMANAGER_UI_LEAK_CYCLES = '100'
           .\tools\run-lock-verifier-stress.ps1 -ExecutablePath $executable.FullName `
             -TestProject '.\tests\FileManager.UiTests\FileManager.UiTests.csproj' -AppVerifierPath $appVerifierPath `
             -LogOutputDirectory '.\application-verifier-logs' -VerifierProfile Full -TestFilter 'TestCategory=UI'

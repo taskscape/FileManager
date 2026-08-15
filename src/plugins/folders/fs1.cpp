@@ -3,6 +3,8 @@
 
 #include "precomp.h"
 
+#include <strsafe.h>
+
 #include "dialogs.h"
 #include "folders.h"
 
@@ -402,8 +404,10 @@ CPluginDataInterface::SetupView(BOOL leftPanel, CSalamanderViewAbstract* view, c
             }
             else
             {
-                lstrcpyn(column.Name, shellCol->Name, SAL_ARRAYSIZE(column.Name));
-                lstrcpyn(column.Description, "", SAL_ARRAYSIZE(column.Description));
+                // Never register a Shell column under a truncated fixed SDK name.
+                if (FAILED(StringCchCopyA(column.Name, SAL_ARRAYSIZE(column.Name), shellCol->Name)))
+                    continue;
+                column.Description[0] = 0;
                 column.GetText = GetRowText;
                 column.SupportSorting = 0;
                 column.LeftAlignment = (shellCol->Fmt == LVCFMT_LEFT) ? 1 : 0;

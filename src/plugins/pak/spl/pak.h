@@ -173,6 +173,7 @@ public:
     virtual BOOL DelNotify(const char* fileName, unsigned fileProgressTotal);
 
     BOOL SafeSeek(DWORD position);
+    BOOL SafeSeek64(const LARGE_INTEGER& position);
 };
 
 extern HINSTANCE DLLInstance; // handle to the SPL - language-independent resources

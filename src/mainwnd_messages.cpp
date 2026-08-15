@@ -4,7 +4,9 @@
 
 #include "precomp.h"
 
+#include <shobjidl.h>
 #include <shlwapi.h>
+#include <strsafe.h>
 #undef PathIsPrefix // otherwise conflicts with CSalamanderGeneral::PathIsPrefix
 
 #include "stswnd.h"
@@ -252,7 +254,12 @@ void CMainWindow::PostChangeOnPathNotification(const char* path, BOOL includingS
 
     // add this notification to the array (for later processing)
     CChangeNotifData data;
-    lstrcpyn(data.Path, path, MAX_PATH);
+    // Do not queue a truncated path that could refresh an unrelated panel later.
+    if (FAILED(StringCchCopyA(data.Path, _countof(data.Path), path)))
+    {
+        HANDLES(LeaveCriticalSection(&DispachChangeNotifCS));
+        return;
+    }
     data.IncludingSubdirs = includingSubdirs;
     ChangeNotifArray.Add(data);
     if (!ChangeNotifArray.IsGood())
@@ -517,7 +524,9 @@ void CMainWindow::ApplyCommandLineParams(const CCommandLineParams* cmdLineParams
     if (cmdLineParams->SetTitlePrefix)
     {
         Configuration.UseTitleBarPrefixForced = TRUE;
-        lstrcpyn(Configuration.TitleBarPrefixForced, cmdLineParams->TitlePrefix, TITLE_PREFIX_MAX);
+        // The forced prefix is a compact title-bar display field with deliberate clipping.
+        StringCchCopyNA(Configuration.TitleBarPrefixForced, _countof(Configuration.TitleBarPrefixForced),
+                        cmdLineParams->TitlePrefix, _countof(Configuration.TitleBarPrefixForced) - 1);
         SetWindowTitle();
     }
 }
@@ -531,9 +540,10 @@ BOOL CMainWindow::SHChangeNotifyInitialize()
     }
 
     LPITEMIDLIST pidl;
-    if (!SUCCEEDED(SHGetSpecialFolderLocation(HWindow, CSIDL_DESKTOP, &pidl)))
+    // Shell change registration still consumes a PIDL; obtain it from the Known Folder contract rather than a CSIDL.
+    if (!SUCCEEDED(SHGetKnownFolderIDList(FOLDERID_Desktop, KF_FLAG_DEFAULT, NULL, &pidl)))
     {
-        TRACE_E("SHGetSpecialFolderLocation failed on CSIDL_DESKTOP");
+        TRACE_E("SHGetKnownFolderIDList failed on FOLDERID_Desktop");
         return FALSE;
     }
 
@@ -555,13 +565,7 @@ BOOL CMainWindow::SHChangeNotifyInitialize()
                                                       WM_USER_SHCHANGENOTIFY,
                                                       1, &entry);
 
-    // dealokace pidl
-    IMalloc* alloc;
-    if (SUCCEEDED(CoGetMalloc(1, &alloc)))
-    {
-        alloc->Free(pidl);
-        alloc->Release();
-    }
+    CoTaskMemFree(pidl);
 
     return TRUE;
 }
@@ -1065,8 +1069,19 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
             case SHCNE_DRIVEADDGUI:
             case SHCNE_EXTENDED_EVENT:
             {
-                if (!SHGetPathFromIDList(ppidl[0], szPath))
+                IShellItem* item = NULL;
+                PWSTR pathW = NULL;
+                // Resolve the notification PIDL through IShellItem so Shell-owned path storage is never fixed at MAX_PATH.
+                if (FAILED(SHCreateItemFromIDList(ppidl[0], IID_PPV_ARGS(&item))) ||
+                    FAILED(item->GetDisplayName(SIGDN_FILESYSPATH, &pathW)) ||
+                    ConvertWideToUtf8(pathW, -1, szPath, _countof(szPath)) == 0)
+                {
                     szPath[0] = 0;
+                }
+                if (pathW != NULL)
+                    CoTaskMemFree(pathW);
+                if (item != NULL)
+                    item->Release();
                 break;
             }
             }
@@ -2981,7 +2996,12 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
                         if (SalShExtSharedMemView->PasteDone) // copy hook supplied the target path for Paste and other data
                         {
                             //                TRACE_I("WM_USER_SALSHEXT_PASTE: copy hook returned: paste done!");
-                            lstrcpyn(tgtPath, SalShExtSharedMemView->TargetPath, MAX_PATH);
+                            // Shared-memory paste targets must remain complete before dispatching an operation.
+                            if (FAILED(StringCchCopyA(tgtPath, _countof(tgtPath), SalShExtSharedMemView->TargetPath)))
+                            {
+                                TRACE_E("WM_USER_SALSHEXT_PASTE: target path is too long.");
+                                break;
+                            }
                             operation = SalShExtSharedMemView->Operation;
                             dataID = SalShExtSharedMemView->PastedDataID;
                             tmpPasteDone = TRUE;

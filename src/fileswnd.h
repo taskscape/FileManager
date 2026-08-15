@@ -4,6 +4,9 @@
 
 #pragma once
 
+// The icon-reader refresh throttle must remain valid across the old 32-bit tick wrap.
+#include "common/monotonic_time.h"
+
 #define NUM_OF_CHECKTHREADS 30                   // maximum number of threads for "non-blocking" path accessibility tests
 #define ICONOVR_REFRESH_PERIOD 2000              // minimum interval between icon-overlay refreshes in the panel (see IconOverlaysChangedOnPath)
 #define MIN_DELAY_BETWEENINACTIVEREFRESHES 2000  // minimum refresh interval when the main window is inactive
@@ -733,8 +736,10 @@ public:
     BOOL InactWinOptimizedReading;        // TRUE = only icons/thumbnails/overlays from the visible part of the panel are being read (used when the main window is inactive and a refresh is triggered – we try to minimize system load as we're "in the background")
     DWORD WaitBeforeReadingIcons;         // how many milliseconds to wait before the icon reader starts reading icons (used on refresh; while waiting old icons can be pushed into the cache to avoid repeated reading and endless refreshes on network drives)
     DWORD WaitOneTimeBeforeReadingIcons;  // how many milliseconds to wait before starting to read icons, then this value resets (used to catch batches of changes from Tortoise SVN, see IconOverlaysChangedOnPath())
-    DWORD EndOfIconReadingTime;           // GetTickCount() from the moment all icons were loaded in the panel
-    HANDLE IconCacheThread;               // handle of the icon - reading the thread
+    CMonotonicTimePoint EndOfIconReadingTime; // monotonic time when all panel icons were loaded
+    // The owner keeps the reader alive until its shell callbacks no longer
+    // reference panel listing and image-list state during destruction.
+    class CThreadOwner* IconCacheThreadOwner;
     HANDLE ICEventTerminate;              // signaled -> terminate the thread
     HANDLE ICEventWork;                   // signaled -> start reading icons
     BOOL ICSleep;                         // TRUE -> leave the icon-reading loop
@@ -810,8 +815,8 @@ public:
 
     BOOL InactiveRefreshTimerSet;   // TRUE when the timer for sending WM_USER_INACTREFRESH_DIR is running
     LPARAM InactRefreshLParam;      // lParam for sending WM_USER_INACTREFRESH_DIR
-    DWORD LastInactiveRefreshStart; // info about the last snooper-initiated refresh in an inactive window: when did it start + matching the line below...
-    DWORD LastInactiveRefreshEnd;   // info about the last snooper-initiated refresh in an inactive window: when did it finish + equality with LastInactiveRefreshStart means that no such refresh has occurred since the last deactivation
+    CMonotonicTimePoint LastInactiveRefreshStart; // 64-bit start of the latest inactive-window snooper refresh
+    CMonotonicTimePoint LastInactiveRefreshEnd;   // matching end; equality means no completed refresh since deactivation
 
     BOOL NeedRefreshAfterIconsReading; // is a refresh needed after icon reading finishes?
     int RefreshAfterIconsReadingTime;  // "time" of the latest refresh that arrived while icons were being read
@@ -843,8 +848,8 @@ public:
     int SingleClickAnchorIndex;   // cursor position in SingleClick mode where the user pressed the left button
     POINT OldSingleClickMousePos; // old cursor position
 
-    POINT LButtonDown;     // used when "tearing" files or directories for dragging
-    DWORD LButtonDownTime; // used for "timed tearing" (minimum time between down and up)
+    POINT LButtonDown;                    // used when "tearing" files or directories for dragging
+    CMonotonicTimePoint LButtonDownTime; // used for the wrap-safe minimum drag delay
 
     BOOL TrackingSingleClick; // are we "highlighting" the item under the cursor?
     BOOL DragBoxVisible;      // selection box is visible
@@ -892,9 +897,9 @@ public:
     int NumberOfItemsInCurDir; // only for ptDisk: number of items returned by FindFirstFile+FindNextFile for the current path (used to detect changes on network and unmonitored paths when dropping to the panel via Explorer)
 
     BOOL NeedIconOvrRefreshAfterIconsReading; // is icon overlay refresh required after icon loading finishes?
-    DWORD LastIconOvrRefreshTime;             // GetTickCount() of the last icon-overlay refresh (see IconOverlaysChangedOnPath())
+    CMonotonicTimePoint LastIconOvrRefreshTime; // 64-bit timestamp of the last icon-overlay refresh
     BOOL IconOvrRefreshTimerSet;              // TRUE if the timer for icon-overlay refresh is running (see IconOverlaysChangedOnPath())
-    DWORD NextIconOvrRefreshTime;             // time when tracking icon-overlay changes makes sense again for this panel (see IconOverlaysChangedOnPath())
+    CMonotonicTimePoint NextIconOvrRefreshTime; // 64-bit time when tracking icon-overlay changes resumes
 
 public:
     CFilesWindow(CMainWindow* parent);
@@ -1297,7 +1302,7 @@ public:
     void RenameFileInternal(CFileData* f, const char* formatedFileName, BOOL* mayChange, BOOL* tryAgain);
     void DropCopyMove(BOOL copy, char* targetPath, CCopyMoveData* data);
 
-    // performs deletion using the SHFileOperation API function (only when deleting to the Recycle Bin)
+    // Performs Recycle Bin deletion through IFileOperation so the Shell owns confirmation and undo behavior.
     BOOL DeleteThroughRecycleBin(int* selection, int selCount, CFileData* oneFile);
 
     BOOL BuildScriptMain(COperations* script, CActionType type, char* targetPath,

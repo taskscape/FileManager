@@ -11,6 +11,11 @@
 
 #include "precomp.h"
 
+#include <strsafe.h>
+
+// The wait-window throttle must remain correct for sessions longer than a DWORD tick-count cycle.
+#include "../../common/monotonic_time.h"
+
 // shared interface for archiver plugin data
 CArcPluginDataInterface ArcPluginDataInterface;
 
@@ -58,8 +63,10 @@ CArcPluginDataInterface::SetupView(BOOL leftPanel, CSalamanderViewAbstract* view
             }
 
         CColumn column;
-        lstrcpy(column.Name, "Size2");
-        lstrcpy(column.Description, "Size v jinem provedeni");
+        // Sample column metadata must fit the SDK's fixed fields before the column is registered.
+        if (FAILED(StringCchCopyA(column.Name, _countof(column.Name), "Size2")) ||
+            FAILED(StringCchCopyA(column.Description, _countof(column.Description), "Size v jinem provedeni")))
+            return;
         column.GetText = GetSzText;
         column.SupportSorting = 1;
         column.LeftAlignment = 0;
@@ -675,17 +682,12 @@ CPluginInterfaceForArchiver::CanCloseArchive(CSalamanderForOperationsAbstract* s
 void GetMyDocumentsPath(char* path)
 {
     path[0] = 0;
-    ITEMIDLIST* pidl = NULL;
-    if (SHGetSpecialFolderLocation(NULL, CSIDL_PERSONAL, &pidl) == NOERROR)
+    PWSTR pathW = NULL;
+    // Obtain Documents through Known Folders so this sample plug-in does not convert a legacy PIDL to a path.
+    if (SUCCEEDED(SHGetKnownFolderPath(FOLDERID_Documents, KF_FLAG_DEFAULT, NULL, &pathW)) && pathW != NULL)
     {
-        if (!SHGetPathFromIDList(pidl, path))
-            path[0] = 0;
-        IMalloc* alloc;
-        if (SUCCEEDED(CoGetMalloc(1, &alloc)))
-        {
-            alloc->Free(pidl);
-            alloc->Release();
-        }
+        WideToUtf8Buffer(pathW, path, MAX_PATH);
+        CoTaskMemFree(pathW);
     }
 }
 
@@ -814,15 +816,15 @@ CPluginInterfaceForArchiver::DeleteTmpCopy(const char* fileName, BOOL firstFile)
         return;
 
     // demonstration of using the wait window
-    static DWORD ti = 0; // time when deletion of the first file in the batch started (when deleting multiple files at once)
+    static CMonotonicTimePoint ti = 0; // time when deletion of the first file in the batch started (when deleting multiple files at once)
     DWORD showTime = 1000;
     if (firstFile)
-        ti = GetTickCount(); // ensure that the wait window shows up after one second across the entire deletion batch
+        ti = CMonotonicClock::Now(); // ensure that the wait window shows up after one second across the entire deletion batch
     else
     {
-        DWORD work = GetTickCount() - ti; // how long the deletion has been running (since the first file in the batch)
+        const CMonotonicDuration work = CMonotonicClock::Elapsed(ti, CMonotonicClock::Now()); // how long the deletion has been running (since the first file in the batch)
         if (work < 1000)
-            showTime -= work;
+            showTime -= (DWORD)work;
         else
             showTime = 0;
     }

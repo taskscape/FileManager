@@ -6,6 +6,7 @@
 #include <windows.h>
 #include <crtdbg.h>
 #include <tchar.h>
+#include <strsafe.h>
 
 #if defined(__TRACESERVER) || defined(TRACE_ENABLE)
 
@@ -66,6 +67,7 @@ const TCHAR* __CONNECT_DATA_ACCEPTED_EVENT_NAME = _T("TraceServerConnectDataAcce
 #pragma warning(3 : 4706) // warning C4706: assignment within conditional expression
 
 #include "trace.h"
+#include "thread_owner.h"
 
 #ifdef MULTITHREADED_TRACE_ENABLE
 
@@ -89,8 +91,9 @@ C__TraceThreadCache::C__TraceThreadCache()
 {
     UniqueThreadID = 0;
     Available = Count = 0;
-    Data = (C__TraceCacheData*)GlobalAlloc(GMEM_FIXED, __TRACE_CACHE_DELTA *
-                                                           sizeof(C__TraceCacheData));
+    // The per-thread cache is private trace state, so it uses the process heap.
+    Data = (C__TraceCacheData*)HeapAlloc(GetProcessHeap(), 0, __TRACE_CACHE_DELTA *
+                                                                sizeof(C__TraceCacheData));
     if (Data != NULL)
         Available = __TRACE_CACHE_DELTA;
 
@@ -104,7 +107,7 @@ C__TraceThreadCache::~C__TraceThreadCache()
     {
         for (int i = 0; i < Count; i++)
             CloseHandle(Data[i].Handle);
-        GlobalFree((HGLOBAL)Data);
+        HeapFree(GetProcessHeap(), 0, Data);
         Data = NULL;
         Count = 0;
         Available = 0;
@@ -115,10 +118,9 @@ BOOL C__TraceThreadCache::EnlargeArray()
 {
     if (Data == NULL)
         return FALSE;
-    C__TraceCacheData* New = (C__TraceCacheData*)GlobalReAlloc((HGLOBAL)Data,
-                                                               (Available + __TRACE_CACHE_DELTA) *
-                                                                   sizeof(C__TraceCacheData),
-                                                               GMEM_MOVEABLE);
+    C__TraceCacheData* New = (C__TraceCacheData*)HeapReAlloc(GetProcessHeap(), 0, Data,
+                                                             (Available + __TRACE_CACHE_DELTA) *
+                                                                 sizeof(C__TraceCacheData));
     if (New == NULL)
         return FALSE;
     else
@@ -443,10 +445,12 @@ BOOL C__Trace::Connect(BOOL onUserRequest)
             WCHAR* s = tmpDir + wcslen(tmpDir);
             if (s > tmpDir && *(s - 1) != L'\\')
                 *s++ = L'\\';
-            lstrcpynW(s, L"taskscape_traces", int(end - s));
-            s += wcslen(s);
+            // Do not fall back to a shortened trace-directory name when the temp path is unexpectedly long.
+            BOOL traceDirAppended = SUCCEEDED(StringCchCopyW(s, end - s, L"taskscape_traces"));
+            if (traceDirAppended)
+                s += wcslen(s);
 
-            if ((s - tmpDir) + 15 < MAX_PATH) // enough space to append "_2000000000.log"
+            if (traceDirAppended && (s - tmpDir) + 15 < MAX_PATH) // enough space to append "_2000000000.log"
             {
                 int num = 1;
                 while (1)
@@ -456,7 +460,9 @@ BOOL C__Trace::Connect(BOOL onUserRequest)
                     if (HTraceFile != INVALID_HANDLE_VALUE)
                     {
 #ifdef __TRACESERVER
-                        lstrcpynW(TraceFileName, tmpDir, _countof(TraceFileName));
+                        // Keep the trace-server's published file name complete.
+                        if (FAILED(StringCchCopyW(TraceFileName, _countof(TraceFileName), tmpDir)))
+                            TraceFileName[0] = 0;
 #endif // __TRACESERVER
                         break;
                     }
@@ -899,10 +905,22 @@ DWORD WINAPI __TraceMsgBoxThread(void* param)
                            "Application will be crashed by \"access violation\" exception after "
                            "clicking OK. Please send us bug report to help us fix this problem. "
                            "If you want to copy this message to clipboard, use Ctrl+C key.";
-    lstrcpynA(msg + (int)strlen(msg), data->Msg, _countof(msg) - (int)strlen(msg) - (int)strlen(appendix));
-    lstrcpynA(msg + (int)strlen(msg), appendix, _countof(msg) - (int)strlen(msg));
+    // Reserve the fixed crash-dialog suffix while deliberately clipping the diagnostic body.
+    size_t used = strlen(msg);
+    size_t appendixLength = strlen(appendix);
+    StringCchCopyNA(msg + used, _countof(msg) - used - appendixLength, data->Msg,
+                    _countof(msg) - used - appendixLength - 1);
+    used = strlen(msg);
+    StringCchCopyNA(msg + used, _countof(msg) - used, appendix, _countof(msg) - used - 1);
     MessageBoxA(NULL, msg, "Debug Message", MB_OK | MB_ICONERROR | MB_SETFOREGROUND);
     return 0;
+}
+
+static DWORD WINAPI TraceMessageBoxOwnedThreadF(void* parameter, HANDLE stopEvent)
+{
+    // Fatal-trace dialogs are intentionally modal; the owner protects stack data until the user dismisses them.
+    UNREFERENCED_PARAMETER(stopEvent);
+    return __TraceMsgBoxThread(parameter);
 }
 
 struct C__TraceMsgBoxThreadDataW
@@ -925,10 +943,22 @@ DWORD WINAPI __TraceMsgBoxThreadW(void* param)
                             L"Application will be crashed by \"access violation\" exception after "
                             L"clicking OK. Please send us bug report to help us fix this problem. "
                             L"If you want to copy this message to clipboard, use Ctrl+C key.";
-    lstrcpynW(msg + (int)wcslen(msg), data->Msg, _countof(msg) - (int)wcslen(msg) - (int)wcslen(appendix));
-    lstrcpynW(msg + (int)wcslen(msg), appendix, _countof(msg) - (int)wcslen(msg));
+    // Reserve the fixed crash-dialog suffix while deliberately clipping the diagnostic body.
+    size_t used = wcslen(msg);
+    size_t appendixLength = wcslen(appendix);
+    StringCchCopyNW(msg + used, _countof(msg) - used - appendixLength, data->Msg,
+                    _countof(msg) - used - appendixLength - 1);
+    used = wcslen(msg);
+    StringCchCopyNW(msg + used, _countof(msg) - used, appendix, _countof(msg) - used - 1);
     MessageBoxW(NULL, msg, L"Debug Message", MB_OK | MB_ICONERROR | MB_SETFOREGROUND);
     return 0;
+}
+
+static DWORD WINAPI TraceWMessageBoxOwnedThreadF(void* parameter, HANDLE stopEvent)
+{
+    // Keep the Unicode crash report stable while its modal dialog is active.
+    UNREFERENCED_PARAMETER(stopEvent);
+    return __TraceMsgBoxThreadW(parameter);
 }
 
 #if defined(TRACE_TO_FILE) && defined(__TRACESERVER)
@@ -937,6 +967,13 @@ DWORD WINAPI __TraceMsgBoxThreadErrInTS(void* param)
 {
     MessageBoxW(NULL, (WCHAR*)param, L"Trace Server", MB_OK | MB_ICONERROR | MB_SETFOREGROUND);
     return 0;
+}
+
+static DWORD WINAPI TraceServerMessageBoxOwnedThreadF(void* parameter, HANDLE stopEvent)
+{
+    // The trace-server error buffer belongs to the caller, so it must remain owned through MessageBoxW completion.
+    UNREFERENCED_PARAMETER(stopEvent);
+    return __TraceMsgBoxThreadErrInTS(parameter);
 }
 
 #endif // defined(TRACE_TO_FILE) && defined(__TRACESERVER)
@@ -1026,13 +1063,11 @@ C__Trace::SendMessageToServer(C__MessageType type, BOOL crash)
         {
             swprintf_s(bufW, L"Error message from Trace Server has been written to file with traces:\n%s", TraceFileName);
 
-            // vypiseme hlasku v jinem threadu, aby nepumpovala zpravy aktualniho threadu
-            DWORD id;
-            HANDLE msgBoxThread = CreateThread(NULL, 0, __TraceMsgBoxThreadErrInTS, bufW, 0, &id);
-            if (msgBoxThread != NULL)
+            // Keep the stack buffer alive through the standard owner while the alternate thread shows the dialog.
+            CThreadOwner msgBoxOwner;
+            if (msgBoxOwner.Start(TraceServerMessageBoxOwnedThreadF, bufW, "TraceServerMessageBox"))
             {
-                WaitForSingleObject(msgBoxThread, INFINITE);
-                CloseHandle(msgBoxThread);
+                msgBoxOwner.StopAndJoin(INFINITE);
             }
         }
 #endif // __TRACESERVER
@@ -1090,10 +1125,12 @@ C__Trace::SendMessageToServer(C__MessageType type, BOOL crash)
         {
             if (unicode)
             {
-                threadDataW.Msg = (WCHAR*)GlobalAlloc(GMEM_FIXED, sizeof(WCHAR) * (TraceStringBufW.length() + 1));
+                // The modal helper consumes this copy synchronously, so no HGLOBAL ownership is required.
+                threadDataW.Msg = (WCHAR*)HeapAlloc(GetProcessHeap(), 0, sizeof(WCHAR) * (TraceStringBufW.length() + 1));
                 if (threadDataW.Msg != NULL)
                 {
-                    lstrcpynW(threadDataW.Msg, TraceStringBufW.c_str(), (int)(TraceStringBufW.length() + 1));
+                    // Copy the exact dynamically allocated crash message without a legacy helper.
+                    StringCchCopyW(threadDataW.Msg, TraceStringBufW.length() + 1, TraceStringBufW.c_str());
                     threadDataW.File = FileW;
                     threadDataW.Line = Line;
                     msgBoxOpened = TRUE;
@@ -1101,10 +1138,12 @@ C__Trace::SendMessageToServer(C__MessageType type, BOOL crash)
             }
             else
             {
-                threadData.Msg = (char*)GlobalAlloc(GMEM_FIXED, TraceStringBuf.length() + 1);
+                // The modal helper consumes this copy synchronously, so no HGLOBAL ownership is required.
+                threadData.Msg = (char*)HeapAlloc(GetProcessHeap(), 0, TraceStringBuf.length() + 1);
                 if (threadData.Msg != NULL)
                 {
-                    lstrcpynA(threadData.Msg, TraceStringBuf.c_str(), (int)(TraceStringBuf.length() + 1));
+                    // Copy the exact dynamically allocated crash message without a legacy helper.
+                    StringCchCopyA(threadData.Msg, TraceStringBuf.length() + 1, TraceStringBuf.c_str());
                     threadData.File = File;
                     threadData.Line = Line;
                     msgBoxOpened = TRUE;
@@ -1129,17 +1168,16 @@ C__Trace::SendMessageToServer(C__MessageType type, BOOL crash)
         if (unicode && threadDataW.Msg != NULL || // break/padacka po vypisu TRACE error hlasky (TRACE_C a TRACE_MC)
             !unicode && threadData.Msg != NULL)
         {
-            // vypiseme hlasku v jinem threadu, aby nepumpovala zpravy aktualniho threadu
-            DWORD id;
-            HANDLE msgBoxThread = CreateThread(NULL, 0, unicode ? __TraceMsgBoxThreadW : __TraceMsgBoxThread,
-                                               unicode ? (void*)&threadDataW : (void*)&threadData, 0, &id);
-            if (msgBoxThread != NULL)
+            // Keep the chosen stack-backed crash data alive until the modal helper returns.
+            CThreadOwner msgBoxOwner;
+            BOOL started = unicode ? msgBoxOwner.Start(TraceWMessageBoxOwnedThreadF, &threadDataW, "UnicodeTraceMessageBox") :
+                                     msgBoxOwner.Start(TraceMessageBoxOwnedThreadF, &threadData, "TraceMessageBox");
+            if (started)
             {
-                WaitForSingleObject(msgBoxThread, INFINITE); // if TRACE_C is put into DllMain into DLL_THREAD_ATTACH, deadlock occurs - highly unlikely, we do not handle it
-                CloseHandle(msgBoxThread);
+                msgBoxOwner.StopAndJoin(INFINITE); // TRACE_C inside DllMain remains unsupported, as before.
             }
             msgBoxOpened = FALSE;
-            GlobalFree(unicode ? (HGLOBAL)threadDataW.Msg : (HGLOBAL)threadData.Msg);
+            HeapFree(GetProcessHeap(), 0, unicode ? (void*)threadDataW.Msg : (void*)threadData.Msg);
             // we trigger the software crash directly in the code where TRACE_C/TRACE_MC is located, so
             // that the bug report shows exactly where the macro is; the crash therefore follows
             // after completion of this method

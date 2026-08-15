@@ -24,6 +24,8 @@
 
 #include "versinfo.rh2"
 
+#include <strsafe.h>
+
 const char* SALAMANDER_TEXT_VERSION = "Open Salamander " VERSINFO_VERSION;
 
 //****************************************************************************
@@ -1241,8 +1243,9 @@ void CMainWindow::SetUnescapedHotPath(int index, const char* path)
     if (Configuration.HotPathAutoConfig)
     {
         // switch to the buffer so that Cancel works
-        lstrcpyn(HotPathSetBufferName, path, MAX_PATH);
-        lstrcpyn(HotPathSetBufferPath, path, HOTPATHITEM_MAXPATH);
+        // Hot Path configuration slots have fixed historical display/storage limits.
+        StringCchCopyNA(HotPathSetBufferName, _countof(HotPathSetBufferName), path, _countof(HotPathSetBufferName) - 1);
+        StringCchCopyNA(HotPathSetBufferPath, _countof(HotPathSetBufferPath), path, _countof(HotPathSetBufferPath) - 1);
         DuplicateDollars(HotPathSetBufferPath, HOTPATHITEM_MAXPATH);
         // open the HotPaths page and edit item index
         PostMessage(HWindow, WM_USER_CONFIGURATION, 1, index);
@@ -1251,9 +1254,9 @@ void CMainWindow::SetUnescapedHotPath(int index, const char* path)
     {
         // push the value directly
         char buff[HOTPATHITEM_MAXPATH];
-        lstrcpyn(buff, path, HOTPATHITEM_MAXPATH);
+        StringCchCopyNA(buff, _countof(buff), path, _countof(buff) - 1);
         char nameBuff[MAX_PATH];
-        lstrcpyn(nameBuff, path, MAX_PATH);
+        StringCchCopyNA(nameBuff, _countof(nameBuff), path, _countof(nameBuff) - 1);
         DuplicateDollars(buff, HOTPATHITEM_MAXPATH);
         HotPaths.Set(index, nameBuff, buff);
         // a change occurred, rebuild the Hot Path Bar
@@ -1569,7 +1572,8 @@ void CMainWindow::SetEnvFont()
         {
             LeftPanel->SleepIconCacheThread();
             LeftPanel->IconCache->Release();
-            LeftPanel->EndOfIconReadingTime = GetTickCount() - 10000;
+            // Disabling thumbnails must not retain a stale icon-read throttle.
+            LeftPanel->EndOfIconReadingTime = CMonotonicClock::AtLeastDurationAgo(10000);
             LeftPanel->UseThumbnails = FALSE;
             PostMessage(LeftPanel->HWindow, WM_USER_REFRESH_DIR, 0, t1);
         }
@@ -1577,7 +1581,8 @@ void CMainWindow::SetEnvFont()
         {
             RightPanel->SleepIconCacheThread();
             RightPanel->IconCache->Release();
-            RightPanel->EndOfIconReadingTime = GetTickCount() - 10000;
+            // Disabling thumbnails must not retain a stale icon-read throttle.
+            RightPanel->EndOfIconReadingTime = CMonotonicClock::AtLeastDurationAgo(10000);
             RightPanel->UseThumbnails = FALSE;
             PostMessage(RightPanel->HWindow, WM_USER_REFRESH_DIR, 0, t2);
         }
@@ -1712,7 +1717,8 @@ void CMainWindow::AddTrayIcon(BOOL updateIcon)
     tnid.uCallbackMessage = WM_USER_ICON_NOTIFY;
     int resID = MainWindowIcons[Configuration.GetMainWindowIconIndex()].IconResID;
     tnid.hIcon = SalLoadIcon(HInstance, resID, IconSizes[ICONSIZE_16]);
-    lstrcpyn(tnid.szTip, MAINWINDOW_NAME, sizeof(tnid.szTip));
+    // The tray tooltip is a fixed shell presentation field.
+    StringCchCopyNA(tnid.szTip, _countof(tnid.szTip), MAINWINDOW_NAME, _countof(tnid.szTip) - 1);
     Shell_NotifyIcon(updateIcon ? NIM_MODIFY : NIM_ADD, &tnid);
     HANDLES(DestroyIcon(tnid.hIcon));
 }
@@ -1935,23 +1941,25 @@ void CMainWindow::SetWindowTitle(const char* text)
         }
 
         // Open Salamander name + ver
-        lstrcat(stdWndName, MAINWINDOW_NAME);
-        lstrcat(stdWndName, " " VERSINFO_VERSION);
+        // Title composition retains the fixed presentation buffer limit.
+        StringCchCatA(stdWndName, _countof(stdWndName), MAINWINDOW_NAME);
+        StringCchCatA(stdWndName, _countof(stdWndName), " " VERSINFO_VERSION);
 
         if (RunningAsAdmin)
-            sprintf(stdWndName + lstrlen(stdWndName), " (%s)", LoadStr(IDS_AS_ADMIN_TITLE));
+            _snprintf_s(stdWndName + strlen(stdWndName), _countof(stdWndName) - strlen(stdWndName), _TRUNCATE,
+                        " (%s)", LoadStr(IDS_AS_ADMIN_TITLE));
 
 #ifdef X64_STRESS_TEST
-        lstrcat(stdWndName, " ST");
+        StringCchCatA(stdWndName, _countof(stdWndName), " ST");
 #endif //X64_STRESS_TEST
 
 #ifdef USE_BETA_EXPIRATION_DATE
         // beta version Expires on
-        lstrcat(stdWndName, " - Expires on ");
+        StringCchCatA(stdWndName, _countof(stdWndName), " - Expires on ");
         char expire[100];
-        if (GetDateFormat(LOCALE_USER_DEFAULT, DATE_LONGDATE, &BETA_EXPIRATION_DATE, NULL, expire, 100) == 0)
+        if (FormatUserDateTimeUtf8(&BETA_EXPIRATION_DATE, DATE_LONGDATE, expire, _countof(expire), TRUE) == 0)
             sprintf(expire, "%u.%u.%u", BETA_EXPIRATION_DATE.wDay, BETA_EXPIRATION_DATE.wMonth, BETA_EXPIRATION_DATE.wYear);
-        lstrcat(stdWndName, expire);
+        StringCchCatA(stdWndName, _countof(stdWndName), expire);
 #endif // USE_BETA_EXPIRATION_DATE
 
         text = stdWndName;
