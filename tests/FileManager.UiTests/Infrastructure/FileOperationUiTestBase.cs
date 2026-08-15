@@ -36,17 +36,23 @@ public abstract class FileOperationUiTestBase : FileManagerUiTestBase
     protected void SelectSourceItem(string name)
     {
         var list = FindSourceList();
+        NativeCommands.ActivateFilePanel(list!.Properties.NativeWindowHandle.Value);
+        // The command gates are computed from the host's active panel, which changes only through the normal panel click route.
         NativeCommands.QuickSearch(list!.Properties.NativeWindowHandle.Value, name);
         // The owner-drawn panel applies quick-search selection asynchronously; wait before dispatching a selection-sensitive command.
         Thread.Sleep(250);
         // Mark the focused match explicitly so Copy/Move/Delete observe the same selected-item state as an interactive user.
         NativeCommands.ToggleFocusedSelection(list.Properties.NativeWindowHandle.Value);
+        // Insert advances the caret after selecting; restore the match because Quick Rename acts on the caret rather than the selection.
+        NativeCommands.QuickSearch(list.Properties.NativeWindowHandle.Value, name);
     }
 
     protected void SelectSourceItems(params string[] names)
     {
         // Explicit Insert selection exercises commands over mixed and multiple items instead of only the focused fallback.
         var list = FindSourceList();
+        NativeCommands.ActivateFilePanel(list.Properties.NativeWindowHandle.Value);
+        // Keep multi-item gestures on the same active source panel as a user selection sequence.
         foreach (var name in names)
         {
             NativeCommands.QuickSearch(list.Properties.NativeWindowHandle.Value, name);
@@ -58,6 +64,7 @@ public abstract class FileOperationUiTestBase : FileManagerUiTestBase
     {
         if (sourceName.Length != 0)
             SelectSourceItem(sourceName);
+        WaitForCommandEnabled(command);
         NativeCommands.Execute(MainWindow.Properties.NativeWindowHandle.Value, command);
         var dialog = WaitForOperationDialog();
         SetDialogPath(dialog, path);
@@ -68,6 +75,7 @@ public abstract class FileOperationUiTestBase : FileManagerUiTestBase
     protected Window ExecuteAndWaitForDialog(int command, string sourceName)
     {
         SelectSourceItem(sourceName);
+        WaitForCommandEnabled(command);
         NativeCommands.Execute(MainWindow.Properties.NativeWindowHandle.Value, command);
         return WaitForOperationDialog();
     }
@@ -126,7 +134,7 @@ public abstract class FileOperationUiTestBase : FileManagerUiTestBase
         WaitForWindowToClose(dialog);
     }
 
-    protected static void WaitForFileSystem(Func<bool> predicate, string failureMessage)
+    protected void WaitForFileSystem(Func<bool> predicate, string failureMessage)
     {
         var timeout = DateTime.UtcNow + TimeSpan.FromSeconds(20);
         while (DateTime.UtcNow < timeout)
@@ -136,7 +144,9 @@ public abstract class FileOperationUiTestBase : FileManagerUiTestBase
             Thread.Sleep(100);
         }
 
-        Assert.Fail(failureMessage);
+        var openWindowTitles = string.Join(", ", NativeCommands.GetTopLevelWindowTitles(Application.ProcessId));
+        // Include native modal titles to differentiate a delayed operation from an error that needs a separate user response.
+        Assert.Fail($"{failureMessage} Open FileManager windows: {openWindowTitles}.");
     }
 
     protected Window WaitForDesktopWindow(Func<Window, bool> predicate, string failureMessage)
@@ -174,12 +184,15 @@ public abstract class FileOperationUiTestBase : FileManagerUiTestBase
     {
         // IDE_PATH is shared by the native create/copy/move/rename templates and bypasses their incomplete UIA children.
         NativeCommands.SetOperationPath(dialog.Properties.NativeWindowHandle.Value, path);
+        Assert.That(NativeCommands.GetOperationPath(dialog.Properties.NativeWindowHandle.Value), Is.EqualTo(path),
+                    "The native operation dialog did not retain the submitted destination or name.");
     }
 
     private Window ExecuteWithPathWithoutWaitingForClose(int command, string sourceName, string path)
     {
         if (sourceName.Length != 0)
             SelectSourceItem(sourceName);
+        WaitForCommandEnabled(command);
         NativeCommands.Execute(MainWindow.Properties.NativeWindowHandle.Value, command);
         var dialog = WaitForOperationDialog();
         SetDialogPath(dialog, path);
@@ -191,6 +204,18 @@ public abstract class FileOperationUiTestBase : FileManagerUiTestBase
     {
         // Filter native top-level windows by IDE_PATH so ComboLBox helpers and progress prompts cannot be mistaken for the input dialog.
         return WaitForWindow(window => NativeCommands.HasOperationPathControl(window.Properties.NativeWindowHandle.Value));
+    }
+
+    protected void WaitForCommandEnabled(int command)
+    {
+        var toolbarState = NativeCommands.TryGetToolbarCommandEnabled(MainWindow.Properties.NativeWindowHandle.Value, command);
+        if (toolbarState == false)
+        {
+            Assert.Fail($"Visible toolbar command {command} remained disabled after selecting the sandbox item.");
+        }
+
+        // This host refreshes command enablers into toolbars but leaves the native menu at its startup state; absent buttons therefore require the command handler itself to prove enablement.
+        Thread.Sleep(250);
     }
 }
 

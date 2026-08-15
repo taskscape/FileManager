@@ -20,9 +20,13 @@ internal static class NativeCommands
     private const uint WmCommand = 0x0111;
     private const uint WmChar = 0x0102;
     private const uint WmKeyDown = 0x0100;
+    private const uint WmLButtonDown = 0x0201;
+    private const uint WmLButtonUp = 0x0202;
     private const uint LvmGetItemCount = 0x1004;
     private const uint BmGetCheck = 0x00F0;
     private const uint BmClick = 0x00F5;
+    private const uint TbIsButtonEnabled = 0x0409;
+    private const uint TbCommandToIndex = 0x0419;
     private const int ConfigurationClearReadOnlyCheckBox = 304;
     internal const int OperationPathControl = 210;
     private const int VkEscape = 0x1B;
@@ -36,6 +40,19 @@ internal static class NativeCommands
 
     [DllImport("user32.dll")]
     private static extern nint SetFocus(nint hWnd);
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct Rect
+    {
+        internal int Left;
+        internal int Top;
+        internal int Right;
+        internal int Bottom;
+    }
+
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool GetClientRect(nint hWnd, out Rect rectangle);
 
     private delegate bool EnumWindowsCallback(nint windowHandle, nint parameter);
 
@@ -117,6 +134,19 @@ internal static class NativeCommands
         return windows;
     }
 
+    internal static IReadOnlyList<string> GetTopLevelWindowTitles(int processId)
+    {
+        var titles = new List<string>();
+        foreach (var windowHandle in GetTopLevelWindows(processId))
+        {
+            var buffer = new char[GetWindowTextLength(windowHandle) + 1];
+            GetWindowText(windowHandle, buffer, buffer.Length);
+            titles.Add(new string(buffer).TrimEnd('\0'));
+        }
+        // Preserve native modal captions in failures because legacy error templates often omit UI Automation text.
+        return titles;
+    }
+
     internal static bool WindowExists(nint windowHandle)
     {
         // UIA can retain a stale provider after a legacy dialog closes, so use the native lifetime check for close waits.
@@ -136,10 +166,43 @@ internal static class NativeCommands
             throw new InvalidOperationException("The operation dialog did not expose its native destination/name input.");
     }
 
+    internal static string GetOperationPath(nint dialogHandle)
+    {
+        var pathControl = FindDialogControl(dialogHandle, OperationPathControl);
+        if (pathControl == 0)
+            throw new InvalidOperationException("The operation dialog did not expose its native destination/name input.");
+
+        var buffer = new char[GetWindowTextLength(pathControl) + 1];
+        GetWindowText(pathControl, buffer, buffer.Length);
+        // Read back the same native control to ensure a test does not acknowledge a dialog while targeting a stale field.
+        return new string(buffer).TrimEnd('\0');
+    }
+
     internal static bool HasDialogButton(nint dialogHandle, int controlId)
     {
         // Standard buttons remain native controls even where the legacy provider does not publish a Button pattern.
         return FindDialogControl(dialogHandle, controlId) != 0;
+    }
+
+    internal static bool? TryGetToolbarCommandEnabled(nint windowHandle, int command)
+    {
+        bool? enabled = null;
+        // The toolbar receives state changes during the native idle cycle, even when the legacy menu retains its startup state.
+        EnumChildWindows(windowHandle, (childHandle, _) =>
+        {
+            var classBuffer = new char[64];
+            GetClassName(childHandle, classBuffer, classBuffer.Length);
+            if (!string.Equals(new string(classBuffer).TrimEnd('\0'), "ToolbarWindow32", StringComparison.Ordinal))
+                return true;
+
+            if (SendMessage(childHandle, TbCommandToIndex, command, 0) != -1)
+            {
+                enabled = SendMessage(childHandle, TbIsButtonEnabled, command, 0) != 0;
+                return false;
+            }
+            return true;
+        }, 0);
+        return enabled;
     }
 
     internal static void ClickDialogButton(nint dialogHandle, int controlId)
@@ -232,8 +295,9 @@ internal static class NativeCommands
 
     internal static void Execute(nint windowHandle, int command)
     {
-        // The custom native menu loop consumes posted WM_COMMAND notifications, so tests must synchronously dispatch stable command IDs.
-        SendMessage(windowHandle, WmCommand, command, 0);
+        // Posting lets the test observe a modal operation dialog after the user-equivalent panel activation instead of blocking in its handler.
+        if (!PostMessage(windowHandle, WmCommand, command, 0))
+            throw new InvalidOperationException($"Could not post native command {command}.");
     }
 
     internal static void QuickSearch(nint listHandle, string name)
@@ -249,6 +313,19 @@ internal static class NativeCommands
         // Insert is the native panel gesture that selects the focused item while preserving prior selections.
         SetFocus(listHandle);
         SendMessage(listHandle, WmKeyDown, 0x2D, 0); // VK_INSERT
+    }
+
+    internal static void ActivateFilePanel(nint listHandle)
+    {
+        if (!GetClientRect(listHandle, out var rectangle) || rectangle.Right <= rectangle.Left || rectangle.Bottom <= rectangle.Top)
+            throw new InvalidOperationException("The source file panel did not expose a usable client area.");
+
+        // A click in the empty lower-right list area changes the host's active panel without selecting or opening any sandbox item.
+        var x = rectangle.Right - 1;
+        var y = rectangle.Bottom - 1;
+        var point = unchecked((nint)((y << 16) | (x & 0xffff)));
+        SendMessage(listHandle, WmLButtonDown, 0, point);
+        SendMessage(listHandle, WmLButtonUp, 0, point);
     }
 
     internal static int GetListViewItemCount(nint listHandle)

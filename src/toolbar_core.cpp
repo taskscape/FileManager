@@ -111,6 +111,7 @@ CToolBar::CToolBar(HWND hNotifyWindow, CObjectOrigin origin)
     MouseIsTracked = FALSE;
     DropDownUpTime = CMonotonicClock::Now();
     HelpMode = FALSE;
+    CenterContent = FALSE; // regular toolbars retain their established leading content alignment
 }
 
 CToolBar::~CToolBar()

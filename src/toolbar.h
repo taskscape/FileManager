@@ -41,10 +41,11 @@ protected:
     int Height; // height of item
     int Offset; // position of item in whole toolbar
 
-    WORD IconX; // placement of individual elements
-    WORD TextX;
-    WORD InnerX;
-    WORD OutterX;
+    // Signed coordinates allow centered content to clip symmetrically in exceptionally narrow slots.
+    int IconX; // placement of individual elements
+    int TextX;
+    int InnerX;
+    int OutterX;
 
 public:
     CToolBarItem();
@@ -98,6 +99,7 @@ protected:
     BOOL MouseIsTracked;  // is mouse tracked using TrackMouseEvent?
     CMonotonicTimePoint DropDownUpTime; // 64-bit release time for the post-dropdown click guard
     BOOL HelpMode;        // Salamander is in Shift+F1 (ctx help) mode and toolbar should highlight even disabled items under cursor
+    BOOL CenterContent;   // opt-in alignment keeps a fixed-width button's visible icon/text group centered
 
 public:
     //
@@ -341,8 +343,11 @@ protected:
     // internal function called from InitDataFromResources
     static BOOL InitDataResRow(CBottomTBStateEnum state, int textResID);
 
-    // for each button finds longest text and sets button width accordingly
-    BOOL SetMaxItemWidths();
+    // Repartition all twelve command slots whenever the bottom bar changes width.
+    BOOL SetEqualItemWidths();
+
+    // The bottom bar owns its resize-dependent equal-width layout.
+    virtual LRESULT WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam);
 };
 
 //*****************************************************************************
