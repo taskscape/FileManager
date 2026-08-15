@@ -368,6 +368,36 @@ BOOL CToolBar::Refresh()
                     item->OutterX = width - (separatedDropPadding + SVGArrowDropDown.GetWidth() + separatedDropPadding); // ukousneme s sirky polozky
             }
 
+            // Center only the visible icon/text group for opted-in fixed-width command slots.
+            if (!vertical && CenterContent && (item->Style & TLBI_STYLE_FIXEDWIDTH))
+            {
+                int contentLeft = 0;
+                int contentRight = 0;
+                BOOL contentPresent = FALSE;
+                if (iconPresent)
+                {
+                    int defaultIconSize = GetIconSizeForSystemDPI(ICONSIZE_16);
+                    int imgW = item->HIcon != NULL ? (ImageWidth > 0 ? ImageWidth : defaultIconSize) : ImageWidth;
+                    contentLeft = item->IconX;
+                    contentRight = item->IconX + imgW;
+                    contentPresent = TRUE;
+                }
+                if (textPresent)
+                {
+                    contentLeft = contentPresent ? min(contentLeft, item->TextX) : item->TextX;
+                    contentRight = contentPresent ? max(contentRight, item->TextX + textWidth) : item->TextX + textWidth;
+                    contentPresent = TRUE;
+                }
+                if (contentPresent && contentRight > contentLeft)
+                {
+                    int contentOffset = (item->Width - (contentRight - contentLeft)) / 2 - contentLeft;
+                    if (iconPresent)
+                        item->IconX += contentOffset;
+                    if (textPresent)
+                        item->TextX += contentOffset;
+                }
+            }
+
             if (!(item->Style & TLBI_STYLE_FIXEDWIDTH))
                 item->Width = width;
             item->Height = height;

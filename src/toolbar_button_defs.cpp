@@ -1345,6 +1345,7 @@ CBottomToolBar::CBottomToolBar(HWND hNotifyWindow, CObjectOrigin origin)
     Padding.ButtonIconText = 1; // move the text closer to the icon
     Padding.IconLeft = 2;       // space before the icon
     Padding.TextRight = 2;      // space after the text
+    CenterContent = TRUE;       // each function-key symbol and label form one centered button caption
 }
 
 // Fills the BottomTBData 'Text' field from a resource string.
@@ -1412,48 +1413,25 @@ BOOL CBottomToolBar::InitDataFromResources()
 void CBottomToolBar::SetFont()
 {
     CToolBar::SetFont();
-    SetMaxItemWidths();
+    SetEqualItemWidths();
 }
 
-BOOL CBottomToolBar::SetMaxItemWidths()
+BOOL CBottomToolBar::SetEqualItemWidths()
 {
-    CALL_STACK_MESSAGE1("CBottomToolBar::SetMaxItemWidths()");
-    if (HWindow == NULL || Items.Count == 0)
+    CALL_STACK_MESSAGE1("CBottomToolBar::SetEqualItemWidths()");
+    if (HWindow == NULL || Items.Count != 12)
         return TRUE;
-    HFONT hOldFont = (HFONT)SelectObject(CacheBitmap->HMemDC, HFont);
+
+    // Integer slot boundaries consume the complete client width and differ by at most one pixel.
     int i;
     for (i = 0; i < 12; i++)
     {
-        WORD maxWidth = 0;
-        int j;
-        for (j = 0; j < btbsCount; j++)
-        {
-            const char* text = BottomTBData[j][i].Text;
-            int textLen = BottomTBData[j][i].TextLen;
-
-            RECT r;
-            r.left = 0;
-            r.top = 0;
-            r.right = 0;
-            r.bottom = 0;
-            DrawText(CacheBitmap->HMemDC, text, textLen,
-                     &r, DT_NOCLIP | DT_LEFT | DT_SINGLELINE | DT_NOPREFIX | DT_CALCRECT);
-            if (r.right > maxWidth)
-                maxWidth = (WORD)r.right;
-        }
-        maxWidth = 3 + BOTTOMBAR_CX + 1 + maxWidth + 3;
         TLBI_ITEM_INFO2 tii;
         tii.Mask = TLBI_MASK_WIDTH;
-        tii.Width = maxWidth;
+        tii.Width = ((i + 1) * Width) / 12 - (i * Width) / 12;
         if (!SetItemInfo2(i, TRUE, &tii))
-        {
-            if (hOldFont != NULL)
-                SelectObject(CacheBitmap->HMemDC, hOldFont);
             return FALSE;
-        }
     }
-    if (hOldFont != NULL)
-        SelectObject(CacheBitmap->HMemDC, hOldFont);
     return TRUE;
 }
 
@@ -1476,8 +1454,16 @@ BOOL CBottomToolBar::CreateWnd(HWND hParent)
         if (!InsertItem2(i, TRUE, &tii))
             return FALSE;
     }
-    SetMaxItemWidths();
+    SetEqualItemWidths();
     return TRUE;
+}
+
+LRESULT CBottomToolBar::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
+{
+    LRESULT result = CToolBar::WindowProc(uMsg, wParam, lParam);
+    if (uMsg == WM_SIZE)
+        SetEqualItemWidths(); // preserve twelve full-width slots after every parent-window resize
+    return result;
 }
 
 BOOL CBottomToolBar::SetState(CBottomTBStateEnum state)

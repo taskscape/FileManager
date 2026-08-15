@@ -2748,8 +2748,9 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
                                               SWP_NOACTIVATE /*| SWP_NOZORDER*/));
 
             if (BottomToolBar->HWindow != NULL)
+                // The bottom command slots span the complete main-window client width.
                 hdwp = HANDLES(DeferWindowPos(hdwp, BottomToolBar->HWindow, NULL,
-                                              1, TopRebarHeight + PanelsHeight + EditHeight + 1, WindowWidth - 2, BottomToolBarHeight,
+                                              0, TopRebarHeight + PanelsHeight + EditHeight + 1, WindowWidth, BottomToolBarHeight,
                                               SWP_NOACTIVATE | SWP_NOZORDER));
             HANDLES(EndDeferWindowPos(hdwp));
         }
