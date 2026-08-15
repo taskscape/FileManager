@@ -521,6 +521,8 @@ catch {
 foreach ($relativePath in @(
     'tools\verify-operation-completion-protocol.ps1',
     'tools\verify-durable-copy-commit.ps1',
+    # Exercise the diff ratchet in an isolated Git history before release publication.
+    'tools\test-raw-thread-creation-verifier.ps1',
     # Keep release-input provenance enforced by the same aggregate test inventory.
     'tools\test-release-input-pinning.ps1',
     # The content-fingerprint baseline rejects unsafe calls even when a diff hunk is unavailable.

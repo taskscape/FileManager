@@ -61,6 +61,12 @@ jobs:
         with:
           arch: x64
 
+      # Run the verifier's synthetic Git-history cases once per matrix to keep
+      # vendor scoping, comment parsing, and actionable diagnostics stable.
+      - name: Exercise raw thread-creation verifier
+        if: matrix.platform == 'x64'
+        run: .\tools\test-raw-thread-creation-verifier.ps1
+
       - name: Reject new forced thread termination
         if: github.event_name == 'pull_request'
         run: |
