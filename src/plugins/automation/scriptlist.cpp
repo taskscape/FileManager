@@ -13,7 +13,7 @@
 
 #include "precomp.h"
 #include "../../common/scoped_native_resources.h"
-#include "../../common/thread_owner.h"
+#include "../shared/plugin_thread_owner.h"
 #include "scriptlist.h"
 #include "scriptsite.h"
 #include "aututils.h"
@@ -29,6 +29,13 @@ extern HINSTANCE g_hInstance;
 extern HINSTANCE g_hLangInst;
 extern CSalamanderGeneralAbstract* SalamanderGeneral;
 extern CAutomationPluginInterface g_oAutomationPlugin;
+
+// Keep plug-in worker naming behind the SDK debug interface so Automation does
+// not acquire the host-only thread owner or its conflicting handle macros.
+static void WINAPI NameAutomationExecutionThread(const char* name)
+{
+    SalamanderDebug->SetThreadNameInVCAndTrace(name);
+}
 
 CScriptInfo::CScriptInfo(
     PCTSTR pszFileName,
@@ -448,10 +455,10 @@ bool CScriptInfo::ExecuteInSeparateThread(EXECUTION_INFO* info)
     info->pInstance = this;
     info->bAsyncResult = false;
 
-    // The caller's stack record remains valid until this owner has joined its message-loop worker.
-    CThreadOwner executionThread;
-    if (executionThread.Start(ExecuteEntryProc, info, "Automation execution"))
-        executionThread.StopAndJoin(CThreadShutdownDeadline("automation execution"));
+    // The caller's stack record remains valid until the plug-in owner has joined its message-loop worker.
+    CPluginThreadOwner executionThread;
+    if (executionThread.Start(ExecuteEntryProc, info, "Automation execution", NameAutomationExecutionThread, 0))
+        executionThread.StopAndJoin(INFINITE);
 
     return info->bAsyncResult;
 }

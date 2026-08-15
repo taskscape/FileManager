@@ -6350,6 +6350,7 @@ BOOL DoDeleteFile(HWND hProgressDlg, COperation* operation, const CQuadWord& siz
                 DeleteFileWithVerifiedIdentity(name, operation->SourceIdentity, &err);
             }
         DELETE_READY:
+            ; // A label must own a statement even when identity rejection only skips deletion.
         }
         else
         {

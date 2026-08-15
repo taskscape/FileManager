@@ -613,8 +613,9 @@ public sealed class NativeSafetyRegressionTests
             Assert.That(callStack, Does.Contain("StopAndJoin(CThreadShutdownDeadline(\"call-stack bug report\"))"));
             Assert.That(callStack, Does.Not.Contain("CreateThread(ThreadBugReportF"));
             // The automation caller passes stack data, so completion must be joined before this method returns.
-            Assert.That(automation, Does.Contain("CThreadOwner executionThread"));
-            Assert.That(automation, Does.Contain("StopAndJoin(CThreadShutdownDeadline(\"automation execution\"))"));
+            Assert.That(automation, Does.Contain("CPluginThreadOwner executionThread"));
+            Assert.That(automation, Does.Contain("NameAutomationExecutionThread"));
+            Assert.That(automation, Does.Contain("executionThread.StopAndJoin(INFINITE)"));
             Assert.That(automation, Does.Not.Contain("CreateThread(NULL, 0, ExecuteEntryProc"));
             Assert.That(renamer, Does.Contain("CThreadOwner executionThread"));
             Assert.That(renamer, Does.Contain("StopAndJoin(CThreadShutdownDeadline(\"renamer regular expression\"))"));
