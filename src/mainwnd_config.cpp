@@ -24,6 +24,8 @@
 #include "pwdmngr.h"
 #include "regwork.h"
 
+#include <strsafe.h>
+
 //
 // ConfigVersion - version number of the loaded configuration
 //
@@ -489,7 +491,8 @@ static BOOL ValidateCompleteConfigurationSchema(HKEY generationKey)
     BOOL valid = GetRequiredDword(generationKey, CONFIGURATION_SCHEMA_VERSION_REG, schemaVersion) &&
                  schemaVersion == CONFIGURATION_SCHEMA_VERSION &&
                  OpenKeyAux(NULL, generationKey, "Version", versionKey) &&
-                 GetRequiredDword(versionKey, "Config Version", configVersion) &&
+                 // Keep validation aligned with the long-standing writer key, or every staged save is rejected.
+                 GetRequiredDword(versionKey, SALAMANDER_VERSIONREG_REG, configVersion) &&
                  configVersion == THIS_CONFIG_VERSION &&
                  OpenKeyAux(NULL, generationKey, "Configuration", configKey) &&
                  ValidateRequiredDwordRange(configKey, "Size Format", SIZE_FORMAT_BYTES, SIZE_FORMAT_MIXED) &&
@@ -610,7 +613,11 @@ void SetConfigurationStoreRoot(const char* root)
     ActiveConfigurationRoot[0] = 0;
     SALAMANDER_ROOT_REG = root;
     if (root != NULL)
-        lstrcpyn(ConfigurationStoreRoot, root, sizeof(ConfigurationStoreRoot));
+    {
+        // The configuration-store root is a registry identity and must never be retained truncated.
+        if (FAILED(StringCchCopyA(ConfigurationStoreRoot, _countof(ConfigurationStoreRoot), root)))
+            ConfigurationStoreRoot[0] = 0;
+    }
 }
 
 BOOL SelectCommittedConfigurationGeneration()
@@ -646,14 +653,16 @@ BOOL SelectCommittedConfigurationGeneration()
                 CloseKeyAux(generationKey);
                 activeGeneration = fallbackGeneration;
                 selected = TRUE;
-                lstrcpyn(ConfigurationSchemaDiagnostic,
-                         "Open Salamander ignored an invalid configuration profile and restored the last verified profile.",
-                         sizeof(ConfigurationSchemaDiagnostic));
+                // Schema diagnostics are bounded presentation text.
+                StringCchCopyNA(ConfigurationSchemaDiagnostic, _countof(ConfigurationSchemaDiagnostic),
+                                "Open Salamander ignored an invalid configuration profile and restored the last verified profile.",
+                                _countof(ConfigurationSchemaDiagnostic) - 1);
             }
             else
-                lstrcpyn(ConfigurationSchemaDiagnostic,
-                         "Open Salamander could not validate the saved configuration. The default profile will be used.",
-                         sizeof(ConfigurationSchemaDiagnostic));
+                // Schema diagnostics are bounded presentation text.
+                StringCchCopyNA(ConfigurationSchemaDiagnostic, _countof(ConfigurationSchemaDiagnostic),
+                                "Open Salamander could not validate the saved configuration. The default profile will be used.",
+                                _countof(ConfigurationSchemaDiagnostic) - 1);
         }
     }
     CloseKeyAux(storeKey);
@@ -1253,8 +1262,9 @@ BOOL GetUpgradeInfo(BOOL* autoImportConfig, char* autoImportConfigFromKey, int a
         if (GetValue(rootKey, SALAMANDER_AUTO_IMPORT_CONFIG, REG_SZ, oldKeyName, 200))
         { // we found "AutoImportConfig"
         OPEN_AUTO_IMPORT_CONFIG_KEY:
-            lstrcpyn(autoImportConfigFromKey, SalamanderConfigurationRoots[0], autoImportConfigFromKeySize);
-            if (CutDirectory(autoImportConfigFromKey) &&
+            // An import target is a registry identity; validation must not use a clipped parent key.
+            if (SUCCEEDED(StringCchCopyA(autoImportConfigFromKey, autoImportConfigFromKeySize, SalamanderConfigurationRoots[0])) &&
+                CutDirectory(autoImportConfigFromKey) &&
                 SalPathAppend(autoImportConfigFromKey, oldKeyName, autoImportConfigFromKeySize) &&
                 !IsTheSamePath(autoImportConfigFromKey, SalamanderConfigurationRoots[0]) &&     // the key stored in AutoImportConfig does not point to this version's key
                 HANDLES_Q(RegOpenKeyEx(HKEY_CURRENT_USER, autoImportConfigFromKey, 0, KEY_READ, // the key stored in AutoImportConfig can be opened (otherwise it doesn't exist?)
@@ -1280,8 +1290,9 @@ BOOL GetUpgradeInfo(BOOL* autoImportConfig, char* autoImportConfigFromKey, int a
         if (*autoImportConfig) // check whether this version's key also contains configuration (besides "AutoImportConfig")
         {
             HKEY cfgKey;
-            lstrcpyn(oldKeyName, SalamanderConfigurationRoots[0], 200);
-            if (SalPathAppend(oldKeyName, SALAMANDER_CONFIG_REG, 200) &&
+            // Probe the complete current configuration key before deciding whether to overwrite it.
+            if (SUCCEEDED(StringCchCopyA(oldKeyName, _countof(oldKeyName), SalamanderConfigurationRoots[0])) &&
+                SalPathAppend(oldKeyName, SALAMANDER_CONFIG_REG, 200) &&
                 HANDLES_Q(RegOpenKeyEx(HKEY_CURRENT_USER, oldKeyName, 0, KEY_READ, &cfgKey)) == ERROR_SUCCESS)
             {
                 HANDLES(RegCloseKey(cfgKey));
@@ -1297,7 +1308,8 @@ BOOL GetUpgradeInfo(BOOL* autoImportConfig, char* autoImportConfigFromKey, int a
                     params.HParent = NULL;
                     params.Flags = MB_ABORTRETRYIGNORE | MB_ICONQUESTION | MB_SETFOREGROUND;
                     params.Caption = SALAMANDER_TEXT_VERSION;
-                    lstrcpyn(oldKeyName, autoImportConfigFromKey, 200);
+                    // The confirmation dialog displays a bounded registry-key tail.
+                    StringCchCopyNA(oldKeyName, _countof(oldKeyName), autoImportConfigFromKey, _countof(oldKeyName) - 1);
                     char* keyName;
                     if (!CutDirectory(oldKeyName, &keyName))
                         keyName = oldKeyName; // theoretically cannot happen
@@ -1341,7 +1353,9 @@ BOOL GetUpgradeInfo(BOOL* autoImportConfig, char* autoImportConfigFromKey, int a
                                            KEY_READ | KEY_WRITE, &cfgKey)) == ERROR_SUCCESS)
                 { // delete the configuration and leave only "AutoImportConfig" (recreate it)
                     ClearKey(cfgKey);
-                    lstrcpyn(oldKeyName, autoImportConfigFromKey, 200);
+                    // The recreated import value must preserve the complete target-key identity.
+                    if (FAILED(StringCchCopyA(oldKeyName, _countof(oldKeyName), autoImportConfigFromKey)))
+                        oldKeyName[0] = 0;
                     char* keyName;
                     if (!CutDirectory(oldKeyName, &keyName))
                         keyName = oldKeyName; // theoretically cannot happen
@@ -3988,7 +4002,8 @@ BOOL CMainWindow::LoadConfig(BOOL importingOldConfig, const CCommandLineParams* 
             if (Configuration.ConfigVersion <= 3 && Configuration.RightToolBar[0] != 0)
             {
                 char tmp[5000];
-                lstrcpyn(tmp, Configuration.RightToolBar, 5000);
+                // Toolbar migration parses a bounded historical presentation field.
+                StringCchCopyNA(tmp, _countof(tmp), Configuration.RightToolBar, _countof(tmp) - 1);
                 char num[50];
 
                 Configuration.RightToolBar[0] = 0;
@@ -4253,7 +4268,9 @@ BOOL CMainWindow::LoadConfig(BOOL importingOldConfig, const CCommandLineParams* 
         GetSystemDirectory(leftPanelPath, MAX_PATH);
         strcpy(rightPanelPath, leftPanelPath);
         char sysDefDir[MAX_PATH];
-        lstrcpyn(sysDefDir, DefaultDir[LowerCase[leftPanelPath[0]] - 'a'], MAX_PATH);
+        // Keep the system-drive default directory complete for restoration after panel loading.
+        if (FAILED(StringCchCopyA(sysDefDir, _countof(sysDefDir), DefaultDir[LowerCase[leftPanelPath[0]] - 'a'])))
+            sysDefDir[0] = 0;
         LoadPanelConfig(leftPanelPath, LeftPanel, salamander, SALAMANDER_LEFTP_REG);
         LoadPanelConfig(rightPanelPath, RightPanel, salamander, SALAMANDER_RIGHTP_REG);
 
@@ -4309,12 +4326,19 @@ BOOL CMainWindow::LoadConfig(BOOL importingOldConfig, const CCommandLineParams* 
             mii.cch = 199;
 
             GetMenuItemInfo(h, SC_MINIMIZE, FALSE, &mii);
-            wsprintf(buff + strlen(buff), "\t%s+%s", LoadStr(IDS_SHIFT), LoadStr(IDS_ESCAPE));
+            // Preserve the system-menu label while bounding the added shortcut text.
+            size_t labelLength = strlen(buff);
+            if (labelLength < _countof(buff))
+                _snprintf_s(buff + labelLength, _countof(buff) - labelLength, _TRUNCATE,
+                            "\t%s+%s", LoadStr(IDS_SHIFT), LoadStr(IDS_ESCAPE));
             SetMenuItemInfo(h, SC_MINIMIZE, FALSE, &mii);
 
             mii.cch = 199;
             GetMenuItemInfo(h, SC_MAXIMIZE, FALSE, &mii);
-            wsprintf(buff + strlen(buff), "\t%s+%s+%s", LoadStr(IDS_CTRL), LoadStr(IDS_SHIFT), LoadStr(IDS_F11));
+            labelLength = strlen(buff);
+            if (labelLength < _countof(buff))
+                _snprintf_s(buff + labelLength, _countof(buff) - labelLength, _TRUNCATE,
+                            "\t%s+%s+%s", LoadStr(IDS_CTRL), LoadStr(IDS_SHIFT), LoadStr(IDS_F11));
             SetMenuItemInfo(h, SC_MAXIMIZE, FALSE, &mii);
         }
 
@@ -4475,7 +4499,9 @@ BOOL CMainWindow::LoadConfig(BOOL importingOldConfig, const CCommandLineParams* 
         UpdateWindow(RightPanel->HWindow); // ensures dir/info line is drawn immediately after the panel content
 
         // restore default-dir on the system drive (damaged - system root was in both panels)
-        lstrcpyn(DefaultDir[LowerCase[sysDefDir[0]] - 'a'], sysDefDir, MAX_PATH);
+        // Restore only a complete saved default; an invalid one is replaced by UpdateDefaultDir below.
+        if (sysDefDir[0] != 0)
+            StringCchCopyA(DefaultDir[LowerCase[sysDefDir[0]] - 'a'], MAX_PATH, sysDefDir);
         // restore DefaultDir
         MainWindow->UpdateDefaultDir(TRUE);
 

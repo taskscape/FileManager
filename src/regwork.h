@@ -44,6 +44,8 @@ enum CRegistryWorkType
     rwtGetSize,
 };
 
+class CThreadOwner;
+
 class CRegistryWorkerThread
 {
 protected:
@@ -59,7 +61,10 @@ protected:
         void ResetT() { T = NULL; }
     };
 
-    HANDLE Thread;           // thread of the registry worker
+    // The owner retains the actual handle until the stop work item has run;
+    // Thread is only the legacy borrowed handle used by existing wait checks.
+    CThreadOwner* ThreadOwner;
+    HANDLE Thread;
     DWORD OwnerTID;          // TID of the thread that started the worker thread (no other thread can terminate it)
     BOOL InUse;              // TRUE = already performing some work; further work runs without the thread (handles recursion, usage from multiple threads is rejected, see OwnerTID)
     int StopWorkerSkipCount; // how many StopThread() calls in the OwnerTID thread to ignore (number of recursive StartThread() calls)
@@ -131,7 +136,7 @@ protected:
     // thread body - all work takes place here
     unsigned Body();
 
-    static DWORD WINAPI ThreadBody(void* param); // helper function for the thread body
+    static DWORD WINAPI ThreadBodyOwned(void* param, HANDLE stopEvent); // adapter for the owner-managed worker
     static unsigned ThreadBodyFEH(void* param);  // helper function for the thread body
 };
 

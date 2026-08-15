@@ -52,6 +52,19 @@
 #include "datacon.h"
 #include <stdlib.h>
 
+static int FormatUserDateTimeAnsi(const SYSTEMTIME* time, DWORD flags, char* buffer, int bufferSize, BOOL isDate)
+{
+    // FTP's ANSI UI performs one bounded conversion after locale-name date/time formatting in UTF-16.
+    WCHAR localeName[LOCALE_NAME_MAX_LENGTH];
+    WCHAR formatted[100];
+    if (GetUserDefaultLocaleName(localeName, ARRAYSIZE(localeName)) == 0)
+        return 0;
+    int length = isDate
+                     ? GetDateFormatEx(localeName, flags, time, NULL, formatted, ARRAYSIZE(formatted), NULL)
+                     : GetTimeFormatEx(localeName, flags, time, NULL, formatted, ARRAYSIZE(formatted));
+    return length != 0 ? WideCharToMultiByte(CP_ACP, 0, formatted, -1, buffer, bufferSize, NULL, NULL) : 0;
+}
+
 #ifndef SALAMANDER_UTF8_WINAPI
 #define SALAMANDER_UTF8_WINAPI
 

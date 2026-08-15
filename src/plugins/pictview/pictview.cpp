@@ -3,6 +3,8 @@
 
 #include "precomp.h"
 
+#include <strsafe.h>
+
 #include "lib/pvw32dll.h"
 #include "pictview.h"
 #include "dialogs.h"
@@ -533,8 +535,10 @@ CPluginInterfaceAbstract* WINAPI SalamanderPluginEntry(CSalamanderPluginEntryAbs
     // and the happy recipient of the images will be Honza Patera.
     // Honza appears on the web in the plural (authors, we fixed, ....)
     TCHAR exceptInfo[512];
-    lstrcpyn(exceptInfo, LoadStr(IDS_EXCEPT_INFO1), SizeOf(exceptInfo));
-    _tcsncat(exceptInfo, LoadStr(IDS_EXCEPT_INFO2), SizeOf(exceptInfo) - _tcslen(exceptInfo));
+    // Bug-report metadata must be a complete localized description rather than a clipped, misleading fragment.
+    if (FAILED(StringCchCopy(exceptInfo, _countof(exceptInfo), LoadStr(IDS_EXCEPT_INFO1))) ||
+        FAILED(StringCchCat(exceptInfo, _countof(exceptInfo), LoadStr(IDS_EXCEPT_INFO2))))
+        exceptInfo[0] = 0;
     SalamanderGeneral->SetPluginBugReportInfo(exceptInfo, "support@pictview.com");
     return &PluginInterface;
 }
@@ -1227,9 +1231,10 @@ BOOL CPluginInterfaceForMenuExt::ExecuteMenuItem(CSalamanderForOperationsAbstrac
     case CMD_INTERNAL_FOCUS:
     {
         TCHAR focusPath[MAX_PATH];
-        lstrcpyn(focusPath, Focus_Path, SizeOf(focusPath));
+        // The panel-focus request must use the complete path retained by the viewer thread.
+        const BOOL focusPathFits = SUCCEEDED(StringCchCopy(focusPath, _countof(focusPath), Focus_Path));
         Focus_Path[0] = 0;
-        if (focusPath[0] != 0) // only if we were lucky (we did not hit the start of Salamander's BUSY mode)
+        if (focusPathFits && focusPath[0] != 0) // only if we were lucky (we did not hit the start of Salamander's BUSY mode)
         {
             LPTSTR fname;
             if (SalamanderGeneral->CutDirectory(focusPath, &fname))
@@ -1465,7 +1470,8 @@ BOOL InitViewer(HWND hParentWnd)
 
     G.HAccel = LoadAccelerators(DLLInstance, MAKEINTRESOURCE(IDA_ACCELERATORS));
 
-    WNDCLASS wc;
+    WNDCLASSEX wc;
+    wc.cbSize = sizeof(wc);
     wc.style = 0;
     wc.lpfnWndProc = ToolTipWindowProc;
     wc.cbClsExtra = 0;
@@ -1476,7 +1482,9 @@ BOOL InitViewer(HWND hParentWnd)
     wc.hbrBackground = 0; //(HBRUSH)(COLOR_WINDOW + 1);
     wc.lpszMenuName = NULL;
     wc.lpszClassName = TIP_WINDOW_CLASSNAME;
-    if (RegisterClass(&wc) == 0)
+    wc.hIconSm = wc.hIcon;
+    // The PictView tooltip class uses the extended registration contract even though it intentionally has no icons.
+    if (RegisterClassEx(&wc) == 0)
     {
         TRACE_E("RegisterClass has failed");
         DeleteCriticalSection(&G.CS);
@@ -1530,8 +1538,9 @@ BOOL InitEXIF(HWND hParent, BOOL bSilent)
     {
         TCHAR name[32];
 
-        lstrcpyn(name, LoadStr(IDS_EXIF_LOCALIZATION_FNAME), SizeOf(name));
-        if (*name && _tcscmp(name, _T("ERROR LOADING STRING")))
+        // Skip loading a locale file whose localized leaf name cannot fit in the fixed plug-in protocol buffer.
+        if (SUCCEEDED(StringCchCopy(name, _countof(name), LoadStr(IDS_EXIF_LOCALIZATION_FNAME))) &&
+            *name && _tcscmp(name, _T("ERROR LOADING STRING")))
         {
             _stprintf((LPTSTR)_tcsrchr(path, '\\') + 1, _T("lang\\exif\\%s"), name);
             initTransl(path);
@@ -1615,7 +1624,8 @@ public:
                   BOOL* success, int enumFilesSourceUID,
                   int enumFilesCurrentIndex) : CThread(PLUGIN_NAME_EN)
     {
-        lstrcpyn(Name, name, MAX_PATH);
+        // ViewFile validates this fixed thread handoff before construction, so the worker never sees a partial identity.
+        StringCchCopy(Name, _countof(Name), name);
         Left = left;
         Top = top;
         Width = width;
@@ -1908,6 +1918,11 @@ BOOL CPluginInterfaceForViewer::ViewFile(LPCTSTR name, int left, int top, int wi
                                          BOOL* lockOwner, CSalamanderPluginViewerData* viewerData,
                                          int enumFilesSourceUID, int enumFilesCurrentIndex)
 {
+    size_t nameLength;
+    // The worker owns a fixed filename field and must never receive a truncated path or sentinel name.
+    if (name == NULL || FAILED(StringCchLength(name, MAX_PATH, &nameLength)))
+        return FALSE;
+
     HANDLE contEvent = CreateEvent(NULL, FALSE, FALSE, NULL);
     if (contEvent == NULL)
     {
@@ -2668,13 +2683,14 @@ void CViewerWindow::ToggleFullScreen()
             Renderer.ZoomFactor = Renderer.SavedZoomFactor;
         }
 
-        DWORD style = WS_VISIBLE | WS_OVERLAPPED | WS_OVERLAPPEDWINDOW | WS_CLIPSIBLINGS | WS_CLIPCHILDREN;
+        // Keep style storage pointer-width because window-long access must be portable to x64.
+        LONG_PTR style = WS_VISIBLE | WS_OVERLAPPED | WS_OVERLAPPEDWINDOW | WS_CLIPSIBLINGS | WS_CLIPCHILDREN;
 
-        SetWindowLong(HWindow, GWL_STYLE, style);
+        SetWindowLongPtr(HWindow, GWL_STYLE, style);
 
-        style = GetWindowLong(Renderer.HWindow, GWL_EXSTYLE);
+        style = GetWindowLongPtr(Renderer.HWindow, GWL_EXSTYLE);
         style |= WS_EX_CLIENTEDGE;
-        SetWindowLong(Renderer.HWindow, GWL_EXSTYLE, style);
+        SetWindowLongPtr(Renderer.HWindow, GWL_EXSTYLE, style);
         ShowWindow(HRebar, SW_SHOW);
         if (StatusBar != NULL)
             ShowWindow(StatusBar->HWindow, SW_SHOW);
@@ -2697,7 +2713,7 @@ void CViewerWindow::ToggleFullScreen()
     else
     {
         RECT dummy, maxRect;
-        DWORD style;
+        LONG_PTR style;
 
         // save the current image view parameters for switching back from full-screen mode
         Renderer.SavedZoomParams = TRUE;
@@ -2712,11 +2728,11 @@ void CViewerWindow::ToggleFullScreen()
         GetWindowPlacement(HWindow, &WindowPlacement);
 
         style = WS_POPUP | WS_VISIBLE | WS_OVERLAPPED | WS_CLIPSIBLINGS | WS_SYSMENU;
-        SetWindowLong(HWindow, GWL_STYLE, style);
+        SetWindowLongPtr(HWindow, GWL_STYLE, style);
 
-        style = GetWindowLong(Renderer.HWindow, GWL_EXSTYLE);
+        style = GetWindowLongPtr(Renderer.HWindow, GWL_EXSTYLE);
         style &= ~WS_EX_CLIENTEDGE;
-        SetWindowLong(Renderer.HWindow, GWL_EXSTYLE, style);
+        SetWindowLongPtr(Renderer.HWindow, GWL_EXSTYLE, style);
 
         ShowWindow(HRebar, SW_HIDE);
         if (StatusBar != NULL)
@@ -2752,7 +2768,7 @@ void CViewerWindow::EnsureNoTopmost()
 {
     if (!AlwaysOnTop && HWindow != NULL)
     {
-        DWORD exStyle = GetWindowLong(HWindow, GWL_EXSTYLE);
+        LONG_PTR exStyle = GetWindowLongPtr(HWindow, GWL_EXSTYLE);
         if (exStyle & WS_EX_TOPMOST)
             SetWindowPos(HWindow, HWND_NOTOPMOST, 0, 0, 0, 0, SWP_NOSIZE | SWP_NOMOVE);
     }
@@ -3056,7 +3072,12 @@ CViewerWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
     case WM_USER_TBGETTOOLTIP:
     {
         TOOLBAR_TOOLTIP* tt = (TOOLBAR_TOOLTIP*)lParam;
-        _tcscpy(tt->Buffer, LoadStr(ToolBarButtons[tt->Index].ToolTipResID));
+        // The host toolbar owns a fixed reply buffer, so do not truncate a localized tooltip.
+        if (tt == NULL || tt->Buffer == NULL)
+            return TRUE;
+        if (FAILED(StringCchCopyA(tt->Buffer, TOOLTIP_TEXT_MAX,
+                                  LoadStr(ToolBarButtons[tt->Index].ToolTipResID))))
+            tt->Buffer[0] = 0;
         SalamanderGUI->PrepareToolTipText(tt->Buffer, FALSE);
         return TRUE;
     }

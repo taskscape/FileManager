@@ -651,6 +651,32 @@ HINSTANCE GetHInstance()
 
 HINSTANCE HModule = NULL;
 
+class CScopedCurrentDirectory
+{
+public:
+  CScopedCurrentDirectory() : Changed(false) {}
+
+  BOOL ChangeTo(const char *directory)
+  {
+    // Resolve filters against the caller's source directory rather than the crash reporter's working directory.
+    if (directory == NULL || *directory == 0 || GetCurrentDirectoryA(MAX_PATH, OriginalDirectory) == 0 ||
+        GetCurrentDirectoryA(MAX_PATH, OriginalDirectory) >= MAX_PATH)
+      return FALSE;
+    Changed = SetCurrentDirectoryA(directory) != FALSE;
+    return Changed;
+  }
+
+  ~CScopedCurrentDirectory()
+  {
+    if (Changed)
+      SetCurrentDirectoryA(OriginalDirectory);
+  }
+
+private:
+  char OriginalDirectory[MAX_PATH];
+  BOOL Changed;
+};
+
 // see http://msdn.microsoft.com/en-us/library/bb687850.aspx
 #define EXPORT comment(linker, "/EXPORT:" __FUNCTION__ "=" __FUNCDNAME__)
 
@@ -661,6 +687,13 @@ BOOL WINAPI CompressFiles(const char* archiveName7z, const char* sourceDir, cons
   OutputBuffer = errorMessage;
   OutputBuffer[0] = 0;
   OutputBufferSize = errorMessageSize;
+
+  CScopedCurrentDirectory sourceDirectory;
+  if (!sourceDirectory.ChangeTo(sourceDir))
+  {
+    PrintError("Can not set source directory");
+    return FALSE;
+  }
 
   HMODULE hmod = HModule;
   char dllPath[MAX_PATH] = {0};
@@ -685,36 +718,53 @@ BOOL WINAPI CompressFiles(const char* archiveName7z, const char* sourceDir, cons
   FString archiveName = CmdStringToFString(archiveName7z);
   CObjectVector<CDirItem> dirItems;
 
-//  SetCurrentDirectoryA(sourceDir);
-  WIN32_FIND_DATAA find;
-  HANDLE hFind = FindFirstFileA(filter, &find);
-  if (hFind != INVALID_HANDLE_VALUE)
+  // A pipe-delimited list lets the crash reporter include only its documented artifacts instead of a broad wildcard.
+  const char *filterStart = filter;
+  while (filterStart != NULL && *filterStart != 0)
   {
-    do
+    const char *separator = strchr(filterStart, '|');
+    const size_t filterLength = separator != NULL ? (size_t)(separator - filterStart) : strlen(filterStart);
+    if (filterLength == 0 || filterLength >= MAX_PATH)
     {
-      if (find.cFileName[0] != 0 && strcmp(find.cFileName, ".") != 0 && strcmp(find.cFileName, "..") != 0)
-      {
-        CDirItem di;
-        FString name = CmdStringToFString(find.cFileName);
-        
-        NFile::NFind::CFileInfo fi;
-        if (!fi.Find(name))
-        {
-          PrintError("Can't find file", name);
-          return FALSE;
-        }
+      PrintError("Invalid file filter");
+      return FALSE;
+    }
+    char oneFilter[MAX_PATH];
+    memcpy(oneFilter, filterStart, filterLength);
+    oneFilter[filterLength] = 0;
 
-        di.Attrib = fi.Attrib;
-        di.Size = fi.Size;
-        di.CTime = fi.CTime;
-        di.ATime = fi.ATime;
-        di.MTime = fi.MTime;
-        di.Name = fs2us(name);
-        di.FullPath = name;
-        dirItems.Add(di);
-      }
-    } while (FindNextFileA(hFind, &find));
-    FindClose(hFind);
+    WIN32_FIND_DATAA find;
+    HANDLE hFind = FindFirstFileA(oneFilter, &find);
+    if (hFind != INVALID_HANDLE_VALUE)
+    {
+      do
+      {
+        if (find.cFileName[0] != 0 && strcmp(find.cFileName, ".") != 0 && strcmp(find.cFileName, "..") != 0)
+        {
+          CDirItem di;
+          FString name = CmdStringToFString(find.cFileName);
+
+          NFile::NFind::CFileInfo fi;
+          if (!fi.Find(name))
+          {
+            FindClose(hFind);
+            PrintError("Can't find file", name);
+            return FALSE;
+          }
+
+          di.Attrib = fi.Attrib;
+          di.Size = fi.Size;
+          di.CTime = fi.CTime;
+          di.ATime = fi.ATime;
+          di.MTime = fi.MTime;
+          di.Name = fs2us(name);
+          di.FullPath = name;
+          dirItems.Add(di);
+        }
+      } while (FindNextFileA(hFind, &find));
+      FindClose(hFind);
+    }
+    filterStart = separator != NULL ? separator + 1 : NULL;
   }
 
   COutFileStream *outFileStreamSpec = new COutFileStream;

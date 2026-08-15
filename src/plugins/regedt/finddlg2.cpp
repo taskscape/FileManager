@@ -3,6 +3,8 @@
 
 #include "precomp.h"
 
+#include <strsafe.h>
+
 int DialogWidth;
 int DialogHeight;
 BOOL Maximized;
@@ -258,7 +260,8 @@ void CFindDialog::UpdateListViewItems()
 
         // used by the search thread so it knows when to notify us next
         FoundVisibleCount = count;
-        NextUpdate = GetTickCount() + 500;
+        // Preserve the former strict 500 ms refresh threshold using a non-wrapping deadline.
+        NextUpdate = CMonotonicClock::DeadlineAfter(501);
     }
 }
 
@@ -291,7 +294,11 @@ void CFindDialog::UpdateStatusText(BOOL searchFinished)
     {
         CFoundFilesData* file = List->At(index);
         WCHAR fullName[MAX_FULL_KEYNAME];
-        PathAppend(lstrcpynW(fullName, file->Path, MAX_FULL_KEYNAME), file->Name, MAX_FULL_KEYNAME);
+        // A selected result must start from the complete registry path before PathAppend adds its leaf name.
+        if (FAILED(StringCchCopyW(fullName, _countof(fullName), file->Path)))
+            fullName[0] = 0;
+        else
+            PathAppend(fullName, file->Name, MAX_FULL_KEYNAME);
         StatusBar->SetBase(fullName, TRUE);
     }
     else
@@ -317,7 +324,8 @@ void CFindDialog::StartSearch()
     UpdateWindow(List->HWindow);
     SetWindowText(GetDlgItem(HWindow, IDC_FOUND_FILES), LoadStr(IDS_FOUNDITEMS1));
     FoundVisibleCount = 0;
-    NextUpdate = GetTickCount();
+    // The old strict comparison allowed the first refresh after the next millisecond tick.
+    NextUpdate = CMonotonicClock::DeadlineAfter(1);
 
     // prepare the pattern for searching
     char patternA[MAX_KEYNAME];
@@ -1029,7 +1037,8 @@ CFindDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 
     case WM_TIMER:
     {
-        if ((int)(GetTickCount() - NextUpdate) > 0 && List->GetCount() > FoundVisibleCount)
+        if (CMonotonicClock::HasReached(NextUpdate, CMonotonicClock::Now()) &&
+            List->GetCount() > FoundVisibleCount)
         {
             UpdateListViewItems();
         }

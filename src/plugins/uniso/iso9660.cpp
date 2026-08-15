@@ -215,7 +215,9 @@ void CISO9660::ExtractExtFileName(char* fileName, const char* src, CDirectoryRec
         } // switch
     }
 
-    lstrcpyn(fileName, src, dr.LengthOfFileIdentifier + 1);
+    // ISO directory identifiers are counted fields and are not required to be NUL terminated.
+    memcpy(fileName, src, dr.LengthOfFileIdentifier);
+    fileName[dr.LengthOfFileIdentifier] = 0;
 }
 
 //

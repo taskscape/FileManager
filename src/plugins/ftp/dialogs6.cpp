@@ -17,7 +17,8 @@ BOOL CALLBACK CorrectDisabledButtons(HWND hwnd, LPARAM lParam)
         char className[31];
         if (GetClassName(hwnd, className, 31) && _stricmp(className, "button") == 0)
         {
-            LONG style = GetWindowLong(hwnd, GWL_STYLE);
+            // Use the pointer-width accessor for this control-style compatibility check.
+            LONG_PTR style = GetWindowLongPtr(hwnd, GWL_STYLE);
             if ((style & BS_CHECKBOX) == 0 && (style & BS_DEFPUSHBUTTON) != 0)
             { // found it, change it to "non-default" and finish (there cannot be two default buttons)
                 PostMessage(hwnd, BM_SETSTYLE, BS_PUSHBUTTON, TRUE);

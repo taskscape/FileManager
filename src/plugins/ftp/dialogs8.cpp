@@ -1651,7 +1651,8 @@ void CProxyServerDlg::EnableControls(BOOL initScriptText, BOOL initProxyPort)
         SetWindowText(portEdit, _itoa(GetProxyDefaultPort((CFTPProxyServerType)type), num, 10));
     }
 
-    DWORD style = GetWindowLong(edit, GWL_STYLE);
+    // The edit control consumes a style mask, obtained with the x64-safe accessor.
+    DWORD style = (DWORD)GetWindowLongPtr(edit, GWL_STYLE);
     if (type != fpstOwnScript)
     {
         if ((style & ES_READONLY) == 0)
@@ -1738,7 +1739,7 @@ CProxyScriptControlWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
             HMENU subMenu = GetSubMenu(main, 0);
             if (subMenu != NULL)
             {
-                BOOL canModify = (GetWindowLong(GetDlgItem(GetParent(HWindow), IDE_PRXSRV_SCRIPT), GWL_STYLE) & ES_READONLY) == 0;
+                BOOL canModify = (GetWindowLongPtr(GetDlgItem(GetParent(HWindow), IDE_PRXSRV_SCRIPT), GWL_STYLE) & ES_READONLY) == 0;
                 EnableMenuItem(subMenu, 0, MF_BYPOSITION | (canModify ? MF_ENABLED : MF_DISABLED | MF_GRAYED));
                 MyEnableMenuItem(subMenu, CM_PSS_UNDO, canModify && SendMessage(HWindow, EM_CANUNDO, 0, 0));
                 DWORD start, end;

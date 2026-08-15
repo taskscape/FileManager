@@ -400,12 +400,15 @@ BOOL CVolume<CHAR>::ReadSectors(void* buffer, QWORD sector, QWORD num)
     {
         // seek to the desired sector
         QWORD pos = sector * bytesPerSector;
-        if (SetFilePointer(HVolume, LODWORD(pos), (PLONG)PHIDWORD(pos), FILE_BEGIN) == 0xFFFFFFFF &&
-            GetLastError() != NO_ERROR)
+        // Sector addressing is QWORD-based, so retain the full position and use the Boolean seek result.
+        LARGE_INTEGER seekPosition;
+        seekPosition.LowPart = LODWORD(pos);
+        seekPosition.HighPart = static_cast<LONG>(HIDWORD(pos));
+        if (!SetFilePointerEx(HVolume, seekPosition, NULL, FILE_BEGIN))
         {
 #ifdef TRACE_ENABLE
             DWORD err = GetLastError();
-            TRACE_E("ReadSectors() SetFilePointer failed! sector=" << sector << " num=" << num << " err=" << err);
+            TRACE_E("ReadSectors() SetFilePointerEx failed! sector=" << sector << " num=" << num << " err=" << err);
             SetLastError(err);
 #endif
             return FALSE;

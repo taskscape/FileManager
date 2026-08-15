@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "precomp.h"
+#include <strsafe.h>
 
 #include "wndtree.h"
 #include "wndframe.h"
@@ -207,8 +208,8 @@ BOOL CData::LoadCheckLst(const char* fileName)
         return FALSE;
     }
 
-    DWORD checkLstDataSize = GetFileSize(hFile, NULL);
-    if (checkLstDataSize == 0xFFFFFFFF)
+    DWORD checkLstDataSize;
+    if (!GetFileSizeDwordLocal(hFile, &checkLstDataSize))
     {
         char buf[MAX_PATH + 100];
         sprintf_s(buf, "Error reading file %s.", fileName);
@@ -250,7 +251,9 @@ BOOL CData::LoadCheckLst(const char* fileName)
         {
             char errbuf[MAX_PATH + 200];
             char lineText[100];
-            lstrcpyn(lineText, lineStart, min(100, (lineEnd - lineStart) + 1));
+            // The source line is counted file data, not a separately terminated string.
+            const size_t lineTextLength = min(static_cast<size_t>(lineEnd - lineStart), _countof(lineText) - 1);
+            StringCchCopyNA(lineText, _countof(lineText), lineStart, lineTextLength);
             sprintf_s(errbuf, "Error reading CheckList data from file:\n"
                               "%s\n"
                               "\n"

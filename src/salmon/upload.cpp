@@ -3,6 +3,8 @@
 
 #include "precomp.h"
 #include "..\\common\\checked_arithmetic.h"
+// The upload's parameter object remains dialog-owned until this worker joins.
+#include "..\\common\\thread_owner.h"
 
 #include <winhttp.h>
 #include <string>
@@ -583,13 +585,19 @@ BOOL AnalyzeResponse(const char* str, int strLen, CUploadParams* uploadParams)
     return FALSE;
 }
 
-DWORD WINAPI UploadThreadF(void* param)
+DWORD WINAPI UploadThreadF(void* param, HANDLE stopEvent)
 {
+    // WinHTTP cancellation is driven by Cancelled plus closing active handles;
+    // the common owner stop event must not bypass that transport cleanup.
+    (void)stopEvent;
     CUploadParams* uploadParams = (CUploadParams*)param;
     uploadParams->Result = UploadReport(uploadParams);
     return EXIT_SUCCESS;
 }
 
+// The owner closes the actual handle only after the upload callback has finished;
+// HUploadThread remains a borrowed compatibility probe for the dialog.
+CThreadOwner* UploadThreadOwner = NULL;
 HANDLE HUploadThread = NULL;
 
 BOOL StartUploadThread(CUploadParams* params)
@@ -607,9 +615,16 @@ BOOL StartUploadThread(CUploadParams* params)
     ActiveUploadSession = NULL;
     LeaveCriticalSection(&UploadRequestLock);
     InterlockedExchange(&params->Cancelled, FALSE);
-    DWORD id;
-    HUploadThread = CreateThread(NULL, 0, UploadThreadF, params, 0, &id);
-    return HUploadThread != NULL;
+    UploadThreadOwner = new CThreadOwner;
+    if (UploadThreadOwner == NULL ||
+        !UploadThreadOwner->Start(UploadThreadF, params, "crash-report upload"))
+    {
+        delete UploadThreadOwner;
+        UploadThreadOwner = NULL;
+        return FALSE;
+    }
+    HUploadThread = UploadThreadOwner->GetThreadHandle();
+    return TRUE;
 }
 
 void CancelUploadThread(CUploadParams* params)
@@ -643,7 +658,10 @@ BOOL IsUploadThreadRunning()
     DWORD res = WaitForSingleObject(HUploadThread, 0);
     if (res != WAIT_TIMEOUT)
     {
-        CloseHandle(HUploadThread);
+        // Completion was observed before the dialog can release CUploadParams.
+        UploadThreadOwner->StopAndJoin(0);
+        delete UploadThreadOwner;
+        UploadThreadOwner = NULL;
         HUploadThread = NULL;
         return FALSE;
     }

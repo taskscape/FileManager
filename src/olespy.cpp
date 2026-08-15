@@ -5,6 +5,10 @@
 #include "precomp.h"
 
 #include "olespy.h"
+#include "common/thread_owner.h"
+
+#include <shobjidl.h>
+#include <strsafe.h>
 
 #ifdef _DEBUG
 
@@ -67,6 +71,28 @@
 
 #define SHID_ROOT 0x10
 #define SHID_ROOT_REGITEM 0x1f // Mail
+
+// Leak diagnostics need a displayable filesystem path, but must not depend on the fixed-size legacy PIDL conversion API.
+static BOOL GetPidlFileSystemPathAnsi(LPCITEMIDLIST pidl, char* path, int pathSize)
+{
+    IShellItem* item = NULL;
+    PWSTR widePath = NULL;
+    BOOL success = FALSE;
+
+    if (path == NULL || pathSize <= 0)
+        return FALSE;
+    path[0] = 0;
+    if (SUCCEEDED(SHCreateItemFromIDList(pidl, IID_PPV_ARGS(&item))) &&
+        SUCCEEDED(item->GetDisplayName(SIGDN_FILESYSPATH, &widePath)))
+    {
+        success = WideCharToMultiByte(CP_ACP, 0, widePath, -1, path, pathSize, NULL, NULL) != 0;
+    }
+    if (widePath != NULL)
+        CoTaskMemFree(widePath);
+    if (item != NULL)
+        item->Release();
+    return success;
+}
 
 #if ((DRIVE_REMOVABLE | DRIVE_FIXED | DRIVE_REMOTE | DRIVE_CDROM | DRIVE_RAMDISK) != 0x07)
 #error Definitions of DRIVE_* are changed!
@@ -169,7 +195,8 @@ const char* DumpPidl(LPCITEMIDLIST pidl)
     while (!ILIsEmpty(pidl))
     {
         cb = pidl->mkid.cb;
-        wsprintf(szTmp, "cb:%x id:", cb);
+        // Keep each diagnostic PIDL fragment bounded before appending it to the dump.
+        _stprintf_s(szTmp, _countof(szTmp), _T("cb:%x id:"), cb);
         StrNCat(szBuf, szTmp, sizeof(szBuf));
 
         switch (SIL_GetType(pidl) & SHID_TYPEMASK)
@@ -782,14 +809,22 @@ void CMallocSpy::SpyStoreStack(SPYBLK* psb)
     if (stack != NULL)
     {
         stack->Reset();
-        lstrcpyn(psb->szStackHead, stack->GetNextLine(), SPYBLK_STACKLEN);
+        // Keep diagnostic call-stack fields intentionally clipped to their persisted record size.
+        const char* firstLine = stack->GetNextLine();
+        if (firstLine != NULL)
+            StringCchCopyNA(psb->szStackHead, _countof(psb->szStackHead), firstLine, _countof(psb->szStackHead) - 1);
+        else
+            psb->szStackHead[0] = 0;
         const char* sOld = NULL;
         const char* sNew;
         do
         {
             sNew = stack->GetNextLine();
             if (sNew == NULL && sOld != NULL)
-                lstrcpyn(psb->szStackTail, sOld, SPYBLK_STACKLEN);
+            {
+                // Keep diagnostic call-stack fields intentionally clipped to their persisted record size.
+                StringCchCopyNA(psb->szStackTail, _countof(psb->szStackTail), sOld, _countof(psb->szStackTail) - 1);
+            }
             sOld = sNew;
         } while (sNew != NULL);
     }
@@ -864,7 +899,8 @@ STDAPI _StrRetToBuf(STRRET* psr, LPCITEMIDLIST pidl, LPSTR pszBuf, UINT cchBuf)
         const char* str = (const char*)psr->cStr;
         if (strlen(str) + 1 > cchBuf)
             TRACE_E("_StrRetToBuf: buffer is short cchBuf=" << cchBuf);
-        lstrcpyn(pszBuf, str, cchBuf);
+        // Preserve this compatibility helper's successful, clipped output contract.
+        StringCchCopyNA(pszBuf, cchBuf, str, cchBuf - 1);
         hres = S_OK;
         break;
     }
@@ -876,7 +912,8 @@ STDAPI _StrRetToBuf(STRRET* psr, LPCITEMIDLIST pidl, LPSTR pszBuf, UINT cchBuf)
             const char* str = (const char*)pidl + psr->uOffset;
             if (strlen(str) + 1 > cchBuf)
                 TRACE_E("_StrRetToBuf: buffer is short cchBuf=" << cchBuf);
-            lstrcpyn(pszBuf, str, cchBuf);
+            // Preserve this compatibility helper's successful, clipped output contract.
+            StringCchCopyNA(pszBuf, cchBuf, str, cchBuf - 1);
             hres = S_OK;
         }
         break;
@@ -948,7 +985,7 @@ BOOL CMallocSpy::DumpLeaks()
                 if (FS_IsValidID((LPITEMIDLIST)pvRequest))
                 {
                     char szTemp[MAX_PATH];
-                    SHGetPathFromIDList((LPCITEMIDLIST)pvRequest, szTemp);
+                    GetPidlFileSystemPathAnsi((LPCITEMIDLIST)pvRequest, szTemp, _countof(szTemp));
                     if (szTemp[0])
                     {
                         sprintf(buff, "  Pidl for '%s'", szTemp);
@@ -966,7 +1003,7 @@ BOOL CMallocSpy::DumpLeaks()
                     if (SUCCEEDED(SHGetDesktopFolder(&desktopFolder)))
                     {
                         char szTemp[MAX_PATH];
-                        if (SHGetPathFromIDList((LPCITEMIDLIST)pvRequest, szTemp) && szTemp[0] != 0)
+                        if (GetPidlFileSystemPathAnsi((LPCITEMIDLIST)pvRequest, szTemp, _countof(szTemp)) && szTemp[0] != 0)
                         {
                             sprintf(buff, "  Pidl for '%s'", szTemp);
                             _OutputDebugString(TRUE, buff);
@@ -1152,12 +1189,13 @@ unsigned OleSpyStressTest(void *param)
   return 0;
 }
 
-DWORD WINAPI OleSpyStressTestF(void *param)
+DWORD WINAPI OleSpyStressTestF(void* param, HANDLE stopEvent)
 {
   CALL_STACK_MESSAGE_NONE
 #ifndef CALLSTK_DISABLE
   CCallStack stack;
 #endif // CALLSTK_DISABLE
+  (void)stopEvent; // This bounded diagnostic worker has no external state to cancel.
   return OleSpyStressTest(param);
 }
 
@@ -1165,17 +1203,15 @@ void OleSpyStressTest()
 {
   // start threads that stress IMalloc
 
-  DWORD threadID;
-  HANDLE thread1 = HANDLES(CreateThread(NULL, 0, OleSpyStressTestF, 0, 0, &threadID));
-  HANDLE thread2 = HANDLES(CreateThread(NULL, 0, OleSpyStressTestF, 0, 0, &threadID));
-  HANDLE thread3 = HANDLES(CreateThread(NULL, 0, OleSpyStressTestF, 0, 0, &threadID));
-  HANDLE thread4 = HANDLES(CreateThread(NULL, 0, OleSpyStressTestF, 0, 0, &threadID));
-  HANDLE thread5 = HANDLES(CreateThread(NULL, 0, OleSpyStressTestF, 0, 0, &threadID));
+  CThreadOwner workers[5];
+  for (int i = 0; i < _countof(workers); i++)
+  {
+    // The owners retain each diagnostic worker until it has left OLE's allocator callbacks.
+    if (!workers[i].Start(OleSpyStressTestF, NULL, "OLE allocator stress"))
+      TRACE_E("Unable to start OLE allocator stress worker.");
+  }
 
-  if (thread1 != NULL && WaitForSingleObject(thread1, INFINITE) == WAIT_OBJECT_0) HANDLES(CloseHandle(thread1));
-  if (thread2 != NULL && WaitForSingleObject(thread2, INFINITE) == WAIT_OBJECT_0) HANDLES(CloseHandle(thread2));
-  if (thread3 != NULL && WaitForSingleObject(thread3, INFINITE) == WAIT_OBJECT_0) HANDLES(CloseHandle(thread3));
-  if (thread4 != NULL && WaitForSingleObject(thread4, INFINITE) == WAIT_OBJECT_0) HANDLES(CloseHandle(thread4));
-  if (thread5 != NULL && WaitForSingleObject(thread5, INFINITE) == WAIT_OBJECT_0) HANDLES(CloseHandle(thread5));
+  for (int i = 0; i < _countof(workers); i++)
+    workers[i].StopAndJoin(CThreadShutdownDeadline("OLE allocator stress"));
 }
 */

@@ -4,6 +4,8 @@
 #include "precomp.h"
 #include "release_diagnostics.h"
 
+#include <strsafe.h>
+
 namespace
 {
 const LONG kReleaseDiagnosticCapacity = 128;
@@ -12,7 +14,8 @@ const size_t kReleaseDiagnosticDetailLength = 80;
 struct CReleaseDiagnosticEntry
 {
     volatile LONG Sequence;
-    DWORD Tick;
+    // This private ring does not cross a process or ABI boundary, so retain full monotonic uptime.
+    ULONGLONG Tick;
     char Category[16];
     char Detail[kReleaseDiagnosticDetailLength];
 };
@@ -60,7 +63,7 @@ void RecordReleaseDiagnostic(const char* category, const char* detail)
             break;
         YieldProcessor();
     }
-    entry.Tick = GetTickCount();
+    entry.Tick = GetTickCount64();
     CopySanitizedLabel(entry.Category, _countof(entry.Category), category);
     CopySanitizedLabel(entry.Detail, _countof(entry.Detail), detail);
     MemoryBarrier();
@@ -76,8 +79,8 @@ void FormatAndRecord(const char* category, const char* format, int first, int se
 
 void FormatDiagnosticLine(char* target, size_t targetSize, const CReleaseDiagnosticEntry& entry)
 {
-    _snprintf_s(target, targetSize, _TRUNCATE, "%ld tick=%lu %s: %s",
-                entry.Sequence, entry.Tick, entry.Category, entry.Detail);
+    _snprintf_s(target, targetSize, _TRUNCATE, "%ld tick=%llu %s: %s",
+                entry.Sequence, (unsigned long long)entry.Tick, entry.Category, entry.Detail);
 }
 
 BOOL WriteDiagnosticText(HANDLE file, const char* text)
@@ -102,8 +105,11 @@ void EnumerateReleaseDiagnosticEntries(TConsumer consumer)
             CReleaseDiagnosticEntry snapshot = {};
             snapshot.Sequence = sequence;
             snapshot.Tick = entry.Tick;
-            lstrcpyn(snapshot.Category, entry.Category, _countof(snapshot.Category));
-            lstrcpyn(snapshot.Detail, entry.Detail, _countof(snapshot.Detail));
+            // Snapshot copies retain valid empty labels if a concurrently repaired entry is malformed.
+            if (FAILED(StringCchCopyA(snapshot.Category, _countof(snapshot.Category), entry.Category)))
+                snapshot.Category[0] = 0;
+            if (FAILED(StringCchCopyA(snapshot.Detail, _countof(snapshot.Detail), entry.Detail)))
+                snapshot.Detail[0] = 0;
             MemoryBarrier();
             InterlockedCompareExchange(&entry.Sequence, sequence, -sequence);
             consumer(snapshot);

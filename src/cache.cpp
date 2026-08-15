@@ -3,11 +3,13 @@
 // CommentsTranslationProject: TRANSLATED
 
 #include "precomp.h"
+#include <strsafe.h>
 
 #include "mainwnd.h"
 #include "cache.h"
 #include "plugins.h"
 #include "dialogs.h"
+#include "common\\scoped_native_resources.h"
 
 CDiskCache DiskCache;
 CDeleteManager DeleteManager;
@@ -832,8 +834,11 @@ unsigned ThreadCacheHandlesEH(void* param)
 #endif // CALLSTK_DISABLE
 }
 
-DWORD WINAPI ThreadCacheHandles(void* param)
+DWORD WINAPI ThreadCacheHandlesOwned(void* param, HANDLE stopEvent)
 {
+    // The cache's terminate event controls its wait set; the owner event only
+    // provides a common lifetime boundary for the thread handle.
+    (void)stopEvent;
 #ifndef CALLSTK_DISABLE
     CCallStack stack;
 #endif // CALLSTK_DISABLE
@@ -842,6 +847,7 @@ DWORD WINAPI ThreadCacheHandles(void* param)
 
 CCacheHandles::CCacheHandles() : Handles(100, 50), Owners(100, 50)
 {
+    ThreadOwner = NULL;
     Idle = 0;
     HandleInBox = NULL;
     OwnerInBox = NULL;
@@ -864,7 +870,6 @@ CCacheHandles::CCacheHandles() : Handles(100, 50), Owners(100, 50)
         if (IsIdle != NULL)
             HANDLES(CloseHandle(IsIdle));
         IsIdle = TestIdle = Terminate = BoxFull = Box = NULL;
-        Thread = NULL;
     }
     else
     {
@@ -876,12 +881,15 @@ CCacheHandles::CCacheHandles() : Handles(100, 50), Owners(100, 50)
         Owners.Add(0);
         if (Handles.IsGood() && Owners.IsGood())
         {
-            DWORD threadID;
-            Thread = HANDLES(CreateThread(NULL, 0, ThreadCacheHandles, this, 0, &threadID));
+            ThreadOwner = new CThreadOwner;
+            if (ThreadOwner == NULL ||
+                !ThreadOwner->Start(ThreadCacheHandlesOwned, this, "cache-handles worker"))
+            {
+                delete ThreadOwner;
+                ThreadOwner = NULL;
+            }
         }
-        else
-            Thread = NULL;
-        if (Thread == NULL)
+        if (ThreadOwner == NULL)
         {
             TRACE_E("Unable to start cache-handles thread.");
             if (Box != NULL)
@@ -902,14 +910,14 @@ CCacheHandles::CCacheHandles() : Handles(100, 50), Owners(100, 50)
 void CCacheHandles::Destroy()
 {
     CALL_STACK_MESSAGE1("CCacheHandles::Destroy()");
-    if (Thread != NULL)
+    if (ThreadOwner != NULL)
     {
         SetEvent(Terminate);                                   // "you should end now"
         // Cache cleanup may be waiting on filesystem I/O, so preserve its
         // recovery state through the named cancellation/recovery deadline.
-        CThreadShutdownDeadline("cache-handles worker").WaitForSafeJoin(Thread);
-        HANDLES(CloseHandle(Thread));
-        Thread = NULL;
+        ThreadOwner->StopAndJoin(CThreadShutdownDeadline("cache-handles worker"));
+        delete ThreadOwner;
+        ThreadOwner = NULL;
     }
     if (Terminate != NULL)
         HANDLES(CloseHandle(Terminate));
@@ -1559,14 +1567,18 @@ void CDiskCache::ClearTEMPIfNeeded(HWND parent, HWND hActivePanel)
                 {
                     for (int i = 0; i < tmpDirs.Count; i++)
                     {
-                        lstrcpyn(tmpDirEnd, tmpDirs[i], (int)(2 * MAX_PATH - (tmpDirEnd - tmpDir)));
-                        RemoveTemporaryDir(tmpDir);
+                        // Removal must use a complete temporary-directory suffix.
+                        if (SUCCEEDED(StringCchCopyA(tmpDirEnd, _countof(tmpDir) - (tmpDirEnd - tmpDir), tmpDirs[i])))
+                            RemoveTemporaryDir(tmpDir);
+                        else
+                            TRACE_E("Temporary directory path is too long to remove safely");
                     }
                 }
                 if (ret == IDIGNORE) // focus
                 {
-                    lstrcpyn(tmpDirEnd, tmpDirs[0], (int)(2 * MAX_PATH - (tmpDirEnd - tmpDir)));
-                    SendMessage(hActivePanel, WM_USER_FOCUSFILE, (WPARAM) "", (LPARAM)tmpDir);
+                    // Focus only a complete path so the panel cannot select a different directory.
+                    if (SUCCEEDED(StringCchCopyA(tmpDirEnd, _countof(tmpDir) - (tmpDirEnd - tmpDir), tmpDirs[0])))
+                        SendMessage(hActivePanel, WM_USER_FOCUSFILE, (WPARAM) "", (LPARAM)tmpDir);
                 }
             }
         }
@@ -1597,6 +1609,8 @@ CDeleteManager::CDeleteManager() : Data(10, 50)
     HANDLES(InitializeCriticalSection(&CS));
     WaitingForProcessing = FALSE;
     BlockDataProcessing = FALSE;
+    QueueHighWater = 0;
+    QueueRejected = 0;
     // Start invalid so startup workers cannot target a window before it has registered itself.
     CallbackWindow = NULL;
     CallbackGeneration = 0;
@@ -1618,7 +1632,8 @@ BOOL CDeleteManager::PostProcessMessageLocked()
 
 void CDeleteManager::RegisterCallbackWindow(HWND hWindow)
 {
-    HANDLES(EnterCriticalSection(&CS));
+    // This queue lock protects worker-to-UI handoff state at the shared worker-queue rank.
+    CScopedCriticalSection lock(&CS, lkrWorkerQueue, "DeleteManager.Queue");
     CallbackWindow = hWindow;
     CallbackGeneration++;
     if (CallbackGeneration == 0)
@@ -1634,12 +1649,12 @@ void CDeleteManager::RegisterCallbackWindow(HWND hWindow)
             TRACE_E("Unable to post delete-manager notification to the registered main window.");
         }
     }
-    HANDLES(LeaveCriticalSection(&CS));
 }
 
 void CDeleteManager::InvalidateCallbackWindow(HWND hWindow)
 {
-    HANDLES(EnterCriticalSection(&CS));
+    // Keep callback-generation invalidation ordered with concurrent queue posts.
+    CScopedCriticalSection lock(&CS, lkrWorkerQueue, "DeleteManager.Queue");
     if (CallbackWindow == hWindow)
     {
         // Invalidate before DestroyWindow completes so workers cannot post to a closing or reused HWND.
@@ -1648,16 +1663,27 @@ void CDeleteManager::InvalidateCallbackWindow(HWND hWindow)
         if (CallbackGeneration == 0)
             CallbackGeneration++;
     }
-    HANDLES(LeaveCriticalSection(&CS));
 }
 
 BOOL CDeleteManager::IsCurrentCallbackWindow(HWND hWindow, DWORD generation)
 {
-    HANDLES(EnterCriticalSection(&CS));
+    // Compare the HWND and generation under the same ranked queue boundary as posting.
+    CScopedCriticalSection lock(&CS, lkrWorkerQueue, "DeleteManager.Queue");
     // The receiver verifies both values because an HWND can be recycled after an asynchronous post.
     BOOL isCurrent = CallbackWindow == hWindow && CallbackGeneration == generation;
-    HANDLES(LeaveCriticalSection(&CS));
     return isCurrent;
+}
+
+CDeleteManagerQueueMetrics CDeleteManager::GetQueueMetrics()
+{
+    // Report a coherent cleanup-queue snapshot while producers can continue asynchronously.
+    CScopedCriticalSection lock(&CS, lkrWorkerQueue, "DeleteManager.Queue");
+    CDeleteManagerQueueMetrics metrics;
+    metrics.Capacity = DELETE_MANAGER_QUEUE_LIMIT;
+    metrics.Queued = Data.Count;
+    metrics.HighWater = QueueHighWater;
+    metrics.Rejected = QueueRejected;
+    return metrics;
 }
 
 void CDeleteManager::AddFile(const char* fileName, CPluginInterfaceAbstract* plugin)
@@ -1667,28 +1693,41 @@ void CDeleteManager::AddFile(const char* fileName, CPluginInterfaceAbstract* plu
     CDeleteManagerItem* item = new CDeleteManagerItem(fileName, plugin);
     if (item != NULL && item->IsGood())
     {
-        HANDLES(EnterCriticalSection(&CS));
-        Data.Add(item);
-        if (Data.IsGood())
         {
-            item = NULL;               // it's added, it will be deallocated outside this method
-            if (!WaitingForProcessing) // if needed, we will ensure processing of new data
+            // Enqueue and select a notification atomically so no producer races a lost wake-up.
+            CScopedCriticalSection lock(&CS, lkrWorkerQueue, "DeleteManager.Queue");
+            if (Data.Count >= DELETE_MANAGER_QUEUE_LIMIT)
             {
-                WaitingForProcessing = TRUE;
-                // Post only through the generation-checked registration, never through MainWindow's raw HWND.
-                if (!PostProcessMessageLocked())
+                // Cleanup is non-durable; refuse excess work rather than allow a stalled UI to exhaust memory.
+                QueueRejected++;
+                TRACE_E("Delete-manager cleanup queue is full; dropping temporary-copy cleanup request.");
+            }
+            else
+            {
+                Data.Add(item);
+                if (Data.IsGood())
                 {
-                    WaitingForProcessing = FALSE;
-                    TRACE_E("Unable to post delete-manager notification; the main window is not registered.");
+                    item = NULL;               // it's added, it will be deallocated outside this method
+                    if (Data.Count > QueueHighWater)
+                        QueueHighWater = Data.Count;
+                    if (!WaitingForProcessing) // if needed, we will ensure processing of new data
+                    {
+                        WaitingForProcessing = TRUE;
+                        // Post only through the generation-checked registration, never through MainWindow's raw HWND.
+                        if (!PostProcessMessageLocked())
+                        {
+                            WaitingForProcessing = FALSE;
+                            TRACE_E("Unable to post delete-manager notification; the main window is not registered.");
+                        }
+                    }
+                }
+                else
+                {
+                    Data.ResetState();
+                    TRACE_I("Unable to delete file " << fileName << ". Low memory!");
                 }
             }
         }
-        else
-        {
-            Data.ResetState();
-            TRACE_I("Unable to delete file " << fileName << ". Low memory!");
-        }
-        HANDLES(LeaveCriticalSection(&CS));
     }
     if (item != NULL)
         delete item; // if adding failed, we will deallocate the item
@@ -1714,17 +1753,19 @@ void CDeleteManager::ProcessData()
     {
         // new data selection
         CDeleteManagerItem* item = NULL;
-        HANDLES(EnterCriticalSection(&CS));
-        if (Data.Count > 0)
         {
-            item = Data[0]; // we will select the oldest item (it can't be NULL)
-            Data.Detach(0);
-            if (!Data.IsGood())
-                Data.ResetState(); // the element has been detached, and it doesn't matter if the array is larger
+            // Detach under the rank, then call into the plug-in without holding shared queue state.
+            CScopedCriticalSection lock(&CS, lkrWorkerQueue, "DeleteManager.Queue");
+            if (Data.Count > 0)
+            {
+                item = Data[0]; // we will select the oldest item (it can't be NULL)
+                Data.Detach(0);
+                if (!Data.IsGood())
+                    Data.ResetState(); // the element has been detached, and it doesn't matter if the array is larger
+            }
+            else
+                WaitingForProcessing = FALSE; // we are finishing processing
         }
-        else
-            WaitingForProcessing = FALSE; // we are finishing processing
-        HANDLES(LeaveCriticalSection(&CS));
         if (item == NULL)
             break; // the end of data processing
 
@@ -1757,20 +1798,22 @@ void CDeleteManager::PluginMayBeUnloaded(HWND parent, CPluginData* plugin)
         // lower the thread's priority - we are going to delete a file in the plugin
         SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_NORMAL);
 
-        HANDLES(EnterCriticalSection(&CS));
-        if (WaitingForProcessing) // message is on its way, we will cancel it, it is unnecessary, at the end of the method data processing will take place
         {
-            if (MainWindow != NULL && MainWindow->HWindow != NULL)
+            // The unload handoff changes only queue flags while this ranked lock is held.
+            CScopedCriticalSection lock(&CS, lkrWorkerQueue, "DeleteManager.Queue");
+            if (WaitingForProcessing) // message is on its way, we will cancel it, it is unnecessary, at the end of the method data processing will take place
             {
-                // we will clean the message-queue from buffered WM_USER_PROCESSDELETEMAN
-                MSG msg;
-                PeekMessage(&msg, MainWindow->HWindow, WM_USER_PROCESSDELETEMAN, WM_USER_PROCESSDELETEMAN, PM_REMOVE);
-                KillTimer(MainWindow->HWindow, IDT_DELETEMNGR_PROCESS); // timer for delayed data processing (it is posted in WM_USER_PROCESSDELETEMAN)
+                if (MainWindow != NULL && MainWindow->HWindow != NULL)
+                {
+                    // we will clean the message-queue from buffered WM_USER_PROCESSDELETEMAN
+                    MSG msg;
+                    PeekMessage(&msg, MainWindow->HWindow, WM_USER_PROCESSDELETEMAN, WM_USER_PROCESSDELETEMAN, PM_REMOVE);
+                    KillTimer(MainWindow->HWindow, IDT_DELETEMNGR_PROCESS); // timer for delayed data processing (it is posted in WM_USER_PROCESSDELETEMAN)
+                }
             }
+            else
+                WaitingForProcessing = TRUE; // we will block sending WM_USER_PROCESSDELETEMAN - undesirable and unnecessary, data processing will take place at the end of the method
         }
-        else
-            WaitingForProcessing = TRUE; // we will block sending WM_USER_PROCESSDELETEMAN - undesirable and unnecessary, data processing will take place at the end of the method
-        HANDLES(LeaveCriticalSection(&CS));
 
         BlockDataProcessing = TRUE; // // in case we missed a WM_TIMER message posted to the main window (we block it, because it can be delivered by the first displayed messagebox and its message loop)
 

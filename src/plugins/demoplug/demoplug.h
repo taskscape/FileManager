@@ -11,6 +11,8 @@
 
 #pragma once
 
+#include "..\\..\\common\\monotonic_time.h"
+
 // if DEMOPLUG_QUIET is defined, keep message-box prompts to a minimum
 #define DEMOPLUG_QUIET
 
@@ -408,7 +410,7 @@ protected:
 
     // because the dialog does not run in its own thread, using a WM_TIMER method is pointless
     // the caller must invoke us anyway to pump the message queue
-    DWORD LastTickCount; // to detect when changed data needs to be repainted
+    CMonotonicTimePoint LastTickCount; // to detect when changed data needs to be repainted without a wrapping clock
 
     char TextCache[MAX_PATH];
     BOOL TextCacheIsDirty;

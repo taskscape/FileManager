@@ -142,7 +142,8 @@ BOOL CPSPGeneral::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         case PSN_APPLY:
         {
             int ret = CPropSheetPage::DialogProc(uMsg, wParam, lParam);
-            LONG oldExStyle = GetWindowLong(MainWindow->HWindow, GWL_EXSTYLE);
+            // Keep the window-style read pointer-width so this property-page update is x64-safe.
+            LONG_PTR oldExStyle = GetWindowLongPtr(MainWindow->HWindow, GWL_EXSTYLE);
             if (((oldExStyle & WS_EX_TOOLWINDOW) != 0) != ConfigData.UseToolbarCaption)
             {
                 if (ConfigData.UseToolbarCaption)
@@ -154,7 +155,7 @@ BOOL CPSPGeneral::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                 {
                     oldExStyle &= ~WS_EX_TOOLWINDOW;
                 }
-                SetWindowLong(MainWindow->HWindow, GWL_EXSTYLE, oldExStyle);
+                SetWindowLongPtr(MainWindow->HWindow, GWL_EXSTYLE, oldExStyle);
 
                 WINDOWPLACEMENT wp;
                 GetWindowPlacement(MainWindow->HWindow, &wp);

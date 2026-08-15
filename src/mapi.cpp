@@ -5,6 +5,7 @@
 #include "precomp.h"
 
 #include "mapi.h"
+#include "common\\thread_owner.h"
 
 CSimpleMAPI::CSimpleMAPI()
     : FileNames(10, 50), TotalSize(0, 0)
@@ -235,10 +236,11 @@ unsigned SimpleMAPISendMailThreadEH(void* param)
 #endif // CALLSTK_DISABLE
 }
 
-DWORD WINAPI SimpleMAPISendMailThread(void* param)
+DWORD WINAPI SimpleMAPISendMailThread(void* param, HANDLE stopEvent)
 {
     CALL_STACK_MESSAGE_NONE
     CCallStack stack;
+    (void)stopEvent; // MAPI provider calls are not safely interruptible; shutdown joins them.
     return SimpleMAPISendMailThreadEH(param);
 }
 
@@ -247,18 +249,18 @@ BOOL SimpleMAPISendMail(CSimpleMAPI* mapi)
     CALL_STACK_MESSAGE_NONE
     HCURSOR hOldCur = SetCursor(LoadCursor(NULL, IDC_WAIT));
 
-    DWORD threadID;
-    HANDLE thread = HANDLES(CreateThread(NULL, 0, SimpleMAPISendMailThread, mapi, 0, &threadID));
-    if (thread == NULL)
+    CThreadOwner* thread = new CThreadOwner;
+    if (thread == NULL || !thread->Start(SimpleMAPISendMailThread, mapi, "Simple MAPI sender"))
     {
         TRACE_E("Unable to start SimpleMAPISendMailThread thread.");
+        delete thread;
         delete mapi;
         SetCursor(hOldCur);
         return FALSE;
     }
 
     // MAPI may be inside provider code, so shutdown waits rather than ending it unsafely.
-    AddAuxThread(thread, FALSE, "Simple MAPI sender");
+    AddOwnedAuxThread(thread, "Simple MAPI sender");
     SetCursor(hOldCur);
     return TRUE;
 }

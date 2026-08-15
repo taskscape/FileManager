@@ -16,6 +16,9 @@
 #include "chicon.h"
 #include "resedit.h"
 #include "selfextr\\comdefs.h"
+#include "..\\..\\common\\checked_arithmetic.h"
+
+#define ICO_IMAGE_MAX_BYTES (32 * 1024 * 1024)
 
 CIcon* LoadIconsFromDirectory(HINSTANCE module, LPICONDIR directory, BOOL isIco);
 LPICONDIR LoadIconDirectoryByResName(HINSTANCE module, LPTSTR lpszName);
@@ -31,7 +34,7 @@ BOOL Read(HANDLE file, void* buffer, DWORD size);
 BOOL ChangeSfxIconAndAddManifest(const char* sfxFile, CIcon* icons, int iconsCount, LPVOID manifest, DWORD manifestSize)
 {
     CALL_STACK_MESSAGE3("ChangeSfxIcon(%s, , %d)", sfxFile, iconsCount);
-    if (!icons)
+    if (!icons || iconsCount <= 0 || iconsCount > USHRT_MAX)
         return FALSE;
 
     TIndirectArray2<TCHAR> IDsArray(16, FALSE);
@@ -43,7 +46,14 @@ BOOL ChangeSfxIconAndAddManifest(const char* sfxFile, CIcon* icons, int iconsCou
         LoadIDsList(module, IDsArray);
         FreeLibrary(module);
 
-        DWORD size = sizeof(MEMICONDIR) + (iconsCount - 1) * sizeof(MEMICONDIRENTRY);
+        size_t entryBytes;
+        size_t size;
+        DWORD resourceSize;
+        // The icon count crosses the plug-in boundary and is stored in both an allocation and a WORD resource field.
+        if (!CheckedMultiplySize((size_t)iconsCount - 1, sizeof(MEMICONDIRENTRY), &entryBytes) ||
+            !CheckedAddSize(sizeof(MEMICONDIR), entryBytes, &size) ||
+            !CheckedCastSizeToDword(size, &resourceSize))
+            return FALSE;
         LPMEMICONDIR dir = (LPMEMICONDIR)malloc(size);
         if (dir)
         {
@@ -53,7 +63,7 @@ BOOL ChangeSfxIconAndAddManifest(const char* sfxFile, CIcon* icons, int iconsCou
                 WORD id = 0;
                 dir->idReserved = 0;
                 dir->idType = 1;
-                dir->idCount = iconsCount;
+                dir->idCount = (WORD)iconsCount;
                 int i;
                 for (i = 0; i < iconsCount; i++)
                 {
@@ -71,7 +81,7 @@ BOOL ChangeSfxIconAndAddManifest(const char* sfxFile, CIcon* icons, int iconsCou
                 }
                 if (i == iconsCount &&
                     re.UpdateResource(RT_GROUP_ICON, MAKEINTRESOURCE(SE_IDI_ICON),
-                                      MAKELANGID(LANG_NEUTRAL, SUBLANG_NEUTRAL), dir, size) &&
+                                      MAKELANGID(LANG_NEUTRAL, SUBLANG_NEUTRAL), dir, resourceSize) &&
                     re.UpdateResource(RT_MANIFEST,
                                       CREATEPROCESS_MANIFEST_RESOURCE_ID,
                                       MAKELANGID(LANG_NEUTRAL, SUBLANG_NEUTRAL), manifest, manifestSize))
@@ -180,7 +190,12 @@ void DestroyIcons(CIcon* icons, int count)
 CIcon* LoadIconsFromDirectory(HINSTANCE module, LPICONDIR directory, BOOL isIco)
 {
     CALL_STACK_MESSAGE2("LoadIconsFromDirectory(, , %d)", isIco);
-    CIcon* icons = (CIcon*)malloc(directory->idCount * sizeof(CIcon));
+    size_t iconsSize;
+    // The directory can originate in an executable resource, so keep its count representable for allocation too.
+    if (directory == NULL || directory->idCount == 0 ||
+        !CheckedMultiplySize(directory->idCount, sizeof(CIcon), &iconsSize))
+        return NULL;
+    CIcon* icons = (CIcon*)malloc(iconsSize);
     if (!icons)
         return NULL;
     int i;
@@ -210,7 +225,7 @@ LPICONDIR LoadIconDirectoryByResName(HINSTANCE module, LPTSTR lpszName)
 {
     CALL_STACK_MESSAGE1("LoadIconDirectoryByResName(, )");
     LPMEMICONDIR memDir = NULL;
-    LPICONDIR dir;
+    LPICONDIR dir = NULL;
     HRSRC hRsrc = FindResource(module, lpszName, RT_GROUP_ICON);
     if (hRsrc)
     {
@@ -218,9 +233,20 @@ LPICONDIR LoadIconDirectoryByResName(HINSTANCE module, LPTSTR lpszName)
         if (hGlobal)
         {
             memDir = (LPMEMICONDIR)LockResource(hGlobal);
-            if (memDir)
+            DWORD resourceSize = SizeofResource(module, hRsrc);
+            size_t sourceEntryBytes;
+            size_t sourceDirectorySize;
+            size_t directoryEntryBytes;
+            size_t directorySize;
+            // Resource metadata is supplied by the selected SFX executable; prove the complete variable record is mapped.
+            if (memDir && memDir->idCount != 0 &&
+                CheckedMultiplySize((size_t)memDir->idCount - 1, sizeof(MEMICONDIRENTRY), &sourceEntryBytes) &&
+                CheckedAddSize(sizeof(MEMICONDIR), sourceEntryBytes, &sourceDirectorySize) &&
+                sourceDirectorySize <= resourceSize &&
+                CheckedMultiplySize((size_t)memDir->idCount - 1, sizeof(ICONDIRENTRY), &directoryEntryBytes) &&
+                CheckedAddSize(sizeof(ICONDIR), directoryEntryBytes, &directorySize))
             {
-                dir = (LPICONDIR)malloc(sizeof(ICONDIR) + (memDir->idCount - 1) * sizeof(ICONDIRENTRY));
+                dir = (LPICONDIR)malloc(directorySize);
                 if (dir)
                 {
                     dir->idReserved = memDir->idReserved;
@@ -291,6 +317,9 @@ LPVOID LoadIconDataFromEXE(HINSTANCE module, DWORD id)
             if (icon)
             {
                 DWORD s = SizeofResource(module, hRsrc);
+                // A corrupted SFX resource must not request an arbitrary heap allocation during icon customization.
+                if (s == 0 || s > ICO_IMAGE_MAX_BYTES)
+                    return NULL;
                 data = malloc(s);
                 if (data)
                     memcpy(data, icon, s);
@@ -324,13 +353,23 @@ LPICONDIR LoadIconDirectoryFromICO(HANDLE icoFile)
     if (!Read(icoFile, &w, sizeof(WORD)))
         return NULL;
 
-    LPICONDIR dir = (LPICONDIR)malloc(sizeof(ICONDIR) + (w - 1) * sizeof(ICONDIRENTRY));
+    size_t entryBytes;
+    size_t directorySize;
+    DWORD directoryReadSize;
+    // A zero count would underflow the variable-length header; retain only a representable record read.
+    if (w == 0 ||
+        !CheckedMultiplySize((size_t)w - 1, sizeof(ICONDIRENTRY), &entryBytes) ||
+        !CheckedAddSize(sizeof(ICONDIR), entryBytes, &directorySize) ||
+        !CheckedMultiplyDword((DWORD)w, (DWORD)sizeof(ICONDIRENTRY), &directoryReadSize))
+        return NULL;
+
+    LPICONDIR dir = (LPICONDIR)malloc(directorySize);
     if (dir)
     {
         dir->idReserved = 0;
         dir->idType = 1;
         dir->idCount = w;
-        if (!Read(icoFile, &dir->idEntries, dir->idCount * sizeof(ICONDIRENTRY)))
+        if (!Read(icoFile, &dir->idEntries, directoryReadSize))
         {
             free(dir);
             return NULL;
@@ -342,9 +381,17 @@ LPICONDIR LoadIconDirectoryFromICO(HANDLE icoFile)
 LPVOID LoadIconDataFromICO(HANDLE icoFile, DWORD offset, DWORD size)
 {
     CALL_STACK_MESSAGE3("LoadIconDataFromICO(, 0x%X, 0x%X)", offset, size);
-    LONG dummy;
-    dummy = 0;
-    if (SetFilePointer(icoFile, offset, &dummy, FILE_BEGIN) == 0xFFFFFFFF && GetLastError() != NO_ERROR)
+    LARGE_INTEGER fileSize;
+    uint64_t imageEnd;
+    // ICO image offsets and sizes are file-provided, so prove their range before seeking or allocating.
+    if (size == 0 || size > ICO_IMAGE_MAX_BYTES || !GetFileSizeEx(icoFile, &fileSize) ||
+        !CheckedAddUInt64(offset, size, &imageEnd) || imageEnd > (uint64_t)fileSize.QuadPart)
+        return NULL;
+
+    // The validated ICO offset is DWORD-sized; use the Boolean API result to distinguish a failed seek.
+    LARGE_INTEGER seekOffset;
+    seekOffset.QuadPart = offset;
+    if (!SetFilePointerEx(icoFile, seekOffset, NULL, FILE_BEGIN))
         return FALSE;
 
     LPVOID data = malloc(size);

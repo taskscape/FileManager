@@ -4,6 +4,10 @@
 
 #include "precomp.h"
 
+#include <strsafe.h>
+
+#include "common\\thread_owner.h"
+
 #include "menu.h"
 #include "drivelst.h"
 #include "cfgdlg.h"
@@ -213,14 +217,17 @@ BOOL NonBlockingWNetAddConnection3(DWORD& err, LPNETRESOURCE lpNetResource,
     // then we will set the parameters and try to start a new thread
     if (lpUserName != NULL)
     {
-        lstrcpyn(NBWNetAC3ThreadFParams.bufUserName, lpUserName, USERNAME_MAXLEN);
+        // The worker receives stable, complete connection identities and credentials.
+        if (FAILED(StringCchCopyA(NBWNetAC3ThreadFParams.bufUserName, _countof(NBWNetAC3ThreadFParams.bufUserName), lpUserName)))
+            return FALSE;
         NBWNetAC3ThreadFParams.lpUserName = NBWNetAC3ThreadFParams.bufUserName;
     }
     else
         NBWNetAC3ThreadFParams.lpUserName = NULL;
     if (lpPassword != NULL)
     {
-        lstrcpyn(NBWNetAC3ThreadFParams.bufPassword, lpPassword, PASSWORD_MAXLEN);
+        if (FAILED(StringCchCopyA(NBWNetAC3ThreadFParams.bufPassword, _countof(NBWNetAC3ThreadFParams.bufPassword), lpPassword)))
+            return FALSE;
         NBWNetAC3ThreadFParams.lpPassword = NBWNetAC3ThreadFParams.bufPassword;
     }
     else
@@ -228,12 +235,14 @@ BOOL NonBlockingWNetAddConnection3(DWORD& err, LPNETRESOURCE lpNetResource,
     NBWNetAC3ThreadFParams.netResource = *lpNetResource;
     if (lpNetResource->lpLocalName != NULL)
     {
-        lstrcpyn(NBWNetAC3ThreadFParams.bufLocalName, lpNetResource->lpLocalName, MAX_PATH);
+        if (FAILED(StringCchCopyA(NBWNetAC3ThreadFParams.bufLocalName, _countof(NBWNetAC3ThreadFParams.bufLocalName), lpNetResource->lpLocalName)))
+            return FALSE;
         NBWNetAC3ThreadFParams.netResource.lpLocalName = NBWNetAC3ThreadFParams.bufLocalName;
     }
     if (lpNetResource->lpRemoteName != NULL)
     {
-        lstrcpyn(NBWNetAC3ThreadFParams.bufRemoteName, lpNetResource->lpRemoteName, MAX_PATH);
+        if (FAILED(StringCchCopyA(NBWNetAC3ThreadFParams.bufRemoteName, _countof(NBWNetAC3ThreadFParams.bufRemoteName), lpNetResource->lpRemoteName)))
+            return FALSE;
         NBWNetAC3ThreadFParams.netResource.lpRemoteName = NBWNetAC3ThreadFParams.bufRemoteName;
     }
     NBWNetAC3ThreadFParams.err = 0;
@@ -269,9 +278,10 @@ BOOL NonBlockingWNetAddConnection3(DWORD& err, LPNETRESOURCE lpNetResource,
     if (errProviderCode != NULL)
         *errProviderCode = NBWNetAC3ThreadFParams.errProviderCode;
     if (errBuf != NULL)
-        lstrcpyn(errBuf, NBWNetAC3ThreadFParams.errBuf, 300);
+        // Provider diagnostics are bounded presentation fields returned to the caller.
+        StringCchCopyNA(errBuf, 300, NBWNetAC3ThreadFParams.errBuf, 299);
     if (errProviderName != NULL)
-        lstrcpyn(errProviderName, NBWNetAC3ThreadFParams.errProviderName, 200);
+        StringCchCopyNA(errProviderName, 200, NBWNetAC3ThreadFParams.errProviderName, 199);
     err = NBWNetAC3ThreadFParams.err;
     return TRUE;
 }
@@ -366,7 +376,8 @@ BOOL IsAdminShareExtraLogonFailureErr(DWORD err, const char* root)
             if (r - server < 50)
             {
                 char ip[51];
-                lstrcpyn(ip, server, (int)((r - server) + 1));
+                // The IPv4 candidate is deliberately the bounded server-name segment.
+                StringCchCopyNA(ip, _countof(ip), server, (size_t)(r - server));
                 if (inet_addr(ip) != INADDR_NONE)
                     root = r; // this is an IP string (aa.bb.cc.dd)
             }
@@ -461,9 +472,11 @@ BOOL RestoreNetworkConnection(HWND parent, const char* name, const char* remoteN
             if (end == NULL || *(end + 1) == 0)
             {
                 if (end == NULL)
-                    lstrcpyn(serverName, lpNetResource->lpRemoteName + 2, MAX_PATH);
+                    // The credential target must contain the complete server identity.
+                    StringCchCopyA(serverName, _countof(serverName), lpNetResource->lpRemoteName + 2);
                 else
-                    lstrcpyn(serverName, lpNetResource->lpRemoteName + 2, (int)min(MAX_PATH, (end - (lpNetResource->lpRemoteName + 2)) + 1));
+                    StringCchCopyNA(serverName, _countof(serverName), lpNetResource->lpRemoteName + 2,
+                                   (size_t)(end - (lpNetResource->lpRemoteName + 2)));
             }
         }
         if (serverName[0] == 0) // this is not a \\server or \\server\ variant, we will solve it by calling the original code
@@ -489,7 +502,8 @@ BOOL RestoreNetworkConnection(HWND parent, const char* name, const char* remoteN
             {
                 const char* last = strchr(end + 2, '\\');
                 if (last == NULL || *(last + 1) == 0) // the own dialog under XP+Vista will be only shown for simple UNC paths: "\\server\share" and "\\server\\share\\"
-                    lstrcpyn(serverName, remoteName + 2, (int)min(MAX_PATH, (end - (remoteName + 2)) + 1));
+                    StringCchCopyNA(serverName, _countof(serverName), remoteName + 2,
+                                   (size_t)(end - (remoteName + 2)));
             }
         }
 
@@ -562,7 +576,8 @@ BOOL RestoreNetworkConnection(HWND parent, const char* name, const char* remoteN
                 if (err == NO_ERROR)                   // user confirmed with OK
                 {
                     confirmCred = TRUE;
-                    lstrcpyn(userNameBuf, dlg.User, USERNAME_MAXLEN);
+                    // Credential dialog fields are fixed presentation records.
+                    StringCchCopyNA(userNameBuf, _countof(userNameBuf), dlg.User, _countof(userNameBuf) - 1);
                     userName = userNameBuf;
                     passwd = dlg.Passwd;
                     /* // there was a problem with trimming the domain from the username, they just couldn't log in because we made their domain name local
@@ -736,7 +751,7 @@ BOOL RestoreNetworkConnection(HWND parent, const char* name, const char* remoteN
                     {
                         if (name == NULL)
                             confirmCred = TRUE;
-                        lstrcpyn(userNameBuf, dlg.User, USERNAME_MAXLEN);
+                        StringCchCopyNA(userNameBuf, _countof(userNameBuf), dlg.User, _countof(userNameBuf) - 1);
                         userName = name != NULL && dlg.User[0] == 0 ? NULL : userNameBuf;
                         passwd = name != NULL && dlg.User[0] == 0 && dlg.Passwd[0] == 0 ? NULL : dlg.Passwd;
                         continue;
@@ -1067,7 +1082,11 @@ CDrivesList::CDrivesList(CFilesWindow* filesWindow, const char* currentPath,
     FilesWindow = filesWindow;
     DriveType = driveType;
     DriveTypeParam = driveTypeParam;
-    lstrcpy(CurrentPath, currentPath);
+    if (FAILED(StringCchCopyA(CurrentPath, _countof(CurrentPath), currentPath)))
+    {
+        // A truncated path could focus the wrong drive-menu item.
+        CurrentPath[0] = 0;
+    }
     PostCmd = postCmd;
     PostCmdParam = postCmdParam;
     FromContextMenu = fromContextMenu;
@@ -1115,7 +1134,8 @@ void GetDisplayNameFromSystem(const char* root, char* volumeName, int volumeName
     SHFILEINFO fi;
     if (SHGetFileInfo(root, 0, &fi, sizeof(fi), SHGFI_DISPLAYNAME))
     {
-        lstrcpyn(volumeName, fi.szDisplayName, volumeNameBufSize);
+        // Shell display names are bounded UI labels.
+        StringCchCopyNA(volumeName, volumeNameBufSize, fi.szDisplayName, volumeNameBufSize - 1);
         char* s = strrchr(volumeName, '(');
         if (s != NULL)
         {
@@ -1139,8 +1159,8 @@ unsigned ReadCDVolNameThreadFBody(void* param) // directory accessibility test
     BOOL run = FALSE;
     if (uid == ReadCDVolNameReqUID) // someone is still waiting for an answer
     {
-        lstrcpyn(root, ReadCDVolNameBuffer, MAX_PATH);
-        run = TRUE;
+        // The worker must probe the complete root currently associated with the request token.
+        run = SUCCEEDED(StringCchCopyA(root, _countof(root), ReadCDVolNameBuffer));
     }
     HANDLES(LeaveCriticalSection(&ReadCDVolNameCS));
 
@@ -1155,7 +1175,7 @@ unsigned ReadCDVolNameThreadFBody(void* param) // directory accessibility test
 
         HANDLES(EnterCriticalSection(&ReadCDVolNameCS));
         if (uid == ReadCDVolNameReqUID) // someone is still waiting for an answer
-            lstrcpyn(ReadCDVolNameBuffer, buf, MAX_PATH);
+            StringCchCopyNA(ReadCDVolNameBuffer, _countof(ReadCDVolNameBuffer), buf, _countof(ReadCDVolNameBuffer) - 1);
         HANDLES(LeaveCriticalSection(&ReadCDVolNameCS));
     }
     return 0;
@@ -1181,12 +1201,13 @@ unsigned ReadCDVolNameThreadFEH(void* param)
 #endif // CALLSTK_DISABLE
 }
 
-DWORD WINAPI ReadCDVolNameThreadF(void* param)
+DWORD WINAPI ReadCDVolNameThreadF(void* param, HANDLE stopEvent)
 {
     CALL_STACK_MESSAGE_NONE
 #ifndef CALLSTK_DISABLE
     CCallStack stack;
 #endif // CALLSTK_DISABLE
+    (void)stopEvent; // Volume labels are queried as one non-interruptible Win32 call and joined on shutdown.
     return ReadCDVolNameThreadFEH(param);
 }
 
@@ -1336,7 +1357,8 @@ void InitDropboxPath()
         DropboxPath[0] = 0;
         char sDbPath[MAX_PATH];
         BOOL cfgAlreadyFound = FALSE;
-        if (SHGetFolderPath(NULL, CSIDL_APPDATA, NULL, 0 /* SHGFP_TYPE_CURRENT */, sDbPath) == S_OK)
+        // Use Known Folders so Dropbox discovery avoids the retired CSIDL shell-path API.
+        if (GetKnownFolderPathToAnsi(FOLDERID_RoamingAppData, sDbPath, _countof(sDbPath)))
         {
             if (SalPathAppend(sDbPath, "Dropbox\\host.db", MAX_PATH) && FileExists(sDbPath))
                 cfgAlreadyFound = TRUE;
@@ -1344,7 +1366,7 @@ void InitDropboxPath()
         else
             TRACE_E("Cannot get value of CSIDL_APPDATA!");
         if (cfgAlreadyFound ||
-            SHGetFolderPath(NULL, CSIDL_LOCAL_APPDATA, NULL, 0 /* SHGFP_TYPE_CURRENT */, sDbPath) == S_OK)
+            GetKnownFolderPathToAnsi(FOLDERID_LocalAppData, sDbPath, _countof(sDbPath)))
         {
             if (cfgAlreadyFound ||
                 SalPathAppend(sDbPath, "Dropbox\\host.db", MAX_PATH) && FileExists(sDbPath))
@@ -1781,25 +1803,37 @@ BOOL CDrivesList::BuildData(BOOL noTimeout, TDirectArray<CDriveData>* copyDrives
                 {
                     HANDLES(EnterCriticalSection(&ReadCDVolNameCS));
                     UINT_PTR uid = ++ReadCDVolNameReqUID;
-                    lstrcpyn(ReadCDVolNameBuffer, root, MAX_PATH);
+                    // Queue only a complete removable-drive root for the shared worker buffer.
+                    StringCchCopyA(ReadCDVolNameBuffer, _countof(ReadCDVolNameBuffer), root);
                     HANDLES(LeaveCriticalSection(&ReadCDVolNameCS));
 
                     // create a thread in which we will find out the volume_name of the CD drive
-                    DWORD threadID;
-                    HANDLE thread = HANDLES(CreateThread(NULL, 0, ReadCDVolNameThreadF,
-                                                         (void*)uid, 0, &threadID));
-                    if (thread != NULL && WaitForSingleObject(thread, noTimeout ? INFINITE : 500) == WAIT_OBJECT_0)
+                    CThreadOwner* thread = new CThreadOwner;
+                    BOOL completed = thread != NULL && thread->Start(ReadCDVolNameThreadF, (void*)uid, "removable-drive volume probe") &&
+                                     WaitForSingleObject(thread->GetThreadHandle(), noTimeout ? INFINITE : 500) == WAIT_OBJECT_0;
+                    if (completed)
 
                     { // give it 500ms to find out the volume-name
                         HANDLES(EnterCriticalSection(&ReadCDVolNameCS));
-                        lstrcpyn(volumeName, ReadCDVolNameBuffer, MAX_PATH + 50);
+                        // The returned label is bounded by the drive-menu presentation buffer.
+                        StringCchCopyNA(volumeName, MAX_PATH + 50, ReadCDVolNameBuffer, MAX_PATH + 49);
                         HANDLES(LeaveCriticalSection(&ReadCDVolNameCS));
                     }
                     else
                         volumeName[0] = 0;
                     if (thread != NULL)
-                        // The probe reads shared volume-name storage during its safe shutdown join.
-                        AddAuxThread(thread, TRUE, "removable-drive volume probe");
+                    {
+                        // A slow probe keeps its owner until shutdown; a completed one releases it immediately.
+                        if (completed)
+                        {
+                            thread->StopAndJoin(CThreadShutdownDeadline("removable-drive volume probe"));
+                            delete thread;
+                        }
+                        else if (thread->HasThread())
+                            AddOwnedAuxThread(thread, "removable-drive volume probe");
+                        else
+                            delete thread;
+                    }
                     if (volumeName[0] == 0)
                         strcpy(volumeName, LoadStr(IDS_COMPACT_DISK));
                     else
@@ -1815,7 +1849,7 @@ BOOL CDrivesList::BuildData(BOOL noTimeout, TDirectArray<CDriveData>* copyDrives
                 }
                 if (freeSpace != CQuadWord(-1, -1))
                 {
-                    char* p = volumeName + lstrlen(volumeName);
+                    char* p = volumeName + strlen(volumeName);
                     if (p == volumeName)
                         *p++ = '\t';
                     *p++ = '\t';
@@ -2635,24 +2669,36 @@ BOOL CDrivesList::GetDriveBarToolTip(int index, char* text)
         root[0] = item->DriveText[0];
         HANDLES(EnterCriticalSection(&ReadCDVolNameCS));
         UINT_PTR uid = ++ReadCDVolNameReqUID;
-        lstrcpyn(ReadCDVolNameBuffer, root, MAX_PATH);
+        // Queue only a complete removable-drive root for the shared worker buffer.
+        StringCchCopyA(ReadCDVolNameBuffer, _countof(ReadCDVolNameBuffer), root);
         HANDLES(LeaveCriticalSection(&ReadCDVolNameCS));
 
         // create thread, in which we will find out the volume_name of the CD drive
-        DWORD threadID;
-        HANDLE thread = HANDLES(CreateThread(NULL, 0, ReadCDVolNameThreadF,
-                                             (void*)uid, 0, &threadID));
-        if (thread != NULL && WaitForSingleObject(thread, 500) == WAIT_OBJECT_0)
+        CThreadOwner* thread = new CThreadOwner;
+        BOOL completed = thread != NULL && thread->Start(ReadCDVolNameThreadF, (void*)uid, "removable-drive volume probe") &&
+                         WaitForSingleObject(thread->GetThreadHandle(), 500) == WAIT_OBJECT_0;
+        if (completed)
         { // give it 500ms to find out the volume-name
             HANDLES(EnterCriticalSection(&ReadCDVolNameCS));
-            lstrcpyn(volumeName, ReadCDVolNameBuffer, MAX_PATH + 50);
+            // The returned label is bounded by the tooltip presentation buffer.
+            StringCchCopyNA(volumeName, MAX_PATH + 50, ReadCDVolNameBuffer, MAX_PATH + 49);
             HANDLES(LeaveCriticalSection(&ReadCDVolNameCS));
         }
         else
             volumeName[0] = 0;
         if (thread != NULL)
-            // The probe reads shared volume-name storage during its safe shutdown join.
-            AddAuxThread(thread, TRUE, "removable-drive volume probe");
+        {
+            // The owner remains alive through a slow probe so it cannot outlive the shared label storage.
+            if (completed)
+            {
+                thread->StopAndJoin(CThreadShutdownDeadline("removable-drive volume probe"));
+                delete thread;
+            }
+            else if (thread->HasThread())
+                AddOwnedAuxThread(thread, "removable-drive volume probe");
+            else
+                delete thread;
+        }
         if (volumeName[0] == 0)
             strcpy(volumeName, LoadStr(IDS_COMPACT_DISK));
 
@@ -2694,7 +2740,8 @@ BOOL CDrivesList::GetDriveBarToolTip(int index, char* text)
             s++; // hot key
         if (*s == '\t')
             s++;
-        lstrcpyn(text, s, TOOLTIP_TEXT_MAX);
+        // Drive tooltip text retains its fixed presentation allocation.
+        StringCchCopyNA(text, TOOLTIP_TEXT_MAX, s, TOOLTIP_TEXT_MAX - 1);
         break;
     }
 
@@ -2709,7 +2756,7 @@ BOOL CDrivesList::GetDriveBarToolTip(int index, char* text)
             const char* e = p + 1; // trim the potential third column in the item name (can be after the second TAB)
             while (*e != 0 && *e != '\t')
                 e++;
-            lstrcpyn(text, p + 1, (int)(e - (p + 1) + 1));
+            StringCchCopyNA(text, TOOLTIP_TEXT_MAX, p + 1, (size_t)(e - (p + 1)));
         }
         break;
     }
@@ -2855,7 +2902,11 @@ BOOL CDrivesList::OnContextMenu(BOOL posByMouse, int itemIndex, int panel, const
 
             char pluginFSNameBuf[MAX_PATH]; // 'pluginFS' may cease to exist, so we put 'fsName' into a local buffer
             if (pluginFSName != NULL)
-                lstrcpyn(pluginFSNameBuf, pluginFSName, MAX_PATH);
+            {
+                // Plug-in context callbacks need a complete filesystem identity after re-entrant UI work.
+                if (FAILED(StringCchCopyA(pluginFSNameBuf, _countof(pluginFSNameBuf), pluginFSName)))
+                    return FALSE;
+            }
             if (pluginData->ChangeDriveMenuItemContextMenu(MainWindow->HWindow, panel, p.x, p.y, pluginFS,
                                                            pluginFSName != NULL ? pluginFSNameBuf : NULL,
                                                            pluginFSName != NULL ? pluginFSNameIndex : -1,

@@ -5,6 +5,7 @@
 #pragma once
 
 #include <atomic>
+#include <strsafe.h>
 
 // when changing this header search for "BuiltForVersion" - tests for older plugin versions will no longer make sense and should be removed
 #define PLUGIN_REQVER 103 // ("5.0") load only plugins that return at least this required Salamander version
@@ -92,6 +93,19 @@ private:
         CPluginCallbackInvokerImpl<decltype(pluginCallbackLambda)> pluginCallbackInvoker(pluginCallbackLambda); \
         CallPluginCallback(pluginInterface, callback, &pluginCallbackInvoker);                      \
     } while (0)
+
+// Plug-ins write into host-owned buffers at this boundary; clear malformed output
+// before any later trace, path, or UI consumer can walk beyond the supplied capacity.
+static BOOL ValidatePluginOutputString(char* buffer, int capacity, const char* diagnostic)
+{
+    if (buffer != NULL && capacity > 0 && memchr(buffer, 0, (size_t)capacity) != NULL)
+        return TRUE;
+
+    TRACE_E(diagnostic);
+    if (buffer != NULL && capacity > 0)
+        buffer[0] = 0;
+    return FALSE;
+}
 
 class CPluginInterfaceForArchiverEncapsulation
 {
@@ -756,6 +770,15 @@ public:
         HIMAGELIST il = Interface->GetSimplePluginIcons(size);
         LeavePlugin();
 
+        const int maxSimplePluginIcons = 4096;
+        int imageCount = il != NULL ? ImageList_GetImageCount(il) : 0;
+        // A plug-in owns this handle, so bound its reported count before conversion can allocate host bitmaps.
+        if (imageCount < 1 || imageCount > maxSimplePluginIcons)
+        {
+            TRACE_E("GetSimplePluginIcons(): invalid plug-in image-list count=" << imageCount);
+            return NULL;
+        }
+
         // convert the plugin's image list into our CIconList
         CIconList* iconList = new CIconList();
         if (iconList != NULL)
@@ -803,6 +826,30 @@ public:
                                                displaySize, selectedSize, buffer,
                                                hotTexts, hotTextsCount);
         LeavePlugin();
+        // The SDK fixes these output capacities; reject malformed plug-in results before UI text/layout consumes them.
+        char* textEnd = r ? (char*)memchr(buffer, 0, 1000) : NULL;
+        BOOL invalidOutput = r && (hotTextsCount < 0 || hotTextsCount > 100 || textEnd == NULL);
+        if (!invalidOutput && r)
+        {
+            const DWORD textLength = (DWORD)(textEnd - buffer);
+            for (int i = 0; i < hotTextsCount; ++i)
+            {
+                const DWORD hotTextStart = LOWORD(hotTexts[i]);
+                const DWORD hotTextLength = HIWORD(hotTexts[i]);
+                if (hotTextStart > textLength || hotTextLength > textLength - hotTextStart)
+                {
+                    invalidOutput = TRUE;
+                    break;
+                }
+            }
+        }
+        if (invalidOutput)
+        {
+            TRACE_E("CPluginDataInterfaceEncapsulation::GetInfoLineContent(): invalid plug-in output count, span, or unterminated text!");
+            buffer[0] = 0;
+            hotTextsCount = 0;
+            r = FALSE;
+        }
         return r;
     }
 
@@ -1009,7 +1056,11 @@ public:
         else
             SupportedServices = 0;
         if (pluginFSName != NULL)
-            lstrcpyn(PluginFSName, pluginFSName, MAX_PATH);
+        {
+            // The active filesystem name is an identity used to reopen the plugin filesystem.
+            if (FAILED(StringCchCopyA(PluginFSName, _countof(PluginFSName), pluginFSName)))
+                PluginFSName[0] = 0;
+        }
         else
             PluginFSName[0] = 0;
         PluginFSNameIndex = pluginFSNameIndex;
@@ -1040,7 +1091,11 @@ public:
         else
             SupportedServices = 0;
         if (pluginFSName != NULL)
-            lstrcpyn(PluginFSName, pluginFSName, MAX_PATH);
+        {
+            // The active filesystem name is an identity used to reopen the plugin filesystem.
+            if (FAILED(StringCchCopyA(PluginFSName, _countof(PluginFSName), pluginFSName)))
+                PluginFSName[0] = 0;
+        }
         else
             PluginFSName[0] = 0;
         PluginFSNameIndex = pluginFSNameIndex;
@@ -1082,7 +1137,9 @@ public:
     // change the FS name
     void SetPluginFS(const char* fsName, int fsNameIndex)
     {
-        lstrcpyn(PluginFSName, fsName, MAX_PATH);
+        // Do not replace the active filesystem with a truncated selection identity.
+        if (FAILED(StringCchCopyA(PluginFSName, _countof(PluginFSName), fsName)))
+            PluginFSName[0] = 0;
         PluginFSNameIndex = fsNameIndex;
     }
 
@@ -1121,6 +1178,11 @@ public:
         EnterPlugin();
         BOOL r = Interface->GetFullName(file, isDir, buf, bufSize);
         LeavePlugin();
+        if (r && !ValidatePluginOutputString(buf, bufSize,
+                                             "CPluginFSInterfaceEncapsulation::GetFullName(): unterminated plug-in output buffer!"))
+        {
+            return FALSE;
+        }
         return r;
     }
 
@@ -1131,6 +1193,12 @@ public:
         EnterPlugin();
         BOOL r = Interface->GetFullFSPath(parent, fsName, path, pathSize, success);
         LeavePlugin();
+        if (r && !ValidatePluginOutputString(path, pathSize,
+                                             "CPluginFSInterfaceEncapsulation::GetFullFSPath(): unterminated plug-in output buffer!"))
+        {
+            success = FALSE;
+            return FALSE;
+        }
         return r;
     }
 
@@ -1224,6 +1292,12 @@ public:
         EnterPlugin();
         Interface->GetDropEffect(srcFSPath, tgtFSPath, allowedEffects, keyState, dropEffect);
         LeavePlugin();
+        // A plug-in may choose only an effect offered by the host; reject bits that could alter unrelated shell behavior.
+        if (dropEffect != NULL && (*dropEffect & ~allowedEffects) != 0)
+        {
+            TRACE_E("CPluginFSInterfaceEncapsulation::GetDropEffect(): invalid plug-in drop-effect mask!");
+            *dropEffect = DROPEFFECT_NONE;
+        }
     }
 
     void GetFSFreeSpace(CQuadWord* retValue)
@@ -1249,6 +1323,13 @@ public:
             EnterPlugin();
             BOOL r = Interface->GetNextDirectoryLineHotPath(text, pathLen, offset);
             LeavePlugin();
+            // The plug-in offset is consumed as an index into caller-owned text, so it must remain inside that range.
+            if (r && (offset < 0 || offset > pathLen))
+            {
+                TRACE_E("CPluginFSInterfaceEncapsulation::GetNextDirectoryLineHotPath(): invalid plug-in text offset!");
+                offset = 0;
+                return FALSE;
+            }
             return r;
         }
         else
@@ -1264,6 +1345,8 @@ public:
             EnterPlugin();
             Interface->CompleteDirectoryLineHotPath(path, pathBufSize);
             LeavePlugin();
+            ValidatePluginOutputString(path, pathBufSize,
+                                       "CPluginFSInterfaceEncapsulation::CompleteDirectoryLineHotPath(): unterminated plug-in output buffer!");
         }
     }
 
@@ -1276,6 +1359,11 @@ public:
             EnterPlugin();
             BOOL r = Interface->GetPathForMainWindowTitle(fsName, mode, buf, bufSize);
             LeavePlugin();
+            if (r && !ValidatePluginOutputString(buf, bufSize,
+                                                 "CPluginFSInterfaceEncapsulation::GetPathForMainWindowTitle(): unterminated plug-in output buffer!"))
+            {
+                return FALSE;
+            }
             return r;
         }
         else
@@ -1535,6 +1623,12 @@ public:
             EnterPlugin();
             Interface->GetAllowedDropEffects(mode, tgtFSPath, allowedEffects);
             LeavePlugin();
+            // The callback refines the standard shell mask, never invents non-drop-effect bits.
+            if (allowedEffects != NULL && (*allowedEffects & ~(DROPEFFECT_COPY | DROPEFFECT_MOVE | DROPEFFECT_LINK | DROPEFFECT_SCROLL)) != 0)
+            {
+                TRACE_E("CPluginFSInterfaceEncapsulation::GetAllowedDropEffects(): invalid plug-in drop-effect mask!");
+                *allowedEffects = DROPEFFECT_NONE;
+            }
         }
     }
 
@@ -1545,6 +1639,9 @@ public:
         EnterPlugin();
         BOOL ret = Interface->GetNoItemsInPanelText(textBuf, textBufSize);
         LeavePlugin();
+        if (ret && !ValidatePluginOutputString(textBuf, textBufSize,
+                                               "CPluginFSInterfaceEncapsulation::GetNoItemsInPanelText(): unterminated plug-in output buffer!"))
+            return FALSE;
         return ret;
     }
 
@@ -1859,8 +1956,14 @@ public:
 
 class CSalamanderGUI : public CSalamanderGUIAbstract
 {
+private:
+    // Icon lists cross the plug-in ownership boundary only after the host factory records their allocation.
+    TDirectArray<CIconList*> CreatedIconLists;
+    CRITICAL_SECTION CreatedIconListsCS;
+
 public:
-    CSalamanderGUI() {}
+    CSalamanderGUI();
+    ~CSalamanderGUI();
 
     // Implementation of CSalamanderGUIAbstract methods:
     virtual CGUIProgressBarAbstract* WINAPI AttachProgressBar(HWND hParent, int ctrlID);
@@ -1882,6 +1985,9 @@ public:
     virtual BOOL WINAPI DisableWindowVisualStyles(HWND hWindow);
     virtual CGUIIconListAbstract* WINAPI CreateIconList();
     virtual BOOL WINAPI DestroyIconList(CGUIIconListAbstract* iconList);
+
+    // Transfers only an object issued by this plug-in's host GUI facade, preventing an unchecked downcast from plug-in memory.
+    BOOL TakeCreatedIconList(CGUIIconListAbstract* iconList, CIconList** createdIconList);
     virtual void WINAPI PrepareToolTipText(char* buf, BOOL stripHotKey);
     virtual void WINAPI SetSubjectTruncatedText(HWND subjectWnd, const char* subjectFormatString,
                                                 const char* fileName, BOOL isDir, BOOL duplicateAmpersands);

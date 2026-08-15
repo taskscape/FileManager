@@ -33,6 +33,8 @@ extern "C"
 #include "crypt\sha1.h"
 #include "pwdmngr.h"
 
+#include <strsafe.h>
+
 // Globals defined in zip_progress.cpp
 extern const char* STR_NONE;
 extern CSalamanderDirectory GlobalEmptySalDir;
@@ -176,7 +178,8 @@ BOOL CSalamanderGeneral::GetSalamanderCommand(int salCmd, char* nameBuf, int nam
 
             if (nameBuf != NULL && nameBufSize > 0)
             {
-                lstrcpyn(nameBuf, ::LoadStr(SalCommandsArray[index].TextID), nameBufSize);
+                // Plug-ins supply this command-label display field; retain its explicit clipping limit.
+                StringCchCopyNA(nameBuf, nameBufSize, ::LoadStr(SalCommandsArray[index].TextID), nameBufSize - 1);
             }
             if (SalCommandsArray[index].Enabled != NULL)
             {
@@ -218,7 +221,8 @@ BOOL CSalamanderGeneral::EnumSalamanderCommands(int* index, int* salCmd, char* n
             *salCmd = SalCommandsArray[*index].SalCmd;
         if (nameBuf != NULL && nameBufSize > 0)
         {
-            lstrcpyn(nameBuf, ::LoadStr(SalCommandsArray[*index].TextID), nameBufSize);
+            // Plug-ins supply this command-label display field; retain its explicit clipping limit.
+            StringCchCopyNA(nameBuf, nameBufSize, ::LoadStr(SalCommandsArray[*index].TextID), nameBufSize - 1);
         }
         if (SalCommandsArray[*index].Enabled != NULL)
         {
@@ -314,7 +318,11 @@ public:
     CSalamanderMaskGroupImp() : maskGroup() {}
 
     virtual void WINAPI SetMasksString(const char* masks, BOOL extendedMode) { maskGroup.SetMasksString(masks, extendedMode); }
-    virtual void WINAPI GetMasksString(char* buffer) { lstrcpyn(buffer, maskGroup.GetMasksString(), MAX_GROUPMASK); }
+    virtual void WINAPI GetMasksString(char* buffer)
+    {
+        // The plug-in ABI guarantees MAX_GROUPMASK output storage for the complete mask identity.
+        StringCchCopyA(buffer, MAX_GROUPMASK, maskGroup.GetMasksString());
+    }
     virtual BOOL WINAPI GetExtendedMode() { return maskGroup.GetExtendedMode(); }
     virtual BOOL WINAPI PrepareMasks(int& errorPos) { return maskGroup.PrepareMasks(errorPos); }
     virtual BOOL WINAPI AgreeMasks(const char* fileName, const char* fileExt) { return maskGroup.AgreeMasks(fileName, fileExt); }
@@ -526,7 +534,8 @@ void CSalamanderGeneral::GetCommonFSOperSourceDescr(char* sourceDescr, int sourc
         }
         else
         {
-            lstrcpyn(nameBuf, fileOrDirName, MAX_PATH);
+            // File descriptions use a compact presentation field with an explicit clipping limit.
+            StringCchCopyNA(nameBuf, _countof(nameBuf), fileOrDirName, _countof(nameBuf) - 1);
             name = nameBuf;
             nameIsDir = isDir;
         }
@@ -1281,7 +1290,11 @@ void CSalamanderGeneral::SetHelpFileName(const char* chmName)
     if (chmName == NULL || *chmName == 0)
         TRACE_E("CSalamanderGeneral::SetHelpFileName(): invalid parameter 'chmName'.");
     else
-        lstrcpyn(HelpFileName, chmName, MAX_PATH);
+    {
+        // Never retain a partial help-file identity for a later plug-in help launch.
+        if (FAILED(StringCchCopyA(HelpFileName, _countof(HelpFileName), chmName)))
+            HelpFileName[0] = 0;
+    }
 }
 
 BOOL CSalamanderGeneral::OpenHtmlHelp(HWND parent, CHtmlHelpCommand command, DWORD_PTR dwData, BOOL quiet)

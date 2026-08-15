@@ -97,8 +97,7 @@ CDMGFile::CDMGFile(HANDLE hFile, BOOL quiet)
 {
     CALL_STACK_MESSAGE2("CDMGFile::CDMGFile(%p,)", hFile);
     DMGFooter footer;
-    DWORD posLo, dwBytesRead;
-    LONG posHi = -1 /*hi part of 64bit -512*/;
+    DWORD dwBytesRead;
     UInt64 ofs;
     char *plist, *partList;
     size_t plistSize;
@@ -111,8 +110,12 @@ CDMGFile::CDMGFile(HANDLE hFile, BOOL quiet)
     CurrentPos = FileSize = 0;
     MRUCachedBlock = 0;
 
-    posLo = SetFilePointer(hFile, -512, &posHi, FILE_END);
-    if (!ReadFile(hFile, &footer, sizeof(footer), &dwBytesRead, NULL) || (sizeof(footer) != dwBytesRead))
+    LARGE_INTEGER seekDistance;
+    seekDistance.QuadPart = -512;
+    LARGE_INTEGER footerPosition;
+    // Footer placement is end-relative; preserve its full physical position for subsequent plist sizing.
+    if (!SetFilePointerEx(hFile, seekDistance, &footerPosition, FILE_END) ||
+        !ReadFile(hFile, &footer, sizeof(footer), &dwBytesRead, NULL) || (sizeof(footer) != dwBytesRead))
     {
         // Too short file
         Error(IDS_ERR_DMG_READ_HDR, FALSE);
@@ -123,11 +126,12 @@ CDMGFile::CDMGFile(HANDLE hFile, BOOL quiet)
         if (!quiet)
         {
             // Check if encrypted
-            char cdsaencr[8];
+            // A failed end-relative seek must not leave the encryption probe reading uninitialized data.
+            char cdsaencr[8] = {};
 
-            posHi = -1;
-            SetFilePointer(hFile, -8, &posHi, FILE_END);
-            ReadFile(hFile, cdsaencr, sizeof(cdsaencr), &dwBytesRead, NULL);
+            seekDistance.QuadPart = -8;
+            if (SetFilePointerEx(hFile, seekDistance, NULL, FILE_END))
+                ReadFile(hFile, cdsaencr, sizeof(cdsaencr), &dwBytesRead, NULL);
             if (!memcmp(cdsaencr, "cdsaencr", sizeof("cdsaencr") - 1))
             {
                 Error(IDS_ERR_DMG_ENCRYPTED, quiet);
@@ -142,10 +146,22 @@ CDMGFile::CDMGFile(HANDLE hFile, BOOL quiet)
     plistSize = (size_t)FromM64(footer.sizePLIST);
     if (!plistSize)
     {
-        plistSize = (size_t)(((UInt64)posHi << 32) + posLo - ofs);
+        if (footerPosition.QuadPart < 0 || (UInt64)footerPosition.QuadPart < ofs)
+        {
+            // Reject an invalid footer range before converting a negative difference to an allocation size.
+            Error(IDS_ERR_DMG_PLIST, quiet);
+            return;
+        }
+        plistSize = (size_t)(footerPosition.QuadPart - (LONGLONG)ofs);
     }
     else
     {
+        if ((UInt64)plistSize < ofs)
+        {
+            // Reject an invalid encoded plist range before it can underflow the allocation size.
+            Error(IDS_ERR_DMG_PLIST, quiet);
+            return;
+        }
         plistSize -= (size_t)ofs;
     }
     plist = (char*)malloc(plistSize + 1);
@@ -154,9 +170,9 @@ CDMGFile::CDMGFile(HANDLE hFile, BOOL quiet)
         Error(IDS_INSUFFICIENT_MEMORY, quiet);
         return;
     }
-    posHi = (LONG)(ofs >> 32);
-    SetFilePointer(hFile, (DWORD)(ofs & 0xffffffff), &posHi, FILE_BEGIN);
-    if (!ReadFile(hFile, plist, (DWORD)plistSize, &dwBytesRead, NULL) || (plistSize != dwBytesRead))
+    seekDistance.QuadPart = (LONGLONG)ofs;
+    if (!SetFilePointerEx(hFile, seekDistance, NULL, FILE_BEGIN) ||
+        !ReadFile(hFile, plist, (DWORD)plistSize, &dwBytesRead, NULL) || (plistSize != dwBytesRead))
     {
         free(plist);
         Error(IDS_ERR_DMG_PLIST, quiet);
@@ -308,7 +324,6 @@ CDMGFile::CADCBlock::CADCBlock(BlockInfo* blockInfo, HANDLE hFile)
 {
     CALL_STACK_MESSAGE3("CADCBlock::CADCBlock(%p, %p)", blockInfo, hFile);
     BYTE *inBuf, *in, *out;
-    LONG posHi;
     DWORD dwBytesRead;
     int size;
 
@@ -329,8 +344,10 @@ CDMGFile::CADCBlock::CADCBlock(BlockInfo* blockInfo, HANDLE hFile)
         return;
     }
     size = (int)blockInfo->inSize;
-    posHi = (LONG)(blockInfo->inPos >> 32);
-    if ((0xFFFFFFFF == SetFilePointer(hFile, (DWORD)(blockInfo->inPos & 0xFFFFFFFF), &posHi, FILE_BEGIN)) || !ReadFile(hFile, inBuf, size, &dwBytesRead, NULL) || (blockInfo->inSize != dwBytesRead))
+    LARGE_INTEGER seekPosition;
+    seekPosition.QuadPart = (LONGLONG)blockInfo->inPos;
+    // ADC block metadata already carries a 64-bit file offset.
+    if (!SetFilePointerEx(hFile, seekPosition, NULL, FILE_BEGIN) || !ReadFile(hFile, inBuf, size, &dwBytesRead, NULL) || (blockInfo->inSize != dwBytesRead))
     {
         free(inBuf);
         free(Buffer);

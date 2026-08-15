@@ -94,9 +94,16 @@ void GetInfo(char* buffer, FILETIME* lastWrite, CQuadWord size)
     FileTimeToSystemTime(&ft, &st);
 
     char date[50], time[50], number[50];
-    if (GetTimeFormat(LOCALE_USER_DEFAULT, 0, &st, NULL, time, 50) == 0)
+    WCHAR localeName[LOCALE_NAME_MAX_LENGTH];
+    WCHAR formattedValue[50];
+    // ISO metadata crosses an ANSI plug-in boundary only after Unicode locale formatting.
+    if (!GetUserDefaultLocaleName(localeName, ARRAYSIZE(localeName)) ||
+        GetTimeFormatEx(localeName, 0, &st, NULL, formattedValue, ARRAYSIZE(formattedValue)) == 0 ||
+        WideCharToMultiByte(CP_ACP, 0, formattedValue, -1, time, ARRAYSIZE(time), NULL, NULL) == 0)
         sprintf(time, "%u:%02u:%02u", st.wHour, st.wMinute, st.wSecond);
-    if (GetDateFormat(LOCALE_USER_DEFAULT, DATE_SHORTDATE, &st, NULL, date, 50) == 0)
+    if (!GetUserDefaultLocaleName(localeName, ARRAYSIZE(localeName)) ||
+        GetDateFormatEx(localeName, DATE_SHORTDATE, &st, NULL, formattedValue, ARRAYSIZE(formattedValue), NULL) == 0 ||
+        WideCharToMultiByte(CP_ACP, 0, formattedValue, -1, date, ARRAYSIZE(date), NULL, NULL) == 0)
         sprintf(date, "%u.%u.%u", st.wDay, st.wMonth, st.wYear);
     sprintf(buffer, "%s, %s, %s", SalamanderGeneral->NumberToStr(number, size), date, time);
 }
@@ -836,18 +843,21 @@ BOOL CISOImage::Open(const char* fileName, BOOL quiet /* = FALSE*/)
     }
     DWORD l = 0;
     DWORD dwBytesRead;
-    LONG posHi = -1; // Upper part of -512
+    LARGE_INTEGER seekDistance;
 
     // NOTE: DMG might be uncompressed disk image not containing some (zero-filled) blocks
     // -> It is wrong to parse files starting with 'ER' as HFS+, we must check for DMG footer!
-    SetFilePointer(hFile, -512, &posHi, FILE_END);
-    ReadFile(hFile, &l, 4, &dwBytesRead, NULL);
-    SetFilePointer(hFile, 0, NULL, FILE_BEGIN);
+    seekDistance.QuadPart = -512;
+    // End-relative image probes must use an unambiguous 64-bit seek result.
+    if (SetFilePointerEx(hFile, seekDistance, NULL, FILE_END))
+        ReadFile(hFile, &l, 4, &dwBytesRead, NULL);
+    seekDistance.QuadPart = 0;
+    SetFilePointerEx(hFile, seekDistance, NULL, FILE_BEGIN);
     if (DMG_FOOTER_MAGIC != l)
     {
-        posHi = -1;
-        SetFilePointer(hFile, -4, &posHi, FILE_END);
-        ReadFile(hFile, &l, 4, &dwBytesRead, NULL);
+        seekDistance.QuadPart = -4;
+        if (SetFilePointerEx(hFile, seekDistance, NULL, FILE_END))
+            ReadFile(hFile, &l, 4, &dwBytesRead, NULL);
     }
     if ((DMG_FOOTER_MAGIC == l) || (DMG_FOOTER_ENCR == l))
     {
@@ -862,7 +872,8 @@ BOOL CISOImage::Open(const char* fileName, BOOL quiet /* = FALSE*/)
     }
     else
     {
-        SetFilePointer(hFile, 0, NULL, FILE_BEGIN);
+        seekDistance.QuadPart = 0;
+        SetFilePointerEx(hFile, seekDistance, NULL, FILE_BEGIN);
         ReadFile(hFile, &l, 4, &dwBytesRead, NULL);
         if (ISZ_HEADER_MAGIC == l)
         {

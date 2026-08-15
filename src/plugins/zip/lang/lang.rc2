@@ -40,6 +40,7 @@ STRINGTABLE
   IDS_EXTRACTING, "extracting: "
   IDS_TOOLONGNAME3, "Cannot extract file because of too long path name."
   IDS_ERRCOMPDATA, "Error in compressed data."
+  IDS_UNSAFEEXTRACTPATH, "Cannot extract archive entry because its path escapes the selected destination."
   IDS_BADMETHOD, "File is compressed using a method which is not supported by this version of ZIP plugin."
   IDS_ERRCRC, "Error in compressed data. CRC does not match."
   IDS_ERRWRITE, "Cannot write to file."

@@ -260,7 +260,7 @@ BOOL CPluginFSInterface::GetFullFSPath(HWND parent, const char* fsName, char* pa
             (int)strlen(root) < pathSize)
         {
             strcpy(path, root);
-            ChangePathOnlyGetCurPathTime = GetTickCount(); // optimization for ChangePath() called right after obtaining the working path
+            ChangePathOnlyGetCurPathTime = CMonotonicClock::Now(); // optimization for ChangePath() called right after obtaining the working path
         }
         else
         {
@@ -723,7 +723,7 @@ BOOL CPluginFSInterface::ChangePath(int currentFSNameIndex, char* fsName, int fs
 
             BOOL showChangeInLog = TRUE;
             if (lastErrorState == fesOK && // on the first call (within a single path change and if it is not a connect)
-                GetTickCount() - ChangePathOnlyGetCurPathTime <= 1000)
+                CMonotonicClock::Elapsed(ChangePathOnlyGetCurPathTime, CMonotonicClock::Now()) <= 1000)
             { // less than a second has passed since obtaining the working path - optimize ChangeWorkingPath()
                 ChangePathOnlyGetCurPathTime = 0;
                 Path[0] = 0;                                           // the next ChangeWorkingPath() call only pulls the working path from cache (no further path change)

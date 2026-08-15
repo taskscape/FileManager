@@ -4,6 +4,9 @@
 
 #include "precomp.h"
 
+#include <shobjidl.h>
+#include <strsafe.h>
+
 #include "cfgdlg.h"
 #include "edtlbwnd.h"
 #include "mainwnd.h"
@@ -21,6 +24,52 @@
 //
 // CFindDialog (continued finddlg1.cpp)
 //
+
+static HRESULT QueueFindResultDeletes(IFileOperation* operation, const char* paths)
+{
+    for (const char* path = paths; *path != 0; path += strlen(path) + 1)
+    {
+        CStrP pathW(ConvertAllocUtf8ToWide(path, -1));
+        if (pathW == NULL)
+            return HRESULT_FROM_WIN32(ERROR_NO_UNICODE_TRANSLATION);
+
+        IShellItem* item = NULL;
+        HRESULT result = SHCreateItemFromParsingName(pathW, NULL, IID_PPV_ARGS(&item));
+        if (FAILED(result))
+            return result;
+        result = operation->DeleteItem(item, NULL);
+        item->Release();
+        if (FAILED(result))
+            return result;
+    }
+    return S_OK;
+}
+
+static HRESULT DeleteFindResultsWithShell(HWND owner, const char* paths, BOOL toRecycle)
+{
+    IFileOperation* operation = NULL;
+    HRESULT result = CoCreateInstance(CLSID_FileOperation, NULL, CLSCTX_INPROC_SERVER,
+                                      IID_PPV_ARGS(&operation));
+    if (FAILED(result))
+        return result;
+
+    // Queue shell items individually so the search-result list never relies on SHFILEOPSTRUCT's double-NUL format.
+    result = operation->SetOwnerWindow(owner);
+    if (SUCCEEDED(result))
+        result = operation->SetOperationFlags(toRecycle ? FOF_ALLOWUNDO : 0);
+    if (SUCCEEDED(result))
+        result = QueueFindResultDeletes(operation, paths);
+    if (SUCCEEDED(result))
+        result = operation->PerformOperations();
+    if (SUCCEEDED(result))
+    {
+        BOOL aborted = FALSE;
+        if (SUCCEEDED(operation->GetAnyOperationsAborted(&aborted)) && aborted)
+            TRACE_I("Search-result deletion was cancelled by the Shell.");
+    }
+    operation->Release();
+    return result;
+}
 
 void CFindDialog::OnHideSelection()
 {
@@ -164,19 +213,10 @@ void CFindDialog::OnDelete(BOOL toRecycle)
         lastFocusedItem.Set(lastItem->Path, lastItem->Name, lastItem->Size, lastItem->Attr, &lastItem->LastWrite, lastItem->IsDir);
     }
 
-    CShellExecuteWnd shellExecuteWnd;
-    SHFILEOPSTRUCT fo;
-    fo.hwnd = shellExecuteWnd.Create(HWindow, "SEW: CFindDialog::OnDelete toRecycle=%d", toRecycle);
-    fo.wFunc = FO_DELETE;
-    fo.pFrom = list;
-    fo.pTo = NULL;
-    fo.fFlags = toRecycle ? FOF_ALLOWUNDO : 0;
-    fo.fAnyOperationsAborted = FALSE;
-    fo.hNameMappings = NULL;
-    fo.lpszProgressTitle = "";
-    // perform the deletion itself - incredibly easy, unfortunately it sometimes crashes ;-)
-    CALL_STACK_MESSAGE1("CFindDialog::OnDelete::SHFileOperation");
-    SHFileOperation(&fo);
+    CALL_STACK_MESSAGE1("CFindDialog::OnDelete::IFileOperation");
+    HRESULT result = DeleteFindResultsWithShell(HWindow, list, toRecycle);
+    if (FAILED(result))
+        TRACE_E("Unable to delete selected search results through the Shell: " << GetErrorText(HRESULT_CODE(result)));
     free(list);
 
     // update the list
@@ -615,12 +655,16 @@ CFindTBHeader::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         if (tt->HToolBar == ToolBar->HWindow)
         {
             int tooltips[FINDTBHDR_BUTTONS] = {IDS_FINDTBTT_FOCUS, IDS_FINDTBTT_VIEW, IDS_FINDTBTT_EDIT, IDS_FINDTBTT_DELETE, IDS_FINDTBTT_USERMENU, IDS_FINDTBTT_PROPERTIES, IDS_FINDTBTT_CUT, IDS_FINDTBTT_COPY, IDS_FINDTBTT_STOP};
-            lstrcpy(tt->Buffer, LoadStr(tooltips[tt->Index]));
+            // Toolbar supplies a fixed tooltip buffer; do not truncate a localized label.
+            if (FAILED(StringCchCopyA(tt->Buffer, TOOLTIP_TEXT_MAX, LoadStr(tooltips[tt->Index]))))
+                tt->Buffer[0] = 0;
             PrepareToolTipText(tt->Buffer, FALSE);
         }
         else
         {
-            wsprintf(tt->Buffer, LoadStr(IDS_FINDTBTT_MESSAGES), ErrorsCount, InfosCount);
+            // Toolbar supplies a fixed tooltip buffer; leave it empty if the localized counters do not fit.
+            if (FAILED(StringCchPrintfA(tt->Buffer, TOOLTIP_TEXT_MAX, LoadStr(IDS_FINDTBTT_MESSAGES), ErrorsCount, InfosCount)))
+                tt->Buffer[0] = 0;
         }
         return TRUE;
     }
@@ -803,14 +847,16 @@ CFindManageDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                         }
                         *item = *CurrenOptionsItem;
                         FO->Add(item);
-                        lstrcpyn(item->ItemName, dispInfo->Buffer, ITEMNAME_TEXT_LEN);
+                        // Retain the editable named-search field's fixed display limit explicitly.
+                        StringCchCopyNA(item->ItemName, _countof(item->ItemName), dispInfo->Buffer, _countof(item->ItemName) - 1);
                         EditLB->SetItemData((INT_PTR)item);
                         LoadControls();
                     }
                     else
                     {
                         item = (CFindOptionsItem*)dispInfo->ItemID;
-                        lstrcpyn(item->ItemName, dispInfo->Buffer, ITEMNAME_TEXT_LEN);
+                        // Retain the editable named-search field's fixed display limit explicitly.
+                        StringCchCopyNA(item->ItemName, _countof(item->ItemName), dispInfo->Buffer, _countof(item->ItemName) - 1);
                     }
                     SetWindowLongPtr(HWindow, DWLP_MSGRESULT, TRUE);
                     return TRUE;
@@ -1224,8 +1270,9 @@ BOOL CFindDialog::GetCommonPrefixPath(char* buffer, int bufferMax, int& commonPr
             CFoundFilesData* file = FoundFilesListView->At(index);
             if (path[0] == 0)
             {
-                lstrcpy(path, file->Path); // in the first step we only copy the path
-                pathLen = lstrlen(path);
+                if (FAILED(StringCchCopyA(path, _countof(path), file->Path)))
+                    return FALSE;
+                pathLen = (int)strlen(path);
             }
             else
             {
@@ -1249,7 +1296,8 @@ BOOL CFindDialog::GetCommonPrefixPath(char* buffer, int bufferMax, int& commonPr
         TRACE_E("Buffer is small. " << pathLen + 1 << " bytes is needed");
         return FALSE;
     }
-    lstrcpy(buffer, path);
+    if (FAILED(StringCchCopyA(buffer, bufferMax, path)))
+        return FALSE;
     commonPrefixChars = pathLen;
     return TRUE;
 }
@@ -1275,16 +1323,23 @@ const char* MyEnumFileNames(int index, void* param)
             p++;
         if (*p != 0)
         {
-            lstrcpy(MyEnumFileNamesBuffer, p);
-            SalPathAddBackslash(MyEnumFileNamesBuffer, MAX_PATH);
+            if (FAILED(StringCchCopyA(MyEnumFileNamesBuffer, _countof(MyEnumFileNamesBuffer), p)) ||
+                FAILED(StringCchCatA(MyEnumFileNamesBuffer, _countof(MyEnumFileNamesBuffer), "\\")))
+                goto ENUM_FILE_NAME_TOO_LONG;
         }
         else
             MyEnumFileNamesBuffer[0] = 0;
-        lstrcat(MyEnumFileNamesBuffer, data->FindDialog->GetName(foundIndex));
+        if (FAILED(StringCchCatA(MyEnumFileNamesBuffer, _countof(MyEnumFileNamesBuffer), data->FindDialog->GetName(foundIndex))))
+            goto ENUM_FILE_NAME_TOO_LONG;
         return MyEnumFileNamesBuffer;
     }
     TRACE_E("Next item was not found");
     return NULL;
+
+ENUM_FILE_NAME_TOO_LONG:
+    // An empty name makes the shell item-list creation fail instead of targeting a truncated child.
+    MyEnumFileNamesBuffer[0] = 0;
+    return MyEnumFileNamesBuffer;
 }
 
 void ContextMenuInvoke(IContextMenu2* contextMenu, CMINVOKECOMMANDINFO* ici)
@@ -1594,8 +1649,8 @@ void CFindDialog::OnOpen(BOOL onlyFocused)
                 oldCur = SetCursor(LoadCursor(NULL, IDC_WAIT));
 
             char fullPath[MAX_PATH];
-            lstrcpy(fullPath, file->Path);
-            if (SalPathAppend(fullPath, file->Name, MAX_PATH))
+            if (SUCCEEDED(StringCchCopyA(fullPath, _countof(fullPath), file->Path)) &&
+                SalPathAppend(fullPath, file->Name, MAX_PATH))
                 MainWindow->FileHistory->AddFile(fhitOpen, 0, fullPath);
 
             ExecuteAssociation(HWindow, file->Path, file->Name);
@@ -1824,7 +1879,8 @@ void CFindLogDialog::Transfer(CTransferInfo& ti)
             ListViewSetItemTextUtf8(HListView, i, 0, LoadStr((item->Flags & FLI_ERROR) != 0 ? IDS_FINDLOG_ERROR : IDS_FINDLOG_INFO));
 
             // remove '\r' and '\n' characters from the text
-            lstrcpyn(buff, item->Text, 4000);
+            // Log rows intentionally use their bounded list-view presentation field.
+            StringCchCopyNA(buff, _countof(buff), item->Text, _countof(buff) - 1);
             int j;
             for (j = 0; buff[j] != 0; j++)
                 if (buff[j] == '\r' || buff[j] == '\n')
@@ -1836,7 +1892,8 @@ void CFindLogDialog::Transfer(CTransferInfo& ti)
 
         if (Log->GetSkippedCount() > 0)
         {
-            wsprintf(buff, LoadStr(IDS_FINDERRORS_SKIPPING), Log->GetSkippedCount());
+            if (FAILED(StringCchPrintfA(buff, ARRAYSIZE(buff), LoadStr(IDS_FINDERRORS_SKIPPING), Log->GetSkippedCount())))
+                buff[0] = 0;
 
             lvi.iItem = i;
             lvi.iSubItem = 0;
@@ -1876,7 +1933,12 @@ void CFindLogDialog::OnFocusFile()
         }
     }
     static char FocusPath[2 * MAX_PATH];
-    lstrcpyn(FocusPath, item->Path, _countof(FocusPath));
+    // File focusing must receive a complete containing path rather than a clipped log entry.
+    if (FAILED(StringCchCopyA(FocusPath, _countof(FocusPath), item->Path)))
+    {
+        TRACE_E("CFindLogDialog::OnFocusFile(): path is too long.");
+        return;
+    }
     char buffEmpty[] = "";
     char* p = buffEmpty;
     if (FocusPath[0] != 0)

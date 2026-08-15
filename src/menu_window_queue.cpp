@@ -28,8 +28,6 @@ const char* WC_POPUPMENU = "PopupMenuClass";
 CMenuWindowQueue MenuWindowQueue;
 COldMenuHookTlsAllocator OldMenuHookTlsAllocator;
 
-//static DWORD MenuMessageHookTimeout = GetTickCount();
-
 //*****************************************************************************
 //
 // CMenuWindowQueue
@@ -60,7 +58,6 @@ BOOL CMenuWindowQueue::Add(HWND hWindow)
         Data.ResetState();
     //  TRACE_I("XXX CMenuWindowQueue::Add() hWnd="<<hex<<hWindow);
     HANDLES(LeaveCriticalSection(&DataCriticalSection));
-    //  MenuMessageHookTimeout = GetTickCount();
     return isGood;
 }
 
@@ -123,14 +120,8 @@ MenuMessageHookProc(int nCode, WPARAM wParam, LPARAM lParam)
             cwp->message == WM_ACTIVATE || cwp->message == WM_NCACTIVATE ||
             cwp->message == WM_KILLFOCUS)
         {
-            //      if (GetTickCount() - MenuMessageHookTimeout < 500)
-            //        TRACE_I("SKIPPING !!!");
-            //      else
-            //      {
             //        TRACE_I("XXX MenuMessageHookProc(); message="<<hex<<cwp->message<<" hwnd="<<cwp->hwnd<<" wParam="<<cwp->wParam<<" lParam="<<cwp->lParam);
             MenuWindowQueue.DispatchCloseMenu();
-            //        MenuMessageHookTimeout = GetTickCount();
-            //      }
         }
     }
     if (hOldHookProc != NULL)
@@ -254,7 +245,8 @@ BOOL CMenuItem::SetText(const char* text, int len)
 {
     CALL_STACK_MESSAGE_NONE
     if (text != NULL && len == -1)
-        len = lstrlen(text);
+        // The caller selects -1 only for a terminated local text string.
+        len = static_cast<int>(strlen(text));
 
     char* newString = NULL;
     if (text != NULL)

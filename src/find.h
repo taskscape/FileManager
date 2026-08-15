@@ -55,7 +55,7 @@ void ReleaseFind();
 // clears all Find histories; if 'dataOnly' == TRUE, comboboxes of open windows are not cleared
 void ClearFindHistory(BOOL dataOnly);
 
-DWORD WINAPI GrepThreadF(void* ptr); // body of the grep thread
+DWORD WINAPI GrepThreadF(void* ptr, HANDLE stopEvent); // body of the grep thread
 
 extern HACCEL FindDialogAccelTable;
 
@@ -63,6 +63,7 @@ class CFoundFilesListView;
 class CFindDialog;
 class CMenuPopup;
 class CMenuBar;
+class CThreadOwner;
 
 //*********************************************************************************
 //
@@ -165,7 +166,8 @@ struct CGrepData
     CFoundFilesListView* FoundFilesListView; // found files are loaded here
     // two criteria for updating the list view
     int FoundVisibleCount;  // number of items displayed in the list view
-    DWORD FoundVisibleTick; // when it was last displayed
+    // UI and search worker exchange this 64-bit monotonic sample without torn reads on 32-bit builds.
+    __declspec(align(8)) volatile LONGLONG FoundVisibleTick; // when results were last displayed
     BOOL NeedRefresh;       // need to refresh the display (an item was added without being shown)
     BOOL ResultLimitReached; // prevents a huge match set from retaining every result indefinitely
     LONG DirectoryStackHighWaterMark; // records bounded deferred-directory pressure for diagnostics
@@ -725,7 +727,10 @@ protected:
     CFindTBHeader* TBHeader;
     BOOL SearchInProgress;
     BOOL CanClose; // the window can be closed (we are not inside a method of this object)
-    HANDLE GrepThread;
+    // GrepData belongs to this dialog, so the owner retains the worker handle
+    // until StopSearch has observed its cooperative completion.
+    CThreadOwner* GrepThreadOwner;
+    HANDLE GrepThread; // legacy borrowed handle used by the message-loop wait
     CGrepData GrepData;
     CSearchingString SearchingText;
     CSearchingString SearchingText2;

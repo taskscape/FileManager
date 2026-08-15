@@ -19,6 +19,7 @@
 #include "arraylt.h"
 
 #include "csvlib.h"
+#include "..\\..\\..\\common\\checked_arithmetic.h"
 
 // only an optimization detail
 extern BOOL IsAlphaNumeric[256]; // TRUE/FALSE array for characters (FALSE = not a letter nor a digit)
@@ -382,7 +383,13 @@ CCSVParser<CChar>::CCSVParser(const char* filename,
         {
             size_t textLen;
             const CChar* text = (const CChar*)GetCellText(i, &textLen);
-            Columns[i].Name = (char*)malloc((textLen + 1) * sizeof(CChar));
+            size_t nameChars;
+            size_t nameBytes;
+            // CSV text lengths come from the input stream; prove the terminator and element size cannot wrap.
+            if (!CheckedAddSize(textLen, 1, &nameChars) ||
+                !CheckedMultiplySize(nameChars, sizeof(CChar), &nameBytes))
+                goto SKIP_ROW_CONVERT;
+            Columns[i].Name = (char*)malloc(nameBytes);
             if (Columns[i].Name == NULL)
                 goto SKIP_ROW_CONVERT;
             memcpy(Columns[i].Name, text, textLen * sizeof(CChar));
@@ -719,7 +726,16 @@ CCSVParser<CChar>::FetchRecord(DWORD index)
     }
     if (Buffer == NULL)
     {
-        Buffer = (CChar*)malloc((BufferSize + 1) * sizeof(CChar)); // space for two terminators
+        size_t bufferChars;
+        size_t bufferBytes;
+        // A corrupted row length must not turn the required terminators into a smaller allocation.
+        if (BufferSize < 0 || !CheckedAddSize((size_t)BufferSize, 1, &bufferChars) ||
+            !CheckedMultiplySize(bufferChars, sizeof(CChar), &bufferBytes))
+        {
+            Status = CSVE_OOM;
+            return Status;
+        }
+        Buffer = (CChar*)malloc(bufferBytes); // space for two terminators
         if (Buffer == NULL)
         {
             Status = CSVE_OOM;
@@ -861,15 +877,24 @@ const char* CCSVParserUTF8::GetColumnName(DWORD index)
     if (!name)
         return NULL;
 
-    int nameLen = (int)strlen(name) + 1;
+    size_t nameChars;
+    int nameLen;
+    // Keep the UTF-8 conversion count representable by its Win32 int API.
+    if (!CheckedAddSize(strlen(name), 1, &nameChars) ||
+        !CheckedCastSizeToInt(nameChars, &nameLen))
+        return NULL;
     int len = MultiByteToWideChar(CP_UTF8, 0, name, nameLen, Buffer, BufferSize);
     if (len <= 0)
     {
         len = MultiByteToWideChar(CP_UTF8, 0, name, nameLen, NULL, 0);
         if (len > 0)
         {
+            size_t bufferBytes;
+            // The conversion result is external text-derived; validate its byte allocation before replacing the buffer.
+            if (!CheckedMultiplySize((size_t)len, sizeof(wchar_t), &bufferBytes))
+                return NULL;
             free(Buffer);
-            Buffer = (wchar_t*)malloc(len * sizeof(wchar_t));
+            Buffer = (wchar_t*)malloc(bufferBytes);
             if (Buffer)
             {
                 BufferSize = len;
@@ -886,14 +911,22 @@ void* CCSVParserUTF8::GetCellText(DWORD index, size_t* textLen)
     if (!text)
         return NULL;
 
-    int len = MultiByteToWideChar(CP_UTF8, 0, text, (int)*textLen, Buffer, BufferSize);
+    int sourceTextLen;
+    // Do not narrow a parsed cell length before passing it to the Win32 conversion API.
+    if (!CheckedCastSizeToInt(*textLen, &sourceTextLen))
+        return NULL;
+    int len = MultiByteToWideChar(CP_UTF8, 0, text, sourceTextLen, Buffer, BufferSize);
     if (len <= 0)
     {
-        len = MultiByteToWideChar(CP_UTF8, 0, text, (int)*textLen, NULL, 0);
+        len = MultiByteToWideChar(CP_UTF8, 0, text, sourceTextLen, NULL, 0);
         if (len > 0)
         {
+            size_t bufferBytes;
+            // Retain the existing buffer when a converted cell cannot have a safe byte allocation.
+            if (!CheckedMultiplySize((size_t)len, sizeof(wchar_t), &bufferBytes))
+                return NULL;
             free(Buffer);
-            Buffer = (wchar_t*)malloc(len * sizeof(wchar_t));
+            Buffer = (wchar_t*)malloc(bufferBytes);
             if (Buffer)
             {
                 BufferSize = len;

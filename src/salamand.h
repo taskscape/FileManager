@@ -1300,7 +1300,7 @@ BOOL GetSidMD5(BYTE* sidMD5);
 // this means that the Everyone group is denied WRITE_DAC | WRITE_OWNER access; otherwise everything is allowed
 // provides stronger security than a "NULL DACL", where the object is fully open to everyone
 // can be called on any OS; returns a pointer on Windows 2000 and newer, otherwise returns NULL
-// if it returns 'psidEveryone' or 'paclNewDacl' non-NULL, they must be destroyed
+// if it returns 'psidEveryone' or 'paclNewDacl' non-NULL, destroy the SID with FreeSid and the private ACL with HeapFree
 SECURITY_ATTRIBUTES* CreateAccessableSecurityAttributes(SECURITY_ATTRIBUTES* sa, SECURITY_DESCRIPTOR* sd,
                                                         DWORD allowedAccessMask, PSID* psidEveryone, PACL* paclNewDacl);
 

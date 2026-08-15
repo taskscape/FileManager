@@ -3,6 +3,25 @@
 
 #include "precomp.h"
 
+static BOOL GetFileEndPosition(HANDLE file, CQuadWord& position)
+{
+    // Import buffers still have a DWORD allocation limit, but the OS file position must remain full-width.
+    LARGE_INTEGER zero = {};
+    LARGE_INTEGER endPosition;
+    if (!SetFilePointerEx(file, zero, &endPosition, FILE_END))
+        return FALSE;
+    position.LoDWord = endPosition.LowPart;
+    position.HiDWord = static_cast<DWORD>(endPosition.HighPart);
+    return TRUE;
+}
+
+static BOOL RewindFile(HANDLE file)
+{
+    // Use the Boolean seek result when returning temporary output streams to their first byte.
+    LARGE_INTEGER startPosition = {};
+    return SetFilePointerEx(file, startPosition, NULL, FILE_BEGIN);
+}
+
 BOOL CRenamerDialog::ExportToTempFile()
 {
     CALL_STACK_MESSAGE1("CRenamerDialog::ExportToTempFile()");
@@ -251,8 +270,11 @@ BOOL CRenamerDialog::ExecuteCommand(const char* command)
     CloseHandle(pi.hThread);
 
     // verify that no error occurred
-    size.HiDWord = 0;
-    size.LoDWord = SetFilePointer(errFile, 0, LPLONG(&size.HiDWord), FILE_END);
+    if (!GetFileEndPosition(errFile, size))
+    {
+        ret = Error(IDS_READTEMP);
+        goto LERROR;
+    }
     if (exitCode || size.LoDWord)
     {
         if (!buffer.Reserve(size.LoDWord + 1))
@@ -261,9 +283,11 @@ BOOL CRenamerDialog::ExecuteCommand(const char* command)
             goto LERROR;
         }
 
-        LONG l;
-        l = 0;
-        SetFilePointer(errFile, 0, &l, FILE_BEGIN);
+        if (!RewindFile(errFile))
+        {
+            ret = Error(IDS_READTEMP);
+            goto LERROR;
+        }
 
         DWORD read;
         if (ReadFile(errFile, buffer.Get(), size.LoDWord, &read, NULL) && read == size.LoDWord)
@@ -284,8 +308,11 @@ BOOL CRenamerDialog::ExecuteCommand(const char* command)
         goto LERROR;
 
     // read the text from the file
-    size.HiDWord = 0;
-    size.LoDWord = SetFilePointer(outFile, 0, LPLONG(&size.HiDWord), FILE_END);
+    if (!GetFileEndPosition(outFile, size))
+    {
+        ret = Error(IDS_READTEMP);
+        goto LERROR;
+    }
 
     if (size.HiDWord > 0)
     {
@@ -299,9 +326,11 @@ BOOL CRenamerDialog::ExecuteCommand(const char* command)
         goto LERROR;
     }
 
-    LONG l;
-    l = 0;
-    SetFilePointer(outFile, 0, &l, FILE_BEGIN);
+    if (!RewindFile(outFile))
+    {
+        ret = Error(IDS_READTEMP);
+        goto LERROR;
+    }
 
     DWORD read;
     if (ReadFile(outFile, buffer.Get(), size.LoDWord, &read, NULL) && read == size.LoDWord)

@@ -3,6 +3,15 @@
 
 #include "precomp.h"
 
+static BOOL SeekCopiedFile(HANDLE file, const CQuadWord& offset)
+{
+    // Copy-resume offsets are CQuadWord values, so retain both halves with the Boolean seek contract.
+    LARGE_INTEGER seekOffset;
+    seekOffset.LowPart = offset.LoDWord;
+    seekOffset.HighPart = static_cast<LONG>(offset.HiDWord);
+    return SetFilePointerEx(file, seekOffset, NULL, FILE_BEGIN);
+}
+
 BOOL CRenamerDialog::MoveFile(char* sourceName, char* targetName, char* newPart,
                               BOOL overwrite, BOOL isDir, BOOL& skip)
 {
@@ -253,13 +262,7 @@ COPY_AGAIN:
                                         }
                                         else // success (the file is large enough), set the offset
                                         {
-                                            LONG lo, hi;
-                                            lo = operationDone.LoDWord;
-                                            hi = operationDone.HiDWord;
-                                            lo = SetFilePointer(out, lo, &hi, FILE_BEGIN);
-                                            if (lo == 0xFFFFFFFF && GetLastError() != NO_ERROR ||
-                                                lo != (LONG)operationDone.LoDWord ||
-                                                hi != (LONG)operationDone.HiDWord)
+                                            if (!SeekCopiedFile(out, operationDone))
                                             { // cannot set the offset, start over
                                                 CloseHandle(in);
                                                 CloseHandle(out);
@@ -312,13 +315,7 @@ COPY_AGAIN:
                                     }
                                     else // success (the file is large enough), set the offset
                                     {
-                                        LONG lo, hi;
-                                        lo = operationDone.LoDWord;
-                                        hi = operationDone.HiDWord;
-                                        lo = SetFilePointer(in, lo, &hi, FILE_BEGIN);
-                                        if (lo == 0xFFFFFFFF && GetLastError() != NO_ERROR ||
-                                            lo != (LONG)operationDone.LoDWord ||
-                                            hi != (LONG)operationDone.HiDWord)
+                                        if (!SeekCopiedFile(in, operationDone))
                                         { // cannot set the offset, start over
                                             CloseHandle(in);
                                             CloseHandle(out);
@@ -377,8 +374,9 @@ COPY_AGAIN:
 
                         if (out != INVALID_HANDLE_VALUE)
                         {
-                            // write from the start of the file (this seek was forced by Windows XP)
-                            SetFilePointer(out, 0, NULL, FILE_BEGIN);
+                            // Windows XP required an explicit rewind before truncation; retain it with the modern seek API.
+                            LARGE_INTEGER startOffset = {};
+                            SetFilePointerEx(out, startOffset, NULL, FILE_BEGIN);
 
                             SetEndOfFile(out); // reset the file length to zero
                             goto COPY;

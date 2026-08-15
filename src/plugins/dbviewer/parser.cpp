@@ -3,6 +3,8 @@
 
 #include "precomp.h"
 
+#include <strsafe.h>
+
 #include "csvlib/csvlib.h"
 #include "dbflib/dbflib.h"
 #include "parser.h"
@@ -20,6 +22,19 @@
                               (((UINT32)((x) & 0x0000FF00L)) << 8) | \
                               (((UINT32)((x) & 0x00FF0000L)) >> 8) | \
                               (((UINT32)((x) & 0xFF000000L)) >> 24)))
+
+static BOOL FormatDBViewerDateTimeAnsi(const SYSTEMTIME* time, DWORD flags, char* buffer, int bufferSize, BOOL isDate)
+{
+    // DBViewer remains ANSI internally, so convert only after named-locale formatting.
+    WCHAR localeName[LOCALE_NAME_MAX_LENGTH];
+    WCHAR formatted[100];
+    if (GetUserDefaultLocaleName(localeName, ARRAYSIZE(localeName)) == 0)
+        return FALSE;
+    int length = isDate
+                     ? GetDateFormatEx(localeName, flags, time, NULL, formatted, ARRAYSIZE(formatted), NULL)
+                     : GetTimeFormatEx(localeName, flags, time, NULL, formatted, ARRAYSIZE(formatted));
+    return length != 0 && WideCharToMultiByte(CP_ACP, 0, formatted, -1, buffer, bufferSize, NULL, NULL) != 0;
+}
 
 bool IsUTF8Encoded(const char* s, int cnt)
 {
@@ -168,7 +183,7 @@ CParserInterfaceDBF::CParserInterfaceDBF()
     DbfHdr = NULL;
     DbfFields = NULL;
     Record = NULL;
-    FileName[0] = 0;
+    FileName = NULL;
 }
 
 CParserStatusEnum
@@ -217,7 +232,15 @@ CParserInterfaceDBF::OpenFile(const char* fileName)
     }
 
     if (status == psOK)
-        lstrcpyn(FileName, fileName, MAX_PATH);
+    {
+        // File-info and reopen paths must retain the complete opened-file identity.
+        FileName = SalGeneral->DupStr(fileName);
+        if (FileName == NULL)
+        {
+            CloseFile();
+            status = psOOM;
+        }
+    }
 
     return status;
 }
@@ -236,7 +259,11 @@ void CParserInterfaceDBF::CloseFile()
     }
     DbfHdr = NULL;
     DbfFields = NULL;
-    FileName[0] = 0;
+    if (FileName != NULL)
+    {
+        SalGeneral->Free(FileName);
+        FileName = NULL;
+    }
 }
 
 BOOL CParserInterfaceDBF::GetFileInfo(HWND hEdit)
@@ -253,8 +280,8 @@ BOOL CParserInterfaceDBF::GetFileInfo(HWND hEdit)
     SetWindowText(hEdit, "");
     DWORD tab = 80;
     SendMessage(hEdit, EM_SETTABSTOPS, 1, (LPARAM)&tab);
-    sprintf(buff, "%s\r\n\r\n", FileName);
-    SendMessage(hEdit, EM_REPLACESEL, FALSE, (LPARAM)buff);
+    SendMessage(hEdit, EM_REPLACESEL, FALSE, (LPARAM)FileName);
+    SendMessage(hEdit, EM_REPLACESEL, FALSE, (LPARAM)"\r\n\r\n");
 
     // obtain file information (size, date & time)
     HANDLE file = CreateFileUtf8Local(FileName, GENERIC_READ,
@@ -274,9 +301,11 @@ BOOL CParserInterfaceDBF::GetFileInfo(HWND hEdit)
         FileTimeToLocalFileTime(&fileTime, &ft);
         FileTimeToSystemTime(&ft, &st);
 
-        GetDateFormat(LOCALE_USER_DEFAULT, DATE_LONGDATE, &st, NULL, buff2, 100);
+        if (!FormatDBViewerDateTimeAnsi(&st, DATE_LONGDATE, buff2, ARRAYSIZE(buff2), TRUE))
+            sprintf(buff2, "%u.%u.%u", st.wDay, st.wMonth, st.wYear);
         strcat(buff2, ", ");
-        GetTimeFormat(LOCALE_USER_DEFAULT, LOCALE_NOUSEROVERRIDE, &st, NULL, buff2 + strlen(buff2), 100);
+        if (!FormatDBViewerDateTimeAnsi(&st, LOCALE_NOUSEROVERRIDE, buff2 + strlen(buff2), (int)(ARRAYSIZE(buff2) - strlen(buff2)), FALSE))
+            sprintf(buff2 + strlen(buff2), "%u:%02u:%02u", st.wHour, st.wMinute, st.wSecond);
         sprintf(buff, "%s:\t%s\r\n", LoadStr(IDS_FINFO_MODIFIED), buff2);
         SendMessage(hEdit, EM_REPLACESEL, FALSE, (LPARAM)buff);
 
@@ -371,8 +400,11 @@ BOOL CParserInterfaceDBF::GetFieldInfo(DWORD index, CFieldInfo* info)
 
     if (info->Name == NULL)
         info->NameMax = (int)strlen((char*)field->name) + 1;
-    else
-        lstrcpyn(info->Name, (char*)field->name, info->NameMax);
+    else if (info->NameMax > 0)
+    {
+        // The caller owns this metadata buffer; preserve its declared display bound.
+        StringCchCopyNA(info->Name, info->NameMax, (char*)field->name, info->NameMax - 1);
+    }
     if (field->type == DBF_FTYPE_NUM ||
         field->type == DBF_FTYPE_DATE ||
         field->type == DBF_FTYPE_FLOAT ||
@@ -458,7 +490,8 @@ BOOL CParserInterfaceDBF::GetFieldInfo(DWORD index, CFieldInfo* info)
             textResID = IDS_FTYPE_UNKOWN;
             break;
         }
-        lstrcpyn(info->Type, LoadStr(textResID), 100);
+        // The host reserves a fixed field for the localized type label.
+        StringCchCopyNA(info->Type, 100, LoadStr(textResID), 99);
     }
 
     if (field->type == DBF_FTYPE_NUM)
@@ -483,28 +516,13 @@ CParserInterfaceDBF::FetchRecord(DWORD index)
 
 char* Int64ToCurrency(char* buffer, __int64 number)
 {
-    /*
-  int DecimalSeparatorLen;
-  char DecimalSeparator[5];
-
-  if ((DecimalSeparatorLen = GetLocaleInfo(LOCALE_USER_DEFAULT, LOCALE_SDECIMAL, DecimalSeparator, 5)) == 0 ||
-      DecimalSeparatorLen > 5)
-  {
-    strcpy(DecimalSeparator, ".");
-    DecimalSeparatorLen = 1;
-  }
-  else
-  {
-    DecimalSeparatorLen--;
-    DecimalSeparator[DecimalSeparatorLen] = 0;  // ensure a zero terminator at the end
-  }
-  */
     // other DBF values use '.' as the decimal separator, so we do not use the system one
     int DecimalSeparatorLen = 1;
     char DecimalSeparator[1] = {'.'};
 
     _i64toa(number, buffer, 10);
-    int l = lstrlen(buffer);
+    // _i64toa always produces a terminated decimal buffer.
+    int l = static_cast<int>(strlen(buffer));
     if (l > 4)
     {
         char* s = buffer + l - 4;
@@ -578,22 +596,25 @@ CParserInterfaceDBF::GetCellText(DWORD index, size_t* textLen)
         size_t buffLen = 0;
         SYSTEMTIME st;
         ZeroMemory(&st, sizeof(st));
-        lstrcpyn(Buffer, text, 5);
+        // DBF dates are eight counted bytes, not independently terminated substrings.
+        memcpy(Buffer, text, 4);
+        Buffer[4] = 0;
         st.wYear = atoi(Buffer);
-        lstrcpyn(Buffer, text + 4, 3);
+        memcpy(Buffer, text + 4, 2);
+        Buffer[2] = 0;
         st.wMonth = atoi(Buffer);
-        lstrcpyn(Buffer, text + 6, 3);
+        memcpy(Buffer, text + 6, 2);
+        Buffer[2] = 0;
         st.wDay = atoi(Buffer);
         if (st.wYear != 0 && st.wMonth != 0 && st.wDay != 0)
         {
-            buffLen = GetDateFormat(LOCALE_USER_DEFAULT, DATE_SHORTDATE, &st, NULL, Buffer, 99);
-            if (buffLen == 0)
+            if (!FormatDBViewerDateTimeAnsi(&st, DATE_SHORTDATE, Buffer, ARRAYSIZE(Buffer), TRUE))
             {
                 sprintf(Buffer, "%u.%u.%u", st.wDay, st.wMonth, st.wYear);
                 buffLen = strlen(Buffer);
             }
             else
-                buffLen--;
+                buffLen = strlen(Buffer);
         }
         *textLen = buffLen;
         return Buffer;
@@ -603,11 +624,13 @@ CParserInterfaceDBF::GetCellText(DWORD index, size_t* textLen)
     {
         if (*text == 'T' || *text == 't' || *text == 'Y' || *text == 'y')
         {
-            lstrcpy(Buffer, LoadStr(IDS_TRUE));
+            if (FAILED(StringCchCopyA(Buffer, _countof(Buffer), LoadStr(IDS_TRUE))))
+                Buffer[0] = 0;
         }
         else if (*text == 'F' || *text == 'f' || *text == 'N' || *text == 'n' || *text == '0')
         {
-            lstrcpy(Buffer, LoadStr(IDS_FALSE));
+            if (FAILED(StringCchCopyA(Buffer, _countof(Buffer), LoadStr(IDS_FALSE))))
+                Buffer[0] = 0;
         }
         else
             Buffer[0] = 0; // Not initialised (default)
@@ -801,7 +824,7 @@ BOOL CParserInterfaceDBF::IsRecordDeleted()
 CParserInterfaceCSV::CParserInterfaceCSV(CCSVConfig* config)
 {
     Csv = NULL;
-    FileName[0] = 0;
+    FileName = NULL;
     Config = config;
     IsUTF8 = IsUnicode = FALSE;
 }
@@ -934,7 +957,15 @@ CParserInterfaceCSV::OpenFile(const char* fileName)
     }
 
     if (status == psOK)
-        lstrcpyn(FileName, fileName, MAX_PATH);
+    {
+        // File-info and reopen paths must retain the complete opened-file identity.
+        FileName = SalGeneral->DupStr(fileName);
+        if (FileName == NULL)
+        {
+            CloseFile();
+            status = psOOM;
+        }
+    }
 
     return status;
 }
@@ -946,7 +977,11 @@ void CParserInterfaceCSV::CloseFile()
         delete Csv;
         Csv = NULL;
     }
-    FileName[0] = 0;
+    if (FileName != NULL)
+    {
+        SalGeneral->Free(FileName);
+        FileName = NULL;
+    }
 }
 
 BOOL CParserInterfaceCSV::GetFileInfo(HWND hEdit)
@@ -963,8 +998,8 @@ BOOL CParserInterfaceCSV::GetFileInfo(HWND hEdit)
     SetWindowText(hEdit, "");
     DWORD tab = 80;
     SendMessage(hEdit, EM_SETTABSTOPS, 1, (LPARAM)&tab);
-    sprintf(buff, "%s\r\n\r\n", FileName);
-    SendMessage(hEdit, EM_REPLACESEL, FALSE, (LPARAM)buff);
+    SendMessage(hEdit, EM_REPLACESEL, FALSE, (LPARAM)FileName);
+    SendMessage(hEdit, EM_REPLACESEL, FALSE, (LPARAM)"\r\n\r\n");
 
     // obtain file information (size, date & time)
     HANDLE file = CreateFileUtf8Local(FileName, GENERIC_READ,
@@ -984,9 +1019,11 @@ BOOL CParserInterfaceCSV::GetFileInfo(HWND hEdit)
         FileTimeToLocalFileTime(&fileTime, &ft);
         FileTimeToSystemTime(&ft, &st);
 
-        GetDateFormat(LOCALE_USER_DEFAULT, DATE_LONGDATE, &st, NULL, buff2, 100);
+        if (!FormatDBViewerDateTimeAnsi(&st, DATE_LONGDATE, buff2, ARRAYSIZE(buff2), TRUE))
+            sprintf(buff2, "%u.%u.%u", st.wDay, st.wMonth, st.wYear);
         strcat(buff2, ", ");
-        GetTimeFormat(LOCALE_USER_DEFAULT, LOCALE_NOUSEROVERRIDE, &st, NULL, buff2 + strlen(buff2), 100);
+        if (!FormatDBViewerDateTimeAnsi(&st, LOCALE_NOUSEROVERRIDE, buff2 + strlen(buff2), (int)(ARRAYSIZE(buff2) - strlen(buff2)), FALSE))
+            sprintf(buff2 + strlen(buff2), "%u:%02u:%02u", st.wHour, st.wMinute, st.wSecond);
         sprintf(buff, "%s:\t%s\r\n", LoadStr(IDS_FINFO_MODIFIED), buff2);
         SendMessage(hEdit, EM_REPLACESEL, FALSE, (LPARAM)buff);
 
@@ -1057,8 +1094,11 @@ BOOL CParserInterfaceCSV::GetFieldInfo(DWORD index, CFieldInfo* info)
     {
         if (info->Name == NULL)
             info->NameMax = (int)strlen(colName.s) + 1;
-        else
-            lstrcpynA(info->Name, colName.s, info->NameMax);
+        else if (info->NameMax > 0)
+        {
+            // The caller owns this metadata buffer; preserve its declared display bound.
+            StringCchCopyNA(info->Name, info->NameMax, colName.s, info->NameMax - 1);
+        }
     }
     else
     {
@@ -1074,7 +1114,10 @@ BOOL CParserInterfaceCSV::GetFieldInfo(DWORD index, CFieldInfo* info)
     info->TextMax = Csv->GetColumnMaxLen(index);
 
     if (info->Type != NULL)
-        lstrcpyn(info->Type, LoadStr(IDS_FTYPE_CHAR), 100);
+    {
+        // The host reserves a fixed field for the localized type label.
+        StringCchCopyNA(info->Type, 100, LoadStr(IDS_FTYPE_CHAR), 99);
+    }
 
     info->FieldLen = info->Decimals = -1;
 

@@ -6,6 +6,7 @@
 #include <ostream>
 #include <commctrl.h>
 #include <stdio.h>
+#include <strsafe.h>
 
 #include "versinfo.rh2"
 
@@ -200,12 +201,12 @@ BOOL CCommentDialog::OnInit(WPARAM wParam, LPARAM lParam)
             SetMenuItemInfo(menu, CM_SAVE, FALSE, &mi);
         }
     }
-    // set a thin frame
-    LONG style = GetWindowLong(CommentHWnd, GWL_EXSTYLE);
+    // Use the pointer-width API so this frame adjustment does not retain a 32-bit window-data assumption.
+    LONG_PTR style = GetWindowLongPtr(CommentHWnd, GWL_EXSTYLE);
     if (style)
     {
-        style = style & ~(LONG)WS_EX_CLIENTEDGE | WS_EX_STATICEDGE;
-        SetWindowLong(CommentHWnd, GWL_EXSTYLE, style);
+        style = style & ~(LONG_PTR)WS_EX_CLIENTEDGE | WS_EX_STATICEDGE;
+        SetWindowLongPtr(CommentHWnd, GWL_EXSTYLE, style);
         //SetWindowPos(hwndPath, 0, 0, 0, w, ShortPathControlHeigth, SWP_NOMOVE | SWP_NOZORDER | SWP_FRAMECHANGED);
     }
 
@@ -448,6 +449,18 @@ ChangeTextsDialog(HWND parent, int* changeLangReaction)
 // other functions
 //
 
+static void FormatSfxDirectoryError(char (&buffer)[512], DWORD error)
+{
+    // The dialog owns a fixed error field, so keep a complete localized prefix before appending Win32 text.
+    if (FAILED(StringCchCopyA(buffer, _countof(buffer), LoadStr(IDS_UNABLEREADSFXDIR))))
+        buffer[0] = 0;
+    const size_t prefixLength = strlen(buffer);
+    if (prefixLength < _countof(buffer) - 1)
+        FormatMessage(FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS, NULL, error,
+                      MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), buffer + prefixLength,
+                      static_cast<DWORD>(_countof(buffer) - prefixLength), NULL);
+}
+
 BOOL LoadSfxLangs(HWND dlg, char* selectedSfxFile, bool isConfig)
 {
     CALL_STACK_MESSAGE2("LoadSfxLangs(, , %d)", isConfig);
@@ -467,7 +480,7 @@ BOOL LoadSfxLangs(HWND dlg, char* selectedSfxFile, bool isConfig)
     for (i = 0; i < SfxLanguages->Count; i++)
     {
         lang = (*SfxLanguages)[i];
-        if (GetLocaleInfo(MAKELCID(MAKELANGID(lang->LangID, SUBLANG_NEUTRAL), SORT_DEFAULT), LOCALE_SLANGUAGE, langName, 128))
+        if (GetLanguageNameFromLangId(lang->LangID, langName, _countof(langName)))
         {
             char* c = strchr(langName, ' ');
             if (c)
@@ -479,7 +492,9 @@ BOOL LoadSfxLangs(HWND dlg, char* selectedSfxFile, bool isConfig)
 
                 if (lstrcmpi(lang->FileName, selectedSfxFile) == 0)
                 {
-                    lstrcpy(selLang, langName);
+                    // Language labels are bounded dialog strings; clear the selection if one is malformed.
+                    if (FAILED(StringCchCopyA(selLang, _countof(selLang), langName)))
+                        selLang[0] = 0;
                 }
             }
         }
@@ -514,10 +529,7 @@ BOOL LoadLangChache(HWND parent)
         else
         {
             char buffer[512];
-            lstrcpy(buffer, LoadStr(IDS_UNABLEREADSFXDIR));
-            FormatMessage(FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS, NULL, le,
-                          MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), buffer + lstrlen(buffer),
-                          512 - lstrlen(buffer), NULL);
+            FormatSfxDirectoryError(buffer, le);
             SalamanderGeneral->SalMessageBox(parent, buffer, LoadStr(IDS_ERROR), MB_OK | MB_ICONEXCLAMATION);
         }
         return FALSE;
@@ -532,7 +544,15 @@ BOOL LoadLangChache(HWND parent)
 
     SalamanderGeneral->CutDirectory(path);
     SalamanderGeneral->SalPathAddBackslash(path, MAX_PATH);
-    file = path + lstrlen(path);
+    const size_t pathLength = strlen(path);
+    if (pathLength >= _countof(path))
+    {
+        FindClose(find);
+        delete SfxLanguages;
+        SfxLanguages = NULL;
+        return FALSE;
+    }
+    file = path + pathLength;
 
     CSfxLang* lang;
     BOOL ret;
@@ -541,29 +561,32 @@ BOOL LoadLangChache(HWND parent)
     {
         if (!(fd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY))
         {
-            lstrcpy(file, fd.cFileName);
-            int r = LoadSfxFileData(path, &lang);
-            if (r || !SfxLanguages->Add(lang))
+            // Only load a language package when its full filesystem path fits the scan buffer.
+            if (SUCCEEDED(StringCchCopyA(file, _countof(path) - pathLength, fd.cFileName)))
             {
-                if (!r)
+                int r = LoadSfxFileData(path, &lang);
+                if (r || !SfxLanguages->Add(lang))
                 {
-                    delete lang;
-                    r = IDS_LOWMEM;
-                }
-                if (r == IDS_LOWMEM)
-                {
-                    SfxLanguages->Destroy();
-                    SalamanderGeneral->SalMessageBox(parent, LoadStr(IDS_LOWMEM), LoadStr(IDS_ERROR), MB_OK | MB_ICONEXCLAMATION);
-                    break;
-                }
-                else
-                {
-                    char err[512];
-                    sprintf(err, LoadStr(r), file);
-                    if (SalamanderGeneral->SalMessageBox(parent, err, LoadStr(IDS_ERROR), MB_OKCANCEL | MB_ICONEXCLAMATION) != IDOK)
+                    if (!r)
+                    {
+                        delete lang;
+                        r = IDS_LOWMEM;
+                    }
+                    if (r == IDS_LOWMEM)
                     {
                         SfxLanguages->Destroy();
+                        SalamanderGeneral->SalMessageBox(parent, LoadStr(IDS_LOWMEM), LoadStr(IDS_ERROR), MB_OK | MB_ICONEXCLAMATION);
                         break;
+                    }
+                    else
+                    {
+                        char err[512];
+                        sprintf(err, LoadStr(r), file);
+                        if (SalamanderGeneral->SalMessageBox(parent, err, LoadStr(IDS_ERROR), MB_OKCANCEL | MB_ICONEXCLAMATION) != IDOK)
+                        {
+                            SfxLanguages->Destroy();
+                            break;
+                        }
                     }
                 }
             }
@@ -574,10 +597,7 @@ BOOL LoadLangChache(HWND parent)
         if (!ret && le != ERROR_NO_MORE_FILES)
         {
             char buffer[512];
-            lstrcpy(buffer, LoadStr(IDS_UNABLEREADSFXDIR));
-            FormatMessage(FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS, NULL, le,
-                          MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), buffer + lstrlen(buffer),
-                          512 - lstrlen(buffer), NULL);
+            FormatSfxDirectoryError(buffer, le);
             SalamanderGeneral->SalMessageBox(parent, buffer, LoadStr(IDS_ERROR), MB_OK | MB_ICONEXCLAMATION);
             break;
         }

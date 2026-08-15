@@ -3,6 +3,7 @@
 // CommentsTranslationProject: TRANSLATED
 
 #include "precomp.h"
+#include <strsafe.h>
 
 #include "viewer.h"
 #include "codetbl.h"
@@ -47,15 +48,23 @@ unsigned ThreadViewerMessageLoopBody(void* parameter)
     CTVData* data = (CTVData*)parameter;
     CViewerWindow* view = data->View;
     char name[MAX_PATH];
-    strcpy(name, data->Name);
+    // The viewer thread must not create a window for a clipped file identity.
+    if (FAILED(StringCchCopyA(name, _countof(name), data->Name)))
+    {
+        data->Success = FALSE;
+        return 0;
+    }
     char captionBuf[MAX_PATH];
     const char* caption = NULL;
     BOOL wholeCaption = FALSE;
     if (data->Caption != NULL)
     {
-        lstrcpyn(captionBuf, data->Caption, MAX_PATH);
-        caption = captionBuf;
-        wholeCaption = data->WholeCaption;
+        // Captions are presentation-only, so retain their intentional display limit.
+        if (SUCCEEDED(StringCchCopyNA(captionBuf, _countof(captionBuf), data->Caption, _countof(captionBuf) - 1)))
+        {
+            caption = captionBuf;
+            wholeCaption = data->WholeCaption;
+        }
     }
     UINT showCmd = data->ShowCmd;
 
@@ -150,8 +159,10 @@ unsigned ThreadViewerMessageLoopEH(void* param)
 #endif // CALLSTK_DISABLE
 }
 
-DWORD WINAPI ThreadViewerMessageLoop(void* param)
+DWORD WINAPI ThreadViewerMessageLoopOwned(void* param, HANDLE stopEvent)
 {
+    // The viewer loop exits through WM_QUIT; the owner event records lifetime without changing that message-loop contract.
+    UNREFERENCED_PARAMETER(stopEvent);
     CCallStack stack;
     return ThreadViewerMessageLoopEH(param);
 }
@@ -193,10 +204,11 @@ BOOL OpenViewer(const char* name, CViewType mode, int left, int top, int width, 
         data.ShowCmd = showCmd;
         data.Caption = intViewerData != NULL ? intViewerData->Caption : NULL;
 
-        DWORD ThreadID;
-        HANDLE loop = HANDLES(CreateThread(NULL, 0, ThreadViewerMessageLoop, &data, 0, &ThreadID));
-        if (loop == NULL)
+        CThreadOwner* loop = new CThreadOwner;
+        if (loop == NULL || !loop->Start(ThreadViewerMessageLoopOwned, &data, "viewer message loop"))
         {
+            if (loop != NULL)
+                delete loop;
             TRACE_E("Unable to start ViewerMessageLoop thread.");
             goto ERROR_TV_CREATE;
         }
@@ -204,8 +216,8 @@ BOOL OpenViewer(const char* name, CViewType mode, int left, int top, int width, 
         {
             //      SetThreadPriority(loop, THREAD_PRIORITY_HIGHEST);
         }
-        // The viewer loop closes before teardown; its handle remains tracked for a safe join.
-        AddAuxThread(loop, FALSE, "viewer message loop");
+        // Transfer the owner only after the startup event makes the stack launch record unreachable.
+        AddOwnedAuxThread(loop, "viewer message loop");
         WaitForSingleObject(ViewerContinue, INFINITE); // wait until the thread finishes its startup
         if (!data.Success)
             goto ERROR_TV_CREATE;
@@ -400,13 +412,13 @@ BOOL CViewerWindow::LoadBefore(HANDLE* hFile)
         DWORD readed;
         BOOL ret;
         BOOL kill = FALSE; // TRUE means that FileName will be cleared on error
-        CQuadWord resSeek;
-        resSeek.SetUI64(Seek); // note, the seek for SetFilePointer is a signed value
-        resSeek.LoDWord = SetFilePointer(file, resSeek.LoDWord, (PLONG)&resSeek.HiDWord, FILE_BEGIN);
+        // Viewer offsets are signed 64-bit values; use the Boolean seek result rather than a sentinel position.
+        LARGE_INTEGER resSeek;
+        resSeek.QuadPart = Seek;
+        BOOL seekSucceeded = SetFilePointerEx(file, resSeek, NULL, FILE_BEGIN);
         err = GetLastError();
 
-        if ((resSeek.LoDWord != INVALID_SET_FILE_POINTER || err == NO_ERROR) && // no error
-            resSeek.Value == (unsigned __int64)Seek)                            // the current file offset matches
+        if (seekSucceeded)
         {
             if (ReadFile(file, Buffer, read, &readed, NULL))
             {
@@ -554,12 +566,10 @@ BOOL CViewerWindow::LoadBehind(HANDLE* hFile)
         BOOL ret;
         BOOL kill = FALSE; // TRUE means that FileName will be set to NULL on error
 
-        CQuadWord resSeek;
-        resSeek.SetUI64(seekEnd); // note, the seek for SetFilePointer is a signed value
-        resSeek.LoDWord = SetFilePointer(file, resSeek.LoDWord, (PLONG)&resSeek.HiDWord, FILE_BEGIN);
-        err = GetLastError();
-        if ((resSeek.LoDWord != INVALID_SET_FILE_POINTER || err == NO_ERROR) && // no error
-            resSeek.Value == (unsigned __int64)seekEnd)                         // the current file offset matches
+        // Keep the append position signed and full-width while relying on the Boolean success contract.
+        LARGE_INTEGER resSeek;
+        resSeek.QuadPart = seekEnd;
+        if (SetFilePointerEx(file, resSeek, NULL, FILE_BEGIN))
         {
             if (ReadFile(file, Buffer + readed, read, &readed, NULL))
             {

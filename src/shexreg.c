@@ -16,6 +16,91 @@
 
 #define NOHANDLES(function) function // obrana proti zanaseni maker HANDLES do zdrojaku pomoci CheckHnd
 
+// Registry key construction must reject unrepresentable text without pulling CRT formatting into the CRT-free shell extension.
+static BOOL BuildShellRegistryString(char* buffer, size_t bufferCount, const char* first,
+                                     const char* second, const char* third)
+{
+    const char* parts[3] = {first, second, third};
+    size_t used = 0;
+    int i;
+
+    if (bufferCount == 0)
+        return FALSE;
+    for (i = 0; i < 3; i++)
+    {
+        const char* part = parts[i];
+        if (part != NULL)
+        {
+            while (*part != '\0')
+            {
+                if (used + 1 >= bufferCount)
+                    return FALSE;
+                buffer[used++] = *part++;
+            }
+        }
+    }
+    buffer[used] = '\0';
+    return TRUE;
+}
+
+static BOOL BuildShellRegistryDescription(char* buffer, size_t bufferCount,
+                                          const char* descriptionTemplate, const char* architecture)
+{
+    size_t used = 0;
+    BOOL substituted = FALSE;
+
+    if (bufferCount == 0)
+        return FALSE;
+    while (*descriptionTemplate != '\0')
+    {
+        if (*descriptionTemplate == '%')
+        {
+            const char* part;
+            if (substituted || descriptionTemplate[1] != 's')
+                return FALSE;
+            part = architecture;
+            substituted = TRUE;
+            while (*part != '\0')
+            {
+                if (used + 1 >= bufferCount)
+                    return FALSE;
+                buffer[used++] = *part++;
+            }
+            descriptionTemplate += 2;
+        }
+        else
+        {
+            if (used + 1 >= bufferCount)
+                return FALSE;
+            buffer[used++] = *descriptionTemplate++;
+        }
+    }
+    buffer[used] = '\0';
+    return substituted;
+}
+
+static BOOL BuildShellRegistryIndex(char* buffer, size_t bufferCount, int value)
+{
+    char digits[16];
+    unsigned int number = (unsigned int)value;
+    size_t count = 0;
+
+    do
+    {
+        digits[count++] = (char)('0' + number % 10);
+        number /= 10;
+    } while (number != 0 && count < _countof(digits));
+    if (count + 1 > bufferCount)
+        return FALSE;
+    {
+        size_t index = 0;
+        while (count != 0)
+            buffer[index++] = digits[--count];
+        buffer[index] = '\0';
+    }
+    return TRUE;
+}
+
 //const char *SALSHEXT_SHAREDMEMMUTEXNAME = "SalShExt_SharedMemMutex"; // salshext.dll (Sal 2.5 beta 1)
 //const char *SALSHEXT_SHAREDMEMNAME = "SalShExt_SharedMem";           // salshext.dll (Sal 2.5 beta 1)
 //const char *SALSHEXT_SHAREDMEMMUTEXNAME = "SalExten_SharedMemMutex"; // salexten.dll - pracovni verze, pred 2.5 beta 2
@@ -142,7 +227,7 @@ SECLoadRegistry()
         SalRegQueryValueEx(hItemKey, SHELLEXT_CM_AND, 0, &gettedType, (BYTE *)&item->LogicalAnd, &bufferSize);
       }
       NOHANDLES(RegCloseKey(hItemKey));
-      wsprintf(key, "%d", ++i);
+      BuildShellRegistryIndex(key, _countof(key), ++i);
     }
 
     // nactu jednotlive promenne konfigurace
@@ -215,7 +300,8 @@ SECDeleteAllItems()
   {
     CShellExtConfigItem *tmp = iterator;
     iterator = iterator->Next;
-    NOHANDLES(GlobalFree(tmp));
+    // Configuration-list nodes are private process state rather than globally shared handles.
+    HeapFree(GetProcessHeap(), 0, tmp);
   }
 
   ShellExtConfigFirst = NULL;
@@ -228,8 +314,8 @@ SECAddItem(CShellExtConfigItem **refItem)
   CShellExtConfigItem *iterator = ShellExtConfigFirst;
   int index;
 
-  // allocate item
-  item = (CShellExtConfigItem*)NOHANDLES(GlobalAlloc(GMEM_FIXED, sizeof(CShellExtConfigItem)));
+  // The registry editor owns each configuration node for its complete list lifetime.
+  item = (CShellExtConfigItem*)HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, sizeof(CShellExtConfigItem));
 
   if (refItem != NULL)
     *refItem = item;
@@ -334,24 +420,32 @@ HRESULT DllUnregisterServerBody(REGSAM regView)
                         NULL);
     shellExtIID[MAX_PATH - 1] = 0;
 
-    wsprintf(key, "CLSID\\%s", shellExtIID);
+    if (!BuildShellRegistryString(key, _countof(key), "CLSID\\", shellExtIID, NULL))
+        return E_FAIL;
     MyDeleteKey(HKEY_CLASSES_ROOT, key, regView);
-    wsprintf(key, "Software\\Classes\\CLSID\\%s", shellExtIID);
+    if (!BuildShellRegistryString(key, _countof(key), "Software\\Classes\\CLSID\\", shellExtIID, NULL))
+        return E_FAIL;
     MyDeleteKey(HKEY_CURRENT_USER, key, regView);
-    wsprintf(key, "directory\\shellex\\CopyHookHandlers\\%s", SHEXREG_OPENSALAMANDER);
+    if (!BuildShellRegistryString(key, _countof(key), "directory\\shellex\\CopyHookHandlers\\", SHEXREG_OPENSALAMANDER, NULL))
+        return E_FAIL;
     MyDeleteKey(HKEY_CLASSES_ROOT, key, regView);
-    wsprintf(key, "Software\\Classes\\directory\\shellex\\CopyHookHandlers\\%s", SHEXREG_OPENSALAMANDER);
+    if (!BuildShellRegistryString(key, _countof(key), "Software\\Classes\\directory\\shellex\\CopyHookHandlers\\", SHEXREG_OPENSALAMANDER, NULL))
+        return E_FAIL;
     MyDeleteKey(HKEY_CURRENT_USER, key, regView);
 
 #ifdef ENABLE_SH_MENU_EXT
 
-    wsprintf(key, "*\\shellex\\ContextMenuHandlers\\%s", SHEXREG_OPENSALAMANDER);
+    if (!BuildShellRegistryString(key, _countof(key), "*\\shellex\\ContextMenuHandlers\\", SHEXREG_OPENSALAMANDER, NULL))
+        return E_FAIL;
     MyDeleteKey(HKEY_CLASSES_ROOT, key, regView);
-    wsprintf(key, "Software\\Classes\\*\\shellex\\ContextMenuHandlers\\%s", SHEXREG_OPENSALAMANDER);
+    if (!BuildShellRegistryString(key, _countof(key), "Software\\Classes\\*\\shellex\\ContextMenuHandlers\\", SHEXREG_OPENSALAMANDER, NULL))
+        return E_FAIL;
     MyDeleteKey(HKEY_CURRENT_USER, key, regView);
-    wsprintf(key, "Directory\\shellex\\ContextMenuHandlers\\%s", SHEXREG_OPENSALAMANDER);
+    if (!BuildShellRegistryString(key, _countof(key), "Directory\\shellex\\ContextMenuHandlers\\", SHEXREG_OPENSALAMANDER, NULL))
+        return E_FAIL;
     MyDeleteKey(HKEY_CLASSES_ROOT, key, regView);
-    wsprintf(key, "Software\\Classes\\Directory\\shellex\\ContextMenuHandlers\\%s", SHEXREG_OPENSALAMANDER);
+    if (!BuildShellRegistryString(key, _countof(key), "Software\\Classes\\Directory\\shellex\\ContextMenuHandlers\\", SHEXREG_OPENSALAMANDER, NULL))
+        return E_FAIL;
     MyDeleteKey(HKEY_CURRENT_USER, key, regView);
 
 #endif // ENABLE_SH_MENU_EXT
@@ -449,6 +543,7 @@ BOOL SECRegisterToRegistry(const char* shellExtensionPath, BOOL doNotLoadDLL, RE
     char key[MAX_PATH];
     char shellExtIID[MAX_PATH];
     char shellExtPath[MAX_PATH];
+    char descrBuf[200];
     char* str;
     WCHAR buff2[MAX_PATH];
     BOOL registered;
@@ -515,15 +610,27 @@ BOOL SECRegisterToRegistry(const char* shellExtensionPath, BOOL doNotLoadDLL, RE
 
 #endif // ENABLE_SH_MENU_EXT
 
-        wsprintf(key, "CLSID\\%s", shellExtIID);
+        // Keep registration atomic with respect to path formatting: do not create a truncated registry key.
+        if (!BuildShellRegistryString(key, _countof(key), "CLSID\\", shellExtIID, NULL))
+        {
+            if (classesKey != HKEY_CLASSES_ROOT)
+                NOHANDLES(RegCloseKey(classesKey));
+            return FALSE;
+        }
+#ifdef _WIN64
+        if (!BuildShellRegistryDescription(descrBuf, _countof(descrBuf), SHEXREG_OPENSALAMANDER_DESCR,
+                                           (regView & KEY_WOW64_32KEY) ? "x86" : "x64"))
+#else  // _WIN64
+        if (!BuildShellRegistryDescription(descrBuf, _countof(descrBuf), SHEXREG_OPENSALAMANDER_DESCR,
+                                           (regView & KEY_WOW64_64KEY) ? "x64" : "x86"))
+#endif // _WIN64
+        {
+            if (classesKey != HKEY_CLASSES_ROOT)
+                NOHANDLES(RegCloseKey(classesKey));
+            return FALSE;
+        }
         if (MyCreateKey(classesKey, key, &hKey, regView))
         {
-            char descrBuf[200];
-#ifdef _WIN64
-            wsprintf(descrBuf, SHEXREG_OPENSALAMANDER_DESCR, (regView & KEY_WOW64_32KEY) ? "x86" : "x64");
-#else  // _WIN64
-            wsprintf(descrBuf, SHEXREG_OPENSALAMANDER_DESCR, (regView & KEY_WOW64_64KEY) ? "x64" : "x86");
-#endif // _WIN64
             RegSetValueEx(hKey, NULL, 0, REG_SZ, (BYTE*)descrBuf, lstrlen(descrBuf) + 1);
             NOHANDLES(RegCloseKey(hKey));
         }
@@ -544,7 +651,12 @@ BOOL SECRegisterToRegistry(const char* shellExtensionPath, BOOL doNotLoadDLL, RE
             return FALSE;
         }
 
-        wsprintf(key, "CLSID\\%s\\InProcServer32", shellExtIID);
+        if (!BuildShellRegistryString(key, _countof(key), "CLSID\\", shellExtIID, "\\InProcServer32"))
+        {
+            if (classesKey != HKEY_CLASSES_ROOT)
+                NOHANDLES(RegCloseKey(classesKey));
+            return FALSE;
+        }
         if (MyCreateKey(classesKey, key, &hKey, regView))
         {
             RegSetValueEx(hKey, NULL, 0, REG_SZ,
@@ -564,15 +676,14 @@ BOOL SECRegisterToRegistry(const char* shellExtensionPath, BOOL doNotLoadDLL, RE
         }
 
         // without "As Admin" this is "dead code", at least on Vista+
-        wsprintf(key, "Software\\Microsoft\\Windows\\CurrentVersion\\Shell Extensions\\Approved");
+        if (!BuildShellRegistryString(key, _countof(key), "Software\\Microsoft\\Windows\\CurrentVersion\\Shell Extensions\\Approved", NULL, NULL))
+        {
+            if (classesKey != HKEY_CLASSES_ROOT)
+                NOHANDLES(RegCloseKey(classesKey));
+            return FALSE;
+        }
         if (MyCreateKey(HKEY_LOCAL_MACHINE, key, &hKey, regView))
         {
-            char descrBuf[200];
-#ifdef _WIN64
-            wsprintf(descrBuf, SHEXREG_OPENSALAMANDER_DESCR, (regView & KEY_WOW64_32KEY) ? "x86" : "x64");
-#else  // _WIN64
-            wsprintf(descrBuf, SHEXREG_OPENSALAMANDER_DESCR, (regView & KEY_WOW64_64KEY) ? "x64" : "x86");
-#endif // _WIN64
             RegSetValueEx(hKey, shellExtIID, 0, REG_SZ, (BYTE*)descrBuf, lstrlen(descrBuf) + 1);
             NOHANDLES(RegCloseKey(hKey));
         }
@@ -624,7 +735,11 @@ BOOL SECSaveRegistry()
         while (iterator != NULL)
         {
             HKEY hItemKey;
-            wsprintf(key, "%d", i);
+            if (!BuildShellRegistryIndex(key, _countof(key), i))
+            {
+                NOHANDLES(RegCloseKey(hKey));
+                return FALSE;
+            }
 
             if (MyCreateKey(hKey, key, &hItemKey))
             {
@@ -690,7 +805,8 @@ BOOL SECDeleteItem(int index)
     else
         ShellExtConfigFirst = next;
 
-    NOHANDLES(GlobalFree(item));
+    // This unlinked configuration node remains process-heap owned.
+    HeapFree(GetProcessHeap(), 0, item);
 
     return TRUE;
 }

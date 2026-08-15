@@ -259,8 +259,9 @@ BOOL CMenuData::LoadMenuEx(LPCSTR original, LPCSTR translated, CData* data)
         translated += (~((UINT_PTR)translated - 1)) & 1;
         LPWSTR oText = (LPWSTR)original;
         LPWSTR tText = (LPWSTR)translated;
-        original += (1 + lstrlenW((wchar_t*)oText)) * sizeof(WCHAR);
-        translated += (1 + lstrlenW((wchar_t*)tText)) * sizeof(WCHAR);
+        // Resource text is already terminated inside the validated menu payload.
+        original += (1 + wcslen((wchar_t*)oText)) * sizeof(WCHAR);
+        translated += (1 + wcslen((wchar_t*)tText)) * sizeof(WCHAR);
         // align
         original += (~((UINT_PTR)original - 1)) & 3;
         translated += (~((UINT_PTR)translated - 1)) & 3;

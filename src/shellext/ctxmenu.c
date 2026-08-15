@@ -58,11 +58,6 @@ STDMETHODIMP SE_QueryContextMenu(THIS_
 
     char buff[MAX_PATH];
 
-    /*
-  char buff1[1000];
-  wsprintf(buff1, "SE_QueryContextMenu");
-  MessageBox(NULL, buff1, "shellext.dll", MB_OK | MB_ICONINFORMATION);
-*/
 
     if ((uFlags & 0x000F) == CMF_NORMAL || (uFlags & CMF_VERBSONLY) || (uFlags & CMF_EXPLORE))
     {
@@ -205,12 +200,6 @@ STDMETHODIMP SE_InvokeCommand(THIS_
         CShellExtConfigItem* item = SECGetItem(index);
         if (item != NULL)
         {
-            char buff[1000];
-            wsprintf(buff,
-                     "SE_InvokeCommand index = %d\nitem ptr = 0x%p\nThe index has to be passed to Salamander so we can retrieve the pointer to the item through it.",
-                     index, item);
-            MessageBox(NULL, buff, "shellext.dll", MB_OK | MB_ICONINFORMATION);
-
             // this is where the communication with Salamander will go
 
             // the list of clicked files can be obtained by the same method

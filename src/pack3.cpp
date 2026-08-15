@@ -3,6 +3,7 @@
 // CommentsTranslationProject: TRANSLATED
 
 #include "precomp.h"
+#include <strsafe.h>
 
 #include "cfgdlg.h"
 #include "mainwnd.h"
@@ -716,7 +717,9 @@ BOOL CPackerFormatConfig::Load(HKEY hKey)
         if (Configuration.ConfigVersion < 44) // convert extensions to lowercase
         {
             char extAux[MAX_PATH + 2];
-            lstrcpyn(extAux, ext, MAX_PATH + 2);
+            // Registry extension sets must remain complete before legacy normalization.
+            if (FAILED(StringCchCopyA(extAux, _countof(extAux), ext)))
+                return FALSE;
             StrICpy(ext, extAux);
         }
         ret &= SetFormat(index, ext, usePacker, packerIndex, unpackerIndex,
@@ -1264,7 +1267,9 @@ const char* WINAPI PackExpArcDosName(HWND msgParent, void* param)
                     *s++ = '\\';
                 strcpy(s, "PACK");
                 s += 4;
-                DWORD randNum = (GetTickCount() & 0xFFF);
+                // Fold the 64-bit uptime so temporary-name probing does not restart with the 32-bit tick cycle.
+                const CMonotonicTimePoint timeSeed = CMonotonicClock::Now();
+                DWORD randNum = (DWORD)(timeSeed ^ (timeSeed >> 32)) & 0xFFF;
                 while (1)
                 {
                     sprintf(s, "%X.*", randNum);
@@ -1795,8 +1800,9 @@ BOOL PackExecute(HWND parent, char* cmdLine, const char* currentDir, TPackErrorT
     HCURSOR prevCrsr = SetCursor(LoadCursor(NULL, IDC_WAIT));
     // Wait for the external program to finish
     HANDLE objects[] = {pi.hProcess};
-    DWORD start = GetTickCount();
-    DWORD elapsed = 0;
+    const CMonotonicTimePoint packDeadline = PackWinTimeout > 0
+                                                  ? CMonotonicClock::DeadlineAfter((CMonotonicDuration)PackWinTimeout)
+                                                  : 0;
 
     DWORD ret;
     do
@@ -1811,8 +1817,10 @@ BOOL PackExecute(HWND parent, char* cmdLine, const char* currentDir, TPackErrorT
                                     PackWinTimeout <= 0 ? INFINITE : PackWinTimeout - elapsed,
                                     QS_PAINT);
 */
-        ret = MsgWaitForMultipleObjects(1, objects, FALSE,
-                                        PackWinTimeout <= 0 ? INFINITE : PackWinTimeout - elapsed,
+        // Retain the legacy message pump while a long-running process wait remains wrap-safe.
+        const DWORD waitTimeout = PackWinTimeout <= 0 ? INFINITE
+                                                       : CMonotonicClock::RemainingWin32TimerDelay(packDeadline, CMonotonicClock::Now());
+        ret = MsgWaitForMultipleObjects(1, objects, FALSE, waitTimeout,
                                         QS_ALLINPUT);
         if (ret == WAIT_OBJECT_0 + 1)
         {
@@ -1828,8 +1836,7 @@ BOOL PackExecute(HWND parent, char* cmdLine, const char* currentDir, TPackErrorT
                 DispatchMessage(&msg);
             }
             // if the timeout has expired, stop
-            elapsed = GetTickCount() - start;
-            if (PackWinTimeout > 0 && (int)elapsed >= PackWinTimeout)
+            if (PackWinTimeout > 0 && CMonotonicClock::HasReached(packDeadline, CMonotonicClock::Now()))
             {
                 ret = WAIT_TIMEOUT;
                 break;

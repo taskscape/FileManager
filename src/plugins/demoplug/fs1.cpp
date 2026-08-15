@@ -11,6 +11,21 @@
 
 #include "precomp.h"
 
+#include <strsafe.h>
+
+static int FormatDemoDateTimeAnsi(const SYSTEMTIME* time, DWORD flags, char* buffer, int bufferSize, BOOL isDate)
+{
+    // The SDK demonstration keeps ANSI column text, so convert only after locale-name formatting.
+    WCHAR localeName[LOCALE_NAME_MAX_LENGTH];
+    WCHAR formatted[50];
+    if (GetUserDefaultLocaleName(localeName, ARRAYSIZE(localeName)) == 0)
+        return 0;
+    int length = isDate
+                     ? GetDateFormatEx(localeName, flags, time, NULL, formatted, ARRAYSIZE(formatted), NULL)
+                     : GetTimeFormatEx(localeName, flags, time, NULL, formatted, ARRAYSIZE(formatted));
+    return length != 0 ? WideCharToMultiByte(CP_ACP, 0, formatted, -1, buffer, bufferSize, NULL, NULL) : 0;
+}
+
 // FS name assigned by Salamander after the plugin loads
 char AssignedFSName[MAX_PATH] = "";
 extern int AssignedFSNameLen = 0;
@@ -159,7 +174,12 @@ CPluginInterfaceForFS::ExecuteChangeDriveMenuItem(int panel)
 
             // change the active panel path to AssignedFSName:ConnectPath
             ConnectData.UseConnectData = TRUE;
-            lstrcpyn(ConnectData.UserPart, ConnectPath, MAX_PATH);
+            if (FAILED(StringCchCopyA(ConnectData.UserPart, _countof(ConnectData.UserPart), ConnectPath)))
+            {
+                // Do not construct a plugin-FS path from a truncated dialog result.
+                ConnectData.UseConnectData = FALSE;
+                continue;
+            }
             int failReason;
             BOOL changeRes = SalamanderGeneral->ChangePanelPathToPluginFS(panel, AssignedFSName, "", &failReason);
             // NOTE: on success it returns failReason==CHPPFR_SHORTERPATH (the user-part of the path is not empty)
@@ -549,7 +569,13 @@ CPluginFSDataInterface::GetSimplePluginIcons(int iconSize)
 HICON WINAPI
 CPluginFSDataInterface::GetPluginIcon(const CFileData* file, int iconSize, BOOL& destroyIcon)
 {
-    lstrcpyn(Name, file->Name, (int)(MAX_PATH - (Name - Path)));
+    if (FAILED(StringCchCopyA(Name, MAX_PATH - (Name - Path), file->Name)))
+    {
+        // Shell icon lookup must not receive a path whose final component was truncated.
+        Name[0] = 0;
+        destroyIcon = TRUE;
+        return NULL;
+    }
     HICON icon;
     if (!SalamanderGeneral->GetFileIcon(Path, FALSE, &icon, iconSize, FALSE, FALSE))
         icon = NULL;
@@ -575,11 +601,11 @@ void WINAPI GetCreatedText()
 {
     FileTimeToLocalFileTime(&((CFSData*)((*TransferFileData)->PluginData))->CreationTime, &FSft);
     FileTimeToSystemTime(&FSft, &FSst);
-    FSlen = GetDateFormat(LOCALE_USER_DEFAULT, DATE_SHORTDATE, &FSst, NULL, TransferBuffer, 50) - 1;
+    FSlen = FormatDemoDateTimeAnsi(&FSst, DATE_SHORTDATE, TransferBuffer, 50, TRUE) - 1;
     if (FSlen < 0)
         FSlen = sprintf(TransferBuffer, "%u.%u.%u", FSst.wDay, FSst.wMonth, FSst.wYear);
     *(TransferBuffer + FSlen++) = ' ';
-    FSlen2 = GetTimeFormat(LOCALE_USER_DEFAULT, 0, &FSst, NULL, TransferBuffer + FSlen, 50) - 1;
+    FSlen2 = FormatDemoDateTimeAnsi(&FSst, 0, TransferBuffer + FSlen, 50, FALSE) - 1;
     if (FSlen2 < 0)
         FSlen2 = sprintf(TransferBuffer + FSlen, "%u:%02u:%02u", FSst.wHour, FSst.wMinute, FSst.wSecond);
     *TransferLen = FSlen + FSlen2;
@@ -589,11 +615,11 @@ void WINAPI GetModifiedText()
 {
     FileTimeToLocalFileTime(&(*TransferFileData)->LastWrite, &FSft);
     FileTimeToSystemTime(&FSft, &FSst);
-    FSlen = GetDateFormat(LOCALE_USER_DEFAULT, DATE_SHORTDATE, &FSst, NULL, TransferBuffer, 50) - 1;
+    FSlen = FormatDemoDateTimeAnsi(&FSst, DATE_SHORTDATE, TransferBuffer, 50, TRUE) - 1;
     if (FSlen < 0)
         FSlen = sprintf(TransferBuffer, "%u.%u.%u", FSst.wDay, FSst.wMonth, FSst.wYear);
     *(TransferBuffer + FSlen++) = ' ';
-    FSlen2 = GetTimeFormat(LOCALE_USER_DEFAULT, 0, &FSst, NULL, TransferBuffer + FSlen, 50) - 1;
+    FSlen2 = FormatDemoDateTimeAnsi(&FSst, 0, TransferBuffer + FSlen, 50, FALSE) - 1;
     if (FSlen2 < 0)
         FSlen2 = sprintf(TransferBuffer + FSlen, "%u:%02u:%02u", FSst.wHour, FSst.wMinute, FSst.wSecond);
     *TransferLen = FSlen + FSlen2;
@@ -603,11 +629,11 @@ void WINAPI GetAccessedText()
 {
     FileTimeToLocalFileTime(&((CFSData*)((*TransferFileData)->PluginData))->LastAccessTime, &FSft);
     FileTimeToSystemTime(&FSft, &FSst);
-    FSlen = GetDateFormat(LOCALE_USER_DEFAULT, DATE_SHORTDATE, &FSst, NULL, TransferBuffer, 50) - 1;
+    FSlen = FormatDemoDateTimeAnsi(&FSst, DATE_SHORTDATE, TransferBuffer, 50, TRUE) - 1;
     if (FSlen < 0)
         FSlen = sprintf(TransferBuffer, "%u.%u.%u", FSst.wDay, FSst.wMonth, FSst.wYear);
     *(TransferBuffer + FSlen++) = ' ';
-    FSlen2 = GetTimeFormat(LOCALE_USER_DEFAULT, 0, &FSst, NULL, TransferBuffer + FSlen, 50) - 1;
+    FSlen2 = FormatDemoDateTimeAnsi(&FSst, 0, TransferBuffer + FSlen, 50, FALSE) - 1;
     if (FSlen2 < 0)
         FSlen2 = sprintf(TransferBuffer + FSlen, "%u:%02u:%02u", FSst.wHour, FSst.wMinute, FSst.wSecond);
     *TransferLen = FSlen + FSlen2;

@@ -4,6 +4,8 @@
 
 #include "precomp.h"
 
+#include <strsafe.h>
+
 #include "cfgdlg.h"
 #include "mainwnd.h"
 #include "usermenu.h"
@@ -83,13 +85,14 @@ void CFilesWindow::Execute(int index)
             netFSName[0] = 0;
             if (file->DosName != NULL)
             {
-                lstrcpy(fullPath, GetPath());
-                if (SalPathAppend(fullPath, file->Name, MAX_PATH) &&
+                // Attribute fallback must probe complete filesystem identities.
+                if (SUCCEEDED(StringCchCopyA(fullPath, _countof(fullPath), GetPath())) &&
+                    SalPathAppend(fullPath, file->Name, MAX_PATH) &&
                     SalGetFileAttributes(fullPath) == INVALID_FILE_ATTRIBUTES &&
                     GetLastError() == ERROR_FILE_NOT_FOUND)
                 {
-                    lstrcpy(fullPath, GetPath());
-                    if (SalPathAppend(fullPath, file->DosName, MAX_PATH) &&
+                    if (SUCCEEDED(StringCchCopyA(fullPath, _countof(fullPath), GetPath())) &&
+                        SalPathAppend(fullPath, file->DosName, MAX_PATH) &&
                         SalGetFileAttributes(fullPath) != INVALID_FILE_ATTRIBUTES)
                     { // when full name is not available (problem converting from multibyte to UNICODE), we'll use DOS name
                         fileName = file->DosName;
@@ -257,8 +260,9 @@ void CFilesWindow::Execute(int index)
 
             // the ExecuteAssociation below can change the panel path during recursive
             // calls (it contains a message loop), so we store the full file name here
-            lstrcpy(fullPath, GetPath());
-            if (!SalPathAppend(fullPath, fileName, MAX_PATH))
+            // History entries require a complete file identity across the re-entrant call.
+            if (FAILED(StringCchCopyA(fullPath, _countof(fullPath), GetPath())) ||
+                !SalPathAppend(fullPath, fileName, MAX_PATH))
                 fullPath[0] = 0;
 
             // launch of the default context menu item (association)
@@ -503,10 +507,11 @@ void CFilesWindow::Execute(int index)
                 CFileData* file = isDir ? &Dirs->At(index) : &Files->At(index - Dirs->Count);
                 CPluginInterfaceForFSEncapsulation* ifaceForFS = GetPluginFS()->GetPluginInterfaceForFS();
                 char fsNameBuf[MAX_PATH]; // GetPluginFS() may cease to exist, so we copy fsName to local buffer
-                lstrcpyn(fsNameBuf, GetPluginFS()->GetPluginFSName(), MAX_PATH);
-                ifaceForFS->ExecuteOnFS(MainWindow->LeftPanel == this ? PANEL_LEFT : PANEL_RIGHT,
-                                        GetPluginFS()->GetInterface(), fsNameBuf,
-                                        GetPluginFS()->GetPluginFSNameIndex(), *file, isDir);
+                // The plug-in callback needs the complete filesystem name after the source object may disappear.
+                if (SUCCEEDED(StringCchCopyA(fsNameBuf, _countof(fsNameBuf), GetPluginFS()->GetPluginFSName())))
+                    ifaceForFS->ExecuteOnFS(MainWindow->LeftPanel == this ? PANEL_LEFT : PANEL_RIGHT,
+                                            GetPluginFS()->GetInterface(), fsNameBuf,
+                                            GetPluginFS()->GetPluginFSNameIndex(), *file, isDir);
             }
         }
     }
@@ -1014,7 +1019,8 @@ BOOL CFilesWindow::IsViewTemplateValid(int templateIndex)
     if (templateIndex < 1) // tree is not supported yet
         return FALSE;
     CViewTemplate* newTemplate = &Parent->ViewTemplates.Items[templateIndex];
-    if (lstrlen(newTemplate->Name) == 0)
+    // View-template names are terminated configuration fields.
+    if (strlen(newTemplate->Name) == 0)
         return FALSE;
     return TRUE;
 }
@@ -1029,7 +1035,8 @@ BOOL CFilesWindow::SelectViewTemplate(int templateIndex, BOOL canRefreshPath,
     if (templateIndex == 0)
         return FALSE;
     CViewTemplate* newTemplate = &Parent->ViewTemplates.Items[templateIndex];
-    if (lstrlen(newTemplate->Name) == 0)
+    // View-template names are terminated configuration fields.
+    if (strlen(newTemplate->Name) == 0)
     {
         // undefined view is not desired - we force the detailed view which always exists
         templateIndex = 2;
@@ -1659,12 +1666,16 @@ BOOL CFilesWindow::ChangePathToDisk(HWND parent, const char* path, int suggested
 
     // we make backup copies
     char backup[2 * MAX_PATH];
-    lstrcpyn(backup, path, 2 * MAX_PATH); // must be done before UpdateDefaultDir (it may point to DefaultDir[])
+    // Re-entrant navigation must retain the complete requested path before defaults change.
+    if (FAILED(StringCchCopyA(backup, _countof(backup), path)))
+        return FALSE;
     char backup2[2 * MAX_PATH];
     if (suggestedFocusName != NULL)
     {
-        lstrcpyn(backup2, suggestedFocusName, 2 * MAX_PATH);
-        suggestedFocusName = backup2;
+        if (SUCCEEDED(StringCchCopyA(backup2, _countof(backup2), suggestedFocusName)))
+            suggestedFocusName = backup2;
+        else
+            suggestedFocusName = NULL;
     }
 
     // restore panel state info (top-index + focused-name) before potentially closing this path
@@ -1937,8 +1948,9 @@ BOOL CFilesWindow::ChangePathToDisk(HWND parent, const char* path, int suggested
                     GetCurrentLocalReparsePoint(changedPath, CheckPathRootWithRetryMsgBox, MAX_PATH);
                     if (strlen(CheckPathRootWithRetryMsgBox) > 3)
                     {
-                        lstrcpyn(drive, CheckPathRootWithRetryMsgBox, MAX_PATH);
-                        SalPathRemoveBackslash(drive);
+                        // The removable-drive prompt must not display a truncated root.
+                        if (SUCCEEDED(StringCchCopyA(drive, _countof(drive), CheckPathRootWithRetryMsgBox)))
+                            SalPathRemoveBackslash(drive);
                     }
                 }
                 else
@@ -1947,8 +1959,9 @@ BOOL CFilesWindow::ChangePathToDisk(HWND parent, const char* path, int suggested
                 int msgboxRes = (int)CDriveSelectErrDlg(parent, text, changedPath).Execute();
                 if (msgboxRes == IDCANCEL && CutDirectory(CheckPathRootWithRetryMsgBox))
                 { // to allow entering the root when a volume is mounted (F:\DRIVE_CD -> F:\)
-                    lstrcpyn(changedPath, CheckPathRootWithRetryMsgBox, MAX_PATH);
-                    msgboxRes = IDRETRY;
+                    // Retry only with the complete root identity.
+                    if (SUCCEEDED(StringCchCopyA(changedPath, _countof(changedPath), CheckPathRootWithRetryMsgBox)))
+                        msgboxRes = IDRETRY;
                 }
                 CheckPathRootWithRetryMsgBox[0] = 0;
                 UpdateWindow(MainWindow->HWindow);
@@ -2006,15 +2019,20 @@ BOOL CFilesWindow::ChangePathToArchive(const char* archive, const char* archiveP
 
     // we make backup copies
     char backup1[2 * MAX_PATH];
-    lstrcpyn(backup1, archive, 2 * MAX_PATH);
+    // Archive navigation may re-enter, so retain complete archive identities first.
+    if (FAILED(StringCchCopyA(backup1, _countof(backup1), archive)))
+        return FALSE;
     char backup2[2 * MAX_PATH];
-    lstrcpyn(backup2, archivePath, 2 * MAX_PATH);
+    if (FAILED(StringCchCopyA(backup2, _countof(backup2), archivePath)))
+        return FALSE;
     archivePath = backup2;
     char backup3[2 * MAX_PATH];
     if (suggestedFocusName != NULL)
     {
-        lstrcpyn(backup3, suggestedFocusName, 2 * MAX_PATH);
-        suggestedFocusName = backup3;
+        if (SUCCEEDED(StringCchCopyA(backup3, _countof(backup3), suggestedFocusName)))
+            suggestedFocusName = backup3;
+        else
+            suggestedFocusName = NULL;
     }
 
     // restore panel state info (top-index + focused-name) before potentially closing this path
@@ -2482,7 +2500,9 @@ BOOL CFilesWindow::ChangeAndListPathOnFS(const char* fsName, int fsNameIndex, co
 
     BOOL ok = FALSE;
     char user[MAX_PATH];
-    lstrcpyn(user, origUserPart, MAX_PATH);
+    // Plug-in filesystem transitions require complete user-part and filesystem identities.
+    if (FAILED(StringCchCopyA(user, _countof(user), origUserPart)))
+        return FALSE;
     pluginData = NULL;
     shorterPath = FALSE;
     if (cancel != NULL)
@@ -2498,7 +2518,8 @@ BOOL CFilesWindow::ChangeAndListPathOnFS(const char* fsName, int fsNameIndex, co
         BOOL pathWasCut = FALSE;
 
         char newFSName[MAX_PATH];
-        lstrcpyn(newFSName, fsName, MAX_PATH);
+        if (FAILED(StringCchCopyA(newFSName, _countof(newFSName), fsName)))
+            return FALSE;
         BOOL changePathRet = pluginFS.ChangePath(pluginFS.GetPluginFSNameIndex(), newFSName,
                                                  fsNameIndex, user, cutFileName,
                                                  cutFileName != NULL ? &pathWasCut : NULL,
@@ -2531,9 +2552,13 @@ BOOL CFilesWindow::ChangeAndListPathOnFS(const char* fsName, int fsNameIndex, co
                     changePathRet = FALSE; // fs-name change failed; simulate a fatal error on the FS
                 else                       // start using the new FS name (for the next loop pass)
                 {
-                    lstrcpyn(fsNameBuf, newFSName, MAX_PATH);
-                    fsName = fsNameBuf;
-                    fsNameIndex = newFSNameIndex;
+                    if (SUCCEEDED(StringCchCopyA(fsNameBuf, _countof(fsNameBuf), newFSName)))
+                    {
+                        fsName = fsNameBuf;
+                        fsNameIndex = newFSNameIndex;
+                    }
+                    else
+                        changePathRet = FALSE;
                 }
             }
             if (changePathRet) // store the used fs-name in 'pluginFS'
@@ -2701,7 +2726,9 @@ BOOL CFilesWindow::ChangePathToPluginFS(const char* fsName, const char* fsUserPa
 
     // as a precaution if fsName points to an unchangeable string (GetPluginFS()->PluginFSName()), we create a backup copy
     char backup[2 * MAX_PATH];
-    lstrcpyn(backup, fsName, 2 * MAX_PATH);
+    // A plugin may retain the input through callbacks, so preserve the complete filesystem name.
+    if (FAILED(StringCchCopyA(backup, _countof(backup), fsName)))
+        return FALSE;
     fsName = backup;
 
     if (noChange != NULL)
@@ -2721,14 +2748,17 @@ BOOL CFilesWindow::ChangePathToPluginFS(const char* fsName, const char* fsUserPa
     }
     // make backup copies
     char backup2[2 * MAX_PATH];
-    lstrcpyn(backup2, fsUserPart, 2 * MAX_PATH);
+    if (FAILED(StringCchCopyA(backup2, _countof(backup2), fsUserPart)))
+        return FALSE;
     fsUserPart = backup2;
     char* fsUserPart2 = backup2;
     char backup3[2 * MAX_PATH];
     if (suggestedFocusName != NULL)
     {
-        lstrcpyn(backup3, suggestedFocusName, 2 * MAX_PATH);
-        suggestedFocusName = backup3;
+        if (SUCCEEDED(StringCchCopyA(backup3, _countof(backup3), suggestedFocusName)))
+            suggestedFocusName = backup3;
+        else
+            suggestedFocusName = NULL;
     }
 
     // restore panel state info (top-index + focused-name) before potentially closing this path
@@ -2926,7 +2956,10 @@ BOOL CFilesWindow::ChangePathToPluginFS(const char* fsName, const char* fsUserPa
                     file = &Files->At(FocusedIndex - Dirs->Count);
             }
             if (file != NULL)
-                lstrcpyn(originalFocusName, file->Name, MAX_PATH);
+            {
+                // Restore focus only when the file name fits its persisted field.
+                StringCchCopyNA(originalFocusName, _countof(originalFocusName), file->Name, _countof(originalFocusName) - 1);
+            }
         }
 
         // attempt to change the path on the current FS
@@ -3210,8 +3243,11 @@ BOOL CFilesWindow::ChangePathToDetachedFS(int fsIndex, int suggestedTopIndex,
     char backup[2 * MAX_PATH];
     if (suggestedFocusName != NULL)
     {
-        lstrcpyn(backup, suggestedFocusName, 2 * MAX_PATH);
-        suggestedFocusName = backup;
+        // Detached-FS callbacks need stable, complete optional identities.
+        if (SUCCEEDED(StringCchCopyA(backup, _countof(backup), suggestedFocusName)))
+            suggestedFocusName = backup;
+        else
+            suggestedFocusName = NULL;
     }
     if (newUserPart == NULL || newFSName == NULL)
     {
@@ -3221,13 +3257,15 @@ BOOL CFilesWindow::ChangePathToDetachedFS(int fsIndex, int suggestedTopIndex,
     char backup2[2 * MAX_PATH];
     if (newUserPart != NULL)
     {
-        lstrcpyn(backup2, newUserPart, 2 * MAX_PATH);
+        if (FAILED(StringCchCopyA(backup2, _countof(backup2), newUserPart)))
+            return FALSE;
         newUserPart = backup2;
     }
     char backup3[2 * MAX_PATH];
     if (newFSName != NULL)
     {
-        lstrcpyn(backup3, newFSName, 2 * MAX_PATH);
+        if (FAILED(StringCchCopyA(backup3, _countof(backup3), newFSName)))
+            return FALSE;
         newFSName = backup3;
     }
 
@@ -3509,7 +3547,9 @@ void GetCommonFileTypeStr(char* buf, int bufSize, int* resLen, const char* ext)
     }
     else
     {
-        lstrcpyn(buf, CommonFileTypeName, bufSize);
+        // This is a deliberate fixed-width column label, so preserve its clipped presentation policy explicitly.
+        if (bufSize > 0)
+            StringCchCopyNA(buf, static_cast<size_t>(bufSize), CommonFileTypeName, static_cast<size_t>(bufSize - 1));
         *resLen = (int)strlen(buf);
     }
 }
@@ -3554,7 +3594,8 @@ void CFilesWindow::RefreshListBox(int suggestedXOffset,
                           Configuration.FileNameFormat, 0, TRUE);
             CStrP wName(ConvertAllocUtf8ToWide(formatedFileName, -1));
             if (wName != NULL)
-                GetTextExtentPoint32W(dc, wName, lstrlenW(wName), &act);
+                // The conversion helper returns a terminated wide display string for GDI measurement.
+                GetTextExtentPoint32W(dc, wName, static_cast<int>(wcslen(wName)), &act);
             else
                 GetTextExtentPoint32(dc, formatedFileName, (int)strlen(formatedFileName), &act);
             if (max.cx < act.cx)
@@ -3567,7 +3608,8 @@ void CFilesWindow::RefreshListBox(int suggestedXOffset,
                           Configuration.FileNameFormat, 0, FALSE);
             CStrP wName(ConvertAllocUtf8ToWide(formatedFileName, -1));
             if (wName != NULL)
-                GetTextExtentPoint32W(dc, wName, lstrlenW(wName), &act);
+                // The conversion helper returns a terminated wide display string for GDI measurement.
+                GetTextExtentPoint32W(dc, wName, static_cast<int>(wcslen(wName)), &act);
             else
                 GetTextExtentPoint32(dc, formatedFileName, (int)strlen(formatedFileName), &act);
             if (max.cx < act.cx)
@@ -3691,6 +3733,7 @@ void CFilesWindow::RefreshListBox(int suggestedXOffset,
             act.cx = act.cy = 0;
 
         char text[50];
+        WCHAR dateLocaleName[LOCALE_NAME_MAX_LENGTH];
 
         DWORD attrSkipCache[10]; // optimization of attribute-width measurement
         int attrSkipCacheCount = 0;
@@ -3702,7 +3745,10 @@ void CFilesWindow::RefreshListBox(int suggestedXOffset,
         if (computeDate && (totalCount > 20))
         {
             // determine whether we can estimate the widths
-            if (GetLocaleInfo(LOCALE_USER_DEFAULT, LOCALE_SSHORTDATE, text, 50) != 0)
+            WCHAR datePattern[50];
+            if (GetUserDefaultLocaleName(dateLocaleName, _countof(dateLocaleName)) != 0 &&
+                GetLocaleInfoEx(dateLocaleName, LOCALE_SSHORTDATE, datePattern, _countof(datePattern)) != 0 &&
+                WideCharToMultiByte(CP_ACP, 0, datePattern, -1, text, _countof(text), NULL, NULL) != 0)
             {
                 // check if the date format contains words (dddd || MMMM),
                 // which would be rendered as text: (Monday || May)
@@ -3717,8 +3763,11 @@ void CFilesWindow::RefreshListBox(int suggestedXOffset,
                     st.wMonth = 12;
                     st.wDay = 24;
                     st.wDayOfWeek = 0; // Sunday
-                    if (GetDateFormat(LOCALE_USER_DEFAULT, DATE_SHORTDATE, &st, NULL, text, 50) == 0)
+                    WCHAR dateText[50];
+                    if (GetDateFormatEx(dateLocaleName, DATE_SHORTDATE, &st, NULL, dateText, _countof(dateText), NULL) == 0 ||
+                        WideCharToMultiByte(CP_ACP, 0, dateText, -1, text, _countof(text), NULL, NULL) == 0)
                         sprintf(text, "%u.%u.%u", st.wDay, st.wMonth, st.wYear);
+                    // Rendering still consumes the ANSI list buffer, but locale formatting now uses the explicit user locale name.
                     GetTextExtentPoint32(dc, text, (int)strlen(text), &act);
                     act.cx += SPACE_WIDTH;
                     if (columnWidthDate < act.cx)
@@ -3763,7 +3812,8 @@ void CFilesWindow::RefreshListBox(int suggestedXOffset,
                 const char* pExt = formatedFileName + (int)(f->Ext - f->Name);
                 CStrP wExt(ConvertAllocUtf8ToWide(pExt, -1));
                 if (wExt != NULL)
-                    GetTextExtentPoint32W(dc, wExt, lstrlenW(wExt), &act);
+                    // The conversion helper returns a terminated wide extension string for GDI measurement.
+                    GetTextExtentPoint32W(dc, wExt, static_cast<int>(wcslen(wExt)), &act);
                 else
                     GetTextExtentPoint32(dc, pExt, (int)strlen(pExt), &act);
                 
@@ -3799,7 +3849,7 @@ void CFilesWindow::RefreshListBox(int suggestedXOffset,
                 }
                 else
                 {
-                    len = GetDateFormat(LOCALE_USER_DEFAULT, DATE_SHORTDATE, &st, NULL, text, 50) - 1;
+                    len = FormatUserDateTimeUtf8(&st, DATE_SHORTDATE, text, _countof(text), TRUE) - 1;
                     if (len < 0)
                         len = sprintf(text, "%u.%u.%u", st.wDay, st.wMonth, st.wYear);
                 }
@@ -3945,14 +3995,14 @@ void CFilesWindow::RefreshListBox(int suggestedXOffset,
             st.wMinute = 59;
             st.wSecond = 59;
             st.wHour = 10; // morning (AM)
-            if (GetTimeFormat(LOCALE_USER_DEFAULT, 0, &st, NULL, text, 50) == 0)
+            if (FormatUserDateTimeUtf8(&st, 0, text, _countof(text), FALSE) == 0)
                 sprintf(text, "%u:%02u:%02u", st.wHour, st.wMinute, st.wSecond);
             GetTextExtentPoint32(dc, text, (int)strlen(text), &act);
             act.cx += SPACE_WIDTH;
             if (columnWidthTime < act.cx)
                 columnWidthTime = act.cx;
             st.wHour = 23; // afternoon (PM)
-            if (GetTimeFormat(LOCALE_USER_DEFAULT, 0, &st, NULL, text, 50) == 0)
+            if (FormatUserDateTimeUtf8(&st, 0, text, _countof(text), FALSE) == 0)
                 sprintf(text, "%u:%02u:%02u", st.wHour, st.wMinute, st.wSecond);
             GetTextExtentPoint32(dc, text, (int)strlen(text), &act);
             act.cx += SPACE_WIDTH;

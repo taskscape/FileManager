@@ -11,6 +11,8 @@
 
 #pragma once
 
+#include "..\\..\\common\\monotonic_time.h"
+
 //****************************************************************************
 //
 // CCommonDialog
@@ -151,5 +153,5 @@ protected:
     CGUIProgressBarAbstract* Progress;
     CGUIProgressBarAbstract* Progress2;
     DWORD ProgressNumber;
-    DWORD LastTickCount;
+    CMonotonicTimePoint LastTickCount;
 };

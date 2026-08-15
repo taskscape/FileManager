@@ -15,16 +15,37 @@
 #include "chicon.h"
 #include "zip2sfx.h"
 
+static BOOL GetZipFileSizeDword(HANDLE file, DWORD* size)
+{
+    LARGE_INTEGER fileSize;
+    if (!GetFileSizeEx(file, &fileSize))
+        return FALSE;
+    if (fileSize.QuadPart < 0 || (ULONGLONG)fileSize.QuadPart > MAXDWORD)
+    {
+        SetLastError(ERROR_FILE_TOO_LARGE);
+        return FALSE;
+    }
+    // ZIP2SFX records archive offsets as DWORD values, so preserve that format boundary explicitly.
+    *size = (DWORD)fileSize.QuadPart;
+    return TRUE;
+}
+
+static BOOL SeekZipFileDword(HANDLE file, DWORD offset)
+{
+    LARGE_INTEGER move;
+    move.QuadPart = offset;
+    // The archive scanner carries DWORD offsets, while SetFilePointerEx removes the legacy sentinel ambiguity.
+    return SetFilePointerEx(file, move, NULL, FILE_BEGIN);
+}
+
 BOOL CheckEntries(DWORD dirOffs, DWORD totalEntries)
 {
     DWORD offs = dirOffs;
     CFileHeader header;
-    LONG dummy;
     DWORD i;
     for (i = 0; i < totalEntries; i++)
     {
-        dummy = 0;
-        if (SetFilePointer(ZipFile, offs, &dummy, FILE_BEGIN) == 0xFFFFFFFF)
+        if (!SeekZipFileDword(ZipFile, offs))
             return Error(STR_ERRACCESS, ZipName);
         if (!Read(ZipFile, &header, sizeof(CFileHeader)))
             return Error(STR_ERRREAD, ZipName);
@@ -50,11 +71,10 @@ BOOL CheckEntries(DWORD dirOffs, DWORD totalEntries)
 
 BOOL CheckZip()
 {
-    ArcSize = GetFileSize(ZipFile, NULL);
+    if (!GetZipFileSizeDword(ZipFile, &ArcSize))
+        return Error(STR_ERRACCESS, ZipName);
     DWORD toRead;
     DWORD offs;
-    if (ArcSize == 0xFFFFFFFF)
-        return Error(STR_ERRACCESS, ZipName);
     if (ArcSize < 22)
         return Error(STR_BADFORMAT);
     if (ArcSize > 0xFFFF)
@@ -67,9 +87,7 @@ BOOL CheckZip()
         toRead = ArcSize;
         offs = 0;
     }
-    LONG dummy;
-    dummy = 0;
-    if (SetFilePointer(ZipFile, offs, &dummy, FILE_BEGIN) == 0xFFFFFFFF)
+    if (!SeekZipFileDword(ZipFile, offs))
         return Error(STR_ERRACCESS, ZipName);
     if (!Read(ZipFile, IOBuffer, toRead))
         return Error(STR_ERRREAD, ZipName);

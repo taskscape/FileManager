@@ -1598,6 +1598,7 @@ STRINGTABLE
  IDS_PROGDLGRESUME, "&Resume"
  IDS_PROGDLGPAUSED, "paused"
  IDS_PROGDLGQUEUEPAUSED, "waiting"
+ IDS_OPERATIONQUEUEFULL, "The file operation queue cannot accept another operation. Wait for an existing operation to finish and try again."
 
  IDS_EDITNEWALREADYEX, "The file already exists. Do you want to edit this existing file?"
 

@@ -10,6 +10,7 @@
 //****************************************************************************
 
 #include "precomp.h"
+#include "..\\..\\common\\monotonic_time.h"
 //#include <windows.h>
 #ifdef _MSC_VER
 #include <crtdbg.h>
@@ -251,7 +252,8 @@ CWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
             WinLibLTHelpCallback(HWindow, HelpID);
             return TRUE;
         }
-        if (GetWindowLong(HWindow, GWL_STYLE) & WS_CHILD)
+        // Query window metadata with the Ptr form so this shared control helper remains x64-safe.
+        if (GetWindowLongPtr(HWindow, GWL_STYLE) & WS_CHILD)
             break;   // if we do not process F1 and if it is child window, let F1 propagate to parent
         return TRUE; // if it is not child, terminate F1 processing
     }
@@ -343,7 +345,8 @@ CWindow::CWindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 
 BOOL CWindow::RegisterUniversalClass(HINSTANCE dllInstance)
 {
-    WNDCLASS CWindowClass;
+    WNDCLASSEX CWindowClass;
+    CWindowClass.cbSize = sizeof(CWindowClass);
     CWindowClass.style = CS_DBLCLKS | CS_HREDRAW | CS_VREDRAW;
     CWindowClass.lpfnWndProc = CWindow::CWindowProc;
     CWindowClass.cbClsExtra = 0;
@@ -354,13 +357,15 @@ BOOL CWindow::RegisterUniversalClass(HINSTANCE dllInstance)
     CWindowClass.hbrBackground = (HBRUSH)(COLOR_WINDOW + 1);
     CWindowClass.lpszMenuName = NULL;
     CWindowClass.lpszClassName = CWINDOW_CLASSNAME;
+    CWindowClass.hIconSm = CWindowClass.hIcon;
 
-    BOOL ret = RegisterClass(&CWindowClass) != 0;
+    // Keep plug-in window classes aligned with the extended registration used by the core window library.
+    BOOL ret = RegisterClassEx(&CWindowClass) != 0;
     if (ret)
     {
         CWindowClass.style = CS_DBLCLKS;
         CWindowClass.lpszClassName = CWINDOW_CLASSNAME2;
-        ret = RegisterClass(&CWindowClass) != 0;
+        ret = RegisterClassEx(&CWindowClass) != 0;
     }
 
     return ret;
@@ -991,19 +996,20 @@ BOOL CWindowQueue::CloseAllWindows(BOOL force, int waitTime, int forceWaitTime)
     // send a request to close all windows
     BroadcastMessage(WM_CLOSE, 0, 0);
 
-    // wait until/whether they close
-    DWORD ti = GetTickCount();
+    // Wait with a non-wrapping elapsed time because this shared helper may serve long-running plug-ins.
+    const CMonotonicTimePoint waitStarted = CMonotonicClock::Now();
     DWORD w = force ? forceWaitTime : waitTime;
     while ((w == INFINITE || w > 0) && !Empty())
     {
-        DWORD t = GetTickCount() - ti;
-        if (w == INFINITE || t < w) // still need to wait
+        const CMonotonicDuration elapsed = CMonotonicClock::Elapsed(waitStarted, CMonotonicClock::Now());
+        if (w == INFINITE || elapsed < w) // still need to wait
         {
-            if (w == INFINITE || 50 < w - t)
+            const CMonotonicDuration remaining = w == INFINITE ? 0 : (CMonotonicDuration)w - elapsed;
+            if (w == INFINITE || remaining > 50)
                 Sleep(50);
             else
             {
-                Sleep(w - t);
+                Sleep((DWORD)remaining);
                 break;
             }
         }

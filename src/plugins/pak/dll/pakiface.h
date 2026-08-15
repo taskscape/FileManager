@@ -99,8 +99,9 @@ public:
     //optimizes the PAK
     virtual BOOL OptimizePak() = 0;
 
-    //creates a message from the parameters passed to 'HandleError()'
-    virtual char* FormatMessage(char* buffer, int errorID, va_list arglist) = 0;
+    // Creates a message from the parameters passed to 'HandleError()'. The capacity is part of the ABI
+    // so implementations cannot overflow caller-owned error buffers.
+    virtual char* FormatMessage(char* buffer, size_t bufferSize, int errorID, va_list arglist) = 0;
 };
 
 #ifdef PAK_DLL

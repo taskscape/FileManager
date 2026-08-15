@@ -3,6 +3,7 @@
 
 #include "precomp.h"
 #include <Ntddscsi.h>
+#include <strsafe.h>
 
 #include "cfgdlg.h"
 #include "plugins.h"
@@ -516,8 +517,8 @@ BOOL GetResolvedPathMountPointAndGUID(const char* path, char* mountPoint, int mo
     }
 
     char resolvedPath[MAX_PATH];
-    lstrcpyn(resolvedPath, path, _countof(resolvedPath));
-    if ((int)strlen(path) >= _countof(resolvedPath))
+    // Mount-point lookup requires the full path identity, never a clipped prefix.
+    if (FAILED(StringCchCopyA(resolvedPath, _countof(resolvedPath), path)))
     {
         TRACE_E("GetResolvedPathMountPointAndGUID(): path is too long.");
         return FALSE;
@@ -540,11 +541,17 @@ BOOL GetResolvedPathMountPointAndGUID(const char* path, char* mountPoint, int mo
         {
             if (GetRootPath(rootPath, _countof(rootPath), resolvedPath) == 0)
                 return FALSE;
-            lstrcpyn(resolvedPath, rootPath, _countof(resolvedPath));
+            // The root remains an API identity and must fit the resolved-path field completely.
+            if (FAILED(StringCchCopyA(resolvedPath, _countof(resolvedPath), rootPath)))
+                return FALSE;
         }
     }
     else
-        lstrcpyn(resolvedPath, rootPath, _countof(resolvedPath)); // for non-DRIVE_FIXED disks we take root path, GetVolumeNameForVolumeMountPoint needs mount point and searching for it by gradually shortening the path seems too time-consuming for now (at least for network paths + for cards hopefully mount points in subdirectories are not a threat, right?)
+    {
+        // Non-fixed volumes also use the complete root path for volume-name lookup.
+        if (FAILED(StringCchCopyA(resolvedPath, _countof(resolvedPath), rootPath)))
+            return FALSE;
+    }
     // GUID can be obtained even for non-DRIVE_FIXED disks, for example card readers
     // according to https://msdn.microsoft.com/en-us/library/windows/desktop/aa364996%28v=vs.85%29.aspx there is no support for DRIVE_REMOTE yet,
     // but that could potentially come too
@@ -554,8 +561,8 @@ BOOL GetResolvedPathMountPointAndGUID(const char* path, char* mountPoint, int mo
     {
         if (mountPoint != NULL)
         {
-            lstrcpyn(mountPoint, resolvedPath, mountPointBufSize);
-            if ((int)strlen(resolvedPath) >= mountPointBufSize)
+            // Return a mount-point identity only when the caller's field holds it in full.
+            if (FAILED(StringCchCopyA(mountPoint, mountPointBufSize, resolvedPath)))
             {
                 TRACE_E("GetResolvedPathMountPointAndGUID(): mountPoint buffer too small.");
                 return FALSE;
@@ -564,8 +571,8 @@ BOOL GetResolvedPathMountPointAndGUID(const char* path, char* mountPoint, int mo
         if (guidPath != NULL)
         {
             SalPathAddBackslash(guidP, sizeof(guidP));
-            lstrcpyn(guidPath, guidP, guidPathBufSize);
-            if ((int)strlen(guidP) >= guidPathBufSize)
+            // Return a volume GUID identity only when the caller's field holds it in full.
+            if (FAILED(StringCchCopyA(guidPath, guidPathBufSize, guidP)))
             {
                 TRACE_E("GetResolvedPathMountPointAndGUID(): guidPath buffer too small.");
                 return FALSE;

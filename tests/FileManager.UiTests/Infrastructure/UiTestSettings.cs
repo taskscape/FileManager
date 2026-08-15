@@ -19,6 +19,15 @@ internal static class UiTestSettings
         return command;
     }
 
+    internal static int RequireFtpConnectCommand()
+    {
+        // Plug-in menu command IDs are allocated by the host at runtime, so use the runner-discovered quick-connect command.
+        if (!int.TryParse(Environment.GetEnvironmentVariable("FILEMANAGER_UI_FTP_CONNECT_COMMAND"), out var command) || command <= 0)
+            Assert.Ignore("Set FILEMANAGER_UI_FTP_CONNECT_COMMAND to the FTP plug-in's runtime Connect to FTP Server command ID to run protocol fixture tests.");
+
+        return command;
+    }
+
     internal static void RequireIsolatedProfile()
     {
         // UI tests save FileManager configuration, so prevent accidental execution against a developer profile.
@@ -68,5 +77,17 @@ internal static class UiTestSettings
     {
         if (!string.Equals(Environment.GetEnvironmentVariable("FILEMANAGER_UI_RECYCLE_BIN"), "1", StringComparison.Ordinal))
             Assert.Ignore("Set FILEMANAGER_UI_RECYCLE_BIN=1 in an isolated profile with the default recycle-bin setting enabled to run this test.");
+    }
+
+    internal static int RequireLeakLifecycleCycles()
+    {
+        RequireIsolatedProfile();
+        var rawValue = Environment.GetEnvironmentVariable("FILEMANAGER_UI_LEAK_CYCLES");
+        // A bounded override keeps the release gate practical while the nightly lane can run a longer soak.
+        if (string.IsNullOrWhiteSpace(rawValue))
+            return 20;
+        if (!int.TryParse(rawValue, out var cycles) || cycles < 5 || cycles > 200)
+            Assert.Ignore("FILEMANAGER_UI_LEAK_CYCLES must be an integer from 5 through 200.");
+        return cycles;
     }
 }

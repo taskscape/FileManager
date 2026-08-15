@@ -4,6 +4,10 @@
 
 #include "precomp.h"
 
+// Use StrSafe for the bounded confirmation message below.
+#include <strsafe.h>
+#include "common\monotonic_time.h"
+
 #include <lm.h>
 
 #include "mainwnd.h"
@@ -222,8 +226,10 @@ CTipOfTheDayDialog::LoadTips(BOOL quiet)
     return FALSE;
   }
 
-  DWORD size = GetFileSize(hFile, NULL);
-  if (size == 0xFFFFFFFF || size == 0)
+  LARGE_INTEGER fileSize;
+  // Tips remain loaded into a DWORD-sized buffer, so reject larger files instead of truncating their size.
+  if (!GetFileSizeEx(hFile, &fileSize) || fileSize.QuadPart <= 0 ||
+      (ULONGLONG)fileSize.QuadPart > MAXDWORD)
   {
     if (!quiet)
     {
@@ -234,6 +240,8 @@ CTipOfTheDayDialog::LoadTips(BOOL quiet)
     HANDLES(CloseHandle(hFile));
     return FALSE;
   }
+
+  DWORD size = (DWORD)fileSize.QuadPart;
 
   BYTE *data = (BYTE*)malloc(size);
   if (data == NULL)
@@ -642,8 +650,9 @@ CSharesDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                 if (SharedDirs.GetItem(index, NULL, &remoteName, NULL))
                 {
                     char buff[2000];
-                    wsprintf(buff, LoadStr(IDS_CONFIRM_STOPSHARE), remoteName);
-                    if (SalMessageBox(HWindow, buff, LoadStr(IDS_QUESTION),
+                    // Do not present a truncated confirmation before removing a shared directory.
+                    if (SUCCEEDED(StringCchPrintfA(buff, ARRAYSIZE(buff), LoadStr(IDS_CONFIRM_STOPSHARE), remoteName)) &&
+                        SalMessageBox(HWindow, buff, LoadStr(IDS_QUESTION),
                                       MB_OKCANCEL | MB_ICONQUESTION) == IDOK)
                     {
                         DeleteShare(remoteName);
@@ -948,7 +957,8 @@ void CDisconnectDialog::EnumConnections()
     // Network: CONNECTED resources
 
     char noneText[50]; // (none)
-    lstrcpyn(noneText, LoadStr(IDS_NETWORK_NONE), sizeof(noneText));
+    // The disconnected-label field is intentionally a compact display buffer.
+    StringCchCopyNA(noneText, _countof(noneText), LoadStr(IDS_NETWORK_NONE), _countof(noneText) - 1);
     HANDLE hEnumNet;
     DWORD err = WNetOpenEnum(RESOURCE_CONNECTED, RESOURCETYPE_DISK, 0, NULL, &hEnumNet);
     if (err == ERROR_SUCCESS)
@@ -1732,13 +1742,15 @@ CCmpDirProgressDialog::CCmpDirProgressDialog(HWND hParent, BOOL hasProgress, CIT
 
 void CCmpDirProgressDialog::SetSource(const char* text)
 {
-    lstrcpyn(DelayedSource, text, 2 * MAX_PATH);
+    // Progress text is a bounded delayed display field, not an operation identity.
+    StringCchCopyNA(DelayedSource, _countof(DelayedSource), text, _countof(DelayedSource) - 1);
     DelayedSourceDirty = TRUE;
 }
 
 void CCmpDirProgressDialog::SetTarget(const char* text)
 {
-    lstrcpyn(DelayedTarget, text, 2 * MAX_PATH);
+    // Progress text is a bounded delayed display field, not an operation identity.
+    StringCchCopyNA(DelayedTarget, _countof(DelayedTarget), text, _countof(DelayedTarget) - 1);
     DelayedTargetDirty = TRUE;
 }
 
@@ -1793,11 +1805,12 @@ BOOL CCmpDirProgressDialog::Continue()
     }
 
     // redraw modified data every 100 ms (text + progress bars)
-    DWORD ticks = GetTickCount();
-    if (ticks - LastTickCount > 100)
+    const CMonotonicTimePoint ticks = CMonotonicClock::Now();
+    if (CMonotonicClock::HasElapsed(LastTickCount, 100, ticks))
     {
         FlushDataToControls();
-        LastTickCount = GetTickCount();
+        // Preserve the completed repaint time as a 64-bit monotonic sample across long uptimes.
+        LastTickCount = ticks;
     }
 
     return !Cancel;
@@ -2149,7 +2162,8 @@ CErrorReadingADSDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
     {
         if (Title != NULL)
         {
-            SetWindowText(HWindow, Title);
+            // Dialog titles share the application's UTF-8 string convention.
+            SetWindowTextUtf8(HWindow, Title);
             Title = NULL; // comes from LoadStr; its lifetime ends soon (it will be overwritten), so we null it out
         }
 
@@ -2159,7 +2173,8 @@ CErrorReadingADSDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         else
             TRACE_E(LOW_MEMORY);
 
-        SetWindowText(GetDlgItem(HWindow, IDS_ERROR), Error);
+        // System error details are UTF-8 and must not be reinterpreted as ANSI.
+        SetWindowTextUtf8(GetDlgItem(HWindow, IDS_ERROR), Error);
 
         break;
     }
@@ -2290,8 +2305,9 @@ CErrorCopyingPermissionsDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         else
             TRACE_E(LOW_MEMORY);
 
-        SetWindowText(GetDlgItem(HWindow, IDS_ERROR),
-                      Error != NO_ERROR ? GetErrorText(Error) : LoadStr(IDS_VIEWER_UNKNOWNERR));
+        // This field can receive localized system errors from GetErrorText in UTF-8.
+        SetWindowTextUtf8(GetDlgItem(HWindow, IDS_ERROR),
+                          Error != NO_ERROR ? GetErrorText(Error) : LoadStr(IDS_VIEWER_UNKNOWNERR));
         break;
     }
 
@@ -2337,8 +2353,9 @@ CErrorCopyingDirTimeDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         else
             TRACE_E(LOW_MEMORY);
 
-        SetWindowText(GetDlgItem(HWindow, IDS_ERROR),
-                      Error != NO_ERROR ? GetErrorText(Error) : LoadStr(IDS_VIEWER_UNKNOWNERR));
+        // This field can receive localized system errors from GetErrorText in UTF-8.
+        SetWindowTextUtf8(GetDlgItem(HWindow, IDS_ERROR),
+                          Error != NO_ERROR ? GetErrorText(Error) : LoadStr(IDS_VIEWER_UNKNOWNERR));
         break;
     }
 
@@ -2367,7 +2384,9 @@ CErrorCopyingDirTimeDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 CDriveSelectErrDlg::CDriveSelectErrDlg(HWND parent, const char* errText, const char* drvPath) : CCommonDialog(HLanguage, IDD_DRIVESELECTERR, parent)
 {
     ErrText = errText;
-    lstrcpyn(DrvPath, drvPath, MAX_PATH);
+    // Timer-driven readiness checks require a complete drive path.
+    if (FAILED(StringCchCopyA(DrvPath, _countof(DrvPath), drvPath)))
+        DrvPath[0] = 0;
     CounterForAllowedUseOfTimer = 5 * 60; // try for at most 5 minutes, then let the user press Retry (prevents drive hammering)
 }
 
@@ -2426,7 +2445,9 @@ CDriveSelectErrDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                 setTimer = FALSE;
                 break; // no idea what's going on, we better skip periodic tests
             }
-            lstrcpyn(DrvPath, root, MAX_PATH);
+            // The root is a complete fixed drive path for the later timer probe.
+            if (FAILED(StringCchCopyA(DrvPath, _countof(DrvPath), root)))
+                setTimer = FALSE;
         }
         else
             setTimer = FALSE; // most likely a network connection
@@ -2447,8 +2468,9 @@ CDriveSelectErrDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
             // always succeeds on junction-points (directory attributes are unrelated to content)
             BOOL ok = FALSE;
             char fileName[MAX_PATH + 10];
-            lstrcpyn(fileName, DrvPath, MAX_PATH + 10);
-            if (SalPathAppend(fileName, "*", MAX_PATH + 10))
+            // Test only a complete drive path so a shortened root cannot probe another location.
+            if (SUCCEEDED(StringCchCopyA(fileName, _countof(fileName), DrvPath)) &&
+                SalPathAppend(fileName, "*", _countof(fileName)))
             {
                 WIN32_FIND_DATAW fileDataW;
                 HANDLE search;

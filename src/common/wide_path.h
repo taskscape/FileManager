@@ -6,6 +6,7 @@
 #include <windows.h>
 #include <stdlib.h>
 #include <string.h>
+#include <wchar.h>
 
 // Owns the two representations of a path at a Win32 boundary.  The original
 // UTF-8 display value remains owned by the caller; this type keeps its UTF-16
@@ -70,7 +71,8 @@ public:
             return NULL;
         if (ApiPath != NULL)
             return ApiPath;
-        if (IsExtendedLengthPath(DisplayPath) || lstrlenW(DisplayPath) < MAX_PATH)
+        // Owned display paths are always terminated, so use the CRT length probe before normalization.
+        if (IsExtendedLengthPath(DisplayPath) || wcslen(DisplayPath) < MAX_PATH)
             return DisplayPath;
         return BuildAbsoluteApiPath();
     }
@@ -102,7 +104,8 @@ private:
             SetLastError(ERROR_INVALID_PARAMETER);
             return NULL;
         }
-        size_t length = lstrlenW(path) + 1;
+        // Copy the complete terminated wide path into independently owned storage.
+        size_t length = wcslen(path) + 1;
         WCHAR* copy = (WCHAR*)malloc(length * sizeof(WCHAR));
         if (copy == NULL)
         {
@@ -165,16 +168,17 @@ private:
 
     static WCHAR* PrefixExtendedLengthPathIfNeeded(WCHAR* fullPath)
     {
-        size_t length = lstrlenW(fullPath);
+        // Full paths are allocated and terminated by BuildAbsoluteApiPath.
+        size_t length = wcslen(fullPath);
         if (length < MAX_PATH || IsExtendedLengthPath(fullPath))
             return fullPath;
 
         static const WCHAR extendedPrefix[] = L"\\\\?\\";
         static const WCHAR extendedUncPrefix[] = L"\\\\?\\UNC\\";
         const WCHAR* prefix = IsUncPath(fullPath) ? extendedUncPrefix : extendedPrefix;
-        size_t prefixLength = lstrlenW(prefix);
+        size_t prefixLength = wcslen(prefix);
         const WCHAR* suffix = IsUncPath(fullPath) ? fullPath + 2 : fullPath;
-        size_t suffixLength = lstrlenW(suffix);
+        size_t suffixLength = wcslen(suffix);
         WCHAR* prefixedPath = (WCHAR*)malloc((prefixLength + suffixLength + 1) * sizeof(WCHAR));
         if (prefixedPath == NULL)
         {

@@ -81,8 +81,9 @@ CSalamanderGuiForm::~CSalamanderGuiForm()
 
     CreateChildren();
 
-    style = GetWindowLong(m_hWnd, GWL_STYLE);
-    exStyle = GetWindowLong(m_hWnd, GWL_EXSTYLE);
+    // These APIs take style masks, but the Ptr accessors keep the form portable to x64 window data.
+    style = (DWORD)GetWindowLongPtr(m_hWnd, GWL_STYLE);
+    exStyle = (DWORD)GetWindowLongPtr(m_hWnd, GWL_EXSTYLE);
 
     CBounds pxbounds = m_bounds;
     pxbounds.cx = cx + 8; // + right padding
@@ -817,9 +818,9 @@ void CSalamanderGuiForm::AlignButtons()
             DWORD dwStyle;
             hwndBtn = pDefButton->GetHwnd();
             _ASSERTE(IsWindow(hwndBtn));
-            dwStyle = GetWindowLong(hwndBtn, GWL_STYLE);
+            dwStyle = (DWORD)GetWindowLongPtr(hwndBtn, GWL_STYLE);
             dwStyle |= BS_DEFPUSHBUTTON;
-            SetWindowLong(hwndBtn, GWL_STYLE, dwStyle);
+            SetWindowLongPtr(hwndBtn, GWL_STYLE, dwStyle);
         }
     }
 }

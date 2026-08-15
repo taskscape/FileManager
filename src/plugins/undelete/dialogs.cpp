@@ -156,8 +156,9 @@ void CCopyProgressDlg::UpdateControls(BOOL now)
 {
     CALL_STACK_MESSAGE_NONE
     //  CALL_STACK_MESSAGE2("CCopyProgressDlg::UpdateControls(%d)", now);
-    DWORD tick = GetTickCount();
-    if (now || tick - LastTick >= 50)
+    // The dialog owns this repaint throttle for the duration of the synchronous restore/copy workflow.
+    const CMonotonicTimePoint tick = CMonotonicClock::Now();
+    if (now || CMonotonicClock::HasElapsed(LastTick, 50, tick))
     {
         if (Changed[0])
         {
@@ -816,8 +817,6 @@ INT_PTR CRestoreProgressDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
     {
         SetDlgItemText(HWindow, IDC_LABEL_UNDELETING, String<char>::LoadStr(IDS_RESTORING));
         SetWindowText(HWindow, String<char>::LoadStr(IDS_RESTORE));
-        /*HWND hLabel = GetDlgItem(HWindow, IDC_LABEL_UNDELETING);
-    SetWindowLong(hLabel, GWL_STYLE, GetWindowLong(hLabel, GWL_STYLE) | SS_RIGHT);*/
     }
     return CCopyProgressDlg::DialogProc(uMsg, wParam, lParam);
 }

@@ -3,6 +3,8 @@
 
 #include "precomp.h"
 
+#include <strsafe.h>
+
 #include "mmviewer.rh"
 #include "mmviewer.rh2"
 #include "lang\lang.rh"
@@ -85,12 +87,17 @@ BOOL CRendererWindow::OpenFile(const char* name)
         delete (parser);
         Output.PrepareForRender(HWindow);
 
-        lstrcpy(FileName, name);
+        if (FAILED(StringCchCopyA(FileName, _countof(FileName), name)))
+        {
+            // Keep the rendered metadata but do not retain a truncated current-file identity.
+            FileName[0] = 0;
+        }
     }
     else
     {
         char buff[2 * MAX_PATH];
-        sprintf(buff, LoadStr(IDS_ERROR_OPENING), name);
+        if (FAILED(StringCchPrintfA(buff, _countof(buff), LoadStr(IDS_ERROR_OPENING), name)))
+            StringCchCopyA(buff, _countof(buff), LoadStr(IDS_PLUGIN_NAME));
         SalGeneral->SalMessageBox(HWindow, buff, LoadStr(IDS_PLUGIN_NAME), MB_ICONEXCLAMATION);
 
         FileName[0] = 0;
@@ -151,9 +158,12 @@ void CRendererWindow::SetViewerTitle()
 {
     char title[MAX_PATH + 300];
     if (FileName[0] != 0)
-        sprintf(title, "%s - %s", FileName, LoadStr(IDS_PLUGIN_NAME));
+    {
+        if (FAILED(StringCchPrintfA(title, _countof(title), "%s - %s", FileName, LoadStr(IDS_PLUGIN_NAME))))
+            StringCchCopyA(title, _countof(title), LoadStr(IDS_PLUGIN_NAME));
+    }
     else
-        sprintf(title, "%s", LoadStr(IDS_PLUGIN_NAME));
+        StringCchCopyA(title, _countof(title), LoadStr(IDS_PLUGIN_NAME));
 
     SetWindowText(GetParent(HWindow), title);
 }

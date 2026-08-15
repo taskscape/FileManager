@@ -39,7 +39,8 @@ STDAPI SHBindToIDListParent(LPCITEMIDLIST pidl, REFIID riid, void** ppv, LPCITEM
 
 BOOL OnExtList(LPCTSTR pszExtList, LPCTSTR pszExt)
 {
-    for (; *pszExtList; pszExtList += lstrlen(pszExtList) + 1)
+    // This list is double-NUL delimited, so advance by each CRT-measured entry plus its terminator.
+    for (; *pszExtList; pszExtList += _tcslen(pszExtList) + 1)
     {
         if (!lstrcmpi(pszExt, pszExtList))
         {

@@ -1,5 +1,8 @@
 [CmdletBinding()]
-param()
+param(
+    [ValidateRange(1, 10000)]
+    [int]$Iterations = 1
+)
 
 $ErrorActionPreference = 'Stop'
 $repositoryRoot = Split-Path -Parent $PSScriptRoot
@@ -31,8 +34,12 @@ try
 {
     & cl.exe @arguments
     if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-    & (Join-Path $workDirectory 'cmark_gfm_hardening_probe.exe') $repositoryRoot
-    exit $LASTEXITCODE
+    for ($iteration = 1; $iteration -le $Iterations; $iteration++) {
+        # Reuse the checked renderer executable so the nightly campaign spends its budget exercising parser paths.
+        & (Join-Path $workDirectory 'cmark_gfm_hardening_probe.exe') $repositoryRoot
+        if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+    }
+    exit 0
 }
 finally
 {

@@ -62,9 +62,24 @@ void WriteToLog(const char* str)
         SYSTEMTIME st;
         char buf[100];
         WaitForSingleObject(LogFileMutex, INFINITE);
-        SetFilePointer(LogFile, 0, NULL, FILE_END);
+        // Keep the append seek on the Boolean API so a valid file position never shares the old error sentinel.
+        LARGE_INTEGER endOffset = {0};
+        SetFilePointerEx(LogFile, endOffset, NULL, FILE_END);
         GetLocalTime(&st);
-        wsprintf(buf, "%02d:%02d:%02d:%03d", st.wHour, st.wMinute, st.wSecond, st.wMilliseconds);
+        // The CRT-free logger formats the fixed-width timestamp directly to avoid an unbounded formatter.
+        buf[0] = (char)('0' + st.wHour / 10);
+        buf[1] = (char)('0' + st.wHour % 10);
+        buf[2] = ':';
+        buf[3] = (char)('0' + st.wMinute / 10);
+        buf[4] = (char)('0' + st.wMinute % 10);
+        buf[5] = ':';
+        buf[6] = (char)('0' + st.wSecond / 10);
+        buf[7] = (char)('0' + st.wSecond % 10);
+        buf[8] = ':';
+        buf[9] = (char)('0' + st.wMilliseconds / 100);
+        buf[10] = (char)('0' + (st.wMilliseconds / 10) % 10);
+        buf[11] = (char)('0' + st.wMilliseconds % 10);
+        buf[12] = 0;
         WriteFile(LogFile, buf, lstrlen(buf), &wr, NULL);
         WriteFile(LogFile, ": ", 2, &wr, NULL);
         WriteFile(LogFile, ModuleName, lstrlen(ModuleName), &wr, NULL);
@@ -93,7 +108,8 @@ SECURITY_ATTRIBUTES* CreateAccessableSecurityAttributes(SECURITY_ATTRIBUTES* sa,
     }
 
     nAclSize = GetLengthSid(psidEveryone) * 2 + sizeof(ACCESS_ALLOWED_ACE) + sizeof(ACCESS_DENIED_ACE) + sizeof(ACL);
-    *paclNewDacl = (PACL)LocalAlloc(LPTR, nAclSize);
+    // This ACL is constructed by the extension and only borrowed by CreateMutex during creation.
+    *paclNewDacl = (PACL)HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, nAclSize);
     if (*paclNewDacl == NULL)
     {
         //    TRACE_E("CreateAccessableSecurityAttributes(): LocalAlloc() failed!");
@@ -132,7 +148,7 @@ SECURITY_ATTRIBUTES* CreateAccessableSecurityAttributes(SECURITY_ATTRIBUTES* sa,
 ErrorExit:
     if (*paclNewDacl != NULL)
     {
-        LocalFree(*paclNewDacl);
+        HeapFree(GetProcessHeap(), 0, *paclNewDacl);
         *paclNewDacl = NULL;
     }
     if (*psidEveryone != NULL)
@@ -209,6 +225,11 @@ DllMain(HINSTANCE hInstance, DWORD dwReason, LPVOID lpReserved)
             }
 
             LogFileMutex = CreateMutex(saPtr, FALSE, "shext-log-mutex");
+            // CreateMutex has consumed the security descriptor; release the extension-owned backing ACL and SID.
+            if (paclNewDacl != NULL)
+                HeapFree(GetProcessHeap(), 0, paclNewDacl);
+            if (psidEveryone != NULL)
+                FreeSid(psidEveryone);
             if (LogFileMutex == NULL)
                 LogFileMutex = OpenMutex(SYNCHRONIZE, FALSE, "shext-log-mutex");
             if (LogFile == INVALID_HANDLE_VALUE || LogFileMutex == NULL)
@@ -319,7 +340,8 @@ ShellExtClassFactory* SECF_Constructor()
 {
     ShellExtClassFactory* secf;
 
-    secf = GlobalAlloc(GMEM_FIXED, sizeof(ShellExtClassFactory));
+    // COM object storage remains wholly owned by this extension, so use the process heap.
+    secf = (ShellExtClassFactory*)HeapAlloc(GetProcessHeap(), 0, sizeof(ShellExtClassFactory));
 
     if (secf == NULL)
         return NULL;
@@ -352,7 +374,7 @@ void SECF_Destructor(ShellExtClassFactory* secf)
 
     g_cRefThisDll--;
 
-    GlobalFree(secf);
+    HeapFree(GetProcessHeap(), 0, secf);
     return;
 }
 
@@ -461,22 +483,23 @@ ShellExt* SE_Constructor()
 {
     ShellExt* se;
 
-    se = GlobalAlloc(GMEM_FIXED, sizeof(ShellExt));
+    // Shell-extension interface objects never cross a GlobalAlloc ownership boundary.
+    se = (ShellExt*)HeapAlloc(GetProcessHeap(), 0, sizeof(ShellExt));
     if (se == NULL)
         return NULL;
 
-    se->m_pSEI = GlobalAlloc(GMEM_FIXED, sizeof(ShellExtInit));
-    se->m_pCH = GlobalAlloc(GMEM_FIXED, sizeof(CopyHook));
-    se->m_pCHW = GlobalAlloc(GMEM_FIXED, sizeof(CopyHookW));
+    se->m_pSEI = (ShellExtInit*)HeapAlloc(GetProcessHeap(), 0, sizeof(ShellExtInit));
+    se->m_pCH = (CopyHook*)HeapAlloc(GetProcessHeap(), 0, sizeof(CopyHook));
+    se->m_pCHW = (CopyHookW*)HeapAlloc(GetProcessHeap(), 0, sizeof(CopyHookW));
     if (se->m_pSEI == NULL || se->m_pCH == NULL || se->m_pCHW == NULL)
     {
         if (se->m_pSEI != NULL)
-            GlobalFree(se->m_pSEI);
+            HeapFree(GetProcessHeap(), 0, se->m_pSEI);
         if (se->m_pCH != NULL)
-            GlobalFree(se->m_pCH);
+            HeapFree(GetProcessHeap(), 0, se->m_pCH);
         if (se->m_pCHW != NULL)
-            GlobalFree(se->m_pCHW);
-        GlobalFree(se);
+            HeapFree(GetProcessHeap(), 0, se->m_pCHW);
+        HeapFree(GetProcessHeap(), 0, se);
         return NULL;
     }
 
@@ -549,10 +572,10 @@ void SE_Destructor(ShellExt* se)
 
     g_cRefThisDll--;
 
-    GlobalFree(se->m_pCHW);
-    GlobalFree(se->m_pCH);
-    GlobalFree(se->m_pSEI);
-    GlobalFree(se);
+    HeapFree(GetProcessHeap(), 0, se->m_pCHW);
+    HeapFree(GetProcessHeap(), 0, se->m_pCH);
+    HeapFree(GetProcessHeap(), 0, se->m_pSEI);
+    HeapFree(GetProcessHeap(), 0, se);
     return;
 }
 
@@ -561,9 +584,8 @@ STDMETHODIMP SE_QueryInterface(THIS_ REFIID riid, LPVOID* ppvObj)
     ShellExt* se = (ShellExt*)This;
 
 #ifdef SHEXT_LOG_ENABLED
-    char buf[200];
-    wsprintf(buf, "SE_QueryInterface (%p):", se);
-    WriteToLog(buf);
+    // Diagnostic logging must not add a variable-size formatter to the CRT-free extension.
+    WriteToLog("SE_QueryInterface");
 #endif // SHEXT_LOG_ENABLED
 
     *ppvObj = NULL;
@@ -609,10 +631,7 @@ STDMETHODIMP SE_QueryInterface(THIS_ REFIID riid, LPVOID* ppvObj)
 #ifdef SHEXT_LOG_ENABLED
     else
     {
-        wsprintf(buf, "SE_QueryInterface (%p): %08X-%04X-%04X-%02X%02X%02X%02X%02X%02X%02X%02X", se,
-                 riid->Data1, riid->Data2, riid->Data3, riid->Data4[0], riid->Data4[1], riid->Data4[2],
-                 riid->Data4[3], riid->Data4[4], riid->Data4[5], riid->Data4[6], riid->Data4[7]);
-        WriteToLog(buf);
+        WriteToLog("SE_QueryInterface: unsupported IID");
     }
 #endif // SHEXT_LOG_ENABLED
 

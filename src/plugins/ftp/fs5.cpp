@@ -4,6 +4,8 @@
 
 #include "precomp.h"
 
+#include "..\\..\\common\\monotonic_time.h"
+
 //
 // ****************************************************************************
 // CPluginFSInterface
@@ -388,7 +390,11 @@ void CPluginFSInterface::ViewFile(const char* fsName, HWND parent,
     while (1)
     {
         if (doNotCacheDownload)
-            sprintf(uniqueFileName + len, "%08X", GetTickCount());
+        {
+            // Preserve the fixed cache-key shape while preventing the seed from repeating at the 32-bit tick boundary.
+            const CMonotonicTimePoint timeSeed = CMonotonicClock::Now();
+            sprintf(uniqueFileName + len, "%08X", (DWORD)(timeSeed ^ (timeSeed >> 32)));
+        }
         tmpFileName = salamander->AllocFileNameInCache(parent, uniqueFileName, nameInCache, NULL, fileExists);
         if (tmpFileName == NULL)
             return; // fatal error

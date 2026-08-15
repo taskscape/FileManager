@@ -3,7 +3,10 @@
 
 #include "precomp.h"
 
+#include <strsafe.h>
+
 #include "common\\checked_arithmetic.h"
+#include "common\\monotonic_time.h"
 #include "common\\scoped_native_resources.h"
 #include "parserbroker.h"
 
@@ -21,6 +24,8 @@ static BOOL BrokerOverlappedIo(HANDLE pipe, void* buffer, DWORD length, BOOL wri
 {
     BYTE* current = (BYTE*)buffer;
     DWORD remaining = length;
+    // One absolute deadline prevents a hostile broker from extending a request with tiny partial transfers.
+    const CMonotonicTimePoint deadline = CMonotonicClock::DeadlineAfter(timeout);
     while (remaining != 0)
     {
         OVERLAPPED overlapped;
@@ -34,7 +39,8 @@ static BOOL BrokerOverlappedIo(HANDLE pipe, void* buffer, DWORD length, BOOL wri
                                : ReadFile(pipe, current, remaining, &transferred, &overlapped);
         if (!completed && GetLastError() == ERROR_IO_PENDING)
         {
-            if (WaitForSingleObject(overlapped.hEvent, timeout) == WAIT_OBJECT_0)
+            const DWORD waitMilliseconds = CMonotonicClock::RemainingWin32TimerDelay(deadline, CMonotonicClock::Now());
+            if (WaitForSingleObject(overlapped.hEvent, waitMilliseconds) == WAIT_OBJECT_0)
                 completed = GetOverlappedResult(pipe, &overlapped, &transferred, FALSE);
             else
             {
@@ -100,6 +106,13 @@ CParserBrokerClient::~CParserBrokerClient()
 
 void CParserBrokerClient::Stop()
 {
+    // Shutdown may run while a panel worker is in Invoke, so share its ranked serialization boundary.
+    CScopedCriticalSection lock(&Lock, lkrExternalBroker, "ParserBroker.Lock");
+    StopLocked();
+}
+
+void CParserBrokerClient::StopLocked()
+{
     if (Job != NULL)
     {
         TerminateJobObject(Job, ERROR_PROCESS_ABORTED);
@@ -123,9 +136,12 @@ BOOL CParserBrokerClient::Start()
 {
     if (Pipe != NULL && Process != NULL && WaitForSingleObject(Process, 0) == WAIT_TIMEOUT)
         return TRUE;
-    Stop();
+    StopLocked();
 
-    wsprintfW(PipeName, L"\\\\.\\pipe\\OpenSal.ParserBroker.%08X", GetCurrentProcessId());
+    // The broker pipe identity must remain bounded before it is passed to the kernel.
+    if (_snwprintf_s(PipeName, _countof(PipeName), _TRUNCATE,
+                     L"\\\\.\\pipe\\OpenSal.ParserBroker.%08X", GetCurrentProcessId()) < 0)
+        return FALSE;
     Pipe = CreateNamedPipeW(PipeName,
                             PIPE_ACCESS_DUPLEX | FILE_FLAG_OVERLAPPED | FILE_FLAG_FIRST_PIPE_INSTANCE,
                             PIPE_TYPE_BYTE | PIPE_READMODE_BYTE | PIPE_WAIT | PIPE_REJECT_REMOTE_CLIENTS,
@@ -140,16 +156,22 @@ BOOL CParserBrokerClient::Start()
     DWORD executableLength = GetModuleFileNameW(NULL, executable, _countof(executable));
     if (executableLength == 0 || executableLength >= _countof(executable))
     {
-        Stop();
+        StopLocked();
         return FALSE;
     }
     WCHAR* filename = wcsrchr(executable, L'\\');
     if (filename == NULL)
     {
-        Stop();
+        StopLocked();
         return FALSE;
     }
-    lstrcpyW(filename + 1, L"salbroker.exe");
+    // The restricted broker must be launched from the application directory; reject an unrepresentable sibling path.
+    if (FAILED(StringCchCopyW(filename + 1, _countof(executable) - (filename + 1 - executable),
+                              L"salbroker.exe")))
+    {
+        StopLocked();
+        return FALSE;
+    }
 
     HANDLE currentToken = NULL;
     HANDLE restrictedToken = NULL;
@@ -158,13 +180,19 @@ BOOL CParserBrokerClient::Start()
     {
         if (currentToken != NULL)
             CloseHandle(currentToken);
-        Stop();
+        StopLocked();
         return FALSE;
     }
     CloseHandle(currentToken);
 
     WCHAR commandLine[2 * MAX_PATH + 32];
-    wsprintfW(commandLine, L"\"%s\" --pipe \"%s\"", executable, PipeName);
+    if (_snwprintf_s(commandLine, _countof(commandLine), _TRUNCATE,
+                     L"\"%s\" --pipe \"%s\"", executable, PipeName) < 0)
+    {
+        CloseHandle(restrictedToken);
+        StopLocked();
+        return FALSE;
+    }
     STARTUPINFOW startup;
     PROCESS_INFORMATION processInfo;
     ZeroMemory(&startup, sizeof(startup));
@@ -175,7 +203,7 @@ BOOL CParserBrokerClient::Start()
     CloseHandle(restrictedToken);
     if (!created)
     {
-        Stop();
+        StopLocked();
         return FALSE;
     }
 
@@ -193,7 +221,7 @@ BOOL CParserBrokerClient::Start()
         TerminateProcess(processInfo.hProcess, ERROR_ACCESS_DENIED);
         CloseHandle(processInfo.hThread);
         CloseHandle(processInfo.hProcess);
-        Stop();
+        StopLocked();
         return FALSE;
     }
     Process = processInfo.hProcess;
@@ -202,7 +230,7 @@ BOOL CParserBrokerClient::Start()
 
     if (!BrokerConnectPipe(Pipe))
     {
-        Stop();
+        StopLocked();
         return FALSE;
     }
     return TRUE;
@@ -238,7 +266,7 @@ BOOL CParserBrokerClient::Invoke(WORD type, const void* request, DWORD requestLe
             completed = TRUE;
             break;
         }
-        Stop(); // timeout, malformed response, or crash: kill and recreate the untrusted process.
+        StopLocked(); // timeout, malformed response, or crash: kill and recreate the untrusted process.
     }
     InterlockedDecrement(&PendingRequests);
     return completed;

@@ -747,11 +747,12 @@ void CFTPWorker::HandleEventInConnectingState(CFTPWorkerEvent event, BOOL& sendQ
                 {
                     SYSTEMTIME st;
                     GetLocalTime(&st);
-                    if (GetDateFormat(LOCALE_USER_DEFAULT, DATE_SHORTDATE, &st, NULL, errBuf, 50) == 0)
+                    if (FormatUserDateTimeAnsi(&st, DATE_SHORTDATE, errBuf, 50, TRUE) == 0)
                         sprintf(errBuf, "%u.%u.%u", st.wDay, st.wMonth, st.wYear);
                     strcat(errBuf, " - ");
-                    if (GetTimeFormat(LOCALE_USER_DEFAULT, 0, &st, NULL, errBuf + strlen(errBuf), 50) == 0)
-                        sprintf(errBuf + strlen(errBuf), "%u:%02u:%02u", st.wHour, st.wMinute, st.wSecond);
+                    size_t timeOffset = strlen(errBuf);
+                    if (timeOffset < 50 && FormatUserDateTimeAnsi(&st, 0, errBuf + timeOffset, 50 - (int)timeOffset, FALSE) == 0)
+                        _snprintf_s(errBuf + timeOffset, 50 - timeOffset, _TRUNCATE, "%u:%02u:%02u", st.wHour, st.wMinute, st.wSecond);
                     Oper->GetConnectLogMsg(TRUE, buf, 700 + FTP_MAX_PATH, ConnectAttemptNumber, errBuf);
                     Logs.LogMessage(LogUID, buf, -1);
                 }

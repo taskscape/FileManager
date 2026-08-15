@@ -371,7 +371,7 @@ public:
         SYSTEMTIME st;
         char buf[100];
         GetSystemTime(&st);
-        if (!GetTimeFormat(LOCALE_USER_DEFAULT, 0, &st, fmt, buf, 100))
+        if (!FormatUserDateTimeAnsi(&st, 0, fmt, buf, 100, FALSE))
         {
             error = IDS_EXP_INVALIDTIMEFMT;
             errorPos1 = argStart;
@@ -390,8 +390,7 @@ public:
 
         SYSTEMTIME st;
         FileTimeToSystemTime(&p->File->LastWrite, &st);
-        int l = GetTimeFormat(LOCALE_USER_DEFAULT, 0, &st,
-                              Format, string, (int)(end - string)) -
+        int l = FormatUserDateTimeAnsi(&st, 0, Format, string, (int)(end - string), FALSE) -
                 1;
         if (l > 0)
             string += l;
@@ -448,7 +447,7 @@ public:
         SYSTEMTIME st;
         char buf[100];
         GetSystemTime(&st);
-        if (!GetDateFormat(LOCALE_USER_DEFAULT, 0, &st, fmt, buf, 100))
+        if (!FormatUserDateTimeAnsi(&st, 0, fmt, buf, 100, TRUE))
         {
             error = IDS_EXP_INVALIDDATEFMT;
             errorPos1 = argStart;
@@ -467,8 +466,7 @@ public:
 
         SYSTEMTIME st;
         FileTimeToSystemTime(&p->File->LastWrite, &st);
-        int l = GetDateFormat(LOCALE_USER_DEFAULT, 0, &st,
-                              Format, string, (int)(end - string)) -
+        int l = FormatUserDateTimeAnsi(&st, 0, Format, string, (int)(end - string), TRUE) -
                 1;
         if (l > 0)
             string += l;

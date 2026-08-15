@@ -121,7 +121,11 @@ static BOOL SplitFile(LPTSTR fileName, LPTSTR targetDir, CQuadWord& qwPartSize,
     }
     // obtain the file size
     CQuadWord bytesRemaining;
-    bytesRemaining.LoDWord = GetFileSize(file.HFile, &bytesRemaining.HiDWord);
+    LARGE_INTEGER fileSize;
+    if (!GetFileSizeEx(file.HFile, &fileSize))
+        return FALSE;
+    // Splitting tracks remaining bytes as CQuadWord, so retain the full size instead of reconstructing DWORD halves.
+    bytesRemaining.SetUI64((unsigned __int64)fileSize.QuadPart);
 
     // obtain the file timestamp
     FILETIME ft;

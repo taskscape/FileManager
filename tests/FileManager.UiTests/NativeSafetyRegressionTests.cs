@@ -30,13 +30,20 @@ public sealed class NativeSafetyRegressionTests
             Assert.That(runner, Does.Contain("test-sqlite-recovery.ps1"));
             Assert.That(runner, Does.Contain("verify-no-new-terminatethread.ps1"));
             Assert.That(runner, Does.Contain("verify-no-new-raw-thread-creation.ps1"));
+            Assert.That(runner, Does.Contain("verify-no-new-gettickcount.ps1"));
             Assert.That(runner, Does.Contain("verify-no-new-max-path-buffers.ps1"));
             Assert.That(runner, Does.Contain("verify-no-new-unsafe-string-calls.ps1"));
             Assert.That(runner, Does.Contain("verify-fluent-icon-coverage.ps1"));
+            Assert.That(runner, Does.Contain("Deterministic FTP/FTPS/HTTP fixture tests"));
+            Assert.That(runner, Does.Contain("DeterministicNetworkFixtureTests"));
+            Assert.That(runner, Does.Contain("Resolve-FtpMenuCommand"));
+            Assert.That(runner, Does.Contain("Connect to FTP Server..."));
             Assert.That(runner, Does.Contain("FileManager.UiTests (complete NUnit project)"));
             Assert.That(runner, Does.Contain("run-lock-verifier-stress.ps1"));
             Assert.That(runner, Does.Contain("FailOnSkipped"));
             Assert.That(runner, Does.Contain("@outcome='NotExecuted'"));
+            Assert.That(runner, Does.Contain("must run from a disposable Windows profile"));
+            Assert.That(runner, Does.Contain("$uiTestEnvironmentSkipReason = $_.Exception.Message"));
             // The release workflow must consume the root inventory rather than
             // maintaining a second list that can silently lose coverage.
             Assert.That(releaseWorkflow, Does.Contain("name: Complete automated release gate"));
@@ -94,6 +101,7 @@ public sealed class NativeSafetyRegressionTests
         var exemptions = File.ReadAllText(Path.Combine(root, "tools", "max-path-buffer-exemptions.md"));
         var workflow = File.ReadAllText(Path.Combine(root, ".github", "workflows", "pr-msbuild.yml"));
         var refactoring = File.ReadAllText(Path.Combine(root, "refactoring.md"));
+        var pluginLoading = File.ReadAllText(Path.Combine(root, "src", "plugins_loading.cpp"));
 
         Assert.Multiple(() =>
         {
@@ -155,6 +163,7 @@ public sealed class NativeSafetyRegressionTests
         var probe = File.ReadAllText(Path.Combine(root, "tools", "bzip2_compatibility_probe.c"));
         var harness = File.ReadAllText(Path.Combine(root, "tools", "test-bzip2-compatibility.ps1"));
         var workflow = File.ReadAllText(Path.Combine(root, ".github", "workflows", "pr-msbuild.yml"));
+        var soakWorkflow = File.ReadAllText(Path.Combine(root, ".github", "workflows", "nightly-parser-fuzz.yml"));
         var refactoring = File.ReadAllText(Path.Combine(root, "refactoring.md"));
 
         // Pin the vendor identity, streaming adapter, retained corpus, and CI gate as one parser boundary.
@@ -175,7 +184,9 @@ public sealed class NativeSafetyRegressionTests
             Assert.That(Directory.GetFiles(Path.Combine(root, "tests", "bzip2-vectors", "fuzz"), "*.hex").Length, Is.GreaterThanOrEqualTo(5));
             Assert.That(harness, Does.Contain("/DBZ_NO_STDIO"));
             Assert.That(harness, Does.Contain("Get-ChildItem -LiteralPath (Join-Path $fixtureDirectory 'fuzz')"));
+            Assert.That(harness, Does.Contain("[int]$Iterations = 1"));
             Assert.That(workflow, Does.Contain("test-bzip2-compatibility.ps1"));
+            Assert.That(soakWorkflow, Does.Contain("test-bzip2-compatibility.ps1 -Architecture x64 -Iterations 250"));
             Assert.That(refactoring, Does.Contain("### 64. Upgrade bzip2 — Implemented"));
         });
     }
@@ -227,9 +238,25 @@ public sealed class NativeSafetyRegressionTests
         var root = FindRepositoryRoot();
         var arithmetic = File.ReadAllText(Path.Combine(root, "src", "common", "checked_arithmetic.h"));
         var upload = File.ReadAllText(Path.Combine(root, "src", "salmon", "upload.cpp"));
+        var minidump = File.ReadAllText(Path.Combine(root, "src", "salmon", "minidump.cpp"));
         var client = File.ReadAllText(Path.Combine(root, "src", "parserbroker.cpp"));
         var broker = File.ReadAllText(Path.Combine(root, "src", "parserbroker", "salbroker.cpp"));
+        var pictViewThumbnails = File.ReadAllText(Path.Combine(root, "src", "plugins", "pictview", "thumbs.cpp"));
+        var pictViewThumbnailer = File.ReadAllText(Path.Combine(root, "src", "plugins", "pictview", "Thumbnailer.cpp"));
+        var pictViewMessageWrapper = File.ReadAllText(Path.Combine(root, "src", "plugins", "pictview", "PVMessageWrapper.cpp"));
+        var pictViewMessageEnvelope = File.ReadAllText(Path.Combine(root, "src", "plugins", "pictview", "PVMessageEnvelope.cpp"));
+        var zipCommon = File.ReadAllText(Path.Combine(root, "src", "plugins", "zip", "common.cpp"));
+        var zipExtraction = File.ReadAllText(Path.Combine(root, "src", "plugins", "zip", "extract.cpp"));
+        var zipListing = File.ReadAllText(Path.Combine(root, "src", "plugins", "zip", "list.cpp"));
+        var zipAdd = File.ReadAllText(Path.Combine(root, "src", "plugins", "zip", "add.cpp"));
+        var zipAddDelete = File.ReadAllText(Path.Combine(root, "src", "plugins", "zip", "add_del.cpp"));
+        var zipIcons = File.ReadAllText(Path.Combine(root, "src", "plugins", "zip", "chicon.cpp"));
+        var zipSettings = File.ReadAllText(Path.Combine(root, "src", "plugins", "zip", "dialogs2.cpp"));
+        var zipMain = File.ReadAllText(Path.Combine(root, "src", "plugins", "zip", "main.cpp"));
+        var splitCombine = File.ReadAllText(Path.Combine(root, "src", "plugins", "splitcbn", "combine.cpp"));
+        var csvParser = File.ReadAllText(Path.Combine(root, "src", "plugins", "dbviewer", "csvlib", "csvlib.cpp"));
         var refactoring = File.ReadAllText(Path.Combine(root, "refactoring.md"));
+        var pluginLoading = File.ReadAllText(Path.Combine(root, "src", "plugins_loading.cpp"));
 
         // These assertions pin the overflow boundaries that adversarial file,
         // HTTP, and IPC lengths must traverse before touching a buffer.
@@ -253,6 +280,73 @@ public sealed class NativeSafetyRegressionTests
             Assert.That(client, Does.Contain("CheckedAddDword((DWORD)sizeof(*thumbnail), thumbnail->PixelBytes, &expectedResponseLength)"));
             Assert.That(broker, Does.Contain("CheckedMultiplyDword((DWORD)bitmapInfo.bmWidth, (DWORD)bitmapInfo.bmHeight, &pixels)"));
             Assert.That(broker, Does.Contain("CheckedAddDword((DWORD)sizeof(CParserBrokerThumbnailResponse), pixelBytes, &packedResponseLength)"));
+            Assert.That(pictViewThumbnails, Does.Contain("#define WIN_THUMBNAIL_MAX_PAYLOAD (32 * 1024 * 1024)"));
+            Assert.That(pictViewThumbnails, Does.Contain("newPos.QuadPart > WIN_THUMBNAIL_MAX_PAYLOAD"));
+            Assert.That(pictViewThumbnailer, Does.Contain("GetThumbnailBufferBytes"));
+            Assert.That(pictViewThumbnailer, Does.Contain("CheckedMultiplySize((size_t)width, (size_t)height, &pixels)"));
+            Assert.That(pictViewThumbnailer, Does.Contain("rowsCount > OriginalHeight - NextLine"));
+            Assert.That(pictViewThumbnailer, Does.Contain("CheckedCastSizeToInt(requiredBytes, &required)"));
+            Assert.That(pictViewMessageWrapper, Does.Contain("CheckedAddSize(dataSize, sizeof(PVMessageHeader), &totalSize)"));
+            Assert.That(pictViewMessageWrapper, Does.Contain("CheckedCastSizeToDword(totalSize, &mappedSize)"));
+            Assert.That(pictViewMessageEnvelope, Does.Contain("pHdr->cbSize != dataSize"));
+            Assert.That(pictViewMessageEnvelope, Does.Contain("pHdr->cbSize < textsOffset"));
+            Assert.That(pictViewMessageEnvelope, Does.Contain("memchr(str, 0, stringsEnd - str)"));
+            Assert.That(pictViewThumbnails, Does.Contain("CheckedCastUInt64ToDword(newPos.QuadPart, &thumbnailLength)"));
+            Assert.That(pictViewThumbnails, Does.Contain("CheckedAddUInt64((uint64_t)sizeof(HuffmanTbl) + sizeof(Quant75Tbl), newPos.QuadPart, &totalLength64)"));
+            Assert.That(pictViewThumbnails, Does.Contain("CheckedCastSizeToInt(allocationLength, &returnedLength)"));
+            Assert.That(pictViewThumbnails, Does.Contain("GetFileSizeEx(hFile, &streamSize)"));
+            Assert.That(pictViewThumbnails, Does.Not.Contain("SetFilePointer(hFile, 0, NULL, FILE_END)"));
+            Assert.That(zipCommon, Does.Contain("BOOL CZipCommon::ProcessLocalHeader"));
+            Assert.That(zipCommon, Does.Contain("CheckedAddUInt64(dataOffset, sizeof(CLocalFileHeader), &dataOffset)"));
+            Assert.That(zipCommon, Does.Contain("CheckedAddDword(nextOffset, 4, &offset)"));
+            Assert.That(zipCommon, Does.Contain("CheckedAddUInt64(CentrDirOffs, CentrDirSize, &endOfCentrDir)"));
+            Assert.That(zipCommon, Does.Contain("CheckedAddUInt64(CentrDirOffs, ExtraBytes, &readOffset)"));
+            Assert.That(zipCommon, Does.Contain("CheckedAddUInt64(ZipFile->FilePointer, sizeof(CFileHeader), &centralHeaderEnd)"));
+            Assert.That(zipExtraction, Does.Contain("if (!ProcessLocalHeader(localHeader, fileInfo, &aesExtraField))"));
+            Assert.That(zipExtraction, Does.Contain("Refuse a wrapped central-directory cursor before archive names drive extraction selection."));
+            Assert.That(zipExtraction, Does.Contain("CheckedAddUInt64(fileInfo->DataOffset, aesHeaderSize, &aesPayloadOffset)"));
+            Assert.That(zipExtraction, Does.Contain("CheckedAddUInt64(fileInfo->DataOffset, ENCRYPT_HEADER_SIZE, &encryptedPayloadOffset)"));
+            Assert.That(zipExtraction, Does.Contain("fileInfo->DataOffset = aesPayloadOffset"));
+            Assert.That(zipExtraction, Does.Contain("fileInfo->DataOffset = encryptedPayloadOffset"));
+            Assert.That(zipExtraction, Does.Contain("int CZipUnpack::GetCompressedPayloadSize"));
+            Assert.That(zipExtraction, Does.Contain("if (fileInfo->CompSize >= encryptionOverhead)"));
+            Assert.That(zipExtraction, Does.Contain("fileInfo->CompSize - encryptionOverhead"));
+            Assert.That(zipExtraction, Does.Contain("GetCompressedPayloadSize(fileInfo, &BytesLeft, errorID)"));
+            Assert.That(zipExtraction, Does.Contain("GetCompressedPayloadSize(fileInfo, &bytesLeft, errorID)"));
+            Assert.That(zipExtraction, Does.Contain("CheckedAddSize(strlen(fileName), 1, &fileNameBytes)"));
+            Assert.That(zipExtraction, Does.Contain("CheckedAddSize((size_t)tempNameLen, 1, &nameAllocationSize)"));
+            Assert.That(zipExtraction, Does.Not.Contain("malloc(len + 1)"));
+            Assert.That(zipListing, Does.Contain("Do not let a ZIP64 offset wrap into a different central-directory listing position."));
+            Assert.That(zipAdd, Does.Contain("CheckedCastUInt64ToDword(archiveEnd, &sfxArchiveSize)"));
+            Assert.That(zipAddDelete, Does.Contain("CheckedCastUInt64ToDword(ZipFile->Size, &sfxArchiveSize)"));
+            Assert.That(zipIcons, Does.Contain("iconsCount <= 0 || iconsCount > USHRT_MAX"));
+            Assert.That(zipIcons, Does.Contain("CheckedMultiplySize((size_t)iconsCount - 1, sizeof(MEMICONDIRENTRY), &entryBytes)"));
+            Assert.That(zipIcons, Does.Contain("CheckedCastSizeToDword(size, &resourceSize)"));
+            Assert.That(zipIcons, Does.Contain("#define ICO_IMAGE_MAX_BYTES (32 * 1024 * 1024)"));
+            Assert.That(zipIcons, Does.Contain("if (w == 0 ||"));
+            Assert.That(zipIcons, Does.Contain("CheckedMultiplyDword((DWORD)w, (DWORD)sizeof(ICONDIRENTRY), &directoryReadSize)"));
+            Assert.That(zipIcons, Does.Contain("!CheckedAddUInt64(offset, size, &imageEnd)"));
+            Assert.That(zipIcons, Does.Contain("sourceDirectorySize <= resourceSize"));
+            Assert.That(zipIcons, Does.Contain("CheckedMultiplySize(directory->idCount, sizeof(CIcon), &iconsSize)"));
+            Assert.That(zipIcons, Does.Contain("if (s == 0 || s > ICO_IMAGE_MAX_BYTES)"));
+            Assert.That(zipCommon, Does.Contain("static BOOL ReadSfxString"));
+            Assert.That(zipCommon, Does.Contain("stringSize >= destinationSize"));
+            Assert.That(zipCommon, Does.Contain("CheckedAddSize((size_t)stringSize, 1, &allocationSize)"));
+            Assert.That(zipCommon, Does.Contain("static BOOL AppendSfxBytes"));
+            Assert.That(zipCommon, Does.Contain("CheckedAddDword(stored, byteCount, &required)"));
+            Assert.That(zipMain, Does.Contain("maxSerializedSfxSettingsSize = 1024 * 1024"));
+            Assert.That(zipMain, Does.Contain("siz <= maxSerializedSfxSettingsSize"));
+            Assert.That(zipSettings, Does.Contain("#define SFX_SETTINGS_IMPORT_MAX_BYTES (1024 * 1024)"));
+            Assert.That(zipSettings, Does.Contain("CheckedCastUInt64ToSize(file->Size, &importSize)"));
+            Assert.That(zipSettings, Does.Contain("CheckedAddSize(importSize, 1, &allocationSize)"));
+            Assert.That(zipSettings, Does.Contain("CheckedCastSizeToDword(importSize, &readSize)"));
+            Assert.That(splitCombine, Does.Contain("CheckedAddUInt64(totalSize.Value, size.Value, &combinedSize)"));
+            Assert.That(splitCombine, Does.Contain("totalSize.Value = combinedSize"));
+            Assert.That(csvParser, Does.Contain("CheckedAddSize(textLen, 1, &nameChars)"));
+            Assert.That(csvParser, Does.Contain("CheckedMultiplySize(nameChars, sizeof(CChar), &nameBytes)"));
+            Assert.That(csvParser, Does.Contain("CheckedAddSize((size_t)BufferSize, 1, &bufferChars)"));
+            Assert.That(csvParser, Does.Contain("CheckedCastSizeToInt(*textLen, &sourceTextLen)"));
+            Assert.That(csvParser, Does.Contain("CheckedMultiplySize((size_t)len, sizeof(wchar_t), &bufferBytes)"));
             Assert.That(refactoring, Does.Contain("### 39. Use checked arithmetic for sizes, offsets, and allocations — Partially implemented"));
         });
     }
@@ -263,10 +357,11 @@ public sealed class NativeSafetyRegressionTests
         var root = FindRepositoryRoot();
         var result = File.ReadAllText(Path.Combine(root, "src", "operation_result.h"));
         var copy = File.ReadAllText(Path.Combine(root, "src", "async_copy.cpp"));
+        var combine = File.ReadAllText(Path.Combine(root, "src", "plugins", "splitcbn", "combine.cpp"));
         var refactoring = File.ReadAllText(Path.Combine(root, "refactoring.md"));
 
-        // The native worker keeps the complete outcome until this adapter feeds an
-        // unchanged BOOL/error pair to the pre-existing progress dialog.
+        // Core copy and Split/Combine retain complete outcomes until their adapters feed
+        // an unchanged BOOL/error pair to the pre-existing progress-dialog contracts.
         Assert.Multiple(() =>
         {
             Assert.That(result, Does.Contain("enum EOperationResultPhase"));
@@ -294,6 +389,11 @@ public sealed class NativeSafetyRegressionTests
             Assert.That(copy, Does.Contain("while (!verificationResult.ToLegacyBool(&verificationError))"));
             Assert.That(copy, Does.Contain("COperationResult commitResult = CommitTransactionalTargetFile"));
             Assert.That(copy, Does.Contain("while (!commitResult.ToLegacyBool(&err))"));
+            Assert.That(combine, Does.Contain("class CCombineTemporaryOutput"));
+            Assert.That(combine, Does.Contain("COperationResult VerifyCombinedOutput"));
+            Assert.That(combine, Does.Contain("COperationResult reserveResult = temporaryOutput.Reserve(targetName)"));
+            Assert.That(combine, Does.Contain("PromoteFileUtf8Local(temporaryOutput.GetName(), targetName)"));
+            Assert.That(combine, Does.Contain("result->AppendCleanupError(orcpDeleteUnverifiedTarget"));
             Assert.That(refactoring, Does.Contain("### 40. Make operation result types explicit — Partially implemented"));
         });
     }
@@ -304,9 +404,10 @@ public sealed class NativeSafetyRegressionTests
         var root = FindRepositoryRoot();
         var result = File.ReadAllText(Path.Combine(root, "src", "operation_result.h"));
         var copy = File.ReadAllText(Path.Combine(root, "src", "async_copy.cpp"));
+        var combine = File.ReadAllText(Path.Combine(root, "src", "plugins", "splitcbn", "combine.cpp"));
         var refactoring = File.ReadAllText(Path.Combine(root, "refactoring.md"));
 
-        // Keep the primary cause, cleanup evidence, and copyable dialog text coupled at the native boundary.
+        // Keep primary failure, cleanup evidence, and copyable diagnostics coupled across core and plug-in output paths.
         Assert.Multiple(() =>
         {
             Assert.That(result, Does.Contain("orcpCloseVerificationHandle"));
@@ -317,6 +418,8 @@ public sealed class NativeSafetyRegressionTests
             Assert.That(copy, Does.Contain("result.AppendCleanupError(orcpCloseVerificationHandle, cleanupError, targetName)"));
             Assert.That(copy, Does.Contain("verificationResult.AppendCleanupError(orcpDeleteUnverifiedTarget, err, op->TargetName)"));
             Assert.That(copy, Does.Contain("Diagnostic (copy with Ctrl+C):"));
+            Assert.That(combine, Does.Contain("result->AppendCleanupError(orcpDeleteUnverifiedTarget, GetLastError(), Name)"));
+            Assert.That(combine, Does.Contain("The primary combine failure remains actionable"));
             Assert.That(refactoring, Does.Contain("### 56. Preserve the first actionable error and its context — Partially implemented"));
         });
     }
@@ -397,6 +500,7 @@ public sealed class NativeSafetyRegressionTests
         var orderingHeader = File.ReadAllText(Path.Combine(root, "src", "common", "lock_ordering.h"));
         var scopedResources = File.ReadAllText(Path.Combine(root, "src", "common", "scoped_native_resources.h"));
         var broker = File.ReadAllText(Path.Combine(root, "src", "parserbroker.cpp"));
+        var cache = File.ReadAllText(Path.Combine(root, "src", "cache.cpp"));
         var project = File.ReadAllText(Path.Combine(root, "src", "vcxproj", "salamand.vcxproj"));
         var architecture = File.ReadAllText(Path.Combine(root, "architecture.md"));
         var workflow = File.ReadAllText(Path.Combine(root, ".github", "workflows", "nightly-lock-stress.yml"));
@@ -421,6 +525,14 @@ public sealed class NativeSafetyRegressionTests
             Assert.That(ordering, Does.Contain("owner=%lu"));
             Assert.That(ordering, Does.Contain("OutputDebugStringA(message)"));
             Assert.That(broker, Does.Contain("lkrExternalBroker, \"ParserBroker.Lock\""));
+            Assert.That(cache, Does.Contain("CScopedCriticalSection lock(&CS, lkrWorkerQueue, \"DeleteManager.Queue\")"));
+            Assert.That(cache, Does.Contain("Detach under the rank, then call into the plug-in without holding shared queue state."));
+            Assert.That(broker, Does.Contain("CMonotonicClock::DeadlineAfter(timeout)"));
+            Assert.That(broker, Does.Contain("RemainingWin32TimerDelay(deadline, CMonotonicClock::Now())"));
+            Assert.That(File.ReadAllText(Path.Combine(root, "src", "plugins", "ftp", "ctrlcon1.cpp")),
+                        Does.Contain("const CMonotonicTimePoint resolveDeadline = CMonotonicClock::DeadlineAfter(resolveTimeoutMilliseconds)"));
+            Assert.That(broker, Does.Contain("void CParserBrokerClient::StopLocked()"));
+            Assert.That(broker, Does.Contain("StopLocked(); // timeout, malformed response, or crash"));
             Assert.That(project, Does.Contain("..\\common\\lock_ordering.cpp"));
             Assert.That(architecture, Does.Contain("### 7.1 Lock ordering contract"));
             Assert.That(workflow, Does.Contain("tools\\run-lock-verifier-stress.ps1"));
@@ -443,9 +555,34 @@ public sealed class NativeSafetyRegressionTests
         var root = FindRepositoryRoot();
         var owner = File.ReadAllText(Path.Combine(root, "src", "common", "thread_owner.h"));
         var checkPath = File.ReadAllText(Path.Combine(root, "src", "path_checking.cpp"));
+        var callStack = File.ReadAllText(Path.Combine(root, "src", "callstk.cpp"));
+        var automation = File.ReadAllText(Path.Combine(root, "src", "plugins", "automation", "scriptlist.cpp"));
+        var renamer = File.ReadAllText(Path.Combine(root, "src", "plugins", "renamer", "regexp.cpp"));
+        var oleSpy = File.ReadAllText(Path.Combine(root, "src", "olespy.cpp"));
+        var messages = File.ReadAllText(Path.Combine(root, "src", "common", "messages.cpp"));
+        var trace = File.ReadAllText(Path.Combine(root, "src", "common", "trace.cpp"));
+        var find = File.ReadAllText(Path.Combine(root, "src", "find.cpp"));
+        var mapi = File.ReadAllText(Path.Combine(root, "src", "mapi.cpp"));
+        var snooper = File.ReadAllText(Path.Combine(root, "src", "snooper.cpp"));
+        var auxThreads = File.ReadAllText(Path.Combine(root, "src", "path_utils.cpp"));
+        var driveList = File.ReadAllText(Path.Combine(root, "src", "drivelst.cpp"));
+        var viewer = File.ReadAllText(Path.Combine(root, "src", "viewer2.cpp"));
+        var safeWait = File.ReadAllText(Path.Combine(root, "src", "string_resources.cpp"));
+        var packAc = File.ReadAllText(Path.Combine(root, "src", "packac.cpp"));
+        var registryWorker = File.ReadAllText(Path.Combine(root, "src", "regwork.cpp"));
+        var iconPool = File.ReadAllText(Path.Combine(root, "src", "iconpool.cpp"));
+        var cache = File.ReadAllText(Path.Combine(root, "src", "cache.cpp"));
+        var findDialog = File.ReadAllText(Path.Combine(root, "src", "find_dialog_ui.cpp"));
+        var filesWindow = File.ReadAllText(Path.Combine(root, "src", "fileswindow_init.cpp"));
+        var upload = File.ReadAllText(Path.Combine(root, "src", "salmon", "upload.cpp"));
+        var minidump = File.ReadAllText(Path.Combine(root, "src", "salmon", "minidump.cpp"));
+        var operations = File.ReadAllText(Path.Combine(root, "src", "operations_core.cpp"));
+        var operationDialog = File.ReadAllText(Path.Combine(root, "src", "dialogs_file_ops.cpp"));
+        var dialogsHeader = File.ReadAllText(Path.Combine(root, "src", "dialogs.h"));
         var ratchet = File.ReadAllText(Path.Combine(root, "tools", "verify-no-new-raw-thread-creation.ps1"));
         var workflow = File.ReadAllText(Path.Combine(root, ".github", "workflows", "pr-msbuild.yml"));
         var refactoring = File.ReadAllText(Path.Combine(root, "refactoring.md"));
+        var pluginLoading = File.ReadAllText(Path.Combine(root, "src", "plugins_loading.cpp"));
 
         // These source contracts preserve the worker boundary where shutdown and
         // completion ordering cannot be deterministically driven through the UI.
@@ -456,7 +593,7 @@ public sealed class NativeSafetyRegressionTests
             Assert.That(owner, Does.Contain("_beginthreadex"));
             Assert.That(owner, Does.Contain("StopEvent"));
             Assert.That(owner, Does.Contain("CompletionEvent"));
-            Assert.That(owner, Does.Contain("SetThreadNameInVCAndTrace"));
+            Assert.That(owner, Does.Contain("SetThreadOwnerDebuggerName"));
             Assert.That(owner, Does.Contain("CoInitializeEx"));
             Assert.That(owner, Does.Contain("CoUninitialize"));
             Assert.That(owner, Does.Contain("catch (...)"));
@@ -468,11 +605,93 @@ public sealed class NativeSafetyRegressionTests
             Assert.That(checkPath, Does.Contain("StopAndJoin(CThreadShutdownDeadline(\"check-path worker\"))"));
             Assert.That(checkPath, Does.Not.Contain("CreateThread("));
             Assert.That(checkPath, Does.Not.Contain("SetThreadNameInVCAndTrace(\"CheckPath\")"));
+            // The crash reporter keeps its legacy event protocol, but the owner
+            // must retain the handle until that worker has completed its safe join.
+            Assert.That(callStack, Does.Contain("CThreadOwner BugReportThreadOwner"));
+            Assert.That(callStack, Does.Contain("ThreadBugReportOwnedF"));
+            Assert.That(callStack, Does.Contain("StopAndJoin(CThreadShutdownDeadline(\"call-stack bug report\"))"));
+            Assert.That(callStack, Does.Not.Contain("CreateThread(ThreadBugReportF"));
+            // The automation caller passes stack data, so completion must be joined before this method returns.
+            Assert.That(automation, Does.Contain("CThreadOwner executionThread"));
+            Assert.That(automation, Does.Contain("StopAndJoin(CThreadShutdownDeadline(\"automation execution\"))"));
+            Assert.That(automation, Does.Not.Contain("CreateThread(NULL, 0, ExecuteEntryProc"));
+            Assert.That(renamer, Does.Contain("CThreadOwner executionThread"));
+            Assert.That(renamer, Does.Contain("StopAndJoin(CThreadShutdownDeadline(\"renamer regular expression\"))"));
+            Assert.That(renamer, Does.Not.Contain("CreateThread(NULL, 0, RegExecThread"));
+            Assert.That(oleSpy, Does.Contain("CThreadOwner workers[5]"));
+            Assert.That(oleSpy, Does.Contain("StopAndJoin(CThreadShutdownDeadline(\"OLE allocator stress\"))"));
+            Assert.That(oleSpy, Does.Not.Contain("CreateThread(NULL, 0, OleSpyStressTestF"));
+            Assert.That(messages, Does.Contain("MessagesMessageBoxOwnedThreadF"));
+            Assert.That(messages, Does.Contain("MessagesWMessageBoxOwnedThreadF"));
+            Assert.That(messages, Does.Not.Contain("HANDLE thread = CreateThread"));
+            Assert.That(messages, Does.Contain("messageBoxOwner.StopAndJoin(INFINITE)"));
+            Assert.That(trace, Does.Contain("TraceMessageBoxOwnedThreadF"));
+            Assert.That(trace, Does.Contain("TraceWMessageBoxOwnedThreadF"));
+            Assert.That(trace, Does.Not.Contain("HANDLE msgBoxThread = CreateThread"));
+            Assert.That(trace, Does.Contain("msgBoxOwner.StopAndJoin(INFINITE)"));
+            Assert.That(find, Does.Contain("ThreadFindDialogMessageLoopOwnedF"));
+            Assert.That(find, Does.Contain("AddOwnedAuxThread(loop, \"Find dialog message loop\")"));
+            Assert.That(find, Does.Not.Contain("CreateThread(NULL, 0, ThreadFindDialogMessageLoop"));
+            Assert.That(find, Does.Not.Contain("_endthreadex(ok ? 0 : 1)"));
+            Assert.That(mapi, Does.Contain("AddOwnedAuxThread(thread, \"Simple MAPI sender\")"));
+            Assert.That(mapi, Does.Not.Contain("CreateThread(NULL, 0, SimpleMAPISendMailThread"));
+            Assert.That(snooper, Does.Contain("CThreadOwner* SnooperThreadOwner"));
+            Assert.That(snooper, Does.Contain("ThreadSnooperOwned"));
+            Assert.That(snooper, Does.Contain("SnooperThreadOwner->StopAndJoin(CThreadShutdownDeadline(\"directory snooper\"))"));
+            Assert.That(snooper, Does.Contain("CThreadOwner* SafeFindCloseThreadOwner"));
+            Assert.That(snooper, Does.Contain("SafeFindCloseThreadOwner->StopAndJoin(CThreadShutdownDeadline(\"safe notification-handle closer\"))"));
+            Assert.That(snooper, Does.Not.Contain("CreateThread(NULL, 0, ThreadSnooper"));
+            Assert.That(auxThreads, Does.Contain("void AddOwnedAuxThread(CThreadOwner* owner"));
+            Assert.That(auxThreads, Does.Contain("delete auxiliary.Owner"));
+            Assert.That(driveList, Does.Contain("thread->Start(ReadCDVolNameThreadF"));
+            Assert.That(driveList, Does.Contain("AddOwnedAuxThread(thread, \"removable-drive volume probe\")"));
+            Assert.That(driveList, Does.Not.Contain("CreateThread(NULL, 0, ReadCDVolNameThreadF"));
+            Assert.That(viewer, Does.Contain("ThreadViewerMessageLoopOwned"));
+            Assert.That(viewer, Does.Contain("loop->Start(ThreadViewerMessageLoopOwned, &data, \"viewer message loop\")"));
+            Assert.That(viewer, Does.Contain("AddOwnedAuxThread(loop, \"viewer message loop\")"));
+            Assert.That(viewer, Does.Not.Contain("CreateThread(NULL, 0, ThreadViewerMessageLoop"));
+            Assert.That(safeWait, Does.Contain("ThreadSafeWaitWindowFOwned"));
+            Assert.That(safeWait, Does.Contain("thread->Start(ThreadSafeWaitWindowFOwned"));
+            Assert.That(safeWait, Does.Contain("AddOwnedAuxThread(thread, \"safe-wait message loop\")"));
+            Assert.That(safeWait, Does.Not.Contain("CreateThread(NULL, 0, ThreadSafeWaitWindowF"));
+            Assert.That(packAc, Does.Contain("PackACDiskSearchThreadOwned"));
+            Assert.That(packAc, Does.Contain("SearchThreadOwner->Start(PackACDiskSearchThreadOwned"));
+            Assert.That(packAc, Does.Contain("SearchThreadOwner->StopAndJoin(0)"));
+            Assert.That(registryWorker, Does.Contain("ThreadBodyOwned(void* param, HANDLE stopEvent)"));
+            Assert.That(registryWorker, Does.Contain("ThreadOwner->Start(CRegistryWorkerThread::ThreadBodyOwned"));
+            Assert.That(registryWorker, Does.Contain("ThreadOwner->StopAndJoin(0)"));
+            Assert.That(registryWorker, Does.Not.Contain("CreateThread(NULL, 0, CRegistryWorkerThread::ThreadBody"));
+            Assert.That(iconPool, Does.Contain("worker->Start(WorkerThreadProc, this, \"icon pool worker\")"));
+            Assert.That(iconPool, Does.Contain("Workers[i]->StopAndJoin(CThreadShutdownDeadline(\"icon work pool\"))"));
+            Assert.That(iconPool, Does.Not.Contain("CreateThread(NULL, 0, WorkerThreadProc"));
+            Assert.That(cache, Does.Contain("ThreadCacheHandlesOwned(void* param, HANDLE stopEvent)"));
+            Assert.That(cache, Does.Contain("ThreadOwner->Start(ThreadCacheHandlesOwned, this, \"cache-handles worker\")"));
+            Assert.That(cache, Does.Contain("ThreadOwner->StopAndJoin(CThreadShutdownDeadline(\"cache-handles worker\"))"));
+            Assert.That(cache, Does.Not.Contain("CreateThread(NULL, 0, ThreadCacheHandles"));
+            Assert.That(findDialog, Does.Contain("GrepThreadOwner->Start(GrepThreadF, &GrepData, \"Find grep worker\")"));
+            Assert.That(findDialog, Does.Contain("GrepThreadOwner->StopAndJoin(0)"));
+            Assert.That(findDialog, Does.Not.Contain("CreateThread(NULL, 0, GrepThreadF"));
+            Assert.That(filesWindow, Does.Contain("IconCacheThreadOwner->Start(IconThreadThreadF, this, \"panel icon reader\")"));
+            Assert.That(filesWindow, Does.Contain("IconCacheThreadOwner->StopAndJoin(CThreadShutdownDeadline(\"panel icon reader\"))"));
+            Assert.That(filesWindow, Does.Not.Contain("CreateThread(NULL, 0, IconThreadThreadF"));
+            Assert.That(upload, Does.Contain("UploadThreadOwner->Start(UploadThreadF, params, \"crash-report upload\")"));
+            Assert.That(upload, Does.Contain("UploadThreadOwner->StopAndJoin(0)"));
+            Assert.That(upload, Does.Not.Contain("CreateThread(NULL, 0, UploadThreadF"));
+            Assert.That(minidump, Does.Contain("MinidumpThreadOwner->Start(MinidumpThreadF, params, \"crash-report minidump\")"));
+            Assert.That(minidump, Does.Contain("MinidumpThreadOwner->StopAndJoin(0)"));
+            Assert.That(minidump, Does.Not.Contain("CreateThread(NULL, 0, MinidumpThreadF"));
+            Assert.That(operations, Does.Contain("CThreadOwner* StartWorker"));
+            Assert.That(operations, Does.Contain("worker->Start(ThreadWorkerOwned, &data, \"operation worker\")"));
+            Assert.That(operations, Does.Not.Contain("CreateThread(NULL, 0, ThreadWorker"));
+            Assert.That(dialogsHeader, Does.Contain("CThreadOwner* WorkerOwner"));
+            Assert.That(operationDialog, Does.Contain("WorkerOwner->StopAndJoin(0)"));
             Assert.That(ratchet, Does.Contain("git diff --no-ext-diff --unified=0 $BaseCommit HEAD"));
             Assert.That(ratchet, Does.Contain("CThreadOwner"));
             Assert.That(ratchet, Does.Contain("CreateThread|_beginthreadex"));
             Assert.That(workflow, Does.Contain("verify-no-new-raw-thread-creation.ps1 -BaseCommit origin/"));
             Assert.That(refactoring, Does.Contain("### 43. Standardize thread creation and ownership — Partially implemented"));
+            Assert.That(pluginLoading, Does.Contain("const int maximumFSNamesPerPlugin = 256"));
+            Assert.That(pluginLoading, Does.Contain("StorePluginOutputIndex(newFSNameIndex, i)"));
         });
     }
 
@@ -652,6 +871,47 @@ public sealed class NativeSafetyRegressionTests
         var clock = File.ReadAllText(Path.Combine(root, "src", "common", "monotonic_time.h"));
         var pluginTimers = File.ReadAllText(Path.Combine(root, "src", "plugins_filesystem.cpp"));
         var pluginHeader = File.ReadAllText(Path.Combine(root, "src", "plugins.h"));
+        var ftpControl = File.ReadAllText(Path.Combine(root, "src", "plugins", "ftp", "ctrlcon1.cpp"));
+        var ftpShutdown = File.ReadAllText(Path.Combine(root, "src", "plugins", "ftp", "ctrlcon2.cpp"));
+        var ftpCommands = File.ReadAllText(Path.Combine(root, "src", "plugins", "ftp", "ctrlcon3.cpp"));
+        var ftpActive = File.ReadAllText(Path.Combine(root, "src", "plugins", "ftp", "ctrlcon5.cpp"));
+        var ftpHeader = File.ReadAllText(Path.Combine(root, "src", "plugins", "ftp", "ctrlcon.h"));
+        var fileOperationDialogs = File.ReadAllText(Path.Combine(root, "src", "dialogs_file_ops.cpp"));
+        var asyncCopy = File.ReadAllText(Path.Combine(root, "src", "async_copy.cpp"));
+        var find = File.ReadAllText(Path.Combine(root, "src", "find.cpp"));
+        var findUi = File.ReadAllText(Path.Combine(root, "src", "find_dialog_ui.cpp"));
+        var findHeader = File.ReadAllText(Path.Combine(root, "src", "find.h"));
+        var navigation = File.ReadAllText(Path.Combine(root, "src", "fileswindow_navigation.cpp"));
+        var configPanels = File.ReadAllText(Path.Combine(root, "src", "dialogs_config_panels.cpp"));
+        var dialogsHeader = File.ReadAllText(Path.Combine(root, "src", "dialogs.h"));
+        var zipProgress = File.ReadAllText(Path.Combine(root, "src", "zip_progress.cpp"));
+        var zipHeader = File.ReadAllText(Path.Combine(root, "src", "zip.h"));
+        var appEntry = File.ReadAllText(Path.Combine(root, "src", "app_entry.cpp"));
+        var fileCompareCache = File.ReadAllText(Path.Combine(root, "src", "plugins", "filecomp", "filecache.cpp"));
+        var snooper = File.ReadAllText(Path.Combine(root, "src", "snooper.cpp"));
+        var archiving = File.ReadAllText(Path.Combine(root, "src", "fileswindow_archiving.cpp"));
+        var mainWindowPanels = File.ReadAllText(Path.Combine(root, "src", "mainwnd_panels.cpp"));
+        var iconReader = File.ReadAllText(Path.Combine(root, "src", "fileswindow_wndproc.cpp"));
+        var iconReaderHeader = File.ReadAllText(Path.Combine(root, "src", "fileswnd.h"));
+        var operations = File.ReadAllText(Path.Combine(root, "src", "fileswindow_operations.cpp"));
+        var controls = File.ReadAllText(Path.Combine(root, "src", "gui_controls.cpp"));
+        var controlsHeader = File.ReadAllText(Path.Combine(root, "src", "gui.h"));
+        var progressBar = File.ReadAllText(Path.Combine(root, "src", "gui_progressbar.cpp"));
+        var mouseHook = File.ReadAllText(Path.Combine(root, "src", "path_utils.cpp"));
+        var fileListRendering = File.ReadAllText(Path.Combine(root, "src", "filesbox_rendering.cpp"));
+        var editWindow = File.ReadAllText(Path.Combine(root, "src", "editwnd.cpp"));
+        var constants = File.ReadAllText(Path.Combine(root, "src", "consts.h"));
+        var panelHeader = File.ReadAllText(Path.Combine(root, "src", "fileswnd.h"));
+        var panelInit = File.ReadAllText(Path.Combine(root, "src", "fileswindow_init.cpp"));
+        var toolbarHeader = File.ReadAllText(Path.Combine(root, "src", "toolbar.h"));
+        var toolbar = File.ReadAllText(Path.Combine(root, "src", "toolbar_core.cpp"));
+        var statusWindow = File.ReadAllText(Path.Combine(root, "src", "stswnd.cpp"));
+        var statusWindowHeader = File.ReadAllText(Path.Combine(root, "src", "stswnd.h"));
+        var menuPopup = File.ReadAllText(Path.Combine(root, "src", "menu_popup.cpp"));
+        var menuHeader = File.ReadAllText(Path.Combine(root, "src", "menu.h"));
+        var fileColumns = File.ReadAllText(Path.Combine(root, "src", "fileswindow_columns.cpp"));
+        var pack = File.ReadAllText(Path.Combine(root, "src", "pack3.cpp"));
+        var timingRatchet = File.ReadAllText(Path.Combine(root, "tools", "verify-no-new-gettickcount.ps1"));
         var refactoring = File.ReadAllText(Path.Combine(root, "refactoring.md"));
 
         // These boundary values model the old 49.7-day wrap while the source
@@ -670,13 +930,115 @@ public sealed class NativeSafetyRegressionTests
             Assert.That(clock, Does.Contain("typedef ULONGLONG CMonotonicDuration"));
             Assert.That(clock, Does.Contain("return GetTickCount64();"));
             Assert.That(clock, Does.Contain("return now >= start ? now - start : 0;"));
+            Assert.That(clock, Does.Contain("AtLeastDurationAgo"));
             Assert.That(clock, Does.Contain("RemainingWin32TimerDelay"));
+            Assert.That(constants, Does.Contain("extern CMonotonicTimePoint MouseWheelMSGTime"));
+            Assert.That(mouseHook, Does.Contain("CMonotonicClock::HasElapsed(MouseWheelMSGTime, MOUSEWHEELMSG_VALID, mouseWheelNow)"));
+            Assert.That(fileListRendering, Does.Contain("CMonotonicClock::HasElapsed(MouseWheelMSGTime, MOUSEWHEELMSG_VALID, mouseWheelNow)"));
+            Assert.That(editWindow, Does.Contain("CMonotonicClock::HasElapsed(MouseWheelMSGTime, MOUSEWHEELMSG_VALID, mouseWheelNow)"));
+            Assert.That(panelHeader, Does.Contain("CMonotonicTimePoint LastIconOvrRefreshTime"));
+            Assert.That(panelHeader, Does.Contain("CMonotonicTimePoint NextIconOvrRefreshTime"));
+            Assert.That(panelHeader, Does.Contain("CMonotonicTimePoint LastInactiveRefreshStart"));
+            Assert.That(panelHeader, Does.Contain("CMonotonicTimePoint LastInactiveRefreshEnd"));
+            Assert.That(panelInit, Does.Contain("LastIconOvrRefreshTime = CMonotonicClock::AtLeastDurationAgo(ICONOVR_REFRESH_PERIOD)"));
+            Assert.That(archiving, Does.Contain("CMonotonicClock::HasReached(NextIconOvrRefreshTime, overlayNow)"));
+            Assert.That(archiving, Does.Contain("CMonotonicClock::Elapsed(LastIconOvrRefreshTime, overlayNow)"));
+            Assert.That(iconReader, Does.Contain("CMonotonicClock::Elapsed(LastInactiveRefreshStart, LastInactiveRefreshEnd)"));
+            Assert.That(iconReader, Does.Contain("elapsedSinceRefresh < delay - 100"));
+            Assert.That(toolbarHeader, Does.Contain("CMonotonicTimePoint DropDownUpTime"));
+            Assert.That(toolbar, Does.Contain("CMonotonicClock::HasElapsed(DropDownUpTime, 26"));
+            Assert.That(statusWindowHeader, Does.Contain("CMonotonicTimePoint DelayedThrobberShowTime"));
+            Assert.That(statusWindow, Does.Contain("CMonotonicClock::DeadlineAfter((CMonotonicDuration)delay)"));
+            Assert.That(statusWindow, Does.Contain("CMonotonicClock::RemainingWin32TimerDelay(DelayedThrobberShowTime"));
+            Assert.That(menuHeader, Does.Contain("CMonotonicTimePoint ChangeTickCount"));
+            Assert.That(menuHeader, Does.Contain("MENU_CHANGE_TICK_NONE"));
+            Assert.That(menuPopup, Does.Contain("CMonotonicClock::RemainingWin32TimerDelay(changeDeadline"));
+            Assert.That(menuPopup, Does.Contain("CMonotonicClock::HasReached(changeDeadline"));
+            Assert.That(menuPopup, Does.Not.Contain("GetTickCount() - SharedRes->ChangeTickCount"));
+            Assert.That(panelHeader, Does.Contain("CMonotonicTimePoint LButtonDownTime"));
+            Assert.That(fileColumns, Does.Contain("CMonotonicClock::Elapsed(LButtonDownTime, CMonotonicClock::Now()) > minimumDelay"));
+            Assert.That(fileColumns, Does.Contain("CMonotonicClock::RemainingWin32TimerDelay(dragDeadline"));
+            Assert.That(fileColumns, Does.Not.Contain("GetTickCount() - LButtonDownTime"));
+            Assert.That(pack, Does.Contain("CMonotonicClock::DeadlineAfter((CMonotonicDuration)PackWinTimeout)"));
+            Assert.That(pack, Does.Contain("CMonotonicClock::RemainingWin32TimerDelay(packDeadline"));
+            Assert.That(pack, Does.Not.Contain("GetTickCount() - start"));
+            Assert.That(dialogsHeader, Does.Contain("CMonotonicTimePoint NextTimeLeftUpdateTime"));
+            Assert.That(fileOperationDialogs, Does.Contain("CMonotonicClock::HasReached(NextTimeLeftUpdateTime, ti)"));
+            Assert.That(fileOperationDialogs, Does.Contain("nextTimeLeftUpdateDelay"));
             Assert.That(pluginHeader, Does.Contain("CMonotonicTimePoint AbsTimeout"));
             Assert.That(pluginTimers, Does.Contain("CMonotonicClock::DeadlineAfter(relTimeout)"));
             Assert.That(pluginTimers, Does.Contain("CMonotonicClock::HasReached(timer->AbsTimeout, timeNow)"));
             Assert.That(pluginTimers, Does.Not.Contain("GetTickCount("),
                         "The plug-in timer queue must not reintroduce a wrap-prone clock read.");
             Assert.That(pluginTimers, Does.Not.Contain("(int)(timer->AbsTimeout - timeNow)"));
+            Assert.That(ftpHeader, Does.Contain("CMonotonicTimePoint StartTime"));
+            Assert.That(ftpHeader, Does.Contain("CMonotonicClock::Now()"));
+            Assert.That(ftpControl, Does.Contain("CMonotonicClock::Elapsed(StartTime"));
+            Assert.That(ftpControl, Does.Contain("const CMonotonicTimePoint waitDeadline"));
+            Assert.That(ftpControl, Does.Not.Contain("GetTickCount()"),
+                        "The FTP control wait path must not reintroduce a wrap-prone timer read.");
+            Assert.That(ftpShutdown, Does.Contain("const CMonotonicTimePoint closeDeadline"));
+            Assert.That(ftpShutdown, Does.Not.Contain("GetTickCount()"),
+                        "The FTP disconnect wait must preserve one monotonic deadline across replies.");
+            Assert.That(ftpCommands, Does.Contain("CMonotonicTimePoint commandDeadline"));
+            Assert.That(ftpCommands, Does.Contain("GetWaitWindowElapsed(operationStart)"));
+            Assert.That(ftpCommands, Does.Contain("A live data transfer retains the legacy extension policy"));
+            Assert.That(ftpCommands, Does.Contain("CMonotonicTimePoint finishDeadline = CMonotonicClock::DeadlineAfter(serverTimeout2)"));
+            Assert.That(ftpCommands, Does.Contain("CMonotonicClock::RemainingWin32TimerDelay(finishDeadline"));
+            Assert.That(ftpCommands, Does.Contain("if (start2 != previousStart)"));
+            Assert.That(ftpActive, Does.Contain("const CMonotonicTimePoint listenDeadline = CMonotonicClock::DeadlineAfter(serverTimeout)"));
+            Assert.That(ftpActive, Does.Contain("CMonotonicClock::RemainingWin32TimerDelay(listenDeadline, CMonotonicClock::Now())"));
+            Assert.That(ftpActive, Does.Not.Contain("DWORD startTime = GetTickCount()"));
+            Assert.That(fileOperationDialogs, Does.Contain("const CMonotonicTimePoint deadline = CMonotonicClock::DeadlineAfter(PROGRESS_DIALOG_STARTUP_TIMEOUT)"));
+            Assert.That(fileOperationDialogs, Does.Contain("RemainingWin32TimerDelay(deadline, CMonotonicClock::Now())"));
+            Assert.That(fileOperationDialogs, Does.Not.Contain("DWORD startedAt = GetTickCount()"));
+            Assert.That(asyncCopy, Does.Contain("CMonotonicTimePoint startTime = CMonotonicClock::Now()"));
+            Assert.That(asyncCopy, Does.Contain("CMonotonicClock::Elapsed(startTime, ti)"));
+            Assert.That(findHeader, Does.Contain("volatile LONGLONG FoundVisibleTick"));
+            Assert.That(find, Does.Contain("InterlockedCompareExchange64(&data->FoundVisibleTick, 0, 0)"));
+            Assert.That(find, Does.Contain("CMonotonicClock::HasElapsed(lastVisible, 500"));
+            Assert.That(findUi, Does.Contain("InterlockedExchange64(&GrepData.FoundVisibleTick"));
+            Assert.That(findUi, Does.Not.Contain("GrepData.FoundVisibleTick = GetTickCount()"));
+            Assert.That(navigation, Does.Contain("CMonotonicTimePoint lastEscCheckTime"));
+            Assert.That(navigation, Does.Contain("CMonotonicClock::HasElapsed(lastEscCheckTime, 200"));
+            Assert.That(navigation, Does.Not.Contain("GetTickCount() - lastEscCheckTime"));
+            Assert.That(dialogsHeader, Does.Contain("ULONGLONG LastTickCount"));
+            Assert.That(configPanels, Does.Contain("CMonotonicClock::HasElapsed(LastTickCount, 100, ticks)"));
+            Assert.That(configPanels, Does.Not.Contain("ticks - LastTickCount > 100"));
+            Assert.That(zipHeader, Does.Contain("ULONGLONG LastTickCount"));
+            Assert.That(zipProgress, Does.Contain("CMonotonicClock::HasElapsed(LastTickCount, 100, ticks)"));
+            Assert.That(zipProgress, Does.Not.Contain("ticks - LastTickCount > 100"));
+            Assert.That(appEntry, Does.Contain("ULONGLONG LastCrtCheckMemoryTime"));
+            Assert.That(appEntry, Does.Contain("CMonotonicClock::HasElapsed(LastCrtCheckMemoryTime, 3000"));
+            Assert.That(appEntry, Does.Not.Contain("GetTickCount() - LastCrtCheckMemoryTime"));
+            Assert.That(fileCompareCache, Does.Contain("CMonotonicClock::HasElapsed(readStartedAt, 200, readFinishedAt)"));
+            Assert.That(fileCompareCache, Does.Contain("CMonotonicClock::HasElapsed(initialTicks, 2000, readFinishedAt)"));
+            Assert.That(fileCompareCache, Does.Not.Contain("GetTickCount() - initialTicks"));
+            Assert.That(snooper, Does.Contain("CMonotonicTimePoint ignoreRefreshesDeadline"));
+            Assert.That(snooper, Does.Contain("CMonotonicClock::RemainingWin32TimerDelay(ignoreRefreshesDeadline"));
+            Assert.That(snooper, Does.Contain("CMonotonicClock::DeadlineAfter(REFRESH_PAUSE)"));
+            Assert.That(snooper, Does.Not.Contain("ignoreRefreshesAbsTimeout - GetTickCount()"));
+            Assert.That(archiving, Does.Contain("static CMonotonicTimePoint lastBreakCheck"));
+            Assert.That(archiving, Does.Contain("CMonotonicClock::HasElapsed(lastBreakCheck, 200"));
+            Assert.That(archiving, Does.Not.Contain("GetTickCount() - lastBreakCheck"));
+            Assert.That(mainWindowPanels, Does.Contain("CMonotonicTimePoint readBegTime"));
+            Assert.That(mainWindowPanels, Does.Contain("CMonotonicClock::HasElapsed(readBegTime, 200"));
+            Assert.That(mainWindowPanels, Does.Contain("CMonotonicClock::Elapsed(readBegTime, CMonotonicClock::Now())"));
+            Assert.That(mainWindowPanels, Does.Not.Contain("GetTickCount() - readBegTime"));
+            Assert.That(iconReaderHeader, Does.Contain("CMonotonicTimePoint EndOfIconReadingTime"));
+            Assert.That(iconReader, Does.Contain("CMonotonicClock::HasElapsed(EndOfIconReadingTime, 1000"));
+            Assert.That(iconReader, Does.Not.Contain("GetTickCount() - EndOfIconReadingTime"));
+            Assert.That(operations, Does.Contain("CMonotonicTimePoint LastBuildInterruptionCheck"));
+            Assert.That(operations, Does.Contain("CMonotonicClock::HasElapsed(LastBuildInterruptionCheck, BS_TIMEOUT"));
+            Assert.That(operations, Does.Not.Contain("GetTickCount() - LastTickCount"));
+            Assert.That(controlsHeader, Does.Contain("CMonotonicTimePoint DropDownUpTime"));
+            Assert.That(controls, Does.Contain("CMonotonicClock::HasElapsed(DropDownUpTime, 26"));
+            Assert.That(controls, Does.Not.Contain("GetTickCount() - DropDownUpTime"));
+            Assert.That(controlsHeader, Does.Contain("CMonotonicTimePoint SelfMoveTicks"));
+            Assert.That(progressBar, Does.Contain("CMonotonicClock::HasElapsed(SelfMoveTicks"));
+            Assert.That(progressBar, Does.Not.Contain("GetTickCount() - SelfMoveTicks"));
+            Assert.That(timingRatchet, Does.Contain("GetTickCount\\s*\\("));
+            Assert.That(timingRatchet, Does.Contain("CMonotonicClock"));
             Assert.That(refactoring, Does.Contain("### 45. Replace wrap-prone time calculations with monotonic 64-bit time — Partially implemented"));
         });
     }
@@ -955,11 +1317,12 @@ public sealed class NativeSafetyRegressionTests
     public void Transactional_copy_and_move_expose_each_durable_phase_to_a_deterministic_fault_adapter()
     {
         var root = FindRepositoryRoot();
-        var executionHeader = File.ReadAllText(Path.Combine(root, "src", "file_operation_filesystem.h"));
+        var executionHeader = File.ReadAllText(Path.Combine(root, "src", "operation_execution_filesystem.h"));
         var executionAdapter = File.ReadAllText(Path.Combine(root, "src", "file_operation_filesystem.cpp"));
         var copy = File.ReadAllText(Path.Combine(root, "src", "async_copy.cpp"));
         var identities = File.ReadAllText(Path.Combine(root, "src", "file_identity.cpp"));
         var journal = File.ReadAllText(Path.Combine(root, "src", "operation_journal.cpp"));
+        var nativeTests = File.ReadAllText(Path.Combine(root, "tests", "NativeSafetyTests", "NativeSafetyTests.cpp"));
         var refactoring = File.ReadAllText(Path.Combine(root, "refactoring.md"));
 
         Assert.Multiple(() =>
@@ -982,6 +1345,8 @@ public sealed class NativeSafetyRegressionTests
             Assert.That(identities, Does.Contain("OperationExecutionFileSystem().SetFileInformationByHandle"));
             Assert.That(journal, Does.Contain("STATE|%d|prepared"));
             Assert.That(journal, Does.Contain("STATE|%d|temporary-ready"));
+            Assert.That(nativeTests, Does.Contain("RunTransactionalFaultSequence(OperationExecutionFileSystem()"));
+            Assert.That(nativeTests, Does.Contain("fake.GetCalls() != expectedCalls[phaseIndex]"));
             Assert.That(refactoring, Does.Contain("### 29. Add crash-consistency fault injection at every operation phase — Partially implemented"));
         });
     }
@@ -1037,7 +1402,7 @@ public sealed class NativeSafetyRegressionTests
             Assert.That(recovery, Does.Contain("STATE|0|temporary-ready"));
             Assert.That(workspace, Does.Contain("TargetVolumeRoot"));
             Assert.That(workspace, Does.Contain("TargetWorkspaceDirectory"));
-            Assert.That(refactoring, Does.Contain("### 28. Build native characterization tests for copy, move, delete, and rename — Partially implemented"));
+            Assert.That(refactoring, Does.Contain("### 28. Build native characterization tests for copy, move, delete, and rename — Implemented"));
             Assert.That(refactoring, Does.Contain("### 32. Test alternate data streams end to end — Implemented"));
         });
     }
@@ -1098,6 +1463,245 @@ public sealed class NativeSafetyRegressionTests
             Assert.That(minidump, Does.Not.Contain("MiniDumpWithHandleData"));
             Assert.That(minidump, Does.Contain("Privacy is the default: never retry a failed minimal dump with a memory-rich variant."));
             Assert.That(reporting, Does.Contain("intentionally excludes private writable memory, module data segments, and handle data"));
+        });
+    }
+
+    [Test]
+    public void Release_builds_apply_and_audit_the_common_PE_mitigation_baseline()
+    {
+        var root = FindRepositoryRoot();
+        var targets = File.ReadAllText(Path.Combine(root, "src", "Directory.Build.targets"));
+        var audit = File.ReadAllText(Path.Combine(root, "tools", "audit-pe-hardening.ps1"));
+        var workflow = File.ReadAllText(Path.Combine(root, ".github", "workflows", "build-installer.yml"));
+
+        // Project properties alone are insufficient: require both post-import enforcement and PE-header inspection.
+        Assert.Multiple(() =>
+        {
+            Assert.That(targets, Does.Contain("'$(Configuration)' == 'Release'"));
+            Assert.That(targets, Does.Contain("'$(Configuration)' == 'Debug'"));
+            Assert.That(targets, Does.Contain("/FS %(AdditionalOptions)"));
+            Assert.That(targets, Does.Contain("<SDLCheck>true</SDLCheck>"));
+            Assert.That(targets, Does.Contain("<ControlFlowGuard>Guard</ControlFlowGuard>"));
+            Assert.That(targets, Does.Contain("/CETCOMPAT /HIGHENTROPYVA"));
+            Assert.That(audit, Does.Contain("dumpbin.exe"));
+            Assert.That(audit, Does.Contain("Control Flow Guard"));
+            Assert.That(audit, Does.Contain("CET compatible"));
+            Assert.That(workflow, Does.Contain("Audit Release PE hardening"));
+        });
+    }
+
+    [Test]
+    public void Release_pipeline_compares_v143_and_v145_artifact_compatibility_metadata()
+    {
+        var root = FindRepositoryRoot();
+        var producer = File.ReadAllText(Path.Combine(root, "tools", "new-toolset-pe-manifest.ps1"));
+        var comparer = File.ReadAllText(Path.Combine(root, "tools", "compare-toolset-pe-manifests.ps1"));
+        var workflow = File.ReadAllText(Path.Combine(root, ".github", "workflows", "build-installer.yml"));
+
+        // Require both compiler jobs and a comparison of shipped compatibility fields, not only two independent builds.
+        Assert.Multiple(() =>
+        {
+            Assert.That(producer, Does.Contain("Get-PeMachine"));
+            Assert.That(producer, Does.Contain("sha256"));
+            Assert.That(comparer, Does.Contain("v143/v145 Release artifact compatibility comparison failed."));
+            Assert.That(comparer, Does.Contain("'machine', 'fileVersion', 'productVersion'"));
+            Assert.That(workflow, Does.Contain("toolset-parity-v145"));
+            Assert.That(workflow, Does.Contain("Compare v143 and v145 release artifacts"));
+        });
+    }
+
+    [Test]
+    public void Legacy_zip_extraction_rejects_escaping_and_device_entry_paths_before_target_concatenation()
+    {
+        var root = FindRepositoryRoot();
+        var extraction = File.ReadAllText(Path.Combine(root, "src", "plugins", "zip", "extract.cpp"));
+        var resources = File.ReadAllText(Path.Combine(root, "src", "plugins", "zip", "lang", "lang.rc2"));
+
+        // Preserve both pre-concatenation validation and the pinned-root check before bytes reach a legacy-created handle.
+        Assert.Multiple(() =>
+        {
+            Assert.That(extraction, Does.Contain("static BOOL IsUnsafeArchiveEntryPath"));
+            Assert.That(extraction, Does.Contain("static BOOL IsReparsePointExtractionRoot"));
+            Assert.That(extraction, Does.Contain("static BOOL HasReparsePointInExtractionPath"));
+            Assert.That(extraction, Does.Contain("class CExtractionRootHandle"));
+            Assert.That(extraction, Does.Contain("FILE_FLAG_OPEN_REPARSE_POINT"));
+            Assert.That(extraction, Does.Contain("GetFinalPathNameByHandleA"));
+            Assert.That(extraction, Does.Contain("extractionRoot.Contains(OutputFile->File)"));
+            Assert.That(extraction, Does.Contain("Do not write archive bytes when the opened object resolved outside the pinned root."));
+            Assert.That(extraction, Does.Contain("FILE_ATTRIBUTE_REPARSE_POINT"));
+            Assert.That(extraction, Does.Contain("Recheck every existing prefix"));
+            Assert.That(extraction, Does.Contain("HasReparsePointInExtractionPath(targetDir, extractionRootLength)"));
+            Assert.That(extraction, Does.Contain("Drive-qualified paths and alternate streams"));
+            Assert.That(extraction, Does.Contain("Win32 device aliases bypass normal directory traversal"));
+            Assert.That(extraction, Does.Contain("return IDS_UNSAFEEXTRACTPATH"));
+            Assert.That(extraction.IndexOf("IsUnsafeArchiveEntryPath(entryPath)", StringComparison.Ordinal), Is.LessThan(extraction.IndexOf("*(targetDir + targetDirLen++)", StringComparison.Ordinal)));
+            Assert.That(extraction.IndexOf("IsReparsePointExtractionRoot(targetDir)", StringComparison.Ordinal), Is.LessThan(extraction.IndexOf("ErrorID = ExtractFiles(targetDir);", StringComparison.Ordinal)));
+            Assert.That(resources, Does.Contain("Cannot extract archive entry because its path escapes the selected destination."));
+        });
+    }
+
+    [Test]
+    public void Lifecycle_leak_lane_measures_handle_gui_and_private_memory_growth()
+    {
+        var root = FindRepositoryRoot();
+        var snapshot = File.ReadAllText(Path.Combine(root, "tests", "FileManager.UiTests", "Infrastructure", "ProcessResourceSnapshot.cs"));
+        var test = File.ReadAllText(Path.Combine(root, "tests", "FileManager.UiTests", "LifecycleLeakUiTests.cs"));
+        var settings = File.ReadAllText(Path.Combine(root, "tests", "FileManager.UiTests", "Infrastructure", "UiTestSettings.cs"));
+        var nightly = File.ReadAllText(Path.Combine(root, ".github", "workflows", "nightly-lock-stress.yml"));
+
+        // The scheduled soak must keep every measured resource in its failure condition, not merely repeat launches.
+        Assert.Multiple(() =>
+        {
+            Assert.That(snapshot, Does.Contain("GetGuiResources"));
+            Assert.That(test, Does.Contain("kernel handles"));
+            Assert.That(test, Does.Contain("GDI objects"));
+            Assert.That(test, Does.Contain("USER objects"));
+            Assert.That(test, Does.Contain("private bytes"));
+            Assert.That(settings, Does.Contain("FILEMANAGER_UI_LEAK_CYCLES"));
+            Assert.That(nightly, Does.Contain("FILEMANAGER_UI_LEAK_CYCLES = '100'"));
+        });
+    }
+
+    [Test]
+    public void Native_safety_target_executes_shared_checked_arithmetic_boundaries()
+    {
+        var root = FindRepositoryRoot();
+        var project = File.ReadAllText(Path.Combine(root, "tests", "NativeSafetyTests", "NativeSafetyTests.vcxproj"));
+        var source = File.ReadAllText(Path.Combine(root, "tests", "NativeSafetyTests", "NativeSafetyTests.cpp"));
+        var runner = File.ReadAllText(Path.Combine(root, "runtests.ps1"));
+
+        // The aggregate runner must execute the C++ target, not merely leave a project available for manual use.
+        Assert.Multiple(() =>
+        {
+            Assert.That(project, Does.Contain("<PlatformToolset>v145</PlatformToolset>"));
+            Assert.That(source, Does.Contain("CheckedAddUInt64"));
+            Assert.That(source, Does.Contain("CheckedMultiplyUInt64"));
+            Assert.That(source, Does.Contain("CheckedCastUInt64ToDword"));
+            Assert.That(source, Does.Contain("TestNativeFileOperationCharacterization"));
+            Assert.That(source, Does.Contain("CopyFileW(source.c_str(), copied.c_str(), FALSE)"));
+            Assert.That(source, Does.Contain("MoveFileW(copied.c_str(), renamed.c_str())"));
+            Assert.That(source, Does.Contain("DeleteFileW(renamed.c_str())"));
+            Assert.That(source, Does.Contain("TestExecutionAdapterFaultInjection"));
+            Assert.That(source, Does.Contain("SetOperationExecutionFileSystemForTests(&fake)"));
+            Assert.That(source, Does.Contain("ERROR_DISK_FULL"));
+            Assert.That(source, Does.Contain("ERROR_DISK_QUOTA_EXCEEDED"));
+            Assert.That(source, Does.Contain("ERROR_SHARING_VIOLATION"));
+            Assert.That(runner, Does.Contain("Invoke-NativeSafetyTests"));
+            Assert.That(runner, Does.Contain("NativeSafetyTests (Debug x64)"));
+        });
+    }
+
+    [Test]
+    public void Release_symbols_are_indexed_by_codeview_identity_and_verified_before_private_retention()
+    {
+        var root = FindRepositoryRoot();
+        var indexer = File.ReadAllText(Path.Combine(root, "tools", "new-symbol-index.ps1"));
+        var verifier = File.ReadAllText(Path.Combine(root, "tools", "test-symbol-index.ps1"));
+        var workflow = File.ReadAllText(Path.Combine(root, ".github", "workflows", "build-installer.yml"));
+
+        // Exact symbol lookup requires both the PE CodeView key and immutable hashes before the private artifact is retained.
+        Assert.Multiple(() =>
+        {
+            Assert.That(indexer, Does.Contain("RSDS"));
+            Assert.That(indexer, Does.Contain("symbolKey"));
+            Assert.That(indexer, Does.Contain("moduleSha256"));
+            Assert.That(indexer, Does.Contain("pdbSha256"));
+            Assert.That(verifier, Does.Contain("Invalid or duplicate symbol key"));
+            Assert.That(workflow, Does.Contain("Index and verify private release symbols"));
+            Assert.That(workflow, Does.Contain("release-symbol-index.json"));
+            Assert.That(workflow, Does.Contain("retention-days: 180"));
+        });
+    }
+
+    [Test]
+    public void Release_pipeline_compares_v143_and_v145_complete_test_result_inventories()
+    {
+        var root = FindRepositoryRoot();
+        var comparer = File.ReadAllText(Path.Combine(root, "tools", "compare-vstest-trx.ps1"));
+        var workflow = File.ReadAllText(Path.Combine(root, ".github", "workflows", "build-installer.yml"));
+
+        // Parity must compare the complete executable inventory, not merely two successful native test exit codes.
+        Assert.Multiple(() =>
+        {
+            Assert.That(comparer, Does.Contain("UnitTestResult"));
+            Assert.That(comparer, Does.Contain("missing from one toolset"));
+            Assert.That(comparer, Does.Contain("v143/v145 test-result parity failed."));
+            Assert.That(workflow, Does.Contain("Run v143 native regression subset"));
+            Assert.That(workflow, Does.Contain("Run v145 native regression subset"));
+            Assert.That(workflow, Does.Contain("Compare v143 and v145 native test results"));
+            Assert.That(workflow, Does.Contain("Run complete v143 verification without skips"));
+            Assert.That(workflow, Does.Contain("Upload v145 complete UI results"));
+            Assert.That(workflow, Does.Contain("Compare v143 and v145 complete UI results"));
+        });
+    }
+
+    [Test]
+    public void Crash_artifacts_enable_EFS_before_dump_or_archive_creation()
+    {
+        var root = FindRepositoryRoot();
+        var salmon = File.ReadAllText(Path.Combine(root, "src", "salmon", "salmon.cpp"));
+        var minidump = File.ReadAllText(Path.Combine(root, "src", "salmon", "minidump.cpp"));
+        var compression = File.ReadAllText(Path.Combine(root, "src", "salmon", "compress.cpp"));
+        var refactoring = File.ReadAllText(Path.Combine(root, "refactoring.md"));
+
+        // A failed EFS setup must stop report creation rather than leave an unprotected fallback artifact.
+        Assert.Multiple(() =>
+        {
+            Assert.That(salmon, Does.Contain("EnsureCrashReportDirectoryEncrypted"));
+            Assert.That(salmon, Does.Contain("EncryptFileW(apiPath)"));
+            Assert.That(salmon, Does.Contain("CrashReportRetentionTicks"));
+            Assert.That(salmon, Does.Contain("IsRetainedCrashReportArtifact"));
+            Assert.That(salmon, Does.Contain("DeleteNamedCrashReportArtifact"));
+            Assert.That(salmon, Does.Contain("const char* extensions[] = {\".DMP\", \".TXT\", \".INF\", \".OPS\", \".7Z\"}"));
+            Assert.That(minidump, Does.Contain("FilterMiniDumpCallback"));
+            Assert.That(minidump, Does.Contain("case IncludeVmRegionCallback"));
+            Assert.That(minidump, Does.Contain("ModuleWriteDataSeg | ModuleWriteTlsData"));
+            Assert.That(minidump, Does.Contain("Unable to encrypt the crash-report directory"));
+            Assert.That(compression, Does.Contain("!EnsureCrashReportDirectoryEncrypted(archive.c_str())"));
+            Assert.That(compression, Does.Contain("reportName + \".DMP|\""));
+            Assert.That(compression, Does.Not.Contain("std::string mask = reportName + \".*\""));
+            Assert.That(refactoring, Does.Contain("### 95. Minimize, encrypt, and govern crash-dump data — Implemented"));
+        });
+    }
+
+    [Test]
+    public void Unsafe_API_baseline_rejects_new_repository_call_fingerprints()
+    {
+        var root = FindRepositoryRoot();
+        var generator = File.ReadAllText(Path.Combine(root, "tools", "new-unsafe-api-baseline.ps1"));
+        var verifier = File.ReadAllText(Path.Combine(root, "tools", "test-unsafe-api-baseline.ps1"));
+        var runner = File.ReadAllText(Path.Combine(root, "runtests.ps1"));
+        var baseline = File.ReadAllText(Path.Combine(root, "tools", "unsafe-api-baseline.json"));
+
+        // Content fingerprints distinguish pre-existing debt from a new API call without treating line movement as an addition.
+        Assert.Multiple(() =>
+        {
+            Assert.That(generator, Does.Contain("Get-UnsafeApiEntries"));
+            Assert.That(verifier, Does.Contain("New unsafe API debt"));
+            Assert.That(verifier, Does.Contain("fingerprint"));
+            Assert.That(runner, Does.Contain("test-unsafe-api-baseline.ps1"));
+            Assert.That(baseline, Does.Contain("\"schemaVersion\":  1"));
+        });
+    }
+
+    [Test]
+    public void Unicode_matrix_exercises_distinct_normalization_forms_and_a_long_native_copy_path()
+    {
+        var root = FindRepositoryRoot();
+        var operations = File.ReadAllText(Path.Combine(root, "tests", "FileManager.UiTests", "FileOperationUiTests.cs"));
+        var identities = File.ReadAllText(Path.Combine(root, "tests", "FileManager.UiTests", "Infrastructure", "FileIdentity.cs"));
+
+        // Keep identity checks on opened handles so normalization never collapses separate native entries.
+        Assert.Multiple(() =>
+        {
+            Assert.That(operations, Does.Contain("Unicode_normalization_surrogate_and_long_path_operations_preserve_distinct_entries"));
+            Assert.That(operations, Does.Contain("unicode-e\\u0301-\\U0001f680.txt"));
+            Assert.That(operations, Does.Contain("Enumerable.Repeat"));
+            Assert.That(operations, Does.Contain("NativeCommands.RenameFile"));
+            Assert.That(operations, Does.Contain("NativeCommands.DeleteFiles"));
+            Assert.That(operations, Does.Contain("FileIdentity.Capture"));
+            Assert.That(identities, Does.Contain("GetFileInformationByHandle"));
+            Assert.That(identities, Does.Contain("FileShare.ReadWrite | FileShare.Delete"));
         });
     }
 
@@ -1222,6 +1826,8 @@ public sealed class NativeSafetyRegressionTests
         var root = FindRepositoryRoot();
         var cacheHeader = File.ReadAllText(Path.Combine(root, "src", "cache.h"));
         var cache = File.ReadAllText(Path.Combine(root, "src", "cache.cpp"));
+        var enumerationData = File.ReadAllText(Path.Combine(root, "src", "consts.h"));
+        var enumeration = File.ReadAllText(Path.Combine(root, "src", "file_enumeration.cpp"));
         var messages = File.ReadAllText(Path.Combine(root, "src", "mainwnd_messages.cpp"));
         var refactoring = File.ReadAllText(Path.Combine(root, "refactoring.md"));
 
@@ -1243,6 +1849,12 @@ public sealed class NativeSafetyRegressionTests
             Assert.That(messages, Does.Contain("DeleteManager.InvalidateCallbackWindow(HWindow);"));
             Assert.That(messages.IndexOf("DeleteManager.InvalidateCallbackWindow(HWindow);", StringComparison.Ordinal),
                         Is.LessThan(messages.IndexOf("SHChangeNotifyRelease();", StringComparison.Ordinal)));
+            // Viewer requests also stop waiting when their source panel is invalidated or its HWND post fails.
+            Assert.That(enumerationData, Does.Contain("BOOL WaitingForResult"));
+            Assert.That(enumeration, Does.Contain("CancelFileNamesEnumRequestLocked"));
+            Assert.That(enumeration, Does.Contain("FileNamesEnumData.WaitingForResult && FileNamesEnumData.SrcUID == sourceUID"));
+            Assert.That(enumeration, Does.Contain("CancelFileNamesEnumRequestLocked((int)(UINT_PTR)FileNamesEnumSources[i - 1]);"));
+            Assert.That(enumeration, Does.Contain("if (!PostMessage(hWnd, WM_USER_ENUMFILENAMES, reqUID, 0))"));
             Assert.That(refactoring, Does.Contain("### 49. Protect window and callback lifetimes — Partially implemented"));
         });
     }
@@ -1398,6 +2010,11 @@ public sealed class NativeSafetyRegressionTests
         var ftpDisk = File.ReadAllText(Path.Combine(root, "src", "plugins", "ftp", "operats5.cpp"));
         var snooperHeader = File.ReadAllText(Path.Combine(root, "src", "snooper.h"));
         var snooper = File.ReadAllText(Path.Combine(root, "src", "snooper.cpp"));
+        var workerHeader = File.ReadAllText(Path.Combine(root, "src", "worker.h"));
+        var operations = File.ReadAllText(Path.Combine(root, "src", "operations_core.cpp"));
+        var operationDialog = File.ReadAllText(Path.Combine(root, "src", "dialogs_file_ops.cpp"));
+        var cacheHeader = File.ReadAllText(Path.Combine(root, "src", "cache.h"));
+        var cache = File.ReadAllText(Path.Combine(root, "src", "cache.cpp"));
         var refactoring = File.ReadAllText(Path.Combine(root, "refactoring.md"));
 
         // Each producer uses a policy appropriate to its semantics: discovery work
@@ -1429,7 +2046,21 @@ public sealed class NativeSafetyRegressionTests
             Assert.That(snooper, Does.Contain("GetDirectoryRefreshMetrics()"));
             Assert.That(snooper, Does.Contain("SnooperRefreshWaits"));
             Assert.That(snooper, Does.Contain("at most one live snooper refresh outstanding"));
+            Assert.That(workerHeader, Does.Contain("#define DISK_OPERATION_QUEUE_LIMIT 64"));
+            Assert.That(workerHeader, Does.Contain("struct COperationsQueueMetrics"));
+            Assert.That(workerHeader, Does.Contain("GetQueueMetrics()"));
+            Assert.That(operations, Does.Contain("OperDlgs.Count >= DISK_OPERATION_QUEUE_LIMIT"));
+            Assert.That(operations, Does.Contain("bounded operation queue rejected admission"));
+            Assert.That(operationDialog, Does.Contain("!OperationsQueue.AddOperation"));
+            Assert.That(operationDialog, Does.Contain("IDS_OPERATIONQUEUEFULL"));
+            Assert.That(cacheHeader, Does.Contain("#define DELETE_MANAGER_QUEUE_LIMIT 4096"));
+            Assert.That(cacheHeader, Does.Contain("struct CDeleteManagerQueueMetrics"));
+            Assert.That(cache, Does.Contain("Data.Count >= DELETE_MANAGER_QUEUE_LIMIT"));
+            Assert.That(cache, Does.Contain("Delete-manager cleanup queue is full"));
+            Assert.That(cache, Does.Contain("CDeleteManager::GetQueueMetrics"));
             Assert.That(refactoring, Does.Contain("Parser broker admission is capped at eight"));
+            Assert.That(refactoring, Does.Contain("disk copy/move operation queue is capped at 64"));
+            Assert.That(refactoring, Does.Contain("temporary-copy cleanup queue is capped at 4,096"));
         });
     }
 
@@ -1457,6 +2088,76 @@ public sealed class NativeSafetyRegressionTests
             Assert.That(loader, Does.Not.Contain("TerminateProcess(GetCurrentProcess(), 1)"));
             Assert.That(registry, Does.Contain("CPlugins::GetPluginData(const void* pluginInterface)"));
             Assert.That(refactoring, Does.Contain("### 23. Add failure barriers around every plug-in callback — Implemented"));
+        });
+    }
+
+    [Test]
+    public void Plugin_interface_results_are_validated_before_host_encapsulation()
+    {
+        var root = FindRepositoryRoot();
+        var loader = File.ReadAllText(Path.Combine(root, "src", "plugins_loading.cpp"));
+        var gui = File.ReadAllText(Path.Combine(root, "src", "plugins_archiver.cpp"));
+        var pluginHeader = File.ReadAllText(Path.Combine(root, "src", "plugins.h"));
+        var iconList = File.ReadAllText(Path.Combine(root, "src", "iconlist.cpp"));
+        var iconListHeader = File.ReadAllText(Path.Combine(root, "src", "iconlist.h"));
+        var display = File.ReadAllText(Path.Combine(root, "src", "fileswindow_display.cpp"));
+        var refactoring = File.ReadAllText(Path.Combine(root, "refactoring.md"));
+
+        // An invalid callback result must be rejected before the host dispatches, copies, or deletes plug-in memory.
+        Assert.Multiple(() =>
+        {
+            Assert.That(loader, Does.Contain("static BOOL ValidatePluginInterfaceResult"));
+            Assert.That(loader, Does.Contain("static BOOL ValidatePluginContractString"));
+            Assert.That(loader, Does.Contain("Do not inspect even the first byte until its committed page has been verified."));
+            Assert.That(loader, Does.Contain("static BOOL ValidatePluginContractIcon"));
+            Assert.That(loader, Does.Contain("GetIconInfo(icon, &iconInfo)"));
+            Assert.That(loader, Does.Contain("destroyIcon != FALSE && destroyIcon != TRUE"));
+            Assert.That(loader, Does.Contain("VirtualQuery(address, &memory, sizeof(memory))"));
+            Assert.That(loader, Does.Contain("displayStringLimit = 4096"));
+            Assert.That(loader, Does.Contain("configurationStringLimit = MAX_PATH - 1"));
+            Assert.That(loader, Does.Contain("Invalid or overlong plug-in contract string"));
+            Assert.That(loader, Does.Contain("__except (EXCEPTION_EXECUTE_HANDLER)"));
+            Assert.That(loader, Does.Contain("Plug-in entry point returned an invalid interface pointer."));
+            Assert.That(loader, Does.Contain("ValidatePluginInterfaceResult(archiver, \"archiver\")"));
+            Assert.That(loader, Does.Contain("ValidatePluginInterfaceResult(thumbnailLoader, \"thumbnail loader\")"));
+            Assert.That(loader, Does.Contain("pluginInterfacesValid &&"));
+            Assert.That(loader, Does.Contain("CSalamanderConnect::AddPanelArchiver(): invalid or overlong plug-in extension list!"));
+            Assert.That(loader, Does.Contain("CSalamanderConnect::AddMenuItem(): invalid or overlong plug-in menu label!"));
+            Assert.That(loader, Does.Contain("CSalamanderBuildMenu::AddSubmenuStart(): invalid or overlong plug-in submenu label!"));
+            Assert.That(loader, Does.Contain("CPluginData::AddMenuItem(): invalid or overlong plug-in menu label!"));
+            Assert.That(loader, Does.Contain("CSalamanderConnect::ForceRemoveViewer(): invalid or overlong plug-in mask!"));
+            Assert.That(loader, Does.Contain("CSalamanderConnect::ForceRemovePanelArchiver(): invalid or overlong plug-in extension!"));
+            Assert.That(loader, Does.Contain("CSalamanderConnect::SetChangeDriveMenuItem(): invalid or overlong plug-in title!"));
+            Assert.That(loader, Does.Contain("CSalamanderConnect::SetThumbnailLoader(): invalid or overlong plug-in mask."));
+            Assert.That(loader, Does.Contain("GetChangeDriveOrDisconnectItem(): invalid plug-in title or icon result!"));
+            Assert.That(loader, Does.Contain("!ValidatePluginContractString(title, 4096, TRUE) || !ValidatePluginContractIcon(icon, destroyIcon)"));
+            Assert.That(loader, Does.Contain("GetFSIcon(): invalid plug-in icon result!"));
+            Assert.That(loader, Does.Contain("CSalamanderConnect::SetBitmapWithIcons(): invalid plug-in icon bitmap!"));
+            Assert.That(loader, Does.Contain("bmp.bmHeight != 16"));
+            Assert.That(pluginHeader, Does.Contain("hotTextsCount < 0 || hotTextsCount > 100"));
+            Assert.That(pluginHeader, Does.Contain("memchr(buffer, 0, 1000) == NULL"));
+            Assert.That(pluginHeader, Does.Contain("hotTextLength > textLength - hotTextStart"));
+            Assert.That(pluginHeader, Does.Contain("invalid plug-in output count, span, or unterminated text"));
+            Assert.That(pluginHeader, Does.Contain("offset < 0 || offset > pathLen"));
+            Assert.That(pluginHeader, Does.Contain("invalid plug-in text offset"));
+            Assert.That(pluginHeader, Does.Contain("GetFullName(): unterminated plug-in output buffer"));
+            Assert.That(pluginHeader, Does.Contain("GetFullFSPath(): unterminated plug-in output buffer"));
+            Assert.That(pluginHeader, Does.Contain("GetPathForMainWindowTitle(): unterminated plug-in output buffer"));
+            Assert.That(pluginHeader, Does.Contain("static BOOL ValidatePluginOutputString"));
+            Assert.That(pluginHeader, Does.Contain("CompleteDirectoryLineHotPath(): unterminated plug-in output buffer"));
+            Assert.That(pluginHeader, Does.Contain("GetNoItemsInPanelText(): unterminated plug-in output buffer"));
+            Assert.That(pluginHeader, Does.Contain("maxSimplePluginIcons = 4096"));
+            Assert.That(pluginHeader, Does.Contain("invalid plug-in image-list count"));
+            Assert.That(iconList, Does.Contain("imageWidth > INT_MAX / imageColumns || imageHeight > INT_MAX / imageRows"));
+            Assert.That(iconListHeader, Does.Contain("int GetImageCount() const"));
+            Assert.That(display, Does.Contain("iconListIndex < 0 || iconListIndex >= iconList->GetImageCount()"));
+            Assert.That(display, Does.Contain("Invalid plug-in simple-icon index"));
+            Assert.That(pluginHeader, Does.Contain("TDirectArray<CIconList*> CreatedIconLists"));
+            Assert.That(gui, Does.Contain("BOOL CSalamanderGUI::TakeCreatedIconList"));
+            Assert.That(gui, Does.Contain("Compare addresses only; never dereference"));
+            Assert.That(loader, Does.Contain("TakeCreatedIconList(iconList, &createdIconList)"));
+            Assert.That(loader, Does.Contain("icon list was not created by this plug-in's host GUI facade"));
+            Assert.That(refactoring, Does.Contain("### 70. Validate every plug-in contract result — Partially implemented"));
         });
     }
 
@@ -1827,6 +2528,8 @@ public sealed class NativeSafetyRegressionTests
         var retryableStreams = File.ReadAllText(Path.Combine(root, "src", "plugins", "7zip", "FStreams.h"));
         var pluginProject = File.ReadAllText(Path.Combine(root, "src", "plugins", "7zip", "vcxproj", "7zip.vcxproj"));
         var record = File.ReadAllText(Path.Combine(root, "src", "plugins", "7zip", "doc", "upgrade-26.02.md"));
+        var corpus = File.ReadAllText(Path.Combine(root, "tools", "test-7zip-compatibility.ps1"));
+        var runner = File.ReadAllText(Path.Combine(root, "runtests.ps1"));
         var refactoring = File.ReadAllText(Path.Combine(root, "refactoring.md"));
 
         // Pin the upgraded parser and the compatibility gate so later vendor refreshes cannot silently drop it.
@@ -1851,7 +2554,13 @@ public sealed class NativeSafetyRegressionTests
             Assert.That(record, Does.Contain("C7502DD4557481F52CCF1B3E680329F1FDD207E79A25544AFEB3106325474944"));
             Assert.That(record, Does.Contain("fuzz regressions"));
             Assert.That(record, Does.Contain("extraction snapshots"));
-            Assert.That(refactoring, Does.Contain("### 61. Upgrade the bundled 7-Zip code — Partially implemented"));
+            Assert.That(corpus, Does.Contain("CompressFilesDelegate"));
+            Assert.That(corpus, Does.Contain("Get-ExtractionManifest"));
+            Assert.That(corpus, Does.Contain("header-bitflip"));
+            Assert.That(corpus, Does.Contain("payload-bitflip"));
+            Assert.That(corpus, Does.Contain("footer-bitflip"));
+            Assert.That(runner, Does.Contain("7-Zip wrapper/oracle compatibility corpus"));
+            Assert.That(refactoring, Does.Contain("### 61. Upgrade the bundled 7-Zip code — Implemented"));
         });
     }
 
@@ -1910,6 +2619,7 @@ public sealed class NativeSafetyRegressionTests
         var probe = File.ReadAllText(Path.Combine(root, "tools", "cmark_gfm_hardening_probe.cpp"));
         var harness = File.ReadAllText(Path.Combine(root, "tools", "test-cmark-gfm-hardening.ps1"));
         var workflow = File.ReadAllText(Path.Combine(root, ".github", "workflows", "pr-msbuild.yml"));
+        var soakWorkflow = File.ReadAllText(Path.Combine(root, ".github", "workflows", "nightly-parser-fuzz.yml"));
         var refactoring = File.ReadAllText(Path.Combine(root, "refactoring.md"));
 
         // Pin the vendor identity, safe default, bounded tree/output seam, and CI fuzz gate together.
@@ -1936,7 +2646,9 @@ public sealed class NativeSafetyRegressionTests
             Assert.That(File.Exists(Path.Combine(root, "tests", "cmark-gfm", "snapshots", "strikethrough.html")), Is.True);
             Assert.That(harness, Does.Contain("markdown_rendering.cpp"));
             Assert.That(harness, Does.Contain("cmark_gfm_hardening_probe.cpp"));
+            Assert.That(harness, Does.Contain("[int]$Iterations = 1"));
             Assert.That(workflow, Does.Contain("test-cmark-gfm-hardening.ps1"));
+            Assert.That(soakWorkflow, Does.Contain("test-cmark-gfm-hardening.ps1 -Iterations 250"));
             Assert.That(refactoring, Does.Contain("### 65. Upgrade cmark-gfm and harden rendered-content defaults — Implemented"));
         });
     }

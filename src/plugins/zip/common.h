@@ -231,7 +231,7 @@ public:
     bool IsDirByHeader(CFileHeader* fileHeader);
     int ProcessName(CFileHeader* fileHeader, char* outputName);
     int ReadLocalHeader(CLocalFileHeader* fileHeader, QWORD offset);
-    void ProcessLocalHeader(CLocalFileHeader* fileHeader,
+    BOOL ProcessLocalHeader(CLocalFileHeader* fileHeader,
                             CFileInfo* fileInfo, CAESExtraField* aesExtraField);
     void SplitPath(char** path, char** name, const char* pathToSplit);
     void QuickSortHeaders(int left, int right, TIndirectArray2<CFileInfo>& headers);
@@ -247,17 +247,18 @@ public:
 
 #ifndef SSZIP
     int ChangeDisk();
-    void FindLastFile(char* lastFile);
+    void FindLastFile(char* lastFile, size_t lastFileCapacity);
 #else  //SSZIP
     int ChangeDisk()
     {
         TRACE_E("ChangeDisk() - dummy, this function should never be called");
         return -1;
     }
-    void FindLastFile(char* lastFile)
+    void FindLastFile(char* lastFile, size_t lastFileCapacity)
     {
         TRACE_E("FindLastFile() - dummy, this function should never be called");
-        *lastFile = 0;
+        if (lastFileCapacity != 0)
+            *lastFile = 0;
     }
 #endif //SSZIP
 };
@@ -296,11 +297,12 @@ int InflateBuffer(char* sour, int sourSize, char* dest, int* destSize);
 int LoadSfxFileData(char* fileName, CSfxLang** lang);
 void GetInfo(char* buffer, FILETIME* lastWrite, QWORD size);
 int MakeFileName(int number, bool seqNames, const char* archive, char* name,
-                 BOOL winZipNames);
+                 size_t nameCapacity, BOOL winZipNames);
 
 int RenumberName(int number, const char* oldName, char* newName,
                  bool lastFile, BOOL winzip);
-void SplitPath2(const char* pathToSplit, char* path, char* name, char* ext);
+bool SplitPath2(const char* pathToSplit, char* path, size_t pathCapacity,
+                char* name, size_t nameCapacity, char* ext, size_t extCapacity);
 
 //bool HasExtension(const char * filename, const char * extension);
 bool Atod(const char* string, char* decSep, double* val);

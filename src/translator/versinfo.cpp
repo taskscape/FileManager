@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "precomp.h"
+#include <strsafe.h>
 
 #include "versinfo.h"
 
@@ -289,7 +290,9 @@ CVersionInfo::FindBlock(const char* block)
     }
 
     char tmp[2048];
-    lstrcpyn(tmp, block, 2048);
+    // A version-resource query must not tokenize a clipped block hierarchy.
+    if (FAILED(StringCchCopyA(tmp, _countof(tmp), block)))
+        return NULL;
 
     if (strcmp(tmp, "\\") == 0)
         return Root;
@@ -385,7 +388,7 @@ BOOL CVersionInfo::SetString(const char* block, const wchar_t* buffer)
         return FALSE;
     }
 
-    int len = lstrlenW(buffer);
+    const size_t len = wcslen(buffer);
     WCHAR* str = (WCHAR*)malloc((len + 1) * sizeof(WCHAR));
     if (str == NULL)
     {

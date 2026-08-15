@@ -3,6 +3,9 @@
 
 #include "precomp.h"
 
+// Use StrSafe for caller-sized plug-in error messages.
+#include <strsafe.h>
+
 #pragma warning(3 : 4706) // warning C4706: assignment within conditional expression
 
 #include "texts.rh2"
@@ -172,12 +175,17 @@ BOOL CPakIface::OpenPak(const char* fileName, DWORD mode)
             return FALSE;
     }
 
-    PakSize = GetFileSize(PakFile, NULL);
-    if (PakSize == 0xFFFFFFFF)
+    LARGE_INTEGER fileSize;
+    BOOL gotFileSize = GetFileSizeEx(PakFile, &fileSize);
+    if (!gotFileSize || fileSize.QuadPart < 0 || (ULONGLONG)fileSize.QuadPart > MAXDWORD)
     {
+        if (gotFileSize)
+            SetLastError(ERROR_FILE_TOO_LARGE);
         CloseHandle(PakFile);
         return HandleError(0, IDS_PAK_ERRGETFILESIZE, LastErrorString(GetLastError(), buf));
     }
+    // PAK directory offsets are DWORD fields, so reject an oversized container rather than truncating its 64-bit size.
+    PakSize = (DWORD)fileSize.QuadPart;
 
     DirSize = 0;
     EmptyPak = FALSE;
@@ -351,10 +359,14 @@ BOOL CPakIface::ExtractFile()
     return TRUE;
 }
 
-char* CPakIface::FormatMessage(char* buffer, int errorID, va_list arglist)
+char* CPakIface::FormatMessage(char* buffer, size_t bufferSize, int errorID, va_list arglist)
 {
+    if (buffer == NULL || bufferSize == 0)
+        return buffer;
     *buffer = 0;
-    wvsprintf(buffer, LoadStr(errorID), arglist);
+    // Preserve the plug-in error ABI while making the caller's 1 KiB message buffer explicit.
+    if (FAILED(StringCchVPrintfA(buffer, bufferSize, LoadStr(errorID), arglist)))
+        StringCchCopyA(buffer, bufferSize, "Unable to format error message.");
     return buffer;
 }
 
@@ -378,10 +390,18 @@ char* CPakIface::LastErrorString(int lastError, char* buffer)
 
 BOOL CPakIface::SafeSeek(HANDLE file, DWORD position)
 {
+    LARGE_INTEGER seekDistance;
+    seekDistance.QuadPart = position;
+    return SafeSeek64(file, seekDistance);
+}
+
+BOOL CPakIface::SafeSeek64(HANDLE file, const LARGE_INTEGER& position)
+{
     char buf[1024];
     while (1)
     {
-        if (SetFilePointer(file, position, NULL, FILE_BEGIN) != 0xFFFFFFFF)
+        // Use the 64-bit seek API so INVALID_SET_FILE_POINTER is never confused with a valid offset.
+        if (SetFilePointerEx(file, position, NULL, FILE_BEGIN))
             return TRUE;
         if (!HandleError(HE_RETRY, IDS_PAK_ERRSETFILEPTR, LastErrorString(GetLastError(), buf)))
             return FALSE;
@@ -393,11 +413,12 @@ BOOL CPakIface::SafeRead(HANDLE file, void* buffer, DWORD size)
     if (size == 0)
         return TRUE;
     char buf[1024];
-    DWORD pos;
+    LARGE_INTEGER pos;
     while (1)
     {
-        pos = SetFilePointer(file, 0, NULL, FILE_CURRENT);
-        if (pos != 0xFFFFFFFF)
+        LARGE_INTEGER zero = {};
+        // Preserve the retry point with a 64-bit position for archives beyond the DWORD range.
+        if (SetFilePointerEx(file, zero, &pos, FILE_CURRENT))
             break;
         if (!HandleError(HE_RETRY, IDS_PAK_ERRGETFILEPTR, LastErrorString(GetLastError(), buf)))
             return FALSE;
@@ -409,7 +430,7 @@ BOOL CPakIface::SafeRead(HANDLE file, void* buffer, DWORD size)
             return TRUE;
         if (!HandleError(HE_RETRY, IDS_PAK_ERRREADFILE, LastErrorString(GetLastError(), buf)))
             return FALSE;
-        if (!SafeSeek(file, pos))
+        if (!SafeSeek64(file, pos))
             return FALSE;
     }
 }
@@ -419,11 +440,12 @@ BOOL CPakIface::SafeWrite(HANDLE file, void* buffer, DWORD size)
     if (size == 0)
         return TRUE;
     char buf[1024];
-    DWORD pos;
+    LARGE_INTEGER pos;
     while (1)
     {
-        pos = SetFilePointer(file, 0, NULL, FILE_CURRENT);
-        if (pos != 0xFFFFFFFF)
+        LARGE_INTEGER zero = {};
+        // Preserve the retry point with a 64-bit position for archives beyond the DWORD range.
+        if (SetFilePointerEx(file, zero, &pos, FILE_CURRENT))
             break;
         if (!HandleError(HE_RETRY, IDS_PAK_ERRGETFILEPTR, LastErrorString(GetLastError(), buf)))
             return FALSE;
@@ -435,7 +457,7 @@ BOOL CPakIface::SafeWrite(HANDLE file, void* buffer, DWORD size)
             return TRUE;
         if (!HandleError(HE_RETRY, IDS_PAK_ERRWRITEFILE, LastErrorString(GetLastError(), buf)))
             return FALSE;
-        if (!SafeSeek(file, pos))
+        if (!SafeSeek64(file, pos))
             return FALSE;
     }
 }

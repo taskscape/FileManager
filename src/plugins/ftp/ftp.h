@@ -4,6 +4,8 @@
 
 #pragma once
 
+#include "..\\..\\common\\monotonic_time.h"
+
 // ****************************************************************************
 // CONSTANTS
 // ****************************************************************************
@@ -1523,7 +1525,8 @@ protected:
     CFTPServerPathType DirLineHotPathType; // helper variable: path type for which hot-texts are identified in Directory Line
     int DirLineHotPathUserLength;          // helper variable: length of the current username if it contains "disallowed" characters
 
-    DWORD ChangePathOnlyGetCurPathTime; // helper variable for optimizing ChangePath() called right after retrieving the working path
+    // This filesystem-object optimization is local process state, not a cross-thread or wire timestamp.
+    CMonotonicTimePoint ChangePathOnlyGetCurPathTime;
 
     // helper variable for passing the total number of connection attempts between individual calls to
     // ChangePath(), ListCurrentPath(), GetFullFSPath(), SendUserFTPCommand(), and ViewFile()

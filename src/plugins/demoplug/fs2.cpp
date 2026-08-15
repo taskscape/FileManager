@@ -81,8 +81,9 @@ BOOL CDeleteProgressDlg::GetWantCancel()
     }
 
     // repaint changed data (text + progress bars) every 100 ms
-    DWORD ticks = GetTickCount();
-    if (ticks - LastTickCount > 100)
+    // The repaint throttle is private to this file-system instance, so it can use a non-wrapping time point.
+    const CMonotonicTimePoint ticks = CMonotonicClock::Now();
+    if (CMonotonicClock::HasElapsed(LastTickCount, 101, ticks))
     {
         LastTickCount = ticks;
         FlushDataToControls();

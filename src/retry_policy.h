@@ -3,6 +3,8 @@
 
 #pragma once
 
+#include "common/monotonic_time.h"
+
 // Automatic retries are centralized so transient transport faults are paced
 // consistently, while uncertain destructive commits always require a user.
 enum ERetryOperationKind
@@ -37,7 +39,9 @@ inline DWORD GetAutomaticRetryDelay(int attempt)
 
     // Spread simultaneous network clients across a bounded +/- 25 percent window.
     DWORD jitterRange = delay / 2 + 1;
-    DWORD jitter = (GetTickCount() ^ (attempt * 0x9e3779b9UL)) % jitterRange;
+    // The retry dephasing seed must continue varying after the 32-bit tick counter would wrap.
+    const CMonotonicTimePoint jitterSample = CMonotonicClock::Now();
+    DWORD jitter = (DWORD)(jitterSample ^ (attempt * 0x9e3779b9UL)) % jitterRange;
     DWORD randomizedDelay = delay - delay / 4 + jitter;
     return randomizedDelay > kAutomaticRetryMaximumDelayMs ?
                kAutomaticRetryMaximumDelayMs : randomizedDelay;

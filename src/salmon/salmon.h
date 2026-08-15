@@ -24,6 +24,10 @@ BOOL RestartSalamander(HWND hParent);
 
 BOOL CleanBugReportsDirectory(BOOL keep7ZipArchives);
 
+// Crash artifacts contain diagnostic data; callers must establish EFS before
+// creating a dump or archive instead of leaving a cleartext fallback on disk.
+BOOL EnsureCrashReportDirectoryEncrypted(const char* reportFileName);
+
 // returns TRUE if a bug report exists
 // sets the LatestBugReport global to the most recent name
 BOOL GetBugReportNames();

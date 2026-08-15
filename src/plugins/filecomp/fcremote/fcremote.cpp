@@ -5,6 +5,32 @@
 
 HINSTANCE DLLInstance = NULL;
 
+static BOOL FormatReleaseEventName(char* name, size_t nameCount, DWORD processId)
+{
+    // fcremote links without the CRT; construct the short synchronization name while honoring its protocol field size.
+    static const char prefix[] = "FCREMOTE";
+    const size_t prefixLength = sizeof(prefix) - 1;
+    if (nameCount <= prefixLength)
+        return FALSE;
+
+    for (size_t index = 0; index < prefixLength; index++)
+        name[index] = prefix[index];
+    char reversedDigits[8];
+    size_t digitCount = 0;
+    do
+    {
+        reversedDigits[digitCount++] = "0123456789ABCDEF"[processId & 0xF];
+        processId >>= 4;
+    } while (processId != 0 && digitCount < _countof(reversedDigits));
+
+    if (prefixLength + digitCount >= nameCount)
+        return FALSE;
+    for (size_t index = 0; index < digitCount; index++)
+        name[prefixLength + index] = reversedDigits[digitCount - index - 1];
+    name[prefixLength + digitCount] = 0;
+    return TRUE;
+}
+
 void my_memcpy(void* dst, const void* src, int len)
 {
     char* d = (char*)dst;
@@ -268,7 +294,9 @@ int RemoteCompareFiles(HINSTANCE hInstance, LPTSTR lpCmdLine)
 
         if (wait)
         {
-            wsprintf(msg.ReleaseEvent, "FCREMOTE%X", GetCurrentProcessId());
+            // The remote protocol has a fixed event-name field, so do not send a truncated synchronization name.
+            if (!FormatReleaseEventName(msg.ReleaseEvent, _countof(msg.ReleaseEvent), GetCurrentProcessId()))
+                break;
             releaseEvent = CreateEvent(NULL, TRUE, FALSE, msg.ReleaseEvent);
         }
         else

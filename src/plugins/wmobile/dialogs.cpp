@@ -48,7 +48,7 @@ CProgressDlg::CProgressDlg(HWND parent, const char* title, const char* operation
 {
     ProgressBar = NULL;
     WantCancel = FALSE;
-    LastTickCount = 0;
+    LastTickCount = CMonotonicClock::AtLeastDurationAgo(101);
     TextCache[0] = 0;
     TextCacheIsDirty = FALSE;
     ProgressCache = 0;
@@ -121,8 +121,9 @@ void CProgressDlg::EnableCancel(BOOL enable)
 BOOL CProgressDlg::GetWantCancel()
 {
     // every 100 ms repaint the changed data (text + progress bars)
-    DWORD ticks = GetTickCount();
-    if (ticks - LastTickCount > 100)
+    const CMonotonicTimePoint ticks = CMonotonicClock::Now();
+    // The repaint throttle must remain valid after the legacy DWORD tick count would wrap.
+    if (CMonotonicClock::Elapsed(LastTickCount, ticks) > 100)
     {
         LastTickCount = ticks;
         FlushDataToControls();

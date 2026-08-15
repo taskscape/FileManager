@@ -5,6 +5,8 @@
 
 #ifdef _WMA_SUPPORT_
 
+#include <strsafe.h>
+
 #include "wmaparser.h"
 #include "..\output.h"
 #include "..\renderer.h"
@@ -118,7 +120,9 @@ HRESULT CParserWMA::GetHeaderAttribute(IWMHeaderInfo* pHdrInfo, LPCWSTR pwszName
     switch (type)
     {
     case WMT_TYPE_DWORD:
-        wsprintf(out, "%lu", *((DWORD*)pValue));
+        // Keep decoded WMA attributes within the shared 512-byte presentation buffer.
+        if (_snprintf_s(out, _countof(out), _TRUNCATE, "%lu", *((DWORD*)pValue)) < 0)
+            hr = HRESULT_FROM_WIN32(ERROR_INSUFFICIENT_BUFFER);
         break;
 
     case WMT_TYPE_STRING:
@@ -126,15 +130,22 @@ HRESULT CParserWMA::GetHeaderAttribute(IWMHeaderInfo* pHdrInfo, LPCWSTR pwszName
         break;
 
     case WMT_TYPE_BINARY:
-        wsprintf(out, LoadStr(IDS_WMA_BINARY), cbLength);
+        if (_snprintf_s(out, _countof(out), _TRUNCATE, LoadStr(IDS_WMA_BINARY), cbLength) < 0)
+            hr = HRESULT_FROM_WIN32(ERROR_INSUFFICIENT_BUFFER);
         break;
 
     case WMT_TYPE_BOOL:
-        (*(BOOL*)pValue) ? lstrcpy(out, LoadStr(IDS_YES)) : lstrcpy(out, LoadStr(IDS_NO));
+        // Localized labels share the parser's fixed presentation buffer, so reject a label that cannot fit completely.
+        if (FAILED(StringCchCopyA(out, _countof(out), (*(BOOL*)pValue) ? LoadStr(IDS_YES) : LoadStr(IDS_NO))))
+        {
+            out[0] = 0;
+            hr = HRESULT_FROM_WIN32(ERROR_INSUFFICIENT_BUFFER);
+        }
         break;
 
     case WMT_TYPE_WORD:
-        wsprintf(out, "%u", *((WORD*)pValue));
+        if (_snprintf_s(out, _countof(out), _TRUNCATE, "%u", *((WORD*)pValue)) < 0)
+            hr = HRESULT_FROM_WIN32(ERROR_INSUFFICIENT_BUFFER);
         break;
 
     case WMT_TYPE_QWORD:

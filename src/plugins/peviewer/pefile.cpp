@@ -14,6 +14,19 @@
 extern HINSTANCE DLLInstance; // handle to the SPL - language-independent resources
 extern HINSTANCE HLanguage;   // handle to the SLG - language-dependent resources
 
+static BOOL FormatPEViewerDateTimeAnsi(const SYSTEMTIME* time, DWORD flags, char* buffer, int bufferSize, BOOL isDate)
+{
+    // PE Viewer stores timestamp annotations as ANSI, so convert only after locale-name formatting.
+    WCHAR localeName[LOCALE_NAME_MAX_LENGTH];
+    WCHAR formatted[50];
+    if (GetUserDefaultLocaleName(localeName, ARRAYSIZE(localeName)) == 0)
+        return FALSE;
+    int length = isDate
+                     ? GetDateFormatEx(localeName, flags, time, NULL, formatted, ARRAYSIZE(formatted), NULL)
+                     : GetTimeFormatEx(localeName, flags, time, NULL, formatted, ARRAYSIZE(formatted));
+    return length != 0 && WideCharToMultiByte(CP_ACP, 0, formatted, -1, buffer, bufferSize, NULL, NULL) != 0;
+}
+
 // ****************************************************************************
 
 int HandleFileException(EXCEPTION_POINTERS* e, LPVOID fileMem, DWORD fileMemSize)
@@ -246,13 +259,13 @@ BOOL TimeDateStampToString(DWORD timeDateStamp, char* buffer)
         return FALSE;
 
     strcpy(buffer, " (");
-    if (GetDateFormatA(LOCALE_USER_DEFAULT, DATE_SHORTDATE, &st, NULL, buffer + 2, 50) == 0)
+    if (!FormatPEViewerDateTimeAnsi(&st, DATE_SHORTDATE, buffer + 2, 50, TRUE))
     {
         *buffer = 0;
         return FALSE;
     }
     strcat(buffer, " ");
-    if (GetTimeFormatA(LOCALE_USER_DEFAULT, 0, &st, NULL, buffer + strlen(buffer), 50) == 0)
+    if (!FormatPEViewerDateTimeAnsi(&st, 0, buffer + strlen(buffer), 50, FALSE))
     {
         *buffer = 0;
         return FALSE;
@@ -917,7 +930,9 @@ void CSectionTableDumper::DumpCore(CFileStream* outStream)
     for (i = 0; i < nSections; i++, psh++)
     {
         char sctName[9];
-        lstrcpynA(sctName, (const char*)psh->Name, 9);
+        // IMAGE_SECTION_HEADER::Name is an eight-byte counted field, not necessarily a C string.
+        memcpy(sctName, psh->Name, sizeof(psh->Name));
+        sctName[sizeof(psh->Name)] = 0;
         if (i > 0)
             outStream->fprintf("\n");
         outStream->fprintf("  Section Header #%d\n", i + 1);
@@ -1657,10 +1672,16 @@ bool CFileVersionResourceDumper::ReadStringTable(CFileStream* outStream, BinaryR
         outStream->fprintf("  %-*s%u", width, "String File Information:", language);
 
         char langName[128];
-        if (language != 0 && GetLocaleInfoA(MAKELCID(MAKELANGID(language, SUBLANG_NEUTRAL), SORT_DEFAULT), LOCALE_SLANGUAGE, langName, sizeof(langName)))
+        WCHAR localeName[LOCALE_NAME_MAX_LENGTH];
+        WCHAR languageName[128];
+        LCID languageLcid = MAKELCID(MAKELANGID(language, SUBLANG_NEUTRAL), SORT_DEFAULT);
+        if (language != 0 && LCIDToLocaleName(languageLcid, localeName, _countof(localeName), 0) != 0 &&
+            GetLocaleInfoEx(localeName, LOCALE_SLANGUAGE, languageName, _countof(languageName)) != 0 &&
+            WideCharToMultiByte(CP_ACP, 0, languageName, -1, langName, _countof(langName), NULL, NULL) != 0)
         {
             outStream->fprintf(" (%s)", langName);
         }
+        // Version resources store LCIDs, while the report keeps an ANSI display boundary after the named-locale lookup.
         outStream->fprintf("\n");
 
         // StringTable::Padding
@@ -2671,7 +2692,9 @@ void CCorMetadataDumper::AsmNameSetMetaData(IAssemblyName* pAssemblyName, const 
         }
     }
 
-    hr = pAssemblyName->SetProperty(ASM_NAME_CULTURE, wzCulture, (lstrlenW(wzCulture) + 1) * sizeof(TCHAR));
+    // Metadata culture text is terminated before being supplied with its byte size.
+    hr = pAssemblyName->SetProperty(ASM_NAME_CULTURE, wzCulture,
+                                    static_cast<DWORD>((wcslen(wzCulture) + 1) * sizeof(TCHAR)));
 }
 
 void CCorMetadataDumper::AsmNameSetPublicKey(IAssemblyName* pAssemblyName, const void* pPublicKey, DWORD cbPublicKey, BOOL bIsFullKey)

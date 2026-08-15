@@ -365,7 +365,8 @@ CComboboxEdit::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
             if (next != NULL)
             {
                 char className[30];
-                WORD wl = LOWORD(GetWindowLong(next, GWL_STYLE)); // only BS_...
+                // The style test uses the pointer-width accessor while retaining the historical BS_ mask.
+                WORD wl = LOWORD(GetWindowLongPtr(next, GWL_STYLE)); // only BS_...
                 nextIsButton = GetClassName(next, className, 30) != 0 &&
                                SG->StrICmp(className, "BUTTON") == 0; // &&
                                                                       // (wl == BS_PUSHBUTTON || wl == BS_DEFPUSHBUTTON ||
@@ -820,13 +821,15 @@ void CCommandErrorDialog::Transfer(CTransferInfo& ti)
 BOOL CProgressDialog::Update(DWORD current, BOOL force)
 {
     CALL_STACK_MESSAGE_NONE
-    if (force || 0 < (int)(GetTickCount() - NextUpdate) ||
+    const CMonotonicTimePoint now = CMonotonicClock::Now();
+    if (force || CMonotonicClock::HasReached(NextUpdate, now) ||
         abs((__int64)(current - Current)) > 100 ||
         current == 0 || current == 1000)
     {
         Progress->SetProgress(current, NULL);
         Current = current;
-        NextUpdate = GetTickCount() + 100;
+        // Preserve the prior strict greater-than check: refresh after 100 full milliseconds.
+        NextUpdate = now + 101;
     }
     // drain the message loop
     EmptyMessageLoop();
@@ -844,9 +847,10 @@ void CProgressDialog::CancelOperation()
         {
             SetDlgItemText(HWindow, IDS_MESSAGE, LoadStr(IDS_CANCELING));
             // disable the close button
-            LONG l = GetWindowLong(HWindow, GWL_STYLE);
+            // Keep this close-button style change portable to x64 window data.
+            LONG_PTR l = GetWindowLongPtr(HWindow, GWL_STYLE);
             l &= ~WS_SYSMENU;
-            SetWindowLong(HWindow, GWL_STYLE, l);
+            SetWindowLongPtr(HWindow, GWL_STYLE, l);
             SetWindowPos(HWindow, NULL, 0, 0, 0, 0,
                          SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_FRAMECHANGED);
             EmptyMessageLoop();
@@ -887,7 +891,8 @@ CProgressDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         DialogStackPush(HWindow);
         Progress = SalGUI->AttachProgressBar(HWindow, IDS_PROGRESS);
         SG->MultiMonCenterWindow(HWindow, Parent, FALSE);
-        NextUpdate = GetTickCount();
+        // The old strict comparison deferred a same-tick non-forced update by one millisecond.
+        NextUpdate = CMonotonicClock::DeadlineAfter(1);
         break;
     }
 

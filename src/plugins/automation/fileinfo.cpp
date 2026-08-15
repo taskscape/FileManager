@@ -15,6 +15,28 @@
 #include "fileinfo.h"
 #include "aututils.h"
 
+static int FormatAutomationDateTime(const SYSTEMTIME* time, DWORD flags, TCHAR* buffer, int bufferSize, BOOL isDate)
+{
+    // Automation exposes TCHAR metadata, so adapt named-locale text at that boundary.
+    WCHAR localeName[LOCALE_NAME_MAX_LENGTH];
+    WCHAR formatted[256];
+    if (GetUserDefaultLocaleName(localeName, ARRAYSIZE(localeName)) == 0)
+        return 0;
+    int length = isDate
+                     ? GetDateFormatEx(localeName, flags, time, NULL, formatted, ARRAYSIZE(formatted), NULL)
+                     : GetTimeFormatEx(localeName, flags, time, NULL, formatted, ARRAYSIZE(formatted));
+    if (length == 0)
+        return 0;
+#ifdef _UNICODE
+    if (length > bufferSize)
+        return 0;
+    memcpy(buffer, formatted, length * sizeof(WCHAR));
+    return length;
+#else
+    return WideCharToMultiByte(CP_ACP, 0, formatted, -1, buffer, bufferSize, NULL, NULL);
+#endif
+}
+
 CFileInfo::CFileInfo()
 {
     m_pszPath = NULL;
@@ -208,16 +230,18 @@ void CFileInfo::SetInfo(const CQuadWord& size, DATE date, UINT uValidFields)
                 len += 2;
             }
 
-            len += GetDateFormat(LOCALE_USER_DEFAULT, DATE_SHORTDATE, &time,
-                                 NULL, m_pszInfo + len, buffSize - (int)len) -
-                   1;
+            int dateLength = FormatAutomationDateTime(&time, DATE_SHORTDATE, m_pszInfo + len,
+                                                       buffSize - (int)len, TRUE);
+            if (dateLength != 0)
+                len += dateLength - 1;
 
             StringCchCat(m_pszInfo, buffSize, TEXT(", "));
             len += 2;
 
-            len += GetTimeFormat(LOCALE_USER_DEFAULT, 0, &time, NULL,
-                                 m_pszInfo + len, buffSize - (int)len) -
-                   1;
+            int timeLength = FormatAutomationDateTime(&time, 0, m_pszInfo + len,
+                                                       buffSize - (int)len, FALSE);
+            if (timeLength != 0)
+                len += timeLength - 1;
         }
     }
 }

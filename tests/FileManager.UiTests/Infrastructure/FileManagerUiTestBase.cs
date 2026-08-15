@@ -128,6 +128,25 @@ public abstract class FileManagerUiTestBase
         return WaitForWindow(window => window.Properties.NativeWindowHandle.Value != MainWindow.Properties.NativeWindowHandle.Value);
     }
 
+    protected Window OpenFtpConnectDialog()
+    {
+        // Use the real quick-connect entry point so protocol fixtures exercise the plug-in's connection state machine.
+        NativeCommands.Execute(MainWindow.Properties.NativeWindowHandle.Value, UiTestSettings.RequireFtpConnectCommand());
+        return WaitForWindow(window => window.Properties.NativeWindowHandle.Value != MainWindow.Properties.NativeWindowHandle.Value);
+    }
+
+    protected void ConnectFtpServer(Window connectDialog, string hostAddress)
+    {
+        // IDE_HOSTADDRESS is a stable plug-in resource ID; host:port preserves the production parser path.
+        var hostBox = connectDialog.FindFirstDescendant(cf => cf.ByAutomationId("563"))?.AsComboBox();
+        Assert.That(hostBox, Is.Not.Null, "FTP connect dialog did not expose its host-address field.");
+        hostBox!.Value = hostAddress;
+
+        var connectButton = connectDialog.FindFirstDescendant(cf => cf.ByAutomationId("1"))?.AsButton();
+        Assert.That(connectButton, Is.Not.Null, "FTP connect dialog did not expose its Connect button.");
+        connectButton!.Invoke();
+    }
+
     protected void CreateFtpBookmark(Window bookmarksDialog, string bookmarkName)
     {
         // These resource IDs are stable plug-in control identities, allowing UIA3 to create a bookmark without display text coupling.

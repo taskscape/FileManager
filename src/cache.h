@@ -33,6 +33,7 @@ enum CCacheRemoveType // if it's possible to remove the item from cache, when it
 
 class CDiskCache;
 class CCacheHandles;
+class CThreadOwner;
 
 class CCacheData // tmp-name, info about file or directory on disk, internal use
 {
@@ -279,7 +280,9 @@ protected:
     HANDLE TestIdle;  // event for running idle-state test - "signaled" means "test"
     HANDLE IsIdle;    // event for marking idle-state - "signaled" means "we are in idle-state"
 
-    HANDLE Thread; // watching thread
+    // The watcher can inspect cache-owned handles until Destroy has joined it,
+    // so its lifetime is retained by this owner rather than a raw HANDLE.
+    CThreadOwner* ThreadOwner;
 
     CDiskCache* DiskCache; // disk-cache, to which this object belongs
 
@@ -484,6 +487,17 @@ protected:
 
 struct CPluginData;
 
+// Temporary-copy cleanup is best effort, so overload must retain process memory rather than enqueue indefinitely.
+#define DELETE_MANAGER_QUEUE_LIMIT 4096
+
+struct CDeleteManagerQueueMetrics
+{
+    int Capacity;
+    int Queued;
+    int HighWater;
+    unsigned int Rejected;
+};
+
 struct CDeleteManagerItem
 {
     char* FileName;                   // the name of file, which should be deleted by the plugin
@@ -506,6 +520,8 @@ protected:
     BOOL WaitingForProcessing; // TRUE = message to the main window is on the way or the data
                                // processing is in progress (the added item will be processed immediately)
     BOOL BlockDataProcessing;  // TRUE = do not process data (ProcessData() does nothing)
+    int QueueHighWater;
+    unsigned int QueueRejected;
     // This registration is protected by CS so workers never retain MainWindow's raw HWND across teardown.
     HWND CallbackWindow;
     DWORD CallbackGeneration;
@@ -527,6 +543,8 @@ public:
     void RegisterCallbackWindow(HWND hWindow);
     void InvalidateCallbackWindow(HWND hWindow);
     BOOL IsCurrentCallbackWindow(HWND hWindow, DWORD generation);
+    // A snapshot lets diagnostics observe cleanup backpressure without exposing the protected queue.
+    CDeleteManagerQueueMetrics GetQueueMetrics();
 
     // called from the main thread (calls main window after receiving the message WM_USER_PROCESSDELETEMAN);
     // processing of new data - deleting files in plugins

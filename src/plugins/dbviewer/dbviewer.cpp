@@ -12,6 +12,8 @@
 #include "dbviewer.h"
 #include "auxtools.h"
 
+#include <strsafe.h>
+
 // untranslated plugin name (used before the language module is loaded + for debug cases where translation would be harmful)
 const char* READABLE_EN_PLUGIN_NAME = "Database Viewer";
 
@@ -910,7 +912,9 @@ BOOL CViewerWindow::InitCodingSubmenu()
         {
             mi.ID = CM_CODING_FIRST + menuIndex;
             mi.Type = MENU_TYPE_STRING;
-            lstrcpyn(buff, name, 1000);
+            // Conversion names are displayed through this fixed menu buffer; do not register a partial label.
+            if (FAILED(StringCchCopyA(buff, _countof(buff), name)))
+                buff[0] = 0;
             menuIndex++;
         }
         popup->InsertItem(2 + index, TRUE, &mi);
@@ -1390,7 +1394,12 @@ CViewerWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
     case WM_USER_TBGETTOOLTIP:
     {
         TOOLBAR_TOOLTIP* tt = (TOOLBAR_TOOLTIP*)lParam;
-        lstrcpy(tt->Buffer, LoadStr(ToolBarButtons[tt->Index].ToolTipResID));
+        // The host toolbar provides a fixed reply buffer; do not truncate a localized label.
+        if (tt == NULL || tt->Buffer == NULL)
+            return TRUE;
+        if (FAILED(StringCchCopyA(tt->Buffer, TOOLTIP_TEXT_MAX,
+                                  LoadStr(ToolBarButtons[tt->Index].ToolTipResID))))
+            tt->Buffer[0] = 0;
         SalamanderGUI->PrepareToolTipText(tt->Buffer, FALSE);
         return TRUE;
     }

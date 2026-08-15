@@ -3,6 +3,10 @@
 
 #include "precomp.h"
 
+#include <strsafe.h>
+
+#include "..\\..\\common\\monotonic_time.h"
+
 BOOL PathAppend(WCHAR* path, WCHAR* more, int pathSize)
 {
     CALL_STACK_MESSAGE_NONE
@@ -38,14 +42,16 @@ BOOL CutDirectory(WCHAR* path, WCHAR* cutDir, int size)
         // path not starting with a slash
         if (*path == L'\0')
             return FALSE; // nothing left to shorten
-        if (cutDir)
-            lstrcpynW(cutDir, path, size);
+        if (cutDir && size > 0)
+            // This output is a display fragment, so retain the former deliberate clipping within its caller-provided capacity.
+            StringCchCopyNW(cutDir, static_cast<size_t>(size), path, static_cast<size_t>(size - 1));
         *path = L'\0';
     }
     else
     {
-        if (cutDir)
-            lstrcpynW(cutDir, slash + 1, size);
+        if (cutDir && size > 0)
+            // This output is a display fragment, so retain the former deliberate clipping within its caller-provided capacity.
+            StringCchCopyNW(cutDir, static_cast<size_t>(size), slash + 1, static_cast<size_t>(size - 1));
         if (slash != path)
             *slash = L'\0';
         else
@@ -207,8 +213,9 @@ BOOL TestForCancel()
 {
     CALL_STACK_MESSAGE_NONE
     //  CALL_STACK_MESSAGE1("TestForCancel()");  // Petr: prilis pomaly call-stack
-    static DWORD nextTest;
-    if ((int)(GetTickCount() - nextTest) < 0)
+    // This polling deadline is private to the cancellation prompt and must remain ordered after a tick wrap.
+    static CMonotonicTimePoint nextTest;
+    if (!CMonotonicClock::HasReached(nextTest, CMonotonicClock::Now()))
         return FALSE;
 
     BOOL cancel = FALSE;
@@ -228,7 +235,7 @@ BOOL TestForCancel()
                                          LoadStr(IDS_CANCEL), LoadStr(IDS_QUESTION),
                                          MB_YESNO | MB_ICONQUESTION | MSGBOXEX_ESCAPEENABLED) == IDYES;
     UpdateWindow(SG->GetMainWindowHWND());
-    nextTest = GetTickCount() + 150;
+    nextTest = CMonotonicClock::DeadlineAfter(150);
     SG->WaitForESCRelease();
     return cancel;
 }
@@ -531,7 +538,9 @@ BOOL GetOpenFileName(HWND parent, const char* title, const char* filter, char* b
     OPENFILENAME ofn;
     char buf[200];
     char fileName[MAX_PATH];
-    lstrcpyn(buf, filter, 200);
+    // A common-dialog filter must remain complete and double-null compatible; do not pass a truncated filter to the shell.
+    if (FAILED(StringCchCopyA(buf, _countof(buf), filter)))
+        return FALSE;
     Replace(buf, '\t', '\0');
 
     memset(&ofn, 0, sizeof(OPENFILENAME));

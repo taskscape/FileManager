@@ -3,6 +3,8 @@
 
 #include "precomp.h"
 
+#include <strsafe.h>
+
 // ****************************************************************************
 //
 // CPluginFSInterface - third part
@@ -1112,7 +1114,8 @@ void CPluginFSInterface::OpenActiveFolder(const char* fsName, HWND parent)
     const char* path2 = path;
     if (*path2 == '\\')
         path2++;
-    RegSetValueEx(hKey, "LastKey", 0, REG_SZ, (LPBYTE)path2, lstrlen(path2) + 1);
+    // LastKey stores an ANSI byte count including the terminator; this panel path is bounded by the local fixed buffer.
+    RegSetValueEx(hKey, "LastKey", 0, REG_SZ, (LPBYTE)path2, static_cast<DWORD>(strlen(path2) + 1));
     RegCloseKey(hKey);
 
     // launch regedit with optional elevation (Vista/7)
@@ -1121,7 +1124,9 @@ void CPluginFSInterface::OpenActiveFolder(const char* fsName, HWND parent)
         *regEditPath = 0;
     else
         SG->SalPathAddBackslash(regEditPath, MAX_PATH);
-    lstrcat(regEditPath, "regedit.exe");
+    // Retain the old PATH-search fallback if the fixed Windows-directory buffer cannot hold the executable name.
+    if (FAILED(StringCchCatA(regEditPath, _countof(regEditPath), "regedit.exe")))
+        StringCchCopyA(regEditPath, _countof(regEditPath), "regedit.exe");
 
     SHELLEXECUTEINFO sei = {0};
     sei.cbSize = sizeof(SHELLEXECUTEINFO);

@@ -62,7 +62,7 @@ CMenuSharedResources::CMenuSharedResources()
     HParent = NULL;
     TextItemHeight = 0;
     BitmapsZoom = 1;
-    ChangeTickCount = INFINITE;
+    ChangeTickCount = MENU_CHANGE_TICK_NONE;
     HideAccel = FALSE;
 
     HCloseEvent = NULL;

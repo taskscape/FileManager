@@ -55,7 +55,8 @@ protected:
 
     const char* Title;   // caption - pointer inside the LoadStr buffer (do not keep for long)
     BOOL Cancel;         // user canceled the operation; the dialog should end as soon as possible
-    DWORD LastTickCount; // used to detect when it is time to repaint the changed data
+    // ZIP extraction can run past the 32-bit tick wrap; keep its repaint cadence monotonic.
+    ULONGLONG LastTickCount;
 
     // note: Summary, Summary2, and Lines will be NULL if memory is low; account for that in the dialog code
     CProgressBar* Summary;

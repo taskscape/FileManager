@@ -3,6 +3,8 @@
 
 #include "precomp.h"
 
+#include <strsafe.h>
+
 #include "dbviewer.rh"
 #include "dbviewer.rh2"
 #include "lang\lang.rh"
@@ -182,7 +184,11 @@ CRendererWindow::CRendererWindow(int enumFilesSourceUID, int enumFilesCurrentInd
     DragColumn = -1;
 
     AutoSelect = CfgAutoSelect;
-    lstrcpy(DefaultCoding, CfgDefaultCoding);
+    if (FAILED(StringCchCopyA(DefaultCoding, _countof(DefaultCoding), CfgDefaultCoding)))
+    {
+        // Ignore a corrupted persisted coding label rather than retaining a prefix.
+        DefaultCoding[0] = 0;
+    }
     UseCodeTable = FALSE;
     Coding[0] = 0;
 
@@ -243,7 +249,11 @@ void CRendererWindow::OnFileReOpen()
         return;
 
     char path[MAX_PATH];
-    lstrcpy(path, Database.GetFileName());
+    if (FAILED(StringCchCopyA(path, _countof(path), Database.GetFileName())))
+    {
+        // Reopen must use the complete file identity.
+        return;
+    }
     OpenFile(path, FALSE);
 }
 
@@ -417,16 +427,21 @@ void CRendererWindow::RecognizeCodePage()
             if (codePage[0] != 0)
             {
                 char conversion[205];
-                lstrcpy(conversion, codePage);
-                lstrcat(conversion, winCodePage);
+                HRESULT conversionResult = StringCchCopyA(conversion, _countof(conversion), codePage);
+                if (SUCCEEDED(conversionResult))
+                    conversionResult = StringCchCatA(conversion, _countof(conversion), winCodePage);
 
                 char codeTable[256];
-                if (lstrcmp(codePage, winCodePage) != 0 &&
+                if (SUCCEEDED(conversionResult) && lstrcmp(codePage, winCodePage) != 0 &&
                     SalGeneral->GetConversionTable(HWindow, codeTable, conversion))
                 {
                     memcpy(CodeTable, codeTable, 256);
                     UseCodeTable = TRUE;
-                    sprintf(Coding, "%s - %s", codePage, winCodePage);
+                    if (FAILED(StringCchPrintfA(Coding, _countof(Coding), "%s - %s", codePage, winCodePage)))
+                    {
+                        // A conversion can remain active without exposing a truncated label.
+                        Coding[0] = 0;
+                    }
                 }
             }
         }
@@ -459,7 +474,11 @@ void CRendererWindow::SelectConversion(const char* conversion)
         {
             memcpy(CodeTable, codeTable, 256);
             UseCodeTable = TRUE;
-            lstrcpy(Coding, conversion);
+            if (FAILED(StringCchCopyA(Coding, _countof(Coding), conversion)))
+            {
+                // A conversion can remain active without exposing a truncated label.
+                Coding[0] = 0;
+            }
         }
     }
     InvalidateRect(HWindow, NULL, TRUE);
@@ -979,7 +998,10 @@ CRendererWindow::OnEditCell()
     return;
 
   char buff[66000];
-  lstrcpyn(buff, Database.GetRecord() + col->PosInRecord, min(col->FieldSize + 1, 66000));
+  // DBF fields are counted record bytes, not necessarily terminated strings.
+  const int copiedFieldSize = min(col->FieldSize, 65999);
+  memcpy(buff, Database.GetRecord() + col->PosInRecord, copiedFieldSize);
+  buff[copiedFieldSize] = 0;
 
   cellX -= XOffset;
   int cellY = (focusY - TopIndex) * RowHeight;

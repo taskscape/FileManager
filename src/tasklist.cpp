@@ -388,8 +388,9 @@ BOOL CTaskList::Init()
 
     if (psidEveryone != NULL)
         FreeSid(psidEveryone);
+    // Kernel object creation is complete, so release the process-heap ACL backing the temporary descriptor.
     if (paclNewDacl != NULL)
-        LocalFree(paclNewDacl);
+        HeapFree(GetProcessHeap(), 0, paclNewDacl);
 
     TerminateEvent = NOHANDLES(CreateEvent(NULL, TRUE, FALSE, NULL));
     if (TerminateEvent == NULL)

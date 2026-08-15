@@ -5,6 +5,8 @@
 
 #include "salmoncl.h"
 
+#include <strsafe.h>
+
 CSalmonSharedMemory* SalmonSharedMemory = NULL;
 HANDLE SalmonFileMapping = NULL;
 HANDLE HSalmonProcess = NULL;
@@ -108,12 +110,15 @@ BOOL SalmonSharedMemInit(CSalmonSharedMemory* mem)
 
     // cestu pro bug reporty nove davame do LOCAL_APPDATA, kam standardne minidumpy uklada Windows WER
     // cestu hned nevytvarime, o to se postarame az v okamziku padu
-    if (SHGetFolderPath(NULL, CSIDL_LOCAL_APPDATA, NULL, 0, mem->BugPath) == S_OK)
+    // Resolve Local AppData through Known Folders before writing the legacy shared-memory ANSI field.
+    if (GetKnownFolderPathToAnsi(FOLDERID_LocalAppData, mem->BugPath, _countof(mem->BugPath)))
     {
-        int len = lstrlen(mem->BugPath);
+        int len = (int)strlen(mem->BugPath);
         if (len > 0 && mem->BugPath[len - 1] == '\\') // better verify the trailing backslash at the end of the path
             mem->BugPath[len - 1] = 0;
-        lstrcat(mem->BugPath, "\\Open Salamander");
+        // The shared-memory bug-report path must remain complete for the child reporter.
+        if (FAILED(StringCchCatA(mem->BugPath, _countof(mem->BugPath), "\\Open Salamander")))
+            mem->BugPath[0] = 0;
     }
 
     // zaklad jmena pro bug reporty
@@ -161,10 +166,17 @@ BOOL SalmonStartProcess(const char* fileMappingName) //Configuration.LoadedSLGNa
     ret = FALSE;
     GetModuleFileName(NULL, cmd, MAX_PATH);
     *(strrchr(cmd, '\\') + 1) = 0;
-    lstrcat(cmd, "salmon.exe");
+    // Stop launch construction if the executable path cannot retain its complete identity.
+    if (FAILED(StringCchCatA(cmd, _countof(cmd), "salmon.exe")))
+        return FALSE;
     AddDoubleQuotesIfNeeded(cmd, MAX_PATH); // CreateProcess wants names with spaces in quotes (otherwise it tries various variants, see help)
     GetStartupSLGName(slgName, sizeof(slgName));
-    wsprintf(cmd + strlen(cmd), " \"%s\" \"%s\"", fileMappingName, slgName); // slgName may be an empty string if configuration does not exist
+    // Keep the child command line bounded while retaining an empty optional language argument.
+    size_t commandLength = strlen(cmd);
+    if (commandLength >= _countof(cmd) ||
+        _snprintf_s(cmd + commandLength, _countof(cmd) - commandLength, _TRUNCATE,
+                    " \"%s\" \"%s\"", fileMappingName, slgName) < 0)
+        return FALSE;
     memset(&si, 0, sizeof(STARTUPINFO));
     si.cb = sizeof(STARTUPINFO);
     si.wShowWindow = SW_SHOWNORMAL;
@@ -176,13 +188,14 @@ BOOL SalmonStartProcess(const char* fileMappingName) //Configuration.LoadedSLGNa
     // zkusime pro child process (SALMON.EXE) rozsirit PATH env promennou o cestu k RTL
     if (GetEnvironmentVariable("PATH", envPATH, MAX_ENV_PATH) != 0)
     {
-        if (lstrlen(envPATH) + 2 + lstrlen(rtlDir) < MAX_ENV_PATH)
+        if (strlen(envPATH) + 2 + strlen(rtlDir) < MAX_ENV_PATH)
         {
             char newPATH[MAX_ENV_PATH];
-            lstrcpy(newPATH, envPATH);
-            lstrcat(newPATH, ";");
-            lstrcat(newPATH, rtlDir);
-            SetEnvironmentVariable("PATH", newPATH);
+            // Construct the child-only PATH in one bounded operation rather than concatenating into a fixed array.
+            if (SUCCEEDED(StringCchPrintfA(newPATH, _countof(newPATH), "%s;%s", envPATH, rtlDir)))
+                SetEnvironmentVariable("PATH", newPATH);
+            else
+                envPATH[0] = 0;
         }
         else
             envPATH[0] = 0;
@@ -265,10 +278,15 @@ BOOL SalmonInit()
     SalmonSharedMemory = NULL;
     char salmonFileMappingName[SALMON_FILEMAPPIN_NAME_SIZE];
     // alokace sdileneho mista v pagefile.sys
-    DWORD ti = (GetTickCount() >> 3) & 0xFFF;
+    // Fold the 64-bit uptime so the fixed-width mapping-name seed does not repeat every 49.7 days.
+    const CMonotonicTimePoint timeSeed = CMonotonicClock::Now();
+    DWORD ti = ((DWORD)(timeSeed ^ (timeSeed >> 32)) >> 3) & 0xFFF;
     while (TRUE) // look for a unique name for file-mapping
     {
-        wsprintf(salmonFileMappingName, "Salmon%X", ti++);
+        // Mapping names stay within their fixed shared-memory protocol field.
+        if (_snprintf_s(salmonFileMappingName, _countof(salmonFileMappingName), _TRUNCATE,
+                        "Salmon%X", ti++) < 0)
+            return FALSE;
         SalmonFileMapping = NOHANDLES(CreateFileMapping(INVALID_HANDLE_VALUE, NULL, PAGE_READWRITE, 0, // FIXME_X64 nepredavame x86/x64 nekompatibilni data?
                                                         sizeof(CSalmonSharedMemory), salmonFileMappingName));
         if (SalmonFileMapping == NULL || GetLastError() != ERROR_ALREADY_EXISTS)

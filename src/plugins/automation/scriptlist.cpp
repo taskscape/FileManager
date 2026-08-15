@@ -13,6 +13,7 @@
 
 #include "precomp.h"
 #include "../../common/scoped_native_resources.h"
+#include "../../common/thread_owner.h"
 #include "scriptlist.h"
 #include "scriptsite.h"
 #include "aututils.h"
@@ -268,7 +269,20 @@ HRESULT CScriptInfo::LoadOleStringFromFile(PCTSTR pszFileName, __out LPOLESTR& s
         return HRESULT_FROM_WIN32(GetLastError());
     }
 
-    cbSize = GetFileSize(hFile, NULL);
+    LARGE_INTEGER fileSize;
+    if (!GetFileSizeEx(hFile, &fileSize))
+    {
+        hr = HRESULT_FROM_WIN32(GetLastError());
+        CloseHandle(hFile);
+        return hr;
+    }
+    // MultiByteToWideChar takes an int count, so reject scripts that cannot be represented by this loader.
+    if (fileSize.QuadPart < 0 || fileSize.QuadPart > INT_MAX)
+    {
+        CloseHandle(hFile);
+        return HRESULT_FROM_WIN32(ERROR_FILE_TOO_LARGE);
+    }
+    cbSize = (DWORD)fileSize.QuadPart;
     if (cbSize == 0)
     {
         CloseHandle(hFile);
@@ -431,22 +445,18 @@ bool CScriptInfo::ExecuteWorker(EXECUTION_INFO* info)
 
 bool CScriptInfo::ExecuteInSeparateThread(EXECUTION_INFO* info)
 {
-    HANDLE hThread;
-
     info->pInstance = this;
     info->bAsyncResult = false;
 
-    hThread = CreateThread(NULL, 0, ExecuteEntryProc, info, 0, NULL);
-    if (hThread != NULL)
-    {
-        WaitForSingleObject(hThread, INFINITE);
-        CloseHandle(hThread);
-    }
+    // The caller's stack record remains valid until this owner has joined its message-loop worker.
+    CThreadOwner executionThread;
+    if (executionThread.Start(ExecuteEntryProc, info, "Automation execution"))
+        executionThread.StopAndJoin(CThreadShutdownDeadline("automation execution"));
 
     return info->bAsyncResult;
 }
 
-DWORD WINAPI CScriptInfo::ExecuteEntryProc(void* arg)
+DWORD WINAPI CScriptInfo::ExecuteEntryProc(void* arg, HANDLE)
 {
     HRESULT hr;
     CScriptInfo* that;
@@ -752,7 +762,8 @@ bool CScriptLookup::Load(HKEY hKey, CSalamanderRegistryAbstract* registry)
         }
     }
 
-    m_dwLastRefreshTime = GetTickCount();
+    // Script-list refresh throttling is private to this lookup object, so it does not need a wrapping timestamp.
+    m_dwLastRefreshTime = CMonotonicClock::Now();
 
     return true;
 }
@@ -1256,7 +1267,7 @@ bool CScriptLookup::Refresh(bool bForce)
 {
     bool res;
 
-    if (GetTickCount() - m_dwLastRefreshTime < 5000 && !bForce)
+    if (!bForce && !CMonotonicClock::HasElapsed(m_dwLastRefreshTime, 5000, CMonotonicClock::Now()))
     {
         // ignore refresh request if it comes too early
         // since the last one (this prevents excessive

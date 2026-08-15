@@ -6,6 +6,7 @@
 #include <windows.h>
 #include <crtdbg.h>
 #include <ostream>
+#include <strsafe.h>
 
 #if defined(_DEBUG) && defined(_MSC_VER) // without passing file+line to 'new' operator, list of memory leaks shows only 'crtdbg.h(552)'
 #define new new (_NORMAL_BLOCK, __FILE__, __LINE__)
@@ -134,7 +135,12 @@ public:
                     return;
                 }
             }
-            lstrcpyn(UsedModules[UsedModulesCount++], fileName, MAX_PATH);
+            // A truncated module path could make leak diagnostics load a different image.
+            if (SUCCEEDED(StringCchCopy(UsedModules[UsedModulesCount],
+                                        _countof(UsedModules[UsedModulesCount]), fileName)))
+                UsedModulesCount++;
+            else
+                TRACE_E("C__GCHeapInit::AddUsedModule(): module name is too long for the diagnostic ledger!");
         }
         else
             TRACE_E("C__GCHeapInit::AddUsedModule(): insufficient reserve for module names, please enlarge GCHEAP_MAX_USED_MODULES!");

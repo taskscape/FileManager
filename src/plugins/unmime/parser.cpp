@@ -112,6 +112,8 @@
 
 #include "precomp.h"
 
+#include <strsafe.h>
+
 #include "unmime.rh"
 #include "unmime.rh2"
 #include "lang\lang.rh"
@@ -283,14 +285,18 @@ void CInputFile::SavePosition()
 
 void CInputFile::RestorePosition()
 {
-    iBufPos = iSavedBufPos;
-    iCurrentLine = iSavedCurrentLine;
     if (iFilePos != iSavedFilePos)
     {
-        SetFilePointer(hFile, iSavedFilePos, NULL, FILE_BEGIN);
+        LARGE_INTEGER savedPosition;
+        savedPosition.QuadPart = iSavedFilePos;
+        // Do not restore parser metadata unless the file handle reached the saved byte position.
+        if (!SetFilePointerEx(hFile, savedPosition, NULL, FILE_BEGIN))
+            return;
         ReadFile(hFile, pBuffer, TEXTBUFSIZE, (DWORD*)&iNumRead, NULL);
         iFilePos = iSavedFilePos;
     }
+    iBufPos = iSavedBufPos;
+    iCurrentLine = iSavedCurrentLine;
 }
 
 // ****************************************************************************
@@ -514,7 +520,11 @@ static BOOL ParseHeader(LPCSTR pszLine, LPSTR pszName, int iMaxName, LPSTR pszTe
         return FALSE;
     }
     SkipCWSP(pszLine);
-    lstrcpyn(pszText, pszLine, iMaxText);
+    if (iMaxText > 0)
+    {
+        // Header text is intentionally clipped to the caller's parser field capacity.
+        StringCchCopyNA(pszText, static_cast<size_t>(iMaxText), pszLine, static_cast<size_t>(iMaxText - 1));
+    }
     return TRUE;
 }
 

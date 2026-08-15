@@ -3,6 +3,7 @@
 // CommentsTranslationProject: TRANSLATED
 
 #include "precomp.h"
+#include "..\\..\\common\\monotonic_time.h"
 
 CClosedCtrlConChecker ClosedCtrlConChecker; // handles informing the user about "control connection" closure outside of operations
 CListingCache ListingCache;                 // cache of directory listings on servers (used when changing and listing directories)
@@ -128,8 +129,9 @@ CControlConnectionSocket::~CControlConnectionSocket()
 DWORD
 CControlConnectionSocket::GetTimeFromStart()
 {
-    DWORD t = GetTickCount();
-    return t - StartTime; // works even for t < StartTime (tick counter wraparound)
+    const CMonotonicDuration elapsed = CMonotonicClock::Elapsed(StartTime, CMonotonicClock::Now());
+    // The wait-window API is DWORD-based; retain its contract without reintroducing a wrap-prone source clock.
+    return elapsed > MAXDWORD ? MAXDWORD : (DWORD)elapsed;
 }
 
 DWORD
@@ -228,8 +230,11 @@ void CControlConnectionSocket::WaitForEventOrESC(HWND parent, CControlConnection
                         milliseconds, waitForUserIfaceFinish);
 
     const DWORD cycleTime = 200; // period of testing the ESC key press in ms (200 = 5 times per second)
-    DWORD timeStart = GetTickCount();
-    DWORD restOfWaitTime = milliseconds; // remaining waiting time
+    const BOOL hasTimeout = (DWORD)milliseconds != INFINITE;
+    const CMonotonicDuration timeoutMilliseconds = hasTimeout && milliseconds > 0 ? (CMonotonicDuration)milliseconds : 0;
+    // Recompute from one deadline so message pumping cannot extend the caller's timeout.
+    const CMonotonicTimePoint waitDeadline = hasTimeout ? CMonotonicClock::DeadlineAfter(timeoutMilliseconds) : 0;
+    DWORD restOfWaitTime = hasTimeout ? CMonotonicClock::RemainingWin32TimerDelay(waitDeadline, CMonotonicClock::Now()) : 0;
 
     HANDLE watchedEvent;
     BOOL watchingUserIface;
@@ -256,7 +261,7 @@ void CControlConnectionSocket::WaitForEventOrESC(HWND parent, CControlConnection
     while (1)
     {
         DWORD waitTime;
-        if (milliseconds != INFINITE)
+        if (hasTimeout)
             waitTime = min(cycleTime, restOfWaitTime);
         else
             waitTime = cycleTime;
@@ -318,14 +323,8 @@ void CControlConnectionSocket::WaitForEventOrESC(HWND parent, CControlConnection
                 }
             }
         }
-        if (milliseconds != INFINITE) // recalculate the remaining waiting time (based on real time)
-        {
-            DWORD t = GetTickCount() - timeStart; // works even when the tick counter wraps around
-            if (t < (DWORD)milliseconds)
-                restOfWaitTime = (DWORD)milliseconds - t;
-            else
-                restOfWaitTime = 0; // let it report the timeout (we must not do it ourselves - the event has priority over the timeout)
-        }
+        if (hasTimeout) // let the next wait report expiry so a queued event retains priority
+            restOfWaitTime = CMonotonicClock::RemainingWin32TimerDelay(waitDeadline, CMonotonicClock::Now());
     }
 }
 
@@ -505,7 +504,8 @@ HWND FindPopupParent(HWND wnd)
     HWND win = wnd;
     for (;;)
     {
-        HWND w = (GetWindowLong(win, GWL_STYLE) & WS_CHILD) ? GetParent(win) : NULL;
+        // Use pointer-width access so the child-style probe stays safe on x64.
+        HWND w = (GetWindowLongPtr(win, GWL_STYLE) & WS_CHILD) ? GetParent(win) : NULL;
         if (w == NULL)
             break;
         win = w;
@@ -694,16 +694,16 @@ RETRY_LABEL:
                 waitWnd.SetText(buf);
                 waitWnd.Create(GetWaitTime(showWaitWndTime));
 
-                DWORD start = GetTickCount();
+                // DNS can emit unrelated socket events; retain one deadline instead of extending the reply timeout per wake-up.
+                const CMonotonicDuration resolveTimeoutMilliseconds = resolveTimeout > 0 ? (CMonotonicDuration)resolveTimeout : 0;
+                const CMonotonicTimePoint resolveDeadline = CMonotonicClock::DeadlineAfter(resolveTimeoutMilliseconds);
                 while (state == sccsGetIP)
                 {
                     // wait for an event on the socket (receiving the resolved IP address) or ESC
                     CControlConnectionSocketEvent event;
                     DWORD data1, data2;
-                    DWORD now = GetTickCount();
-                    if (now - start > (DWORD)resolveTimeout)
-                        now = start + (DWORD)resolveTimeout;
-                    WaitForEventOrESC(parent, &event, &data1, &data2, resolveTimeout - (now - start),
+                    const DWORD remainingWait = CMonotonicClock::RemainingWin32TimerDelay(resolveDeadline, CMonotonicClock::Now());
+                    WaitForEventOrESC(parent, &event, &data1, &data2, remainingWait,
                                       &waitWnd, NULL, FALSE);
                     switch (event)
                     {
@@ -769,11 +769,12 @@ RETRY_LABEL:
 
             SYSTEMTIME st;
             GetLocalTime(&st);
-            if (GetDateFormat(LOCALE_USER_DEFAULT, DATE_SHORTDATE, &st, NULL, errBuf, 50) == 0)
+            if (FormatUserDateTimeAnsi(&st, DATE_SHORTDATE, errBuf, 50, TRUE) == 0)
                 sprintf(errBuf, "%u.%u.%u", st.wDay, st.wMonth, st.wYear);
             strcat(errBuf, " - ");
-            if (GetTimeFormat(LOCALE_USER_DEFAULT, 0, &st, NULL, errBuf + strlen(errBuf), 50) == 0)
-                sprintf(errBuf + strlen(errBuf), "%u:%02u:%02u", st.wHour, st.wMinute, st.wSecond);
+            size_t timeOffset = strlen(errBuf);
+            if (timeOffset < 50 && FormatUserDateTimeAnsi(&st, 0, errBuf + timeOffset, 50 - (int)timeOffset, FALSE) == 0)
+                _snprintf_s(errBuf + timeOffset, 50 - timeOffset, _TRUNCATE, "%u:%02u:%02u", st.wHour, st.wMinute, st.wSecond);
 
             HANDLES(EnterCriticalSection(&SocketCritSect));
 
@@ -857,16 +858,16 @@ RETRY_LABEL:
                 waitWnd.SetText(buf);
                 waitWnd.Create(GetWaitTime(showWaitWndTime));
 
-                DWORD start = GetTickCount();
+                const CMonotonicDuration connectTimeoutMilliseconds = connectTimeout > 0 ? (CMonotonicDuration)connectTimeout : 0;
+                // Keep one deadline across socket wake-ups so a busy connection cannot extend its timeout.
+                const CMonotonicTimePoint connectDeadline = CMonotonicClock::DeadlineAfter(connectTimeoutMilliseconds);
                 while (state == sccsConnect)
                 {
                     // wait for an event on the socket (opening the connection to the server) or ESC
                     CControlConnectionSocketEvent event;
                     DWORD data1, data2;
-                    DWORD now = GetTickCount();
-                    if (now - start > (DWORD)connectTimeout)
-                        now = start + (DWORD)connectTimeout;
-                    WaitForEventOrESC(parent, &event, &data1, &data2, connectTimeout - (now - start),
+                    const DWORD remainingWait = CMonotonicClock::RemainingWin32TimerDelay(connectDeadline, CMonotonicClock::Now());
+                    WaitForEventOrESC(parent, &event, &data1, &data2, remainingWait,
                                       &waitWnd, NULL, FALSE);
                     switch (event)
                     {
@@ -1076,19 +1077,25 @@ RETRY_LABEL:
                     CControlConnectionSocketEvent event;
                     DWORD data1, data2;
                     BOOL run = TRUE;
-                    DWORD start = GetTickCount();
+                    const CMonotonicDuration retryDelayMilliseconds = delayBetweenConRetries > 0 ?
+                                                                         (CMonotonicDuration)delayBetweenConRetries * 1000 :
+                                                                         0;
+                    // Keep the retry countdown tied to one monotonic deadline despite dialog wake-ups.
+                    const CMonotonicTimePoint retryDeadline = CMonotonicClock::DeadlineAfter(retryDelayMilliseconds);
+                    CMonotonicTimePoint previousRetrySample = 0;
                     while (run)
                     {
-                        DWORD now = GetTickCount();
-                        if (now - start < (DWORD)delayBetweenConRetries * 1000)
+                        const CMonotonicTimePoint retryNow = CMonotonicClock::Now();
+                        if (!CMonotonicClock::HasReached(retryDeadline, retryNow))
                         { // rebuild the text for the retry wait window (contains the countdown)
-                            DWORD wait = delayBetweenConRetries * 1000 - (now - start);
-                            if (now != start) // it makes no sense the first time
+                            DWORD wait = CMonotonicClock::RemainingWin32TimerDelay(retryDeadline, retryNow);
+                            if (previousRetrySample != 0) // it makes no sense the first time
                             {
                                 _snprintf_s(retryBuf, _TRUNCATE, LoadStr(IDS_WAITINGTORETRYSUF), buf, (1 + (wait - 1) / 1000),
                                             attemptNum, Config.GetConnectRetries() + 1);
                                 waitWnd.SetText(retryBuf);
                             }
+                            previousRetrySample = retryNow;
                             BOOL notTimeout = FALSE; // TRUE = it cannot be a timeout
                             if (wait > 1500)
                             {
@@ -1181,16 +1188,16 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
             waitWnd.SetText(LoadStr(IDS_WAITINGFORLOGIN));
             waitWnd.Create(GetWaitTime(showWaitWndTime));
 
-            DWORD start = GetTickCount();
+            const CMonotonicDuration protocolTimeoutMilliseconds = protocolTimeout > 0 ? (CMonotonicDuration)protocolTimeout : 0;
+            // Preserve the protocol budget when partial server replies wake the wait loop.
+            const CMonotonicTimePoint serverReadyDeadline = CMonotonicClock::DeadlineAfter(protocolTimeoutMilliseconds);
             while (state == sccsServerReady)
             {
                 // wait for an event on the socket (server reply) or ESC
                 CControlConnectionSocketEvent event;
                 DWORD data1, data2;
-                DWORD now = GetTickCount();
-                if (now - start > (DWORD)protocolTimeout)
-                    now = start + (DWORD)protocolTimeout;
-                WaitForEventOrESC(parent, &event, &data1, &data2, protocolTimeout - (now - start),
+                const DWORD remainingWait = CMonotonicClock::RemainingWin32TimerDelay(serverReadyDeadline, CMonotonicClock::Now());
+                WaitForEventOrESC(parent, &event, &data1, &data2, remainingWait,
                                   &waitWnd, NULL, FALSE);
                 switch (event)
                 {
@@ -1532,17 +1539,17 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
                                 waitWnd.SetText(buf);
                                 waitWnd.Create(GetWaitTime(showWaitWndTime));
 
-                                DWORD start = GetTickCount();
+                                const CMonotonicDuration protocolTimeoutMilliseconds = protocolTimeout > 0 ? (CMonotonicDuration)protocolTimeout : 0;
+                                // A command's deadline must survive write-completion and partial-reply events.
+                                const CMonotonicTimePoint loginCommandDeadline = CMonotonicClock::DeadlineAfter(protocolTimeoutMilliseconds);
                                 BOOL replyReceived = FALSE;
                                 while (!allBytesWritten || state == sccsProcessLoginScript && !replyReceived)
                                 {
                                     // wait for an event on the socket (server reply) or ESC
                                     CControlConnectionSocketEvent event;
                                     DWORD data1, data2;
-                                    DWORD now = GetTickCount();
-                                    if (now - start > (DWORD)protocolTimeout)
-                                        now = start + (DWORD)protocolTimeout;
-                                    WaitForEventOrESC(parent, &event, &data1, &data2, protocolTimeout - (now - start),
+                                    const DWORD remainingWait = CMonotonicClock::RemainingWin32TimerDelay(loginCommandDeadline, CMonotonicClock::Now());
+                                    WaitForEventOrESC(parent, &event, &data1, &data2, remainingWait,
                                                       &waitWnd, NULL, FALSE);
                                     switch (event)
                                     {

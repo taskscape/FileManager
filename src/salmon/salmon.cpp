@@ -3,6 +3,9 @@
 
 #include "precomp.h"
 
+// Owns the report-directory substring while establishing the encrypted storage boundary.
+#include <string>
+
 #include <Shlobj.h>
 #include <Shellapi.h>
 #include <Sddl.h>
@@ -372,48 +375,143 @@ BOOL RestartSalamander(HWND hParent)
 // CleanBugReportsDirectory
 //
 
+namespace
+{
+const size_t CrashReportMaximumPathLength = 32767;
+
+BOOL IsSafeCrashReportBaseName(const char* baseName)
+{
+    // Report names originate on disk, so never let a malformed name turn a cleanup request into a parent-path deletion.
+    return baseName != NULL && *baseName != 0 && strpbrk(baseName, "\\/:*") == NULL;
+}
+
+BOOL DeleteNamedCrashReportArtifact(const char* baseName, const char* extension)
+{
+    if (!IsSafeCrashReportBaseName(baseName) || extension == NULL || *extension != '.')
+    {
+        SetLastError(ERROR_INVALID_NAME);
+        return FALSE;
+    }
+
+    std::string path(BugReportPath);
+    if (path.empty())
+    {
+        SetLastError(ERROR_PATH_NOT_FOUND);
+        return FALSE;
+    }
+    if (path[path.size() - 1] != '\\')
+        path.append("\\");
+    path.append(baseName);
+    path.append(extension);
+    if (path.size() > CrashReportMaximumPathLength)
+    {
+        SetLastError(ERROR_INSUFFICIENT_BUFFER);
+        return FALSE;
+    }
+
+    CWidePath widePath(path.c_str());
+    const WCHAR* apiPath = widePath.GetFullPathForWin32Api();
+    if (apiPath == NULL)
+        return FALSE;
+
+    if (DeleteFileW(apiPath) || GetLastError() == ERROR_FILE_NOT_FOUND)
+        return TRUE;
+    return FALSE;
+}
+}
+
 BOOL CleanBugReportsDirectory(BOOL keep7ZipArchives)
 {
-    char path[MAX_PATH];
-    strcpy(path, BugReportPath);
-    if (strlen(path) == 0)
+    if (BugReportPath[0] == 0)
         return FALSE;
-    if (*(path + strlen(path) - 1) != '\\')
-        strcat(path, "\\");
-    char* name = path + strlen(path);
+
+    // Use a fixed artifact allowlist instead of the legacy "base.*" wildcard, preserving unrelated user files.
+    const char* extensions[] = {".DMP", ".TXT", ".INF", ".OPS", ".7Z"};
+    BOOL ret = TRUE;
     for (int i = 0; i < BugReports.Count; i++)
     {
-        strcpy(name, BugReports[i].Name);
-        strcat(name, ".*");
-        WIN32_FIND_DATA find;
-        HANDLE hFind = FindFirstFile(path, &find);
-        if (hFind != INVALID_HANDLE_VALUE)
+        for (int j = 0; j < _countof(extensions); j++)
         {
-            do
-            {
-                if ((find.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) == 0)
-                {
-                    if (find.cFileName[0] != 0 && strcmp(find.cFileName, ".") != 0 && strcmp(find.cFileName, "..") != 0)
-                    {
-                        BOOL skipDelete = FALSE;
-                        if (keep7ZipArchives)
-                        {
-                            const char* ext = strrchr(find.cFileName, '.');
-                            if (ext != NULL && _stricmp(ext, ".7z") == 0)
-                                skipDelete = TRUE;
-                        }
-                        if (!skipDelete)
-                        {
-                            strcpy(name, find.cFileName);
-                            DeleteFile(path);
-                        }
-                    }
-                }
-            } while (FindNextFile(hFind, &find));
-            FindClose(hFind);
+            if (keep7ZipArchives && _stricmp(extensions[j], ".7Z") == 0)
+                continue;
+            if (!DeleteNamedCrashReportArtifact(BugReports[i].Name, extensions[j]))
+                ret = FALSE;
         }
     }
-    return TRUE;
+    return ret;
+}
+
+BOOL EnsureCrashReportDirectoryEncrypted(const char* reportFileName)
+{
+    if (reportFileName == NULL || *reportFileName == 0)
+    {
+        SetLastError(ERROR_INVALID_PARAMETER);
+        return FALSE;
+    }
+
+    std::string directory(reportFileName);
+    std::string::size_type separator = directory.find_last_of('\\');
+    if (separator == std::string::npos)
+    {
+        SetLastError(ERROR_BAD_PATHNAME);
+        return FALSE;
+    }
+    directory.resize(separator);
+    CWidePath directoryPath(directory.c_str());
+    const WCHAR* apiPath = directoryPath.GetFullPathForWin32Api();
+    if (apiPath == NULL)
+        return FALSE;
+
+    DWORD attributes = GetFileAttributesW(apiPath);
+    if (attributes == INVALID_FILE_ATTRIBUTES || (attributes & FILE_ATTRIBUTE_DIRECTORY) == 0)
+        return FALSE;
+    if ((attributes & FILE_ATTRIBUTE_ENCRYPTED) != 0)
+        return TRUE;
+
+    // Encrypt the directory before opening its first artifact so NTFS encrypts
+    // every subsequent crash file transparently for the reporting process.
+    return EncryptFileW(apiPath);
+}
+
+namespace
+{
+const ULONGLONG CrashReportRetentionTicks = 30ULL * 24 * 60 * 60 * 10000000ULL;
+
+BOOL IsRetainedCrashReportArtifact(const char* name)
+{
+    const char* extension = name != NULL ? strrchr(name, '.') : NULL;
+    return extension != NULL && (_stricmp(extension, ".DMP") == 0 || _stricmp(extension, ".TXT") == 0 ||
+                                _stricmp(extension, ".INF") == 0 || _stricmp(extension, ".OPS") == 0 ||
+                                _stricmp(extension, ".7Z") == 0);
+}
+
+void DeleteExpiredCrashReportArtifacts()
+{
+    char pattern[MAX_PATH];
+    _snprintf_s(pattern, _countof(pattern), _TRUNCATE, "%s*.*", BugReportPath);
+    WIN32_FIND_DATA find;
+    HANDLE findHandle = FindFirstFile(pattern, &find);
+    if (findHandle == INVALID_HANDLE_VALUE)
+        return;
+
+    FILETIME now;
+    GetSystemTimeAsFileTime(&now);
+    ULARGE_INTEGER nowValue = {now.dwLowDateTime, now.dwHighDateTime};
+    do
+    {
+        if ((find.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) != 0 || !IsRetainedCrashReportArtifact(find.cFileName))
+            continue;
+        ULARGE_INTEGER written = {find.ftLastWriteTime.dwLowDateTime, find.ftLastWriteTime.dwHighDateTime};
+        if (nowValue.QuadPart < written.QuadPart || nowValue.QuadPart - written.QuadPart <= CrashReportRetentionTicks)
+            continue;
+
+        char expiredPath[MAX_PATH];
+        _snprintf_s(expiredPath, _countof(expiredPath), _TRUNCATE, "%s%s", BugReportPath, find.cFileName);
+        // Retention deletes only known reporter extensions; arbitrary user files in this directory remain untouched.
+        DeleteFile(expiredPath);
+    } while (FindNextFile(findHandle, &find));
+    FindClose(findHandle);
+}
 }
 
 //------------------------------------------------------------------------------------------------
@@ -458,6 +556,10 @@ BOOL GetBugReportNames()
     // if the directory does not exist, it cannot contain reports
     if (!DirExists(BugReportPath))
         return FALSE;
+
+    // Expire only after the report directory is known to exist so failed path
+    // setup cannot turn a retention check into a broad filesystem operation.
+    DeleteExpiredCrashReportArtifacts();
 
     // look for reports by extension
     char findPath[MAX_PATH];
@@ -687,10 +789,11 @@ SECURITY_ATTRIBUTES* CreateAccessableSecurityAttributes(SECURITY_ATTRIBUTES* sa,
     }
 
     nAclSize = GetLengthSid(psidEveryone) * 2 + sizeof(ACCESS_ALLOWED_ACE) + sizeof(ACCESS_DENIED_ACE) + sizeof(ACL);
-    *paclNewDacl = (PACL)LocalAlloc(LPTR, nAclSize);
+    // The ACL is local Salmon state and is only borrowed during mutex creation.
+    *paclNewDacl = (PACL)HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, nAclSize);
     if (*paclNewDacl == NULL)
     {
-        TRACE_E("CreateAccessableSecurityAttributes(): LocalAlloc() failed!");
+        TRACE_E("CreateAccessableSecurityAttributes(): HeapAlloc() failed!");
         goto ErrorExit;
     }
     if (!InitializeAcl(*paclNewDacl, nAclSize, ACL_REVISION))
@@ -726,7 +829,7 @@ SECURITY_ATTRIBUTES* CreateAccessableSecurityAttributes(SECURITY_ATTRIBUTES* sa,
 ErrorExit:
     if (*paclNewDacl != NULL)
     {
-        LocalFree(*paclNewDacl);
+        HeapFree(GetProcessHeap(), 0, *paclNewDacl);
         *paclNewDacl = NULL;
     }
     if (*psidEveryone != NULL)
@@ -849,8 +952,9 @@ void CMainDialogMutex::Init()
 
     if (psidEveryone != NULL)
         FreeSid(psidEveryone);
+    // The mutex retained the security descriptor during creation; release its process-heap ACL backing.
     if (paclNewDacl != NULL)
-        LocalFree(paclNewDacl);
+        HeapFree(GetProcessHeap(), 0, paclNewDacl);
 }
 
 BOOL CMainDialogMutex::Enter()

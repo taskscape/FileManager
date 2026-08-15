@@ -26,6 +26,128 @@ DWORD CPluginFSInterfaceEncapsulation::PluginFSTime = 1; // zero is used as the 
 
 // ****************************************************************************
 
+static BOOL IsReadablePluginContractProtection(DWORD protection)
+{
+    const DWORD baseProtection = protection & 0xFF;
+    return baseProtection == PAGE_READONLY || baseProtection == PAGE_READWRITE || baseProtection == PAGE_WRITECOPY ||
+           baseProtection == PAGE_EXECUTE_READ || baseProtection == PAGE_EXECUTE_READWRITE ||
+           baseProtection == PAGE_EXECUTE_WRITECOPY;
+}
+
+static BOOL IsReadablePluginContractAddress(const void* address, SIZE_T byteCount)
+{
+    MEMORY_BASIC_INFORMATION memory;
+    if (address == NULL || VirtualQuery(address, &memory, sizeof(memory)) != sizeof(memory) ||
+        memory.State != MEM_COMMIT || (memory.Protect & PAGE_GUARD) != 0 ||
+        !IsReadablePluginContractProtection(memory.Protect))
+        return FALSE;
+
+    const SIZE_T offset = (const BYTE*)address - (const BYTE*)memory.BaseAddress;
+    return offset <= memory.RegionSize && byteCount <= memory.RegionSize - offset;
+}
+
+static BOOL ValidatePluginInterfaceResult(const void* pluginInterface, const char* contractName)
+{
+    if (pluginInterface == NULL)
+        return TRUE; // Capability interfaces are optional; callers validate required capabilities separately.
+
+    const void* vtable = NULL;
+    // A malicious or incompatible plug-in can return an arbitrary pointer. Read
+    // only its vtable slot under SEH before the host stores or dispatches it.
+    __try
+    {
+        if (!IsReadablePluginContractAddress(pluginInterface, sizeof(vtable)))
+            return FALSE;
+        vtable = *(const void* const*)pluginInterface;
+    }
+    __except (EXCEPTION_EXECUTE_HANDLER)
+    {
+        return FALSE;
+    }
+
+    if (!IsReadablePluginContractAddress(vtable, sizeof(void*)))
+    {
+        TRACE_E("Plug-in returned an unreadable " << contractName << " interface.");
+        return FALSE;
+    }
+    return TRUE;
+}
+
+static BOOL ValidatePluginContractString(const char* value, SIZE_T maximumLength, BOOL requireNonEmpty)
+{
+    if (value == NULL)
+        return FALSE;
+
+    const char* cursor = value;
+    SIZE_T remaining = maximumLength + 1;
+    while (remaining != 0)
+    {
+        MEMORY_BASIC_INFORMATION memory;
+        if (VirtualQuery(cursor, &memory, sizeof(memory)) != sizeof(memory) || memory.State != MEM_COMMIT ||
+            (memory.Protect & PAGE_GUARD) != 0 || !IsReadablePluginContractProtection(memory.Protect))
+            return FALSE;
+
+        const SIZE_T offset = (const BYTE*)cursor - (const BYTE*)memory.BaseAddress;
+        if (offset >= memory.RegionSize)
+            return FALSE;
+        SIZE_T available = memory.RegionSize - offset;
+        if (available > remaining)
+            available = remaining;
+
+        // Scan only readable committed pages so a malformed plug-in string cannot cross into an invalid page.
+        __try
+        {
+            // Do not inspect even the first byte until its committed page has been verified.
+            if (cursor == value && requireNonEmpty && *cursor == 0)
+                return FALSE;
+            if (memchr(cursor, 0, available) != NULL)
+                return TRUE;
+        }
+        __except (EXCEPTION_EXECUTE_HANDLER)
+        {
+            return FALSE;
+        }
+        cursor += available;
+        remaining -= available;
+    }
+    return FALSE;
+}
+
+static BOOL ValidatePluginContractIcon(HICON icon, BOOL destroyIcon)
+{
+    // Returned icon ownership has only two valid states; normalize it before a host caller can destroy an arbitrary handle.
+    if (destroyIcon != FALSE && destroyIcon != TRUE)
+        return FALSE;
+    if (icon == NULL)
+        return destroyIcon == FALSE;
+
+    ICONINFO iconInfo;
+    ZeroMemory(&iconInfo, sizeof(iconInfo));
+    if (!GetIconInfo(icon, &iconInfo))
+        return FALSE;
+
+    // GetIconInfo returns host-owned bitmap copies, which must not accumulate while validating plug-in output.
+    if (iconInfo.hbmMask != NULL)
+        DeleteObject(iconInfo.hbmMask);
+    if (iconInfo.hbmColor != NULL)
+        DeleteObject(iconInfo.hbmColor);
+    return TRUE;
+}
+
+static BOOL StorePluginOutputIndex(int* output, int value)
+{
+    // Keep SEH isolated from loader RAII scopes while rejecting a bad plug-in output pointer.
+    __try
+    {
+        *output = value;
+        return TRUE;
+    }
+    __except (EXCEPTION_EXECUTE_HANDLER)
+    {
+        return FALSE;
+    }
+}
+
 class CPluginDataLock
 {
 public:
@@ -93,6 +215,11 @@ public:
 
     void SetReturnedInterface(CPluginInterfaceAbstract* pluginIface)
     {
+        if (!ValidatePluginInterfaceResult(pluginIface, "entry-point"))
+        {
+            TRACE_E("Plug-in entry point returned an invalid interface pointer.");
+            pluginIface = NULL;
+        }
         CPluginDataLock dataLock;
         PluginIface.Init(pluginIface, BuiltForVersion);
         EntryReturned = TRUE;
@@ -302,7 +429,20 @@ BOOL CPluginFSInterfaceEncapsulation::GetChangeDriveOrDisconnectItem(const char*
     {
         EnterPlugin();
         BOOL r = FALSE;
+        // An exception or malformed callback result must not retain stale caller-owned output values.
+        title = NULL;
+        icon = NULL;
+        destroyIcon = FALSE;
         PLUGIN_CALLBACK(Iface, "GetChangeDriveOrDisconnectItem", r = Interface->GetChangeDriveOrDisconnectItem(fsName, title, icon, destroyIcon));
+        // A successful callback hands text and an optionally-owned icon to the drive list; validate both before retention.
+        if (r && (!ValidatePluginContractString(title, 4096, TRUE) || !ValidatePluginContractIcon(icon, destroyIcon)))
+        {
+            TRACE_E("CPluginFSInterfaceEncapsulation::GetChangeDriveOrDisconnectItem(): invalid plug-in title or icon result!");
+            title = NULL;
+            icon = NULL;
+            destroyIcon = FALSE;
+            r = FALSE;
+        }
         if (r && icon != NULL && destroyIcon) // add the handle for 'icon' to HANDLES
             HANDLES_ADD(__htIcon, __hoLoadImage, icon);
         LeavePlugin();
@@ -321,7 +461,15 @@ CPluginFSInterfaceEncapsulation::GetFSIcon(BOOL& destroyIcon)
     {
         EnterPlugin();
         HICON r = NULL;
+        // Start from no ownership so a failing callback cannot make the host destroy a stale icon handle.
+        destroyIcon = FALSE;
         PLUGIN_CALLBACK(Iface, "GetFSIcon", r = Interface->GetFSIcon(destroyIcon));
+        if (!ValidatePluginContractIcon(r, destroyIcon))
+        {
+            TRACE_E("CPluginFSInterfaceEncapsulation::GetFSIcon(): invalid plug-in icon result!");
+            r = NULL;
+            destroyIcon = FALSE;
+        }
         if (r != NULL && destroyIcon) // add the handle of the returned icon to HANDLES
             HANDLES_ADD(__htIcon, __hoLoadImage, r);
         LeavePlugin();
@@ -744,6 +892,13 @@ void CSalamanderDebug::Pop(CCallStackMsgContext* callStackMsgContext)
 
 void CSalamanderConnect::AddCustomPacker(const char* title, const char* defaultExtension, BOOL update)
 {
+    // Registration strings remain plug-in-owned until this bounded validation succeeds.
+    if (!ValidatePluginContractString(title, 4096, TRUE) ||
+        !ValidatePluginContractString(defaultExtension, MAX_PATH - 1, FALSE))
+    {
+        TRACE_E("CSalamanderConnect::AddCustomPacker(): invalid plug-in registration string!");
+        return;
+    }
     CALL_STACK_MESSAGE4("CSalamanderConnect::AddCustomPacker(%s, %s, %d)", title, defaultExtension, update);
     if (CustomPack)
     {
@@ -770,6 +925,13 @@ void CSalamanderConnect::AddCustomPacker(const char* title, const char* defaultE
 
 void CSalamanderConnect::AddCustomUnpacker(const char* title, const char* masks, BOOL update)
 {
+    // Bound masks before tracing because configuration retains a host-owned copy only later.
+    if (!ValidatePluginContractString(title, 4096, TRUE) ||
+        !ValidatePluginContractString(masks, MAX_PATH - 1, FALSE))
+    {
+        TRACE_E("CSalamanderConnect::AddCustomUnpacker(): invalid plug-in registration string!");
+        return;
+    }
     CALL_STACK_MESSAGE4("CSalamanderConnect::AddCustomUnpacker(%s, %s, %d)", title, masks, update);
     if (CustomUnpack)
     {
@@ -796,6 +958,12 @@ void CSalamanderConnect::AddCustomUnpacker(const char* title, const char* masks,
 
 void CSalamanderConnect::AddViewer(const char* masks, BOOL force)
 {
+    // The legacy parser stores masks in fixed 300-byte scratch arrays.
+    if (!ValidatePluginContractString(masks, 299, FALSE))
+    {
+        TRACE_E("CSalamanderConnect::AddViewer(): invalid or overlong plug-in mask!");
+        return;
+    }
     CALL_STACK_MESSAGE3("CSalamanderConnect::AddViewer(%s, %d)", masks, force);
     if (strchr(masks, '|') != NULL)
     {
@@ -958,6 +1126,12 @@ int StrICmpIgnoreSpacesOnStartAndEnd(const char* s1, const char* s2)
 
 void CSalamanderConnect::ForceRemoveViewer(const char* mask)
 {
+    // The removal matcher splits host masks into a 300-byte local buffer, so do not compare an unchecked plug-in pointer.
+    if (!ValidatePluginContractString(mask, 299, FALSE))
+    {
+        TRACE_E("CSalamanderConnect::ForceRemoveViewer(): invalid or overlong plug-in mask!");
+        return;
+    }
     CALL_STACK_MESSAGE2("CSalamanderConnect::ForceRemoveViewer(%s)", mask);
     char ext2[300]; // used to split found masks (replace ';' with '\0')
     int i;
@@ -1027,6 +1201,12 @@ void CSalamanderConnect::ForceRemoveViewer(const char* mask)
 
 void CSalamanderConnect::AddPanelArchiver(const char* extensions, BOOL edit, BOOL updateExts)
 {
+    // This legacy registration parser uses 300-byte local buffers, so reject an untrusted value before logging or copying it.
+    if (!ValidatePluginContractString(extensions, 299, FALSE))
+    {
+        TRACE_E("CSalamanderConnect::AddPanelArchiver(): invalid or overlong plug-in extension list!");
+        return;
+    }
     CALL_STACK_MESSAGE3("CSalamanderConnect::AddPanelArchiver(%s, %d)", extensions, edit);
 
     if (!PanelView && (!edit || !PanelEdit) && !updateExts)
@@ -1233,6 +1413,12 @@ void CSalamanderConnect::AddPanelArchiver(const char* extensions, BOOL edit, BOO
 
 void CSalamanderConnect::ForceRemovePanelArchiver(const char* extension)
 {
+    // Keep extension removal within the fixed format-parser buffer and validate before trace formatting.
+    if (!ValidatePluginContractString(extension, 299, FALSE))
+    {
+        TRACE_E("CSalamanderConnect::ForceRemovePanelArchiver(): invalid or overlong plug-in extension!");
+        return;
+    }
     CALL_STACK_MESSAGE2("CSalamanderConnect::ForceRemovePanelArchiver(%s)", extension);
     BOOL needBuild = FALSE;
 
@@ -1243,7 +1429,8 @@ NEXT_ROUND:
         if (PackerFormatConfig.GetUnpackerIndex(i) == -Index - 1) // if the plug-in is configured at least for "view"
         {
             char ext[300];
-            lstrcpyn(ext, PackerFormatConfig.GetExt(i), _countof(ext));
+            // Extension parsing uses a bounded configuration display field.
+            StringCchCopyNA(ext, _countof(ext), PackerFormatConfig.GetExt(i), _countof(ext) - 1);
             char* s = ext + strlen(ext);
             char* extEnd = NULL;
             while (s > ext)
@@ -1294,6 +1481,12 @@ NEXT_ROUND:
 void CSalamanderConnect::AddMenuItem(int iconIndex, const char* name, DWORD hotKey, int id, BOOL callGetState,
                                      DWORD state_or, DWORD state_and, DWORD skillLevel)
 {
+    // Menu labels are supplied by plug-ins and later copied by CPluginMenuItem; bound them before trace formatting.
+    if (name != NULL && !ValidatePluginContractString(name, 4096, FALSE))
+    {
+        TRACE_E("CSalamanderConnect::AddMenuItem(): invalid or overlong plug-in menu label!");
+        return;
+    }
     CALL_STACK_MESSAGE9("CSalamanderConnect::AddMenuItem(%d, %s, %u, %d, 0x%X, 0x%X, 0x%X, 0x%X)",
                         iconIndex, name, hotKey, id, callGetState, state_or, state_and, skillLevel);
     if (iconIndex < -1)
@@ -1322,6 +1515,12 @@ void CSalamanderConnect::AddMenuItem(int iconIndex, const char* name, DWORD hotK
 void CSalamanderConnect::AddSubmenuStart(int iconIndex, const char* name, int id, BOOL callGetState,
                                          DWORD state_or, DWORD state_and, DWORD skillLevel)
 {
+    // A submenu cannot be represented without a bounded, non-empty host-owned label.
+    if (!ValidatePluginContractString(name, 4096, TRUE))
+    {
+        TRACE_E("CSalamanderConnect::AddSubmenuStart(): invalid or overlong plug-in submenu label!");
+        return;
+    }
     CALL_STACK_MESSAGE8("CSalamanderConnect::AddSubmenuStart(%d, %s, %d, %d, 0x%X, 0x%X, 0x%X)",
                         iconIndex, name, id, callGetState, state_or, state_and, skillLevel);
     if (name == NULL)
@@ -1384,6 +1583,12 @@ void CSalamanderConnect::AddSubmenuEnd()
 
 void CSalamanderConnect::SetChangeDriveMenuItem(const char* title, int iconIndex)
 {
+    // The host duplicates this plug-in label, therefore prove its readable terminator before it is logged or retained.
+    if (!ValidatePluginContractString(title, 4096, TRUE))
+    {
+        TRACE_E("CSalamanderConnect::SetChangeDriveMenuItem(): invalid or overlong plug-in title!");
+        return;
+    }
     CALL_STACK_MESSAGE3("CSalamanderConnect::SetChangeDriveMenuItem(%s, %d)", title, iconIndex);
     CPluginData* p = Plugins.Get(Index);
     if (p != NULL)
@@ -1415,9 +1620,10 @@ void CSalamanderConnect::SetChangeDriveMenuItem(const char* title, int iconIndex
 
 void CSalamanderConnect::SetThumbnailLoader(const char* masks)
 {
-    if (masks == NULL || *masks == 0)
+    // Thumbnail masks are an SDK configuration string, not a host buffer; bound it before the mask parser copies it.
+    if (!ValidatePluginContractString(masks, MAX_PATH - 1, TRUE))
     {
-        TRACE_E("CSalamanderConnect::SetThumbnailLoader(): unexpected parameter value (NULL or empty string).");
+        TRACE_E("CSalamanderConnect::SetThumbnailLoader(): invalid or overlong plug-in mask.");
         return;
     }
 
@@ -1450,14 +1656,22 @@ void CSalamanderConnect::SetBitmapWithIcons(HBITMAP bitmap)
         return;
     }
 
+    // This obsolete plug-in handle is copied into host storage; prove its documented 16x16 strip geometry first.
+    BITMAP bmp;
+    ZeroMemory(&bmp, sizeof(bmp));
+    if (GetObject(bitmap, sizeof(bmp), &bmp) != sizeof(bmp) ||
+        bmp.bmType != 0 || bmp.bmWidth <= 0 || bmp.bmHeight != 16 ||
+        bmp.bmWidth % 16 != 0 || bmp.bmWidth / 16 > 4096)
+    {
+        TRACE_E("CSalamanderConnect::SetBitmapWithIcons(): invalid plug-in icon bitmap!");
+        return;
+    }
+
     CPluginData* p = Plugins.Get(Index);
     if (p != NULL)
     {
         //  copy the 'bitmap' into our DIB,
         // to which we will have access at the RAW-data level
-        BITMAP bmp;
-        GetObject(bitmap, sizeof(bmp), &bmp);
-
         if (p->PluginIcons != NULL)
         {
             delete p->PluginIcons;
@@ -1517,6 +1731,13 @@ void CSalamanderConnect::SetIconListForGUI(CGUIIconListAbstract* iconList)
     CPluginData* p = Plugins.Get(Index);
     if (p != NULL)
     {
+        CIconList* createdIconList = NULL;
+        // Only take ownership of an icon list the plug-in obtained from this host facade.
+        if (!p->SalamanderGUI.TakeCreatedIconList(iconList, &createdIconList))
+        {
+            TRACE_E("CSalamanderConnect::SetIconListForGUI(): icon list was not created by this plug-in's host GUI facade!");
+            return;
+        }
         if (p->PluginIcons != NULL)
         {
             delete p->PluginIcons;
@@ -1527,7 +1748,7 @@ void CSalamanderConnect::SetIconListForGUI(CGUIIconListAbstract* iconList)
             delete p->PluginIconsGray;
             p->PluginIconsGray = NULL;
         }
-        p->PluginIcons = (CIconList*)iconList;
+        p->PluginIcons = createdIconList;
         if (p->PluginIcons != NULL)
         {
             p->PluginIconsGray = new CIconList();
@@ -1548,6 +1769,12 @@ void CSalamanderConnect::SetIconListForGUI(CGUIIconListAbstract* iconList)
 void CSalamanderBuildMenu::AddMenuItem(int iconIndex, const char* name, DWORD hotKey, int id, BOOL callGetState,
                                        DWORD state_or, DWORD state_and, DWORD skillLevel)
 {
+    // Build-menu callbacks have the same plug-in string ownership boundary as ordinary menu registration.
+    if (name != NULL && !ValidatePluginContractString(name, 4096, FALSE))
+    {
+        TRACE_E("CSalamanderBuildMenu::AddMenuItem(): invalid or overlong plug-in menu label!");
+        return;
+    }
     CALL_STACK_MESSAGE9("CSalamanderBuildMenu::AddMenuItem(%d, %s, %u, %d, 0x%X, 0x%X, 0x%X, 0x%X)",
                         iconIndex, name, hotKey, id, callGetState, state_or, state_and, skillLevel);
     if (iconIndex < -1)
@@ -1571,6 +1798,12 @@ void CSalamanderBuildMenu::AddMenuItem(int iconIndex, const char* name, DWORD ho
 void CSalamanderBuildMenu::AddSubmenuStart(int iconIndex, const char* name, int id, BOOL callGetState,
                                            DWORD state_or, DWORD state_and, DWORD skillLevel)
 {
+    // Validate before changing nesting state so rejected callbacks cannot unbalance the host menu tree.
+    if (!ValidatePluginContractString(name, 4096, TRUE))
+    {
+        TRACE_E("CSalamanderBuildMenu::AddSubmenuStart(): invalid or overlong plug-in submenu label!");
+        return;
+    }
     CALL_STACK_MESSAGE8("CSalamanderBuildMenu::AddSubmenuStart(%d, %s, %d, %d, 0x%X, 0x%X, 0x%X)",
                         iconIndex, name, id, callGetState, state_or, state_and, skillLevel);
     SubmenuLevel++;
@@ -1626,8 +1859,15 @@ void CSalamanderBuildMenu::SetIconListForMenu(CGUIIconListAbstract* iconList)
     CPluginData* p = Plugins.Get(Index);
     if (p != NULL)
     {
+        CIconList* createdIconList = NULL;
+        // Dynamic menu icons obey the same host-factory ownership rule as persistent GUI icons.
+        if (!p->SalamanderGUI.TakeCreatedIconList(iconList, &createdIconList))
+        {
+            TRACE_E("CSalamanderBuildMenu::SetIconListForMenu(): icon list was not created by this plug-in's host GUI facade!");
+            return;
+        }
         p->ReleasePluginDynMenuIcons();
-        p->PluginDynMenuIcons = (CIconList*)iconList;
+        p->PluginDynMenuIcons = createdIconList;
     }
 }
 
@@ -1700,9 +1940,7 @@ BOOL CSalamanderPluginEntry::SetBasicPluginData(const char* pluginName, DWORD fu
                                                 const char* description, const char* regKeyName,
                                                 const char* extensions, const char* fsName)
 {
-    CALL_STACK_MESSAGE9("CSalamanderPluginEntry::SetBasicPluginData(%s, 0x%X, %s, %s, %s, %s, %s, %s)",
-                        pluginName, functions, version, copyright, description, regKeyName, extensions,
-                        fsName);
+    CALL_STACK_MESSAGE1("CSalamanderPluginEntry::SetBasicPluginData()");
 
     if (Valid)
     {
@@ -1720,15 +1958,25 @@ BOOL CSalamanderPluginEntry::SetBasicPluginData(const char* pluginName, DWORD fu
     BOOL supportFS = (functions & FUNCTION_FILESYSTEM) != 0;
     BOOL supportDynMenuExt = (functions & FUNCTION_DYNAMICMENUEXT) != 0;
 
-    if (pluginName == NULL || version == NULL || copyright == NULL || description == NULL ||
-        supportLoadSave && (regKeyName == NULL || regKeyName[0] == 0) ||
-        (supportPanelView || supportPanelEdit) && extensions == NULL ||
-        supportFS && fsName == NULL)
+    const SIZE_T displayStringLimit = 4096;
+    const SIZE_T configurationStringLimit = MAX_PATH - 1;
+    if (!ValidatePluginContractString(pluginName, displayStringLimit, TRUE) ||
+        !ValidatePluginContractString(version, displayStringLimit, TRUE) ||
+        !ValidatePluginContractString(copyright, displayStringLimit, TRUE) ||
+        !ValidatePluginContractString(description, displayStringLimit, TRUE) ||
+        supportLoadSave && !ValidatePluginContractString(regKeyName, configurationStringLimit, TRUE) ||
+        (supportPanelView || supportPanelEdit) && !ValidatePluginContractString(extensions, configurationStringLimit, FALSE) ||
+        supportFS && !ValidatePluginContractString(fsName, configurationStringLimit, FALSE))
     {
-        TRACE_E("CSalamanderPluginEntry::SetBasicPluginData(): Invalid parameter (NULL or empty string)!");
+        // Validate before tracing or copying because the strings are still owned by untrusted plug-in code.
+        TRACE_E("CSalamanderPluginEntry::SetBasicPluginData(): Invalid or overlong plug-in contract string!");
         Error = TRUE;
         return FALSE;
     }
+
+    CALL_STACK_MESSAGE9("CSalamanderPluginEntry::SetBasicPluginData(%s, 0x%X, %s, %s, %s, %s, %s, %s)",
+                        pluginName, functions, version, copyright, description, regKeyName, extensions,
+                        fsName);
 
     // this is either loading an installed plugin or adding a new plugin,
     // perform a check and update data (a new plugin should always pass the tests)
@@ -1886,14 +2134,15 @@ CSalamanderPluginEntry::LoadLanguageModule(HWND parent, const char* pluginName)
         strcat(s, Plugin->DLLName);
     }
     else
-        lstrcpyn(path, s, MAX_PATH);
+        // Language-module paths are load identities and must be complete.
+        StringCchCopyA(path, _countof(path), s);
     s = strrchr(path, '\\') + 1;
-    lstrcpyn(s, "lang\\", MAX_PATH - (int)(s - path));
+    StringCchCopyA(s, MAX_PATH - (int)(s - path), "lang\\");
     char* slgName = path + strlen(path);
     int slgNameBufSize = MAX_PATH - (int)(slgName - path);
 
     // first try to load the SLG of the language Salamander is currently running in
-    lstrcpyn(slgName, Configuration.LoadedSLGName, slgNameBufSize);
+    StringCchCopyA(slgName, slgNameBufSize, Configuration.LoadedSLGName);
     lang = HANDLES_Q(LoadLibraryUtf8(path));
     WORD languageID = 0;
     if (lang == NULL || !IsSLGFileValid(Plugin->GetPluginDLL(), lang, languageID, NULL))
@@ -1920,7 +2169,7 @@ CSalamanderPluginEntry::LoadLanguageModule(HWND parent, const char* pluginName)
         }
         else // try to load the .slg chosen during the previous plugin load
         {
-            lstrcpyn(slgName, Plugin->LastSLGName, slgNameBufSize);
+            StringCchCopyA(slgName, slgNameBufSize, Plugin->LastSLGName);
             lang = HANDLES_Q(LoadLibraryUtf8(path));
             if (lang == NULL || !IsSLGFileValid(Plugin->GetPluginDLL(), lang, languageID, NULL))
             { // the SLG doesn't exist or isn't the expected one (completely different file or at least another version)
@@ -1947,7 +2196,7 @@ CSalamanderPluginEntry::LoadLanguageModule(HWND parent, const char* pluginName)
             char selSLGName[MAX_PATH];
             selSLGName[0] = 0;
             CLanguageSelectorDialog slgDialog(parent, selSLGName, pluginName);
-            lstrcpyn(slgName, "*.slg", slgNameBufSize);
+            StringCchCopyA(slgName, slgNameBufSize, "*.slg");
             slgDialog.Initialize(path, Plugin->GetPluginDLL());
             if (slgDialog.GetLanguagesCount() == 0)
                 SalMessageBox(parent, LoadStr(IDS_PLUGINSLGNOTFOUND), pluginName, MB_OK | MB_ICONERROR);
@@ -1960,7 +2209,7 @@ CSalamanderPluginEntry::LoadLanguageModule(HWND parent, const char* pluginName)
                     if (Configuration.UseAsAltSLGInOtherPlugins &&
                         slgDialog.SLGNameExists(Configuration.AltPluginSLGName))
                     {
-                        lstrcpy(selSLGName, Configuration.AltPluginSLGName);
+                        StringCchCopyA(selSLGName, _countof(selSLGName), Configuration.AltPluginSLGName);
                     }
                     else
                     {
@@ -1969,7 +2218,7 @@ CSalamanderPluginEntry::LoadLanguageModule(HWND parent, const char* pluginName)
                         slgDialog.Execute();
                     }
                 }
-                lstrcpyn(slgName, selSLGName, slgNameBufSize);
+                StringCchCopyA(slgName, slgNameBufSize, selSLGName);
                 lang = HANDLES_Q(LoadLibraryUtf8(path));
                 if (lang == NULL || !IsSLGFileValid(Plugin->GetPluginDLL(), lang, languageID, NULL))
                 { // shouldn't theoretically happen (dialog verifies the validity of the .SLG module)
@@ -2004,6 +2253,12 @@ CSalamanderPluginEntry::LoadLanguageModule(HWND parent, const char* pluginName)
 
 void CSalamanderPluginEntry::SetPluginHomePageURL(const char* url)
 {
+    // Never trace or retain a plug-in string until its readable, bounded terminator is proven.
+    if (!ValidatePluginContractString(url, 2048, FALSE))
+    {
+        TRACE_E("CSalamanderPluginEntry::SetPluginHomePageURL(): invalid or overlong URL!");
+        return;
+    }
     CALL_STACK_MESSAGE2("CSalamanderPluginEntry::SetPluginHomePageURL(%s)", url);
     if (Plugin->PluginHomePageURL != NULL)
         free(Plugin->PluginHomePageURL);
@@ -2012,12 +2267,23 @@ void CSalamanderPluginEntry::SetPluginHomePageURL(const char* url)
 
 BOOL CSalamanderPluginEntry::AddFSName(const char* fsName, int* newFSNameIndex)
 {
-    CALL_STACK_MESSAGE2("CSalamanderPluginEntry::AddFSName(%s,)", fsName);
     if (fsName == NULL || newFSNameIndex == NULL)
     {
         TRACE_E("CSalamanderPluginEntry::AddFSName(): invalid parameter (NULL)!");
         return FALSE;
     }
+
+    // Validate before tracing or copying because both pointers remain owned by the plug-in.
+    const SIZE_T fsNameLimit = MAX_PATH - 1;
+    const int maximumFSNamesPerPlugin = 256;
+    if (!ValidatePluginContractString(fsName, fsNameLimit, FALSE) ||
+        Plugin->FSNames.Count >= maximumFSNamesPerPlugin)
+    {
+        TRACE_E("CSalamanderPluginEntry::AddFSName(): invalid fs-name or per-plugin name limit reached!");
+        return FALSE;
+    }
+
+    CALL_STACK_MESSAGE2("CSalamanderPluginEntry::AddFSName(%s,)", fsName);
 
     if (!Valid)
     {
@@ -2050,8 +2316,11 @@ BOOL CSalamanderPluginEntry::AddFSName(const char* fsName, int* newFSNameIndex)
         }
         else
         {
-            *newFSNameIndex = i;
-            return TRUE;
+            if (StorePluginOutputIndex(newFSNameIndex, i))
+                return TRUE;
+            // A malformed callback output pointer must not crash the host or retain a phantom name.
+            Plugin->FSNames.Delete(i);
+            return FALSE;
         }
     }
     return FALSE;
@@ -2463,13 +2732,36 @@ BOOL CPluginData::InitDLL(HWND parent, BOOL quiet, BOOL waitCursor, BOOL showUns
                     SalamanderGeneral.Init(NULL);
                 }
 
+                BOOL pluginInterfacesValid = TRUE;
                 if (!oldVer && PluginIface.NotEmpty() && salamander.DataValid())
                 { // pull interfaces of other plugin parts
-                    PluginIfaceForArchiver.Init(PluginIface.GetInterfaceForArchiver());
-                    PluginIfaceForViewer.Init(PluginIface.GetInterfaceForViewer());
-                    PluginIfaceForMenuExt.Init(PluginIface.GetInterfaceForMenuExt(), BuiltForVersion);
-                    PluginIfaceForFS.Init(PluginIface.GetInterfaceForFS(), BuiltForVersion);
-                    PluginIfaceForThumbLoader.Init(PluginIface.GetInterfaceForThumbLoader(), DLLName, Version);
+                    CPluginInterfaceForArchiverAbstract* archiver = PluginIface.GetInterfaceForArchiver();
+                    CPluginInterfaceForViewerAbstract* viewer = PluginIface.GetInterfaceForViewer();
+                    CPluginInterfaceForMenuExtAbstract* menuExt = PluginIface.GetInterfaceForMenuExt();
+                    CPluginInterfaceForFSAbstract* fileSystem = PluginIface.GetInterfaceForFS();
+                    CPluginInterfaceForThumbLoaderAbstract* thumbnailLoader = PluginIface.GetInterfaceForThumbLoader();
+                    pluginInterfacesValid = ValidatePluginInterfaceResult(archiver, "archiver") &&
+                                            ValidatePluginInterfaceResult(viewer, "viewer") &&
+                                            ValidatePluginInterfaceResult(menuExt, "menu extension") &&
+                                            ValidatePluginInterfaceResult(fileSystem, "file-system") &&
+                                            ValidatePluginInterfaceResult(thumbnailLoader, "thumbnail loader");
+                    if (pluginInterfacesValid)
+                    {
+                        PluginIfaceForArchiver.Init(archiver);
+                        PluginIfaceForViewer.Init(viewer);
+                        PluginIfaceForMenuExt.Init(menuExt, BuiltForVersion);
+                        PluginIfaceForFS.Init(fileSystem, BuiltForVersion);
+                        PluginIfaceForThumbLoader.Init(thumbnailLoader, DLLName, Version);
+                    }
+                    else
+                    {
+                        // Invalid pointers must flow through the existing failed-load cleanup, never into encapsulations.
+                        PluginIfaceForArchiver.Init(NULL);
+                        PluginIfaceForViewer.Init(NULL);
+                        PluginIfaceForMenuExt.Init(NULL, 0);
+                        PluginIfaceForFS.Init(NULL, 0);
+                        PluginIfaceForThumbLoader.Init(NULL, NULL, NULL);
+                    }
                 }
                 else // clear the other parts of the plugin interface as well
                 {
@@ -2497,7 +2789,7 @@ BOOL CPluginData::InitDLL(HWND parent, BOOL quiet, BOOL waitCursor, BOOL showUns
                 // menuExtOK cannot be determined - if the menu extension interface is unavailable, menu items will not be added
                 BOOL FSOK = !SupportFS || PluginIfaceForFS.NotEmpty();
 
-                if (!oldVer && PluginIface.NotEmpty() && salamander.DataValid() &&
+                if (!oldVer && PluginIface.NotEmpty() && salamander.DataValid() && pluginInterfacesValid &&
                     archiverOK && viewerOK && FSOK)
                 {
                     supportPanelView = (!supportPanelView && SupportPanelView);
@@ -2705,8 +2997,9 @@ void CPluginData::GetDisplayName(char* buf, int bufSize)
     int l = (int)strlen(add);
     if (l + 1 < bufSize)
     {
-        lstrcpyn(buf, Name, bufSize - l);
-        lstrcpyn(buf + strlen(buf), add, l + 1);
+        // Preserve suffix capacity in the caller-provided plugin-name display buffer.
+        StringCchCopyNA(buf, bufSize, Name, bufSize - l - 1);
+        StringCchCatA(buf, bufSize, add);
     }
     else
     {
@@ -2719,6 +3012,12 @@ void CPluginData::AddMenuItem(int iconIndex, const char* name, DWORD hotKey, int
                               DWORD state_or, DWORD state_and, DWORD skillLevel,
                               CPluginMenuItemType type)
 {
+    // Keep this final copying boundary defensive in case a future registration path bypasses the public adapters.
+    if (name != NULL && !ValidatePluginContractString(name, 4096, FALSE))
+    {
+        TRACE_E("CPluginData::AddMenuItem(): invalid or overlong plug-in menu label!");
+        return;
+    }
     CALL_STACK_MESSAGE12("CPluginData::AddMenuItem(%d, %s, %u, %d, %d, 0x%X, 0x%X, 0x%X, %d) (%s v. %s)",
                          iconIndex, name, hotKey, id, callGetState, state_or, state_and,
                          skillLevel, (int)type, DLLName, Version);
@@ -2771,7 +3070,9 @@ BOOL CPluginData::GetMenuItemHotKey(int id, WORD* hotKey, char* hotKeyText, int 
             {
                 char buff[200];
                 GetHotKeyText(HOTKEY_GET(item->HotKey), buff);
-                lstrcpyn(hotKeyText, buff, hotKeyTextSize);
+                // Hotkey text is returned through the caller-provided display buffer.
+                if (hotKeyTextSize > 0)
+                    StringCchCopyNA(hotKeyText, hotKeyTextSize, buff, hotKeyTextSize - 1);
             }
             return TRUE;
         }
@@ -3269,7 +3570,8 @@ void CPluginData::AddMenuItemsToSubmenuAux(CMenuPopup* menu, int& i, int count, 
                           MENU_MASK_STRING | MENU_MASK_SKILLLEVEL | MENU_MASK_IMAGEINDEX |
                           (item->Type == pmitStartSubmenu ? MENU_MASK_SUBMENU : 0);
                 mi.Type = MENU_TYPE_STRING;
-                lstrcpyn(buff, item->Name, 400);
+                // Plugin menu captions retain their fixed presentation limit.
+                StringCchCopyNA(buff, _countof(buff), item->Name, _countof(buff) - 1);
                 mi.String = buff;
 
                 if (HOTKEY_GET(item->HotKey) != 0)

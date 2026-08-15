@@ -3,6 +3,8 @@
 
 #include "precomp.h"
 
+#include "..\\..\\common\\monotonic_time.h"
+
 #include "undelete.rh"
 #include "undelete.rh2"
 #include "lang\lang.rh"
@@ -268,7 +270,8 @@ CPluginFSInterface::ChangePath(int currentFSNameIndex, char* fsName, int fsNameI
         }
 
 #ifdef TRACE_ENABLE
-        DWORD time = GetTickCount();
+        // Trace-only duration measurements still need a non-wrapping clock for long snapshot operations.
+        CMonotonicTimePoint time = CMonotonicClock::Now();
 #endif
 
         if (ret)
@@ -310,7 +313,7 @@ CPluginFSInterface::ChangePath(int currentFSNameIndex, char* fsName, int fsNameI
             }
         }
 #ifdef TRACE_ENABLE
-        time = GetTickCount() - time;
+        time = CMonotonicClock::Elapsed(time, CMonotonicClock::Now());
         TRACE_I("Snapshot load time: " << time << " ms");
 #endif
 
@@ -703,6 +706,19 @@ static BOOL WINAPI EncryptedProgress(int inc, void* ctx)
         return SalamanderGeneral->GetSafeWaitWindowClosePressed();
 }
 
+static BOOL FormatUndeleteDateTimeAnsi(const SYSTEMTIME* time, DWORD flags, char* buffer, int bufferSize, BOOL isDate)
+{
+    // Undelete retains ANSI recovery metadata, so convert only after locale-name formatting.
+    WCHAR localeName[LOCALE_NAME_MAX_LENGTH];
+    WCHAR formatted[50];
+    if (GetUserDefaultLocaleName(localeName, ARRAYSIZE(localeName)) == 0)
+        return FALSE;
+    int length = isDate
+                     ? GetDateFormatEx(localeName, flags, time, NULL, formatted, ARRAYSIZE(formatted), NULL)
+                     : GetTimeFormatEx(localeName, flags, time, NULL, formatted, ARRAYSIZE(formatted));
+    return length != 0 && WideCharToMultiByte(CP_ACP, 0, formatted, -1, buffer, bufferSize, NULL, NULL) != 0;
+}
+
 char* GetSCFData(FILETIME* lastWrite, CQuadWord& size)
 {
     CALL_STACK_MESSAGE1("GetSCFData( , )");
@@ -713,9 +729,9 @@ char* GetSCFData(FILETIME* lastWrite, CQuadWord& size)
 
     static char buffer[200];
     char date[50], time[50], number[50];
-    if (GetTimeFormat(LOCALE_USER_DEFAULT, 0, &st, NULL, time, 50) == 0)
+    if (!FormatUndeleteDateTimeAnsi(&st, 0, time, ARRAYSIZE(time), FALSE))
         sprintf(time, "%u:%02u:%02u", st.wHour, st.wMinute, st.wSecond);
-    if (GetDateFormat(LOCALE_USER_DEFAULT, DATE_SHORTDATE, &st, NULL, date, 50) == 0)
+    if (!FormatUndeleteDateTimeAnsi(&st, DATE_SHORTDATE, date, ARRAYSIZE(date), TRUE))
         sprintf(date, "%u.%u.%u", st.wDay, st.wMonth, st.wYear);
     sprintf(buffer, "%s, %s, %s", SalamanderGeneral->NumberToStr(number, size), date, time);
 
@@ -1608,11 +1624,14 @@ void DumpExistingFileLayout(FILE* file, const char* fileName, CVolume<char>* vol
         return;
     }
 
-    DWORD hiSize = 0;
-    DWORD loSize = ::GetFileSize(hFile, &hiSize);
-    if (loSize == INVALID_FILE_SIZE)
+    LARGE_INTEGER fileSize;
+    if (!GetFileSizeEx(hFile, &fileSize))
+    {
         TRACE_E("GetFileSize() failed on " << fileName);
-    LONGLONG fileSize = MAKEQWORD(loSize, hiSize);
+        CloseHandle(hFile);
+        return;
+    }
+    // Validate the file through the unambiguous 64-bit query before issuing retrieval-pointer diagnostics.
 
     fprintf(file, "\n");
     fprintf(file, "Query existing file %s\n", fileName);
@@ -2114,7 +2133,7 @@ void CPluginFSInterface::SetFileValidData(HWND parent, const DIR_ITEM_I<char>* d
     bool ret = false;
     DWORD enlarge = 100000;
     LONGLONG size{};
-    DWORD loSize{};
+    LARGE_INTEGER fileSize{};
 
     HANDLE hFile = CreateFile(fullPath, GENERIC_READ | GENERIC_WRITE, 0, NULL, OPEN_EXISTING, 0, NULL);
     if (hFile == NULL)
@@ -2122,14 +2141,13 @@ void CPluginFSInterface::SetFileValidData(HWND parent, const DIR_ITEM_I<char>* d
         TRACE_E("CreateFile() failed on " << fullPath);
         goto exit;
     }
-    DWORD hiSize;
-    loSize = ::GetFileSize(hFile, &hiSize);
-    if (loSize == INVALID_FILE_SIZE)
+    if (!GetFileSizeEx(hFile, &fileSize))
     {
         TRACE_E("GetFileSize() failed on " << fullPath);
         goto exit;
     }
-    size = MAKEQWORD(loSize, hiSize);
+    // These test operations use LONGLONG offsets, so avoid reconstructing the file size from legacy DWORD halves.
+    size = fileSize.QuadPart;
     if (size < 2)
     {
         TRACE_E("File is too small for SetFileValidData() test " << fullPath);
@@ -2166,8 +2184,7 @@ exit:
 void CPluginFSInterface::SetFileSparse(HWND parent, const DIR_ITEM_I<char>* di, const char* fullPath)
 {
     HANDLE hFile = CreateFile(fullPath, GENERIC_READ | GENERIC_WRITE, 0, NULL, OPEN_EXISTING, 0, NULL);
-    DWORD hiSize{};
-    DWORD loSize{};
+    LARGE_INTEGER fileSize{};
     LONGLONG size{};
     BOOL ret = false;
     if (hFile == NULL)
@@ -2185,13 +2202,13 @@ void CPluginFSInterface::SetFileSparse(HWND parent, const DIR_ITEM_I<char>* di, 
         goto exit;
     }
 
-    loSize = ::GetFileSize(hFile, &hiSize);
-    if (loSize == INVALID_FILE_SIZE)
+    if (!GetFileSizeEx(hFile, &fileSize))
     {
         TRACE_E("GetFileSize() failed on " << fullPath);
         goto exit;
     }
-    size = MAKEQWORD(loSize, hiSize);
+    // The sparse-file test operates on 64-bit byte offsets and retains the complete file size.
+    size = fileSize.QuadPart;
     if (size < 70000)
     {
         TRACE_E("File is too small for sparse test " << fullPath);

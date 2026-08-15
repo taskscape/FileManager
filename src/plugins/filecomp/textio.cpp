@@ -5,6 +5,17 @@
 
 using namespace std;
 
+static void SeekFileToOffset(HANDLE file, size_t offset, const char* name)
+{
+    LARGE_INTEGER distance;
+    // File Comparison tracks offsets as size_t, so reject values SetFilePointerEx cannot represent instead of narrowing them.
+    if (offset > (size_t)MAXLONGLONG)
+        CFilecompWorker::CException::Raise(IDS_ACCESFILE, ERROR_ARITHMETIC_OVERFLOW, name);
+    distance.QuadPart = (LONGLONG)offset;
+    if (!SetFilePointerEx(file, distance, NULL, FILE_BEGIN))
+        CFilecompWorker::CException::Raise(IDS_ACCESFILE, GetLastError(), name);
+}
+
 // ****************************************************************************
 //
 // CTextFileReader::CByteReader
@@ -118,8 +129,7 @@ void CTextFileReader::FetchFilePrefix()
         if (!Buffer)
             CFilecompWorker::CException::Raise(IDS_LOWMEM, 0);
 
-        if (SetFilePointer(File, 0, NULL, FILE_BEGIN) == INVALID_SET_FILE_POINTER)
-            CFilecompWorker::CException::Raise(IDS_ACCESFILE, GetLastError(), Name);
+        SeekFileToOffset(File, 0, Name);
 
         DWORD toRead = DWORD(min(size_t(BufferSize), Size));
         DWORD read;
@@ -533,8 +543,7 @@ void CTextFileReader::Get(char*& buffer, size_t& size, const int& cancel)
         Buffer = ret;
     }
 
-    if (SetFilePointer(File, BufferedCharacters, NULL, FILE_BEGIN) == INVALID_SET_FILE_POINTER)
-        CFilecompWorker::CException::Raise(IDS_ACCESFILE, GetLastError(), Name);
+    SeekFileToOffset(File, BufferedCharacters, Name);
 
     // read rest of the file
     size_t bytesLeft = Size - BufferedCharacters;
@@ -581,8 +590,7 @@ void CTextFileReader::Get(wchar_t*& buffer, size_t& size, const int& cancel)
     if (Encoding == encUnknown)
         EstimateFileType();
 
-    if (SetFilePointer(File, BufferedCharacters, NULL, FILE_BEGIN) == INVALID_SET_FILE_POINTER)
-        CFilecompWorker::CException::Raise(IDS_ACCESFILE, GetLastError(), Name);
+    SeekFileToOffset(File, BufferedCharacters, Name);
 
     buffer = NULL;
     try

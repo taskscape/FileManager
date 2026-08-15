@@ -73,6 +73,12 @@ jobs:
           git fetch --no-tags --depth=1 origin ${{ github.event.pull_request.base.ref }}
           .\tools\verify-no-new-raw-thread-creation.ps1 -BaseCommit origin/${{ github.event.pull_request.base.ref }}
 
+      - name: Reject new wrap-prone tick-count timing
+        if: github.event_name == 'pull_request'
+        run: |
+          git fetch --no-tags --depth=1 origin ${{ github.event.pull_request.base.ref }}
+          .\tools\verify-no-new-gettickcount.ps1 -BaseCommit origin/${{ github.event.pull_request.base.ref }}
+
       - name: Reject new fixed MAX_PATH buffers
         if: github.event_name == 'pull_request'
         run: |

@@ -33,6 +33,8 @@ extern "C"
 #include "crypt\sha1.h"
 #include "pwdmngr.h"
 
+#include <strsafe.h>
+
 // Globals defined in zip_progress.cpp
 extern const char* STR_NONE;
 extern CSalamanderDirectory GlobalEmptySalDir;
@@ -1164,7 +1166,10 @@ char* CSalamanderGeneral::GetGFNErrorText(int GFN, char* buf, int bufSize)
         break;
     }
     if (s != NULL)
-        lstrcpyn(buf, s, bufSize);
+    {
+        // Caller-provided error text is a compact presentation field with deliberate clipping.
+        StringCchCopyNA(buf, bufSize, s, bufSize - 1);
+    }
     else
         buf[0] = 0;
     return buf;
@@ -1189,7 +1194,8 @@ char* CSalamanderGeneral::GetErrorText(int err, char* buf, int bufSize)
     {
         char txt[100];
         sprintf(txt, "System error %d, text description is not available.", err);
-        lstrcpyn(buf, txt, bufSize);
+        // Caller-provided error text is a compact presentation field with deliberate clipping.
+        StringCchCopyNA(buf, bufSize, txt, bufSize - 1);
     }
     return buf;
 }
@@ -1365,7 +1371,11 @@ void CSalamanderGeneral::GetPluginFSName(char* buf, int fsNameIndex)
     }
     CPluginData* data = Plugins.GetPluginData(Plugin);
     if (data != NULL && data->SupportFS && fsNameIndex >= 0 && fsNameIndex < data->FSNames.Count)
-        lstrcpyn(buf, data->FSNames[fsNameIndex], MAX_PATH);
+    {
+        // The plug-in ABI supplies MAX_PATH storage for the complete FS name.
+        if (FAILED(StringCchCopyA(buf, MAX_PATH, data->FSNames[fsNameIndex])))
+            buf[0] = 0;
+    }
     else
     {
         TRACE_E("CSalamanderGeneral::GetPluginFSName(): incorrect call (not supporting FS or 'fsNameIndex' is out of range)!");
@@ -1629,8 +1639,10 @@ void CSalamanderGeneral::FocusNameInPanel(int panel, const char* path, const cha
     CFilesWindow* p = GetPanel(panel);
     char pathBackup[MAX_PATH + 200];
     char nameBackup[MAX_PATH + 200];
-    lstrcpyn(pathBackup, path, MAX_PATH + 200);
-    lstrcpyn(nameBackup, name, MAX_PATH + 200);
+    // Synchronous focus delivery must never receive a truncated path or item name.
+    if (FAILED(StringCchCopyA(pathBackup, _countof(pathBackup), path)) ||
+        FAILED(StringCchCopyA(nameBackup, _countof(nameBackup), name)))
+        return;
     if (p != NULL)
         SendMessage(p->HWindow, WM_USER_FOCUSFILE, (WPARAM)nameBackup, (LPARAM)pathBackup);
 }
@@ -2074,7 +2086,9 @@ BOOL ViewFileInPluginViewer(const char* pluginSPL,
         // insert the file 'pluginData->FileName' into the disk cache under the name 'fileNameInCache'
         while (1)
         {
-            sprintf(viewUniqueName, "ViewFile %X", GetTickCount());
+            // Keep the existing cache-key shape while folding the 64-bit uptime past the old tick-wrap boundary.
+            const CMonotonicTimePoint timeSeed = CMonotonicClock::Now();
+            sprintf(viewUniqueName, "ViewFile %X", (DWORD)(timeSeed ^ (timeSeed >> 32)));
             BOOL exists;
             fileName = DiskCache.GetName(viewUniqueName, fileNameInCache, &exists, TRUE, rootTmpPath, FALSE, NULL, NULL);
             if (fileName == NULL) // error (if 'exists' is TRUE -> fatal, otherwise "file already exists")
@@ -3003,7 +3017,13 @@ void CSalamanderGeneral::CallPluginOperationFromDisk(int panel, SalPluginOperati
         data.Dirs = p->Dirs;
         data.Files = p->Files;
         data.ArchiveDir = p->GetArchiveDir();
-        lstrcpyn(data.WorkPath, p->GetPath(), MAX_PATH);
+        // The disk-operation callback must enumerate from a complete working path.
+        if (FAILED(StringCchCopyA(data.WorkPath, _countof(data.WorkPath), p->GetPath())))
+        {
+            if (count > 0)
+                delete[] (data.Indexes);
+            return;
+        }
         data.EnumLastDir = NULL;
         data.EnumLastIndex = -1;
 

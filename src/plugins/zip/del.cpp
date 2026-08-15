@@ -5,6 +5,7 @@
 #include <crtdbg.h>
 #include <ostream>
 #include <commctrl.h>
+#include <strsafe.h>
 
 #include "spl_com.h"
 #include "spl_base.h"
@@ -106,10 +107,11 @@ int CZipPack::DeleteFiles(int* deletedFiles)
         sour = LoadStr(IDS_REMOVING);
     else
         sour = LoadStr(IDS_DELETING);
-    progrText = progrTextBuf;
-    while (*sour)
-        *progrText++ = *sour++;
-    progrPrefixLen = (int)(progrText - progrTextBuf);
+    // The localized prefix shares a fixed progress field with the deleted entry name.
+    if (FAILED(StringCchCopyNA(progrTextBuf, _countof(progrTextBuf), sour, _countof(progrTextBuf) - 1)))
+        progrTextBuf[_countof(progrTextBuf) - 1] = 0;
+    progrPrefixLen = static_cast<int>(strlen(progrTextBuf));
+    progrText = progrTextBuf + progrPrefixLen;
     if (Config.BackupZip)
     {
         Salamander->ProgressDialogAddText(LoadStr(IDS_BACKUPING), TRUE);
@@ -134,7 +136,11 @@ int CZipPack::DeleteFiles(int* deletedFiles)
               ", isdir: " << curFile->IsDir <<
               ", file attr:" << curFile->FileAttr);
 */
-            lstrcpyn(progrText, curFile->Name + RootLen + (RootLen ? 1 : 0), MAX_PATH + 32 - progrPrefixLen);
+            // Progress text may clip visually, but must remain terminated within its fixed presentation buffer.
+            const size_t remainingProgressText = _countof(progrTextBuf) - progrPrefixLen;
+            if (FAILED(StringCchCopyNA(progrText, remainingProgressText,
+                                       curFile->Name + RootLen + (RootLen ? 1 : 0), remainingProgressText - 1)))
+                progrText[remainingProgressText - 1] = 0;
             Salamander->ProgressDialogAddText(progrTextBuf, TRUE);
             if (i + 1 < DelFiles.Count)
                 nextFile = DelFiles[i + 1];

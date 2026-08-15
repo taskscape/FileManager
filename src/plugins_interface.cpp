@@ -16,6 +16,8 @@
 #include "dialogs.h"
 #include "utf8gui.h"
 
+#include <strsafe.h>
+
 // header for saving a DIB to the registry
 
 #define DIB_METHOD_STORE 1   // direct storage 1:1
@@ -658,8 +660,9 @@ void CPlugins::InitMenuItems(HWND parent, CMenuPopup* root)
 #endif // _WIN64
 
                 char pluginName[300];
-                lstrcpyn(pluginName, p->Name, 299);
-                DuplicateAmpersands(pluginName, 299); // plugin name can contain '&'
+                // Reserve menu-caption headroom while escaping accelerator ampersands.
+                StringCchCopyNA(pluginName, _countof(pluginName), p->Name, _countof(pluginName) - 2);
+                DuplicateAmpersands(pluginName, _countof(pluginName)); // plugin name can contain '&'
 
                 mi.String = pluginName;
                 mi.ImageIndex = (p->PluginSubmenuIconIndex != -1) ? orderIndex : -1;
@@ -694,7 +697,8 @@ void CPlugins::InitMenuItems(HWND parent, CMenuPopup* root)
             lcmii.State = 0;
             pluginData->GetMenuItemStateType(pluginIndex, menuItemIndex, &lcmii);
 
-            lstrcpyn(lastCmdStr, pluginData->Name, 299);
+            // Reserve display headroom while escaping the plugin name in the command caption.
+            StringCchCopyNA(lastCmdStr, _countof(lastCmdStr), pluginData->Name, 298);
             char* s = strchr(lastCmdStr, '('); // drop text in parentheses from plugin name ("WinSCP (SFTP/SCP Client)" -> "WinSCP")
             if (s != NULL)
             {
@@ -1108,8 +1112,9 @@ BOOL CPlugins::AddNamesToMenu(CMenuPopup* menu, DWORD firstID, int maxCount, BOO
             mii.ID = firstID + orderIndex;
 
             char pluginName[300];
-            lstrcpyn(pluginName, data->Name, 299);
-            DuplicateAmpersands(pluginName, 299); // plugin name may contain '&' character
+            // Reserve menu-caption headroom while escaping accelerator ampersands.
+            StringCchCopyNA(pluginName, _countof(pluginName), data->Name, _countof(pluginName) - 2);
+            DuplicateAmpersands(pluginName, _countof(pluginName)); // plugin name may contain '&' character
 
             mii.String = (LPTSTR)pluginName;
             mii.ImageIndex = (data->PluginIconIndex != -1) ? orderIndex : -1;
@@ -2290,7 +2295,8 @@ void CPlugins::GetUniqueFSName(char* uniqueFSName, const char* fsName, TIndirect
 {
     CALL_STACK_MESSAGE2("CPlugins::GetUniqueFSName(, %s, ,)", fsName);
     int number = 2;
-    lstrcpyn(uniqueFSName, fsName, MAX_PATH - 9); // leave a 9-character reserve at the end of the fs-name for digits when searching for a unique name
+    // Preserve the suffix reserve used while generating unique filesystem names.
+    StringCchCopyNA(uniqueFSName, MAX_PATH, fsName, MAX_PATH - 10);
     int offset = (int)strlen(uniqueFSName);
     if (offset < 2)
     {
@@ -2327,12 +2333,15 @@ void CPlugins::GetUniqueFSName(char* uniqueFSName, const char* fsName, TIndirect
                     num++;
                 if (*num == 0) // numeric suffix -> this old fs-name can be used for the sought fs-name
                 {
-                    lstrcpyn(uniqueFSName + offset, s + offset, MAX_PATH - offset);
-                    oldFSNameUsed = TRUE;
-                    oldFSNames->Delete(i); // remove the used fs-name from the array (reusing it makes no sense, even if the name is not unique)
-                    if (!oldFSNames->IsGood())
-                        oldFSNames->ResetState(); // deletion succeeded, nothing else matters
-                    break;
+                    // Reuse an old filesystem identity only when its complete numeric suffix fits.
+                    if (SUCCEEDED(StringCchCopyA(uniqueFSName + offset, MAX_PATH - offset, s + offset)))
+                    {
+                        oldFSNameUsed = TRUE;
+                        oldFSNames->Delete(i); // remove the used fs-name from the array (reusing it makes no sense, even if the name is not unique)
+                        if (!oldFSNames->IsGood())
+                            oldFSNames->ResetState(); // deletion succeeded, nothing else matters
+                        break;
+                    }
                 }
             }
         }
@@ -2828,12 +2837,13 @@ BOOL SearchForAddedSPLs(char* buf, char* s, TIndirectArray<char>& foundFiles)
                 while (sep < eol && *sep != ':')
                     sep++;
                 char num[20];
-                lstrcpyn(num, start, (int)min(20, sep - start + 1));
+                // Compatibility-file fields are parsed into fixed local records with explicit limits.
+                StringCchCopyNA(num, _countof(num), start, min((int)_countof(num) - 1, (int)(sep - start)));
                 int ver = atoi(num);
                 char name[MAX_PATH];
                 if (sep + 1 < eol)
                 {
-                    lstrcpyn(name, sep + 1, (int)min(MAX_PATH, (eol - sep) - 1 + 1));
+                    StringCchCopyNA(name, _countof(name), sep + 1, min((int)_countof(name) - 1, (int)(eol - sep - 1)));
                 }
                 else
                     name[0] = 0;
@@ -3275,7 +3285,8 @@ void CPlugins::RemoveNoLongerExistingPlugins(BOOL canDelPluginRegKey, BOOL loadA
                     _stricmp(Data[i]->DLLName, "unace\\unace.spl") != 0 &&     // we want to suppress UnACE (no need to alert that it’s missing)
                     _stricmp(Data[i]->DLLName, "diskcopy\\diskcopy.spl") != 0) // we want to suppress DiskCopy (no need to alert that it’s missing)
                 {
-                    lstrcpyn(pluginName, Data[i]->Name, MAX_PATH); // if it has a registry key, store its name
+                    // Missing-plugin notices retain a bounded presentation copy of the registered name.
+                    StringCchCopyNA(pluginName, _countof(pluginName), Data[i]->Name, _countof(pluginName) - 1);
                 }
                 if (Remove(parent, i, canDelPluginRegKey))
                 {
@@ -3677,7 +3688,11 @@ BOOL CPlugins::GetFirstNethoodPluginFSName(char* fsName, CPluginData** nethoodPl
         if (p->PluginIsNethood && p->SupportFS && p->FSNames.Count > 0)
         {
             if (fsName != NULL)
-                lstrcpyn(fsName, p->FSNames[0], MAX_PATH);
+            {
+                // Callers reopen this filesystem by name, so do not return a clipped identity.
+                if (FAILED(StringCchCopyA(fsName, MAX_PATH, p->FSNames[0])))
+                    return FALSE;
+            }
             if (nethoodPlugin != NULL)
                 *nethoodPlugin = p;
             return TRUE;

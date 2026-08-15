@@ -94,7 +94,8 @@ BOOL ErrorHelper(HWND parent, const char* message, int lastError, va_list arglis
         // insert a space between our message and the system error description
         if (*buf != 0 && *(buf + strlen(buf) - 1) != ' ')
             strcat(buf, " ");
-        int l = lstrlen(buf);
+        // The error prefix is a terminated local buffer before FormatMessage appends to it.
+        int l = static_cast<int>(strlen(buf));
         FormatMessage(FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS, NULL, lastError,
                       MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), buf + l, 2048 - l, NULL);
     }

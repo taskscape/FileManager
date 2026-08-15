@@ -3,6 +3,8 @@
 
 #include "precomp.h"
 
+#include <strsafe.h>
+
 #include "lha.h"
 #include "unlha.h"
 #include "unlha.rh"
@@ -309,11 +311,23 @@ BOOL CPluginInterfaceForArchiver::UnpackOneFile(CSalamanderForOperationsAbstract
     }
 
     char justName[MAX_PATH];
-    lstrcpy(justName, nameInArchive);
+    if (FAILED(StringCchCopyA(justName, _countof(justName), nameInArchive)))
+    {
+        // Single-file extraction must not strip and reuse a truncated archive name.
+        SalamanderGeneral->ShowMessageBox(LoadStr(IDS_TOOLONGNAME), LoadStr(IDS_PLUGINNAME), MSGBOX_ERROR);
+        fclose(f);
+        return FALSE;
+    }
     SalamanderGeneral->SalPathStripPath(justName);
     char targetName[MAX_PATH];
-    lstrcpy(targetName, targetDir);
-    SalamanderGeneral->SalPathAppend(targetName, justName, MAX_PATH);
+    if (FAILED(StringCchCopyA(targetName, _countof(targetName), targetDir)) ||
+        !SalamanderGeneral->SalPathAppend(targetName, justName, _countof(targetName)))
+    {
+        // Target creation requires the complete directory and archive leaf name.
+        SalamanderGeneral->ShowMessageBox(LoadStr(IDS_TOOLONGNAME), LoadStr(IDS_PLUGINNAME), MSGBOX_ERROR);
+        fclose(f);
+        return FALSE;
+    }
     BOOL skip;
     DWORD silent = 0;
 
@@ -524,8 +538,14 @@ void CPluginInterfaceForArchiver::UnpackInnerBody(FILE* f, const char* targetDir
     CALL_STACK_MESSAGE4("CPluginInterfaceForArchiver::UnpackInnerBody( , %s, %s, , %ld)", targetDir, fileName, bDir);
 
     char message[MAX_PATH + 32];
-    lstrcpy(message, LoadStr(IDS_UNPACKING));
-    lstrcat(message, hdr.name);
+    HRESULT messageResult = StringCchCopyA(message, _countof(message), LoadStr(IDS_UNPACKING));
+    if (SUCCEEDED(messageResult))
+        messageResult = StringCchCatA(message, _countof(message), hdr.name);
+    if (FAILED(messageResult))
+    {
+        // Progress text must not display a partial archive entry name.
+        message[0] = 0;
+    }
     Salamander->ProgressDialogAddText(message, TRUE);
 
     if (hdr.method == LHA_UNKNOWNMETHOD && hdr.original_size)
@@ -640,9 +660,16 @@ void GetInfo(char* buffer, FILETIME* lastWrite, unsigned size)
     FileTimeToSystemTime(&ft, &st);
 
     char date[50], time[50], number[50];
-    if (GetTimeFormat(LOCALE_USER_DEFAULT, 0, &st, NULL, time, 50) == 0)
+    WCHAR localeName[LOCALE_NAME_MAX_LENGTH];
+    WCHAR formattedValue[50];
+    // LHA metadata crosses an ANSI plug-in boundary only after Unicode locale formatting.
+    if (!GetUserDefaultLocaleName(localeName, ARRAYSIZE(localeName)) ||
+        GetTimeFormatEx(localeName, 0, &st, NULL, formattedValue, ARRAYSIZE(formattedValue)) == 0 ||
+        WideCharToMultiByte(CP_ACP, 0, formattedValue, -1, time, ARRAYSIZE(time), NULL, NULL) == 0)
         sprintf(time, "%u:%02u:%02u", st.wHour, st.wMinute, st.wSecond);
-    if (GetDateFormat(LOCALE_USER_DEFAULT, DATE_SHORTDATE, &st, NULL, date, 50) == 0)
+    if (!GetUserDefaultLocaleName(localeName, ARRAYSIZE(localeName)) ||
+        GetDateFormatEx(localeName, DATE_SHORTDATE, &st, NULL, formattedValue, ARRAYSIZE(formattedValue), NULL) == 0 ||
+        WideCharToMultiByte(CP_ACP, 0, formattedValue, -1, date, ARRAYSIZE(date), NULL, NULL) == 0)
         sprintf(date, "%u.%u.%u", st.wDay, st.wMonth, st.wYear);
     sprintf(buffer, "%s, %s, %s", SalamanderGeneral->NumberToStr(number, CQuadWord(size, 0)), date, time);
 }

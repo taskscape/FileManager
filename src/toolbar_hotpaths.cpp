@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "precomp.h"
+#include <strsafe.h>
 
 #include "mainwnd.h"
 #include "usermenu.h"
@@ -49,7 +50,8 @@ CHotPathsBar::CHotPathsBar(HWND hNotifyWindow, CObjectOrigin origin)
             tii.Mask = TLBI_MASK_STYLE | TLBI_MASK_TEXT | TLBI_MASK_ICON | TLBI_MASK_ID;
             tii.Style = TLBI_STYLE_SHOWTEXT;
             char buff[200];
-            lstrcpyn(buff, srcName, 200);
+            // Toolbar captions are bounded presentation fields before accelerator escaping.
+            StringCchCopyNA(buff, _countof(buff), srcName, _countof(buff) - 1);
             DuplicateAmpersands(buff, 200);
             tii.Text = buff;
             tii.HIcon = HFavoritIcon;
@@ -86,7 +88,8 @@ CHotPathsBar::CHotPathsBar(HWND hNotifyWindow, CObjectOrigin origin)
           if (item->Type == umitSubmenuBegin)
             tii.Style |= TLBI_STYLE_WHOLEDROPDOWN | TLBI_STYLE_DROPDOWN;
           char buff[80];
-          lstrcpyn(buff, item->ItemName, 80);
+          // User-menu toolbar captions retain their compact display allocation.
+          StringCchCopyNA(buff, _countof(buff), item->ItemName, _countof(buff) - 1);
           RemoveAmpersands(buff);
           tii.Text = buff;
           tii.HIcon = item->HIcon;

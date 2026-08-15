@@ -533,17 +533,15 @@ void CTabList::GetText(int iItem, int index, WCHAR* buff, int buffMax, BOOL pref
 
     case 7:
     {
-        GetDateFormat(LOCALE_USER_DEFAULT, DATE_SHORTDATE,
-                      &Data.Messages[iItem].Time, NULL, buff,
-                      buffMax);
+        FormatTestServerDateTime(&Data.Messages[iItem].Time, DATE_SHORTDATE,
+                                 NULL, buff, buffMax, TRUE);
         break;
     }
 
     case 8:
     {
-        GetTimeFormat(LOCALE_USER_DEFAULT, TIME_FORCE24HOURFORMAT,
-                      &Data.Messages[iItem].Time,
-                      L"hh':'mm':'ss", buff, buffMax);
+        FormatTestServerDateTime(&Data.Messages[iItem].Time, TIME_FORCE24HOURFORMAT,
+                                 L"hh':'mm':'ss", buff, buffMax, FALSE);
         SWPrintFToEnd_s(buff, buffMax, L".%03d", Data.Messages[iItem].Time.wMilliseconds);
         break;
     }

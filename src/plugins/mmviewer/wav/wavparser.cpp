@@ -3,6 +3,8 @@
 
 #include "precomp.h"
 
+#include <strsafe.h>
+
 #ifdef _WAV_SUPPORT_
 
 #include "wavparser.h"
@@ -265,7 +267,9 @@ CParserWAV::GetFileInfo(COutputInterface* output)
             bps = m_pwfx->wBitsPerSample;
             hz = m_pwfx->nSamplesPerSec;
             chn = m_pwfx->nChannels;
-            lstrcpy(compression, "PCM");
+            // Codec labels are display-only and must not retain a partial localized name.
+            if (FAILED(StringCchCopyA(compression, _countof(compression), "PCM")))
+                compression[0] = 0;
         }
         else //for non-pcm formats
         {
@@ -278,25 +282,24 @@ CParserWAV::GetFileInfo(COutputInterface* output)
             aftd.cbStruct = sizeof(ACMFORMATTAGDETAILS);
             aftd.dwFormatTag = m_pwfx->wFormatTag;
             MMRESULT mmr = acmFormatTagDetails(NULL, &aftd, ACM_FORMATTAGDETAILSF_FORMATTAG);
-            if (mmr == 0)
-                lstrcpy(compression, aftd.szFormatTag);
-            else
-                lstrcpy(compression, "?");
+            const char* formatTag = mmr == 0 ? aftd.szFormatTag : "?";
+            if (FAILED(StringCchCopyA(compression, _countof(compression), formatTag)))
+                compression[0] = 0;
         }
 
         double div = double(bps / 8 * hz * chn);
         if (div > 0.0f)
             s = (int)(double(filesize) / div);
 
-        if (s / 3600)
-            lstrcpy(time, FStr("%02lu:%02lu:%02lu", s / 3600, s / 60 % 60, s % 60));
-        else
-            lstrcpy(time, FStr("%02lu:%02lu", s / 60 % 60, s % 60));
+        const char* formattedTime = s / 3600 ? FStr("%02lu:%02lu:%02lu", s / 3600, s / 60 % 60, s % 60)
+                                             : FStr("%02lu:%02lu", s / 60 % 60, s % 60);
+        // A failed display-label copy must not expose a partial duration.
+        if (FAILED(StringCchCopyA(time, _countof(time), formattedTime)))
+            time[0] = 0;
 
-        if (chn >= 2)
-            lstrcpy(mode, LoadStr(IDS_WAV_STEREO));
-        else
-            lstrcpy(mode, LoadStr(IDS_WAV_MONO));
+        const char* channelMode = chn >= 2 ? LoadStr(IDS_WAV_STEREO) : LoadStr(IDS_WAV_MONO);
+        if (FAILED(StringCchCopyA(mode, _countof(mode), channelMode)))
+            mode[0] = 0;
 
         output->AddHeader(LoadStr(IDS_WAV_INFO));
         output->AddItem(LoadStr(IDS_OGG_LENGTH), time);

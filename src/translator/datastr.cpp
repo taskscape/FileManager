@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "precomp.h"
+#include <strsafe.h>
 
 //*****************************************************************************
 //
@@ -233,8 +234,9 @@ BOOL CData::GetStringWithID(WORD id, wchar_t* buf, int bufSize)
 
             if (strID == id)
             {
-                lstrcpynW(buf, str, bufSize);
-                return TRUE;
+                // A caller that cannot hold the whole translation must not receive a truncated value.
+                return buf != NULL && bufSize > 0 &&
+                       SUCCEEDED(StringCchCopyW(buf, static_cast<size_t>(bufSize), str));
             }
         }
     }

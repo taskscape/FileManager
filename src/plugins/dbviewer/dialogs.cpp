@@ -161,7 +161,8 @@ void CGoToDialog::Transfer(CTransferInfo& ti)
         TCHAR buff[20];
         if (ti.Type == ttDataToWindow)
         {
-            wsprintf(buff, _T("%d"), (*pRecord) + 1);
+            // Bound the record number before placing it in the dialog control.
+            _stprintf_s(buff, _countof(buff), _T("%d"), (*pRecord) + 1);
             SendMessage(hWnd, WM_SETTEXT, 0, (LPARAM)buff);
         }
         else

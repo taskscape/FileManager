@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "precomp.h"
+#include <strsafe.h>
 
 #include "cfgdlg.h"
 #include "mainwnd.h"
@@ -97,16 +98,19 @@ BOOL CIconThreadPool::Initialize(int numWorkers)
     WorkerCount = 0;
     for (int i = 0; i < numWorkers; i++)
     {
-        DWORD threadId;
-        Workers[i] = HANDLES(CreateThread(NULL, 0, WorkerThreadProc, this, 0, &threadId));
-        if (Workers[i] != NULL)
+        CThreadOwner* worker = new CThreadOwner;
+        if (worker != NULL && worker->Start(WorkerThreadProc, this, "icon pool worker"))
         {
+            // Keep successful workers packed so a failed later start cannot
+            // leave an owner outside the shutdown loop.
+            Workers[WorkerCount] = worker;
             // Set lower priority so icon loading doesn't interfere with UI
-            SetThreadPriority(Workers[i], THREAD_PRIORITY_BELOW_NORMAL);
+            SetThreadPriority(worker->GetThreadHandle(), THREAD_PRIORITY_BELOW_NORMAL);
             WorkerCount++;
         }
         else
         {
+            delete worker;
             TRACE_E("CIconThreadPool::Initialize(): Failed to create worker thread " << i);
         }
     }
@@ -145,14 +149,14 @@ void CIconThreadPool::Shutdown()
     
     // A diagnostic deadline is not permission to free queue state a worker may still use.
     for (int i = 0; i < WorkerCount; i++)
-        CThreadShutdownDeadline("icon work pool").WaitForSafeJoin(Workers[i]);
-    
-    // Close worker handles
+        Workers[i]->StopAndJoin(CThreadShutdownDeadline("icon work pool"));
+
+    // Deleting owners closes handles only after their workers have safely joined.
     for (int i = 0; i < WorkerCount; i++)
     {
         if (Workers[i] != NULL)
         {
-            HANDLES(CloseHandle(Workers[i]));
+            delete Workers[i];
             Workers[i] = NULL;
         }
     }
@@ -296,7 +300,9 @@ DWORD CIconThreadPool::SubmitGetFileIcon(const char* path, CIconSizeEnum iconSiz
     CIconWorkItem item;
     memset(&item, 0, sizeof(item));
     item.Type = iwtGetFileIcon;
-    lstrcpynA(item.Path, path, MAX_PATH);
+    // Queued icon work must retain the complete file identity; request ID zero denotes rejection.
+    if (FAILED(StringCchCopyA(item.Path, _countof(item.Path), path)))
+        return 0;
     item.Index = 0;
     item.IconSize = iconSize;
     item.Generation = generation;
@@ -309,7 +315,8 @@ DWORD CIconThreadPool::SubmitExtractIcon(const char* path, int index, CIconSizeE
     CIconWorkItem item;
     memset(&item, 0, sizeof(item));
     item.Type = iwtExtractIcon;
-    lstrcpynA(item.Path, path, MAX_PATH);
+    if (FAILED(StringCchCopyA(item.Path, _countof(item.Path), path)))
+        return 0;
     item.Index = index;
     item.IconSize = iconSize;
     item.Generation = generation;
@@ -322,7 +329,8 @@ DWORD CIconThreadPool::SubmitLoadImageIcon(const char* path, CIconSizeEnum iconS
     CIconWorkItem item;
     memset(&item, 0, sizeof(item));
     item.Type = iwtLoadImageIcon;
-    lstrcpynA(item.Path, path, MAX_PATH);
+    if (FAILED(StringCchCopyA(item.Path, _countof(item.Path), path)))
+        return 0;
     item.Index = 0;
     item.IconSize = iconSize;
     item.Generation = generation;
@@ -424,9 +432,13 @@ BOOL CIconThreadPool::WaitForCompletion(DWORD timeoutMs)
            WaitForSingleObject(AllWorkCompletedEvent, timeoutMs) == WAIT_OBJECT_0;
 }
 
-DWORD WINAPI CIconThreadPool::WorkerThreadProc(LPVOID param)
+DWORD WINAPI CIconThreadPool::WorkerThreadProc(void* param, HANDLE stopEvent)
 {
     CIconThreadPool* pool = (CIconThreadPool*)param;
+
+    // TerminateEvent wakes the whole pool at once; the owner stop event exists
+    // solely to retain a common handle-lifetime boundary for these workers.
+    (void)stopEvent;
     
     SetThreadNameInVCAndTrace("IconPoolWorker");
     

@@ -7,6 +7,7 @@
 #include <stdio.h>
 #include <commctrl.h>
 #include <tchar.h>
+#include <strsafe.h>
 
 #include "spl_com.h"
 #include "spl_base.h"
@@ -27,6 +28,18 @@
 #include "common.h"
 #include "add_del.h"
 #include "dialogs.h"
+
+template<size_t capacity>
+static bool CopyZipDialogText(char (&destination)[capacity], const char* source)
+{
+    // Dialog and persisted fields must be complete; clear a value that exceeds its declared array.
+    if (FAILED(StringCchCopyA(destination, capacity, source != NULL ? source : "")))
+    {
+        destination[0] = 0;
+        return false;
+    }
+    return true;
+}
 
 WNDPROC OrigTextControlProc;
 WNDPROC OrigCBEditCtrlProc;
@@ -64,7 +77,8 @@ LRESULT CALLBACK TextControlProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lPa
         SetTextColor(ps.hdc, color);
         int prevBkMode = SetBkMode(ps.hdc, TRANSPARENT);
         int len = GetWindowText(hWnd, txt, MAX_PATH);
-        DrawText(ps.hdc, txt, lstrlen(txt), &r, format);
+        // Window text is terminated by GetWindowText before GDI receives its character count.
+        DrawText(ps.hdc, txt, static_cast<int>(strlen(txt)), &r, format);
         SetBkMode(ps.hdc, prevBkMode);
         SelectObject(ps.hdc, hOldFont);
         EndPaint(hWnd, &ps);
@@ -284,14 +298,20 @@ BOOL CPackDialog::OnInit(WPARAM wParam, LPARAM lParam)
     SubClassStatic(IDC_ARCHIVE, true);
     SubClassComboBox(IDC_VOLSIZE, true);
 
-    if ((DecimalSeparatorLen = GetLocaleInfoA(LOCALE_USER_DEFAULT, LOCALE_SDECIMAL, DecimalSeparator, 5)) == 0 ||
-        DecimalSeparatorLen > 5)
+    WCHAR localeName[LOCALE_NAME_MAX_LENGTH];
+    WCHAR decimalSeparatorW[5];
+    if (GetUserDefaultLocaleName(localeName, _countof(localeName)) == 0 ||
+        GetLocaleInfoEx(localeName, LOCALE_SDECIMAL, decimalSeparatorW, _countof(decimalSeparatorW)) == 0 ||
+        (DecimalSeparatorLen = WideCharToMultiByte(CP_ACP, 0, decimalSeparatorW, -1,
+                                                    DecimalSeparator, _countof(DecimalSeparator), NULL, NULL)) == 0 ||
+        DecimalSeparatorLen > (int)_countof(DecimalSeparator))
     {
         strcpy(DecimalSeparator, ".");
         DecimalSeparatorLen = 1;
     }
     else
     {
+        // The archive dialog stores the separator in an ANSI parser buffer after resolving the named user locale.
         DecimalSeparatorLen--;
         DecimalSeparator[DecimalSeparatorLen] = 0; // make sure there is a zero terminator at the end
     }
@@ -352,9 +372,9 @@ BOOL CPackDialog::OnMultiVol(WORD wNotifyCode, WORD wID, HWND hwndCtl)
                 EnableWindow(GetDlgItem(Dlg, IDC_SEQNAME), TRUE);
             if (SendDlgItemMessage(Dlg, IDC_SELFEXTR, BM_GETCHECK, 0, 0) == BST_UNCHECKED)
             {
-                MakeFileName(1, SendDlgItemMessage(Dlg, IDC_SEQNAME, BM_GETCHECK, 0, 0) == BST_CHECKED,
-                             ZipFile, name, Config->WinZipNames && SendDlgItemMessage(Dlg, IDC_SELFEXTR, BM_GETCHECK, 0, 0) == BST_UNCHECKED);
-                SendDlgItemMessage(Dlg, IDC_ARCHIVE, WM_SETTEXT, 0, (LPARAM)name);
+                if (MakeFileName(1, SendDlgItemMessage(Dlg, IDC_SEQNAME, BM_GETCHECK, 0, 0) == BST_CHECKED,
+                                 ZipFile, name, _countof(name), Config->WinZipNames && SendDlgItemMessage(Dlg, IDC_SELFEXTR, BM_GETCHECK, 0, 0) == BST_UNCHECKED) >= 0)
+                    SendDlgItemMessage(Dlg, IDC_ARCHIVE, WM_SETTEXT, 0, (LPARAM)name);
                 InvalidateRect(GetDlgItem(Dlg, IDC_ARCHIVE), NULL, TRUE);
                 UpdateWindow(GetDlgItem(Dlg, IDC_ARCHIVE));
             }
@@ -392,9 +412,9 @@ BOOL CPackDialog::OnSeqName(WORD wNotifyCode, WORD wID, HWND hwndCtl)
     case BN_CLICKED:
         if (SendDlgItemMessage(Dlg, IDC_SELFEXTR, BM_GETCHECK, 0, 0) == BST_UNCHECKED)
         {
-            MakeFileName(1, SendDlgItemMessage(Dlg, wID, BM_GETCHECK, 0, 0) == BST_CHECKED,
-                         ZipFile, name, Config->WinZipNames && SendDlgItemMessage(Dlg, IDC_SELFEXTR, BM_GETCHECK, 0, 0) == BST_UNCHECKED);
-            SendDlgItemMessage(Dlg, IDC_ARCHIVE, WM_SETTEXT, 0, (LPARAM)name);
+            if (MakeFileName(1, SendDlgItemMessage(Dlg, wID, BM_GETCHECK, 0, 0) == BST_CHECKED,
+                             ZipFile, name, _countof(name), Config->WinZipNames && SendDlgItemMessage(Dlg, IDC_SELFEXTR, BM_GETCHECK, 0, 0) == BST_UNCHECKED) >= 0)
+                SendDlgItemMessage(Dlg, IDC_ARCHIVE, WM_SETTEXT, 0, (LPARAM)name);
             InvalidateRect(GetDlgItem(Dlg, IDC_ARCHIVE), NULL, TRUE);
             UpdateWindow(GetDlgItem(Dlg, IDC_ARCHIVE));
         }
@@ -414,11 +434,11 @@ BOOL CPackDialog::OnSelfExtr(WORD wNotifyCode, WORD wID, HWND hwndCtl)
         {
             EnableWindow(GetDlgItem(Dlg, IDC_ADVANCED), TRUE);
             char path[MAX_PATH + 4], ext[MAX_PATH];
-            SplitPath2(ZipFile, path, name, ext);
-            strcat(path, name);
-            strcat(path, ".exe");
-            *(path + MAX_PATH - 1) = 0; // just to be sure
-            SendDlgItemMessage(Dlg, IDC_ARCHIVE, WM_SETTEXT, 0, (LPARAM)path);
+            // The self-extractor name must contain the complete split path and replacement suffix.
+            if (SplitPath2(ZipFile, path, _countof(path), name, _countof(name), ext, _countof(ext)) &&
+                SUCCEEDED(StringCchCatA(path, _countof(path), name)) &&
+                SUCCEEDED(StringCchCatA(path, _countof(path), ".exe")))
+                SendDlgItemMessage(Dlg, IDC_ARCHIVE, WM_SETTEXT, 0, (LPARAM)path);
             InvalidateRect(GetDlgItem(Dlg, IDC_ARCHIVE), NULL, TRUE);
             UpdateWindow(GetDlgItem(Dlg, IDC_ARCHIVE));
             SetWindowText(Dlg, LoadStr(IDS_CREAETARCH));
@@ -428,9 +448,9 @@ BOOL CPackDialog::OnSelfExtr(WORD wNotifyCode, WORD wID, HWND hwndCtl)
             EnableWindow(GetDlgItem(Dlg, IDC_ADVANCED), FALSE);
             if (SendDlgItemMessage(Dlg, IDC_MULTIVOL, BM_GETCHECK, 0, 0) == BST_CHECKED)
             {
-                MakeFileName(1, SendDlgItemMessage(Dlg, IDC_SEQNAME, BM_GETCHECK, 0, 0) == BST_CHECKED,
-                             ZipFile, name, Config->WinZipNames);
-                SendDlgItemMessage(Dlg, IDC_ARCHIVE, WM_SETTEXT, 0, (LPARAM)name);
+                if (MakeFileName(1, SendDlgItemMessage(Dlg, IDC_SEQNAME, BM_GETCHECK, 0, 0) == BST_CHECKED,
+                                 ZipFile, name, _countof(name), Config->WinZipNames) >= 0)
+                    SendDlgItemMessage(Dlg, IDC_ARCHIVE, WM_SETTEXT, 0, (LPARAM)name);
             }
             else
             {
@@ -564,14 +584,14 @@ BOOL CPackDialog::OnOK(WORD wNotifyCode, WORD wID, HWND hwndCtl)
         while (*sour && *sour == ' ')
             sour++;
         const char* a = LoadStr(IDS_AUTO);
-        if (!_strnicmp(sour, a, lstrlen(a)))
+        if (!_strnicmp(sour, a, static_cast<int>(strlen(a))))
         {
             PackOptions->VolumeSize = -1;
             ok = true;
         }
         else
         {
-            if (lstrlen(sour) < 12)
+            if (strlen(sour) < 12)
             {
                 double aux;
                 if (Atod(sour, DecimalSeparator, &aux))
@@ -618,11 +638,11 @@ BOOL CPackDialog::OnOK(WORD wNotifyCode, WORD wID, HWND hwndCtl)
             }
             for (; i > 0; i--)
             {
-                lstrcpy(Config->VolSizeCache[i], Config->VolSizeCache[i - 1]);
+                CopyZipDialogText(Config->VolSizeCache[i], Config->VolSizeCache[i - 1]);
                 //Config->VolSizeCache[i] = Config->VolSizeCache[i - 1];
                 Config->VolSizeUnits[i] = Config->VolSizeUnits[i - 1];
             }
-            lstrcpy(Config->VolSizeCache[0], volSize);
+            CopyZipDialogText(Config->VolSizeCache[0], volSize);
             Config->VolSizeUnits[0] = mb ? 1 : 0;
             Config->LastUsedAuto = false;
             /*
@@ -633,10 +653,10 @@ BOOL CPackDialog::OnOK(WORD wNotifyCode, WORD wID, HWND hwndCtl)
         {
           for (i = cs; i > 0; i--)
           {
-            lstrcpy(Config->VolSizeCache[i], Config->VolSizeCache[i - 1]);
+                CopyZipDialogText(Config->VolSizeCache[i], Config->VolSizeCache[i - 1]);
             Config->VolSizeUnits[i] = Config->VolSizeUnits[i - 1];
           }
-          lstrcpy(Config->VolSizeCache[0], volSize);
+            CopyZipDialogText(Config->VolSizeCache[0], volSize);
           Config->VolSizeUnits[0] = mb ? 1 : 0;
           Config->LastUsedAuto = false;
         }
@@ -674,7 +694,7 @@ BOOL CPackDialog::OnOK(WORD wNotifyCode, WORD wID, HWND hwndCtl)
         if (GetDlgItemText(Dlg, IDC_PASSWORD1, pwd1, MAX_PASSWORD - 1) > 0 &&
             GetDlgItemText(Dlg, IDC_PASSWORD2, pwd2, MAX_PASSWORD - 1) > 0)
             if (!lstrcmp(pwd1, pwd2))
-                lstrcpy(PackOptions->Password, pwd1);
+                CopyZipDialogText(PackOptions->Password, pwd1);
             else
             {
                 SalamanderGeneral->SalMessageBox(Dlg, LoadStr(IDS_PWDDONTMATCH), LoadStr(IDS_ERROR), MB_OK | MB_ICONEXCLAMATION);
@@ -721,19 +741,22 @@ void CPackDialog::ResetControls()
     SetWindowText(Dlg, Flags & PD_NEWARCHIVE || PackOptions->Action & (PA_MULTIVOL | PA_SELFEXTRACT)
                            ? LoadStr(IDS_CREAETARCH)
                            : LoadStr(IDS_ADDTOARCHIVE));
-    lstrcpy(archive, ZipFile);
+    // Preserve the complete initial archive path before applying any preview transformation.
+    CopyZipDialogText(archive, ZipFile);
     if (PackOptions->Action & PA_MULTIVOL)
     {
-        MakeFileName(1, PackOptions->SeqNames, ZipFile, archive,
-                     Config->WinZipNames && !(PackOptions->Action & PA_SELFEXTRACT));
+        if (MakeFileName(1, PackOptions->SeqNames, ZipFile, archive, _countof(archive),
+                         Config->WinZipNames && !(PackOptions->Action & PA_SELFEXTRACT)) < 0)
+            archive[0] = 0;
     }
     if (PackOptions->Action & PA_SELFEXTRACT)
     {
         char name[MAX_PATH], ext[MAX_PATH];
-        SplitPath2(ZipFile, archive, name, ext);
-        lstrcat(archive, name);
-        lstrcat(archive, ".exe");
-        *(archive + MAX_PATH - 1) = 0; // just to be sure
+        // Keep the default self-extractor target only when its complete path fits the dialog buffer.
+        if (!(SplitPath2(ZipFile, archive, _countof(archive), name, _countof(name), ext, _countof(ext)) &&
+              SUCCEEDED(StringCchCatA(archive, _countof(archive), name)) &&
+              SUCCEEDED(StringCchCatA(archive, _countof(archive), ".exe"))))
+            archive[0] = 0;
     }
     SendDlgItemMessage(Dlg, IDC_ARCHIVE, WM_SETTEXT, 0, (LPARAM)archive);
 }
@@ -914,7 +937,7 @@ BOOL CConfigDialog::OnOK(WORD wNotifyCode, WORD wID, HWND hwndCtl)
         else file++;
         lstrcpy(Config->DefSfxFile, file);
         */
-                lstrcpy(Config->DefSfxFile, lang->FileName);
+                CopyZipDialogText(Config->DefSfxFile, lang->FileName);
             }
         }
 
@@ -985,7 +1008,7 @@ BOOL CConfigDialog::OnDefault(WORD wNotifyCode, WORD wID, HWND hwndCtl)
             if (lstrcmpi(lang->FileName, DefConfig.DefSfxFile) == 0)
             {
                 char langName[128];
-                if (GetLocaleInfo(MAKELCID(MAKELANGID(lang->LangID, SUBLANG_NEUTRAL), SORT_DEFAULT), LOCALE_SLANGUAGE, langName, 128))
+                if (GetLanguageNameFromLangId(lang->LangID, langName, _countof(langName)))
                 {
                     char* c = strchr(langName, ' ');
                     if (c)
@@ -1186,7 +1209,8 @@ BOOL CLowDiskSpaceDialog::OnInit(WPARAM wParam, LPARAM lParam)
     }
     else
     {
-        lstrcpy(buf, LoadStr(IDS_AUTO));
+        // The fixed disk-space dialog label is cleared if a localized value cannot fit.
+        CopyZipDialogText(buf, LoadStr(IDS_AUTO));
     }
     SendDlgItemMessage(Dlg, IDC_VOLUMESIZE, WM_SETTEXT, 0, (LPARAM)buf);
     CenterDlgToParent();
@@ -1906,7 +1930,8 @@ BOOL CRenFavDialog::OnOK(WORD wNotifyCode, WORD wID, HWND hwndCtl)
     CALL_STACK_MESSAGE3("CRenFavDialog::OnOK(0x%X, 0x%X, )", wNotifyCode, wID);
     char buf[MAX_FAVNAME];
     GetDlgItemText(Dlg, IDC_NAME, buf, MAX_FAVNAME - 1);
-    if (lstrlen(TrimTralingSpaces(buf)) == 0)
+    // The editable favorite name is terminated after trimming trailing spaces.
+    if (strlen(TrimTralingSpaces(buf)) == 0)
     {
         SalamanderGeneral->SalMessageBox(Dlg, LoadStr(IDS_NONTEXT), LoadStr(IDS_ERROR), MB_OK | MB_ICONEXCLAMATION);
         return TRUE;

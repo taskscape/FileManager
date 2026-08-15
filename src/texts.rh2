@@ -1157,6 +1157,8 @@
 #define IDS_PROGDLGPAUSED             10922
 // disk operations progress dialog: substitution for number of percents in window caption when operation is waiting in queue (it will be resumed when running operation in queue ends)
 #define IDS_PROGDLGQUEUEPAUSED        10923
+// disk operation admission failed because its bounded queue cannot retain more dialogs
+#define IDS_OPERATIONQUEUEFULL         10924
 
 // Subst x:
 #define IDS_INFODLGTYPE7              10925

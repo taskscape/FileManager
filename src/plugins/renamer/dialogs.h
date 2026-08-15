@@ -3,6 +3,8 @@
 
 #pragma once
 
+#include "..\\..\\common\\monotonic_time.h"
+
 #define MNTS_ALL (MNTS_B | MNTS_I | MNTS_A)
 
 #define MAX_HISTORY_ENTRIES 20
@@ -243,7 +245,8 @@ class CProgressDialog : public CDialog
 {
     CGUIProgressBarAbstract* Progress;
     BOOL Cancel;
-    DWORD NextUpdate;
+    // This UI-thread dialog drains its own messages, so the refresh deadline has no cross-thread DWORD contract.
+    CMonotonicTimePoint NextUpdate;
     DWORD Current;
 
 public:

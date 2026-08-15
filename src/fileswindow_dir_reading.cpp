@@ -15,6 +15,8 @@
 #include "shellib.h"
 #include "pack.h"
 
+#include <strsafe.h>
+
 static BOOL ConvertFindDataWToA(const WIN32_FIND_DATAW& src, WIN32_FIND_DATAA& dst)
 {
     ZeroMemory(&dst, sizeof(dst));
@@ -117,7 +119,10 @@ void CFilesWindow::PluginFSFilesAction(CPluginFSActionType type)
         BOOL isDir = i < Dirs->Count;
         CFileData* f = isDir ? &Dirs->At(i) : &Files->At(i - Dirs->Count);
         AlterFileName(formatedFileName, f->Name, -1, Configuration.FileNameFormat, 0, isDir);
-        lstrcpy(expanded, LoadStr(isDir ? IDS_QUESTION_DIRECTORY : IDS_QUESTION_FILE));
+        // The localized confirmation label has a fixed presentation buffer; do not silently truncate it.
+        if (FAILED(StringCchCopyA(expanded, _countof(expanded),
+                                  LoadStr(isDir ? IDS_QUESTION_DIRECTORY : IDS_QUESTION_FILE))))
+            expanded[0] = 0;
     }
     else
     {
@@ -142,7 +147,9 @@ void CFilesWindow::PluginFSFilesAction(CPluginFSActionType type)
     {
         // IDS_COPY/IDS_MOVE contain ampersands, cancel it
         char templ[200];
-        lstrcpyn(templ, LoadStr(resID), 200);
+        // Preserve a valid empty format string if a localization exceeds the dialog's fixed template buffer.
+        if (FAILED(StringCchCopyA(templ, _countof(templ), LoadStr(resID))))
+            templ[0] = 0;
         RemoveAmpersands(templ);
         sprintf(subject, templ, expanded);
         str.Set(subject, count > 1 ? NULL : formatedFileName);
@@ -214,7 +221,10 @@ void CFilesWindow::PluginFSFilesAction(CPluginFSActionType type)
                     }
 
                     char errTitle[200];
-                    lstrcpyn(errTitle, LoadStr(copy ? IDS_ERRORCOPY : IDS_ERRORMOVE), 200);
+                    // Error titles use the same fixed UI buffer and must remain terminated.
+                    if (FAILED(StringCchCopyA(errTitle, _countof(errTitle),
+                                              LoadStr(copy ? IDS_ERRORCOPY : IDS_ERRORMOVE))))
+                        errTitle[0] = 0;
                     BOOL pathError = FALSE;
 
                     int len = (int)strlen(targetPath);
@@ -292,9 +302,12 @@ void CFilesWindow::PluginFSFilesAction(CPluginFSActionType type)
             {
                 if (targetPath[0] != 0) // switch focus to 'targetPath'
                 {
-                    lstrcpyn(NextFocusName, targetPath, MAX_PATH);
-                    // RefreshDirectory may not run - the source might not have changed - just to be safe, post a message
-                    PostMessage(HWindow, WM_USER_DONEXTFOCUS, 0, 0);
+                    // Avoid queuing a partial UTF-8 name for the later refresh handler.
+                    if (SUCCEEDED(StringCchCopyA(NextFocusName, _countof(NextFocusName), targetPath)))
+                    {
+                        // RefreshDirectory may not run - the source might not have changed - just to be safe, post a message
+                        PostMessage(HWindow, WM_USER_DONEXTFOCUS, 0, 0);
+                    }
                 }
 
                 unselect = TRUE; // operation successful, deselect the source
@@ -421,7 +434,14 @@ void CFilesWindow::DragDropToArcOrFS(CTmpDragDropOperData* data)
 
     // load complete data about files and directories, their names are in data->Data
     char path[MAX_PATH + 10];
-    lstrcpyn(path, data->Data->SrcPath, MAX_PATH);
+    // Stop before wildcard enumeration when the source path cannot retain its complete identity.
+    if (FAILED(StringCchCopyA(path, MAX_PATH, data->Data->SrcPath)))
+    {
+        TRACE_E("CFilesWindow::DragDropToArcOrFS(): source path is too long for disk enumeration.");
+        free(nameFound);
+        delete baseDir;
+        return;
+    }
     char* end = path + strlen(path);
     SalPathAppend(path, "*", MAX_PATH + 10);
     char text[2 * MAX_PATH + 100];
@@ -591,7 +611,9 @@ void CFilesWindow::DragDropToArcOrFS(CTmpDragDropOperData* data)
         for (i = 0; i < dataEnum.IndexesCount; i++)
             nameFound[i] = i;
         dataEnum.Indexes = nameFound;
-        lstrcpyn(dataEnum.WorkPath, data->Data->SrcPath, MAX_PATH);
+        // A disk enumerator must never receive a truncated working-path identity.
+        if (FAILED(StringCchCopyA(dataEnum.WorkPath, _countof(dataEnum.WorkPath), data->Data->SrcPath)))
+            dataEnum.IndexesCount = 0;
         dataEnum.EnumLastIndex = -1;
 
         if (dataEnum.IndexesCount > 0)
@@ -677,9 +699,12 @@ void CFilesWindow::DragDropToArcOrFS(CTmpDragDropOperData* data)
 
                     //---  refresh non-automatically refreshed directories
                     // change in the directory with the target archive (archive file is modified)
-                    lstrcpyn(text, data->ArchiveOrFSName, MAX_PATH);
-                    CutDirectory(text); // 'text' is the archive name -> must always succeed
-                    MainWindow->PostChangeOnPathNotification(text, FALSE);
+                    // Notify only with a complete archive path; a partial one can refresh the wrong panel.
+                    if (SUCCEEDED(StringCchCopyA(text, MAX_PATH, data->ArchiveOrFSName)))
+                    {
+                        CutDirectory(text); // 'text' is the archive name -> must always succeed
+                        MainWindow->PostChangeOnPathNotification(text, FALSE);
+                    }
                     if (!data->Copy)
                     {
                         // changes on the source path (when moving files to the archive,

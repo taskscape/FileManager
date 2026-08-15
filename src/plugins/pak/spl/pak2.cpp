@@ -3,6 +3,8 @@
 
 #include "precomp.h"
 
+#include <strsafe.h>
+
 #include "dumpmem.h"
 #include "array2.h"
 
@@ -11,6 +13,13 @@
 #include "pak.rh2"
 #include "lang\lang.rh"
 #include "pak.h"
+
+static void CopyPak2ErrorPrefix(char* buffer, size_t bufferCapacity, int stringId)
+{
+    // FormatMessage appends to this buffer, so an oversized localized prefix must leave a valid empty destination.
+    if (FAILED(StringCchCopyA(buffer, bufferCapacity, LoadStr(stringId))))
+        buffer[0] = 0;
+}
 
 DWORD ComputeDirDepth(const char* fileName)
 {
@@ -47,9 +56,11 @@ BOOL CPluginInterfaceForArchiver::MakeFileList3(TIndirectArray2<CFileInfo>& file
         skip = FALSE;
         if (isDir)
             continue;
-        lstrcpy(sourName, sourcePath);
-        SalamanderGeneral->SalPathAppend(sourName, nextName, MAX_PATH);
-        if (lstrlen(archiveRoot) + lstrlen(nextName) + 2 >= PAK_MAXPATH)
+        // Both source and archive names must be complete before comparison or overwrite prompts.
+        if (FAILED(StringCchCopyA(sourName, _countof(sourName), sourcePath)) ||
+            !SalamanderGeneral->SalPathAppend(sourName, nextName, _countof(sourName)))
+            return FALSE;
+        if (strlen(archiveRoot) + strlen(nextName) + 2 >= PAK_MAXPATH)
         {
             if (Silent & SF_LONGNAMES)
                 continue;
@@ -64,8 +75,9 @@ BOOL CPluginInterfaceForArchiver::MakeFileList3(TIndirectArray2<CFileInfo>& file
             }
             continue;
         }
-        lstrcpy(pakName, archiveRoot);
-        SalamanderGeneral->SalPathAppend(pakName, nextName, PAK_MAXPATH);
+        if (FAILED(StringCchCopyA(pakName, _countof(pakName), archiveRoot)) ||
+            !SalamanderGeneral->SalPathAppend(pakName, nextName, _countof(pakName)))
+            return FALSE;
         if (!PakIFace->FindFile(pakName, &pakSize))
             return FALSE;
         if (pakSize != -1 && (Silent & SF_SKIPALL))
@@ -79,8 +91,9 @@ BOOL CPluginInterfaceForArchiver::MakeFileList3(TIndirectArray2<CFileInfo>& file
                 char data2[100];
                 FILETIME ft;
 
-                lstrcpy(name1, PakFileName);
-                SalamanderGeneral->SalPathAppend(name1, pakName, MAX_PATH + PAK_MAXPATH + 1);
+                if (FAILED(StringCchCopyA(name1, _countof(name1), PakFileName)) ||
+                    !SalamanderGeneral->SalPathAppend(name1, pakName, _countof(name1)))
+                    return FALSE;
                 PakIFace->GetPakTime(&ft);
                 GetInfo(data1, &ft, pakSize);
                 HANDLE file;
@@ -97,9 +110,10 @@ BOOL CPluginInterfaceForArchiver::MakeFileList3(TIndirectArray2<CFileInfo>& file
                         break;
                     }
                     char buf[1024];
-                    lstrcpy(buf, LoadStr(IDS_ERROPEN));
+                    CopyPak2ErrorPrefix(buf, _countof(buf), IDS_ERROPEN);
+                    const DWORD prefixLength = static_cast<DWORD>(strlen(buf)); // buf is bounded to 1,024 bytes for FormatMessage.
                     FormatMessage(FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS, NULL,
-                                  GetLastError(), MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), buf + lstrlen(buf), 1024 - lstrlen(buf), NULL);
+                                  GetLastError(), MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), buf + prefixLength, _countof(buf) - prefixLength, NULL);
                     switch (SalamanderGeneral->DialogError(SalamanderGeneral->GetMsgBoxParent(), BUTTONS_RETRYSKIPCANCEL, sourName, buf, NULL))
                     {
                     case DIALOG_SKIPALL:
@@ -206,13 +220,17 @@ BOOL CPluginInterfaceForArchiver::AddFiles(TIndirectArray2<CFileInfo>& files, un
     char message[MAX_PATH + 32];
     BOOL skip;
     CQuadWord currentProgress = CQuadWord(deleted, 0);
+    // This path prefix is immutable throughout the add loop and is validated against every source entry.
+    const size_t sourPathLength = strlen(sourPath);
     int i;
     for (i = 0; i < files.Count; i++)
     {
         skip = FALSE;
         f = files[i];
-        lstrcpy(message, LoadStr(IDS_PACKING));
-        lstrcat(message, f->Name);
+        // Omit only the progress label when its localized prefix and file name exceed the display buffer.
+        if (FAILED(StringCchCopyA(message, _countof(message), LoadStr(IDS_PACKING))) ||
+            FAILED(StringCchCatA(message, _countof(message), f->Name)))
+            message[0] = 0;
         Salamander->ProgressDialogAddText(message, TRUE);
         IOFile = INVALID_HANDLE_VALUE;
         while (IOFile == INVALID_HANDLE_VALUE)
@@ -227,9 +245,10 @@ BOOL CPluginInterfaceForArchiver::AddFiles(TIndirectArray2<CFileInfo>& files, un
                 goto l_next;
             }
             char buf[1024];
-            lstrcpy(buf, LoadStr(IDS_ERROPEN));
+            CopyPak2ErrorPrefix(buf, _countof(buf), IDS_ERROPEN);
+            const DWORD prefixLength = static_cast<DWORD>(strlen(buf)); // buf is bounded to 1,024 bytes for FormatMessage.
             FormatMessage(FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS, NULL,
-                          GetLastError(), MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), buf + lstrlen(buf), 1024 - lstrlen(buf), NULL);
+                          GetLastError(), MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), buf + prefixLength, _countof(buf) - prefixLength, NULL);
             switch (SalamanderGeneral->DialogError(SalamanderGeneral->GetMsgBoxParent(), BUTTONS_RETRYSKIPCANCEL, f->Name, buf, NULL))
             {
             case DIALOG_SKIPALL:
@@ -248,12 +267,16 @@ BOOL CPluginInterfaceForArchiver::AddFiles(TIndirectArray2<CFileInfo>& files, un
         Salamander->ProgressSetTotalSize(CQuadWord(f->Size, 0), ProgressTotal);
         BOOL ret;
         char pakName[PAK_MAXPATH];
-        lstrcpy(pakName, archiveRoot);
+        if (FAILED(StringCchCopyA(pakName, _countof(pakName), archiveRoot)))
+            return FALSE;
         char* root;
-        root = f->Name + lstrlen(sourPath);
+        if (sourPathLength > strlen(f->Name))
+            return FALSE;
+        root = f->Name + sourPathLength;
         if (*root == '\\')
             root++;
-        SalamanderGeneral->SalPathAppend(pakName, root, PAK_MAXPATH);
+        if (!SalamanderGeneral->SalPathAppend(pakName, root, _countof(pakName)))
+            return FALSE;
         ret = PakIFace->AddFile(pakName, f->Size);
         CloseHandle(IOFile);
         if (!ret && Abort)
@@ -314,7 +337,9 @@ void CPluginInterfaceForArchiver::DeleteSourceFiles(TIndirectArray2<CFileInfo>& 
         {
             SalamanderGeneral->ClearReadOnlyAttr(f->Name);
             DeleteFileUtf8Local(f->Name);
-            lstrcpy(path, f->Name);
+            // Parent cleanup starts only from a complete source path.
+            if (FAILED(StringCchCopyA(path, _countof(path), f->Name)))
+                continue;
             while (ComputeDirDepth(path) > sourceDepth + 1)
             {
                 SalamanderGeneral->CutDirectory(path);
@@ -408,9 +433,11 @@ BOOL CPluginInterfaceForArchiver::DeleteFiles(const char* archiveRoot, SalEnumSe
 
     while ((nextName = next(NULL, 0, &isDir, NULL, NULL, nextParam, NULL)) != NULL)
     {
-        lstrcpy(nextFull, arcRoot);
-        SalamanderGeneral->SalPathAppend(nextFull, nextName, PAK_MAXPATH);
-        len = lstrlen(nextFull);
+        // Archive deletion matching requires the complete selected archive path.
+        if (FAILED(StringCchCopyA(nextFull, _countof(nextFull), arcRoot)) ||
+            !SalamanderGeneral->SalPathAppend(nextFull, nextName, _countof(nextFull)))
+            return FALSE;
+        len = static_cast<int>(strlen(nextFull));
         if (!PakIFace->GetFirstFile(file, &size))
             return FALSE;
         while (*file)
@@ -486,8 +513,10 @@ BOOL CPakCallbacks::DelNotify(const char* fileName, unsigned fileProgressTotal)
     CALL_STACK_MESSAGE3("CPakCallbacks::DelNotify(%s, 0x%X)", fileName,
                         fileProgressTotal);
     char message[PAK_MAXPATH + 32];
-    lstrcpy(message, LoadStr(IDS_DELETING));
-    lstrcat(message, fileName);
+    // Omit only the progress label when its localized prefix and file name exceed the display buffer.
+    if (FAILED(StringCchCopyA(message, _countof(message), LoadStr(IDS_DELETING))) ||
+        FAILED(StringCchCatA(message, _countof(message), fileName)))
+        message[0] = 0;
     Plugin->Salamander->ProgressDialogAddText(message, TRUE);
     if (!Plugin->Salamander->ProgressSetSize(CQuadWord(0, 0), CQuadWord(-1, -1), TRUE))
     {
@@ -505,15 +534,17 @@ BOOL CPakCallbacks::Read(void* buffer, DWORD size)
     if (size == 0)
         return TRUE;
     char buf[1024];
-    DWORD pos;
+    LARGE_INTEGER pos;
     while (1)
     {
-        pos = SetFilePointer(Plugin->IOFile, 0, NULL, FILE_CURRENT);
-        if (pos != 0xFFFFFFFF)
+        LARGE_INTEGER zero = {};
+        // Preserve the complete retry location when reading a PAK through the shared file handle.
+        if (SetFilePointerEx(Plugin->IOFile, zero, &pos, FILE_CURRENT))
             break;
-        lstrcpy(buf, LoadStr(IDS_UNABLEGETFIELPOS));
+        CopyPak2ErrorPrefix(buf, _countof(buf), IDS_UNABLEGETFIELPOS);
+        const DWORD prefixLength = static_cast<DWORD>(strlen(buf)); // buf is bounded to 1,024 bytes for FormatMessage.
         FormatMessage(FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS, NULL,
-                      GetLastError(), MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), buf + lstrlen(buf), 1024 - lstrlen(buf), NULL);
+                      GetLastError(), MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), buf + prefixLength, _countof(buf) - prefixLength, NULL);
         if (Plugin->Silent & SF_IOERRORS)
         {
             Plugin->Abort = FALSE;
@@ -536,9 +567,10 @@ BOOL CPakCallbacks::Read(void* buffer, DWORD size)
     {
         if (ReadFile(Plugin->IOFile, buffer, size, &read, NULL) && size == read)
             return TRUE;
-        lstrcpy(buf, LoadStr(IDS_UNABLEREAD));
+        CopyPak2ErrorPrefix(buf, _countof(buf), IDS_UNABLEREAD);
+        const DWORD prefixLength = static_cast<DWORD>(strlen(buf)); // buf is bounded to 1,024 bytes for FormatMessage.
         FormatMessage(FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS, NULL,
-                      GetLastError(), MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), buf + lstrlen(buf), 1024 - lstrlen(buf), NULL);
+                      GetLastError(), MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), buf + prefixLength, _countof(buf) - prefixLength, NULL);
         if (Plugin->Silent & SF_IOERRORS)
         {
             Plugin->Abort = FALSE;
@@ -555,7 +587,7 @@ BOOL CPakCallbacks::Read(void* buffer, DWORD size)
         case DIALOG_FAIL:
             return FALSE;
         }
-        if (!SafeSeek(pos))
+        if (!SafeSeek64(pos))
             return FALSE;
     }
     return TRUE;
@@ -600,7 +632,8 @@ BOOL CPluginInterfaceForMenuExt::ExecuteMenuItem(CSalamanderForOperationsAbstrac
     if (!arch)
     {
         SalamanderGeneral->SalPathAddBackslash(pakFile, MAX_PATH);
-        fileName = pakFile + lstrlen(pakFile);
+        // Keep the insertion pointer at the end of the terminated panel path.
+        fileName = pakFile + strlen(pakFile);
         selFiles = eventMask & MENU_EVENT_FILES_SELECTED;
     }
 
@@ -629,7 +662,9 @@ BOOL CPluginInterfaceForMenuExt::ExecuteMenuItem(CSalamanderForOperationsAbstrac
                 fileData = SalamanderGeneral->GetPanelFocusedItem(PANEL_SOURCE, NULL);
             if (!fileData)
                 break; // end of enumeration, or an error (in the case of GetFocusedItem)
-            lstrcpy(fileName, fileData->Name);
+            // The selected filename is appended within the remaining panel-path buffer capacity.
+            if (FAILED(StringCchCopyA(fileName, _countof(pakFile) - static_cast<size_t>(fileName - pakFile), fileData->Name)))
+                break;
             DWORD attr = SalamanderGeneral->SalGetFileAttributes(pakFile);
             if (attr != 0xFFFFFFFF && attr & FILE_ATTRIBUTE_DIRECTORY)
                 continue;
@@ -703,7 +738,8 @@ char* PrintDiskSize(char* buf, CQuadWord size)
     if (size.GetDouble() >= 1023.5)
     {
         char num2[100];
-        sprintf(buf + lstrlen(buf), " (%s)", SalamanderGeneral->PrintDiskSize(num2, size, 0));
+        // The formatted size label is terminated before its optional display suffix is appended.
+        sprintf(buf + strlen(buf), " (%s)", SalamanderGeneral->PrintDiskSize(num2, size, 0));
     }
     return buf;
 }

@@ -12,6 +12,8 @@
 #include "dialogs.h"
 #include "common/scoped_kernel_handle.h"
 
+#include <strsafe.h>
+
 CSystemPolicies SystemPolicies;
 
 const int ctsNotRunning = 0x00;   // can be started
@@ -378,7 +380,12 @@ RETRY:
 
     if (err == ERROR_SUCCESS)
     {
-        lstrcpyn(ThreadPath, path, MAX_PATH);
+        // Worker threads must never observe a truncated shared path identity.
+        if (FAILED(StringCchCopyA(ThreadPath, _countof(ThreadPath), path)))
+        {
+            err = ERROR_FILENAME_EXCED_RANGE;
+            goto RETRY;
+        }
 
     TEST_AGAIN:
 
@@ -596,7 +603,8 @@ RETRY:
                 GetCurrentLocalReparsePoint(path, CheckPathRootWithRetryMsgBox, MAX_PATH);
                 if (strlen(CheckPathRootWithRetryMsgBox) > 3)
                 {
-                    lstrcpyn(drive, CheckPathRootWithRetryMsgBox, MAX_PATH);
+                    // The resolved root is a complete bounded drive-display identity.
+                    StringCchCopyA(drive, _countof(drive), CheckPathRootWithRetryMsgBox);
                     SalPathRemoveBackslash(drive);
                 }
             }
@@ -834,7 +842,13 @@ PARSE_AGAIN:
                 }
                 else
                 {
-                    lstrcpyn(path, curPath, pathBufSize);
+                    // Restore the current path only when the caller's field preserves it in full.
+                    if (FAILED(StringCchCopyA(path, pathBufSize, curPath)))
+                    {
+                        if (error != NULL)
+                            *error = SPP_WINDOWSPATHERROR;
+                        return FALSE;
+                    }
                     goto PARSE_AGAIN;
                 }
             }
@@ -1444,7 +1458,7 @@ BOOL CSystemPolicies::LoadList(TDirectArray<char*>* list, HKEY hRootKey, const c
                 res = RegEnumValue(hKey, i, valueName, &valueNameLen, 0, &type, (BYTE*)data, &dataLen);
                 if (res == ERROR_SUCCESS && type == REG_SZ)
                 {
-                    int len = lstrlen(data);
+                    int len = (int)strlen(data);
                     char* appName = (char*)malloc(len + 1);
                     if (appName == NULL)
                     {
@@ -1490,7 +1504,8 @@ BOOL CSystemPolicies::GetMyCanRun(const char* fileName)
     if (strlen(p) >= MAX_PATH)
         return RestrictRun == 0; // disallow running if only selected commands are allowed (failed to separate this from command line)
     char name[MAX_PATH];
-    lstrcpyn(name, p, MAX_PATH);
+    // Policy matching uses the complete, prevalidated executable name.
+    StringCchCopyA(name, _countof(name), p);
     // trim spaces from right
     char* p2 = name + strlen(name) - 1;
     while (p2 >= name && *p2 == ' ')
@@ -2065,7 +2080,8 @@ BOOL GetOurPathInRoamingAPPDATA(char* buf, int bufSize)
     }
 
     char appDataPath[MAX_PATH];
-    if (SHGetFolderPath(NULL, CSIDL_APPDATA, NULL, 0 /* SHGFP_TYPE_CURRENT */, appDataPath) != S_OK)
+    // Use Known Folders so application data resolution remains on the supported shell API.
+    if (!GetKnownFolderPathToAnsi(FOLDERID_RoamingAppData, appDataPath, _countof(appDataPath)))
         return FALSE;
 
     if ((int)strlen(appDataPath) >= bufSize)
@@ -2074,7 +2090,12 @@ BOOL GetOurPathInRoamingAPPDATA(char* buf, int bufSize)
         return FALSE;
     }
 
-    lstrcpyn(buf, appDataPath, bufSize);
+    // Roaming AppData must remain a complete caller-visible base path before appending our folder.
+    if (FAILED(StringCchCopyA(buf, bufSize, appDataPath)))
+    {
+        buf[0] = 0;
+        return FALSE;
+    }
     return SalPathAppend(buf, "Open Salamander", bufSize);
 }
 
@@ -2088,7 +2109,8 @@ BOOL CreateOurPathInRoamingAPPDATA(char* buf, int bufSize)
     static char path[MAX_PATH]; // called from exception handler, stack may be full
     if (buf != NULL && bufSize > 0)
         buf[0] = 0;
-    if (SHGetFolderPath(NULL, CSIDL_APPDATA, NULL, 0 /* SHGFP_TYPE_CURRENT */, path) == S_OK)
+    // The static exception-path buffer still receives a bounded result from the modern shell API.
+    if (GetKnownFolderPathToAnsi(FOLDERID_RoamingAppData, path, _countof(path)))
     {
         if (SalPathAppend(path, "Open Salamander", _countof(path)))
         {
@@ -2097,9 +2119,12 @@ BOOL CreateOurPathInRoamingAPPDATA(char* buf, int bufSize)
             {
                 if (bufSize <= 0)
                     return FALSE;
-                lstrcpyn(buf, path, bufSize);
-                if ((int)strlen(path) >= bufSize)
+                // Do not return a partial exception-reporting directory to the caller.
+                if (FAILED(StringCchCopyA(buf, bufSize, path)))
+                {
+                    buf[0] = 0;
                     return FALSE;
+                }
             }
             return TRUE;
         }

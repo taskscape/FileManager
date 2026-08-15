@@ -4,15 +4,18 @@
 #include "precomp.h"
 #include "wndframe.h"
 
+#include <strsafe.h>
 #include <tlhelp32.h>
 
-BOOL GetProcessPath(PROCESSENTRY32* pe32, LPTSTR szPath)
+BOOL GetProcessPath(PROCESSENTRY32* pe32, LPTSTR szPath, size_t szPathCapacity)
 {
     HANDLE hModules;
     MODULEENTRY32 me32 = {0};
 
     hModules = CreateToolhelp32Snapshot(TH32CS_SNAPMODULE, pe32->th32ProcessID);
     me32.dwSize = sizeof(me32);
+    if (szPath == NULL || szPathCapacity == 0)
+        return FALSE;
     szPath[0] = '\0';
 
     if (hModules && Module32First(hModules, &me32))
@@ -22,7 +25,8 @@ BOOL GetProcessPath(PROCESSENTRY32* pe32, LPTSTR szPath)
             if (_stricmp(pe32->szExeFile, me32.szModule) == 0 ||
                 _stricmp("", me32.szModule) == 0)
             {
-                lstrcpy(szPath, me32.szExePath);
+                // Process matching must use the complete executable path, never a clipped prefix.
+                StringCchCopy(szPath, szPathCapacity, me32.szExePath);
                 break;
             }
 
@@ -53,7 +57,7 @@ BOOL KillSalamandersAux(const char* path)
                 HANDLE hProcess = OpenProcess(PROCESS_QUERY_INFORMATION + PROCESS_VM_READ + PROCESS_TERMINATE, FALSE, entry.th32ProcessID);
 
                 char processPath[MAX_PATH];
-                GetProcessPath(&entry, processPath);
+                GetProcessPath(&entry, processPath, _countof(processPath));
                 if (lstrcmpi(processPath, path) == 0)
                 {
                     HANDLE h = OpenProcess(PROCESS_TERMINATE, FALSE, entry.th32ProcessID);

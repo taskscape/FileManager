@@ -4,6 +4,8 @@
 
 #include "precomp.h"
 
+#include <strsafe.h>
+
 //
 //*****************************************************************************
 // Functions for wildcard operations
@@ -84,7 +86,8 @@ char* MaskName(char* buffer, int bufSize, const char* name, const char* mask)
         return NULL;
     if (mask == NULL)
     {
-        lstrcpyn(buffer, name, bufSize);
+        // Preserve the helper's historical clipped display result without lstrcpyn.
+        StringCchCopyNA(buffer, bufSize, name, bufSize - 1);
         return buffer;
     }
 
@@ -335,7 +338,12 @@ CMaskGroup::operator=(const CMaskGroup& s)
 {
     Release();
 
-    lstrcpy(MasksString, s.MasksString);
+    // SetMasksString keeps the source within this exact fixed mask capacity; retain an empty-safe copy if that invariant is broken.
+    if (FAILED(StringCchCopyA(MasksString, _countof(MasksString), s.MasksString)))
+    {
+        MasksString[0] = 0;
+        TRACE_E("CMaskGroup::operator=: source mask exceeds MAX_GROUPMASK.");
+    }
     ExtendedMode = s.ExtendedMode;
 
     NeedPrepare = TRUE;
@@ -676,7 +684,8 @@ BOOL CMaskGroup::AgreeMasks(const char* fileName, const char* fileExt)
     SLOW_CALL_STACK_MESSAGE3("CMaskGroup::AgreeMasks(%s, %s)", fileName, fileExt);
     if (fileExt == NULL)
     {
-        int tmpLen = lstrlen(fileName);
+        // Filename parsing only needs the length of the caller's terminated ANSI mask candidate.
+        int tmpLen = static_cast<int>(strlen(fileName));
         fileExt = fileName + tmpLen;
         while (--fileExt >= fileName && *fileExt != '.')
             ;

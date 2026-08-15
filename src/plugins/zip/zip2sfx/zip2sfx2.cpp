@@ -19,12 +19,18 @@
 
 #include "zip2sfx.rh"
 
+static int SfxStringLength(const char* text)
+{
+    // The SFX header stores ANSI string sizes and offsets as int-sized byte counts.
+    return static_cast<int>(strlen(text));
+}
+
 LPTSTR
 StrNChr(LPCTSTR lpStart, int nChar, char wMatch)
 {
     if (lpStart == NULL)
         return NULL;
-    int i = lstrlen(lpStart);
+    int i = SfxStringLength(lpStart);
     if (i > nChar)
         i = nChar;
     LPCTSTR lpEnd = lpStart + nChar;
@@ -70,7 +76,7 @@ BOOL WriteSFXHeader()
     CSelfExtrHeader header;
     int offs = sizeof(CSelfExtrHeader);
 
-    int l = lstrlen(Settings.Command);
+    int l = SfxStringLength(Settings.Command);
     if (l)
     {
         header.CommandOffs = offs;
@@ -79,10 +85,10 @@ BOOL WriteSFXHeader()
     else
         header.CommandOffs = 0;
     header.TextOffs = offs;
-    l = lstrlen(Settings.Text);
+    l = SfxStringLength(Settings.Text);
     offs += ++l;
     header.TitleOffs = offs;
-    l = lstrlen(Settings.Title);
+    l = SfxStringLength(Settings.Title);
     offs += ++l;
     header.SubDirOffs = offs;
 
@@ -93,19 +99,19 @@ BOOL WriteSFXHeader()
     HKEY key;
     // no need to test the return value; it was verified earlier
     ParseTargetDir(Settings.TargetDir, &td, &sd, &sdl, &sdr, &key);
-    l = lstrlen(sd);
+    l = SfxStringLength(sd);
     offs += ++l;
     header.AboutOffs = offs;
-    l = lstrlen(About);
+    l = SfxStringLength(About);
     offs += ++l;
     header.ExtractBtnTextOffs = offs;
-    l = lstrlen(Settings.ExtractBtnText);
+    l = SfxStringLength(Settings.ExtractBtnText);
     offs += ++l;
     header.VendorOffs = offs;
-    l = lstrlen(Settings.Vendor);
+    l = SfxStringLength(Settings.Vendor);
     offs += ++l;
     header.WWWOffs = offs;
-    l = lstrlen(Settings.WWW);
+    l = SfxStringLength(Settings.WWW);
     offs += ++l;
     header.ArchiveNameOffs = offs;
     //l = lstrlen(archName);
@@ -121,23 +127,23 @@ BOOL WriteSFXHeader()
         if (!bs)
             offs += 1; // add a separator character between the subkey and value
     }
-    header.MBoxStyle = (lstrlen(Settings.MBoxTitle) ||
-                        Settings.MBoxText && lstrlen(Settings.MBoxText))
+    header.MBoxStyle = (SfxStringLength(Settings.MBoxTitle) ||
+                        Settings.MBoxText && SfxStringLength(Settings.MBoxText))
                            ? Settings.MBoxStyle
                            : -1;
     header.MBoxTitleOffs = offs;
-    l = lstrlen(Settings.MBoxTitle);
+    l = SfxStringLength(Settings.MBoxTitle);
     offs += ++l;
     header.MBoxTextOffs = offs;
     if (Settings.MBoxText)
     {
-        l = lstrlen(Settings.MBoxText);
+        l = SfxStringLength(Settings.MBoxText);
         offs += ++l;
     }
     else
         offs++;
     header.WaitForOffs = offs;
-    l = lstrlen(Settings.WaitFor);
+    l = SfxStringLength(Settings.WaitFor);
     offs += Settings.Flags & SE_REMOVEAFTER ? ++l : 1;
 
     header.Signature = SELFEXTR_SIG;
@@ -151,23 +157,23 @@ BOOL WriteSFXHeader()
 
     if (!Write(ExeFile, &header, sizeof(CSelfExtrHeader)))
         return FALSE;
-    l = lstrlen(Settings.Command);
+    l = SfxStringLength(Settings.Command);
     if (l &&
         !Write(ExeFile, Settings.Command, ++l))
         return FALSE;
-    if (!Write(ExeFile, Settings.Text, lstrlen(Settings.Text) + 1))
+    if (!Write(ExeFile, Settings.Text, SfxStringLength(Settings.Text) + 1))
         return FALSE;
-    if (!Write(ExeFile, Settings.Title, lstrlen(Settings.Title) + 1))
+    if (!Write(ExeFile, Settings.Title, SfxStringLength(Settings.Title) + 1))
         return FALSE;
-    if (!Write(ExeFile, (void*)sd, lstrlen(sd) + 1))
+    if (!Write(ExeFile, (void*)sd, SfxStringLength(sd) + 1))
         return FALSE;
-    if (!Write(ExeFile, About, lstrlen(About) + 1))
+    if (!Write(ExeFile, About, SfxStringLength(About) + 1))
         return FALSE;
-    if (!Write(ExeFile, Settings.ExtractBtnText, lstrlen(Settings.ExtractBtnText) + 1))
+    if (!Write(ExeFile, Settings.ExtractBtnText, SfxStringLength(Settings.ExtractBtnText) + 1))
         return FALSE;
-    if (!Write(ExeFile, Settings.Vendor, lstrlen(Settings.Vendor) + 1))
+    if (!Write(ExeFile, Settings.Vendor, SfxStringLength(Settings.Vendor) + 1))
         return FALSE;
-    if (!Write(ExeFile, Settings.WWW, lstrlen(Settings.WWW) + 1))
+    if (!Write(ExeFile, Settings.WWW, SfxStringLength(Settings.WWW) + 1))
         return FALSE;
     if (!Write(ExeFile, "", 1))
         return FALSE;
@@ -210,13 +216,13 @@ BOOL WriteSFXHeader()
         if (!Write(ExeFile, "", 1))
             return FALSE;
     }
-    if (!Write(ExeFile, Settings.MBoxTitle, lstrlen(Settings.MBoxTitle) + 1))
+    if (!Write(ExeFile, Settings.MBoxTitle, SfxStringLength(Settings.MBoxTitle) + 1))
         return FALSE;
     const char* str = Settings.MBoxText ? Settings.MBoxText : "";
-    if (!Write(ExeFile, str, lstrlen(str) + 1))
+    if (!Write(ExeFile, str, SfxStringLength(str) + 1))
         return FALSE;
     str = Settings.Flags & SE_REMOVEAFTER ? Settings.WaitFor : "";
-    if (!Write(ExeFile, str, lstrlen(str) + 1))
+    if (!Write(ExeFile, str, SfxStringLength(str) + 1))
         return FALSE;
     return TRUE;
 }
@@ -244,9 +250,12 @@ BOOL WriteSfxExecutable()
     if (sfxHead.HeaderCRC != UpdateCrc((__UINT8*)&sfxHead, sizeof(CSfxFileHeader) - sizeof(DWORD), INIT_CRC, CrcTab))
         return Error(STR_CORRUPTSFX, Settings.SfxFile);
 
-    if (GetLocaleInfo(
-            MAKELCID(MAKELANGID(sfxHead.LangID, SUBLANG_NEUTRAL), SORT_DEFAULT),
-            LOCALE_SLANGUAGE, langName, 128))
+    WCHAR localeName[LOCALE_NAME_MAX_LENGTH];
+    WCHAR languageName[128];
+    LCID languageLcid = MAKELCID(MAKELANGID(sfxHead.LangID, SUBLANG_NEUTRAL), SORT_DEFAULT);
+    if (LCIDToLocaleName(languageLcid, localeName, _countof(localeName), 0) != 0 &&
+        GetLocaleInfoEx(localeName, LOCALE_SLANGUAGE, languageName, _countof(languageName)) != 0 &&
+        WideCharToMultiByte(CP_ACP, 0, languageName, -1, langName, 128, NULL, NULL) != 0)
     {
         char* c = strchr(langName, ' ');
         if (c)
@@ -254,6 +263,7 @@ BOOL WriteSfxExecutable()
     }
     else
         langName[0] = 0;
+    // The SFX metadata stores an LCID; convert it to a locale name before formatting its ANSI status label.
     printf(StringTable[STR_SFXINFO], Settings.SfxFile, langName);
 
     //copy executable
@@ -272,8 +282,10 @@ BOOL WriteSfxExecutable()
     if (!buffer)
         return Error(STR_LOWMEM);
     BOOL success = FALSE;
-    LONG dummy = 0;
-    if (SetFilePointer(SfxPackage, offset, &dummy, FILE_BEGIN) == 0xFFFFFFFF)
+    // The SFX header remains DWORD-based, but the seek result must not share an error sentinel with a valid offset.
+    LARGE_INTEGER sfxOffset;
+    sfxOffset.QuadPart = offset;
+    if (!SetFilePointerEx(SfxPackage, sfxOffset, NULL, FILE_BEGIN))
         Error(STR_ERRACCESS, Settings.SfxFile);
     else
     {
@@ -333,8 +345,9 @@ BOOL WriteSfxExecutable()
     if (ExeFile == INVALID_HANDLE_VALUE)
         return Error(STR_ERROPEN, ExeName);
 
-    dummy = 0;
-    if (SetFilePointer(ExeFile, 0, &dummy, FILE_END) == 0xFFFFFFFF)
+    // Seeking to the generated executable's end needs an unambiguous success result before appending metadata.
+    LARGE_INTEGER endOffset = {};
+    if (!SetFilePointerEx(ExeFile, endOffset, NULL, FILE_END))
         return Error(STR_ERRACCESS, ExeName);
 
     if (!WriteSFXHeader())
@@ -346,7 +359,9 @@ BOOL WriteSfxExecutable()
 BOOL AppendArchive()
 {
     printf(StringTable[STR_WRITINGARC]);
-    if (SetFilePointer(ZipFile, 0, NULL, FILE_BEGIN) == 0xFFFFFFFF)
+    // Restart archive copying with SetFilePointerEx so offset zero cannot be confused with legacy failure handling.
+    LARGE_INTEGER startOffset = {};
+    if (!SetFilePointerEx(ZipFile, startOffset, NULL, FILE_BEGIN))
         return Error(STR_ERRACCESS, ZipName);
     DWORD left = ArcSize;
     DWORD toRead;

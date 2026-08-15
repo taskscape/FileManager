@@ -4,6 +4,9 @@
 
 #include "precomp.h"
 
+// Use StrSafe for bounded formatting of localized menu text.
+#include <strsafe.h>
+
 #include <commctrl.h>
 
 #include "mainwnd.h"
@@ -342,7 +345,8 @@ void CFilterDialog::Validate(CTransferInfo& ti)
     if (useFilter)
     {
         char buf[MAX_PATH];
-        lstrcpyn(buf, Filter->GetMasksString(), MAX_PATH); // backup
+        // Preserve the established fixed edit-control backup limit without lstrcpyn.
+        StringCchCopyNA(buf, _countof(buf), Filter->GetMasksString(), _countof(buf) - 1);
         // provide a buffer for MasksString, there is a size check, nothing serious
         ti.EditLine(IDE_FILTER, Filter->GetWritableMasksString(), MAX_PATH);
         int errorPos;
@@ -603,8 +607,9 @@ MENU_TEMPLATE_ITEM EditNewFileDialogMenu[] =
             HMENU hMenu = CreatePopupMenu();
             InsertMenu(hMenu, 0xFFFFFFFF, MF_BYCOMMAND | MF_STRING, 1, LoadStr(IDS_EDITNEWFILE_SAVEASDEFAULT));
             char buff[2 * MAX_PATH];
-            wsprintf(buff, LoadStr(IDS_EDITNEWFILE_REVERTDEFAULT), LoadStr(IDS_EDITNEWFILE_DEFAULTNAME));
-            InsertMenu(hMenu, 0xFFFFFFFF, MF_BYCOMMAND | MF_STRING, 2, buff);
+            // Do not add a command whose localized label does not fit its fixed menu buffer.
+            if (SUCCEEDED(StringCchPrintfA(buff, ARRAYSIZE(buff), LoadStr(IDS_EDITNEWFILE_REVERTDEFAULT), LoadStr(IDS_EDITNEWFILE_DEFAULTNAME))))
+                InsertMenu(hMenu, 0xFFFFFFFF, MF_BYCOMMAND | MF_STRING, 2, buff);
 
             TPMPARAMS tpmPar;
             tpmPar.cbSize = sizeof(tpmPar);
@@ -1030,7 +1035,8 @@ CCopyMoveMoreDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         if (Subject->TruncateText(hSubject))
         {
             char buff[MAX_PATH];
-            lstrcpyn(buff, Subject->Get(), MAX_PATH - 1);
+            // Reserve the existing display headroom for escaped ampersands.
+            StringCchCopyNA(buff, _countof(buff), Subject->Get(), _countof(buff) - 2);
             DuplicateAmpersands(buff, MAX_PATH - 1, TRUE);
             SetWindowTextUtf8(hSubject, buff);
         }
@@ -1303,7 +1309,8 @@ CChangeDirDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 CDriveInfo::CDriveInfo(HWND parent, const char* path, CObjectOrigin origin)
     : CCommonDialog(HLanguage, IDD_DRIVEINFO, IDD_DRIVEINFO, parent, origin)
 {
-    lstrcpyn(VolumePath, path, MAX_PATH);
+    // The volume APIs used by this dialog still expose a MAX_PATH root contract.
+    StringCchCopyNA(VolumePath, _countof(VolumePath), path, _countof(VolumePath) - 1);
     OldVolumeName[0] = 0;
     HDriveIcon = NULL;
 }
@@ -1320,7 +1327,8 @@ void CDriveInfo::Validate(CTransferInfo& ti)
         if (strcmp(OldVolumeName, newName) != 0)
         {
             char volumePathWithBackslash[MAX_PATH];
-            lstrcpyn(volumePathWithBackslash, VolumePath, MAX_PATH);
+            // Retain the downstream volume API's fixed root-path contract explicitly.
+            StringCchCopyNA(volumePathWithBackslash, _countof(volumePathWithBackslash), VolumePath, _countof(volumePathWithBackslash) - 1);
             SalPathAddBackslash(volumePathWithBackslash, MAX_PATH);
             BOOL handsOffLeft = SalPathIsPrefix(volumePathWithBackslash, MainWindow->LeftPanel->GetPath());
             BOOL handsOffRight = SalPathIsPrefix(volumePathWithBackslash, MainWindow->RightPanel->GetPath());
@@ -1367,7 +1375,8 @@ void CDriveInfo::Transfer(CTransferInfo& ti)
         err = (MyGetVolumeInformation(VolumePath, volumePathWithBackslash, junctionOrSymlinkTgt, &linkType,
                                       volumeName, 200, &volumeSerialNumber, &maximumComponentLength,
                                       &fileSystemFlags, fileSystemNameBuffer, 100) == 0);
-        lstrcpyn(VolumePath, volumePathWithBackslash, MAX_PATH);
+        // MyGetVolumeInformation returns the same MAX_PATH root representation used by this dialog.
+        StringCchCopyNA(VolumePath, _countof(VolumePath), volumePathWithBackslash, _countof(VolumePath) - 1);
         SalPathAddBackslash(volumePathWithBackslash, MAX_PATH);
         //---  GetVolumeInformation - display
         if (!err)
@@ -1621,7 +1630,8 @@ void CDriveInfo::Transfer(CTransferInfo& ti)
         if (driveType == DRIVE_REMOTE)
         {
             // GetRootPath(buff, volumePathWithBackslash);
-            lstrcpyn(buff, volumePathWithBackslash, 300);
+            // The remote-drive query receives a bounded root name, not an unbounded copy.
+            StringCchCopyNA(buff, _countof(buff), volumePathWithBackslash, _countof(buff) - 1);
             if (buff[0] != 0 && buff[1] == ':' && strlen(buff) <= 3)
                 buff[2] = 0; // "x:\\" -> "x:"
             DWORD l = MAX_PATH;
@@ -1778,7 +1788,10 @@ CPasswordDialog::CPasswordDialog(HWND parent, const char* path, const char* user
 {
     Path = path;
     if (user != NULL)
-        lstrcpyn(User, user, USERNAME_MAXLEN);
+    {
+        // The dialog historically clips this presentation-only username to its fixed field.
+        StringCchCopyNA(User, _countof(User), user, _countof(User) - 1);
+    }
     else
         User[0] = 0;
     Passwd[0] = 0;

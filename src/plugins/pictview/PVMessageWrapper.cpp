@@ -7,6 +7,7 @@
 
 #include "pictview.h"
 #include "PVMessage.h"
+#include "..\\..\\common\\checked_arithmetic.h"
 
 // PVWrapperImageHandle wraps LPPVHandle for use by the Wrapper
 class PVWrapperImageHandle
@@ -42,24 +43,31 @@ bool PVMessage::Init(ePVMSG type, size_t dataSize, LPPVHandle pvHandle)
 {
     TCHAR fileMapName[48];
     LPPVMessageHeader pHdr;
+    size_t totalSize;
+    DWORD mappedSize;
+
+    // The wrapper protocol receives variable payload sizes; reject a wrapped header addition before Win32 narrows it.
+    if (!CheckedAddSize(dataSize, sizeof(PVMessageHeader), &totalSize) ||
+        !CheckedCastSizeToDword(totalSize, &mappedSize))
+        return false;
 
     pWImg = (LPPVWrapperImageHandle)pvHandle;
     iID = PVWrapper.MessageID++;
     _sntprintf(fileMapName, SizeOf(fileMapName), _T("%s_%d"), PVWrapper.MutexName, iID);
     hFileMap = CreateFileMapping(INVALID_HANDLE_VALUE, NULL, PAGE_READWRITE,
-                                 0, (DWORD)(dataSize + sizeof(PVMessageHeader)), fileMapName);
+                                 0, mappedSize, fileMapName);
     if (!hFileMap)
     {
         return false;
     }
-    pData = (LPPVMessageHeader)MapViewOfFile(hFileMap, FILE_MAP_ALL_ACCESS, 0, 0, dataSize + sizeof(PVMessageHeader));
+    pData = (LPPVMessageHeader)MapViewOfFile(hFileMap, FILE_MAP_ALL_ACCESS, 0, 0, mappedSize);
     if (!pData)
     {
         return false;
     }
-    memset(pData, 0, dataSize + sizeof(PVMessageHeader));
+    memset(pData, 0, mappedSize);
     pHdr = (LPPVMessageHeader)pData;
-    pHdr->cbSize = (DWORD)(dataSize + sizeof(PVMessageHeader));
+    pHdr->cbSize = mappedSize;
     pHdr->Type = type;
     pHdr->PVHandle = pWImg ? pWImg->hPVHandle : NULL;
     pHdr->ResultCode = PVC_ENVELOPE_NOT_LOADED;

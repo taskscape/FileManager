@@ -356,7 +356,17 @@ void CLocales::FillComboBox(HWND hCombo)
     int i;
     for (i = 0; i < Items.Count; i++)
     {
-        GetLocaleInfo(MAKELCID(Items[i], SORT_DEFAULT), LOCALE_SLANGUAGE, buff, 500);
+        WCHAR localeName[LOCALE_NAME_MAX_LENGTH];
+        WCHAR languageName[500];
+        if (LCIDToLocaleName(MAKELCID(Items[i], SORT_DEFAULT), localeName, _countof(localeName), 0) == 0 ||
+            GetLocaleInfoEx(localeName, LOCALE_SLANGUAGE, languageName, _countof(languageName)) == 0 ||
+            WideCharToMultiByte(CP_ACP, 0, languageName, -1, buff, _countof(buff), NULL, NULL) == 0)
+        {
+            // Preserve a deterministic fallback label when locale conversion fails.
+            buff[0] = '?';
+            buff[1] = 0;
+        }
+        // Translator stores list labels as ANSI text, but resolves each LCID through the locale-name API first.
         SPrintFToEnd_s(buff, " - 0x%04x", Items[i]);
         int index = SendMessage(hCombo, CB_ADDSTRING, 0, (LPARAM)buff);
         SendMessage(hCombo, CB_SETITEMDATA, index, Items[i]);
@@ -407,14 +417,14 @@ void CPropertiesDialog::Validate(CTransferInfo& ti)
 {
     wchar_t buff[500];
     CTransferInfo_EditLineW(&ti, IDC_PRP_AUTHOR, buff, 500);
-    if (lstrlenW(buff) == 0)
+    if (wcslen(buff) == 0)
     {
         MessageBox(HWindow, "Empty string is not allowed here.", ERROR_TITLE, MB_OK | MB_ICONEXCLAMATION);
         ti.ErrorOn(IDC_PRP_AUTHOR);
     }
 
     CTransferInfo_EditLineW(&ti, IDC_PRP_WEB, buff, 500);
-    if (lstrlenW(buff) == 0)
+    if (wcslen(buff) == 0)
     {
         MessageBox(HWindow, "Empty string is not allowed here.", ERROR_TITLE, MB_OK | MB_ICONEXCLAMATION);
         ti.ErrorOn(IDC_PRP_WEB);
@@ -425,7 +435,7 @@ void CPropertiesDialog::Validate(CTransferInfo& ti)
     if (Data.SLGSignature.HelpDirExist)
     {
         CTransferInfo_EditLineW(&ti, IDC_PRP_HELPDIR, buff, 100);
-        if (lstrlenW(buff) == 0)
+        if (wcslen(buff) == 0)
         {
             MessageBox(HWindow, "Empty string is not allowed here.", ERROR_TITLE, MB_OK | MB_ICONEXCLAMATION);
             ti.ErrorOn(IDC_PRP_HELPDIR);
@@ -774,8 +784,8 @@ CAgreementDialog::CAgreementDialog(HWND parent)
                                         NULL));
     if (hFile != INVALID_HANDLE_VALUE)
     {
-        DWORD size = GetFileSize(hFile, NULL);
-        if (size > 0 && size < 10000)
+        DWORD size;
+        if (GetFileSizeDwordLocal(hFile, &size) && size > 0 && size < 10000)
         {
             Agreement = (char*)malloc(size + 1);
             if (Agreement != NULL)

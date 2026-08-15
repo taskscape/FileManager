@@ -44,7 +44,8 @@ BOOL RegisterLogClass()
 {
     if (ClassIsRegistred)
         return TRUE;
-    WNDCLASS wc;
+    WNDCLASSEX wc;
+    wc.cbSize = sizeof(wc);
     wc.style = CS_DBLCLKS;
     wc.lpfnWndProc = LogWindowProc;
     wc.cbClsExtra = 0;
@@ -55,7 +56,9 @@ BOOL RegisterLogClass()
     wc.hbrBackground = (HBRUSH)(COLOR_WINDOW + 1);
     wc.lpszMenuName = NULL;
     wc.lpszClassName = LOGWINDOW_CLASSNAME;
-    if (RegisterClass(&wc) == 0)
+    wc.hIconSm = wc.hIcon;
+    // The update log window uses the extended class contract shared by current Win32 controls.
+    if (RegisterClassEx(&wc) == 0)
     {
         DWORD err = GetLastError();
         TRACE_E("RegisterClass has failed error=" << err);

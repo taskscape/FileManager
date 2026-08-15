@@ -37,7 +37,6 @@ CBlockedFile::CZLIBBlock::CZLIBBlock(BlockInfo* blockInfo, HANDLE hFile)
     CALL_STACK_MESSAGE3("CZLIBBlock::CZLIBBlock(%p, %p)", blockInfo, hFile);
     CSalZLIB zi;
     BYTE* inBuf;
-    LONG posHi;
     DWORD dwBytesRead;
     int err;
 
@@ -57,8 +56,10 @@ CBlockedFile::CZLIBBlock::CZLIBBlock(BlockInfo* blockInfo, HANDLE hFile)
         Error(IDS_INSUFFICIENT_MEMORY, FALSE);
         return;
     }
-    posHi = (LONG)(blockInfo->inPos >> 32);
-    if ((0xFFFFFFFF == SetFilePointer(hFile, (DWORD)(blockInfo->inPos & 0xFFFFFFFF), &posHi, FILE_BEGIN)) || !ReadFile(hFile, inBuf, (DWORD)blockInfo->inSize, &dwBytesRead, NULL) || (blockInfo->inSize != dwBytesRead))
+    LARGE_INTEGER seekPosition;
+    seekPosition.QuadPart = (LONGLONG)blockInfo->inPos;
+    // Block metadata already carries a 64-bit offset; retain it through the OS seek.
+    if (!SetFilePointerEx(hFile, seekPosition, NULL, FILE_BEGIN) || !ReadFile(hFile, inBuf, (DWORD)blockInfo->inSize, &dwBytesRead, NULL) || (blockInfo->inSize != dwBytesRead))
     {
         free(inBuf);
         free(Buffer);
@@ -110,7 +111,6 @@ CBlockedFile::CBZIP2Block::CBZIP2Block(BlockInfo* blockInfo, HANDLE hFile)
     CALL_STACK_MESSAGE3("CBZIP2Block::CBZIP2Block(%p, %p)", blockInfo, hFile);
     CSalBZIP2 bzi;
     BYTE* inBuf;
-    LONG posHi;
     DWORD dwBytesRead;
     int err;
 
@@ -130,8 +130,10 @@ CBlockedFile::CBZIP2Block::CBZIP2Block(BlockInfo* blockInfo, HANDLE hFile)
         Error(IDS_INSUFFICIENT_MEMORY, FALSE);
         return;
     }
-    posHi = (LONG)(blockInfo->inPos >> 32);
-    if ((0xFFFFFFFF == SetFilePointer(hFile, (DWORD)(blockInfo->inPos & 0xFFFFFFFF), &posHi, FILE_BEGIN)) || !ReadFile(hFile, inBuf, (DWORD)blockInfo->inSize, &dwBytesRead, NULL) || (blockInfo->inSize != dwBytesRead))
+    LARGE_INTEGER seekPosition;
+    seekPosition.QuadPart = (LONGLONG)blockInfo->inPos;
+    // Block metadata already carries a 64-bit offset; retain it through the OS seek.
+    if (!SetFilePointerEx(hFile, seekPosition, NULL, FILE_BEGIN) || !ReadFile(hFile, inBuf, (DWORD)blockInfo->inSize, &dwBytesRead, NULL) || (blockInfo->inSize != dwBytesRead))
     {
         free(inBuf);
         free(Buffer);
@@ -196,10 +198,12 @@ CBlockedFile::CCopyBlock::~CCopyBlock()
 DWORD CBlockedFile::CCopyBlock::Read(char* buf, DWORD BytesToRead)
 {
     UInt64 pos = pBlockInfo->inPos + PosInBuf;
-    LONG posHi = (DWORD)(pos >> 32);
     DWORD dwBytesRead;
 
-    if ((0xFFFFFFFF == SetFilePointer(File, (DWORD)(pos & 0xffffffff), &posHi, FILE_BEGIN)) && (GetLastError() != NO_ERROR))
+    LARGE_INTEGER seekPosition;
+    seekPosition.QuadPart = (LONGLONG)pos;
+    // Copy blocks are addressed by a 64-bit image offset and must not be split into legacy halves.
+    if (!SetFilePointerEx(File, seekPosition, NULL, FILE_BEGIN))
     {
         Error(IDS_ERR_BF_SEEK, FALSE, pos);
         return 0;

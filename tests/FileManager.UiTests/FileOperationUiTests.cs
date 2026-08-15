@@ -217,6 +217,64 @@ public sealed class FileOperationUiTests : FileOperationUiTestBase
     }
 
     [Test]
+    [Category("Unicode")]
+    public void Unicode_normalization_surrogate_and_long_path_operations_preserve_distinct_entries()
+    {
+        const string composedName = "unicode-\u00e9-\U0001f680.txt";
+        const string decomposedName = "unicode-e\u0301-\U0001f680.txt";
+        const string renamedName = "renamed-\u00e9-\U0001f680.txt";
+        const string treeName = "unicode-long-tree";
+        var longRelativePath = string.Join(Path.DirectorySeparatorChar.ToString(),
+            Enumerable.Repeat("\u9577\u3044-unicode-segment-123456789012345678901234567890", 6));
+
+        // NTFS treats normalization forms as distinct directory entries; keep both
+        // through native selection and mutation instead of comparing display text.
+        File.WriteAllText(Workspace.SourcePath(composedName), "composed-content");
+        File.WriteAllText(Workspace.SourcePath(decomposedName), "decomposed-content");
+        var longSource = Workspace.SourcePath(Path.Combine(treeName, longRelativePath, "payload-\U0001f680.txt"));
+        Directory.CreateDirectory(Path.GetDirectoryName(longSource)!);
+        File.WriteAllText(longSource, "long-unicode-content");
+        // File IDs prove that normalization forms stay separate entries even where path comparison is lossy.
+        var composedSourceIdentity = FileIdentity.Capture(Workspace.SourcePath(composedName));
+        var decomposedSourceIdentity = FileIdentity.Capture(Workspace.SourcePath(decomposedName));
+        var longSourceIdentity = FileIdentity.Capture(longSource);
+        Assert.That(composedSourceIdentity, Is.Not.EqualTo(decomposedSourceIdentity));
+
+        ExecuteWithPath(NativeCommands.CopyFiles, composedName, Workspace.TargetDirectory, commit: true);
+        ExecuteWithPath(NativeCommands.CopyFiles, decomposedName, Workspace.TargetDirectory, commit: true);
+        ExecuteWithPath(NativeCommands.CopyFiles, treeName, Workspace.TargetDirectory, commit: true);
+
+        WaitForFileSystem(() => File.Exists(Workspace.TargetPath(composedName)) &&
+                                File.Exists(Workspace.TargetPath(decomposedName)) &&
+                                File.Exists(Workspace.TargetPath(Path.Combine(treeName, longRelativePath, "payload-\U0001f680.txt"))),
+                          "Copy did not preserve the Unicode or long-path entries.");
+        Assert.Multiple(() =>
+        {
+            Assert.That(File.ReadAllText(Workspace.TargetPath(composedName)), Is.EqualTo("composed-content"));
+            Assert.That(File.ReadAllText(Workspace.TargetPath(decomposedName)), Is.EqualTo("decomposed-content"));
+            Assert.That(File.ReadAllText(Workspace.TargetPath(Path.Combine(treeName, longRelativePath, "payload-\U0001f680.txt"))),
+                        Is.EqualTo("long-unicode-content"));
+            Assert.That(FileIdentity.Capture(Workspace.TargetPath(composedName)), Is.Not.EqualTo(composedSourceIdentity));
+            Assert.That(FileIdentity.Capture(Workspace.TargetPath(decomposedName)), Is.Not.EqualTo(decomposedSourceIdentity));
+            Assert.That(FileIdentity.Capture(Workspace.TargetPath(Path.Combine(treeName, longRelativePath, "payload-\U0001f680.txt"))),
+                        Is.Not.EqualTo(longSourceIdentity));
+        });
+
+        ExecuteWithPath(NativeCommands.RenameFile, composedName, renamedName, commit: true);
+        WaitForFileSystem(() => File.Exists(Workspace.SourcePath(renamedName)),
+                          "Rename did not retain the composed Unicode filename.");
+        SelectSourceItem(decomposedName);
+        NativeCommands.Execute(MainWindow.Properties.NativeWindowHandle.Value, NativeCommands.DeleteFiles);
+        ConfirmDeleteIfPrompted();
+        WaitForFileSystem(() => !File.Exists(Workspace.SourcePath(decomposedName)),
+                          "Delete did not remove only the decomposed Unicode filename.");
+        Assert.That(File.Exists(Workspace.SourcePath(renamedName)), Is.True,
+                    "Deleting the decomposed name must not remove its composed counterpart.");
+        Assert.That(FileIdentity.Capture(Workspace.SourcePath(renamedName)), Is.EqualTo(composedSourceIdentity),
+                    "Rename must preserve the composed entry's NTFS identity.");
+    }
+
+    [Test]
     public void Rename_file_renames_without_changing_content()
     {
         ExecuteWithPath(NativeCommands.RenameFile, "rename-file.txt", "renamed-file.txt", commit: true);

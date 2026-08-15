@@ -4,6 +4,8 @@
 
 #include "precomp.h"
 
+#include "common\\monotonic_time.h"
+
 #include "cfgdlg.h"
 #include "common/scoped_native_resources.h"
 #include "file_operation_filesystem.h"
@@ -16,6 +18,8 @@
 #include <Aclapi.h>
 #include <Ntsecapi.h>
 #include <bcrypt.h>
+#include <shobjidl.h>
+#include <strsafe.h>
 
 #pragma comment(lib, "bcrypt.lib")
 
@@ -24,6 +28,90 @@
 int GetOptimalSyncCopyBufferSize(COperations* script, DWORD opFlags);
 extern NTQUERYINFORMATIONFILE DynNtQueryInformationFile;
 extern NTFSCONTROLFILE DynNtFsControlFile;
+
+struct CRecycleBinDeleteRequest
+{
+    HWND Owner;
+    const char* Path;
+    DWORD Error;
+};
+
+static DWORD GetFileOperationError(HRESULT result)
+{
+    if (SUCCEEDED(result))
+        return ERROR_SUCCESS;
+    if (result == E_OUTOFMEMORY)
+        return ERROR_NOT_ENOUGH_MEMORY;
+    if (HRESULT_FACILITY(result) == FACILITY_WIN32)
+        return HRESULT_CODE(result);
+    return ERROR_GEN_FAILURE;
+}
+
+static DWORD WINAPI RunRecycleBinDeleteOnSta(void* parameter, HANDLE stopEvent)
+{
+    // IFileOperation is an STA-only Shell API; this executor isolates it from the MTA copy worker.
+    UNREFERENCED_PARAMETER(stopEvent);
+    CRecycleBinDeleteRequest* request = (CRecycleBinDeleteRequest*)parameter;
+    request->Error = ERROR_GEN_FAILURE;
+
+    CStrP pathW(ConvertAllocUtf8ToWide(request->Path, -1));
+    if (pathW == NULL)
+    {
+        request->Error = ERROR_NO_UNICODE_TRANSLATION;
+        return request->Error;
+    }
+
+    IFileOperation* operation = NULL;
+    IShellItem* item = NULL;
+    HRESULT result = CoCreateInstance(CLSID_FileOperation, NULL, CLSCTX_INPROC_SERVER,
+                                      IID_PPV_ARGS(&operation));
+    if (SUCCEEDED(result))
+        result = operation->SetOwnerWindow(request->Owner);
+    if (SUCCEEDED(result))
+        result = operation->SetOperationFlags(FOF_ALLOWUNDO | FOF_SILENT | FOF_NOCONFIRMATION);
+    if (SUCCEEDED(result))
+        result = SHCreateItemFromParsingName(pathW, NULL, IID_PPV_ARGS(&item));
+    if (SUCCEEDED(result))
+        result = operation->DeleteItem(item, NULL);
+    if (SUCCEEDED(result))
+        result = operation->PerformOperations();
+    if (SUCCEEDED(result))
+    {
+        BOOL aborted = FALSE;
+        if (SUCCEEDED(operation->GetAnyOperationsAborted(&aborted)) && aborted)
+            result = HRESULT_FROM_WIN32(ERROR_CANCELLED);
+    }
+    if (item != NULL)
+        item->Release();
+    if (operation != NULL)
+        operation->Release();
+    request->Error = GetFileOperationError(result);
+    return request->Error;
+}
+
+static BOOL DeleteThroughRecycleBin(HWND owner, const char* path, DWORD* error)
+{
+    CRecycleBinDeleteRequest request;
+    request.Owner = owner;
+    request.Path = path;
+    request.Error = ERROR_GEN_FAILURE;
+    CThreadOwner executor;
+    // The owner initializes an STA before invoking the executor and keeps the stack request alive until it completes.
+    if (!executor.Start(RunRecycleBinDeleteOnSta, &request, "recycle bin operation", TRUE))
+    {
+        *error = GetLastError();
+        return FALSE;
+    }
+    DWORD completed = executor.WaitForCompletion(INFINITE);
+    if (completed != WAIT_OBJECT_0)
+    {
+        *error = completed == WAIT_FAILED ? GetLastError() : ERROR_GEN_FAILURE;
+        return FALSE;
+    }
+    *error = request.Error;
+    return request.Error == ERROR_SUCCESS;
+}
+
 // ****************************************************************************
 // CAsyncCopyParams (declaration in worker.h, implementations below)
 //
@@ -162,6 +250,12 @@ void SetProgressWithoutSuspend(HWND hProgressDlg, int operation, int summary, CP
 BOOL GetDirTime(const char* dirName, FILETIME* ftModified);
 BOOL DoCopyDirTime(HWND hProgressDlg, const char* targetName, FILETIME* modified, CProgressDlgData& dlgData, BOOL quiet);
 
+static DWORD GetTemporaryNameSeed()
+{
+    // Preserve the legacy 12-bit, 10 ms filename seed while avoiding a 32-bit uptime wrap.
+    return (DWORD)((CMonotonicClock::Now() / 10) % 0xFFF);
+}
+
 void GetFileOverwriteInfo(char* buff, int buffLen, HANDLE file, const char* fileName, FILETIME* fileTime, BOOL* getTimeFailed)
 {
     FILETIME lastWrite;
@@ -181,14 +275,16 @@ void GetFileOverwriteInfo(char* buff, int buffLen, HANDLE file, const char* file
     {
         if (fileTime != NULL)
             *fileTime = ft;
-        if (GetTimeFormat(LOCALE_USER_DEFAULT, 0, &st, NULL, time, 50) == 0)
+        if (FormatUserDateTimeUtf8(&st, 0, time, _countof(time), FALSE) == 0)
             _snprintf_s(time, _countof(time), _TRUNCATE, "%u:%02u:%02u", st.wHour, st.wMinute, st.wSecond);
-        if (GetDateFormat(LOCALE_USER_DEFAULT, DATE_SHORTDATE, &st, NULL, date, 50) == 0)
+        if (FormatUserDateTimeUtf8(&st, DATE_SHORTDATE, date, _countof(date), TRUE) == 0)
             _snprintf_s(date, _countof(date), _TRUNCATE, "%u.%u.%u", st.wDay, st.wMonth, st.wYear);
     }
 
     char attr[30];
-    lstrcpy(attr, ", ");
+    // Keep the fixed diagnostic attribute suffix valid even if its prefix is ever changed.
+    if (FAILED(StringCchCopyA(attr, _countof(attr), ", ")))
+        attr[0] = 0;
     DWORD attrs = SalGetFileAttributes(fileName);
     if (attrs != 0xFFFFFFFF)
         GetAttrsString(attr + 2, attrs);
@@ -251,9 +347,9 @@ void GetDirInfo(char* buffer, int bufferLen, const char* dir)
             FileTimeToSystemTime(&ft, &st))
         {
             char date[50], time[50];
-            if (GetTimeFormat(LOCALE_USER_DEFAULT, 0, &st, NULL, time, 50) == 0)
+            if (FormatUserDateTimeUtf8(&st, 0, time, _countof(time), FALSE) == 0)
                 _snprintf_s(time, _countof(time), _TRUNCATE, "%u:%02u:%02u", st.wHour, st.wMinute, st.wSecond);
-            if (GetDateFormat(LOCALE_USER_DEFAULT, DATE_SHORTDATE, &st, NULL, date, 50) == 0)
+            if (FormatUserDateTimeUtf8(&st, DATE_SHORTDATE, date, _countof(date), TRUE) == 0)
                 _snprintf_s(date, _countof(date), _TRUNCATE, "%u.%u.%u", st.wDay, st.wMonth, st.wYear);
 
             _snprintf_s(buffer, bufferLen, _TRUNCATE, "%s, %s", date, time);
@@ -457,7 +553,8 @@ BOOL IsUserAdmin()
       return FALSE;
     }
 
-    TokenGroupList = (PTOKEN_GROUPS)GlobalAlloc(GPTR, InfoLength);
+    // This token-query buffer never crosses an API ownership boundary, so keep it on the process heap.
+    TokenGroupList = (PTOKEN_GROUPS)HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, InfoLength);
 
     if (TokenGroupList == NULL)
     {
@@ -476,7 +573,7 @@ BOOL IsUserAdmin()
 
     if (!NT_SUCCESS(Status))
     {
-      GlobalFree(TokenGroupList);
+      HeapFree(GetProcessHeap(), 0, TokenGroupList);
       FreeSid(AdminsDomainSid);
       CloseHandle(hUserToken);
       return FALSE;
@@ -496,7 +593,7 @@ BOOL IsUserAdmin()
     }
 
     // Tidy up
-    GlobalFree(TokenGroupList);
+    HeapFree(GetProcessHeap(), 0, TokenGroupList);
     FreeSid(AdminsDomainSid);
     CloseHandle(hUserToken);
 
@@ -994,11 +1091,12 @@ void RecordMetadataLoss(CProgressDlgData& dlgData, DWORD lossMask,
     if (dlgData.MetadataLosses.TargetFileSystem == mtfsUnknown && targetName != NULL)
         dlgData.MetadataLosses.TargetFileSystem = GetMetadataTargetFileSystem(targetName);
     if (dlgData.MetadataLosses.FirstSourceName[0] == 0 && sourceName != NULL)
-        lstrcpyn(dlgData.MetadataLosses.FirstSourceName, sourceName,
-                 _countof(dlgData.MetadataLosses.FirstSourceName));
+    {
+        // Metadata diagnostics must retain a complete first source identity.
+        StringCchCopyA(dlgData.MetadataLosses.FirstSourceName, _countof(dlgData.MetadataLosses.FirstSourceName), sourceName);
+    }
     if (dlgData.MetadataLosses.FirstTargetName[0] == 0 && targetName != NULL)
-        lstrcpyn(dlgData.MetadataLosses.FirstTargetName, targetName,
-                 _countof(dlgData.MetadataLosses.FirstTargetName));
+        StringCchCopyA(dlgData.MetadataLosses.FirstTargetName, _countof(dlgData.MetadataLosses.FirstTargetName), targetName);
 }
 
 void RecordPlannedMetadataLosses(CProgressDlgData& dlgData, const COperations* script,
@@ -1040,11 +1138,9 @@ BOOL ConfirmMetadataLossesBeforeSourceDeletion(HWND hProgressDlg, CProgressDlgDa
         return TRUE;
 
     if (dlgData.MetadataLosses.FirstSourceName[0] == 0 && sourceName != NULL)
-        lstrcpyn(dlgData.MetadataLosses.FirstSourceName, sourceName,
-                 _countof(dlgData.MetadataLosses.FirstSourceName));
+        StringCchCopyA(dlgData.MetadataLosses.FirstSourceName, _countof(dlgData.MetadataLosses.FirstSourceName), sourceName);
     if (dlgData.MetadataLosses.FirstTargetName[0] == 0 && targetName != NULL)
-        lstrcpyn(dlgData.MetadataLosses.FirstTargetName, targetName,
-                 _countof(dlgData.MetadataLosses.FirstTargetName));
+        StringCchCopyA(dlgData.MetadataLosses.FirstTargetName, _countof(dlgData.MetadataLosses.FirstTargetName), targetName);
 
     char lossDetails[768];
     lossDetails[0] = 0;
@@ -1616,18 +1712,18 @@ BOOL CheckTailOfOutFile(CAsyncCopyParams* asyncPar, HANDLE in, HANDLE out, const
         return FALSE;
     }
 
-    DWORD startTime = GetTickCount();
-    DWORD rutineStartTime = startTime;
+    CMonotonicTimePoint startTime = CMonotonicClock::Now();
+    CMonotonicTimePoint rutineStartTime = startTime;
     CQuadWord lastOffset = offset;
     int roundNum = 1;
     DWORD curBufSize = RETRYCOPY_TAIL_MINSIZE;
-    DWORD lastRoundStartTime = 0;
+    CMonotonicTimePoint lastRoundStartTime = 0;
     DWORD lastRoundBufSize = 0;
     BOOL searchLongLastingBlock = TRUE;
     BOOL ok;
     while (1)
     {
-        DWORD roundStartTime = GetTickCount();
+        CMonotonicTimePoint roundStartTime = CMonotonicClock::Now();
         ok = FALSE;
         CQuadWord start;
         start.Value = lastOffset.Value > curBufSize ? lastOffset.Value - curBufSize : 0;
@@ -1723,11 +1819,11 @@ BOOL CheckTailOfOutFile(CAsyncCopyParams* asyncPar, HANDLE in, HANDLE out, const
         DWORD curBufSizeBackup = curBufSize;
         if (roundNum > 1)
         {
-            DWORD ti = GetTickCount();
+            const CMonotonicTimePoint ti = CMonotonicClock::Now();
             if (searchLongLastingBlock)
             {
-                DWORD t1 = roundStartTime - lastRoundStartTime;
-                DWORD t2 = ti - roundStartTime;
+                CMonotonicDuration t1 = CMonotonicClock::Elapsed(lastRoundStartTime, roundStartTime);
+                CMonotonicDuration t2 = CMonotonicClock::Elapsed(roundStartTime, ti);
                 if (roundNum == 2 && t1 > 300 && 10 * t2 < t1) // first iteration waits for the disk/network to be ready, shift the start time (so we spend the configured time reading instead of just waiting)
                 {
 #ifdef WORKER_COPY_DEBUG_MSG
@@ -1740,7 +1836,7 @@ BOOL CheckTailOfOutFile(CAsyncCopyParams* asyncPar, HANDLE in, HANDLE out, const
                     if (t2 > 1000 && ((curBufSize * 10) / lastRoundBufSize) * t1 < t2)
                     { // unexpectedly long block read, likely waiting for disk "verification" or similar; ignore this block once so the overall check still behaves normally
                         searchLongLastingBlock = FALSE;
-                        DWORD sh = t2 - ((unsigned __int64)curBufSize * t1) / lastRoundBufSize;
+                        CMonotonicDuration sh = t2 - ((unsigned __int64)curBufSize * t1) / lastRoundBufSize;
 #ifdef WORKER_COPY_DEBUG_MSG
                         TRACE_I("CheckTailOfOutFile(): detected long lasting block, start time shifted by " << (sh / 1000.0) << " secs.");
 #endif // WORKER_COPY_DEBUG_MSG
@@ -1748,9 +1844,9 @@ BOOL CheckTailOfOutFile(CAsyncCopyParams* asyncPar, HANDLE in, HANDLE out, const
                     }
                 }
             }
-            if (ti - startTime > RETRYCOPY_TESTINGTIME)
+            if (CMonotonicClock::Elapsed(startTime, ti) > RETRYCOPY_TESTINGTIME)
                 break; // we have been reading long enough; stop after the mandatory two rounds
-            if (ti - roundStartTime < 300 && curBufSize < ASYNC_COPY_BUF_SIZE)
+            if (CMonotonicClock::Elapsed(roundStartTime, ti) < 300 && curBufSize < ASYNC_COPY_BUF_SIZE)
             { // when reading is fast enough, enlarge the buffer to avoid excessive reverse seeking (toward the beginning of the file)
                 curBufSize *= 2;
                 if (curBufSize > ASYNC_COPY_BUF_SIZE)
@@ -1785,7 +1881,7 @@ BOOL CheckTailOfOutFile(CAsyncCopyParams* asyncPar, HANDLE in, HANDLE out, const
         TRACE_I("CheckTailOfOutFile(): aborting Retry...");
     else
     {
-        TRACE_I("CheckTailOfOutFile(): " << (offset.Value - lastOffset.Value) / 1024.0 << " KB tested in " << (GetTickCount() - rutineStartTime) / 1000.0 << " secs (clear read time: " << (GetTickCount() - startTime) / 1000.0 << " secs).");
+        TRACE_I("CheckTailOfOutFile(): " << (offset.Value - lastOffset.Value) / 1024.0 << " KB tested in " << CMonotonicClock::Elapsed(rutineStartTime, CMonotonicClock::Now()) / 1000.0 << " secs (clear read time: " << CMonotonicClock::Elapsed(startTime, CMonotonicClock::Now()) / 1000.0 << " secs).");
     }
 #endif // WORKER_COPY_DEBUG_MSG
     return ok;
@@ -1828,10 +1924,10 @@ COPY_ADS_AGAIN:
             srcName[0] = 0;
         if (!ConvertUtf8ToWide(longTargetName, -1, tgtName, 2 * MAX_PATH))
             tgtName[0] = 0;
-        wchar_t* srcEnd = srcName + lstrlenW(srcName);
+        wchar_t* srcEnd = srcName + wcslen(srcName);
         if (srcEnd > srcName && *(srcEnd - 1) == L'\\')
             *--srcEnd = 0;
-        wchar_t* tgtEnd = tgtName + lstrlenW(tgtName);
+        wchar_t* tgtEnd = tgtName + wcslen(tgtName);
         if (tgtEnd > tgtName && *(tgtEnd - 1) == L'\\')
             *--tgtEnd = 0;
 
@@ -2453,7 +2549,7 @@ HANDLE SalCreateFileEx(const char* fileName, DWORD desiredAccess,
                         }
                         else
                         {
-                            lstrcpyn(tmpName, fileName, _countof(tmpName));
+                            StringCchCopyA(tmpName, _countof(tmpName), fileName);
                             CutDirectory(tmpName);
                             SalPathAddBackslash(tmpName, _countof(tmpName));
                             char* tmpNamePart = tmpName + strlen(tmpName);
@@ -2461,7 +2557,7 @@ HANDLE SalCreateFileEx(const char* fileName, DWORD desiredAccess,
                             if (SalPathAppend(tmpName, fullName, _countof(tmpName)))
                             {
                                 strcpy(origFullName, tmpName);
-                                DWORD num = (GetTickCount() / 10) % 0xFFF;
+                                DWORD num = GetTemporaryNameSeed();
                                 DWORD origFullNameAttr = SalGetFileAttributes(origFullName);
                                 while (1)
                                 {
@@ -2537,7 +2633,11 @@ HANDLE SalCreateFileEx(const char* fileName, DWORD desiredAccess,
 static BOOL CreateTransactionalTargetFileName(const char* targetName, char* temporaryName, int temporaryNameLen)
 {
     char targetDirectory[3 * MAX_PATH];
-    lstrcpyn(targetDirectory, targetName, _countof(targetDirectory));
+    if (FAILED(StringCchCopyA(targetDirectory, _countof(targetDirectory), targetName)))
+    {
+        SetLastError(ERROR_FILENAME_EXCED_RANGE);
+        return FALSE;
+    }
     if (!CutDirectory(targetDirectory))
     {
         SetLastError(ERROR_INVALID_NAME);
@@ -5063,7 +5163,8 @@ COPY_AGAIN:
                                 else
                                 {
                                     getTimeFailed = TRUE;
-                                    lstrcpyn(tAttr, LoadStr(IDS_ERR_FILEOPEN), _countof(tAttr));
+                                    // This error field is a fixed dialog presentation buffer.
+                                    StringCchCopyNA(tAttr, _countof(tAttr), LoadStr(IDS_ERR_FILEOPEN), _countof(tAttr) - 1);
                                 }
                                 out = NULL;
 
@@ -5553,12 +5654,13 @@ BOOL DoMoveFile(COperation* op, HWND hProgressDlg, void* buffer,
         BOOL dirTimeModifiedIsValid = FALSE;
         if (!invalidName && dir && !*novellRenamePatch && *setDirTimeAfterMove != 2 /* no */) // the issue apparently does not apply to Novell Netware, so ignore it there (affects e.g. Samba)
             dirTimeModifiedIsValid = GetDirTime(sourceNameMvDir, &dirTimeModified);
+        COperation::CFileIdentity expectedTargetIdentity = op->TargetIdentity;
         while (1)
         {
             DWORD identityError = ERROR_SUCCESS;
             BOOL identitiesMatch = !invalidName &&
                                    VerifyFileIdentity(sourceNameMvDir, op->SourceIdentity, &identityError) &&
-                                   VerifyFileIdentity(targetNameMvDir, op->TargetIdentity, &identityError);
+                                   VerifyFileIdentity(targetNameMvDir, expectedTargetIdentity, &identityError);
             if (identitiesMatch && !*novellRenamePatch && SalMoveFile(sourceNameMvDir, targetNameMvDir))
             {
                 if (script->CopyAttrs && (op->Attr & FILE_ATTRIBUTE_ARCHIVE) == 0) // Archive attribute was not set, MoveFile turned it on, clear it again
@@ -5679,7 +5781,7 @@ BOOL DoMoveFile(COperation* op, HWND hProgressDlg, void* buffer,
                     DWORD attr = SalGetFileAttributes(sourceNameMvDir);
                     BOOL setAttr = ClearReadOnlyAttr(sourceNameMvDir, attr);
                     if (VerifyFileIdentity(sourceNameMvDir, op->SourceIdentity, &err) &&
-                        VerifyFileIdentity(targetNameMvDir, op->TargetIdentity, &err) &&
+                        VerifyFileIdentity(targetNameMvDir, expectedTargetIdentity, &err) &&
                         SalMoveFile(sourceNameMvDir, targetNameMvDir))
                     {
                         if (!*novellRenamePatch)
@@ -5731,7 +5833,7 @@ BOOL DoMoveFile(COperation* op, HWND hProgressDlg, void* buffer,
                             }
                             else
                             {
-                                lstrcpyn(tmpName, op->TargetName, _countof(tmpName));
+                                StringCchCopyA(tmpName, _countof(tmpName), op->TargetName);
                                 CutDirectory(tmpName);
                                 SalPathAddBackslash(tmpName, _countof(tmpName));
                                 char* tmpNamePart = tmpName + strlen(tmpName);
@@ -5739,7 +5841,7 @@ BOOL DoMoveFile(COperation* op, HWND hProgressDlg, void* buffer,
                                 if (SalPathAppend(tmpName, fullName, _countof(tmpName)))
                                 {
                                     strcpy(origFullName, tmpName);
-                                    DWORD num = (GetTickCount() / 10) % 0xFFF;
+                                    DWORD num = GetTemporaryNameSeed();
                                     DWORD origFullNameAttr = SalGetFileAttributes(origFullName);
                                     while (1)
                                     {
@@ -5983,6 +6085,11 @@ BOOL DoMoveFile(COperation* op, HWND hProgressDlg, void* buffer,
                             }
                         }
                     }
+
+                    // The overwrite delete is now committed.  Subsequent move retries must
+                    // require the cleared destination to stay absent, not match its old file ID.
+                    memset(&expectedTargetIdentity, 0, sizeof(expectedTargetIdentity));
+                    expectedTargetIdentity.State = 1; // FileIdentityAbsent; see CFileIdentity.
                 }
                 else
                 {
@@ -6199,7 +6306,7 @@ BOOL DoDeleteFile(HWND hProgressDlg, COperation* operation, const CQuadWord& siz
                     if (fileName != NULL) // "always true"
                     {
                         fileName++;
-                        int tmpLen = lstrlen(fileName);
+                        int tmpLen = (int)strlen(fileName);
                         const char* ext = fileName + tmpLen;
                         //            while (ext > fileName && *ext != '.') ext--;
                         while (--ext >= fileName && *ext != '.')
@@ -6234,38 +6341,8 @@ BOOL DoDeleteFile(HWND hProgressDlg, COperation* operation, const CQuadWord& siz
                 }
                 else
                 {
-                    CStrP nameW(ConvertAllocUtf8ToWide(name, -1));
-                    if (nameW == NULL)
-                    {
-                        err = ERROR_NO_UNICODE_TRANSLATION;
-                    }
-                    else
-                    {
-                        int nameLen = lstrlenW(nameW);
-                        WCHAR* nameListW = (WCHAR*)malloc((nameLen + 2) * sizeof(WCHAR));
-                        if (nameListW == NULL)
-                        {
-                            err = ERROR_NOT_ENOUGH_MEMORY;
-                        }
-                        else
-                        {
-                            memcpy(nameListW, nameW, (nameLen + 1) * sizeof(WCHAR));
-                            nameListW[nameLen + 1] = 0; // double null
-
-                            CShellExecuteWnd shellExecuteWnd;
-                            SHFILEOPSTRUCTW opCode;
-                            memset(&opCode, 0, sizeof(opCode));
-
-                            opCode.hwnd = shellExecuteWnd.Create(hProgressDlg, "SEW: DoDeleteFile");
-
-                            opCode.wFunc = FO_DELETE;
-                            opCode.pFrom = nameListW;
-                            opCode.fFlags = FOF_ALLOWUNDO | FOF_SILENT | FOF_NOCONFIRMATION;
-                            opCode.lpszProgressTitle = L"";
-                            err = SHFileOperationW(&opCode);
-                            free(nameListW);
-                        }
-                    }
+                    // The dedicated STA executor preserves silent Recycle Bin deletion without SHFileOperation's double-NUL list.
+                    DeleteThroughRecycleBin(hProgressDlg, name, &err);
                 }
             }
             else
@@ -6380,7 +6457,7 @@ BOOL SalCreateDirectoryEx(const char* name, DWORD* err)
                     }
                     else
                     {
-                        lstrcpyn(tmpName, name, _countof(tmpName));
+                        StringCchCopyA(tmpName, _countof(tmpName), name);
                         CutDirectory(tmpName);
                         SalPathAddBackslash(tmpName, _countof(tmpName));
                         char* tmpNamePart = tmpName + strlen(tmpName);
@@ -6388,7 +6465,7 @@ BOOL SalCreateDirectoryEx(const char* name, DWORD* err)
                         if (SalPathAppend(tmpName, fullName, _countof(tmpName)))
                         {
                             strcpy(origFullName, tmpName);
-                            DWORD num = (GetTickCount() / 10) % 0xFFF;
+                            DWORD num = GetTemporaryNameSeed();
                             DWORD origFullNameAttr = SalGetFileAttributes(origFullName);
                             while (1)
                             {
@@ -6910,38 +6987,8 @@ BOOL DoDeleteDir(HWND hProgressDlg, COperation* operation, const CQuadWord& size
             }
             else
             {
-                CStrP nameW(ConvertAllocUtf8ToWide(name, -1));
-                if (nameW == NULL)
-                {
-                    err = ERROR_NO_UNICODE_TRANSLATION;
-                }
-                else
-                {
-                    int nameLen = lstrlenW(nameW);
-                    WCHAR* nameListW = (WCHAR*)malloc((nameLen + 2) * sizeof(WCHAR));
-                    if (nameListW == NULL)
-                    {
-                        err = ERROR_NOT_ENOUGH_MEMORY;
-                    }
-                    else
-                    {
-                        memcpy(nameListW, nameW, (nameLen + 1) * sizeof(WCHAR));
-                        nameListW[nameLen + 1] = 0; // double null
-
-                        CShellExecuteWnd shellExecuteWnd;
-                        SHFILEOPSTRUCTW opCode;
-                        memset(&opCode, 0, sizeof(opCode));
-
-                        opCode.hwnd = shellExecuteWnd.Create(hProgressDlg, "SEW: DoDeleteDir");
-
-                        opCode.wFunc = FO_DELETE;
-                        opCode.pFrom = nameListW;
-                        opCode.fFlags = FOF_ALLOWUNDO | FOF_SILENT | FOF_NOCONFIRMATION;
-                        opCode.lpszProgressTitle = L"";
-                        err = SHFileOperationW(&opCode);
-                        free(nameListW);
-                    }
-                }
+                // Directory Recycle Bin deletion follows the same STA path as files to retain its existing error handling.
+                DeleteThroughRecycleBin(hProgressDlg, name, &err);
             }
         }
         else

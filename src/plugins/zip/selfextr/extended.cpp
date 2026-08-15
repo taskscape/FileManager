@@ -16,6 +16,35 @@
 #include "dialog.h"
 #include "extended.h"
 
+// The CRT-free self-extractor still needs a failure-aware fixed-buffer title builder.
+static BOOL AppendPasswordDialogTitle(char* target, size_t targetSize, const char* source)
+{
+    if (target == NULL || targetSize == 0 || source == NULL)
+        return FALSE;
+
+    size_t length = 0;
+    while (length < targetSize && target[length] != 0)
+        length++;
+    if (length == targetSize)
+        return FALSE;
+
+    while (*source != 0)
+    {
+        if (length + 1 >= targetSize)
+            return FALSE;
+        target[length++] = *source++;
+    }
+    target[length] = 0;
+    return TRUE;
+}
+
+static WNDPROC ReplaceExtendedControlWindowProc(HWND control, WNDPROC procedure)
+{
+    // Password-dialog subclass procedures must not pass through a 32-bit LONG on x64 builds.
+    return reinterpret_cast<WNDPROC>(SetWindowLongPtr(control, GWLP_WNDPROC,
+                                                       reinterpret_cast<LONG_PTR>(procedure)));
+}
+
 const char* const DetachedExe = "sfx.exe";
 const char* const DetachedBat = "sfx.bat";
 
@@ -130,15 +159,15 @@ int DetachArchive(char* sfxBat, const char* parameters)
         HandleError(STR_ERROR_GETMODULENAME, GetLastError());
     PathRemoveFileSpec(archive);
     PathAppend(archive, (char*)ArchiveStart + ArchiveStart->ArchiveNameOffs);
-    /*
-  wsprintf(buf, "start /wait %s \"%s\" %s -a \"%s\"\r\n"
-                "rmdir /s /q \"%s\"\r\n"
-                "del \"%s\"\r\n"
-                "del \"%s\"\r\n",
-                "\"\"", sfxExe, parameters, archive, TargetPath, sfxExe, sfxBat);
-                */
-    wsprintf(buf, "start /wait \"\" \"%s\" %s -a \"%s\"\r\nrmdir /s /q \"%s\"\r\n",
-             sfxExe, parameters, archive, TargetPath);
+    if (!SelfExtrFormat(buf, ARRAYSIZE(buf), "start /wait \"\" \"%s\" %s -a \"%s\"\r\nrmdir /s /q \"%s\"\r\n",
+                         sfxExe, parameters, archive, TargetPath))
+    {
+        HandleError(STR_ERROR_TEMPCREATE, ERROR_INSUFFICIENT_BUFFER, sfxBat, NULL, 0, true);
+        CloseHandle(OutFile);
+        OutFile = 0;
+        CloseMapping();
+        return 1;
+    }
 
     if (!WriteFile(OutFile, buf, lstrlen(buf), &written, NULL))
     {
@@ -219,7 +248,8 @@ int OpenLastVolume()
       if (sour >= file)
       {
         *(++sour) = 0;
-        wsprintf(mask, "%s*%s", file, ext);
+        if (!SelfExtrFormat(mask, ARRAYSIZE(mask), "%s*%s", file, ext))
+            return 0;
         search = FindFirstFile(mask, &data);
         if (search != INVALID_HANDLE_VALUE)
         {
@@ -353,7 +383,8 @@ int ChangeDisk(int number, BOOL firstVolume)
         if (sour >= file)
         {
             *(++sour) = 0;
-            wsprintf(RealArchiveName, "%s%02d%s", file, number, ext);
+            if (!SelfExtrFormat(RealArchiveName, MAX_PATH, "%s%02d%s", file, number, ext))
+                return 1;
         }
     }
 
@@ -364,7 +395,12 @@ int ChangeDisk(int number, BOOL firstVolume)
         if (!firstVolume && !(ArchiveStart->Flags & SE_SEQNAMES) || attr & FILE_ATTRIBUTE_DIRECTORY)
         {
             char buf[1024];
-            wsprintf(buf, StringTable[STR_INSERT_NEXT_DISK], number);
+            if (!SelfExtrFormat(buf, ARRAYSIZE(buf), StringTable[STR_INSERT_NEXT_DISK], number))
+            {
+                size_t fallbackLength = 0;
+                buf[0] = 0;
+                SelfExtrAppendText(buf, ARRAYSIZE(buf), &fallbackLength, "Unable to format the next-volume prompt.");
+            }
             if (MessageBox(DlgWin, buf, Title, MB_ICONQUESTION | MB_SETFOREGROUND | MB_OKCANCEL) == IDCANCEL)
             {
                 Stop = true;
@@ -407,17 +443,25 @@ BOOL WINAPI PasswordDlgProc(HWND hDlg, UINT uMsg, WPARAM wParam, LPARAM lParam)
     {
         password = ((CPasswordDlgInfo*)lParam)->Password;
         SendDlgItemMessage(DlgWin, IDC_PASSWORD, EM_SETLIMITTEXT, MAX_PASSWORD - 1, 0);
-        OrigTextControlProc = (WNDPROC)SetWindowLong(GetDlgItem(hDlg, IDC_FILE), GWL_WNDPROC, (LONG)TextControlProc);
+        OrigTextControlProc = ReplaceExtendedControlWindowProc(GetDlgItem(hDlg, IDC_FILE), TextControlProc);
         SetDlgItemText(hDlg, IDC_FILE, ((CPasswordDlgInfo*)lParam)->File);
         char title[200];
-        *title = 0;
+        const char* passwordTitle = StringTable[STR_PASSWORDDLGTITLE];
+        title[0] = 0;
         if (DlgWin == NULL)
         {
-            lstrcpy(title, Title);
-            lstrcat(title, " - ");
+            // A localized title can exceed this fixed dialog buffer, so every append checks the final terminator.
+            if (!AppendPasswordDialogTitle(title, _countof(title), Title) ||
+                !AppendPasswordDialogTitle(title, _countof(title), " - ") ||
+                !AppendPasswordDialogTitle(title, _countof(title), passwordTitle))
+            {
+                title[0] = 0;
+                AppendPasswordDialogTitle(title, _countof(title), passwordTitle);
+            }
             CenterDialog(hDlg);
         }
-        lstrcat(title, StringTable[STR_PASSWORDDLGTITLE]);
+        else if (!AppendPasswordDialogTitle(title, _countof(title), passwordTitle))
+            title[0] = 0; // Never pass an unterminated fallback to the window title API.
         SetWindowText(hDlg, title);
         SetForegroundWindow(hDlg);
         return FALSE;
@@ -444,7 +488,7 @@ BOOL WINAPI PasswordDlgProc(HWND hDlg, UINT uMsg, WPARAM wParam, LPARAM lParam)
         }
 
     case WM_DESTROY:
-        SetWindowLong(GetDlgItem(hDlg, IDC_FILE), GWL_WNDPROC, (LONG)OrigTextControlProc);
+        ReplaceExtendedControlWindowProc(GetDlgItem(hDlg, IDC_FILE), OrigTextControlProc);
         return FALSE;
     }
     return FALSE;

@@ -5,6 +5,7 @@
 #include "precomp.h"
 
 #include <shlwapi.h>
+#include <strsafe.h>
 #undef PathIsPrefix // otherwise collision with CSalamanderGeneral::PathIsPrefix
 
 #include "cfgdlg.h"
@@ -31,7 +32,8 @@ static int DrawTextUtf8(HDC hdc, const char* text, int len, RECT* rect, UINT for
     CStrP textW(ConvertAllocUtf8ToWide(text, -1));
     if (textW == NULL)
         return DrawTextW(hdc, L"?", 1, rect, format);
-    return DrawTextW(hdc, textW, lstrlenW(textW), rect, format);
+    // UTF-8 conversion returns an owned terminated Unicode buffer for drawing.
+    return DrawTextW(hdc, textW, static_cast<int>(wcslen(textW)), rect, format);
 }
 
 // !!! do not use StdColumnsPrivate directly, use GetStdColumn()
@@ -667,7 +669,8 @@ void CFilesWindow::ClipboardPastePath()
             {
                 while (*path != 0 && *path <= ' ')
                     path++; // trim spaces+CR+LF before the path
-                lstrcpyn(buff, path, _countof(buff));
+                // Shell-provided paths are displayed in this fixed text field.
+                StringCchCopyNA(buff, _countof(buff), path, _countof(buff) - 1);
 
                 changePath = TRUE;
                 HANDLES(GlobalUnlock(handle));
@@ -709,7 +712,7 @@ BOOL CFilesWindow::OnLButtonDown(WPARAM wParam, LPARAM lParam, LRESULT* lResult)
     KillQuickRenameTimer(); // prevent possible opening of QuickRenameWindow
     LButtonDown.x = LOWORD(lParam);
     LButtonDown.y = HIWORD(lParam);
-    LButtonDownTime = GetTickCount();
+    LButtonDownTime = CMonotonicClock::Now();
     DragBoxLeft = 1;
     FocusedSinceClick = FALSE;
 
@@ -936,7 +939,7 @@ BOOL CFilesWindow::OnRButtonDown(WPARAM wParam, LPARAM lParam, LRESULT* lResult)
 
     LButtonDown.x = LOWORD(lParam);
     LButtonDown.y = HIWORD(lParam);
-    LButtonDownTime = GetTickCount();
+    LButtonDownTime = CMonotonicClock::Now();
     DragBoxLeft = 0;
     MainWindow->CancelPanelsUI(); // cancel QuickSearch and QuickEdit
     if (Dirs->Count + Files->Count == 0)
@@ -1111,8 +1114,11 @@ BOOL CFilesWindow::IsDragDropSafe(int x, int y)
     if (hWndHit != NULL && hTopHit != NULL && hTopHit != MainWindow->HWindow)
         return TRUE;
 
-    // enough time has passed since the start of dragging
-    if ((int)(GetTickCount() - LButtonDownTime) > Configuration.DragDropMinTime)
+    // Preserve the legacy strictly-after threshold while avoiding a 32-bit uptime wrap.
+    const CMonotonicDuration minimumDelay = Configuration.DragDropMinTime > 0
+                                                ? (CMonotonicDuration)Configuration.DragDropMinTime
+                                                : 0;
+    if (CMonotonicClock::Elapsed(LButtonDownTime, CMonotonicClock::Now()) > minimumDelay)
         return TRUE;
 
     return FALSE;
@@ -1245,7 +1251,15 @@ BOOL CFilesWindow::OnMouseMove(WPARAM wParam, LPARAM lParam, LRESULT* lResult)
                     {
                         if (Configuration.UseDragDropMinTime)
                         {
-                            SetTimer(GetListBoxHWND(), IDT_DRAGDROPTESTAGAIN, Configuration.DragDropMinTime - (GetTickCount() - LButtonDownTime) + 10, NULL);
+                            const CMonotonicDuration minimumDelay = Configuration.DragDropMinTime > 0
+                                                                        ? (CMonotonicDuration)Configuration.DragDropMinTime
+                                                                        : 0;
+                            const CMonotonicTimePoint dragDeadline = LButtonDownTime + minimumDelay;
+                            const DWORD remaining = CMonotonicClock::RemainingWin32TimerDelay(dragDeadline,
+                                                                                                 CMonotonicClock::Now());
+                            // Keep the historical 10 ms cushion without overflowing the Win32 timer argument.
+                            const DWORD retryDelay = remaining > MAXDWORD - 10 ? MAXDWORD : remaining + 10;
+                            SetTimer(GetListBoxHWND(), IDT_DRAGDROPTESTAGAIN, retryDelay, NULL);
                         }
                     }
                 }
@@ -1607,7 +1621,7 @@ CFilesWindow::CreateDragImage(int cursorX, int cursorY, int& dxHotspot, int& dyH
             buff[0] = 0;
         }
     }
-    int buffLen = lstrlen(buff);
+    int buffLen = static_cast<int>(strlen(buff));
 
     int width;
     int height = ListBox->ItemHeight;
@@ -1861,9 +1875,10 @@ BOOL CopyUNCPathToClipboard(const char* path, const char* name, BOOL isDir, HWND
         SalPathAddBackslash(buff, 2 * MAX_PATH);
         strcat(buff, name);
 
-        wsprintf(uncPath, LoadStr(IDS_CANNOT_CREATE_UNC_NAME), buff);
-        SalMessageBox(hMessageParent, uncPath, LoadStr(IDS_INFOTITLE),
-                      MB_OK | MB_ICONINFORMATION);
+        // The UNC conversion explanation incorporates a path assembled at the maximum supported length.
+        if (SUCCEEDED(StringCchPrintfA(uncPath, ARRAYSIZE(uncPath), LoadStr(IDS_CANNOT_CREATE_UNC_NAME), buff)))
+            SalMessageBox(hMessageParent, uncPath, LoadStr(IDS_INFOTITLE),
+                          MB_OK | MB_ICONINFORMATION);
     }
     return FALSE;
 }
@@ -1924,7 +1939,8 @@ BOOL CFilesWindow::CopyItemNameToClipboard(int index, CCopyFocusedNameModeEnum m
         char fileName[MAX_PATH];
         AlterFileName(fileName, file->Name, -1, Configuration.FileNameFormat, 0, index < Dirs->Count);
         int l = (int)strlen(buff);
-        lstrcpyn(buff + l, fileName, 2 * MAX_PATH - l);
+        // Clipboard text retains the fixed combined path field's explicit remaining capacity.
+        StringCchCopyNA(buff + l, 2 * MAX_PATH - l, fileName, 2 * MAX_PATH - l - 1);
         return CopyTextToClipboard(buff);
     }
     else
@@ -1977,7 +1993,18 @@ void AddStrToStr(char* dstStr, int dstBufSize, const char* srcStr)
         }
     }
     dstStr[dstStrLen] = 0;
-    lstrcpyn(dstStr + dstStrLen + 1, srcStr, l + 1);
+    // Preserve the two-string representation without relying on lstrcpyn truncation.
+    memcpy(dstStr + dstStrLen + 1, srcStr, l);
+    dstStr[dstStrLen + 1 + l] = 0;
+}
+
+static BOOL CopyColumnText(char* destination, size_t capacity, const char* source)
+{
+    // Reserve the second terminator required by the host's Name/Ext metadata layout.
+    if (capacity < 2 || FAILED(StringCchCopyA(destination, capacity - 1, source)))
+        return FALSE;
+    destination[strlen(destination) + 1] = 0;
+    return TRUE;
 }
 
 // prepare a template for the 'Columns' variable
@@ -1996,10 +2023,9 @@ BOOL CFilesWindow::BuildColumnsTemplate()
         // so that tests like CFilesWindow::IsExtensionInSeparateColumn work correctly
         CColumn column;
         column.CustomData = 0;
-        lstrcpy(column.Name, LoadStr(IDS_COLUMN_NAME_NAME));
-        column.Name[strlen(column.Name) + 1] = 0; // two nulls at the end (the text "Ext" is after the name, avoid trouble if searched there)
-        lstrcpy(column.Description, LoadStr(IDS_COLUMN_DESC_NAME));
-        column.Description[strlen(column.Description) + 1] = 0; // two nulls at the end (the description "Ext" is after the name, avoid trouble if searched there)
+        if (!CopyColumnText(column.Name, _countof(column.Name), LoadStr(IDS_COLUMN_NAME_NAME)) ||
+            !CopyColumnText(column.Description, _countof(column.Description), LoadStr(IDS_COLUMN_DESC_NAME)))
+            return FALSE;
         column.GetText = NULL;
         column.SupportSorting = 1;
         column.LeftAlignment = 1;
@@ -2034,8 +2060,9 @@ BOOL CFilesWindow::BuildColumnsTemplate()
         // the Name column (i==0) is always visible
         if (i == 0 || ViewTemplate->Flags & item->Flag)
         {
-            lstrcpy(column.Name, LoadStr(item->NameResID));
-            lstrcpy(column.Description, LoadStr(item->DescResID));
+            if (!CopyColumnText(column.Name, _countof(column.Name), LoadStr(item->NameResID)) ||
+                !CopyColumnText(column.Description, _countof(column.Description), LoadStr(item->DescResID)))
+                return FALSE;
             if (i == 0) // column "Name"
             {
                 if ((ViewTemplate->Flags & VIEW_SHOW_EXTENSION) == 0) // "Ext" is part of the "Name" column, the name and description of the "Ext" column are after the terminating null of the name and description
@@ -2045,8 +2072,7 @@ BOOL CFilesWindow::BuildColumnsTemplate()
                 }
                 else // to be safe, create double-null-terminated strings
                 {
-                    column.Name[strlen(column.Name) + 1] = 0;
-                    column.Description[strlen(column.Description) + 1] = 0;
+                    // CopyColumnText already reserved the extra terminators for this case.
                 }
             }
             column.GetText = item->GetText;

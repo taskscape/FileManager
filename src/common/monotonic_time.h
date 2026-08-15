@@ -25,6 +25,14 @@ public:
         return Now() + duration;
     }
 
+    // Initializing a throttle as already expired must also be safe during the
+    // first few milliseconds of process uptime, before a full duration elapsed.
+    static CMonotonicTimePoint AtLeastDurationAgo(CMonotonicDuration duration)
+    {
+        const CMonotonicTimePoint now = Now();
+        return now > duration ? now - duration : 0;
+    }
+
     static CMonotonicDuration Elapsed(CMonotonicTimePoint start, CMonotonicTimePoint now)
     {
         // A defensive zero also makes injected/synthetic backward samples safe.

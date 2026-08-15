@@ -172,10 +172,10 @@ BOOL CMainWindow::Init()
     // we do not want visual styles for the rebar
     if (SalGUI->DisableWindowVisualStyles(Rebar->HWindow))
     {
-        // force WS_BORDER back in case it "disappeared"
-        DWORD style = GetWindowLong(Rebar->HWindow, GWL_STYLE);
+        // Use the pointer-width pair to keep this window-state update portable to x64 builds.
+        LONG_PTR style = GetWindowLongPtr(Rebar->HWindow, GWL_STYLE);
         style |= WS_BORDER;
-        SetWindowLong(Rebar->HWindow, GWL_STYLE, style);
+        SetWindowLongPtr(Rebar->HWindow, GWL_STYLE, style);
     }
 
     // Initialize and send the REBARINFO structure.

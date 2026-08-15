@@ -3,6 +3,8 @@
 
 #include "precomp.h"
 
+#include <strsafe.h>
+
 #include "cfgdlg.h"
 #include "menu.h"
 #include "mainwnd.h"
@@ -252,7 +254,9 @@ CFilesWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                 BOOL operationMask = FALSE;
                 BOOL cancelOrHandlePath = FALSE;
                 char targetPath[2 * MAX_PATH];
-                lstrcpyn(targetPath, tgtPath, 2 * MAX_PATH - 1);
+                // Preserve the required double terminator while bounding a plugin-provided drop path.
+                if (FAILED(StringCchCopyA(targetPath, _countof(targetPath) - 1, tgtPath)))
+                    targetPath[0] = 0;
                 if (tgtPath[0] == '\\' && tgtPath[1] == '\\' || // UNC path
                     tgtPath[0] != 0 && tgtPath[1] == ':')       // classic disk path (C:\path)
                 {
@@ -279,9 +283,12 @@ CFilesWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                 {
                     if (targetPath[0] != 0) // change focus to 'targetPath'
                     {
-                        lstrcpyn(NextFocusName, targetPath, MAX_PATH);
-                        // RefreshDirectory may not occur - source may not have changed - to be safe we post a message
-                        PostMessage(HWindow, WM_USER_DONEXTFOCUS, 0, 0);
+                        // Do not post an unrepresentable focus name to the later refresh handler.
+                        if (SUCCEEDED(StringCchCopyA(NextFocusName, _countof(NextFocusName), targetPath)))
+                        {
+                            // RefreshDirectory may not occur - source may not have changed - to be safe we post a message
+                            PostMessage(HWindow, WM_USER_DONEXTFOCUS, 0, 0);
+                        }
                     }
 
                     // successful operation, but we don't unselect source because it's a drag&drop
@@ -362,7 +369,7 @@ CFilesWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                         (UseSystemIcons || UseThumbnails) && IconCache != NULL)
                     {
                         //              TRACE_I("Timer IDT_ICONOVRREFRESH: refreshing icon overlays");
-                        LastIconOvrRefreshTime = GetTickCount();
+                        LastIconOvrRefreshTime = CMonotonicClock::Now();
                         SleepIconCacheThread();
                         WakeupIconCacheThread();
                     }
@@ -495,7 +502,8 @@ CFilesWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         if (uMsg == WM_USER_ICONREADING_END)
         {
             IconCacheValid = TRUE;
-            EndOfIconReadingTime = GetTickCount();
+            // Record completion with a non-wrapping timestamp for refresh suppression.
+            EndOfIconReadingTime = CMonotonicClock::Now();
             if (NeedRefreshAfterIconsReading) // should refresh occur?
             {
                 //          TRACE_I("Doing delayed refresh (all icons are read).");
@@ -516,7 +524,7 @@ CFilesWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                         (UseSystemIcons || UseThumbnails) && IconCache != NULL)
                     {
                         //              TRACE_I("NeedIconOvrRefreshAfterIconsReading: refreshing icon overlays");
-                        LastIconOvrRefreshTime = GetTickCount();
+                        LastIconOvrRefreshTime = CMonotonicClock::Now();
                         SleepIconCacheThread();
                         WakeupIconCacheThread();
                     }
@@ -533,7 +541,7 @@ CFilesWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         //      if (uMsg == WM_USER_INACTREFRESH_DIR) TRACE_I("WM_USER_INACTREFRESH_DIR");
         if (uMsg != WM_USER_ICONREADING_END)
         {
-            if (GetTickCount() - EndOfIconReadingTime < 1000)
+            if (!CMonotonicClock::HasElapsed(EndOfIconReadingTime, 1000, CMonotonicClock::Now()))
             {
                 probablyUselessRefresh = TRUE; // within 1 second after icon reading completes we still expect unnecessary refresh caused by icon reading
                                                //          TRACE_I("less than second after reading of icons was finished: probablyUselessRefresh=TRUE");
@@ -581,23 +589,31 @@ CFilesWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                         isInactiveRefresh = TRUE;
                         if (LastInactiveRefreshStart != LastInactiveRefreshEnd) // some refresh already occurred since last deactivation
                         {
-                            DWORD delay = 20 * (LastInactiveRefreshEnd - LastInactiveRefreshStart);
+                            CMonotonicDuration elapsedRefresh = CMonotonicClock::Elapsed(LastInactiveRefreshStart, LastInactiveRefreshEnd);
+                            // Saturate before scaling so a long-running panel cannot overflow the pacing delay.
+                            CMonotonicDuration delay = elapsedRefresh > MAX_DELAY_BETWEENINACTIVEREFRESHES / 20
+                                                           ? MAX_DELAY_BETWEENINACTIVEREFRESHES
+                                                           : 20 * elapsedRefresh;
                             //                TRACE_I("Calculated delay between refreshes is " << delay);
                             if (delay < MIN_DELAY_BETWEENINACTIVEREFRESHES)
                                 delay = MIN_DELAY_BETWEENINACTIVEREFRESHES;
                             if (delay > MAX_DELAY_BETWEENINACTIVEREFRESHES)
                                 delay = MAX_DELAY_BETWEENINACTIVEREFRESHES;
                             //                TRACE_I("Delay between refreshes is " << delay);
-                            DWORD ti = GetTickCount();
-                            //                TRACE_I("Last refresh was before " << ti - LastInactiveRefreshEnd);
+                            CMonotonicTimePoint ti = CMonotonicClock::Now();
+                            CMonotonicDuration elapsedSinceRefresh = CMonotonicClock::Elapsed(LastInactiveRefreshEnd, ti);
+                            //                TRACE_I("Last refresh was before " << elapsedSinceRefresh);
                             if (InactiveRefreshTimerSet ||                 // timer is already running, just wait for it
-                                ti - LastInactiveRefreshEnd + 100 < delay) // +100 so timer is not set "unnecessarily" (so refresh delay is at least 100ms)
+                                elapsedSinceRefresh < delay - 100)         // +100 so timer is not set "unnecessarily" (so refresh delay is at least 100ms)
                             {
                                 //                  TRACE_I("Delaying refresh");
                                 if (!InactiveRefreshTimerSet) // timer is not running yet, create it
                                 {
                                     //                    TRACE_I("Setting timer");
-                                    if (SetTimer(HWindow, IDT_INACTIVEREFRESH, max(200, delay - (ti - LastInactiveRefreshEnd)), NULL))
+                                    DWORD timerDelay = (DWORD)(delay - elapsedSinceRefresh);
+                                    if (timerDelay < 200)
+                                        timerDelay = 200;
+                                    if (SetTimer(HWindow, IDT_INACTIVEREFRESH, timerDelay, NULL))
                                     {
                                         InactiveRefreshTimerSet = TRUE;
                                         InactRefreshLParam = lParam;
@@ -627,9 +643,11 @@ CFilesWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                         CPanelType typeBackup;
                         if (isInactiveRefresh)
                         {
-                            lstrcpyn(pathBackup, GetPath(), MAX_PATH); // we're interested only in disk paths and paths to archives (for plugin-FS snooper doesn't inform us about changes)
+                            // An incomplete snapshot must compare as changed and force the prompt follow-up refresh.
+                            if (FAILED(StringCchCopyA(pathBackup, _countof(pathBackup), GetPath())))
+                                pathBackup[0] = 0;
                             typeBackup = GetPanelType();
-                            LastInactiveRefreshStart = GetTickCount();
+                            LastInactiveRefreshStart = CMonotonicClock::Now();
                         }
 
                         HANDLES(EnterCriticalSection(&TimeCounterSection));
@@ -646,8 +664,8 @@ CFilesWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                             }
                             else
                             {
-                                LastInactiveRefreshEnd = GetTickCount();
-                                if ((int)(LastInactiveRefreshEnd - LastInactiveRefreshStart) <= 0)
+                                LastInactiveRefreshEnd = CMonotonicClock::Now();
+                                if (LastInactiveRefreshEnd <= LastInactiveRefreshStart)
                                     LastInactiveRefreshEnd = LastInactiveRefreshStart + 1; // must not be the same (that's the state "no refresh yet")
                             }
                         }
@@ -1264,7 +1282,9 @@ CFilesWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                 }
                 if (FileNamesEnumData.Found)
                 {
-                    lstrcpyn(FileNamesEnumData.FileName, GetPath(), MAX_PATH);
+                    // Keep the enumerator's path identity complete before appending its file name.
+                    if (FAILED(StringCchCopyA(FileNamesEnumData.FileName, _countof(FileNamesEnumData.FileName), GetPath())))
+                        FileNamesEnumData.FileName[0] = 0;
                     SalPathAppend(FileNamesEnumData.FileName, Files->At(index).Name, MAX_PATH);
                     FileNamesEnumData.LastFileIndex = index;
                 }
@@ -1503,7 +1523,8 @@ void CFilesWindow::SetThumbnailSize(int size)
             // clear icon-cache
             SleepIconCacheThread();
             IconCache->Release();
-            EndOfIconReadingTime = GetTickCount() - 10000;
+            // Resizing clears the old icon result, so do not suppress its next refresh.
+            EndOfIconReadingTime = CMonotonicClock::AtLeastDurationAgo(10000);
 
             ListBox->ThumbnailWidth = size;
             ListBox->ThumbnailHeight = size;

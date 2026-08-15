@@ -3,7 +3,7 @@
 
 #include "precomp.h"
 #include <zmouse.h>
-#include <shlobj.h>
+#include <shobjidl.h>
 
 #include "lib/pvw32dll.h"
 #include "renderer.h"
@@ -30,6 +30,115 @@ inline int sgn(int x)
     if (x > 0)
         return 1;
     return 0;
+}
+
+static HRESULT CreatePictViewShellItem(LPCTSTR path, IShellItem** item)
+{
+#ifdef UNICODE
+    return SHCreateItemFromParsingName(path, NULL, IID_PPV_ARGS(item));
+#else
+    int pathLength = MultiByteToWideChar(CP_ACP, MB_ERR_INVALID_CHARS, path, -1, NULL, 0);
+    if (pathLength == 0)
+        return HRESULT_FROM_WIN32(GetLastError());
+
+    WCHAR* pathW = (WCHAR*)malloc(pathLength * sizeof(WCHAR));
+    if (pathW == NULL)
+        return E_OUTOFMEMORY;
+    if (MultiByteToWideChar(CP_ACP, MB_ERR_INVALID_CHARS, path, -1, pathW, pathLength) == 0)
+    {
+        HRESULT result = HRESULT_FROM_WIN32(GetLastError());
+        free(pathW);
+        return result;
+    }
+    HRESULT result = SHCreateItemFromParsingName(pathW, NULL, IID_PPV_ARGS(item));
+    free(pathW);
+    return result;
+#endif
+}
+
+static HRESULT DeletePictViewFileWithShell(HWND owner, LPCTSTR path, BOOL toRecycle, BOOL* aborted)
+{
+    *aborted = FALSE;
+    IFileOperation* operation = NULL;
+    HRESULT result = CoCreateInstance(CLSID_FileOperation, NULL, CLSCTX_INPROC_SERVER,
+                                      IID_PPV_ARGS(&operation));
+    if (FAILED(result))
+        return result;
+
+    IShellItem* item = NULL;
+    // Use a shell item instead of a double-NUL path list so ANSI conversion stays at this plug-in boundary.
+    result = CreatePictViewShellItem(path, &item);
+    if (SUCCEEDED(result))
+        result = operation->SetOwnerWindow(owner);
+    if (SUCCEEDED(result))
+        result = operation->SetOperationFlags(toRecycle ? FOF_ALLOWUNDO : 0);
+    if (SUCCEEDED(result))
+        result = operation->DeleteItem(item, NULL);
+    if (SUCCEEDED(result))
+        result = operation->PerformOperations();
+    if (SUCCEEDED(result))
+        result = operation->GetAnyOperationsAborted(aborted);
+    if (item != NULL)
+        item->Release();
+    operation->Release();
+    return result;
+}
+
+static HRESULT CopyPictViewFileWithShell(HWND owner, LPCTSTR source, LPCTSTR destination, BOOL* aborted)
+{
+    *aborted = FALSE;
+    IFileOperation* operation = NULL;
+    HRESULT result = CoCreateInstance(CLSID_FileOperation, NULL, CLSCTX_INPROC_SERVER,
+                                      IID_PPV_ARGS(&operation));
+    if (FAILED(result))
+        return result;
+
+    IShellItem* sourceItem = NULL;
+    IShellItem* destinationFolder = NULL;
+    result = CreatePictViewShellItem(source, &sourceItem);
+
+#ifdef UNICODE
+    WCHAR* destinationW = _wcsdup(destination);
+    HRESULT destinationResult = destinationW == NULL ? E_OUTOFMEMORY : S_OK;
+#else
+    int destinationLength = MultiByteToWideChar(CP_ACP, MB_ERR_INVALID_CHARS, destination, -1, NULL, 0);
+    WCHAR* destinationW = destinationLength == 0 ? NULL : (WCHAR*)malloc(destinationLength * sizeof(WCHAR));
+    HRESULT destinationResult = destinationLength == 0 ? HRESULT_FROM_WIN32(GetLastError()) :
+                                destinationW == NULL ? E_OUTOFMEMORY : S_OK;
+    if (destinationW != NULL && MultiByteToWideChar(CP_ACP, MB_ERR_INVALID_CHARS, destination, -1, destinationW, destinationLength) == 0)
+    {
+        destinationResult = HRESULT_FROM_WIN32(GetLastError());
+        free(destinationW);
+        destinationW = NULL;
+    }
+#endif
+    if (SUCCEEDED(result) && FAILED(destinationResult))
+        result = destinationResult;
+
+    WCHAR* copyName = destinationW == NULL ? NULL : wcsrchr(destinationW, L'\\');
+    if (SUCCEEDED(result) && copyName == NULL)
+        result = HRESULT_FROM_WIN32(ERROR_INVALID_NAME);
+    if (SUCCEEDED(result))
+    {
+        *copyName++ = 0;
+        result = SHCreateItemFromParsingName(destinationW, NULL, IID_PPV_ARGS(&destinationFolder));
+    }
+    if (SUCCEEDED(result))
+        result = operation->SetOwnerWindow(owner);
+    if (SUCCEEDED(result))
+        result = operation->CopyItem(sourceItem, destinationFolder, copyName, NULL);
+    if (SUCCEEDED(result))
+        result = operation->PerformOperations();
+    if (SUCCEEDED(result))
+        result = operation->GetAnyOperationsAborted(aborted);
+
+    if (destinationFolder != NULL)
+        destinationFolder->Release();
+    if (sourceItem != NULL)
+        sourceItem->Release();
+    free(destinationW);
+    operation->Release();
+    return result;
 }
 
 void NormalizeRect(RECT* r)
@@ -633,7 +742,8 @@ void CRendererWindow::WMSize(void)
     case eShrinkToWidth:
         if (!Loading)
         {
-            int tmp1, tmp2;
+            // The unified scroll-info query only needs the horizontal-page calculation below.
+            int tmp1;
 
             if (inWMSizeCnt > 5)
             {
@@ -664,11 +774,9 @@ void CRendererWindow::WMSize(void)
 
             sc.cbSize = sizeof(sc);
             sc.fMask = SIF_RANGE | SIF_PAGE;
-            GetScrollRange(HWindow, SB_VERT, &tmp1, &tmp2);
-            if (tmp2 > tmp1)
+            // GetScrollInfo returns the same range plus page data, avoiding the obsolete GetScrollRange split query.
+            if (GetScrollInfo(HWindow, SB_VERT, &sc) && sc.nMax > sc.nMin)
             { // max > min
-                // obsolete GetScrollRange returns meaningful values unlike GetScrollInfo
-                GetScrollInfo(HWindow, SB_VERT, &sc);
                 if (sc.nMax >= (int)sc.nPage)
                     pw += GetSystemMetrics(SM_CXVSCROLL);
             }
@@ -1867,7 +1975,7 @@ LRESULT CRendererWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
             SetCursorPos(p.x, p.y);
         }
         else if (Viewer->IsFullScreen())
-            LastMoveTickCount = GetTickCount();
+            LastMoveTickCount = CMonotonicClock::Now();
     }
 
     switch (uMsg)
@@ -1944,7 +2052,8 @@ LRESULT CRendererWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 
     case WM_CREATE:
     {
-        LastMoveTickCount = GetTickCount();
+        // Fullscreen cursor fading owns this timestamp and can use a non-wrapping clock.
+        LastMoveTickCount = CMonotonicClock::Now();
         SetTimer(HWindow, CURSOR_TIMER_ID, 200, NULL);
         SetTimer(HWindow, BRUSH_TIMER_ID, 100, NULL);
         DragAcceptFiles(HWindow, TRUE);
@@ -2109,8 +2218,8 @@ LRESULT CRendererWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         case CURSOR_TIMER_ID:
             if (Viewer->IsFullScreen() && CanHideCursor)
             {
-                DWORD tickCount = GetTickCount();
-                if (tickCount - LastMoveTickCount > 3000)
+                const CMonotonicTimePoint tickCount = CMonotonicClock::Now();
+                if (CMonotonicClock::HasElapsed(LastMoveTickCount, 3001, tickCount))
                 {
                     // 3000 corresponds to three seconds after which we fade the cursor
                     HiddenCursor = TRUE;
@@ -2699,6 +2808,28 @@ LRESULT CALLBACK ToolTipWindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM l
     return DefWindowProc(hwnd, uMsg, wParam, lParam);
 }
 
+static BOOL FormatPictViewDateTime(const SYSTEMTIME* time, DWORD flags, LPTSTR buffer, int bufferSize, BOOL isDate)
+{
+    // PictView keeps TCHAR metadata output, so adapt named-locale text at that display boundary.
+    WCHAR localeName[LOCALE_NAME_MAX_LENGTH];
+    WCHAR formatted[50];
+    if (GetUserDefaultLocaleName(localeName, ARRAYSIZE(localeName)) == 0)
+        return FALSE;
+    int length = isDate
+                     ? GetDateFormatEx(localeName, flags, time, NULL, formatted, ARRAYSIZE(formatted), NULL)
+                     : GetTimeFormatEx(localeName, flags, time, NULL, formatted, ARRAYSIZE(formatted));
+    if (length == 0)
+        return FALSE;
+#ifdef _UNICODE
+    if (length > bufferSize)
+        return FALSE;
+    memcpy(buffer, formatted, length * sizeof(WCHAR));
+    return TRUE;
+#else
+    return WideCharToMultiByte(CP_ACP, 0, formatted, -1, buffer, bufferSize, NULL, NULL) != 0;
+#endif
+}
+
 void GetInfo(LPTSTR buffer, HANDLE file)
 {
     FILETIME lastWrite;
@@ -2709,9 +2840,9 @@ void GetInfo(LPTSTR buffer, HANDLE file)
     FileTimeToSystemTime(&ft, &st);
 
     TCHAR date[50], time[50];
-    if (GetTimeFormat(LOCALE_USER_DEFAULT, 0, &st, NULL, time, 50) == 0)
+    if (!FormatPictViewDateTime(&st, 0, time, ARRAYSIZE(time), FALSE))
         _stprintf(time, _T("%u:%02u:%02u"), st.wHour, st.wMinute, st.wSecond);
-    if (GetDateFormat(LOCALE_USER_DEFAULT, DATE_SHORTDATE, &st, NULL, date, 50) == 0)
+    if (!FormatPictViewDateTime(&st, DATE_SHORTDATE, date, ARRAYSIZE(date), TRUE))
         _stprintf(date, _T("%u.%u.%u"), st.wDay, st.wMonth, st.wYear);
 
     TCHAR number[50];
@@ -2907,48 +3038,19 @@ void CRendererWindow::OnCopyTo()
     CCopyToDlg dlg(HWindow, FileName, dstName);
     if (dlg.Execute() == IDOK)
     {
-        // SHFileOperation works with multiple paths which must be NULL-separated
-        // Thus extra terminating NULL is needed
-
-        int srcListSize = (int)_tcslen(FileName) + 2;
-        LPTSTR srcList = (LPTSTR)malloc(srcListSize * sizeof(TCHAR));
-        if (srcList == NULL)
-            return;
-        memcpy(srcList, FileName, (srcListSize - 1) * sizeof(TCHAR));
-        srcList[srcListSize - 1] = 0;
-
-        int dstListSize = (int)_tcslen(dstName) + 2;
-        LPTSTR dstList = (LPTSTR)malloc(dstListSize * sizeof(TCHAR));
-        if (dstList == NULL)
-        {
-            free(srcList);
-            return;
-        }
-        memcpy(dstList, dstName, (dstListSize - 1) * sizeof(TCHAR));
-        dstList[dstListSize - 1] = 0;
-
-        SHFILEOPSTRUCT fo;
-        fo.hwnd = HWindow;
-        fo.wFunc = FO_COPY;
-        fo.pFrom = srcList;
-        fo.pTo = dstList;
-        fo.fFlags = 0;
-        fo.fAnyOperationsAborted = FALSE;
-        fo.hNameMappings = NULL;
-        fo.lpszProgressTitle = _T("");
-        // perform the actual deletion - wonderfully simple, unfortunately it occasionally crashes for them ;-)
-        CALL_STACK_MESSAGE1("CRendererWindow::OnCopyTo::SHFileOperation");
+        CALL_STACK_MESSAGE1("CRendererWindow::OnCopyTo::IFileOperation");
         TCHAR changedPath[MAX_PATH];
         lstrcpyn(changedPath, FileName, MAX_PATH);
-        if (SHFileOperation(&fo) == 0)
+        BOOL aborted = FALSE;
+        HRESULT result = CopyPictViewFileWithShell(HWindow, FileName, dstName, &aborted);
+        if (FAILED(result))
+            TRACE_E("Unable to copy the viewed file through the Shell: " << SalamanderGeneral->GetErrorText(HRESULT_CODE(result)));
+        else if (!aborted)
         {
             // report the change on the path (renamed file)
             SalamanderGeneral->CutDirectory(changedPath);
             SalamanderGeneral->PostChangeOnPathNotification(changedPath, FALSE);
         }
-
-        free(srcList);
-        free(dstList);
     }
 }
 
@@ -2956,34 +3058,15 @@ void CRendererWindow::OnDelete(BOOL toRecycle)
 {
     CALL_STACK_MESSAGE2("CRendererWindow::OnDelete(%d)", toRecycle);
 
-    // SHFileOperation works with multiple paths which must be NULL-separated
-    // Thus extra terminating NULL is needed
-
-    int listSize = (int)_tcslen(FileName) + 2;
-    LPTSTR list = (LPTSTR)malloc(listSize * sizeof(TCHAR));
-    if (list == NULL)
-        return;
-
-    memcpy(list, FileName, (listSize - 1) * sizeof(TCHAR));
-    list[listSize - 1] = 0;
-
-    SHFILEOPSTRUCT fo;
-    fo.hwnd = HWindow;
-    fo.wFunc = FO_DELETE;
-    fo.pFrom = list;
-    fo.pTo = NULL;
-    fo.fFlags = toRecycle ? FOF_ALLOWUNDO : 0;
-    fo.fAnyOperationsAborted = FALSE;
-    fo.hNameMappings = NULL;
-    fo.lpszProgressTitle = _T("");
-    // perform the actual deletion - wonderfully simple, unfortunately it occasionally crashes for them ;-)
-    CALL_STACK_MESSAGE1("CRendererWindow::OnDelete::SHFileOperation");
+    CALL_STACK_MESSAGE1("CRendererWindow::OnDelete::IFileOperation");
     TCHAR changedPath[MAX_PATH];
     lstrcpyn(changedPath, FileName, MAX_PATH);
-    if (SHFileOperation(&fo) == 0)
+    BOOL aborted = FALSE;
+    HRESULT result = DeletePictViewFileWithShell(HWindow, FileName, toRecycle, &aborted);
+    if (FAILED(result))
+        TRACE_E("Unable to delete the viewed file through the Shell: " << SalamanderGeneral->GetErrorText(HRESULT_CODE(result)));
+    else if (!aborted)
     {
-        // from the return values we cannot tell whether the file was deleted or
-        // the user merely pressed Cancel in the confirmation dialog
         if (!SalamanderGeneral->FileExists(FileName))
         {
             SalamanderGeneral->Free(FileName);
@@ -2994,8 +3077,6 @@ void CRendererWindow::OnDelete(BOOL toRecycle)
     // report the change on the path (renamed file)
     SalamanderGeneral->CutDirectory(changedPath);
     SalamanderGeneral->PostChangeOnPathNotification(changedPath, FALSE);
-
-    free(list);
 }
 
 LRESULT CRendererWindow::OnCommand(WPARAM wParam, LPARAM lParam, BOOL* closingViewer)

@@ -10,6 +10,7 @@
 #include "toolbar.h"
 #include "gui.h"
 #include <uxtheme.h>
+#include <strsafe.h>
 
 //
 // plugins3 module is reserved for the GUI exposed to plugins
@@ -471,23 +472,78 @@ BOOL CSalamanderGUI::DisableWindowVisualStyles(HWND hWindow)
 // IconList
 //
 
+CSalamanderGUI::CSalamanderGUI() : CreatedIconLists(4, 4)
+{
+    // Each plug-in has its own facade; the lock also covers dynamic-menu callbacks that return icon lists asynchronously.
+    HANDLES(InitializeCriticalSection(&CreatedIconListsCS));
+}
+
+CSalamanderGUI::~CSalamanderGUI()
+{
+    HANDLES(EnterCriticalSection(&CreatedIconListsCS));
+    for (int i = 0; i < CreatedIconLists.Count; ++i)
+        delete CreatedIconLists[i]; // Unclaimed host allocations cannot outlive their plug-in facade.
+    CreatedIconLists.DestroyMembers();
+    HANDLES(LeaveCriticalSection(&CreatedIconListsCS));
+    HANDLES(DeleteCriticalSection(&CreatedIconListsCS));
+}
+
 CGUIIconListAbstract*
 CSalamanderGUI::CreateIconList()
 {
     CIconList* il = new CIconList();
-    //il->Dump = TRUE;
+    if (il != NULL)
+    {
+        // Record factory ownership before exposing the pointer to plug-in code.
+        HANDLES(EnterCriticalSection(&CreatedIconListsCS));
+        CreatedIconLists.Add(il);
+        BOOL added = CreatedIconLists.IsGood();
+        if (!added)
+            CreatedIconLists.ResetState();
+        HANDLES(LeaveCriticalSection(&CreatedIconListsCS));
+        if (!added)
+        {
+            delete il;
+            il = NULL;
+        }
+    }
     return il;
 }
 
 BOOL CSalamanderGUI::DestroyIconList(CGUIIconListAbstract* iconList)
 {
-    if (iconList == NULL)
+    CIconList* createdIconList = NULL;
+    if (!TakeCreatedIconList(iconList, &createdIconList))
     {
-        TRACE_E("CSalamanderGUI::DestroyIconList iconList==NULL!");
+        TRACE_E("CSalamanderGUI::DestroyIconList(): icon list was not created by this host facade!");
         return FALSE;
     }
-    delete (CIconList*)iconList;
+    delete createdIconList;
     return TRUE;
+}
+
+BOOL CSalamanderGUI::TakeCreatedIconList(CGUIIconListAbstract* iconList, CIconList** createdIconList)
+{
+    if (createdIconList == NULL)
+        return FALSE;
+    *createdIconList = NULL;
+    if (iconList == NULL)
+        return FALSE;
+
+    // Compare addresses only; never dereference a plug-in-supplied object before factory ownership is established.
+    HANDLES(EnterCriticalSection(&CreatedIconListsCS));
+    for (int i = 0; i < CreatedIconLists.Count; ++i)
+    {
+        if (CreatedIconLists[i] == (CIconList*)iconList)
+        {
+            *createdIconList = CreatedIconLists[i];
+            CreatedIconLists.Detach(i);
+            HANDLES(LeaveCriticalSection(&CreatedIconListsCS));
+            return TRUE;
+        }
+    }
+    HANDLES(LeaveCriticalSection(&CreatedIconListsCS));
+    return FALSE;
 }
 
 ///////////////////////////////////////////////////////////////////////////
@@ -504,11 +560,11 @@ void CSalamanderGUI::PrepareToolTipText(char* buf, BOOL stripHotKey)
     {
         if (!stripHotKey && *(p + 1) != 0)
         {
-            *p = ' ';
-            p++;
-            memmove(p + 1, p, lstrlen(p) + 1);
-            *p = '(';
-            lstrcat(p, ")");
+            // The facade contract reserves this fixed tooltip field for the added parentheses.
+            char hotKey[TOOLTIP_TEXT_MAX];
+            if (FAILED(StringCchCopyA(hotKey, _countof(hotKey), p + 1)) ||
+                FAILED(StringCchPrintfA(p, TOOLTIP_TEXT_MAX - (p - buf), " (%s)", hotKey)))
+                *p = 0;
         }
         else
             *p = 0;
@@ -531,7 +587,8 @@ void CSalamanderGUI::SetSubjectTruncatedText(HWND subjectWnd, const char* subjec
 
     char formatedFileName[MAX_PATH];
     char tmpFileName[MAX_PATH];
-    lstrcpyn(tmpFileName, fileName, MAX_PATH);
+    // Keep the existing compact panel-name presentation limit explicit.
+    StringCchCopyNA(tmpFileName, _countof(tmpFileName), fileName, _countof(tmpFileName) - 1);
     AlterFileName(formatedFileName, tmpFileName, -1, Configuration.FileNameFormat, 0, isDir);
 
     CTruncatedString subject;
@@ -542,7 +599,8 @@ void CSalamanderGUI::SetSubjectTruncatedText(HWND subjectWnd, const char* subjec
         if (duplicateAmpersands)
         {
             char buff[1000];
-            lstrcpyn(buff, subject.Get(), 1000);
+            // Reserve the subject field's fixed presentation capacity for ampersand escaping.
+            StringCchCopyNA(buff, _countof(buff), subject.Get(), _countof(buff) - 1);
             DuplicateAmpersands(buff, 1000, TRUE);
             SetWindowText(subjectWnd, buff);
         }

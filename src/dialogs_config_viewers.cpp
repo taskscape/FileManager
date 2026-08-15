@@ -18,6 +18,8 @@
 #include "shellib.h"
 #include "utf8gui.h"
 
+#include <strsafe.h>
+
 static char LastSelectedPluginDLLName[MAX_PATH] = {0}; // after reopening Plugins Manager, select the last chosen plugin
 
 //
@@ -212,7 +214,11 @@ void CPluginsDlg::OnSelChanged()
     if (p != NULL)
     {
         if (p->DLLName != NULL)
-            lstrcpyn(LastSelectedPluginDLLName, p->DLLName, MAX_PATH);
+        {
+            // The selection key must be complete; a truncated DLL path could select a different plugin.
+            if (FAILED(StringCchCopyA(LastSelectedPluginDLLName, _countof(LastSelectedPluginDLLName), p->DLLName)))
+                LastSelectedPluginDLLName[0] = 0;
+        }
         else
             LastSelectedPluginDLLName[0] = 0;
 
@@ -323,8 +329,9 @@ void CPluginsDlg::OnSelChanged()
 
         char buff[MAX_PATH + 200];
         char pluginName[300];
-        lstrcpyn(pluginName, p->Name, 299);
-        DuplicateAmpersands(pluginName, 299); // plugin name may contain the '&' character
+        // Reserve presentation headroom while escaping accelerator ampersands in the plugin label.
+        StringCchCopyNA(pluginName, _countof(pluginName), p->Name, _countof(pluginName) - 2);
+        DuplicateAmpersands(pluginName, _countof(pluginName)); // plugin name may contain the '&' character
         sprintf(buff, ShowInBarText, pluginName);
         SetWindowTextUtf8(showInBar, buff);
 
@@ -339,7 +346,8 @@ void CPluginsDlg::OnSelChanged()
                 itemText = p->ChDrvMenuFSItemName;
             else // there is at least one tab character
             {
-                lstrcpyn(fsItemText, s + 1, 200);
+                // The drive-menu caption is display-only, so preserve the fixed control width explicitly.
+                StringCchCopyNA(fsItemText, _countof(fsItemText), s + 1, _countof(fsItemText) - 1);
                 itemText = fsItemText;
                 s = fsItemText;
                 while (*s != 0 && *s != '\t')
@@ -928,10 +936,13 @@ CPluginsDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 // CPluginKeys
 //
 
-void GetKeyName(UINT vk, char* buff)
+static BOOL AppendKeyName(UINT vk, char* buff)
 {
+    size_t length;
+    if (FAILED(StringCchLengthA(buff, 50, &length)))
+        return FALSE;
     LONG scan = (LONG)MapVirtualKey(vk, 0) << 16;
-    GetKeyNameText(scan, buff, 50);
+    return GetKeyNameText(scan, buff + length, (int)(50 - length)) != 0;
 }
 
 void GetHotKeyText(WORD hotKey, char* buff)
@@ -944,21 +955,27 @@ void GetHotKeyText(WORD hotKey, char* buff)
         const char* plus = "+";
         if (wMods & HOTKEYF_CONTROL)
         {
-            GetKeyName(VK_CONTROL, buff);
-            lstrcat(buff, plus);
+            if (!AppendKeyName(VK_CONTROL, buff) || FAILED(StringCchCatA(buff, 50, plus)))
+                goto HOTKEY_TEXT_TOO_LONG;
         }
         if (wMods & HOTKEYF_SHIFT)
         {
-            GetKeyName(VK_SHIFT, buff + lstrlen(buff));
-            lstrcat(buff, plus);
+            if (!AppendKeyName(VK_SHIFT, buff) || FAILED(StringCchCatA(buff, 50, plus)))
+                goto HOTKEY_TEXT_TOO_LONG;
         }
         if (wMods & HOTKEYF_ALT)
         {
-            GetKeyName(VK_MENU, buff + lstrlen(buff));
-            lstrcat(buff, plus);
+            if (!AppendKeyName(VK_MENU, buff) || FAILED(StringCchCatA(buff, 50, plus)))
+                goto HOTKEY_TEXT_TOO_LONG;
         }
-        GetKeyName(wVirtKey, buff + lstrlen(buff));
+        if (!AppendKeyName(wVirtKey, buff))
+            goto HOTKEY_TEXT_TOO_LONG;
     }
+    return;
+
+HOTKEY_TEXT_TOO_LONG:
+    // Do not display a partial shortcut when the public 50-byte result cannot fit.
+    buff[0] = 0;
 }
 
 CPluginKeys::CPluginKeys(HWND hParent, CPluginData* plugin)
@@ -1071,7 +1088,8 @@ void CPluginKeys::RefreshListView(BOOL setOnly)
         }
         // command name
         char buff[500];
-        lstrcpyn(buff, item->Name, 500);
+        // List-view command captions intentionally retain their fixed presentation width.
+        StringCchCopyNA(buff, _countof(buff), item->Name, _countof(buff) - 1);
         RemoveAmpersands(buff);
 
         // remove the hint from the text if present
@@ -1846,7 +1864,10 @@ void CCfgPageDrives::Transfer(CTransferInfo& ti)
             else
             {
                 Configuration.IfPathIsInaccessibleGoToIsMyDocs = FALSE;
-                lstrcpyn(Configuration.IfPathIsInaccessibleGoTo, newPath, MAX_PATH);
+                // An inaccessible-path fallback is an identity, so never retain a truncated edit value.
+                if (FAILED(StringCchCopyA(Configuration.IfPathIsInaccessibleGoTo,
+                                          _countof(Configuration.IfPathIsInaccessibleGoTo), newPath)))
+                    Configuration.IfPathIsInaccessibleGoTo[0] = 0;
             }
         }
     }
@@ -2233,7 +2254,9 @@ CCfgPageViewers::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                 EDTLB_DISPINFO* dispInfo = (EDTLB_DISPINFO*)lParam;
                 if (dispInfo->ToDo == edtlbGetData)
                 {
-                    lstrcpyn(dispInfo->Buffer, ((CViewerMasksItem*)dispInfo->ItemID)->Masks->GetMasksString(), MAX_PATH);
+                    // The edit-list control supplies a MAX_PATH display field for mask text.
+                    StringCchCopyNA(dispInfo->Buffer, MAX_PATH,
+                                    ((CViewerMasksItem*)dispInfo->ItemID)->Masks->GetMasksString(), MAX_PATH - 1);
                     SetWindowLongPtr(HWindow, DWLP_MSGRESULT, FALSE);
                     return TRUE;
                 }
@@ -2589,7 +2612,9 @@ CCfgPageEditors::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                 EDTLB_DISPINFO* dispInfo = (EDTLB_DISPINFO*)lParam;
                 if (dispInfo->ToDo == edtlbGetData)
                 {
-                    lstrcpyn(dispInfo->Buffer, ((CEditorMasksItem*)dispInfo->ItemID)->Masks->GetMasksString(), MAX_PATH);
+                    // The edit-list control supplies a MAX_PATH display field for mask text.
+                    StringCchCopyNA(dispInfo->Buffer, MAX_PATH,
+                                    ((CEditorMasksItem*)dispInfo->ItemID)->Masks->GetMasksString(), MAX_PATH - 1);
                     SetWindowLongPtr(HWindow, DWLP_MSGRESULT, FALSE);
                     return TRUE;
                 }
@@ -2756,7 +2781,9 @@ void CCfgPageMainWindow::Transfer(CTransferInfo& ti)
     // back up data so we can detect change
     BOOL oldUseTitleBarPrefix = Configuration.UseTitleBarPrefix;
     char oldTitleBarPrefix[TITLE_PREFIX_MAX];
-    lstrcpyn(oldTitleBarPrefix, Configuration.TitleBarPrefix, TITLE_PREFIX_MAX);
+    // A malformed persisted prefix must not become a partial comparison baseline.
+    if (FAILED(StringCchCopyA(oldTitleBarPrefix, _countof(oldTitleBarPrefix), Configuration.TitleBarPrefix)))
+        oldTitleBarPrefix[0] = 0;
 
     ti.CheckBox(IDC_TITLEBAR_PREFIX, Configuration.UseTitleBarPrefix);
     ti.EditLine(IDC_TITLEBAR_PREFIX_TEXT, Configuration.TitleBarPrefix, TITLE_PREFIX_MAX);
@@ -3477,12 +3504,12 @@ void CTaskListDialog::Refresh()
     for (i = 0; i < c; i++)
     {
         char date[50], time[50];
-        if (GetTimeFormat(LOCALE_USER_DEFAULT, 0, &items[i].StartTime, NULL, time, 50) == 0)
+        if (FormatUserDateTimeUtf8(&items[i].StartTime, 0, time, _countof(time), FALSE) == 0)
         {
             sprintf(time, "%u:%02u:%02u", items[i].StartTime.wHour, items[i].StartTime.wMinute,
                     items[i].StartTime.wSecond);
         }
-        if (GetDateFormat(LOCALE_USER_DEFAULT, DATE_SHORTDATE, &items[i].StartTime, NULL, date, 50) == 0)
+        if (FormatUserDateTimeUtf8(&items[i].StartTime, DATE_SHORTDATE, date, _countof(date), TRUE) == 0)
         {
             sprintf(date, "%u.%u.%u", items[i].StartTime.wDay, items[i].StartTime.wMonth,
                     items[i].StartTime.wYear);

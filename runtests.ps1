@@ -2,7 +2,11 @@
 param(
     [string]$BaseCommit,
     [string]$SqliteDll,
-    [switch]$FailOnSkipped
+    [switch]$FailOnSkipped,
+    [switch]$KeepBuildArtifacts,
+    [ValidateSet('v143', 'v145')]
+    [string]$PlatformToolset = 'v145',
+    [string]$NUnitTrxPath
 )
 
 Set-StrictMode -Version Latest
@@ -11,6 +15,7 @@ $ErrorActionPreference = 'Stop'
 $repositoryRoot = $PSScriptRoot
 $testProject = Join-Path $repositoryRoot 'tests\FileManager.UiTests\FileManager.UiTests.csproj'
 $nativeSolution = Join-Path $repositoryRoot 'src\vcxproj\salamand.sln'
+$nativeSafetyProject = Join-Path $repositoryRoot 'tests\NativeSafetyTests\NativeSafetyTests.vcxproj'
 $failures = [System.Collections.Generic.List[string]]::new()
 $passed = [System.Collections.Generic.List[string]]::new()
 $skipped = [System.Collections.Generic.List[string]]::new()
@@ -135,7 +140,10 @@ function Build-UiTestApplication {
         [Parameter(Mandatory = $true)]
         [string]$DeveloperCommand,
         [Parameter(Mandatory = $true)]
-        [string]$BuildDirectory
+        [string]$BuildDirectory,
+        [Parameter(Mandatory = $true)]
+        [ValidateSet('v143', 'v145')]
+        [string]$Toolset
     )
 
     if (-not (Test-Path -LiteralPath $nativeSolution -PathType Leaf)) {
@@ -145,12 +153,46 @@ function Build-UiTestApplication {
     New-Item -ItemType Directory -Path $BuildDirectory -Force | Out-Null
     # Build the complete Debug x64 solution into a per-run directory so UI tests
     # always exercise this checkout rather than a caller-provided executable.
+    # Keep the toolset explicit so parity jobs test the executable they built.
+    # The generated workspace path has no spaces; avoid a trailing backslash escaping the MSBuild property quote.
     $buildCommand = 'call "' + $DeveloperCommand + '" -arch=x64 -host_arch=x64 && msbuild "' + $nativeSolution +
-        '" /m /t:Build /p:Configuration=Debug /p:Platform=x64 /p:PlatformToolset=v145 /p:PreferredToolArchitecture=x64 /p:OPENSAL_BUILD_DIR="' +
-        $BuildDirectory + '\" /nr:false'
+        '" /m /t:Build /p:Configuration=Debug /p:Platform=x64 /p:PlatformToolset=' + $Toolset + ' /p:PreferredToolArchitecture=x64 /p:OPENSAL_BUILD_DIR=' +
+        ($BuildDirectory.TrimEnd('\') + '\') + ' /nr:false'
     & $env:ComSpec /d /s /c $buildCommand
     if ($LASTEXITCODE -ne 0) {
         throw "Building the Debug x64 FileManager solution failed with exit code $LASTEXITCODE."
+    }
+}
+
+function Invoke-NativeSafetyTests {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$DeveloperCommand,
+        [Parameter(Mandatory = $true)]
+        [ValidateSet('v143', 'v145')]
+        [string]$Toolset
+    )
+
+    if (-not (Test-Path -LiteralPath $nativeSafetyProject -PathType Leaf)) {
+        throw "The native safety test project was not found: $nativeSafetyProject"
+    }
+
+    # Keep the native executable independent of the product solution so its
+    # pure boundary checks run quickly after the main build has produced UI artifacts.
+    $buildCommand = 'call "' + $DeveloperCommand + '" -arch=x64 -host_arch=x64 && msbuild "' + $nativeSafetyProject +
+        '" /m /t:Build /p:Configuration=Debug /p:Platform=x64 /p:PlatformToolset=' + $Toolset + ' /nr:false'
+    & $env:ComSpec /d /s /c $buildCommand
+    if ($LASTEXITCODE -ne 0) {
+        throw "Building the native safety tests failed with exit code $LASTEXITCODE."
+    }
+
+    $testExecutable = Join-Path $repositoryRoot 'tests\NativeSafetyTests\x64\Debug\NativeSafetyTests.exe'
+    if (-not (Test-Path -LiteralPath $testExecutable -PathType Leaf)) {
+        throw "The native safety test executable was not produced: $testExecutable"
+    }
+    & $testExecutable
+    if ($LASTEXITCODE -ne 0) {
+        throw "The native safety tests failed with exit code $LASTEXITCODE."
     }
 }
 
@@ -216,10 +258,13 @@ function Assert-UiTestSymbolicLinkSupport {
     }
 }
 
-function Resolve-FtpOrganizeBookmarksCommand {
+function Resolve-FtpMenuCommand {
     param(
         [Parameter(Mandatory = $true)]
-        [string]$ExecutablePath
+        [string]$ExecutablePath,
+
+        [Parameter(Mandatory = $true)]
+        [string]$Caption
     )
 
     if ($null -eq ('FileManager.NativeMenuProbe' -as [type])) {
@@ -278,7 +323,7 @@ namespace FileManager {
                 [void][FileManager.NativeMenuProbe]::GetMenuString($menu, [uint32]$index, $captionBuffer, $captionBuffer.Length, 0x400)
                 $caption = -join $captionBuffer
                 $caption = $caption.Trim([char]0).Replace('&', '').Split("`t")[0]
-                if ($caption -eq 'Organize Bookmarks...') {
+                if ($caption -eq $Caption) {
                     $command = [FileManager.NativeMenuProbe]::GetMenuItemID($menu, $index)
                     if ($command -ne [uint32]::MaxValue) {
                         return [int]$command
@@ -297,7 +342,7 @@ namespace FileManager {
 
         $command = & $findCommand $rootMenu
         if ($null -eq $command -or $command -le 0) {
-            throw 'The built FileManager menu does not contain the FTP Client Organize Bookmarks command.'
+            throw "The built FileManager menu does not contain the FTP Client $Caption command."
         }
 
         return $command
@@ -316,15 +361,26 @@ function Set-UiTestEnvironment {
         [string]$ExecutablePath
     )
 
-    $env:FILEMANAGER_UI_ISOLATED = '1'
+    if (-not [string]::Equals($env:FILEMANAGER_UI_ISOLATED, '1', [StringComparison]::Ordinal)) {
+        throw 'The complete UI suite must run from a disposable Windows profile; set FILEMANAGER_UI_ISOLATED=1 only in that profile.'
+    }
     $env:FILEMANAGER_UI_EXE = $ExecutablePath
-    $env:FILEMANAGER_UI_CONFIG_FAULT_INJECTION = '1'
-    $env:FILEMANAGER_UI_RECYCLE_BIN = '1'
-    $env:FILEMANAGER_UI_CROSS_VOLUME_ROOT = Resolve-UiTestVolume -RequiredFileSystems @('NTFS') -Purpose 'cross-volume move tests'
-    $env:FILEMANAGER_UI_ADS_UNSUPPORTED_TARGET_ROOT = Resolve-UiTestVolume -RequiredFileSystems @('FAT', 'FAT32', 'exFAT') -Purpose 'ADS-loss tests'
+    if ([string]::IsNullOrWhiteSpace($env:FILEMANAGER_UI_CROSS_VOLUME_ROOT)) {
+        $env:FILEMANAGER_UI_CROSS_VOLUME_ROOT = Resolve-UiTestVolume -RequiredFileSystems @('NTFS') -Purpose 'cross-volume move tests'
+    }
+    if ([string]::IsNullOrWhiteSpace($env:FILEMANAGER_UI_ADS_UNSUPPORTED_TARGET_ROOT)) {
+        $env:FILEMANAGER_UI_ADS_UNSUPPORTED_TARGET_ROOT = Resolve-UiTestVolume -RequiredFileSystems @('FAT', 'FAT32', 'exFAT') -Purpose 'ADS-loss tests'
+    }
     Assert-UiTestSymbolicLinkSupport
 
-    $env:FILEMANAGER_UI_FTP_ORGANIZE_COMMAND = Resolve-FtpOrganizeBookmarksCommand -ExecutablePath $ExecutablePath
+    if ([string]::IsNullOrWhiteSpace($env:FILEMANAGER_UI_FTP_ORGANIZE_COMMAND)) {
+        # Resolve dynamic plug-in commands from this build rather than assuming a load-order-dependent SUID.
+        $env:FILEMANAGER_UI_FTP_ORGANIZE_COMMAND = Resolve-FtpMenuCommand -ExecutablePath $ExecutablePath -Caption 'Organize Bookmarks...'
+    }
+    if ([string]::IsNullOrWhiteSpace($env:FILEMANAGER_UI_FTP_CONNECT_COMMAND)) {
+        # The protocol fixture drives the actual quick-connect dialog through the same runtime menu surface as a user.
+        $env:FILEMANAGER_UI_FTP_CONNECT_COMMAND = Resolve-FtpMenuCommand -ExecutablePath $ExecutablePath -Caption 'Connect to FTP Server...'
+    }
 }
 
 function Resolve-SqliteDll {
@@ -346,6 +402,44 @@ function Resolve-SqliteDll {
     return $candidates | Where-Object { Test-Path -LiteralPath $_ -PathType Leaf } | Select-Object -First 1
 }
 
+function Remove-OlderUiTestBuildResults {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$ResultsDirectory
+    )
+
+    if (-not (Test-Path -LiteralPath $ResultsDirectory -PathType Container)) {
+        return
+    }
+
+    $buildResults = @(Get-ChildItem -LiteralPath $ResultsDirectory -Directory -Filter 'runtests-build-*' |
+        Sort-Object LastWriteTimeUtc -Descending)
+    $buildResults | Select-Object -Skip 1 | ForEach-Object {
+        # A compiler can release a PCH shortly after an interrupted build; do
+        # not turn that transient stale-artifact cleanup race into a test skip.
+        $staleDirectory = $_.FullName
+        $removed = $false
+        for ($attempt = 1; $attempt -le 3 -and -not $removed; $attempt++) {
+            try {
+                Remove-Item -LiteralPath $staleDirectory -Recurse -Force -ErrorAction Stop
+                $removed = $true
+            }
+            catch {
+                if ($attempt -lt 3) {
+                    Start-Sleep -Seconds 1
+                }
+                else {
+                    Write-Warning "Could not remove locked stale UI build directory '$staleDirectory': $($_.Exception.Message)"
+                }
+            }
+        }
+    }
+}
+
+$testResultsDirectory = Join-Path $repositoryRoot 'TestResults'
+# Prune interrupted runs before preflight checks can exit, so an unavailable toolchain cannot defer retention indefinitely.
+Remove-OlderUiTestBuildResults -ResultsDirectory $testResultsDirectory
+
 $vsDevCmd = Find-VisualStudioDeveloperCommand
 if ([string]::IsNullOrWhiteSpace($vsDevCmd)) {
     throw 'Visual Studio C++ developer tools were not found; the complete UI suite cannot build the current solution.'
@@ -355,11 +449,26 @@ if ($null -eq $dotnet) {
     throw '.NET 8 SDK was not found; the complete UI suite cannot run the NUnit project.'
 }
 
-$uiBuildDirectory = Join-Path (Join-Path $repositoryRoot 'TestResults') ('runtests-build-' + [Guid]::NewGuid().ToString('N'))
-Build-UiTestApplication -DeveloperCommand $vsDevCmd -BuildDirectory $uiBuildDirectory
+$uiBuildDirectory = Join-Path $testResultsDirectory ('runtests-build-' + [Guid]::NewGuid().ToString('N'))
+try {
+Build-UiTestApplication -DeveloperCommand $vsDevCmd -BuildDirectory $uiBuildDirectory -Toolset $PlatformToolset
+# Keep the script scope so Invoke-AutomatedCheck can resolve the helper function.
+$nativeSafetyAction = {
+    Invoke-NativeSafetyTests -DeveloperCommand $vsDevCmd -Toolset $PlatformToolset
+}
+Invoke-AutomatedCheck -Name 'NativeSafetyTests (Debug x64)' -Action $nativeSafetyAction
 $builtUiExecutable = Resolve-UiTestArtifact -BuildDirectory $uiBuildDirectory -FileName 'salamand.exe'
 $builtSqliteDll = Resolve-UiTestArtifact -BuildDirectory $uiBuildDirectory -FileName 'sqlite.dll'
-Set-UiTestEnvironment -ExecutablePath $builtUiExecutable
+$built7zWrapper = Resolve-UiTestArtifact -BuildDirectory $uiBuildDirectory -FileName '7zwrapper.dll'
+$built7zEngine = Resolve-UiTestArtifact -BuildDirectory $uiBuildDirectory -FileName '7za.dll'
+$uiTestEnvironmentSkipReason = $null
+try {
+    Set-UiTestEnvironment -ExecutablePath $builtUiExecutable
+}
+catch {
+    # Missing disposable-profile or topology prerequisites must not hide the independent native and source checks.
+    $uiTestEnvironmentSkipReason = $_.Exception.Message
+}
 
 # Fast source contracts and native compatibility probes are always collected;
 # architecture-aware probes run both variants declared by their public scripts.
@@ -367,7 +476,9 @@ foreach ($relativePath in @(
     'tools\verify-operation-completion-protocol.ps1',
     'tools\verify-durable-copy-commit.ps1',
     # Keep release-input provenance enforced by the same aggregate test inventory.
-    'tools\test-release-input-pinning.ps1'
+    'tools\test-release-input-pinning.ps1',
+    # The content-fingerprint baseline rejects unsafe calls even when a diff hunk is unavailable.
+    'tools\test-unsafe-api-baseline.ps1'
 )) {
     Invoke-WindowsPowerShellScript -RelativePath $relativePath
 }
@@ -391,6 +502,17 @@ $cmarkAction = {
 }.GetNewClosure()
 Invoke-AutomatedCheck -Name 'tools\test-cmark-gfm-hardening.ps1' -Action $cmarkAction -SkipReason $cmarkSkipReason
 
+$sevenZipOracle = Get-Command 7z.exe -ErrorAction SilentlyContinue | Select-Object -First 1
+$sevenZipSkipReason = if ($null -eq $sevenZipOracle) {
+    'A 7z.exe-compatible oracle is required for the bundled 7-Zip differential compatibility test.'
+} else { $null }
+$sevenZipAction = {
+    & powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $repositoryRoot 'tools\test-7zip-compatibility.ps1') `
+        -WrapperPath $built7zWrapper -EnginePath $built7zEngine -SevenZipPath $sevenZipOracle.Source
+}.GetNewClosure()
+# The shipped wrapper and an independent console must agree on the retained archive corpus before release.
+Invoke-AutomatedCheck -Name '7-Zip wrapper/oracle compatibility corpus' -Action $sevenZipAction -SkipReason $sevenZipSkipReason
+
 $resolvedSqliteDll = $builtSqliteDll
 $pwsh = Get-Command pwsh.exe -ErrorAction SilentlyContinue | Select-Object -First 1
 $sqliteSkipReason = $null
@@ -412,6 +534,7 @@ $ratchetSkipReason = if ([string]::IsNullOrWhiteSpace($resolvedBaseCommit)) {
 foreach ($relativePath in @(
     'tools\verify-no-new-terminatethread.ps1',
     'tools\verify-no-new-raw-thread-creation.ps1',
+    'tools\verify-no-new-gettickcount.ps1',
     'tools\verify-no-new-max-path-buffers.ps1',
     'tools\verify-no-new-unsafe-string-calls.ps1'
 )) {
@@ -421,13 +544,35 @@ foreach ($relativePath in @(
 
 Invoke-WindowsPowerShellScript -RelativePath 'tools\verify-fluent-icon-coverage.ps1'
 
-$nunitSkipReason = $null
-$nunitResultsDirectory = Join-Path ([System.IO.Path]::GetTempPath()) ('FileManager-runtests-' + [Guid]::NewGuid().ToString('N'))
-$nunitTrxName = 'runtests.trx'
+$networkFixtureAction = {
+    # These loopback fixtures are safe in every profile and keep protocol-edge
+    # coverage visible when the destructive UI suite must be skipped.
+    & $dotnet.Source test $testProject --filter 'FullyQualifiedName~DeterministicNetworkFixtureTests' `
+        --logger 'console;verbosity=minimal'
+    if ($LASTEXITCODE -ne 0) {
+        throw "The deterministic network fixture tests failed with exit code $LASTEXITCODE."
+    }
+}.GetNewClosure()
+Invoke-AutomatedCheck -Name 'Deterministic FTP/FTPS/HTTP fixture tests' -Action $networkFixtureAction
+
+$nunitSkipReason = $uiTestEnvironmentSkipReason
+$retainNunitResults = -not [string]::IsNullOrWhiteSpace($NUnitTrxPath)
+if ($retainNunitResults) {
+    $nunitTrxPath = [System.IO.Path]::GetFullPath($NUnitTrxPath)
+    if (Test-Path -LiteralPath $nunitTrxPath) {
+        throw "The requested NUnit TRX path already exists: $nunitTrxPath"
+    }
+    $nunitResultsDirectory = Split-Path -Parent $nunitTrxPath
+    $nunitTrxName = Split-Path -Leaf $nunitTrxPath
+}
+else {
+    $nunitResultsDirectory = Join-Path ([System.IO.Path]::GetTempPath()) ('FileManager-runtests-' + [Guid]::NewGuid().ToString('N'))
+    $nunitTrxName = 'runtests.trx'
+}
 $nunitAction = {
     # Running the complete project discovers every fixture after this runner
     # has supplied the executable and every prerequisite UI-test environment value.
-    New-Item -ItemType Directory -Path $nunitResultsDirectory | Out-Null
+    New-Item -ItemType Directory -Path $nunitResultsDirectory -Force | Out-Null
     try {
         & $dotnet.Source test $testProject --results-directory $nunitResultsDirectory `
             --logger "trx;LogFileName=$nunitTrxName" --logger 'console;verbosity=minimal' -- NUnit.NumberOfTestWorkers=0
@@ -447,7 +592,7 @@ $nunitAction = {
         }
     }
     finally {
-        if (Test-Path -LiteralPath $nunitResultsDirectory) {
+        if (-not $retainNunitResults -and (Test-Path -LiteralPath $nunitResultsDirectory)) {
             Remove-Item -LiteralPath $nunitResultsDirectory -Recurse -Force
         }
     }
@@ -485,15 +630,29 @@ if ($skipped.Count -ne 0) {
     Write-Host "$($skipped.Count) checks skipped:" -ForegroundColor Yellow
     $skipped | ForEach-Object { Write-Host "  - $_" -ForegroundColor Yellow }
 }
+$runnerExitCode = 0
 if ($failures.Count -ne 0) {
     Write-Host "$($failures.Count) checks failed:" -ForegroundColor Red
     $failures | ForEach-Object { Write-Host "  - $_" -ForegroundColor Red }
-    exit 1
+    # Exit only after finally removes this run's disposable build tree.
+    $runnerExitCode = 1
 }
 if ($FailOnSkipped -and $skipped.Count -ne 0) {
     Write-Host 'Skipped checks are prohibited by -FailOnSkipped.' -ForegroundColor Red
-    exit 1
+    # Preserve a failure result while still executing the cleanup boundary below.
+    $runnerExitCode = 1
 }
 
-Write-Host 'All available automated checks passed.' -ForegroundColor Green
-exit 0
+if ($runnerExitCode -eq 0) {
+    Write-Host 'All available automated checks passed.' -ForegroundColor Green
+}
+}
+finally {
+    if (-not $KeepBuildArtifacts -and (Test-Path -LiteralPath $uiBuildDirectory -PathType Container)) {
+        # This per-run GUID directory is owned by the runner; remove it on every exit path to avoid exhausting the test host.
+        Remove-Item -LiteralPath $uiBuildDirectory -Recurse -Force
+    }
+    Remove-OlderUiTestBuildResults -ResultsDirectory $testResultsDirectory
+}
+
+exit $runnerExitCode

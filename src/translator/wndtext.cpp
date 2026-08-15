@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "precomp.h"
+#include <strsafe.h>
 
 #include "wndtext.h"
 #include "wndtree.h"
@@ -9,6 +10,13 @@
 #include "wndframe.h"
 #include "config.h"
 #include "datarh.h"
+
+static void CopyTextWindowDisplay(wchar_t* destination, size_t destinationCapacity, const wchar_t* source)
+{
+    // Text-window rows are display fields; retain explicit clipping after live edits.
+    if (destinationCapacity != 0)
+        StringCchCopyNW(destination, destinationCapacity, source, destinationCapacity - 1);
+}
 
 const char* TEXTWINDOW_NAME = "Texts (Alt+3)";
 
@@ -81,7 +89,8 @@ EditWindowProcW(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
             return 0;
         }
 
-        DWORD style = GetWindowLong(hWnd, GWL_STYLE);
+        // The readonly check uses a style mask, but reads it through the x64-safe accessor.
+        DWORD style = (DWORD)GetWindowLongPtr(hWnd, GWL_STYLE);
         if (style & ES_READONLY)
             MessageBeep(-1);
         break;
@@ -663,8 +672,9 @@ CTextWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                                       NULL, //HMenu
                                       HInstance,
                                       NULL);
-        DefEditWndProc = (WNDPROC)GetWindowLongW(HTranslated, GWL_WNDPROC);
-        SetWindowLongW(HTranslated, GWL_WNDPROC, (LONG)EditWindowProcW);
+        // Keep the Unicode subclass procedure pointer intact when this dialog is built for x64.
+        DefEditWndProc = (WNDPROC)GetWindowLongPtrW(HTranslated, GWLP_WNDPROC);
+        SetWindowLongPtrW(HTranslated, GWLP_WNDPROC, (LONG_PTR)EditWindowProcW);
 
         SendMessage(HTranslated, EM_LIMITTEXT, 5000, 0); // Limit the buffer size
 
@@ -684,8 +694,9 @@ CTextWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                                     NULL, //HMenu
                                     HInstance,
                                     NULL);
-        DefEditWndOriginalProc = (WNDPROC)GetWindowLongW(HOriginal, GWL_WNDPROC);
-        SetWindowLongW(HOriginal, GWL_WNDPROC, (LONG)EditWindowOriginalProcW);
+        // Keep the original edit subclass procedure pointer intact when this dialog is built for x64.
+        DefEditWndOriginalProc = (WNDPROC)GetWindowLongPtrW(HOriginal, GWLP_WNDPROC);
+        SetWindowLongPtrW(HOriginal, GWLP_WNDPROC, (LONG_PTR)EditWindowOriginalProcW);
 
         HFONT hFont = (HFONT)SendMessage(ListView.HWindow, WM_GETFONT, 0, 0);
         SendMessage(HOriginalLabel, WM_SETFONT, (WPARAM)hFont, TRUE);
@@ -785,8 +796,7 @@ CTextWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                     GetStringFromWindow(HTranslated, &Data.StrData[groupIndex]->TStrings[strIndex]);
 
                     lvi.mask = LVIF_TEXT;
-                    lstrcpynW(buff, Data.StrData[groupIndex]->TStrings[strIndex], 9999);
-                    buff[9999] = 0;
+                    CopyTextWindowDisplay(buff, _countof(buff), Data.StrData[groupIndex]->TStrings[strIndex]);
                     lvi.pszText = buff;
                     lvi.iSubItem = 1;
                     SendMessageW(ListView.HWindow, LVM_SETITEMW, 0, (LPARAM)&lvi);
@@ -801,16 +811,13 @@ CTextWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                     GetStringFromWindow(HTranslated, &Data.MenuData[groupIndex]->Items[strIndex].TString);
 
                     // Indent nested submenus one level to the right
-                    int j = 0;
-                    while (j < Data.MenuData[groupIndex]->Items[strIndex].Level * 5) // Five spaces per level still leave room for the caption
-                    {
-                        buff[j] = ' ';
-                        j++;
-                    }
+                    const int level = Data.MenuData[groupIndex]->Items[strIndex].Level;
+                    const size_t indent = level > 0 ? min(static_cast<size_t>(level), (_countof(buff) - 1) / 5) * 5 : 0;
+                    wmemset(buff, L' ', indent); // Five spaces per level still leave room for the caption.
 
                     lvi.mask = LVIF_TEXT;
-                    lstrcpynW(buff + j, Data.MenuData[groupIndex]->Items[strIndex].TString, 9999);
-                    buff[9999] = 0;
+                    CopyTextWindowDisplay(buff + indent, _countof(buff) - indent,
+                                          Data.MenuData[groupIndex]->Items[strIndex].TString);
                     lvi.pszText = buff;
                     lvi.iSubItem = 1;
                     SendMessageW(ListView.HWindow, LVM_SETITEMW, 0, (LPARAM)&lvi);
@@ -826,8 +833,7 @@ CTextWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                     GetStringFromWindow(HTranslated, &control->TWindowName);
 
                     lvi.mask = LVIF_TEXT;
-                    lstrcpynW(buff, control->TWindowName, 9999);
-                    buff[9999] = 0;
+                    CopyTextWindowDisplay(buff, _countof(buff), control->TWindowName);
                     lvi.pszText = buff;
                     lvi.iSubItem = 1;
                     SendMessageW(ListView.HWindow, LVM_SETITEMW, 0, (LPARAM)&lvi);

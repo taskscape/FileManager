@@ -3,6 +3,9 @@
 
 #include <windows.h>
 #include <shlobj.h>
+#include <shobjidl.h>
+
+#include "..\\..\\..\\common\\monotonic_time.h"
 
 #include "strings.h"
 #include "comdefs.h"
@@ -29,6 +32,13 @@ bool AboutShowed;
 
 //bool Started = false;
 
+static WNDPROC ReplaceControlWindowProc(HWND control, WNDPROC procedure)
+{
+    // Window procedures are pointer-sized; the Ptr API preserves them in x64 self-extractors.
+    return reinterpret_cast<WNDPROC>(SetWindowLongPtr(control, GWLP_WNDPROC,
+                                                       reinterpret_cast<LONG_PTR>(procedure)));
+}
+
 void CenterDialog(HWND dlg)
 {
     int width = GetSystemMetrics(SM_CXSCREEN);
@@ -51,8 +61,8 @@ BOOL WINAPI OvewriteDlgProc(HWND hDlg, UINT uMsg, WPARAM wParam, LPARAM lParam)
     case WM_INITDIALOG:
     {
         COverwriteDlgInfo* info = (COverwriteDlgInfo*)lParam;
-        OrigTextControlProc = (WNDPROC)SetWindowLong(GetDlgItem(hDlg, IDC_SOURCENAME), GWL_WNDPROC, (LONG)TextControlProc);
-        SetWindowLong(GetDlgItem(hDlg, IDC_TARGETNAME), GWL_WNDPROC, (LONG)TextControlProc);
+        OrigTextControlProc = ReplaceControlWindowProc(GetDlgItem(hDlg, IDC_SOURCENAME), TextControlProc);
+        ReplaceControlWindowProc(GetDlgItem(hDlg, IDC_TARGETNAME), TextControlProc);
         SetDlgItemText(hDlg, IDC_TARGETNAME, info->Target);
         SetDlgItemText(hDlg, IDC_TARGETATTR, info->TargetAttr);
         if ((readOnly = info->ReadOnly) != 0)
@@ -104,8 +114,8 @@ BOOL WINAPI OvewriteDlgProc(HWND hDlg, UINT uMsg, WPARAM wParam, LPARAM lParam)
         }
 
     case WM_DESTROY:
-        SetWindowLong(GetDlgItem(hDlg, IDC_SOURCENAME), GWL_WNDPROC, (LONG)OrigTextControlProc);
-        SetWindowLong(GetDlgItem(hDlg, IDC_TARGETNAME), GWL_WNDPROC, (LONG)OrigTextControlProc);
+        ReplaceControlWindowProc(GetDlgItem(hDlg, IDC_SOURCENAME), OrigTextControlProc);
+        ReplaceControlWindowProc(GetDlgItem(hDlg, IDC_TARGETNAME), OrigTextControlProc);
         return FALSE;
     }
     return FALSE;
@@ -146,7 +156,7 @@ BOOL WINAPI ErrorDlgProc(HWND hDlg, UINT uMsg, WPARAM wParam, LPARAM lParam)
         int defID = IDC_RETRY;
         CErrorDlgInfo* info = (CErrorDlgInfo*)lParam;
         SetWindowText(hDlg, info->Title);
-        OrigTextControlProc = (WNDPROC)SetWindowLong(GetDlgItem(hDlg, IDC_FILENAME), GWL_WNDPROC, (LONG)TextControlProc);
+        OrigTextControlProc = ReplaceControlWindowProc(GetDlgItem(hDlg, IDC_FILENAME), TextControlProc);
         SetDlgItemText(hDlg, IDC_FILENAME, info->File);
         SetDlgItemText(hDlg, IDC_ERROR, info->Error);
         if (!info->Retry)
@@ -188,7 +198,7 @@ BOOL WINAPI ErrorDlgProc(HWND hDlg, UINT uMsg, WPARAM wParam, LPARAM lParam)
             return FALSE;
         }
     case WM_DESTROY:
-        SetWindowLong(GetDlgItem(hDlg, IDC_FILENAME), GWL_WNDPROC, (LONG)OrigTextControlProc);
+        ReplaceControlWindowProc(GetDlgItem(hDlg, IDC_FILENAME), OrigTextControlProc);
         return FALSE;
     }
     return FALSE;
@@ -271,7 +281,7 @@ LRESULT CALLBACK ProgressControlProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM
     static HBRUSH LightBrush;
     static __int64 DisplayedProgress;
     static bool AlreadyWaitForRefresh;
-    static DWORD LastRedrawTime;
+    static CMonotonicTimePoint LastRedrawTime;
     switch (uMsg)
     {
     case WM_USER_INITCONTROL:
@@ -303,14 +313,15 @@ LRESULT CALLBACK ProgressControlProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM
 
     case WM_USER_REFRESHPROGRESS:
     {
-        DWORD time = GetTickCount();
+        // Progress redraw throttling is local to this dialog and must not stall after a 32-bit tick wrap.
+        CMonotonicTimePoint time = CMonotonicClock::Now();
         Progress += wParam;
         if (Progress == ProgressTotalSize ||
             (Progress - DisplayedProgress) * 100 / ProgressTotalSize > 10)
         {
             time = LastRedrawTime + 101;
         }
-        if (time - LastRedrawTime > 100)
+        if (CMonotonicClock::HasElapsed(LastRedrawTime, 101, time))
         {
             InvalidateRect(hWnd, NULL, FALSE);
             UpdateWindow(hWnd);
@@ -339,7 +350,7 @@ LRESULT CALLBACK ProgressControlProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM
 
     case WM_PAINT:
     {
-        LastRedrawTime = GetTickCount();
+        LastRedrawTime = CMonotonicClock::Now();
         AlreadyWaitForRefresh = FALSE;
         DisplayedProgress = Progress;
 
@@ -395,7 +406,7 @@ LRESULT CALLBACK ProgressControlProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM
                 FillRect(dc, &r, NormalBrush);
 
             char txt[10];
-            wsprintf(txt, "%d %%", (int)((progress * 1000 / ProgressTotalSize /*+ 5*/)) / 10); // we don't round (100% must be only at 100% and not at 99.5%)
+            SelfExtrFormat(txt, ARRAYSIZE(txt), "%d %%", (int)((progress * 1000 / ProgressTotalSize /*+ 5*/)) / 10); // we don't round (100% must be only at 100% and not at 99.5%)
             r.left = 2;                                                                        /*
         r.right = Width - 2;
         r.top = 2;
@@ -542,7 +553,12 @@ int TestFreeSpace(bool* unpack)
         char buf1[50];
         char buf2[50];
         char buf3[500];
-        wsprintf(buf3, StringTable[STR_NOTENOUGHTSPACE], NumberToStr(buf1, needed), NumberToStr(buf2, free), DlgWin ? "" : StringTable[STR_ADVICE]);
+        if (!SelfExtrFormat(buf3, ARRAYSIZE(buf3), StringTable[STR_NOTENOUGHTSPACE], NumberToStr(buf1, needed), NumberToStr(buf2, free), DlgWin ? "" : StringTable[STR_ADVICE]))
+        {
+            size_t fallbackLength = 0;
+            buf3[0] = 0;
+            SelfExtrAppendText(buf3, ARRAYSIZE(buf3), &fallbackLength, "Unable to format the free-space warning.");
+        }
         switch (MessageBox(DlgWin, buf3, DlgWin ? StringTable[STR_QUESTION] : Title, MB_YESNOCANCEL | MB_ICONQUESTION | MB_SETFOREGROUND))
         {
         case IDNO:
@@ -564,7 +580,7 @@ void EnablePathControl(BOOL enable)
     ShowWindow(GetDlgItem(DlgWin, IDC_BROWSE), enable ? SW_SHOW : SW_HIDE);
     SendDlgItemMessage(DlgWin, IDC_PATH, EM_SETREADONLY, !enable, 0);
     HWND hwndPath = GetDlgItem(DlgWin, IDC_PATH);
-    LONG style = GetWindowLong(hwndPath, GWL_EXSTYLE);
+    LONG_PTR style = GetWindowLongPtr(hwndPath, GWL_EXSTYLE);
     if (style)
     {
         int w;
@@ -580,7 +596,8 @@ void EnablePathControl(BOOL enable)
             GetWindowRect(ProgressWin, &r);
             w = r.right - r.left;
         }
-        SetWindowLong(hwndPath, GWL_EXSTYLE, style);
+        // Keep the style value pointer-sized so this shared window helper remains x64-safe.
+        SetWindowLongPtr(hwndPath, GWL_EXSTYLE, style);
         SetWindowPos(hwndPath, 0, 0, 0, w, ShortPathControlHeigth, SWP_NOMOVE | SWP_NOZORDER | SWP_FRAMECHANGED);
     }
 }
@@ -677,17 +694,6 @@ int StartExtracting()
                         if (DlgWin)
                             SetDlgItemText(DlgWin, IDC_PATH, TargetPath);
                         RemoveTemp = ArchiveStart->Flags & SE_TEMPDIR && ArchiveStart->Flags & SE_REMOVEAFTER;
-                        /*if (RemoveTemp)
-            {
-              if (RegCreateKey(HKEY_LOCAL_MACHINE, "Software\\Microsoft\\Windows\\CurrentVersion\\RunOnce",
-                  &RunOnceHKey) == ERROR_SUCCESS)
-              {
-                wsprintf(RunOnceValue, "Self-extraxtor%X", GetTickCount());
-                char buf[1024];
-                wsprintf(buf, "rmdir /s /q \"%s\"", TargetPath);
-                RegSetValueEx(RunOnceHKey, RunOnceValue, 0, REG_SZ, (unsigned char *)buf, lstrlen(buf) + 1);
-              }
-            }*/
                     }
                 }
             }
@@ -729,46 +735,59 @@ int StartExtracting()
     return 0;
 }
 
-int CALLBACK DirectoryBrowse(HWND hwnd, UINT uMsg, LPARAM lParam, LPARAM lpData)
-{
-    if (uMsg == BFFM_INITIALIZED)
-    {
-        SetWindowText(hwnd, StringTable[STR_BROWSEDIRTITLE]);
-        if (GetRootLen(TargetPath) < lstrlen(TargetPath)) // this is not a root directory
-            PathRemoveBackslash(TargetPath);
-        else
-            PathAddBackslash(TargetPath);
-        SendMessage(hwnd, BFFM_SETSELECTION, TRUE, (LPARAM)TargetPath);
-    }
-    return 0;
-}
-
 void OnBrowse()
 {
     SendDlgItemMessage(DlgWin, IDC_PATH, WM_GETTEXT, MAX_PATH, (LPARAM)TargetPath);
 
-    char display[MAX_PATH];
-    BROWSEINFO bi;
-    bi.hwndOwner = DlgWin;
-    bi.pidlRoot = NULL;
-    bi.pszDisplayName = display;
-    bi.lpszTitle = StringTable[STR_BROWSEDIRCOMMENT];
-    bi.ulFlags = BIF_RETURNONLYFSDIRS;
-    bi.lpfn = DirectoryBrowse;
-    bi.lParam = 0;
-    ITEMIDLIST* res = SHBrowseForFolder(&bi);
-    if (res != NULL)
+    HRESULT initializeResult = CoInitializeEx(NULL, COINIT_APARTMENTTHREADED);
+    if (SUCCEEDED(initializeResult))
     {
-        SHGetPathFromIDList(res, TargetPath);
-        SetDlgItemText(DlgWin, IDC_PATH, TargetPath);
-    }
-    // release the item ID list
-    IMalloc* alloc;
-    if (SUCCEEDED(CoGetMalloc(1, &alloc)))
-    {
-        if (alloc->DidAlloc(res) == 1)
-            alloc->Free(res);
-        alloc->Release();
+        IFileDialog* dialog = NULL;
+        HRESULT result = CoCreateInstance(CLSID_FileOpenDialog, NULL, CLSCTX_INPROC_SERVER,
+                                          IID_PPV_ARGS(&dialog));
+        if (SUCCEEDED(result))
+        {
+            DWORD options;
+            // Return a filesystem folder directly so the self-extractor never converts a legacy selection PIDL.
+            if (SUCCEEDED(dialog->GetOptions(&options)))
+                dialog->SetOptions(options | FOS_PICKFOLDERS | FOS_FORCEFILESYSTEM);
+
+            WCHAR titleW[MAX_PATH];
+            if (MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, StringTable[STR_BROWSEDIRCOMMENT], -1,
+                                    titleW, _countof(titleW)) != 0)
+                dialog->SetTitle(titleW);
+
+            WCHAR initialPathW[MAX_PATH];
+            IShellItem* initialFolder = NULL;
+            if (MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, TargetPath, -1,
+                                    initialPathW, _countof(initialPathW)) != 0 &&
+                SUCCEEDED(SHCreateItemFromParsingName(initialPathW, NULL, IID_PPV_ARGS(&initialFolder))))
+            {
+                dialog->SetFolder(initialFolder);
+                initialFolder->Release();
+            }
+
+            result = dialog->Show(DlgWin);
+            if (SUCCEEDED(result))
+            {
+                IShellItem* selectedFolder = NULL;
+                result = dialog->GetResult(&selectedFolder);
+                if (SUCCEEDED(result))
+                {
+                    PWSTR selectedPathW = NULL;
+                    result = selectedFolder->GetDisplayName(SIGDN_FILESYSPATH, &selectedPathW);
+                    if (SUCCEEDED(result))
+                    {
+                        if (SelfExtrWideToUtf8Buffer(selectedPathW, TargetPath, MAX_PATH))
+                            SetDlgItemText(DlgWin, IDC_PATH, TargetPath);
+                        CoTaskMemFree(selectedPathW);
+                    }
+                    selectedFolder->Release();
+                }
+            }
+            dialog->Release();
+        }
+        CoUninitialize();
     }
 }
 
@@ -792,13 +811,6 @@ BOOL SfxOnInit(WPARAM wParam, LPARAM lParam)
     ShowWindow(GetDlgItem(DlgWin, IDC_PROGRESS), SW_HIDE);
     ShowWindow(GetDlgItem(DlgWin, IDC_FILENAME), SW_HIDE);
     SetDlgItemText(DlgWin, IDC_TEXT, (char*)ArchiveStart + ArchiveStart->TextOffs);
-    //LONG style = GetWindowLong(WebLinkControl, GWL_STYLE);
-    //if (style)
-    //{
-    //  style = style | SS_NOTIFY;
-    //  SetWindowLong(WebLinkControl, GWL_STYLE, style);
-    //  //SetWindowPos(WebLinkControl, 0, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_FRAMECHANGED);
-    //}
     SetDlgItemText(DlgWin, IDC_ABOUTTEXT, (char*)ArchiveStart + ArchiveStart->AboutOffs);
     CenterDialog(DlgWin);
     SetFocus(GetDlgItem(DlgWin, IDOK));
@@ -850,9 +862,9 @@ BOOL WINAPI SfxDlgProc(HWND hDlg, UINT uMsg, WPARAM wParam, LPARAM lParam)
         ProgressWin = GetDlgItem(hDlg, IDC_PROGRESS);
         text = GetDlgItem(hDlg, IDC_FILENAME);
         WebLinkControl = GetDlgItem(hDlg, IDC_WEBLINK);
-        OrigProgressControlProc = (WNDPROC)SetWindowLong(ProgressWin, GWL_WNDPROC, (LONG)ProgressControlProc);
-        OrigTextControlProc = (WNDPROC)SetWindowLong(text, GWL_WNDPROC, (LONG)TextControlProc);
-        OrigTextControlProc = (WNDPROC)SetWindowLong(WebLinkControl, GWL_WNDPROC, (LONG)TextControlProc);
+        OrigProgressControlProc = ReplaceControlWindowProc(ProgressWin, ProgressControlProc);
+        OrigTextControlProc = ReplaceControlWindowProc(text, TextControlProc);
+        OrigTextControlProc = ReplaceControlWindowProc(WebLinkControl, TextControlProc);
         return SfxOnInit(wParam, lParam);
 
     case WM_COMMAND:
@@ -923,9 +935,9 @@ BOOL WINAPI SfxDlgProc(HWND hDlg, UINT uMsg, WPARAM wParam, LPARAM lParam)
 
     case WM_DESTROY:
         SendMessage(ProgressWin, WM_USER_DESTROY, 0, 0);
-        SetWindowLong(ProgressWin, GWL_WNDPROC, (LONG)OrigProgressControlProc);
-        SetWindowLong(text, GWL_WNDPROC, (LONG)OrigTextControlProc);
-        SetWindowLong(WebLinkControl, GWL_WNDPROC, (LONG)OrigTextControlProc);
+        ReplaceControlWindowProc(ProgressWin, OrigProgressControlProc);
+        ReplaceControlWindowProc(text, OrigTextControlProc);
+        ReplaceControlWindowProc(WebLinkControl, OrigTextControlProc);
         DlgWin = NULL;
         return FALSE;
 

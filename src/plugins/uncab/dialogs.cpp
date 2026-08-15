@@ -3,6 +3,8 @@
 
 #include "precomp.h"
 
+#include <shobjidl.h>
+
 #include "array2.h"
 
 #include "fdi.h"
@@ -148,55 +150,61 @@ BOOL CNextVolumeDialog::OnInit(WPARAM wParam, LPARAM lParam)
     return TRUE;
 }
 
-int CALLBACK DirectoryBrowse(HWND hwnd, UINT uMsg, LPARAM lParam, LPARAM lpData)
-{
-    CALL_STACK_MESSAGE4("DirectoryBrowse(, 0x%X, 0x%IX, 0x%IX)", uMsg, lParam,
-                        lpData);
-    if (uMsg == BFFM_INITIALIZED)
-    {
-        SetWindowText(hwnd, LoadStr(IDS_BROWSEARCHIVETITLE));
-        char buf[MAX_PATH];
-        SalamanderGeneral->GetRootPath(buf, (char*)lpData);
-        SalamanderGeneral->SalPathRemoveBackslash(buf);
-        SalamanderGeneral->SalPathRemoveBackslash((char*)lpData);
-        if (lstrlen(buf) == lstrlen((char*)lpData)) // this is the root directory
-            SalamanderGeneral->SalPathAddBackslash((char*)lpData, MAX_PATH);
-        SendMessage(hwnd, BFFM_SETSELECTION, TRUE, lpData);
-    }
-    return 0;
-}
-
 BOOL CNextVolumeDialog::OnBrowse(WORD wNotifyCode, WORD wID, HWND hwndCtl)
 {
     CALL_STACK_MESSAGE3("CNextVolumeDialog::OnBrowse(0x%X, 0x%X, )", wNotifyCode,
                         wID);
-    char path[MAX_PATH];
-
     GetDlgItemText(Dlg, IDC_FILENAME, VolumePath, MAX_PATH);
 
-    BROWSEINFO bi;
-    bi.hwndOwner = Dlg;
-    bi.pidlRoot = NULL;
-    bi.pszDisplayName = path;
     char buf[1024];
     sprintf(buf, LoadStr(IDS_BROWSEFOLDERTEXT), VolumeName);
-    bi.lpszTitle = buf;
-    bi.ulFlags = BIF_RETURNONLYFSDIRS;
-    bi.lpfn = DirectoryBrowse;
-    bi.lParam = (LPARAM)VolumePath;
-    LPITEMIDLIST res = SHBrowseForFolder(&bi);
-    if (res != NULL)
+    HRESULT initializeResult = CoInitializeEx(NULL, COINIT_APARTMENTTHREADED);
+    if (SUCCEEDED(initializeResult))
     {
-        SHGetPathFromIDList(res, VolumePath);
-        SetDlgItemText(Dlg, IDC_FILENAME, VolumePath);
-    }
-    // release the item ID list
-    IMalloc* alloc;
-    if (SUCCEEDED(CoGetMalloc(1, &alloc)))
-    {
-        if (alloc->DidAlloc(res) == 1)
-            alloc->Free(res);
-        alloc->Release();
+        IFileDialog* dialog = NULL;
+        HRESULT result = CoCreateInstance(CLSID_FileOpenDialog, NULL, CLSCTX_INPROC_SERVER,
+                                          IID_PPV_ARGS(&dialog));
+        if (SUCCEEDED(result))
+        {
+            DWORD options;
+            // Use the modern folder dialog so CAB volume selection no longer round-trips through a PIDL.
+            if (SUCCEEDED(dialog->GetOptions(&options)))
+                dialog->SetOptions(options | FOS_PICKFOLDERS | FOS_FORCEFILESYSTEM);
+
+            WCHAR titleW[_countof(buf)];
+            if (MultiByteToWideChar(CP_ACP, 0, buf, -1, titleW, _countof(titleW)) != 0)
+                dialog->SetTitle(titleW);
+
+            WCHAR initialPathW[MAX_PATH];
+            IShellItem* initialFolder = NULL;
+            if (MultiByteToWideChar(CP_ACP, 0, VolumePath, -1, initialPathW, _countof(initialPathW)) != 0 &&
+                SUCCEEDED(SHCreateItemFromParsingName(initialPathW, NULL, IID_PPV_ARGS(&initialFolder))))
+            {
+                dialog->SetFolder(initialFolder);
+                initialFolder->Release();
+            }
+
+            result = dialog->Show(Dlg);
+            if (SUCCEEDED(result))
+            {
+                IShellItem* selectedFolder = NULL;
+                result = dialog->GetResult(&selectedFolder);
+                if (SUCCEEDED(result))
+                {
+                    PWSTR selectedPathW = NULL;
+                    result = selectedFolder->GetDisplayName(SIGDN_FILESYSPATH, &selectedPathW);
+                    if (SUCCEEDED(result))
+                    {
+                        if (WideCharToMultiByte(CP_ACP, 0, selectedPathW, -1, VolumePath, MAX_PATH, NULL, NULL) != 0)
+                            SetDlgItemText(Dlg, IDC_FILENAME, VolumePath);
+                        CoTaskMemFree(selectedPathW);
+                    }
+                    selectedFolder->Release();
+                }
+            }
+            dialog->Release();
+        }
+        CoUninitialize();
     }
 
     return TRUE;

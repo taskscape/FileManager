@@ -107,7 +107,7 @@ private:
     _dbf_header* DbfHdr;     // data extracted from the opened database
     _dbf_field* DbfFields;   // pointer to the list of columns
     char* Record;            // buffer used for retrieving records from the database
-    char FileName[MAX_PATH]; // path to the opened file
+    char* FileName; // owned full path; parser metadata and file-info queries must retain the exact identity
 
 public:
     // constructor
@@ -145,7 +145,7 @@ class CParserInterfaceCSV : public CParserInterfaceAbstract
 {
 private:
     CCSVParserBase* Csv;     // interface to the CSV library
-    char FileName[MAX_PATH]; // path to the opened file
+    char* FileName; // owned full path; parser metadata and file-info queries must retain the exact identity
     const CCSVConfig* Config;
     BOOL IsUnicode;
     BOOL IsUTF8;

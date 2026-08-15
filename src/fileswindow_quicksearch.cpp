@@ -3,6 +3,7 @@
 // CommentsTranslationProject: TRANSLATED
 
 #include "precomp.h"
+#include <strsafe.h>
 
 #include "cfgdlg.h"
 #include "mainwnd.h"
@@ -14,6 +15,13 @@
 #include "zip.h"
 #include "shellib.h"
 #include "toolbar.h"
+
+static void SetQuickSearchMatch(char* destination, size_t destinationCapacity, const char* name, int matchLength)
+{
+    // Quick Search displays only the matched prefix, bounded to its caret-state field.
+    const size_t copyLength = matchLength > 0 ? min(static_cast<size_t>(matchLength), destinationCapacity - 1) : 0;
+    StringCchCopyNA(destination, destinationCapacity, name, copyLength);
+}
 
 //*****************************************************************************
 //
@@ -75,7 +83,7 @@ BOOL CFilesWindow::QSFindNext(int currentIndex, BOOL next, BOOL skip, BOOL whole
             {
                 if (AgreeQSMask(name, hasExtension, mask, wholeString, offset))
                 {
-                    lstrcpyn(QuickSearch, name, offset + 1);
+                    SetQuickSearchMatch(QuickSearch, _countof(QuickSearch), name, offset);
                     index = i;
                     return TRUE;
                 }
@@ -103,7 +111,7 @@ BOOL CFilesWindow::QSFindNext(int currentIndex, BOOL next, BOOL skip, BOOL whole
             {
                 if (AgreeQSMask(name, hasExtension, mask, wholeString, offset))
                 {
-                    lstrcpyn(QuickSearch, name, offset + 1);
+                    SetQuickSearchMatch(QuickSearch, _countof(QuickSearch), name, offset);
                     index = i;
                     return TRUE;
                 }

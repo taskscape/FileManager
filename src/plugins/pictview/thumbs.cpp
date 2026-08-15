@@ -3,12 +3,16 @@
 
 #include "precomp.h"
 
+// Use StrSafe when composing the fixed-size thumbnail error path/message buffer.
+#include <strsafe.h>
+
 #include "lib/pvw32dll.h"
 #include "pictview.h"
 #include "exif/exif.h"
 #include "pictview.rh"
 #include "pictview.rh2"
 #include "lang/lang.rh"
+#include "../../common/checked_arithmetic.h"
 
 // Salamander-proprietary flag for super-fast low-quality JPEG-decompression
 
@@ -25,6 +29,9 @@
 #define FL_NON_JPEG_ALL 0x100
 #define FL_NON_IMG_SKIP_ALL 0x200
 #define FL_KEEP (FL_SKIP_ALL | FL_OVERWRITE_RO_ALL | FL_JFXX_ALL | FL_JFXX_SKIP_ALL | FL_NON_JPEG_ALL | FL_NON_IMG_SKIP_ALL)
+
+// Shell thumbnail streams are untrusted; enough for valid JPEG previews without admitting a memory bomb.
+#define WIN_THUMBNAIL_MAX_PAYLOAD (32 * 1024 * 1024)
 
 class CEnumFiles
 {
@@ -470,7 +477,9 @@ void UpdateThumbnails(CSalamanderForOperationsAbstract* Salamander)
             }
             else if (code != PVC_CANCELED)
             {
-                wsprintf(path, LoadStr(IDS_SAVEERROR), PVW32DLL.PVGetErrorText(code));
+                // Preserve a useful message even when a localized error string cannot fit the path-sized buffer.
+                if (FAILED(StringCchPrintf(path, ARRAYSIZE(path), LoadStr(IDS_SAVEERROR), PVW32DLL.PVGetErrorText(code))))
+                    StringCchCopy(path, ARRAYSIZE(path), _T("Unable to save thumbnail."));
                 SalamanderGeneral->ShowMessageBox(path, LoadStr(IDS_ERRORTITLE), MSGBOX_ERROR);
             }
             free(pd.wfd.Buffer);
@@ -580,7 +589,8 @@ int ExtractWinThumbnail(LPCTSTR filename, unsigned char** pptr)
     i = tmp - filename;
     j = wcslen(filename);
     pwcFile = new OLECHAR[max(i + 9, j) + 1];
-    lstrcpyn(pwcFile, filename, i);
+    // Copy the counted directory prefix exactly so the path separator reaches Thumbs.db.
+    memcpy(pwcFile, filename, i * sizeof(OLECHAR));
 #else
     i = MultiByteToWideChar(CP_ACP, 0, filename, (int)(tmp - filename), NULL, 0);
     j = MultiByteToWideChar(CP_ACP, 0, filename, -1, NULL, 0);
@@ -707,20 +717,35 @@ int ExtractWinThumbnail(LPCTSTR filename, unsigned char** pptr)
                             {
                                 // There are some 28 bytes of irrelevant or unknown meaning
                                 // We also skip the SOF marker present here
-                                lint.QuadPart = 28 + 2;
+                                uint64_t totalLength64;
+                                size_t allocationLength;
+                                DWORD thumbnailLength;
+                                int returnedLength;
+                                if (newPos.QuadPart < 28 + 2)
+                                    break;
                                 newPos.QuadPart -= 28 + 2;
-                                pIStream->Seek(lint, STREAM_SEEK_SET, NULL);
-                                *pptr = (unsigned char*)malloc(sizeof(HuffmanTbl) + sizeof(Quant75Tbl) + (int)newPos.QuadPart);
-                                if (*pptr)
+                                // Validate the stream-derived length before it reaches malloc, ReadFile, or the int return value.
+                                if (newPos.QuadPart > WIN_THUMBNAIL_MAX_PAYLOAD ||
+                                    !CheckedCastUInt64ToDword(newPos.QuadPart, &thumbnailLength) ||
+                                    !CheckedAddUInt64((uint64_t)sizeof(HuffmanTbl) + sizeof(Quant75Tbl), newPos.QuadPart, &totalLength64) ||
+                                    !CheckedCastUInt64ToSize(totalLength64, &allocationLength) ||
+                                    !CheckedCastSizeToInt(allocationLength, &returnedLength))
+                                    break;
+                                lint.QuadPart = 28 + 2;
+                                if (FAILED(pIStream->Seek(lint, STREAM_SEEK_SET, NULL)))
+                                    break;
+                                *pptr = (unsigned char*)malloc(allocationLength);
+                                if (*pptr != NULL)
                                 {
                                     // concatenate file header w/ appropriate quantization tables, Huffman tables
                                     // and the image data itself
                                     memcpy(*pptr, (hdr.version >= 5) ? Quant75Tbl : Quant50Tbl, sizeof(Quant75Tbl));
                                     memcpy(*pptr + sizeof(Quant75Tbl), HuffmanTbl, sizeof(HuffmanTbl));
-                                    pIStream->Read(*pptr + sizeof(HuffmanTbl) + sizeof(Quant75Tbl), (DWORD)newPos.QuadPart, &nBytesRead);
-                                    if (newPos.QuadPart == nBytesRead)
+                                    nBytesRead = 0;
+                                    hr = pIStream->Read(*pptr + sizeof(HuffmanTbl) + sizeof(Quant75Tbl), thumbnailLength, &nBytesRead);
+                                    if (!FAILED(hr) && thumbnailLength == nBytesRead)
                                     {
-                                        ret = sizeof(HuffmanTbl) + sizeof(Quant75Tbl) + (int)newPos.QuadPart;
+                                        ret = returnedLength;
                                     }
                                     else
                                     {
@@ -757,42 +782,66 @@ int ExtractWinThumbnail(LPCTSTR filename, unsigned char** pptr)
             if (hFile != INVALID_HANDLE_VALUE)
             {
                 CALL_STACK_MESSAGE1("ExtractWinThumbnail: Parsing ADS");
-                j = SetFilePointer(hFile, 0, NULL, FILE_END) - 140 - 2;
-                if (j > 0)
+                LARGE_INTEGER streamSize;
+                if (GetFileSizeEx(hFile, &streamSize) && streamSize.QuadPart > 140 + 2)
                 {
-                    SetFilePointer(hFile, 0x74, NULL, FILE_BEGIN);
-                    *pptr = (unsigned char*)malloc(sizeof(HuffmanTbl) + sizeof(Quant50Tbl) + j);
-                    if (*pptr)
+                    uint64_t thumbnailLength64 = (uint64_t)streamSize.QuadPart - (140 + 2);
+                    uint64_t totalLength64;
+                    size_t allocationLength;
+                    DWORD thumbnailLength;
+                    int returnedLength;
+                    LARGE_INTEGER thumbnailOffset;
+                    thumbnailOffset.QuadPart = 0x74;
+                    // The ADS is also file-controlled input; retain the same bound and checked conversions as Thumbs.db.
+                    if (thumbnailLength64 <= WIN_THUMBNAIL_MAX_PAYLOAD &&
+                        CheckedCastUInt64ToDword(thumbnailLength64, &thumbnailLength) &&
+                        CheckedAddUInt64((uint64_t)sizeof(HuffmanTbl) + sizeof(Quant50Tbl), thumbnailLength64, &totalLength64) &&
+                        CheckedCastUInt64ToSize(totalLength64, &allocationLength) &&
+                        CheckedCastSizeToInt(allocationLength, &returnedLength) &&
+                        SetFilePointerEx(hFile, thumbnailOffset, NULL, FILE_BEGIN))
                     {
-                        WORD fatDate, fatTime;
-
-                        ReadFile(hFile, *pptr, 140 + 2 - 0x74, &nBytesRead, NULL);
-                        FileTimeToDosDateTime((FILETIME*)*pptr, &fatDate, &fatTime);
-                        if ((fatDate == fileDate) && (fatTime == fileTime))
+                        *pptr = (unsigned char*)malloc(allocationLength);
+                        if (*pptr != NULL)
                         {
-                            // FAT time is rounded to multiple of 2 seconds.
-                            // Better to compare these low-precision times otherwise we would reject
+                            WORD fatDate, fatTime;
 
-                            // concatenate file header w/ appropriate quantization tables, Huffman tables
-                            // and the image data itself
-                            memcpy(*pptr, Quant50Tbl, sizeof(Quant75Tbl));
-                            memcpy(*pptr + sizeof(Quant50Tbl), HuffmanTbl, sizeof(HuffmanTbl));
-                            ReadFile(hFile, *pptr + sizeof(HuffmanTbl) + sizeof(Quant75Tbl), j, &nBytesRead, NULL);
-                            if (j == (int)nBytesRead)
+                            nBytesRead = 0;
+                            if (ReadFile(hFile, *pptr, 140 + 2 - 0x74, &nBytesRead, NULL) && nBytesRead == 140 + 2 - 0x74)
                             {
-                                ret = sizeof(HuffmanTbl) + sizeof(Quant75Tbl) + j;
+                                FileTimeToDosDateTime((FILETIME*)*pptr, &fatDate, &fatTime);
+                                if ((fatDate == fileDate) && (fatTime == fileTime))
+                                {
+                                    // FAT time is rounded to multiple of 2 seconds.
+                                    // Better to compare these low-precision times otherwise we would reject
+
+                                    // concatenate file header w/ appropriate quantization tables, Huffman tables
+                                    // and the image data itself
+                                    memcpy(*pptr, Quant50Tbl, sizeof(Quant75Tbl));
+                                    memcpy(*pptr + sizeof(Quant50Tbl), HuffmanTbl, sizeof(HuffmanTbl));
+                                    nBytesRead = 0;
+                                    if (ReadFile(hFile, *pptr + sizeof(HuffmanTbl) + sizeof(Quant75Tbl), thumbnailLength, &nBytesRead, NULL) &&
+                                        thumbnailLength == nBytesRead)
+                                    {
+                                        ret = returnedLength;
+                                    }
+                                    else
+                                    {
+                                        free(*pptr);
+                                        *pptr = NULL;
+                                    }
+                                }
+                                else
+                                {
+                                    // wrong time stamp -> ignore the thumbnail
+                                    free(*pptr);
+                                    *pptr = NULL;
+                                }
                             }
                             else
                             {
                                 free(*pptr);
                                 *pptr = NULL;
                             }
-                        }
-                        else
-                        {
-                            // wrong time stamp -> ignore the thumbnail
-                            free(*pptr);
-                            *pptr = NULL;
                         }
                     }
                 }

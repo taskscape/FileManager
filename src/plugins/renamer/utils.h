@@ -24,6 +24,9 @@ BOOL FileOverwrite(HWND parent, const char* fileName1, const char* fileData1,
                    const char* fileName2, const char* fileData2, DWORD attr,
                    int shquestion, int shtitle, BOOL* skip, DWORD* silent);
 
+int FormatUserDateTimeAnsi(const SYSTEMTIME* time, DWORD flags, const char* format,
+                           char* buffer, int bufferSize, BOOL isDate);
+
 // ****************************************************************************
 
 class CBuffer

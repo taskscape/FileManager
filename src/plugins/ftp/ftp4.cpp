@@ -15,17 +15,12 @@ char* HandleNULLStr(char* str)
 void GetMyDocumentsPath(char* initDir)
 {
     initDir[0] = 0;
-    ITEMIDLIST* pidl = NULL;
-    if (SHGetSpecialFolderLocation(NULL, CSIDL_PERSONAL, &pidl) == NOERROR)
+    PWSTR pathW = NULL;
+    // The UTF-8 plug-in boundary receives a Known Folder path directly, without a transient PIDL.
+    if (SUCCEEDED(SHGetKnownFolderPath(FOLDERID_Documents, KF_FLAG_DEFAULT, NULL, &pathW)) && pathW != NULL)
     {
-        if (!SHGetPathFromIDList(pidl, initDir))
-            initDir[0] = 0;
-        IMalloc* alloc;
-        if (SUCCEEDED(CoGetMalloc(1, &alloc)))
-        {
-            alloc->Free(pidl);
-            alloc->Release();
-        }
+        WideToUtf8Buffer(pathW, initDir, MAX_PATH);
+        CoTaskMemFree(pathW);
     }
 }
 

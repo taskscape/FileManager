@@ -1046,6 +1046,16 @@ BOOL CControlConnectionSocket::QuickRename(char* changedPath, HWND parent, const
     return retSuccess;
 }
 
+// The wait-window API takes an int delay, so narrow only after the 64-bit elapsed value has been bounded by that delay.
+static int GetRemainingWaitWindowTime(CMonotonicTimePoint started, int waitWindowTime)
+{
+    if (waitWindowTime <= 0)
+        return 0;
+
+    const CMonotonicDuration elapsed = CMonotonicClock::Elapsed(started, CMonotonicClock::Now());
+    return elapsed >= (CMonotonicDuration)waitWindowTime ? 0 : waitWindowTime - (int)elapsed;
+}
+
 BOOL CControlConnectionSocket::OpenForListeningAndWaitForRes(HWND parent, CDataConnectionSocket* dataConnection,
                                                              DWORD* listenOnIP, unsigned short* listenOnPort,
                                                              BOOL* canRetry, char* retryMsg, int retryMsgBufSize,
@@ -1056,7 +1066,7 @@ BOOL CControlConnectionSocket::OpenForListeningAndWaitForRes(HWND parent, CDataC
     char buf[300];
 
     parent = FindPopupParent(parent);
-    DWORD startTime = GetTickCount(); // operation start time
+    CMonotonicTimePoint operationStart = CMonotonicClock::Now(); // operation start time
     *canRetry = FALSE;
     if (retryMsgBufSize > 0)
         retryMsg[0] = 0;
@@ -1102,8 +1112,7 @@ BOOL CControlConnectionSocket::OpenForListeningAndWaitForRes(HWND parent, CDataC
     {
         // wait for the keep-alive command to finish (if it is running) + set
         // keep-alive to 'kamForbidden' (a normal command is in progress)
-        DWORD waitTime = GetTickCount() - startTime;
-        WaitForEndOfKeepAlive(parent, waitTime < (DWORD)waitWndTime ? waitWndTime - waitTime : 0);
+        WaitForEndOfKeepAlive(parent, GetRemainingWaitWindowTime(operationStart, waitWndTime));
     }
 
     dataConnection->SetPostMessagesToWorker(TRUE, GetMsg(), GetUID(), -1, -1, -1, CTRLCON_LISTENFORCON);
@@ -1113,9 +1122,8 @@ BOOL CControlConnectionSocket::OpenForListeningAndWaitForRes(HWND parent, CDataC
     DWORD err;
     if (dataConnection->OpenForListeningWithProxy(*listenOnIP, *listenOnPort, &listenError, &err))
     {
-        DWORD start = GetTickCount();
-        DWORD waitTime = start - startTime;
-        waitWnd.Create(waitTime < (DWORD)waitWndTime ? waitWndTime - waitTime : 0);
+        const CMonotonicTimePoint listenDeadline = CMonotonicClock::DeadlineAfter(serverTimeout);
+        waitWnd.Create(GetRemainingWaitWindowTime(operationStart, waitWndTime));
 
         BOOL newBytesReadReceived = FALSE;
         DWORD newBytesReadData1 = 0;
@@ -1127,10 +1135,8 @@ BOOL CControlConnectionSocket::OpenForListeningAndWaitForRes(HWND parent, CDataC
             // wait for an event on the socket (server reply) or ESC
             CControlConnectionSocketEvent event;
             DWORD data1, data2;
-            DWORD now = GetTickCount();
-            if (now - start > (DWORD)serverTimeout)
-                now = start + (DWORD)serverTimeout;
-            WaitForEventOrESC(parent, &event, &data1, &data2, serverTimeout - (now - start),
+            WaitForEventOrESC(parent, &event, &data1, &data2,
+                              CMonotonicClock::RemainingWin32TimerDelay(listenDeadline, CMonotonicClock::Now()),
                               &waitWnd, NULL, FALSE);
             switch (event)
             {

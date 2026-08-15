@@ -121,8 +121,8 @@ public:
     //optimizes the PAK
     virtual BOOL OptimizePak();
 
-    //creates a message from the parameters passed to 'HandleError()'
-    virtual char* FormatMessage(char* buffer, int errorID, va_list arglist);
+    // Creates a message from the parameters passed to 'HandleError()' within the caller-provided capacity.
+    virtual char* FormatMessage(char* buffer, size_t bufferSize, int errorID, va_list arglist);
 
 protected:
     BOOL HandleError(DWORD flags, int errorID, ...);
@@ -130,6 +130,7 @@ protected:
     char* LastErrorString(int lastError, char* buffer);
 
     BOOL SafeSeek(HANDLE file, DWORD position);
+    BOOL SafeSeek64(HANDLE file, const LARGE_INTEGER& position);
 
     BOOL SafeRead(HANDLE file, void* buffer, DWORD size);
 

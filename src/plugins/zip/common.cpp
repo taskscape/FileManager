@@ -7,6 +7,7 @@
 #include <stdio.h>
 #include <commctrl.h>
 #include <tchar.h>
+#include <strsafe.h>
 
 #include "spl_com.h"
 #include "spl_base.h"
@@ -16,6 +17,8 @@
 #include "dbg.h"
 
 #include "array2.h"
+#include "..\\..\\common\\checked_arithmetic.h"
+#include "..\\..\\common\\monotonic_time.h"
 
 #include "selfextr/comdefs.h"
 #include "config.h"
@@ -68,6 +71,15 @@ CConfiguration Config;
 HINSTANCE DLLInstance = NULL; // handle of the SPL - language-independent resources
 HINSTANCE HLanguage = NULL;   // handle of the SLG - language-dependent resources
 
+static BOOL SeekArchiveFile(HANDLE file, QWORD position)
+{
+    // ZIP buffers retain QWORD positions, so keep both halves when using the Boolean seek API.
+    LARGE_INTEGER seekPosition;
+    seekPosition.LowPart = LODWORD(position);
+    seekPosition.HighPart = static_cast<LONG>(HIDWORD(position));
+    return SetFilePointerEx(file, seekPosition, NULL, FILE_BEGIN);
+}
+
 #ifndef SSZIP
 BOOL WINAPI DllMain(HINSTANCE hinstDLL, DWORD fdwReason, LPVOID lpvReserved)
 {
@@ -114,7 +126,9 @@ BOOL SalGetTempFileName(const char *path, const char *prefix, char *tmpName, BOO
 
   if (s - tmpDir < MAX_PATH - 10)  // enough room to append "XXXX.tmp"
   {
-    DWORD randNum = (GetTickCount() & 0xFFF);
+    // Fold the 64-bit uptime so temporary-name probing does not restart with the 32-bit tick cycle.
+    const CMonotonicTimePoint timeSeed = CMonotonicClock::Now();
+    DWORD randNum = (DWORD)(timeSeed ^ (timeSeed >> 32)) & 0xFFF;
     while (1)
     {
       sprintf(s, "%X.tmp", randNum++);
@@ -362,9 +376,7 @@ int CZipCommon::Read(CFile* file, void* buffer, unsigned bytesToRead,
             // the data are not in the buffer at all or not entirely, go read them
             while (1)
             {
-                LONG distHi = HIDWORD(file->FilePointer);
-                if (SetFilePointer(file->File, LODWORD((DWORD)(file->FilePointer & 0x00000000FFFFFFFF)), &distHi, FILE_BEGIN) != 0xFFFFFFFF ||
-                    GetLastError() == NO_ERROR)
+                if (SeekArchiveFile(file->File, file->FilePointer))
                 {
                     file->RealFilePointer = file->FilePointer;
                     unsigned long myToRead = max(toRead, INPUT_BUFFER_SIZE);
@@ -400,9 +412,7 @@ int CZipCommon::Read(CFile* file, void* buffer, unsigned bytesToRead,
             // original non-cached reading
             while (1)
             {
-                LONG distHi = HIDWORD(file->FilePointer);
-                if (SetFilePointer(file->File, LODWORD((DWORD)(file->FilePointer & 0x00000000FFFFFFFF)), &distHi, FILE_BEGIN) != 0xFFFFFFFF ||
-                    GetLastError() == NO_ERROR)
+                if (SeekArchiveFile(file->File, file->FilePointer))
                 {
                     if ((result = ReadFile(file->File, buffer, toRead, &read, NULL)) != 0 && toRead == read)
                     {
@@ -454,9 +464,7 @@ int CZipCommon::Write(CFile* file, const void* buffer, unsigned bytesToWrite,
         file->BufferPosition = 0;
         while (1)
         {
-            LONG distHi = HIDWORD(file->FilePointer);
-            if (SetFilePointer(file->File, LODWORD((DWORD)(file->FilePointer & 0x00000000FFFFFFFF)), &distHi, FILE_BEGIN) == 0xFFFFFFFF &&
-                GetLastError() != NO_ERROR)
+            if (!SeekArchiveFile(file->File, file->FilePointer))
             {
                 result = ProcessError(IDS_ERRACCESS, GetLastError(), file->FileName, file->Flags, skipAll);
                 if (result != ERR_RETRY)
@@ -523,9 +531,7 @@ int CZipCommon::Flush(CFile* file, const void* buffer, unsigned bytesToWrite,
     }
     while (1)
     {
-        LONG distHi = HIDWORD(file->RealFilePointer);
-        if (SetFilePointer(file->File, LODWORD((DWORD)(file->RealFilePointer & 0x00000000FFFFFFFF)), &distHi, FILE_BEGIN) == 0xFFFFFFFF &&
-            GetLastError() != NO_ERROR)
+        if (!SeekArchiveFile(file->File, file->RealFilePointer))
         {
             result = ProcessError(IDS_ERRACCESS, GetLastError(), file->FileName, file->Flags, skipAll);
             if (result != ERR_RETRY)
@@ -938,7 +944,7 @@ int CZipCommon::FindEOCentrDirSig(BOOL* success)
                 DetectRemovable();
                 if (!Removable)
                 {
-                    FindLastFile(lastFile);
+                    FindLastFile(lastFile, _countof(lastFile));
                     if (*lastFile &&
                         CompareString(LOCALE_USER_DEFAULT, NORM_IGNORECASE,
                                       lastFile, -1, ZipName, -1) != CSTR_EQUAL)
@@ -1134,7 +1140,10 @@ int CZipCommon::CheckForExtraBytes()
     if (MultiVol)
         return 0;
 
-    QWORD endOfCentrDir = CentrDirOffs + CentrDirSize;
+    QWORD endOfCentrDir;
+    // ZIP64 central-directory offsets are archive-controlled; validate their sum before comparing physical file positions.
+    if (!CheckedAddUInt64(CentrDirOffs, CentrDirSize, &endOfCentrDir))
+        return IDS_ERRFORMAT;
     QWORD expectedEndOfCentrDir = Zip64 ? Zip64EOCentrDirOffs : EOCentrDirOffs;
 
     if (endOfCentrDir == expectedEndOfCentrDir)
@@ -1155,8 +1164,13 @@ int CZipCommon::CheckForExtraBytes()
             if (Extract) // || MenuSfx)
             {
                 __UINT32 sig = 0;
-                ZipFile->FilePointer = CentrDirOffs + ExtraBytes;
-                if (ZipFile->FilePointer + 4 <= ZipFile->Size &&
+                QWORD centralDirectoryOffset;
+                QWORD signatureEnd;
+                if (!CheckedAddUInt64(CentrDirOffs, ExtraBytes, &centralDirectoryOffset) ||
+                    !CheckedAddUInt64(centralDirectoryOffset, 4, &signatureEnd))
+                    return IDS_ERRFORMAT;
+                ZipFile->FilePointer = centralDirectoryOffset;
+                if (signatureEnd <= ZipFile->Size &&
                     Read(ZipFile, &sig, 4, NULL, NULL))
                     return IDS_NODISPLAY;
                 if (sig == SIG_CENTRFH)
@@ -1195,7 +1209,14 @@ int CZipCommon::ReadCentralHeader(CFileHeader* fileHeader, LPQWORD offset,
         unsigned bytesRead;
     //reads file header and name from disc
     ZipFile->FilePointer = *offset;
-    if (ZipFile->FilePointer + sizeof(CFileHeader) > ZipFile->Size)
+    QWORD centralHeaderEnd;
+    if (!CheckedAddUInt64(ZipFile->FilePointer, sizeof(CFileHeader), &centralHeaderEnd))
+    {
+        // An overflowing archive offset is malformed, not a request to advance to another volume.
+        Fatal = true;
+        return IDS_ERRFORMAT;
+    }
+    if (centralHeaderEnd > ZipFile->Size)
     {
         if (Extract && MultiVol)
         {
@@ -1508,6 +1529,13 @@ int CZipCommon::ReadLocalHeader(CLocalFileHeader* fileHeader, QWORD offset)
 
     //reads file header and name from disc
     ZipFile->FilePointer = offset;
+    QWORD localHeaderEnd;
+    if (!CheckedAddUInt64(ZipFile->FilePointer, sizeof(CLocalFileHeader), &localHeaderEnd))
+    {
+        // Reject a wrapped local offset before Read can interpret it as an unrelated file position.
+        Fatal = true;
+        return IDS_ERRFORMAT;
+    }
     if (Read(ZipFile, fileHeader, sizeof(CLocalFileHeader), &bytesRead, NULL))
         return IDS_NODISPLAY;
     if (bytesRead != sizeof(CLocalFileHeader))
@@ -1541,14 +1569,17 @@ int CZipCommon::ReadLocalHeader(CLocalFileHeader* fileHeader, QWORD offset)
     return 0;
 }
 
-void CZipCommon::ProcessLocalHeader(CLocalFileHeader* fileHeader,
+BOOL CZipCommon::ProcessLocalHeader(CLocalFileHeader* fileHeader,
                                     CFileInfo* fileInfo, CAESExtraField* aesExtraField)
 {
     CALL_STACK_MESSAGE1("CZipCommon::ProcessLocalHeader(, )");
-    fileInfo->DataOffset = fileInfo->LocHeaderOffs +
-                           sizeof(CLocalFileHeader) +
-                           fileHeader->NameLen +
-                           fileHeader->ExtraLen;
+    uint64_t dataOffset = fileInfo->LocHeaderOffs;
+    // Local-header sizes come from the archive; reject wrap before the result controls decompressor I/O.
+    if (!CheckedAddUInt64(dataOffset, sizeof(CLocalFileHeader), &dataOffset) ||
+        !CheckedAddUInt64(dataOffset, fileHeader->NameLen, &dataOffset) ||
+        !CheckedAddUInt64(dataOffset, fileHeader->ExtraLen, &dataOffset))
+        return FALSE;
+    fileInfo->DataOffset = dataOffset;
 
     if (fileHeader->Method == CM_AES)
     {
@@ -1567,9 +1598,13 @@ void CZipCommon::ProcessLocalHeader(CLocalFileHeader* fileHeader,
                 break;
             }
 
-            offset += *LPWORD(LPBYTE(fileHeader) + offset + 2) + 4;
+            DWORD nextOffset;
+            if (!CheckedAddDword(offset, *LPWORD(LPBYTE(fileHeader) + offset + 2), &nextOffset) ||
+                !CheckedAddDword(nextOffset, 4, &offset))
+                return FALSE;
         }
     }
+    return TRUE;
 }
 
 void CZipCommon::SplitPath(char** path, char** name, const char* pathToSplit)
@@ -1835,8 +1870,14 @@ int CZipCommon::MatchFiles(TIndirectArray2<CFileInfo>& files, TIndirectArray2<CE
             free(tempName);
         return IDS_LOWMEM;
     }
-    //i = EOCentrDir.TotalEntries;//directory entries counter
-    readOffset = CentrDirOffs + ExtraBytes;
+    // The in-memory central-directory reader must not begin from a wrapped archive offset.
+    if (!CheckedAddUInt64(CentrDirOffs, ExtraBytes, &readOffset))
+    {
+        if (centralHeader && !centrDir)
+            free(centralHeader);
+        free(tempName);
+        return IDS_ERRFORMAT;
+    }
     readSize = 0;
     if (DiskNum != CentrDirStartDisk && MultiVol)
     {
@@ -2228,6 +2269,19 @@ FAIL:
     return ret;
 }
 
+static BOOL FormatZipDateTimeAnsi(const SYSTEMTIME* time, DWORD flags, char* buffer, int bufferSize, BOOL isDate)
+{
+    // ZIP preserves its ANSI plug-in contract, so convert only after locale-name formatting.
+    WCHAR localeName[LOCALE_NAME_MAX_LENGTH];
+    WCHAR formatted[50];
+    if (GetUserDefaultLocaleName(localeName, ARRAYSIZE(localeName)) == 0)
+        return FALSE;
+    int length = isDate
+                     ? GetDateFormatEx(localeName, flags, time, NULL, formatted, ARRAYSIZE(formatted), NULL)
+                     : GetTimeFormatEx(localeName, flags, time, NULL, formatted, ARRAYSIZE(formatted));
+    return length != 0 && WideCharToMultiByte(CP_ACP, 0, formatted, -1, buffer, bufferSize, NULL, NULL) != 0;
+}
+
 void GetInfo(char* buffer, FILETIME* lastWrite, QWORD size)
 {
     CALL_STACK_MESSAGE1("GetInfo(, , )");
@@ -2237,20 +2291,30 @@ void GetInfo(char* buffer, FILETIME* lastWrite, QWORD size)
     FileTimeToSystemTime(&ft, &st);
 
     char date[50], time[50], number[50];
-    if (GetTimeFormat(LOCALE_USER_DEFAULT, 0, &st, NULL, time, 50) == 0)
+    if (!FormatZipDateTimeAnsi(&st, 0, time, ARRAYSIZE(time), FALSE))
         sprintf(time, "%u:%02u:%02u", st.wHour, st.wMinute, st.wSecond);
-    if (GetDateFormat(LOCALE_USER_DEFAULT, DATE_SHORTDATE, &st, NULL, date, 50) == 0)
+    if (!FormatZipDateTimeAnsi(&st, DATE_SHORTDATE, date, ARRAYSIZE(date), TRUE))
         sprintf(date, "%u.%u.%u", st.wDay, st.wMonth, st.wYear);
     sprintf(buffer, "%s, %s, %s", SalamanderGeneral->NumberToStr(number, CQuadWord().SetUI64(size)), date, time);
 }
 
 int MakeFileName(int number, bool seqNames, const char* archive,
-                 char* name, BOOL winZipNames)
+                 char* name, size_t nameCapacity, BOOL winZipNames)
 {
     CALL_STACK_MESSAGE5("MakeFileName(%d, %d, %s, , %d)", number, seqNames, archive, winZipNames);
 
+    // Generated volume names must remain complete; callers receive -1 instead of a truncated fallback.
+    if (archive == NULL || name == NULL || nameCapacity == 0)
+        return -1;
     if (!seqNames)
-        return (int)strlen(strcpy(name, archive));
+    {
+        if (FAILED(StringCchCopyA(name, nameCapacity, archive)))
+        {
+            name[0] = 0;
+            return -1;
+        }
+        return static_cast<int>(strlen(name));
+    }
 
     const char* arcName = strrchr(archive, '\\');
     if (arcName != NULL)
@@ -2260,25 +2324,30 @@ int MakeFileName(int number, bool seqNames, const char* archive,
     const char* ext = strrchr(arcName, '.');
     if (ext == NULL)
         ext = archive + strlen(archive); // ".cvspass" is extension in Windows
-    int namelen = (int)(ext - archive);
+    const size_t nameLength = static_cast<size_t>(ext - archive);
 
     char buf[MAX_PATH + 12];
-    memcpy(buf, archive, namelen);
-
-    if (winZipNames)
-        sprintf(buf + namelen, ".z%02d", number);
-    else
-        sprintf(buf + namelen, ext > archive && isdigit(ext[-1]) ? "_%02d%s" : "%02d%s", number, ext);
-
-    int ret = (int)strlen(buf);
-    if (ret > MAX_PATH)
+    if (nameLength >= _countof(buf))
     {
-        TRACE_I("archive name is too long to add file numbers:" << buf);
-        return (int)strlen(strcpy(name, archive));
+        name[0] = 0;
+        return -1;
     }
+    memcpy(buf, archive, nameLength);
 
-    strcpy(name, buf);
-    return ret;
+    HRESULT formatResult;
+    if (winZipNames)
+        formatResult = StringCchPrintfA(buf + nameLength, _countof(buf) - nameLength, ".z%02d", number);
+    else
+        formatResult = StringCchPrintfA(buf + nameLength, _countof(buf) - nameLength,
+                                        ext > archive && isdigit(ext[-1]) ? "_%02d%s" : "%02d%s", number, ext);
+
+    if (FAILED(formatResult) || FAILED(StringCchCopyA(name, nameCapacity, buf)))
+    {
+        TRACE_I("archive name is too long to add file numbers:" << archive);
+        name[0] = 0;
+        return -1;
+    }
+    return static_cast<int>(strlen(name));
 }
 
 bool Atod(const char* string, char* decSep, double* val)
@@ -2337,59 +2406,124 @@ bool Atod(const char* string, char* decSep, double* val)
         return false;
 }
 
-#define GET_DWORD(dw) \
-    { \
-        if (size < 4) \
-            return -1; \
-        size -= 4; \
-        dw = *(DWORD*)ptr; \
-        ptr += 4; \
+static BOOL ReadSfxDword(const char*& ptr, DWORD& bytesLeft, DWORD& value)
+{
+    if (bytesLeft < sizeof(value))
+        return FALSE;
+    memcpy(&value, ptr, sizeof(value));
+    ptr += sizeof(value);
+    bytesLeft -= sizeof(value);
+    return TRUE;
+}
+
+static BOOL ReadSfxString(const char*& ptr, DWORD& bytesLeft, char* destination, size_t destinationSize)
+{
+    DWORD stringSize;
+    // Settings stored in the registry are untrusted; reserve the terminator before copying into a fixed field.
+    if (destination == NULL || destinationSize == 0 ||
+        !ReadSfxDword(ptr, bytesLeft, stringSize) || stringSize >= destinationSize ||
+        bytesLeft < stringSize)
+        return FALSE;
+    if (stringSize != 0)
+        memcpy(destination, ptr, stringSize);
+    destination[stringSize] = 0;
+    ptr += stringSize;
+    bytesLeft -= stringSize;
+    return TRUE;
+}
+
+static BOOL ReadSfxAllocatedString(const char*& ptr, DWORD& bytesLeft, char*& destination)
+{
+    DWORD stringSize;
+    size_t allocationSize;
+    if (!ReadSfxDword(ptr, bytesLeft, stringSize) || bytesLeft < stringSize ||
+        !CheckedAddSize((size_t)stringSize, 1, &allocationSize))
+        return FALSE;
+
+    char* replacement = (char*)malloc(allocationSize);
+    if (replacement == NULL)
+        return FALSE;
+    if (stringSize != 0)
+        memcpy(replacement, ptr, stringSize);
+    replacement[stringSize] = 0;
+    // Allocate before discarding the prior setting so a malformed value cannot leave a dangling pointer.
+    free(destination);
+    destination = replacement;
+    ptr += stringSize;
+    bytesLeft -= stringSize;
+    return TRUE;
+}
+
+static BOOL AppendSfxBytes(char*& buffer, DWORD& capacity, DWORD& stored, const void* source, DWORD byteCount)
+{
+    DWORD required;
+    if (!CheckedAddDword(stored, byteCount, &required))
+        return FALSE;
+    if (required > capacity)
+    {
+        DWORD doubledCapacity;
+        DWORD newCapacity;
+        if (!CheckedAddDword(capacity, capacity, &doubledCapacity))
+            doubledCapacity = MAXDWORD;
+        newCapacity = doubledCapacity > required ? doubledCapacity : required;
+        char* resized = (char*)realloc(buffer, newCapacity);
+        if (resized == NULL)
+            return FALSE;
+        buffer = resized;
+        capacity = newCapacity;
     }
-#define GET_STRING(str) \
-    { \
-        DWORD s; \
-        GET_DWORD(s); \
-        if (size < s) \
-            return -1; \
-        size -= s; \
-        memcpy(str, ptr, s); \
-        str[s] = 0; \
-        ptr += s; \
-    }
-#define GET_STRING_ALLOC(str) \
-    { \
-        DWORD s; \
-        GET_DWORD(s); \
-        if (size < s) \
-            return -1; \
-        size -= s; \
-        str = (char*)realloc(str, s + 1); \
-        memcpy(str, ptr, s); \
-        str[s] = 0; \
-        ptr += s; \
-    }
+    if (byteCount != 0)
+        memcpy(buffer + stored, source, byteCount);
+    stored = required;
+    return TRUE;
+}
+
+static BOOL AppendSfxDword(char*& buffer, DWORD& capacity, DWORD& stored, DWORD value)
+{
+    return AppendSfxBytes(buffer, capacity, stored, &value, sizeof(value));
+}
+
+static BOOL AppendSfxString(char*& buffer, DWORD& capacity, DWORD& stored, const char* value)
+{
+    size_t length = value != NULL ? strlen(value) : 0;
+    DWORD storedLength;
+    // Convert the host string only after proving the serialized length fits the DWORD format.
+    if (!CheckedCastSizeToDword(length, &storedLength) ||
+        !AppendSfxDword(buffer, capacity, stored, storedLength))
+        return FALSE;
+    return AppendSfxBytes(buffer, capacity, stored, value, storedLength);
+}
 
 DWORD ExpandSfxSettings(CSfxSettings* settings, void* buffer, DWORD size)
 {
     CALL_STACK_MESSAGE2("ExpandSfxSettings(, , 0x%X)", size);
-    char* ptr = (char*)buffer;
-    GET_DWORD(settings->Flags);
-    GET_STRING(settings->Command);
-    GET_STRING(settings->SfxFile);
-    GET_STRING(settings->Text);
-    GET_STRING(settings->Title);
-    GET_STRING(settings->TargetDir);
-    GET_STRING(settings->ExtractBtnText);
-    GET_STRING(settings->IconFile);
-    GET_DWORD(settings->IconIndex);
-    GET_DWORD(settings->MBoxStyle);
-    GET_STRING_ALLOC(settings->MBoxText);
-    GET_STRING(settings->MBoxTitle);
-    GET_STRING(settings->WaitFor);
-    if (size > 0)
+    if (settings == NULL || (buffer == NULL && size != 0))
+        return (DWORD)-1;
+    const char* ptr = (const char*)buffer;
+    DWORD bytesLeft = size;
+    DWORD flags;
+    DWORD mboxStyle;
+    if (!ReadSfxDword(ptr, bytesLeft, flags) ||
+        !ReadSfxString(ptr, bytesLeft, settings->Command, _countof(settings->Command)) ||
+        !ReadSfxString(ptr, bytesLeft, settings->SfxFile, _countof(settings->SfxFile)) ||
+        !ReadSfxString(ptr, bytesLeft, settings->Text, _countof(settings->Text)) ||
+        !ReadSfxString(ptr, bytesLeft, settings->Title, _countof(settings->Title)) ||
+        !ReadSfxString(ptr, bytesLeft, settings->TargetDir, _countof(settings->TargetDir)) ||
+        !ReadSfxString(ptr, bytesLeft, settings->ExtractBtnText, _countof(settings->ExtractBtnText)) ||
+        !ReadSfxString(ptr, bytesLeft, settings->IconFile, _countof(settings->IconFile)) ||
+        !ReadSfxDword(ptr, bytesLeft, settings->IconIndex) ||
+        !ReadSfxDword(ptr, bytesLeft, mboxStyle) ||
+        !ReadSfxAllocatedString(ptr, bytesLeft, settings->MBoxText) ||
+        !ReadSfxString(ptr, bytesLeft, settings->MBoxTitle, _countof(settings->MBoxTitle)) ||
+        !ReadSfxString(ptr, bytesLeft, settings->WaitFor, _countof(settings->WaitFor)))
+        return (DWORD)-1;
+    settings->Flags = flags;
+    settings->MBoxStyle = mboxStyle;
+    if (bytesLeft > 0)
     {
-        GET_STRING(settings->Vendor);
-        GET_STRING(settings->WWW);
+        if (!ReadSfxString(ptr, bytesLeft, settings->Vendor, _countof(settings->Vendor)) ||
+            !ReadSfxString(ptr, bytesLeft, settings->WWW, _countof(settings->WWW)))
+            return (DWORD)-1;
     }
     else
     {
@@ -2408,56 +2542,44 @@ DWORD ExpandSfxSettings(CSfxSettings* settings, void* buffer, DWORD size)
         if (lang)
             delete lang;
     }
-    return (int)(ptr - (char*)buffer);
+    return size - bytesLeft;
 }
-
-#define PUT_DWORD(dw) \
-    { \
-        if (stored + 4 > size) \
-            buffer = (char*)realloc(buffer, (size = max(size * 2, size + 4))); \
-        *(DWORD*)(buffer + stored) = dw; \
-        stored += 4; \
-    }
-#define PUT_STRING(str) \
-    { \
-        DWORD s = lstrlen(str); \
-        PUT_DWORD(s); \
-        if (stored + s > size) \
-            buffer = (char*)realloc(buffer, (size = max(size * 2, size + s))); \
-        memcpy(buffer + stored, str, s); \
-        stored += s; \
-    }
 
 DWORD PackSfxSettings(CSfxSettings* settings, char*& buffer, DWORD& size)
 {
     CALL_STACK_MESSAGE2("PackSfxSettings(, , 0x%X)", size);
     DWORD stored = 0;
-    PUT_DWORD(settings->Flags);
-    PUT_STRING(settings->Command);
-    PUT_STRING(settings->SfxFile);
-    PUT_STRING(settings->Text);
-    PUT_STRING(settings->Title);
-    PUT_STRING(settings->TargetDir);
-    PUT_STRING(settings->ExtractBtnText);
-    PUT_STRING(settings->IconFile);
-    PUT_DWORD(settings->IconIndex);
-    PUT_DWORD(settings->MBoxStyle);
-    PUT_STRING(settings->MBoxText);
-    PUT_STRING(settings->MBoxTitle);
-    PUT_STRING(settings->WaitFor);
-    PUT_STRING(settings->Vendor);
-    PUT_STRING(settings->WWW);
+    if (settings == NULL ||
+        !AppendSfxDword(buffer, size, stored, settings->Flags) ||
+        !AppendSfxString(buffer, size, stored, settings->Command) ||
+        !AppendSfxString(buffer, size, stored, settings->SfxFile) ||
+        !AppendSfxString(buffer, size, stored, settings->Text) ||
+        !AppendSfxString(buffer, size, stored, settings->Title) ||
+        !AppendSfxString(buffer, size, stored, settings->TargetDir) ||
+        !AppendSfxString(buffer, size, stored, settings->ExtractBtnText) ||
+        !AppendSfxString(buffer, size, stored, settings->IconFile) ||
+        !AppendSfxDword(buffer, size, stored, settings->IconIndex) ||
+        !AppendSfxDword(buffer, size, stored, settings->MBoxStyle) ||
+        !AppendSfxString(buffer, size, stored, settings->MBoxText) ||
+        !AppendSfxString(buffer, size, stored, settings->MBoxTitle) ||
+        !AppendSfxString(buffer, size, stored, settings->WaitFor) ||
+        !AppendSfxString(buffer, size, stored, settings->Vendor) ||
+        !AppendSfxString(buffer, size, stored, settings->WWW))
+        return (DWORD)-1;
     return stored;
 }
 
 char* FormatMessage(char* buffer, int errorID, int lastError)
 {
     CALL_STACK_MESSAGE3("FormatMessage(, %d, %d)", errorID, lastError);
-    lstrcpy(buffer, LoadStr(errorID));
-    if (lastError)
+    // This legacy formatter has a fixed 512-byte caller contract; keep only a complete localized prefix.
+    if (FAILED(StringCchCopyA(buffer, 512, LoadStr(errorID))))
+        buffer[0] = 0;
+    const size_t prefixLength = strlen(buffer);
+    if (lastError && prefixLength < 511)
         ::FormatMessage(FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS, NULL, lastError,
-                        MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), buffer + lstrlen(buffer),
-                        512 - lstrlen(buffer), NULL);
+                        MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), buffer + prefixLength,
+                        static_cast<DWORD>(512 - prefixLength), NULL);
     return buffer;
 }
 
@@ -2467,9 +2589,7 @@ StrNChr(LPCTSTR lpStart, int nChar, char wMatch)
     CALL_STACK_MESSAGE_NONE
     if (lpStart == NULL)
         return NULL;
-    int i = lstrlen(lpStart);
-    if (i > nChar)
-        i = nChar;
+    // Search only the explicit caller range; the terminated length was never part of this bound.
     LPCTSTR lpEnd = lpStart + nChar;
     while (lpStart < lpEnd)
     {
@@ -2498,7 +2618,8 @@ LPTSTR TrimTralingSpaces(LPTSTR lpString)
     CALL_STACK_MESSAGE_NONE
     if (lpString)
     {
-        char* sour = lpString + lstrlen(lpString);
+        // Trimming operates on a terminated mutable string.
+        char* sour = lpString + strlen(lpString);
         while (--sour >= lpString && *sour == ' ')
             ;
         sour[1] = 0;

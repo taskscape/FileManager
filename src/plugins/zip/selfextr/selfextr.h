@@ -3,6 +3,8 @@
 
 #pragma once
 
+#include <stdarg.h>
+
 //silent flags
 #define SF_TOOLONGNAMES 0x0001
 #define SF_CREATEFILE 0x0002
@@ -25,6 +27,130 @@ extern bool SafeMode;
 extern HINSTANCE HInstance;
 void CloseMapping();
 int HandleError(CStringIndex message, unsigned long err, char* fileName = NULL, bool* retry = NULL, unsigned silentFlag = 0, bool noSkip = false);
+
+static BOOL SelfExtrAppendCharacter(char* buffer, size_t bufferSize, size_t* used, char value)
+{
+    if (*used + 1 >= bufferSize)
+        return FALSE;
+    buffer[(*used)++] = value;
+    buffer[*used] = 0;
+    return TRUE;
+}
+
+static BOOL SelfExtrAppendText(char* buffer, size_t bufferSize, size_t* used, const char* text)
+{
+    while (*text != 0)
+    {
+        if (!SelfExtrAppendCharacter(buffer, bufferSize, used, *text++))
+            return FALSE;
+    }
+    return TRUE;
+}
+
+static BOOL SelfExtrAppendUnsigned(char* buffer, size_t bufferSize, size_t* used, unsigned value, unsigned base, size_t width, char padding)
+{
+    static const char digits[] = "0123456789ABCDEF";
+    char reverse[16];
+    size_t length = 0;
+    do
+    {
+        reverse[length++] = digits[value % base];
+        value /= base;
+    } while (value != 0);
+    while (length < width)
+    {
+        if (!SelfExtrAppendCharacter(buffer, bufferSize, used, padding))
+            return FALSE;
+        width--;
+    }
+    while (length > 0)
+    {
+        if (!SelfExtrAppendCharacter(buffer, bufferSize, used, reverse[--length]))
+            return FALSE;
+    }
+    return TRUE;
+}
+
+static BOOL SelfExtrVFormat(char* buffer, size_t bufferSize, const char* format, va_list args)
+{
+    // The standalone SFX is CRT-free; support its bounded %s/%d/%u/%x/%X formats without wsprintf.
+    size_t used = 0;
+    buffer[0] = 0;
+    while (*format != 0)
+    {
+        if (*format != '%')
+        {
+            if (!SelfExtrAppendCharacter(buffer, bufferSize, &used, *format++))
+                return FALSE;
+            continue;
+        }
+        format++;
+        if (*format == '%')
+        {
+            if (!SelfExtrAppendCharacter(buffer, bufferSize, &used, *format++))
+                return FALSE;
+            continue;
+        }
+        char padding = ' ';
+        size_t width = 0;
+        if (*format == '0')
+        {
+            padding = '0';
+            format++;
+        }
+        while (*format >= '0' && *format <= '9')
+            width = width * 10 + (size_t)(*format++ - '0');
+        if (*format == 's')
+        {
+            const char* text = va_arg(args, const char*);
+            if (!SelfExtrAppendText(buffer, bufferSize, &used, text != NULL ? text : "(null)"))
+                return FALSE;
+        }
+        else if (*format == 'd' || *format == 'i')
+        {
+            int value = va_arg(args, int);
+            if (value < 0 && !SelfExtrAppendCharacter(buffer, bufferSize, &used, '-'))
+                return FALSE;
+            unsigned magnitude = value < 0 ? (unsigned)(-(value + 1)) + 1 : (unsigned)value;
+            if (!SelfExtrAppendUnsigned(buffer, bufferSize, &used, magnitude, 10, width, padding))
+                return FALSE;
+        }
+        else if (*format == 'u' || *format == 'x' || *format == 'X')
+        {
+            unsigned value = va_arg(args, unsigned);
+            if (!SelfExtrAppendUnsigned(buffer, bufferSize, &used, value, *format == 'u' ? 10 : 16, width, padding))
+                return FALSE;
+        }
+        else
+        {
+            return FALSE;
+        }
+        format++;
+    }
+    return TRUE;
+}
+
+static BOOL SelfExtrFormat(char* buffer, size_t bufferSize, const char* format, ...)
+{
+    va_list args;
+    va_start(args, format);
+    BOOL result = SelfExtrVFormat(buffer, bufferSize, format, args);
+    va_end(args);
+    return result;
+}
+
+static BOOL SelfExtrFormatUserDateTime(const SYSTEMTIME* time, DWORD flags, char* buffer, int bufferSize, BOOL isDate)
+{
+    // Keep the standalone SFX UTF-8 while obtaining user-visible text through locale-name APIs.
+    WCHAR localeName[LOCALE_NAME_MAX_LENGTH];
+    WCHAR formatted[50];
+    if (GetUserDefaultLocaleName(localeName, ARRAYSIZE(localeName)) == 0)
+        return FALSE;
+    int length = isDate
+                     ? GetDateFormatEx(localeName, flags, time, NULL, formatted, ARRAYSIZE(formatted), NULL)
+                     : GetTimeFormatEx(localeName, flags, time, NULL, formatted, ARRAYSIZE(formatted));
+    return length != 0 && WideCharToMultiByte(CP_UTF8, 0, formatted, -1, buffer, bufferSize, NULL, NULL) != 0;
+}
 
 #ifndef SALAMANDER_UTF8_WINAPI_SELFEXTR
 #define SALAMANDER_UTF8_WINAPI_SELFEXTR
@@ -66,7 +192,10 @@ static BOOL SelfExtrConvertFindDataWToUtf8(const WIN32_FIND_DATAW* src, WIN32_FI
 {
     if (dst == NULL || src == NULL)
         return FALSE;
-    ZeroMemory(dst, sizeof(*dst));
+    // This CRT-free SFX target cannot link the compiler-generated memset used by ZeroMemory for this structure.
+    volatile BYTE* dstBytes = (volatile BYTE*)dst;
+    for (size_t i = 0; i < sizeof(*dst); i++)
+        dstBytes[i] = 0;
     dst->dwFileAttributes = src->dwFileAttributes;
     dst->ftCreationTime = src->ftCreationTime;
     dst->ftLastAccessTime = src->ftLastAccessTime;

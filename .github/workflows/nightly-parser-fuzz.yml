@@ -1,0 +1,35 @@
+name: Nightly Parser Corpus Soak
+
+on:
+  schedule:
+    - cron: '43 3 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+
+jobs:
+  deterministic-parser-soak:
+    runs-on: windows-2025
+
+    steps:
+      - name: Checkout
+        # Pin the scheduled campaign to a reviewed action commit as well as a reviewed source revision.
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Setup MSVC Developer Command Prompt (x64 toolchain)
+        uses: ilammy/msvc-dev-cmd@0b201ec74fa43914dc39ae48a89fd1d8cb592756 # v1
+        with:
+          arch: x64
+
+      - name: Replay bzip2 hostile-input corpus
+        shell: pwsh
+        # Repetition raises the scheduled parser-execution budget without making PR checks slow.
+        run: .\tools\test-bzip2-compatibility.ps1 -Architecture x64 -Iterations 250
+
+      - name: Replay Markdown extension-combination corpus
+        shell: pwsh
+        run: .\tools\test-cmark-gfm-hardening.ps1 -Iterations 250

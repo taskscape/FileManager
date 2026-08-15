@@ -14,6 +14,7 @@
 
 #pragma once
 
+#include "..\\..\\common\\monotonic_time.h"
 #include "tree.h"
 
 class CNethoodCache;
@@ -231,7 +232,7 @@ protected:
 
     /// Timestamp when the node was inserted in the stand-by list.
     /// If the node is not in the stand-by list then this value is zero.
-    UINT m_uStandbyTimestamp;
+    CMonotonicTimePoint m_uStandbyTimestamp;
 
     /// If true, the node will survive even if not included
     /// in the enumeration result.
@@ -1383,10 +1384,11 @@ private:
     ///         return value is the value of dwError parameter.
     static DWORD ExtendWNetError(__in DWORD dwError);
 
-    /// Returns path to the user's network places folder.
+    /// Returns path to the user's network places folder; callers provide a MAX_PATH buffer
+    /// because this ANSI plug-in has not yet adopted dynamically sized paths.
     /// \return If the method succeeds, the return value is nonzero.
     ///         Otherwise the return value is zero.
-    static BOOL GetShortcutsDir(__out PTSTR pszPath);
+    static BOOL GetShortcutsDir(__out_ecount(MAX_PATH) PTSTR pszPath);
 
     ///
     static BOOL ResolveNetShortcut(__inout_ecount(MAX_PATH) PTSTR path);

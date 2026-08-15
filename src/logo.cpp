@@ -434,7 +434,8 @@ CAboutDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
     {
         HDC hdcStatic = (HDC)wParam;
         HWND hwndStatic = (HWND)lParam;
-        int resID = GetWindowLong(hwndStatic, GWL_ID);
+        // Read the control ID through the pointer-width API to avoid retaining a 32-bit window-data contract.
+        int resID = (int)GetWindowLongPtr(hwndStatic, GWL_ID);
         COLORREF textClr = RGB(70, 70, 70);
         switch (resID)
         {

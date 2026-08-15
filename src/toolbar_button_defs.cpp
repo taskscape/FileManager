@@ -11,6 +11,8 @@
 #include "plugins.h"
 #include "fileswnd.h"
 
+#include <strsafe.h>
+
 #include "nanosvg\nanosvg.h"
 #include "nanosvg\nanosvgrast.h"
 #include "svg.h"
@@ -960,11 +962,11 @@ void PrepareToolTipText(char* buff, BOOL stripHotKey)
     {
         if (!stripHotKey && *(p + 1) != 0)
         {
-            *p = ' ';
-            p++;
-            memmove(p + 1, p, lstrlen(p) + 1);
-            *p = '(';
-            lstrcat(p, ")");
+            // Toolbar tooltip callers provide the fixed reply field needed for the parentheses.
+            char hotKey[TOOLTIP_TEXT_MAX];
+            if (FAILED(StringCchCopyA(hotKey, _countof(hotKey), p + 1)) ||
+                FAILED(StringCchPrintfA(p, TOOLTIP_TEXT_MAX - (p - buff), " (%s)", hotKey)))
+                *p = 0;
         }
         else
             *p = 0;
@@ -1059,7 +1061,9 @@ BOOL CMainToolBar::Load(const char* data)
 {
     CALL_STACK_MESSAGE2("CMainToolBar::Load(%s)", data);
     char tmp[5000];
-    lstrcpyn(tmp, data, 5000);
+    // Reject an oversized persisted toolbar layout rather than parsing a truncated configuration.
+    if (FAILED(StringCchCopyA(tmp, _countof(tmp), data)))
+        return FALSE;
 
     RemoveAllItems();
     char* p = strtok(tmp, ",");
@@ -1109,8 +1113,9 @@ BOOL CMainToolBar::Save(char* data)
         p += sprintf(p, "%d", tbbeIndex);
         if (i < count - 1)
         {
-            lstrcpy(p, ",");
-            p++;
+            // The legacy caller-owned layout buffer reserves delimiters between serialized indices.
+            *p++ = ',';
+            *p = 0;
         }
     }
     return TRUE;
@@ -1120,11 +1125,17 @@ void CMainToolBar::OnGetToolTip(LPARAM lParam)
 {
     CALL_STACK_MESSAGE2("CMainToolBar::OnGetToolTip(0x%IX)", lParam);
     TOOLBAR_TOOLTIP* tt = (TOOLBAR_TOOLTIP*)lParam;
+    if (tt == NULL || tt->Buffer == NULL)
+        return;
     int tbbeIndex = tt->CustomData;
     if (tbbeIndex < TBBE_TERMINATOR)
     {
-        lstrcpy(tt->Buffer, LoadStr(ToolBarButtons[tbbeIndex].ToolTipResID));
-        if (tbbeIndex == TBBE_CLIPBOARD_PASTE)
+        // The host owns this fixed reply buffer; do not truncate the base tooltip or its state annotation.
+        const BOOL toolTipCopied = SUCCEEDED(StringCchCopyA(tt->Buffer, TOOLTIP_TEXT_MAX,
+                                                            LoadStr(ToolBarButtons[tbbeIndex].ToolTipResID)));
+        if (!toolTipCopied)
+            tt->Buffer[0] = 0;
+        if (toolTipCopied && tbbeIndex == TBBE_CLIPBOARD_PASTE)
         {
             CFilesWindow* activePanel = MainWindow != NULL ? MainWindow->GetActivePanel() : NULL;
             BOOL activePanelIsDisk = (activePanel != NULL && activePanel->Is(ptDisk));
@@ -1136,10 +1147,15 @@ void CMainToolBar::OnGetToolTip(LPARAM lParam)
                 tail[0] = 0;
                 char* p = strrchr(tt->Buffer, '\t');
                 if (p != NULL)
-                    strcpy(tail, p);
+                {
+                    if (FAILED(StringCchCopyA(tail, _countof(tail), p)))
+                        tail[0] = 0;
+                }
                 else
                     p = tt->Buffer + strlen(tt->Buffer);
-                sprintf(p, " (%s)%s", LoadStr(IDS_PASTE_CHANGE_DIRECTORY), tail);
+                if (FAILED(StringCchPrintfA(p, TOOLTIP_TEXT_MAX - (p - tt->Buffer), " (%s)%s",
+                                            LoadStr(IDS_PASTE_CHANGE_DIRECTORY), tail)))
+                    tt->Buffer[0] = 0;
             }
         }
         PrepareToolTipText(tt->Buffer, FALSE);
@@ -1338,7 +1354,8 @@ BOOL CBottomToolBar::InitDataResRow(CBottomTBStateEnum state, int textResID)
 {
     CALL_STACK_MESSAGE2("CBottomToolBar::InitDataResRow(, %d)", textResID);
     char buff[BOTTOMTB_TEXT_MAX * 12];
-    lstrcpyn(buff, LoadStr(textResID), BOTTOMTB_TEXT_MAX * 12);
+    // Bottom-toolbar resource text is intentionally bounded to its parser's fixed row field.
+    StringCchCopyNA(buff, _countof(buff), LoadStr(textResID), _countof(buff) - 1);
 
     int index = 0;
     const char* begin = buff;
@@ -1515,10 +1532,15 @@ void CBottomToolBar::OnGetToolTip(LPARAM lParam)
 {
     CALL_STACK_MESSAGE2("CBottomToolBar::OnGetToolTip(0x%IX)", lParam);
     TOOLBAR_TOOLTIP* tt = (TOOLBAR_TOOLTIP*)lParam;
+    if (tt == NULL || tt->Buffer == NULL)
+        return;
     int tbbeIndex = tt->CustomData;
     if (tbbeIndex < TBBE_TERMINATOR)
     {
-        lstrcpy(tt->Buffer, LoadStr(ToolBarButtons[tbbeIndex].ToolTipResID));
+        // Bottom-toolbar tooltips use the same host-owned fixed reply buffer.
+        if (FAILED(StringCchCopyA(tt->Buffer, TOOLTIP_TEXT_MAX,
+                                  LoadStr(ToolBarButtons[tbbeIndex].ToolTipResID))))
+            tt->Buffer[0] = 0;
         PrepareToolTipText(tt->Buffer, TRUE);
     }
 }

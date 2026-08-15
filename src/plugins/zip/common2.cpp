@@ -6,6 +6,7 @@
 #include <ostream>
 #include <stdio.h>
 #include <commctrl.h>
+#include <strsafe.h>
 
 #include "spl_com.h"
 #include "spl_base.h"
@@ -99,7 +100,15 @@ int RenumberName(int number, const char* oldName, char* newName,
     return (int)strlen(newName);
 }
 
-void SplitPath2(const char* pathToSplit, char* path, char* name, char* ext)
+static bool CopyZipPathSegment(char* destination, size_t destinationCapacity,
+                               const char* source, size_t sourceLength)
+{
+    // Volume-name components are retained only when their complete measured segment fits.
+    return SUCCEEDED(StringCchCopyNA(destination, destinationCapacity, source, sourceLength));
+}
+
+bool SplitPath2(const char* pathToSplit, char* path, size_t pathCapacity,
+                char* name, size_t nameCapacity, char* ext, size_t extCapacity)
 {
     CALL_STACK_MESSAGE2("SplitPath2(%s, , , )", pathToSplit);
     const char* sour = pathToSplit;
@@ -114,7 +123,9 @@ void SplitPath2(const char* pathToSplit, char* path, char* name, char* ext)
     }
     if (lastSlash)
     {
-        lstrcpyn(path, pathToSplit, (int)(lastSlash - pathToSplit) + 2);
+        if (!CopyZipPathSegment(path, pathCapacity, pathToSplit,
+                                static_cast<size_t>(lastSlash - pathToSplit) + 1))
+            return false;
         sour = ++lastSlash;
     }
     else
@@ -130,14 +141,18 @@ void SplitPath2(const char* pathToSplit, char* path, char* name, char* ext)
     }
     if (lastDot)
     {
-        lstrcpyn(name, lastSlash, (int)(lastDot - lastSlash) + 1);
-        lstrcpy(ext, lastDot);
+        if (!CopyZipPathSegment(name, nameCapacity, lastSlash,
+                                static_cast<size_t>(lastDot - lastSlash)) ||
+            FAILED(StringCchCopyA(ext, extCapacity, lastDot)))
+            return false;
     }
     else
     {
-        lstrcpy(name, lastSlash);
+        if (FAILED(StringCchCopyA(name, nameCapacity, lastSlash)))
+            return false;
         *ext = 0;
     }
+    return true;
 }
 
 int CZipCommon::ChangeDisk()
@@ -212,7 +227,7 @@ int CZipCommon::ChangeDisk()
     return 0;
 }
 
-void CZipCommon::FindLastFile(char* lastFile)
+void CZipCommon::FindLastFile(char* lastFile, size_t lastFileCapacity)
 {
     CALL_STACK_MESSAGE1("CZipCommon::FindLastFile()");
     char path[MAX_PATH];
@@ -227,15 +242,21 @@ void CZipCommon::FindLastFile(char* lastFile)
     char buf[MAX_PATH];
     int pathLen;
 
-    *lastFile = NULL;
-    SplitPath2(ZipName, path, name, ext);
+    if (lastFileCapacity == 0)
+        return;
+    *lastFile = 0;
+    if (!SplitPath2(ZipName, path, _countof(path), name, _countof(name), ext, _countof(ext)))
+        return;
     if (!*name)
         return;
     /*{
     lstrcpy(name, ext);
     *ext = 0;
   }*/
-    i = lstrlen(name) - 1;
+    const int initialNameLength = static_cast<int>(strlen(name));
+    if (initialNameLength == 0)
+        return;
+    i = initialNameLength - 1;
     sour = name + i;
     while (sour >= name)
     {
@@ -246,40 +267,56 @@ void CZipCommon::FindLastFile(char* lastFile)
     if (sour < name || sour == name + i)
         return;
     *(++sour) = 0;
-    sprintf(mask, "%s%s*%s", path, name, ext);
+    // Searching a prefix would select the wrong next volume, so reject an oversized mask.
+    if (FAILED(StringCchPrintfA(mask, _countof(mask), "%s%s*%s", path, name, ext)))
+        return;
     search = FindFirstFile(mask, &data);
     if (search == INVALID_HANDLE_VALUE)
         return;
-    lstrcpy(buf, path);
-    pathLen = lstrlen(buf);
+    if (FAILED(StringCchCopyA(buf, _countof(buf), path)))
+    {
+        FindClose(search);
+        return;
+    }
+    pathLen = static_cast<int>(strlen(buf));
     do
     {
-        SplitPath2(data.cFileName, path, name, ext);
-        /*if (!*name)
-    {
-      lstrcpy(name, ext);
-      *ext = 0;
-    }*/
-        i = lstrlen(name) - 1;
-        sour = name + i;
-        while (sour >= name)
+        if (SplitPath2(data.cFileName, path, _countof(path), name, _countof(name), ext, _countof(ext)))
         {
-            if (!isdigit(*sour))
-                break;
-            sour--;
-        }
-        if (sour >= name && sour != name + i)
+            /*if (!*name)
         {
-            j = atoi(++sour);
-            if (j > biggest && !(data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY))
+          lstrcpy(name, ext);
+          *ext = 0;
+        }*/
+            const int candidateNameLength = static_cast<int>(strlen(name));
+            if (candidateNameLength != 0)
             {
-                biggest = j;
-                lstrcpy(buf + pathLen, data.cFileName);
+                i = candidateNameLength - 1;
+                sour = name + i;
+                while (sour >= name)
+                {
+                    if (!isdigit(*sour))
+                        break;
+                    sour--;
+                }
+                if (sour >= name && sour != name + i)
+                {
+                    j = atoi(++sour);
+                    if (j > biggest && !(data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY))
+                    {
+                        if (SUCCEEDED(StringCchCopyA(buf + pathLen, _countof(buf) - pathLen, data.cFileName)))
+                            biggest = j;
+                    }
+                }
             }
         }
     } while (FindNextFile(search, &data));
     if (GetLastError() == ERROR_NO_MORE_FILES && biggest)
-        lstrcpy(lastFile, buf);
+    {
+        // Preserve the caller's full-volume-name contract when reporting the discovered file.
+        if (FAILED(StringCchCopyA(lastFile, lastFileCapacity, buf)))
+            *lastFile = 0;
+    }
     FindClose(search);
     return;
 }

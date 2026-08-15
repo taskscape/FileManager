@@ -289,7 +289,9 @@ CProgressBar::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
     {
         if (wParam == IDT_PROGRESSSELFMOVE)
         {
-            if ((SelfMoveTime != 0xFFFFFFFF) && (GetTickCount() - SelfMoveTicks > SelfMoveTime))
+            if ((SelfMoveTime != 0xFFFFFFFF) &&
+                CMonotonicClock::HasElapsed(SelfMoveTicks, (CMonotonicDuration)SelfMoveTime + 1,
+                                            CMonotonicClock::Now()))
             {
                 KillTimer(HWindow, IDT_PROGRESSSELFMOVE);
                 TimerIsRunning = FALSE;
@@ -333,7 +335,7 @@ CProgressBar::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         {
             if (SelfMoveTime > 0)
             {
-                SelfMoveTicks = GetTickCount();
+                SelfMoveTicks = CMonotonicClock::Now();
                 if (!TimerIsRunning)
                 {
                     SetTimer(HWindow, IDT_PROGRESSSELFMOVE, SelfMoveSpeed, NULL);

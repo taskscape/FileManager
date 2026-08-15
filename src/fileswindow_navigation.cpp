@@ -3,6 +3,7 @@
 // CommentsTranslationProject: TRANSLATED
 
 #include "precomp.h"
+#include "common\monotonic_time.h"
 
 #include "cfgdlg.h"
 #include "plugins.h"
@@ -18,6 +19,8 @@
 #include "zip.h"
 #include "shiconov.h"
 #include "execlog.h"
+
+#include <strsafe.h>
 
 //
 // ****************************************************************************
@@ -182,7 +185,8 @@ BOOL CFilesWindow::ReadDirectory(HWND parent, BOOL isRefresh)
     // icon-cache cleanup
     SleepIconCacheThread();
     IconCache->Release();
-    EndOfIconReadingTime = GetTickCount() - 10000;
+    // A new listing must not inherit refresh suppression from its predecessor.
+    EndOfIconReadingTime = CMonotonicClock::AtLeastDurationAgo(10000);
     StopThumbnailLoading = FALSE; // icon-cache is cleaned, the period of impossibility of using data about "thumbnail-loaders" in icon-cache ends
 
     TemporarilySimpleIcons = FALSE;
@@ -391,9 +395,9 @@ BOOL CFilesWindow::ReadDirectory(HWND parent, BOOL isRefresh)
         sprintf(buf, LoadStr(IDS_READINGPATHESC), GetPath());
         CreateSafeWaitWindow(buf, NULL, 2000, TRUE, MainWindow->HWindow);
 
-        DWORD lastEscCheckTime;
+        CMonotonicTimePoint lastEscCheckTime;
         //lastEscCheckTime = GetTickCount() - 200;  // the first ESC will go immediately
-        lastEscCheckTime = GetTickCount(); // the first ESC will go after 200 ms -- it's a protection
+        lastEscCheckTime = CMonotonicClock::Now(); // the first ESC will go after 200 ms -- it's a protection
                                            // against the cancel prompt for listing after the user
                                            // has closed a dialog (e.g. Files/Security/*) by Esc and
                                            // in the panel there was a network drive (and during the
@@ -469,8 +473,9 @@ BOOL CFilesWindow::ReadDirectory(HWND parent, BOOL isRefresh)
                             GetCurrentLocalReparsePoint(GetPath(), CheckPathRootWithRetryMsgBox, MAX_PATH);
                             if (strlen(CheckPathRootWithRetryMsgBox) > 3)
                             {
-                                lstrcpyn(drive, CheckPathRootWithRetryMsgBox, MAX_PATH);
-                                SalPathRemoveBackslash(drive);
+                                // The retry dialog identifies one root; retain the original drive label on overflow.
+                                if (SUCCEEDED(StringCchCopyA(drive, _countof(drive), CheckPathRootWithRetryMsgBox)))
+                                    SalPathRemoveBackslash(drive);
                             }
                         }
                         else
@@ -526,7 +531,7 @@ BOOL CFilesWindow::ReadDirectory(HWND parent, BOOL isRefresh)
 
                 // Test ESC at least once per batch; retain the time-based probe for
                 // sparse, high-latency enumeration calls that do not reach a batch.
-                if (atBatchBoundary || GetTickCount() - lastEscCheckTime >= 200)
+                if (atBatchBoundary || CMonotonicClock::HasElapsed(lastEscCheckTime, 200, CMonotonicClock::Now()))
                 {
                     if (UserWantsToCancelSafeWaitWindow())
                     {
@@ -564,7 +569,8 @@ BOOL CFilesWindow::ReadDirectory(HWND parent, BOOL isRefresh)
                             }
                         }
                     }
-                    lastEscCheckTime = GetTickCount();
+                    // This cancellation throttle must remain valid across the old 32-bit tick wrap.
+                    lastEscCheckTime = CMonotonicClock::Now();
                 }
 
                 st = fileData.cFileName;
@@ -1937,7 +1943,9 @@ BOOL ContainsWin64RedirectedDir(CFilesWindow* panel, int* indexes, int count, ch
     if (Windows64Bit && WindowsDirectory[0] != 0)
     {
         char path[MAX_PATH];
-        lstrcpyn(path, panel->GetPath(), MAX_PATH);
+        // Redirector probing must never append to a partial panel path identity.
+        if (FAILED(StringCchCopyA(path, _countof(path), panel->GetPath())))
+            return FALSE;
         char* pathEnd = path + strlen(path);
         int i;
         for (i = 0; i < count; i++)
@@ -1951,7 +1959,9 @@ BOOL ContainsWin64RedirectedDir(CFilesWindow* panel, int* indexes, int count, ch
                     if (SalPathAppend(path, dir->Name, MAX_PATH) &&
                         IsWin64RedirectedDir(path, NULL, onlyAdded))
                     {
-                        lstrcpyn(redirectedDir, dir->Name, MAX_PATH);
+                        // The redirected directory name is returned for later lookup, not as a clipped label.
+                        if (FAILED(StringCchCopyA(redirectedDir, MAX_PATH, dir->Name)))
+                            return FALSE;
                         return TRUE;
                     }
                 }
@@ -1979,8 +1989,9 @@ BOOL AddWin64RedirectedDirAux(const char* path, const char* subDir, const char* 
             }
 
         char findPath[MAX_PATH];
-        lstrcpyn(findPath, path, MAX_PATH);
-        if (SalPathAppend(findPath, redirectedDirLastComp, MAX_PATH) &&
+        // The filesystem probe must start from the complete caller path.
+        if (SUCCEEDED(StringCchCopyA(findPath, _countof(findPath), path)) &&
+            SalPathAppend(findPath, redirectedDirLastComp, MAX_PATH) &&
             SalPathAppend(findPath, "*", MAX_PATH))
         {
             HANDLE h;
@@ -2005,9 +2016,11 @@ BOOL AddWin64RedirectedDirAux(const char* path, const char* subDir, const char* 
                 HANDLES(FindClose(h));
                 if (found)
                 {
+                    // WIN32_FIND_DATA keeps a bounded display name for the redirected directory.
+                    if (FAILED(StringCchCopyA(fileData->cFileName, _countof(fileData->cFileName), redirectedDirLastComp)))
+                        return FALSE;
                     if (deleteIndex != -1)
                         dirs->Delete(deleteIndex); // there's is a directory here, we will delete it, redirected-dir has priority (redirector ignores this directory)
-                    lstrcpyn(fileData->cFileName, redirectedDirLastComp, MAX_PATH);
                     fileData->cAlternateFileName[0] = 0;
 
                     if (CutDirectory(findPath)) // find out if there's a directory with the same name as redirected-dir on the disk (it does not need to be in the 'dirs' array, e.g. because of the command "Hide Selected Names")
@@ -2080,8 +2093,11 @@ BOOL CFilesWindow::ChangeDir(const char* newDir, int suggestedTopIndex, const ch
     char backup[2 * MAX_PATH];
     if (suggestedFocusName != NULL)
     {
-        lstrcpyn(backup, suggestedFocusName, 2 * MAX_PATH);
-        suggestedFocusName = backup;
+        // A focus hint must be complete or omitted; a clipped name could select another item.
+        if (SUCCEEDED(StringCchCopyA(backup, _countof(backup), suggestedFocusName)))
+            suggestedFocusName = backup;
+        else
+            suggestedFocusName = NULL;
     }
 
     MainWindow->CancelPanelsUI(); // cancel QuickSearch and QuickEdit
@@ -2117,7 +2133,11 @@ CHANGE_AGAIN:
 
         UpdateWindow(MainWindow->HWindow);
         if (newDir != NULL)
-            lstrcpyn(path, newDir, 2 * MAX_PATH);
+        {
+            // The requested navigation target is an identity and cannot be safely truncated.
+            if (FAILED(StringCchCopyA(path, _countof(path), newDir)))
+                return FALSE;
+        }
         else // focus and top-index setting won't be done for path from dialog
         {
             suggestedTopIndex = -1;
@@ -2568,8 +2588,9 @@ CHANGE_AGAIN:
                                 if (err == ERROR_INVALID_PARAMETER || err == ERROR_NOT_READY)
                                 {
                                     char drive[MAX_PATH];
-                                    lstrcpyn(drive, copy, MAX_PATH);
-                                    if (CutDirectory(drive))
+                                    // Reparse-point recovery needs a complete parent path before inspecting it.
+                                    if (SUCCEEDED(StringCchCopyA(drive, _countof(drive), copy)) &&
+                                        CutDirectory(drive))
                                     {
                                         DWORD attrs = SalGetFileAttributes(drive);
                                         if (attrs != INVALID_FILE_ATTRIBUTES &&
@@ -2594,8 +2615,9 @@ CHANGE_AGAIN:
                                                 GetCurrentLocalReparsePoint(copy, CheckPathRootWithRetryMsgBox, MAX_PATH);
                                                 if (strlen(CheckPathRootWithRetryMsgBox) > 3)
                                                 {
-                                                    lstrcpyn(drive, CheckPathRootWithRetryMsgBox, MAX_PATH);
-                                                    SalPathRemoveBackslash(drive);
+                                                    // The retry dialog identifies one root; retain the original drive label on overflow.
+                                                    if (SUCCEEDED(StringCchCopyA(drive, _countof(drive), CheckPathRootWithRetryMsgBox)))
+                                                        SalPathRemoveBackslash(drive);
                                                 }
                                             }
                                             else

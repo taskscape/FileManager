@@ -3,6 +3,10 @@
 
 #include "precomp.h"
 
+#include <shobjidl.h>
+
+#include "common\\thread_owner.h"
+
 #include "mainwnd.h"
 #include "usermenu.h"
 #include "plugins.h"
@@ -254,7 +258,8 @@ BOOL SalGetTempFileName(const char* path, const char* prefix, char* tmpName, int
         }
     }
 
-    WCHAR* sW = tmpDirW + lstrlenW(tmpDirW);
+    // Temporary paths are conventional NUL-terminated wide strings.
+    WCHAR* sW = tmpDirW + wcslen(tmpDirW);
     if (sW > tmpDirW && *(sW - 1) != L'\\')
     {
         if (sW >= endW)
@@ -282,10 +287,17 @@ BOOL SalGetTempFileName(const char* path, const char* prefix, char* tmpName, int
 
     if ((sW - tmpDirW) + 8 < MAX_PATH) // dost mista pro pripojeni "XXXX.tmp"
     {
-        DWORD randNum = (GetTickCount() & 0xFFF);
+        // Fold the 64-bit uptime so temporary-name probing does not restart with the 32-bit tick cycle.
+        const CMonotonicTimePoint timeSeed = CMonotonicClock::Now();
+        DWORD randNum = (DWORD)(timeSeed ^ (timeSeed >> 32)) & 0xFFF;
         while (1)
         {
-            wsprintfW(sW, L"%X.tmp", randNum++);
+            // The collision suffix must fit the remaining temporary-path buffer before probing it.
+            if (_snwprintf_s(sW, (size_t)(endW - sW), _TRUNCATE, L"%X.tmp", randNum++) < 0)
+            {
+                SetLastError(ERROR_BUFFER_OVERFLOW);
+                return FALSE;
+            }
             if (file) // file
             {
                 HANDLE h = HANDLES_Q(CreateFileW(tmpDirW, GENERIC_WRITE, 0, NULL, CREATE_NEW,
@@ -424,7 +436,7 @@ BOOL SalRemovePointsFromPath(WCHAR* afterRoot)
                         if (*(d + 2) == 0)
                             *l = 0;
                         else
-                            memmove(l, d + 3, sizeof(WCHAR) * (lstrlenW(d + 3) + 1));
+                            memmove(l, d + 3, sizeof(WCHAR) * (wcslen(d + 3) + 1));
                         d = l;
                     }
                     else
@@ -437,7 +449,7 @@ BOOL SalRemovePointsFromPath(WCHAR* afterRoot)
                         if (*(d + 1) == 0)
                             *d = 0;
                         else
-                            memmove(d, d + 2, sizeof(WCHAR) * (lstrlenW(d + 2) + 1));
+                            memmove(d, d + 2, sizeof(WCHAR) * (wcslen(d + 2) + 1));
                     }
                     else
                         d++;
@@ -590,7 +602,8 @@ BOOL SalGetFullName(char* name, int* errTextID, const char* curDir, char* nextFo
                             while (*test != 0 && *test != '\\')
                                 test++;
                             if (*test == 0 && (int)strlen(name) < MAX_PATH)
-                                lstrcpyn(nextFocus, name, MAX_PATH);
+                                // Focus labels retain their fixed panel-presentation capacity.
+                                StringCchCopyNA(nextFocus, MAX_PATH, name, MAX_PATH - 1);
                         }
 
                         int l2 = (int)strlen(curDir);
@@ -674,10 +687,16 @@ BOOL SalGetFullName(char* name, int* errTextID, const char* curDir, char* nextFo
 struct CAuxThread
 {
     HANDLE Thread;
+    CThreadOwner* Owner;
     LPCSTR Description;
 
     CAuxThread(HANDLE thread, LPCSTR description)
-        : Thread(thread), Description(description)
+        : Thread(thread), Owner(NULL), Description(description)
+    {
+    }
+
+    CAuxThread(CThreadOwner* owner, LPCSTR description)
+        : Thread(NULL), Owner(owner), Description(description)
     {
     }
 };
@@ -686,7 +705,7 @@ struct CAuxThread
 // operator which component is still preventing resource teardown.
 TDirectArray<CAuxThread> AuxThreads(10, 5);
 
-void AuxThreadBody(BOOL add, HANDLE thread, BOOL testIfFinished, LPCSTR description)
+void AuxThreadBody(BOOL add, HANDLE thread, BOOL testIfFinished, LPCSTR description, CThreadOwner* owner = NULL)
 {
     // Prevent re-entrance
     static CCriticalSection cs;
@@ -701,9 +720,16 @@ void AuxThreadBody(BOOL add, HANDLE thread, BOOL testIfFinished, LPCSTR descript
             for (int i = 0; i < AuxThreads.Count; i++)
             {
                 DWORD code;
-                if (!GetExitCodeThread(AuxThreads[i].Thread, &code) || code != STILL_ACTIVE)
+                HANDLE tracked = AuxThreads[i].Owner != NULL ? AuxThreads[i].Owner->GetThreadHandle() : AuxThreads[i].Thread;
+                if (!GetExitCodeThread(tracked, &code) || code != STILL_ACTIVE)
                 { // thread uz dobehl
-                    HANDLES(CloseHandle(AuxThreads[i].Thread));
+                    if (AuxThreads[i].Owner != NULL)
+                    {
+                        AuxThreads[i].Owner->StopAndJoin(CThreadShutdownDeadline(AuxThreads[i].Description));
+                        delete AuxThreads[i].Owner;
+                    }
+                    else
+                        HANDLES(CloseHandle(tracked));
                     AuxThreads.Delete(i);
                     i--;
                 }
@@ -720,7 +746,7 @@ void AuxThreadBody(BOOL add, HANDLE thread, BOOL testIfFinished, LPCSTR descript
             }
             // pridame novy thread
             if (!skipAdd)
-                AuxThreads.Add(CAuxThread(thread, description));
+                AuxThreads.Add(owner != NULL ? CAuxThread(owner, description) : CAuxThread(thread, description));
         }
         else
         {
@@ -728,13 +754,19 @@ void AuxThreadBody(BOOL add, HANDLE thread, BOOL testIfFinished, LPCSTR descript
             for (int i = 0; i < AuxThreads.Count; i++)
             {
                 CAuxThread& auxiliary = AuxThreads[i];
-                HANDLE t = auxiliary.Thread;
+                HANDLE t = auxiliary.Owner != NULL ? auxiliary.Owner->GetThreadHandle() : auxiliary.Thread;
                 DWORD code;
                 if (GetExitCodeThread(t, &code) && code == STILL_ACTIVE)
                     // These legacy workers may still reference host globals, so
                     // deadline breach is diagnostic and cannot justify detaching.
                     CThreadShutdownDeadline(auxiliary.Description).WaitForSafeJoin(t);
-                HANDLES(CloseHandle(t));
+                if (auxiliary.Owner != NULL)
+                {
+                    auxiliary.Owner->StopAndJoin(CThreadShutdownDeadline(auxiliary.Description));
+                    delete auxiliary.Owner;
+                }
+                else
+                    HANDLES(CloseHandle(t));
             }
             AuxThreads.DestroyMembers();
         }
@@ -747,6 +779,17 @@ void AddAuxThread(HANDLE thread, BOOL testIfFinished, LPCSTR description)
 {
     // Preserve a stable component label for deadline diagnostics at process exit.
     AuxThreadBody(TRUE, thread, testIfFinished, description);
+}
+
+void AddOwnedAuxThread(CThreadOwner* owner, LPCSTR description)
+{
+    if (owner == NULL || !owner->HasThread())
+    {
+        delete owner;
+        return;
+    }
+    // The registry owns the worker through shutdown so its stop/completion handles stay valid.
+    AuxThreadBody(TRUE, NULL, FALSE, description, owner);
 }
 
 void ShutdownAuxThreads()
@@ -1031,7 +1074,8 @@ void _RemoveTemporaryDir(const char* dir)
     int dirLen = (int)strlen(dir);
     if (dirLen <= 0 || dirLen >= MAX_PATH)
         return;
-    lstrcpyn(path, dir, _countof(path));
+    // The existing MAX_PATH guard above makes this recursive identity copy exact.
+    StringCchCopyA(path, _countof(path), dir);
     char* end = path + strlen(path);
     if (*(end - 1) != '\\')
         *end++ = '\\';
@@ -1047,7 +1091,7 @@ void _RemoveTemporaryDir(const char* dir)
             if (file.cFileName[0] != 0 && strcmp(file.cFileName, "..") && strcmp(file.cFileName, ".") &&
                 (end - path) + strlen(file.cFileName) < MAX_PATH)
             {
-                lstrcpyn(end, file.cFileName, (int)(_countof(path) - (end - path)));
+                StringCchCopyA(end, _countof(path) - (end - path), file.cFileName);
                 ClearReadOnlyAttr(path, file.dwFileAttributes);
                 if (file.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)
                     _RemoveTemporaryDir(path);
@@ -1099,7 +1143,8 @@ void _RemoveEmptyDirs(const char* dir)
     int dirLen = (int)strlen(dir);
     if (dirLen <= 0 || dirLen >= MAX_PATH)
         return;
-    lstrcpyn(path, dir, _countof(path));
+    // The existing MAX_PATH guard above makes this recursive identity copy exact.
+    StringCchCopyA(path, _countof(path), dir);
     char* end = path + strlen(path);
     if (*(end - 1) != '\\')
         *end++ = '\\';
@@ -1117,7 +1162,7 @@ void _RemoveEmptyDirs(const char* dir)
                 if ((file.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) &&
                     (end - path) + strlen(file.cFileName) < MAX_PATH)
                 {
-                    lstrcpyn(end, file.cFileName, (int)(_countof(path) - (end - path)));
+                    StringCchCopyA(end, _countof(path) - (end - path), file.cFileName);
                     ClearReadOnlyAttr(path, file.dwFileAttributes);
                     _RemoveEmptyDirs(path);
                 }
@@ -1199,9 +1244,10 @@ AGAIN:
                 char title[100];
                 char text[MAX_PATH + 500];
                 char checkText[200];
-                lstrcpyn(title, LoadStr(IDS_QUESTION), _countof(title));
+                // Dialog text fields retain their fixed presentation buffers.
+                StringCchCopyNA(title, _countof(title), LoadStr(IDS_QUESTION), _countof(title) - 1);
                 _snprintf_s(text, _countof(text), _TRUNCATE, LoadStr(IDS_CREATEDIRECTORY), dir);
-                lstrcpyn(checkText, LoadStr(IDS_DONTSHOWAGAINCD), _countof(checkText));
+                StringCchCopyNA(checkText, _countof(checkText), LoadStr(IDS_DONTSHOWAGAINCD), _countof(checkText) - 1);
                 BOOL dontShow = !Configuration.CnfrmCreateDir;
 
                 MSGBOXEX_PARAMS params;
@@ -1221,7 +1267,9 @@ AGAIN:
         }
         if (quiet || msgBoxRet == IDOK)
         {
-            lstrcpyn(name, dir, _countof(name));
+            // Directory creation works only from a complete requested path.
+            if (FAILED(StringCchCopyA(name, _countof(name), dir)))
+                return FALSE;
             char* s;
             while (1) // find the first existing directory
             {
@@ -1239,7 +1287,7 @@ AGAIN:
                     *s = 0;
                 else
                 {
-                    lstrcpyn(name, root, _countof(name));
+                    StringCchCopyA(name, _countof(name), root);
                     break; // uz jsme na root-adresari
                 }
                 attrs = SalGetFileAttributes(name);
@@ -1319,7 +1367,7 @@ AGAIN:
                 else
                 {
                     if (first && newDir != NULL)
-                        lstrcpyn(newDir, name, MAX_PATH);
+                        StringCchCopyA(newDir, MAX_PATH, name);
                     first = FALSE;
                 }
                 name[len++] = '\\';
@@ -2196,7 +2244,9 @@ void CPathHistory::SaveToRegistry(HKEY hKey, const char* name, BOOL onlyClear)
                         TRACE_E("CPathHistory::SaveToRegistry(): path is too long, skipping.");
                         continue;
                     }
-                    lstrcpyn(path, item->PathOrArchiveOrFSName, _countof(path));
+                    // History navigation requires the complete stored identity.
+                    if (FAILED(StringCchCopyA(path, _countof(path), item->PathOrArchiveOrFSName)))
+                        continue;
                     break;
                 }
 
@@ -2210,7 +2260,9 @@ void CPathHistory::SaveToRegistry(HKEY hKey, const char* name, BOOL onlyClear)
                         TRACE_E("CPathHistory::SaveToRegistry(): path is too long, skipping.");
                         continue;
                     }
-                    lstrcpyn(path, item->PathOrArchiveOrFSName, _countof(path));
+                    // History navigation requires the complete stored identity.
+                    if (FAILED(StringCchCopyA(path, _countof(path), item->PathOrArchiveOrFSName)))
+                        continue;
                     StrNCat(path, ":", 2 * MAX_PATH);
                     if (item->ArchivePathOrFSUserPart != NULL)
                         StrNCat(path, item->ArchivePathOrFSUserPart, 2 * MAX_PATH);
@@ -2908,7 +2960,8 @@ int CUserMenuItems::GetSubmenuEndIndex(int index)
 // handle of the old mouse hook procedure
 HHOOK HOldMouseWheelHookProc = NULL;
 BOOL MouseWheelMSGThroughHook = FALSE;
-DWORD MouseWheelMSGTime = 0;
+// Keep the hook/window de-duplication interval valid during long-running sessions.
+CMonotonicTimePoint MouseWheelMSGTime = 0;
 BOOL GotMouseWheelScrollLines = FALSE;
 BOOL GotMouseWheelScrollChars = FALSE;
 
@@ -3059,10 +3112,12 @@ LRESULT CALLBACK MenuWheelHookProc(int nCode, WPARAM wParam, LPARAM lParam)
         return retValue;
 
     // if the message arrived "recently" through the other channel, ignore this channel
-    if (!MouseWheelMSGThroughHook && MouseWheelMSGTime != 0 && (GetTickCount() - MouseWheelMSGTime < MOUSEWHEELMSG_VALID))
+    const CMonotonicTimePoint mouseWheelNow = CMonotonicClock::Now();
+    if (!MouseWheelMSGThroughHook && MouseWheelMSGTime != 0 &&
+        !CMonotonicClock::HasElapsed(MouseWheelMSGTime, MOUSEWHEELMSG_VALID, mouseWheelNow))
         return retValue;
     MouseWheelMSGThroughHook = TRUE;
-    MouseWheelMSGTime = GetTickCount();
+    MouseWheelMSGTime = mouseWheelNow;
 
     PostMouseWheelMessage(pMSG);
 
@@ -3162,7 +3217,9 @@ BOOL CFileTimeStamps::AddFile(const char* zipFile, const char* zipRoot, const ch
             TRACE_E("CFileTimeStamps::AddFile(): ZIP file path is too long.");
             return FALSE;
         }
-        lstrcpyn(ZIPFile, zipFile, _countof(ZIPFile));
+        // Archive selection must preserve the complete ZIP-file identity.
+        if (FAILED(StringCchCopyA(ZIPFile, _countof(ZIPFile), zipFile)))
+            return FALSE;
     }
     else
     {
@@ -3261,7 +3318,9 @@ void CFileTimeStamps::AddFilesToListBox(HWND list)
     for (i = 0; i < List.Count; i++)
     {
         char buf[MAX_PATH];
-        lstrcpyn(buf, List[i]->ZIPRoot, _countof(buf));
+        // Archive list entries require complete root names before appending files.
+        if (FAILED(StringCchCopyA(buf, _countof(buf), List[i]->ZIPRoot)))
+            continue;
         if (strlen(List[i]->ZIPRoot) < _countof(buf) && SalPathAppend(buf, List[i]->FileName, _countof(buf)))
             SendMessage(list, LB_ADDSTRING, 0, (LPARAM)buf);
     }
@@ -3318,6 +3377,69 @@ void CDynamicStringImp::DetachData()
     Length = 0;
 }
 
+static HRESULT QueueUtf8CopyItems(IFileOperation* operation, const char* sources, const char* destinations)
+{
+    while (*sources != 0 && *destinations != 0)
+    {
+        CStrP sourceW(ConvertAllocUtf8ToWide(sources, -1));
+        CStrP destinationW(ConvertAllocUtf8ToWide(destinations, -1));
+        if (sourceW == NULL || destinationW == NULL)
+            return HRESULT_FROM_WIN32(ERROR_NO_UNICODE_TRANSLATION);
+
+        WCHAR* copyName = wcsrchr(destinationW, L'\\');
+        if (copyName == NULL || copyName[1] == 0)
+            return HRESULT_FROM_WIN32(ERROR_INVALID_NAME);
+        *copyName++ = 0;
+
+        IShellItem* sourceItem = NULL;
+        IShellItem* destinationFolder = NULL;
+        HRESULT result = SHCreateItemFromParsingName(sourceW, NULL, IID_PPV_ARGS(&sourceItem));
+        if (SUCCEEDED(result))
+            result = SHCreateItemFromParsingName(destinationW, NULL, IID_PPV_ARGS(&destinationFolder));
+        if (SUCCEEDED(result))
+            result = operation->CopyItem(sourceItem, destinationFolder, copyName, NULL);
+        if (destinationFolder != NULL)
+            destinationFolder->Release();
+        if (sourceItem != NULL)
+            sourceItem->Release();
+        if (FAILED(result))
+            return result;
+
+        sources += strlen(sources) + 1;
+        destinations += strlen(destinations) + 1;
+    }
+    return *sources == 0 && *destinations == 0 ? S_OK : HRESULT_FROM_WIN32(ERROR_INVALID_DATA);
+}
+
+static HRESULT CopyTimeStampFilesWithShell(HWND parent, const char* sources, const char* destinations)
+{
+    IFileOperation* operation = NULL;
+    HRESULT result = CoCreateInstance(CLSID_FileOperation, NULL, CLSCTX_INPROC_SERVER,
+                                      IID_PPV_ARGS(&operation));
+    if (FAILED(result))
+        return result;
+
+    CStrP progressMessageW(ConvertAllocUtf8ToWide(LoadStr(IDS_BROWSEARCUPDATE), -1));
+    // Individual CopyItem calls preserve the old one-source/one-destination mapping without FOF_MULTIDESTFILES.
+    result = operation->SetOwnerWindow(parent);
+    if (SUCCEEDED(result))
+        result = operation->SetOperationFlags(FOF_SIMPLEPROGRESS | FOF_NOCONFIRMMKDIR);
+    if (SUCCEEDED(result) && progressMessageW != NULL)
+        result = operation->SetProgressMessage(progressMessageW);
+    if (SUCCEEDED(result))
+        result = QueueUtf8CopyItems(operation, sources, destinations);
+    if (SUCCEEDED(result))
+        result = operation->PerformOperations();
+    if (SUCCEEDED(result))
+    {
+        BOOL aborted = FALSE;
+        if (SUCCEEDED(operation->GetAnyOperationsAborted(&aborted)) && aborted)
+            TRACE_I("Timestamp-associated file copy was cancelled by the Shell.");
+    }
+    operation->Release();
+    return result;
+}
+
 void CFileTimeStamps::CopyFilesTo(HWND parent, int* indexes, int count, const char* initPath)
 {
     CALL_STACK_MESSAGE3("CFileTimeStamps::CopyFilesTo(, , %d, %s)", count, initPath);
@@ -3337,12 +3459,13 @@ void CFileTimeStamps::CopyFilesTo(HWND parent, int* indexes, int count, const ch
             {
                 CFileTimeStampsItem* item = List[index];
                 char name[MAX_PATH];
-                lstrcpyn(name, item->SourcePath, _countof(name));
+                // Timestamp operations retain complete source and target identities.
+                StringCchCopyA(name, _countof(name), item->SourcePath);
                 tooLongName |= strlen(item->SourcePath) >= _countof(name);
                 tooLongName |= !SalPathAppend(name, item->FileName, _countof(name));
                 ok &= fromStr.Add(name, (int)strlen(name) + 1);
 
-                lstrcpyn(name, path, _countof(name));
+                StringCchCopyA(name, _countof(name), path);
                 tooLongName |= strlen(path) >= _countof(name);
                 tooLongName |= !SalPathAppend(name, item->ZIPRoot, _countof(name));
                 tooLongName |= !SalPathAppend(name, item->FileName, _countof(name));
@@ -3354,21 +3477,10 @@ void CFileTimeStamps::CopyFilesTo(HWND parent, int* indexes, int count, const ch
 
         if (ok && !tooLongName)
         {
-            CShellExecuteWnd shellExecuteWnd;
-            SHFILEOPSTRUCT fo;
-            fo.hwnd = shellExecuteWnd.Create(parent, "SEW: CFileTimeStamps::CopyFilesTo");
-            fo.wFunc = FO_COPY;
-            fo.pFrom = fromStr.Text;
-            fo.pTo = toStr.Text;
-            fo.fFlags = FOF_SIMPLEPROGRESS | FOF_NOCONFIRMMKDIR | FOF_MULTIDESTFILES;
-            fo.fAnyOperationsAborted = FALSE;
-            fo.hNameMappings = NULL;
-            char title[100];
-            lstrcpyn(title, LoadStr(IDS_BROWSEARCUPDATE), 100); // radsi backupneme, LoadStr pouzivaji i ostatni thready
-            fo.lpszProgressTitle = title;
-            // provedeme samotne nakopirovani - uzasne snadne, bohuzel jim sem tam pada ;-)
-            CALL_STACK_MESSAGE1("CFileTimeStamps::CopyFilesTo::SHFileOperation");
-            SHFileOperation(&fo);
+            CALL_STACK_MESSAGE1("CFileTimeStamps::CopyFilesTo::IFileOperation");
+            HRESULT result = CopyTimeStampFilesWithShell(parent, fromStr.Text, toStr.Text);
+            if (FAILED(result))
+                TRACE_E("Unable to copy timestamp-associated files through the Shell: " << GetErrorText(HRESULT_CODE(result)));
         }
         else
         {
@@ -3397,7 +3509,8 @@ void CFileTimeStamps::CheckAndPackAndClear(HWND parent, BOOL* someFilesChanged, 
     {
         CFileTimeStampsItem* item = List[i];
         BOOL kill = TRUE;
-        lstrcpyn(buf, item->SourcePath, _countof(buf));
+        // Verification rejects items whose complete source path cannot fit.
+        StringCchCopyA(buf, _countof(buf), item->SourcePath);
         if (strlen(item->SourcePath) >= _countof(buf) || !SalPathAppend(buf, item->FileName, _countof(buf)))
             kill = FALSE; // keep the item, we cannot safely verify it with truncated path
         HANDLE find = INVALID_HANDLE_VALUE;
@@ -3550,12 +3663,13 @@ void CScrollPositionMemory::Push(const char* path, int topIndex)
                 TopIndexes[i] = TopIndexes[i + 1];
             TopIndexesCount--;
         }
-        lstrcpyn(Path, path, _countof(Path));
+        // Directory history stores a bounded presentation path.
+        StringCchCopyNA(Path, _countof(Path), path, _countof(Path) - 1);
         TopIndexes[TopIndexesCount++] = topIndex;
     }
     else // nenavazuje -> prvni top-index v rade
     {
-        lstrcpyn(Path, path, _countof(Path));
+        StringCchCopyNA(Path, _countof(Path), path, _countof(Path) - 1);
         TopIndexesCount = 1;
         TopIndexes[0] = topIndex;
     }
@@ -3682,13 +3796,14 @@ BOOL CFileHistory::FillPopupMenu(CMenuPopup* popup)
         CFileHistoryItem* item = Files[i];
 
         // separate name from path with '\t' - it will then be in a separate column
-        lstrcpyn(name, item->FileName, _countof(name));
+        // File-list rows retain their fixed display-name allocation.
+        StringCchCopyNA(name, _countof(name), item->FileName, _countof(name) - 1);
         if (strlen(item->FileName) >= _countof(name))
             continue;
         char* ptr = strrchr(name, '\\');
         if (ptr == NULL)
             return FALSE;
-        memmove(ptr + 1, ptr, lstrlen(ptr) + 1);
+        memmove(ptr + 1, ptr, strlen(ptr) + 1);
         *(ptr + 1) = '\t';
         const char* text = "";
         // zdvojime '&', aby se nezobrazovalo jako podtrzeni
@@ -3779,7 +3894,7 @@ BOOL SetEditOrComboText(HWND hWnd, const char* text)
 
     CStrP wide(ConvertAllocUtf8ToWide(text != NULL ? text : "", -1));
     SendMessageW(hEdit, WM_SETTEXT, 0, (LPARAM)(wide != NULL ? wide.Ptr : L""));
-    SendMessage(hEdit, EM_SETSEL, 0, wide != NULL ? lstrlenW(wide) : 0);
+    SendMessage(hEdit, EM_SETSEL, 0, wide != NULL ? (LPARAM)wcslen(wide) : 0);
     return TRUE;
 }
 

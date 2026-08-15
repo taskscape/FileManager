@@ -3,6 +3,8 @@
 
 #include "precomp.h"
 
+#include <strsafe.h>
+
 #include <uxtheme.h>
 
 #include <Shlwapi.h>
@@ -413,7 +415,9 @@ CToolTipWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 
     case WM_SETTEXT:
     {
-        lstrcpyn(Text, (char*)lParam, 10);
+        // This private tooltip has a deliberately tiny label buffer; reject text that cannot fit.
+        if (lParam == 0 || FAILED(StringCchCopyA(Text, _countof(Text), (const char*)lParam)))
+            Text[0] = 0;
         TextLen = int(strlen(Text));
 
         // find out the text length

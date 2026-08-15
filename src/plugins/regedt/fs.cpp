@@ -3,6 +3,8 @@
 
 #include "precomp.h"
 
+#include <strsafe.h>
+
 // image list for simple FS icons
 HIMAGELIST ImageList = NULL;
 
@@ -104,7 +106,9 @@ BOOL InitFS()
     Len_REG_SZ = (int)strlen(Str_REG_SZ);
     Len_REG_FULL_RESOURCE_DESCRIPTOR = (int)strlen(Str_REG_FULL_RESOURCE_DESCRIPTOR);
     Len_REG_RESOURCE_REQUIREMENTS_LIST = (int)strlen(Str_REG_RESOURCE_REQUIREMENTS_LIST);
-    lstrcpyn(KeyText, LoadStr(IDS_KEY), 10);
+    // The short type label is fixed presentation text; keep it valid if a localization cannot fit.
+    if (FAILED(StringCchCopyA(KeyText, _countof(KeyText), LoadStr(IDS_KEY))))
+        KeyText[0] = 0;
     KeyTextLen = (int)strlen(KeyText);
 
     return TRUE;

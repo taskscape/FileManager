@@ -20,6 +20,8 @@
 #include "geticon.h"
 #include "shiconov.h"
 
+#include <strsafe.h>
+
 //
 // ****************************************************************************
 // CFilesWindowAncestor
@@ -1312,8 +1314,11 @@ unsigned IconThreadThreadFEH(void* param)
 #endif // CALLSTK_DISABLE
 }
 
-DWORD WINAPI IconThreadThreadF(void* param)
+DWORD WINAPI IconThreadThreadF(void* param, HANDLE stopEvent)
 {
+    // The panel terminate event remains in the shell-worker wait set; this
+    // common owner event only establishes handle and launch-data lifetime.
+    (void)stopEvent;
     CALL_STACK_MESSAGE_NONE
 #ifndef CALLSTK_DISABLE
     CCallStack stack;
@@ -1343,7 +1348,8 @@ CFilesWindow::CFilesWindow(CMainWindow* parent)
     InactWinOptimizedReading = FALSE;
     WaitBeforeReadingIcons = 0;
     WaitOneTimeBeforeReadingIcons = 0;
-    EndOfIconReadingTime = GetTickCount() - 10000;
+    // Start with the post-icon refresh suppression already expired.
+    EndOfIconReadingTime = CMonotonicClock::AtLeastDurationAgo(10000);
     ICEventTerminate = HANDLES(CreateEvent(NULL, FALSE, FALSE, NULL));
     ICEventWork = HANDLES(CreateEvent(NULL, FALSE, FALSE, NULL));
     ICSleep = FALSE;
@@ -1352,20 +1358,27 @@ CFilesWindow::CFilesWindow(CMainWindow* parent)
     HANDLES(InitializeCriticalSection(&ICSleepSection));
     HANDLES(InitializeCriticalSection(&ICSectionUsingIcon));
     HANDLES(InitializeCriticalSection(&ICSectionUsingThumb));
-    DWORD ThreadID;
-    IconCacheThread = NULL;
+    IconCacheThreadOwner = NULL;
     if (ICEventTerminate != NULL && ICEventWork != NULL)
-        IconCacheThread = HANDLES(CreateThread(NULL, 0, IconThreadThreadF, this, 0, &ThreadID));
+    {
+        IconCacheThreadOwner = new CThreadOwner;
+        if (IconCacheThreadOwner == NULL ||
+            !IconCacheThreadOwner->Start(IconThreadThreadF, this, "panel icon reader"))
+        {
+            delete IconCacheThreadOwner;
+            IconCacheThreadOwner = NULL;
+        }
+    }
     if (ICEventTerminate == NULL ||
         ICEventWork == NULL ||
-        IconCacheThread == NULL)
+        IconCacheThreadOwner == NULL)
     {
         TRACE_E("Unable to start icon-reader thread.");
         IconCache = NULL;
     }
     else
     {
-        //    SetThreadPriority(IconCacheThread, THREAD_PRIORITY_IDLE); // loading then fails
+        //    SetThreadPriority(IconCacheThreadOwner->GetThreadHandle(), THREAD_PRIORITY_IDLE); // loading then fails
         IconCache = new CIconCache();
     }
 
@@ -1472,7 +1485,9 @@ CFilesWindow::CFilesWindow(CMainWindow* parent)
     NumberOfItemsInCurDir = 0;
 
     NeedIconOvrRefreshAfterIconsReading = FALSE;
-    LastIconOvrRefreshTime = GetTickCount() - ICONOVR_REFRESH_PERIOD;
+    // Start the throttles expired so the first overlay notification is never delayed by uptime arithmetic.
+    LastIconOvrRefreshTime = CMonotonicClock::AtLeastDurationAgo(ICONOVR_REFRESH_PERIOD);
+    NextIconOvrRefreshTime = 0;
     IconOvrRefreshTimerSet = FALSE;
 }
 
@@ -1488,13 +1503,14 @@ CFilesWindow::~CFilesWindow()
     if (PathHistory != NULL)
         delete PathHistory;
 
-    if (IconCacheThread != NULL)
+    if (IconCacheThreadOwner != NULL)
     {
         SetEvent(ICEventTerminate); // icon reader, terminate yourself!
         // Shell handlers can take time to return; panel state stays alive until
         // the worker has completed its bounded recovery phase and safe join.
-        CThreadShutdownDeadline("panel icon reader").WaitForSafeJoin(IconCacheThread);
-        HANDLES(CloseHandle(IconCacheThread));
+        IconCacheThreadOwner->StopAndJoin(CThreadShutdownDeadline("panel icon reader"));
+        delete IconCacheThreadOwner;
+        IconCacheThreadOwner = NULL;
     }
 
     HANDLES(DeleteCriticalSection(&ICSectionUsingThumb));
@@ -1721,7 +1737,8 @@ void CFilesWindow::DirectoryLineSetText()
             memcpy(buf, path, l);
             if (buf[l - 1] != '\\')
                 buf[l++] = '\\';
-            lstrcpyn(buf + l, Filter.GetMasksString(), MAX_PATH);
+            // Reserve the directory line's established MAX_PATH mask presentation field.
+            StringCchCopyNA(buf + l, MAX_PATH, Filter.GetMasksString(), MAX_PATH - 1);
         }
         else
         {
@@ -1731,7 +1748,8 @@ void CFilesWindow::DirectoryLineSetText()
                 memcpy(buf, path, l);
                 buf[l++] = ':';
                 //        if (FilterInverse) buf[l++] = '-';
-                lstrcpyn(buf + l, Filter.GetMasksString(), MAX_PATH);
+                // Reserve the directory line's established MAX_PATH mask presentation field.
+                StringCchCopyNA(buf + l, MAX_PATH, Filter.GetMasksString(), MAX_PATH - 1);
             }
         }
         DirectoryLine->SetText(buf, pathLen);
@@ -1852,7 +1870,7 @@ void CFilesWindow::SelectUnselectByFocusedItem(BOOL select, BOOL byName)
         int lastIndex = Dirs->Count + Files->Count - 1;
         int lastSelectdCount = SelectedCount;
         const char* focusedStr = byName ? focusedItem->Name : (isDir ? "" : focusedItem->Ext);
-        int focusedLen = byName ? (isDir ? focusedItem->NameLen : (int)(focusedItem->Ext - focusedItem->Name)) : (isDir ? 0 : (int)lstrlen(focusedItem->Ext));
+        int focusedLen = byName ? (isDir ? focusedItem->NameLen : (int)(focusedItem->Ext - focusedItem->Name)) : (isDir ? 0 : (int)strlen(focusedItem->Ext));
         if (!isDir && byName && *focusedItem->Ext != 0)
             focusedLen--; // skip '.'
         int i;
@@ -1861,7 +1879,7 @@ void CFilesWindow::SelectUnselectByFocusedItem(BOOL select, BOOL byName)
             BOOL itemIsDir = i < Dirs->Count;
             CFileData* item = itemIsDir ? &Dirs->At(i) : &Files->At(i - Dirs->Count);
             const char* str = byName ? item->Name : (itemIsDir ? "" : item->Ext);
-            int len = byName ? (itemIsDir ? item->NameLen : (int)(item->Ext - item->Name)) : (itemIsDir ? 0 : (int)lstrlen(item->Ext));
+            int len = byName ? (itemIsDir ? item->NameLen : (int)(item->Ext - item->Name)) : (itemIsDir ? 0 : (int)strlen(item->Ext));
             if (!itemIsDir && byName && *item->Ext != 0)
                 len--; // skip '.'
             if (len == focusedLen && StrNICmp(str, focusedStr, len) == 0)
@@ -2264,13 +2282,14 @@ void CFilesWindow::OpenActiveFolder()
         if (Windows64Bit && WindowsDirectory[0] != 0)
         {
             BOOL done = FALSE;
-            lstrcpyn(dirName, WindowsDirectory, MAX_PATH);
+            // The cached Windows directory is bounded at process startup and can be copied as a complete compatibility prefix.
+            StringCchCopyA(dirName, _countof(dirName), WindowsDirectory);
             if (SalPathAppend(dirName, "Sysnative", MAX_PATH))
             {
                 int len = (int)strlen(dirName);
                 if (StrNICmp(path, dirName, len) == 0 && (path[len] == '\\' || path[len] == 0))
                 {
-                    lstrcpyn(dirName, WindowsDirectory, MAX_PATH);
+                    StringCchCopyA(dirName, _countof(dirName), WindowsDirectory);
                     SalPathAppend(dirName, "System32", MAX_PATH); // if Sysnative fit, System32 will fit as well
                     memmove(dirName + strlen(dirName), path + len, strlen(path + len) + 1);
                     path = dirName;
@@ -2279,7 +2298,7 @@ void CFilesWindow::OpenActiveFolder()
             }
             if (!done)
             {
-                lstrcpyn(dirName, WindowsDirectory, MAX_PATH);
+                StringCchCopyA(dirName, _countof(dirName), WindowsDirectory);
                 if (SalPathAppend(dirName, "System32", MAX_PATH))
                 {
                     int len = (int)strlen(dirName);
@@ -2298,7 +2317,7 @@ void CFilesWindow::OpenActiveFolder()
                         }
                         if (!done)
                         {
-                            lstrcpyn(dirName, WindowsDirectory, MAX_PATH);
+                            StringCchCopyA(dirName, _countof(dirName), WindowsDirectory);
                             SalPathAppend(dirName, "SysWOW64", MAX_PATH); // if System32 fit, SysWOW64 will fit as well
                             memmove(dirName + strlen(dirName), path + len, strlen(path + len) + 1);
                             path = dirName;

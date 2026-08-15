@@ -151,6 +151,7 @@ typedef TIndirectArray<CPackACPacker> APackACPackersTable;
 // CPackACListView
 //
 class CPackACDialog;
+class CThreadOwner;
 
 class CPackACListView : public CWindow
 {
@@ -207,10 +208,11 @@ public:
         WillExit = FALSE;
         DrivesList = drivesList;
         HSearchThread = NULL;
+        SearchThreadOwner = NULL;
         StopSearch = NULL;
     }
 
-    static DWORD WINAPI PackACDiskSearchThread(LPVOID instance);
+    static DWORD WINAPI PackACDiskSearchThreadOwned(LPVOID instance, HANDLE stopEvent);
     static unsigned int PackACDiskSearchThreadEH(LPVOID instance);
     DWORD DiskSearch();
     BOOL DirectorySearch(char* path);
@@ -231,6 +233,7 @@ protected:
     CPackACListView* ListView;
     char** DrivesList;
     HANDLE HSearchThread;
+    CThreadOwner* SearchThreadOwner;
     HWND HStatusBar;
     BOOL SearchRunning;
     HANDLE StopSearch;

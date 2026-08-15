@@ -3,6 +3,8 @@
 
 #include "precomp.h"
 
+#include <strsafe.h>
+
 #include "undelete.rh"
 #include "undelete.rh2"
 #include "lang\lang.rh"
@@ -64,6 +66,13 @@ static DWORD WINAPI RestoreCallback(PBYTE data, PVOID _ctx, PULONG plen)
     return ERROR_SUCCESS;
 }
 
+static BOOL BuildRestorePath(char* path, size_t pathCapacity, const char* root, const char* name)
+{
+    // Restores must not continue with a truncated source or destination path.
+    return SUCCEEDED(StringCchCopyA(path, pathCapacity, root)) &&
+           SalamanderGeneral->SalPathAppend(path, name, (int)pathCapacity);
+}
+
 static BOOL RestoreFile(const char* fileName, const char* sourcePath, const char* targetPath)
 {
     CALL_STACK_MESSAGE4("RestoreFile(%s, %s, %s)", fileName, sourcePath, targetPath);
@@ -72,11 +81,10 @@ static BOOL RestoreFile(const char* fileName, const char* sourcePath, const char
     char srcpath[2 * MAX_PATH];
     char dstpath[2 * MAX_PATH];
 
-    // prepare source and target paths
-    lstrcpyn(srcpath, sourcePath, 2 * MAX_PATH);
-    lstrcpyn(dstpath, targetPath, 2 * MAX_PATH);
-    SalamanderGeneral->SalPathAppend(srcpath, fileName, 2 * MAX_PATH);
-    SalamanderGeneral->SalPathAppend(dstpath, fileName, 2 * MAX_PATH);
+    // Prepare source and target paths before either one is used for I/O.
+    if (!BuildRestorePath(srcpath, _countof(srcpath), sourcePath, fileName) ||
+        !BuildRestorePath(dstpath, _countof(dstpath), targetPath, fileName))
+        return FALSE;
 
     // open source file
     SAFE_FILE srcfile;
@@ -111,7 +119,10 @@ static BOOL RestoreFile(const char* fileName, const char* sourcePath, const char
     if (real && ReadFile(srcfile.HFile, sig, sizeof(sig), &numread, NULL) &&
         numread == sizeof(sig) && (sig[1] != 0x004f0052 || sig[2] != 0x00530042))
         real = FALSE;
-    SetFilePointer(srcfile.HFile, 0, NULL, FILE_BEGIN);
+    // Rewind after the signature probe with an unambiguous failure result before restoring file content.
+    LARGE_INTEGER startOffset = {};
+    if (!SetFilePointerEx(srcfile.HFile, startOffset, NULL, FILE_BEGIN))
+        return FALSE;
 
     // remove .bak extension for target file, if it is real backup
     if (real)
@@ -214,12 +225,11 @@ static BOOL RestoreDir(const char* fileName, const char* sourcePath, const char*
 {
     CALL_STACK_MESSAGE4("RestoreDir(%s, %s, %s)", fileName, sourcePath, targetPath);
 
-    // prepare source and target paths
+    // Prepare source and target paths before either one is used for I/O.
     char srcpath[2 * MAX_PATH], dstpath[2 * MAX_PATH];
-    lstrcpyn(srcpath, sourcePath, 2 * MAX_PATH);
-    lstrcpyn(dstpath, targetPath, 2 * MAX_PATH);
-    SalamanderGeneral->SalPathAppend(srcpath, fileName, 2 * MAX_PATH);
-    SalamanderGeneral->SalPathAppend(dstpath, fileName, 2 * MAX_PATH);
+    if (!BuildRestorePath(srcpath, _countof(srcpath), sourcePath, fileName) ||
+        !BuildRestorePath(dstpath, _countof(dstpath), targetPath, fileName))
+        return FALSE;
 
     // update progress
     FileProgress = 0;

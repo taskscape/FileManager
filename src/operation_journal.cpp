@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "precomp.h"
+#include <strsafe.h>
 
 #include "operation_journal.h"
 #include "worker.h"
@@ -30,7 +31,10 @@ BOOL WriteAll(HANDLE file, const char* text)
 
 BOOL GetPathIdentity(const char* path, char* identity, int identityLen)
 {
-    lstrcpyn(identity, "unavailable", identityLen);
+    // Keep the diagnostic fallback terminated within the caller's declared identity field.
+    if (identity == NULL || identityLen <= 0)
+        return FALSE;
+    StringCchCopyNA(identity, static_cast<size_t>(identityLen), "unavailable", static_cast<size_t>(identityLen) - 1);
     if (path == NULL || path[0] == 0)
         return FALSE;
     HANDLE handle = HANDLES_Q(CreateFileUtf8(path, 0,
@@ -80,12 +84,15 @@ char* ReadJournal(const char* path)
                                             NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL));
     if (file == INVALID_HANDLE_VALUE)
         return NULL;
-    DWORD size = GetFileSize(file, NULL);
-    if (size == INVALID_FILE_SIZE || size > 16 * 1024 * 1024)
+    LARGE_INTEGER fileSize;
+    // Recovery journals are deliberately bounded, so reject large values before narrowing to the read-buffer size.
+    if (!GetFileSizeEx(file, &fileSize) || fileSize.QuadPart < 0 ||
+        (ULONGLONG)fileSize.QuadPart > 16 * 1024 * 1024)
     {
         HANDLES(CloseHandle(file));
         return NULL;
     }
+    DWORD size = (DWORD)fileSize.QuadPart;
     char* content = (char*)malloc(size + 1);
     DWORD read = 0;
     BOOL ok = content != NULL && ReadFile(file, content, size, &read, NULL) && read == size;
@@ -195,8 +202,10 @@ BOOL IsSiblingTransactionalTemporary(const char* temporaryPath, const char* targ
     if (temporaryPath == NULL || targetPath == NULL) return FALSE;
     char temporaryDirectory[3 * MAX_PATH];
     char targetDirectory[3 * MAX_PATH];
-    lstrcpyn(temporaryDirectory, temporaryPath, _countof(temporaryDirectory));
-    lstrcpyn(targetDirectory, targetPath, _countof(targetDirectory));
+    // Transactional sibling checks must compare complete directories, not clipped prefixes.
+    if (FAILED(StringCchCopyA(temporaryDirectory, _countof(temporaryDirectory), temporaryPath)) ||
+        FAILED(StringCchCopyA(targetDirectory, _countof(targetDirectory), targetPath)))
+        return FALSE;
     if (!CutDirectory(temporaryDirectory) || !CutDirectory(targetDirectory) ||
         StrICmp(temporaryDirectory, targetDirectory) != 0) return FALSE;
     const char* name = strrchr(temporaryPath, '\\');
@@ -245,7 +254,10 @@ BOOL WriteReconciliationReport(char* reportPath, int reportPathLen, TDirectArray
 {
     char directory[MAX_PATH];
     if (!GetJournalDirectory(directory, _countof(directory), TRUE)) return FALSE;
-    _snprintf_s(reportPath, reportPathLen, _TRUNCATE, "%s\\reconciliation-%08lX.txt", directory, GetTickCount());
+    // Preserve the fixed recovery-report name while folding uptime beyond the 32-bit tick cycle.
+    const CMonotonicTimePoint timeSeed = CMonotonicClock::Now();
+    _snprintf_s(reportPath, reportPathLen, _TRUNCATE, "%s\\reconciliation-%08lX.txt", directory,
+                (DWORD)(timeSeed ^ (timeSeed >> 32)));
     HANDLE report = HANDLES_Q(CreateFileUtf8(reportPath, GENERIC_WRITE, 0, NULL, CREATE_ALWAYS,
                                               FILE_ATTRIBUTE_NORMAL | FILE_FLAG_WRITE_THROUGH, NULL));
     if (report == INVALID_HANDLE_VALUE) return FALSE;
@@ -339,8 +351,10 @@ BOOL COperationJournal::Begin(COperations& operations)
 {
     char directory[MAX_PATH];
     if (!GetJournalDirectory(directory, _countof(directory), TRUE)) return FALSE;
+    // Keep journal names fixed-width while avoiding a 49.7-day reuse of their timestamp component.
+    const CMonotonicTimePoint timeSeed = CMonotonicClock::Now();
     _snprintf_s(Path, _countof(Path), _TRUNCATE, "%s\\operation-%08lX-%08lX.opj",
-                directory, GetCurrentProcessId(), GetTickCount());
+                directory, GetCurrentProcessId(), (DWORD)(timeSeed ^ (timeSeed >> 32)));
     File = HANDLES_Q(CreateFileUtf8(Path, GENERIC_WRITE, FILE_SHARE_READ, NULL, CREATE_NEW,
                                     FILE_ATTRIBUTE_NORMAL | FILE_FLAG_WRITE_THROUGH, NULL));
     if (File == INVALID_HANDLE_VALUE) return FALSE;
@@ -441,8 +455,10 @@ void COperationJournal::PersistEmergencyShutdownState()
     char directory[MAX_PATH];
     if (!GetJournalDirectory(directory, _countof(directory), TRUE)) return;
     char path[3 * MAX_PATH];
+    // Preserve the established recovery-marker format while folding the 64-bit monotonic seed.
+    const CMonotonicTimePoint timeSeed = CMonotonicClock::Now();
     _snprintf_s(path, _countof(path), _TRUNCATE, "%s\\memory-pressure-%08lX-%08lX.opj",
-                directory, GetCurrentProcessId(), GetTickCount());
+                directory, GetCurrentProcessId(), (DWORD)(timeSeed ^ (timeSeed >> 32)));
     HANDLE file = HANDLES_Q(CreateFileUtf8(path, GENERIC_WRITE, FILE_SHARE_READ, NULL, CREATE_NEW,
                                             FILE_ATTRIBUTE_NORMAL | FILE_FLAG_WRITE_THROUGH, NULL));
     if (file == INVALID_HANDLE_VALUE) return;
@@ -457,16 +473,24 @@ void COperationJournal::OfferRecovery(HWND parent)
     if (!GetJournalDirectory(directory, _countof(directory), FALSE)) return;
     char pattern[3 * MAX_PATH];
     _snprintf_s(pattern, _countof(pattern), _TRUNCATE, "%s\\*.opj", directory);
-    WIN32_FIND_DATA findData;
-    HANDLE find = HANDLES_Q(FindFirstFileUtf8(pattern, &findData));
+    // Recovery runs in Release too, so enumerate through the common owned
+    // wide-path boundary rather than the debug-only handle tracker wrapper.
+    CWidePath patternW(pattern);
+    const WCHAR* apiPattern = patternW.GetPathForWin32Api();
+    if (apiPattern == NULL) return;
+    WIN32_FIND_DATAW findData;
+    HANDLE find = HANDLES_Q(FindFirstFileW(apiPattern, &findData));
     if (find == INVALID_HANDLE_VALUE) return;
     TDirectArray<char*> journals(4, 4);
     do
     {
         if ((findData.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) == 0)
         {
+            char name[MAX_PATH * 3];
+            if (ConvertWideToUtf8(findData.cFileName, -1, name, _countof(name)) == 0)
+                continue;
             char path[3 * MAX_PATH];
-            _snprintf_s(path, _countof(path), _TRUNCATE, "%s\\%s", directory, findData.cFileName);
+            _snprintf_s(path, _countof(path), _TRUNCATE, "%s\\%s", directory, name);
             char* content = ReadJournal(path);
             if (content != NULL)
             {
@@ -478,7 +502,7 @@ void COperationJournal::OfferRecovery(HWND parent)
                 free(content);
             }
         }
-    } while (FindNextFileA(find, &findData));
+    } while (FindNextFileW(find, &findData));
     HANDLES(FindClose(find));
     if (journals.Count == 0) return;
     int action = SalMessageBox(parent,

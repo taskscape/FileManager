@@ -13,6 +13,8 @@
 #include <uxtheme.h>
 
 #include <Shlwapi.h>
+#include <strsafe.h>
+#include <wchar.h>
 
 // Helper function to draw UTF-8 text using Unicode API
 static int DrawTextUtf8(HDC hDC, const char* text, int textLen, LPRECT rect, UINT format)
@@ -348,7 +350,7 @@ int GetCmdLineLimit()
         if (!GetEnvironmentVariable("COMSPEC", cmd, MAX_PATH))
             cmd[0] = 0;
         AddDoubleQuotesIfNeeded(cmd, MAX_PATH); // CreateProcess expects names with spaces quoted (otherwise it tries various variants; see help)
-        return 8191 - lstrlen(cmd) - 6;         // 6 = strlen(" /K ") + 2 (two quotation marks around the command itself)
+        return 8191 - (int)strlen(cmd) - 6;     // 6 = strlen(" /K ") + 2 (two quotation marks around the command itself)
     }
     else
         return 8192; // XP
@@ -533,20 +535,22 @@ CEditLine::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                     if (panel->Is(ptPluginFS) && panel->GetPluginFS()->NotEmpty() &&
                         panel->GetPluginFS()->IsServiceSupported(FS_SERVICE_COMMANDLINE))
                     { // executing commands from FS
-                        lstrcpyn(command, cmdLine, SALCMDLINE_MAXLEN + 1);
-
-                        panel->UserWorkedOnThisPath = TRUE;
-
-                        // lower the thread priority to "normal" (so the operations do not burden the machine too much)
-                        SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_NORMAL);
-
-                        if (panel->GetPluginFS()->ExecuteCommandLine(HWindow, command, selFrom, selTo))
+                        // A plug-in must receive the complete command line, never a truncated operation request.
+                        if (SUCCEEDED(StringCchCopyA(command, _countof(command), cmdLine)))
                         {
-                            executed = TRUE;
-                        }
+                            panel->UserWorkedOnThisPath = TRUE;
 
-                        // increase the thread priority again once the operation has finished
-                        SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_ABOVE_NORMAL);
+                            // lower the thread priority to "normal" (so the operations do not burden the machine too much)
+                            SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_NORMAL);
+
+                            if (panel->GetPluginFS()->ExecuteCommandLine(HWindow, command, selFrom, selTo))
+                            {
+                                executed = TRUE;
+                            }
+
+                            // increase the thread priority again once the operation has finished
+                            SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_ABOVE_NORMAL);
+                        }
                     }
                 }
 
@@ -662,10 +666,12 @@ CEditLine::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         // and then route it so it reaches the window under the cursor as we've always done
 
         // if the message arrived "recently" through the other channel, ignore this one
-        if (MouseWheelMSGThroughHook && MouseWheelMSGTime != 0 && (GetTickCount() - MouseWheelMSGTime < MOUSEWHEELMSG_VALID))
+        const CMonotonicTimePoint mouseWheelNow = CMonotonicClock::Now();
+        if (MouseWheelMSGThroughHook && MouseWheelMSGTime != 0 &&
+            !CMonotonicClock::HasElapsed(MouseWheelMSGTime, MOUSEWHEELMSG_VALID, mouseWheelNow))
             return 0;
         MouseWheelMSGThroughHook = FALSE;
-        MouseWheelMSGTime = GetTickCount();
+        MouseWheelMSGTime = mouseWheelNow;
 
         MSG msg;
         DWORD pos = GetMessagePos();
@@ -1166,12 +1172,13 @@ public:
         {
             SetInsertMark(-1);
             char buff[10000];
-            lstrcpyn(buff, text, 10000);
+            // Drag-insert text intentionally uses its bounded edit presentation field.
+            StringCchCopyNA(buff, _countof(buff), text, _countof(buff) - 1);
             char* start = buff;
             if ((GetKeyState(VK_MENU) & 0x8000) != 0)
             {
                 // we do not want the whole path - trim it
-                int len = lstrlen(buff);
+                int len = (int)strlen(buff);
                 if (len > 2)
                 {
                     if (buff[len - 1] == '\\')
@@ -1230,7 +1237,12 @@ public:
                 {
                     havePath = data[0] != 0 && data[1] != 0;
                     if (data[0] != 0 && path != NULL)
-                        lstrcpyn(path, data + 1, MAX_PATH);
+                    {
+                        // Clipboard data must yield a complete path before it is treated as a drop target.
+                        havePath = SUCCEEDED(StringCchCopyA(path, MAX_PATH, data + 1));
+                        if (!havePath)
+                            path[0] = 0;
+                    }
                     HANDLES(GlobalUnlock(stgMedium.hGlobal));
                 }
             }
@@ -1259,7 +1271,7 @@ public:
                     if (data->fWide)
                     {
                         const wchar_t* fileW = (wchar_t*)(((char*)data) + data->pFiles);
-                        int l = lstrlenW(fileW);
+                        int l = (int)wcslen(fileW);
                         if (l < MAX_PATH && *(fileW + l + 1) == 0)
                         {
                             if (path != NULL)
@@ -1276,9 +1288,15 @@ public:
                         int l = (int)strlen(fileA);
                         if (l < MAX_PATH && *(fileA + l + 1) == 0)
                         {
+                            BOOL pathFits = TRUE;
                             if (path != NULL)
-                                lstrcpyn(path, fileA, MAX_PATH);
-                            ret = TRUE;
+                            {
+                                // A one-item file drop must retain its complete path identity.
+                                pathFits = SUCCEEDED(StringCchCopyA(path, MAX_PATH, fileA));
+                                if (!pathFits)
+                                    path[0] = 0;
+                            }
+                            ret = pathFits;
                         }
                     }
 

@@ -229,9 +229,9 @@ int CZIPUnpackProgress::AddSize(int size, BOOL delayedPaint)
         FlushDataToControls();
     }
 
-    // every 100 ms redraw the changed data (text + progress bars)
-    DWORD ticks = GetTickCount();
-    if (ticks - LastTickCount > 100)
+    // Keep extraction progress redraws correct after the legacy 32-bit tick wrap.
+    const CMonotonicTimePoint ticks = CMonotonicClock::Now();
+    if (CMonotonicClock::HasElapsed(LastTickCount, 100, ticks))
     {
         LastTickCount = ticks;
         // if we have not repainted a moment ago, do it now
@@ -296,9 +296,9 @@ void CZIPUnpackProgress::NewLine(const char* txt, BOOL delayedPaint)
         FlushDataToControls();
     }
 
-    // every 100 ms redraw the changed data (text + progress bars)
-    DWORD ticks = GetTickCount();
-    if (ticks - LastTickCount > 100)
+    // The line-refresh path shares the 64-bit cadence used by size updates.
+    const CMonotonicTimePoint ticks = CMonotonicClock::Now();
+    if (CMonotonicClock::HasElapsed(LastTickCount, 100, ticks))
     {
         LastTickCount = ticks;
         // if we have not repainted a moment ago, do it now

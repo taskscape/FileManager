@@ -92,8 +92,9 @@ BOOL CTBCustomizeDialog::EnumButtons()
         if (sent)
         {
             // naalokujeme kopie retezcu text a name
-            tii.TextLen = lstrlen(tii.Text);
-            tii.NameLen = lstrlen(tii.Name);
+            // The notify protocol supplies terminated labels before their exact owned copies are allocated.
+            tii.TextLen = static_cast<int>(strlen(tii.Text));
+            tii.NameLen = static_cast<int>(strlen(tii.Name));
             char* text = (char*)malloc(tii.TextLen + 1);
             char* name = (char*)malloc(tii.NameLen + 1);
             if (tii.TextLen > 0)

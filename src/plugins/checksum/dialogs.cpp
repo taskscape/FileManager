@@ -2,6 +2,8 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "precomp.h"
+
+#include <strsafe.h>
 #include "checksum.h"
 #include "checksum.rh"
 #include "checksum.rh2"
@@ -871,14 +873,22 @@ BOOL CCalculateDialog::GetSaveFileName(LPTSTR buffer, LPCTSTR title)
         const char* slash = _tcsrchr(SourcePath, '\\');
         if (slash != NULL && slash[1])
         {
-            lstrcpyn(buffer, slash + 1, MAX_PATH);
+            if (FAILED(StringCchCopyA(buffer, MAX_PATH, slash + 1)))
+            {
+                // An oversized suggestion must not become a different output filename.
+                buffer[0] = 0;
+            }
         }
         else
             buffer[0] = 0; // no default name
     }
     else
     {
-        lstrcpyn(buffer, file1, MAX_PATH);
+        if (FAILED(StringCchCopyA(buffer, MAX_PATH, file1)))
+        {
+            // An oversized suggestion must not become a different output filename.
+            buffer[0] = 0;
+        }
     }
 
     // save dialog
@@ -1902,8 +1912,13 @@ INT_PTR CVerifyDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 
             if (SalamanderGeneral->SalamanderIsNotBusy(NULL))
             {
-                lstrcpyn(Focus_Path, fileList[i]->fileName, MAX_PATH);
-                SalamanderGeneral->PostMenuExtCommand(CMD_FOCUSFILE, TRUE);
+                if (SUCCEEDED(StringCchCopyA(Focus_Path, _countof(Focus_Path), fileList[i]->fileName)))
+                    SalamanderGeneral->PostMenuExtCommand(CMD_FOCUSFILE, TRUE);
+                else
+                {
+                    // The cross-window focus command must never act on a truncated path.
+                    Focus_Path[0] = 0;
+                }
                 Sleep(500);        // switching to another window happens, so this Sleep should not hurt anything
                 Focus_Path[0] = 0; // after 0.5 seconds we no longer want the focus (handles hitting the start of Salamander's BUSY mode)
             }

@@ -3,7 +3,10 @@
 
 #include "precomp.h"
 
+#include "..\\..\\common\\monotonic_time.h"
+
 #include <comutil.h>
+#include <strsafe.h>
 
 #include "ieviewer.h"
 #include "ieviewer.rh"
@@ -134,7 +137,10 @@ int WINAPI SalamanderPluginGetReqVer()
 void WriteFeatureControl(const char* feature, const char* exe, DWORD value)
 {
     char buff[1000];
-    wsprintf(buff, "Software\\Microsoft\\Internet Explorer\\Main\\FeatureControl\\%s", feature);
+    // Bound the feature registry path before attempting to create the key.
+    if (_snprintf_s(buff, _countof(buff), _TRUNCATE,
+                    "Software\\Microsoft\\Internet Explorer\\Main\\FeatureControl\\%s", feature) < 0)
+        return;
     HKEY hKey;
     DWORD disp;
     RegCreateKeyEx(HKEY_CURRENT_USER, buff, 0, NULL,
@@ -391,9 +397,10 @@ unsigned WINAPI ThreadIEMessageLoop(void* param)
 
     CALL_STACK_MESSAGE1("ThreadIEMessageLoop::SetEvent");
     char name[MAX_PATH];
-    lstrcpyn(name, data->Name, MAX_PATH);
     IStream* contentStream = data->ContentStream;
-    BOOL openFile = data->Success;
+    const BOOL nameFits = SUCCEEDED(StringCchCopyA(name, _countof(name), data->Name));
+    // Navigation must not use a truncated filename after the startup data is released.
+    BOOL openFile = data->Success && nameFits;
     SetEvent(data->Continue); // let the main thread continue; data are invalid from this point (=NULL)
     data = NULL;
 
@@ -522,7 +529,8 @@ BOOL InitViewer()
         return FALSE;
     }
 
-    WNDCLASS wc;
+    WNDCLASSEX wc;
+    wc.cbSize = sizeof(wc);
     wc.style = CS_DBLCLKS;
     wc.lpfnWndProc = CIEMainWindow::CIEMainWindowProc;
     wc.cbClsExtra = 0;
@@ -533,7 +541,9 @@ BOOL InitViewer()
     wc.hbrBackground = (HBRUSH)(COLOR_WINDOW + 1);
     wc.lpszMenuName = NULL;
     wc.lpszClassName = WINDOW_CLASSNAME;
-    if (RegisterClass(&wc) == 0)
+    wc.hIconSm = wc.hIcon;
+    // The embedded browser window uses the extended class contract for current shell integration.
+    if (RegisterClassEx(&wc) == 0)
     {
         TRACE_E("RegisterClass has failed");
         return FALSE;
@@ -1132,16 +1142,16 @@ STDMETHODIMP_(void) CImpIAdviseSink::OnViewChange(DWORD dwAspect, LONG lindex)
 
     char location[1024];
     BOOL file = strncmp(locationURL, "file:", 5) == 0;
-    if (file || locationName[0] == 0)
-      lstrcpy(location, locationURL);
-    else
-      lstrcpy(location, locationName);
+    const char* displayLocation = file || locationName[0] == 0 ? locationURL : locationName;
+    if (FAILED(StringCchCopyA(location, _countof(location), displayLocation)))
+      location[0] = 0;
 
     char title[MAX_PATH + 200];
-    title[0] = 0;
-    if (location[0] != 0)
-      sprintf(title, "%s - ", location);
-    lstrcat(title, LoadStr(IDS_PLUGINNAME));
+    HRESULT titleResult = location[0] != 0
+                              ? StringCchPrintfA(title, _countof(title), "%s - %s", location, LoadStr(IDS_PLUGINNAME))
+                              : StringCchCopyA(title, _countof(title), LoadStr(IDS_PLUGINNAME));
+    if (FAILED(titleResult))
+      title[0] = 0;
 //    SetWindowText(m_pSite->m_hParentWnd, title);
 
     if (m_pSite->m_pIWebBrowser2 != NULL)
@@ -1298,7 +1308,8 @@ BOOL CImpIDispatch::CanonizeURL(char* psz)
             else
                 offset -= 2;
         }
-        memmove(psz, psz + offset, lstrlen(psz) - offset + 1);
+        // The URL fragment is a terminated mutable buffer while its prefix is removed.
+        memmove(psz, psz + offset, strlen(psz) - offset + 1);
     }
     return file;
 }
@@ -1347,16 +1358,19 @@ STDMETHODIMP CImpIDispatch::Invoke(DISPID dispID,
                 BOOL file = CanonizeURL(locationURL);
 
                 char buff[3000];
+                HRESULT captionResult;
                 if (m_pSite->MarkdownFilename[0] != 0)
-                    lstrcpy(buff, m_pSite->MarkdownFilename);
+                    captionResult = StringCchPrintfA(buff, _countof(buff), "%s - %s", m_pSite->MarkdownFilename, LoadStr(IDS_PLUGINNAME));
+                else if (!file || lstrcmp(locationURL, title) != 0)
+                    captionResult = StringCchPrintfA(buff, _countof(buff), "%s (%s) - %s", locationURL, title, LoadStr(IDS_PLUGINNAME));
                 else
-                {
-                    lstrcpy(buff, locationURL);
-                    if (!file || lstrcmp(locationURL, title) != 0)
-                        sprintf(buff + lstrlen(buff), " (%s)", title);
-                }
+                    captionResult = StringCchPrintfA(buff, _countof(buff), "%s - %s", locationURL, LoadStr(IDS_PLUGINNAME));
 
-                sprintf(buff + lstrlen(buff), " - %s", LoadStr(IDS_PLUGINNAME));
+                if (FAILED(captionResult))
+                {
+                    // Do not update the parent window with a partial URL or Markdown filename.
+                    buff[0] = 0;
+                }
 
                 SetWindowText(m_pSite->m_hParentWnd, buff);
             }
@@ -2009,18 +2023,20 @@ BOOL CIEMainWindowQueue::CloseAllWindows(BOOL force, int waitTime, int forceWait
     CS.Leave();
 
     // wait until/if they close
-    DWORD ti = GetTickCount();
+    // Closing multiple browser windows can outlive the 32-bit tick range, so keep the wait duration monotonic.
+    const CMonotonicTimePoint waitStarted = CMonotonicClock::Now();
     DWORD w = force ? forceWaitTime : waitTime;
     while ((w == INFINITE || w > 0) && !Empty())
     {
-        DWORD t = GetTickCount() - ti;
-        if (w == INFINITE || t < w) // should we keep waiting
+        const CMonotonicDuration elapsed = CMonotonicClock::Elapsed(waitStarted, CMonotonicClock::Now());
+        if (w == INFINITE || elapsed < w) // should we keep waiting
         {
-            if (w == INFINITE || 50 < w - t)
+            const CMonotonicDuration remaining = w == INFINITE ? 0 : (CMonotonicDuration)w - elapsed;
+            if (w == INFINITE || remaining > 50)
                 Sleep(50);
             else
             {
-                Sleep(w - t);
+                Sleep((DWORD)remaining);
                 break;
             }
         }

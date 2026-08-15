@@ -147,7 +147,10 @@ CFTPAutodetCondLexAn::GetActualElement()
                 {
                     char id[100];
                     int idLen = (int)(s - beg);
-                    lstrcpyn(id, beg, min(100, idLen + 1));
+                    // The lexer token is counted, so terminate the bounded copy explicitly.
+                    const int copiedIdLen = min(99, idLen);
+                    memcpy(id, beg, copiedIdLen);
+                    id[copiedIdLen] = 0;
 
                     ActElem = lexUnknown;
                     if (idLen == 2 && _stricmp(id, "or") == 0)

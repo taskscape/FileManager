@@ -3,6 +3,8 @@
 
 #pragma once
 
+#include "..\..\common\monotonic_time.h"
+
 extern LPWSTR PatternHistory[MAX_HISTORY_ENTRIES];
 extern LPWSTR LookInHistory[MAX_HISTORY_ENTRIES];
 
@@ -215,7 +217,8 @@ protected:
     BOOL SearchInProgress;
     HANDLE CancelEvent;
     int FoundVisibleCount;
-    DWORD NextUpdate;
+    // This dialog-owned deadline never crosses the plug-in boundary, so retain full monotonic uptime.
+    CMonotonicTimePoint NextUpdate;
     BOOL CloseWhenSearchFinishes;
     WCHAR LVItemTextBuffer[100];
     BOOL Stopped;
@@ -288,7 +291,8 @@ class CFindThread : public CThread
     CSalamanderBMSearchData* BMForPatternW;
     CSalamanderREGEXPSearchData* SalRegExp;
 
-    DWORD NextStatusUpdate;
+    // The worker's private status deadline uses the same non-wrapping time representation.
+    CMonotonicTimePoint NextStatusUpdate;
 
 public:
     CFindThread(TIndirectArray<WCHAR>& lookIn,

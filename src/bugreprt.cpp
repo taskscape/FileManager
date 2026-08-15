@@ -27,7 +27,28 @@ static struct CBugReportReasonBreak_Init
 } __BugReportReasonBreak_Init;
 
 TIndirectArray<char> GlobalModulesStore(50, 20);
-TDirectArray<DWORD> GlobalModulesListTimeStore(50, 20); // x64_OK
+// Module-list timestamps are private diagnostic samples and must remain valid beyond the 32-bit tick wrap.
+TDirectArray<ULONGLONG> GlobalModulesListTimeStore(50, 20); // x64_OK
+
+static int GetUserLocaleInfoUtf8(LCTYPE type, char* destination, int destinationCapacity)
+{
+    WCHAR localeName[LOCALE_NAME_MAX_LENGTH];
+    if (GetUserDefaultLocaleName(localeName, _countof(localeName)) == 0)
+        return 0;
+
+    int valueLength = GetLocaleInfoEx(localeName, type, NULL, 0);
+    if (valueLength == 0)
+        return 0;
+    WCHAR* value = (WCHAR*)malloc(valueLength * sizeof(WCHAR));
+    if (value == NULL)
+        return 0;
+
+    // Resolve the explicit user locale rather than inheriting the diagnostic thread's legacy LCID state.
+    int result = GetLocaleInfoEx(localeName, type, value, valueLength) == 0 ? 0 :
+                 ConvertWideToUtf8(value, -1, destination, destinationCapacity);
+    free(value);
+    return result;
+}
 
 //
 // ****************************************************************************
@@ -98,6 +119,21 @@ struct VS_VERSIONINFO_HEADER
     WORD wType;
 };
 
+// Crash reporting may have only a small caller buffer, so preserve its legacy truncation behavior with an explicit terminator.
+static void CopyModuleVersionText(char* target, int targetCapacity, const char* source)
+{
+    if (target == NULL || targetCapacity <= 0)
+        return;
+
+    int length = 0;
+    while (source[length] != 0 && length + 1 < targetCapacity)
+    {
+        target[length] = source[length];
+        length++;
+    }
+    target[length] = 0;
+}
+
 // VERSIONINFO could be retrieved via GetFileVersionInfo, but we use a direct memory approach
 // which might be more reliable after a crash
 BOOL GetModuleVersion(HINSTANCE hModule, char* buffer, int bufferLen)
@@ -105,14 +141,14 @@ BOOL GetModuleVersion(HINSTANCE hModule, char* buffer, int bufferLen)
     HRSRC hRes = FindResource(hModule, MAKEINTRESOURCE(VS_VERSION_INFO), RT_VERSION);
     if (hRes == NULL)
     {
-        lstrcpyn(buffer, "unknown", bufferLen);
+        CopyModuleVersionText(buffer, bufferLen, "unknown");
         return FALSE;
     }
 
     HGLOBAL hVer = LoadResource(hModule, hRes);
     if (hVer == NULL)
     {
-        lstrcpyn(buffer, "unknown", bufferLen);
+        CopyModuleVersionText(buffer, bufferLen, "unknown");
         return FALSE;
     }
 
@@ -120,7 +156,7 @@ BOOL GetModuleVersion(HINSTANCE hModule, char* buffer, int bufferLen)
     const BYTE* first = (BYTE*)LockResource(hVer);
     if (resSize == 0 || first == 0)
     {
-        lstrcpyn(buffer, "unknown", bufferLen);
+        CopyModuleVersionText(buffer, bufferLen, "unknown");
         return FALSE;
     }
     const BYTE* iterator = first + sizeof(VS_VERSIONINFO_HEADER);
@@ -132,7 +168,7 @@ BOOL GetModuleVersion(HINSTANCE hModule, char* buffer, int bufferLen)
         iterator++;
         if (iterator + 4 >= first + resSize)
         {
-            lstrcpyn(buffer, "unknown", bufferLen);
+            CopyModuleVersionText(buffer, bufferLen, "unknown");
             return FALSE;
         }
     }
@@ -142,7 +178,7 @@ BOOL GetModuleVersion(HINSTANCE hModule, char* buffer, int bufferLen)
     char buff[200];
     sprintf(buff, "%u.%u.%u.%u", HIWORD(ffi->dwFileVersionMS), LOWORD(ffi->dwFileVersionMS),
             HIWORD(ffi->dwFileVersionLS), LOWORD(ffi->dwFileVersionLS));
-    lstrcpyn(buffer, buff, bufferLen);
+    CopyModuleVersionText(buffer, bufferLen, buff);
     return TRUE;
 }
 
@@ -383,43 +419,15 @@ BOOL PrintSystemVersion(FPrintLine PrintLine, void* param, char* buf, char* avbu
 {
     static OSVERSIONINFOEX osvi;
     static SYSTEM_INFO si;
-    static BOOL bOsVersionInfoEx;
     static PGNSI pGNSI;
     pGNSI = NULL;
 
     PrintLine(param, "System Version:", FALSE);
 
-    // avoid deprecated warning (the function may be removed from the SDK in the future)
-    typedef BOOL(WINAPI * FDynGetVersionExA)(LPOSVERSIONINFOA lpVersionInformation);
-    FDynGetVersionExA DynGetVersionExA = (FDynGetVersionExA)GetProcAddress(GetModuleHandle("kernel32.dll"), "GetVersionExA");
-    if (DynGetVersionExA != NULL)
-    {
-        ZeroMemory(&osvi, sizeof(OSVERSIONINFOEX));
-        osvi.dwOSVersionInfoSize = sizeof(OSVERSIONINFOEX);
-
-        // Try calling GetVersionEx using the OSVERSIONINFOEX structure.
-        // If that fails, try using the OSVERSIONINFO structure.
-        if ((bOsVersionInfoEx = DynGetVersionExA((LPOSVERSIONINFO)&osvi)) == 0)
-        {
-            // If OSVERSIONINFOEX doesn't work, try OSVERSIONINFO.
-            osvi.dwOSVersionInfoSize = sizeof(OSVERSIONINFO);
-            if (!DynGetVersionExA((OSVERSIONINFO*)&osvi))
-                return FALSE;
-        }
-
-        sprintf(buf, "GetVersionEx Version %u.%u (Build %u)", osvi.dwMajorVersion,
-                osvi.dwMinorVersion, osvi.dwBuildNumber & 0xFFFF);
-        if (bOsVersionInfoEx)
-        {
-            sprintf(buf + strlen(buf), " SP %u.%u, %s", osvi.wServicePackMajor,
-                    osvi.wServicePackMinor, osvi.szCSDVersion);
-        }
-        PrintLine(param, buf, TRUE);
-    }
-
     ZeroMemory(&osvi, sizeof(OSVERSIONINFOEX));
-    SalGetVersionEx(&osvi, FALSE); // !!! SLOW, original GetVersionEx() is deprecated !!!
-    sprintf(buf, "SalGetVersionEx Version %u.%u (Build %u)", osvi.dwMajorVersion,
+    // The VerifyVersionInfo-based helper remains diagnostic-only and avoids the deprecated version-query API.
+    SalGetVersionEx(&osvi, FALSE);
+    sprintf(buf, "Compatibility version probe %u.%u (Build %u)", osvi.dwMajorVersion,
             osvi.dwMinorVersion, osvi.dwBuildNumber & 0xFFFF);
     sprintf(buf + strlen(buf), " SP %u.%u, SMask %u, PType %u, PlatId %u", osvi.wServicePackMajor,
             osvi.wServicePackMinor, osvi.wSuiteMask, osvi.wProductType, osvi.dwPlatformId);
@@ -471,7 +479,8 @@ const char* FindModuleName(char* buf, void* address, BOOL unloadedName = FALSE)
                         if (unloadedName)
                         {
                             strcpy(buf, "(UNLOADED: ");
-                            lstrcpyn(buf + 11, s + 3, MAX_PATH - 12);
+                            // Crash-report module labels stay bounded to the caller's diagnostic buffer.
+                            StringCchCopyNA(buf + 11, MAX_PATH - 12, s + 3, MAX_PATH - 13);
                             s = strstr(buf + 11, " (");
                             if (s != NULL)
                                 *s = 0; // if the module is listed as "%s (%s)", name, fullName -- trim fullName
@@ -480,7 +489,7 @@ const char* FindModuleName(char* buf, void* address, BOOL unloadedName = FALSE)
                         else
                         {
                             strcpy(buf, " (");
-                            lstrcpyn(buf + 2, s + 3, MAX_PATH - 3);
+                            StringCchCopyNA(buf + 2, MAX_PATH - 3, s + 3, MAX_PATH - 4);
                             s = strstr(buf + 2, " (");
                             if (s != NULL)
                                 *s = 0; // if the module is listed as "%s (%s)", name, fullName -- trim fullName
@@ -536,7 +545,8 @@ void CCallStack::PrintBugReport(EXCEPTION_POINTERS* Exception, DWORD ThreadID, D
 
             case EXCEPTION_ACCESS_VIOLATION:
             {
-                lstrcpy(avbuf, "access violation");
+                // Exception descriptions are fixed crash-report presentation fields.
+                StringCchCopyA(avbuf, _countof(avbuf), "access violation");
                 if (Exception->ExceptionRecord->NumberParameters >= 2)
                 {
                     sprintf(avbuf + strlen(avbuf), ": %s on 0x%p",
@@ -833,12 +843,12 @@ void CCallStack::PrintBugReport(EXCEPTION_POINTERS* Exception, DWORD ThreadID, D
                                     //                  lstrcat(buf, " ");
                                     __try
                                     {
-                                        sprintf(buf + lstrlen(buf), "%02X", *(iterator + j));
+                                        StringCchPrintfA(buf + strlen(buf), _countof(buf) - strlen(buf), "%02X", *(iterator + j));
                                         j++;
                                     }
                                     __except (EXCEPTION_EXECUTE_HANDLER)
                                     {
-                                        lstrcat(buf, "(exception)");
+                                        StringCchCatA(buf, _countof(buf), "(exception)");
                                         j = 28;
                                     }
                                 }
@@ -980,12 +990,12 @@ void CCallStack::PrintBugReport(EXCEPTION_POINTERS* Exception, DWORD ThreadID, D
                                     //                  lstrcat(buf, " ");
                                     __try
                                     {
-                                        sprintf(buf + lstrlen(buf), "%02X", *(iterator + j));
+                                        StringCchPrintfA(buf + strlen(buf), _countof(buf) - strlen(buf), "%02X", *(iterator + j));
                                         j++;
                                     }
                                     __except (EXCEPTION_EXECUTE_HANDLER)
                                     {
-                                        lstrcat(buf, "(exception)");
+                                        StringCchCatA(buf, _countof(buf), "(exception)");
                                         j = 28;
                                     }
                                 }
@@ -1053,256 +1063,257 @@ void CCallStack::PrintBugReport(EXCEPTION_POINTERS* Exception, DWORD ThreadID, D
         {
             PrintLine(param, "Window Handles:", FALSE);
 
-            lstrcpy(buf, "MainWindow=");
+            // Window-handle diagnostics use the fixed crash-report buffer.
+            StringCchCopyA(buf, _countof(buf), "MainWindow=");
             __try
             {
-                sprintf(buf + lstrlen(buf), "0x%p", MainWindow);
+                StringCchPrintfA(buf + strlen(buf), _countof(buf) - strlen(buf), "0x%p", MainWindow);
             }
             __except (EXCEPTION_EXECUTE_HANDLER)
             {
-                lstrcat(buf, "(exception)");
+                StringCchCatA(buf, _countof(buf), "(exception)");
             }
             PrintLine(param, buf, TRUE);
 
-            lstrcpy(buf, "LeftPanel=");
+            StringCchCopyA(buf, _countof(buf), "LeftPanel=");
             __try
             {
-                sprintf(buf + lstrlen(buf), "0x%p", MainWindow->LeftPanel);
+                StringCchPrintfA(buf + strlen(buf), _countof(buf) - strlen(buf), "0x%p", MainWindow->LeftPanel);
             }
             __except (EXCEPTION_EXECUTE_HANDLER)
             {
-                lstrcat(buf, "(exception)");
+                StringCchCatA(buf, _countof(buf), "(exception)");
             }
             PrintLine(param, buf, TRUE);
 
-            lstrcpy(buf, "LeftFilesBox=");
+            StringCchCopyA(buf, _countof(buf), "LeftFilesBox=");
             __try
             {
-                sprintf(buf + lstrlen(buf), "0x%p", MainWindow->LeftPanel->ListBox);
+                StringCchPrintfA(buf + strlen(buf), _countof(buf) - strlen(buf), "0x%p", MainWindow->LeftPanel->ListBox);
             }
             __except (EXCEPTION_EXECUTE_HANDLER)
             {
-                lstrcat(buf, "(exception)");
+                StringCchCatA(buf, _countof(buf), "(exception)");
             }
             PrintLine(param, buf, TRUE);
 
-            lstrcpy(buf, "LeftDirectoryLine=");
+            StringCchCopyA(buf, _countof(buf), "LeftDirectoryLine=");
             __try
             {
-                sprintf(buf + lstrlen(buf), "0x%p", MainWindow->LeftPanel->DirectoryLine);
+                StringCchPrintfA(buf + strlen(buf), _countof(buf) - strlen(buf), "0x%p", MainWindow->LeftPanel->DirectoryLine);
             }
             __except (EXCEPTION_EXECUTE_HANDLER)
             {
-                lstrcat(buf, "(exception)");
+                StringCchCatA(buf, _countof(buf), "(exception)");
             }
             PrintLine(param, buf, TRUE);
 
-            lstrcpy(buf, "LeftToolBar=");
+            StringCchCopyA(buf, _countof(buf), "LeftToolBar=");
             __try
             {
-                sprintf(buf + lstrlen(buf), "0x%p", MainWindow->LeftPanel->DirectoryLine->ToolBar);
+                StringCchPrintfA(buf + strlen(buf), _countof(buf) - strlen(buf), "0x%p", MainWindow->LeftPanel->DirectoryLine->ToolBar);
             }
             __except (EXCEPTION_EXECUTE_HANDLER)
             {
-                lstrcat(buf, "(exception)");
+                StringCchCatA(buf, _countof(buf), "(exception)");
             }
             PrintLine(param, buf, TRUE);
 
-            lstrcpy(buf, "LeftStatusLine=");
+            StringCchCopyA(buf, _countof(buf), "LeftStatusLine=");
             __try
             {
-                sprintf(buf + lstrlen(buf), "0x%p", MainWindow->LeftPanel->StatusLine);
+                StringCchPrintfA(buf + strlen(buf), _countof(buf) - strlen(buf), "0x%p", MainWindow->LeftPanel->StatusLine);
             }
             __except (EXCEPTION_EXECUTE_HANDLER)
             {
-                lstrcat(buf, "(exception)");
+                StringCchCatA(buf, _countof(buf), "(exception)");
             }
             PrintLine(param, buf, TRUE);
 
-            lstrcpy(buf, "RightPanel=");
+            StringCchCopyA(buf, _countof(buf), "RightPanel=");
             __try
             {
-                sprintf(buf + lstrlen(buf), "0x%p", MainWindow->RightPanel);
+                StringCchPrintfA(buf + strlen(buf), _countof(buf) - strlen(buf), "0x%p", MainWindow->RightPanel);
             }
             __except (EXCEPTION_EXECUTE_HANDLER)
             {
-                lstrcat(buf, "(exception)");
+                StringCchCatA(buf, _countof(buf), "(exception)");
             }
             PrintLine(param, buf, TRUE);
 
-            lstrcpy(buf, "RightFilesBox=");
+            StringCchCopyA(buf, _countof(buf), "RightFilesBox=");
             __try
             {
-                sprintf(buf + lstrlen(buf), "0x%p", MainWindow->RightPanel->ListBox);
+                StringCchPrintfA(buf + strlen(buf), _countof(buf) - strlen(buf), "0x%p", MainWindow->RightPanel->ListBox);
             }
             __except (EXCEPTION_EXECUTE_HANDLER)
             {
-                lstrcat(buf, "(exception)");
+                StringCchCatA(buf, _countof(buf), "(exception)");
             }
             PrintLine(param, buf, TRUE);
 
-            lstrcpy(buf, "RightDirectoryLine=");
+            StringCchCopyA(buf, _countof(buf), "RightDirectoryLine=");
             __try
             {
-                sprintf(buf + lstrlen(buf), "0x%p", MainWindow->RightPanel->DirectoryLine);
+                StringCchPrintfA(buf + strlen(buf), _countof(buf) - strlen(buf), "0x%p", MainWindow->RightPanel->DirectoryLine);
             }
             __except (EXCEPTION_EXECUTE_HANDLER)
             {
-                lstrcat(buf, "(exception)");
+                StringCchCatA(buf, _countof(buf), "(exception)");
             }
             PrintLine(param, buf, TRUE);
 
-            lstrcpy(buf, "RightToolBar=");
+            StringCchCopyA(buf, _countof(buf), "RightToolBar=");
             __try
             {
-                sprintf(buf + lstrlen(buf), "0x%p", MainWindow->RightPanel->DirectoryLine->ToolBar);
+                StringCchPrintfA(buf + strlen(buf), _countof(buf) - strlen(buf), "0x%p", MainWindow->RightPanel->DirectoryLine->ToolBar);
             }
             __except (EXCEPTION_EXECUTE_HANDLER)
             {
-                lstrcat(buf, "(exception)");
+                StringCchCatA(buf, _countof(buf), "(exception)");
             }
             PrintLine(param, buf, TRUE);
 
-            lstrcpy(buf, "RightStatusLine=");
+            StringCchCopyA(buf, _countof(buf), "RightStatusLine=");
             __try
             {
-                sprintf(buf + lstrlen(buf), "0x%p", MainWindow->RightPanel->StatusLine);
+                StringCchPrintfA(buf + strlen(buf), _countof(buf) - strlen(buf), "0x%p", MainWindow->RightPanel->StatusLine);
             }
             __except (EXCEPTION_EXECUTE_HANDLER)
             {
-                lstrcat(buf, "(exception)");
+                StringCchCatA(buf, _countof(buf), "(exception)");
             }
             PrintLine(param, buf, TRUE);
 
-            lstrcpy(buf, "TopRebar=");
+            StringCchCopyA(buf, _countof(buf), "TopRebar=");
             __try
             {
-                sprintf(buf + lstrlen(buf), "0x%p", MainWindow->HTopRebar);
+                StringCchPrintfA(buf + strlen(buf), _countof(buf) - strlen(buf), "0x%p", MainWindow->HTopRebar);
             }
             __except (EXCEPTION_EXECUTE_HANDLER)
             {
-                lstrcat(buf, "(exception)");
+                StringCchCatA(buf, _countof(buf), "(exception)");
             }
             PrintLine(param, buf, TRUE);
 
-            lstrcpy(buf, "MenuBar=");
+            StringCchCopyA(buf, _countof(buf), "MenuBar=");
             __try
             {
-                sprintf(buf + lstrlen(buf), "0x%p", MainWindow->MenuBar);
+                StringCchPrintfA(buf + strlen(buf), _countof(buf) - strlen(buf), "0x%p", MainWindow->MenuBar);
             }
             __except (EXCEPTION_EXECUTE_HANDLER)
             {
-                lstrcat(buf, "(exception)");
+                StringCchCatA(buf, _countof(buf), "(exception)");
             }
             PrintLine(param, buf, TRUE);
 
-            lstrcpy(buf, "TopToolBar=");
+            StringCchCopyA(buf, _countof(buf), "TopToolBar=");
             __try
             {
-                sprintf(buf + lstrlen(buf), "0x%p", MainWindow->TopToolBar);
+                StringCchPrintfA(buf + strlen(buf), _countof(buf) - strlen(buf), "0x%p", MainWindow->TopToolBar);
             }
             __except (EXCEPTION_EXECUTE_HANDLER)
             {
-                lstrcat(buf, "(exception)");
+                StringCchCatA(buf, _countof(buf), "(exception)");
             }
             PrintLine(param, buf, TRUE);
 
-            lstrcpy(buf, "MiddleToolBar=");
+            StringCchCopyA(buf, _countof(buf), "MiddleToolBar=");
             __try
             {
-                sprintf(buf + lstrlen(buf), "0x%p", MainWindow->MiddleToolBar);
+                StringCchPrintfA(buf + strlen(buf), _countof(buf) - strlen(buf), "0x%p", MainWindow->MiddleToolBar);
             }
             __except (EXCEPTION_EXECUTE_HANDLER)
             {
-                lstrcat(buf, "(exception)");
+                StringCchCatA(buf, _countof(buf), "(exception)");
             }
             PrintLine(param, buf, TRUE);
 
-            lstrcpy(buf, "UMToolBar=");
+            StringCchCopyA(buf, _countof(buf), "UMToolBar=");
             __try
             {
-                sprintf(buf + lstrlen(buf), "0x%p", MainWindow->UMToolBar);
+                StringCchPrintfA(buf + strlen(buf), _countof(buf) - strlen(buf), "0x%p", MainWindow->UMToolBar);
             }
             __except (EXCEPTION_EXECUTE_HANDLER)
             {
-                lstrcat(buf, "(exception)");
+                StringCchCatA(buf, _countof(buf), "(exception)");
             }
             PrintLine(param, buf, TRUE);
 
-            lstrcpy(buf, "HPToolBar=");
+            StringCchCopyA(buf, _countof(buf), "HPToolBar=");
             __try
             {
-                sprintf(buf + lstrlen(buf), "0x%p", MainWindow->HPToolBar);
+                StringCchPrintfA(buf + strlen(buf), _countof(buf) - strlen(buf), "0x%p", MainWindow->HPToolBar);
             }
             __except (EXCEPTION_EXECUTE_HANDLER)
             {
-                lstrcat(buf, "(exception)");
+                StringCchCatA(buf, _countof(buf), "(exception)");
             }
             PrintLine(param, buf, TRUE);
 
-            lstrcpy(buf, "PluginsBar=");
+            StringCchCopyA(buf, _countof(buf), "PluginsBar=");
             __try
             {
-                sprintf(buf + lstrlen(buf), "0x%p", MainWindow->PluginsBar);
+                StringCchPrintfA(buf + strlen(buf), _countof(buf) - strlen(buf), "0x%p", MainWindow->PluginsBar);
             }
             __except (EXCEPTION_EXECUTE_HANDLER)
             {
-                lstrcat(buf, "(exception)");
+                StringCchCatA(buf, _countof(buf), "(exception)");
             }
             PrintLine(param, buf, TRUE);
 
-            lstrcpy(buf, "DriveBar=");
+            StringCchCopyA(buf, _countof(buf), "DriveBar=");
             __try
             {
-                sprintf(buf + lstrlen(buf), "0x%p", MainWindow->DriveBar);
+                StringCchPrintfA(buf + strlen(buf), _countof(buf) - strlen(buf), "0x%p", MainWindow->DriveBar);
             }
             __except (EXCEPTION_EXECUTE_HANDLER)
             {
-                lstrcat(buf, "(exception)");
+                StringCchCatA(buf, _countof(buf), "(exception)");
             }
             PrintLine(param, buf, TRUE);
 
-            lstrcpy(buf, "DriveBar2=");
+            StringCchCopyA(buf, _countof(buf), "DriveBar2=");
             __try
             {
-                sprintf(buf + lstrlen(buf), "0x%p", MainWindow->DriveBar2);
+                StringCchPrintfA(buf + strlen(buf), _countof(buf) - strlen(buf), "0x%p", MainWindow->DriveBar2);
             }
             __except (EXCEPTION_EXECUTE_HANDLER)
             {
-                lstrcat(buf, "(exception)");
+                StringCchCatA(buf, _countof(buf), "(exception)");
             }
             PrintLine(param, buf, TRUE);
 
-            lstrcpy(buf, "BottomToolBar=");
+            StringCchCopyA(buf, _countof(buf), "BottomToolBar=");
             __try
             {
-                sprintf(buf + lstrlen(buf), "0x%p", MainWindow->BottomToolBar);
+                StringCchPrintfA(buf + strlen(buf), _countof(buf) - strlen(buf), "0x%p", MainWindow->BottomToolBar);
             }
             __except (EXCEPTION_EXECUTE_HANDLER)
             {
-                lstrcat(buf, "(exception)");
+                StringCchCatA(buf, _countof(buf), "(exception)");
             }
             PrintLine(param, buf, TRUE);
 
-            lstrcpy(buf, "EditWindow=");
+            StringCchCopyA(buf, _countof(buf), "EditWindow=");
             __try
             {
-                sprintf(buf + lstrlen(buf), "0x%p", MainWindow->EditWindow);
+                StringCchPrintfA(buf + strlen(buf), _countof(buf) - strlen(buf), "0x%p", MainWindow->EditWindow);
             }
             __except (EXCEPTION_EXECUTE_HANDLER)
             {
-                lstrcat(buf, "(exception)");
+                StringCchCatA(buf, _countof(buf), "(exception)");
             }
             PrintLine(param, buf, TRUE);
 
-            lstrcpy(buf, "EditLine=");
+            StringCchCopyA(buf, _countof(buf), "EditLine=");
             __try
             {
-                sprintf(buf + lstrlen(buf), "0x%p", MainWindow->EditWindow->GetEditLine());
+                StringCchPrintfA(buf + strlen(buf), _countof(buf) - strlen(buf), "0x%p", MainWindow->EditWindow->GetEditLine());
             }
             __except (EXCEPTION_EXECUTE_HANDLER)
             {
-                lstrcat(buf, "(exception)");
+                StringCchCatA(buf, _countof(buf), "(exception)");
             }
             PrintLine(param, buf, TRUE);
 
@@ -1648,7 +1659,7 @@ void CCallStack::PrintBugReport(EXCEPTION_POINTERS* Exception, DWORD ThreadID, D
             {
                 if (GlobalModulesStore[i] != NULL)
                 {
-                    sprintf(buf, "(%u ms) %s", GlobalModulesListTimeStore[i] - SalamanderStartTime, GlobalModulesStore[i]);
+                    sprintf(buf, "(%llu ms) %s", (unsigned long long)(GlobalModulesListTimeStore[i] - SalamanderStartTime), GlobalModulesStore[i]);
                     PrintLine(param, buf, TRUE);
                     unloadedModuleExist = TRUE;
                 }
@@ -1703,15 +1714,18 @@ void CCallStack::PrintBugReport(EXCEPTION_POINTERS* Exception, DWORD ThreadID, D
         sprintf(buf, "Bug Report Time: %u.%u.%u - %02u:%02u:%02u",
                 st.wDay, st.wMonth, st.wYear, st.wHour, st.wMinute, st.wSecond);
         PrintLine(param, buf, FALSE);
-        DWORD ti = SalamanderExceptionTime - SalamanderStartTime;
-        sprintf(buf, "Salamander Started Before: %u:%02u:%02u:%02u.%03u",
-                ti / (24 * 60 * 60 * 1000), (ti / (60 * 60 * 1000)) % 24,
-                (ti / (60 * 1000)) % 60, (ti / (1000)) % 60, ti % 1000);
+        ULONGLONG ti = SalamanderExceptionTime - SalamanderStartTime;
+        sprintf(buf, "Salamander Started Before: %llu:%02llu:%02llu:%02llu.%03llu",
+                (unsigned long long)(ti / (24ull * 60 * 60 * 1000)),
+                (unsigned long long)((ti / (60ull * 60 * 1000)) % 24),
+                (unsigned long long)((ti / (60ull * 1000)) % 60),
+                (unsigned long long)((ti / 1000) % 60), (unsigned long long)(ti % 1000));
         PrintLine(param, buf, FALSE);
-        ti = GetTickCount();
-        sprintf(buf, "System Started Before: %u:%02u:%02u:%02u",
-                ti / (24 * 60 * 60 * 1000), (ti / (60 * 60 * 1000)) % 24,
-                (ti / (60 * 1000)) % 60, (ti / (1000)) % 60);
+        // System uptime is diagnostic-only, so retain all 64 bits instead of wrapping its displayed duration.
+        const ULONGLONG systemUptime = GetTickCount64();
+        sprintf(buf, "System Started Before: %llu:%02llu:%02llu:%02llu",
+                systemUptime / (24ULL * 60 * 60 * 1000), (systemUptime / (60ULL * 60 * 1000)) % 24,
+                (systemUptime / (60ULL * 1000)) % 60, (systemUptime / 1000) % 60);
         PrintLine(param, buf, FALSE);
         PrintLine(param, "", FALSE);
 
@@ -1726,24 +1740,22 @@ void CCallStack::PrintBugReport(EXCEPTION_POINTERS* Exception, DWORD ThreadID, D
         sprintf(buf, "Built: %s", __DATE__ ", " __TIME__);
         PrintLine(param, buf, FALSE);
 
-        LCID lcid = GetThreadLocale();
-
         lstrcpy(buf, "Country: ");
-        GetLocaleInfo(lcid, LOCALE_ICOUNTRY, buf + strlen(buf), 100);
+        GetUserLocaleInfoUtf8(LOCALE_ICOUNTRY, buf + strlen(buf), 100);
         lstrcat(buf, " (");
-        GetLocaleInfo(lcid, LOCALE_SENGCOUNTRY, buf + strlen(buf), 100);
+        GetUserLocaleInfoUtf8(LOCALE_SENGCOUNTRY, buf + strlen(buf), 100);
         lstrcat(buf, ")");
         PrintLine(param, buf, FALSE);
 
         lstrcpy(buf, "Language: ");
-        GetLocaleInfo(lcid, LOCALE_ILANGUAGE, buf + strlen(buf), 100);
+        GetUserLocaleInfoUtf8(LOCALE_ILANGUAGE, buf + strlen(buf), 100);
         lstrcat(buf, " (");
-        GetLocaleInfo(lcid, LOCALE_SENGLANGUAGE, buf + strlen(buf), 100);
+        GetUserLocaleInfoUtf8(LOCALE_SENGLANGUAGE, buf + strlen(buf), 100);
         lstrcat(buf, ")");
         PrintLine(param, buf, FALSE);
 
         lstrcpy(buf, "Code Page: ");
-        GetLocaleInfo(lcid, LOCALE_IDEFAULTANSICODEPAGE, buf + strlen(buf), 100);
+        GetUserLocaleInfoUtf8(LOCALE_IDEFAULTANSICODEPAGE, buf + strlen(buf), 100);
         PrintLine(param, buf, FALSE);
 
         PrintLine(param, "", FALSE);
@@ -2566,7 +2578,7 @@ void AddUniqueToGlobalModulesStore(const char* str)
         char* s = DupStr(str);
         if (s != NULL)
         {
-            GlobalModulesListTimeStore.Add(GetTickCount());
+            GlobalModulesListTimeStore.Add(GetTickCount64());
             if (!GlobalModulesListTimeStore.IsGood())
                 GlobalModulesListTimeStore.ResetState();
             else
@@ -2600,7 +2612,7 @@ void AddUniqueToGlobalModulesStore(const char* str)
                 char* s = DupStr(str);
                 if (s != NULL)
                 {
-                    GlobalModulesListTimeStore.Insert(m, GetTickCount());
+                    GlobalModulesListTimeStore.Insert(m, GetTickCount64());
                     if (!GlobalModulesListTimeStore.IsGood())
                         GlobalModulesListTimeStore.ResetState();
                     else
@@ -2626,7 +2638,7 @@ void AddUniqueToGlobalModulesStore(const char* str)
                 char* s = DupStr(str);
                 if (s != NULL)
                 {
-                    GlobalModulesListTimeStore.Insert(m + 1, GetTickCount());
+                    GlobalModulesListTimeStore.Insert(m + 1, GetTickCount64());
                     if (!GlobalModulesListTimeStore.IsGood())
                         GlobalModulesListTimeStore.ResetState();
                     else

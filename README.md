@@ -52,6 +52,8 @@ Use ```\src\vcxproj\!populate_build_dir.cmd``` to populate build directory with 
 
 See [testing.md](testing.md) for test prerequisites, commands, safety requirements, CI coverage, and a short description of every automated test available in the repository.
 
+Reliability objectives, responsible roles, required incident records, and release-review evidence are defined in [reliability.md](reliability.md). Release symbols remain private: the retained artifact contains PDBs plus a verified CodeView GUID/age and SHA-256 index for exact-build crash symbolization.
+
 ### Creating Installer
 
 Open Salamander uses [Inno Setup](https://jrsoftware.org/isinfo.php) to create the installer. The installer script is located at `Installer\setup.iss`.
@@ -98,6 +100,24 @@ Open Salamander uses scalable SVG icons for its toolbars.
 ### Execution Logging
 
 The execution logging system runs only in DEBUG builds. It records major application execution paths (startup, plugin loading, directory listing, file operations, and key UI features) through the Trace system. The logs are emitted as TRACE messages, so they appear in the Trace Server when it is connected. In release builds, the logging calls are compiled out and produce no output.
+
+#### Running the Trace Server
+
+Build the `tserver` project in the `Debug | Win32` configuration, then start `tserver.exe` before debugging Open Salamander. The standard debug output path is `src\vcxproj\tserver\tserver\Debug\tserver.exe`; it can be launched from PowerShell with:
+
+```powershell
+Start-Process C:\Projects\FileManager\src\vcxproj\tserver\tserver\Debug\tserver.exe
+```
+
+Leave the window titled **Trace Server** open while the application runs. To verify that it is still running, use:
+
+```powershell
+Get-Process tserver
+```
+
+Visual Studio can start both processes automatically: configure `tserver` and the main Open Salamander project as multiple startup projects, with `tserver` set to start without debugging. Start the Trace Server with the same Windows user and privilege level as the application being debugged.
+
+If the debug shutdown dialog reports monitored handles that remain open, choose **Yes** only after the Trace Server is running. The application will connect and send the list of outstanding handles (including their allocation locations); it does not launch the Trace Server itself.
 
 ### Contributing
 
@@ -386,7 +406,7 @@ The codebase follows these conventions for new and refactored code:
 
 ### Build System
 
-The solution (`src/vcxproj/salamand.sln`) targets MSVC v143 (VS 2022). MSBuild property sheets layer the configuration:
+The solution (`src/vcxproj/salamand.sln`) targets MSVC v145 (Visual Studio 2026) for local development. Release CI also builds v143 (VS 2022) and compares its release artifacts and complete executable test inventory with v145 before packaging. MSBuild property sheets layer the configuration:
 
 - `sal_base.props` — common defines, include paths, warning level
 - `sal_debug.props` / `sal_release.props` — optimization and debug flags

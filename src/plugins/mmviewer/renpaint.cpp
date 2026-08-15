@@ -144,7 +144,8 @@ void CRendererWindow::Paint(HDC hDC, BOOL moveEditBoxes, DWORD deferFlg)
                 SetTextColor(hDC, ((item->Flags & OIF_HEADER) == 0) ? rgbTC : rgbHeaderTC);
                 SetBkColor(hDC, ((item->Flags & OIF_HEADER) == 0) ? rgbBC : rgbHeaderBC);
                 SelectObject(hDC, ((item->Flags & OIF_HEADER) == 0) ? HNormalFont : HBoldFont);
-                ExtTextOut(hDC, startH + 5, y + 1, ETO_CLIPPED | ETO_OPAQUE, &rct, item->Name, lstrlen(item->Name), NULL);
+                // Output item names are terminated strings; GDI only needs their measured character count.
+                ExtTextOut(hDC, startH + 5, y + 1, ETO_CLIPPED | ETO_OPAQUE, &rct, item->Name, static_cast<UINT>(strlen(item->Name)), NULL);
 
                 ExcludeClipRect(hDC, rct.left, rct.top, rct.right, rct.bottom);
             }
@@ -160,8 +161,9 @@ void CRendererWindow::Paint(HDC hDC, BOOL moveEditBoxes, DWORD deferFlg)
 
                         if (lines > 1) // add a tiny scrollbar ;-)
                         {
-                            LONG style = GetWindowLong(item->hwnd, GWL_STYLE);
-                            SetWindowLong(item->hwnd, GWL_STYLE, style | WS_VSCROLL);
+                            // The Ptr API prevents a future pointer-valued style slot from being truncated on x64.
+                            LONG_PTR style = GetWindowLongPtr(item->hwnd, GWL_STYLE);
+                            SetWindowLongPtr(item->hwnd, GWL_STYLE, style | WS_VSCROLL);
                             // Now this kind of brutal refresh is necessary
                             SetWindowPos(item->hwnd, HWND_TOP, startH + sLeft.cx, y, sRight.cx, FontHeight,
                                          SWP_FRAMECHANGED | SWP_NOMOVE | SWP_NOZORDER | SWP_NOSIZE);

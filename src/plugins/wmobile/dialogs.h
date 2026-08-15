@@ -34,7 +34,8 @@ protected:
 
     // because the dialog does not run in its own thread, there is no point in using the WM_TIMER
     // method; the same code has to be called to pump the message queue
-    DWORD LastTickCount; // detects when it is time to repaint changed data
+    // This throttle spans an application's lifetime, so keep its monotonic timestamp non-wrapping.
+    CMonotonicTimePoint LastTickCount;
 
     char TextCache[MAX_PATH];
     BOOL TextCacheIsDirty;

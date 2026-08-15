@@ -3,6 +3,8 @@
 
 #include "precomp.h"
 
+#include <strsafe.h>
+
 #include "translator.h"
 
 #include "wndout.h"
@@ -57,36 +59,42 @@ int ConvertU2A(const WCHAR* src, int srcLen, char* buf, int bufSize, BOOL compos
 // PATH routines by Lukas from SFX
 //
 
-LPTSTR PathAddBackslash(LPTSTR pszPath)
+BOOL PathAddBackslash(LPTSTR pszPath, size_t pathCapacity)
 {
-    if (pszPath == NULL)
-        return NULL;
-    int len = lstrlen(pszPath);
+    if (pszPath == NULL || pathCapacity == 0)
+        return FALSE;
+    const size_t len = strlen(pszPath);
     if (len > 0 && pszPath[len - 1] != '\\')
     {
+        // Project paths must remain complete before a separator is appended.
+        if (len + 1 >= pathCapacity)
+            return FALSE;
         pszPath[len] = '\\';
         pszPath[len + 1] = 0;
-        len++;
     }
-    return pszPath + len;
+    return TRUE;
 }
 
-BOOL PathAppend(LPTSTR pPath, LPCTSTR pMore)
+BOOL PathAppend(LPTSTR pPath, size_t pathCapacity, LPCTSTR pMore)
 {
+    if (pPath == NULL || pMore == NULL)
+        return FALSE;
     if (pMore[0] == 0)
     {
         return TRUE;
     }
-    PathAddBackslash(pPath);
+    if (!PathAddBackslash(pPath, pathCapacity))
+        return FALSE;
     if (*pMore == '\\')
         pMore++;
-    lstrcat(pPath, pMore);
-    return TRUE;
+    return SUCCEEDED(StringCchCatA(pPath, pathCapacity, pMore));
 }
 
 BOOL PathRemoveFileSpec(LPTSTR pszPath)
 {
-    int len = lstrlen(pszPath);
+    const size_t len = strlen(pszPath);
+    if (len == 0)
+        return FALSE;
     char* iterator = pszPath + len - 1;
     while (iterator >= pszPath)
     {
@@ -131,7 +139,8 @@ LPTSTR PathRemoveBackslash(LPTSTR pszPath)
 {
     if (pszPath == NULL)
         return NULL;
-    int len = lstrlen(pszPath);
+    // Keep this mutable because the returned pointer follows the removed separator when present.
+    size_t len = strlen(pszPath);
     if (len > 0 && pszPath[len - 1] == '\\')
     {
         pszPath[len - 1] = 0;
@@ -142,9 +151,9 @@ LPTSTR PathRemoveBackslash(LPTSTR pszPath)
     return pszPath + len;
 }
 
-BOOL PathStripToRoot(LPTSTR pszPath)
+BOOL PathStripToRoot(LPTSTR pszPath, size_t pathCapacity)
 {
-    int len = lstrlen(pszPath);
+    const size_t len = strlen(pszPath);
     if (len < 2)
         return FALSE;
     if (pszPath[0] == '\\' && pszPath[1] == '\\') // UNC
@@ -164,11 +173,13 @@ BOOL PathStripToRoot(LPTSTR pszPath)
         if (len > 3)
             pszPath[3] = 0;
     }
-    len = lstrlen(pszPath);
-    if (pszPath[len - 1] != '\\')
+    const size_t rootLength = strlen(pszPath);
+    if (rootLength == 0 || pszPath[rootLength - 1] != '\\')
     {
-        pszPath[len] = '\\';
-        pszPath[len + 1] = 0;
+        if (rootLength + 1 >= pathCapacity)
+            return FALSE;
+        pszPath[rootLength] = '\\';
+        pszPath[rootLength + 1] = 0;
     }
     return TRUE;
 }
@@ -190,20 +201,24 @@ int GetRootLen(const char* path)
         return 3;
 }
 
-BOOL PathMerge(char* fullPath, const char* relativePath)
+BOOL PathMerge(char* fullPath, size_t fullPathCapacity, const char* relativePath)
 {
-    char* destMax = fullPath + MAX_PATH - 1;
+    if (fullPath == NULL || fullPathCapacity == 0 || relativePath == NULL)
+        return FALSE;
+    char* destMax = fullPath + fullPathCapacity - 1;
     char* dest;
     const char* sour = relativePath;
 
-    PathAddBackslash(fullPath);
+    if (!PathAddBackslash(fullPath, fullPathCapacity))
+        return FALSE;
     if (relativePath[0] == '\\') //UNC or relative to root dir
     {
         if (relativePath[1] == '\\')
             *fullPath = 0; //UNC
         else
         {
-            PathStripToRoot(fullPath); //root dir
+            if (!PathStripToRoot(fullPath, fullPathCapacity)) //root dir
+                return FALSE;
             sour++;
         }
     }
@@ -212,7 +227,7 @@ BOOL PathMerge(char* fullPath, const char* relativePath)
         if (relativePath[1] == ':')
             *fullPath = 0; //drive letter
     }
-    dest = fullPath + lstrlen(fullPath);
+    dest = fullPath + strlen(fullPath);
 
     while (*sour && dest < destMax)
     {
@@ -221,8 +236,13 @@ BOOL PathMerge(char* fullPath, const char* relativePath)
             if (sour[1] == '.' && (sour[2] == 0 || sour[2] == '\\'))
             {
                 *dest = NULL;
-                if (GetRootLen(fullPath) < lstrlen(fullPath))
-                    dest = StrRChr(fullPath, dest - 1, '\\') + 1;
+                if (GetRootLen(fullPath) < static_cast<int>(strlen(fullPath)))
+                {
+                    char* separator = StrRChr(fullPath, dest - 1, '\\');
+                    if (separator == NULL)
+                        return FALSE;
+                    dest = separator + 1;
+                }
                 sour += 2;
                 if (*sour)
                     sour++; // skip the slash too if we are not at the end
@@ -243,6 +263,23 @@ BOOL PathMerge(char* fullPath, const char* relativePath)
     *dest = NULL;
     PathRemoveBackslash(fullPath);
     return dest < destMax;
+}
+
+static BOOL ResolveProjectPath(char* storedPath, size_t storedPathCapacity,
+                               char* fullPath, size_t fullPathCapacity,
+                               const char* projectFile, const char* projectValue)
+{
+    // Project entries are valid only when both the persisted spelling and resolved filesystem path are complete.
+    if (FAILED(StringCchCopyA(storedPath, storedPathCapacity, projectValue)) ||
+        FAILED(StringCchCopyA(fullPath, fullPathCapacity, projectFile)) ||
+        !PathRemoveFileSpec(fullPath) ||
+        !PathMerge(fullPath, fullPathCapacity, storedPath))
+    {
+        storedPath[0] = 0;
+        fullPath[0] = 0;
+        return FALSE;
+    }
+    return TRUE;
 }
 
 //*****************************************************************************
@@ -310,8 +347,8 @@ BOOL GetFileCRC(const char* fileName, DWORD* crc)
         return FALSE;
     }
 
-    DWORD size = GetFileSize(hFile, NULL);
-    if (size == 0xFFFFFFFF || size == 0)
+    DWORD size;
+    if (!GetFileSizeDwordLocal(hFile, &size) || size == 0)
     {
         sprintf_s(buf, "Error reading file %s.", fileName);
         MessageBox(GetMsgParent(), buf, ERROR_TITLE, MB_OK | MB_ICONEXCLAMATION);
@@ -414,95 +451,52 @@ BOOL CData::ProcessProjectLine(CProjectSectionEnum* section, const char* line, i
     {
         if (strcmp(identifier, "Original") == 0)
         {
-            lstrcpyn(SourceFile, p, MAX_PATH);
-
-            lstrcpy(FullSourceFile, ProjectFile);
-            PathRemoveFileSpec(FullSourceFile);
-            PathMerge(FullSourceFile, SourceFile);
-
-            return TRUE;
+            return ResolveProjectPath(SourceFile, _countof(SourceFile), FullSourceFile, _countof(FullSourceFile), ProjectFile, p);
         }
 
         if (strcmp(identifier, "Translated") == 0)
         {
-            lstrcpyn(TargetFile, p, MAX_PATH);
-
-            lstrcpy(FullTargetFile, ProjectFile);
-            PathRemoveFileSpec(FullTargetFile);
-            PathMerge(FullTargetFile, TargetFile);
-
-            return TRUE;
+            return ResolveProjectPath(TargetFile, _countof(TargetFile), FullTargetFile, _countof(FullTargetFile), ProjectFile, p);
         }
 
         if (strcmp(identifier, "Include") == 0)
         {
-            lstrcpyn(IncludeFile, p, MAX_PATH);
-
-            lstrcpy(FullIncludeFile, ProjectFile);
-            PathRemoveFileSpec(FullIncludeFile);
-            PathMerge(FullIncludeFile, IncludeFile);
-
-            return TRUE;
+            return ResolveProjectPath(IncludeFile, _countof(IncludeFile), FullIncludeFile, _countof(FullIncludeFile), ProjectFile, p);
         }
 
         if (strcmp(identifier, "SalMenu") == 0)
         {
-            lstrcpyn(SalMenuFile, p, MAX_PATH);
-
-            lstrcpy(FullSalMenuFile, ProjectFile);
-            PathRemoveFileSpec(FullSalMenuFile);
-            PathMerge(FullSalMenuFile, SalMenuFile);
-
-            return TRUE;
+            return ResolveProjectPath(SalMenuFile, _countof(SalMenuFile), FullSalMenuFile, _countof(FullSalMenuFile), ProjectFile, p);
         }
 
         if (strcmp(identifier, "IgnoreList") == 0)
         {
-            lstrcpyn(IgnoreLstFile, p, MAX_PATH);
-
-            lstrcpy(FullIgnoreLstFile, ProjectFile);
-            PathRemoveFileSpec(FullIgnoreLstFile);
-            PathMerge(FullIgnoreLstFile, IgnoreLstFile);
-
-            return TRUE;
+            return ResolveProjectPath(IgnoreLstFile, _countof(IgnoreLstFile), FullIgnoreLstFile, _countof(FullIgnoreLstFile), ProjectFile, p);
         }
 
         if (strcmp(identifier, "CheckList") == 0)
         {
-            lstrcpyn(CheckLstFile, p, MAX_PATH);
-
-            lstrcpy(FullCheckLstFile, ProjectFile);
-            PathRemoveFileSpec(FullCheckLstFile);
-            PathMerge(FullCheckLstFile, CheckLstFile);
-
-            return TRUE;
+            return ResolveProjectPath(CheckLstFile, _countof(CheckLstFile), FullCheckLstFile, _countof(FullCheckLstFile), ProjectFile, p);
         }
 
         if (strcmp(identifier, "SalamanderExe") == 0)
         {
-            lstrcpyn(SalamanderExeFile, p, MAX_PATH);
-
-            lstrcpy(FullSalamanderExeFile, ProjectFile);
-            PathRemoveFileSpec(FullSalamanderExeFile);
-            PathMerge(FullSalamanderExeFile, SalamanderExeFile);
-
-            return TRUE;
+            return ResolveProjectPath(SalamanderExeFile, _countof(SalamanderExeFile), FullSalamanderExeFile, _countof(FullSalamanderExeFile), ProjectFile, p);
         }
 
         if (strcmp(identifier, "Export") == 0)
         {
-            lstrcpyn(ExportFile, p, MAX_PATH);
-
-            lstrcpy(FullExportFile, ProjectFile);
-            PathRemoveFileSpec(FullExportFile);
-            PathMerge(FullExportFile, ExportFile);
-
-            return TRUE;
+            return ResolveProjectPath(ExportFile, _countof(ExportFile), FullExportFile, _countof(FullExportFile), ProjectFile, p);
         }
 
         if (strcmp(identifier, "ExportAsTextArchive") == 0)
         {
-            lstrcpyn(ExportAsTextArchiveFile, p, MAX_PATH);
+            // This setting is consumed later as text, but it still must retain the complete persisted path.
+            if (FAILED(StringCchCopyA(ExportAsTextArchiveFile, _countof(ExportAsTextArchiveFile), p)))
+            {
+                ExportAsTextArchiveFile[0] = 0;
+                return FALSE;
+            }
 
             //      lstrcpy(FullExportFile, ProjectFile);
             //      PathRemoveFileSpec(FullExportFile);
@@ -598,7 +592,12 @@ BOOL CData::ProcessProjectLine(CProjectSectionEnum* section, const char* line, i
 
 BOOL CData::LoadProject(const char* fileName)
 {
-    lstrcpy(ProjectFile, fileName);
+    // The project identity is used to resolve every relative entry, so reject a truncated filename.
+    if (FAILED(StringCchCopyA(ProjectFile, _countof(ProjectFile), fileName)))
+    {
+        ProjectFile[0] = 0;
+        return FALSE;
+    }
 
     HANDLE hFile = HANDLES_Q(CreateFile(fileName, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL,
                                         OPEN_EXISTING, FILE_FLAG_SEQUENTIAL_SCAN, NULL));
@@ -611,8 +610,8 @@ BOOL CData::LoadProject(const char* fileName)
         return FALSE;
     }
 
-    DWORD size = GetFileSize(hFile, NULL);
-    if (size == 0xFFFFFFFF || size == 0)
+    DWORD size;
+    if (!GetFileSizeDwordLocal(hFile, &size) || size == 0)
     {
         char buf[MAX_PATH + 100];
         sprintf_s(buf, "Error reading file %s.", fileName);
@@ -689,7 +688,8 @@ BOOL CData::LoadProject(const char* fileName)
 
 BOOL CData::WriteProjectLine(HANDLE hFile, const char* line)
 {
-    DWORD len = lstrlen(line);
+    // Project lines are terminated local strings before their byte count is written.
+    DWORD len = static_cast<DWORD>(strlen(line));
     DWORD written;
     if (!WriteFile(hFile, line, len, &written, NULL) || written != len)
     {

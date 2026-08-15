@@ -93,13 +93,6 @@ static BOOL SetFileAttributesUtf8Local(const char* fileName, DWORD attrs)
     return ok;
 }
 
-/* could be used for files smaller than 2GB */
-#define GetFilePointer(hFile) SetFilePointer(hFile, 0, NULL, FILE_CURRENT)
-/* could be used for large files */
-/* lpPositionHigh is a value of type PLONG. The high order long word of the current file position will be returned in lpPositionHigh */
-#define GetVLFilePointer(hFile, lpPositionHigh) \
-    (*lpPositionHigh = 0, \
-     SetFilePointer(hFile, 0, lpPositionHigh, FILE_CURRENT))
 /* forward declaration - defined in 7zIn.c */
 int TestSignatureCandidate(Byte* testBytes);
 
@@ -142,9 +135,12 @@ SZ_RESULT SzFileReadImp(void* object, void* buffer, size_t size, size_t* process
 SZ_RESULT SzFileSeekImp(void* object, CFileSize pos)
 {
     CFileInStream* s = (CFileInStream*)object;
-    //  int res = fseek(s->File, (long) pos, SEEK_SET);
-    //  if (SetFilePointer(s->File, pos, NULL, FILE_BEGIN) != 0xFFFFFFFF)
-    if (SetFilePointer(s->File, s->Offset + pos, NULL, FILE_BEGIN) != 0xFFFFFFFF)
+    // This SFX format stores a DWORD base offset, so reject an overflowing archive-relative seek explicitly.
+    if (pos > 0xFFFFFFFFUL - s->Offset)
+        return SZE_FAIL;
+    LARGE_INTEGER seekPosition;
+    seekPosition.QuadPart = (LONGLONG)(s->Offset + pos);
+    if (SetFilePointerEx(s->File, seekPosition, NULL, FILE_BEGIN))
         return SZ_OK;
     return SZE_FAIL;
 }
@@ -295,10 +291,17 @@ int DecompressInit(struct SCabinet* cabinet)
         // test the signature candidate
     } while (!TestSignatureCandidate(data));
 
-    // move the file position back before the header we just read
-    SetFilePointer(cabinet->file, -(signed)sizeof(k7zSignature), NULL, FILE_CURRENT);
+    // Move back to the signature with a full-width seek before retaining the format's DWORD offset.
+    LARGE_INTEGER rewindPosition;
+    rewindPosition.QuadPart = -(LONGLONG)sizeof(k7zSignature);
+    if (!SetFilePointerEx(cabinet->file, rewindPosition, NULL, FILE_CURRENT))
+        return 0;
 
-    cabinet->offset = GetFilePointer(cabinet->file);
+    LARGE_INTEGER currentPosition = {0};
+    if (!SetFilePointerEx(cabinet->file, currentPosition, &currentPosition, FILE_CURRENT) ||
+        currentPosition.HighPart != 0)
+        return 0;
+    cabinet->offset = currentPosition.LowPart;
 
     return 1;
 }

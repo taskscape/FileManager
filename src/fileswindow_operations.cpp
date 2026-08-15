@@ -39,8 +39,8 @@ BOOL ErrGetFileSizeOfLnkTgtIgnAll = FALSE;
 // CFilesWindow
 //
 
-// helper variables for tests attempting to interrupt script building
-DWORD LastTickCount;
+// Keep build interruption checks valid across the 32-bit tick-count wrap on long-running sessions.
+CMonotonicTimePoint LastBuildInterruptionCheck;
 
 void CFilesWindow::Activate(BOOL shares)
 {
@@ -312,7 +312,7 @@ BOOL CFilesWindow::MoveFiles(const char* source, const char* target, const char*
         }
 
         //---  initialize build interruption test
-        LastTickCount = GetTickCount();
+        LastBuildInterruptionCheck = CMonotonicClock::Now();
 
         //---  enumerate files/directories of the source directory
         char sourceDir[MAX_PATH + 4];
@@ -545,7 +545,7 @@ BOOL CFilesWindow::BuildScriptMain2(COperations* script, BOOL copy, char* target
     DWORD dummy, flags;
 
     //---  initialize the build interruption test
-    LastTickCount = GetTickCount();
+    LastBuildInterruptionCheck = CMonotonicClock::Now();
 
     BOOL fastDirectoryMove = TRUE; // Configuration.FastDirectoryMove;
     if (data->Count > 0)
@@ -678,15 +678,16 @@ BOOL CFilesWindow::BuildScriptMain2(COperations* script, BOOL copy, char* target
                         if (!isKnown)
                             AddStringToNames(usedNames, targetName);
                         char copyTxt[100];
-                        lstrcpyn(copyTxt, LoadStr(IDS_NEWNAME_COPY), 100);
+                        // Preserve the MAX_PATH+1 overflow sentinel used by duplicate-name generation.
+                        StringCchCopyNA(copyTxt, _countof(copyTxt), LoadStr(IDS_NEWNAME_COPY), _countof(copyTxt) - 1);
                         char ofTxt[100];
-                        lstrcpyn(ofTxt, LoadStr(IDS_NEWNAME_OF), 100);
+                        StringCchCopyNA(ofTxt, _countof(ofTxt), LoadStr(IDS_NEWNAME_OF), _countof(ofTxt) - 1);
                         char copyOpenPar[100];
-                        lstrcpyn(copyOpenPar, copyTxt, 98);
-                        lstrcpyn(copyOpenPar + strlen(copyOpenPar), " (", 100 - (int)strlen(copyOpenPar));
+                        StringCchCopyNA(copyOpenPar, 98, copyTxt, 97);
+                        StringCchCopyA(copyOpenPar + strlen(copyOpenPar), 100 - strlen(copyOpenPar), " (");
                         char hyphenCopy[100];
                         strcpy(hyphenCopy, " - ");
-                        lstrcpyn(hyphenCopy + strlen(hyphenCopy), copyTxt, 100 - (int)strlen(hyphenCopy));
+                        StringCchCopyA(hyphenCopy + strlen(hyphenCopy), 100 - strlen(hyphenCopy), copyTxt);
                         char number[20];
                         int val = 0;
                         if (WindowsVistaAndLater)
@@ -730,39 +731,39 @@ BOOL CFilesWindow::BuildScriptMain2(COperations* script, BOOL copy, char* target
                                 {
                                     if (numBeg < ext)
                                     {
-                                        lstrcpyn(targetName + (numBeg - (s + 1)), number, (int)(1 + MAX_PATH - (numBeg - (s + 1))));                                 // "1 +" ensures that overly long names result in exactly MAX_PATH
-                                        lstrcpyn(targetName + strlen(targetName), numEnd, (int)min((DWORD)((ext - numEnd) + 1), 1 + MAX_PATH - strlen(targetName))); // "1 +" ensures that overly long names result in exactly MAX_PATH
-                                        lstrcpyn(targetName + strlen(targetName), hyphenCopy, (int)(1 + MAX_PATH - strlen(targetName)));                             // "1 +" ensures that overly long names result in exactly MAX_PATH
-                                        lstrcpyn(targetName + strlen(targetName), ext, (int)(1 + MAX_PATH - strlen(targetName)));                                    // "1 +" ensures that overly long names result in exactly MAX_PATH
+                                        StringCchCopyA(targetName + (numBeg - (s + 1)), 1 + MAX_PATH - (numBeg - (s + 1)), number);
+                                        StringCchCopyNA(targetName + strlen(targetName), min((DWORD)((ext - numEnd) + 1), 1 + MAX_PATH - strlen(targetName)), numEnd, (ext - numEnd));
+                                        StringCchCopyA(targetName + strlen(targetName), 1 + MAX_PATH - strlen(targetName), hyphenCopy);
+                                        StringCchCopyA(targetName + strlen(targetName), 1 + MAX_PATH - strlen(targetName), ext);
                                     }
                                     else
                                     {
-                                        lstrcpyn(targetName + (ext - (s + 1)), hyphenCopy, (int)(1 + MAX_PATH - (ext - (s + 1))));                                // "1 +" ensures that overly long names result in exactly MAX_PATH
-                                        lstrcpyn(targetName + strlen(targetName), ext, (int)min((DWORD)((numBeg - ext) + 1), 1 + MAX_PATH - strlen(targetName))); // "1 +" ensures that overly long names result in exactly MAX_PATH
-                                        lstrcpyn(targetName + strlen(targetName), number, (int)(1 + MAX_PATH - strlen(targetName)));                              // "1 +" ensures that overly long names result in exactly MAX_PATH
-                                        lstrcpyn(targetName + strlen(targetName), numEnd, (int)(1 + MAX_PATH - strlen(targetName)));                              // "1 +" ensures that overly long names result in exactly MAX_PATH
+                                        StringCchCopyA(targetName + (ext - (s + 1)), 1 + MAX_PATH - (ext - (s + 1)), hyphenCopy);
+                                        StringCchCopyNA(targetName + strlen(targetName), min((DWORD)((numBeg - ext) + 1), 1 + MAX_PATH - strlen(targetName)), ext, (numBeg - ext));
+                                        StringCchCopyA(targetName + strlen(targetName), 1 + MAX_PATH - strlen(targetName), number);
+                                        StringCchCopyA(targetName + strlen(targetName), 1 + MAX_PATH - strlen(targetName), numEnd);
                                     }
                                 }
                                 else
                                 {
-                                    lstrcpyn(targetName + (numBeg - (s + 1)), number, (int)(1 + MAX_PATH - (numBeg - (s + 1))));     // "1 +" ensures that overly long names result in exactly MAX_PATH
-                                    lstrcpyn(targetName + strlen(targetName), numEnd, (int)(1 + MAX_PATH - strlen(targetName)));     // "1 +" ensures that overly long names result in exactly MAX_PATH
-                                    lstrcpyn(targetName + strlen(targetName), hyphenCopy, (int)(1 + MAX_PATH - strlen(targetName))); // "1 +" ensures that overly long names result in exactly MAX_PATH
+                                    StringCchCopyA(targetName + (numBeg - (s + 1)), 1 + MAX_PATH - (numBeg - (s + 1)), number);
+                                    StringCchCopyA(targetName + strlen(targetName), 1 + MAX_PATH - strlen(targetName), numEnd);
+                                    StringCchCopyA(targetName + strlen(targetName), 1 + MAX_PATH - strlen(targetName), hyphenCopy);
                                 }
                             }
                             else
                             {
                                 if (ext == NULL)
-                                    lstrcpyn(targetName + len, hyphenCopy, 1 + MAX_PATH - len); // "1 +" ensures that overly long names result in exactly MAX_PATH
+                                    StringCchCopyA(targetName + len, 1 + MAX_PATH - len, hyphenCopy);
                                 else
-                                    lstrcpyn(targetName + (ext - (s + 1)), hyphenCopy, (int)(1 + MAX_PATH - (ext - (s + 1)))); // "1 +" ensures that overly long names result in exactly MAX_PATH
+                                    StringCchCopyA(targetName + (ext - (s + 1)), 1 + MAX_PATH - (ext - (s + 1)), hyphenCopy);
                                 if (val > 1)
                                 {
                                     sprintf(number, " (%d)", val);
-                                    lstrcpyn(targetName + strlen(targetName), number, (int)(1 + MAX_PATH - strlen(targetName))); // "1 +" ensures that overly long names result in exactly MAX_PATH
+                                    StringCchCopyA(targetName + strlen(targetName), 1 + MAX_PATH - strlen(targetName), number);
                                 }
                                 if (ext != NULL)
-                                    lstrcpyn(targetName + strlen(targetName), ext, (int)(1 + MAX_PATH - strlen(targetName))); // "1 +" ensures that overly long names result in exactly MAX_PATH
+                                    StringCchCopyA(targetName + strlen(targetName), 1 + MAX_PATH - strlen(targetName), ext);
                             }
 
                             if (strlen(targetName) < MAX_PATH) // name assembly succeeded, otherwise we ignore the result
@@ -794,10 +795,10 @@ BOOL CFilesWindow::BuildScriptMain2(COperations* script, BOOL copy, char* target
 
                                 _NEXT_1: // pattern "copy (++val)*"
 
-                                    lstrcpyn(targetName, copyOpenPar, MAX_PATH);
+                                    StringCchCopyA(targetName, MAX_PATH, copyOpenPar);
                                     sprintf(number, "%d)", ++val);
-                                    lstrcpyn(targetName + strlen(targetName), number, (int)(MAX_PATH - strlen(targetName)));
-                                    lstrcpyn(targetName + strlen(targetName), num + 1, (int)(1 + MAX_PATH - strlen(targetName))); // "1 +" ensures that overly long names result in exactly MAX_PATH
+                                    StringCchCopyA(targetName + strlen(targetName), MAX_PATH - strlen(targetName), number);
+                                    StringCchCopyA(targetName + strlen(targetName), 1 + MAX_PATH - strlen(targetName), num + 1);
                                     if (strlen(targetName) < MAX_PATH)                                                            // name assembly succeeded, otherwise we ignore the result
                                     {
                                         if ((isKnown = ContainsString(usedNames, targetName)) != 0 ||
@@ -841,17 +842,17 @@ BOOL CFilesWindow::BuildScriptMain2(COperations* script, BOOL copy, char* target
                                     if (ext == NULL)
                                     {
                                         if (num2 == NULL)
-                                            lstrcpyn(targetName + len, number, 1 + MAX_PATH - len); // "1 +" ensures that overly long names result in exactly MAX_PATH
+                                            StringCchCopyA(targetName + len, 1 + MAX_PATH - len, number);
                                         else
-                                            lstrcpyn(targetName + (num2 - (s + 1)), number, (int)(1 + MAX_PATH - (num2 - (s + 1)))); // "1 +" ensures that overly long names result in exactly MAX_PATH
+                                            StringCchCopyA(targetName + (num2 - (s + 1)), 1 + MAX_PATH - (num2 - (s + 1)), number);
                                     }
                                     else
                                     {
                                         if (num2 == NULL)
-                                            lstrcpyn(targetName + (ext - (s + 1)), number, (int)(1 + MAX_PATH - (ext - (s + 1)))); // "1 +" ensures that overly long names result in exactly MAX_PATH
+                                            StringCchCopyA(targetName + (ext - (s + 1)), 1 + MAX_PATH - (ext - (s + 1)), number);
                                         else
-                                            lstrcpyn(targetName + (num2 - (s + 1)), number, (int)(1 + MAX_PATH - (num2 - (s + 1)))); // "1 +" ensures that overly long names result in exactly MAX_PATH
-                                        lstrcpyn(targetName + strlen(targetName), ext, 1 + MAX_PATH - (int)strlen(targetName));      // "1 +" ensures that overly long names result in exactly MAX_PATH
+                                            StringCchCopyA(targetName + (num2 - (s + 1)), 1 + MAX_PATH - (num2 - (s + 1)), number);
+                                        StringCchCopyA(targetName + strlen(targetName), 1 + MAX_PATH - strlen(targetName), ext);
                                     }
                                     if (strlen(targetName) < MAX_PATH) // name assembly succeeded, otherwise we ignore the result
                                     {
@@ -874,19 +875,19 @@ BOOL CFilesWindow::BuildScriptMain2(COperations* script, BOOL copy, char* target
                             {
                             _NEXT_3: // pattern "copy of *", then "copy (++val) of *"
 
-                                lstrcpyn(targetName, copyTxt, MAX_PATH);
-                                lstrcpyn(targetName + strlen(targetName), " ", MAX_PATH - (int)strlen(targetName));
+                                StringCchCopyA(targetName, MAX_PATH, copyTxt);
+                                StringCchCopyA(targetName + strlen(targetName), MAX_PATH - strlen(targetName), " ");
                                 if (++val > 1)
                                 {
                                     sprintf(number, "(%d) ", val);
-                                    lstrcpyn(targetName + strlen(targetName), number, MAX_PATH - (int)strlen(targetName));
+                                    StringCchCopyA(targetName + strlen(targetName), MAX_PATH - strlen(targetName), number);
                                 }
                                 if (ofTxt[0] != ' ' || ofTxt[1] != 0)
                                 {
-                                    lstrcpyn(targetName + strlen(targetName), ofTxt, MAX_PATH - (int)strlen(targetName));
-                                    lstrcpyn(targetName + strlen(targetName), " ", MAX_PATH - (int)strlen(targetName));
+                                    StringCchCopyA(targetName + strlen(targetName), MAX_PATH - strlen(targetName), ofTxt);
+                                    StringCchCopyA(targetName + strlen(targetName), MAX_PATH - strlen(targetName), " ");
                                 }
-                                lstrcpyn(targetName + strlen(targetName), s + 1, 1 + MAX_PATH - (int)strlen(targetName)); // "1 +" ensures that overly long names result in exactly MAX_PATH
+                                StringCchCopyA(targetName + strlen(targetName), 1 + MAX_PATH - strlen(targetName), s + 1);
                                 if (strlen(targetName) < MAX_PATH)                                                        // name assembly succeeded, otherwise we ignore the result
                                 {
                                     if ((isKnown = ContainsString(usedNames, targetName)) != 0 ||
@@ -1022,7 +1023,9 @@ void CFilesWindow::DropCopyMove(BOOL copy, char* targetPath, CCopyMoveData* data
             if (!copy && data->Count > 0)
             {
                 char source[2 * MAX_PATH];
-                lstrcpyn(source, data->At(0)->FileName, 2 * MAX_PATH);
+                // Operation planning requires a complete first-source identity before trimming it.
+                if (FAILED(StringCchCopyA(source, _countof(source), data->At(0)->FileName)))
+                    return;
                 CutDirectory(source);
                 BOOL sameRootPath = HasTheSameRootPath(source, targetPath);
                 script->SameRootButDiffVolume = sameRootPath && !HasTheSameRootPathAndVolume(source, targetPath);
@@ -1035,9 +1038,14 @@ void CFilesWindow::DropCopyMove(BOOL copy, char* targetPath, CCopyMoveData* data
 
             char caption[50]; // otherwise the LoadStr buffer gets overwritten before being copied to the dialog's local buffer
             if (copy)
-                lstrcpyn(caption, LoadStr(IDS_COPY), 50);
+            {
+                // Operation captions retain their fixed presentation buffer.
+                StringCchCopyNA(caption, _countof(caption), LoadStr(IDS_COPY), _countof(caption) - 1);
+            }
             else
-                lstrcpyn(caption, LoadStr(IDS_MOVE), 50);
+            {
+                StringCchCopyNA(caption, _countof(caption), LoadStr(IDS_MOVE), _countof(caption) - 1);
+            }
 
             HWND hFocusedWnd = GetFocus();
             CreateSafeWaitWindow(LoadStr(IDS_ANALYSINGDIRTREEESC), NULL, 1000, TRUE, MainWindow->HWindow);
@@ -1095,7 +1103,9 @@ void CFilesWindow::DropCopyMove(BOOL copy, char* targetPath, CCopyMoveData* data
                     if (name != NULL)
                     {
                         char path[2 * MAX_PATH];
-                        lstrcpyn(path, name, 2 * MAX_PATH);
+                        // Source-directory grouping must retain the complete source path.
+                        if (FAILED(StringCchCopyA(path, _countof(path), name)))
+                            return;
                         if (CutDirectory(path)) // assume a single source directory (panel operations only, not Find)
                         {
                             // change in the source directory and its subdirectories
@@ -1159,7 +1169,7 @@ BOOL CFilesWindow::BuildScriptMain(COperations* script, CActionType type,
     char fsName[MAX_PATH];
 
     //---  initialize the build interruption test
-    LastTickCount = GetTickCount();
+    LastBuildInterruptionCheck = CMonotonicClock::Now();
 
     //---  when copying/moving from CD, clear the read-only attribute
     //     and set CurrentDirectory to the slower medium
@@ -1230,7 +1240,9 @@ BOOL CFilesWindow::BuildScriptMain(COperations* script, CActionType type,
     char nameMask[2 * MAX_PATH]; // + MAX_PATH is a reserve (Windows create paths longer than MAX_PATH)
     if (mask != NULL)
     {
-        lstrcpyn(nameMask, mask, 2 * MAX_PATH);
+        // The operation mask remains a complete identity through the dialog call.
+        if (FAILED(StringCchCopyA(nameMask, _countof(nameMask), mask)))
+            return FALSE;
         mask = nameMask;
     }
 
@@ -1904,7 +1916,8 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
                         {
                             // first we try whether an error occurs even when listing the directory - such an error
                             // is easier to understand, so we show it first (before the ADS read error)
-                            lstrcpyn(finalName, sourcePath, 2 * MAX_PATH + 200);
+                            // Error reporting must retain the complete source identity.
+                            StringCchCopyA(finalName, _countof(finalName), sourcePath);
                             if (SalPathAppend(finalName, "*", 2 * MAX_PATH + 200))
                             {
                                 WIN32_FIND_DATAW fW;
@@ -2059,7 +2072,8 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
             DWORD err = GetLastError();
             if (err == ERROR_PATH_NOT_FOUND && type == atCountSize && dirDOSName != NULL && strcmp(dirName, dirDOSName) != 0)
             { // workaround for computing the size of a directory that must be accessed via DOS-name when we can't handle the UNICODE name (the multibyte version converted back to UNICODE doesn't match the original)
-                lstrcpyn(finalName, sourcePath, 2 * MAX_PATH + 200);
+                // DOS-name fallback starts with the complete source identity.
+                StringCchCopyA(finalName, _countof(finalName), sourcePath);
                 if (CutDirectory(finalName) &&
                     SalPathAppend(finalName, dirDOSName, 2 * MAX_PATH + 200) &&
                     SalPathAppend(finalName, "*", 2 * MAX_PATH + 200))
@@ -2152,7 +2166,8 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
                     askDirDelete = FALSE;
                 }
                 //---  does anyone want to interrupt script building?
-                if (GetTickCount() - LastTickCount > BS_TIMEOUT)
+                if (CMonotonicClock::HasElapsed(LastBuildInterruptionCheck, BS_TIMEOUT,
+                                                CMonotonicClock::Now()))
                 {
                     if (UserWantsToCancelSafeWaitWindow())
                     {
@@ -2169,7 +2184,7 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
                             goto BUILD_ERROR;
                     }
 
-                    LastTickCount = GetTickCount();
+                    LastBuildInterruptionCheck = CMonotonicClock::Now();
                 }
 
                 //---  build a directory or file

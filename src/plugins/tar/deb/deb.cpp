@@ -73,8 +73,11 @@ CDEBArchive::CDEBArchive(const char* fileName, CSalamanderForOperationsAbstract*
         return;
     }
     // Skip the 4 data bytes that should contain version number "2.0\x0A"
-    DWORD pos = SetFilePointer(file, SubArchiveSize, NULL, FILE_CURRENT);
-    if (pos == INVALID_SET_FILE_POINTER)
+    LARGE_INTEGER seekDistance;
+    seekDistance.QuadPart = SubArchiveSize;
+    LARGE_INTEGER pos;
+    // Preserve the physical file location while validating the TAR reader's DWORD offset boundary.
+    if (!SetFilePointerEx(file, seekDistance, &pos, FILE_CURRENT))
     {
         ShowError(IDS_GZERR_SEEK);
         CloseHandle(file);
@@ -93,10 +96,18 @@ CDEBArchive::CDEBArchive(const char* fileName, CSalamanderForOperationsAbstract*
         return;
     }
     sscanf(ARBlock.FileSize, "%u", &SubArchiveSize);
-    pos += sizeof(ARBlock);
+    if (pos.QuadPart < 0 || (ULONGLONG)pos.QuadPart > MAXDWORD - sizeof(ARBlock))
+    {
+        SetLastError(ERROR_FILE_TOO_LARGE);
+        ShowError(IDS_GZERR_SEEK);
+        CloseHandle(file);
+        return;
+    }
+    // CArchive retains a DWORD input-offset ABI, so reject an unrepresentable Debian subarchive location.
+    DWORD archiveOffset = (DWORD)pos.QuadPart + sizeof(ARBlock);
 
     // Open the fist subarchive
-    controlArchive = new CArchive(fileName, salamander, pos, CQuadWord(SubArchiveSize, 0));
+    controlArchive = new CArchive(fileName, salamander, archiveOffset, CQuadWord(SubArchiveSize, 0));
     if (!controlArchive->IsOk())
     {
         delete controlArchive;
@@ -109,8 +120,8 @@ CDEBArchive::CDEBArchive(const char* fileName, CSalamanderForOperationsAbstract*
     // Skip the subarchive and read the 3rd and last subarchive
     if (SubArchiveSize & 1)
         SubArchiveSize++; // ARBlock starts on even positions
-    pos = SetFilePointer(file, SubArchiveSize, NULL, FILE_CURRENT);
-    if (pos == INVALID_SET_FILE_POINTER)
+    seekDistance.QuadPart = SubArchiveSize;
+    if (!SetFilePointerEx(file, seekDistance, &pos, FILE_CURRENT))
     {
         CloseHandle(file);
         return;
@@ -127,7 +138,16 @@ CDEBArchive::CDEBArchive(const char* fileName, CSalamanderForOperationsAbstract*
         return;
     }
     sscanf(ARBlock.FileSize, "%u", &SubArchiveSize);
-    dataArchive = new CArchive(fileName, salamander, pos + sizeof(ARBlock), CQuadWord(0, 0));
+    if (pos.QuadPart < 0 || (ULONGLONG)pos.QuadPart > MAXDWORD - sizeof(ARBlock))
+    {
+        SetLastError(ERROR_FILE_TOO_LARGE);
+        ShowError(IDS_GZERR_SEEK);
+        CloseHandle(file);
+        return;
+    }
+    // CArchive retains a DWORD input-offset ABI, so reject an unrepresentable Debian subarchive location.
+    archiveOffset = (DWORD)pos.QuadPart + sizeof(ARBlock);
+    dataArchive = new CArchive(fileName, salamander, archiveOffset, CQuadWord(0, 0));
     if (!dataArchive->IsOk())
     {
         delete dataArchive;

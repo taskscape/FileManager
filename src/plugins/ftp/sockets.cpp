@@ -3105,14 +3105,16 @@ CSocketsThread::Body()
 {
     TRACE_I("Begin");
 
-    WNDCLASS hiddenWinCls;
+    WNDCLASSEX hiddenWinCls;
     memset(&hiddenWinCls, 0, sizeof(hiddenWinCls));
+    hiddenWinCls.cbSize = sizeof(hiddenWinCls);
     hiddenWinCls.lpfnWndProc = CSocketsThread::WindowProc;
     hiddenWinCls.hInstance = DLLInstance;
     hiddenWinCls.hCursor = LoadCursor(NULL, IDC_ARROW);
     hiddenWinCls.hbrBackground = (HBRUSH)(COLOR_WINDOW + 1);
     hiddenWinCls.lpszClassName = SOCKETSWINDOW_CLASSNAME;
-    if (RegisterClass(&hiddenWinCls) != 0)
+    // Register through the extended class contract so this background window remains compatible with current Windows metadata.
+    if (RegisterClassEx(&hiddenWinCls) != 0)
     {
         HWindow = CreateWindow(SOCKETSWINDOW_CLASSNAME, "HiddenSocketsWindow", 0, CW_USEDEFAULT,
                                CW_USEDEFAULT, CW_USEDEFAULT, CW_USEDEFAULT, NULL, NULL, DLLInstance, 0);

@@ -10,6 +10,8 @@
 #include "mainwnd.h"
 #include "salinflt.h"
 
+#include <strsafe.h>
+
 //****************************************************************************
 //
 // CTruncatedString
@@ -705,9 +707,10 @@ CViewTemplates::CViewTemplates()
 
 void CViewTemplates::Set(DWORD index, const char* name, DWORD flags, BOOL leftSmartMode, BOOL rightSmartMode)
 {
-    if (lstrlen(name) >= VIEW_NAME_MAX)
+    if (strlen(name) >= VIEW_NAME_MAX)
         TRACE_E("String is too long");
-    lstrcpyn(Items[index].Name, name, VIEW_NAME_MAX);
+    // View-template names intentionally use their fixed editable presentation field.
+    StringCchCopyNA(Items[index].Name, _countof(Items[index].Name), name, _countof(Items[index].Name) - 1);
     Items[index].Flags = flags;
     Items[index].LeftSmartMode = leftSmartMode;
     Items[index].RightSmartMode = rightSmartMode;
@@ -1090,7 +1093,7 @@ BOOL CopyTextToClipboard(const char* text, int textLen, BOOL showEcho, HWND hEch
     DWORD err = ERROR_SUCCESS;
 
     if (textLen == -1)
-        textLen = lstrlen(text);
+        textLen = (int)strlen(text);
 
     HGLOBAL hglbCopy = NOHANDLES(GlobalAlloc(GMEM_MOVEABLE | GMEM_DDESHARE, textLen + 1));
     if (hglbCopy != NULL)
@@ -1142,7 +1145,7 @@ BOOL CopyHTextToClipboard(HGLOBAL hGlobalText, int textLen, BOOL showEcho, HWND 
             if (text != NULL)
             {
                 if (textLen == -1)
-                    textLen = lstrlen(text);
+                    textLen = (int)strlen(text);
                 err = AddUnicodeToClipboard(text, textLen); // store the text in Unicode first
                 HANDLES(GlobalUnlock(hGlobalText));
             }
@@ -1197,7 +1200,7 @@ void WINAPI InternalGetDosName()
 {
     if (TransferFileData->DosName != NULL)
     {
-        TransferLen = lstrlen(TransferFileData->DosName);
+        TransferLen = (int)strlen(TransferFileData->DosName);
         CopyMemory(TransferBuffer, TransferFileData->DosName, TransferLen);
     }
     else
@@ -1300,7 +1303,7 @@ void WINAPI InternalGetDate()
         }
         TransferRowData |= 0x00000001;
     }
-    TransferLen = GetDateFormat(LOCALE_USER_DEFAULT, DATE_SHORTDATE, &InternalColumnST, NULL, TransferBuffer, TRANSFER_BUFFER_MAX) - 1;
+    TransferLen = FormatUserDateTimeUtf8(&InternalColumnST, DATE_SHORTDATE, TransferBuffer, TRANSFER_BUFFER_MAX, TRUE) - 1;
     if (TransferLen < 0)
         TransferLen = sprintf(TransferBuffer, "%u.%u.%u", InternalColumnST.wDay, InternalColumnST.wMonth, InternalColumnST.wYear);
 }
@@ -1325,7 +1328,7 @@ void WINAPI InternalGetDateOnlyForDisk()
         TransferLen = 0;
         return;
     }
-    TransferLen = GetDateFormat(LOCALE_USER_DEFAULT, DATE_SHORTDATE, &InternalColumnST, NULL, TransferBuffer, TRANSFER_BUFFER_MAX) - 1;
+    TransferLen = FormatUserDateTimeUtf8(&InternalColumnST, DATE_SHORTDATE, TransferBuffer, TRANSFER_BUFFER_MAX, TRUE) - 1;
     if (TransferLen < 0)
         TransferLen = sprintf(TransferBuffer, "%u.%u.%u", InternalColumnST.wDay, InternalColumnST.wMonth, InternalColumnST.wYear);
 }
@@ -1342,7 +1345,7 @@ void WINAPI InternalGetTime()
         }
         TransferRowData |= 0x00000001;
     }
-    TransferLen = GetTimeFormat(LOCALE_USER_DEFAULT, 0, &InternalColumnST, NULL, TransferBuffer, TRANSFER_BUFFER_MAX) - 1;
+    TransferLen = FormatUserDateTimeUtf8(&InternalColumnST, 0, TransferBuffer, TRANSFER_BUFFER_MAX, FALSE) - 1;
     if (TransferLen < 0)
         TransferLen = sprintf(TransferBuffer, "%u:%02u:%02u", InternalColumnST.wHour, InternalColumnST.wMinute, InternalColumnST.wSecond);
 }
@@ -1367,7 +1370,7 @@ void WINAPI InternalGetTimeOnlyForDisk()
         TransferLen = 0;
         return;
     }
-    TransferLen = GetTimeFormat(LOCALE_USER_DEFAULT, 0, &InternalColumnST, NULL, TransferBuffer, TRANSFER_BUFFER_MAX) - 1;
+    TransferLen = FormatUserDateTimeUtf8(&InternalColumnST, 0, TransferBuffer, TRANSFER_BUFFER_MAX, FALSE) - 1;
     if (TransferLen < 0)
         TransferLen = sprintf(TransferBuffer, "%u:%02u:%02u", InternalColumnST.wHour, InternalColumnST.wMinute, InternalColumnST.wSecond);
 }
@@ -1534,8 +1537,13 @@ BOOL CSalamanderView::InsertStandardColumn(int index, DWORD id)
     {
         CColumn column;
         column.CustomData = 0;
-        lstrcpy(column.Name, LoadStr(item->NameResID));
-        lstrcpy(column.Description, LoadStr(item->DescResID));
+        // Standard-column labels must fit their fixed metadata fields; avoid registering a truncated column contract.
+        if (FAILED(StringCchCopyA(column.Name, _countof(column.Name), LoadStr(item->NameResID))) ||
+            FAILED(StringCchCopyA(column.Description, _countof(column.Description), LoadStr(item->DescResID))))
+        {
+            TRACE_E("CSalamanderView::InsertStandardColumn(): localized column metadata is too long.");
+            return FALSE;
+        }
         column.GetText = item->GetText;
         column.SupportSorting = item->SupportSorting;
         column.LeftAlignment = item->LeftAlignment;
@@ -1616,8 +1624,17 @@ BOOL CSalamanderView::SetColumnName(int index, const char* name, const char* des
     }
     else
     {
-        lstrcpyn(Panel->Columns[index].Name, name, COLUMN_NAME_MAX);
-        lstrcpyn(Panel->Columns[index].Description, description, COLUMN_DESCRIPTION_MAX);
+        // This plug-in-facing API reports failure, so reject oversized metadata rather than silently truncating it.
+        size_t nameLength;
+        size_t descriptionLength;
+        if (FAILED(StringCchLengthA(name, COLUMN_NAME_MAX, &nameLength)) ||
+            FAILED(StringCchLengthA(description, COLUMN_DESCRIPTION_MAX, &descriptionLength)))
+        {
+            TRACE_E("CSalamanderView::SetColumnName(): column metadata is too long.");
+            return FALSE;
+        }
+        StringCchCopyA(Panel->Columns[index].Name, COLUMN_NAME_MAX, name);
+        StringCchCopyA(Panel->Columns[index].Description, COLUMN_DESCRIPTION_MAX, description);
     }
     return TRUE;
 }
@@ -1688,7 +1705,9 @@ BOOL CFileHistoryItem::Execute()
     case fhitOpen:
     {
         char buff[MAX_PATH];
-        lstrcpy(buff, FileName);
+        // Opening a history entry requires a complete containing file path.
+        if (FAILED(StringCchCopyA(buff, _countof(buff), FileName)))
+            return FALSE;
         char* ptr = strrchr(buff, '\\');
         if (ptr != NULL)
         {
@@ -1745,7 +1764,9 @@ BOOL SalOpenExecute(HWND hWindow, const char* fileName)
 
     if (SalOpenSharedMem != NULL)
     {
-        lstrcpyn((char*)SalOpenSharedMem, fileName, MAX_PATH + 200);
+        // The helper process must receive a complete shared-memory file identity.
+        if (FAILED(StringCchCopyA((char*)SalOpenSharedMem, MAX_PATH + 200, fileName)))
+            return FALSE;
 
         char cmdline[MAX_PATH];
         cmdline[0] = '"';

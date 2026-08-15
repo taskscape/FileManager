@@ -25,7 +25,7 @@ extern SYSTEMTIME BETA_EXPIRATION_DATE;
 
 // used for detecting whether wheel message came through hook or directly
 extern BOOL MouseWheelMSGThroughHook; // TRUE: message went through hook at time MouseWheelMSGTime; FALSE: message went through panel at time MouseWheelMSGTime
-extern DWORD MouseWheelMSGTime;       // timestamp of last message
+extern CMonotonicTimePoint MouseWheelMSGTime; // 64-bit timestamp keeps cross-channel suppression valid after tick wrap
 #define MOUSEWHEELMSG_VALID 100       // [ms] number of milliseconds for which one channel is valid (hook vs window)
 
 enum
@@ -1020,6 +1020,8 @@ BOOL CheckAndRestoreNetworkConnection(HWND parent, const char drive, BOOL& pathI
 // Auxiliary workers are tracked until their named shutdown deadline and final
 // safe join; they are never force-terminated while they may use host state.
 void AddAuxThread(HANDLE view, BOOL testIfFinished = FALSE, LPCSTR description = "legacy auxiliary worker");
+class CThreadOwner;
+void AddOwnedAuxThread(CThreadOwner* owner, LPCSTR description = "owned auxiliary worker");
 void ShutdownAuxThreads();
 
 // returns TRUE if the specified file exists; otherwise returns FALSE
@@ -1686,8 +1688,8 @@ extern int DecimalSeparatorLen;  // length in characters without terminating zer
 extern char ThousandsSeparator[5];
 extern int ThousandsSeparatorLen;
 
-extern DWORD SalamanderStartTime;     // Salamander start time (GetTickCount)
-extern DWORD SalamanderExceptionTime; // exception time in Salamander (GetTickCount) or time of last Bug Report dialog invocation
+extern ULONGLONG SalamanderStartTime;     // Salamander start time (GetTickCount64)
+extern ULONGLONG SalamanderExceptionTime; // exception time in Salamander (GetTickCount64) or time of last Bug Report dialog invocation
 
 extern BOOL SkipOneActivateRefresh; // should refresh be skipped during activation of main window? (for internal viewers)
 
@@ -2165,6 +2167,7 @@ struct CFileNamesEnumData
     // request:
     int RequestUID;                        // request number
     CFileNamesEnumRequestType RequestType; // request type
+    BOOL WaitingForResult;                 // caller is still waiting for this request's completion event
     int SrcUID;
     int LastFileIndex;
     char LastFileName[MAX_PATH];

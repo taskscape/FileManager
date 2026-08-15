@@ -3,6 +3,8 @@
 
 #include "precomp.h"
 
+#include <strsafe.h>
+
 #include "wndtree.h"
 #include "wndframe.h"
 #include "translator.h"
@@ -16,6 +18,30 @@ CData Data;
 // Utilities used during conversions.
 #define TEMP_BUFF_LEN 500000
 static wchar_t TempBuff[TEMP_BUFF_LEN];
+
+template<size_t capacity>
+static bool ReplaceTargetExtension(char (&destination)[capacity], const char* source, const char* extension)
+{
+    // Save/backup paths must retain the entire target identity before their extension is replaced.
+    if (FAILED(StringCchCopyA(destination, capacity, source)))
+        return false;
+    char* dot = strrchr(destination, '.');
+    if (dot == NULL)
+        return false;
+    return SUCCEEDED(StringCchCopyA(dot + 1, capacity - static_cast<size_t>(dot + 1 - destination), extension));
+}
+
+template<size_t capacity>
+static bool CopySLGSignatureField(wchar_t (&destination)[capacity], const wchar_t* source)
+{
+    // Imported signature fields must remain complete rather than carrying a truncated language identity.
+    if (FAILED(StringCchCopyW(destination, capacity, source != NULL ? source : L"")))
+    {
+        destination[0] = 0;
+        return false;
+    }
+    return true;
+}
 
 BOOL __GetNextChar(wchar_t& charValue, wchar_t*& start, wchar_t* end)
 {
@@ -324,8 +350,11 @@ BOOL CData::Save()
     CleanTranslationStates();
 
     char buff[MAX_PATH];
-    lstrcpy(buff, Data.FullTargetFile);
-    lstrcpy(strrchr(buff, '.') + 1, "tmp");
+    if (!ReplaceTargetExtension(buff, Data.FullTargetFile, "tmp"))
+    {
+        SetCursor(hOldCursor);
+        return FALSE;
+    }
     if (CopyFile(Data.FullTargetFile, buff, FALSE))
     {
         HANDLE hUpdate = BeginUpdateResource(buff, FALSE);
@@ -361,36 +390,40 @@ BOOL CData::Save()
         }
         if (ret)
         {
-            lstrcpy(buff, Data.FullTargetFile);
-            lstrcpy(strrchr(buff, '.') + 1, "bak");
-            if (!DeleteFile(buff) &&
+            if (!ReplaceTargetExtension(buff, Data.FullTargetFile, "bak"))
+                ret = FALSE;
+            else if (!DeleteFile(buff) &&
                 GetFileAttributesUtf8Local(buff) != INVALID_FILE_ATTRIBUTES) // The deletion did not fail due to a missing .bak file.
             {                                                       // Deletion probably failed because the .bak is opened by a running Salamander from the bin folder.
                 // Attempt to rename it to "xxxx (2).bak", "xxxx (3).bak", etc.
                 char buff2[MAX_PATH + 20];
-                lstrcpyn(buff2, buff, MAX_PATH);
-                char* num = strrchr(buff2, '.');
-                if (num != NULL)
+                if (FAILED(StringCchCopyA(buff2, _countof(buff2), buff)))
+                    ret = FALSE;
+                else
                 {
-                    for (int i = 2;; i++)
+                    char* num = strrchr(buff2, '.');
+                    if (num != NULL)
                     {
-                        sprintf_s(num, _countof(buff2) - (num - buff2), " (%d).bak", i);
-                        if (MoveFile(buff, buff2))
-                            break;
-                        else
+                        for (int i = 2;; i++)
                         {
-                            DWORD err = GetLastError();
-                            if (err != ERROR_FILE_EXISTS && err != ERROR_ALREADY_EXISTS)
+                            sprintf_s(num, _countof(buff2) - (num - buff2), " (%d).bak", i);
+                            if (MoveFile(buff, buff2))
                                 break;
+                            else
+                            {
+                                DWORD err = GetLastError();
+                                if (err != ERROR_FILE_EXISTS && err != ERROR_ALREADY_EXISTS)
+                                    break;
+                            }
                         }
                     }
                 }
             }
             if (MoveFile(Data.FullTargetFile, buff))
             {
-                lstrcpy(buff, Data.FullTargetFile);
-                lstrcpy(strrchr(buff, '.') + 1, "tmp");
-                if (!MoveFile(buff, Data.FullTargetFile))
+                if (!ReplaceTargetExtension(buff, Data.FullTargetFile, "tmp"))
+                    ret = FALSE;
+                else if (!MoveFile(buff, Data.FullTargetFile))
                 {
                     ret = FALSE;
                     DWORD err = GetLastError();
@@ -897,7 +930,8 @@ BOOL CData::LoadSLGSignature(HINSTANCE hModule)
     if (ret)
         SLGSignature.LanguageID = *((WORD*)buffer);
     if (ret && !VersionInfo.QueryString("\\StringFileInfo\\040904b0\\SLGCRCofImpSLT", SLGSignature.CRCofImpSLT, 100))
-        lstrcpyW(SLGSignature.CRCofImpSLT, L"not found");
+        // The fixed signature marker is a known literal that fits the 100-character CRC field.
+        StringCchCopyW(SLGSignature.CRCofImpSLT, _countof(SLGSignature.CRCofImpSLT), L"not found");
 
     /*
   ver.WriteResourceToFile(hModule, VS_VERSION_INFO, "D:\\Zumpa\\translator\\prj2\\original.bin");
@@ -1015,9 +1049,9 @@ BOOL CData::Import(const char* project, BOOL trlPropOnly, BOOL onlyDlgLayouts)
             OutWindow.AddLine(buff, mteInfo);
 
             SLGSignature.LanguageID = oldData.SLGSignature.LanguageID;
-            lstrcpyW(SLGSignature.Author, oldData.SLGSignature.Author);
-            lstrcpyW(SLGSignature.Web, oldData.SLGSignature.Web);
-            lstrcpyW(SLGSignature.Comment, oldData.SLGSignature.Comment);
+            CopySLGSignatureField(SLGSignature.Author, oldData.SLGSignature.Author);
+            CopySLGSignatureField(SLGSignature.Web, oldData.SLGSignature.Web);
+            CopySLGSignatureField(SLGSignature.Comment, oldData.SLGSignature.Comment);
         }
         if (!trlPropOnly)                                      // Importing (typically from an older version) creates a new version that has not yet been imported from SLT, therefore:
             SLGSignature.SetCRCofImpSLTIfFound((wchar_t*)L""); // Mark as changed without an SLT import/export.
@@ -1026,12 +1060,12 @@ BOOL CData::Import(const char* project, BOOL trlPropOnly, BOOL onlyDlgLayouts)
         if (!onlyDlgLayouts &&
             SLGSignature.HelpDirExist == oldData.SLGSignature.HelpDirExist) // Do not copy HelpDir when importing translation properties from salamand.atp into a plug-in.
         {
-            lstrcpyW(SLGSignature.HelpDir, oldData.SLGSignature.HelpDir);
+            CopySLGSignatureField(SLGSignature.HelpDir, oldData.SLGSignature.HelpDir);
         }
         if (!onlyDlgLayouts &&
             SLGSignature.SLGIncompleteExist == oldData.SLGSignature.SLGIncompleteExist) // Likewise keep SLGIncomplete unchanged when importing translation properties.
         {
-            lstrcpyW(SLGSignature.SLGIncomplete, oldData.SLGSignature.SLGIncomplete);
+            CopySLGSignatureField(SLGSignature.SLGIncomplete, oldData.SLGSignature.SLGIncomplete);
         }
         if (!trlPropOnly)
         {
@@ -1286,7 +1320,8 @@ void RemoveGarbage(wchar_t* buff)
         {
             if (*(p + 1) == L'&')
                 p++;
-            memmove(p, p + 1, lstrlenW(p) * sizeof(wchar_t));
+            // The edited translation text is terminated, so preserve the shifted terminator with the CRT length.
+            memmove(p, p + 1, wcslen(p) * sizeof(wchar_t));
         }
         else
         {
@@ -1295,7 +1330,8 @@ void RemoveGarbage(wchar_t* buff)
                 if (*(p + 1) == L'n' || *(p + 1) == L'r' || *(p + 1) == L't')
                 {
                     *p = L' ';
-                    memmove(p + 1, p + 2, lstrlenW(p + 1) * sizeof(wchar_t));
+                    // The edited translation text is terminated, so preserve the shifted terminator with the CRT length.
+                    memmove(p + 1, p + 2, wcslen(p + 1) * sizeof(wchar_t));
                 }
             }
             p++;
@@ -1346,10 +1382,15 @@ BOOL CData::Export(const char* fileName)
 
             if (HIWORD(control->TWindowName) != 0x0000 && IsTranslatableControl(control->TWindowName))
             {
-                lstrcpynW(buff, control->TWindowName, 10000);
-                RemoveGarbage(buff);
-                if (ret)
-                    ret &= WriteUnicodeTextLine(hFile, buff);
+                // Export complete translated text only; a clipped scratch copy would corrupt the text archive.
+                if (SUCCEEDED(StringCchCopyW(buff, _countof(buff), control->TWindowName)))
+                {
+                    RemoveGarbage(buff);
+                    if (ret)
+                        ret &= WriteUnicodeTextLine(hFile, buff);
+                }
+                else
+                    ret = FALSE;
             }
         }
     }
@@ -1362,10 +1403,15 @@ BOOL CData::Export(const char* fileName)
 
             if (wcslen(item->TString) > 0)
             {
-                lstrcpynW(buff, item->TString, 10000);
-                RemoveGarbage(buff);
-                if (ret)
-                    ret &= WriteUnicodeTextLine(hFile, buff);
+                // Export complete translated text only; a clipped scratch copy would corrupt the text archive.
+                if (SUCCEEDED(StringCchCopyW(buff, _countof(buff), item->TString)))
+                {
+                    RemoveGarbage(buff);
+                    if (ret)
+                        ret &= WriteUnicodeTextLine(hFile, buff);
+                }
+                else
+                    ret = FALSE;
             }
         }
     }
@@ -1376,10 +1422,15 @@ BOOL CData::Export(const char* fileName)
         {
             if (StrData[i]->TStrings[j] != NULL)
             {
-                lstrcpynW(buff, StrData[i]->TStrings[j], 10000);
-                RemoveGarbage(buff);
-                if (ret)
-                    ret &= WriteUnicodeTextLine(hFile, buff);
+                // Export complete translated text only; a clipped scratch copy would corrupt the text archive.
+                if (SUCCEEDED(StringCchCopyW(buff, _countof(buff), StrData[i]->TStrings[j])))
+                {
+                    RemoveGarbage(buff);
+                    if (ret)
+                        ret &= WriteUnicodeTextLine(hFile, buff);
+                }
+                else
+                    ret = FALSE;
             }
         }
     }
@@ -2318,8 +2369,8 @@ BOOL CData::ImportTextArchive(const char* fileName, BOOL testOnly)
         return FALSE;
     }
 
-    DWORD size = GetFileSize(hFile, NULL);
-    if (size == 0xFFFFFFFF || size == 0)
+    DWORD size;
+    if (!GetFileSizeDwordLocal(hFile, &size) || size == 0)
     {
         sprintf_s(buf, "Error reading file %s.", fileName);
         MessageBox(GetMsgParent(), buf, ERROR_TITLE, MB_OK | MB_ICONEXCLAMATION);

@@ -11,6 +11,8 @@
 
 #include "precomp.h"
 
+#include <strsafe.h>
+
 // ****************************************************************************
 // VIEWER SECTION
 // ****************************************************************************
@@ -296,7 +298,11 @@ public:
                   BOOL* success, int enumFilesSourceUID,
                   int enumFilesCurrentIndex) : CThread("DOP Viewer")
     {
-        lstrcpyn(Name, name, MAX_PATH);
+        if (FAILED(StringCchCopyA(Name, _countof(Name), name)))
+        {
+            // A viewer thread must not retain a truncated file identity.
+            Name[0] = 0;
+        }
         Left = left;
         Top = top;
         Width = width;
@@ -731,7 +737,13 @@ void FillMenuFilter(CGUIMenuPopupAbstract* popup, int cmdFirst, int filterCount)
     int index = 0;
     while (index < filterCount)
     {
-        wsprintf(buff, "&%d %s %d", index < 9 ? index + 1 : 0, LoadStr(IDS_FILTER), index + 1);
+        // Menu labels must fit the callback-owned buffer before being handed to the GUI API.
+        if (_snprintf_s(buff, _countof(buff), _TRUNCATE, "&%d %s %d",
+                        index < 9 ? index + 1 : 0, LoadStr(IDS_FILTER), index + 1) < 0)
+        {
+            index++;
+            continue;
+        }
         mi.ID = cmdFirst + index;
         popup->InsertItem(-1, TRUE, &mi);
         index++;
@@ -1073,7 +1085,10 @@ CViewerWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         if (LOWORD(wParam) >= CM_FILTER_FIRST && LOWORD(wParam) <= CM_FILTER_LAST)
         {
             char buff[100];
-            wsprintf(buff, "%s %d", LoadStr(IDS_FILTER), LOWORD(wParam) - CM_FILTER_FIRST + 1);
+            // Do not display a partially formatted filter label.
+            if (_snprintf_s(buff, _countof(buff), _TRUNCATE, "%s %d",
+                            LoadStr(IDS_FILTER), LOWORD(wParam) - CM_FILTER_FIRST + 1) < 0)
+                return 0;
             SalamanderGeneral->SalMessageBox(HWindow, buff, LoadStr(IDS_PLUGINNAME), MB_ICONINFORMATION | MB_OK);
             return 0;
         }
@@ -1089,7 +1104,11 @@ CViewerWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
             ofn.lStructSize = sizeof(OPENFILENAME);
             ofn.hwndOwner = HWindow;
             char filterBuf[100];
-            lstrcpyn(filterBuf, LoadStr(IDS_DOP_FILES_FILTER), 100);
+            if (FAILED(StringCchCopyA(filterBuf, _countof(filterBuf), LoadStr(IDS_DOP_FILES_FILTER))))
+            {
+                // A partial common-dialog filter has a different field layout.
+                break;
+            }
             char* s = filterBuf;
             ofn.lpstrFilter = s;
             while (*s != 0) // create a double-null-terminated list
@@ -1102,8 +1121,13 @@ CViewerWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
             ofn.nMaxFile = MAX_PATH;
             ofn.nFilterIndex = 1;
             char curDir[MAX_PATH];
-            lstrcpyn(curDir, Name, MAX_PATH);
-            SalamanderGeneral->CutDirectory(curDir);
+            if (SUCCEEDED(StringCchCopyA(curDir, _countof(curDir), Name)))
+                SalamanderGeneral->CutDirectory(curDir);
+            else
+            {
+                // Let the dialog select its default directory if the cached name is invalid.
+                curDir[0] = 0;
+            }
             ofn.lpstrInitialDir = curDir[0] != 0 ? curDir : NULL;
             ofn.Flags = OFN_PATHMUSTEXIST | OFN_FILEMUSTEXIST | OFN_HIDEREADONLY;
 
@@ -1163,7 +1187,12 @@ CViewerWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         if (ToolBar != NULL && hToolBar == ToolBar->GetHWND())
         {
             TOOLBAR_TOOLTIP* tt = (TOOLBAR_TOOLTIP*)lParam;
-            lstrcpy(tt->Buffer, LoadStr(ToolBarButtons[tt->Index].ToolTipResID));
+            // The host toolbar owns a fixed reply buffer, so do not truncate a localized tooltip.
+            if (tt == NULL || tt->Buffer == NULL)
+                return 0;
+            if (FAILED(StringCchCopyA(tt->Buffer, TOOLTIP_TEXT_MAX,
+                                      LoadStr(ToolBarButtons[tt->Index].ToolTipResID))))
+                tt->Buffer[0] = 0;
             SalamanderGUI->PrepareToolTipText(tt->Buffer, FALSE);
         }
         return 0;
@@ -1182,12 +1211,16 @@ CViewerWindow::GetLock()
 
 void CViewerWindow::OpenFile(const char* name, BOOL setLock)
 {
+    if (FAILED(StringCchCopyA(Name, _countof(Name), name)))
+    {
+        // Do not replace the current view with a truncated filename.
+        return;
+    }
     if (setLock && Lock != NULL)
     {
         SetEvent(Lock);
         Lock = NULL; // from here on only the disk cache is responsible
     }
-    lstrcpyn(Name, name, MAX_PATH);
     InvalidateRect(HWindow, NULL, TRUE);
     InvalidateRect(Renderer.HWindow, NULL, TRUE);
 }

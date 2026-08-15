@@ -109,6 +109,26 @@ EBoundedStringResult ConvertWideToUtf8Checked(const WCHAR* source, char* destina
     return bsrSuccess;
 }
 
+BOOL GetKnownFolderPathToAnsi(REFKNOWNFOLDERID folderId, char* destination, int destinationCapacity)
+{
+    if (destination == NULL || destinationCapacity <= 0)
+    {
+        SetLastError(ERROR_INVALID_PARAMETER);
+        return FALSE;
+    }
+
+    destination[0] = 0;
+    PWSTR widePath = NULL;
+    // Keep shell paths in UTF-16 until the repository's ANSI boundary conversion is unavoidable.
+    HRESULT result = SHGetKnownFolderPath(folderId, KF_FLAG_DEFAULT, NULL, &widePath);
+    if (FAILED(result) || widePath == NULL)
+        return FALSE;
+
+    BOOL converted = ConvertU2A(widePath, -1, destination, destinationCapacity) != 0;
+    CoTaskMemFree(widePath);
+    return converted;
+}
+
 int ConvertU2A(const WCHAR* src, int srcLen, char* buf, int bufSize, BOOL compositeCheck, UINT codepage)
 {
     if (buf == NULL || bufSize <= 0)
@@ -617,7 +637,8 @@ WCHAR* DupStr(const WCHAR* txt)
 {
     if (txt == NULL)
         return NULL;
-    int len = lstrlenW(txt) + 1;
+    // The allocation is sized from the terminated source, independent of legacy Win32 helpers.
+    const size_t len = wcslen(txt) + 1;
     WCHAR* ret = (WCHAR*)malloc(len * sizeof(WCHAR));
 #ifndef SAFE_ALLOC
     if (ret == NULL)

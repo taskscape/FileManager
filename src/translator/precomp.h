@@ -46,3 +46,18 @@ static DWORD GetFileAttributesUtf8Local(const char* fileName)
     HeapFree(GetProcessHeap(), 0, buf);
     return attrs;
 }
+
+static BOOL GetFileSizeDwordLocal(HANDLE file, DWORD* size)
+{
+    LARGE_INTEGER fileSize;
+    if (!GetFileSizeEx(file, &fileSize))
+        return FALSE;
+    if (fileSize.QuadPart < 0 || (ULONGLONG)fileSize.QuadPart > MAXDWORD)
+    {
+        SetLastError(ERROR_FILE_TOO_LARGE);
+        return FALSE;
+    }
+    // Translator loaders allocate/read DWORD-sized buffers, so reject oversize files before narrowing the 64-bit result.
+    *size = (DWORD)fileSize.QuadPart;
+    return TRUE;
+}

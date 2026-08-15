@@ -4,6 +4,8 @@
 #include "precomp.h"
 #include "operation_journal.h"
 #include <time.h>
+// Use StrSafe for the bounded process command line built below.
+#include <strsafe.h>
 //#ifdef MSVC_RUNTIME_CHECKS
 #include <rtcapi.h>
 //#endif // MSVC_RUNTIME_CHECKS
@@ -294,16 +296,17 @@ BOOL SalamanderIsNotBusy(DWORD* lastIdleTime)
 BOOL InitPreloadedStrings()
 {
     DirColumnStr = DupStr(LoadStr(IDS_DIRCOLUMN));
-    DirColumnStrLen = lstrlen(DirColumnStr);
+    // Preloaded resource strings are CRT-terminated allocations.
+    DirColumnStrLen = (int)strlen(DirColumnStr);
 
     ColExtStr = DupStr(LoadStr(IDS_COLUMN_NAME_EXT));
-    ColExtStrLen = lstrlen(ColExtStr);
+    ColExtStrLen = (int)strlen(ColExtStr);
 
     UpDirTypeName = DupStr(LoadStr(IDS_UPDIRTYPENAME));
-    UpDirTypeNameLen = lstrlen(UpDirTypeName);
+    UpDirTypeNameLen = (int)strlen(UpDirTypeName);
 
     CommonFileTypeName = DupStr(LoadStr(IDS_COMMONFILETYPE));
-    CommonFileTypeNameLen = lstrlen(CommonFileTypeName);
+    CommonFileTypeNameLen = (int)strlen(CommonFileTypeName);
     CommonFileTypeName2 = DupStr(LoadStr(IDS_COMMONFILETYPE2));
 
     ProgDlgHoursStr = DupStr(LoadStr(IDS_PROGDLGHOURS));
@@ -629,7 +632,9 @@ BOOL HasTheSameRootPathAndVolume(const char* p1, const char* p2)
         char p1Volume[100] = "1";
         char p2Volume[100] = "2";
         char resPath[MAX_PATH];
-        lstrcpyn(resPath, p1, MAX_PATH);
+        // Volume comparisons require the complete input path.
+        if (FAILED(StringCchCopyA(resPath, _countof(resPath), p1)))
+            return FALSE;
         ResolveSubsts(resPath);
         GetRootPath(root, resPath);
         if (!IsUNCPath(root) && GetDriveType(root) == DRIVE_FIXED) // reparse points only make sense on fixed disks
@@ -691,10 +696,13 @@ BOOL PathsAreOnTheSameVolume(const char* path1, const char* path2, BOOL* resIsOn
     char ourPath[MAX_PATH];
     char path1NetPath[MAX_PATH];
     char path2NetPath[MAX_PATH];
-    lstrcpyn(ourPath, path1, MAX_PATH);
+    // Volume comparison must not resolve a truncated path identity.
+    if (FAILED(StringCchCopyA(ourPath, _countof(ourPath), path1)))
+        return FALSE;
     ResolveSubsts(ourPath);
     GetRootPath(root1, ourPath);
-    lstrcpyn(ourPath, path2, MAX_PATH);
+    if (FAILED(StringCchCopyA(ourPath, _countof(ourPath), path2)))
+        return FALSE;
     ResolveSubsts(ourPath);
     GetRootPath(root2, ourPath);
     BOOL ret = TRUE;
@@ -716,8 +724,8 @@ BOOL PathsAreOnTheSameVolume(const char* path1, const char* path2, BOOL* resIsOn
                 // if under W2K and it's not a root path, try to traverse through reparse points
                 ResolveLocalPathWithReparsePoints(ourPath, path1, &cutPathIsPossible, NULL, NULL, NULL, NULL, path1NetPath);
             }
-            else
-                lstrcpyn(ourPath, root1, MAX_PATH);
+            else if (FAILED(StringCchCopyA(ourPath, _countof(ourPath), root1)))
+                return FALSE;
             int numOfGetVolNamesFailed = 0;
             if (path1NetPath[0] == 0) // cannot get "volume name" from network path, won't even try
             {
@@ -739,8 +747,8 @@ BOOL PathsAreOnTheSameVolume(const char* path1, const char* path2, BOOL* resIsOn
                 // if under W2K and it's not a root path, try to traverse through reparse points
                 ResolveLocalPathWithReparsePoints(ourPath, path2, &cutPathIsPossible, NULL, NULL, NULL, NULL, path2NetPath);
             }
-            else
-                lstrcpyn(ourPath, root2, MAX_PATH);
+            else if (FAILED(StringCchCopyA(ourPath, _countof(ourPath), root2)))
+                return FALSE;
             if (path2NetPath[0] == 0) // cannot get "volume name" from network path, won't even try
             {
                 if (path1NetPath[0] == 0)
@@ -791,9 +799,10 @@ BOOL PathsAreOnTheSameVolume(const char* path1, const char* path2, BOOL* resIsOn
 
         if (resIsOnlyEstimation != NULL)
         {
-            lstrcpyn(path1NetPath, path1, MAX_PATH);
-            lstrcpyn(path2NetPath, path2, MAX_PATH);
-            if (ResolveSubsts(path1NetPath) && ResolveSubsts(path2NetPath))
+            // Estimation is valid only when both original paths fit completely.
+            if (SUCCEEDED(StringCchCopyA(path1NetPath, _countof(path1NetPath), path1)) &&
+                SUCCEEDED(StringCchCopyA(path2NetPath, _countof(path2NetPath), path2)) &&
+                ResolveSubsts(path1NetPath) && ResolveSubsts(path2NetPath))
             {
                 if (IsTheSamePath(path1NetPath, path2NetPath))
                     *resIsOnlyEstimation = FALSE; // stejne cesty = urcite i stejne svazky
@@ -2648,8 +2657,10 @@ void CMessagesKeeper::Print(char* buffer, int buffMax, int index)
         else
             i = index;
         const MSG* msg = &Messages[i];
+        // MSG::time remains the documented wrapping DWORD tick, so compare it with the 32-bit projection of the 64-bit exception time.
         _snprintf_s(buffer, buffMax, _TRUNCATE, "w=0x%p m=0x%X w=0x%IX l=0x%IX t=%u p=%d,%d",
-                    msg->hwnd, msg->message, msg->wParam, msg->lParam, msg->time - SalamanderExceptionTime, msg->pt.x, msg->pt.y);
+                    msg->hwnd, msg->message, msg->wParam, msg->lParam,
+                    msg->time - (DWORD)SalamanderExceptionTime, msg->pt.x, msg->pt.y);
     }
 }
 
@@ -2736,7 +2747,8 @@ int MyRTCErrorFunc(int errType, const wchar_t* file, int line,
 
     WideCharToMultiByte(CP_ACP, 0, buf, -1, bufA, RTC_ERROR_DESCRIPTION_SIZE, NULL, NULL);
     bufA[RTC_ERROR_DESCRIPTION_SIZE - 1] = 0;
-    lstrcpyn(RTCErrorDescription, bufA, RTC_ERROR_DESCRIPTION_SIZE);
+    // Runtime-check text is a bounded diagnostic field, not an execution identity.
+    StringCchCopyNA(RTCErrorDescription, RTC_ERROR_DESCRIPTION_SIZE, bufA, RTC_ERROR_DESCRIPTION_SIZE - 1);
 
     // prefer breaking here with an exception, the callstack should be clearer - if not, we can remove this exception
     // viz popis chovani _CrtDbgReportW - http://msdn.microsoft.com/en-us/library/8hyw4sy7(v=VS.90).aspx
@@ -2759,7 +2771,8 @@ int MyRTCErrorFunc(int errType, const wchar_t* file, int line,
 
 #ifdef _DEBUG
 
-DWORD LastCrtCheckMemoryTime; // kdy jsme posledne kontrolovali pamet v IDLE
+// Debug heap checks can run after 49 days; preserve their three-second cadence across tick wrap.
+ULONGLONG LastCrtCheckMemoryTime;
 
 #endif //_DEBUG
 
@@ -2812,11 +2825,13 @@ void StartNotepad(const char* file)
     char buf[MAX_PATH];
     char buf2[MAX_PATH + 50];
 
-    if (lstrlen(file) >= MAX_PATH)
+    if (strlen(file) >= MAX_PATH)
         return;
 
     GetSystemDirectory(buf, MAX_PATH); // give it the system directory so it does not block deletion of the current working directory
-    wsprintf(buf2, "notepad.exe \"%s\"", file);
+    // A path accepted by the legacy check still needs bounded command-line formatting.
+    if (FAILED(StringCchPrintfA(buf2, ARRAYSIZE(buf2), "notepad.exe \"%s\"", file)))
+        return;
     si.cb = sizeof(STARTUPINFO);
     if (HANDLES(CreateProcess(NULL, buf2, NULL, NULL, TRUE, CREATE_DEFAULT_ERROR_MODE | NORMAL_PRIORITY_CLASS,
                               NULL, buf, &si, &pi)))
@@ -2828,52 +2843,8 @@ void StartNotepad(const char* file)
 
 BOOL RunningInCompatibilityMode()
 {
-    // If running under XP or a later OS, a diligent user may have enabled
-    // Compatibility Mode. Pokud tomu tak je, zobrazime varovani.
-    // CAUTION: Application Verifier sets the Windows version newer than it really is,
-    // dela to pri testovani aplikace pri ziskavani "Windows 7 Software Logo".
-    WORD kernel32major, kernel32minor;
-    if (GetModuleVersion(GetModuleHandle("kernel32.dll"), &kernel32major, &kernel32minor))
-    {
-        TRACE_I("kernel32.dll: " << kernel32major << ":" << kernel32minor);
-        // we must call GetVersionEx because it returns values according to the set Compatibility Mode
-        // (SalIsWindowsVersionOrGreater nastaveny Compatibility Mode ignoruje)
-        OSVERSIONINFO os;
-        os.dwOSVersionInfoSize = sizeof(OSVERSIONINFO);
-
-        // only avoid deprecated warning, GetVersionEx should hopefully always be everywhere
-        typedef BOOL(WINAPI * FDynGetVersionExA)(LPOSVERSIONINFOA lpVersionInformation);
-        FDynGetVersionExA DynGetVersionExA = (FDynGetVersionExA)GetProcAddress(GetModuleHandle("kernel32.dll"),
-                                                                               "GetVersionExA");
-        if (DynGetVersionExA == NULL)
-        {
-            TRACE_E("RunningInCompatibilityMode(): unable to get address of GetVersionEx()");
-            return FALSE;
-        }
-
-        DynGetVersionExA(&os);
-        TRACE_I("GetVersionEx(): " << os.dwMajorVersion << ":" << os.dwMinorVersion);
-
-        // aktualni verze Salamandera je manifestovana pro Windows 10
-        const DWORD SAL_MANIFESTED_FOR_MAJOR = 10;
-        const DWORD SAL_MANIFESTED_FOR_MINOR = 0;
-
-        // GetVersionEx nikdy nevrati vic nez os.dwMajorVersion == SAL_MANIFESTED_FOR_MAJOR
-        // a os.dwMinorVersion == SAL_MANIFESTED_FOR_MINOR, je-li tedy kernel32.dll vyssi
-        // verze, nejsme schopni 100% detekovat Compatibility Mode, je potreba mafinestovat
-        // Salamandera pro nove Windows a posunout konstanty SAL_MANIFESTED_FOR_MAJOR a
-        // SAL_MANIFESTED_FOR_MINOR, detekujeme aspon nastaveni Compatibility Mode na
-        // starsi Windows, nez pro ktera je Salamander manifestovan
-        if (kernel32major > SAL_MANIFESTED_FOR_MAJOR ||
-            kernel32major == SAL_MANIFESTED_FOR_MAJOR && kernel32minor > SAL_MANIFESTED_FOR_MINOR)
-        {
-            kernel32major = SAL_MANIFESTED_FOR_MAJOR;
-            kernel32minor = SAL_MANIFESTED_FOR_MINOR;
-            TRACE_I("kernel32.dll version was limited by Salamander's manifest to: " << kernel32major << ":" << kernel32minor);
-        }
-        if (kernel32major > os.dwMajorVersion || kernel32major == os.dwMajorVersion && kernel32minor > os.dwMinorVersion)
-            return TRUE;
-    }
+    // Version virtualization is not a capability contract, so do not block startup on an obsolete version-lie detector.
+    TRACE_I("Compatibility-mode version detection is disabled; feature probes govern supported behavior.");
     return FALSE;
 }
 
@@ -2886,8 +2857,13 @@ void GetCommandLineParamExpandEnvVars(const char* argv, char* target, DWORD targ
         if (!ret)
         {
             TRACE_E("ExpandHotPath failed.");
-            // if expansion fails, use the string without expansion
-            lstrcpyn(target, argv, targetSize);
+            // Fallback command paths must fit completely; do not continue with a prefix.
+            if (FAILED(StringCchCopyA(target, targetSize, argv)))
+            {
+                if (targetSize > 0)
+                    target[0] = 0;
+                return;
+            }
         }
     }
     else
@@ -2896,8 +2872,13 @@ void GetCommandLineParamExpandEnvVars(const char* argv, char* target, DWORD targ
         if (auxRes == 0 || auxRes > targetSize)
         {
             TRACE_E("ExpandEnvironmentStrings failed.");
-            // if expansion fails, use the string without expansion
-            lstrcpyn(target, argv, targetSize);
+            // Fallback command paths must fit completely; do not continue with a prefix.
+            if (FAILED(StringCchCopyA(target, targetSize, argv)))
+            {
+                if (targetSize > 0)
+                    target[0] = 0;
+                return;
+            }
         }
     }
     if (!IsPluginFSPath(target) && GetCurrentDirectory(MAX_PATH, curDir))
@@ -2924,8 +2905,9 @@ BOOL ParseCommandLineParameters(LPSTR cmdLine, CCommandLineParams* cmdLineParams
     if (!FileExists(ConfigurationName) && GetOurPathInRoamingAPPDATA(curDir, _countof(curDir)) &&
         SalPathAppend(curDir, configReg, MAX_PATH) && FileExists(curDir))
     { // if file config.reg does not exist next to .exe, also look for it in APPDATA
-        lstrcpyn(ConfigurationName, curDir, MAX_PATH);
-        ConfigurationNameIgnoreIfNotExists = FALSE;
+        // Configuration-file selection requires the complete roaming-path identity.
+        if (SUCCEEDED(StringCchCopyA(ConfigurationName, _countof(ConfigurationName), curDir)))
+            ConfigurationNameIgnoreIfNotExists = FALSE;
     }
     OpenReadmeInNotepad[0] = 0;
     if (GetCmdLine(buf, _countof(buf), argv, p, cmdLine))
@@ -2981,7 +2963,9 @@ BOOL ParseCommandLineParameters(LPSTR cmdLine, CCommandLineParams* cmdLineParams
                     if (*s == '\\' && *(s + 1) == '\\' || // UNC full path
                         *s != 0 && *(s + 1) == ':')       // "c:\" full path
                     {                                     // full name
-                        lstrcpyn(ConfigurationName, argv[i + 1], MAX_PATH);
+                        // An explicit configuration file must fit before it becomes active.
+                        if (FAILED(StringCchCopyA(ConfigurationName, _countof(ConfigurationName), argv[i + 1])))
+                            return FALSE;
                     }
                     else // relative name
                     {
@@ -2991,7 +2975,9 @@ BOOL ParseCommandLineParameters(LPSTR cmdLine, CCommandLineParams* cmdLineParams
                         if (!FileExists(ConfigurationName) && GetOurPathInRoamingAPPDATA(curDir, _countof(curDir)) &&
                             SalPathAppend(curDir, s, MAX_PATH) && FileExists(curDir))
                         { // if the relative file specified after -C does not exist next to .exe, also look for it in APPDATA
-                            lstrcpyn(ConfigurationName, curDir, MAX_PATH);
+                            // The roaming configuration path must remain a complete identity.
+                            if (FAILED(StringCchCopyA(ConfigurationName, _countof(ConfigurationName), curDir)))
+                                return FALSE;
                         }
                     }
                     ConfigurationNameIgnoreIfNotExists = FALSE;
@@ -3025,10 +3011,11 @@ BOOL ParseCommandLineParameters(LPSTR cmdLine, CCommandLineParams* cmdLineParams
                     char* s = argv[i + 1];
                     if (*s != 0)
                     {
-                        lstrcpyn(Configuration.TitleBarPrefixForced, s, TITLE_PREFIX_MAX);
+                        // Title prefixes are fixed presentation fields.
+                        StringCchCopyNA(Configuration.TitleBarPrefixForced, _countof(Configuration.TitleBarPrefixForced), s, TITLE_PREFIX_MAX - 1);
 
                         cmdLineParams->SetTitlePrefix = TRUE;
-                        lstrcpyn(cmdLineParams->TitlePrefix, s, MAX_PATH);
+                        StringCchCopyNA(cmdLineParams->TitlePrefix, _countof(cmdLineParams->TitlePrefix), s, _countof(cmdLineParams->TitlePrefix) - 1);
                     }
                     i++;
                     continue;
@@ -3057,7 +3044,9 @@ BOOL ParseCommandLineParameters(LPSTR cmdLine, CCommandLineParams* cmdLineParams
 
             if (StrICmp(argv[i], "-run_notepad") == 0 && i + 1 < p)
             { // Vista+: after installation: installer (SFX7ZIP) executes Salamander and asks for execution of notepad with readme file
-                lstrcpyn(OpenReadmeInNotepad, argv[i + 1], MAX_PATH);
+                // The deferred Notepad target must fit as a complete filesystem identity.
+                if (FAILED(StringCchCopyA(OpenReadmeInNotepad, _countof(OpenReadmeInNotepad), argv[i + 1])))
+                    return FALSE;
                 i++;
                 continue;
             }
@@ -3108,7 +3097,7 @@ int WinMainBody(HINSTANCE hInstance, HINSTANCE /*hPrevInstance*/, LPSTR cmdLine,
     // funkci _CrtSetBreakAlloc umoznuje breaknou na tomto bloku
     // _CrtSetBreakAlloc(33521);
 
-    LastCrtCheckMemoryTime = GetTickCount();
+    LastCrtCheckMemoryTime = CMonotonicClock::Now();
 
     // na tomto pripade prepisu konce pameti zabere ochrana -- v IDLE se zobrazi messagebox
     // a do TraceServeru se nalejou debug hlasky
@@ -3183,10 +3172,13 @@ int WinMainBody(HINSTANCE hInstance, HINSTANCE /*hPrevInstance*/, LPSTR cmdLine,
     // detekce defaultniho userova charsetu pro fonty
     CHARSETINFO ci;
     memset(&ci, 0, sizeof(ci));
-    char bufANSI[10];
-    if (GetLocaleInfo(LOCALE_USER_DEFAULT, LOCALE_IDEFAULTANSICODEPAGE, bufANSI, 10))
+    WCHAR localeName[LOCALE_NAME_MAX_LENGTH];
+    WCHAR codePageText[10];
+    if (GetUserDefaultLocaleName(localeName, _countof(localeName)) &&
+        GetLocaleInfoEx(localeName, LOCALE_IDEFAULTANSICODEPAGE, codePageText, _countof(codePageText)))
     {
-        if (TranslateCharsetInfo((DWORD*)(DWORD_PTR)MAKELONG(atoi(bufANSI), 0), &ci, TCI_SRCCODEPAGE))
+        // Resolve the user's named locale explicitly instead of depending on the legacy default-LCID mapping.
+        if (TranslateCharsetInfo((DWORD*)(DWORD_PTR)MAKELONG(_wtoi(codePageText), 0), &ci, TCI_SRCCODEPAGE))
         {
             UserCharset = ci.ciCharset;
         }
@@ -3338,9 +3330,10 @@ FIND_NEW_SLG_FILE:
         char prevVerSLGName[MAX_PATH];
         if (!autoImportConfig &&                            // pri UPGRADE toto nema smysl (jazyk se cte o par radek vyse, tahle rutina by ho jen precetla znovu)
             FindLanguageFromPrevVerOfSal(prevVerSLGName) && // importneme jazyk z predchozi verze, je dost pravdepodobne, ze ho user opet chce pouzit (jde o import stare konfigurace Salama)
-            slgDialog.SLGNameExists(prevVerSLGName))
+            slgDialog.SLGNameExists(prevVerSLGName) &&
+            // A malformed previous setting must fall back to the normal picker.
+            SUCCEEDED(StringCchCopyA(Configuration.SLGName, _countof(Configuration.SLGName), prevVerSLGName)))
         {
-            lstrcpy(Configuration.SLGName, prevVerSLGName);
         }
         else
         {
@@ -4022,7 +4015,8 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
                             // jednou za tri vteriny osetrime konzistenci heapu
                             if (_CrtSetDbgFlag(_CRTDBG_REPORT_FLAG) & _CRTDBG_ALLOC_MEM_DF)
                             {
-                                if (GetTickCount() - LastCrtCheckMemoryTime > 3000) // kazde tri vteriny
+                                // Keep the debug heap-check interval monotonic during long-lived sessions.
+                                if (CMonotonicClock::HasElapsed(LastCrtCheckMemoryTime, 3000, CMonotonicClock::Now())) // kazde tri vteriny
                                 {
                                     if (!_CrtCheckMemory())
                                     {
@@ -4031,7 +4025,7 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
                                             hParent = MainWindow->HWindow;
                                         MessageBox(hParent, "_CrtCheckMemory failed. Look to the Trace Server for details.", "Open Salamander", MB_OK | MB_ICONERROR);
                                     }
-                                    LastCrtCheckMemoryTime = GetTickCount();
+                                    LastCrtCheckMemoryTime = CMonotonicClock::Now();
                                 }
                             }
 #endif //_DEBUG

@@ -30,6 +30,7 @@
 
 #include <process.h>
 
+#include "../../common/thread_owner.h"
 #include "regexp.h"
 
 //    - option to define your own messages; otherwise just copy it into the code
@@ -1243,22 +1244,19 @@ BOOL CRegExp::RegExec(char* string, int length, int offset, BOOL separateThread)
 
     if (separateThread)
     {
-        DWORD i;
+        DWORD result;
         CRegExecData data;
         data.RegExp = this;
         data.String = string;
         data.Length = length;
         data.Offset = offset;
-        HANDLE thread = CreateThread(NULL, 0, RegExecThread, &data, 0, &i);
-        if (thread == 0)
+        // Keep the owner outside this method: its native __try handler cannot coexist with an RAII object.
+        if (!RegExecInOwnedThread(&data, &result))
         {
             State = reeErrorStartingThread;
             return FALSE;
         }
-        WaitForSingleObject(thread, INFINITE);
-        GetExitCodeThread(thread, &i);
-        CloseHandle(thread);
-        return i;
+        return result;
     }
 
     __try
@@ -1333,11 +1331,30 @@ BOOL CRegExp::RegExec(char* string, int length, int offset, BOOL separateThread)
 }
 
 DWORD WINAPI
-CRegExp::RegExecThread(void* data)
+CRegExp::RegExecThread(void* data, HANDLE)
 {
     CALL_STACK_MESSAGE_NONE
     CRegExecData* d = (CRegExecData*)data;
     return d->RegExp->RegExec(d->String, d->Length, d->Offset, FALSE);
+}
+
+BOOL CRegExp::RegExecInOwnedThread(void* data, DWORD* result)
+{
+    if (result == NULL)
+        return FALSE;
+
+    // The caller's match record remains valid until this owner has joined the stack worker.
+    CThreadOwner executionThread;
+    if (!executionThread.Start(RegExecThread, data, "Renamer regular expression"))
+        return FALSE;
+    executionThread.WaitForCompletion(INFINITE);
+    if (!executionThread.GetExitCode(result))
+    {
+        executionThread.StopAndJoin(CThreadShutdownDeadline("renamer regular expression"));
+        return FALSE;
+    }
+    executionThread.StopAndJoin(CThreadShutdownDeadline("renamer regular expression"));
+    return TRUE;
 }
 
 /*
