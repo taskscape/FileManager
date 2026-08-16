@@ -1018,7 +1018,7 @@ CHexFileViewWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
             break;
 
         case SB_PAGEUP:
-            if (pos - (page - 1) > 0)
+            if (pos > page - 1)
                 pos -= (page - 1);
             else
                 pos = 0;

@@ -375,7 +375,7 @@ int LZXreset(struct LZXstate* pState)
 
 static int make_decode_table(ULONG nsyms, ULONG nbits, UBYTE* length, UWORD* table)
 {
-    register UWORD sym;
+    register ULONG sym;
     register ULONG leaf;
     register UBYTE bit_num = 1;
     ULONG fill;

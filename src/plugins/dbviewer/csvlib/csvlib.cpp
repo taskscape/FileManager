@@ -665,7 +665,7 @@ void CCSVParser<CChar>::AnalyseFile(BOOL autoSeparator, CChar* separator,
             c = buffer[index];
             if (c == 0 || c == '\r' || c == '\n')
             {
-                if (row == 0 || index - rowSeek > 0) // skip empty rows unless it is the first row
+                if (row == 0 || index > rowSeek) // skip empty rows unless it is the first row
                 {
                     rows.Add((WORD)rowSeek);
                     if (!rows.IsGood())

@@ -14,7 +14,7 @@ public sealed class NativeSafetyRegressionTests
     public void Root_test_runner_collects_every_documented_automated_test_layer()
     {
         var root = FindRepositoryRoot();
-        var runner = File.ReadAllText(Path.Combine(root, "scripts\runtests.ps1"));
+        var runner = File.ReadAllText(Path.Combine(root, "scripts", "runtests.ps1"));
         var releaseWorkflow = File.ReadAllText(Path.Combine(root, ".github", "workflows", "build-installer.yml"));
 
         // The root command is the advertised entry point, so pin every
@@ -1571,7 +1571,7 @@ public sealed class NativeSafetyRegressionTests
         var root = FindRepositoryRoot();
         var project = File.ReadAllText(Path.Combine(root, "tests", "NativeSafetyTests", "NativeSafetyTests.vcxproj"));
         var source = File.ReadAllText(Path.Combine(root, "tests", "NativeSafetyTests", "NativeSafetyTests.cpp"));
-        var runner = File.ReadAllText(Path.Combine(root, "scripts\runtests.ps1"));
+        var runner = File.ReadAllText(Path.Combine(root, "scripts", "runtests.ps1"));
 
         // The aggregate runner must execute the C++ target, not merely leave a project available for manual use.
         Assert.Multiple(() =>
@@ -1673,7 +1673,7 @@ public sealed class NativeSafetyRegressionTests
         var root = FindRepositoryRoot();
         var generator = File.ReadAllText(Path.Combine(root, "tools", "new-unsafe-api-baseline.ps1"));
         var verifier = File.ReadAllText(Path.Combine(root, "tools", "test-unsafe-api-baseline.ps1"));
-        var runner = File.ReadAllText(Path.Combine(root, "scripts\runtests.ps1"));
+        var runner = File.ReadAllText(Path.Combine(root, "scripts", "runtests.ps1"));
         var baseline = File.ReadAllText(Path.Combine(root, "tools", "unsafe-api-baseline.json"));
 
         // Content fingerprints distinguish pre-existing debt from a new API call without treating line movement as an addition.
@@ -2535,7 +2535,7 @@ public sealed class NativeSafetyRegressionTests
         var pluginProject = File.ReadAllText(Path.Combine(root, "src", "plugins", "7zip", "vcxproj", "7zip.vcxproj"));
         var record = File.ReadAllText(Path.Combine(root, "src", "plugins", "7zip", "doc", "upgrade-26.02.md"));
         var corpus = File.ReadAllText(Path.Combine(root, "tools", "test-7zip-compatibility.ps1"));
-        var runner = File.ReadAllText(Path.Combine(root, "scripts\runtests.ps1"));
+        var runner = File.ReadAllText(Path.Combine(root, "scripts", "runtests.ps1"));
         var refactoring = File.ReadAllText(Path.Combine(root, "refactoring.md"));
 
         // Pin the upgraded parser and the compatibility gate so later vendor refreshes cannot silently drop it.
