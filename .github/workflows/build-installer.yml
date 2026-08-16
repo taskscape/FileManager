@@ -142,7 +142,8 @@ jobs:
 
       - name: Run complete v143 verification without skips
         shell: pwsh
-        run .\scripts\runtests.ps1 -BaseCommit HEAD^ -FailOnSkipped -PlatformToolset v143 -NUnitTrxPath $env:RUNNER_TEMP\runtests-v143.trx
+        # Keep the v143 verification command explicit so Actions parses this step correctly.
+        run: .\scripts\runtests.ps1 -BaseCommit HEAD^ -FailOnSkipped -PlatformToolset v143 -NUnitTrxPath $env:RUNNER_TEMP\runtests-v143.trx
 
       - name: Upload v143 complete UI results
         if: always()
