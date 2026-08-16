@@ -25,6 +25,17 @@ The 5.0 release marks a transition to open development with several key enhancem
 - **Codebase Internationalization:** We are systematically translating legacy Czech comments into English (`// CommentsTranslationProject: TRANSLATED`) to foster a global contributor community.
 - **Reliability:** Addressed critical threading issues, fixed "Access Denied" errors in worker threads, and resolved stability bugs in directory refreshing.
 
+## File Manager 6.0 Updates
+
+The 5.0 release marks a transition to taskscape development with several key enhancements:
+
+-- **Unicode support** - now supports unicode file names, unicode in user interface elements and prompts
+-- **C++ modernization** - now compiles under modern version of C++ version available in Visual Studio 2026
+-- **UI modernization** - now supports multi-resolution toolbar icons sourced from vector graphics and improved command bar
+-- **Win32 API modernization** - now supports modern Windows API equivalents of deprecated APIs consumed by previous versions
+-- **Plugin modernization** - now supports modern versions of compression, communication and encryption protocols
+-- **Code modernization** - translation to English and improvements in memory management
+
 ## Development
 
 ### Prerequisites
