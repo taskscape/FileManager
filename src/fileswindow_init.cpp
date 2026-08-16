@@ -225,7 +225,8 @@ void CFilesWindowAncestor::SetPath(const char* path)
     if (SuppressAutoRefresh && (!Is(ptDisk) || !IsTheSamePath(path, Path)))
         SuppressAutoRefresh = FALSE;
     DetachDirectory((CFilesWindow*)this);
-    strcpy(Path, path);
+    strcpy(Path, path != NULL ? path : "");
+    PathW.Set(path);
 
     //--- detection of file-based compression/encryption and FAT32
     DWORD dummy1, flags;
@@ -298,6 +299,19 @@ void CFilesWindowAncestor::SetPath(const char* path)
     {
         ((CFilesWindow*)this)->SetAutomaticRefresh(TRUE, TRUE);
     }
+}
+
+void CFilesWindowAncestor::SetPathW(const WCHAR* path)
+{
+    if (path == NULL)
+    {
+        SetPath("");
+        return;
+    }
+    CPathW tmp(path);
+    char utf8Buf[2 * MAX_PATH];
+    tmp.ToUtf8(utf8Buf, sizeof(utf8Buf));
+    SetPath(utf8Buf);
 }
 
 CFilesArray*

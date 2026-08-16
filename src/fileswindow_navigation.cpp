@@ -197,7 +197,10 @@ BOOL CFilesWindow::ReadDirectory(HWND parent, BOOL isRefresh)
     DeleteColumnsWithoutData();                      // removing columns for which we don't have data (empty values would be shown in them)
     GetPluginIconIndex = InternalGetPluginIconIndex; // setting standard callback (just returns zero)
 
-    char fileName[MAX_PATH + 4];
+    CPathW fileNameW;
+    char extBuf[MAX_PATH];
+    char* st = NULL;
+    const char* s = NULL;
 
     if (Is(ptDisk))
     {
@@ -253,8 +256,9 @@ BOOL CFilesWindow::ReadDirectory(HWND parent, BOOL isRefresh)
 
         GetAsyncKeyState(VK_ESCAPE); // init GetAsyncKeyState - see help
 
-        GetRootPath(fileName, GetPath());
-        BOOL isRootPath = (strlen(GetPath()) <= strlen(fileName));
+        WCHAR rootPathW[MAX_PATH];
+        GetRootPathW(rootPathW, GetPathW());
+        BOOL isRootPath = (wcslen(GetPathW()) <= wcslen(rootPathW));
 
         //--- getting drive type (we will not bother network drives with getting shares)
         UINT drvType = MyGetDriveType(GetPath());
@@ -266,7 +270,7 @@ BOOL CFilesWindow::ReadDirectory(HWND parent, BOOL isRefresh)
         case DRIVE_REMOVABLE:
         {
             BOOL isDriveFloppy = FALSE; // floppies have their own configuration beside other removable drives
-            int drv = UpperCase[fileName[0]] - 'A' + 1;
+            int drv = (rootPathW[0] >= L'a' && rootPathW[0] <= L'z' ? rootPathW[0] - L'a' : (rootPathW[0] >= L'A' && rootPathW[0] <= L'Z' ? rootPathW[0] - L'A' : -1)) + 1;
             if (drv >= 1 && drv <= 26) // doing "range-check" for sure
             {
                 DWORD medium = GetDriveFormFactor(drv);
@@ -296,21 +300,16 @@ BOOL CFilesWindow::ReadDirectory(HWND parent, BOOL isRefresh)
         }
         }
 
-        const char* s = GetPath();
-        char* st = fileName;
-        while (*s != 0)
-            *st++ = *s++;
-        if (s == GetPath())
+        fileNameW.Set(GetPathW());
+        if (fileNameW.IsEmpty())
         {
             SetCurrentDirectoryToSystem();
             DirectoryLine->SetHidden(HiddenFilesCount, HiddenDirsCount);
             //      TRACE_I("ReadDirectory: end");
             return FALSE; // empty string on input
         }
-        if (*(st - 1) != '\\')
-            *st++ = '\\';
-        strcpy(st, "*");
-        char* fileNameEnd = st;
+        fileNameW.AddBackslash();
+        fileNameW.Append(L"*");
         //--- preparing for reading icons
         if (UseSystemIcons)
         {
@@ -410,7 +409,6 @@ BOOL CFilesWindow::ReadDirectory(HWND parent, BOOL isRefresh)
         HANDLE search;
         BOOL directoryEnumerationLimitReached = FALSE;
 
-        CWidePath fileNameW(fileName);
         const WCHAR* fileNameApiPath = fileNameW.GetPathForWin32Api();
         search = fileNameApiPath != NULL ? HANDLES_Q(FindFirstFileW(fileNameApiPath, &fileDataW)) : INVALID_HANDLE_VALUE;
 
@@ -455,19 +453,21 @@ BOOL CFilesWindow::ReadDirectory(HWND parent, BOOL isRefresh)
                     {
                         showErr = FALSE;
                         char drive[MAX_PATH];
+                        WCHAR driveW[MAX_PATH];
                         UINT drvType2;
-                        if (GetPath()[0] == '\\' && GetPath()[1] == '\\')
+                        if (GetPathW()[0] == L'\\' && GetPathW()[1] == L'\\')
                         {
                             drvType2 = DRIVE_REMOTE;
-                            GetRootPath(drive, GetPath());
-                            drive[strlen(drive) - 1] = 0; // we don't want the last '\\'
+                            GetRootPathW(driveW, GetPathW());
+                            SalPathRemoveBackslashW(driveW);
                         }
                         else
                         {
-                            drive[0] = GetPath()[0];
-                            drive[1] = 0;
+                            driveW[0] = GetPathW()[0];
+                            driveW[1] = 0;
                             drvType2 = MyGetDriveType(GetPath());
                         }
+                        CPathW(driveW).ToUtf8(drive, _countof(drive));
                         if (drvType2 != DRIVE_REMOTE)
                         {
                             GetCurrentLocalReparsePoint(GetPath(), CheckPathRootWithRetryMsgBox, MAX_PATH);
@@ -1027,10 +1027,9 @@ BOOL CFilesWindow::ReadDirectory(HWND parent, BOOL isRefresh)
         if (upDir && (Dirs->Count == 0 || strcmp(Dirs->At(0).Name, "..") != 0))
         {
             upDir = FALSE;
-            *(fileNameEnd - 1) = 0; // it's not logical, but times ".." are from current directory
             if (!UNCRootUpDir)
             {
-                CWidePath parentFileNameW(fileName);
+                CWidePath parentFileNameW(GetPathW());
                 const WCHAR* parentFileNameApiPath = parentFileNameW.GetPathForWin32Api();
                 search = parentFileNameApiPath != NULL ? HANDLES_Q(FindFirstFileW(parentFileNameApiPath, &fileDataW)) : INVALID_HANDLE_VALUE;
                 if (search != INVALID_HANDLE_VALUE)
@@ -1297,11 +1296,11 @@ BOOL CFilesWindow::ReadDirectory(HWND parent, BOOL isRefresh)
             {
 */
                         char* s = f->Ext - 1;
-                        char* st = fileName;
+                        st = extBuf;
                         while (*++s != 0)
                             *st++ = LowerCase[*s];
                         *(DWORD*)st = 0; // zeroes to the end
-                        st = fileName;   // lowercase extension
+                        st = extBuf;   // lowercase extension
 
                         f->Association = Associations.IsAssociatedStatic(st, iconLocation, iconSize);
                         f->Archive = FALSE;
@@ -1558,11 +1557,11 @@ BOOL CFilesWindow::ReadDirectory(HWND parent, BOOL isRefresh)
               {
 */
                             char* s = f->Ext - 1;
-                            char* st = fileName;
+                            st = extBuf;
                             while (*++s != 0)
                                 *st++ = LowerCase[*s];
                             *(DWORD*)st = 0; // zeroes to the end
-                            st = fileName;   // lowercase extension
+                            st = extBuf;   // lowercase extension
 
                             f->Association = Associations.IsAssociatedStatic(st, iconLocation, iconSize);
                             f->Archive = FALSE;
@@ -1875,6 +1874,77 @@ void CFilesWindow::SortDirectory(CFilesArray* files, CFilesArray* dirs)
 
 #ifndef _WIN64
 
+BOOL IsWin64RedirectedDirAuxW(const WCHAR* subDirW, const WCHAR* redirectedDirW, const WCHAR* redirectedDirLastCompW,
+                              WCHAR* winDirW, WCHAR* winDirEndW, WCHAR** lastSubDirW, BOOL failIfDirWithSameNameExists)
+{
+    if (IsTheSamePathW(subDirW, redirectedDirW))
+    {
+        wcscpy(winDirEndW, redirectedDirW);
+
+        WIN32_FIND_DATAW findW;
+        HANDLE h;
+        if (failIfDirWithSameNameExists)
+        {
+            CWidePath wp(winDirW);
+            const WCHAR* apiPath = wp.GetPathForWin32Api();
+            h = apiPath != NULL ? FindFirstFileW(apiPath, &findW) : INVALID_HANDLE_VALUE;
+            if (h != INVALID_HANDLE_VALUE)
+            {
+                HANDLES(FindClose(h));
+                return FALSE; // this is not just a pseudo-directory, there is a directory with the same name, which means that e.g. context menu will work more or less normally
+            }
+        }
+
+        wcscat(winDirEndW, L"\\*");
+        CWidePath wp(winDirW);
+        const WCHAR* apiPath = wp.GetPathForWin32Api();
+        h = apiPath != NULL ? FindFirstFileW(apiPath, &findW) : INVALID_HANDLE_VALUE;
+        if (h != INVALID_HANDLE_VALUE)
+        {
+            HANDLES(FindClose(h));
+            if (lastSubDirW != NULL)
+            {
+                wcscpy(*lastSubDirW + 1, redirectedDirLastCompW != NULL ? redirectedDirLastCompW : redirectedDirW);
+                *lastSubDirW += wcslen(*lastSubDirW);
+            }
+            return TRUE;
+        }
+    }
+    return FALSE;
+}
+
+BOOL IsWin64RedirectedDirW(const WCHAR* pathW, WCHAR** lastSubDirW, BOOL failIfDirWithSameNameExists)
+{
+    if (Windows64Bit)
+    {
+        WCHAR sysDirW[MAX_PATH];
+        if (GetWindowsDirectoryW(sysDirW, MAX_PATH) > 0)
+        {
+            CPathW winDirW(sysDirW);
+            winDirW.AddBackslash();
+            int len = winDirW.GetLength();
+            if (_wcsnicmp(winDirW.CStr(), pathW, len) == 0)
+            {
+                const WCHAR* subDirW = pathW + len;
+                WCHAR bufW[MAX_PATH];
+                wcscpy(bufW, winDirW.CStr());
+                WCHAR* winDirEndW = bufW + len;
+                if (IsWin64RedirectedDirAuxW(subDirW, L"Sysnative", NULL, bufW, winDirEndW, lastSubDirW, failIfDirWithSameNameExists) ||
+                    IsWin64RedirectedDirAuxW(subDirW, L"system32\\catroot", L"catroot", bufW, winDirEndW, lastSubDirW, failIfDirWithSameNameExists) ||
+                    IsWin64RedirectedDirAuxW(subDirW, L"system32\\catroot2", L"catroot2", bufW, winDirEndW, lastSubDirW, failIfDirWithSameNameExists) ||
+                    (Windows7AndLater && IsWin64RedirectedDirAuxW(subDirW, L"system32\\DriverStore", L"DriverStore", bufW, winDirEndW, lastSubDirW, failIfDirWithSameNameExists)) ||
+                    IsWin64RedirectedDirAuxW(subDirW, L"system32\\drivers\\etc", L"etc", bufW, winDirEndW, lastSubDirW, failIfDirWithSameNameExists) ||
+                    IsWin64RedirectedDirAuxW(subDirW, L"system32\\LogFiles", L"LogFiles", bufW, winDirEndW, lastSubDirW, failIfDirWithSameNameExists) ||
+                    IsWin64RedirectedDirAuxW(subDirW, L"system32\\spool", L"spool", bufW, winDirEndW, lastSubDirW, failIfDirWithSameNameExists))
+                {
+                    return TRUE;
+                }
+            }
+        }
+    }
+    return FALSE;
+}
+
 BOOL IsWin64RedirectedDirAux(const char* subDir, const char* redirectedDir, const char* redirectedDirLastComp,
                              char* winDir, char* winDirEnd, char** lastSubDir, BOOL failIfDirWithSameNameExists)
 {
@@ -1912,41 +1982,16 @@ BOOL IsWin64RedirectedDirAux(const char* subDir, const char* redirectedDir, cons
 
 BOOL IsWin64RedirectedDir(const char* path, char** lastSubDir, BOOL failIfDirWithSameNameExists)
 {
-    if (Windows64Bit && WindowsDirectory[0] != 0)
-    {
-        char winDir[MAX_PATH];
-        strcpy(winDir, WindowsDirectory);
-        int len = (int)strlen(winDir);
-        if (len > 0 && winDir[len - 1] != '\\')
-            strcpy(winDir + len++, "\\");
-        if (StrNICmp(winDir, path, len) == 0)
-        {
-            const char* subDir = path + len;
-            if (IsWin64RedirectedDirAux(subDir, "Sysnative", NULL, winDir, winDir + len, lastSubDir, failIfDirWithSameNameExists) ||
-                IsWin64RedirectedDirAux(subDir, "system32\\catroot", "catroot", winDir, winDir + len, lastSubDir, failIfDirWithSameNameExists) ||
-                IsWin64RedirectedDirAux(subDir, "system32\\catroot2", "catroot2", winDir, winDir + len, lastSubDir, failIfDirWithSameNameExists) ||
-                Windows7AndLater && IsWin64RedirectedDirAux(subDir, "system32\\DriverStore", "DriverStore", winDir, winDir + len, lastSubDir, failIfDirWithSameNameExists) ||
-                IsWin64RedirectedDirAux(subDir, "system32\\drivers\\etc", "etc", winDir, winDir + len, lastSubDir, failIfDirWithSameNameExists) ||
-                IsWin64RedirectedDirAux(subDir, "system32\\LogFiles", "LogFiles", winDir, winDir + len, lastSubDir, failIfDirWithSameNameExists) ||
-                IsWin64RedirectedDirAux(subDir, "system32\\spool", "spool", winDir, winDir + len, lastSubDir, failIfDirWithSameNameExists))
-            {
-                return TRUE;
-            }
-        }
-    }
-    return FALSE;
+    CWidePath pathW(path);
+    return IsWin64RedirectedDirW(pathW.CStr(), NULL, failIfDirWithSameNameExists);
 }
 
 BOOL ContainsWin64RedirectedDir(CFilesWindow* panel, int* indexes, int count, char* redirectedDir, BOOL onlyAdded)
 {
     redirectedDir[0] = 0;
-    if (Windows64Bit && WindowsDirectory[0] != 0)
+    if (Windows64Bit)
     {
-        char path[MAX_PATH];
-        // Redirector probing must never append to a partial panel path identity.
-        if (FAILED(StringCchCopyA(path, _countof(path), panel->GetPath())))
-            return FALSE;
-        char* pathEnd = path + strlen(path);
+        CPathW pathW(panel->GetPathW());
         int i;
         for (i = 0; i < count; i++)
         {
@@ -1955,11 +2000,11 @@ BOOL ContainsWin64RedirectedDir(CFilesWindow* panel, int* indexes, int count, ch
                 CFileData* dir = &panel->Dirs->At(indexes[i]);
                 if (dir->IsLink) // all pseudo-directories have IsLink set
                 {
-                    *pathEnd = 0;
-                    if (SalPathAppend(path, dir->Name, MAX_PATH) &&
-                        IsWin64RedirectedDir(path, NULL, onlyAdded))
+                    CPathW fullPathW(pathW);
+                    CWidePath dirNameW(dir->Name);
+                    fullPathW.Append(dirNameW.CStr());
+                    if (IsWin64RedirectedDirW(fullPathW.CStr(), NULL, onlyAdded))
                     {
-                        // The redirected directory name is returned for later lookup, not as a clipped label.
                         if (FAILED(StringCchCopyA(redirectedDir, MAX_PATH, dir->Name)))
                             return FALSE;
                         return TRUE;

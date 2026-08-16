@@ -2211,6 +2211,29 @@ C__Handles::LoadLibraryUtf8(LPCSTR lpLibFileName)
 }
 
 HINSTANCE
+C__Handles::LoadLibraryW(LPCWSTR wideLibFileName)
+{
+    HINSTANCE ret = NULL;
+    CWidePath fileNameW(wideLibFileName);
+    const WCHAR* fullPath = fileNameW.GetFullPathForWin32Api();
+    if (fullPath == NULL)
+    {
+        SetLastError(ERROR_INVALID_NAME);
+    }
+    else
+    {
+        const DWORD loadFlags = LOAD_LIBRARY_SEARCH_DLL_LOAD_DIR |
+                                LOAD_LIBRARY_SEARCH_SYSTEM32 |
+                                LOAD_LIBRARY_SEARCH_USER_DIRS;
+        ret = ::LoadLibraryExW(fullPath, NULL, loadFlags);
+    }
+    DWORD err = GetLastError();
+    CheckCreate(ret != NULL, __htLibrary, __hoLoadLibrary, ret, err, TRUE, NULL, NULL, fileNameW.GetDisplayPath());
+    SetLastError(err);
+    return ret;
+}
+
+HINSTANCE
 C__Handles::LoadLibraryEx(LPCTSTR lpLibFileName, HANDLE hFile, DWORD dwFlags)
 {
     HINSTANCE ret = ::LoadLibraryEx(lpLibFileName, hFile, dwFlags);

@@ -53,6 +53,37 @@ BOOL SalPathAppend(char* path, const char* name, int pathSize)
     return TRUE;
 }
 
+BOOL SalPathAppendW(WCHAR* path, const WCHAR* name, int pathSizeInChars)
+{
+    if (path == NULL || name == NULL)
+    {
+        TRACE_E("Unexpected situation in SalPathAppendW()");
+        return FALSE;
+    }
+    if (*name == L'\\' || *name == L'/')
+        name++;
+    int l = (int)wcslen(path);
+    if (l > 0 && (path[l - 1] == L'\\' || path[l - 1] == L'/'))
+        l--;
+    if (*name != 0)
+    {
+        int n = (int)wcslen(name);
+        if (l + 1 + n < pathSizeInChars)
+        {
+            if (l != 0)
+                path[l] = L'\\';
+            else
+                l = -1;
+            memcpy(path + l + 1, name, (n + 1) * sizeof(WCHAR));
+        }
+        else
+            return FALSE;
+    }
+    else
+        path[l] = 0;
+    return TRUE;
+}
+
 // ****************************************************************************
 
 BOOL SalPathAddBackslash(char* path, int pathSize)
@@ -76,6 +107,27 @@ BOOL SalPathAddBackslash(char* path, int pathSize)
     return TRUE;
 }
 
+BOOL SalPathAddBackslashW(WCHAR* path, int pathSizeInChars)
+{
+    if (path == NULL)
+    {
+        TRACE_E("Unexpected situation in SalPathAddBackslashW()");
+        return FALSE;
+    }
+    int l = (int)wcslen(path);
+    if (l > 0 && path[l - 1] != L'\\' && path[l - 1] != L'/')
+    {
+        if (l + 1 < pathSizeInChars)
+        {
+            path[l] = L'\\';
+            path[l + 1] = 0;
+        }
+        else
+            return FALSE;
+    }
+    return TRUE;
+}
+
 // ****************************************************************************
 
 void SalPathRemoveBackslash(char* path)
@@ -90,6 +142,18 @@ void SalPathRemoveBackslash(char* path)
         path[l - 1] = 0;
 }
 
+void SalPathRemoveBackslashW(WCHAR* path)
+{
+    if (path == NULL)
+    {
+        TRACE_E("Unexpected situation in SalPathRemoveBackslashW()");
+        return;
+    }
+    int l = (int)wcslen(path);
+    if (l > 0 && (path[l - 1] == L'\\' || path[l - 1] == L'/'))
+        path[l - 1] = 0;
+}
+
 void SalPathStripPath(char* path)
 {
     if (path == NULL)
@@ -100,6 +164,21 @@ void SalPathStripPath(char* path)
     char* name = strrchr(path, '\\');
     if (name != NULL)
         memmove(path, name + 1, strlen(name + 1) + 1);
+}
+
+void SalPathStripPathW(WCHAR* path)
+{
+    if (path == NULL)
+    {
+        TRACE_E("Unexpected situation in SalPathStripPathW()");
+        return;
+    }
+    WCHAR* name = wcsrchr(path, L'\\');
+    WCHAR* forwardName = wcsrchr(path, L'/');
+    if (forwardName != NULL && (name == NULL || forwardName > name))
+        name = forwardName;
+    if (name != NULL)
+        memmove(path, name + 1, (wcslen(name + 1) + 1) * sizeof(WCHAR));
 }
 
 void SalPathRemoveExtension(char* path)
@@ -117,11 +196,33 @@ void SalPathRemoveExtension(char* path)
         iterator--;
         if (*iterator == '.')
         {
-            //      if (iterator != path && *(iterator - 1) != '\\')  // ".cvspass" in Windows is an extension ...
             *iterator = 0;
             break;
         }
         if (*iterator == '\\')
+            break;
+    }
+}
+
+void SalPathRemoveExtensionW(WCHAR* path)
+{
+    if (path == NULL)
+    {
+        TRACE_E("Unexpected situation in SalPathRemoveExtensionW()");
+        return;
+    }
+
+    int len = (int)wcslen(path);
+    WCHAR* iterator = path + len;
+    while (iterator > path)
+    {
+        iterator--;
+        if (*iterator == L'.')
+        {
+            *iterator = 0;
+            break;
+        }
+        if (*iterator == L'\\' || *iterator == L'/')
             break;
     }
 }
@@ -141,9 +242,7 @@ BOOL SalPathAddExtension(char* path, const char* extension, int pathSize)
         iterator--;
         if (*iterator == '.')
         {
-            //      if (iterator != path && *(iterator - 1) != '\\')  // ".cvspass" in Windows is an extension ...
-            return TRUE; // extension already exists
-                         //      break;  // dal hledat nema smysl
+            return TRUE;
         }
         if (*iterator == '\\')
             break;
@@ -153,6 +252,37 @@ BOOL SalPathAddExtension(char* path, const char* extension, int pathSize)
     if (len + extLen < pathSize)
     {
         memcpy(path + len, extension, extLen + 1);
+        return TRUE;
+    }
+    else
+        return FALSE;
+}
+
+BOOL SalPathAddExtensionW(WCHAR* path, const WCHAR* extension, int pathSizeInChars)
+{
+    if (path == NULL || extension == NULL)
+    {
+        TRACE_E("Unexpected situation in SalPathAddExtensionW()");
+        return FALSE;
+    }
+
+    int len = (int)wcslen(path);
+    WCHAR* iterator = path + len;
+    while (iterator > path)
+    {
+        iterator--;
+        if (*iterator == L'.')
+        {
+            return TRUE;
+        }
+        if (*iterator == L'\\' || *iterator == L'/')
+            break;
+    }
+
+    int extLen = (int)wcslen(extension);
+    if (len + extLen < pathSizeInChars)
+    {
+        memcpy(path + len, extension, (extLen + 1) * sizeof(WCHAR));
         return TRUE;
     }
     else
@@ -174,12 +304,8 @@ BOOL SalPathRenameExtension(char* path, const char* extension, int pathSize)
         iterator--;
         if (*iterator == '.')
         {
-            //      if (iterator != path && *(iterator - 1) != '\\')  // ".cvspass" in Windows is an extension ...
-            //      {
             len = (int)(iterator - path);
-            break; // extension already exists -> overwrite it
-                   //      }
-                   //      break;
+            break;
         }
         if (*iterator == '\\')
             break;
@@ -189,6 +315,38 @@ BOOL SalPathRenameExtension(char* path, const char* extension, int pathSize)
     if (len + extLen < pathSize)
     {
         memcpy(path + len, extension, extLen + 1);
+        return TRUE;
+    }
+    else
+        return FALSE;
+}
+
+BOOL SalPathRenameExtensionW(WCHAR* path, const WCHAR* extension, int pathSizeInChars)
+{
+    if (path == NULL || extension == NULL)
+    {
+        TRACE_E("Unexpected situation in SalPathRenameExtensionW()");
+        return FALSE;
+    }
+
+    int len = (int)wcslen(path);
+    WCHAR* iterator = path + len;
+    while (iterator > path)
+    {
+        iterator--;
+        if (*iterator == L'.')
+        {
+            len = (int)(iterator - path);
+            break;
+        }
+        if (*iterator == L'\\' || *iterator == L'/')
+            break;
+    }
+
+    int extLen = (int)wcslen(extension);
+    if (len + extLen < pathSizeInChars)
+    {
+        memcpy(path + len, extension, (extLen + 1) * sizeof(WCHAR));
         return TRUE;
     }
     else
@@ -211,6 +369,27 @@ const char* SalPathFindFileName(const char* path)
     {
         iterator--;
         if (*iterator == '\\')
+            return iterator + 1;
+    }
+    return path;
+}
+
+const WCHAR* SalPathFindFileNameW(const WCHAR* path)
+{
+    if (path == NULL)
+    {
+        TRACE_E("Unexpected situation in SalPathFindFileNameW()");
+        return L"";
+    }
+
+    int len = (int)wcslen(path);
+    if (len <= 1)
+        return path;
+    const WCHAR* iterator = path + len - 1;
+    while (iterator > path)
+    {
+        iterator--;
+        if (*iterator == L'\\' || *iterator == L'/')
             return iterator + 1;
     }
     return path;
@@ -1113,6 +1292,50 @@ void _RemoveTemporaryDir(const char* dir)
     }
 }
 
+void _RemoveTemporaryDirW(const WCHAR* dir)
+{
+    if (dir == NULL || *dir == L'\0')
+        return;
+
+    CPathW pattern(dir);
+    pattern.AddBackslash();
+    pattern.Append(L"*");
+
+    WIN32_FIND_DATAW fileW;
+    HANDLE find = HANDLES_Q(FindFirstFileW(pattern.GetPathForWin32Api(), &fileW));
+    if (find != INVALID_HANDLE_VALUE)
+    {
+        do
+        {
+            if (fileW.cFileName[0] != L'\0' && wcscmp(fileW.cFileName, L"..") != 0 && wcscmp(fileW.cFileName, L".") != 0)
+            {
+                CPathW childPath(dir);
+                childPath.AddBackslash();
+                childPath.Append(fileW.cFileName);
+
+                ClearReadOnlyAttrW(childPath.CStr(), fileW.dwFileAttributes);
+                if (fileW.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)
+                {
+                    _RemoveTemporaryDirW(childPath.CStr());
+                }
+                else
+                {
+                    CWidePath delW(childPath.CStr());
+                    const WCHAR* apiPath = delW.GetPathForWin32Api();
+                    if (apiPath != NULL)
+                        DeleteFileW(apiPath);
+                }
+            }
+        } while (FindNextFileW(find, &fileW));
+        HANDLES(FindClose(find));
+    }
+
+    CWidePath removeW(dir);
+    const WCHAR* removeApiPath = removeW.GetPathForWin32Api();
+    if (removeApiPath != NULL)
+        RemoveDirectoryW(removeApiPath);
+}
+
 void RemoveTemporaryDir(const char* dir)
 {
     CALL_STACK_MESSAGE2("RemoveTemporaryDir(%s)", dir);
@@ -1131,6 +1354,22 @@ void RemoveTemporaryDir(const char* dir)
         if (dirW != NULL)
             RemoveDirectoryW(dirW);
     }
+}
+
+void RemoveTemporaryDirW(const WCHAR* dir)
+{
+    if (dir == NULL || *dir == L'\0')
+        return;
+
+    SetCurrentDirectoryW(dir);
+    _RemoveTemporaryDirW(dir);
+    SetCurrentDirectoryToSystem();
+
+    ClearReadOnlyAttrW(dir);
+    CWidePath dirW(dir);
+    const WCHAR* apiPath = dirW.GetPathForWin32Api();
+    if (apiPath != NULL)
+        RemoveDirectoryW(apiPath);
 }
 
 // ****************************************************************************
@@ -1178,6 +1417,43 @@ void _RemoveEmptyDirs(const char* dir)
     }
 }
 
+void _RemoveEmptyDirsW(const WCHAR* dir)
+{
+    if (dir == NULL || *dir == L'\0')
+        return;
+
+    CPathW pattern(dir);
+    pattern.AddBackslash();
+    pattern.Append(L"*");
+
+    WIN32_FIND_DATAW fileW;
+    HANDLE find = HANDLES_Q(FindFirstFileW(pattern.GetPathForWin32Api(), &fileW));
+    if (find != INVALID_HANDLE_VALUE)
+    {
+        do
+        {
+            if (fileW.cFileName[0] != L'\0' && wcscmp(fileW.cFileName, L"..") != 0 && wcscmp(fileW.cFileName, L".") != 0)
+            {
+                if (fileW.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)
+                {
+                    CPathW childPath(dir);
+                    childPath.AddBackslash();
+                    childPath.Append(fileW.cFileName);
+
+                    ClearReadOnlyAttrW(childPath.CStr(), fileW.dwFileAttributes);
+                    _RemoveEmptyDirsW(childPath.CStr());
+                }
+            }
+        } while (FindNextFileW(find, &fileW));
+        HANDLES(FindClose(find));
+    }
+
+    CWidePath removeW(dir);
+    const WCHAR* removeApiPath = removeW.GetPathForWin32Api();
+    if (removeApiPath != NULL)
+        RemoveDirectoryW(removeApiPath);
+}
+
 void RemoveEmptyDirs(const char* dir)
 {
     CALL_STACK_MESSAGE2("RemoveEmptyDirs(%s)", dir);
@@ -1196,6 +1472,22 @@ void RemoveEmptyDirs(const char* dir)
         if (dirW != NULL)
             RemoveDirectoryW(dirW);
     }
+}
+
+void RemoveEmptyDirsW(const WCHAR* dir)
+{
+    if (dir == NULL || *dir == L'\0')
+        return;
+
+    SetCurrentDirectoryW(dir);
+    _RemoveEmptyDirsW(dir);
+    SetCurrentDirectoryToSystem();
+
+    ClearReadOnlyAttrW(dir);
+    CWidePath dirW(dir);
+    const WCHAR* apiPath = dirW.GetPathForWin32Api();
+    if (apiPath != NULL)
+        RemoveDirectoryW(apiPath);
 }
 
 // ****************************************************************************
@@ -1552,9 +1844,24 @@ void CPathHistoryItem::GetPath(char* buffer, int bufferSize)
             buffer[l - 1] = 0;
         }
     }
+}
 
-    // must double all '&', otherwise they become underlines
-    DuplicateAmpersands(origBuffer, bufferSize);
+void CPathHistoryItem::GetPathW(WCHAR* buffer, int bufferSizeInChars)
+{
+    if (buffer == NULL || bufferSizeInChars <= 0)
+        return;
+    buffer[0] = 0;
+    char utf8Buf[2 * MAX_PATH];
+    GetPath(utf8Buf, sizeof(utf8Buf));
+    MultiByteToWideChar(CP_UTF8, 0, utf8Buf, -1, buffer, bufferSizeInChars);
+    buffer[bufferSizeInChars - 1] = 0;
+}
+
+void CPathHistoryItem::GetPathW(CPathW& path)
+{
+    char utf8Buf[2 * MAX_PATH];
+    GetPath(utf8Buf, sizeof(utf8Buf));
+    path.Set(utf8Buf);
 }
 
 HICON
@@ -2146,6 +2453,18 @@ void CPathHistory::AddPath(int type, const char* pathOrArchiveOrFSName, const ch
     }
 }
 
+void CPathHistory::AddPathW(int type, const WCHAR* pathOrArchiveOrFSName, const WCHAR* archivePathOrFSUserPart,
+                            CPluginFSInterfaceAbstract* pluginFS, CPluginFSInterfaceEncapsulation* curPluginFS)
+{
+    CPathW name1(pathOrArchiveOrFSName);
+    CPathW name2(archivePathOrFSUserPart);
+    char buf1[2 * MAX_PATH];
+    char buf2[2 * MAX_PATH];
+    name1.ToUtf8(buf1, sizeof(buf1));
+    name2.ToUtf8(buf2, sizeof(buf2));
+    AddPath(type, buf1, buf2, pluginFS, curPluginFS);
+}
+
 void CPathHistory::AddPathUnique(int type, const char* pathOrArchiveOrFSName, const char* archivePathOrFSUserPart,
                                  HICON hIcon, CPluginFSInterfaceAbstract* pluginFS,
                                  CPluginFSInterfaceEncapsulation* curPluginFS)
@@ -2217,6 +2536,19 @@ void CPathHistory::AddPathUnique(int type, const char* pathOrArchiveOrFSName, co
         delete n;
         Paths.ResetState();
     }
+}
+
+void CPathHistory::AddPathUniqueW(int type, const WCHAR* pathOrArchiveOrFSName, const WCHAR* archivePathOrFSUserPart,
+                                  HICON hIcon, CPluginFSInterfaceAbstract* pluginFS,
+                                  CPluginFSInterfaceEncapsulation* curPluginFS)
+{
+    CPathW name1(pathOrArchiveOrFSName);
+    CPathW name2(archivePathOrFSUserPart);
+    char buf1[2 * MAX_PATH];
+    char buf2[2 * MAX_PATH];
+    name1.ToUtf8(buf1, sizeof(buf1));
+    name2.ToUtf8(buf2, sizeof(buf2));
+    AddPathUnique(type, buf1, buf2, hIcon, pluginFS, curPluginFS);
 }
 
 void CPathHistory::SaveToRegistry(HKEY hKey, const char* name, BOOL onlyClear)
@@ -3898,6 +4230,40 @@ BOOL SetEditOrComboText(HWND hWnd, const char* text)
     return TRUE;
 }
 
+BOOL SetEditOrComboTextW(HWND hWnd, const WCHAR* text)
+{
+    if (hWnd == NULL)
+        return FALSE;
+
+    char className[31];
+    className[0] = 0;
+    if (GetClassName(hWnd, className, 30) == 0)
+    {
+        TRACE_E("GetClassName failed on hWnd=0x" << hWnd);
+        return FALSE;
+    }
+
+    HWND hEdit;
+    if (StrICmp(className, "edit") != 0)
+    {
+        hEdit = GetWindow(hWnd, GW_CHILD);
+        if (hEdit == NULL ||
+            GetClassName(hEdit, className, 30) == 0 ||
+            StrICmp(className, "edit") != 0)
+        {
+            TRACE_E("Edit window was not found hWnd=0x" << hWnd);
+            return FALSE;
+        }
+    }
+    else
+        hEdit = hWnd;
+
+    const WCHAR* val = text != NULL ? text : L"";
+    SendMessageW(hEdit, WM_SETTEXT, 0, (LPARAM)val);
+    SendMessage(hEdit, EM_SETSEL, 0, (LPARAM)wcslen(val));
+    return TRUE;
+}
+
 BOOL GetEditOrComboTextUtf8(HWND hWnd, char* buf, int bufSize)
 {
     if (buf == NULL || bufSize <= 0)
@@ -3936,6 +4302,88 @@ BOOL GetEditOrComboTextUtf8(HWND hWnd, char* buf, int bufSize)
         return FALSE;
     GetWindowTextW(hEdit, wide, len + 1);
     ConvertWideToUtf8(wide, -1, buf, bufSize);
+    return TRUE;
+}
+
+BOOL GetEditOrComboTextW(HWND hWnd, WCHAR* buf, int bufSizeInChars)
+{
+    if (buf == NULL || bufSizeInChars <= 0)
+        return FALSE;
+    buf[0] = 0;
+
+    if (hWnd == NULL)
+        return FALSE;
+
+    char className[31];
+    className[0] = 0;
+    if (GetClassName(hWnd, className, 30) == 0)
+    {
+        TRACE_E("GetClassName failed on hWnd=0x" << hWnd);
+        return FALSE;
+    }
+
+    HWND hEdit;
+    if (StrICmp(className, "edit") != 0)
+    {
+        hEdit = GetWindow(hWnd, GW_CHILD);
+        if (hEdit == NULL ||
+            GetClassName(hEdit, className, 30) == 0 ||
+            StrICmp(className, "edit") != 0)
+        {
+            TRACE_E("Edit window was not found hWnd=0x" << hWnd);
+            return FALSE;
+        }
+    }
+    else
+        hEdit = hWnd;
+
+    int len = GetWindowTextLengthW(hEdit);
+    if (len <= 0)
+        return TRUE;
+
+    if (len >= bufSizeInChars)
+        len = bufSizeInChars - 1;
+
+    GetWindowTextW(hEdit, buf, len + 1);
+    buf[len] = 0;
+    return TRUE;
+}
+
+BOOL GetEditOrComboTextW(HWND hWnd, CPathW& path)
+{
+    path.Clear();
+    if (hWnd == NULL)
+        return FALSE;
+
+    char className[31];
+    className[0] = 0;
+    if (GetClassName(hWnd, className, 30) == 0)
+        return FALSE;
+
+    HWND hEdit;
+    if (StrICmp(className, "edit") != 0)
+    {
+        hEdit = GetWindow(hWnd, GW_CHILD);
+        if (hEdit == NULL ||
+            GetClassName(hEdit, className, 30) == 0 ||
+            StrICmp(className, "edit") != 0)
+        {
+            return FALSE;
+        }
+    }
+    else
+        hEdit = hWnd;
+
+    int len = GetWindowTextLengthW(hEdit);
+    if (len <= 0)
+        return TRUE;
+
+    WCHAR* buffer = path.GetBuffer(len + 1);
+    if (buffer == NULL)
+        return FALSE;
+
+    GetWindowTextW(hEdit, buffer, len + 1);
+    path.ReleaseBuffer(len);
     return TRUE;
 }
 

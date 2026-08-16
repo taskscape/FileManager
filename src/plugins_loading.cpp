@@ -2613,23 +2613,36 @@ BOOL CPluginData::InitDLL(HWND parent, BOOL quiet, BOOL waitCursor, BOOL showUns
         BOOL refreshUNCRootPaths = FALSE;
 
         // obtain the full DLL name
-        char buf[MAX_PATH];
-        char* s = DLLName;
-        if ((*s != '\\' || *(s + 1) != '\\') && // not UNC
-            (*s == 0 || *(s + 1) != ':'))       // not "c:" -> path relative to the plugins subdirectory
+        CPathW dllPathW;
+        if ((DLLName[0] != '\\' || DLLName[1] != '\\') &&
+            (DLLName[0] == 0 || DLLName[1] != ':')) // relative to plugins dir
         {
-            GetModuleFileName(HInstance, buf, MAX_PATH);
-            s = strrchr(buf, '\\') + 1;
-            strcpy(s, "plugins\\");
-            strcat(s, DLLName);
-            s = buf;
+            WCHAR modPathW[MAX_PATH];
+            if (GetModuleFileNameW(HInstance, modPathW, MAX_PATH) > 0)
+            {
+                dllPathW.Set(modPathW);
+                CutDirectoryW(dllPathW.GetBuffer(dllPathW.GetLength() + 1));
+                dllPathW.ReleaseBuffer();
+                dllPathW.AddBackslash();
+                dllPathW.Append(L"plugins");
+                dllPathW.AddBackslash();
+                dllPathW.Append(CPathW(DLLName).CStr());
+            }
         }
+        else
+        {
+            dllPathW.Set(CPathW(DLLName).CStr());
+        }
+
+        char dllPathUtf8[MAX_PATH];
+        dllPathW.ToUtf8(dllPathUtf8, sizeof(dllPathUtf8));
+        const char* s = dllPathUtf8;
 
         // load the DLL
         HCURSOR oldCur;
         if (waitCursor)
             oldCur = SetCursor(LoadCursor(NULL, IDC_WAIT));
-        DLL = HANDLES(LoadLibraryUtf8(s));
+        DLL = HANDLES(LoadLibraryW(dllPathW.CStr()));
         if (waitCursor)
             SetCursor(oldCur);
         if (DLL == NULL) // error

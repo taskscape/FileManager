@@ -1235,16 +1235,36 @@ const char*
 CFindDialog::GetName(int index)
 {
     if (index < 0 || index >= FoundFilesListView->GetCount())
-        return FALSE;
+        return "";
     return FoundFilesListView->At(index)->Name;
+}
+
+const WCHAR*
+CFindDialog::GetNameW(int index)
+{
+    static CPathW nameW;
+    if (index < 0 || index >= FoundFilesListView->GetCount())
+        return L"";
+    nameW.Set(FoundFilesListView->At(index)->Name);
+    return nameW.CStr();
 }
 
 const char*
 CFindDialog::GetPath(int index)
 {
     if (index < 0 || index >= FoundFilesListView->GetCount())
-        return FALSE;
+        return "";
     return FoundFilesListView->At(index)->Path;
+}
+
+const WCHAR*
+CFindDialog::GetPathW(int index)
+{
+    static CPathW pathW;
+    if (index < 0 || index >= FoundFilesListView->GetCount())
+        return L"";
+    pathW.Set(FoundFilesListView->At(index)->Path);
+    return pathW.CStr();
 }
 
 BOOL CFindDialog::GetCommonPrefixPath(char* buffer, int bufferMax, int& commonPrefixChars)
@@ -1302,6 +1322,82 @@ BOOL CFindDialog::GetCommonPrefixPath(char* buffer, int bufferMax, int& commonPr
     return TRUE;
 }
 
+BOOL CFindDialog::GetCommonPrefixPathW(WCHAR* buffer, int bufferMaxInChars, int& commonPrefixChars)
+{
+    commonPrefixChars = 0;
+    if (buffer == NULL || bufferMaxInChars <= 0)
+        return FALSE;
+    buffer[0] = 0;
+
+    CPathW path;
+    if (!GetCommonPrefixPathW(path, commonPrefixChars))
+        return FALSE;
+
+    if (commonPrefixChars + 1 > bufferMaxInChars)
+    {
+        TRACE_E("Buffer is small. " << commonPrefixChars + 1 << " chars is needed");
+        return FALSE;
+    }
+    wcsncpy_s(buffer, bufferMaxInChars, path.CStr(), _TRUNCATE);
+    return TRUE;
+}
+
+BOOL CFindDialog::GetCommonPrefixPathW(CPathW& path, int& commonPrefixChars)
+{
+    commonPrefixChars = 0;
+    path.Clear();
+
+    HWND hListView = FoundFilesListView->HWindow;
+    DWORD selCount = ListView_GetSelectedCount(hListView);
+    if (selCount == 0)
+    {
+        TRACE_E("Selected count = 0");
+        return FALSE;
+    }
+
+    int pathLen = 0;
+    int index = -1;
+    do
+    {
+        index = ListView_GetNextItem(FoundFilesListView->HWindow, index, LVNI_SELECTED);
+        if (index != -1)
+        {
+            CFoundFilesData* file = FoundFilesListView->At(index);
+            if (path.IsEmpty())
+            {
+                path.Set(file->Path);
+                pathLen = (int)path.GetLength();
+            }
+            else
+            {
+                CPathW filePath(file->Path);
+                int count = CommonPrefixLengthW(path.CStr(), filePath.CStr());
+                if (count < pathLen)
+                {
+                    WCHAR* buf = path.GetBuffer(path.GetLength() + 1);
+                    if (buf != NULL)
+                        buf[count] = L'\0';
+                    path.ReleaseBuffer(count);
+                    pathLen = count;
+                }
+                if (count == 0)
+                {
+                    path.Clear();
+                    return FALSE;
+                }
+            }
+        }
+    } while (index != -1);
+
+    if (pathLen == 0)
+    {
+        path.Clear();
+        return FALSE;
+    }
+    commonPrefixChars = pathLen;
+    return TRUE;
+}
+
 struct CMyEnumFileNamesData
 {
     CFindDialog* FindDialog;
@@ -1310,7 +1406,8 @@ struct CMyEnumFileNamesData
     int LastIndex;
 };
 
-static char MyEnumFileNamesBuffer[MAX_PATH]; // function is called from the GUI => cannot be called from multiple threads => we can afford a static buffer
+static WCHAR MyEnumFileNamesBufferW[UNICODE_STRING_MAX_CHARS];
+static char MyEnumFileNamesBuffer[MAX_PATH];
 const char* MyEnumFileNames(int index, void* param)
 {
     CMyEnumFileNamesData* data = (CMyEnumFileNamesData*)param;
@@ -1318,26 +1415,29 @@ const char* MyEnumFileNames(int index, void* param)
     if (foundIndex != -1)
     {
         data->LastIndex = foundIndex;
-        const char* p = data->FindDialog->GetPath(foundIndex) + data->CommonPrefixChars;
-        while (*p == '\\')
-            p++;
-        if (*p != 0)
+        CPathW fullPathW(data->FindDialog->GetPathW(foundIndex));
+        const WCHAR* pW = fullPathW.CStr() + data->CommonPrefixChars;
+        while (*pW == L'\\')
+            pW++;
+        if (*pW != L'\0')
         {
-            if (FAILED(StringCchCopyA(MyEnumFileNamesBuffer, _countof(MyEnumFileNamesBuffer), p)) ||
-                FAILED(StringCchCatA(MyEnumFileNamesBuffer, _countof(MyEnumFileNamesBuffer), "\\")))
+            if (FAILED(StringCchCopyW(MyEnumFileNamesBufferW, _countof(MyEnumFileNamesBufferW), pW)) ||
+                FAILED(StringCchCatW(MyEnumFileNamesBufferW, _countof(MyEnumFileNamesBufferW), L"\\")))
                 goto ENUM_FILE_NAME_TOO_LONG;
         }
         else
-            MyEnumFileNamesBuffer[0] = 0;
-        if (FAILED(StringCchCatA(MyEnumFileNamesBuffer, _countof(MyEnumFileNamesBuffer), data->FindDialog->GetName(foundIndex))))
+            MyEnumFileNamesBufferW[0] = 0;
+        if (FAILED(StringCchCatW(MyEnumFileNamesBufferW, _countof(MyEnumFileNamesBufferW), data->FindDialog->GetNameW(foundIndex))))
             goto ENUM_FILE_NAME_TOO_LONG;
+
+        CPathW(MyEnumFileNamesBufferW).ToUtf8(MyEnumFileNamesBuffer, _countof(MyEnumFileNamesBuffer));
         return MyEnumFileNamesBuffer;
     }
     TRACE_E("Next item was not found");
     return NULL;
 
 ENUM_FILE_NAME_TOO_LONG:
-    // An empty name makes the shell item-list creation fail instead of targeting a truncated child.
+    MyEnumFileNamesBufferW[0] = 0;
     MyEnumFileNamesBuffer[0] = 0;
     return MyEnumFileNamesBuffer;
 }
@@ -1401,9 +1501,9 @@ void CFindDialog::OnDrag(BOOL rightMouseButton)
     if (selCount < 1)
         return;
 
-    char commonPrefixPath[MAX_PATH];
+    CPathW commonPrefixPathW;
     int commonPrefixChars;
-    if (!GetCommonPrefixPath(commonPrefixPath, MAX_PATH, commonPrefixChars))
+    if (!GetCommonPrefixPathW(commonPrefixPathW, commonPrefixChars))
     {
         SalMessageBox(HWindow, LoadStr(IDS_COMMONPREFIXNOTFOUND), LoadStr(IDS_ERRORTITLE),
                       MB_ICONEXCLAMATION | MB_OK);
@@ -1432,6 +1532,8 @@ void CFindDialog::OnDrag(BOOL rightMouseButton)
         return;
     }
 
+    char commonPrefixPath[2 * MAX_PATH];
+    commonPrefixPathW.ToUtf8(commonPrefixPath, sizeof(commonPrefixPath));
     IDataObject* dataObject = CreateIDataObject(MainWindow->HWindow, commonPrefixPath,
                                                 selCount, MyEnumFileNames, &data);
     if (dataObject == NULL)
@@ -1478,9 +1580,9 @@ void CFindDialog::OnContextMenu(int x, int y)
     if (selCount < 1)
         return;
 
-    char commonPrefixPath[MAX_PATH];
+    CPathW commonPrefixPathW;
     int commonPrefixChars;
-    if (!GetCommonPrefixPath(commonPrefixPath, MAX_PATH, commonPrefixChars))
+    if (!GetCommonPrefixPathW(commonPrefixPathW, commonPrefixChars))
     {
         SalMessageBox(HWindow, LoadStr(IDS_COMMONPREFIXNOTFOUND), LoadStr(IDS_ERRORTITLE),
                       MB_ICONEXCLAMATION | MB_OK);
@@ -1491,6 +1593,8 @@ void CFindDialog::OnContextMenu(int x, int y)
     data.HListView = hListView;
     data.CommonPrefixChars = commonPrefixChars;
     data.LastIndex = -1;
+    char commonPrefixPath[2 * MAX_PATH];
+    commonPrefixPathW.ToUtf8(commonPrefixPath, sizeof(commonPrefixPath));
     ContextMenu = CreateIContextMenu2(HWindow, commonPrefixPath,
                                       selCount, MyEnumFileNames, &data);
 
@@ -1563,15 +1667,17 @@ BOOL CFindDialog::InvokeContextMenu(const char* lpVerb)
     HCURSOR hOldCursor = SetCursor(LoadCursor(NULL, IDC_WAIT));
     if (InitializeOle())
     {
-        char commonPrefixPath[MAX_PATH];
+        CPathW commonPrefixPathW;
         int commonPrefixChars;
-        if (GetCommonPrefixPath(commonPrefixPath, MAX_PATH, commonPrefixChars))
+        if (GetCommonPrefixPathW(commonPrefixPathW, commonPrefixChars))
         {
             CMyEnumFileNamesData data;
             data.FindDialog = this;
             data.HListView = hListView;
             data.CommonPrefixChars = commonPrefixChars;
             data.LastIndex = -1;
+            char commonPrefixPath[2 * MAX_PATH];
+            commonPrefixPathW.ToUtf8(commonPrefixPath, sizeof(commonPrefixPath));
             IContextMenu2* menu = CreateIContextMenu2(HWindow, commonPrefixPath,
                                                       selCount, MyEnumFileNames, &data);
 
@@ -1648,10 +1754,9 @@ void CFindDialog::OnOpen(BOOL onlyFocused)
             if (setWait)
                 oldCur = SetCursor(LoadCursor(NULL, IDC_WAIT));
 
-            char fullPath[MAX_PATH];
-            if (SUCCEEDED(StringCchCopyA(fullPath, _countof(fullPath), file->Path)) &&
-                SalPathAppend(fullPath, file->Name, MAX_PATH))
-                MainWindow->FileHistory->AddFile(fhitOpen, 0, fullPath);
+            CPathW fullPathW(file->Path);
+            fullPathW.Append(file->Name);
+            MainWindow->FileHistory->AddFileW(fhitOpen, 0, fullPathW.CStr());
 
             ExecuteAssociation(HWindow, file->Path, file->Name);
             if (setWait)
@@ -1932,29 +2037,24 @@ void CFindLogDialog::OnFocusFile()
             return;
         }
     }
-    static char FocusPath[2 * MAX_PATH];
-    // File focusing must receive a complete containing path rather than a clipped log entry.
-    if (FAILED(StringCchCopyA(FocusPath, _countof(FocusPath), item->Path)))
+    CPathW focusPathW(item->Path);
+    focusPathW.RemoveBackslash();
+    if (!focusPathW.IsEmpty())
     {
-        TRACE_E("CFindLogDialog::OnFocusFile(): path is too long.");
-        return;
-    }
-    char buffEmpty[] = "";
-    char* p = buffEmpty;
-    if (FocusPath[0] != 0)
-    {
-        if (FocusPath[strlen(FocusPath) - 1] == '\\')
-            FocusPath[strlen(FocusPath) - 1] = 0;
-        p = strrchr(FocusPath, '\\');
-        if (p == NULL)
+        WCHAR focusPathBufW[2 * MAX_PATH];
+        wcscpy(focusPathBufW, focusPathW.CStr());
+        WCHAR* pW = wcsrchr(focusPathBufW, L'\\');
+        if (pW != NULL)
         {
-            TRACE_E("p == NULL");
+            *pW = L'\0';
+            char focusDir[MAX_PATH];
+            char focusName[MAX_PATH];
+            CPathW(focusPathBufW).ToUtf8(focusDir, sizeof(focusDir));
+            CPathW(pW + 1).ToUtf8(focusName, sizeof(focusName));
+            SendMessage(MainWindow->GetActivePanel()->HWindow, WM_USER_FOCUSFILE, (WPARAM)focusName, (LPARAM)focusDir);
             return;
         }
-        *p = 0;
     }
-
-    SendMessage(MainWindow->GetActivePanel()->HWindow, WM_USER_FOCUSFILE, (WPARAM)p + 1, (LPARAM)FocusPath);
 }
 
 void CFindLogDialog::OnIgnore()

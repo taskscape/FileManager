@@ -2156,18 +2156,30 @@ public:
 
     virtual BOOL WINAPI HasTheSameRootPath(const char* path1, const char* path2);
     virtual int WINAPI CommonPrefixLength(const char* path1, const char* path2);
+    virtual int WINAPI CommonPrefixLengthW(const WCHAR* path1, const WCHAR* path2);
     virtual BOOL WINAPI PathIsPrefix(const char* prefix, const char* path);
+    virtual BOOL WINAPI PathIsPrefixW(const WCHAR* prefix, const WCHAR* path);
     virtual BOOL WINAPI IsTheSamePath(const char* path1, const char* path2);
+    virtual BOOL WINAPI IsTheSamePathW(const WCHAR* path1, const WCHAR* path2);
     virtual int WINAPI GetRootPath(char* root, const char* path);
     virtual BOOL WINAPI CutDirectory(char* path, char** cutDir = NULL);
+    virtual BOOL WINAPI CutDirectoryW(WCHAR* path, WCHAR** cutDir = NULL);
     virtual BOOL WINAPI SalPathAppend(char* path, const char* name, int pathSize);
+    virtual BOOL WINAPI SalPathAppendW(WCHAR* path, const WCHAR* name, int pathSizeInChars);
     virtual BOOL WINAPI SalPathAddBackslash(char* path, int pathSize);
+    virtual BOOL WINAPI SalPathAddBackslashW(WCHAR* path, int pathSizeInChars);
     virtual void WINAPI SalPathRemoveBackslash(char* path);
+    virtual void WINAPI SalPathRemoveBackslashW(WCHAR* path);
     virtual void WINAPI SalPathStripPath(char* path);
+    virtual void WINAPI SalPathStripPathW(WCHAR* path);
     virtual void WINAPI SalPathRemoveExtension(char* path);
+    virtual void WINAPI SalPathRemoveExtensionW(WCHAR* path);
     virtual BOOL WINAPI SalPathAddExtension(char* path, const char* extension, int pathSize);
+    virtual BOOL WINAPI SalPathAddExtensionW(WCHAR* path, const WCHAR* extension, int pathSizeInChars);
     virtual BOOL WINAPI SalPathRenameExtension(char* path, const char* extension, int pathSize);
+    virtual BOOL WINAPI SalPathRenameExtensionW(WCHAR* path, const WCHAR* extension, int pathSizeInChars);
     virtual const char* WINAPI SalPathFindFileName(const char* path);
+    virtual const WCHAR* WINAPI SalPathFindFileNameW(const WCHAR* path);
 
     virtual BOOL WINAPI SalGetFullName(char* name, int* errTextID = NULL, const char* curDir = NULL,
                                        char* nextFocus = NULL, int nameBufSize = MAX_PATH);

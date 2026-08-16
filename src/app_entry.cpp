@@ -832,6 +832,26 @@ BOOL IsTheSamePath(const char* path1, const char* path2)
     return *path1 == 0 && *path2 == 0;
 }
 
+BOOL IsTheSamePathW(const WCHAR* path1, const WCHAR* path2)
+{
+    if (path1 == NULL || path2 == NULL)
+        return path1 == path2;
+    if (*path1 == L'\\' || *path1 == L'/')
+        path1++;
+    if (*path2 == L'\\' || *path2 == L'/')
+        path2++;
+    while (*path1 != 0 && towlower(*path1) == towlower(*path2))
+    {
+        path1++;
+        path2++;
+    }
+    if (*path1 == L'\\' || *path1 == L'/')
+        path1++;
+    if (*path2 == L'\\' || *path2 == L'/')
+        path2++;
+    return *path1 == 0 && *path2 == 0;
+}
+
 // ****************************************************************************
 
 int CommonPrefixLength(const char* path1, const char* path2)
@@ -888,6 +908,59 @@ int CommonPrefixLength(const char* path1, const char* path2)
 
 // ****************************************************************************
 
+int CommonPrefixLengthW(const WCHAR* path1, const WCHAR* path2)
+{
+    if (path1 == NULL || path2 == NULL)
+        return 0;
+
+    const WCHAR* lastBackslash = path1;
+    int backslashCount = 0;
+    const WCHAR* s1 = path1;
+    const WCHAR* s2 = path2;
+    while (*s1 != 0 && *s2 != 0 && towlower(*s1) == towlower(*s2))
+    {
+        if (*s1 == L'\\')
+        {
+            lastBackslash = s1;
+            backslashCount++;
+        }
+        s1++;
+        s2++;
+    }
+
+    if (s1 - path1 < 3)
+        return 0;
+
+    if ((*s1 == 0 && *s2 == L'\\') || (*s1 == L'\\' && *s2 == 0) ||
+        (*s1 == 0 && *s2 == 0 && *(s1 - 1) != L'\\'))
+    {
+        lastBackslash = s1;
+        backslashCount++;
+    }
+
+    if (path1[1] == L':')
+    {
+        if (path1[2] != L'\\')
+            return 0;
+
+        if (lastBackslash - path1 < 3)
+            return 3;
+
+        return (int)(lastBackslash - path1);
+    }
+    else
+    {
+        if (path1[0] != L'\\' || path1[1] != L'\\')
+            return 0;
+        if (backslashCount < 4)
+            return 0;
+
+        return (int)(lastBackslash - path1);
+    }
+}
+
+// ****************************************************************************
+
 BOOL SalPathIsPrefix(const char* prefix, const char* path)
 {
     int commonLen = CommonPrefixLength(prefix, path);
@@ -901,6 +974,25 @@ BOOL SalPathIsPrefix(const char* prefix, const char* path)
     // CommonPrefixLength returned the length without the last backslash (unless it was a root path).
     // If our prefix has a trailing backslash, drop it.
     if (prefixLen > 3 && prefix[prefixLen - 1] == '\\')
+        prefixLen--;
+
+    return (commonLen == prefixLen);
+}
+
+BOOL SalPathIsPrefixW(const WCHAR* prefix, const WCHAR* path)
+{
+    if (prefix == NULL || path == NULL)
+        return FALSE;
+
+    int commonLen = CommonPrefixLengthW(prefix, path);
+    if (commonLen == 0)
+        return FALSE;
+
+    int prefixLen = (int)wcslen(prefix);
+    if (prefixLen < 3)
+        return FALSE;
+
+    if (prefixLen > 3 && prefix[prefixLen - 1] == L'\\')
         prefixLen--;
 
     return (commonLen == prefixLen);
@@ -969,6 +1061,53 @@ BOOL CutDirectory(char* path, char** cutDir)
     return TRUE;
 }
 
+BOOL CutDirectoryW(WCHAR* path, WCHAR** cutDir)
+{
+    if (path == NULL)
+        return FALSE;
+    int l = (int)wcslen(path);
+    WCHAR* lastBackslash = path + l - 1;
+    while (--lastBackslash >= path && *lastBackslash != L'\\')
+        ;
+    WCHAR* nextBackslash = lastBackslash;
+    while (--nextBackslash >= path && *nextBackslash != L'\\')
+        ;
+    if (lastBackslash < path)
+    {
+        if (cutDir != NULL)
+            *cutDir = path + l;
+        return FALSE;
+    }
+    if (nextBackslash < path)
+    {
+        if (cutDir != NULL)
+        {
+            if (*(path + l - 1) == L'\\')
+                *(path + --l) = 0;
+            memmove(lastBackslash + 2, lastBackslash + 1, (l - (lastBackslash - path)) * sizeof(WCHAR));
+            *cutDir = lastBackslash + 2;
+        }
+        *(lastBackslash + 1) = 0;
+    }
+    else
+    {
+        if (path[0] == L'\\' && path[1] == L'\\' && nextBackslash <= path + 2)
+        {
+            if (cutDir != NULL)
+                *cutDir = path + l;
+            return FALSE;
+        }
+        *lastBackslash = 0;
+        if (cutDir != NULL)
+        {
+            if (*(path + l - 1) == L'\\')
+                *(path + l - 1) = 0;
+            *cutDir = lastBackslash + 1;
+        }
+    }
+    return TRUE;
+}
+
 // ****************************************************************************
 
 int GetRootPath(char* root, int rootBufSize, const char* path)
@@ -1012,6 +1151,49 @@ int GetRootPath(char* root, int rootBufSize, const char* path)
 int GetRootPath(char* root, const char* path)
 {
     return GetRootPath(root, MAX_PATH, path);
+}
+
+int GetRootPathW(WCHAR* root, int rootBufSizeInChars, const WCHAR* path)
+{
+    if (root == NULL || path == NULL || rootBufSizeInChars <= 0)
+        return 0;
+
+    root[0] = 0;
+
+    if (path[0] == L'\\' && path[1] == L'\\') // UNC
+    {
+        const WCHAR* s = path + 2;
+        while (*s != 0 && *s != L'\\' && *s != L'/')
+            s++;
+        if (*s != 0)
+            s++;
+        while (*s != 0 && *s != L'\\' && *s != L'/')
+            s++;
+        int len = (int)(s - path);
+        if (len > rootBufSizeInChars - 2)
+            len = rootBufSizeInChars - 2;
+        if (len < 0)
+            return 0;
+        memcpy(root, path, len * sizeof(WCHAR));
+        root[len] = L'\\';
+        root[len + 1] = 0;
+        return len + 1;
+    }
+    else
+    {
+        if (rootBufSizeInChars < 4)
+            return 0;
+        root[0] = path[0];
+        root[1] = L':';
+        root[2] = L'\\';
+        root[3] = 0;
+        return 3;
+    }
+}
+
+int GetRootPathW(WCHAR* root, const WCHAR* path)
+{
+    return GetRootPathW(root, MAX_PATH, path);
 }
 
 // ****************************************************************************

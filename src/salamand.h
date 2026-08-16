@@ -303,6 +303,8 @@ public:
     void ChangeData(int topIndex, const char* focusedName);
 
     void GetPath(char* buffer, int bufferSize);
+    void GetPathW(WCHAR* buffer, int bufferSizeInChars);
+    void GetPathW(CPathW& path);
     HICON GetIcon();
     BOOL Execute(CFilesWindow* panel); // returns TRUE if the change succeeded (FALSE - stays in place)
 
@@ -332,11 +334,16 @@ public:
     // adds a path to the history
     void AddPath(int type, const char* pathOrArchiveOrFSName, const char* archivePathOrFSUserPart,
                  CPluginFSInterfaceAbstract* pluginFS, CPluginFSInterfaceEncapsulation* curPluginFS);
+    void AddPathW(int type, const WCHAR* pathOrArchiveOrFSName, const WCHAR* archivePathOrFSUserPart,
+                  CPluginFSInterfaceAbstract* pluginFS, CPluginFSInterfaceEncapsulation* curPluginFS);
 
     // adds a path to the history only if the path is not already present (see Alt+F12; for FS it overwrites pluginFS with the newest one)
     void AddPathUnique(int type, const char* pathOrArchiveOrFSName, const char* archivePathOrFSUserPart,
                        HICON hIcon, CPluginFSInterfaceAbstract* pluginFS,
                        CPluginFSInterfaceEncapsulation* curPluginFS);
+    void AddPathUniqueW(int type, const WCHAR* pathOrArchiveOrFSName, const WCHAR* archivePathOrFSUserPart,
+                        HICON hIcon, CPluginFSInterfaceAbstract* pluginFS,
+                        CPluginFSInterfaceEncapsulation* curPluginFS);
 
     // changes the data (top index and focused name) of the current path only if the given path
     // matches the current path in the history
@@ -432,6 +439,12 @@ public:
     // searches the history and, if it does not find the item being added, inserts it at the top
     // if the item already exists, it will be pulled to the top position
     BOOL AddFile(CFileHistoryItemTypeEnum type, DWORD handlerID, const char* fileName);
+    BOOL AddFileW(CFileHistoryItemTypeEnum type, DWORD handlerID, const WCHAR* fileNameW)
+    {
+        char buf[MAX_PATH];
+        CPathW(fileNameW).ToUtf8(buf, _countof(buf));
+        return AddFile(type, handlerID, buf);
+    }
 
     // populates the menu with items
     // IDs will start from one and correspond to the index parameter when calling the Execute() method

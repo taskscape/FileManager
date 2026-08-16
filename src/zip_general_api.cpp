@@ -1024,14 +1024,29 @@ int CSalamanderGeneral::CommonPrefixLength(const char* path1, const char* path2)
     return ::CommonPrefixLength(path1, path2);
 }
 
+int CSalamanderGeneral::CommonPrefixLengthW(const WCHAR* path1, const WCHAR* path2)
+{
+    return ::CommonPrefixLengthW(path1, path2);
+}
+
 BOOL CSalamanderGeneral::PathIsPrefix(const char* prefix, const char* path)
 {
     return ::SalPathIsPrefix(prefix, path);
 }
 
+BOOL CSalamanderGeneral::PathIsPrefixW(const WCHAR* prefix, const WCHAR* path)
+{
+    return ::SalPathIsPrefixW(prefix, path);
+}
+
 BOOL CSalamanderGeneral::IsTheSamePath(const char* path1, const char* path2)
 {
     return ::IsTheSamePath(path1, path2);
+}
+
+BOOL CSalamanderGeneral::IsTheSamePathW(const WCHAR* path1, const WCHAR* path2)
+{
+    return ::IsTheSamePathW(path1, path2);
 }
 
 int CSalamanderGeneral::GetRootPath(char* root, const char* path)
@@ -1044,9 +1059,19 @@ BOOL CSalamanderGeneral::CutDirectory(char* path, char** cutDir)
     return ::CutDirectory(path, cutDir);
 }
 
+BOOL CSalamanderGeneral::CutDirectoryW(WCHAR* path, WCHAR** cutDir)
+{
+    return ::CutDirectoryW(path, cutDir);
+}
+
 BOOL CSalamanderGeneral::SalPathAppend(char* path, const char* name, int pathSize)
 {
     return ::SalPathAppend(path, name, pathSize);
+}
+
+BOOL CSalamanderGeneral::SalPathAppendW(WCHAR* path, const WCHAR* name, int pathSizeInChars)
+{
+    return ::SalPathAppendW(path, name, pathSizeInChars);
 }
 
 BOOL CSalamanderGeneral::SalPathAddBackslash(char* path, int pathSize)
@@ -1054,9 +1079,19 @@ BOOL CSalamanderGeneral::SalPathAddBackslash(char* path, int pathSize)
     return ::SalPathAddBackslash(path, pathSize);
 }
 
+BOOL CSalamanderGeneral::SalPathAddBackslashW(WCHAR* path, int pathSizeInChars)
+{
+    return ::SalPathAddBackslashW(path, pathSizeInChars);
+}
+
 void CSalamanderGeneral::SalPathRemoveBackslash(char* path)
 {
     ::SalPathRemoveBackslash(path);
+}
+
+void CSalamanderGeneral::SalPathRemoveBackslashW(WCHAR* path)
+{
+    ::SalPathRemoveBackslashW(path);
 }
 
 void CSalamanderGeneral::SalPathStripPath(char* path)
@@ -1064,9 +1099,19 @@ void CSalamanderGeneral::SalPathStripPath(char* path)
     ::SalPathStripPath(path);
 }
 
+void CSalamanderGeneral::SalPathStripPathW(WCHAR* path)
+{
+    ::SalPathStripPathW(path);
+}
+
 void CSalamanderGeneral::SalPathRemoveExtension(char* path)
 {
     ::SalPathRemoveExtension(path);
+}
+
+void CSalamanderGeneral::SalPathRemoveExtensionW(WCHAR* path)
+{
+    ::SalPathRemoveExtensionW(path);
 }
 
 BOOL CSalamanderGeneral::SalPathAddExtension(char* path, const char* extension, int pathSize)
@@ -1074,15 +1119,31 @@ BOOL CSalamanderGeneral::SalPathAddExtension(char* path, const char* extension, 
     return ::SalPathAddExtension(path, extension, pathSize);
 }
 
+BOOL CSalamanderGeneral::SalPathAddExtensionW(WCHAR* path, const WCHAR* extension, int pathSizeInChars)
+{
+    return ::SalPathAddExtensionW(path, extension, pathSizeInChars);
+}
+
 BOOL CSalamanderGeneral::SalPathRenameExtension(char* path, const char* extension, int pathSize)
 {
     return ::SalPathRenameExtension(path, extension, pathSize);
+}
+
+BOOL CSalamanderGeneral::SalPathRenameExtensionW(WCHAR* path, const WCHAR* extension, int pathSizeInChars)
+{
+    return ::SalPathRenameExtensionW(path, extension, pathSizeInChars);
 }
 
 const char*
 CSalamanderGeneral::SalPathFindFileName(const char* path)
 {
     return ::SalPathFindFileName(path);
+}
+
+const WCHAR*
+CSalamanderGeneral::SalPathFindFileNameW(const WCHAR* path)
+{
+    return ::SalPathFindFileNameW(path);
 }
 
 BOOL CSalamanderGeneral::SalGetFullName(char* name, int* errTextID, const char* curDir,

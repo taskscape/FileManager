@@ -2496,6 +2496,7 @@ COPY_ADS_AGAIN:
 HANDLE SalCreateFileEx(const char* fileName, DWORD desiredAccess,
                        DWORD shareMode, DWORD flagsAndAttributes, BOOL* encryptionNotSupported)
 {
+    DWORD err = ERROR_SUCCESS;
     CStrP fileNameW(ConvertAllocUtf8ToWide(fileName, -1));
     if (fileNameW == NULL)
     {
@@ -2506,7 +2507,7 @@ HANDLE SalCreateFileEx(const char* fileName, DWORD desiredAccess,
                                        CREATE_NEW, flagsAndAttributes, NULL));
     if (out == INVALID_HANDLE_VALUE)
     {
-        DWORD err = GetLastError();
+        err = GetLastError();
         if (encryptionNotSupported != NULL && (flagsAndAttributes & FILE_ATTRIBUTE_ENCRYPTED))
         { // when the target disk cannot create an Encrypted file (observed on NTFS network disk (tested on share from XP) while logged in under a different username than we have in the system (on the current console) - the remote machine has a same-named user without a password, so it cannot be used over the network)
             out = NOHANDLES(CreateFileW(fileNameW, desiredAccess, shareMode, NULL,
@@ -2549,16 +2550,18 @@ HANDLE SalCreateFileEx(const char* fileName, DWORD desiredAccess,
                         }
                         else
                         {
-                            StringCchCopyA(tmpName, _countof(tmpName), fileName);
-                            CutDirectory(tmpName);
-                            SalPathAddBackslash(tmpName, _countof(tmpName));
-                            char* tmpNamePart = tmpName + strlen(tmpName);
+                            CPathW tmpDirW(fileNameW);
+                            CutDirectoryW(tmpDirW.GetBuffer(tmpDirW.GetLength() + 1));
+                            tmpDirW.ReleaseBuffer();
+                            tmpDirW.AddBackslash();
+                            CPathW origFullNameW(tmpDirW);
+                            origFullNameW.Append(fullName);
+                            origFullNameW.ToUtf8(tmpName, sizeof(tmpName));
                             char origFullName[MAX_PATH + 20];
-                            if (SalPathAppend(tmpName, fullName, _countof(tmpName)))
-                            {
-                                strcpy(origFullName, tmpName);
-                                DWORD num = GetTemporaryNameSeed();
-                                DWORD origFullNameAttr = SalGetFileAttributes(origFullName);
+                            StringCchCopyA(origFullName, _countof(origFullName), tmpName);
+                            char* tmpNamePart = tmpName + strlen(tmpName);
+                            DWORD num = GetTemporaryNameSeed();
+                            DWORD origFullNameAttr = SalGetFileAttributes(origFullName);
                                 while (1)
                                 {
                                     sprintf(tmpNamePart, "sal%03X", num++);
@@ -2613,8 +2616,6 @@ HANDLE SalCreateFileEx(const char* fileName, DWORD desiredAccess,
                                     }
                                 }
                             }
-                            else
-                                TRACE_E("SalCreateFileEx(): Original full file name is too long, unable to bypass only-dos-name-overwrite problem!");
                         }
                     }
                 }
@@ -2622,9 +2623,8 @@ HANDLE SalCreateFileEx(const char* fileName, DWORD desiredAccess,
         }
         if (out == INVALID_HANDLE_VALUE)
             SetLastError(err);
+        return out;
     }
-    return out;
-}
 
 // Reserve a unique file in the destination directory.  The reservation is opened with
 // CREATE_ALWAYS by DoCopyFile and is never visible under the requested target name.
@@ -2632,17 +2632,20 @@ HANDLE SalCreateFileEx(const char* fileName, DWORD desiredAccess,
 // same-volume commit.
 static BOOL CreateTransactionalTargetFileName(const char* targetName, char* temporaryName, int temporaryNameLen)
 {
-    char targetDirectory[3 * MAX_PATH];
-    if (FAILED(StringCchCopyA(targetDirectory, _countof(targetDirectory), targetName)))
+    WCHAR targetDirectoryW[3 * MAX_PATH];
+    CPathW targetPathW(targetName);
+    if (FAILED(StringCchCopyW(targetDirectoryW, _countof(targetDirectoryW), targetPathW.CStr())))
     {
         SetLastError(ERROR_FILENAME_EXCED_RANGE);
         return FALSE;
     }
-    if (!CutDirectory(targetDirectory))
+    if (!CutDirectoryW(targetDirectoryW))
     {
         SetLastError(ERROR_INVALID_NAME);
         return FALSE;
     }
+    char targetDirectory[3 * MAX_PATH];
+    CPathW(targetDirectoryW).ToUtf8(targetDirectory, sizeof(targetDirectory));
     return SalGetTempFileName(targetDirectory, "SALCP", temporaryName, temporaryNameLen, TRUE);
 }
 
@@ -5833,16 +5836,19 @@ BOOL DoMoveFile(COperation* op, HWND hProgressDlg, void* buffer,
                             }
                             else
                             {
-                                StringCchCopyA(tmpName, _countof(tmpName), op->TargetName);
-                                CutDirectory(tmpName);
-                                SalPathAddBackslash(tmpName, _countof(tmpName));
-                                char* tmpNamePart = tmpName + strlen(tmpName);
+                                CPathW targetBuf;
+                                CPathW tmpDirW(op->GetTargetNameW(targetBuf));
+                                CutDirectoryW(tmpDirW.GetBuffer(tmpDirW.GetLength() + 1));
+                                tmpDirW.ReleaseBuffer();
+                                tmpDirW.AddBackslash();
+                                CPathW origFullNameW(tmpDirW);
+                                origFullNameW.Append(fullName);
+                                origFullNameW.ToUtf8(tmpName, sizeof(tmpName));
                                 char origFullName[MAX_PATH + 20];
-                                if (SalPathAppend(tmpName, fullName, _countof(tmpName)))
-                                {
-                                    strcpy(origFullName, tmpName);
-                                    DWORD num = GetTemporaryNameSeed();
-                                    DWORD origFullNameAttr = SalGetFileAttributes(origFullName);
+                                StringCchCopyA(origFullName, _countof(origFullName), tmpName);
+                                char* tmpNamePart = tmpName + strlen(tmpName);
+                                DWORD num = GetTemporaryNameSeed();
+                                DWORD origFullNameAttr = SalGetFileAttributes(origFullName);
                                     while (1)
                                     {
                                         sprintf(tmpNamePart, "sal%03X", num++);
@@ -5885,12 +5891,9 @@ BOOL DoMoveFile(COperation* op, HWND hProgressDlg, void* buffer,
                                             goto OPERATION_DONE;
                                     }
                                 }
-                                else
-                                    TRACE_E("DoMoveFile(): Original full file/dir name is too long, unable to bypass only-dos-name-overwrite problem!");
                             }
                         }
                     }
-                }
 
                 if ((err == ERROR_ALREADY_EXISTS || // theoretically can happen for directories; prevent that (overwrite prompt is only for files)
                      err == ERROR_FILE_EXISTS) &&
@@ -6458,16 +6461,18 @@ BOOL SalCreateDirectoryEx(const char* name, DWORD* err)
                     }
                     else
                     {
-                        StringCchCopyA(tmpName, _countof(tmpName), name);
-                        CutDirectory(tmpName);
-                        SalPathAddBackslash(tmpName, _countof(tmpName));
-                        char* tmpNamePart = tmpName + strlen(tmpName);
+                        CPathW tmpDirW(nameW != NULL ? CPathW(nameW.Ptr) : CPathW(name));
+                        CutDirectoryW(tmpDirW.GetBuffer(tmpDirW.GetLength() + 1));
+                        tmpDirW.ReleaseBuffer();
+                        tmpDirW.AddBackslash();
+                        CPathW origFullNameW(tmpDirW);
+                        origFullNameW.Append(fullName);
+                        origFullNameW.ToUtf8(tmpName, sizeof(tmpName));
                         char origFullName[MAX_PATH + 20];
-                        if (SalPathAppend(tmpName, fullName, _countof(tmpName)))
-                        {
-                            strcpy(origFullName, tmpName);
-                            DWORD num = GetTemporaryNameSeed();
-                            DWORD origFullNameAttr = SalGetFileAttributes(origFullName);
+                        StringCchCopyA(origFullName, _countof(origFullName), tmpName);
+                        char* tmpNamePart = tmpName + strlen(tmpName);
+                        DWORD num = GetTemporaryNameSeed();
+                        DWORD origFullNameAttr = SalGetFileAttributes(origFullName);
                             while (1)
                             {
                                 sprintf(tmpNamePart, "sal%03X", num++);
@@ -6508,16 +6513,13 @@ BOOL SalCreateDirectoryEx(const char* name, DWORD* err)
                                     return TRUE;
                             }
                         }
-                        else
-                            TRACE_E("Original full file name is too long, unable to bypass only-dos-name-overwrite problem!");
                     }
                 }
             }
-        }
         if (err != NULL)
             *err = errLoc;
+        return FALSE;
     }
-    return FALSE;
 }
 
 BOOL GetDirTime(const char* dirName, FILETIME* ftModified)

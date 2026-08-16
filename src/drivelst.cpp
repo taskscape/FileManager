@@ -21,55 +21,46 @@
 
 CNBWNetAC3Thread NBWNetAC3Thread;
 
-void GetNetworkDrives(DWORD& netDrives, char (*netRemotePath)[MAX_PATH])
+void GetNetworkDrivesW(DWORD& netDrives, WCHAR (*netRemotePathW)[MAX_PATH])
 {
-    char buffer[10000];
-    GetNetworkDrivesBody(netDrives, netRemotePath, buffer);
-}
-
-void GetNetworkDrivesBody(DWORD& netDrives, char (*netRemotePath)[MAX_PATH], char* buffer)
-{
-    CALL_STACK_MESSAGE1("GetNetworkDrives(,)");
+    CALL_STACK_MESSAGE1("GetNetworkDrivesW(,)");
     netDrives = 0; // bit array of network drives
 
+    WCHAR buffer[10000];
     HANDLE hEnumNet;
-    DWORD err = WNetOpenEnum(RESOURCE_REMEMBERED, RESOURCETYPE_DISK,
-                             RESOURCEUSAGE_CONNECTABLE, NULL, &hEnumNet);
+    DWORD err = WNetOpenEnumW(RESOURCE_REMEMBERED, RESOURCETYPE_DISK,
+                              RESOURCEUSAGE_CONNECTABLE, NULL, &hEnumNet);
     if (err == ERROR_SUCCESS)
     {
         DWORD bufSize;
         DWORD entries = 0;
-        NETRESOURCE* netSources = (NETRESOURCE*)buffer;
+        NETRESOURCEW* netSources = (NETRESOURCEW*)buffer;
         while (1)
         {
             DWORD e = 0xFFFFFFFF; // as many as possible
-            bufSize = 10000;
-            err = WNetEnumResource(hEnumNet, &e, netSources, &bufSize);
+            bufSize = sizeof(buffer);
+            err = WNetEnumResourceW(hEnumNet, &e, netSources, &bufSize);
             if (err == ERROR_SUCCESS && e > 0)
             {
                 int i;
                 for (i = 0; i < (int)e; i++) // we will process new data
                 {
-                    char* name = netSources[i].lpLocalName;
+                    WCHAR* name = netSources[i].lpLocalName;
                     if (name != NULL)
                     {
-                        char drv = LowerCase[name[0]];
-                        if (drv >= 'a' && drv <= 'z' && name[1] == ':')
+                        WCHAR drv = towlower(name[0]);
+                        if (drv >= L'a' && drv <= L'z' && name[1] == L':')
                         {
-                            netDrives |= (1 << (drv - 'a'));
-                            if (netRemotePath != NULL)
+                            netDrives |= (1 << (drv - L'a'));
+                            if (netRemotePathW != NULL)
                             {
                                 name = netSources[i].lpRemoteName;
                                 if (name != NULL)
                                 {
-                                    int l = (int)strlen(name);
-                                    if (l >= MAX_PATH)
-                                        l = MAX_PATH - 1;
-                                    memmove(netRemotePath[drv - 'a'], name, l);
-                                    netRemotePath[drv - 'a'][l] = 0;
+                                    wcsncpy_s(netRemotePathW[drv - L'a'], MAX_PATH, name, _TRUNCATE);
                                 }
                                 else
-                                    netRemotePath[drv - 'a'][0] = 0;
+                                    netRemotePathW[drv - L'a'][0] = 0;
                             }
                         }
                     }
@@ -89,52 +80,79 @@ void GetNetworkDrivesBody(DWORD& netDrives, char (*netRemotePath)[MAX_PATH], cha
     }
 }
 
+void GetNetworkDrives(DWORD& netDrives, char (*netRemotePath)[MAX_PATH])
+{
+    WCHAR netRemotePathW[26][MAX_PATH];
+    GetNetworkDrivesW(netDrives, netRemotePathW);
+    if (netRemotePath != NULL)
+    {
+        for (int i = 0; i < 26; i++)
+        {
+            if (netDrives & (1 << i))
+                CPathW(netRemotePathW[i]).ToUtf8(netRemotePath[i], MAX_PATH);
+            else
+                netRemotePath[i][0] = 0;
+        }
+    }
+}
+
+void GetNetworkDrivesBody(DWORD& netDrives, char (*netRemotePath)[MAX_PATH], char* buffer)
+{
+    GetNetworkDrives(netDrives, netRemotePath);
+}
+
 BOOL GetUserName(const char* drive, const char* remoteName, char* userName, DWORD userBufSize,
                  char* providerBuf, DWORD providerBufSize)
 {
     CALL_STACK_MESSAGE5("GetUserName(%s, %s, , %u, , %u)", drive, remoteName, userBufSize, providerBufSize);
     HKEY network;
-    LONG res = HANDLES_Q(RegOpenKeyEx(HKEY_CURRENT_USER, "Network", 0, KEY_READ, &network));
+    LONG res = RegOpenKeyExW(HKEY_CURRENT_USER, L"Network", 0, KEY_READ, &network);
     if (res != ERROR_SUCCESS)
         return FALSE; // well, nothing ...
 
     BOOL ret = FALSE;
-    char keyName[MAX_PATH];
-    DWORD keyNameSize, type;
-    HKEY driveKey;
+    WCHAR driveKeyNameW[MAX_PATH];
+    CPathW driveW(drive);
+    driveKeyNameW[0] = driveW.CStr()[0];
+    driveKeyNameW[1] = L'\0';
 
-    keyName[0] = drive[0];
-    keyName[1] = 0;
-    if (HANDLES_Q(RegOpenKeyEx(network, keyName, 0, KEY_READ, &driveKey)) == ERROR_SUCCESS)
+    HKEY driveKey;
+    if (RegOpenKeyExW(network, driveKeyNameW, 0, KEY_READ, &driveKey) == ERROR_SUCCESS)
     {
-        keyNameSize = MAX_PATH;
-        type = REG_SZ;
-        res = SalRegQueryValueEx(driveKey, "RemotePath", 0, &type,
-                                 (unsigned char*)keyName, &keyNameSize);
-        if (res == ERROR_SUCCESS && type == REG_SZ && IsTheSamePath(keyName, remoteName))
+        WCHAR keyNameW[MAX_PATH];
+        DWORD keyNameSize = sizeof(keyNameW);
+        DWORD type = REG_SZ;
+        res = RegQueryValueExW(driveKey, L"RemotePath", 0, &type, (BYTE*)keyNameW, &keyNameSize);
+        if (res == ERROR_SUCCESS && type == REG_SZ && IsTheSamePathW(keyNameW, CPathW(remoteName).CStr()))
         {
             ret = TRUE; // we will announce success, even if the user name is not defined (the current user should be used)
 
-            keyNameSize = userBufSize;
+            WCHAR userW[MAX_PATH];
+            keyNameSize = sizeof(userW);
             type = REG_SZ;
-            res = SalRegQueryValueEx(driveKey, "UserName", 0, &type,
-                                     (unsigned char*)userName, &keyNameSize);
-            if (res == ERROR_SUCCESS && type == REG_SZ && userName[0] != 0) // do we have a user?
-                TRACE_I("Found user name: " << keyName << ", " << userName);
+            res = RegQueryValueExW(driveKey, L"UserName", 0, &type, (BYTE*)userW, &keyNameSize);
+            if (res == ERROR_SUCCESS && type == REG_SZ && userW[0] != L'\0')
+            {
+                CPathW(userW).ToUtf8(userName, userBufSize);
+                TRACE_I("Found user name: " << remoteName << ", " << userName);
+            }
             else
                 userName[0] = 0;
 
-            keyNameSize = providerBufSize;
+            WCHAR providerW[MAX_PATH];
+            keyNameSize = sizeof(providerW);
             type = REG_SZ;
-            res = SalRegQueryValueEx(driveKey, "ProviderName", 0, &type,
-                                     (unsigned char*)providerBuf, &keyNameSize);
-            if (res != ERROR_SUCCESS || type != REG_SZ) // if we do not have a provider, we will reset the buffer
+            res = RegQueryValueExW(driveKey, L"ProviderName", 0, &type, (BYTE*)providerW, &keyNameSize);
+            if (res == ERROR_SUCCESS && type == REG_SZ && providerW[0] != L'\0')
+            {
+                CPathW(providerW).ToUtf8(providerBuf, providerBufSize);
+            }
+            else
                 providerBuf[0] = 0;
         }
-        HANDLES(RegCloseKey(driveKey));
+        RegCloseKey(driveKey);
     }
-    HANDLES(RegCloseKey(network));
-
+    RegCloseKey(network);
     return ret;
 }
 
@@ -1355,23 +1373,33 @@ void InitDropboxPath()
     if (!alreadyCalled) // it makes sense to find the path only once, then we just ignore it
     {
         DropboxPath[0] = 0;
-        char sDbPath[MAX_PATH];
+        PWSTR appDataW = NULL;
         BOOL cfgAlreadyFound = FALSE;
-        // Use Known Folders so Dropbox discovery avoids the retired CSIDL shell-path API.
-        if (GetKnownFolderPathToAnsi(FOLDERID_RoamingAppData, sDbPath, _countof(sDbPath)))
+        CPathW dbPathW;
+        if (SUCCEEDED(SHGetKnownFolderPath(FOLDERID_RoamingAppData, 0, NULL, &appDataW)))
         {
-            if (SalPathAppend(sDbPath, "Dropbox\\host.db", MAX_PATH) && FileExists(sDbPath))
+            dbPathW.Set(appDataW);
+            CoTaskMemFree(appDataW);
+            dbPathW.Append(L"Dropbox\\host.db");
+            CWidePath wideDbPath(dbPathW.CStr());
+            if (FileExistsW(wideDbPath.GetPathForWin32Api()))
                 cfgAlreadyFound = TRUE;
         }
         else
-            TRACE_E("Cannot get value of CSIDL_APPDATA!");
+            TRACE_E("Cannot get value of FOLDERID_RoamingAppData!");
         if (cfgAlreadyFound ||
-            GetKnownFolderPathToAnsi(FOLDERID_LocalAppData, sDbPath, _countof(sDbPath)))
+            SUCCEEDED(SHGetKnownFolderPath(FOLDERID_LocalAppData, 0, NULL, &appDataW)))
         {
-            if (cfgAlreadyFound ||
-                SalPathAppend(sDbPath, "Dropbox\\host.db", MAX_PATH) && FileExists(sDbPath))
+            if (!cfgAlreadyFound)
             {
-                HANDLE hFile = HANDLES_Q(CreateFileUtf8(sDbPath, GENERIC_READ,
+                dbPathW.Set(appDataW);
+                CoTaskMemFree(appDataW);
+                dbPathW.Append(L"Dropbox\\host.db");
+            }
+            CWidePath wideDbPath(dbPathW.CStr());
+            if (cfgAlreadyFound || FileExistsW(wideDbPath.GetPathForWin32Api()))
+            {
+                HANDLE hFile = HANDLES_Q(CreateFileW(wideDbPath.GetPathForWin32Api(), GENERIC_READ,
                                                     FILE_SHARE_READ | FILE_SHARE_WRITE, NULL,
                                                     OPEN_EXISTING,
                                                     FILE_FLAG_SEQUENTIAL_SCAN,
@@ -1415,18 +1443,34 @@ void InitDropboxPath()
                             }
                         }
                         else
-                            TRACE_E("Unable to read Dropbox's configuration file: " << sDbPath);
+                        {
+                            char dbPathUtf8[MAX_PATH];
+                            dbPathW.ToUtf8(dbPathUtf8, sizeof(dbPathUtf8));
+                            TRACE_E("Unable to read Dropbox's configuration file: " << dbPathUtf8);
+                        }
                         free(buf);
                     }
                     else
-                        TRACE_E("Dropbox's configuration file is too large: " << sDbPath);
+                    {
+                        char dbPathUtf8[MAX_PATH];
+                        dbPathW.ToUtf8(dbPathUtf8, sizeof(dbPathUtf8));
+                        TRACE_E("Dropbox's configuration file is too large: " << dbPathUtf8);
+                    }
                     HANDLES(CloseHandle(hFile));
                 }
                 else
-                    TRACE_E("Cannot open Dropbox's configuration file: " << sDbPath);
+                {
+                    char dbPathUtf8[MAX_PATH];
+                    dbPathW.ToUtf8(dbPathUtf8, sizeof(dbPathUtf8));
+                    TRACE_E("Cannot open Dropbox's configuration file: " << dbPathUtf8);
+                }
             }
             else
-                TRACE_I("Cannot find Dropbox's configuration file: " << sDbPath);
+            {
+                char dbPathUtf8[MAX_PATH];
+                dbPathW.ToUtf8(dbPathUtf8, sizeof(dbPathUtf8));
+                TRACE_I("Cannot find Dropbox's configuration file: " << dbPathUtf8);
+            }
         }
         else
             TRACE_E("Cannot get value of CSIDL_LOCAL_APPDATA!");

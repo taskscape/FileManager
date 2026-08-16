@@ -363,6 +363,24 @@ struct CMetadataLossRecord
     }
 };
 
+struct CMetadataLossRecordW
+{
+    DWORD LossMask;
+    DWORD AcknowledgedLossMask;
+    EMetadataTargetFileSystem TargetFileSystem;
+    CPathW FirstSourceNameW;
+    CPathW FirstTargetNameW;
+
+    void Clear()
+    {
+        LossMask = mmlNone;
+        AcknowledgedLossMask = mmlNone;
+        TargetFileSystem = mtfsUnknown;
+        FirstSourceNameW.Clear();
+        FirstTargetNameW.Clear();
+    }
+};
+
 struct COperation
 {
     COperationCode Opcode;
@@ -372,6 +390,18 @@ struct COperation
         *TargetName;
     DWORD Attr;
     DWORD OpFlags; // combination of OPFL_xxx, see above
+
+    const WCHAR* GetSourceNameW(CPathW& pathBuf) const
+    {
+        pathBuf.Set(SourceName);
+        return pathBuf.CStr();
+    }
+
+    const WCHAR* GetTargetNameW(CPathW& pathBuf) const
+    {
+        pathBuf.Set(TargetName);
+        return pathBuf.CStr();
+    }
     // These values are captured when the worker starts this item, before any
     // confirmation dialog can delay its destructive phase.  They are never
     // derived from a path string: the helper records the opened object's
@@ -447,8 +477,10 @@ public:
     char CorrelationId[OPERATION_CORRELATION_ID_LENGTH];
 
     char WorkPath1[MAX_PATH];  // when non-empty string first path processed (used for change notifications)
+    CPathW WorkPath1W;         // wide path representation
     BOOL WorkPath1InclSubDirs; // TRUE/FALSE = with/without subdirectories (first path)
     char WorkPath2[MAX_PATH];  // when non-empty string second path processed (used for change notifications)
+    CPathW WorkPath2W;         // wide path representation
     BOOL WorkPath2InclSubDirs; // TRUE/FALSE = with/without subdirectories (second path)
 
     char* WaitInQueueSubject; // text for the "waiting in queue" state: dialog title
@@ -514,17 +546,43 @@ public:
     void SetWorkPath1(const char* path, BOOL inclSubDirs)
     {
         // Background work must retain a complete source identity.
-        if (FAILED(StringCchCopyA(WorkPath1, _countof(WorkPath1), path)))
+        if (FAILED(StringCchCopyA(WorkPath1, _countof(WorkPath1), path != NULL ? path : "")))
             WorkPath1[0] = 0;
+        WorkPath1W.Set(path);
         WorkPath1InclSubDirs = inclSubDirs;
+    }
+
+    void SetWorkPath1W(const WCHAR* pathW, BOOL inclSubDirs)
+    {
+        WorkPath1W.Set(pathW);
+        WorkPath1W.ToUtf8(WorkPath1, sizeof(WorkPath1));
+        WorkPath1InclSubDirs = inclSubDirs;
+    }
+
+    const WCHAR* GetWorkPath1W() const
+    {
+        return WorkPath1W.CStr();
     }
 
     void SetWorkPath2(const char* path, BOOL inclSubDirs)
     {
         // Background work must retain a complete target identity.
-        if (FAILED(StringCchCopyA(WorkPath2, _countof(WorkPath2), path)))
+        if (FAILED(StringCchCopyA(WorkPath2, _countof(WorkPath2), path != NULL ? path : "")))
             WorkPath2[0] = 0;
+        WorkPath2W.Set(path);
         WorkPath2InclSubDirs = inclSubDirs;
+    }
+
+    void SetWorkPath2W(const WCHAR* pathW, BOOL inclSubDirs)
+    {
+        WorkPath2W.Set(pathW);
+        WorkPath2W.ToUtf8(WorkPath2, sizeof(WorkPath2));
+        WorkPath2InclSubDirs = inclSubDirs;
+    }
+
+    const WCHAR* GetWorkPath2W() const
+    {
+        return WorkPath2W.CStr();
     }
 
     void SetTFS(const CQuadWord& TFS);

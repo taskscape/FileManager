@@ -148,6 +148,7 @@ DWORD SalGetFileAttributes(const char* fileName);
 // unnecessarily large attribute change on remaining file hardlinks (all
 // hardlinks share attributes)
 BOOL ClearReadOnlyAttr(const char* name, DWORD attr = -1);
+BOOL ClearReadOnlyAttrW(const WCHAR* name, DWORD attr = -1);
 
 // deletes directory link (junction point, symbolic link, mount point); on success
 // returns TRUE; on error returns FALSE and if 'err' is not NULL, returns error code in 'err'
@@ -267,6 +268,7 @@ BOOL PathsAreOnTheSameVolume(const char* path1, const char* path2, BOOL* resIsOn
 
 // compares two paths: ignore-case, also ignores one backslash at beginning and end of paths
 BOOL IsTheSamePath(const char* path1, const char* path2);
+BOOL IsTheSamePathW(const WCHAR* path1, const WCHAR* path2);
 
 // determines if path is plugin FS type, 'path' is the path being checked, 'fsName' is
 // optional output buffer for FS name (size in 'fsNameBufSize', can be NULL),
@@ -285,11 +287,13 @@ BOOL IsFileURLPath(const char* path);
 // otherwise returns 0
 int IsFileLink(const char* fileExtension);
 
-// gets both UNC and normal root path from 'path', returns path in 'root' in format 'C:\' or '\\SERVER\SHARE\',
+// gets both UNC and normal root path from 'path', returns path in 'root' in format 'C:' or '\SERVERSHARE',
 // returns number of characters in root path (without null-terminator)
 int GetRootPath(char* root, int rootBufSize, const char* path);
+int GetRootPathW(WCHAR* root, int rootBufSizeInChars, const WCHAR* path);
 // legacy compatibility overload ('root' must be at least MAX_PATH)
 int GetRootPath(char* root, const char* path);
+int GetRootPathW(WCHAR* root, const WCHAR* path);
 
 // returns pointer after root (more precisely to backslash right after root) of both UNC and normal path 'path'
 const char* SkipRoot(const char* path);
@@ -299,46 +303,57 @@ const char* SkipRoot(const char* path);
 // returns pointer to last directory (cut part) in 'cutDir'
 // replacement for PathRemoveFileSpec
 BOOL CutDirectory(char* path, char** cutDir = NULL);
+BOOL CutDirectoryW(WCHAR* path, WCHAR** cutDir = NULL);
 
 // joins 'path' and 'name' into 'path', ensures connection with backslash, 'path' is buffer of at least 'pathSize' characters
 // returns TRUE if 'name' fit after 'path'; if 'path' or 'name' is empty,
 // connecting (initial/trailing) backslash won't be added (e.g. "c:\" + "" -> "c:")
 BOOL SalPathAppend(char* path, const char* name, int pathSize);
+BOOL SalPathAppendW(WCHAR* path, const WCHAR* name, int pathSizeInChars);
 
 // if 'path' doesn't end with backslash yet, adds it to end of 'path'; 'path' is buffer of at least 'pathSize'
 // characters; returns TRUE if backslash fit after 'path'; if 'path' is empty, backslash won't be added
 BOOL SalPathAddBackslash(char* path, int pathSize);
+BOOL SalPathAddBackslashW(WCHAR* path, int pathSizeInChars);
 
 // if there's a backslash at end of 'path', removes it
 void SalPathRemoveBackslash(char* path);
+void SalPathRemoveBackslashW(WCHAR* path);
 
 // converts all '/' to '\\' and also if there are two or more '\\' in a row,
 // leaves only one (except two '\\' at beginning of string, which indicates UNC path)
 void SlashesToBackslashesAndRemoveDups(char* path);
+void SlashesToBackslashesAndRemoveDupsW(WCHAR* path);
 
 // from full name makes name ("c:\path\file" -> "file")
 void SalPathStripPath(char* path);
+void SalPathStripPathW(WCHAR* path);
 
 // if there's an extension in name, removes it
 void SalPathRemoveExtension(char* path);
+void SalPathRemoveExtensionW(WCHAR* path);
 
 // if name 'path' doesn't have extension yet, adds extension 'extension' (e.g. ".txt"), 'path' is buffer
 // of at least 'pathSize' characters, returns FALSE if buffer 'path' is insufficient for resulting path
 BOOL SalPathAddExtension(char* path, const char* extension, int pathSize);
+BOOL SalPathAddExtensionW(WCHAR* path, const WCHAR* extension, int pathSizeInChars);
 
 // changes/adds extension 'extension' (e.g. ".txt") in name 'path', 'path' is buffer
 // of at least 'pathSize' characters, returns FALSE if buffer 'path' is insufficient for resulting path
 BOOL SalPathRenameExtension(char* path, const char* extension, int pathSize);
+BOOL SalPathRenameExtensionW(WCHAR* path, const WCHAR* extension, int pathSizeInChars);
 
 // returns pointer into 'path' to file/directory name (ignores backslash at end of 'path'),
 // if name doesn't contain other backslashes than at end of string, returns 'path'
 const char* SalPathFindFileName(const char* path);
+const WCHAR* SalPathFindFileNameW(const WCHAR* path);
 
 // Works for both normal and UNC paths.
 // Returns number of characters in common path. On normal path root must be terminated with backslash,
 // otherwise function returns 0. ("C:\"+"C:"->0, "C:\A\B"+"C:\"->3, "C:\A\B\"+"C:\A"->4,
 // "C:\AA\BB"+"C:\AA\CC"->5)
 int CommonPrefixLength(const char* path1, const char* path2);
+int CommonPrefixLengthW(const WCHAR* path1, const WCHAR* path2);
 
 // Returns TRUE if path 'prefix' is base of path 'path'. Otherwise returns FALSE.
 // "C:\aa","C:\Aa\BB"->TRUE
@@ -347,6 +362,7 @@ int CommonPrefixLength(const char* path1, const char* path2);
 // "\\server\share","\\server\share\aaa"->TRUE
 // Works for both normal and UNC paths.
 BOOL SalPathIsPrefix(const char* prefix, const char* path);
+BOOL SalPathIsPrefixW(const WCHAR* prefix, const WCHAR* path);
 
 // removes ".." (skips ".." along with one subdirectory to the left) and "." (skips just ".")
 // from path; condition is backslash as subdirectory separator; 'afterRoot' points after root
@@ -373,6 +389,13 @@ BOOL SalGetFullName(char* name, int* errTextID = NULL, const char* curDir = NULL
                     char* nextFocus = NULL, BOOL* callNethood = NULL, int nameBufSize = MAX_PATH,
                     BOOL allowRelPathWithSpaces = FALSE);
 
+// Edit/Combo control text helpers (UTF-8 and UTF-16)
+BOOL SetEditOrComboText(HWND hWnd, const char* text);
+BOOL SetEditOrComboTextW(HWND hWnd, const WCHAR* text);
+BOOL GetEditOrComboTextUtf8(HWND hWnd, char* buf, int bufSize);
+BOOL GetEditOrComboTextW(HWND hWnd, WCHAR* buf, int bufSizeInChars);
+BOOL GetEditOrComboTextW(HWND hWnd, CPathW& path);
+
 // tries to access path 'path' (normal or UNC), runs in separate thread, so
 // allows interrupting test with ESC key (after certain time pops up window with ESC message)
 // 'echo' TRUE means allowed output of error message (if path is not accessible);
@@ -382,12 +405,14 @@ BOOL SalGetFullName(char* name, int* errTextID = NULL, const char* curDir = NULL
 // otherwise returns standard Windows error code or ERROR_USER_TERMINATED if
 // user used ESC key to interrupt test
 DWORD SalCheckPath(BOOL echo, const char* path, DWORD err, BOOL postRefresh, HWND parent);
+DWORD SalCheckPathW(BOOL echo, const WCHAR* pathW, DWORD err, BOOL postRefresh, HWND parent);
 
 // tries if path 'path' is accessible, if necessary restores network connections using functions
 // CheckAndRestoreNetworkConnection and CheckAndConnectUNCNetworkPath; returns TRUE if
 // path is accessible; 'parent' is messagebox parent; 'tryNet' is TRUE if it makes sense
 // to try to restore network connections
 BOOL SalCheckAndRestorePath(HWND parent, const char* path, BOOL tryNet);
+BOOL SalCheckAndRestorePathW(HWND parent, const WCHAR* pathW, BOOL tryNet);
 
 // tries if path 'path' is accessible, if necessary shortens it; if 'tryNet' is TRUE, if necessary restores
 // network connections using functions CheckAndRestoreNetworkConnection and CheckAndConnectUNCNetworkPath
@@ -430,6 +455,10 @@ BOOL SalParsePath(HWND parent, char* path, int& type, BOOL& isDir, char*& second
                   const char* errorTitle, char* nextFocus, BOOL curPathIsDiskOrArchive,
                   const char* curPath, const char* curArchivePath, int* error,
                   int pathBufSize);
+BOOL SalParsePathW(HWND parent, WCHAR* pathW, int& type, BOOL& isDir, WCHAR*& secondPartW,
+                   const WCHAR* errorTitleW, WCHAR* nextFocusW, BOOL curPathIsDiskOrArchive,
+                   const WCHAR* curPathW, const WCHAR* curArchivePathW, int* error,
+                   int pathBufSizeInChars);
 
 // gets existing part and operation mask from windows target path; allows creating
 // non-existing part; on success returns TRUE and existing windows target path (in 'path')
@@ -631,6 +660,7 @@ BOOL SalamanderActive();
 
 // removal of directory including its contents (SHFileOperation is terribly slow)
 void RemoveTemporaryDir(const char* dir);
+void RemoveTemporaryDirW(const WCHAR* dir);
 
 // helper function for adding name to list of names (separated by space), returns success
 BOOL AddToListOfNames(char** list, char* listEnd, const char* name, int nameLen);
@@ -652,6 +682,7 @@ BOOL CheckAndCreateDirectory(const char* dir, HWND parent = NULL, BOOL quiet = F
 // deletes empty subdirectories from disk in 'dir' and if 'dir' is empty after deleting subdirectories,
 // it is deleted too
 void RemoveEmptyDirs(const char* dir);
+void RemoveEmptyDirsW(const WCHAR* dir);
 
 // executes routine for opening viewer - used in CFilesWindow::ViewFile and
 // CSalamanderForViewFileOnFS::OpenViewer; no other use is expected, therefore
@@ -1026,6 +1057,7 @@ void ShutdownAuxThreads();
 
 // returns TRUE if the specified file exists; otherwise returns FALSE
 extern "C" BOOL FileExists(const char* fileName);
+extern "C" BOOL FileExistsW(const WCHAR* fileNameW);
 
 // returns TRUE if the specified directory exists; otherwise returns FALSE
 BOOL DirExists(const char* dirName);
@@ -2476,6 +2508,7 @@ BOOL CreateOurPathInRoamingAPPDATA(char* buf);
 // 32-bit version under Win64 only: determines if it is path that redirector redirects to
 // SysWOW64 or conversely back to System32
 BOOL IsWin64RedirectedDir(const char* path, char** lastSubDir, BOOL failIfDirWithSameNameExists);
+BOOL IsWin64RedirectedDirW(const WCHAR* pathW, WCHAR** lastSubDirW, BOOL failIfDirWithSameNameExists);
 
 // 32-bit version under Win64 only: determines if selection contains pseudo-directory that redirector
 // redirects to SysWOW64 or conversely back to System32 and at same time directory with same name

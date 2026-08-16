@@ -1503,19 +1503,27 @@ void CDiskCache::PrematureDeleteByPlugin(CPluginInterfaceAbstract* ownDeletePlug
 
 void CDiskCache::ClearTEMPIfNeeded(HWND parent, HWND hActivePanel)
 {
-    char tmpDir[2 * MAX_PATH];
-    if (GetTempPath(2 * MAX_PATH, tmpDir))
+    WCHAR tmpDirBufW[2 * MAX_PATH];
+    if (GetTempPathW(2 * MAX_PATH, tmpDirBufW) > 0)
     {
-        SalPathAddBackslash(tmpDir, 2 * MAX_PATH);
-        char* tmpDirEnd = tmpDir + strlen(tmpDir);
-        if (SalPathAppend(tmpDir, "SAL*.tmp", 2 * MAX_PATH)) // we will add a mask (it won't fit = no sense in searching anything)
-        {
-            TIndirectArray<char> tmpDirs(10, 50);
+        CPathW tmpDirW(tmpDirBufW);
+        tmpDirW.AddBackslash();
+        tmpDirW.Append(L"SAL*.tmp");
+        CWidePath searchPathW(tmpDirW.CStr());
 
-            WIN32_FIND_DATAW dataW;
-            WIN32_FIND_DATA data;
-            CStrP tmpDirW(ConvertAllocUtf8ToWide(tmpDir, -1));
-            HANDLE find = tmpDirW != NULL ? HANDLES_Q(FindFirstFileW(tmpDirW, &dataW)) : INVALID_HANDLE_VALUE;
+        char tmpDir[2 * MAX_PATH];
+        tmpDirW.ToUtf8(tmpDir, sizeof(tmpDir));
+        SalPathRemoveBackslash(tmpDir);
+        CutDirectory(tmpDir);
+        SalPathAddBackslash(tmpDir, sizeof(tmpDir));
+        char* tmpDirEnd = tmpDir + strlen(tmpDir);
+
+        TIndirectArray<char> tmpDirs(10, 50);
+
+        WIN32_FIND_DATAW dataW;
+        WIN32_FIND_DATA data;
+        const WCHAR* apiPath = searchPathW.GetPathForWin32Api();
+        HANDLE find = apiPath != NULL ? HANDLES_Q(FindFirstFileW(apiPath, &dataW)) : INVALID_HANDLE_VALUE;
             if (find != INVALID_HANDLE_VALUE)
             {
                 do
@@ -1581,7 +1589,6 @@ void CDiskCache::ClearTEMPIfNeeded(HWND parent, HWND hActivePanel)
                         SendMessage(hActivePanel, WM_USER_FOCUSFILE, (WPARAM) "", (LPARAM)tmpDir);
                 }
             }
-        }
     }
     else
         TRACE_E("Unable to clear TEMP directory: TEMP directory not defined!");

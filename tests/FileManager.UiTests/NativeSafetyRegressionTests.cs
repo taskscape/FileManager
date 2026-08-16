@@ -1079,6 +1079,149 @@ public sealed class NativeSafetyRegressionTests
     }
 
     [Test]
+    public void Utf16_internal_paths_support_dynamic_wide_path_and_procedural_functions()
+    {
+        var root = FindRepositoryRoot();
+        var widePath = File.ReadAllText(Path.Combine(root, "src", "common", "wide_path.h"));
+        var constants = File.ReadAllText(Path.Combine(root, "src", "consts.h"));
+        var pathUtils = File.ReadAllText(Path.Combine(root, "src", "path_utils.cpp"));
+        var appEntry = File.ReadAllText(Path.Combine(root, "src", "app_entry.cpp"));
+        var pathChecking = File.ReadAllText(Path.Combine(root, "src", "path_checking.cpp"));
+
+        var filesWndHeader = File.ReadAllText(Path.Combine(root, "src", "fileswnd.h"));
+        var filesWndInit = File.ReadAllText(Path.Combine(root, "src", "fileswindow_init.cpp"));
+        var splGen = File.ReadAllText(Path.Combine(root, "src", "plugins", "shared", "spl_gen.h"));
+        var pluginsHeader = File.ReadAllText(Path.Combine(root, "src", "plugins.h"));
+        var zipGenApi = File.ReadAllText(Path.Combine(root, "src", "zip_general_api.cpp"));
+        var salamandHeader = File.ReadAllText(Path.Combine(root, "src", "salamand.h"));
+        var workerHeader = File.ReadAllText(Path.Combine(root, "src", "worker.h"));
+        var findHeader = File.ReadAllText(Path.Combine(root, "src", "find.h"));
+        var findDlg2 = File.ReadAllText(Path.Combine(root, "src", "finddlg2.cpp"));
+        var executeSource = File.ReadAllText(Path.Combine(root, "src", "execute.cpp"));
+
+        Assert.Multiple(() =>
+        {
+            // CPathW class checks
+            Assert.That(widePath, Does.Contain("class CPathW"));
+            Assert.That(widePath, Does.Contain("EnsureCapacity"));
+            Assert.That(widePath, Does.Contain("BOOL Append(const WCHAR* subPath)"));
+            Assert.That(widePath, Does.Contain("BOOL AddBackslash()"));
+            Assert.That(widePath, Does.Contain("void RemoveBackslash()"));
+            Assert.That(widePath, Does.Contain("void StripPath()"));
+            Assert.That(widePath, Does.Contain("void RemoveExtension()"));
+            Assert.That(widePath, Does.Contain("BOOL AddExtension(const WCHAR* extension)"));
+            Assert.That(widePath, Does.Contain("BOOL RenameExtension(const WCHAR* extension)"));
+            Assert.That(widePath, Does.Contain("const WCHAR* FindFileName() const"));
+            Assert.That(widePath, Does.Contain("BOOL RemovePoints()"));
+            Assert.That(widePath, Does.Contain("char* ToUtf8Alloc() const"));
+            Assert.That(widePath, Does.Contain("BOOL ToUtf8("));
+            Assert.That(widePath, Does.Contain("BOOL Equals("));
+
+            // Consts header declaration checks
+            Assert.That(constants, Does.Contain("BOOL CutDirectoryW(WCHAR* path, WCHAR** cutDir = NULL);"));
+            Assert.That(constants, Does.Contain("BOOL SalPathAppendW(WCHAR* path, const WCHAR* name, int pathSizeInChars);"));
+            Assert.That(constants, Does.Contain("BOOL SalPathAddBackslashW(WCHAR* path, int pathSizeInChars);"));
+            Assert.That(constants, Does.Contain("void SalPathRemoveBackslashW(WCHAR* path);"));
+            Assert.That(constants, Does.Contain("void SlashesToBackslashesAndRemoveDupsW(WCHAR* path);"));
+            Assert.That(constants, Does.Contain("void SalPathStripPathW(WCHAR* path);"));
+            Assert.That(constants, Does.Contain("void SalPathRemoveExtensionW(WCHAR* path);"));
+            Assert.That(constants, Does.Contain("BOOL SalPathAddExtensionW(WCHAR* path, const WCHAR* extension, int pathSizeInChars);"));
+            Assert.That(constants, Does.Contain("BOOL SalPathRenameExtensionW(WCHAR* path, const WCHAR* extension, int pathSizeInChars);"));
+            Assert.That(constants, Does.Contain("const WCHAR* SalPathFindFileNameW(const WCHAR* path);"));
+            Assert.That(constants, Does.Contain("int CommonPrefixLengthW(const WCHAR* path1, const WCHAR* path2);"));
+            Assert.That(constants, Does.Contain("BOOL SalPathIsPrefixW(const WCHAR* prefix, const WCHAR* path);"));
+            Assert.That(constants, Does.Contain("BOOL IsTheSamePathW(const WCHAR* path1, const WCHAR* path2);"));
+            Assert.That(constants, Does.Contain("int GetRootPathW(WCHAR* root, int rootBufSizeInChars, const WCHAR* path);"));
+
+            // Source implementation checks
+            Assert.That(pathUtils, Does.Contain("BOOL SalPathAppendW(WCHAR* path, const WCHAR* name, int pathSizeInChars)"));
+            Assert.That(pathUtils, Does.Contain("BOOL SalPathAddBackslashW(WCHAR* path, int pathSizeInChars)"));
+            Assert.That(pathUtils, Does.Contain("void SalPathRemoveBackslashW(WCHAR* path)"));
+            Assert.That(pathUtils, Does.Contain("void SalPathStripPathW(WCHAR* path)"));
+            Assert.That(pathUtils, Does.Contain("void SalPathRemoveExtensionW(WCHAR* path)"));
+            Assert.That(pathUtils, Does.Contain("BOOL SalPathAddExtensionW(WCHAR* path, const WCHAR* extension, int pathSizeInChars)"));
+            Assert.That(pathUtils, Does.Contain("BOOL SalPathRenameExtensionW(WCHAR* path, const WCHAR* extension, int pathSizeInChars)"));
+            Assert.That(pathUtils, Does.Contain("const WCHAR* SalPathFindFileNameW(const WCHAR* path)"));
+
+            Assert.That(appEntry, Does.Contain("int CommonPrefixLengthW(const WCHAR* path1, const WCHAR* path2)"));
+            Assert.That(appEntry, Does.Contain("BOOL SalPathIsPrefixW(const WCHAR* prefix, const WCHAR* path)"));
+            Assert.That(appEntry, Does.Contain("BOOL IsTheSamePathW(const WCHAR* path1, const WCHAR* path2)"));
+            Assert.That(appEntry, Does.Contain("int GetRootPathW(WCHAR* root, int rootBufSizeInChars, const WCHAR* path)"));
+            Assert.That(appEntry, Does.Contain("BOOL CutDirectoryW(WCHAR* path, WCHAR** cutDir)"));
+
+            Assert.That(pathChecking, Does.Contain("void SlashesToBackslashesAndRemoveDupsW(WCHAR* path)"));
+            Assert.That(pathChecking, Does.Contain("BOOL ClearReadOnlyAttrW(const WCHAR* name, DWORD attr)"));
+
+            Assert.That(constants, Does.Contain("BOOL ClearReadOnlyAttrW(const WCHAR* name, DWORD attr = -1);"));
+            Assert.That(constants, Does.Contain("void RemoveTemporaryDirW(const WCHAR* dir);"));
+            Assert.That(constants, Does.Contain("void RemoveEmptyDirsW(const WCHAR* dir);"));
+
+            Assert.That(pathUtils, Does.Contain("void _RemoveTemporaryDirW(const WCHAR* dir)"));
+            Assert.That(pathUtils, Does.Contain("void RemoveTemporaryDirW(const WCHAR* dir)"));
+            Assert.That(pathUtils, Does.Contain("void _RemoveEmptyDirsW(const WCHAR* dir)"));
+            Assert.That(pathUtils, Does.Contain("void RemoveEmptyDirsW(const WCHAR* dir)"));
+
+            // Panel path and edit control wide helper checks
+            Assert.That(filesWndHeader, Does.Contain("CPathW PathW;"));
+            Assert.That(filesWndHeader, Does.Contain("const WCHAR* GetPathW()"));
+            Assert.That(filesWndHeader, Does.Contain("void SetPathW(const WCHAR* path);"));
+            Assert.That(filesWndInit, Does.Contain("void CFilesWindowAncestor::SetPathW(const WCHAR* path)"));
+
+            Assert.That(constants, Does.Contain("BOOL SetEditOrComboTextW(HWND hWnd, const WCHAR* text);"));
+            Assert.That(constants, Does.Contain("BOOL GetEditOrComboTextW(HWND hWnd, WCHAR* buf, int bufSizeInChars);"));
+            Assert.That(constants, Does.Contain("BOOL GetEditOrComboTextW(HWND hWnd, CPathW& path);"));
+            Assert.That(pathUtils, Does.Contain("BOOL SetEditOrComboTextW(HWND hWnd, const WCHAR* text)"));
+            Assert.That(pathUtils, Does.Contain("BOOL GetEditOrComboTextW(HWND hWnd, WCHAR* buf, int bufSizeInChars)"));
+            Assert.That(pathUtils, Does.Contain("BOOL GetEditOrComboTextW(HWND hWnd, CPathW& path)"));
+
+            // Plugin bridge wide path checks
+            Assert.That(splGen, Does.Contain("virtual int WINAPI CommonPrefixLengthW(const WCHAR* path1, const WCHAR* path2) = 0;"));
+            Assert.That(splGen, Does.Contain("virtual BOOL WINAPI PathIsPrefixW(const WCHAR* prefix, const WCHAR* path) = 0;"));
+            Assert.That(splGen, Does.Contain("virtual BOOL WINAPI IsTheSamePathW(const WCHAR* path1, const WCHAR* path2) = 0;"));
+            Assert.That(splGen, Does.Contain("virtual BOOL WINAPI CutDirectoryW(WCHAR* path, WCHAR** cutDir = NULL) = 0;"));
+            Assert.That(splGen, Does.Contain("virtual BOOL WINAPI SalPathAppendW(WCHAR* path, const WCHAR* name, int pathSizeInChars) = 0;"));
+
+            Assert.That(pluginsHeader, Does.Contain("virtual int WINAPI CommonPrefixLengthW(const WCHAR* path1, const WCHAR* path2);"));
+            Assert.That(pluginsHeader, Does.Contain("virtual BOOL WINAPI PathIsPrefixW(const WCHAR* prefix, const WCHAR* path);"));
+            Assert.That(pluginsHeader, Does.Contain("virtual BOOL WINAPI IsTheSamePathW(const WCHAR* path1, const WCHAR* path2);"));
+            Assert.That(pluginsHeader, Does.Contain("virtual BOOL WINAPI CutDirectoryW(WCHAR* path, WCHAR** cutDir = NULL);"));
+
+            Assert.That(zipGenApi, Does.Contain("int CSalamanderGeneral::CommonPrefixLengthW(const WCHAR* path1, const WCHAR* path2)"));
+            Assert.That(zipGenApi, Does.Contain("BOOL CSalamanderGeneral::PathIsPrefixW(const WCHAR* prefix, const WCHAR* path)"));
+            Assert.That(zipGenApi, Does.Contain("BOOL CSalamanderGeneral::IsTheSamePathW(const WCHAR* path1, const WCHAR* path2)"));
+
+            // Path history wide methods check
+            Assert.That(salamandHeader, Does.Contain("void GetPathW(WCHAR* buffer, int bufferSizeInChars);"));
+            Assert.That(salamandHeader, Does.Contain("void GetPathW(CPathW& path);"));
+            Assert.That(salamandHeader, Does.Contain("void AddPathW("));
+            Assert.That(salamandHeader, Does.Contain("void AddPathUniqueW("));
+            Assert.That(pathUtils, Does.Contain("void CPathHistoryItem::GetPathW(WCHAR* buffer, int bufferSizeInChars)"));
+            Assert.That(pathUtils, Does.Contain("void CPathHistory::AddPathW("));
+            Assert.That(pathUtils, Does.Contain("void CPathHistory::AddPathUniqueW("));
+
+            // Operations queue wide workpath methods check
+            Assert.That(workerHeader, Does.Contain("CPathW WorkPath1W;"));
+            Assert.That(workerHeader, Does.Contain("CPathW WorkPath2W;"));
+            Assert.That(workerHeader, Does.Contain("void SetWorkPath1W(const WCHAR* pathW, BOOL inclSubDirs)"));
+            Assert.That(workerHeader, Does.Contain("void SetWorkPath2W(const WCHAR* pathW, BOOL inclSubDirs)"));
+            Assert.That(workerHeader, Does.Contain("const WCHAR* GetSourceNameW(CPathW& pathBuf) const"));
+            Assert.That(workerHeader, Does.Contain("const WCHAR* GetTargetNameW(CPathW& pathBuf) const"));
+
+            // Find dialog wide common prefix path checks
+            Assert.That(findHeader, Does.Contain("BOOL GetCommonPrefixPathW(WCHAR* buffer, int bufferMaxInChars, int& commonPrefixChars);"));
+            Assert.That(findHeader, Does.Contain("BOOL GetCommonPrefixPathW(CPathW& path, int& commonPrefixChars);"));
+            Assert.That(findDlg2, Does.Contain("BOOL CFindDialog::GetCommonPrefixPathW(WCHAR* buffer, int bufferMaxInChars, int& commonPrefixChars)"));
+            Assert.That(findDlg2, Does.Contain("BOOL CFindDialog::GetCommonPrefixPathW(CPathW& path, int& commonPrefixChars)"));
+
+            // Command expansion wide Win32 API checks
+            Assert.That(executeSource, Does.Contain("GetWindowsDirectoryW(pathW, MAX_PATH)"));
+            Assert.That(executeSource, Does.Contain("GetSystemDirectoryW(pathW, MAX_PATH)"));
+            Assert.That(executeSource, Does.Contain("GetModuleFileNameW(HInstance, pathW, MAX_PATH)"));
+            Assert.That(executeSource, Does.Contain("GetShortPathNameW(pathW, shortPathW, MAX_PATH)"));
+        });
+    }
+
+    [Test]
     public void Destructive_operations_keep_the_handle_identity_guard()
     {
         var root = FindRepositoryRoot();

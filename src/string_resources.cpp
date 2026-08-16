@@ -721,6 +721,18 @@ BOOL FileExists(const char* fileName)
     return (attr != INVALID_FILE_ATTRIBUTES && (attr & FILE_ATTRIBUTE_DIRECTORY) == 0);
 }
 
+BOOL FileExistsW(const WCHAR* fileNameW)
+{
+    if (fileNameW == NULL || fileNameW[0] == L'\0')
+        return FALSE;
+    CWidePath wp(fileNameW);
+    const WCHAR* apiPath = wp.GetPathForWin32Api();
+    if (apiPath == NULL)
+        return FALSE;
+    DWORD attr = GetFileAttributesW(apiPath);
+    return (attr != INVALID_FILE_ATTRIBUTES && (attr & FILE_ATTRIBUTE_DIRECTORY) == 0);
+}
+
 BOOL DirExists(const char* dirName)
 {
     // j.r. FIXME: discuss with Petr; I tried removing the file's right to read

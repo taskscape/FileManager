@@ -280,7 +280,7 @@ The important reading rule is that type, origin flag, and cleanup path jointly d
 
 ### 4.3 String and API-boundary conventions
 
-Much of the historical core represents paths and text as narrow strings, generally UTF-8-aware application strings, then calls explicit wide-character wrappers at Windows boundaries. Language text is stored in resource-only `.slg` modules and accessed through the selected `HLanguage`. Code that crosses among application text, Windows UTF-16, archive formats, and remote filesystem encodings must preserve that conversion boundary.
+Much of the historical core represents paths and text as narrow strings, generally UTF-8-aware application strings, then calls explicit wide-character wrappers at Windows boundaries. Full UTF-16 internal path support is provided through `CPathW` (in `src/common/wide_path.h`) and wide procedural utilities (`SalPath*W`, `CommonPrefixLengthW`, `CutDirectoryW`, `SlashesToBackslashesAndRemoveDupsW`), allowing paths to be represented and manipulated directly in native UTF-16 without `MAX_PATH` truncation limits while handling extended-length syntax (`\\?\`). Language text is stored in resource-only `.slg` modules and accessed through the selected `HLanguage`. Code that crosses among application text, Windows UTF-16, archive formats, and remote filesystem encodings must preserve that conversion boundary.
 
 ### 4.4 Global state
 

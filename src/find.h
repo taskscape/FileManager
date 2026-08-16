@@ -775,6 +775,8 @@ public:
     BOOL GetFocusedFile(char* buffer, int bufferLen, int* viewedIndex /* can be NULL */);
     const char* GetName(int index);
     const char* GetPath(int index);
+    const WCHAR* GetNameW(int index);
+    const WCHAR* GetPathW(int index);
     void UpdateInternalViewerData();
 
     BOOL IsSearchInProgress() { return SearchInProgress; }
@@ -864,6 +866,8 @@ protected:
     // if it founds it, it copies it to the buffer and returns TRUE
     // if it does not found it or the buffer is too small, it returns FALSE
     BOOL GetCommonPrefixPath(char* buffer, int bufferMax, int& commonPrefixChars);
+    BOOL GetCommonPrefixPathW(WCHAR* buffer, int bufferMaxInChars, int& commonPrefixChars);
+    BOOL GetCommonPrefixPathW(CPathW& path, int& commonPrefixChars);
 
     BOOL InitializeOle();
     void UninitializeOle();

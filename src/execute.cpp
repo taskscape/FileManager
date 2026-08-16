@@ -585,6 +585,16 @@ struct CExecuteExpData
     CUserMenuAdvancedData* UserMenuAdvancedData; // applies only to User Menu, otherwise NULL here
 };
 
+struct CExecuteExpDataW
+{
+    const WCHAR* NameW;
+    const WCHAR* DosNameW;
+    CPathW BufferW;
+    BOOL* FileNameUsed;
+
+    CUserMenuAdvancedData* UserMenuAdvancedData;
+};
+
 const char* WINAPI ExecuteExpDrive(HWND msgParent, void* param) // drive ("D:", "\\server\share") without backslash
 {
     CExecuteExpData* data = (CExecuteExpData*)param;
@@ -602,18 +612,24 @@ const char* WINAPI ExecuteExpPath(HWND msgParent, void* param) // full path ("\\
     CExecuteExpData* data = (CExecuteExpData*)param;
     if (data->FileNameUsed != NULL)
         *data->FileNameUsed = TRUE;
-    GetRootPath(data->Buffer, data->Name);
-    int l = (int)strlen(data->Buffer);
-    if (l > 0 && data->Buffer[l - 1] == '\\')
+    WCHAR rootW[MAX_PATH];
+    CPathW nameW(data->Name);
+    int l = GetRootPathW(rootW, nameW.CStr());
+    if (l > 0 && rootW[l - 1] == L'\\')
         l--;
-    strcpy(data->Buffer, data->Name + l);
-    char* s = strrchr(data->Buffer, '\\');
+    const WCHAR* namePtr = nameW.CStr() + l;
+    CPathW bufW(namePtr);
+    const WCHAR* s = wcsrchr(bufW.CStr(), L'\\');
     if (s == NULL)
     {
         TRACE_E("Unexpected value in ExecuteExpPath().");
         return "\\";
     }
-    *++s = 0;
+    size_t pos = s - bufW.CStr();
+    WCHAR temp[MAX_PATH];
+    wcscpy(temp, bufW.CStr());
+    temp[pos + 1] = L'\0';
+    CPathW(temp).ToUtf8(data->Buffer, MAX_PATH);
     return data->Buffer;
 }
 
@@ -622,18 +638,24 @@ const char* WINAPI ExecuteExpDOSPath(HWND msgParent, void* param)
     CExecuteExpData* data = (CExecuteExpData*)param;
     if (data->FileNameUsed != NULL)
         *data->FileNameUsed = TRUE;
-    GetRootPath(data->Buffer, data->DosName);
-    int l = (int)strlen(data->Buffer);
-    if (l > 0 && data->Buffer[l - 1] == '\\')
+    WCHAR rootW[MAX_PATH];
+    CPathW dosNameW(data->DosName);
+    int l = GetRootPathW(rootW, dosNameW.CStr());
+    if (l > 0 && rootW[l - 1] == L'\\')
         l--;
-    strcpy(data->Buffer, data->DosName + l);
-    char* s = strrchr(data->Buffer, '\\');
+    const WCHAR* dosNamePtr = dosNameW.CStr() + l;
+    CPathW bufW(dosNamePtr);
+    const WCHAR* s = wcsrchr(bufW.CStr(), L'\\');
     if (s == NULL)
     {
         TRACE_E("Unexpected value in ExecuteExpDOSPath().");
         return "\\";
     }
-    *++s = 0;
+    size_t pos = s - bufW.CStr();
+    WCHAR temp[MAX_PATH];
+    wcscpy(temp, bufW.CStr());
+    temp[pos + 1] = L'\0';
+    CPathW(temp).ToUtf8(data->Buffer, MAX_PATH);
     return data->Buffer;
 }
 
@@ -672,21 +694,27 @@ const char* WINAPI ExecuteExpPath2(HWND msgParent, void* param) // full path ("\
     CExecuteExpData* data = (CExecuteExpData*)param;
     if (data->FileNameUsed != NULL)
         *data->FileNameUsed = TRUE;
-    GetRootPath(data->Buffer, data->Name);
-    int l = (int)strlen(data->Buffer);
-    if (l > 0 && data->Buffer[l - 1] == '\\')
+    WCHAR rootW[MAX_PATH];
+    CPathW nameW(data->Name);
+    int l = GetRootPathW(rootW, nameW.CStr());
+    if (l > 0 && rootW[l - 1] == L'\\')
         l--;
-    strcpy(data->Buffer, data->Name + l);
-    char* s = strrchr(data->Buffer, '\\');
+    const WCHAR* namePtr = nameW.CStr() + l;
+    CPathW bufW(namePtr);
+    const WCHAR* s = wcsrchr(bufW.CStr(), L'\\');
     if (s == NULL)
     {
         TRACE_E("Unexpected value in ExecuteExpPath2().");
         return "\\";
     }
-    if (s != data->Buffer)
-        *s = 0;
+    size_t pos = s - bufW.CStr();
+    WCHAR temp[MAX_PATH];
+    wcscpy(temp, bufW.CStr());
+    if (s != bufW.CStr())
+        temp[pos] = L'\0';
     else
-        *++s = 0; // root must end with '\\'
+        temp[pos + 1] = L'\0';
+    CPathW(temp).ToUtf8(data->Buffer, MAX_PATH);
     return data->Buffer;
 }
 
@@ -793,42 +821,65 @@ const char* WINAPI ExecuteExpFullPath(HWND msgParent, void* param) // full path 
     CExecuteExpData* data = (CExecuteExpData*)param;
     if (data->FileNameUsed != NULL)
         *data->FileNameUsed = TRUE;
-    strcpy(data->Buffer, data->Name);
-    char* s = strrchr(data->Buffer, '\\');
+    CPathW bufW(data->Name);
+    const WCHAR* s = wcsrchr(bufW.CStr(), L'\\');
     if (s == NULL)
     {
         TRACE_E("Unexpected value in ExecuteExpFullPath().");
         return "C:\\";
     }
-    *++s = 0;
+    size_t pos = s - bufW.CStr();
+    WCHAR temp[MAX_PATH];
+    wcscpy(temp, bufW.CStr());
+    temp[pos + 1] = L'\0';
+    CPathW(temp).ToUtf8(data->Buffer, MAX_PATH);
     return data->Buffer;
 }
 
 const char* WINAPI ExecuteExpWinDir(HWND msgParent, void* param) // full path to the Windows directory
 {
     CExecuteExpData* data = (CExecuteExpData*)param;
-    GetWindowsDirectory(data->Buffer, MAX_PATH);
-    char* s = data->Buffer + strlen(data->Buffer);
-    if (s > data->Buffer && *(s - 1) != '\\')
-        strcat(data->Buffer, "\\");
+    WCHAR pathW[MAX_PATH];
+    if (GetWindowsDirectoryW(pathW, MAX_PATH) > 0)
+    {
+        SalPathAddBackslashW(pathW, MAX_PATH);
+        CPathW p(pathW);
+        p.ToUtf8(data->Buffer, MAX_PATH);
+    }
+    else
+        data->Buffer[0] = 0;
     return data->Buffer;
 }
 
 const char* WINAPI ExecuteExpSysDir(HWND msgParent, void* param) // full path to the System directory
 {
     CExecuteExpData* data = (CExecuteExpData*)param;
-    GetSystemDirectory(data->Buffer, MAX_PATH);
-    char* s = data->Buffer + strlen(data->Buffer);
-    if (s > data->Buffer && *(s - 1) != '\\')
-        strcat(data->Buffer, "\\");
+    WCHAR pathW[MAX_PATH];
+    if (GetSystemDirectoryW(pathW, MAX_PATH) > 0)
+    {
+        SalPathAddBackslashW(pathW, MAX_PATH);
+        CPathW p(pathW);
+        p.ToUtf8(data->Buffer, MAX_PATH);
+    }
+    else
+        data->Buffer[0] = 0;
     return data->Buffer;
 }
 
 const char* WINAPI ExecuteExpSalDir(HWND msgParent, void* param) // full path to the Salamander directory
 {
     CExecuteExpData* data = (CExecuteExpData*)param;
-    GetModuleFileName(HInstance, data->Buffer, MAX_PATH);
-    *(strrchr(data->Buffer, '\\') + 1) = 0;
+    WCHAR pathW[MAX_PATH];
+    if (GetModuleFileNameW(HInstance, pathW, MAX_PATH) > 0)
+    {
+        WCHAR* lastBackslash = wcsrchr(pathW, L'\\');
+        if (lastBackslash != NULL)
+            *(lastBackslash + 1) = 0;
+        CPathW p(pathW);
+        p.ToUtf8(data->Buffer, MAX_PATH);
+    }
+    else
+        data->Buffer[0] = 0;
     return data->Buffer;
 }
 
@@ -837,38 +888,52 @@ const char* WINAPI ExecuteExpDOSFullPath(HWND msgParent, void* param) // DOS ful
     CExecuteExpData* data = (CExecuteExpData*)param;
     if (data->FileNameUsed != NULL)
         *data->FileNameUsed = TRUE;
-    strcpy(data->Buffer, data->DosName);
-    char* s = strrchr(data->Buffer, '\\');
+    CPathW bufW(data->DosName);
+    const WCHAR* s = wcsrchr(bufW.CStr(), L'\\');
     if (s == NULL)
     {
         TRACE_E("Unexpected value in ExecuteExpDOSFullPath().");
         return "C:\\";
     }
-    *++s = 0;
+    size_t pos = s - bufW.CStr();
+    WCHAR temp[MAX_PATH];
+    wcscpy(temp, bufW.CStr());
+    temp[pos + 1] = L'\0';
+    CPathW(temp).ToUtf8(data->Buffer, MAX_PATH);
     return data->Buffer;
 }
 
 const char* WINAPI ExecuteExpDOSWinDir(HWND msgParent, void* param) // DOS full path to the Windows directory
 {
     CExecuteExpData* data = (CExecuteExpData*)param;
-    char path[MAX_PATH];
-    GetWindowsDirectory(path, MAX_PATH);
-    GetShortPathName(path, data->Buffer, MAX_PATH);
-    char* s = data->Buffer + strlen(data->Buffer);
-    if (s > data->Buffer && *(s - 1) != '\\')
-        strcat(data->Buffer, "\\");
+    WCHAR pathW[MAX_PATH];
+    WCHAR shortPathW[MAX_PATH];
+    if (GetWindowsDirectoryW(pathW, MAX_PATH) > 0 &&
+        GetShortPathNameW(pathW, shortPathW, MAX_PATH) > 0)
+    {
+        SalPathAddBackslashW(shortPathW, MAX_PATH);
+        CPathW p(shortPathW);
+        p.ToUtf8(data->Buffer, MAX_PATH);
+    }
+    else
+        data->Buffer[0] = 0;
     return data->Buffer;
 }
 
 const char* WINAPI ExecuteExpDOSSysDir(HWND msgParent, void* param) // DOS full path to the System directory
 {
     CExecuteExpData* data = (CExecuteExpData*)param;
-    char path[MAX_PATH];
-    GetSystemDirectory(path, MAX_PATH);
-    GetShortPathName(path, data->Buffer, MAX_PATH);
-    char* s = data->Buffer + strlen(data->Buffer);
-    if (s > data->Buffer && *(s - 1) != '\\')
-        strcat(data->Buffer, "\\");
+    WCHAR pathW[MAX_PATH];
+    WCHAR shortPathW[MAX_PATH];
+    if (GetSystemDirectoryW(pathW, MAX_PATH) > 0 &&
+        GetShortPathNameW(pathW, shortPathW, MAX_PATH) > 0)
+    {
+        SalPathAddBackslashW(shortPathW, MAX_PATH);
+        CPathW p(shortPathW);
+        p.ToUtf8(data->Buffer, MAX_PATH);
+    }
+    else
+        data->Buffer[0] = 0;
     return data->Buffer;
 }
 

@@ -1433,6 +1433,7 @@ public:
     // "C:\AA\BB"+"C:\AA\CC"->5)
     // Works for normal and UNC paths.
     virtual int WINAPI CommonPrefixLength(const char* path1, const char* path2) = 0;
+    virtual int WINAPI CommonPrefixLengthW(const WCHAR* path1, const WCHAR* path2) = 0;
 
     // Returns TRUE if path 'prefix' is base of path 'path'. Otherwise returns FALSE.
     // "C:\aa","C:\Aa\BB"->TRUE
@@ -1441,11 +1442,13 @@ public:
     // "\\server\share","\\server\share\aaa"->TRUE
     // Works for normal and UNC paths.
     virtual BOOL WINAPI PathIsPrefix(const char* prefix, const char* path) = 0;
+    virtual BOOL WINAPI PathIsPrefixW(const WCHAR* prefix, const WCHAR* path) = 0;
 
     // compares two normal (c:\path) and UNC (\\server\share\path) paths, ignores lowercase/uppercase,
     // also ignores one backslash at beginning and end of paths, returns TRUE if paths are same
     // can be called from any thread
     virtual BOOL WINAPI IsTheSamePath(const char* path1, const char* path2) = 0;
+    virtual BOOL WINAPI IsTheSamePathW(const WCHAR* path1, const WCHAR* path2) = 0;
 
     // gets root path from normal (c:\path) and UNC (\\server\share\path) path 'path', returns in 'root'
     // path in format 'c:\' or '\\server\share\' (min. size of 'root' buffer is MAX_PATH),
@@ -1462,6 +1465,7 @@ public:
     // returns TRUE if shortening occurred (it wasn't root path)
     // can be called from any thread
     virtual BOOL WINAPI CutDirectory(char* path, char** cutDir = NULL) = 0;
+    virtual BOOL WINAPI CutDirectoryW(WCHAR* path, WCHAR** cutDir = NULL) = 0;
 
     // works with normal (c:\path) and UNC (\\server\share\path) paths,
     // joins 'path' and 'name' into 'path', ensures joining with backslash, 'path' is buffer of at least
@@ -1469,6 +1473,7 @@ public:
     // empty, joining (initial/terminal) backslash won't be present (e.g. "c:\" + "" -> "c:")
     // can be called from any thread
     virtual BOOL WINAPI SalPathAppend(char* path, const char* name, int pathSize) = 0;
+    virtual BOOL WINAPI SalPathAppendW(WCHAR* path, const WCHAR* name, int pathSizeInChars) = 0;
 
     // works with normal (c:\path) and UNC (\\server\share\path) paths,
     // if 'path' doesn't end with backslash yet, adds it to end of 'path'; 'path' is buffer
@@ -1476,21 +1481,25 @@ public:
     // empty, backslash won't be added
     // can be called from any thread
     virtual BOOL WINAPI SalPathAddBackslash(char* path, int pathSize) = 0;
+    virtual BOOL WINAPI SalPathAddBackslashW(WCHAR* path, int pathSizeInChars) = 0;
 
     // works with normal (c:\path) and UNC (\\server\share\path) paths,
     // if there is backslash at end of 'path', removes it
     // can be called from any thread
     virtual void WINAPI SalPathRemoveBackslash(char* path) = 0;
+    virtual void WINAPI SalPathRemoveBackslashW(WCHAR* path) = 0;
 
     // works with normal (c:\path) and UNC (\\server\share\path) paths,
     // converts full name to name only ("c:\path\file" -> "file")
     // can be called from any thread
     virtual void WINAPI SalPathStripPath(char* path) = 0;
+    virtual void WINAPI SalPathStripPathW(WCHAR* path) = 0;
 
     // works with normal (c:\path) and UNC (\\server\share\path) paths,
     // if name has extension, removes it
     // can be called from any thread
     virtual void WINAPI SalPathRemoveExtension(char* path) = 0;
+    virtual void WINAPI SalPathRemoveExtensionW(WCHAR* path) = 0;
 
     // works with normal (c:\path) and UNC (\\server\share\path) paths,
     // if name 'path' doesn't have extension yet, adds extension 'extension' (e.g. ".txt"),
@@ -1498,18 +1507,21 @@ public:
     // for resulting path
     // can be called from any thread
     virtual BOOL WINAPI SalPathAddExtension(char* path, const char* extension, int pathSize) = 0;
+    virtual BOOL WINAPI SalPathAddExtensionW(WCHAR* path, const WCHAR* extension, int pathSizeInChars) = 0;
 
     // works with normal (c:\path) and UNC (\\server\share\path) paths,
     // changes/adds extension 'extension' (e.g. ".txt") in name 'path', 'path' is buffer
     // of at least 'pathSize' characters, returns FALSE if buffer 'path' doesn't suffice for resulting path
     // can be called from any thread
     virtual BOOL WINAPI SalPathRenameExtension(char* path, const char* extension, int pathSize) = 0;
+    virtual BOOL WINAPI SalPathRenameExtensionW(WCHAR* path, const WCHAR* extension, int pathSizeInChars) = 0;
 
     // works with normal (c:\path) and UNC (\\server\share\path) paths,
     // returns pointer into 'path' to file/directory name (ignores backslash at end of 'path'),
     // if name doesn't contain other backslashes than at end of string, returns 'path'
     // can be called from any thread
     virtual const char* WINAPI SalPathFindFileName(const char* path) = 0;
+    virtual const WCHAR* WINAPI SalPathFindFileNameW(const WCHAR* path) = 0;
 
     // modifies relative or absolute normal (c:\path) and UNC (\\server\share\path) path
     // to absolute without '.', '..' and trailing backslashes (except type "c:\"); if 'curDir' is NULL,

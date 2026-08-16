@@ -354,6 +354,20 @@ static void WaitForCheckPathRetryDeadline(DWORD deadlineMilliseconds)
     WaitForCheckPathCompletionOrDeadline(NULL, NULL, deadlineMilliseconds);
 }
 
+DWORD SalCheckPathW(BOOL echo, const WCHAR* pathW, DWORD err, BOOL postRefresh, HWND parent)
+{
+    char path[MAX_PATH];
+    CPathW(pathW).ToUtf8(path, sizeof(path));
+    return SalCheckPath(echo, path, err, postRefresh, parent);
+}
+
+BOOL SalCheckAndRestorePathW(HWND parent, const WCHAR* pathW, BOOL tryNet)
+{
+    char path[MAX_PATH];
+    CPathW(pathW).ToUtf8(path, sizeof(path));
+    return SalCheckAndRestorePath(parent, path, tryNet);
+}
+
 DWORD SalCheckPath(BOOL echo, const char* path, DWORD err, BOOL postRefresh, HWND parent)
 {
     CALL_STACK_MESSAGE5("SalCheckPath(%d, %s, 0x%X, %d, )", echo, path, err, postRefresh);
@@ -1025,13 +1039,51 @@ PARSE_AGAIN:
     }
 }
 
+BOOL SalParsePathW(HWND parent, WCHAR* pathW, int& type, BOOL& isDir, WCHAR*& secondPartW,
+                   const WCHAR* errorTitleW, WCHAR* nextFocusW, BOOL curPathIsDiskOrArchive,
+                   const WCHAR* curPathW, const WCHAR* curArchivePathW, int* error,
+                   int pathBufSizeInChars)
+{
+    char pathUtf8[MAX_PATH];
+    CPathW(pathW).ToUtf8(pathUtf8, sizeof(pathUtf8));
+    char errorTitle[MAX_PATH];
+    CPathW(errorTitleW).ToUtf8(errorTitle, sizeof(errorTitle));
+    char curPath[MAX_PATH];
+    CPathW(curPathW).ToUtf8(curPath, sizeof(curPath));
+    char curArchivePath[MAX_PATH];
+    CPathW(curArchivePathW).ToUtf8(curArchivePath, sizeof(curArchivePath));
+    char nextFocus[MAX_PATH];
+    if (nextFocusW != NULL) nextFocusW[0] = L'\0';
+
+    char* secondPart = NULL;
+    BOOL ret = SalParsePath(parent, pathUtf8, type, isDir, secondPart,
+                            errorTitle, nextFocusW != NULL ? nextFocus : NULL,
+                            curPathIsDiskOrArchive, curPath, curArchivePath,
+                            error, sizeof(pathUtf8));
+    if (ret)
+    {
+        CPathW resW(pathUtf8);
+        wcsncpy_s(pathW, pathBufSizeInChars, resW.CStr(), _TRUNCATE);
+        if (secondPart != NULL)
+        {
+            secondPartW = pathW + (secondPart - pathUtf8);
+        }
+        if (nextFocusW != NULL)
+        {
+            CPathW focusW(nextFocus);
+            wcsncpy_s(nextFocusW, MAX_PATH, focusW.CStr(), _TRUNCATE);
+        }
+    }
+    return ret;
+}
+
 BOOL SalSplitWindowsPath(HWND parent, const char* title, const char* errorTitle, int selCount,
                          char* path, char* secondPart, BOOL pathIsDir, BOOL backslashAtEnd,
                          const char* dirName, const char* curDiskPath, char*& mask)
 {
-    char root[MAX_PATH];
-    GetRootPath(root, path);
-    char* afterRoot = path + strlen(root) - 1;
+    WCHAR rootW[MAX_PATH];
+    int rootLen = GetRootPathW(rootW, CPathW(path).CStr());
+    char* afterRoot = path + rootLen - 1;
     if (*afterRoot == '\\')
         afterRoot++;
 
@@ -1691,6 +1743,36 @@ BOOL ClearReadOnlyAttr(const char* name, DWORD attr)
     return FALSE;
 }
 
+BOOL ClearReadOnlyAttrW(const WCHAR* name, DWORD attr)
+{
+    if (name == NULL)
+        return FALSE;
+    CWidePath namePathW(name);
+    const WCHAR* apiPath = namePathW.GetPathForWin32Api();
+    if (apiPath == NULL)
+        return FALSE;
+
+    if (attr == (DWORD)-1)
+        attr = GetFileAttributesW(apiPath);
+
+    if (attr != INVALID_FILE_ATTRIBUTES)
+    {
+        if ((attr & FILE_ATTRIBUTE_READONLY) != 0)
+        {
+            if (!SetFileAttributesW(apiPath, attr & ~FILE_ATTRIBUTE_READONLY))
+                TRACE_E("ClearReadOnlyAttrW(): error setting attrs");
+            return TRUE;
+        }
+    }
+    else
+    {
+        if (!SetFileAttributesW(apiPath, FILE_ATTRIBUTE_ARCHIVE))
+            TRACE_E("ClearReadOnlyAttrW(): error setting attrs");
+        return TRUE;
+    }
+    return FALSE;
+}
+
 BOOL IsNetworkProviderDrive(const char* path, DWORD providerType)
 {
     HANDLE hEnumNet;
@@ -2188,6 +2270,23 @@ void SlashesToBackslashesAndRemoveDups(char* path)
         if (*s == '\\' && s > path + 1 && *(s - 1) == '\\')
         {
             memmove(s, s + 1, strlen(s + 1) + 1);
+            s--;
+        }
+    }
+}
+
+void SlashesToBackslashesAndRemoveDupsW(WCHAR* path)
+{
+    if (path == NULL)
+        return;
+    WCHAR* s = path - 1;
+    while (*++s != 0)
+    {
+        if (*s == L'/')
+            *s = L'\\';
+        if (*s == L'\\' && s > path + 1 && *(s - 1) == L'\\')
+        {
+            memmove(s, s + 1, (wcslen(s + 1) + 1) * sizeof(WCHAR));
             s--;
         }
     }
