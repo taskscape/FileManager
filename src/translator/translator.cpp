@@ -404,6 +404,22 @@ int GetSystemDPI(HDC hDC = NULL)
     static int systemDPI = -1;
     if (systemDPI == -1)
     {
+        typedef UINT(WINAPI *GetDpiForSystemFunc)();
+        HMODULE user32 = GetModuleHandle("user32.dll");
+        if (user32)
+        {
+            GetDpiForSystemFunc fnGetDpiForSystem = (GetDpiForSystemFunc)GetProcAddress(user32, "GetDpiForSystem");
+            if (fnGetDpiForSystem)
+            {
+                UINT dpi = fnGetDpiForSystem();
+                if (dpi > 0)
+                {
+                    systemDPI = (int)dpi;
+                    return systemDPI;
+                }
+            }
+        }
+
         HDC hTmpDC;
         if (hDC == NULL)
             hTmpDC = GetDC(NULL);

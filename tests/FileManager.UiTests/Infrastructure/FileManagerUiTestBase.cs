@@ -276,9 +276,9 @@ public abstract class FileManagerUiTestBase
                 if (string.Equals(process.MainModule?.FileName, expectedPath, StringComparison.OrdinalIgnoreCase))
                     reporterIds.Add(process.Id);
             }
-            catch (InvalidOperationException)
+            catch (Exception ex) when (ex is InvalidOperationException || ex is System.ComponentModel.Win32Exception)
             {
-                // A reporter that exited during enumeration cannot be owned by the active fixture anymore.
+                // A reporter that exited or changed state during enumeration cannot be owned by the active fixture anymore.
             }
             finally
             {

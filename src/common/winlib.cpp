@@ -322,6 +322,20 @@ CWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 {
     switch (uMsg)
     {
+    case WM_DPICHANGED:
+    {
+        RECT* prcNew = (RECT*)lParam;
+        if (prcNew != NULL)
+        {
+            SetWindowPos(HWindow, NULL,
+                         prcNew->left, prcNew->top,
+                         prcNew->right - prcNew->left,
+                         prcNew->bottom - prcNew->top,
+                         SWP_NOZORDER | SWP_NOACTIVATE);
+        }
+        return 0;
+    }
+
     case WM_HELP:
     {
         if (WinLibHelp != NULL && HelpID != -1)

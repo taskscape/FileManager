@@ -1660,6 +1660,53 @@ void GetSystemDPI(HDC hDC)
 
 // Per-monitor DPI support functions
 
+void InitializeDpiAwareness()
+{
+    // Try SetProcessDpiAwarenessContext (Windows 10 v1607+ / Build 14393+)
+    typedef BOOL(WINAPI *SetProcessDpiAwarenessContextFunc)(HANDLE);
+#ifndef DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2
+#define DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2 ((HANDLE)-4)
+#endif
+
+    HMODULE user32 = GetModuleHandle("user32.dll");
+    if (user32)
+    {
+        SetProcessDpiAwarenessContextFunc fnSetDpiContext =
+            (SetProcessDpiAwarenessContextFunc)GetProcAddress(user32, "SetProcessDpiAwarenessContext");
+        if (fnSetDpiContext && fnSetDpiContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2))
+        {
+            return;
+        }
+    }
+
+    // Try SetProcessDpiAwareness (Windows 8.1 / Windows Server 2012 R2+)
+    typedef HRESULT(WINAPI *SetProcessDpiAwarenessFunc)(int);
+    HMODULE shcore = LoadLibrary("shcore.dll");
+    if (shcore)
+    {
+        SetProcessDpiAwarenessFunc fnSetDpiAwareness =
+            (SetProcessDpiAwarenessFunc)GetProcAddress(shcore, "SetProcessDpiAwareness");
+        if (fnSetDpiAwareness && SUCCEEDED(fnSetDpiAwareness(2))) // PROCESS_PER_MONITOR_DPI_AWARE
+        {
+            FreeLibrary(shcore);
+            return;
+        }
+        FreeLibrary(shcore);
+    }
+
+    // Fallback: SetProcessDPIAware (Windows Vista+)
+    if (user32)
+    {
+        typedef BOOL(WINAPI *SetProcessDPIAwareFunc)();
+        SetProcessDPIAwareFunc fnSetDPIAware =
+            (SetProcessDPIAwareFunc)GetProcAddress(user32, "SetProcessDPIAware");
+        if (fnSetDPIAware)
+        {
+            fnSetDPIAware();
+        }
+    }
+}
+
 int GetDpiForWindow(HWND hwnd)
 {
     // Windows 8.1+ supports per-monitor DPI
@@ -1679,9 +1726,55 @@ int GetDpiForWindow(HWND hwnd)
     }
 
     if (fnGetDpiForWindow && hwnd) {
-        return fnGetDpiForWindow(hwnd);
+        UINT dpi = fnGetDpiForWindow(hwnd);
+        if (dpi > 0)
+            return (int)dpi;
     }
-    return SystemDPI;
+
+    // If hwnd is NULL or GetDpiForWindow failed, try GetDpiForSystem (Windows 10+)
+    typedef UINT(WINAPI *GetDpiForSystemFunc)();
+    static GetDpiForSystemFunc fnGetDpiForSystem = NULL;
+    static BOOL initializedSystem = FALSE;
+    if (!initializedSystem) {
+        HMODULE user32 = GetModuleHandle("user32.dll");
+        if (user32) {
+            fnGetDpiForSystem = (GetDpiForSystemFunc)GetProcAddress(user32, "GetDpiForSystem");
+        }
+        initializedSystem = TRUE;
+    }
+    if (fnGetDpiForSystem) {
+        UINT dpi = fnGetDpiForSystem();
+        if (dpi > 0)
+            return (int)dpi;
+    }
+
+    return SystemDPI != 0 ? SystemDPI : 96;
+}
+
+int GetDpiForMonitor(HMONITOR hMonitor)
+{
+    typedef HRESULT(WINAPI *GetDpiForMonitorFunc)(HMONITOR, int, UINT*, UINT*);
+    static GetDpiForMonitorFunc fnGetDpiForMonitor = NULL;
+    static BOOL initialized = FALSE;
+
+    if (!initialized) {
+        HMODULE shcore = GetModuleHandle("shcore.dll");
+        if (!shcore)
+            shcore = LoadLibrary("shcore.dll");
+        if (shcore) {
+            fnGetDpiForMonitor = (GetDpiForMonitorFunc)GetProcAddress(shcore, "GetDpiForMonitor");
+        }
+        initialized = TRUE;
+    }
+
+    if (fnGetDpiForMonitor && hMonitor) {
+        UINT dpiX = 0, dpiY = 0;
+        if (SUCCEEDED(fnGetDpiForMonitor(hMonitor, 0 /* MDT_EFFECTIVE_DPI */, &dpiX, &dpiY)) && dpiX > 0) {
+            return (int)dpiX;
+        }
+    }
+
+    return GetSystemDPI();
 }
 
 int GetScaleForWindow(HWND hwnd)
@@ -1717,10 +1810,56 @@ int GetScaleForDpi(int dpi)
 int GetSystemMetricsForDpi(int nIndex, int dpi)
 {
     // Get system metrics scaled for specific DPI
-    // This is a simplified implementation; for full support use GetSystemMetricsForDpi on Windows 10
+    typedef int(WINAPI *GetSystemMetricsForDpiFunc)(int, UINT);
+    static GetSystemMetricsForDpiFunc fnGetSystemMetricsForDpi = NULL;
+    static BOOL initialized = FALSE;
+
+    if (!initialized) {
+        HMODULE user32 = GetModuleHandle("user32.dll");
+        if (user32) {
+            fnGetSystemMetricsForDpi = (GetSystemMetricsForDpiFunc)GetProcAddress(user32, "GetSystemMetricsForDpi");
+        }
+        initialized = TRUE;
+    }
+
+    if (fnGetSystemMetricsForDpi) {
+        return fnGetSystemMetricsForDpi(nIndex, (UINT)dpi);
+    }
+
     int baseValue = GetSystemMetrics(nIndex);
-    // Scale based on DPI ratio
     return MulDiv(baseValue, dpi, 96);
+}
+
+int GetIconSizeForDpi(int dpi, CIconSizeEnum iconSize)
+{
+    if (iconSize < ICONSIZE_16 || iconSize >= ICONSIZE_COUNT)
+    {
+        TRACE_E("GetIconSizeForDpi() unknown iconSize!");
+        return 16;
+    }
+
+    int scale = GetScaleForDpi(dpi);
+    int baseIconSize[ICONSIZE_COUNT] = {16, 32, 48};
+    return (baseIconSize[iconSize] * scale) / 100;
+}
+
+int GetIconSizeForWindow(HWND hwnd, CIconSizeEnum iconSize)
+{
+    int dpi = GetDpiForWindow(hwnd);
+    return GetIconSizeForDpi(dpi, iconSize);
+}
+
+int GetToolbarIconSizeForDpi(int dpi)
+{
+    int logicalSize = IsValidToolbarIconSize(Configuration.ToolbarIconSize) ?
+                          Configuration.ToolbarIconSize :
+                          TOOLBAR_ICON_SIZE_SMALL;
+    return (logicalSize * GetScaleForDpi(dpi)) / 100;
+}
+
+int GetToolbarIconSizeForWindow(HWND hwnd)
+{
+    return GetToolbarIconSizeForDpi(GetDpiForWindow(hwnd));
 }
 
 BOOL InitializeGraphics(BOOL colorsOnly)
@@ -3127,6 +3266,8 @@ BOOL ParseCommandLineParameters(LPSTR cmdLine, CCommandLineParams* cmdLineParams
 int WinMainBody(HINSTANCE hInstance, HINSTANCE /*hPrevInstance*/, LPSTR cmdLine, int cmdShow)
 {
     int myExitCode = 1;
+
+    InitializeDpiAwareness();
 
     //--- nechci zadne kriticke chyby jako "no disk in drive A:"
     SetErrorMode(SetErrorMode(0) | SEM_FAILCRITICALERRORS);

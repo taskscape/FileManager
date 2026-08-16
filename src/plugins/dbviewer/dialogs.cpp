@@ -386,9 +386,21 @@ void CConfigurationDialog::SetFontText()
 
     HDC hDC = GetDC(HWindow);
     SendMessage(hEdit, WM_SETFONT, (WPARAM)HFont, MAKELPARAM(TRUE, 0));
+    UINT dpi = 96;
+    typedef UINT(WINAPI * GetDpiForWindowFunc)(HWND);
+    HMODULE user32 = GetModuleHandle("user32.dll");
+    if (user32)
+    {
+        GetDpiForWindowFunc fnGetDpiForWindow = (GetDpiForWindowFunc)GetProcAddress(user32, "GetDpiForWindow");
+        if (fnGetDpiForWindow && HWindow)
+            dpi = fnGetDpiForWindow(HWindow);
+    }
+    if (dpi == 96 && hDC)
+        dpi = GetDeviceCaps(hDC, LOGPIXELSY);
+
     char buf[LF_FACESIZE + 200];
     _snprintf_s(buf, _TRUNCATE, LoadStr(IDS_FONTDESCRIPTION),
-                MulDiv(-oldHeight, 72, GetDeviceCaps(hDC, LOGPIXELSY)),
+                MulDiv(-oldHeight, 72, dpi),
                 logFont.lfFaceName,
                 LoadStr(UseCustomFont ? IDS_CUSTOMFONT : IDS_DEFAULTFONT));
     SetWindowText(hEdit, buf);

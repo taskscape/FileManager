@@ -2511,10 +2511,16 @@ int GetSystemDPI();
 // returns scale corresponding to current DPI; instead of 1.0 returns 100, for 1.25 returns 125, etc
 int GetScaleForSystemDPI();
 
+// Initialize process DPI awareness at startup
+void InitializeDpiAwareness();
+
 // Per-monitor DPI support functions (Windows 8.1+)
 
 // Get DPI for specific window (falls back to SystemDPI on older Windows)
 int GetDpiForWindow(HWND hwnd);
+
+// Get DPI for specific monitor handle
+int GetDpiForMonitor(HMONITOR hMonitor);
 
 // Get scale percentage for specific window
 int GetScaleForWindow(HWND hwnd);
@@ -2524,3 +2530,15 @@ int GetScaleForDpi(int dpi);
 
 // Get system metrics scaled for specific DPI
 int GetSystemMetricsForDpi(int nIndex, int dpi);
+
+// Get icon size scaled for specific DPI value
+int GetIconSizeForDpi(int dpi, CIconSizeEnum iconSize);
+
+// Get icon size scaled for specific window
+int GetIconSizeForWindow(HWND hwnd, CIconSizeEnum iconSize);
+
+// Get toolbar icon size scaled for specific DPI value
+int GetToolbarIconSizeForDpi(int dpi);
+
+// Get toolbar icon size scaled for specific window
+int GetToolbarIconSizeForWindow(HWND hwnd);

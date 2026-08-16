@@ -955,6 +955,25 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
         break;
     }
 
+    case WM_DPICHANGED:
+    {
+        RECT* prcNew = (RECT*)lParam;
+        if (prcNew != NULL)
+        {
+            SetWindowPos(HWindow, NULL,
+                         prcNew->left, prcNew->top,
+                         prcNew->right - prcNew->left,
+                         prcNew->bottom - prcNew->top,
+                         SWP_NOZORDER | SWP_NOACTIVATE);
+        }
+        InitializeGraphics(FALSE);
+        SetFont();
+        SetEnvFont();
+        BroadcastConfigChanged();
+        InvalidateRect(HWindow, NULL, TRUE);
+        return 0;
+    }
+
     case WM_SYSCOLORCHANGE:
     {
         UserMenuIconBkgndReader.SetSysColorsChanged();

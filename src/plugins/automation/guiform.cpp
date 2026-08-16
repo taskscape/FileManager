@@ -336,17 +336,32 @@ HWND CSalamanderGuiForm::HwndNeeded()
         LOGFONT lf = {
             0,
         };
-        HDC hDC = GetDC(hWnd);
+        UINT dpi = 96;
+        typedef UINT(WINAPI * GetDpiForWindowFunc)(HWND);
+        HMODULE user32 = GetModuleHandle(_T("user32.dll"));
+        if (user32)
+        {
+            GetDpiForWindowFunc fnGetDpiForWindow = (GetDpiForWindowFunc)GetProcAddress(user32, "GetDpiForWindow");
+            if (fnGetDpiForWindow && hWnd)
+                dpi = fnGetDpiForWindow(hWnd);
+        }
+        if (dpi == 96)
+        {
+            HDC hDC = GetDC(hWnd);
+            if (hDC)
+            {
+                dpi = GetDeviceCaps(hDC, LOGPIXELSY);
+                ReleaseDC(hWnd, hDC);
+            }
+        }
 
-        lf.lfHeight = -MulDiv(9, GetDeviceCaps(hDC, LOGPIXELSY), 72);
+        lf.lfHeight = -MulDiv(9, dpi, 72);
         lf.lfWeight = FW_NORMAL;
         lf.lfCharSet = ANSI_CHARSET;
         lf.lfOutPrecision = OUT_DEFAULT_PRECIS;
         lf.lfClipPrecision = CLIP_DEFAULT_PRECIS;
         lf.lfQuality = DEFAULT_QUALITY;
         StringCchCopy(lf.lfFaceName, _countof(lf.lfFaceName), _T("Segoe UI"));
-
-        ReleaseDC(hWnd, hDC);
 
         m_hFont = CreateFontIndirect(&lf);
         if (m_hFont)

@@ -96,10 +96,21 @@ void CPropPageGeneral::LoadControls(BOOL initCombo)
     HFont = CreateFontIndirect(&logFont);
 
     HDC hDC = GetDC(HWindow);
+    UINT dpi = 96;
+    typedef UINT(WINAPI * GetDpiForWindowFunc)(HWND);
+    HMODULE user32 = GetModuleHandle("user32.dll");
+    if (user32)
+    {
+        GetDpiForWindowFunc fnGetDpiForWindow = (GetDpiForWindowFunc)GetProcAddress(user32, "GetDpiForWindow");
+        if (fnGetDpiForWindow && HWindow)
+            dpi = fnGetDpiForWindow(HWindow);
+    }
+    if (dpi == 96 && hDC)
+        dpi = GetDeviceCaps(hDC, LOGPIXELSY);
 
     SendMessage(hEdit, WM_SETFONT, (WPARAM)HFont, MAKELPARAM(TRUE, 0));
     sprintf(logFont.lfFaceName, LoadStr(IDS_FONTDESCRIPTION),
-            MulDiv(-LogFont.lfHeight, 72, GetDeviceCaps(hDC, LOGPIXELSY)),
+            MulDiv(-LogFont.lfHeight, 72, dpi),
             LogFont.lfFaceName);
     SetWindowText(hEdit, logFont.lfFaceName);
 

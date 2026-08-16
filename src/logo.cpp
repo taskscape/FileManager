@@ -56,9 +56,8 @@ CSplashScreen::CSplashScreen()
     //  GetSystemGUIFont(&lf);
     //  lf.lfWeight = FW_NORMAL;
 
-    HDC hDC2 = HANDLES(GetDC(NULL));
-    lf.lfHeight = -MulDiv(8, GetDeviceCaps(hDC2, LOGPIXELSY), 72);
-    HANDLES(ReleaseDC(NULL, hDC2));
+    int dpi = GetDpiForWindow(NULL);
+    lf.lfHeight = -MulDiv(8, dpi, 72);
     lf.lfWidth = 0;
     lf.lfEscapement = 0;
     lf.lfOrientation = 0;
