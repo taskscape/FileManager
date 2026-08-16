@@ -10,6 +10,33 @@ Run all commands from the repository root. The test suite has four layers:
 
 Visual Studio 2026 and its developer-command environment are the authoritative native build environment. Most scripts support Windows PowerShell 5.1. The SQLite recovery probe is the exception: use 64-bit PowerShell 7.4 or newer (`pwsh.exe`) for an x64 DLL.
 
+## Building
+
+### Complete installer build
+
+The repository includes a local build script that reproduces the GitHub Actions installer build workflow:
+
+```powershell
+# Build Release configuration with v143 toolset (VS2022)
+.\scripts\build-installer.ps1
+
+# Build with different configuration or toolset
+.\scripts\build-installer.ps1 -Configuration Debug -PlatformToolset v145
+
+# Skip tests (useful for quick iteration)
+.\scripts\build-installer.ps1 -SkipTests
+```
+
+This script:
+- Builds the solution with MSBuild
+- Runs native regression tests
+- Creates PE manifest for toolset verification
+- Installs Inno Setup 6.7.3 (if not present)
+- Stages files for Inno Setup
+- Compiles the installer
+
+See `Get-Help .\scripts\build-installer.ps1 -Detailed` for full usage information.
+
 ## Quick start
 
 ### Complete local runner
@@ -18,10 +45,10 @@ Run every automated test whose prerequisites are available on the current machin
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass `
-  -File .\runtests.ps1
+  -File .\scripts\runtests.ps1
 ```
 
-`runtests.ps1` collects all PowerShell/native probes, both x64 and x86 compatibility variants, the built 7-Zip wrapper/oracle corpus gate, the complete NUnit project, and the optional Application Verifier lane. It runs every collected check even after a failure and prints passed, failed, and explicitly skipped checks. The 7-Zip gate requires a `7z.exe`-compatible independent oracle; strict release runs fail if it is unavailable. The runner creates only the guarded `filemanager-testdata` directory and the suffixed current-user configuration key before executing the complete UI project.
+`scripts/runtests.ps1` collects all PowerShell/native probes, both x64 and x86 compatibility variants, the built 7-Zip wrapper/oracle corpus gate, the complete NUnit project, and the optional Application Verifier lane. It runs every collected check even after a failure and prints passed, failed, and explicitly skipped checks. The 7-Zip gate requires a `7z.exe`-compatible independent oracle; strict release runs fail if it is unavailable. The runner creates only the guarded `filemanager-testdata` directory and the suffixed current-user configuration key before executing the complete UI project.
 
 Each run removes its own GUID-named `TestResults\runtests-build-*` directory, including after a failure. Pass `-KeepBuildArtifacts` only when the isolated native build outputs are needed for diagnosis.
 
@@ -30,7 +57,7 @@ Each run removes its own GUID-named `TestResults\runtests-build-*` directory, in
 The runner uses the CI pull-request base for changed-line ratchets or accepts `-BaseCommit` explicitly; it does not guess from a potentially stale local tracking branch. It discovers an existing Debug or Release x64 SQLite DLL when possible. Supply prerequisites explicitly or require a fully provisioned run with:
 
 ```powershell
-.\runtests.ps1 `
+.\scripts\runtests.ps1 `
   -BaseCommit origin/main `
   -SqliteDll .\src\vcxproj\sqlite\salamander\Debug_x64\utils\sqlite.dll `
   -FailOnSkipped

@@ -88,7 +88,7 @@ jobs:
 
       - name: Run every automated test without skips
         shell: pwsh
-        run: .\runtests.ps1 -BaseCommit $env:RELEASE_BASE_COMMIT -SqliteDll $env:SQLITE_TEST_DLL -FailOnSkipped -PlatformToolset v145 -NUnitTrxPath $env:RUNNER_TEMP\runtests-v145.trx
+        run .\scripts\runtests.ps1 -BaseCommit $env:RELEASE_BASE_COMMIT -SqliteDll $env:SQLITE_TEST_DLL -FailOnSkipped -PlatformToolset v145 -NUnitTrxPath $env:RUNNER_TEMP\runtests-v145.trx
 
       - name: Upload v145 complete UI results
         if: always()
@@ -141,7 +141,7 @@ jobs:
 
       - name: Run complete v143 verification without skips
         shell: pwsh
-        run: .\runtests.ps1 -BaseCommit HEAD^ -FailOnSkipped -PlatformToolset v143 -NUnitTrxPath $env:RUNNER_TEMP\runtests-v143.trx
+        run .\scripts\runtests.ps1 -BaseCommit HEAD^ -FailOnSkipped -PlatformToolset v143 -NUnitTrxPath $env:RUNNER_TEMP\runtests-v143.trx
 
       - name: Upload v143 complete UI results
         if: always()

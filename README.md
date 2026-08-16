@@ -60,6 +60,29 @@ Open Salamander uses [Inno Setup](https://jrsoftware.org/isinfo.php) to create t
 
 #### Building Locally
 
+**Recommended:** Use the automated build script that reproduces the GitHub Actions workflow:
+
+```powershell
+# Build Release configuration with v143 toolset (VS2022)
+.\scripts\build-installer.ps1
+
+# Build with different configuration or toolset
+.\scripts\build-installer.ps1 -Configuration Debug -PlatformToolset v145
+
+# Skip tests (for quick iteration)
+.\scripts\build-installer.ps1 -SkipTests
+```
+
+The script automatically:
+- Builds the solution with MSBuild
+- Runs native regression tests
+- Creates PE manifest for toolset verification
+- Installs Inno Setup 6.7.3 (if not present)
+- Stages files for Inno Setup
+- Compiles the installer
+
+**Manual build:** For debugging, you can run the individual steps:
+
 1. Install [Inno Setup 6](https://jrsoftware.org/isdl.php) or later
 2. Build the solution in Release|x64 configuration
 3. Stage the files and compile the installer:
@@ -78,7 +101,7 @@ The installer will be created in `Installer\Output\`.
 
 The repository includes a GitHub Actions workflow (`.github\workflows\build-installer.yml`) that automatically:
 
-1. Runs the complete `runtests.ps1` inventory without skipped tests on the dedicated release-test runner
+1. Runs the complete `scripts/runtests.ps1` inventory without skipped tests on the dedicated release-test runner
 2. Builds the solution using MSBuild
 3. Stages all required files (executables, plugins, language files, toolbars)
 4. Downloads the version- and SHA-256-pinned Inno Setup input and verifies its Authenticode signature

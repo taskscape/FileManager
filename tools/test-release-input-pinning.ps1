@@ -65,7 +65,7 @@ foreach ($requiredPattern in @(
     }
 }
 
-$rootRunner = Get-Content -LiteralPath (Join-Path $repositoryRoot 'runtests.ps1') -Raw
+$rootRunner = Get-Content -LiteralPath (Join-Path $repositoryRoot 'scripts\runtests.ps1') -Raw
 if ($rootRunner -notmatch 'test-release-input-pinning\.ps1') {
     throw 'The aggregate test runner must execute the release-input pinning contract.'
 }
