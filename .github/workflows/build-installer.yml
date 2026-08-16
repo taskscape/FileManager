@@ -88,7 +88,8 @@ jobs:
 
       - name: Run every automated test without skips
         shell: pwsh
-        run .\scripts\runtests.ps1 -BaseCommit $env:RELEASE_BASE_COMMIT -SqliteDll $env:SQLITE_TEST_DLL -FailOnSkipped -PlatformToolset v145 -NUnitTrxPath $env:RUNNER_TEMP\runtests-v145.trx
+        # Keep the strict test invocation as a workflow command so Actions can parse and execute this step.
+        run: .\scripts\runtests.ps1 -BaseCommit $env:RELEASE_BASE_COMMIT -SqliteDll $env:SQLITE_TEST_DLL -FailOnSkipped -PlatformToolset v145 -NUnitTrxPath $env:RUNNER_TEMP\runtests-v145.trx
 
       - name: Upload v145 complete UI results
         if: always()
