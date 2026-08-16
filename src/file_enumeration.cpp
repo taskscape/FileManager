@@ -1751,22 +1751,378 @@ CTargetPathState GetTargetPathState(CTargetPathState upperDirState, const char* 
     return tpsUnknown;
 }
 
+static BOOL InternalIFileDialog(LPOPENFILENAME lpofn, BOOL isSave)
+{
+    if (lpofn == NULL || lpofn->lpstrFile == NULL || lpofn->nMaxFile == 0)
+        return FALSE;
+
+    // Fall back to legacy common dialogs if hook or template is specified
+    if ((lpofn->Flags & (OFN_ENABLEHOOK | OFN_ENABLETEMPLATE)) != 0 ||
+        lpofn->lpfnHook != NULL || lpofn->lpTemplateName != NULL)
+    {
+        return isSave ? GetSaveFileName(lpofn) : GetOpenFileName(lpofn);
+    }
+
+    HRESULT hrInit = S_FALSE;
+    IFileDialog* pfd = NULL;
+    HRESULT hr = CoCreateInstance(isSave ? CLSID_FileSaveDialog : CLSID_FileOpenDialog,
+                                  NULL, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&pfd));
+    if (hr == CO_E_NOTINITIALIZED)
+    {
+        hrInit = CoInitializeEx(NULL, COINIT_APARTMENTTHREADED);
+        hr = CoCreateInstance(isSave ? CLSID_FileSaveDialog : CLSID_FileOpenDialog,
+                              NULL, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&pfd));
+    }
+
+    if (FAILED(hr) || pfd == NULL)
+    {
+        if (SUCCEEDED(hrInit)) CoUninitialize();
+        return isSave ? GetSaveFileName(lpofn) : GetOpenFileName(lpofn);
+    }
+
+    // Set dialog options
+    FILEOPENDIALOGOPTIONS dwOptions = 0;
+    pfd->GetOptions(&dwOptions);
+
+    if (lpofn->Flags & OFN_FILEMUSTEXIST) dwOptions |= FOS_FILEMUSTEXIST;
+    if (lpofn->Flags & OFN_PATHMUSTEXIST) dwOptions |= FOS_PATHMUSTEXIST;
+    if (lpofn->Flags & OFN_OVERWRITEPROMPT) dwOptions |= FOS_OVERWRITEPROMPT;
+    if (lpofn->Flags & OFN_NOCHANGEDIR) dwOptions |= FOS_NOCHANGEDIR;
+    if (lpofn->Flags & OFN_HIDEREADONLY) dwOptions |= FOS_FORCEFILESYSTEM;
+    if (!isSave && (lpofn->Flags & OFN_ALLOWMULTISELECT)) dwOptions |= FOS_ALLOWMULTISELECT;
+
+    pfd->SetOptions(dwOptions);
+
+    // Set Title
+    if (lpofn->lpstrTitle && *lpofn->lpstrTitle)
+    {
+        WCHAR titleW[1024];
+        if (MultiByteToWideChar(CP_ACP, 0, lpofn->lpstrTitle, -1, titleW, (int)_countof(titleW)) > 0)
+            pfd->SetTitle(titleW);
+    }
+
+    // Set Default Extension
+    if (lpofn->lpstrDefExt && *lpofn->lpstrDefExt)
+    {
+        WCHAR defExtW[256];
+        if (MultiByteToWideChar(CP_ACP, 0, lpofn->lpstrDefExt, -1, defExtW, (int)_countof(defExtW)) > 0)
+            pfd->SetDefaultExtension(defExtW);
+    }
+
+    // Parse filters
+    if (lpofn->lpstrFilter && *lpofn->lpstrFilter)
+    {
+        const char* p = lpofn->lpstrFilter;
+        UINT filterCount = 0;
+        while (*p)
+        {
+            p += strlen(p) + 1;
+            if (*p)
+            {
+                p += strlen(p) + 1;
+                filterCount++;
+            }
+            else
+            {
+                break;
+            }
+        }
+
+        if (filterCount > 0)
+        {
+            COMDLG_FILTERSPEC* specs = (COMDLG_FILTERSPEC*)calloc(filterCount, sizeof(COMDLG_FILTERSPEC));
+            WCHAR** descW = (WCHAR**)calloc(filterCount, sizeof(WCHAR*));
+            WCHAR** specW = (WCHAR**)calloc(filterCount, sizeof(WCHAR*));
+
+            if (specs && descW && specW)
+            {
+                p = lpofn->lpstrFilter;
+                UINT idx = 0;
+                while (*p && idx < filterCount)
+                {
+                    const char* d = p;
+                    p += strlen(p) + 1;
+                    if (*p)
+                    {
+                        const char* s = p;
+                        p += strlen(p) + 1;
+
+                        int dLen = MultiByteToWideChar(CP_ACP, 0, d, -1, NULL, 0);
+                        int sLen = MultiByteToWideChar(CP_ACP, 0, s, -1, NULL, 0);
+                        descW[idx] = (WCHAR*)malloc(dLen * sizeof(WCHAR));
+                        specW[idx] = (WCHAR*)malloc(sLen * sizeof(WCHAR));
+
+                        if (descW[idx] && specW[idx])
+                        {
+                            MultiByteToWideChar(CP_ACP, 0, d, -1, descW[idx], dLen);
+                            MultiByteToWideChar(CP_ACP, 0, s, -1, specW[idx], sLen);
+                            specs[idx].pszName = descW[idx];
+                            specs[idx].pszSpec = specW[idx];
+                            idx++;
+                        }
+                    }
+                    else
+                    {
+                        break;
+                    }
+                }
+
+                if (idx > 0)
+                {
+                    pfd->SetFileTypes(idx, specs);
+                    if (lpofn->nFilterIndex > 0)
+                        pfd->SetFileTypeIndex(lpofn->nFilterIndex);
+                }
+
+                for (UINT i = 0; i < filterCount; i++)
+                {
+                    if (descW[i]) free(descW[i]);
+                    if (specW[i]) free(specW[i]);
+                }
+                free(descW);
+                free(specW);
+                free(specs);
+            }
+        }
+    }
+
+    // Initial folder
+    IShellItem* psiFolder = NULL;
+    char initDir[MAX_PATH];
+    initDir[0] = 0;
+
+    if (lpofn->lpstrInitialDir && *lpofn->lpstrInitialDir)
+    {
+        StringCchCopyA(initDir, MAX_PATH, lpofn->lpstrInitialDir);
+    }
+    else if (lpofn->lpstrFile && *lpofn->lpstrFile)
+    {
+        StringCchCopyA(initDir, MAX_PATH, lpofn->lpstrFile);
+        char* lastBS = strrchr(initDir, '\\');
+        if (lastBS)
+            *lastBS = 0;
+        else
+            initDir[0] = 0;
+    }
+
+    if (initDir[0] != 0)
+    {
+        WCHAR initDirW[MAX_PATH];
+        if (MultiByteToWideChar(CP_ACP, 0, initDir, -1, initDirW, (int)_countof(initDirW)) > 0)
+        {
+            SHCreateItemFromParsingName(initDirW, NULL, IID_PPV_ARGS(&psiFolder));
+        }
+    }
+
+    // If initial folder is invalid, fall back to Documents/Desktop
+    if (psiFolder == NULL)
+    {
+        if (GetMyDocumentsOrDesktopPath(initDir, MAX_PATH))
+        {
+            WCHAR initDirW[MAX_PATH];
+            if (MultiByteToWideChar(CP_ACP, 0, initDir, -1, initDirW, (int)_countof(initDirW)) > 0)
+            {
+                SHCreateItemFromParsingName(initDirW, NULL, IID_PPV_ARGS(&psiFolder));
+            }
+        }
+    }
+
+    if (psiFolder != NULL)
+    {
+        pfd->SetFolder(psiFolder);
+        psiFolder->Release();
+        psiFolder = NULL;
+    }
+
+    // Initial filename
+    if (lpofn->lpstrFile && *lpofn->lpstrFile)
+    {
+        const char* fileNameOnly = strrchr(lpofn->lpstrFile, '\\');
+        if (fileNameOnly)
+            fileNameOnly++;
+        else
+            fileNameOnly = lpofn->lpstrFile;
+
+        if (*fileNameOnly)
+        {
+            WCHAR fileW[MAX_PATH];
+            if (MultiByteToWideChar(CP_ACP, 0, fileNameOnly, -1, fileW, (int)_countof(fileW)) > 0)
+                pfd->SetFileName(fileW);
+        }
+    }
+
+    // Show dialog
+    hr = pfd->Show(lpofn->hwndOwner);
+    if (FAILED(hr))
+    {
+        pfd->Release();
+        if (SUCCEEDED(hrInit)) CoUninitialize();
+        return FALSE;
+    }
+
+    // Selected filter index
+    UINT fileTypeIndex = 1;
+    if (SUCCEEDED(pfd->GetFileTypeIndex(&fileTypeIndex)))
+    {
+        lpofn->nFilterIndex = (DWORD)fileTypeIndex;
+    }
+
+    BOOL success = FALSE;
+
+    if (!isSave && (lpofn->Flags & OFN_ALLOWMULTISELECT))
+    {
+        IFileOpenDialog* pfod = (IFileOpenDialog*)pfd;
+        IShellItemArray* pItemArray = NULL;
+        if (SUCCEEDED(pfod->GetResults(&pItemArray)))
+        {
+            DWORD itemCount = 0;
+            pItemArray->GetCount(&itemCount);
+            if (itemCount == 1)
+            {
+                IShellItem* pItem = NULL;
+                if (SUCCEEDED(pItemArray->GetItemAt(0, &pItem)))
+                {
+                    PWSTR pszName = NULL;
+                    if (SUCCEEDED(pItem->GetDisplayName(SIGDN_FILESYSPATH, &pszName)))
+                    {
+                        char fullPath[MAX_PATH];
+                        if (WideCharToMultiByte(CP_ACP, 0, pszName, -1, fullPath, sizeof(fullPath), NULL, NULL) > 0)
+                        {
+                            StringCchCopyA(lpofn->lpstrFile, lpofn->nMaxFile, fullPath);
+                            const char* pFileName = strrchr(lpofn->lpstrFile, '\\');
+                            if (pFileName)
+                            {
+                                lpofn->nFileOffset = (WORD)(pFileName - lpofn->lpstrFile + 1);
+                                const char* pExt = strrchr(pFileName, '.');
+                                lpofn->nFileExtension = pExt ? (WORD)(pExt - lpofn->lpstrFile + 1) : 0;
+                            }
+                            else
+                            {
+                                lpofn->nFileOffset = 0;
+                                lpofn->nFileExtension = 0;
+                            }
+                            if (lpofn->lpstrFileTitle && lpofn->nMaxFileTitle > 0)
+                            {
+                                const char* titlePart = pFileName ? (pFileName + 1) : lpofn->lpstrFile;
+                                StringCchCopyA(lpofn->lpstrFileTitle, lpofn->nMaxFileTitle, titlePart);
+                            }
+                            success = TRUE;
+                        }
+                        CoTaskMemFree(pszName);
+                    }
+                    pItem->Release();
+                }
+            }
+            else if (itemCount > 1)
+            {
+                IShellItem* pItem0 = NULL;
+                if (SUCCEEDED(pItemArray->GetItemAt(0, &pItem0)))
+                {
+                    PWSTR pszName0 = NULL;
+                    if (SUCCEEDED(pItem0->GetDisplayName(SIGDN_FILESYSPATH, &pszName0)))
+                    {
+                        char dirPath[MAX_PATH];
+                        if (WideCharToMultiByte(CP_ACP, 0, pszName0, -1, dirPath, sizeof(dirPath), NULL, NULL) > 0)
+                        {
+                            char* lastBS = strrchr(dirPath, '\\');
+                            if (lastBS) *lastBS = 0;
+
+                            size_t dirLen = strlen(dirPath);
+                            if (dirLen + 2 < lpofn->nMaxFile)
+                            {
+                                char* pBuf = lpofn->lpstrFile;
+                                size_t remaining = lpofn->nMaxFile;
+
+                                StringCchCopyA(pBuf, remaining, dirPath);
+                                pBuf += dirLen + 1;
+                                remaining -= (dirLen + 1);
+
+                                lpofn->nFileOffset = (WORD)(dirLen + 1);
+                                lpofn->nFileExtension = 0;
+
+                                for (DWORD i = 0; i < itemCount; i++)
+                                {
+                                    IShellItem* pItem = NULL;
+                                    if (SUCCEEDED(pItemArray->GetItemAt(i, &pItem)))
+                                    {
+                                        PWSTR pszItemName = NULL;
+                                        if (SUCCEEDED(pItem->GetDisplayName(SIGDN_FILESYSPATH, &pszItemName)))
+                                        {
+                                            char itemPath[MAX_PATH];
+                                            if (WideCharToMultiByte(CP_ACP, 0, pszItemName, -1, itemPath, sizeof(itemPath), NULL, NULL) > 0)
+                                            {
+                                                const char* fn = strrchr(itemPath, '\\');
+                                                fn = fn ? (fn + 1) : itemPath;
+                                                size_t fnLen = strlen(fn);
+                                                if (fnLen + 2 <= remaining)
+                                                {
+                                                    StringCchCopyA(pBuf, remaining, fn);
+                                                    pBuf += fnLen + 1;
+                                                    remaining -= (fnLen + 1);
+                                                }
+                                            }
+                                            CoTaskMemFree(pszItemName);
+                                        }
+                                        pItem->Release();
+                                    }
+                                }
+                                *pBuf = 0;
+                                success = TRUE;
+                            }
+                        }
+                        CoTaskMemFree(pszName0);
+                    }
+                    pItem0->Release();
+                }
+            }
+            pItemArray->Release();
+        }
+    }
+    else
+    {
+        IShellItem* pItem = NULL;
+        if (SUCCEEDED(pfd->GetResult(&pItem)))
+        {
+            PWSTR pszName = NULL;
+            if (SUCCEEDED(pItem->GetDisplayName(SIGDN_FILESYSPATH, &pszName)))
+            {
+                char fullPath[MAX_PATH];
+                if (WideCharToMultiByte(CP_ACP, 0, pszName, -1, fullPath, sizeof(fullPath), NULL, NULL) > 0)
+                {
+                    StringCchCopyA(lpofn->lpstrFile, lpofn->nMaxFile, fullPath);
+                    const char* pFileName = strrchr(lpofn->lpstrFile, '\\');
+                    if (pFileName)
+                    {
+                        lpofn->nFileOffset = (WORD)(pFileName - lpofn->lpstrFile + 1);
+                        const char* pExt = strrchr(pFileName, '.');
+                        lpofn->nFileExtension = pExt ? (WORD)(pExt - lpofn->lpstrFile + 1) : 0;
+                    }
+                    else
+                    {
+                        lpofn->nFileOffset = 0;
+                        lpofn->nFileExtension = 0;
+                    }
+                    if (lpofn->lpstrFileTitle && lpofn->nMaxFileTitle > 0)
+                    {
+                        const char* titlePart = pFileName ? (pFileName + 1) : lpofn->lpstrFile;
+                        StringCchCopyA(lpofn->lpstrFileTitle, lpofn->nMaxFileTitle, titlePart);
+                    }
+                    success = TRUE;
+                }
+                CoTaskMemFree(pszName);
+            }
+            pItem->Release();
+        }
+    }
+
+    pfd->Release();
+    if (SUCCEEDED(hrInit)) CoUninitialize();
+    return success;
+}
+
 BOOL SafeGetOpenFileName(LPOPENFILENAME lpofn)
 {
-    BOOL ret = GetOpenFileName(lpofn);
-    if (!ret && FNERR_INVALIDFILENAME == CommDlgExtendedError())
-    {
-        // Windows refuse to open the dialog for a path like "C:\" or for a non-existent path.
-        // In that case, force Documents
-        char initDir[MAX_PATH];
-        const char* oldInitDir = lpofn->lpstrInitialDir;
-        lpofn->lpstrInitialDir = initDir;
-        if (!GetMyDocumentsOrDesktopPath(initDir, MAX_PATH))
-            strcpy(initDir, "");
-        strcpy(lpofn->lpstrFile, "");
-        ret = GetOpenFileName(lpofn);
-        lpofn->lpstrInitialDir = oldInitDir;
-    }
+    BOOL ret = InternalIFileDialog(lpofn, FALSE);
     if (!ret && CommDlgExtendedError() != 0 /* only if this is not Cancel in the dialog */)
         TRACE_E("Cannot open OpenFile dialog box. CommDlgExtendedError()=" << CommDlgExtendedError());
     return ret;
@@ -1774,20 +2130,7 @@ BOOL SafeGetOpenFileName(LPOPENFILENAME lpofn)
 
 BOOL SafeGetSaveFileName(LPOPENFILENAME lpofn)
 {
-    BOOL ret = GetSaveFileName(lpofn);
-    if (!ret && FNERR_INVALIDFILENAME == CommDlgExtendedError())
-    {
-        // Windows refuse to open the dialog for a path like "C:\" or for a non-existent path.
-        // In that case, force Documents
-        char initDir[MAX_PATH];
-        const char* oldInitDir = lpofn->lpstrInitialDir;
-        lpofn->lpstrInitialDir = initDir;
-        if (!GetMyDocumentsOrDesktopPath(initDir, MAX_PATH))
-            strcpy(initDir, "");
-        strcpy(lpofn->lpstrFile, "");
-        ret = GetSaveFileName(lpofn);
-        lpofn->lpstrInitialDir = oldInitDir;
-    }
+    BOOL ret = InternalIFileDialog(lpofn, TRUE);
     if (!ret && CommDlgExtendedError() != 0 /* only if this is not Cancel in the dialog */)
         TRACE_E("Cannot open SaveFile dialog box. CommDlgExtendedError()=" << CommDlgExtendedError());
     return ret;
