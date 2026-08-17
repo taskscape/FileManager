@@ -46,3 +46,5 @@ nul
 .nuget-packages
 tests/FileManager.UiTests/obj
 *.trx
+Installer/Installer_Staging
+tmp/pe-manifest-Release.json

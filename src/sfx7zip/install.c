@@ -322,6 +322,42 @@ void* memset(void* dest, int val, size_t len)
     return dest;
 }
 
+// This CRT-free target ignores default libraries, but the compiler still emits
+// memcpy/memmove for some struct/array copies (e.g. MSVC 14.51 / v145). Provide
+// minimal, capacity-agnostic implementations and disable intrinsic expansion so
+// the names may be defined here.
+#pragma intrinsic(memcpy, memmove)
+#pragma function(memcpy, memmove)
+void* __cdecl memcpy(void* dest, const void* src, size_t count)
+{
+    char* d = (char*)dest;
+    const char* s = (const char*)src;
+    while (count--)
+        *d++ = *s++;
+    return dest;
+}
+
+void* __cdecl memmove(void* dest, const void* src, size_t count)
+{
+    char* d = (char*)dest;
+    const char* s = (const char*)src;
+    if (d == s || count == 0)
+        return dest;
+    if (d < s)
+    {
+        while (count--)
+            *d++ = *s++;
+    }
+    else
+    {
+        d += count - 1;
+        s += count - 1;
+        while (count--)
+            *d-- = *s--;
+    }
+    return dest;
+}
+
 #ifdef FOR_SALAMANDER_SETUP
 
 BOOL GetKnownFolderPathUtf8(const KNOWNFOLDERID* folder, char* path)

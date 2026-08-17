@@ -942,62 +942,78 @@ const char* WINAPI ExecuteExpFullPath2(HWND msgParent, void* param) // full path
     CExecuteExpData* data = (CExecuteExpData*)param;
     if (data->FileNameUsed != NULL)
         *data->FileNameUsed = TRUE;
-    strcpy(data->Buffer, data->Name);
-    char* s = strrchr(data->Buffer, '\\');
+    CPathW bufW(data->Name);
+    const WCHAR* s = wcsrchr(bufW.CStr(), L'\\');
     if (s == NULL)
     {
         TRACE_E("Unexpected value in ExecuteExpFullPath2().");
         return "C:\\";
     }
-    if (s - data->Buffer == 2 && data->Buffer[1] == ':') // not a UNC path
+    if (s - bufW.CStr() == 2 && bufW.CStr()[1] == L':') // not a UNC path
     {
-        *(s + 1) = 0;
+        bufW.GetBuffer(bufW.GetLength() + 1)[s - bufW.CStr() + 1] = 0;
     }
     else
     {
-        *s = 0;
+        bufW.GetBuffer(bufW.GetLength() + 1)[s - bufW.CStr()] = 0;
     }
+    bufW.ReleaseBuffer();
+    bufW.ToUtf8(data->Buffer, MAX_PATH);
     return data->Buffer;
 }
 
 const char* WINAPI ExecuteExpWinDir2(HWND msgParent, void* param) // full path to the Windows directory without trailing '\\'
 {
     CExecuteExpData* data = (CExecuteExpData*)param;
-    GetWindowsDirectory(data->Buffer, MAX_PATH);
-    char* s = data->Buffer + strlen(data->Buffer);
-    if (s > data->Buffer && *(s - 1) == '\\')
-        *(s - 1) = 0;
+    WCHAR pathW[MAX_PATH];
+    if (GetWindowsDirectoryW(pathW, MAX_PATH) > 0)
+    {
+        size_t l = wcslen(pathW);
+        if (l > 0 && pathW[l - 1] == L'\\')
+            pathW[l - 1] = 0;
+        CPathW(pathW).ToUtf8(data->Buffer, MAX_PATH);
+    }
+    else
+        data->Buffer[0] = 0;
     return data->Buffer;
 }
 
 const char* WINAPI ExecuteExpSysDir2(HWND msgParent, void* param) // full path to the System directory without trailing '\\'
 {
     CExecuteExpData* data = (CExecuteExpData*)param;
-    GetSystemDirectory(data->Buffer, MAX_PATH);
-    char* s = data->Buffer + strlen(data->Buffer);
-    if (s > data->Buffer && *(s - 1) == '\\')
-        *(s - 1) = 0;
+    WCHAR pathW[MAX_PATH];
+    if (GetSystemDirectoryW(pathW, MAX_PATH) > 0)
+    {
+        size_t l = wcslen(pathW);
+        if (l > 0 && pathW[l - 1] == L'\\')
+            pathW[l - 1] = 0;
+        CPathW(pathW).ToUtf8(data->Buffer, MAX_PATH);
+    }
+    else
+        data->Buffer[0] = 0;
     return data->Buffer;
 }
 
 const char* WINAPI ExecuteExpSalDir2(HWND msgParent, void* param) // full path to the Salamander directory without trailing '\\'
 {
     CExecuteExpData* data = (CExecuteExpData*)param;
-    GetModuleFileName(HInstance, data->Buffer, MAX_PATH);
-    char* s = strrchr(data->Buffer, '\\');
-    if (s == NULL)
+    WCHAR pathW[MAX_PATH];
+    if (GetModuleFileNameW(HInstance, pathW, MAX_PATH) > 0)
     {
-        TRACE_E("Unexpected value in ExecuteExpSalDir2().");
-        return "C:\\";
-    }
-    if (s - data->Buffer == 2 && data->Buffer[1] == ':') // not a UNC path
-    {
-        *(s + 1) = 0;
+        WCHAR* s = wcsrchr(pathW, L'\\');
+        if (s == NULL)
+        {
+            TRACE_E("Unexpected value in ExecuteExpSalDir2().");
+            return "C:\\";
+        }
+        if (s - pathW == 2 && pathW[1] == L':') // not a UNC path
+            *(s + 1) = 0;
+        else
+            *s = 0;
+        CPathW(pathW).ToUtf8(data->Buffer, MAX_PATH);
     }
     else
-    {
-        *s = 0;
-    }
+        data->Buffer[0] = 0;
     return data->Buffer;
 }
 

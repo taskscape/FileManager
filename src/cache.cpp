@@ -1506,89 +1506,85 @@ void CDiskCache::ClearTEMPIfNeeded(HWND parent, HWND hActivePanel)
     WCHAR tmpDirBufW[2 * MAX_PATH];
     if (GetTempPathW(2 * MAX_PATH, tmpDirBufW) > 0)
     {
-        CPathW tmpDirW(tmpDirBufW);
-        tmpDirW.AddBackslash();
-        tmpDirW.Append(L"SAL*.tmp");
-        CWidePath searchPathW(tmpDirW.CStr());
+        CPathW tmpDirBaseW(tmpDirBufW);
+        tmpDirBaseW.AddBackslash();
 
-        char tmpDir[2 * MAX_PATH];
-        tmpDirW.ToUtf8(tmpDir, sizeof(tmpDir));
-        SalPathRemoveBackslash(tmpDir);
-        CutDirectory(tmpDir);
-        SalPathAddBackslash(tmpDir, sizeof(tmpDir));
-        char* tmpDirEnd = tmpDir + strlen(tmpDir);
+        CPathW searchPathW(tmpDirBaseW);
+        searchPathW.Append(L"SAL*.tmp");
+        CWidePath apiSearchPathW(searchPathW.CStr());
 
-        TIndirectArray<char> tmpDirs(10, 50);
+        TIndirectArray<WCHAR> tmpDirsW(10, 50);
 
         WIN32_FIND_DATAW dataW;
-        WIN32_FIND_DATA data;
-        const WCHAR* apiPath = searchPathW.GetPathForWin32Api();
+        const WCHAR* apiPath = apiSearchPathW.GetPathForWin32Api();
         HANDLE find = apiPath != NULL ? HANDLES_Q(FindFirstFileW(apiPath, &dataW)) : INVALID_HANDLE_VALUE;
-            if (find != INVALID_HANDLE_VALUE)
-            {
-                do
-                { // we will process all found directories (search errors are ignored)
-                    ConvertFindDataWToUtf8(dataW, &data);
-                    if (data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)
+        if (find != INVALID_HANDLE_VALUE)
+        {
+            do
+            { // we will process all found directories (search errors are ignored)
+                if (dataW.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)
+                {
+                    const WCHAR* s = dataW.cFileName + 3;
+                    while (*s != 0 && *s != L'.' &&
+                           (*s >= L'0' && *s <= L'9' || *s >= L'a' && *s <= L'f' || *s >= L'A' && *s <= L'F'))
+                        s++;
+                    if (_wcsicmp(s, L".tmp") == 0) // matches "SAL" + hex-number + ".tmp" = it's almost certainly our directory
                     {
-                        char* s = data.cFileName + 3;
-                        while (*s != 0 && *s != '.' &&
-                               (*s >= '0' && *s <= '9' || *s >= 'a' && *s <= 'f' || *s >= 'A' && *s <= 'F'))
-                            s++;
-                        if (StrICmp(s, ".tmp") == 0) // matches "SAL" + hex-number + ".tmp" = it's almost certainly our directory
+                        WCHAR* tmp = DupStr(dataW.cFileName);
+                        if (tmp != NULL)
                         {
-                            char* tmp = DupStr(data.cFileName);
-                            if (tmp != NULL)
+                            tmpDirsW.Add(tmp);
+                            if (!tmpDirsW.IsGood())
                             {
-                                tmpDirs.Add(tmp);
-                                if (!tmpDirs.IsGood())
-                                {
-                                    free(tmp);
-                                    tmpDirs.ResetState();
-                                }
+                                free(tmp);
+                                tmpDirsW.ResetState();
                             }
                         }
                     }
-                } while (FindNextFileW(find, &dataW));
-                HANDLES(FindClose(find));
-            }
+                }
+            } while (FindNextFileW(find, &dataW));
+            HANDLES(FindClose(find));
+        }
 
-            if (tmpDirs.IsGood() && tmpDirs.Count > 0)
+        if (tmpDirsW.IsGood() && tmpDirsW.Count > 0)
+        {
+            char buf[300];
+            char buf2[300];
+            CQuadWord qwSize(tmpDirsW.Count, 0);
+            ExpandPluralString(buf2, 300, LoadStr(IDS_DELETETMPSALDIRS),
+                               1, &qwSize);
+            _snprintf_s(buf, _TRUNCATE, buf2, tmpDirsW.Count);
+            char alias[200];
+            sprintf(alias, "%d\t%s\t%d\t%s\t%d\t%s",
+                    DIALOG_ABORT, LoadStr(IDS_DELETETMPSALDIRS_YES),
+                    DIALOG_RETRY, LoadStr(IDS_DELETETMPSALDIRS_NO),
+                    DIALOG_IGNORE, LoadStr(IDS_DELETETMPSALDIRS_FOCUS));
+            int ret = CMessageBox(parent,
+                                  MSGBOXEX_ABORTRETRYIGNORE | MSGBOXEX_ICONQUESTION | MSGBOXEX_DEFBUTTON3,
+                                  LoadStr(IDS_QUESTION), buf, NULL, NULL, NULL,
+                                  0, NULL, alias, NULL, NULL)
+                          .Execute();
+            if (ret == IDABORT)
             {
-                char buf[300];
-                char buf2[300];
-                CQuadWord qwSize(tmpDirs.Count, 0);
-                ExpandPluralString(buf2, 300, LoadStr(IDS_DELETETMPSALDIRS),
-                                   1, &qwSize);
-                _snprintf_s(buf, _TRUNCATE, buf2, tmpDirs.Count);
-                char alias[200];
-                sprintf(alias, "%d\t%s\t%d\t%s\t%d\t%s",
-                        DIALOG_ABORT, LoadStr(IDS_DELETETMPSALDIRS_YES),
-                        DIALOG_RETRY, LoadStr(IDS_DELETETMPSALDIRS_NO),
-                        DIALOG_IGNORE, LoadStr(IDS_DELETETMPSALDIRS_FOCUS));
-                int ret = CMessageBox(parent,
-                                      MSGBOXEX_ABORTRETRYIGNORE | MSGBOXEX_ICONQUESTION | MSGBOXEX_DEFBUTTON3,
-                                      LoadStr(IDS_QUESTION), buf, NULL, NULL, NULL,
-                                      0, NULL, alias, NULL, NULL)
-                              .Execute();
-                if (ret == IDABORT)
+                for (int i = 0; i < tmpDirsW.Count; i++)
                 {
-                    for (int i = 0; i < tmpDirs.Count; i++)
-                    {
-                        // Removal must use a complete temporary-directory suffix.
-                        if (SUCCEEDED(StringCchCopyA(tmpDirEnd, _countof(tmpDir) - (tmpDirEnd - tmpDir), tmpDirs[i])))
-                            RemoveTemporaryDir(tmpDir);
-                        else
-                            TRACE_E("Temporary directory path is too long to remove safely");
-                    }
-                }
-                if (ret == IDIGNORE) // focus
-                {
-                    // Focus only a complete path so the panel cannot select a different directory.
-                    if (SUCCEEDED(StringCchCopyA(tmpDirEnd, _countof(tmpDir) - (tmpDirEnd - tmpDir), tmpDirs[0])))
-                        SendMessage(hActivePanel, WM_USER_FOCUSFILE, (WPARAM) "", (LPARAM)tmpDir);
+                    // Removal uses a native wide path, so long temporary-directory
+                    // names are never truncated through a MAX_PATH UTF-8 buffer.
+                    CPathW tmpDirFullW(tmpDirBaseW);
+                    tmpDirFullW.Append(tmpDirsW[i]);
+                    RemoveTemporaryDirW(tmpDirFullW.CStr());
                 }
             }
+            if (ret == IDIGNORE) // focus
+            {
+                // Focus only a complete path so the panel cannot select a different directory.
+                CPathW focusW(tmpDirBaseW);
+                focusW.Append(tmpDirsW[0]);
+                char focusUtf8[MAX_PATH];
+                focusW.ToUtf8(focusUtf8, sizeof(focusUtf8));
+                SendMessage(hActivePanel, WM_USER_FOCUSFILE, (WPARAM) "", (LPARAM)focusUtf8);
+            }
+        }
     }
     else
         TRACE_E("Unable to clear TEMP directory: TEMP directory not defined!");

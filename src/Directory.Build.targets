@@ -9,22 +9,29 @@
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)' == 'Release'">
     <ClCompile>
-      <!-- These compiler protections apply to every first-party Release translation unit. -->
+      <!-- These compiler protections apply to every first-party Release translation unit that links the CRT.
+           CRT-free modules (CrtFreeModule=true, IgnoreAllDefaultLibraries=true) cannot supply the
+           __security_cookie/__GSHandlerCheck/__report_rangecheckfailure symbols that /GS, /sdl and
+           /guard:cf require, so they are exempted below. -->
       <BufferSecurityCheck>true</BufferSecurityCheck>
+      <BufferSecurityCheck Condition="'$(CrtFreeModule)' == 'true'">false</BufferSecurityCheck>
       <SDLCheck>true</SDLCheck>
+      <SDLCheck Condition="'$(CrtFreeModule)' == 'true'">false</SDLCheck>
       <!-- Legacy /GL emits C4703 at link time despite /WX-; retain /sdl while
            tracking that pre-existing warning debt separately from the binary baseline. -->
       <DisableSpecificWarnings>4703;%(DisableSpecificWarnings)</DisableSpecificWarnings>
       <ControlFlowGuard>Guard</ControlFlowGuard>
+      <ControlFlowGuard Condition="'$(CrtFreeModule)' == 'true'">false</ControlFlowGuard>
     </ClCompile>
     <Link>
       <!-- Keep exploit mitigations consistent across the executable, utilities, extensions, and plug-ins. -->
       <RandomizedBaseAddress>true</RandomizedBaseAddress>
       <DataExecutionPrevention>true</DataExecutionPrevention>
-      <HighEntropyVA>true</HighEntropyVA>
+      <HighEntropyVA Condition="'$(Platform)' != 'Win32'">true</HighEntropyVA>
       <ControlFlowGuard>Guard</ControlFlowGuard>
-      <!-- MSBuild omits HighEntropyVA for some legacy project shapes, so pass its linker switch explicitly. -->
-      <AdditionalOptions>/CETCOMPAT /HIGHENTROPYVA %(AdditionalOptions)</AdditionalOptions>
+      <ControlFlowGuard Condition="'$(CrtFreeModule)' == 'true'">false</ControlFlowGuard>
+      <!-- CET and high-entropy VA are x64-only concepts; passing /HIGHENTROPYVA to an x86 linker is an error. -->
+      <AdditionalOptions Condition="'$(Platform)' != 'Win32'">/CETCOMPAT /HIGHENTROPYVA %(AdditionalOptions)</AdditionalOptions>
     </Link>
   </ItemDefinitionGroup>
 </Project>

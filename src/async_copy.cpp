@@ -1090,13 +1090,13 @@ void RecordMetadataLoss(CProgressDlgData& dlgData, DWORD lossMask,
     dlgData.MetadataLosses.LossMask |= lossMask;
     if (dlgData.MetadataLosses.TargetFileSystem == mtfsUnknown && targetName != NULL)
         dlgData.MetadataLosses.TargetFileSystem = GetMetadataTargetFileSystem(targetName);
-    if (dlgData.MetadataLosses.FirstSourceName[0] == 0 && sourceName != NULL)
+    if (dlgData.MetadataLosses.FirstSourceName.IsEmpty() && sourceName != NULL)
     {
         // Metadata diagnostics must retain a complete first source identity.
-        StringCchCopyA(dlgData.MetadataLosses.FirstSourceName, _countof(dlgData.MetadataLosses.FirstSourceName), sourceName);
+        dlgData.MetadataLosses.FirstSourceName.Set(sourceName);
     }
-    if (dlgData.MetadataLosses.FirstTargetName[0] == 0 && targetName != NULL)
-        StringCchCopyA(dlgData.MetadataLosses.FirstTargetName, _countof(dlgData.MetadataLosses.FirstTargetName), targetName);
+    if (dlgData.MetadataLosses.FirstTargetName.IsEmpty() && targetName != NULL)
+        dlgData.MetadataLosses.FirstTargetName.Set(targetName);
 }
 
 void RecordPlannedMetadataLosses(CProgressDlgData& dlgData, const COperations* script,
@@ -1137,10 +1137,10 @@ BOOL ConfirmMetadataLossesBeforeSourceDeletion(HWND hProgressDlg, CProgressDlgDa
     if (unacknowledgedLosses == mmlNone)
         return TRUE;
 
-    if (dlgData.MetadataLosses.FirstSourceName[0] == 0 && sourceName != NULL)
-        StringCchCopyA(dlgData.MetadataLosses.FirstSourceName, _countof(dlgData.MetadataLosses.FirstSourceName), sourceName);
-    if (dlgData.MetadataLosses.FirstTargetName[0] == 0 && targetName != NULL)
-        StringCchCopyA(dlgData.MetadataLosses.FirstTargetName, _countof(dlgData.MetadataLosses.FirstTargetName), targetName);
+    if (dlgData.MetadataLosses.FirstSourceName.IsEmpty() && sourceName != NULL)
+        dlgData.MetadataLosses.FirstSourceName.Set(sourceName);
+    if (dlgData.MetadataLosses.FirstTargetName.IsEmpty() && targetName != NULL)
+        dlgData.MetadataLosses.FirstTargetName.Set(targetName);
 
     char lossDetails[768];
     lossDetails[0] = 0;
@@ -1157,10 +1157,12 @@ BOOL ConfirmMetadataLossesBeforeSourceDeletion(HWND hProgressDlg, CProgressDlgDa
     if (unacknowledgedLosses & mmlCompressionAndEncryption)
         AppendMetadataLossLine(lossDetails, _countof(lossDetails), LoadStr(IDS_METADATALOSS_COMPRESSIONANDENCRYPTION));
 
+    char firstSourceUtf8[MAX_PATH];
+    dlgData.MetadataLosses.FirstSourceName.ToUtf8(firstSourceUtf8, sizeof(firstSourceUtf8));
     char text[3 * MAX_PATH + 1024];
     _snprintf_s(text, _countof(text), _TRUNCATE, LoadStr(IDS_METADATALOSS_BEFORESOURCEDELETE),
                 GetMetadataTargetFileSystemName(dlgData.MetadataLosses.TargetFileSystem),
-                dlgData.MetadataLosses.FirstSourceName[0] != 0 ? dlgData.MetadataLosses.FirstSourceName : sourceName,
+                !dlgData.MetadataLosses.FirstSourceName.IsEmpty() ? firstSourceUtf8 : sourceName,
                 lossDetails);
 
     int result = IDCANCEL;

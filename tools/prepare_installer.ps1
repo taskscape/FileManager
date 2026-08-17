@@ -49,9 +49,11 @@ function Copy-Exe($srcPatterns, $fileName, $dest) {
 # Main exes
 $salamandCopied = Copy-Exe @("$BuildDir\Release_x64\salamand.exe", "src\vcxproj\salamander\Release_x64\salamand.exe") "salamand.exe" "$StagingDir\"
 $salmonCopied = Copy-Exe @("$BuildDir\Release_x64\salmon.exe", "src\vcxproj\salmon\salamander\Release_x64\utils\salmon.exe") "salmon.exe" "$StagingDir\"
+$salbrokerCopied = Copy-Exe @("$BuildDir\salamander\Release_x64\salbroker.exe", "src\vcxproj\salamander\Release_x64\salbroker.exe") "salbroker.exe" "$StagingDir\"
 
 if (-not $salamandCopied) { Write-Error "Could not find salamand.exe" }
 if (-not $salmonCopied) { Write-Error "Could not find salmon.exe" }
+if (-not $salbrokerCopied) { Write-Error "Could not find salbroker.exe" }
 
 # Shell extensions are installed from the utils directory and registered by Salamander itself.
 Copy-Exe @("$BuildDir\Release_x64\salextx64.dll", "$BuildDir\shellext\Release_x64\salextx64.dll", "src\vcxproj\shellext\salamander\Release_x64\plugins\Intermediate\salextx64\salextx64.dll", "src\vcxproj\shellext\salamander\Release_x64\salextx64.dll") "salextx64.dll" "$StagingDir\utils\"
@@ -67,8 +69,20 @@ Copy-Exe @("$BuildDir\Release_x64\translator.exe", "$BuildDir\Release_Win32\tran
 Copy-Exe @("$BuildDir\Release_x64\fcremote.exe") "fcremote.exe" "$StagingDir\"
 Copy-Exe @("$BuildDir\Release_x64\7zwrapper.exe") "7zwrapper.exe" "$StagingDir\"
 
-# 3. Copy lang (main app)
-Copy-Item "Installer\lang\*" "$StagingDir\lang\" -Recurse -ErrorAction SilentlyContinue
+# 3. Copy lang (main app) - must come from the freshly built Release_x64 output so its
+#    VERSIONINFO matches salamand.exe (a stale or mismatched SLG is rejected at startup).
+$langFiles = @(Get-ChildItem -Path "$BuildDir\salamander\Release_x64\lang" -Filter '*.slg' -ErrorAction SilentlyContinue)
+if ($langFiles.Count -eq 0) {
+    $langFiles = @(Get-ChildItem -Path $BuildDir -Filter '*.slg' -Recurse -ErrorAction SilentlyContinue |
+        Where-Object { $_.FullName -match 'Release_x64.*\\lang\\' -and $_.FullName -notmatch '\\plugins\\' })
+}
+if ($langFiles.Count -gt 0) {
+    $langFiles | ForEach-Object { Copy-Item $_.FullName "$StagingDir\lang\" }
+    Write-Host "Found $($langFiles.Count) main-app language file(s)." -ForegroundColor Green
+} else {
+    Write-Warning 'No freshly built main-app .slg language file was found; falling back to Installer\lang.'
+    Copy-Item "Installer\lang\*" "$StagingDir\lang\" -Recurse -ErrorAction SilentlyContinue
+}
 
 # 4. Copy convert
 Copy-Item "convert\*" "$StagingDir\convert\" -Recurse -ErrorAction SilentlyContinue

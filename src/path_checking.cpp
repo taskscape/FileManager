@@ -1166,6 +1166,48 @@ BOOL SalSplitWindowsPath(HWND parent, const char* title, const char* errorTitle,
         return FALSE;
 }
 
+// UTF-16 counterpart of CutSpacesFromBothSides (trims spaces at both ends).
+//
+// SalSplitWindowsPathW is the wide facade of SalSplitWindowsPath. It accepts a native
+// WCHAR path and mirrors the narrow implementation through the same UTF-8 core (the
+// ANSI message-box and change-notification framework is narrow), preserving the full
+// path without truncation on input.
+BOOL SalSplitWindowsPathW(HWND parent, const WCHAR* titleW, const WCHAR* errorTitleW, int selCount,
+                          WCHAR* pathW, WCHAR* secondPartW, BOOL pathIsDir, BOOL backslashAtEnd,
+                          const WCHAR* dirNameW, const WCHAR* curDiskPathW, WCHAR*& maskW)
+{
+    char title[MAX_PATH];
+    CPathW(titleW).ToUtf8(title, sizeof(title));
+    char errorTitle[MAX_PATH];
+    CPathW(errorTitleW).ToUtf8(errorTitle, sizeof(errorTitle));
+    char dirName[MAX_PATH];
+    if (dirNameW != NULL)
+        CPathW(dirNameW).ToUtf8(dirName, sizeof(dirName));
+    char curDiskPath[MAX_PATH];
+    if (curDiskPathW != NULL)
+        CPathW(curDiskPathW).ToUtf8(curDiskPath, sizeof(curDiskPath));
+
+    char pathUtf8[2 * MAX_PATH];
+    CPathW(pathW).ToUtf8(pathUtf8, sizeof(pathUtf8));
+
+    char* secondPart = NULL;
+    char* mask = NULL;
+    BOOL ret = SalSplitWindowsPath(parent, title, errorTitle, selCount, pathUtf8, secondPart,
+                                   pathIsDir, backslashAtEnd,
+                                   dirNameW != NULL ? dirName : NULL,
+                                   curDiskPathW != NULL ? curDiskPath : NULL, mask);
+    if (ret)
+    {
+        CPathW resW(pathUtf8);
+        wcsncpy_s(pathW, 2 * MAX_PATH, resW.CStr(), _TRUNCATE);
+        if (secondPart != NULL)
+            secondPartW = pathW + (secondPart - pathUtf8);
+        if (mask != NULL)
+            maskW = pathW + (mask - pathUtf8);
+    }
+    return ret;
+}
+
 BOOL SalSplitGeneralPath(HWND parent, const char* title, const char* errorTitle, int selCount,
                          char* path, char* afterRoot, char* secondPart, BOOL pathIsDir, BOOL backslashAtEnd,
                          const char* dirName, const char* curPath, char*& mask, char* newDirs,

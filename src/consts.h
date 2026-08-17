@@ -479,6 +479,11 @@ BOOL SalSplitWindowsPath(HWND parent, const char* title, const char* errorTitle,
                          char* path, char* secondPart, BOOL pathIsDir, BOOL backslashAtEnd,
                          const char* dirName, const char* curDiskPath, char*& mask);
 
+// UTF-16 counterpart of SalSplitWindowsPath (native WCHAR path handling, no narrow MAX_PATH round-trip).
+BOOL SalSplitWindowsPathW(HWND parent, const WCHAR* titleW, const WCHAR* errorTitleW, int selCount,
+                          WCHAR* pathW, WCHAR* secondPartW, BOOL pathIsDir, BOOL backslashAtEnd,
+                          const WCHAR* dirNameW, const WCHAR* curDiskPathW, WCHAR*& maskW);
+
 // gets existing part and operation mask from target path; recognizes non-existing part; on
 // success returns TRUE, relative path to create (in 'newDirs'), existing target path (in 'path';
 // existing only assuming creation of relative path 'newDirs') and found operation mask

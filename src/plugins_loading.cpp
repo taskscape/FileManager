@@ -2642,7 +2642,7 @@ BOOL CPluginData::InitDLL(HWND parent, BOOL quiet, BOOL waitCursor, BOOL showUns
         HCURSOR oldCur;
         if (waitCursor)
             oldCur = SetCursor(LoadCursor(NULL, IDC_WAIT));
-        DLL = HANDLES(LoadLibraryW(dllPathW.CStr()));
+        DLL = HANDLES(LoadLibraryPathW(dllPathW.CStr()));
         if (waitCursor)
             SetCursor(oldCur);
         if (DLL == NULL) // error

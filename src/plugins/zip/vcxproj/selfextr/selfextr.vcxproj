@@ -59,6 +59,9 @@
   </ImportGroup>
   <PropertyGroup Label="UserMacros">
   </PropertyGroup>
+  <PropertyGroup>
+    <CrtFreeModule>true</CrtFreeModule>
+  </PropertyGroup>
   <!-- sfxmake.bat supplies a code page for localized builds; IDE builds must not emit an empty compiler switch. -->
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='ReleaseEx|Win32'">
     <OutDir>ReleaseEx\</OutDir>

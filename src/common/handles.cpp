@@ -2211,7 +2211,7 @@ C__Handles::LoadLibraryUtf8(LPCSTR lpLibFileName)
 }
 
 HINSTANCE
-C__Handles::LoadLibraryW(LPCWSTR wideLibFileName)
+C__Handles::LoadLibraryPathW(LPCWSTR wideLibFileName)
 {
     HINSTANCE ret = NULL;
     CWidePath fileNameW(wideLibFileName);

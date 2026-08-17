@@ -26,8 +26,28 @@
 // to avoid problems with semicolons in the macros defined below
 inline void __HandlesEmptyFunction() {}
 
-// LoadLibraryW for Release mode (when HANDLES_ENABLE is not defined)
-inline HINSTANCE LoadLibraryW(LPCWSTR wideLibFileName)
+// LoadLibraryUtf8 for Release mode (when HANDLES_ENABLE is not defined)
+inline HINSTANCE LoadLibraryUtf8(LPCSTR lpLibFileName)
+{
+    HINSTANCE ret = NULL;
+    CWidePath fileNameW(lpLibFileName);
+    const WCHAR* fullPath = fileNameW.GetFullPathForWin32Api();
+    if (fullPath == NULL)
+    {
+        SetLastError(ERROR_NO_UNICODE_TRANSLATION);
+    }
+    else
+    {
+        const DWORD loadFlags = LOAD_LIBRARY_SEARCH_DLL_LOAD_DIR |
+                                LOAD_LIBRARY_SEARCH_SYSTEM32 |
+                                LOAD_LIBRARY_SEARCH_USER_DIRS;
+        ret = ::LoadLibraryExW(fullPath, NULL, loadFlags);
+    }
+    return ret;
+}
+
+// LoadLibraryPathW for Release mode (when HANDLES_ENABLE is not defined)
+inline HINSTANCE LoadLibraryPathW(LPCWSTR wideLibFileName)
 {
     HINSTANCE ret = NULL;
     CWidePath fileNameW(wideLibFileName);
@@ -43,8 +63,6 @@ inline HINSTANCE LoadLibraryW(LPCWSTR wideLibFileName)
                                 LOAD_LIBRARY_SEARCH_USER_DIRS;
         ret = ::LoadLibraryExW(fullPath, NULL, loadFlags);
     }
-    return ret;
-}
     return ret;
 }
 
@@ -630,7 +648,7 @@ public:
 
     HINSTANCE LoadLibrary(LPCTSTR lpLibFileName);
     HINSTANCE LoadLibraryUtf8(LPCSTR lpLibFileName);
-    HINSTANCE LoadLibraryW(LPCWSTR wideLibFileName);
+    HINSTANCE LoadLibraryPathW(LPCWSTR wideLibFileName);
 
     HINSTANCE LoadLibraryEx(LPCTSTR lpLibFileName, HANDLE hFile, DWORD dwFlags);
 

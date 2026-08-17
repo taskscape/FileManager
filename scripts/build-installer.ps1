@@ -4,9 +4,10 @@ param(
     [ValidateSet('Debug', 'Release')]
     [string]$Configuration = 'Release',
 
-    # Platform toolset (v143 for VS2022, v145 for VS2026)
+    # Platform toolset (v143 for VS2022, v145 for VS2026).
+    # Defaults to auto-detection from the installed Visual Studio toolchain.
     [ValidateSet('v143', 'v145')]
-    [string]$PlatformToolset = 'v143',
+    [string]$PlatformToolset = '',
 
     # Build number for versioning
     [string]$BuildNumber = $env:GITHUB_RUN_NUMBER,
@@ -14,8 +15,8 @@ param(
     # Custom build directory (defaults to build_stage for Release, build_debug for Debug)
     [string]$BuildDir,
 
-    # Custom staging directory
-    [string]$StagingDir = 'Installer_Staging',
+    # Custom staging directory (relative to the repository root; must match setup.iss expectations)
+    [string]$StagingDir = 'Installer\Installer_Staging',
 
     # Skip running tests before building
     [switch]$SkipTests,
@@ -62,6 +63,27 @@ if ($Help) {
     return
 }
 
+# This script relies on PowerShell 7 cmdlets (Get-FileHash, Get-AuthenticodeSignature, etc.)
+# that are absent from a minimal Windows PowerShell 5.1 host. When started under 5.1,
+# re-launch under pwsh so the whole pipeline runs against a consistent, complete runtime.
+if ($PSVersionTable.PSVersion.Major -lt 6) {
+    $pwsh = Get-Command pwsh.exe -ErrorAction SilentlyContinue | Select-Object -First 1
+    if ($null -ne $pwsh) {
+        $argList = @()
+        foreach ($key in $PSBoundParameters.Keys) {
+            $value = $PSBoundParameters[$key]
+            if ($value -is [switch]) {
+                if ($value) { $argList += "-$key" }
+            } else {
+                $argList += "-$key"
+                $argList += [string]$value
+            }
+        }
+        & $pwsh.Source -NoProfile -ExecutionPolicy Bypass -File $PSCommandPath @argList
+        exit $LASTEXITCODE
+    }
+}
+
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue'
@@ -77,6 +99,29 @@ if (-not (Test-Path $script:RUNNER_TEMP)) {
     New-Item -ItemType Directory -Path $script:RUNNER_TEMP | Out-Null
 }
 
+# Auto-detect the platform toolset from the installed MSVC toolchain unless the
+# caller explicitly supplied one. MSVC 14.5x maps to v145 (VS2026) and 14.3x maps
+# to v143 (VS2022).
+if (-not $PSBoundParameters.ContainsKey('PlatformToolset') -or [string]::IsNullOrWhiteSpace($PlatformToolset)) {
+    $PlatformToolset = 'v143'
+    $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+    if (-not (Test-Path $vswhere)) {
+        $vswhere = "${env:ProgramFiles}\Microsoft Visual Studio\Installer\vswhere.exe"
+    }
+    if (Test-Path $vswhere) {
+        $vsPath = & $vswhere -latest -prerelease -property installationPath | Select-Object -First 1
+        $msvcDir = Join-Path $vsPath 'VC\Tools\MSVC'
+        if ($vsPath -and (Test-Path $msvcDir)) {
+            $toolsetVersions = Get-ChildItem $msvcDir -Directory -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Name
+            if ($toolsetVersions -match '^14\.5') {
+                $PlatformToolset = 'v145'
+            } elseif ($toolsetVersions -match '^14\.3') {
+                $PlatformToolset = 'v143'
+            }
+        }
+    }
+}
+
 Write-Host "=== Open Salamander Installer Build Script ===" -ForegroundColor Cyan
 Write-Host "Repository root: $repositoryRoot"
 Write-Host "Configuration: $Configuration"
@@ -88,17 +133,40 @@ Write-Host ""
 
 # Verify MSBuild is available
 function Test-MSBuildAvailable() {
-    $msbuildPath = if ($PlatformToolset -eq 'v145') {
-        # Try to find VS2026 (v145)
+    $msbuildPath = $null
+
+    # 1. Prefer an explicit install for the requested toolset.
+    if ($PlatformToolset -eq 'v145') {
         $vs2026Path = "${env:ProgramFiles}\Microsoft Visual Studio\2026\Enterprise"
-        if (Test-Path $vs2026Path) { Join-Path $vs2026Path 'MSBuild\Current\Bin\MSBuild.exe' } else { $null }
-    } else {
-        # VS2022 (v143) - should be in PATH
-        (Get-Command 'msbuild.exe' -ErrorAction SilentlyContinue).Path
+        if (Test-Path $vs2026Path) {
+            $msbuildPath = Join-Path $vs2026Path 'MSBuild\Current\Bin\MSBuild.exe'
+        }
+    }
+
+    # 2. Check if msbuild.exe is already on PATH.
+    if (-not $msbuildPath -or -not (Test-Path $msbuildPath)) {
+        $cmd = Get-Command 'msbuild.exe' -ErrorAction SilentlyContinue
+        if ($null -ne $cmd) {
+            $msbuildPath = $cmd.Source
+        }
+    }
+
+    # 3. Fall back to vswhere (authoritative for Visual Studio installs).
+    if (-not $msbuildPath -or -not (Test-Path $msbuildPath)) {
+        $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+        if (-not (Test-Path $vswhere)) {
+            $vswhere = "${env:ProgramFiles}\Microsoft Visual Studio\Installer\vswhere.exe"
+        }
+        if (Test-Path $vswhere) {
+            $foundPath = & $vswhere -latest -prerelease -requires Microsoft.Component.MSBuild -find 'MSBuild\**\Bin\MSBuild.exe' | Select-Object -First 1
+            if ($foundPath -and (Test-Path $foundPath)) {
+                $msbuildPath = $foundPath
+            }
+        }
     }
 
     if (-not $msbuildPath -or -not (Test-Path $msbuildPath)) {
-        Write-Error "MSBuild not found for toolset $PlatformToolset. Please install Visual Studio $PlatformToolset."
+        Write-Error "MSBuild not found for toolset $PlatformToolset. Please install Visual Studio with the C++ workload."
     }
     return $msbuildPath
 }
@@ -279,10 +347,10 @@ function Invoke-InstallInnoSetup() {
     }
 
     Write-Host "Installing Inno Setup silently..."
-    & $installerPath /VERYSILENT /SUPPRESSMSGBOXES /NORESTART /SP-
+    $installProcess = Start-Process -FilePath $installerPath -ArgumentList '/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', '/SP-' -Wait -PassThru
 
-    if ($LASTEXITCODE -ne 0) {
-        throw "Inno Setup installation failed with exit code $LASTEXITCODE."
+    if ($installProcess.ExitCode -ne 0) {
+        throw "Inno Setup installation failed with exit code $($installProcess.ExitCode)."
     }
 
     if (-not (Test-Path $iscc)) {

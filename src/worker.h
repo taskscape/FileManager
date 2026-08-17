@@ -350,34 +350,16 @@ struct CMetadataLossRecord
     DWORD LossMask;
     DWORD AcknowledgedLossMask;
     EMetadataTargetFileSystem TargetFileSystem;
-    char FirstSourceName[MAX_PATH];
-    char FirstTargetName[MAX_PATH];
+    CPathW FirstSourceName;
+    CPathW FirstTargetName;
 
     void Clear()
     {
         LossMask = mmlNone;
         AcknowledgedLossMask = mmlNone;
         TargetFileSystem = mtfsUnknown;
-        FirstSourceName[0] = 0;
-        FirstTargetName[0] = 0;
-    }
-};
-
-struct CMetadataLossRecordW
-{
-    DWORD LossMask;
-    DWORD AcknowledgedLossMask;
-    EMetadataTargetFileSystem TargetFileSystem;
-    CPathW FirstSourceNameW;
-    CPathW FirstTargetNameW;
-
-    void Clear()
-    {
-        LossMask = mmlNone;
-        AcknowledgedLossMask = mmlNone;
-        TargetFileSystem = mtfsUnknown;
-        FirstSourceNameW.Clear();
-        FirstTargetNameW.Clear();
+        FirstSourceName.Clear();
+        FirstTargetName.Clear();
     }
 };
 
