@@ -119,17 +119,20 @@ function Find-VisualStudioDeveloperCommand {
 }
 
 function Find-ApplicationVerifier {
+    # Prefer the SDK's Application Verifier CLI, then fall back to the in-box
+    # C:\Windows\System32\appverif.exe (which is a full tool on Windows 11).
+    $debuggerRoot = Join-Path ([Environment]::GetFolderPath([Environment+SpecialFolder]::ProgramFilesX86)) 'Windows Kits\10\Debuggers'
+    if (Test-Path -LiteralPath $debuggerRoot -PathType Container) {
+        $sdk = Get-ChildItem -LiteralPath $debuggerRoot -Filter appverif.exe -Recurse -ErrorAction SilentlyContinue |
+            Select-Object -First 1
+        if ($null -ne $sdk) {
+            return $sdk.FullName
+        }
+    }
+
     $command = Get-Command appverif.exe -ErrorAction SilentlyContinue | Select-Object -First 1
     if ($null -ne $command) {
         return $command.Source
-    }
-
-    # Windows SDK installations do not always add the debugger tools to PATH,
-    # so the strict release lane also searches their standard installation root.
-    $debuggerRoot = Join-Path ([Environment]::GetFolderPath([Environment+SpecialFolder]::ProgramFilesX86)) 'Windows Kits\10\Debuggers'
-    if (Test-Path -LiteralPath $debuggerRoot -PathType Container) {
-        return Get-ChildItem -LiteralPath $debuggerRoot -Filter appverif.exe -Recurse -ErrorAction SilentlyContinue |
-            Select-Object -First 1 -ExpandProperty FullName
     }
 
     return $null
@@ -293,6 +296,17 @@ function Assert-UiTestSymbolicLinkSupport {
     finally {
         if (Test-Path -LiteralPath $root) {
             Remove-Item -LiteralPath $root -Recurse -Force
+        }
+        # Building the preflight subtree can create the test-data root as a side
+        # effect, and an interrupted earlier run can leave an empty markerless root
+        # behind. Either way the NUnit sandbox refuses such a directory, so remove
+        # it whenever it is truly empty and let the sandbox create it with its
+        # ownership marker.
+        if (Test-Path -LiteralPath $env:FILEMANAGER_UI_TESTDATA_ROOT) {
+            $remaining = @(Get-ChildItem -LiteralPath $env:FILEMANAGER_UI_TESTDATA_ROOT -Force)
+            if ($remaining.Count -eq 0) {
+                Remove-Item -LiteralPath $env:FILEMANAGER_UI_TESTDATA_ROOT -Force
+            }
         }
     }
 }

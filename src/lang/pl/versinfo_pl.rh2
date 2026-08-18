@@ -1,0 +1,28 @@
+// Defines for POLISH.SLG VERSIONINFO
+// Overrides the neutral VERSIONINFO metadata for the Polish language pack.
+
+// WARNING: cannot be replaced by "#pragma once" because it is included from .rc
+// file and the resource compiler does not support "#pragma once".
+#ifndef __VERSINFO_PL_RH2
+#define __VERSINFO_PL_RH2
+
+// Polish (Poland): 0x0415 / 0x0415 (neutral sublanguage).
+#define VERSINFO_TRANSLATION_LANG    0x0415
+#define VERSINFO_TRANSLATION_SUBLANG 0x0415
+
+#undef VERSINFO_INTERNAL
+#undef VERSINFO_ORIGINAL
+#undef VERSINFO_SLG_COMMENT
+
+#ifdef _LANG
+#define VERSINFO_INTERNAL    "POLISH"
+#define VERSINFO_ORIGINAL    VERSINFO_INTERNAL ".SLG"
+#else
+#define VERSINFO_INTERNAL    "POLISH"
+#define VERSINFO_ORIGINAL    VERSINFO_INTERNAL ".SLG"
+#endif
+
+#define VERSINFO_SLG_WEB     "www.taskscape.com"
+#define VERSINFO_SLG_COMMENT "Wersja polska"
+
+#endif // __VERSINFO_PL_RH2

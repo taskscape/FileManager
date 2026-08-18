@@ -1,0 +1,17 @@
+//
+// lang_pl.rc2 - Polish language resources (not edited by Visual Studio)
+//
+
+#ifdef APSTUDIO_INVOKED
+#error this file is not editable by Microsoft Visual C++
+#endif //APSTUDIO_INVOKED
+
+/////////////////////////////////////////////////////////////////////////////
+// Add manually edited resources here...
+
+#include "..\..\versinfo.rh2"
+#include "versinfo_pl.rh2"
+#include "..\..\plugins\shared\versinfo.rc2"
+
+#include "texts_pl.rc2"
+

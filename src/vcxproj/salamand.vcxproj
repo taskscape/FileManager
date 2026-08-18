@@ -1041,6 +1041,10 @@
       <Project>{7c7059ba-1fce-4c36-b0b3-d095779cf89f}</Project>
       <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
     </ProjectReference>
+    <ProjectReference Include="lang_pl.vcxproj">
+      <Project>{a1b2c3d4-5e6f-4a0b-9c8d-1e2f3a4b5c6d}</Project>
+      <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
+    </ProjectReference>
   </ItemGroup>
   <ItemDefinitionGroup>
     <Link>

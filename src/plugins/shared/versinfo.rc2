@@ -27,6 +27,14 @@
 // VarFileInfo\Translation je zobrazovano ve vlastnostech souboru
 // na strance Version jako "Language"
 //
+// A language pack may override the translation language/sub-language before including
+// this file (e.g. Polish: VERSINFO_TRANSLATION_LANG 0x0415).
+#ifndef VERSINFO_TRANSLATION_LANG
+#define VERSINFO_TRANSLATION_LANG 0x0409
+#endif
+#ifndef VERSINFO_TRANSLATION_SUBLANG
+#define VERSINFO_TRANSLATION_SUBLANG 0x04b0
+#endif
 
 VS_VERSION_INFO VERSIONINFO
  FILEVERSION VERSINFO_MAJOR,VERSINFO_MINORA,VERSINFO_MINORB,VERSINFO_BUILDNUMBER
@@ -72,7 +80,7 @@ BEGIN
     END
     BLOCK "VarFileInfo"
     BEGIN
-        VALUE "Translation", 0x0409, 0x04b0
+        VALUE "Translation", VERSINFO_TRANSLATION_LANG, VERSINFO_TRANSLATION_SUBLANG
     END
 END
 

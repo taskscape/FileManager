@@ -50,6 +50,7 @@ The 5.0 release marks a transition to taskscape development with several key enh
 - [Git](https://git-scm.com/downloads)
 - [PowerShell 7.4](https://learn.microsoft.com/en-us/powershell/scripting/install/installing-powershell-on-windows) or newer
 - [HTMLHelp Workshop 1.3](https://learn.microsoft.com/en-us/answers/questions/265752/htmlhelp-workshop-download-for-chm-compiler-instal)
+- [Application Verifier for Windows](https://learn.microsoft.com/en-us/windows-hardware/drivers/devtest/application-verifier) for the nightly lock-stress lane (the `Locks` layer must be registered)
 
 - Set the ```OPENSAL_BUILD_DIR``` environment variable to specify the build directory. Make sure the path has a trailing backslah, e.q. ```D:\Build\OpenSal\```
 

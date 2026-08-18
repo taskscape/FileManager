@@ -1,0 +1,1946 @@
+#include "..\..\texts.rh2"
+
+STRINGTABLE
+{
+ // menu główne
+ IDS_MENU_LEFT,              "&Lewy"
+ IDS_MENU_LEFT_CHANGEDRIVE,  "&Zmień napęd\tAlt+F1"
+ IDS_MENU_LEFT_GO,           "&Przejdź do"
+ IDS_MENU_LEFT_GO_BACK,      "W&stecz\tAlt+Strzałka w lewo"
+ IDS_MENU_LEFT_GO_FORWARD,   "Da&lej\tAlt+Strzałka w prawo"
+ IDS_MENU_LEFT_GO_UPDIR,     "Katalog &nadrzędny\tBackspace"
+ IDS_MENU_LEFT_GO_ROOT,      "Katalog &główny\tShift+Backspace"
+ IDS_MENU_LEFT_GO_OTHER,     "Ścieżka z &drugiego panelu\tCtrl+."
+ IDS_MENU_LEFT_FILTER,       "&Filtr...\tCtrl+F12"
+ IDS_MENU_LEFT_VIEW,         "Wyb&ierz kolumny..."
+ IDS_MENU_LEFT_SORTBY,       "&Sortuj według"
+ IDS_MENU_LEFT_VSB,          "Po&każ"
+ IDS_MENU_LEFT_VSB_DIRLINE,  "Wiersz &katalogu"
+ IDS_MENU_LEFT_VSB_HDRLINE,  "Wiersz &nagłówka"
+ IDS_MENU_LEFT_VSB_INFOLINE, "Wiersz &informacji"
+ IDS_MENU_LEFT_REFRESH,      "&Odśwież\tCtrl+F9"
+ IDS_MENU_LEFT_ZOOM,         "&Maksymalizuj/Przywróć\tCtrl+F11"
+ IDS_MENU_LEFT_SWAPPANELS,   "Z&amień panele\tCtrl+U"
+ IDS_MENU_LEFT_SORTOPTIONS,  "&Opcje sortowania..."
+
+ IDS_MENU_FILES,             "&Pliki"
+ IDS_MENU_FILES_RENAME,      "&Szybka zmiana nazwy...\tF2"
+ IDS_MENU_FILES_VIEW,        "&Podgląd\tF3"
+ IDS_MENU_FILES_ALTVIEW,     "Podgląd &alternatywny\tAlt+F3"
+ IDS_MENU_FILES_VIEWWITH,    "Podgląd &za pomocą\tCtrl+Shift+F3"
+ IDS_MENU_FILES_EDIT,        "&Edytuj\tF4"
+ IDS_MENU_FILES_EDITNEW,     "Edytuj &nowy plik...\tShift+F4"
+ IDS_MENU_FILES_EDITWITH,    "Edytuj &za pomocą\tCtrl+Shift+F4"
+ IDS_MENU_FILES_COPY,        "&Kopiuj...\tF5"
+ IDS_MENU_FILES_MOVE,        "&Przenieś/Zmień nazwę...\tF6"
+ IDS_MENU_FILES_EMAIL,       "W&yślij e-mailem...\tCtrl+E"
+ IDS_MENU_FILES_DELETE,      "&Usuń\tF8"
+ IDS_MENU_FILES_PROPERTIES,  "Właści&wości\tAlt+Enter"
+ IDS_MENU_FILES_SECURITY,    "&Zabezpieczenia\tCtrl+P"
+
+ IDS_MENU_FILES_CHANGEATTR,  "Zmień &atrybuty...\tCtrl+F2"
+ IDS_MENU_FILES_CHANGECASE,  "Zmi&eń wielkość liter...\tCtrl+F7"
+ IDS_MENU_FILES_CONVERT,     "Kon&wertuj...\tCtrl+K"
+ IDS_MENU_FILES_COMPRESS,    "&Skompresuj (NTFS)..."
+ IDS_MENU_FILES_UNCOMPRESS,  "&Dekompresuj (NTFS)..."
+ IDS_MENU_FILES_PACK,        "&Spakuj...\tAlt+F5"
+ IDS_MENU_FILES_UNPACK,      "Rozpaku&j...\tAlt+F9"
+ IDS_MENU_FILES_NEW,         "No&wy"
+ IDS_MENU_FILES_EXIT,        "Za&kończ\tAlt+F4"
+ IDS_MENU_FILES_ENCRYPT,     "&Szyfruj (NTFS)..."
+ IDS_MENU_FILES_DECRYPT,     "&Odszyfruj (NTFS)..."
+ IDS_MENU_FILES_NTFS,        "Po&lecenia NTFS"
+
+ IDS_MENU_EDIT,              "&Edycja"
+ IDS_MENU_EDIT_CUT,          "Wy&tnij\tCtrl+X"
+ IDS_MENU_EDIT_COPY,         "&Kopiuj\tCtrl+C"
+ IDS_MENU_EDIT_COPYFULLNAME, "&Kopiuj ścieżkę i nazwę jako tekst\tAlt+Insert"
+ IDS_MENU_EDIT_COPYNAME,     "Kopiuj &nazwę jako tekst\tAlt+Shift+Insert"
+ IDS_MENU_EDIT_COPYFULLPATH, "Kopiuj ście&żkę jako tekst\tCtrl+Alt+Insert"
+ IDS_MENU_EDIT_COPYUNCNAME,  "Kopiuj ścieżkę &UNC i nazwę jako tekst\tCtrl+Shift+Insert"
+ IDS_MENU_EDIT_PASTE,        "W&klej\tCtrl+V"
+ IDS_MENU_EDIT_PASTELINKS,   "Wklej &skrót\tCtrl+S"
+ IDS_MENU_EDIT_SELECT,       "Z&aznacz...\tNum +"
+ IDS_MENU_EDIT_UNSELECT,     "&Odznacz...\tNum -"
+ IDS_MENU_EDIT_INVERTSEL,    "Od&wróć zaznaczenie\tNum *"
+ IDS_MENU_EDIT_SELECTALL,    "Zaznacz &wszystko\tCtrl+A"
+ IDS_MENU_EDIT_UNSELECTALL,  "&Odznacz wszystko\tCtrl+D"
+ IDS_MENU_EDIT_RESELECT,     "&Przywróć zaznaczenie\tCtrl+W"
+ IDS_MENU_EDIT_ADVANCED,     "Zaa&wansowane"
+ IDS_MENU_EDIT_BY_SELEXT,    "&Zaznacz o tym samym rozszerzeniu\tShift+Num +"
+ IDS_MENU_EDIT_BY_UNSELEXT,  "&Odznacz o tym samym rozszerzeniu\tShift+Num -"
+ IDS_MENU_EDIT_BY_SELNAME,   "Za&znacz o tej samej nazwie\tCtrl+Shift+Num +"
+ IDS_MENU_EDIT_BY_UNSELNAME, "O&dznacz o tej samej nazwie\tCtrl+Shift+Num -"
+ IDS_MENU_EDIT_STORESEL,     "Zap&isz zaznaczenie\tCtrl+Shift+F5"
+ IDS_MENU_EDIT_RESTORESEL,   "Wcz&ytaj zaznaczenie...\tCtrl+Shift+F6"
+ IDS_MENU_EDIT_PREVSEL,      "Przejdź do pop&rzedniej zaznaczonej nazwy\tAlt+Up"
+ IDS_MENU_EDIT_NEXTSEL,       "Przejdź do następ&nej zaznaczonej nazwy\tAlt+Down"
+ IDS_MENU_EDIT_HIDE_SEL,      "&Ukryj zaznaczone nazwy"
+ IDS_MENU_EDIT_HIDE_UNSEL,    "U&kryj niezaznaczone nazwy"
+ IDS_MENU_EDIT_SHOW_ALL,      "Pokaż &ukryte nazwy"
+
+ IDS_MENU_CMD,               "&Polecenia"
+ IDS_MENU_CMD_CREATEDIR,     "&Utwórz katalog...\tF7"
+ IDS_MENU_CMD_CHANGEDIR,     "&Zmień katalog...\tShift+F7"
+ IDS_MENU_CMD_COMPAREDIR,    "&Porównaj katalogi...\tCtrl+F10"
+ IDS_MENU_CMD_OCCUPIED,      "Oblicz z&ajmowane miejsce\tAlt+F10"
+ IDS_MENU_CMD_CALCDIRSIZES,  "Oblicz &rozmiary katalogów\tCtrl+Shift+F10"
+ IDS_MENU_CMD_MEMDIRSIZES,   "Zapamiętaj rozmiary katalogów\tCtrl+Alt+F10"
+ IDS_MENU_CMD_DRIVEINFO,     "Info&rmacje o napędzie...\tCtrl+F1"
+ IDS_MENU_CMD_FINDFILE,      "&Znajdź pliki i katalogi...\tAlt+F7"
+ IDS_MENU_CMD_FILELIST,      "U&twórz listę plików...\tCtrl+M"
+ IDS_MENU_CMD_FILEHISTORY,   "Lista otwartych plików\tAlt+F11"
+ IDS_MENU_CMD_DIRHISTORY,    "Lista katalogów roboczych\tAlt+F12"
+ IDS_MENU_CMD_CONNECTNET,    "Połącz &dysk sieciowy...\tF11"
+ IDS_MENU_CMD_DISCONNECTNET, "&Rozłącz...\tF12"
+ IDS_MENU_CMD_SHARES,        "Udostęp&nione katalogi...\tCtrl+Shift+F9"
+ IDS_MENU_CMD_SHELL,         "Wiersz &poleceń\tNum /"
+ IDS_MENU_CMD_REFRESHASSOC,  "&Odczytaj skojarzenia"
+ IDS_MENU_CMD_USERMENU,      "&Menu użytkownika\tF9"
+ IDS_MENU_CMD_FOCUSLNK,      "&Przejdź do skrótu lub celu łącza\tCtrl+T"
+ IDS_MENU_CMD_FLD,           "O&twórz folder"
+ IDS_MENU_CMD_FLD_ACTUAL,    "&Aktywny folder\tShift+F3"
+ IDS_MENU_CMD_FLD_DESKTOP,   "&Pulpit"
+ IDS_MENU_CMD_FLD_MYCOMP,    "Ko&mputer"
+ IDS_MENU_CMD_FLD_CTRLPANEL, "&Panel sterowania"
+ IDS_MENU_CMD_FLD_NET,       "&Sieć"
+ IDS_MENU_CMD_FLD_BIN,       "&Kosz"
+ IDS_MENU_CMD_FLD_FONTS,     "&Czcionki"
+ IDS_MENU_CMD_FLD_PRINTERS,  "&Drukarki"
+ IDS_MENU_CMD_FLD_RECENT,    "O&statnio używane dokumenty"
+ IDS_MENU_CMD_FLD_PERSONAL,  "Moje d&okumenty"
+ IDS_MENU_CMD_FLD_TEMPLATES, "Sz&ablony dokumentów"
+ IDS_MENU_CMD_FLD_SENDTO,    "Wyślij do kata&logu"
+ IDS_MENU_CMD_FLD_DESKTOPDIR,"Katalog p&ulpitu"
+ IDS_MENU_CMD_FLD_STARTMENU, "Grupy menu &Start"
+ IDS_MENU_CMD_FLD_PROGRAMS,  "Grupy &programów"
+ IDS_MENU_CMD_FLD_STARTUP,   "Grupa a&utostartu"
+
+ IDS_MENU_PLG,               "&Wtyczki"
+ IDS_MENU_PLG_PLUGINS,       "&Menedżer wtyczek..."
+ IDS_MENU_PLG_LASTCMD,       "Ostatnie polecenie\tCtrl+I"
+
+ IDS_MENU_OPT,               "&Opcje"
+ IDS_MENU_OPT_SKILLLEVEL,    "Poziom zaawan&sowania użytkownika..."
+ IDS_MENU_OPT_CONFIGURATION, "&Konfiguracja..."
+ IDS_MENU_OPT_PLUGINS_CFG,   "&Konfiguracja wtyczek"
+ IDS_MENU_OPT_ARCHAUTOCFG,   "&Autokonfiguracja archiwizatorów..."
+ IDS_MENU_OPT_CST,           "D&ostosuj"
+ IDS_MENU_OPT_CST_TOP,       "&Górny pasek narzędzi..."
+ IDS_MENU_OPT_CST_PLG,       "&Pasek wtyczek..."
+ IDS_MENU_OPT_CST_UM,        "&Pasek menu użytkownika..."
+ IDS_MENU_OPT_CST_HP,        "Pasek &szybkich ścieżek..."
+ IDS_MENU_OPT_CST_LEFT,      "Pasek narzędzi &lewego panelu..."
+ IDS_MENU_OPT_CST_RIGHT,     "Pasek narzędzi p&rawego panelu..."
+ IDS_MENU_OPT_CST_MID,       "&Środkowy pasek narzędzi..."
+ IDS_MENU_OPT_VSB,           "Po&każ"
+ IDS_MENU_OPT_VSB_TOP,       "&Górny pasek narzędzi"
+ IDS_MENU_OPT_VSB_PLG,       "&Pasek wtyczek"
+ IDS_MENU_OPT_VSB_HP,        "&Pasek szybkich ścieżek"
+ IDS_MENU_OPT_VSB_MID,       "Śro&dkowy pasek narzędzi"
+ IDS_MENU_OPT_VSB_UM,        "Pasek menu użyt&kownika"
+ IDS_MENU_OPT_VSB_DB,        "Pasek &napędów"
+ IDS_MENU_OPT_VSB_DB2,       "&Dwa paski napędów"
+ IDS_MENU_OPT_VSB_EDIT,      "Wiersz &poleceń"
+ IDS_MENU_OPT_VSB_BOTTOM,    "&Dolny pasek narzędzi"
+ IDS_MENU_OPT_VSB_UMLABELS,  "Etykie&ty tekstowe na pasku menu użytkownika"
+ IDS_MENU_OPT_VSB_GRIPS,     "&Zablokuj paski narzędzi"
+ IDS_MENU_OPT_SAVECONFIG,    "&Zapisz konfigurację"
+ IDS_MENU_OPT_EXPORTCONFIG,  "&Eksportuj konfigurację..."
+ IDS_MENU_OPT_IMPORTCONFIG,  "&Importuj konfigurację..."
+
+ IDS_MENU_RIGHT,             "&Prawy"
+ IDS_MENU_RIGHT_CHANGEDRIVE, "&Zmień napęd\tAlt+F2"
+
+ IDS_MENU_HELP,              "Pomo&c"
+ IDS_MENU_HELP_CONTENTS,     "&Spis treści\tF1"
+ IDS_MENU_HELP_INDEX,        "&Indeks..."
+ IDS_MENU_HELP_SEARCH,       "&Szukaj..."
+ IDS_MENU_HELP_KEYBOARD,     "&Skróty klawiaturowe"
+ IDS_MENU_HELP_CONTEXT,      "&Co to jest?\tShift+F1"
+ IDS_MENU_HELP_TASKLIST,     "Lista &zadań..."
+ IDS_MENU_HELP_FORUM,        "Oficjalne &forum pomocy technicznej"
+ IDS_MENU_HELP_ABOUTPLUGINS, "O &wtyczce"
+ IDS_MENU_HELP_ABOUT,        "&Informacje o Open Salamander"
+
+//
+// menu znajdowania plików
+//
+
+ IDS_FFMENU_FILES,          "&Pliki"
+ IDS_FFMENU_FILES_OPEN,     "&Otwórz\tEnter"
+ IDS_FFMENU_FILES_OPENSEL,  "Otwórz wszystkie &zaznaczone\tShift+Enter"
+ IDS_FFMENU_FILES_FOCUS,    "&Skup\tSpacja"
+ IDS_FFMENU_FILES_HIDE,     "&Ukryj\tCtrl+H"
+ IDS_FFMENU_FILES_HIDE_DUP, "Ukryj &duplikaty nazw\tCtrl+Shift+H"
+ IDS_FFMENU_FILES_VIEW,     "&Podgląd\tF3"
+ IDS_FFMENU_FILES_VIEWWITH, "Podgląd &za pomocą\tCtrl+Shift+F3"
+ IDS_FFMENU_FILES_ALT_VIEW, "&Podgląd alternatywny\tAlt+F3"
+ IDS_FFMENU_FILES_EDIT,     "&Edytuj\tF4"
+ IDS_FFMENU_FILES_EDITWITH, "Edytuj &za pomocą\tCtrl+Shift+F4"
+ IDS_FFMENU_FILES_DELETE,   "&Usuń\tF8";
+ IDS_FFMENU_FILES_USERMENU, "&Menu użytkownika\tF9"
+ IDS_FFMENU_FILES_PROP,     "Właści&wości\tAlt+Enter"
+ IDS_FFMENU_FILES_CLOSE,    "&Zamknij\tAlt+F4"
+ IDS_FFMENU_FILES_FIND,     "Po&lecenia"
+ IDS_FFMENU_FIND_NOW,       "&Znajdź teraz\tCtrl+F"
+ IDS_FFMENU_FIND_INTERSECT, "Zawęź - &część wspólna ze znalezionymi\tCtrl+I"
+ IDS_FFMENU_FIND_SUBTRACT,  "Zawęź - &odejmij od znalezionych\tCtrl+S"
+ IDS_FFMENU_FIND_APPEND,    "Do&daj do znalezionych\tCtrl+W"
+ IDS_FFMENU_FIND_DUPLICATES,"Znajdź &zduplikowane pliki...\tCtrl+D"
+ IDS_FFMENU_OPT_ERRORS,     "Pokaż &dziennik znajdowania...\tCtrl+L"
+
+ IDS_FFMENU_EDIT,              "&Edycja"
+ IDS_FFMENU_EDIT_CUT,          "Wy&tnij\tCtrl+X"
+ IDS_FFMENU_EDIT_COPY,         "&Kopiuj\tCtrl+C"
+ IDS_FFMENU_EDIT_COPYFULLNAME, "&Kopiuj ścieżkę i nazwę jako tekst\tAlt+Insert"
+ IDS_FFMENU_EDIT_COPYNAME,     "Kopiuj &nazwę jako tekst\tAlt+Shift+Insert"
+ IDS_FFMENU_EDIT_COPYFULLPATH, "Kopiuj ście&żkę jako tekst\tCtrl+Alt+Insert"
+ IDS_FFMENU_EDIT_COPYUNCNAME,  "Kopiuj ścieżkę &UNC i nazwę jako tekst\tCtrl+Shift+Insert"
+
+ IDS_FFMENU_EDIT_SELALL,    "Zaznacz &wszystko\tCtrl+A"
+ IDS_FFMENU_EDIT_INVERTSEL, "&Odwróć zaznaczenie"
+
+ IDS_FFMENU_VIEW,           "&Widok"
+ IDS_FFMENU_VIEW_NAME,      "Sortuj według &nazwy\tCtrl+F3"
+ IDS_FFMENU_VIEW_PATH,      "Sortuj według &ścieżki\tCtrl+F4"
+ IDS_FFMENU_VIEW_TIME,      "Sortuj według &czasu\tCtrl+F5"
+ IDS_FFMENU_VIEW_SIZE,      "Sortuj według &rozmiaru\tCtrl+F6"
+
+ IDS_FFMENU_OPTIONS,        "&Opcje"
+ IDS_FFMENU_OPT_SHOWERRORS, "&Pokaż komunikaty o błędach po zakończeniu znajdowania"
+ IDS_FFMENU_OPT_FULLROWSEL, "&Zaznaczanie całego wiersza"
+ IDS_FFMENU_OPT_ONEINSTANCE,"Zezwól tylko na &jedno okno znajdowania"
+ IDS_FFMENU_OPT_ADD,        "&Dodaj bieżące\tCtrl+N"
+ IDS_FFMENU_OPT_MANAGE,     "&Zarządzaj...\tCtrl+M"
+ IDS_FFMENU_OPT_IGNORE,     "&Ignoruj listę katalogów...\tCtrl+G"
+
+ IDS_FFMENU_HELP,           "Pomo&c"
+
+//
+// menu kontekstowe archiwum
+//
+
+ IDS_ARCHIVEMENU_OPEN,      "&Otwórz\tEnter"
+ IDS_ARCHIVEMENU_VIEW,      "&Podgląd\tF3"
+ IDS_ARCHIVEMENU_VIEWWITH,  "Podgląd &za pomocą\tCtrl+Shift+F3"
+ IDS_ARCHIVEMENU_ALT_VIEW,  "&Podgląd alternatywny\tAlt+F3"
+ IDS_ARCHIVEMENU_EDIT,      "&Edytuj\tF4"
+ IDS_ARCHIVEMENU_EDITWITH,  "Edytuj &za pomocą\tCtrl+Shift+F4"
+ IDS_ARCHIVEMENU_COPY,      "&Kopiuj...\tF5"
+ IDS_ARCHIVEMENU_DELETE,    "&Usuń...\tF8"
+ IDS_ARCHIVEMENU_CLIPCOPY,  "Kopiuj &do schowka\tCtrl+C"
+ IDS_ARCHIVEMENU_CLIPPASTE, "&Wklej\tCtrl+V"
+
+ // inne komunikaty
+ IDS_QUESTION, "Pytanie"
+ IDS_CANCELOPERATION, "Czy chcesz anulować tę operację?"
+
+ IDS_USERITEMNAME, "Nazwa elementu"
+ IDS_USERITEMCOMMAND, "Polecenie"
+
+ IDS_ALLFILTER, "Wszystkie pliki (*.*)|*.*|"
+ IDS_EXEFILTER, "Pliki wykonywalne (*.exe, *.pif, *.com)|*.exe;*.pif;*.com|Wszystkie pliki (*.*)|*.*|"
+ IDS_REGFILTER, "Plik rejestru (*.reg)|*.reg|"
+ IDS_ICOFILTER, "Pliki ikon (*exe, *.dll, *.ico)|*.exe;*.dll;*.ico|Programy (*.exe)|*exe|Biblioteki (*.dll)|*.dll|Ikony (*.ico)|*.ico|Wszystkie pliki (*.*)|*.*|"
+ IDS_PLUGINFILTER, "Pliki wtyczek (*.spl)|*.spl|Wszystkie pliki (*.*)|*.*|"
+
+ IDS_NETWORKERROR, "Błąd sieci"
+
+ IDS_COMPACT_DISK, "Dysk kompaktowy"
+ IDS_LOCAL_DISK, "Dysk lokalny"
+ IDS_REMOVABLE_DISK, "Dysk wymienny"
+
+ IDS_INCORRECTSYNTAX, "Maska pliku jest niepoprawna składniowo."
+
+ IDS_CANNOTCHECKPATH, "Nie można sprawdzić ścieżki."
+
+ IDS_PATHINVALID, "Ścieżka ma nieprawidłowy format."
+
+ IDS_CONFIGURATION, "Konfiguracja"
+
+ IDS_INFODLGYES, "tak"
+
+ IDS_INFODLGNO, "nie"
+
+ IDS_INFODLGFLAG1, "zachowuje wielkość liter nazw plików"
+ IDS_INFODLGFLAG2, "obsługuje nazwy plików z rozróżnianiem wielkości liter"
+ IDS_INFODLGFLAG3, "obsługuje nazwy plików w standardzie Unicode"
+ IDS_INFODLGFLAG4, "zachowuje i wymusza listy ACL (listy kontroli dostępu)"
+ IDS_INFODLGFLAG5, "obsługuje kompresję plików"
+ IDS_INFODLGFLAG6, "wolumin skompresowany"
+
+ IDS_INFODLGTYPE1, "dysk wymienny"
+ IDS_INFODLGTYPE2, "dysk lokalny"
+ IDS_INFODLGTYPE3, "dysk sieciowy"
+ IDS_INFODLGTYPE4, "dysk kompaktowy"
+ IDS_INFODLGTYPE5, "dysk RAM"
+ IDS_INFODLGTYPE6, "nieznany (typ: %d)"
+ IDS_INFODLGTYPE7, "(podst: %s)"
+ IDS_INFODLGTYPE8, "(nazwa: %s, użytkownik: %s)"
+ IDS_INFODLGTYPE9, "(punkt połączenia do: %s)"
+ IDS_INFODLGTYPE10, "(link symboliczny do: %s)"
+
+ IDS_NOMATCHESFOUND, "Nie znaleziono żadnych dopasowań."
+ IDS_INFOTITLE, "Informacja"
+
+ IDS_UNABLETOGETASSOC, "Nie można odczytać skojarzeń z rejestru.\nBłąd: %s"
+ IDS_UNABLETOGETASSOCTITLE, "Błąd odczytu skojarzeń"
+
+ IDS_TOOLONGNAME, "Nie można ukończyć operacji z powodu zbyt długiej nazwy."
+ IDS_TOOLONGNAME2, "Ścieżka do katalogu docelowego jest zbyt długa. Naciśnij przycisk Pomiń, aby pominąć cały katalog.\n\nŚcieżka: %s\n\nNazwa: %s"
+
+ IDS_ERRORTITLE, "Błąd"
+
+ IDS_ERRORFINDINGFILE, "Błąd znajdowania pliku"
+
+ IDS_STOPPED, "Zatrzymano."
+
+ IDS_FINDFILESADD, "Dodaj"
+
+ IDS_FINDFILESEDIT, "Edytuj"
+
+ IDS_COMMONPREFIXNOTFOUND, "Wszystkie pliki i katalogi muszą pochodzić z tego samego dysku."
+ IDS_FOUNDITEMNOTFOUND, "Niektóre zaznaczone pliki lub katalogi są niedostępne.\nNaciśnij przycisk Znajdź teraz, aby odświeżyć listę znalezionych elementów."
+
+ IDS_WANTTOSTOP, "Czy chcesz przerwać wyszukiwanie?"
+ IDS_WANTTOSTOPTITLE, "Znajdź pliki i katalogi"
+ IDS_WANTTOCLOSEFIND, "Czy chcesz zamknąć okno Znajdź?"
+ IDS_DONTSHOWAGAIN, "&Nie pokazuj tego komunikatu ponownie\tjak cofnąć\tMożesz zmienić tę opcję później na stronie Potwierdzenia w Konfiguracji."
+ IDS_DONTSHOWAGAINSE, "&Wysyłaj zaznaczone pliki e-mailem bez pytania następnym razem\tjak cofnąć\tMożesz zmienić tę opcję później na stronie Potwierdzenia w Konfiguracji."
+ IDS_DONTSHOWAGAINSS, "&Przerwij wyszukiwanie bez pytania następnym razem\tjak cofnąć\tMożesz zmienić tę opcję później na stronie Potwierdzenia w Konfiguracji."
+ IDS_DONTSHOWAGAINCF, "&Zamknij okno Znajdź bez pytania następnym razem\tjak cofnąć\tMożesz zmienić tę opcję później na stronie Potwierdzenia w Konfiguracji."
+ IDS_DONTSHOWAGAINAT, "&Włącz opcję Zawsze na wierzchu bez pytania następnym razem\tjak cofnąć\tMożesz zmienić tę opcję później na stronie Potwierdzenia w Konfiguracji."
+ IDS_DONTSHOWAGAINCS, "&Zamknij program Open Salamander bez pytania następnym razem\tjak cofnąć\tMożesz zmienić tę opcję później na stronie Potwierdzenia w Konfiguracji."
+ IDS_DONTSHOWAGAINCD, "&Utwórz katalog bez pytania następnym razem\tjak cofnąć\tMożesz zmienić tę opcję później na stronie Potwierdzenia w Konfiguracji."
+
+ IDS_CANTSHOWRESULTS, "Nie można pokazać wyników, brak pamięci."
+
+ IDS_INCLUDESUBDIRSYES, "tak"
+ IDS_INCLUDESUBDIRSNO, "nie"
+
+ IDS_FILEERRORFORMAT, "Plik: „%s”\nBłąd: %s"
+
+ IDS_DIRERRORFORMAT, "Błąd odczytu katalogu: %s"
+ IDS_ERROR_OPENING_FILE2, "Błąd otwierania pliku: %s"
+ IDS_ERROR_READING_FILE2, "Błąd odczytu pliku: %s"
+ IDS_FILEREADERROR2, "Nie można odczytać pliku."
+ IDS_GETLINKTGTFILESIZEERROR, "Błąd pobierania rozmiaru pliku docelowego łącza: %s"
+
+ IDS_SIZEMUSTBEPOSITIVE, "Rozmiar pliku musi być liczbą dodatnią."
+
+ IDS_INVALIDDATE, "Data ma nieprawidłowy format."
+
+ IDS_SIZE_LIMIT_16EB, "Rozmiar musi być mniejszy niż 16 EB."
+ IDS_SIZE_MAX_MIN, "Drugi rozmiar nie może być mniejszy niż pierwszy."
+ IDS_TIME_MIN, "Wartość minimalna to 1 sekunda."
+ IDS_TIME_MAX, "Wartość maksymalna to 300 lat."
+ IDS_SPECIFY_DATE, "Należy podać co najmniej jedną datę."
+ IDS_TIME_MAX_MIN, "Drugi czas nie może być mniejszy niż pierwszy."
+
+ IDS_FIND_NO_FILES_FOUND, "Nie znaleziono plików ani katalogów."
+ IDS_FIND_NO_DUPS_FOUND, "Nie znaleziono zduplikowanych plików."
+ IDS_FIND_INIT_HINT, "Określ opcje wyszukiwania i kliknij przycisk Znajdź teraz."
+ IDS_FIND_DUPS_NO_OPTION, "Należy wybrać co najmniej jedną opcję."
+ IDS_FIND_DUPS_RESULTS, "Określanie zduplikowanych plików..."
+
+ IDS_SEARCHFORCOLUMN1, "Maska"
+ IDS_SEARCHFORCOLUMN2, "Ścieżka"
+ IDS_SEARCHFORCOLUMN3, "Podkatalogi"
+
+ IDS_FOUNDFILESCOLUMN1, "Nazwa"
+ IDS_FOUNDFILESCOLUMN2, "Ścieżka"
+ IDS_FOUNDFILESCOLUMN3, "Rozmiar"
+ IDS_FOUNDFILESCOLUMN4, "Data"
+ IDS_FOUNDFILESCOLUMN5, "Czas"
+ IDS_FOUNDFILESCOLUMN6, "Atr."
+
+ IDS_FINDTB_FOCUS, "Skup"
+ IDS_FINDTBTT_FOCUS, "Skup element\tSpacja"
+ IDS_FINDTBTT_VIEW, "Podgląd pliku\tF3"
+ IDS_FINDTBTT_EDIT, "Edytuj plik\tF4"
+ IDS_FINDTBTT_DELETE, "Usuń plik\tF8"
+ IDS_FINDTBTT_USERMENU, "Menu użytkownika\tF9"
+ IDS_FINDTBTT_PROPERTIES, "Właściwości\tAlt+Enter"
+ IDS_FINDTBTT_CUT, "Wytnij\tCtrl+X"
+ IDS_FINDTBTT_COPY, "Kopiuj\tCtrl+C"
+ IDS_FINDTBTT_STOP, "Zatrzymaj\tAlt+P"
+ IDS_FINDTBTT_MESSAGES, "Komunikaty o błędach: %d\nKomunikaty informacyjne: %d\nKliknij, aby pokazać dziennik znajdowania"
+
+ IDS_TOOLONGPATH, "Podana ścieżka jest zbyt długa."
+
+ IDS_ERROREXECVIEW, "Nie można uruchomić zewnętrznej przeglądarki „%s”.\n\n%s"
+
+ IDS_ERROREXECEDIT, "Nie można uruchomić zewnętrznego edytora „%s”.\n\n%s"
+
+ IDS_EXECERROR, "Nie można uruchomić polecenia zewnętrznego „%s”.\n\n%s"
+
+ IDS_COMMANDSHELL, "Wiersz poleceń"
+
+ IDS_ERRORREADINGFILE, "Błąd odczytu pliku"
+
+ IDS_VIEWERTITLE, "Przeglądarka"
+
+ IDS_ERRORLOADCONFIG, "Błąd ładowania konfiguracji"
+
+ IDS_ERRORSAVECONFIG, "Błąd zapisywania konfiguracji"
+
+ IDS_UNEXPECTEDVALUETYPE, "Nieoczekiwany typ wartości."
+ IDS_UNEXPECTEDVALUE, "Nieoczekiwana wartość."
+
+ IDS_ERRORRENAMINGFILE, "Błąd zmiany nazwy pliku"
+
+ IDS_ERROROPENINGFILE, "Błąd otwierania pliku"
+
+ IDS_ERRORCREATINGFILE, "Błąd tworzenia pliku"
+
+ IDS_ERRORWRITINGFILE, "Błąd zapisu pliku"
+
+ IDS_ERROROVERWRITINGFILE, "Błąd nadpisywania pliku"
+
+ IDS_ERRORDELETINGFILE, "Błąd usuwania pliku"
+
+ IDS_ERRORCREATINGDIR, "Błąd tworzenia katalogu"
+
+ IDS_ERRORDELETINGDIR, "Błąd usuwania katalogu"
+ IDS_ERRORDELETINGDIRLINK, "Błąd usuwania punktu ponownej analizy"
+
+ IDS_ERRORCHANGINGATTRS, "Błąd zmiany atrybutów"
+
+ IDS_ERRORCOMPRESSING, "Błąd zmiany kompresji"
+ IDS_ERRORENCRYPTING, "Błąd zmiany szyfrowania"
+
+ IDS_CONFIRMFILEOVERWRITING, "Potwierdź nadpisanie pliku"
+
+ IDS_ERRORGETTINGLINKTGTSIZE, "Błąd pobierania rozmiaru pliku docelowego łącza"
+
+ IDS_WANTOVERWRITESHFILE, "Czy chcesz nadpisać plik z atrybutem SYSTEM lub UKRYTY?"
+
+ IDS_TERMINATEDBYUSER, "Anulowano sprawdzanie ścieżki.\nSprawdzana ścieżka: „%s”."
+ IDS_CHECKINGPATHESC, "Sprawdzanie ścieżki „%s”, naciśnij klawisz ESC, aby anulować..."
+
+ IDS_NODISKINDRIVE, "Brak dysku w stacji %s.\n\nWłóż dysk i spróbuj ponownie."
+
+ IDS_DIRNAMEINVALID, "Ścieżka lub nazwa pliku „%s” jest nieprawidłowa."
+
+ IDS_NOFILESFOUND, "Nie znaleziono pliku ani katalogu"
+
+ IDS_SEPARATOR, "Separator"
+
+ IDS_DIRCOLUMN, "KAT"
+
+ IDS_CHANGECASE, "Zmień wielkość liter"
+
+ IDS_DATEORTIMEINVALID, "Data lub czas mają nieprawidłowy format."
+
+ IDS_CHANGEATTRSTITLE, "Zmień atrybuty"
+
+ IDS_EDITNEWFILE_DEFAULTNAME, "nowy.txt"
+
+ IDS_CREATEDIRECTORY_TITLE, "Utwórz katalog"
+ IDS_CREATEDIRECTORY_TEXT, "Nazwa katalogu:"
+
+ IDS_EDITNEWFILE, "Edytuj nowy plik"
+ IDS_NEWFILENAME, "Nazwa nowego pliku:"
+
+ IDS_SERVERNAMEMISSING, "W podanej ścieżce brakuje nazwy serwera."
+ IDS_SHARENAMEMISSING, "W podanej ścieżce brakuje nazwy udziału."
+ IDS_INVALIDDRIVE, "W podanej ścieżce znajduje się nieprawidłowy dysk."
+
+ IDS_COMPAREDIR_ARE_IDENTICAL, "Pliki w dwóch katalogach są identyczne."
+ IDS_COMPAREDIR_SEEMS_IDENTICAL, "Pliki w dwóch katalogach wydają się identyczne."
+
+ IDS_COMPAREDIRSTITLE, "Porównaj katalogi"
+
+ IDS_ERROREXECCMDLINE, "Błąd wykonywania wiersza poleceń"
+
+ IDS_ERROREXECPROMPT, "Błąd wykonywania wiersza polecenia"
+
+ IDS_RENAME_TITLE, "Szybka zmiana nazwy"
+ IDS_RENAME_TO, "Zmień nazwę %s na"
+
+ IDS_COPY, "Kopiuj"
+
+ IDS_MOVE, "Przenieś/Zmień nazwę"
+
+ IDS_DELETE, "Usuń"
+
+ IDS_PATHISINVALID, "Podana ścieżka jest nieprawidłowa."
+
+ IDS_ERRORCOPY, "Błąd kopiowania"
+
+ IDS_ERRORMOVE, "Błąd przenoszenia"
+
+ IDS_NAMEISTOOLONG, "Nazwa „%s” wraz z pełną ścieżką jest zbyt długa.\n\nŚcieżka: %s"
+
+ IDS_ERRORBUILDINGSCRIPT, "Błąd tworzenia skryptu"
+
+ IDS_CANNOTREADDIR, "Nie można odczytać katalogu „%s”.\n%s"
+
+ IDS_CANNOTCOPYFILETOITSELF, "Nie można skopiować pliku do samego siebie."
+
+ IDS_STRINGISNOTHEX, "Ciąg nie jest prawidłowym wzorcem szesnastkowym."
+
+ IDS_BADTABSIZE, "Rozmiar tabulacji musi być w zakresie od 1 do 30."
+
+ IDS_BADTIMERESOLUTION, "Rozdzielczość czasu musi być w zakresie od 0 do 3600 s"
+
+ IDS_UNABLETOVIEWFILENT, "Nie można wyświetlić plików o rozmiarze większym niż 8 EB."
+
+ IDS_VIEWERFILTER, "Wszystkie pliki (*.*)|*.*|"
+
+ IDS_CONFIRMSHFILEDELETE, "Potwierdź usunięcie pliku"
+ IDS_DELETESHFILE, "Czy chcesz usunąć plik z atrybutem SYSTEM lub UKRYTY?"
+
+ IDS_CONFIRMSFILEENCRYPT, "Potwierdź szyfrowanie pliku"
+ IDS_ENCRYPTSFILE, "Czy chcesz zaszyfrować plik z atrybutem SYSTEM?"
+
+ IDS_NAMEALREADYUSED, "Ta nazwa została już użyta dla pliku."
+
+ IDS_DELETESHDIR, "Katalog „%s” ma atrybut SYSTEM lub UKRYTY.\nCzy chcesz go usunąć?"
+
+ IDS_COMPRNOTSUPPORTED, "Kompresja nie jest obsługiwana na tym woluminie ani w tym systemie operacyjnym."
+ IDS_ENCRYPNOTSUPPORTED, "Szyfrowanie nie jest obsługiwane na tym woluminie ani w tym systemie operacyjnym."
+
+ IDS_COPYING, "Kopiowanie"
+ IDS_COPYINGPREP, "do"
+ IDS_MOVING, "Przenoszenie"
+ IDS_MOVINGPREP, "do"
+ IDS_CREATINGDIR, "Tworzenie"
+ IDS_DELETING, "Usuwanie"
+ IDS_CHANGINGATTRS, "Zmiana"
+
+ IDS_FINDTITLE, "Znajdź"
+ IDS_EMPTYMATCH, "Wyrażenie regularne dopasowuje pusty ciąg."
+
+ IDS_REGEXPERROR1, "Brak błędu"
+ IDS_REGEXPERROR2, "Za mało pamięci"
+ IDS_REGEXPERROR3, "Wyrażenie regularne jest puste"
+ IDS_REGEXPERROR4, "Wyrażenie regularne jest zbyt duże"
+ IDS_REGEXPERROR5, "Zbyt wiele nawiasów ()"
+ IDS_REGEXPERROR6, "Niedopasowane nawiasy ()"
+ IDS_REGEXPERROR7, "Operand *+ może być pusty"
+ IDS_REGEXPERROR8, "Zagnieżdżone *?+"
+ IDS_REGEXPERROR9, "Nieprawidłowy zakres []"
+ IDS_REGEXPERROR10, "Niedopasowane nawiasy []"
+ IDS_REGEXPERROR11, "Po ?+* nic nie następuje"
+ IDS_REGEXPERROR12, "Końcowy znak \\"
+ IDS_REGEXPERROR13, "Błąd wewnętrzny"
+
+ IDS_CANNOTMOVEFILETOITSELF, "Nie można przenieść pliku do samego siebie."
+
+ IDS_CANNOTMOVEDIRTOITSELF, "Nie można przenieść katalogu do samego siebie."
+
+ IDS_NOTENOUGHSPACE, "Wydaje się, że na dysku docelowym nie ma wystarczającej ilości miejsca.\nCzy chcesz kontynuować?\n\nWymagane miejsce: %s bajtów.\nDostępne miejsce: %s bajtów."
+
+ IDS_ERRORCHANGINGDIR, "Błąd zmiany katalogu"
+
+ IDS_LOSTCHANGEDDATA1, "Zmieniono tylko dane tymczasowe (użyj przycisku Dodaj lub Modyfikuj, aby zmienić element Menu użytkownika).\n\nCzy chcesz utracić te zmiany?"
+
+ IDS_LOSTCHANGEDDATA2, "Zmieniono tylko dane tymczasowe (użyj przycisku Ustaw, aby zmienić szybką ścieżkę).\n\nCzy chcesz utracić te zmiany?"
+
+ IDS_NAMEALREADYUSEDFORDIR, "Ta nazwa została już użyta dla katalogu."
+ IDS_FILEALREADYEXIST, "Plik „%s” już istnieje.\n\nCzy chcesz go zastąpić?"
+
+ IDS_PASTE_CHANGE_DIRECTORY, "Zmień katalog"
+
+ IDS_ALWAYSONTOP, "Zawsze na wier&zchu"
+ IDS_WANTALWAYSONTOP, "Opcja Zawsze na wierzchu uniemożliwia otwieranie innych okien aplikacji nad oknami programu Open Salamander. Nie będzie można otwierać tych okien na wierzchu, dopóki nie wyłączysz opcji Zawsze na wierzchu."
+
+ IDS_EMPTYHOTPATHS, "Puste (użyj Ctrl+Shift+klawisz numeryczny, aby przypisać szybką ścieżkę)"
+ IDS_NEWHOTPATH, "(Nowa szybka ścieżka)\tCtrl+Shift+="
+ IDS_EMPTYUSERMENU, "(Puste)"
+ IDS_ENDUSERSUBMENU, "(Koniec podmenu)"
+ IDS_EMPTYPLUGINSMENU1, "(Nie zainstalowano żadnych wtyczek)"
+ IDS_EMPTYPLUGINSMENU2, "(Brak konfigurowalnych wtyczek)"
+
+ IDS_MYDOCUMENTS, "Dokumenty"
+ IDS_GOOGLEDRIVE, "Dysk Google"
+ IDS_DROPBOX, "Dropbox"
+ IDS_ONEDRIVE, "OneDrive"
+ IDS_ONEDRIVEPERSONAL, "Osobiste"
+ IDS_NETWORKDRIVE, "Sieć"
+ IDS_ANOTHERPANEL, "Jako drugi panel"
+
+ IDS_CHANGEDRIVE, "Zmień napęd"
+ IDS_CHANGEDRIVETEXT, "Wybierz ścieżkę sieciową, którą chcesz odwiedzić."
+
+ IDS_BROWSECHANGEDIRTEXT, "Wybierz katalog, który chcesz odwiedzić."
+
+ IDS_BROWSETARGETDIRECTORY, "Wybierz katalog docelowy."
+
+ IDS_VIEWEROFFSETTIP, "przesunięcie: %s"
+
+ // opis czcionki w oknie dialogowym konfiguracji   "10 pt. MS Shell Dlg"
+ IDS_FONTDESCRIPTION, "%d pt. %s (%s)"
+ IDS_FONTDESCRIPTION_DEF, "czcionka domyślna"
+ IDS_FONTDESCRIPTION_CST, "czcionka niestandardowa"
+
+ // przyciski okien dialogowych
+ IDS_BUTTON_OK, "OK"
+ IDS_BUTTON_CANCEL, "Anuluj"
+ IDS_BUTTON_HELP, "Pomoc"
+ IDS_BUTTON_ABORT, "&Przerwij"
+ IDS_BUTTON_RETRY, "&Ponów"
+ IDS_BUTTON_IGNORE, "&Ignoruj"
+ IDS_BUTTON_TRY, "&Spróbuj ponownie"
+ IDS_BUTTON_CONTINUE, "Kont&ynuuj"
+ IDS_BUTTON_YES, "&Tak"
+ IDS_BUTTON_NO, "&Nie"
+
+ // nazwa strony konfiguracji Przeglądarki alternatywne
+ IDS_ALTVIEWERS, "Przeglądarki alternatywne"
+
+ // elementy menu Polecenie, Argumenty i Katalog początkowy
+ IDS_EXECUTE_DRIVE,       "Dysk"
+ IDS_EXECUTE_PATH,        "Ścieżka"
+ IDS_EXECUTE_DOSPATH,     "Ścieżka DOS"
+ IDS_EXECUTE_NAME,        "Nazwa"
+ IDS_EXECUTE_DOSNAME,     "Nazwa DOS"
+ IDS_EXECUTE_ENV,         "Zmienna środowiskowa"
+ IDS_EXECUTE_FULLNAME,    "Pełna nazwa"
+ IDS_EXECUTE_DOSFULLNAME, "Pełna nazwa DOS"
+ IDS_EXECUTE_FULLPATH,    "Pełna ścieżka"
+ IDS_EXECUTE_WINDIR,      "Katalog systemu Windows"
+ IDS_EXECUTE_SYSDIR,      "Katalog systemowy"
+ IDS_EXECUTE_SALDIR,      "Katalog programu Salamander"
+ IDS_EXECUTE_BROWSE,      "Przeglądaj..."
+ IDS_EXECUTE_DOSFULLPATH, "Pełna ścieżka DOS"
+ IDS_EXECUTE_DOSWINDIR,   "Katalog systemu Windows w formacie DOS"
+ IDS_EXECUTE_DOSSYSDIR,   "Katalog systemowy w formacie DOS"
+ IDS_EXECUTE_NAMEPART,    "Część nazwy"
+ IDS_EXECUTE_EXTPART,     "Część rozszerzenia"
+ IDS_EXECUTE_DOSNAMEPART, "Część nazwy DOS"
+ IDS_EXECUTE_DOSEXTPART,  "Część rozszerzenia DOS"
+
+ IDS_EXECUTE_ADVANCEDMENU,       "Zaawansowane"
+ IDS_EXECUTE_FULLPATHINACTIVE,   "Pełna ścieżka w panelu nieaktywnym"
+ IDS_EXECUTE_FULLPATHLEFT,       "Pełna ścieżka w panelu lewym"
+ IDS_EXECUTE_FULLPATHRIGHT,      "Pełna ścieżka w panelu prawym"
+ IDS_EXECUTE_COMPAREDFILELEFT,   "Pierwszy plik do porównania (preferuj panel lewy)"
+ IDS_EXECUTE_COMPAREDFILERIGHT,  "Drugi plik do porównania (preferuj panel prawy)"
+ IDS_EXECUTE_COMPAREDDIRLEFT,    "Pierwszy katalog do porównania (preferuj panel lewy)"
+ IDS_EXECUTE_COMPAREDDIRRIGHT,   "Drugi katalog do porównania (preferuj panel prawy)"
+ IDS_EXECUTE_COMPAREDFILEACT,    "Pierwszy plik do porównania (preferuj panel aktywny)"
+ IDS_EXECUTE_COMPAREDFILEINACT,  "Drugi plik do porównania (preferuj panel nieaktywny)"
+ IDS_EXECUTE_COMPAREDDIRACT,     "Pierwszy katalog do porównania (preferuj panel aktywny)"
+ IDS_EXECUTE_COMPAREDDIRINACT,   "Drugi katalog do porównania (preferuj panel nieaktywny)"
+ IDS_EXECUTE_LISTOFSELNAMES,     "Lista zaznaczonych nazw"
+ IDS_EXECUTE_LISTOFSELFULLNAMES, "Lista zaznaczonych nazw ze ścieżką"
+ IDS_EXECUTE_COMPAREDLEFT,       "Pierwszy plik lub katalog do porównania (preferuj panel lewy)"
+ IDS_EXECUTE_COMPAREDRIGHT,      "Drugi plik lub katalog do porównania (preferuj panel prawy)"
+ IDS_EXECUTE_COMPAREDACT,        "Pierwszy plik lub katalog do porównania (preferuj panel aktywny)"
+ IDS_EXECUTE_COMPAREDINACT,      "Drugi plik lub katalog do porównania (preferuj panel nieaktywny)"
+
+ // elementy menu wyrażeń regularnych
+ IDS_REGEXP_ANYCHAR,            "Dowolny znak"
+ IDS_REGEXP_SETOFCHAR,          "Dowolny ze zbioru znaków"
+ IDS_REGEXP_NOTSETOFCHAR,       "Dowolny spoza zbioru znaków"
+ IDS_REGEXP_RANGEOFCHAR,        "Dowolny z zakresu znaków"
+ IDS_REGEXP_BEGINOFLINE,        "Początek wiersza"
+ IDS_REGEXP_ENDOFLINE,          "Koniec wiersza"
+ IDS_REGEXP_OR,                 "Lub"
+ IDS_REGEXP_0ORMORE,            "0 lub więcej dopasowań"
+ IDS_REGEXP_1ORMORE,            "1 lub więcej dopasowań"
+ IDS_REGEXP_0OR1,               "0 lub 1 dopasowanie"
+
+ IDS_REGEXP_ALPHANUMERIC_CHAR,  "Znak alfanumeryczny"
+ IDS_REGEXP_ALPHABETIC_CHAR,    "Znak alfabetyczny"
+ IDS_REGEXP_DECIMAL_DIGIT,      "Cyfra dziesiętna"
+
+ IDS_REGEXP_PARENTHESIS_L_CHAR,  "Lewy nawias '('"
+ IDS_REGEXP_PARENTHESIS_R_CHAR,  "Prawy nawias ')'"
+ IDS_REGEXP_DOT_CHAR,            "Kropka '.'"
+ IDS_REGEXP_PLUS_CHAR,           "Plus '+'"
+ IDS_REGEXP_ASTERISK_CHAR,       "Gwiazdka '*'"
+
+ IDS_REGEXP_DECIMAL_NUMBER,     "Liczba dziesiętna"
+ IDS_REGEXP_HEXADECIMAL_NUMBER, "Liczba szesnastkowa"
+ IDS_REGEXP_REAL_NUMBER,        "Liczba rzeczywista"
+
+ IDS_REGEXP_QUOTED_STRING,      "Ciąg w cudzysłowie"
+ IDS_REGEXP_ALPHABETIC_STRING,  "Ciąg alfabetyczny"
+ IDS_REGEXP_IDENTIFIER,         "Identyfikator"
+
+ IDS_REGEXP_HELP,               "Pomoc dotycząca wyrażeń regularnych..."
+
+ IDS_VIEWWITH_EMPTY,            "Puste (użyj Konfiguracji, aby zdefiniować przeglądarki)"
+ IDS_EDITWITH_EMPTY,            "Puste (użyj Konfiguracji, aby zdefiniować edytory)"
+
+ // elementy menu kontekstowego
+ IDS_SETHOTPATH,         "&Przypisz szybką ścieżkę"
+ IDS_TOPTOOLBAR,         "&Górny pasek narzędzi"
+ IDS_PLUGINSBAR,         "&Pasek wtyczek"
+ IDS_UMTOOLBAR,          "&Pasek menu użytkownika"
+ IDS_HPTOOLBAR,          "&Pasek szybkich ścieżek"
+ IDS_DRIVEBAR,           "&Pasek napędów"
+ IDS_DRIVEBAR2,          "D&wa paski napędów"
+ IDS_COMMANDLINE,        "Wiersz &poleceń"
+ IDS_BOTTOMTOOLBAR,      "&Dolny pasek narzędzi"
+ IDS_CUSTOMIZE,          "&Dostosuj pasek narzędzi..."
+ IDS_SHOWLABELS,         "Etykie&ty tekstowe na pasku menu użytkownika"
+ IDS_GRIPSINTOOLBAR,     "&Zablokuj paski narzędzi"
+ IDS_MIDDLETOOLBAR,      "Śro&dkowy pasek narzędzi"
+ IDS_CHANGEDIRECTORY,    "Zmień &katalog...\tShift+F7"
+ // Zachowaj logiczne wymiary pikseli przy wyborze rozmiaru paska narzędzi.
+ IDS_TOOLBAR_ICON_SIZE_SMALL,  "Mały (16x16 pikseli)"
+ IDS_TOOLBAR_ICON_SIZE_MEDIUM, "Średni (24x24 piksele)"
+ IDS_TOOLBAR_ICON_SIZE_LARGE,  "Duży (32x32 piksele)"
+
+ IDS_HDR_ELASTIC,        "Automatyczna szerokość kolumny"
+ IDS_HDR_SMARTMODE,      "Tryb inteligentnych kolumn\tCtrl+N"
+ IDS_HDR_EXTENSION,      "Oddzielone rozszerzenie pliku\tCtrl+E"
+ IDS_HDR_DOS,            "Nazwa &DOS (8.3)"
+ IDS_HDR_SIZE,           "&Rozmiar pliku"
+ IDS_HDR_DATE,           "Data ostatniego &zapisu"
+ IDS_HDR_TIME,           "Czas ostatniego &zapisu"
+ IDS_HDR_ATTR,           "&Atrybuty pliku"
+ IDS_DIRECTORYLINE,      "Wiersz &katalogu"
+ IDS_HEADERLINE,         "&Wiersz nagłówka"
+ IDS_INFORMATIONLINE,    "&Wiersz informacji"
+ IDS_CUSTOMIZEPANEL,     "Dostosuj &pasek narzędzi panelu..."
+
+// elementy menu Zawartość wiersza informacji
+ IDS_FILEDATA_FILENAME,    "Nazwa pliku"
+ IDS_FILEDATA_FILESIZE,    "Rozmiar pliku"
+ IDS_FILEDATA_FILEDATE,    "Data ostatniego zapisu"
+ IDS_FILEDATA_FILETIME,    "Czas ostatniego zapisu"
+ IDS_FILEDATA_FILEATTR,    "Atrybuty pliku"
+ IDS_FILEDATA_FILEDOSNAME, "Nazwa DOS (8.3)"
+// elementy polecenia Utwórz listę plików
+ IDS_FILEDATA_FILENAMEPART,"Część nazwy pliku"
+ IDS_FILEDATA_FILEEXTENSION,"Część rozszerzenia pliku"
+
+ IDS_FILEDATA_LF,           "LF (koniec wiersza Unix)"
+ IDS_FILEDATA_CR,           "CR (koniec wiersza MAC)"
+ IDS_FILEDATA_CRLF,         "CRLF (koniec wiersza DOS, Windows, OS/2)"
+ IDS_FILEDATA_TAB,          "TAB"
+
+ // przyciski paska narzędzi pola listy Edytuj
+ IDS_EDTLB_MODIFY, "Modyfikuj (F2)"
+ IDS_EDTLB_NEW, "Nowy (Insert)"
+ IDS_EDTLB_DELETE, "Usuń (Delete)"
+ IDS_EDTLB_SORT, "Sortuj elementy alfabetycznie"
+ IDS_EDTLB_UP, "Przenieś element w górę (Alt + Strzałka w górę)"
+ IDS_EDTLB_DOWN, "Przenieś element w dół (Alt + Strzałka w dół)"
+
+ // Teksty dolnego paska narzędzi dla klawiszy F1 - F12
+ IDS_BTBTEXTS,     "Pomoc,Zmień nazwę,Podgląd,Edytuj,Kopiuj,Przenieś,Utwórz katalog,Usuń,Menu użytkownika,Menu,Połącz,Rozłącz"
+ // Alt
+ IDS_BTBTEXTS_A,   "LZmNapr,PZmNapr,Podgląd alt.,Zakończ,Spakuj,Rozpakuj,Znajdź,,Rozpakuj,Oblicz miejsce,Otwórz pliki,Katalogi robocze"
+ // Ctrl
+ IDS_BTBTEXTS_C,   "Inf. napędu,Zm. atrybuty,Według nazwy,Według rozszerzenia,Według czasu,Według rozmiaru,Zm. wielkość liter,,Odśwież,Porównaj,Pełny ekran,Filtr"
+ // Shift
+ IDS_BTBTEXTS_S,   "Pomoc kontekstowa,,Aktywny folder,Edytuj nowy,,,Zmień katalog,Usuń,Szybkie ścieżki,Menu kontekstowe,,"
+ // Ctrl+Shift
+ IDS_BTBTEXTS_CS,  ",,Podgląd za pomocą,Edytuj za pomocą,Zapisz zazn.,Wczytaj zazn.,,,Udostępnione,Rozmiary katalogów,Pełny ekran,"
+ // Alt+Shift
+ IDS_BTBTEXTS_AS,  ",,,,,,,,,Menu katalogu,,"
+ // Menu
+ IDS_BTBTEXTS_MENU,"Pomoc,,,,,,,,,Menu,,"
+
+ // Podpowiedzi paska narzędzi
+ IDS_TBTT_CONNECTNET,          "Połącz dysk sieciowy\tF11"
+ IDS_TBTT_DISCONNECTNET,       "Rozłącz\tF12"
+ IDS_TBTT_CREATEDIR,           "Utwórz katalog\tF7"
+ IDS_TBTT_NEW,                 "Nowy"
+ IDS_TBTT_FINDFILE,            "Znajdź pliki i katalogi\tAlt+F7"
+ IDS_TBTT_VIEW_MODE,           "Widoki"
+ IDS_TBTT_SORTBYNAME,          "Sortuj według nazwy\tCtrl+F3"
+ IDS_TBTT_SORTBYEXT,           "Sortuj według rozszerzenia\tCtrl+F4"
+ IDS_TBTT_SORTBYSIZE,          "Sortuj według rozmiaru\tCtrl+F6"
+ IDS_TBTT_SORTBYDATE,          "Sortuj według daty\tCtrl+F5"
+ IDS_TBTT_PARENTDIR,           "Katalog nadrzędny\tBackspace"
+ IDS_TBTT_ROOTDIR,             "Katalog główny\tShift+Backspace"
+ IDS_TBTT_FILTER,              "Filtr\tCtrl+F12"
+ IDS_TBTT_BACK,                "Wstecz\tAlt+Strzałka w lewo"
+ IDS_TBTT_FORWARD,             "Dalej\tAlt+Strzałka w prawo"
+ IDS_TBTT_REFRESH,             "Odśwież\tCtrl+F9"
+ IDS_TBTT_SWAPPANELS,          "Zamień panele\tCtrl+U"
+ IDS_TBTT_PROPERTIES,          "Właściwości\tAlt+Enter"
+ IDS_TBTT_USERMENU,            "Menu użytkownika\tF9"
+ IDS_TBTT_COMMANDSHELL,        "Wiersz poleceń\tNum /"
+ IDS_TBTT_COPY,                "Kopiuj\tF5"
+ IDS_TBTT_MOVE,                "Przenieś\tF6"
+ IDS_TBTT_DELETE,              "Usuń\tF8"
+ IDS_TBTT_COMPRESS,            "Kompresja NTFS"
+ IDS_TBTT_UNCOMPRESS,          "Dekompresja NTFS"
+ IDS_TBTT_QUICKRENAME,         "Szybka zmiana nazwy\tF2"
+ IDS_TBTT_CHANGECASE,          "Zmień wielkość liter\tCtrl+F7"
+ IDS_TBTT_VIEW,                "Podgląd\tF3"
+ IDS_TBTT_CLIPBOARDCUT,        "Wytnij do schowka\tCtrl+X"
+ IDS_TBTT_CLIPBOARDCOPY,       "Kopiuj do schowka\tCtrl+C"
+ IDS_TBTT_CLIPBOARDPASTE,      "Wklej ze schowka\tCtrl+V"
+ IDS_TBTT_PERMISSIONS,         "Zabezpieczenia\tCtrl+P"
+ IDS_TBTT_CHANGEATTR,          "Zmień atrybuty\tCtrl+F2"
+ IDS_TBTT_COMPAREDIR,          "Porównaj katalogi\tCtrl+F10"
+ IDS_TBTT_DRIVEINFO,           "Informacje o napędzie\tCtrl+F1"
+ IDS_TBTT_HELP,                "Spis treści pomocy"
+ IDS_TBTT_CONTEXTHELP,         "Co to jest?\tShift+F1"
+ IDS_TBTT_CHANGEDRIVE,         "Zmień napęd"
+ IDS_TBTT_EDIT,                "Edytuj\tF4"
+ IDS_TBTT_OPENINOTHER_A,        "Skup nazwę w drugim panelu"
+ IDS_TBTT_OPENINOTHER,          "Otwórz nazwę w drugim panelu"
+ IDS_TBTT_ASOTHERPANEL,         "Przejdź do ścieżki z drugiego panelu"
+ IDS_TBTT_HIDE_SELECTED,        "Ukryj zaznaczone nazwy"
+ IDS_TBTT_HIDE_UNSELECTED,      "Ukryj niezaznaczone nazwy"
+ IDS_TBTT_SHOW_ALL,             "Pokaż ukryte nazwy"
+
+ IDS_TBTT_SELECT,              "Zaznacz\tNum +"
+ IDS_TBTT_UNSELECT,            "Odznacz\tNum -"
+ IDS_TBTT_INVERTSEL,           "Odwróć zaznaczenie\tNum *"
+ IDS_TBTT_SELECTALL,           "Zaznacz wszystko\tCtrl+A"
+ IDS_TBTT_UNSELECTALL,         "Odznacz wszystko\tCtrl+D"
+
+ IDS_TBTT_PACK,                "Spakuj\tAlt+F5"
+ IDS_TBTT_UNPACK,              "Rozpakuj\tAlt+F9"
+
+ IDS_TBTT_OPENACTIVE,          "Otwórz aktywny folder\tShift+F3"
+ IDS_TBTT_OPENDESKTOP,         "Otwórz pulpit"
+ IDS_TBTT_OPENMYCOMP,          "Otwórz komputer"
+ IDS_TBTT_OPENCONTROL,         "Otwórz panel sterowania"
+ IDS_TBTT_OPENPRINTERS,        "Otwórz drukarki"
+ IDS_TBTT_OPENNETWORK,         "Otwórz sieć"
+ IDS_TBTT_OPENRECYCLE,         "Otwórz kosz"
+ IDS_TBTT_OPENFONTS,           "Otwórz czcionki"
+ IDS_TBTT_OPENMYDOC,           "Otwórz dokumenty"
+
+ IDS_TBTT_SMARTMODE,           "Tryb inteligentnych kolumn\tCtrl+N"
+
+ IDS_TBTT_CONVERT,             "Konwertuj\tCtrl+K"
+
+ IDS_TBTT_MENU,                 "Wejdź lub opuść menu"
+ IDS_TBTT_ALTVIEW,              "Podgląd alternatywny"
+ IDS_TBTT_EXIT,                 "Zakończ program Open Salamander"
+ IDS_TBTT_OCCUPIEDSPACE,        "Oblicz zajmowane miejsce\tAlt+F10"
+ IDS_TBTT_EDITNEW,              "Edytuj nowy plik\tShift+F4"
+ IDS_TBTT_CHANGEDIR,            "Zmień katalog\tShift+F7"
+ IDS_TBTT_HOTPATHS,             "Wyświetl szybkie ścieżki"
+ IDS_TBTT_CONTEXTMENU,          "Wyświetl menu kontekstowe"
+ IDS_TBTT_VIEWWITH,             "Podgląd za pomocą"
+ IDS_TBTT_EDITWITH,             "Edytuj za pomocą"
+ IDS_TBTT_CALCDIRSIZES,         "Oblicz rozmiary katalogów\tCtrl+Shift+F10"
+ IDS_TBTT_FILEHISTORY,          "Lista otwartych plików"
+ IDS_TBTT_DIRHISTORY,           "Lista katalogów roboczych"
+ IDS_TBTT_HOTPATHSDROP,         "Przejdź do szybkiej ścieżki\tShift+F9"
+ IDS_TBTT_EMAIL,                "Wyślij e-mailem"
+ IDS_TBTT_ZOOMPANEL,            "Maksymalizuj/Przywróć panel"
+ IDS_TBTT_SHARES,               "Udostępnione katalogi\tCtrl+Shift+F9"
+ IDS_TBTT_FULLSCREEN,           "Przełącz tryb pełnoekranowy"
+ IDS_TBTT_PREV_SEL,             "Przejdź do poprzedniej zaznaczonej nazwy\tAlt+Up"
+ IDS_TBTT_NEXT_SEL,             "Przejdź do następnej zaznaczonej nazwy\tAlt+Down"
+ IDS_TBTT_RESELECT,             "Przywróć zaznaczenie\tCtrl+W"
+ IDS_TBTT_PASTESHORTCUT,        "Wklej skrót\tCtrl+S"
+ IDS_TBTT_FOCUSSHORTCUT,        "Przejdź do skrótu lub celu łącza\tCtrl+T"
+ IDS_TBTT_SAVESELECTION,        "Zapisz zaznaczenie\tCtrl+Shift+F5"
+ IDS_TBTT_LOADSELECTION,        "Wczytaj zaznaczenie\tCtrl+Shift+F6"
+ IDS_TBTT_SEL_BY_EXT,           "Zaznacz pliki o tym samym rozszerzeniu\tShift+Num +"
+ IDS_TBTT_UNSEL_BY_EXT,         "Odznacz pliki o tym samym rozszerzeniu\tShift+Num -"
+ IDS_TBTT_SEL_BY_NAME,          "Zaznacz pliki o tej samej nazwie\tCtrl+Shift+Num +"
+ IDS_TBTT_UNSEL_BY_NAME,        "Odznacz pliki o tej samej nazwie\tCtrl+Shift+Num -"
+ IDS_TBTT_OPEN_FOLDER,          "Otwórz folder"
+ IDS_TBTT_CONFIGURATION,        "Konfiguracja"
+ IDS_TBTT_DIRMENU,              "Menu kontekstowe bieżącego katalogu"
+
+ IDS_HELPERROR,               "Błąd pomocy"
+ IDS_FAILED_TO_LAUNCH_HELP,   "Nie można uruchomić pomocy HtmlHelp."
+ IDS_FAILED_TO_FIND_HELP,     "Nie można odnaleźć pliku pomocy."
+
+// elementy menu kontekstowego wyboru koloru
+ IDS_SETCOLOR_CUSTOM, "&Kolor niestandardowy..."
+ IDS_SETCOLOR_SYSTEM, "&Kolor automatyczny"
+ IDS_SETCOLOR_CUSTOM_FG, "Niestandardowy kolor &tekstu..."
+ IDS_SETCOLOR_CUSTOM_BK, "Niestandardowy kolor &tła..."
+ IDS_SETCOLOR_SYSTEM_FG, "&Automatyczny kolor tekstu"
+ IDS_SETCOLOR_SYSTEM_BK, "A&utomatyczny kolor tła"
+ IDS_SETCOLOR_DEFAULT_FG, "&Nie zmieniaj koloru tekstu"
+ IDS_SETCOLOR_DEFAULT_BK, "&Nie zmieniaj koloru tła"
+
+ IDS_UNPACKCOPY, "Kopiuj"
+ IDS_PACKTITLE, "Pakowanie"
+ IDS_UNPACKTMPMOVE, "Przenieś"
+
+ IDS_CTRL, "Ctrl"
+ IDS_SHIFT, "Shift"
+ IDS_ESCAPE, "ESC"
+ IDS_F11, "F11"
+
+ IDS_CONFIGEXPORTED, "Konfiguracja została pomyślnie wyeksportowana."
+ IDS_PREDCONFIGEXPORT, "Plik wyeksportowanej konfiguracji zostanie utworzony na podstawie konfiguracji w rejestrze.\nCzy chcesz zapisać konfigurację do rejestru przed eksportem?"
+ IDS_TEXTCOPIED, "Tekst został pomyślnie skopiowany do schowka."
+ IDS_COPYTOCLIPBOARD, "&Kopiuj do schowka"
+
+ IDS_CONFIGHOWTOIMPORT, "Importowanie konfiguracji jest proste. Wystarczy znaleźć plik z konfiguracją i go otworzyć (klawisz Enter lub podwójne kliknięcie). Powinien zostać otwarty w Edytorze rejestru. Gdy pojawi się pytanie, czy chcesz dodać informacje z pliku do rejestru, zamknij wszystkie uruchomione wystąpienia programu Open Salamander. Zapobiegnie to nadpisaniu nowo zaimportowanej konfiguracji przez automatyczny zapis konfiguracji przy zamykaniu programu Open Salamander. Gdy żadne wystąpienie programu Open Salamander nie jest uruchomione, naciśnij Tak w oknie pytania Edytora rejestru. Wtedy konfiguracja zostanie zaimportowana z pliku do rejestru."
+
+ IDS_ERRORUNPACK, "Błąd rozpakowywania archiwum"
+
+ IDS_NEW_ARCHIVE, "archiwum."
+
+ IDS_UNPACKARCHIVE, "Rozpakuj archiwum „%s” do"
+
+ IDS_CREATEDIRECTORY, "Katalog „%s” nie istnieje.\n\nCzy chcesz go utworzyć?"
+ IDS_NAMEUSEDFORFILE, "Nazwa „%s” została już użyta dla pliku."
+ IDS_CREATEDIRFAILED, "Nie można utworzyć katalogu „%s”."
+
+ IDS_SE_INVALIDSUBMENUNAME, "Nieprawidłowa nazwa podmenu.\nPusty ciąg nie jest tu dozwolony."
+ IDS_SE_INVALIDOPTIONS, "Należy zaznaczyć co najmniej jedną opcję."
+ IDS_SE_INVALIDOPTIONSCOMB, "Nieprawidłowa kombinacja opcji."
+
+ IDS_ACBUTTON_STOP, "&Zatrzymaj"
+ IDS_ACBUTTON_RESCAN, "&Start"
+ IDS_ACCOLUMN1, "Ścieżka"
+ IDS_ACCOLUMN2, "Rozmiar"
+ IDS_ACCOLUMN3, "Data"
+ IDS_ACCOLUMN4, "Czas"
+ IDS_ACBADDRIVE, "Ścieżka nie jest prawidłowym katalogiem."
+ IDS_ACSTATUSDONE, "Gotowe."
+
+// Okno dialogowe Znajdź - opcje zaawansowane
+ IDS_FFA_ATTRIBUTES, "Atrybuty"
+ IDS_FFA_SIZE, "Rozmiar"
+ IDS_FFA_DATE, "Data"
+ IDS_FFA_TIME, "Czas"
+ IDS_FFA_NONE, "Brak opcji zaawansowanych"
+ IDS_FFA_OPTIONS, "Użyto opcji zaawansowanych: "
+
+ IDS_FFA_SECONDS, "{!}sekund{a|0|||y|4|}"
+ IDS_FFA_MINUTES, "{!}minut{a|0|||y|4|}"
+ IDS_FFA_HOURS, "{!}godzin{a|0|||y|4|}"
+ IDS_FFA_DAYS, "{!}dni{||0|||4|}"
+ IDS_FFA_WEEKS, "{!}tygodni{||0|||4|}"
+ IDS_FFA_MONTHS, "{!}miesi{ąc|0|ące|ęcy|4|ące}"
+ IDS_FFA_YEARS, "{!}lat{||0|||4|}"
+ IDS_FFA_BYTES, "{!}bajt{||0|y|ów|4|y}"
+
+// Okno dialogowe Znajdź
+ IDS_CHANGE_DIRECTORY, "Zmień katalog"
+ IDS_FF_IN, "w"
+ IDS_FF_STOP, "Zatrzy&maj"
+ 
+ IDS_FF_SEARCHING, "Wyszukiwanie:"
+ IDS_FF_NAME, "Znajdź"
+ IDS_FF_NAMED, "wyszukiwanie"
+ IDS_FF_EMPTYSTRING, "Pusty ciąg nie jest tu dozwolony."
+ IDS_FF_AUTOLOAD, "Załadowano opcje „%s”"
+ IDS_FF_BROWSE, "&Przeglądaj..."
+ IDS_FF_LOCALDRIVES, "Wszystkie &dyski lokalne"
+ IDS_FF_ALLDRIVES, "Wszystkie dyski &lokalne i sieciowe"
+
+// Podgląd/Edycja - nie można wyświetlić/edytować
+ IDS_CANT_VIEW_FILE, "Nie można znaleźć odpowiedniej przeglądarki dla pliku „%s”.\n\nZobacz stronę Konfiguracja/Przeglądarki i edytory/Przeglądarki, aby uzyskać informacje o skojarzeniach przeglądarek."
+ IDS_CANT_VIEW_FILE_ALT, "Nie można znaleźć odpowiedniej przeglądarki dla pliku „%s”.\n\nZobacz stronę Konfiguracja/Przeglądarki i edytory/Przeglądarki alternatywne, aby uzyskać informacje o skojarzeniach przeglądarek."
+ IDS_CANT_EDIT_FILE, "Nie można znaleźć odpowiedniego edytora dla pliku „%s”.\n\nZobacz stronę Konfiguracja/Przeglądarki i edytory/Edytory, aby uzyskać informacje o skojarzeniach edytorów."
+
+//Uruchamianie
+ IDS_STARTUP_DATA, "Inicjowanie danych..."
+ IDS_STARTUP_SHARES, "Odczyt listy udostępnionych katalogów..."
+ IDS_STARTUP_ASSOCIATIONS, "Odczyt skojarzeń z rejestru..."
+ IDS_STARTUP_IMPORT_CONFIG, "Importowanie konfiguracji do rejestru..."
+ IDS_STARTUP_CONFIG, "Odczyt konfiguracji z rejestru..."
+ IDS_STARTUP_POLICY, "Odczyt zasad grupy z rejestru..."
+ IDS_STARTUP_USERMENU, "Odczyt elementów Menu użytkownika z rejestru..."
+
+//przycinanie lub przeciąganie ścieżki
+ IDS_TRIM_DRAG_PATH, "Kliknij, aby zmienić ścieżkę w panelu, lub przeciągnij ścieżkę do innego panelu lub do wiersza poleceń"
+//kopiowanie lub przeciąganie elementu
+ IDS_COPY_DRAG_TEXT, "Kliknij, aby skopiować do schowka, lub przeciągnij tekst do wiersza poleceń"
+
+//typy widoków
+ IDS_VIEW_MODE, "Tryb"
+ IDS_ICONS_VIEW_NAME, "Ikony"
+ IDS_BRIEF_VIEW_NAME, "Krótki"
+ IDS_DETAILED_VIEW_NAME, "Szczegółowy"
+ IDS_THUMBNAILS_VIEW_NAME, "Miniatury"
+ IDS_TREE_VIEW_NAME, "Zarezerwowany"
+ IDS_TILES_VIEW_NAME, "Kafelki"
+
+ IDS_TREE_VIEW, "Zarezerwowany"
+ IDS_ICONS_VIEW, "&Ikony"
+ IDS_BRIEF_VIEW, "&Krótki"
+ IDS_DETAILED_VIEW, "&Szczegółowy"
+ IDS_THUMBNAILS_VIEW, "&Miniatury"
+ IDS_TYPES_VIEW, "&Typy"
+ IDS_DESCRIPTIONS_VIEW, "&Opisy"
+ IDS_TILES_VIEW, "Ka&felki"
+
+// nazwy kolumn w panelu
+ IDS_COLUMN_NAME_NAME, "Nazwa"
+ IDS_COLUMN_NAME_EXT, "Rozsz."
+ IDS_COLUMN_NAME_DOSNAME, "Nazwa DOS"
+ IDS_COLUMN_NAME_SIZE, "Rozmiar"
+ IDS_COLUMN_NAME_TYPE, "Typ"
+ IDS_COLUMN_NAME_DATE, "Data"
+ IDS_COLUMN_NAME_TIME, "Czas"
+ IDS_COLUMN_NAME_ATTR, "Atr."
+ IDS_COLUMN_NAME_DESC, "Opis"
+
+// nazwy kolumn w oknie dialogowym konfiguracji widoków
+ IDS_COLUMN_CFG_NAME,    "Nazwa"
+ IDS_COLUMN_CFG_EXT,     "Oddzielone rozszerzenie"
+ IDS_COLUMN_CFG_DOSNAME, "Nazwa DOS (8.3)"
+ IDS_COLUMN_CFG_SIZE,    "Rozmiar"
+ IDS_COLUMN_CFG_TYPE,    "Typ"
+ IDS_COLUMN_CFG_DATE,    "Data ostatniego zapisu"
+ IDS_COLUMN_CFG_TIME,    "Czas ostatniego zapisu"
+ IDS_COLUMN_CFG_ATTR,    "Atrybuty"
+ IDS_COLUMN_CFG_DESC,    "Opis"
+
+// opisy kolumn w panelu
+ IDS_COLUMN_DESC_NAME,   "Nazwa"
+ IDS_COLUMN_DESC_EXT,    "Rozszerzenie"
+ IDS_COLUMN_DESC_DOSNAME,"Nazwa DOS (8.3)"
+ IDS_COLUMN_DESC_SIZE,   "Rozmiar"
+ IDS_COLUMN_DESC_TYPE,   "Typ"
+ IDS_COLUMN_DESC_DATE,   "Data ostatniego zapisu"
+ IDS_COLUMN_DESC_TIME,   "Czas ostatniego zapisu"
+ IDS_COLUMN_DESC_ATTR,   "Atrybuty"
+ IDS_COLUMN_DESC_DESC,   "Opis"
+
+// nazwa kolumny w menu
+ IDS_COLUMN_MENU_NAME, "&Nazwa\tCtrl+F3"
+ IDS_COLUMN_MENU_EXT, "&Rozszerzenie\tCtrl+F4"
+ IDS_COLUMN_MENU_SIZE, "&Rozmiar\tCtrl+F6"
+ IDS_COLUMN_MENU_TIME, "&Czas\tCtrl+F5"
+ IDS_COLUMN_MENU_ATTR, "&Atrybuty"
+
+ IDS_PACKERR_TITLE, "Błąd pakowania"
+ IDS_PACKERR_NOMEM, "Niewystarczająca ilość pamięci."
+ IDS_PACKERR_ARCNAME_UNSUP, "Rozszerzenie nie należy do żadnego obsługiwanego typu archiwum."
+ IDS_PACKERR_PACKER_UNSUP, "Operacje „Usuń i spakuj” nie są obsługiwane dla tego typu archiwum."
+ IDS_PACKERR_GENERAL, "Błąd systemowy: %1"
+ IDS_PACKERR_PROCESS, "Nie można uruchomić nowego procesu „%1”. Jeśli jeszcze tego nie zrobiono, uruchom Autokonfigurację archiwizatorów z menu Opcje. Błąd: %2"
+ IDS_PACKERR_RETURN, "Program zewnętrzny „%1” zwrócił błąd: %2"
+ IDS_PACKERR_NOTFOUND, "Nie można uruchomić zewnętrznego archiwizatora „%1”."
+ IDS_PACKERR_FILE, "Nieprawidłowy plik tymczasowy."
+ IDS_PACKERR_PATH, "Ścieżka do pliku zbyt długa: %1"
+ IDS_PACKERR_CMDLNERR, "Błąd analizy wiersza poleceń archiwizatora."
+ IDS_PACKERR_IDIRERR, "Błąd analizy katalogu początkowego archiwizatora."
+ IDS_PACKERR_CMDLNLEN, "Wiersz poleceń zbyt długi: %1"
+ IDS_PACKERR_FDATA, "Niewystarczająca ilość pamięci."
+ IDS_PACKERR_COMSPEC, "Nie znaleziono zmiennej środowiskowej COMSPEC."
+ IDS_PACKERR_MOVE, "Nie można przenieść rozpakowanych plików do ścieżki docelowej (ze ścieżki tymczasowej)."
+ IDS_PACKERR_PARSE, "Wystąpił błąd podczas analizowania listy zarchiwizowanych plików."
+ IDS_PACKERR_ARCCFG, "Błąd konfiguracji archiwizatora, nie znaleziono pola nazwy pliku."
+ IDS_PACKERR_DATETIME, "Data i/lub czas pliku podane przez archiwizator są nieprawidłowe."
+ IDS_PACKERR_NOOUTPUT, "Brak danych wyjściowych z zewnętrznego pakera, sprawdź konfigurację."
+ IDS_PACKERR_UNABLETOREN, "Nie można zmienić nazwy tymczasowego pliku archiwum (%1) na nazwę archiwum (%2)."
+ IDS_PACKERR_INVALIDNAME, "Ta nazwa pliku jest nieprawidłowa w systemach plików Windows. Zewnętrzne archiwizatory nie obsługują rozpakowywania do innej nazwy pliku, więc nie można rozpakować tego pliku."
+
+ IDS_PACKRET_GENERAL, "Kod zakończenia %d."
+ IDS_PACKRET_WARNING, "Napotkano ostrzeżenie."
+ IDS_PACKRET_EXTRACT, "Błąd wyodrębniania pliku."
+ IDS_PACKRET_FATAL, "Napotkano błąd krytyczny."
+ IDS_PACKRET_CRC, "Napotkano błąd CRC."
+ IDS_PACKRET_SECURITY, "Naruszenie zabezpieczeń archiwum."
+ IDS_PACKRET_DISK, "Dysk pełny lub błąd zapisu."
+ IDS_PACKRET_FOPEN, "Błąd otwierania archiwum lub pliku."
+ IDS_PACKRET_PARAMS, "Błąd użytkownika - nieprawidłowe parametry."
+ IDS_PACKRET_MEMORY, "Za mało pamięci."
+ IDS_PACKRET_NOTARC, "Plik nie jest archiwum."
+ IDS_PACKRET_XMSMEM, "Błąd pamięci XMS."
+ IDS_PACKRET_BREAK, "Przerwanie przez użytkownika."
+ IDS_PACKRET_BREAK2, "Przerwanie przez użytkownika lub pytanie bez odpowiedzi (powtórz operację i kliknij proces „salspawn.exe” na pasku zadań, zobaczysz monit archiwizatora)."
+ IDS_PACKRET_CHAPTERS, "Zbyt wiele rozdziałów w archiwum."
+ IDS_PACKRET_TEMP, "Nie można przekonwertować pliku tymczasowego na archiwum."
+ IDS_PACKRET_INTERN, "Błąd wewnętrzny."
+ IDS_PACKRET_UNKNOWN, "Nieznany błąd."
+ IDS_PACKRET_SKIPPED, "Pominięto plik."
+ IDS_PACKRET_DAMAGED, "Archiwum jest uszkodzone."
+ IDS_PACKRET_VIRUS, "Wykryto wirusa."
+ IDS_PACKRET_SPAWN, "Błąd konfiguracji wewnętrznej: nieprawidłowe parametry dla salspawn.exe."
+ IDS_PACKRET_EXTRACT_LHA, "Błąd wyodrębniania pliku lub, jeśli usuwasz z archiwum, zignoruj ten komunikat o błędzie."
+
+ IDS_PACK_ARC_NAME, "Pełna nazwa archiwum"
+ IDS_PACK_ARC_FILE, "Nazwa archiwum"
+ IDS_PACK_ARC_PATH, "Ścieżka do archiwum"
+ IDS_PACK_LST_NAME, "Pełna nazwa listy plików"
+ IDS_PACK_ARC_DOSNAME, "Pełna nazwa archiwum w formacie DOS"
+ IDS_PACK_ARC_DOSFILE, "Nazwa archiwum w formacie DOS"
+ IDS_PACK_LST_DOSNAME, "Pełna nazwa listy plików w formacie DOS"
+ IDS_PACK_EXECUTING, "Uruchamianie programu zewnętrznego, proszę czekać..."
+
+ IDS_PACK_EXE_JAR32, "Ścieżka do pliku wykonywalnego Jar32"
+ IDS_PACK_EXE_JAR16, "Ścieżka do pliku wykonywalnego Jar16"
+ IDS_PACK_EXE_RAR32, "Ścieżka do pliku wykonywalnego Rar32"
+ IDS_PACK_EXE_RAR16, "Ścieżka do pliku wykonywalnego Rar16"
+ IDS_PACK_EXE_ARJ32, "Ścieżka do pliku wykonywalnego Arj32"
+ IDS_PACK_EXE_ARJ16, "Ścieżka do pliku wykonywalnego Arj16"
+ IDS_PACK_EXE_ACE32, "Ścieżka do pliku wykonywalnego Ace32"
+ IDS_PACK_EXE_ACE16, "Ścieżka do pliku wykonywalnego Ace16"
+ IDS_PACK_EXE_LHA16, "Ścieżka do pliku wykonywalnego Lha"
+ IDS_PACK_EXE_UC216, "Ścieżka do pliku wykonywalnego UC2"
+ IDS_PACK_EXE_ZIP32, "Ścieżka do pliku wykonywalnego PkZip32"
+ IDS_PACK_EXE_ZIP16, "Ścieżka do pliku wykonywalnego PkZip16"
+ IDS_PACK_EXE_UZP16, "Ścieżka do pliku wykonywalnego PkUnzip16"
+ IDS_PACK_EXE_BROWSE, "Przeglądaj w poszukiwaniu pliku wykonywalnego"
+
+ IDS_PACKQRY_ARCPATH, "Archiwizator nie obsługuje kompresji do podkatalogów.\nCzy chcesz umieścić pliki w katalogu głównym archiwum?"
+ IDS_PACKQRY_NOMOVE, "Archiwizator nie obsługuje polecenia „przenieś do archiwum”.\nCzy chcesz zamiast tego użyć polecenia „skopiuj do archiwum”?"
+
+ IDS_THEPATHISINVALID, "Ścieżka jest nieprawidłowa."
+
+ IDS_COMDLG_INVALIDFILENAME, "Nazwa pliku „%s” jest nieprawidłowa."
+
+ IDS_NONEMPTYDIRDELCONFIRM, "Katalog „%s” nie jest pusty.\nCzy chcesz go usunąć?"
+
+ IDS_EXP_UNMATCHEDPAR, "Nazwa zmiennej musi kończyć się znakiem ')'."
+ IDS_EXP_INTERNALERR, "Błąd wewnętrzny."
+ IDS_EXP_VARNOTFOUND, "Nie znaleziono zmiennej „%s”."
+ IDS_EXP_ENVVARNOTFOUND, "Nie znaleziono zmiennej środowiskowej „%s”."
+ IDS_EXP_ENVVARTOOLARGE, "Wartość zmiennej środowiskowej „%s” jest zbyt duża."
+ IDS_EXP_UNMATCHEDBRACKET, "Nazwa zmiennej środowiskowej musi kończyć się znakiem ']'."
+ IDS_EXP_UNEXPECTEDCHAR, "Oczekiwano nazwy zmiennej lub znaku '$'."
+ IDS_EXP_SMALLBUFFER, "Rozwinięty ciąg jest zbyt duży."
+ IDS_EXP_TRAILINGDOLLAR, "Nieoczekiwany koniec ciągu, po znaku '$' musi następować nazwa zmiennej lub znak '$'."
+ IDS_EXP_EMPTYSTR, "Pusty ciąg nie jest tu dozwolony."
+ IDS_EXP_INVALIDVARWIDTH, "Nieprawidłowa szerokość zmiennej (musi być w zakresie od 1 do 9999 lub tekst 'max', jeśli ma dopasować się do najdłuższej wartości zmiennej)."
+
+ IDS_READDIRTERMINATED, "Jeśli chcesz anulować listowanie (lista plików i katalogów będzie niekompletna), naciśnij przycisk Tak. Jeśli chcesz kontynuować listowanie i tymczasowo wyłączyć automatyczne odświeżanie bieżącej ścieżki, naciśnij przycisk Nie. Jeśli chcesz kontynuować listowanie, naciśnij przycisk Anuluj."
+ IDS_READINGPATHESC, "Listowanie ścieżki „%s”, naciśnij klawisz ESC, aby anulować..."
+ IDS_DIRECTORYENUMERATIONLIMIT, "Listowanie katalogu zostało ograniczone do 100 000 elementów, aby zachować responsywność panelu. Doprecyzuj ścieżkę lub filtr, aby zobaczyć dodatkowe elementy."
+
+// Podgląd za pomocą, Edytuj za pomocą:
+ IDS_VIEWWITH_EXTERNAL, "Przeglądarka zewnętrzna [%s]"
+ IDS_VIEWWITH_INTERNAL, "Przeglądarka wewnętrzna"
+ IDS_EDITWITH_EXTERNAL, "Edytor zewnętrzny [%s]"
+
+// domyślni pakowacze zdefiniowani przez użytkownika
+ IDS_DP_JAR_E, "JAR (zewnętrzny Win32, testowany z v1.02)"
+ IDS_DP_JARV_E, "JAR na woluminy 1,44 MB (zewnętrzny Win32, testowany z v1.02)"
+ IDS_DP_RAR_E, "RAR (zewnętrzny Win32, testowany z v2.50)"
+ IDS_DP_RARV_E, "RAR na woluminy 1,44 MB (zewnętrzny Win32, testowany z v2.50)"
+ IDS_DP_ARJ16_E, "ARJ (zewnętrzny DOS, testowany z v2.60)"
+ IDS_DP_ARJ16V_E, "ARJ na woluminy 1,44 MB (zewnętrzny DOS, testowany z v2.60)"
+ IDS_DP_LHA_E, "LHA (zewnętrzny DOS, testowany z v2.55)"
+ IDS_DP_UC2_E, "UC2 (zewnętrzny DOS, testowany z v2r3PRO)"
+ IDS_DP_ARJ32_E, "ARJ (zewnętrzny Win32, testowany z v3.00c)"
+ IDS_DP_ARJ32V_E, "ARJ na woluminy 1,44 MB (zewnętrzny Win32, testowany z v3.00c)"
+ IDS_DP_ACE_E, "ACE (zewnętrzny Win32, testowany z v1.2b)"
+ IDS_DP_ACEV_E, "ACE na woluminy 1,44 MB (zewnętrzny Win32, testowany z v1.2b)"
+ IDS_DP_ACE16_E, "ACE (zewnętrzny DOS, testowany z v1.2b)"
+ IDS_DP_ACE16V_E, "ACE na woluminy 1,44 MB (zewnętrzny DOS, testowany z v1.2b)"
+ IDS_DP_JAR16_E, "JAR (zewnętrzny DOS, testowany z v1.02)"
+ IDS_DP_JAR16V_E, "JAR na woluminy 1,44 MB (zewnętrzny DOS, testowany z v1.02)"
+ IDS_DP_RAR16_E, "RAR (zewnętrzny DOS, testowany z v2.50)"
+ IDS_DP_RAR16V_E, "RAR na woluminy 1,44 MB (zewnętrzny DOS, testowany z v2.50)"
+ IDS_DP_ZIP32_E, "PKZIP (zewnętrzny Win32, testowany z v2.50)"
+ IDS_DP_ZIP16_E, "PKZIP (zewnętrzny DOS, testowany z v2.04g)"
+
+// domyślni rozpakowujący zdefiniowani przez użytkownika
+ IDS_DU_JAR_E, "JAR (zewnętrzny Win32, testowany z v1.02)"
+ IDS_DU_RAR_E, "RAR (zewnętrzny Win32, testowany z v2.50)"
+ IDS_DU_ARJ16_E, "ARJ (zewnętrzny DOS, testowany z v2.60)"
+ IDS_DU_LHA_E, "LHA (zewnętrzny DOS, testowany z v2.55)"
+ IDS_DU_UC2_E, "UC2 (zewnętrzny DOS, testowany z v2r3PRO)"
+ IDS_DU_ARJ32_E, "ARJ (zewnętrzny Win32, testowany z v3.00c)"
+ IDS_DU_ACE_E, "ACE (zewnętrzny Win32, testowany z v1.2b)"
+ IDS_DU_ACE16_E, "ACE (zewnętrzny DOS, testowany z v1.2b)"
+ IDS_DU_JAR16_E, "JAR (zewnętrzny DOS, testowany z v1.02)"
+ IDS_DU_RAR16_E, "RAR (zewnętrzny DOS, testowany z v2.50)"
+ IDS_DU_ZIP32_E, "PKZIP (zewnętrzny Win32, testowany z v2.50)"
+ IDS_DU_ZIP16_E, "PKUNZIP (zewnętrzny DOS, testowany z v2.04g)"
+
+// obsługiwane archiwizatory zewnętrzne
+ IDS_EXT_JAR32,  "Konsolowy plik wykonywalny JAR Win32 (testowany z v1.02)"
+ IDS_EXT_RAR32,  "Konsolowy plik wykonywalny RAR Win32 (testowany z v2.50)"
+ IDS_EXT_ARJ16,  "Plik wykonywalny ARJ MS-DOS (testowany z v2.60)"
+ IDS_EXT_LHA16,  "Plik wykonywalny LHA MS-DOS (testowany z v2.55)"
+ IDS_EXT_UC216,  "Plik wykonywalny UC2 MS-DOS (testowany z v2r3PRO)"
+ IDS_EXT_JAR16,  "Plik wykonywalny JAR MS-DOS (testowany z v1.02)"
+ IDS_EXT_RAR16,  "Plik wykonywalny RAR MS-DOS (testowany z v2.50)"
+ IDS_EXT_ZIP32,  "Konsolowy plik wykonywalny PKZIP Win32 (testowany z v2.50)"
+ IDS_EXT_ZIP16,  "Plik wykonywalny PKZIP/PKUNZIP MS-DOS (testowany z v2.04g)"
+ IDS_EXT_ARJ32,  "Konsolowy plik wykonywalny ARJ Win32 (testowany z v3.00c)"
+ IDS_EXT_ACE32,  "Konsolowy plik wykonywalny ACE Win32 (testowany z v1.2b)"
+ IDS_EXT_ACE16,  "Plik wykonywalny ACE MS-DOS (testowany z v1.2b)"
+
+// typ pakowania/rozpakowywania
+ IDS_PUT_EXTERNAL, "Program zewnętrzny"
+ IDS_PUT_NONE, "-- nieobsługiwany --"
+
+// schemat kolorów
+ IDS_COLORSCHEME_CUSTOM, "Niestandardowy"
+ IDS_COLORSCHEME_SALAMANDER, "Open Salamander"
+ IDS_COLORSCHEME_EXPLORER, "Windows Explorer"
+ IDS_COLORSCHEME_NORTON, "Norton Commander"
+ IDS_COLORSCHEME_NAVIGATOR, "DOS Navigator"
+// element koloru
+ IDS_COLORITEM_PANELITEM, "Elementy w panelu"
+ IDS_COLORITEM_FOCUSEDFRAME, "Ramka elementu z fokusem w panelu"
+ IDS_COLORITEM_THUMBNAILFRAME, "Ramka wokół miniatury w panelu"
+ IDS_COLORITEM_BLENDEDICONS, "Zabarwienie ikon w panelu"
+ IDS_COLORITEM_PROGRESS, "Postęp operacji"
+ IDS_COLORITEM_CAPTION, "Tytuł panelu"
+ IDS_COLORITEM_HOT, "Elementy aktywne"
+
+// etykieta koloru
+ IDS_COLORLABEL_ACTIVENORMAL, "Aktywny normalny"
+ IDS_COLORLABEL_ACTIVESELECTED, "Aktywny zaznaczony"
+ IDS_COLORLABEL_INACTIVENORMAL, "Nieaktywny normalny"
+ IDS_COLORLABEL_INACTIVESELECTED, "Nieaktywny zaznaczony"
+ IDS_COLORLABEL_NORMAL, "Normalny"
+ IDS_COLORLABEL_SELECTED, "Zaznaczony"
+ IDS_COLORLABEL_FOCUSED, "Z fokusem"
+ IDS_COLORLABEL_FOCUSEDSELECTED, "Z fokusem i zaznaczony"
+ IDS_COLORLABEL_LEFTPART, "Lewa część (wykonano)"
+ IDS_COLORLABEL_RIGHTPART, "Prawa część (do wykonania)"
+ IDS_COLORLABEL_ACTIVE, "Panel aktywny"
+ IDS_COLORLABEL_INACTIVE, "Panel nieaktywny"
+ IDS_COLORLABEL_HOTPANEL, "Panel"
+ IDS_COLORLABEL_HOTACTIVE, "Tytuł aktywny"
+ IDS_COLORLABEL_HOTINACTIVE, "Tytuł nieaktywny"
+ IDS_COLORLABEL_HIGHLIGHTED, "Wyróżniona część wiersza"
+
+ IDS_FILEHISTORY_VIEW, "Podgląd"
+ IDS_FILEHISTORY_EDIT, "Edytuj"
+ IDS_FILEHISTORY_OPEN, "Otwórz"
+
+// Strona konfiguracji 5 - Szybkie ścieżki
+ IDS_HOTPATH_NAME, "Nazwa"
+ IDS_HOTPATH_HOTKEY, "Klawisz skrótu"
+ IDS_COLUMN_NAME, "Nazwa"
+
+ IDS_CUSTOMIZE_HOTPATHS, "Dostosuj..."
+
+ IDS_CONTEXTMENU_EXIT, "Zakończ program Open Salamander"
+
+// Podpowiedzi wiersza katalogu i wiersza stanu
+ IDS_PANELFILTER, "Filtr jest włączony"
+ IDS_FREESPACE, "Wolne miejsce na dysku\nKliknij, aby wyświetlić informacje o napędzie (Ctrl+F1)"
+ IDS_DIRHISTORY, "Lista katalogów roboczych (Alt+F12)"
+ IDS_ZOOMPANEL, "Maksymalizuj/Przywróć panel (Ctrl+F11)"
+
+ IDS_MENUNEWTITLE, "No&wy"
+
+ IDS_UNABLETOCHANGEDRIVELABEL, "Nie można zmienić etykiety dysku.\nBłąd: %s"
+
+// okno oczekiwania
+ IDS_ANALYSINGDIRTREEESC, "Odczyt drzewa katalogów, naciśnij klawisz ESC, aby anulować..."
+
+// tabele konwersji
+ IDS_CONVERSION_DESCRIPTION, "Opis"
+ IDS_CONVERSION_CODEPAGE, "Strona kodowa"
+ IDS_CONVERSION_PATH, "Ścieżka"
+
+// nazwy przeglądarek
+ IDS_VIEWER_INTERNAL, "Przeglądarka wewnętrzna"
+ IDS_VIEWER_EXTERNAL, "Przeglądarka zewnętrzna"
+
+ IDS_MAILERFAILED, "Nie można uruchomić domyślnego programu pocztowego. Numer błędu %d."
+
+ IDS_DROPMOVE, "&Przenieś tutaj"
+ IDS_DROPCOPY, "&Kopiuj tutaj"
+ IDS_DROPLINK, "&Inne..."
+ IDS_DROPUNKNOWN, "&Zakończ operację"
+ IDS_DROPCANCEL, "Anuluj"
+
+ IDS_UNABLETOLOADPLUGIN, "Nie można załadować wtyczki %s (%s) lub niektórych jej składników.\nBłąd: %s\nZobacz szczegóły wtyczki w menu Wtyczki / Menedżer wtyczek."
+ IDS_UNABLETOFINDPLUGINENTRY, "Plik SPL %s nie jest wtyczką programu Open Salamander."
+ IDS_REINSTALLPLUGIN, "Wtyczka %s (%s) została zmieniona. Zainstaluj ponownie (usuń i dodaj) tę wtyczkę (w menu Wtyczki / Menedżer wtyczek)."
+ IDS_PLUGININVALID, "Wtyczka %s (%s) nie została załadowana. Wtyczka nie jest prawidłową wtyczką programu Open Salamander lub wystąpił wewnętrzny błąd wtyczki."
+ IDS_PLUGININVALID2, "Ta wtyczka (%s) nie została załadowana. Wtyczka nie jest prawidłową wtyczką programu Open Salamander lub wystąpił wewnętrzny błąd wtyczki."
+ IDS_OLDPLUGINVERSION, "Wtyczka %s (%s) nie jest obsługiwana przez tę wersję programu Open Salamander. Pobierz zaktualizowaną wersję tej wtyczki."
+ IDS_OLDPLUGINVERSION2, "Wtyczka (%s) nie jest obsługiwana przez tę wersję programu Open Salamander. Pobierz zaktualizowaną wersję tej wtyczki."
+
+ IDS_UPDATEFAILED, "Spakowanie zaktualizowanych plików do archiwum nie powiodło się. Czy chcesz spróbować ponownie? Jeśli wybierzesz NIE, powrócisz do okna dialogowego Aktualizacja archiwum, dzięki czemu będzie można skopiować zaktualizowane pliki do wybranego katalogu na dysku (do późniejszego spakowania do archiwum)."
+
+ IDS_NOICONS, "Plik „%s” nie zawiera ikon."
+ IDS_CANNONTFINDFILE, "Nie można znaleźć pliku „%s”."
+
+ IDS_VIEWER_BLOCKTOOBIG, "Rozmiar bloku zaznaczonego w tej przeglądarce przekracza 100 MB. Kopiowanie tego bloku do schowka lub przenoszenie go metodą przeciągnij i upuść może być powolne. Czy chcesz pominąć takie operacje dla bloków powyżej 100 MB w tej przeglądarce?"
+ IDS_VIEWER_UNKNOWNERR, "Nieznany błąd."
+ IDS_VIEWER_BINFILE, "Ten plik zawiera wiersz o długości ponad 10 000 znaków. Prawdopodobnie jest to plik binarny.\nCzy chcesz wyświetlić ten plik w trybie szesnastkowym?\n\nOSTRZEŻENIE: Wyświetlanie pliku z wyjątkowo długimi wierszami w trybie tekstowym może być powolne."
+ IDS_FINDTERMINATEDBYUSER, "Anulowano wyszukiwanie tekstu."
+
+ IDS_VIEWERCODINGMENU, "&Konwertuj"
+ IDS_VIEWERNONECODING, "&Nie konwertuj"
+ IDS_VIEWERANSI2OEMCODING, "&ANSI - OEM"
+ IDS_VIEWEROEM2ANSICODING, "&OEM - ANSI"
+ IDS_VIEWERANSICODEPAGE, "ANSI"
+ IDS_VIEWERBADFILESIZE, "Nieprawidłowy rozmiar pliku (nie 256 bajtów)."
+ IDS_VIEWERERROPENFILE, "Błąd otwierania pliku „%s”.\n%s"
+ IDS_VIEWERBADINTCODING, "Nieznana nazwa kodowania wewnętrznego (ani ANSI - OEM ani OEM - ANSI) w pliku „%s”."
+ IDS_VIEWERINVALIDLINE, "Nieprawidłowy wiersz w pliku „%s”."
+ IDS_VIEWERERROPENCODES, "Błąd otwierania pliku „%s”.\n%s"
+ IDS_VIEWERAUTOCODING, "&Automatycznie"
+ IDS_VIEWERSETDEFAULTCODING, "Ustaw jako domyślne"
+
+ IDS_VIEWERNEXTCODING, "Następny\tF8"
+ IDS_VIEWERPREVIOUSCODING, "Poprzedni\tShift+F8"
+
+ IDS_EMPTYNAMENOTALLOWED, "Pusta nazwa nie ma tu sensu."
+ IDS_INCOMLETEFILENAME, "Podana ścieżka jest niekompletna, podaj pełną ścieżkę."
+
+ IDS_SALAMANDBUSY, "Uruchomione wystąpienie programu Open Salamander jest zajęte.\nCzy chcesz uruchomić nowe wystąpienie?"
+ IDS_SALAMANDBUSY2, "Program Open Salamander jest zajęty. Nie można wykonać żądanego polecenia, spróbuj ponownie później."
+
+ IDS_VIEWERCOPYTOFILE, "Kopiuj do pliku"
+
+ IDS_CONVERTTITLE, "Konwertuj"
+ IDS_CONVERTING, "Konwertowanie"
+ IDS_ERRORCREATINGTMPFILE, "Błąd tworzenia pliku tymczasowego"
+
+ IDS_PLUGINFUNCVIEW, "Listuj i rozpakowuj archiwum w panelu"
+ IDS_PLUGINFUNCEDIT, "Pakuj do i usuwaj z archiwum w panelu"
+ IDS_PLUGINFUNCCUSTPACK, "Pakowacz w oknie dialogowym Pakowanie"
+ IDS_PLUGINFUNCCUSTUNPACK, "Rozpakowujący w oknie dialogowym Rozpakowywanie"
+ IDS_PLUGINFUNCFILEVIEWER, "Przeglądarka plików"
+ IDS_PLUGINFUNCMENUEXTENSION, "Rozszerzenie menu"
+ IDS_PLUGINFUNCFILESYSTEM, "System plików (FS)"
+ IDS_PLUGINFUNCTHUMBLOADER, "Moduł ładujący miniatury"
+ IDS_PLUGINADDTITLE, "Dodaj wtyczki"
+ IDS_PLUGINTESTOK, "Wtyczka %s wydaje się działać poprawnie."
+ IDS_PLUGINTESTALLOK, "Wszystkie wtyczki wydają się działać poprawnie."
+ IDS_PLUGINSAVECONFIG, "Wtyczka %s zostanie zwolniona.\n\nCzy chcesz zapisać jej konfigurację?"
+ IDS_PLUGINREMOVEOK, "Czy na pewno chcesz usunąć wtyczkę %s?\n\nUwaga: nie powoduje to usunięcia plików wtyczki z dysku."
+ IDS_PLUGINEXISTS, "Wtyczka %s (%s) została już zainstalowana.\nNie można dodać jej ponownie."
+ IDS_PLUGINFORCEUNLOAD, "Wtyczka %s odmówiła zwolnienia.\nCzy chcesz wymusić jej zwolnienie?"
+ IDS_PLUGINEXTNONE, "(brak)"
+ IDS_PLUGINFSNONE, "(brak)"
+ IDS_PLUGINTHUMBNONE, "(brak)"
+ IDS_PLUGINS_NAME, "Nazwa"
+ IDS_PLUGINS_LOADED, "Załadowana"
+ IDS_PLUGINS_LOADED_YES, "Tak"
+ IDS_PLUGINS_LOADED_NO, "Nie"
+ IDS_PLUGINS_VERSION, "Wersja"
+ IDS_PLUGINS_LOCATION, "Lokalizacja"
+ IDS_PLUGIN_COMMAND, "Polecenie"
+ IDS_PLUGIN_KEY, "Klawisz skrótu"
+ IDS_PLUGINRESETKEYS, "Wtyczka %s musi zostać zwolniona i załadowana, aby przywrócić klawisze skrótów.\n\nCzy chcesz przywrócić klawisze skrótów?"
+
+
+ IDS_INVALIDCMDLINE, "Nieprawidłowe parametry wiersza poleceń.\n\nUżycie:\n  SALAMAND.EXE [-L ścieżka-do-lewego-panelu] [-R ścieżka-do-prawego-panelu] [-A ścieżka-do-aktywnego-panelu] [-C użyj-pliku-konfiguracji] [-I indeks-ikony] [-T prefiks-tytułu] [-O tylko-jedno-wystąpienie] [-P indeks-panelu]\n\n  [X] oznacza, że parametr X jest opcjonalny"
+ IDS_FILEREADERROR, "Nie można odczytać pliku „%s”."
+ IDS_FILEWRITEERROR, "Nie można zapisać pliku „%s”."
+
+ IDS_ERRORCREATINGROOTDIR, "Katalog jest katalogiem głównym."
+ IDS_ERR_FILEOPEN, "Błąd pobierania właściwości pliku."
+
+ IDS_NOTARCHIVEPATH, "Podana ścieżka zawiera ścieżkę do pliku. Plik nie jest zarejestrowanym plikiem archiwum (patrz Konfiguracja/Archiwizatory panelu/Rozszerzenia), więc program Open Salamander nie wie, jak go otworzyć."
+ IDS_PATHNOTFOUND, "Nie znaleziono podanej ścieżki."
+ IDS_NOTPLUGINFS, "Podana ścieżka zawiera nieznany system plików wtyczki (jego nazwa znajduje się przed ':',\npatrz menu Wtyczki / Menedżer wtyczek, aby poznać znane systemy plików wtyczek)."
+
+ IDS_ARCHIVEFORCECLOSE, "Archiwum „%s” odmówiło zamknięcia.\nCzy chcesz wymusić jego zamknięcie?"
+ IDS_ARCHIVEREFRESHEDIT, "Plik archiwum „%s” uległ zmianie. Archiwum zostanie ponownie otwarte w panelu."
+ IDS_ARCHIVECLOSEEDIT, "Archiwum „%s” zostanie zamknięte. Jeśli nadal edytujesz pliki z tego archiwum, zapisz zmiany i zamknij te pliki w edytorach teraz. Aktualizacja archiwum zostanie zaproponowana w przypadku zmian w edytowanych plikach."
+ IDS_ARCHIVECLOSEEDIT2, "Przed użyciem żądanego polecenia konieczna jest aktualizacja archiwum. Jeśli nadal edytujesz pliki z archiwum „%s”, zapisz zmiany i zamknij te pliki w edytorach teraz. Aktualizacja archiwum zostanie zaproponowana tylko w przypadku zmian w edytowanych plikach. Po aktualizacji archiwum sprawdź zaznaczenie w odświeżonym panelu i powtórz polecenie."
+ IDS_ARCHIVECLOSEEDIT3, "Przed rozpoczęciem operacji przeciągnij i upuść konieczna jest aktualizacja archiwum. Jeśli nadal edytujesz pliki z archiwum „%s”, zapisz zmiany i zamknij te pliki w edytorach teraz. Aktualizacja archiwum zostanie zaproponowana tylko w przypadku zmian w edytowanych plikach. Po aktualizacji archiwum sprawdź zaznaczenie w odświeżonym panelu i rozpocznij operację przeciągnij i upuść ponownie."
+
+ IDS_UNABLETOFOCUSFILEONFS, "Nie można skupić pliku „%s”. Plik nie został znaleziony."
+
+ IDS_AUTOINSTALLPLUGINS, "Instalowanie nowych wtyczek, proszę czekać..."
+ IDS_AUTOINSTALLPLUGINS_INIT, "(inicjalizacja)"
+ IDS_LOADINGPLUGINS, "Ładowanie wszystkich wtyczek, proszę czekać..."
+ IDS_READINGASSOCIATIONS, "Odczyt skojarzeń z rejestru, proszę czekać..."
+ IDS_TRYINGRECONNECTESC, "Próba połączenia dysku sieciowego, naciśnij klawisz ESC, aby anulować..."
+ IDS_SAVINGCONFIGURATION, "Zapisywanie konfiguracji do rejestru, proszę czekać..."
+ IDS_DELETINGCONFIGURATION, "Usuwanie starej konfiguracji z rejestru, proszę czekać..."
+
+ IDS_SAVECFG_EXPFILEEXISTS, "Znaleziono plik „%s”. Ten plik zawiera wyeksportowaną konfigurację, która jest ładowana przy każdym uruchomieniu programu Open Salamander. Jeśli nie chcesz ładować konfiguracji z tego pliku, zmień jego nazwę lub usuń go. Naciśnij OK, aby zapisać konfigurację, lub Anuluj, aby skupić plik."
+
+ IDS_FSFORCECLOSE, "Ścieżka „%s” odmówiła zamknięcia.\nCzy chcesz wymusić jej zamknięcie?"
+
+ IDS_CREDENTIALCONFLICT, "Wiele połączeń z serwerem lub zasobem udostępnionym przez tego samego użytkownika przy użyciu więcej niż jednej nazwy użytkownika jest niedozwolone. Rozłącz wszystkie poprzednie połączenia z serwerem lub zasobem udostępnionym i spróbuj ponownie."
+
+ IDS_ARCREALLYIGNORESEL, "Czy chcesz zignorować wszystkie zaznaczone pliki (aby wykluczyć je z aktualizacji archiwum)?"
+ IDS_ARCREALLYIGNOREALL, "Czy chcesz zignorować wszystkie zaktualizowane pliki (aby przerwać aktualizację archiwum)?"
+
+ IDS_BROWSEARCUPDATE, "Kopiuj zaktualizowane pliki"
+ IDS_BROWSEARCUPDATETEXT, "Wybierz folder docelowy dla zaktualizowanych plików."
+
+ IDS_SEARCHINGTEXTESC, "Wyszukiwanie tekstu, naciśnij klawisz ESC, aby anulować..."
+
+ IDS_PATHERRORFORMAT, "Ścieżka: „%s”\nBłąd: %s"
+ IDS_PATHINARCHIVENOTFOUND, "Ścieżka „%s” nie istnieje w archiwum."
+
+ IDS_EMPTYUSERNAME, "Pusta nazwa użytkownika nie jest tu dozwolona."
+
+ IDS_NEWISNOTAVAILABLE, "Menu Nowy jest niedostępne."
+
+ IDS_TMPDIRERROR, "Katalog określony przez zmienne środowiskowe TMP lub TEMP nie istnieje lub nie jest dostępny. Program Open Salamander użyje katalogu systemowego dla plików tymczasowych."
+
+ IDS_UPDIRTYPENAME, "Katalog nadrzędny"
+
+ IDS_FLOPPY350, "Dyskietka 3,5 cala"
+ IDS_FLOPPY525, "Dyskietka 5,25 cala"
+ IDS_FLOPPY800, "Dyskietka 8,0 cala"
+
+ IDS_NEWNAME_COPY, "Kopia"
+ IDS_NEWNAME_OF, "z"
+
+ IDS_NOITEMSINPANEL, "W tym panelu nie ma żadnych elementów."
+
+ IDS_EMAILFILES_SUBJECT, "Wysyłanie e-mailem:"
+ IDS_EMAILFILES_BODY, "Pliki są dołączone i gotowe do wysłania z tą wiadomością."
+ IDS_EMAILFILES_MAPIERROR, "Nie można wysłać poczty. Żaden program pocztowy nie jest skonfigurowany do wysyłania poczty, nie znaleziono pliku MAPI32.DLL."
+
+ IDS_PLUGINSUFFIX, " (Wtyczka)"
+
+ IDS_CURRENTPROCESSBREAK, "Nie można przerwać tego zadania (nie ma to sensu). Użyj innego zadania programu Open Salamander, aby przerwać to zadanie."
+ IDS_CURRENTPROCESSTERMINATE, "Czy na pewno chcesz zakończyć bieżący proces?\n\nOSTRZEŻENIE: Wszystkie niezapisane dane w bieżącym procesie zostaną utracone!"
+ IDS_CONFIRM_TERMINATE, "Czy na pewno chcesz zakończyć określony proces?\n\nOSTRZEŻENIE: Wszystkie niezapisane dane w określonym procesie zostaną utracone!"
+ IDS_CONFIRM_BREAK, "Czy na pewno chcesz przerwać określony proces i wysłać nam raport o błędzie?\n\nOSTRZEŻENIE: Wszystkie niezapisane dane w określonym procesie zostaną utracone!"
+
+ IDS_UNABLETOREADFILE, "Nie można odczytać pliku."
+
+ IDS_MOVECOPY_NONSENSE, "Ta operacja prawdopodobnie nie ma sensu. Wszystkie zaznaczone pliki i katalogi mają tę samą nazwę docelową (nadpisałyby się nawzajem).\nCzy chcesz kontynuować tę operację?"
+
+ IDS_MOVECOPY_CREATEPATH, "Ścieżka docelowa „%s” nie istnieje. Czy chcesz ją utworzyć?"
+ IDS_MOVECOPY_CREATEPATH_CNFRM, "&Twórz ścieżkę docelową bez pytania następnym razem\tjak cofnąć\tMożesz zmienić tę opcję później na stronie Potwierdzenia w Konfiguracji."
+
+ IDS_MOVECOPY_OPMASKSNOTSUP, "Maski operacji nie są obsługiwane w archiwach (ścieżka do archiwum musi kończyć się znakiem ukośnika odwrotnego)."
+
+ IDS_INVALIDNUMBER, "Nieprawidłowa liczba."
+
+ IDS_CLEARHISTORY_CNFRM, "Czy na pewno chcesz, aby program Open Salamander usunął wszystkie dane dotyczące historii?\n\nHistoria wiersza poleceń, kopiowania, przenoszenia, zaznaczania, katalogów roboczych, otwartych plików, znajdowania, wtyczek itp. zostanie usunięta."
+ IDS_HISTORY_WAS_CLEARED, "Wszystkie dane dotyczące historii zostały wyczyszczone z pamięci.\n\nRozważ zapisanie konfiguracji programu Open Salamander.\nSpowoduje to usunięcie danych dotyczących historii również z rejestru."
+
+ IDS_UNPACK_ONLYDISK, "Rozpakowywanie do archiwów lub systemów plików wtyczek nie jest jeszcze obsługiwane."
+ IDS_UNPACK_OPMASKSNOTSUP, "Maski operacji nie są obsługiwane podczas rozpakowywania z archiwów (ścieżka docelowa musi istnieć lub kończyć się znakiem ukośnika odwrotnego)."
+
+ IDS_LANGUAGE_CHANGE, "Zmiany języka zaczną obowiązywać dopiero po ponownym uruchomieniu programu Open Salamander."
+ IDS_CONVERSION_CHANGE, "Zmiany tabeli konwersji zaczną obowiązywać dopiero po ponownym uruchomieniu programu Open Salamander."
+
+ IDS_FSCOPYMOVE_ONLYDISK_A, "Ten system plików wtyczki nie obsługuje kopiowania ani przenoszenia do archiwów."
+ IDS_FSCOPYMOVE_ONLYDISK_FS, "Ten system plików wtyczki nie obsługuje kopiowania ani przenoszenia do określonego systemu plików wtyczki."
+ IDS_FSCOPYMOVE_INCOMPLETEPATH, "Kopiowanie i przenoszenie wewnątrz tego systemu plików wtyczki nie jest obsługiwane."
+ IDS_FSCOPYMOVE_OPMASKSNOTSUP, "Ten system plików wtyczki nie obsługuje masek operacji (ścieżka docelowa musi istnieć lub kończyć się znakiem ukośnika odwrotnego)."
+ IDS_FSCOPYMOVE_TOFS_NOTSUP, "Kopiowanie i przenoszenie do określonego systemu plików wtyczki nie są obsługiwane."
+
+ IDS_GETCOMPRFILESIZEERROR, "Nie można pobrać skompresowanego rozmiaru pliku: „%s”\nBłąd: %s\nCzy chcesz pominąć wszystkie podobne błędy?"
+
+ // Uwaga: %s nie może być w cudzysłowie tutaj, ponieważ będzie zawierał teksty zmiennych,
+ // które już zawierają cudzysłowy.
+ IDS_CONFIRM_NTFSCOMPRESS, "Czy na pewno chcesz skompresować %s?\n\nOstrzeżenie: pliki i katalogi zostaną odszyfrowane przed skompresowaniem."
+ IDS_CONFIRM_NTFSUNCOMPRESS, "Czy na pewno chcesz zdekompresować %s?"
+ IDS_CONFIRM_NTFSENCRYPT, "Czy na pewno chcesz zaszyfrować %s?\n\nOstrzeżenie: pliki i katalogi zostaną zdekompresowane przed zaszyfrowaniem."
+ IDS_CONFIRM_NTFSDECRYPT, "Czy na pewno chcesz odszyfrować %s?"
+ IDS_CONFIRM_DELETEFROMARCHIVE, "Czy na pewno chcesz usunąć %s z archiwum?"
+ IDS_COPYFROMARCHIVETO, "Kopiuj %s z archiwum do"
+ IDS_PACKTOARCHIVE, "Spakuj %s do archiwum"
+ IDS_COPYTO, "&Kopiuj %s do"
+ IDS_MOVETO, "&Przenieś %s do"
+ IDS_CONFIRM_DELETE, "Czy na pewno chcesz usunąć %s?"
+ IDS_CONFIRM_DELETE2, "Czy na pewno chcesz usunąć %s?\n\nWszystkie pliki pasujące do masek kosza zostaną wysłane do Kosza."
+
+ IDS_DELETETMPSALDIRS, "{!}Czy chcesz usunąć %d tymczasow{y|1|e|e} katalog{||1|i|ów} używany{e|1|e|e} przez poprzednie wystąpienia programu Open Salamander?"
+ IDS_DELETETMPSALDIRS_YES, "&Tak";
+ IDS_DELETETMPSALDIRS_NO, "&Nie";
+ IDS_DELETETMPSALDIRS_FOCUS, "&Skup";
+
+ IDS_QUESTION_FILE, "plik „%s”"
+ IDS_DLG_QUESTION_FILE, "Plik „%s”"
+ IDS_QUESTION_DIRECTORY, "katalog „%s”"
+ IDS_DLG_QUESTION_DIRECTORY, "Katalog „%s”"
+
+ IDS_CONFIRM_NTFSCOMPRESS_TITLE, "Potwierdź kompresję NTFS"
+ IDS_CONFIRM_NTFSUNCOMPRESS_TITLE, "Potwierdź dekompresję NTFS"
+ IDS_CONFIRM_NTFSENCRYPT_TITLE, "Potwierdź szyfrowanie NTFS"
+ IDS_CONFIRM_NTFSDECRYPT_TITLE, "Potwierdź odszyfrowanie NTFS"
+ IDS_CONFIRM_DELETE_TITLE, "Potwierdź usunięcie"
+
+ IDS_FIND_NOMATCH, "Nie można znaleźć ciągu '%s'."
+ IDS_FIND_NOREGEXPMATCH, "Nie można znaleźć dopasowania dla wyrażenia regularnego '%s'."
+
+//
+// łańcuchy liczby mnogiej -- początek
+//
+// Znaki '<' i '>' ograniczają obszar, który można skopiować do schowka za pomocą myszy.
+
+ IDS_PLURAL_X_BYTES, "{!}%s bajt{||0|y|ów|4|y}"
+
+ IDS_PLURAL_X_SEL_FILES, "{!}%d zaznaczon{y|1|e|ych|4|ych} plik{||1|i|ów|4|i}"
+ IDS_PLURAL_X_SEL_DIRS, "{!}%d zaznaczon{y|1|e|ych|4|ych} katalog{||1|i|ów|4|i}"
+ IDS_PLURAL_X_SEL_FILES_Y_SEL_DIRS, "{!}%d zaznaczon{y|1|e|ych|4|ych} plik{||1|i|ów|4|i} i %d zaznaczon{y|1|e|ych|4|ych} katalog{||1|i|ów|4|i}"
+ IDS_DLG_PLURAL_X_SEL_FILES, "{!}%d zaznaczon{y|1|e|ych|4|ych} plik{||1|i|ów|4|i}"
+ IDS_DLG_PLURAL_X_SEL_DIRS, "{!}%d zaznaczon{y|1|e|ych|4|ych} katalog{||1|i|ów|4|i}"
+ IDS_DLG_PLURAL_X_SEL_FILES_Y_SEL_DIRS, "{!}%d zaznaczon{y|1|e|ych|4|ych} plik{||1|i|ów|4|i} i %d zaznaczon{y|1|e|ych|4|ych} katalog{||1|i|ów|4|i}"
+
+ IDS_PLURAL_X_HID_FILES, "{!}%d ukryt{y|1|e|ych|4|ych} plik{||1|i|ów|4|i}"
+ IDS_PLURAL_X_HID_DIRS, "{!}%d ukryt{y|1|e|ych|4|ych} katalog{||1|i|ów|4|i}"
+ IDS_PLURAL_X_HID_FILES_Y_HID_DIRS, "{!}%d ukryt{y|1|e|ych|4|ych} plik{||1|i|ów|4|i} i %d ukryt{y|1|e|ych|4|ych} katalog{||1|i|ów|4|i}"
+ IDS_DLG_PLURAL_X_HID_FILES, "{!}%d ukryt{y|1|e|ych|4|ych} plik{||1|i|ów|4|i}"
+ IDS_DLG_PLURAL_X_HID_DIRS, "{!}%d ukryt{y|1|e|ych|4|ych} katalog{||1|i|ów|4|i}"
+ IDS_DLG_PLURAL_X_HID_FILES_Y_HID_DIRS, "{!}%d ukryt{y|1|e|ych|4|ych} plik{||1|i|ów|4|i} i %d ukryt{y|1|e|ych|4|ych} katalog{||1|i|ów|4|i}"
+
+ IDS_PLURAL_X_BYTES_Y_SEL_FILES, "{!}%s bajt{||0|y|ów|4|y} w %d zaznaczon{y|1|e|ych|4|ych} plik{u|1|ach|ach|4|ach}"
+ IDS_PLURAL_X_BYTES_Y_SEL_FILES2, "{!}<%s> bajt{||0|y|ów|4|y} w %d zaznaczon{y|1|e|ych|4|ych} plik{u|1|ach|ach|4|ach}"
+ IDS_PLURAL_X_BYTES_Y_SEL_DIRS, "{!}%s bajt{||0|y|ów|4|y} w %d zaznaczon{y|1|e|ych|4|ych} katalog{u|1|ach|ach|4|ach}"
+ IDS_PLURAL_X_BYTES_Y_SEL_DIRS2, "{!}<%s> bajt{||0|y|ów|4|y} w %d zaznaczon{y|1|e|ych|4|ych} katalog{u|1|ach|ach|4|ach}"
+ IDS_PLURAL_X_BYTES_Y_SEL_FILES_Z_SEL_DIRS, "{!}%s bajt{||0|y|ów|4|y} w %d zaznaczon{y|1|e|ych|4|ych} plik{u|1|ach|ach|4|ach} i %d zaznaczon{y|1|e|ych|4|ych} katalog{u|1|ach|ach|4|ach}"
+ IDS_PLURAL_X_BYTES_Y_SEL_FILES_Z_SEL_DIRS2, "{!}<%s> bajt{||0|y|ów|4|y} w %d zaznaczon{y|1|e|ych|4|ych} plik{u|1|ach|ach|4|ach} i %d zaznaczon{y|1|e|ych|4|ych} katalog{u|1|ach|ach|4|ach}"
+
+ IDS_PLURAL_X_FILES, "{!}%d plik{||1|i|ów|4|i}"
+ IDS_PLURAL_X_DIRS, "{!}%d katalog{||1|i|ów|4|i}"
+ IDS_PLURAL_X_FILES_Y_DIRS, "{!}%d plik{||1|i|ów|4|i} i %d katalog{||1|i|ów|4|i}"
+ IDS_DLG_PLURAL_X_FILES, "{!}%d plik{||1|i|ów|4|i}"
+ IDS_DLG_PLURAL_X_DIRS, "{!}%d katalog{||1|i|ów|4|i}"
+ IDS_DLG_PLURAL_X_FILES_Y_DIRS, "{!}%d plik{||1|i|ów|4|i} i %d katalog{||1|i|ów|4|i}"
+
+//
+// łańcuchy liczby mnogiej -- koniec
+//
+
+ IDS_ARCPATHNOTSUPPORTED, "Ścieżka docelowa tej operacji nie może zawierać ścieżki do pliku (archiwa nie są tu obsługiwane)."
+ IDS_TARGETPATHMUSTEXIST, "Ścieżka docelowa tej operacji musi istnieć (tworzenie ścieżki docelowej nie jest tu obsługiwane)."
+
+ IDS_UNABLETOEDITDUPFILES, "Nie można edytować ani otwierać pliku z archiwum. Nazwa tego pliku jest używana przez więcej niż jeden plik w archiwum (takie pliki można otwierać tylko w przeglądarkach)."
+ IDS_UNABLETOEDITINVFILES, "Nie można edytować ani otwierać pliku z archiwum. Nazwa tego pliku jest nieprawidłowa w systemach plików Windows (takie pliki można otwierać tylko w przeglądarkach)."
+
+ IDS_EDITPACKNOTSUPPORTED, "Pakowanie do tego typu archiwum nie jest obsługiwane. Program Open Salamander nie będzie w stanie zaktualizować pliku w archiwum.\n\nCzy nadal chcesz edytować ten plik?"
+
+ IDS_UNPACKINGFILEFROMARC, "Rozpakowywanie pliku z archiwum, proszę czekać..."
+ IDS_LISTINGARCHIVE, "Odczyt listy plików i katalogów z archiwum, proszę czekać..."
+
+ IDS_POLICIESRESTRICTION_TITLE, "Ograniczenia"
+ IDS_POLICIESRESTRICTION, "Ta operacja została anulowana z powodu ograniczeń obowiązujących na tym komputerze. Skontaktuj się z administratorem systemu."
+
+ IDS_WARNINGTITLE, "Ostrzeżenie"
+
+ IDS_INVALIDREGEXP, "Ciąg '%s' nie jest prawidłowym wyrażeniem regularnym.\nBłąd: %s."
+
+ IDS_SALCMD_VIEWWITH, "Podgląd &za pomocą\tCtrl+Shift+F3"
+ IDS_SALCMD_EDITWITH, "Edytuj &za pomocą\tCtrl+Shift+F4"
+ IDS_SALCMD_OPEN, "&Otwórz\tEnter"
+
+ IDS_CANNOT_CREATE_UNC_NAME, "Nazwa „%s” nie może zostać przekonwertowana na format UNC.\nNazwa nie pochodzi ani z udostępnionego katalogu, ani z zamapowanego dysku."
+
+ // Okno dialogowe Udostępnione katalogi
+ IDS_CONFIRM_STOPSHARE, "Czy na pewno chcesz zatrzymać udostępnianie „%s”?"
+ IDS_SHARES_NAME, "Nazwa udziału"
+ IDS_SHARES_PATH, "Ścieżka udostępniona"
+ IDS_SHARES_COMMENT, "Komentarz"
+
+ IDS_DISCONNECT_NAME, "Nazwa"
+ IDS_DISCONNECT_PATH, "Ścieżka"
+ IDS_DISCONNECT_NODRIVES, "Brak połączeń sieciowych do rozłączenia."
+
+ IDS_CONFIRM_EMAIL, "Czy chcesz wysłać %s e-mailem?\nCałkowity rozmiar: %s"
+ IDS_WANTEMAIL_NOFILE, "Nie wybrano żadnego pliku."
+
+ IDS_CONFIRM_ADDTOARCHIVE, "Plik „%s” już istnieje.\n\nCzy chcesz dodać %s do istniejącego archiwum, czy nadpisać istniejące?"
+ IDS_CONFIRM_ADDTOARCHIVE_ADD, "&Dodaj"
+ IDS_CONFIRM_ADDTOARCHIVE_OVER, "&Nadpisz"
+ IDS_CONFIRM_ADDTOARCHIVE_NOASK, "Dodaj do archiwum &bez pytania następnym razem\tjak cofnąć\tMożesz zmienić tę opcję później na stronie Potwierdzenia w Konfiguracji."
+
+ IDS_TITLEBAR_DIRECTORY, "Tylko nazwa katalogu"
+ IDS_TITLEBAR_COMPOSITE, "Skrócona ścieżka"
+ IDS_TITLEBAR_FULLPATH, "Pełna ścieżka"
+
+ IDS_SHORTCUT_INVALID, "Plik '%s' nie jest prawidłowym skrótem ani łączem."
+ IDS_SHORTCUT_WRONG_PATH, "Nie można pobrać celu skrótu lub ścieżka docelowa jest niedostępna."
+ IDS_DIRLINK_WRONG_PATH, "Nie można pobrać celu łącza."
+ IDS_DIRLINK_MOUNT_POINT, "To łącze jest punktem instalacji woluminu. Nie można go pokazać w panelu.\nŚcieżka: %s"
+
+ IDS_MASKS_HINT, "'*' oznacza dowolną liczbę znaków. '?' oznacza dowolny znak.\nPrzykład: *.a? (.a1, cokolwiek.ai, itd.)\nMaski są rozdzielane średnikiem. Przykład: *.txt;*.doc (a.txt, b.doc, itd.)\nMaski wykluczone są umieszczane po '|'. Przykład: |*.txt;*.doc (cokolwiek oprócz *.txt;*.doc)\nJeśli potrzebujesz średnika wewnątrz maski, wpisz go dwukrotnie. Przykład: jeden;;maska"
+ IDS_EXTENDED_MASKS_HINT, "Maski są rozdzielane średnikiem.\nZnak '#' oznacza dowolną cyfrę ('0' ... '9')"
+
+ IDS_FILELISTLINE_HINT, "Możesz ustawić szerokość wartości zmiennej na liczbę znaków lub na 'max' (aby dopasować do najdłuższej wartości).\nNa przykład: $(FileName:20) lub $(FileName:max)."
+
+ IDS_SPECIFY_CONVERT_ACTION, "Należy określić co najmniej jedną akcję konwersji."
+ IDS_NOFILE_MATCHEDMASK, "Brak pliku pasującego do określonej maski pliku."
+
+ IDS_HIDDEN_ATTRIBUTE, "&Pokaż pliki i katalogi z atrybutem Ukryty lub Systemowy\tCtrl+H"
+ IDS_HIDDEN_FILTER, "&Nie używaj filtra\tCtrl+F12"
+ IDS_HIDDEN_HIDECMD, "P&okaż ukryte nazwy"
+
+ IDS_ERROR_OPENING_FILE, "Błąd otwierania pliku „%s”.\n%s"
+ IDS_ERROR_READING_FILE, "Błąd odczytu pliku „%s”.\n%s"
+
+ IDS_COMPARE_FS, "Porównywanie z systemem plików wtyczki nie jest jeszcze obsługiwane."
+ IDS_COMPARE_SAMEPATH, "Ta sama ścieżka znajduje się w lewym i prawym panelu."
+
+ IDS_FINDLOG_TYPE, "Typ"
+ IDS_FINDLOG_TEXT, "Tekst"
+ IDS_FINDLOG_PATH, "Plik lub katalog"
+ IDS_FINDLOG_ERROR, "Błąd"
+ IDS_FINDLOG_INFO, "Informacja"
+ IDS_FINDLOG_SKIP, "Pomijanie katalogu"
+ IDS_FINDLOG_IGNORE, "Czy chcesz dodać katalog „%s” do listy ignorowanych katalogów?"
+ IDS_FINDERRORS_SKIPPING, "Pomijanie %d błędów..."
+ IDS_FINDERRORS_DEFER, "&Odłóż kolejne komunikaty o błędach"
+
+ IDS_UNPACKFILEPROGRESS, "Plik:"
+
+ IDS_ARCFILESNOTFOUND, "Nie można rozpakować plików i katalogów określonych w schowku. Nie ma ich już w archiwum."
+ IDS_ARCFILESNOTFOUND2, "Niektóre pliki lub katalogi określone w schowku nie zostały znalezione w archiwum.\n\nCzy chcesz kontynuować?"
+ IDS_ARCUNABLETOPASTE1, "Nie można wkleić plików i katalogów ze schowka tutaj. Główne okno programu Open Salamander\nmusi być dostępne, aby przetworzyć polecenie Wklej."
+ IDS_ARCUNABLETOPASTE2, "Nie można teraz wkleić plików i katalogów ze schowka. Główne okno programu Open Salamander\nmusi być dostępne, aby przetworzyć polecenie Wklej."
+
+ IDS_INFODLGFLAG7, "obsługuje strumienie nazwane"
+ IDS_INFODLGFLAG8, "wolumin tylko do odczytu"
+ IDS_INFODLGFLAG9, "obsługuje system szyfrowania plików (EFS)"
+ IDS_INFODLGFLAG10, "obsługuje identyfikatory obiektów"
+ IDS_INFODLGFLAG11, "obsługuje punkty ponownej analizy"
+ IDS_INFODLGFLAG12, "obsługuje pliki rozrzedzone"
+ IDS_INFODLGFLAG13, "obsługuje przydziały dyskowe"
+
+ IDS_PROGDLGPAUSE, "&Wstrzymaj"
+ IDS_PROGDLGRESUME, "&Wznów"
+ IDS_PROGDLGPAUSED, "wstrzymano"
+ IDS_PROGDLGQUEUEPAUSED, "oczekiwanie"
+ IDS_OPERATIONQUEUEFULL, "Kolejka operacji na plikach nie może przyjąć kolejnej operacji. Poczekaj na zakończenie istniejącej operacji i spróbuj ponownie."
+
+ IDS_EDITNEWALREADYEX, "Plik już istnieje. Czy chcesz edytować ten istniejący plik?"
+
+ IDS_SRCPATHUNICODEONLY, "Ścieżki źródłowej nie można przetłumaczyć z formatu Unicode na format wielobajtowy, więc program Open Salamander nie może na niej pracować."
+ IDS_SRCFILESNOTFOUND, "Niektóre pliki lub katalogi określone w operacji przeciągnij i upuść lub w schowku nie zostały znalezione.\n\nCzy chcesz kontynuować?"
+
+ IDS_PLUGINPACKERNOTFOUND, "Nie można znaleźć pakowacza dla wtyczki %s (zobacz Pakowacze na stronie okna dialogowego Pakowanie w Konfiguracji)."
+ IDS_PLUGINUNPACKERNOTFOUND, "Nie można znaleźć rozpakowującego dla wtyczki %s (zobacz Rozpakowujący na stronie okna dialogowego Rozpakowywanie w Konfiguracji)."
+
+ IDS_FILETITLE, "Plik:"
+ IDS_CONFADSLOSS_WARNING_MOVE_FILE, "Plik zawiera alternatywne strumienie danych (ADS). Strumienie ADS nie są obsługiwane na ścieżce docelowej. Naciśnij przycisk Tak, aby przenieść plik bez strumieni ADS (OSTRZEŻENIE: strumienie ADS zostaną utracone). Naciśnij przycisk Pomiń, aby pominąć przenoszenie tego pliku."
+ IDS_CONFADSLOSS_WARNING_MOVE_DIR, "Katalog zawiera alternatywne strumienie danych (ADS). Strumienie ADS nie są obsługiwane na ścieżce docelowej. Naciśnij przycisk Tak, aby przenieść katalog bez strumieni ADS (OSTRZEŻENIE: strumienie ADS zostaną utracone). Naciśnij przycisk Pomiń, aby pominąć przenoszenie tego katalogu."
+ IDS_CONFADSLOSS_WARNING_COPY_FILE, "Plik zawiera alternatywne strumienie danych (ADS). Strumienie ADS nie są obsługiwane na ścieżce docelowej. Naciśnij przycisk Tak, aby skopiować plik bez strumieni ADS. Naciśnij przycisk Pomiń, aby pominąć kopiowanie tego pliku."
+ IDS_CONFADSLOSS_WARNING_COPY_DIR, "Katalog zawiera alternatywne strumienie danych (ADS). Strumienie ADS nie są obsługiwane na ścieżce docelowej. Naciśnij przycisk Tak, aby skopiować katalog bez strumieni ADS. Naciśnij przycisk Pomiń, aby pominąć kopiowanie tego katalogu."
+
+ IDS_ERROROPENINGADS, "Błąd otwierania alternatywnego strumienia danych"
+ IDS_ERRORREADINGADS, "Błąd odczytu alternatywnego strumienia danych"
+ IDS_ERRORWRITINGADS, "Błąd zapisu alternatywnego strumienia danych"
+
+ IDS_ERRORGETTINGFILETIME, "Błąd pobierania czasu pliku"
+ IDS_ERRORSETTINGFILETIME, "Błąd ustawiania czasu pliku"
+
+ IDS_METADATALOSS_BEFORESOURCEDELETE, "Przenoszenie między woluminami nie może zachować wszystkich metadanych na %s.\n\nŹródło: %s\n\nNastępujące metadane są tracone lub nie mogły zostać zweryfikowane:\n%s\n\nTak usuwa źródło i kończy przenoszenie. Nie zachowuje źródło i kontynuuje kopiowanie."
+ IDS_METADATALOSS_LASTWRITETIME, "Sygnatura czasowa ostatniego zapisu"
+ IDS_METADATALOSS_CREATIONANDACCESSTIMES, "Sygnatury czasowe utworzenia i ostatniego dostępu"
+ IDS_METADATALOSS_ATTRIBUTES, "Atrybuty pliku"
+ IDS_METADATALOSS_SECURITY, "Właściciel, grupa i lista kontroli dostępu"
+ IDS_METADATALOSS_ADS, "Alternatywne strumienie danych"
+ IDS_METADATALOSS_COMPRESSIONANDENCRYPTION, "Kompresja NTFS lub szyfrowanie EFS"
+
+ IDS_USERMENUERROR, "Błąd menu użytkownika"
+ IDS_TOOLONGLISTOFSELNAMES, "Lista zaznaczonych nazw jest zbyt długa. Odznacz niektóre nazwy. Maksymalna długość to 32771 znaków."
+ IDS_EMPTYLISTOFSELNAMES, "Lista zaznaczonych nazw jest pusta. Zaznacz niektóre nazwy lub skup jakąś nazwę."
+ IDS_COMPAREARGSCOLISION, "Używasz niezgodnych zmiennych dla porównywarki. Możesz użyć tylko jednej pary tych zmiennych."
+ IDS_COMPARENEEDSBOTHARGS, "Używasz tylko jednej zmiennej dla porównywarki. Musisz użyć całej pary tych zmiennych."
+ IDS_INCOMPATIBLEARGS, "Używasz niezgodnych zmiennych. Niektóre zmienne działają ze wszystkimi zaznaczonymi nazwami naraz (ListOfSelectedNames, FileToCompareLeft itp.), a inne (FullName, Name itp.) działają z nimi pojedynczo (polecenie Menu użytkownika jest wykonywane dla każdej zaznaczonej nazwy)."
+ IDS_NOTDEFFULLPATHLEFT, "To polecenie Menu użytkownika używa zmiennej FullPathLeft (pełna ścieżka w lewym panelu), która nie jest zdefiniowana w tym kontekście (używana z okna Znajdź lub lewy panel zawiera archiwum lub ścieżkę systemu plików wtyczki)."
+ IDS_NOTDEFFULLPATHRIGHT, "To polecenie Menu użytkownika używa zmiennej FullPathRight (pełna ścieżka w prawym panelu), która nie jest zdefiniowana w tym kontekście (używana z okna Znajdź lub prawy panel zawiera archiwum lub ścieżkę systemu plików wtyczki)."
+ IDS_NOTDEFFULLPATHINACTIVE, "To polecenie Menu użytkownika używa zmiennej FullPathInactive (pełna ścieżka w nieaktywnym panelu), która nie jest zdefiniowana w tym kontekście (używana z okna Znajdź lub nieaktywny panel zawiera archiwum lub ścieżkę systemu plików wtyczki)."
+ IDS_TOOLONGLISTOFSELFULLNAMES, "Lista zaznaczonych nazw ze ścieżką jest zbyt długa. Odznacz niektóre nazwy. Maksymalna długość to 32771 znaków."
+ IDS_EMPTYLISTOFSELFULLNAMES, "Lista zaznaczonych nazw ze ścieżką jest pusta. Zaznacz niektóre nazwy lub skup jakąś nazwę."
+
+ IDS_USERMENUCOMPAREARGSTITLE, "Wybierz katalogi do porównania"
+ IDS_USERMENUCOMPAREARG1, "&Porównaj katalog:"
+ IDS_USERMENUCOMPAREARG2, "&Z katalogiem:"
+ IDS_BROWSEUMCDIRTITLE, "Wybierz katalog"
+ IDS_BROWSEUMCDIRTEXT, "Wybierz katalog, który chcesz porównać."
+ IDS_UMCCONFIRMHOWTOREV, "Możesz zmienić tę opcję później na stronie Potwierdzenia w Konfiguracji."
+
+ IDS_USRMNUTOOLONGCMDORARGS, "Nie można wykonać polecenia Menu użytkownika. Polecenie lub jego argumenty są zbyt długie. Maksymalna długość polecenia z argumentami zależy od wersji systemu Windows oraz od tego, czy polecenie jest wykonywane przez powłokę. Zobacz pomoc, aby uzyskać przegląd limitów."
+
+ IDS_QUESTION_VOLMOUNTPOINT, "punkt instalacji woluminu „%s”"
+ IDS_QUESTION_JUNCTION, "punkt połączenia „%s”"
+ IDS_QUESTION_SYMLINK, "link symboliczny „%s”"
+
+ IDS_CONFENCLOSS_WARNING_MOVE_FILE, "Plik docelowy powinien być zaszyfrowany (przy użyciu systemu EFS), ale szyfrowanie nie jest obsługiwane na ścieżce docelowej lub nie można zaszyfrować pliku w bieżącym stanie. Naciśnij przycisk Tak, aby przenieść plik bez szyfrowania. Naciśnij przycisk Pomiń, aby pominąć przenoszenie tego pliku."
+ IDS_CONFENCLOSS_WARNING_MOVE_DIR, "Katalog docelowy powinien być zaszyfrowany (przy użyciu systemu EFS), ale szyfrowanie nie jest obsługiwane na ścieżce docelowej lub nie można zaszyfrować katalogu w bieżącym stanie. Naciśnij przycisk Tak, aby przenieść katalog bez szyfrowania. Naciśnij przycisk Pomiń, aby pominąć przenoszenie tego katalogu."
+ IDS_CONFENCLOSS_WARNING_COPY_FILE, "Plik docelowy powinien być zaszyfrowany (przy użyciu systemu EFS), ale szyfrowanie nie jest obsługiwane na ścieżce docelowej lub nie można zaszyfrować pliku w bieżącym stanie. Naciśnij przycisk Tak, aby skopiować plik bez szyfrowania. Naciśnij przycisk Pomiń, aby pominąć kopiowanie tego pliku."
+ IDS_CONFENCLOSS_WARNING_COPY_DIR, "Katalog docelowy powinien być zaszyfrowany (przy użyciu systemu EFS), ale szyfrowanie nie jest obsługiwane na ścieżce docelowej lub nie można zaszyfrować katalogu w bieżącym stanie. Naciśnij przycisk Tak, aby skopiować katalog bez szyfrowania. Naciśnij przycisk Pomiń, aby pominąć kopiowanie tego katalogu."
+
+ // potwierdzenia: grupy
+ IDS_CNFRM_CONFIRMON, "Potwierdzaj przy"
+ IDS_CNFRM_SHOWMESSAGE, "Pokaż komunikat"
+ // potwierdzenia: potwierdzaj przy
+ IDS_CNFRM_FILEDIRDEL, "Usuwanie pliku lub katalogu (patrz uwaga 1 poniżej)"
+ IDS_CNFRM_NEDIRDEL, "Usuwanie niepustego katalogu (patrz uwaga 1 poniżej)"
+ IDS_CNFRM_FILEOVER, "Nadpisywanie pliku (ignorowane w archiwach)"
+ IDS_CNFRM_SHFILEDEL, "Usuwanie pliku systemowego lub ukrytego (patrz uwaga 2 poniżej)"
+ IDS_CNFRM_SHDIRDEL, "Usuwanie katalogu systemowego lub ukrytego (patrz uwaga 2 poniżej)"
+ IDS_CNFRM_SHFILEOVER, "Nadpisywanie pliku systemowego lub ukrytego (ignorowane w archiwach)"
+ IDS_CNFRM_NTFSPRESS, "Kompresja lub dekompresja NTFS (ignorowane w archiwach)"
+ IDS_CNFRM_NTFSCRYPT, "Szyfrowanie lub odszyfrowanie NTFS (ignorowane w archiwach)"
+ IDS_CNFRM_DAD, "Operacje przeciągnij i upuść"
+ IDS_CNFRM_DIRALREADYEXISTS, "Scalanie katalogów (ignorowane w archiwach)"
+ IDS_CNFRM_UMDIFFDLG, "Menu użytkownika: zawsze pokazuj okno dialogowe z nazwami do porównania"
+ IDS_CNFRM_DSTIGNORED, "Porównaj katalogi: ignorowane różnice wynoszące dokładnie 1 lub 2 godziny"
+ IDS_CNFRM_DSTCANIGN, "Porównaj katalogi: znalezione różnice wynoszące dokładnie 1 lub 2 godziny"
+ // potwierdzenia: pokaż komunikat
+ IDS_CNFRM_CLOSEARCHIVE, "Archiwum zostanie zamknięte... (tylko jeśli edytujesz pliki z archiwum)"
+ IDS_CNFRM_CLOSEFIND, "Czy chcesz zamknąć okno Znajdź?"
+ IDS_CNFRM_STOPFIND, "Czy chcesz przerwać wyszukiwanie? (w poleceniu Znajdź pliki i katalogi)"
+ IDS_CNFRM_CREATEPATH, "Czy chcesz utworzyć ścieżkę docelową? (w operacjach Kopiuj/Przenieś)"
+ IDS_CNFRM_ALWAYSONTOP, "Czy chcesz włączyć opcję Zawsze na wierzchu?"
+ IDS_CNFRM_ONSALCLOSE, "Czy chcesz zamknąć program Open Salamander?"
+ IDS_CNFRM_ONSENDEMAIL, "Czy chcesz wysłać zaznaczone pliki e-mailem?"
+ IDS_CNFRM_ONADDTOARCHIVE, "Czy chcesz dodać pliki do istniejącego archiwum?"
+ IDS_CNFRM_ONCREATEDIR, "Katalog nie istnieje. Czy chcesz go utworzyć?"
+ IDS_CNFRM_COPYMOVEOPTNS, "Kopiuj/Przenieś do archiwów i systemu plików wtyczek: opcje zostaną zignorowane."
+
+ IDS_CANCLOSESALAMANDER, "Czy chcesz zamknąć program Open Salamander?"
+
+ IDS_PLUGINURLNONE, "(brak)"
+
+ IDS_SHELLEXTBREAK, "Główne okno programu Open Salamander zostało zniszczone przez wadliwe rozszerzenie powłoki. Wyślij nam następujący raport o błędzie, aby pomóc nam rozwiązać ten problem.\n\nNaciśnij OK, aby otworzyć okno dialogowe Raport o błędzie."
+ IDS_SHELLEXTBREAK2, "Wadliwe rozszerzenie powłoki zniszczyło nasze okno. Wyślij nam następujący raport o błędzie, aby pomóc nam rozwiązać ten problem.\n\nNaciśnij OK, aby otworzyć okno dialogowe Raport o błędzie."
+ IDS_SHELLEXTCRASH, "Program Open Salamander staje się niestabilny z powodu wadliwego rozszerzenia powłoki. Wyślij nam następujący raport o błędzie, aby pomóc nam rozwiązać ten problem.\n\nNaciśnij OK, aby otworzyć okno dialogowe Raport o błędzie."
+ IDS_SHELLEXTBREAK3, "To okno nie może zostać teraz zamknięte, ponieważ istnieje oczekujące zadanie, które go używa. Naciśnij Kontynuuj i poczekaj, aż zadanie zostanie zakończone.\n\nJeśli nie ma takiego zadania, naciśnij Przerwij i wyślij nam raport o błędzie, aby pomóc nam rozwiązać ten problem. Program Open Salamander zostanie zakończony."
+ IDS_SHELLEXTBREAK4, "Nie można wykonać nowego zadania, ponieważ wykonywanie poprzedniego zadania nie zostało jeszcze zakończone. Naciśnij Kontynuuj i poczekaj na wykonanie poprzedniego zadania.\n\nJeśli nie ma takiego zadania, naciśnij Przerwij i wyślij nam raport o błędzie, aby pomóc nam rozwiązać ten problem. Program Open Salamander zostanie zakończony."
+
+ IDS_NEWLYCREATEDFILE, "Plik już istnieje. Czy chcesz go zastąpić?"
+
+ IDS_UNPACKTOOLONGNAME, "Nie można rozpakować pliku z archiwum do katalogu tymczasowego, ponieważ\nwynikowa nazwa pliku jest zbyt długa."
+ IDS_UNPACKINVNAMERENUNSUP, "Nie można rozpakować pliku z archiwum, ponieważ jego nazwa jest nieprawidłowa w systemach plików Windows, a wtyczka archiwizatora nie obsługuje rozpakowywania do innej nazwy pliku."
+ 
+ IDS_VIEWFILEFAILED, "Nie można umieścić pliku w katalogu tymczasowym."
+ IDS_VIEWFILETOOLONGNAME, "Wynikowa nazwa pliku jest zbyt długa."
+
+ IDS_BROWSEONERRGOTOTITLE, "Wybierz ścieżkę"
+ IDS_BROWSEONERRGOTOTEXT, "Wybierz ścieżkę, którą chcesz odwiedzić, gdy bieżąca ścieżka w panelu jest niedostępna."
+
+ IDS_ERROPENADS_IGNOREALL, "Ignoruj &wszystkie"
+
+ IDS_CHDHOTPATHS_HINT, "Widoczność elementów Szybkich ścieżek (tylko w menu Zmień napęd) można zmienić na stronie Szybkie ścieżki."
+ IDS_CHDPLUGINS_HINT, "Widoczność elementów systemu plików wtyczek można zmienić w Menedżerze wtyczek (patrz menu Wtyczki)."
+
+ IDS_NAMEMANGLE_ONTHEDISK, "Tak jak są zapisane na dysku"
+ IDS_NAMEMANGLE_EXPLORER, "W częściowo mieszanej wielkości liter, jeśli są w formacie DOS"
+ IDS_NAMEMANGLE_VC, "Małymi literami; katalogi wielkimi literami"
+ IDS_NAMEMANGLE_PARTMIXEDCASE, "W częściowo mieszanej wielkości liter"
+ IDS_NAMEMANGLE_LOWERCASE, "Małymi literami"
+ IDS_NAMEMANGLE_UPPERCASE, "Wielkimi literami"
+
+ IDS_SIZEMODE_BYTES, "W bajtach (domyślne dla programu Open Salamander)"
+ IDS_SIZEMODE_KB, "W kilobajtach (domyślne dla Eksploratora Windows)"
+ IDS_SIZEMODE_MIXED, "W formacie skróconym (na przykład 15 B, 3,41 KB lub 12,5 MB)"
+
+ IDS_IMPORTCFG_DEFCFG, "Nie importuj, rozpocznij z konfiguracją domyślną"
+
+ IDS_PATHMENU_BROWSE, "&Przeglądaj...\tCtrl+B"
+ IDS_PATHMENU_LEFT, "Ścieżka &lewego panelu\tCtrl+["
+ IDS_PATHMENU_RIGHT, "Ścieżka &prawego panelu\tCtrl+]"
+
+ IDS_NETWORK_NONE, "(brak)"
+ IDS_NETWORK_NETWORK, "Sieć"
+ IDS_NETWORK_PLUGINS, "Wtyczki"
+
+ IDS_CHANGEDIR_HINT, "Wpisz ścieżkę, którą chcesz odwiedzić. Przykłady:\nŚcieżka lokalna: C:\\Program Files\nŚcieżka względna: ..\\doc\nŚcieżka UNC: \\\\server\\share\nŚcieżka wtyczki: REG:\\HKEY_USERS\nŚcieżka archiwum: C:\\archive.zip"
+ IDS_CHANGEDIR_TC_HINT, "Aby zmienić bieżący katalog, użyj polecenia Zmień katalog (Shift+F7)."
+ IDS_DONTSHOWAGAIN2, "&Nie pokazuj tego komunikatu ponownie"
+
+ IDS_HOTKEY_PLUGIN_CONFLICT, "Obecnie przypisany do: %s"
+ IDS_HOTKEY_SAL_CONFLICT, "Ten skrót należy do programu Open Salamander. Wybierz inny."
+
+ IDS_FINDIGNORE_RESET, "Czy na pewno chcesz ustawić ścieżki na wartości domyślne?"
+
+ IDS_BROWSE_BTN_TIP, "Aby otworzyć menu z pola edycji, naciśnij Alt+Strzałka w prawo"
+
+ IDS_MOVECOPY_OPTIONS_NOTSUPPORTED, "Określono pewne opcje specjalne (patrz przycisk Opcje w oknie dialogowym Kopiuj/Przenieś). Te opcje nie są obsługiwane podczas kopiowania/przenoszenia do systemów plików wtyczek i archiwów. Opcje zostaną zignorowane."
+ IDS_MOVECOPY_OPTIONS_NOTSUPPORTED_AGAIN, "&Nie pokazuj tego komunikatu ponownie\tjak cofnąć\tMożesz zmienić tę opcję później na stronie Potwierdzenia w Konfiguracji."
+
+ IDS_COPYDLGTITLE, "Kopiuj %s"
+ IDS_MOVEDLGTITLE, "Przenieś %s"
+ IDS_COPYINGFROM, "Z:"
+ IDS_COPYINGTO, "Do:"
+
+ IDS_MAKEFILELIST_OUTPUT, "Wynik tworzenia listy plików"
+
+ IDS_ACLNOTSUPPORTEDONTGTPATH, "Nie można zachować właścicieli i uprawnień. Nie są one obsługiwane\nna ścieżce docelowej (nie jest to wolumin NTFS).\n\nCzy chcesz kontynuować?"
+
+ IDS_BUGREPORTCNFRM_TITLE, "Zgłoś błąd"
+ IDS_BUGREPORTCNFRM_TEXT, "W przypadku raportów o błędach lub próśb o funkcje użyj menu Pomoc > Oficjalne forum pomocy technicznej.\n\nUżyj tego raportu o błędzie tylko do wysyłania nam poufnych danych lub gdy o to poprosimy."
+
+ IDS_MSGBOXBTN_SKIP, "&Pomiń"
+ IDS_MSGBOXBTN_SKIPALL, "Pomiń &wszystkie"
+ IDS_MSGBOXBTN_FOCUS, "&Skup"
+
+ IDS_CANTLOADPLUGINSLG1, "Nie można załadować tej wtyczki w aktualnie używanym języku. Plik języka wtyczki %s nie został znaleziony lub jest nieprawidłowy. Program Open Salamander spróbuje wyszukać inny plik języka wtyczki (.SLG)."
+ IDS_CANTLOADPLUGINSLG2, "Nie można załadować modułu języka wtyczki, który był wcześniej używany przez tę wtyczkę. Plik języka wtyczki %s nie został znaleziony lub jest nieprawidłowy. Program Open Salamander spróbuje wyszukać inny plik języka wtyczki (.SLG)."
+ IDS_PLUGINSLGNOTFOUND, "Wygląda na to, że nie masz żadnych modułów języka (.SLG) dla tej wtyczki (patrz podkatalog LANG wtyczki)."
+ IDS_DONOTSHOWCANTLOADPLUGINSLG, "&Nie pokazuj tego komunikatu dla innych wtyczek"
+
+ IDS_CORRUPTEDCONFIGFOUND, "Konfiguracja zapisana w rejestrze jest uszkodzona, więc nie można jej załadować. Program Open Salamander został prawdopodobnie zakończony podczas zapisywania konfiguracji. Dzieje się tak głównie, gdy program Open Salamander nadal działa podczas zamykania systemu (lub wylogowania). Aby zapobiec temu problemowi, zamknij program Open Salamander przed zamknięciem systemu (lub wylogowaniem).\n\nMożesz teraz wykonać kopię zapasową uszkodzonej konfiguracji (uruchom RegEdit.exe, zmień nazwę klucza HKEY_CURRENT_USER\\%s). Później możesz spróbować pobrać niektóre ustawienia z tej kopii zapasowej (Menu użytkownika, Szybkie ścieżki, zakładki FTP itp.).\n\nUszkodzona konfiguracja musi zostać usunięta z rejestru przed uruchomieniem programu Open Salamander."
+ IDS_CORRUPTEDCONFIGREMOVEBTN, "&Usuń konfigurację"
+ IDS_CHANGEDSHUTDOWNPARS, "Używasz niestandardowych wartości następujących parametrów używanych podczas wylogowywania i zamykania systemu. Prawdopodobnie powoduje to uszkodzenie konfiguracji programu Open Salamander (jest ona kończona podczas zapisywania konfiguracji).\n\nHKEY_CURRENT_USER\\Control Panel\\Desktop\\WaitToKillAppTimeout powinno mieć wartość 20000.\nHKEY_CURRENT_USER\\Control Panel\\Desktop\\AutoEndTasks powinno mieć wartość 0."
+
+ IDS_COMPAREFILESORDIRS, "Określ, czy chcesz porównać pliki, czy katalogi."
+ IDS_MSGBOXBTN_FILES, "&Pliki"
+ IDS_MSGBOXBTN_DIRS, "&Katalogi"
+
+ IDS_FILEISTOOBIGFORFAT32, "Pliku nie można skopiować do określonej ścieżki docelowej, ponieważ jest zbyt duży dla systemu plików FAT32.\n\nPlik: %s"
+
+ IDS_INVALIDESCAPEPATH, "Ścieżka, do której należy przejść, gdy ścieżka w panelu jest niedostępna, jest nieprawidłowa. Popraw tę ścieżkę w konfiguracji na stronie Napędy."
+ 
+ IDS_SHEXT_NOTLOADEDYET, "Operacja przeciągnij i upuść z archiwum lub systemu plików wtyczki nie powiodła się. Usuń niechcianie utworzony katalog DROPFAKE (jeśli istnieje) z katalogu docelowego.\n\nPowinno to mieć miejsce tylko bezpośrednio po instalacji lub jeśli cel upuszczenia nie jest ani Eksploratorem Windows, ani programem Open Salamander. Jeśli celem upuszczenia jest Eksplorator Windows, uruchom ponownie system Windows, aby rozwiązać ten problem (zaawansowani użytkownicy mogą po prostu zakończyć proces explorer.exe i uruchomić go ponownie)."
+ 
+ IDS_SALAMANDERICON_DEFAULT, "Domyślna"
+ IDS_SALAMANDERICON_RED, "Czerwona"
+ IDS_SALAMANDERICON_GREEN, "Zielona"
+ IDS_SALAMANDERICON_BLUE, "Niebieska"
+ 
+ IDS_PROGDLGHOURS, "%d godz."
+ IDS_PROGDLGMINUTES, "%d min"
+ IDS_PROGDLGSECS, "%d s"
+ 
+ IDS_PROGDLGSTATUSCOPY, "Skopiowano %s z %s"
+ IDS_PROGDLGSTATUSMOVE, "Przeniesiono %s z %s"
+ IDS_PROGDLGTRRATE, "szybkość: %s/s"
+ IDS_PROGDLGTRRATELIM, "szybkość: %s/s (limit: %s/s)"
+ IDS_PROGDLGTIMELEFT, "pozostały czas: %s"
+ 
+ IDS_SPEEDLIMITSIZE, "Limit szybkości musi być liczbą z zakresu od 1 B/s do 4 GB/s."
+ 
+ IDS_PROGDLGSETSPLIM, "&Ustaw limit szybkości..."
+ IDS_PROGDLGAUTOPAUSE, "&Poczekaj, aż wszystkie inne operacje kopiowania/przenoszenia zostaną zakończone"
+ 
+ IDS_SELLANGEXITBUTTON, "&Zakończ"
+ 
+ IDS_PLUGINSAVEFAILED, "Nie można zapisać konfiguracji wtyczki %s (błąd otwierania klucza konfiguracji programu Open Salamander).\n\nCzy nadal chcesz ją zwolnić?"
+ 
+ IDS_ICONOVRLS_NAME, "Nazwa"
+ IDS_ICONOVRLS_DESCR, "Opis"
+ IDS_ICONOVRLS_CHANGE, "Zmiany nakładek ikon zaczną obowiązywać dopiero po ponownym uruchomieniu programu Open Salamander."
+ IDS_ICONOVRLS_CRASH, "Program Open Salamander stał się niestabilny. Wystąpił nieobsłużony wyjątek w programie obsługi nakładek ikon %s. Możesz zapobiec podobnym awariom, jeśli program Open Salamander nie będzie używał tego programu obsługi (kliknij przycisk Ten) lub przestanie wyświetlać niestandardowe nakładki ikon w ogóle (kliknij przycisk Wszystkie). Możesz też spróbować uaktualnić oprogramowanie udostępniające ten program obsługi ().\n\nKtóre programy obsługi nakładek ikon chcesz wyłączyć?\n\nUwaga: nakładki ikon można skonfigurować w oknie dialogowym konfiguracji (patrz strona Nakładki ikon)."
+ IDS_ICONOVRLS_DISTHIS, "&Ten"
+ IDS_ICONOVRLS_DISALL, "&Wszystkie"
+ 
+ IDS_IMPORTCFGFROMFILESKIPPED, "Plik config.reg (lub inny plik określony parametrem -c) nie został zaimportowany do rejestru z powodu importu konfiguracji ze starszej wersji programu Open Salamander. Zamknij teraz program Open Salamander i uruchom go ponownie, aby rozwiązać ten problem."
+ IDS_NOTALLPLUGINSCFGIMPORTED, "Dokonano uaktualnienia do nowej wersji programu Open Salamander. Trwa teraz importowanie konfiguracji starej wersji. Stara wersja zawierała pewne wtyczki (wymienione poniżej), których brakuje (lub które nie działają) w nowej wersji, więc ich konfiguracji nie można teraz zaimportować. Możesz teraz uruchomić program Open Salamander bez tych wtyczek (konfiguracja starej wersji pozostaje w rejestrze, więc możesz ją zaimportować później). Lub zamknij teraz program Open Salamander, zainstaluj brakujące wtyczki i uruchom program Open Salamander ponownie.\n\nBrakujące (lub niedziałające) wtyczki: %s%s."
+ IDS_NUMOFSKIPPEDPLUGINNAMES, ", pominięto %d więcej wtyczek"
+ IDS_STARTWITHOUTMISSINGPLUGINS, "&Uruchom bez brakujących wtyczek"
+ 
+ IDS_ALLOCHANDLER_MSG, "Niewystarczająca ilość pamięci, aby przydzielić %Iu bajtów. Spróbuj zwolnić trochę pamięci (np. zamknij jakąś uruchomioną aplikację) i kliknij Ponów. Jeśli to nie pomoże, możesz kliknąć Ignoruj, aby przekazać błąd przydziału pamięci tej aplikacji, lub kliknąć Przerwij, aby zakończyć tę aplikację."
+ IDS_ALLOCHANDLER_WRNIGNORE, "Czy na pewno chcesz przekazać błąd przydziału pamięci tej aplikacji?\n\nOSTRZEŻENIE: Aplikacja może ulec awarii, a wtedy wszystkie niezapisane dane zostaną utracone!\nWSKAZÓWKA: Zalecamy podejmowanie tego ryzyka tylko wtedy, gdy aplikacja próbuje przydzielić wyjątkowo duży blok pamięci (tj. ponad 500 MB)."
+ IDS_ALLOCHANDLER_WRNABORT, "Czy na pewno chcesz zakończyć tę aplikację?\n\nOSTRZEŻENIE: Wszystkie niezapisane dane zostaną utracone!"
+ 
+ IDS_RECONNET_TITLE, "Połącz z %s"
+ IDS_RECONNET_TEXT, "Nieprawidłowe hasło lub nieznana nazwa użytkownika dla: %s"
+ 
+ IDS_COMMONFILETYPE, "Plik"
+ IDS_COMMONFILETYPE2, "%s plik"
+ 
+ IDS_MASTERPASSWORD_NOTSET, "(nie ustawiono)"
+ 
+ IDS_INSECUREPASSWORD, "Twoje hasło jest zbyt proste i może nie zapewnić wystarczającego bezpieczeństwa przed atakami słownikowymi lub siłowymi.\nCzy na pewno chcesz go użyć?\n\nUwaga: dobre hasła mają co najmniej sześć znaków i zawierają zarówno małe, jak i wielkie litery, cyfry oraz znaki specjalne, takie jak separatory, symbole, litery ze znakami diakrytycznymi itp."
+ 
+ IDS_MASTERPASSWORD_CHANGED_TITLE, "Zmiana hasła powiodła się"
+ IDS_MASTERPASSWORD_REMOVED, "Usunięto hasło główne. Zapisane hasła (na przykład FTP i WinSCP) nie będą chronione."
+ IDS_MASTERPASSWORD_SET, "Hasło główne zostało pomyślnie zmienione. Zapisane hasła (na przykład FTP i WinSCP) są teraz zabezpieczone szyfrem AES."
+ IDS_WRONG_MASTERPASSWORD, "Nie wprowadzono poprawnego bieżącego hasła głównego. Spróbuj ponownie."
+
+ IDS_BROWSEDIRECTORY_TITLE, "Przeglądaj katalog"
+ IDS_BROWSEDIRECTORY_TEXT, "Wybierz katalog, którego chcesz użyć."
+ 
+ IDS_USEDEFAULTFONT, "Użyj &domyślnej czcionki"
+ IDS_USECUSTOMFONT, "Użyj &niestandardowej czcionki..."
+ 
+ IDS_TASKLISTLINE, "PID=%d, uruchomiono %s, %s%s"
+ IDS_TASKLISTCURLINE, ", bieżący proces"
+
+ IDS_EDITNEWFILE_SAVEASDEFAULT, "Zapisz bieżącą nazwę pliku jako domyślną"
+ IDS_EDITNEWFILE_REVERTDEFAULT, "Przywróć domyślną nazwę pliku na %s"
+ 
+ IDS_CMPDIRS_IGNDSTDIFFS, "{!}Porównane katalogi zawierają co najmniej %d par{ę|1|y||} plików z różnicą czasu wynoszącą dokładnie jedną lub dwie godziny. {Ta różnica została|1|Te różnice zostały} zignorowana jako związana ze zmianą czasu DST (czas letni). Możesz to wyłączyć na stronie Konfiguracja/Ogólne."
+ IDS_CMPDIRS_FOUNDDSTDIFFS, "{!}Porównane katalogi zawierają co najmniej %d par{ę|1|y||} plików z różnicą czasu wynoszącą dokładnie jedną lub dwie godziny. {Ta różnica jest|1|Te różnice są} prawdopodobnie związana ze zmianą czasu DST (czas letni) i może być zignorowana. Zobacz Konfiguracja/Ogólne."
+ IDS_CMPDIRS_NOTE, "Uwaga:"
+ IDS_CMPDIRS_DONTSHOWNOTEAG, "&Nie pokazuj informacji o zignorowanych różnicach następnym razem\tjak cofnąć\tMożesz zmienić tę opcję później na stronie Potwierdzenia w Konfiguracji."
+ IDS_CMPDIRS_IGNDSTDIFFSEXACT, "{!}Porównane katalogi zawierają %d par{ę|1|y||} plików z różnicą czasu wynoszącą dokładnie jedną lub dwie godziny. {Ta różnica została|1|Te różnice zostały} zignorowana jako związana ze zmianą czasu DST (czas letni). Możesz to wyłączyć na stronie Konfiguracja/Ogólne."
+ 
+ IDS_COPYMOVE_RESETHIDE, "Zresetuj i ukryj opcje"
+ IDS_COPYMOVE_SAVEASDEF, "Zapisz opcje jako domyślne"
+ IDS_COPYMOVE_RESETDEFS, "Zresetuj opcje i wartości domyślne"
+ 
+ IDS_CONFIGEXPUPTOXP, "Jeśli chcesz importować konfigurację przy każdym uruchomieniu programu Open Salamander, wyeksportuj ją do katalogu instalacyjnego do pliku o nazwie config.reg. Aby zaimportować inny plik konfiguracji, użyj parametru wiersza poleceń -C (np. „salamand.exe -C myconfig.reg”).\n\nZalecamy dodanie czyszczenia klucza rejestru z konfiguracją bezpośrednio do wyeksportowanego pliku. W przeciwnym razie zaimportowana konfiguracja zostanie scalona z bieżącą w rejestrze i może spowodować niespójną konfigurację."
+ IDS_CONFIGEXPVISTA, "Jeśli chcesz importować konfigurację przy każdym uruchomieniu programu Open Salamander, wyeksportuj ją do katalogu danych aplikacji (lub katalogu instalacyjnego) do pliku o nazwie config.reg. Aby zaimportować inny plik konfiguracji, użyj parametru wiersza poleceń -C (np. „salamand.exe -C myconfig.reg”).\n\nZalecamy dodanie czyszczenia klucza rejestru z konfiguracją bezpośrednio do wyeksportowanego pliku. W przeciwnym razie zaimportowana konfiguracja zostanie scalona z bieżącą w rejestrze i może spowodować niespójną konfigurację."
+ IDS_CONFIGEXPCLEARKEY, "&Dodaj czyszczenie klucza rejestru z konfiguracją bezpośrednio do wyeksportowanego pliku"
+ 
+ IDS_IMPORTCFG_OPENERR, "Nie można otworzyć ani odczytać pliku konfiguracji.\n\nPlik: %s\nBłąd: %s"
+ IDS_IMPORTCFG_TOOBIG, "Plik konfiguracji jest zbyt duży.\n\nPlik: %s"
+ IDS_IMPORTCFG_NOTREG, "Nie można zaimportować określonego pliku. To nie jest plik konfiguracji.\n\nPlik: %s"
+ IDS_IMPORTCFG_INVALIDFORMAT, "Nie można zaimportować pliku konfiguracji. Ma nieprawidłowy format.\n\nPlik: %s"
+ IDS_IMPORTCFG_REGERR, "Nie można zaimportować pliku konfiguracji do rejestru. Błąd zapisu do rejestru.\n\nPlik: %s"
+ 
+ IDS_IMPORTCFG_NOTOURVER, "Plik konfiguracji (%s) nie zawiera konfiguracji dla tej wersji programu Open Salamander.\n\nCzy chcesz go zaimportować mimo to?"
+ 
+ IDS_EXPORTCFG_REGERR, "Nie można wyeksportować konfiguracji do pliku. Błąd odczytu konfiguracji z rejestru."
+ IDS_EXPORTCFG_FILEERR, "Nie można wyeksportować konfiguracji do pliku. Błąd zapisu konfiguracji do pliku.\n\nPlik: %s"
+ 
+ IDS_ERROPENMENUFORW64ALIAS, "Nie można otworzyć menu kontekstowego dla panelu, ponieważ ścieżka w panelu jest tylko pseudokatalogiem dla przekierowania WOW64."
+ IDS_ERROPENMENUSELCONTW64ALIAS, "Nie można otworzyć menu kontekstowego, ponieważ bieżące zaznaczenie zawiera „%s”, które jest tylko pseudokatalogiem dla przekierowania WOW64."
+ IDS_ERROPENPROPSELCONTW64ALIAS, "Nie można otworzyć okna Właściwości, ponieważ bieżące zaznaczenie zawiera „%s”, które jest tylko pseudokatalogiem dla przekierowania WOW64."
+ IDS_ERRRENAMINGW64ALIAS, "Nie można zmienić nazwy „%s”, ponieważ jest to tylko pseudokatalog dla przekierowania WOW64."
+ IDS_ERRMOVESELCONTW64ALIAS, "Nie można przenieść bieżącego zaznaczenia, ponieważ zawiera ono „%s”, które jest tylko pseudokatalogiem dla przekierowania WOW64."
+ IDS_ERRDELETESELCONTW64ALIAS, "Nie można usunąć bieżącego zaznaczenia, ponieważ zawiera ono „%s”, które jest tylko pseudokatalogiem dla przekierowania WOW64."
+ IDS_ERRCUTSELCONTW64ALIAS, "Nie można wyciąć bieżącego zaznaczenia, ponieważ zawiera ono „%s”, które jest tylko pseudokatalogiem dla przekierowania WOW64."
+
+ IDS_SIZE_B, "B"
+ IDS_SIZE_KB, "KB"
+ IDS_SIZE_MB, "MB"
+ IDS_SIZE_GB, "GB"
+ IDS_SIZE_TB, "TB"
+ IDS_SIZE_PB, "PB"
+ IDS_SIZE_EB, "EB"
+
+ IDS_SPEED_B_per_s, "B/s"
+ IDS_SPEED_KB_per_s, "KB/s"
+ IDS_SPEED_MB_per_s, "MB/s"
+ IDS_SPEED_GB_per_s, "GB/s"
+ 
+ IDS_INVALID_DATEORTIME, "[nieprawidłowe]"
+ 
+ IDS_AS_ADMIN_TITLE, "Administrator"
+
+ IDS_SALMON_INVALIDEMAIL, "Wpisz prawidłowy adres e-mail, abyśmy mogli pomóc w zgłoszonym problemie."
+ IDS_SALMON_WAITFORUPLOAD, "Poczekaj na zakończenie kompresji i przekazywania."
+ IDS_SALMON_CONFIRMEXIT, "Czy na pewno nie chcesz nas poinformować o tym problemie? Bez Twojego raportu nie będziemy w stanie go naprawić.\n\nKliknij OK, aby usunąć raport bez informowania nas." 
+ IDS_SALMON_ERR_INI_SIZE, "Przekazany plik przekracza dozwolony rozmiar. Kod: %d."
+ IDS_SALMON_ERR_PARTIAL, "Przekazany plik został tylko częściowo przekazany. Kod: %d."
+ IDS_SALMON_ERR_NO_FILE, "Nie przekazano żadnego pliku. Kod: %d."
+ IDS_SALMON_ERR_NO_TMP_DIR, "Brak folderu tymczasowego. Kod: %d."
+ IDS_SALMON_ERR_CANT_WRITE, "Nie można zapisać pliku na dysk. Kod: %d."
+ IDS_SALMON_ERR_EXTENSION, "Pewne rozszerzenie zatrzymało przekazywanie pliku. Kod: %d."
+ IDS_SALMON_ERR_UNKNOWN, "Nieznany błąd przekazywania. Kod: %d."
+ IDS_SALMON_SYNTAX_ERROR_CLOSE, "Błąd składni w odpowiedzi serwera. Nie znaleziono znacznika zamykającego."
+ IDS_SALMON_SYNTAX_ERROR_OPEN, "Błąd składni w odpowiedzi serwera. Nie znaleziono znacznika otwierającego."
+ IDS_SALMON_SYNTAX_ERROR_VALUE, "Błąd składni w odpowiedzi serwera. Nie znaleziono wartości."
+ IDS_SALMON_SOCK_ERR_RECV, "Nie można odebrać danych. Kod: %d."
+ IDS_SALMON_SOCK_ERR_SHUTDOWN, "Nie można zamknąć połączenia. Kod: %d."
+ IDS_SALMON_SOCK_ERR_SEND, "Nie można wysłać danych. Kod: %d."
+ IDS_SALMON_SOCK_ERR_CONNECT, "Nie można połączyć się z serwerem. Kod: %d."
+ IDS_SALMON_SOCK_ERR_SOCKET, "Nie można otworzyć połączenia. Kod: %d."
+ IDS_SALMON_SOCK_ERR_HOST, "Nie można rozwiązać nazwy hosta. Kod: %d."
+ IDS_SALMON_SOCK_ERR_INIT, "Nie można zainicjować połączenia. Kod: %d."
+ IDS_SALMON_READING_FILE, "Błąd odczytu pliku %s" 
+ IDS_SALMON_OUT_OF_MEMORY, "Brak pamięci" 
+ IDS_SALMON_FILE_SIZE, "Pobranie rozmiaru pliku nie powiodło się dla %s"
+ IDS_SALMON_FILE_OPEN, "Nie można otworzyć %s"
+ IDS_SALMON_MORE_REPORTS, "Znaleziono starsze raporty o błędach. Czy chcesz zgłosić również te błędy i pomóc nam ulepszyć program Open Salamander?\n\nNaciśnij Tak, aby przetworzyć stare raporty o błędach. Naciśnij Nie, aby usunąć stare raporty o błędach."
+ IDS_SALMON_TITLE, "Narzędzie do zgłaszania błędów programu Open Salamander"
+ IDS_SALMON_COMPRESSING, "Kompresowanie, proszę czekać..."
+ IDS_SALMON_UPLOADING, "Przekazywanie, proszę czekać..."
+ IDS_SALMON_UPLOADSUCCESS, "Raport został pomyślnie przekazany.\n\nDziękujemy za pomoc w ulepszaniu programu Open Salamander!" 
+ IDS_SALMON_UPLOADFAILED, "Przekazanie raportu nie powiodło się, powód: %s\n\nWyślij nam raport e-mailem na adres support@taskscape.com i usuń je z dysku. Kliknij OK, aby pokazać raport."
+ IDS_SALMON_COMPRESSFAILED, "Kompresja raportu nie powiodła się, powód: %s\n\nSpakuj raport o błędzie przy użyciu programu 7-Zip, wyślij go e-mailem na adres support@taskscape.com i usuń pliki raportu z dysku. Kliknij OK, aby pokazać raport."
+ IDS_SALMON_LOAD_FAILED, "Ładowanie %s nie powiodło się."
+ IDS_SALMON_WRONG_CMDLINE, "To jest wewnętrzne narzędzie programu Open Salamander, nie uruchamiaj go bezpośrednio."
+ IDS_SALMON_WRONG_VERSION, "Nieprawidłowa wersja narzędzia do zgłaszania błędów programu Open Salamander. Skontaktuj się z nami pod adresem support@taskscape.com."
+ IDS_SALMON_MINIDUMP, "Wystąpił problem wymuszający zamknięcie programu Open Salamander.\nTworzenie raportu o błędzie, proszę czekać..."
+ IDS_SALMON_BUGREPORT_PROBLEM, "Wystąpił problem podczas tworzenia raportu o błędzie:\n%s"
+ IDS_SALMON_MINIDUMP_CREATE, "Nie można utworzyć pliku zrzutu minidump %s. Kod: %d."
+ IDS_SALMON_MINIDUMP_CALL, "Błąd podczas tworzenia zrzutu minidump. Kod: %d."
+ IDS_SALMON_HTTP_ERROR, "Nie można bezpiecznie przekazać raportu. Kod: %d."
+ IDS_SALMON_HTTP_STATUS, "Bezpieczna usługa zgłaszania awarii zwróciła kod stanu HTTP %d."
+
+ IDS_SALMON_NOT_RUNNING, "Narzędzie do zgłaszania błędów programu Open Salamander (salmon.exe) nie działa. Program Open Salamander nie będzie w stanie obsłużyć potencjalnych awarii. Uruchom ponownie program Open Salamander."
+
+ IDS_SLGINCOMPLETE_TITLE, "Niedokończone tłumaczenie programu Open Salamander"
+ IDS_SLGINCOMPLETE_TEXT, "Tłumaczenie programu Open Salamander na Twój język nie jest ukończone. Rozważ odwiedzenie naszego forum dyskusyjnego i dołączenie do prac nad tłumaczeniem:"
+ 
+ IDS_RECYCLEBINERROR, "Nie można wysłać pliku lub katalogu do Kosza, ponieważ ma nieprawidłową nazwę.\n\nNieprawidłowa część nazwy: „%s”\n\nWskazówka: Spróbuj zmienić jego nazwę przed wysłaniem do Kosza lub usuń go trwale (spróbuj klawisza Shift+Delete)."
+ 
+ IDS_PLUGINISX86ONLY, "Nie można załadować wtyczki %s. Ta wtyczka jest dostępna tylko w wersji x86 (32-bitowej) programu Open Salamander. Uruchom wersję x86 programu Open Salamander, aby użyć tej wtyczki. Przepraszamy za niedogodności."
+ 
+ IDS_UNABLETORESOLVELINK, "nie można rozwiązać łącza"
+ IDS_VOLMOUNTPOINT, "punkt instalacji woluminu"
+ 
+ IDS_DELFILESAFTERPACKINGNOLINKS, "Próbujesz przenieść zaznaczone pliki i katalogi do archiwum. Nie jest to możliwe, ponieważ zaznaczenie zawiera łącze do katalogu (punkt połączenia, punkt instalacji woluminu lub link symboliczny). Kontynuuj bez usuwania plików z dysku po spakowaniu do archiwum.\n\nŁącze: %s"
+ 
+ IDS_BLOCKSHUTDOWNDISKOPER, "Operacja na dysku jest w toku."
+ IDS_BLOCKSHUTDOWNFINDFILES, "Wyszukiwanie jest w toku."
+ IDS_BLOCKSHUTDOWNSAVECFG, "Zapisywanie konfiguracji, proszę poczekać kilka sekund."
+ IDS_FORCEDSHUTDOWN, "System Windows odmawia przerwania zamykania. Ten komunikat tymczasowo je zablokuje. Poczekaj na ręczne przerwanie zamykania, zanim zamkniesz ten komunikat, w przeciwnym razie program Open Salamander zostanie zakończony bez zapisania konfiguracji."
+ IDS_FORCEDSHUTDOWNDISKOPER, "System Windows odmawia przerwania zamykania. Ten komunikat tymczasowo je zablokuje.\n\nMasz w toku pewne operacje na dysku. Czy chcesz je teraz anulować? Kliknij Nie tylko wtedy, gdy ręcznie przerwano zamykanie, w przeciwnym razie ryzykujesz pozostawienie niedokończonych plików na dysku.\n\nPoczekaj na ręczne przerwanie zamykania, zanim odpowiesz na to pytanie, w przeciwnym razie program Open Salamander zostanie zakończony bez zapisania konfiguracji."
+ IDS_CLOSINGFINDWINDOWS, "Zamykanie okien Znajdź, proszę czekać..."
+}

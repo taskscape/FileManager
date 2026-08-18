@@ -225,7 +225,7 @@ void CFilesWindowAncestor::SetPath(const char* path)
     if (SuppressAutoRefresh && (!Is(ptDisk) || !IsTheSamePath(path, Path)))
         SuppressAutoRefresh = FALSE;
     DetachDirectory((CFilesWindow*)this);
-    strcpy(Path, path != NULL ? path : "");
+    StringCchCopyA(Path, _countof(Path), path != NULL ? path : "");
     PathW.Set(path);
 
     //--- detection of file-based compression/encryption and FAT32

@@ -48,3 +48,5 @@ tests/FileManager.UiTests/obj
 *.trx
 Installer/Installer_Staging
 tmp/pe-manifest-Release.json
+TestResults/application-verifier-logs
+errors.txt

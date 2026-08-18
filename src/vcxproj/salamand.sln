@@ -6,6 +6,8 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "salamand", "salamand.vcxpro
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "lang", "lang.vcxproj", "{7C7059BA-1FCE-4C36-B0B3-D095779CF89F}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "lang_pl", "lang_pl.vcxproj", "{A1B2C3D4-5E6F-4A0B-9C8D-1E2F3A4B5C6D}"
+EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "unfat", "..\plugins\unfat\vcxproj\unfat.vcxproj", "{AFD3091E-0A54-4936-9DD2-328F84308668}"
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "lang_unfat", "..\plugins\unfat\vcxproj\lang_unfat.vcxproj", "{858D9AB6-7EFD-4976-8724-31D553C63E41}"
@@ -213,6 +215,16 @@ Global
 		{7C7059BA-1FCE-4C36-B0B3-D095779CF89F}.Release|x64.Build.0 = Release|x64
 		{7C7059BA-1FCE-4C36-B0B3-D095779CF89F}.Utils (Release)|Win32.ActiveCfg = Release|Win32
 		{7C7059BA-1FCE-4C36-B0B3-D095779CF89F}.Utils (Release)|x64.ActiveCfg = Release|x64
+		{A1B2C3D4-5E6F-4A0B-9C8D-1E2F3A4B5C6D}.Debug|Win32.ActiveCfg = Debug|Win32
+		{A1B2C3D4-5E6F-4A0B-9C8D-1E2F3A4B5C6D}.Debug|Win32.Build.0 = Debug|Win32
+		{A1B2C3D4-5E6F-4A0B-9C8D-1E2F3A4B5C6D}.Debug|x64.ActiveCfg = Debug|x64
+		{A1B2C3D4-5E6F-4A0B-9C8D-1E2F3A4B5C6D}.Debug|x64.Build.0 = Debug|x64
+		{A1B2C3D4-5E6F-4A0B-9C8D-1E2F3A4B5C6D}.Release|Win32.ActiveCfg = Release|Win32
+		{A1B2C3D4-5E6F-4A0B-9C8D-1E2F3A4B5C6D}.Release|Win32.Build.0 = Release|Win32
+		{A1B2C3D4-5E6F-4A0B-9C8D-1E2F3A4B5C6D}.Release|x64.ActiveCfg = Release|x64
+		{A1B2C3D4-5E6F-4A0B-9C8D-1E2F3A4B5C6D}.Release|x64.Build.0 = Release|x64
+		{A1B2C3D4-5E6F-4A0B-9C8D-1E2F3A4B5C6D}.Utils (Release)|Win32.ActiveCfg = Release|Win32
+		{A1B2C3D4-5E6F-4A0B-9C8D-1E2F3A4B5C6D}.Utils (Release)|x64.ActiveCfg = Release|x64
 		{AFD3091E-0A54-4936-9DD2-328F84308668}.Debug|Win32.ActiveCfg = Debug|Win32
 		{AFD3091E-0A54-4936-9DD2-328F84308668}.Debug|Win32.Build.0 = Debug|Win32
 		{AFD3091E-0A54-4936-9DD2-328F84308668}.Debug|x64.ActiveCfg = Debug|x64

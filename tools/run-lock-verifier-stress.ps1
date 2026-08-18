@@ -39,8 +39,13 @@ if ($VerifierProfile -eq 'Full') {
 
 try {
     # Verifier configuration is process-persistent, so every enabled layer is removed in finally.
-    $layers = if ($VerifierProfile -eq 'Full') { @('Heaps', 'Handles', 'Locks', 'Exceptions') } else { @('Locks') }
+    # The unary comma keeps a single layer as an array; without it, @('Locks')
+    # unrolls to a scalar string and @layers splats as the character 'L'.
+    $layers = if ($VerifierProfile -eq 'Full') { @('Heaps', 'Handles', 'Locks', 'Exceptions') } else { , @('Locks') }
     & $AppVerifierPath -enable @layers -for $targetName
+    if ($null -eq $LASTEXITCODE) {
+        throw "Application Verifier could not be launched to enable $($layers -join ', ') for $targetName (the command did not set an exit code; it may require an elevated console)."
+    }
     if ($LASTEXITCODE -ne 0) {
         throw "Application Verifier failed to enable $($layers -join ', ') for $targetName (exit code $LASTEXITCODE)."
     }
