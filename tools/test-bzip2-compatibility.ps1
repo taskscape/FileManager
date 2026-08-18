@@ -36,8 +36,9 @@ try {
     $probeExecutable = Join-Path $temporaryDirectory 'bzip2_compatibility_probe.exe'
     $compilerCommand = (
         'call "' + $vsDevCmd + '" -arch=' + $Architecture + ' -host_arch=x64 && cd /d "' + $temporaryDirectory + '" && ' +
-        # Upstream's portable integer aliases intentionally trigger these MSVC-only conversion diagnostics.
-        'cl /nologo /TC /W4 /WX /wd4100 /wd4244 /wd4245 /DBZ_NO_STDIO /I"' + $bzip2Directory + '" ' +
+        # Upstream's portability and assertion macros intentionally trigger these
+        # MSVC-only constant-condition and integer-conversion diagnostics.
+        'cl /nologo /TC /W4 /WX /wd4100 /wd4127 /wd4244 /wd4245 /DBZ_NO_STDIO /I"' + $bzip2Directory + '" ' +
         '/Fe"' + $probeExecutable + '" "' + $probeSource + '" ' + ($sourceFiles -join ' ')
     )
 
