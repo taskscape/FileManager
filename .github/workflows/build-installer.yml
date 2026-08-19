@@ -60,9 +60,11 @@ jobs:
         uses: microsoft/setup-msbuild@6fb02220983dee41ce7ae257b6f4d8f9bf5ed4ce # v2
 
       - name: Setup MSVC Developer Command Prompt (x64 toolchain)
+        # The setup action's default search omits VS 2026, so select its major version explicitly.
         uses: ilammy/msvc-dev-cmd@0b201ec74fa43914dc39ae48a89fd1d8cb592756 # v1
         with:
           arch: x64
+          vsversion: '18.0'
 
       - name: Build Debug x64 test artifacts
         shell: pwsh
@@ -148,9 +150,11 @@ jobs:
         uses: microsoft/setup-msbuild@6fb02220983dee41ce7ae257b6f4d8f9bf5ed4ce # v2
 
       - name: Setup MSVC Developer Command Prompt (x64 toolchain)
+        # The parity run must resolve VS 2026 instead of the action's older default search set.
         uses: ilammy/msvc-dev-cmd@0b201ec74fa43914dc39ae48a89fd1d8cb592756 # v1
         with:
           arch: x64
+          vsversion: '18.0'
 
       - name: Run complete v143 verification without skips
         shell: pwsh
@@ -190,9 +194,11 @@ jobs:
         uses: microsoft/setup-msbuild@6fb02220983dee41ce7ae257b6f4d8f9bf5ed4ce # v2
 
       - name: Setup MSVC Developer Command Prompt (x64 toolchain)
+        # v145 is supplied by VS 2026, which requires an explicit action version selector.
         uses: ilammy/msvc-dev-cmd@0b201ec74fa43914dc39ae48a89fd1d8cb592756 # v1
         with:
           arch: x64
+          vsversion: '18.0'
 
       - name: Build Release x64 with v145
         shell: pwsh
