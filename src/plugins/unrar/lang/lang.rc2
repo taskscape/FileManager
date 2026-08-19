@@ -19,7 +19,7 @@ STRINGTABLE
   IDS_ABOUT, "About Plugin"
   IDS_LOWMEM, "Insufficient memory."
   IDS_ERRMODULEFN, "Unable to get module filename."
-  IDS_ERRLOADLIB, "Unable to load library '%s'."
+  IDS_ERRLOADLIB, "Unable to load '%s'.\n\nRAR support needs unrar.dll from RARLAB, which cannot be redistributed with this GPL package. Download it from https://www.rarlab.com/rar_add.htm and place it next to the plugin."
   IDS_ERRGETPROCADDR, "Unable to get procedure address."
   IDS_BADDATA, "Archive is corrupted. (Wrong password?)"
   IDS_BADPASSWORD, "The password is incorrect. Letters in password must be typed using the correct case. Make sure that CapsLock is not accidentally on."

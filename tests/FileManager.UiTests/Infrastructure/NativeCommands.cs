@@ -224,8 +224,10 @@ internal static class NativeCommands
             if (string.Equals(title, "Error", StringComparison.Ordinal) ||
                 string.Equals(title, "UnRAR", StringComparison.Ordinal))
             {
-                // The clean open-source build lacks UnRAR's binary, so its expected load notice cannot block UI startup.
-                // PictView no longer belongs here: it decodes through WIC and must load without a notice.
+                // Both plug-ins that used to fail here now load without a notice:
+                // PictView decodes through WIC, and UnRAR resolves its optional
+                // RARLAB library only when a RAR is actually opened. This stays as a
+                // safety net so an unrelated plug-in notice cannot wedge UI startup.
                 ClickDialogButton(windowHandle, 1);
             }
         }

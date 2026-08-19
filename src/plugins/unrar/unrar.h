@@ -149,7 +149,7 @@ protected:
     CPluginDataInterface* PluginData;
     BOOL AllocateWholeFile;
     BOOL TestAllocateWholeFile;
-    CDynamicString* ArchiveVolumes;
+    CDynamicString* ArchiveVolumes = NULL;
 
 public:
     virtual BOOL WINAPI ListArchive(CSalamanderForOperationsAbstract* salamander, const char* fileName,
@@ -179,7 +179,10 @@ public:
 
     BOOL Error(int error, ...);
 
-    BOOL Init();
+    // Loads unrar.dll on first use and reports a single actionable error if it
+    // is absent. The library is a RARLAB redistributable that cannot ship inside
+    // a GPL package, so its absence must not stop the plug-in from loading.
+    BOOL EnsureLibraryLoaded();
 
     BOOL OpenArchive();
     BOOL ReadHeader(CFileHeader* header);

@@ -110,8 +110,8 @@ CPluginInterfaceAbstract* WINAPI SalamanderPluginEntry(CSalamanderPluginEntryAbs
     SalamanderGeneral = salamander->GetSalamanderGeneral();
     SalamanderSafeFile = salamander->GetSalamanderSafeFile();
 
-    if (!InterfaceForArchiver.Init())
-        return NULL;
+    // The RAR library is optional and resolved on first use, so a machine
+    // without it still gets a working plug-in registration.
 
     // set basic information about the plugin
     salamander->SetBasicPluginData(LoadStr(IDS_PLUGINNAME),
@@ -200,7 +200,11 @@ BOOL CPluginInterface::Release(HWND parent, BOOL force)
 {
     CALL_STACK_MESSAGE2("CPluginInterface::Release(, %d)", force);
     //  if (PakLibDLL) FreeLibrary(PakLibDLL);
-    FreeLibrary(UnRarDll);
+    if (UnRarDll != NULL)
+    {
+        FreeLibrary(UnRarDll);
+        UnRarDll = NULL;
+    }
     return TRUE;
 }
 
@@ -268,6 +272,8 @@ BOOL CPluginInterfaceForArchiver::ListArchive(CSalamanderForOperationsAbstract* 
                                               CPluginDataInterfaceAbstract*& pluginData)
 {
     CALL_STACK_MESSAGE2("CPluginInterfaceForArchiver::ListArchive(, %s, ,)", fileName);
+    if (!EnsureLibraryLoaded())
+        return FALSE;
     Salamander = salamander;
     List = TRUE;
     BOOL ret = TRUE;
@@ -418,6 +424,8 @@ BOOL CPluginInterfaceForArchiver::UnpackArchive(CSalamanderForOperationsAbstract
 {
     CALL_STACK_MESSAGE4("CPluginInterfaceForArchiver::UnpackArchive(, %s, , %s, %s, ,)", fileName, targetDir, archiveRoot);
 
+    if (!EnsureLibraryLoaded())
+        return FALSE;
     Salamander = salamander;
     List = FALSE;
     BOOL ret = TRUE;
@@ -580,6 +588,9 @@ BOOL CPluginInterfaceForArchiver::UnpackOneFile(CSalamanderForOperationsAbstract
 {
     CALL_STACK_MESSAGE4("CPluginInterfaceForArchiver::UnpackOneFile(, %s, , %s, , %s, ,)", fileName,
                         nameInArchive, targetDir);
+
+    if (!EnsureLibraryLoaded())
+        return FALSE;
 
     if (newFileName != NULL)
     {
@@ -753,6 +764,9 @@ BOOL CPluginInterfaceForArchiver::UnpackWholeArchive(CSalamanderForOperationsAbs
     CALL_STACK_MESSAGE5("CPluginInterfaceForArchiver::UnpackWholeArchive(, %s, %s, %s, %d,)",
                         fileName, mask, targetDir, delArchiveWhenDone);
 
+    if (!EnsureLibraryLoaded())
+        return FALSE;
+
     BOOL ret = TRUE;
     Abort = FALSE;
     ArcRoot = "";
@@ -923,16 +937,22 @@ BOOL CPluginInterfaceForArchiver::Error(int error, ...)
     return FALSE;
 }
 
-BOOL CPluginInterfaceForArchiver::Init()
+BOOL CPluginInterfaceForArchiver::EnsureLibraryLoaded()
 {
-    CALL_STACK_MESSAGE1("CPluginInterfaceForArchiver::Init()");
-    ArchiveVolumes = NULL;
+    CALL_STACK_MESSAGE1("CPluginInterfaceForArchiver::EnsureLibraryLoaded()");
+    if (UnRarDll != NULL)
+        return TRUE; // already resolved in this process
+
     char buf[MAX_PATH + 12];
     if (!GetModuleFileName(DLLInstance, buf, 1024))
         return Error(IDS_ERRMODULEFN);
     SalamanderGeneral->CutDirectory(buf);
     SalamanderGeneral->SalPathAppend(buf, "unrar.dll", MAX_PATH + 12);
-    UnRarDll = LoadLibrary(buf);
+    // Restricted search: only the plug-in directory and System32, never the
+    // current directory or a caller-controlled PATH entry.
+    UnRarDll = LoadLibraryEx(buf, NULL, LOAD_LIBRARY_SEARCH_DEFAULT_DIRS |
+                                            LOAD_LIBRARY_SEARCH_DLL_LOAD_DIR |
+                                            LOAD_LIBRARY_SEARCH_SYSTEM32);
     if (!UnRarDll)
         return Error(IDS_ERRLOADLIB, buf);
 
