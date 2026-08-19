@@ -5,6 +5,12 @@ on:
     branches: ["main"]
   workflow_dispatch:
 
+# Keep an unavailable UI runner from accumulating obsolete release queues; a
+# newer main revision supersedes any older installer release candidate.
+concurrency:
+  group: build-and-release-installer-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
   # Release write access is granted only to the protected publish job below.
   contents: read
