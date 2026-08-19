@@ -1,10 +1,12 @@
 # FileManager UI tests
 
-This project contains seven primary parameterized FlaUI/UIA3 lifecycle cases plus focused file-operation characterization cases for the native FileManager UI. Repetition belongs to the separately scheduled lock-stress soak. The cases cover application launch, accessibility-tree discovery, Configuration dialog cancel/commit/restart flows, a committed setting verified after restart, FTP bookmark creation plus edit verified after restart, and native disk create/copy/rename/move/delete/find/view/edit commands.
+This project contains a seven-case parameterized FlaUI/UIA3 lifecycle group, together with focused file-operation, recovery, plug-in, toolbar, TLS, and native-safety characterization tests. The cases cover application launch, accessibility-tree discovery, Configuration dialog cancel/commit/restart flows, a committed setting verified after restart, FTP bookmark creation plus edit verified after restart, and native disk create/copy/rename/move/delete/find/view/edit commands.
 
 The tests intentionally refuse to run unless `FILEMANAGER_UI_ISOLATED=1` is set. The application persists configuration under the current user registry hive, so run them under a dedicated Windows test account or another isolated user profile.
 
 Set these environment variables before running:
+
+The `run-ui-tests.ps1` entry point described below sets `FILEMANAGER_UI_ISOLATED` and `FILEMANAGER_UI_EXE` for its child test process. Configure the remaining variables only when their optional test lanes are required. When calling `dotnet test` directly, set the first two variables manually.
 
 - `FILEMANAGER_UI_ISOLATED=1` — confirms that the current Windows profile is disposable.
 - `FILEMANAGER_UI_EXE` — absolute path to `salamand.exe` or a debug build of the executable.
@@ -18,11 +20,21 @@ Set these environment variables before running:
 - `FILEMANAGER_UI_HELP_SEARCH_TERM` — a search term known to exist in the language-specific deployed `salamand.chm`.
 - `FILEMANAGER_UI_HELP_EXPECTED_RESULT` — text expected in the Help Search result for that term.
 
-Run the suite on an interactive Windows desktop session:
+Run the interactive UI category on an interactive Windows desktop session. This is the runner default and currently selects approximately 60 cases:
 
 ```powershell
-dotnet test tests/FileManager.UiTests/FileManager.UiTests.csproj --filter TestCategory=UI
+.\run-ui-tests.ps1 -ConfirmIsolatedProfile
 ```
+
+Run the entire test project, currently 125 discovered cases, by explicitly clearing the default category filter:
+
+```powershell
+.\run-ui-tests.ps1 -ConfirmIsolatedProfile -Filter ''
+```
+
+The complete run includes UI, native-safety, TLS, toolbar-contract, and other non-UI tests. Tests whose optional prerequisites are unavailable—such as the ZIP plug-in, deployed Help content, a second volume, fault injection, or Recycle Bin configuration—are reported as skipped rather than omitted from discovery.
+
+The runner derives paths from its repository location, prefers an existing checkout build, and otherwise checks the Windows `App Paths` registration for an installed `salamand.exe`. Use `-ExecutablePath 'C:\Program Files\Open Salamander\salamand.exe'` to select another installation, `-Filter 'Name~Copy_file'` for a focused run, or `-NoBuild` after the managed test project is already built. The confirmation switch is intentionally required because the application writes configuration under the current user profile. File-operation tests create their own disposable source and target directories; callers do not need to configure shared test folders.
 
 The configuration dialog is opened through its stable native command ID only to avoid locale-dependent menu text. All window discovery, control inspection, focus, dialog lifecycle, and restart assertions use FlaUI/UIA3.
 
