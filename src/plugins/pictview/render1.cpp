@@ -333,7 +333,7 @@ BOOL CRendererWindow::OpenFile(LPCTSTR name, int showCmd, HBITMAP hBmp)
     LPPVHandle OldPVHandle = PVHandle;
     PVOpenImageExInfo oiei;
 #ifdef _UNICODE
-    char nameA[_MAX_PATH];
+    char nameA[_MAX_PATH * 3];
 #endif
 
     if (showCmd != -1)
@@ -361,8 +361,9 @@ BOOL CRendererWindow::OpenFile(LPCTSTR name, int showCmd, HBITMAP hBmp)
     else
     {
 #ifdef _UNICODE
-        WideCharToMultiByte(CP_ACP, 0, name, -1, nameA, sizeof(nameA), NULL, NULL);
-        nameA[sizeof(nameA) - 1] = 0;
+        // UTF-8 at the engine boundary: the WIC engine decodes these back to
+        // UTF-16, so a path outside the ANSI code page reaches the codecs intact.
+        WideToUtf8Buffer(name, nameA, (int)sizeof(nameA));
         oiei.FileName = nameA;
 #else
         oiei.FileName = name;

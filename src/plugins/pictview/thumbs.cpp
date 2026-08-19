@@ -254,10 +254,11 @@ void UpdateThumbnails(CSalamanderForOperationsAbstract* Salamander)
         memset(&oiei, 0, sizeof(oiei));
         oiei.cbSize = sizeof(oiei);
 #ifdef _UNICODE
-        char pathA[_MAX_PATH];
+        // UTF-8 at the engine boundary: the WIC engine decodes these back to
+        // UTF-16, so a path outside the ANSI code page reaches the codecs intact.
+        char pathA[_MAX_PATH * 3];
 
-        WideCharToMultiByte(CP_ACP, 0, path, -1, pathA, sizeof(pathA), NULL, NULL);
-        pathA[sizeof(pathA) - 1] = 0;
+        WideToUtf8Buffer(path, pathA, (int)sizeof(pathA));
         oiei.FileName = pathA;
 #else
         oiei.FileName = path;
@@ -883,10 +884,11 @@ BOOL CPluginInterfaceForThumbLoader::LoadThumbnail(LPCTSTR filename, int thumbWi
         pvoi.Flags = PVFF_FAST | (G.IgnoreThumbnails ? 0 : (fastThumbnail ? PVOF_THUMBNAIL : 0));
 
 #ifdef _UNICODE
-        char filenameA[_MAX_PATH];
+        // UTF-8 at the engine boundary: the WIC engine decodes these back to
+        // UTF-16, so a path outside the ANSI code page reaches the codecs intact.
+        char filenameA[_MAX_PATH * 3];
 
-        WideCharToMultiByte(CP_ACP, 0, filename, -1, filenameA, sizeof(filenameA), NULL, NULL);
-        filenameA[sizeof(filenameA) - 1] = 0;
+        WideToUtf8Buffer(filename, filenameA, (int)sizeof(filenameA));
         pvoi.FileName = filenameA;
 #else
         pvoi.FileName = filename;

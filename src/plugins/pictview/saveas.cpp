@@ -27,34 +27,21 @@ typedef struct _gen_ftype
     int type;
 } PVFS_FTYPE;
 
+// Output formats the WIC engine can encode. Everything the old PictView
+// engine could additionally write has no free replacement, so it is gone
+// from here and from the IDS_SAVEASFILTER* lists.
 static PVFS_FTYPE fs_types[] = {
     {_T("jpg"), PVF_JPG | SAVEAS_COMMENT_FLAG},
     {_T("bmp"), PVF_BMP},
     {_T("tif"), PVF_TIFF | SAVEAS_COMMENT_FLAG},
     {_T("gif"), PVF_GIF | SAVEAS_COMMENT_FLAG},
-    {_T("tga"), PVF_TGA},
-    {_T("wbmp"), PVF_WBMP},
-    {_T("cel"), PVF_CEL},
-    {_T("cit"), PVF_IRF | SAVEAS_COMMENT_FLAG},
-    {_T("dat"), PVF_IRF | SAVEAS_COMMENT_FLAG},
-    {_T("pbm"), PVF_PNM},
-    {_T("pnm"), PVF_PNM},
     {_T("png"), PVF_PNG | SAVEAS_COMMENT_FLAG},
-    {_T("iff"), PVF_LBM},
-    {_T("rgb"), PVF_SGI},
-    {_T("bw"), PVF_SGI},
-    {_T("ras"), PVF_RAS},
-    {_T("ska"), PVF_SKA},
-    {_T("rle"), PVF_RLE},
-    {_T("pcx"), PVF_PCX},
     {NULL, 0}};
 
 static PVFS_FTYPE fs_comptypes[] = {
-    {_T("ASCII"), PVCS_ASCII},
     {_T("CCITT G3"), PVCS_CCITT_3},
     {_T("CCITT G4"), PVCS_CCITT_4},
     {_T("Deflating (LZ77)"), PVCS_DEFLATE},
-    {_T("Huffman"), PVCS_HUFFMAN},
     {_T("JPEG"), PVCS_JPEG_HUFFMAN},
     {_T("Lempel-Ziv-Welch (LZW)"), PVCS_LZW},
     {_T("PackBits"), PVCS_PACKBITS},
@@ -1033,10 +1020,11 @@ int CRendererWindow::SaveImage(LPCTSTR fileName, DWORD format, SAVEAS_INFO_PTR p
     // Initialize both callback throttles from the same 64-bit sample.
     pbi.lastCheckTicks = pbi.lastUpdateTicks = CMonotonicClock::Now();
 #ifdef _UNICODE
-    char fileNameA[_MAX_PATH];
+    // UTF-8 at the engine boundary: the WIC engine decodes these back to
+    // UTF-16, so a path outside the ANSI code page reaches the codecs intact.
+    char fileNameA[_MAX_PATH * 3];
 
-    WideCharToMultiByte(CP_ACP, 0, fileName, -1, fileNameA, sizeof(fileNameA), NULL, NULL);
-    fileNameA[sizeof(fileNameA) - 1] = 0;
+    WideToUtf8Buffer(fileName, fileNameA, (int)sizeof(fileNameA));
     int saveRet = PVW32DLL.PVSaveImage(PVHandle, fileNameA, &sii, SaveProgressProcedure, &pbi, pvii.CurrentImage);
 #else
     int saveRet = PVW32DLL.PVSaveImage(PVHandle, fileName, &sii, SaveProgressProcedure, &pbi, pvii.CurrentImage);

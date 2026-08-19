@@ -362,7 +362,7 @@ COMMENT,"Magyar változat"
 
 [STRINGTABLE 9]
 1008,1,"LAB"
-1009,1,"Hibás PVW32Cnv.DLL meghívás"
+1009,1,"Hiba a kép dekódolásakor"
 1010,1,"Vörös: %i, Zöld: %i, Kék: %i"
 1011,1,"Vörös: %#02x, Zöld: %#02x, Kék: %#02x"
 1012,1,"(%i, %i): Vörös: %i, Zöld: %i, Kék: %i"
@@ -387,12 +387,12 @@ COMMENT,"Magyar változat"
 1034,1,"<Vágólap>"
 1035,1,"<Képernyőmentés>"
 1036,1,"Üres"
-1037,1,"Gyakori grafikus fájlok (*.bmp;*.cur;*.gif;*.icn;*.ico;*.jpg;*.jpeg;*.lbm;*.pcx;*.png;*.psd;*.tga;*.tif;*.tiff)|*.bmp;*.cur;*.gif;*.icn;*.ico;*.jpg;*.jpeg;*.lbm;*.pcx;*.png;*.psd;*.tga;*.tif;*.tiff|Minden fájl (*.*)|*.*|"
+1037,1,"Gyakori grafikus fájlok (*.bmp;*.dib;*.gif;*.ico;*.jpg;*.jpeg;*.png;*.tif;*.tiff;*.dds;*.heic;*.webp;*.avif)|*.bmp;*.dib;*.gif;*.ico;*.jpg;*.jpeg;*.png;*.tif;*.tiff;*.dds;*.heic;*.webp;*.avif|Minden fájl (*.*)|*.*|"
 1038,1,"<Vizsgálat>"
-1039,1,"Autodesk CEL (*.cel)|*.cel|Amiga Interchange Format (*.iff,*.lbm)|*.iff;*.lbm|CompuServe GIF (*.gif)|*.gif|Intergraph (*.cit,*.dat,*.rle)|*.dat;*.cit;*.rle|JPEG (*.jpg,*.jpeg)|*.jpg;*.jpeg|Portable Bitmap (*.pbm,*.ppm)|*.pbm;*.ppm|Portable Network Graphics (*.png)|*.png|Silicon Graphics (*.bw)|*.bw|SunRaster (*.ras)|*.ras|Targa (*.tga)|*.tga|TIFF (*.tif)|*.tif;*.tiff|Utah RLE (*.rle)|*.rle|Video-renting box SKA (*.ska)|*.ska|Windows Bitmap (*.bmp)|*.bmp|Wireless Bitmap (*.wbmp)|*.wbmp|ZSoft PCX (*.pcx)|*.pcx|"
+1039,1,"CompuServe GIF (*.gif)|*.gif|JPEG (*.jpg,*.jpeg)|*.jpg;*.jpeg|Portable Network Graphics (*.png)|*.png|TIFF (*.tif)|*.tif;*.tiff|Windows Bitmap (*.bmp)|*.bmp|"
 
 [STRINGTABLE 11]
-1040,1,"Autodesk CEL (*.cel)|*.cel|Amiga Interchange Format (*.iff,*.lbm)|*.iff;*.lbm|CompuServe GIF (*.gif)|*.gif|JPEG (*.jpg,*.jpeg)|*.jpg;*.jpeg|Portable Bitmap (*.pnm,*.ppm)|*.pnm;*.ppm|Portable Network Graphics (*.png)|*.png|Silicon Graphics (*.rgb)|*.rgb;*.rgba|SunRaster (*.ras)|*.ras|Targa (*.tga)|*.tga|TIFF (*.tif)|*.tif;*.tiff|Utah RLE (*.rle)|*.rle|Video-renting box SKA (*.ska)|*.ska|Windows Bitmap (*.bmp)|*.bmp|ZSoft PCX (*.pcx)|*.pcx|"
+1040,1,"CompuServe GIF (*.gif)|*.gif|JPEG (*.jpg,*.jpeg)|*.jpg;*.jpeg|Portable Network Graphics (*.png)|*.png|TIFF (*.tif)|*.tif;*.tiff|Windows Bitmap (*.bmp)|*.bmp|"
 1041,1,"A kép nem menthető.\nHiba: %hs"
 1042,1,"A kép sikeresen mentve."
 1043,1,"&Egyéni szín..."
@@ -463,7 +463,7 @@ COMMENT,"Magyar változat"
 1102,1,"Többi csatorna (O)"
 
 [STRINGTABLE 15]
-1109,1,"A képfeldolgozó PVW32Cnv.dll nem tölthető be."
+1109,1,"A Windows Imaging Component nem érhető el, a képek nem dekódolhatók."
 1110,1,"Rossz verziós PVW32Cnv.dll fájl."
 1111,1,"Előbb válasszon egy területet."
 1112,1,"Alapbeállítás"

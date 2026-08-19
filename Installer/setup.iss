@@ -67,7 +67,6 @@ Source: "{#SourcePath}\tserver.exe"; DestDir: "{app}"; Flags: ignoreversion skip
 Source: "{#SourcePath}\sfx7zip.exe"; DestDir: "{app}"; Flags: ignoreversion skipifsourcedoesntexist
 Source: "{#SourcePath}\zip2sfx.exe"; DestDir: "{app}"; Flags: ignoreversion skipifsourcedoesntexist
 Source: "{#SourcePath}\translator.exe"; DestDir: "{app}"; Flags: ignoreversion skipifsourcedoesntexist
-Source: "{#SourcePath}\salpvenv.exe"; DestDir: "{app}"; Flags: ignoreversion skipifsourcedoesntexist
 Source: "{#SourcePath}\fcremote.exe"; DestDir: "{app}"; Flags: ignoreversion skipifsourcedoesntexist
 Source: "{#SourcePath}\7zwrapper.exe"; DestDir: "{app}"; Flags: ignoreversion skipifsourcedoesntexist
 

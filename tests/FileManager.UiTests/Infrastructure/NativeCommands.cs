@@ -224,7 +224,8 @@ internal static class NativeCommands
             if (string.Equals(title, "Error", StringComparison.Ordinal) ||
                 string.Equals(title, "UnRAR", StringComparison.Ordinal))
             {
-                // The clean open-source build lacks PictView's converter and UnRAR's binary, so their expected load notices cannot block UI startup.
+                // The clean open-source build lacks UnRAR's binary, so its expected load notice cannot block UI startup.
+                // PictView no longer belongs here: it decodes through WIC and must load without a notice.
                 ClickDialogButton(windowHandle, 1);
             }
         }

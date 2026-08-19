@@ -362,7 +362,7 @@ COMMENT,"Česká verze"
 
 [STRINGTABLE 9]
 1008,1,"LAB"
-1009,1,"Chyba při volání PVW32Cnv.DLL"
+1009,1,"Chyba při dekódování obrázku"
 1010,1,"Červená: %i, Zelená: %i, Modrá: %i"
 1011,1,"Červená: %#02x, Zelená: %#02x, Modrá: %#02x"
 1012,1,"(%i, %i): Červená: %i, Zelená: %i, Modrá: %i"
@@ -387,12 +387,12 @@ COMMENT,"Česká verze"
 1034,1,"<Schránka>"
 1035,1,"<Sejmutá obrazovka>"
 1036,1,"Prázdné"
-1037,1,"Běžné formáty (*.bmp;*.cur;*.gif;*.icn;*.ico;*.jpg;*.jpeg;*.lbm;*.pcx;*.png;*.psd;*.tga;*.tif;*.tiff)|*.bmp;*.cur;*.gif;*.icn;*.ico;*.jpg;*.jpeg;*.lbm;*.pcx;*.png;*.psd;*.tga;*.tif;*.tiff|Všechny soubory (*.*)|*.*|"
+1037,1,"Běžné formáty (*.bmp;*.dib;*.gif;*.ico;*.jpg;*.jpeg;*.png;*.tif;*.tiff;*.dds;*.heic;*.webp;*.avif)|*.bmp;*.dib;*.gif;*.ico;*.jpg;*.jpeg;*.png;*.tif;*.tiff;*.dds;*.heic;*.webp;*.avif|Všechny soubory (*.*)|*.*|"
 1038,1,"<Naskenováno>"
-1039,1,"Autodesk CEL (*.cel)|*.cel|Amiga Interchange Format (*.iff,*.lbm)|*.iff;*.lbm|CompuServe GIF (*.gif)|*.gif|Intergraph (*.cit,*.dat,*.rle)|*.dat;*.cit;*.rle|JPEG (*.jpg,*.jpeg)|*.jpg;*.jpeg|Portable Bitmap (*.pbm,*.ppm)|*.pbm;*.ppm|Portable Network Graphics (*.png)|*.png|Silicon Graphics (*.bw)|*.bw|SunRaster (*.ras)|*.ras|Targa (*.tga)|*.tga|TIFF (*.tif)|*.tif;*.tiff|Utah RLE (*.rle)|*.rle|Video-renting box SKA (*.ska)|*.ska|Windows Bitmap (*.bmp)|*.bmp|Wireless Bitmap (*.wbmp)|*.wbmp|ZSoft PCX (*.pcx)|*.pcx|"
+1039,1,"CompuServe GIF (*.gif)|*.gif|JPEG (*.jpg,*.jpeg)|*.jpg;*.jpeg|Portable Network Graphics (*.png)|*.png|TIFF (*.tif)|*.tif;*.tiff|Windows Bitmap (*.bmp)|*.bmp|"
 
 [STRINGTABLE 11]
-1040,1,"Autodesk CEL (*.cel)|*.cel|Amiga Interchange Format (*.iff,*.lbm)|*.iff;*.lbm|CompuServe GIF (*.gif)|*.gif|JPEG (*.jpg,*.jpeg)|*.jpg;*.jpeg|Portable Bitmap (*.pnm,*.ppm)|*.pnm;*.ppm|Portable Network Graphics (*.png)|*.png|Silicon Graphics (*.rgb)|*.rgb;*.rgba|SunRaster (*.ras)|*.ras|Targa (*.tga)|*.tga|TIFF (*.tif)|*.tif;*.tiff|Utah RLE (*.rle)|*.rle|Video-renting box SKA (*.ska)|*.ska|Windows Bitmap (*.bmp)|*.bmp|ZSoft PCX (*.pcx)|*.pcx|"
+1040,1,"CompuServe GIF (*.gif)|*.gif|JPEG (*.jpg,*.jpeg)|*.jpg;*.jpeg|Portable Network Graphics (*.png)|*.png|TIFF (*.tif)|*.tif;*.tiff|Windows Bitmap (*.bmp)|*.bmp|"
 1041,1,"Nelze uložit do souboru.\nPopis chyby: %hs"
 1042,1,"Soubor úspěšně uložen."
 1043,1,"&Vlastní..."
@@ -463,7 +463,7 @@ COMMENT,"Česká verze"
 1102,1,"Ukázat ostatní kanály (O)"
 
 [STRINGTABLE 15]
-1109,1,"Nelze najít knihovnu PVW32Cnv.dll pro zpracování obrázků."
+1109,1,"Windows Imaging Component není k dispozici, obrázky nelze dekódovat."
 1110,1,"Byla nalezena špatná verze knihovny PVW32Cnv.dll."
 1111,1,"Není vybrána žádná oblast."
 1112,1,"Výchozí"

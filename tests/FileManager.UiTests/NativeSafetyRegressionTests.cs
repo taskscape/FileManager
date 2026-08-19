@@ -243,9 +243,8 @@ public sealed class NativeSafetyRegressionTests
         var client = File.ReadAllText(Path.Combine(root, "src", "parserbroker.cpp"));
         var broker = File.ReadAllText(Path.Combine(root, "src", "parserbroker", "salbroker.cpp"));
         var pictViewThumbnails = File.ReadAllText(Path.Combine(root, "src", "plugins", "pictview", "thumbs.cpp"));
-        var pictViewThumbnailer = File.ReadAllText(Path.Combine(root, "src", "plugins", "pictview", "Thumbnailer.cpp"));
-        var pictViewMessageWrapper = File.ReadAllText(Path.Combine(root, "src", "plugins", "pictview", "PVMessageWrapper.cpp"));
-        var pictViewMessageEnvelope = File.ReadAllText(Path.Combine(root, "src", "plugins", "pictview", "PVMessageEnvelope.cpp"));
+        var pictViewWicEngine = File.ReadAllText(Path.Combine(root, "src", "plugins", "pictview", "PVWicEngine.cpp"));
+        var pictViewDirectory = Path.Combine(root, "src", "plugins", "pictview");
         var zipCommon = File.ReadAllText(Path.Combine(root, "src", "plugins", "zip", "common.cpp"));
         var zipExtraction = File.ReadAllText(Path.Combine(root, "src", "plugins", "zip", "extract.cpp"));
         var zipListing = File.ReadAllText(Path.Combine(root, "src", "plugins", "zip", "list.cpp"));
@@ -283,15 +282,15 @@ public sealed class NativeSafetyRegressionTests
             Assert.That(broker, Does.Contain("CheckedAddDword((DWORD)sizeof(CParserBrokerThumbnailResponse), pixelBytes, &packedResponseLength)"));
             Assert.That(pictViewThumbnails, Does.Contain("#define WIN_THUMBNAIL_MAX_PAYLOAD (32 * 1024 * 1024)"));
             Assert.That(pictViewThumbnails, Does.Contain("newPos.QuadPart > WIN_THUMBNAIL_MAX_PAYLOAD"));
-            Assert.That(pictViewThumbnailer, Does.Contain("GetThumbnailBufferBytes"));
-            Assert.That(pictViewThumbnailer, Does.Contain("CheckedMultiplySize((size_t)width, (size_t)height, &pixels)"));
-            Assert.That(pictViewThumbnailer, Does.Contain("rowsCount > OriginalHeight - NextLine"));
-            Assert.That(pictViewThumbnailer, Does.Contain("CheckedCastSizeToInt(requiredBytes, &required)"));
-            Assert.That(pictViewMessageWrapper, Does.Contain("CheckedAddSize(dataSize, sizeof(PVMessageHeader), &totalSize)"));
-            Assert.That(pictViewMessageWrapper, Does.Contain("CheckedCastSizeToDword(totalSize, &mappedSize)"));
-            Assert.That(pictViewMessageEnvelope, Does.Contain("pHdr->cbSize != dataSize"));
-            Assert.That(pictViewMessageEnvelope, Does.Contain("pHdr->cbSize < textsOffset"));
-            Assert.That(pictViewMessageEnvelope, Does.Contain("memchr(str, 0, stringsEnd - str)"));
+            // The shared-memory envelope that used to host the 32-bit PictView
+            // engine is gone; codec-controlled surface sizes are now bounded
+            // inside the in-process WIC engine instead.
+            Assert.That(pictViewWicEngine, Does.Contain("CheckedCastUInt64ToSize(total, &allocation)"));
+            Assert.That(pictViewWicEngine, Does.Contain("CheckedCastUInt64ToSize(alphaTotal, &alphaAllocation)"));
+            Assert.That(pictViewWicEngine, Does.Contain("CheckedCastUInt64ToSize(total, &bufferSize)"));
+            Assert.That(File.Exists(Path.Combine(pictViewDirectory, "PVMessageWrapper.cpp")), Is.False);
+            Assert.That(File.Exists(Path.Combine(pictViewDirectory, "PVMessageEnvelope.cpp")), Is.False);
+            Assert.That(File.Exists(Path.Combine(pictViewDirectory, "Thumbnailer.cpp")), Is.False);
             Assert.That(pictViewThumbnails, Does.Contain("CheckedCastUInt64ToDword(newPos.QuadPart, &thumbnailLength)"));
             Assert.That(pictViewThumbnails, Does.Contain("CheckedAddUInt64((uint64_t)sizeof(HuffmanTbl) + sizeof(Quant75Tbl), newPos.QuadPart, &totalLength64)"));
             Assert.That(pictViewThumbnails, Does.Contain("CheckedCastSizeToInt(allocationLength, &returnedLength)"));

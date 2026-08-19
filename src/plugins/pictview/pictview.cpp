@@ -20,7 +20,7 @@
 #include "pictview.rh2"
 #include "lang/lang.rh"
 #include "histwnd.h"
-#include "PVEXEWrapper.h"
+#include "PVWicEngine.h"
 #include "PixelAccess.h"
 
 // plugin interface object; its methods are called from Salamander
@@ -73,7 +73,7 @@ BOOL SalamanderRegistered = FALSE;
 //               22 - Salamander 2.52 B1: Added *.BLP files used by Blizzard Entertainment in World of Wordcraft
 
 int ConfigVersion = 0;
-#define CURRENT_CONFIG_VERSION 22
+#define CURRENT_CONFIG_VERSION 23
 
 SGlobals G; // initialized in InitViewer
 TDirectArray<DWORD> ExifHighlights(20, 10);
@@ -458,8 +458,6 @@ BOOL WINAPI DllMain(HINSTANCE hinstDLL, DWORD fdwReason, LPVOID lpvReserved)
             FreeLibrary(EXIFLibrary); // release EXIF.DLL as well
             EXIFLibrary = NULL;
         }
-        if (PVW32DLL.Handle != NULL)
-            FreeLibrary(PVW32DLL.Handle); // release PVW32.DLL as well
         if (G.HAccel != NULL)
             DestroyAcceleratorTable(G.HAccel);
         if (G.CaptureAtomID != 0)
@@ -967,17 +965,13 @@ void CPluginInterface::Connect(HWND parent, CSalamanderConnectAbstract* salamand
     // the suffixes are added only when inserting the plugin into Salamander (during
     // plugin installation or auto-installation at the first Salamander launch),
     // this entire section is ignored for plugin upgrades
-    salamander->AddViewer("*.psp*;*.dtx;*.dds;*.nef;*.crw;*.eps;*.ept;*.ai;*.raf;*.mov;*.hpi", FALSE);
-    salamander->AddViewer("*.pntg;*.thumb;*.tiff;*.wbmp;*.ani;*.clk;*.mbm;*.thm;*.zno;*.mng", FALSE);
-    salamander->AddViewer("*.st;*.cals;*.itiff;*.jfif;*.jpeg;*.macp;*.mpnt;*.paint;*.pict;*.2bp", FALSE);
-    salamander->AddViewer("*.stw;*.sun;*.tga;*.tif;*.udi;*.web;*.wpg;*.xar;*.zbr;*.zmf;*.bw", FALSE);
-    salamander->AddViewer("*.psd;*.pyx;*.qfx;*.ras;*.rgb;*.rle;*.sam;*.scx;*.sep;*.sgi;*.ska", FALSE);
-    salamander->AddViewer("*.pat;*.pbm;*.pc2;*.pcd;*.pct;*.pcx;*.pgm;*.pic;*.png;*.pnm;*.ppm", FALSE);
-    salamander->AddViewer("*.jff;*.jif;*.jmx;*.jpe;*.jpg;*.lbm;*.mac;*.mil;*.msp;*.ofx;*.pan", FALSE);
-    salamander->AddViewer("*.flc;*.fli;*.gem;*.gif;*.ham;*.hmr;*.hrz;*.icn;*.ico;*.iff;*.img", FALSE);
-    salamander->AddViewer("*.cdt;*.cel;*.clp;*.cit;*.cmx;*.cot;*.cpt;*.cur;*.cut;*.dcx;*.dib", FALSE);
-    salamander->AddViewer("*.82i;*.83i;*.85i;*.86i;*.89i;*.92i;*.awd;*.bmi;*.bmp;*.cal;*.cdr", FALSE);
-    salamander->AddViewer("*.arw;*.blp;*.cr2;*.dng;*.orf;*.pef", FALSE);
+    // Formats the Windows Imaging Component can decode. The first line is
+    // always available; the rest need an OS codec that ships with Windows or
+    // comes from the Store (Raw Image Extension, HEIF, WebP, AV1).
+    salamander->AddViewer("*.bmp;*.dib;*.2bp;*.gif;*.ico;*.png;*.tif;*.tiff;*.itiff;*.dds", FALSE);
+    salamander->AddViewer("*.jpg;*.jpeg;*.jpe;*.jfif;*.jif;*.jff;*.jxr;*.wdp;*.hdp", FALSE);
+    salamander->AddViewer("*.heic;*.heif;*.hif;*.avif;*.webp", FALSE);
+    salamander->AddViewer("*.arw;*.cr2;*.cr3;*.crw;*.dng;*.nef;*.orf;*.pef;*.raf;*.rw2;*.srw", FALSE);
 
     // this section contains all suffixes added in (removed from) version X
     if (ConfigVersion < 3) // suffixes added in version 3
@@ -1065,6 +1059,31 @@ void CPluginInterface::Connect(HWND parent, CSalamanderConnectAbstract* salamand
     if (ConfigVersion < 22) // Added *.blp textures used by Blizzard Entertainment in World of Warcraft
     {
         salamander->AddViewer("*.blp", TRUE);
+    }
+
+    if (ConfigVersion < 23)
+    {
+        // The imaging engine is now the Windows Imaging Component. Drop the
+        // masks whose formats only the removed PictView engine could read, so
+        // double-clicking such a file falls through to whatever else handles it
+        // instead of opening a viewer that can only report an error.
+        static const char* const retiredMasks[] = {
+            "*.82i", "*.83i", "*.85i", "*.86i", "*.89i", "*.92i", "*.ai", "*.ani", "*.awd", "*.blp", "*.bmi",
+            "*.bw", "*.cal", "*.cals", "*.cdr", "*.cdt", "*.cel", "*.cit", "*.clk", "*.clp", "*.cmx", "*.cot",
+            "*.cpt", "*.cur", "*.cut", "*.dcx", "*.dtx", "*.eps", "*.ept", "*.flc", "*.fli", "*.gem", "*.ham",
+            "*.hmr", "*.hpi", "*.hrz", "*.icn", "*.iff", "*.img", "*.jmx", "*.lbm", "*.mac", "*.macp", "*.mbm",
+            "*.mil", "*.mng", "*.mov", "*.mpnt", "*.msp", "*.ofx", "*.paint", "*.pan", "*.pat", "*.pbm", "*.pc2",
+            "*.pcd", "*.pct", "*.pcx", "*.pgm", "*.pic", "*.pict", "*.pnm", "*.pntg", "*.ppm", "*.psd", "*.psp*",
+            "*.pyx", "*.qfx", "*.ras", "*.rgb", "*.rle", "*.sam", "*.scx", "*.sep", "*.sgi", "*.ska", "*.st",
+            "*.stw", "*.sun", "*.tga", "*.thm", "*.thumb", "*.udi", "*.wbmp", "*.web", "*.wpg", "*.xar", "*.zbr",
+            "*.zmf", "*.zno"
+        };
+        for (int i = 0; i < _countof(retiredMasks); i++)
+            salamander->ForceRemoveViewer(retiredMasks[i]);
+
+        // ...and pick up what WIC adds over the old engine.
+        salamander->AddViewer("*.heic;*.heif;*.hif;*.avif;*.webp;*.jxr;*.wdp;*.hdp", TRUE);
+        salamander->AddViewer("*.cr3;*.rw2;*.srw;*.dib;*.itiff", TRUE);
     }
 
     /* used by the export_mnu.py script that generates salmenu.mnu for Translator
@@ -1363,60 +1382,10 @@ void WINAPI HTMLHelpCallback(HWND hWindow, UINT helpID)
 
 BOOL LoadPictViewDll(HWND hParentWnd)
 {
-    TCHAR path[_MAX_PATH];
-
-    if (!GetModuleFileName(DLLInstance, path, SizeOf(path)))
-    {
-        TRACE_E("GetModuleFileName failed");
-        return FALSE;
-    }
-    _tcsrchr(path, '\\')[0] = 0;
-#ifndef PICTVIEW_DLL_IN_SEPARATE_PROCESS
-    _tcscat(path, _T("\\PVW32Cnv.dll"));
-    PVW32DLL.Handle = LoadLibrary(path); // load PVW32Cnv.dll
-    if (!PVW32DLL.Handle)
-    {
-        TRACE_E("LoadLibrary(PVW32Cnv.dll) failed");
-        SalamanderGeneral->SalMessageBox(hParentWnd, LoadStr(IDS_DLL_NOTFOUND),
-                                         LoadStr(IDS_ERRORTITLE), MB_ICONSTOP | MB_OK);
-        return FALSE;
-    }
-    PVW32DLL.PVReadImage2 = (TPVReadImage2)GetProcAddress(PVW32DLL.Handle, "PVReadImage2");
-    PVW32DLL.PVCloseImage = (TPVCloseImage)GetProcAddress(PVW32DLL.Handle, "PVCloseImage");
-    PVW32DLL.PVDrawImage = (TPVDrawImage)GetProcAddress(PVW32DLL.Handle, "PVDrawImage");
-    PVW32DLL.PVGetErrorText = (TPVGetErrorText)GetProcAddress(PVW32DLL.Handle, "PVGetErrorText");
-    PVW32DLL.PVOpenImageEx = (TPVOpenImageEx)GetProcAddress(PVW32DLL.Handle, "PVOpenImageEx");
-    PVW32DLL.PVSetBkHandle = (TPVSetBkHandle)GetProcAddress(PVW32DLL.Handle, "PVSetBkHandle");
-    PVW32DLL.PVGetDLLVersion = (TPVGetDLLVersion)GetProcAddress(PVW32DLL.Handle, "PVGetDLLVersion");
-    PVW32DLL.PVSetStretchParameters = (TPVSetStretchParameters)GetProcAddress(PVW32DLL.Handle, "PVSetStretchParameters");
-    PVW32DLL.PVLoadFromClipboard = (TPVLoadFromClipboard)GetProcAddress(PVW32DLL.Handle, "PVLoadFromClipboard");
-    PVW32DLL.PVGetImageInfo = (TPVGetImageInfo)GetProcAddress(PVW32DLL.Handle, "PVGetImageInfo");
-    PVW32DLL.PVSetParam = (TPVSetParam)GetProcAddress(PVW32DLL.Handle, "PVSetParam");
-    PVW32DLL.PVGetHandles2 = (TPVGetHandles2)GetProcAddress(PVW32DLL.Handle, "PVGetHandles2");
-    PVW32DLL.PVSaveImage = (TPVSaveImage)GetProcAddress(PVW32DLL.Handle, "PVSaveImage");
-    PVW32DLL.PVChangeImage = (TPVChangeImage)GetProcAddress(PVW32DLL.Handle, "PVChangeImage");
-    PVW32DLL.PVIsOutCombSupported = (TPVIsOutCombSupported)GetProcAddress(PVW32DLL.Handle, "PVIsOutCombSupported");
-    PVW32DLL.PVReadImageSequence = (TPVReadImageSequence)GetProcAddress(PVW32DLL.Handle, "PVReadImageSequence");
-    PVW32DLL.PVCropImage = (TPVCropImage)GetProcAddress(PVW32DLL.Handle, "PVCropImage");
-    PVW32DLL.GetRGBAtCursor = GetRGBAtCursor;
-    PVW32DLL.CalculateHistogram = CalculateHistogram;
-    PVW32DLL.CreateThumbnail = CreateThumbnail;
-    PVW32DLL.SimplifyImageSequence = SimplifyImageSequence;
-
-    if (!PVW32DLL.PVReadImage2 || !PVW32DLL.PVIsOutCombSupported || !PVW32DLL.PVChangeImage || !PVW32DLL.PVSetParam || !PVW32DLL.PVGetHandles2 || !PVW32DLL.PVCropImage)
-    {
-        TRACE_E("PVW32Cnv was not compiled for Salamander or an old version was found");
-        SalamanderGeneral->SalMessageBox(hParentWnd, LoadStr(IDS_DLL_WRONG_VERSION),
-                                         LoadStr(IDS_ERRORTITLE), MB_ICONSTOP | MB_OK);
-        return FALSE;
-    }
-#else  // PICTVIEW_DLL_IN_SEPARATE_PROCESS
-    if (!InitPVEXEWrapper(hParentWnd, path))
-    {
-        return FALSE;
-    }
-#endif // PICTVIEW_DLL_IN_SEPARATE_PROCESS
-    return TRUE;
+    // The imaging engine now lives inside the plug-in and is backed by the
+    // Windows Imaging Component, so there is no external module to locate,
+    // version-check, or launch as a helper process.
+    return InitWicEngine(hParentWnd);
 }
 
 BOOL InitViewer(HWND hParentWnd)
@@ -1440,8 +1409,8 @@ BOOL InitViewer(HWND hParentWnd)
     G.CaptureHotKey = VK_F10;
     G.CaptureTimer = 5;
     G.CaptureCursor = FALSE;
-    G.LastSaveAsFilterIndexMono = 14;  // index is 1-based (IDS_SAVEASFILTERMONO: 14=BMP)
-    G.LastSaveAsFilterIndexColor = 13; // index is 1-based (IDS_SAVEASFILTERCOLOR: 13=BMP)
+    G.LastSaveAsFilterIndexMono = 5;  // index is 1-based (IDS_SAVEASFILTERMONO: 5=BMP)
+    G.LastSaveAsFilterIndexColor = 5; // index is 1-based (IDS_SAVEASFILTERCOLOR: 5=BMP)
     G.bShowPathInTitle = TRUE;
     G.Save.Flags = PVSF_GIF89;
     G.Save.JPEGQuality = 75;
@@ -1464,8 +1433,12 @@ BOOL InitViewer(HWND hParentWnd)
     }
     i = PVW32DLL.PVGetDLLVersion();
 
-    sprintf(PVW32DLL.Version, "PVW32Cnv.dll %d.%#02d.%d", i >> 16, i & 255, (i >> 8) & 255);
+    if (FAILED(StringCchPrintfA(PVW32DLL.Version, _countof(PVW32DLL.Version),
+                                "WIC engine %d.%d.%d", i >> 16, (i >> 8) & 255, i & 255)))
+        PVW32DLL.Version[0] = 0;
 
+    // Hands the engine the plug-in's string loader so it can name formats,
+    // compression schemes and errors from the language module.
     PVW32DLL.PVSetParam(GetExtText);
 
     G.HAccel = LoadAccelerators(DLLInstance, MAKEINTRESOURCE(IDA_ACCELERATORS));
@@ -1552,9 +1525,7 @@ BOOL InitEXIF(HWND hParent, BOOL bSilent)
 
 void ReleaseViewer()
 {
-#ifdef PICTVIEW_DLL_IN_SEPARATE_PROCESS
-    ReleasePVEXEWrapper();
-#endif
+    ReleaseWicEngine();
     if (!UnregisterClass(TIP_WINDOW_CLASSNAME, DLLInstance))
         TRACE_E("UnregisterClass(TIP_WINDOW_CLASSNAME) has failed");
     ReleaseWinLib(DLLInstance);
@@ -2017,10 +1988,11 @@ BOOL CPluginInterfaceForViewer::CanViewFile(LPCTSTR name)
         memset(&oiei, 0, sizeof(oiei));
         oiei.cbSize = sizeof(oiei);
 #ifdef _UNICODE
-        char nameA[_MAX_PATH];
+        // UTF-8 at the engine boundary: the WIC engine decodes these back to
+        // UTF-16, so a path outside the ANSI code page reaches the codecs intact.
+        char nameA[_MAX_PATH * 3];
 
-        WideCharToMultiByte(CP_ACP, 0, name, -1, nameA, sizeof(nameA), NULL, NULL);
-        nameA[sizeof(nameA) - 1] = 0;
+        WideToUtf8Buffer(name, nameA, (int)sizeof(nameA));
         oiei.FileName = nameA;
 #else
         oiei.FileName = name;

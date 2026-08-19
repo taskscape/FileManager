@@ -59,7 +59,7 @@ if (-not $salbrokerCopied) { Write-Error "Could not find salbroker.exe" }
 Copy-Exe @("$BuildDir\Release_x64\salextx64.dll", "$BuildDir\shellext\Release_x64\salextx64.dll", "src\vcxproj\shellext\salamander\Release_x64\plugins\Intermediate\salextx64\salextx64.dll", "src\vcxproj\shellext\salamander\Release_x64\salextx64.dll") "salextx64.dll" "$StagingDir\utils\"
 Copy-Exe @("$BuildDir\Release_Win32\salextx86.dll", "$BuildDir\shellext\Release_Win32\salextx86.dll", "$BuildDir\Release_x64\salextx86.dll", "src\vcxproj\shellext\salamander\Release_x86\plugins\Intermediate\salextx86\salextx86.dll", "src\vcxproj\shellext\salamander\Release_x86\salextx86.dll") "salextx86.dll" "$StagingDir\utils\"
 
-# Utils (Note: salpvenv.exe excluded - depends on proprietary PVW32Cnv.lib)
+# Utils
 Copy-Exe @("$BuildDir\Release_x64\salopen.exe") "salopen.exe" "$StagingDir\"
 Copy-Exe @("$BuildDir\Release_x64\salspawn.exe") "salspawn.exe" "$StagingDir\"
 Copy-Exe @("$BuildDir\Release_x64\tserver.exe", "$BuildDir\Release_Win32\tserver.exe") "tserver.exe" "$StagingDir\"

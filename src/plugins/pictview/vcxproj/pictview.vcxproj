@@ -137,6 +137,10 @@
     </ClCompile>
     <ClCompile Include="..\PixelAccess.cpp">
     </ClCompile>
+    <ClCompile Include="..\PVWicEngine.cpp">
+    </ClCompile>
+    <ClCompile Include="..\PVWicSave.cpp">
+    </ClCompile>
     <ClCompile Include="..\precomp.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Create</PrecompiledHeader>
@@ -144,12 +148,6 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Create</PrecompiledHeader>
     </ClCompile>
     <ClCompile Include="..\print.cpp">
-    </ClCompile>
-    <ClCompile Include="..\PVEXEWrapper.cpp">
-    </ClCompile>
-    <ClCompile Include="..\PVMessage.cpp">
-    </ClCompile>
-    <ClCompile Include="..\PVMessageWrapper.cpp">
     </ClCompile>
     <ClCompile Include="..\pvtwain.cpp">
     </ClCompile>
@@ -160,8 +158,6 @@
     <ClCompile Include="..\saveas.cpp">
     </ClCompile>
     <ClCompile Include="..\statsbar.cpp">
-    </ClCompile>
-    <ClCompile Include="..\Thumbnailer.cpp">
     </ClCompile>
     <ClCompile Include="..\thumbs.cpp">
     </ClCompile>
@@ -209,17 +205,13 @@
     </ClInclude>
     <ClInclude Include="..\PixelAccess.h">
     </ClInclude>
+    <ClInclude Include="..\PVWicEngine.h">
+    </ClInclude>
     <ClInclude Include="..\precomp.h">
-    </ClInclude>
-    <ClInclude Include="..\PVEXEWrapper.h">
-    </ClInclude>
-    <ClInclude Include="..\PVMessage.h">
     </ClInclude>
     <ClInclude Include="..\pvtwain.h">
     </ClInclude>
     <ClInclude Include="..\renderer.h">
-    </ClInclude>
-    <ClInclude Include="..\Thumbnailer.h">
     </ClInclude>
     <ClInclude Include="..\twain\twain.h">
     </ClInclude>

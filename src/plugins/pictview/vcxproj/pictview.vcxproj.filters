@@ -27,19 +27,16 @@
     <ClCompile Include="..\PixelAccess.cpp">
       <Filter>cpp</Filter>
     </ClCompile>
+    <ClCompile Include="..\PVWicEngine.cpp">
+      <Filter>cpp</Filter>
+    </ClCompile>
+    <ClCompile Include="..\PVWicSave.cpp">
+      <Filter>cpp</Filter>
+    </ClCompile>
     <ClCompile Include="..\precomp.cpp">
       <Filter>cpp</Filter>
     </ClCompile>
     <ClCompile Include="..\print.cpp">
-      <Filter>cpp</Filter>
-    </ClCompile>
-    <ClCompile Include="..\PVEXEWrapper.cpp">
-      <Filter>cpp</Filter>
-    </ClCompile>
-    <ClCompile Include="..\PVMessage.cpp">
-      <Filter>cpp</Filter>
-    </ClCompile>
-    <ClCompile Include="..\PVMessageWrapper.cpp">
       <Filter>cpp</Filter>
     </ClCompile>
     <ClCompile Include="..\pvtwain.cpp">
@@ -58,9 +55,6 @@
       <Filter>cpp</Filter>
     </ClCompile>
     <ClCompile Include="..\thumbs.cpp">
-      <Filter>cpp</Filter>
-    </ClCompile>
-    <ClCompile Include="..\Thumbnailer.cpp">
       <Filter>cpp</Filter>
     </ClCompile>
     <ClCompile Include="..\utils.cpp">
@@ -95,13 +89,10 @@
     <ClInclude Include="..\PixelAccess.h">
       <Filter>h</Filter>
     </ClInclude>
+    <ClInclude Include="..\PVWicEngine.h">
+      <Filter>h</Filter>
+    </ClInclude>
     <ClInclude Include="..\precomp.h">
-      <Filter>h</Filter>
-    </ClInclude>
-    <ClInclude Include="..\PVEXEWrapper.h">
-      <Filter>h</Filter>
-    </ClInclude>
-    <ClInclude Include="..\PVMessage.h">
       <Filter>h</Filter>
     </ClInclude>
     <ClInclude Include="..\pvtwain.h">
@@ -111,9 +102,6 @@
       <Filter>h</Filter>
     </ClInclude>
     <ClInclude Include="..\renderer.h">
-      <Filter>h</Filter>
-    </ClInclude>
-    <ClInclude Include="..\Thumbnailer.h">
       <Filter>h</Filter>
     </ClInclude>
     <ClInclude Include="..\twain\twain.h">

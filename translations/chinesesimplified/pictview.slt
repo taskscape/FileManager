@@ -362,7 +362,7 @@ COMMENT,"简体中文版"
 
 [STRINGTABLE 9]
 1008,1,"LAB"
-1009,1,"调用 PVW32Cnv.DLL 错误"
+1009,1,"图像解码错误"
 1010,1,"红: %i, 绿: %i, 蓝: %i"
 1011,1,"红: %#02x, 绿: %#02x, 蓝: %#02x"
 1012,1,"(%i, %i): 红: %i, 绿: %i, 蓝: %i"
@@ -387,12 +387,12 @@ COMMENT,"简体中文版"
 1034,1,"<剪贴板>"
 1035,1,"<屏幕捕捉>"
 1036,1,"空"
-1037,1,"常见的图形文件 (*.bmp;*.cur;*.gif;*.icn;*.ico;*.jpg;*.jpeg;*.lbm;*.pcx;*.png;*.psd;*.tga;*.tif;*.tiff)|*.bmp;*.cur;*.gif;*.icn;*.ico;*.jpg;*.jpeg;*.lbm;*.pcx;*.png;*.psd;*.tga;*.tif;*.tiff|All Files (*.*)|*.*|"
+1037,1,"常见的图形文件 (*.bmp;*.dib;*.gif;*.ico;*.jpg;*.jpeg;*.png;*.tif;*.tiff;*.dds;*.heic;*.webp;*.avif)|*.bmp;*.dib;*.gif;*.ico;*.jpg;*.jpeg;*.png;*.tif;*.tiff;*.dds;*.heic;*.webp;*.avif|All Files (*.*)|*.*|"
 1038,1,"<扫描>"
-1039,1,"Autodesk CEL (*.cel)|*.cel|Amiga 交换格式 (*.iff,*.lbm)|*.iff;*.lbm|电脑服务 GIF (*.gif)|*.gif|Intergraph (*.cit,*.dat,*.rle)|*.dat;*.cit;*.rle|JPEG (*.jpg,*.jpeg)|*.jpg;*.jpeg|便携式位图 (*.pbm,*.ppm)|*.pbm;*.ppm|便携式网络图形 (*.png)|*.png|Silicon 图形 (*.bw)|*.bw|SunRaster (*.ras)|*.ras|Targa (*.tga)|*.tga|TIFF (*.tif)|*.tif;*.tiff|Utah RLE (*.rle)|*.rle|视频租赁盒 SKA (*.ska)|*.ska|Windows 位图 (*.bmp)|*.bmp|无线位图 (*.wbmp)|*.wbmp|ZSoft PCX (*.pcx)|*.pcx|"
+1039,1,"电脑服务 GIF (*.gif)|*.gif|JPEG (*.jpg,*.jpeg)|*.jpg;*.jpeg|便携式网络图形 (*.png)|*.png|TIFF (*.tif)|*.tif;*.tiff|Windows 位图 (*.bmp)|*.bmp|"
 
 [STRINGTABLE 11]
-1040,1,"Autodesk CEL (*.cel)|*.cel|Amiga 交换格式 (*.iff,*.lbm)|*.iff;*.lbm|电脑服务 GIF (*.gif)|*.gif|JPEG (*.jpg,*.jpeg)|*.jpg;*.jpeg|便携式位图 (*.pnm,*.ppm)|*.pnm;*.ppm|便携式网络图形 (*.png)|*.png|Silicon 图形 (*.rgb)|*.rgb;*.rgba|SunRaster (*.ras)|*.ras|Targa (*.tga)|*.tga|TIFF (*.tif)|*.tif;*.tiff|Utah RLE (*.rle)|*.rle|Video-renting box SKA (*.ska)|*.ska|Windows 位图 (*.bmp)|*.bmp|ZSoft PCX (*.pcx)|*.pcx|"
+1040,1,"电脑服务 GIF (*.gif)|*.gif|JPEG (*.jpg,*.jpeg)|*.jpg;*.jpeg|便携式网络图形 (*.png)|*.png|TIFF (*.tif)|*.tif;*.tiff|Windows 位图 (*.bmp)|*.bmp|"
 1041,1,"无法保存图像。\n错误: %hs"
 1042,1,"图像保存成功。"
 1043,1,"自定义颜色(&C)..."
@@ -463,7 +463,7 @@ COMMENT,"简体中文版"
 1102,1,"显示其他通道(O)"
 
 [STRINGTABLE 15]
-1109,1,"无法加载图像处理库 PVW32Cnv.dll."
+1109,1,"Windows 图像组件不可用，无法解码图像。"
 1110,1,"发现错误的 PVW32Cnv.dll 版本。"
 1111,1,"请先选择一个区域。"
 1112,1,"默认"

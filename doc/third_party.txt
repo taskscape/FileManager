@@ -13,7 +13,10 @@ The Multimedia Viewer plugin includes software written by Tomas Jelinek.
 Copyright (C) 2003-2023 Tomas Jelinek
 
 === Jan Patera ===
-Portions of PictView plugin licensed from Jan Patera.
+The PictView plugin descends from work licensed from Jan Patera. Its imaging
+engine (PVW32Cnv) has been replaced by the Windows Imaging Component, a
+component of the operating system; the surrounding viewer is still derived
+from the original plugin.
 Copyright (C) 1994-2023 Jan Patera
 
 === Curtis Galloway and Lutz Muller ===

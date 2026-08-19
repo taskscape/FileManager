@@ -362,7 +362,7 @@ COMMENT,"Versiunea romana"
 
 [STRINGTABLE 9]
 1008,1,"LAB"
-1009,1,"Eroare apelare PVW32Cnv.DLL"
+1009,1,"Eroare la decodarea imaginii"
 1010,1,"Rosu: %i, Verde: %i, Albastru: %i"
 1011,1,"Rosu: %#02x, Verde: %#02x, Albastru: %#02x"
 1012,1,"(%i, %i): Rosu: %i, Verde: %i, Albastru: %i"
@@ -387,12 +387,12 @@ COMMENT,"Versiunea romana"
 1034,1,"<Clipboard>"
 1035,1,"<Captura Ecran>"
 1036,1,"Gol"
-1037,1,"Fisiere Grafice Comune (*.bmp;*.cur;*.gif;*.icn;*.ico;*.jpg;*.jpeg;*.lbm;*.pcx;*.png;*.psd;*.tga;*.tif;*.tiff)|*.bmp;*.cur;*.gif;*.icn;*.ico;*.jpg;*.jpeg;*.lbm;*.pcx;*.png;*.psd;*.tga;*.tif;*.tiff|Toate Fisierele (*.*)|*.*|"
+1037,1,"Fisiere Grafice Comune (*.bmp;*.dib;*.gif;*.ico;*.jpg;*.jpeg;*.png;*.tif;*.tiff;*.dds;*.heic;*.webp;*.avif)|*.bmp;*.dib;*.gif;*.ico;*.jpg;*.jpeg;*.png;*.tif;*.tiff;*.dds;*.heic;*.webp;*.avif|Toate Fisierele (*.*)|*.*|"
 1038,1,"<Scanare>"
-1039,1,"Autodesk CEL (*.cel)|*.cel|Amiga Interchange Format (*.iff,*.lbm)|*.iff;*.lbm|CompuServe GIF (*.gif)|*.gif|Intergraph (*.cit,*.dat,*.rle)|*.dat;*.cit;*.rle|JPEG (*.jpg,*.jpeg)|*.jpg;*.jpeg|Portable Bitmap (*.pbm,*.ppm)|*.pbm;*.ppm|Portable Network Graphics (*.png)|*.png|Silicon Graphics (*.bw)|*.bw|SunRaster (*.ras)|*.ras|Targa (*.tga)|*.tga|TIFF (*.tif)|*.tif;*.tiff|Utah RLE (*.rle)|*.rle|Video-renting box SKA (*.ska)|*.ska|Windows Bitmap (*.bmp)|*.bmp|Wireless Bitmap (*.wbmp)|*.wbmp|ZSoft PCX (*.pcx)|*.pcx|"
+1039,1,"CompuServe GIF (*.gif)|*.gif|JPEG (*.jpg,*.jpeg)|*.jpg;*.jpeg|Portable Network Graphics (*.png)|*.png|TIFF (*.tif)|*.tif;*.tiff|Windows Bitmap (*.bmp)|*.bmp|"
 
 [STRINGTABLE 11]
-1040,1,"Autodesk CEL (*.cel)|*.cel|Amiga Interchange Format (*.iff,*.lbm)|*.iff;*.lbm|CompuServe GIF (*.gif)|*.gif|JPEG (*.jpg,*.jpeg)|*.jpg;*.jpeg|Portable Bitmap (*.pnm,*.ppm)|*.pnm;*.ppm|Portable Network Graphics (*.png)|*.png|Silicon Graphics (*.rgb)|*.rgb;*.rgba|SunRaster (*.ras)|*.ras|Targa (*.tga)|*.tga|TIFF (*.tif)|*.tif;*.tiff|Utah RLE (*.rle)|*.rle|Video-renting box SKA (*.ska)|*.ska|Windows Bitmap (*.bmp)|*.bmp|ZSoft PCX (*.pcx)|*.pcx|"
+1040,1,"CompuServe GIF (*.gif)|*.gif|JPEG (*.jpg,*.jpeg)|*.jpg;*.jpeg|Portable Network Graphics (*.png)|*.png|TIFF (*.tif)|*.tif;*.tiff|Windows Bitmap (*.bmp)|*.bmp|"
 1041,1,"Nu pot salva imaginea.\nEroare: %hs"
 1042,1,"Imagine salvata cu succes."
 1043,1,"Parti&cularizare culoare..."
@@ -463,7 +463,7 @@ COMMENT,"Versiunea romana"
 1102,1,"Arata Alte Canale (O)"
 
 [STRINGTABLE 15]
-1109,1,"Nu pot incarca libraria de procesare imagine PVW32Cnv.dll."
+1109,1,"Windows Imaging Component nu este disponibil, imaginile nu pot fi decodate."
 1110,1,"A fost gasita o versiune gresita a PVW32Cnv.dll."
 1111,1,"Mai intai selecteaza o regiune."
 1112,1,"Implicit"

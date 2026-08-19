@@ -16,6 +16,7 @@ $repositoryRoot = Split-Path -Parent $PSScriptRoot
 $testProject = Join-Path $repositoryRoot 'tests\FileManager.UiTests\FileManager.UiTests.csproj'
 $nativeSolution = Join-Path $repositoryRoot 'src\vcxproj\salamand.sln'
 $nativeSafetyProject = Join-Path $repositoryRoot 'tests\NativeSafetyTests\NativeSafetyTests.vcxproj'
+$pictViewEngineProject = Join-Path $repositoryRoot 'tests\PictViewEngineTests\PictViewEngineTests.vcxproj'
 $failures = [System.Collections.Generic.List[string]]::new()
 $passed = [System.Collections.Generic.List[string]]::new()
 $skipped = [System.Collections.Generic.List[string]]::new()
@@ -196,6 +197,38 @@ function Invoke-NativeSafetyTests {
     & $testExecutable
     if ($LASTEXITCODE -ne 0) {
         throw "The native safety tests failed with exit code $LASTEXITCODE."
+    }
+}
+
+function Invoke-PictViewEngineTests {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$DeveloperCommand,
+        [Parameter(Mandatory = $true)]
+        [ValidateSet('v143', 'v145')]
+        [string]$Toolset
+    )
+
+    if (-not (Test-Path -LiteralPath $pictViewEngineProject -PathType Leaf)) {
+        throw "The PictView engine test project was not found: $pictViewEngineProject"
+    }
+
+    # The engine links straight into a console host, so its decode, transform and
+    # encode round trips run without a desktop session or the plug-in host.
+    $buildCommand = 'call "' + $DeveloperCommand + '" -arch=x64 -host_arch=x64 && msbuild "' + $pictViewEngineProject +
+        '" /m /t:Build /p:Configuration=Debug /p:Platform=x64 /p:PlatformToolset=' + $Toolset + ' /nr:false'
+    & $env:ComSpec /d /s /c $buildCommand
+    if ($LASTEXITCODE -ne 0) {
+        throw "Building the PictView engine tests failed with exit code $LASTEXITCODE."
+    }
+
+    $testExecutable = Join-Path $repositoryRoot 'tests\PictViewEngineTests\x64\Debug\PictViewEngineTests.exe'
+    if (-not (Test-Path -LiteralPath $testExecutable -PathType Leaf)) {
+        throw "The PictView engine test executable was not produced: $testExecutable"
+    }
+    & $testExecutable
+    if ($LASTEXITCODE -ne 0) {
+        throw "The PictView engine tests failed with exit code $LASTEXITCODE."
     }
 }
 
@@ -516,6 +549,10 @@ $nativeSafetyAction = {
     Invoke-NativeSafetyTests -DeveloperCommand $vsDevCmd -Toolset $PlatformToolset
 }
 Invoke-AutomatedCheck -Name 'NativeSafetyTests (Debug x64)' -Action $nativeSafetyAction
+$pictViewEngineAction = {
+    Invoke-PictViewEngineTests -DeveloperCommand $vsDevCmd -Toolset $PlatformToolset
+}
+Invoke-AutomatedCheck -Name 'PictViewEngineTests (Debug x64)' -Action $pictViewEngineAction
 $builtUiExecutable = Resolve-UiTestArtifact -BuildDirectory $uiBuildDirectory -FileName 'salamand.exe'
 $null = Stage-UiTestCrashReporter -ExecutablePath $builtUiExecutable -BuildDirectory $uiBuildDirectory
 $builtSqliteDll = Resolve-UiTestArtifact -BuildDirectory $uiBuildDirectory -FileName 'sqlite.dll'

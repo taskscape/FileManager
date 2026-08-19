@@ -184,7 +184,7 @@ This project welcomes contributions to build and enhance Open Salamander!
 \translations    Translations into other languages
 ```
 
-A few Open Salamander 5.0 plugins are either not included or cannot be compiled. For instance, the PictView engine ```pvw32cnv.dll``` is not open-sourced, so we should consider switching to [WIC](https://learn.microsoft.com/en-us/windows/win32/wic/-wic-about-windows-imaging-codec) or another library. The Encrypt plugin is incompatible with modern SSD disks and has been deprecated. The UnRAR plugin lacks [unrar.dll](https://www.rarlab.com/rar_add.htm). The FTP plugin uses Windows SChannel for FTPS and does not require bundled TLS DLLs. To build WinSCP plugin you need Embarcadero C++ Builder.
+A few Open Salamander 5.0 plugins are either not included or cannot be compiled. The PictView plugin used to be one of them, because its ```pvw32cnv.dll``` engine is not open-sourced; it now decodes and encodes through [WIC](https://learn.microsoft.com/en-us/windows/win32/wic/-wic-about-windows-imaging-codec) instead, which also retired the ```salpvenv.exe``` out-of-process envelope. WIC covers the mainstream formats plus whatever OS codecs are installed (HEIF, WebP, AVIF, camera RAW), but not the long tail of legacy formats the original engine handled. The Encrypt plugin is incompatible with modern SSD disks and has been deprecated. The UnRAR plugin lacks [unrar.dll](https://www.rarlab.com/rar_add.htm). The FTP plugin uses Windows SChannel for FTPS and does not require bundled TLS DLLs. To build WinSCP plugin you need Embarcadero C++ Builder.
 
 All the source code uses UTF-8-BOM encoding and is formatted with ```clang-format```. Refer to the ```\normalize.ps1``` script for more information.
 

@@ -13,12 +13,14 @@
 <div class="page">
 <h1>Getting Started with PictView Plugin</h1>
 
-<p>The PictView plugin is an image viewer, converter, and thumbnailer. It supports more than
-<a href="appendix_fileformats.htm">60 file formats</a>. PictView plugin is based on the
+<p>The PictView plugin is an image viewer, converter, and thumbnailer. It is based on the
 famous freeware <a href="http://www.pictview.com/" target="_blank">PictView</a>
-(for DOS and Windows) image manipulation program and it utilizes
-<a href="http://www.pictview.com/dll.htm" target="_blank">PVW32Cnv.DLL</a>,
-an image rendering library that can be licensed for use by third-party programs.</p>
+(for DOS and Windows) image manipulation program, but it decodes and encodes through the
+<a href="https://learn.microsoft.com/en-us/windows/win32/wic/-wic-about-windows-imaging-codec" target="_blank">Windows
+Imaging Component</a> rather than the original PVW32Cnv.DLL engine. It therefore reads and
+writes the formats Windows itself supports, plus any additional imaging codec installed on the
+machine (HEIF, WebP, AVIF and camera RAW among them), and no longer covers the long tail of
+legacy formats the original engine handled.</p>
 
 <p>See File Viewer, Menu Extension and Thumbnail Loader sections in
 <a href="ms-its:salamand.chm::/hh/salamand/plugins_using.htm">Using Plugins</a>
