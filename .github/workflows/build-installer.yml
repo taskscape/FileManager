@@ -28,7 +28,10 @@ jobs:
     name: Complete automated release gate
     # Every UI fixture mutates profile state, so the release gate uses the same
     # dedicated unlocked desktop as the existing Application Verifier lane.
-    runs-on: [self-hosted, windows, filemanager-ui]
+    # Pin public-repository UI work to its dedicated, repository-restricted runner group.
+    runs-on:
+      group: FileManager UI
+      labels: [self-hosted, windows, filemanager-ui]
     permissions:
       contents: read
 
@@ -119,7 +122,10 @@ jobs:
     needs: release-tests
     # The same disposable desktop, volumes, and verifier installation make the
     # v143 inventory comparable to the gated v145 executable run above.
-    runs-on: [self-hosted, windows, filemanager-ui]
+    # Keep the parity UI run on the same repository-restricted desktop as the release gate.
+    runs-on:
+      group: FileManager UI
+      labels: [self-hosted, windows, filemanager-ui]
     permissions:
       contents: read
 
@@ -162,7 +168,10 @@ jobs:
   toolset-parity-v145:
     name: Produce v145 Release artifact manifest
     needs: release-tests
-    runs-on: [self-hosted, windows, filemanager-ui]
+    # Restrict the v145 artifact job to the dedicated group that may serve this public repository.
+    runs-on:
+      group: FileManager UI
+      labels: [self-hosted, windows, filemanager-ui]
     permissions:
       contents: read
 
