@@ -59,6 +59,9 @@ public sealed class NativeSafetyRegressionTests
             Assert.That(releaseWorkflow, Does.Not.Contain("vars.FILEMANAGER_UI"));
             Assert.That(volumeProvisioner, Does.Contain("FILEMANAGER_UI_CROSS_VOLUME_ROOT"));
             Assert.That(volumeProvisioner, Does.Contain("FILEMANAGER_UI_ADS_UNSUPPORTED_TARGET_ROOT"));
+            // Provisioned roots must satisfy the same ownership guard as roots created by the NUnit harness.
+            Assert.That(volumeProvisioner, Does.Contain(".filemanager-testdata-owner"));
+            Assert.That(volumeProvisioner, Does.Contain("Open Salamander UI test sandbox"));
         });
     }
 
@@ -1851,11 +1854,31 @@ public sealed class NativeSafetyRegressionTests
             // Keep the two quick-search targets distinguishable before their non-ASCII suffixes.
             Assert.That(operations, Does.Contain("first-unicode-\\u00e9.txt"));
             Assert.That(operations, Does.Contain("Enumerable.Repeat"));
+            // Include the payload in the dynamic budget so a longer CI sandbox root cannot exceed PATH_MAX_PATH.
+            Assert.That(operations, Does.Contain("productPathMaximumLength"));
+            Assert.That(operations, Does.Contain("payloadName.Length"));
             Assert.That(operations, Does.Contain("NativeCommands.RenameFile"));
             Assert.That(operations, Does.Contain("NativeCommands.DeleteFiles"));
             Assert.That(operations, Does.Contain("FileIdentity.Capture"));
             Assert.That(identities, Does.Contain("GetFileInformationByHandle"));
             Assert.That(identities, Does.Contain("FileShare.ReadWrite | FileShare.Delete"));
+        });
+    }
+
+    [Test]
+    public void Ftp_bookmark_verification_uses_the_legacy_ansi_list_box()
+    {
+        var root = FindRepositoryRoot();
+        var basicUiTests = File.ReadAllText(Path.Combine(root, "tests", "FileManager.UiTests", "BasicUiTests.cs"));
+        var nativeCommands = File.ReadAllText(Path.Combine(root, "tests", "FileManager.UiTests", "Infrastructure", "NativeCommands.cs"));
+
+        // An ANSI list box misreads a SendMessageW string at its first UTF-16 terminator, hiding persisted bookmarks.
+        Assert.Multiple(() =>
+        {
+            Assert.That(nativeCommands, Does.Contain("EntryPoint = \"SendMessageA\""));
+            Assert.That(nativeCommands, Does.Contain("SendMessageAnsiText(listHandle, LbFindStringExact"));
+            Assert.That(basicUiTests, Does.Contain("WaitForFtpBookmark(bookmarksDialog"));
+            Assert.That(basicUiTests, Does.Contain("WaitForFtpBookmark(reloadedDialog"));
         });
     }
 

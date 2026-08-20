@@ -225,16 +225,13 @@ public sealed class FileOperationUiTests : FileOperationUiTestBase
         const string longSegment = "long-unicode-\u00e9-segment-123456789012345678901234567890";
         const string payloadName = "payload-\u00e9.txt";
 
-        // PATH_MAX_PATH (src/plugins/shared/spl_gen.h) caps a full directory path
-        // at 248 characters including the terminator, and the script builder
-        // rejects anything longer. Fill that budget instead of exceeding it: the
-        // case proves that deep Unicode paths survive copy, rename and delete;
-        // support for paths beyond MAX_PATH is a separate, unbuilt capability
-        // recorded in testing.md. The source and target workspace directories
-        // differ only in their equal-length names, so one budget covers both.
-        const int productDirectoryLimit = 248;
+        // PATH_MAX_PATH (src/plugins/shared/spl_gen.h) leaves 247 usable characters.
+        // Budget the filename as well as its directory so runners with longer sandbox
+        // roots exercise a supported deep path instead of provoking the native error dialog.
+        const int productPathMaximumLength = 247;
         var longPathBase = Path.Combine(Workspace.TargetDirectory, treeName);
-        var longSegmentCount = Math.Max(1, (productDirectoryLimit - 1 - longPathBase.Length) / (longSegment.Length + 1));
+        var remainingPathLength = productPathMaximumLength - longPathBase.Length - payloadName.Length - 1;
+        var longSegmentCount = Math.Max(1, remainingPathLength / (longSegment.Length + 1));
         var longRelativePath = string.Join(Path.DirectorySeparatorChar.ToString(),
             Enumerable.Repeat(longSegment, longSegmentCount));
 
@@ -242,6 +239,8 @@ public sealed class FileOperationUiTests : FileOperationUiTestBase
         File.WriteAllText(Workspace.SourcePath(firstUnicodeName), "first-unicode-content");
         File.WriteAllText(Workspace.SourcePath(secondUnicodeName), "second-unicode-content");
         var longSource = Workspace.SourcePath(Path.Combine(treeName, longRelativePath, payloadName));
+        // Keep the exact source name within the ANSI product boundary before opening the native copy dialog.
+        Assert.That(longSource.Length, Is.LessThanOrEqualTo(productPathMaximumLength));
         Directory.CreateDirectory(Path.GetDirectoryName(longSource)!);
         File.WriteAllText(longSource, "long-unicode-content");
         // File IDs prove that native operations do not collapse the distinct non-ASCII entries.

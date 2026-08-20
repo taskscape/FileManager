@@ -98,13 +98,31 @@ public sealed class BasicUiTests : FileManagerUiTestBase
         var bookmarksDialog = OpenFtpBookmarksDialog();
         CreateFtpBookmark(bookmarksDialog, createdBookmarkName);
         RenameFocusedFtpBookmark(bookmarksDialog, editedBookmarkName);
+        // Prove the organizer accepted the rename before its Close action persists the collection.
+        WaitForFtpBookmark(bookmarksDialog, editedBookmarkName,
+                           "The FTP organizer did not retain the created and edited bookmark before restart.");
         CloseFtpBookmarksDialog(bookmarksDialog);
 
         RestartFileManager();
         var reloadedDialog = OpenFtpBookmarksDialog();
-        // Query the owner-drawn list box directly because UIA does not reliably publish its item descendants.
-        Assert.That(NativeCommands.FtpBookmarksContains(reloadedDialog.Properties.NativeWindowHandle.Value, editedBookmarkName), Is.True,
-                    "The created and edited FTP bookmark was not present after restart.");
+        // The post-restart native read proves that the accepted organizer state was reloaded from the isolated profile.
+        WaitForFtpBookmark(reloadedDialog, editedBookmarkName,
+                           "The created and edited FTP bookmark was not present after restart.");
         CloseFtpBookmarksDialog(reloadedDialog);
+    }
+
+    private static void WaitForFtpBookmark(FlaUI.Core.AutomationElements.Window bookmarksDialog, string bookmarkName, string failureMessage)
+    {
+        // The owner-drawn list populates during dialog initialization, so wait for its native ANSI item table before judging persistence.
+        var timeout = DateTime.UtcNow + TimeSpan.FromSeconds(10);
+        while (DateTime.UtcNow < timeout)
+        {
+            if (NativeCommands.FtpBookmarksContains(bookmarksDialog.Properties.NativeWindowHandle.Value, bookmarkName))
+                return;
+
+            Thread.Sleep(100);
+        }
+
+        Assert.Fail(failureMessage);
     }
 }

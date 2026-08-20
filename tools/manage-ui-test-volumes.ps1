@@ -19,6 +19,10 @@ if ([IO.Path]::GetFileName($managedDirectory.TrimEnd([IO.Path]::DirectorySeparat
     throw "WorkingDirectory must end with the exact managed leaf 'filemanager-ui-volumes': $managedDirectory"
 }
 
+# Match the NUnit sandbox contract so each freshly provisioned volume is safe to reset and remove.
+$ownershipMarkerName = '.filemanager-testdata-owner'
+$ownershipMarkerContents = 'Open Salamander UI test sandbox'
+
 function Invoke-ManagedDiskPart {
     param(
         [Parameter(Mandatory = $true)]
@@ -102,7 +106,10 @@ try {
         if ($mounted.FileSystem -ine $volume.FileSystem) {
             throw "Drive $($volume.Letter): mounted as $($mounted.FileSystem), expected $($volume.FileSystem)."
         }
-        New-Item -ItemType Directory -Force -Path "$($volume.Letter):\filemanager-testdata" | Out-Null
+        $testDataRoot = "$($volume.Letter):\filemanager-testdata"
+        New-Item -ItemType Directory -Force -Path $testDataRoot | Out-Null
+        # The marker grants only this newly created root to the reparse-safe NUnit cleanup routine.
+        [IO.File]::WriteAllText((Join-Path $testDataRoot $ownershipMarkerName), $ownershipMarkerContents, [Text.Encoding]::ASCII)
     }
 
     # GITHUB_ENV is the supported boundary for passing dynamic drive assignments to later Actions steps.
