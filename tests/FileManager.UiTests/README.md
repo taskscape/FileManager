@@ -16,6 +16,8 @@ Set these environment variables before running:
 - `FILEMANAGER_UI_ADS_UNSUPPORTED_TARGET_ROOT` — an existing dedicated directory on a different volume that does not support alternate data streams (for example FAT/FAT32/exFAT). This enables the ADS metadata-loss decision scenario and the fixture creates and removes only a GUID-named child below this directory.
 - `FILEMANAGER_UI_RECYCLE_BIN=1` — explicitly enables the recycle-bin characterization test. It requires the default recycle-bin delete setting in the isolated profile and adds one disposable file to that profile's recycle bin.
 
+The release workflow creates fresh NTFS source/cross-volume VHDX images and an exFAT ADS-unsupported VHDX image for each complete UI job, then detaches them in an `always()` cleanup step. Local runs may continue to point the two additional-volume variables at dedicated existing test volumes.
+
 Run the suite on an interactive Windows desktop session:
 
 ```powershell
@@ -30,7 +32,7 @@ The FTP plug-in menu command has no compile-time host command ID: FileManager al
 
 ## Transactional configuration fault injection
 
-The `FaultInjection` category first measures the exact registry-write count of a real configuration commit, then starts a fresh executable for every write boundary. The native test hook terminates that process immediately after the selected successful registry mutation. A clean restart must show either the complete baseline setting or the complete candidate setting; the test fails if the process did not terminate at the requested boundary or if restart exposes a mixture.
+The `FaultInjection` category first measures the exact registry-write count of a real configuration commit, then starts fresh executables at uniformly spaced payload writes and five named transaction mutations (checksum, completion marker, generation flush, active-generation selector, and store flush). Named atomic-tail points remain stable when earlier tests or plug-ins change the inactive snapshot's write count. The bounded structural matrix remains practical when plug-ins add thousands of values. The native test hook terminates each process immediately after the selected successful registry mutation. A clean restart must show either the complete baseline setting or the complete candidate setting; the test fails if the process did not terminate at the requested boundary or if restart exposes a mixture.
 
 Run this separately on the disposable profile because it intentionally terminates the executable many times:
 
@@ -39,4 +41,4 @@ $env:FILEMANAGER_UI_CONFIG_FAULT_INJECTION = '1'
 dotnet test tests/FileManager.UiTests/FileManager.UiTests.csproj --filter TestCategory=FaultInjection
 ```
 
-The executable honors `FILEMANAGER_CONFIG_FAULT_AFTER_WRITE` and `FILEMANAGER_CONFIG_FAULT_REPORT` only while `FILEMANAGER_UI_ISOLATED=1` is present. The test supplies those two variables to its child executable processes; users should not need to set them manually.
+The executable honors `FILEMANAGER_CONFIG_FAULT_AFTER_WRITE` and `FILEMANAGER_CONFIG_FAULT_REPORT` only while `FILEMANAGER_UI_ISOLATED=1` is present. The test also supplies `FILEMANAGER_CONFIG_FAULT_ARM_FILE` and creates that owned marker immediately before accepting the Configuration dialog, preventing automatic plug-in startup saves from consuming the requested boundary. Users should not need to set these variables manually.

@@ -22,9 +22,12 @@ BOOL GetValueDontCheckTypeAux(HKEY hKey, const char* name, void* buffer, DWORD b
 // inert unless FILEMANAGER_UI_CONFIG_ROOT selects the suffixed test key, so ordinary
 // application launches cannot accidentally enable it.  FILEMANAGER_CONFIG_FAULT_AFTER_WRITE terminates the
 // process immediately after that successful registry mutation; FILEMANAGER_CONFIG_FAULT_REPORT
-// receives the number of mutations in a completed save.
+// receives the number of mutations in a completed save. FILEMANAGER_CONFIG_FAULT_ARM_FILE may
+// point at a harness-owned marker that excludes automatic startup saves until the intended commit.
 void BeginConfigurationWriteFaultInjection();
 void EndConfigurationWriteFaultInjection();
+// Wraps a successful structural commit mutation with a name that remains stable as snapshot size changes.
+BOOL PassConfigurationTransactionFaultPoint(BOOL succeeded, const char* phase);
 LONG FlushConfigurationRegistryKey(HKEY key);
 const DWORD CONFIGURATION_WRITE_FAULT_EXIT_CODE = 121;
 

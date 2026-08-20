@@ -24,6 +24,7 @@ internal static class NativeCommands
     private const uint WmLButtonDown = 0x0201;
     private const uint WmLButtonUp = 0x0202;
     private const uint LvmGetItemCount = 0x1004;
+    private const uint LbFindStringExact = 0x01A2;
     private const uint BmGetCheck = 0x00F0;
     private const uint BmClick = 0x00F5;
     private const uint TbIsButtonEnabled = 0x0409;
@@ -155,7 +156,24 @@ internal static class NativeCommands
         {
             var buffer = new char[GetWindowTextLength(windowHandle) + 1];
             GetWindowText(windowHandle, buffer, buffer.Length);
-            titles.Add(new string(buffer).TrimEnd('\0'));
+            var title = new string(buffer).TrimEnd('\0');
+            if (string.Equals(title, "Microsoft Visual C++ Runtime Library", StringComparison.Ordinal))
+            {
+                // Debug-runtime dialogs put the assertion details in child controls; include them before teardown kills the process.
+                var details = new List<string>();
+                EnumChildWindows(windowHandle, (childHandle, _) =>
+                {
+                    var childBuffer = new char[GetWindowTextLength(childHandle) + 1];
+                    GetWindowText(childHandle, childBuffer, childBuffer.Length);
+                    var childText = new string(childBuffer).TrimEnd('\0').Trim();
+                    if (childText.Length != 0)
+                        details.Add(childText.Replace("\r", " ").Replace("\n", " "));
+                    return true;
+                }, 0);
+                if (details.Count != 0)
+                    title += ": " + string.Join(" | ", details);
+            }
+            titles.Add(title);
         }
         // Preserve native modal captions in failures because legacy error templates often omit UI Automation text.
         return titles;
@@ -239,6 +257,16 @@ internal static class NativeCommands
         return FindDialogControl(dialogHandle, controlId) != 0;
     }
 
+    internal static bool FtpBookmarksContains(nint dialogHandle, string bookmarkName)
+    {
+        // The FTP list box is owner-drawn, so its native string table is authoritative when UIA omits list items.
+        const int ftpBookmarksList = 561; // IDL_BOOKMARKS in src/plugins/ftp/lang/lang.rh.
+        var listHandle = FindDialogControl(dialogHandle, ftpBookmarksList);
+        if (listHandle == 0)
+            throw new InvalidOperationException("FTP bookmarks dialog did not expose its native bookmark list.");
+        return SendMessageText(listHandle, LbFindStringExact, -1, bookmarkName) != -1;
+    }
+
     internal static bool? TryGetToolbarCommandEnabled(nint windowHandle, int command)
     {
         bool? enabled = null;
@@ -292,6 +320,11 @@ internal static class NativeCommands
                 // notice must be acknowledged or every later case times out waiting
                 // for a main window that is not coming.
                 ClickDialogButton(windowHandle, 1);
+            }
+            else if (string.Equals(title, "Check for New Versions", StringComparison.Ordinal))
+            {
+                // A restored plug-in profile may reopen its optional update prompt; decline it so startup can expose the host window.
+                ClickDialogButton(windowHandle, 2);
             }
         }
     }

@@ -111,7 +111,11 @@ public abstract class FileOperationUiTestBase : FileManagerUiTestBase
         foreach (var name in names)
         {
             NativeCommands.QuickSearch(list.Properties.NativeWindowHandle.Value, name);
+            // Match the single-item path: quick-search focus is asynchronous and Insert must target the settled match.
+            Thread.Sleep(250);
             NativeCommands.ToggleFocusedSelection(list.Properties.NativeWindowHandle.Value);
+            // Let the caret advance before the next quick-search so all prior selections remain intact.
+            Thread.Sleep(100);
         }
     }
 

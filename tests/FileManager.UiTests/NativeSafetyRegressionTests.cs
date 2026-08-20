@@ -16,6 +16,7 @@ public sealed class NativeSafetyRegressionTests
         var root = FindRepositoryRoot();
         var runner = File.ReadAllText(Path.Combine(root, "scripts", "runtests.ps1"));
         var releaseWorkflow = File.ReadAllText(Path.Combine(root, ".github", "workflows", "build-installer.yml"));
+        var volumeProvisioner = File.ReadAllText(Path.Combine(root, "tools", "manage-ui-test-volumes.ps1"));
 
         // The root command is the advertised entry point, so pin every
         // independently executable probe and the complete NUnit/UI collector.
@@ -52,9 +53,12 @@ public sealed class NativeSafetyRegressionTests
             Assert.That(releaseWorkflow, Does.Contain("needs: release-tests"));
             Assert.That(releaseWorkflow, Does.Contain("fetch-depth: 0"));
             Assert.That(releaseWorkflow, Does.Contain("FILEMANAGER_UI_CONFIG_FAULT_INJECTION: '1'"));
-            Assert.That(releaseWorkflow, Does.Contain("FILEMANAGER_UI_CROSS_VOLUME_ROOT"));
-            Assert.That(releaseWorkflow, Does.Contain("FILEMANAGER_UI_ADS_UNSUPPORTED_TARGET_ROOT"));
-            Assert.That(releaseWorkflow, Does.Contain("FILEMANAGER_UI_FTP_ORGANIZE_COMMAND"));
+            // The release jobs must provision their capabilities and let the runner discover dynamic FTP commands.
+            Assert.That(releaseWorkflow, Does.Contain("manage-ui-test-volumes.ps1 -Action Setup"));
+            Assert.That(releaseWorkflow, Does.Contain("manage-ui-test-volumes.ps1 -Action Cleanup"));
+            Assert.That(releaseWorkflow, Does.Not.Contain("vars.FILEMANAGER_UI"));
+            Assert.That(volumeProvisioner, Does.Contain("FILEMANAGER_UI_CROSS_VOLUME_ROOT"));
+            Assert.That(volumeProvisioner, Does.Contain("FILEMANAGER_UI_ADS_UNSUPPORTED_TARGET_ROOT"));
         });
     }
 
@@ -218,6 +222,10 @@ public sealed class NativeSafetyRegressionTests
             Assert.That(registry, Does.Contain("ConfigurationFaultEnvironmentMaximum = 32767"));
             Assert.That(registry, Does.Contain("GetEnvironmentVariableA(name, NULL, 0)"));
             Assert.That(registry, Does.Contain("return cferTooLarge"));
+            // Fault injection must not terminate a plug-in-triggered save before the UI harness reaches its intended commit.
+            Assert.That(registry, Does.Contain("FILEMANAGER_CONFIG_FAULT_ARM_FILE"));
+            Assert.That(registry, Does.Contain("IsConfigurationWriteFaultArmed()"));
+            Assert.That(registry, Does.Contain("FILEMANAGER_CONFIG_FAULT_PHASE"));
             Assert.That(registry, Does.Contain("CreateFileA(ConfigurationWriteFaultReport.c_str()"));
             Assert.That(minidump, Does.Contain("CopyBoundedExternalText"));
             Assert.That(minidump, Does.Contain("memchr(source, 0, sourceCapacity)"));
@@ -1830,17 +1838,18 @@ public sealed class NativeSafetyRegressionTests
     }
 
     [Test]
-    public void Unicode_matrix_exercises_distinct_normalization_forms_and_a_long_native_copy_path()
+    public void Unicode_matrix_exercises_ansi_round_trippable_names_and_a_long_native_copy_path()
     {
         var root = FindRepositoryRoot();
         var operations = File.ReadAllText(Path.Combine(root, "tests", "FileManager.UiTests", "FileOperationUiTests.cs"));
         var identities = File.ReadAllText(Path.Combine(root, "tests", "FileManager.UiTests", "Infrastructure", "FileIdentity.cs"));
 
-        // Keep identity checks on opened handles so normalization never collapses separate native entries.
+        // Keep identity checks on opened handles while the matrix stays within the product's documented ANSI path boundary.
         Assert.Multiple(() =>
         {
-            Assert.That(operations, Does.Contain("Unicode_normalization_surrogate_and_long_path_operations_preserve_distinct_entries"));
-            Assert.That(operations, Does.Contain("-e\\u0301-\\U0001f680.txt"));
+            Assert.That(operations, Does.Contain("Ansi_round_trippable_unicode_and_long_path_operations_preserve_distinct_entries"));
+            // Keep the two quick-search targets distinguishable before their non-ASCII suffixes.
+            Assert.That(operations, Does.Contain("first-unicode-\\u00e9.txt"));
             Assert.That(operations, Does.Contain("Enumerable.Repeat"));
             Assert.That(operations, Does.Contain("NativeCommands.RenameFile"));
             Assert.That(operations, Does.Contain("NativeCommands.DeleteFiles"));

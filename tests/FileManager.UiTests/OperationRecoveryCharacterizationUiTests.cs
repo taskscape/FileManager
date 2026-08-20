@@ -11,6 +11,9 @@ public sealed class OperationRecoveryCharacterizationUiTests : FileOperationUiTe
     private string targetPath = null!;
     private HashSet<string> reportsBeforeStartup = null!;
 
+    // This fixture must attach to the disabled owner window so it can answer the intentionally seeded recovery prompt.
+    protected override bool AllowDisabledMainWindowDuringStartup => true;
+
     protected override void BeforeFileManagerStarted()
     {
         targetPath = Workspace.TargetPath("restart-reconciled.txt");

@@ -752,18 +752,29 @@ static BOOL CommitConfigurationTransaction(HKEY storeKey, HKEY generationKey, DW
 {
     DWORD checksum = 2166136261u;
     DWORD complete = 1;
+    // Named fault points make the atomic tail independently testable without inferring its indices from plug-in payload size.
     BOOL committed = MigrateConfigurationSchema(generationKey) &&
                      ValidateCompleteConfigurationSchema(generationKey) &&
                      CalculateConfigurationChecksum(generationKey, checksum) &&
-                     SetValue(generationKey, CONFIGURATION_TRANSACTION_CHECKSUM_REG, REG_DWORD,
-                              &checksum, sizeof(checksum)) &&
-                     SetValue(generationKey, CONFIGURATION_TRANSACTION_COMPLETE_REG, REG_DWORD,
-                              &complete, sizeof(complete)) &&
-                     FlushConfigurationRegistryKey(generationKey) == ERROR_SUCCESS &&
+                     PassConfigurationTransactionFaultPoint(
+                         SetValue(generationKey, CONFIGURATION_TRANSACTION_CHECKSUM_REG, REG_DWORD,
+                                  &checksum, sizeof(checksum)),
+                         "checksum") &&
+                     PassConfigurationTransactionFaultPoint(
+                         SetValue(generationKey, CONFIGURATION_TRANSACTION_COMPLETE_REG, REG_DWORD,
+                                  &complete, sizeof(complete)),
+                         "complete") &&
+                     PassConfigurationTransactionFaultPoint(
+                         FlushConfigurationRegistryKey(generationKey) == ERROR_SUCCESS,
+                         "generation-flush") &&
                      IsCommittedConfigurationGeneration(generationKey) &&
-                     SetValue(storeKey, CONFIGURATION_ACTIVE_GENERATION_REG, REG_DWORD,
-                              &generation, sizeof(generation)) &&
-                     FlushConfigurationRegistryKey(storeKey) == ERROR_SUCCESS;
+                     PassConfigurationTransactionFaultPoint(
+                         SetValue(storeKey, CONFIGURATION_ACTIVE_GENERATION_REG, REG_DWORD,
+                                  &generation, sizeof(generation)),
+                         "selector") &&
+                     PassConfigurationTransactionFaultPoint(
+                         FlushConfigurationRegistryKey(storeKey) == ERROR_SUCCESS,
+                         "store-flush");
     if (committed)
     {
         _snprintf_s(ActiveConfigurationRoot, _TRUNCATE, "%s\\%s\\%s", ConfigurationStoreRoot,

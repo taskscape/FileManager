@@ -17,6 +17,7 @@ static volatile LONG ConfigurationWriteFaultInjectionActive = 0;
 static volatile LONG ConfigurationWriteFaultAfter = 0;
 static volatile LONG ConfigurationWriteCount = 0;
 static std::string ConfigurationWriteFaultReport;
+static std::string ConfigurationWriteFaultPhase;
 
 // Environment variables are external input.  Query their required length first
 // and retain an owned value only when it fits the documented Win32 limit.
@@ -79,6 +80,21 @@ static BOOL IsSandboxedConfigurationFaultTest()
            root == "Software\\Open Salamander\\6.0-filemanager-testdata";
 }
 
+static BOOL IsConfigurationWriteFaultArmed()
+{
+    std::string armFile;
+    EConfigurationFaultEnvironmentResult result =
+        ReadConfigurationFaultEnvironment("FILEMANAGER_CONFIG_FAULT_ARM_FILE", &armFile);
+    if (result == cferNotFound)
+        return TRUE; // retain the original opt-in contract for external test harnesses
+    if (result != cferSuccess || armFile.empty())
+        return FALSE;
+
+    // The UI harness creates this owned marker immediately before its intended commit, excluding plug-in startup saves.
+    DWORD attributes = GetFileAttributesA(armFile.c_str());
+    return attributes != INVALID_FILE_ATTRIBUTES && (attributes & FILE_ATTRIBUTE_DIRECTORY) == 0;
+}
+
 static void RecordConfigurationWrite()
 {
     if (InterlockedCompareExchange(&ConfigurationWriteFaultInjectionActive, 0, 0) == 0)
@@ -95,8 +111,9 @@ void BeginConfigurationWriteFaultInjection()
     InterlockedExchange(&ConfigurationWriteCount, 0);
     InterlockedExchange(&ConfigurationWriteFaultAfter, 0);
     ConfigurationWriteFaultReport.clear();
+    ConfigurationWriteFaultPhase.clear();
 
-    if (!IsSandboxedConfigurationFaultTest())
+    if (!IsSandboxedConfigurationFaultTest() || !IsConfigurationWriteFaultArmed())
         return;
 
     std::string value;
@@ -109,7 +126,18 @@ void BeginConfigurationWriteFaultInjection()
             InterlockedExchange(&ConfigurationWriteFaultAfter, parsed);
     }
     ReadConfigurationFaultEnvironment("FILEMANAGER_CONFIG_FAULT_REPORT", &ConfigurationWriteFaultReport);
+    ReadConfigurationFaultEnvironment("FILEMANAGER_CONFIG_FAULT_PHASE", &ConfigurationWriteFaultPhase);
     InterlockedExchange(&ConfigurationWriteFaultInjectionActive, 1);
+}
+
+BOOL PassConfigurationTransactionFaultPoint(BOOL succeeded, const char* phase)
+{
+    // Named commit phases stay stable when plug-ins add or remove values from the inactive generation snapshot.
+    if (succeeded && phase != NULL &&
+        InterlockedCompareExchange(&ConfigurationWriteFaultInjectionActive, 0, 0) != 0 &&
+        !ConfigurationWriteFaultPhase.empty() && _stricmp(ConfigurationWriteFaultPhase.c_str(), phase) == 0)
+        TerminateProcess(GetCurrentProcess(), CONFIGURATION_WRITE_FAULT_EXIT_CODE);
+    return succeeded;
 }
 
 void EndConfigurationWriteFaultInjection()

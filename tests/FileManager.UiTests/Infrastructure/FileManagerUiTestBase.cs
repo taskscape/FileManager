@@ -17,8 +17,13 @@ public abstract class FileManagerUiTestBase
     protected UIA3Automation Automation { get; private set; } = null!;
     protected Application Application { get; private set; } = null!;
     protected Window MainWindow { get; private set; } = null!;
+    // Cache the native owner while UIA is responsive so restart-heavy fixtures do not query a stale provider later.
+    protected nint NativeMainWindowHandle { get; private set; }
 
     protected virtual string ApplicationArguments => UiTestSettings.Arguments;
+
+    // Recovery fixtures deliberately start behind a modal prompt; ordinary fixtures still require an interactive main window.
+    protected virtual bool AllowDisabledMainWindowDuringStartup => false;
 
     [SetUp]
     public void StartFileManager()
@@ -65,7 +70,15 @@ public abstract class FileManagerUiTestBase
         }
         launchedCrashReporterIds.Clear();
 
-        OnAfterFileManagerStopped();
+        try
+        {
+            OnAfterFileManagerStopped();
+        }
+        finally
+        {
+            // Preserve restart state within one test but always remove its mutations before NUnit starts the next case.
+            UiTestSandbox.Cleanup();
+        }
 
         // Setup can intentionally skip before UIA3 is created when the test sandbox is not configured.
         if (Automation is not null)
@@ -87,7 +100,7 @@ public abstract class FileManagerUiTestBase
 
     protected Window OpenConfigurationDialog()
     {
-        NativeCommands.OpenConfiguration(MainWindow.Properties.NativeWindowHandle.Value);
+        NativeCommands.OpenConfiguration(NativeMainWindowHandle);
         // The localized configuration page keeps the stable property-sheet caption in the English test language.
         return WaitForWindow(window => string.Equals(window.Title, "Configuration", StringComparison.Ordinal));
     }
@@ -138,18 +151,39 @@ public abstract class FileManagerUiTestBase
         var timeout = DateTime.UtcNow + TimeSpan.FromSeconds(10);
         while (DateTime.UtcNow < timeout)
         {
-            using var root = Registry.CurrentUser.OpenSubKey(UiTestSettings.ConfigurationRegistryRoot);
-            if (root?.GetValue("Active Generation") is int generation && generation is >= 0 and <= 1)
-            {
-                using var configuration = root.OpenSubKey($"Configuration Generations\\Generation {generation}\\Configuration");
-                if (configuration?.GetValue("Clear Readonly Attribute") is int value && (value != 0) == expectedValue)
-                    return;
-            }
+            if (TryReadPersistedConfigurationClearReadOnly(out var value) && value == expectedValue)
+                return;
 
             Thread.Sleep(50);
         }
 
         Assert.Fail("The accepted Configuration dialog did not commit its isolated registry generation before restart.");
+    }
+
+    protected bool ReadPersistedConfigurationClearReadOnly()
+    {
+        // Fault-injection trials inspect the active generation directly so opening a read-only dialog cannot trigger unrelated UI lifecycle races.
+        Assert.That(TryReadPersistedConfigurationClearReadOnly(out var value), Is.True,
+                    "The isolated profile does not contain a complete active Configuration generation.");
+        return value;
+    }
+
+    private static bool TryReadPersistedConfigurationClearReadOnly(out bool value)
+    {
+        // A value is usable only when both the generation pointer and its target key are present.
+        using var root = Registry.CurrentUser.OpenSubKey(UiTestSettings.ConfigurationRegistryRoot);
+        if (root?.GetValue("Active Generation") is int generation && generation is >= 0 and <= 1)
+        {
+            using var configuration = root.OpenSubKey($"Configuration Generations\\Generation {generation}\\Configuration");
+            if (configuration?.GetValue("Clear Readonly Attribute") is int persistedValue)
+            {
+                value = persistedValue != 0;
+                return true;
+            }
+        }
+
+        value = default;
+        return false;
     }
 
     protected Window OpenFtpBookmarksDialog()
@@ -307,9 +341,12 @@ public abstract class FileManagerUiTestBase
                 {
                     if (string.Equals(window.Properties.ClassName.ValueOrDefault, "SalamanderMainWindowVer25", StringComparison.Ordinal))
                     {
-                        // Do not return while startup still owns a modal child; every caller expects an interactive main window.
-                        if (window.IsEnabled)
+                        // Ordinary fixtures wait for an interactive owner; recovery fixtures explicitly opt into its disabled state.
+                        if (window.IsEnabled || AllowDisabledMainWindowDuringStartup)
+                        {
+                            NativeMainWindowHandle = window.Properties.NativeWindowHandle.Value;
                             return window;
+                        }
                         continue;
                     }
 
@@ -340,10 +377,24 @@ public abstract class FileManagerUiTestBase
         var timeout = DateTime.UtcNow + TimeSpan.FromSeconds(10);
         while (DateTime.UtcNow < timeout)
         {
-            // Convert native top-level handles back into UIA elements so legacy property sheets remain testable.
-            var dialog = NativeCommands.GetTopLevelWindows(Application.ProcessId)
-                .Select(windowHandle => Automation.FromHandle(windowHandle).AsWindow())
-                .FirstOrDefault(predicate);
+            // Convert handles one at a time because one stale provider must not abort discovery of another live dialog.
+            Window? dialog = null;
+            foreach (var windowHandle in NativeCommands.GetTopLevelWindows(Application.ProcessId))
+            {
+                try
+                {
+                    var candidate = Automation.FromHandle(windowHandle).AsWindow();
+                    if (predicate(candidate))
+                    {
+                        dialog = candidate;
+                        break;
+                    }
+                }
+                catch (Exception ex) when (ex is COMException || ex is TimeoutException)
+                {
+                    // A window can close or stop answering UIA between native enumeration and provider conversion.
+                }
+            }
             if (dialog is not null)
                 return dialog;
 

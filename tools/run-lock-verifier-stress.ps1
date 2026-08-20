@@ -42,6 +42,8 @@ try {
     # The unary comma keeps a single layer as an array; without it, @('Locks')
     # unrolls to a scalar string and @layers splats as the character 'L'.
     $layers = if ($VerifierProfile -eq 'Full') { @('Heaps', 'Handles', 'Locks', 'Exceptions') } else { , @('Locks') }
+    # Define the automatic variable before launching the GUI-subsystem CLI so a non-elevated host reports the real prerequisite error under StrictMode.
+    $global:LASTEXITCODE = $null
     & $AppVerifierPath -enable @layers -for $targetName
     if ($null -eq $LASTEXITCODE) {
         throw "Application Verifier could not be launched to enable $($layers -join ', ') for $targetName (the command did not set an exit code; it may require an elevated console)."

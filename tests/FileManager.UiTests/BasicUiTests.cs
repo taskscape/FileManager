@@ -102,7 +102,8 @@ public sealed class BasicUiTests : FileManagerUiTestBase
 
         RestartFileManager();
         var reloadedDialog = OpenFtpBookmarksDialog();
-        Assert.That(reloadedDialog.FindAllDescendants().Any(element => element.Name == editedBookmarkName), Is.True,
+        // Query the owner-drawn list box directly because UIA does not reliably publish its item descendants.
+        Assert.That(NativeCommands.FtpBookmarksContains(reloadedDialog.Properties.NativeWindowHandle.Value, editedBookmarkName), Is.True,
                     "The created and edited FTP bookmark was not present after restart.");
         CloseFtpBookmarksDialog(reloadedDialog);
     }

@@ -176,7 +176,8 @@ void ParseRecoveryItems(char* content, TDirectArray<CRecoveryItem*>& items)
             {
                 item->Index = atoi(fields[1]);
                 item->Target = _strdup(fields[4]);
-                if (!items.Add(item)) delete item;
+                // TDirectArray::Add returns the inserted index (including zero), so only -1 means ownership was not transferred.
+                if (items.Add(item) == -1) delete item;
             }
         }
         else if (strcmp(fields[0], "TEMP") == 0)
@@ -497,7 +498,8 @@ void COperationJournal::OfferRecovery(HWND parent)
                 if (!IsTerminalJournal(content))
                 {
                     char* copy = _strdup(path);
-                    if (copy != NULL && !journals.Add(copy)) free(copy);
+                    // Preserve the first discovered journal: index zero is a successful insertion, not an allocation failure.
+                    if (copy != NULL && journals.Add(copy) == -1) free(copy);
                 }
                 free(content);
             }

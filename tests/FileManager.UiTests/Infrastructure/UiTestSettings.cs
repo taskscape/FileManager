@@ -62,7 +62,7 @@ internal static class UiTestSettings
     {
         RequireTestSandbox();
         if (!string.Equals(Environment.GetEnvironmentVariable("FILEMANAGER_UI_CONFIG_FAULT_INJECTION"), "1", StringComparison.Ordinal))
-            Assert.Ignore("Set FILEMANAGER_UI_CONFIG_FAULT_INJECTION=1 to run the exhaustive configuration write-boundary recovery test.");
+            Assert.Ignore("Set FILEMANAGER_UI_CONFIG_FAULT_INJECTION=1 to run the structural configuration write-boundary recovery test.");
     }
 
     internal static string RequireCrossVolumeRoot()

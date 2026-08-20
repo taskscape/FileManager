@@ -43,11 +43,6 @@ jobs:
       FILEMANAGER_UI_ISOLATED: '1'
       FILEMANAGER_UI_CONFIG_FAULT_INJECTION: '1'
       FILEMANAGER_UI_RECYCLE_BIN: '1'
-      # Dedicated-volume roots and the runtime FTP command are configured as
-      # repository variables; strict skip handling blocks release if any is absent.
-      FILEMANAGER_UI_CROSS_VOLUME_ROOT: '${{ vars.FILEMANAGER_UI_CROSS_VOLUME_ROOT }}'
-      FILEMANAGER_UI_ADS_UNSUPPORTED_TARGET_ROOT: '${{ vars.FILEMANAGER_UI_ADS_UNSUPPORTED_TARGET_ROOT }}'
-      FILEMANAGER_UI_FTP_ORGANIZE_COMMAND: '${{ vars.FILEMANAGER_UI_FTP_ORGANIZE_COMMAND }}'
 
     steps:
       - name: Checkout complete history
@@ -55,6 +50,11 @@ jobs:
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           fetch-depth: 0
+
+      - name: Provision isolated UI test volumes
+        shell: pwsh
+        # Fresh volumes make cross-volume, ADS-loss, and recycle-bin coverage independent of persistent runner configuration.
+        run: .\tools\manage-ui-test-volumes.ps1 -Action Setup -WorkingDirectory (Join-Path $env:RUNNER_TEMP 'filemanager-ui-volumes') -EnvironmentFile $env:GITHUB_ENV
 
       - name: Setup MSBuild
         uses: microsoft/setup-msbuild@6fb02220983dee41ce7ae257b6f4d8f9bf5ed4ce # v2
@@ -100,6 +100,12 @@ jobs:
         # Keep the strict test invocation as a workflow command so Actions can parse and execute this step.
         run: .\scripts\runtests.ps1 -BaseCommit $env:RELEASE_BASE_COMMIT -SqliteDll $env:SQLITE_TEST_DLL -FailOnSkipped -PlatformToolset v145 -NUnitTrxPath $env:RUNNER_TEMP\runtests-v145.trx
 
+      - name: Remove isolated UI test volumes
+        if: always()
+        shell: pwsh
+        # Always detach owned images so cancelled or failed tests do not affect the next self-hosted job.
+        run: .\tools\manage-ui-test-volumes.ps1 -Action Cleanup -WorkingDirectory (Join-Path $env:RUNNER_TEMP 'filemanager-ui-volumes')
+
       - name: Upload v145 complete UI results
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
@@ -133,9 +139,6 @@ jobs:
       FILEMANAGER_UI_ISOLATED: '1'
       FILEMANAGER_UI_CONFIG_FAULT_INJECTION: '1'
       FILEMANAGER_UI_RECYCLE_BIN: '1'
-      FILEMANAGER_UI_CROSS_VOLUME_ROOT: '${{ vars.FILEMANAGER_UI_CROSS_VOLUME_ROOT }}'
-      FILEMANAGER_UI_ADS_UNSUPPORTED_TARGET_ROOT: '${{ vars.FILEMANAGER_UI_ADS_UNSUPPORTED_TARGET_ROOT }}'
-      FILEMANAGER_UI_FTP_ORGANIZE_COMMAND: '${{ vars.FILEMANAGER_UI_FTP_ORGANIZE_COMMAND }}'
 
     steps:
       - name: Checkout complete history
@@ -143,6 +146,11 @@ jobs:
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           fetch-depth: 0
+
+      - name: Provision isolated UI test volumes
+        shell: pwsh
+        # Recreate rather than reuse the v145 volumes so parity starts from the same clean filesystem state.
+        run: .\tools\manage-ui-test-volumes.ps1 -Action Setup -WorkingDirectory (Join-Path $env:RUNNER_TEMP 'filemanager-ui-volumes') -EnvironmentFile $env:GITHUB_ENV
 
       - name: Setup MSBuild
         uses: microsoft/setup-msbuild@6fb02220983dee41ce7ae257b6f4d8f9bf5ed4ce # v2
@@ -156,6 +164,12 @@ jobs:
         shell: pwsh
         # Keep the v143 verification command explicit so Actions parses this step correctly.
         run: .\scripts\runtests.ps1 -BaseCommit HEAD^ -FailOnSkipped -PlatformToolset v143 -NUnitTrxPath $env:RUNNER_TEMP\runtests-v143.trx
+
+      - name: Remove isolated UI test volumes
+        if: always()
+        shell: pwsh
+        # Parity cleanup owns only the images provisioned in this job's runner-temp leaf.
+        run: .\tools\manage-ui-test-volumes.ps1 -Action Cleanup -WorkingDirectory (Join-Path $env:RUNNER_TEMP 'filemanager-ui-volumes')
 
       - name: Upload v143 complete UI results
         if: always()
