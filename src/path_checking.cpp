@@ -2269,6 +2269,48 @@ BOOL GetFileManagerUiTestDataRoot(char* buf, int bufSize)
     return SUCCEEDED(StringCchCopyA(buf, bufSize, fullPath));
 }
 
+BOOL GetFileManagerUiTestDataRootPath(CPathW& path)
+{
+    DWORD requestedCapacity = GetEnvironmentVariableW(L"FILEMANAGER_UI_TESTDATA_ROOT", NULL, 0);
+    if (requestedCapacity == 0)
+        return FALSE;
+
+    // Query and copy through resizeable storage so the sandbox boundary is not
+    // weakened merely because its absolute path exceeds the legacy limit.
+    WCHAR* requested = path.GetBuffer(requestedCapacity);
+    if (requested == NULL)
+        return FALSE;
+    DWORD requestedLength = GetEnvironmentVariableW(L"FILEMANAGER_UI_TESTDATA_ROOT", requested, requestedCapacity);
+    if (requestedLength == 0 || requestedLength >= requestedCapacity)
+    {
+        path.Clear();
+        return FALSE;
+    }
+    path.ReleaseBuffer((int)requestedLength);
+
+    DWORD fullCapacity = GetFullPathNameW(path.CStr(), 0, NULL, NULL);
+    if (fullCapacity == 0)
+        return FALSE;
+    CPathW fullPath;
+    WCHAR* fullPathBuffer = fullPath.GetBuffer(fullCapacity);
+    if (fullPathBuffer == NULL)
+        return FALSE;
+    DWORD fullLength = GetFullPathNameW(path.CStr(), fullCapacity, fullPathBuffer, NULL);
+    if (fullLength == 0 || fullLength >= fullCapacity)
+        return FALSE;
+    fullPath.ReleaseBuffer((int)fullLength);
+    while (fullPath.GetLength() > 3 &&
+           (fullPath.CStr()[fullPath.GetLength() - 1] == L'\\' ||
+            fullPath.CStr()[fullPath.GetLength() - 1] == L'/'))
+        fullPath.RemoveBackslash();
+
+    const WCHAR* leaf = fullPath.FindFileName();
+    if (leaf == fullPath.CStr() || _wcsicmp(leaf, L"filemanager-testdata") != 0)
+        return FALSE;
+    path = fullPath;
+    return TRUE;
+}
+
 // Records every dialog the application raises while the UI-test sandbox is
 // selected. UI automation can only observe a dialog it manages to poll while
 // that dialog is on screen, so a prompt which appears and closes between polls
@@ -2280,9 +2322,11 @@ void LogUiTestDialog(const char* phase, const char* caption, const char* text, D
     if (!IsFileManagerUiTestSandboxRequested())
         return;
 
-    char root[MAX_PATH];
-    if (!GetFileManagerUiTestDataRoot(root, _countof(root)) ||
-        !SalPathAppend(root, "ui-test-dialogs.log", _countof(root)))
+    // The transcript is diagnostic infrastructure, so use the growable
+    // sandbox adapter rather than reintroducing a fixed path boundary.
+    CPathW logPath;
+    if (!GetFileManagerUiTestDataRootPath(logPath) ||
+        !logPath.Append(L"ui-test-dialogs.log"))
         return;
 
     // Newlines would break the one-record-per-line contract the harness reads.
@@ -2306,13 +2350,52 @@ void LogUiTestDialog(const char* phase, const char* caption, const char* text, D
         return;
 
     // Shared so the harness can read the transcript while a run is still live.
-    HANDLE log = CreateFileA(root, FILE_APPEND_DATA, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL,
+    const WCHAR* logApiPath = logPath.GetPathForWin32Api();
+    if (logApiPath == NULL)
+        return;
+    HANDLE log = CreateFileW(logApiPath, FILE_APPEND_DATA, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL,
                              OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
     if (log == INVALID_HANDLE_VALUE)
         return;
     DWORD written;
     WriteFile(log, line, (DWORD)strlen(line), &written, NULL);
     CloseHandle(log);
+}
+
+void LogUiTestPluginMenuCommand(const char* dllName, int pluginCommand, int salamanderCommand)
+{
+    if (!IsFileManagerUiTestSandboxRequested() || dllName == NULL)
+        return;
+
+    CPathW mapPath;
+    if (!GetFileManagerUiTestDataRootPath(mapPath) ||
+        !mapPath.Append(L"ui-test-plugin-commands.log"))
+        return;
+
+    // Keep the map line-oriented and unambiguous even if a third-party plug-in
+    // uses delimiter characters in its configured DLL path.
+    char safeDllName[512];
+    if (FAILED(StringCchCopyNA(safeDllName, _countof(safeDllName), dllName, _countof(safeDllName) - 1)))
+        return;
+    for (char* scan = safeDllName; *scan != 0; scan++)
+        if (*scan == '|' || *scan == '\r' || *scan == '\n')
+            *scan = '_';
+
+    char line[768];
+    if (FAILED(StringCchPrintfA(line, _countof(line), "%s|%d|%d\r\n",
+                                safeDllName, pluginCommand, salamanderCommand)))
+        return;
+
+    const WCHAR* mapApiPath = mapPath.GetPathForWin32Api();
+    if (mapApiPath == NULL)
+        return;
+    HANDLE map = CreateFileW(mapApiPath, FILE_APPEND_DATA, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL,
+                             OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+    if (map == INVALID_HANDLE_VALUE)
+        return;
+    DWORD written;
+    WriteFile(map, line, (DWORD)strlen(line), &written, NULL);
+    CloseHandle(map);
 }
 
 /// Records a worker-raised operation dialog in the same transcript. Only the

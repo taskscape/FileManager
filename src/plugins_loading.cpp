@@ -3647,6 +3647,9 @@ void CPluginData::AddMenuItemsToSubmenuAux(CMenuPopup* menu, int& i, int count, 
 
                 mi.ID = Plugins.LastSUID;      // another unique number within Salamander (SUID)
                 item->SUID = Plugins.LastSUID; // remember which SUID was assigned
+                // UI tests execute the same owner-drawn menu commands as users;
+                // publish their runtime IDs because no native HMENU exists to inspect.
+                LogUiTestPluginMenuCommand(DLLName, item->ID, item->SUID);
                 if (Plugins.LastSUID < CM_PLUGINCMD_MAX)
                     Plugins.LastSUID++; // generate another SUID
                 else

@@ -949,6 +949,29 @@ void CPlugins::CalculateStateCache()
     //  }
 }
 
+void CPlugins::InitUiTestPluginMenuItems(HWND parent, CMenuPopup* root, const char* dllSuffix)
+{
+    if (root == NULL || dllSuffix == NULL)
+        return;
+
+    // Populate the real root first so the selected plug-in owns the same submenu
+    // object and starts from the same command range as an interactive first open.
+    InitMenuItems(parent, root);
+    int suffixLength = (int)strlen(dllSuffix);
+    for (int i = 0; i < Data.Count; i++)
+    {
+        CPluginData* plugin = Data[i];
+        int dllNameLength = (int)strlen(plugin->DLLName);
+        if (dllNameLength >= suffixLength &&
+            StrNICmp(plugin->DLLName + dllNameLength - suffixLength, dllSuffix, suffixLength) == 0 &&
+            plugin->SubMenu != NULL)
+        {
+            plugin->InitMenuItems(parent, i, plugin->SubMenu);
+            break;
+        }
+    }
+}
+
 void CPlugins::InitSubMenuItems(HWND parent, CMenuPopup* submenu)
 {
     // we check whether they are not entering any of the plug-in's submenus

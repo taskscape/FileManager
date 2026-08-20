@@ -2837,11 +2837,19 @@ static void RemoveCommittedStreamsMissingFromSource(const char* sourceName, cons
         if (SourceHasStream(sourcePathW.CStr(), targetStream.cStreamName))
             continue;
 
-        WCHAR streamPath[3 * MAX_PATH];
-        if (FAILED(StringCchPrintfW(streamPath, _countof(streamPath), L"%s%s",
-                                    targetPathW.CStr(), targetStream.cStreamName)))
+        // An ADS name is a suffix rather than a child path, so append it into
+        // growable storage without inserting a slash and preserve long paths.
+        CPathW streamPath(targetPathW.CStr());
+        size_t targetLength = streamPath.GetLength();
+        size_t streamLength = wcslen(targetStream.cStreamName);
+        WCHAR* streamPathBuffer = streamPath.GetBuffer(targetLength + streamLength + 1);
+        if (streamPathBuffer == NULL)
             continue;
-        if (!DeleteFileW(streamPath))
+        memcpy(streamPathBuffer + targetLength, targetStream.cStreamName,
+               (streamLength + 1) * sizeof(WCHAR));
+        streamPath.ReleaseBuffer((int)(targetLength + streamLength));
+        const WCHAR* streamApiPath = streamPath.GetPathForWin32Api();
+        if (streamApiPath == NULL || !DeleteFileW(streamApiPath))
         {
             DWORD err = GetLastError();
             TRACE_E("RemoveCommittedStreamsMissingFromSource(): unable to remove a stale alternate data stream from "

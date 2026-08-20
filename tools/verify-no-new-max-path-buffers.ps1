@@ -64,9 +64,11 @@ foreach ($line in $diff) {
 }
 
 if ($violations.Count -ne 0) {
-    Write-Error 'New fixed char/WCHAR MAX_PATH buffers are prohibited. Migrate the boundary to CWidePath or a subsystem adapter.'
-    Write-Error 'A temporary exception requires an inline MAX_PATH-RATCHET-EXEMPT ID and a matching reason/removal entry in tools/max-path-buffer-exemptions.md.'
-    $violations | ForEach-Object { Write-Error $_ }
+    # Emit every offending line before the terminating error so CI identifies
+    # the migration sites even under ErrorActionPreference=Stop.
+    $violations | ForEach-Object { Write-Host $_ -ForegroundColor Red }
+    Write-Host 'A temporary exception requires an inline MAX_PATH-RATCHET-EXEMPT ID and a matching reason/removal entry in tools/max-path-buffer-exemptions.md.' -ForegroundColor Red
+    Write-Error 'New fixed char/WCHAR MAX_PATH buffers are prohibited. Migrate the boundary to CWidePath or a subsystem adapter.' -ErrorAction Continue
     exit 1
 }
 

@@ -4283,6 +4283,15 @@ FIND_NEW_SLG_FILE:
                         if (Configuration.ConfigVersion < 45) // zavedeni password manageru
                             Plugins.LoadAll(MainWindow->HWindow);
 
+                        if (IsFileManagerUiTestSandboxRequested())
+                        {
+                            // The UI suite invokes FTP commands directly; eagerly assign
+                            // their otherwise lazy owner-drawn-menu IDs only in its sandbox.
+                            CMenuPopup* pluginsMenu =
+                                (CMenuPopup*)MainMenu.GetSubMenu(CML_PLUGINS, FALSE);
+                            Plugins.InitUiTestPluginMenuItems(MainWindow->HWindow, pluginsMenu, "ftp\\ftp.spl");
+                        }
+
                         // Save into a new generation below the newest version root.
                         SetConfigurationStoreRoot(SalamanderConfigurationRoots[0]);
                         SelectCommittedConfigurationGeneration();

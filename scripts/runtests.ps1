@@ -311,6 +311,29 @@ function Initialize-UiTestSandbox {
     }
     $env:FILEMANAGER_UI_TESTDATA_ROOT = $fullRoot
     $env:FILEMANAGER_UI_CONFIG_ROOT = 'Software\Open Salamander\6.0-filemanager-testdata'
+
+    $ownershipMarker = Join-Path $fullRoot '.filemanager-testdata-owner'
+    $ownershipMarkerContents = 'Open Salamander UI test sandbox'
+    if (Test-Path -LiteralPath $fullRoot -PathType Container) {
+        $entries = @(Get-ChildItem -LiteralPath $fullRoot -Force)
+        if (Test-Path -LiteralPath $ownershipMarker -PathType Leaf) {
+            if ([IO.File]::ReadAllText($ownershipMarker) -cne $ownershipMarkerContents) {
+                throw "Refusing to reuse an unowned UI test data directory '$fullRoot'."
+            }
+        }
+        elseif ($entries.Count -ne 0) {
+            throw "Refusing to reuse an unowned UI test data directory '$fullRoot'."
+        }
+    }
+    else {
+        New-Item -ItemType Directory -Path $fullRoot | Out-Null
+    }
+
+    # Command discovery runs before NUnit creates its sandbox, so establish the
+    # same ownership contract now and let NUnit reparse-safely reset it later.
+    [IO.File]::WriteAllText($ownershipMarker, $ownershipMarkerContents)
+    New-Item -ItemType Directory -Path (Join-Path $fullRoot 'temp') -Force | Out-Null
+    New-Item -ItemType Directory -Path (Join-Path $fullRoot 'appdata') -Force | Out-Null
 }
 
 function Assert-UiTestSymbolicLinkSupport {
@@ -350,6 +373,9 @@ function Resolve-FtpMenuCommand {
         [string]$ExecutablePath,
 
         [Parameter(Mandatory = $true)]
+        [int]$PluginCommand,
+
+        [Parameter(Mandatory = $true)]
         [string]$Caption
     )
 
@@ -361,83 +387,145 @@ using System.Runtime.InteropServices;
 namespace FileManager {
     public static class NativeMenuProbe {
         [DllImport("user32.dll", CharSet = CharSet.Unicode)]
-        public static extern IntPtr GetMenu(IntPtr hWnd);
-
-        [DllImport("user32.dll")]
-        public static extern int GetMenuItemCount(IntPtr hMenu);
-
-        [DllImport("user32.dll")]
-        public static extern IntPtr GetSubMenu(IntPtr hMenu, int nPos);
+        public static extern int GetWindowText(IntPtr hWnd, char[] lpString, int cchMax);
 
         [DllImport("user32.dll", CharSet = CharSet.Unicode)]
-        public static extern int GetMenuString(IntPtr hMenu, uint uIDItem, char[] lpString, int cchMax, uint flags);
+        public static extern int GetClassName(IntPtr hWnd, char[] lpClassName, int nMaxCount);
 
         [DllImport("user32.dll")]
-        public static extern uint GetMenuItemID(IntPtr hMenu, int nPos);
+        public static extern IntPtr GetDlgItem(IntPtr hDlg, int nIDDlgItem);
+
+        [DllImport("user32.dll")]
+        public static extern bool PostMessage(IntPtr hWnd, uint message, IntPtr wParam, IntPtr lParam);
     }
 }
 '@
     }
 
-    # Inspect the menu from this freshly built executable; plug-in SUIDs change
-    # with load order, so a workflow or caller cannot safely supply this value.
-    # The legacy host creates its native menu only for a normal interactive window;
-    # a hidden launch makes the menu probe falsely classify an available UI runner as unsupported.
+    $getWindowText = {
+        param([IntPtr]$window)
+        $buffer = New-Object char[] 512
+        [void][FileManager.NativeMenuProbe]::GetWindowText($window, $buffer, $buffer.Length)
+        return (-join $buffer).Trim([char]0)
+    }
+
+    $getWindowClass = {
+        param([IntPtr]$window)
+        $buffer = New-Object char[] 128
+        [void][FileManager.NativeMenuProbe]::GetClassName($window, $buffer, $buffer.Length)
+        return (-join $buffer).Trim([char]0)
+    }
+
+    $acknowledgedWindows = [System.Collections.Generic.HashSet[long]]::new()
+    $acknowledgeKnownStartupDialog = {
+        param([IntPtr]$window)
+        if (-not $acknowledgedWindows.Add($window.ToInt64())) {
+            return $false
+        }
+
+        $title = & $getWindowText $window
+        $accept = $false
+        $buttonId = 1
+        if ($title -eq 'Open Salamander') {
+            $prompt = [FileManager.NativeMenuProbe]::GetDlgItem($window, 1150)
+            $accept = $prompt -ne [IntPtr]::Zero -and
+                      (& $getWindowText $prompt) -eq 'Select one of the installed languages.'
+        }
+        elseif ($title -eq 'Open Salamander Configuration') {
+            # A previously interrupted disposable-profile write can raise this
+            # warning before the main window; accepting it uses the verified fallback.
+            $accept = $true
+        }
+        elseif ($title -eq 'Check for New Versions') {
+            # A fresh profile opens the optional update plug-in after loading;
+            # close it so command discovery can observe the host's main menu.
+            $accept = $true
+            $buttonId = 2
+        }
+
+        if (-not $accept) {
+            return $false
+        }
+        $okButton = [FileManager.NativeMenuProbe]::GetDlgItem($window, $buttonId)
+        if ($okButton -eq [IntPtr]::Zero) {
+            return $false
+        }
+        # Post rather than send because accepting a startup dialog continues
+        # initialization synchronously and may create another modal window.
+        return [FileManager.NativeMenuProbe]::PostMessage($okButton, 0x00F5, [IntPtr]::Zero, [IntPtr]::Zero)
+    }
+
+    $commandMap = Join-Path $env:FILEMANAGER_UI_TESTDATA_ROOT 'ui-test-plugin-commands.log'
+    if (Test-Path -LiteralPath $commandMap -PathType Leaf) {
+        # This exact file is below the verified owned root and stale IDs must not
+        # be mistaken for commands emitted by the executable being tested.
+        Remove-Item -LiteralPath $commandMap -Force
+    }
+
+    # Plug-in SUIDs change with load order. The owner-drawn menu has no HMENU,
+    # so read the map emitted while this freshly built executable constructs it.
     $process = Start-Process -FilePath $ExecutablePath -PassThru
+    $mainWindow = [IntPtr]::Zero
     try {
-        $deadline = [DateTime]::UtcNow.AddSeconds(20)
+        $deadline = [DateTime]::UtcNow.AddSeconds(60)
+        $command = $null
+        $lastWindowTitle = ''
         do {
             $process.Refresh()
+            if ($process.HasExited) {
+                throw "The built FileManager executable exited with code $($process.ExitCode) during FTP command discovery."
+            }
             if ($process.MainWindowHandle -ne [IntPtr]::Zero) {
+                $lastWindowTitle = & $getWindowText $process.MainWindowHandle
+                if ((& $getWindowClass $process.MainWindowHandle) -eq 'SalamanderMainWindowVer25') {
+                    $mainWindow = $process.MainWindowHandle
+                }
+                else {
+                    [void](& $acknowledgeKnownStartupDialog $process.MainWindowHandle)
+                }
+            }
+
+            if (Test-Path -LiteralPath $commandMap -PathType Leaf) {
+                foreach ($line in @(Get-Content -LiteralPath $commandMap -ErrorAction SilentlyContinue)) {
+                    $fields = $line -split '\|', 3
+                    $parsedPluginCommand = 0
+                    $parsedSalamanderCommand = 0
+                    if ($fields.Count -eq 3 -and
+                        [IO.Path]::GetFileName($fields[0]) -ieq 'ftp.spl' -and
+                        [int]::TryParse($fields[1], [ref]$parsedPluginCommand) -and
+                        $parsedPluginCommand -eq $PluginCommand -and
+                        [int]::TryParse($fields[2], [ref]$parsedSalamanderCommand) -and
+                        $parsedSalamanderCommand -gt 0) {
+                        $command = $parsedSalamanderCommand
+                    }
+                }
+            }
+            if ($mainWindow -ne [IntPtr]::Zero -and $null -ne $command) {
                 break
             }
             Start-Sleep -Milliseconds 100
         } while ([DateTime]::UtcNow -lt $deadline)
 
-        if ($process.MainWindowHandle -eq [IntPtr]::Zero) {
-            throw 'The built FileManager executable did not expose a main window for FTP command discovery.'
+        if ($mainWindow -eq [IntPtr]::Zero) {
+            throw "The built FileManager executable did not expose its main window for FTP command discovery. Last startup window: '$lastWindowTitle'."
         }
-
-        $rootMenu = [FileManager.NativeMenuProbe]::GetMenu($process.MainWindowHandle)
-        if ($rootMenu -eq [IntPtr]::Zero) {
-            throw 'The built FileManager executable did not expose a native menu for FTP command discovery.'
-        }
-
-        $findCommand = $null
-        $findCommand = {
-            param([IntPtr]$menu)
-            for ($index = 0; $index -lt [FileManager.NativeMenuProbe]::GetMenuItemCount($menu); $index++) {
-                $captionBuffer = New-Object char[] 512
-                [void][FileManager.NativeMenuProbe]::GetMenuString($menu, [uint32]$index, $captionBuffer, $captionBuffer.Length, 0x400)
-                $caption = -join $captionBuffer
-                $caption = $caption.Trim([char]0).Replace('&', '').Split("`t")[0]
-                if ($caption -eq $Caption) {
-                    $command = [FileManager.NativeMenuProbe]::GetMenuItemID($menu, $index)
-                    if ($command -ne [uint32]::MaxValue) {
-                        return [int]$command
-                    }
-                }
-
-                $submenu = [FileManager.NativeMenuProbe]::GetSubMenu($menu, $index)
-                if ($submenu -ne [IntPtr]::Zero) {
-                    $command = & $findCommand $submenu
-                    if ($null -ne $command) {
-                        return $command
-                    }
-                }
-            }
-        }
-
-        $command = & $findCommand $rootMenu
-        if ($null -eq $command -or $command -le 0) {
-            throw "The built FileManager menu does not contain the FTP Client $Caption command."
+        if ($null -eq $command) {
+            throw "The built FileManager executable did not publish the FTP Client $Caption command ($PluginCommand)."
         }
 
         return $command
     }
     finally {
         if (-not $process.HasExited) {
-            Stop-Process -Id $process.Id -Force
+            if ($mainWindow -ne [IntPtr]::Zero) {
+                # A normal close lets the disposable profile finish startup
+                # persistence; force remains a bounded fallback for hung builds.
+                [void][FileManager.NativeMenuProbe]::PostMessage($mainWindow, 0x0010, [IntPtr]::Zero, [IntPtr]::Zero)
+                [void]$process.WaitForExit(10000)
+            }
+            if (-not $process.HasExited) {
+                Stop-Process -Id $process.Id -Force
+            }
         }
         $process.Dispose()
     }
@@ -469,11 +557,11 @@ function Set-UiTestEnvironment {
 
     if ([string]::IsNullOrWhiteSpace($env:FILEMANAGER_UI_FTP_ORGANIZE_COMMAND)) {
         # Resolve dynamic plug-in commands from this build rather than assuming a load-order-dependent SUID.
-        $env:FILEMANAGER_UI_FTP_ORGANIZE_COMMAND = Resolve-FtpMenuCommand -ExecutablePath $ExecutablePath -Caption 'Organize Bookmarks...'
+        $env:FILEMANAGER_UI_FTP_ORGANIZE_COMMAND = Resolve-FtpMenuCommand -ExecutablePath $ExecutablePath -PluginCommand 7 -Caption 'Organize Bookmarks...'
     }
     if ([string]::IsNullOrWhiteSpace($env:FILEMANAGER_UI_FTP_CONNECT_COMMAND)) {
         # The protocol fixture drives the actual quick-connect dialog through the same runtime menu surface as a user.
-        $env:FILEMANAGER_UI_FTP_CONNECT_COMMAND = Resolve-FtpMenuCommand -ExecutablePath $ExecutablePath -Caption 'Connect to FTP Server...'
+        $env:FILEMANAGER_UI_FTP_CONNECT_COMMAND = Resolve-FtpMenuCommand -ExecutablePath $ExecutablePath -PluginCommand 1 -Caption 'Connect to FTP Server...'
     }
 }
 

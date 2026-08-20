@@ -3216,6 +3216,10 @@ public:
     // 'parent' is the parent message box window, 'root' is the Plugins menu
     void InitMenuItems(HWND parent, CMenuPopup* root);
 
+    // Test automation sends commands without opening the lazy owner-drawn menu first;
+    // initialize one plug-in deterministically so its published SUID is executable.
+    void InitUiTestPluginMenuItems(HWND parent, CMenuPopup* root, const char* dllSuffix);
+
     // handles WM_USER_INITMENUPOPUP for individual plugin submenus from the Plugins menu
     // 'parent' is the parent window for message boxes, 'submenu' is the specific plugin menu
     void InitSubMenuItems(HWND parent, CMenuPopup* submenu);
