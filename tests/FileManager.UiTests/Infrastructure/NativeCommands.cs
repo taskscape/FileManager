@@ -18,6 +18,8 @@ internal static class NativeCommands
     internal const int ViewFile = 742;
     internal const int EditFile = 743;
     internal const int RenameFile = 754;
+    // CM_ACTIVEREFRESH synchronously refreshes the active file panel before a test quick-searches newly created files.
+    internal const int RefreshActivePanel = 740;
     private const uint WmCommand = 0x0111;
     private const uint WmChar = 0x0102;
     private const uint WmKeyDown = 0x0100;
@@ -401,6 +403,12 @@ internal static class NativeCommands
         // Posting lets the test observe a modal operation dialog after the user-equivalent panel activation instead of blocking in its handler.
         if (!PostMessage(windowHandle, WmCommand, command, 0))
             throw new InvalidOperationException($"Could not post native command {command}.");
+    }
+
+    internal static void RefreshActiveFilePanel(nint windowHandle)
+    {
+        // Refresh is non-modal, so send it synchronously to guarantee the panel has enumerated externally-created test files.
+        SendMessage(windowHandle, WmCommand, RefreshActivePanel, 0);
     }
 
     internal static void QuickSearch(nint listHandle, string name)

@@ -249,6 +249,7 @@ public sealed class FileOperationUiTests : FileOperationUiTestBase
         var longSourceIdentity = FileIdentity.Capture(longSource);
         Assert.That(firstSourceIdentity, Is.Not.EqualTo(secondSourceIdentity));
 
+        RefreshSourcePanel();
         // Select through unique ASCII prefixes because the legacy panel's WM_CHAR quick-search path is itself ANSI.
         SelectSourceItem("first-unicode-");
         ExecuteWithPath(NativeCommands.CopyFiles, string.Empty, Workspace.TargetDirectory, commit: true);

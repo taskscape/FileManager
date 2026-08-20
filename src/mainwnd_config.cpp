@@ -2879,9 +2879,11 @@ void CMainWindow::SaveConfig(HWND parent)
     EndConfigurationWriteFaultInjection();
     if (ConfigSaveQueued && !CriticalShutdown)
     {
-        // A later commit arrived while this save yielded to the UI, so debounce one follow-up snapshot.
+        // A later commit arrived while this save yielded to the UI.  Flush that
+        // complete follow-up snapshot before returning so a committed plug-in
+        // edit cannot be lost if the process is terminated immediately after it.
         ConfigSaveQueued = FALSE;
-        ScheduleConfigSave();
+        SaveConfig(parent);
     }
 }
 

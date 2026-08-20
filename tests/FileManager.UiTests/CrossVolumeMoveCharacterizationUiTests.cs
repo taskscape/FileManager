@@ -18,6 +18,8 @@ public sealed class CrossVolumeMoveCharacterizationUiTests : FileOperationUiTest
                     "The cross-volume fixture must use different source and target volumes.");
 
         ExecuteWithPath(NativeCommands.MoveFiles, "move-tree", Workspace.TargetDirectory, commit: true);
+        // Cross-volume copies cannot preserve every timestamp, so acknowledge the explicit gate before expecting source deletion.
+        ChooseOperationPrompt(WaitForOperationPrompt(6), 6); // IDYES
 
         var targetPayload = Workspace.TargetPath("move-tree\\nested\\payload.txt");
         WaitForFileSystem(() => File.Exists(targetPayload), "Cross-volume move did not create the complete target tree.");
@@ -46,6 +48,8 @@ public sealed class CrossVolumeMoveCharacterizationUiTests : FileOperationUiTest
         AlternateDataStreams.Write(source, "second", "second-cross-volume-stream"u8.ToArray());
 
         ExecuteWithPath(NativeCommands.MoveFiles, "ads-cross-volume.txt", Workspace.TargetDirectory, commit: true);
+        // ADS survives on the NTFS target, but the cross-volume metadata gate still protects source deletion.
+        ChooseOperationPrompt(WaitForOperationPrompt(6), 6); // IDYES
 
         WaitForFileSystem(() => File.Exists(target), "Cross-volume move did not create the ADS test target.");
         Assert.Multiple(() =>

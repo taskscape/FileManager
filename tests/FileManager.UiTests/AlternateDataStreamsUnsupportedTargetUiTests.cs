@@ -26,7 +26,9 @@ public sealed class AlternateDataStreamsUnsupportedTargetUiTests : FileOperation
         AlternateDataStreams.Write(source, "must-not-silently-disappear", "source-stream-content"u8.ToArray());
 
         ExecuteWithPath(NativeCommands.MoveFiles, "ads-unsupported-target.txt", Workspace.TargetDirectory, commit: true);
-        ChooseOperationPrompt(WaitForOperationPrompt(7), 7); // IDNO: retain the source when ADS loss is reported
+        // The custom ADS dialog has Yes/All/Skip choices, then the standard metadata gate decides whether the move removes its source.
+        ChooseOperationPrompt(WaitForOperationPrompt(6), 6); // IDYES: copy the default stream while discarding unsupported ADS.
+        ChooseOperationPrompt(WaitForOperationPrompt(7), 7); // IDNO: retain the source after the metadata-loss warning.
 
         WaitForFileSystem(() => File.Exists(target), "The unsupported target did not receive the default data stream.");
         Assert.Multiple(() =>

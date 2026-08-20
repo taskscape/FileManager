@@ -102,6 +102,14 @@ public abstract class FileOperationUiTestBase : FileManagerUiTestBase
         NativeCommands.QuickSearch(list.Properties.NativeWindowHandle.Value, name);
     }
 
+    protected void RefreshSourcePanel()
+    {
+        var list = FindSourceList();
+        NativeCommands.ActivateFilePanel(list.Properties.NativeWindowHandle.Value);
+        // The test creates this fixture's Unicode files after startup, so force the owner-drawn panel to enumerate them before selection.
+        NativeCommands.RefreshActiveFilePanel(MainWindow.Properties.NativeWindowHandle.Value);
+    }
+
     protected void SelectSourceItems(params string[] names)
     {
         // Explicit Insert selection exercises commands over mixed and multiple items instead of only the focused fallback.
