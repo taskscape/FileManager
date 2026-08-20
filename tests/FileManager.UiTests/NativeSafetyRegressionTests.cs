@@ -1872,12 +1872,13 @@ public sealed class NativeSafetyRegressionTests
         var basicUiTests = File.ReadAllText(Path.Combine(root, "tests", "FileManager.UiTests", "BasicUiTests.cs"));
         var nativeCommands = File.ReadAllText(Path.Combine(root, "tests", "FileManager.UiTests", "Infrastructure", "NativeCommands.cs"));
 
-        // An ANSI list box misreads a SendMessageW string at its first UTF-16 terminator, hiding persisted bookmarks.
+        // An ANSI list box misreads a SendMessageW string at its first UTF-16 terminator, and a forced restart must wait for the committed generation.
         Assert.Multiple(() =>
         {
             Assert.That(nativeCommands, Does.Contain("EntryPoint = \"SendMessageA\""));
             Assert.That(nativeCommands, Does.Contain("SendMessageAnsiText(listHandle, LbFindStringExact"));
             Assert.That(basicUiTests, Does.Contain("WaitForFtpBookmark(bookmarksDialog"));
+            Assert.That(basicUiTests, Does.Contain("WaitForFtpBookmarkPersistence(editedBookmarkName)"));
             Assert.That(basicUiTests, Does.Contain("WaitForFtpBookmark(reloadedDialog"));
         });
     }

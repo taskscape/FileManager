@@ -33,6 +33,13 @@ public abstract class FileOperationUiTestBase : FileManagerUiTestBase
         // Fixtures that deliberately seed a journal override this without
         // calling base, so their own recovery scenario still runs.
         PurgeStaleOperationJournals();
+        // Create scenario-specific inputs before FileManager enumerates its panels;
+        // post-start files can be absent from the legacy owner-drawn list on CI.
+        SeedWorkspaceBeforeFileManagerStart(Workspace);
+    }
+
+    protected virtual void SeedWorkspaceBeforeFileManagerStart(FileOperationWorkspace workspace)
+    {
     }
 
     /// <summary>
@@ -106,7 +113,7 @@ public abstract class FileOperationUiTestBase : FileManagerUiTestBase
     {
         var list = FindSourceList();
         NativeCommands.ActivateFilePanel(list.Properties.NativeWindowHandle.Value);
-        // The test creates this fixture's Unicode files after startup, so force the owner-drawn panel to enumerate them before selection.
+        // Refresh the source panel after a test has changed its fixture on disk.
         NativeCommands.RefreshActiveFilePanel(MainWindow.Properties.NativeWindowHandle.Value);
     }
 
@@ -520,11 +527,38 @@ public sealed class FileOperationWorkspace : IDisposable
             var retrySource = SourcePath("ads-retry.txt");
             File.WriteAllText(retrySource, "ads-retry-default-content");
             AlternateDataStreams.Write(retrySource, "temporarily-denied", "retry-stream-content"u8.ToArray());
+
+            // The unsupported-volume move case must be visible in the panel before
+            // it opens, otherwise its quick-search can select a seeded collision file.
+            var unsupportedTargetSource = SourcePath("ads-unsupported-target.txt");
+            File.WriteAllText(unsupportedTargetSource, "ads-unsupported-default-content");
+            AlternateDataStreams.Write(unsupportedTargetSource, "must-not-silently-disappear", "source-stream-content"u8.ToArray());
         }
         catch (IOException)
         {
             // The volume does not support streams; the affected cases skip themselves.
         }
+    }
+
+    /// <summary>Creates the ANSI-round-trippable file identities before panel enumeration.</summary>
+    public void SeedAnsiRoundTrippableUnicodeAndLongPathFixtures()
+    {
+        const string treeName = "unicode-long-tree";
+        const string longSegment = "long-unicode-\u00e9-segment-123456789012345678901234567890";
+        const string payloadName = "payload-\u00e9.txt";
+        const int productPathMaximumLength = 247;
+        var longPathBase = Path.Combine(TargetDirectory, treeName);
+        var remainingPathLength = productPathMaximumLength - longPathBase.Length - payloadName.Length - 1;
+        var longSegmentCount = Math.Max(1, remainingPathLength / (longSegment.Length + 1));
+        var longRelativePath = string.Join(Path.DirectorySeparatorChar.ToString(),
+            Enumerable.Repeat(longSegment, longSegmentCount));
+        var longSource = SourcePath(Path.Combine(treeName, longRelativePath, payloadName));
+
+        // Seed all names before launch so the legacy panel cannot race the filesystem watcher.
+        File.WriteAllText(SourcePath("first-unicode-\u00e9.txt"), "first-unicode-content");
+        File.WriteAllText(SourcePath("second-unicode-\u00f6.txt"), "second-unicode-content");
+        Directory.CreateDirectory(Path.GetDirectoryName(longSource)!);
+        File.WriteAllText(longSource, "long-unicode-content");
     }
 
     /// <summary>Deterministic multi-megabyte stream payload shared with the tests.</summary>

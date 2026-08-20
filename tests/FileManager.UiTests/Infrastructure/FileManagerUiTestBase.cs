@@ -160,6 +160,20 @@ public abstract class FileManagerUiTestBase
         Assert.Fail("The accepted Configuration dialog did not commit its isolated registry generation before restart.");
     }
 
+    protected void WaitForFtpBookmarkPersistence(string bookmarkName)
+    {
+        var timeout = DateTime.UtcNow + TimeSpan.FromSeconds(10);
+        while (DateTime.UtcNow < timeout)
+        {
+            if (TryFindPersistedFtpBookmark(bookmarkName))
+                return;
+
+            Thread.Sleep(50);
+        }
+
+        Assert.Fail("The accepted FTP organizer did not commit its bookmark to the isolated registry generation before restart.");
+    }
+
     protected bool ReadPersistedConfigurationClearReadOnly()
     {
         // Fault-injection trials inspect the active generation directly so opening a read-only dialog cannot trigger unrelated UI lifecycle races.
@@ -183,6 +197,28 @@ public abstract class FileManagerUiTestBase
         }
 
         value = default;
+        return false;
+    }
+
+    private static bool TryFindPersistedFtpBookmark(string bookmarkName)
+    {
+        // Inspect the committed generation, not the live plug-in list, so a forced
+        // restart cannot hide a queued host transaction behind an open dialog state.
+        using var root = Registry.CurrentUser.OpenSubKey(UiTestSettings.ConfigurationRegistryRoot);
+        if (root?.GetValue("Active Generation") is not int generation || generation is < 0 or > 1)
+            return false;
+
+        using var bookmarks = root.OpenSubKey($"Configuration Generations\\Generation {generation}\\Plugins Configuration\\FTP\\Bookmarks");
+        if (bookmarks is null)
+            return false;
+
+        foreach (var bookmarkKeyName in bookmarks.GetSubKeyNames())
+        {
+            using var bookmark = bookmarks.OpenSubKey(bookmarkKeyName);
+            if (string.Equals(bookmark?.GetValue("Name") as string, bookmarkName, StringComparison.Ordinal))
+                return true;
+        }
+
         return false;
     }
 

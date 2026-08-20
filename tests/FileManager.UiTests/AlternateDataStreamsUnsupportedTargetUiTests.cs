@@ -20,10 +20,10 @@ public sealed class AlternateDataStreamsUnsupportedTargetUiTests : FileOperation
         AlternateDataStreams.RequireSupportAt(Workspace.SourceDirectory);
         AlternateDataStreams.RequireUnsupportedAt(Workspace.TargetDirectory);
 
+        // This ADS-bearing input is seeded before startup so quick-search cannot
+        // select an earlier collision fixture while the source panel is stale.
         var source = Workspace.SourcePath("ads-unsupported-target.txt");
         var target = Workspace.TargetPath("ads-unsupported-target.txt");
-        File.WriteAllText(source, "ads-unsupported-default-content");
-        AlternateDataStreams.Write(source, "must-not-silently-disappear", "source-stream-content"u8.ToArray());
 
         ExecuteWithPath(NativeCommands.MoveFiles, "ads-unsupported-target.txt", Workspace.TargetDirectory, commit: true);
         // The custom ADS dialog has Yes/All/Skip choices, then the standard metadata gate decides whether the move removes its source.

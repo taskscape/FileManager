@@ -102,6 +102,9 @@ public sealed class BasicUiTests : FileManagerUiTestBase
         WaitForFtpBookmark(bookmarksDialog, editedBookmarkName,
                            "The FTP organizer did not retain the created and edited bookmark before restart.");
         CloseFtpBookmarksDialog(bookmarksDialog);
+        // The organizer can close while a prior host save is still finishing; wait
+        // for its transaction commit before simulating the abrupt restart.
+        WaitForFtpBookmarkPersistence(editedBookmarkName);
 
         RestartFileManager();
         var reloadedDialog = OpenFtpBookmarksDialog();

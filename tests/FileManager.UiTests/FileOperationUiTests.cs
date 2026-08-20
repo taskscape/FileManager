@@ -8,6 +8,13 @@ namespace FileManager.UiTests;
 [TestFixture]
 public sealed class FileOperationUiTests : FileOperationUiTestBase
 {
+    protected override void SeedWorkspaceBeforeFileManagerStart(FileOperationWorkspace workspace)
+    {
+        // This fixture selects Unicode inputs by native quick-search, which only
+        // sees files enumerated before FileManager finishes opening its panel.
+        workspace.SeedAnsiRoundTrippableUnicodeAndLongPathFixtures();
+    }
+
     [Test]
     public void Create_directory_creates_requested_nested_directory()
     {
@@ -236,13 +243,9 @@ public sealed class FileOperationUiTests : FileOperationUiTestBase
             Enumerable.Repeat(longSegment, longSegmentCount));
 
         // File identities keep the two non-ASCII entries distinct independently of display-text comparisons.
-        File.WriteAllText(Workspace.SourcePath(firstUnicodeName), "first-unicode-content");
-        File.WriteAllText(Workspace.SourcePath(secondUnicodeName), "second-unicode-content");
         var longSource = Workspace.SourcePath(Path.Combine(treeName, longRelativePath, payloadName));
         // Keep the exact source name within the ANSI product boundary before opening the native copy dialog.
         Assert.That(longSource.Length, Is.LessThanOrEqualTo(productPathMaximumLength));
-        Directory.CreateDirectory(Path.GetDirectoryName(longSource)!);
-        File.WriteAllText(longSource, "long-unicode-content");
         // File IDs prove that native operations do not collapse the distinct non-ASCII entries.
         var firstSourceIdentity = FileIdentity.Capture(Workspace.SourcePath(firstUnicodeName));
         var secondSourceIdentity = FileIdentity.Capture(Workspace.SourcePath(secondUnicodeName));
