@@ -19,4 +19,13 @@
       <PrivateAssets>all</PrivateAssets>
     </PackageReference>
   </ItemGroup>
+
+  <ItemGroup>
+    <!-- Built alongside the lane so the Edit case can copy a harness-owned
+         editor into its disposable sandbox instead of driving whatever editor
+         the current user has installed and running. -->
+    <ProjectReference Include="..\FileManager.UiTests.EditorStub\FileManager.UiTests.EditorStub.csproj"
+                      ReferenceOutputAssembly="false"
+                      Private="false" />
+  </ItemGroup>
 </Project>

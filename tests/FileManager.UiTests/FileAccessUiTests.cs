@@ -52,14 +52,33 @@ public sealed class FileAccessUiTests : FileOperationUiTestBase
     [Test]
     public void Edit_file_opens_the_selected_file_in_the_configured_editor()
     {
-        // The default editor is out of process, so the opened file name in its window proves the edit dispatch reached it.
+        // Point the disposable profile at the harness-owned editor before the
+        // dispatch. The seeded product default is notepad.exe, and Windows 11's
+        // packaged Notepad opens files as tabs in one shared window, so the
+        // original assertion could inspect - and then close - a window holding
+        // the current user's unsaved documents. The change goes through the real
+        // Configuration page because a committed profile is checksum-protected.
+        var (command, arguments, initialDirectory) = SandboxEditor.ProfileEntry();
+        var configuration = OpenConfigurationDialog();
+        Assert.That(ConfigurationDialogPages.RewriteSelectedEditor(
+                        configuration.Properties.NativeWindowHandle.Value,
+                        SandboxEditor.SeededCommand, command, arguments, initialDirectory),
+                    Is.True, "The Configuration dialog did not accept the sandbox editor entry.");
+        CloseConfigurationDialog(configuration, commit: true);
+        SandboxEditor.WaitForProfileEntry(command);
+        RestartFileManager();
+
+        // The editor is out of process, so the opened file name in its window proves the edit dispatch reached it.
         SelectSourceItem("edit-file.txt");
         NativeCommands.Execute(MainWindow.Properties.NativeWindowHandle.Value, NativeCommands.EditFile);
 
+        var expectedTitle = SandboxEditor.WindowTitlePrefix + "edit-file.txt";
         var editor = WaitForDesktopWindow(window =>
                 window.Properties.ProcessId.ValueOrDefault != Application.ProcessId &&
-                window.Properties.Name.ValueOrDefault?.Contains("edit-file.txt", StringComparison.OrdinalIgnoreCase) == true,
-            "Configured editor did not open the selected file.");
+                string.Equals(window.Properties.Name.ValueOrDefault, expectedTitle, StringComparison.Ordinal),
+            $"Configured editor did not open the selected file in a window titled '{expectedTitle}'.");
+        // Only a window this lane owns is ever closed: the title is exact and the
+        // stub creates one process and one window per Edit dispatch.
         editor.Close();
         WaitForWindowToClose(editor);
     }

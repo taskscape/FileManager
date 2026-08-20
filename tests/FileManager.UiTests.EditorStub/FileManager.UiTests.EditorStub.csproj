@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <!-- A GUI subsystem app so the UI lane never drives a console host: Windows
+         Terminal is the default console delegate and shares one tabbed window
+         between launches, which is exactly the shared-instance hazard this stub
+         exists to avoid. -->
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <UseWindowsForms>true</UseWindowsForms>
+    <IsPackable>false</IsPackable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <AssemblyName>SandboxEditor</AssemblyName>
+    <RootNamespace>FileManager.UiTests.EditorStub</RootNamespace>
+    <!-- The UI lane copies this whole output directory into the disposable
+         test-data root, so keep satellite files to a minimum. -->
+    <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
+  </PropertyGroup>
+</Project>

@@ -2499,6 +2499,10 @@ BOOL GetOurPathInRoamingAPPDATA(char* buf);
 // UI automation may redirect its application data only into a deliberately named disposable tree.
 BOOL IsFileManagerUiTestSandboxRequested();
 BOOL GetFileManagerUiTestDataRoot(char* buf, int bufSize);
+// Appends one record per dialog to the UI-test data root while that sandbox is
+// selected; a no-op otherwise. 'phase' is SHOW or RESULT.
+void LogUiTestDialog(const char* phase, const char* caption, const char* text, DWORD flags, int result);
+void LogUiTestOperationDialog(const char* phase, int kind, char** data, int result);
 
 // creates "Open Salamander" directory on path CSIDL_APPDATA; returns TRUE if path
 // fits in MAX_PATH (its existence is not guaranteed, CreateDirectory result is not checked);

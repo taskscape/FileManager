@@ -50,3 +50,4 @@ Installer/Installer_Staging
 tmp/pe-manifest-Release.json
 TestResults/application-verifier-logs
 errors.txt
+tests/FileManager.UiTests.EditorStub/obj

@@ -290,7 +290,11 @@ public abstract class FileManagerUiTestBase
 
     private Window WaitForNativeMainWindow()
     {
-        var timeout = DateTime.UtcNow + TimeSpan.FromSeconds(20);
+        // The first start against a fresh profile auto-installs every bundled
+        // plug-in before the main window becomes usable, which can take far longer
+        // than a warm start. Twenty seconds turned that into an intermittent
+        // "did not expose its main window" failure on the first case of a run.
+        var timeout = DateTime.UtcNow + TimeSpan.FromSeconds(60);
         while (DateTime.UtcNow < timeout)
         {
             // UIA's application view can omit a modal Win32 error window, so acknowledge the known open-source plug-in notice natively.
@@ -346,7 +350,11 @@ public abstract class FileManagerUiTestBase
             Thread.Sleep(100);
         }
 
-        Assert.Fail("Timed out waiting for the requested FileManager window.");
+        // Naming what was on screen instead separates "the prompt never appeared"
+        // from "the prompt appeared but did not match", which the bare timeout
+        // message left indistinguishable.
+        var titles = string.Join(", ", NativeCommands.GetTopLevelWindowTitles(Application.ProcessId));
+        Assert.Fail($"Timed out waiting for the requested FileManager window. Open FileManager windows: {(titles.Length == 0 ? "none" : titles)}.");
         return null!;
     }
 

@@ -403,6 +403,10 @@ struct COperation
 // path replacement while the progress dialog or copy transfer is running.
 BOOL CaptureOperationFileIdentities(COperation* operation, DWORD* error);
 BOOL VerifyFileIdentity(const char* path, const COperation::CFileIdentity& expected, DWORD* error);
+
+// Same verification, but through a handle opened for deletion, so a file another
+// process holds open is rejected before the operation delegates to the shell.
+BOOL VerifyFileDeletable(const char* path, const COperation::CFileIdentity& expected, DWORD* error);
 BOOL VerifyFileHandleIdentity(HANDLE handle, const COperation::CFileIdentity& expected, DWORD* error);
 BOOL DeleteFileWithVerifiedIdentity(const char* path, const COperation::CFileIdentity& expected, DWORD* error);
 

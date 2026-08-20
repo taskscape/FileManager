@@ -1,4 +1,5 @@
 using System.Runtime.InteropServices;
+using System.Text;
 
 namespace FileManager.UiTests.Infrastructure;
 
@@ -30,6 +31,13 @@ internal static class NativeCommands
     private const int ConfigurationClearReadOnlyCheckBox = 304;
     internal const int OperationPathControl = 210;
     private const int VkEscape = 0x1B;
+    private const uint WmSetText = 0x000C;
+    private const uint WmGetText = 0x000D;
+    private const uint WmGetTextLength = 0x000E;
+
+    // Caption of the owner-less startup notice raised when a configuration
+    // generation could not be validated (src/app_entry.cpp).
+    private const string ConfigurationNoticeCaption = "Open Salamander Configuration";
 
     [DllImport("user32.dll", SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]
@@ -37,6 +45,12 @@ internal static class NativeCommands
 
     [DllImport("user32.dll", CharSet = CharSet.Unicode)]
     private static extern nint SendMessage(nint hWnd, uint msg, nint wParam, nint lParam);
+
+    [DllImport("user32.dll", CharSet = CharSet.Unicode, EntryPoint = "SendMessageW")]
+    private static extern nint SendMessageText(nint hWnd, uint msg, nint wParam, string lParam);
+
+    [DllImport("user32.dll", CharSet = CharSet.Unicode, EntryPoint = "SendMessageW")]
+    private static extern nint SendMessageBuffer(nint hWnd, uint msg, nint wParam, StringBuilder lParam);
 
     [DllImport("user32.dll")]
     private static extern nint SetFocus(nint hWnd);
@@ -161,21 +175,62 @@ internal static class NativeCommands
 
     internal static void SetOperationPath(nint dialogHandle, string path)
     {
-        var pathControl = FindDialogControl(dialogHandle, OperationPathControl);
-        if (pathControl == 0 || !SetWindowText(pathControl, path))
-            throw new InvalidOperationException("The operation dialog did not expose its native destination/name input.");
+        var pathControl = RequireOperationPathControl(dialogHandle);
+        // WM_SETTEXT through SendMessage, not SetWindowText: across a process
+        // boundary SetWindowText updates the cached window title that
+        // GetWindowText then reads back, so a write and its verification agreed
+        // with each other while the control itself never received the text and the
+        // application read an empty value. Copy and Move hid this because their
+        // default already names the destination the test wanted; Create Directory
+        // and Rename need a value and were submitted with the default instead.
+        SendMessageText(pathControl, WmSetText, 0, path);
     }
 
     internal static string GetOperationPath(nint dialogHandle)
     {
+        var pathControl = RequireOperationPathControl(dialogHandle);
+        // Read through the window procedure as well, so the verification observes
+        // the same text the application will transfer out of the dialog.
+        var length = (int)SendMessage(pathControl, WmGetTextLength, 0, 0);
+        if (length <= 0)
+            return string.Empty;
+        var buffer = new StringBuilder(length + 1);
+        SendMessageBuffer(pathControl, WmGetText, buffer.Capacity, buffer);
+        return buffer.ToString();
+    }
+
+    private static nint RequireOperationPathControl(nint dialogHandle)
+    {
         var pathControl = FindDialogControl(dialogHandle, OperationPathControl);
         if (pathControl == 0)
             throw new InvalidOperationException("The operation dialog did not expose its native destination/name input.");
+        return pathControl;
+    }
+    /// <summary>
+    /// Clicks a dialog button without waiting for the click to be handled. Use
+    /// this when the button synchronously opens another modal dialog: the
+    /// SendMessage form does not return until that dialog is dismissed, so the
+    /// caller would deadlock before it could answer it.
+    /// </summary>
+    internal static void PostDialogButtonClick(nint dialogHandle, int controlId)
+    {
+        var buttonHandle = FindDialogControl(dialogHandle, controlId);
+        if (buttonHandle == 0)
+            throw new InvalidOperationException($"The dialog did not expose native button {controlId}.");
+        PostMessage(buttonHandle, BmClick, 0, 0);
+    }
 
-        var buffer = new char[GetWindowTextLength(pathControl) + 1];
-        GetWindowText(pathControl, buffer, buffer.Length);
-        // Read back the same native control to ensure a test does not acknowledge a dialog while targeting a stale field.
-        return new string(buffer).TrimEnd('\0');
+    /// <summary>Handle of a top-level dialog with the given caption, 0 when absent.</summary>
+    internal static nint FindDialogByTitle(int processId, string title)
+    {
+        foreach (var windowHandle in GetTopLevelWindows(processId))
+        {
+            var buffer = new char[GetWindowTextLength(windowHandle) + 1];
+            GetWindowText(windowHandle, buffer, buffer.Length);
+            if (string.Equals(new string(buffer).TrimEnd(char.MinValue), title, StringComparison.Ordinal))
+                return windowHandle;
+        }
+        return 0;
     }
 
     internal static bool HasDialogButton(nint dialogHandle, int controlId)
@@ -222,12 +277,20 @@ internal static class NativeCommands
             GetWindowText(windowHandle, buffer, buffer.Length);
             var title = new string(buffer).TrimEnd('\0');
             if (string.Equals(title, "Error", StringComparison.Ordinal) ||
-                string.Equals(title, "UnRAR", StringComparison.Ordinal))
+                string.Equals(title, "UnRAR", StringComparison.Ordinal) ||
+                string.Equals(title, ConfigurationNoticeCaption, StringComparison.Ordinal))
             {
-                // Both plug-ins that used to fail here now load without a notice:
-                // PictView decodes through WIC, and UnRAR resolves its optional
-                // RARLAB library only when a RAR is actually opened. This stays as a
-                // safety net so an unrelated plug-in notice cannot wedge UI startup.
+                // Plug-in notices: both plug-ins that used to fail here now load
+                // cleanly (PictView decodes through WIC, UnRAR resolves its optional
+                // RARLAB library only when a RAR is opened), but this stays as a
+                // safety net so an unrelated plug-in cannot wedge UI startup.
+                //
+                // Configuration notice: the harness kills the application between
+                // cases, which can interrupt a profile write. The product then
+                // reports that it fell back to the last verified profile through an
+                // owner-less MessageBox shown before the main window exists, so the
+                // notice must be acknowledged or every later case times out waiting
+                // for a main window that is not coming.
                 ClickDialogButton(windowHandle, 1);
             }
         }

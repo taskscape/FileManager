@@ -973,6 +973,11 @@ CProgressDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         }
 
         char** data = (char**)lParam;
+        // Every worker-raised operation prompt passes through this one switch, so
+        // it is the single place that can record them. These are custom dialogs,
+        // not message boxes, so the SalMessageBox transcript never saw them and a
+        // test waiting on one had no evidence of whether it was ever raised.
+        LogUiTestOperationDialog("SHOW", (int)wParam, data, 0);
         switch (wParam)
         {
         case 0:
@@ -1087,6 +1092,8 @@ CProgressDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
             break;
         }
         }
+
+        LogUiTestOperationDialog("RESULT", (int)wParam, data, wParam == 5 ? 0 : *(int*)data[0]);
 
         // The response is synchronous with the worker, making this the single
         // place to count every user-approved retry across operation dialogs.

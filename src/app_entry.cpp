@@ -3946,7 +3946,15 @@ FIND_NEW_SLG_FILE:
     BOOL saveNewConfig = currentCfgDoesNotExist;
     const char* configurationDiagnostic = GetConfigurationSchemaDiagnostic();
     if (configurationDiagnostic != NULL)
-        MessageBox(NULL, configurationDiagnostic, "Open Salamander Configuration", MB_OK | MB_ICONWARNING);
+    {
+        // Raised before the main window exists and outside SalMessageBox, so it
+        // needs its own transcript record to be visible to a UI-test run.
+        LogUiTestDialog("SHOW", "Open Salamander Configuration", configurationDiagnostic, MB_OK | MB_ICONWARNING, 0);
+        int diagnosticResult = MessageBox(NULL, configurationDiagnostic, "Open Salamander Configuration",
+                                          MB_OK | MB_ICONWARNING);
+        LogUiTestDialog("RESULT", "Open Salamander Configuration", configurationDiagnostic,
+                        MB_OK | MB_ICONWARNING, diagnosticResult);
+    }
 
     // if the user does not want more instances, only activate the previous one
     if (!currentCfgDoesNotExist &&

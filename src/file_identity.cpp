@@ -185,6 +185,19 @@ BOOL VerifyFileIdentity(const char* path, const COperation::CFileIdentity& expec
     return TRUE;
 }
 
+BOOL VerifyFileDeletable(const char* path, const COperation::CFileIdentity& expected, DWORD* error)
+{
+    // An attribute-only open bypasses the sharing check entirely, so
+    // VerifyFileIdentity accepts a file that no one can actually delete.
+    // Requesting DELETE is what makes another process's exclusive handle visible.
+    CScopedKernelHandle handle;
+    if (!OpenVerifiedFileForDelete(path, expected, &handle, error))
+        return FALSE;
+    handle.Reset();
+    *error = ERROR_SUCCESS;
+    return TRUE;
+}
+
 BOOL VerifyFileHandleIdentity(HANDLE handle, const COperation::CFileIdentity& expected, DWORD* error)
 {
     if (expected.State != FileIdentityPresent)

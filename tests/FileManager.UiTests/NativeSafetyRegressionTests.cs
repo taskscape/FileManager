@@ -1840,7 +1840,7 @@ public sealed class NativeSafetyRegressionTests
         Assert.Multiple(() =>
         {
             Assert.That(operations, Does.Contain("Unicode_normalization_surrogate_and_long_path_operations_preserve_distinct_entries"));
-            Assert.That(operations, Does.Contain("unicode-e\\u0301-\\U0001f680.txt"));
+            Assert.That(operations, Does.Contain("-e\\u0301-\\U0001f680.txt"));
             Assert.That(operations, Does.Contain("Enumerable.Repeat"));
             Assert.That(operations, Does.Contain("NativeCommands.RenameFile"));
             Assert.That(operations, Does.Contain("NativeCommands.DeleteFiles"));

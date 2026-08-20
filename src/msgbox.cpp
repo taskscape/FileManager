@@ -206,7 +206,12 @@ int CMessageBox::Execute()
   }
   */
 
+    // Every message box the product shows is executed here, including the ones
+    // constructed directly rather than through SalMessageBox, so this is the one
+    // place a UI-test run can record what was asked and how it was answered.
+    LogUiTestDialog("SHOW", Title, Text.Get(), Flags, 0);
     int ret = (int)CCommonDialog::Execute();
+    LogUiTestDialog("RESULT", Title, Text.Get(), Flags, ret);
     if (mainWnd != NULL)
         FlashWindow(mainWnd, FALSE);
 
@@ -1245,7 +1250,9 @@ int SalMessageBox(HWND hParent, LPCTSTR lpText, LPCTSTR lpCaption, UINT uType)
 
 int SalMessageBoxEx(const MSGBOXEX_PARAMS* params)
 {
-    return CMessageBox(params->HParent,
+    // The transcript is written by CMessageBox::Execute so that message boxes
+    // built directly, without this helper, are recorded too.
+    int result = CMessageBox(params->HParent,
                        params->Flags,
                        params->Caption,
                        params->Text,
@@ -1256,6 +1263,7 @@ int SalMessageBoxEx(const MSGBOXEX_PARAMS* params)
                        params->HelpCallback,
                        params->AliasBtnNames,
                        params->URL,
-                       params->URLText)
-        .Execute();
+                             params->URLText)
+                      .Execute();
+    return result;
 }

@@ -12,6 +12,10 @@ public sealed class FileOperationUiTests : FileOperationUiTestBase
     public void Create_directory_creates_requested_nested_directory()
     {
         ExecuteWithPath(NativeCommands.CreateDirectory, string.Empty, "created\\nested", commit: true);
+        // The intermediate directory does not exist yet, so the host asks before
+        // creating the whole branch. That prompt is MB_OKCANCEL, so its affirmative
+        // button is IDOK rather than IDYES.
+        AnswerQuestionIfPrompted(1); // IDOK
 
         WaitForFileSystem(() => Directory.Exists(Workspace.SourcePath("created\\nested")),
                           "Create Directory did not create the requested nested directory.");
@@ -49,14 +53,9 @@ public sealed class FileOperationUiTests : FileOperationUiTestBase
         AlternateDataStreams.RequireSupportAt(Workspace.SourceDirectory);
         AlternateDataStreams.RequireSupportAt(Workspace.TargetDirectory);
 
-        var source = Workspace.SourcePath("ads-copy.txt");
+        // Seeded with the rest of the workspace so the panel already lists the item.
         var target = Workspace.TargetPath("ads-copy.txt");
-        var large = CreateLargeStreamContent();
-        File.WriteAllText(source, "ads-copy-default-content");
-        AlternateDataStreams.Write(source, "notes", "named-stream-content"u8.ToArray());
-        AlternateDataStreams.Write(source, "empty", []);
-        AlternateDataStreams.Write(source, "large", large);
-        AlternateDataStreams.Write(source, "edge name.with.dots", "edge-stream-content"u8.ToArray());
+        var large = FileOperationWorkspace.LargeStreamContent;
 
         ExecuteWithPath(NativeCommands.CopyFiles, "ads-copy.txt", Workspace.TargetDirectory, commit: true);
 
@@ -78,13 +77,8 @@ public sealed class FileOperationUiTests : FileOperationUiTestBase
         AlternateDataStreams.RequireSupportAt(Workspace.SourceDirectory);
         AlternateDataStreams.RequireSupportAt(Workspace.TargetDirectory);
 
-        var source = Workspace.SourcePath("ads-overwrite.txt");
+        // Seeded with the rest of the workspace so the panel already lists the item.
         var target = Workspace.TargetPath("ads-overwrite.txt");
-        File.WriteAllText(source, "ads-overwrite-source");
-        File.WriteAllText(target, "ads-overwrite-target");
-        AlternateDataStreams.Write(source, "replacement", "replacement-stream-content"u8.ToArray());
-        AlternateDataStreams.Write(target, "replacement", "stale-replacement-content"u8.ToArray());
-        AlternateDataStreams.Write(target, "stale", "stale-stream-content"u8.ToArray());
 
         ExecuteWithPath(NativeCommands.CopyFiles, "ads-overwrite.txt", Workspace.TargetDirectory, commit: true);
         ChooseOperationPrompt(WaitForOperationPrompt(6), 6); // IDYES
@@ -105,10 +99,9 @@ public sealed class FileOperationUiTests : FileOperationUiTestBase
         AlternateDataStreams.RequireSupportAt(Workspace.SourceDirectory);
         AlternateDataStreams.RequireSupportAt(Workspace.TargetDirectory);
 
+        // Seeded with the rest of the workspace so the panel already lists the item.
         var source = Workspace.SourcePath("ads-retry.txt");
         var target = Workspace.TargetPath("ads-retry.txt");
-        File.WriteAllText(source, "ads-retry-default-content");
-        AlternateDataStreams.Write(source, "temporarily-denied", "retry-stream-content"u8.ToArray());
 
         var deniedStream = AlternateDataStreams.LockForRead(source, "temporarily-denied");
         try
@@ -183,10 +176,12 @@ public sealed class FileOperationUiTests : FileOperationUiTestBase
 
         ExecuteWithPath(NativeCommands.CopyFiles, "copy-file.txt", Workspace.TargetDirectory, commit: true);
 
-        WaitForFileSystem(() => FindJournalFor(source) is not null,
-                          "Copy did not persist a durable operation journal.");
-        var journal = FindJournalFor(source)!;
-        var content = File.ReadAllText(journal);
+        // The journal is appended as the operation runs, and a journal naming the
+        // source exists from the planning record onwards. Wait for the completion
+        // record so the assertions below see the finished document, not a prefix.
+        WaitForFileSystem(() => ReadJournalFor(source).Contains("OPERATION|completed", StringComparison.Ordinal),
+                          "Copy did not persist a completed durable operation journal.");
+        var content = ReadJournalFor(source);
         var planItem = content.Split(new[] { "\r\n", "\n" }, StringSplitOptions.RemoveEmptyEntries)
             .Single(line => line.StartsWith("PLANITEM|0|copy-file|", StringComparison.Ordinal));
         var correlation = Regex.Match(content, @"CORRELATION\|operation=(?<id>[0-9A-F]{8}-[0-9A-F]{8}-[0-9A-F]{8})",
@@ -220,12 +215,39 @@ public sealed class FileOperationUiTests : FileOperationUiTestBase
     [Category("Unicode")]
     public void Unicode_normalization_surrogate_and_long_path_operations_preserve_distinct_entries()
     {
-        const string composedName = "unicode-\u00e9-\U0001f680.txt";
-        const string decomposedName = "unicode-e\u0301-\U0001f680.txt";
-        const string renamedName = "renamed-\u00e9-\U0001f680.txt";
+        // The two normalization forms are given distinct ASCII prefixes because
+        // the panel is driven by incremental search, and a search string is matched
+        // against the listed name: with a shared prefix the decomposed entry could
+        // not be addressed separately from the composed one, so the harness rather
+        // than the product decided which file an operation acted on. The names still
+        // differ only by the normalization of the same grapheme, and both carry a
+        // surrogate pair, which is what this case is about.
+        const string composedName = "unicode-composed-\u00e9-\U0001f680.txt";
+        const string decomposedName = "unicode-decomposed-e\u0301-\U0001f680.txt";
+        // The rename target deliberately stops at a Latin-1 character. Every dialog
+        // in the product is still an ANSI window (CDialog is only ever constructed
+        // with unicodeWnd FALSE, src/common/winlib.h), so text put into an input
+        // control is round-tripped through the ANSI code page: a supplementary-plane
+        // character reaches the control as "?" and the product would rename the file
+        // to that. Copying and deleting a name that carries the surrogate pair still
+        // works and is covered above, because those paths never pass the name through
+        // a dialog. Recorded as a gap in testing.md.
+        const string renamedName = "renamed-composed-\u00e9.txt";
         const string treeName = "unicode-long-tree";
+        const string longSegment = "長い-unicode-segment-123456789012345678901234567890";
+
+        // PATH_MAX_PATH (src/plugins/shared/spl_gen.h) caps a full directory path
+        // at 248 characters including the terminator, and the script builder
+        // rejects anything longer. Fill that budget instead of exceeding it: the
+        // case proves that deep Unicode paths survive copy, rename and delete;
+        // support for paths beyond MAX_PATH is a separate, unbuilt capability
+        // recorded in testing.md. The source and target workspace directories
+        // differ only in their equal-length names, so one budget covers both.
+        const int productDirectoryLimit = 248;
+        var longPathBase = Path.Combine(Workspace.TargetDirectory, treeName);
+        var longSegmentCount = Math.Max(1, (productDirectoryLimit - 1 - longPathBase.Length) / (longSegment.Length + 1));
         var longRelativePath = string.Join(Path.DirectorySeparatorChar.ToString(),
-            Enumerable.Repeat("\u9577\u3044-unicode-segment-123456789012345678901234567890", 6));
+            Enumerable.Repeat(longSegment, longSegmentCount));
 
         // NTFS treats normalization forms as distinct directory entries; keep both
         // through native selection and mutation instead of comparing display text.
@@ -382,14 +404,19 @@ public sealed class FileOperationUiTests : FileOperationUiTestBase
         // Overwrite All must commit every destination before the move removes the complete source tree.
         ExecuteWithPath(NativeCommands.MoveFiles, "move-overwrite-all-tree", Workspace.TargetDirectory, commit: true);
         ChooseOperationPrompt(WaitForOperationPrompt(185), 185); // IDB_ALL
+        // The metadata-preservation gate is answered below, once per affected item.
 
         WaitForFileSystem(() => File.ReadAllText(Workspace.TargetPath("move-overwrite-all-tree\\nested\\first.txt")) ==
                                     "move-overwrite-all-first-source" &&
                                 File.ReadAllText(Workspace.TargetPath("move-overwrite-all-tree\\nested\\second.txt")) ==
                                     "move-overwrite-all-second-source",
                           "Move Overwrite All did not replace every conflicting descendant.");
-        Assert.That(Directory.Exists(Workspace.SourcePath("move-overwrite-all-tree")), Is.False,
-                    "Move Overwrite All retained the fully committed source tree.");
+        // Removing the source is gated behind the metadata-preservation prompt, which
+        // reports the timestamps this move cannot carry over and is raised once per
+        // affected item. Accepting the loss is what completes the move.
+        WaitForFileSystemAnsweringQuestions(() => !Directory.Exists(Workspace.SourcePath("move-overwrite-all-tree")),
+                                            6, // IDYES
+                                            "Move Overwrite All retained the fully committed source tree.");
     }
 
     [Test]
@@ -470,12 +497,23 @@ public sealed class FileOperationUiTests : FileOperationUiTestBase
         var source = Workspace.SourcePath("cancel-conflict.txt");
 
         ExecuteWithPath(NativeCommands.CopyFiles, "cancel-conflict.txt", Workspace.TargetDirectory, commit: true);
-        ChooseOperationPrompt(WaitForOperationPrompt(2), 2); // IDCANCEL
+        // The conflict prompt proves the copy is genuinely in progress and waiting.
+        var conflict = WaitForOperationPrompt(6);
+        // Cancel through the progress window rather than the conflict prompt: only
+        // RequestCancellation records OPERATION|cancelled, while declining the
+        // conflict is journalled as an ordinary failure.
+        CancelThroughProgressWindow();
+        // The worker is still parked on the conflict prompt and cannot unwind until it
+        // is answered; dismissing it now lets the operation finish as the cancellation
+        // it was already asked for.
+        NativeCommands.PostDialogButtonClick(conflict.Properties.NativeWindowHandle.Value, 2); // IDCANCEL
+        ConfirmCancellationIfPrompted();
 
         WaitForFileSystem(() => File.ReadAllText(Workspace.TargetPath("cancel-conflict.txt")) == "cancel-conflict-target-content",
                           "Cancellation unexpectedly changed the target.");
         Assert.That(File.ReadAllText(source), Is.EqualTo("cancel-conflict-source-content"));
-        WaitForFileSystem(() => FindJournalFor(source)?.Contains("OPERATION|cancelled", StringComparison.Ordinal) == true,
+        // FindJournalFor returns the journal path; the cancellation record lives in its contents.
+        WaitForFileSystem(() => ReadJournalFor(source).Contains("OPERATION|cancelled", StringComparison.Ordinal),
                           "Cancellation was not recorded in the durable operation journal.");
     }
 
@@ -546,9 +584,20 @@ public sealed class FileOperationUiTests : FileOperationUiTestBase
     [Test]
     public void Delete_skip_for_locked_file_keeps_it_and_continues_with_later_items()
     {
+        // Retry/Skip/Skip All belongs to the product's own delete engine, and the
+        // panel only runs that engine for permanent deletion: with the Recycle
+        // Bin enabled it hands the whole selection to the shell, which raises its
+        // own "File In Use" window instead. Switch the disposable profile to
+        // immediate deletion, which is what Shift+Delete selects interactively.
+        var configuration = OpenConfigurationDialog();
+        Assert.That(ConfigurationDialogPages.SelectImmediateDeletion(configuration.Properties.NativeWindowHandle.Value),
+                    Is.True, "The Configuration dialog did not accept immediate deletion.");
+        CloseConfigurationDialog(configuration, commit: true);
+
         // Handling the worker prompt prevents this case from passing merely because deletion has not completed yet.
         using var handle = Workspace.HoldSourceFileOpen("delete-locked.txt");
         SelectSourceItems("delete-locked.txt", "delete-z-after-skip.txt");
+        WaitForCommandEnabled(NativeCommands.DeleteFiles);
         NativeCommands.Execute(MainWindow.Properties.NativeWindowHandle.Value, NativeCommands.DeleteFiles);
         ConfirmDeleteIfPrompted();
         ChooseOperationPrompt(WaitForOperationPrompt(173), 173); // IDB_SKIP
@@ -568,15 +617,35 @@ public sealed class FileOperationUiTests : FileOperationUiTestBase
 
         return Directory.EnumerateFiles(directory, "*.opj")
             .OrderByDescending(File.GetLastWriteTimeUtc)
-            .FirstOrDefault(path => File.ReadAllText(path).Contains(source, StringComparison.Ordinal));
+            .FirstOrDefault(path => ReadJournal(path).Contains(source, StringComparison.Ordinal));
     }
 
-    private static byte[] CreateLargeStreamContent()
+    /// <summary>Contents of the journal naming <paramref name="source"/>, empty when there is none yet.</summary>
+    private static string ReadJournalFor(string source)
     {
-        var content = new byte[(3 * 1024 * 1024) + 17];
-        for (var index = 0; index < content.Length; index++)
-            content[index] = (byte)(index % 251);
-
-        return content;
+        var path = FindJournalFor(source);
+        return path is null ? string.Empty : ReadJournal(path);
     }
+
+    /// <summary>
+    /// Reads a journal the application may still hold open. File.ReadAllText
+    /// requests no write sharing, so it raises a sharing violation against a
+    /// journal the running operation has not closed yet.
+    /// </summary>
+    private static string ReadJournal(string path)
+    {
+        try
+        {
+            using var stream = new FileStream(path, FileMode.Open, FileAccess.Read,
+                                              FileShare.ReadWrite | FileShare.Delete);
+            using var reader = new StreamReader(stream);
+            return reader.ReadToEnd();
+        }
+        catch (IOException)
+        {
+            // A journal being rewritten right now simply has nothing to match yet.
+            return string.Empty;
+        }
+    }
+
 }

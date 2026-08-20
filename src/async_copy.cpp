@@ -44,8 +44,77 @@ static DWORD GetFileOperationError(HRESULT result)
         return ERROR_NOT_ENOUGH_MEMORY;
     if (HRESULT_FACILITY(result) == FACILITY_WIN32)
         return HRESULT_CODE(result);
+    // The copy engine reports a locked file with its own code rather than a
+    // wrapped Win32 error, and the error dialog has no text for it.
+    if (result == COPYENGINE_E_SHARING_VIOLATION_SRC ||
+        result == COPYENGINE_E_SHARING_VIOLATION_DEST)
+        return ERROR_SHARING_VIOLATION;
     return ERROR_GEN_FAILURE;
 }
+
+// Captures the per-item result of a shell delete. Without a sink the only
+// failure signal IFileOperation offers is "some operation was aborted", which
+// would report every cause as a cancellation.
+class CRecycleBinDeleteSink : public IFileOperationProgressSink
+{
+public:
+    CRecycleBinDeleteSink() : RefCount(1), ItemResult(S_OK) {}
+
+    HRESULT GetItemResult() const { return ItemResult; }
+
+    STDMETHOD(QueryInterface)(REFIID riid, void** object)
+    {
+        if (object == NULL)
+            return E_POINTER;
+        if (riid == IID_IUnknown || riid == __uuidof(IFileOperationProgressSink))
+        {
+            *object = static_cast<IFileOperationProgressSink*>(this);
+            AddRef();
+            return S_OK;
+        }
+        *object = NULL;
+        return E_NOINTERFACE;
+    }
+
+    STDMETHOD_(ULONG, AddRef)() { return InterlockedIncrement(&RefCount); }
+
+    STDMETHOD_(ULONG, Release)()
+    {
+        LONG count = InterlockedDecrement(&RefCount);
+        if (count == 0)
+            delete this;
+        return count;
+    }
+
+    STDMETHOD(PostDeleteItem)(DWORD, IShellItem*, HRESULT hrDelete, IShellItem*)
+    {
+        ItemResult = hrDelete;
+        return S_OK;
+    }
+
+    // A single-item delete uses none of the remaining notifications.
+    STDMETHOD(StartOperations)() { return S_OK; }
+    STDMETHOD(FinishOperations)(HRESULT) { return S_OK; }
+    STDMETHOD(PreRenameItem)(DWORD, IShellItem*, LPCWSTR) { return S_OK; }
+    STDMETHOD(PostRenameItem)(DWORD, IShellItem*, LPCWSTR, HRESULT, IShellItem*) { return S_OK; }
+    STDMETHOD(PreMoveItem)(DWORD, IShellItem*, IShellItem*, LPCWSTR) { return S_OK; }
+    STDMETHOD(PostMoveItem)(DWORD, IShellItem*, IShellItem*, LPCWSTR, HRESULT, IShellItem*) { return S_OK; }
+    STDMETHOD(PreCopyItem)(DWORD, IShellItem*, IShellItem*, LPCWSTR) { return S_OK; }
+    STDMETHOD(PostCopyItem)(DWORD, IShellItem*, IShellItem*, LPCWSTR, HRESULT, IShellItem*) { return S_OK; }
+    STDMETHOD(PreDeleteItem)(DWORD, IShellItem*) { return S_OK; }
+    STDMETHOD(PreNewItem)(DWORD, IShellItem*, LPCWSTR) { return S_OK; }
+    STDMETHOD(PostNewItem)(DWORD, IShellItem*, LPCWSTR, LPCWSTR, DWORD, HRESULT, IShellItem*) { return S_OK; }
+    STDMETHOD(UpdateProgress)(UINT, UINT) { return S_OK; }
+    STDMETHOD(ResetTimer)() { return S_OK; }
+    STDMETHOD(PauseTimer)() { return S_OK; }
+    STDMETHOD(ResumeTimer)() { return S_OK; }
+
+private:
+    ~CRecycleBinDeleteSink() {}
+
+    LONG RefCount;
+    HRESULT ItemResult;
+};
 
 static DWORD WINAPI RunRecycleBinDeleteOnSta(void* parameter, HANDLE stopEvent)
 {
@@ -63,28 +132,46 @@ static DWORD WINAPI RunRecycleBinDeleteOnSta(void* parameter, HANDLE stopEvent)
 
     IFileOperation* operation = NULL;
     IShellItem* item = NULL;
-    HRESULT result = CoCreateInstance(CLSID_FileOperation, NULL, CLSCTX_INPROC_SERVER,
-                                      IID_PPV_ARGS(&operation));
+    CRecycleBinDeleteSink* sink = new CRecycleBinDeleteSink();
+    HRESULT result = sink == NULL ? E_OUTOFMEMORY : S_OK;
+    if (SUCCEEDED(result))
+        result = CoCreateInstance(CLSID_FileOperation, NULL, CLSCTX_INPROC_SERVER,
+                                  IID_PPV_ARGS(&operation));
     if (SUCCEEDED(result))
         result = operation->SetOwnerWindow(request->Owner);
     if (SUCCEEDED(result))
-        result = operation->SetOperationFlags(FOF_ALLOWUNDO | FOF_SILENT | FOF_NOCONFIRMATION);
+    {
+        // FOF_NOERRORUI as well as FOF_SILENT: FOF_SILENT hides only the progress
+        // dialog, so a locked file used to raise the shell's own "File In Use"
+        // window. That took the failure out of the operation's Retry/Skip/Skip
+        // All contract and blocked the worker on a modal the application does
+        // not own.
+        result = operation->SetOperationFlags(FOF_ALLOWUNDO | FOF_SILENT | FOF_NOCONFIRMATION |
+                                              FOF_NOERRORUI);
+    }
     if (SUCCEEDED(result))
         result = SHCreateItemFromParsingName(pathW, NULL, IID_PPV_ARGS(&item));
     if (SUCCEEDED(result))
-        result = operation->DeleteItem(item, NULL);
+        result = operation->DeleteItem(item, sink);
     if (SUCCEEDED(result))
         result = operation->PerformOperations();
     if (SUCCEEDED(result))
     {
+        // PerformOperations reports the batch, not the item, so a delete that
+        // failed still succeeds here; the sink carries the real reason.
+        HRESULT itemResult = sink->GetItemResult();
         BOOL aborted = FALSE;
-        if (SUCCEEDED(operation->GetAnyOperationsAborted(&aborted)) && aborted)
+        if (FAILED(itemResult))
+            result = itemResult;
+        else if (SUCCEEDED(operation->GetAnyOperationsAborted(&aborted)) && aborted)
             result = HRESULT_FROM_WIN32(ERROR_CANCELLED);
     }
     if (item != NULL)
         item->Release();
     if (operation != NULL)
         operation->Release();
+    if (sink != NULL)
+        sink->Release();
     request->Error = GetFileOperationError(result);
     return request->Error;
 }
@@ -2705,6 +2792,65 @@ static COperationResult CommitTransactionalTargetFile(const char* targetName, co
                                      IsRetryableOperationError(error), opeTemporaryTargetReady);
 }
 
+// TRUE when the source carries a stream of this name. Files hold a handful of
+// streams, so re-enumerating per candidate is cheaper than building an index.
+static BOOL SourceHasStream(const WCHAR* sourcePath, const WCHAR* streamName)
+{
+    WIN32_FIND_STREAM_DATA stream;
+    HANDLE find = FindFirstStreamW(sourcePath, FindStreamInfoStandard, &stream, 0);
+    if (find == INVALID_HANDLE_VALUE)
+        return FALSE;
+
+    BOOL found = FALSE;
+    do
+    {
+        if (_wcsicmp(stream.cStreamName, streamName) == 0)
+        {
+            found = TRUE;
+            break;
+        }
+    } while (FindNextStreamW(find, &stream));
+    FindClose(find);
+    return found;
+}
+
+// ReplaceFileW deliberately merges the replaced file's alternate data streams
+// into the committed result, so a stream that existed only on the old
+// destination would outlive the file it belonged to. An overwrite has to leave
+// the destination equal to the source, so remove what the source does not
+// carry. This runs after the commit, never before: the transactional target
+// exists precisely so that a failed commit leaves the old file untouched.
+static void RemoveCommittedStreamsMissingFromSource(const char* sourceName, const char* targetName)
+{
+    CPathW sourcePathW(sourceName);
+    CPathW targetPathW(targetName);
+
+    WIN32_FIND_STREAM_DATA targetStream;
+    HANDLE find = FindFirstStreamW(targetPathW.CStr(), FindStreamInfoStandard, &targetStream, 0);
+    if (find == INVALID_HANDLE_VALUE)
+        return;
+
+    do
+    {
+        if (_wcsicmp(targetStream.cStreamName, L"::$DATA") == 0)
+            continue; // the file's own contents, replaced by the commit itself
+        if (SourceHasStream(sourcePathW.CStr(), targetStream.cStreamName))
+            continue;
+
+        WCHAR streamPath[3 * MAX_PATH];
+        if (FAILED(StringCchPrintfW(streamPath, _countof(streamPath), L"%s%s",
+                                    targetPathW.CStr(), targetStream.cStreamName)))
+            continue;
+        if (!DeleteFileW(streamPath))
+        {
+            DWORD err = GetLastError();
+            TRACE_E("RemoveCommittedStreamsMissingFromSource(): unable to remove a stale alternate data stream from "
+                    << targetName << ", error: " << GetErrorText(err));
+        }
+    } while (FindNextStreamW(find, &targetStream));
+    FindClose(find);
+}
+
 // A successful write is not a copy commit.  Reopen the closed destination and
 // verify its on-disk file metadata before reporting success, replacing an old
 // target, or allowing a cross-volume move to remove its source.
@@ -5079,6 +5225,12 @@ COPY_AGAIN:
                             }
                         }
                         transactionalTargetCommitted = TRUE;
+                        if (copyADS)
+                        {
+                            // The commit merged the replaced file's streams into the
+                            // result; only the source's streams belong on it.
+                            RemoveCommittedStreamsMissingFromSource(op->SourceName, requestedTargetName);
+                        }
                     }
 
                     totalDone += op->Size;
@@ -6336,8 +6488,11 @@ BOOL DoDeleteFile(HWND hProgressDlg, COperation* operation, const CQuadWord& siz
             {
                 // The shell accepts only a name, so it cannot consume our
                 // verified handle. Recheck immediately before handing that
-                // name to the shell and only then adjust its attributes.
-                if (!VerifyFileIdentity(name, operation->SourceIdentity, &err))
+                // name to the shell and only then adjust its attributes. The
+                // check opens for deletion so a file another process holds open
+                // is reported here, through this operation's own error dialog,
+                // instead of by whatever UI the shell decides to raise.
+                if (!VerifyFileDeletable(name, operation->SourceIdentity, &err))
                     goto DELETE_READY;
                 ClearReadOnlyAttr(name, attr);
                 if (!PathContainsValidComponents((char*)name, FALSE))
@@ -6983,7 +7138,7 @@ BOOL DoDeleteDir(HWND hProgressDlg, COperation* operation, const CQuadWord& size
              !script->InvertRecycleBin && dlgData.UseRecycleBin == 1) &&
             IsDirectoryEmpty(name)) // subdirectory must not contain any files!!!
         {
-            if (!VerifyFileIdentity(nameRmDir, operation->SourceIdentity, &err))
+            if (!VerifyFileDeletable(nameRmDir, operation->SourceIdentity, &err))
                 goto DELETE_DIR_READY;
             ClearReadOnlyAttr(nameRmDir, attr);
             if (!PathContainsValidComponents((char*)name, FALSE))

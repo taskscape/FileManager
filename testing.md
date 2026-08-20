@@ -293,6 +293,188 @@ These tests do not drive the FileManager UI and can run in a normal developer pr
 
 All fixtures in this section require the guarded `FILEMANAGER_UI_TESTDATA_ROOT`, `FILEMANAGER_UI_CONFIG_ROOT`, `FILEMANAGER_UI_EXE`, and an interactive desktop unless a stricter requirement is stated.
 
+#### Containment audit of the file-operation lane
+
+The file-operation lane (`FileOperationUiTests`, `FileAccessUiTests`, and every fixture deriving from
+`FileOperationUiTestBase`) drives real destructive commands against a live desktop, so its blast radius was audited
+explicitly. The findings below describe what the lane is allowed to touch and how that is enforced in code.
+
+**Everything the lane creates, mutates, or deletes is seeded by the harness.** `FileOperationWorkspace` builds a fresh
+`<test-data root>\<GUID>\source` and `...\target` pair per test and writes every file and directory tree the cases
+act on. No case in the lane names a path that is not derived from `Workspace.SourcePath`, `Workspace.TargetPath`,
+`Workspace.SourceDirectory`, or `Workspace.TargetDirectory`; none reads `%TEMP%`, `%USERPROFILE%`, a special folder,
+or a literal drive path.
+
+The boundaries are enforced rather than assumed:
+
+| Boundary | Enforcement |
+| --- | --- |
+| Test-data root | `UiTestSettings.TestDataRoot` skips the lane unless the path is absolute and its leaf is literally `filemanager-testdata`. |
+| Deletion safety | `UiTestSandbox` writes a `.filemanager-testdata-owner` marker into every root it creates and refuses to reuse or delete a directory that lacks it. |
+| Registry | Writes are confined to `HKCU\Software\Open Salamander\6.0-filemanager-testdata`; the lane never touches the live configuration root. |
+| Temporary files | Each launched process gets `TEMP` and `TMP` redirected below the test-data root. |
+| Processes | Teardown kills only the instances the fixture launched, plus crash reporters matched by full path next to the executable under test. |
+| Reparse points | Cleanup deletes a junction or symlink itself and never recurses into its target. |
+
+Individual cases that look like they might reach outside do not:
+
+- **Invalid-destination failures.** `Copy_or_move_failure_does_not_modify_source` and
+  `Create_directory_failure_keeps_existing_file_intact` submit a destination *inside* the workspace that cannot
+  succeed: `blocked-target` is seeded as a file, so creating a child below it fails without leaving the sandbox.
+- **Find.** `Find_files_searches_subdirectories_from_the_active_panel` sets the search root explicitly to
+  `Workspace.SourceDirectory` before searching, so recursion cannot escape the workspace. It only reads.
+- **View.** The internal viewer opens a seeded file and is closed by the test. It only reads.
+- **Long paths and Unicode.** `Unicode_normalization_surrogate_and_long_path_operations_preserve_distinct_entries`
+  builds the deepest path the product accepts, still entirely below the workspace.
+- **Recycle Bin.** `Delete_to_recycle_bin_...` is opt-in (`FILEMANAGER_UI_RECYCLE_BIN=1`) and `ShellRecycleBin`
+  exposes only `GetItemCount`. The case leaves one harness-created file in the bin and never empties or restores it.
+- **Second volumes.** The cross-volume and ADS-unsupported roots are opt-in, must also be named
+  `filemanager-testdata`, must be on a different volume, and are registered as owned roots so the same marker and
+  cleanup rules apply.
+
+##### The external editor, and why the lane ships its own
+
+One case did reach outside: `Edit_file_opens_the_selected_file_in_the_configured_editor`. The product seeds
+`notepad.exe` for `*.*` (`src/mainwnd_init.cpp`), and on Windows 11 that resolves to the packaged, tabbed Notepad.
+Measured on a Windows 11 host, opening a second file produces another process but still **one** window, whose caption
+becomes the newly opened file. The case matched a desktop window by caption and then closed it, so with Notepad
+already open it could close a window holding unsaved documents belonging to whoever was running the tests. The same
+launch also pinned the workspace as the editor's working directory, which blocked sandbox cleanup afterwards.
+
+The lane now supplies its own editor:
+
+- `tests/FileManager.UiTests.EditorStub` builds `SandboxEditor.exe`, a GUI-subsystem WinForms app that shows the
+  opened file in a window titled `SandboxEditor - <file name>`. It is a GUI app deliberately: Windows Terminal is the
+  default console delegate on Windows 11 and shares one tabbed window between launches, which would reproduce the
+  same hazard with a console stub.
+- `SandboxEditor.Install()` copies it into `<test-data root>\editor`, so the editor binary itself lives in the
+  disposable sandbox and is removed with it.
+- `ConfigurationEditorPage.RewriteSelectedEditor` points the profile at that copy **through the real Configuration
+  dialog**. A committed configuration generation is checksum-protected, and the product correctly rejects a
+  hand-edited generation and falls back to the previous profile
+  (`SelectCommittedConfigurationGeneration` in `src/mainwnd_config.cpp`), so the registry must never be written
+  directly. The page is located by content, not by a translated tree label: only the Editors page carries a command,
+  and the seeded value is `notepad.exe` while every seeded viewer entry is empty.
+- `SandboxEditor.WaitForProfileEntry` waits for the committed generation to record the change before the restart,
+  because the product writes its profile after the property sheet closes.
+- The stub moves its own working directory out of the workspace at startup, and teardown kills any stub still running
+  from the sandbox copy, matched by full image path so an editor belonging to the current user is never affected.
+
+If the stub is missing the case is skipped with an explicit message; it never falls back to the machine editor.
+
+##### Journals must not leak between cases
+
+Teardown kills the application, which can interrupt an operation and leave an incomplete journal in the shared
+`<test-data root>\appdata\Open Salamander\operation-journals` folder. The next start then raises the modal
+**Recover file operations** prompt, which owns the main window. `WaitForNativeMainWindow` deliberately skips a
+disabled main window, so a single leaked journal strands every remaining case in the run behind a window that never
+becomes usable. `FileOperationUiTestBase` therefore purges that folder both after the application stops and before
+the next start, retrying briefly because an exiting process can hold its journal open for a moment.
+`OperationRecoveryCharacterizationUiTests` seeds a journal on purpose and overrides `BeforeFileManagerStarted`
+without calling base, so its own scenario is unaffected.
+
+For the same reason the harness now acknowledges the **Open Salamander Configuration** notice at startup: an
+interrupted profile write makes the product report that it fell back to the last verified profile, through an
+owner-less message box shown before the main window exists.
+
+##### Running the lane
+
+The lane takes over the desktop: it opens modal confirmation prompts, drives selection, and launches the editor. Run
+it on a session that can be left alone, not alongside interactive work.
+
+##### The dialog transcript
+
+The lane's hardest failures were all the same shape: a case timed out waiting for something, and nothing in the
+harness could say whether the application had asked a question, asked a different one, or asked nothing at all. The
+product therefore writes a transcript of every dialog it raises while the sandbox is active:
+
+- `LogUiTestDialog` (`src/path_checking.cpp`) appends one line per event to `<test-data root>\ui-test-dialogs.log`,
+  with a timestamp, `SHOW` or `RESULT`, the flags, the chosen button, the caption and the text. It is a no-op unless
+  `IsFileManagerUiTestSandboxRequested()`, and the file is shared for reading so a run can be watched live.
+- `CMessageBox::Execute` (`src/msgbox.cpp`) records every message box, including the ones built directly instead of
+  through `SalMessageBox` — the delete confirmation is one of those.
+- The worker's `WM_USER_DIALOG` handler (`src/dialogs_file_ops.cpp`) records every operation prompt through
+  `LogUiTestOperationDialog`. Those are custom templates rather than message boxes, so nothing else sees them. Only
+  the array slots a given dialog kind really passes as strings are read, because several kinds carry DWORD or BOOL
+  values in the same positions.
+
+A `SHOW` with no matching `RESULT` names exactly the prompt a stalled run is waiting on. That single signal
+identified four separate causes: a metadata-preservation gate raised once per item, an unanswered delete
+confirmation, the shell's own "File In Use" window appearing instead of the product's error dialog, and an overwrite
+prompt proving that a copy had been dispatched for the wrong item.
+
+##### Two product defects the lane found
+
+Both are fixed, and neither was visible without the transcript.
+
+- **The Recycle Bin owned the error UI.** The worker's recycle-bin delete passed `FOF_SILENT`, which hides only the
+  progress dialog. A locked file made the shell raise its own **File In Use** window, taking the failure out of the
+  operation's Retry/Skip/Skip All contract and blocking the worker on a modal the product does not own.
+  `RunRecycleBinDeleteOnSta` now also passes `FOF_NOERRORUI` and reads the per-item result through an
+  `IFileOperationProgressSink`, because `PerformOperations` reports the batch rather than the item. The recycle-bin
+  branches additionally verify through a handle opened for deletion (`VerifyFileDeletable`): an attribute-only open
+  bypasses the sharing check entirely, so the previous check accepted a file nobody could delete.
+- **`ReplaceFileW` merged stale alternate data streams.** The transactional copy commits by replacing the
+  destination, and `ReplaceFileW` deliberately carries the replaced file's streams into the result. A stream that
+  existed only on the old destination therefore outlived the file it belonged to, so an overwrite did not leave the
+  destination equal to the source. `RemoveCommittedStreamsMissingFromSource` prunes them, after the commit rather
+  than before it, so a failed commit still leaves the old file untouched.
+
+##### Two product limits the lane respects
+
+Neither is fixed, and neither is something the lane should assert away. Both are recorded here because a case that
+crosses one fails for a reason that has nothing to do with what it is testing.
+
+- **Paths stop at `PATH_MAX_PATH`.** A full directory path is capped at 248 characters including the terminator
+  (`src/plugins/shared/spl_gen.h`), and the script builder rejects anything longer with **Error Building Script**.
+  Support for paths beyond `MAX_PATH` is listed as outstanding in `refactoring.md`. The Unicode case therefore
+  computes how many path segments fit inside that budget instead of hard-coding a depth, so it probes the boundary
+  the product actually claims.
+- **Dialog text stops at the ANSI code page.** Every dialog is still an ANSI window — `CDialog` is only ever
+  constructed with `unicodeWnd` false (`src/common/winlib.h`) — so text placed in an input control is round-tripped
+  through the ANSI code page. A supplementary-plane character reaches the control as `?`, and the product would
+  rename the file to that. Copying and deleting a name carrying a surrogate pair works and is covered, because those
+  paths never pass the name through a dialog; only the rename target avoids one.
+
+##### Known state on a developer workstation
+
+Measured on a Windows 11 developer machine (Release x64 build, v143 toolset). "Before" is the state when this work
+started, "containment" is after the sandbox and journal work described above, and "after" is current.
+
+| Batch | Before | After containment | After |
+| --- | --- | --- | --- |
+| `FileOperationUiTests` Copy | 2 passed / 11 failed | 7 / 6 | 13 / 0 |
+| `FileOperationUiTests` Move + Rename | 2 / 10 | 5 / 7 | 12 / 0 |
+| `FileOperationUiTests` Delete, Create, Cancel, Unicode | 7 / 5 | 7 / 5 | 12 / 0 |
+| `FileAccessUiTests` | 1 / 2 | 3 / 0 | 3 / 0 |
+
+The lane passes 40 of 40 locally. The first jump came from removing the journal and configuration-notice cascades,
+which turned one failing case into a run-long series of "did not expose its main window" timeouts. The second came
+from four harness defects, plus the two product defects above:
+
+- **Text never reached the control.** `SetOperationPath` used `SetWindowText`, which across a process boundary
+  updates the cached window title that `GetWindowText` then reads back. The write and its verification agreed with
+  each other while the control stayed empty and the application read nothing. Copy and Move hid this because their
+  default already names the wanted destination; Create Directory and Rename were submitted with the default instead.
+  Both now go through `WM_SETTEXT`/`WM_GETTEXT`, which repaired five cases at once.
+- **The delete confirmation was never answered.** `CMessageBox` assigns its button IDs after the buttons are created,
+  so UI Automation still reports the template placeholder and a search for `IDYES` found nothing. The confirmation
+  stood open and the delete silently never ran. It is now found and clicked natively, and the click is posted rather
+  than sent, because answering it runs the whole operation inside the application's message handling.
+- **A gated prompt is raised per item.** The metadata-preservation gate that removal of a moved source sits behind
+  names one item at a time, so answering it once left the rest of the tree waiting.
+  `WaitForFileSystemAnsweringQuestions` answers while it waits for the outcome.
+- **Fixtures raced the panel.** Alternate-data-stream files created inside a case were not listed yet when
+  quick-search ran, so the operation acted on nothing. They are seeded with the rest of the workspace.
+
+Selection deserves its own note. The panel is driven by incremental search, so a fixture whose name is only a prefix
+of another cannot be addressed on its own: the harness, not the product, would decide which file an operation acted
+on. The two Unicode normalization fixtures are therefore given distinct ASCII prefixes. They still differ only by
+the normalization of the same grapheme, which is what that case is about.
+
+A timeout now names the windows that were open, which is what separates "the prompt never appeared" from "a
+different prompt appeared".
+
 #### `BasicUiTests` — risk-based lifecycle matrix
 
 `Basic_ui_scenario` generates the seven cases below. They are categorized as `LockStress` so the nightly verifier lane can repeat the compact risk matrix independently of the release gate.
@@ -327,7 +509,7 @@ All fixtures in this section require the guarded `FILEMANAGER_UI_TESTDATA_ROOT`,
 - `Copy_skip_all_keeps_the_existing_conflicting_tree` — applies Skip All without changing conflicting targets.
 - `Copy_file_persists_a_completed_recovery_journal_with_item_intent` — verifies the completed durable journal, immutable plan, states, and correlation ID.
 - `Copy_directory_copies_all_descendants_to_other_panel` — copies a complete nested directory tree.
-- `Unicode_normalization_surrogate_and_long_path_operations_preserve_distinct_entries` — copies composed/decomposed Unicode and surrogate-pair names plus a >260-character descendant path, then renames and deletes distinct normalization forms.
+- `Unicode_normalization_surrogate_and_long_path_operations_preserve_distinct_entries` — copies composed/decomposed Unicode and surrogate-pair names plus a deep descendant path sized to `PATH_MAX_PATH`, then renames and deletes distinct normalization forms.
 - `Rename_file_renames_without_changing_content` — renames a file and preserves content.
 - `Rename_directory_preserves_all_descendants` — renames a directory and retains its tree.
 - `Rename_case_only_change_preserves_the_file_and_updates_its_displayed_name` — verifies a case-only directory-entry rename.
@@ -348,7 +530,7 @@ All fixtures in this section require the guarded `FILEMANAGER_UI_TESTDATA_ROOT`,
 - `Copy_or_move_failure_does_not_modify_source` — two cases verify invalid copy and move destinations leave sources intact.
 - `Rename_overwrite_decline_keeps_the_original_file_and_existing_target` — chooses No at the rename overwrite prompt and retains both files.
 - `Rename_directory_collision_keeps_both_directory_trees` — verifies directory rename collisions cannot overwrite either tree.
-- `Delete_skip_for_locked_file_keeps_it_and_continues_with_later_items` — skips a sharing violation and deletes later selected items.
+- `Delete_skip_for_locked_file_keeps_it_and_continues_with_later_items` — skips a sharing violation and deletes later selected items. It first switches the disposable profile to immediate deletion through the Configuration dialog, because Retry/Skip/Skip All belongs to the product’s own delete engine: with the Recycle Bin enabled the panel hands the whole selection to the shell (`CFilesWindow::DeleteThroughRecycleBin`). Nothing reaches the Recycle Bin as a result.
 
 #### Optional UI fixtures
 

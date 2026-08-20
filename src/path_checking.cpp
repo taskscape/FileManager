@@ -2269,6 +2269,108 @@ BOOL GetFileManagerUiTestDataRoot(char* buf, int bufSize)
     return SUCCEEDED(StringCchCopyA(buf, bufSize, fullPath));
 }
 
+// Records every dialog the application raises while the UI-test sandbox is
+// selected. UI automation can only observe a dialog it manages to poll while
+// that dialog is on screen, so a prompt which appears and closes between polls
+// is invisible to a failing test. This transcript makes the whole sequence
+// reviewable, and a SHOW record with no matching RESULT identifies exactly which
+// prompt a stalled run is waiting on. Outside the sandbox it is a no-op.
+void LogUiTestDialog(const char* phase, const char* caption, const char* text, DWORD flags, int result)
+{
+    if (!IsFileManagerUiTestSandboxRequested())
+        return;
+
+    char root[MAX_PATH];
+    if (!GetFileManagerUiTestDataRoot(root, _countof(root)) ||
+        !SalPathAppend(root, "ui-test-dialogs.log", _countof(root)))
+        return;
+
+    // Newlines would break the one-record-per-line contract the harness reads.
+    char body[2048];
+    body[0] = 0;
+    if (text != NULL)
+    {
+        StringCchCopyNA(body, _countof(body), text, _countof(body) - 1);
+        for (char* scan = body; *scan != 0; scan++)
+            if (*scan == '\r' || *scan == '\n')
+                *scan = ' ';
+    }
+
+    SYSTEMTIME now;
+    GetLocalTime(&now);
+    char line[3072];
+    if (FAILED(StringCchPrintfA(line, _countof(line),
+                                "%02d:%02d:%02d.%03d|%s|flags=0x%08X|result=%d|caption=%s|text=%s\r\n",
+                                now.wHour, now.wMinute, now.wSecond, now.wMilliseconds, phase, flags, result,
+                                caption == NULL ? "" : caption, body)))
+        return;
+
+    // Shared so the harness can read the transcript while a run is still live.
+    HANDLE log = CreateFileA(root, FILE_APPEND_DATA, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL,
+                             OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+    if (log == INVALID_HANDLE_VALUE)
+        return;
+    DWORD written;
+    WriteFile(log, line, (DWORD)strlen(line), &written, NULL);
+    CloseHandle(log);
+}
+
+/// Records a worker-raised operation dialog in the same transcript. Only the
+/// fields a given dialog kind really passes as strings are read: several kinds
+/// carry DWORD or BOOL values in the same array slots, so a blanket dump would
+/// dereference them as pointers.
+void LogUiTestOperationDialog(const char* phase, int kind, char** data, int result)
+{
+    if (!IsFileManagerUiTestSandboxRequested() || data == NULL)
+        return;
+
+    const char* parts[3] = {NULL, NULL, NULL};
+    switch (kind)
+    {
+    case 5: // the only kind whose data[0] is a string rather than the result slot
+        parts[0] = data[0];
+        parts[1] = data[1];
+        parts[2] = data[2];
+        break;
+
+    case 9:  // data[2..3] are attribute masks
+    case 11: // data[2] is an error code
+    case 13: // a plain question, text only
+        parts[0] = data[1];
+        break;
+
+    case 10: // data[3] is an error code
+        parts[0] = data[1];
+        parts[1] = data[2];
+        break;
+
+    case 12: // data[1] and data[3] are flags
+        parts[0] = data[2];
+        break;
+
+    default:
+        parts[0] = data[1];
+        parts[1] = data[2];
+        break;
+    }
+
+    char text[1024];
+    text[0] = 0;
+    for (int i = 0; i < 3; i++)
+    {
+        if (parts[i] == NULL)
+            continue;
+        if (text[0] != 0)
+            StringCchCatA(text, _countof(text), " | ");
+        StringCchCatA(text, _countof(text), parts[i]);
+    }
+
+    char caption[64];
+    if (FAILED(StringCchPrintfA(caption, _countof(caption), "operation-dialog kind=%d", kind)))
+        return;
+    LogUiTestDialog(phase, caption, text, 0, result);
+}
+
 BOOL CreateOurPathInRoamingAPPDATA(char* buf, int bufSize)
 {
     static char path[MAX_PATH]; // called from exception handler, stack may be full
