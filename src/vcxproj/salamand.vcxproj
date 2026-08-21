@@ -523,6 +523,12 @@
     </ClCompile>
     <ClCompile Include="..\path_utils.cpp">
     </ClCompile>
+    <ClCompile Include="..\file_timestamps.cpp">
+    </ClCompile>
+    <ClCompile Include="..\path_history.cpp">
+    </ClCompile>
+    <ClCompile Include="..\user_menu_icons.cpp">
+    </ClCompile>
     <ClCompile Include="..\truncated_string.cpp">
     </ClCompile>
     <ClCompile Include="..\path_checking.cpp">
@@ -606,6 +612,20 @@
     <ClCompile Include="..\transfer_speed.cpp">
     </ClCompile>
     <ClCompile Include="..\async_copy.cpp">
+    </ClCompile>
+    <ClCompile Include="..\ads_operations.cpp">
+    </ClCompile>
+    <ClCompile Include="..\copy_commit.cpp">
+    </ClCompile>
+    <ClCompile Include="..\copy_loop.cpp">
+    </ClCompile>
+    <ClCompile Include="..\file_attributes.cpp">
+    </ClCompile>
+    <ClCompile Include="..\metadata_preservation.cpp">
+    </ClCompile>
+    <ClCompile Include="..\recycle_bin_delete.cpp">
+    </ClCompile>
+    <ClCompile Include="..\security_helpers.cpp">
     </ClCompile>
     <ClCompile Include="..\operations_core.cpp">
     </ClCompile>
@@ -922,6 +942,12 @@
     <ClInclude Include="..\viewer.h">
     </ClInclude>
     <ClInclude Include="..\worker.h">
+    </ClInclude>
+    <ClInclude Include="..\async_copy_internals.h">
+    </ClInclude>
+    <ClInclude Include="..\file_attributes.h">
+    </ClInclude>
+    <ClInclude Include="..\security_helpers.h">
     </ClInclude>
     <ClInclude Include="..\operation_journal.h">
     </ClInclude>

@@ -6,6 +6,10 @@
 
 #include "cfgdlg.h"
 #include "worker.h"
+// Compression/encryption and security helpers moved out of async_copy.cpp;
+// these headers replace the previous ad-hoc extern declarations.
+#include "file_attributes.h"
+#include "security_helpers.h"
 #include "execlog.h"
 #include "common/allochan.h"
 #include "release_diagnostics.h"
@@ -19,13 +23,7 @@
 extern NTQUERYINFORMATIONFILE DynNtQueryInformationFile;
 extern NTFSCONTROLFILE DynNtFsControlFile;
 
-// Forward declarations of helpers defined in async_copy.cpp
-void GainWriteOwnerAccess();
-DWORD CompressFile(char* fileName, DWORD attrs);
-DWORD UncompressFile(char* fileName, DWORD attrs);
-DWORD MyEncryptFile(HWND hProgressDlg, char* fileName, DWORD attrs, DWORD finalAttrs,
-                    CProgressDlgData& dlgData, BOOL& cancelOper, BOOL preserveDate);
-DWORD MyDecryptFile(char* fileName, DWORD attrs, BOOL preserveDate);
+// Forward declaration of the top-level copy entry point defined in async_copy.cpp
 BOOL DoCopyFile(COperation* op, HWND hProgressDlg, void* buffer,
                 COperations* script, CQuadWord& totalDone,
                 DWORD clearReadonlyMask, BOOL* skip, BOOL lantasticCheck,
@@ -187,7 +185,7 @@ BOOL DoDeleteDirLink(HWND hProgressDlg, COperation* operation, const CQuadWord& 
             script->AddBytesToSpeedMetersAndTFSandPS((DWORD)size.Value, TRUE, 0, NULL, MAX_OP_FILESIZE);
 
             totalDone += size;
-            SetProgress(hProgressDlg, 0, CaclProg(totalDone, script->TotalSize), dlgData);
+            SetProgress(hProgressDlg, 0, CalculateProgressPercent(totalDone, script->TotalSize), dlgData);
             return TRUE;
         }
         else
@@ -220,7 +218,7 @@ BOOL DoDeleteDirLink(HWND hProgressDlg, COperation* operation, const CQuadWord& 
 
                 totalDone += size;
                 script->SetProgressSize(totalDone);
-                SetProgress(hProgressDlg, 0, CaclProg(totalDone, script->TotalSize), dlgData);
+                SetProgress(hProgressDlg, 0, CalculateProgressPercent(totalDone, script->TotalSize), dlgData);
                 return TRUE;
             }
 
@@ -460,7 +458,7 @@ CONVERT_AGAIN:
                                         {
                                             ClearReadOnlyAttr(tmpFileName); // ensure it can be deleted
                                             DeleteFileUtf8(tmpFileName);
-                                            SetProgress(hProgressDlg, 0, CaclProg(totalDone, script->TotalSize), dlgData);
+                                            SetProgress(hProgressDlg, 0, CalculateProgressPercent(totalDone, script->TotalSize), dlgData);
                                             goto CONVERT_AGAIN;
                                         }
                                         break;
@@ -479,7 +477,7 @@ CONVERT_AGAIN:
                                             HANDLES(CloseHandle(hTarget));
                                         ClearReadOnlyAttr(tmpFileName); // ensure it can be deleted
                                         DeleteFileUtf8(tmpFileName);
-                                        SetProgress(hProgressDlg, 0, CaclProg(totalDone, script->TotalSize), dlgData);
+                                        SetProgress(hProgressDlg, 0, CalculateProgressPercent(totalDone, script->TotalSize), dlgData);
                                         return TRUE;
                                     }
 
@@ -493,8 +491,8 @@ CONVERT_AGAIN:
 
                                 operationDone += CQuadWord(read, 0);
                                 SetProgress(hProgressDlg,
-                                            CaclProg(operationDone, size),
-                                            CaclProg(totalDone + operationDone, script->TotalSize), dlgData);
+                                            CalculateProgressPercent(operationDone, size),
+                                            CalculateProgressPercent(totalDone + operationDone, script->TotalSize), dlgData);
                             }
                             else
                             {
@@ -707,7 +705,7 @@ CONVERT_AGAIN:
 
                         HANDLES(CloseHandle(hSource));
                         totalDone += size;
-                        SetProgress(hProgressDlg, 0, CaclProg(totalDone, script->TotalSize), dlgData);
+                        SetProgress(hProgressDlg, 0, CalculateProgressPercent(totalDone, script->TotalSize), dlgData);
                         return TRUE;
                     }
 
@@ -754,7 +752,7 @@ CONVERT_AGAIN:
             SKIP_OPEN_IN:
 
                 totalDone += size;
-                SetProgress(hProgressDlg, 0, CaclProg(totalDone, script->TotalSize), dlgData);
+                SetProgress(hProgressDlg, 0, CalculateProgressPercent(totalDone, script->TotalSize), dlgData);
                 return TRUE;
             }
 
@@ -879,7 +877,7 @@ BOOL DoChangeAttrs(HWND hProgressDlg, char* name, const CQuadWord& size, DWORD a
                 }
             }
             totalDone += size;
-            SetProgress(hProgressDlg, 0, CaclProg(totalDone, script->TotalSize), dlgData);
+            SetProgress(hProgressDlg, 0, CalculateProgressPercent(totalDone, script->TotalSize), dlgData);
             return TRUE;
         }
         else
@@ -918,7 +916,7 @@ BOOL DoChangeAttrs(HWND hProgressDlg, char* name, const CQuadWord& size, DWORD a
             SKIP_ATTRS_ERROR:
 
                 totalDone += size;
-                SetProgress(hProgressDlg, 0, CaclProg(totalDone, script->TotalSize), dlgData);
+                SetProgress(hProgressDlg, 0, CalculateProgressPercent(totalDone, script->TotalSize), dlgData);
                 return TRUE;
             }
 
@@ -1069,7 +1067,7 @@ unsigned ThreadWorkerBody(void* parameter)
                 pd.Target = op->TargetName;
                 SetProgressDialog(hProgressDlg, &pd, dlgData);
 
-                SetProgress(hProgressDlg, 0, CaclProg(totalDone, script->TotalSize), dlgData);
+                SetProgress(hProgressDlg, 0, CalculateProgressPercent(totalDone, script->TotalSize), dlgData);
 
                 BOOL lantasticCheck = IsLantasticDrive(op->TargetName, lastLantasticCheckRoot, _countof(lastLantasticCheckRoot), lastIsLantasticPath);
 
@@ -1094,7 +1092,7 @@ unsigned ThreadWorkerBody(void* parameter)
                 pd.Target = op->TargetName;
                 SetProgressDialog(hProgressDlg, &pd, dlgData);
 
-                SetProgress(hProgressDlg, 0, CaclProg(totalDone, script->TotalSize), dlgData);
+                SetProgress(hProgressDlg, 0, CalculateProgressPercent(totalDone, script->TotalSize), dlgData);
 
                 BOOL lantasticCheck = IsLantasticDrive(op->TargetName, lastLantasticCheckRoot, _countof(lastLantasticCheckRoot), lastIsLantasticPath);
                 BOOL ignInvalidName = op->Opcode == ocMoveDir && (op->OpFlags & OPFL_IGNORE_INVALID_NAME) != 0;
@@ -1123,7 +1121,7 @@ unsigned ThreadWorkerBody(void* parameter)
                 pd.Target = "";
                 SetProgressDialog(hProgressDlg, &pd, dlgData);
 
-                SetProgress(hProgressDlg, 0, CaclProg(totalDone, script->TotalSize), dlgData);
+                SetProgress(hProgressDlg, 0, CalculateProgressPercent(totalDone, script->TotalSize), dlgData);
 
                 BOOL skip, alreadyExisted;
                 Error = !DoCreateDir(hProgressDlg, op->TargetName, op->Attr, clearReadonlyMask, dlgData,
@@ -1164,7 +1162,7 @@ unsigned ThreadWorkerBody(void* parameter)
                     }
                     totalDone += op->Size;
                     script->SetProgressSize(totalDone);
-                    SetProgress(hProgressDlg, 0, CaclProg(totalDone, script->TotalSize), dlgData);
+                    SetProgress(hProgressDlg, 0, CalculateProgressPercent(totalDone, script->TotalSize), dlgData);
                 }
                 break;
             }
@@ -1215,7 +1213,7 @@ unsigned ThreadWorkerBody(void* parameter)
                     pd.Target = "";
                     SetProgressDialog(hProgressDlg, &pd, dlgData);
 
-                    SetProgress(hProgressDlg, 0, CaclProg(totalDone, script->TotalSize), dlgData);
+                    SetProgress(hProgressDlg, 0, CalculateProgressPercent(totalDone, script->TotalSize), dlgData);
 
                     FILETIME modified;
                     modified.dwLowDateTime = (DWORD)(DWORD_PTR)op->SourceName;
@@ -1227,7 +1225,7 @@ unsigned ThreadWorkerBody(void* parameter)
                     script->AddBytesToSpeedMetersAndTFSandPS((DWORD)op->Size.Value, TRUE, 0, NULL, MAX_OP_FILESIZE);
 
                     totalDone += op->Size;
-                    SetProgress(hProgressDlg, 0, CaclProg(totalDone, script->TotalSize), dlgData);
+                    SetProgress(hProgressDlg, 0, CalculateProgressPercent(totalDone, script->TotalSize), dlgData);
                 }
                 break;
             }
@@ -1244,7 +1242,7 @@ unsigned ThreadWorkerBody(void* parameter)
                 pd.Target = "";
                 SetProgressDialog(hProgressDlg, &pd, dlgData);
 
-                SetProgress(hProgressDlg, 0, CaclProg(totalDone, script->TotalSize), dlgData);
+                SetProgress(hProgressDlg, 0, CalculateProgressPercent(totalDone, script->TotalSize), dlgData);
 
                 if (script->IsCopyOrMoveOperation && !script->IsCopyOperation)
                 {
@@ -1253,7 +1251,7 @@ unsigned ThreadWorkerBody(void* parameter)
                     {
                         totalDone += op->Size;
                         script->SetProgressSize(totalDone);
-                        SetProgress(hProgressDlg, 0, CaclProg(totalDone, script->TotalSize), dlgData);
+                        SetProgress(hProgressDlg, 0, CalculateProgressPercent(totalDone, script->TotalSize), dlgData);
                         break; // the user chose to retain this move source
                     }
                 }
@@ -1305,7 +1303,7 @@ unsigned ThreadWorkerBody(void* parameter)
                 pd.Target = "";
                 SetProgressDialog(hProgressDlg, &pd, dlgData);
 
-                SetProgress(hProgressDlg, 0, CaclProg(totalDone, script->TotalSize), dlgData);
+                SetProgress(hProgressDlg, 0, CalculateProgressPercent(totalDone, script->TotalSize), dlgData);
 
                 Error = !DoConvert(hProgressDlg, op->SourceName, (char*)buffer, tgtBuffer, op->Size, script,
                                    totalDone, convertData, dlgData);
@@ -1323,7 +1321,7 @@ unsigned ThreadWorkerBody(void* parameter)
                 pd.Target = "";
                 SetProgressDialog(hProgressDlg, &pd, dlgData);
 
-                SetProgress(hProgressDlg, 0, CaclProg(totalDone, script->TotalSize), dlgData);
+                SetProgress(hProgressDlg, 0, CalculateProgressPercent(totalDone, script->TotalSize), dlgData);
 
                 Error = !DoChangeAttrs(hProgressDlg, op->SourceName, op->Size, (DWORD)(DWORD_PTR)op->TargetName,
                                        script, totalDone,

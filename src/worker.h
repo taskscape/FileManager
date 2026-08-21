@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: 2023 Taskscape Ltd
+﻿// SPDX-FileCopyrightText: 2023 Taskscape Ltd
 // SPDX-License-Identifier: GPL-2.0-or-later
 // CommentsTranslationProject: TRANSLATED
 
@@ -956,7 +956,7 @@ struct CAsyncCopyParams
     void SetOverlappedToEOF(int i, const CQuadWord& offset);
 };
 
-int CaclProg(const CQuadWord& progressCurrent, const CQuadWord& progressTotal);
+int CalculateProgressPercent(const CQuadWord& progressCurrent, const CQuadWord& progressTotal);
 void SetProgress(HWND hProgressDlg, int operation, int summary, CProgressDlgData& dlgData);
 void SetProgressDialog(HWND hProgressDlg, CProgressData* data, CProgressDlgData& dlgData);
 
