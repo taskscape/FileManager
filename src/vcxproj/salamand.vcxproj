@@ -441,6 +441,10 @@
     </ClCompile>
     <ClCompile Include="..\mainwnd_commands.cpp">
     </ClCompile>
+    <ClCompile Include="..\config_store.cpp">
+    </ClCompile>
+    <ClCompile Include="..\config_import.cpp">
+    </ClCompile>
     <ClCompile Include="..\mainwnd_panels.cpp">
     </ClCompile>
     <ClCompile Include="..\mapi.cpp">
@@ -516,6 +520,10 @@
     <ClCompile Include="..\safefile.cpp">
     </ClCompile>
     <ClCompile Include="..\app_entry.cpp">
+    </ClCompile>
+    <ClCompile Include="..\app_graphics.cpp">
+    </ClCompile>
+    <ClCompile Include="..\app_shutdown.cpp">
     </ClCompile>
     <ClCompile Include="..\app_globals.cpp">
     </ClCompile>
@@ -944,6 +952,8 @@
     <ClInclude Include="..\worker.h">
     </ClInclude>
     <ClInclude Include="..\async_copy_internals.h">
+    </ClInclude>
+    <ClInclude Include="..\app_shutdown.h">
     </ClInclude>
     <ClInclude Include="..\file_attributes.h">
     </ClInclude>

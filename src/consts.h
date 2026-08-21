@@ -2554,6 +2554,9 @@ int GetIconSizeForSystemDPI(CIconSizeEnum iconSize);
 // returns current system DPI (96, 120, 144, ...)
 int GetSystemDPI();
 
+// recomputes the system DPI from the given DC (NULL = screen DC); defined in app_graphics.cpp
+void GetSystemDPI(HDC hDC);
+
 // returns scale corresponding to current DPI; instead of 1.0 returns 100, for 1.25 returns 125, etc
 int GetScaleForSystemDPI();
 
