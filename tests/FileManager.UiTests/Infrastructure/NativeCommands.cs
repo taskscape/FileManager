@@ -249,12 +249,18 @@ internal static class NativeCommands
     {
         foreach (var windowHandle in GetTopLevelWindows(processId))
         {
-            var buffer = new char[GetWindowTextLength(windowHandle) + 1];
-            GetWindowText(windowHandle, buffer, buffer.Length);
-            if (string.Equals(new string(buffer).TrimEnd(char.MinValue), title, StringComparison.Ordinal))
+            if (string.Equals(GetWindowTitle(windowHandle), title, StringComparison.Ordinal))
                 return windowHandle;
         }
         return 0;
+    }
+
+    internal static string GetWindowTitle(nint windowHandle)
+    {
+        // Native captions distinguish dialogs that deliberately share standard button IDs such as IDYES.
+        var buffer = new char[GetWindowTextLength(windowHandle) + 1];
+        GetWindowText(windowHandle, buffer, buffer.Length);
+        return new string(buffer).TrimEnd(char.MinValue);
     }
 
     internal static bool HasDialogButton(nint dialogHandle, int controlId)

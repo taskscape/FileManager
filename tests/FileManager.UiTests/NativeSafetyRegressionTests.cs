@@ -1520,6 +1520,7 @@ public sealed class NativeSafetyRegressionTests
         var settings = File.ReadAllText(Path.Combine(root, "tests", "FileManager.UiTests", "Infrastructure", "UiTestSettings.cs"));
         var ads = File.ReadAllText(Path.Combine(root, "tests", "FileManager.UiTests", "Infrastructure", "AlternateDataStreams.cs"));
         var unsupportedAds = File.ReadAllText(Path.Combine(root, "tests", "FileManager.UiTests", "AlternateDataStreamsUnsupportedTargetUiTests.cs"));
+        var nativeCommands = File.ReadAllText(Path.Combine(root, "tests", "FileManager.UiTests", "Infrastructure", "NativeCommands.cs"));
         var refactoring = File.ReadAllText(Path.Combine(root, "refactoring.md"));
 
         Assert.Multiple(() =>
@@ -1550,6 +1551,10 @@ public sealed class NativeSafetyRegressionTests
             Assert.That(operations, Does.Contain("Copy_retries_a_temporarily_denied_alternate_data_stream_without_losing_it"));
             Assert.That(crossVolume, Does.Contain("Move_across_ADS_capable_volumes_preserves_multiple_streams_before_removing_the_source"));
             Assert.That(unsupportedAds, Does.Contain("Cross_volume_move_to_an_ADS_unsupported_target_keeps_the_source_when_metadata_loss_is_declined"));
+            // VHD-backed panel enumeration and shared IDYES dialogs require an explicit readiness and caption invariant.
+            Assert.That(workspace, Does.Contain("PrepareSourcePanelForSelection"));
+            Assert.That(nativeCommands, Does.Contain("RefreshActiveFilePanel"));
+            Assert.That(unsupportedAds, Does.Contain("WaitForOperationPrompt(\"Confirm Alternate Data Streams Loss\", 6)"));
             Assert.That(ads, Does.Contain("RequireSupportAt"));
             Assert.That(ads, Does.Contain("RequireUnsupportedAt"));
             Assert.That(settings, Does.Contain("FILEMANAGER_UI_CROSS_VOLUME_ROOT"));

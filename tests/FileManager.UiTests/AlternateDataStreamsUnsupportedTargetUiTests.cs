@@ -24,11 +24,14 @@ public sealed class AlternateDataStreamsUnsupportedTargetUiTests : FileOperation
         // select an earlier collision fixture while the source panel is stale.
         var source = Workspace.SourcePath("ads-unsupported-target.txt");
         var target = Workspace.TargetPath("ads-unsupported-target.txt");
+        // The dedicated target starts empty; an overwrite prompt here would prove selection raced the panel listing.
+        Assert.That(File.Exists(target), Is.False, "The ADS-loss test target must not collide before the move starts.");
 
         ExecuteWithPath(NativeCommands.MoveFiles, "ads-unsupported-target.txt", Workspace.TargetDirectory, commit: true);
-        // The custom ADS dialog has Yes/All/Skip choices, then the standard metadata gate decides whether the move removes its source.
-        ChooseOperationPrompt(WaitForOperationPrompt(6), 6); // IDYES: copy the default stream while discarding unsupported ADS.
-        ChooseOperationPrompt(WaitForOperationPrompt(7), 7); // IDNO: retain the source after the metadata-loss warning.
+        // The custom ADS dialog and an overwrite dialog both expose IDYES, so keep the caption invariant with the response.
+        ChooseOperationPrompt(WaitForOperationPrompt("Confirm Alternate Data Streams Loss", 6), 6); // IDYES: copy the default stream while discarding unsupported ADS.
+        // The metadata-loss decision is a standard Question message box whose No preserves the ADS-bearing source.
+        ChooseOperationPrompt(WaitForOperationPrompt("Question", 7), 7); // IDNO: retain the source after the metadata-loss warning.
 
         WaitForFileSystem(() => File.Exists(target), "The unsupported target did not receive the default data stream.");
         Assert.Multiple(() =>

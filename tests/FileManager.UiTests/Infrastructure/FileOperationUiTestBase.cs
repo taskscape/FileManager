@@ -97,8 +97,7 @@ public abstract class FileOperationUiTestBase : FileManagerUiTestBase
 
     protected void SelectSourceItem(string name)
     {
-        var list = FindSourceList();
-        NativeCommands.ActivateFilePanel(list!.Properties.NativeWindowHandle.Value);
+        var list = PrepareSourcePanelForSelection();
         // The command gates are computed from the host's active panel, which changes only through the normal panel click route.
         NativeCommands.QuickSearch(list!.Properties.NativeWindowHandle.Value, name);
         // The owner-drawn panel applies quick-search selection asynchronously; wait before dispatching a selection-sensitive command.
@@ -120,8 +119,7 @@ public abstract class FileOperationUiTestBase : FileManagerUiTestBase
     protected void SelectSourceItems(params string[] names)
     {
         // Explicit Insert selection exercises commands over mixed and multiple items instead of only the focused fallback.
-        var list = FindSourceList();
-        NativeCommands.ActivateFilePanel(list.Properties.NativeWindowHandle.Value);
+        var list = PrepareSourcePanelForSelection();
         // Keep multi-item gestures on the same active source panel as a user selection sequence.
         foreach (var name in names)
         {
@@ -158,6 +156,14 @@ public abstract class FileOperationUiTestBase : FileManagerUiTestBase
     {
         return WaitForWindow(window =>
             window.Properties.NativeWindowHandle.Value != MainWindow.Properties.NativeWindowHandle.Value &&
+            NativeCommands.HasDialogButton(window.Properties.NativeWindowHandle.Value, buttonId));
+    }
+
+    protected Window WaitForOperationPrompt(string title, int buttonId)
+    {
+        return WaitForWindow(window =>
+            window.Properties.NativeWindowHandle.Value != MainWindow.Properties.NativeWindowHandle.Value &&
+            string.Equals(NativeCommands.GetWindowTitle(window.Properties.NativeWindowHandle.Value), title, StringComparison.Ordinal) &&
             NativeCommands.HasDialogButton(window.Properties.NativeWindowHandle.Value, buttonId));
     }
 
@@ -352,6 +358,17 @@ public abstract class FileOperationUiTestBase : FileManagerUiTestBase
         return list!;
     }
 
+    private FlaUI.Core.AutomationElements.AutomationElement PrepareSourcePanelForSelection()
+    {
+        var list = FindSourceList();
+        NativeCommands.ActivateFilePanel(list.Properties.NativeWindowHandle.Value);
+        // A visible main window can precede VHD-backed directory enumeration, so
+        // refresh every selection path before quick-searching a seeded fixture.
+        NativeCommands.RefreshActiveFilePanel(MainWindow.Properties.NativeWindowHandle.Value);
+        Thread.Sleep(250);
+        return list;
+    }
+
     private static void SetDialogPath(Window dialog, string path)
     {
         // IDE_PATH is shared by the native create/copy/move/rename templates and bypasses their incomplete UIA children.
@@ -408,14 +425,27 @@ public abstract class FileOperationUiTestBase : FileManagerUiTestBase
 
     protected void WaitForCommandEnabled(int command)
     {
-        var toolbarState = NativeCommands.TryGetToolbarCommandEnabled(MainWindow.Properties.NativeWindowHandle.Value, command);
-        if (toolbarState == false)
+        var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(5);
+        var observedToolbarCommand = false;
+        while (DateTime.UtcNow < deadline)
         {
-            Assert.Fail($"Visible toolbar command {command} remained disabled after selecting the sandbox item.");
+            var toolbarState = NativeCommands.TryGetToolbarCommandEnabled(MainWindow.Properties.NativeWindowHandle.Value, command);
+            if (toolbarState.HasValue)
+            {
+                observedToolbarCommand = true;
+                if (toolbarState.Value)
+                    return;
+            }
+
+            // Some legacy toolbar layouts omit the command entirely; give their panel selection a bounded idle turn before dispatching.
+            if (!observedToolbarCommand && DateTime.UtcNow >= deadline - TimeSpan.FromSeconds(4))
+                return;
+
+            // Selection changes are published from the panel's next idle cycle, which is slower when a VHD is first enumerated.
+            Thread.Sleep(100);
         }
 
-        // This host refreshes command enablers into toolbars but leaves the native menu at its startup state; absent buttons therefore require the command handler itself to prove enablement.
-        Thread.Sleep(250);
+        Assert.Fail($"Visible toolbar command {command} remained disabled after selecting the sandbox item.");
     }
 }
 
