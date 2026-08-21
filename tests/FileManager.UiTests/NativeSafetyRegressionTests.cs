@@ -1551,9 +1551,11 @@ public sealed class NativeSafetyRegressionTests
             Assert.That(operations, Does.Contain("Copy_retries_a_temporarily_denied_alternate_data_stream_without_losing_it"));
             Assert.That(crossVolume, Does.Contain("Move_across_ADS_capable_volumes_preserves_multiple_streams_before_removing_the_source"));
             Assert.That(unsupportedAds, Does.Contain("Cross_volume_move_to_an_ADS_unsupported_target_keeps_the_source_when_metadata_loss_is_declined"));
-            // VHD-backed panel enumeration and shared IDYES dialogs require an explicit readiness and caption invariant.
+            // VHD-backed panel enumeration and shared IDYES dialogs require an explicit focused-item and caption invariant.
             Assert.That(workspace, Does.Contain("PrepareSourcePanelForSelection"));
+            Assert.That(workspace, Does.Contain("FocusSourceItemByName"));
             Assert.That(nativeCommands, Does.Contain("RefreshActiveFilePanel"));
+            Assert.That(nativeCommands, Does.Contain("GetFocusedItemName"));
             Assert.That(unsupportedAds, Does.Contain("WaitForOperationPrompt(\"Confirm Alternate Data Streams Loss\", 6)"));
             Assert.That(ads, Does.Contain("RequireSupportAt"));
             Assert.That(ads, Does.Contain("RequireUnsupportedAt"));

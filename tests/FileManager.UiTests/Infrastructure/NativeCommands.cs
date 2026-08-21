@@ -20,6 +20,10 @@ internal static class NativeCommands
     internal const int RenameFile = 754;
     // CM_ACTIVEREFRESH synchronously refreshes the active file panel before a test quick-searches newly created files.
     internal const int RefreshActivePanel = 740;
+    // CM_ACTIVEUNSELECTALL prevents a stale selection from being combined with the item a test is about to mark.
+    private const int UnselectAll = 844;
+    // CM_CLIPCOPYNAME exposes the native panel's focused item without relying on its owner-drawn UIA tree.
+    private const int CopyFocusedName = 710;
     private const uint WmCommand = 0x0111;
     private const uint WmChar = 0x0102;
     private const uint WmKeyDown = 0x0100;
@@ -45,6 +49,27 @@ internal static class NativeCommands
     [DllImport("user32.dll", SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]
     private static extern bool PostMessage(nint hWnd, uint msg, nint wParam, nint lParam);
+
+    [DllImport("user32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool OpenClipboard(nint windowHandle);
+
+    [DllImport("user32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool CloseClipboard();
+
+    [DllImport("user32.dll")]
+    private static extern nint GetClipboardData(uint format);
+
+    [DllImport("user32.dll")]
+    private static extern uint GetClipboardSequenceNumber();
+
+    [DllImport("kernel32.dll")]
+    private static extern nint GlobalLock(nint memoryHandle);
+
+    [DllImport("kernel32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool GlobalUnlock(nint memoryHandle);
 
     [DllImport("user32.dll", CharSet = CharSet.Unicode)]
     private static extern nint SendMessage(nint hWnd, uint msg, nint wParam, nint lParam);
@@ -417,6 +442,29 @@ internal static class NativeCommands
         SendMessage(windowHandle, WmCommand, RefreshActivePanel, 0);
     }
 
+    internal static void ClearActiveSelection(nint windowHandle)
+    {
+        // Clearing through the host command synchronizes the selected set with the active panel instead of relying on a prior test's caret state.
+        SendMessage(windowHandle, WmCommand, UnselectAll, 0);
+    }
+
+    internal static string? GetFocusedItemName(nint windowHandle)
+    {
+        var clipboardSequence = GetClipboardSequenceNumber();
+        // The legacy panel does not expose its focused item through UIA, but its own Copy Name command reports that exact native state.
+        SendMessage(windowHandle, WmCommand, CopyFocusedName, 0);
+
+        var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(2);
+        while (DateTime.UtcNow < deadline)
+        {
+            if (GetClipboardSequenceNumber() != clipboardSequence && TryGetClipboardText(out var name))
+                return name;
+            Thread.Sleep(25);
+        }
+
+        return null;
+    }
+
     internal static void QuickSearch(nint listHandle, string name)
     {
         SetFocus(listHandle);
@@ -449,5 +497,45 @@ internal static class NativeCommands
     {
         // LVM_GETITEMCOUNT crosses process boundaries without caller-owned buffers and works for the virtual Find list.
         return checked((int)SendMessage(listHandle, LvmGetItemCount, 0, 0));
+    }
+
+    private static bool TryGetClipboardText(out string text)
+    {
+        const uint cfUnicodeText = 13;
+        const uint cfText = 1;
+        text = string.Empty;
+        if (!OpenClipboard(0))
+            return false;
+
+        try
+        {
+            var memoryHandle = GetClipboardData(cfUnicodeText);
+            var isUnicode = memoryHandle != 0;
+            // Legacy copy commands normally publish both encodings, but CF_TEXT keeps focused-name checks available if Unicode conversion fails.
+            if (!isUnicode)
+                memoryHandle = GetClipboardData(cfText);
+            if (memoryHandle == 0)
+                return false;
+
+            var pointer = GlobalLock(memoryHandle);
+            if (pointer == 0)
+                return false;
+
+            try
+            {
+                text = isUnicode
+                    ? Marshal.PtrToStringUni(pointer) ?? string.Empty
+                    : Marshal.PtrToStringAnsi(pointer) ?? string.Empty;
+                return true;
+            }
+            finally
+            {
+                GlobalUnlock(memoryHandle);
+            }
+        }
+        finally
+        {
+            CloseClipboard();
+        }
     }
 }
