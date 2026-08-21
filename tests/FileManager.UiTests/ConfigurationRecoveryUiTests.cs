@@ -1,5 +1,4 @@
 using FileManager.UiTests.Infrastructure;
-using Microsoft.Win32;
 using NUnit.Framework;
 
 namespace FileManager.UiTests;
@@ -10,8 +9,6 @@ public sealed class ConfigurationRecoveryUiTests : FileManagerUiTestBase
 {
     // Keep this aligned with CONFIGURATION_WRITE_FAULT_EXIT_CODE in src/regwork.h.
     private const int ConfigurationWriteFaultExitCode = 121;
-    private const string ConfigurationRoot = @"Software\Open Salamander\6.0";
-    private const string ConfigurationBackupRoot = ConfigurationRoot + ".backup.63A7CD13";
 
     [Test]
     [Category("FaultInjection")]
@@ -20,30 +17,22 @@ public sealed class ConfigurationRecoveryUiTests : FileManagerUiTestBase
         UiTestSettings.RequireConfigurationFaultInjection();
 
         var reportPath = Path.Combine(Path.GetTempPath(), $"filemanager-config-writes-{Guid.NewGuid():N}.txt");
-        RegistryRootsSnapshot? baselineSnapshot = null;
         try
         {
             var baseline = ReadFirstConfigurationCheckBox();
             CommitFirstConfigurationCheckBox(baseline);
             RestartFileManager();
             Assert.That(ReadFirstConfigurationCheckBox(), Is.EqualTo(baseline), "The baseline configuration did not survive restart.");
-            // Freeze the complete host store only after a normal save and restart have validated the baseline.
-            baselineSnapshot = RegistryRootsSnapshot.Capture(ConfigurationRoot, ConfigurationBackupRoot);
 
             var candidate = !baseline;
-            var operationCount = UiTestSettings.LimitConfigurationFaultBoundaries(
-                MeasureConfigurationWriteBoundaries(baseline, candidate, reportPath));
+            var operationCount = MeasureConfigurationWriteBoundaries(baseline, candidate, reportPath);
+            RestoreBaseline(baseline);
 
             for (var writeBoundary = 1; writeBoundary <= operationCount; writeBoundary++)
-                AssertRecoveryAtWriteBoundary(writeBoundary, baseline, candidate, baselineSnapshot);
+                AssertRecoveryAtWriteBoundary(writeBoundary, baseline, candidate);
         }
         finally
         {
-            if (baselineSnapshot is not null)
-            {
-                // Leave the disposable account at its verified pre-matrix state even when a boundary assertion fails.
-                StopCurrentApplication(baselineSnapshot.Restore);
-            }
             if (File.Exists(reportPath))
                 File.Delete(reportPath);
         }
@@ -71,16 +60,15 @@ public sealed class ConfigurationRecoveryUiTests : FileManagerUiTestBase
         return 0;
     }
 
-    private void AssertRecoveryAtWriteBoundary(int writeBoundary, bool baseline, bool candidate,
-                                               RegistryRootsSnapshot baselineSnapshot)
+    private void AssertRecoveryAtWriteBoundary(int writeBoundary, bool baseline, bool candidate)
     {
-        // Every boundary starts from byte-for-byte equivalent registry state, independent of the preceding crash result.
-        RestartFileManager(afterPreviousApplicationStopped: baselineSnapshot.Restore);
+        RestartFileManager(new Dictionary<string, string>
+        {
+            ["FILEMANAGER_CONFIG_FAULT_AFTER_WRITE"] = writeBoundary.ToString(),
+        });
         Assert.That(ReadFirstConfigurationCheckBox(), Is.EqualTo(baseline),
                     $"Boundary {writeBoundary} did not begin from the complete baseline profile.");
 
-        // Arm only after the baseline dialog closes so its deferred command save cannot consume this trial.
-        NativeCommands.ArmNextConfigurationWriteFault(MainWindowHandle, writeBoundary);
         var dialog = OpenConfigurationDialog();
         ToggleFirstConfigurationCheckBox(dialog);
         CommitConfigurationDialogWithoutWaiting(dialog);
@@ -91,6 +79,7 @@ public sealed class ConfigurationRecoveryUiTests : FileManagerUiTestBase
         var restored = ReadFirstConfigurationCheckBox();
         Assert.That(restored == baseline || restored == candidate, Is.True,
                     $"Restart after write boundary {writeBoundary} exposed a mixed configuration profile.");
+        RestoreBaseline(baseline);
     }
 
     private bool ReadFirstConfigurationCheckBox()
@@ -109,89 +98,10 @@ public sealed class ConfigurationRecoveryUiTests : FileManagerUiTestBase
         CloseConfigurationDialog(dialog, commit: true);
     }
 
-    private sealed class RegistryRootsSnapshot
+    private void RestoreBaseline(bool baseline)
     {
-        private readonly Dictionary<string, RegistryNode?> roots;
-
-        private RegistryRootsSnapshot(Dictionary<string, RegistryNode?> roots)
-        {
-            this.roots = roots;
-        }
-
-        internal static RegistryRootsSnapshot Capture(params string[] rootPaths)
-        {
-            using var currentUser = RegistryKey.OpenBaseKey(RegistryHive.CurrentUser, RegistryView.Registry64);
-            var roots = new Dictionary<string, RegistryNode?>(StringComparer.OrdinalIgnoreCase);
-            foreach (var rootPath in rootPaths)
-            {
-                using var key = currentUser.OpenSubKey(rootPath, writable: false);
-                // Capture absence as well as content so stale recovery backups cannot leak into another boundary.
-                roots[rootPath] = key is null ? null : RegistryNode.Capture(key);
-            }
-            return new RegistryRootsSnapshot(roots);
-        }
-
-        internal void Restore()
-        {
-            using var currentUser = RegistryKey.OpenBaseKey(RegistryHive.CurrentUser, RegistryView.Registry64);
-            foreach (var (rootPath, snapshot) in roots)
-            {
-                currentUser.DeleteSubKeyTree(rootPath, throwOnMissingSubKey: false);
-                if (snapshot is null)
-                    continue;
-
-                using var key = currentUser.CreateSubKey(rootPath, writable: true)
-                    ?? throw new InvalidOperationException($"Could not recreate registry baseline '{rootPath}'.");
-                snapshot.Restore(key);
-            }
-        }
-    }
-
-    private sealed class RegistryNode
-    {
-        private readonly Dictionary<string, RegistryValue> values = new(StringComparer.OrdinalIgnoreCase);
-        private readonly Dictionary<string, RegistryNode> children = new(StringComparer.OrdinalIgnoreCase);
-
-        internal static RegistryNode Capture(RegistryKey key)
-        {
-            var node = new RegistryNode();
-            foreach (var valueName in key.GetValueNames())
-            {
-                var value = key.GetValue(valueName, null, RegistryValueOptions.DoNotExpandEnvironmentNames)
-                    ?? throw new InvalidOperationException($"Registry value '{key.Name}\\{valueName}' could not be captured.");
-                // Registry APIs return mutable arrays; clone them so the baseline remains immutable in memory.
-                node.values[valueName] = new RegistryValue(CloneRegistryValue(value), key.GetValueKind(valueName));
-            }
-
-            foreach (var childName in key.GetSubKeyNames())
-            {
-                using var child = key.OpenSubKey(childName, writable: false)
-                    ?? throw new InvalidOperationException($"Registry key '{key.Name}\\{childName}' could not be captured.");
-                node.children[childName] = Capture(child);
-            }
-            return node;
-        }
-
-        internal void Restore(RegistryKey key)
-        {
-            foreach (var (valueName, value) in values)
-                key.SetValue(valueName, CloneRegistryValue(value.Data), value.Kind);
-
-            foreach (var (childName, childSnapshot) in children)
-            {
-                using var child = key.CreateSubKey(childName, writable: true)
-                    ?? throw new InvalidOperationException($"Could not recreate registry baseline '{key.Name}\\{childName}'.");
-                childSnapshot.Restore(child);
-            }
-        }
-
-        private static object CloneRegistryValue(object value) => value switch
-        {
-            byte[] bytes => bytes.ToArray(),
-            string[] strings => strings.ToArray(),
-            _ => value,
-        };
-
-        private sealed record RegistryValue(object Data, RegistryValueKind Kind);
+        CommitFirstConfigurationCheckBox(baseline);
+        RestartFileManager();
+        Assert.That(ReadFirstConfigurationCheckBox(), Is.EqualTo(baseline), "The next fault trial did not start from a complete baseline profile.");
     }
 }

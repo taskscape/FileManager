@@ -3944,8 +3944,6 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
 
                     // let the process list know we are running and have the main window (we can be activated for OnlyOneInstance)
                     TaskList.SetProcessState(PROCESS_STATE_RUNNING, MainWindow->HWindow);
-                    // Publish readiness after first-run language and plug-in work so isolated UI commands cannot race startup.
-                    FileManagerUiStartupReady = TRUE;
 
                     // pozadame Salmon o kontrolu, zda na disku nejsou stare bug reporty, ktere by bylo potreba odeslat
                     SalmonCheckBugs();

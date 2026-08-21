@@ -977,38 +977,6 @@ BOOL CPlugins::ExecuteMenuItem(CFilesWindow* panel, HWND parent, int suid)
     return FALSE;
 }
 
-int CPlugins::ResolveMenuItemCommandForTests(HWND parent, const char* dllSuffix, int id)
-{
-    CPluginData* pluginData = GetPluginDataFromSuffix(dllSuffix);
-    if (pluginData == NULL)
-        return 0;
-
-    int pluginIndex = -1;
-    for (int i = 0; i < Data.Count; i++)
-    {
-        if (Data[i] == pluginData)
-        {
-            pluginIndex = i;
-            break;
-        }
-    }
-    if (pluginIndex == -1)
-        return 0;
-
-    // Build the real plug-in submenu so the returned SUID follows the host's normal dynamic allocation path.
-    CMenuPopup menu(CML_PLUGINS_SUBMENU);
-    if (!InitPluginMenuItemsForBar(parent, pluginIndex, &menu))
-        return 0;
-
-    for (int i = 0; i < pluginData->MenuItems.Count; i++)
-    {
-        CPluginMenuItem* item = pluginData->MenuItems[i];
-        if (item->ID == id)
-            return item->SUID;
-    }
-    return 0;
-}
-
 BOOL CPlugins::HelpForMenuItem(HWND parent, int suid)
 {
     BOOL helpDisplayed;

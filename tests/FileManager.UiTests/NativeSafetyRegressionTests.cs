@@ -514,8 +514,10 @@ public sealed class NativeSafetyRegressionTests
         var owner = File.ReadAllText(Path.Combine(root, "src", "plugins", "shared", "plugin_thread_owner.h"));
         var ftpConsumer = File.ReadAllText(Path.Combine(root, "src", "plugins", "ftp", "fs1.cpp"));
         var ratchet = File.ReadAllText(Path.Combine(root, "tools", "verify-no-new-raw-thread-creation.ps1"));
+        var refactoring = File.ReadAllText(Path.Combine(root, "refactoring.md"));
 
-        // Pin the executable cooperative-shutdown contract without coupling safety coverage to editable documentation prose.
+        // The shared queue is compiled into many plug-ins, so preserve its API
+        // while pinning the cooperative ownership boundary and safe-join order.
         Assert.Multiple(() =>
         {
             Assert.That(queueHeader, Does.Contain("CPluginThreadOwner* Owner"));
@@ -536,6 +538,7 @@ public sealed class NativeSafetyRegressionTests
             Assert.That(ftpConsumer, Does.Contain("CThreadQueue AuxThreadQueue(\"FTP Aux\")"));
             Assert.That(ftpConsumer, Does.Contain("AuxThreadQueue.KillAll(TRUE, 0, 0)"));
             Assert.That(ratchet, Does.Contain("src/plugins/shared/plugin_thread_owner.h"));
+            Assert.That(refactoring, Does.Contain("`CPluginThreadOwner` adapts the shared plug-in queue"));
         });
     }
 
@@ -1186,9 +1189,9 @@ public sealed class NativeSafetyRegressionTests
             Assert.That(loader, Does.Contain("~CPluginEntryScope()"));
             Assert.That(loader, Does.Contain("CPluginDataLock dataLock"));
             Assert.That(loader, Does.Contain("PluginIface.Init(NULL, 0)"));
-            // Source files may use either Git or Windows line endings; the ordering invariant is platform-independent.
-            Assert.That(loader.ReplaceLineEndings("\n"),
-                        Does.Contain("CallbackState.Leave();\n        SalamanderGeneral.Init(PluginIface.GetInterface());"));
+            // This ordering contract spans lines, so accept both Git checkout
+            // conventions while still requiring the two calls to remain adjacent.
+            Assert.That(loader, Does.Match(@"CallbackState\.Leave\(\);\r?\n        SalamanderGeneral\.Init\(PluginIface\.GetInterface\(\)\);"));
             Assert.That(loader, Does.Contain("CPluginEntryScope pluginEntry(Plugins.GetCallbackState(), PluginIface,"));
             Assert.That(loader, Does.Contain("pluginEntry.SetReturnedInterface(resIface)"));
             Assert.That(loader, Does.Not.Contain("EnterPlugin(); // for the plugin entry point"));
@@ -1880,9 +1883,9 @@ public sealed class NativeSafetyRegressionTests
             Assert.That(policy, Does.Contain("628a44cfe82c66aed1ccbbe85a562d2e33ebe64b3288981ed76285612227934e"));
             Assert.That(policy, Does.Contain("PRAGMA integrity_check"));
             Assert.That(policy, Does.Contain("BEGIN IMMEDIATE"));
-            // Vendor policy validation must not depend on the checkout's configured line-ending convention.
-            Assert.That(policy.ReplaceLineEndings("\n"),
-                        Does.Contain("FileManager must not run\nintegrity checks, checkpoints, migrations, or recovery writes against it."));
+            // The policy sentence spans lines; tolerate CRLF without weakening
+            // the exact prohibition guarded by this contract test.
+            Assert.That(policy, Does.Match("FileManager must not run\\r?\\nintegrity checks, checkpoints, migrations, or recovery writes against it\\."));
             Assert.That(externalReader, Does.Contain("SQLITE_OPEN_READONLY"));
             Assert.That(externalReader, Does.Contain("never a FileManager recovery or write target"));
             Assert.That(recoveryTest, Does.Contain("PRAGMA journal_mode=WAL"));

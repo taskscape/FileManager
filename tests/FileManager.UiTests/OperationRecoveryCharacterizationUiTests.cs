@@ -29,21 +29,11 @@ public sealed class OperationRecoveryCharacterizationUiTests : FileOperationUiTe
             $"STATE|0|temporary-ready{Environment.NewLine}");
     }
 
-    protected override bool IsExpectedStartupModal(nint windowHandle)
-    {
-        // Stable dialog/control IDs identify the recovery choice without depending on its localized title or text.
-        return NativeCommands.GetWindowClassName(windowHandle) == "#32770" &&
-               NativeCommands.HasDialogControl(windowHandle, 2477) &&
-               NativeCommands.HasDialogControl(windowHandle, 6) &&
-               NativeCommands.HasDialogControl(windowHandle, 7) &&
-               NativeCommands.HasDialogControl(windowHandle, 2);
-    }
-
     [Test]
     [Category("Recovery")]
     public void Restart_reconciliation_commits_a_fully_written_transactional_target()
     {
-        // The fixture accepts the expected startup modal before its disabled owner would satisfy normal readiness.
+        // Startup reaches the main window before presenting the modal recovery choice.
         ChooseOperationPrompt(WaitForOperationPrompt(6), 6); // IDYES: resume a ready target
         var completion = WaitForOperationPrompt(1); // IDOK: recovery summary
         ChooseOperationPrompt(completion, 1);

@@ -22,21 +22,12 @@ public abstract class FileOperationUiTestBase : FileManagerUiTestBase
 
     protected override void OnAfterFileManagerStopped()
     {
-        var completedWorkspace = workspace;
-        // Clear first so a cleanup exception cannot leak this case's partial topology into the next NUnit case.
-        workspace = null;
-        completedWorkspace?.Dispose();
+        workspace?.Dispose();
     }
 
     protected void SelectSourceItem(string name)
     {
-        // ADS and topology scenarios create sources after startup, so refresh before selecting from the owner-drawn list.
-        NativeCommands.RefreshLeftPanel(MainWindowHandle);
-        var list = MainWindow.FindAllDescendants()
-            .Where(element => string.Equals(element.Properties.ClassName.ValueOrDefault, "SalamanderItemsBox", StringComparison.Ordinal))
-            .OrderBy(element => element.BoundingRectangle.Left)
-            .FirstOrDefault();
-        Assert.That(list, Is.Not.Null, "The left file panel did not expose its SalamanderItemsBox control.");
+        var list = FindSourceList();
         NativeCommands.QuickSearch(list!.Properties.NativeWindowHandle.Value, name);
     }
 
@@ -55,8 +46,8 @@ public abstract class FileOperationUiTestBase : FileManagerUiTestBase
     {
         if (sourceName.Length != 0)
             SelectSourceItem(sourceName);
-        NativeCommands.Execute(MainWindowHandle, command);
-        var dialog = WaitForOperationEntryDialog();
+        NativeCommands.Execute(MainWindow.Properties.NativeWindowHandle.Value, command);
+        var dialog = WaitForWindow(window => window.Properties.NativeWindowHandle.Value != MainWindow.Properties.NativeWindowHandle.Value);
         SetDialogPath(dialog, path);
         CloseDialog(dialog, commit);
         return dialog;
@@ -65,72 +56,63 @@ public abstract class FileOperationUiTestBase : FileManagerUiTestBase
     protected Window ExecuteAndWaitForDialog(int command, string sourceName)
     {
         SelectSourceItem(sourceName);
-        NativeCommands.Execute(MainWindowHandle, command);
-        return WaitForOperationEntryDialog();
+        NativeCommands.Execute(MainWindow.Properties.NativeWindowHandle.Value, command);
+        return WaitForWindow(window => window.Properties.NativeWindowHandle.Value != MainWindow.Properties.NativeWindowHandle.Value);
     }
 
     protected Window WaitForOperationPrompt(int buttonId)
     {
         return WaitForWindow(window =>
-            window.Properties.NativeWindowHandle.Value != MainWindowHandle &&
-            NativeCommands.HasDialogControl(window.Properties.NativeWindowHandle.Value, buttonId));
+            window.Properties.NativeWindowHandle.Value != MainWindow.Properties.NativeWindowHandle.Value &&
+            window.FindFirstDescendant(cf => cf.ByAutomationId(buttonId.ToString()))?.AsButton() is not null);
     }
 
     protected static void ChooseOperationPrompt(Window dialog, int buttonId)
     {
-        NativeCommands.ClickDialogButton(dialog.Properties.NativeWindowHandle.Value, buttonId);
+        var button = dialog.FindFirstDescendant(cf => cf.ByAutomationId(buttonId.ToString()))?.AsButton();
+        Assert.That(button, Is.Not.Null, $"The operation prompt did not expose button {buttonId}.");
+        button!.Invoke();
         WaitForWindowToClose(dialog);
     }
 
     protected void SubmitInvalidPathAndCancel(int command, string sourceName, string path)
     {
         var operationDialog = ExecuteWithPathWithoutWaitingForClose(command, sourceName, path);
-        var operationDialogHandle = operationDialog.Properties.NativeWindowHandle.Value;
         var failureDialog = WaitForWindow(window =>
-            window.Properties.NativeWindowHandle.Value != MainWindowHandle &&
-            window.Properties.NativeWindowHandle.Value != operationDialogHandle &&
-            (NativeCommands.HasDialogControl(window.Properties.NativeWindowHandle.Value, 1) ||
-             NativeCommands.HasDialogControl(window.Properties.NativeWindowHandle.Value, 2)));
-        // Error boxes use OK, while overwrite/collision confirmations are cancelled to preserve both filesystem items.
-        CloseDialog(failureDialog, commit: NativeCommands.HasDialogControl(failureDialog.Properties.NativeWindowHandle.Value, 1));
-        // Some validation failures close the entry dialog themselves; cancel it only when its HWND remains alive.
-        if (NativeCommands.IsWindowAvailable(operationDialogHandle))
-            CloseDialog(operationDialog, commit: false);
+            window.Properties.NativeWindowHandle.Value != MainWindow.Properties.NativeWindowHandle.Value &&
+            window.Properties.NativeWindowHandle.Value != operationDialog.Properties.NativeWindowHandle.Value);
+        CloseDialog(failureDialog, commit: true);
+        // Quick Rename destroys and recreates its input dialog after an execution error; copy/move validation keeps it alive.
+        var dialogToCancel = operationDialog.IsAvailable
+            ? operationDialog
+            : WaitForWindow(window =>
+                window.Properties.NativeWindowHandle.Value != MainWindow.Properties.NativeWindowHandle.Value &&
+                window.FindFirstDescendant(cf => cf.ByAutomationId("2"))?.AsButton() is not null);
+        CloseDialog(dialogToCancel, commit: false);
     }
 
     protected void ConfirmDeleteIfPrompted()
     {
-        DismissOptionalPrompt(6, TimeSpan.FromSeconds(3), 6); // IDYES
-    }
-
-    protected void ConfirmCreateDirectoryParentsIfPrompted()
-    {
-        DismissOptionalPrompt(1, TimeSpan.FromSeconds(3), 1, 2); // IDOK with IDCANCEL distinguishes the missing-parent question.
-    }
-
-    protected bool DismissOptionalPrompt(int buttonToClick, TimeSpan wait, params int[] requiredControls)
-    {
-        var timeout = DateTime.UtcNow + wait;
+        var timeout = DateTime.UtcNow + TimeSpan.FromSeconds(3);
         while (DateTime.UtcNow < timeout)
         {
-            var dialog = GetFileManagerTopLevelWindows()
-                .FirstOrDefault(window => window.Properties.NativeWindowHandle.Value != MainWindowHandle &&
-                                          requiredControls.All(controlId =>
-                                              NativeCommands.HasDialogControl(window.Properties.NativeWindowHandle.Value, controlId)));
-            if (dialog is not null)
+            var dialog = Application.GetAllTopLevelWindows(Automation)
+                .FirstOrDefault(window => window.Properties.NativeWindowHandle.Value != MainWindow.Properties.NativeWindowHandle.Value);
+            var yes = dialog?.FindFirstDescendant(cf => cf.ByAutomationId("6"))?.AsButton();
+            if (yes is not null)
             {
-                // Stable button IDs allow optional confirmations to vary by profile without translated-text coupling.
-                NativeCommands.ClickDialogButton(dialog.Properties.NativeWindowHandle.Value, buttonToClick);
-                return true;
+                yes.Invoke();
+                return;
             }
             Thread.Sleep(100);
         }
-        return false;
     }
 
     protected static void CloseDialog(Window dialog, bool commit)
     {
-        NativeCommands.ClickDialogButton(dialog.Properties.NativeWindowHandle.Value, commit ? 1 : 2);
+        var button = dialog.FindFirstDescendant(cf => cf.ByAutomationId(commit ? "1" : "2"))?.AsButton();
+        Assert.That(button, Is.Not.Null, $"The operation dialog did not expose its {(commit ? "OK" : "Cancel")} button.");
+        button!.Invoke();
         WaitForWindowToClose(dialog);
     }
 
@@ -193,21 +175,13 @@ public abstract class FileOperationUiTestBase : FileManagerUiTestBase
     {
         if (sourceName.Length != 0)
             SelectSourceItem(sourceName);
-        NativeCommands.Execute(MainWindowHandle, command);
-        var dialog = WaitForOperationEntryDialog();
+        NativeCommands.Execute(MainWindow.Properties.NativeWindowHandle.Value, command);
+        var dialog = WaitForWindow(window => window.Properties.NativeWindowHandle.Value != MainWindow.Properties.NativeWindowHandle.Value);
         SetDialogPath(dialog, path);
-        NativeCommands.ClickDialogButton(dialog.Properties.NativeWindowHandle.Value, 1);
+        var ok = dialog.FindFirstDescendant(cf => cf.ByAutomationId("1"))?.AsButton();
+        Assert.That(ok, Is.Not.Null, "The operation dialog did not expose its OK button.");
+        ok!.Invoke();
         return dialog;
-    }
-
-    private Window WaitForOperationEntryDialog()
-    {
-        // Destination and name dialogs expose editable input plus standard OK/Cancel identities across languages.
-        return WaitForWindow(window =>
-            window.Properties.NativeWindowHandle.Value != MainWindowHandle &&
-            window.FindAllDescendants().Any(element => element.ControlType is ControlType.Edit or ControlType.ComboBox) &&
-            NativeCommands.HasDialogControl(window.Properties.NativeWindowHandle.Value, 1) &&
-            NativeCommands.HasDialogControl(window.Properties.NativeWindowHandle.Value, 2));
     }
 }
 
@@ -267,8 +241,9 @@ public sealed class FileOperationWorkspace : IDisposable
         File.WriteAllText(TargetPath("overwrite-file.txt"), "overwrite-target-content");
         File.WriteAllText(TargetPath("skip-file.txt"), "skip-target-content");
         File.WriteAllText(TargetPath("cancel-conflict.txt"), "cancel-conflict-target-content");
-        // Rename is panel-local, so its overwrite fixture must collide in the source panel rather than the opposite panel.
-        File.WriteAllText(SourcePath("rename-overwrite-target.txt"), "rename-overwrite-target-content");
+        File.WriteAllText(TargetPath("move-overwrite.txt"), "move-overwrite-target-content");
+        File.WriteAllText(TargetPath("move-skip.txt"), "move-skip-target-content");
+        File.WriteAllText(TargetPath("rename-overwrite-target.txt"), "rename-overwrite-target-content");
         WriteTargetFile(Path.Combine("overwrite-all-tree", "nested", "first.txt"), "overwrite-all-first-target");
         WriteTargetFile(Path.Combine("overwrite-all-tree", "nested", "second.txt"), "overwrite-all-second-target");
         WriteTargetFile(Path.Combine("skip-all-tree", "nested", "first.txt"), "skip-all-first-target");
@@ -294,10 +269,10 @@ public sealed class FileOperationWorkspace : IDisposable
     public void Dispose()
     {
         if (Directory.Exists(RootDirectory))
-            DeleteDirectoryTreeWithoutTraversingReparsePoints(RootDirectory);
+            Directory.Delete(RootDirectory, recursive: true);
         if (!string.Equals(TargetWorkspaceDirectory, RootDirectory, StringComparison.OrdinalIgnoreCase) &&
             Directory.Exists(TargetWorkspaceDirectory))
-            DeleteDirectoryTreeWithoutTraversingReparsePoints(TargetWorkspaceDirectory);
+            Directory.Delete(TargetWorkspaceDirectory, recursive: true);
     }
 
     private void WriteSourceFile(string relativePath, string content)
@@ -312,29 +287,5 @@ public sealed class FileOperationWorkspace : IDisposable
         var path = TargetPath(relativePath);
         Directory.CreateDirectory(Path.GetDirectoryName(path)!);
         File.WriteAllText(path, content);
-    }
-
-    private static void DeleteDirectoryTreeWithoutTraversingReparsePoints(string directory)
-    {
-        foreach (var entry in Directory.EnumerateFileSystemEntries(directory))
-        {
-            var attributes = File.GetAttributes(entry);
-            if ((attributes & FileAttributes.Directory) != 0)
-            {
-                // A junction or directory symlink is a fixture entry, never a cleanup traversal boundary.
-                if ((attributes & FileAttributes.ReparsePoint) != 0)
-                    Directory.Delete(entry);
-                else
-                    DeleteDirectoryTreeWithoutTraversingReparsePoints(entry);
-            }
-            else
-            {
-                if ((attributes & FileAttributes.ReadOnly) != 0)
-                    File.SetAttributes(entry, attributes & ~FileAttributes.ReadOnly);
-                File.Delete(entry);
-            }
-        }
-
-        Directory.Delete(directory);
     }
 }
