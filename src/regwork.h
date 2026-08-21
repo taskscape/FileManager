@@ -20,11 +20,11 @@ BOOL GetValueDontCheckTypeAux(HKEY hKey, const char* name, void* buffer, DWORD b
 
 // Test-only crash injection for the transactional configuration writer.  The scope is
 // inert unless FILEMANAGER_UI_ISOLATED=1 is present, so ordinary application launches
-// cannot accidentally enable it. The private UI command selects the write boundary and
-// FILEMANAGER_CONFIG_FAULT_REPORT receives the number of mutations in a completed save.
+// cannot accidentally enable it.  FILEMANAGER_CONFIG_FAULT_AFTER_WRITE terminates the
+// process immediately after that successful registry mutation; FILEMANAGER_CONFIG_FAULT_REPORT
+// receives the number of mutations in a completed save.
 void BeginConfigurationWriteFaultInjection();
 void EndConfigurationWriteFaultInjection();
-void ArmNextConfigurationWriteFault(LONG writeBoundary);
 LONG FlushConfigurationRegistryKey(HKEY key);
 const DWORD CONFIGURATION_WRITE_FAULT_EXIT_CODE = 121;
 

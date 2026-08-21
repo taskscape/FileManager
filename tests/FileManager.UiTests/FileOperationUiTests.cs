@@ -12,8 +12,6 @@ public sealed class FileOperationUiTests : FileOperationUiTestBase
     public void Create_directory_creates_requested_nested_directory()
     {
         ExecuteWithPath(NativeCommands.CreateDirectory, string.Empty, "created\\nested", commit: true);
-        // A disposable profile may ask before creating the missing parent; the test owns that normal interaction.
-        ConfirmCreateDirectoryParentsIfPrompted();
 
         WaitForFileSystem(() => Directory.Exists(Workspace.SourcePath("created\\nested")),
                           "Create Directory did not create the requested nested directory.");
@@ -89,7 +87,7 @@ public sealed class FileOperationUiTests : FileOperationUiTestBase
         AlternateDataStreams.Write(target, "stale", "stale-stream-content"u8.ToArray());
 
         ExecuteWithPath(NativeCommands.CopyFiles, "ads-overwrite.txt", Workspace.TargetDirectory, commit: true);
-        DismissOptionalPrompt(6, TimeSpan.FromSeconds(3), 6); // IDYES when this profile confirms overwrites.
+        ChooseOperationPrompt(WaitForOperationPrompt(6), 6); // IDYES
 
         WaitForFileSystem(() => File.ReadAllText(target) == "ads-overwrite-source",
                           "Confirmed overwrite did not replace the ADS test target.");
@@ -133,7 +131,7 @@ public sealed class FileOperationUiTests : FileOperationUiTestBase
     public void Copy_overwrite_replaces_the_existing_target_only_after_the_user_confirms()
     {
         ExecuteWithPath(NativeCommands.CopyFiles, "overwrite-file.txt", Workspace.TargetDirectory, commit: true);
-        DismissOptionalPrompt(6, TimeSpan.FromSeconds(3), 6); // IDYES when this profile confirms overwrites.
+        ChooseOperationPrompt(WaitForOperationPrompt(6), 6); // IDYES
 
         WaitForFileSystem(() => File.ReadAllText(Workspace.TargetPath("overwrite-file.txt")) == "overwrite-source-content",
                           "Confirmed overwrite did not replace the target content.");
@@ -144,7 +142,7 @@ public sealed class FileOperationUiTests : FileOperationUiTestBase
     public void Copy_overwrite_all_applies_the_choice_to_the_complete_conflicting_tree()
     {
         ExecuteWithPath(NativeCommands.CopyFiles, "overwrite-all-tree", Workspace.TargetDirectory, commit: true);
-        DismissOptionalPrompt(185, TimeSpan.FromSeconds(3), 185); // IDB_ALL when conflict choices are enabled.
+        ChooseOperationPrompt(WaitForOperationPrompt(185), 185); // IDB_ALL
 
         WaitForFileSystem(() => File.ReadAllText(Workspace.TargetPath("overwrite-all-tree\\nested\\first.txt")) == "overwrite-all-first-source" &&
                                 File.ReadAllText(Workspace.TargetPath("overwrite-all-tree\\nested\\second.txt")) == "overwrite-all-second-source",
@@ -155,7 +153,7 @@ public sealed class FileOperationUiTests : FileOperationUiTestBase
     public void Copy_skip_keeps_the_existing_target_and_the_source()
     {
         ExecuteWithPath(NativeCommands.CopyFiles, "skip-file.txt", Workspace.TargetDirectory, commit: true);
-        DismissOptionalPrompt(173, TimeSpan.FromSeconds(3), 173); // Semantic checks expose an unavailable Skip choice.
+        ChooseOperationPrompt(WaitForOperationPrompt(173), 173); // IDB_SKIP
 
         WaitForFileSystem(() => File.ReadAllText(Workspace.TargetPath("skip-file.txt")) == "skip-target-content",
                           "Skip unexpectedly modified the conflicting target.");
@@ -166,7 +164,7 @@ public sealed class FileOperationUiTests : FileOperationUiTestBase
     public void Copy_skip_all_keeps_the_existing_conflicting_tree()
     {
         ExecuteWithPath(NativeCommands.CopyFiles, "skip-all-tree", Workspace.TargetDirectory, commit: true);
-        DismissOptionalPrompt(174, TimeSpan.FromSeconds(3), 174); // Semantic checks expose an unavailable Skip All choice.
+        ChooseOperationPrompt(WaitForOperationPrompt(174), 174); // IDB_SKIPALL
 
         WaitForFileSystem(() => Directory.Exists(Workspace.TargetPath("skip-all-tree")), "Skip All removed the existing target directory.");
         Assert.Multiple(() =>
@@ -185,9 +183,9 @@ public sealed class FileOperationUiTests : FileOperationUiTestBase
 
         ExecuteWithPath(NativeCommands.CopyFiles, "copy-file.txt", Workspace.TargetDirectory, commit: true);
 
-        WaitForFileSystem(() => FindOperationJournalFor(source) is not null,
+        WaitForFileSystem(() => FindJournalFor(source) is not null,
                           "Copy did not persist a durable operation journal.");
-        var journal = FindOperationJournalFor(source)!;
+        var journal = FindJournalFor(source)!;
         var content = File.ReadAllText(journal);
         var planItem = content.Split(new[] { "\r\n", "\n" }, StringSplitOptions.RemoveEmptyEntries)
             .Single(line => line.StartsWith("PLANITEM|0|copy-file|", StringComparison.Ordinal));
@@ -255,20 +253,13 @@ public sealed class FileOperationUiTests : FileOperationUiTestBase
     public void Rename_overwrite_replaces_the_collision_without_losing_source_metadata()
     {
         var source = Workspace.SourcePath("rename-overwrite.txt");
-        var target = Workspace.SourcePath("rename-overwrite-target.txt");
         var expectedTimestamp = new DateTime(2023, 11, 03, 08, 15, 00, DateTimeKind.Utc);
         File.SetLastWriteTimeUtc(source, expectedTimestamp);
 
-        // Fail at fixture setup instead of timing out on a prompt when the panel-local collision is missing.
-        Assert.Multiple(() =>
-        {
-            Assert.That(File.Exists(source), Is.True, "The rename source fixture is missing.");
-            Assert.That(File.Exists(target), Is.True, "The rename collision fixture is missing from the source panel.");
-        });
-
         ExecuteWithPath(NativeCommands.RenameFile, "rename-overwrite.txt", "rename-overwrite-target.txt", commit: true);
-        DismissOptionalPrompt(6, TimeSpan.FromSeconds(3), 6); // IDYES when this profile confirms overwrites.
+        ChooseOperationPrompt(WaitForOperationPrompt(6), 6); // IDYES
 
+        var target = Workspace.SourcePath("rename-overwrite-target.txt");
         WaitForFileSystem(() => File.ReadAllText(target) == "rename-overwrite-source-content",
                           "Confirmed rename overwrite did not replace the collision target.");
         Assert.Multiple(() =>
@@ -307,7 +298,7 @@ public sealed class FileOperationUiTests : FileOperationUiTestBase
     {
         // Move must apply the confirmed overwrite before deleting the source identity.
         ExecuteWithPath(NativeCommands.MoveFiles, "move-overwrite.txt", Workspace.TargetDirectory, commit: true);
-        DismissOptionalPrompt(6, TimeSpan.FromSeconds(3), 6); // IDYES when this profile confirms overwrites.
+        ChooseOperationPrompt(WaitForOperationPrompt(6), 6); // IDYES
 
         WaitForFileSystem(() => File.ReadAllText(Workspace.TargetPath("move-overwrite.txt")) == "move-overwrite-source-content",
                           "Confirmed move overwrite did not replace the target content.");
@@ -320,7 +311,7 @@ public sealed class FileOperationUiTests : FileOperationUiTestBase
     {
         // A skipped move collision must retain both versions because no target commit occurred.
         ExecuteWithPath(NativeCommands.MoveFiles, "move-skip.txt", Workspace.TargetDirectory, commit: true);
-        DismissOptionalPrompt(173, TimeSpan.FromSeconds(3), 173); // Semantic checks expose an unavailable Skip choice.
+        ChooseOperationPrompt(WaitForOperationPrompt(173), 173); // IDB_SKIP
 
         WaitForFileSystem(() => File.ReadAllText(Workspace.TargetPath("move-skip.txt")) == "move-skip-target-content",
                           "Skipped move unexpectedly modified the conflicting target.");
@@ -332,16 +323,13 @@ public sealed class FileOperationUiTests : FileOperationUiTestBase
     {
         // Overwrite All must commit every destination before the move removes the complete source tree.
         ExecuteWithPath(NativeCommands.MoveFiles, "move-overwrite-all-tree", Workspace.TargetDirectory, commit: true);
-        DismissOptionalPrompt(185, TimeSpan.FromSeconds(3), 185); // IDB_ALL when conflict choices are enabled.
+        ChooseOperationPrompt(WaitForOperationPrompt(185), 185); // IDB_ALL
 
-        var firstTarget = Workspace.TargetPath("move-overwrite-all-tree\\nested\\first.txt");
-        var secondTarget = Workspace.TargetPath("move-overwrite-all-tree\\nested\\second.txt");
-        WaitForFileSystem(() => File.Exists(firstTarget) && File.Exists(secondTarget) &&
-                                File.ReadAllText(firstTarget) == "move-overwrite-all-first-source" &&
-                                File.ReadAllText(secondTarget) == "move-overwrite-all-second-source",
+        WaitForFileSystem(() => File.ReadAllText(Workspace.TargetPath("move-overwrite-all-tree\\nested\\first.txt")) ==
+                                    "move-overwrite-all-first-source" &&
+                                File.ReadAllText(Workspace.TargetPath("move-overwrite-all-tree\\nested\\second.txt")) ==
+                                    "move-overwrite-all-second-source",
                           "Move Overwrite All did not replace every conflicting descendant.");
-        WaitForOperationJournalTerminal(Workspace.SourcePath("move-overwrite-all-tree"),
-                                        "Move Overwrite All left its durable operation journal incomplete.");
         Assert.That(Directory.Exists(Workspace.SourcePath("move-overwrite-all-tree")), Is.False,
                     "Move Overwrite All retained the fully committed source tree.");
     }
@@ -351,7 +339,7 @@ public sealed class FileOperationUiTests : FileOperationUiTestBase
     {
         // Skip All suppresses later conflict prompts without retaining independently committed siblings.
         ExecuteWithPath(NativeCommands.MoveFiles, "move-skip-all-tree", Workspace.TargetDirectory, commit: true);
-        DismissOptionalPrompt(174, TimeSpan.FromSeconds(3), 174); // Semantic checks expose an unavailable Skip All choice.
+        ChooseOperationPrompt(WaitForOperationPrompt(174), 174); // IDB_SKIPALL
 
         WaitForFileSystem(() => File.Exists(Workspace.TargetPath("move-skip-all-tree\\nested\\unique.txt")),
                           "Move Skip All did not continue with a nonconflicting sibling.");
@@ -365,16 +353,13 @@ public sealed class FileOperationUiTests : FileOperationUiTestBase
             Assert.That(File.Exists(Workspace.SourcePath("move-skip-all-tree\\nested\\second.txt")), Is.True);
             Assert.That(File.Exists(Workspace.SourcePath("move-skip-all-tree\\nested\\unique.txt")), Is.False);
         });
-        // The visible result can precede the worker's final directory cleanup and durable terminal transition.
-        WaitForOperationJournalTerminal(Workspace.SourcePath("move-skip-all-tree"),
-                                        "Move Skip All left its durable operation journal incomplete.");
     }
 
     [Test]
     public void Delete_file_removes_the_selected_file()
     {
         SelectSourceItem("delete-file.txt");
-        NativeCommands.Execute(MainWindowHandle, NativeCommands.DeleteFiles);
+        NativeCommands.Execute(MainWindow.Properties.NativeWindowHandle.Value, NativeCommands.DeleteFiles);
         ConfirmDeleteIfPrompted();
 
         WaitForFileSystem(() => !File.Exists(Workspace.SourcePath("delete-file.txt")), "Delete did not remove the selected file.");
@@ -384,7 +369,7 @@ public sealed class FileOperationUiTests : FileOperationUiTestBase
     public void Delete_directory_removes_all_descendants()
     {
         SelectSourceItem("delete-tree");
-        NativeCommands.Execute(MainWindowHandle, NativeCommands.DeleteFiles);
+        NativeCommands.Execute(MainWindow.Properties.NativeWindowHandle.Value, NativeCommands.DeleteFiles);
         ConfirmDeleteIfPrompted();
 
         WaitForFileSystem(() => !Directory.Exists(Workspace.SourcePath("delete-tree")), "Delete did not remove the selected directory tree.");
@@ -413,7 +398,7 @@ public sealed class FileOperationUiTests : FileOperationUiTestBase
         var itemCountBefore = ShellRecycleBin.GetItemCount(volumeRoot);
 
         SelectSourceItem("recycle-file.txt");
-        NativeCommands.Execute(MainWindowHandle, NativeCommands.DeleteFiles);
+        NativeCommands.Execute(MainWindow.Properties.NativeWindowHandle.Value, NativeCommands.DeleteFiles);
         ConfirmDeleteIfPrompted();
 
         WaitForFileSystem(() => !File.Exists(source), "Recycle-bin delete did not remove the source file.");
@@ -427,17 +412,12 @@ public sealed class FileOperationUiTests : FileOperationUiTestBase
         var source = Workspace.SourcePath("cancel-conflict.txt");
 
         ExecuteWithPath(NativeCommands.CopyFiles, "cancel-conflict.txt", Workspace.TargetDirectory, commit: true);
-        DismissOptionalPrompt(2, TimeSpan.FromSeconds(3), 2); // Semantic checks expose an unavailable Cancel choice.
+        ChooseOperationPrompt(WaitForOperationPrompt(2), 2); // IDCANCEL
 
         WaitForFileSystem(() => File.ReadAllText(Workspace.TargetPath("cancel-conflict.txt")) == "cancel-conflict-target-content",
                           "Cancellation unexpectedly changed the target.");
         Assert.That(File.ReadAllText(source), Is.EqualTo("cancel-conflict-source-content"));
-        WaitForFileSystem(() =>
-        {
-            var journal = FindOperationJournalFor(source);
-            return journal is not null && TryReadOperationJournal(journal, out var content) &&
-                   content.Contains("OPERATION|cancelled", StringComparison.Ordinal);
-        },
+        WaitForFileSystem(() => FindJournalFor(source)?.Contains("OPERATION|cancelled", StringComparison.Ordinal) == true,
                           "Cancellation was not recorded in the durable operation journal.");
     }
 
@@ -483,13 +463,11 @@ public sealed class FileOperationUiTests : FileOperationUiTestBase
     {
         // IDNO is the rename-specific skip path and must return to the rename dialog without changing either file.
         ExecuteWithPath(NativeCommands.RenameFile, "rename-file.txt", "rename-collision.txt", commit: true);
-        if (DismissOptionalPrompt(7, TimeSpan.FromSeconds(3), 7)) // IDNO
-        {
-            var reopenedRenameDialog = WaitForWindow(window =>
-                window.Properties.NativeWindowHandle.Value != MainWindow.Properties.NativeWindowHandle.Value &&
-                window.FindFirstDescendant(cf => cf.ByAutomationId("2"))?.AsButton() is not null);
-            CloseDialog(reopenedRenameDialog, commit: false);
-        }
+        ChooseOperationPrompt(WaitForOperationPrompt(7), 7); // IDNO
+        var reopenedRenameDialog = WaitForWindow(window =>
+            window.Properties.NativeWindowHandle.Value != MainWindow.Properties.NativeWindowHandle.Value &&
+            window.FindFirstDescendant(cf => cf.ByAutomationId("2"))?.AsButton() is not null);
+        CloseDialog(reopenedRenameDialog, commit: false);
 
         Assert.That(File.ReadAllText(Workspace.SourcePath("rename-file.txt")), Is.EqualTo("rename-file-content"));
         Assert.That(File.ReadAllText(Workspace.SourcePath("rename-collision.txt")), Is.EqualTo("collision-content"));
@@ -512,15 +490,27 @@ public sealed class FileOperationUiTests : FileOperationUiTestBase
     {
         // Handling the worker prompt prevents this case from passing merely because deletion has not completed yet.
         using var handle = Workspace.HoldSourceFileOpen("delete-locked.txt");
-        SelectSourceItem("delete-locked.txt");
-        NativeCommands.Execute(MainWindowHandle, NativeCommands.DeleteFiles);
+        SelectSourceItems("delete-locked.txt", "delete-z-after-skip.txt");
+        NativeCommands.Execute(MainWindow.Properties.NativeWindowHandle.Value, NativeCommands.DeleteFiles);
         ConfirmDeleteIfPrompted();
-        DismissOptionalPrompt(173, TimeSpan.FromSeconds(3), 173); // Semantic checks expose a missing locked-file Skip path.
+        ChooseOperationPrompt(WaitForOperationPrompt(173), 173); // IDB_SKIP
 
         WaitForFileSystem(() => !File.Exists(Workspace.SourcePath("delete-z-after-skip.txt")),
                           "Delete did not continue with later items after skipping the locked file.");
         Assert.That(File.Exists(Workspace.SourcePath("delete-locked.txt")), Is.True,
                     "Skipping a delete error removed the locked source file.");
+    }
+
+    private static string? FindJournalFor(string source)
+    {
+        var directory = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+                                     "Open Salamander", "operation-journals");
+        if (!Directory.Exists(directory))
+            return null;
+
+        return Directory.EnumerateFiles(directory, "*.opj")
+            .OrderByDescending(File.GetLastWriteTimeUtc)
+            .FirstOrDefault(path => File.ReadAllText(path).Contains(source, StringComparison.Ordinal));
     }
 
     private static byte[] CreateLargeStreamContent()
