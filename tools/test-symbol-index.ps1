@@ -13,7 +13,7 @@ $root = (Resolve-Path -LiteralPath $BuildRoot).Path.TrimEnd('\')
 $index = Get-Content -LiteralPath $IndexPath -Raw | ConvertFrom-Json
 if ($index.schemaVersion -ne 1 -or $null -eq $index.modules -or $index.modules.Count -eq 0) { throw 'Symbol index has no versioned module records.' }
 
-$seenKeys = [Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
+$symbolContent = [Collections.Generic.Dictionary[string, string]]::new([StringComparer]::OrdinalIgnoreCase)
 foreach ($entry in $index.modules) {
     # Verify immutable hashes before publication so an index never points at an unrelated PDB.
     $module = Join-Path $root $entry.module.Replace('/', '\')
@@ -21,6 +21,20 @@ foreach ($entry in $index.modules) {
     if (-not (Test-Path -LiteralPath $module) -or -not (Test-Path -LiteralPath $pdb)) { throw "Symbol index references a missing module or PDB: $($entry.module)" }
     if ((Get-FileHash -LiteralPath $module -Algorithm SHA256).Hash.ToLowerInvariant() -ne $entry.moduleSha256) { throw "Module hash drifted for $($entry.module)." }
     if ((Get-FileHash -LiteralPath $pdb -Algorithm SHA256).Hash.ToLowerInvariant() -ne $entry.pdbSha256) { throw "PDB hash drifted for $($entry.pdb)." }
-    if ($entry.symbolKey -notmatch '^[^/]+/[0-9A-F]{32}\d+/[^/]+\.pdb$' -or -not $seenKeys.Add($entry.symbolKey)) { throw "Invalid or duplicate symbol key: $($entry.symbolKey)" }
+    if ($entry.symbolKey -notmatch '^[^/]+/[0-9A-F]{32}\d+/[^/]+\.pdb$') {
+        throw "Invalid symbol key: $($entry.symbolKey)"
+    }
+
+    # Release staging deliberately mirrors helper binaries; a shared CodeView key is safe only when both immutable artifacts are identical.
+    $contentIdentity = "$($entry.moduleSha256)|$($entry.pdbSha256)"
+    [string]$knownContentIdentity = $null
+    if ($symbolContent.TryGetValue($entry.symbolKey, [ref]$knownContentIdentity)) {
+        if ($knownContentIdentity -ne $contentIdentity) {
+            throw "Symbol key resolves to inconsistent release content: $($entry.symbolKey)"
+        }
+    }
+    else {
+        $symbolContent.Add($entry.symbolKey, $contentIdentity)
+    }
 }
 Write-Host "Verified $($index.modules.Count) indexed release symbols."

@@ -1804,7 +1804,8 @@ public sealed class NativeSafetyRegressionTests
             Assert.That(indexer, Does.Contain("symbolKey"));
             Assert.That(indexer, Does.Contain("moduleSha256"));
             Assert.That(indexer, Does.Contain("pdbSha256"));
-            Assert.That(verifier, Does.Contain("Invalid or duplicate symbol key"));
+            // Identical staged helper copies may share a CodeView key; the verifier must still reject a key with divergent content.
+            Assert.That(verifier, Does.Contain("Symbol key resolves to inconsistent release content"));
             Assert.That(workflow, Does.Contain("Index and verify private release symbols"));
             Assert.That(workflow, Does.Contain("release-symbol-index.json"));
             Assert.That(workflow, Does.Contain("retention-days: 180"));
