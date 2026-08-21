@@ -17,6 +17,8 @@ public sealed class NativeSafetyRegressionTests
         var runner = File.ReadAllText(Path.Combine(root, "scripts", "runtests.ps1"));
         var releaseWorkflow = File.ReadAllText(Path.Combine(root, ".github", "workflows", "build-installer.yml"));
         var volumeProvisioner = File.ReadAllText(Path.Combine(root, "tools", "manage-ui-test-volumes.ps1"));
+        var quarantineVerifier = File.ReadAllText(Path.Combine(root, "tools", "verify-ui-test-quarantine.ps1"));
+        var quarantineWorkflow = File.ReadAllText(Path.Combine(root, ".github", "workflows", "quarantined-ui-tests.yml"));
 
         // The root command is the advertised entry point, so pin every
         // independently executable probe and the complete NUnit/UI collector.
@@ -43,13 +45,21 @@ public sealed class NativeSafetyRegressionTests
             Assert.That(runner, Does.Contain("run-lock-verifier-stress.ps1"));
             Assert.That(runner, Does.Contain("FailOnSkipped"));
             Assert.That(runner, Does.Contain("@outcome='NotExecuted'"));
+            // Only manifest-backed categories may leave the blocking inventory; NUnit Ignore remains a hard failure.
+            Assert.That(runner, Does.Contain("verify-ui-test-quarantine.ps1"));
+            Assert.That(runner, Does.Contain("NUnitFilter"));
+            Assert.That(runner, Does.Contain("unexpectedly ignored"));
+            Assert.That(quarantineVerifier, Does.Contain("Quarantine is filterable coverage"));
+            Assert.That(quarantineVerifier, Does.Contain("expiresOn"));
+            Assert.That(quarantineWorkflow, Does.Contain("TestCategory=Quarantined"));
+            Assert.That(quarantineWorkflow, Does.Contain("continue-on-error: true"));
             // The runner must select explicit data and registry boundaries before driving the current user's desktop.
             Assert.That(runner, Does.Contain("FILEMANAGER_UI_TESTDATA_ROOT"));
             Assert.That(runner, Does.Contain("$uiTestEnvironmentSkipReason = $_.Exception.Message"));
             // The release workflow must consume the root inventory rather than
             // maintaining a second list that can silently lose coverage.
             Assert.That(releaseWorkflow, Does.Contain("name: Complete automated release gate"));
-            Assert.That(releaseWorkflow, Does.Contain(".\\scripts\\runtests.ps1 -BaseCommit $env:RELEASE_BASE_COMMIT -SqliteDll $env:SQLITE_TEST_DLL -FailOnSkipped"));
+            Assert.That(releaseWorkflow, Does.Contain(".\\scripts\\runtests.ps1 -BaseCommit $env:RELEASE_BASE_COMMIT -SqliteDll $env:SQLITE_TEST_DLL -FailOnSkipped -NUnitFilter 'TestCategory!=Quarantined'"));
             Assert.That(releaseWorkflow, Does.Contain("needs: release-tests"));
             Assert.That(releaseWorkflow, Does.Contain("fetch-depth: 0"));
             Assert.That(releaseWorkflow, Does.Contain("FILEMANAGER_UI_CONFIG_FAULT_INJECTION: '1'"));
@@ -1798,7 +1808,7 @@ public sealed class NativeSafetyRegressionTests
             Assert.That(workflow, Does.Contain("Run v143 native regression subset"));
             Assert.That(workflow, Does.Contain("Run v145 native regression subset"));
             Assert.That(workflow, Does.Contain("Compare v143 and v145 native test results"));
-            Assert.That(workflow, Does.Contain("Run complete v143 verification without skips"));
+            Assert.That(workflow, Does.Contain("Run v143 verification without unexpected skips"));
             Assert.That(workflow, Does.Contain("Upload v145 complete UI results"));
             Assert.That(workflow, Does.Contain("Compare v143 and v145 complete UI results"));
         });

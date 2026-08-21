@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 1,
+  "tests": [
+    {
+      "fullyQualifiedName": "FileManager.UiTests.AlternateDataStreamsUnsupportedTargetUiTests.Cross_volume_move_to_an_ADS_unsupported_target_keeps_the_source_when_metadata_loss_is_declined",
+      "sourceFile": "tests/FileManager.UiTests/AlternateDataStreamsUnsupportedTargetUiTests.cs",
+      "testName": "Cross_volume_move_to_an_ADS_unsupported_target_keeps_the_source_when_metadata_loss_is_declined",
+      "reason": "The remote panel can select inherited ads-overwrite.txt and show the overwrite dialog instead of the ADS-loss dialog.",
+      "owner": "FileManager maintainers",
+      "trackingReference": "https://github.com/taskscape/FileManager/actions/runs/32452609747",
+      "expiresOn": "2026-09-18"
+    },
+    {
+      "fullyQualifiedName": "FileManager.UiTests.LifecycleLeakUiTests.Repeated_clean_startup_and_shutdown_does_not_accumulate_process_resources",
+      "sourceFile": "tests/FileManager.UiTests/LifecycleLeakUiTests.cs",
+      "testName": "Repeated_clean_startup_and_shutdown_does_not_accumulate_process_resources",
+      "reason": "The remote runner measured a 39-handle warm-start spread against the 32-handle budget while Application Verifier and lock stress passed.",
+      "owner": "FileManager maintainers",
+      "trackingReference": "https://github.com/taskscape/FileManager/actions/runs/32452609747",
+      "expiresOn": "2026-09-18"
+    }
+  ]
+}

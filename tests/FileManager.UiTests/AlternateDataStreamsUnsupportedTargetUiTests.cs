@@ -10,10 +10,10 @@ public sealed class AlternateDataStreamsUnsupportedTargetUiTests : FileOperation
 {
     protected override string? TargetVolumeRoot => UiTestSettings.RequireUnsupportedAdsTargetRoot();
 
-    // Temporarily disabled pending a dedicated source fixture: remote run 32452609747 selected inherited ads-overwrite.txt and showed Confirm File Overwrite instead of the ADS-loss prompt.
-    // The shared seeded workspace still permits that stale-panel collision after VHD settling; re-evaluate and re-enable after this scenario enumerates only its intended ADS input.
+    // Quarantined pending a dedicated source fixture: remote run 32452609747 selected inherited ads-overwrite.txt and showed Confirm File Overwrite instead of the ADS-loss prompt.
+    // The manifest records an owner, tracking reference, and expiry so the shared-panel collision cannot become a permanent silent exclusion.
     [Test]
-    [Ignore("Remote runner can select inherited ads-overwrite.txt; re-enable after isolating the ADS-loss source fixture.")]
+    [Category("Quarantined")]
     [Category("CrossVolume")]
     [Category("AlternateDataStreams")]
     public void Cross_volume_move_to_an_ADS_unsupported_target_keeps_the_source_when_metadata_loss_is_declined()

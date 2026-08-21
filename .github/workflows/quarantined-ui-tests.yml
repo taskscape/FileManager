@@ -1,0 +1,85 @@
+name: Monitor quarantined UI checks
+
+on:
+  schedule:
+    # Run independently of release publication so flaky evidence remains visible without blocking a verified installer.
+    - cron: '23 3 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  quarantined-ui-tests:
+    name: Monitor manifest-backed quarantined UI checks
+    # The job records failures and artifacts but cannot turn a scheduled monitor into a release blocker.
+    continue-on-error: true
+    runs-on:
+      group: FileManager UI
+      labels: [self-hosted, windows, filemanager-ui]
+    env:
+      BUILD_CONFIGURATION: Debug
+      SOLUTION_PATH: 'src\vcxproj\salamand.sln'
+      PLATFORM_TOOLSET: v145
+      OPENSAL_BUILD_DIR: '${{ github.workspace }}\quarantine-build\'
+      FILEMANAGER_UI_ISOLATED: '1'
+      FILEMANAGER_UI_CONFIG_FAULT_INJECTION: '1'
+      FILEMANAGER_UI_RECYCLE_BIN: '1'
+
+    steps:
+      - name: Checkout complete history
+        # The quarantine validator checks source-category ownership against the exact monitored revision.
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          fetch-depth: 0
+
+      - name: Provision isolated UI test volumes
+        shell: pwsh
+        # A fresh VHD set makes the monitor useful as evidence rather than a repeat of the persistent desktop's filesystem state.
+        run: .\tools\manage-ui-test-volumes.ps1 -Action Setup -WorkingDirectory (Join-Path $env:RUNNER_TEMP 'filemanager-ui-volumes') -EnvironmentFile $env:GITHUB_ENV
+
+      - name: Setup MSBuild
+        uses: microsoft/setup-msbuild@6fb02220983dee41ce7ae257b6f4d8f9bf5ed4ce # v2
+
+      - name: Setup MSVC Developer Command Prompt (x64 toolchain)
+        shell: pwsh
+        run: .\tools\setup-vs2026-buildtools.ps1
+
+      - name: Build Debug x64 monitor artifacts
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path $env:OPENSAL_BUILD_DIR | Out-Null
+          msbuild $env:SOLUTION_PATH /m /t:Build /p:Configuration=$env:BUILD_CONFIGURATION /p:Platform=x64 /p:PlatformToolset=$env:PLATFORM_TOOLSET /p:PreferredToolArchitecture=x64 /nr:false
+
+      - name: Resolve monitor inputs
+        shell: pwsh
+        run: |
+          $sqlite = Get-ChildItem $env:OPENSAL_BUILD_DIR -Filter sqlite.dll -Recurse |
+            Where-Object { $_.FullName -like '*Debug_x64*' } | Select-Object -First 1
+          $executable = Get-ChildItem $env:OPENSAL_BUILD_DIR -Filter salamand.exe -Recurse |
+            Where-Object { $_.FullName -like '*Debug_x64*' } | Select-Object -First 1
+          if ($null -eq $sqlite -or $null -eq $executable) {
+            throw 'The quarantine monitor requires Debug x64 sqlite.dll and salamand.exe artifacts.'
+          }
+          "SQLITE_TEST_DLL=$($sqlite.FullName)" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
+          "FILEMANAGER_UI_EXE=$($executable.FullName)" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
+
+      - name: Run manifest-backed quarantined UI tests
+        shell: pwsh
+        # Filtering is the only exclusion mechanism; this preserves failure on any unexpected skipped test.
+        run: .\scripts\runtests.ps1 -BaseCommit HEAD^ -SqliteDll $env:SQLITE_TEST_DLL -FailOnSkipped -NUnitFilter 'TestCategory=Quarantined' -PlatformToolset v145 -NUnitTrxPath $env:RUNNER_TEMP\quarantined-ui-tests.trx
+
+      - name: Remove isolated UI test volumes
+        if: always()
+        shell: pwsh
+        # Cleanup is unconditional so a failing monitor never contaminates the next scheduled sample.
+        run: .\tools\manage-ui-test-volumes.ps1 -Action Cleanup -WorkingDirectory (Join-Path $env:RUNNER_TEMP 'filemanager-ui-volumes')
+
+      - name: Upload quarantined UI results
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          # Keep the monitored TRX so the owner can compare recurrence and expiry decisions over time.
+          name: quarantined-ui-results-${{ github.sha }}
+          path: ${{ runner.temp }}\quarantined-ui-tests.trx
+          if-no-files-found: warn

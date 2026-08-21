@@ -4,6 +4,7 @@ param(
     [string]$SqliteDll,
     [switch]$FailOnSkipped,
     [switch]$KeepBuildArtifacts,
+    [string]$NUnitFilter,
     [ValidateSet('v143', 'v145')]
     [string]$PlatformToolset = 'v145',
     [string]$NUnitTrxPath
@@ -738,6 +739,7 @@ foreach ($relativePath in @(
 }
 
 Invoke-WindowsPowerShellScript -RelativePath 'tools\verify-fluent-icon-coverage.ps1'
+Invoke-WindowsPowerShellScript -RelativePath 'tools\verify-ui-test-quarantine.ps1'
 
 $networkFixtureAction = {
     # These loopback fixtures are safe in every profile and keep protocol-edge
@@ -769,21 +771,33 @@ $nunitAction = {
     # has supplied the executable and every prerequisite UI-test environment value.
     New-Item -ItemType Directory -Path $nunitResultsDirectory -Force | Out-Null
     try {
-        & $dotnet.Source test $testProject --results-directory $nunitResultsDirectory `
-            --logger "trx;LogFileName=$nunitTrxName" --logger 'console;verbosity=minimal' -- NUnit.NumberOfTestWorkers=0
+        $nunitArguments = @(
+            'test',
+            $testProject,
+            '--results-directory', $nunitResultsDirectory,
+            '--logger', "trx;LogFileName=$nunitTrxName",
+            '--logger', 'console;verbosity=minimal'
+        )
+        if (-not [string]::IsNullOrWhiteSpace($NUnitFilter)) {
+            # A caller-supplied category filter can route manifest-backed quarantines to monitoring without weakening unexpected-skip enforcement.
+            $nunitArguments += @('--filter', $NUnitFilter)
+        }
+        $nunitArguments += @('--', 'NUnit.NumberOfTestWorkers=0')
+        & $dotnet.Source @nunitArguments
         $dotnetExitCode = $LASTEXITCODE
         if ($dotnetExitCode -ne 0) {
             throw "The complete NUnit project failed with exit code $dotnetExitCode."
         }
 
-        # VSTest treats NUnit Assert.Ignore as success.  The root runner owns
-        # UI prerequisites, so every ignored result is a configuration defect.
+        # VSTest treats NUnit Ignore as success. Manifest-backed quarantines are
+        # filtered before discovery, so a NotExecuted result is always an
+        # unexpected prerequisite or test-harness defect.
         [xml]$trx = Get-Content -LiteralPath (Join-Path $nunitResultsDirectory $nunitTrxName) -Raw
         $ignoredResults = @($trx.SelectNodes("//*[local-name()='UnitTestResult' and @outcome='NotExecuted']"))
         if ($ignoredResults.Count -ne 0) {
             $ignoredNames = $ignoredResults | Select-Object -First 10 | ForEach-Object { $_.testName }
             $ignoredNames | ForEach-Object { Write-Host "Ignored NUnit test: $_" -ForegroundColor Yellow }
-            throw "$($ignoredResults.Count) NUnit tests were ignored; runtests.ps1 must configure every UI prerequisite."
+            throw "$($ignoredResults.Count) NUnit tests were unexpectedly ignored; quarantined tests must be routed with -NUnitFilter."
         }
     }
     finally {
