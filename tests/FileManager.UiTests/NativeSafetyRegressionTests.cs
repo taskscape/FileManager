@@ -1555,6 +1555,9 @@ public sealed class NativeSafetyRegressionTests
             Assert.That(workspace, Does.Contain("PrepareSourcePanelForSelection"));
             Assert.That(workspace, Does.Contain("QuickSearchSourceItem"));
             Assert.That(workspace, Does.Contain("VhdPanelSettleMilliseconds"));
+            // Copy and move assertions must wait for native handle release, not only for directory-entry visibility.
+            Assert.That(workspace, Does.Contain("WaitForOperationOutputToBeReleased"));
+            Assert.That(operations, Does.Contain("WaitForOperationOutputToBeReleased"));
             Assert.That(nativeCommands, Does.Contain("RefreshActiveFilePanel"));
             Assert.That(nativeCommands, Does.Contain("ClearActiveSelection"));
             // The remote runner has no stable interactive clipboard owner, so panel readiness must never depend on clipboard observation.

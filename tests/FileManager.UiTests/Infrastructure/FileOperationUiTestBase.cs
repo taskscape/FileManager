@@ -280,14 +280,48 @@ public abstract class FileOperationUiTestBase : FileManagerUiTestBase
         var timeout = DateTime.UtcNow + TimeSpan.FromSeconds(20);
         while (DateTime.UtcNow < timeout)
         {
-            if (predicate())
-                return;
+            try
+            {
+                if (predicate())
+                    return;
+            }
+            catch (IOException)
+            {
+                // A predicate that reads an operation output can race its final native handle close; retry instead of converting that transient state into a test failure.
+            }
+            catch (UnauthorizedAccessException)
+            {
+                // A destination can briefly inherit restrictive ACL or sharing state while the native operation commits it; the same completion barrier applies.
+            }
             Thread.Sleep(100);
         }
 
         var openWindowTitles = string.Join(", ", NativeCommands.GetTopLevelWindowTitles(Application.ProcessId));
         // Include native modal titles to differentiate a delayed operation from an error that needs a separate user response.
         Assert.Fail($"{failureMessage} Open FileManager windows: {openWindowTitles}.");
+    }
+
+    /// <summary>
+    /// Waits until an operation output exists and no process still owns a
+    /// conflicting file handle. File existence alone is not a completion
+    /// signal: the native copy/move worker publishes the directory entry before
+    /// closing its destination handle.
+    /// </summary>
+    protected void WaitForOperationOutputToBeReleased(string path, string failureMessage)
+    {
+        WaitForFileSystem(() =>
+        {
+            try
+            {
+                // FileShare.None turns this probe into a real handle-release barrier rather than merely proving that the directory entry is visible.
+                using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.None);
+                return true;
+            }
+            catch (Exception exception) when (exception is FileNotFoundException or DirectoryNotFoundException or IOException or UnauthorizedAccessException)
+            {
+                return false;
+            }
+        }, failureMessage);
     }
 
     /// <summary>

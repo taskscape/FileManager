@@ -33,7 +33,8 @@ public sealed class FileOperationUiTests : FileOperationUiTestBase
     {
         ExecuteWithPath(NativeCommands.CopyFiles, "copy-file.txt", Workspace.TargetDirectory, commit: true);
 
-        WaitForFileSystem(() => File.Exists(Workspace.TargetPath("copy-file.txt")), "Copy did not create the destination file.");
+        // The destination entry can appear before the copy worker releases its write handle.
+        WaitForOperationOutputToBeReleased(Workspace.TargetPath("copy-file.txt"), "Copy did not release the destination file.");
         Assert.That(File.ReadAllText(Workspace.TargetPath("copy-file.txt")), Is.EqualTo("copy-file-content"));
         Assert.That(File.Exists(Workspace.SourcePath("copy-file.txt")), Is.True, "Copy unexpectedly removed the source file.");
     }
@@ -48,7 +49,8 @@ public sealed class FileOperationUiTests : FileOperationUiTestBase
         ExecuteWithPath(NativeCommands.CopyFiles, "copy-file.txt", Workspace.TargetDirectory, commit: true);
 
         var target = Workspace.TargetPath("copy-file.txt");
-        WaitForFileSystem(() => File.Exists(target), "Copy did not create the destination file.");
+        // Metadata is meaningful only after the native copy worker has closed the destination handle.
+        WaitForOperationOutputToBeReleased(target, "Copy did not release the destination file.");
         Assert.That(File.GetLastWriteTimeUtc(target), Is.EqualTo(File.GetLastWriteTimeUtc(source)),
                     "Copy did not preserve the source last-write metadata.");
     }
@@ -66,7 +68,8 @@ public sealed class FileOperationUiTests : FileOperationUiTestBase
 
         ExecuteWithPath(NativeCommands.CopyFiles, "ads-copy.txt", Workspace.TargetDirectory, commit: true);
 
-        WaitForFileSystem(() => File.Exists(target), "Copy did not create the ADS test target.");
+        // Stream reads require the same completed-handle barrier as the default data stream.
+        WaitForOperationOutputToBeReleased(target, "Copy did not release the ADS test target.");
         Assert.Multiple(() =>
         {
             Assert.That(File.ReadAllText(target), Is.EqualTo("ads-copy-default-content"));
@@ -123,7 +126,8 @@ public sealed class FileOperationUiTests : FileOperationUiTestBase
             deniedStream.Dispose();
         }
 
-        WaitForFileSystem(() => File.Exists(target), "Retry did not complete the ADS copy.");
+        // The retry prompt closes before the worker necessarily releases every copied stream handle.
+        WaitForOperationOutputToBeReleased(target, "Retry did not release the ADS copy target.");
         AlternateDataStreams.AssertContent(target, "temporarily-denied", "retry-stream-content"u8.ToArray());
     }
 
@@ -213,7 +217,8 @@ public sealed class FileOperationUiTests : FileOperationUiTestBase
         ExecuteWithPath(NativeCommands.CopyFiles, "copy-tree", Workspace.TargetDirectory, commit: true);
 
         var copiedPayload = Workspace.TargetPath("copy-tree\\nested\\payload.txt");
-        WaitForFileSystem(() => File.Exists(copiedPayload), "Copy did not create the directory descendant.");
+        // A copied descendant must be readable, not merely present in the target directory.
+        WaitForOperationOutputToBeReleased(copiedPayload, "Copy did not release the directory descendant.");
         Assert.That(File.ReadAllText(copiedPayload), Is.EqualTo("copy-tree-content"));
         Assert.That(Directory.Exists(Workspace.SourcePath("copy-tree\\nested")), Is.True);
     }
@@ -257,15 +262,16 @@ public sealed class FileOperationUiTests : FileOperationUiTestBase
         SelectSourceItem("first-unicode-");
         ExecuteWithPath(NativeCommands.CopyFiles, string.Empty, Workspace.TargetDirectory, commit: true);
         // File operations complete asynchronously after their dialog closes; serialize selections across the plug-in-rich release layout.
-        WaitForFileSystem(() => File.Exists(Workspace.TargetPath(firstUnicodeName)),
-                          "Copy did not preserve the first Unicode entry.");
+        // File operations complete asynchronously after their dialog closes; wait for the output handle to close before driving the next selection.
+        WaitForOperationOutputToBeReleased(Workspace.TargetPath(firstUnicodeName),
+                                           "Copy did not release the first Unicode entry.");
         SelectSourceItem("second-unicode-");
         ExecuteWithPath(NativeCommands.CopyFiles, string.Empty, Workspace.TargetDirectory, commit: true);
-        WaitForFileSystem(() => File.Exists(Workspace.TargetPath(secondUnicodeName)),
-                          "Copy did not preserve the second Unicode entry.");
+        WaitForOperationOutputToBeReleased(Workspace.TargetPath(secondUnicodeName),
+                                           "Copy did not release the second Unicode entry.");
         ExecuteWithPath(NativeCommands.CopyFiles, treeName, Workspace.TargetDirectory, commit: true);
-        WaitForFileSystem(() => File.Exists(Workspace.TargetPath(Path.Combine(treeName, longRelativePath, payloadName))),
-                          "Copy did not preserve the long-path entry.");
+        WaitForOperationOutputToBeReleased(Workspace.TargetPath(Path.Combine(treeName, longRelativePath, payloadName)),
+                                           "Copy did not release the long-path entry.");
         Assert.Multiple(() =>
         {
             Assert.That(File.ReadAllText(Workspace.TargetPath(firstUnicodeName)), Is.EqualTo("first-unicode-content"));
@@ -354,7 +360,8 @@ public sealed class FileOperationUiTests : FileOperationUiTestBase
         ExecuteWithPath(NativeCommands.MoveFiles, "move-file.txt", Workspace.TargetDirectory, commit: true);
 
         var target = Workspace.TargetPath("move-file.txt");
-        WaitForFileSystem(() => File.Exists(target), "Move did not create the destination file.");
+        // A same-volume move can expose the target name before the operation closes its final handle.
+        WaitForOperationOutputToBeReleased(target, "Move did not release the destination file.");
         Assert.That(File.Exists(Workspace.SourcePath("move-file.txt")), Is.False, "Move retained the source file.");
         Assert.That(File.ReadAllText(target), Is.EqualTo("move-file-content"));
     }
@@ -365,7 +372,8 @@ public sealed class FileOperationUiTests : FileOperationUiTestBase
         ExecuteWithPath(NativeCommands.MoveFiles, "move-tree", Workspace.TargetDirectory, commit: true);
 
         var payload = Workspace.TargetPath("move-tree\\nested\\payload.txt");
-        WaitForFileSystem(() => File.Exists(payload), "Move did not create the directory descendant.");
+        // The descendant's handle-release barrier distinguishes completed moves from visible-but-still-open targets.
+        WaitForOperationOutputToBeReleased(payload, "Move did not release the directory descendant.");
         Assert.That(Directory.Exists(Workspace.SourcePath("move-tree")), Is.False, "Move retained the source directory.");
         Assert.That(File.ReadAllText(payload), Is.EqualTo("move-tree-content"));
     }
