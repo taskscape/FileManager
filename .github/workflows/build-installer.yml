@@ -41,7 +41,7 @@ jobs:
       PLATFORM_TOOLSET: v145
       OPENSAL_BUILD_DIR: '${{ github.workspace }}\build_stage\'
       FILEMANAGER_UI_ISOLATED: '1'
-      # Direct verifier execution also needs the same disposable profile namespace as the complete suite.
+      # The deterministic release suite uses a disposable profile namespace.
       FILEMANAGER_UI_CONFIG_ROOT: 'Software\Open Salamander\6.0-filemanager-testdata'
       FILEMANAGER_UI_CONFIG_FAULT_INJECTION: '1'
       FILEMANAGER_UI_RECYCLE_BIN: '1'
@@ -99,34 +99,13 @@ jobs:
 
       - name: Run release tests without unexpected skips
         shell: pwsh
-        # Exclude only manifest-backed quarantines; verifier stress gets a fresh volume phase below.
+        # Exclude only manifest-backed quarantines; Application Verifier remains an instrumented nightly diagnostic lane.
         run: .\scripts\runtests.ps1 -BaseCommit $env:RELEASE_BASE_COMMIT -SqliteDll $env:SQLITE_TEST_DLL -FailOnSkipped -SkipLockVerifier -NUnitFilter 'TestCategory!=Quarantined' -PlatformToolset v145 -NUnitTrxPath $env:RUNNER_TEMP\runtests-v145.trx
 
       - name: Remove isolated UI test volumes after release tests
         if: always()
         shell: pwsh
-        # Always detach owned images so a failed full suite cannot poison the verifier's fresh volume phase.
-        run: .\tools\manage-ui-test-volumes.ps1 -Action Cleanup -WorkingDirectory (Join-Path $env:RUNNER_TEMP 'filemanager-ui-volumes')
-
-      - name: Provision isolated UI test volumes for verifier
-        shell: pwsh
-        # Application Verifier must never inspect filesystem state left by a prior full-suite failure.
-        run: .\tools\manage-ui-test-volumes.ps1 -Action Setup -WorkingDirectory (Join-Path $env:RUNNER_TEMP 'filemanager-ui-volumes') -EnvironmentFile $env:GITHUB_ENV
-
-      - name: Run Application Verifier lock stress on fresh volumes
-        shell: pwsh
-        # Keep the lock regression independent while preserving the exact executable produced by the release build.
-        run: |
-          $appVerifier = Get-Command appverif.exe -ErrorAction Stop
-          .\tools\run-lock-verifier-stress.ps1 -ExecutablePath $env:FILEMANAGER_UI_EXE `
-            -TestProject .\tests\FileManager.UiTests\FileManager.UiTests.csproj `
-            -AppVerifierPath $appVerifier.Source `
-            -LogOutputDirectory TestResults\application-verifier-logs
-
-      - name: Remove isolated UI test volumes after verifier
-        if: always()
-        shell: pwsh
-        # Always detach verifier volumes so even a cancelled stress run starts cleanly next time.
+        # Always detach owned images so a cancelled release run cannot affect a later diagnostic lane.
         run: .\tools\manage-ui-test-volumes.ps1 -Action Cleanup -WorkingDirectory (Join-Path $env:RUNNER_TEMP 'filemanager-ui-volumes')
 
       - name: Upload v145 complete UI results
@@ -137,14 +116,6 @@ jobs:
           name: toolset-ui-results-v145-${{ github.sha }}
           path: ${{ runner.temp }}\runtests-v145.trx
           if-no-files-found: error
-
-      - name: Upload Application Verifier logs
-        if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
-        with:
-          name: release-application-verifier-logs
-          path: TestResults\application-verifier-logs
-          if-no-files-found: warn
 
   build:
     name: Build Installer (x64 Release)

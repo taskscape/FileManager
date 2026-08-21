@@ -10,6 +10,9 @@ param(
     [string] $LogOutputDirectory,
     [ValidateSet('Locks', 'Full')]
     [string] $VerifierProfile = 'Locks',
+    # Individual layers are run before the full profile so a startup failure identifies the first incompatible verifier provider.
+    [ValidateSet('Locks', 'Handles', 'Heaps', 'Exceptions')]
+    [string[]] $VerifierLayers,
     [string] $TestFilter = 'TestCategory=LockStress'
 )
 
@@ -41,7 +44,7 @@ try {
     # Verifier configuration is process-persistent, so every enabled layer is removed in finally.
     # The unary comma keeps a single layer as an array; without it, @('Locks')
     # unrolls to a scalar string and @layers splats as the character 'L'.
-    $layers = if ($VerifierProfile -eq 'Full') { @('Heaps', 'Handles', 'Locks', 'Exceptions') } else { , @('Locks') }
+    $layers = if ($PSBoundParameters.ContainsKey('VerifierLayers')) { @($VerifierLayers) } elseif ($VerifierProfile -eq 'Full') { @('Heaps', 'Handles', 'Locks', 'Exceptions') } else { , @('Locks') }
     # Define the automatic variable before launching the GUI-subsystem CLI so a non-elevated host reports the real prerequisite error under StrictMode.
     $global:LASTEXITCODE = $null
     & $AppVerifierPath -enable @layers -for $targetName
@@ -59,8 +62,11 @@ try {
         }
     }
 
-    # The caller chooses either the compact lock soak or the complete UI category under one verifier profile.
-    dotnet test $TestProject --filter $TestFilter -- NUnit.NumberOfTestWorkers=0
+    # Preserve the probe result beside verifier XML so CI diagnosis does not depend on an ephemeral console log.
+    $testResultsDirectory = Join-Path $LogOutputDirectory 'nunit-results'
+    New-Item -ItemType Directory -Path $testResultsDirectory -Force | Out-Null
+    dotnet test $TestProject --filter $TestFilter --results-directory $testResultsDirectory `
+        --logger 'trx;LogFileName=verifier-tests.trx' --logger 'console;verbosity=normal' -- NUnit.NumberOfTestWorkers=0
     if ($LASTEXITCODE -ne 0) {
         throw "The Application Verifier lock stress suite failed (exit code $LASTEXITCODE)."
     }

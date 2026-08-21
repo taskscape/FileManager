@@ -14,31 +14,46 @@ env:
   SOLUTION_PATH: 'src\\vcxproj\\salamand.sln'
   PLATFORM_TOOLSET: v145
   OPENSAL_BUILD_DIR: '${{ github.workspace }}\\build_stage\\'
+  FILEMANAGER_UI_ISOLATED: '1'
+  # The diagnostic lane must use the same disposable profile boundary as the blocking release suite.
+  FILEMANAGER_UI_CONFIG_ROOT: 'Software\Open Salamander\6.0-filemanager-testdata'
+  FILEMANAGER_UI_CONFIG_FAULT_INJECTION: '1'
+  FILEMANAGER_UI_RECYCLE_BIN: '1'
+  # Nightly retains the longer resource-growth sample after the provider startup probes pass.
+  FILEMANAGER_UI_LEAK_CYCLES: '100'
 
 jobs:
   verifier-lock-stress:
     # FlaUI needs an unlocked desktop and an isolated profile; this label is deliberately not a hosted runner.
-    runs-on: [self-hosted, windows, filemanager-ui]
+    runs-on:
+      group: FileManager UI
+      labels: [self-hosted, windows, filemanager-ui]
 
     steps:
       - name: Checkout
         # Pin actions by reviewed commit to keep the nightly diagnostic lane reproducible.
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
 
+      - name: Provision isolated UI test volumes
+        shell: pwsh
+        # Fresh volumes make the verifier probe reproducible instead of inheriting a dedicated account's prior test data.
+        run: .\tools\manage-ui-test-volumes.ps1 -Action Setup -WorkingDirectory (Join-Path $env:RUNNER_TEMP 'filemanager-ui-volumes') -EnvironmentFile $env:GITHUB_ENV
+
       - name: Setup MSBuild
         uses: microsoft/setup-msbuild@6fb02220983dee41ce7ae257b6f4d8f9bf5ed4ce # v2
 
       - name: Setup MSVC Developer Command Prompt (x64 toolchain)
-        uses: ilammy/msvc-dev-cmd@0b201ec74fa43914dc39ae48a89fd1d8cb592756 # v1
-        with:
-          arch: x64
+        # Use the same fixed Visual Studio 2026 environment as the release lane.
+        shell: pwsh
+        run: .\tools\setup-vs2026-buildtools.ps1
 
       - name: Build Debug x64 executable
         shell: pwsh
         run: |
+          New-Item -ItemType Directory -Force -Path $env:OPENSAL_BUILD_DIR | Out-Null
           msbuild $env:SOLUTION_PATH /m /t:Build /p:Configuration=$env:BUILD_CONFIGURATION /p:Platform=x64 /p:PlatformToolset=$env:PLATFORM_TOOLSET /p:PreferredToolArchitecture=x64 /nr:false
 
-      - name: Run Application Verifier and PageHeap UI suite
+      - name: Resolve Application Verifier diagnostic inputs
         shell: pwsh
         run: |
           $appVerifier = Get-Command appverif.exe -ErrorAction SilentlyContinue
@@ -62,19 +77,42 @@ jobs:
             throw 'The Debug x64 salamand.exe build output was not found.'
           }
 
-          # The self-hosted runner account is dedicated to this lane, which makes profile-mutating UI tests safe.
-          $env:FILEMANAGER_UI_ISOLATED = '1'
-          $env:FILEMANAGER_UI_EXE = $executable.FullName
-          # Nightly has the time budget for the longer lifecycle resource-growth sample.
-          $env:FILEMANAGER_UI_LEAK_CYCLES = '100'
-          .\tools\run-lock-verifier-stress.ps1 -ExecutablePath $executable.FullName `
-            -TestProject '.\tests\FileManager.UiTests\FileManager.UiTests.csproj' -AppVerifierPath $appVerifierPath `
-            -LogOutputDirectory '.\application-verifier-logs' -VerifierProfile Full -TestFilter 'TestCategory=UI'
+          # Persist exact paths across steps so every layer instruments the binary just built by this run.
+          "FILEMANAGER_UI_EXE=$($executable.FullName)" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
+          "FILEMANAGER_APPVERIFIER_EXE=$appVerifierPath" | Out-File $env:GITHUB_ENV -Encoding utf8 -Append
+
+      - name: Run baseline startup probe without Application Verifier
+        shell: pwsh
+        # Prove the desktop, executable, and disposable sandbox before attributing any startup failure to a verifier provider.
+        run: dotnet test .\tests\FileManager.UiTests\FileManager.UiTests.csproj --filter 'TestCategory=VerifierStartup' --results-directory TestResults\application-verifier-logs\baseline --logger 'trx;LogFileName=baseline-startup.trx' --logger 'console;verbosity=normal' -- NUnit.NumberOfTestWorkers=0
+
+      - name: Identify the first verifier layer that blocks startup
+        shell: pwsh
+        # Enable one provider at a time; the resulting TRX, native window state, and verifier XML identify a real startup fault.
+        run: |
+          foreach ($layer in @('Locks', 'Handles', 'Heaps', 'Exceptions')) {
+            .\tools\run-lock-verifier-stress.ps1 -ExecutablePath $env:FILEMANAGER_UI_EXE `
+              -TestProject '.\tests\FileManager.UiTests\FileManager.UiTests.csproj' `
+              -AppVerifierPath $env:FILEMANAGER_APPVERIFIER_EXE `
+              -LogOutputDirectory (Join-Path 'TestResults\application-verifier-logs' "startup-$layer") `
+              -VerifierLayers $layer -TestFilter 'TestCategory=VerifierStartup'
+          }
+
+      - name: Run Application Verifier and PageHeap UI suite
+        shell: pwsh
+        # Only run broad UI coverage after every individual provider reaches a usable native main window.
+        run: .\tools\run-lock-verifier-stress.ps1 -ExecutablePath $env:FILEMANAGER_UI_EXE -TestProject '.\tests\FileManager.UiTests\FileManager.UiTests.csproj' -AppVerifierPath $env:FILEMANAGER_APPVERIFIER_EXE -LogOutputDirectory 'TestResults\application-verifier-logs\full-ui' -VerifierProfile Full -TestFilter 'TestCategory=UI'
+
+      - name: Remove isolated UI test volumes
+        if: always()
+        shell: pwsh
+        # Always detach diagnostic disks so the next nightly run begins from a verifiable clean state.
+        run: .\tools\manage-ui-test-volumes.ps1 -Action Cleanup -WorkingDirectory (Join-Path $env:RUNNER_TEMP 'filemanager-ui-volumes')
 
       - name: Upload Application Verifier logs
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: application-verifier-pageheap-logs
-          path: application-verifier-logs
+          name: application-verifier-diagnostic-logs
+          path: TestResults\application-verifier-logs
           if-no-files-found: warn

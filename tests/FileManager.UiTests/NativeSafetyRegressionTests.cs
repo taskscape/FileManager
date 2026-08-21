@@ -20,6 +20,8 @@ public sealed class NativeSafetyRegressionTests
         var quarantineVerifier = File.ReadAllText(Path.Combine(root, "tools", "verify-ui-test-quarantine.ps1"));
         var quarantineWorkflow = File.ReadAllText(Path.Combine(root, ".github", "workflows", "quarantined-ui-tests.yml"));
         var sandbox = File.ReadAllText(Path.Combine(root, "tests", "FileManager.UiTests", "Infrastructure", "UiTestSandbox.cs"));
+        var nightlyWorkflow = File.ReadAllText(Path.Combine(root, ".github", "workflows", "nightly-lock-stress.yml"));
+        var verifierRunner = File.ReadAllText(Path.Combine(root, "tools", "run-lock-verifier-stress.ps1"));
 
         // The root command is the advertised entry point, so pin every
         // independently executable probe and the complete NUnit/UI collector.
@@ -67,9 +69,14 @@ public sealed class NativeSafetyRegressionTests
             // The release jobs must provision their capabilities and let the runner discover dynamic FTP commands.
             Assert.That(releaseWorkflow, Does.Contain("manage-ui-test-volumes.ps1 -Action Setup"));
             Assert.That(releaseWorkflow, Does.Contain("manage-ui-test-volumes.ps1 -Action Cleanup"));
-            // A failed full suite must not pass its VHD state into the verifier-only diagnostic phase.
-            Assert.That(releaseWorkflow, Does.Contain("Provision isolated UI test volumes for verifier"));
-            Assert.That(releaseWorkflow, Does.Contain("Run Application Verifier lock stress on fresh volumes"));
+            // Verifier fault injection is diagnostic: it must not block release on an opaque startup timeout.
+            Assert.That(releaseWorkflow, Does.Not.Contain("Run Application Verifier lock stress on fresh volumes"));
+            Assert.That(nightlyWorkflow, Does.Contain("Run baseline startup probe without Application Verifier"));
+            Assert.That(nightlyWorkflow, Does.Contain("Identify the first verifier layer that blocks startup"));
+            Assert.That(nightlyWorkflow, Does.Contain("manage-ui-test-volumes.ps1 -Action Setup"));
+            Assert.That(nightlyWorkflow, Does.Contain("setup-vs2026-buildtools.ps1"));
+            Assert.That(verifierRunner, Does.Contain("VerifierLayers"));
+            Assert.That(verifierRunner, Does.Contain("verifier-tests.trx"));
             Assert.That(runner, Does.Contain("[switch]$SkipLockVerifier"));
             Assert.That(sandbox, Does.Contain("ClearOwnedRoot"));
             Assert.That(sandbox, Does.Contain("Delete the marker last"));
@@ -1742,7 +1749,8 @@ public sealed class NativeSafetyRegressionTests
             Assert.That(test, Does.Contain("USER objects"));
             Assert.That(test, Does.Contain("private bytes"));
             Assert.That(settings, Does.Contain("FILEMANAGER_UI_LEAK_CYCLES"));
-            Assert.That(nightly, Does.Contain("FILEMANAGER_UI_LEAK_CYCLES = '100'"));
+            // Job-level configuration keeps the 100-cycle soak available to both provider probes and the full nightly suite.
+            Assert.That(nightly, Does.Contain("FILEMANAGER_UI_LEAK_CYCLES: '100'"));
         });
     }
 

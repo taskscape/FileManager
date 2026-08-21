@@ -187,6 +187,21 @@ internal static class NativeCommands
         return titles;
     }
 
+    internal static IReadOnlyList<string> GetTopLevelWindowDescriptions(int processId)
+    {
+        var descriptions = new List<string>();
+        foreach (var windowHandle in GetTopLevelWindows(processId))
+        {
+            var classBuffer = new char[64];
+            GetClassName(windowHandle, classBuffer, classBuffer.Length);
+            var titleBuffer = new char[GetWindowTextLength(windowHandle) + 1];
+            GetWindowText(windowHandle, titleBuffer, titleBuffer.Length);
+            // Include the native class with the caption so verifier startup timeouts distinguish a hidden main window from a modal error.
+            descriptions.Add($"0x{windowHandle:X} class='{new string(classBuffer).TrimEnd('\0')}' title='{new string(titleBuffer).TrimEnd('\0')}'");
+        }
+        return descriptions;
+    }
+
     internal static bool WindowExists(nint windowHandle)
     {
         // UIA can retain a stale provider after a legacy dialog closes, so use the native lifetime check for close waits.

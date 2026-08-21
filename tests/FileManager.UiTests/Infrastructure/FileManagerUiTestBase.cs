@@ -405,7 +405,30 @@ public abstract class FileManagerUiTestBase
             Thread.Sleep(100);
         }
 
-        throw new AssertionException("FileManager did not expose its SalamanderMainWindowVer25 UI Automation main window.");
+        throw new AssertionException(BuildStartupFailureMessage());
+    }
+
+    private string BuildStartupFailureMessage()
+    {
+        var processState = "unavailable";
+        try
+        {
+            using var process = Process.GetProcessById(Application.ProcessId);
+            processState = process.HasExited
+                ? $"exited with code {process.ExitCode}"
+                : $"running (responding={process.Responding})";
+        }
+        catch (Exception exception) when (exception is ArgumentException or InvalidOperationException or System.ComponentModel.Win32Exception)
+        {
+            // A verifier-terminated process can disappear while its exit state is being queried.
+            processState = "exited before its exit code could be collected";
+        }
+
+        var windows = NativeCommands.GetTopLevelWindowDescriptions(Application.ProcessId);
+        // Verifier startup failures otherwise collapse into an opaque UIA timeout; preserve native state for the diagnostic artifact.
+        return "FileManager did not expose its SalamanderMainWindowVer25 UI Automation main window. " +
+               $"Process {Application.ProcessId} was {processState}. Visible native windows: " +
+               (windows.Count == 0 ? "<none>." : string.Join("; ", windows));
     }
 
     protected Window WaitForWindow(Func<Window, bool> predicate)
