@@ -102,7 +102,12 @@ internal static class SandboxEditor
             try
             {
                 if (string.Equals(process.MainModule?.FileName, ExecutablePath, StringComparison.OrdinalIgnoreCase))
-                    process.Kill();
+                {
+                    // Cleanup may delete the stub immediately, so wait until Windows has released its image handle.
+                    process.Kill(entireProcessTree: true);
+                    if (!process.WaitForExit(milliseconds: 10_000))
+                        throw new TimeoutException($"The sandbox editor did not exit: {ExecutablePath}");
+                }
             }
             catch (Exception ex) when (ex is InvalidOperationException || ex is System.ComponentModel.Win32Exception)
             {

@@ -19,6 +19,7 @@ public sealed class NativeSafetyRegressionTests
         var volumeProvisioner = File.ReadAllText(Path.Combine(root, "tools", "manage-ui-test-volumes.ps1"));
         var quarantineVerifier = File.ReadAllText(Path.Combine(root, "tools", "verify-ui-test-quarantine.ps1"));
         var quarantineWorkflow = File.ReadAllText(Path.Combine(root, ".github", "workflows", "quarantined-ui-tests.yml"));
+        var sandbox = File.ReadAllText(Path.Combine(root, "tests", "FileManager.UiTests", "Infrastructure", "UiTestSandbox.cs"));
 
         // The root command is the advertised entry point, so pin every
         // independently executable probe and the complete NUnit/UI collector.
@@ -59,13 +60,19 @@ public sealed class NativeSafetyRegressionTests
             // The release workflow must consume the root inventory rather than
             // maintaining a second list that can silently lose coverage.
             Assert.That(releaseWorkflow, Does.Contain("name: Complete automated release gate"));
-            Assert.That(releaseWorkflow, Does.Contain(".\\scripts\\runtests.ps1 -BaseCommit $env:RELEASE_BASE_COMMIT -SqliteDll $env:SQLITE_TEST_DLL -FailOnSkipped -NUnitFilter 'TestCategory!=Quarantined'"));
+            Assert.That(releaseWorkflow, Does.Contain(".\\scripts\\runtests.ps1 -BaseCommit $env:RELEASE_BASE_COMMIT -SqliteDll $env:SQLITE_TEST_DLL -FailOnSkipped -SkipLockVerifier -NUnitFilter 'TestCategory!=Quarantined'"));
             Assert.That(releaseWorkflow, Does.Contain("needs: release-tests"));
             Assert.That(releaseWorkflow, Does.Contain("fetch-depth: 0"));
             Assert.That(releaseWorkflow, Does.Contain("FILEMANAGER_UI_CONFIG_FAULT_INJECTION: '1'"));
             // The release jobs must provision their capabilities and let the runner discover dynamic FTP commands.
             Assert.That(releaseWorkflow, Does.Contain("manage-ui-test-volumes.ps1 -Action Setup"));
             Assert.That(releaseWorkflow, Does.Contain("manage-ui-test-volumes.ps1 -Action Cleanup"));
+            // A failed full suite must not pass its VHD state into the verifier-only diagnostic phase.
+            Assert.That(releaseWorkflow, Does.Contain("Provision isolated UI test volumes for verifier"));
+            Assert.That(releaseWorkflow, Does.Contain("Run Application Verifier lock stress on fresh volumes"));
+            Assert.That(runner, Does.Contain("[switch]$SkipLockVerifier"));
+            Assert.That(sandbox, Does.Contain("ClearOwnedRoot"));
+            Assert.That(sandbox, Does.Contain("Delete the marker last"));
             Assert.That(releaseWorkflow, Does.Not.Contain("vars.FILEMANAGER_UI"));
             Assert.That(volumeProvisioner, Does.Contain("FILEMANAGER_UI_CROSS_VOLUME_ROOT"));
             Assert.That(volumeProvisioner, Does.Contain("FILEMANAGER_UI_ADS_UNSUPPORTED_TARGET_ROOT"));

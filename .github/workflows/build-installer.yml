@@ -41,6 +41,8 @@ jobs:
       PLATFORM_TOOLSET: v145
       OPENSAL_BUILD_DIR: '${{ github.workspace }}\build_stage\'
       FILEMANAGER_UI_ISOLATED: '1'
+      # Direct verifier execution also needs the same disposable profile namespace as the complete suite.
+      FILEMANAGER_UI_CONFIG_ROOT: 'Software\Open Salamander\6.0-filemanager-testdata'
       FILEMANAGER_UI_CONFIG_FAULT_INJECTION: '1'
       FILEMANAGER_UI_RECYCLE_BIN: '1'
 
@@ -97,13 +99,34 @@ jobs:
 
       - name: Run release tests without unexpected skips
         shell: pwsh
-        # Exclude only manifest-backed quarantines; the runner still rejects every unclassified skipped or ignored test.
-        run: .\scripts\runtests.ps1 -BaseCommit $env:RELEASE_BASE_COMMIT -SqliteDll $env:SQLITE_TEST_DLL -FailOnSkipped -NUnitFilter 'TestCategory!=Quarantined' -PlatformToolset v145 -NUnitTrxPath $env:RUNNER_TEMP\runtests-v145.trx
+        # Exclude only manifest-backed quarantines; verifier stress gets a fresh volume phase below.
+        run: .\scripts\runtests.ps1 -BaseCommit $env:RELEASE_BASE_COMMIT -SqliteDll $env:SQLITE_TEST_DLL -FailOnSkipped -SkipLockVerifier -NUnitFilter 'TestCategory!=Quarantined' -PlatformToolset v145 -NUnitTrxPath $env:RUNNER_TEMP\runtests-v145.trx
 
-      - name: Remove isolated UI test volumes
+      - name: Remove isolated UI test volumes after release tests
         if: always()
         shell: pwsh
-        # Always detach owned images so cancelled or failed tests do not affect the next self-hosted job.
+        # Always detach owned images so a failed full suite cannot poison the verifier's fresh volume phase.
+        run: .\tools\manage-ui-test-volumes.ps1 -Action Cleanup -WorkingDirectory (Join-Path $env:RUNNER_TEMP 'filemanager-ui-volumes')
+
+      - name: Provision isolated UI test volumes for verifier
+        shell: pwsh
+        # Application Verifier must never inspect filesystem state left by a prior full-suite failure.
+        run: .\tools\manage-ui-test-volumes.ps1 -Action Setup -WorkingDirectory (Join-Path $env:RUNNER_TEMP 'filemanager-ui-volumes') -EnvironmentFile $env:GITHUB_ENV
+
+      - name: Run Application Verifier lock stress on fresh volumes
+        shell: pwsh
+        # Keep the lock regression independent while preserving the exact executable produced by the release build.
+        run: |
+          $appVerifier = Get-Command appverif.exe -ErrorAction Stop
+          .\tools\run-lock-verifier-stress.ps1 -ExecutablePath $env:FILEMANAGER_UI_EXE `
+            -TestProject .\tests\FileManager.UiTests\FileManager.UiTests.csproj `
+            -AppVerifierPath $appVerifier.Source `
+            -LogOutputDirectory TestResults\application-verifier-logs
+
+      - name: Remove isolated UI test volumes after verifier
+        if: always()
+        shell: pwsh
+        # Always detach verifier volumes so even a cancelled stress run starts cleanly next time.
         run: .\tools\manage-ui-test-volumes.ps1 -Action Cleanup -WorkingDirectory (Join-Path $env:RUNNER_TEMP 'filemanager-ui-volumes')
 
       - name: Upload v145 complete UI results

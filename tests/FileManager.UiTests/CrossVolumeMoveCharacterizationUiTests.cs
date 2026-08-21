@@ -24,6 +24,9 @@ public sealed class CrossVolumeMoveCharacterizationUiTests : FileOperationUiTest
         var targetPayload = Workspace.TargetPath("move-tree\\nested\\payload.txt");
         // A cross-volume move stages a copy first, so visibility of the target does not prove the worker released it.
         WaitForOperationOutputToBeReleased(targetPayload, "Cross-volume move did not release the complete target tree.");
+        // Destination handles can close before the source-removal transaction commits, so wait for that independent completion boundary.
+        WaitForFileSystem(() => !Directory.Exists(Workspace.SourcePath("move-tree")),
+                          "Cross-volume move committed the target but did not remove the source tree.");
         Assert.Multiple(() =>
         {
             Assert.That(File.ReadAllText(targetPayload), Is.EqualTo("move-tree-content"));
@@ -54,6 +57,9 @@ public sealed class CrossVolumeMoveCharacterizationUiTests : FileOperationUiTest
 
         // ADS verification must wait for the staged cross-volume copy to close its destination handle.
         WaitForOperationOutputToBeReleased(target, "Cross-volume move did not release the ADS test target.");
+        // ADS copy completion is distinct from deleting the source stream set on the original volume.
+        WaitForFileSystem(() => !File.Exists(source),
+                          "Cross-volume move committed the ADS target but did not remove the source file.");
         Assert.Multiple(() =>
         {
             Assert.That(File.Exists(source), Is.False, "Cross-volume move retained the source after copying ADS.");

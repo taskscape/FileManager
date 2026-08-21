@@ -4,6 +4,8 @@ param(
     [string]$SqliteDll,
     [switch]$FailOnSkipped,
     [switch]$KeepBuildArtifacts,
+    # The release workflow provisions a fresh VHD before verifier stress instead of reusing a failed suite's filesystem state.
+    [switch]$SkipLockVerifier,
     [string]$NUnitFilter,
     # The complete UI harness must match the repository-wide VS 2026 compiler contract.
     [ValidateSet('v145')]
@@ -813,31 +815,37 @@ $nunitAction = {
 }.GetNewClosure()
 Invoke-AutomatedCheck -Name 'FileManager.UiTests (complete NUnit project)' -Action $nunitAction -SkipReason $nunitSkipReason
 
-$sandboxedUi = -not [string]::IsNullOrWhiteSpace($env:FILEMANAGER_UI_TESTDATA_ROOT) -and
-               [string]::Equals($env:FILEMANAGER_UI_CONFIG_ROOT, 'Software\Open Salamander\6.0-filemanager-testdata', [StringComparison]::OrdinalIgnoreCase)
-$uiExecutable = $env:FILEMANAGER_UI_EXE
-$appVerifierPath = Find-ApplicationVerifier
-$lockStressSkipReason = $null
-if (-not $sandboxedUi) {
-    $lockStressSkipReason = 'FILEMANAGER_UI_TESTDATA_ROOT and the suffixed configuration key are required for the Application Verifier lane.'
+if ($SkipLockVerifier) {
+    # The release workflow owns verifier execution as a separate fresh-volume phase, not a skipped test result.
+    Write-Host 'Deferring Application Verifier lock stress to the caller-owned isolated phase.' -ForegroundColor Cyan
 }
-elseif ([string]::IsNullOrWhiteSpace($uiExecutable) -or -not (Test-Path -LiteralPath $uiExecutable -PathType Leaf)) {
-    $lockStressSkipReason = 'FILEMANAGER_UI_EXE must identify the built executable.'
+else {
+    $sandboxedUi = -not [string]::IsNullOrWhiteSpace($env:FILEMANAGER_UI_TESTDATA_ROOT) -and
+                   [string]::Equals($env:FILEMANAGER_UI_CONFIG_ROOT, 'Software\Open Salamander\6.0-filemanager-testdata', [StringComparison]::OrdinalIgnoreCase)
+    $uiExecutable = $env:FILEMANAGER_UI_EXE
+    $appVerifierPath = Find-ApplicationVerifier
+    $lockStressSkipReason = $null
+    if (-not $sandboxedUi) {
+        $lockStressSkipReason = 'FILEMANAGER_UI_TESTDATA_ROOT and the suffixed configuration key are required for the Application Verifier lane.'
+    }
+    elseif ([string]::IsNullOrWhiteSpace($uiExecutable) -or -not (Test-Path -LiteralPath $uiExecutable -PathType Leaf)) {
+        $lockStressSkipReason = 'FILEMANAGER_UI_EXE must identify the built executable.'
+    }
+    elseif ([string]::IsNullOrWhiteSpace($appVerifierPath)) {
+        $lockStressSkipReason = 'Application Verifier was not found.'
+    }
+    $lockStressLogDirectory = Join-Path $repositoryRoot 'TestResults\application-verifier-logs'
+    $lockStressArguments = if ($null -eq $lockStressSkipReason) {
+        @(
+            '-ExecutablePath', $uiExecutable,
+            '-TestProject', $testProject,
+            '-AppVerifierPath', $appVerifierPath,
+            '-LogOutputDirectory', $lockStressLogDirectory
+        )
+    } else { @() }
+    Invoke-WindowsPowerShellScript -RelativePath 'tools\run-lock-verifier-stress.ps1' `
+        -ScriptArguments $lockStressArguments -SkipReason $lockStressSkipReason
 }
-elseif ([string]::IsNullOrWhiteSpace($appVerifierPath)) {
-    $lockStressSkipReason = 'Application Verifier was not found.'
-}
-$lockStressLogDirectory = Join-Path $repositoryRoot 'TestResults\application-verifier-logs'
-$lockStressArguments = if ($null -eq $lockStressSkipReason) {
-    @(
-        '-ExecutablePath', $uiExecutable,
-        '-TestProject', $testProject,
-        '-AppVerifierPath', $appVerifierPath,
-        '-LogOutputDirectory', $lockStressLogDirectory
-    )
-} else { @() }
-Invoke-WindowsPowerShellScript -RelativePath 'tools\run-lock-verifier-stress.ps1' `
-    -ScriptArguments $lockStressArguments -SkipReason $lockStressSkipReason
 
 Write-Host "`n=== Automated test summary ===" -ForegroundColor Cyan
 Write-Host "$($passed.Count) checks passed." -ForegroundColor Green
