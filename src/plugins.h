@@ -3114,9 +3114,6 @@ public:
     // 'parent' is the parent window for message boxes; returns TRUE if panel selection should be cleared
     BOOL ExecuteMenuItem(CFilesWindow* panel, HWND parent, int suid);
 
-    // Test control resolves a plug-in-owned ID only after normal menu allocation, avoiding a duplicated host command ID.
-    int ResolveMenuItemCommandForTests(HWND parent, const char* dllSuffix, int id);
-
     // shows help for the menu command with the identifier 'suid' (WM_COMMAND in HelpMode)
     // 'parent' is the parent window for message boxes; returns TRUE if the help was shown
     BOOL HelpForMenuItem(HWND parent, int suid);
