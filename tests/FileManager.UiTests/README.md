@@ -1,6 +1,6 @@
 # FileManager UI tests
 
-This project contains seven primary parameterized FlaUI/UIA3 lifecycle cases plus focused file-operation characterization cases for the native FileManager UI. Repetition belongs to the separately scheduled lock-stress soak. The cases cover application launch, accessibility-tree discovery, Configuration dialog cancel/commit/restart flows, a committed setting verified after restart, FTP bookmark creation plus edit verified after restart, and native disk create/copy/rename/move/delete/find/view/edit commands.
+This project contains 100 basic, parameterized FlaUI/UIA3 NUnit cases plus focused file-operation characterization cases for the native FileManager UI. The cases cover application launch, accessibility-tree discovery, Configuration dialog cancel/commit/restart flows, a committed setting verified after restart, FTP bookmark creation plus edit verified after restart, and native disk create/copy/rename/move/delete/find/view/edit commands.
 
 The tests intentionally refuse to run unless `FILEMANAGER_UI_ISOLATED=1` is set. The application persists configuration under the current user registry hive, so run them under a dedicated Windows test account or another isolated user profile.
 

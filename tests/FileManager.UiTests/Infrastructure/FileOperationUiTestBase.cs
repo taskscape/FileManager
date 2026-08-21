@@ -10,7 +10,6 @@ namespace FileManager.UiTests.Infrastructure;
 public abstract class FileOperationUiTestBase : FileManagerUiTestBase
 {
     private FileOperationWorkspace? workspace;
-    private readonly HashSet<string> journalsBeforeStart = new(StringComparer.OrdinalIgnoreCase);
 
     protected FileOperationWorkspace Workspace => workspace ??= new FileOperationWorkspace(TargetVolumeRoot);
 
@@ -21,34 +20,12 @@ public abstract class FileOperationUiTestBase : FileManagerUiTestBase
     protected override string ApplicationArguments =>
         $"{UiTestSettings.Arguments} -l \"{Workspace.SourceDirectory}\" -r \"{Workspace.TargetDirectory}\" -p 1";
 
-    protected override void BeforeFileManagerStarted()
-    {
-        journalsBeforeStart.Clear();
-        var journalDirectory = GetOperationJournalDirectory();
-        if (Directory.Exists(journalDirectory))
-            journalsBeforeStart.UnionWith(Directory.EnumerateFiles(journalDirectory, "*.opj"));
-    }
-
     protected override void OnAfterFileManagerStopped()
     {
-        try
-        {
-            var journalDirectory = GetOperationJournalDirectory();
-            if (Directory.Exists(journalDirectory))
-            {
-                // Each nonparallel case removes only journals it created, so a failed worker cannot block the next startup.
-                foreach (var journal in Directory.EnumerateFiles(journalDirectory, "*.opj")
-                                                 .Where(path => !journalsBeforeStart.Contains(path)))
-                    File.Delete(journal);
-            }
-        }
-        finally
-        {
-            var completedWorkspace = workspace;
-            // Clear first so a cleanup exception cannot leak this case's partial topology into the next NUnit case.
-            workspace = null;
-            completedWorkspace?.Dispose();
-        }
+        var completedWorkspace = workspace;
+        // Clear first so a cleanup exception cannot leak this case's partial topology into the next NUnit case.
+        workspace = null;
+        completedWorkspace?.Dispose();
     }
 
     protected void SelectSourceItem(string name)
@@ -170,57 +147,6 @@ public abstract class FileOperationUiTestBase : FileManagerUiTestBase
         Assert.Fail(failureMessage);
     }
 
-    protected static void WaitForOperationJournalTerminal(string source, string failureMessage)
-    {
-        WaitForFileSystem(() =>
-        {
-            var journal = FindOperationJournalFor(source);
-            if (journal is null || !TryReadOperationJournal(journal, out var content))
-                return false;
-            // These are the four terminal states recognized by the native startup reconciler.
-            return content.Contains("OPERATION|completed", StringComparison.Ordinal) ||
-                   content.Contains("OPERATION|cancelled", StringComparison.Ordinal) ||
-                   content.Contains("OPERATION|failed", StringComparison.Ordinal) ||
-                   content.Contains("OPERATION|reconciled", StringComparison.Ordinal);
-        }, failureMessage);
-    }
-
-    protected static string? FindOperationJournalFor(string source)
-    {
-        var directory = GetOperationJournalDirectory();
-        if (!Directory.Exists(directory))
-            return null;
-
-        // Newest-first lookup binds completion checks to the disposable source path unique to this case.
-        return Directory.EnumerateFiles(directory, "*.opj")
-            .OrderByDescending(File.GetLastWriteTimeUtc)
-            .FirstOrDefault(path => TryReadOperationJournal(path, out var content) &&
-                                    content.Contains(source, StringComparison.Ordinal));
-    }
-
-    protected static bool TryReadOperationJournal(string path, out string content)
-    {
-        try
-        {
-            // The application appends journal records while tests observe them, so readers must share writes and deletion.
-            using var stream = new FileStream(path, FileMode.Open, FileAccess.Read,
-                                              FileShare.ReadWrite | FileShare.Delete);
-            using var reader = new StreamReader(stream);
-            content = reader.ReadToEnd();
-            return true;
-        }
-        catch (IOException)
-        {
-            content = string.Empty;
-            return false;
-        }
-        catch (UnauthorizedAccessException)
-        {
-            content = string.Empty;
-            return false;
-        }
-    }
-
     protected Window WaitForDesktopWindow(Func<Window, bool> predicate, string failureMessage)
     {
         // Editors run out of process, so desktop-level UIA is required to observe the configured editor window.
@@ -283,9 +209,6 @@ public abstract class FileOperationUiTestBase : FileManagerUiTestBase
             NativeCommands.HasDialogControl(window.Properties.NativeWindowHandle.Value, 1) &&
             NativeCommands.HasDialogControl(window.Properties.NativeWindowHandle.Value, 2));
     }
-
-    private static string GetOperationJournalDirectory() => Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "Open Salamander", "operation-journals");
 }
 
 public sealed class FileOperationWorkspace : IDisposable

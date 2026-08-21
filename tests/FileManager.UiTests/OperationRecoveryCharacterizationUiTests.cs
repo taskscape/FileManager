@@ -13,8 +13,6 @@ public sealed class OperationRecoveryCharacterizationUiTests : FileOperationUiTe
 
     protected override void BeforeFileManagerStarted()
     {
-        // Capture preexisting journals before this fixture deliberately seeds its recovery input.
-        base.BeforeFileManagerStarted();
         targetPath = Workspace.TargetPath("restart-reconciled.txt");
         temporaryPath = Workspace.TargetPath("SALCPrestart-reconciled.tmp");
         File.WriteAllText(temporaryPath, "recovered-after-restart");

@@ -20,8 +20,6 @@ public sealed class ReparsePointTopologyUiTests : FileOperationUiTestBase
 
     protected override void BeforeFileManagerStarted()
     {
-        // Preserve base journal isolation before creating the topology visible at application startup.
-        base.BeforeFileManagerStarted();
         operationRoot = Workspace.SourcePath("reparse-operation-root");
         firstOutsideTarget = Path.Combine(Workspace.RootDirectory, "outside-first-target");
         changedOutsideTarget = Path.Combine(Workspace.RootDirectory, "outside-changed-target");

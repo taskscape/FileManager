@@ -52,8 +52,6 @@ public sealed class FileAccessUiTests : FileOperationUiTestBase
     [Test]
     public void Edit_file_opens_the_selected_file_in_the_configured_editor()
     {
-        using var editorProcesses = new TestOwnedProcessScope("notepad");
-        // The process scope also cleans a headless default editor when the product defect prevents HWND discovery.
         // The default editor is out of process, so the opened file name in its window proves the edit dispatch reached it.
         SelectSourceItem("edit-file.txt");
         NativeCommands.Execute(MainWindow.Properties.NativeWindowHandle.Value, NativeCommands.EditFile);

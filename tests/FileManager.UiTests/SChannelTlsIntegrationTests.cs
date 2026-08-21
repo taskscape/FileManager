@@ -12,17 +12,12 @@ namespace FileManager.UiTests;
 [NonParallelizable]
 public sealed class SChannelTlsIntegrationTests
 {
-    // SChannel credential acquisition can exceed five seconds on a busy CI profile without indicating a protocol hang.
-    private static readonly TimeSpan HandshakeTimeout = TimeSpan.FromSeconds(15);
+    private static readonly TimeSpan HandshakeTimeout = TimeSpan.FromSeconds(5);
 
     [TestCase(SslProtocols.Tls12)]
     [TestCase(SslProtocols.Tls13)]
     public async Task LocalTlsServerNegotiatesTheRequiredProtocol(SslProtocols protocol)
     {
-        // Windows 10 SChannel never negotiates TLS 1.3; skip that platform prerequisite instead of waiting for a doomed handshake.
-        if (protocol == SslProtocols.Tls13 && Environment.OSVersion.Version.Build < 20348)
-            Assert.Ignore("TLS 1.3 requires Windows 11 or Windows Server 2022 and later.");
-
         using var timeout = new CancellationTokenSource(HandshakeTimeout);
         using var certificate = CreateCertificate();
         using var listener = new TcpListener(IPAddress.Loopback, 0);
@@ -136,8 +131,8 @@ public sealed class SChannelTlsIntegrationTests
         request.CertificateExtensions.Add(new X509KeyUsageExtension(X509KeyUsageFlags.DigitalSignature | X509KeyUsageFlags.KeyEncipherment, false));
         request.CertificateExtensions.Add(new X509SubjectKeyIdentifierExtension(request.PublicKey, false));
         using var generated = request.CreateSelfSigned(DateTimeOffset.UtcNow.AddDays(-1), DateTimeOffset.UtcNow.AddDays(1));
-        // SChannel requires a persisted server key; a machine-key import avoids the user-profile deletion race between cases.
-        return new X509Certificate2(generated.Export(X509ContentType.Pfx), (string?)null,
-                                    X509KeyStorageFlags.MachineKeySet | X509KeyStorageFlags.Exportable);
+        // Windows SChannel cannot use an ephemeral private-key handle for a
+        // server credential. UserKeySet keeps the test self-contained.
+        return new X509Certificate2(generated.Export(X509ContentType.Pfx), (string?)null, X509KeyStorageFlags.UserKeySet);
     }
 }

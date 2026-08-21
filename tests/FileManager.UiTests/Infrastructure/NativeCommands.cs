@@ -17,10 +17,7 @@ internal static class NativeCommands
     internal const int DeleteFiles = 729;
     internal const int CreateDirectory = 730;
     internal const int Open = 732;
-    // Preserve the upstream discovery/view/edit command surface with the stable native command identities.
-    internal const int FindFiles = 741;
-    internal const int ViewFile = 742;
-    internal const int EditFile = 743;
+    internal const int Edit = 743;
     internal const int RenameFile = 754;
     internal const int HelpSearch = 2212;
     private const uint WmNull = 0x0000;
@@ -35,7 +32,6 @@ internal static class NativeCommands
     private const int BstChecked = 1;
     private const uint CbGetCurSel = 0x0147;
     private const uint CbSetCurSel = 0x014E;
-    private const uint LvmGetItemCount = 0x1004;
     private const int CbnSelChange = 1;
     private const uint WmApp = 0x8000;
     private const uint WmUiTestReady = WmApp + 417;
@@ -49,7 +45,6 @@ internal static class NativeCommands
     private const int TvgnCaret = 9;
     private const uint SmtoAbortIfHung = 0x0002;
     private const int VkEscape = 0x1B;
-    private const int VkInsert = 0x2D;
     private const int VkReturn = 0x0D;
 
     [DllImport("user32.dll", SetLastError = true)]
@@ -322,19 +317,6 @@ internal static class NativeCommands
         SendMessage(listHandle, WmKeyDown, VkEscape, 0);
         foreach (var character in name)
             SendMessage(listHandle, WmChar, character, 1);
-    }
-
-    internal static void ToggleFocusedSelection(nint listHandle)
-    {
-        // Insert is the native panel gesture that selects the focused item while preserving prior selections.
-        SetFocus(listHandle);
-        SendMessage(listHandle, WmKeyDown, VkInsert, 0);
-    }
-
-    internal static int GetListViewItemCount(nint listHandle)
-    {
-        // This buffer-free list-view query is safe across processes and supports the virtual Find results control.
-        return checked((int)SendMessage(listHandle, LvmGetItemCount, 0, 0).ToInt64());
     }
 
     internal static void PressEnter(nint controlHandle)

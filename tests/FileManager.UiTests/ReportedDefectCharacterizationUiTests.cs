@@ -1,4 +1,5 @@
 using System.IO.Compression;
+using System.Diagnostics;
 using FileManager.UiTests.Infrastructure;
 using FlaUI.Core.AutomationElements;
 using FlaUI.Core.Definitions;
@@ -17,11 +18,14 @@ public sealed class ReportedDefectCharacterizationUiTests : FileOperationUiTestB
     private const string MoveOverwriteName = "move-overwrite-characterization.txt";
     private const string MoveCancelName = "move-cancel-characterization.txt";
     private readonly string editFileName = $"files-menu-edit-{Guid.NewGuid():N}.txt";
+    private readonly HashSet<string> journalsBeforeStart = new(StringComparer.OrdinalIgnoreCase);
 
     protected override void BeforeFileManagerStarted()
     {
-        // Reuse normal file-operation journal isolation before seeding the reported-defect fixtures.
-        base.BeforeFileManagerStarted();
+        journalsBeforeStart.Clear();
+        var journalDirectory = GetOperationJournalDirectory();
+        if (Directory.Exists(journalDirectory))
+            journalsBeforeStart.UnionWith(Directory.EnumerateFiles(journalDirectory));
         // Seed every reported scenario before launch so the first native panel listing contains deterministic fixtures.
         CreateZipFixture();
         File.WriteAllText(Workspace.SourcePath(MoveOverwriteName), "move-overwrite-source");
@@ -29,6 +33,24 @@ public sealed class ReportedDefectCharacterizationUiTests : FileOperationUiTestB
         File.WriteAllText(Workspace.SourcePath(MoveCancelName), "move-cancel-source");
         File.WriteAllText(Workspace.TargetPath(MoveCancelName), "move-cancel-existing-target");
         File.WriteAllText(Workspace.SourcePath(editFileName), "edit-characterization-content");
+    }
+
+    protected override void OnAfterFileManagerStopped()
+    {
+        try
+        {
+            var journalDirectory = GetOperationJournalDirectory();
+            if (!Directory.Exists(journalDirectory))
+                return;
+
+            // A deliberately failing operation must not leave recovery input that changes the next independent test.
+            foreach (var journal in Directory.EnumerateFiles(journalDirectory).Where(path => !journalsBeforeStart.Contains(path)))
+                File.Delete(journal);
+        }
+        finally
+        {
+            base.OnAfterFileManagerStopped();
+        }
     }
 
     [Test]
@@ -88,7 +110,7 @@ public sealed class ReportedDefectCharacterizationUiTests : FileOperationUiTestB
         var target = Workspace.TargetPath(MoveOverwriteName);
 
         ExecuteWithPath(NativeCommands.MoveFiles, MoveOverwriteName, Workspace.TargetDirectory, commit: true);
-        DismissOptionalPrompt(6, TimeSpan.FromSeconds(3), 6); // IDYES when this profile confirms overwrites.
+        ChooseOperationPrompt(WaitForOperationPrompt(6), 6); // IDYES: overwrite
 
         WaitForFileSystem(() => !File.Exists(source), "Confirmed move overwrite did not finish removing the source.");
         Assert.Multiple(() =>
@@ -107,7 +129,7 @@ public sealed class ReportedDefectCharacterizationUiTests : FileOperationUiTestB
         var target = Workspace.TargetPath(MoveCancelName);
 
         ExecuteWithPath(NativeCommands.MoveFiles, MoveCancelName, Workspace.TargetDirectory, commit: true);
-        DismissOptionalPrompt(2, TimeSpan.FromSeconds(3), 2); // Semantic checks expose an unavailable Cancel choice.
+        ChooseOperationPrompt(WaitForOperationPrompt(2), 2); // IDCANCEL
 
         Assert.Multiple(() =>
         {
@@ -122,12 +144,18 @@ public sealed class ReportedDefectCharacterizationUiTests : FileOperationUiTestB
     public void Files_menu_edit_opens_editor_without_freezing_main_window()
     {
         var windowsBefore = NativeCommands.GetVisibleTopLevelWindowHandles().ToHashSet();
-        using var editorProcesses = new TestOwnedProcessScope("notepad");
+        var notepadProcessesBefore = Process.GetProcessesByName("notepad")
+            .Select(process =>
+            {
+                using (process)
+                    return process.Id;
+            })
+            .ToHashSet();
         nint editorWindowHandle = 0;
         try
         {
             SelectSourceItem(editFileName);
-            NativeCommands.Execute(MainWindowHandle, NativeCommands.EditFile);
+            NativeCommands.Execute(MainWindowHandle, NativeCommands.Edit);
 
             var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(10);
             var lastResponsive = DateTime.UtcNow;
@@ -160,6 +188,7 @@ public sealed class ReportedDefectCharacterizationUiTests : FileOperationUiTestB
                                                   .Contains(editFileName, StringComparison.OrdinalIgnoreCase));
             }
             NativeCommands.RequestWindowClose(editorWindowHandle);
+            CloseTestOwnedDefaultEditorProcesses(notepadProcessesBefore);
         }
     }
 
@@ -169,6 +198,24 @@ public sealed class ReportedDefectCharacterizationUiTests : FileOperationUiTestB
         var entry = archive.CreateEntry(ZipPayloadName);
         using var writer = new StreamWriter(entry.Open());
         writer.Write("zip-characterization-content");
+    }
+
+    private static string GetOperationJournalDirectory() => Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "Open Salamander", "operation-journals");
+
+    private static void CloseTestOwnedDefaultEditorProcesses(IReadOnlySet<int> processesBefore)
+    {
+        foreach (var process in Process.GetProcessesByName("notepad"))
+        {
+            using (process)
+            {
+                // A frozen default editor may never create an HWND, so its post-command PID is the only safe cleanup identity.
+                if (processesBefore.Contains(process.Id) || process.HasExited)
+                    continue;
+                process.Kill(entireProcessTree: true);
+                process.WaitForExit(5000);
+            }
+        }
     }
 
     private static void RequireDeployedMainHelp()
