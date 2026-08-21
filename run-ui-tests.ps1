@@ -115,7 +115,7 @@ try {
 
     Push-Location $repositoryRoot
     try {
-        & dotnet @arguments
+        & dotnet @($arguments.ToArray())
         $testExitCode = $LASTEXITCODE
     }
     finally {
