@@ -1679,7 +1679,13 @@ public sealed class NativeSafetyRegressionTests
             Assert.That(audit, Does.Contain("dumpbin.exe"));
             Assert.That(audit, Does.Contain("Control Flow Guard"));
             Assert.That(audit, Does.Contain("CET compatible"));
+            // The audit must reject a mixed Debug/Release staging directory instead of applying Release requirements to Debug helpers.
+            Assert.That(audit, Does.Contain("exact Release_x64 artifact directory"));
+            // CRT-free and x86 release helpers retain their compatible mitigations without being required to carry unsupported CFG/CET metadata.
+            Assert.That(audit, Does.Contain("crtFreeArtifactNames"));
+            Assert.That(audit, Does.Contain("machine \\(x64\\)"));
             Assert.That(workflow, Does.Contain("Audit Release PE hardening"));
+            Assert.That(workflow, Does.Contain("$releaseArtifactRoot = Join-Path $env:OPENSAL_BUILD_DIR 'salamander\\Release_x64'"));
         });
     }
 

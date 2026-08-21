@@ -158,8 +158,9 @@ jobs:
       - name: Audit Release PE hardening
         shell: pwsh
         run: |
-          # Inspect linked binaries so a project-level override cannot silently weaken the common baseline.
-          .\tools\audit-pe-hardening.ps1 -BuildRoot $env:OPENSAL_BUILD_DIR
+          # Audit only installer-bound Release x64 binaries; Debug utility outputs are not Release mitigation candidates.
+          $releaseArtifactRoot = Join-Path $env:OPENSAL_BUILD_DIR 'salamander\Release_x64'
+          .\tools\audit-pe-hardening.ps1 -BuildRoot $releaseArtifactRoot
 
       - name: Run v145 native regression subset
         shell: pwsh
