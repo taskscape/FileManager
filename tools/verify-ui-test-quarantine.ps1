@@ -1,10 +1,15 @@
 [CmdletBinding()]
 param(
-    [string]$ManifestPath = (Join-Path $PSScriptRoot '..\tests\FileManager.UiTests\quarantined-ui-tests.json')
+    [string]$ManifestPath
 )
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
+
+# Windows PowerShell binds parameter defaults before it assigns PSScriptRoot, so resolve the repository-relative manifest only after script initialization.
+if ([string]::IsNullOrWhiteSpace($ManifestPath)) {
+    $ManifestPath = Join-Path $PSScriptRoot '..\tests\FileManager.UiTests\quarantined-ui-tests.json'
+}
 
 # The release suite filters only entries proven here, preventing a broad category from silently hiding an untracked test.
 $resolvedManifestPath = [System.IO.Path]::GetFullPath($ManifestPath)
@@ -81,8 +86,10 @@ foreach ($entry in @($manifest.tests)) {
     [void]$manifestLocations.Add((($entry.sourceFile -replace '\\', '/') + '::' + $entry.testName))
 }
 $categorizedLocations = [System.Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
-Get-ChildItem -LiteralPath (Join-Path $repositoryRoot 'tests\FileManager.UiTests') -Filter '*.cs' -Recurse | ForEach-Object {
-    $relativePath = [System.IO.Path]::GetRelativePath($repositoryRoot, $_.FullName) -replace '\\', '/'
+$uiTestSourceRoot = Join-Path $repositoryRoot 'tests\FileManager.UiTests'
+Get-ChildItem -LiteralPath $uiTestSourceRoot -Filter '*.cs' -Recurse | ForEach-Object {
+    # Path.GetRelativePath is unavailable in the Windows PowerShell/.NET Framework host used by the release runner.
+    $relativePath = $_.FullName.Substring($repositoryRoot.Length).TrimStart([char[]]@('\', '/')) -replace '\\', '/'
     $source = Get-Content -LiteralPath $_.FullName -Raw
     foreach ($match in [regex]::Matches($source, '(?s)(?<attributes>(?:\s*\[[^\]]+\]\s*)+)public\s+void\s+(?<name>[A-Za-z_][A-Za-z0-9_]*)\s*\(')) {
         $attributes = $match.Groups['attributes'].Value
