@@ -5,7 +5,8 @@ param(
     [switch]$FailOnSkipped,
     [switch]$KeepBuildArtifacts,
     [string]$NUnitFilter,
-    [ValidateSet('v143', 'v145')]
+    # The complete UI harness must match the repository-wide VS 2026 compiler contract.
+    [ValidateSet('v145')]
     [string]$PlatformToolset = 'v145',
     [string]$NUnitTrxPath
 )
@@ -111,7 +112,8 @@ function Find-VisualStudioDeveloperCommand {
     $programFilesX86 = [Environment]::GetFolderPath([Environment+SpecialFolder]::ProgramFilesX86)
     $vswhere = Join-Path $programFilesX86 'Microsoft Visual Studio\Installer\vswhere.exe'
     if (Test-Path -LiteralPath $vswhere) {
-        $installationPath = & $vswhere -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
+        # Restrict discovery to VS 2026 so an older installation cannot supply the test compiler.
+        $installationPath = & $vswhere -latest -products * -version '[18.0,19.0)' -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
         if (-not [string]::IsNullOrWhiteSpace($installationPath)) {
             $candidates.Add((Join-Path $installationPath.Trim() 'Common7\Tools\VsDevCmd.bat'))
         }
@@ -147,7 +149,8 @@ function Build-UiTestApplication {
         [Parameter(Mandatory = $true)]
         [string]$BuildDirectory,
         [Parameter(Mandatory = $true)]
-        [ValidateSet('v143', 'v145')]
+        # Build the disposable UI executable with the only supported native toolset.
+        [ValidateSet('v145')]
         [string]$Toolset
     )
 
@@ -174,7 +177,8 @@ function Invoke-NativeSafetyTests {
         [Parameter(Mandatory = $true)]
         [string]$DeveloperCommand,
         [Parameter(Mandatory = $true)]
-        [ValidateSet('v143', 'v145')]
+        # Keep native safety probes on the same VS 2026 toolset as the UI executable.
+        [ValidateSet('v145')]
         [string]$Toolset
     )
 
@@ -206,7 +210,8 @@ function Invoke-PictViewEngineTests {
         [Parameter(Mandatory = $true)]
         [string]$DeveloperCommand,
         [Parameter(Mandatory = $true)]
-        [ValidateSet('v143', 'v145')]
+        # PictView coverage shares the single supported VS 2026 toolchain.
+        [ValidateSet('v145')]
         [string]$Toolset
     )
 
@@ -625,7 +630,7 @@ Remove-OlderUiTestBuildResults -ResultsDirectory $testResultsDirectory
 
 $vsDevCmd = Find-VisualStudioDeveloperCommand
 if ([string]::IsNullOrWhiteSpace($vsDevCmd)) {
-    throw 'Visual Studio C++ developer tools were not found; the complete UI suite cannot build the current solution.'
+    throw 'Visual Studio 2026 C++ developer tools were not found; the complete UI suite cannot build the current solution.'
 }
 $dotnet = Get-Command dotnet.exe -ErrorAction SilentlyContinue | Select-Object -First 1
 if ($null -eq $dotnet) {

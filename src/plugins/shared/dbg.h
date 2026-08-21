@@ -378,7 +378,7 @@ public:
 
 // to avoid problems with semicolons in macros defined below
 
-// Bypasses a clang-format bug in version 19.1.5 (part of Visual Studio 2022 17.14).
+// Bypasses a clang-format bug in the bundled version 19.1.5 formatter.
 // clang-format off
 inline void __TraceEmptyFunction() {}
 // clang-format on

@@ -302,7 +302,7 @@ ShufBytes_256(void *items8, const void *lim8, const void *mask128_ptr)
  #else
   /* msvc: broadcastsi128() version reserves the stack for no reason
      msvc 19.29-: _mm256_insertf128_si256() / _mm256_set_m128i)) versions use non-avx movdqu   xmm0,XMMWORD PTR [r8]
-     msvc 19.30+ (VS2022): replaces _mm256_set_m128i(m,m) to vbroadcastf128(m) as we want
+     msvc 19.30+: replaces _mm256_set_m128i(m,m) to vbroadcastf128(m) as we want
   */
   // _mm256_broadcastsi128_si256(*mask128_ptr);
 #if defined(Z7_GCC_VERSION) && (Z7_GCC_VERSION < 80000)

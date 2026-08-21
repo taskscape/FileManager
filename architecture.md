@@ -23,7 +23,7 @@ The most accurate high-level classification is a **Win32 modular monolith with a
 - Main executable project: `src/vcxproj/salamand.vcxproj`.
 - Solution scale: 93 Visual C++ projects; roughly 958 `.cpp`, 1,134 `.h`, and 212 `.c` files in the repository.
 - Shipped architectures: Win32 and x64 are represented in property sheets and the solution; the current installer workflow produces x64.
-- Local project toolset: v145; hosted workflows override it with v143.
+- Local projects and CI use the VS 2026 `v145` toolset.
 - UI test project: `tests/FileManager.UiTests`, targeting .NET 8 Windows with NUnit and FlaUI/UIA3.
 - Configuration store: primarily versioned keys under `HKEY_CURRENT_USER`, with optional `config.reg` import from the executable directory or roaming AppData.
 - Localization: the host and plug-ins load `.slg` language resource modules; resources and command identifiers are central to UI composition and automation.
@@ -83,7 +83,7 @@ The common MSBuild policy is defined in `src/vcxproj/sal_base.props`:
 - `WINVER` and `_WIN32_WINNT` are set to Windows 7 (`0x0601`) for compatibility.
 - Debug builds enable tracing and handle tracking; Release builds enable optimization and link-time code generation.
 - Win32 and x64 builds are separated by platform-specific property sheets and output directories.
-- The checked-in projects currently select toolset `v145`; CI intentionally overrides that to `v143`, so the effective toolset is environment-dependent.
+- The checked-in projects and CI use toolset `v145`, keeping the effective toolset environment-independent.
 
 The pull-request workflow compiles Debug Win32 and x64 configurations and treats warnings as errors. The release workflow builds x64 Release, stages the installer tree, and publishes artifacts. FTPS uses Windows SChannel rather than a bundled TLS runtime, so the installer does not download or ship OpenSSL DLLs. Installer scripts collect the executable, helper processes, shell extensions, language modules, toolbar assets, conversion tables, and plug-ins. Consequently, successful compilation of `salamand.exe` alone does not prove a distributable installation is complete.
 

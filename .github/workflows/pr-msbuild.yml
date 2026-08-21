@@ -22,7 +22,10 @@ concurrency:
 jobs:
   build:
     name: Build ${{ matrix.platform }} Debug (fail on warnings)
-    runs-on: windows-2022
+    # Compile PRs with the repository's sole supported VS 2026 toolchain.
+    runs-on:
+      group: FileManager UI
+      labels: [self-hosted, windows, filemanager-ui]
 
     strategy:
       fail-fast: false
@@ -38,13 +41,8 @@ jobs:
       BUILD_CONFIGURATION: Debug
       SOLUTION_PATH: '.\src\vcxproj\salamand.sln'
       LOG_DIRECTORY: build_logs
-      # The project files target the VS2026 v145 toolset for local development.
-      # GitHub-hosted runners only ship VS2022 (v143), and v145 (VS2026, prerelease)
-      # cannot be bolted onto VS2022, so CI pins the build to v143 via a global MSBuild
-      # property (overrides the per-project <PlatformToolset>v145</PlatformToolset>).
-      # The same sources build identically on both toolsets. Change to v145 only on a
-      # runner that has VS2026 installed.
-      PLATFORM_TOOLSET: v143
+      # Project files and PR validation share the VS 2026 v145 compiler contract.
+      PLATFORM_TOOLSET: v145
 
     steps:
       - name: Checkout
@@ -53,13 +51,12 @@ jobs:
         with:
           path: s
 
-      - name: Setup MSBuild in PATH (VS2022)
+      - name: Setup MSBuild
         uses: microsoft/setup-msbuild@6fb02220983dee41ce7ae257b6f4d8f9bf5ed4ce # v2
 
       - name: Setup MSVC Developer Command Prompt (x64 toolchain)
-        uses: ilammy/msvc-dev-cmd@0b201ec74fa43914dc39ae48a89fd1d8cb592756 # v1
-        with:
-          arch: x64
+        # Establish the VS 2026 environment before invoking every native build.
+        run: .\tools\setup-vs2026-buildtools.ps1
 
       # Run the verifier's synthetic Git-history cases once per matrix to keep
       # vendor scoping, comment parsing, and actionable diagnostics stable.

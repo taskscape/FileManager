@@ -4,7 +4,7 @@
 
 #include <limits.h>
 #if defined(_MSC_VER) && (_MSC_VER >= 1600)
-#include <stdint.h> // for WCHAR_MAX in vs2022
+#include <stdint.h> // for WCHAR_MAX in modern MSVC
 #endif
 
 #include "StringToInt.h"

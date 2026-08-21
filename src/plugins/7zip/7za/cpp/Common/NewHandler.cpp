@@ -84,11 +84,11 @@ operator delete(void *p) throw()
 }
 
 /* we define operator delete(void *p, size_t n) because
-   vs2022 compiler uses delete(void *p, size_t n), and
+   modern MSVC uses delete(void *p, size_t n), and
    we want to mix files from different compilers:
      - old vc6 linker
      - old vc6 complier
-     - new vs2022 complier
+     - new MSVC compiler
 */
 void
 #ifdef _MSC_VER

@@ -20,7 +20,8 @@ jobs:
       fail-fast: false # Make sure the relaxed run completes even if the strict mode fails first.
       matrix:
         mode: [strict, ignore-whitespace] # Run the guard in strict mode and with whitespace ignored.
-    runs-on: windows-2022
+    # This hosted guard only needs clang preprocessing; keep it independent of native compiler compatibility lanes.
+    runs-on: windows-2025
     defaults:
       run:
         shell: pwsh
@@ -127,7 +128,7 @@ jobs:
           }
 
           if (-not (Get-Command clang.exe -ErrorAction SilentlyContinue)) {
-            Write-Error 'clang.exe not found on PATH (expected on windows-2022 runner).'
+            Write-Error 'clang.exe not found on PATH (expected on the hosted guard runner).'
           }
 
           if (-not [string]::IsNullOrWhiteSpace($baseRef)) {

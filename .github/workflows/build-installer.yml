@@ -110,7 +110,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          # Preserve the full executable result inventory for toolset parity, not just source contracts.
+          # Preserve the full executable result inventory for release diagnosis, not just source contracts.
           name: toolset-ui-results-v145-${{ github.sha }}
           path: ${{ runner.temp }}\runtests-v145.trx
           if-no-files-found: error
@@ -123,121 +123,13 @@ jobs:
           path: TestResults\application-verifier-logs
           if-no-files-found: warn
 
-  toolset-parity-v143-ui:
-    name: Run complete UI suite with v143
-    needs: release-tests
-    # The same disposable desktop, volumes, and verifier installation make the
-    # v143 inventory comparable to the gated v145 executable run above.
-    # Keep the parity UI run on the same repository-restricted desktop as the release gate.
-    runs-on:
-      group: FileManager UI
-      labels: [self-hosted, windows, filemanager-ui]
-    permissions:
-      contents: read
-
-    env:
-      FILEMANAGER_UI_ISOLATED: '1'
-      FILEMANAGER_UI_CONFIG_FAULT_INJECTION: '1'
-      FILEMANAGER_UI_RECYCLE_BIN: '1'
-
-    steps:
-      - name: Checkout complete history
-        # The v143 UI job must use the exact commit gated by the v145 release job.
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
-        with:
-          fetch-depth: 0
-
-      - name: Provision isolated UI test volumes
-        shell: pwsh
-        # Recreate rather than reuse the v145 volumes so parity starts from the same clean filesystem state.
-        run: .\tools\manage-ui-test-volumes.ps1 -Action Setup -WorkingDirectory (Join-Path $env:RUNNER_TEMP 'filemanager-ui-volumes') -EnvironmentFile $env:GITHUB_ENV
-
-      - name: Setup MSBuild
-        uses: microsoft/setup-msbuild@6fb02220983dee41ce7ae257b6f4d8f9bf5ed4ce # v2
-
-      - name: Setup MSVC Developer Command Prompt (x64 toolchain)
-        # Use the same fixed VS 2026 path so toolset parity does not depend on action version discovery.
-        shell: pwsh
-        run: .\tools\setup-vs2026-buildtools.ps1
-
-      - name: Run v143 verification without unexpected skips
-        shell: pwsh
-        # Use the same explicit quarantine filter so v143/v145 result inventories remain comparable.
-        run: .\scripts\runtests.ps1 -BaseCommit HEAD^ -FailOnSkipped -NUnitFilter 'TestCategory!=Quarantined' -PlatformToolset v143 -NUnitTrxPath $env:RUNNER_TEMP\runtests-v143.trx
-
-      - name: Remove isolated UI test volumes
-        if: always()
-        shell: pwsh
-        # Parity cleanup owns only the images provisioned in this job's runner-temp leaf.
-        run: .\tools\manage-ui-test-volumes.ps1 -Action Cleanup -WorkingDirectory (Join-Path $env:RUNNER_TEMP 'filemanager-ui-volumes')
-
-      - name: Upload v143 complete UI results
-        if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
-        with:
-          name: toolset-ui-results-v143-${{ github.sha }}
-          path: ${{ runner.temp }}\runtests-v143.trx
-          if-no-files-found: error
-
-  toolset-parity-v145:
-    name: Produce v145 Release artifact manifest
-    needs: release-tests
-    # Restrict the v145 artifact job to the dedicated group that may serve this public repository.
-    runs-on:
-      group: FileManager UI
-      labels: [self-hosted, windows, filemanager-ui]
-    permissions:
-      contents: read
-
-    env:
-      BUILD_CONFIGURATION: Release
-      SOLUTION_PATH: 'src\vcxproj\salamand.sln'
-      PLATFORM_TOOLSET: v145
-      OPENSAL_BUILD_DIR: '${{ github.workspace }}\toolset-v145\'
-
-    steps:
-      - name: Checkout
-        # The comparison must build the exact commit verified by the release-test job.
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
-
-      - name: Setup MSBuild
-        uses: microsoft/setup-msbuild@6fb02220983dee41ce7ae257b6f4d8f9bf5ed4ce # v2
-
-      - name: Setup MSVC Developer Command Prompt (x64 toolchain)
-        # v145 requires the verified VS 2026 Build Tools location rather than a version-range lookup.
-        shell: pwsh
-        run: .\tools\setup-vs2026-buildtools.ps1
-
-      - name: Build Release x64 with v145
-        shell: pwsh
-        run: |
-          New-Item -ItemType Directory -Force -Path $env:OPENSAL_BUILD_DIR | Out-Null
-          msbuild $env:SOLUTION_PATH /m /t:Build /p:Configuration=$env:BUILD_CONFIGURATION /p:Platform=x64 /p:PlatformToolset=$env:PLATFORM_TOOLSET /p:PreferredToolArchitecture=x64 /nr:false
-
-      - name: Write v145 artifact manifest
-        shell: pwsh
-        run: .\tools\new-toolset-pe-manifest.ps1 -BuildRoot $env:OPENSAL_BUILD_DIR -Toolset v145 -OutputPath $env:RUNNER_TEMP\v145-pe-manifest.json
-
-      - name: Run v145 native regression subset
-        shell: pwsh
-        run: dotnet test .\tests\FileManager.UiTests\FileManager.UiTests.csproj --filter "FullyQualifiedName~NativeSafetyRegressionTests" --results-directory $env:RUNNER_TEMP --logger "trx;LogFileName=v145-native.trx"
-
-      - name: Upload v145 artifact manifest
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
-        with:
-          # The build job compares this immutable manifest against the hosted v143 release output.
-          name: toolset-pe-manifest-v145-${{ github.sha }}
-          path: |
-            ${{ runner.temp }}\v145-pe-manifest.json
-            ${{ runner.temp }}\v145-native.trx
-          if-no-files-found: error
-
   build:
     name: Build Installer (x64 Release)
-    # Publishing cannot begin until the unified runner has executed every test
-    # and rejected both failures and missing prerequisites.
-    needs: [release-tests, toolset-parity-v143-ui, toolset-parity-v145]
-    runs-on: windows-2022
+    # Packaging uses the same VS 2026 toolchain that passed the release gate.
+    needs: release-tests
+    runs-on:
+      group: FileManager UI
+      labels: [self-hosted, windows, filemanager-ui]
     permissions:
       contents: read
 
@@ -247,27 +139,21 @@ jobs:
       # OPENSAL_BUILD_DIR MUST end with a backslash as expected by props files
       OPENSAL_BUILD_DIR: '${{ github.workspace }}\build_stage\'
       INSTALLER_STAGING_DIR: 'Installer\Installer_Staging'
-      # The project files target the VS2026 v145 toolset for local development.
-      # GitHub-hosted runners only ship VS2022 (v143), and v145 (VS2026, prerelease)
-      # cannot be bolted onto VS2022, so CI pins the build to v143 via a global MSBuild
-      # property (overrides the per-project <PlatformToolset>v145</PlatformToolset>).
-      # The same sources build identically on both toolsets. Change to v145 only on a
-      # runner that has VS2026 installed.
-      PLATFORM_TOOLSET: v143
+      # The repository supports one compiler contract: VS 2026's v145 toolset.
+      PLATFORM_TOOLSET: v145
 
     steps:
       - name: Checkout
         # Pin actions by reviewed commit to keep the release input graph immutable.
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
 
-      - name: Setup MSBuild in PATH (VS2022)
+      - name: Setup MSBuild
         uses: microsoft/setup-msbuild@6fb02220983dee41ce7ae257b6f4d8f9bf5ed4ce # v2
 
       - name: Setup MSVC Developer Command Prompt (x64 toolchain)
-        # dumpbin in the Release audit is supplied by this same pinned toolchain environment.
-        uses: ilammy/msvc-dev-cmd@0b201ec74fa43914dc39ae48a89fd1d8cb592756 # v1
-        with:
-          arch: x64
+        # dumpbin and MSBuild must come from the same verified VS 2026 installation.
+        shell: pwsh
+        run: .\tools\setup-vs2026-buildtools.ps1
 
       - name: Build Solution (Release | x64)
         run: |
@@ -281,38 +167,9 @@ jobs:
           # Inspect linked binaries so a project-level override cannot silently weaken the common baseline.
           .\tools\audit-pe-hardening.ps1 -BuildRoot $env:OPENSAL_BUILD_DIR
 
-      - name: Write v143 artifact manifest
+      - name: Run v145 native regression subset
         shell: pwsh
-        run: .\tools\new-toolset-pe-manifest.ps1 -BuildRoot $env:OPENSAL_BUILD_DIR -Toolset v143 -OutputPath $env:RUNNER_TEMP\v143-pe-manifest.json
-
-      - name: Run v143 native regression subset
-        shell: pwsh
-        run: dotnet test .\tests\FileManager.UiTests\FileManager.UiTests.csproj --filter "FullyQualifiedName~NativeSafetyRegressionTests" --results-directory $env:RUNNER_TEMP --logger "trx;LogFileName=v143-native.trx"
-
-      - name: Retrieve v145 artifact manifest
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
-        with:
-          name: toolset-pe-manifest-v145-${{ github.sha }}
-          path: ${{ runner.temp }}\toolset-manifests
-
-      - name: Compare v143 and v145 release artifacts
-        shell: pwsh
-        run: .\tools\compare-toolset-pe-manifests.ps1 -V143Manifest $env:RUNNER_TEMP\v143-pe-manifest.json -V145Manifest $env:RUNNER_TEMP\toolset-manifests\v145-pe-manifest.json
-
-      - name: Compare v143 and v145 native test results
-        shell: pwsh
-        run: .\tools\compare-vstest-trx.ps1 -V143Results $env:RUNNER_TEMP\v143-native.trx -V145Results $env:RUNNER_TEMP\toolset-manifests\v145-native.trx
-
-      - name: Retrieve complete v143 and v145 UI results
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
-        with:
-          pattern: toolset-ui-results-*
-          path: ${{ runner.temp }}\toolset-ui-results
-          merge-multiple: false
-
-      - name: Compare v143 and v145 complete UI results
-        shell: pwsh
-        run: .\tools\compare-vstest-trx.ps1 -V143Results $env:RUNNER_TEMP\toolset-ui-results\toolset-ui-results-v143-${{ github.sha }}\runtests-v143.trx -V145Results $env:RUNNER_TEMP\toolset-ui-results\toolset-ui-results-v145-${{ github.sha }}\runtests-v145.trx
+        run: dotnet test .\tests\FileManager.UiTests\FileManager.UiTests.csproj --filter "FullyQualifiedName~NativeSafetyRegressionTests"
 
       - name: Index and verify private release symbols
         shell: pwsh
@@ -392,7 +249,10 @@ jobs:
   publish:
     name: Publish verified installer
     needs: build
-    runs-on: windows-2022
+    # Keep publishing on the repository-restricted VS 2026 runner family.
+    runs-on:
+      group: FileManager UI
+      labels: [self-hosted, windows, filemanager-ui]
     environment: production
     permissions:
       contents: write

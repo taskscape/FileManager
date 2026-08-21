@@ -1875,7 +1875,7 @@ Blake2sp_Final_AVX2_Fast(UInt32 *states)
 
 
 #if 0 || 1 && defined(Z7_MSC_VER_ORIGINAL) && Z7_MSC_VER_ORIGINAL >= 1600
-  // good for vs2022
+  // good for modern MSVC
   #define LOOP_8(mac) { unsigned kkk; for (kkk = 0; kkk < 8; kkk++) mac(kkk) }
 #else
    // good for Z7_BLAKE2S_UNROLL for GCC9 (arm*/x86*) and MSC_VER_1400-x64.

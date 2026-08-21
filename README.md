@@ -41,9 +41,9 @@ The 5.0 release marks a transition to taskscape development with several key enh
 ### Prerequisites
 
 - Windows 11 or newer
-- [Visual Studio 2022](https://visualstudio.microsoft.com/downloads/)
-- [Desktop development with C++](https://learn.microsoft.com/en-us/cpp/build/vscpp-step-0-installation?view=msvc-170) workload installed in VS2022
-- [Windows 11 (10.0.26100.4654) SDK](https://developer.microsoft.com/en-us/windows/downloads/windows-sdk/) optional component installed in VS2022
+- [Visual Studio 2026](https://visualstudio.microsoft.com/downloads/)
+- [Desktop development with C++](https://learn.microsoft.com/en-us/cpp/build/vscpp-step-0-installation?view=msvc-180) workload installed in Visual Studio 2026
+- [Windows 11 (10.0.26100.4654) SDK](https://developer.microsoft.com/en-us/windows/downloads/windows-sdk/) optional component installed in Visual Studio 2026
 
 ### Optional requirements
 
@@ -75,7 +75,7 @@ Open Salamander uses [Inno Setup](https://jrsoftware.org/isinfo.php) to create t
 **Recommended:** Use the automated build script that reproduces the GitHub Actions workflow:
 
 ```powershell
-# Build Release configuration with v143 toolset (VS2022)
+# Build Release configuration with the VS 2026 v145 toolset
 .\scripts\build-installer.ps1
 
 # Build with different configuration or toolset
@@ -441,7 +441,7 @@ The codebase follows these conventions for new and refactored code:
 
 ### Build System
 
-The solution (`src/vcxproj/salamand.sln`) targets MSVC v145 (Visual Studio 2026) for local development. Release CI also builds v143 (VS 2022) and compares its release artifacts and complete executable test inventory with v145 before packaging. MSBuild property sheets layer the configuration:
+The solution (`src/vcxproj/salamand.sln`) and CI target MSVC v145 (Visual Studio 2026). MSBuild property sheets layer the configuration:
 
 - `sal_base.props` — common defines, include paths, warning level
 - `sal_debug.props` / `sal_release.props` — optimization and debug flags

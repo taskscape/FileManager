@@ -540,9 +540,9 @@ This document is the working record for a read-only stability and resilience aud
 - **Justification:** PR CI covers only Debug Win32/x64 (`.github/workflows/pr-msbuild.yml:24-39`), while optimization, conditional compilation, and linker settings can create Release-only failures.
 - **Proposed solution:** Add Release matrices for all shipped architectures, cache intermediates where safe, and make the exact publish build reusable from the verified workflow.
 
-### 80. Verify v143 and v145 toolset parity — Implemented (2026-08-14)
+### 80. Standardize the VS 2026 toolchain — Implemented (2026-08-21)
 
-- **Delivered:** The release workflow builds the exact gated source with v145 on the self-hosted Visual Studio 2026 runner and v143 on the hosted Release build. It records immutable PE manifests with paths, machine type, file/product version, length, and SHA-256, then blocks packaging when the v143/v145 artifact inventory, machine type, or version identity differs. Hashes are retained as provenance rather than required to match across compilers. Both toolsets run the native regression subset. The dedicated UI runner additionally runs `scripts/runtests.ps1 -FailOnSkipped` with each toolset, retains the complete NUnit TRX inventory, and `compare-vstest-trx.ps1` blocks publication if any executable test name or outcome differs.
+- **Delivered:** All project, installer, pull-request, and UI-test paths use the Visual Studio 2026 `v145` toolset on the repository-restricted runner. The release gate runs `scripts/runtests.ps1 -FailOnSkipped`, and packaging runs the native safety subset plus PE-hardening and symbol-index verification before publication.
 
 ### Foundational: test depth, observability, and sustainable delivery
 

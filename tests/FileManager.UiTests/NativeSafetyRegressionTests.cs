@@ -1670,22 +1670,20 @@ public sealed class NativeSafetyRegressionTests
     }
 
     [Test]
-    public void Release_pipeline_compares_v143_and_v145_artifact_compatibility_metadata()
+    public void Release_pipeline_uses_the_single_supported_VS_2026_toolset()
     {
         var root = FindRepositoryRoot();
-        var producer = File.ReadAllText(Path.Combine(root, "tools", "new-toolset-pe-manifest.ps1"));
-        var comparer = File.ReadAllText(Path.Combine(root, "tools", "compare-toolset-pe-manifests.ps1"));
         var workflow = File.ReadAllText(Path.Combine(root, ".github", "workflows", "build-installer.yml"));
+        var runner = File.ReadAllText(Path.Combine(root, "scripts", "runtests.ps1"));
 
-        // Require both compiler jobs and a comparison of shipped compatibility fields, not only two independent builds.
+        // A single compiler contract prevents unavailable legacy toolchains from masking release-test failures.
         Assert.Multiple(() =>
         {
-            Assert.That(producer, Does.Contain("Get-PeMachine"));
-            Assert.That(producer, Does.Contain("sha256"));
-            Assert.That(comparer, Does.Contain("v143/v145 Release artifact compatibility comparison failed."));
-            Assert.That(comparer, Does.Contain("'machine', 'fileVersion', 'productVersion'"));
-            Assert.That(workflow, Does.Contain("toolset-parity-v145"));
-            Assert.That(workflow, Does.Contain("Compare v143 and v145 release artifacts"));
+            Assert.That(workflow, Does.Contain("PLATFORM_TOOLSET: v145"));
+            Assert.That(workflow, Does.Contain("setup-vs2026-buildtools.ps1"));
+            Assert.That(runner, Does.Contain("[ValidateSet('v145')]"));
+            Assert.That(Regex.Matches(workflow, "PLATFORM_TOOLSET: (?!v145)").Count, Is.Zero);
+            Assert.That(Regex.Matches(workflow, "group: FileManager UI").Count, Is.EqualTo(3));
         });
     }
 
@@ -1793,24 +1791,18 @@ public sealed class NativeSafetyRegressionTests
     }
 
     [Test]
-    public void Release_pipeline_compares_v143_and_v145_complete_test_result_inventories()
+    public void Release_pipeline_runs_complete_UI_and_native_safety_coverage_with_VS_2026()
     {
         var root = FindRepositoryRoot();
-        var comparer = File.ReadAllText(Path.Combine(root, "tools", "compare-vstest-trx.ps1"));
         var workflow = File.ReadAllText(Path.Combine(root, ".github", "workflows", "build-installer.yml"));
 
-        // Parity must compare the complete executable inventory, not merely two successful native test exit codes.
+        // Complete UI and focused native checks retain broad coverage without a second compiler lane.
         Assert.Multiple(() =>
         {
-            Assert.That(comparer, Does.Contain("UnitTestResult"));
-            Assert.That(comparer, Does.Contain("missing from one toolset"));
-            Assert.That(comparer, Does.Contain("v143/v145 test-result parity failed."));
-            Assert.That(workflow, Does.Contain("Run v143 native regression subset"));
             Assert.That(workflow, Does.Contain("Run v145 native regression subset"));
-            Assert.That(workflow, Does.Contain("Compare v143 and v145 native test results"));
-            Assert.That(workflow, Does.Contain("Run v143 verification without unexpected skips"));
+            Assert.That(workflow, Does.Contain("Run release tests without unexpected skips"));
             Assert.That(workflow, Does.Contain("Upload v145 complete UI results"));
-            Assert.That(workflow, Does.Contain("Compare v143 and v145 complete UI results"));
+            Assert.That(workflow, Does.Not.Contain("compare-vstest-trx.ps1"));
         });
     }
 

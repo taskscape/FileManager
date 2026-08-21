@@ -17,7 +17,7 @@ Visual Studio 2026 and its developer-command environment are the authoritative n
 The repository includes a local build script that reproduces the GitHub Actions installer build workflow:
 
 ```powershell
-# Build Release configuration with v143 toolset (VS2022)
+# Build Release configuration with the VS 2026 v145 toolset
 .\scripts\build-installer.ps1
 
 # Build with different configuration or toolset
@@ -52,7 +52,7 @@ powershell -NoProfile -ExecutionPolicy Bypass `
 
 Each run removes its own GUID-named `TestResults\runtests-build-*` directory, including after a failure. Pass `-KeepBuildArtifacts` only when the isolated native build outputs are needed for diagnosis.
 
-`-PlatformToolset v143|v145` selects the toolset used for both the built executable and native safety target (default `v145`). CI supplies `-NUnitTrxPath` only for toolset-parity jobs; that explicit path retains the complete executable result inventory for comparison instead of deleting the caller-owned TRX.
+`-PlatformToolset v145` selects the toolset used for both the built executable and native safety target. CI may supply `-NUnitTrxPath` to retain the complete executable result inventory as a workflow artifact.
 
 The runner uses the CI pull-request base for changed-line ratchets or accepts `-BaseCommit` explicitly; it does not guess from a potentially stale local tracking branch. It discovers an existing Debug or Release x64 SQLite DLL when possible. Supply prerequisites explicitly or require a fully provisioned run with:
 
@@ -196,9 +196,7 @@ The toolbar icon coverage check has no parameters:
 | `verify-durable-copy-commit.ps1` | Checks write-through creation, flush/close/verification ordering, transactional replacement, retry paths, and deterministic filesystem fault boundaries for durable copy commits. |
 | `test-release-input-pinning.ps1` | Checks that release inputs have a complete lock record, all workflow actions use reviewed immutable commits, and publication consumes the gated immutable installer artifact. |
 | `audit-pe-hardening.ps1` | Inspects linked Release PE headers for ASLR, DEP/NX, CFG, CET compatibility, and high-entropy VA. The release workflow runs it after the Release build. |
-| `compare-vstest-trx.ps1` | Rejects mismatched discovered-test inventories or outcomes between v143 and v145 native-regression and complete executable UI results. |
 | `test-unsafe-api-baseline.ps1` | Compares every repository unsafe API fingerprint with the reviewed generated baseline and rejects new or duplicated unsafe calls. |
-| `new-toolset-pe-manifest.ps1` / `compare-toolset-pe-manifests.ps1` | Record v143/v145 Release PE inventories and compare path, architecture, and version identity while retaining output hashes for provenance. |
 | `test-zlib-compatibility.ps1` | Compiles the checked-in zlib sources and replays the retained legacy, checksum-error, invalid-deflate, and truncated-stream vectors. Supports `-Architecture x64` and `x86`. |
 | `test-bzip2-compatibility.ps1` | Compiles the checked-in bzip2 sources and checks golden and legacy streams, truncation rejection, and the malformed fuzz-vector corpus. Supports `-Architecture x64` and `x86`. |
 | `test-cmark-gfm-hardening.ps1` | Compiles the production Markdown renderer, compares retained snapshots, checks safe link and raw-HTML behavior, exercises extension combinations, and enforces input, nesting, node, and output limits. |
@@ -438,7 +436,7 @@ crosses one fails for a reason that has nothing to do with what it is testing.
 
 ##### Known state on a developer workstation
 
-Measured on a Windows 11 developer machine (Release x64 build, v143 toolset). "Before" is the state when this work
+Measured on a Windows 11 developer machine (Release x64 build, v145 toolset). "Before" is the state when this work
 started, "containment" is after the sandbox and journal work described above, and "after" is current.
 
 | Batch | Before | After containment | After |

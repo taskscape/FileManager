@@ -4,10 +4,9 @@ param(
     [ValidateSet('Debug', 'Release')]
     [string]$Configuration = 'Release',
 
-    # Platform toolset (v143 for VS2022, v145 for VS2026).
-    # Defaults to auto-detection from the installed Visual Studio toolchain.
-    [ValidateSet('v143', 'v145')]
-    [string]$PlatformToolset = '',
+    # Installer builds are intentionally pinned to the repository-wide VS 2026 toolset.
+    [ValidateSet('v145')]
+    [string]$PlatformToolset = 'v145',
 
     # Build number for versioning
     [string]$BuildNumber = $env:GITHUB_RUN_NUMBER,
@@ -33,21 +32,19 @@ param(
     This script reproduces the GitHub Actions build-installer.yml workflow locally:
     1. Builds the solution with MSBuild
     2. Runs native regression tests
-    3. Builds the v145 toolset manifest for comparison
-    4. Compares toolset parity with v145
-    5. Installs Inno Setup (if not present)
-    6. Stages files for Inno Setup
-    7. Compiles the installer
+    3. Installs Inno Setup (if not present)
+    4. Stages files for Inno Setup
+    5. Compiles the installer
 
     Prerequisites:
-    - Visual Studio 2022 (v143) or Visual Studio 2026 (v145)
+    - Visual Studio 2026 (v145)
     - .NET SDK
     - Git (for version info)
     - Inno Setup 6.7.3 (will be downloaded if not installed)
 
 .EXAMPLE
     .\scripts\build-installer.ps1
-    # Builds Release configuration with v143 toolset
+    # Builds Release configuration with the VS 2026 v145 toolset
 
 .EXAMPLE
     .\scripts\build-installer.ps1 -Configuration Debug -PlatformToolset v145
@@ -99,29 +96,6 @@ if (-not (Test-Path $script:RUNNER_TEMP)) {
     New-Item -ItemType Directory -Path $script:RUNNER_TEMP | Out-Null
 }
 
-# Auto-detect the platform toolset from the installed MSVC toolchain unless the
-# caller explicitly supplied one. MSVC 14.5x maps to v145 (VS2026) and 14.3x maps
-# to v143 (VS2022).
-if (-not $PSBoundParameters.ContainsKey('PlatformToolset') -or [string]::IsNullOrWhiteSpace($PlatformToolset)) {
-    $PlatformToolset = 'v143'
-    $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
-    if (-not (Test-Path $vswhere)) {
-        $vswhere = "${env:ProgramFiles}\Microsoft Visual Studio\Installer\vswhere.exe"
-    }
-    if (Test-Path $vswhere) {
-        $vsPath = & $vswhere -latest -prerelease -property installationPath | Select-Object -First 1
-        $msvcDir = Join-Path $vsPath 'VC\Tools\MSVC'
-        if ($vsPath -and (Test-Path $msvcDir)) {
-            $toolsetVersions = Get-ChildItem $msvcDir -Directory -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Name
-            if ($toolsetVersions -match '^14\.5') {
-                $PlatformToolset = 'v145'
-            } elseif ($toolsetVersions -match '^14\.3') {
-                $PlatformToolset = 'v143'
-            }
-        }
-    }
-}
-
 Write-Host "=== Open Salamander Installer Build Script ===" -ForegroundColor Cyan
 Write-Host "Repository root: $repositoryRoot"
 Write-Host "Configuration: $Configuration"
@@ -135,15 +109,7 @@ Write-Host ""
 function Test-MSBuildAvailable() {
     $msbuildPath = $null
 
-    # 1. Prefer an explicit install for the requested toolset.
-    if ($PlatformToolset -eq 'v145') {
-        $vs2026Path = "${env:ProgramFiles}\Microsoft Visual Studio\2026\Enterprise"
-        if (Test-Path $vs2026Path) {
-            $msbuildPath = Join-Path $vs2026Path 'MSBuild\Current\Bin\MSBuild.exe'
-        }
-    }
-
-    # 2. Check if msbuild.exe is already on PATH.
+    # 1. Prefer the VS 2026 developer environment already established by the caller.
     if (-not $msbuildPath -or -not (Test-Path $msbuildPath)) {
         $cmd = Get-Command 'msbuild.exe' -ErrorAction SilentlyContinue
         if ($null -ne $cmd) {
@@ -151,14 +117,14 @@ function Test-MSBuildAvailable() {
         }
     }
 
-    # 3. Fall back to vswhere (authoritative for Visual Studio installs).
+    # 2. Fall back only to a VS 2026 MSBuild installation, never to an older toolchain.
     if (-not $msbuildPath -or -not (Test-Path $msbuildPath)) {
         $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
         if (-not (Test-Path $vswhere)) {
             $vswhere = "${env:ProgramFiles}\Microsoft Visual Studio\Installer\vswhere.exe"
         }
         if (Test-Path $vswhere) {
-            $foundPath = & $vswhere -latest -prerelease -requires Microsoft.Component.MSBuild -find 'MSBuild\**\Bin\MSBuild.exe' | Select-Object -First 1
+            $foundPath = & $vswhere -latest -prerelease -version '[18.0,19.0)' -requires Microsoft.Component.MSBuild -find 'MSBuild\**\Bin\MSBuild.exe' | Select-Object -First 1
             if ($foundPath -and (Test-Path $foundPath)) {
                 $msbuildPath = $foundPath
             }
@@ -166,7 +132,7 @@ function Test-MSBuildAvailable() {
     }
 
     if (-not $msbuildPath -or -not (Test-Path $msbuildPath)) {
-        Write-Error "MSBuild not found for toolset $PlatformToolset. Please install Visual Studio with the C++ workload."
+        Write-Error "VS 2026 MSBuild not found for toolset $PlatformToolset. Please install the Visual Studio 2026 C++ workload."
     }
     return $msbuildPath
 }
@@ -239,68 +205,6 @@ function Invoke-NativeRegressionTests() {
     }
 
     Write-Host "Native regression tests completed" -ForegroundColor Green
-}
-
-# Create PE manifest
-function Invoke-CreatePEManifest() {
-    param(
-        [string]$BuildRoot,
-        [string]$Toolset,
-        [string]$OutputPath
-    )
-
-    Write-Host "=== Creating PE Manifest ($Toolset) ===" -ForegroundColor Cyan
-
-    $manifestTool = Join-Path $repositoryRoot 'tools\new-toolset-pe-manifest.ps1'
-    if (-not (Test-Path $manifestTool)) {
-        Write-Error "Manifest tool not found: $manifestTool"
-    }
-
-    & $manifestTool -BuildRoot $BuildRoot -Toolset $Toolset -OutputPath $OutputPath
-
-    if ($LASTEXITCODE -ne 0) {
-        Write-Error "Failed to create PE manifest"
-    }
-
-    Write-Host "PE manifest created: $OutputPath" -ForegroundColor Green
-}
-
-# Compare PE manifests
-function Invoke-ComparePEManifests() {
-    param(
-        [string]$V143Manifest,
-        [string]$V145Manifest
-    )
-
-    Write-Host "=== Comparing PE Manifests ===" -ForegroundColor Cyan
-
-    $compareTool = Join-Path $repositoryRoot 'tools\compare-toolset-pe-manifests.ps1'
-    if (-not (Test-Path $compareTool)) {
-        Write-Error "Compare tool not found: $compareTool"
-    }
-
-    & $compareTool -V143Manifest $V143Manifest -V145Manifest $V145Manifest
-
-    Write-Host "PE manifest comparison completed" -ForegroundColor Green
-}
-
-# Compare TRX files
-function Invoke-CompareTRX() {
-    param(
-        [string]$V143Results,
-        [string]$V145Results
-    )
-
-    Write-Host "=== Comparing Test Results ===" -ForegroundColor Cyan
-
-    $compareTool = Join-Path $repositoryRoot 'tools\compare-vstest-trx.ps1'
-    if (-not (Test-Path $compareTool)) {
-        Write-Error "Compare tool not found: $compareTool"
-    }
-
-    & $compareTool -V143Results $V143Results -V145Results $V145Results
-
-    Write-Host "Test result comparison completed" -ForegroundColor Green
 }
 
 # Install Inno Setup if not present
@@ -471,24 +375,18 @@ try {
     Invoke-NativeRegressionTests -ResultsDirectory $nativeResultsDir -OutputFile "native-$Configuration.trx"
     Write-Host ""
 
-    # Step 3: Create PE manifest
-    Write-Host "Step 3: Creating PE manifest..." -ForegroundColor Yellow
-    $peManifestPath = Join-Path $script:RUNNER_TEMP "pe-manifest-$Configuration.json"
-    Invoke-CreatePEManifest -BuildRoot $script:BUILD_DIR -Toolset $PlatformToolset -OutputPath $peManifestPath
-    Write-Host ""
-
-    # Step 4: Install Inno Setup (if needed)
-    Write-Host "Step 4: Checking Inno Setup installation..." -ForegroundColor Yellow
+    # Step 3: Install Inno Setup (if needed)
+    Write-Host "Step 3: Checking Inno Setup installation..." -ForegroundColor Yellow
     Invoke-InstallInnoSetup
     Write-Host ""
 
-    # Step 5: Stage files
-    Write-Host "Step 5: Staging files..." -ForegroundColor Yellow
+    # Step 4: Stage files
+    Write-Host "Step 4: Staging files..." -ForegroundColor Yellow
     Invoke-StageFiles -BuildDir $script:BUILD_DIR -StagingDir $script:STAGING_DIR -BuildNumber $BuildNumber
     Write-Host ""
 
-    # Step 6: Build installer
-    Write-Host "Step 6: Building installer..." -ForegroundColor Yellow
+    # Step 5: Build installer
+    Write-Host "Step 5: Building installer..." -ForegroundColor Yellow
     Invoke-BuildInstaller -StagingDir $script:STAGING_DIR -BuildNumber $BuildNumber
     Write-Host ""
 
@@ -497,7 +395,6 @@ try {
     Write-Host "Output locations:" -ForegroundColor Cyan
     Write-Host "  Build artifacts: $script:BUILD_DIR"
     Write-Host "  Staging directory: $script:STAGING_DIR"
-    Write-Host "  PE manifest: $peManifestPath"
     Write-Host "  Native tests: $nativeResultsDir"
 }
 catch {

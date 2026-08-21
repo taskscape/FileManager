@@ -152,7 +152,7 @@ wchar_t * __cdecl wcscat (
 }
 
 // MSVC 14.51 (v145) emits an implicit memset for struct/array zero-init even in these no-CRT
-// utilities (v143/14.44 did not, at least for x64). Default libs are ignored here, so provide it
+// utilities (earlier MSVC releases did not, at least for x64). Default libs are ignored here, so provide it
 // and disable intrinsic expansion so we may define the name. (memcpy/memmove are already provided
 // for these modules, so we must NOT redefine them - that causes LNK2005.)
 #pragma function(memset)
