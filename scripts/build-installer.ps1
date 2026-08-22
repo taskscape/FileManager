@@ -215,7 +215,8 @@ function Invoke-InstallInnoSetup() {
     $installDirectory = Join-Path $script:RUNNER_TEMP 'filemanager-inno-setup-6.7.3'
     # Reuse the workflow helper so local builds never require machine-wide Program Files access.
     $script:INNO_SETUP_COMPILER = & (Join-Path $repositoryRoot 'tools\install-pinned-inno-setup.ps1') -InstallDirectory $installDirectory
-    if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath $script:INNO_SETUP_COMPILER -PathType Leaf)) {
+    # The helper is a PowerShell contract, so validate its returned path instead of stale native-process exit state.
+    if (-not (Test-Path -LiteralPath $script:INNO_SETUP_COMPILER -PathType Leaf)) {
         throw 'Pinned Inno Setup provisioning did not produce ISCC.exe.'
     }
 

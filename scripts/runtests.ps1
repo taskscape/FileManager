@@ -551,7 +551,8 @@ function Get-PinnedInnoSetupCompiler {
     $installRoot = Join-Path ([IO.Path]::GetTempPath()) 'filemanager-inno-setup-6.7.3'
     # Keep local packaging non-administrative by sharing GitHub's verified per-run compiler installation path.
     $compiler = & (Join-Path $repositoryRoot 'tools\install-pinned-inno-setup.ps1') -InstallDirectory $installRoot
-    if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath $compiler -PathType Leaf)) {
+    # A successful PowerShell helper does not set LASTEXITCODE; its returned compiler path is the completion barrier.
+    if (-not (Test-Path -LiteralPath $compiler -PathType Leaf)) {
         throw 'Pinned Inno Setup provisioning did not produce ISCC.exe.'
     }
     return $compiler

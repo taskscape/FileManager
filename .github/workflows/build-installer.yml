@@ -180,7 +180,8 @@ jobs:
           # Install under RUNNER_TEMP so the self-hosted service account needs no Program Files write permission.
           $innoPath = Join-Path $env:RUNNER_TEMP 'filemanager-inno-setup-6.7.3'
           $iscc = & .\tools\install-pinned-inno-setup.ps1 -InstallDirectory $innoPath
-          if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath $iscc -PathType Leaf)) { throw 'Pinned Inno Setup provisioning did not produce ISCC.exe.' }
+          # A PowerShell script returns by throwing or yielding its compiler path; LASTEXITCODE is reserved for native executables.
+          if (-not (Test-Path -LiteralPath $iscc -PathType Leaf)) { throw 'Pinned Inno Setup provisioning did not produce ISCC.exe.' }
           $innoPath | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
 
       - name: Prepare Installer Files

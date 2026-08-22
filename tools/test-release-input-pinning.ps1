@@ -78,6 +78,18 @@ foreach ($requiredPattern in @(
     }
 }
 
+foreach ($scriptPath in @(
+    (Join-Path $repositoryRoot '.github\workflows\build-installer.yml'),
+    (Join-Path $repositoryRoot 'scripts\build-installer.ps1'),
+    (Join-Path $repositoryRoot 'scripts\runtests.ps1')
+)) {
+    $scriptText = Get-Content -LiteralPath $scriptPath -Raw
+    # The compiler provisioner is a PowerShell script, so LASTEXITCODE would reject a successful return on a fresh shell.
+    if ($scriptText -match 'install-pinned-inno-setup\.ps1[\s\S]{0,400}\$LASTEXITCODE') {
+        throw "Inno Setup provisioner caller incorrectly checks LASTEXITCODE: $scriptPath"
+    }
+}
+
 $rootRunner = Get-Content -LiteralPath (Join-Path $repositoryRoot 'scripts\runtests.ps1') -Raw
 if ($rootRunner -notmatch 'test-release-input-pinning\.ps1') {
     throw 'The aggregate test runner must execute the release-input pinning contract.'
