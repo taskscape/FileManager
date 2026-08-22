@@ -25,7 +25,9 @@ public sealed class ToolbarIconSizeUiTests : FileManagerUiTestBase
         // Closing between choices exercises the native image-list rebuild and layout path for every supported size.
         for (var index = 0; index < 3; index++)
         {
-            combo.Items[index].Select();
+            // Drive the native selection notification because UIA Select() alone bypasses the legacy dialog's CBN_SELCHANGE handler.
+            NativeCommands.SelectComboBoxItem(dialog.Properties.NativeWindowHandle.Value,
+                                               combo.Properties.NativeWindowHandle.Value, index);
             CloseCustomizeToolbarDialog(dialog);
             dialog = OpenCustomizeToolbarDialog();
             combo = GetIconSizeCombo(dialog);
@@ -42,7 +44,8 @@ public sealed class ToolbarIconSizeUiTests : FileManagerUiTestBase
             "The large toolbar icon preference was not restored after restarting the executable.");
 
         // Restore the disposable profile to its incoming setting so repeated UI runs remain independent.
-        combo.Items[originalIndex].Select();
+        NativeCommands.SelectComboBoxItem(dialog.Properties.NativeWindowHandle.Value,
+                                           combo.Properties.NativeWindowHandle.Value, originalIndex);
         CloseCustomizeToolbarDialog(dialog);
         Thread.Sleep(500);
     }

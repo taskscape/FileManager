@@ -6,13 +6,16 @@ param(
     [switch]$KeepBuildArtifacts,
     # The release workflow provisions a fresh VHD before verifier stress instead of reusing a failed suite's filesystem state.
     [switch]$SkipLockVerifier,
-    [string]$NUnitFilter,
+    # Match the blocking release inventory by default; the quarantine workflow opts in explicitly to diagnostic monitoring tests.
+    [string]$NUnitFilter = 'TestCategory!=Quarantined',
     # The complete UI harness must match the repository-wide VS 2026 compiler contract.
     [ValidateSet('v145')]
     [string]$PlatformToolset = 'v145',
     [string]$NUnitTrxPath,
     # Run the local equivalent of both release-test and installer-build jobs, excluding the GitHub-only publish job.
     [switch]$ReleasePipeline,
+    # Inspect the blocking release environment without creating VHDs, building binaries, or changing installed tools.
+    [switch]$PrerequisiteOnly,
     # GitHub supplies its monotonically increasing run number; local pipeline runs use 0 unless callers provide one.
     [string]$BuildNumber = $env:GITHUB_RUN_NUMBER
 )
@@ -28,6 +31,12 @@ $pictViewEngineProject = Join-Path $repositoryRoot 'tests\PictViewEngineTests\Pi
 $failures = [System.Collections.Generic.List[string]]::new()
 $passed = [System.Collections.Generic.List[string]]::new()
 $skipped = [System.Collections.Generic.List[string]]::new()
+# These assertions deliberately describe capabilities that a normal developer desktop need not provide; strict release runs provision all of them.
+$optionalUiIgnoreMessagePrefixes = @(
+    'Set FILEMANAGER_UI_CONFIG_FAULT_INJECTION=1 ',
+    'Set FILEMANAGER_UI_CROSS_VOLUME_ROOT ',
+    'Set FILEMANAGER_UI_RECYCLE_BIN=1 '
+)
 
 if ($ReleasePipeline) {
     # The local parity mode uses the blocking release inventory, not the diagnostic verifier or quarantined monitoring lane.
@@ -35,6 +44,10 @@ if ($ReleasePipeline) {
     $SkipLockVerifier = $true
     if ([string]::IsNullOrWhiteSpace($NUnitFilter)) {
         $NUnitFilter = 'TestCategory!=Quarantined'
+    }
+    elseif ($NUnitFilter -cne 'TestCategory!=Quarantined') {
+        # A custom filter would make the local inventory differ from the one that blocks the GitHub release gate.
+        throw '-ReleasePipeline requires the workflow NUnit filter: TestCategory!=Quarantined.'
     }
     if ([string]::IsNullOrWhiteSpace($BuildNumber)) {
         $BuildNumber = '0'
@@ -143,6 +156,27 @@ function Find-VisualStudioDeveloperCommand {
     return $candidates | Where-Object { Test-Path -LiteralPath $_ } | Select-Object -First 1
 }
 
+function Import-VisualStudioDeveloperEnvironment {
+    param([Parameter(Mandatory = $true)][string]$DeveloperCommand)
+
+    # Release audit scripts call dumpbin directly, so retain the VS 2026 environment across local steps just as GITHUB_ENV does in Actions.
+    $developerEnvironment = & $env:ComSpec /d /s /c ('call "' + $DeveloperCommand + '" -arch=x64 -host_arch=x64 >nul && set')
+    if ($LASTEXITCODE -ne 0) {
+        throw "Visual Studio 2026 developer environment setup failed with exit code $LASTEXITCODE."
+    }
+
+    foreach ($line in $developerEnvironment) {
+        $separator = $line.IndexOf('=')
+        if ($separator -lt 1) {
+            continue
+        }
+        $name = $line.Substring(0, $separator)
+        if ($name -match '^[A-Za-z_][A-Za-z0-9_]*$') {
+            Set-Item -Path ("Env:" + $name) -Value $line.Substring($separator + 1)
+        }
+    }
+}
+
 function Find-ApplicationVerifier {
     # Prefer the SDK's Application Verifier CLI, then fall back to the in-box
     # C:\Windows\System32\appverif.exe (which is a full tool on Windows 11).
@@ -163,11 +197,84 @@ function Find-ApplicationVerifier {
     return $null
 }
 
+function Resolve-ReleasePipelineBaseCommit {
+    param([string]$RequestedCommit)
+
+    # Mirror the workflow's push payload first, then use the selected revision's first parent for manual local runs.
+    $candidate = $RequestedCommit
+    if ([string]::IsNullOrWhiteSpace($candidate)) {
+        $candidate = $env:PUSH_BASE_COMMIT
+    }
+    if ([string]::IsNullOrWhiteSpace($candidate) -or $candidate -match '^0+$') {
+        $candidate = 'HEAD^'
+    }
+
+    & git rev-parse --verify --quiet "$candidate^{commit}" *> $null
+    if ($LASTEXITCODE -ne 0) {
+        throw "The release pipeline base commit is unavailable: $candidate. Fetch complete history or pass -BaseCommit explicitly."
+    }
+
+    return $candidate
+}
+
 function Test-ProcessIsElevated {
     $identity = [Security.Principal.WindowsIdentity]::GetCurrent()
     $principal = [Security.Principal.WindowsPrincipal]::new($identity)
     # Application Verifier mutates system-wide image settings, so a normal desktop token cannot run this lane.
     return $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
+}
+
+function Get-ReleasePipelinePrerequisiteFailures {
+    $missing = [System.Collections.Generic.List[string]]::new()
+
+    # DiskPart needs an elevated token to attach the fresh VHD topology used by the release UI gate.
+    if (-not (Test-ProcessIsElevated)) {
+        $missing.Add('Run from an elevated PowerShell console; DiskPart cannot create the three isolated VHD test volumes otherwise.')
+    }
+
+    if ([string]::IsNullOrWhiteSpace((Find-VisualStudioDeveloperCommand))) {
+        $missing.Add('Install Visual Studio 2026 C++ tools with the v145 x64/x86 toolset.')
+    }
+    if ($null -eq (Get-Command dotnet.exe -ErrorAction SilentlyContinue | Select-Object -First 1)) {
+        $missing.Add('Install the .NET SDK used to run the net8.0 NUnit project.')
+    }
+    if ($null -eq (Get-Command powershell.exe -ErrorAction SilentlyContinue | Select-Object -First 1)) {
+        $missing.Add('Windows PowerShell is required for the repository PowerShell probes.')
+    }
+    if ($null -eq (Get-Command pwsh.exe -ErrorAction SilentlyContinue | Select-Object -First 1)) {
+        $missing.Add('Install 64-bit PowerShell 7.4 or newer for the SQLite recovery probe.')
+    }
+    if ($null -eq (Get-Command diskpart.exe -ErrorAction SilentlyContinue | Select-Object -First 1)) {
+        $missing.Add('DiskPart is required to provision the isolated NTFS and exFAT VHD test volumes.')
+    }
+
+    $usedLetters = @(Get-Volume | Where-Object DriveLetter | ForEach-Object { $_.DriveLetter.ToString().ToUpperInvariant() })
+    $freeLetters = @('V', 'W', 'X', 'Y', 'Z') | Where-Object { $_ -notin $usedLetters }
+    if ($freeLetters.Count -lt 3) {
+        $missing.Add('Free three drive letters from V: through Z: for the isolated UI test VHDs.')
+    }
+
+    # Preserve the mutable collection for callers that add checkout-specific failures after this generic audit.
+    return (, $missing)
+}
+
+function Get-ReleasePipelineProvisioningNotes {
+    $notes = [System.Collections.Generic.List[string]]::new()
+    $innoCompiler = 'C:\Program Files (x86)\Inno Setup 6\ISCC.exe'
+    $innoVersion = if (Test-Path -LiteralPath $innoCompiler -PathType Leaf) { (Get-Item -LiteralPath $innoCompiler).VersionInfo.ProductVersion } else { $null }
+    if ($innoVersion -notmatch '^6\.7\.3') {
+        # The workflow acquires the locked compiler during packaging, so report the local gap without rejecting a runnable elevated pipeline.
+        $notes.Add('Pinned Inno Setup 6.7.3 is not installed; the runner will download and install the locked compiler from tools\\release-inputs.json.')
+    }
+
+    $buildToolsDeveloperCommand = Join-Path ([Environment]::GetFolderPath([Environment+SpecialFolder]::ProgramFilesX86)) 'Microsoft Visual Studio\18\BuildTools\Common7\Tools\VsDevCmd.bat'
+    if (-not (Test-Path -LiteralPath $buildToolsDeveloperCommand -PathType Leaf)) {
+        # The repository permits the installed VS 2026 IDE, while Actions itself is provisioned with Build Tools at this fixed path.
+        $notes.Add('The workflow-specific VS 2026 Build Tools installation is absent; the local runner will use the installed VS 2026 developer environment instead.')
+    }
+
+    # Keep provisioning notes as one collection instead of letting PowerShell enumerate it into scalar pipeline output.
+    return (, $notes)
 }
 
 function Build-UiTestApplication {
@@ -376,15 +483,6 @@ function Initialize-ReleasePipelineUiVolumes {
         [string]$WorkingDirectory
     )
 
-    $requiredRoots = @(
-        $env:FILEMANAGER_UI_TESTDATA_ROOT,
-        $env:FILEMANAGER_UI_CROSS_VOLUME_ROOT,
-        $env:FILEMANAGER_UI_ADS_UNSUPPORTED_TARGET_ROOT
-    )
-    if (@($requiredRoots | Where-Object { [string]::IsNullOrWhiteSpace($_) }).Count -eq 0) {
-        return $false
-    }
-
     $environmentFile = Join-Path (Split-Path -Parent $WorkingDirectory) 'release-ui-volumes.env'
     $provisioner = Join-Path $repositoryRoot 'tools\manage-ui-test-volumes.ps1'
     # The release gate mounts fresh capability volumes so filesystem topology is not inherited from a developer desktop.
@@ -402,6 +500,29 @@ function Initialize-ReleasePipelineUiVolumes {
     $env:FILEMANAGER_UI_CONFIG_FAULT_INJECTION = '1'
     $env:FILEMANAGER_UI_RECYCLE_BIN = '1'
     return $true
+}
+
+function Build-ReleaseGateDebugArtifacts {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$DeveloperCommand,
+        [Parameter(Mandatory = $true)]
+        [string]$BuildDirectory,
+        [Parameter(Mandatory = $true)]
+        [ValidateSet('v145')]
+        [string]$Toolset
+    )
+
+    New-Item -ItemType Directory -Path $BuildDirectory -Force | Out-Null
+    # This intentionally precedes runtests' disposable build, matching the workflow's staged Debug artifact step and its strict input resolution.
+    $buildRoot = $BuildDirectory.TrimEnd('\') + '\'
+    $buildCommand = 'call "' + $DeveloperCommand + '" -arch=x64 -host_arch=x64 && set "OPENSAL_BUILD_DIR=' + $buildRoot +
+        '" && msbuild "' + $nativeSolution + '" /m /t:Build /p:Configuration=Debug /p:Platform=x64 /p:PlatformToolset=' +
+        $Toolset + ' /p:PreferredToolArchitecture=x64 /nr:false'
+    & $env:ComSpec /d /s /c $buildCommand
+    if ($LASTEXITCODE -ne 0) {
+        throw "Building the staged Debug x64 release-gate artifacts failed with exit code $LASTEXITCODE."
+    }
 }
 
 function Build-ReleaseApplication {
@@ -821,14 +942,58 @@ function Remove-OlderUiTestBuildResults {
     }
 }
 
+if ($PrerequisiteOnly -and -not $ReleasePipeline) {
+    throw '-PrerequisiteOnly is reserved for -ReleasePipeline because the ordinary runner intentionally allows optional diagnostic lanes.'
+}
+
+if ($ReleasePipeline) {
+    # A clean checkout and an exact base revision make the local comparison inputs identical to a fresh Actions workspace.
+    $BaseCommit = Resolve-ReleasePipelineBaseCommit -RequestedCommit $BaseCommit
+    $releasePrerequisiteFailures = Get-ReleasePipelinePrerequisiteFailures
+    $workingTreeChanges = @(& git status --porcelain)
+    if ($workingTreeChanges.Count -ne 0) {
+        $releasePrerequisiteFailures.Add('Use a clean checkout at the selected commit; GitHub Actions never tests uncommitted source or documentation changes.')
+    }
+    $releaseProvisioningNotes = Get-ReleasePipelineProvisioningNotes
+
+    Write-Host "`n=== Release pipeline prerequisite report ===" -ForegroundColor Cyan
+    Write-Host "Base commit: $BaseCommit"
+    if ($releasePrerequisiteFailures.Count -eq 0) {
+        Write-Host 'Blocking prerequisites: satisfied.' -ForegroundColor Green
+    }
+    else {
+        Write-Host 'Blocking prerequisites:' -ForegroundColor Red
+        $releasePrerequisiteFailures | ForEach-Object { Write-Host "  - $_" -ForegroundColor Red }
+    }
+    if ($releaseProvisioningNotes.Count -ne 0) {
+        Write-Host 'Pipeline provisioning:' -ForegroundColor Yellow
+        $releaseProvisioningNotes | ForEach-Object { Write-Host "  - $_" -ForegroundColor Yellow }
+    }
+
+    if ($PrerequisiteOnly) {
+        exit $(if ($releasePrerequisiteFailures.Count -eq 0) { 0 } else { 1 })
+    }
+    if ($releasePrerequisiteFailures.Count -ne 0) {
+        throw 'Release-pipeline prerequisites are not satisfied. Run with -PrerequisiteOnly after correcting the listed items.'
+    }
+}
+
 $testResultsDirectory = Join-Path $repositoryRoot 'TestResults'
 # Prune interrupted runs before preflight checks can exit, so an unavailable toolchain cannot defer retention indefinitely.
 Remove-OlderUiTestBuildResults -ResultsDirectory $testResultsDirectory
 
 $releasePipelineVolumeDirectory = $null
 $releasePipelineOwnsVolumes = $false
+$releaseGateBuildDirectory = $null
+$releaseGateResultDirectory = $null
 if ($ReleasePipeline) {
     $releasePipelineVolumeDirectory = Join-Path (Join-Path $testResultsDirectory ('runtests-release-volumes-' + [Guid]::NewGuid().ToString('N'))) 'filemanager-ui-volumes'
+    # Keep the release-gate artifacts and TRX outside the disposable runner build, just as Actions carries them across individual steps.
+    $releaseGateResultDirectory = Join-Path $testResultsDirectory ('runtests-release-gate-' + [Guid]::NewGuid().ToString('N'))
+    $releaseGateBuildDirectory = Join-Path $releaseGateResultDirectory 'build_stage'
+    if ([string]::IsNullOrWhiteSpace($NUnitTrxPath)) {
+        $NUnitTrxPath = Join-Path $releaseGateResultDirectory 'runtests-v145.trx'
+    }
 }
 
 $vsDevCmd = Find-VisualStudioDeveloperCommand
@@ -839,16 +1004,20 @@ $dotnet = Get-Command dotnet.exe -ErrorAction SilentlyContinue | Select-Object -
 if ($null -eq $dotnet) {
     throw '.NET 8 SDK was not found; the complete UI suite cannot run the NUnit project.'
 }
+if ($ReleasePipeline) {
+    # Match the workflow setup step so subsequent PowerShell audit tools resolve dumpbin from the same VS 2026 toolchain.
+    Import-VisualStudioDeveloperEnvironment -DeveloperCommand $vsDevCmd
+}
 
 $uiBuildDirectory = Join-Path $testResultsDirectory ('runtests-build-' + [Guid]::NewGuid().ToString('N'))
 $releaseBuildDirectory = $null
 try {
 if ($ReleasePipeline) {
     $releasePipelineOwnsVolumes = Initialize-ReleasePipelineUiVolumes -WorkingDirectory $releasePipelineVolumeDirectory
-    # Caller-provided volumes are valid too, but release-only fault and recycle coverage must not depend on their ambient environment.
-    $env:FILEMANAGER_UI_ISOLATED = '1'
-    $env:FILEMANAGER_UI_CONFIG_FAULT_INJECTION = '1'
-    $env:FILEMANAGER_UI_RECYCLE_BIN = '1'
+    Build-ReleaseGateDebugArtifacts -DeveloperCommand $vsDevCmd -BuildDirectory $releaseGateBuildDirectory -Toolset $PlatformToolset
+    # Resolve the staged artifacts before invoking the aggregate runner, matching the workflow's strict hand-off between steps.
+    $SqliteDll = Resolve-UiTestArtifact -BuildDirectory $releaseGateBuildDirectory -FileName 'sqlite.dll'
+    $env:FILEMANAGER_UI_EXE = Resolve-UiTestArtifact -BuildDirectory $releaseGateBuildDirectory -FileName 'salamand.exe'
 }
 Build-UiTestApplication -DeveloperCommand $vsDevCmd -BuildDirectory $uiBuildDirectory -Toolset $PlatformToolset
 # Keep the script scope so Invoke-AutomatedCheck can resolve the helper function.
@@ -928,7 +1097,8 @@ else {
     Invoke-AutomatedCheck -Name '7-Zip wrapper/oracle compatibility corpus' -Action $sevenZipAction
 }
 
-$resolvedSqliteDll = $builtSqliteDll
+# The workflow passes its staged Debug DLL explicitly; ordinary local runs retain the freshly built disposable artifact.
+$resolvedSqliteDll = if ([string]::IsNullOrWhiteSpace($SqliteDll)) { $builtSqliteDll } else { Resolve-SqliteDll -RequestedPath $SqliteDll }
 $pwsh = Get-Command pwsh.exe -ErrorAction SilentlyContinue | Select-Object -First 1
 $sqliteSkipReason = $null
 if ([string]::IsNullOrWhiteSpace($resolvedSqliteDll)) {
@@ -1007,15 +1177,42 @@ $nunitAction = {
             throw "The complete NUnit project failed with exit code $dotnetExitCode."
         }
 
-        # VSTest treats NUnit Ignore as success. Manifest-backed quarantines are
-        # filtered before discovery, so a NotExecuted result is always an
-        # unexpected prerequisite or test-harness defect.
+        # VSTest treats NUnit Ignore as success. Only the documented optional
+        # capability gates may be skipped locally; every other ignored result remains a harness defect.
         [xml]$trx = Get-Content -LiteralPath (Join-Path $nunitResultsDirectory $nunitTrxName) -Raw
         $ignoredResults = @($trx.SelectNodes("//*[local-name()='UnitTestResult' and @outcome='NotExecuted']"))
         if ($ignoredResults.Count -ne 0) {
-            $ignoredNames = $ignoredResults | Select-Object -First 10 | ForEach-Object { $_.testName }
-            $ignoredNames | ForEach-Object { Write-Host "Ignored NUnit test: $_" -ForegroundColor Yellow }
-            throw "$($ignoredResults.Count) NUnit tests were unexpectedly ignored; quarantined tests must be routed with -NUnitFilter."
+            $expectedCapabilitySkips = @()
+            $unexpectedIgnoredResults = @()
+            foreach ($result in $ignoredResults) {
+                $messageNode = $result.SelectSingleNode("./*[local-name()='Output']/*[local-name()='ErrorInfo']/*[local-name()='Message']")
+                $message = if ($null -eq $messageNode) { '' } else { $messageNode.InnerText }
+                $isExpectedCapabilitySkip = $false
+                foreach ($prefix in $optionalUiIgnoreMessagePrefixes) {
+                    if ($message.StartsWith($prefix, [StringComparison]::Ordinal)) {
+                        $isExpectedCapabilitySkip = $true
+                        break
+                    }
+                }
+                if ($isExpectedCapabilitySkip) {
+                    $expectedCapabilitySkips += [pscustomobject]@{ Result = $result; Message = $message }
+                }
+                else {
+                    $unexpectedIgnoredResults += $result
+                }
+            }
+            foreach ($result in $expectedCapabilitySkips) {
+                # Preserve missing local capabilities in the summary instead of misclassifying their explicitly gated tests as failures.
+                $skipped.Add("FileManager.UiTests (complete NUnit project): $($result.Result.testName) - $($result.Message)")
+                Write-Host "Skipped NUnit test: $($result.Result.testName)" -ForegroundColor Yellow
+            }
+            if ($unexpectedIgnoredResults.Count -ne 0) {
+                $unexpectedIgnoredResults | Select-Object -First 10 | ForEach-Object { Write-Host "Ignored NUnit test: $($_.testName)" -ForegroundColor Yellow }
+                throw "$($unexpectedIgnoredResults.Count) NUnit tests were unexpectedly ignored; quarantined tests must be routed with -NUnitFilter."
+            }
+            if ($FailOnSkipped -and $expectedCapabilitySkips.Count -ne 0) {
+                throw "$($expectedCapabilitySkips.Count) capability-gated NUnit tests were skipped despite -FailOnSkipped. Provision the release test environment before retrying."
+            }
         }
     }
     finally {
@@ -1102,6 +1299,11 @@ finally {
     if (-not $KeepBuildArtifacts -and (Test-Path -LiteralPath $uiBuildDirectory -PathType Container)) {
         # This per-run GUID directory is owned by the runner; remove it on every exit path to avoid exhausting the test host.
         Remove-Item -LiteralPath $uiBuildDirectory -Recurse -Force
+    }
+    if (-not $KeepBuildArtifacts -and -not [string]::IsNullOrWhiteSpace($releaseGateBuildDirectory) -and
+        (Test-Path -LiteralPath $releaseGateBuildDirectory -PathType Container)) {
+        # Retain the TRX artifact but discard the workflow-equivalent staged Debug tree once it is no longer needed.
+        Remove-Item -LiteralPath $releaseGateBuildDirectory -Recurse -Force
     }
     if (-not $KeepBuildArtifacts -and -not [string]::IsNullOrWhiteSpace($releaseBuildDirectory) -and
         (Test-Path -LiteralPath $releaseBuildDirectory -PathType Container)) {

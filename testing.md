@@ -20,7 +20,13 @@ The release-parity runner is the authoritative local equivalent of the GitHub Ac
 .\scripts\runtests.ps1 -ReleasePipeline -BaseCommit HEAD^ -BuildNumber 0
 ```
 
-It provisions the UI-test topology when needed, runs the complete Debug release gate, builds Release x64, audits PE hardening, verifies private symbols, validates the pinned Inno Setup compiler, stages files, and compiles the installer. It does not publish a GitHub release.
+First inspect the blocking environment without mutating disks, build outputs, or installed tools:
+
+```powershell
+.\scripts\runtests.ps1 -ReleasePipeline -PrerequisiteOnly -BaseCommit HEAD^
+```
+
+The parity command requires an elevated interactive PowerShell session, a clean checkout with complete Git history, VS 2026 v145 C++ tools, Windows PowerShell, PowerShell 7, DiskPart, and three unused letters from `V:` through `Z:`. It always provisions fresh NTFS/NTFS/exFAT VHDs, performs the workflow's staged Debug build and strict artifact resolution, then runs the aggregate test gate. Only after that gate passes does it perform the separate Release build, PE audit, symbol validation, pinned Inno Setup installation, staging, and installer compilation. It does not publish a GitHub release.
 
 `scripts\build-installer.ps1` remains available for packaging-only iteration, but it is not a replacement for release-pipeline validation.
 
@@ -50,6 +56,8 @@ Run the complete local equivalent of the GitHub release gate and installer-build
 ```
 
 `-ReleasePipeline` applies the release category filter and unexpected-skip policy, omits the nightly Application Verifier diagnostic, then builds `Release|x64`, audits Release PE hardening, re-runs the native regression subset, verifies the private symbol index, validates/installs the pinned Inno Setup compiler, stages the installer, and compiles it. It deliberately does not publish a GitHub release. Pass `-KeepBuildArtifacts` to retain the isolated Debug and Release build trees after diagnosis.
+
+Unlike the ordinary runner, release-pipeline mode refuses ambient UI roots and a dirty checkout: it must exercise the same fresh-volume topology and committed source snapshot used by Actions. Its generated `TestResults\runtests-release-gate-*\runtests-v145.trx` is the local counterpart of the uploaded GitHub test artifact.
 
 The runner uses the CI pull-request base for changed-line ratchets or accepts `-BaseCommit` explicitly; it does not guess from a potentially stale local tracking branch. It discovers an existing Debug or Release x64 SQLite DLL when possible. Supply prerequisites explicitly or require a fully provisioned run with:
 

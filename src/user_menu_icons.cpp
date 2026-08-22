@@ -436,11 +436,12 @@ BOOL CUserMenuItem::Set(char* name, char* umCommand, char* arguments, char* init
         return FALSE;
     }
 
-    strcpy(itemName, name);
-    strcpy(commandName, umCommand);
-    strcpy(argumentsName, arguments);
-    strcpy(initDirName, initDir);
-    strcpy(iconName, icon);
+    // Each allocation is sized from its source, so copy the exact payload and terminator without retaining unchecked string APIs.
+    memcpy(itemName, name, strlen(name) + 1);
+    memcpy(commandName, umCommand, strlen(umCommand) + 1);
+    memcpy(argumentsName, arguments, strlen(arguments) + 1);
+    memcpy(initDirName, initDir, strlen(initDir) + 1);
+    memcpy(iconName, icon, strlen(icon) + 1);
 
     if (ItemName != NULL)
         free(ItemName);

@@ -23,6 +23,8 @@ internal static class NativeCommands
     // CM_ACTIVEUNSELECTALL prevents a stale selection from being combined with the item a test is about to mark.
     private const int UnselectAll = 844;
     private const uint WmCommand = 0x0111;
+    private const uint CbSetCurSel = 0x014E;
+    private const int CbnSelChange = 1;
     private const uint WmChar = 0x0102;
     private const uint WmKeyDown = 0x0100;
     private const uint WmLButtonDown = 0x0201;
@@ -137,6 +139,17 @@ internal static class NativeCommands
         if (buttonHandle == 0)
             throw new InvalidOperationException($"Configuration dialog did not expose native button {controlId}.");
         SendMessage(buttonHandle, BmClick, 0, 0);
+    }
+
+    internal static void SelectComboBoxItem(nint dialogHandle, nint comboHandle, int itemIndex)
+    {
+        // UIA's SelectionItem pattern updates the native combo without its parent notification, unlike a user selection.
+        if (SendMessage(comboHandle, CbSetCurSel, itemIndex, 0) == -1)
+            throw new InvalidOperationException($"The native combo box did not contain item {itemIndex}.");
+
+        var controlId = GetDlgCtrlID(comboHandle);
+        var notification = (nint)((CbnSelChange << 16) | (controlId & 0xffff));
+        SendMessage(dialogHandle, WmCommand, notification, comboHandle);
     }
 
     internal static IReadOnlyList<nint> GetTopLevelWindows(int processId)

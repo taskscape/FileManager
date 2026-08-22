@@ -3,6 +3,7 @@ using System.Runtime.InteropServices;
 using Microsoft.Win32;
 using FlaUI.Core;
 using FlaUI.Core.AutomationElements;
+using FlaUI.Core.Exceptions;
 using FlaUI.UIA3;
 using NUnit.Framework;
 
@@ -449,9 +450,9 @@ public abstract class FileManagerUiTestBase
                         break;
                     }
                 }
-                catch (Exception ex) when (ex is COMException || ex is TimeoutException)
+                catch (Exception ex) when (ex is ElementNotAvailableException || ex is COMException || ex is TimeoutException)
                 {
-                    // A window can close or stop answering UIA between native enumeration and provider conversion.
+                    // A native window can close or its UIA provider can detach between enumeration and conversion; retry the remaining live handles.
                 }
             }
             if (dialog is not null)

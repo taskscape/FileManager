@@ -8,6 +8,8 @@ namespace FileManager.UiTests;
 // the native handle-binding contract from being silently removed while the
 // executable-level file-operation suite covers normal delete and overwrite
 // behavior.
+// Refactoring notes remain documentation, not a mutable input to product
+// contracts; each assertion below instead names the concrete source boundary.
 public sealed class NativeSafetyRegressionTests
 {
     [Test]
@@ -20,6 +22,7 @@ public sealed class NativeSafetyRegressionTests
         var quarantineVerifier = File.ReadAllText(Path.Combine(root, "tools", "verify-ui-test-quarantine.ps1"));
         var quarantineWorkflow = File.ReadAllText(Path.Combine(root, ".github", "workflows", "quarantined-ui-tests.yml"));
         var sandbox = File.ReadAllText(Path.Combine(root, "tests", "FileManager.UiTests", "Infrastructure", "UiTestSandbox.cs"));
+        var uiTestBase = File.ReadAllText(Path.Combine(root, "tests", "FileManager.UiTests", "Infrastructure", "FileManagerUiTestBase.cs"));
         var nightlyWorkflow = File.ReadAllText(Path.Combine(root, ".github", "workflows", "nightly-lock-stress.yml"));
         var verifierRunner = File.ReadAllText(Path.Combine(root, "tools", "run-lock-verifier-stress.ps1"));
 
@@ -48,6 +51,14 @@ public sealed class NativeSafetyRegressionTests
             Assert.That(runner, Does.Contain("run-lock-verifier-stress.ps1"));
             // The opt-in local release mode must cover the packaging job as well as the Debug release gate.
             Assert.That(runner, Does.Contain("[switch]$ReleasePipeline"));
+            // Keep local parity from silently collapsing the workflow's staged Debug artifact hand-off into one build.
+            Assert.That(runner, Does.Contain("[switch]$PrerequisiteOnly"));
+            // A plain local run must keep diagnostic quarantine tests out of the release-equivalent verdict.
+            Assert.That(runner, Does.Contain("[string]$NUnitFilter = 'TestCategory!=Quarantined'"));
+            Assert.That(runner, Does.Contain("Get-ReleasePipelinePrerequisiteFailures"));
+            Assert.That(runner, Does.Contain("Resolve-ReleasePipelineBaseCommit"));
+            Assert.That(runner, Does.Contain("Build-ReleaseGateDebugArtifacts"));
+            Assert.That(runner, Does.Contain("Resolve-SqliteDll -RequestedPath $SqliteDll"));
             Assert.That(runner, Does.Contain("Build-ReleaseApplication"));
             Assert.That(runner, Does.Contain("audit-pe-hardening.ps1"));
             Assert.That(runner, Does.Contain("new-symbol-index.ps1"));
@@ -55,7 +66,10 @@ public sealed class NativeSafetyRegressionTests
             Assert.That(runner, Does.Contain("Get-PinnedInnoSetupCompiler"));
             Assert.That(runner, Does.Contain("FailOnSkipped"));
             Assert.That(runner, Does.Contain("@outcome='NotExecuted'"));
-            // Only manifest-backed categories may leave the blocking inventory; NUnit Ignore remains a hard failure.
+            // Local capability gates are explicit skips; strict release mode still rejects them and every unrecognized NUnit Ignore.
+            Assert.That(runner, Does.Contain("$optionalUiIgnoreMessagePrefixes"));
+            Assert.That(runner, Does.Contain("capability-gated NUnit tests were skipped despite -FailOnSkipped"));
+            // Only manifest-backed categories may leave the blocking inventory; unrecognized NUnit Ignore remains a hard failure.
             Assert.That(runner, Does.Contain("verify-ui-test-quarantine.ps1"));
             Assert.That(runner, Does.Contain("NUnitFilter"));
             Assert.That(runner, Does.Contain("unexpectedly ignored"));
@@ -66,6 +80,8 @@ public sealed class NativeSafetyRegressionTests
             // The runner must select explicit data and registry boundaries before driving the current user's desktop.
             Assert.That(runner, Does.Contain("FILEMANAGER_UI_TESTDATA_ROOT"));
             Assert.That(runner, Does.Contain("$uiTestEnvironmentSkipReason = $_.Exception.Message"));
+            // A disappearing prompt provider is transport noise, not evidence that the native operation omitted its prompt.
+            Assert.That(uiTestBase, Does.Contain("ElementNotAvailableException || ex is COMException || ex is TimeoutException"));
             // The release workflow must consume the root inventory rather than
             // maintaining a second list that can silently lose coverage.
             Assert.That(releaseWorkflow, Does.Contain("name: Complete automated release gate"));
@@ -105,7 +121,6 @@ public sealed class NativeSafetyRegressionTests
         var strings = File.ReadAllText(Path.Combine(root, "src", "common", "strutils.cpp"));
         var declarations = File.ReadAllText(Path.Combine(root, "src", "common", "strutils.h"));
         var startup = File.ReadAllText(Path.Combine(root, "src", "app_entry.cpp"));
-        var refactoring = File.ReadAllText(Path.Combine(root, "refactoring.md"));
 
         Assert.Multiple(() =>
         {
@@ -128,7 +143,6 @@ public sealed class NativeSafetyRegressionTests
             Assert.That(strings, Does.Contain("ConvertWideToUtf8Checked(src.cFileName"));
             Assert.That(startup, Does.Contain("FormatStringChecked(languageFileName + 1"));
             Assert.That(startup, Does.Not.Contain("sprintf(strrchr(path, '\\\\') + 1"));
-            Assert.That(refactoring, Does.Contain("### 37. Ratchet unchecked string-copy and formatting calls — Implemented"));
         });
     }
 
@@ -139,7 +153,6 @@ public sealed class NativeSafetyRegressionTests
         var ratchet = File.ReadAllText(Path.Combine(root, "tools", "verify-no-new-max-path-buffers.ps1"));
         var exemptions = File.ReadAllText(Path.Combine(root, "tools", "max-path-buffer-exemptions.md"));
         var workflow = File.ReadAllText(Path.Combine(root, ".github", "workflows", "pr-msbuild.yml"));
-        var refactoring = File.ReadAllText(Path.Combine(root, "refactoring.md"));
         var pluginLoading = File.ReadAllText(Path.Combine(root, "src", "plugins_loading.cpp"));
 
         Assert.Multiple(() =>
@@ -155,7 +168,6 @@ public sealed class NativeSafetyRegressionTests
             Assert.That(exemptions, Does.Contain("No exemptions are currently approved."));
             Assert.That(exemptions, Does.Contain("MAX_PATH-RATCHET-EXEMPT: ID"));
             Assert.That(workflow, Does.Contain("verify-no-new-max-path-buffers.ps1 -BaseCommit origin/"));
-            Assert.That(refactoring, Does.Contain("### 36. Ban new fixed `MAX_PATH` buffers — Implemented"));
         });
     }
 
@@ -168,7 +180,6 @@ public sealed class NativeSafetyRegressionTests
         var project = File.ReadAllText(Path.Combine(root, "src", "vcxproj", "salamand.vcxproj"));
         var probe = File.ReadAllText(Path.Combine(root, "tools", "zlib_compatibility_probe.c"));
         var workflow = File.ReadAllText(Path.Combine(root, ".github", "workflows", "pr-msbuild.yml"));
-        var refactoring = File.ReadAllText(Path.Combine(root, "refactoring.md"));
 
         // Keep the vendor provenance, hostile streams, and build path coupled to the production C sources.
         Assert.Multiple(() =>
@@ -186,7 +197,6 @@ public sealed class NativeSafetyRegressionTests
             Assert.That(File.Exists(Path.Combine(root, "tests", "zlib-vectors", "bad-adler32-zlib-stream.hex")), Is.True);
             Assert.That(File.Exists(Path.Combine(root, "tests", "zlib-vectors", "invalid-deflate-zlib-stream.hex")), Is.True);
             Assert.That(workflow, Does.Contain("test-zlib-compatibility.ps1"));
-            Assert.That(refactoring, Does.Contain("### 63. Upgrade zlib — Implemented"));
         });
     }
 
@@ -203,7 +213,6 @@ public sealed class NativeSafetyRegressionTests
         var harness = File.ReadAllText(Path.Combine(root, "tools", "test-bzip2-compatibility.ps1"));
         var workflow = File.ReadAllText(Path.Combine(root, ".github", "workflows", "pr-msbuild.yml"));
         var soakWorkflow = File.ReadAllText(Path.Combine(root, ".github", "workflows", "nightly-parser-fuzz.yml"));
-        var refactoring = File.ReadAllText(Path.Combine(root, "refactoring.md"));
 
         // Pin the vendor identity, streaming adapter, retained corpus, and CI gate as one parser boundary.
         Assert.Multiple(() =>
@@ -226,7 +235,6 @@ public sealed class NativeSafetyRegressionTests
             Assert.That(harness, Does.Contain("[int]$Iterations = 1"));
             Assert.That(workflow, Does.Contain("test-bzip2-compatibility.ps1"));
             Assert.That(soakWorkflow, Does.Contain("test-bzip2-compatibility.ps1 -Architecture x64 -Iterations 250"));
-            Assert.That(refactoring, Does.Contain("### 64. Upgrade bzip2 — Implemented"));
         });
     }
 
@@ -240,7 +248,6 @@ public sealed class NativeSafetyRegressionTests
         var registry = File.ReadAllText(Path.Combine(root, "src", "regwork.cpp"));
         var minidump = File.ReadAllText(Path.Combine(root, "src", "salmon", "minidump.cpp"));
         var salmonHeader = File.ReadAllText(Path.Combine(root, "src", "salmon", "salmon.h"));
-        var refactoring = File.ReadAllText(Path.Combine(root, "refactoring.md"));
 
         Assert.Multiple(() =>
         {
@@ -271,7 +278,6 @@ public sealed class NativeSafetyRegressionTests
             Assert.That(minidump, Does.Not.Contain("static char findPath[MAX_PATH]"));
             Assert.That(salmonHeader, Does.Contain("int targetPathSize"));
             Assert.That(salmonHeader, Does.Contain("int shortNameSize"));
-            Assert.That(refactoring, Does.Contain("### 38. Replace fixed buffers at trust boundaries first — Implemented"));
         });
     }
 
@@ -297,7 +303,6 @@ public sealed class NativeSafetyRegressionTests
         var zipMain = File.ReadAllText(Path.Combine(root, "src", "plugins", "zip", "main.cpp"));
         var splitCombine = File.ReadAllText(Path.Combine(root, "src", "plugins", "splitcbn", "combine.cpp"));
         var csvParser = File.ReadAllText(Path.Combine(root, "src", "plugins", "dbviewer", "csvlib", "csvlib.cpp"));
-        var refactoring = File.ReadAllText(Path.Combine(root, "refactoring.md"));
         var pluginLoading = File.ReadAllText(Path.Combine(root, "src", "plugins_loading.cpp"));
 
         // These assertions pin the overflow boundaries that adversarial file,
@@ -389,7 +394,6 @@ public sealed class NativeSafetyRegressionTests
             Assert.That(csvParser, Does.Contain("CheckedAddSize((size_t)BufferSize, 1, &bufferChars)"));
             Assert.That(csvParser, Does.Contain("CheckedCastSizeToInt(*textLen, &sourceTextLen)"));
             Assert.That(csvParser, Does.Contain("CheckedMultiplySize((size_t)len, sizeof(wchar_t), &bufferBytes)"));
-            Assert.That(refactoring, Does.Contain("### 39. Use checked arithmetic for sizes, offsets, and allocations — Partially implemented"));
         });
     }
 
@@ -400,7 +404,6 @@ public sealed class NativeSafetyRegressionTests
         var result = File.ReadAllText(Path.Combine(root, "src", "operation_result.h"));
         var copy = ReadOperationImplementationSources(root);
         var combine = File.ReadAllText(Path.Combine(root, "src", "plugins", "splitcbn", "combine.cpp"));
-        var refactoring = File.ReadAllText(Path.Combine(root, "refactoring.md"));
 
         // Core copy and Split/Combine retain complete outcomes until their adapters feed
         // an unchanged BOOL/error pair to the pre-existing progress-dialog contracts.
@@ -437,7 +440,6 @@ public sealed class NativeSafetyRegressionTests
             Assert.That(combine, Does.Contain("COperationResult reserveResult = temporaryOutput.Reserve(targetName)"));
             Assert.That(combine, Does.Contain("PromoteFileUtf8Local(temporaryOutput.GetName(), targetName)"));
             Assert.That(combine, Does.Contain("result->AppendCleanupError(orcpDeleteUnverifiedTarget"));
-            Assert.That(refactoring, Does.Contain("### 40. Make operation result types explicit — Partially implemented"));
         });
     }
 
@@ -448,7 +450,6 @@ public sealed class NativeSafetyRegressionTests
         var result = File.ReadAllText(Path.Combine(root, "src", "operation_result.h"));
         var copy = ReadOperationImplementationSources(root);
         var combine = File.ReadAllText(Path.Combine(root, "src", "plugins", "splitcbn", "combine.cpp"));
-        var refactoring = File.ReadAllText(Path.Combine(root, "refactoring.md"));
 
         // Keep primary failure, cleanup evidence, and copyable diagnostics coupled across core and plug-in output paths.
         Assert.Multiple(() =>
@@ -463,7 +464,6 @@ public sealed class NativeSafetyRegressionTests
             Assert.That(copy, Does.Contain("Diagnostic (copy with Ctrl+C):"));
             Assert.That(combine, Does.Contain("result->AppendCleanupError(orcpDeleteUnverifiedTarget, GetLastError(), Name)"));
             Assert.That(combine, Does.Contain("The primary combine failure remains actionable"));
-            Assert.That(refactoring, Does.Contain("### 56. Preserve the first actionable error and its context — Partially implemented"));
         });
     }
 
@@ -473,7 +473,6 @@ public sealed class NativeSafetyRegressionTests
         var root = FindRepositoryRoot();
         var scopedHandle = File.ReadAllText(Path.Combine(root, "src", "common", "scoped_kernel_handle.h"));
         var identity = File.ReadAllText(Path.Combine(root, "src", "file_identity.cpp"));
-        var refactoring = File.ReadAllText(Path.Combine(root, "refactoring.md"));
 
         // These source checks pin the RAII seam that protects verified delete
         // handles across identity mismatch, mutation failure, and future returns.
@@ -494,7 +493,6 @@ public sealed class NativeSafetyRegressionTests
             Assert.That(identity, Does.Contain("handle->Get()"));
             Assert.That(identity, Does.Contain("handle.Close(&closeError)"));
             Assert.That(identity, Does.Not.Contain("CloseHandle(handle)"));
-            Assert.That(refactoring, Does.Contain("### 41. Adopt RAII for kernel handles in touched code — Implemented"));
         });
     }
 
@@ -506,7 +504,6 @@ public sealed class NativeSafetyRegressionTests
         var copy = ReadOperationImplementationSources(root);
         var broker = File.ReadAllText(Path.Combine(root, "src", "parserbroker.cpp"));
         var scripts = File.ReadAllText(Path.Combine(root, "src", "plugins", "automation", "scriptlist.cpp"));
-        var refactoring = File.ReadAllText(Path.Combine(root, "refactoring.md"));
 
         // These source checks pin cleanup at operation and plug-in seams where
         // future returns or callbacks would otherwise bypass a manual pair.
@@ -531,7 +528,6 @@ public sealed class NativeSafetyRegressionTests
             Assert.That(broker, Does.Not.Contain("LeaveCriticalSection(&Lock);"));
             Assert.That(scripts, Does.Contain("CScopedMappingView codeView(MapViewOfFile"));
             Assert.That(scripts, Does.Not.Contain("UnmapViewOfFile(pszCodeA)"));
-            Assert.That(refactoring, Does.Contain("### 42. Adopt RAII for memory, mappings, and critical sections — Implemented"));
         });
     }
 
@@ -548,7 +544,6 @@ public sealed class NativeSafetyRegressionTests
         var architecture = File.ReadAllText(Path.Combine(root, "architecture.md"));
         var workflow = File.ReadAllText(Path.Combine(root, ".github", "workflows", "nightly-lock-stress.yml"));
         var stressRunner = File.ReadAllText(Path.Combine(root, "tools", "run-lock-verifier-stress.ps1"));
-        var refactoring = File.ReadAllText(Path.Combine(root, "refactoring.md"));
 
         // Pin the wrapper, implementation, build registration, runtime lane, and ledger so the rank scheme cannot become documentation-only.
         Assert.Multiple(() =>
@@ -588,7 +583,6 @@ public sealed class NativeSafetyRegressionTests
             Assert.That(stressRunner, Does.Contain("TestCategory=LockStress"));
             Assert.That(stressRunner, Does.Contain("finally"));
             Assert.That(stressRunner, Does.Contain("LogOutputDirectory"));
-            Assert.That(refactoring, Does.Contain("### 47. Document and verify lock ordering — Partially implemented"));
         });
     }
 
@@ -624,7 +618,6 @@ public sealed class NativeSafetyRegressionTests
         var dialogsHeader = File.ReadAllText(Path.Combine(root, "src", "dialogs.h"));
         var ratchet = File.ReadAllText(Path.Combine(root, "tools", "verify-no-new-raw-thread-creation.ps1"));
         var workflow = File.ReadAllText(Path.Combine(root, ".github", "workflows", "pr-msbuild.yml"));
-        var refactoring = File.ReadAllText(Path.Combine(root, "refactoring.md"));
         var pluginLoading = File.ReadAllText(Path.Combine(root, "src", "plugins_loading.cpp"));
 
         // These source contracts preserve the worker boundary where shutdown and
@@ -733,7 +726,6 @@ public sealed class NativeSafetyRegressionTests
             Assert.That(ratchet, Does.Contain("CThreadOwner"));
             Assert.That(ratchet, Does.Contain("CreateThread|_beginthreadex"));
             Assert.That(workflow, Does.Contain("verify-no-new-raw-thread-creation.ps1 -BaseCommit origin/"));
-            Assert.That(refactoring, Does.Contain("### 43. Standardize thread creation and ownership — Partially implemented"));
             Assert.That(pluginLoading, Does.Contain("const int maximumFSNamesPerPlugin = 256"));
             Assert.That(pluginLoading, Does.Contain("StorePluginOutputIndex(newFSNameIndex, i)"));
         });
@@ -777,7 +769,6 @@ public sealed class NativeSafetyRegressionTests
         var owner = File.ReadAllText(Path.Combine(root, "src", "plugins", "shared", "plugin_thread_owner.h"));
         var ftpConsumer = File.ReadAllText(Path.Combine(root, "src", "plugins", "ftp", "fs1.cpp"));
         var ratchet = File.ReadAllText(Path.Combine(root, "tools", "verify-no-new-raw-thread-creation.ps1"));
-        var refactoring = File.ReadAllText(Path.Combine(root, "refactoring.md"));
 
         // The shared queue is compiled into many plug-ins, so preserve its API
         // while pinning the cooperative ownership boundary and safe-join order.
@@ -801,7 +792,6 @@ public sealed class NativeSafetyRegressionTests
             Assert.That(ftpConsumer, Does.Contain("CThreadQueue AuxThreadQueue(\"FTP Aux\")"));
             Assert.That(ftpConsumer, Does.Contain("AuxThreadQueue.KillAll(TRUE, 0, 0)"));
             Assert.That(ratchet, Does.Contain("src/plugins/shared/plugin_thread_owner.h"));
-            Assert.That(refactoring, Does.Contain("`CPluginThreadOwner` adapts the shared plug-in queue"));
         });
     }
 
@@ -842,7 +832,6 @@ public sealed class NativeSafetyRegressionTests
         var callStack = File.ReadAllText(Path.Combine(root, "src", "callstk.cpp"));
         var auxiliary = File.ReadAllText(Path.Combine(root, "src", "path_utils.cpp"));
         var appEntry = ReadApplicationLifecycleSources(root);
-        var refactoring = File.ReadAllText(Path.Combine(root, "refactoring.md"));
 
         // These contracts make stalled shutdown observable without letting a
         // caller release shared state while a legacy worker can still use it.
@@ -868,7 +857,6 @@ public sealed class NativeSafetyRegressionTests
             Assert.That(auxiliary, Does.Not.Contain("TerminateThread(t, 666)"));
             Assert.That(appEntry, Does.Contain("ShutdownAuxThreads()"));
             Assert.That(appEntry, Does.Not.Contain("TerminateAuxThreads()"));
-            Assert.That(refactoring, Does.Contain("### 44. Define bounded shutdown deadlines without unsafe escalation — Implemented"));
         });
     }
 
@@ -880,7 +868,6 @@ public sealed class NativeSafetyRegressionTests
         var checkPath = File.ReadAllText(Path.Combine(root, "src", "path_checking.cpp"));
         var safeWait = File.ReadAllText(Path.Combine(root, "src", "string_resources.cpp"));
         var waitWindow = File.ReadAllText(Path.Combine(root, "src", "dialogs_attributes.cpp"));
-        var refactoring = File.ReadAllText(Path.Combine(root, "refactoring.md"));
 
         // These source contracts keep cancellation, work completion, and retry
         // deadlines as independently signaled wake reasons rather than timing guesses.
@@ -904,7 +891,6 @@ public sealed class NativeSafetyRegressionTests
             Assert.That(safeWait, Does.Contain("DuplicateHandle(GetCurrentProcess(), SafeWaitWindowCancelEvent"));
             Assert.That(safeWait, Does.Contain("void SignalSafeWaitWindowCancellation()"));
             Assert.That(waitWindow, Does.Contain("SignalSafeWaitWindowCancellation();"));
-            Assert.That(refactoring, Does.Contain("### 46. Implemented: replace `Sleep` polling with signaled waits"));
         });
     }
 
@@ -956,7 +942,6 @@ public sealed class NativeSafetyRegressionTests
         var fileColumns = File.ReadAllText(Path.Combine(root, "src", "fileswindow_columns.cpp"));
         var pack = File.ReadAllText(Path.Combine(root, "src", "pack3.cpp"));
         var timingRatchet = File.ReadAllText(Path.Combine(root, "tools", "verify-no-new-gettickcount.ps1"));
-        var refactoring = File.ReadAllText(Path.Combine(root, "refactoring.md"));
 
         // These boundary values model the old 49.7-day wrap while the source
         // checks keep the native timer queue on the tested 64-bit seam.
@@ -1083,7 +1068,6 @@ public sealed class NativeSafetyRegressionTests
             Assert.That(progressBar, Does.Not.Contain("GetTickCount() - SelfMoveTicks"));
             Assert.That(timingRatchet, Does.Contain("GetTickCount\\s*\\("));
             Assert.That(timingRatchet, Does.Contain("CMonotonicClock"));
-            Assert.That(refactoring, Does.Contain("### 45. Replace wrap-prone time calculations with monotonic 64-bit time — Partially implemented"));
         });
     }
 
@@ -1095,7 +1079,6 @@ public sealed class NativeSafetyRegressionTests
         var strings = File.ReadAllText(Path.Combine(root, "src", "common", "strutils.cpp"));
         var handles = File.ReadAllText(Path.Combine(root, "src", "common", "handles.cpp"));
         var navigation = File.ReadAllText(Path.Combine(root, "src", "fileswindow_navigation.cpp"));
-        var refactoring = File.ReadAllText(Path.Combine(root, "refactoring.md"));
 
         Assert.Multiple(() =>
         {
@@ -1116,7 +1099,6 @@ public sealed class NativeSafetyRegressionTests
             Assert.That(handles, Does.Not.Contain("Utf8AllocWideHandles"));
             Assert.That(navigation, Does.Contain("CWidePath pathW(path)"));
             Assert.That(navigation, Does.Not.Contain("CStrStackOrHeap"));
-            Assert.That(refactoring, Does.Contain("### 35. Introduce a dynamic wide-path abstraction — Implemented"));
         });
     }
 
@@ -1296,7 +1278,6 @@ public sealed class NativeSafetyRegressionTests
         var navigation = File.ReadAllText(Path.Combine(root, "src", "fileswindow_navigation.cpp"));
         var topologyTests = File.ReadAllText(Path.Combine(root, "tests", "FileManager.UiTests", "ReparsePointTopologyUiTests.cs"));
         var architecture = File.ReadAllText(Path.Combine(root, "architecture.md"));
-        var refactoring = File.ReadAllText(Path.Combine(root, "refactoring.md"));
 
         Assert.Multiple(() =>
         {
@@ -1316,7 +1297,6 @@ public sealed class NativeSafetyRegressionTests
             Assert.That(topologyTests, Does.Contain("outside-symlink"));
             Assert.That(topologyTests, Does.Contain("Delete_junction_removes_only_the_link_and_never_its_target"));
             Assert.That(architecture, Does.Contain("Reparse-point operation policy"));
-            Assert.That(refactoring, Does.Contain("### 34. Exercise junction, symlink, mount-point, and cloud-placeholder cases — Implemented"));
         });
     }
 
@@ -1415,7 +1395,6 @@ public sealed class NativeSafetyRegressionTests
         var nativeFileSystem = File.ReadAllText(Path.Combine(root, "src", "file_operation_filesystem.cpp"));
         var planner = File.ReadAllText(Path.Combine(root, "src", "fileswindow_operations.cpp"));
         var journal = File.ReadAllText(Path.Combine(root, "src", "operation_journal.cpp"));
-        var refactoring = File.ReadAllText(Path.Combine(root, "refactoring.md"));
 
         Assert.Multiple(() =>
         {
@@ -1434,7 +1413,6 @@ public sealed class NativeSafetyRegressionTests
             Assert.That(planner, Does.Contain("FileOperationFileSystem().GetDiskFreeSpace"));
             Assert.That(journal, Does.Contain("AppendGoldenMasterPlan"));
             Assert.That(journal, Does.Contain("PLANITEM|%d|%s"));
-            Assert.That(refactoring, Does.Contain("### 27. Extract a testable file-operation planning seam — Implemented"));
         });
     }
 
@@ -1449,7 +1427,6 @@ public sealed class NativeSafetyRegressionTests
         var journal = File.ReadAllText(Path.Combine(root, "src", "operation_journal.cpp"));
         var dialogs = File.ReadAllText(Path.Combine(root, "src", "dialogs_file_ops.cpp"));
         var log = File.ReadAllText(Path.Combine(root, "src", "execlog.cpp"));
-        var refactoring = File.ReadAllText(Path.Combine(root, "refactoring.md"));
 
         // This source-level characterization pins the handoffs that cannot be deterministically faulted from UIA.
         Assert.Multiple(() =>
@@ -1464,7 +1441,6 @@ public sealed class NativeSafetyRegressionTests
             Assert.That(journal, Does.Contain("CORRELATION|operation=%s"));
             Assert.That(journal, Does.Contain("RETRY|%d|attempt=%d"));
             Assert.That(log, Does.Contain("operation=%s, item=%d, attempt=%d"));
-            Assert.That(refactoring, Does.Contain("### 55. Assign correlation IDs to operations and workers — Implemented"));
         });
     }
 
@@ -1475,7 +1451,6 @@ public sealed class NativeSafetyRegressionTests
         var policy = File.ReadAllText(Path.Combine(root, "src", "retry_policy.h"));
         var result = File.ReadAllText(Path.Combine(root, "src", "operation_result.h"));
         var copy = ReadOperationImplementationSources(root);
-        var refactoring = File.ReadAllText(Path.Combine(root, "refactoring.md"));
 
         // Source characterization keeps retry pacing and destructive-operation safety independently reviewable.
         Assert.Multiple(() =>
@@ -1497,7 +1472,6 @@ public sealed class NativeSafetyRegressionTests
             Assert.That(copy, Does.Contain("PrepareAutomaticRetry(err, &AutoRetryCounter, rokDestructiveCommit"));
             Assert.That(copy, Does.Not.Contain("Sleep(100);"));
             Assert.That(copy, Does.Not.Contain("Sleep(AutoRetryCounter * 100);"));
-            Assert.That(refactoring, Does.Contain("### 57. Centralize retry policy — Partially implemented"));
         });
     }
 
@@ -1511,7 +1485,6 @@ public sealed class NativeSafetyRegressionTests
         var identities = File.ReadAllText(Path.Combine(root, "src", "file_identity.cpp"));
         var journal = File.ReadAllText(Path.Combine(root, "src", "operation_journal.cpp"));
         var nativeTests = File.ReadAllText(Path.Combine(root, "tests", "NativeSafetyTests", "NativeSafetyTests.cpp"));
-        var refactoring = File.ReadAllText(Path.Combine(root, "refactoring.md"));
 
         Assert.Multiple(() =>
         {
@@ -1535,7 +1508,6 @@ public sealed class NativeSafetyRegressionTests
             Assert.That(journal, Does.Contain("STATE|%d|temporary-ready"));
             Assert.That(nativeTests, Does.Contain("RunTransactionalFaultSequence(OperationExecutionFileSystem()"));
             Assert.That(nativeTests, Does.Contain("fake.GetCalls() != expectedCalls[phaseIndex]"));
-            Assert.That(refactoring, Does.Contain("### 29. Add crash-consistency fault injection at every operation phase — Partially implemented"));
         });
     }
 
@@ -1553,7 +1525,6 @@ public sealed class NativeSafetyRegressionTests
         var ads = File.ReadAllText(Path.Combine(root, "tests", "FileManager.UiTests", "Infrastructure", "AlternateDataStreams.cs"));
         var unsupportedAds = File.ReadAllText(Path.Combine(root, "tests", "FileManager.UiTests", "AlternateDataStreamsUnsupportedTargetUiTests.cs"));
         var nativeCommands = File.ReadAllText(Path.Combine(root, "tests", "FileManager.UiTests", "Infrastructure", "NativeCommands.cs"));
-        var refactoring = File.ReadAllText(Path.Combine(root, "refactoring.md"));
 
         Assert.Multiple(() =>
         {
@@ -1603,8 +1574,6 @@ public sealed class NativeSafetyRegressionTests
             Assert.That(recovery, Does.Contain("STATE|0|temporary-ready"));
             Assert.That(workspace, Does.Contain("TargetVolumeRoot"));
             Assert.That(workspace, Does.Contain("TargetWorkspaceDirectory"));
-            Assert.That(refactoring, Does.Contain("### 28. Build native characterization tests for copy, move, delete, and rename — Implemented"));
-            Assert.That(refactoring, Does.Contain("### 32. Test alternate data streams end to end — Implemented"));
         });
     }
 
@@ -1616,7 +1585,6 @@ public sealed class NativeSafetyRegressionTests
         var project = File.ReadAllText(Path.Combine(root, "src", "vcxproj", "salmon", "salmon_base.props"));
         var dialog = File.ReadAllText(Path.Combine(root, "src", "lang", "lang.rc"));
         var reporting = File.ReadAllText(Path.Combine(root, "reporting.md"));
-        var refactoring = File.ReadAllText(Path.Combine(root, "refactoring.md"));
 
         Assert.Multiple(() =>
         {
@@ -1644,7 +1612,6 @@ public sealed class NativeSafetyRegressionTests
             Assert.That(reporting, Does.Contain("https://reports.taskscape.com/api/v1/crash-reports"));
             Assert.That(reporting, Does.Contain("http://reports.taskscape.com/upload.php"));
             Assert.That(reporting, Does.Contain("Transfer-Encoding: chunked"));
-            Assert.That(refactoring, Does.Contain("### 12. Replace the custom crash uploader with HTTPS WinHTTP — Implemented"));
         });
     }
 
@@ -1843,7 +1810,6 @@ public sealed class NativeSafetyRegressionTests
         var salmon = File.ReadAllText(Path.Combine(root, "src", "salmon", "salmon.cpp"));
         var minidump = File.ReadAllText(Path.Combine(root, "src", "salmon", "minidump.cpp"));
         var compression = File.ReadAllText(Path.Combine(root, "src", "salmon", "compress.cpp"));
-        var refactoring = File.ReadAllText(Path.Combine(root, "refactoring.md"));
 
         // A failed EFS setup must stop report creation rather than leave an unprotected fallback artifact.
         Assert.Multiple(() =>
@@ -1861,7 +1827,6 @@ public sealed class NativeSafetyRegressionTests
             Assert.That(compression, Does.Contain("!EnsureCrashReportDirectoryEncrypted(archive.c_str())"));
             Assert.That(compression, Does.Contain("reportName + \".DMP|\""));
             Assert.That(compression, Does.Not.Contain("std::string mask = reportName + \".*\""));
-            Assert.That(refactoring, Does.Contain("### 95. Minimize, encrypt, and govern crash-dump data — Implemented"));
         });
     }
 
@@ -1880,6 +1845,8 @@ public sealed class NativeSafetyRegressionTests
             Assert.That(generator, Does.Contain("Get-UnsafeApiEntries"));
             Assert.That(verifier, Does.Contain("New unsafe API debt"));
             Assert.That(verifier, Does.Contain("fingerprint"));
+            // The baseline must scan from its own repository root when callers run the script from scripts/.
+            Assert.That(verifier, Does.Contain("git -C $root grep"));
             Assert.That(runner, Does.Contain("test-unsafe-api-baseline.ps1"));
             Assert.That(baseline, Does.Contain("\"schemaVersion\":  1"));
         });
@@ -1936,7 +1903,6 @@ public sealed class NativeSafetyRegressionTests
         var releaseHandles = File.ReadAllText(Path.Combine(root, "src", "common", "handles.h"));
         var debugHandles = File.ReadAllText(Path.Combine(root, "src", "common", "handles.cpp"));
         var widePath = File.ReadAllText(Path.Combine(root, "src", "common", "wide_path.h"));
-        var refactoring = File.ReadAllText(Path.Combine(root, "refactoring.md"));
 
         Assert.Multiple(() =>
         {
@@ -1957,7 +1923,6 @@ public sealed class NativeSafetyRegressionTests
                         "Release builds must not restore unrestricted LoadLibraryW calls.");
             Assert.That(Regex.Matches(debugHandles, @"(?m)^(?!\s*//).*?\bLoadLibraryW\s*\(").Count, Is.Zero,
                         "Debug builds must not restore unrestricted LoadLibraryW calls.");
-            Assert.That(refactoring, Does.Contain("### 19. Constrain DLL search paths — Implemented"));
         });
     }
 
@@ -1971,7 +1936,6 @@ public sealed class NativeSafetyRegressionTests
         var thumbnails = File.ReadAllText(Path.Combine(root, "src", "fileswindow_init.cpp"));
         var archives = File.ReadAllText(Path.Combine(root, "src", "plugins_loading.cpp"));
         var installer = File.ReadAllText(Path.Combine(root, "Installer", "setup.iss"));
-        var refactoring = File.ReadAllText(Path.Combine(root, "refactoring.md"));
 
         Assert.Multiple(() =>
         {
@@ -1995,7 +1959,6 @@ public sealed class NativeSafetyRegressionTests
             Assert.That(thumbnails, Does.Not.Contain("(*loader)->LoadThumbnail"));
             Assert.That(archives, Does.Contain("ParserBroker.QueryArchiveMetadata"));
             Assert.That(installer, Does.Contain("salbroker.exe"));
-            Assert.That(refactoring, Does.Contain("### 21. Move risky parsers and previewers out of process — Partially implemented"));
         });
     }
 
@@ -2008,7 +1971,6 @@ public sealed class NativeSafetyRegressionTests
         var messages = File.ReadAllText(Path.Combine(root, "src", "mainwnd_messages.cpp"));
         var shutdown = File.ReadAllText(Path.Combine(root, "src", "mainwnd_shutdown.cpp"));
         var pathUtilities = File.ReadAllText(Path.Combine(root, "src", "path_utils.cpp"));
-        var refactoring = File.ReadAllText(Path.Combine(root, "refactoring.md"));
 
         Assert.Multiple(() =>
         {
@@ -2038,8 +2000,6 @@ public sealed class NativeSafetyRegressionTests
             Assert.That(messages, Does.Contain("IsInPlugin() || StopRefresh > 0"));
             Assert.That(shutdown, Does.Contain("!endAfterCleanup && IsInPlugin()"));
             Assert.That(pathUtilities, Does.Contain("!IsInPlugin()"));
-            Assert.That(refactoring, Does.Contain("### 22. Implemented: make plug-in entry bookkeeping exception-safe"));
-            Assert.That(refactoring, Does.Contain("### 48. Reduce unowned global mutable state — Partially implemented"));
         });
     }
 
@@ -2052,7 +2012,6 @@ public sealed class NativeSafetyRegressionTests
         var enumerationData = File.ReadAllText(Path.Combine(root, "src", "consts.h"));
         var enumeration = File.ReadAllText(Path.Combine(root, "src", "file_enumeration.cpp"));
         var messages = File.ReadAllText(Path.Combine(root, "src", "mainwnd_messages.cpp"));
-        var refactoring = File.ReadAllText(Path.Combine(root, "refactoring.md"));
 
         Assert.Multiple(() =>
         {
@@ -2078,7 +2037,6 @@ public sealed class NativeSafetyRegressionTests
             Assert.That(enumeration, Does.Contain("FileNamesEnumData.WaitingForResult && FileNamesEnumData.SrcUID == sourceUID"));
             Assert.That(enumeration, Does.Contain("CancelFileNamesEnumRequestLocked((int)(UINT_PTR)FileNamesEnumSources[i - 1]);"));
             Assert.That(enumeration, Does.Contain("if (!PostMessage(hWnd, WM_USER_ENUMFILENAMES, reqUID, 0))"));
-            Assert.That(refactoring, Does.Contain("### 49. Protect window and callback lifetimes — Partially implemented"));
         });
     }
 
@@ -2088,7 +2046,6 @@ public sealed class NativeSafetyRegressionTests
         var root = FindRepositoryRoot();
         var header = File.ReadAllText(Path.Combine(root, "src", "iconpool.h"));
         var implementation = File.ReadAllText(Path.Combine(root, "src", "iconpool.cpp"));
-        var refactoring = File.ReadAllText(Path.Combine(root, "refactoring.md"));
 
         // The queue contract prevents directory-sized background warming from
         // retaining unbounded work or delaying the currently visible panel.
@@ -2115,7 +2072,6 @@ public sealed class NativeSafetyRegressionTests
             Assert.That(implementation, Does.Not.Contain("QueueHead"));
             Assert.That(implementation, Does.Not.Contain("QueueTail"));
             Assert.That(implementation, Does.Not.Contain("Sleep(1)"));
-            Assert.That(refactoring, Does.Contain("### 50. Bound background work queues — Partially implemented"));
         });
     }
 
@@ -2127,7 +2083,6 @@ public sealed class NativeSafetyRegressionTests
         var listBox = File.ReadAllText(Path.Combine(root, "src", "filesbox_rendering.cpp"));
         var resourceIds = File.ReadAllText(Path.Combine(root, "src", "texts.rh2"));
         var strings = File.ReadAllText(Path.Combine(root, "src", "lang", "texts.rc2"));
-        var refactoring = File.ReadAllText(Path.Combine(root, "refactoring.md"));
 
         // Large synthetic directories must encounter predictable cancellation
         // checkpoints while the native panel retains no more than its budget.
@@ -2167,7 +2122,6 @@ public sealed class NativeSafetyRegressionTests
             Assert.That(listBox, Does.Contain("Parent->VisibleItemsArray.InvalidateArr()"));
             Assert.That(resourceIds, Does.Contain("IDS_DIRECTORYENUMERATIONLIMIT"));
             Assert.That(strings, Does.Contain("Directory listing was limited to 100,000 items"));
-            Assert.That(refactoring, Does.Contain("### 51. Set resource budgets for directory enumeration — Implemented"));
         });
     }
 
@@ -2182,7 +2136,6 @@ public sealed class NativeSafetyRegressionTests
         var startup = File.ReadAllText(Path.Combine(root, "src", "app_entry.cpp"));
         var mainWindowMessages = File.ReadAllText(Path.Combine(root, "src", "mainwnd_messages.cpp"));
         var constants = File.ReadAllText(Path.Combine(root, "src", "consts.h"));
-        var refactoring = File.ReadAllText(Path.Combine(root, "refactoring.md"));
 
         // OOM cannot be safely synthesized in the executable; these source-level
         // checks pin the non-interactive handler and its pre-registered UI handoff.
@@ -2215,8 +2168,6 @@ public sealed class NativeSafetyRegressionTests
             Assert.That(mainWindowMessages, Does.Contain("PostMessage(HWindow, WM_USER_FORCECLOSE_MAINWND, 0, 0);"));
             Assert.That(operations, Does.Contain("if (IsAllocationEmergencyActive())"));
             Assert.That(operations, Does.Contain("COperationsQueue::AddOperation"));
-            Assert.That(refactoring, Does.Contain("### 52. Reserve memory for graceful out-of-memory handling — Implemented"));
-            Assert.That(refactoring, Does.Contain("### 53. Remove modal UI and retry loops from the global allocation handler — Implemented"));
         });
     }
 
@@ -2239,7 +2190,6 @@ public sealed class NativeSafetyRegressionTests
         var operationDialog = File.ReadAllText(Path.Combine(root, "src", "dialogs_file_ops.cpp"));
         var cacheHeader = File.ReadAllText(Path.Combine(root, "src", "cache.h"));
         var cache = File.ReadAllText(Path.Combine(root, "src", "cache.cpp"));
-        var refactoring = File.ReadAllText(Path.Combine(root, "refactoring.md"));
 
         // Each producer uses a policy appropriate to its semantics: discovery work
         // may stop or fall back, while durable FTP intent is rejected atomically.
@@ -2282,9 +2232,6 @@ public sealed class NativeSafetyRegressionTests
             Assert.That(cache, Does.Contain("Data.Count >= DELETE_MANAGER_QUEUE_LIMIT"));
             Assert.That(cache, Does.Contain("Delete-manager cleanup queue is full"));
             Assert.That(cache, Does.Contain("CDeleteManager::GetQueueMetrics"));
-            Assert.That(refactoring, Does.Contain("Parser broker admission is capped at eight"));
-            Assert.That(refactoring, Does.Contain("disk copy/move operation queue is capped at 64"));
-            Assert.That(refactoring, Does.Contain("temporary-copy cleanup queue is capped at 4,096"));
         });
     }
 
@@ -2295,7 +2242,6 @@ public sealed class NativeSafetyRegressionTests
         var header = File.ReadAllText(Path.Combine(root, "src", "plugins.h"));
         var loader = File.ReadAllText(Path.Combine(root, "src", "plugins_loading.cpp"));
         var registry = File.ReadAllText(Path.Combine(root, "src", "plugins_interface.cpp"));
-        var refactoring = File.ReadAllText(Path.Combine(root, "refactoring.md"));
 
         Assert.Multiple(() =>
         {
@@ -2311,7 +2257,6 @@ public sealed class NativeSafetyRegressionTests
             Assert.That(loader, Does.Contain("WM_USER_POSTCMDORUNLOADPLUGIN"));
             Assert.That(loader, Does.Not.Contain("TerminateProcess(GetCurrentProcess(), 1)"));
             Assert.That(registry, Does.Contain("CPlugins::GetPluginData(const void* pluginInterface)"));
-            Assert.That(refactoring, Does.Contain("### 23. Add failure barriers around every plug-in callback — Implemented"));
         });
     }
 
@@ -2325,7 +2270,6 @@ public sealed class NativeSafetyRegressionTests
         var iconList = File.ReadAllText(Path.Combine(root, "src", "iconlist.cpp"));
         var iconListHeader = File.ReadAllText(Path.Combine(root, "src", "iconlist.h"));
         var display = File.ReadAllText(Path.Combine(root, "src", "fileswindow_display.cpp"));
-        var refactoring = File.ReadAllText(Path.Combine(root, "refactoring.md"));
 
         // An invalid callback result must be rejected before the host dispatches, copies, or deletes plug-in memory.
         Assert.Multiple(() =>
@@ -2382,7 +2326,6 @@ public sealed class NativeSafetyRegressionTests
             Assert.That(gui, Does.Contain("Compare addresses only; never dereference"));
             Assert.That(loader, Does.Contain("TakeCreatedIconList(iconList, &createdIconList)"));
             Assert.That(loader, Does.Contain("icon list was not created by this plug-in's host GUI facade"));
-            Assert.That(refactoring, Does.Contain("### 70. Validate every plug-in contract result — Partially implemented"));
         });
     }
 
@@ -2395,7 +2338,6 @@ public sealed class NativeSafetyRegressionTests
         var plugins = File.ReadAllText(Path.Combine(root, "src", "plugins_loading.cpp"));
         var startup = File.ReadAllText(Path.Combine(root, "src", "app_entry.cpp"));
         var architecture = File.ReadAllText(Path.Combine(root, "architecture.md"));
-        var refactoring = File.ReadAllText(Path.Combine(root, "refactoring.md"));
 
         Assert.Multiple(() =>
         {
@@ -2420,7 +2362,6 @@ public sealed class NativeSafetyRegressionTests
             Assert.That(plugins, Does.Contain("MainWindow->SaveConfig(parent);"));
             Assert.That(plugins, Does.Not.Contain("CreateKey(HKEY_CURRENT_USER, SALAMANDER_ROOT_REG"),
                         "Plug-in commits must not mutate the checksum-protected active generation.");
-            Assert.That(refactoring, Does.Contain("### 24. Make configuration saves transactional — Implemented"));
             Assert.That(architecture, Does.Contain("the root's `Active Generation` DWORD"));
         });
     }
@@ -2432,7 +2373,6 @@ public sealed class NativeSafetyRegressionTests
         var configuration = ReadConfigurationSources(root);
         var startup = File.ReadAllText(Path.Combine(root, "src", "app_entry.cpp"));
         var architecture = File.ReadAllText(Path.Combine(root, "architecture.md"));
-        var refactoring = File.ReadAllText(Path.Combine(root, "refactoring.md"));
 
         Assert.Multiple(() =>
         {
@@ -2451,7 +2391,6 @@ public sealed class NativeSafetyRegressionTests
             Assert.That(startup, Does.Contain("GetConfigurationSchemaDiagnostic()"));
             Assert.That(startup, Does.Contain("Open Salamander Configuration"));
             Assert.That(architecture, Does.Contain("Each transactional generation has a schema version."));
-            Assert.That(refactoring, Does.Contain("### 25. Version and validate the complete configuration schema — Implemented"));
         });
     }
 
@@ -2467,7 +2406,6 @@ public sealed class NativeSafetyRegressionTests
         var dialogs = File.ReadAllText(Path.Combine(root, "src", "dialogs_file_ops.cpp"));
         var strings = File.ReadAllText(Path.Combine(root, "src", "lang", "texts.rc2"));
         var architecture = File.ReadAllText(Path.Combine(root, "architecture.md"));
-        var refactoring = File.ReadAllText(Path.Combine(root, "refactoring.md"));
 
         Assert.Multiple(() =>
         {
@@ -2510,7 +2448,6 @@ public sealed class NativeSafetyRegressionTests
             Assert.That(architecture, Does.Contain("Copy to FAT/FAT32/exFAT"));
             Assert.That(architecture, Does.Contain("Copy to SMB"));
             Assert.That(architecture, Does.Contain("only an explicit **Yes** allows source deletion"));
-            Assert.That(refactoring, Does.Contain("### 31. Publish an explicit metadata preservation contract — Implemented"));
         });
     }
 
@@ -2520,7 +2457,6 @@ public sealed class NativeSafetyRegressionTests
         var root = FindRepositoryRoot();
         var copy = ReadOperationImplementationSources(root);
         var architecture = File.ReadAllText(Path.Combine(root, "architecture.md"));
-        var refactoring = File.ReadAllText(Path.Combine(root, "refactoring.md"));
 
         Assert.Multiple(() =>
         {
@@ -2551,7 +2487,6 @@ public sealed class NativeSafetyRegressionTests
             Assert.That(architecture, Does.Contain("Source or target descriptor inaccessible"));
             Assert.That(architecture, Does.Contain("FAT/FAT32/exFAT target"));
             Assert.That(architecture, Does.Contain("restore the target snapshot"));
-            Assert.That(refactoring, Does.Contain("### 33. Verify ACL and ownership preservation under privilege variation — Implemented"));
         });
     }
 
@@ -2569,7 +2504,6 @@ public sealed class NativeSafetyRegressionTests
         var bugReport = File.ReadAllText(Path.Combine(root, "src", "bugreprt.cpp"));
         var project = File.ReadAllText(Path.Combine(root, "src", "vcxproj", "salamand.vcxproj"));
         var reporting = File.ReadAllText(Path.Combine(root, "reporting.md"));
-        var refactoring = File.ReadAllText(Path.Combine(root, "refactoring.md"));
 
         // Pin the bounded storage, safe publication, producer coverage, and
         // consent-gated local sidecar so release diagnostics cannot regress to debug-only traces.
@@ -2600,7 +2534,6 @@ public sealed class NativeSafetyRegressionTests
             Assert.That(project, Does.Contain("..\\release_diagnostics.h"));
             Assert.That(reporting, Does.Contain("Release diagnostic ring (`.OPS`)"));
             Assert.That(reporting, Does.Contain("View Report** provides the local export without sending it"));
-            Assert.That(refactoring, Does.Contain("### 54. Add a bounded release-build diagnostic ring buffer — Implemented"));
         });
     }
 
@@ -2615,7 +2548,6 @@ public sealed class NativeSafetyRegressionTests
         var ftp = File.ReadAllText(Path.Combine(root, "src", "plugins", "ftp", "ctrlcon1.cpp"));
         var ftpTls = File.ReadAllText(Path.Combine(root, "src", "plugins", "ftp", "ssl.cpp"));
         var upload = File.ReadAllText(Path.Combine(root, "src", "salmon", "upload.cpp"));
-        var refactoring = File.ReadAllText(Path.Combine(root, "refactoring.md"));
 
         Assert.Multiple(() =>
         {
@@ -2655,7 +2587,6 @@ public sealed class NativeSafetyRegressionTests
             Assert.That(upload, Does.Contain("Network timeout"));
             Assert.That(upload, Does.Contain("Authentication failure"));
             Assert.That(upload, Does.Contain("Protocol or TLS failure"));
-            Assert.That(refactoring, Does.Contain("### 58. Apply deadlines and cancellation to all network operations — Implemented"));
         });
     }
 
@@ -2666,7 +2597,6 @@ public sealed class NativeSafetyRegressionTests
         var control = File.ReadAllText(Path.Combine(root, "src", "plugins", "ftp", "ctrlcon5.cpp"));
         var dataConnection = File.ReadAllText(Path.Combine(root, "src", "plugins", "ftp", "datacon1.cpp"));
         var disk = File.ReadAllText(Path.Combine(root, "src", "plugins", "ftp", "operats5.cpp"));
-        var refactoring = File.ReadAllText(Path.Combine(root, "refactoring.md"));
 
         // Network loss must leave an explicitly incomplete side file; only a fully verified transfer can replace the cache entry.
         Assert.Multiple(() =>
@@ -2689,7 +2619,6 @@ public sealed class NativeSafetyRegressionTests
             Assert.That(dataConnection, Does.Contain("DiskWork.AppendToFile = TgtDiskFile == NULL && TgtDiskFileAppend"));
             Assert.That(disk, Does.Contain("localWork.AppendToFile ? OPEN_ALWAYS : CREATE_ALWAYS"));
             Assert.That(disk, Does.Contain("SetFilePointerEx(f, offset, NULL, FILE_BEGIN)"));
-            Assert.That(refactoring, Does.Contain("### 59. Make FTP transfers transactional and resumable safely — Partially implemented"));
         });
     }
 
@@ -2703,7 +2632,6 @@ public sealed class NativeSafetyRegressionTests
         var operationDialog = File.ReadAllText(Path.Combine(root, "src", "plugins", "ftp", "dialogs5.cpp"));
         var configuration = File.ReadAllText(Path.Combine(root, "src", "plugins", "ftp", "ftp.cpp"));
         var dialogResource = File.ReadAllText(Path.Combine(root, "src", "plugins", "ftp", "lang", "lang.rc"));
-        var refactoring = File.ReadAllText(Path.Combine(root, "refactoring.md"));
 
         // Pin every trust dimension so chain failures can be explicitly accepted without making the decision reusable.
         Assert.Multiple(() =>
@@ -2735,7 +2663,6 @@ public sealed class NativeSafetyRegressionTests
             Assert.That(configuration, Does.Contain("LoadCertificateExceptions(regKey, registry)"));
             Assert.That(configuration, Does.Contain("SaveCertificateExceptions(regKey, registry)"));
             Assert.That(dialogResource, Does.Contain("Remember this exception for 30 days"));
-            Assert.That(refactoring, Does.Contain("### 60. Strengthen FTP certificate exception storage — Implemented"));
         });
     }
 
@@ -2756,7 +2683,6 @@ public sealed class NativeSafetyRegressionTests
         var record = File.ReadAllText(Path.Combine(root, "src", "plugins", "7zip", "doc", "upgrade-26.02.md"));
         var corpus = File.ReadAllText(Path.Combine(root, "tools", "test-7zip-compatibility.ps1"));
         var runner = File.ReadAllText(Path.Combine(root, "scripts", "runtests.ps1"));
-        var refactoring = File.ReadAllText(Path.Combine(root, "refactoring.md"));
 
         // Pin the upgraded parser and the compatibility gate so later vendor refreshes cannot silently drop it.
         Assert.Multiple(() =>
@@ -2786,7 +2712,6 @@ public sealed class NativeSafetyRegressionTests
             Assert.That(corpus, Does.Contain("payload-bitflip"));
             Assert.That(corpus, Does.Contain("footer-bitflip"));
             Assert.That(runner, Does.Contain("7-Zip wrapper/oracle compatibility corpus"));
-            Assert.That(refactoring, Does.Contain("### 61. Upgrade the bundled 7-Zip code — Implemented"));
         });
     }
 
@@ -2801,7 +2726,6 @@ public sealed class NativeSafetyRegressionTests
         var externalReader = File.ReadAllText(Path.Combine(root, "src", "shiconov.cpp"));
         var recoveryTest = File.ReadAllText(Path.Combine(root, "tools", "test-sqlite-recovery.ps1"));
         var workflow = File.ReadAllText(Path.Combine(root, ".github", "workflows", "pr-msbuild.yml"));
-        var refactoring = File.ReadAllText(Path.Combine(root, "refactoring.md"));
 
         // Keep the vendored binary, ownership boundary, and executable recovery probe aligned after future upgrades.
         Assert.Multiple(() =>
@@ -2829,7 +2753,6 @@ public sealed class NativeSafetyRegressionTests
             Assert.That(recoveryTest, Does.Contain("sqlite3_compileoption_used"));
             Assert.That(recoveryTest, Does.Contain("CorruptPage"));
             Assert.That(workflow, Does.Contain("test-sqlite-recovery.ps1"));
-            Assert.That(refactoring, Does.Contain("### 62. Upgrade SQLite and define database recovery behavior — Implemented"));
         });
     }
 
@@ -2846,7 +2769,6 @@ public sealed class NativeSafetyRegressionTests
         var harness = File.ReadAllText(Path.Combine(root, "tools", "test-cmark-gfm-hardening.ps1"));
         var workflow = File.ReadAllText(Path.Combine(root, ".github", "workflows", "pr-msbuild.yml"));
         var soakWorkflow = File.ReadAllText(Path.Combine(root, ".github", "workflows", "nightly-parser-fuzz.yml"));
-        var refactoring = File.ReadAllText(Path.Combine(root, "refactoring.md"));
 
         // Pin the vendor identity, safe default, bounded tree/output seam, and CI fuzz gate together.
         Assert.Multiple(() =>
@@ -2875,7 +2797,6 @@ public sealed class NativeSafetyRegressionTests
             Assert.That(harness, Does.Contain("[int]$Iterations = 1"));
             Assert.That(workflow, Does.Contain("test-cmark-gfm-hardening.ps1"));
             Assert.That(soakWorkflow, Does.Contain("test-cmark-gfm-hardening.ps1 -Iterations 250"));
-            Assert.That(refactoring, Does.Contain("### 65. Upgrade cmark-gfm and harden rendered-content defaults — Implemented"));
         });
     }
 

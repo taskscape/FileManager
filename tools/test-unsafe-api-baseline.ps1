@@ -14,6 +14,15 @@ $root = Split-Path $PSScriptRoot -Parent
 $baseline = Get-Content -LiteralPath $BaselinePath -Raw | ConvertFrom-Json
 if ($baseline.schemaVersion -ne 1 -or $null -eq $baseline.entries) { throw 'Unsafe API baseline has an unsupported schema.' }
 
+if ([string]::IsNullOrWhiteSpace($BaseCommit)) {
+    # A normal local run has no pull-request base; use HEAD^ only to recognize pre-existing calls mechanically relocated by the current change.
+    # Anchor Git to the repository because runtests.ps1 may be launched from its scripts directory.
+    & git -C $root rev-parse --verify --quiet 'HEAD^' *> $null
+    if ($LASTEXITCODE -eq 0) {
+        $BaseCommit = 'HEAD^'
+    }
+}
+
 $allowed = @{}
 foreach ($entry in $baseline.entries) {
     $key = "$($entry.path)|$($entry.api)|$($entry.fingerprint)"
@@ -26,7 +35,8 @@ if (-not [string]::IsNullOrWhiteSpace($BaseCommit)) {
     $sourcePathspecs = @(':(glob)**/*.c', ':(glob)**/*.cc', ':(glob)**/*.cpp', ':(glob)**/*.h', ':(glob)**/*.hpp')
     # One base-revision source scan avoids treating format strings as Git revisions
     # while keeping move detection fast enough for the full local test runner.
-    foreach ($baseSourceLine in (& git grep -h -I -e '.' $BaseCommit -- $sourcePathspecs)) { [void]$baseSourceLines.Add($baseSourceLine.Trim()) }
+    # Pathspecs must be evaluated from the repository root so local and Actions scans cover the same source tree.
+    foreach ($baseSourceLine in (& git -C $root grep -h -I -e '.' $BaseCommit -- $sourcePathspecs)) { [void]$baseSourceLines.Add($baseSourceLine.Trim()) }
 }
 
 function Test-LineWasPresentInBaseRevision {

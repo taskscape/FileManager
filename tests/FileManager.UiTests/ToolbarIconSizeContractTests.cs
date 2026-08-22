@@ -45,7 +45,8 @@ public sealed class ToolbarIconSizeContractTests
         var root = FindRepositoryRoot();
         var constants = File.ReadAllText(Path.Combine(root, "src", "consts.h"));
         var globals = File.ReadAllText(Path.Combine(root, "src", "app_globals.cpp"));
-        var graphics = File.ReadAllText(Path.Combine(root, "src", "app_entry.cpp"));
+        // Image-list construction moved with the graphics-focused implementation; keep this contract tied to its compiled owner.
+        var graphics = File.ReadAllText(Path.Combine(root, "src", "app_graphics.cpp"));
         var svgRasterizer = File.ReadAllText(Path.Combine(root, "src", "svg.cpp"));
         var toolbarCore = File.ReadAllText(Path.Combine(root, "src", "toolbar_core.cpp"));
         var toolbarRendering = File.ReadAllText(Path.Combine(root, "src", "toolbar_rendering.cpp"));
