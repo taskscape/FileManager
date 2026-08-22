@@ -5,6 +5,14 @@
 #include "precomp.h"
 #include <Sddl.h>
 
+// The debug-allocator 'new' macro from precomp.h breaks WIL's nothrow
+// allocations; suppress it while WIL templates are parsed.
+#pragma push_macro("new")
+#undef new
+#include <wil/com.h>
+#include <wil/resource.h>
+#pragma pop_macro("new")
+
 #include "cfgdlg.h"
 #include "mainwnd.h"
 #include "plugins.h"
@@ -1887,7 +1895,8 @@ static BOOL InternalIFileDialog(LPOPENFILENAME lpofn, BOOL isSave)
     }
 
     // Initial folder
-    IShellItem* psiFolder = NULL;
+    // The shell item is released by the wrapper after SetFolder on every path.
+    wil::com_ptr<IShellItem> psiFolder;
     char initDir[MAX_PATH];
     initDir[0] = 0;
 
@@ -1929,9 +1938,7 @@ static BOOL InternalIFileDialog(LPOPENFILENAME lpofn, BOOL isSave)
 
     if (psiFolder != NULL)
     {
-        pfd->SetFolder(psiFolder);
-        psiFolder->Release();
-        psiFolder = NULL;
+        pfd->SetFolder(psiFolder.get());
     }
 
     // Initial filename
@@ -1972,21 +1979,23 @@ static BOOL InternalIFileDialog(LPOPENFILENAME lpofn, BOOL isSave)
     if (!isSave && (lpofn->Flags & OFN_ALLOWMULTISELECT))
     {
         IFileOpenDialog* pfod = (IFileOpenDialog*)pfd;
-        IShellItemArray* pItemArray = NULL;
+        // Items, arrays, and their display-name buffers are owned by the wrappers
+        // below; every branch can return without a manual Release/CoTaskMemFree ladder.
+        wil::com_ptr<IShellItemArray> pItemArray;
         if (SUCCEEDED(pfod->GetResults(&pItemArray)))
         {
             DWORD itemCount = 0;
             pItemArray->GetCount(&itemCount);
             if (itemCount == 1)
             {
-                IShellItem* pItem = NULL;
+                wil::com_ptr<IShellItem> pItem;
                 if (SUCCEEDED(pItemArray->GetItemAt(0, &pItem)))
                 {
-                    PWSTR pszName = NULL;
+                    wil::unique_cotaskmem_string pszName;
                     if (SUCCEEDED(pItem->GetDisplayName(SIGDN_FILESYSPATH, &pszName)))
                     {
                         char fullPath[MAX_PATH];
-                        if (WideCharToMultiByte(CP_ACP, 0, pszName, -1, fullPath, sizeof(fullPath), NULL, NULL) > 0)
+                        if (WideCharToMultiByte(CP_ACP, 0, pszName.get(), -1, fullPath, sizeof(fullPath), NULL, NULL) > 0)
                         {
                             StringCchCopyA(lpofn->lpstrFile, lpofn->nMaxFile, fullPath);
                             const char* pFileName = strrchr(lpofn->lpstrFile, '\\');
@@ -2008,21 +2017,19 @@ static BOOL InternalIFileDialog(LPOPENFILENAME lpofn, BOOL isSave)
                             }
                             success = TRUE;
                         }
-                        CoTaskMemFree(pszName);
                     }
-                    pItem->Release();
                 }
             }
             else if (itemCount > 1)
             {
-                IShellItem* pItem0 = NULL;
+                wil::com_ptr<IShellItem> pItem0;
                 if (SUCCEEDED(pItemArray->GetItemAt(0, &pItem0)))
                 {
-                    PWSTR pszName0 = NULL;
+                    wil::unique_cotaskmem_string pszName0;
                     if (SUCCEEDED(pItem0->GetDisplayName(SIGDN_FILESYSPATH, &pszName0)))
                     {
                         char dirPath[MAX_PATH];
-                        if (WideCharToMultiByte(CP_ACP, 0, pszName0, -1, dirPath, sizeof(dirPath), NULL, NULL) > 0)
+                        if (WideCharToMultiByte(CP_ACP, 0, pszName0.get(), -1, dirPath, sizeof(dirPath), NULL, NULL) > 0)
                         {
                             char* lastBS = strrchr(dirPath, '\\');
                             if (lastBS) *lastBS = 0;
@@ -2042,14 +2049,14 @@ static BOOL InternalIFileDialog(LPOPENFILENAME lpofn, BOOL isSave)
 
                                 for (DWORD i = 0; i < itemCount; i++)
                                 {
-                                    IShellItem* pItem = NULL;
+                                    wil::com_ptr<IShellItem> pItem;
                                     if (SUCCEEDED(pItemArray->GetItemAt(i, &pItem)))
                                     {
-                                        PWSTR pszItemName = NULL;
+                                        wil::unique_cotaskmem_string pszItemName;
                                         if (SUCCEEDED(pItem->GetDisplayName(SIGDN_FILESYSPATH, &pszItemName)))
                                         {
                                             char itemPath[MAX_PATH];
-                                            if (WideCharToMultiByte(CP_ACP, 0, pszItemName, -1, itemPath, sizeof(itemPath), NULL, NULL) > 0)
+                                            if (WideCharToMultiByte(CP_ACP, 0, pszItemName.get(), -1, itemPath, sizeof(itemPath), NULL, NULL) > 0)
                                             {
                                                 const char* fn = strrchr(itemPath, '\\');
                                                 fn = fn ? (fn + 1) : itemPath;
@@ -2061,33 +2068,28 @@ static BOOL InternalIFileDialog(LPOPENFILENAME lpofn, BOOL isSave)
                                                     remaining -= (fnLen + 1);
                                                 }
                                             }
-                                            CoTaskMemFree(pszItemName);
                                         }
-                                        pItem->Release();
                                     }
                                 }
                                 *pBuf = 0;
                                 success = TRUE;
                             }
                         }
-                        CoTaskMemFree(pszName0);
                     }
-                    pItem0->Release();
                 }
             }
-            pItemArray->Release();
         }
     }
     else
     {
-        IShellItem* pItem = NULL;
+        wil::com_ptr<IShellItem> pItem;
         if (SUCCEEDED(pfd->GetResult(&pItem)))
         {
-            PWSTR pszName = NULL;
+            wil::unique_cotaskmem_string pszName;
             if (SUCCEEDED(pItem->GetDisplayName(SIGDN_FILESYSPATH, &pszName)))
             {
                 char fullPath[MAX_PATH];
-                if (WideCharToMultiByte(CP_ACP, 0, pszName, -1, fullPath, sizeof(fullPath), NULL, NULL) > 0)
+                if (WideCharToMultiByte(CP_ACP, 0, pszName.get(), -1, fullPath, sizeof(fullPath), NULL, NULL) > 0)
                 {
                     StringCchCopyA(lpofn->lpstrFile, lpofn->nMaxFile, fullPath);
                     const char* pFileName = strrchr(lpofn->lpstrFile, '\\');
@@ -2109,9 +2111,7 @@ static BOOL InternalIFileDialog(LPOPENFILENAME lpofn, BOOL isSave)
                     }
                     success = TRUE;
                 }
-                CoTaskMemFree(pszName);
             }
-            pItem->Release();
         }
     }
 

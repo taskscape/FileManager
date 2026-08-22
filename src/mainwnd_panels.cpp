@@ -1143,6 +1143,17 @@ void SkipIgnoredNames(BOOL ignoreNames, CMaskGroup* ignoreNamesMasks, BOOL dirs,
     }
 }
 
+// Compares the two panels' listings and marks differences by selection.
+// 'flags' selects criteria: COMPARE_DIRECTORIES_BYCONTENT (byte comparison,
+// ptDisk panels only, shows a progress dialog), _SUBDIRS (recursive,
+// not on plug-in filesystems), _IGNFILENAMES/_IGNDIRNAMES (mask-based
+// exclusions from configuration), and the timestamp/name criteria bits.
+// Works on shallow copies of the panel arrays because the visible selection
+// must not change until the result is applied. FAT volumes are detected on
+// both sides so 2-second DOS timestamp precision is honored when comparing;
+// timestamps differing by exactly one/two hours with all else equal are
+// counted as DST shifts rather than differences ('foundDSTShifts' drives the
+// summary dialog). Runs at normal thread priority under BeginStopRefresh.
 void CMainWindow::CompareDirectories(DWORD flags)
 {
     CALL_STACK_MESSAGE2("CMainWindow::CompareDirectories(%u)", flags);

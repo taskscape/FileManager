@@ -6,6 +6,23 @@
 
 #include "bitmap.h"
 
+// Scoped screen device context: releases through the tracked handle API on
+// every exit, replacing the manual releaseDC flag/error-path ladder.
+namespace
+{
+struct CScopedScreenDC
+{
+    HDC DC;
+    bool Owned;
+    CScopedScreenDC(HDC dc) : DC(dc), Owned(dc != NULL) {}
+    ~CScopedScreenDC()
+    {
+        if (Owned)
+            HANDLES(ReleaseDC(NULL, DC));
+    }
+};
+} // namespace
+
 //*****************************************************************************
 //
 // CBitmap
@@ -110,24 +127,23 @@ BOOL CBitmap::CreateBmp(HDC hDC, int width, int height)
         TRACE_E("Changing height of bitmap");
         height = 1;
     }
-    BOOL releaseDC = FALSE;
+    BOOL ownedDC = FALSE;
     if (hDC == NULL)
     {
         hDC = HANDLES(GetDC(NULL));
         if (hDC == NULL)
             return FALSE;
-        releaseDC = TRUE;
+        ownedDC = TRUE;
     }
+    // Released here only when this call acquired the screen DC; a caller-supplied
+    // DC stays owned by the caller.
+    CScopedScreenDC screenDC(ownedDC ? hDC : NULL);
     HBmp = HANDLES(CreateCompatibleBitmap(hDC, width, height));
     if (HBmp == NULL)
     {
         TRACE_E("CreateCompatibleBitmap failed!");
-        if (releaseDC)
-            HANDLES(ReleaseDC(NULL, hDC));
         return FALSE;
     }
-    if (releaseDC)
-        HANDLES(ReleaseDC(NULL, hDC));
 
     // fetch information for later changes
     BITMAP bmp;
@@ -160,6 +176,8 @@ BOOL CBitmap::ReCreateForScreenDC(int width, int height)
     HDC hDC = HANDLES(GetDC(NULL));
     if (hDC == NULL)
         return FALSE;
+    // The screen DC is released by the wrapper on every exit path.
+    CScopedScreenDC screenDC(hDC);
 
     if (width == -1 || width < Width)
         width = Width;
@@ -170,7 +188,6 @@ BOOL CBitmap::ReCreateForScreenDC(int width, int height)
     if (hTmpBmp == NULL)
     {
         TRACE_E("CreateCompatibleBitmap failed!");
-        HANDLES(ReleaseDC(NULL, hDC));
         return FALSE;
     }
     if (HMemDC != NULL && HOldBmp != NULL)
@@ -189,7 +206,6 @@ BOOL CBitmap::ReCreateForScreenDC(int width, int height)
     if (HMemDC != NULL)
         HOldBmp = (HBITMAP)SelectObject(HMemDC, HBmp);
 
-    HANDLES(ReleaseDC(NULL, hDC));
     return TRUE;
 }
 

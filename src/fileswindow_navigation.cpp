@@ -127,6 +127,21 @@ BOOL IsFilePlaceholder(WIN32_FIND_DATA const* findData)
            (findData->dwReserved0 == IO_REPARSE_TAG_FILE_PLACEHOLDER);
 }
 
+// Re-reads the panel content for the current path ('isRefresh' = triggered by
+// refresh rather than navigation). This is the panel's data pipeline and its
+// largest decision tree, split by panel type:
+//   - ptDisk: picks thumbnail-loader plug-ins up front (none -> skip
+//     thumbnails), enumerates the directory with FindFirstFileW in a batched
+//     loop that yields at batch boundaries, resolves ".lnk" targets and icon
+//     locations, handles "..", and enforces the cached-item limit
+//     (limit reached -> status-bar notice).
+//   - ptZIPArchive: lists archive members through the internal ZIP reader.
+//   - ptPluginFS: asks the plug-in filesystem for the listing; unexpected
+//     failures take the "(2)" error exit.
+// Common prologue resets all per-listing state (items, name arena, icon cache,
+// cut-to-clipboard flags, hidden counters); common epilogue publishes the
+// hidden-item counts and writes the execution-log entry via CListLogScope.
+// Returns TRUE when the listing succeeded.
 BOOL CFilesWindow::ReadDirectory(HWND parent, BOOL isRefresh)
 {
     CALL_STACK_MESSAGE1("CFilesWindow::ReadDirectory()");
@@ -202,6 +217,7 @@ BOOL CFilesWindow::ReadDirectory(HWND parent, BOOL isRefresh)
     char* st = NULL;
     const char* s = NULL;
 
+    // ---- disk branch: Win32 enumeration with thumbnail-loader preselection ----
     if (Is(ptDisk))
     {
         // setting icon size for IconCache
@@ -1133,6 +1149,7 @@ BOOL CFilesWindow::ReadDirectory(HWND parent, BOOL isRefresh)
             WakeupIconCacheThread(); // start loading icons
         }
     }
+    // ---- archive branch: list members via the internal ZIP reader ----
     else
     {
         if (Is(ptZIPArchive))
@@ -1398,6 +1415,7 @@ BOOL CFilesWindow::ReadDirectory(HWND parent, BOOL isRefresh)
                 }
             }
         }
+        // ---- plug-in filesystem branch: delegate the listing to the plug-in ----
         else
         {
             if (Is(ptPluginFS))

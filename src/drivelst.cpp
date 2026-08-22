@@ -6,6 +6,13 @@
 
 #include <strsafe.h>
 
+// The debug-allocator 'new' macro from precomp.h breaks WIL's nothrow
+// allocations; suppress it while WIL templates are parsed.
+#pragma push_macro("new")
+#undef new
+#include <wil/resource.h>
+#pragma pop_macro("new")
+
 #include "common\\thread_owner.h"
 
 #include "menu.h"
@@ -1540,17 +1547,17 @@ void InitOneDrivePath()
                                                                                               "SHGetKnownFolderPath");
         if (DynSHGetKnownFolderPath != NULL)
         {
-            PWSTR path = NULL;
+            // The CoTaskMem buffer is released by the wrapper on every exit path.
+            wil::unique_cotaskmem_string path;
             if (DynSHGetKnownFolderPath(my_FOLDERID_SkyDrive, 0, NULL, &path) == S_OK && path != NULL)
             {
-                if (path[0] != 0) // FOLDERID_SkyDrive was introduced in Windows 8.1 = we should not need to hunt it in the registry
+                if (path.get()[0] != 0) // FOLDERID_SkyDrive was introduced in Windows 8.1 = we should not need to hunt it in the registry
                 {
-                    done = ConvertU2A(path, -1, OneDrivePath, _countof(OneDrivePath)) != 0;
+                    done = ConvertU2A(path.get(), -1, OneDrivePath, _countof(OneDrivePath)) != 0;
                     if (!done)
                         OneDrivePath[0] = 0; // just for sync
                                              //else TRACE_I("OneDrive path (FOLDERID_SkyDrive): " << OneDrivePath);
                 }
-                CoTaskMemFree(path);
             }
         }
     }

@@ -1946,6 +1946,19 @@ void LoadIconOvrlsInfo(const char* root)
     }
 }
 
+// Loads the whole application configuration from the committed generation of
+// the transactional configuration store rooted at SALAMANDER_ROOT_REG.
+// 'importingOldConfig' marks values arriving from an imported older version;
+// 'cmdLineParams' may override startup paths.
+// Robustness model: the configuration format version is inferred from key
+// presence (no version value = 1.52-era layout), and every section is read
+// tolerantly - each GetValue keeps its in-memory default when the value or its
+// whole key is missing, so a partial or interrupted configuration still yields
+// a working application. The rebar bands are re-inserted in their saved index
+// order with the menu band forced (corrupted index -> menu first + trace).
+// The load runs under LoadSaveToRegistryMutex; on success the previous
+// configuration generation is retired (commit confirmation of the
+// transactional store). Returns FALSE only when the root key cannot be opened.
 BOOL CMainWindow::LoadConfig(BOOL importingOldConfig, const CCommandLineParams* cmdLineParams)
 {
     CALL_STACK_MESSAGE2("CMainWindow::LoadConfig(%d)", importingOldConfig);
@@ -3486,7 +3499,7 @@ BOOL CMainWindow::LoadConfig(BOOL importingOldConfig, const CCommandLineParams* 
         MainWindow->UpdateDefaultDir(TRUE);
 
         if (ret)
-            RetirePreviousConfigurationGenerationAfterSuccessfulStartup();
+            RetirePreviousConfigurationGenerationAfterSuccessfulStartup(); // commit confirmation of the transactional store
         return ret;
     }
 

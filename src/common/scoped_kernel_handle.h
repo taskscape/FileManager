@@ -77,3 +77,50 @@ public:
 private:
     HANDLE Handle;
 };
+
+// Find-first handles must be released with FindClose rather than CloseHandle;
+// this wrapper keeps the debug handle accounting while scoping that ownership.
+class CScopedFindHandle
+{
+public:
+    CScopedFindHandle() : Handle(INVALID_HANDLE_VALUE)
+    {
+    }
+
+    explicit CScopedFindHandle(HANDLE handle) : Handle(handle)
+    {
+    }
+
+    ~CScopedFindHandle()
+    {
+        // Destruction must not replace the failure code a caller is returning.
+        const DWORD error = GetLastError();
+        Close();
+        SetLastError(error);
+    }
+
+    CScopedFindHandle(const CScopedFindHandle&);
+    CScopedFindHandle& operator=(const CScopedFindHandle&);
+
+    BOOL IsValid() const
+    {
+        return Handle != INVALID_HANDLE_VALUE && Handle != NULL;
+    }
+
+    HANDLE Get() const
+    {
+        return Handle;
+    }
+
+    void Close()
+    {
+        if (IsValid())
+        {
+            HANDLES(FindClose(Handle));
+            Handle = INVALID_HANDLE_VALUE;
+        }
+    }
+
+private:
+    HANDLE Handle;
+};

@@ -11,6 +11,13 @@
 #define CONTROL_ALT (CONTROL | ALT)
 #define ALT_SHIFT (ALT | SHIFT)
 
+// Determines whether an accelerator is reserved by Salamander itself (panels,
+// command line, quick search) and therefore must not reach plug-ins or the
+// shell. 'hotKey' packs the virtual key into LOBYTE and CHOTKEYFLAG-style
+// modifiers (HOTKEYF_CONTROL/SHIFT/ALT) into HIBYTE. The body is a lookup
+// table: one case per virtual key, each listing exactly the modifier
+// combinations the application consumes (each combination carries a trailing
+// comment naming its action). Returns TRUE when the combination is reserved.
 BOOL IsSalHotKey(WORD hotKey)
 {
     BYTE vk = LOBYTE(hotKey);

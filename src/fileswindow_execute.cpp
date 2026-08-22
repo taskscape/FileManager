@@ -3559,6 +3559,13 @@ void GetCommonFileTypeStr(char* buf, int* resLen, const char* ext)
     GetCommonFileTypeStr(buf, TRANSFER_BUFFER_MAX, resLen, ext);
 }
 
+// Recomputes list-box metrics after a content or view change and repaints.
+// Per view mode it measures the widest formatted name (Brief; GDI text extents
+// via the panel font, wide API preferred), applies fixed icon-based cell
+// sizes (Icons/Thumbnails), or recomputes column widths (Detailed), then
+// restores the scroll offset and focus from the 'suggested*' values when they
+// still point at valid items ('ensureFocusIndexVisible'/'wholeItemVisible'
+// control scroll correction). Also cancels any pending quick-rename popup.
 void CFilesWindow::RefreshListBox(int suggestedXOffset,
                                   int suggestedTopIndex, int suggestedFocusIndex,
                                   BOOL ensureFocusIndexVisible, BOOL wholeItemVisible)

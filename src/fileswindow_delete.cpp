@@ -6,6 +6,15 @@
 
 #include <shobjidl.h>
 #include <strsafe.h>
+#include <vector>
+
+// The debug-allocator 'new' macro from precomp.h breaks WIL's nothrow
+// allocations; suppress it while WIL templates are parsed.
+#pragma push_macro("new")
+#undef new
+#include <wil/com.h>
+#include <wil/resource.h>
+#pragma pop_macro("new")
 
 #include "cfgdlg.h"
 #include "mainwnd.h"
@@ -30,23 +39,17 @@ static HRESULT QueueUtf8DeleteItems(IFileOperation* operation, const char* paths
         if (pathLength == 0)
             return HRESULT_FROM_WIN32(GetLastError());
 
-        WCHAR* pathW = (WCHAR*)malloc(pathLength * sizeof(WCHAR));
-        if (pathW == NULL)
-            return E_OUTOFMEMORY;
-        if (MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, path, -1, pathW, pathLength) == 0)
-        {
-            HRESULT result = HRESULT_FROM_WIN32(GetLastError());
-            free(pathW);
-            return result;
-        }
+        // The conversion buffer and shell item own themselves for the rest of the
+        // loop iteration; no manual free/Release ladder on any exit path.
+        std::vector<WCHAR> pathW(pathLength);
+        if (MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, path, -1, pathW.data(), pathLength) == 0)
+            return HRESULT_FROM_WIN32(GetLastError());
 
-        IShellItem* item = NULL;
-        HRESULT result = SHCreateItemFromParsingName(pathW, NULL, IID_PPV_ARGS(&item));
-        free(pathW);
+        wil::com_ptr<IShellItem> item;
+        HRESULT result = SHCreateItemFromParsingName(pathW.data(), NULL, IID_PPV_ARGS(&item));
         if (FAILED(result))
             return result;
-        result = operation->DeleteItem(item, NULL);
-        item->Release();
+        result = operation->DeleteItem(item.get(), NULL);
         if (FAILED(result))
             return result;
     }

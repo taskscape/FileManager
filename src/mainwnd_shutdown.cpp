@@ -93,6 +93,14 @@ BOOL MyShutdownBlockReasonDestroy(HWND hWnd)
 // and those three combined cases.
 //
 
+// Handles the application-exit family of messages. WM_CLOSE defers to
+// WM_USER_CLOSE_MAINWND so all exits share one path. WM_ENDSESSION implements
+// three shutdown flavors distinguished by lParam flags: normal (normally
+// already handled during WM_QUERYENDSESSION), "critical" shutdown/log off
+// (ENDSESSION_CRITICAL, no chance to ask - save what is possible) and Vista+
+// "forced" shutdown (EWX_FORCEIFHUNG - may still warn and let the user
+// cancel). WM_QUERYENDSESSION decides whether Salamander can close (config
+// save, worker teardown); WM_USER_FORCECLOSE_MAINWND bypasses prompts.
 LRESULT CMainWindow::HandleShutdown(UINT uMsg, WPARAM wParam, LPARAM lParam)
 {
     switch (uMsg)

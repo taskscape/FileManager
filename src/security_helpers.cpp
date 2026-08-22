@@ -7,7 +7,15 @@
 #include <Aclapi.h>
 #include <Ntsecapi.h>
 
+// The debug-allocator 'new' macro from precomp.h breaks WIL's nothrow
+// allocations; suppress it while WIL templates are parsed.
+#pragma push_macro("new")
+#undef new
+#include <wil/resource.h> // RAII for the admin-group SID
+#pragma pop_macro("new")
+
 #include "security_helpers.h"
+#include "common/scoped_kernel_handle.h"
 
 // Privilege setup, admin check, and best-effort security-descriptor copy extracted
 // from async_copy.cpp as a mechanical move; behavior is unchanged.
@@ -29,6 +37,8 @@ void GainWriteOwnerAccess()
             TRACE_E("GainWriteOwnerAccess(): OpenProcessToken failed!");
             return;
         }
+        // The token is closed by the wrapper on every exit path.
+        CScopedKernelHandle token(tokenHandle);
 
         DWORD reqSize;
         if (GetTokenInformation(tokenHandle, TokenUser, CurrentProcessTokenUser, 200, &reqSize))
@@ -77,7 +87,6 @@ void GainWriteOwnerAccess()
                 TRACE_E("GainWriteOwnerAccess(): LookupPrivilegeValue(" << (privName != NULL ? privName : "null") << ") failed! error: " << GetErrorText(err));
             }
         }
-        CloseHandle(tokenHandle);
     }
 }
 /*
@@ -211,8 +220,6 @@ BOOL IsUserAdmin()
 #define BUFF_SIZE 1024
 BOOL IsUserAdmin()
 {
-    HANDLE hToken = NULL;
-    PSID pAdminSid = NULL;
     BYTE buffer[BUFF_SIZE];
     PTOKEN_GROUPS pGroups = (PTOKEN_GROUPS)buffer;
     DWORD dwSize; // buffer size
@@ -221,14 +228,18 @@ BOOL IsUserAdmin()
     SID_IDENTIFIER_AUTHORITY siaNtAuth = SECURITY_NT_AUTHORITY;
 
     // get token handle
+    HANDLE hToken = NULL;
     if (!OpenProcessToken(GetCurrentProcess(), TOKEN_QUERY, &hToken))
         return FALSE;
+    // The token is closed by the wrapper on every exit path.
+    CScopedKernelHandle token(hToken);
 
     bSuccess = GetTokenInformation(hToken, TokenGroups, (LPVOID)pGroups, BUFF_SIZE, &dwSize);
-    CloseHandle(hToken);
     if (!bSuccess)
         return FALSE;
 
+    // The admin-group SID is freed by the wrapper on every exit path.
+    wil::unique_sid pAdminSid;
     if (!AllocateAndInitializeSid(&siaNtAuth, 2,
                                   SECURITY_BUILTIN_DOMAIN_RID,
                                   DOMAIN_ALIAS_RID_ADMINS,
@@ -238,10 +249,9 @@ BOOL IsUserAdmin()
     bSuccess = FALSE;
     for (i = 0; (i < pGroups->GroupCount) && !bSuccess; i++)
     {
-        if (EqualSid(pAdminSid, pGroups->Groups[i].Sid))
+        if (EqualSid(pAdminSid.get(), pGroups->Groups[i].Sid))
             bSuccess = TRUE;
     }
-    FreeSid(pAdminSid);
 
     return bSuccess;
 }

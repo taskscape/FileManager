@@ -509,6 +509,21 @@ const char* FindModuleName(char* buf, void* address, BOOL unloadedName = FALSE)
 
 static CModulesInfo ModulesInfo;
 
+// Renders the complete crash report through the 'PrintLine' callback (file,
+// clipboard, or window - decided by the caller). Report sections in order:
+// application version; exception description when 'Exception' is non-NULL
+// (known NTSTATUS codes decoded to text, access-violation read/write +
+// target address, origin thread and module, debugger presence) - otherwise
+// the break/RTC flags are raised for a manual report; break/RTC reasons;
+// registered call stacks (the exception thread is printed first and
+// cross-referenced from the others); CPU registers; RSP/ESP stack-and-memory
+// dumps around the faulting frame; main-thread message history; window
+// handles; selected global variables; panel states; loaded/unloaded modules;
+// plug-ins with versions; hardware information; per-thread stack back traces;
+// drive list including network timeouts guarded against hanging the reporter.
+// The trailing "End." line lets readers detect truncated reports. Static
+// buffers are used freely: this runs on a crashing thread where allocation
+// must be avoided.
 void CCallStack::PrintBugReport(EXCEPTION_POINTERS* Exception, DWORD ThreadID, DWORD ShellExtCrashID,
                                 FPrintLine PrintLine, void* param)
 {

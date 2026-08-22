@@ -14,6 +14,7 @@
 #include "spl_file.h"
 
 #include <strsafe.h>
+#include "common/scoped_kernel_handle.h"
 
 CSalamanderSafeFile SalSafeFile;
 
@@ -98,14 +99,16 @@ BOOL CSalamanderSafeFile::SafeFileOpen(SAFE_FILE* file,
     } while (hFile == INVALID_HANDLE_VALUE);
 
     // everything is OK - populate the context structure
+    // The open handle is closed by the wrapper if the name copy below fails;
+    // ownership is released only when it is stored into the SAFE_FILE.
+    CScopedKernelHandle fileScope(hFile);
     file->FileName = DupStr(fileName);
     if (file->FileName == NULL)
     {
         TRACE_E(LOW_MEMORY);
-        HANDLES(CloseHandle(hFile));
         return FALSE;
     }
-    file->HFile = hFile;
+    file->HFile = fileScope.Release();
     file->HParentWnd = hParent;
     file->dwDesiredAccess = dwDesiredAccess;
     file->dwShareMode = dwShareMode;

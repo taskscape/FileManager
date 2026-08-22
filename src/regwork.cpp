@@ -7,6 +7,24 @@
 #include "mainwnd.h"
 #include <string>
 
+// Scoped registry key: closes through the tracked handle API on every exit so
+// recursive cleanup helpers cannot leak an opened HKEY.
+namespace
+{
+struct CScopedRegKey
+{
+    HKEY Key;
+    explicit CScopedRegKey(HKEY key) : Key(key) {}
+    ~CScopedRegKey()
+    {
+        if (Key != NULL)
+            HANDLES(RegCloseKey(Key));
+    }
+    CScopedRegKey(const CScopedRegKey&);
+    CScopedRegKey& operator=(const CScopedRegKey&);
+};
+} // namespace
+
 CRegistryWorkerThread RegistryWorkerThread;
 
 // The injector deliberately lives at the registry boundary rather than in SaveConfig's
@@ -174,14 +192,15 @@ LONG FlushConfigurationRegistryKey(HKEY key)
 BOOL ClearKeyAux(HKEY key)
 {
     char name[MAX_PATH];
-    HKEY subKey;
     while (RegEnumKey(key, 0, name, MAX_PATH) == ERROR_SUCCESS)
     {
+        HKEY subKey;
         if (HANDLES_Q(RegOpenKeyEx(key, name, 0, KEY_READ | KEY_WRITE, &subKey)) == ERROR_SUCCESS)
         {
-            BOOL ret = ClearKeyAux(subKey);
-            HANDLES(RegCloseKey(subKey));
-            if (!ret || RegDeleteKey(key, name) != ERROR_SUCCESS)
+            // The opened subkey is closed by the wrapper even when the recursive
+            // cleanup or the delete below fails.
+            CScopedRegKey subKeyScope(subKey);
+            if (!ClearKeyAux(subKey) || RegDeleteKey(key, name) != ERROR_SUCCESS)
                 return FALSE;
             RecordConfigurationWrite();
         }

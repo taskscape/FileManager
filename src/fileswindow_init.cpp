@@ -410,6 +410,15 @@ void IconThreadThreadFBodyAux(const char* path, SHFILEINFO& shi, CIconSizeEnum i
     }
 }
 
+// Background icon/thumbnail reader thread for one panel (runs while the panel
+// exists). Waits on {terminate, work} events; a work signal first honors the
+// panel's WaitBeforeReadingIcons delay (interruptible by termination) so the
+// main thread can repaint and fast directory changes can cancel the round,
+// then re-checks under ICSleepSection whether new work or termination arrived
+// before reading. Reads icons/thumbnails for the current listing into the
+// panel's icon cache (shell icons, overlay identifiers, plug-in thumbnails via
+// CSalamanderThumbnailMaker), posting incremental refreshes to the main
+// thread. COM is initialized for IconHandler-based shell extensions.
 unsigned IconThreadThreadFBody(void* parameter)
 {
     CALL_STACK_MESSAGE1("IconThreadThreadFBody()");

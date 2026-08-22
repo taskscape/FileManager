@@ -11,6 +11,15 @@
 #include "shellib.h"
 
 #include <shobjidl.h> // IFileOpenDialog, IFileDialog, IShellItem
+#include <vector>
+
+// The debug-allocator 'new' macro from precomp.h breaks WIL's nothrow
+// allocations; suppress it while WIL templates are parsed.
+#pragma push_macro("new")
+#undef new
+#include <wil/com.h>
+#include <wil/resource.h>
+#pragma pop_macro("new")
 
 //******************************************************************************
 //
@@ -2222,21 +2231,19 @@ BOOL BrowseCommand(HWND hParent, int editlineResID, int filterResID)
     // WM_GETTEXT capped this buffer at MAX_PATH, making the API's int length safe.
     int fileLen = (int)strlen(file);
     int fileLenW = MultiByteToWideChar(CP_ACP, 0, file, fileLen, NULL, 0);
-    WCHAR* fileW = (WCHAR*)malloc((fileLenW + 1) * sizeof(WCHAR));
-    if (fileW == NULL)
-        return FALSE;
-    MultiByteToWideChar(CP_ACP, 0, file, fileLen, fileW, fileLenW + 1);
-    fileW[fileLenW] = 0;
+    // An empty or unconvertible name must still open the dialog (without a default
+    // file name), matching the previous allocation of at least one WCHAR.
+    std::vector<WCHAR> fileW((fileLenW > 0 ? fileLenW : 0) + 1);
+    if (fileLenW > 0)
+        MultiByteToWideChar(CP_ACP, 0, file, fileLen, fileW.data(), fileLenW + 1);
+    fileW[fileLenW > 0 ? fileLenW : 0] = 0;
 
-    // Create IFileOpenDialog
-    IFileOpenDialog* dialog = NULL;
+    // Create IFileOpenDialog; released automatically on every return path.
+    wil::com_ptr<IFileOpenDialog> dialog;
     HRESULT hr = CoCreateInstance(CLSID_FileOpenDialog, NULL, CLSCTX_INPROC_SERVER,
                                    IID_PPV_ARGS(&dialog));
-
-    if (FAILED(hr)) {
-        free(fileW);
+    if (FAILED(hr))
         return FALSE;
-    }
 
     // Set file type filters
     COMDLG_FILTERSPEC filters[10];
@@ -2245,8 +2252,8 @@ BOOL BrowseCommand(HWND hParent, int editlineResID, int filterResID)
 
     // Parse the filter string to create COMDLG_FILTERSPEC
     // The filter format is: "Description1|*.ext1;*.ext2|Description2|*.ext3|..."
-    WCHAR* filterDescW = NULL;
-    WCHAR* filterPatternW = NULL;
+    std::vector<WCHAR> filterDescW;
+    std::vector<WCHAR> filterPatternW;
 
     // Parse the filter string (simplified - just use a general filter)
     // For a complete implementation, the filter parsing would need to be more sophisticated
@@ -2275,11 +2282,9 @@ BOOL BrowseCommand(HWND hParent, int editlineResID, int filterResID)
 
     // Convert filter strings to wide
     if (descLen > 0) {
-        filterDescW = (WCHAR*)malloc((descLen + 1) * sizeof(WCHAR));
-        if (filterDescW) {
-            MultiByteToWideChar(CP_ACP, 0, descStart, descLen, filterDescW, descLen + 1);
-            filterDescW[descLen] = 0;
-        }
+        filterDescW.resize(descLen + 1);
+        MultiByteToWideChar(CP_ACP, 0, descStart, descLen, filterDescW.data(), descLen + 1);
+        filterDescW[descLen] = 0;
     }
 
     // For pattern, convert the wildcard pattern to wide
@@ -2291,24 +2296,22 @@ BOOL BrowseCommand(HWND hParent, int editlineResID, int filterResID)
             patternLenW++;
         }
         if (patternLenW > 0) {
-            filterPatternW = (WCHAR*)malloc((patternLenW + 1) * sizeof(WCHAR));
-            if (filterPatternW) {
-                MultiByteToWideChar(CP_ACP, 0, patternStart, patternLenW, filterPatternW, patternLenW + 1);
-                filterPatternW[patternLenW] = 0;
-            }
+            filterPatternW.resize(patternLenW + 1);
+            MultiByteToWideChar(CP_ACP, 0, patternStart, patternLenW, filterPatternW.data(), patternLenW + 1);
+            filterPatternW[patternLenW] = 0;
         }
     }
 
     // Build filters array
-    if (filterDescW && filterPatternW) {
-        filters[0].pszName = filterDescW;
-        filters[0].pszSpec = filterPatternW;
+    if (!filterDescW.empty() && !filterPatternW.empty()) {
+        filters[0].pszName = filterDescW.data();
+        filters[0].pszSpec = filterPatternW.data();
         filterCount = 1;
     }
 
     // Set default file name and filters
     if (fileLenW > 0) {
-        dialog->SetFileName(fileW);
+        dialog->SetFileName(fileW.data());
     }
     if (filterCount > 0) {
         dialog->SetFileTypes(filterCount, filters);
@@ -2317,43 +2320,30 @@ BOOL BrowseCommand(HWND hParent, int editlineResID, int filterResID)
     // Show dialog
     hr = dialog->Show(hParent);
 
-    // Clean up
-    free(fileW);
-    if (filterDescW) free(filterDescW);
-    if (filterPatternW) free(filterPatternW);
-
     if (SUCCEEDED(hr)) {
-        // Get the selected file
-        IShellItem* item = NULL;
+        // Get the selected file; released automatically on every return path.
+        wil::com_ptr<IShellItem> item;
         hr = dialog->GetResult(&item);
         if (SUCCEEDED(hr)) {
-            PWSTR resultPathW = NULL;
+            // The display-name buffer is CoTaskMem-allocated by the shell and is
+            // released by the wrapper even when the conversion below fails.
+            wil::unique_cotaskmem_string resultPathW;
             hr = item->GetDisplayName(SIGDN_FILESYSPATH, &resultPathW);
             if (SUCCEEDED(hr)) {
                 // Convert wide string back to ANSI for the control
-                int resultLen = WideCharToMultiByte(CP_ACP, 0, resultPathW, -1, NULL, 0, NULL, NULL);
+                int resultLen = WideCharToMultiByte(CP_ACP, 0, resultPathW.get(), -1, NULL, 0, NULL, NULL);
                 if (resultLen > 0 && resultLen <= MAX_PATH) {
-                    char* resultPath = (char*)malloc(resultLen);
-                    if (resultPath) {
-                        WideCharToMultiByte(CP_ACP, 0, resultPathW, -1, resultPath, resultLen, NULL, NULL);
+                    char resultPath[MAX_PATH];
+                    WideCharToMultiByte(CP_ACP, 0, resultPathW.get(), -1, resultPath, resultLen, NULL, NULL);
 
-                        // Update the control
-                        CALL_STACK_MESSAGE2("BrowseCommand::SendMessage( , , ,%s)", resultPath);
-                        SendMessage(GetDlgItem(hParent, editlineResID), WM_SETTEXT, 0, (LPARAM)resultPath);
-
-                        free(resultPath);
-                        CoTaskMemFree(resultPathW);
-                        item->Release();
-                        dialog->Release();
-                        return TRUE;
-                    }
+                    // Update the control
+                    CALL_STACK_MESSAGE2("BrowseCommand::SendMessage( , , ,%s)", resultPath);
+                    SendMessage(GetDlgItem(hParent, editlineResID), WM_SETTEXT, 0, (LPARAM)resultPath);
+                    return TRUE;
                 }
-                CoTaskMemFree(resultPathW);
             }
-            item->Release();
         }
     }
 
-    dialog->Release();
     return FALSE;
 }

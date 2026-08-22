@@ -1761,6 +1761,13 @@ void CPanelStatusBar::RevokeDragDrop()
 #define BUTTON_OFFSET 0
 
 LRESULT
+// Message procedure of the panel status bar. Owns the hot-tracking state
+// machine: WM_MOUSEMOVE hit-tests the status cells (size, history, zoom,
+// hidden, security, throbber), captures the mouse, and routes clicks to their
+// actions (selection-state popups on left button, context menu on right,
+// double-click zoom). Also handles creation/destruction of the optional
+// tool bar border (left/right panel), delayed throbber activation, tooltip
+// text requests, painting, and the blink timer.
 CPanelStatusBar::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 {
     SLOW_CALL_STACK_MESSAGE4("CPanelStatusBar::WindowProc(0x%X, 0x%IX, 0x%IX)", uMsg, wParam, lParam);

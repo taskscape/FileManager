@@ -376,6 +376,11 @@ void CEditLine::InsertText(char* s)
 BOOL SkipNextSysCharacter = FALSE;
 
 LRESULT
+// Message procedure of the panel's command-line edit box. WM_CHAR is the
+// decision core: while the UI is unlocked it intercepts Tab (panel switch),
+// Enter variants (execute, copy name to command line), and other Salamander
+// hot keys before the edit control sees them; clipboard/focus/mouse messages
+// coordinate with quick-search state and the main window's keyboard lock.
 CEditLine::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 {
     SLOW_CALL_STACK_MESSAGE4("CEditLine::WindowProc(0x%X, 0x%IX, 0x%IX)", uMsg, wParam, lParam);

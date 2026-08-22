@@ -35,6 +35,7 @@
 #include "logo.h"
 #include "color.h"
 #include "toolbar.h"
+#include "common/scoped_gdi.h"
 
 #include "svg.h"
 
@@ -903,6 +904,79 @@ int GetToolbarIconSizeForWindow(HWND hwnd)
     return GetToolbarIconSizeForDpi(GetDpiForWindow(hwnd));
 }
 
+// Menu and toolbar image lists are built from temporary GDI bitmaps; keeping
+// this work in its own SEH-free scope lets the scoped bitmaps unwind while
+// InitializeGraphics keeps its structured exception handler.
+static BOOL CreateMenuAndToolbarImageLists()
+{
+    int menuIconSize = IconSizes[ICONSIZE_16];
+    int toolbarIconSize = GetToolbarIconSizeForSystemDPI();
+    int iconSize = menuIconSize;
+    // Temporary toolbar bitmaps live only until the ImageList_Add calls; the
+    // guard deletes them through the tracked handle API even on early returns.
+    CScopedGDIBitmap hTmpMaskBitmap;
+    CScopedGDIBitmap hTmpGrayBitmap;
+    CScopedGDIBitmap hTmpColorBitmap;
+    // Keep menu state glyphs in the same Fluent color language as command icons.
+    CSVGIcon menuMarkIcons[] = {{0, "MenuCheck"}, {1, "MenuRadio"}};
+    if (!CreateToolbarBitmaps(HInstance,
+                              IDB_MENU,
+                              RGB(255, 0, 255), GetSysColor(COLOR_BTNFACE),
+                              *hTmpMaskBitmap.Put(), *hTmpGrayBitmap.Put(), *hTmpColorBitmap.Put(),
+                              FALSE, menuMarkIcons, _countof(menuMarkIcons), menuIconSize))
+        return FALSE;
+    HMenuMarkImageList = ImageList_Create(menuIconSize, menuIconSize, ILC_MASK | ILC_COLORDDB, 2, 1);
+    ImageList_Add(HMenuMarkImageList, hTmpColorBitmap.Get(), hTmpMaskBitmap.Get());
+    hTmpMaskBitmap.Reset();
+    hTmpGrayBitmap.Reset();
+    hTmpColorBitmap.Reset();
+
+    CSVGIcon* svgIcons;
+    int svgIconsCount;
+    GetSVGIconsMainToolbar(&svgIcons, &svgIconsCount);
+    // Render a compact command set for menus before creating the independently sized toolbar set.
+    if (!CreateToolbarBitmaps(HInstance,
+                              Use256ColorsBitmap() ? IDB_TOOLBAR_256 : IDB_TOOLBAR_16,
+                              RGB(255, 0, 255), GetSysColor(COLOR_BTNFACE),
+                              *hTmpMaskBitmap.Put(), *hTmpGrayBitmap.Put(), *hTmpColorBitmap.Put(),
+                              TRUE, svgIcons, svgIconsCount, menuIconSize))
+        return FALSE;
+    HHotMenuImageList = ImageList_Create(menuIconSize, menuIconSize, ILC_MASK | ILC_COLORDDB, IDX_TB_COUNT, 1);
+    HGrayMenuImageList = ImageList_Create(menuIconSize, menuIconSize, ILC_MASK | ILC_COLORDDB, IDX_TB_COUNT, 1);
+    ImageList_Add(HHotMenuImageList, hTmpColorBitmap.Get(), hTmpMaskBitmap.Get());
+    ImageList_Add(HGrayMenuImageList, hTmpGrayBitmap.Get(), hTmpMaskBitmap.Get());
+    hTmpMaskBitmap.Reset();
+    hTmpGrayBitmap.Reset();
+    hTmpColorBitmap.Reset();
+
+    if (HHotMenuImageList == NULL || HGrayMenuImageList == NULL)
+    {
+        TRACE_E("Unable to create image list.");
+        return FALSE;
+    }
+
+    if (!CreateToolbarBitmaps(HInstance,
+                              Use256ColorsBitmap() ? IDB_TOOLBAR_256 : IDB_TOOLBAR_16,
+                              RGB(255, 0, 255), GetSysColor(COLOR_BTNFACE),
+                              *hTmpMaskBitmap.Put(), *hTmpGrayBitmap.Put(), *hTmpColorBitmap.Put(),
+                              TRUE, svgIcons, svgIconsCount, toolbarIconSize))
+        return FALSE;
+    HHotToolBarImageList = ImageList_Create(toolbarIconSize, toolbarIconSize, ILC_MASK | ILC_COLORDDB, IDX_TB_COUNT, 1);
+    HGrayToolBarImageList = ImageList_Create(toolbarIconSize, toolbarIconSize, ILC_MASK | ILC_COLORDDB, IDX_TB_COUNT, 1);
+    ImageList_Add(HHotToolBarImageList, hTmpColorBitmap.Get(), hTmpMaskBitmap.Get());
+    ImageList_Add(HGrayToolBarImageList, hTmpGrayBitmap.Get(), hTmpMaskBitmap.Get());
+    hTmpMaskBitmap.Reset();
+    hTmpGrayBitmap.Reset();
+    hTmpColorBitmap.Reset();
+
+    if (HHotToolBarImageList == NULL || HGrayToolBarImageList == NULL)
+    {
+        TRACE_E("Unable to create image list.");
+        return FALSE;
+    }
+    return TRUE;
+}
+
 BOOL InitializeGraphics(BOOL colorsOnly)
 {
     // 48x48 az od XP
@@ -1048,69 +1122,9 @@ BOOL InitializeGraphics(BOOL colorsOnly)
         ImageList_SetImageCount(HFindSymbolsImageList, 2); // inicializace
                                                            //    ImageList_SetBkColor(HFindSymbolsImageList, GetSysColor(COLOR_WINDOW)); // aby pod XP chodily pruhledne ikonky
 
-        int menuIconSize = IconSizes[ICONSIZE_16];
-        int toolbarIconSize = GetToolbarIconSizeForSystemDPI();
-        int iconSize = menuIconSize;
-        HBITMAP hTmpMaskBitmap;
-        HBITMAP hTmpGrayBitmap;
-        HBITMAP hTmpColorBitmap;
-        // Keep menu state glyphs in the same Fluent color language as command icons.
-        CSVGIcon menuMarkIcons[] = {{0, "MenuCheck"}, {1, "MenuRadio"}};
-        if (!CreateToolbarBitmaps(HInstance,
-                                  IDB_MENU,
-                                  RGB(255, 0, 255), GetSysColor(COLOR_BTNFACE),
-                                  hTmpMaskBitmap, hTmpGrayBitmap, hTmpColorBitmap,
-                                  FALSE, menuMarkIcons, _countof(menuMarkIcons), menuIconSize))
+        if (!CreateMenuAndToolbarImageLists())
             return FALSE;
-        HMenuMarkImageList = ImageList_Create(menuIconSize, menuIconSize, ILC_MASK | ILC_COLORDDB, 2, 1);
-        ImageList_Add(HMenuMarkImageList, hTmpColorBitmap, hTmpMaskBitmap);
-        HANDLES(DeleteObject(hTmpMaskBitmap));
-        HANDLES(DeleteObject(hTmpGrayBitmap));
-        HANDLES(DeleteObject(hTmpColorBitmap));
-
-        CSVGIcon* svgIcons;
-        int svgIconsCount;
-        GetSVGIconsMainToolbar(&svgIcons, &svgIconsCount);
-        // Render a compact command set for menus before creating the independently sized toolbar set.
-        if (!CreateToolbarBitmaps(HInstance,
-                                  Use256ColorsBitmap() ? IDB_TOOLBAR_256 : IDB_TOOLBAR_16,
-                                  RGB(255, 0, 255), GetSysColor(COLOR_BTNFACE),
-                                  hTmpMaskBitmap, hTmpGrayBitmap, hTmpColorBitmap,
-                                  TRUE, svgIcons, svgIconsCount, menuIconSize))
-            return FALSE;
-        HHotMenuImageList = ImageList_Create(menuIconSize, menuIconSize, ILC_MASK | ILC_COLORDDB, IDX_TB_COUNT, 1);
-        HGrayMenuImageList = ImageList_Create(menuIconSize, menuIconSize, ILC_MASK | ILC_COLORDDB, IDX_TB_COUNT, 1);
-        ImageList_Add(HHotMenuImageList, hTmpColorBitmap, hTmpMaskBitmap);
-        ImageList_Add(HGrayMenuImageList, hTmpGrayBitmap, hTmpMaskBitmap);
-        HANDLES(DeleteObject(hTmpMaskBitmap));
-        HANDLES(DeleteObject(hTmpGrayBitmap));
-        HANDLES(DeleteObject(hTmpColorBitmap));
-
-        if (HHotMenuImageList == NULL || HGrayMenuImageList == NULL)
-        {
-            TRACE_E("Unable to create image list.");
-            return FALSE;
-        }
-
-        if (!CreateToolbarBitmaps(HInstance,
-                                  Use256ColorsBitmap() ? IDB_TOOLBAR_256 : IDB_TOOLBAR_16,
-                                  RGB(255, 0, 255), GetSysColor(COLOR_BTNFACE),
-                                  hTmpMaskBitmap, hTmpGrayBitmap, hTmpColorBitmap,
-                                  TRUE, svgIcons, svgIconsCount, toolbarIconSize))
-            return FALSE;
-        HHotToolBarImageList = ImageList_Create(toolbarIconSize, toolbarIconSize, ILC_MASK | ILC_COLORDDB, IDX_TB_COUNT, 1);
-        HGrayToolBarImageList = ImageList_Create(toolbarIconSize, toolbarIconSize, ILC_MASK | ILC_COLORDDB, IDX_TB_COUNT, 1);
-        ImageList_Add(HHotToolBarImageList, hTmpColorBitmap, hTmpMaskBitmap);
-        ImageList_Add(HGrayToolBarImageList, hTmpGrayBitmap, hTmpMaskBitmap);
-        HANDLES(DeleteObject(hTmpMaskBitmap));
-        HANDLES(DeleteObject(hTmpGrayBitmap));
-        HANDLES(DeleteObject(hTmpColorBitmap));
-
-        if (HHotToolBarImageList == NULL || HGrayToolBarImageList == NULL)
-        {
-            TRACE_E("Unable to create image list.");
-            return FALSE;
-        }
+        int iconSize = IconSizes[ICONSIZE_16]; // menu glyph size also drives the small SVG arrows below
 
         HBottomTBImageList = ImageList_Create(BOTTOMBAR_CX, BOTTOMBAR_CY, ILC_MASK | ILC_COLORDDB, 12, 0);
         HHotBottomTBImageList = ImageList_Create(BOTTOMBAR_CX, BOTTOMBAR_CY, ILC_MASK | ILC_COLORDDB, 12, 0);

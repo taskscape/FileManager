@@ -6,6 +6,13 @@
 #include <windows.h>
 #include <errno.h>
 
+// The debug-allocator 'new' macro from precomp.h breaks WIL's nothrow
+// allocations; suppress it while WIL templates are parsed.
+#pragma push_macro("new")
+#undef new
+#include <wil/resource.h>
+#pragma pop_macro("new")
+
 #pragma warning(3 : 4706) // warning C4706: assignment within conditional expression
 
 #include "strutils.h"
@@ -118,15 +125,13 @@ BOOL GetKnownFolderPathToAnsi(REFKNOWNFOLDERID folderId, char* destination, int 
     }
 
     destination[0] = 0;
-    PWSTR widePath = NULL;
-    // Keep shell paths in UTF-16 until the repository's ANSI boundary conversion is unavoidable.
+    // The CoTaskMem buffer is released by the wrapper even when the conversion below fails.
+    wil::unique_cotaskmem_string widePath;
     HRESULT result = SHGetKnownFolderPath(folderId, KF_FLAG_DEFAULT, NULL, &widePath);
     if (FAILED(result) || widePath == NULL)
         return FALSE;
 
-    BOOL converted = ConvertU2A(widePath, -1, destination, destinationCapacity) != 0;
-    CoTaskMemFree(widePath);
-    return converted;
+    return ConvertU2A(widePath.get(), -1, destination, destinationCapacity) != 0;
 }
 
 int ConvertU2A(const WCHAR* src, int srcLen, char* buf, int bufSize, BOOL compositeCheck, UINT codepage)

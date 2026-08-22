@@ -62,6 +62,13 @@ BOOL IsCustomEventGUID(LPARAM lParam, REFGUID guidEvent)
 //
 
 LRESULT
+// Message procedure of a file panel window. Layout messages (WM_SIZE)
+// re-position the directory line, list box, and status line atomically via
+// DeferWindowPos. Device notifications (WM_DEVICECHANGE) translate volume
+// events (lock/unlock, media arrival/removal) into icon-cache pauses and panel
+// refreshes. The remaining cases cover painting, drag/drop, user messages from
+// the worker/icon threads, and context menus; unhandled messages fall through
+// to DefWindowProc.
 CFilesWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 {
     SLOW_CALL_STACK_MESSAGE4("CFilesWindow::WindowProc(0x%X, 0x%IX, 0x%IX)", uMsg, wParam, lParam);

@@ -998,6 +998,23 @@ void CFilesWindow::GotoSelectedItem(BOOL next)
     }
 }
 
+// Sys-key-down handler of the panel list box; the heart of panel keyboard
+// handling. Decision order (first match wins, TRUE = consumed):
+//   1. Keyboard-disabled guard (modal "busy" state); Esc cancels it.
+//   2. First Shift press latches the selection mode (select vs. deselect) that
+//      subsequent Shift+navigation applies.
+//   3. Alt+printable key with QuickSearchEnterAlt: re-injected as WM_CHAR so
+//      quick search starts typing.
+//   4. Esc aborts an active drag or drag-box selection.
+//   5. Space toggles selection of the focused item (+ optional occupied-space
+//      calculation for directories), Ctrl+'/' opens the command shell,
+//      Ctrl+'+'/'-' adjust column widths or select by mask, Insert selects and
+//      steps, Ctrl+PgUp/PgDn and Tab handle directory/panel navigation.
+//   6. In quick-search mode a dedicated switch maps keys to mask editing and
+//      match jumping (Up/Down/PgUp/PgDn/Home/End); outside it the same keys
+//      perform caret moves with optional Shift range selection.
+//   7. Finally plug-ins get the key (Plugins.HandleKeyDown); FALSE = nobody
+//      consumed it and the default processing should run.
 BOOL CFilesWindow::OnSysKeyDown(UINT uMsg, WPARAM wParam, LPARAM lParam, LRESULT* lResult)
 {
     CALL_STACK_MESSAGE_NONE

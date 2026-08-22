@@ -15,6 +15,18 @@
 #define INITGUID
 
 #include "7zclient.h"
+#include <memory>
+
+// The directory object is host-allocated and must go back through the host's
+// free function; the custom deleter guarantees that on every exit path.
+struct CScopedSalamanderDirectoryDeleter
+{
+    void operator()(CSalamanderDirectoryAbstract* dir) const
+    {
+        if (dir != NULL)
+            SalamanderGeneral->FreeSalamanderDirectory(dir);
+    }
+};
 
 // ****************************************************************************
 
@@ -894,8 +906,10 @@ BOOL CPluginInterfaceForArchiver::UnpackWholeArchive(CSalamanderForOperationsAbs
 
     if (delArchiveWhenDone)
         archiveVolumes->Add(fileName, -2); // FIXME: once the 7-zip plugin learns multi-volume archives (.7z.001, .7z.002, etc.), we must add all archive volumes here (so the entire archive is deleted)
-    CSalamanderDirectoryAbstract* dir = SalamanderGeneral->AllocSalamanderDirectory(FALSE);
-    if (dir == NULL)
+    // Freed by the scoped wrapper even when later steps fail or return early.
+    std::unique_ptr<CSalamanderDirectoryAbstract, CScopedSalamanderDirectoryDeleter> dir(
+        SalamanderGeneral->AllocSalamanderDirectory(FALSE));
+    if (!dir)
         return Error(IDS_INSUFFICIENT_MEMORY);
 
     BOOL ret = FALSE;
@@ -907,11 +921,11 @@ BOOL CPluginInterfaceForArchiver::UnpackWholeArchive(CSalamanderForOperationsAbs
         if (pluginData)
         {
             // open the archive
-            if (client->ListArchive(fileName, dir, pluginData, pluginData->Password))
+            if (client->ListArchive(fileName, dir.get(), pluginData, pluginData->Password))
             {
                 CQuadWord totalSize(0, 0);
                 int itemCount = 0;
-                CalcSize(dir, mask, totalSize, itemCount);
+                CalcSize(dir.get(), mask, totalSize, itemCount);
 
                 //
                 BOOL delTempDir = TRUE;
@@ -928,7 +942,7 @@ BOOL CPluginInterfaceForArchiver::UnpackWholeArchive(CSalamanderForOperationsAbs
                     archivePath[0] = '\0';
 
                     TIndirectArray<CArchiveItemInfo> archiveItems(itemCount, 10, dtDelete);
-                    if (GatherItems(dir, modmask, &archiveItems, archivePath) != OPER_CANCEL)
+                    if (GatherItems(dir.get(), modmask, &archiveItems, archivePath) != OPER_CANCEL)
                     {
                         C7zClient* client2 = ((CPluginDataInterface*)pluginData)->Get7zClient();
 
@@ -960,8 +974,6 @@ BOOL CPluginInterfaceForArchiver::UnpackWholeArchive(CSalamanderForOperationsAbs
     {
         ret = Error(IDS_INSUFFICIENT_MEMORY);
     }
-
-    SalamanderGeneral->FreeSalamanderDirectory(dir);
 
     return ret;
 }

@@ -8,6 +8,7 @@
 #include "gui.h"
 #include "gui_bitmap.h"
 #include "toolbar.h"
+#include "common/scoped_gdi.h"
 #include "menu.h"
 #include "tooltip.h"
 
@@ -1477,22 +1478,21 @@ CToolbarHeader::CToolbarHeader(HWND hDlg, int ctrlID, HWND hAlignWindow, DWORD b
     };
 
     int iconSize = GetIconSizeForSystemDPI(ICONSIZE_16);
-    HBITMAP hTmpMaskBitmap;
-    HBITMAP hTmpGrayBitmap;
-    HBITMAP hTmpColorBitmap;
+    // Temporary toolbar bitmaps live only until the ImageList_Add calls; the
+    // guard deletes them through the tracked handle API even on early returns.
+    CScopedGDIBitmap hTmpMaskBitmap;
+    CScopedGDIBitmap hTmpGrayBitmap;
+    CScopedGDIBitmap hTmpColorBitmap;
     CreateToolbarBitmaps(HInstance,
                          IDB_EDTLBTB,
                          RGB(255, 0, 255), GetSysColor(COLOR_BTNFACE),
-                         hTmpMaskBitmap, hTmpGrayBitmap, hTmpColorBitmap,
+                         *hTmpMaskBitmap.Put(), *hTmpGrayBitmap.Put(), *hTmpColorBitmap.Put(),
                          FALSE, svgIcons, TLBHDR_COUNT,
                          iconSize); // Embedded edit controls intentionally remain compact.
     HHotImageList = ImageList_Create(iconSize, iconSize, ILC_MASK | ILC_COLORDDB, TLBHDR_COUNT, 1);
     HGrayImageList = ImageList_Create(iconSize, iconSize, ILC_MASK | ILC_COLORDDB, TLBHDR_COUNT, 1);
-    ImageList_Add(HHotImageList, hTmpColorBitmap, hTmpMaskBitmap);
-    ImageList_Add(HGrayImageList, hTmpGrayBitmap, hTmpMaskBitmap);
-    HANDLES(DeleteObject(hTmpMaskBitmap));
-    HANDLES(DeleteObject(hTmpGrayBitmap));
-    HANDLES(DeleteObject(hTmpColorBitmap));
+    ImageList_Add(HHotImageList, hTmpColorBitmap.Get(), hTmpMaskBitmap.Get());
+    ImageList_Add(HGrayImageList, hTmpGrayBitmap.Get(), hTmpMaskBitmap.Get());
     ToolBar->SetImageList(HGrayImageList);
     ToolBar->SetHotImageList(HHotImageList);
     //HImageList = ImageList_Create(TOOLBARHDR_WIDTH, TOOLBARHDR_HEIGHT,

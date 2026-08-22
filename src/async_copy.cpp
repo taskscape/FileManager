@@ -9,6 +9,7 @@
 #include "cfgdlg.h"
 #include "common/scoped_native_resources.h"
 #include "file_operation_filesystem.h"
+#include "common/scoped_kernel_handle.h"
 #include "operation_result.h"
 #include "retry_policy.h"
 #include "worker.h"
@@ -206,10 +207,10 @@ BOOL IsDirectoryEmpty(const char* name) // directories/subdirectories contain no
     *end = 0;
 
     WIN32_FIND_DATAW fileData;
-    HANDLE search;
     CStrP dirW(ConvertAllocUtf8ToWide(dir, -1));
-    search = dirW != NULL ? HANDLES_Q(FindFirstFileW(dirW, &fileData)) : INVALID_HANDLE_VALUE;
-    if (search != INVALID_HANDLE_VALUE)
+    // The search handle is closed by the wrapper even on the early "not empty" returns.
+    CScopedFindHandle search(dirW != NULL ? HANDLES_Q(FindFirstFileW(dirW, &fileData)) : INVALID_HANDLE_VALUE);
+    if (search.IsValid())
     {
         do
         {
@@ -224,18 +225,13 @@ BOOL IsDirectoryEmpty(const char* name) // directories/subdirectories contain no
                 if (remaining <= 1 || ConvertWideToUtf8(fileData.cFileName, -1, end, remaining) == 0)
                     continue;
                 if (!IsDirectoryEmpty(dir)) // the subdirectory is not empty
-                {
-                    HANDLES(FindClose(search));
                     return FALSE;
-                }
             }
             else
             {
-                HANDLES(FindClose(search)); // a file exists here
-                return FALSE;
+                return FALSE; // a file exists here
             }
-        } while (FindNextFileW(search, &fileData));
-        HANDLES(FindClose(search));
+        } while (FindNextFileW(search.Get(), &fileData));
     }
     return TRUE;
 }
@@ -629,6 +625,29 @@ static BOOL SkipCopyIfTargetNotOlder(COperation* op, HWND hProgressDlg, COperati
     return TRUE;
 }
 
+// Copies one file ('op') from source to target with full error handling.
+// Control flow is a retry state machine built on gotos; phase map in order:
+//   1. SkipCopyIfTargetNotOlder probe - "Overwrite Older" may resolve the
+//      whole operation without any data transfer.
+//   2. COPY_AGAIN: buffer-size selection (async tiers vs. sync optimum),
+//     source open; re-entered after restart-worthy failures.
+//   3. OPEN_TGT_FILE loop: creates the target either as a transactional
+//     sibling reservation or directly via SalCreateFileEx; retries without
+//     the Encrypted attribute when the filesystem refuses encryption
+//     (SKIP_/CANCEL_ENCNOTSUP paths consult the user).
+//   4. COPY: pre-allocation of the whole target size (fragmentation
+//     avoidance, with delete-and-retry on failure), then delegates to
+//     DoCopyFileLoopAsync / DoCopyFileLoopOrig; their outcomes map to
+//     COPY_ERROR / SKIP_COPY / copyAgain -> COPY_AGAIN.
+//   5. Post-copy metadata: timestamps, ADS streams, attribute verification,
+//     NTFS security, then VerifyAndCommitCopyTarget (durability check +
+//     transactional ReplaceFile commit + stale-stream cleanup).
+//   6. Overwrite resolution when the target exists (confirm dialogs,
+//     hidden/system confirmation, delete-before-overwrite workaround for
+//     Samba, NORMAL_ERROR retry loop).
+// 'skip' reports user Skip; 'suspiciousIoRetry' tells DoMoveFile to verify
+// content by SHA-256 before deleting its source; asyncPar carries overlapped
+// I/O state across files of one script. Returns FALSE only on cancel/error.
 BOOL DoCopyFile(COperation* op, HWND hProgressDlg, void* buffer,
                 COperations* script, CQuadWord& totalDone,
                 DWORD clearReadonlyMask, BOOL* skip, BOOL lantasticCheck,
@@ -1924,6 +1943,19 @@ static BOOL FinishSameVolumeMove(COperation* op, HWND hProgressDlg, COperations*
     return TRUE;
 }
 
+// Moves one file ('op'). Two disjoint strategies chosen up front:
+//   - Same root path and not forced-copy: native rename path. Stashes source
+//     security before the rename (the source vanishes), verifies both file
+//     identities, retries via the Novell read-only-attribute patch on
+//     ACCESS_DENIED, works around 8.3 DOS-name collisions, resolves overwrite
+//     by deleting the verified destination first (its identity then becomes
+//     "absent"), and finishes with FinishSameVolumeMove.
+//   - Otherwise: full DoCopyFile copy; only after a successful copy may the
+//     source be deleted, gated by ConfirmMetadataLossesBeforeSourceDeletion
+//     and, when suspicious I/O retries occurred, VerifyFullFileContentSha256;
+//     the delete itself uses DeleteFileWithVerifiedIdentity with retry/skip
+//     dialogs ('dir' variant never reaches here - directories are refused).
+// Returns FALSE on cancel/error; TRUE also covers "skip" outcomes.
 BOOL DoMoveFile(COperation* op, HWND hProgressDlg, void* buffer,
                 COperations* script, CQuadWord& totalDone, BOOL dir,
                 DWORD clearReadonlyMask, BOOL* novellRenamePatch, BOOL lantasticCheck,

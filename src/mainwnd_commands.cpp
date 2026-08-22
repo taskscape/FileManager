@@ -1806,8 +1806,19 @@ static void CMainWindowWindowProcAux(IContextMenu* menu2, CMINVOKECOMMANDINFO& i
     SetThreadPriority(hThread, oldThreadPriority);
 }
 
+// Central WM_COMMAND dispatcher for the main window. Every menu item,
+// accelerator, and toolbar button lands here as LOWORD(wParam) = command ID
+// ('lParam != NULL' marks control-sourced messages). The ID space is mostly
+// dynamic ranges (per-panel hot paths, sort menus, plug-in commands), so
+// dispatch happens in three stages:
+//   1. Help mode (Shift+F1): any command is translated into a help-topic jump;
+//      dynamic ranges fold to their first ID so one topic covers the range.
+//   2. Dynamic ranges handled arithmetically (ID - range_base = index).
+//   3. A switch over the remaining fixed CM_* command IDs.
+// Returns 0 after handling; unhandled IDs fall out of the switch.
 LRESULT CMainWindow::HandleWmCommand(WPARAM wParam, LPARAM lParam)
 {
+        // ---- stage 1: context-help mode turns commands into help jumps ----
         if (HelpMode && (HWND)lParam == NULL && LOWORD(wParam) != CM_HELP_CONTEXT)
         {
             DWORD id = LOWORD(wParam);
@@ -1871,7 +1882,9 @@ LRESULT CMainWindow::HandleWmCommand(WPARAM wParam, LPARAM lParam)
             return 0;
         }
 
-        // exit quick-search mode
+        // ---- quick-search teardown: menu/accelerator commands (not refreshes) ----
+        // leave quick-search/quick-edit mode first so the command operates on a
+        // panel in its normal state
         if (LOWORD(wParam) != CM_ACTIVEREFRESH &&         // except refresh in the active panel
             LOWORD(wParam) != CM_LEFTREFRESH &&           // except refresh in the left panel
             LOWORD(wParam) != CM_RIGHTREFRESH &&          // except refresh in the right panel
@@ -1881,7 +1894,7 @@ LRESULT CMainWindow::HandleWmCommand(WPARAM wParam, LPARAM lParam)
         }
 
         if (LOWORD(wParam) >= CM_NEWMENU_MIN && LOWORD(wParam) <= CM_NEWMENU_MAX)
-        { // command from the New menu
+        { // ---- stage 2a: "New" menu -> invoke the shell context-menu verb by index
             if (ContextMenuNew->MenuIsAssigned() && activePanel->CheckPath(TRUE) == ERROR_SUCCESS)
             {
                 activePanel->UserWorkedOnThisPath = TRUE;
@@ -2247,6 +2260,7 @@ LRESULT CMainWindow::HandleWmCommand(WPARAM wParam, LPARAM lParam)
             return 0;
         }
 
+        // ---- stage 2b: remaining dynamic ID ranges, handled arithmetically ----
         if (LOWORD(wParam) >= CM_VIEWWITH_MIN && LOWORD(wParam) <= CM_VIEWWITH_MAX)
         {
             activePanel->UserWorkedOnThisPath = TRUE;
@@ -2333,6 +2347,7 @@ LRESULT CMainWindow::HandleWmCommand(WPARAM wParam, LPARAM lParam)
             return 0;
         }
 
+        // ---- stage 3: fixed command IDs ----
         switch (LOWORD(wParam))
         {
         case CM_HELP_CONTEXT:
