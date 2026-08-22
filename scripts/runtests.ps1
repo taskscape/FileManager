@@ -10,7 +10,11 @@ param(
     # The complete UI harness must match the repository-wide VS 2026 compiler contract.
     [ValidateSet('v145')]
     [string]$PlatformToolset = 'v145',
-    [string]$NUnitTrxPath
+    [string]$NUnitTrxPath,
+    # Run the local equivalent of both release-test and installer-build jobs, excluding the GitHub-only publish job.
+    [switch]$ReleasePipeline,
+    # GitHub supplies its monotonically increasing run number; local pipeline runs use 0 unless callers provide one.
+    [string]$BuildNumber = $env:GITHUB_RUN_NUMBER
 )
 
 Set-StrictMode -Version Latest
@@ -24,6 +28,21 @@ $pictViewEngineProject = Join-Path $repositoryRoot 'tests\PictViewEngineTests\Pi
 $failures = [System.Collections.Generic.List[string]]::new()
 $passed = [System.Collections.Generic.List[string]]::new()
 $skipped = [System.Collections.Generic.List[string]]::new()
+
+if ($ReleasePipeline) {
+    # The local parity mode uses the blocking release inventory, not the diagnostic verifier or quarantined monitoring lane.
+    $FailOnSkipped = $true
+    $SkipLockVerifier = $true
+    if ([string]::IsNullOrWhiteSpace($NUnitFilter)) {
+        $NUnitFilter = 'TestCategory!=Quarantined'
+    }
+    if ([string]::IsNullOrWhiteSpace($BuildNumber)) {
+        $BuildNumber = '0'
+    }
+    if ($BuildNumber -notmatch '^\d+$') {
+        throw 'BuildNumber must be a non-negative integer so the installer version matches the GitHub release contract.'
+    }
+}
 
 function Invoke-AutomatedCheck {
     param(
@@ -142,6 +161,13 @@ function Find-ApplicationVerifier {
     }
 
     return $null
+}
+
+function Test-ProcessIsElevated {
+    $identity = [Security.Principal.WindowsIdentity]::GetCurrent()
+    $principal = [Security.Principal.WindowsPrincipal]::new($identity)
+    # Application Verifier mutates system-wide image settings, so a normal desktop token cannot run this lane.
+    return $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
 }
 
 function Build-UiTestApplication {
@@ -342,6 +368,175 @@ function Initialize-UiTestSandbox {
     [IO.File]::WriteAllText($ownershipMarker, $ownershipMarkerContents)
     New-Item -ItemType Directory -Path (Join-Path $fullRoot 'temp') -Force | Out-Null
     New-Item -ItemType Directory -Path (Join-Path $fullRoot 'appdata') -Force | Out-Null
+}
+
+function Initialize-ReleasePipelineUiVolumes {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$WorkingDirectory
+    )
+
+    $requiredRoots = @(
+        $env:FILEMANAGER_UI_TESTDATA_ROOT,
+        $env:FILEMANAGER_UI_CROSS_VOLUME_ROOT,
+        $env:FILEMANAGER_UI_ADS_UNSUPPORTED_TARGET_ROOT
+    )
+    if (@($requiredRoots | Where-Object { [string]::IsNullOrWhiteSpace($_) }).Count -eq 0) {
+        return $false
+    }
+
+    $environmentFile = Join-Path (Split-Path -Parent $WorkingDirectory) 'release-ui-volumes.env'
+    $provisioner = Join-Path $repositoryRoot 'tools\manage-ui-test-volumes.ps1'
+    # The release gate mounts fresh capability volumes so filesystem topology is not inherited from a developer desktop.
+    & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $provisioner -Action Setup -WorkingDirectory $WorkingDirectory -EnvironmentFile $environmentFile
+    if ($LASTEXITCODE -ne 0) {
+        throw "Provisioning isolated UI test volumes failed with exit code $LASTEXITCODE."
+    }
+    foreach ($line in Get-Content -LiteralPath $environmentFile) {
+        $parts = $line -split '=', 2
+        if ($parts.Count -eq 2 -and $parts[0] -match '^FILEMANAGER_UI_') {
+            Set-Item -Path ("Env:" + $parts[0]) -Value $parts[1]
+        }
+    }
+    $env:FILEMANAGER_UI_ISOLATED = '1'
+    $env:FILEMANAGER_UI_CONFIG_FAULT_INJECTION = '1'
+    $env:FILEMANAGER_UI_RECYCLE_BIN = '1'
+    return $true
+}
+
+function Build-ReleaseApplication {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$DeveloperCommand,
+        [Parameter(Mandatory = $true)]
+        [string]$BuildDirectory,
+        [Parameter(Mandatory = $true)]
+        [ValidateSet('v145')]
+        [string]$Toolset
+    )
+
+    New-Item -ItemType Directory -Path $BuildDirectory -Force | Out-Null
+    # Match the installer job: project props consume OPENSAL_BUILD_DIR rather than a divergent OutDir override.
+    $buildRoot = $BuildDirectory.TrimEnd('\') + '\'
+    $buildCommand = 'call "' + $DeveloperCommand + '" -arch=x64 -host_arch=x64 && set "OPENSAL_BUILD_DIR=' + $buildRoot +
+        '" && msbuild "' + $nativeSolution + '" /m /t:Build /p:Configuration=Release /p:Platform=x64 /p:PlatformToolset=' +
+        $Toolset + ' /p:PreferredToolArchitecture=x64 /nr:false'
+    & $env:ComSpec /d /s /c $buildCommand
+    if ($LASTEXITCODE -ne 0) {
+        throw "Building the Release x64 FileManager solution failed with exit code $LASTEXITCODE."
+    }
+}
+
+function Get-Sha256Hex {
+    param([Parameter(Mandatory = $true)][string]$Path)
+
+    # The release-parity runner must hash locked inputs even when its minimal host omits Get-FileHash.
+    $stream = [System.IO.File]::OpenRead($Path)
+    try {
+        $bytes = [System.Security.Cryptography.SHA256]::Create().ComputeHash($stream)
+        return (($bytes | ForEach-Object { $_.ToString('x2') }) -join '')
+    }
+    finally {
+        $stream.Dispose()
+    }
+}
+
+function Get-PinnedInnoSetupCompiler {
+    $innoPath = 'C:\Program Files (x86)\Inno Setup 6'
+    $compiler = Join-Path $innoPath 'ISCC.exe'
+    if ((Test-Path -LiteralPath $compiler -PathType Leaf) -and
+        ((Get-Item -LiteralPath $compiler).VersionInfo.ProductVersion -match '^6\.7\.3')) {
+        return $compiler
+    }
+
+    $lockPath = Join-Path $repositoryRoot 'tools\release-inputs.json'
+    $input = (Get-Content -LiteralPath $lockPath -Raw | ConvertFrom-Json).inputs.innoSetup
+    $installer = Join-Path ([IO.Path]::GetTempPath()) 'filemanager-innosetup-6.7.3.exe'
+    # Use the same hash and publisher lock as GitHub before a local pipeline run can install a release compiler.
+    Invoke-WebRequest -Uri $input.url -OutFile $installer
+    $actualHash = Get-Sha256Hex $installer
+    if ($actualHash -ne $input.sha256) {
+        throw "Pinned Inno Setup SHA-256 mismatch: expected $($input.sha256), got $actualHash."
+    }
+    $signature = Get-AuthenticodeSignature -LiteralPath $installer
+    if ($signature.Status -ne 'Valid' -or $signature.SignerCertificate.Subject -notlike "*CN=$($input.publisher)*") {
+        throw "Pinned Inno Setup Authenticode verification failed: $($signature.Status) $($signature.SignerCertificate.Subject)"
+    }
+    & $installer /VERYSILENT /SUPPRESSMSGBOXES /NORESTART /SP-
+    if ($LASTEXITCODE -ne 0) {
+        throw "Inno Setup installation failed with exit code $LASTEXITCODE."
+    }
+    if (-not (Test-Path -LiteralPath $compiler -PathType Leaf) -or
+        (Get-Item -LiteralPath $compiler).VersionInfo.ProductVersion -notmatch '^6\.7\.3') {
+        throw "Pinned Inno Setup did not install the locked compiler at $compiler."
+    }
+    return $compiler
+}
+
+function Invoke-ReleasePipelineCheck {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Name,
+        [Parameter(Mandatory = $true)]
+        [scriptblock]$Action
+    )
+
+    $failureCount = $failures.Count
+    Invoke-AutomatedCheck -Name $Name -Action $Action
+    # GitHub stops the installer job at its first failed step, so local parity must not stage an unverified artifact.
+    return $failures.Count -eq $failureCount
+}
+
+function Invoke-ReleasePipelinePackaging {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$DeveloperCommand,
+        [Parameter(Mandatory = $true)]
+        [string]$BuildDirectory,
+        [Parameter(Mandatory = $true)]
+        [ValidateSet('v145')]
+        [string]$Toolset,
+        [Parameter(Mandatory = $true)]
+        [string]$ReleaseBuildNumber
+    )
+
+    $releaseBuildAction = { Build-ReleaseApplication -DeveloperCommand $DeveloperCommand -BuildDirectory $BuildDirectory -Toolset $Toolset }.GetNewClosure()
+    if (-not (Invoke-ReleasePipelineCheck -Name 'Build Solution (Release x64)' -Action $releaseBuildAction)) { return }
+
+    $releaseArtifactRoot = Join-Path $BuildDirectory 'salamander\Release_x64'
+    $auditAction = { & powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $repositoryRoot 'tools\audit-pe-hardening.ps1') -BuildRoot $releaseArtifactRoot }.GetNewClosure()
+    if (-not (Invoke-ReleasePipelineCheck -Name 'Audit Release PE hardening' -Action $auditAction)) { return }
+
+    $nativeRegressionAction = {
+        & $dotnet.Source test $testProject --filter 'FullyQualifiedName~NativeSafetyRegressionTests' --logger 'console;verbosity=minimal'
+        if ($LASTEXITCODE -ne 0) { throw "The Release native regression subset failed with exit code $LASTEXITCODE." }
+    }.GetNewClosure()
+    if (-not (Invoke-ReleasePipelineCheck -Name 'Run v145 native regression subset' -Action $nativeRegressionAction)) { return }
+
+    $symbolIndex = Join-Path $BuildDirectory 'release-symbol-index.json'
+    $symbolsAction = {
+        & powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $repositoryRoot 'tools\new-symbol-index.ps1') -BuildRoot $BuildDirectory -OutputPath $symbolIndex
+        if ($LASTEXITCODE -ne 0) { throw "Generating the release symbol index failed with exit code $LASTEXITCODE." }
+        & powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $repositoryRoot 'tools\test-symbol-index.ps1') -BuildRoot $BuildDirectory -IndexPath $symbolIndex
+        if ($LASTEXITCODE -ne 0) { throw "Verifying the release symbol index failed with exit code $LASTEXITCODE." }
+    }.GetNewClosure()
+    if (-not (Invoke-ReleasePipelineCheck -Name 'Index and verify private release symbols' -Action $symbolsAction)) { return }
+
+    $installerAction = {
+        $compiler = Get-PinnedInnoSetupCompiler
+        $stagingDirectory = Join-Path $repositoryRoot 'Installer\Installer_Staging'
+        & powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $repositoryRoot 'tools\prepare_installer.ps1') -BuildDir $BuildDirectory -StagingDir $stagingDirectory -BuildNumber $ReleaseBuildNumber
+        if ($LASTEXITCODE -ne 0) { throw "Preparing installer files failed with exit code $LASTEXITCODE." }
+        $requiredFiles = @('salamand.exe', 'salmon.exe', 'LICENSE') | ForEach-Object { Join-Path $stagingDirectory $_ }
+        $missingFiles = @($requiredFiles | Where-Object { -not (Test-Path -LiteralPath $_ -PathType Leaf) })
+        if ($missingFiles.Count -ne 0) { throw "Installer staging is incomplete: $($missingFiles -join ', ')" }
+        $sourcePath = Split-Path -Leaf $stagingDirectory
+        & $compiler ('/DSourcePath="' + $sourcePath + '"') ('/DBuildNumber=' + $ReleaseBuildNumber) (Join-Path $repositoryRoot 'Installer\setup.iss')
+        if ($LASTEXITCODE -ne 0) { throw "Building the installer failed with exit code $LASTEXITCODE." }
+        $installerPath = Join-Path $repositoryRoot ('Installer\Output\OpenSalamander_6.0.' + $ReleaseBuildNumber + '.exe')
+        if (-not (Test-Path -LiteralPath $installerPath -PathType Leaf)) { throw "The expected installer was not produced: $installerPath" }
+    }.GetNewClosure()
+    [void](Invoke-ReleasePipelineCheck -Name 'Build installer with pinned Inno Setup' -Action $installerAction)
 }
 
 function Assert-UiTestSymbolicLinkSupport {
@@ -630,6 +825,12 @@ $testResultsDirectory = Join-Path $repositoryRoot 'TestResults'
 # Prune interrupted runs before preflight checks can exit, so an unavailable toolchain cannot defer retention indefinitely.
 Remove-OlderUiTestBuildResults -ResultsDirectory $testResultsDirectory
 
+$releasePipelineVolumeDirectory = $null
+$releasePipelineOwnsVolumes = $false
+if ($ReleasePipeline) {
+    $releasePipelineVolumeDirectory = Join-Path (Join-Path $testResultsDirectory ('runtests-release-volumes-' + [Guid]::NewGuid().ToString('N'))) 'filemanager-ui-volumes'
+}
+
 $vsDevCmd = Find-VisualStudioDeveloperCommand
 if ([string]::IsNullOrWhiteSpace($vsDevCmd)) {
     throw 'Visual Studio 2026 C++ developer tools were not found; the complete UI suite cannot build the current solution.'
@@ -640,7 +841,15 @@ if ($null -eq $dotnet) {
 }
 
 $uiBuildDirectory = Join-Path $testResultsDirectory ('runtests-build-' + [Guid]::NewGuid().ToString('N'))
+$releaseBuildDirectory = $null
 try {
+if ($ReleasePipeline) {
+    $releasePipelineOwnsVolumes = Initialize-ReleasePipelineUiVolumes -WorkingDirectory $releasePipelineVolumeDirectory
+    # Caller-provided volumes are valid too, but release-only fault and recycle coverage must not depend on their ambient environment.
+    $env:FILEMANAGER_UI_ISOLATED = '1'
+    $env:FILEMANAGER_UI_CONFIG_FAULT_INJECTION = '1'
+    $env:FILEMANAGER_UI_RECYCLE_BIN = '1'
+}
 Build-UiTestApplication -DeveloperCommand $vsDevCmd -BuildDirectory $uiBuildDirectory -Toolset $PlatformToolset
 # Keep the script scope so Invoke-AutomatedCheck can resolve the helper function.
 $nativeSafetyAction = {
@@ -667,18 +876,21 @@ catch {
 
 # Fast source contracts and native compatibility probes are always collected;
 # architecture-aware probes run both variants declared by their public scripts.
+$resolvedBaseCommit = Resolve-BaseCommit -RequestedCommit $BaseCommit
 foreach ($relativePath in @(
     'tools\verify-operation-completion-protocol.ps1',
     'tools\verify-durable-copy-commit.ps1',
     # Exercise the diff ratchet in an isolated Git history before release publication.
     'tools\test-raw-thread-creation-verifier.ps1',
     # Keep release-input provenance enforced by the same aggregate test inventory.
-    'tools\test-release-input-pinning.ps1',
-    # The content-fingerprint baseline rejects unsafe calls even when a diff hunk is unavailable.
-    'tools\test-unsafe-api-baseline.ps1'
+    'tools\test-release-input-pinning.ps1'
 )) {
     Invoke-WindowsPowerShellScript -RelativePath $relativePath
 }
+# Give the global unsafe baseline the same base revision as the diff ratchets,
+# so pure source relocations do not masquerade as newly introduced API debt.
+$unsafeBaselineArguments = if ($null -ne $resolvedBaseCommit) { @('-BaseCommit', $resolvedBaseCommit) } else { @() }
+Invoke-WindowsPowerShellScript -RelativePath 'tools\test-unsafe-api-baseline.ps1' -ScriptArguments $unsafeBaselineArguments
 
 foreach ($architecture in @('x64', 'x86')) {
     Invoke-WindowsPowerShellScript -RelativePath 'tools\test-zlib-compatibility.ps1' `
@@ -730,7 +942,6 @@ $sqliteAction = {
 }.GetNewClosure()
 Invoke-AutomatedCheck -Name 'tools\test-sqlite-recovery.ps1' -Action $sqliteAction -SkipReason $sqliteSkipReason
 
-$resolvedBaseCommit = Resolve-BaseCommit -RequestedCommit $BaseCommit
 $ratchetSkipReason = if ([string]::IsNullOrWhiteSpace($resolvedBaseCommit)) {
     'No authoritative pull-request base was supplied; pass -BaseCommit explicitly.'
 } else { $null }
@@ -834,6 +1045,10 @@ else {
     elseif ([string]::IsNullOrWhiteSpace($appVerifierPath)) {
         $lockStressSkipReason = 'Application Verifier was not found.'
     }
+    elseif (-not (Test-ProcessIsElevated)) {
+        # Do not misreport an unavailable privileged diagnostic lane as a product failure on a developer desktop.
+        $lockStressSkipReason = 'Application Verifier requires an elevated console to configure Locks for the built executable.'
+    }
     $lockStressLogDirectory = Join-Path $repositoryRoot 'TestResults\application-verifier-logs'
     $lockStressArguments = if ($null -eq $lockStressSkipReason) {
         @(
@@ -845,6 +1060,19 @@ else {
     } else { @() }
     Invoke-WindowsPowerShellScript -RelativePath 'tools\run-lock-verifier-stress.ps1' `
         -ScriptArguments $lockStressArguments -SkipReason $lockStressSkipReason
+}
+
+if ($ReleasePipeline) {
+    if ($failures.Count -eq 0 -and $skipped.Count -eq 0) {
+        # Keep Release outputs separate from Debug UI artifacts so the PE audit sees the same tree as the installer job.
+        $releaseBuildDirectory = Join-Path $testResultsDirectory ('runtests-release-' + [Guid]::NewGuid().ToString('N'))
+        Invoke-ReleasePipelinePackaging -DeveloperCommand $vsDevCmd -BuildDirectory $releaseBuildDirectory `
+            -Toolset $PlatformToolset -ReleaseBuildNumber $BuildNumber
+    }
+    else {
+        # GitHub's build job depends on the release gate, so do not package when its prerequisites were not verified.
+        Write-Host 'Skipping Release build and installer because the release-test gate did not pass.' -ForegroundColor Yellow
+    }
 }
 
 Write-Host "`n=== Automated test summary ===" -ForegroundColor Cyan
@@ -874,6 +1102,19 @@ finally {
     if (-not $KeepBuildArtifacts -and (Test-Path -LiteralPath $uiBuildDirectory -PathType Container)) {
         # This per-run GUID directory is owned by the runner; remove it on every exit path to avoid exhausting the test host.
         Remove-Item -LiteralPath $uiBuildDirectory -Recurse -Force
+    }
+    if (-not $KeepBuildArtifacts -and -not [string]::IsNullOrWhiteSpace($releaseBuildDirectory) -and
+        (Test-Path -LiteralPath $releaseBuildDirectory -PathType Container)) {
+        # Release artifacts are likewise per-run outputs; retain them only when a packaging failure needs inspection.
+        Remove-Item -LiteralPath $releaseBuildDirectory -Recurse -Force
+    }
+    if ($releasePipelineOwnsVolumes -and -not [string]::IsNullOrWhiteSpace($releasePipelineVolumeDirectory)) {
+        # Detach only the exact VHDs provisioned above, matching the workflow's unconditional cleanup phase.
+        & powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $repositoryRoot 'tools\manage-ui-test-volumes.ps1') `
+            -Action Cleanup -WorkingDirectory $releasePipelineVolumeDirectory
+        if ($LASTEXITCODE -ne 0) {
+            Write-Warning "Could not remove the release-pipeline UI test volumes (exit code $LASTEXITCODE)."
+        }
     }
     Remove-OlderUiTestBuildResults -ResultsDirectory $testResultsDirectory
 }

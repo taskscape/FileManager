@@ -45,12 +45,26 @@ function Invoke-SevenZipOracle {
     }
 }
 
+function Get-Sha256Hex {
+    param([Parameter(Mandatory = $true)][string]$Path)
+
+    # Use the BCL directly because minimal Windows PowerShell hosts can omit the Get-FileHash cmdlet.
+    $stream = [System.IO.File]::OpenRead($Path)
+    try {
+        $bytes = [System.Security.Cryptography.SHA256]::Create().ComputeHash($stream)
+        return (($bytes | ForEach-Object { $_.ToString('x2') }) -join '')
+    }
+    finally {
+        $stream.Dispose()
+    }
+}
+
 function Get-ExtractionManifest {
     param([Parameter(Mandatory = $true)][string]$Root)
 
     return @(Get-ChildItem -LiteralPath $Root -File -Recurse | ForEach-Object {
         $relative = $_.FullName.Substring($Root.Length).TrimStart('\', '/') -replace '\\', '/'
-        $hash = (Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+        $hash = Get-Sha256Hex $_.FullName
         "$relative|$($_.Length)|$hash"
     } | Sort-Object)
 }

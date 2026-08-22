@@ -3,7 +3,10 @@ Set-StrictMode -Version Latest
 $script:UnsafeApiPattern = '\b(?<api>strcpy|strcat|strncpy|strncat|sprintf|vsprintf|_snprintf|_vsnprintf|lstrcpy(?:A|W)?|lstrcat(?:A|W)?|wsprintf(?:A|W)?|gets|scanf|fscanf|sscanf)\s*\('
 
 function Get-UnsafeApiEntries {
-    param([Parameter(Mandatory = $true)][string] $RepositoryRoot)
+    param(
+        [Parameter(Mandatory = $true)][string] $RepositoryRoot,
+        [switch] $IncludeSourceLine
+    )
 
     $root = (Resolve-Path -LiteralPath $RepositoryRoot).Path.TrimEnd('\')
     $entries = @{}
@@ -26,12 +29,16 @@ function Get-UnsafeApiEntries {
                 $key = "$relative|$api|$fingerprint"
                 if (-not $entries.ContainsKey($key)) {
                     $entries[$key] = [ordered]@{ path = $relative; api = $api; fingerprint = $fingerprint; count = 0 }
+                    # The optional normalized line lets the checker recognize an unchanged call relocated by a refactor.
+                    if ($IncludeSourceLine) { $entries[$key].sourceLine = $normalized }
                 }
                 $entries[$key].count++
             }
         }
     }
-    return @($entries.Values | Sort-Object path, api, fingerprint)
+    # Emit objects, not ordered dictionaries: PowerShell otherwise enumerates
+    # dictionary properties and corrupts the path/API comparison in callers.
+    return @($entries.Values | Sort-Object path, api, fingerprint | ForEach-Object { [pscustomobject]$_ })
 }
 
 Export-ModuleMember -Function Get-UnsafeApiEntries

@@ -11,6 +11,12 @@ if (-not (Test-Path -LiteralPath $exemptionsPath)) {
 }
 $exemptions = Get-Content -LiteralPath $exemptionsPath -Raw
 
+$baseSourceLines = [System.Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
+$sourcePathspecs = @(':(glob)**/*.c', ':(glob)**/*.cc', ':(glob)**/*.cpp', ':(glob)**/*.h', ':(glob)**/*.hpp')
+# One base-revision source scan avoids treating format strings as Git revisions
+# while keeping move detection fast enough for the full local test runner.
+foreach ($baseLine in (& git grep -h -I -e '.' $BaseCommit -- $sourcePathspecs)) { [void]$baseSourceLines.Add($baseLine.Trim()) }
+
 function Test-ApprovedExemption([string]$Id, [string]$File) {
     $escapedId = [regex]::Escape($Id)
     $entry = [regex]::Match($exemptions, "(?ms)^###\s+$escapedId\s*$.*?(?=^###|\z)")
@@ -23,6 +29,12 @@ function Test-ApprovedExemption([string]$Id, [string]$File) {
     return $entry.Value -match $filePattern -and
            $entry.Value -match '(?m)^- Reason:\s+\S' -and
            $entry.Value -match '(?m)^- Removal:\s+\S'
+}
+
+function Test-LineWasPresentInBaseRevision([string]$SourceLine) {
+    # Source extraction preserves the debt's history; only an actually changed
+    # fixed buffer needs an exemption or a CWidePath migration.
+    return $baseSourceLines.Contains($SourceLine.Trim())
 }
 
 # This is a changed-lines ratchet, not a historical cleanup. It deliberately
@@ -50,6 +62,11 @@ foreach ($line in $diff) {
     }
 
     $exemption = [regex]::Match($addedCode, 'MAX_PATH-RATCHET-EXEMPT:\s*([A-Za-z0-9._-]+)')
+    # A same-line match in the base revision is a relocation, not a new fixed buffer.
+    if (Test-LineWasPresentInBaseRevision $addedCode) {
+        continue
+    }
+
     if ($exemption.Success -and (Test-ApprovedExemption $exemption.Groups[1].Value $currentFile)) {
         Write-Host "Approved MAX_PATH buffer exemption $($exemption.Groups[1].Value): $currentFile"
         continue

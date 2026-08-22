@@ -12,30 +12,17 @@ Visual Studio 2026 and its developer-command environment are the authoritative n
 
 ## Building
 
-### Complete installer build
+### Complete release-pipeline build
 
-The repository includes a local build script that reproduces the GitHub Actions installer build workflow:
+The release-parity runner is the authoritative local equivalent of the GitHub Actions release gate and installer-build jobs:
 
 ```powershell
-# Build Release configuration with the VS 2026 v145 toolset
-.\scripts\build-installer.ps1
-
-# Build with different configuration or toolset
-.\scripts\build-installer.ps1 -Configuration Debug -PlatformToolset v145
-
-# Skip tests (useful for quick iteration)
-.\scripts\build-installer.ps1 -SkipTests
+.\scripts\runtests.ps1 -ReleasePipeline -BaseCommit HEAD^ -BuildNumber 0
 ```
 
-This script:
-- Builds the solution with MSBuild
-- Runs native regression tests
-- Creates PE manifest for toolset verification
-- Installs Inno Setup 6.7.3 (if not present)
-- Stages files for Inno Setup
-- Compiles the installer
+It provisions the UI-test topology when needed, runs the complete Debug release gate, builds Release x64, audits PE hardening, verifies private symbols, validates the pinned Inno Setup compiler, stages files, and compiles the installer. It does not publish a GitHub release.
 
-See `Get-Help .\scripts\build-installer.ps1 -Detailed` for full usage information.
+`scripts\build-installer.ps1` remains available for packaging-only iteration, but it is not a replacement for release-pipeline validation.
 
 ## Quick start
 
@@ -53,6 +40,16 @@ powershell -NoProfile -ExecutionPolicy Bypass `
 Each run removes its own GUID-named `TestResults\runtests-build-*` directory, including after a failure. Pass `-KeepBuildArtifacts` only when the isolated native build outputs are needed for diagnosis.
 
 `-PlatformToolset v145` selects the toolset used for both the built executable and native safety target. CI may supply `-NUnitTrxPath` to retain the complete executable result inventory as a workflow artifact.
+
+### GitHub release-pipeline parity
+
+Run the complete local equivalent of the GitHub release gate and installer-build jobs with:
+
+```powershell
+.\scripts\runtests.ps1 -ReleasePipeline -BaseCommit HEAD^ -BuildNumber 0
+```
+
+`-ReleasePipeline` applies the release category filter and unexpected-skip policy, omits the nightly Application Verifier diagnostic, then builds `Release|x64`, audits Release PE hardening, re-runs the native regression subset, verifies the private symbol index, validates/installs the pinned Inno Setup compiler, stages the installer, and compiles it. It deliberately does not publish a GitHub release. Pass `-KeepBuildArtifacts` to retain the isolated Debug and Release build trees after diagnosis.
 
 The runner uses the CI pull-request base for changed-line ratchets or accepts `-BaseCommit` explicitly; it does not guess from a potentially stale local tracking branch. It discovers an existing Debug or Release x64 SQLite DLL when possible. Supply prerequisites explicitly or require a fully provisioned run with:
 

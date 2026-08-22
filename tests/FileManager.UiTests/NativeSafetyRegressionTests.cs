@@ -46,6 +46,13 @@ public sealed class NativeSafetyRegressionTests
             Assert.That(runner, Does.Contain("Connect to FTP Server..."));
             Assert.That(runner, Does.Contain("FileManager.UiTests (complete NUnit project)"));
             Assert.That(runner, Does.Contain("run-lock-verifier-stress.ps1"));
+            // The opt-in local release mode must cover the packaging job as well as the Debug release gate.
+            Assert.That(runner, Does.Contain("[switch]$ReleasePipeline"));
+            Assert.That(runner, Does.Contain("Build-ReleaseApplication"));
+            Assert.That(runner, Does.Contain("audit-pe-hardening.ps1"));
+            Assert.That(runner, Does.Contain("new-symbol-index.ps1"));
+            Assert.That(runner, Does.Contain("prepare_installer.ps1"));
+            Assert.That(runner, Does.Contain("Get-PinnedInnoSetupCompiler"));
             Assert.That(runner, Does.Contain("FailOnSkipped"));
             Assert.That(runner, Does.Contain("@outcome='NotExecuted'"));
             // Only manifest-backed categories may leave the blocking inventory; NUnit Ignore remains a hard failure.
@@ -391,7 +398,7 @@ public sealed class NativeSafetyRegressionTests
     {
         var root = FindRepositoryRoot();
         var result = File.ReadAllText(Path.Combine(root, "src", "operation_result.h"));
-        var copy = File.ReadAllText(Path.Combine(root, "src", "async_copy.cpp"));
+        var copy = ReadOperationImplementationSources(root);
         var combine = File.ReadAllText(Path.Combine(root, "src", "plugins", "splitcbn", "combine.cpp"));
         var refactoring = File.ReadAllText(Path.Combine(root, "refactoring.md"));
 
@@ -418,8 +425,9 @@ public sealed class NativeSafetyRegressionTests
             Assert.That(result, Does.Contain("void BuildDiagnosticSummary"));
             Assert.That(result, Does.Contain("Cleanup is secondary evidence"));
             Assert.That(result, Does.Contain("BOOL ToLegacyBool(DWORD* error) const"));
-            Assert.That(copy, Does.Contain("static COperationResult CommitTransactionalTargetFile"));
-            Assert.That(copy, Does.Contain("static COperationResult VerifyDurableCopyCommit"));
+            // These helpers now cross the split copy implementation boundary, so linkage may change without weakening the result contract.
+            Assert.That(copy, Does.Contain("COperationResult CommitTransactionalTargetFile"));
+            Assert.That(copy, Does.Contain("COperationResult VerifyDurableCopyCommit"));
             Assert.That(copy, Does.Contain("COperationResult verificationResult = VerifyDurableCopyCommit"));
             Assert.That(copy, Does.Contain("while (!verificationResult.ToLegacyBool(&verificationError))"));
             Assert.That(copy, Does.Contain("COperationResult commitResult = CommitTransactionalTargetFile"));
@@ -438,7 +446,7 @@ public sealed class NativeSafetyRegressionTests
     {
         var root = FindRepositoryRoot();
         var result = File.ReadAllText(Path.Combine(root, "src", "operation_result.h"));
-        var copy = File.ReadAllText(Path.Combine(root, "src", "async_copy.cpp"));
+        var copy = ReadOperationImplementationSources(root);
         var combine = File.ReadAllText(Path.Combine(root, "src", "plugins", "splitcbn", "combine.cpp"));
         var refactoring = File.ReadAllText(Path.Combine(root, "refactoring.md"));
 
@@ -495,7 +503,7 @@ public sealed class NativeSafetyRegressionTests
     {
         var root = FindRepositoryRoot();
         var resources = File.ReadAllText(Path.Combine(root, "src", "common", "scoped_native_resources.h"));
-        var copy = File.ReadAllText(Path.Combine(root, "src", "async_copy.cpp"));
+        var copy = ReadOperationImplementationSources(root);
         var broker = File.ReadAllText(Path.Combine(root, "src", "parserbroker.cpp"));
         var scripts = File.ReadAllText(Path.Combine(root, "src", "plugins", "automation", "scriptlist.cpp"));
         var refactoring = File.ReadAllText(Path.Combine(root, "refactoring.md"));
@@ -833,7 +841,7 @@ public sealed class NativeSafetyRegressionTests
         var snooper = File.ReadAllText(Path.Combine(root, "src", "snooper.cpp"));
         var callStack = File.ReadAllText(Path.Combine(root, "src", "callstk.cpp"));
         var auxiliary = File.ReadAllText(Path.Combine(root, "src", "path_utils.cpp"));
-        var appEntry = File.ReadAllText(Path.Combine(root, "src", "app_entry.cpp"));
+        var appEntry = ReadApplicationLifecycleSources(root);
         var refactoring = File.ReadAllText(Path.Combine(root, "refactoring.md"));
 
         // These contracts make stalled shutdown observable without letting a
@@ -913,7 +921,7 @@ public sealed class NativeSafetyRegressionTests
         var ftpActive = File.ReadAllText(Path.Combine(root, "src", "plugins", "ftp", "ctrlcon5.cpp"));
         var ftpHeader = File.ReadAllText(Path.Combine(root, "src", "plugins", "ftp", "ctrlcon.h"));
         var fileOperationDialogs = File.ReadAllText(Path.Combine(root, "src", "dialogs_file_ops.cpp"));
-        var asyncCopy = File.ReadAllText(Path.Combine(root, "src", "async_copy.cpp"));
+        var asyncCopy = ReadOperationImplementationSources(root);
         var find = File.ReadAllText(Path.Combine(root, "src", "find.cpp"));
         var findUi = File.ReadAllText(Path.Combine(root, "src", "find_dialog_ui.cpp"));
         var findHeader = File.ReadAllText(Path.Combine(root, "src", "find.h"));
@@ -1118,7 +1126,7 @@ public sealed class NativeSafetyRegressionTests
         var root = FindRepositoryRoot();
         var widePath = File.ReadAllText(Path.Combine(root, "src", "common", "wide_path.h"));
         var constants = File.ReadAllText(Path.Combine(root, "src", "consts.h"));
-        var pathUtils = File.ReadAllText(Path.Combine(root, "src", "path_utils.cpp"));
+        var pathUtils = ReadPathHistorySources(root);
         var appEntry = File.ReadAllText(Path.Combine(root, "src", "app_entry.cpp"));
         var pathChecking = File.ReadAllText(Path.Combine(root, "src", "path_checking.cpp"));
 
@@ -1261,7 +1269,7 @@ public sealed class NativeSafetyRegressionTests
         var root = FindRepositoryRoot();
         var helper = File.ReadAllText(Path.Combine(root, "src", "file_identity.cpp"));
         var operations = File.ReadAllText(Path.Combine(root, "src", "operations_core.cpp"));
-        var copy = File.ReadAllText(Path.Combine(root, "src", "async_copy.cpp"));
+        var copy = ReadOperationImplementationSources(root);
 
         // The mutation API borrows the RAII owner's handle; it must not receive
         // or retain ownership of the verified delete handle itself.
@@ -1466,7 +1474,7 @@ public sealed class NativeSafetyRegressionTests
         var root = FindRepositoryRoot();
         var policy = File.ReadAllText(Path.Combine(root, "src", "retry_policy.h"));
         var result = File.ReadAllText(Path.Combine(root, "src", "operation_result.h"));
-        var copy = File.ReadAllText(Path.Combine(root, "src", "async_copy.cpp"));
+        var copy = ReadOperationImplementationSources(root);
         var refactoring = File.ReadAllText(Path.Combine(root, "refactoring.md"));
 
         // Source characterization keeps retry pacing and destructive-operation safety independently reviewable.
@@ -1499,7 +1507,7 @@ public sealed class NativeSafetyRegressionTests
         var root = FindRepositoryRoot();
         var executionHeader = File.ReadAllText(Path.Combine(root, "src", "operation_execution_filesystem.h"));
         var executionAdapter = File.ReadAllText(Path.Combine(root, "src", "file_operation_filesystem.cpp"));
-        var copy = File.ReadAllText(Path.Combine(root, "src", "async_copy.cpp"));
+        var copy = ReadOperationImplementationSources(root);
         var identities = File.ReadAllText(Path.Combine(root, "src", "file_identity.cpp"));
         var journal = File.ReadAllText(Path.Combine(root, "src", "operation_journal.cpp"));
         var nativeTests = File.ReadAllText(Path.Combine(root, "tests", "NativeSafetyTests", "NativeSafetyTests.cpp"));
@@ -2382,7 +2390,7 @@ public sealed class NativeSafetyRegressionTests
     public void Configuration_saves_stage_validate_and_atomically_select_a_generation()
     {
         var root = FindRepositoryRoot();
-        var configuration = File.ReadAllText(Path.Combine(root, "src", "mainwnd_config.cpp"));
+        var configuration = ReadConfigurationSources(root);
         var registryWork = File.ReadAllText(Path.Combine(root, "src", "regwork.cpp"));
         var plugins = File.ReadAllText(Path.Combine(root, "src", "plugins_loading.cpp"));
         var startup = File.ReadAllText(Path.Combine(root, "src", "app_entry.cpp"));
@@ -2421,7 +2429,7 @@ public sealed class NativeSafetyRegressionTests
     public void Configuration_profiles_are_schema_versioned_migrated_and_validated_before_loading()
     {
         var root = FindRepositoryRoot();
-        var configuration = File.ReadAllText(Path.Combine(root, "src", "mainwnd_config.cpp"));
+        var configuration = ReadConfigurationSources(root);
         var startup = File.ReadAllText(Path.Combine(root, "src", "app_entry.cpp"));
         var architecture = File.ReadAllText(Path.Combine(root, "architecture.md"));
         var refactoring = File.ReadAllText(Path.Combine(root, "refactoring.md"));
@@ -2454,7 +2462,7 @@ public sealed class NativeSafetyRegressionTests
         var workerHeader = File.ReadAllText(Path.Combine(root, "src", "worker.h"));
         var worker = File.ReadAllText(Path.Combine(root, "src", "worker.cpp"));
         var planner = File.ReadAllText(Path.Combine(root, "src", "fileswindow_operations.cpp"));
-        var copy = File.ReadAllText(Path.Combine(root, "src", "async_copy.cpp"));
+        var copy = ReadOperationImplementationSources(root);
         var operations = File.ReadAllText(Path.Combine(root, "src", "operations_core.cpp"));
         var dialogs = File.ReadAllText(Path.Combine(root, "src", "dialogs_file_ops.cpp"));
         var strings = File.ReadAllText(Path.Combine(root, "src", "lang", "texts.rc2"));
@@ -2510,7 +2518,7 @@ public sealed class NativeSafetyRegressionTests
     public void Security_descriptor_copy_uses_the_privilege_aware_preservation_matrix()
     {
         var root = FindRepositoryRoot();
-        var copy = File.ReadAllText(Path.Combine(root, "src", "async_copy.cpp"));
+        var copy = ReadOperationImplementationSources(root);
         var architecture = File.ReadAllText(Path.Combine(root, "architecture.md"));
         var refactoring = File.ReadAllText(Path.Combine(root, "refactoring.md"));
 
@@ -2555,7 +2563,7 @@ public sealed class NativeSafetyRegressionTests
         var diagnosticsHeader = File.ReadAllText(Path.Combine(root, "src", "release_diagnostics.h"));
         var worker = File.ReadAllText(Path.Combine(root, "src", "worker.cpp"));
         var operations = File.ReadAllText(Path.Combine(root, "src", "operations_core.cpp"));
-        var copy = File.ReadAllText(Path.Combine(root, "src", "async_copy.cpp"));
+        var copy = ReadOperationImplementationSources(root);
         var plugins = File.ReadAllText(Path.Combine(root, "src", "plugins_loading.cpp"));
         var callStack = File.ReadAllText(Path.Combine(root, "src", "callstk.cpp"));
         var bugReport = File.ReadAllText(Path.Combine(root, "src", "bugreprt.cpp"));
@@ -2869,6 +2877,36 @@ public sealed class NativeSafetyRegressionTests
             Assert.That(soakWorkflow, Does.Contain("test-cmark-gfm-hardening.ps1 -Iterations 250"));
             Assert.That(refactoring, Does.Contain("### 65. Upgrade cmark-gfm and harden rendered-content defaults — Implemented"));
         });
+    }
+
+    // Refactors may move an operation seam, but every source below must remain compiled into the product.
+    private static string ReadOperationImplementationSources(string root) =>
+        ReadCompiledNativeSources(root,
+            "async_copy.cpp", "copy_commit.cpp", "copy_loop.cpp", "metadata_preservation.cpp",
+            "security_helpers.cpp", "file_attributes.cpp", "ads_operations.cpp", "recycle_bin_delete.cpp");
+
+    // Application shutdown is intentionally split from startup so lifecycle contracts span both compiled units.
+    private static string ReadApplicationLifecycleSources(string root) =>
+        ReadCompiledNativeSources(root, "app_entry.cpp", "app_shutdown.cpp");
+
+    // Configuration persistence and import are separate implementation seams with one external contract.
+    private static string ReadConfigurationSources(string root) =>
+        ReadCompiledNativeSources(root, "mainwnd_config.cpp", "config_store.cpp", "config_import.cpp");
+
+    // Path history was separated from general path handling without changing the UTF-16 API surface.
+    private static string ReadPathHistorySources(string root) =>
+        ReadCompiledNativeSources(root, "path_utils.cpp", "path_history.cpp");
+
+    private static string ReadCompiledNativeSources(string root, params string[] relativePaths)
+    {
+        var project = File.ReadAllText(Path.Combine(root, "src", "vcxproj", "salamand.vcxproj"));
+        return string.Join(Environment.NewLine, relativePaths.Select(relativePath =>
+        {
+            var projectPath = relativePath.Replace('/', '\\');
+            Assert.That(project, Does.Contain($"<ClCompile Include=\"..\\{projectPath}\">"),
+                $"{relativePath} must remain compiled by salamand.vcxproj.");
+            return File.ReadAllText(Path.Combine(root, "src", relativePath));
+        }));
     }
 
     private static string FindRepositoryRoot()

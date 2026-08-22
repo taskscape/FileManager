@@ -1,5 +1,8 @@
 [CmdletBinding()]
-param([string] $BaselinePath)
+param(
+    [string] $BaselinePath,
+    [string] $BaseCommit
+)
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
@@ -18,10 +21,30 @@ foreach ($entry in $baseline.entries) {
     $allowed[$key] = [int]$entry.count
 }
 
+$baseSourceLines = [System.Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
+if (-not [string]::IsNullOrWhiteSpace($BaseCommit)) {
+    $sourcePathspecs = @(':(glob)**/*.c', ':(glob)**/*.cc', ':(glob)**/*.cpp', ':(glob)**/*.h', ':(glob)**/*.hpp')
+    # One base-revision source scan avoids treating format strings as Git revisions
+    # while keeping move detection fast enough for the full local test runner.
+    foreach ($baseSourceLine in (& git grep -h -I -e '.' $BaseCommit -- $sourcePathspecs)) { [void]$baseSourceLines.Add($baseSourceLine.Trim()) }
+}
+
+function Test-LineWasPresentInBaseRevision {
+    param([Parameter(Mandatory = $true)][string]$SourceLine)
+
+    # Baseline fingerprints include paths, so retain equivalent pre-refactor
+    # calls only when the exact normalized source line existed in the base revision.
+    return $baseSourceLines.Contains($SourceLine.Trim())
+}
+
 $violations = @()
-foreach ($entry in Get-UnsafeApiEntries -RepositoryRoot $root) {
+foreach ($entry in Get-UnsafeApiEntries -RepositoryRoot $root -IncludeSourceLine) {
     $key = "$($entry.path)|$($entry.api)|$($entry.fingerprint)"
     if (-not $allowed.ContainsKey($key) -or [int]$entry.count -gt $allowed[$key]) {
+        if (-not [string]::IsNullOrWhiteSpace($BaseCommit) -and
+            (Test-LineWasPresentInBaseRevision $entry.sourceLine)) {
+            continue
+        }
         $violations += "$($entry.path): $($entry.api) ($($entry.count) occurrence(s))"
     }
 }

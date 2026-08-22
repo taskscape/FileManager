@@ -8,6 +8,20 @@ $toolbarDefinitionsPath = Join-Path $repoRoot 'src\toolbar_button_defs.cpp'
 $toolbarDirectory = Join-Path $repoRoot 'src\res\toolbars'
 $errors = [System.Collections.Generic.List[string]]::new()
 
+function Get-Sha256Hex {
+    param([Parameter(Mandatory = $true)][string]$Path)
+
+    # Use the BCL directly because minimal Windows PowerShell hosts can omit the Get-FileHash cmdlet.
+    $stream = [System.IO.File]::OpenRead($Path)
+    try {
+        $bytes = [System.Security.Cryptography.SHA256]::Create().ComputeHash($stream)
+        return (($bytes | ForEach-Object { $_.ToString('X2') }) -join '')
+    }
+    finally {
+        $stream.Dispose()
+    }
+}
+
 $definitionText = [System.IO.File]::ReadAllText($toolbarDefinitionsPath)
 $mappedNames = [regex]::Matches(
     $definitionText,
@@ -72,7 +86,7 @@ $protectedAppIcons = @{
 foreach ($entry in $protectedAppIcons.GetEnumerator())
 {
     $path = Join-Path $repoRoot ('src\res\' + $entry.Key)
-    $actual = (Get-FileHash -LiteralPath $path -Algorithm SHA256).Hash
+    $actual = Get-Sha256Hex $path
     if ($actual -ne $entry.Value)
     {
         $errors.Add("Protected main application icon changed: $($entry.Key)")

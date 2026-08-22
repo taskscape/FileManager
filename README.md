@@ -72,26 +72,15 @@ Open Salamander uses [Inno Setup](https://jrsoftware.org/isinfo.php) to create t
 
 #### Building Locally
 
-**Recommended:** Use the automated build script that reproduces the GitHub Actions workflow:
+**Recommended:** Use the release-parity runner, which reproduces the GitHub release gate and installer-build jobs locally:
 
 ```powershell
-# Build Release configuration with the VS 2026 v145 toolset
-.\scripts\build-installer.ps1
-
-# Build with different configuration or toolset
-.\scripts\build-installer.ps1 -Configuration Debug -PlatformToolset v145
-
-# Skip tests (for quick iteration)
-.\scripts\build-installer.ps1 -SkipTests
+.\scripts\runtests.ps1 -ReleasePipeline -BaseCommit HEAD^ -BuildNumber 0
 ```
 
-The script automatically:
-- Builds the solution with MSBuild
-- Runs native regression tests
-- Creates PE manifest for toolset verification
-- Installs Inno Setup 6.7.3 (if not present)
-- Stages files for Inno Setup
-- Compiles the installer
+The runner executes the complete Debug release gate, builds Release x64, audits PE hardening, verifies private symbols, validates the pinned Inno Setup compiler, stages files, and compiles the installer. It does not publish a GitHub release.
+
+`scripts\build-installer.ps1` remains useful for packaging-only iteration, but it does not replace release-pipeline validation.
 
 **Manual build:** For debugging, you can run the individual steps:
 
