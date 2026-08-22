@@ -50,18 +50,31 @@ if ($mutableReferences.Count -ne 0) {
 }
 
 $releaseWorkflow = Get-Content -LiteralPath (Join-Path $repositoryRoot '.github\workflows\build-installer.yml') -Raw
+$innoProvisioner = Get-Content -LiteralPath (Join-Path $repositoryRoot 'tools\install-pinned-inno-setup.ps1') -Raw
 foreach ($requiredPattern in @(
     'needs: release-tests',
     'needs: build',
     'environment: production',
     'contents: write',
-    'Get-FileHash',
-    'Get-AuthenticodeSignature',
+    'install-pinned-inno-setup\.ps1',
     'release-installer-\$\{\{ github\.sha \}\}',
     'private-symbols-\$\{\{ github\.sha \}\}'
 )) {
     if ($releaseWorkflow -notmatch $requiredPattern) {
         throw "Release workflow is missing required immutable-release contract: $requiredPattern"
+    }
+}
+
+foreach ($requiredPattern in @(
+    'Get-FileHash',
+    'Get-AuthenticodeSignature',
+    '/DIR=',
+    'runner service account cannot write Program Files',
+    'ISCC\.exe publishes a 0\.0\.0\.0 PE version'
+)) {
+    # The helper owns verification and user-writable installation, so both local and GitHub packaging share one immutable tool boundary.
+    if ($innoProvisioner -notmatch $requiredPattern) {
+        throw "Pinned Inno Setup provisioner is missing required contract: $requiredPattern"
     }
 }
 

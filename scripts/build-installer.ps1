@@ -90,6 +90,7 @@ $repositoryRoot = Split-Path -Parent $PSScriptRoot
 $script:BUILD_DIR = if ($BuildDir) { $BuildDir } else { Join-Path $repositoryRoot 'build_stage' }
 $script:STAGING_DIR = Join-Path $repositoryRoot $StagingDir
 $script:RUNNER_TEMP = Join-Path $repositoryRoot 'tmp'
+$script:INNO_SETUP_COMPILER = $null
 
 # Ensure temporary directory exists
 if (-not (Test-Path $script:RUNNER_TEMP)) {
@@ -211,60 +212,14 @@ function Invoke-NativeRegressionTests() {
 function Invoke-InstallInnoSetup() {
     Write-Host "=== Checking Inno Setup Installation ===" -ForegroundColor Cyan
 
-    $innoPath = 'C:\Program Files (x86)\Inno Setup 6'
-    $iscc = Join-Path $innoPath 'ISCC.exe'
-
-    if (Test-Path $iscc) {
-        $version = (Get-Item $iscc).VersionInfo.ProductVersion
-        Write-Host "Inno Setup found: $version"
-        return $true
+    $installDirectory = Join-Path $script:RUNNER_TEMP 'filemanager-inno-setup-6.7.3'
+    # Reuse the workflow helper so local builds never require machine-wide Program Files access.
+    $script:INNO_SETUP_COMPILER = & (Join-Path $repositoryRoot 'tools\install-pinned-inno-setup.ps1') -InstallDirectory $installDirectory
+    if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath $script:INNO_SETUP_COMPILER -PathType Leaf)) {
+        throw 'Pinned Inno Setup provisioning did not produce ISCC.exe.'
     }
 
-    Write-Host "Inno Setup not found. Installing version 6.7.3..." -ForegroundColor Yellow
-
-    $inputsPath = Join-Path $repositoryRoot 'tools\release-inputs.json'
-    if (-not (Test-Path $inputsPath)) {
-        Write-Error "Release inputs file not found: $inputsPath"
-    }
-
-    $inputs = Get-Content $inputsPath -Raw | ConvertFrom-Json
-    $innoInput = $inputs.inputs.innoSetup
-
-    if ($innoInput.version -ne '6.7.3') {
-        Write-Warning "Lock file specifies Inno Setup version $($innoInput.version), but script expects 6.7.3"
-    }
-
-    $installerPath = Join-Path $script:RUNNER_TEMP 'innosetup-installer.exe'
-
-    Write-Host "Downloading Inno Setup from: $($innoInput.url)"
-    Invoke-WebRequest -Uri $innoInput.url -OutFile $installerPath
-
-    $actualHash = (Get-FileHash -LiteralPath $installerPath -Algorithm SHA256).Hash.ToLowerInvariant()
-    if ($actualHash -ne $innoInput.sha256) {
-        throw "Inno Setup SHA-256 mismatch: expected $($innoInput.sha256), got $actualHash."
-    }
-
-    Write-Host "Verifying Authenticode signature..."
-    $signature = Get-AuthenticodeSignature -LiteralPath $installerPath
-    if ($signature.Status -ne 'Valid' -or $signature.SignerCertificate.Subject -notlike "*CN=$($innoInput.publisher)*") {
-        throw "Inno Setup Authenticode verification failed: $($signature.Status) $($signature.SignerCertificate.Subject)"
-    }
-
-    Write-Host "Installing Inno Setup silently..."
-    $installProcess = Start-Process -FilePath $installerPath -ArgumentList '/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', '/SP-' -Wait -PassThru
-
-    if ($installProcess.ExitCode -ne 0) {
-        throw "Inno Setup installation failed with exit code $($installProcess.ExitCode)."
-    }
-
-    if (-not (Test-Path $iscc)) {
-        throw "Inno Setup did not install $iscc."
-    }
-
-    $version = (Get-Item $iscc).VersionInfo.ProductVersion
-    Write-Host "Inno Setup installed successfully: $version" -ForegroundColor Green
-
-    return $true
+    Write-Host "Inno Setup provisioned: $script:INNO_SETUP_COMPILER" -ForegroundColor Green
 }
 
 # Stage files for Inno Setup
@@ -318,11 +273,9 @@ function Invoke-BuildInstaller() {
         Write-Error "Setup script not found: $setupScript"
     }
 
-    $innoPath = 'C:\Program Files (x86)\Inno Setup 6'
-    $iscc = Join-Path $innoPath 'ISCC.exe'
-
-    if (-not (Test-Path $iscc)) {
-        Write-Error "Inno Setup ISCC.exe not found: $iscc"
+    $iscc = $script:INNO_SETUP_COMPILER
+    if ([string]::IsNullOrWhiteSpace($iscc) -or -not (Test-Path -LiteralPath $iscc -PathType Leaf)) {
+        throw 'Run Invoke-InstallInnoSetup before compiling the installer.'
     }
 
     $sourcePath = Split-Path -Leaf $StagingDir

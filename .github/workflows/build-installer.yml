@@ -177,26 +177,10 @@ jobs:
       - name: Install pinned Inno Setup
         shell: pwsh
         run: |
-          # The lock file makes a tool update an explicit reviewed source change.
-          $input = (Get-Content tools\release-inputs.json -Raw | ConvertFrom-Json).inputs.innoSetup
-          $installer = Join-Path $env:RUNNER_TEMP 'innosetup-installer.exe'
-          Invoke-WebRequest -Uri $input.url -OutFile $installer
-          $actualHash = (Get-FileHash -LiteralPath $installer -Algorithm SHA256).Hash.ToLowerInvariant()
-          if ($actualHash -ne $input.sha256) {
-            throw "Pinned Inno Setup SHA-256 mismatch: expected $($input.sha256), got $actualHash."
-          }
-          $signature = Get-AuthenticodeSignature -LiteralPath $installer
-          if ($signature.Status -ne 'Valid' -or $signature.SignerCertificate.Subject -notlike "*CN=$($input.publisher)*") {
-            throw "Pinned Inno Setup Authenticode verification failed: $($signature.Status) $($signature.SignerCertificate.Subject)"
-          }
-          & $installer /VERYSILENT /SUPPRESSMSGBOXES /NORESTART /SP-
-          if ($LASTEXITCODE -ne 0) { throw "Inno Setup installation failed with exit code $LASTEXITCODE." }
-          $innoPath = 'C:\Program Files (x86)\Inno Setup 6'
-          $iscc = Join-Path $innoPath 'ISCC.exe'
-          if (-not (Test-Path -LiteralPath $iscc)) { throw "Pinned Inno Setup did not install $iscc." }
-          if ((Get-Item -LiteralPath $iscc).VersionInfo.ProductVersion -notmatch '^6\.7\.3') {
-            throw "Installed Inno Setup version does not match the locked version $($input.version)."
-          }
+          # Install under RUNNER_TEMP so the self-hosted service account needs no Program Files write permission.
+          $innoPath = Join-Path $env:RUNNER_TEMP 'filemanager-inno-setup-6.7.3'
+          $iscc = & .\tools\install-pinned-inno-setup.ps1 -InstallDirectory $innoPath
+          if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath $iscc -PathType Leaf)) { throw 'Pinned Inno Setup provisioning did not produce ISCC.exe.' }
           $innoPath | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
 
       - name: Prepare Installer Files

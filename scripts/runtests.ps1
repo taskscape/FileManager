@@ -261,10 +261,9 @@ function Get-ReleasePipelinePrerequisiteFailures {
 function Get-ReleasePipelineProvisioningNotes {
     $notes = [System.Collections.Generic.List[string]]::new()
     $innoCompiler = 'C:\Program Files (x86)\Inno Setup 6\ISCC.exe'
-    $innoVersion = if (Test-Path -LiteralPath $innoCompiler -PathType Leaf) { (Get-Item -LiteralPath $innoCompiler).VersionInfo.ProductVersion } else { $null }
-    if ($innoVersion -notmatch '^6\.7\.3') {
+    if (-not (Test-Path -LiteralPath $innoCompiler -PathType Leaf)) {
         # The workflow acquires the locked compiler during packaging, so report the local gap without rejecting a runnable elevated pipeline.
-        $notes.Add('Pinned Inno Setup 6.7.3 is not installed; the runner will download and install the locked compiler from tools\\release-inputs.json.')
+        $notes.Add('Pinned Inno Setup 6.7.3 is not installed; the runner will provision the locked compiler in a per-run directory from tools\\release-inputs.json.')
     }
 
     $buildToolsDeveloperCommand = Join-Path ([Environment]::GetFolderPath([Environment+SpecialFolder]::ProgramFilesX86)) 'Microsoft Visual Studio\18\BuildTools\Common7\Tools\VsDevCmd.bat'
@@ -548,48 +547,12 @@ function Build-ReleaseApplication {
     }
 }
 
-function Get-Sha256Hex {
-    param([Parameter(Mandatory = $true)][string]$Path)
-
-    # The release-parity runner must hash locked inputs even when its minimal host omits Get-FileHash.
-    $stream = [System.IO.File]::OpenRead($Path)
-    try {
-        $bytes = [System.Security.Cryptography.SHA256]::Create().ComputeHash($stream)
-        return (($bytes | ForEach-Object { $_.ToString('x2') }) -join '')
-    }
-    finally {
-        $stream.Dispose()
-    }
-}
-
 function Get-PinnedInnoSetupCompiler {
-    $innoPath = 'C:\Program Files (x86)\Inno Setup 6'
-    $compiler = Join-Path $innoPath 'ISCC.exe'
-    if ((Test-Path -LiteralPath $compiler -PathType Leaf) -and
-        ((Get-Item -LiteralPath $compiler).VersionInfo.ProductVersion -match '^6\.7\.3')) {
-        return $compiler
-    }
-
-    $lockPath = Join-Path $repositoryRoot 'tools\release-inputs.json'
-    $input = (Get-Content -LiteralPath $lockPath -Raw | ConvertFrom-Json).inputs.innoSetup
-    $installer = Join-Path ([IO.Path]::GetTempPath()) 'filemanager-innosetup-6.7.3.exe'
-    # Use the same hash and publisher lock as GitHub before a local pipeline run can install a release compiler.
-    Invoke-WebRequest -Uri $input.url -OutFile $installer
-    $actualHash = Get-Sha256Hex $installer
-    if ($actualHash -ne $input.sha256) {
-        throw "Pinned Inno Setup SHA-256 mismatch: expected $($input.sha256), got $actualHash."
-    }
-    $signature = Get-AuthenticodeSignature -LiteralPath $installer
-    if ($signature.Status -ne 'Valid' -or $signature.SignerCertificate.Subject -notlike "*CN=$($input.publisher)*") {
-        throw "Pinned Inno Setup Authenticode verification failed: $($signature.Status) $($signature.SignerCertificate.Subject)"
-    }
-    & $installer /VERYSILENT /SUPPRESSMSGBOXES /NORESTART /SP-
-    if ($LASTEXITCODE -ne 0) {
-        throw "Inno Setup installation failed with exit code $LASTEXITCODE."
-    }
-    if (-not (Test-Path -LiteralPath $compiler -PathType Leaf) -or
-        (Get-Item -LiteralPath $compiler).VersionInfo.ProductVersion -notmatch '^6\.7\.3') {
-        throw "Pinned Inno Setup did not install the locked compiler at $compiler."
+    $installRoot = Join-Path ([IO.Path]::GetTempPath()) 'filemanager-inno-setup-6.7.3'
+    # Keep local packaging non-administrative by sharing GitHub's verified per-run compiler installation path.
+    $compiler = & (Join-Path $repositoryRoot 'tools\install-pinned-inno-setup.ps1') -InstallDirectory $installRoot
+    if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath $compiler -PathType Leaf)) {
+        throw 'Pinned Inno Setup provisioning did not produce ISCC.exe.'
     }
     return $compiler
 }
