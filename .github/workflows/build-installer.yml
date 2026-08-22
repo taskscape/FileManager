@@ -250,7 +250,9 @@ jobs:
           # Keep the release-managed major separate from GitHub's automatic run number.
           tag_name: 6.0.${{ github.run_number }}
           name: Open Salamander 6.0.${{ github.run_number }}
-          files: Installer\Output\OpenSalamander_6.0.${{ github.run_number }}.exe
+          # Use forward slashes: the softprops/action-gh-release glob library treats
+          # backslashes as escape characters rather than path separators on Windows.
+          files: Installer/Output/OpenSalamander_6.0.${{ github.run_number }}.exe
           draft: false
           prerelease: false
         env:
