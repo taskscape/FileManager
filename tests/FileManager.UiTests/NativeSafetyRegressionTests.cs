@@ -1801,6 +1801,8 @@ public sealed class NativeSafetyRegressionTests
             Assert.That(workflow, Does.Contain("Run v145 native regression subset"));
             Assert.That(workflow, Does.Contain("Run release tests without unexpected skips"));
             Assert.That(workflow, Does.Contain("Upload v145 complete UI results"));
+            // The release gate must remain runnable after a forced main-branch update.
+            Assert.That(workflow, Does.Contain("Force-pushes can leave the event's previous revision outside the checkout"));
             Assert.That(workflow, Does.Not.Contain("compare-vstest-trx.ps1"));
         });
     }

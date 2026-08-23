@@ -75,6 +75,17 @@ jobs:
           if ([string]::IsNullOrWhiteSpace($baseCommit) -or $baseCommit -match '^0+$') {
             $baseCommit = 'HEAD^'
           }
+          # Force-pushes can leave the event's previous revision outside the checkout; compare with the current parent instead.
+          try {
+            git cat-file -e "$baseCommit^{commit}" 2>$null
+            $baseCommitIsAvailable = $LASTEXITCODE -eq 0
+          }
+          catch {
+            $baseCommitIsAvailable = $false
+          }
+          if (-not $baseCommitIsAvailable) {
+            $baseCommit = 'HEAD^'
+          }
           git rev-parse --verify "$baseCommit^{commit}" | Out-Null
 
           $sqlite = Get-ChildItem $env:OPENSAL_BUILD_DIR -Filter sqlite.dll -Recurse |
