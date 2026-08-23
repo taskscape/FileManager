@@ -36,7 +36,8 @@ public sealed class ApplicationVersionContractTests
             Assert.That(installer, Does.Contain("AppVersion={#MyAppVersion}.{#BuildNumber}"));
             Assert.That(installer, Does.Contain("OutputBaseFilename=OpenSalamander_{#MyAppVersion}.{#BuildNumber}"));
             Assert.That(workflow, Does.Contain("/DBuildNumber=${{ github.run_number }}"));
-            Assert.That(workflow, Does.Contain("tag_name: 6.0.${{ github.run_number }}"));
+            // The Node 24 GitHub Script release action receives the generated tag through its environment.
+            Assert.That(workflow, Does.Contain("RELEASE_TAG: 6.0.${{ github.run_number }}"));
             Assert.That(workflow, Does.Contain("OpenSalamander_6.0.${{ github.run_number }}.exe"));
 
             Assert.That(configuration, Does.Contain("const DWORD THIS_CONFIG_VERSION = 105;"));
