@@ -188,7 +188,7 @@ void CFTPOperationsList::WaitForFinishOrESC(HWND parent, int milliseconds, CWait
     CALL_STACK_MESSAGE2("CFTPOperationsList::WaitForFinishOrESC(, %d,)", milliseconds);
 
     const DWORD cycleTime = 200; // period for checking the ESC key in ms (200 = 5 times per second) - NOTE: also a safeguard against unintended races (PulseEvent(WorkerMayBeClosedEvent) may happen before entering the wait function)
-    DWORD timeStart = GetTickCount();
+    CMonotonicTimePoint timeStart = CMonotonicClock::Now(); // 64-bit monotonic, so long waits cannot wrap the remaining-time math
     DWORD restOfWaitTime = milliseconds; // remaining waiting time
 
     GetAsyncKeyState(VK_ESCAPE); // init GetAsyncKeyState - see help
@@ -253,9 +253,9 @@ void CFTPOperationsList::WaitForFinishOrESC(HWND parent, int milliseconds, CWait
         }
         if (milliseconds != INFINITE) // recalculate the remaining wait time (according to real time)
         {
-            DWORD t = GetTickCount() - timeStart; // works even when the tick counter overflows
-            if (t < (DWORD)milliseconds)
-                restOfWaitTime = (DWORD)milliseconds - t;
+            CMonotonicDuration t = CMonotonicClock::Elapsed(timeStart, CMonotonicClock::Now()); // plain 64-bit difference, no wrap projection needed
+            if (t < (CMonotonicDuration)milliseconds)
+                restOfWaitTime = milliseconds - (DWORD)t;
             else
                 restOfWaitTime = 0; // let the timeout be reported (we must not do it ourselves - the worker socket closure has priority over the timeout)
         }
@@ -359,16 +359,16 @@ void CFTPOperationsList::StopWorkers(HWND parent, int operUID, int workerInd)
     if (serverTimeout < 1000)
         serverTimeout = 1000; // at least one second
 
-    DWORD start = GetTickCount();
+    CMonotonicTimePoint start = CMonotonicClock::Now();
     while (1)
     {
         // wait for a worker socket to close or for ESC
-        DWORD now = GetTickCount();
-        if (now - start > (DWORD)serverTimeout)
-            now = start + (DWORD)serverTimeout;
+        CMonotonicTimePoint now = CMonotonicClock::Now();
+        if (now - start > (CMonotonicDuration)serverTimeout)
+            now = start + serverTimeout;
 
         CWorkerWaitSatisfiedReason reason;
-        WaitForFinishOrESC(parent, serverTimeout - (now - start), &waitWnd,
+        WaitForFinishOrESC(parent, serverTimeout - (DWORD)(now - start), &waitWnd,
                            reason, postWM_CLOSE, lastWorkerMayBeClosedState);
         BOOL terminate = FALSE;
         switch (reason)
@@ -3680,10 +3680,10 @@ CFTPOperation::CFTPOperation()
     CompressData = 0;
 
     GlobalTransferSpeedMeter.JustConnected();   // measure the global transfer speed from the start of the operation
-    GlobalLastActivityTime.Set(GetTickCount()); // the first activity is the start of the operation
+    GlobalLastActivityTime.Set(CMonotonicClock::Now()); // the first activity is the start of the operation
 
-    OperationEnd = OperationStart = GetTickCount();
-    if (OperationEnd == -1)
+    OperationEnd = OperationStart = CMonotonicClock::Now();
+    if (OperationEnd == ~(CMonotonicTimePoint)0)
         OperationEnd++;
 }
 

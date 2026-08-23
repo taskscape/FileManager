@@ -158,19 +158,19 @@ void CSendCmdUserIfaceForListAndDownload::SendingFinished()
     WaitWnd.Destroy();
 }
 
-BOOL CSendCmdUserIfaceForListAndDownload::IsTimeout(DWORD* start, DWORD serverTimeout, int* errorTextID,
+BOOL CSendCmdUserIfaceForListAndDownload::IsTimeout(CMonotonicTimePoint* start, DWORD serverTimeout, int* errorTextID,
                                                     char* errBuf, int errBufSize)
 {
     BOOL trFinished;
     BOOL ret = FALSE;
     if (DataConnection->IsTransfering(&trFinished))
-        *start = GetTickCount(); // waiting for data, so this is not a timeout
+        *start = CMonotonicClock::Now(); // waiting for data, so this is not a timeout
     else
     {
         if (trFinished)
         {
             *start = DataConnection->GetSocketCloseTime();
-            ret = (GetTickCount() - *start) >= serverTimeout; // the timeout is measured from the connection closing (the moment since when the server can react and also learns about the closure)
+            ret = CMonotonicClock::Elapsed(*start, CMonotonicClock::Now()) >= serverTimeout; // the timeout is measured from the connection closing (the moment since when the server can react and also learns about the closure)
         }
         else
             ret = TRUE; // the connection has not opened yet -> treat it as a timeout
@@ -241,9 +241,9 @@ void CSendCmdUserIfaceForListAndDownload::BeforeWaitingForFinish(int replyCode, 
     }
 }
 
-void CSendCmdUserIfaceForListAndDownload::HandleDataConTimeout(DWORD* start)
+void CSendCmdUserIfaceForListAndDownload::HandleDataConTimeout(CMonotonicTimePoint* start)
 {
-    DWORD lastActTime = DataConnection->GetLastActivityTime();
+    CMonotonicTimePoint lastActTime = DataConnection->GetLastActivityTime();
     if (*start < lastActTime)
         *start = lastActTime;
     else
@@ -834,12 +834,12 @@ public:
     virtual void AfterWrite(BOOL aborting, DWORD showTime) {}
     virtual BOOL HandleESC(HWND parent, BOOL isSend, BOOL allowCmdAbort) { return FALSE; }
     virtual void SendingFinished() {}
-    virtual BOOL IsTimeout(DWORD* start, DWORD serverTimeout, int* errorTextID, char* errBuf, int errBufSize) { return FALSE; }
+    virtual BOOL IsTimeout(CMonotonicTimePoint* start, DWORD serverTimeout, int* errorTextID, char* errBuf, int errBufSize) { return FALSE; }
     virtual void MaybeSuccessReplyReceived(const char* reply, int replySize) {}
     virtual void CancelDataCon() {}
     virtual BOOL CanFinishSending(int replyCode, BOOL* useTimeout) { return FALSE; }
     virtual void BeforeWaitingForFinish(int replyCode, BOOL* useTimeout) {}
-    virtual void HandleDataConTimeout(DWORD* start) {}
+    virtual void HandleDataConTimeout(CMonotonicTimePoint* start) {}
     virtual void HandleESCWhenWaitingForFinish(HWND parent) {}
 };
 
@@ -847,7 +847,7 @@ void CControlConnectionSocket::WaitForEndOfKeepAlive(HWND parent, int waitWndTim
 {
     CALL_STACK_MESSAGE2("CControlConnectionSocket::WaitForEndOfKeepAlive(, %d)", waitWndTime);
 
-    DWORD startTime = GetTickCount(); // operation start time
+    CMonotonicTimePoint startTime = CMonotonicClock::Now(); // operation start time
 
     HANDLES(EnterCriticalSection(&SocketCritSect));
 
@@ -871,8 +871,8 @@ void CControlConnectionSocket::WaitForEndOfKeepAlive(HWND parent, int waitWndTim
         // show a wait window to indicate we are waiting for the keep-alive command to finish
         CWaitWindow waitWnd(parent, TRUE);
         waitWnd.SetText(LoadStr(IDS_FINISHINGKEEPALIVECMD));
-        DWORD start = GetTickCount();
-        DWORD waitTime = start - startTime;
+        CMonotonicTimePoint start = CMonotonicClock::Now();
+        DWORD waitTime = (DWORD)CMonotonicClock::Elapsed(startTime, start);
         waitWnd.Create(waitTime < (DWORD)waitWndTime ? waitWndTime - waitTime : 0);
 
         // wait for the keep-alive command to finish or be interrupted (ESC/timeout)
@@ -885,10 +885,11 @@ void CControlConnectionSocket::WaitForEndOfKeepAlive(HWND parent, int waitWndTim
         {
             CControlConnectionSocketEvent event;
             DWORD data1, data2;
-            DWORD now = GetTickCount();
-            if (now - start > (DWORD)serverTimeout)
-                now = start + (DWORD)serverTimeout;
-            WaitForEventOrESC(parent, &event, &data1, &data2, serverTimeout - (now - start),
+            CMonotonicTimePoint now = CMonotonicClock::Now();
+            if (now - start > (CMonotonicDuration)serverTimeout)
+                now = start + serverTimeout;
+            WaitForEventOrESC(parent, &event, &data1, &data2,
+                              (DWORD)min(serverTimeout - (now - start), (CMonotonicDuration)MAXDWORD),
                               NULL, &userIface, TRUE);
             switch (event)
             {
@@ -925,7 +926,7 @@ void CControlConnectionSocket::WaitForEndOfKeepAlive(HWND parent, int waitWndTim
                     BOOL trFinished;
                     if (KeepAliveDataCon->IsTransfering(&trFinished))
                     { // waiting for data, so this is not a timeout
-                        start = GetTickCount();
+                        start = CMonotonicClock::Now();
                         isTimeout = FALSE;
                     }
                     else
@@ -933,7 +934,7 @@ void CControlConnectionSocket::WaitForEndOfKeepAlive(HWND parent, int waitWndTim
                         if (trFinished)
                         {
                             start = KeepAliveDataCon->GetSocketCloseTime();
-                            isTimeout = (GetTickCount() - start) >= (DWORD)serverTimeout; // the timeout is measured from the connection closing (the moment since when the server can react and also learns about the closure)
+                            isTimeout = CMonotonicClock::Elapsed(start, CMonotonicClock::Now()) >= (CMonotonicDuration)serverTimeout; // the timeout is measured from the connection closing (the moment since when the server can react and also learns about the closure)
                         }
                         // else isTimeout = TRUE;  // the connection has not opened yet -> treat it as a timeout
                     }
@@ -1023,14 +1024,14 @@ void CControlConnectionSocket::SetupKeepAliveTimer(BOOL immediate)
     BOOL timer = FALSE;
     int msg;
     int uid;
-    DWORD ti;
+    CMonotonicTimePoint ti;
     if (KeepAliveEnabled && KeepAliveMode == kamForbidden) // called after completing a normal command
     {
         KeepAliveMode = kamWaiting;
         timer = TRUE;
         msg = Msg;
         uid = UID;
-        KeepAliveStart = GetTickCount();                                   // time of the last normal command executed in the "control connection"
+        KeepAliveStart = CMonotonicClock::Now();                                   // time of the last normal command executed in the "control connection"
         ti = KeepAliveStart + (immediate ? 0 : KeepAliveSendEvery * 1000); // time when the first keep-alive command should be sent
     }
     else
@@ -1068,10 +1069,10 @@ void CControlConnectionSocket::SetupNextKeepAliveTimer()
     BOOL timer = FALSE;
     int msg;
     int uid;
-    DWORD ti;
+    CMonotonicTimePoint ti;
     if (KeepAliveMode == kamProcessing) // the keep-alive finished normally; decide whether to set the keep-alive timer again
     {
-        ti = GetTickCount() + KeepAliveSendEvery * 1000; // time when the next keep-alive command should be sent
+        ti = CMonotonicClock::DeadlineAfter(KeepAliveSendEvery * 1000); // time when the next keep-alive command should be sent (64-bit deadline, wrap-free)
         if ((int)((ti - KeepAliveStart) / 60000) < KeepAliveStopAfter)
         {
             KeepAliveMode = kamWaiting;

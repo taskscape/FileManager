@@ -148,7 +148,7 @@ BOOL MakeArgv(const char* commandLine, char argv[2][MAX_PATH], int& argc,
     return *start == 0;
 }
 
-BOOL PathAppend(LPTSTR pPath, LPCTSTR pMore)
+BOOL PathAppend(LPTSTR pPath, int pathSize, LPCTSTR pMore)
 {
     if (pPath == NULL || pMore == NULL)
     {
@@ -164,10 +164,19 @@ BOOL PathAppend(LPTSTR pPath, LPCTSTR pMore)
     // trim the trailing backslash before appending
     if (len > 1 && pPath[len - 1] != '\\' && pMore[0] != '\\')
     {
+        if (len + 1 >= pathSize)
+            return FALSE; // no room for the separator + terminator
         pPath[len] = '\\';
         len++;
     }
-    lstrcpy(pPath + len, pMore);
+    // counted append: fail cleanly instead of overrunning the caller's fixed buffer
+    for (int i = 0; pMore[i] != 0; i++)
+    {
+        if (len + i >= pathSize - 1)
+            return FALSE;
+        pPath[len + i] = pMore[i];
+    }
+    pPath[len + lstrlen(pMore)] = 0;
     return TRUE;
 }
 
@@ -257,7 +266,7 @@ int RemoteCompareFiles(HINSTANCE hInstance, LPTSTR lpCmdLine)
                 PathRemoveFileSpec(sal); // fcremote.exe
                 PathRemoveFileSpec(sal); // filecomp
                 PathRemoveFileSpec(sal); // plugins
-                PathAppend(sal, "salamand.exe");
+                PathAppend(sal, MAX_PATH, "salamand.exe");
 
                 STARTUPINFO si;
                 PROCESS_INFORMATION pi;

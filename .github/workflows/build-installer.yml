@@ -15,14 +15,6 @@ permissions:
   # Release write access is granted only to the protected publish job below.
   contents: read
 
-env:
-  # Opt JavaScript actions (actions/checkout, microsoft/setup-msbuild,
-  # softprops/action-gh-release, ...) into the Node.js 24 runtime ahead of the
-  # June 2026 default switch. Silences the runner deprecation warning about
-  # Node.js 20 being removed on 2026-09-16. See:
-  # https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
-
 jobs:
   release-tests:
     name: Complete automated release gate
@@ -49,7 +41,7 @@ jobs:
     steps:
       - name: Checkout complete history
         # Pin actions by reviewed commit to keep the release input graph immutable.
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           fetch-depth: 0
 
@@ -59,7 +51,7 @@ jobs:
         run: .\tools\manage-ui-test-volumes.ps1 -Action Setup -WorkingDirectory (Join-Path $env:RUNNER_TEMP 'filemanager-ui-volumes') -EnvironmentFile $env:GITHUB_ENV
 
       - name: Setup MSBuild
-        uses: microsoft/setup-msbuild@6fb02220983dee41ce7ae257b6f4d8f9bf5ed4ce # v2
+        uses: microsoft/setup-msbuild@30375c66a4eea26614e0d39710365f22f8b0af57 # v3
 
       - name: Setup MSVC Developer Command Prompt (x64 toolchain)
         # Use the runner's fixed VS 2026 path because version discovery excludes the current 18.9 release.
@@ -110,7 +102,7 @@ jobs:
 
       - name: Upload v145 complete UI results
         if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           # Preserve the full executable result inventory for release diagnosis, not just source contracts.
           name: toolset-ui-results-v145-${{ github.sha }}
@@ -139,10 +131,10 @@ jobs:
     steps:
       - name: Checkout
         # Pin actions by reviewed commit to keep the release input graph immutable.
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
 
       - name: Setup MSBuild
-        uses: microsoft/setup-msbuild@6fb02220983dee41ce7ae257b6f4d8f9bf5ed4ce # v2
+        uses: microsoft/setup-msbuild@30375c66a4eea26614e0d39710365f22f8b0af57 # v3
 
       - name: Setup MSVC Developer Command Prompt (x64 toolchain)
         # dumpbin and MSBuild must come from the same verified VS 2026 installation.
@@ -208,7 +200,7 @@ jobs:
           iscc.exe /DSourcePath="$sourcePath" /DBuildNumber=${{ github.run_number }} "Installer\setup.iss"
 
       - name: Preserve verified installer for the publish job
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           # Artifact immutability prevents publish from receiving a rebuilt installer.
           name: release-installer-${{ github.sha }}
@@ -216,7 +208,7 @@ jobs:
           if-no-files-found: error
 
       - name: Preserve private symbols for crash analysis
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           # Keep PDBs out of the public release while retaining exact-build diagnostics.
           name: private-symbols-${{ github.sha }}
@@ -224,7 +216,8 @@ jobs:
             ${{ env.OPENSAL_BUILD_DIR }}\**\*.pdb
             ${{ runner.temp }}\release-symbol-index.json
           if-no-files-found: error
-          retention-days: 180
+          # The repository cap is 90 days; request that value directly to avoid a runner warning.
+          retention-days: 90
 
   publish:
     name: Publish verified installer
@@ -239,21 +232,52 @@ jobs:
 
     steps:
       - name: Retrieve the immutable installer
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
         with:
           name: release-installer-${{ github.sha }}
           path: Installer\Output
 
       - name: Create Release
-        uses: softprops/action-gh-release@e5f48c3b7b613b7a911e58a617b757074c4c790d # v2.0.2
-        with:
-          # Keep the release-managed major separate from GitHub's automatic run number.
-          tag_name: 6.0.${{ github.run_number }}
-          name: Open Salamander 6.0.${{ github.run_number }}
-          # Use forward slashes: the softprops/action-gh-release glob library treats
-          # backslashes as escape characters rather than path separators on Windows.
-          files: Installer/Output/OpenSalamander_6.0.${{ github.run_number }}.exe
-          draft: false
-          prerelease: false
+        # github-script runs natively on Node 24 and uploads the exact verified installer.
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: 6.0.${{ github.run_number }}
+          RELEASE_NAME: Open Salamander 6.0.${{ github.run_number }}
+          INSTALLER_PATH: Installer/Output/OpenSalamander_6.0.${{ github.run_number }}.exe
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const fs = require('fs');
+            const path = require('path');
+            const { owner, repo } = context.repo;
+            const tag = process.env.RELEASE_TAG;
+            const name = process.env.RELEASE_NAME;
+            const installerPath = process.env.INSTALLER_PATH;
+
+            // Keep reruns idempotent while replacing only this build's immutable asset.
+            let release;
+            try {
+              ({ data: release } = await github.rest.repos.getReleaseByTag({ owner, repo, tag }));
+              ({ data: release } = await github.rest.repos.updateRelease({
+                owner, repo, release_id: release.id, tag_name: tag, name, draft: false, prerelease: false
+              }));
+            } catch (error) {
+              if (error.status !== 404) throw error;
+              ({ data: release } = await github.rest.repos.createRelease({
+                owner, repo, tag_name: tag, name, draft: false, prerelease: false
+              }));
+            }
+
+            const assetName = path.basename(installerPath);
+            const existingAssets = await github.paginate(github.rest.repos.listReleaseAssets, {
+              owner, repo, release_id: release.id
+            });
+            for (const asset of existingAssets.filter((item) => item.name === assetName)) {
+              await github.rest.repos.deleteReleaseAsset({ owner, repo, asset_id: asset.id });
+            }
+
+            const installer = fs.readFileSync(installerPath);
+            await github.rest.repos.uploadReleaseAsset({
+              owner, repo, release_id: release.id, name: assetName, data: installer,
+              headers: { 'content-type': 'application/octet-stream', 'content-length': installer.length }
+            });

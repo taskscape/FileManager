@@ -6,6 +6,8 @@
 
 #include <strsafe.h>
 
+#include "common\monotonic_time.h" // 64-bit monotonic timestamps for the copy speed meters and throttle state
+
 #define CREATE_DIR_SIZE CQuadWord(4096, 0) // operation cost estimates (uncached measurements based on worker thread runtimes)
 #define MOVE_DIR_SIZE CQuadWord(5050, 0)
 #define DELETE_DIR_SIZE CQuadWord(2400, 0)
@@ -197,11 +199,11 @@ protected:
     // transfer speed calculation:
     DWORD TransferedBytes[TRSPMETER_ACTSPEEDNUMOFSTEPS + 1]; // circular queue storing bytes transferred during the last N intervals (time intervals) + a working slot (accumulating the current interval)
     int ActIndexInTrBytes;                                   // index of the last (current) entry in TransferedBytes
-    DWORD ActIndexInTrBytesTimeLim;                          // timestamp boundary (ms) for the last entry in TransferedBytes (bytes keep accumulating until this time)
+    CMonotonicTimePoint ActIndexInTrBytesTimeLim;            // timestamp boundary (ms) for the last entry in TransferedBytes (bytes keep accumulating until this time); 64-bit monotonic, wrap-free
     int CountOfTrBytesItems;                                 // number of slots in TransferedBytes (completed ones + the working slot)
 
-    DWORD LastPacketsSize[TRSPMETER_NUMOFSTOREDPACKETS + 1]; // circular queue with sizes of the last N+1 "packets"
-    DWORD LastPacketsTime[TRSPMETER_NUMOFSTOREDPACKETS + 1]; // circular queue with receive times of the last N+1 "packets"
+    DWORD LastPacketsSize[TRSPMETER_NUMOFSTOREDPACKETS + 1];      // circular queue with sizes of the last N+1 "packets"
+    CMonotonicTimePoint LastPacketsTime[TRSPMETER_NUMOFSTOREDPACKETS + 1]; // circular queue with receive times of the last N+1 "packets" (64-bit monotonic)
     int ActIndexInLastPackets;                               // index in LastPacketsSize and LastPacketsTime for writing the next received "packet" (when full it also points to the oldest "packet")
     int CountOfLastPackets;                                  // number of "packets" in LastPacketsSize/LastPacketsTime (number of valid entries)
     DWORD MaxPacketSize;                                     // largest packet size we expect
@@ -227,15 +229,15 @@ public:
     // call after some of the data are transfered; report a data chunk: 'count' bytes
     // transferred in 'time'; 'maxPacketSize' is the largest amount expected
     // before the next BytesReceived() call
-    void BytesReceived(DWORD count, DWORD time, DWORD maxPacketSize);
+    void BytesReceived(DWORD count, CMonotonicTimePoint time, DWORD maxPacketSize);
 
     // tunes 'progressBufferLimit' according to current received packets data;
-    // 'lastFileBlockCount' is the limit we must not cross (we consider only continuous 
+    // 'lastFileBlockCount' is the limit we must not cross (we consider only continuous
     // copying of a single file; the counter 'lastFileBlockCount' is overflow-safe and
-    // values > 1000000 simply mean "a lot", the exact figure is irrelevant); 'lastFileStartTime' 
-    // is the GetTickCount() captured when the most recent file copy started
+    // values > 1000000 simply mean "a lot", the exact figure is irrelevant); 'lastFileStartTime'
+    // is the monotonic time captured when the most recent file copy started
     void AdjustProgressBufferLimit(DWORD* progressBufferLimit, DWORD lastFileBlockCount,
-                                   DWORD lastFileStartTime);
+                                   CMonotonicTimePoint lastFileStartTime);
 };
 
 //
@@ -257,11 +259,11 @@ protected:
     // progress speed calculation:
     DWORD TransferedBytes[PRSPMETER_ACTSPEEDNUMOFSTEPS + 1]; // circular queue storing bytes transferred during the last N intervals (time intervals) + a working slot (accumulating the current interval)
     int ActIndexInTrBytes;                                   // index of the last (current) entry in TransferedBytes
-    DWORD ActIndexInTrBytesTimeLim;                          // timestamp boundary (ms) for the last entry in TransferedBytes (bytes keep accumulating until this time)
+    CMonotonicTimePoint ActIndexInTrBytesTimeLim;            // timestamp boundary (ms) for the last entry in TransferedBytes (bytes keep accumulating until this time); 64-bit monotonic, wrap-free
     int CountOfTrBytesItems;                                 // number of slots in TransferedBytes (completed ones + the working slot)
 
-    DWORD LastPacketsSize[PRSPMETER_NUMOFSTOREDPACKETS + 1]; // circular queue with sizes of the last N+1 "packets"
-    DWORD LastPacketsTime[PRSPMETER_NUMOFSTOREDPACKETS + 1]; // circular queue with receive times of the last N+1 "packets"
+    DWORD LastPacketsSize[PRSPMETER_NUMOFSTOREDPACKETS + 1];      // circular queue with sizes of the last N+1 "packets"
+    CMonotonicTimePoint LastPacketsTime[PRSPMETER_NUMOFSTOREDPACKETS + 1]; // circular queue with receive times of the last N+1 "packets" (64-bit monotonic)
     int ActIndexInLastPackets;                               // index in LastPacketsSize and LastPacketsTime for writing the next received "packet" (when full it also points to the oldest "packet")
     int CountOfLastPackets;                                  // number of "packets" in LastPacketsSize/LastPacketsTime (number of valid entries)
     DWORD MaxPacketSize;                                     // largest packet size we expect
@@ -284,7 +286,7 @@ public:
     // call after some of the data are transfered; report a data chunk: 'count' bytes
     // transferred in 'time'; 'maxPacketSize' is the largest amount expected
     // before the next BytesReceived() call
-    void BytesReceived(DWORD count, DWORD time, DWORD maxPacketSize);
+    void BytesReceived(DWORD count, CMonotonicTimePoint time, DWORD maxPacketSize);
 };
 
 #define OPFL_OVERWROLDERALRTESTED 0x00000001 // the "overwrite older, skip other existing" test has already been performed
@@ -495,15 +497,15 @@ private:
     DWORD SpeedLimit;               // speed limit value (in bytes per second), WARNING: must never be zero!
     DWORD SleepAfterWrite;          // how many ms to wait after a packet of size LastBufferLimit; -1 = the value must be computed (after the first packet)
     int LastBufferLimit;            // packet size, WARNING: must never be zero!
-    DWORD LastSetupTime;            // GetTickCount() captured when we last computed the speed limit parameters + any braking
+    CMonotonicTimePoint LastSetupTime; // monotonic time captured when we last computed the speed limit parameters + any braking (may lie in the future right after braking)
     CQuadWord BytesTrFromLastSetup; // bytes transferred since LastSetupTime
 
     // for asynchronous copying only: buffer limiter data (keeps progress updates flowing by preventing oversized buffers); used only inside StatusCS
     BOOL UseProgressBufferLimit;  // TRUE = use the buffer size limiter (asynchronous copying)
     DWORD ProgressBufferLimit;    // copy buffer size limit to keep progress updates reasonably frequent
-    DWORD LastProgBufLimTestTime; // GetTickCount() from the last ProgressBufferLimit size evaluation
+    CMonotonicTimePoint LastProgBufLimTestTime; // monotonic time of the last ProgressBufferLimit size evaluation
     DWORD LastFileBlockCount;     // blocks copied since the last file started (WARNING: overflow-protected; values > 1000000 mean "a lot", the exact amount doesn't matter)
-    DWORD LastFileStartTime;      // GetTickCount() from when we started copying the last file
+    CMonotonicTimePoint LastFileStartTime; // monotonic time from when we started copying the last file (64-bit, wrap-free like the meter samples)
 
 public:
     COperations(int base, int delta, char* waitInQueueSubject, char* waitInQueueFrom, char* waitInQueueTo);

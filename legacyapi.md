@@ -18,6 +18,31 @@ upstream-patch it rather than making an unreviewed mass edit in place.
 
 ### Implemented in this pass
 
+* The FTP plug-in now runs its entire timing layer on the 64-bit monotonic
+  clock: the sockets-thread timer queue (`CTimerData::TimeoutAbs`,
+  `AddTimer`, `FindIndexForNewTimer`), data-connection activity/close
+  timestamps, keep-alive scheduling, operation-dialog throttles, worker
+  timeouts, and operation start/end tracking. The former DWORD
+  base-relative timer sort became a direct comparison, `CSynchronizedDWORD`
+  was widened to `CSynchronizedQWORD` for cross-thread activity samples,
+  and the plug-in speed meter takes full-width sample times. The idle
+  hand-off in `operats4.cpp` intentionally stays on `GetTickCount`
+  arithmetic because `SalamanderIsNotBusy` exposes a DWORD tick through
+  the plug-in ABI.
+* The core copy speed meters (`worker.h`, `transfer_speed.cpp`) now use
+  64-bit monotonic packet times, interval limits, and throttle deadlines;
+  the speed-limit braking math projects a future `LastSetupTime` through a
+  signed 64-bit difference instead of wrapped tick arithmetic. The
+  tasklist single-instance wait deadline is likewise monotonic, while the
+  shared-memory `TodoTimestamp`/`RequestTimestamp` fields remain on their
+  documented cross-version DWORD contract.
+* Remaining active first-party unbounded `lstrcpy` calls were replaced by
+  counted or capacity-checked copies: Registry Editor's localized window
+  title, the shared message-center name allocation (CRT-free loop),
+  PAK DLL's fixed updir alias, UnARJ's volume-extension rewrite and
+  archive-name copy, UnLHA's extraction paths (including a new guard for
+  the directory-separator byte), Undelete's `GetRootPath`, and File
+  Compare's CRT-free remote helper `PathAppend` (now capacity-aware).
 * `src/codetbl.cpp` now obtains conversion-table sizes through `GetFileSizeEx`
   and explicitly rejects values that its DWORD parser cannot represent.
 * `src/plugins/zip/selfextr/dialog.cpp` and `extended.cpp` now install and

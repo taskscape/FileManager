@@ -57,13 +57,13 @@ public:
     virtual BOOL GetWindowClosePressed() { return WaitWnd.GetWindowClosePressed(); }
     virtual BOOL HandleESC(HWND parent, BOOL isSend, BOOL allowCmdAbort);
     virtual void SendingFinished() { WaitWnd.Destroy(); }
-    virtual BOOL IsTimeout(DWORD* start, DWORD serverTimeout, int* errorTextID, char* errBuf, int errBufSize) { return TRUE; }
+    virtual BOOL IsTimeout(CMonotonicTimePoint* start, DWORD serverTimeout, int* errorTextID, char* errBuf, int errBufSize) { return TRUE; }
     virtual void MaybeSuccessReplyReceived(const char* reply, int replySize) {}
     virtual void CancelDataCon() {}
 
     virtual BOOL CanFinishSending(int replyCode, BOOL* useTimeout) { return TRUE; }
     virtual void BeforeWaitingForFinish(int replyCode, BOOL* useTimeout) {}
-    virtual void HandleDataConTimeout(DWORD* start) {}
+    virtual void HandleDataConTimeout(CMonotonicTimePoint* start) {}
     virtual HANDLE GetFinishedEvent() { return NULL; }
     virtual void HandleESCWhenWaitingForFinish(HWND parent) {}
 };
@@ -307,8 +307,8 @@ BOOL CControlConnectionSocket::SendFTPCommand(HWND parent, const char* ftpCmd, c
                 Logs.LogMessage(logUID, !aborting ? logCmd : errBuf, -1);
 
                 CMonotonicTimePoint commandDeadline = CMonotonicClock::DeadlineAfter(serverTimeout > 0 ? (CMonotonicDuration)serverTimeout : 0);
-                // The specialized data-connection callback still exposes a DWORD tick pointer; seed its compatibility value from the monotonic clock.
-                DWORD timeoutStart = (DWORD)CMonotonicClock::Now();
+                // The timeout is now tracked in full 64-bit monotonic time, matching the data-connection timestamps.
+                CMonotonicTimePoint timeoutStart = CMonotonicClock::Now();
                 DWORD waitTime = GetWaitWindowElapsed(operationStart);
                 userIface->AfterWrite(aborting, waitTime < (DWORD)waitWndTime ? waitWndTime - waitTime : 0);
 
@@ -486,8 +486,8 @@ BOOL CControlConnectionSocket::SendFTPCommand(HWND parent, const char* ftpCmd, c
                     BOOL useTimeout = FALSE;    // TRUE = use the 'serverTimeout2' timeout while waiting for the data connection to finish
                     int serverTimeout2 = 10000; // timeout for finishing the data connection when LIST returns an error or the connection has not been opened yet is 10 seconds
                     CMonotonicTimePoint finishDeadline = CMonotonicClock::DeadlineAfter(serverTimeout2);
-                    // The callback ABI still carries a DWORD activity sample; timeout ownership remains monotonic here.
-                    DWORD start2 = (DWORD)CMonotonicClock::Now();
+                    // The data-connection timeout is tracked in full 64-bit monotonic time as well.
+                    CMonotonicTimePoint start2 = CMonotonicClock::Now();
                     while (!userIface->CanFinishSending(*ftpReplyCode, &useTimeout))
                     {
                         if (!calledBeforeWaitingForFinish) // call only the first time
@@ -512,9 +512,9 @@ BOOL CControlConnectionSocket::SendFTPCommand(HWND parent, const char* ftpCmd, c
                         {
                             if (useTimeout)
                             {
-                                DWORD previousStart = start2;
+                                CMonotonicTimePoint previousStart = start2;
                                 userIface->HandleDataConTimeout(&start2);
-                                // A newer legacy activity sample extends the monotonic deadline without reintroducing wrap arithmetic.
+                                // A newer activity sample from the data connection extends the deadline.
                                 if (start2 != previousStart)
                                     finishDeadline = CMonotonicClock::DeadlineAfter(serverTimeout2);
                             }
@@ -1188,7 +1188,7 @@ BOOL CControlConnectionSocket::ChangeWorkingPath(BOOL notInPanel, BOOL leftPanel
         BOOL isFTPS = EncryptControlConnection == 1;
         int useListingsCacheAux = UseListingsCache;
         BOOL resuscitateKeepAlive = (IsConnected() && KeepAliveEnabled && KeepAliveMode == kamNone); // if keep-alive has already turned off (revival time expired), we must restart it
-        KeepAliveStart = GetTickCount();                                                             // beware, it is not enough to do it simply; 'resuscitateKeepAlive' must be used
+        KeepAliveStart = CMonotonicClock::Now();                                                     // beware, it is not enough to do it simply; 'resuscitateKeepAlive' must be used
         HANDLES(LeaveCriticalSection(&SocketCritSect));
 
         if (donotTestPath)

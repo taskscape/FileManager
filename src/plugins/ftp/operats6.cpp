@@ -682,7 +682,7 @@ void CFTPWorker::HandleEventInConnectingState(CFTPWorkerEvent event, BOOL& sendQ
                             serverTimeout = 1000; // at least one second
                         // because we are already inside CSocketsThread::CritSect, this call is also possible
                         // from within CSocket::SocketCritSect and CFTPWorker::WorkerCritSect (no risk of dead-lock)
-                        SocketsThread->AddTimer(Msg, UID, GetTickCount() + serverTimeout,
+                        SocketsThread->AddTimer(Msg, UID, CMonotonicClock::DeadlineAfter(serverTimeout),
                                                 WORKER_CONTIMEOUTTIMID, NULL); // ignore the error, at worst the user hits Stop
 
                         SubState = fwssConWaitingForIP;
@@ -777,7 +777,7 @@ void CFTPWorker::HandleEventInConnectingState(CFTPWorkerEvent event, BOOL& sendQ
                         serverTimeout = 1000; // at least one second
                     // because we are already inside CSocketsThread::CritSect, this call is also possible
                     // from within CSocket::SocketCritSect and CFTPWorker::WorkerCritSect (no risk of dead-lock)
-                    SocketsThread->AddTimer(Msg, UID, GetTickCount() + serverTimeout,
+                    SocketsThread->AddTimer(Msg, UID, CMonotonicClock::DeadlineAfter(serverTimeout),
                                             WORKER_CONTIMEOUTTIMID, NULL); // ignore the error, at worst the user hits Stop
 
                     SubState = fwssConWaitForConRes;
@@ -812,7 +812,7 @@ void CFTPWorker::HandleEventInConnectingState(CFTPWorkerEvent event, BOOL& sendQ
                         serverTimeout = 1000; // at least one second
                     // because we are already inside CSocketsThread::CritSect, this call is also possible
                     // from within CSocket::SocketCritSect and CFTPWorker::WorkerCritSect (no risk of dead-lock)
-                    SocketsThread->AddTimer(Msg, UID, GetTickCount() + serverTimeout,
+                    SocketsThread->AddTimer(Msg, UID, CMonotonicClock::DeadlineAfter(serverTimeout),
                                             WORKER_TIMEOUTTIMERID, NULL); // ignore the error, at worst the user hits Stop
 
                     SubState = fwssConWaitForPrompt;
@@ -1371,7 +1371,7 @@ void CFTPWorker::HandleEventInConnectingState(CFTPWorkerEvent event, BOOL& sendQ
                         int delayBetweenConRetries = Config.GetDelayBetweenConRetries() * 1000;
                         // because we are already inside CSocketsThread::CritSect, this call is also possible
                         // from within CSocket::SocketCritSect and CFTPWorker::WorkerCritSect (no risk of dead-lock)
-                        SocketsThread->AddTimer(Msg, UID, GetTickCount() + delayBetweenConRetries,
+                        SocketsThread->AddTimer(Msg, UID, CMonotonicClock::DeadlineAfter(delayBetweenConRetries),
                                                 WORKER_RECONTIMEOUTTIMID, NULL); // ignore the error, at worst the user hits Stop
 
                         State = fwsWaitingForReconnect; // NOTE: assumes ErrorDescr is set; no need to call Oper->OperationStatusMaybeChanged(), the operation state does not change (it is not paused and will not be after this change)

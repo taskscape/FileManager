@@ -4,6 +4,8 @@
 
 #pragma once
 
+#include "..\..\common\monotonic_time.h" // 64-bit monotonic time points keep socket timers correct across the 32-bit tick wrap
+
 // ****************************************************************************
 // CONSTANTS
 // ****************************************************************************
@@ -155,7 +157,7 @@ protected:
     char* HTTP11_FirstLineOfReply;    // if not NULL, contains the first line of the reply from the HTTP 1.1 proxy server (to the CONNECT request)
     int HTTP11_EmptyRowCharsReceived; // the server response ends with CRLFCRLF, here we store how many characters of that sequence have already arrived
 
-    DWORD IsSocketConnectedLastCallTime; // 0 if CSocketsThread::IsSocketConnected() has not yet been called for this socket, otherwise the GetTickCount() of the last call
+    CMonotonicTimePoint IsSocketConnectedLastCallTime; // 0 if CSocketsThread::IsSocketConnected() has not yet been called for this socket, otherwise the monotonic time of the last call (64-bit, so long uptimes cannot wrap)
 
 public:
     CSocket();
@@ -204,9 +206,9 @@ public:
     // returns TRUE if CSocketsThread::IsSocketConnected() has been called for this socket -
     // returns the call time in 'lastCallTime'; returns FALSE if CSocketsThread::IsSocketConnected()
     // has not been called yet
-    BOOL GetIsSocketConnectedLastCallTime(DWORD* lastCallTime);
+    BOOL GetIsSocketConnectedLastCallTime(CMonotonicTimePoint* lastCallTime);
 
-    // sets IsSocketConnectedLastCallTime to the current GetTickCount()
+    // sets IsSocketConnectedLastCallTime to the current monotonic time
     void SetIsSocketConnectedLastCallTime();
 
     // ******************************************************************************************
@@ -490,11 +492,11 @@ struct CTimerData // data for WM_TIMER (see CSocketsThread::AddTimer())
 {
     int SocketMsg;    // message number used to receive events for the informed socket; if (WM_APP_SOCKET_MIN-1), it is a deleted timer in the locked section of the Timers array
     int SocketUID;    // UID of the informed socket
-    DWORD TimeoutAbs; // absolute time in milliseconds; the timer fires only when GetTickCount() returns at least this value
+    CMonotonicTimePoint TimeoutAbs; // absolute monotonic time in milliseconds; the timer fires only when the monotonic clock returns at least this value (64-bit, immune to tick wrap)
     DWORD ID;         // timer id
     void* Param;      // timer parameter
 
-    CTimerData(int socketMsg, int socketUID, DWORD timeoutAbs, DWORD id, void* param)
+    CTimerData(int socketMsg, int socketUID, CMonotonicTimePoint timeoutAbs, DWORD id, void* param)
     {
         SocketMsg = socketMsg;
         SocketUID = socketUID;
@@ -540,7 +542,7 @@ protected:
 
     TIndirectArray<CTimerData> Timers;    // array of timers for sockets
     int LockedTimers;                     // section of the Timers array (number of elements from the start of the array) that must not change (used during CSocketsThread::ReceiveTimer()); -1 = such a section does not exist
-    static DWORD LastWM_TIMER_Processing; // GetTickCount() from the time of the last WM_TIMER processing (WM_TIMER arrives only during an "idle" message loop, which is unacceptable for us)
+    static CMonotonicTimePoint LastWM_TIMER_Processing; // monotonic time of the last WM_TIMER processing (WM_TIMER arrives only during an "idle" message loop, which is unacceptable for us)
 
     TIndirectArray<CPostMsgData> PostMsgs; // data for WM_APP_SOCKET_POSTMSG (when receiving the message we distribute data from the array)
 
@@ -564,8 +566,9 @@ public:
     // called by the main thread if the sockets thread needs to terminate
     void Terminate();
 
-    // adds a timer to the timers array with timeout 'timeoutAbs' (absolute time in milliseconds,
-    // the timer will fire only after GetTickCount() returns at least this value);
+    // adds a timer to the timers array with timeout 'timeoutAbs' (absolute monotonic time in milliseconds,
+    // the timer will fire only after the monotonic clock returns at least this value; obtain it via
+    // CMonotonicClock::DeadlineAfter() so 64-bit arithmetic stays wrap-free);
     // after the timer fires it is removed from the timers array; 'socketMsg'+'socketUID' identifies
     // the socket that should be notified of the added timer timeout (see the CSocket::ReceiveTimer() method);
     // 'id' is the timer ID; 'param' is an optional timer parameter, if it contains any allocated
@@ -573,7 +576,7 @@ public:
     // or when unloading the plugin; returns TRUE when the timer is added successfully, otherwise returns FALSE
     // (the only error is lack of memory)
     // callable from any thread
-    BOOL AddTimer(int socketMsg, int socketUID, DWORD timeoutAbs, DWORD id, void* param);
+    BOOL AddTimer(int socketMsg, int socketUID, CMonotonicTimePoint timeoutAbs, DWORD id, void* param);
 
     // finds and removes from the timers array the timer with ID 'id' for the socket with UID 'socketUID';
     // if there are multiple timers in the array that match the criteria, all of them are removed;
@@ -684,7 +687,7 @@ protected:
     // (preserves chronological order); 'leftIndex' is the first index where the new timer can
     // be inserted (used when the beginning of the Timers array is locked)
     // WARNING: call only from the 'CritSect' section
-    int FindIndexForNewTimer(DWORD timeoutAbs, int leftIndex);
+    int FindIndexForNewTimer(CMonotonicTimePoint timeoutAbs, int leftIndex);
 };
 
 extern CSocketsThread* SocketsThread; // thread handling all sockets, intended only for internal use in the sockets modules

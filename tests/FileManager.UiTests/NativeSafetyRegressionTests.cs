@@ -1783,7 +1783,9 @@ public sealed class NativeSafetyRegressionTests
             Assert.That(verifier, Does.Contain("Symbol key resolves to inconsistent release content"));
             Assert.That(workflow, Does.Contain("Index and verify private release symbols"));
             Assert.That(workflow, Does.Contain("release-symbol-index.json"));
-            Assert.That(workflow, Does.Contain("retention-days: 180"));
+            // The workflow must request the repository maximum instead of a
+            // higher value that Actions silently clamps and warns about.
+            Assert.That(workflow, Does.Contain("retention-days: 90"));
         });
     }
 
@@ -2353,6 +2355,11 @@ public sealed class NativeSafetyRegressionTests
             // for transactional-save fault injection.
             Assert.That(configuration, Does.Contain("FlushConfigurationRegistryKey(generationKey) == ERROR_SUCCESS"));
             Assert.That(registryWork, Does.Contain("LONG result = RegFlushKey(key)"));
+            // A recursive registry deletion must close its child handle before
+            // deleting the child name, or Windows can reject the deletion.
+            Assert.That(registryWork, Does.Contain("subKeyScope.Close();"));
+            Assert.That(registryWork.IndexOf("subKeyScope.Close();", StringComparison.Ordinal),
+                        Is.GreaterThanOrEqualTo(0).And.LessThan(registryWork.IndexOf("RegDeleteKey(key, name)", StringComparison.Ordinal)));
             Assert.That(configuration, Does.Contain("SetValue(storeKey, CONFIGURATION_ACTIVE_GENERATION_REG"));
             Assert.That(configuration, Does.Contain("RetirePreviousConfigurationGenerationAfterSuccessfulStartup"));
             Assert.That(configuration, Does.Contain("OpenCommittedConfigurationGeneration(storeKey, fallbackGeneration"));

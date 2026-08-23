@@ -713,7 +713,7 @@ void CFTPWorker::HandleEventInWorkingState3(CFTPWorkerEvent event, BOOL& sendQui
                                     SocketsThread->DeleteTimer(UID, WORKER_DATACONSTARTTIMID);
                                     // since we are already in the CSocketsThread::CritSect section, this call
                                     // is also possible from the CSocket::SocketCritSect and CFTPWorker::WorkerCritSect sections (no dead-lock risk)
-                                    SocketsThread->AddTimer(Msg, UID, GetTickCount() + 20000,
+                                    SocketsThread->AddTimer(Msg, UID, CMonotonicClock::DeadlineAfter(20000),
                                                             WORKER_DATACONSTARTTIMID, NULL); // ignore the error; at worst the user presses Stop
                                 }
                             }
@@ -942,7 +942,7 @@ void CFTPWorker::HandleEventInWorkingState3(CFTPWorkerEvent event, BOOL& sendQui
                                                 SubState = fwssWorkCopyDelayedAutoRetry; // use a delayed auto-retry so that all unexpected server responses have time to arrive
                                                 // since we are already in the CSocketsThread::CritSect section, this call
                                                 // is also possible from the CSocket::SocketCritSect and CFTPWorker::WorkerCritSect sections (no dead-lock risk)
-                                                SocketsThread->AddTimer(Msg, UID, GetTickCount() + WORKER_DELAYEDAUTORETRYTIMEOUT,
+                                                SocketsThread->AddTimer(Msg, UID, CMonotonicClock::DeadlineAfter(WORKER_DELAYEDAUTORETRYTIMEOUT),
                                                                         WORKER_DELAYEDAUTORETRYTIMID, NULL); // ignore the error; at worst the user presses Stop
                                             }
                                             else

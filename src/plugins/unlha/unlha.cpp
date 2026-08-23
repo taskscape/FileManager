@@ -577,7 +577,7 @@ void CPluginInterfaceForArchiver::UnpackInnerBody(FILE* f, const char* targetDir
     }
 
     char nameInArc[MAX_PATH + MAX_PATH];
-    lstrcpy(nameInArc, fileName);
+    strncpy_s(nameInArc, sizeof(nameInArc), fileName, _TRUNCATE); // matches the adjacent targetName truncation policy for fixed buffers
     SalamanderGeneral->SalPathAppend(nameInArc, hdr.name, MAX_PATH + MAX_PATH);
     char buf[100];
     GetInfo(buf, &hdr.last_modified_filetime, hdr.original_size);
@@ -691,10 +691,13 @@ BOOL CPluginInterfaceForArchiver::MakeFilesList(TDirectArray<int>& offsets, SalE
     const CFileData* pfd;
     int errorOccured;
 
-    lstrcpy(dir, targetDir);
+    // bounded copy of the target directory; fail when no room remains for the path separator
+    strncpy_s(dir, sizeof(dir), targetDir, _TRUNCATE);
     addDir = dir + lstrlen(dir);
     if (*(addDir - 1) != '\\')
     {
+        if (addDir - dir >= MAX_PATH - 1)
+            return FALSE; // the separator would not fit the fixed buffer
         *addDir++ = '\\';
         *addDir = 0;
     }
@@ -721,7 +724,8 @@ BOOL CPluginInterfaceForArchiver::MakeFilesList(TDirectArray<int>& offsets, SalE
                     return FALSE;
                 }
             }
-            lstrcpy(addDir, nextName);
+            // the length guard above guarantees the name fits the remaining capacity
+            StringCchCopyA(addDir, MAX_PATH - dirLen, nextName);
             BOOL skip;
             if (SalamanderSafeFile->SafeFileCreate(dir, 0, 0, 0, TRUE, SalamanderGeneral->GetMsgBoxParent(), NULL, NULL,
                                                    &Silent, TRUE, &skip, NULL, 0, NULL, NULL) == INVALID_HANDLE_VALUE &&

@@ -17,11 +17,21 @@ struct CScopedRegKey
     explicit CScopedRegKey(HKEY key) : Key(key) {}
     ~CScopedRegKey()
     {
-        if (Key != NULL)
-            HANDLES(RegCloseKey(Key));
+        Close();
     }
     CScopedRegKey(const CScopedRegKey&);
     CScopedRegKey& operator=(const CScopedRegKey&);
+
+    // Recursive deletion must release an opened child key before RegDeleteKey
+    // removes that child by name; relying on destructor scope is too late.
+    void Close()
+    {
+        if (Key != NULL)
+        {
+            HANDLES(RegCloseKey(Key));
+            Key = NULL;
+        }
+    }
 };
 } // namespace
 
@@ -197,10 +207,12 @@ BOOL ClearKeyAux(HKEY key)
         HKEY subKey;
         if (HANDLES_Q(RegOpenKeyEx(key, name, 0, KEY_READ | KEY_WRITE, &subKey)) == ERROR_SUCCESS)
         {
-            // The opened subkey is closed by the wrapper even when the recursive
-            // cleanup or the delete below fails.
+            // Close the child before deleting it by name; an open registry key
+            // can make RegDeleteKey fail even after its contents were cleared.
             CScopedRegKey subKeyScope(subKey);
-            if (!ClearKeyAux(subKey) || RegDeleteKey(key, name) != ERROR_SUCCESS)
+            BOOL cleared = ClearKeyAux(subKey);
+            subKeyScope.Close();
+            if (!cleared || RegDeleteKey(key, name) != ERROR_SUCCESS)
                 return FALSE;
             RecordConfigurationWrite();
         }

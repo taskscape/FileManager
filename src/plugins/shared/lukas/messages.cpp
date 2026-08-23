@@ -15,7 +15,13 @@ const char* CMessageCenter::Version = "1";
 CMessageCenter::CMessageCenter(const char* name, BOOL sender)
 {
     CALL_STACK_MESSAGE3("CMessageCenter::CMessageCenter(%s, %d)", name, sender);
-    lstrcpy(Name = new char[lstrlen(name) + 1], name);
+    // the allocation is sized by the measured length below, so copy exactly that byte count
+    // (including the terminator) with an inline loop instead of an unbounded legacy helper
+    // (the /NODEFAULTLIB consumers of this library have no CRT memcpy)
+    int nameLen = lstrlen(name);
+    Name = new char[nameLen + 1];
+    for (int i = 0; i <= nameLen; i++)
+        Name[i] = name[i];
     Sender = sender;
 
     StartupMutex = NULL;

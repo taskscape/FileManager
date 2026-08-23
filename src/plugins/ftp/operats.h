@@ -4,6 +4,8 @@
 
 #pragma once
 
+#include "..\\..\\common\\monotonic_time.h" // 64-bit monotonic time for operation/speed timestamps
+
 #pragma pack(push, enter_include_operats_h_dt) // so that all structures are as small as possible (speed is not needed, we mainly save space)
 #pragma pack(1)
 
@@ -1913,10 +1915,10 @@ protected:
     // transfer speed calculation:
     DWORD TransferedBytes[DATACON_ACTSPEEDNUMOFSTEPS + 1]; // circular queue with the number of bytes transferred in the last N steps (time intervals) + one extra "working" step (the value for the current interval is accumulated there)
     int ActIndexInTrBytes;                                 // index of the last (current) record in TransferedBytes
-    DWORD ActIndexInTrBytesTimeLim;                        // time limit (in ms) of the last record in TransferedBytes (bytes are added to the last record up to this time)
+    CMonotonicTimePoint ActIndexInTrBytesTimeLim;          // time limit (in ms) of the last record in TransferedBytes (bytes are added to the last record up to this time); 64-bit monotonic, so the step queue cannot misbehave after a tick wrap
     int CountOfTrBytesItems;                               // number of steps in TransferedBytes (closed ones + one "working" step)
 
-    DWORD LastTransferTime; // GetTickCount from the moment of the last BytesReceived call
+    CMonotonicTimePoint LastTransferTime; // monotonic time from the moment of the last BytesReceived call
 
 public:
     CTransferSpeedMeter();
@@ -1936,28 +1938,29 @@ public:
     void JustConnected();
 
     // called after transferring a portion of data; 'count' contains how much data it was; 'time' is
-    // the transfer duration
-    void BytesReceived(DWORD count, DWORD time);
+    // the absolute 64-bit monotonic sample time of the reception
+    void BytesReceived(DWORD count, CMonotonicTimePoint time);
 };
 
 //
 // ****************************************************************************
-// CSynchronizedDWORD
+// CSynchronizedQWORD
 //
-// DWORD with synchronized access for use from multiple threads
+// 64-bit value with synchronized access for use from multiple threads
+// (widened from CSynchronizedDWORD so cross-thread monotonic timestamps survive tick wrap)
 
-class CSynchronizedDWORD
+class CSynchronizedQWORD
 {
 private:
     CRITICAL_SECTION ValueCS; // critical section for accessing the object's data
-    DWORD Value;
+    ULONGLONG Value;
 
 public:
-    CSynchronizedDWORD();
-    ~CSynchronizedDWORD();
+    CSynchronizedQWORD();
+    ~CSynchronizedQWORD();
 
-    void Set(DWORD value);
-    DWORD Get();
+    void Set(ULONGLONG value);
+    ULONGLONG Get();
 };
 
 //
@@ -2143,8 +2146,8 @@ protected:
     BOOL OperStateChangedPosted;           // TRUE = we have already posted WM_APP_OPERSTATECHANGE to the operation dialog, waiting for it to react (call GetOperationState(TRUE))
     COperationState LastReportedOperState; // last operation state returned by GetOperationState(TRUE)
 
-    DWORD OperationStart; // GetTickCount() from the moment the operation was started (when interrupted and restarted it shifts by the "idle" time so the total elapsed time fits)
-    DWORD OperationEnd;   // GetTickCount() from the moment the operation finished (even with errors) (-1 = invalid - operation still running)
+CMonotonicTimePoint OperationStart; // monotonic time from the moment the operation was started (when interrupted and restarted it shifts by the "idle" time so the total elapsed time fits)
+CMonotonicTimePoint OperationEnd;   // monotonic time from the moment the operation finished (even with errors) (all-ones value = invalid - operation still running)
 
     CFTPOperationType Type; // operation type
     char* OperationSubject; // what the operation works with ("file "test.txt"", "3 files and 1 directory", etc.)
@@ -2242,7 +2245,7 @@ protected:
     // data without needing a critical section (have their own synchronization + used only in shorter-lived objects):
     // global object for storing the time of the last activity on the data-connection group (all
     // data-connection workers of the FTP operation)
-    CSynchronizedDWORD GlobalLastActivityTime;
+    CSynchronizedQWORD GlobalLastActivityTime;
 
 public:
     CFTPOperation();
@@ -2713,7 +2716,7 @@ public:
     CTransferSpeedMeter* GetGlobalTransferSpeedMeter() { return &GlobalTransferSpeedMeter; }
 
     // returns the global object for storing the time of the last activity on the data connections of all workers
-    CSynchronizedDWORD* GetGlobalLastActivityTime() { return &GlobalLastActivityTime; }
+    CSynchronizedQWORD* GetGlobalLastActivityTime() { return &GlobalLastActivityTime; }
 
     // returns (in the critical section) the operation type (see 'Type')
     CFTPOperationType GetOperationType();

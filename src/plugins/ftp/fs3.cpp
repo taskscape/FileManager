@@ -169,9 +169,9 @@ void CPluginFSInterface::Event(int event, DWORD param)
     case FSE_TIMER: // delayed panel refresh (to give the connection time to return from the operation dialog to the panel)
     {
         DWORD paramLimit = 4; // maximum one second waiting for the connection (we wait to see whether the worker will try to hand over the connection)
-        DWORD ti;
+        CMonotonicTimePoint ti;
         if (ControlConnection != NULL &&
-            ControlConnection->GetIsSocketConnectedLastCallTime(&ti) && GetTickCount() - ti < 5000)
+            ControlConnection->GetIsSocketConnectedLastCallTime(&ti) && CMonotonicClock::Elapsed(ti, CMonotonicClock::Now()) < 5000)
         {
             paramLimit = 24; // maximum five seconds waiting for the connection (we know the worker is trying to hand it over)
         }

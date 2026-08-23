@@ -26,7 +26,7 @@ void CTransferSpeedMeter::Clear()
     ActIndexInTrBytes = 0;
     ActIndexInTrBytesTimeLim = 0;
     CountOfTrBytesItems = 0;
-    LastTransferTime = GetTickCount();
+    LastTransferTime = CMonotonicClock::Now(); // 64-bit monotonic, so speed windows survive tick wrap
     HANDLES(LeaveCriticalSection(&TransferSpeedMeterCS));
 }
 
@@ -36,9 +36,9 @@ CTransferSpeedMeter::GetSpeed(DWORD* transferIdleTime)
     CALL_STACK_MESSAGE1("CTransferSpeedMeter::GetSpeed()");
 
     HANDLES(EnterCriticalSection(&TransferSpeedMeterCS));
-    DWORD time = GetTickCount();
+    CMonotonicTimePoint time = CMonotonicClock::Now();
     if (transferIdleTime != NULL)
-        *transferIdleTime = (time - LastTransferTime) / 1000;
+        *transferIdleTime = (DWORD)(CMonotonicClock::Elapsed(LastTransferTime, time) / 1000);
     DWORD speed;
     if (CountOfTrBytesItems > 0) // after establishing the connection this is "always true"
     {
@@ -47,10 +47,10 @@ CTransferSpeedMeter::GetSpeed(DWORD* transferIdleTime)
         CQuadWord total(0, 0);                           // total number of bytes over the last max. DATACON_ACTSPEEDNUMOFSTEPS steps
         int addFromTrBytes = CountOfTrBytesItems - 1;    // number of closed steps to add from the queue
         DWORD restTime = 0;                              // time from the last counted step up to now
-        if ((int)(time - ActIndexInTrBytesTimeLim) >= 0) // current index is already closed and empty steps might be needed
+        if (time >= ActIndexInTrBytesTimeLim)            // current index is already closed and empty steps might be needed (64-bit comparison, no wrap projection)
         {
-            emptyTrBytes = (time - ActIndexInTrBytesTimeLim) / DATACON_ACTSPEEDSTEP;
-            restTime = (time - ActIndexInTrBytesTimeLim) % DATACON_ACTSPEEDSTEP;
+            emptyTrBytes = (int)((time - ActIndexInTrBytesTimeLim) / DATACON_ACTSPEEDSTEP);
+            restTime = (DWORD)((time - ActIndexInTrBytesTimeLim) % DATACON_ACTSPEEDSTEP);
             emptyTrBytes = min(emptyTrBytes, DATACON_ACTSPEEDNUMOFSTEPS);
             if (emptyTrBytes < DATACON_ACTSPEEDNUMOFSTEPS) // empty steps alone are not enough, include the current index as well
             {
@@ -62,7 +62,7 @@ CTransferSpeedMeter::GetSpeed(DWORD* transferIdleTime)
         }
         else
         {
-            restTime = time + DATACON_ACTSPEEDSTEP - ActIndexInTrBytesTimeLim;
+            restTime = (DWORD)(time + DATACON_ACTSPEEDSTEP - ActIndexInTrBytesTimeLim); // bounded by DATACON_ACTSPEEDSTEP in this branch
             total = CQuadWord(TransferedBytes[ActIndexInTrBytes], 0);
         }
 
@@ -94,25 +94,25 @@ void CTransferSpeedMeter::JustConnected()
     HANDLES(EnterCriticalSection(&TransferSpeedMeterCS));
     TransferedBytes[0] = 0;
     ActIndexInTrBytes = 0;
-    ActIndexInTrBytesTimeLim = GetTickCount() + DATACON_ACTSPEEDSTEP;
+    ActIndexInTrBytesTimeLim = CMonotonicClock::DeadlineAfter(DATACON_ACTSPEEDSTEP);
     CountOfTrBytesItems = 1;
     HANDLES(LeaveCriticalSection(&TransferSpeedMeterCS));
 }
 
-void CTransferSpeedMeter::BytesReceived(DWORD count, DWORD time)
+void CTransferSpeedMeter::BytesReceived(DWORD count, CMonotonicTimePoint time)
 {
     DEBUG_SLOW_CALL_STACK_MESSAGE1("CTransferSpeedMeter::BytesReceived(,)"); // parameters ignored for performance reasons (the call stack slows it down enough)
 
     HANDLES(EnterCriticalSection(&TransferSpeedMeterCS));
     if (count > 0)
         LastTransferTime = time;
-    if ((int)(time - ActIndexInTrBytesTimeLim) < 0) // within the current time interval, just add the byte count to the interval
+    if (time < ActIndexInTrBytesTimeLim) // within the current time interval, just add the byte count to the interval
     {
         TransferedBytes[ActIndexInTrBytes] += count;
     }
     else // not in the current time interval, we have to start a new one
     {
-        int emptyTrBytes = (time - ActIndexInTrBytesTimeLim) / DATACON_ACTSPEEDSTEP;
+        int emptyTrBytes = (int)((time - ActIndexInTrBytesTimeLim) / DATACON_ACTSPEEDSTEP);
         int i = min(emptyTrBytes, DATACON_ACTSPEEDNUMOFSTEPS); // more has no effect (the entire queue would be cleared)
         if (i > 0 && CountOfTrBytesItems <= DATACON_ACTSPEEDNUMOFSTEPS)
             CountOfTrBytesItems = min(DATACON_ACTSPEEDNUMOFSTEPS + 1, CountOfTrBytesItems + i);
@@ -134,32 +134,32 @@ void CTransferSpeedMeter::BytesReceived(DWORD count, DWORD time)
 
 //
 // ****************************************************************************
-// CSynchronizedDWORD
+// CSynchronizedQWORD
 //
 
-CSynchronizedDWORD::CSynchronizedDWORD()
+CSynchronizedQWORD::CSynchronizedQWORD()
 {
     HANDLES(InitializeCriticalSection(&ValueCS));
     Value = 0;
 }
 
-CSynchronizedDWORD::~CSynchronizedDWORD()
+CSynchronizedQWORD::~CSynchronizedQWORD()
 {
     HANDLES(DeleteCriticalSection(&ValueCS));
 }
 
-void CSynchronizedDWORD::Set(DWORD value)
+void CSynchronizedQWORD::Set(ULONGLONG value)
 {
     HANDLES(EnterCriticalSection(&ValueCS));
     Value = value;
     HANDLES(LeaveCriticalSection(&ValueCS));
 }
 
-DWORD
-CSynchronizedDWORD::Get()
+ULONGLONG
+CSynchronizedQWORD::Get()
 {
     HANDLES(EnterCriticalSection(&ValueCS));
-    DWORD ret = Value;
+    ULONGLONG ret = Value;
     HANDLES(LeaveCriticalSection(&ValueCS));
     return ret;
 }
@@ -180,8 +180,8 @@ CKeepAliveDataConSocket::CKeepAliveDataConSocket(CControlConnectionSocket* paren
     NetEventLastError = NO_ERROR;
     SSLErrorOccured = SSLCONERR_NOERROR;
     ReceivedConnected = FALSE;
-    LastActivityTime = GetTickCount();
-    SocketCloseTime = GetTickCount(); // just in case, it should be overwritten before calling GetSocketCloseTime()
+    LastActivityTime = CMonotonicClock::Now();
+    SocketCloseTime = CMonotonicClock::Now(); // just in case, it should be overwritten before calling GetSocketCloseTime()
     ParentControlSocket = parentControlSocket;
     CallSetupNextKeepAliveTimer = FALSE;
     ListenOnIP = INADDR_NONE;
@@ -208,7 +208,7 @@ void CKeepAliveDataConSocket::SetPassive(DWORD ip, unsigned short port, int logU
     ServerIP = ip;
     ServerPort = port;
     LogUID = logUID;
-    LastActivityTime = GetTickCount(); // we rely on the object being initialized before the transfer command is sent (the command will have an equal or shorter timeout)
+    LastActivityTime = CMonotonicClock::Now(); // we rely on the object being initialized before the transfer command is sent (the command will have an equal or shorter timeout)
     HANDLES(LeaveCriticalSection(&SocketCritSect));
 }
 
@@ -302,7 +302,7 @@ void CKeepAliveDataConSocket::SetActive(int logUID)
     NetEventLastError = NO_ERROR;
     SSLErrorOccured = SSLCONERR_NOERROR;
     ReceivedConnected = FALSE;
-    LastActivityTime = GetTickCount(); // we rely on the object being initialized before the transfer command is sent (the command will have an equal or shorter timeout)
+    LastActivityTime = CMonotonicClock::Now(); // we rely on the object being initialized before the transfer command is sent (the command will have an equal or shorter timeout)
 
     HANDLES(LeaveCriticalSection(&SocketCritSect));
 }
@@ -363,13 +363,13 @@ void CKeepAliveDataConSocket::ActivateConnection()
     }
 }
 
-DWORD
+CMonotonicTimePoint
 CKeepAliveDataConSocket::GetSocketCloseTime()
 {
     CALL_STACK_MESSAGE1("CKeepAliveDataConSocket::GetSocketCloseTime()");
 
     HANDLES(EnterCriticalSection(&SocketCritSect));
-    DWORD r = SocketCloseTime;
+    CMonotonicTimePoint r = SocketCloseTime;
     HANDLES(LeaveCriticalSection(&SocketCritSect));
     return r;
 }
@@ -379,7 +379,7 @@ BOOL CKeepAliveDataConSocket::CloseSocketEx(DWORD* error)
     CALL_STACK_MESSAGE1("CKeepAliveDataConSocket::CloseSocketEx()");
 
     HANDLES(EnterCriticalSection(&SocketCritSect));
-    SocketCloseTime = GetTickCount();
+    SocketCloseTime = CMonotonicClock::Now();
     HANDLES(LeaveCriticalSection(&SocketCritSect));
 
     return CSocket::CloseSocket(error);
@@ -404,7 +404,7 @@ void CKeepAliveDataConSocket::JustConnected()
     ReceivedConnected = TRUE; // if FD_READ arrives before FD_CONNECT (it has to be connected anyway)
     // because we are already inside CSocketsThread::CritSect, this call is
     // also possible from CSocket::SocketCritSect (no risk of deadlock)
-    SocketsThread->AddTimer(Msg, UID, GetTickCount() + DATACON_TESTNODATATRTIMEOUT,
+    SocketsThread->AddTimer(Msg, UID, CMonotonicClock::DeadlineAfter(DATACON_TESTNODATATRTIMEOUT),
                             DATACON_TESTNODATATRTIMERID, NULL);
 }
 
@@ -454,7 +454,7 @@ void CKeepAliveDataConSocket::ConnectionAccepted(BOOL success, DWORD winError, B
         NetEventLastError = NO_ERROR; // a previous accept may have failed; it is no longer relevant now
         SSLErrorOccured = SSLCONERR_NOERROR;
         JustConnected();
-        LastActivityTime = GetTickCount(); // a successful accept occurred
+        LastActivityTime = CMonotonicClock::Now(); // a successful accept occurred
     }
     else // an error occurred - log it at least
     {
@@ -505,7 +505,7 @@ void CKeepAliveDataConSocket::ReceiveNetEvent(LPARAM lParam, int index)
                     {
                         if (len > 0)
                         {
-                            LastActivityTime = GetTickCount(); // bytes were successfully read from the socket
+                            LastActivityTime = CMonotonicClock::Now(); // bytes were successfully read from the socket
                             if (WSAGETSELECTEVENT(lParam) == FD_CLOSE)
                                 sendFDCloseAgain = TRUE;
                         }
@@ -578,7 +578,7 @@ void CKeepAliveDataConSocket::ReceiveNetEvent(LPARAM lParam, int index)
         if (eventError == NO_ERROR)
         {
             JustConnected();
-            LastActivityTime = GetTickCount(); // the connect succeeded
+            LastActivityTime = CMonotonicClock::Now(); // the connect succeeded
         }
         else
         {
@@ -606,7 +606,7 @@ void CKeepAliveDataConSocket::ReceiveTimer(DWORD id, void* param)
     HANDLES(EnterCriticalSection(&SocketCritSect));
     if (id == DATACON_TESTNODATATRTIMERID && Socket != INVALID_SOCKET)
     { // periodic no-data-transfer timeout check
-        if ((GetTickCount() - LastActivityTime) / 1000 >= (DWORD)Config.GetNoDataTransferTimeout())
+        if (CMonotonicClock::Elapsed(LastActivityTime, CMonotonicClock::Now()) / 1000 >= (DWORD)Config.GetNoDataTransferTimeout())
         { // timeout occurred, close the data connection to simulate the server doing it
             Logs.LogMessage(LogUID, LoadStr(IDS_LOGMSGNODATATRTIMEOUT), -1, TRUE);
             HANDLES(LeaveCriticalSection(&SocketCritSect));
@@ -617,7 +617,7 @@ void CKeepAliveDataConSocket::ReceiveTimer(DWORD id, void* param)
         {
             // because we are already inside CSocketsThread::CritSect, this call is
             // also possible from CSocket::SocketCritSect (no risk of deadlock)
-            SocketsThread->AddTimer(Msg, UID, GetTickCount() + DATACON_TESTNODATATRTIMEOUT,
+            SocketsThread->AddTimer(Msg, UID, CMonotonicClock::DeadlineAfter(DATACON_TESTNODATATRTIMEOUT),
                                     DATACON_TESTNODATATRTIMERID, NULL);
         }
     }
@@ -630,7 +630,7 @@ void CKeepAliveDataConSocket::SocketWasClosed(DWORD error)
 
     HANDLES(EnterCriticalSection(&SocketCritSect));
 
-    SocketCloseTime = GetTickCount();
+    SocketCloseTime = CMonotonicClock::Now();
     if (error != NO_ERROR)
         NetEventLastError = error;
     BOOL callSetupNextKeepAliveTimerAux = CallSetupNextKeepAliveTimer;
@@ -755,9 +755,9 @@ CUploadDataConnectionSocket::CUploadDataConnectionSocket(CFTPProxyForDataCon* pr
 
     NoDataTransTimeout = FALSE;
 
-    FirstWriteAfterConnect = FALSE;
-    FirstWriteAfterConnectTime = GetTickCount() - 10000;
-    SkippedWriteAfterConnect = 0;
+      FirstWriteAfterConnect = FALSE;
+      FirstWriteAfterConnectTime = CMonotonicClock::AtLeastDurationAgo(10000); // pretend the first write happened 10 s ago without wrapping below zero
+      SkippedWriteAfterConnect = 0;
     LastSpeedTestTime = 0;
     LastPacketSizeEstimation = 4096;
     PacketSizeChangeTime = 0;
@@ -789,7 +789,7 @@ BOOL CUploadDataConnectionSocket::CloseSocketEx(DWORD* error)
     CALL_STACK_MESSAGE1("CUploadDataConnectionSocket::CloseSocketEx()");
 
     HANDLES(EnterCriticalSection(&SocketCritSect));
-    SocketCloseTime = GetTickCount();
+    SocketCloseTime = CMonotonicClock::Now();
     HANDLES(LeaveCriticalSection(&SocketCritSect));
 
     return CSocket::CloseSocket(error);
@@ -910,7 +910,7 @@ void CUploadDataConnectionSocket::SocketWasClosed(DWORD error)
 
     HANDLES(EnterCriticalSection(&SocketCritSect));
 
-    SocketCloseTime = GetTickCount();
+    SocketCloseTime = CMonotonicClock::Now();
     if (error != NO_ERROR)
         NetEventLastError = error;
 
@@ -929,7 +929,7 @@ void CUploadDataConnectionSocket::UploadFinished()
 
     if (ConnectionClosedOnEOF && SkippedWriteAfterConnect > 0)
     { // account bytes from local buffers in the upload speed (we are not sure the local buffers will be sent, but without them the speed on small files that fit almost entirely into local buffers would be completely wrong—absurdly low)
-        DWORD ti = GetTickCount();
+          CMonotonicTimePoint ti = CMonotonicClock::Now();
         TransferSpeedMeter.BytesReceived(SkippedWriteAfterConnect, ti);
         if (GlobalTransferSpeedMeter != NULL)
             GlobalTransferSpeedMeter->BytesReceived(SkippedWriteAfterConnect, ti);
@@ -946,7 +946,7 @@ void CUploadDataConnectionSocket::GetStatus(CQuadWord* uploaded, CQuadWord* tota
     *total = DataTotalSize;
     if (*total < *uploaded)
         *total = *uploaded;
-    *connectionIdleTime = (GetTickCount() - LastActivityTime) / 1000;
+      *connectionIdleTime = (DWORD)(CMonotonicClock::Elapsed(LastActivityTime, CMonotonicClock::Now()) / 1000);
     *speed = TransferSpeedMeter.GetSpeed(NULL);
     HANDLES(LeaveCriticalSection(&SocketCritSect));
 }
@@ -963,7 +963,7 @@ void CUploadDataConnectionSocket::UpdatePauseStatus(BOOL pause)
             TRACE_E("Unexpected situation in CUploadDataConnectionSocket::UpdatePauseStatus(): DataTransferPostponed=" << DataTransferPostponed);
         if (!WorkerPaused)
         {
-            LastActivityTime = GetTickCount();
+            LastActivityTime = CMonotonicClock::Now();
             if (GlobalLastActivityTime != NULL)
                 GlobalLastActivityTime->Set(LastActivityTime);
             TransferSpeedMeter.Clear();
@@ -995,7 +995,7 @@ void CUploadDataConnectionSocket::JustConnected()
     DoPostMessageToWorker(WorkerMsgConnectedToServer);
     // because we are already inside CSocketsThread::CritSect, this call is
     // also possible from CSocket::SocketCritSect (no risk of deadlock)
-    SocketsThread->AddTimer(Msg, UID, GetTickCount() + DATACON_TESTNODATATRTIMEOUT,
+    SocketsThread->AddTimer(Msg, UID, CMonotonicClock::DeadlineAfter(DATACON_TESTNODATATRTIMEOUT),
                             DATACON_TESTNODATATRTIMERID, NULL);
 }
 
@@ -1010,7 +1010,7 @@ void CUploadDataConnectionSocket::ConnectionAccepted(BOOL success, DWORD winErro
 
     if (success)
     {
-        LastActivityTime = GetTickCount(); // a successful accept occurred
+        LastActivityTime = CMonotonicClock::Now(); // a successful accept occurred
         if (GlobalLastActivityTime != NULL)
             GlobalLastActivityTime->Set(LastActivityTime);
         NetEventLastError = NO_ERROR; // a previous accept may have failed; it is no longer relevant now
@@ -1074,19 +1074,19 @@ void CUploadDataConnectionSocket::DebugLogPacketSizeAndWriteSize(int size, BOOL 
             sprintf(buf, "(Too big send block size is %u bytes)\r\n", TooBigPacketSize);
             Logs.LogMessage(LogUID, buf, -1, TRUE);
         }
-        DebugLastWriteToLog = GetTickCount();
+        DebugLastWriteToLog = CMonotonicClock::Now();
     }
     else
     {
         DebugSentButNotLoggedBytes += size;
         DebugSentButNotLoggedCount++;
-        if (GetTickCount() - DebugLastWriteToLog >= 1000)
+          if (CMonotonicClock::HasElapsed(DebugLastWriteToLog, 1000, CMonotonicClock::Now()))
         {
             sprintf(buf, "Sent size: %u bytes (in %u blocks)\r\n", DebugSentButNotLoggedBytes, DebugSentButNotLoggedCount);
             Logs.LogMessage(LogUID, buf, -1, TRUE);
             DebugSentButNotLoggedBytes = 0;
             DebugSentButNotLoggedCount = 0;
-            DebugLastWriteToLog = GetTickCount();
+            DebugLastWriteToLog = CMonotonicClock::Now();
         }
     }
 }
@@ -1156,9 +1156,9 @@ void CUploadDataConnectionSocket::ReceiveNetEvent(LPARAM lParam, int index)
                                 }
                             }
 
-                            FirstWriteAfterConnectTime = GetTickCount();
-                            LastSpeedTestTime = GetTickCount() - 4000; // let the speed test run one second after the transfer starts
-                            LastPacketSizeEstimation = 4096;           // initial compromise (for the first second of the transfer)
+                              FirstWriteAfterConnectTime = CMonotonicClock::Now();
+                              LastSpeedTestTime = CMonotonicClock::AtLeastDurationAgo(4000); // let the speed test run one second after the transfer starts
+                              LastPacketSizeEstimation = 4096;           // initial compromise (for the first second of the transfer)
                             if (LastPacketSizeEstimation >= TooBigPacketSize)
                                 LastPacketSizeEstimation = 512;
                             PacketSizeChangeTime = LastSpeedTestTime - 1000; // measure only when LastSpeedTestTime == PacketSizeChangeTime; this disables that measurement
@@ -1202,10 +1202,10 @@ void CUploadDataConnectionSocket::ReceiveNetEvent(LPARAM lParam, int index)
                                     //                      if (BytesToWriteOffset >= BytesToWriteCount && ValidBytesInFlushBuffer == 0 && EndOfFileReached)
                                     //                        TRACE_I("TotalWrittenBytesCount=" << (int)TotalWrittenBytesCount.Value);
 
-                                    LastActivityTime = GetTickCount();
+                                    LastActivityTime = CMonotonicClock::Now();
                                     if (GlobalLastActivityTime != NULL)
                                         GlobalLastActivityTime->Set(LastActivityTime);
-                                    if (LastActivityTime - FirstWriteAfterConnectTime > 100)
+                                      if (CMonotonicClock::Elapsed(FirstWriteAfterConnectTime, LastActivityTime) > 100)
                                     { // during upload the local buffer fills first (e.g. 8KB in 1ms or 45KB in 8ms when connected to localhost, apparently both send and receive buffers fill up), we do not measure the rate of this filling because it would artificially and unfairly boost the upload speed
                                         TransferSpeedMeter.BytesReceived(decomprSentLen, LastActivityTime);
                                         if (CompressData)
@@ -1213,7 +1213,7 @@ void CUploadDataConnectionSocket::ReceiveNetEvent(LPARAM lParam, int index)
 
                                         if (PacketSizeChangeTime == LastSpeedTestTime) // the previous speed test changed LastPacketSizeEstimation, we must verify that the transfer was not degraded (on Windows XP this happens on intranets around 5 MB/s; selecting LastPacketSizeEstimation==32KB drops transfer speed to 160 KB/s, observed only with some FTP servers such as RaidenFTPD v2.4)
                                         {
-                                            if (LastActivityTime - PacketSizeChangeTime <= 1000) // accumulate how many bytes transfer during one second after changing LastPacketSizeEstimation
+                                              if (CMonotonicClock::Elapsed(PacketSizeChangeTime, LastActivityTime) <= 1000) // accumulate how many bytes transfer during one second after changing LastPacketSizeEstimation
                                                 BytesSentAfterPckSizeCh += sentLen;
                                             else
                                             {
@@ -1242,7 +1242,7 @@ void CUploadDataConnectionSocket::ReceiveNetEvent(LPARAM lParam, int index)
                                             }
                                         }
 
-                                        if (LastActivityTime - LastSpeedTestTime >= 5000) // every five seconds calibrate the packet size according to the connection speed
+                                          if (CMonotonicClock::Elapsed(LastSpeedTestTime, LastActivityTime) >= 5000) // every five seconds calibrate the packet size according to the connection speed
                                         {
                                             LastSpeedTestTime = LastActivityTime;
                                             DWORD speed = CompressData ? ComprTransferSpeedMeter.GetSpeed(NULL) : TransferSpeedMeter.GetSpeed(NULL);
@@ -1366,7 +1366,7 @@ void CUploadDataConnectionSocket::ReceiveNetEvent(LPARAM lParam, int index)
         {
             if (!ReceivedConnected)
                 JustConnected();
-            LastActivityTime = GetTickCount(); // the connect succeeded
+            LastActivityTime = CMonotonicClock::Now(); // the connect succeeded
             if (GlobalLastActivityTime != NULL)
                 GlobalLastActivityTime->Set(LastActivityTime);
         }
@@ -1401,7 +1401,7 @@ void CUploadDataConnectionSocket::ReceiveTimer(DWORD id, void* param)
     if (id == DATACON_TESTNODATATRTIMERID && Socket != INVALID_SOCKET)
     { // periodic no-data-transfer timeout check
         if (!WorkerPaused &&
-            (GetTickCount() - LastActivityTime) / 1000 >= (DWORD)Config.GetNoDataTransferTimeout())
+            CMonotonicClock::Elapsed(LastActivityTime, CMonotonicClock::Now()) / 1000 >= (DWORD)Config.GetNoDataTransferTimeout())
         { // timeout occurred, close the data connection to simulate the server doing it
             NoDataTransTimeout = TRUE;
             Logs.LogMessage(LogUID, LoadStr(IDS_LOGMSGNODATATRTIMEOUT), -1, TRUE);
@@ -1413,7 +1413,7 @@ void CUploadDataConnectionSocket::ReceiveTimer(DWORD id, void* param)
         {
             // because we are already inside CSocketsThread::CritSect, this call is
             // also possible from CSocket::SocketCritSect (no risk of deadlock)
-            SocketsThread->AddTimer(Msg, UID, GetTickCount() + DATACON_TESTNODATATRTIMEOUT,
+            SocketsThread->AddTimer(Msg, UID, CMonotonicClock::DeadlineAfter(DATACON_TESTNODATATRTIMEOUT),
                                     DATACON_TESTNODATATRTIMERID, NULL);
         }
     }

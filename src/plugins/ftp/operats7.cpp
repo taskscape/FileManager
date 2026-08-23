@@ -43,7 +43,7 @@ void CFTPWorker::OpenActDataCon(CFTPWorkerSubState waitForListen, char* errBuf, 
             serverTimeout = 1000; // at least one second
         // Since we are already inside the CSocketsThread::CritSect section, this call
         // is possible even from the CSocket::SocketCritSect and CFTPWorker::WorkerCritSect sections (no risk of deadlock).
-        SocketsThread->AddTimer(Msg, UID, GetTickCount() + serverTimeout,
+        SocketsThread->AddTimer(Msg, UID, CMonotonicClock::DeadlineAfter(serverTimeout),
                                 WORKER_LISTENTIMEOUTTIMID, NULL); // ignore error; at worst the user presses Stop
     }
     else // failed to open a "listen" socket for receiving the data connection from

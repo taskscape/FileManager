@@ -92,7 +92,7 @@ COperationDlg::COperationDlg(HWND parent, HWND centerToWnd, CFTPOperation* oper,
 
     IsDirtyStatus = FALSE;
     IsDirtyProgress = FALSE;
-    LastUpdateOfProgressByWorker = GetTickCount() - OPERDLG_STATUSUPDATEPERIOD;
+    LastUpdateOfProgressByWorker = CMonotonicClock::AtLeastDurationAgo(OPERDLG_STATUSUPDATEPERIOD);
     IsDirtyConsListView = FALSE;
     IsDirtyItemsListView = FALSE;
     HasDelayedUpdateTimer = FALSE;
@@ -109,7 +109,7 @@ COperationDlg::COperationDlg(HWND parent, HWND centerToWnd, CFTPOperation* oper,
     UserWasActive = FALSE;
     DelayAfterCancel = FALSE;
     CloseDlgWhenOperFin = Config.CloseOperationDlgWhenOperFinishes;
-    ClearChkboxTime = GetTickCount() - 1000;
+      ClearChkboxTime = CMonotonicClock::AtLeastDurationAgo(1000);
     LastFocusedControl = NULL;
     LastActivityTime = 0;
 
@@ -123,7 +123,7 @@ COperationDlg::COperationDlg(HWND parent, HWND centerToWnd, CFTPOperation* oper,
 
     ShowLowDiskWarning = FALSE;
     LastNeededDiskSpace.Set(0, 0);
-    LastGetDiskFreeSpace = GetTickCount() - OPERDLG_GETDISKSPACEPERIOD;
+      LastGetDiskFreeSpace = CMonotonicClock::AtLeastDurationAgo(OPERDLG_GETDISKSPACEPERIOD);
     LowDiskSpaceHint = NULL;
     GetDiskFreeSpaceThread = NULL;
 
@@ -341,8 +341,8 @@ BOOL COperationDlg::UpdateDataInDialog()
 
     if (IsDirtyStatus || IsDirtyProgress && reportProgressChange)
     {
-        if (IsDirtyProgress)
-            LastUpdateOfProgressByWorker = GetTickCount();
+          if (IsDirtyProgress)
+              LastUpdateOfProgressByWorker = CMonotonicClock::Now();
         IsDirtyStatus = FALSE;
         IsDirtyProgress = FALSE;
 
@@ -696,11 +696,11 @@ BOOL COperationDlg::UpdateDataInDialog()
             (operType == fotCopyDownload || operType == fotMoveDownload) &&
             waiting > CQuadWord(0, 0) &&
             GetDiskFreeSpaceThread != NULL &&
-            GetTickCount() - LastGetDiskFreeSpace >= OPERDLG_GETDISKSPACEPERIOD)
+              CMonotonicClock::Elapsed(LastGetDiskFreeSpace, CMonotonicClock::Now()) >= OPERDLG_GETDISKSPACEPERIOD)
         {
-            LastNeededDiskSpace = waiting;
-            LastGetDiskFreeSpace = GetTickCount();
-            GetDiskFreeSpaceThread->ScheduleGetDiskFreeSpace();
+              LastNeededDiskSpace = waiting;
+              LastGetDiskFreeSpace = CMonotonicClock::Now();
+              GetDiskFreeSpaceThread->ScheduleGetDiskFreeSpace();
         }
         else
         {
@@ -1279,7 +1279,7 @@ void COperationDlg::SolveErrorOnConnection(int index)
                     {
                     case IDOK: // Accept once
                     {
-                        LastActivityTime = GetTickCount() - OPERDLG_SHOWERRMINIDLETIME; // simulate "idle" so the next error can appear immediately
+                        LastActivityTime = CMonotonicClock::AtLeastDurationAgo(OPERDLG_SHOWERRMINIDLETIME); // simulate "idle" so the next error can appear immediately
                         Oper->SetCertificate(unverifiedCertificate);
                         // A worker may reuse the decision only through the certificate's host, port, pin, and expiry scope.
                         if (unverifiedCertificate->RememberException(certificateDialog.RememberException() ? cesPersistent : cesSession) &&
@@ -1294,7 +1294,7 @@ void COperationDlg::SolveErrorOnConnection(int index)
                     {
                         //              SetUserWasActive();  // commented out to keep the operation window "untouched" after ESC from the Solve Error dialog
                         DelayAfterCancel = TRUE;
-                        LastActivityTime = GetTickCount();
+                        LastActivityTime = CMonotonicClock::Now();
                         break;
                     }
 
@@ -1313,7 +1313,7 @@ void COperationDlg::SolveErrorOnConnection(int index)
                         {
                             dlgRes = -1;             // just to avoid looping
                             DelayAfterCancel = TRUE; // simulate Cancel
-                            LastActivityTime = GetTickCount();
+                            LastActivityTime = CMonotonicClock::Now();
                         }
                         else
                         {
@@ -1321,7 +1321,7 @@ void COperationDlg::SolveErrorOnConnection(int index)
                             {                // the server certificate is already trusted (the user probably imported it manually)
                                 dlgRes = -1; // just to avoid looping
                                 unverifiedCertificate->SetVerified(true);
-                                LastActivityTime = GetTickCount() - OPERDLG_SHOWERRMINIDLETIME; // simulate "idle" so the next error can appear immediately
+                                LastActivityTime = CMonotonicClock::AtLeastDurationAgo(OPERDLG_SHOWERRMINIDLETIME); // simulate "idle" so the next error can appear immediately
                                 Oper->SetCertificate(unverifiedCertificate);
                                 // notify all workers with a connection error
                                 WorkersList->PostLoginChanged(-1);
@@ -1335,7 +1335,7 @@ void COperationDlg::SolveErrorOnConnection(int index)
             else // the certificate is already fine (showing the dialog would be pointless?)
             {
                 unverifiedCertificate->SetVerified(true);
-                LastActivityTime = GetTickCount() - OPERDLG_SHOWERRMINIDLETIME; // simulate "idle" so the next error can appear immediately
+                LastActivityTime = CMonotonicClock::AtLeastDurationAgo(OPERDLG_SHOWERRMINIDLETIME); // simulate "idle" so the next error can appear immediately
                 Oper->SetCertificate(unverifiedCertificate);
                 // notify all workers with a connection error
                 WorkersList->PostLoginChanged(-1);
@@ -1369,7 +1369,7 @@ void COperationDlg::SolveErrorOnConnection(int index)
             }
             if (res == IDOK)
             {
-                LastActivityTime = GetTickCount() - OPERDLG_SHOWERRMINIDLETIME; // simulate "idle" so the next error can appear immediately
+                LastActivityTime = CMonotonicClock::AtLeastDurationAgo(OPERDLG_SHOWERRMINIDLETIME); // simulate "idle" so the next error can appear immediately
                 Oper->SetLoginErrorDlgInfo(proxyScriptParams.Password, proxyScriptParams.Account, dlg.RetryWithoutAsking,
                                            proxyUsed, proxyScriptParams.ProxyUser, proxyScriptParams.ProxyPassword);
                 // notify the relevant worker or all workers with a connection error
@@ -1379,7 +1379,7 @@ void COperationDlg::SolveErrorOnConnection(int index)
             {
                 //        SetUserWasActive();  // commented out to keep the operation window "untouched" after ESC from the Solve Error dialog
                 DelayAfterCancel = TRUE;
-                LastActivityTime = GetTickCount();
+                LastActivityTime = CMonotonicClock::Now();
             }
         }
     }
@@ -1396,7 +1396,7 @@ void COperationDlg::SetUserWasActive()
         {
             CheckDlgButton(HWindow, IDC_OPCLOSEWINWHENDONE, BST_UNCHECKED);
             DlgWillCloseIfOpFinWithSkips = FALSE;
-            ClearChkboxTime = GetTickCount();
+              ClearChkboxTime = CMonotonicClock::Now();
         }
     }
 }
@@ -1414,7 +1414,7 @@ void COperationDlg::SolveErrorOnItem(int itemUID)
     }
     if (changedIndex != -2) // if there was at least some change
     {
-        LastActivityTime = GetTickCount() - OPERDLG_SHOWERRMINIDLETIME; // simulate "idle" so the next error can appear immediately
+        LastActivityTime = CMonotonicClock::AtLeastDurationAgo(OPERDLG_SHOWERRMINIDLETIME); // simulate "idle" so the next error can appear immediately
         if (!ShowOnlyErrors && changedIndex != -1)
             RefreshItems(FALSE, changedIndex); // refresh the changed item
         else
@@ -1426,7 +1426,7 @@ void COperationDlg::SolveErrorOnItem(int itemUID)
     {
         //    SetUserWasActive();  // commented out to keep the operation window "untouched" after ESC from the Solve Error dialog
         DelayAfterCancel = TRUE;
-        LastActivityTime = GetTickCount();
+        LastActivityTime = CMonotonicClock::Now();
     }
 }
 

@@ -418,7 +418,7 @@ void CFTPOperation::AddToNotDoneSkippedFailed(int notDone, int skipped, int fail
         {
             GlobalTransferSpeedMeter.Clear();
             GlobalTransferSpeedMeter.JustConnected();
-            GlobalLastActivityTime.Set(GetTickCount()); // retry counts as activity
+            GlobalLastActivityTime.Set(CMonotonicClock::Now()); // retry counts as activity
         }
         ReportOperationStateChange();
     }
@@ -561,7 +561,7 @@ BOOL CFTPOperation::AddWorker(CFTPWorker* newWorker)
     BOOL ret = WorkersList.AddWorker(newWorker); // synchronization is inside WorkersList (the OperCritSect section is not needed here)
     if (ret)
     {
-        GlobalLastActivityTime.Set(GetTickCount()); // adding a worker counts as activity
+        GlobalLastActivityTime.Set(CMonotonicClock::Now()); // adding a worker counts as activity
         OperationStatusMaybeChanged();
     }
     return ret;
@@ -584,22 +584,22 @@ void CFTPOperation::OperationStatusMaybeChanged()
     }
     if (paused || stopping) // the operation is supposed to be "paused"
     {
-        if (OperationEnd == -1) // the operation is running
+        if (OperationEnd == ~(CMonotonicTimePoint)0) // the operation is running
         {
-            OperationEnd = GetTickCount();
-            if (OperationEnd == -1)
-                OperationEnd++; // avoid colliding with the value -1 (shift the time by 1 ms)
+            OperationEnd = CMonotonicClock::Now();
+            if (OperationEnd == ~(CMonotonicTimePoint)0)
+                OperationEnd++; // avoid colliding with the all-ones "invalid" value (shift the time by 1 ms)
         }
     }
     else // the operation is supposed to be "resumed"
     {
-        if (OperationEnd != -1) // the operation is not running
+        if (OperationEnd != ~(CMonotonicTimePoint)0) // the operation is not running
         {
             GlobalTransferSpeedMeter.Clear();
             GlobalTransferSpeedMeter.JustConnected();
 
-            OperationStart = GetTickCount() - (OperationEnd - OperationStart);
-            OperationEnd = -1;
+            OperationStart = CMonotonicClock::Now() - (OperationEnd - OperationStart); // 64-bit arithmetic, so the pause shift stays exact across tick wraps
+            OperationEnd = ~(CMonotonicTimePoint)0;
         }
     }
     HANDLES(LeaveCriticalSection(&OperCritSect));
@@ -1288,11 +1288,10 @@ CFTPOperation::GetElapsedSeconds()
 
     HANDLES(EnterCriticalSection(&OperCritSect));
     DWORD ret;
-    if (OperationEnd == -1)
-        ret = GetTickCount() - OperationStart;
+    if (OperationEnd == ~(CMonotonicTimePoint)0)
+        ret = (DWORD)(CMonotonicClock::Elapsed(OperationStart, CMonotonicClock::Now()) / 1000);
     else
-        ret = OperationEnd - OperationStart;
-    ret /= 1000;
+        ret = (DWORD)((OperationEnd - OperationStart) / 1000); // the DWORD UI boundary is kept only here
     HANDLES(LeaveCriticalSection(&OperCritSect));
     return ret;
 }
@@ -1300,7 +1299,7 @@ CFTPOperation::GetElapsedSeconds()
 BOOL CFTPOperation::GetDataActivityInLastPeriod()
 {
     CALL_STACK_MESSAGE1("CFTPOperation::GetDataActivityInLastPeriod()");
-    return (GetTickCount() - GlobalLastActivityTime.Get()) <= WORKER_STATUSUPDATETIMEOUT;
+    return CMonotonicClock::Elapsed(GlobalLastActivityTime.Get(), CMonotonicClock::Now()) <= WORKER_STATUSUPDATETIMEOUT;
 }
 
 void CFTPOperation::GetTargetPath(char* buf, int bufSize)

@@ -27,7 +27,7 @@ void CreateOperationCorrelationId(char* destination, int destinationLen)
 {
     // Process, monotonic tick, and an atomic dispatch ordinal stay unique when commands share a tick.
     _snprintf_s(destination, destinationLen, _TRUNCATE, "%08lX-%08lX-%08lX",
-                GetCurrentProcessId(), GetTickCount(),
+                GetCurrentProcessId(), (DWORD)CMonotonicClock::Now(), // low 32 bits of the 64-bit monotonic clock keep the fixed-width format wrap-free of the legacy API
                 (DWORD)InterlockedIncrement(&NextOperationCorrelationSequence));
 }
 }
@@ -183,13 +183,13 @@ COperations::COperations(int base, int delta, char* waitInQueueSubject, char* wa
     SpeedLimit = 1;
     SleepAfterWrite = -1;
     LastBufferLimit = 1;
-    LastSetupTime = GetTickCount();
+    LastSetupTime = CMonotonicClock::Now();
     BytesTrFromLastSetup = CQuadWord(0, 0);
     UseProgressBufferLimit = FALSE;
     ProgressBufferLimit = ASYNC_SLOW_COPY_BUF_SIZE;
-    LastProgBufLimTestTime = GetTickCount() - 1000;
+    LastProgBufLimTestTime = CMonotonicClock::AtLeastDurationAgo(1000); // due immediately without a wrap-unsafe subtraction
     LastFileBlockCount = 0;
-    LastFileStartTime = GetTickCount();
+    LastFileStartTime = CMonotonicClock::Now();
 }
 
 COperations::~COperations()
@@ -413,7 +413,7 @@ void COperations::SetFileStartParams()
     {
         HANDLES(EnterCriticalSection(&StatusCS));
         LastFileBlockCount = 0;
-        LastFileStartTime = GetTickCount();
+        LastFileStartTime = CMonotonicClock::Now();
         HANDLES(LeaveCriticalSection(&StatusCS));
     }
 }
@@ -447,7 +447,7 @@ void COperations::AddBytesToSpeedMetersAndTFSandPS(DWORD bytesCount, BOOL onlyTo
     if (ShowStatus)
     {
         HANDLES(EnterCriticalSection(&StatusCS));
-        DWORD ti = GetTickCount();
+        CMonotonicTimePoint ti = CMonotonicClock::Now(); // 64-bit monotonic sample keeps the speed-limit arithmetic wrap-free
 
         if (maxPacketSize == 0)
             CalcLimitBufferSize((int*)&maxPacketSize, bufferSize);
@@ -482,7 +482,7 @@ void COperations::AddBytesToSpeedMetersAndTFSandPS(DWORD bytesCount, BOOL onlyTo
                     }
                     else
                     {
-                        if ((int)(ti - LastSetupTime) >= 1000 || BytesTrFromLastSetup.Value + bytesCount >= SpeedLimit ||
+                        if ((LONGLONG)(ti - LastSetupTime) >= 1000 || BytesTrFromLastSetup.Value + bytesCount >= SpeedLimit ||
                             SpeedLimit >= HIGH_SPEED_LIMIT && BytesTrFromLastSetup.Value + bytesCount >= SpeedLimit / HIGH_SPEED_LIMIT_BRAKE_DIV)
                         { // time to recalculate the speed limit parameters + possibly "brake"
                             __int64 sleepFromLastSetup64 = (SleepAfterWrite * BytesTrFromLastSetup.Value) / LastBufferLimit;
@@ -490,9 +490,9 @@ void COperations::AddBytesToSpeedMetersAndTFSandPS(DWORD bytesCount, BOOL onlyTo
                             BytesTrFromLastSetup += CQuadWord(bytesCount, 0);
                             __int64 idealTotalTime64 = (1000 * BytesTrFromLastSetup.Value + SpeedLimit - 1) / SpeedLimit; // "+ SpeedLimit - 1" is for rounding
                             int idealTotalTime = idealTotalTime64 < 10000 ? (int)idealTotalTime64 : 10000;
-                            if (idealTotalTime > (int)(ti - LastSetupTime))
+                            if (idealTotalTime > (LONGLONG)(ti - LastSetupTime))
                             {
-                                sleepNow = idealTotalTime - (ti - LastSetupTime); // need to brake (we are faster or only slightly slower than the speed limit)
+                                sleepNow = (DWORD)(idealTotalTime - (LONGLONG)(ti - LastSetupTime)); // need to brake (we are faster or only slightly slower than the speed limit); the signed projection handles a future LastSetupTime after braking
                                 if (sleepNow > 1000)                              // waiting longer than a second makes no sense (the meter will accept at most *limitBufferSize)
                                     sleepNow = 1000;
                             }
@@ -505,7 +505,7 @@ void COperations::AddBytesToSpeedMetersAndTFSandPS(DWORD bytesCount, BOOL onlyTo
                                 SleepAfterWrite = 0;
                             else
                             {
-                                int idealTotalSleep = (int)(sleepFromLastSetup + (idealTotalTime - (ti - LastSetupTime)));
+                                int idealTotalSleep = (int)(sleepFromLastSetup + (idealTotalTime - (LONGLONG)(ti - LastSetupTime)));
                                 if (idealTotalSleep > 0) // speed limit is lower than the copy speed, we will brake after each packet
                                     SleepAfterWrite = (DWORD)(((unsigned __int64)idealTotalSleep * LastBufferLimit) / BytesTrFromLastSetup.Value);
                                 else
@@ -533,7 +533,7 @@ void COperations::AddBytesToSpeedMetersAndTFSandPS(DWORD bytesCount, BOOL onlyTo
                         HANDLES(LeaveCriticalSection(&StatusCS));
                         Sleep(sleepNow);
                         HANDLES(EnterCriticalSection(&StatusCS));
-                        ti = GetTickCount();
+                        ti = CMonotonicClock::Now();
                     }
                 }
                 else
@@ -548,7 +548,7 @@ void COperations::AddBytesToSpeedMetersAndTFSandPS(DWORD bytesCount, BOOL onlyTo
                 ti - LastProgBufLimTestTime >= 1000) // and it is time for another test
             {                                        // compute ProgressBufferLimit for the next round (the next read still uses the current value)
                 TransferSpeedMeter.AdjustProgressBufferLimit(&ProgressBufferLimit, LastFileBlockCount, LastFileStartTime);
-                LastProgBufLimTestTime = GetTickCount();
+                LastProgBufLimTestTime = CMonotonicClock::Now();
                 if (LastFileBlockCount > 1000000000)
                     LastFileBlockCount = 1000000; // overflow protection (just a ton of blocks, the exact count is not that important)
             }
@@ -602,8 +602,8 @@ void COperations::GetTFSandResetTrSpeedIfNeeded(CQuadWord* TFS)
             if (UseSpeedLimit)
             {
                 SleepAfterWrite = -1; // compute when the first packet arrives
-                LastSetupTime = GetTickCount();
-                BytesTrFromLastSetup.SetUI64(0);
+LastSetupTime = CMonotonicClock::Now();
+                    BytesTrFromLastSetup.SetUI64(0);
             }
         }
         HANDLES(LeaveCriticalSection(&StatusCS));
@@ -644,15 +644,15 @@ void COperations::InitSpeedMeters(BOOL operInProgress)
         if (UseSpeedLimit)
         {
             SleepAfterWrite = -1; // compute when the first packet arrives
-            LastSetupTime = GetTickCount();
-            BytesTrFromLastSetup.SetUI64(0);
+LastSetupTime = CMonotonicClock::Now();
+              BytesTrFromLastSetup.SetUI64(0);
         }
         // after a pause, a speed limit change, or an error dialog discard the old data
         if (operInProgress)
         {
             LastFileBlockCount = 0;
-            LastFileStartTime = GetTickCount();
-            LastProgBufLimTestTime = GetTickCount(); // postpone the next test by a second so that we have relevant data
+            LastFileStartTime = CMonotonicClock::Now();
+            LastProgBufLimTestTime = CMonotonicClock::Now(); // postpone the next test by a second so that we have relevant data
         }
         HANDLES(LeaveCriticalSection(&StatusCS));
     }

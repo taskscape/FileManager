@@ -408,7 +408,7 @@ COperationDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 
     case WM_APP_WORKERCHANGEREP:
     {
-        if (GetTickCount() - LastUpdateOfProgressByWorker >= OPERDLG_STATUSMINIDLETIME)
+        if (CMonotonicClock::HasElapsed(LastUpdateOfProgressByWorker, OPERDLG_STATUSMINIDLETIME, CMonotonicClock::Now()))
             IsDirtyProgress = TRUE;
         IsDirtyConsListView = TRUE;
         ScheduleDelayedUpdate();
@@ -435,7 +435,7 @@ COperationDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         HWND lastFocus = GetFocus();
         if (lastFocus != NULL)
             LastFocusedControl = lastFocus;
-        LastActivityTime = GetTickCount();
+        LastActivityTime = CMonotonicClock::Now();
         if (wParam == SC_MAXIMIZE || wParam == SC_MINIMIZE || wParam == SC_RESTORE ||
             wParam == SC_MAXIMIZE + 2 || wParam == SC_MINIMIZE + 2 || wParam == SC_RESTORE + 2)
         {
@@ -479,7 +479,7 @@ COperationDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         HWND lastFocus = GetFocus();
         if (lastFocus != NULL)
             LastFocusedControl = lastFocus;
-        LastActivityTime = GetTickCount();
+        LastActivityTime = CMonotonicClock::Now();
         Config.OperDlgPlacement.length = sizeof(WINDOWPLACEMENT); // store the window position
         GetWindowPlacement(HWindow, &Config.OperDlgPlacement);
         if (SimpleLook) // simple-look is unsuitable; store the size of the opened dialog
@@ -507,7 +507,7 @@ COperationDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
             HWND lastFocus = GetFocus();
             if (lastFocus != NULL)
                 LastFocusedControl = lastFocus;
-            LastActivityTime = GetTickCount();
+            LastActivityTime = CMonotonicClock::Now();
             switch (LOWORD(wParam))
             {
             case IDOK:
@@ -517,7 +517,7 @@ COperationDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
             {
                 if (HIWORD(wParam) == BN_CLICKED)
                 {
-                    if (GetTickCount() - ClearChkboxTime < 300)
+                      if (CMonotonicClock::Elapsed(ClearChkboxTime, CMonotonicClock::Now()) < 300)
                     { // if the checkbox was cleared due to clicking it, it was immediately set again, so we must clear it once more
                         CheckDlgButton(HWindow, IDC_OPCLOSEWINWHENDONE, BST_UNCHECKED);
                     }
@@ -788,7 +788,7 @@ COperationDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                     if (nmhi->uNewState & LVIS_FOCUSED)
                     {
                         SetUserWasActive();
-                        LastActivityTime = GetTickCount();
+                        LastActivityTime = CMonotonicClock::Now();
                         EnableRetryItem(nmhi->iItem);
                         int focusIndex = nmhi->iItem;
                         if (ShowOnlyErrors && focusIndex >= 0 && focusIndex < ErrorsIndexes.Count)
@@ -838,7 +838,7 @@ COperationDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                         if (nmhi->uNewState & LVIS_FOCUSED)
                         {
                             SetUserWasActive();
-                            LastActivityTime = GetTickCount();
+                            LastActivityTime = CMonotonicClock::Now();
                             int logUID = WorkersList->GetLogUID(nmhi->iItem);
                             if (logUID != -1 && Config.AlwaysShowLogForActPan)
                                 Logs.ActivateLog(logUID);
@@ -880,9 +880,9 @@ COperationDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
     case WM_ACTIVATE:
     {
         if (wParam == WA_ACTIVE || wParam == WA_CLICKACTIVE)
-        {
-            LastGetDiskFreeSpace = GetTickCount() - OPERDLG_GETDISKSPACEPERIOD;
-            IsDirtyStatus = TRUE;
+          {
+              LastGetDiskFreeSpace = CMonotonicClock::AtLeastDurationAgo(OPERDLG_GETDISKSPACEPERIOD);
+              IsDirtyStatus = TRUE;
             ScheduleDelayedUpdate();
             SetTimer(HWindow, OPERDLG_CORRECTBTNSTIMER, 100, 0); // wait for the dialog to activate, then check the button states (we do not want disabled ones with a frame)
         }
@@ -932,10 +932,10 @@ COperationDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         case OPERDLG_CHECKCOUNTERSTIMER:
         {
             KillTimer(HWindow, OPERDLG_CHECKCOUNTERSTIMER);
-            //        TRACE_I("Calling: Queue->DebugCheckCounters()...");
-            DWORD ti = GetTickCount();
-            Queue->DebugCheckCounters(Oper);
-            DWORD timeout = 10 * (GetTickCount() - ti); // at least 10 times more time for working than checking so it does not overwhelm itself
+              //        TRACE_I("Calling: Queue->DebugCheckCounters()...");
+              CMonotonicTimePoint ti = CMonotonicClock::Now();
+              Queue->DebugCheckCounters(Oper);
+              DWORD timeout = (DWORD)(10 * CMonotonicClock::Elapsed(ti, CMonotonicClock::Now())); // at least 10 times more time for working than checking so it does not overwhelm itself
                                                         //        TRACE_I("Finished: Queue->DebugCheckCounters()...");
             SetTimer(HWindow, OPERDLG_CHECKCOUNTERSTIMER, max(timeout, OPERDLG_CHECKCOUNTERSPERIOD), NULL);
             break;
@@ -944,7 +944,7 @@ COperationDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 
         case OPERDLG_STATUSUPDATETIMER:
         {
-            if (GetTickCount() - LastUpdateOfProgressByWorker >= OPERDLG_STATUSMINIDLETIME)
+            if (CMonotonicClock::HasElapsed(LastUpdateOfProgressByWorker, OPERDLG_STATUSMINIDLETIME, CMonotonicClock::Now()))
             {
                 IsDirtyStatus = TRUE;
                 ScheduleDelayedUpdate();
@@ -960,8 +960,8 @@ COperationDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                 IsWindowEnabled(HWindow) &&                                // only if no other modal window is open
                 !ConsListViewObj.Scrolling && !ItemsListViewObj.Scrolling) // and only if the user is not currently dragging the scrollbar of either list view
             {
-                BOOL dlgIsInactive = GetForegroundWindow() != HWindow;
-                if (!UserWasActive && !DelayAfterCancel || dlgIsInactive || GetTickCount() - LastActivityTime >= OPERDLG_SHOWERRMINIDLETIME)
+                  BOOL dlgIsInactive = GetForegroundWindow() != HWindow;
+                  if (!UserWasActive && !DelayAfterCancel || dlgIsInactive || CMonotonicClock::HasElapsed(LastActivityTime, OPERDLG_SHOWERRMINIDLETIME, CMonotonicClock::Now()))
                 {
                     DelayAfterCancel = FALSE;
                     int workerIndex = -1;
@@ -1074,7 +1074,7 @@ COperationDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
             if (lastFocus != NULL && LastFocusedControl != lastFocus)
             {
                 SetUserWasActive();
-                LastActivityTime = GetTickCount();
+                LastActivityTime = CMonotonicClock::Now();
             }
             if (lastFocus != NULL)
                 LastFocusedControl = lastFocus;
@@ -1187,7 +1187,7 @@ COperationDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         HWND lastFocus = GetFocus();
         if (lastFocus != NULL)
             LastFocusedControl = lastFocus;
-        LastActivityTime = GetTickCount();
+        LastActivityTime = CMonotonicClock::Now();
         if (InListViewSplit)
         {
             SetCapture(HWindow);

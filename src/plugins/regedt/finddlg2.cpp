@@ -253,7 +253,7 @@ void CFindDialog::UpdateListViewItems()
                     LoadStr(IDS_FF_NAME), LoadStr(IDS_FF_NAMED), SearchForData[0]->MasksGroup.GetMasksString());
       }
       else
-        lstrcpy(buf, LoadStr(IDS_FF_NAME));
+        StringCchCopyA(buf, _countof(buf), LoadStr(IDS_FF_NAME)); // bounded copy keeps an oversized localized title from overrunning the fixed buffer
       SetWindowText(HWindow, buf);
     }
     */

@@ -138,7 +138,9 @@ BOOL WINAPI
 CPluginFSInterface::GetRootPath(char* userPart)
 {
     CALL_STACK_MESSAGE1("CPluginFSInterface::GetRootPath()");
-    lstrcpy(userPart, Root);
+    // the SDK supplies at least a MAX_PATH buffer for 'userPart' and Root is a MAX_PATH field,
+    // so the copy is bounded by the source allocation instead of an unbounded helper
+    strncpy_s(userPart, MAX_PATH, Root, _TRUNCATE);
     return TRUE;
 }
 

@@ -1112,7 +1112,7 @@ protected:
 
     BOOL IsDirtyStatus;                 // TRUE = status/progress of the operation needs update (the dialog must redraw status/progress)
     BOOL IsDirtyProgress;               // TRUE = a worker changed; maybe (if the worker changed due to progress) status/progress needs update (the dialog must redraw status/progress)
-    DWORD LastUpdateOfProgressByWorker; // GetTickCount at the last update of progress triggered by a worker (used to skip unnecessarily frequent updates with multiple workers + skip periodic updates)
+    CMonotonicTimePoint LastUpdateOfProgressByWorker; // monotonic time at the last update of progress triggered by a worker (used to skip unnecessarily frequent updates with multiple workers + skip periodic updates)
     BOOL IsDirtyConsListView;           // TRUE = the Connections listview content changed (needs repaint in the dialog)
     BOOL IsDirtyItemsListView;          // TRUE = the Operations listview content changed (needs repaint in the dialog)
     BOOL HasDelayedUpdateTimer;         // TRUE = timer OPERDLG_UPDATETIMER is running
@@ -1130,9 +1130,9 @@ protected:
     BOOL UserWasActive;       // TRUE = prevent the window from closing automatically after the operation finishes successfully (the user was doing something and the dialog would vanish)
     BOOL DelayAfterCancel;    // TRUE = do not open another Solve Error dialog immediately after Cancel in the previous Solve Error dialog
     BOOL CloseDlgWhenOperFin; // FALSE = do not close the window after operation completion = the window may close only if Config.CloseOperationDlgIfSuccessfullyFinished==TRUE
-    DWORD ClearChkboxTime;
+    CMonotonicTimePoint ClearChkboxTime;
     HWND LastFocusedControl; // last focused control in the dialog
-    DWORD LastActivityTime;  // GetTickCount() from the time of the user's last activity
+    CMonotonicTimePoint LastActivityTime;  // monotonic time of the user's last activity (64-bit, wrap-free)
 
     DWORD LastTimeEstimation; // -1==invalid, otherwise rounded number of seconds until the operation finishes
 
@@ -1144,7 +1144,7 @@ protected:
 
     BOOL ShowLowDiskWarning;       // TRUE = the "low disk space" icon+hint is shown, FALSE = the status stretches to the right edge and the icon with hint is hidden
     CQuadWord LastNeededDiskSpace; // value of the required space on the target disk (from the last scheduling of the disk free space check)
-    DWORD LastGetDiskFreeSpace;    // GetTickCount() from the last scheduling of the disk free space check (in the GetDiskFreeSpaceThread)
+    CMonotonicTimePoint LastGetDiskFreeSpace; // monotonic time of the last scheduling of the disk free space check (in the GetDiskFreeSpaceThread)
     CGUIHyperLinkAbstract* LowDiskSpaceHint;
     CGetDiskFreeSpaceThread* GetDiskFreeSpaceThread;
 

@@ -273,8 +273,11 @@ BOOL CPakIface::GetName(const char* nameInPak, char* outName)
             if ((sour == PakDir[DirPos].FileName || *(sour - 1) == '/') &&
                 *(sour + 1) == '.' && *(sour + 2) == '/')
             {
-                lstrcpy(dest, PAK_UPDIR);
-                dest += lstrlen(PAK_UPDIR);
+                // counted copy of the fixed alias keeps this CRT-light path free of unbounded helpers
+                const char updir[] = PAK_UPDIR;
+                for (size_t i = 0; i < sizeof(updir); i++)
+                    dest[i] = updir[i];
+                dest += sizeof(updir) - 1;
                 sour += 2;
                 break;
             }

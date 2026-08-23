@@ -20,7 +20,7 @@ CRITICAL_SECTION CSocket::NextSocketUIDCritSect; // critical section of the coun
 BOOL InDeleteSocket = FALSE; // TRUE if we are inside DeleteSocket (for testing direct calls to "delete socket")
 #endif
 
-DWORD CSocketsThread::LastWM_TIMER_Processing = 0; // GetTickCount() from the moment WM_TIMER was last processed (WM_TIMER arrives only during "idle" message loops, which is unacceptable for us)
+CMonotonicTimePoint CSocketsThread::LastWM_TIMER_Processing = 0; // monotonic time of the moment WM_TIMER was last processed (WM_TIMER arrives only during "idle" message loops, which is unacceptable for us)
 
 // ***************************************************************************************
 
@@ -2432,7 +2432,7 @@ void CSocket::SwapSockets(CSocket* sock)
     HANDLES(LeaveCriticalSection(&SocketCritSect));
 }
 
-BOOL CSocket::GetIsSocketConnectedLastCallTime(DWORD* lastCallTime)
+BOOL CSocket::GetIsSocketConnectedLastCallTime(CMonotonicTimePoint* lastCallTime)
 {
     HANDLES(EnterCriticalSection(&SocketCritSect));
     BOOL ret = FALSE;
@@ -2448,7 +2448,7 @@ BOOL CSocket::GetIsSocketConnectedLastCallTime(DWORD* lastCallTime)
 void CSocket::SetIsSocketConnectedLastCallTime()
 {
     HANDLES(EnterCriticalSection(&SocketCritSect));
-    IsSocketConnectedLastCallTime = GetTickCount();
+    IsSocketConnectedLastCallTime = CMonotonicClock::Now(); // 64-bit monotonic sample, so the "connected recently" test in fs3.cpp stays correct after a tick wrap
     if (IsSocketConnectedLastCallTime == 0)
         IsSocketConnectedLastCallTime = 1;
     HANDLES(LeaveCriticalSection(&SocketCritSect));
@@ -2795,25 +2795,21 @@ void CSocketsThread::ReceivePostMessage()
     HANDLES(LeaveCriticalSection(&CritSect));
 }
 
-int CSocketsThread::FindIndexForNewTimer(DWORD timeoutAbs, int leftIndex)
+int CSocketsThread::FindIndexForNewTimer(CMonotonicTimePoint timeoutAbs, int leftIndex)
 {
     if (leftIndex >= Timers.Count)
         return leftIndex;
 
-    // all times must be related to the nearest timeout, because only then can timeouts that exceed 0xFFFFFFFF be sorted
-    DWORD timeoutAbsBase = Timers[leftIndex]->TimeoutAbs;
-    if ((int)(timeoutAbs - timeoutAbsBase) < 0)
-        timeoutAbsBase = timeoutAbs;
-    timeoutAbs -= timeoutAbsBase;
-
+    // 64-bit monotonic timeouts order correctly by direct comparison, so the former
+    // DWORD base-relative workaround for timeouts beyond 0xFFFFFFFF is not needed
     int l = leftIndex, r = Timers.Count - 1, m;
     while (1)
     {
         m = (l + r) / 2;
-        DWORD actTimeoutAbs = Timers[m]->TimeoutAbs - timeoutAbsBase;
+        CMonotonicTimePoint actTimeoutAbs = Timers[m]->TimeoutAbs;
         if (actTimeoutAbs == timeoutAbs)
         {
-            while (++m < Timers.Count && Timers[m]->TimeoutAbs - timeoutAbsBase == timeoutAbs)
+            while (++m < Timers.Count && Timers[m]->TimeoutAbs == timeoutAbs)
                 ;     // return the index after the last identical timer
             return m; // found
         }
@@ -2832,7 +2828,7 @@ int CSocketsThread::FindIndexForNewTimer(DWORD timeoutAbs, int leftIndex)
     }
 }
 
-BOOL CSocketsThread::AddTimer(int socketMsg, int socketUID, DWORD timeoutAbs, DWORD id, void* param)
+BOOL CSocketsThread::AddTimer(int socketMsg, int socketUID, CMonotonicTimePoint timeoutAbs, DWORD id, void* param)
 {
     HANDLES(EnterCriticalSection(&CritSect));
 
@@ -2847,13 +2843,14 @@ BOOL CSocketsThread::AddTimer(int socketMsg, int socketUID, DWORD timeoutAbs, DW
         {
             if (i == 0 && !Terminating) // inserting the timer with the shortest time into the timeout
             {
-                DWORD ti = timeoutAbs - GetTickCount();
-                if ((int)ti > 0) // if the new timer has not yet expired (the time difference can also be negative), adjust or start the Windows timer
-                    SetTimer(GetHiddenWindow(), SOCKETSTHREAD_TIMERID, ti, NULL);
+                CMonotonicTimePoint now = CMonotonicClock::Now();
+                if (timeoutAbs > now) // if the new timer has not yet expired, adjust or start the Windows timer (the delay stays a DWORD only at this Win32 boundary)
+                    SetTimer(GetHiddenWindow(), SOCKETSTHREAD_TIMERID,
+                             (UINT)min(timeoutAbs - now, (CMonotonicDuration)USER_TIMER_MAXIMUM), NULL);
                 else
                 {
-                    if ((int)ti < 0)
-                        TRACE_E("CSocketsThread::AddTimer(): expired timer was added (" << (int)ti << " ms)");
+                    if (timeoutAbs < now)
+                        TRACE_E("CSocketsThread::AddTimer(): expired timer was added (" << (long long)(now - timeoutAbs) << " ms)");
                     KillTimer(GetHiddenWindow(), SOCKETSTHREAD_TIMERID);                // cancel the possible Windows timer, it is no longer needed
                     PostMessage(GetHiddenWindow(), WM_TIMER, SOCKETSTHREAD_TIMERID, 0); // process the next timeout as soon as possible
                 }
@@ -2905,9 +2902,10 @@ BOOL CSocketsThread::DeleteTimer(int socketUID, DWORD id)
     {
         if (Timers.Count > 0 && !Terminating)
         {
-            DWORD ti = Timers[0]->TimeoutAbs - GetTickCount();
-            if ((int)ti > 0) // if the new timer has not yet expired (the time difference can also be negative), adjust or start the Windows timer
-                SetTimer(GetHiddenWindow(), SOCKETSTHREAD_TIMERID, ti, NULL);
+            CMonotonicTimePoint now = CMonotonicClock::Now();
+            if (Timers[0]->TimeoutAbs > now) // if the new timer has not yet expired, adjust or start the Windows timer
+                SetTimer(GetHiddenWindow(), SOCKETSTHREAD_TIMERID,
+                         (UINT)min(Timers[0]->TimeoutAbs - now, (CMonotonicDuration)USER_TIMER_MAXIMUM), NULL);
             else
             {
                 KillTimer(GetHiddenWindow(), SOCKETSTHREAD_TIMERID);                // cancel the possible Windows timer, it is no longer needed
@@ -2933,8 +2931,8 @@ void CSocketsThread::ReceiveTimer()
     // processing the first call to ReceiveTimer(), a new timer will be started or WM_TIMER posted
     if (LockedTimers == -1)
     {
-        DWORD ti = GetTickCount();
-        int last = FindIndexForNewTimer(ti, 0);
+        CMonotonicTimePoint now = CMonotonicClock::Now();
+        int last = FindIndexForNewTimer(now, 0);
         if (last > 0) // if any timer timeout occurred
         {
             LockedTimers = last; // protect the timers being processed from deletion and array shifting
@@ -2980,9 +2978,10 @@ void CSocketsThread::ReceiveTimer()
         }
         if (Timers.Count > 0 && !Terminating)
         {
-            ti = Timers[0]->TimeoutAbs - GetTickCount();
-            if ((int)ti > 0) // if another timeout has not yet occurred (the time difference can also be negative), start the timer again
-                SetTimer(GetHiddenWindow(), SOCKETSTHREAD_TIMERID, ti, NULL);
+            CMonotonicTimePoint now2 = CMonotonicClock::Now();
+            if (Timers[0]->TimeoutAbs > now2) // if another timeout has not yet occurred, start the timer again
+                SetTimer(GetHiddenWindow(), SOCKETSTHREAD_TIMERID,
+                         (UINT)min(Timers[0]->TimeoutAbs - now2, (CMonotonicDuration)USER_TIMER_MAXIMUM), NULL);
             else
                 PostMessage(GetHiddenWindow(), WM_TIMER, SOCKETSTHREAD_TIMERID, 0); // process the next timeout as soon as possible
         }
@@ -3041,10 +3040,10 @@ CSocketsThread::WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 {
     //  SLOW_CALL_STACK_MESSAGE5("CSocketsThread::WindowProc(0x%X, 0x%X, 0x%X, 0x%X)", hwnd, uMsg, wParam, lParam);
 
-    if (GetTickCount() - LastWM_TIMER_Processing >= 500 && uMsg != WM_TIMER)
-    {                                             // if 1000 ms passed since the last WM_TIMER, insert it for processing manually, because most likely
-                                                  // the thread simply is not "idle", and therefore the system does not send WM_TIMER (it is unfortunately a low-priority message)
-        LastWM_TIMER_Processing = GetTickCount(); // store when WM_TIMER was last processed
+    if (CMonotonicClock::HasElapsed(LastWM_TIMER_Processing, 500, CMonotonicClock::Now()) && uMsg != WM_TIMER)
+    {                                                        // if 500 ms passed since the last WM_TIMER, insert it for processing manually, because most likely
+                                                             // the thread simply is not "idle", and therefore the system does not send WM_TIMER (it is unfortunately a low-priority message)
+        LastWM_TIMER_Processing = CMonotonicClock::Now(); // store when WM_TIMER was last processed
         if (SocketsThread != NULL)
             SocketsThread->ReceiveTimer();
     }
@@ -3068,7 +3067,7 @@ CSocketsThread::WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
         case WM_TIMER:
         {
             // store when WM_TIMER was last processed
-            LastWM_TIMER_Processing = GetTickCount();
+            LastWM_TIMER_Processing = CMonotonicClock::Now();
             if (SocketsThread != NULL)
                 SocketsThread->ReceiveTimer();
             return 0;
@@ -3124,7 +3123,7 @@ CSocketsThread::Body()
             Running = TRUE;
             SetEvent(RunningEvent);
             WaitForSingleObject(CanEndThread, INFINITE);
-            LastWM_TIMER_Processing = GetTickCount();
+            LastWM_TIMER_Processing = CMonotonicClock::Now();
 
             // message loop
             MSG msg;

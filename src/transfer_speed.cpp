@@ -31,15 +31,15 @@ void CTransferSpeedMeter::GetSpeed(CQuadWord* speed)
 {
     CALL_STACK_MESSAGE1("CTransferSpeedMeter::GetSpeed()");
 
-    DWORD time = GetTickCount();
+    CMonotonicTimePoint time = CMonotonicClock::Now(); // 64-bit monotonic sample keeps every difference below wrap-free
 
     if (CountOfLastPackets >= 2)
     { // test whether this is a low speed (calculated from LastPacketsSize and LastPacketsTime)
         int firstPacket = ((TRSPMETER_NUMOFSTOREDPACKETS + 1) + ActIndexInLastPackets - CountOfLastPackets) % (TRSPMETER_NUMOFSTOREDPACKETS + 1);
         int lastPacket = ((TRSPMETER_NUMOFSTOREDPACKETS + 1) + ActIndexInLastPackets - 1) % (TRSPMETER_NUMOFSTOREDPACKETS + 1);
-        DWORD lastPacketTime = LastPacketsTime[lastPacket];
-        DWORD totalTime = lastPacketTime - LastPacketsTime[firstPacket]; // time between receiving the first and last packet
-        if (totalTime >= ((DWORD)(CountOfLastPackets - 1) * TRSPMETER_STPCKTSMININTERVAL) / TRSPMETER_NUMOFSTOREDPACKETS)
+        CMonotonicTimePoint lastPacketTime = LastPacketsTime[lastPacket];
+        CMonotonicDuration totalTime = lastPacketTime - LastPacketsTime[firstPacket]; // time between receiving the first and last packet
+        if (totalTime >= ((CMonotonicDuration)(CountOfLastPackets - 1) * TRSPMETER_STPCKTSMININTERVAL) / TRSPMETER_NUMOFSTOREDPACKETS)
         {                                     // this is a low speed (up to TRSPMETER_NUMOFSTOREDPACKETS packets per TRSPMETER_STPCKTSMININTERVAL ms)
             if (time - lastPacketTime > 2000) // two-second "protection" period for the last computed slow speed
             {                                 // check whether the speed has dropped by more than double compared to the speed of the last packet; if so, display
@@ -100,10 +100,10 @@ void CTransferSpeedMeter::GetSpeed(CQuadWord* speed)
         UINT64 total = 0;                                // total number of bytes over the last at most TRSPMETER_ACTSPEEDNUMOFSTEPS steps
         int addFromTrBytes = CountOfTrBytesItems - 1;    // number of closed steps to add from the queue
         DWORD restTime = 0;                              // time from the last counted step to now
-        if ((int)(time - ActIndexInTrBytesTimeLim) >= 0) // current index already closed + empty steps may be needed
+        if (time >= ActIndexInTrBytesTimeLim)            // current index already closed + empty steps may be needed (direct 64-bit comparison)
         {
-            emptyTrBytes = (time - ActIndexInTrBytesTimeLim) / TRSPMETER_ACTSPEEDSTEP;
-            restTime = (time - ActIndexInTrBytesTimeLim) % TRSPMETER_ACTSPEEDSTEP;
+            emptyTrBytes = (int)((time - ActIndexInTrBytesTimeLim) / TRSPMETER_ACTSPEEDSTEP);
+            restTime = (DWORD)((time - ActIndexInTrBytesTimeLim) % TRSPMETER_ACTSPEEDSTEP);
             emptyTrBytes = min(emptyTrBytes, TRSPMETER_ACTSPEEDNUMOFSTEPS);
             if (emptyTrBytes < TRSPMETER_ACTSPEEDNUMOFSTEPS) // empty steps are not enough; include the current index as well
             {
@@ -115,7 +115,7 @@ void CTransferSpeedMeter::GetSpeed(CQuadWord* speed)
         }
         else
         {
-            restTime = time + TRSPMETER_ACTSPEEDSTEP - ActIndexInTrBytesTimeLim;
+            restTime = (DWORD)(time + TRSPMETER_ACTSPEEDSTEP - ActIndexInTrBytesTimeLim); // bounded by TRSPMETER_ACTSPEEDSTEP in this branch
             total = TransferedBytes[ActIndexInTrBytes];
         }
 
@@ -144,7 +144,7 @@ void CTransferSpeedMeter::JustConnected()
 
     TransferedBytes[0] = 0;
     ActIndexInTrBytes = 0;
-    ActIndexInTrBytesTimeLim = (LastPacketsTime[0] = GetTickCount()) + TRSPMETER_ACTSPEEDSTEP;
+    ActIndexInTrBytesTimeLim = (LastPacketsTime[0] = CMonotonicClock::Now()) + TRSPMETER_ACTSPEEDSTEP;
     CountOfTrBytesItems = 1;
     LastPacketsSize[0] = 0;
     ActIndexInLastPackets = 1;
@@ -153,7 +153,7 @@ void CTransferSpeedMeter::JustConnected()
     MaxPacketSize = 0;
 }
 
-void CTransferSpeedMeter::BytesReceived(DWORD count, DWORD time, DWORD maxPacketSize)
+void CTransferSpeedMeter::BytesReceived(DWORD count, CMonotonicTimePoint time, DWORD maxPacketSize)
 {
     DEBUG_SLOW_CALL_STACK_MESSAGE1("CTransferSpeedMeter::BytesReceived(, ,)"); // ignore parameters for performance reasons (the call stack already slows us down)
 
@@ -174,13 +174,13 @@ void CTransferSpeedMeter::BytesReceived(DWORD count, DWORD time, DWORD maxPacket
         if (CountOfLastPackets < TRSPMETER_NUMOFSTOREDPACKETS + 1)
             CountOfLastPackets++;
     }
-    if ((int)(time - ActIndexInTrBytesTimeLim) < 0) // within the current time interval, just add the byte count to the interval
+    if (time < ActIndexInTrBytesTimeLim) // within the current time interval, just add the byte count to the interval
     {
         TransferedBytes[ActIndexInTrBytes] += count;
     }
     else // outside the current time interval, we must create a new interval
     {
-        int emptyTrBytes = (time - ActIndexInTrBytesTimeLim) / TRSPMETER_ACTSPEEDSTEP;
+        int emptyTrBytes = (int)((time - ActIndexInTrBytesTimeLim) / TRSPMETER_ACTSPEEDSTEP);
         int i = min(emptyTrBytes, TRSPMETER_ACTSPEEDNUMOFSTEPS); // more has no effect (the entire queue would be reset)
         if (i > 0 && CountOfTrBytesItems <= TRSPMETER_ACTSPEEDNUMOFSTEPS)
             CountOfTrBytesItems = min(TRSPMETER_ACTSPEEDNUMOFSTEPS + 1, CountOfTrBytesItems + i);
@@ -200,7 +200,7 @@ void CTransferSpeedMeter::BytesReceived(DWORD count, DWORD time, DWORD maxPacket
 }
 
 void CTransferSpeedMeter::AdjustProgressBufferLimit(DWORD* progressBufferLimit, DWORD lastFileBlockCount,
-                                                    DWORD lastFileStartTime)
+                                                    CMonotonicTimePoint lastFileStartTime)
 {
     if (CountOfLastPackets > 1 && lastFileBlockCount > 0) // "always true": at the start of the file CountOfLastPackets is 1 (2 = we already have one packet)
     {
@@ -208,7 +208,7 @@ void CTransferSpeedMeter::AdjustProgressBufferLimit(DWORD* progressBufferLimit, 
         int i = ((TRSPMETER_NUMOFSTOREDPACKETS + 1) + ActIndexInLastPackets - 1) % (TRSPMETER_NUMOFSTOREDPACKETS + 1);
         int c = min((DWORD)(CountOfLastPackets - 1), lastFileBlockCount);
         int packets = c;
-        DWORD ti = GetTickCount();
+        CMonotonicTimePoint ti = CMonotonicClock::Now();
         while (c--)
         {
             size += LastPacketsSize[i];
@@ -220,9 +220,9 @@ void CTransferSpeedMeter::AdjustProgressBufferLimit(DWORD* progressBufferLimit, 
                 break; // take packets at most 2 seconds old (trying to compute the "current" speed)
             }
         }
-        DWORD totalTime = min(ti - LastPacketsTime[i], ti - lastFileStartTime); // LastPacketsTime[i] may be older than lastFileStartTime (it is the last packet of the previous file); we care only about the time spent on this file
+        CMonotonicDuration totalTime = min(ti - LastPacketsTime[i], ti - lastFileStartTime); // LastPacketsTime[i] may be older than lastFileStartTime (it is the last packet of the previous file); we care only about the time spent on this file
         if (totalTime == 0)
-            totalTime = 10; // treat 0 ms as 10 ms (approx. the GetTickCount() step)
+            totalTime = 10; // treat 0 ms as 10 ms (approx. the clock resolution step)
         unsigned __int64 speed = (size * 1000) / totalTime;
         DWORD bufLimit = ASYNC_SLOW_COPY_BUF_SIZE;
         while (bufLimit < ASYNC_COPY_BUF_SIZE)
@@ -284,15 +284,15 @@ void CProgressSpeedMeter::GetSpeed(CQuadWord* speed)
 {
     CALL_STACK_MESSAGE1("CProgressSpeedMeter::GetSpeed()");
 
-    DWORD time = GetTickCount();
+    CMonotonicTimePoint time = CMonotonicClock::Now(); // 64-bit monotonic sample keeps every difference below wrap-free
 
     if (CountOfLastPackets >= 2)
     { // test whether this is a low speed (calculated from LastPacketsSize and LastPacketsTime)
         int firstPacket = ((PRSPMETER_NUMOFSTOREDPACKETS + 1) + ActIndexInLastPackets - CountOfLastPackets) % (PRSPMETER_NUMOFSTOREDPACKETS + 1);
         int lastPacket = ((PRSPMETER_NUMOFSTOREDPACKETS + 1) + ActIndexInLastPackets - 1) % (PRSPMETER_NUMOFSTOREDPACKETS + 1);
-        DWORD lastPacketTime = LastPacketsTime[lastPacket];
-        DWORD totalTime = lastPacketTime - LastPacketsTime[firstPacket]; // time between receiving the first and last packet
-        if (totalTime >= ((DWORD)(CountOfLastPackets - 1) * PRSPMETER_STPCKTSMININTERVAL) / PRSPMETER_NUMOFSTOREDPACKETS)
+        CMonotonicTimePoint lastPacketTime = LastPacketsTime[lastPacket];
+        CMonotonicDuration totalTime = lastPacketTime - LastPacketsTime[firstPacket]; // time between receiving the first and last packet
+        if (totalTime >= ((CMonotonicDuration)(CountOfLastPackets - 1) * PRSPMETER_STPCKTSMININTERVAL) / PRSPMETER_NUMOFSTOREDPACKETS)
         {                                     // this is a low speed (up to PRSPMETER_NUMOFSTOREDPACKETS packets per PRSPMETER_STPCKTSMININTERVAL ms)
             if (time - lastPacketTime > 5000) // five-second "protection" period for the last computed slow speed
             {                                 // check whether the speed has dropped by more than four times compared to the speed of the last packet; if so, display
@@ -351,10 +351,10 @@ void CProgressSpeedMeter::GetSpeed(CQuadWord* speed)
         UINT64 total = 0;                                // total number of bytes over the last at most PRSPMETER_ACTSPEEDNUMOFSTEPS steps
         int addFromTrBytes = CountOfTrBytesItems - 1;    // number of closed steps to add from the queue
         DWORD restTime = 0;                              // time from the last counted step to now
-        if ((int)(time - ActIndexInTrBytesTimeLim) >= 0) // current index already closed + empty steps may be needed
+        if (time >= ActIndexInTrBytesTimeLim)            // current index already closed + empty steps may be needed (direct 64-bit comparison)
         {
-            emptyTrBytes = (time - ActIndexInTrBytesTimeLim) / PRSPMETER_ACTSPEEDSTEP;
-            restTime = (time - ActIndexInTrBytesTimeLim) % PRSPMETER_ACTSPEEDSTEP;
+            emptyTrBytes = (int)((time - ActIndexInTrBytesTimeLim) / PRSPMETER_ACTSPEEDSTEP);
+            restTime = (DWORD)((time - ActIndexInTrBytesTimeLim) % PRSPMETER_ACTSPEEDSTEP);
             emptyTrBytes = min(emptyTrBytes, PRSPMETER_ACTSPEEDNUMOFSTEPS);
             if (emptyTrBytes < PRSPMETER_ACTSPEEDNUMOFSTEPS) // empty steps are not enough; include the current index as well
             {
@@ -366,7 +366,7 @@ void CProgressSpeedMeter::GetSpeed(CQuadWord* speed)
         }
         else
         {
-            restTime = time + PRSPMETER_ACTSPEEDSTEP - ActIndexInTrBytesTimeLim;
+            restTime = (DWORD)(time + PRSPMETER_ACTSPEEDSTEP - ActIndexInTrBytesTimeLim); // bounded by PRSPMETER_ACTSPEEDSTEP in this branch
             total = TransferedBytes[ActIndexInTrBytes];
         }
 
@@ -395,7 +395,7 @@ void CProgressSpeedMeter::JustConnected()
 
     TransferedBytes[0] = 0;
     ActIndexInTrBytes = 0;
-    ActIndexInTrBytesTimeLim = (LastPacketsTime[0] = GetTickCount()) + PRSPMETER_ACTSPEEDSTEP;
+    ActIndexInTrBytesTimeLim = (LastPacketsTime[0] = CMonotonicClock::Now()) + PRSPMETER_ACTSPEEDSTEP;
     CountOfTrBytesItems = 1;
     LastPacketsSize[0] = 0;
     ActIndexInLastPackets = 1;
@@ -403,7 +403,7 @@ void CProgressSpeedMeter::JustConnected()
     MaxPacketSize = 0;
 }
 
-void CProgressSpeedMeter::BytesReceived(DWORD count, DWORD time, DWORD maxPacketSize)
+void CProgressSpeedMeter::BytesReceived(DWORD count, CMonotonicTimePoint time, DWORD maxPacketSize)
 {
     DEBUG_SLOW_CALL_STACK_MESSAGE1("CProgressSpeedMeter::BytesReceived(, ,)"); // ignore parameters for performance reasons (the call stack already slows us down)
 
@@ -421,13 +421,13 @@ void CProgressSpeedMeter::BytesReceived(DWORD count, DWORD time, DWORD maxPacket
         if (CountOfLastPackets < PRSPMETER_NUMOFSTOREDPACKETS + 1)
             CountOfLastPackets++;
     }
-    if ((int)(time - ActIndexInTrBytesTimeLim) < 0) // within the current time interval, just add the byte count to the interval
+    if (time < ActIndexInTrBytesTimeLim) // within the current time interval, just add the byte count to the interval
     {
         TransferedBytes[ActIndexInTrBytes] += count;
     }
     else // outside the current time interval, we must create a new interval
     {
-        int emptyTrBytes = (time - ActIndexInTrBytesTimeLim) / PRSPMETER_ACTSPEEDSTEP;
+        int emptyTrBytes = (int)((time - ActIndexInTrBytesTimeLim) / PRSPMETER_ACTSPEEDSTEP);
         int i = min(emptyTrBytes, PRSPMETER_ACTSPEEDNUMOFSTEPS); // more has no effect (the entire queue would be reset)
         if (i > 0 && CountOfTrBytesItems <= PRSPMETER_ACTSPEEDNUMOFSTEPS)
             CountOfTrBytesItems = min(PRSPMETER_ACTSPEEDNUMOFSTEPS + 1, CountOfTrBytesItems + i);

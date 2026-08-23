@@ -482,7 +482,7 @@ public:
     virtual BOOL GetWindowClosePressed() = 0;
     virtual BOOL HandleESC(HWND parent, BOOL isSend, BOOL allowCmdAbort) = 0;
     virtual void SendingFinished() = 0;
-    virtual BOOL IsTimeout(DWORD* start, DWORD serverTimeout, int* errorTextID, char* errBuf, int errBufSize) = 0;
+    virtual BOOL IsTimeout(CMonotonicTimePoint* start, DWORD serverTimeout, int* errorTextID, char* errBuf, int errBufSize) = 0;
     virtual void MaybeSuccessReplyReceived(const char* reply, int replySize) = 0; // FTP reply code: 1xx
     virtual void CancelDataCon() = 0;
 
@@ -495,7 +495,7 @@ public:
     virtual void BeforeWaitingForFinish(int replyCode, BOOL* useTimeout) = 0; // called after the first
                                                                               // CanFinishSending() that
                                                                               // returns FALSE
-    virtual void HandleDataConTimeout(DWORD* start) = 0;                      // called only if
+    virtual void HandleDataConTimeout(CMonotonicTimePoint* start) = 0;        // called only if
                                                                               // BeforeWaitingForFinish
                                                                               // returns TRUE in
                                                                               // 'useTimeout'
@@ -548,13 +548,12 @@ public:
     virtual BOOL GetWindowClosePressed() { return WaitWnd.GetWindowClosePressed(); }
     virtual BOOL HandleESC(HWND parent, BOOL isSend, BOOL allowCmdAbort);
     virtual void SendingFinished();
-    virtual BOOL IsTimeout(DWORD* start, DWORD serverTimeout, int* errorTextID, char* errBuf, int errBufSize);
-    virtual void MaybeSuccessReplyReceived(const char* reply, int replySize);
+    virtual BOOL IsTimeout(CMonotonicTimePoint* start, DWORD serverTimeout, int* errorTextID, char* errBuf, int errBufSize);    virtual void MaybeSuccessReplyReceived(const char* reply, int replySize);
     virtual void CancelDataCon();
 
     virtual BOOL CanFinishSending(int replyCode, BOOL* useTimeout);
     virtual void BeforeWaitingForFinish(int replyCode, BOOL* useTimeout);
-    virtual void HandleDataConTimeout(DWORD* start);
+    virtual void HandleDataConTimeout(CMonotonicTimePoint* start);
     virtual HANDLE GetFinishedEvent();
     virtual void HandleESCWhenWaitingForFinish(HWND parent);
 };
@@ -658,7 +657,7 @@ protected:
     int KeepAliveSendEvery;           // interval for sending keep-alive commands (period) (copy for use across threads)
     int KeepAliveStopAfter;           // time after which keep-alive commands stop (copy for use across threads)
     int KeepAliveCommand;             // keep-alive command (0-NOOP, 1-PWD, 2-NLST, 3-LIST) (copy for use across threads)
-    DWORD KeepAliveStart;             // GetTickCount() of the last executed command (excluding keep-alive) in the "control connection"
+    CMonotonicTimePoint KeepAliveStart; // monotonic time of the last executed command (excluding keep-alive) in the "control connection" (64-bit, wrap-free)
     CKeepAliveMode KeepAliveMode;     // current state of keep-alive processing in the "control connection"
     BOOL KeepAliveCmdAllBytesWritten; // FALSE = the last keep-alive command has not been fully sent yet (must wait for FD_WRITE)
     HANDLE KeepAliveFinishedEvent;    // signaled after the keep-alive command finishes (used by the main thread when waiting to

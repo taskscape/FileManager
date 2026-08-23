@@ -1528,7 +1528,7 @@ void CFTPWorker::HandleEventInWorkingState5(CFTPWorkerEvent event, BOOL& sendQui
                         serverTimeout = 1000; // at least one second
                     // because we are already in CSocketsThread::CritSect, this call is also
                     // possible from CSocket::SocketCritSect and CFTPWorker::WorkerCritSect (no deadlock risk)
-                    SocketsThread->AddTimer(Msg, UID, GetTickCount() + serverTimeout,
+                    SocketsThread->AddTimer(Msg, UID, CMonotonicClock::DeadlineAfter(serverTimeout),
                                             WORKER_LISTENTIMEOUTTIMID, NULL); // ignore the error; at worst the user will press Stop
                 }
                 else // failed to open the "listen" socket to accept the data connection from
@@ -1964,7 +1964,7 @@ void CFTPWorker::HandleEventInWorkingState5(CFTPWorkerEvent event, BOOL& sendQui
                                             SubState = fwssWorkCopyDelayedAutoRetry; // use delayed auto-retry so all unexpected replies from the server can arrive
                                             // because we are already in CSocketsThread::CritSect, this call is also
                                             // possible from CSocket::SocketCritSect and CFTPWorker::WorkerCritSect (no deadlock risk)
-                                            SocketsThread->AddTimer(Msg, UID, GetTickCount() + WORKER_DELAYEDAUTORETRYTIMEOUT,
+                                            SocketsThread->AddTimer(Msg, UID, CMonotonicClock::DeadlineAfter(WORKER_DELAYEDAUTORETRYTIMEOUT),
                                                                     WORKER_DELAYEDAUTORETRYTIMID, NULL); // ignore the error; at worst the user will press Stop
                                         }
                                         else

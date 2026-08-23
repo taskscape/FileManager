@@ -104,7 +104,7 @@ void CFTPWorker::HandleEventInWorkingState(CFTPWorkerEvent event, BOOL& sendQuit
 
                             // since we are already inside CSocketsThread::CritSect, this call
                             // is also possible from CSocket::SocketCritSect and CFTPWorker::WorkerCritSect (no risk of deadlock)
-                            SocketsThread->AddTimer(Msg, UID, GetTickCount() + 100 /* perform the first status update "immediately" */,
+                            SocketsThread->AddTimer(Msg, UID, CMonotonicClock::DeadlineAfter(100) /* perform the first status update "immediately" */,
                                                     WORKER_STATUSUPDATETIMID, NULL); // ignore the error; at worst the status will not update
                         }
                     }
@@ -191,7 +191,7 @@ void CFTPWorker::HandleEventInWorkingState(CFTPWorkerEvent event, BOOL& sendQuit
 
                             // since we are already inside CSocketsThread::CritSect, this call
                             // is also possible from CSocket::SocketCritSect and CFTPWorker::WorkerCritSect (no risk of deadlock)
-                            SocketsThread->AddTimer(Msg, UID, GetTickCount() + 100 /* we perform the first status update "immediately" */,
+                            SocketsThread->AddTimer(Msg, UID, CMonotonicClock::DeadlineAfter(100) /* we perform the first status update "immediately" */,
                                                     WORKER_STATUSUPDATETIMID, NULL); // ignore the error; at worst the status will not update
                         }
                     }
@@ -738,7 +738,7 @@ void CFTPWorker::HandleEventInWorkingState(CFTPWorkerEvent event, BOOL& sendQuit
                                     if (finished) // use only the final command in the operation for speed measurement (RMD may follow DELE; eliminate that here)
                                     {
                                         // the server replied -> add theoretical bytes to the speed meter
-                                        Oper->GetGlobalTransferSpeedMeter()->BytesReceived(SMPLCMD_APPROXBYTESIZE, GetTickCount());
+                                        Oper->GetGlobalTransferSpeedMeter()->BytesReceived(SMPLCMD_APPROXBYTESIZE, CMonotonicClock::Now());
                                     }
                                     break;
                                 }
@@ -766,7 +766,7 @@ void CFTPWorker::HandleEventInWorkingState(CFTPWorkerEvent event, BOOL& sendQuit
                                 case fweCmdReplyReceived:
                                 {
                                     // the server replied -> add theoretical bytes to the speed meter
-                                    Oper->GetGlobalTransferSpeedMeter()->BytesReceived(SMPLCMD_APPROXBYTESIZE, GetTickCount());
+                                    Oper->GetGlobalTransferSpeedMeter()->BytesReceived(SMPLCMD_APPROXBYTESIZE, CMonotonicClock::Now());
 
                                     if (FTP_DIGIT_1(replyCode) == FTP_D1_SUCCESS)
                                     { // the directory/link was deleted successfully; record "completed successfully" in the item
@@ -863,7 +863,7 @@ void CFTPWorker::HandleEventInWorkingState(CFTPWorkerEvent event, BOOL& sendQuit
                                     if (finished) // use only the final command in the operation for speed measurement (RMD may follow DELE; eliminate that here)
                                     {
                                         // the server replied -> add theoretical bytes to the speed meter
-                                        Oper->GetGlobalTransferSpeedMeter()->BytesReceived(SMPLCMD_APPROXBYTESIZE, GetTickCount());
+                                        Oper->GetGlobalTransferSpeedMeter()->BytesReceived(SMPLCMD_APPROXBYTESIZE, CMonotonicClock::Now());
                                     }
                                     break;
                                 }
@@ -1216,6 +1216,9 @@ void CFTPWorker::HandleEvent(CFTPWorkerEvent event, char* reply, int replySize, 
         {
             DWORD lastIdle, lastIdle2;
             BOOL isNotBusy = SalamanderGeneral->SalamanderIsNotBusy(&lastIdle);
+            // NOTE: this hand-off stays on GetTickCount arithmetic on purpose: 'lastIdle' comes from
+            // the host plug-in API (CSalamanderGeneralAbstract::SalamanderIsNotBusy) as a 32-bit tick,
+            // so mixing in 64-bit monotonic samples here would corrupt the comparisons across the ABI.
             if (isNotBusy || GetTickCount() - lastIdle < 2000) // high chance that Salamander reaches the "idle" state (the connection can be returned to the panel)
             {
                 HANDLES(LeaveCriticalSection(&WorkerCritSect));
@@ -1300,7 +1303,7 @@ void CFTPWorker::HandleEvent(CFTPWorkerEvent event, char* reply, int replySize, 
                 serverTimeout = 1000; // at least one second
             // since we are already inside CSocketsThread::CritSect, this call
             // is also possible from CSocket::SocketCritSect (no risk of deadlock)
-            SocketsThread->AddTimer(Msg, UID, GetTickCount() + serverTimeout,
+            SocketsThread->AddTimer(Msg, UID, CMonotonicClock::DeadlineAfter(serverTimeout),
                                     WORKER_TIMEOUTTIMERID, NULL); // ignore errors; at worst the user will press Stop
         }
         else
@@ -1317,7 +1320,7 @@ void CFTPWorker::HandleEvent(CFTPWorkerEvent event, char* reply, int replySize, 
 
             // since we are already inside CSocketsThread::CritSect, this call
             // is also possible from CSocket::SocketCritSect (no risk of deadlock)
-            SocketsThread->AddTimer(Msg, UID, GetTickCount() + 100, // give 0.1 seconds to possibly receive bytes from the socket (it may re-post FD_CLOSE, etc.)
+            SocketsThread->AddTimer(Msg, UID, CMonotonicClock::DeadlineAfter(100), // give 0.1 seconds to possibly receive bytes from the socket (it may re-post FD_CLOSE, etc.)
                                     WORKER_CMDERRORTIMERID, NULL);  // ignore errors; at worst the user will press Stop
         }
     }

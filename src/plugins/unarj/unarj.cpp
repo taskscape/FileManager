@@ -694,7 +694,8 @@ void NextVolume(BOOL forceQuestion)
     char* ext = PathFindExtension(ArcName);
     if (lstrcmpi(ext, ".arj") == 0)
     {
-        lstrcpy(ext, ".a01");
+        // same 4+terminator footprint as ".arj", copied by count instead of the unbounded helper
+        memcpy(ext, ".a01", sizeof(".a01"));
     }
     else
     {
@@ -745,7 +746,8 @@ ARJOpenArchive(CARJOpenData* openData)
 {
     CALL_STACK_MESSAGE1("ARJOpenArchive()");
     ArcFile = INVALID_HANDLE_VALUE;
-    lstrcpy(ArcName, openData->ArcName);
+    // bounded copy into the fixed MAX_PATH archive-name field; clipping matches the former behavior explicitly
+    strncpy_s(ArcName, sizeof(ArcName), openData->ArcName, _TRUNCATE);
     ChangeVolProc = openData->ARJChangeVolProc;
     ProcessDataProc = openData->ARJProcessDataProc;
     ErrorProc = openData->ARJErrorProc;

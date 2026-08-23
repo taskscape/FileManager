@@ -1993,7 +1993,7 @@ void CFTPWorker::ReceiveTimer(DWORD id, void* param)
 
                 // since we are already in the CSocketsThread::CritSect section, this call
                 // is possible even from the CSocket::SocketCritSect and CFTPWorker::WorkerCritSect sections (no deadlock risk)
-                SocketsThread->AddTimer(Msg, UID, GetTickCount() + WORKER_STATUSUPDATETIMEOUT,
+                SocketsThread->AddTimer(Msg, UID, CMonotonicClock::DeadlineAfter(WORKER_STATUSUPDATETIMEOUT),
                                         WORKER_STATUSUPDATETIMID, NULL); // ignore errors; at worst the status will not update
             }
         }
@@ -2364,7 +2364,7 @@ void CFTPWorker::HandleSocketEvent(CFTPWorkerSocketEvent event, DWORD data1, DWO
                             serverTimeout = 1000; // at least one second
 
                         BOOL trFinished;
-                        DWORD start;
+                        CMonotonicTimePoint start;
                         HANDLES(LeaveCriticalSection(&WorkerCritSect));
                         // since we are already in the CSocketsThread::CritSect section, this call
                         // is possible even from the CSocket::SocketCritSect section (no deadlock risk)
@@ -2373,7 +2373,7 @@ void CFTPWorker::HandleSocketEvent(CFTPWorkerSocketEvent event, DWORD data1, DWO
                         { // waiting for data, so this is not a timeout
                             // since we are already in the CSocketsThread::CritSect section, this call
                             // is possible even from the CSocket::SocketCritSect section (no deadlock risk)
-                            SocketsThread->AddTimer(Msg, UID, GetTickCount() + serverTimeout,
+                            SocketsThread->AddTimer(Msg, UID, CMonotonicClock::DeadlineAfter(serverTimeout),
                                                     WORKER_TIMEOUTTIMERID, NULL); // ignore the error; at worst the user will press Stop
                             HANDLES(EnterCriticalSection(&WorkerCritSect));
                             break;
@@ -2387,7 +2387,7 @@ void CFTPWorker::HandleSocketEvent(CFTPWorkerSocketEvent event, DWORD data1, DWO
                                 // since we are already in the CSocketsThread::CritSect section, this call
                                 // is possible even from the CSocket::SocketCritSect section (no deadlock risk)
                                 start = WorkerDataCon != NULL ? WorkerDataCon->GetSocketCloseTime() : WorkerUploadDataCon->GetSocketCloseTime();
-                                if ((GetTickCount() - start) < (DWORD)serverTimeout) // the timeout since closing the connection has not yet expired
+                                if (CMonotonicClock::Elapsed(start, CMonotonicClock::Now()) < (CMonotonicDuration)serverTimeout) // the timeout since closing the connection has not yet expired
                                 {
                                     // since we are already in the CSocketsThread::CritSect section, this call
                                     // is possible even from the CSocket::SocketCritSect section (no deadlock risk)

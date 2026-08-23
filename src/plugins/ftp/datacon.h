@@ -4,6 +4,8 @@
 
 #pragma once
 
+#include "..\\..\\common\\monotonic_time.h" // 64-bit monotonic time for connection activity timestamps
+
 //#define DEBUGLOGPACKETSIZEANDWRITESIZE    // enabled = logs the current block sizes sent during upload to the socket and, additionally, every second how much data was successfully sent
 
 // ****************************************************************************
@@ -51,10 +53,10 @@ protected:
     DWORD NetEventLastError; // code of the last error reported to ReceiveNetEvent() or that occurred in PassiveConnect()
     int SSLErrorOccured;     // see constants SSLCONERR_XXX
     BOOL ReceivedConnected;  // TRUE = the "data connection" opened (connect or accept); does not describe the current state
-    DWORD LastActivityTime;  // GetTickCount() from when we last worked with the "data connection" (tracks initialization (SetPassive() and SetActive()), successful connect, and read)
-    DWORD SocketCloseTime;   // GetTickCount() from the moment the "data connection" socket closed
+    CMonotonicTimePoint LastActivityTime;  // monotonic time from when we last worked with the "data connection" (tracks initialization (SetPassive() and SetActive()), successful connect, and read); 64-bit, so idle-time computations cannot wrap
+    CMonotonicTimePoint SocketCloseTime;   // monotonic time from the moment the "data connection" socket closed
 
-    CSynchronizedDWORD* GlobalLastActivityTime; // object for storing the last activity time of a group of data connections
+    CSynchronizedQWORD* GlobalLastActivityTime; // object for storing the last activity time of a group of data connections
 
     BOOL PostMessagesToWorker;        // TRUE = send messages to the owner (worker - see below for its identification)
     int WorkerSocketMsg;              // identifies the owner of the data connection
@@ -106,7 +108,7 @@ public:
     // sets the object for storing the last activity time of a group of data connections
     // (all data connection workers of the FTP operation)
     // can be called from any thread
-    void SetGlobalLastActivityTime(CSynchronizedDWORD* globalLastActivityTime);
+    void SetGlobalLastActivityTime(CSynchronizedQWORD* globalLastActivityTime);
 
     // sets the active mode of the "data connection"; socket opening see CSocket::OpenForListening();
     // 'logUID' is the log UID of the "control connection" to which this "data connection" belongs
@@ -118,7 +120,7 @@ public:
     BOOL IsTransfering(BOOL* transferFinished);
 
     // returns LastActivityTime (uses a critical section)
-    DWORD GetLastActivityTime();
+    CMonotonicTimePoint GetLastActivityTime();
 
     // called at the moment when the data transfer should start (for example after sending a listing command);
     // in passive mode it checks whether the first attempt to establish the connection was rejected
@@ -130,7 +132,7 @@ public:
     virtual void ActivateConnection();
 
     // returns SocketCloseTime (uses a critical section)
-    DWORD GetSocketCloseTime();
+    CMonotonicTimePoint GetSocketCloseTime();
 
     // returns LogUID (within a critical section)
     int GetLogUID();
@@ -451,11 +453,11 @@ protected:
     BOOL NoDataTransTimeout; // TRUE = a no-data-transfer timeout occurred - we closed the data connection
 
     BOOL FirstWriteAfterConnect;      // TRUE = after this connection to the server no data have been written to the socket yet
-    DWORD FirstWriteAfterConnectTime; // time of the first write to the socket (start of filling the local buffers) after this connection to the server
+    CMonotonicTimePoint FirstWriteAfterConnectTime; // time of the first write to the socket (start of filling the local buffers) after this connection to the server
     DWORD SkippedWriteAfterConnect;   // number of bytes excluded from the upload speed calculation because they most likely went into a local buffer (artificially and incorrectly increases the initial upload speed)
-    DWORD LastSpeedTestTime;          // time of the last connection speed test (to estimate how many bytes to write to the socket at once)
+    CMonotonicTimePoint LastSpeedTestTime; // time of the last connection speed test (to estimate how many bytes to write to the socket at once); 64-bit monotonic like the speed meter it feeds
     DWORD LastPacketSizeEstimation;   // last estimate of the optimal "packet" size (how many bytes to write to the socket at once)
-    DWORD PacketSizeChangeTime;       // time of the last change to LastPacketSizeEstimation
+    CMonotonicTimePoint PacketSizeChangeTime; // time of the last change to LastPacketSizeEstimation
     DWORD BytesSentAfterPckSizeCh;    // number of bytes sent within one second after the last change to LastPacketSizeEstimation
     DWORD PacketSizeChangeSpeed;      // transfer speed before the last change to LastPacketSizeEstimation
     DWORD TooBigPacketSize;           // packet size at which transfer speed starts to degrade (e.g. from 5MB/s to 160KB/s); -1 if no such size was detected
@@ -464,7 +466,7 @@ protected:
 
 #ifdef DEBUGLOGPACKETSIZEANDWRITESIZE
     // auxiliary data section for DebugLogPacketSizeAndWriteSize
-    DWORD DebugLastWriteToLog;        // time of the last log write (we write once per second to avoid flooding the log)
+    CMonotonicTimePoint DebugLastWriteToLog; // time of the last log write (we write once per second to avoid flooding the log)
     DWORD DebugSentButNotLoggedBytes; // number of bytes skipped because of DebugLastWriteToLog
     DWORD DebugSentButNotLoggedCount; // number of written blocks skipped because of DebugLastWriteToLog
 #endif                                // DEBUGLOGPACKETSIZEANDWRITESIZE
@@ -606,9 +608,8 @@ protected:
     DWORD NetEventLastError; // code of the last error reported to ReceiveNetEvent() or that occurred in PassiveConnect()
     int SSLErrorOccured;     // see constants SSLCONERR_XXX
     BOOL ReceivedConnected;  // TRUE = the "data connection" opened (connect or accept); does not describe the current state
-    DWORD LastActivityTime;  // GetTickCount() from when we last worked with the "data connection" (tracks initialization (SetPassive() and SetActive()), successful connect, and read)
-    DWORD SocketCloseTime;   // GetTickCount() from the moment the "data connection" socket closed
-
+    CMonotonicTimePoint LastActivityTime;  // monotonic time from when we last worked with the "data connection" (tracks initialization (SetPassive() and SetActive()), successful connect, and read); 64-bit, so idle-time computations cannot wrap
+    CMonotonicTimePoint SocketCloseTime;   // monotonic time from the moment the "data connection" socket closed
     // used when closing the "data connection" (evaluates whether the keep-alive command has finished)
     // WARNING: ParentControlSocket->SocketCritSect must not be entered (do not call ParentControlSocket methods)
     //        from this object's SocketCritSect (the opposite order of entry is already used, see
@@ -640,7 +641,7 @@ public:
     BOOL CloseSocketEx(DWORD* error);
 
     // returns SocketCloseTime (uses a critical section)
-    DWORD GetSocketCloseTime();
+    CMonotonicTimePoint GetSocketCloseTime();
 
     // sets parameters for the passive mode of the "data connection"; these parameters are used
     // in the PassiveConnect() method; 'ip' + 'port' are the connection parameters obtained from the server;

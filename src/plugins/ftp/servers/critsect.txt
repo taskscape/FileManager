@@ -8,7 +8,7 @@ Sekce bez vstupu do jinych sekci (primitivni):
   CReturningConnections::RetConsCritSect
   CFTPDiskThread::DiskCritSect
   CTransferSpeedMeter::TransferSpeedMeterCS
-  CSynchronizedDWORD::ValueCS
+  CSynchronizedQWORD::ValueCS
   CFTPProxyServerList::ProxyServerListCS
 
 Ze sekce CClosedCtrlConChecker::DataSect se vstupuje do:
@@ -28,7 +28,7 @@ Ze sekce CSocketsThread::CritSect se vstupuje do:
   CFTPDiskThread::DiskCritSect
   CConfiguration::ConParamsCS
   CTransferSpeedMeter::TransferSpeedMeterCS
-  CSynchronizedDWORD::ValueCS
+  CSynchronizedQWORD::ValueCS
   CUploadListingCache::UploadLstCacheCritSect
 
 Ze sekce CSocket::SocketCritSect se vstupuje do:
@@ -43,7 +43,7 @@ Ze sekce CSocket::SocketCritSect se vstupuje do:
   CFTPDiskThread::DiskCritSect
   CConfiguration::ConParamsCS
   CTransferSpeedMeter::TransferSpeedMeterCS
-  CSynchronizedDWORD::ValueCS
+  CSynchronizedQWORD::ValueCS
   CUploadListingCache::UploadLstCacheCritSect
   CFTPProxyServerList::ProxyServerListCS
 

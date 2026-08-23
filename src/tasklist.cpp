@@ -623,7 +623,7 @@ BOOL CTaskList::ActivateRunningInstance(const CCommandLineParams* cmdLineParams,
     // find running process in our class, or starting one (wait a moment to see if it starts)
     int firstStarting = -1; // index of process that is from our class (same Integrity Level and SID) but doesn't have main window yet
     int firstRunnig = -1;   // index of process that is from our class (same Integrity Level and SID) and is already running (has main window)
-    DWORD timeStamp = GetTickCount();
+    CMonotonicTimePoint timeStamp = CMonotonicClock::Now(); // internal wait deadline in 64-bit monotonic time (the shared-memory TodoTimestamp fields stay on the cross-version DWORD tick contract)
     do
     {
         firstStarting = -1;
@@ -661,7 +661,7 @@ BOOL CTaskList::ActivateRunningInstance(const CCommandLineParams* cmdLineParams,
                     Sleep(200); // we found starting candidate, go silent for 200ms so it has a chance to call SetProcessState()
             }
         }
-    } while (firstRunnig == -1 && (GetTickCount() - timeStamp < TASKLIST_TODO_TIMEOUT)); // wait for running instance max 5s
+    } while (firstRunnig == -1 && (CMonotonicClock::Elapsed(timeStamp, CMonotonicClock::Now()) < TASKLIST_TODO_TIMEOUT)); // wait for running instance max 5s
 
     // if we didn't find any instance from our class that should have main window, or if waiting took 5s, let's pack it up
     if (firstRunnig == -1)
