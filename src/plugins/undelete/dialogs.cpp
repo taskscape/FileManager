@@ -6,6 +6,7 @@
 
 #include <objbase.h>
 #include <shobjidl.h>
+#include <vector>
 
 #include "undelete.rh"
 #include "undelete.rh2"
@@ -570,15 +571,22 @@ void CConnectDialog::OnImageBrowse()
         fileDialog->SetFileTypes(_countof(imageFilters), imageFilters);
         fileDialog->SetFileTypeIndex(1);
 
-        // split the persisted volume path into an initial folder and a suggested leaf name
-        WCHAR volumeW[MAX_PATH];
-        int converted = MultiByteToWideChar(CP_ACP, 0, Volume, -1, volumeW, MAX_PATH);
-        if (converted > 0)
+        // Allocate the complete UTF-16 spelling so a long persisted image path is never truncated before shell navigation.
+        int requiredChars = MultiByteToWideChar(CP_ACP, 0, Volume, -1, NULL, 0);
+        std::vector<WCHAR> volumeW;
+        if (requiredChars > 0)
         {
-            PWSTR sep = wcsrchr(volumeW, L'\\');
+            volumeW.resize(requiredChars);
+            int converted = MultiByteToWideChar(CP_ACP, 0, Volume, -1, volumeW.data(), requiredChars);
+            if (converted <= 0)
+                volumeW.clear();
+        }
+        if (!volumeW.empty())
+        {
+            PWSTR sep = wcsrchr(volumeW.data(), L'\\');
             if (sep == NULL)
-                sep = wcsrchr(volumeW, L':');
-            WCHAR* leafW = volumeW;
+                sep = wcsrchr(volumeW.data(), L':');
+            WCHAR* leafW = volumeW.data();
             if (sep != NULL)
             {
                 *sep = 0;
@@ -586,7 +594,7 @@ void CConnectDialog::OnImageBrowse()
                 if (volumeW[0] != 0) // non-empty folder part seeds the initial location
                 {
                     IShellItem* folder = NULL;
-                    if (SUCCEEDED(SHCreateItemFromParsingName(volumeW, NULL, IID_PPV_ARGS(&folder))))
+                    if (SUCCEEDED(SHCreateItemFromParsingName(volumeW.data(), NULL, IID_PPV_ARGS(&folder))))
                     {
                         fileDialog->SetFolder(folder);
                         folder->Release();

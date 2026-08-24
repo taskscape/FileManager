@@ -60,7 +60,7 @@ protected:
     void ConvertPath(char* str, char from, char to);
     virtual void OnThreadEnd();
     void SetItemTextAndIcon(int row, int col, const char* text = NULL, int icon = -1);
-    void GetItemText(int row, int col, char* text, int textMax);
+    int GetItemText(int row, int col, char* text, int textMax);
     void IncreaseProgress(const CQuadWord& delta);
     virtual void DeleteItem(int index);
     void ScrollToItem(int i);

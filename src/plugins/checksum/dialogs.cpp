@@ -6,6 +6,7 @@
 #include <strsafe.h>
 #include <objbase.h>
 #include <shobjidl.h>
+#include <vector>
 #include "checksum.h"
 #include "checksum.rh"
 #include "checksum.rh2"
@@ -222,17 +223,17 @@ void CSFVMD5Dialog::SetItemTextAndIcon(int row, int col, const char* text, int i
         item->IconIndex = icon;
 }
 
-void CSFVMD5Dialog::GetItemText(int row, int col, char* text, int textMax)
+int CSFVMD5Dialog::GetItemText(int row, int col, char* text, int textMax)
 {
     CALL_STACK_MESSAGE_NONE // frequently called function
         // CALL_STACK_MESSAGE4("CSFVMD5Dialog::GetItemText(%d, %d, , %d)", row, col, textMax);
-        LVITEM lvi;
+    LVITEM lvi;
     lvi.mask = LVIF_TEXT;
     lvi.iItem = row;
     lvi.iSubItem = col;
     lvi.pszText = text;
     lvi.cchTextMax = textMax;
-    ListView_GetItem(hList, &lvi);
+    return (int)SendMessage(hList, LVM_GETITEMTEXT, row, (LPARAM)&lvi);
 }
 
 void CSFVMD5Dialog::IncreaseProgress(const CQuadWord& delta)
@@ -867,17 +868,27 @@ BOOL CCalculateDialog::GetSaveFileName(LPTSTR buffer, LPCTSTR title)
 {
     CALL_STACK_MESSAGE2("CCalculateDialog::GetSaveFileName(, %s)", title);
 
-    // obtain the default name; are all names identical?
-    char file1[MAX_PATH], file2[MAX_PATH];
-    GetItemText(0, 0, file1, MAX_PATH);
-    SalamanderGeneral->SalPathRemoveExtension(file1);
+    // Grow retrieval storage so long list-view names are compared without a MAX_PATH truncation.
+    std::vector<char> file1(256), file2(256);
+    auto getItemName = [this](int row, std::vector<char>& text) {
+        for (;;)
+        {
+            int capacity = (int)text.size();
+            int copied = GetItemText(row, 0, text.data(), capacity);
+            if (copied < capacity - 1)
+                return;
+            text.resize(text.size() * 2);
+        }
+    };
+    getItemName(0, file1);
+    SalamanderGeneral->SalPathRemoveExtension(file1.data());
     BOOL allSame = TRUE;
     int i;
     for (i = 1; i < ListView_GetItemCount(hList); i++)
     {
-        GetItemText(i, 0, file2, MAX_PATH);
-        SalamanderGeneral->SalPathRemoveExtension(file2);
-        if (_stricmp(file1, file2))
+        getItemName(i, file2);
+        SalamanderGeneral->SalPathRemoveExtension(file2.data());
+        if (_stricmp(file1.data(), file2.data()))
         {
             allSame = FALSE;
             break;
@@ -901,7 +912,7 @@ BOOL CCalculateDialog::GetSaveFileName(LPTSTR buffer, LPCTSTR title)
     }
     else
     {
-        if (FAILED(StringCchCopyA(buffer, MAX_PATH, file1)))
+        if (FAILED(StringCchCopyA(buffer, MAX_PATH, file1.data())))
         {
             // An oversized suggestion must not become a different output filename.
             buffer[0] = 0;
@@ -1076,8 +1087,15 @@ BOOL CCalculateDialog::GetSaveFileName(LPTSTR buffer, LPCTSTR title)
                 break;
             }
             fclose(f);
-            sprintf(file1, LoadStr(IDS_SAVE_OVERWRITE), buffer);
-            switch (SalamanderGeneral->SalMessageBox(HWindow, file1, LoadStr(IDS_SAVE_TITLE),
+            // The overwrite prompt shares the growable name storage so its path argument cannot overflow a fixed diagnostic buffer.
+            for (;;)
+            {
+                HRESULT formatResult = StringCchPrintfA(file1.data(), file1.size(), LoadStr(IDS_SAVE_OVERWRITE), buffer);
+                if (formatResult != STRSAFE_E_INSUFFICIENT_BUFFER)
+                    break;
+                file1.resize(file1.size() * 2);
+            }
+            switch (SalamanderGeneral->SalMessageBox(HWindow, file1.data(), LoadStr(IDS_SAVE_TITLE),
                                                      MB_YESNOCANCEL | MB_ICONQUESTION))
             {
             case IDYES:
