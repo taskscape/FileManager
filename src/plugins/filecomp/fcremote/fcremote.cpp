@@ -39,9 +39,12 @@ void my_memcpy(void* dst, const void* src, int len)
         *d++ = *s++;
 }
 
-// This no-CRT executable can receive optimizer-generated memcpy calls from shared message code.
-#pragma intrinsic(memcpy)
+// Release optimization can synthesize memcpy calls in shared no-CRT code; temporarily remove the legacy macro so this fallback exports the required symbol.
+#ifdef memcpy
+#undef memcpy
+#endif
 #pragma function(memcpy)
+extern "C"
 void* __cdecl memcpy(void* dest, const void* src, size_t count)
 {
     char* d = (char*)dest;
@@ -50,6 +53,9 @@ void* __cdecl memcpy(void* dest, const void* src, size_t count)
         *d++ = *s++;
     return dest;
 }
+#ifndef _DEBUG
+#define memcpy my_memcpy
+#endif
 
 #pragma optimize("", off)
 void my_zeromem(void* dst, int len)

@@ -18,6 +18,7 @@ public sealed class NativeSafetyRegressionTests
         var root = FindRepositoryRoot();
         var runner = File.ReadAllText(Path.Combine(root, "scripts", "runtests.ps1"));
         var releaseWorkflow = File.ReadAllText(Path.Combine(root, ".github", "workflows", "build-installer.yml"));
+        var releaseInstaller = File.ReadAllText(Path.Combine(root, "tools", "build-release-installer.ps1"));
         var volumeProvisioner = File.ReadAllText(Path.Combine(root, "tools", "manage-ui-test-volumes.ps1"));
         var quarantineVerifier = File.ReadAllText(Path.Combine(root, "tools", "verify-ui-test-quarantine.ps1"));
         var quarantineWorkflow = File.ReadAllText(Path.Combine(root, ".github", "workflows", "quarantined-ui-tests.yml"));
@@ -59,11 +60,19 @@ public sealed class NativeSafetyRegressionTests
             Assert.That(runner, Does.Contain("Resolve-ReleasePipelineBaseCommit"));
             Assert.That(runner, Does.Contain("Build-ReleaseGateDebugArtifacts"));
             Assert.That(runner, Does.Contain("Resolve-SqliteDll -RequestedPath $SqliteDll"));
-            Assert.That(runner, Does.Contain("Build-ReleaseApplication"));
-            Assert.That(runner, Does.Contain("audit-pe-hardening.ps1"));
-            Assert.That(runner, Does.Contain("new-symbol-index.ps1"));
-            Assert.That(runner, Does.Contain("prepare_installer.ps1"));
-            Assert.That(runner, Does.Contain("Get-PinnedInnoSetupCompiler"));
+            // Local parity must invoke the same complete Build Installer implementation as the separate CI job.
+            Assert.That(runner, Does.Contain("build-release-installer.ps1"));
+            Assert.That(runner, Does.Contain("Build Installer (x64 Release)"));
+            Assert.That(releaseWorkflow, Does.Contain(".\\tools\\build-release-installer.ps1"));
+            Assert.That(releaseInstaller, Does.Contain("Configuration=Release"));
+            Assert.That(releaseInstaller, Does.Contain("Platform=x64"));
+            Assert.That(releaseInstaller, Does.Contain("PlatformToolset=$PlatformToolset"));
+            Assert.That(releaseInstaller, Does.Contain("PreferredToolArchitecture=x64"));
+            Assert.That(releaseInstaller, Does.Contain("OPENSAL_BUILD_DIR"));
+            Assert.That(releaseInstaller, Does.Contain("audit-pe-hardening.ps1"));
+            Assert.That(releaseInstaller, Does.Contain("new-symbol-index.ps1"));
+            Assert.That(releaseInstaller, Does.Contain("prepare_installer.ps1"));
+            Assert.That(releaseInstaller, Does.Contain("setup.iss"));
             Assert.That(runner, Does.Contain("FailOnSkipped"));
             Assert.That(runner, Does.Contain("@outcome='NotExecuted'"));
             // Local capability gates are explicit skips; strict release mode still rejects them and every unrecognized NUnit Ignore.
@@ -1641,6 +1650,7 @@ public sealed class NativeSafetyRegressionTests
         var targets = File.ReadAllText(Path.Combine(root, "src", "Directory.Build.targets"));
         var audit = File.ReadAllText(Path.Combine(root, "tools", "audit-pe-hardening.ps1"));
         var workflow = File.ReadAllText(Path.Combine(root, ".github", "workflows", "build-installer.yml"));
+        var releaseInstaller = File.ReadAllText(Path.Combine(root, "tools", "build-release-installer.ps1"));
 
         // Project properties alone are insufficient: require both post-import enforcement and PE-header inspection.
         Assert.Multiple(() =>
@@ -1659,8 +1669,9 @@ public sealed class NativeSafetyRegressionTests
             // CRT-free and x86 release helpers retain their compatible mitigations without being required to carry unsupported CFG/CET metadata.
             Assert.That(audit, Does.Contain("crtFreeArtifactNames"));
             Assert.That(audit, Does.Contain("machine \\(x64\\)"));
-            Assert.That(workflow, Does.Contain("Audit Release PE hardening"));
-            Assert.That(workflow, Does.Contain("$releaseArtifactRoot = Join-Path $env:OPENSAL_BUILD_DIR 'salamander\\Release_x64'"));
+            // The shared Build Installer pass owns the Release artifact root and PE audit for both CI and local parity.
+            Assert.That(releaseInstaller, Does.Contain("audit-pe-hardening.ps1"));
+            Assert.That(releaseInstaller, Does.Contain("salamander\\Release_x64"));
         });
     }
 
@@ -1771,6 +1782,7 @@ public sealed class NativeSafetyRegressionTests
         var indexer = File.ReadAllText(Path.Combine(root, "tools", "new-symbol-index.ps1"));
         var verifier = File.ReadAllText(Path.Combine(root, "tools", "test-symbol-index.ps1"));
         var workflow = File.ReadAllText(Path.Combine(root, ".github", "workflows", "build-installer.yml"));
+        var releaseInstaller = File.ReadAllText(Path.Combine(root, "tools", "build-release-installer.ps1"));
 
         // Exact symbol lookup requires both the PE CodeView key and immutable hashes before the private artifact is retained.
         Assert.Multiple(() =>
@@ -1781,7 +1793,9 @@ public sealed class NativeSafetyRegressionTests
             Assert.That(indexer, Does.Contain("pdbSha256"));
             // Identical staged helper copies may share a CodeView key; the verifier must still reject a key with divergent content.
             Assert.That(verifier, Does.Contain("Symbol key resolves to inconsistent release content"));
-            Assert.That(workflow, Does.Contain("Index and verify private release symbols"));
+            // Symbol indexing remains part of the shared Build Installer gate rather than a CI-only step list.
+            Assert.That(releaseInstaller, Does.Contain("new-symbol-index.ps1"));
+            Assert.That(releaseInstaller, Does.Contain("test-symbol-index.ps1"));
             Assert.That(workflow, Does.Contain("release-symbol-index.json"));
             // The workflow must request the repository maximum instead of a
             // higher value that Actions silently clamps and warns about.
@@ -1794,11 +1808,13 @@ public sealed class NativeSafetyRegressionTests
     {
         var root = FindRepositoryRoot();
         var workflow = File.ReadAllText(Path.Combine(root, ".github", "workflows", "build-installer.yml"));
+        var releaseInstaller = File.ReadAllText(Path.Combine(root, "tools", "build-release-installer.ps1"));
 
         // Complete UI and focused native checks retain broad coverage without a second compiler lane.
         Assert.Multiple(() =>
         {
-            Assert.That(workflow, Does.Contain("Run v145 native regression subset"));
+            Assert.That(releaseInstaller, Does.Contain("v145 native regression subset"));
+            Assert.That(workflow, Does.Contain("Run Build Installer pass (Release | x64)"));
             Assert.That(workflow, Does.Contain("Run release tests without unexpected skips"));
             Assert.That(workflow, Does.Contain("Upload v145 complete UI results"));
             // The release gate must remain runnable after a forced main-branch update.

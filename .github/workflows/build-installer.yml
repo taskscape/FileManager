@@ -152,63 +152,10 @@ jobs:
         shell: pwsh
         run: .\tools\setup-vs2026-buildtools.ps1
 
-      - name: Build Solution (Release | x64)
-        run: |
-          New-Item -ItemType Directory -Force -Path $env:OPENSAL_BUILD_DIR
-          # We do NOT pass /p:OutDir here, we let the project props use OPENSAL_BUILD_DIR
-          msbuild $env:SOLUTION_PATH /m /t:Build /p:Configuration=$env:BUILD_CONFIGURATION /p:Platform=x64 /p:PlatformToolset=$env:PLATFORM_TOOLSET /p:PreferredToolArchitecture=x64
-
-      - name: Audit Release PE hardening
+      # Keep the separate installer job visible while sharing its exact implementation with local -ReleasePipeline runs.
+      - name: Run Build Installer pass (Release | x64)
         shell: pwsh
-        run: |
-          # Audit only installer-bound Release x64 binaries; Debug utility outputs are not Release mitigation candidates.
-          $releaseArtifactRoot = Join-Path $env:OPENSAL_BUILD_DIR 'salamander\Release_x64'
-          .\tools\audit-pe-hardening.ps1 -BuildRoot $releaseArtifactRoot
-
-      - name: Run v145 native regression subset
-        shell: pwsh
-        run: dotnet test .\tests\FileManager.UiTests\FileManager.UiTests.csproj --filter "FullyQualifiedName~NativeSafetyRegressionTests"
-
-      - name: Index and verify private release symbols
-        shell: pwsh
-        run: |
-          # The index carries the CodeView GUID/age and immutable module/PDB hashes required for exact-build symbolization.
-          $symbolIndex = Join-Path $env:RUNNER_TEMP 'release-symbol-index.json'
-          .\tools\new-symbol-index.ps1 -BuildRoot $env:OPENSAL_BUILD_DIR -OutputPath $symbolIndex
-          .\tools\test-symbol-index.ps1 -BuildRoot $env:OPENSAL_BUILD_DIR -IndexPath $symbolIndex
-
-      - name: Install pinned Inno Setup
-        shell: pwsh
-        run: |
-          # Install under RUNNER_TEMP so the self-hosted service account needs no Program Files write permission.
-          $innoPath = Join-Path $env:RUNNER_TEMP 'filemanager-inno-setup-6.7.3'
-          $iscc = & .\tools\install-pinned-inno-setup.ps1 -InstallDirectory $innoPath
-          # A PowerShell script returns by throwing or yielding its compiler path; LASTEXITCODE is reserved for native executables.
-          if (-not (Test-Path -LiteralPath $iscc -PathType Leaf)) { throw 'Pinned Inno Setup provisioning did not produce ISCC.exe.' }
-          $innoPath | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
-
-      - name: Prepare Installer Files
-        run: |
-          # Stage files for Inno Setup
-          powershell.exe -File tools\prepare_installer.ps1 -BuildDir $env:OPENSAL_BUILD_DIR -StagingDir $env:INSTALLER_STAGING_DIR -BuildNumber ${{ github.run_number }}
-
-          $requiredFiles = @(
-            (Join-Path $env:INSTALLER_STAGING_DIR 'salamand.exe')
-            (Join-Path $env:INSTALLER_STAGING_DIR 'salmon.exe')
-            (Join-Path $env:INSTALLER_STAGING_DIR 'LICENSE')
-          )
-
-          $missingFiles = $requiredFiles | Where-Object { -not (Test-Path $_) }
-          if ($missingFiles.Count -gt 0) {
-            $missingFiles | ForEach-Object { Write-Host "::error::Missing staged installer file: $_" }
-            throw "Installer staging is incomplete."
-          }
-
-      - name: Build Installer with Inno Setup
-        run: |
-          # Compile the Inno Setup script
-          $sourcePath = Split-Path -Leaf $env:INSTALLER_STAGING_DIR
-          iscc.exe /DSourcePath="$sourcePath" /DBuildNumber=${{ github.run_number }} "Installer\setup.iss"
+        run: .\tools\build-release-installer.ps1 -BuildDirectory $env:OPENSAL_BUILD_DIR -InstallerStagingDirectory $env:INSTALLER_STAGING_DIR -BuildNumber '${{ github.run_number }}' -PlatformToolset $env:PLATFORM_TOOLSET
 
       - name: Preserve verified installer for the publish job
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1

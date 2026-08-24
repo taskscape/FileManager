@@ -524,40 +524,6 @@ function Build-ReleaseGateDebugArtifacts {
     }
 }
 
-function Build-ReleaseApplication {
-    param(
-        [Parameter(Mandatory = $true)]
-        [string]$DeveloperCommand,
-        [Parameter(Mandatory = $true)]
-        [string]$BuildDirectory,
-        [Parameter(Mandatory = $true)]
-        [ValidateSet('v145')]
-        [string]$Toolset
-    )
-
-    New-Item -ItemType Directory -Path $BuildDirectory -Force | Out-Null
-    # Match the installer job: project props consume OPENSAL_BUILD_DIR rather than a divergent OutDir override.
-    $buildRoot = $BuildDirectory.TrimEnd('\') + '\'
-    $buildCommand = 'call "' + $DeveloperCommand + '" -arch=x64 -host_arch=x64 && set "OPENSAL_BUILD_DIR=' + $buildRoot +
-        '" && msbuild "' + $nativeSolution + '" /m /t:Build /p:Configuration=Release /p:Platform=x64 /p:PlatformToolset=' +
-        $Toolset + ' /p:PreferredToolArchitecture=x64 /nr:false'
-    & $env:ComSpec /d /s /c $buildCommand
-    if ($LASTEXITCODE -ne 0) {
-        throw "Building the Release x64 FileManager solution failed with exit code $LASTEXITCODE."
-    }
-}
-
-function Get-PinnedInnoSetupCompiler {
-    $installRoot = Join-Path ([IO.Path]::GetTempPath()) 'filemanager-inno-setup-6.7.3'
-    # Keep local packaging non-administrative by sharing GitHub's verified per-run compiler installation path.
-    $compiler = & (Join-Path $repositoryRoot 'tools\install-pinned-inno-setup.ps1') -InstallDirectory $installRoot
-    # A successful PowerShell helper does not set LASTEXITCODE; its returned compiler path is the completion barrier.
-    if (-not (Test-Path -LiteralPath $compiler -PathType Leaf)) {
-        throw 'Pinned Inno Setup provisioning did not produce ISCC.exe.'
-    }
-    return $compiler
-}
-
 function Invoke-ReleasePipelineCheck {
     param(
         [Parameter(Mandatory = $true)]
@@ -585,43 +551,16 @@ function Invoke-ReleasePipelinePackaging {
         [string]$ReleaseBuildNumber
     )
 
-    $releaseBuildAction = { Build-ReleaseApplication -DeveloperCommand $DeveloperCommand -BuildDirectory $BuildDirectory -Toolset $Toolset }.GetNewClosure()
-    if (-not (Invoke-ReleasePipelineCheck -Name 'Build Solution (Release x64)' -Action $releaseBuildAction)) { return }
-
-    $releaseArtifactRoot = Join-Path $BuildDirectory 'salamander\Release_x64'
-    $auditAction = { & powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $repositoryRoot 'tools\audit-pe-hardening.ps1') -BuildRoot $releaseArtifactRoot }.GetNewClosure()
-    if (-not (Invoke-ReleasePipelineCheck -Name 'Audit Release PE hardening' -Action $auditAction)) { return }
-
-    $nativeRegressionAction = {
-        & $dotnet.Source test $testProject --filter 'FullyQualifiedName~NativeSafetyRegressionTests' --logger 'console;verbosity=minimal'
-        if ($LASTEXITCODE -ne 0) { throw "The Release native regression subset failed with exit code $LASTEXITCODE." }
+    $buildInstallerScript = Join-Path $repositoryRoot 'tools\build-release-installer.ps1'
+    $stagingDirectory = Join-Path $repositoryRoot 'Installer\Installer_Staging'
+    $buildInstallerAction = {
+        # The local release gate delegates the entire CI Build Installer job to the same script.
+        & $buildInstallerScript -BuildDirectory $BuildDirectory -InstallerStagingDirectory $stagingDirectory -BuildNumber $ReleaseBuildNumber -PlatformToolset $Toolset
+        if ($LASTEXITCODE -ne 0) {
+            throw "The Build Installer pass failed with exit code $LASTEXITCODE."
+        }
     }.GetNewClosure()
-    if (-not (Invoke-ReleasePipelineCheck -Name 'Run v145 native regression subset' -Action $nativeRegressionAction)) { return }
-
-    $symbolIndex = Join-Path $BuildDirectory 'release-symbol-index.json'
-    $symbolsAction = {
-        & powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $repositoryRoot 'tools\new-symbol-index.ps1') -BuildRoot $BuildDirectory -OutputPath $symbolIndex
-        if ($LASTEXITCODE -ne 0) { throw "Generating the release symbol index failed with exit code $LASTEXITCODE." }
-        & powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $repositoryRoot 'tools\test-symbol-index.ps1') -BuildRoot $BuildDirectory -IndexPath $symbolIndex
-        if ($LASTEXITCODE -ne 0) { throw "Verifying the release symbol index failed with exit code $LASTEXITCODE." }
-    }.GetNewClosure()
-    if (-not (Invoke-ReleasePipelineCheck -Name 'Index and verify private release symbols' -Action $symbolsAction)) { return }
-
-    $installerAction = {
-        $compiler = Get-PinnedInnoSetupCompiler
-        $stagingDirectory = Join-Path $repositoryRoot 'Installer\Installer_Staging'
-        & powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $repositoryRoot 'tools\prepare_installer.ps1') -BuildDir $BuildDirectory -StagingDir $stagingDirectory -BuildNumber $ReleaseBuildNumber
-        if ($LASTEXITCODE -ne 0) { throw "Preparing installer files failed with exit code $LASTEXITCODE." }
-        $requiredFiles = @('salamand.exe', 'salmon.exe', 'LICENSE') | ForEach-Object { Join-Path $stagingDirectory $_ }
-        $missingFiles = @($requiredFiles | Where-Object { -not (Test-Path -LiteralPath $_ -PathType Leaf) })
-        if ($missingFiles.Count -ne 0) { throw "Installer staging is incomplete: $($missingFiles -join ', ')" }
-        $sourcePath = Split-Path -Leaf $stagingDirectory
-        & $compiler ('/DSourcePath="' + $sourcePath + '"') ('/DBuildNumber=' + $ReleaseBuildNumber) (Join-Path $repositoryRoot 'Installer\setup.iss')
-        if ($LASTEXITCODE -ne 0) { throw "Building the installer failed with exit code $LASTEXITCODE." }
-        $installerPath = Join-Path $repositoryRoot ('Installer\Output\OpenSalamander_6.0.' + $ReleaseBuildNumber + '.exe')
-        if (-not (Test-Path -LiteralPath $installerPath -PathType Leaf)) { throw "The expected installer was not produced: $installerPath" }
-    }.GetNewClosure()
-    [void](Invoke-ReleasePipelineCheck -Name 'Build installer with pinned Inno Setup' -Action $installerAction)
+    [void](Invoke-ReleasePipelineCheck -Name 'Build Installer (x64 Release)' -Action $buildInstallerAction)
 }
 
 function Assert-UiTestSymbolicLinkSupport {

@@ -16,10 +16,11 @@ New-Item -ItemType Directory -Path "$StagingDir\convert" | Out-Null
 New-Item -ItemType Directory -Path "$StagingDir\toolbars" | Out-Null
 New-Item -ItemType Directory -Path "$StagingDir\utils" | Out-Null
 
-# Write build info file for traceability
+# Use an explicit UTC conversion because the pipeline invokes Windows PowerShell, which has no Get-Date -AsUTC parameter.
+$buildDateUtc = (Get-Date).ToUniversalTime().ToString('yyyy-MM-dd HH:mm:ss UTC')
 @"
 Build Number: $BuildNumber
-Build Date: $(Get-Date -Format "yyyy-MM-dd HH:mm:ss UTC" -AsUTC)
+Build Date: $buildDateUtc
 "@ | Out-File -FilePath "$StagingDir\build_info.txt" -Encoding utf8
 
 # 1. Copy license file
