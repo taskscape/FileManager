@@ -50,13 +50,16 @@ if ($mutableReferences.Count -ne 0) {
 }
 
 $releaseWorkflow = Get-Content -LiteralPath (Join-Path $repositoryRoot '.github\workflows\build-installer.yml') -Raw
+$releaseInstaller = Get-Content -LiteralPath (Join-Path $repositoryRoot 'tools\build-release-installer.ps1') -Raw
 $innoProvisioner = Get-Content -LiteralPath (Join-Path $repositoryRoot 'tools\install-pinned-inno-setup.ps1') -Raw
 foreach ($requiredPattern in @(
     'needs: release-tests',
     'needs: build',
     'environment: production',
     'contents: write',
-    'install-pinned-inno-setup\.ps1',
+    # The workflow delegates packaging to the shared helper; the helper owns
+    # the pinned Inno Setup call so local and CI packaging cannot drift.
+    'build-release-installer\.ps1',
     'release-installer-\$\{\{ github\.sha \}\}',
     'private-symbols-\$\{\{ github\.sha \}\}'
 )) {
@@ -76,6 +79,10 @@ foreach ($requiredPattern in @(
     if ($innoProvisioner -notmatch $requiredPattern) {
         throw "Pinned Inno Setup provisioner is missing required contract: $requiredPattern"
     }
+}
+
+if ($releaseInstaller -notmatch 'install-pinned-inno-setup\.ps1') {
+    throw 'The shared release installer helper must invoke the pinned Inno Setup provisioner.'
 }
 
 foreach ($scriptPath in @(

@@ -15,6 +15,7 @@ public sealed class ApplicationVersionContractTests
         var buildProps = File.ReadAllText(Path.Combine(root, "src", "Directory.Build.props"));
         var installer = File.ReadAllText(Path.Combine(root, "Installer", "setup.iss"));
         var workflow = File.ReadAllText(Path.Combine(root, ".github", "workflows", "build-installer.yml"));
+        var releaseInstaller = File.ReadAllText(Path.Combine(root, "tools", "build-release-installer.ps1"));
         var configuration = File.ReadAllText(Path.Combine(root, "src", "mainwnd_config.cpp"));
         var constants = File.ReadAllText(Path.Combine(root, "src", "consts.h"));
         var manifestPath = Path.Combine(root, "src", "manifest.xml");
@@ -35,7 +36,9 @@ public sealed class ApplicationVersionContractTests
             Assert.That(installer, Does.Contain("#define MyAppVersion \"6.0\""));
             Assert.That(installer, Does.Contain("AppVersion={#MyAppVersion}.{#BuildNumber}"));
             Assert.That(installer, Does.Contain("OutputBaseFilename=OpenSalamander_{#MyAppVersion}.{#BuildNumber}"));
-            Assert.That(workflow, Does.Contain("/DBuildNumber=${{ github.run_number }}"));
+            // The workflow delegates the installer command to one shared helper, which owns the build-number argument.
+            Assert.That(workflow, Does.Contain("build-release-installer.ps1"));
+            Assert.That(releaseInstaller, Does.Contain("('/DBuildNumber=' + $BuildNumber)"));
             // The Node 24 GitHub Script release action receives the generated tag through its environment.
             Assert.That(workflow, Does.Contain("RELEASE_TAG: 6.0.${{ github.run_number }}"));
             Assert.That(workflow, Does.Contain("OpenSalamander_6.0.${{ github.run_number }}.exe"));
@@ -56,7 +59,10 @@ public sealed class ApplicationVersionContractTests
         var current = new DirectoryInfo(TestContext.CurrentContext.TestDirectory);
         while (current is not null)
         {
-            if (Directory.Exists(Path.Combine(current.FullName, ".git")))
+            // Git worktrees expose .git as a file; accepting both forms keeps source contracts runnable in clean CI checkouts and local parity worktrees.
+            var gitMetadata = Path.Combine(current.FullName, ".git");
+            if ((Directory.Exists(gitMetadata) || File.Exists(gitMetadata)) &&
+                Directory.Exists(Path.Combine(current.FullName, "src")))
             {
                 return current.FullName;
             }
