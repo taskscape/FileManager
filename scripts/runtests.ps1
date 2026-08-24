@@ -319,7 +319,7 @@ function Build-UiTestApplication {
     $buildCommand = 'call "' + $DeveloperCommand + '" -arch=x64 -host_arch=x64 && set "PATH=' + $masmPath + ';!PATH!" && msbuild "' + $nativeSolution +
         '" /m /t:Build /p:Configuration=Debug /p:Platform=x64 /p:PlatformToolset=' + $Toolset + ' /p:PreferredToolArchitecture=x64 /p:OPENSAL_BUILD_DIR=' +
         ($BuildDirectory.TrimEnd('\') + '\') + ' /nr:false'
-    & $env:ComSpec /d /s /c $buildCommand
+    & $env:ComSpec /d /v:on /s /c $buildCommand
     if ($LASTEXITCODE -ne 0) {
         throw "Building the Debug x64 FileManager solution failed with exit code $LASTEXITCODE."
     }
