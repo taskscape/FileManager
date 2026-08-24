@@ -263,9 +263,11 @@ CZipCommon::CZipCommon(const char* zipName, const char* zipRoot,
     CALL_STACK_MESSAGE3("CZipCommon::CZipCommon(%s, %s, )", zipName, zipRoot);
     Config = ::Config;
     ZipFile = 0;
-    lstrcpy(ZipName, zipName);
+    // counted copy: a path cannot overflow the fixed archive-name field
+    StringCchCopyA(ZipName, _countof(ZipName), zipName);
     ZipRoot = zipRoot;
-    RootLen = lstrlen(ZipRoot);
+    // ZipRoot is stored in the plugin's legacy int-length path contract.
+    RootLen = static_cast<int>(strlen(ZipRoot));
     ZeroZip = false;
     Zip64 = false;
     Salamander = salamander;
@@ -949,7 +951,7 @@ int CZipCommon::FindEOCentrDirSig(BOOL* success)
                         CompareString(LOCALE_USER_DEFAULT, NORM_IGNORECASE,
                                       lastFile, -1, ZipName, -1) != CSTR_EQUAL)
                     {
-                        lstrcpy(ZipName, lastFile);
+                        StringCchCopyA(ZipName, _countof(ZipName), lastFile); // counted copy into the fixed archive-name field
                     }
                     else
                         Config.AutoExpandMV = false;
@@ -2250,7 +2252,9 @@ int LoadSfxFileData(char* fileName, CSfxLang** lang)
         c++;
     else
         c = fileName;
-    lstrcpy((*lang)->FileName, c);
+    // the language-package file name is external input; an oversized leaf leaves the field empty
+    if (FAILED(StringCchCopyA((*lang)->FileName, _countof((*lang)->FileName), c)))
+        (*lang)->FileName[0] = 0;
     ret = 0;
 
 FAIL:

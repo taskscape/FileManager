@@ -349,6 +349,12 @@ BOOL CImpDropTarget::TryCopyOrMove(BOOL copy, IDataObject* pDataObject, UINT CF_
     return ret;
 }
 
+// Decides whether a drag/drop IDataObject is a "simple" file-name selection
+// that Salamander can consume directly: enumerates its formats, accepts
+// CF_HDROP / FILENAMEMAP A+W, and detects the truncated Remote-Desktop format
+// names (XP quirk) where GetData must not be called (it would copy files
+// remotely and hang). When 'namesList' is given, the extracted paths are
+// returned in it. Returns FALSE for complex/fake objects.
 BOOL IsSimpleSelection(IDataObject* pDataObject, CDragDropOperData* namesList)
 {
     CALL_STACK_MESSAGE1("IsSimpleSelection()");
@@ -922,6 +928,14 @@ STDMETHODIMP CImpDropTarget::DragLeave()
     return ret;
 }
 
+// IDropTarget::Drop for drops onto Salamander (panels, command line, desktop
+// integration). Resolves the drop target under 'pt' via GetCurDir/SetDirectory,
+// restricts effects to what the source offered, and then either forwards the
+// drop to the underlying directory's own IDropTarget (drops from Explorer)
+// or performs the internal copy/move with confirmation. Right-button drops and
+// confirmed drops show the context menu to pick the effect; non-simple
+// selections cannot target archives/plug-in filesystems. Image-drag visuals
+// are torn down and DROPEFFECT_NONE is reported when nothing is acceptable.
 STDMETHODIMP CImpDropTarget::Drop(IDataObject* pDataObject, DWORD grfKeyState,
                                   POINTL pt, DWORD* pdwEffect)
 {
@@ -1580,6 +1594,12 @@ ITEMIDLIST** CreateItemIdList(LPSHELLFOLDER folder, int files,
 // GetShellFolder
 //
 
+// Binds 'dir' to its shell namespace folder: returns the IShellFolder
+// interface and full PIDL. Chooses the namespace root by path shape
+// (ComputerFolder for drive paths, NetworkFolder for UNC), parses the display
+// name into a PIDL relative to that root, and combines them. Bails out early
+// on paths with components ending in spaces/dots, which the shell would
+// silently trim to a different path. Returns FALSE when binding fails.
 BOOL GetShellFolder(const char* dir, IShellFolder*& shellFolderObj, LPITEMIDLIST& pidlFolder)
 {
     CALL_STACK_MESSAGE2("GetShellFolder(%s, ,)", dir);

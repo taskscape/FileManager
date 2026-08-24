@@ -10,6 +10,7 @@
 //****************************************************************************
 
 #include "precomp.h"
+#include <strsafe.h> // counted bounded copies (StringCchCopyNA)
 //#include <windows.h>
 #ifdef _MSC_VER
 #include <crtdbg.h>
@@ -435,7 +436,7 @@ HANDLE CThreadQueue::StartThread(CThreadQueueStopBody body, void* param, unsigne
 CThread::CThread(const char* name)
 {
     if (name != NULL)
-        lstrcpyn(Name, name, 101);
+        StringCchCopyNA(Name, 101, name, 101); // counted bounded copy instead of lstrcpyn
     else
         Name[0] = 0;
     Thread = NULL;

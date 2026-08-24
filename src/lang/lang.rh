@@ -671,6 +671,10 @@
 #define IDD_SALMON_MAIN                 6130
 #define IDC_SALMON_INTRO                6131
 #define IDC_SALMON_PRIVACY              6132
+// Keep each localized consent line below RC's per-string limit.
+#define IDC_SALMON_PRIVACY_LINE2        6141
+#define IDC_SALMON_PRIVACY_LINE3        6142
+#define IDC_SALMON_PRIVACY_LINE4        6143
 #define IDC_SALMON_VIEW                 6133
 #define IDC_SALMON_DESCRIPTION          6134
 #define IDC_SALMON_ACTION_LABEL         6135

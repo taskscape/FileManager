@@ -3,6 +3,7 @@
 // CommentsTranslationProject: TRANSLATED
 
 #include "precomp.h"
+#include <strsafe.h> // counted bounded copies (StringCchCopyNA)
 
 namespace
 {
@@ -62,10 +63,10 @@ void BuildTransactionalDownloadMetadata(CFTPTransactionalDownloadMetadata* metad
         metadata->RemoteTime = *remoteTime;
     }
     metadata->Port = port;
-    lstrcpyn(metadata->User, user, USER_MAX_SIZE);
-    lstrcpyn(metadata->Host, host, HOST_MAX_SIZE);
-    lstrcpyn(metadata->RemotePath, remotePath, FTP_MAX_PATH);
-    lstrcpyn(metadata->RemoteName, remoteName, FTP_MAX_PATH);
+    StringCchCopyNA(metadata->User, USER_MAX_SIZE, user, USER_MAX_SIZE); // counted bounded copy instead of lstrcpyn
+    StringCchCopyNA(metadata->Host, HOST_MAX_SIZE, host, HOST_MAX_SIZE); // counted bounded copy instead of lstrcpyn
+    StringCchCopyNA(metadata->RemotePath, FTP_MAX_PATH, remotePath, FTP_MAX_PATH); // counted bounded copy instead of lstrcpyn
+    StringCchCopyNA(metadata->RemoteName, FTP_MAX_PATH, remoteName, FTP_MAX_PATH); // counted bounded copy instead of lstrcpyn
 }
 
 BOOL WriteTransactionalDownloadMetadata(const char* metadataPath, const CFTPTransactionalDownloadMetadata& metadata)
@@ -178,8 +179,8 @@ void CControlConnectionSocket::DownloadOneFile(HWND parent, const char* fileName
     char errBuf[900 + FTP_MAX_PATH];
     char hostBuf[HOST_MAX_SIZE];
     char userBuffer[USER_MAX_SIZE];
-    lstrcpyn(hostBuf, Host, HOST_MAX_SIZE);
-    lstrcpyn(userBuffer, User, USER_MAX_SIZE);
+    StringCchCopyNA(hostBuf, HOST_MAX_SIZE, Host, HOST_MAX_SIZE); // counted bounded copy instead of lstrcpyn
+    StringCchCopyNA(userBuffer, USER_MAX_SIZE, User, USER_MAX_SIZE); // counted bounded copy instead of lstrcpyn
     unsigned short portBuf = Port;
     HANDLES(LeaveCriticalSection(&SocketCritSect));
 
@@ -406,7 +407,7 @@ void CControlConnectionSocket::DownloadOneFile(HWND parent, const char* fileName
                     CSendCmdUserIfaceForListAndDownload userIface(TRUE, parent, dataConnection, logUID);
 
                     HANDLES(EnterCriticalSection(&SocketCritSect));
-                    lstrcpyn(hostBuf, Host, HOST_MAX_SIZE);
+                    StringCchCopyNA(hostBuf, HOST_MAX_SIZE, Host, HOST_MAX_SIZE); // counted bounded copy instead of lstrcpyn
                     CFTPServerPathType pathType = ::GetFTPServerPathType(ServerFirstReply, ServerSystem, workPath);
                     HANDLES(LeaveCriticalSection(&SocketCritSect));
 
@@ -525,7 +526,7 @@ void CControlConnectionSocket::DownloadOneFile(HWND parent, const char* fileName
                                         sslReuseErr)
                                     {                                                                       // we need to reconnect
                                         CloseControlConnection(parent);                                     // close the current control connection
-                                        lstrcpyn(retryMsgBuf, LoadStr(IDS_ERRDATACONSSLCONNECTERROR), 300); // set the error text for the reconnect wait dialog
+                                        StringCchCopyNA(retryMsgBuf, 300, LoadStr(IDS_ERRDATACONSSLCONNECTERROR), 300); // counted bounded copy instead of lstrcpyn // set the error text for the reconnect wait dialog
                                         retryMsgAux = retryMsgBuf;
                                         sslErrReconnect = TRUE;
                                         run = TRUE;
@@ -551,11 +552,11 @@ void CControlConnectionSocket::DownloadOneFile(HWND parent, const char* fileName
                                                 tgtFileError = TRUE;
                                             }
                                             if (sslErrorOccured != SSLCONERR_NOERROR || decomprErrorOccured)
-                                                lstrcpyn(replyBuf, LoadStr(decomprErrorOccured ? IDS_ERRDATACONDECOMPRERROR : IDS_ERRDATACONSSLCONNECTERROR), 700);
+                                                StringCchCopyNA(replyBuf, 700, LoadStr(decomprErrorOccured ? IDS_ERRDATACONDECOMPRERROR : IDS_ERRDATACONSSLCONNECTERROR), 700); // counted bounded copy instead of lstrcpyn
                                             else
                                             {
                                                 if (noDataTrTimeout)
-                                                    lstrcpyn(replyBuf, LoadStr(IDS_ERRDATACONNODATATRTIMEOUT), 700);
+                                                    StringCchCopyNA(replyBuf, 700, LoadStr(IDS_ERRDATACONNODATATRTIMEOUT), 700); // counted bounded copy instead of lstrcpyn
                                                 else
                                                 {
                                                     if (netErr != NO_ERROR)
@@ -570,12 +571,12 @@ void CControlConnectionSocket::DownloadOneFile(HWND parent, const char* fileName
                                                     else
                                                     {
                                                         if (userIface.GetDatConCancelled())
-                                                            lstrcpyn(replyBuf, LoadStr(IDS_ERRDATACONNOTOPENED), 700);
+                                                            StringCchCopyNA(replyBuf, 700, LoadStr(IDS_ERRDATACONNOTOPENED), 700); // counted bounded copy instead of lstrcpyn
                                                         else
                                                         {
                                                             /*if (decomprMissingStreamEnd) lstrcpyn(replyBuf, LoadStr(IDS_ERRDATACONDECOMPRERROR), 700);
                               else*/
-                                                            lstrcpyn(replyBuf, LoadStr(IDS_UNKNOWNERROR), 700);
+                                                            StringCchCopyNA(replyBuf, 700, LoadStr(IDS_UNKNOWNERROR), 700); // counted bounded copy instead of lstrcpyn
                                                         }
                                                     }
                                                 }
@@ -659,7 +660,7 @@ void CControlConnectionSocket::DownloadOneFile(HWND parent, const char* fileName
                                     if (err != NO_ERROR)
                                         FTPGetErrorText(err, replyBuf, 700);
                                     else
-                                        lstrcpyn(replyBuf, LoadStr(IDS_UNKNOWNERROR), 700);
+                                        StringCchCopyNA(replyBuf, 700, LoadStr(IDS_UNKNOWNERROR), 700); // counted bounded copy instead of lstrcpyn
                                     _snprintf_s(errBuf + len, 900 + FTP_MAX_PATH - len, _TRUNCATE, LoadStr(IDS_DOWNLOADFILEERRORSUFIX3), replyBuf);
                                     SalamanderGeneral->SalMessageBox(parent, errBuf,
                                                                      LoadStr(IDS_FTPERRORTITLE),
@@ -783,8 +784,8 @@ BOOL CControlConnectionSocket::CreateDir(char* changedPath, HWND parent, char* n
                 if (retSuccess && workPath[0] != 0) // if the directory/directories were created, adjust the listing(s) (if the FTP command does not report success, we simply assume no directory was created - on VMS multiple directories can be created at once; partial creation might occur, but we do not handle that)
                 {
                     HANDLES(EnterCriticalSection(&SocketCritSect));
-                    lstrcpyn(hostBuf, Host, HOST_MAX_SIZE);
-                    lstrcpyn(userBuffer, User, USER_MAX_SIZE);
+                    StringCchCopyNA(hostBuf, HOST_MAX_SIZE, Host, HOST_MAX_SIZE); // counted bounded copy instead of lstrcpyn
+                    StringCchCopyNA(userBuffer, USER_MAX_SIZE, User, USER_MAX_SIZE); // counted bounded copy instead of lstrcpyn
                     unsigned short portBuf = Port;
                     HANDLES(LeaveCriticalSection(&SocketCritSect));
                     UploadListingCache.ReportCreateDirs(hostBuf, userBuffer, portBuf, workPath,
@@ -801,15 +802,15 @@ BOOL CControlConnectionSocket::CreateDir(char* changedPath, HWND parent, char* n
                     {
                         if (!FTPIsPrefixOfServerPath(pathType, workPath, newPath))
                         {
-                            lstrcpyn(changedPath, newPath, FTP_MAX_PATH);
+                            StringCchCopyNA(changedPath, FTP_MAX_PATH, newPath, FTP_MAX_PATH); // counted bounded copy instead of lstrcpyn
                             refreshWorkingPath = FALSE;
                         }
                         if (FTPIsTheSameServerPath(pathType, newPath, workPath))
-                            lstrcpyn(newName, cutDir, 2 * MAX_PATH); // directory name for focus after the refresh
+                            StringCchCopyNA(newName, 2 * MAX_PATH, cutDir, 2 * MAX_PATH); // counted bounded copy instead of lstrcpyn // directory name for focus after the refresh
                     }
                     else // probably the server returns a relative directory name in reply "257" (e.g. warftpd)
                     {
-                        lstrcpyn(newName, newPath, 2 * MAX_PATH); // directory name for focus after the refresh
+                        StringCchCopyNA(newName, 2 * MAX_PATH, newPath, 2 * MAX_PATH); // counted bounded copy instead of lstrcpyn // directory name for focus after the refresh
                     }
                 }
                 else // error (including unexpected format of reply "257")
@@ -827,8 +828,8 @@ BOOL CControlConnectionSocket::CreateDir(char* changedPath, HWND parent, char* n
                 if (workPath[0] != 0) // we do not know whether the directory/directories were created; invalidate the listing(s)
                 {
                     HANDLES(EnterCriticalSection(&SocketCritSect));
-                    lstrcpyn(hostBuf, Host, HOST_MAX_SIZE);
-                    lstrcpyn(userBuffer, User, USER_MAX_SIZE);
+                    StringCchCopyNA(hostBuf, HOST_MAX_SIZE, Host, HOST_MAX_SIZE); // counted bounded copy instead of lstrcpyn
+                    StringCchCopyNA(userBuffer, USER_MAX_SIZE, User, USER_MAX_SIZE); // counted bounded copy instead of lstrcpyn
                     unsigned short portBuf = Port;
                     HANDLES(LeaveCriticalSection(&SocketCritSect));
                     UploadListingCache.ReportCreateDirs(hostBuf, userBuffer, portBuf, workPath,
@@ -841,7 +842,7 @@ BOOL CControlConnectionSocket::CreateDir(char* changedPath, HWND parent, char* n
                 }
             }
             if (refreshWorkingPath)
-                lstrcpyn(changedPath, workPath, FTP_MAX_PATH);
+                StringCchCopyNA(changedPath, FTP_MAX_PATH, workPath, FTP_MAX_PATH); // counted bounded copy instead of lstrcpyn
         }
 
         if (!run)
@@ -877,8 +878,8 @@ BOOL CControlConnectionSocket::QuickRename(char* changedPath, HWND parent, const
     HANDLES(EnterCriticalSection(&SocketCritSect));
     char hostBuf[HOST_MAX_SIZE];
     char userBuffer[USER_MAX_SIZE];
-    lstrcpyn(hostBuf, Host, HOST_MAX_SIZE);
-    lstrcpyn(userBuffer, User, USER_MAX_SIZE);
+    StringCchCopyNA(hostBuf, HOST_MAX_SIZE, Host, HOST_MAX_SIZE); // counted bounded copy instead of lstrcpyn
+    StringCchCopyNA(userBuffer, USER_MAX_SIZE, User, USER_MAX_SIZE); // counted bounded copy instead of lstrcpyn
     unsigned short portBuf = Port;
     HANDLES(LeaveCriticalSection(&SocketCritSect));
 
@@ -968,8 +969,8 @@ BOOL CControlConnectionSocket::QuickRename(char* changedPath, HWND parent, const
                                     if (workPath[0] != 0)
                                     {
                                         HANDLES(EnterCriticalSection(&SocketCritSect));
-                                        lstrcpyn(hostBuf, Host, HOST_MAX_SIZE);
-                                        lstrcpyn(userBuffer, User, USER_MAX_SIZE);
+                                        StringCchCopyNA(hostBuf, HOST_MAX_SIZE, Host, HOST_MAX_SIZE); // counted bounded copy instead of lstrcpyn
+                                        StringCchCopyNA(userBuffer, USER_MAX_SIZE, User, USER_MAX_SIZE); // counted bounded copy instead of lstrcpyn
                                         portBuf = Port;
                                         HANDLES(LeaveCriticalSection(&SocketCritSect));
                                         UploadListingCache.ReportRename(hostBuf, userBuffer, portBuf, workPath,
@@ -988,8 +989,8 @@ BOOL CControlConnectionSocket::QuickRename(char* changedPath, HWND parent, const
                                 if (workPath[0] != 0)
                                 {
                                     HANDLES(EnterCriticalSection(&SocketCritSect));
-                                    lstrcpyn(hostBuf, Host, HOST_MAX_SIZE);
-                                    lstrcpyn(userBuffer, User, USER_MAX_SIZE);
+                                    StringCchCopyNA(hostBuf, HOST_MAX_SIZE, Host, HOST_MAX_SIZE); // counted bounded copy instead of lstrcpyn
+                                    StringCchCopyNA(userBuffer, USER_MAX_SIZE, User, USER_MAX_SIZE); // counted bounded copy instead of lstrcpyn
                                     portBuf = Port;
                                     HANDLES(LeaveCriticalSection(&SocketCritSect));
                                     UploadListingCache.ReportRename(hostBuf, userBuffer, portBuf, workPath,
@@ -1001,7 +1002,7 @@ BOOL CControlConnectionSocket::QuickRename(char* changedPath, HWND parent, const
                                     retryMsgAux = retryMsgBuf;
                                 }
                             }
-                            lstrcpyn(changedPath, workPath, FTP_MAX_PATH);
+                            StringCchCopyNA(changedPath, FTP_MAX_PATH, workPath, FTP_MAX_PATH); // counted bounded copy instead of lstrcpyn
                         }
                         else // error (including an unexpected reply)
                         {
@@ -1162,7 +1163,7 @@ BOOL CControlConnectionSocket::OpenForListeningAndWaitForRes(HWND parent, CDataC
             case ccsevTimeout:
             {
                 if (!dataConnection->GetProxyTimeoutDescr(buf, 300))
-                    lstrcpyn(buf, LoadStr(IDS_PREPACTDATACONTIMEOUT), 300);
+                    StringCchCopyNA(buf, 300, LoadStr(IDS_PREPACTDATACONTIMEOUT), 300); // counted bounded copy instead of lstrcpyn
                 if (retryMsgBufSize > 0)
                 {
                     _snprintf_s(retryMsg, retryMsgBufSize, _TRUNCATE, "%s\r\n", buf);
@@ -1186,7 +1187,7 @@ BOOL CControlConnectionSocket::OpenForListeningAndWaitForRes(HWND parent, CDataC
                             Logs.LogMessage(logUID, errBuf, -1, TRUE);
                         }
                         *canRetry = TRUE;
-                        lstrcpyn(retryMsg, LoadStr(IDS_PROXYERROPENACTDATA), retryMsgBufSize);
+                        StringCchCopyNA(retryMsg, retryMsgBufSize, LoadStr(IDS_PROXYERROPENACTDATA), retryMsgBufSize); // counted bounded copy instead of lstrcpyn
                     }
                     else
                         ret = TRUE; // success, return the "listen" IP+port
@@ -1252,7 +1253,7 @@ BOOL CControlConnectionSocket::OpenForListeningAndWaitForRes(HWND parent, CDataC
             Logs.LogMessage(logUID, buf, -1, TRUE);
 
             *canRetry = TRUE;
-            lstrcpyn(retryMsg, LoadStr(IDS_PROXYERRUNABLETOCON), retryMsgBufSize);
+            StringCchCopyNA(retryMsg, retryMsgBufSize, LoadStr(IDS_PROXYERRUNABLETOCON), retryMsgBufSize); // counted bounded copy instead of lstrcpyn
         }
     }
 

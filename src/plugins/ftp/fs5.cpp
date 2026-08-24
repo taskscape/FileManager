@@ -3,6 +3,7 @@
 // CommentsTranslationProject: TRANSLATED
 
 #include "precomp.h"
+#include <strsafe.h> // counted bounded copies (StringCchCopyNA)
 
 #include "..\\..\\common\\monotonic_time.h"
 
@@ -383,7 +384,7 @@ void CPluginFSInterface::ViewFile(const char* fsName, HWND parent,
     BOOL fileExists;
     const char* tmpFileName;
     char nameInCache[MAX_PATH];
-    lstrcpyn(nameInCache, file.Name, MAX_PATH);
+    StringCchCopyNA(nameInCache, MAX_PATH, file.Name, MAX_PATH); // counted bounded copy instead of lstrcpyn
     if (GetFTPServerPathType(Path) == ftpsptOpenVMS)
         FTPVMSCutFileVersion(nameInCache, -1);
     SalamanderGeneral->SalMakeValidFileNameComponent(nameInCache);
@@ -568,7 +569,7 @@ BOOL CPluginFSInterface::QuickRename(const char* fsName, int mode, HWND parent, 
             {
                 char targetName[2 * MAX_PATH];
                 SalamanderGeneral->MaskName(targetName, 2 * MAX_PATH, file.Name, newName);
-                lstrcpyn(newName, targetName, MAX_PATH);
+                StringCchCopyNA(newName, MAX_PATH, targetName, MAX_PATH); // counted bounded copy instead of lstrcpyn
             }
 
             if (!Config.AlwaysOverwrite)
@@ -684,7 +685,7 @@ CFTPQueueItem* CreateItemForCopyOrMoveUploadOperation(const char* name, BOOL isD
             char buffer[MAX_PATH];
             if (isVMS) // on VMS we must have the name trimmed to the base (the version number would break mask comparison)
             {
-                lstrcpyn(buffer, name, MAX_PATH);
+                StringCchCopyNA(buffer, MAX_PATH, name, MAX_PATH); // counted bounded copy instead of lstrcpyn
                 FTPVMSCutFileVersion(buffer, -1);
                 name = buffer;
             }
@@ -750,7 +751,7 @@ BOOL CPluginFSInterface::CopyOrMoveFromDiskToFS(BOOL copy, int mode, const char*
 
         char* userPart = strchr(targetPath, ':') + 1; // 'targetPath' must contain fs-name + ':'
         char newUserPart[FTP_USERPART_SIZE + 1];
-        lstrcpyn(newUserPart, userPart, FTP_USERPART_SIZE);
+        StringCchCopyNA(newUserPart, FTP_USERPART_SIZE, userPart, FTP_USERPART_SIZE); // counted bounded copy instead of lstrcpyn
         char *u, *host, *p, *path, *password;
         char firstCharOfPath = '/';
         int userLength = 0;
@@ -763,7 +764,7 @@ BOOL CPluginFSInterface::CopyOrMoveFromDiskToFS(BOOL copy, int mode, const char*
         if (u == NULL || *u == 0)
             strcpy(user, FTP_ANONYMOUS);
         else
-            lstrcpyn(user, u, USER_MAX_SIZE);
+            StringCchCopyNA(user, USER_MAX_SIZE, u, USER_MAX_SIZE); // counted bounded copy instead of lstrcpyn
         int port = IPPORT_FTP;
         if (p != NULL && *p != 0)
             port = atoi(p);
@@ -797,9 +798,9 @@ BOOL CPluginFSInterface::CopyOrMoveFromDiskToFS(BOOL copy, int mode, const char*
                 return FALSE;                                  // fatal error
             }
 
-            lstrcpyn(Host, host, HOST_MAX_SIZE);
+            StringCchCopyNA(Host, HOST_MAX_SIZE, host, HOST_MAX_SIZE); // counted bounded copy instead of lstrcpyn
             Port = port;
-            lstrcpyn(User, user, USER_MAX_SIZE);
+            StringCchCopyNA(User, USER_MAX_SIZE, user, USER_MAX_SIZE); // counted bounded copy instead of lstrcpyn
             Path[0] = 0;
 
             char anonymousPasswd[PASSWORD_MAX_SIZE];
@@ -828,7 +829,7 @@ BOOL CPluginFSInterface::CopyOrMoveFromDiskToFS(BOOL copy, int mode, const char*
                 memset(newUserPart, 0, FTP_USERPART_SIZE + 1); // wipe the memory where the password appeared
                 return TRUE;                                   // cancel
             }
-            lstrcpyn(HomeDir, RescuePath, FTP_MAX_PATH); // store the current path after logging in to the server (home dir)
+            StringCchCopyNA(HomeDir, FTP_MAX_PATH, RescuePath, FTP_MAX_PATH); // counted bounded copy instead of lstrcpyn // store the current path after logging in to the server (home dir)
         }
         else // verify whether the target path is on the server opened in this FS
         {
@@ -852,7 +853,7 @@ BOOL CPluginFSInterface::CopyOrMoveFromDiskToFS(BOOL copy, int mode, const char*
         {
             BOOL isSpecRootPath = FALSE;
             tgtPath[0] = firstCharOfPath;
-            lstrcpyn(tgtPath + 1, path, FTP_MAX_PATH - 1);
+            StringCchCopyNA(tgtPath + 1, FTP_MAX_PATH - 1, path, FTP_MAX_PATH - 1); // counted bounded copy instead of lstrcpyn
             memset(newUserPart, 0, FTP_USERPART_SIZE + 1); // wipe the memory where the password appeared
 
             // determine the path type and optionally skip '/' or '\\' at the beginning of the path (after the host name)
@@ -868,18 +869,18 @@ BOOL CPluginFSInterface::CopyOrMoveFromDiskToFS(BOOL copy, int mode, const char*
                     {
                         isSpecRootPath = TRUE;
                         if (pathType == ftpsptOpenVMS)
-                            lstrcpyn(tgtPath, "[000000]", FTP_MAX_PATH);
+                            StringCchCopyNA(tgtPath, FTP_MAX_PATH, "[000000]", FTP_MAX_PATH); // counted bounded copy instead of lstrcpyn
                         else
                         {
                             if (pathType == ftpsptMVS)
-                                lstrcpyn(tgtPath, "''", FTP_MAX_PATH);
+                                StringCchCopyNA(tgtPath, FTP_MAX_PATH, "''", FTP_MAX_PATH); // counted bounded copy instead of lstrcpyn
                             else
                             {
                                 if (pathType == ftpsptIBMz_VM)
                                 {
                                     if (HomeDir[0] == 0 || !FTPGetIBMz_VMRootPath(tgtPath, FTP_MAX_PATH, HomeDir))
                                     {
-                                        lstrcpyn(tgtPath, "/", FTP_MAX_PATH); // tested server supported the Unix root "/", someone might report otherwise and we will handle it later...
+                                        StringCchCopyNA(tgtPath, FTP_MAX_PATH, "/", FTP_MAX_PATH); // counted bounded copy instead of lstrcpyn // tested server supported the Unix root "/", someone might report otherwise and we will handle it later...
                                     }
                                 }
                                 else
@@ -888,7 +889,7 @@ BOOL CPluginFSInterface::CopyOrMoveFromDiskToFS(BOOL copy, int mode, const char*
                                     {
                                         if (HomeDir[0] == 0 || !FTPGetOS2RootPath(tgtPath, FTP_MAX_PATH, HomeDir))
                                         {
-                                            lstrcpyn(tgtPath, "/", FTP_MAX_PATH); // try at least the Unix root "/", we cannot do anything else, someone might report otherwise and we will handle it later...
+                                            StringCchCopyNA(tgtPath, FTP_MAX_PATH, "/", FTP_MAX_PATH); // counted bounded copy instead of lstrcpyn // try at least the Unix root "/", we cannot do anything else, someone might report otherwise and we will handle it later...
                                         }
                                     }
                                 }
@@ -918,7 +919,7 @@ BOOL CPluginFSInterface::CopyOrMoveFromDiskToFS(BOOL copy, int mode, const char*
                 if (!FTPPathEndsWithDelimiter(pathType, tgtPath))
                 {
                     char cutTgtPath[FTP_MAX_PATH];
-                    lstrcpyn(cutTgtPath, tgtPath, FTP_MAX_PATH);
+                    StringCchCopyNA(cutTgtPath, FTP_MAX_PATH, tgtPath, FTP_MAX_PATH); // counted bounded copy instead of lstrcpyn
                     char cutMask[MAX_PATH];
                     BOOL cutMaybeFileName = FALSE;
                     if (FTPCutDirectory(pathType, cutTgtPath, FTP_MAX_PATH, cutMask, MAX_PATH, &cutMaybeFileName))
@@ -930,7 +931,7 @@ BOOL CPluginFSInterface::CopyOrMoveFromDiskToFS(BOOL copy, int mode, const char*
                         BOOL done = FALSE;
                         if (pathType == ftpsptIBMz_VM)
                         {
-                            lstrcpyn(cutTgtPathIBMz_VM, tgtPath, FTP_MAX_PATH);
+                            StringCchCopyNA(cutTgtPathIBMz_VM, FTP_MAX_PATH, tgtPath, FTP_MAX_PATH); // counted bounded copy instead of lstrcpyn
                             if (FTPIBMz_VmCutTwoDirectories(cutTgtPathIBMz_VM, FTP_MAX_PATH, cutMaskIBMz_VM, MAX_PATH))
                             {
                                 char* sep = strchr(cutMaskIBMz_VM, '.');
@@ -938,8 +939,8 @@ BOOL CPluginFSInterface::CopyOrMoveFromDiskToFS(BOOL copy, int mode, const char*
                                 char* exc = strchr(cutMaskIBMz_VM, '?');
                                 if (ast != NULL && ast < sep || exc != NULL && exc < sep)
                                 { // the trimmed part contains '*' or '?' (wildcards) before '.' (definitely a file mask such as "*.*")
-                                    lstrcpyn(tgtPath, cutTgtPathIBMz_VM, FTP_MAX_PATH);
-                                    lstrcpyn(mask, cutMaskIBMz_VM, MAX_PATH);
+                                    StringCchCopyNA(tgtPath, FTP_MAX_PATH, cutTgtPathIBMz_VM, FTP_MAX_PATH); // counted bounded copy instead of lstrcpyn
+                                    StringCchCopyNA(mask, MAX_PATH, cutMaskIBMz_VM, MAX_PATH); // counted bounded copy instead of lstrcpyn
                                     done = TRUE;
                                 }
                             }
@@ -955,8 +956,8 @@ BOOL CPluginFSInterface::CopyOrMoveFromDiskToFS(BOOL copy, int mode, const char*
                                     (strchr(cutMask, '*') != NULL || strchr(cutMask, '?') != NULL) ||
                                 pathType == ftpsptOpenVMS && cutMaybeFileName)
                             { // the trimmed part contains '*' or '?' (wildcards) or it is a VMS file name (must be a mask, the target path is the path to that file)
-                                lstrcpyn(tgtPath, cutTgtPath, FTP_MAX_PATH);
-                                lstrcpyn(mask, cutMask, MAX_PATH);
+                                StringCchCopyNA(tgtPath, FTP_MAX_PATH, cutTgtPath, FTP_MAX_PATH); // counted bounded copy instead of lstrcpyn
+                                StringCchCopyNA(mask, MAX_PATH, cutMask, MAX_PATH); // counted bounded copy instead of lstrcpyn
                             }
                             else
                             {
@@ -982,8 +983,8 @@ BOOL CPluginFSInterface::CopyOrMoveFromDiskToFS(BOOL copy, int mode, const char*
                                         {
                                             if (success) // 'cutTgtPath' is a valid path - the mask is 'cutMask'
                                             {
-                                                lstrcpyn(tgtPath, cutTgtPath, FTP_MAX_PATH);
-                                                lstrcpyn(mask, cutMask, MAX_PATH);
+                                                StringCchCopyNA(tgtPath, FTP_MAX_PATH, cutTgtPath, FTP_MAX_PATH); // counted bounded copy instead of lstrcpyn
+                                                StringCchCopyNA(mask, MAX_PATH, cutMask, MAX_PATH); // counted bounded copy instead of lstrcpyn
                                             }
                                             else // otherwise continue
                                             {
@@ -997,8 +998,8 @@ BOOL CPluginFSInterface::CopyOrMoveFromDiskToFS(BOOL copy, int mode, const char*
                                                     {
                                                         if (success) // 'cutTgtPathIBMz_VM' is a valid path - the mask is 'cutMaskIBMz_VM'
                                                         {
-                                                            lstrcpyn(tgtPath, cutTgtPathIBMz_VM, FTP_MAX_PATH);
-                                                            lstrcpyn(mask, cutMaskIBMz_VM, MAX_PATH);
+                                                            StringCchCopyNA(tgtPath, FTP_MAX_PATH, cutTgtPathIBMz_VM, FTP_MAX_PATH); // counted bounded copy instead of lstrcpyn
+                                                            StringCchCopyNA(mask, MAX_PATH, cutMaskIBMz_VM, MAX_PATH); // counted bounded copy instead of lstrcpyn
                                                             done = TRUE;
                                                         }
                                                     }
@@ -1042,7 +1043,7 @@ BOOL CPluginFSInterface::CopyOrMoveFromDiskToFS(BOOL copy, int mode, const char*
                                                   LoadStr(IDS_FTPERRORTITLE), MSGBOX_ERROR);
                 return FALSE; // invalid path
             }
-            lstrcpyn(tgtPath, HomeDir, FTP_MAX_PATH);
+            StringCchCopyNA(tgtPath, FTP_MAX_PATH, HomeDir, FTP_MAX_PATH); // counted bounded copy instead of lstrcpyn
         }
 
         // moving/copying multiple files/directories into one name (they would overwrite each other) is probably nonsense
@@ -1136,7 +1137,7 @@ BOOL CPluginFSInterface::CopyOrMoveFromDiskToFS(BOOL copy, int mode, const char*
                             DWORD attr; // dummy
                             BOOL useMask = strchr(mask, '*') != NULL || strchr(mask, '?') != NULL;
                             char linkName[MAX_PATH];
-                            lstrcpyn(linkName, sourcePath, _countof(linkName));
+                            StringCchCopyNA(linkName, _countof(linkName), sourcePath, _countof(linkName)); // counted bounded copy instead of lstrcpyn
                             SalamanderGeneral->SalPathAddBackslash(linkName, _countof(linkName));
                             char* linkNameEnd = linkName + strlen(linkName);
                             BOOL ignoreAll = FALSE;
@@ -1148,7 +1149,7 @@ BOOL CPluginFSInterface::CopyOrMoveFromDiskToFS(BOOL copy, int mode, const char*
                                 if (useMask)
                                     SalamanderGeneral->MaskName(targetName, 2 * MAX_PATH, name, mask);
                                 else
-                                    lstrcpyn(targetName, mask, 2 * MAX_PATH);
+                                    StringCchCopyNA(targetName, 2 * MAX_PATH, mask, 2 * MAX_PATH); // counted bounded copy instead of lstrcpyn
                                 if (is_AS_400_QSYS_LIB_Path)
                                     FTPAS400AddFileNamePart(targetName);
 

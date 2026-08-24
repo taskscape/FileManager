@@ -1759,6 +1759,12 @@ CTargetPathState GetTargetPathState(CTargetPathState upperDirState, const char* 
     return tpsUnknown;
 }
 
+// Bridges an OPENFILENAME request onto the Vista+ IFileDialog common dialog,
+// translating filters, initial directory, default name, title, and the
+// supported OFN_* flags; falls back to the legacy GetOpenFileName/
+// GetSaveFileName when hooks/templates are requested (unsupported here), COM
+// initialization is missing (it initializes STA temporarily), or instantiation
+// fails. Returns TRUE with the chosen path written back into lpofn->lpstrFile.
 static BOOL InternalIFileDialog(LPOPENFILENAME lpofn, BOOL isSave)
 {
     if (lpofn == NULL || lpofn->lpstrFile == NULL || lpofn->nMaxFile == 0)

@@ -70,6 +70,11 @@ static BOOL FindNextFileUtf8(HANDLE hFind, WIN32_FIND_DATAA* data)
     return TRUE;
 }
 
+// Runs a plug-in files operation (copy/move/delete per 'type') between this
+// plugin-FS panel and the opposite panel: collects the selection (or focused
+// item), classifies selected directories, builds the subject text for the
+// progress dialog, and delegates to the plugin's FsExecuteOnValidPathStyle
+// action path with suspend/refresh guards held for the duration.
 void CFilesWindow::PluginFSFilesAction(CPluginFSActionType type)
 {
     CALL_STACK_MESSAGE2("CFilesWindow::PluginFSFilesAction(%d)", type);
@@ -400,6 +405,11 @@ void CFilesWindow::RefreshVisibleItemsArray()
         VisibleItemsArraySurround.RefreshArr(this);
 }
 
+// Executes a drag-and-drop of disk files onto an archive or plug-in FS panel:
+// enumerates the dropped names on their source path (sorting for fast lookup,
+// reporting missing ones), builds a CSalamanderDirectory description of the
+// selection, and hands it to the archive packer or plugin FS interface to
+// perform the copy/move, with progress and error handling.
 void CFilesWindow::DragDropToArcOrFS(CTmpDragDropOperData* data)
 {
     CALL_STACK_MESSAGE1("CFilesWindow::DragDropToArcOrFS()");

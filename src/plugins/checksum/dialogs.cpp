@@ -4,6 +4,8 @@
 #include "precomp.h"
 
 #include <strsafe.h>
+#include <objbase.h>
+#include <shobjidl.h>
 #include "checksum.h"
 #include "checksum.rh"
 #include "checksum.rh2"
@@ -846,12 +848,27 @@ void CCalculateDialog::DeleteItem(int index)
         EnableButtons(FALSE);
 }
 
+// The Shell file dialog is Unicode-only, so ANSI plug-in text converts at this boundary.
+static WCHAR* DupWideFromTchar(LPCTSTR text)
+{
+    int len = MultiByteToWideChar(CP_ACP, 0, text, -1, NULL, 0);
+    if (len == 0)
+        return NULL;
+    WCHAR* wide = (WCHAR*)malloc(len * sizeof(WCHAR));
+    if (wide != NULL && MultiByteToWideChar(CP_ACP, 0, text, -1, wide, len) == 0)
+    {
+        free(wide);
+        return NULL;
+    }
+    return wide;
+}
+
 BOOL CCalculateDialog::GetSaveFileName(LPTSTR buffer, LPCTSTR title)
 {
     CALL_STACK_MESSAGE2("CCalculateDialog::GetSaveFileName(, %s)", title);
 
     // obtain the default name; are all names identical?
-    char file1[MAX_PATH], file2[MAX_PATH], filter[MAX_PATH], *s;
+    char file1[MAX_PATH], file2[MAX_PATH];
     GetItemText(0, 0, file1, MAX_PATH);
     SalamanderGeneral->SalPathRemoveExtension(file1);
     BOOL allSame = TRUE;
@@ -891,76 +908,204 @@ BOOL CCalculateDialog::GetSaveFileName(LPTSTR buffer, LPCTSTR title)
         }
     }
 
-    // save dialog
-    OPENFILENAME ofn;
+    // save dialog through the modern Shell file dialog (IFileSaveDialog) instead of the
+    // legacy common-dialog surface; the manual overwrite prompt and the filter-index to
+    // hash-type mapping are kept identical to the previous flow
+    HRESULT comInit = CoInitialize(NULL);
+    if (FAILED(comInit) && comInit != RPC_E_CHANGED_MODE)
+    {
+        TRACE_E("CoInitialize() failed in CCalculateDialog::GetSaveFileName()");
+        return FALSE;
+    }
+    BOOL comOwned = SUCCEEDED(comInit);
 
-    memset(&ofn, 0, sizeof(ofn));
-    ofn.lStructSize = sizeof(ofn);
-    ofn.hwndOwner = HWindow;
-    ofn.hInstance = HLanguage;
-    ofn.nFilterIndex = 1; // 1-based index
-    filter[0] = 0;
-    int j, ind;
-    for (j = 0, ind = 0; j < HT_COUNT; j++)
+    UINT calculatedCount = 0;
+    int defaultIndex = 0;
+    int j;
+    for (j = 0; j < HT_COUNT; j++)
         if (HashInfo[j].bCalculate)
         {
-            ind++;
+            calculatedCount++;
             if (HashInfo[j].Type == Config.HashType)
-                ofn.nFilterIndex = ind; // 1-based index
-            _tcscat(filter, LoadStr(HashInfo[j].idSaveAsFilter));
+                defaultIndex = calculatedCount; // 1-based position of the configured hash among the calculated ones
         }
-    ofn.lpstrFilter = s = filter;
-    while (NULL != (s = _tcschr(s, '|')))
-        *s++ = 0;
-    ofn.lpstrFile = buffer;
-    ofn.nMaxFile = MAX_PATH;
-    ofn.lpstrInitialDir = SourcePath;
-    ofn.lpstrTitle = title;
-    ofn.Flags = OFN_PATHMUSTEXIST;
-    for (;;)
+
+    // each filter resource holds "description|pattern|", exactly the legacy filter layout
+    COMDLG_FILTERSPEC* specs = new COMDLG_FILTERSPEC[calculatedCount];
+    WCHAR** specTexts = new WCHAR*[calculatedCount * 2];
+    BOOL specsOK = specs != NULL && specTexts != NULL;
+    UINT specFilled = 0;
+    UINT textsFilled = 0;
+    if (specsOK)
     {
-        if (!SalamanderGeneral->SafeGetSaveFileName(&ofn))
-            return FALSE; // Canceled
-        // Translate filter index into eHASH_TYPE
-        int HashType = ofn.nFilterIndex - 1; // keep ofn.nFilterIndex unmodified
-        int ind2 = ofn.nFilterIndex - 1;
-        int k;
-        for (k = 0; k < HT_COUNT; k++)
+        memset(specs, 0, sizeof(COMDLG_FILTERSPEC) * calculatedCount);
+        for (j = 0; specsOK && j < HT_COUNT; j++)
         {
-            if (!HashInfo[k].bCalculate)
+            if (!HashInfo[j].bCalculate)
+                continue;
+            const char* s = LoadStr(HashInfo[j].idSaveAsFilter);
+            for (int part = 0; part < 2 && specsOK; part++)
             {
-                if (ind2 >= 0)
-                    HashType++;
+                char partBuf[128];
+                size_t partLen = 0;
+                while (*s != 0 && *s != '|' && partLen + 1 < _countof(partBuf))
+                    partBuf[partLen++] = *s++;
+                partBuf[partLen] = 0;
+                if (*s == '|')
+                    s++;
+                WCHAR* widePart = DupWideFromTchar(partBuf);
+                if (widePart == NULL)
+                    specsOK = FALSE; // an oversized or unconvertible filter entry fails the whole setup
+                else
+                    specTexts[textsFilled++] = widePart;
             }
-            else
+            if (specsOK)
             {
-                ind2--;
+                specs[specFilled].pszName = specTexts[specFilled * 2];
+                specs[specFilled].pszSpec = specTexts[specFilled * 2 + 1];
+                specFilled++;
             }
-        }
-        Config.HashType = (eHASH_TYPE)HashType;
-        if (!buffer[ofn.nFileExtension] && ofn.nFileExtension)
-        { // The filename ends with '.'
-            buffer[--ofn.nFileExtension] = 0;
-        }
-        else if (_tcscmp(buffer + ofn.nFileExtension, HashInfo[Config.HashType].sSaveAsExt + 1))
-        { // The user did not enter any extension -> use the default one
-            _tcscat(buffer, HashInfo[Config.HashType].sSaveAsExt);
-        }
-        FILE* f = _tfopen(buffer, "r");
-        if (!f)
-            break;
-        fclose(f);
-        sprintf(file1, LoadStr(IDS_SAVE_OVERWRITE), buffer);
-        switch (SalamanderGeneral->SalMessageBox(HWindow, file1, LoadStr(IDS_SAVE_TITLE),
-                                                 MB_YESNOCANCEL | MB_ICONQUESTION))
-        {
-        case IDYES:
-            return TRUE;
-        case IDCANCEL:
-            return FALSE;
         }
     }
-    return TRUE;
+
+    BOOL ret = FALSE;
+    IFileSaveDialog* fileDialog = NULL;
+    if (specsOK &&
+        SUCCEEDED(CoCreateInstance(CLSID_FileSaveDialog, NULL, CLSCTX_INPROC_SERVER,
+                                   IID_PPV_ARGS(&fileDialog))) &&
+        fileDialog != NULL)
+    {
+        DWORD options = FOS_PATHMUSTEXIST;
+        fileDialog->GetOptions(&options);
+        // the localized manual overwrite prompt below replaces the shell one
+        fileDialog->SetOptions((options & ~FOS_OVERWRITEPROMPT) | FOS_PATHMUSTEXIST);
+        WCHAR* titleW = DupWideFromTchar(title);
+        if (titleW != NULL)
+        {
+            fileDialog->SetTitle(titleW);
+            free(titleW);
+        }
+        WCHAR* nameW = DupWideFromTchar(buffer);
+        if (nameW != NULL)
+        {
+            fileDialog->SetFileName(nameW);
+            free(nameW);
+        }
+        WCHAR* sourceW = DupWideFromTchar(SourcePath);
+        if (sourceW != NULL)
+        {
+            IShellItem* folder = NULL;
+            if (SUCCEEDED(SHCreateItemFromParsingName(sourceW, NULL, IID_PPV_ARGS(&folder))))
+            {
+                fileDialog->SetFolder(folder);
+                folder->Release();
+            }
+            free(sourceW);
+        }
+        fileDialog->SetFileTypeIndex(defaultIndex); // 1-based like OFN.nFilterIndex was
+        fileDialog->SetFileTypes(specFilled, specs);
+
+        BOOL dialogDone = FALSE;
+        for (;;)
+        {
+            HRESULT hr = fileDialog->Show(HWindow);
+            if (FAILED(hr))
+            {
+                ret = FALSE; // canceled, or the dialog could not be shown
+                break;
+            }
+            IShellItem* item = NULL;
+            PWSTR pathW = NULL;
+            if (FAILED(fileDialog->GetResult(&item)) || item == NULL ||
+                FAILED(item->GetDisplayName(SIGDN_FILESYSPATH, &pathW)) || pathW == NULL)
+            {
+                if (item != NULL)
+                    item->Release();
+                ret = FALSE;
+                break;
+            }
+            int converted = WideCharToMultiByte(CP_ACP, 0, pathW, -1, buffer, MAX_PATH, NULL, NULL);
+            CoTaskMemFree(pathW);
+            item->Release();
+            if (converted == 0 || strlen(buffer) >= MAX_PATH)
+            {
+                // A path that cannot fit its fixed buffer must not become the output file.
+                ret = FALSE;
+                break;
+            }
+
+            // translate the selected filter into eHASH_TYPE with the legacy mapping loop
+            UINT selectedIndex = 0;
+            int HashType = defaultIndex - 1;
+            if (SUCCEEDED(fileDialog->GetFileTypeIndex(&selectedIndex)) &&
+                selectedIndex >= 1 && selectedIndex <= calculatedCount)
+                HashType = (int)selectedIndex - 1;
+            int ind2 = HashType + 1;
+            int k;
+            for (k = 0; k < HT_COUNT; k++)
+            {
+                if (!HashInfo[k].bCalculate)
+                {
+                    if (ind2 >= 0)
+                        HashType++;
+                }
+                else
+                {
+                    ind2--;
+                }
+            }
+            Config.HashType = (eHASH_TYPE)HashType;
+
+            // extension handling without OFN.nFileExtension: scan the final path directly
+            const char* slash = strrchr(buffer, '\\');
+            const char* dot = strrchr(buffer, '.');
+            if (dot != NULL && (slash == NULL || dot > slash))
+            {
+                if (dot[1] == 0)
+                    ((char*)dot)[0] = 0; // "name." -> "name" (the legacy offset logic stripped the dot)
+                else if (_tcscmp(dot + 1, HashInfo[Config.HashType].sSaveAsExt + 1) != 0)
+                    _tcscat(buffer, HashInfo[Config.HashType].sSaveAsExt); // user entered a foreign extension -> add the default one
+            }
+            else
+                _tcscat(buffer, HashInfo[Config.HashType].sSaveAsExt); // no extension -> add the default one
+
+            FILE* f = _tfopen(buffer, "r");
+            if (!f)
+            {
+                ret = TRUE;
+                break;
+            }
+            fclose(f);
+            sprintf(file1, LoadStr(IDS_SAVE_OVERWRITE), buffer);
+            switch (SalamanderGeneral->SalMessageBox(HWindow, file1, LoadStr(IDS_SAVE_TITLE),
+                                                     MB_YESNOCANCEL | MB_ICONQUESTION))
+            {
+            case IDYES:
+                ret = TRUE;
+                dialogDone = TRUE;
+                break;
+            case IDCANCEL:
+                ret = FALSE;
+                dialogDone = TRUE;
+                break;
+                // IDNO re-enters the loop and shows the save dialog again
+            }
+            if (dialogDone)
+                break;
+        }
+    }
+    else if (!specsOK)
+        TRACE_E("Filter setup failed in CCalculateDialog::GetSaveFileName()");
+
+    for (UINT i = 0; i < textsFilled; i++)
+        free(specTexts[i]);
+    delete[] specTexts;
+    delete[] specs;
+    if (fileDialog != NULL)
+        fileDialog->Release();
+    if (comOwned)
+        CoUninitialize();
+    return ret;
 }
 
 void CCalculateDialog::SaveHashes()

@@ -98,7 +98,7 @@ int DetachArchive(char* sfxBat, const char* parameters)
             return HandleError(STR_ERROR_TEMPPATH, GetLastError());
     }
     else
-        lstrcpy(buf, TargetPath);
+        SfxStrCopy(buf, _countof(buf), TargetPath);
 
     //*(TargetPath + lstrlen(TargetPath) - 1) = 0;//removes ending slash
     if (SalGetFileAttributes(buf) == 0xFFFFFFFF)
@@ -120,8 +120,8 @@ int DetachArchive(char* sfxBat, const char* parameters)
         return HandleError(STR_ERROR_MKDIR, GetLastError());
     RemoveTemp = true;
 
-    lstrcpy(sfxExe, TargetPath);
-    PathAppend(sfxExe, DetachedExe);
+    SfxStrCopy(sfxExe, _countof(sfxExe), TargetPath);
+    PathAppend(sfxExe, _countof(sfxExe), DetachedExe);
     OutFile = CreateFile(sfxExe, GENERIC_WRITE, FILE_SHARE_READ, NULL, CREATE_ALWAYS,
                          FILE_ATTRIBUTE_NORMAL | FILE_FLAG_SEQUENTIAL_SCAN, NULL);
     if (OutFile == INVALID_HANDLE_VALUE)
@@ -143,8 +143,8 @@ int DetachArchive(char* sfxBat, const char* parameters)
     CloseHandle(OutFile);
     OutFile = 0;
 
-    lstrcpy(sfxBat, TargetPath);
-    PathAppend(sfxBat, DetachedBat);
+    SfxStrCopy(sfxBat, MAX_PATH, TargetPath);
+    PathAppend(sfxBat, MAX_PATH, DetachedBat);
     OutFile = CreateFile(sfxBat, GENERIC_WRITE, FILE_SHARE_READ, NULL, CREATE_ALWAYS,
                          FILE_ATTRIBUTE_NORMAL | FILE_FLAG_SEQUENTIAL_SCAN, NULL);
     if (OutFile == INVALID_HANDLE_VALUE)
@@ -158,7 +158,7 @@ int DetachArchive(char* sfxBat, const char* parameters)
     if (!GetModuleFileName(NULL, archive, MAX_PATH))
         HandleError(STR_ERROR_GETMODULENAME, GetLastError());
     PathRemoveFileSpec(archive);
-    PathAppend(archive, (char*)ArchiveStart + ArchiveStart->ArchiveNameOffs);
+    PathAppend(archive, _countof(archive), (char*)ArchiveStart + ArchiveStart->ArchiveNameOffs);
     if (!SelfExtrFormat(buf, ARRAYSIZE(buf), "start /wait \"\" \"%s\" %s -a \"%s\"\r\nrmdir /s /q \"%s\"\r\n",
                          sfxExe, parameters, archive, TargetPath))
     {
@@ -182,14 +182,14 @@ int DetachArchive(char* sfxBat, const char* parameters)
     return 0;
 }
 
-void SplitPath(char* path, char* file, char* ext)
+void SplitPath(char* path, char* file, char* ext, size_t extCount)
 {
     int l = lstrlen(path);
     char* dot = StrRChr(path, path + l, '.'); // ".cvspass" is extension in Windows
     int i = dot - path;
     if (dot > StrRChr(path, path + l, '\\'))
     {
-        lstrcpy(ext, dot);
+        SfxStrCopy(ext, extCount, dot); // counted copy of the extension into the caller's fixed buffer
     }
     else
     {
@@ -220,7 +220,7 @@ int atoi(const char *nptr)
 int OpenLastVolume()
 {
   char lastFile[MAX_PATH];
-  lstrcpy(lastFile, RealArchiveName);
+  SfxStrCopy(lastFile, _countof(lastFile), RealArchiveName);
 
   while (1)
   {
@@ -238,7 +238,7 @@ int OpenLastVolume()
 
       biggest = 0;
 
-      SplitPath(RealArchiveName, file, ext);
+      SplitPath(RealArchiveName, file, ext, _countof(ext));
       char * sour = file + lstrlen(file) - 1;
       while (sour > file)
       {
@@ -253,10 +253,10 @@ int OpenLastVolume()
         search = FindFirstFile(mask, &data);
         if (search != INVALID_HANDLE_VALUE)
         {
-          lstrcpy(buf, file);
+          SfxStrCopy(buf, _countof(buf), file);
           do
           {
-            SplitPath(data.cFileName, file, ext);
+            SplitPath(data.cFileName, file, ext, _countof(ext));
             sour = file + lstrlen(file) - 1;
             while (sour > file)
             {
@@ -270,11 +270,11 @@ int OpenLastVolume()
               {
                 biggest = j;
                 PathRemoveFileSpec(buf);
-                PathAppend(buf, data.cFileName);
+                PathAppend(buf, _countof(buf), data.cFileName);
               }
             }
           } while (FindNextFile(search, &data));
-          if (GetLastError() == ERROR_NO_MORE_FILES && biggest) lstrcpy(lastFile, buf);
+          if (GetLastError() == ERROR_NO_MORE_FILES && biggest) SfxStrCopy(lastFile, _countof(lastFile), buf);
           FindClose(search);
         }
       }
@@ -372,7 +372,7 @@ int ChangeDisk(int number, BOOL firstVolume)
     RAData = NULL;
     if (ArchiveStart->Flags & SE_SEQNAMES)
     {
-        SplitPath(RealArchiveName, file, ext);
+        SplitPath(RealArchiveName, file, ext, _countof(ext));
         char* sour = file + lstrlen(file) - 1;
         while (sour > file)
         {

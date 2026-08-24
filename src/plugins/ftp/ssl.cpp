@@ -3,6 +3,7 @@
 // CommentsTranslationProject: TRANSLATED
 
 #include "precomp.h"
+#include <strsafe.h> // counted bounded copies (StringCchCopyNA)
 
 #define MAX_DER_CERT_SIZE 5120
 #define SizeOf(x) (sizeof(x) / sizeof(x[0]))
@@ -352,7 +353,7 @@ static bool CheckCertificate(BYTE* pCert, int certLen, LPTSTR buf, int maxlen, c
         buf[0] = 0;
     if (!certContext)
     {
-        lstrcpyn(buf, SalamanderGeneral->GetErrorText(GetLastError()), maxlen);
+        StringCchCopyNA(buf, maxlen, SalamanderGeneral->GetErrorText(GetLastError()), maxlen); // counted bounded copy instead of lstrcpyn
         return false;
     }
 
@@ -366,7 +367,7 @@ CHECK_CERT_AGAIN:
                                      CERT_CHAIN_DISABLE_AUTH_ROOT_AUTO_UPDATE,
                                  NULL, &chainContext))
     {
-        lstrcpyn(buf, SalamanderGeneral->GetErrorText(GetLastError()), maxlen);
+        StringCchCopyNA(buf, maxlen, SalamanderGeneral->GetErrorText(GetLastError()), maxlen); // counted bounded copy instead of lstrcpyn
         CertFreeCertificateContext(certContext);
         return false;
     }
@@ -388,7 +389,7 @@ CHECK_CERT_AGAIN:
 
     if (!CertVerifyCertificateChainPolicy(CERT_CHAIN_POLICY_SSL, chainContext, &policyPara, &policyStatus))
     {
-        lstrcpyn(buf, SalamanderGeneral->GetErrorText(GetLastError()), maxlen);
+        StringCchCopyNA(buf, maxlen, SalamanderGeneral->GetErrorText(GetLastError()), maxlen); // counted bounded copy instead of lstrcpyn
         CertFreeCertificateChain(chainContext);
         CertFreeCertificateContext(certContext);
         return false;
@@ -405,14 +406,14 @@ CHECK_CERT_AGAIN:
             goto CHECK_CERT_AGAIN;
         }
         ok = false;
-        lstrcpyn(buf, SalamanderGeneral->GetErrorText(policyStatus.dwError), maxlen);
+        StringCchCopyNA(buf, maxlen, SalamanderGeneral->GetErrorText(policyStatus.dwError), maxlen); // counted bounded copy instead of lstrcpyn
     }
     int timeResult = CertVerifyTimeValidity(NULL, certContext->pCertInfo);
     if (timeResult != 0)
     {
         ok = false;
         AddNewLine(buf, maxlen);
-        lstrcpyn(buf, LoadStr(timeResult < 0 ? IDS_SSL_ERR_NOTYETVALID : IDS_SSL_ERR_EXPIRED), maxlen);
+        StringCchCopyNA(buf, maxlen, LoadStr(timeResult < 0 ? IDS_SSL_ERR_NOTYETVALID : IDS_SSL_ERR_EXPIRED), maxlen); // counted bounded copy instead of lstrcpyn
     }
     CertFreeCertificateChain(chainContext);
     CertFreeCertificateContext(certContext);
@@ -922,9 +923,9 @@ BOOL CSocket::EncryptSocket(int logUID, int* sslErrorOccured, CCertificate** unv
     {
         char message[256];
         if (socketError == WSAETIMEDOUT)
-            lstrcpyn(message, "TLS handshake deadline expired.", SizeOf(message));
+            StringCchCopyNA(message, SizeOf(message), "TLS handshake deadline expired.", SizeOf(message)); // counted bounded copy instead of lstrcpyn
         else if (socketError != NO_ERROR)
-            lstrcpyn(message, SalamanderGeneral->GetErrorText(socketError), SizeOf(message));
+            StringCchCopyNA(message, SizeOf(message), SalamanderGeneral->GetErrorText(socketError), SizeOf(message)); // counted bounded copy instead of lstrcpyn
         else
             SecurityStatusText(securityError, message, SizeOf(message));
         if (errorID)

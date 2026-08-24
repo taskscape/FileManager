@@ -64,7 +64,14 @@ int HandleError(int titleID, int messageID, unsigned long err, const char* fileN
             p++;
             *p = '\n';
         }
-        lstrcpy(p + 1, fileName);
+        // counted append keeps the file identity inside the fixed message buffer
+        size_t used = 0;
+        while (fileName[used] != '\0' && p + 1 + used < message + _countof(message) - 1)
+        {
+            p[1 + used] = fileName[used];
+            used++;
+        }
+        p[1 + used] = '\0';
     }
     MessageBox(DlgWin, message, title, MB_OK | MB_ICONEXCLAMATION);
     return 1;

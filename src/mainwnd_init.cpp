@@ -2722,6 +2722,12 @@ static BOOL CheckerSmartMode = 0xFFFFFFFF;
 static BOOL CheckerLeftSmartMode = 0xFFFFFFFF;
 static BOOL CheckerRightSmartMode = 0xFFFFFFFF;
 
+// Idle-time refresh of every menu/toolbar command's enabled+checked state.
+// Gathers a snapshot of UI-relevant facts about both panels (cursor/selection
+// composition, panel types, archive editability, path-history availability,
+// clipboard paste enablers, view modes and sort types, plug-in FS validity),
+// then enables/checks each CM_* command from that snapshot. Invoked when
+// IdleRefreshStates was set; clears it on entry.
 void CMainWindow_RefreshCommandStates(CMainWindow* obj)
 {
     IdleRefreshStates = FALSE; // clear the control variable

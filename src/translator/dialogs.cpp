@@ -3,6 +3,9 @@
 
 #include "precomp.h"
 
+#include <objbase.h>
+#include <shobjidl.h>
+
 #include "config.h"
 #include "dialogs.h"
 #include "translator.h"
@@ -11,6 +14,178 @@
 const char* FILTER_EXECUTABLE = "Translator Project (*.atp)|*.atp|";
 const char* FILTER_INCLUDE = "Resource Symbols (*.inc)|*.inc|";
 const char* ERROR_TITLE = "Error";
+
+// The Shell file dialog is Unicode-only, so ANSI text and the pipe-separated
+// filters convert at this shared boundary instead of the legacy common dialog.
+static WCHAR* DupWideFromAnsi(const char* text)
+{
+    int len = MultiByteToWideChar(CP_ACP, 0, text, -1, NULL, 0);
+    if (len == 0)
+        return NULL;
+    WCHAR* wide = (WCHAR*)malloc(len * sizeof(WCHAR));
+    if (wide != NULL && MultiByteToWideChar(CP_ACP, 0, text, -1, wide, len) == 0)
+    {
+        free(wide);
+        return NULL;
+    }
+    return wide;
+}
+
+BOOL TranslatorGetFileName(HWND parent, const char* title, const char* filter,
+                           char* buffer, BOOL save, const char* defaultExt,
+                           BOOL overwritePrompt)
+{
+    char buf[300];
+    // The legacy dialog filter carries embedded separators, so reject rather than corrupt an oversized filter.
+    if (FAILED(StringCchCopyA(buf, _countof(buf), filter)))
+        return FALSE;
+    for (char* s = buf; *s != 0; s++)
+    {
+        if (*s == '|')
+            *s = 0;
+    }
+
+    // count the filter segments; they alternate description/pattern and end with an empty one
+    UINT segCount = 0;
+    for (const char* s = buf; *s != '\0'; )
+    {
+        segCount++;
+        while (*s)
+            s++;
+        s++;
+    }
+    if (segCount < 2 || (segCount % 2) != 0)
+        return FALSE;
+
+    HRESULT comInit = CoInitialize(NULL);
+    if (FAILED(comInit) && comInit != RPC_E_CHANGED_MODE)
+        return FALSE;
+    BOOL comOwned = SUCCEEDED(comInit);
+
+    UINT pairCount = segCount / 2;
+    COMDLG_FILTERSPEC* specs = new COMDLG_FILTERSPEC[pairCount];
+    WCHAR** texts = new WCHAR*[segCount];
+    BOOL setupOK = specs != NULL && texts != NULL;
+    UINT filled = 0;
+    if (setupOK)
+    {
+        memset(specs, 0, sizeof(COMDLG_FILTERSPEC) * pairCount);
+        const char* s = buf;
+        while (setupOK && *s != '\0')
+        {
+            WCHAR* wide = DupWideFromAnsi(s); // dup stops at the segment terminator
+            if (wide == NULL)
+                setupOK = FALSE;
+            else
+            {
+                texts[filled] = wide;
+                if ((filled % 2) == 0)
+                    specs[filled / 2].pszName = wide;
+                else
+                    specs[filled / 2].pszSpec = wide;
+                filled++;
+                s += strlen(s) + 1;
+            }
+        }
+        setupOK = filled == segCount;
+    }
+
+    BOOL ret = FALSE;
+    IFileDialog* fileDialog = NULL;
+    if (setupOK &&
+        SUCCEEDED(CoCreateInstance(save ? CLSID_FileSaveDialog : CLSID_FileOpenDialog, NULL,
+                                   CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&fileDialog))) &&
+        fileDialog != NULL)
+    {
+        DWORD options = FOS_NOCHANGEDIR | FOS_PATHMUSTEXIST;
+        fileDialog->GetOptions(&options);
+        options |= FOS_NOCHANGEDIR | FOS_PATHMUSTEXIST;
+        if (save)
+        {
+            if (overwritePrompt)
+                options |= FOS_OVERWRITEPROMPT;
+            else
+                options &= ~FOS_OVERWRITEPROMPT; // e.g. ExportAsTextArchive prompts on its own
+        }
+        else
+            options |= FOS_FILEMUSTEXIST;
+        fileDialog->SetOptions(options);
+
+        if (title != NULL)
+        {
+            WCHAR* titleW = DupWideFromAnsi(title);
+            if (titleW != NULL)
+            {
+                fileDialog->SetTitle(titleW);
+                free(titleW);
+            }
+        }
+        fileDialog->SetFileTypes(pairCount, specs);
+        fileDialog->SetFileTypeIndex(1);
+
+        if (defaultExt != NULL)
+        {
+            WCHAR* extW = DupWideFromAnsi(defaultExt); // replaces OFN.lpstrDefExt
+            if (extW != NULL)
+            {
+                fileDialog->SetDefaultExtension(extW);
+                free(extW);
+            }
+        }
+
+        // the persisted buffer holds a suggested leaf name (its parent seeds the location)
+        WCHAR* nameW = DupWideFromAnsi(buffer);
+        if (nameW != NULL)
+        {
+            PWSTR sep = wcsrchr(nameW, L'\\');
+            if (sep != NULL)
+            {
+                *sep = 0;
+                if (nameW[0] != 0)
+                {
+                    IShellItem* folder = NULL;
+                    if (SUCCEEDED(SHCreateItemFromParsingName(nameW, NULL, IID_PPV_ARGS(&folder))))
+                    {
+                        fileDialog->SetFolder(folder);
+                        folder->Release();
+                    }
+                }
+                fileDialog->SetFileName(sep + 1);
+            }
+            else
+                fileDialog->SetFileName(nameW);
+            free(nameW);
+        }
+
+        if (SUCCEEDED(fileDialog->Show(parent)))
+        {
+            IShellItem* item = NULL;
+            PWSTR pathW = NULL;
+            if (SUCCEEDED(fileDialog->GetResult(&item)) && item != NULL &&
+                SUCCEEDED(item->GetDisplayName(SIGDN_FILESYSPATH, &pathW)) && pathW != NULL)
+            {
+                int converted = WideCharToMultiByte(CP_ACP, 0, pathW, -1, buffer, MAX_PATH, NULL, NULL);
+                CoTaskMemFree(pathW);
+                // a result that cannot fit the fixed caller field fails instead of truncating
+                ret = converted > 0 && strlen(buffer) < MAX_PATH;
+            }
+            if (item != NULL)
+                item->Release();
+        }
+        fileDialog->Release();
+    }
+
+    if (texts != NULL)
+    {
+        for (UINT i = 0; i < filled; i++)
+            free(texts[i]);
+        delete[] texts;
+    }
+    delete[] specs;
+    if (comOwned)
+        CoUninitialize();
+    return ret;
+}
 
 void CenterWindowToWindow(HWND hWnd, HWND hBaseWnd)
 {
@@ -124,28 +299,7 @@ void BrowseFileName(HWND hParent, int editlineResID, const char* filter)
 {
     char file[MAX_PATH];
     GetDlgItemText(hParent, editlineResID, file, MAX_PATH);
-    OPENFILENAME ofn;
-    memset(&ofn, 0, sizeof(OPENFILENAME));
-    ofn.lStructSize = sizeof(OPENFILENAME);
-    ofn.hwndOwner = hParent;
-    char buf[200];
-    strcpy_s(buf, filter);
-    char* s = buf;
-    ofn.lpstrFilter = s;
-    while (*s != 0) // build the double-null-terminated filter list
-    {
-        if (*s == '|')
-            *s = 0;
-        s++;
-    }
-    ofn.lpstrFile = file;
-    ofn.nMaxFile = MAX_PATH;
-    ofn.nFilterIndex = 1;
-    //  ofn.lpstrFileTitle = file;
-    //  ofn.nMaxFileTitle = MAX_PATH;
-    ofn.Flags = OFN_PATHMUSTEXIST | OFN_HIDEREADONLY | OFN_NOCHANGEDIR | OFN_FILEMUSTEXIST;
-
-    if (GetOpenFileName(&ofn))
+    if (TranslatorGetFileName(hParent, NULL, filter, file, FALSE, NULL, FALSE))
     {
         SendMessage(GetDlgItem(hParent, editlineResID), WM_SETTEXT, 0, (LPARAM)file);
     }
@@ -283,17 +437,8 @@ CNewDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         char fileName[MAX_PATH];
         fileName[0] = 0;
         GetDlgItemText(HWindow, IDC_NEW_PROJECT, fileName, MAX_PATH);
-        OPENFILENAME ofn;
-        memset(&ofn, 0, sizeof(OPENFILENAME));
-        ofn.lStructSize = sizeof(OPENFILENAME);
-        ofn.hwndOwner = HWindow;
-        ofn.lpstrFilter = "Translator Project (*.atp)\0*.atp\0";
-        ofn.lpstrFile = fileName;
-        ofn.nMaxFile = MAX_PATH;
-        ofn.nFilterIndex = 1;
-        ofn.lpstrTitle = "New Project";
-        ofn.Flags = OFN_PATHMUSTEXIST | OFN_HIDEREADONLY | OFN_LONGNAMES | OFN_NOCHANGEDIR | OFN_OVERWRITEPROMPT;
-        if (GetSaveFileName(&ofn))
+        if (TranslatorGetFileName(HWindow, "New Project", "Translator Project (*.atp)|*.atp|",
+                                  fileName, TRUE, NULL, TRUE))
         {
           SetDlgItemText(HWindow, IDC_NEW_PROJECT, fileName);
         }

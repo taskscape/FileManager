@@ -306,6 +306,13 @@ StrToUInt64(const char* str, int len, BOOL* isNum)
 //          ValidatePluralStrings in the TRANSLATOR project
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
+// Expands a localized plural-form format string into 'lpOut'. Syntax: an
+// optional leading "{!}" signature enables expansion; '{[index:]value1|value2|...}'
+// sections pick one alternative based on the referenced (or next-in-order)
+// numeric parameter (e.g., singular/plural forms); '\|' '\\' '\:' '\{' '\}'
+// are escapes. Tracks used parameters to detect mismatches; output is
+// truncated safely with a trace warning. The TRANSLATOR project's
+// ValidatePluralStrings must mirror any syntax change.
 int ExpandPluralString(char* lpOut, int nOutMax, const char* lpFmt, int nParCount,
                        const CQuadWord* lpParArray)
 {

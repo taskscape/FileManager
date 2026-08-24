@@ -177,9 +177,8 @@ SECLoadRegistry()
   DWORD version;
   BOOL reRead = TRUE;
 
-  lstrcpy(key, SHELLEXT_ROOT_REG);
-  lstrcat(key, "\\");
-  lstrcat(key, SHELLEXT_CONTEXTMENU);
+  if (!BuildShellRegistryString(key, _countof(key), SHELLEXT_ROOT_REG, "\\", SHELLEXT_CONTEXTMENU))
+    return FALSE;
 
   // otevru klic Shell Extensions
   res = NOHANDLES(RegOpenKeyEx(HKEY_CURRENT_USER, key, 0, KEY_READ, &hKey));
@@ -210,7 +209,7 @@ SECLoadRegistry()
     SECDeleteAllItems();
 
     // a nactu nova
-    lstrcpy(key, "1");
+    BuildShellRegistryString(key, _countof(key), "1", NULL, NULL);
     while (NOHANDLES(RegOpenKeyEx(hKey, key, 0, KEY_READ, &hItemKey)) == ERROR_SUCCESS) 
     {
       // ted vytvorim a nactu jednu polozku
@@ -450,7 +449,8 @@ HRESULT DllUnregisterServerBody(REGSAM regView)
 
 #endif // ENABLE_SH_MENU_EXT
 
-    lstrcpy(key, "Software\\Microsoft\\Windows\\CurrentVersion\\Shell Extensions\\Approved");
+    // a fixed registry path cannot overflow, but build it through the counted helper for consistency
+    BuildShellRegistryString(key, _countof(key), "Software\\Microsoft\\Windows\\CurrentVersion\\Shell Extensions\\Approved", NULL, NULL);
     if (NOHANDLES(RegOpenKeyEx(HKEY_LOCAL_MACHINE, key, 0, KEY_READ | KEY_WRITE | regView, &hKey)) == ERROR_SUCCESS)
     {
         RegDeleteValue(hKey, shellExtIID);
@@ -565,9 +565,8 @@ BOOL SECRegisterToRegistry(const char* shellExtensionPath, BOOL doNotLoadDLL, RE
 
     // find out whether our shell extension is already registered, where its DLL is, and whether it is the correct version
     registered = FALSE;
-    lstrcpy(key, "CLSID\\");
-    lstrcat(key, shellExtIID);
-    lstrcat(key, "\\InProcServer32");
+    if (!BuildShellRegistryString(key, _countof(key), "CLSID\\", shellExtIID, "\\InProcServer32"))
+        return E_FAIL;
     if (NOHANDLES(RegOpenKeyEx(HKEY_CLASSES_ROOT, key, 0, KEY_READ | regView, &hKey)) == ERROR_SUCCESS)
     {
         if (MyGetValue(hKey, NULL /* default value */, REG_SZ, shellExtPath, MAX_PATH))
@@ -599,8 +598,8 @@ BOOL SECRegisterToRegistry(const char* shellExtensionPath, BOOL doNotLoadDLL, RE
         }
         // else;  // key opening error under HKEY_CLASSES_ROOT is handled later (it would be pointless here)
 
-        lstrcpy(key, "Directory\\shellex\\ContextMenuHandlers\\");
-        lstrcat(key, SHEXREG_OPENSALAMANDER);
+        if (!BuildShellRegistryString(key, _countof(key), "Directory\\shellex\\ContextMenuHandlers\\", SHEXREG_OPENSALAMANDER, NULL))
+            return E_FAIL;
         if (MyCreateKey(classesKey, key, &hKey, regView))
         {
             RegSetValueEx(hKey, NULL, 0, REG_SZ,
@@ -666,8 +665,8 @@ BOOL SECRegisterToRegistry(const char* shellExtensionPath, BOOL doNotLoadDLL, RE
             NOHANDLES(RegCloseKey(hKey));
         }
 
-        lstrcpy(key, "directory\\shellex\\CopyHookHandlers\\");
-        lstrcat(key, SHEXREG_OPENSALAMANDER);
+        if (!BuildShellRegistryString(key, _countof(key), "directory\\shellex\\CopyHookHandlers\\", SHEXREG_OPENSALAMANDER, NULL))
+            return E_FAIL;
         if (MyCreateKey(classesKey, key, &hKey, regView))
         {
             RegSetValueEx(hKey, NULL, 0, REG_SZ,
@@ -707,9 +706,8 @@ BOOL SECSaveRegistry()
     DWORD bufferSize;
     DWORD gettedType;
 
-    lstrcpy(key, SHELLEXT_ROOT_REG);
-    lstrcat(key, "\\");
-    lstrcat(key, SHELLEXT_CONTEXTMENU);
+    if (!BuildShellRegistryString(key, _countof(key), SHELLEXT_ROOT_REG, "\\", SHELLEXT_CONTEXTMENU))
+        return FALSE;
 
     if (MyCreateKey(HKEY_CURRENT_USER, key, &hKey))
     {

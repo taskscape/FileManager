@@ -927,6 +927,13 @@ BOOL DoChangeAttrs(HWND hProgressDlg, char* name, const CQuadWord& size, DWORD a
     }
 }
 
+// Body of the copy/move/delete worker thread. Copies the operation context
+// into thread-local storage (progress-dialog handles, all Skip*/Ignore*/
+// *All confirmation flags seeded from Configuration, cancellation bindings),
+// then executes the script plan operation by operation (directories, files,
+// deletes) through the Do* entry points, pumping progress to the dialog and
+// honoring suspend/cancel events between items. Finishes with summary
+// accounting and posts the result back to the owning dialog.
 unsigned ThreadWorkerBody(void* parameter)
 {
     CALL_STACK_MESSAGE1("ThreadWorkerBody()");

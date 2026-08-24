@@ -855,6 +855,11 @@ void CToolBar::OnColorsChanged()
 }
 
 LRESULT
+// Message procedure of the shared tool-bar control: paints from the cached
+// bitmap, tracks the hot item and pressed state across mouse capture changes
+// (WM_MOUSEMOVE/LEAVE/CANCELMODE + help-mode moves), implements click,
+// double-click, and drag behaviors (button press timing, drop-down arrows),
+// and context menus on right button. Layout adjusts on WM_SIZE.
 CToolBar::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 {
     SLOW_CALL_STACK_MESSAGE4("CToolBar::WindowProc(0x%X, 0x%IX, 0x%IX)", uMsg, wParam, lParam);

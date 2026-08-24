@@ -3,6 +3,7 @@
 // CommentsTranslationProject: TRANSLATED
 
 #include "precomp.h"
+#include <strsafe.h> // counted bounded copies (StringCchCopyNA)
 
 // ****************************************************************************
 // support for filling the combobox with default behavior when errors occur during operations
@@ -175,12 +176,12 @@ void CSolveItemErrorDlg::Transfer(CTransferInfo& ti)
             {
             case sidtTransferFailedOnCreatedFile:
             case sidtUploadTransferFailedOnCreatedFile:
-                lstrcpyn(buf, LoadStr(IDS_SIED_DETAIL1), 500);
+                StringCchCopyNA(buf, 500, LoadStr(IDS_SIED_DETAIL1), 500); // counted bounded copy instead of lstrcpyn
                 break;
 
             case sidtTransferFailedOnResumedFile:
             case sidtUploadTransferFailedOnResumedFile:
-                lstrcpyn(buf, LoadStr(IDS_SIED_DETAIL2), 500);
+                StringCchCopyNA(buf, 500, LoadStr(IDS_SIED_DETAIL2), 500); // counted bounded copy instead of lstrcpyn
                 break;
 
             default:
@@ -190,7 +191,7 @@ void CSolveItemErrorDlg::Transfer(CTransferInfo& ti)
                 else
                 {
                     if (ErrDescription != NULL)
-                        lstrcpyn(buf, ErrDescription, 500);
+                        StringCchCopyNA(buf, 500, ErrDescription, 500); // counted bounded copy instead of lstrcpyn
                 }
                 char* s = buf + strlen(buf);
                 while (--s >= buf && (*s == '\r' || *s == '\n'))
@@ -1295,7 +1296,7 @@ void COperDlgListView::HideToolTip(int onlyIfOnIndex)
 CGetDiskFreeSpaceThread::CGetDiskFreeSpaceThread(const char* path, HWND dialog) : CThread("GetDiskFreeSpaceThread")
 {
     HANDLES(InitializeCriticalSection(&GetFreeSpaceCritSect));
-    lstrcpyn(Path, path, MAX_PATH);
+    StringCchCopyNA(Path, MAX_PATH, path, MAX_PATH); // counted bounded copy instead of lstrcpyn
     FreeSpace.Set(-1, -1);
     Dialog = dialog;
     WorkOrTerminate = HANDLES(CreateEvent(NULL, FALSE, FALSE, NULL)); // auto, non-signaled
@@ -1352,7 +1353,7 @@ CGetDiskFreeSpaceThread::Body()
         HANDLES(EnterCriticalSection(&GetFreeSpaceCritSect));
         char path[MAX_PATH];
         BOOL terminate = TerminateThread;
-        lstrcpyn(path, Path, MAX_PATH);
+        StringCchCopyNA(path, MAX_PATH, Path, MAX_PATH); // counted bounded copy instead of lstrcpyn
         HANDLES(LeaveCriticalSection(&GetFreeSpaceCritSect));
         if (terminate)
             break; // we are done...

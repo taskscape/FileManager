@@ -1,7 +1,8 @@
-﻿// SPDX-FileCopyrightText: 2023 Taskscape Ltd
+// SPDX-FileCopyrightText: 2023 Taskscape Ltd
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "precomp.h"
+#include <strsafe.h> // counted bounded copies (StringCchCopyNA)
 
 // Owns the report-directory substring while establishing the encrypted storage boundary.
 #include <string>
@@ -285,7 +286,7 @@ BOOL ParseCommandLine(const char* cmdLine, char* fileMappingName, char* slgName)
     if (paramLen >= SALMON_FILEMAPPIN_NAME_SIZE)
         return FALSE;
 
-    lstrcpyn(fileMappingName, p1, paramLen);
+    StringCchCopyNA(fileMappingName, paramLen, p1, paramLen); // counted bounded copy instead of lstrcpyn
 
     p1 = p2 + 1;
     if (*p1 != ' ')
@@ -300,7 +301,7 @@ BOOL ParseCommandLine(const char* cmdLine, char* fileMappingName, char* slgName)
     if (*p2 != '"')
         return FALSE;
 
-    lstrcpyn(slgName, p1, (int)(p2 - p1) + 1);
+    StringCchCopyNA(slgName, (int)(p2 - p1) + 1, p1, (int)(p2 - p1) + 1); // counted bounded copy instead of lstrcpyn
 
     return TRUE;
 }

@@ -88,7 +88,22 @@ void* MemZero(void* dst, unsigned count)
 // Routines from SHLWAPI.DLL
 //
 
-BOOL PathAppend(LPTSTR pPath, LPCTSTR pMore)
+BOOL SfxStrCopy(char* dest, size_t destCount, const char* source)
+{
+    size_t used = 0;
+    if (destCount == 0)
+        return FALSE;
+    while (source != NULL && *source != '\0')
+    {
+        if (used + 1 >= destCount)
+            return FALSE; // the source does not fit; leave the destination unchanged
+        dest[used++] = *source++;
+    }
+    dest[used] = '\0';
+    return TRUE;
+}
+
+BOOL PathAppend(LPTSTR pPath, size_t pathCount, LPCTSTR pMore)
 {
     if (pMore[0] == 0)
     {
@@ -97,7 +112,9 @@ BOOL PathAppend(LPTSTR pPath, LPCTSTR pMore)
     PathAddBackslash(pPath);
     if (*pMore == '\\')
         pMore++;
-    lstrcat(pPath, pMore);
+    // counted append keeps the combined path inside the caller's fixed buffer
+    if (!SfxStrCopy(pPath + lstrlen(pPath), pathCount - lstrlen(pPath), pMore))
+        return FALSE;
     return TRUE;
 }
 
@@ -633,7 +650,9 @@ HANDLE SafeCreateFile(char* name, DWORD attr, FILETIME* time, unsigned size)
                     CloseHandle(file);
                     char buf[MAX_PATH * 2];
                     GetModuleFileName(NULL, buf, MAX_PATH);
-                    lstrcat(buf, name + TargetPathLen - 1);
+                    // bounded append keeps the overwrite-prompt identity inside its fixed buffer
+                    if (!SfxStrCopy(buf + lstrlen(buf), _countof(buf) - lstrlen(buf), name + TargetPathLen - 1))
+                        return INVALID_HANDLE_VALUE;
                     switch (OverwriteDialog(buf, attr1, name, attr2, attr))
                     {
                     case IDYES:

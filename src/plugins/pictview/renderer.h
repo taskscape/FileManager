@@ -223,6 +223,4 @@ protected:
     void ZoomOnTheSpot(LPARAM dwMousePos, BOOL bZoomIn);
 
     friend class CViewerWindow;
-    friend void FillTypeFmt(HWND hDlg, OPENFILENAME* lpOFN, BOOL bUpdCompressions,
-                            BOOL bUpdBitDepths, BOOL onlyEnable);
 };

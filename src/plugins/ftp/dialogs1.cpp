@@ -3,6 +3,7 @@
 // CommentsTranslationProject: TRANSLATED
 
 #include "precomp.h"
+#include <strsafe.h> // counted bounded copies (StringCchCopyNA)
 
 TIndirectArray<CDialog> ModelessDlgs(2, 2, dtNoDelete); // array of "Welcome Message" dialogs
 
@@ -986,8 +987,8 @@ void CConnectDlg::SelChanged()
                 char* plainPassword;
                 if (passwordManager->DecryptPassword(s->EncryptedPassword, s->EncryptedPasswordSize, &plainPassword))
                 {
-                    lstrcpyn(password, plainPassword, PASSWORD_MAX_SIZE);
-                    memset(plainPassword, 0, lstrlen(plainPassword));
+                    StringCchCopyNA(password, PASSWORD_MAX_SIZE, plainPassword, PASSWORD_MAX_SIZE); // counted bounded copy instead of lstrcpyn
+                    memset(plainPassword, 0, strlen(plainPassword)); // CRT length instead of the legacy Win32 length API
                     SalamanderGeneral->Free(plainPassword);
                     lockedPassword = FALSE;
                 }
@@ -1368,7 +1369,7 @@ CConnectDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                 params.Text = buff;
                 if (SalamanderGeneral->SalMessageBoxEx(&params) == IDYES)
                     SalamanderGeneral->CopyTextToClipboard(plainPassword, -1, FALSE, NULL);
-                memset(plainPassword, 0, lstrlen(plainPassword));
+                memset(plainPassword, 0, strlen(plainPassword)); // CRT length instead of the legacy Win32 length API
                 memset(buff, 0, 1000);
             }
         }
@@ -1622,7 +1623,7 @@ CConnectDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                 name[0] = 0;
                 if (s->ItemName != NULL)
                 {
-                    lstrcpyn(name, s->ItemName, BOOKMARKNAME_MAX_SIZE);
+                    StringCchCopyNA(name, BOOKMARKNAME_MAX_SIZE, s->ItemName, BOOKMARKNAME_MAX_SIZE); // counted bounded copy instead of lstrcpyn
                 }
                 CRenameDlg dlg(HWindow, name,
                                LOWORD(wParam) == IDB_NEWBOOKMARK || LOWORD(wParam) == CM_COPYSRVTO);
@@ -1708,7 +1709,7 @@ CConnectDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                 {
                     ti.EditLine(IDE_HOSTADDRESS, LastRawHostAddress, HOST_MAX_SIZE);
                     char buf[HOST_MAX_SIZE];
-                    lstrcpyn(buf, LastRawHostAddress, HOST_MAX_SIZE);
+                    StringCchCopyNA(buf, HOST_MAX_SIZE, LastRawHostAddress, HOST_MAX_SIZE); // counted bounded copy instead of lstrcpyn
 
                     char* str = buf;
                     while (*str != 0 && *str <= ' ')
@@ -1799,12 +1800,12 @@ CConnectDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                         if (type == ftpsptOpenVMS || type == ftpsptMVS || type == ftpsptIBMz_VM ||
                             type == ftpsptOS2) // VMS + MVS + IBM_z/VM + OS/2 (poorly recognizes the Unix path "/C:/path", but it probably will not bother anyone; it is a very unlikely Unix path)
                         {                      // they do not have '/' or '\\' at the start of the path
-                            lstrcpyn(pathBuf, path, FTP_MAX_PATH);
+                            StringCchCopyNA(pathBuf, FTP_MAX_PATH, path, FTP_MAX_PATH); // counted bounded copy instead of lstrcpyn
                         }
                         else
                         {
                             pathBuf[0] = firstCharOfPath;
-                            lstrcpyn(pathBuf + 1, path, FTP_MAX_PATH - 1);
+                            StringCchCopyNA(pathBuf + 1, FTP_MAX_PATH - 1, path, FTP_MAX_PATH - 1); // counted bounded copy instead of lstrcpyn
                         }
                         UpdateStr(s->InitialPath, pathBuf);
                     }

@@ -3,6 +3,7 @@
 // CommentsTranslationProject: TRANSLATED
 
 #include "precomp.h"
+#include <strsafe.h> // counted bounded copies (StringCchCopyNA)
 
 //
 // ****************************************************************************
@@ -319,7 +320,7 @@ void CFTPWorker::HandleEventInWorkingState5(CFTPWorkerEvent event, BOOL& sendQui
 
             case fwssWorkUploadResolveLink: // upload copy/move file: determine what the link is (file/directory) whose name collides with the target file name on the server
             {
-                lstrcpyn(ftpPath, curItem->TgtPath, FTP_MAX_PATH);
+                StringCchCopyNA(ftpPath, FTP_MAX_PATH, curItem->TgtPath, FTP_MAX_PATH); // counted bounded copy instead of lstrcpyn
                 CFTPServerPathType type = Oper->GetFTPServerPathType(ftpPath);
                 if (FTPPathAppend(type, ftpPath, FTP_MAX_PATH, curItem->TgtName, TRUE))
                 { // we have the path; send CWD to the server into the directory being examined
@@ -696,7 +697,7 @@ void CFTPWorker::HandleEventInWorkingState5(CFTPWorkerEvent event, BOOL& sendQui
                         // by the server in response to PWD, we assume PWD would return it again now, and therefore
                         // we will not send it (an optimization hopefully with very low risk)
                         HaveWorkingPath = TRUE;
-                        lstrcpyn(WorkingPath, curItem->TgtPath, FTP_MAX_PATH);
+                        StringCchCopyNA(WorkingPath, FTP_MAX_PATH, curItem->TgtPath, FTP_MAX_PATH); // counted bounded copy instead of lstrcpyn
 
                         if (ShouldStop)
                             handleShouldStop = TRUE; // check whether the worker should stop
@@ -1564,7 +1565,7 @@ void CFTPWorker::HandleEventInWorkingState5(CFTPWorkerEvent event, BOOL& sendQui
                         else
                             _snprintf_s(ErrorDescr, _TRUNCATE, LoadStr(IDS_PROXYERRUNABLETOCON));
                         _snprintf_s(errBuf, 50 + FTP_MAX_PATH, _TRUNCATE, LoadStr(IDS_LOGMSGDATCONERROR), ErrorDescr);
-                        lstrcpyn(ErrorDescr, errBuf, FTPWORKER_ERRDESCR_BUFSIZE); // we want the error text to contain "data con. err.:"
+                        StringCchCopyNA(ErrorDescr, FTPWORKER_ERRDESCR_BUFSIZE, errBuf, FTPWORKER_ERRDESCR_BUFSIZE); // counted bounded copy instead of lstrcpyn // we want the error text to contain "data con. err.:"
                         CorrectErrorDescr();
 
                         // log the timeout
@@ -1656,7 +1657,7 @@ void CFTPWorker::HandleEventInWorkingState5(CFTPWorkerEvent event, BOOL& sendQui
 
                                 // prepare the error (timeout) text in 'ErrorDescr'
                                 if (errBuf[0] == 0)
-                                    lstrcpyn(ErrorDescr, LoadStr(IDS_PROXYERROPENACTDATA), FTPWORKER_ERRDESCR_BUFSIZE);
+                                    StringCchCopyNA(ErrorDescr, FTPWORKER_ERRDESCR_BUFSIZE, LoadStr(IDS_PROXYERROPENACTDATA), FTPWORKER_ERRDESCR_BUFSIZE); // counted bounded copy instead of lstrcpyn
                                 else
                                     _snprintf_s(ErrorDescr, _TRUNCATE, LoadStr(IDS_LOGMSGDATCONERROR), errBuf);
                                 needRetry = TRUE;
@@ -1686,7 +1687,7 @@ void CFTPWorker::HandleEventInWorkingState5(CFTPWorkerEvent event, BOOL& sendQui
                             WorkerDataConState = wdcsDoesNotExist;
                         }
                         if (errBuf[0] == 0)
-                            lstrcpyn(ErrorDescr, LoadStr(IDS_PREPACTDATACONTIMEOUT), FTPWORKER_ERRDESCR_BUFSIZE);
+                            StringCchCopyNA(ErrorDescr, FTPWORKER_ERRDESCR_BUFSIZE, LoadStr(IDS_PREPACTDATACONTIMEOUT), FTPWORKER_ERRDESCR_BUFSIZE); // counted bounded copy instead of lstrcpyn
                         else
                             _snprintf_s(ErrorDescr, _TRUNCATE, LoadStr(IDS_LOGMSGDATCONERROR), errBuf);
                         needRetry = TRUE;
@@ -2075,7 +2076,7 @@ void CFTPWorker::HandleEventInWorkingState5(CFTPWorkerEvent event, BOOL& sendQui
                                                     else
                                                     {
                                                         if (dataSSLErrorOccured != SSLCONERR_NOERROR)
-                                                            lstrcpyn(errText, LoadStr(IDS_ERRDATACONSSLCONNECTERROR), 200 + FTP_MAX_PATH);
+                                                            StringCchCopyNA(errText, 200 + FTP_MAX_PATH, LoadStr(IDS_ERRDATACONSSLCONNECTERROR), 200 + FTP_MAX_PATH); // counted bounded copy instead of lstrcpyn
                                                         else
                                                         {
                                                             errText[0] = 0;
@@ -2085,7 +2086,7 @@ void CFTPWorker::HandleEventInWorkingState5(CFTPWorkerEvent event, BOOL& sendQui
                                                             }
 
                                                             if (errText[0] == 0 && errBuf[0] != 0) // try to use the error text from the proxy server
-                                                                lstrcpyn(errText, errBuf, 200 + FTP_MAX_PATH);
+                                                                StringCchCopyNA(errText, 200 + FTP_MAX_PATH, errBuf, 200 + FTP_MAX_PATH); // counted bounded copy instead of lstrcpyn
                                                         }
 
                                                         // an error occurred on the item, record this state in it

@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "precomp.h"
+#include <strsafe.h> // counted bounded copies (StringCchCopyNA)
 
 //****************************************************************************
 //
@@ -62,7 +63,7 @@ CProgressDlg::CProgressDlg(HWND parent, const char* title, const char* operation
 
 void CProgressDlg::Set(const char* fileName, DWORD progressTotal, BOOL dalayedPaint)
 {
-    lstrcpyn(TextCache, fileName != NULL ? fileName : "", MAX_PATH);
+    StringCchCopyNA(TextCache, MAX_PATH, fileName != NULL ? fileName : "", MAX_PATH); // counted bounded copy instead of lstrcpyn
     TextCacheIsDirty = TRUE;
 
     if (progressTotal != ProgressTotalCache)
@@ -232,8 +233,8 @@ CProgress2Dlg::CProgress2Dlg(HWND parent, const char* title, const char* operati
 
 void CProgress2Dlg::Set(const char* fileName, const char* fileName2, BOOL dalayedPaint)
 {
-    lstrcpyn(TextCache, fileName != NULL ? fileName : "", MAX_PATH);
-    lstrcpyn(TextCache2, fileName2 != NULL ? fileName2 : "", MAX_PATH);
+    StringCchCopyNA(TextCache, MAX_PATH, fileName != NULL ? fileName : "", MAX_PATH); // counted bounded copy instead of lstrcpyn
+    StringCchCopyNA(TextCache2, MAX_PATH, fileName2 != NULL ? fileName2 : "", MAX_PATH); // counted bounded copy instead of lstrcpyn
     TextCache2IsDirty = TextCacheIsDirty = TRUE;
 
     if (!dalayedPaint)

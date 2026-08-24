@@ -777,13 +777,13 @@ void ClearTEMPIfNeeded(HWND parent)
                 {
                     for (int i = 0; i < tmpDirs.Count; i++)
                     {
-                        lstrcpyn(tmpDirEnd, tmpDirs[i], 2 * MAX_PATH - (int)(tmpDirEnd - tmpDir));
+                        StringCchCopyNA(tmpDirEnd, 2 * MAX_PATH - (int)(tmpDirEnd - tmpDir), tmpDirs[i], 2 * MAX_PATH - (int)(tmpDirEnd - tmpDir)); // counted bounded copy instead of lstrcpyn
                         SalamanderGeneral->RemoveTemporaryDir(tmpDir);
                     }
                 }
                 if (ret == IDIGNORE) // focus
                 {
-                    lstrcpyn(tmpDirEnd, tmpDirs[0], 2 * MAX_PATH - (int)(tmpDirEnd - tmpDir));
+                    StringCchCopyNA(tmpDirEnd, 2 * MAX_PATH - (int)(tmpDirEnd - tmpDir), tmpDirs[0], 2 * MAX_PATH - (int)(tmpDirEnd - tmpDir)); // counted bounded copy instead of lstrcpyn
                     SalamanderGeneral->FocusNameInPanel(PANEL_SOURCE, tmpDir, "");
                 }
             }

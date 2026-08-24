@@ -747,6 +747,11 @@ BOOL CButton::ToolTipAssigned()
 }
 
 LRESULT
+// Message procedure of the owner-drawn button: reports dialog-code semantics
+// (default/undefined push button, arrow keys for drop-downs), maintains the
+// pressed/hot state across focus loss and capture changes, handles Space/Enter
+// activation, keyboard mnemonics, and drop-down menu invocation; repaints on
+// every state transition.
 CButton::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 {
     SLOW_CALL_STACK_MESSAGE4("CButton::WindowProc(0x%X, 0x%IX, 0x%IX)", uMsg, wParam, lParam);

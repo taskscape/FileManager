@@ -352,7 +352,8 @@ BOOL CPluginInterfaceForArchiver::UnpackArchive(CSalamanderForOperationsAbstract
     ArcRoot = archiveRoot ? archiveRoot : "";
     if (*ArcRoot == '\\')
         ArcRoot++;
-    RootLen = lstrlen(ArcRoot);
+    // Archive roots use the plugin's legacy int length contract.
+    RootLen = static_cast<int>(strlen(ArcRoot));
     TargetDir = targetDir;
     AllocateWholeFile = TRUE;
     TestAllocateWholeFile = TRUE;
@@ -473,7 +474,8 @@ BOOL CPluginInterfaceForArchiver::UnpackOneFile(CSalamanderForOperationsAbstract
     ArcRoot = rootDir;
     if (*ArcRoot == '\\')
         ArcRoot++;
-    RootLen = lstrlen(ArcRoot);
+    // Archive roots use the plugin's legacy int length contract.
+    RootLen = static_cast<int>(strlen(ArcRoot));
     TargetDir = targetDir;
     NameInArchive = nameInArchive;
     OneFileSuccess = FALSE;
@@ -687,7 +689,8 @@ BOOL CPluginInterfaceForArchiver::Error(int error, ...)
     va_end(arglist);
     if (lastErr != ERROR_SUCCESS)
     {
-        int l = lstrlen(buf);
+        // FormatMessage uses an int-compatible buffer remainder, and buf is fixed at 1024 bytes.
+        int l = static_cast<int>(strlen(buf));
         FormatMessage(FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS, NULL, lastErr,
                       MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), buf + l, 1024 - l, NULL);
     }
@@ -947,7 +950,7 @@ BOOL CPluginInterfaceForArchiver::ListFile(char* fileName, DWORD size, WORD date
     if (fileData.Ext != NULL)
         fileData.Ext++; // ".cvspass" is an extension in Windows
     else
-        fileData.Ext = fileData.Name + lstrlen(fileData.Name);
+        fileData.Ext = fileData.Name + strlen(fileData.Name); // CRT length instead of the legacy Win32 length API
     fileData.Size = CQuadWord(size, 0);
     fileData.Attr = attributes & FILE_ATTRIBUTE_MASK;
     fileData.Hidden = fileData.Attr & FILE_ATTRIBUTE_HIDDEN ? 1 : 0;
@@ -959,7 +962,7 @@ BOOL CPluginInterfaceForArchiver::ListFile(char* fileName, DWORD size, WORD date
     }
     LocalFileTimeToFileTime(&ft, &fileData.LastWrite);
     fileData.DosName = NULL;
-    fileData.NameLen = lstrlen(fileData.Name);
+    fileData.NameLen = strlen(fileData.Name); // CRT length instead of the legacy Win32 length API
     fileData.IsLink = SalamanderGeneral->IsFileLink(fileData.Ext);
     fileData.IsOffline = 0;
     if (!Dir->AddFile(path, fileData, NULL))
@@ -1259,8 +1262,9 @@ CPluginInterfaceForArchiver::Open(char* pszFile, int oflag, int pmode)
         }
         char buf[1024];
         CopyUncabErrorPrefix(buf, _countof(buf), IDS_UNABLECREATE);
+        const DWORD prefixLength = static_cast<DWORD>(strlen(buf)); // FormatMessage receives the fixed buffer's DWORD remainder.
         FormatMessage(FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS, NULL,
-                      GetLastError(), MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), buf + lstrlen(buf), 1024 - lstrlen(buf), NULL);
+                      GetLastError(), MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), buf + prefixLength, 1024 - prefixLength, NULL);
         if (SalamanderGeneral->DialogError(SalamanderGeneral->GetMsgBoxParent(), BUTTONS_RETRYCANCEL, pszFile, buf, NULL) != DIALOG_RETRY)
         {
             Abort = TRUE;
@@ -1288,8 +1292,9 @@ UINT CPluginInterfaceForArchiver::Read(INT_PTR hf, void* pv, UINT cb)
         if (SetFilePointerEx(file->Handle, zero, &pos, FILE_CURRENT))
             break;
         CopyUncabErrorPrefix(buf, _countof(buf), IDS_UNABLEGETFIELPOS);
+        const DWORD prefixLength = static_cast<DWORD>(strlen(buf)); // FormatMessage receives the fixed buffer's DWORD remainder.
         FormatMessage(FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS, NULL,
-                      GetLastError(), MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), buf + lstrlen(buf), 1024 - lstrlen(buf), NULL);
+                      GetLastError(), MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), buf + prefixLength, 1024 - prefixLength, NULL);
 
         if (Silent & SF_IOERRORS && file->Flags & FF_EXTRFILE)
             return -1;
@@ -1320,8 +1325,9 @@ UINT CPluginInterfaceForArchiver::Read(INT_PTR hf, void* pv, UINT cb)
             return read; //success
         }
         CopyUncabErrorPrefix(buf, _countof(buf), IDS_UNABLEREAD);
+        const DWORD prefixLength = static_cast<DWORD>(strlen(buf)); // FormatMessage receives the fixed buffer's DWORD remainder.
         FormatMessage(FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS, NULL,
-                      GetLastError(), MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), buf + lstrlen(buf), 1024 - lstrlen(buf), NULL);
+                      GetLastError(), MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), buf + prefixLength, 1024 - prefixLength, NULL);
 
         if (Silent & SF_IOERRORS && file->Flags & FF_EXTRFILE)
             return -1;
@@ -1372,8 +1378,9 @@ UINT CPluginInterfaceForArchiver::Write(INT_PTR hf, void* pv, UINT cb)
         if (SetFilePointerEx(file->Handle, zero, &pos, FILE_CURRENT))
             break;
         CopyUncabErrorPrefix(buf, _countof(buf), IDS_UNABLEGETFIELPOS);
+        const DWORD prefixLength = static_cast<DWORD>(strlen(buf)); // FormatMessage receives the fixed buffer's DWORD remainder.
         FormatMessage(FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS, NULL,
-                      GetLastError(), MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), buf + lstrlen(buf), 1024 - lstrlen(buf), NULL);
+                      GetLastError(), MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), buf + prefixLength, 1024 - prefixLength, NULL);
 
         if (Silent & SF_IOERRORS && file->Flags & FF_EXTRFILE)
         {
@@ -1434,8 +1441,9 @@ UINT CPluginInterfaceForArchiver::Write(INT_PTR hf, void* pv, UINT cb)
         }
 
         CopyUncabErrorPrefix(buf, _countof(buf), IDS_UNABLEWRITE);
+        const DWORD prefixLength = static_cast<DWORD>(strlen(buf)); // FormatMessage receives the fixed buffer's DWORD remainder.
         FormatMessage(FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS, NULL,
-                      GetLastError(), MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), buf + lstrlen(buf), 1024 - lstrlen(buf), NULL);
+                      GetLastError(), MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), buf + prefixLength, 1024 - prefixLength, NULL);
 
         if (Silent & SF_IOERRORS && file->Flags & FF_EXTRFILE)
         {
@@ -1521,8 +1529,9 @@ long CPluginInterfaceForArchiver::SafeSeek(CFile* file, DWORD distance, DWORD me
             SetLastError(ERROR_ARITHMETIC_OVERFLOW);
         }
         CopyUncabErrorPrefix(buf, _countof(buf), IDS_UNABLESEEK);
+        const DWORD prefixLength = static_cast<DWORD>(strlen(buf)); // FormatMessage receives the fixed buffer's DWORD remainder.
         FormatMessage(FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS, NULL,
-                      GetLastError(), MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), buf + lstrlen(buf), 1024 - lstrlen(buf), NULL);
+                      GetLastError(), MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), buf + prefixLength, 1024 - prefixLength, NULL);
 
         if (Silent & SF_IOERRORS && file->Flags & FF_EXTRFILE)
         {
@@ -1566,8 +1575,9 @@ BOOL CPluginInterfaceForArchiver::SafeSeekAbsolute(CFile* file, const LARGE_INTE
         if (SetFilePointerEx(file->Handle, position, NULL, FILE_BEGIN))
             return TRUE;
         CopyUncabErrorPrefix(buf, _countof(buf), IDS_UNABLESEEK);
+        const DWORD prefixLength = static_cast<DWORD>(strlen(buf)); // FormatMessage receives the fixed buffer's DWORD remainder.
         FormatMessage(FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS, NULL,
-                      GetLastError(), MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), buf + lstrlen(buf), 1024 - lstrlen(buf), NULL);
+                      GetLastError(), MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), buf + prefixLength, 1024 - prefixLength, NULL);
 
         if (Silent & SF_IOERRORS && file->Flags & FF_EXTRFILE)
         {

@@ -200,6 +200,13 @@ void CPackerConfig::InitializeDefaultValues()
     AddDefault(0);
 }
 
+// Seeds the packer list with defaults appropriate for configuration imported
+// from Salamander version 'SalamVersion' (0 = fresh install). The fall-through
+// switch is intentional: each case adds only what that version lacked, so a
+// v1.52 import accumulates everything added in later betas. Internal
+// plug-in-based packers are inserted first to keep the list sorted; external
+// packers follow. Type values up to version 6 were: 0 ZIP, 1 external,
+// 2 TAR, 3 PAK.
 void CPackerConfig::AddDefault(int SalamVersion)
 {
     // WARNING: up to version 6 the old 'Type' values were: 0 ZIP, 1 external, 2 TAR, 3 PAK
@@ -966,6 +973,9 @@ void CUnpackerConfig::InitializeDefaultValues()
     AddDefault(0);
 }
 
+// Unpacker counterpart of CPackerConfig::AddDefault: seeds defaults for a
+// fresh install or repairs/migrates lists imported from 'SalamVersion'
+// (e.g., 1.6b1 extensions were not masks yet - "EXT" becomes "*.EXT").
 void CUnpackerConfig::AddDefault(int SalamVersion)
 {
     // WARNING: up to version 6 the old 'Type' values were: 0 ZIP, 1 external, 2 TAR, 3 PAK

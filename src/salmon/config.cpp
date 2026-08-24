@@ -35,7 +35,8 @@ BOOL SetValue(HKEY hKey, const char* name, DWORD type,
               const void* data, DWORD dataSize)
 {
     if (dataSize == -1)
-        dataSize = (lstrlen((char*)data) + 1) * sizeof(char);
+        // The registry API uses DWORD byte counts; REG_SZ data here is a bounded narrow string.
+        dataSize = static_cast<DWORD>(strlen(static_cast<const char*>(data)) + 1);
     LONG res = RegSetValueEx(hKey, name, 0, type, (CONST BYTE*)data, dataSize);
     if (res == ERROR_SUCCESS)
         return TRUE;

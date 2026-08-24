@@ -763,6 +763,11 @@ LONG GetMessagePosClient(HWND hwnd, LPPOINT ppt)
 #define IDT_EDITLB_TIMERLEN 50
 
 LRESULT
+// Message procedure of the edit-in-place list box used by configuration
+// dialogs (mask lists, hot paths). Coordinates the embedded edit line with
+// header-button commands (TLBHDR_MODIFY/NEW/DELETE), keyboard editing and
+// navigation, scroll synchronization, double-click/drag item handling, and
+// hover timers; EN_KILLFOCUS commits the in-progress edit.
 CEditListBox::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 {
     CALL_STACK_MESSAGE4("CEditListBox::WindowProc(0x%X, 0x%IX, 0x%IX)", uMsg, wParam, lParam);

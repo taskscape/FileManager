@@ -96,12 +96,14 @@ BOOL Write(HANDLE file, const void* buffer, DWORD size)
     return TRUE;
 }
 
-BOOL PathRenameExtension(LPTSTR pszPath, LPCTSTR pszExt)
+BOOL PathRenameExtension(LPTSTR pszPath, size_t pathCount, LPCTSTR pszExt)
 {
     char* ext = strrchr(pszPath, '.');
     if (ext != NULL)
         *ext = 0; // ".cvspass" is treated as an extension in Windows
-    lstrcat(pszPath, pszExt);
+    // counted append keeps the renamed path inside the caller's fixed buffer
+    if (strcat_s(pszPath, pathCount, pszExt) != 0)
+        return FALSE;
     return TRUE;
 }
 
@@ -123,11 +125,11 @@ BOOL ProcessCommandline(int argc, char* argv[])
   else Param = 0;
   if (i >= argc) return 1;
   ZipName = argv[i];
-  lstrcpy(ExeName, ZipName);
-  PathRenameExtension(ExeName, ".exe");
+  strncpy_s(ExeName, _countof(ExeName), ZipName, _TRUNCATE); // counted copy of the tool input
+  PathRenameExtension(ExeName, _countof(ExeName), ".exe");
   i++;
   if (i >= argc) return FALSE;
-  lstrcpy(ExeName, argv[i]);
+    strncpy_s(ExeName, _countof(ExeName), argv[i], _TRUNCATE); // counted copy of the tool input
   if (i + 1 < argc) return FALSE;
   return TRUE;
 }
@@ -173,12 +175,12 @@ BOOL ProcessCommandline(int argc, char* argv[])
         file++;
     else
         file = ZipName;
-    lstrcpy(ExeName, file);
-    PathRenameExtension(ExeName, ".exe");
+    strncpy_s(ExeName, _countof(ExeName), file, _TRUNCATE); // counted copy of the tool input
+    PathRenameExtension(ExeName, _countof(ExeName), ".exe");
     i++;
     if (i >= argc)
         return TRUE;
-    lstrcpy(ExeName, argv[i]);
+    strncpy_s(ExeName, _countof(ExeName), argv[i], _TRUNCATE); // counted copy of the tool input
     if (i + 1 < argc)
         return FALSE;
     return TRUE;
@@ -362,7 +364,7 @@ BOOL LoadDefaults()
     size = min(sfxHead.TextLen[ABOUTLICENCEDLEN], SE_MAX_ABOUT - 1);
     memcpy(About, ptr, size);
     About[size] = 0;
-    lstrcpy(DefAbout, About); // keep for later use
+    strncpy_s(DefAbout, _countof(DefAbout), About, _TRUNCATE); // keep for later use (same-capacity field)
     ptr += sfxHead.TextLen[ABOUTLICENCEDLEN];
 
     size = min(sfxHead.TextLen[BUTTONTEXTLEN], SE_MAX_EXTRBTN - 1);
@@ -373,13 +375,13 @@ BOOL LoadDefaults()
     size = min(sfxHead.TextLen[VENDORLEN], SE_MAX_VENDOR - 1);
     memcpy(Settings.Vendor, ptr, size);
     Settings.Vendor[size] = 0;
-    lstrcpy(DefVendor, Settings.Vendor); // keep for later use
+    strncpy_s(DefVendor, _countof(DefVendor), Settings.Vendor, _TRUNCATE); // keep for later use (same-capacity field)
     ptr += sfxHead.TextLen[VENDORLEN];
 
     size = min(sfxHead.TextLen[WWWLEN], SE_MAX_WWW - 1);
     memcpy(Settings.WWW, ptr, size);
     Settings.WWW[size] = 0;
-    lstrcpy(DefWWW, Settings.WWW); // keep for later use
+    strncpy_s(DefWWW, _countof(DefWWW), Settings.WWW, _TRUNCATE); // keep for later use (same-capacity field)
     ptr += sfxHead.TextLen[WWWLEN];
 
     GetModuleFileName(NULL, Settings.IconFile, MAX_PATH);
@@ -403,7 +405,7 @@ BOOL main2()
         switch (*Param)
         {
         case 'p':
-            lstrcpy(Settings.SfxFile, Param + 1);
+            strncpy_s(Settings.SfxFile, _countof(Settings.SfxFile), Param + 1, _TRUNCATE); // counted copy of the package path
             break;
         case 's':
             if (!LoadSettings())
@@ -425,7 +427,7 @@ BOOL main2()
         {
             char buffer[SE_MAX_VENDOR + SE_MAX_WWW + 10 + SE_MAX_ABOUT];
             sprintf(buffer, "%s\r\n%s\r\n\r\n%s", DefVendor, DefWWW, DefAbout);
-            lstrcpyn(About, buffer, SE_MAX_ABOUT);
+            strncpy_s(About, _countof(About), buffer, _TRUNCATE); // explicit clipping into the fixed About field
         }
     }
     switch (LoadIcons(Settings.IconFile, Settings.IconIndex, &Icons, &IconsCount))

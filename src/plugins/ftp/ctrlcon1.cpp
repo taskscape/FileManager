@@ -3,6 +3,7 @@
 // CommentsTranslationProject: TRANSLATED
 
 #include "precomp.h"
+#include <strsafe.h> // counted bounded copies (StringCchCopyNA)
 #include "..\\..\\common\\monotonic_time.h"
 
 CClosedCtrlConChecker ClosedCtrlConChecker; // handles informing the user about "control connection" closure outside of operations
@@ -367,7 +368,7 @@ void CControlConnectionSocket::SetConnectionParameters(const char* host, unsigne
                 else
                 {
                     ProxyServer->SetProxyPassword(plainPassword[0] == 0 ? NULL : plainPassword);
-                    memset(plainPassword, 0, lstrlen(plainPassword));
+                    memset(plainPassword, 0, strlen(plainPassword)); // CRT length instead of the legacy Win32 length API
                     SalamanderGeneral->Free(plainPassword);
                 }
             }
@@ -375,10 +376,10 @@ void CControlConnectionSocket::SetConnectionParameters(const char* host, unsigne
                 ProxyServer->SetProxyPassword(NULL);
         }
     }
-    lstrcpyn(Host, host, HOST_MAX_SIZE);
+    StringCchCopyNA(Host, HOST_MAX_SIZE, host, HOST_MAX_SIZE); // counted bounded copy instead of lstrcpyn
     Port = port;
-    lstrcpyn(User, user, USER_MAX_SIZE);
-    lstrcpyn(Password, password, PASSWORD_MAX_SIZE);
+    StringCchCopyNA(User, USER_MAX_SIZE, user, USER_MAX_SIZE); // counted bounded copy instead of lstrcpyn
+    StringCchCopyNA(Password, PASSWORD_MAX_SIZE, password, PASSWORD_MAX_SIZE); // counted bounded copy instead of lstrcpyn
     UseListingsCache = useListingsCache;
     if (InitFTPCommands != NULL)
         SalamanderGeneral->Free(InitFTPCommands);
@@ -591,19 +592,19 @@ BOOL CControlConnectionSocket::StartControlConnection(HWND parent, char* user, i
     CWaitWindow waitWnd(parent, TRUE);
 
     HANDLES(EnterCriticalSection(&SocketCritSect));
-    lstrcpyn(user, User, userSize);
+    StringCchCopyNA(user, userSize, User, userSize); // counted bounded copy instead of lstrcpyn
     CProxyScriptParams proxyScriptParams(ProxyServer, Host, Port, User, Password, Account, Password[0] == 0 && reconnect);
     CFTPProxyServerType proxyType = fpstNotUsed;
     if (ProxyServer != NULL)
         proxyType = ProxyServer->ProxyType;
     if (proxyType == fpstOwnScript)
-        lstrcpyn(proxyScriptText, HandleNULLStr(ProxyServer->ProxyScript), PROXYSCRIPT_MAX_SIZE);
+        StringCchCopyNA(proxyScriptText, PROXYSCRIPT_MAX_SIZE, HandleNULLStr(ProxyServer->ProxyScript), PROXYSCRIPT_MAX_SIZE); // counted bounded copy instead of lstrcpyn
     else
     {
         const char* txt = GetProxyScriptText(proxyType, FALSE);
         if (txt[0] == 0)
             txt = GetProxyScriptText(fpstNotUsed, FALSE); // undefined script = "not used (direct connection)" script - SOCKS 4/4A/5, HTTP 1.1
-        lstrcpyn(proxyScriptText, txt, PROXYSCRIPT_MAX_SIZE);
+        StringCchCopyNA(proxyScriptText, PROXYSCRIPT_MAX_SIZE, txt, PROXYSCRIPT_MAX_SIZE); // counted bounded copy instead of lstrcpyn
     }
     DWORD auxServerIP = ServerIP;
     srvAddr.s_addr = auxServerIP;
@@ -640,7 +641,7 @@ BOOL CControlConnectionSocket::StartControlConnection(HWND parent, char* user, i
 
     if (retryMsg != NULL) // simulate the state when the connection was interrupted directly in this method - "retry" connection
     {
-        lstrcpyn(errBuf, retryMsg, 300); // store the retry message in errBuf (for sccsOperationFatalError)
+        StringCchCopyNA(errBuf, 300, retryMsg, 300); // counted bounded copy instead of lstrcpyn // store the retry message in errBuf (for sccsOperationFatalError)
         opFatalErrorTextID = reconnectErrResID != -1 ? reconnectErrResID : IDS_SENDCOMMANDERROR;
         opFatalError = -1;                      // the "error" (reply) is directly in errBuf
         noRetryState = sccsOperationFatalError; // if retry is not performed, execute sccsOperationFatalError
@@ -656,7 +657,7 @@ BOOL CControlConnectionSocket::StartControlConnection(HWND parent, char* user, i
         if (proxyScriptParams.NeedUserInput()) // theoretically should not happen
         {                                      // only proxyScriptParams->NeedProxyHost can be TRUE (otherwise ProcessProxyScript would return an error)
             strcpy(errBuf, LoadStr(IDS_PROXYSRVADREMPTY));
-            lstrcpyn(errBuf, errBuf2, 300);
+            StringCchCopyNA(errBuf, 300, errBuf2, 300); // counted bounded copy instead of lstrcpyn
             opFatalError = -1; // error is directly in errBuf
             opFatalErrorTextID = IDS_ERRINPROXYSCRIPT;
             state = sccsOperationFatalError;
@@ -666,7 +667,7 @@ BOOL CControlConnectionSocket::StartControlConnection(HWND parent, char* user, i
     }
     else // theoretically should never happen (saved scripts are validated)
     {
-        lstrcpyn(errBuf, errBuf2, 300);
+        StringCchCopyNA(errBuf, 300, errBuf2, 300); // counted bounded copy instead of lstrcpyn
         opFatalError = -1; // error is directly in errBuf
         opFatalErrorTextID = IDS_ERRINPROXYSCRIPT;
         state = sccsOperationFatalError;
@@ -919,7 +920,7 @@ RETRY_LABEL:
                             if (opFatalError == -1 && errBuf[0] == 0) // simple error -> convert it to sccsFatalError
                             {
                                 fatalErrorTextID = -1;
-                                lstrcpyn(errBuf, formatBuf, 300);
+                                StringCchCopyNA(errBuf, 300, formatBuf, 300); // counted bounded copy instead of lstrcpyn
                                 noRetryState = sccsFatalError; // if retry is not performed, execute sccsFatalError
                             }
                             state = sccsRetry;
@@ -962,13 +963,13 @@ RETRY_LABEL:
             {
             case sccsFatalError:
             {
-                lstrcpyn(buf, GetFatalErrorTxt(fatalErrorTextID, errBuf), 1000);
+                StringCchCopyNA(buf, 1000, GetFatalErrorTxt(fatalErrorTextID, errBuf), 1000); // counted bounded copy instead of lstrcpyn
                 break;
             }
 
             case sccsOperationFatalError:
             {
-                lstrcpyn(buf, GetOperationFatalErrorTxt(opFatalError, errBuf), 1000);
+                StringCchCopyNA(buf, 1000, GetOperationFatalErrorTxt(opFatalError, errBuf), 1000); // counted bounded copy instead of lstrcpyn
                 break;
             }
 
@@ -1439,8 +1440,8 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
                             else // values changed -> we must update the originals
                             {
                                 HANDLES(EnterCriticalSection(&SocketCritSect));
-                                lstrcpyn(User, proxyScriptParams.User, USER_MAX_SIZE);
-                                lstrcpyn(user, proxyScriptParams.User, userSize);
+                                StringCchCopyNA(User, USER_MAX_SIZE, proxyScriptParams.User, USER_MAX_SIZE); // counted bounded copy instead of lstrcpyn
+                                StringCchCopyNA(user, userSize, proxyScriptParams.User, userSize); // counted bounded copy instead of lstrcpyn
                                 Logs.ChangeUser(logUID, User);
                                 HANDLES(LeaveCriticalSection(&SocketCritSect));
                             }
@@ -1463,7 +1464,7 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
                                 if (proxyScriptParams.Password[0] == 0)
                                     proxyScriptParams.AllowEmptyPassword = TRUE; // empty password at the user's request (we will not ask again)
                                 HANDLES(EnterCriticalSection(&SocketCritSect));
-                                lstrcpyn(Password, proxyScriptParams.Password, PASSWORD_MAX_SIZE);
+                                StringCchCopyNA(Password, PASSWORD_MAX_SIZE, proxyScriptParams.Password, PASSWORD_MAX_SIZE); // counted bounded copy instead of lstrcpyn
                                 HANDLES(LeaveCriticalSection(&SocketCritSect));
                             }
                         }
@@ -1483,7 +1484,7 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
                             else // values changed -> we must update the originals
                             {
                                 HANDLES(EnterCriticalSection(&SocketCritSect));
-                                lstrcpyn(Account, proxyScriptParams.Account, ACCOUNT_MAX_SIZE);
+                                StringCchCopyNA(Account, ACCOUNT_MAX_SIZE, proxyScriptParams.Account, ACCOUNT_MAX_SIZE); // counted bounded copy instead of lstrcpyn
                                 HANDLES(LeaveCriticalSection(&SocketCritSect));
                             }
                         }
@@ -1514,7 +1515,7 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
                                 }
                                 else // FTP_DIGIT_1(proxyLastCmdReply) == FTP_D1_PARTIALSUCCESS  // e.g. 331 User name okay, need password
                                 {
-                                    lstrcpyn(errBuf, proxyLastCmdReplyText, 300);
+                                    StringCchCopyNA(errBuf, 300, proxyLastCmdReplyText, 300); // counted bounded copy instead of lstrcpyn
                                     opFatalError = -1; // error is directly in errBuf
                                     opFatalErrorTextID = IDS_INCOMPLETEPRXSCR;
                                     state = sccsOperationFatalError;
@@ -1531,7 +1532,7 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
                                     welcomeMessage.Append(proxyLogCmdBuf, -1);
                                 Logs.LogMessage(logUID, proxyLogCmdBuf, -1);
 
-                                lstrcpyn(tmpCmdBuf, proxyLogCmdBuf, FTPCOMMAND_MAX_SIZE);
+                                StringCchCopyNA(tmpCmdBuf, FTPCOMMAND_MAX_SIZE, proxyLogCmdBuf, FTPCOMMAND_MAX_SIZE); // counted bounded copy instead of lstrcpyn
                                 char* s = strchr(tmpCmdBuf, '\r');
                                 if (s != NULL)
                                     *s = 0;
@@ -1672,11 +1673,11 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
                                                                         ProxyServer->SetProxyUser(proxyScriptParams.ProxyUser);
                                                                         ProxyServer->SetProxyPassword(proxyScriptParams.ProxyPassword);
                                                                     }
-                                                                    lstrcpyn(User, proxyScriptParams.User, USER_MAX_SIZE);
-                                                                    lstrcpyn(user, proxyScriptParams.User, userSize);
+                                                                    StringCchCopyNA(User, USER_MAX_SIZE, proxyScriptParams.User, USER_MAX_SIZE); // counted bounded copy instead of lstrcpyn
+                                                                    StringCchCopyNA(user, userSize, proxyScriptParams.User, userSize); // counted bounded copy instead of lstrcpyn
                                                                     Logs.ChangeUser(logUID, User);
-                                                                    lstrcpyn(Password, proxyScriptParams.Password, PASSWORD_MAX_SIZE);
-                                                                    lstrcpyn(Account, proxyScriptParams.Account, ACCOUNT_MAX_SIZE);
+                                                                    StringCchCopyNA(Password, PASSWORD_MAX_SIZE, proxyScriptParams.Password, PASSWORD_MAX_SIZE); // counted bounded copy instead of lstrcpyn
+                                                                    StringCchCopyNA(Account, ACCOUNT_MAX_SIZE, proxyScriptParams.Account, ACCOUNT_MAX_SIZE); // counted bounded copy instead of lstrcpyn
                                                                     HANDLES(LeaveCriticalSection(&SocketCritSect));
 
                                                                     retryLoginWithoutAsking = dlg.RetryWithoutAsking;
@@ -1965,7 +1966,7 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
 
         case sccsFatalError: // fatal error (resource ID of the text is in 'fatalErrorTextID' + if 'fatalErrorTextID' is -1, the string is directly in 'errBuf')
         {
-            lstrcpyn(buf, GetFatalErrorTxt(fatalErrorTextID, errBuf), 1000);
+            StringCchCopyNA(buf, 1000, GetFatalErrorTxt(fatalErrorTextID, errBuf), 1000); // counted bounded copy instead of lstrcpyn
             char* s = buf + strlen(buf);
             while (s > buf && (*(s - 1) == '\n' || *(s - 1) == '\r'))
                 s--;
@@ -1988,7 +1989,7 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
             const char* e = GetOperationFatalErrorTxt(opFatalError, errBuf);
             if (fatalErrLogMsg)
             {
-                lstrcpyn(buf, e, 1000);
+                StringCchCopyNA(buf, 1000, e, 1000); // counted bounded copy instead of lstrcpyn
                 char* s = buf + strlen(buf);
                 while (s > buf && (*(s - 1) == '\n' || *(s - 1) == '\r'))
                     s--;
@@ -2077,7 +2078,7 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
         HANDLES(EnterCriticalSection(&SocketCritSect));
         char cmdBuf[FTP_MAX_PATH];
         if (InitFTPCommands != NULL && *InitFTPCommands != 0)
-            lstrcpyn(cmdBuf, InitFTPCommands, FTP_MAX_PATH);
+            StringCchCopyNA(cmdBuf, FTP_MAX_PATH, InitFTPCommands, FTP_MAX_PATH); // counted bounded copy instead of lstrcpyn
         else
             cmdBuf[0] = 0;
         HANDLES(LeaveCriticalSection(&SocketCritSect));

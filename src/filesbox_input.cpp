@@ -453,6 +453,11 @@ void CFileListHeader::Cancel()
 }
 
 LRESULT
+// Message procedure of the panel's column-header line: paints header cells
+// off-screen, tracks the mouse for hover highlighting, and implements the
+// interaction model - click sorts by column, drag reorders/resizes columns,
+// double-click auto-fits width, right button opens the column menu; tooltip
+// text requests report truncated column titles.
 CFileListHeader::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 {
     switch (uMsg)

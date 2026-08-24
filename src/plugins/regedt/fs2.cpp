@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "precomp.h"
+#include <strsafe.h> // counted bounded copies (StringCchCopyNA)
 
 // ****************************************************************************
 //
@@ -210,7 +211,7 @@ BOOL CPluginFSInterface::GetFullFSPath(HWND parent, const char* fsName, char* pa
         if (!success)
             return TRUE;
 
-        lstrcpyn(path, fsName, pathSize);
+        StringCchCopyNA(path, pathSize, fsName, pathSize); // counted bounded copy instead of lstrcpyn
         StrNCat(path, ":", pathSize);
         int l = (int)strlen(path);
         success = WStrToStr(path + l, pathSize - l, buffer) >= 0 || Error(IDS_LONGNAME);

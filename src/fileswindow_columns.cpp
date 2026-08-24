@@ -116,6 +116,11 @@ BOOL SafeInvokeCommand(IContextMenu2* menu, CMINVOKECOMMANDINFO& ici)
     return ret;
 }
 
+// Pastes clipboard content into the panel: detects Salamander's own "fake"
+// data object (paste from archive/FS cut/copy via shared memory handshake),
+// shortcut-only pastes ('onlyLinks'), or ordinary shell file drops; honors
+// the Preferred DropEffect (copy vs. move) and delegates to the standard
+// copy/move script builder. 'onlyTest' only reports paste availability.
 BOOL CFilesWindow::ClipboardPaste(BOOL onlyLinks, BOOL onlyTest, const char* pastePath)
 {
     CALL_STACK_MESSAGE4("CFilesWindow::ClipboardPaste(%d, %d, %s)", onlyLinks, onlyTest, pastePath);

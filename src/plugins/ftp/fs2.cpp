@@ -3,6 +3,7 @@
 // CommentsTranslationProject: TRANSLATED
 
 #include "precomp.h"
+#include <strsafe.h> // counted bounded copies (StringCchCopyNA)
 
 int CSimpleListPluginDataInterface::ListingColumnWidth = 0;      // LO/HI-WORD: left/right panel: width of the Raw Listing column
 int CSimpleListPluginDataInterface::ListingColumnFixedWidth = 0; // LO/HI-WORD: left/right panel: does the Raw Listing column have a fixed width?
@@ -230,7 +231,7 @@ BOOL CPluginFSInterface::GetFullFSPath(HWND parent, const char* fsName, char* pa
             if (ControlConnection->GetCurrentWorkingPath(SalamanderGeneral->GetMsgBoxParent(),
                                                          replyBuf, 700, TRUE, &canRetry, retryMsgBuf, 300))
             {
-                lstrcpyn(path, replyBuf, pathSize); // successfully obtained a new path on the server
+                StringCchCopyNA(path, pathSize, replyBuf, pathSize); // counted bounded copy instead of lstrcpyn // successfully obtained a new path on the server
             }
             else
             {
@@ -279,7 +280,7 @@ BOOL CPluginFSInterface::GetFullName(CFileData& file, int isDir, char* buf, int 
     if (isDir == 2) // up-dir
     {
         char tmpPath[FTP_MAX_PATH];
-        lstrcpyn(tmpPath, Path, FTP_MAX_PATH);
+        StringCchCopyNA(tmpPath, FTP_MAX_PATH, Path, FTP_MAX_PATH); // counted bounded copy instead of lstrcpyn
         if (FTPCutDirectory(type, tmpPath, FTP_MAX_PATH, NULL, 0, NULL))
             return MakeUserPart(buf, bufSize, tmpPath);
         else
@@ -399,7 +400,7 @@ BOOL CPluginFSInterface::ChangePath(int currentFSNameIndex, char* fsName, int fs
             strcpy(uniqueFileName, i == 0 ? AssignedFSName : AssignedFSNameFTPS);
             strcat(uniqueFileName, ":");
             int len = (int)strlen(uniqueFileName);
-            lstrcpyn(uniqueFileName + len, userPart, FTP_USERPART_SIZE + 50 - len);
+            StringCchCopyNA(uniqueFileName + len, FTP_USERPART_SIZE + 50 - len, userPart, FTP_USERPART_SIZE + 50 - len); // counted bounded copy instead of lstrcpyn
             SalamanderGeneral->RemoveFilesFromCache(uniqueFileName);
         }
     }
@@ -449,25 +450,23 @@ BOOL CPluginFSInterface::ChangePath(int currentFSNameIndex, char* fsName, int fs
             }
 
             AutodetectSrvType = server->ServerType == NULL;
-            lstrcpyn(LastServerType,
-                     HandleNULLStr(server->ServerType != NULL ? (server->ServerType +
+            StringCchCopyNA(LastServerType, SERVERTYPE_MAX_SIZE, HandleNULLStr(server->ServerType != NULL ? (server->ServerType +
                                                                  (server->ServerType[0] == '*' ? 1 : 0))
-                                                              : NULL),
-                     SERVERTYPE_MAX_SIZE);
+                                                              : NULL), SERVERTYPE_MAX_SIZE); // counted bounded copy instead of lstrcpyn
 
-            lstrcpyn(Host, HandleNULLStr(server->Address), HOST_MAX_SIZE);
+            StringCchCopyNA(Host, HOST_MAX_SIZE, HandleNULLStr(server->Address), HOST_MAX_SIZE); // counted bounded copy instead of lstrcpyn
             Port = server->Port;
             if (server->AnonymousConnection)
                 strcpy(User, FTP_ANONYMOUS);
             else
             {
-                lstrcpyn(User, HandleNULLStr(server->UserName), USER_MAX_SIZE);
+                StringCchCopyNA(User, USER_MAX_SIZE, HandleNULLStr(server->UserName), USER_MAX_SIZE); // counted bounded copy instead of lstrcpyn
             }
-            lstrcpyn(Path, HandleNULLStr(server->InitialPath), FTP_MAX_PATH);
+            StringCchCopyNA(Path, FTP_MAX_PATH, HandleNULLStr(server->InitialPath), FTP_MAX_PATH); // counted bounded copy instead of lstrcpyn
             parsedPath = FALSE; // path entered by the user (never trim '/' or '\\' at the beginning)
 
             if (server->TargetPanelPath != NULL)
-                lstrcpyn(TargetPanelPath, server->TargetPanelPath, MAX_PATH);
+                StringCchCopyNA(TargetPanelPath, MAX_PATH, server->TargetPanelPath, MAX_PATH); // counted bounded copy instead of lstrcpyn
 
             BOOL useListingsCache = Config.UseListingsCache;
             if (server->UseListingsCache != 2)
@@ -506,7 +505,7 @@ BOOL CPluginFSInterface::ChangePath(int currentFSNameIndex, char* fsName, int fs
                 }
             }
             int encControlConn = server->EncryptControlConnection == 1;
-            lstrcpyn(fsName, encControlConn ? AssignedFSNameFTPS : AssignedFSName, MAX_PATH);
+            StringCchCopyNA(fsName, MAX_PATH, encControlConn ? AssignedFSNameFTPS : AssignedFSName, MAX_PATH); // counted bounded copy instead of lstrcpyn
             int encDataConn = encControlConn && server->EncryptDataConnection == 1;
             int compressData = (server->CompressData >= 0) ? server->CompressData : Config.CompressData;
 
@@ -515,7 +514,7 @@ BOOL CPluginFSInterface::ChangePath(int currentFSNameIndex, char* fsName, int fs
             char password[PASSWORD_MAX_SIZE];
             if (server->AnonymousConnection)
             {
-                lstrcpyn(password, anonymousPasswd, PASSWORD_MAX_SIZE);
+                StringCchCopyNA(password, PASSWORD_MAX_SIZE, anonymousPasswd, PASSWORD_MAX_SIZE); // counted bounded copy instead of lstrcpyn
             }
             else
             {
@@ -523,8 +522,8 @@ BOOL CPluginFSInterface::ChangePath(int currentFSNameIndex, char* fsName, int fs
                 CSalamanderPasswordManagerAbstract* passwordManager = SalamanderGeneral->GetSalamanderPasswordManager();
                 if (server->EncryptedPassword != NULL && passwordManager->DecryptPassword(server->EncryptedPassword, server->EncryptedPasswordSize, &plainPassword))
                 {
-                    lstrcpyn(password, plainPassword, PASSWORD_MAX_SIZE);
-                    memset(plainPassword, 0, lstrlen(plainPassword)); // clear the buffer with the password
+                    StringCchCopyNA(password, PASSWORD_MAX_SIZE, plainPassword, PASSWORD_MAX_SIZE); // counted bounded copy instead of lstrcpyn
+                    memset(plainPassword, 0, strlen(plainPassword)); // clear the buffer with the password
                     SalamanderGeneral->Free(plainPassword);
                 }
                 else
@@ -546,7 +545,7 @@ BOOL CPluginFSInterface::ChangePath(int currentFSNameIndex, char* fsName, int fs
                                                        encControlConn,
                                                        encDataConn,
                                                        compressData);
-            memset(password, 0, lstrlen(password)); // clear the buffer with the password
+            memset(password, 0, strlen(password)); // clear the buffer with the password
         }
         else // connection based on changing the path in the FTP file system (e.g. Shift+F7 + "ftp://ftp.taskscape.com/")
         {
@@ -565,7 +564,7 @@ BOOL CPluginFSInterface::ChangePath(int currentFSNameIndex, char* fsName, int fs
             AutodetectSrvType = TRUE; // we are using automatic server type detection
             LastServerType[0] = 0;
 
-            lstrcpyn(newUserPart, userPart, FTP_USERPART_SIZE);
+            StringCchCopyNA(newUserPart, FTP_USERPART_SIZE, userPart, FTP_USERPART_SIZE); // counted bounded copy instead of lstrcpyn
             char *u, *host, *p, *path, *password;
             char firstCharOfPath = '/';
             FTPSplitPath(newUserPart, &u, &password, &host, &p, &path, &firstCharOfPath, 0);
@@ -583,7 +582,7 @@ BOOL CPluginFSInterface::ChangePath(int currentFSNameIndex, char* fsName, int fs
             if (u == NULL || u != NULL && *u == 0)
                 strcpy(user, FTP_ANONYMOUS);
             else
-                lstrcpyn(user, u, USER_MAX_SIZE);
+                StringCchCopyNA(user, USER_MAX_SIZE, u, USER_MAX_SIZE); // counted bounded copy instead of lstrcpyn
             int port = IPPORT_FTP;
             if (p != NULL && *p != 0)
             {
@@ -601,13 +600,13 @@ BOOL CPluginFSInterface::ChangePath(int currentFSNameIndex, char* fsName, int fs
                 }
             }
 
-            lstrcpyn(Host, host, HOST_MAX_SIZE);
+            StringCchCopyNA(Host, HOST_MAX_SIZE, host, HOST_MAX_SIZE); // counted bounded copy instead of lstrcpyn
             Port = port;
-            lstrcpyn(User, user, USER_MAX_SIZE);
+            StringCchCopyNA(User, USER_MAX_SIZE, user, USER_MAX_SIZE); // counted bounded copy instead of lstrcpyn
             if (path != NULL)
             {
                 Path[0] = firstCharOfPath;
-                lstrcpyn(Path + 1, path, FTP_MAX_PATH - 1);
+                StringCchCopyNA(Path + 1, FTP_MAX_PATH - 1, path, FTP_MAX_PATH - 1); // counted bounded copy instead of lstrcpyn
             }
             else
                 Path[0] = 0;
@@ -641,7 +640,7 @@ BOOL CPluginFSInterface::ChangePath(int currentFSNameIndex, char* fsName, int fs
             TargetPanelPath[0] = 0; // the connection failed, no path change in the target panel
             return FALSE;
         }
-        lstrcpyn(HomeDir, RescuePath, FTP_MAX_PATH); // save the current path after logging into the server (home dir)
+        StringCchCopyNA(HomeDir, FTP_MAX_PATH, RescuePath, FTP_MAX_PATH); // counted bounded copy instead of lstrcpyn // save the current path after logging into the server (home dir)
         char* pathListing = NULL;
         int pathListingLen = 0;
         CFTPDate pathListingDate;
@@ -701,14 +700,14 @@ BOOL CPluginFSInterface::ChangePath(int currentFSNameIndex, char* fsName, int fs
             NextRefreshCanUseOldListing = FALSE;
 
             // retrieve the new path
-            lstrcpyn(newUserPart, userPart, FTP_USERPART_SIZE);
+            StringCchCopyNA(newUserPart, FTP_USERPART_SIZE, userPart, FTP_USERPART_SIZE); // counted bounded copy instead of lstrcpyn
             char* path;
             char firstCharOfPath;
             FTPSplitPath(newUserPart, NULL, NULL, NULL, NULL, &path, &firstCharOfPath, FTPGetUserLength(User));
             if (path != NULL)
             {
                 Path[0] = firstCharOfPath;
-                lstrcpyn(Path + 1, path, FTP_MAX_PATH - 1);
+                StringCchCopyNA(Path + 1, FTP_MAX_PATH - 1, path, FTP_MAX_PATH - 1); // counted bounded copy instead of lstrcpyn
             }
             else
                 Path[0] = 0;
@@ -1186,7 +1185,7 @@ BOOL CPluginFSInterface::ListCurrentPath(CSalamanderDirectoryAbstract* dir,
                                         const char* s = serverType->TypeName;
                                         if (*s == '*')
                                             s++;
-                                        lstrcpyn(LastServerType, s, SERVERTYPE_MAX_SIZE);
+                                        StringCchCopyNA(LastServerType, SERVERTYPE_MAX_SIZE, s, SERVERTYPE_MAX_SIZE); // counted bounded copy instead of lstrcpyn
                                     }
                                     needSimpleListing = err; // successfully parsed the listing or ran into low memory, stop
                                     break;
@@ -1214,7 +1213,7 @@ BOOL CPluginFSInterface::ListCurrentPath(CSalamanderDirectoryAbstract* dir,
                                     const char* s = serverType->TypeName;
                                     if (*s == '*')
                                         s++;
-                                    lstrcpyn(LastServerType, s, SERVERTYPE_MAX_SIZE);
+                                    StringCchCopyNA(LastServerType, SERVERTYPE_MAX_SIZE, s, SERVERTYPE_MAX_SIZE); // counted bounded copy instead of lstrcpyn
                                 }
                                 needSimpleListing = err; // successfully parsed the listing or ran into low memory, stop
                                 break;
@@ -1234,8 +1233,7 @@ BOOL CPluginFSInterface::ListCurrentPath(CSalamanderDirectoryAbstract* dir,
             {
                 if (needSimpleListing) // unknown listing; show a message about sending the information to Taskscape Ltd
                 {                      // and log "Unknown Server Type"
-                    lstrcpyn(logBuf, LoadStr(AutodetectSrvType ? IDS_LOGMSGUNKNOWNSRVTYPE : IDS_LOGMSGUNKNOWNSRVTYPE2),
-                             200 + FTP_MAX_PATH);
+                    StringCchCopyNA(logBuf, 200 + FTP_MAX_PATH, LoadStr(AutodetectSrvType ? IDS_LOGMSGUNKNOWNSRVTYPE : IDS_LOGMSGUNKNOWNSRVTYPE2), 200 + FTP_MAX_PATH); // counted bounded copy instead of lstrcpyn
                     ControlConnection->LogMessage(logBuf, -1, TRUE);
                     if (InformAboutUnknownSrvType)
                     {

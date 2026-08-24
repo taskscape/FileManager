@@ -3,6 +3,7 @@
 // CommentsTranslationProject: TRANSLATED
 
 #include "precomp.h"
+#include <strsafe.h> // counted bounded copies (StringCchCopyNA)
 
 //****************************************************************************
 
@@ -94,7 +95,7 @@ CSendFTPCommandDlg::CSendFTPCommandDlg(HWND parent)
     ChangePathInPanel = TRUE;
     RefreshWorkingPath = TRUE;
     if (!Config.SendSecretCommand && Config.CommandHistory[0] != NULL)
-        lstrcpyn(Command, Config.CommandHistory[0], FTPCOMMAND_MAX_SIZE);
+        StringCchCopyNA(Command, FTPCOMMAND_MAX_SIZE, Config.CommandHistory[0], FTPCOMMAND_MAX_SIZE); // counted bounded copy instead of lstrcpyn
 }
 
 void CSendFTPCommandDlg::Validate(CTransferInfo& ti)
@@ -970,8 +971,7 @@ CRenameDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                 if (!ServerTypes || CopyFromName != NULL)
                 {
                     char checkboxName[BOOKMSRVTYPE_MAX_SIZE];
-                    lstrcpyn(checkboxName, ServerTypes ? CopyFromName : Name,
-                             ServerTypes ? SERVERTYPE_MAX_SIZE - 1 : BOOKMARKNAME_MAX_SIZE);
+                    StringCchCopyNA(checkboxName, ServerTypes ? SERVERTYPE_MAX_SIZE - 1 : BOOKMARKNAME_MAX_SIZE, ServerTypes ? CopyFromName : Name, ServerTypes ? SERVERTYPE_MAX_SIZE - 1 : BOOKMARKNAME_MAX_SIZE); // counted bounded copy instead of lstrcpyn
                     SalamanderGeneral->DuplicateAmpersands(checkboxName, ServerTypes ? SERVERTYPE_MAX_SIZE - 1 : BOOKMARKNAME_MAX_SIZE);
                     sprintf(buf, LoadStr(ServerTypes ? IDS_SRVTYPECOPYFROM : IDS_COPYDATAFROM),
                             checkboxName[0] != 0 ? checkboxName : LoadStr(IDS_QUICKCONNECT));
@@ -1501,11 +1501,11 @@ void CProxyServerDlg::Transfer(CTransferInfo& ti)
     int saveProxyPassword;
     char proxyScript[PROXYSCRIPT_MAX_SIZE];
 
-    lstrcpyn(proxyName, HandleNULLStr(Proxy->ProxyName), 200);
+    StringCchCopyNA(proxyName, 200, HandleNULLStr(Proxy->ProxyName), 200); // counted bounded copy instead of lstrcpyn
     proxyType = Proxy->ProxyType;
-    lstrcpyn(proxyHost, HandleNULLStr(Proxy->ProxyHost), HOST_MAX_SIZE);
+    StringCchCopyNA(proxyHost, HOST_MAX_SIZE, HandleNULLStr(Proxy->ProxyHost), HOST_MAX_SIZE); // counted bounded copy instead of lstrcpyn
     proxyPort = Proxy->ProxyPort;
-    lstrcpyn(proxyUser, HandleNULLStr(Proxy->ProxyUser), USER_MAX_SIZE);
+    StringCchCopyNA(proxyUser, USER_MAX_SIZE, HandleNULLStr(Proxy->ProxyUser), USER_MAX_SIZE); // counted bounded copy instead of lstrcpyn
 
     if (ti.Type == ttDataToWindow)
     {
@@ -1520,8 +1520,8 @@ void CProxyServerDlg::Transfer(CTransferInfo& ti)
                 char* plainPassword;
                 if (passwordManager->DecryptPassword(Proxy->ProxyEncryptedPassword, Proxy->ProxyEncryptedPasswordSize, &plainPassword))
                 {
-                    lstrcpyn(proxyPlainPassword, plainPassword, PASSWORD_MAX_SIZE);
-                    memset(plainPassword, 0, lstrlen(plainPassword));
+                    StringCchCopyNA(proxyPlainPassword, PASSWORD_MAX_SIZE, plainPassword, PASSWORD_MAX_SIZE); // counted bounded copy instead of lstrcpyn
+                    memset(plainPassword, 0, strlen(plainPassword)); // CRT length instead of the legacy Win32 length API
                     SalamanderGeneral->Free(plainPassword);
                     lockedPassword = FALSE;
                 }
@@ -1533,7 +1533,7 @@ void CProxyServerDlg::Transfer(CTransferInfo& ti)
     }
 
     saveProxyPassword = Proxy->SaveProxyPassword;
-    lstrcpyn(proxyScript, HandleNULLStr(Proxy->ProxyScript), PROXYSCRIPT_MAX_SIZE);
+    StringCchCopyNA(proxyScript, PROXYSCRIPT_MAX_SIZE, HandleNULLStr(Proxy->ProxyScript), PROXYSCRIPT_MAX_SIZE); // counted bounded copy instead of lstrcpyn
 
     ti.EditLine(IDE_PRXSRV_NAME, proxyName, 200);
     HWND combo;
@@ -1629,7 +1629,7 @@ void CProxyServerDlg::Transfer(CTransferInfo& ti)
             memset(proxyEncryptedPassword, 0, proxyEncryptedPasswordSize);
             SalamanderGeneral->Free(proxyEncryptedPassword);
         }
-        memset(proxyPlainPassword, 0, lstrlen(proxyPlainPassword));
+        memset(proxyPlainPassword, 0, strlen(proxyPlainPassword)); // CRT length instead of the legacy Win32 length API
     }
 }
 
@@ -1938,7 +1938,7 @@ CProxyServerDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                 params.Text = buff;
                 if (SalamanderGeneral->SalMessageBoxEx(&params) == IDYES)
                     SalamanderGeneral->CopyTextToClipboard(plainPassword, -1, FALSE, NULL);
-                memset(plainPassword, 0, lstrlen(plainPassword));
+                memset(plainPassword, 0, strlen(plainPassword)); // CRT length instead of the legacy Win32 length API
                 memset(buff, 0, 1000);
             }
         }
@@ -2084,7 +2084,7 @@ CProxyServerDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                     // zero the buffer
                     if (proxyPlainPassword != NULL)
                     {
-                        memset(proxyPlainPassword, 0, lstrlen(proxyPlainPassword));
+                        memset(proxyPlainPassword, 0, strlen(proxyPlainPassword)); // CRT length instead of the legacy Win32 length API
                         SalamanderGeneral->Free(proxyPlainPassword);
                     }
                 }

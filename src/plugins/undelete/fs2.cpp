@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "precomp.h"
+#include <strsafe.h> // counted bounded copies (StringCchCopyNA)
 
 #include "..\\..\\common\\monotonic_time.h"
 
@@ -156,7 +157,7 @@ BOOL WINAPI
 CPluginFSInterface::GetFullName(CFileData& file, int isDir, char* buf, int bufSize)
 {
     CALL_STACK_MESSAGE3("CPluginFSInterface::GetFullName(, %d, , %d)", isDir, bufSize);
-    lstrcpyn(buf, Path, bufSize); // if path doesn't fit, name doesn't fit too (report error)
+    StringCchCopyNA(buf, bufSize, Path, bufSize); // counted bounded copy instead of lstrcpyn // if path doesn't fit, name doesn't fit too (report error)
     if (isDir == 2)
         return SalamanderGeneral->CutDirectory(buf, NULL); // up-dir
     else
@@ -332,7 +333,7 @@ CPluginFSInterface::ChangePath(int currentFSNameIndex, char* fsName, int fsNameI
     // we will cut path to individual parts
     char temp[MAX_PATH];
     if (strlen(userPart) > strlen(Root))
-        lstrcpyn(temp, userPart + strlen(Root), MAX_PATH);
+        StringCchCopyNA(temp, MAX_PATH, userPart + strlen(Root), MAX_PATH); // counted bounded copy instead of lstrcpyn
     else
         temp[0] = 0;
     char* component = strtok(temp, PATHSEP);
@@ -354,7 +355,7 @@ CPluginFSInterface::ChangePath(int currentFSNameIndex, char* fsName, int fsNameI
                 else // it is file
                 {
                     if (cutFileName != NULL)
-                        lstrcpyn(cutFileName, di->FileName->FNName, MAX_PATH);
+                        StringCchCopyNA(cutFileName, MAX_PATH, di->FileName->FNName, MAX_PATH); // counted bounded copy instead of lstrcpyn
                     if (mode < 3)
                         return !String<char>::Error(IDS_UNDELETE, IDS_PATHFILE);
                 }
@@ -642,7 +643,7 @@ BOOL CPluginFSInterface::AppendPath(char* buffer, char* path, char* name, BOOL* 
 {
     CALL_STACK_MESSAGE1("CPluginFSInterface::AppendPath(, , , )");
     // join the path and name and check the length
-    lstrcpyn(buffer, path, MAX_PATH);
+    StringCchCopyNA(buffer, MAX_PATH, path, MAX_PATH); // counted bounded copy instead of lstrcpyn
     if (!SalamanderGeneral->SalPathAppend(buffer, name, MAX_PATH))
     {
         *ret = TRUE;
@@ -672,7 +673,7 @@ char* CPluginFSInterface::FixDamagedName(char* name)
         return name;
 
     static char buffer[MAX_PATH];
-    lstrcpyn(buffer, name, MAX_PATH);
+    StringCchCopyNA(buffer, MAX_PATH, name, MAX_PATH); // counted bounded copy instead of lstrcpyn
     if (AllSubstChar)
     {
         buffer[0] = AllSubstChar;
@@ -762,7 +763,7 @@ BOOL CPluginFSInterface::CopyFile(FILE_RECORD_I<char>* record, char* filename, c
         char* name = FixDamagedName(filename);
         if (name == NULL)
             return FALSE;
-        lstrcpyn(namepos, name, MAX_PATH - (int)(namepos - SourcePath));
+        StringCchCopyNA(namepos, MAX_PATH - (int)(namepos - SourcePath), name, MAX_PATH - (int)(namepos - SourcePath)); // counted bounded copy instead of lstrcpyn
 
         // make target path
         if (!AppendPath(path, targetPath, name, &ret))
@@ -774,8 +775,8 @@ BOOL CPluginFSInterface::CopyFile(FILE_RECORD_I<char>* record, char* filename, c
     else
     {
         // for view it is simple
-        lstrcpyn(path, targetPath, MAX_PATH);
-        lstrcpyn(SourcePath, filename, MAX_PATH);
+        StringCchCopyNA(path, MAX_PATH, targetPath, MAX_PATH); // counted bounded copy instead of lstrcpyn
+        StringCchCopyNA(SourcePath, MAX_PATH, filename, MAX_PATH); // counted bounded copy instead of lstrcpyn
         oldlen = 0;
     }
 
@@ -820,7 +821,7 @@ BOOL CPluginFSInterface::CopyFile(FILE_RECORD_I<char>* record, char* filename, c
             // append .bak when backuping encrypted files
             if (BackupEncryptedFiles)
             {
-                lstrcpyn(pathend, ".bak", MAX_PATH);
+                StringCchCopyNA(pathend, MAX_PATH, ".bak", MAX_PATH); // counted bounded copy instead of lstrcpyn
                 strcat(SourcePath, ".bak");
             }
         }
@@ -830,7 +831,7 @@ BOOL CPluginFSInterface::CopyFile(FILE_RECORD_I<char>* record, char* filename, c
             if (stream->DSName != NULL)
             {
                 *pathend = ':';
-                lstrcpyn(pathend + 1, stream->DSName, MAX_PATH - 1);
+                StringCchCopyNA(pathend + 1, MAX_PATH - 1, stream->DSName, MAX_PATH - 1); // counted bounded copy instead of lstrcpyn
             }
             else
                 *pathend = 0;
@@ -1810,7 +1811,7 @@ BOOL CPluginFSInterface::TestUndeleteOnExistingFile(FILE* file, FILE_RECORD_I<ch
             if (stream->DSName != NULL)
             {
                 *pathend = ':';
-                lstrcpyn(pathend + 1, stream->DSName, MAX_PATH - 1);
+                StringCchCopyNA(pathend + 1, MAX_PATH - 1, stream->DSName, MAX_PATH - 1); // counted bounded copy instead of lstrcpyn
             }
             else
                 *pathend = 0;

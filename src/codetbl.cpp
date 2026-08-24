@@ -69,6 +69,10 @@ char* ReadTable(const char* fileName, char* table)
     return text;
 }
 
+// Parses one conversion-table (.tcfg-like text) file into 'Data': reads
+// WINDOWS_CODE_PAGE= header, named 256-byte tables, and comments; validates
+// syntax and byte values, reporting errors via 'text' (message) while
+// continuing to the next table entry. SEH-guarded against malformed files.
 void InitAux(HWND hWindow, TIndirectArray<CCodeTablesData>& Data,
              char* fileMem, DWORD fileSize, char* fileName, char* fileNameEnd, char* textBuf,
              char* winCodePage, DWORD* identifier, char* description)
@@ -886,6 +890,11 @@ void CCodeTables::GetWinCodePage(char* buf)
     strcpy(buf, Table->WinCodePage);
 }
 
+// Decides whether a data sample ('pattern') is text and in which code page.
+// Scores each configured code table by re-encoding the sample and penalizing
+// implausible conversions (uppercase/lowercase flips, control characters,
+// broken word shapes); 'forceText' skips the binary heuristics. Returns the
+// winning code page via 'codePage' and the text verdict via 'isText'.
 void CCodeTables::RecognizeFileType(const char* pattern, int patternLen, BOOL forceText, BOOL* isText,
                                     char* codePage)
 {

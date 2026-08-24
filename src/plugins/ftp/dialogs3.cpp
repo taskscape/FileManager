@@ -3,6 +3,7 @@
 // CommentsTranslationProject: TRANSLATED
 
 #include "precomp.h"
+#include <strsafe.h> // counted bounded copies (StringCchCopyNA)
 
 //
 // ****************************************************************************
@@ -153,8 +154,7 @@ void CConfigPageServers::OnExportServer(CServerType* serverType)
     if (ImpExpInitDir[0] == 0)
         GetMyDocumentsPath(ImpExpInitDir);
     char fileName[MAX_PATH];
-    lstrcpyn(fileName, serverType->TypeName[0] == '*' ? serverType->TypeName + 1 : serverType->TypeName,
-             MAX_PATH - 4);
+    StringCchCopyNA(fileName, MAX_PATH - 4, serverType->TypeName[0] == '*' ? serverType->TypeName + 1 : serverType->TypeName, MAX_PATH - 4); // counted bounded copy instead of lstrcpyn
     strcat(fileName, ".str");
     SalamanderGeneral->SalMakeValidFileNameComponent(fileName);
 
@@ -460,8 +460,7 @@ CConfigPageServers::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                     name[0] = '*';
                     if (LOWORD(wParam) == CM_RENAMESERVER || LOWORD(wParam) == CM_COPYSERVERTO)
                     {
-                        lstrcpyn(name + 1, s != NULL ? (s->TypeName[0] == '*' ? s->TypeName + 1 : s->TypeName) : "",
-                                 SERVERTYPE_MAX_SIZE - 1);
+                        StringCchCopyNA(name + 1, SERVERTYPE_MAX_SIZE - 1, s != NULL ? (s->TypeName[0] == '*' ? s->TypeName + 1 : s->TypeName) : "", SERVERTYPE_MAX_SIZE - 1); // counted bounded copy instead of lstrcpyn
                     }
                     else
                         name[1] = 0;
@@ -775,7 +774,7 @@ void CEditServerTypeDlg::Transfer(CTransferInfo& ti)
         {
             char name[SERVERTYPE_MAX_SIZE];
             name[0] = '*';
-            lstrcpyn(name + 1, ServerType->TypeName, SERVERTYPE_MAX_SIZE - 1);
+            StringCchCopyNA(name + 1, SERVERTYPE_MAX_SIZE - 1, ServerType->TypeName, SERVERTYPE_MAX_SIZE - 1); // counted bounded copy instead of lstrcpyn
             BOOL err = FALSE;
             UpdateStr(ServerType->TypeName, name, &err);
             if (err && ServerType->TypeName[0] != 0)

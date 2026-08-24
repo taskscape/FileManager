@@ -3,6 +3,7 @@
 // CommentsTranslationProject: TRANSLATED
 
 #include "precomp.h"
+#include <strsafe.h> // counted bounded copies (StringCchCopyNA)
 #include "..\\..\\common\\monotonic_time.h"
 
 const char* LogsSeparator = "\r\n=================\r\n\r\n";
@@ -483,7 +484,7 @@ void CControlConnectionSocket::CheckCtrlConClose(BOOL notInPanel, BOOL leftPanel
                 {                                 // show it again in a message box
                     HANDLES(EnterCriticalSection(&SocketCritSect));
                     if (ConnectionLostMsg != NULL)
-                        lstrcpyn(errBuf, ConnectionLostMsg, 300);
+                        StringCchCopyNA(errBuf, 300, ConnectionLostMsg, 300); // counted bounded copy instead of lstrcpyn
                     else
                         errBuf[0] = 0;
                     SalamanderGeneral->Free(ConnectionLostMsg); // it is no longer needed
@@ -508,7 +509,7 @@ void CControlConnectionSocket::CheckCtrlConClose(BOOL notInPanel, BOOL leftPanel
         {    // show it again in a message box
             HANDLES(EnterCriticalSection(&SocketCritSect));
             if (ConnectionLostMsg != NULL)
-                lstrcpyn(errBuf, ConnectionLostMsg, 300);
+                StringCchCopyNA(errBuf, 300, ConnectionLostMsg, 300); // counted bounded copy instead of lstrcpyn
             else
                 errBuf[0] = 0;
             SalamanderGeneral->Free(ConnectionLostMsg); // it is no longer needed
@@ -791,7 +792,7 @@ BOOL CControlConnectionSocket::SendKeepAliveCmd(int logUID, const char* ftpCmd)
     {
         // Add the error to the log; ClosedCtrlConChecker will alert the user about the lost connection
         const char* e = GetOperationFatalErrorTxt(error, errBuf);
-        lstrcpyn(buf, e, 500);
+        StringCchCopyNA(buf, 500, e, 500); // counted bounded copy instead of lstrcpyn
         char* s = buf + strlen(buf);
         while (s > buf && (*(s - 1) == '\n' || *(s - 1) == '\r'))
             s--;

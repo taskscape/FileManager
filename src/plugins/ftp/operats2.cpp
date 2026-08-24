@@ -3,6 +3,7 @@
 // CommentsTranslationProject: TRANSLATED
 
 #include "precomp.h"
+#include <strsafe.h> // counted bounded copies (StringCchCopyNA)
 
 //
 // ****************************************************************************
@@ -718,7 +719,7 @@ BOOL CFTPOperation::GetServerAddress(DWORD* serverIP, char* host, int hostBufSiz
     *serverIP = ServerIP;
     if (ServerIP == INADDR_NONE) // IP address is unknown, return the host name
     {
-        lstrcpyn(host, ConnectToHost, hostBufSize);
+        StringCchCopyNA(host, hostBufSize, ConnectToHost, hostBufSize); // counted bounded copy instead of lstrcpyn
         ret = FALSE;
     }
     HANDLES(LeaveCriticalSection(&OperCritSect));
@@ -743,15 +744,15 @@ void CFTPOperation::GetConnectInfo(DWORD* serverIP, unsigned short* port, char* 
     HANDLES(EnterCriticalSection(&OperCritSect));
     *serverIP = ServerIP;
     *port = ConnectToPort;
-    lstrcpyn(host, HandleNULLStr(Host), HOST_MAX_SIZE);
+    StringCchCopyNA(host, HOST_MAX_SIZE, HandleNULLStr(Host), HOST_MAX_SIZE); // counted bounded copy instead of lstrcpyn
     *hostIP = HostIP;
     *hostPort = Port;
     *proxyType = fpstNotUsed;
     if (ProxyServer != NULL)
     {
         *proxyType = ProxyServer->ProxyType;
-        lstrcpyn(proxyUser, HandleNULLStr(ProxyServer->ProxyUser), USER_MAX_SIZE);
-        lstrcpyn(proxyPassword, HandleNULLStr(ProxyServer->ProxyPlainPassword), PASSWORD_MAX_SIZE);
+        StringCchCopyNA(proxyUser, USER_MAX_SIZE, HandleNULLStr(ProxyServer->ProxyUser), USER_MAX_SIZE); // counted bounded copy instead of lstrcpyn
+        StringCchCopyNA(proxyPassword, PASSWORD_MAX_SIZE, HandleNULLStr(ProxyServer->ProxyPlainPassword), PASSWORD_MAX_SIZE); // counted bounded copy instead of lstrcpyn
     }
     else
     {
@@ -873,16 +874,16 @@ BOOL CFTPOperation::PrepareNextScriptCmd(char* buf, int bufSize, char* logBuf, i
             if (proxyScriptParams.NeedAccount)
                 resID = IDS_WORKERUNKNOWNACCOUNT;
             if (resID != 0)
-                lstrcpyn(errDescrBuf, LoadStr(resID), 300);
+                StringCchCopyNA(errDescrBuf, 300, LoadStr(resID), 300); // counted bounded copy instead of lstrcpyn
         }
         else
         {
             if (proxySendCmdBuf[0] != 0) // we have a command to send to the server
             {
-                lstrcpyn(buf, proxySendCmdBuf, bufSize);
+                StringCchCopyNA(buf, bufSize, proxySendCmdBuf, bufSize); // counted bounded copy instead of lstrcpyn
                 if (bufSize > 0)
                     *cmdLen = (int)strlen(buf);
-                lstrcpyn(logBuf, proxyLogCmdBuf, logBufSize);
+                StringCchCopyNA(logBuf, logBufSize, proxyLogCmdBuf, logBufSize); // counted bounded copy instead of lstrcpyn
             }
             // else ; // end of the login script
         }
@@ -919,7 +920,7 @@ void CFTPOperation::GetInitFTPCommands(char* buf, int bufSize)
 {
     CALL_STACK_MESSAGE1("CFTPOperation::GetInitFTPCommands(,)");
     HANDLES(EnterCriticalSection(&OperCritSect));
-    lstrcpyn(buf, InitFTPCommands != NULL ? InitFTPCommands : "", bufSize);
+    StringCchCopyNA(buf, bufSize, InitFTPCommands != NULL ? InitFTPCommands : "", bufSize); // counted bounded copy instead of lstrcpyn
     HANDLES(LeaveCriticalSection(&OperCritSect));
 }
 
@@ -932,14 +933,14 @@ void CFTPOperation::GetLoginErrorDlgInfo(char* user, int userBufSize, char* pass
     char anonymousPasswd[PASSWORD_MAX_SIZE];
     Config.GetAnonymousPasswd(anonymousPasswd, PASSWORD_MAX_SIZE);
     HANDLES(EnterCriticalSection(&OperCritSect));
-    lstrcpyn(user, User != NULL ? User : FTP_ANONYMOUS, userBufSize);
-    lstrcpyn(password, Password != NULL ? Password : (User == NULL ? anonymousPasswd : ""), passwordBufSize);
-    lstrcpyn(account, Account != NULL ? Account : "", accountBufSize);
+    StringCchCopyNA(user, userBufSize, User != NULL ? User : FTP_ANONYMOUS, userBufSize); // counted bounded copy instead of lstrcpyn
+    StringCchCopyNA(password, passwordBufSize, Password != NULL ? Password : (User == NULL ? anonymousPasswd : ""), passwordBufSize); // counted bounded copy instead of lstrcpyn
+    StringCchCopyNA(account, accountBufSize, Account != NULL ? Account : "", accountBufSize); // counted bounded copy instead of lstrcpyn
     *proxyUsed = ProxyServer != NULL;
     if (ProxyServer != NULL)
     {
-        lstrcpyn(proxyUser, HandleNULLStr(ProxyServer->ProxyUser), proxyUserBufSize);
-        lstrcpyn(proxyPassword, HandleNULLStr(ProxyServer->ProxyPlainPassword), proxyPasswordBufSize);
+        StringCchCopyNA(proxyUser, proxyUserBufSize, HandleNULLStr(ProxyServer->ProxyUser), proxyUserBufSize); // counted bounded copy instead of lstrcpyn
+        StringCchCopyNA(proxyPassword, proxyPasswordBufSize, HandleNULLStr(ProxyServer->ProxyPlainPassword), proxyPasswordBufSize); // counted bounded copy instead of lstrcpyn
     }
     else
     {
@@ -1307,7 +1308,7 @@ void CFTPOperation::GetTargetPath(char* buf, int bufSize)
     CALL_STACK_MESSAGE1("CFTPOperation::GetDiskOperDefaults()");
 
     HANDLES(EnterCriticalSection(&OperCritSect));
-    lstrcpyn(buf, TargetPath != NULL ? TargetPath : "", bufSize);
+    StringCchCopyNA(buf, bufSize, TargetPath != NULL ? TargetPath : "", bufSize); // counted bounded copy instead of lstrcpyn
     HANDLES(LeaveCriticalSection(&OperCritSect));
 }
 
@@ -1767,7 +1768,7 @@ void CFTPOperation::GetListCommand(char* buf, int bufSize)
 {
     CALL_STACK_MESSAGE2("CFTPOperation::GetListCommand(, %d)", bufSize);
     HANDLES(EnterCriticalSection(&OperCritSect));
-    lstrcpyn(buf, (ListCommand != NULL && *ListCommand != 0 ? ListCommand : LIST_CMD_TEXT), bufSize);
+    StringCchCopyNA(buf, bufSize, (ListCommand != NULL && *ListCommand != 0 ? ListCommand : LIST_CMD_TEXT), bufSize); // counted bounded copy instead of lstrcpyn
     if (bufSize > 2 && bufSize > (int)strlen(buf) + 2)
         strcat(buf, "\r\n");
     HANDLES(LeaveCriticalSection(&OperCritSect));
@@ -1786,7 +1787,7 @@ void CFTPOperation::GetUser(char* buf, int bufSize)
 {
     CALL_STACK_MESSAGE2("CFTPOperation::GetUser(, %d)", bufSize);
     HANDLES(EnterCriticalSection(&OperCritSect));
-    lstrcpyn(buf, User != NULL ? User : FTP_ANONYMOUS, bufSize);
+    StringCchCopyNA(buf, bufSize, User != NULL ? User : FTP_ANONYMOUS, bufSize); // counted bounded copy instead of lstrcpyn
     HANDLES(LeaveCriticalSection(&OperCritSect));
 }
 
@@ -1814,7 +1815,7 @@ BOOL CFTPOperation::GetListingServerType(char* buf)
     HANDLES(EnterCriticalSection(&OperCritSect));
     BOOL ret = ListingServerType != NULL;
     if (ret)
-        lstrcpyn(buf, ListingServerType, SERVERTYPE_MAX_SIZE);
+        StringCchCopyNA(buf, SERVERTYPE_MAX_SIZE, ListingServerType, SERVERTYPE_MAX_SIZE); // counted bounded copy instead of lstrcpyn
     else
         buf[0] = 0;
     HANDLES(LeaveCriticalSection(&OperCritSect));
@@ -1945,7 +1946,7 @@ BOOL CFTPOperation::CanMakeChangesOnPath(const char* user, const char* host, uns
                       SourcePath[AssignedFSNameLenFTPS] == ':';                                                  // our fs-name is not just a prefix
         if (isFTP || isFTPS)
         {
-            lstrcpyn(buf, SourcePath + (isFTP ? AssignedFSNameLen : AssignedFSNameLenFTPS) + 1, FTP_USERPART_SIZE);
+            StringCchCopyNA(buf, FTP_USERPART_SIZE, SourcePath + (isFTP ? AssignedFSNameLen : AssignedFSNameLenFTPS) + 1, FTP_USERPART_SIZE); // counted bounded copy instead of lstrcpyn
             char *user2, *host2, *portStr2, *pathStr2;
             FTPSplitPath(buf, &user2, NULL, &host2, &portStr2, &pathStr2, NULL, userLength);
             const char* pathPart2 = NULL;
@@ -1974,7 +1975,7 @@ BOOL CFTPOperation::CanMakeChangesOnPath(const char* user, const char* host, uns
                       TargetPath[AssignedFSNameLenFTPS] == ':';                                                  // our fs-name is not just a prefix
         if (isFTP || isFTPS)
         {
-            lstrcpyn(buf, TargetPath + (isFTP ? AssignedFSNameLen : AssignedFSNameLenFTPS) + 1, FTP_USERPART_SIZE);
+            StringCchCopyNA(buf, FTP_USERPART_SIZE, TargetPath + (isFTP ? AssignedFSNameLen : AssignedFSNameLenFTPS) + 1, FTP_USERPART_SIZE); // counted bounded copy instead of lstrcpyn
             char *user2, *host2, *portStr2, *pathStr2;
             FTPSplitPath(buf, &user2, NULL, &host2, &portStr2, &pathStr2, NULL, userLength);
             const char* pathPart2 = NULL;
@@ -2015,7 +2016,7 @@ BOOL CFTPOperation::IsUploadingToServer(const char* user, const char* host, unsi
                       TargetPath[AssignedFSNameLenFTPS] == ':';                                                  // our fs-name is not just a prefix
         if (isFTP || isFTPS)
         {
-            lstrcpyn(buf, TargetPath + (isFTP ? AssignedFSNameLen : AssignedFSNameLenFTPS) + 1, FTP_USERPART_SIZE);
+            StringCchCopyNA(buf, FTP_USERPART_SIZE, TargetPath + (isFTP ? AssignedFSNameLen : AssignedFSNameLenFTPS) + 1, FTP_USERPART_SIZE); // counted bounded copy instead of lstrcpyn
             char *user2, *host2, *portStr2;
             FTPSplitPath(buf, &user2, NULL, &host2, &portStr2, NULL, NULL, userLength);
             int port2 = portStr2 != NULL ? atoi(portStr2) : IPPORT_FTP;
@@ -2043,14 +2044,14 @@ void CFTPOperation::GetUserHostPort(char* user, char* host, unsigned short* port
     if (host != NULL)
     {
         if (Host != NULL)
-            lstrcpyn(host, Host, HOST_MAX_SIZE);
+            StringCchCopyNA(host, HOST_MAX_SIZE, Host, HOST_MAX_SIZE); // counted bounded copy instead of lstrcpyn
         else
             host[0] = 0;
     }
     if (user != NULL)
     {
         if (User != NULL)
-            lstrcpyn(user, User, USER_MAX_SIZE);
+            StringCchCopyNA(user, USER_MAX_SIZE, User, USER_MAX_SIZE); // counted bounded copy instead of lstrcpyn
         else
             user[0] = 0;
     }
@@ -2160,7 +2161,7 @@ void CFTPQueueItem::GetProblemDescr(char* buf, int bufSize)
             if (WinError != NO_ERROR)
                 FTPGetErrorText(WinError, errBuf, 300);
             else
-                lstrcpyn(errBuf, LoadStr(IDS_UNKNOWNERROR), 300);
+                StringCchCopyNA(errBuf, 300, LoadStr(IDS_UNKNOWNERROR), 300); // counted bounded copy instead of lstrcpyn
             char* s = errBuf + strlen(errBuf); // orizneme EOL a '.'
             while (--s >= errBuf && (*s == '\r' || *s == '\n' || *s == '.'))
                 ;
@@ -2276,7 +2277,7 @@ void CFTPQueueItem::GetProblemDescr(char* buf, int bufSize)
             if (WinError != NO_ERROR)
                 FTPGetErrorText(WinError, errBuf, 300);
             else
-                lstrcpyn(errBuf, LoadStr(IDS_UNKNOWNERROR), 300);
+                StringCchCopyNA(errBuf, 300, LoadStr(IDS_UNKNOWNERROR), 300); // counted bounded copy instead of lstrcpyn
             char* s = errBuf + strlen(errBuf); // orizneme EOL a '.'
             while (--s >= errBuf && (*s == '\r' || *s == '\n' || *s == '.'))
                 ;
@@ -2307,7 +2308,7 @@ void CFTPQueueItem::GetProblemDescr(char* buf, int bufSize)
                     if (ProblemID == ITEMPR_UPLOADCANNOTLISTTGTPATH)
                         errBuf[0] = 0;
                     else
-                        lstrcpyn(errBuf, LoadStr(IDS_UNKNOWNERROR), 300);
+                        StringCchCopyNA(errBuf, 300, LoadStr(IDS_UNKNOWNERROR), 300); // counted bounded copy instead of lstrcpyn
                 }
                 char* s = errBuf + strlen(errBuf); // orizneme EOL a '.'
                 while (--s >= errBuf && (*s == '\r' || *s == '\n' || *s == '.'))

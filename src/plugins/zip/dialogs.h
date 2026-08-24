@@ -491,4 +491,4 @@ int CompareMenuItems(char* name1, char* name2);
 
 BOOL LoadSfxLangs(HWND dlg, char* selectedSfxFile, bool isConfig);
 BOOL LoadLangChache(HWND parent);
-int FormatNumber(__UINT64 number, char* buffer, const char* text);
+int FormatNumber(__UINT64 number, char* buffer, size_t bufferCount, const char* text);

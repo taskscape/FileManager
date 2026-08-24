@@ -3,6 +3,7 @@
 // CommentsTranslationProject: TRANSLATED
 
 #include "precomp.h"
+#include <strsafe.h> // counted bounded copies (StringCchCopyNA)
 
 //
 // ****************************************************************************
@@ -118,7 +119,7 @@ void CFTPWorker::HandleEventInWorkingState4(CFTPWorkerEvent event, BOOL& sendQui
 
         case fwssWorkUploadResolveLink: // upload copy/move file: determine what the link is (file/directory) whose name collides with the target directory on the server
         {
-            lstrcpyn(ftpPath, curItem->TgtPath, FTP_MAX_PATH);
+            StringCchCopyNA(ftpPath, FTP_MAX_PATH, curItem->TgtPath, FTP_MAX_PATH); // counted bounded copy instead of lstrcpyn
             CFTPServerPathType type = Oper->GetFTPServerPathType(ftpPath);
             if (FTPPathAppend(type, ftpPath, FTP_MAX_PATH, curItem->TgtName, TRUE))
             { // we have the path, send CWD to the examined directory on the server
@@ -635,7 +636,7 @@ void CFTPWorker::HandleEventInWorkingState4(CFTPWorkerEvent event, BOOL& sendQui
 
         case fwssWorkUploadGetTgtPath: // upload copy/move file: determine the path to the target directory on the server - start by changing into it
         {
-            lstrcpyn(ftpPath, curItem->TgtPath, FTP_MAX_PATH);
+            StringCchCopyNA(ftpPath, FTP_MAX_PATH, curItem->TgtPath, FTP_MAX_PATH); // counted bounded copy instead of lstrcpyn
             CFTPServerPathType type = Oper->GetFTPServerPathType(ftpPath);
             if (FTPPathAppend(type, ftpPath, FTP_MAX_PATH, curItem->TgtName, TRUE))
             { // we have the path, send CWD to the examined directory on the server
@@ -722,7 +723,7 @@ void CFTPWorker::HandleEventInWorkingState4(CFTPWorkerEvent event, BOOL& sendQui
                 if (FTP_DIGIT_1(replyCode) == FTP_D1_SUCCESS &&
                     FTPGetDirectoryFromReply(reply, replySize, ftpPath, FTP_MAX_PATH))
                 { // success, we have the working path
-                    lstrcpyn(WorkingPath, ftpPath, FTP_MAX_PATH);
+                    StringCchCopyNA(WorkingPath, FTP_MAX_PATH, ftpPath, FTP_MAX_PATH); // counted bounded copy instead of lstrcpyn
                     HaveWorkingPath = TRUE;
 
                     if (ShouldStop)
@@ -806,7 +807,7 @@ void CFTPWorker::HandleEventInWorkingState4(CFTPWorkerEvent event, BOOL& sendQui
                         BOOL copy = CurItem->Type == fqitUploadCopyExploreDir;
                         CQuadWord totalSize(0, 0); // total size (in bytes)
                         char sourcePath[MAX_PATH];
-                        lstrcpyn(sourcePath, CurItem->Path, MAX_PATH);
+                        StringCchCopyNA(sourcePath, MAX_PATH, CurItem->Path, MAX_PATH); // counted bounded copy instead of lstrcpyn
 
                         BOOL err = ftpQueueItems == NULL || !HaveWorkingPath || DiskWork.DiskListing == NULL ||
                                    !SalamanderGeneral->SalPathAppend(sourcePath, CurItem->Name, MAX_PATH) /* always true - an error would already have been reported by DoListDirectory() */;
@@ -825,7 +826,7 @@ void CFTPWorker::HandleEventInWorkingState4(CFTPWorkerEvent event, BOOL& sendQui
                                 char* tgtName = lstItem->Name;
                                 if (is_AS_400_QSYS_LIB_Path)
                                 {
-                                    lstrcpyn(mbrName, tgtName, MAX_PATH);
+                                    StringCchCopyNA(mbrName, MAX_PATH, tgtName, MAX_PATH); // counted bounded copy instead of lstrcpyn
                                     FTPAS400AddFileNamePart(mbrName);
                                     tgtName = mbrName;
                                 }

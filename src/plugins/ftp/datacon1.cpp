@@ -3,6 +3,7 @@
 // CommentsTranslationProject: TRANSLATED
 
 #include "precomp.h"
+#include <strsafe.h> // counted bounded copies (StringCchCopyNA)
 #include "spl_zlib.h"
 
 //
@@ -697,7 +698,7 @@ void CDataConnectionSocket::DirectFlushData()
                     DiskWork.SocketUID = UID;
                     DiskWork.MsgID = DATACON_DISKWORKWRITEFINISHED;
                     DiskWork.Type = fdwtCreateAndWriteFile;
-                    lstrcpyn(DiskWork.Name, TgtDiskFileName, MAX_PATH);
+                    StringCchCopyNA(DiskWork.Name, MAX_PATH, TgtDiskFileName, MAX_PATH); // counted bounded copy instead of lstrcpyn
                     DiskWork.WinError = NO_ERROR;
                     DiskWork.State = sqisNone;
                     if (DiskWork.OpenedFile != NULL)
@@ -1359,7 +1360,7 @@ void CDataConnectionSocket::SetDirectFlushParams(const char* tgtFileName, CCurre
     CALL_STACK_MESSAGE1("CDataConnectionSocket::SetDirectFlushParams()");
 
     HANDLES(EnterCriticalSection(&SocketCritSect));
-    lstrcpyn(TgtDiskFileName, tgtFileName, MAX_PATH);
+    StringCchCopyNA(TgtDiskFileName, MAX_PATH, tgtFileName, MAX_PATH); // counted bounded copy instead of lstrcpyn
     CurrentTransferMode = currentTransferMode;
     // Only the identity-validated binary prefix may survive an interrupted direct download.
     TgtDiskFileResumeOffset = resumeOffset;

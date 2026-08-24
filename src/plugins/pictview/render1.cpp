@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "precomp.h"
+#include <strsafe.h> // counted bounded copies (StringCchCopyNA)
 #include <zmouse.h>
 #include <shobjidl.h>
 
@@ -53,6 +54,43 @@ static HRESULT CreatePictViewShellItem(LPCTSTR path, IShellItem** item)
     HRESULT result = SHCreateItemFromParsingName(pathW, NULL, IID_PPV_ARGS(item));
     free(pathW);
     return result;
+#endif
+}
+
+// The Shell file dialog is Unicode-only, so TCHAR plug-in text converts at this boundary.
+static WCHAR* DupPictViewWide(LPCTSTR text)
+{
+#ifdef UNICODE
+    size_t len = _tcslen(text) + 1;
+    WCHAR* wide = (WCHAR*)malloc(len * sizeof(WCHAR));
+    if (wide != NULL)
+        memcpy(wide, text, len * sizeof(WCHAR));
+    return wide;
+#else
+    int len = MultiByteToWideChar(CP_ACP, 0, text, -1, NULL, 0);
+    if (len == 0)
+        return NULL;
+    WCHAR* wide = (WCHAR*)malloc(len * sizeof(WCHAR));
+    if (wide != NULL && MultiByteToWideChar(CP_ACP, 0, text, -1, wide, len) == 0)
+    {
+        free(wide);
+        return NULL;
+    }
+    return wide;
+#endif
+}
+
+static BOOL DupPictViewTcharFromWide(const WCHAR* wide, LPTSTR buffer, DWORD bufferCount)
+{
+#ifdef UNICODE
+    size_t len = wcslen(wide) + 1;
+    if ((DWORD)len > bufferCount)
+        return FALSE;
+    memcpy(buffer, wide, len * sizeof(TCHAR));
+    return TRUE;
+#else
+    int converted = WideCharToMultiByte(CP_ACP, 0, wide, -1, buffer, (int)bufferCount, NULL, NULL);
+    return converted > 0 && strlen(buffer) < bufferCount; // refuse instead of truncating
 #endif
 }
 
@@ -295,33 +333,115 @@ void CRendererWindow::SetTitle()
 
 BOOL CRendererWindow::OnFileOpen(LPCTSTR defaultDirectory)
 {
-    TCHAR file[MAX_PATH] = _T("");
-    OPENFILENAME ofn;
-    memset(&ofn, 0, sizeof(OPENFILENAME));
-    ofn.lStructSize = sizeof(OPENFILENAME);
-    ofn.hwndOwner = HWindow;
-    // I tried stuffing all extensions into the filter, but the filter stopped working.
-    // MSDN mentions no limit. IrfanView handles it like this.
+    // open dialog through the modern Shell interface; the image-extension filter
+    // resource keeps its original pipe layout and converts at this boundary
+    HRESULT comInit = CoInitialize(NULL);
+    if (FAILED(comInit) && comInit != RPC_E_CHANGED_MODE)
+        return TRUE;
+    BOOL comOwned = SUCCEEDED(comInit);
+
     TCHAR filterStr[1000];
-    lstrcpyn(filterStr, LoadStr(IDS_OPENFILTER), SizeOf(filterStr));
+    StringCchCopyNA(filterStr, SizeOf(filterStr), LoadStr(IDS_OPENFILTER), SizeOf(filterStr)); // counted bounded copy instead of lstrcpyn
     LPTSTR s = filterStr;
-    ofn.lpstrFilter = s;
     while (*s != 0) // create a double-null-terminated list
     {
         if (*s == '|')
             *s = 0;
         s++;
     }
-    ofn.lpstrFile = file;
-    ofn.nMaxFile = MAX_PATH;
-    ofn.nFilterIndex = 1;
-    ofn.lpstrInitialDir = defaultDirectory;
-    ofn.Flags = OFN_HIDEREADONLY | OFN_PATHMUSTEXIST | OFN_FILEMUSTEXIST;
-    if (SalamanderGeneral->SafeGetOpenFileName(&ofn))
+
+    // count the filter segments; they alternate description/pattern and end with an empty one
+    UINT segCount = 0;
+    for (LPCTSTR fs = filterStr; *fs != '\0'; )
     {
-        EnumFilesSourceUID = -1;
-        OpenFile(file, -1, NULL);
+        segCount++;
+        while (*fs)
+            fs++;
+        fs++;
     }
+
+    BOOL dialogOK = FALSE;
+    IFileOpenDialog* fileDialog = NULL;
+    COMDLG_FILTERSPEC* specs = segCount >= 2 ? new COMDLG_FILTERSPEC[segCount / 2] : NULL;
+    WCHAR** texts = segCount > 0 ? new WCHAR*[segCount]() : NULL; // zero-initialized so cleanup can stop at NULL
+    if (specs != NULL && texts != NULL)
+    {
+        memset(specs, 0, sizeof(COMDLG_FILTERSPEC) * (segCount / 2));
+        UINT filled = 0;
+        dialogOK = TRUE;
+        for (LPCTSTR fs = filterStr; dialogOK && *fs != '\0'; )
+        {
+            WCHAR* wide = DupPictViewWide(fs); // dup stops at the segment terminator
+            if (wide == NULL)
+            {
+                dialogOK = FALSE;
+                break;
+            }
+            texts[filled] = wide;
+            if ((filled % 2) == 0)
+                specs[filled / 2].pszName = wide;
+            else
+                specs[filled / 2].pszSpec = wide;
+            filled++;
+            while (*fs)
+                fs++;
+            fs++;
+        }
+        if (dialogOK && filled == segCount)
+        {
+            IFileOpenDialog* dialogLocal = NULL;
+            if (SUCCEEDED(CoCreateInstance(CLSID_FileOpenDialog, NULL, CLSCTX_INPROC_SERVER,
+                                           IID_PPV_ARGS(&dialogLocal))) &&
+                dialogLocal != NULL)
+            {
+                DWORD options = FOS_PATHMUSTEXIST | FOS_FILEMUSTEXIST;
+                dialogLocal->GetOptions(&options);
+                dialogLocal->SetOptions(options | FOS_PATHMUSTEXIST | FOS_FILEMUSTEXIST);
+                dialogLocal->SetFileTypes(segCount / 2, specs);
+                dialogLocal->SetFileTypeIndex(1);
+                if (defaultDirectory != NULL && *defaultDirectory != 0)
+                {
+                    IShellItem* folder = NULL;
+                    if (SUCCEEDED(CreatePictViewShellItem(defaultDirectory, &folder)))
+                    {
+                        dialogLocal->SetFolder(folder);
+                        folder->Release();
+                    }
+                }
+                if (SUCCEEDED(dialogLocal->Show(HWindow)))
+                {
+                    IShellItem* item = NULL;
+                    PWSTR pathW = NULL;
+                    if (SUCCEEDED(dialogLocal->GetResult(&item)) && item != NULL &&
+                        SUCCEEDED(item->GetDisplayName(SIGDN_FILESYSPATH, &pathW)) && pathW != NULL)
+                    {
+                        TCHAR file[MAX_PATH];
+                        // a result that cannot fit the fixed buffer is refused instead of truncated
+                        if (DupPictViewTcharFromWide(pathW, file, MAX_PATH))
+                        {
+                            EnumFilesSourceUID = -1;
+                            OpenFile(file, -1, NULL);
+                        }
+                        CoTaskMemFree(pathW);
+                    }
+                    if (item != NULL)
+                        item->Release();
+                }
+                dialogLocal->Release();
+            }
+        }
+        else
+            dialogOK = FALSE;
+    }
+    if (texts != NULL)
+    {
+        for (UINT i = 0; i < segCount && texts[i] != NULL; i++)
+            free(texts[i]);
+        delete[] texts;
+    }
+    delete[] specs;
+    if (comOwned)
+        CoUninitialize();
     return TRUE;
 } /* CRendererWindow::OnFileOpen */
 
@@ -2934,7 +3054,7 @@ BOOL CRendererWindow::RenameFileInternal(LPCTSTR oldPath, LPCTSTR oldName, TCHAR
 
             // report the change on the path (renamed file)
             TCHAR changedPath[MAX_PATH];
-            lstrcpyn(changedPath, path, MAX_PATH);
+            StringCchCopyNA(changedPath, MAX_PATH, path, MAX_PATH); // counted bounded copy instead of lstrcpyn
             SalamanderGeneral->CutDirectory(changedPath);
             SalamanderGeneral->PostChangeOnPathNotification(changedPath, FALSE);
 
@@ -3041,7 +3161,7 @@ void CRendererWindow::OnCopyTo()
     {
         CALL_STACK_MESSAGE1("CRendererWindow::OnCopyTo::IFileOperation");
         TCHAR changedPath[MAX_PATH];
-        lstrcpyn(changedPath, FileName, MAX_PATH);
+        StringCchCopyNA(changedPath, MAX_PATH, FileName, MAX_PATH); // counted bounded copy instead of lstrcpyn
         BOOL aborted = FALSE;
         HRESULT result = CopyPictViewFileWithShell(HWindow, FileName, dstName, &aborted);
         if (FAILED(result))
@@ -3061,7 +3181,7 @@ void CRendererWindow::OnDelete(BOOL toRecycle)
 
     CALL_STACK_MESSAGE1("CRendererWindow::OnDelete::IFileOperation");
     TCHAR changedPath[MAX_PATH];
-    lstrcpyn(changedPath, FileName, MAX_PATH);
+    StringCchCopyNA(changedPath, MAX_PATH, FileName, MAX_PATH); // counted bounded copy instead of lstrcpyn
     BOOL aborted = FALSE;
     HRESULT result = DeletePictViewFileWithShell(HWindow, FileName, toRecycle, &aborted);
     if (FAILED(result))
@@ -3135,7 +3255,7 @@ LRESULT CRendererWindow::OnCommand(WPARAM wParam, LPARAM lParam, BOOL* closingVi
                     {
                         s++; // root dir -> keep the backslash
                     }
-                    lstrcpyn(path, FileName, (int)min(s - FileName + 1, SizeOf(path)));
+                    StringCchCopyNA(path, (int)min(s - FileName + 1, SizeOf(path)), FileName, (int)min(s - FileName + 1, SizeOf(path))); // counted bounded copy instead of lstrcpyn
                 }
             }
             OnFileOpen(path);
@@ -3326,7 +3446,7 @@ LRESULT CRendererWindow::OnCommand(WPARAM wParam, LPARAM lParam, BOOL* closingVi
             if (Viewer->IsFullScreen())
                 Viewer->ToggleFullScreen();
 
-            lstrcpyn(Focus_Path, FileName, MAX_PATH);
+            StringCchCopyNA(Focus_Path, MAX_PATH, FileName, MAX_PATH); // counted bounded copy instead of lstrcpyn
             SalamanderGeneral->PostMenuExtCommand(CMD_INTERNAL_FOCUS, TRUE);
             Sleep(500);        // switching to another window occurs, so in theory this Sleep should not hurt anything
             Focus_Path[0] = 0; // after 0.5 seconds we no longer want the focus (handles hitting the beginning of Salamander's BUSY mode)

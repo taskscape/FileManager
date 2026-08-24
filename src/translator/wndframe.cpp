@@ -964,17 +964,8 @@ CFrameWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         {
             char file[MAX_PATH];
             file[0] = 0;
-            OPENFILENAME ofn;
-            memset(&ofn, 0, sizeof(OPENFILENAME));
-            ofn.lStructSize = sizeof(OPENFILENAME);
-            ofn.hwndOwner = HWindow;
-            ofn.lpstrFilter = "Translator Project (*.atp)\0*.atp\0";
-            ofn.lpstrFile = file;
-            ofn.nMaxFile = MAX_PATH;
-            ofn.nFilterIndex = 1;
-            ofn.Flags = OFN_PATHMUSTEXIST | OFN_HIDEREADONLY | OFN_NOCHANGEDIR | OFN_FILEMUSTEXIST;
-
-            if (GetOpenFileName(&ofn))
+            if (TranslatorGetFileName(HWindow, NULL, "Translator Project (*.atp)|*.atp|",
+                                      file, FALSE, NULL, FALSE))
             {
                 if (QueryClose())
                 {
@@ -1046,20 +1037,8 @@ CFrameWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 
             char fileName[MAX_PATH];
             strcpy_s(fileName, Data.ExportFile);
-            OPENFILENAME ofn;
-            memset(&ofn, 0, sizeof(OPENFILENAME));
-            ofn.lStructSize = sizeof(OPENFILENAME);
-            ofn.hwndOwner = HWindow;
-            ofn.lpstrFilter = "Text file (*.txt)\0*.txt\0";
-            ofn.lpstrDefExt = "txt";
-            ofn.lpstrFile = fileName;
-            ofn.nMaxFile = MAX_PATH;
-            ofn.nFilterIndex = 1;
-            ofn.lpstrTitle = "Export Translation";
-            ofn.Flags = OFN_PATHMUSTEXIST | OFN_HIDEREADONLY | OFN_LONGNAMES | OFN_NOCHANGEDIR |
-                        OFN_OVERWRITEPROMPT;
-
-            if (GetSaveFileName(&ofn))
+            if (TranslatorGetFileName(HWindow, "Export Translation", "Text file (*.txt)|*.txt|",
+                                      fileName, TRUE, "txt", TRUE))
             {
                 strcpy_s(Data.ExportFile, fileName);
                 Data.SetDirty();
@@ -1075,21 +1054,10 @@ CFrameWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 
             char fileName[MAX_PATH];
             strcpy_s(fileName, Data.ExportAsTextArchiveFile);
-            OPENFILENAME ofn;
-            memset(&ofn, 0, sizeof(OPENFILENAME));
-            ofn.lStructSize = sizeof(OPENFILENAME);
-            ofn.hwndOwner = HWindow;
-            ofn.lpstrFilter = "Salamander Language Translation (*.slt)\0*.slt\0";
-            ofn.lpstrDefExt = "slt";
-            ofn.lpstrFile = fileName;
-            ofn.nMaxFile = MAX_PATH;
-            ofn.nFilterIndex = 1;
-            ofn.lpstrTitle = "Export Translation as Text Archive";
-            ofn.Flags = OFN_PATHMUSTEXIST | OFN_HIDEREADONLY | OFN_LONGNAMES | OFN_NOCHANGEDIR /* |
-                      OFN_OVERWRITEPROMPT*/
-                ;                                                                              // The overwrite prompt is handled later in Data.ExportAsTextArchive
-
-            if (GetSaveFileName(&ofn))
+            // The overwrite prompt is handled later in Data.ExportAsTextArchive
+            if (TranslatorGetFileName(HWindow, "Export Translation as Text Archive",
+                                      "Salamander Language Translation (*.slt)|*.slt|",
+                                      fileName, TRUE, "slt", FALSE))
             {
                 strcpy_s(Data.ExportAsTextArchiveFile, fileName);
                 Data.SetDirty();
@@ -1105,17 +1073,8 @@ CFrameWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 
             char fileName[MAX_PATH];
             strcpy_s(fileName, Data.ExportAsTextArchiveFile);
-            OPENFILENAME ofn;
-            memset(&ofn, 0, sizeof(OPENFILENAME));
-            ofn.lStructSize = sizeof(OPENFILENAME);
-            ofn.hwndOwner = HWindow;
-            ofn.lpstrFilter = "Salamander Language Translation (*.slt)\0*.slt\0";
-            ofn.lpstrFile = fileName;
-            ofn.nMaxFile = MAX_PATH;
-            ofn.nFilterIndex = 1;
-            ofn.Flags = OFN_PATHMUSTEXIST | OFN_HIDEREADONLY | OFN_NOCHANGEDIR | OFN_FILEMUSTEXIST;
-
-            if (GetOpenFileName(&ofn))
+            if (TranslatorGetFileName(HWindow, NULL, "Salamander Language Translation (*.slt)|*.slt|",
+                                      fileName, FALSE, NULL, FALSE))
             {
                 strcpy_s(Data.ExportAsTextArchiveFile, fileName);
                 if (Data.ImportTextArchive(fileName, TRUE))

@@ -3,6 +3,7 @@
 // CommentsTranslationProject: TRANSLATED
 
 #include "precomp.h"
+#include <strsafe.h> // counted bounded copies (StringCchCopyNA)
 
 //
 // ****************************************************************************
@@ -79,7 +80,7 @@ void CFTPWorker::OpenActDataCon(CFTPWorkerSubState waitForListen, char* errBuf, 
             else
                 _snprintf_s(ErrorDescr, _TRUNCATE, LoadStr(IDS_PROXYERRUNABLETOCON));
             _snprintf_s(errBuf, 50 + FTP_MAX_PATH, _TRUNCATE, LoadStr(IDS_LOGMSGDATCONERROR), ErrorDescr);
-            lstrcpyn(ErrorDescr, errBuf, FTPWORKER_ERRDESCR_BUFSIZE); // we want the error text to contain "data con. err.:"
+            StringCchCopyNA(ErrorDescr, FTPWORKER_ERRDESCR_BUFSIZE, errBuf, FTPWORKER_ERRDESCR_BUFSIZE); // counted bounded copy instead of lstrcpyn // we want the error text to contain "data con. err.:"
             CorrectErrorDescr();
 
             // Write the timeout to the log.
@@ -174,7 +175,7 @@ void CFTPWorker::WaitForListen(CFTPWorkerEvent event, BOOL& handleShouldStop, ch
 
                     // Prepare the error (timeout) text into 'ErrorDescr'
                     if (errBuf[0] == 0)
-                        lstrcpyn(ErrorDescr, LoadStr(IDS_PROXYERROPENACTDATA), FTPWORKER_ERRDESCR_BUFSIZE);
+                        StringCchCopyNA(ErrorDescr, FTPWORKER_ERRDESCR_BUFSIZE, LoadStr(IDS_PROXYERROPENACTDATA), FTPWORKER_ERRDESCR_BUFSIZE); // counted bounded copy instead of lstrcpyn
                     else
                         _snprintf_s(ErrorDescr, _TRUNCATE, LoadStr(IDS_LOGMSGDATCONERROR), errBuf);
                     needRetry = TRUE;
@@ -205,7 +206,7 @@ void CFTPWorker::WaitForListen(CFTPWorkerEvent event, BOOL& handleShouldStop, ch
                 WorkerDataConState = wdcsDoesNotExist;
             }
             if (errBuf[0] == 0)
-                lstrcpyn(ErrorDescr, LoadStr(IDS_PREPACTDATACONTIMEOUT), FTPWORKER_ERRDESCR_BUFSIZE);
+                StringCchCopyNA(ErrorDescr, FTPWORKER_ERRDESCR_BUFSIZE, LoadStr(IDS_PREPACTDATACONTIMEOUT), FTPWORKER_ERRDESCR_BUFSIZE); // counted bounded copy instead of lstrcpyn
             else
                 _snprintf_s(ErrorDescr, _TRUNCATE, LoadStr(IDS_LOGMSGDATCONERROR), errBuf);
             needRetry = TRUE;
@@ -487,9 +488,9 @@ void CFTPWorker::HandleEventInWorkingState2(CFTPWorkerEvent event, BOOL& sendQui
             }
 
             if (UploadDirGetTgtPathListing)
-                lstrcpyn(ftpPath, tgtPath, FTP_MAX_PATH);
+                StringCchCopyNA(ftpPath, FTP_MAX_PATH, tgtPath, FTP_MAX_PATH); // counted bounded copy instead of lstrcpyn
             else
-                lstrcpyn(ftpPath, CurItem->Path, FTP_MAX_PATH);
+                StringCchCopyNA(ftpPath, FTP_MAX_PATH, CurItem->Path, FTP_MAX_PATH); // counted bounded copy instead of lstrcpyn
             CFTPServerPathType type = Oper->GetFTPServerPathType(ftpPath);
             if (UploadDirGetTgtPathListing || FTPPathAppend(type, ftpPath, FTP_MAX_PATH, CurItem->Name, TRUE))
             { // we have the path; send CWD to the server to enter the inspected directory
@@ -583,11 +584,11 @@ void CFTPWorker::HandleEventInWorkingState2(CFTPWorkerEvent event, BOOL& sendQui
                             BOOL cycle = FALSE;
                             if (!UploadDirGetTgtPathListing)
                             {
-                                lstrcpyn(WorkingPath, ftpPath, FTP_MAX_PATH);
+                                StringCchCopyNA(WorkingPath, FTP_MAX_PATH, ftpPath, FTP_MAX_PATH); // counted bounded copy instead of lstrcpyn
                                 HaveWorkingPath = TRUE;
 
                                 // Check whether the path did not shorten (jump to the parent directory = guaranteed endless loop).
-                                lstrcpyn(ftpPath, CurItem->Path, FTP_MAX_PATH);
+                                StringCchCopyNA(ftpPath, FTP_MAX_PATH, CurItem->Path, FTP_MAX_PATH); // counted bounded copy instead of lstrcpyn
                                 CFTPServerPathType type = Oper->GetFTPServerPathType(ftpPath);
                                 if (FTPPathAppend(type, ftpPath, FTP_MAX_PATH, CurItem->Name, TRUE))
                                 { // perform the test only if composing the path succeeds - "always true"
@@ -775,7 +776,7 @@ void CFTPWorker::HandleEventInWorkingState2(CFTPWorkerEvent event, BOOL& sendQui
                 StartLstTimeOfListing = IncListingCounter();
 
                 Oper->GetListCommand(buf, 200 + FTP_MAX_PATH);
-                lstrcpyn(errBuf, buf, 50 + FTP_MAX_PATH);
+                StringCchCopyNA(errBuf, 50 + FTP_MAX_PATH, buf, 50 + FTP_MAX_PATH); // counted bounded copy instead of lstrcpyn
                 cmdLen = (int)strlen(buf);
                 CommandTransfersData = TRUE;
                 sendCmd = TRUE;
@@ -1058,7 +1059,7 @@ void CFTPWorker::HandleEventInWorkingState2(CFTPWorkerEvent event, BOOL& sendQui
                                     else
                                     {
                                         if (sslErrorOccured != SSLCONERR_NOERROR)
-                                            lstrcpyn(errText, LoadStr(IDS_ERRDATACONSSLCONNECTERROR), 200 + FTP_MAX_PATH);
+                                            StringCchCopyNA(errText, 200 + FTP_MAX_PATH, LoadStr(IDS_ERRDATACONSSLCONNECTERROR), 200 + FTP_MAX_PATH); // counted bounded copy instead of lstrcpyn
                                         else
                                         {
                                             errText[0] = 0;
@@ -1067,14 +1068,14 @@ void CFTPWorker::HandleEventInWorkingState2(CFTPWorkerEvent event, BOOL& sendQui
                                                  FTP_DIGIT_2(listCmdReplyCode) != FTP_D2_CONNECTION && !isVMSFileNotFound) &&
                                                 ListCmdReplyText != NULL)
                                             { // if we do not have a network error description from the server, use the system description
-                                                lstrcpyn(errText, ListCmdReplyText, 200 + FTP_MAX_PATH);
+                                                StringCchCopyNA(errText, 200 + FTP_MAX_PATH, ListCmdReplyText, 200 + FTP_MAX_PATH); // counted bounded copy instead of lstrcpyn
                                             }
 
                                             if (errText[0] == 0 && errBuf[0] != 0) // try to take the error text from the proxy server
-                                                lstrcpyn(errText, errBuf, 200 + FTP_MAX_PATH);
+                                                StringCchCopyNA(errText, 200 + FTP_MAX_PATH, errBuf, 200 + FTP_MAX_PATH); // counted bounded copy instead of lstrcpyn
 
                                             if (errText[0] == 0 && decomprErr)
-                                                lstrcpyn(errText, LoadStr(IDS_ERRDATACONDECOMPRERROR), 200 + FTP_MAX_PATH);
+                                                StringCchCopyNA(errText, 200 + FTP_MAX_PATH, LoadStr(IDS_ERRDATACONDECOMPRERROR), 200 + FTP_MAX_PATH); // counted bounded copy instead of lstrcpyn
                                         }
 
                                         // Item error; record this state into it.
@@ -1251,7 +1252,7 @@ void CFTPWorker::HandleEventInWorkingState2(CFTPWorkerEvent event, BOOL& sendQui
                                                                     const char* s = serverType->TypeName;
                                                                     if (*s == '*')
                                                                         s++;
-                                                                    lstrcpyn(listingServerType, s, SERVERTYPE_MAX_SIZE);
+                                                                    StringCchCopyNA(listingServerType, SERVERTYPE_MAX_SIZE, s, SERVERTYPE_MAX_SIZE); // counted bounded copy instead of lstrcpyn
                                                                 }
                                                                 needSimpleListing = err2; // either we parsed the listing successfully or a low-memory error occurred; exit
                                                                 break;
@@ -1285,7 +1286,7 @@ void CFTPWorker::HandleEventInWorkingState2(CFTPWorkerEvent event, BOOL& sendQui
                                                                 const char* s = serverType->TypeName;
                                                                 if (*s == '*')
                                                                     s++;
-                                                                lstrcpyn(listingServerType, s, SERVERTYPE_MAX_SIZE);
+                                                                StringCchCopyNA(listingServerType, SERVERTYPE_MAX_SIZE, s, SERVERTYPE_MAX_SIZE); // counted bounded copy instead of lstrcpyn
                                                             }
                                                             needSimpleListing = err2; // either we parsed the listing successfully or a low-memory error occurred; exit
                                                             break;
@@ -1300,8 +1301,7 @@ void CFTPWorker::HandleEventInWorkingState2(CFTPWorkerEvent event, BOOL& sendQui
                                     {
                                         if (needSimpleListing) // unknown listing format
                                         {                      // write "Unknown Server Type" to the log
-                                            lstrcpyn(errText, LoadStr(listingServerType[0] == 0 ? IDS_LOGMSGUNKNOWNSRVTYPE : IDS_LOGMSGUNKNOWNSRVTYPE2),
-                                                     199 + FTP_MAX_PATH);
+                                            StringCchCopyNA(errText, 199 + FTP_MAX_PATH, LoadStr(listingServerType[0] == 0 ? IDS_LOGMSGUNKNOWNSRVTYPE : IDS_LOGMSGUNKNOWNSRVTYPE2), 199 + FTP_MAX_PATH); // counted bounded copy instead of lstrcpyn
                                             Logs.LogMessage(LogUID, errText, -1, TRUE);
 
                                             // Item error; record this state into it.

@@ -615,7 +615,7 @@ BOOL LoadLangChache(HWND parent)
     return TRUE;
 }
 
-int FormatNumber(__UINT64 number, char* buffer, const char* text)
+int FormatNumber(__UINT64 number, char* buffer, size_t bufferCount, const char* text)
 {
     CALL_STACK_MESSAGE3("FormatNumber(0x%I64X, , %s)", number, text);
     __UINT64 i;
@@ -638,9 +638,20 @@ int FormatNumber(__UINT64 number, char* buffer, const char* text)
     }
     dest2 = buffer;
     dest--;
-    while (dest >= buf1)
+    while (dest >= buf1 && dest2 < buffer + bufferCount - 1)
         *dest2++ = *dest--;
+    if (dest2 >= buffer + bufferCount - 1)
+    { // the grouped number alone cannot fit the caller's fixed presentation buffer
+        *buffer = 0;
+        return 0;
+    }
     *dest2++ = ' ';
-    lstrcpy(dest2, text);
-    return lstrlen(buffer);
+    // counted append of the unit label keeps the composed label inside the fixed buffer
+    if (FAILED(StringCchCopyA(dest2, bufferCount - (dest2 - buffer), text)))
+    {
+        *buffer = 0;
+        return 0;
+    }
+    // FormatNumber retains its int return contract for callers that size UI labels.
+    return static_cast<int>(strlen(buffer));
 }

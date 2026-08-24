@@ -448,6 +448,10 @@ void CToolBar::DrawItem(int index)
     HANDLES(ReleaseDC(HWindow, hDC));
 }
 
+// Draws one tool-bar item (button, separator, or text) at its stored offset:
+// clears the background, paints pressed/checked/hot states with themed edges,
+// centers the icon (or text for text items) per vertical/horizontal layout.
+// Index validity is guarded - stale repaints have crashed here before.
 void CToolBar::DrawItem(HDC hDC, int index)
 {
     CALL_STACK_MESSAGE_NONE

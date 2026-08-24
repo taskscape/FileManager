@@ -102,7 +102,8 @@ BOOL ErrorHelper(HWND parent, const char* message, int lastError, va_list arglis
     vsprintf(buf, message, arglist);
     if (lastError != ERROR_SUCCESS)
     {
-        int l = lstrlen(buf);
+        // FormatMessage uses an int-compatible buffer remainder, and buf is fixed at 1024 bytes.
+        int l = static_cast<int>(strlen(buf));
         FormatMessage(FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS, NULL, lastError,
                       MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), buf + l, 1024 - l, NULL);
     }
@@ -216,8 +217,9 @@ Concatenate(const char* string1, const char* string2)
     static char buffer[5120];
     static int iterator = 0;
 
-    int len1 = lstrlen(string1);
-    int len2 = lstrlen(string2);
+    // Concatenate uses int lengths for its fixed 5120-byte ring buffer.
+    int len1 = static_cast<int>(strlen(string1));
+    int len2 = static_cast<int>(strlen(string2));
 
     if (len1 + len2 >= 5120)
         return "STRING TOO LONG";

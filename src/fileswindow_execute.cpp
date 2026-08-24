@@ -53,6 +53,11 @@ void CFilesWindow::HandsOff(BOOL off)
     }
 }
 
+// Executes the item at 'index' (Enter/double-click): directories enter them
+// (disk subdirectory, archive, or plug-in FS path), files are opened via
+// associations / internal viewer / editor according to type and configuration,
+// with the DOS-name fallback when the long name is not accessible on disk.
+// Archives and executables inside archives get extraction-then-run handling.
 void CFilesWindow::Execute(int index)
 {
     CALL_STACK_MESSAGE2("CFilesWindow::Execute(%d)", index);
@@ -1644,6 +1649,12 @@ void CFilesWindow::InvalidateChangesInPanelWeHaveNewListing()
     }
 }
 
+// Changes the panel to a disk path: validates the path length/format, handles
+// root/UPDIR navigation, removable-media availability (prompting to retry with
+// disk insertion; 'canForce' bypasses), UNC accessibility checks, and
+// re-entrancy during refreshes ('isRefresh'). On success updates the panel
+// listing and scroll/focus hints; 'failReason' reports CHPPFR_* codes for
+// callers that need the failure classification.
 BOOL CFilesWindow::ChangePathToDisk(HWND parent, const char* path, int suggestedTopIndex,
                                     const char* suggestedFocusName, BOOL* noChange,
                                     BOOL refreshListBox, BOOL canForce, BOOL isRefresh, int* failReason,
@@ -2007,6 +2018,11 @@ BOOL CFilesWindow::ChangePathToDisk(HWND parent, const char* path, int suggested
     return ret;
 }
 
+// Changes the panel into 'archive' at subpath 'archivePath': opens the archive
+// with a matching packer/unpacker plugin (or the internal ZIP reader), keeps
+// the panel's archive state consistent when already inside the same archive,
+// and applies scroll/focus hints. History navigation ('isHistory') skips
+// redundant re-listing. Reports via 'noChange'/'failReason'.
 BOOL CFilesWindow::ChangePathToArchive(const char* archive, const char* archivePath,
                                        int suggestedTopIndex, const char* suggestedFocusName,
                                        BOOL forceUpdate, BOOL* noChange, BOOL refreshListBox,
@@ -2431,6 +2447,12 @@ BOOL CFilesWindow::ChangePathToArchive(const char* archive, const char* archiveP
     return ok;
 }
 
+// Core of plug-in FS navigation: asks the plugin FS interface to change to
+// 'fsUserPart' and list its content into 'dir' (listing may be reused from
+// the other panel or kept when the change fails - 'keepOldListing'),
+// translating between history-navigation modes, forced updates, detached-FS
+// restoration, and focus-file requests ('cutFileName'). Handles shorter-path
+// fallbacks when a subpath no longer exists.
 BOOL CFilesWindow::ChangeAndListPathOnFS(const char* fsName, int fsNameIndex, const char* fsUserPart,
                                          CPluginFSInterfaceEncapsulation& pluginFS, CSalamanderDirectory* dir,
                                          CPluginDataInterfaceAbstract*& pluginData, BOOL& shorterPath,
@@ -2714,6 +2736,12 @@ BOOL CFilesWindow::ChangeAndListPathOnFS(const char* fsName, int fsNameIndex, co
     return ok;
 }
 
+// Changes the panel to a plug-in filesystem path ('fsName' + 'fsUserPart').
+// Finds or opens the matching plugin FS interface, may detach it from the
+// other panel when needed, focuses 'suggestedFocusName', and honors
+// 'forceUpdate' to re-list even if already there. 'mode' selects change
+// semantics (e.g. history navigation); 'convertPathToInternal' adapts
+// externally formatted paths. Reports via 'noChange'/'failReason'.
 BOOL CFilesWindow::ChangePathToPluginFS(const char* fsName, const char* fsUserPart, int suggestedTopIndex,
                                         const char* suggestedFocusName, BOOL forceUpdate, int mode,
                                         BOOL* noChange, BOOL refreshListBox, int* failReason, BOOL isRefresh,

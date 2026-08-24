@@ -207,6 +207,12 @@ char* PackGetField(char* buffer, const int index, const int nameidx, const char 
 //        index is the index in PackTable table corresponding to the given line
 //   OUT: CSalamanderDirectory is created and filled with archive data
 
+// Parses one line of an external archiver's listing into a CFileData entry
+// using the user-configurable field layout ('configTable': name/size/date/
+// time column indexes and separators). Normalizes the name (leading slash
+// strip, forward to backslashes), parses sizes/dates with format tolerance,
+// and classifies directories vs. files. 'ARJHack' applies the ARJ-specific
+// quirk fixes. Failures route through PackErrorHandlerPtr for user feedback.
 BOOL PackScanLine(char* buffer, CSalamanderDirectory& dir, const int index,
                   const SPackBrowseTable* configTable, BOOL ARJHack)
 {
@@ -578,6 +584,10 @@ BOOL PackScanLine(char* buffer, CSalamanderDirectory& dir, const int index,
 //        pluginData is the interface to column data defined by the archiver plug-in
 //        plugin is the plug-in record that performed ListArchive
 
+// Lists an archive into 'dir' by dispatching on its configured format:
+// internal plug-in archivers (ZIP via pluginData interface) or external
+// command-line archivers whose listing output is parsed. Errors route through
+// PackErrorHandlerPtr.
 BOOL PackList(CFilesWindow* panel, const char* archiveFileName, CSalamanderDirectory& dir,
               CPluginDataInterfaceAbstract*& pluginData, CPluginData*& plugin)
 {
@@ -1003,6 +1013,9 @@ BOOL PackList(CFilesWindow* panel, const char* archiveFileName, CSalamanderDirec
 //        lineArray is the array of lines from the archiver output
 //   OUT: dir is created and filled with archive data
 
+// Parses UC2 archiver listing output (line array) into 'dir', tracking the
+// current directory across indented entries and removing UC2's helper result
+// file. Errors route through PackErrorHandlerPtr.
 BOOL PackUC2List(const char* archiveFileName, CPackLineArray& lineArray,
                  CSalamanderDirectory& dir)
 {

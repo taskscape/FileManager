@@ -488,6 +488,12 @@ CPluginsDlg::OnDrag()
 */
 
 INT_PTR
+// Dialog procedure of the Plugins configuration page: builds the plug-in
+// list view (columns, sortable header with sort/up/down buttons), hyperlink
+// to the plug-ins web page, and the Add drop-down; WM_COMMAND handles
+// add/remove/configure/copy-to-other-panel actions and the "show in bar" /
+// "show in change-drive menu" check boxes, keeping the list and Configuration
+// in sync on OK.
 CPluginsDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 {
     SLOW_CALL_STACK_MESSAGE4("CPluginsDlg::DialogProc(0x%X, 0x%IX, 0x%IX)", uMsg, wParam, lParam);

@@ -221,7 +221,7 @@ BOOL ParseStorage(CSalamanderDirectoryAbstract* Dir, LPSTORAGE CF, LPMALLOC pIMa
         if (fileData.Ext != NULL)
             fileData.Ext++; // ".cvspass" is an extension on Windows
         else
-            fileData.Ext = fileData.Name + lstrlen(fileData.Name);
+            fileData.Ext = fileData.Name + strlen(fileData.Name); // CRT length instead of the legacy Win32 length API
         fileData.Size = CQuadWord(element.cbSize.u.LowPart, element.cbSize.u.HighPart);
         fileData.Attr = 0;
         if (element.type == STGTY_STORAGE)
@@ -245,7 +245,7 @@ BOOL ParseStorage(CSalamanderDirectoryAbstract* Dir, LPSTORAGE CF, LPMALLOC pIMa
         fileData.LastWrite.dwLowDateTime = pFT->dwLowDateTime;
         fileData.LastWrite.dwHighDateTime = pFT->dwHighDateTime;
         fileData.DosName = NULL;
-        fileData.NameLen = lstrlen(fileData.Name);
+        fileData.NameLen = strlen(fileData.Name); // CRT length instead of the legacy Win32 length API
         fileData.IsOffline = 0;
         if (element.type == STGTY_STORAGE)
         {
@@ -537,7 +537,8 @@ BOOL Error(HRESULT hr, int error, ...)
     va_end(arglist);
     if (hr != S_OK)
     {
-        int l = lstrlen(buf);
+        // FormatMessage uses an int-compatible buffer remainder, and buf is fixed at 1024 bytes.
+        int l = static_cast<int>(strlen(buf));
         FormatMessage(FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS, NULL, hr,
                       MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), buf + l, 1024 - l, NULL);
     }

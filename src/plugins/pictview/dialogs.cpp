@@ -1842,7 +1842,7 @@ void CCopyToDlg::Validate(CTransferInfo& ti)
 
     // put the full path of the viewed file into srcDir and trim off the name
     TCHAR srcDir[MAX_PATH];
-    lstrcpyn(srcDir, SrcName, SizeOf(srcDir));
+    StringCchCopyNA(srcDir, SizeOf(srcDir), SrcName, SizeOf(srcDir)); // counted bounded copy instead of lstrcpyn
     LPTSTR namePart = (LPTSTR)_tcsrchr(srcDir, '\\');
     if (namePart == NULL)
     {
@@ -1885,7 +1885,7 @@ void CCopyToDlg::Transfer(CTransferInfo& ti)
         if (ti.Type == ttDataToWindow)
         {
             if (G.CopyToDestinations[i] != NULL)
-                lstrcpyn(buff, G.CopyToDestinations[i], SizeOf(buff));
+                StringCchCopyNA(buff, SizeOf(buff), G.CopyToDestinations[i], SizeOf(buff)); // counted bounded copy instead of lstrcpyn
             else
                 buff[0] = 0;
         }

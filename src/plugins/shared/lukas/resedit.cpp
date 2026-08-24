@@ -773,7 +773,8 @@ BOOL CResDir::AddResource(LPCSTR type, LPCSTR name, WORD language, void* data, D
 
     if ((DWORD)(DWORD_PTR)n & 0xFFFF0000)
     {
-        int len = lstrlen(n);
+        // The conversion and allocation APIs use int lengths, while the source is a bounded resource name.
+        int len = static_cast<int>(strlen(n));
         buf = (WCHAR*)malloc(2 * len + 2);
         if (!buf)
             return FALSE;

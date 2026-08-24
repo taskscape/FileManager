@@ -237,6 +237,10 @@ BOOL CStaticText::SetTextToDblQuotesIfNeeded(const char* text)
     return SetText(text);
 }
 
+// Precomputes the text layout for painting: measures the text with the
+// control font (wide API when available) and prepares ellipsis handling
+// (PATH/END ellipsis flags), clipping decisions, and word-wrap state so
+// WM_PAINT can render without measuring again.
 void CStaticText::PrepareForPaint()
 {
     ClipDraw = FALSE;
@@ -661,6 +665,10 @@ BOOL CStaticText::ShowHint()
 }
 
 LRESULT
+// Message procedure of the owner-drawn static text control: resizes the
+// off-screen bitmap and re-prepares layout on size/enable changes, suppresses
+// background erasing (paint covers everything), and forwards mouse messages
+// for tooltip/copy behavior.
 CStaticText::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 {
     SLOW_CALL_STACK_MESSAGE4("CStaticText::WindowProc(0x%X, 0x%IX, 0x%IX)", uMsg, wParam, lParam);

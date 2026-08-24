@@ -3,6 +3,7 @@
 // CommentsTranslationProject: TRANSLATED
 
 #include "precomp.h"
+#include <strsafe.h> // counted bounded copies (StringCchCopyNA)
 
 #include "cfgdlg.h"
 #include "mainwnd.h"
@@ -513,6 +514,14 @@ void AddStringToNames(TIndirectArray<char>* usedNames, const char* txt)
     }
 }
 
+// Builds the copy/move operation script for the panel selection into
+// 'targetDir' (the "main" variant used by the copy/move dialog). Walks the
+// selected items recursively (subdirectories included), resolves per-item
+// overwrite/skip decisions, detects fast-directory-move eligibility
+// (same-volume rename instead of copy+delete), applies the read-only-clear
+// mask, and accumulates sizes for progress accounting. Resets all Skip*/
+// Confirm*All bookkeeping flags at entry. Returns FALSE when the script
+// could not be built (memory, interrupted).
 BOOL CFilesWindow::BuildScriptMain2(COperations* script, BOOL copy, char* targetDir,
                                     CCopyMoveData* data)
 {
@@ -1133,6 +1142,13 @@ void CFilesWindow::DropCopyMove(BOOL copy, char* targetPath, CCopyMoveData* data
     }
 }
 
+// General operation-script builder for the active panel: 'type' selects the
+// action (delete, change attributes, change case, calculate occupied space,
+// ...), inputs are either a selection array ('selection'/'selCount') or the
+// single 'oneFile'. Applies the filename 'mask' filter and 'filterCriteria',
+// optionally only accumulating sizes ('onlySize'), fills 'attrsData'/
+// 'chCaseData' outputs for the respective dialogs, and resets the shared
+// Skip*/Confirm*All flags. Returns FALSE when interrupted or out of memory.
 BOOL CFilesWindow::BuildScriptMain(COperations* script, CActionType type,
                                    char* targetPath, char* mask, int selCount,
                                    int* selection, CFileData* oneFile,

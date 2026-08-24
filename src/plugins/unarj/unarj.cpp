@@ -49,6 +49,7 @@
  */
 
 #include "precomp.h"
+#include <strsafe.h> // counted bounded copies (StringCchCopyNA)
 
 #include "array2.h"
 
@@ -450,16 +451,17 @@ int ReadHeader(BOOL first, CARJHeaderData* headerData)
         ext_size = 0;
 
     char* hdr_filename = (char*)&header[first_hdr_size];
-    lstrcpyn(headerData->FileName, hdr_filename, ARJ_MAX_PATH);
+    StringCchCopyNA(headerData->FileName, ARJ_MAX_PATH, hdr_filename, ARJ_MAX_PATH); // counted bounded copy instead of lstrcpyn
     if (host_os != OS && host_os != 11) // neither DOS nor Win32
-        FixParity((uchar*)headerData->FileName, lstrlen(headerData->FileName));
+        // FixParity uses a DWORD byte count, and FileName is bounded by ARJ_MAX_PATH.
+        FixParity((uchar*)headerData->FileName, static_cast<DWORD>(strlen(headerData->FileName)));
     if ((arj_flags & PATHSYM_FLAG) != 0)
         DecodePath(headerData->FileName);
     EnsureBackslashes(headerData->FileName);
     OemToChar(headerData->FileName, headerData->FileName);
 
     /*hdr_comment = (char *)&header[first_hdr_size + strlen(hdr_filename) + 1];
-  lstrcpyn(comment, hdr_comment, sizeof(comment));
+  StringCchCopyNA(comment, sizeof(comment), hdr_comment, sizeof(comment)); // counted bounded copy instead of lstrcpyn
   if (host_os != OS)
       strparity((uchar *)comment);*/
 

@@ -133,7 +133,9 @@ void* MemCpy(void* dst, const void* src, unsigned count);
 // Routines from SHLWAPI.DLL
 //
 
-BOOL PathAppend(LPTSTR pPath, LPCTSTR pMore);
+// counted copy for the CRT-free build: fails cleanly instead of overrunning fixed buffers
+BOOL SfxStrCopy(char* dest, size_t destCount, const char* source);
+BOOL PathAppend(LPTSTR pPath, size_t pathCount, LPCTSTR pMore);
 //BOOL PathAddExtension(LPTSTR pszPath, LPCTSTR pszExtension);
 BOOL PathRemoveFileSpec(LPTSTR pszPath);
 LPTSTR PathAddBackslash(LPTSTR pszPath);

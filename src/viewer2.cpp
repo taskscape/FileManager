@@ -1084,6 +1084,13 @@ BOOL CViewerWindow::FindNextEOL(HANDLE* hFile, __int64 seek, __int64 maxSeek, __
     return !fatalErr && nextLineBegin != -1;
 }
 
+// Locates the start of the line preceding 'seek' by scanning backwards for
+// end-of-line characters (block-wise via Prepare buffers). Handles wrap-aware
+// tab collection ('collectTabs'), auto-switch to HEX view when a "line"
+// exceeds TEXT_MAX_LINE_LEN from the file start, and optional wrapping to the
+// end of the file ('allowWrap'). Outputs 'lineBegin'/'previousLineEnd' and,
+// when requested, the first-line offsets used by callers building wrapped
+// layouts. Returns FALSE on I/O failure ('fatalErr').
 BOOL CViewerWindow::FindPreviousEOL(HANDLE* hFile, __int64 seek, __int64 minSeek, __int64& lineBegin,
                                     __int64& previousLineEnd, BOOL allowWrap, BOOL takeLineBegin,
                                     BOOL& fatalErr, int* lines, __int64* firstLineEndOff,

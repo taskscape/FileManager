@@ -40,7 +40,8 @@ LRESULT CALLBACK TextControlProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lPa
         SetTextColor(ps.hdc, GetSysColor(COLOR_BTNTEXT));
         int prevBkMode = SetBkMode(ps.hdc, TRANSPARENT);
         int len = GetWindowText(hWnd, txt, MAX_PATH);
-        DrawText(ps.hdc, txt, lstrlen(txt), &r, DT_SINGLELINE | /*DT_VCENTER*/ DT_BOTTOM | DT_NOPREFIX | DT_PATH_ELLIPSIS);
+        // DrawText takes an int count; the window text buffer bounds the explicit conversion.
+        DrawText(ps.hdc, txt, static_cast<int>(strlen(txt)), &r, DT_SINGLELINE | /*DT_VCENTER*/ DT_BOTTOM | DT_NOPREFIX | DT_PATH_ELLIPSIS);
         SetBkMode(ps.hdc, prevBkMode);
         SelectObject(ps.hdc, hOldFont);
         EndPaint(hWnd, &ps);

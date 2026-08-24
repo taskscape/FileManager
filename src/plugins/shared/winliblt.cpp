@@ -10,6 +10,7 @@
 //****************************************************************************
 
 #include "precomp.h"
+#include <strsafe.h> // counted bounded copies (StringCchCopyNA)
 #include "..\\..\\common\\monotonic_time.h"
 //#include <windows.h>
 #ifdef _MSC_VER
@@ -59,8 +60,8 @@ FWinLibLTHelpCallback WinLibLTHelpCallback = NULL; // callback for connection to
 
 void SetWinLibStrings(const char* invalidNumber, const char* error)
 {
-    lstrcpyn(WinLibStrings[WLS_INVALID_NUMBER], invalidNumber, 100);
-    lstrcpyn(WinLibStrings[WLS_ERROR], error, 100);
+    StringCchCopyNA(WinLibStrings[WLS_INVALID_NUMBER], 100, invalidNumber, 100); // counted bounded copy instead of lstrcpyn
+    StringCchCopyNA(WinLibStrings[WLS_ERROR], 100, error, 100); // counted bounded copy instead of lstrcpyn
 }
 
 void SetupWinLibHelp(FWinLibLTHelpCallback helpCallback)
@@ -70,9 +71,9 @@ void SetupWinLibHelp(FWinLibLTHelpCallback helpCallback)
 
 BOOL InitializeWinLib(const char* pluginName, HINSTANCE dllInstance)
 {
-    lstrcpyn(CWINDOW_CLASSNAME, pluginName, 50);
+    StringCchCopyNA(CWINDOW_CLASSNAME, 50, pluginName, 50); // counted bounded copy instead of lstrcpyn
     strcat(CWINDOW_CLASSNAME, " - WinLib Universal Window");
-    lstrcpyn(CWINDOW_CLASSNAME2, pluginName, 50);
+    StringCchCopyNA(CWINDOW_CLASSNAME2, 50, pluginName, 50); // counted bounded copy instead of lstrcpyn
     strcat(CWINDOW_CLASSNAME2, " - WinLib Universal Window2");
 
     AtomObject = GlobalAddAtom("object handle"); // all plugins will use same atom, no collision

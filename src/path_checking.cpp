@@ -779,6 +779,13 @@ _CHECK_AGAIN:
     return !pathInvalid && err == ERROR_SUCCESS;
 }
 
+// Classifies and validates a user-entered path, splitting it into its parts:
+// type reports disk path / archive (with 'secondPart' = inner path) /
+// plug-in FS path ('fsName' + user part) / invalid; 'isDir' says whether the
+// target is a directory. Shows a formatted error box via 'errorTitle' on
+// failure (error codes in 'error', e.g. SPP_NOTPLUGINFS) and loops
+// (PARSE_AGAIN) while the caller-provided text needs re-prompting.
+// 'curPath'/'curArchivePath' resolve relative targets against the panel state.
 BOOL SalParsePath(HWND parent, char* path, int& type, BOOL& isDir, char*& secondPart,
                   const char* errorTitle, char* nextFocus, BOOL curPathIsDiskOrArchive,
                   const char* curPath, const char* curArchivePath, int* error,

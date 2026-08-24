@@ -4,6 +4,8 @@
 ; happen when address space is already allocated, for example by third party shell extension.
 salamand        0x04000000
 lang            0x30000000
+; Keep the Polish language module above the English image and below lang_demoplug.
+lang_pl         0x30080000
 demoplug        0x20100000
 lang_demoplug   0x30100000
 ieviewer        0x20200000

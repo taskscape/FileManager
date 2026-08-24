@@ -1,8 +1,9 @@
-﻿// SPDX-FileCopyrightText: 2023 Taskscape Ltd
+// SPDX-FileCopyrightText: 2023 Taskscape Ltd
 // SPDX-License-Identifier: GPL-2.0-or-later
 // CommentsTranslationProject: TRANSLATED
 
 #include "precomp.h"
+#include <strsafe.h> // counted bounded copies (StringCchCopyNA)
 
 #include <cwctype>
 #include "common/strutils.h"
@@ -2046,8 +2047,8 @@ BOOL CheckOnlyOneInstance(const char *leftPath, const char *rightPath, const cha
         if (params != NULL)
         {
           ZeroMemory(params, sizeof(CSetPathsParams));
-          lstrcpyn(params->LeftPath, leftPath, MAX_PATH);
-          lstrcpyn(params->RightPath, rightPath, MAX_PATH - 1); // Salamander older than 2.52 could crash on a path of length MAX_PATH - 1
+          StringCchCopyNA(params->LeftPath, MAX_PATH, leftPath, MAX_PATH); // counted bounded copy instead of lstrcpyn
+          StringCchCopyNA(params->RightPath, MAX_PATH - 1, rightPath, MAX_PATH - 1); // counted bounded copy instead of lstrcpyn // Salamander older than 2.52 could crash on a path of length MAX_PATH - 1
 
           // unfortunately when receiving mapped memory we cannot determine its size to the byte (only with page-size granularity)
           // so we use a "trick" -- append a signature after the structure; if it is there, it is very likely our data
@@ -2055,7 +2056,7 @@ BOOL CheckOnlyOneInstance(const char *leftPath, const char *rightPath, const cha
           params->MagicSignature1 = 0x07f2ab13;
           params->MagicSignature2 = 0x471e0901;
           params->StructVersion = 1;
-          lstrcpyn(params->ActivePath, activePath, MAX_PATH);
+          StringCchCopyNA(params->ActivePath, MAX_PATH, activePath, MAX_PATH); // counted bounded copy instead of lstrcpyn
           params->ActivatePanel = activatePanel;
 
           // let the old process read the memory and change directories

@@ -913,6 +913,11 @@ void CPanelStatusBar::PaintSecurity(HDC hDC)
 #define ZOOM_WIDTH 9
 #define ZOOM_HEIGHT 8
 
+// Renders the status/directory line into the off-screen ItemBitmap: optional
+// panel caption, per-cell texts (selection summary, disk free, sizes), hot
+// cell highlighting ('highlightHotTrackOnly' limits it during hover-only
+// updates; 'highlightText' inverts text colors for pressed cells), throbber,
+// and the embedded tool bar area for directory-line borders.
 void CPanelStatusBar::Paint(HDC hdc, BOOL highlightText, BOOL highlightHotTrackOnly)
 {
     CALL_STACK_MESSAGE3("CPanelStatusBar::Paint(, %d, %d)", highlightText, highlightHotTrackOnly);

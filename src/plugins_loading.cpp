@@ -3,6 +3,7 @@
 // CommentsTranslationProject: TRANSLATED
 
 #include "precomp.h"
+#include <strsafe.h> // counted bounded copies (StringCchCopyNA)
 
 #include "menu.h"
 #include "cfgdlg.h"
@@ -956,6 +957,11 @@ void CSalamanderConnect::AddCustomUnpacker(const char* title, const char* masks,
     }
 }
 
+// Plug-in registration callback: registers viewer masks for the plug-in.
+// Rejects '|' (negation is unsupported when merging group masks), splits the
+// mask list, and either installs a new viewer record or merges into an
+// existing one on upgrade ('force'), deduplicating masks already owned by
+// other plug-ins. Input is contract-validated first.
 void CSalamanderConnect::AddViewer(const char* masks, BOOL force)
 {
     // The legacy parser stores masks in fixed 300-byte scratch arrays.
@@ -1199,6 +1205,11 @@ void CSalamanderConnect::ForceRemoveViewer(const char* mask)
     }
 }
 
+// Plug-in registration callback (CSalamanderConnect): registers the plug-in
+// as a panel archiver for its 'extensions' list. Splits the list, finds or
+// creates the archive-format record (merging with an existing record on
+// plug-in upgrade / extension update), and sets edit capability ('edit').
+// Input is contract-validated before the fixed-size legacy buffers see it.
 void CSalamanderConnect::AddPanelArchiver(const char* extensions, BOOL edit, BOOL updateExts)
 {
     // This legacy registration parser uses 300-byte local buffers, so reject an untrusted value before logging or copying it.
@@ -2566,6 +2577,13 @@ CPluginData::~CPluginData()
         TRACE_E("CPluginData::~CPluginData(): IconOverlaysCount is not 0 or IconOverlays is not NULL, please contact Petr Solin");
 }
 
+// Loads a plug-in DLL on demand (idempotent - returns TRUE if already
+// loaded). Resolves the DLL path relative to the plug-ins directory, rejects
+// x64-unsupported plug-ins (with an optional user notice), performs the
+// LoadLibrary + Salamander plugin interface negotiation and version checks,
+// imports its menus/icons, and logs the whole attempt via CPluginLoadLogScope.
+// 'quiet' suppresses error boxes; 'waitCursor' shows the hourglass during
+// loading. Returns FALSE on any failure (DLL load, unsupported, low memory).
 BOOL CPluginData::InitDLL(HWND parent, BOOL quiet, BOOL waitCursor, BOOL showUnsupOnX64, BOOL releaseDynMenuIcons)
 {
     CALL_STACK_MESSAGE8("CPluginData::InitDLL(0x%p, %d, %d, %d, %d) (%s v. %s)",

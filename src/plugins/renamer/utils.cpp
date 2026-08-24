@@ -4,6 +4,8 @@
 #include "precomp.h"
 
 #include <strsafe.h>
+#include <objbase.h>
+#include <shobjidl.h>
 
 int FormatUserDateTimeAnsi(const SYSTEMTIME* time, DWORD flags, const char* format,
                            char* buffer, int bufferSize, BOOL isDate)
@@ -678,31 +680,155 @@ char* Replace(char* string, char s, char d)
     }
     return string;
 }
+// The Shell file dialog is Unicode-only, so ANSI plug-in text converts at this boundary.
+static WCHAR* DupWideFromAnsi(const char* text)
+{
+    int len = MultiByteToWideChar(CP_ACP, 0, text, -1, NULL, 0);
+    if (len == 0)
+        return NULL;
+    WCHAR* wide = (WCHAR*)malloc(len * sizeof(WCHAR));
+    if (wide != NULL && MultiByteToWideChar(CP_ACP, 0, text, -1, wide, len) == 0)
+    {
+        free(wide);
+        return NULL;
+    }
+    return wide;
+}
+
 BOOL GetOpenFileName(HWND parent, const char* title, const char* filter, char* buffer, BOOL save)
 {
     CALL_STACK_MESSAGE4("GetOpenFileName(, %s, %s, , %d)", title, filter, save);
-    OPENFILENAME ofn;
     char buf[200];
     // The legacy dialog filter carries embedded separators, so reject rather than corrupt an oversized filter.
     if (FAILED(StringCchCopyA(buf, _countof(buf), filter)))
         return FALSE;
     Replace(buf, '\t', '\0');
 
-    memset(&ofn, 0, sizeof(OPENFILENAME));
-    ofn.lStructSize = sizeof(OPENFILENAME);
-    ofn.hwndOwner = parent;
-    ofn.lpstrFilter = buf;
-    ofn.lpstrFile = buffer;
-    ofn.nMaxFile = MAX_PATH;
-    ofn.lpstrTitle = title;
-    //ofn.lpfnHook = OFNHookProc;
-    ofn.Flags = OFN_EXPLORER | OFN_HIDEREADONLY | OFN_NOCHANGEDIR /*| OFN_ENABLEHOOK*/;
-
-    if (save)
-        return SG->SafeGetSaveFileName(&ofn);
-    else
+    // count the filter segments; they alternate description/pattern and end with an empty one
+    UINT segCount = 0;
+    for (const char* s = buf; *s != '\0'; )
     {
-        ofn.Flags |= OFN_FILEMUSTEXIST;
-        return SG->SafeGetOpenFileName(&ofn);
+        segCount++;
+        while (*s)
+            s++;
+        s++;
     }
+    if (segCount < 2 || (segCount % 2) != 0)
+        return FALSE;
+
+    // migrate to the modern Shell file dialog; the former literal flag set is kept
+    // (no shell overwrite prompt for save, an existing file is required for open,
+    // and the dialog does not change the process current directory)
+    HRESULT comInit = CoInitialize(NULL);
+    if (FAILED(comInit) && comInit != RPC_E_CHANGED_MODE)
+        return FALSE;
+    BOOL comOwned = SUCCEEDED(comInit);
+
+    UINT pairCount = segCount / 2;
+    COMDLG_FILTERSPEC* specs = new COMDLG_FILTERSPEC[pairCount];
+    WCHAR** texts = new WCHAR*[segCount];
+    BOOL setupOK = specs != NULL && texts != NULL;
+    UINT filled = 0;
+    if (setupOK)
+    {
+        memset(specs, 0, sizeof(COMDLG_FILTERSPEC) * pairCount);
+        const char* s = buf;
+        while (setupOK && *s != '\0')
+        {
+            WCHAR* wide = DupWideFromAnsi(s); // dup stops at the segment terminator
+            if (wide == NULL)
+                setupOK = FALSE;
+            else
+            {
+                texts[filled] = wide;
+                if ((filled % 2) == 0)
+                    specs[filled / 2].pszName = wide;
+                else
+                    specs[filled / 2].pszSpec = wide;
+                filled++;
+                s += strlen(s) + 1;
+            }
+        }
+        setupOK = filled == segCount;
+    }
+
+    BOOL ret = FALSE;
+    IFileDialog* fileDialog = NULL;
+    if (setupOK &&
+        SUCCEEDED(CoCreateInstance(save ? CLSID_FileSaveDialog : CLSID_FileOpenDialog, NULL,
+                                   CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&fileDialog))) &&
+        fileDialog != NULL)
+    {
+        DWORD options = FOS_NOCHANGEDIR;
+        fileDialog->GetOptions(&options);
+        options |= FOS_NOCHANGEDIR;
+        if (!save)
+            options |= FOS_FILEMUSTEXIST;
+        options &= ~FOS_OVERWRITEPROMPT; // parity with the former flag set
+        fileDialog->SetOptions(options);
+
+        WCHAR* titleW = DupWideFromAnsi(title);
+        if (titleW != NULL)
+        {
+            fileDialog->SetTitle(titleW);
+            free(titleW);
+        }
+        fileDialog->SetFileTypes(pairCount, specs);
+        fileDialog->SetFileTypeIndex(1);
+
+        // the persisted buffer always holds a suggested leaf name here
+        WCHAR* nameW = DupWideFromAnsi(buffer);
+        if (nameW != NULL)
+        {
+            PWSTR sep = wcsrchr(nameW, L'\\');
+            if (sep != NULL)
+            {
+                *sep = 0;
+                if (nameW[0] != 0)
+                {
+                    IShellItem* folder = NULL;
+                    if (SUCCEEDED(SHCreateItemFromParsingName(nameW, NULL, IID_PPV_ARGS(&folder))))
+                    {
+                        fileDialog->SetFolder(folder);
+                        folder->Release();
+                    }
+                }
+                fileDialog->SetFileName(sep + 1);
+            }
+            else
+                fileDialog->SetFileName(nameW);
+            free(nameW);
+        }
+
+        if (SUCCEEDED(fileDialog->Show(parent)))
+        {
+            IShellItem* item = NULL;
+            PWSTR pathW = NULL;
+            if (SUCCEEDED(fileDialog->GetResult(&item)) && item != NULL &&
+                SUCCEEDED(item->GetDisplayName(SIGDN_FILESYSPATH, &pathW)) && pathW != NULL)
+            {
+                char fileName[MAX_PATH];
+                int converted = WideCharToMultiByte(CP_ACP, 0, pathW, -1, fileName, MAX_PATH, NULL, NULL);
+                CoTaskMemFree(pathW);
+                // a result that cannot fit the fixed caller field fails instead of truncating
+                ret = converted > 0 && strlen(fileName) < MAX_PATH;
+                if (ret)
+                    strcpy(buffer, fileName);
+            }
+            if (item != NULL)
+                item->Release();
+        }
+        fileDialog->Release();
+    }
+
+    if (texts != NULL)
+    {
+        for (UINT i = 0; i < filled; i++)
+            free(texts[i]);
+        delete[] texts;
+    }
+    delete[] specs;
+    if (comOwned)
+        CoUninitialize();
+    return ret;
 }

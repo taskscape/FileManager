@@ -39,6 +39,18 @@ void my_memcpy(void* dst, const void* src, int len)
         *d++ = *s++;
 }
 
+// This no-CRT executable can receive optimizer-generated memcpy calls from shared message code.
+#pragma intrinsic(memcpy)
+#pragma function(memcpy)
+void* __cdecl memcpy(void* dest, const void* src, size_t count)
+{
+    char* d = (char*)dest;
+    const char* s = (const char*)src;
+    while (count--)
+        *d++ = *s++;
+    return dest;
+}
+
 #pragma optimize("", off)
 void my_zeromem(void* dst, int len)
 {

@@ -3,6 +3,7 @@
 // CommentsTranslationProject: TRANSLATED
 
 #include "precomp.h"
+#include <strsafe.h> // counted bounded copies (StringCchCopyNA)
 #include "..\\..\\common\\monotonic_time.h"
 
 //
@@ -74,7 +75,7 @@ void CSendCmdUserIfaceWaitWnd::Init(HWND parent, const char* logCmd, const char*
     char errBuf[300];
     if (waitWndText == NULL) // standard text of the wait window
     {
-        lstrcpyn(errBuf, logCmd, 300); // trim the CRLF from the command
+        StringCchCopyNA(errBuf, 300, logCmd, 300); // counted bounded copy instead of lstrcpyn // trim the CRLF from the command
         char* s = errBuf + strlen(errBuf);
         while (s > errBuf && (*(s - 1) == '\r' || *(s - 1) == '\n'))
             s--;
@@ -607,7 +608,7 @@ BOOL CControlConnectionSocket::SendFTPCommand(HWND parent, const char* ftpCmd, c
                                 FTP_DIGIT_1(unexpReplyCode) == FTP_D1_ERROR)            // description of an error
                             {
                                 opFatalErrorTextID = !aborting ? IDS_SENDCOMMANDERROR : IDS_ABORTCOMMANDERROR;
-                                lstrcpyn(errBuf, unexpReply, 300);
+                                StringCchCopyNA(errBuf, 300, unexpReply, 300); // counted bounded copy instead of lstrcpyn
                                 opFatalError = -1;      // the "error" (reply) is directly in errBuf
                                 fatalErrLogMsg = FALSE; // the error is already in the log, do not add it again
                                 state = sfcsOperationFatalError;
@@ -662,7 +663,7 @@ BOOL CControlConnectionSocket::SendFTPCommand(HWND parent, const char* ftpCmd, c
 
         case sfcsFatalError: // fatal error (the resource ID of the text is in 'fatalErrorTextID' + if 'fatalErrorTextID' is -1, the string is directly in 'errBuf')
         {
-            lstrcpyn(buf, GetFatalErrorTxt(fatalErrorTextID, errBuf), 500);
+            StringCchCopyNA(buf, 500, GetFatalErrorTxt(fatalErrorTextID, errBuf), 500); // counted bounded copy instead of lstrcpyn
             char* s = buf + strlen(buf);
             while (s > buf && (*(s - 1) == '\n' || *(s - 1) == '\r'))
                 s--;
@@ -681,7 +682,7 @@ BOOL CControlConnectionSocket::SendFTPCommand(HWND parent, const char* ftpCmd, c
             else
             {
                 *canRetry = TRUE;
-                lstrcpyn(retryMsg, buf, retryMsgBufSize); // "retry"
+                StringCchCopyNA(retryMsg, retryMsgBufSize, buf, retryMsgBufSize); // counted bounded copy instead of lstrcpyn // "retry"
             }
             state = sfcsDone;
             break;
@@ -693,7 +694,7 @@ BOOL CControlConnectionSocket::SendFTPCommand(HWND parent, const char* ftpCmd, c
             const char* e = GetOperationFatalErrorTxt(opFatalError, errBuf);
             if (fatalErrLogMsg)
             {
-                lstrcpyn(buf, e, 500);
+                StringCchCopyNA(buf, 500, e, 500); // counted bounded copy instead of lstrcpyn
                 char* s = buf + strlen(buf);
                 while (s > buf && (*(s - 1) == '\n' || *(s - 1) == '\r'))
                     s--;
@@ -711,7 +712,7 @@ BOOL CControlConnectionSocket::SendFTPCommand(HWND parent, const char* ftpCmd, c
             else
             {
                 *canRetry = TRUE;
-                lstrcpyn(retryMsg, e, retryMsgBufSize); // "retry"
+                StringCchCopyNA(retryMsg, retryMsgBufSize, e, retryMsgBufSize); // counted bounded copy instead of lstrcpyn // "retry"
             }
             state = sfcsDone;
             break;
@@ -843,7 +844,7 @@ BOOL CControlConnectionSocket::GetCurrentWorkingPath(HWND parent, char* path, in
 
     if (leaveSect) // HaveWorkingPath == TRUE at the same time
     {
-        lstrcpyn(path, WorkingPath, pathBufSize);
+        StringCchCopyNA(path, pathBufSize, WorkingPath, pathBufSize); // counted bounded copy instead of lstrcpyn
         HANDLES(LeaveCriticalSection(&SocketCritSect));
     }
     return leaveSect;
@@ -956,14 +957,14 @@ BOOL CControlConnectionSocket::SendChangeWorkingPath(BOOL notInPanel, BOOL leftP
                         if (FTP_DIGIT_1(ftpReplyCode) != FTP_D1_SUCCESS)
                         {               // failure (the absolute path we base it on does not exist)
                             ret = TRUE; // the change happened (with an error)
-                            lstrcpyn(ftpReplyBuf, replyBuf, ftpReplyBufSize);
+                            StringCchCopyNA(ftpReplyBuf, ftpReplyBufSize, replyBuf, ftpReplyBufSize); // counted bounded copy instead of lstrcpyn
                             break; // failure -> finish
                         }
                     }
                     else
                     {
                         ret = TRUE; // the change happened (successfully or with an error)
-                        lstrcpyn(ftpReplyBuf, replyBuf, ftpReplyBufSize);
+                        StringCchCopyNA(ftpReplyBuf, ftpReplyBufSize, replyBuf, ftpReplyBufSize); // counted bounded copy instead of lstrcpyn
                         if (FTP_DIGIT_1(ftpReplyCode) == FTP_D1_SUCCESS) // success is returned (should be 250)
                             *success = TRUE;
                     }
@@ -1082,18 +1083,18 @@ BOOL CControlConnectionSocket::ChangeWorkingPath(BOOL notInPanel, BOOL leftPanel
                     if (path[0] == 0)                                               // generic root -> supplement it according to the system type
                     {
                         if (pathType == ftpsptOpenVMS)
-                            lstrcpyn(path, "[000000]", pathBufSize);
+                            StringCchCopyNA(path, pathBufSize, "[000000]", pathBufSize); // counted bounded copy instead of lstrcpyn
                         else
                         {
                             if (pathType == ftpsptMVS)
-                                lstrcpyn(path, "''", pathBufSize);
+                                StringCchCopyNA(path, pathBufSize, "''", pathBufSize); // counted bounded copy instead of lstrcpyn
                             else
                             {
                                 if (pathType == ftpsptIBMz_VM)
                                 {
                                     if (rescuePath[0] == 0 || !FTPGetIBMz_VMRootPath(path, pathBufSize, rescuePath))
                                     {
-                                        lstrcpyn(path, "/", pathBufSize); // the tested server supported the Unix root "/"; maybe someone will report it, then we will handle it further...
+                                        StringCchCopyNA(path, pathBufSize, "/", pathBufSize); // counted bounded copy instead of lstrcpyn // the tested server supported the Unix root "/"; maybe someone will report it, then we will handle it further...
                                     }
                                 }
                                 else
@@ -1102,7 +1103,7 @@ BOOL CControlConnectionSocket::ChangeWorkingPath(BOOL notInPanel, BOOL leftPanel
                                     {
                                         if (rescuePath[0] == 0 || !FTPGetOS2RootPath(path, pathBufSize, rescuePath))
                                         {
-                                            lstrcpyn(path, "/", pathBufSize); // try at least the Unix root "/", we know nothing else; maybe someone will report it, then we will handle it further...
+                                            StringCchCopyNA(path, pathBufSize, "/", pathBufSize); // counted bounded copy instead of lstrcpyn // try at least the Unix root "/", we know nothing else; maybe someone will report it, then we will handle it further...
                                         }
                                     }
                                 }
@@ -1114,14 +1115,14 @@ BOOL CControlConnectionSocket::ChangeWorkingPath(BOOL notInPanel, BOOL leftPanel
                         if (pathType == ftpsptOpenVMS && mode == 3 && !fileNameAlreadyCut &&
                             cutFileName != NULL && !cutDirectory)
                         { // try whether it is a file name (with VMS it is distinguished by syntax)
-                            lstrcpyn(prevUsedPath, path, FTP_MAX_PATH);
+                            StringCchCopyNA(prevUsedPath, FTP_MAX_PATH, path, FTP_MAX_PATH); // counted bounded copy instead of lstrcpyn
                             BOOL fileNameCouldBeCut;
                             if (FTPCutDirectory(pathType, prevUsedPath, FTP_MAX_PATH, newPath,
                                                 FTP_MAX_PATH, &fileNameCouldBeCut) &&
                                 fileNameCouldBeCut) // with VMS, 'fileNameCouldBeCut' == TRUE means it is definitely a file
                             {
-                                lstrcpyn(cutFileName, newPath, MAX_PATH);
-                                lstrcpyn(path, prevUsedPath, pathBufSize);
+                                StringCchCopyNA(cutFileName, MAX_PATH, newPath, MAX_PATH); // counted bounded copy instead of lstrcpyn
+                                StringCchCopyNA(path, pathBufSize, prevUsedPath, pathBufSize); // counted bounded copy instead of lstrcpyn
                                 fileNameAlreadyCut = TRUE;
                                 if (pathWasCut != NULL)
                                     *pathWasCut = TRUE;
@@ -1151,12 +1152,12 @@ BOOL CControlConnectionSocket::ChangeWorkingPath(BOOL notInPanel, BOOL leftPanel
     {
         if (donotTestPath)
             donotTestPath = FALSE;                  // path change - we must test the modified one
-        lstrcpyn(prevUsedPath, path, FTP_MAX_PATH); // remember the previous path on the server (returned by the server)
+        StringCchCopyNA(prevUsedPath, FTP_MAX_PATH, path, FTP_MAX_PATH); // counted bounded copy instead of lstrcpyn // remember the previous path on the server (returned by the server)
         if (!FTPCutDirectory(pathType, path, pathBufSize, NULL, 0, NULL))
         {
             if (rescuePath[0] != 0) // try the rescue path as well
             {
-                lstrcpyn(path, rescuePath, pathBufSize);
+                StringCchCopyNA(path, pathBufSize, rescuePath, pathBufSize); // counted bounded copy instead of lstrcpyn
                 pathType = GetFTPServerPathType(path);
                 rescuePath[0] = 0; // do not try it next time (avoid loops)
             }
@@ -1179,11 +1180,10 @@ BOOL CControlConnectionSocket::ChangeWorkingPath(BOOL notInPanel, BOOL leftPanel
     {
         HANDLES(EnterCriticalSection(&SocketCritSect));
         char hostTmp[HOST_MAX_SIZE];
-        lstrcpyn(hostTmp, Host, HOST_MAX_SIZE);
+        StringCchCopyNA(hostTmp, HOST_MAX_SIZE, Host, HOST_MAX_SIZE); // counted bounded copy instead of lstrcpyn
         unsigned short portTmp = Port;
         char listCmd[FTPCOMMAND_MAX_SIZE + 2];
-        lstrcpyn(listCmd, UseLIST_aCommand ? LIST_a_CMD_TEXT : (ListCommand != NULL && *ListCommand != 0 ? ListCommand : LIST_CMD_TEXT),
-                 FTPCOMMAND_MAX_SIZE);
+        StringCchCopyNA(listCmd, FTPCOMMAND_MAX_SIZE, UseLIST_aCommand ? LIST_a_CMD_TEXT : (ListCommand != NULL && *ListCommand != 0 ? ListCommand : LIST_CMD_TEXT), FTPCOMMAND_MAX_SIZE); // counted bounded copy instead of lstrcpyn
         strcat(listCmd, "\r\n");
         BOOL isFTPS = EncryptControlConnection == 1;
         int useListingsCacheAux = UseListingsCache;
@@ -1224,7 +1224,7 @@ BOOL CControlConnectionSocket::ChangeWorkingPath(BOOL notInPanel, BOOL leftPanel
                                                            cachedListingStartTime);
                 char pathSearchedInCache[FTP_MAX_PATH];
                 if (useListingsCacheAux && !forceRefresh)
-                    lstrcpyn(pathSearchedInCache, path, FTP_MAX_PATH);
+                    StringCchCopyNA(pathSearchedInCache, FTP_MAX_PATH, path, FTP_MAX_PATH); // counted bounded copy instead of lstrcpyn
                 else
                     pathSearchedInCache[0] = 0;
 
@@ -1262,7 +1262,7 @@ BOOL CControlConnectionSocket::ChangeWorkingPath(BOOL notInPanel, BOOL leftPanel
                                 }
                                 else
                                 {
-                                    lstrcpyn(path, newPath, pathBufSize);       // take over the new path from the server
+                                    StringCchCopyNA(path, pathBufSize, newPath, pathBufSize); // counted bounded copy instead of lstrcpyn       // take over the new path from the server
                                     if (useListingsCacheAux && !forceRefresh && // the user wants to use the cache and this is not a hard refresh
                                         strcmp(path, pathSearchedInCache) != 0) // if we have not searched for this path in the cache yet, try it
                                     {
@@ -1309,7 +1309,7 @@ BOOL CControlConnectionSocket::ChangeWorkingPath(BOOL notInPanel, BOOL leftPanel
                         {
                             if (rescuePath[0] != 0) // try the rescue path as well
                             {
-                                lstrcpyn(path, rescuePath, pathBufSize);
+                                StringCchCopyNA(path, pathBufSize, rescuePath, pathBufSize); // counted bounded copy instead of lstrcpyn
                                 fileNameAlreadyCut = TRUE;
                                 pathType = GetFTPServerPathType(path);
                                 rescuePath[0] = 0; // do not try it next time (avoid loops)
@@ -1351,7 +1351,7 @@ BOOL CControlConnectionSocket::ChangeWorkingPath(BOOL notInPanel, BOOL leftPanel
                         {
                             errBuf[0] = 0; // in 'mode' 3 this is not reported as an error (we are trying to focus on the file)
                             if (cutFileName != NULL)
-                                lstrcpyn(cutFileName, newPath, MAX_PATH);
+                                StringCchCopyNA(cutFileName, MAX_PATH, newPath, MAX_PATH); // counted bounded copy instead of lstrcpyn
                         }
                         else
                         {
@@ -1494,7 +1494,7 @@ void CControlConnectionSocket::GiveConnectionToWorker(CFTPWorker* newWorker, HWN
                 if (HaveWorkingPath)
                 {
                     newWorker->HaveWorkingPath = TRUE;
-                    lstrcpyn(newWorker->WorkingPath, WorkingPath, FTP_MAX_PATH);
+                    StringCchCopyNA(newWorker->WorkingPath, FTP_MAX_PATH, WorkingPath, FTP_MAX_PATH); // counted bounded copy instead of lstrcpyn
                 }
                 newWorker->CurrentTransferMode = CurrentTransferMode;
                 newWorker->ResetBuffersAndEvents();
@@ -1561,7 +1561,7 @@ void CControlConnectionSocket::GetConnectionFromWorker(CFTPWorker* workerWithCon
             if (workerWithCon->HaveWorkingPath)
             {
                 HaveWorkingPath = TRUE;
-                lstrcpyn(WorkingPath, workerWithCon->WorkingPath, FTP_MAX_PATH);
+                StringCchCopyNA(WorkingPath, FTP_MAX_PATH, workerWithCon->WorkingPath, FTP_MAX_PATH); // counted bounded copy instead of lstrcpyn
             }
             CurrentTransferMode = workerWithCon->CurrentTransferMode;
             ResetBuffersAndEvents();

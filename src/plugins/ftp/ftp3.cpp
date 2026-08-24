@@ -3,6 +3,7 @@
 // CommentsTranslationProject: TRANSLATED
 
 #include "precomp.h"
+#include <strsafe.h> // counted bounded copies (StringCchCopyNA)
 
 //
 // ****************************************************************************
@@ -368,7 +369,7 @@ BOOL EncryptPasswordAux(BYTE** encryptedPassword, int* encryptedPasswordSize, BO
                         }
                     }
                     // zero out and free the temporary plain buffer
-                    memset(plainPassword, 0, lstrlen(plainPassword));
+                    memset(plainPassword, 0, strlen(plainPassword)); // CRT length instead of the legacy Win32 length API
                     SalamanderGeneral->Free(plainPassword);
                 }
             }
@@ -395,7 +396,7 @@ BOOL EncryptPasswordAux(BYTE** encryptedPassword, int* encryptedPasswordSize, BO
                         }
                     }
                     // zero out and free the temporary plain buffer
-                    memset(plainPassword, 0, lstrlen(plainPassword));
+                    memset(plainPassword, 0, strlen(plainPassword)); // CRT length instead of the legacy Win32 length API
                     SalamanderGeneral->Free(plainPassword);
                 }
                 else
@@ -2010,14 +2011,14 @@ void CConfiguration::ReleaseDataFromSalamanderGeneral()
 void CConfiguration::GetAnonymousPasswd(char* buf, int bufSize)
 {
     HANDLES(EnterCriticalSection(&ConParamsCS));
-    lstrcpyn(buf, AnonymousPasswd, bufSize);
+    StringCchCopyNA(buf, bufSize, AnonymousPasswd, bufSize); // counted bounded copy instead of lstrcpyn
     HANDLES(LeaveCriticalSection(&ConParamsCS));
 }
 
 void CConfiguration::SetAnonymousPasswd(const char* passwd)
 {
     HANDLES(EnterCriticalSection(&ConParamsCS));
-    lstrcpyn(AnonymousPasswd, passwd, PASSWORD_MAX_SIZE);
+    StringCchCopyNA(AnonymousPasswd, PASSWORD_MAX_SIZE, passwd, PASSWORD_MAX_SIZE); // counted bounded copy instead of lstrcpyn
     HANDLES(LeaveCriticalSection(&ConParamsCS));
 }
 

@@ -3,6 +3,7 @@
 // CommentsTranslationProject: TRANSLATED
 
 #include "precomp.h"
+#include <strsafe.h> // counted bounded copies (StringCchCopyNA)
 
 const char* GetWorkerErrorTxt(int error, char* errBuf, int errBufSize)
 {
@@ -299,11 +300,11 @@ void CFTPWorker::InitDiskWork(DWORD msgID, CFTPDiskWorkType type, const char* pa
     DiskWork.MsgID = msgID;
     DiskWork.Type = type;
     if (path != NULL)
-        lstrcpyn(DiskWork.Path, path, MAX_PATH);
+        StringCchCopyNA(DiskWork.Path, MAX_PATH, path, MAX_PATH); // counted bounded copy instead of lstrcpyn
     else
         DiskWork.Path[0] = 0;
     if (name != NULL)
-        lstrcpyn(DiskWork.Name, name, MAX_PATH);
+        StringCchCopyNA(DiskWork.Name, MAX_PATH, name, MAX_PATH); // counted bounded copy instead of lstrcpyn
     else
         DiskWork.Name[0] = 0;
     DiskWork.ForceAction = forceAction;
@@ -637,7 +638,7 @@ void CFTPWorker::GetListViewData(LVITEM* itemData, char* buf, int bufSize)
                                                 while (expon--)
                                                     dif *= CQuadWord(60, 0);
                                                 secs = ((secs + dif / CQuadWord(2, 0)) / dif) * dif; // round 'secs' to 'dif' seconds
-                                                lstrcpyn(timeLeftText, LoadStr(IDS_OPERDLGCOACT_TIMELEFT), 200);
+                                                StringCchCopyNA(timeLeftText, 200, LoadStr(IDS_OPERDLGCOACT_TIMELEFT), 200); // counted bounded copy instead of lstrcpyn
                                                 int len = (int)strlen(timeLeftText);
                                                 if (len < 99) // total of 200, so if 100 characters must remain for the time value, len must be < 99
                                                 {
@@ -670,7 +671,7 @@ void CFTPWorker::GetListViewData(LVITEM* itemData, char* buf, int bufSize)
                                     if (num3[0] != 0)
                                         _snprintf_s(bufRest, bufRestSize, _TRUNCATE, LoadStr(IDS_LISTWNDSTATUS2), num1, num3);
                                     else
-                                        lstrcpyn(bufRest, num1, bufRestSize);
+                                        StringCchCopyNA(bufRest, bufRestSize, num1, bufRestSize); // counted bounded copy instead of lstrcpyn
                                 }
                             }
                         }
@@ -735,7 +736,7 @@ BOOL CFTPWorker::GetErrorDescr(char* buf, int bufSize, BOOL* postActivate, CCert
             *postActivate = TRUE; // fweActivate is posted after the method finishes; in fwsConnectionError the item must return to the queue
             Oper->ReportWorkerChange(ID, FALSE);
         }
-        lstrcpyn(buf, ErrorDescr, bufSize);
+        StringCchCopyNA(buf, bufSize, ErrorDescr, bufSize); // counted bounded copy instead of lstrcpyn
         if (unverifiedCertificate != NULL && UnverifiedCertificate != NULL)
         {
             *unverifiedCertificate = UnverifiedCertificate;
@@ -2284,7 +2285,7 @@ void CFTPWorker::HandleSocketEvent(CFTPWorkerSocketEvent event, DWORD data1, DWO
                     }
                     if (ErrorDescr[0] == 0) // when closing the connection we must fill ErrorDescr (even with "unknown error")
                     {
-                        lstrcpyn(ErrorDescr, GetWorkerErrorTxt(data1, errBuf, 300), FTPWORKER_ERRDESCR_BUFSIZE);
+                        StringCchCopyNA(ErrorDescr, FTPWORKER_ERRDESCR_BUFSIZE, GetWorkerErrorTxt(data1, errBuf, 300), FTPWORKER_ERRDESCR_BUFSIZE); // counted bounded copy instead of lstrcpyn
                         CorrectErrorDescr();
                     }
                     break;
@@ -2349,7 +2350,7 @@ void CFTPWorker::HandleSocketEvent(CFTPWorkerSocketEvent event, DWORD data1, DWO
                     }
                     deleteTimerTimeout = TRUE;
                     handleClose = TRUE;
-                    lstrcpyn(ErrorDescr, LoadStr(IDS_CONNECTIONLOSTERROR), FTPWORKER_ERRDESCR_BUFSIZE);
+                    StringCchCopyNA(ErrorDescr, FTPWORKER_ERRDESCR_BUFSIZE, LoadStr(IDS_CONNECTIONLOSTERROR), FTPWORKER_ERRDESCR_BUFSIZE); // counted bounded copy instead of lstrcpyn
                     CorrectErrorDescr();
                     break;
                 }
@@ -2422,8 +2423,7 @@ void CFTPWorker::HandleSocketEvent(CFTPWorkerSocketEvent event, DWORD data1, DWO
                     handleClose = TRUE;
                     isTimeout = TRUE;
                     HANDLES(EnterCriticalSection(&WorkerCritSect));
-                    lstrcpyn(ErrorDescr, LoadStr(CommandState == fwcsWaitForLoginPrompt ? IDS_WORKERWAITLOGTIM : IDS_LOGMSGCMDTIMEOUT),
-                             FTPWORKER_ERRDESCR_BUFSIZE);
+                    StringCchCopyNA(ErrorDescr, FTPWORKER_ERRDESCR_BUFSIZE, LoadStr(CommandState == fwcsWaitForLoginPrompt ? IDS_WORKERWAITLOGTIM : IDS_LOGMSGCMDTIMEOUT), FTPWORKER_ERRDESCR_BUFSIZE); // counted bounded copy instead of lstrcpyn
                     CorrectErrorDescr();
                     HANDLES(LeaveCriticalSection(&WorkerCritSect));
                     break;
@@ -2453,7 +2453,7 @@ void CFTPWorker::HandleSocketEvent(CFTPWorkerSocketEvent event, DWORD data1, DWO
                     handleClose = TRUE;
                     if (ErrorDescr[0] == 0)
                     {
-                        lstrcpyn(ErrorDescr, GetWorkerErrorTxt(data1, errBuf, 300), FTPWORKER_ERRDESCR_BUFSIZE);
+                        StringCchCopyNA(ErrorDescr, FTPWORKER_ERRDESCR_BUFSIZE, GetWorkerErrorTxt(data1, errBuf, 300), FTPWORKER_ERRDESCR_BUFSIZE); // counted bounded copy instead of lstrcpyn
                         CorrectErrorDescr();
                     }
                     break;
@@ -2477,8 +2477,7 @@ void CFTPWorker::HandleSocketEvent(CFTPWorkerSocketEvent event, DWORD data1, DWO
                     HANDLES(EnterCriticalSection(&WorkerCritSect));
                     if (ErrorDescr[0] == 0)
                     {
-                        lstrcpyn(ErrorDescr, GetWorkerErrorTxt(WaitForCmdErrError, errBuf, 300),
-                                 FTPWORKER_ERRDESCR_BUFSIZE);
+                        StringCchCopyNA(ErrorDescr, FTPWORKER_ERRDESCR_BUFSIZE, GetWorkerErrorTxt(WaitForCmdErrError, errBuf, 300), FTPWORKER_ERRDESCR_BUFSIZE); // counted bounded copy instead of lstrcpyn
                         CorrectErrorDescr();
                     }
                     HANDLES(LeaveCriticalSection(&WorkerCritSect));

@@ -270,7 +270,8 @@ BOOL FlexWriteText(HDC hDC, int x, int y, const char* text, int cchText, int* hi
 void DrawLine(HDC hDC, int lineIndex, int yOffset)
 {
     const char* line = LogLines[lineIndex];
-    FlexWriteText(hDC, LEFT_MARGIN, yOffset + 1, line, lstrlen(line), NULL);
+    // FlexWriteText preserves the legacy int length contract; log lines are bounded by that UI contract.
+    FlexWriteText(hDC, LEFT_MARGIN, yOffset + 1, line, static_cast<int>(strlen(line)), NULL);
 }
 
 void OnPaint(HDC hDC, BOOL lastOnly)
@@ -318,7 +319,8 @@ void ClearLogWindow()
 
 void AddLogLine(const char* line, BOOL scrollToEnd)
 {
-    int len = lstrlen(line);
+    // The allocation API accepts size_t, so keep the CRT length wide until the copy is complete.
+    size_t len = strlen(line);
     char* tmp = (char*)malloc(len + 1);
     if (tmp == NULL)
         return;
@@ -371,7 +373,8 @@ BOOL LinkHitTest(int x, int y, char* link, char* item)
         const char* line = LogLines[lineIndex];
         int charIndex;
         HDC hDC = GetDC(HWindow);
-        if (FlexWriteText(hDC, x - LEFT_MARGIN, 0, line, lstrlen(line), &charIndex))
+        // FlexWriteText preserves the legacy int length contract; log lines are bounded by that UI contract.
+        if (FlexWriteText(hDC, x - LEFT_MARGIN, 0, line, static_cast<int>(strlen(line)), &charIndex))
         {
             //      TRACE_I("LineIndex="<<lineIndex<<" CharIndex="<<charIndex);
             if (link != NULL)

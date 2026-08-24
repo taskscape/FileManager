@@ -2146,6 +2146,15 @@ BOOL AddWin64RedirectedDir(const char* path, CFilesArray* dirs, WIN32_FIND_DATA*
 
 #endif // _WIN64
 
+// Navigates the panel to 'newDir' (NULL = ask the user in the change-directory
+// dialog). Resolves the target across panel types - disk path, archive
+// (entering archives transparently), and plug-in filesystem paths, including
+// paths that must be handed to a plugin verbatim ('sendDirectlyToPlugin').
+// CHANGE_AGAIN loops re-prompt on invalid user input; user-entered paths go
+// through PostProcessPathFromUser (env-var/hot-path expansion). On failure
+// shows an error box (suppressed by 'showNewDirPathInErrBoxes') and reports
+// 'failReason'. Restores focus onto 'suggestedFocusName' and scroll from
+// 'suggestedTopIndex' after the listing loads. Returns TRUE on success.
 BOOL CFilesWindow::ChangeDir(const char* newDir, int suggestedTopIndex, const char* suggestedFocusName,
                              int mode, int* failReason, BOOL convertFSPathToInternal, BOOL showNewDirPathInErrBoxes)
 {

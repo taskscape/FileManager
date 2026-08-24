@@ -8,7 +8,8 @@
 #include <commctrl.h>
 #include <stdio.h>
 #include <strsafe.h>
-
+#include <objbase.h>
+#include <shobjidl.h>
 #include "spl_com.h"
 #include "spl_base.h"
 #include "spl_gen.h"
@@ -1014,6 +1015,125 @@ BOOL CAdvancedSEDialog::CreateFavoritesMenu()
 #define SFX_SET_CURRENTVERSION 1
 #define SFX_SETTINGS_IMPORT_MAX_BYTES (1024 * 1024)
 
+// The Shell file dialog is Unicode-only, so ANSI plug-in text converts at this boundary.
+static WCHAR* DupWideFromAnsi(const char* text)
+{
+    int len = MultiByteToWideChar(CP_ACP, 0, text, -1, NULL, 0);
+    if (len == 0)
+        return NULL;
+    WCHAR* wide = (WCHAR*)malloc(len * sizeof(WCHAR));
+    if (wide != NULL && MultiByteToWideChar(CP_ACP, 0, text, -1, wide, len) == 0)
+    {
+        free(wide);
+        return NULL;
+    }
+    return wide;
+}
+
+// shared dialog for the SFX settings import/export: ".set" filter plus an optional
+// all-files entry; export keeps its manual overwrite prompt by clearing FOS_OVERWRITEPROMPT
+static BOOL ZipGetSettingsFileName(HWND parent, BOOL save, BOOL includeAllFiles,
+                                   const char* lastExportPath, char* fileName)
+{
+    CALL_STACK_MESSAGE3("ZipGetSettingsFileName(, %d, %d)", save, includeAllFiles);
+    HRESULT comInit = CoInitialize(NULL);
+    if (FAILED(comInit) && comInit != RPC_E_CHANGED_MODE)
+        return FALSE;
+    BOOL comOwned = SUCCEEDED(comInit);
+
+    COMDLG_FILTERSPEC specs[2];
+    WCHAR* texts[4] = {NULL, NULL, NULL, NULL};
+    UINT specCount = 0;
+    BOOL setupOK = TRUE;
+    // filter segments: "settings file", "*.set" and optionally "all files", "*.*"
+    const char* segs[4];
+    int segCount = includeAllFiles ? 4 : 2;
+    segs[0] = LoadStr(IDS_SETTINGSFILE);
+    segs[1] = "*.set";
+    if (includeAllFiles)
+    {
+        segs[2] = LoadStr(IDS_ALLFILES);
+        segs[3] = "*.*";
+    }
+    for (int i = 0; setupOK && i < segCount; i++)
+    {
+        texts[i] = DupWideFromAnsi(segs[i]);
+        if (texts[i] == NULL)
+            setupOK = FALSE;
+    }
+    if (setupOK)
+    {
+        specs[0].pszName = texts[0];
+        specs[0].pszSpec = texts[1];
+        specCount = 1;
+        if (includeAllFiles)
+        {
+            specs[1].pszName = texts[2];
+            specs[1].pszSpec = texts[3];
+            specCount = 2;
+        }
+    }
+
+    BOOL ret = FALSE;
+    IFileDialog* fileDialog = NULL;
+    if (setupOK &&
+        SUCCEEDED(CoCreateInstance(save ? CLSID_FileSaveDialog : CLSID_FileOpenDialog, NULL,
+                                   CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&fileDialog))) &&
+        fileDialog != NULL)
+    {
+        DWORD options = FOS_NOCHANGEDIR;
+        fileDialog->GetOptions(&options);
+        options |= FOS_NOCHANGEDIR;
+        if (!save)
+            options |= FOS_FILEMUSTEXIST;
+        else
+            options &= ~FOS_OVERWRITEPROMPT; // the manual localized overwrite check stays in charge
+        fileDialog->SetOptions(options);
+        fileDialog->SetFileTypes(specCount, specs);
+        fileDialog->SetFileTypeIndex(1);
+        if (save)
+            fileDialog->SetDefaultExtension(L"set"); // replaces OFN.lpstrDefExt
+
+        if (lastExportPath != NULL && *lastExportPath != 0)
+        {
+            WCHAR* folderW = DupWideFromAnsi(lastExportPath);
+            if (folderW != NULL)
+            {
+                IShellItem* folder = NULL;
+                if (SUCCEEDED(SHCreateItemFromParsingName(folderW, NULL, IID_PPV_ARGS(&folder))))
+                {
+                    fileDialog->SetFolder(folder);
+                    folder->Release();
+                }
+                free(folderW);
+            }
+        }
+
+        if (SUCCEEDED(fileDialog->Show(parent)))
+        {
+            IShellItem* item = NULL;
+            PWSTR pathW = NULL;
+            if (SUCCEEDED(fileDialog->GetResult(&item)) && item != NULL &&
+                SUCCEEDED(item->GetDisplayName(SIGDN_FILESYSPATH, &pathW)) && pathW != NULL)
+            {
+                int converted = WideCharToMultiByte(CP_ACP, 0, pathW, -1, fileName, MAX_PATH, NULL, NULL);
+                CoTaskMemFree(pathW);
+                // a result that cannot fit the fixed caller field fails instead of truncating
+                ret = converted > 0 && strlen(fileName) < MAX_PATH;
+            }
+            if (item != NULL)
+                item->Release();
+        }
+        fileDialog->Release();
+    }
+
+    for (int i = 0; i < 4; i++)
+        free(texts[i]);
+    if (comOwned)
+        CoUninitialize();
+    return ret;
+}
+
 struct CSettingsHeader
 {
     DWORD Signature;
@@ -1024,28 +1144,13 @@ struct CSettingsHeader
 BOOL CAdvancedSEDialog::OnImport()
 {
     CALL_STACK_MESSAGE1("CAdvancedSEDialog::OnImport()");
-    OPENFILENAME ofn;
-    memset(&ofn, 0, sizeof(OPENFILENAME));
-    ofn.lStructSize = sizeof(OPENFILENAME);
-    ofn.hwndOwner = Dlg;
-    char buf[128];
-    sprintf(buf, "%s%c*.set%c"
-                 "%s%c%s%c",
-            LoadStr(IDS_SETTINGSFILE), 0, 0,
-            LoadStr(IDS_ALLFILES), 0, "*.*", 0);
-    ofn.lpstrFilter = buf;
-    ofn.nFilterIndex = 1;
     char fileName[MAX_PATH];
     fileName[0] = 0;
-    ofn.lpstrFile = fileName;
-    if (PackObject->Config.LastExportPath[0])
-        ofn.lpstrInitialDir = PackObject->Config.LastExportPath;
-    ofn.nMaxFile = MAX_PATH;
-    ofn.Flags = OFN_EXPLORER | OFN_FILEMUSTEXIST | OFN_HIDEREADONLY | OFN_NOCHANGEDIR;
-    ofn.lpstrDefExt = "set";
-
-    if (GetOpenFileName(&ofn))
+    if (!ZipGetSettingsFileName(Dlg, FALSE, TRUE, PackObject->Config.LastExportPath, fileName))
+        return TRUE;
     {
+        // the former if-block scope is kept so the untouched import body below stays
+        // inside its own lexical block
         CFile* file;
         int ret = PackObject->CreateCFile(&file, fileName, GENERIC_READ, FILE_SHARE_READ,
                                           OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, PE_NOSKIP, NULL,
@@ -1216,24 +1321,10 @@ BOOL CAdvancedSEDialog::OnExport()
     //lstrcpy(settings.IconFile, TmpSfxSettings.IconFile);
     //settings.IconIndex = TmpSfxSettings.IconIndex;
 
-    OPENFILENAME ofn;
-    memset(&ofn, 0, sizeof(OPENFILENAME));
-    ofn.lStructSize = sizeof(OPENFILENAME);
-    ofn.hwndOwner = Dlg;
-    char buf[128];
-    sprintf(buf, "%s%c*.set%c", LoadStr(IDS_SETTINGSFILE), 0, 0);
-    ofn.lpstrFilter = buf;
-    ofn.nFilterIndex = 1;
     char fileName[MAX_PATH];
     fileName[0] = 0;
-    ofn.lpstrFile = fileName;
-    if (PackObject->Config.LastExportPath[0])
-        ofn.lpstrInitialDir = PackObject->Config.LastExportPath;
-    ofn.nMaxFile = MAX_PATH;
-    ofn.Flags = OFN_EXPLORER | /*OFN_FILEMUSTEXIST | */ OFN_HIDEREADONLY | OFN_NOCHANGEDIR;
-    ofn.lpstrDefExt = "set";
-
-    if (SalamanderGeneral->SafeGetSaveFileName(&ofn))
+    if (!ZipGetSettingsFileName(Dlg, TRUE, FALSE, PackObject->Config.LastExportPath, fileName))
+        return TRUE;
     {
         // test whether it already exists
         if (SalamanderGeneral->SalGetFileAttributes(fileName) == 0xFFFFFFFF ||
@@ -1265,7 +1356,7 @@ BOOL CAdvancedSEDialog::OnExport()
             else
             {
                 PackObject->CloseCFile(file);
-                DeleteFile(ofn.lpstrFile);
+                DeleteFile(fileName);
             }
         }
     }
@@ -1558,7 +1649,7 @@ BOOL CAdvancedSEDialog::OnAddFavorite()
   mi.wID = CM_SFX_FAVORITE + Favorities.Count - 1;
   mi.dwItemData = (ULONG_PTR) newFav;
   mi.dwTypeData = newFav->Name;
-  mi.cch = lstrlen(mi.dwTypeData);
+  mi.cch = strlen(mi.dwTypeData); // CRT length instead of the legacy Win32 length API
   InsertMenuItem(FavoritiesMenu, index, TRUE, &mi);
   */
 

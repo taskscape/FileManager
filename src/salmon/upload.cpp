@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "precomp.h"
+#include <strsafe.h> // counted bounded copies (StringCchCopyNA)
 #include "..\\common\\checked_arithmetic.h"
 // The upload's parameter object remains dialog-owned until this worker joins.
 #include "..\\common\\thread_owner.h"
@@ -572,7 +573,7 @@ BOOL AnalyzeResponse(const char* str, int strLen, CUploadParams* uploadParams)
             if (tagClose == num)
             {
                 char buff[10];
-                lstrcpyn(buff, numBegin, (int)(num - numBegin + 1));
+                StringCchCopyNA(buff, (int)(num - numBegin + 1), numBegin, (int)(num - numBegin + 1)); // counted bounded copy instead of lstrcpyn
                 return GetFilesError(atoi(buff), uploadParams);
             }
             sprintf(uploadParams->ErrorMessage, LoadStr(IDS_SALMON_SYNTAX_ERROR_CLOSE, HLanguage));

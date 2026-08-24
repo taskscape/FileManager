@@ -277,6 +277,11 @@ CFilesMap::GetMapItem(int column, int row)
     return Map + index;
 }
 
+// Converts a screen point into the panel's virtual content coordinates for
+// the overview map: clamps into FilesRect, then adds view-mode-specific
+// scroll offsets (horizontal scroll for Brief, XOffset/TopIndex for Detailed,
+// grid offsets for Icons/Thumbnails/Tiles) so the map rectangle mirrors what
+// the list box is showing.
 void CFilesMap::SetPoint(int x, int y)
 {
     CALL_STACK_MESSAGE3("CFilesMap::SetPoint(%d, %d)", x, y);

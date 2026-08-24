@@ -1,8 +1,9 @@
-﻿// SPDX-FileCopyrightText: 2023 Taskscape Ltd
+// SPDX-FileCopyrightText: 2023 Taskscape Ltd
 // SPDX-License-Identifier: GPL-2.0-or-later
 // CommentsTranslationProject: TRANSLATED
 
 #include "precomp.h"
+#include <strsafe.h> // counted bounded copies (StringCchCopyNA)
 
 // FS-name assigned by Salamander after loading the plug-in
 char AssignedFSName[MAX_PATH] = "";
@@ -664,7 +665,7 @@ void CPluginInterfaceForFS::ExecuteOnFS(int panel, CPluginFSInterfaceAbstract* p
         char newUserPart[FTP_USERPART_SIZE];
         char newPath[FTP_MAX_PATH];
         char cutDir[FTP_MAX_PATH];
-        lstrcpyn(newPath, fs->Path, FTP_MAX_PATH);
+        StringCchCopyNA(newPath, FTP_MAX_PATH, fs->Path, FTP_MAX_PATH); // counted bounded copy instead of lstrcpyn
         CFTPServerPathType type = fs->GetFTPServerPathType(newPath);
         if (isDir == 2) // up-dir
         {
@@ -749,7 +750,7 @@ void CScrollPositionMemory::Push(CFTPServerPathType type, const char* path, int 
 {
     // determine whether path follows Path (path == Path+"/name")
     char testPath[FTP_MAX_PATH];
-    lstrcpyn(testPath, path, FTP_MAX_PATH);
+    StringCchCopyNA(testPath, FTP_MAX_PATH, path, FTP_MAX_PATH); // counted bounded copy instead of lstrcpyn
     BOOL ok = FALSE;
     if (FTPCutDirectory(type, testPath, FTP_MAX_PATH, NULL, 0, NULL))
     {

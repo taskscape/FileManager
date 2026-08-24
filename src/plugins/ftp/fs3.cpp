@@ -3,6 +3,7 @@
 // CommentsTranslationProject: TRANSLATED
 
 #include "precomp.h"
+#include <strsafe.h> // counted bounded copies (StringCchCopyNA)
 
 //
 // ****************************************************************************
@@ -491,7 +492,7 @@ BOOL CPluginFSInterface::GetPathForMainWindowTitle(const char* fsName, int mode,
     char path[FTP_MAX_PATH];
     if (mode == 1) // "Directory Name Only" mode
     {
-        lstrcpyn(path, Path, FTP_MAX_PATH);
+        StringCchCopyNA(path, FTP_MAX_PATH, Path, FTP_MAX_PATH); // counted bounded copy instead of lstrcpyn
         if (pathType == ftpsptUnknown)
             pathType = ftpsptUnix;
         if (FTPCutDirectory(pathType, path, FTP_MAX_PATH, buf, bufSize, NULL)) // trimming succeeded
@@ -509,7 +510,7 @@ BOOL CPluginFSInterface::GetPathForMainWindowTitle(const char* fsName, int mode,
         {
             char* trimStart = NULL;
             char* trimEnd = NULL;
-            lstrcpyn(path, Path, FTP_MAX_PATH);
+            StringCchCopyNA(path, FTP_MAX_PATH, Path, FTP_MAX_PATH); // counted bounded copy instead of lstrcpyn
             switch (pathType)
             {
             case ftpsptIBMz_VM: // "ACADEM:ANONYMOU.PICS" (+the root must end with a dot: "ACADEM:ANONYMOU.")
@@ -647,7 +648,7 @@ BOOL CPluginFSInterface::GetPathForMainWindowTitle(const char* fsName, int mode,
                 int len = (int)strlen(root);
                 if (MakeUserPart(root + len, 2 * MAX_PATH - len, path))
                 {
-                    lstrcpyn(buf, root, bufSize);
+                    StringCchCopyNA(buf, bufSize, root, bufSize); // counted bounded copy instead of lstrcpyn
                     return TRUE;
                 }
             }
@@ -661,7 +662,7 @@ BOOL CPluginFSInterface::GetPathForMainWindowTitle(const char* fsName, int mode,
         int len = (int)strlen(root);
         if (MakeUserPart(root + len, 2 * MAX_PATH - len, Path))
         {
-            lstrcpyn(buf, root, bufSize);
+            StringCchCopyNA(buf, bufSize, root, bufSize); // counted bounded copy instead of lstrcpyn
             return TRUE;
         }
     }
@@ -682,7 +683,7 @@ void CPluginFSInterface::AcceptChangeOnPathNotification(const char* fsName, cons
         // test whether the user-part paths match or at least share the same prefix
         char path1[FTP_USERPART_SIZE];
         char path2[FTP_USERPART_SIZE];
-        lstrcpyn(path1, path + (isFTP ? AssignedFSNameLen : AssignedFSNameLenFTPS) + 1, FTP_USERPART_SIZE);
+        StringCchCopyNA(path1, FTP_USERPART_SIZE, path + (isFTP ? AssignedFSNameLen : AssignedFSNameLenFTPS) + 1, FTP_USERPART_SIZE); // counted bounded copy instead of lstrcpyn
         MakeUserPart(path2, FTP_USERPART_SIZE);
         int userLength = FTPGetUserLength(User);
         if (FTPHasTheSameRootPath(path1, path2, userLength)) // same root (connection)
@@ -712,7 +713,7 @@ void CPluginFSInterface::AcceptChangeOnPathNotification(const char* fsName, cons
 void CPluginFSInterface::AddBookmark(HWND parent)
 {
     char name[BOOKMARKNAME_MAX_SIZE];
-    lstrcpyn(name, Host, BOOKMARKNAME_MAX_SIZE);
+    StringCchCopyNA(name, BOOKMARKNAME_MAX_SIZE, Host, BOOKMARKNAME_MAX_SIZE); // counted bounded copy instead of lstrcpyn
     if (CRenameDlg(parent, name, FALSE, TRUE).Execute() == IDOK)
     {
         BOOL anonymous = strcmp(User, FTP_ANONYMOUS) == 0;
@@ -757,7 +758,7 @@ void CPluginFSInterface::SendUserFTPCommand(HWND parent)
         char cmdBuf[FTPCOMMAND_MAX_SIZE + 2];
         char logBuf[FTPCOMMAND_MAX_SIZE + 2];
         char txtBuf[200 + FTPCOMMAND_MAX_SIZE];
-        lstrcpyn(cmdBuf, dlg.Command, FTPCOMMAND_MAX_SIZE);
+        StringCchCopyNA(cmdBuf, FTPCOMMAND_MAX_SIZE, dlg.Command, FTPCOMMAND_MAX_SIZE); // counted bounded copy instead of lstrcpyn
         strcpy(logBuf, Config.SendSecretCommand ? LoadStr(IDS_SECRETFTPCOMMAND) : cmdBuf);
         _snprintf_s(txtBuf, _TRUNCATE, LoadStr(IDS_LOGMSGSENDINGUSRCMD), logBuf);
         ControlConnection->LogMessage(txtBuf, -1, TRUE);
@@ -1190,8 +1191,8 @@ void CSimpleListPluginDataInterface::SetupView(BOOL leftPanel, CSalamanderViewAb
     view->SetColumnName(0, LoadStr(IDS_LINENUMCOLUMN), LoadStr(IDS_LINENUMCOLUMNDESC));
 
     CColumn column;
-    lstrcpyn(column.Name, LoadStr(IDS_RAWLISTCOLUMN), COLUMN_NAME_MAX);
-    lstrcpyn(column.Description, LoadStr(IDS_RAWLISTCOLUMNDESC), COLUMN_DESCRIPTION_MAX);
+    StringCchCopyNA(column.Name, COLUMN_NAME_MAX, LoadStr(IDS_RAWLISTCOLUMN), COLUMN_NAME_MAX); // counted bounded copy instead of lstrcpyn
+    StringCchCopyNA(column.Description, COLUMN_DESCRIPTION_MAX, LoadStr(IDS_RAWLISTCOLUMNDESC), COLUMN_DESCRIPTION_MAX); // counted bounded copy instead of lstrcpyn
     column.GetText = GetRowText;
     column.SupportSorting = 0;
     column.LeftAlignment = 1;

@@ -2,12 +2,15 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "precomp.h"
+#include <strsafe.h> // counted bounded copies (StringCchCopyNA)
 
 #include <crtdbg.h>
 #include <ostream>
 #include <stdio.h>
 #include <commctrl.h>
 #include <limits.h>
+#include <objbase.h>
+#include <shobjidl.h>
 
 #include "lstrfix.h"
 #include "trace.h"
@@ -237,25 +240,54 @@ void AddChars(WCHAR* buffer, int count, WCHAR chr = L' ')
 
 void CMainWindow::ExportAllMessages()
 {
+    // save dialog through the modern Shell interface (IFileSaveDialog); the shell
+    // keeps the overwrite prompt and the default ".log" extension behavior
+    HRESULT comInit = CoInitialize(NULL);
+    if (FAILED(comInit) && comInit != RPC_E_CHANGED_MODE)
+        return;
+    BOOL comOwned = SUCCEEDED(comInit);
+
+    BOOL dialogOK = FALSE;
     WCHAR fileName[MAX_PATH];
-    wcscpy_s(fileName, L"tserver.log");
+    IFileSaveDialog* fileDialog = NULL;
+    if (SUCCEEDED(CoCreateInstance(CLSID_FileSaveDialog, NULL, CLSCTX_INPROC_SERVER,
+                                   IID_PPV_ARGS(&fileDialog))) &&
+        fileDialog != NULL)
+    {
+        static const COMDLG_FILTERSPEC logFilter[] = {{L"Log file (*.log)", L"*.log"}};
+        DWORD options = FOS_PATHMUSTEXIST | FOS_OVERWRITEPROMPT;
+        fileDialog->GetOptions(&options);
+        fileDialog->SetOptions(options | FOS_PATHMUSTEXIST | FOS_OVERWRITEPROMPT);
+        fileDialog->SetFileTypes(_countof(logFilter), logFilter);
+        fileDialog->SetFileTypeIndex(1);
+        fileDialog->SetDefaultExtension(L"log"); // replaces OFN.lpstrDefExt
+        fileDialog->SetFileName(L"tserver.log");
+        if (SUCCEEDED(fileDialog->Show(HWindow)))
+        {
+            IShellItem* item = NULL;
+            PWSTR pathW = NULL;
+            if (SUCCEEDED(fileDialog->GetResult(&item)) && item != NULL &&
+                SUCCEEDED(item->GetDisplayName(SIGDN_FILESYSPATH, &pathW)) && pathW != NULL)
+            {
+                if (wcslen(pathW) < MAX_PATH)
+                {
+                    wcscpy_s(fileName, _countof(fileName), pathW);
+                    dialogOK = TRUE; // a path that cannot fit the fixed buffer is refused instead of truncated
+                }
+                CoTaskMemFree(pathW);
+            }
+            if (item != NULL)
+                item->Release();
+        }
+        fileDialog->Release();
+    }
+    if (comOwned)
+        CoUninitialize();
+    if (!dialogOK)
+        return;
 
-    OPENFILENAME ofn;
-    memset(&ofn, 0, sizeof(OPENFILENAME));
-    ofn.lStructSize = sizeof(OPENFILENAME);
-    ofn.hwndOwner = HWindow;
-    WCHAR filter[MAX_PATH];
-    wcscpy_s(filter, L"Log file (*.log)\0*.log\0");
-    ofn.lpstrFilter = filter;
-    ofn.nFilterIndex = 1;
-    ofn.lpstrFile = fileName;
-    ofn.nMaxFile = MAX_PATH;
-    ofn.lpstrFileTitle = fileName;
-    ofn.nMaxFileTitle = MAX_PATH;
-    ofn.lpstrDefExt = L"log";
-    ofn.Flags = OFN_PATHMUSTEXIST | OFN_HIDEREADONLY | OFN_OVERWRITEPROMPT | OFN_EXPLORER;
-
-    if (GetSaveFileName(&ofn))
+    // export the messages under the chosen name (the former if-block scope is kept
+    // so the untouched export body below stays inside its own lexical block)
     {
         WCHAR fullName[MAX_PATH];
         if (GetFullPathName(fileName, MAX_PATH, fullName, NULL) != 0)
@@ -1034,7 +1066,8 @@ BOOL CMainWindow::TaskBarAddIcon()
     tnid.uCallbackMessage = WM_USER_ICON_NOTIFY;
     tnid.hIcon = HANDLES(LoadIcon(HInstance, MAKEINTRESOURCE(IC_TSERVER_1)));
 
-    lstrcpyn(tnid.szTip, MAINWINDOW_NAME, sizeof(tnid.szTip));
+    // NOTIFYICONDATA::szTip is UTF-16; sizeof would count bytes instead of destination characters.
+    StringCchCopyNW(tnid.szTip, _countof(tnid.szTip), MAINWINDOW_NAME, _countof(tnid.szTip) - 1);
 
     res = Shell_NotifyIcon(NIM_ADD, &tnid);
 

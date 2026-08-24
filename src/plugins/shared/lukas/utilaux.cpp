@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "precomp.h"
+#include <strsafe.h> // counted bounded copies (StringCchCopyNA)
 
 char* Replace(char* string, char s, char d)
 {
@@ -23,7 +24,7 @@ BOOL GetOpenFileName(HWND parent, const char* title, const char* filter,
     OPENFILENAME ofn;
     char buf[200];
     char fileName[MAX_PATH];
-    lstrcpyn(buf, filter, 200);
+    StringCchCopyNA(buf, 200, filter, 200); // counted bounded copy instead of lstrcpyn
     Replace(buf, '\t', '\0');
 
     memset(&ofn, 0, sizeof(OPENFILENAME));

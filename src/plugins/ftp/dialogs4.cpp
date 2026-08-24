@@ -3,6 +3,7 @@
 // CommentsTranslationProject: TRANSLATED
 
 #include "precomp.h"
+#include <strsafe.h> // counted bounded copies (StringCchCopyNA)
 
 //
 // ****************************************************************************
@@ -164,7 +165,7 @@ void CEditSrvTypeColumnDlg::Transfer(CTransferInfo& ti)
                     LastUsedIndexForName = col->NameID;
                 }
                 else
-                    lstrcpyn(bufName, HandleNULLStr(col->NameStr), STC_NAME_MAX_SIZE);
+                    StringCchCopyNA(bufName, STC_NAME_MAX_SIZE, HandleNULLStr(col->NameStr), STC_NAME_MAX_SIZE); // counted bounded copy instead of lstrcpyn
                 if (col->DescrID != -1)
                 {
                     if (!LoadStdColumnStrDescr(bufDescr, STC_DESCR_MAX_SIZE, col->DescrID))
@@ -172,7 +173,7 @@ void CEditSrvTypeColumnDlg::Transfer(CTransferInfo& ti)
                     LastUsedIndexForDescr = col->DescrID;
                 }
                 else
-                    lstrcpyn(bufDescr, HandleNULLStr(col->DescrStr), STC_DESCR_MAX_SIZE);
+                    StringCchCopyNA(bufDescr, STC_DESCR_MAX_SIZE, HandleNULLStr(col->DescrStr), STC_DESCR_MAX_SIZE); // counted bounded copy instead of lstrcpyn
                 SetWindowText(comboName, bufName);
                 SetWindowText(comboDescr, bufDescr);
             }
@@ -666,9 +667,9 @@ void CSrvTypeTestParserDlg::ParseListingToListView()
     LastSelectedOffset = -1;
 
     char strOnlyInPanel[100];
-    lstrcpyn(strOnlyInPanel, LoadStr(IDS_SRVTYPE_ONLYINPANEL), 100);
+    StringCchCopyNA(strOnlyInPanel, 100, LoadStr(IDS_SRVTYPE_ONLYINPANEL), 100); // counted bounded copy instead of lstrcpyn
     char strDIR[100];
-    lstrcpyn(strDIR, LoadStr(IDS_SRVTYPE_SIZEISDIR), 100);
+    StringCchCopyNA(strDIR, 100, LoadStr(IDS_SRVTYPE_SIZEISDIR), 100); // counted bounded copy instead of lstrcpyn
 
     CFileData file;
     CFTPListingPluginDataInterface dataIface(Columns, FALSE, 0 /* not used here */, FALSE /* not used here */);

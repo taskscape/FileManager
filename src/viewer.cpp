@@ -814,6 +814,11 @@ void MyTextOut(HDC hdc, int nXStart, int nYStart, LPCTSTR lpString, int cbString
     }
 }
 
+// Repaints the viewer window: rebuilds the line-offset table for the visible
+// region (the text model is recomputed lazily on paint), draws the margin
+// column, visible lines, and selection/highlight ranges into the memory bitmap
+// and blits it. Guarded by EnablePaint to avoid re-entrant repaints while the
+// text layout is being rebuilt.
 void CViewerWindow::Paint(HDC dc)
 {
     CALL_STACK_MESSAGE1("CViewerWindow::Paint()");

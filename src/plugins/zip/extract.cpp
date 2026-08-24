@@ -7,7 +7,7 @@
 #include <ostream>
 #include <commctrl.h>
 #include <stdio.h>
-
+#include <strsafe.h> // counted copies for fixed extraction-path buffers
 #include "spl_com.h"
 #include "spl_base.h"
 #include "spl_file.h"
@@ -273,8 +273,10 @@ int CZipUnpack::UnpackOneFile(const char* nameInZip, const CFileData* fileData, 
             ErrorID = FindFile(nameInZip, &fileInfo, zipFileData->ItemNumber);
         if (!ErrorID)
         {
-            lstrcpy(targetDir, targetPath);
-            targetDirLen = lstrlen(targetDir);
+            // counted copy of the extraction root into its fixed buffer
+            StringCchCopyA(targetDir, _countof(targetDir), targetPath);
+            // Extraction paths use the plugin's legacy int length contract.
+            targetDirLen = static_cast<int>(strlen(targetDir));
             if (targetDirLen && targetDir[targetDirLen - 1] == '\\')
             {
                 targetDir[targetDirLen - 1] = 0;
@@ -451,7 +453,8 @@ int CZipUnpack::FindFile(LPCTSTR name, CFileInfo* fileInfo, int nItem)
         if (i == nItem)
         {
             unsigned int tempNameLen = ProcessName(centralHeader, tempName);
-            unsigned int nameLen = lstrlen(name);
+            // Central-directory name lengths are stored as unsigned 32-bit values.
+            unsigned int nameLen = static_cast<unsigned int>(strlen(name));
 
             if (tempNameLen == nameLen)
             {
@@ -618,7 +621,8 @@ int CZipUnpack::MatchFilesToMask(TIndirectArray2<char>& maskArray)
                     errorID = IDS_LOWMEM;
                     break;
                 }
-                lstrcpy(fileInfo->Name, tempName);
+                // the allocation above is sized from the same measured length, so copy that exact span
+                memcpy(fileInfo->Name, tempName, tempNameLen + 1);
                 if (!ExtrFiles->Add(fileInfo))
                 {
                     delete fileInfo;
@@ -1700,12 +1704,22 @@ int CZipUnpack::ExtractSingleFile(char* targetDir, int targetDirLen,
                         {
                             char attr[101];
                             char buf[MAX_PATH];
-                            int len = lstrlen(ZipName);
+                            // The fixed MAX_PATH composition below uses an int length contract.
+                            int len = static_cast<int>(strlen(ZipName));
 
-                            lstrcpy(buf, ZipName);
-                            *(buf + len++) = '\\';
-                            lstrcpyn(buf + len, fileInfo->Name, MAX_PATH - len);
-                            GetInfo(attr, &fileInfo->LastWrite, fileInfo->Size);
+                            // counted composition of the target path inside its fixed buffer
+                            if (len >= _countof(buf) - 2 ||
+                                FAILED(StringCchCopyA(buf, _countof(buf), ZipName)))
+                            {
+                                errorID = IDS_TOOLONGNAME3;
+                            }
+                            else
+                            {
+                                *(buf + len++) = '\\';
+                                StringCchCopyNA(buf + len, _countof(buf) - len, fileInfo->Name, _countof(buf) - len); // counted bounded copy instead of lstrcpyn
+                            }
+                            if (!errorID)
+                                GetInfo(attr, &fileInfo->LastWrite, fileInfo->Size);
                             if (HasReparsePointInExtractionPath(targetDir, extractionRootLength))
                                 errorID = IDS_UNSAFEEXTRACTPATH;
                             else
@@ -1912,8 +1926,10 @@ int CZipUnpack::ExtractFiles(const char* targetDir)
   else
   {
   */
-    lstrcpy(tempDir, targetDir);
-    tempDirLen = lstrlen(tempDir);
+    // the allocation is sized ZIP_MAX_PATH+1, so bound the copy of the extraction root by it
+    StringCchCopyA(tempDir, ZIP_MAX_PATH + 1, targetDir);
+    // Temporary extraction paths use the plugin's legacy int length contract.
+    tempDirLen = static_cast<int>(strlen(tempDir));
     if (tempDirLen && tempDir[tempDirLen - 1] == '\\')
     {
         tempDir[tempDirLen - 1] = 0;
@@ -1957,7 +1973,8 @@ int CZipUnpack::ExtractFiles(const char* targetDir)
                 }
                 break;
             }
-            lstrcpy(progrText, fileInfo->Name + RootLen + (RootLen ? 1 : 0));
+            // bounded by the length guard above; copy with an explicit capacity anyway
+            StringCchCopyA(progrText, ZIP_MAX_PATH + 32, fileInfo->Name + RootLen + (RootLen ? 1 : 0));
             Salamander->ProgressDialogAddText(progrTextBuf, TRUE);
             if (Salamander->ProgressSetSize(CQuadWord(0, 0), CQuadWord(-1, -1), TRUE))
             {
@@ -1980,14 +1997,14 @@ int CZipUnpack::ExtractFiles(const char* targetDir)
       char  buf[MAX_PATH + 1];
       int   len;
 
-      lstrcpyn(buf, ZipName, MAX_PATH + 1);
-      len = lstrlen(buf);
+      StringCchCopyNA(buf, MAX_PATH + 1, ZipName, MAX_PATH + 1); // counted bounded copy instead of lstrcpyn
+      len = strlen(buf); // CRT length instead of the legacy Win32 length API
       if (RootLen)
       {
         *(buf + len) = '\\';
         len++;
       }
-      lstrcpyn(buf + len, ZipRoot, MAX_PATH + 1 - lstrlen(buf));
+      StringCchCopyNA(buf + len, MAX_PATH + 1 - strlen(buf), ZipRoot, MAX_PATH + 1 - strlen(buf)); // counted bounded copy instead of lstrcpyn // CRT length instead of the legacy Win32 length API
       Salamander->MoveFiles(tempDir, targetDir, tempDir, buf);
     }
     SalamanderGeneral->RemoveTemporaryDir(tempDir);
@@ -2134,7 +2151,8 @@ int CZipUnpack::SafeCreateCFile(CFile** file, const char* fileName, const char* 
                                                                silent, TRUE, &toSkip, NULL, 0, allocate ? &q : NULL, NULL);
             if ((*file)->File != INVALID_HANDLE_VALUE)
             {
-                lstrcpy((*file)->FileName, fileName);
+                // the allocation is sized from the same measured length, so copy that exact span
+                memcpy((*file)->FileName, fileName, fileNameBytes);
                 (*file)->FilePointer = 0;
                 (*file)->RealFilePointer = 0;
                 (*file)->Flags = flags;

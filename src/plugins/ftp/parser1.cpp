@@ -3,6 +3,7 @@
 // CommentsTranslationProject: TRANSLATED
 
 #include "precomp.h"
+#include <strsafe.h> // counted bounded copies (StringCchCopyNA)
 
 // skips spaces, tabs and EOLs, returns TRUE if 's' has not reached the end of the string ('end')
 BOOL SkipWSAndEOLs(const char*& s, const char* end)
@@ -251,7 +252,7 @@ BOOL CFTPParser::CompileNewRule(const char*& rules, const char* rulesEnd,
                     {
                         funcExpected = FALSE; // we have already encountered the function
                         char functionName[100];
-                        lstrcpyn(functionName, beg, (int)min(100, rules - beg + 1));
+                        StringCchCopyNA(functionName, (int)min(100, rules - beg + 1), beg, (int)min(100, rules - beg + 1)); // counted bounded copy instead of lstrcpyn
                         CFTPParserFunctionCode func = FindFunctionCode(functionName);
                         if (func == fpfNone)
                         {
@@ -480,7 +481,7 @@ BOOL CFTPParserRule::CompileNewFunction(CFTPParserFunctionCode func, const char*
                                     if (SkipIdentifier(rules, rulesEnd, errorResID, IDS_STPAR_ERR_INVALIDCOLUMNID))
                                     {
                                         char columnName[STC_ID_MAX_SIZE];
-                                        lstrcpyn(columnName, beg, (int)min(STC_ID_MAX_SIZE, rules - beg + 1));
+                                        StringCchCopyNA(columnName, (int)min(STC_ID_MAX_SIZE, rules - beg + 1), beg, (int)min(STC_ID_MAX_SIZE, rules - beg + 1)); // counted bounded copy instead of lstrcpyn
                                         if (!FindColumnIndex(columnName, columns, &columnIndex, errorResID))
                                             return FALSE;
 
@@ -651,7 +652,7 @@ BOOL CFTPParserRule::CompileNewFunction(CFTPParserFunctionCode func, const char*
                                 if (SkipIdentifier(rules, rulesEnd, errorResID, IDS_STPAR_ERR_INVALVARORBOOL))
                                 {
                                     char name[100];
-                                    lstrcpyn(name, beg, (int)min(100, rules - beg + 1));
+                                    StringCchCopyNA(name, (int)min(100, rules - beg + 1), beg, (int)min(100, rules - beg + 1)); // counted bounded copy instead of lstrcpyn
                                     CFTPParserStateVariables var = psvNone;
                                     int boolVal = -1;
                                     if (!FindStateVarOrBool(name, &var, &boolVal))

@@ -802,6 +802,10 @@ int CFoundFilesListView::CompareDuplicatesFunc(CFoundFilesData* f1, CFoundFilesD
 // (they are only called from CFindDialog methods)
 
 LRESULT
+// Message procedure of the Find window's results list view. Claims Enter via
+// WM_GETDLGCODE so it opens the focused found item (panel/archive navigation),
+// routes keys to the Find dialog (open, properties, context menu on Shift+F10/
+// VK_APPS), and forwards the rest to the list view control.
 CFoundFilesListView::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 {
     SLOW_CALL_STACK_MESSAGE4("CFoundFilesListView::WindowProc(0x%X, 0x%IX, 0x%IX)", uMsg, wParam, lParam);

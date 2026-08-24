@@ -3,6 +3,7 @@
 // CommentsTranslationProject: TRANSLATED
 
 #include "precomp.h"
+#include <strsafe.h> // counted bounded copies (StringCchCopyNA)
 
 //
 // ****************************************************************************
@@ -337,8 +338,7 @@ BOOL CControlConnectionSocket::ListWorkingPath(HWND parent, const char* path, ch
     char listCmd[FTPCOMMAND_MAX_SIZE + 2];
 
     HANDLES(EnterCriticalSection(&SocketCritSect));
-    lstrcpyn(listCmd, UseLIST_aCommand ? LIST_a_CMD_TEXT : (ListCommand != NULL && *ListCommand != 0 ? ListCommand : LIST_CMD_TEXT),
-             FTPCOMMAND_MAX_SIZE);
+    StringCchCopyNA(listCmd, FTPCOMMAND_MAX_SIZE, UseLIST_aCommand ? LIST_a_CMD_TEXT : (ListCommand != NULL && *ListCommand != 0 ? ListCommand : LIST_CMD_TEXT), FTPCOMMAND_MAX_SIZE); // counted bounded copy instead of lstrcpyn
     BOOL usePassiveModeAux = UsePassiveMode;
     int logUID = LogUID; // log UID of this connection
     int useListingsCacheAux = UseListingsCache;
@@ -486,7 +486,7 @@ BOOL CControlConnectionSocket::ListWorkingPath(HWND parent, const char* path, ch
                 //          dataConnection->EncryptConnection();
                 //        }
                 HANDLES(EnterCriticalSection(&SocketCritSect));
-                lstrcpyn(hostTmp, Host, HOST_MAX_SIZE);
+                StringCchCopyNA(hostTmp, HOST_MAX_SIZE, Host, HOST_MAX_SIZE); // counted bounded copy instead of lstrcpyn
                 CFTPServerPathType pathType = ::GetFTPServerPathType(ServerFirstReply, ServerSystem, path);
                 HANDLES(LeaveCriticalSection(&SocketCritSect));
 
@@ -545,7 +545,7 @@ BOOL CControlConnectionSocket::ListWorkingPath(HWND parent, const char* path, ch
                                     sslReuseErr)
                                 {                                                                       // we need to perform a reconnect
                                     CloseControlConnection(parent);                                     // close the current control connection
-                                    lstrcpyn(retryMsgBuf, LoadStr(IDS_ERRDATACONSSLCONNECTERROR), 300); // set the error text for the reconnect wait window
+                                    StringCchCopyNA(retryMsgBuf, 300, LoadStr(IDS_ERRDATACONSSLCONNECTERROR), 300); // counted bounded copy instead of lstrcpyn // set the error text for the reconnect wait window
                                     retryMsgAux = retryMsgBuf;
                                     sslErrReconnect = TRUE;
                                     fastSSLErrReconnect = sslErrorOccured == SSLCONERR_UNVERIFIEDCERT || sslReuseErr;
@@ -553,7 +553,7 @@ BOOL CControlConnectionSocket::ListWorkingPath(HWND parent, const char* path, ch
                                 else
                                 {
                                     // display the "list can be incomplete" message; the user has not been warned yet
-                                    lstrcpyn(errBuf, LoadStr(IDS_UNABLETOREADLIST), 900 + FTP_MAX_PATH);
+                                    StringCchCopyNA(errBuf, 900 + FTP_MAX_PATH, LoadStr(IDS_UNABLETOREADLIST), 900 + FTP_MAX_PATH); // counted bounded copy instead of lstrcpyn
                                     int len = (int)strlen(errBuf);
                                     BOOL systErr = FALSE;
                                     BOOL trModeHint = FTP_DIGIT_1(ftpReplyCode) == FTP_D1_TRANSIENTERROR &&
@@ -568,13 +568,13 @@ BOOL CControlConnectionSocket::ListWorkingPath(HWND parent, const char* path, ch
                                             trModeHint = err == WSAETIMEDOUT || sslErrorOccured != SSLCONERR_NOERROR;
                                         if (sslErrorOccured != SSLCONERR_NOERROR)
                                         {
-                                            lstrcpyn(replyBuf, LoadStr(IDS_ERRDATACONSSLCONNECTERROR), 700);
+                                            StringCchCopyNA(replyBuf, 700, LoadStr(IDS_ERRDATACONSSLCONNECTERROR), 700); // counted bounded copy instead of lstrcpyn
                                             strcat(replyBuf, "\r\n");
                                         }
                                         else
                                         {
                                             if (noDataTrTimeout)
-                                                lstrcpyn(replyBuf, LoadStr(IDS_ERRDATACONNODATATRTIMEOUT), 700);
+                                                StringCchCopyNA(replyBuf, 700, LoadStr(IDS_ERRDATACONNODATATRTIMEOUT), 700); // counted bounded copy instead of lstrcpyn
                                             else
                                             {
                                                 if (err != NO_ERROR)
@@ -585,9 +585,9 @@ BOOL CControlConnectionSocket::ListWorkingPath(HWND parent, const char* path, ch
                                                 else
                                                 {
                                                     if (userIface.GetDatConCancelled())
-                                                        lstrcpyn(replyBuf, LoadStr(IDS_ERRDATACONNOTOPENED), 700);
+                                                        StringCchCopyNA(replyBuf, 700, LoadStr(IDS_ERRDATACONNOTOPENED), 700); // counted bounded copy instead of lstrcpyn
                                                     else
-                                                        lstrcpyn(replyBuf, LoadStr(IDS_UNKNOWNERROR), 700);
+                                                        StringCchCopyNA(replyBuf, 700, LoadStr(IDS_UNKNOWNERROR), 700); // counted bounded copy instead of lstrcpyn
                                                 }
                                             }
                                         }
@@ -737,7 +737,7 @@ BOOL CControlConnectionSocket::ListWorkingPath(HWND parent, const char* path, ch
             ok = FALSE;
 
             // display the "list can be incomplete" message; the user has not been warned yet
-            lstrcpyn(errBuf, LoadStr(IDS_UNABLETOREADLIST), 900 + FTP_MAX_PATH);
+            StringCchCopyNA(errBuf, 900 + FTP_MAX_PATH, LoadStr(IDS_UNABLETOREADLIST), 900 + FTP_MAX_PATH); // counted bounded copy instead of lstrcpyn
             int len = (int)strlen(errBuf);
             _snprintf_s(errBuf + len, 900 + FTP_MAX_PATH - len, _TRUNCATE, LoadStr(IDS_UNABLETOREADLISTSUFFIX),
                         LoadStr(IDS_ERRDATACONDECOMPRERROR));
@@ -760,9 +760,9 @@ BOOL CControlConnectionSocket::ListWorkingPath(HWND parent, const char* path, ch
         {                    // called only once we have a replacement listing (until then the user will certainly prefer
                              // an outdated listing over none at all)
             HANDLES(EnterCriticalSection(&SocketCritSect));
-            lstrcpyn(hostTmp, Host, HOST_MAX_SIZE);
+            StringCchCopyNA(hostTmp, HOST_MAX_SIZE, Host, HOST_MAX_SIZE); // counted bounded copy instead of lstrcpyn
             unsigned short portTmp = Port;
-            lstrcpyn(userTmp, User, USER_MAX_SIZE);
+            StringCchCopyNA(userTmp, USER_MAX_SIZE, User, USER_MAX_SIZE); // counted bounded copy instead of lstrcpyn
             CFTPServerPathType pathType = ::GetFTPServerPathType(ServerFirstReply, ServerSystem, path);
             HANDLES(LeaveCriticalSection(&SocketCritSect));
 
@@ -774,9 +774,9 @@ BOOL CControlConnectionSocket::ListWorkingPath(HWND parent, const char* path, ch
             if (!*pathListingIsBroken && useListingsCacheAux && *allocatedListing != NULL)
             { // the user wants to use the cache -> add the newly fetched listing to the cache
                 HANDLES(EnterCriticalSection(&SocketCritSect));
-                lstrcpyn(hostTmp, Host, HOST_MAX_SIZE);
+                StringCchCopyNA(hostTmp, HOST_MAX_SIZE, Host, HOST_MAX_SIZE); // counted bounded copy instead of lstrcpyn
                 unsigned short portTmp = Port;
-                lstrcpyn(userTmp, User, USER_MAX_SIZE);
+                StringCchCopyNA(userTmp, USER_MAX_SIZE, User, USER_MAX_SIZE); // counted bounded copy instead of lstrcpyn
                 CFTPServerPathType pathType = ::GetFTPServerPathType(ServerFirstReply, ServerSystem, path);
                 BOOL isFTPS = EncryptControlConnection == 1;
                 HANDLES(LeaveCriticalSection(&SocketCritSect));
@@ -1504,7 +1504,7 @@ BOOL CListingCache::GetPathListing(const char* host, unsigned short port, const 
             TRACE_E(LOW_MEMORY); // *cachedListingLen stays 0 and the caller handles the memory error
         *cachedListingDate = item->CachedListingDate;
         *cachedListingStartTime = item->CachedListingStartTime;
-        lstrcpyn(path, item->Path, pathBufSize);
+        StringCchCopyNA(path, pathBufSize, item->Path, pathBufSize); // counted bounded copy instead of lstrcpyn
     }
 
     HANDLES(LeaveCriticalSection(&CacheCritSect));
@@ -1630,7 +1630,7 @@ void CListingCache::AcceptChangeOnPathNotification(const char* userPart, BOOL in
         if (userLength == -1 || userLength != item->UserLength)
         {
             userLength = item->UserLength;
-            lstrcpyn(buf, userPart, FTP_USERPART_SIZE);
+            StringCchCopyNA(buf, FTP_USERPART_SIZE, userPart, FTP_USERPART_SIZE); // counted bounded copy instead of lstrcpyn
             FTPSplitPath(buf, &user, NULL, &host, &portStr, &pathStr, NULL, userLength);
             if (pathStr != NULL && pathStr > buf)
                 pathPart = userPart + (pathStr - buf) - 1;
@@ -1639,7 +1639,7 @@ void CListingCache::AcceptChangeOnPathNotification(const char* userPart, BOOL in
                 user = NULL;
             if (host == NULL || pathPart == NULL)
             { // this may still be just a coincidence; we need to try it with an unknown username length
-                lstrcpyn(buf, userPart, FTP_USERPART_SIZE);
+                StringCchCopyNA(buf, FTP_USERPART_SIZE, userPart, FTP_USERPART_SIZE); // counted bounded copy instead of lstrcpyn
                 FTPSplitPath(buf, &user, NULL, &host, &portStr, &pathStr, NULL, 0);
                 if (pathStr != NULL && pathStr > buf)
                     pathPart = userPart + (pathStr - buf) - 1;

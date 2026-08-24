@@ -5,6 +5,12 @@
 
 void CenterWindowToWindow(HWND hWnd, HWND hBaseWnd);
 
+// shared Shell-file-dialog helper: 'filter' uses '|' separators, 'defaultExt' is
+// without the dot (NULL = none), 'overwritePrompt' applies to save only
+BOOL TranslatorGetFileName(HWND parent, const char* title, const char* filter,
+                           char* buffer, BOOL save, const char* defaultExt,
+                           BOOL overwritePrompt);
+
 class CLayoutEditor;
 
 //*****************************************************************************

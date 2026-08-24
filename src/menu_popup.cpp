@@ -2052,6 +2052,16 @@ void CMenuPopup::SelectNewItemIndex(int newItemIndex, BOOL byMouse)
     }
 }
 
+// Menu-loop message filter for the whole tracked menu tree. Called from the
+// custom message loop while a Salamander menu is open; decides per message
+// whether to consume it, leave the menu loop, or defer it. Keyboard handling:
+// characters go to the active popup (mnemonics incl. Alt+letter), Shift+F10 /
+// VK_APPS open a context menu for the selection, Alt/F10 exits the loop,
+// navigation keys are forwarded as item moves/opens/closes, and mouse
+// messages implement hover-highlighting, sub-menu opening on click/hover,
+// and drag-style dismissal. WM_TIMER drives delayed sub-menu opening.
+// 'leaveMenu'/'retValue' report loop exit and the chosen command;
+// 'dispatchLater' asks the caller to pass the message to normal dispatch.
 void CMenuPopup::DoDispatchMessage(MSG* msg, BOOL* leaveMenu, DWORD* retValue, BOOL* dispatchLater)
 {
     CALL_STACK_MESSAGE1("CMenuPopup::DoDispatchMessage(, , , )");

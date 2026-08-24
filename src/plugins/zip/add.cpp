@@ -70,6 +70,15 @@ static bool CopyZipPath(char (&destination)[capacity], const char* source)
     return true;
 }
 
+template<size_t capacity>
+static void CopySfxField(char (&destination)[capacity], const char* source)
+{
+    // Default SFX metadata must be complete or empty: an oversized localized value
+    // would otherwise survive as a silently clipped setting.
+    if (FAILED(StringCchCopyA(destination, capacity, source != NULL ? source : "")))
+        destination[0] = 0;
+}
+
 void* LoadRCData(int id, DWORD& size)
 {
     HRSRC hRsrc = FindResource(DLLInstance, MAKEINTRESOURCE(id), RT_RCDATA);
@@ -2142,7 +2151,7 @@ int CZipPack::LoadExPackOptions(unsigned flags)
   {
     LastUsedSfxSet.Settings = Options.SfxSettings;
     // this name is only needed internally (it is checked for "" somewhere else)
-    lstrcpy(LastUsedSfxSet.Name,  "Last Used");
+    CopySfxField(LastUsedSfxSet.Name, "Last Used");
   }
   return 0;
 }
@@ -2904,30 +2913,31 @@ BOOL CZipPack::LoadDefaults()
       delete DefLanguage;
       DefLanguage = NULL;
     }
-    lstrcpy(Options.SfxSettings.SfxFile, file);
+    CopySfxField(Options.SfxSettings.SfxFile, file);
     if (!DefLanguage && LoadSfxFileData(file, &DefLanguage))
     {
       char err[512];
       sprintf(err, LoadStr(IDS_UNABLEREADSFX2), file);
       SalamanderGeneral->ShowMessageBox(err, LoadStr(IDS_ERROR), MSGBOX_ERROR);
-      lstrcpy(Options.SfxSettings.Text, LoadStr(IDS_DEFAULTTEXT));
-      lstrcpy(Options.SfxSettings.Title, LoadStr(IDS_DEFSFXTITLE));
-      lstrcpy(Options.About, "Version 1.0 beta, Personal Edition\r\n\r\n"
+      CopySfxField(Options.SfxSettings.Text, LoadStr(IDS_DEFAULTTEXT));
+      CopySfxField(Options.SfxSettings.Title, LoadStr(IDS_DEFSFXTITLE));
+      CopySfxField(Options.About, "Version 1.0 beta, Personal Edition\r\n\r\n"
                                   "Coded by Lukas Cerman\r\n"
                                   "E-mail: support@taskscape.com\r\n\r\n"
                                   "ATTENTION: This selfextractor edition is licenced only for "
                                   "personal use and may not be used in business or for programs "
                                   "distribution.");
-      lstrcpy(Options.SfxSettings.ExtractBtnText, LoadStr(IDS_DEFEXTRBUTTON));
+      CopySfxField(Options.SfxSettings.ExtractBtnText, LoadStr(IDS_DEFEXTRBUTTON));
     }
     else
     {
-      lstrcpy(Options.SfxSettings.Text, DefLanguage->DlgText);
-      lstrcpy(Options.SfxSettings.Title, DefLanguage->DlgTitle);
-      lstrcpy(Options.About, DefLanguage->AboutFree);
-      lstrcpy(Options.SfxSettings.ExtractBtnText, DefLanguage->ButtonText);
+      // language-package strings are external input; an oversized value leaves its field empty
+      CopySfxField(Options.SfxSettings.Text, DefLanguage->DlgText);
+      CopySfxField(Options.SfxSettings.Title, DefLanguage->DlgTitle);
+      CopySfxField(Options.About, DefLanguage->AboutFree);
+      CopySfxField(Options.SfxSettings.ExtractBtnText, DefLanguage->ButtonText);
     }
-    lstrcpy(Options.SfxSettings.SubDir, "");
+    CopySfxField(Options.SfxSettings.SubDir, "");
 
     GetModuleFileName(DLLInstance, Options.SfxSettings.IconFile, MAX_PATH);
     Options.SfxSettings.IconIndex = -IDI_SFXICON;

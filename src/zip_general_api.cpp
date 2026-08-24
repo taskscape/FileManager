@@ -2501,6 +2501,11 @@ BOOL CSalamanderGeneral::SalRemovePointsFromPath(char* afterRoot)
     return ::SalRemovePointsFromPath(afterRoot);
 }
 
+// CSalamanderGeneral plug-in API: returns the current value of a shared
+// configuration parameter by 'paramID' (SALCFG_*). Main-thread-only (guarded);
+// fills 'buffer' from the live Configuration object, sets 'type' to the value
+// kind, and reports SALCFGTYPE_NOTFOUND for unknown or retired IDs. Some
+// historical IDs are answered with fixed values to preserve the plug-in ABI.
 BOOL CSalamanderGeneral::GetConfigParameter(int paramID, void* buffer, int bufferSize, int* type)
 {
     SLOW_CALL_STACK_MESSAGE3("CSalamanderGeneral::GetConfigParameter(%d, , %d,)", paramID, bufferSize);

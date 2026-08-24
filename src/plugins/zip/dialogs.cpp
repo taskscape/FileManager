@@ -1201,11 +1201,11 @@ BOOL CLowDiskSpaceDialog::OnInit(WPARAM wParam, LPARAM lParam)
     SubClassStatic(IDC_PATH, true);
     SendDlgItemMessage(Dlg, IDC_TEXT, WM_SETTEXT, 0, (LPARAM)Text);
     SendDlgItemMessage(Dlg, IDC_PATH, WM_SETTEXT, 0, (LPARAM)Path);
-    FormatNumber(FreeSpace, buf, LoadStr(IDS_BYTES));
+    FormatNumber(FreeSpace, buf, _countof(buf), LoadStr(IDS_BYTES));
     SendDlgItemMessage(Dlg, IDC_FREESPACE, WM_SETTEXT, 0, (LPARAM)buf);
     if (VolumeSize != -1)
     {
-        FormatNumber(VolumeSize, buf, LoadStr(IDS_BYTES));
+        FormatNumber(VolumeSize, buf, _countof(buf), LoadStr(IDS_BYTES));
     }
     else
     {

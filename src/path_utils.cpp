@@ -1,7 +1,8 @@
-﻿// SPDX-FileCopyrightText: 2023 Taskscape Ltd
+// SPDX-FileCopyrightText: 2023 Taskscape Ltd
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "precomp.h"
+#include <strsafe.h> // counted bounded copies (StringCchCopyNA)
 
 #include <shobjidl.h>
 
@@ -639,6 +640,14 @@ BOOL SalRemovePointsFromPath(WCHAR* afterRoot)
     return TRUE;
 }
 
+// Converts user-typed path text into a canonical absolute path in place.
+// Handles leading-space trimming, UNC validation (\\server\share completeness,
+// rejection of \\?\ and \\.\ device forms), drive-relative forms, environment
+// and hot-path expansion done by callers, relative paths against 'curDir'
+// ('allowRelPathWithSpaces' tolerates spaces in the relative part), and
+// detects nethood-only input ('callNethood'). On failure returns FALSE with
+// 'errTextID' set to the message ID and 'nextFocus' suggesting which edit
+// field to focus for correction.
 BOOL SalGetFullName(char* name, int* errTextID, const char* curDir, char* nextFocus,
                     BOOL* callNethood, int nameBufSize, BOOL allowRelPathWithSpaces)
 {

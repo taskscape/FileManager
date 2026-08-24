@@ -3,6 +3,7 @@
 // CommentsTranslationProject: TRANSLATED
 
 #include "precomp.h"
+#include <strsafe.h> // counted bounded copies (StringCchCopyNA)
 
 const char* FTP_ANONYMOUS = "anonymous"; // standard name for an anonymous user
 
@@ -39,7 +40,7 @@ BOOL FTPCutDirectory(CFTPServerPathType type, char* path, int pathBufSize,
         {
             if (*(path + l - 1) == '/')
                 *(path + --l) = 0; // removal of trailing '/'
-            lstrcpyn(cutDir, lastSlash + 1, cutDirBufSize);
+            StringCchCopyNA(cutDir, cutDirBufSize, lastSlash + 1, cutDirBufSize); // counted bounded copy instead of lstrcpyn
         }
         if (prevSlash < path)
             *(lastSlash + 1) = 0; // "/somedir" or "/somedir/" -> "/"
@@ -63,7 +64,7 @@ BOOL FTPCutDirectory(CFTPServerPathType type, char* path, int pathBufSize,
         {
             if (*(path + l - 1) == '/' || *(path + l - 1) == '\\')
                 *(path + --l) = 0; // removal of trailing '/'
-            lstrcpyn(cutDir, lastSlash + 1, cutDirBufSize);
+            StringCchCopyNA(cutDir, cutDirBufSize, lastSlash + 1, cutDirBufSize); // counted bounded copy instead of lstrcpyn
         }
         if (prevSlash < path)
             *(lastSlash + 1) = 0; // "/somedir" or "/somedir/" -> "/"
@@ -86,7 +87,7 @@ BOOL FTPCutDirectory(CFTPServerPathType type, char* path, int pathBufSize,
         {
             if (*(path + l - 1) == '/' || *(path + l - 1) == '\\')
                 *(path + --l) = 0; // removal of trailing '/'
-            lstrcpyn(cutDir, lastSlash + 1, cutDirBufSize);
+            StringCchCopyNA(cutDir, cutDirBufSize, lastSlash + 1, cutDirBufSize); // counted bounded copy instead of lstrcpyn
         }
         if (prevSlash < path)
             *(lastSlash + 1) = 0; // "C:/somedir" or "C:/somedir/" -> "C:/"
@@ -105,7 +106,7 @@ BOOL FTPCutDirectory(CFTPServerPathType type, char* path, int pathBufSize,
         {
             name++;
             if (cutDirBufSize > 0)
-                lstrcpyn(cutDir, name, cutDirBufSize);
+                StringCchCopyNA(cutDir, cutDirBufSize, name, cutDirBufSize); // counted bounded copy instead of lstrcpyn
             *name = 0;
             return TRUE;
         }
@@ -126,7 +127,7 @@ BOOL FTPCutDirectory(CFTPServerPathType type, char* path, int pathBufSize,
                     {
                         *end = 0; // we remove the original closing ']'
                         if (cutDirBufSize > 0)
-                            lstrcpyn(cutDir, s + 1, cutDirBufSize);
+                            StringCchCopyNA(cutDir, cutDirBufSize, s + 1, cutDirBufSize); // counted bounded copy instead of lstrcpyn
                         *s++ = ']';
                         *s = 0;
                         return TRUE;
@@ -137,8 +138,8 @@ BOOL FTPCutDirectory(CFTPServerPathType type, char* path, int pathBufSize,
                         {
                             *end = 0; // we remove the original closing ']'
                             if (cutDirBufSize > 0)
-                                lstrcpyn(cutDir, s + 1, cutDirBufSize);
-                            lstrcpyn(s + 1, "000000]", pathBufSize - (int)((s - path) + 1));
+                                StringCchCopyNA(cutDir, cutDirBufSize, s + 1, cutDirBufSize); // counted bounded copy instead of lstrcpyn
+                            StringCchCopyNA(s + 1, pathBufSize - (int)((s - path) + 1), "000000]", pathBufSize - (int)((s - path) + 1)); // counted bounded copy instead of lstrcpyn
                             return TRUE;
                         }
                     }
@@ -165,7 +166,7 @@ BOOL FTPCutDirectory(CFTPServerPathType type, char* path, int pathBufSize,
                 {
                     *end = 0; // we remove the original closing '\''
                     if (cutDirBufSize > 0)
-                        lstrcpyn(cutDir, s + 1, cutDirBufSize);
+                        StringCchCopyNA(cutDir, cutDirBufSize, s + 1, cutDirBufSize); // counted bounded copy instead of lstrcpyn
                     if (*s == '\'')
                         s++; // "'pub'" -> we must keep the first '\''
                     *s++ = '\'';
@@ -188,7 +189,7 @@ BOOL FTPCutDirectory(CFTPServerPathType type, char* path, int pathBufSize,
         {
             if (*(path + l - 1) == '.')
                 *(path + --l) = 0; // removal of trailing '.'
-            lstrcpyn(cutDir, lastDot + 1, cutDirBufSize);
+            StringCchCopyNA(cutDir, cutDirBufSize, lastDot + 1, cutDirBufSize); // counted bounded copy instead of lstrcpyn
         }
         *lastDot = 0;
         return TRUE;
@@ -221,7 +222,7 @@ BOOL FTPCutDirectory(CFTPServerPathType type, char* path, int pathBufSize,
         else
             prevPeriod = lastPeriod;
         if (cutDirBufSize > 0)
-            lstrcpyn(cutDir, prevPeriod + 1, cutDirBufSize);
+            StringCchCopyNA(cutDir, cutDirBufSize, prevPeriod + 1, cutDirBufSize); // counted bounded copy instead of lstrcpyn
         *(prevPeriod + (willBeRoot ? 1 : 0)) = 0;
         return TRUE;
     }
@@ -956,7 +957,7 @@ char* FTPGetErrorText(int err, char* buf, int bufSize)
     {
         char txt[100];
         sprintf(txt, "System error %d, text description is not available.", err);
-        lstrcpyn(buf, txt, bufSize);
+        StringCchCopyNA(buf, bufSize, txt, bufSize); // counted bounded copy instead of lstrcpyn
     }
     return buf;
 }
@@ -1402,7 +1403,7 @@ BOOL FTPGetIBMz_VMRootPath(char* root, int rootSize, const char* path)
         if (*s != 0)
         {
             s++;
-            lstrcpyn(root, path, (int)min(s - path + 1, rootSize));
+            StringCchCopyNA(root, (int)min(s - path + 1, rootSize), path, (int)min(s - path + 1, rootSize)); // counted bounded copy instead of lstrcpyn
             return TRUE;
         }
     }
@@ -1867,7 +1868,7 @@ void FTPMakeVMSDirName(char* vmsDirNameBuf, int vmsDirNameBufSize, const char* d
     if (dirNameLen >= vmsDirNameBufSize)
         dirNameLen = vmsDirNameBufSize - 1;
     memcpy(vmsDirNameBuf, dirName, dirNameLen);
-    lstrcpyn(vmsDirNameBuf + dirNameLen, ".DIR;1", vmsDirNameBufSize - dirNameLen);
+    StringCchCopyNA(vmsDirNameBuf + dirNameLen, vmsDirNameBufSize - dirNameLen, ".DIR;1", vmsDirNameBufSize - dirNameLen); // counted bounded copy instead of lstrcpyn
 }
 
 BOOL FTPIsVMSEscapeSequence(const char* pathBeginning, const char* checkedChar)
@@ -1952,7 +1953,7 @@ BOOL FTPIBMz_VmCutTwoDirectories(char* path, int pathBufSize, char* cutDir, int 
     else
         prevPrevPeriod = prevPeriod;
     if (cutDirBufSize > 0)
-        lstrcpyn(cutDir, prevPrevPeriod + 1, cutDirBufSize);
+        StringCchCopyNA(cutDir, cutDirBufSize, prevPrevPeriod + 1, cutDirBufSize); // counted bounded copy instead of lstrcpyn
     *(prevPrevPeriod + (willBeRoot ? 1 : 0)) = 0;
     return TRUE;
 }
@@ -2024,14 +2025,14 @@ BOOL FTPCutFirstDirFromRelativePath(CFTPServerPathType pathType, char* path, cha
         if (s != NULL) // "aaa/bbb"
         {
             *s = 0;
-            lstrcpyn(cut, path, cutBufSize);
+            StringCchCopyNA(cut, cutBufSize, path, cutBufSize); // counted bounded copy instead of lstrcpyn
             memmove(path, s + 1, strlen(s + 1) + 1);
         }
         else // "aaa"
         {
             if (*path == 0)
                 return FALSE;
-            lstrcpyn(cut, path, cutBufSize);
+            StringCchCopyNA(cut, cutBufSize, path, cutBufSize); // counted bounded copy instead of lstrcpyn
             *path = 0;
         }
         return TRUE;
@@ -2046,14 +2047,14 @@ BOOL FTPCutFirstDirFromRelativePath(CFTPServerPathType pathType, char* path, cha
         if (*s != 0) // "aaa/bbb" or "aaa\\bbb"
         {
             *s = 0;
-            lstrcpyn(cut, path, cutBufSize);
+            StringCchCopyNA(cut, cutBufSize, path, cutBufSize); // counted bounded copy instead of lstrcpyn
             memmove(path, s + 1, strlen(s + 1) + 1);
         }
         else // "aaa"
         {
             if (*path == 0)
                 return FALSE;
-            lstrcpyn(cut, path, cutBufSize);
+            StringCchCopyNA(cut, cutBufSize, path, cutBufSize); // counted bounded copy instead of lstrcpyn
             *path = 0;
         }
         return TRUE;
@@ -2071,7 +2072,7 @@ BOOL FTPCutFirstDirFromRelativePath(CFTPServerPathType pathType, char* path, cha
                 int l = (int)(s - (path + 2));
                 if (l >= cutBufSize)
                     l = cutBufSize - 1;
-                lstrcpyn(cut, path + 2, l + 1);
+                StringCchCopyNA(cut, l + 1, path + 2, l + 1); // counted bounded copy instead of lstrcpyn
                 if (*s == '.')
                 {
                     s++;
@@ -2095,14 +2096,14 @@ BOOL FTPCutFirstDirFromRelativePath(CFTPServerPathType pathType, char* path, cha
             if (s != NULL) // "aaa.bbb"
             {
                 *s = 0;
-                lstrcpyn(cut, path, cutBufSize);
+                StringCchCopyNA(cut, cutBufSize, path, cutBufSize); // counted bounded copy instead of lstrcpyn
                 memmove(path, s + 1, strlen(s + 1) + 1);
             }
             else // "aaa"
             {
                 if (*path == 0)
                     return FALSE;
-                lstrcpyn(cut, path, cutBufSize);
+                StringCchCopyNA(cut, cutBufSize, path, cutBufSize); // counted bounded copy instead of lstrcpyn
                 *path = 0;
             }
         }
@@ -2117,14 +2118,14 @@ BOOL FTPCutFirstDirFromRelativePath(CFTPServerPathType pathType, char* path, cha
         if (s != NULL) // "aaa.bbb"
         {
             *s = 0;
-            lstrcpyn(cut, path, cutBufSize);
+            StringCchCopyNA(cut, cutBufSize, path, cutBufSize); // counted bounded copy instead of lstrcpyn
             memmove(path, s + 1, strlen(s + 1) + 1);
         }
         else // "aaa"
         {
             if (*path == 0)
                 return FALSE;
-            lstrcpyn(cut, path, cutBufSize);
+            StringCchCopyNA(cut, cutBufSize, path, cutBufSize); // counted bounded copy instead of lstrcpyn
             *path = 0;
         }
         return TRUE;
@@ -2652,7 +2653,7 @@ void FTPGenerateNewName(int* phase, char* newName, int* index, const char* origi
         }
         else // at this stage the names will be valid on Windows (for FTP servers on Windows pretending to be UNIX) + ftpsptNetware + ftpsptWindows + ftpsptOS2
         {
-            lstrcpyn(newName, originalName, MAX_PATH);
+            StringCchCopyNA(newName, MAX_PATH, originalName, MAX_PATH); // counted bounded copy instead of lstrcpyn
             SalamanderGeneral->SalMakeValidFileNameComponent(newName);
             if (*index == 0 && strcmp(newName, originalName) == 0)
                 *index = 1;  // newName is identical to originalName, we must adjust newName
@@ -3279,20 +3280,20 @@ void FTPAS400CutFileNamePart(char* mbrName, const char* name)
             if (mbrEnd - mbrBeg == fileEnd - fileBeg &&
                 _strnicmp(fileBeg, mbrBeg, fileEnd - fileBeg) == 0) // if the names before ".file" and before ".mbr" match, this is the case we are looking for and it will be shortened
             {
-                lstrcpyn(mbrName, mbrBeg, MAX_PATH);
+                StringCchCopyNA(mbrName, MAX_PATH, mbrBeg, MAX_PATH); // counted bounded copy instead of lstrcpyn
             }
             else // "a.file/b.mbr" -> "a.b.mbr"
             {
                 if ((fileEnd - fileBeg) + 1 < MAX_PATH)
                 {
                     memcpy(mbrName, fileBeg, (fileEnd - fileBeg) + 1);
-                    lstrcpyn(mbrName + (fileEnd - fileBeg) + 1, mbrBeg, (int)(MAX_PATH - ((fileEnd - fileBeg) + 1)));
+                    StringCchCopyNA(mbrName + (fileEnd - fileBeg) + 1, (int)(MAX_PATH - ((fileEnd - fileBeg) + 1)), mbrBeg, (int)(MAX_PATH - ((fileEnd - fileBeg) + 1))); // counted bounded copy instead of lstrcpyn
                 }
             }
         }
     }
     if (mbrName[0] == 0)
-        lstrcpyn(mbrName, name, MAX_PATH);
+        StringCchCopyNA(mbrName, MAX_PATH, name, MAX_PATH); // counted bounded copy instead of lstrcpyn
 }
 
 void FTPAS400AddFileNamePart(char* name)

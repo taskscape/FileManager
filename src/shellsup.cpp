@@ -262,6 +262,13 @@ void DoGetFSToFSDropEffect(const char* srcFSPath, const char* tgtFSPath,
 // GetCurrentDir
 //
 
+// Drop-target resolution for drops onto a panel (called during DragOver and
+// Drop). Hit-tests the list-box item under 'pt' and classifies the target:
+// disk directory, archive subpath (with ".." unwinding back to the enclosing
+// disk path), or plug-in FS path; a focused file can itself be the target
+// ('isTgtFile', e.g. dropping onto an openable document). Adjusts the allowed
+// effects (archive targets accept copy/move only) and stores the live drop
+// highlight via SetDropTarget/DropPath.
 const char* GetCurrentDir(POINTL& pt, void* param, DWORD* effect, BOOL rButton, BOOL& isTgtFile,
                           DWORD keyState, int& tgtType, int srcType)
 {

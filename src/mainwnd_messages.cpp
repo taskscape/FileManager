@@ -1,4 +1,4 @@
-﻿// SPDX-FileCopyrightText: 2023 Taskscape Ltd
+// SPDX-FileCopyrightText: 2023 Taskscape Ltd
 // SPDX-License-Identifier: GPL-2.0-or-later
 // CommentsTranslationProject: TRANSLATED
 
@@ -1531,14 +1531,14 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
             alreadyDone = unsafe->Received;
             if (!alreadyDone)
             {
-              lstrcpyn(params.LeftPath, unsafe->LeftPath, MAX_PATH);
-              lstrcpyn(params.RightPath, unsafe->RightPath, MAX_PATH - 1);
+              StringCchCopyNA(params.LeftPath, MAX_PATH, unsafe->LeftPath, MAX_PATH); // counted bounded copy instead of lstrcpyn
+              StringCchCopyNA(params.RightPath, MAX_PATH - 1, unsafe->RightPath, MAX_PATH - 1); // counted bounded copy instead of lstrcpyn
 
               if (unsafe->MagicSignature1 == 0x07f2ab13 && unsafe->MagicSignature2 == 0x471e0901)
               {
                 // new features since 2.52
                 // WORD version = unsafe->StructVersion; // not used yet, the first version is recognized by the presence of signatures
-                lstrcpyn(params.ActivePath, unsafe->ActivePath, MAX_PATH);
+                StringCchCopyNA(params.ActivePath, MAX_PATH, unsafe->ActivePath, MAX_PATH); // counted bounded copy instead of lstrcpyn
                 params.ActivatePanel = unsafe->ActivatePanel;
               }
               // we return the result value having taken over the data

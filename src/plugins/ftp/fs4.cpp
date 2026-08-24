@@ -3,6 +3,7 @@
 // CommentsTranslationProject: TRANSLATED
 
 #include "precomp.h"
+#include <strsafe.h> // counted bounded copies (StringCchCopyNA)
 
 //
 // ****************************************************************************
@@ -136,9 +137,9 @@ void CFTPListingPluginDataInterface::SetupView(BOOL leftPanel, CSalamanderViewAb
                 {
                 case stctName: // the Name column is already inserted (cannot be removed), just tweak the name+description
                 {
-                    lstrcpyn(tmpName, colName, COLUMN_NAME_MAX);
+                    StringCchCopyNA(tmpName, COLUMN_NAME_MAX, colName, COLUMN_NAME_MAX); // counted bounded copy instead of lstrcpyn
                     SalamanderGeneral->AddStrToStr(tmpName, COLUMN_NAME_MAX, "a"); // dummy title of the "Ext" column (always needed because the "Name" column is currently the only one in the panel)
-                    lstrcpyn(tmpDescr, colDescr, COLUMN_DESCRIPTION_MAX);
+                    StringCchCopyNA(tmpDescr, COLUMN_DESCRIPTION_MAX, colDescr, COLUMN_DESCRIPTION_MAX); // counted bounded copy instead of lstrcpyn
                     SalamanderGeneral->AddStrToStr(tmpDescr, COLUMN_DESCRIPTION_MAX, "a"); // dummy description of the "Ext" column (always needed because the "Name" column is currently the only one in the panel)
                     view->SetColumnName(i, tmpName, tmpDescr);
 
@@ -204,8 +205,8 @@ void CFTPListingPluginDataInterface::SetupView(BOOL leftPanel, CSalamanderViewAb
                 case stctGeneralNumber:
                 {
                     CColumn column;
-                    lstrcpyn(column.Name, colName, COLUMN_NAME_MAX);
-                    lstrcpyn(column.Description, colDescr, COLUMN_DESCRIPTION_MAX);
+                    StringCchCopyNA(column.Name, COLUMN_NAME_MAX, colName, COLUMN_NAME_MAX); // counted bounded copy instead of lstrcpyn
+                    StringCchCopyNA(column.Description, COLUMN_DESCRIPTION_MAX, colDescr, COLUMN_DESCRIPTION_MAX); // counted bounded copy instead of lstrcpyn
                     switch (col->Type)
                     {
                     case stctGeneralText:
@@ -975,7 +976,7 @@ BOOL CPluginFSInterface::CopyOrMoveFromFS(BOOL copy, int mode, const char* fsNam
             {                                                   // add a trailing backslash so it is a path in every case ('mode'==5 always provides a path)
                 SalamanderGeneral->SalPathAddBackslash(targetPath, MAX_PATH);
             }
-            lstrcpyn(subject, LoadStr(IDS_FTPERRORTITLE), MAX_PATH + 200);
+            StringCchCopyNA(subject, MAX_PATH + 200, LoadStr(IDS_FTPERRORTITLE), MAX_PATH + 200); // counted bounded copy instead of lstrcpyn
             if (SalamanderGeneral->SalParsePath(parent, targetPath, type, isDir, secondPart,
                                                 subject, NULL, FALSE,
                                                 NULL, NULL, NULL, 2 * MAX_PATH))
@@ -1100,7 +1101,7 @@ BOOL CPluginFSInterface::CopyOrMoveFromFS(BOOL copy, int mode, const char* fsNam
                                     if (!is_AS_400_QSYS_LIB_Path)
                                     {
                                         if (donotUseOpMask)
-                                            lstrcpyn(targetName, f->Name, 2 * MAX_PATH); // masks trim '.' from name ends, which is not always OK (e.g. directories "a.b" and "a.b." would merge) - probably rare, so for now we solve it only provisionally like this
+                                            StringCchCopyNA(targetName, 2 * MAX_PATH, f->Name, 2 * MAX_PATH); // counted bounded copy instead of lstrcpyn // masks trim '.' from name ends, which is not always OK (e.g. directories "a.b" and "a.b." would merge) - probably rare, so for now we solve it only provisionally like this
                                         else
                                             SalamanderGeneral->MaskName(targetName, 2 * MAX_PATH, f->Name, opMask);
                                     }
@@ -1109,7 +1110,7 @@ BOOL CPluginFSInterface::CopyOrMoveFromFS(BOOL copy, int mode, const char* fsNam
                                         char mbrName[MAX_PATH];
                                         FTPAS400CutFileNamePart(mbrName, f->Name);
                                         if (donotUseOpMask)
-                                            lstrcpyn(targetName, mbrName, 2 * MAX_PATH); // masks trim '.' from name ends, which is not always OK (e.g. directories "a.b" and "a.b." would merge) - probably rare, so for now we solve it only provisionally like this
+                                            StringCchCopyNA(targetName, 2 * MAX_PATH, mbrName, 2 * MAX_PATH); // counted bounded copy instead of lstrcpyn // masks trim '.' from name ends, which is not always OK (e.g. directories "a.b" and "a.b." would merge) - probably rare, so for now we solve it only provisionally like this
                                         else
                                             SalamanderGeneral->MaskName(targetName, 2 * MAX_PATH, mbrName, opMask);
                                     }

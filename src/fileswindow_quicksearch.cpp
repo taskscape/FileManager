@@ -2274,6 +2274,15 @@ BOOL AreTheSameFiles(DWORD validFileData, CPluginDataInterfaceEncapsulation* plu
     return FALSE;
 }
 
+// Refreshes the panel listing while preserving the user's view context:
+// saves scroll offset and the focused item (by shallow copy of its data, plus
+// visibility state), transfers loaded icons from the old icon cache into a new
+// one when the icon source did not change, then calls ReadDirectory and
+// restores focus/scroll by looking the old focus up in the new listing.
+// 'probablyUselessRefresh' skips the work when the panel cannot have changed;
+// 'forceReloadThumbnails' invalidates cached thumbnails; 'isInactiveRefresh'
+// marks background refreshes of the inactive panel. Recursive self-posts on
+// manually refreshed drives are guarded with BeginStopRefresh.
 void CFilesWindow::RefreshDirectory(BOOL probablyUselessRefresh, BOOL forceReloadThumbnails, BOOL isInactiveRefresh)
 {
     CALL_STACK_MESSAGE1("CFilesWindow::RefreshDirectory()");

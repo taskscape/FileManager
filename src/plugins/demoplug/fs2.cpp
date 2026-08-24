@@ -10,6 +10,7 @@
 //****************************************************************************
 
 #include "precomp.h"
+#include <strsafe.h> // counted bounded copies (StringCchCopyNA)
 
 //
 // ****************************************************************************
@@ -30,7 +31,7 @@ CDeleteProgressDlg::CDeleteProgressDlg(HWND parent, CObjectOrigin origin)
 
 void CDeleteProgressDlg::Set(const char* fileName, DWORD progress, BOOL dalayedPaint)
 {
-    lstrcpyn(TextCache, fileName != NULL ? fileName : "", MAX_PATH);
+    StringCchCopyNA(TextCache, MAX_PATH, fileName != NULL ? fileName : "", MAX_PATH); // counted bounded copy instead of lstrcpyn
     TextCacheIsDirty = TRUE;
 
     if (progress != ProgressCache)
@@ -202,7 +203,7 @@ CPluginFSInterface::GetCurrentPath(char* userPart)
 BOOL WINAPI
 CPluginFSInterface::GetFullName(CFileData& file, int isDir, char* buf, int bufSize)
 {
-    lstrcpyn(buf, Path, bufSize); // if the path does not fit, the name certainly will not (Salamander will report an error)
+    StringCchCopyNA(buf, bufSize, Path, bufSize); // counted bounded copy instead of lstrcpyn // if the path does not fit, the name certainly will not (Salamander will report an error)
     if (isDir == 2)
         return SalamanderGeneral->CutDirectory(buf, NULL); // up-dir
     else
@@ -302,10 +303,10 @@ CPluginFSInterface::ChangePath(int currentFSNameIndex, char* fsName, int fsNameI
     if (*userPart == 0 && ConnectData.UseConnectData) // data from the Connect dialog
     {
         userPart = ConnectData.UserPart;
-        lstrcpyn(path, ConnectData.UserPart, MAX_PATH);
+        StringCchCopyNA(path, MAX_PATH, ConnectData.UserPart, MAX_PATH); // counted bounded copy instead of lstrcpyn
     }
     else
-        lstrcpyn(path, userPart, MAX_PATH);
+        StringCchCopyNA(path, MAX_PATH, userPart, MAX_PATH); // counted bounded copy instead of lstrcpyn
 
     SalamanderGeneral->SalUpdateDefaultDir(TRUE); // refresh before SalGetFullName; prefer the active panel regardless of which panel this FS serves
     int err;
@@ -382,7 +383,7 @@ CPluginFSInterface::ChangePath(int currentFSNameIndex, char* fsName, int fsNameI
                     {
                         fileNameAlreadyCut = TRUE;
                         if (cutFileName != NULL && attr != 0xFFFFFFFF) // it is a file
-                            lstrcpyn(cutFileName, cut, MAX_PATH);
+                            StringCchCopyNA(cutFileName, MAX_PATH, cut, MAX_PATH); // counted bounded copy instead of lstrcpyn
                     }
                     else
                     {
@@ -508,7 +509,7 @@ CPluginFSInterface::ListCurrentPath(CSalamanderDirectoryAbstract* dir,
                                                                                                                 : ICONOVERLAYINDEX_NOTUSED;
 
             SHFILEINFO shfi;
-            lstrcpyn(name, file.Name, MAX_PATH + 4 - (int)(name - curPath));
+            StringCchCopyNA(name, MAX_PATH + 4 - (int)(name - curPath), file.Name, MAX_PATH + 4 - (int)(name - curPath)); // counted bounded copy instead of lstrcpyn
             BOOL isUpDir;
             isUpDir = strcmp(file.Name, "..") == 0;
             if (!isUpDir)
@@ -921,7 +922,7 @@ CPluginFSInterface::QuickRename(const char* fsName, int mode, HWND parent, CFile
 
     // apply the mask in newName
     SalamanderGeneral->MaskName(buf, 2 * MAX_PATH, file.Name, newName);
-    lstrcpyn(newName, buf, MAX_PATH);
+    StringCchCopyNA(newName, MAX_PATH, buf, MAX_PATH); // counted bounded copy instead of lstrcpyn
 
     // perform the rename operation
     char nameFrom[MAX_PATH];
@@ -983,8 +984,8 @@ CPluginFSInterface::AcceptChangeOnPathNotification(const char* fsName, const cha
     // FS paths in 'path' are excluded automatically because they can never match Path)
     char path1[MAX_PATH];
     char path2[MAX_PATH];
-    lstrcpyn(path1, path, MAX_PATH);
-    lstrcpyn(path2, Path, MAX_PATH);
+    StringCchCopyNA(path1, MAX_PATH, path, MAX_PATH); // counted bounded copy instead of lstrcpyn
+    StringCchCopyNA(path2, MAX_PATH, Path, MAX_PATH); // counted bounded copy instead of lstrcpyn
     SalamanderGeneral->SalPathRemoveBackslash(path1);
     SalamanderGeneral->SalPathRemoveBackslash(path2);
     int len1 = (int)strlen(path1);
@@ -1010,7 +1011,7 @@ CPluginFSInterface::AcceptChangeOnPathNotification(const char* fsName, const cha
   // because they can never match 'fsName'+':' at the beginning of 'path2' below)
   char path1[2 * MAX_PATH];
   char path2[2 * MAX_PATH];
-  lstrcpyn(path1, path, 2 * MAX_PATH);
+  StringCchCopyNA(path1, 2 * MAX_PATH, path, 2 * MAX_PATH); // counted bounded copy instead of lstrcpyn
   sprintf(path2, "%s:%s", fsName, Path);
   SalamanderGeneral->SalPathRemoveBackslash(path1);
   SalamanderGeneral->SalPathRemoveBackslash(path2);
@@ -1392,8 +1393,8 @@ CPluginFSInterface::Delete(const char* fsName, int mode, HWND parent, int panel,
     {
       // assemble the full names; trimming to MAX_PATH (2 * MAX_PATH) is theoretically unnecessary
       // but unfortunately required in practice
-      lstrcpyn(end, f->Name, endSize);
-      lstrcpyn(endDFSName, f->Name, endDFSNameSize);
+      StringCchCopyNA(end, endSize, f->Name, endSize); // counted bounded copy instead of lstrcpyn
+      StringCchCopyNA(endDFSName, endDFSNameSize, f->Name, endDFSNameSize); // counted bounded copy instead of lstrcpyn
 
       if (isDir)
       {
@@ -2172,8 +2173,8 @@ CPluginFSInterface::CopyOrMoveFromFS(BOOL copy, int mode, const char* fsName, HW
         if (f != NULL)
         {
             // assemble the full name; trimming to MAX_PATH is theoretically unnecessary but unfortunately required
-            lstrcpyn(endSource, f->Name, endSourceSize);
-            lstrcpyn(endDFSSource, f->Name, endDFSSourceSize);
+            StringCchCopyNA(endSource, endSourceSize, f->Name, endSourceSize); // counted bounded copy instead of lstrcpyn
+            StringCchCopyNA(endDFSSource, endDFSSourceSize, f->Name, endDFSSourceSize); // counted bounded copy instead of lstrcpyn
             // filenames on disk are case-insensitive, the disk cache is case-sensitive, converting
             // to lowercase makes the disk cache behave case-insensitively as well
             SalamanderGeneral->ToLowerCase(endDFSSource);
@@ -2197,8 +2198,7 @@ CPluginFSInterface::CopyOrMoveFromFS(BOOL copy, int mode, const char* fsName, HW
                 if (diskPath) // Windows destination path
                 {
                     // compose the destination name - simplified without handling the "Can't finish operation because of too long name" error
-                    lstrcpyn(endTarget, SalamanderGeneral->MaskName(buf, 3 * MAX_PATH + 100, f->Name, opMask),
-                             endTargetSize);
+                    StringCchCopyNA(endTarget, endTargetSize, SalamanderGeneral->MaskName(buf, 3 * MAX_PATH + 100, f->Name, opMask), endTargetSize); // counted bounded copy instead of lstrcpyn
 
                     const char* tmpName;
                     BOOL fileFromCache = SalamanderGeneral->GetFileFromCache(dfsSourceName, tmpName, fileLock);
@@ -2733,7 +2733,7 @@ CPluginFSInterface::CopyOrMoveFromDiskToFS(BOOL copy, int mode, const char* fsNa
         while ((name = next(NULL, 0, &dosName, &isDir, &size, &attr, &lastWrite, nextParam, NULL)) != NULL)
         { // perform the copy/move on a file or directory
             // assemble the full name; trimming to MAX_PATH is theoretically unnecessary but unfortunately required
-            lstrcpyn(endSource, name, endSourceSize);
+            StringCchCopyNA(endSource, endSourceSize, name, endSourceSize); // counted bounded copy instead of lstrcpyn
 
             if (isDir) // directory
             {
@@ -2753,8 +2753,7 @@ CPluginFSInterface::CopyOrMoveFromDiskToFS(BOOL copy, int mode, const char* fsNa
                 BOOL skip = FALSE;
                 // compose the target name - simplified without handling the "Can't finish operation because of too long name" error
                 // ('name' comes only from the root of the source path - no subdirectories - we apply the mask to the entire 'name')
-                lstrcpyn(endTarget, SalamanderGeneral->MaskName(buf, 3 * MAX_PATH + 100, (char*)name, opMask),
-                         endTargetSize);
+                StringCchCopyNA(endTarget, endTargetSize, SalamanderGeneral->MaskName(buf, 3 * MAX_PATH + 100, (char*)name, opMask), endTargetSize); // counted bounded copy instead of lstrcpyn
 
                 // copy the file directly to the DFS
                 // the demo plug-in does not handle overwriting files; real code should confirm overwrites here
@@ -2942,7 +2941,7 @@ CPluginFSInterface::ChangeAttributes(const char* fsName, HWND parent, int panel,
         if (f != NULL)
         {
             // assemble the full name; trimming to MAX_PATH is theoretically unnecessary but unfortunately required
-            lstrcpyn(end, f->Name, endSize);
+            StringCchCopyNA(end, endSize, f->Name, endSize); // counted bounded copy instead of lstrcpyn
 
             // performing the attribute change is not implemented here
 
@@ -3024,7 +3023,7 @@ CPluginFSInterface::ShowProperties(const char* fsName, HWND parent, int panel,
         if (f != NULL)
         {
             // assemble the full name; trimming to MAX_PATH is theoretically unnecessary but unfortunately required
-            lstrcpyn(end, f->Name, endSize);
+            StringCchCopyNA(end, endSize, f->Name, endSize); // counted bounded copy instead of lstrcpyn
 
             // retrieving the attributes is not implemented here
 

@@ -3,6 +3,7 @@
 // CommentsTranslationProject: TRANSLATED
 
 #include "precomp.h"
+#include <strsafe.h> // counted bounded copies (StringCchCopyNA)
 
 WSADATA WinSocketsData; // information about the Windows Sockets implementation
 
@@ -896,7 +897,7 @@ BOOL CSocket::GetProxyError(char* errBuf, int errBufSize, char* formatBuf, int f
             ProxyErrorCode != pecHTTPProxySrvError)
         {
             if (ProxyWinError == NO_ERROR)
-                lstrcpyn(errText, LoadStr(ProxyErrorCode == pecReceivingBytes ? IDS_CONNECTIONLOSTERROR : IDS_UNKNOWNERROR), 300);
+                StringCchCopyNA(errText, 300, LoadStr(ProxyErrorCode == pecReceivingBytes ? IDS_CONNECTIONLOSTERROR : IDS_UNKNOWNERROR), 300); // counted bounded copy instead of lstrcpyn
             else
             {
                 FTPGetErrorText(ProxyWinError, errText, 300);
@@ -933,7 +934,7 @@ BOOL CSocket::GetProxyError(char* errBuf, int errBufSize, char* formatBuf, int f
             else
             {
                 if (ProxyErrorCode == pecProxySrvError)
-                    lstrcpyn(errText, LoadStr(ProxyWinError), 300);
+                    StringCchCopyNA(errText, 300, LoadStr(ProxyWinError), 300); // counted bounded copy instead of lstrcpyn
                 else
                     errText[0] = 0;
             }
@@ -1006,7 +1007,7 @@ BOOL CSocket::GetProxyError(char* errBuf, int errBufSize, char* formatBuf, int f
                                                                                                                                : IDS_PROXYOPENCONERROR), // ProxyErrorCode == pecProxySrvError or pecHTTPProxySrvError
                             HostAddress, HostPort);
             }
-            lstrcpyn(errBuf, errText, errBufSize);
+            StringCchCopyNA(errBuf, errBufSize, errText, errBufSize); // counted bounded copy instead of lstrcpyn
         }
     }
     HANDLES(LeaveCriticalSection(&SocketCritSect));
@@ -1034,14 +1035,14 @@ BOOL CSocket::GetProxyTimeoutDescr(char* buf, int bufSize)
     case ssSocks5_ListenWaitForLogin:
     case ssHTTP1_1_Listen:
     {
-        lstrcpyn(buf, LoadStr(IDS_OPENPROXYSRVCONTIMEOUT), bufSize);
+        StringCchCopyNA(buf, bufSize, LoadStr(IDS_OPENPROXYSRVCONTIMEOUT), bufSize); // counted bounded copy instead of lstrcpyn
         ret = TRUE;
         break;
     }
 
     case ssSocks4_WaitForIP:
     {
-        lstrcpyn(buf, LoadStr(IDS_GETIPTIMEOUT), bufSize);
+        StringCchCopyNA(buf, bufSize, LoadStr(IDS_GETIPTIMEOUT), bufSize); // counted bounded copy instead of lstrcpyn
         ret = TRUE;
         break;
     }

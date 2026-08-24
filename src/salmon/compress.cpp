@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "precomp.h"
+#include <strsafe.h> // counted bounded copies (StringCchCopyNA)
 
 #include "thread_owner.h"
 
@@ -313,7 +314,7 @@ BOOL CompresBugReports(CCompressParams* compressParams, HANDLE stopEvent)
                     return FALSE;
                 }
                 if (!res)
-                    lstrcpyn(compressParams->ErrorMessage, &error[0], _countof(compressParams->ErrorMessage));
+                    StringCchCopyNA(compressParams->ErrorMessage, _countof(compressParams->ErrorMessage), &error[0], _countof(compressParams->ErrorMessage)); // counted bounded copy instead of lstrcpyn
                 ret &= res;
                 if (!ReportOldBugs)
                     break;

@@ -434,6 +434,12 @@ BOOL CMaskGroup::GetExtendedMode()
         hash = hash % MasksHashArraySize; \
     }
 
+// Parses a semicolon-separated mask string into the prepared-mask array used
+// by OkMask/IsMask. Masks after '|' are exclusions and are stored at the
+// array's beginning so they are evaluated first; extension-only masks
+// (*.ext) are counted as hashable for fast lookup. 'errorPos' receives the
+// offset of a syntax error (invalid characters, empty masks). Passing NULL
+// 'masksString' re-prepares from the stored MasksString only when dirty.
 BOOL CMaskGroup::PrepareMasks(int& errorPos, const char* masksString)
 {
     CALL_STACK_MESSAGE1("CMaskGroup::PrepareMasks(,)");

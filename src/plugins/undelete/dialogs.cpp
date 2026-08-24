@@ -2,6 +2,10 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "precomp.h"
+#include <strsafe.h> // counted bounded copies (StringCchCopyNA)
+
+#include <objbase.h>
+#include <shobjidl.h>
 
 #include "undelete.rh"
 #include "undelete.rh2"
@@ -540,23 +544,78 @@ void CConnectDialog::OnImageBrowse()
 {
     GetDlgItemText(HWindow, IDC_EDIT_IMAGE, Volume, MAX_PATH);
 
-    OPENFILENAME openInfo;
-    memset(&openInfo, 0, sizeof(OPENFILENAME));
-    openInfo.lStructSize = sizeof(OPENFILENAME);
-    openInfo.hwndOwner = HWindow;
-    openInfo.lpstrFilter = "Image Files (*.img;*.ima)\0*.IMG;*.IMA\0AllFiles (*.*)\0*.*\0\0\0";
-    openInfo.lpstrFile = Volume;
-    // TODO: this still feels wrong; when the volume is e.g. C:\Work\Taskscape Ltd\, the initial dir becomes garbage because of lpstrFile
-    openInfo.lpstrInitialDir = Volume;
-    openInfo.nMaxFile = MAX_PATH;
-    openInfo.Flags = OFN_FILEMUSTEXIST | OFN_READONLY;
-    BOOL ret = GetOpenFileName(&openInfo);
-    if (!ret && FNERR_INVALIDFILENAME == CommDlgExtendedError())
+    // open dialog through the modern Shell interface (IFileOpenDialog); the former
+    // retry around invalid initial directories is unnecessary because a location the
+    // shell cannot resolve simply falls back to no initial folder
+    HRESULT comInit = CoInitialize(NULL);
+    if (FAILED(comInit) && comInit != RPC_E_CHANGED_MODE)
+        return;
+    BOOL comOwned = SUCCEEDED(comInit);
+
+    BOOL ret = FALSE;
+    IFileOpenDialog* fileDialog = NULL;
+    static const COMDLG_FILTERSPEC imageFilters[] = {
+        {L"Image Files (*.img;*.ima)", L"*.IMG;*.IMA"},
+        {L"AllFiles (*.*)", L"*.*"},
+    };
+
+    if (SUCCEEDED(CoCreateInstance(CLSID_FileOpenDialog, NULL, CLSCTX_INPROC_SERVER,
+                                   IID_PPV_ARGS(&fileDialog))) &&
+        fileDialog != NULL)
     {
-        // Windows refuse to open dialog with initial path e.g. C:\. Oh well...
-        strcpy(Volume, "");
-        ret = GetOpenFileName(&openInfo);
+        // OFN_READONLY has no counterpart: the modern dialog has no read-only box at all
+        DWORD options = FOS_FILEMUSTEXIST;
+        fileDialog->GetOptions(&options);
+        fileDialog->SetOptions((options & ~FOS_OVERWRITEPROMPT) | FOS_FILEMUSTEXIST | FOS_PATHMUSTEXIST);
+        fileDialog->SetFileTypes(_countof(imageFilters), imageFilters);
+        fileDialog->SetFileTypeIndex(1);
+
+        // split the persisted volume path into an initial folder and a suggested leaf name
+        WCHAR volumeW[MAX_PATH];
+        int converted = MultiByteToWideChar(CP_ACP, 0, Volume, -1, volumeW, MAX_PATH);
+        if (converted > 0)
+        {
+            PWSTR sep = wcsrchr(volumeW, L'\\');
+            if (sep == NULL)
+                sep = wcsrchr(volumeW, L':');
+            WCHAR* leafW = volumeW;
+            if (sep != NULL)
+            {
+                *sep = 0;
+                leafW = sep + 1;
+                if (volumeW[0] != 0) // non-empty folder part seeds the initial location
+                {
+                    IShellItem* folder = NULL;
+                    if (SUCCEEDED(SHCreateItemFromParsingName(volumeW, NULL, IID_PPV_ARGS(&folder))))
+                    {
+                        fileDialog->SetFolder(folder);
+                        folder->Release();
+                    }
+                }
+            }
+            if (*leafW != 0)
+                fileDialog->SetFileName(leafW);
+        }
+
+        if (SUCCEEDED(fileDialog->Show(HWindow)))
+        {
+            IShellItem* item = NULL;
+            PWSTR pathW = NULL;
+            if (SUCCEEDED(fileDialog->GetResult(&item)) && item != NULL &&
+                SUCCEEDED(item->GetDisplayName(SIGDN_FILESYSPATH, &pathW)) && pathW != NULL)
+            {
+                int backConverted = WideCharToMultiByte(CP_ACP, 0, pathW, -1, Volume, MAX_PATH, NULL, NULL);
+                ret = backConverted > 0 && strlen(Volume) < MAX_PATH; // refuse instead of truncating the identity
+                CoTaskMemFree(pathW);
+            }
+            if (item != NULL)
+                item->Release();
+        }
+        fileDialog->Release();
     }
+    if (comOwned)
+        CoUninitialize();
+
     if (ret)
         SetDlgItemText(HWindow, IDC_EDIT_IMAGE, Volume);
 }
@@ -757,7 +816,7 @@ INT_PTR CRestoreDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
             if (beg != NULL && end != NULL && beg < end && end - (beg + 1) < MAX_PATH)
             {
                 char fileName[MAX_PATH];
-                lstrcpyn(fileName, beg + 1, (int)(end - (beg + 1) + 1));
+                StringCchCopyNA(fileName, (int)(end - (beg + 1) + 1), beg + 1, (int)(end - (beg + 1) + 1)); // counted bounded copy instead of lstrcpyn
                 memmove(beg + 1 + 2, end, strlen(end) + 1);
                 memcpy(beg + 1, "%s", 2);
                 _snprintf_s(path, _TRUNCATE, text1, text2);

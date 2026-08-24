@@ -3,6 +3,7 @@
 // CommentsTranslationProject: TRANSLATED
 
 #include "precomp.h"
+#include <strsafe.h> // counted bounded copies (StringCchCopyNA)
 
 CFTPOperationsList FTPOperationsList; // all FTP operations
 
@@ -1620,21 +1621,21 @@ int CFTPQueue::SolveErrorOnItem(HWND parent, int UID, CFTPOperation* oper)
             if (found->Type == fqitUploadCopyExploreDir || found->Type == fqitUploadMoveExploreDir)
             {
                 isUploadItem = TRUE;
-                lstrcpyn(ftpPath, ((CFTPQueueItemCopyMoveUploadExplore*)found)->TgtPath, FTP_MAX_PATH);
-                lstrcpyn(ftpName, ((CFTPQueueItemCopyMoveUploadExplore*)found)->TgtName, FTP_MAX_PATH);
+                StringCchCopyNA(ftpPath, FTP_MAX_PATH, ((CFTPQueueItemCopyMoveUploadExplore*)found)->TgtPath, FTP_MAX_PATH); // counted bounded copy instead of lstrcpyn
+                StringCchCopyNA(ftpName, FTP_MAX_PATH, ((CFTPQueueItemCopyMoveUploadExplore*)found)->TgtName, FTP_MAX_PATH); // counted bounded copy instead of lstrcpyn
             }
             else
             {
                 if (found->Type == fqitUploadCopyFile || found->Type == fqitUploadMoveFile)
                 {
                     isUploadItem = TRUE;
-                    lstrcpyn(ftpPath, ((CFTPQueueItemCopyOrMoveUpload*)found)->TgtPath, FTP_MAX_PATH);
-                    lstrcpyn(ftpName, ((CFTPQueueItemCopyOrMoveUpload*)found)->TgtName, FTP_MAX_PATH);
+                    StringCchCopyNA(ftpPath, FTP_MAX_PATH, ((CFTPQueueItemCopyOrMoveUpload*)found)->TgtPath, FTP_MAX_PATH); // counted bounded copy instead of lstrcpyn
+                    StringCchCopyNA(ftpName, FTP_MAX_PATH, ((CFTPQueueItemCopyOrMoveUpload*)found)->TgtName, FTP_MAX_PATH); // counted bounded copy instead of lstrcpyn
                 }
                 else
                 {
-                    lstrcpyn(ftpPath, found->Path, FTP_MAX_PATH);
-                    lstrcpyn(ftpName, found->Name, FTP_MAX_PATH);
+                    StringCchCopyNA(ftpPath, FTP_MAX_PATH, found->Path, FTP_MAX_PATH); // counted bounded copy instead of lstrcpyn
+                    StringCchCopyNA(ftpName, FTP_MAX_PATH, found->Name, FTP_MAX_PATH); // counted bounded copy instead of lstrcpyn
                 }
             }
             switch (found->ProblemID)
@@ -1643,8 +1644,8 @@ int CFTPQueue::SolveErrorOnItem(HWND parent, int UID, CFTPOperation* oper)
             {
                 if (isUploadItem)
                 {
-                    lstrcpyn(diskPath, found->Path, MAX_PATH);
-                    lstrcpyn(diskName, found->Name, MAX_PATH);
+                    StringCchCopyNA(diskPath, MAX_PATH, found->Path, MAX_PATH); // counted bounded copy instead of lstrcpyn
+                    StringCchCopyNA(diskName, MAX_PATH, found->Name, MAX_PATH); // counted bounded copy instead of lstrcpyn
                 }
                 openDlgWithID = 1;
                 break;
@@ -1677,8 +1678,8 @@ int CFTPQueue::SolveErrorOnItem(HWND parent, int UID, CFTPOperation* oper)
                 {
                     ftpPath[0] = 0;
                     ftpName[0] = 0;
-                    lstrcpyn(diskPath, found->Path, MAX_PATH);
-                    lstrcpyn(diskName, found->Name, MAX_PATH);
+                    StringCchCopyNA(diskPath, MAX_PATH, found->Path, MAX_PATH); // counted bounded copy instead of lstrcpyn
+                    StringCchCopyNA(diskName, MAX_PATH, found->Name, MAX_PATH); // counted bounded copy instead of lstrcpyn
                 }
                 openDlgWithID = found->ProblemID == ITEMPR_UNABLETOPWD ? 13 : found->ProblemID == ITEMPR_UNABLETOCWD || found->ProblemID == ITEMPR_UNABLETOCWDONLYPATH ? 12
                                                                           : found->ProblemID == ITEMPR_UNABLETORESOLVELNK                                              ? 17
@@ -1692,7 +1693,7 @@ int CFTPQueue::SolveErrorOnItem(HWND parent, int UID, CFTPOperation* oper)
                                                                           : found->ProblemID == ITEMPR_SRCFILEREADERROR                                                ? 39
                                                                                                                                                                        : 41;
                 if (found->ErrAllocDescr != NULL)
-                    lstrcpyn(errDescrBuf, found->ErrAllocDescr, 500);
+                    StringCchCopyNA(errDescrBuf, 500, found->ErrAllocDescr, 500); // counted bounded copy instead of lstrcpyn
                 else
                 {
                     if (found->WinError != NO_ERROR)
@@ -1700,9 +1701,9 @@ int CFTPQueue::SolveErrorOnItem(HWND parent, int UID, CFTPOperation* oper)
                     else
                     {
                         if (found->ProblemID == ITEMPR_UPLOADCANNOTLISTTGTPATH)
-                            lstrcpyn(errDescrBuf, LoadStr(IDS_OPERDOPPR_UPLCANTLISTTGTPATH), 500);
+                            StringCchCopyNA(errDescrBuf, 500, LoadStr(IDS_OPERDOPPR_UPLCANTLISTTGTPATH), 500); // counted bounded copy instead of lstrcpyn
                         else
-                            lstrcpyn(errDescrBuf, LoadStr(IDS_UNKNOWNERROR), 500);
+                            StringCchCopyNA(errDescrBuf, 500, LoadStr(IDS_UNKNOWNERROR), 500); // counted bounded copy instead of lstrcpyn
                     }
                 }
                 break;
@@ -1712,13 +1713,13 @@ int CFTPQueue::SolveErrorOnItem(HWND parent, int UID, CFTPOperation* oper)
             {
                 openDlgWithID = 14;
                 if (found->ErrAllocDescr != NULL)
-                    lstrcpyn(errDescrBuf, found->ErrAllocDescr, 500);
+                    StringCchCopyNA(errDescrBuf, 500, found->ErrAllocDescr, 500); // counted bounded copy instead of lstrcpyn
                 else
                 {
                     if (found->WinError != NO_ERROR)
                         FTPGetErrorText(found->WinError, errDescrBuf, 500);
                     else
-                        lstrcpyn(errDescrBuf, LoadStr(IDS_UNKNOWNERROR), 500);
+                        StringCchCopyNA(errDescrBuf, 500, LoadStr(IDS_UNKNOWNERROR), 500); // counted bounded copy instead of lstrcpyn
                 }
                 break;
             }
@@ -1729,15 +1730,15 @@ int CFTPQueue::SolveErrorOnItem(HWND parent, int UID, CFTPOperation* oper)
                     found->Type == fqitUploadCopyExploreDir || found->Type == fqitUploadMoveExploreDir)
                 {
                     openDlgWithID = 49;
-                    lstrcpyn(diskPath, found->Path, MAX_PATH);
-                    lstrcpyn(diskName, found->Name, MAX_PATH);
+                    StringCchCopyNA(diskPath, MAX_PATH, found->Path, MAX_PATH); // counted bounded copy instead of lstrcpyn
+                    StringCchCopyNA(diskName, MAX_PATH, found->Name, MAX_PATH); // counted bounded copy instead of lstrcpyn
                 }
                 else
                     openDlgWithID = 15;
                 if (found->WinError != NO_ERROR)
                     FTPGetErrorText(found->WinError, errDescrBuf, 500);
                 else
-                    lstrcpyn(errDescrBuf, LoadStr(IDS_UNKNOWNERROR), 500);
+                    StringCchCopyNA(errDescrBuf, 500, LoadStr(IDS_UNKNOWNERROR), 500); // counted bounded copy instead of lstrcpyn
                 break;
             }
 
@@ -1756,15 +1757,15 @@ int CFTPQueue::SolveErrorOnItem(HWND parent, int UID, CFTPOperation* oper)
             {
                 if (found->Type == fqitCopyFileOrFileLink || found->Type == fqitMoveFileOrFileLink)
                 {
-                    lstrcpyn(diskPath, ((CFTPQueueItemCopyOrMove*)found)->TgtPath, MAX_PATH);
-                    lstrcpyn(diskName, ((CFTPQueueItemCopyOrMove*)found)->TgtName, MAX_PATH);
+                    StringCchCopyNA(diskPath, MAX_PATH, ((CFTPQueueItemCopyOrMove*)found)->TgtPath, MAX_PATH); // counted bounded copy instead of lstrcpyn
+                    StringCchCopyNA(diskName, MAX_PATH, ((CFTPQueueItemCopyOrMove*)found)->TgtName, MAX_PATH); // counted bounded copy instead of lstrcpyn
                 }
                 if (found->Type == fqitUploadCopyFile || found->Type == fqitUploadMoveFile)
                 {
-                    lstrcpyn(diskPath, found->Path, MAX_PATH);
-                    lstrcpyn(diskName, found->Name, MAX_PATH);
+                    StringCchCopyNA(diskPath, MAX_PATH, found->Path, MAX_PATH); // counted bounded copy instead of lstrcpyn
+                    StringCchCopyNA(diskName, MAX_PATH, found->Name, MAX_PATH); // counted bounded copy instead of lstrcpyn
                 }
-                lstrcpyn(errDescrBuf, LoadStr(found->ProblemID == ITEMPR_UNABLETORESUME ? IDS_SSCD2_UNABLETORESUME : IDS_SSCD2_RESUMETESTFAILED), 500);
+                StringCchCopyNA(errDescrBuf, 500, LoadStr(found->ProblemID == ITEMPR_UNABLETORESUME ? IDS_SSCD2_UNABLETORESUME : IDS_SSCD2_RESUMETESTFAILED), 500); // counted bounded copy instead of lstrcpyn
                 openDlgWithID = found->ProblemID == ITEMPR_UNABLETORESUME ? (found->Type == fqitUploadCopyFile ||
                                                                                      found->Type == fqitUploadMoveFile
                                                                                  ? 45
@@ -1778,13 +1779,13 @@ int CFTPQueue::SolveErrorOnItem(HWND parent, int UID, CFTPOperation* oper)
             {
                 if (found->Type == fqitCopyFileOrFileLink || found->Type == fqitMoveFileOrFileLink)
                 {
-                    lstrcpyn(diskPath, ((CFTPQueueItemCopyOrMove*)found)->TgtPath, MAX_PATH);
-                    lstrcpyn(diskName, ((CFTPQueueItemCopyOrMove*)found)->TgtName, MAX_PATH);
+                    StringCchCopyNA(diskPath, MAX_PATH, ((CFTPQueueItemCopyOrMove*)found)->TgtPath, MAX_PATH); // counted bounded copy instead of lstrcpyn
+                    StringCchCopyNA(diskName, MAX_PATH, ((CFTPQueueItemCopyOrMove*)found)->TgtName, MAX_PATH); // counted bounded copy instead of lstrcpyn
                 }
                 if (found->WinError != NO_ERROR)
                     FTPGetErrorText(found->WinError, errDescrBuf, 500);
                 else
-                    lstrcpyn(errDescrBuf, LoadStr(IDS_UNKNOWNERROR), 500);
+                    StringCchCopyNA(errDescrBuf, 500, LoadStr(IDS_UNKNOWNERROR), 500); // counted bounded copy instead of lstrcpyn
                 openDlgWithID = found->ProblemID == ITEMPR_TGTFILEREADERROR ? 23 : 24;
                 break;
             }
@@ -1799,39 +1800,39 @@ int CFTPQueue::SolveErrorOnItem(HWND parent, int UID, CFTPOperation* oper)
             {
                 if (found->Type == fqitCopyFileOrFileLink || found->Type == fqitMoveFileOrFileLink)
                 {
-                    lstrcpyn(diskPath, ((CFTPQueueItemCopyOrMove*)found)->TgtPath, MAX_PATH);
-                    lstrcpyn(diskName, ((CFTPQueueItemCopyOrMove*)found)->TgtName, MAX_PATH);
+                    StringCchCopyNA(diskPath, MAX_PATH, ((CFTPQueueItemCopyOrMove*)found)->TgtPath, MAX_PATH); // counted bounded copy instead of lstrcpyn
+                    StringCchCopyNA(diskName, MAX_PATH, ((CFTPQueueItemCopyOrMove*)found)->TgtName, MAX_PATH); // counted bounded copy instead of lstrcpyn
                 }
                 if (found->Type == fqitUploadCopyFile || found->Type == fqitUploadMoveFile)
                 {
-                    lstrcpyn(diskPath, found->Path, MAX_PATH);
-                    lstrcpyn(diskName, found->Name, MAX_PATH);
+                    StringCchCopyNA(diskPath, MAX_PATH, found->Path, MAX_PATH); // counted bounded copy instead of lstrcpyn
+                    StringCchCopyNA(diskName, MAX_PATH, found->Name, MAX_PATH); // counted bounded copy instead of lstrcpyn
                 }
                 switch (found->ProblemID)
                 {
                 case ITEMPR_UPLOADASCIIRESUMENOTSUP:
-                    lstrcpyn(errDescrBuf, LoadStr(IDS_UPLERR_UPLCANTRESUMINASC), 500);
+                    StringCchCopyNA(errDescrBuf, 500, LoadStr(IDS_UPLERR_UPLCANTRESUMINASC), 500); // counted bounded copy instead of lstrcpyn
                     break;
                 case ITEMPR_UPLOADUNABLETORESUMEUNKSIZ:
-                    lstrcpyn(errDescrBuf, LoadStr(IDS_OPERDOPPR_UPUNABLERESUNKSIZ), 500);
+                    StringCchCopyNA(errDescrBuf, 500, LoadStr(IDS_OPERDOPPR_UPUNABLERESUNKSIZ), 500); // counted bounded copy instead of lstrcpyn
                     break;
                 case ITEMPR_UPLOADUNABLETORESUMEBIGTGT:
-                    lstrcpyn(errDescrBuf, LoadStr(IDS_UPLERR_UPLCANTRESUMBIGTGT), 500);
+                    StringCchCopyNA(errDescrBuf, 500, LoadStr(IDS_UPLERR_UPLCANTRESUMBIGTGT), 500); // counted bounded copy instead of lstrcpyn
                     break;
                 case ITEMPR_UPLOADTESTIFFINISHEDNOTSUP:
-                    lstrcpyn(errDescrBuf, LoadStr(IDS_UPLERR_UPLTESTIFFINNOTSUP), 500);
+                    StringCchCopyNA(errDescrBuf, 500, LoadStr(IDS_UPLERR_UPLTESTIFFINNOTSUP), 500); // counted bounded copy instead of lstrcpyn
                     break;
 
                 default:
                 {
                     if (found->ErrAllocDescr != NULL)
-                        lstrcpyn(errDescrBuf, found->ErrAllocDescr, 500);
+                        StringCchCopyNA(errDescrBuf, 500, found->ErrAllocDescr, 500); // counted bounded copy instead of lstrcpyn
                     else
                     {
                         if (found->WinError != NO_ERROR)
                             FTPGetErrorText(found->WinError, errDescrBuf, 500);
                         else
-                            lstrcpyn(errDescrBuf, LoadStr(IDS_UNKNOWNERROR), 500);
+                            StringCchCopyNA(errDescrBuf, 500, LoadStr(IDS_UNKNOWNERROR), 500); // counted bounded copy instead of lstrcpyn
                     }
                     break;
                 }
@@ -1885,7 +1886,7 @@ int CFTPQueue::SolveErrorOnItem(HWND parent, int UID, CFTPOperation* oper)
                         {
                             if (((CFTPQueueItemChAttr*)found)->OrigRights != NULL)
                             {
-                                lstrcpyn(origRightsBuf, ((CFTPQueueItemChAttr*)found)->OrigRights, 100);
+                                StringCchCopyNA(origRightsBuf, 100, ((CFTPQueueItemChAttr*)found)->OrigRights, 100); // counted bounded copy instead of lstrcpyn
                                 origRights = origRightsBuf;
                             }
                             newAttr = ((CFTPQueueItemChAttr*)found)->Attr;
@@ -1894,7 +1895,7 @@ int CFTPQueue::SolveErrorOnItem(HWND parent, int UID, CFTPOperation* oper)
                         {
                             if (((CFTPQueueItemChAttrDir*)found)->OrigRights != NULL)
                             {
-                                lstrcpyn(origRightsBuf, ((CFTPQueueItemChAttrDir*)found)->OrigRights, 100);
+                                StringCchCopyNA(origRightsBuf, 100, ((CFTPQueueItemChAttrDir*)found)->OrigRights, 100); // counted bounded copy instead of lstrcpyn
                                 origRights = origRightsBuf;
                             }
                             newAttr = ((CFTPQueueItemChAttrDir*)found)->Attr;
@@ -1910,8 +1911,8 @@ int CFTPQueue::SolveErrorOnItem(HWND parent, int UID, CFTPOperation* oper)
                 {
                     if (((CFTPQueueItemCopyMoveExplore*)found)->TgtDirState == TGTDIRSTATE_UNKNOWN)
                     {
-                        lstrcpyn(diskPath, ((CFTPQueueItemCopyMoveExplore*)found)->TgtPath, MAX_PATH);
-                        lstrcpyn(diskName, ((CFTPQueueItemCopyMoveExplore*)found)->TgtName, MAX_PATH);
+                        StringCchCopyNA(diskPath, MAX_PATH, ((CFTPQueueItemCopyMoveExplore*)found)->TgtPath, MAX_PATH); // counted bounded copy instead of lstrcpyn
+                        StringCchCopyNA(diskName, MAX_PATH, ((CFTPQueueItemCopyMoveExplore*)found)->TgtName, MAX_PATH); // counted bounded copy instead of lstrcpyn
                         winError = found->WinError;
 
                         switch (found->ProblemID)
@@ -1932,21 +1933,21 @@ int CFTPQueue::SolveErrorOnItem(HWND parent, int UID, CFTPOperation* oper)
                 {
                     if (((CFTPQueueItemCopyMoveUploadExplore*)found)->TgtDirState == UPLOADTGTDIRSTATE_UNKNOWN)
                     {
-                        lstrcpyn(diskPath, found->Path, MAX_PATH);
-                        lstrcpyn(diskName, found->Name, MAX_PATH);
+                        StringCchCopyNA(diskPath, MAX_PATH, found->Path, MAX_PATH); // counted bounded copy instead of lstrcpyn
+                        StringCchCopyNA(diskName, MAX_PATH, found->Name, MAX_PATH); // counted bounded copy instead of lstrcpyn
 
                         switch (found->ProblemID)
                         {
                         case ITEMPR_UPLOADCANNOTCREATETGTDIR:
                         {
                             if (found->ErrAllocDescr != NULL)
-                                lstrcpyn(errDescrBuf, found->ErrAllocDescr, 500);
+                                StringCchCopyNA(errDescrBuf, 500, found->ErrAllocDescr, 500); // counted bounded copy instead of lstrcpyn
                             else
                             {
                                 if (found->WinError == ERROR_ALREADY_EXISTS)
-                                    lstrcpyn(errDescrBuf, LoadStr(IDS_UPLERR_CANTCRTGTDIRFILEEX), 500);
+                                    StringCchCopyNA(errDescrBuf, 500, LoadStr(IDS_UPLERR_CANTCRTGTDIRFILEEX), 500); // counted bounded copy instead of lstrcpyn
                                 else
-                                    lstrcpyn(errDescrBuf, LoadStr(IDS_UPLERR_CANTCRTGTDIRINV), 500);
+                                    StringCchCopyNA(errDescrBuf, 500, LoadStr(IDS_UPLERR_CANTCRTGTDIRINV), 500); // counted bounded copy instead of lstrcpyn
                             }
                             openDlgWithID = 28;
                             break;
@@ -1959,7 +1960,7 @@ int CFTPQueue::SolveErrorOnItem(HWND parent, int UID, CFTPOperation* oper)
                         case ITEMPR_UPLOADCRDIRAUTORENFAILED:
                         {
                             if (found->ErrAllocDescr != NULL)
-                                lstrcpyn(errDescrBuf, found->ErrAllocDescr, 500);
+                                StringCchCopyNA(errDescrBuf, 500, found->ErrAllocDescr, 500); // counted bounded copy instead of lstrcpyn
                             openDlgWithID = 32;
                             break;
                         }
@@ -1973,8 +1974,8 @@ int CFTPQueue::SolveErrorOnItem(HWND parent, int UID, CFTPOperation* oper)
                 {
                     if (((CFTPQueueItemCopyOrMove*)found)->TgtFileState != TGTFILESTATE_TRANSFERRED)
                     {
-                        lstrcpyn(diskPath, ((CFTPQueueItemCopyOrMove*)found)->TgtPath, MAX_PATH);
-                        lstrcpyn(diskName, ((CFTPQueueItemCopyOrMove*)found)->TgtName, MAX_PATH);
+                        StringCchCopyNA(diskPath, MAX_PATH, ((CFTPQueueItemCopyOrMove*)found)->TgtPath, MAX_PATH); // counted bounded copy instead of lstrcpyn
+                        StringCchCopyNA(diskName, MAX_PATH, ((CFTPQueueItemCopyOrMove*)found)->TgtName, MAX_PATH); // counted bounded copy instead of lstrcpyn
                         winError = found->WinError;
 
                         switch (found->ProblemID)
@@ -2004,8 +2005,8 @@ int CFTPQueue::SolveErrorOnItem(HWND parent, int UID, CFTPOperation* oper)
                 {
                     if (((CFTPQueueItemCopyOrMoveUpload*)found)->TgtFileState != UPLOADTGTFILESTATE_TRANSFERRED)
                     {
-                        lstrcpyn(diskPath, found->Path, MAX_PATH);
-                        lstrcpyn(diskName, found->Name, MAX_PATH);
+                        StringCchCopyNA(diskPath, MAX_PATH, found->Path, MAX_PATH); // counted bounded copy instead of lstrcpyn
+                        StringCchCopyNA(diskName, MAX_PATH, found->Name, MAX_PATH); // counted bounded copy instead of lstrcpyn
 
                         switch (found->ProblemID)
                         {
@@ -2013,10 +2014,10 @@ int CFTPQueue::SolveErrorOnItem(HWND parent, int UID, CFTPOperation* oper)
                         {
                             if (found->ErrAllocDescr == NULL)
                             {
-                                lstrcpyn(errDescrBuf, LoadStr(found->WinError == ERROR_ALREADY_EXISTS ? IDS_UPLERR_CANTCRTGTFILEDIREX : IDS_UPLERR_CANTCRTGTFILEINV), 500);
+                                StringCchCopyNA(errDescrBuf, 500, LoadStr(found->WinError == ERROR_ALREADY_EXISTS ? IDS_UPLERR_CANTCRTGTFILEDIREX : IDS_UPLERR_CANTCRTGTFILEINV), 500); // counted bounded copy instead of lstrcpyn
                             }
                             else
-                                lstrcpyn(errDescrBuf, found->ErrAllocDescr, 500);
+                                StringCchCopyNA(errDescrBuf, 500, found->ErrAllocDescr, 500); // counted bounded copy instead of lstrcpyn
                             openDlgWithID = 34;
                             break;
                         }
@@ -2037,7 +2038,7 @@ int CFTPQueue::SolveErrorOnItem(HWND parent, int UID, CFTPOperation* oper)
                         case ITEMPR_UPLOADFILEAUTORENFAILED:
                         {
                             if (found->ErrAllocDescr != NULL)
-                                lstrcpyn(errDescrBuf, found->ErrAllocDescr, 500);
+                                StringCchCopyNA(errDescrBuf, 500, found->ErrAllocDescr, 500); // counted bounded copy instead of lstrcpyn
                             openDlgWithID = 48;
                             break;
                         }

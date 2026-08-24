@@ -233,6 +233,11 @@ BOOL PackCompress(HWND parent, CFilesWindow* panel, const char* archiveFileName,
 //        needANSIListFile is TRUE if the file list should be in ANSI (not OEM)
 //   OUT:
 
+// Packs files into an external archiver via its command line: enumerates the
+// selection through 'nextName' building the response/list file (ANSI when
+// 'needANSIListFile'), expands 'initDir' if requested, prepends 'archiveRoot'
+// to stored paths, launches 'command' with error-table translation of the
+// exit code, and honors long-name support flags when writing the list.
 BOOL PackUniversalCompress(HWND parent, const char* command, TPackErrorTable* const errorTable,
                            const char* initDir, BOOL expandInitDir, const BOOL supportLongNames,
                            const char* archiveFileName, const char* sourceDir,

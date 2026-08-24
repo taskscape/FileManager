@@ -3,6 +3,7 @@
 // CommentsTranslationProject: TRANSLATED
 
 #include "precomp.h"
+#include <strsafe.h> // counted bounded copies (StringCchCopyNA)
 
 // ****************************************************************************
 
@@ -1445,26 +1446,26 @@ CProxyScriptParams::CProxyScriptParams(CFTPProxyServer* proxyServer, const char*
     }
     else
     {
-        lstrcpyn(ProxyHost, HandleNULLStr(proxyServer->ProxyHost), HOST_MAX_SIZE);
+        StringCchCopyNA(ProxyHost, HOST_MAX_SIZE, HandleNULLStr(proxyServer->ProxyHost), HOST_MAX_SIZE); // counted bounded copy instead of lstrcpyn
         ProxyPort = proxyServer->ProxyPort;
-        lstrcpyn(ProxyUser, HandleNULLStr(proxyServer->ProxyUser), USER_MAX_SIZE);
-        lstrcpyn(ProxyPassword, HandleNULLStr(proxyServer->ProxyPlainPassword), PASSWORD_MAX_SIZE);
+        StringCchCopyNA(ProxyUser, USER_MAX_SIZE, HandleNULLStr(proxyServer->ProxyUser), USER_MAX_SIZE); // counted bounded copy instead of lstrcpyn
+        StringCchCopyNA(ProxyPassword, PASSWORD_MAX_SIZE, HandleNULLStr(proxyServer->ProxyPlainPassword), PASSWORD_MAX_SIZE); // counted bounded copy instead of lstrcpyn
     }
 
-    lstrcpyn(Host, host, HOST_MAX_SIZE);
+    StringCchCopyNA(Host, HOST_MAX_SIZE, host, HOST_MAX_SIZE); // counted bounded copy instead of lstrcpyn
     Port = port;
     if (user == NULL)
         User[0] = 0;
     else
-        lstrcpyn(User, user, USER_MAX_SIZE);
+        StringCchCopyNA(User, USER_MAX_SIZE, user, USER_MAX_SIZE); // counted bounded copy instead of lstrcpyn
     if (password == NULL)
         Password[0] = 0;
     else
-        lstrcpyn(Password, password, PASSWORD_MAX_SIZE);
+        StringCchCopyNA(Password, PASSWORD_MAX_SIZE, password, PASSWORD_MAX_SIZE); // counted bounded copy instead of lstrcpyn
     if (account == NULL)
         Account[0] = 0;
     else
-        lstrcpyn(Account, account, ACCOUNT_MAX_SIZE);
+        StringCchCopyNA(Account, ACCOUNT_MAX_SIZE, account, ACCOUNT_MAX_SIZE); // counted bounded copy instead of lstrcpyn
 
     NeedProxyHost = FALSE;
     NeedProxyPassword = FALSE;
@@ -2001,7 +2002,7 @@ BOOL ProcessProxyScript(const char* script, const char** execPoint, int lastCmdR
     if (errCode != 0 || scriptParams == NULL || !scriptParams->NeedUserInput())
         *execPoint = s;
     if (errCode != 0 && errDescrBuf != NULL) // error text not yet in the buffer, text resource ID stored in errCode
-        lstrcpyn(errDescrBuf, LoadStr(errCode), 300);
+        StringCchCopyNA(errDescrBuf, 300, LoadStr(errCode), 300); // counted bounded copy instead of lstrcpyn
     return errCode == 0;
 }
 
@@ -2441,7 +2442,7 @@ BOOL CFTPProxyServer::Load(HWND parent, HKEY regKey, CSalamanderRegistryAbstract
                     proxyEncryptedPassword = NULL;
                     proxyEncryptedPasswordSize = 0;
                 }
-                memset(plainPassword, 0, lstrlen(plainPassword));
+                memset(plainPassword, 0, strlen(plainPassword)); // CRT length instead of the legacy Win32 length API
                 SalamanderGeneral->Free(plainPassword);
             }
         }
@@ -2930,7 +2931,7 @@ BOOL CFTPProxyServerList::GetProxyName(char* buf, int bufSize, int proxyServerUI
 {
     if (proxyServerUID == -1)
     {
-        lstrcpyn(buf, LoadStr(IDS_ADVSTRPROXYNOTUSED), bufSize);
+        StringCchCopyNA(buf, bufSize, LoadStr(IDS_ADVSTRPROXYNOTUSED), bufSize); // counted bounded copy instead of lstrcpyn
         return TRUE;
     }
     int i;
@@ -2939,7 +2940,7 @@ BOOL CFTPProxyServerList::GetProxyName(char* buf, int bufSize, int proxyServerUI
         CFTPProxyServer* s = At(i);
         if (s->ProxyUID == proxyServerUID)
         {
-            lstrcpyn(buf, HandleNULLStr(s->ProxyName), bufSize);
+            StringCchCopyNA(buf, bufSize, HandleNULLStr(s->ProxyName), bufSize); // counted bounded copy instead of lstrcpyn
             return TRUE;
         }
     }

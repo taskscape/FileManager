@@ -51,6 +51,12 @@ void DoWantDataEvent()
     SetEvent(ContinueEvent);                       // they're ours now, let main thread continue
 }
 
+// Body of the "snooper" thread: the shared low-priority watcher. Registers
+// registry-change notifications on the LanMan shares key (detects new/removed
+// network shares), then runs a WaitForMultipleObjects loop over its object
+// array (data-usage requests, termination, per-window refresh events),
+// dispatching notifications (drive changes, share changes, media events) back
+// to the main thread. Must not call main-thread functions from here.
 unsigned ThreadSnooperBody(void* /*param*/) // don't call main thread functions (not even TRACE) !!!
 {
     CALL_STACK_MESSAGE1("ThreadSnooperBody()");

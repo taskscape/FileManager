@@ -3,6 +3,7 @@
 // CommentsTranslationProject: TRANSLATED
 
 #include "precomp.h"
+#include <strsafe.h> // counted bounded copies (StringCchCopyNA)
 
 // *********************************************************************************
 
@@ -146,7 +147,7 @@ BOOL LoadStdColumnStrName(char* buf, int bufSize, int id)
     if (bufSize > 0)
     {
         if (resID != -1)
-            lstrcpyn(buf, LoadStr(resID), bufSize);
+            StringCchCopyNA(buf, bufSize, LoadStr(resID), bufSize); // counted bounded copy instead of lstrcpyn
         else
         {
             TRACE_E("LoadStdColumnStrName: unknown ID: " << id);
@@ -278,7 +279,7 @@ BOOL LoadStdColumnStrDescr(char* buf, int bufSize, int id)
     if (bufSize > 0)
     {
         if (resID != -1)
-            lstrcpyn(buf, LoadStr(resID), bufSize);
+            StringCchCopyNA(buf, bufSize, LoadStr(resID), bufSize); // counted bounded copy instead of lstrcpyn
         else
         {
             TRACE_E("LoadStdColumnStrDescr: unknown ID: " << id);
@@ -327,7 +328,7 @@ BOOL GetColumnTypeName(char* buf, int bufSize, CSrvTypeColumnTypes type)
     if (bufSize > 0)
     {
         if (resID != -1)
-            lstrcpyn(buf, LoadStr(resID), bufSize);
+            StringCchCopyNA(buf, bufSize, LoadStr(resID), bufSize); // counted bounded copy instead of lstrcpyn
         else
         {
             TRACE_E("GetColumnTypeName: unknown type: " << (int)type);
@@ -367,7 +368,7 @@ BOOL GetColumnEmptyValueForType(char* buf, int bufSize, CSrvTypeColumnTypes type
     if (bufSize > 0)
     {
         if (s != NULL)
-            lstrcpyn(buf, s, bufSize);
+            StringCchCopyNA(buf, bufSize, s, bufSize); // counted bounded copy instead of lstrcpyn
         else
         {
             TRACE_E("GetColumnEmptyValueForType: unknown type: " << (int)type);

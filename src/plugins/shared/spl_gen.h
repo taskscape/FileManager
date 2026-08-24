@@ -2241,7 +2241,7 @@ public:
     // returns standard charset that user has set (part of regional
     // settings); fonts must be constructed with this charset, otherwise
     // texts may not be readable (if text is in standard code page, see Win32 API function
-    // GetLocaleInfo(LOCALE_USER_DEFAULT, LOCALE_IDEFAULTANSICODEPAGE, ...))
+    // GetLocaleInfoEx with the user locale name and LOCALE_IDEFAULTANSICODEPAGE, ...)
     // can be called from any thread
     virtual BYTE WINAPI GetUserDefaultCharset() = 0;
 

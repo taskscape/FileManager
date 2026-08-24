@@ -950,6 +950,10 @@ char* CreateIndexedPluginPathText(const char* pathText, int index)
     return newText;
 }
 
+// Fills the disconnect dialog's list with connected network resources
+// (WNetOpenEnum RESOURCE_CONNECTED + WNetEnumResource loop, buffered batches)
+// and then remembered-but-disconnected drive mappings; each row pairs a local
+// drive letter (or "(none)") with its remote path.
 void CDisconnectDialog::EnumConnections()
 {
     CALL_STACK_MESSAGE1("CDisconnectDialog::EnumConnections()");

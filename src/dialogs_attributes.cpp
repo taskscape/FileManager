@@ -1356,6 +1356,11 @@ void CDriveInfo::Validate(CTransferInfo& ti)
     }
 }
 
+// Fills the Drive Information dialog (ttDataToWindow) from the volume: label,
+// serial number, filesystem name and flags, mount point and volume GUID path
+// (junction/symlink resolution), plus disk-space figures; the ttDataFromWindow
+// direction applies a renamed volume label. 'err' tracks volume-information
+// failures so unavailable fields stay blank instead of showing stale data.
 void CDriveInfo::Transfer(CTransferInfo& ti)
 {
     CALL_STACK_MESSAGE1("CDriveInfo::Transfer()");

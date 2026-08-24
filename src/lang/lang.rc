@@ -2072,7 +2072,11 @@ CAPTION "Open Salamander Bug Reporter"
 FONT 8, "MS Shell Dlg", 400, 0, 0x1
 BEGIN
     LTEXT           "A problem has occured, forcing Open Salamander to close. To help us avoid similar problems in the future, please send an error report below.",IDC_SALMON_INTRO,8,9,336,16
-    LTEXT           "Consent: Send Report uploads this crash archive (dump, optional description and optional email) to reports.taskscape.com over HTTPS. View Report lets you inspect it. Do Not Send Report prevents upload; you can then confirm deletion.",IDC_SALMON_PRIVACY,8,31,336,24
+    // Split the disclosure into fixed lines so translations do not exceed RC's string limit.
+    LTEXT           "Consent: Send Report uploads this crash archive (dump, optional description",IDC_SALMON_PRIVACY,8,31,336,8
+    LTEXT           "and optional email) to reports.taskscape.com over HTTPS.",IDC_SALMON_PRIVACY_LINE2,8,37,336,8
+    LTEXT           "View Report lets you inspect it. Do Not Send Report prevents upload.",IDC_SALMON_PRIVACY_LINE3,8,43,336,8
+    LTEXT           "You can then confirm deletion.",IDC_SALMON_PRIVACY_LINE4,8,49,336,8
     LTEXT           "...",IDC_SALMON_UPLOADING,8,57,84,8
     LTEXT           "Error description (optional)",IDC_SALMON_DESCRIPTION,8,66,169,8
     PUSHBUTTON      "&View Report",IDC_SALMON_VIEW,254,63,90,14

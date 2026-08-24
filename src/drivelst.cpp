@@ -1,4 +1,4 @@
-﻿// SPDX-FileCopyrightText: 2023 Taskscape Ltd
+// SPDX-FileCopyrightText: 2023 Taskscape Ltd
 // SPDX-License-Identifier: GPL-2.0-or-later
 // CommentsTranslationProject: TRANSLATED
 
@@ -473,6 +473,12 @@ typedef WINADVAPI DWORD (WINAPI *FT_CredUIParseUserNameA)(
 #define CREDUI_FLAGS_EXPECT_CONFIRMATION 0x20000 // do not persist unless caller later confirms credential via CredUIConfirmCredential() api
 #define CREDUI_FLAGS_GENERIC_CREDENTIALS 0x40000 // Credential is a generic credential
 
+// Restores a network drive mapping ('name' -> 'remoteName'), prompting for
+// credentials interactively. Pre-W7 special case: a bare \\server (or
+// \\server\) remote name is completed to \\server\IPC$ so the credential
+// prompt binds to the full server identity; other shapes go straight to
+// WNetAddConnection2(CONNECT_INTERACTIVE). Returns TRUE on success and the
+// Win32 error via 'retErr'.
 BOOL RestoreNetworkConnection(HWND parent, const char* name, const char* remoteName, DWORD* retErr, LPNETRESOURCE lpNetResource)
 {
     CALL_STACK_MESSAGE3("RestoreNetworkConnection(, %s, %s, ,)", name, remoteName);
@@ -786,7 +792,7 @@ BOOL RestoreNetworkConnection(HWND parent, const char* name, const char* remoteN
                 credUIParseUserNameA(dlg.User, userNameBuf, USERNAME_MAXLEN, domain, DOMAIN_MAXLEN) == NO_ERROR)
             {
               if (name == NULL) confirmCred = TRUE;
-              if (onlyUserName) lstrcpyn(userNameBuf, dlg.User, USERNAME_MAXLEN);
+              StringCchCopyNA(userNameBuf, USERNAME_MAXLEN, dlg.User, USERNAME_MAXLEN); // counted bounded copy instead of lstrcpyn
               userName = name != NULL && dlg.User[0] == 0 ? NULL : userNameBuf;
               passwd = name != NULL && dlg.User[0] == 0 && dlg.Passwd[0] == 0 ? NULL : dlg.Passwd;
               continue;
@@ -1657,6 +1663,14 @@ void CDrivesList::AddToDrives(CDriveData& drv, int textResId, char hotkey, CDriv
     Drives->Add(drv);
 }
 
+// Builds the drive-bar data model. Two paths: with 'copyDrives' the fresh
+// data of another (just-updated) drive bar is reused - only icons are
+// re-fetched, saving a few ms between the two bars; otherwise all fixed,
+// removable, and network drives are probed from the system (network drives
+// honor 'noTimeout' against cached accessibility so a dead share cannot hang
+// the UI). Appends separators and the plug-in filesystem / network-neighborhood
+// pseudo-entries, resolves current-drive highlighting, and optionally loads
+// gray (disabled) icon variants for inaccessible drives.
 BOOL CDrivesList::BuildData(BOOL noTimeout, TDirectArray<CDriveData>* copyDrives,
                             DWORD copyCachedDrivesMask, BOOL getGrayIcons, BOOL forDriveBar)
 {
@@ -2815,6 +2829,12 @@ BOOL CDrivesList::GetDriveBarToolTip(int index, char* text)
     return TRUE;
 }
 
+// Shows the drive-bar context menu for 'itemIndex' (or the popup's current
+// selection when opened via keyboard). Menu content depends on the drive type
+// (fixed/removable/network/plug-in FS): change drive, eject, disconnect
+// network mapping, format, plug-in FS specific commands ('pluginFSDLLName'
+// reports a plug-in menu target back to the caller). Returns FALSE when no
+// valid item/menu applies.
 BOOL CDrivesList::OnContextMenu(BOOL posByMouse, int itemIndex, int panel, const char** pluginFSDLLName)
 {
     CALL_STACK_MESSAGE4("CDrivesList::DisplayMenu(%d, %d, %d)", posByMouse, itemIndex, panel);

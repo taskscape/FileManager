@@ -831,6 +831,13 @@ void CMainWindow::ScheduleConfigSave()
     }
 }
 
+// Persists the whole configuration to a new transactional generation of the
+// registry store. Re-entrancy: pending timer saves are coalesced, concurrent
+// requests are queued (ConfigSaveQueued) instead of nesting; normal saves run
+// on RegistryWorkerThread so registry I/O yields to the UI loop (critical
+// shutdown saves inline with the wait window). Under LoadSaveToRegistryMutex
+// it snapshots all application state into registry values and commits the
+// generation via CommitConfigurationTransaction.
 void CMainWindow::SaveConfig(HWND parent)
 {
     CALL_STACK_MESSAGE1("CMainWindow::SaveConfig()");

@@ -3,6 +3,7 @@
 // CommentsTranslationProject: TRANSLATED
 
 #include "precomp.h"
+#include <strsafe.h> // counted bounded copies (StringCchCopyNA)
 
 #ifdef _DEBUG
 int CUploadListingsOnServer::FoundPathIndexesInCache = 0; // how many searched paths the cache has caught
@@ -479,7 +480,7 @@ CUploadListingsOnServer::AddEmptyListing(const char* path, const char* dirName, 
 {
     CUploadPathListing* ret = NULL;
     char dir[FTP_MAX_PATH];
-    lstrcpyn(dir, path, FTP_MAX_PATH);
+    StringCchCopyNA(dir, FTP_MAX_PATH, path, FTP_MAX_PATH); // counted bounded copy instead of lstrcpyn
     if (dirName == NULL || FTPPathAppend(pathType, dir, FTP_MAX_PATH, dirName, TRUE))
     {
         int index;
@@ -562,8 +563,8 @@ void CUploadListingsOnServer::ReportCreateDirs(const char* workPath, CFTPServerP
     if (FTPIsPathRelative(pathType, newDirs))
     { // call ReportCreateDir sequentially for all directories being created
         char relPath[FTP_MAX_PATH];
-        lstrcpyn(relPath, newDirs, FTP_MAX_PATH);
-        lstrcpyn(path, workPath, FTP_MAX_PATH);
+        StringCchCopyNA(relPath, FTP_MAX_PATH, newDirs, FTP_MAX_PATH); // counted bounded copy instead of lstrcpyn
+        StringCchCopyNA(path, FTP_MAX_PATH, workPath, FTP_MAX_PATH); // counted bounded copy instead of lstrcpyn
         while (FTPCutFirstDirFromRelativePath(pathType, relPath, cutDir, FTP_MAX_PATH))
         {
             if (strcmp(cutDir, ".") != 0) // assumption: "." is the current directory or is meaningless
@@ -595,7 +596,7 @@ void CUploadListingsOnServer::ReportCreateDirs(const char* workPath, CFTPServerP
     }
     else // newDirs is an absolute path, so trim it up to the root and call ReportCreateDir for all subdirectories (we do not know how many subdirectories were created)
     {
-        lstrcpyn(path, newDirs, FTP_MAX_PATH);
+        StringCchCopyNA(path, FTP_MAX_PATH, newDirs, FTP_MAX_PATH); // counted bounded copy instead of lstrcpyn
         FTPCompleteAbsolutePath(pathType, path, FTP_MAX_PATH, workPath); // convert the path to a full absolute path if necessary
         FTPRemovePointsFromPath(path, pathType);                         // assumption: "." is the current directory or is meaningless, ".." is the parent directory or is meaningless
         while (FTPCutDirectory(pathType, path, FTP_MAX_PATH, cutDir, FTP_MAX_PATH, NULL))
@@ -656,7 +657,7 @@ void CUploadListingsOnServer::ReportDelete(const char* workPath, CFTPServerPathT
         // just in case 'name' is a directory or a link to a directory, invalidate
         // the listing of the path to that directory
         char path[FTP_MAX_PATH];
-        lstrcpyn(path, workPath, FTP_MAX_PATH);
+        StringCchCopyNA(path, FTP_MAX_PATH, workPath, FTP_MAX_PATH); // counted bounded copy instead of lstrcpyn
         if (FTPPathAppend(pathType, path, FTP_MAX_PATH, name, TRUE))
         {
             if (FindPath(path, pathType, index)) // find the path in the cache (if it was a file, the path cannot be found)
@@ -1268,7 +1269,7 @@ BOOL CUploadPathListing::ParseListing(const char* pathListing, int pathListingLe
     if (suggestedListingServerType == NULL)
         listingServerType[0] = 0;
     else
-        lstrcpyn(listingServerType, suggestedListingServerType, SERVERTYPE_MAX_SIZE);
+        StringCchCopyNA(listingServerType, SERVERTYPE_MAX_SIZE, suggestedListingServerType, SERVERTYPE_MAX_SIZE); // counted bounded copy instead of lstrcpyn
 
     // reset the helper variable used to determine which server type has already been tested (unsuccessfully)
     CServerTypeList* serverTypeList = Config.LockServerTypeList();
@@ -1340,7 +1341,7 @@ BOOL CUploadPathListing::ParseListing(const char* pathListing, int pathListingLe
                             const char* s = serverType->TypeName;
                             if (*s == '*')
                                 s++;
-                            lstrcpyn(listingServerType, s, SERVERTYPE_MAX_SIZE);
+                            StringCchCopyNA(listingServerType, SERVERTYPE_MAX_SIZE, s, SERVERTYPE_MAX_SIZE); // counted bounded copy instead of lstrcpyn
                         }
                         needSimpleListing = err; // either successfully parsed the listing or ran into a memory shortage error, finish
                         break;
@@ -1369,7 +1370,7 @@ BOOL CUploadPathListing::ParseListing(const char* pathListing, int pathListingLe
                             const char* s = serverType->TypeName;
                             if (*s == '*')
                                 s++;
-                            lstrcpyn(listingServerType, s, SERVERTYPE_MAX_SIZE);
+                            StringCchCopyNA(listingServerType, SERVERTYPE_MAX_SIZE, s, SERVERTYPE_MAX_SIZE); // counted bounded copy instead of lstrcpyn
                         }
                         needSimpleListing = err; // either successfully parsed the listing or ran into a memory shortage error, finish
                         break;
@@ -1841,12 +1842,12 @@ void CFTPOpenedFile::Set(int myUID, const char* user, const char* host, unsigned
 {
     UID = myUID;
     AccessType = accessType;
-    lstrcpyn(User, user, USER_MAX_SIZE);
-    lstrcpyn(Host, host, HOST_MAX_SIZE);
+    StringCchCopyNA(User, USER_MAX_SIZE, user, USER_MAX_SIZE); // counted bounded copy instead of lstrcpyn
+    StringCchCopyNA(Host, HOST_MAX_SIZE, host, HOST_MAX_SIZE); // counted bounded copy instead of lstrcpyn
     Port = port;
-    lstrcpyn(Path, path, FTP_MAX_PATH);
+    StringCchCopyNA(Path, FTP_MAX_PATH, path, FTP_MAX_PATH); // counted bounded copy instead of lstrcpyn
     PathType = pathType;
-    lstrcpyn(Name, name, MAX_PATH);
+    StringCchCopyNA(Name, MAX_PATH, name, MAX_PATH); // counted bounded copy instead of lstrcpyn
 }
 
 BOOL CFTPOpenedFile::IsSameFile(const char* user, const char* host, unsigned short port,

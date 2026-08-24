@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "precomp.h"
+#include <strsafe.h> // counted bounded copies (StringCchCopyNA)
 
 BOOL ExportStringsForViewerInASCII = TRUE;
 
@@ -194,7 +195,7 @@ void CPluginFSInterface::AcceptChangeOnPathNotification(const char* fsName, cons
         char path2[MAX_FULL_KEYNAME + MAX_PATH];
         char root[MAX_PREDEF_KEYNAME];
         char key[MAX_KEYNAME];
-        lstrcpyn(path1, path, MAX_PATH * 2);
+        StringCchCopyNA(path1, MAX_PATH * 2, path, MAX_PATH * 2); // counted bounded copy instead of lstrcpyn
         WStrToStr(root, MAX_PREDEF_KEYNAME, PredefinedHKeys[CurrentKeyRoot].KeyName);
         WStrToStr(key, MAX_KEYNAME, CurrentKeyName);
         SalPrintf(path2, MAX_FULL_KEYNAME + MAX_PATH, "%s:\\%s\\%s", fsName, root, key);
@@ -392,7 +393,7 @@ void CPluginFSInterface::ViewFile(const char* fsName, HWND parent,
     // create a file name that Windows can handle
     char fileName[MAX_PATH];
     fileName[0] = '_';
-    lstrcpyn(fileName + 1, file.Name, MAX_PATH - 1);
+    StringCchCopyNA(fileName + 1, MAX_PATH - 1, file.Name, MAX_PATH - 1); // counted bounded copy instead of lstrcpyn
 
     // obtain the copy name in the disk cache
     BOOL fileExists;

@@ -3,6 +3,7 @@
 // CommentsTranslationProject: TRANSLATED
 
 #include "precomp.h"
+#include <strsafe.h> // counted bounded copies (StringCchCopyNA)
 
 #include "..\\..\\common\\monotonic_time.h"
 
@@ -813,7 +814,7 @@ CFTPFileToClose::CFTPFileToClose(const char* path, const char* name, HANDLE file
 {
     File = file;
     DeleteIfEmpty = deleteIfEmpty;
-    lstrcpyn(FileName, path, MAX_PATH);
+    StringCchCopyNA(FileName, MAX_PATH, path, MAX_PATH); // counted bounded copy instead of lstrcpyn
     if (!SalamanderGeneral->SalPathAppend(FileName, name, MAX_PATH))
         TRACE_E("Unexpected situation in CFTPFileToClose::CFTPFileToClose(): too long file name!");
     SetDateAndTime = setDateAndTime;
@@ -860,8 +861,8 @@ void CFTPDiskWork::CopyFrom(CFTPDiskWork* work)
 
     Type = work->Type;
 
-    lstrcpyn(Path, work->Path, MAX_PATH);
-    lstrcpyn(Name, work->Name, MAX_PATH);
+    StringCchCopyNA(Path, MAX_PATH, work->Path, MAX_PATH); // counted bounded copy instead of lstrcpyn
+    StringCchCopyNA(Name, MAX_PATH, work->Name, MAX_PATH); // counted bounded copy instead of lstrcpyn
 
     ForceAction = work->ForceAction;
     AlreadyRenamedName = work->AlreadyRenamedName;
@@ -1253,7 +1254,7 @@ void DoCreateDir(CFTPDiskWork& localWork, char* fullName, BOOL& workDone, BOOL& 
                                 }
                                 SalamanderGeneral->SalMakeValidFileNameComponent(localWork.Name);
                             }
-                            lstrcpyn(pathEnd, localWork.Name, rest); // build the full name for the new name
+                            StringCchCopyNA(pathEnd, rest, localWork.Name, rest); // counted bounded copy instead of lstrcpyn // build the full name for the new name
                         }
                         else
                         {
@@ -1663,7 +1664,7 @@ void DoCreateFileUtf8Local(CFTPDiskWork& localWork, char* fullName, BOOL& workDo
                                 }
                                 SalamanderGeneral->SalMakeValidFileNameComponent(localWork.Name);
                             }
-                            lstrcpyn(pathEnd, localWork.Name, rest); // build the full name for the new name
+                            StringCchCopyNA(pathEnd, rest, localWork.Name, rest); // counted bounded copy instead of lstrcpyn // build the full name for the new name
                         }
                         else
                         {
@@ -2077,7 +2078,7 @@ void DoCreateAndWriteFile(CFTPDiskWork& localWork, BOOL& needCopyBack, BOOL& wor
 void DoListDirectory(CFTPDiskWork& localWork, BOOL& needCopyBack)
 {
     char srcPath[MAX_PATH + 10];
-    lstrcpyn(srcPath, localWork.Path, MAX_PATH);
+    StringCchCopyNA(srcPath, MAX_PATH, localWork.Path, MAX_PATH); // counted bounded copy instead of lstrcpyn
     if (SalamanderGeneral->SalPathAppend(srcPath, localWork.Name, MAX_PATH))
     {
         localWork.DiskListing = new TIndirectArray<CDiskListingItem>(100, 500);
@@ -2175,7 +2176,7 @@ void DoListDirectory(CFTPDiskWork& localWork, BOOL& needCopyBack)
 void DoDeleteDir(CFTPDiskWork& localWork, BOOL& needCopyBack)
 {
     char delPath[MAX_PATH + 10];
-    lstrcpyn(delPath, localWork.Path, MAX_PATH);
+    StringCchCopyNA(delPath, MAX_PATH, localWork.Path, MAX_PATH); // counted bounded copy instead of lstrcpyn
     if (SalamanderGeneral->SalPathAppend(delPath, localWork.Name, MAX_PATH))
     {
         DWORD attr = SalamanderGeneral->SalGetFileAttributes(delPath);
@@ -2205,7 +2206,7 @@ void DoDeleteDir(CFTPDiskWork& localWork, BOOL& needCopyBack)
 void DoDeleteFileUtf8Local(CFTPDiskWork& localWork, BOOL& needCopyBack)
 {
     char delPath[MAX_PATH + 10];
-    lstrcpyn(delPath, localWork.Path, MAX_PATH);
+    StringCchCopyNA(delPath, MAX_PATH, localWork.Path, MAX_PATH); // counted bounded copy instead of lstrcpyn
     if (SalamanderGeneral->SalPathAppend(delPath, localWork.Name, MAX_PATH))
     {
         DWORD attr = SalamanderGeneral->SalGetFileAttributes(delPath);
@@ -2236,7 +2237,7 @@ void DoDeleteFileUtf8Local(CFTPDiskWork& localWork, BOOL& needCopyBack)
 void DoOpenFileForReading(CFTPDiskWork& localWork, BOOL& needCopyBack)
 {
     char fileName[MAX_PATH];
-    lstrcpyn(fileName, localWork.Path, MAX_PATH);
+    StringCchCopyNA(fileName, MAX_PATH, localWork.Path, MAX_PATH); // counted bounded copy instead of lstrcpyn
     DWORD winError = NO_ERROR;
     BOOL ok = FALSE;
     if (SalamanderGeneral->SalPathAppend(fileName, localWork.Name, MAX_PATH))

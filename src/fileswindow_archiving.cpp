@@ -387,6 +387,11 @@ const char* WINAPI PanelSalEnumSelection(HWND parent, int enumFiles, BOOL* isDir
     return _PanelSalEnumSelection(enumFiles, NULL, isDir, size, fileData, param, parent, errorOccured);
 }
 
+// Extracts the selected items from the internal-ZIP archive panel into
+// 'tgtPath' (or back over themselves when 'deleteOp' turns the unpack into a
+// delete-from-archive operation). Collects the selection (whole listing when
+// nothing is selected), skips "..", runs the ZIP extraction with progress and
+// overwrite handling, then refreshes the target panel.
 void CFilesWindow::UnpackZIPArchive(CFilesWindow* target, BOOL deleteOp, const char* tgtPath)
 {
     CALL_STACK_MESSAGE3("CFilesWindow::UnpackZIPArchive(, %d, %s)", deleteOp, tgtPath);
@@ -828,6 +833,12 @@ void CFilesWindow::DeleteFromZIPArchive()
     UnpackZIPArchive(NULL, TRUE); // almost the same operation
 }
 
+// Recursively enumerates the directory tree under 'path'\'name' into 'dir'
+// for archiving: FindFirstFileW loop per directory, recursion into
+// subdirectories, resolving .lnk targets (optionally stat-ing their file size
+// when the packer needs it - 'getLinkTgtFileSize' with a Skip-All latch),
+// and counting directory links. Returns TRUE when this subtree was processed
+// without aborting the whole enumeration ('errorOccured' accumulates).
 BOOL _ReadDirectoryTree(HWND parent, char (&path)[MAX_PATH], char* name, CSalamanderDirectory* dir,
                         int* errorOccured, BOOL getLinkTgtFileSize, BOOL* errGetFileSizeOfLnkTgtIgnAll,
                         int* containsDirLinks, char* linkName)
@@ -1297,6 +1308,11 @@ const char* WINAPI PanelEnumDiskSelection(HWND parent, int enumFiles, const char
     }
 }
 
+// Packs the selection from this panel into an archive using plug-in
+// 'pluginIndex' (or the pack dialog flow), optionally deleting sources
+// afterwards ('delFilesAfterPacking': 0=no, 1=confirm each, 2=all). Collects
+// the selection (whole listing if none), resolves the "name by item" archive
+// naming, shows the pack dialog, and drives the packing with progress.
 void CFilesWindow::Pack(CFilesWindow* target, int pluginIndex, const char* pluginName, int delFilesAfterPacking)
 {
     CALL_STACK_MESSAGE4("CFilesWindow::Pack(, %d, %s, %d)", pluginIndex, pluginName, delFilesAfterPacking);

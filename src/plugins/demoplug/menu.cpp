@@ -10,6 +10,7 @@
 //****************************************************************************
 
 #include "precomp.h"
+#include <strsafe.h> // counted bounded copies (StringCchCopyNA)
 
 // ****************************************************************************
 // MENU SECTION
@@ -336,7 +337,7 @@ CPluginInterfaceForMenuExt::ExecuteMenuItem(CSalamanderForOperationsAbstract* sa
 */
         /*
       char path[MAX_PATH];
-      lstrcpyn(path, "F:\\DRIVE_D", MAX_PATH);
+      StringCchCopyNA(path, MAX_PATH, "F:\\DRIVE_D", MAX_PATH); // counted bounded copy instead of lstrcpyn
       CQuadWord total;
       CQuadWord space;
       SalamanderGeneral->GetDiskFreeSpace(&space, path, &total);
@@ -530,7 +531,7 @@ CPluginInterfaceForMenuExt::ExecuteMenuItem(CSalamanderForOperationsAbstract* sa
           if (passwordManager->DecryptPassword(encryptedPassword, encryptedPasswordSize, &decryptedPassword))
           {
             TRACE_I("Decrypted password: " << decryptedPassword);
-            memset(decryptedPassword, 0, lstrlen(decryptedPassword));  // clear memory with plain password
+            memset(decryptedPassword, 0, strlen(decryptedPassword));  // clear memory with plain password
             SalamanderGeneral->Free(decryptedPassword);
           }
 

@@ -1304,6 +1304,11 @@ void CConfigPageView::OnMove(BOOL up)
 }
 
 INT_PTR
+// Dialog procedure of the "View" configuration page: manages the two list
+// views (view templates + their column definitions) with toolbar headers
+// (modify/delete/up/down), drag-free reordering, and validation of template
+// names; WM_COMMAND routes the add/modify/delete buttons into CMyListView
+// editing dialogs.
 CConfigPageView::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 {
     CALL_STACK_MESSAGE4("CConfigPageView::DialogProc(0x%X, 0x%IX, 0x%IX)", uMsg, wParam, lParam);
@@ -2249,6 +2254,11 @@ void CCfgPageUserMenu::RefreshGroupIconInUMItems()
     }
 }
 
+// Dialog procedure of the User Menu configuration page: manages the menu-item
+// tree in a CEditListBox (add/rename/delete/grouping with drag reordering)
+// plus the detail fields for the selected item (command, arguments, initial
+// directory with browse arrows, icon browsing). WM_NOTIFY handles header
+// buttons and list notifications; colors changes refresh group icons.
 INT_PTR
 CCfgPageUserMenu::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 {

@@ -153,6 +153,11 @@ void CFilesWindow::SetFontAndColors(HDC hDC, CHighlightMasksItem* highlightMasks
 // CFilesWindow::DrawIcon
 //
 
+// Draws one file/directory icon from the panel's icon cache: composes the
+// icon state flags (selected/focused/hidden/cut, shortcut arrow, offline
+// mask, drag-mask), picks the icon by extension (lower-cased) or the special
+// up-dir/symbol bitmaps, and blits it at 'x','y' with 'iconSize'; overlay
+// drawing (e.g. link arrow) is positioned via 'overlayRect'.
 void CFilesWindow::DrawIcon(HDC hDC, CFileData* f, BOOL isDir, BOOL isItemUpDir,
                             BOOL isItemFocusedOrEditMode, int x, int y, CIconSizeEnum iconSize,
                             const RECT* overlayRect, DWORD drawFlags)
@@ -497,6 +502,13 @@ void DrawFocusRect(HDC hDC, const RECT* r, BOOL selected, BOOL editMode)
 char DrawItemBuff[1024]; // destination buffer for strings
 int DrawItemAlpDx[1024]; // for width calculations of columns with FixedWidth bit + elastic columns with smart mode
 
+// Renders one list-box item in Brief or Detailed view mode. Decision layers:
+// dirty-only skipping (DRAWFLAG_DIRTY_ONLY + CFileData::Dirty), ".." up-dir
+// special case (always index 0, drawn without focus frame), focus frame
+// visibility (caret visible, edit mode, or suppressed by DRAWFLAG_NO_FRAME),
+// full-row highlight policy in Detailed view (only when FullRowSelect is
+// off), then per-column text/icon/thumbnail drawing with selection and
+// overlay states. Called from the list-box paint path for each visible item.
 void CFilesWindow::DrawBriefDetailedItem(HDC hTgtDC, int itemIndex, RECT* itemRect, DWORD drawFlags)
 {
     CALL_STACK_MESSAGE_NONE
@@ -1248,6 +1260,10 @@ void SplitText(HDC hDC, const char* text, int textLen, int* maxWidth,
 // Draws an item in Icons and Thumbnails modes
 //
 
+// Icons/thumbnails counterpart of DrawBriefDetailedItem: renders one cell of
+// the icon or thumbnail view (image from the icon cache, name below, focus
+// frame, selection state, ".." up-dir special case, dirty-only skipping).
+// 'iconSize' selects the icon metric; the item rectangle defines the cell.
 void CFilesWindow::DrawIconThumbnailItem(HDC hTgtDC, int itemIndex, RECT* itemRect,
                                          DWORD drawFlags, CIconSizeEnum iconSize)
 {

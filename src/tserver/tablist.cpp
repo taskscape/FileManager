@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "precomp.h"
+#include <strsafe.h> // counted bounded copies (StringCchCopyNA)
 
 #include <crtdbg.h>
 #include <ostream>
@@ -581,7 +582,8 @@ void CTabList::GetText(int iItem, int index, WCHAR* buff, int buffMax, BOOL pref
                     s++; // UTF-16 can contain surrogate pairs; skip the second code unit so the text does not start in the middle of a character
             }
         }
-        lstrcpyn(buff, s, buffMax);
+        // The destination is UTF-16; use character counts so the tooltip copy cannot overrun it.
+        StringCchCopyNW(buff, static_cast<size_t>(buffMax), s, static_cast<size_t>(buffMax - 1));
         break;
     }
     }

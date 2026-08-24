@@ -977,6 +977,11 @@ static BOOL CreateMenuAndToolbarImageLists()
     return TRUE;
 }
 
+// (Re)builds all shared graphics resources: reads the system icon color
+// depth and DPI, scales the 16/32/48 icon-size table, loads the color scheme,
+// creates image lists, fonts, brushes and constant bitmaps. With 'colorsOnly'
+// only color-dependent resources are recreated (used by ColorsChanged);
+// otherwise everything is torn down and rebuilt. Returns FALSE on failure.
 BOOL InitializeGraphics(BOOL colorsOnly)
 {
     // 48x48 az od XP

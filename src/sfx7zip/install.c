@@ -200,6 +200,22 @@ BOOL Is64BitWindows()
     return bIsWow64;
 }
 
+// counted copy for the CRT-free installer: refuses source text that cannot fit the fixed buffer
+static BOOL InstallStrCopy(char* dest, size_t destCount, const char* source)
+{
+    size_t used = 0;
+    if (destCount == 0)
+        return FALSE;
+    while (source != NULL && *source != '\0')
+    {
+        if (used + 1 >= destCount)
+            return FALSE;
+        dest[used++] = *source++;
+    }
+    dest[used] = '\0';
+    return TRUE;
+}
+
 void _RemoveTemporaryDir(const char* dir)
 {
     char path[MAX_PATH];
@@ -208,11 +224,12 @@ void _RemoveTemporaryDir(const char* dir)
     WIN32_FIND_DATAW fileW;
     char fileNameUtf8[MAX_PATH];
 
-    lstrcpy(path, dir);
+    if (!InstallStrCopy(path, _countof(path), dir))
+        return; // an oversized temporary-directory path cannot be scanned for cleanup
     end = path + lstrlen(path);
     if (*(end - 1) != '\\')
         *end++ = '\\';
-    lstrcpy(end, "*.*");
+    InstallStrCopy(end, _countof(path) - (end - path), "*.*");
     {
         WCHAR* pathW = AllocWideFromUtf8(path);
         find = pathW != NULL ? FindFirstFileW(pathW, &fileW) : INVALID_HANDLE_VALUE;
@@ -228,7 +245,8 @@ void _RemoveTemporaryDir(const char* dir)
             if (fileNameUtf8[0] != '.' || fileNameUtf8[1] != '\0' &&
                                               (fileNameUtf8[1] != '.' || fileNameUtf8[2] != '\0'))
             {
-                lstrcpy(end, fileNameUtf8);
+                if (!InstallStrCopy(end, _countof(path) - (end - path), fileNameUtf8))
+                    continue; // a name that cannot fit the scan path is skipped instead of truncated
                 if (fileW.dwFileAttributes & (FILE_ATTRIBUTE_READONLY | FILE_ATTRIBUTE_HIDDEN |
                                               FILE_ATTRIBUTE_SYSTEM))
                     SetFileAttributesUtf8Local(path, FILE_ATTRIBUTE_ARCHIVE);
@@ -425,7 +443,7 @@ BOOL CreateParamsFileIfNeeded(const char* path, char* name)
         if (len + sizeof("params.txt") <= MAX_PATH)
         {
             HANDLE file;
-            lstrcpy(name + len, "params.txt");
+            InstallStrCopy(name + len, MAX_PATH - len, "params.txt"); // the guard above guarantees the fit
             file = CreateFileUtf8Local(name, GENERIC_WRITE, 0, NULL, CREATE_NEW, FILE_ATTRIBUTE_NORMAL, NULL);
             if (file != INVALID_HANDLE_VALUE)
             {
@@ -475,7 +493,8 @@ void MyCreateProcess(const char* fileName, BOOL parseCurDir, BOOL addQuotes, con
     if (parseCurDir)
     {
         char* p;
-        lstrcpy(buf, fileName);
+        if (!InstallStrCopy(buf, _countof(buf), fileName))
+            return; // the caller's length guard makes this unreachable, but fail cleanly anyway
         p = buf + lstrlen(buf) - 1;
         while (p > buf && *p != '\\')
             p--;
@@ -508,7 +527,8 @@ void MyCreateProcess(const char* fileName, BOOL parseCurDir, BOOL addQuotes, con
     }
     else
     {
-        lstrcpy(buf2, fileName);
+        if (!InstallStrCopy(buf2, _countof(buf2), fileName))
+            return; // the caller's length guard makes this unreachable, but fail cleanly anyway
     }
     si.cb = sizeof(STARTUPINFO);
     CreateProcess(NULL, buf2, NULL, NULL, TRUE, CREATE_DEFAULT_ERROR_MODE | NORMAL_PRIORITY_CLASS, NULL, buf, &si, &pi);
@@ -679,10 +699,10 @@ int MyWinMain(struct SCabinet* cabinet)
         while (i < MAX_PATH && *ptr != '\0' && *ptr != ' ' && *ptr != '\t')
             exeName[i++] = *ptr++;
     exeName[i] = '\0';
-    // If the extension is not present, add ".exe"
+    // If the extension is not present, add ".exe" (counted append into the fixed command-line buffer)
     if (i < 5 || exeName[i - 4] != '.')
     {
-        lstrcpy(exeName, ".exe");
+        InstallStrCopy((char*)exeName + i, _countof(exeName) - i, ".exe");
     }
 
     // if there remains any parameter on command line, parse it
@@ -747,7 +767,7 @@ int MyWinMain(struct SCabinet* cabinet)
         if (GetTempPath(MAX_PATH, tmpPath) == 0)
             return HandleError(ERROR_TITLE, ERROR_TEMPPATH, GetLastError(), NULL);
     }
-    lstrcpy(instPrefix, "SFX");
+    InstallStrCopy((char*)instPrefix, _countof(instPrefix), "SFX");
     if (GetTempFileName(tmpPath, instPrefix, 0, tmpName) == 0)
         return HandleError(ERROR_TITLE, ERROR_TEMPNAME, GetLastError(), NULL);
     if (DeleteFileUtf8Local(tmpName) == 0)
@@ -845,13 +865,14 @@ int MyWinMain(struct SCabinet* cabinet)
                 }
             }
 
-            lstrcpy(tmpPath, tmpName);
-            ptr = tmpPath + lstrlen(tmpPath) - 1;
+            if (!InstallStrCopy((char*)tmpPath, _countof(tmpPath), (const char*)tmpName))
+                return 1; // the extraction path cannot fit its fixed buffer
+            ptr = tmpPath + lstrlen((char*)tmpPath) - 1;
             if (ptr >= tmpPath && *ptr != '\\')
                 *++ptr = '\\';
 
             // if we find the marker for an x64 installation and we are not on an x64 system, stop the installation here
-            lstrcpy(ptr + 1, X64MARK_NAME);
+            InstallStrCopy((char*)ptr + 1, _countof(tmpPath) - ((ptr + 1) - tmpPath), X64MARK_NAME);
             if (FileExists(tmpPath) && !Is64BitWindows())
             {
                 char title[500];
@@ -865,7 +886,7 @@ int MyWinMain(struct SCabinet* cabinet)
                 return 1;
             }
 
-            lstrcpy(ptr + 1, SETUP_NAME);
+            InstallStrCopy((char*)ptr + 1, _countof(tmpPath) - ((ptr + 1) - tmpPath), SETUP_NAME);
 
             tmpArgs[0] = 0;
             ptr = tmpArgs;
@@ -891,7 +912,8 @@ int MyWinMain(struct SCabinet* cabinet)
             }
 #endif // FOR_SALAMANDER_SETUP
 
-            lstrcpy(ptr, setupParams);
+            // the established bounded-append helper composes the optional setup arguments
+            AppendText((char*)ptr, ARRAYSIZE(tmpArgs), setupParams);
 
             sei.cbSize = sizeof(SHELLEXECUTEINFO);
             sei.fMask = SEE_MASK_NOCLOSEPROCESS;

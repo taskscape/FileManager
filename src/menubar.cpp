@@ -294,6 +294,12 @@ void CMenuBar::EnterMenu()
     EnterMenuInternal(-1, FALSE, FALSE); // user pressed VK_MENU
 }
 
+// Runs the custom menu loop for the menu bar: installs the thread message
+// hook, joins the shared menu-window monitoring queue, tracks the popup under
+// 'index' (opened with selection when 'openWidthSelect'), and pumps messages
+// via CMenuPopup::DoDispatchMessage until a command is chosen, the loop is
+// closed externally (ExitMenuLoop/CloseEvent), or Escape/mouse-out dismisses.
+// 'RetValue' carries the selected command ID. Guards against re-entry.
 void CMenuBar::EnterMenuInternal(int index, BOOL openWidthSelect, BOOL byMouse)
 {
     CALL_STACK_MESSAGE4("CMenuBar::EnterMenuInternal(%d, %d, %d)", index,

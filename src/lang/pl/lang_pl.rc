@@ -2072,7 +2072,11 @@ CAPTION "Zgłaszanie błędów Open Salamander"
 FONT 8, "MS Shell Dlg", 400, 0, 0x1
 BEGIN
     LTEXT           "Wystąpił problem, który zmusił Open Salamander do zamknięcia. Aby pomóc nam uniknąć podobnych problemów w przyszłości, wyślij poniższy raport o błędzie.",IDC_SALMON_INTRO,8,9,336,16
-    LTEXT           "Zgoda: przycisk Wyślij raport przesyła to archiwum awarii (zrzut, opcjonalny opis i opcjonalny adres e-mail) na adres reports.taskscape.com przez HTTPS. Przycisk Wyświetl raport pozwala go obejrzeć. Przycisk Nie wysyłaj raportu zapobiega wysłaniu; możesz wtedy potwierdzić usunięcie.",IDC_SALMON_PRIVACY,8,31,336,24
+    // Split the disclosure into fixed lines so the Polish translation stays within RC's string limit.
+    LTEXT           "Zgoda: Wyślij raport przesyła archiwum awarii (zrzut,",IDC_SALMON_PRIVACY,8,31,336,8
+    LTEXT           "opcjonalny opis i adres e-mail) na reports.taskscape.com przez HTTPS.",IDC_SALMON_PRIVACY_LINE2,8,37,336,8
+    LTEXT           "Wyświetl raport pozwala je obejrzeć. Nie wysyłaj raportu blokuje wysłanie;",IDC_SALMON_PRIVACY_LINE3,8,43,336,8
+    LTEXT           "po czym możesz potwierdzić usunięcie.",IDC_SALMON_PRIVACY_LINE4,8,49,336,8
     LTEXT           "...",IDC_SALMON_UPLOADING,8,57,84,8
     LTEXT           "Opis błędu (opcjonalny)",IDC_SALMON_DESCRIPTION,8,66,169,8
     PUSHBUTTON      "&Wyświetl raport",IDC_SALMON_VIEW,254,63,90,14

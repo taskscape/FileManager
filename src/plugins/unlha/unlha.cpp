@@ -166,7 +166,8 @@ BOOL CPluginInterfaceForArchiver::ListArchive(CSalamanderForOperationsAbstract* 
     while ((gh = LHAGetHeader(f, &hdr)) == GH_SUCCESS)
     {
         // if it ends with '\', remove it (because of directories)
-        int l = lstrlen(hdr.name) - 1;
+        // Archive header names are bounded before this legacy int-length operation.
+        int l = static_cast<int>(strlen(hdr.name)) - 1;
         if (hdr.name[l] == '\\')
         {
             hdr.name[l] = 0;
@@ -384,7 +385,8 @@ BOOL CPluginInterfaceForArchiver::UnpackArchive(CSalamanderForOperationsAbstract
     ArcRoot = archiveRoot ? archiveRoot : "";
     if (*ArcRoot == '\\')
         ArcRoot++;
-    RootLen = lstrlen(ArcRoot);
+    // Archive roots use the plugin's legacy int length contract.
+    RootLen = static_cast<int>(strlen(ArcRoot));
     TDirectArray<int> offsets(256, 256);
 
     if (!MakeFilesList(offsets, next, nextParam, targetDir))
@@ -487,7 +489,7 @@ BOOL CPluginInterfaceForArchiver::UnpackWholeArchive(CSalamanderForOperationsAbs
         int nameLen = (int)strlen(name);
         if (nameLen > 0 && name[nameLen - 1] == '\\') // due to SalPathFindFileName the '\\' can only be at the end; remove it before calling AgreeMask
         {
-            lstrcpyn(nameBuf, name, min(nameLen, MAX_PATH));
+            StringCchCopyNA(nameBuf, min(nameLen, MAX_PATH), name, min(nameLen, MAX_PATH)); // counted bounded copy instead of lstrcpyn
             name = nameBuf;
         }
         BOOL nameHasExt = strchr(name, '.') != NULL; // ".cvspass" is considered an extension on Windows
@@ -693,7 +695,7 @@ BOOL CPluginInterfaceForArchiver::MakeFilesList(TDirectArray<int>& offsets, SalE
 
     // bounded copy of the target directory; fail when no room remains for the path separator
     strncpy_s(dir, sizeof(dir), targetDir, _TRUNCATE);
-    addDir = dir + lstrlen(dir);
+    addDir = dir + strlen(dir); // CRT length instead of the legacy Win32 length API
     if (*(addDir - 1) != '\\')
     {
         if (addDir - dir >= MAX_PATH - 1)
@@ -701,14 +703,15 @@ BOOL CPluginInterfaceForArchiver::MakeFilesList(TDirectArray<int>& offsets, SalE
         *addDir++ = '\\';
         *addDir = 0;
     }
-    dirLen = lstrlen(dir);
+    // The destination directory is fixed to MAX_PATH, so its legacy length is an int.
+    dirLen = static_cast<int>(strlen(dir));
 
     ProgressTotal = CQuadWord(0, 0);
     while ((nextName = next(SalamanderGeneral->GetMsgBoxParent(), 1, &isDir, &size, &pfd, nextParam, &errorOccured)) != NULL)
     {
         if (isDir)
         {
-            if (dirLen + lstrlen(nextName) + 1 >= MAX_PATH)
+            if (dirLen + strlen(nextName) + 1 >= MAX_PATH) // CRT length instead of the legacy Win32 length API
             {
                 if (Silent & SF_LONGNAMES)
                     continue;

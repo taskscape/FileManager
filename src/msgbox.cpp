@@ -451,6 +451,13 @@ COPY_FAILED:
 }
 
 INT_PTR
+// Dialog procedure of the extended message box. WM_INITDIALOG unpacks the
+// MSGBOXEX flag groups (buttons type, icon, default button, mode, misc,
+// extensions), builds the button row and optional check box, applies the
+// help/escape policy (system Close grayed when Esc must not dismiss), and
+// handles multilingual layout; WM_COMMAND resolves the pressed button or the
+// check-box toggle into the dialog result; remaining messages cover themed
+// background painting, text copy-out, and context help.
 CMessageBox::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 {
     switch (uMsg)

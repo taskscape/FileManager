@@ -3,6 +3,7 @@
 // CommentsTranslationProject: TRANSLATED
 
 #include "precomp.h"
+#include <strsafe.h> // counted bounded copies (StringCchCopyNA)
 
 #include <Tlhelp32.h>
 
@@ -1825,23 +1826,25 @@ void CCallStack::PrintBugReport(EXCEPTION_POINTERS* Exception, DWORD ThreadID, D
 
             if (iver[0] != 0 || build[0] != 0 || version[0] != 0)
             {
-                lstrcpy(buf, "IE ");
+                // bounded append chain: registry strings are external input, so every
+                // step is capacity-checked instead of using the unbounded legacy helpers
+                StringCchCopyA(buf, _countof(buf), "IE ");
                 if (version[0] != 0)
                 {
-                    lstrcat(buf, "Version: ");
-                    lstrcat(buf, version);
-                    lstrcat(buf, " ");
+                    StringCchCatA(buf, _countof(buf), "Version: ");
+                    StringCchCatA(buf, _countof(buf), version);
+                    StringCchCatA(buf, _countof(buf), " ");
                 }
                 if (build[0] != 0)
                 {
-                    lstrcat(buf, "Build: ");
-                    lstrcat(buf, build);
-                    lstrcat(buf, " ");
+                    StringCchCatA(buf, _countof(buf), "Build: ");
+                    StringCchCatA(buf, _countof(buf), build);
+                    StringCchCatA(buf, _countof(buf), " ");
                 }
                 if (iver[0] != 0)
                 {
-                    lstrcat(buf, "IVer: ");
-                    lstrcat(buf, iver);
+                    StringCchCatA(buf, _countof(buf), "IVer: ");
+                    StringCchCatA(buf, _countof(buf), iver);
                 }
                 PrintLine(param, buf, TRUE);
             }

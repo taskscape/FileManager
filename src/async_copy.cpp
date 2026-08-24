@@ -2913,6 +2913,14 @@ BOOL DoCopyDirTime(HWND hProgressDlg, const char* targetName, FILETIME* modified
     return TRUE;
 }
 
+// Creates one target directory for the copy/move script: creates the
+// directory (SalCreateDirectoryEx), applies cleared-readonly attributes,
+// optionally copies alternate data streams from 'sourceDir', sets compression
+// /encryption attributes, and handles the already-exists case as a
+// user-confirmable overwrite ('alreadyExisted') with retry/skip/cancel loop.
+// Progress is accounted with the synthetic CREATE_DIR_SIZE so the summary
+// bar moves for directory-only operations. Returns FALSE on cancel/error;
+// 'skip' reports user Skip.
 BOOL DoCreateDir(HWND hProgressDlg, char* name, DWORD attr,
                  DWORD clearReadonlyMask, CProgressDlgData& dlgData,
                  CQuadWord& totalDone, CQuadWord& operTotal,

@@ -153,7 +153,9 @@ STDMETHODIMP SE_QueryContextMenu(THIS_
                 (!iterator->LogicalAnd && ((iterator->OneFile == of) || (iterator->MoreFiles == mf) ||
                                            (iterator->OneDirectory == od) || (iterator->MoreDirectories == md))))
             {
-                lstrcpy(buff, iterator->Name);
+                // configured item names may hold up to SEC_NAMEMAX bytes, so clip explicitly
+                // to the menu buffer instead of relying on an unbounded copy
+                lstrcpyn(buff, iterator->Name, _countof(buff));
                 InsertMenu(hTmpMenu,
                            indexMenu++,
                            MF_STRING | MF_BYPOSITION,

@@ -3,6 +3,7 @@
 // CommentsTranslationProject: TRANSLATED
 
 #include "precomp.h"
+#include <strsafe.h> // counted bounded copies (StringCchCopyNA)
 
 //
 // ****************************************************************************
@@ -427,7 +428,7 @@ BOOL COperationDlg::UpdateDataInDialog()
                     statusText[statusTextLen++] = ',';
                     statusText[statusTextLen++] = ' ';
                 }
-                lstrcpyn(statusText + statusTextLen, num1, 300 - statusTextLen);
+                StringCchCopyNA(statusText + statusTextLen, 300 - statusTextLen, num1, 300 - statusTextLen); // counted bounded copy instead of lstrcpyn
             }
             if (unknownSizeCount != 0)
             {
@@ -441,7 +442,7 @@ BOOL COperationDlg::UpdateDataInDialog()
                     statusText[statusTextLen++] = ',';
                     statusText[statusTextLen++] = ' ';
                 }
-                lstrcpyn(statusText + statusTextLen, num1, 300 - statusTextLen);
+                StringCchCopyNA(statusText + statusTextLen, 300 - statusTextLen, num1, 300 - statusTextLen); // counted bounded copy instead of lstrcpyn
             }
             if (reallyInProgress) // show status only for a running operation
             {
@@ -511,7 +512,7 @@ BOOL COperationDlg::UpdateDataInDialog()
                         _snprintf_s(statusText, _TRUNCATE, LoadStr(IDS_OPERDLGSTATUS2), num1, num2);
                     }
                     else
-                        lstrcpyn(statusText, num1, 300);
+                        StringCchCopyNA(statusText, 300, num1, 300); // counted bounded copy instead of lstrcpyn
                 }
                 if (errorsCount > 0)
                 {
@@ -525,7 +526,7 @@ BOOL COperationDlg::UpdateDataInDialog()
                         statusText[statusTextLen++] = ',';
                         statusText[statusTextLen++] = ' ';
                     }
-                    lstrcpyn(statusText + statusTextLen, num1, 300 - statusTextLen);
+                    StringCchCopyNA(statusText + statusTextLen, 300 - statusTextLen, num1, 300 - statusTextLen); // counted bounded copy instead of lstrcpyn
                 }
                 if (unknownSizeCount != 0)
                 {
@@ -539,7 +540,7 @@ BOOL COperationDlg::UpdateDataInDialog()
                         statusText[statusTextLen++] = ',';
                         statusText[statusTextLen++] = ' ';
                     }
-                    lstrcpyn(statusText + statusTextLen, num1, 300 - statusTextLen);
+                    StringCchCopyNA(statusText + statusTextLen, 300 - statusTextLen, num1, 300 - statusTextLen); // counted bounded copy instead of lstrcpyn
                 }
                 if (reallyInProgress) // show status only for a running operation
                 {
@@ -610,16 +611,16 @@ BOOL COperationDlg::UpdateDataInDialog()
             case opstInProgress:
             {
                 if (reallyInProgress || !WorkersList->EmptyOrAllShouldStop())
-                    lstrcpyn(timeLeftText, LoadStr(reallyInProgress ? IDS_LISTWNDESTIMTIMEUNKNOWN : IDS_OPERDLGTIMLEFTWAIT), 100);
+                    StringCchCopyNA(timeLeftText, 100, LoadStr(reallyInProgress ? IDS_LISTWNDESTIMTIMEUNKNOWN : IDS_OPERDLGTIMLEFTWAIT), 100); // counted bounded copy instead of lstrcpyn
                 break;
             }
 
             case opstFinishedWithSkips:
             case opstSuccessfullyFinished:
-                lstrcpyn(timeLeftText, LoadStr(IDS_OPERDLGTIMLEFTDONE), 100);
+                StringCchCopyNA(timeLeftText, 100, LoadStr(IDS_OPERDLGTIMLEFTDONE), 100); // counted bounded copy instead of lstrcpyn
                 break;
             case opstFinishedWithErrors:
-                lstrcpyn(timeLeftText, LoadStr(IDS_OPERDLGTIMLEFTWAIT), 100);
+                StringCchCopyNA(timeLeftText, 100, LoadStr(IDS_OPERDLGTIMLEFTWAIT), 100); // counted bounded copy instead of lstrcpyn
                 break;
             }
             LastTimeEstimation = -1;

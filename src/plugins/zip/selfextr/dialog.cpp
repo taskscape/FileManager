@@ -76,15 +76,16 @@ BOOL WINAPI OvewriteDlgProc(HWND hDlg, UINT uMsg, WPARAM wParam, LPARAM lParam)
         }
         SetDlgItemText(hDlg, IDC_SOURCENAME, info->Source);
         char title[200];
+        BOOL titleComposed;
         if (DlgWin)
-            *title = 0;
+            titleComposed = SelfExtrFormat(title, ARRAYSIZE(title), "%s", StringTable[STR_OVERWRITEDLGTITLE]);
         else
         {
-            lstrcpy(title, Title);
-            lstrcat(title, " - ");
             CenterDialog(hDlg);
+            titleComposed = SelfExtrFormat(title, ARRAYSIZE(title), "%s - %s", Title, StringTable[STR_OVERWRITEDLGTITLE]);
         }
-        lstrcat(title, StringTable[STR_OVERWRITEDLGTITLE]);
+        if (!titleComposed)
+            *title = 0; // an oversized localized composition falls back to no title instead of a truncated one
         SetWindowText(hDlg, title);
         SetForegroundWindow(hDlg);
         return FALSE;
@@ -617,7 +618,7 @@ int StartExtracting()
     }
 
     //check drive or network share if exists
-    lstrcpy(buf, TargetPath);
+    SfxStrCopy(buf, _countof(buf), TargetPath);
     PathStripToRoot(buf);
     DWORD attr;
     attr = SalGetFileAttributes(buf);
@@ -669,7 +670,7 @@ int StartExtracting()
         if (ArchiveStart->Flags & SE_TEMPDIR)
         {
             char tempPath[MAX_PATH];
-            lstrcpy(tempPath, TargetPath);
+            SfxStrCopy(tempPath, _countof(tempPath), TargetPath);
             if (GetTempFileName(tempPath, "SFX", 0, TargetPath) == 0)
             {
                 HandleError(STR_ERROR_TEMPNAME, GetLastError());

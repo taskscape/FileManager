@@ -1341,6 +1341,14 @@ BOOL CCopy_Context::HandleSuspModeAndCancel(BOOL* copyError)
     return FALSE;
 }
 
+// Overlapped copy engine (Windows 7+ / network paths). Pipelines up to eight
+// blocks: issues reads ahead of writes (at most half the blocks in flight per
+// direction), detects EOF via zero-length probe reads, resizes 'fileSize' when
+// the source shrinks mid-copy, and drives progress + speed-limit accounting
+// from completed writes. All error/cancel/retry decisions delegate to
+// CCopy_Context handlers; outputs mirror DoCopyFileLoopOrig ('copyError',
+// 'skipCopy', 'copyAgain', truncation of pre-allocated targets). Disables SMB
+// client-side caching for network endpoints before starting.
 void DoCopyFileLoopAsync(CAsyncCopyParams* asyncPar, HANDLE& in, HANDLE& out, void* buffer, int& limitBufferSize,
                          COperations* script, CProgressDlgData& dlgData, BOOL wholeFileAllocated, COperation* op,
                          const CQuadWord& totalDone, BOOL& copyError, BOOL& skipCopy, HWND hProgressDlg,

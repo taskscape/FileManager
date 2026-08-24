@@ -178,6 +178,11 @@ int CFileListBox::GetColumnsCount()
     return 1;
 }
 
+// Paints all visible list-box items for the current view mode, clipped to
+// 'hUpdateRgn'. Optimizes the common cases: empty/simple clip regions skip
+// per-item visibility tests (DRAWFLAG_SKIP_VISTEST); the rubber-band drag box
+// and drag image are hidden for the duration and restored afterwards.
+// Dispatches to per-mode item drawing (detailed/brief vs. icons/thumbnails).
 void CFileListBox::PaintAllItems(HRGN hUpdateRgn, DWORD drawFlags)
 {
     int index = TopIndex;
@@ -1261,6 +1266,13 @@ void CFileListBox::OnVScroll(int scrollCode, int pos)
 }
 
 LRESULT
+// Message procedure of the panel's list box (the item viewport itself, below
+// the directory line). Painting renders visible items from panel data with
+// per-cell dirty tracking; keyboard messages forward to the quick-search /
+// selection logic in OnSysKeyDown/OnSysKeyUp and caret movement; mouse
+// messages implement item selection, drag-box rubber-band selection, hot
+// tracking, and in-place rename; scroll messages page/line-scroll through
+// VisibleItemsArray. Focus changes toggle the caret and idle-state refreshes.
 CFileListBox::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 {
     SLOW_CALL_STACK_MESSAGE4("CFileListBox::WindowProc(0x%X, 0x%IX, 0x%IX)", uMsg, wParam, lParam);
@@ -1813,6 +1825,11 @@ CFileListBox::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
     return CWindow::WindowProc(uMsg, wParam, lParam);
 }
 
+// Maps list-box client coordinates to an item index. 'nearest' clamps the
+// point into FilesRect and returns the closest item (used for keyboard/caret
+// emulation); otherwise out-of-range points yield INT_MAX. 'labelRect' (only
+// without 'nearest') receives the name-label rectangle of the hit item for
+// in-place rename hit-testing.
 int CFileListBox::GetIndex(int x, int y, BOOL nearest, RECT* labelRect)
 {
     CALL_STACK_MESSAGE4("CFileListBox::GetIndex(%d, %d, %d, )", x, y, nearest);

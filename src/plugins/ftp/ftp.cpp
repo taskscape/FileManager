@@ -3,6 +3,7 @@
 // CommentsTranslationProject: TRANSLATED
 
 #include "precomp.h"
+#include <strsafe.h> // counted bounded copies (StringCchCopyNA)
 
 // plugin interface object, its methods are called from Salamander
 CPluginInterface PluginInterface;
@@ -312,7 +313,7 @@ CPluginInterfaceAbstract* WINAPI SalamanderPluginEntry(CSalamanderPluginEntryAbs
     SalamanderGeneral->GetConfigParameter(SALCFG_MINBEEPWHENDONE, &InactiveBeepWhenDone,
                                           sizeof(InactiveBeepWhenDone), NULL);
     SalamanderGeneral->GetLowerAndUpperCase(&LowerCase, &UpperCase);
-    lstrcpyn(UserDefinedSuffix, LoadStr(IDS_SRVTYPEUSERDEF), 100);
+    StringCchCopyNA(UserDefinedSuffix, 100, LoadStr(IDS_SRVTYPEUSERDEF), 100); // counted bounded copy instead of lstrcpyn
     if (!Config.InitWithSalamanderGeneral())
         return NULL; // error
 
@@ -1083,9 +1084,7 @@ void CPluginInterface::AcceptChangeOnPathNotification(const char* path, BOOL inc
 
         char path2[2 * MAX_PATH]; // build the name for the second FS-name (remove the same name from cache on the other FS-name as a precaution)
         strcpy(path2, isFTPS ? AssignedFSName : AssignedFSNameFTPS);
-        lstrcpyn(path2 + (isFTPS ? AssignedFSNameLen : AssignedFSNameLenFTPS),
-                 path + (isFTP ? AssignedFSNameLen : AssignedFSNameLenFTPS),
-                 2 * MAX_PATH - (isFTPS ? AssignedFSNameLen : AssignedFSNameLenFTPS));
+        StringCchCopyNA(path2 + (isFTPS ? AssignedFSNameLen : AssignedFSNameLenFTPS), 2 * MAX_PATH - (isFTPS ? AssignedFSNameLen : AssignedFSNameLenFTPS), path + (isFTP ? AssignedFSNameLen : AssignedFSNameLenFTPS), 2 * MAX_PATH - (isFTPS ? AssignedFSNameLen : AssignedFSNameLenFTPS)); // counted bounded copy instead of lstrcpyn
         SalamanderGeneral->RemoveFilesFromCache(path2);
     }
 }
@@ -1415,7 +1414,7 @@ void UnscramblePassword(char* password)
     }
 
     char backup[PASSWORD_MAX_SIZE + 50]; // backup for TRACE_E
-    lstrcpyn(backup, password, PASSWORD_MAX_SIZE + 50);
+    StringCchCopyNA(backup, PASSWORD_MAX_SIZE + 50, password, PASSWORD_MAX_SIZE + 50); // counted bounded copy instead of lstrcpyn
 
     char* s = password;
     int last = 31;

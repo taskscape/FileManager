@@ -3,6 +3,7 @@
 // CommentsTranslationProject: TRANSLATED
 
 #include "precomp.h"
+#include <strsafe.h> // counted bounded copies (StringCchCopyNA)
 
 //
 // ****************************************************************************
@@ -718,7 +719,7 @@ void CFTPWorker::HandleEventInConnectingState(CFTPWorkerEvent event, BOOL& sendQ
 
                 case fweConTimeout:
                 {
-                    lstrcpyn(ErrorDescr, LoadStr(IDS_GETIPTIMEOUT), FTPWORKER_ERRDESCR_BUFSIZE);
+                    StringCchCopyNA(ErrorDescr, FTPWORKER_ERRDESCR_BUFSIZE, LoadStr(IDS_GETIPTIMEOUT), FTPWORKER_ERRDESCR_BUFSIZE); // counted bounded copy instead of lstrcpyn
                     CorrectErrorDescr();
                     SubState = fwssConReconnect;
                     run = TRUE;
@@ -836,7 +837,7 @@ void CFTPWorker::HandleEventInConnectingState(CFTPWorkerEvent event, BOOL& sendQ
                     // because we are already inside CSocket::SocketCritSect, this call is also possible
                     // from within CFTPWorker::WorkerCritSect (no risk of dead-lock)
                     if (!GetProxyTimeoutDescr(ErrorDescr, FTPWORKER_ERRDESCR_BUFSIZE))
-                        lstrcpyn(ErrorDescr, LoadStr(IDS_OPENCONTIMEOUT), FTPWORKER_ERRDESCR_BUFSIZE);
+                        StringCchCopyNA(ErrorDescr, FTPWORKER_ERRDESCR_BUFSIZE, LoadStr(IDS_OPENCONTIMEOUT), FTPWORKER_ERRDESCR_BUFSIZE); // counted bounded copy instead of lstrcpyn
                     CorrectErrorDescr();
                     SubState = fwssConReconnect;
                     run = TRUE;
@@ -871,8 +872,7 @@ void CFTPWorker::HandleEventInConnectingState(CFTPWorkerEvent event, BOOL& sendQ
                             if (FTP_DIGIT_1(replyCode) == FTP_D1_TRANSIENTERROR ||
                                 FTP_DIGIT_1(replyCode) == FTP_D1_ERROR) // e.g. 421 Service not available, closing control connection
                             {
-                                lstrcpyn(ErrorDescr, CopyStr(errBuf, 50 + FTP_MAX_PATH, reply, replySize),
-                                         FTPWORKER_ERRDESCR_BUFSIZE);
+                                StringCchCopyNA(ErrorDescr, FTPWORKER_ERRDESCR_BUFSIZE, CopyStr(errBuf, 50 + FTP_MAX_PATH, reply, replySize), FTPWORKER_ERRDESCR_BUFSIZE); // counted bounded copy instead of lstrcpyn
                                 CorrectErrorDescr();
                                 closeSocket = TRUE; // close the connection (no point in continuing)
 
@@ -961,7 +961,7 @@ void CFTPWorker::HandleEventInConnectingState(CFTPWorkerEvent event, BOOL& sendQ
                     {
                         if (ProxyScriptLastCmdReply == -1) // the script does not contain any command that would be sent to the server - e.g. commands were skipped because they contain optional variables
                         {
-                            lstrcpyn(ErrorDescr, LoadStr(IDS_INCOMPLETEPRXSCR2), FTPWORKER_ERRDESCR_BUFSIZE);
+                            StringCchCopyNA(ErrorDescr, FTPWORKER_ERRDESCR_BUFSIZE, LoadStr(IDS_INCOMPLETEPRXSCR2), FTPWORKER_ERRDESCR_BUFSIZE); // counted bounded copy instead of lstrcpyn
                             CorrectErrorDescr();
                             fail = TRUE;
                         }
@@ -993,7 +993,7 @@ void CFTPWorker::HandleEventInConnectingState(CFTPWorkerEvent event, BOOL& sendQ
                 else // script error or missing variable value
                 {
                     if (needUserInput)
-                        lstrcpyn(ErrorDescr, errDescrBuf, FTPWORKER_ERRDESCR_BUFSIZE);
+                        StringCchCopyNA(ErrorDescr, FTPWORKER_ERRDESCR_BUFSIZE, errDescrBuf, FTPWORKER_ERRDESCR_BUFSIZE); // counted bounded copy instead of lstrcpyn
                     else
                         _snprintf_s(ErrorDescr, _TRUNCATE, LoadStr(IDS_ERRINPROXYSCRIPT), errDescrBuf);
                     CorrectErrorDescr();
@@ -1046,7 +1046,7 @@ void CFTPWorker::HandleEventInConnectingState(CFTPWorkerEvent event, BOOL& sendQ
                                         if (UnverifiedCertificate != NULL)
                                             UnverifiedCertificate->Release();
                                         UnverifiedCertificate = unverifiedCert;
-                                        lstrcpyn(ErrorDescr, LoadStr(IDS_SSLNEWUNVERIFIEDCERT), FTPWORKER_ERRDESCR_BUFSIZE);
+                                        StringCchCopyNA(ErrorDescr, FTPWORKER_ERRDESCR_BUFSIZE, LoadStr(IDS_SSLNEWUNVERIFIEDCERT), FTPWORKER_ERRDESCR_BUFSIZE); // counted bounded copy instead of lstrcpyn
                                         failed = TRUE;
                                     }
                                     else
@@ -1059,7 +1059,7 @@ void CFTPWorker::HandleEventInConnectingState(CFTPWorkerEvent event, BOOL& sendQ
                                 else
                                 {
                                     if (errBuf[0] == 0)
-                                        lstrcpyn(ErrorDescr, LoadStr(errID), FTPWORKER_ERRDESCR_BUFSIZE);
+                                        StringCchCopyNA(ErrorDescr, FTPWORKER_ERRDESCR_BUFSIZE, LoadStr(errID), FTPWORKER_ERRDESCR_BUFSIZE); // counted bounded copy instead of lstrcpyn
                                     else
                                         _snprintf_s(ErrorDescr, _TRUNCATE, LoadStr(errID), errBuf);
                                     failed = TRUE;
@@ -1068,7 +1068,7 @@ void CFTPWorker::HandleEventInConnectingState(CFTPWorkerEvent event, BOOL& sendQ
                             }
                             else
                             {
-                                lstrcpyn(ErrorDescr, LoadStr(errID), FTPWORKER_ERRDESCR_BUFSIZE);
+                                StringCchCopyNA(ErrorDescr, FTPWORKER_ERRDESCR_BUFSIZE, LoadStr(errID), FTPWORKER_ERRDESCR_BUFSIZE); // counted bounded copy instead of lstrcpyn
                                 failed = TRUE;
                             }
                             break;
@@ -1087,7 +1087,7 @@ void CFTPWorker::HandleEventInConnectingState(CFTPWorkerEvent event, BOOL& sendQ
                     }
                     else
                     {
-                        lstrcpyn(ErrorDescr, LoadStr(SubState == fwssConWaitForAUTHCmdRes ? IDS_SSL_ERR_CONTRENCUNSUP : IDS_SSL_ERR_DATAENCUNSUP), FTPWORKER_ERRDESCR_BUFSIZE);
+                        StringCchCopyNA(ErrorDescr, FTPWORKER_ERRDESCR_BUFSIZE, LoadStr(SubState == fwssConWaitForAUTHCmdRes ? IDS_SSL_ERR_CONTRENCUNSUP : IDS_SSL_ERR_DATAENCUNSUP), FTPWORKER_ERRDESCR_BUFSIZE); // counted bounded copy instead of lstrcpyn
                         failed = TRUE;
                     }
                     if (failed)
@@ -1472,7 +1472,7 @@ BOOL CFTPWorker::ParseListingToFTPQueue(TIndirectArray<CFTPQueueItem>* ftpQueueI
                     CurItem->Type == fqitMoveExploreDirLink)
                 {
                     CFTPQueueItemCopyMoveExplore* cmItem = (CFTPQueueItemCopyMoveExplore*)CurItem;
-                    lstrcpyn(targetPath, cmItem->TgtPath, MAX_PATH);
+                    StringCchCopyNA(targetPath, MAX_PATH, cmItem->TgtPath, MAX_PATH); // counted bounded copy instead of lstrcpyn
                     SalamanderGeneral->SalPathAppend(targetPath, cmItem->TgtName, MAX_PATH); // must succeed, the directory already exists on disk and its full name is at most PATH_MAX_PATH-1 characters
                 }
                 else

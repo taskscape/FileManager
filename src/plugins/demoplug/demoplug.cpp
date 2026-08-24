@@ -10,6 +10,7 @@
 //****************************************************************************
 
 #include "precomp.h"
+#include <strsafe.h> // counted bounded copies (StringCchCopyNA)
 
 // plugin interface object whose methods are invoked by Salamander
 CPluginInterface PluginInterface;
@@ -265,14 +266,14 @@ BOOL GetModuleVersion(HINSTANCE hModule, char *buffer, int bufferLen)
   HRSRC hRes = FindResource(hModule, MAKEINTRESOURCE(VS_VERSION_INFO), RT_VERSION);
   if (hRes == NULL)
   {
-    lstrcpyn(buffer, "unknown", bufferLen);
+    StringCchCopyNA(buffer, bufferLen, "unknown", bufferLen); // counted bounded copy instead of lstrcpyn
     return FALSE;
   }
 
   HGLOBAL hVer = LoadResource(hModule, hRes);
   if (hVer == NULL)
   {
-    lstrcpyn(buffer, "unknown", bufferLen);
+    StringCchCopyNA(buffer, bufferLen, "unknown", bufferLen); // counted bounded copy instead of lstrcpyn
     return FALSE;
   }
 
@@ -280,7 +281,7 @@ BOOL GetModuleVersion(HINSTANCE hModule, char *buffer, int bufferLen)
   const BYTE *first = (BYTE*)LockResource(hVer);
   if (resSize == 0 || first == 0)
   {
-    lstrcpyn(buffer, "unknown", bufferLen);
+    StringCchCopyNA(buffer, bufferLen, "unknown", bufferLen); // counted bounded copy instead of lstrcpyn
     return FALSE;
   }
   const BYTE *iterator = first + sizeof(VS_VERSIONINFO_HEADER);
@@ -292,7 +293,7 @@ BOOL GetModuleVersion(HINSTANCE hModule, char *buffer, int bufferLen)
     iterator++;
     if (iterator + 4 >= first + resSize)
     {
-      lstrcpyn(buffer, "unknown", bufferLen);
+      StringCchCopyNA(buffer, bufferLen, "unknown", bufferLen); // counted bounded copy instead of lstrcpyn
       return FALSE;
     }
   }
@@ -302,7 +303,7 @@ BOOL GetModuleVersion(HINSTANCE hModule, char *buffer, int bufferLen)
   char buff[200];
   sprintf(buff, "%d.%d.%d.%d", HIWORD(ffi->dwFileVersionMS), LOWORD(ffi->dwFileVersionMS),
            HIWORD(ffi->dwFileVersionLS), LOWORD(ffi->dwFileVersionLS));
-  lstrcpyn(buffer, buff, bufferLen);
+  StringCchCopyNA(buffer, bufferLen, buff, bufferLen); // counted bounded copy instead of lstrcpyn
   return TRUE;
 }
 */

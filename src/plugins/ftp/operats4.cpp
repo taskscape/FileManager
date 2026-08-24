@@ -3,6 +3,7 @@
 // CommentsTranslationProject: TRANSLATED
 
 #include "precomp.h"
+#include <strsafe.h> // counted bounded copies (StringCchCopyNA)
 
 //
 // ****************************************************************************
@@ -304,7 +305,7 @@ void CFTPWorker::HandleEventInWorkingState(CFTPWorkerEvent event, BOOL& sendQuit
                             Oper->GetGlobalTransferSpeedMeter()->JustConnected();
                         }
 
-                        lstrcpyn(ftpPath, CurItem->Path, FTP_MAX_PATH);
+                        StringCchCopyNA(ftpPath, FTP_MAX_PATH, CurItem->Path, FTP_MAX_PATH); // counted bounded copy instead of lstrcpyn
                         CFTPServerPathType type = Oper->GetFTPServerPathType(ftpPath);
                         if (FTPPathAppend(type, ftpPath, FTP_MAX_PATH, CurItem->Name, TRUE))
                         { // we have the path, send CWD to the examined directory on the server
@@ -608,7 +609,7 @@ void CFTPWorker::HandleEventInWorkingState(CFTPWorkerEvent event, BOOL& sendQuit
                                         // from the server in response to PWD, we assume that PWD would now return this path again
                                         // and therefore we will not send it (optimization with hopefully low risk)
                                         HaveWorkingPath = TRUE;
-                                        lstrcpyn(WorkingPath, CurItem->Path, FTP_MAX_PATH);
+                                        StringCchCopyNA(WorkingPath, FTP_MAX_PATH, CurItem->Path, FTP_MAX_PATH); // counted bounded copy instead of lstrcpyn
                                         SubState = fwssWorkSimpleCmdStartWork;
                                         nextLoop = TRUE;
                                     }

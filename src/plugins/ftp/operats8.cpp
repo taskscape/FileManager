@@ -3,6 +3,7 @@
 // CommentsTranslationProject: TRANSLATED
 
 #include "precomp.h"
+#include <strsafe.h> // counted bounded copies (StringCchCopyNA)
 
 //
 // ****************************************************************************
@@ -955,17 +956,17 @@ void CFTPWorker::HandleEventInWorkingState3(CFTPWorkerEvent event, BOOL& sendQui
                                                 else
                                                 {
                                                     if (dataSSLErrorOccured != SSLCONERR_NOERROR || dataConDecomprErrorOccured)
-                                                        lstrcpyn(errText, LoadStr(dataConDecomprErrorOccured ? IDS_ERRDATACONDECOMPRERROR : IDS_ERRDATACONSSLCONNECTERROR), 200 + FTP_MAX_PATH);
+                                                        StringCchCopyNA(errText, 200 + FTP_MAX_PATH, LoadStr(dataConDecomprErrorOccured ? IDS_ERRDATACONDECOMPRERROR : IDS_ERRDATACONSSLCONNECTERROR), 200 + FTP_MAX_PATH); // counted bounded copy instead of lstrcpyn
                                                     else
                                                     {
                                                         errText[0] = 0;
                                                         if (FTP_DIGIT_1(ListCmdReplyCode) != FTP_D1_SUCCESS && ListCmdReplyText != NULL)
                                                         { // if we do not have a network error description from the server, settle for the system description
-                                                            lstrcpyn(errText, ListCmdReplyText, 200 + FTP_MAX_PATH);
+                                                            StringCchCopyNA(errText, 200 + FTP_MAX_PATH, ListCmdReplyText, 200 + FTP_MAX_PATH); // counted bounded copy instead of lstrcpyn
                                                         }
 
                                                         if (errText[0] == 0 && errBuf[0] != 0) // try to take the error text from the proxy server
-                                                            lstrcpyn(errText, errBuf, 200 + FTP_MAX_PATH);
+                                                            StringCchCopyNA(errText, 200 + FTP_MAX_PATH, errBuf, 200 + FTP_MAX_PATH); // counted bounded copy instead of lstrcpyn
 
                                                         //                              if (errText[0] == 0 && dataConDecomprMissingStreamEnd)
                                                         //                                lstrcpyn(errText, LoadStr(IDS_ERRDATACONDECOMPRERROR), 200 + FTP_MAX_PATH);

@@ -185,6 +185,12 @@ void CFilesWindow::Convert()
     EndStopRefresh(); // snooper will start again now
 }
 
+// Applies NTFS compression/encryption changes to the selection (or focused
+// item when nothing is selected; UpDir is ignored). With confirmations
+// enabled it first latches the affected item's name for the progress dialog,
+// enumerates the targets, and processes them through the worker with
+// retry/skip handling - CompressFile/UncompressFile or MyEncryptFile/
+// MyDecryptFile from the copy engine. Refreshes the panel afterwards.
 void CFilesWindow::ChangeAttr(BOOL setCompress, BOOL compressed, BOOL setEncryption, BOOL encrypted)
 {
     CALL_STACK_MESSAGE5("CFilesWindow::ChangeAttr(%d, %d, %d, %d)", setCompress, compressed, setEncryption, encrypted);
@@ -2117,6 +2123,12 @@ void CFilesWindow::CreateDir(CFilesWindow* target)
     EndStopRefresh(); // snooper will start again now
 }
 
+// Performs the actual in-panel rename of item 'f' to 'formatedFileName':
+// validates the name (no path separators/illegal characters), applies mask
+// wildcards via MaskName when the new name contains '*', sanitizes edges,
+// then moves the file/directory (long name, falling back to the DOS 8.3 name
+// when the long path is not representable). 'mayChange' reports whether the
+// caller should update the panel; 'tryAgain' drives the retry loop on errors.
 void CFilesWindow::RenameFileInternal(CFileData* f, const char* formatedFileName, BOOL* mayChange, BOOL* tryAgain)
 {
     *tryAgain = TRUE;

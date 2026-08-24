@@ -3,6 +3,8 @@
 
 #pragma once
 
+#include <strsafe.h> // counted bounded copies (StringCchCopyNA)
+
 class CDlgRoot
 {
 public:
@@ -35,7 +37,7 @@ public:
         VolumePath = volumePath;
         DiskName = diskName;
         CabNumber = cabNumber;
-        lstrcpyn(CurrentPath, VolumeName, MAX_PATH);
+        StringCchCopyNA(CurrentPath, MAX_PATH, VolumeName, MAX_PATH); // counted bounded copy instead of lstrcpyn
         SalamanderGeneral->CutDirectory(CurrentPath);
     }
     INT_PTR Proceed();

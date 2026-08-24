@@ -212,6 +212,10 @@ void CMainDialog::ShowChilds(CDialogTaskEnum task, BOOL show)
     int ids[] = {IDD_SALMON_MAIN,
                  IDC_SALMON_INTRO,
                  IDC_SALMON_PRIVACY,
+                 // The consent disclosure spans several resource controls; hide them together.
+                 IDC_SALMON_PRIVACY_LINE2,
+                 IDC_SALMON_PRIVACY_LINE3,
+                 IDC_SALMON_PRIVACY_LINE4,
                  IDC_SALMON_VIEW,
                  IDC_SALMON_DESCRIPTION,
                  IDC_SALMON_ACTION_LABEL,

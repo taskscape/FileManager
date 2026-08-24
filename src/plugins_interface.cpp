@@ -1295,6 +1295,11 @@ void SaveFSNames(HKEY itemKey, TIndirectArray<char>* fsNames)
     SetValue(itemKey, SALAMANDER_PLUGINS_FSNAME, REG_SZ, buf, -1);
 }
 
+// Loads the plug-in list from the configuration registry ('regKey', numbered
+// value groups "1".."n"): reads each plug-in's DLL name, version, masks, FS
+// names, menu/toolbar visibility flags and thumbnail masks into CPluginData
+// records. DLLs themselves are not loaded here - that happens lazily via
+// CPluginData::InitDLL when a plug-in is first used.
 void CPlugins::Load(HWND parent, HKEY regKey)
 {
     CALL_STACK_MESSAGE1("CPlugins::Load(,)");

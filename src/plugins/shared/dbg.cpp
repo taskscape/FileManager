@@ -10,6 +10,7 @@
 //****************************************************************************
 
 #include "precomp.h"
+#include <strsafe.h> // counted bounded copies (StringCchCopyNA)
 //#include <windows.h>
 //#include <commctrl.h>
 #ifdef _MSC_VER
@@ -233,8 +234,8 @@ DWORD WINAPI __TraceMsgBoxThread(void* param)
                            "Application will be crashed by \"access violation\" exception after "
                            "clicking OK. Please send us bug report to help us fix this problem. "
                            "If you want to copy this message to clipboard, use Ctrl+C key.";
-    lstrcpyn(msg + (int)strlen(msg), data->Msg, _countof(msg) - (int)strlen(msg) - (int)strlen(appendix));
-    lstrcpyn(msg + (int)strlen(msg), appendix, _countof(msg) - (int)strlen(msg));
+    StringCchCopyNA(msg + (int)strlen(msg), _countof(msg) - (int)strlen(msg) - (int)strlen(appendix), data->Msg, _countof(msg) - (int)strlen(msg) - (int)strlen(appendix)); // counted bounded copy instead of lstrcpyn
+    StringCchCopyNA(msg + (int)strlen(msg), _countof(msg) - (int)strlen(msg), appendix, _countof(msg) - (int)strlen(msg)); // counted bounded copy instead of lstrcpyn
     MessageBox(NULL, msg, "Debug Message", MB_OK | MB_ICONERROR | MB_SETFOREGROUND);
     return 0;
 }
@@ -333,7 +334,7 @@ void C__Trace::SendMessageToServer(BOOL information, BOOL unicode, BOOL crash)
                 threadData.Msg = (char*)HeapAlloc(GetProcessHeap(), 0, TraceStringBuf.length() + 1);
                 if (threadData.Msg != NULL)
                 {
-                    lstrcpyn(threadData.Msg, TraceStringBuf.c_str(), (int)TraceStringBuf.length() + 1);
+                    StringCchCopyNA(threadData.Msg, (int)TraceStringBuf.length() + 1, TraceStringBuf.c_str(), (int)TraceStringBuf.length() + 1); // counted bounded copy instead of lstrcpyn
                     threadData.File = File;
                     threadData.Line = Line;
                     msgBoxOpened = TRUE;

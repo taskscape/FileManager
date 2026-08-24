@@ -104,15 +104,16 @@ int HandleError(CStringIndex message, unsigned long err, char* fileName, bool* r
     int ret;
     char title[SE_MAX_TITLE + 100];
 
+    // bounded composition of the localized title/text keeps both inside their fixed buffers
+    BOOL titleComposed;
     if (DlgWin)
-        *title = 0;
+        titleComposed = SelfExtrFormat(title, ARRAYSIZE(title), "%s", StringTable[STR_ERROR]);
     else
-    {
-        lstrcpy(title, Title);
-        lstrcat(title, " - ");
-    }
-    lstrcat(title, StringTable[STR_ERROR]);
-    lstrcpy(text, StringTable[message]);
+        titleComposed = SelfExtrFormat(title, ARRAYSIZE(title), "%s - %s", Title, StringTable[STR_ERROR]);
+    if (!titleComposed)
+        *title = 0;
+    if (!SfxStrCopy(text, _countof(text), StringTable[message]))
+        *text = 0;
 
     if (err)
         FormatMessage(FORMAT_MESSAGE_FROM_SYSTEM |
@@ -124,15 +125,15 @@ int HandleError(CStringIndex message, unsigned long err, char* fileName, bool* r
     {
 #ifdef EXT_VER
         if (MVMode == MV_DETACH_ARCHIVE)
-            lstrcat(text, StringTable[STR_ADVICE2]);
+            SfxStrCopy(text + lstrlen(text), _countof(text) - lstrlen(text), StringTable[STR_ADVICE2]);
         else
 #endif
             //if (DlgWin) noSkip = true;
             if (!DlgWin)
-                lstrcat(text, StringTable[STR_ADVICE]);
+                SfxStrCopy(text + lstrlen(text), _countof(text) - lstrlen(text), StringTable[STR_ADVICE]);
     }
     if (message == STR_ERROR_WAIT)
-        lstrcat(text, StringTable[STR_ERROR_WAIT2]);
+        SfxStrCopy(text + lstrlen(text), _countof(text) - lstrlen(text), StringTable[STR_ERROR_WAIT2]);
     if (fileName)
         ret = ErrorDialog(title, fileName, text, retry != NULL, noSkip);
     else
@@ -163,11 +164,11 @@ void _RemoveTemporaryDir(const char* dir)
     HANDLE find;
     WIN32_FIND_DATA file;
 
-    lstrcpy(path, dir);
+    SfxStrCopy(path, _countof(path), dir);
     end = path + lstrlen(path);
     if (*(end - 1) != '\\')
         *end++ = '\\';
-    lstrcpy(end, "*.*");
+    SfxStrCopy(end, _countof(path) - (end - path), "*.*");
     find = FindFirstFile(path, &file);
     if (find != INVALID_HANDLE_VALUE)
     {
@@ -176,7 +177,7 @@ void _RemoveTemporaryDir(const char* dir)
             if (file.cFileName[0] != 0 && lstrcmp(file.cFileName, "..") && lstrcmp(file.cFileName, ".") &&
                 (end - path) + lstrlen(file.cFileName) < MAX_PATH)
             {
-                lstrcpy(end, file.cFileName);
+                SfxStrCopy(end, _countof(path) - (end - path), file.cFileName);
                 if (file.dwFileAttributes & FILE_ATTRIBUTE_READONLY)
                     SetFileAttributes(path, file.dwFileAttributes & ~FILE_ATTRIBUTE_READONLY);
                 if (file.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)
@@ -456,7 +457,8 @@ int InitExtraction(const char* name)
         {
             if (type != REG_SZ)
                 goto LCURENTDIR;
-            lstrcpy(TargetPath, buffer);
+            if (!SfxStrCopy(TargetPath, MAX_PATH, buffer))
+                goto LCURENTDIR; // an oversized persisted path cannot become the target directory
         }
         break;
     }
@@ -553,10 +555,11 @@ int MyWinMain()
     Heap = GetProcessHeap();
 
     i = SplitCommandLine(exeName, &parameters, GetCommandLine());
-    // If the extension is not present, add ".exe"
+    // If the extension is not present, add ".exe" (counted append keeps the fixed buffer safe)
     if (i < 5 || exeName[i - 4] != '.')
     {
-        lstrcat(exeName, "*.exe");
+        if (!SfxStrCopy(exeName + lstrlen(exeName), _countof(exeName) - lstrlen(exeName), "*.exe"))
+            return 1;
     }
 
 #ifdef EXT_VER

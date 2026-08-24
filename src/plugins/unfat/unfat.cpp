@@ -10,6 +10,7 @@
 //****************************************************************************
 
 #include "precomp.h"
+#include <strsafe.h> // counted bounded copies (StringCchCopyNA)
 
 #include "unfat.h"
 #include "fat.h"
@@ -516,7 +517,7 @@ BOOL ExtractArchive(CSalamanderDirectoryAbstract const* dir, CSalamanderMaskGrou
             salamander->ProgressSetTotalSize(fileData->Size, CQuadWord(-1, -1));
 
             char myTargetDir[2 * MAX_PATH];
-            lstrcpyn(myTargetDir, targetDir, 2 * MAX_PATH);
+            StringCchCopyNA(myTargetDir, 2 * MAX_PATH, targetDir, 2 * MAX_PATH); // counted bounded copy instead of lstrcpyn
             SalamanderGeneral->SalPathAppend(myTargetDir, path, 2 * MAX_PATH);
 
             SalamanderGeneral->SalPathAppend(path, fileData->Name, pathBufSize);
@@ -564,7 +565,7 @@ BOOL ExtractArchive(CSalamanderDirectoryAbstract const* dir, CSalamanderMaskGrou
         if (skipPath[0] != 0)
         {
             char testPath[2 * MAX_PATH];
-            lstrcpyn(testPath, targetDir, 2 * MAX_PATH);
+            StringCchCopyNA(testPath, 2 * MAX_PATH, targetDir, 2 * MAX_PATH); // counted bounded copy instead of lstrcpyn
             SalamanderGeneral->SalPathAppend(testPath, path, 2 * MAX_PATH);
 
             if (SalamanderGeneral->PathIsPrefix(skipPath, testPath))
@@ -593,7 +594,7 @@ BOOL ExtractArchive(CSalamanderDirectoryAbstract const* dir, CSalamanderMaskGrou
 
         // an empty directory must be created explicitly
         char dirName[MAX_PATH];
-        lstrcpyn(dirName, targetDir, MAX_PATH);
+        StringCchCopyNA(dirName, MAX_PATH, targetDir, MAX_PATH); // counted bounded copy instead of lstrcpyn
         SalamanderGeneral->SalPathAppend(dirName, path, MAX_PATH);
 
         // "extracting: %s..."
