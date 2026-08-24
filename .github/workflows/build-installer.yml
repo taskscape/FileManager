@@ -204,6 +204,9 @@ jobs:
           INSTALLER_PATH: Installer/Output/OpenSalamander_6.0.${{ github.run_number }}.exe
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
+          # Retry transient GitHub API/upload failures without masking authentication or validation errors.
+          retries: 3
+          retry-exempt-status-codes: 400,401,403,404,422
           script: |
             const fs = require('fs');
             const path = require('path');
