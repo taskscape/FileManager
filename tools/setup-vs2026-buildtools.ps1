@@ -19,11 +19,22 @@ if ([string]::IsNullOrWhiteSpace($env:GITHUB_ENV)) {
 $initialEnvironment = @{}
 Get-ChildItem Env: | ForEach-Object { $initialEnvironment[$_.Name] = $_.Value }
 
-$command = 'call "' + $vsDevCmd + '" -arch=x64 -host_arch=x64 >nul && set'
+# Request both target-architecture tool paths because the x64 solution includes the x86 sfx7zip MASM project.
+$command = 'call "' + $vsDevCmd + '" -arch=x86 -host_arch=x64 >nul && set'
 $developerEnvironment = & $env:ComSpec /d /s /c $command
 if ($LASTEXITCODE -ne 0) {
     throw "VsDevCmd failed with exit code $LASTEXITCODE."
 }
+
+$visualStudioRoot = Split-Path -Parent (Split-Path -Parent (Split-Path -Parent $vsDevCmd))
+$masm = Get-ChildItem -LiteralPath (Join-Path $visualStudioRoot 'VC\Tools\MSVC') -Filter 'ml.exe' -File -Recurse -ErrorAction SilentlyContinue |
+    Where-Object { $_.FullName -match '\\bin\\Hostx64\\x86\\ml\.exe$' } |
+    Sort-Object FullName -Descending |
+    Select-Object -First 1
+if ($null -eq $masm) {
+    throw "The VS 2026 x86 MASM assembler was not found below '$visualStudioRoot'."
+}
+# The dual-architecture VsDevCmd invocation above must expose the x86 MASM directory used by sfx7zip.
 
 foreach ($line in $developerEnvironment) {
     $separator = $line.IndexOf('=')
