@@ -174,8 +174,7 @@ function Import-VisualStudioDeveloperEnvironment {
     param([Parameter(Mandatory = $true)][string]$DeveloperCommand)
 
     # Release audit scripts call dumpbin directly, so retain the VS 2026 environment across local steps just as GITHUB_ENV does in Actions.
-    # Request both target-architecture tool paths because the x64 solution includes the x86 sfx7zip MASM project.
-    $developerEnvironment = & $env:ComSpec /d /s /c ('call "' + $DeveloperCommand + '" -arch=x86 -host_arch=x64 >nul && set')
+    $developerEnvironment = & $env:ComSpec /d /s /c ('call "' + $DeveloperCommand + '" -arch=x64 -host_arch=x64 >nul && set')
     if ($LASTEXITCODE -ne 0) {
         throw "Visual Studio 2026 developer environment setup failed with exit code $LASTEXITCODE."
     }
@@ -315,8 +314,9 @@ function Build-UiTestApplication {
     # always exercise this checkout rather than a caller-provided executable.
     # Keep the toolset explicit so parity jobs test the executable they built.
     # The generated workspace path has no spaces; avoid a trailing backslash escaping the MSBuild property quote.
-    # Request both target-architecture tool paths so the complete Debug solution can assemble sfx7zip.
-    $buildCommand = 'call "' + $DeveloperCommand + '" -arch=x86 -host_arch=x64 && msbuild "' + $nativeSolution +
+    # Re-add the x86 MASM directory after VsDevCmd resets PATH for the x64 host toolchain.
+    $masmPath = Find-VisualStudioX86MasmPath -DeveloperCommand $DeveloperCommand
+    $buildCommand = 'call "' + $DeveloperCommand + '" -arch=x64 -host_arch=x64 && set "PATH=' + $masmPath + ';!PATH!" && msbuild "' + $nativeSolution +
         '" /m /t:Build /p:Configuration=Debug /p:Platform=x64 /p:PlatformToolset=' + $Toolset + ' /p:PreferredToolArchitecture=x64 /p:OPENSAL_BUILD_DIR=' +
         ($BuildDirectory.TrimEnd('\') + '\') + ' /nr:false'
     & $env:ComSpec /d /s /c $buildCommand
@@ -534,11 +534,12 @@ function Build-ReleaseGateDebugArtifacts {
     New-Item -ItemType Directory -Path $BuildDirectory -Force | Out-Null
     # This intentionally precedes runtests' disposable build, matching the workflow's staged Debug artifact step and its strict input resolution.
     $buildRoot = $BuildDirectory.TrimEnd('\') + '\'
-    # Request both target-architecture tool paths so the staged Debug solution can assemble sfx7zip.
-    $buildCommand = 'call "' + $DeveloperCommand + '" -arch=x86 -host_arch=x64 && set "OPENSAL_BUILD_DIR=' + $buildRoot +
+    # Re-add the x86 MASM directory after VsDevCmd resets PATH for the x64 host toolchain.
+    $masmPath = Find-VisualStudioX86MasmPath -DeveloperCommand $DeveloperCommand
+    $buildCommand = 'call "' + $DeveloperCommand + '" -arch=x64 -host_arch=x64 && set "PATH=' + $masmPath + ';!PATH!" && set "OPENSAL_BUILD_DIR=' + $buildRoot +
         '" && msbuild "' + $nativeSolution + '" /m /t:Build /p:Configuration=Debug /p:Platform=x64 /p:PlatformToolset=' +
         $Toolset + ' /p:PreferredToolArchitecture=x64 /nr:false'
-    & $env:ComSpec /d /s /c $buildCommand
+    & $env:ComSpec /d /v:on /s /c $buildCommand
     if ($LASTEXITCODE -ne 0) {
         throw "Building the staged Debug x64 release-gate artifacts failed with exit code $LASTEXITCODE."
     }
