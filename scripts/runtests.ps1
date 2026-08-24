@@ -156,25 +156,40 @@ function Find-VisualStudioDeveloperCommand {
     return $candidates | Where-Object { Test-Path -LiteralPath $_ } | Select-Object -First 1
 }
 
-function Find-VisualStudioX86MasmPath {
-    param([Parameter(Mandatory = $true)][string]$DeveloperCommand)
-
-    $visualStudioRoot = Split-Path -Parent (Split-Path -Parent (Split-Path -Parent $DeveloperCommand))
-    $masm = Get-ChildItem -LiteralPath (Join-Path $visualStudioRoot 'VC\Tools\MSVC') -Filter 'ml.exe' -File -Recurse -ErrorAction SilentlyContinue |
-        Where-Object { $_.FullName -match '\\bin\\Hostx64\\x86\\ml\.exe$' } |
-        Sort-Object FullName -Descending |
-        Select-Object -First 1
-    if ($null -eq $masm) {
-        throw "The VS 2026 x86 MASM assembler was not found below '$visualStudioRoot'."
+# Keep cmd.exe's initial environment bounded so PowerShell callers with oversized PATH values can still start VsDevCmd.
+function Get-VisualStudioBootstrapPath {
+    $paths = [System.Collections.Generic.List[string]]::new()
+    foreach ($candidate in @(
+        (Join-Path $env:SystemRoot 'System32'),
+        $env:SystemRoot,
+        (Join-Path $env:SystemRoot 'System32\Wbem'),
+        (Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0'),
+        (Join-Path $env:SystemRoot 'System32\OpenSSH'),
+        (Join-Path $env:ProgramFiles 'dotnet'),
+        (Join-Path $env:ProgramFiles 'PowerShell\7'),
+        (Join-Path $env:ProgramFiles 'Git\cmd')
+    )) {
+        if (-not [string]::IsNullOrWhiteSpace($candidate) -and (Test-Path -LiteralPath $candidate -PathType Container)) {
+            $paths.Add($candidate)
+        }
     }
-    return $masm.DirectoryName
+    foreach ($commandName in @('git.exe', 'pwsh.exe')) {
+        $command = Get-Command $commandName -ErrorAction SilentlyContinue | Select-Object -First 1
+        if ($null -ne $command -and -not [string]::IsNullOrWhiteSpace($command.Source)) {
+            $paths.Add((Split-Path -Parent $command.Source))
+        }
+    }
+    return (($paths | Select-Object -Unique) -join ';')
 }
 
 function Import-VisualStudioDeveloperEnvironment {
     param([Parameter(Mandatory = $true)][string]$DeveloperCommand)
 
     # Release audit scripts call dumpbin directly, so retain the VS 2026 environment across local steps just as GITHUB_ENV does in Actions.
-    $developerEnvironment = & $env:ComSpec /d /s /c ('call "' + $DeveloperCommand + '" -arch=x64 -host_arch=x64 >nul && set')
+    $bootstrapPath = Get-VisualStudioBootstrapPath
+    # Start VsDevCmd with a bounded PATH so a caller's oversized environment cannot exceed cmd.exe limits.
+    # Request both target architectures so x86 MASM is available while PreferredToolArchitecture selects x64 C++.
+    $developerEnvironment = & $env:ComSpec /d /s /c ('set "PATH=' + $bootstrapPath + '" && call "' + $DeveloperCommand + '" -arch=x86 -host_arch=x64 >nul && set')
     if ($LASTEXITCODE -ne 0) {
         throw "Visual Studio 2026 developer environment setup failed with exit code $LASTEXITCODE."
     }
@@ -189,9 +204,6 @@ function Import-VisualStudioDeveloperEnvironment {
             Set-Item -Path ("Env:" + $name) -Value $line.Substring($separator + 1)
         }
     }
-
-    # VsDevCmd's x64 environment omits the x86-hosted MASM path needed by the sfx7zip Debug project.
-    $env:Path = (Find-VisualStudioX86MasmPath -DeveloperCommand $DeveloperCommand) + ';' + $env:Path
 }
 
 function Find-ApplicationVerifier {
@@ -314,12 +326,12 @@ function Build-UiTestApplication {
     # always exercise this checkout rather than a caller-provided executable.
     # Keep the toolset explicit so parity jobs test the executable they built.
     # The generated workspace path has no spaces; avoid a trailing backslash escaping the MSBuild property quote.
-    # Re-add the x86 MASM directory after VsDevCmd resets PATH for the x64 host toolchain.
-    $masmPath = Find-VisualStudioX86MasmPath -DeveloperCommand $DeveloperCommand
-    $buildCommand = 'call "' + $DeveloperCommand + '" -arch=x64 -host_arch=x64 && set "PATH=' + $masmPath + ';!PATH!" && msbuild "' + $nativeSolution +
+    $bootstrapPath = Get-VisualStudioBootstrapPath
+    # Use both target architectures so the x64 solution can assemble its x86 sfx7zip dependency without inheriting a large user PATH.
+    $buildCommand = 'set "PATH=' + $bootstrapPath + '" && call "' + $DeveloperCommand + '" -arch=x86 -host_arch=x64 && msbuild "' + $nativeSolution +
         '" /m /t:Build /p:Configuration=Debug /p:Platform=x64 /p:PlatformToolset=' + $Toolset + ' /p:PreferredToolArchitecture=x64 /p:OPENSAL_BUILD_DIR=' +
         ($BuildDirectory.TrimEnd('\') + '\') + ' /nr:false'
-    & $env:ComSpec /d /v:on /s /c $buildCommand
+    & $env:ComSpec /d /s /c $buildCommand
     if ($LASTEXITCODE -ne 0) {
         throw "Building the Debug x64 FileManager solution failed with exit code $LASTEXITCODE."
     }
@@ -341,7 +353,9 @@ function Invoke-NativeSafetyTests {
 
     # Keep the native executable independent of the product solution so its
     # pure boundary checks run quickly after the main build has produced UI artifacts.
-    $buildCommand = 'call "' + $DeveloperCommand + '" -arch=x64 -host_arch=x64 && msbuild "' + $nativeSafetyProject +
+    $bootstrapPath = Get-VisualStudioBootstrapPath
+    # Keep the safety build on the same bounded dual-architecture environment as the product build.
+    $buildCommand = 'set "PATH=' + $bootstrapPath + '" && call "' + $DeveloperCommand + '" -arch=x86 -host_arch=x64 && msbuild "' + $nativeSafetyProject +
         '" /m /t:Build /p:Configuration=Debug /p:Platform=x64 /p:PlatformToolset=' + $Toolset + ' /nr:false'
     & $env:ComSpec /d /s /c $buildCommand
     if ($LASTEXITCODE -ne 0) {
@@ -374,7 +388,9 @@ function Invoke-PictViewEngineTests {
 
     # The engine links straight into a console host, so its decode, transform and
     # encode round trips run without a desktop session or the plug-in host.
-    $buildCommand = 'call "' + $DeveloperCommand + '" -arch=x64 -host_arch=x64 && msbuild "' + $pictViewEngineProject +
+    $bootstrapPath = Get-VisualStudioBootstrapPath
+    # Keep the PictView build on the same bounded dual-architecture environment as the product build.
+    $buildCommand = 'set "PATH=' + $bootstrapPath + '" && call "' + $DeveloperCommand + '" -arch=x86 -host_arch=x64 && msbuild "' + $pictViewEngineProject +
         '" /m /t:Build /p:Configuration=Debug /p:Platform=x64 /p:PlatformToolset=' + $Toolset + ' /nr:false'
     & $env:ComSpec /d /s /c $buildCommand
     if ($LASTEXITCODE -ne 0) {
@@ -534,12 +550,12 @@ function Build-ReleaseGateDebugArtifacts {
     New-Item -ItemType Directory -Path $BuildDirectory -Force | Out-Null
     # This intentionally precedes runtests' disposable build, matching the workflow's staged Debug artifact step and its strict input resolution.
     $buildRoot = $BuildDirectory.TrimEnd('\') + '\'
-    # Re-add the x86 MASM directory after VsDevCmd resets PATH for the x64 host toolchain.
-    $masmPath = Find-VisualStudioX86MasmPath -DeveloperCommand $DeveloperCommand
-    $buildCommand = 'call "' + $DeveloperCommand + '" -arch=x64 -host_arch=x64 && set "PATH=' + $masmPath + ';!PATH!" && set "OPENSAL_BUILD_DIR=' + $buildRoot +
+    $bootstrapPath = Get-VisualStudioBootstrapPath
+    # Use both target architectures so the staged release build can assemble x86 sfx7zip while retaining x64 C++ tools.
+    $buildCommand = 'set "PATH=' + $bootstrapPath + '" && call "' + $DeveloperCommand + '" -arch=x86 -host_arch=x64 && set "OPENSAL_BUILD_DIR=' + $buildRoot +
         '" && msbuild "' + $nativeSolution + '" /m /t:Build /p:Configuration=Debug /p:Platform=x64 /p:PlatformToolset=' +
         $Toolset + ' /p:PreferredToolArchitecture=x64 /nr:false'
-    & $env:ComSpec /d /v:on /s /c $buildCommand
+    & $env:ComSpec /d /s /c $buildCommand
     if ($LASTEXITCODE -ne 0) {
         throw "Building the staged Debug x64 release-gate artifacts failed with exit code $LASTEXITCODE."
     }
