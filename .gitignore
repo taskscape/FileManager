@@ -53,3 +53,5 @@ errors.txt
 tests/FileManager.UiTests.EditorStub/obj
 .zed
 TestResults/codex-inno-setup-validation
+TestResults
+build_errors.txt
