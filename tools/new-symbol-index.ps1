@@ -23,6 +23,22 @@ function Convert-RvaToFileOffset {
     throw "$Path has a debug directory RVA outside its section table."
 }
 
+function Get-Sha256Hex {
+    param([Parameter(Mandatory = $true)][string]$Path)
+
+    # Use the BCL directly so symbol indexing remains available in minimal Windows PowerShell hosts.
+    $stream = [System.IO.File]::OpenRead($Path)
+    $hasher = [System.Security.Cryptography.SHA256]::Create()
+    try {
+        $bytes = $hasher.ComputeHash($stream)
+        return (($bytes | ForEach-Object { $_.ToString('x2') }) -join '')
+    }
+    finally {
+        $hasher.Dispose()
+        $stream.Dispose()
+    }
+}
+
 function Get-CodeViewRecord {
     param([string] $Path)
 
@@ -105,9 +121,9 @@ $entries = foreach ($binary in $binaries) {
     $pdb = if ($null -ne $sibling) { $sibling } elseif ($candidates.Count -eq 1) { $candidates[0] } else { throw "Cannot unambiguously locate $($record.PdbName) for $($binary.FullName)." }
     [ordered]@{
         module = $binary.FullName.Substring($root.Length).TrimStart('\').Replace('\', '/')
-        moduleSha256 = (Get-FileHash -LiteralPath $binary.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+        moduleSha256 = Get-Sha256Hex -Path $binary.FullName
         pdb = $pdb.FullName.Substring($root.Length).TrimStart('\').Replace('\', '/')
-        pdbSha256 = (Get-FileHash -LiteralPath $pdb.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+        pdbSha256 = Get-Sha256Hex -Path $pdb.FullName
         pdbGuid = $record.Guid
         pdbAge = $record.Age
         symbolKey = "$($record.PdbName)/$($record.Guid)$($record.Age)/$($record.PdbName)"

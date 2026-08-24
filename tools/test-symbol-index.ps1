@@ -9,6 +9,22 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
+function Get-Sha256Hex {
+    param([Parameter(Mandatory = $true)][string]$Path)
+
+    # Use the BCL directly so symbol verification matches indexing on minimal Windows PowerShell hosts.
+    $stream = [System.IO.File]::OpenRead($Path)
+    $hasher = [System.Security.Cryptography.SHA256]::Create()
+    try {
+        $bytes = $hasher.ComputeHash($stream)
+        return (($bytes | ForEach-Object { $_.ToString('x2') }) -join '')
+    }
+    finally {
+        $hasher.Dispose()
+        $stream.Dispose()
+    }
+}
+
 $root = (Resolve-Path -LiteralPath $BuildRoot).Path.TrimEnd('\')
 $index = Get-Content -LiteralPath $IndexPath -Raw | ConvertFrom-Json
 if ($index.schemaVersion -ne 1 -or $null -eq $index.modules -or $index.modules.Count -eq 0) { throw 'Symbol index has no versioned module records.' }
@@ -19,8 +35,8 @@ foreach ($entry in $index.modules) {
     $module = Join-Path $root $entry.module.Replace('/', '\')
     $pdb = Join-Path $root $entry.pdb.Replace('/', '\')
     if (-not (Test-Path -LiteralPath $module) -or -not (Test-Path -LiteralPath $pdb)) { throw "Symbol index references a missing module or PDB: $($entry.module)" }
-    if ((Get-FileHash -LiteralPath $module -Algorithm SHA256).Hash.ToLowerInvariant() -ne $entry.moduleSha256) { throw "Module hash drifted for $($entry.module)." }
-    if ((Get-FileHash -LiteralPath $pdb -Algorithm SHA256).Hash.ToLowerInvariant() -ne $entry.pdbSha256) { throw "PDB hash drifted for $($entry.pdb)." }
+    if ((Get-Sha256Hex -Path $module) -ne $entry.moduleSha256) { throw "Module hash drifted for $($entry.module)." }
+    if ((Get-Sha256Hex -Path $pdb) -ne $entry.pdbSha256) { throw "PDB hash drifted for $($entry.pdb)." }
     if ($entry.symbolKey -notmatch '^[^/]+/[0-9A-F]{32}\d+/[^/]+\.pdb$') {
         throw "Invalid symbol key: $($entry.symbolKey)"
     }
