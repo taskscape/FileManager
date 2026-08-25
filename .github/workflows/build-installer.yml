@@ -102,8 +102,8 @@ jobs:
 
       - name: Run release tests without unexpected skips
         shell: pwsh
-        # Exclude only manifest-backed quarantines; Application Verifier remains an instrumented nightly diagnostic lane.
-        run: .\scripts\runtests.ps1 -BaseCommit $env:RELEASE_BASE_COMMIT -SqliteDll $env:SQLITE_TEST_DLL -FailOnSkipped -SkipLockVerifier -NUnitFilter 'TestCategory!=Quarantined' -PlatformToolset v145 -NUnitTrxPath $env:RUNNER_TEMP\runtests-v145.trx
+        # Exclude manifest quarantines and the credentialed external FTPS smoke test; Application Verifier remains an instrumented nightly diagnostic lane.
+        run: .\scripts\runtests.ps1 -BaseCommit $env:RELEASE_BASE_COMMIT -SqliteDll $env:SQLITE_TEST_DLL -FailOnSkipped -SkipLockVerifier -NUnitFilter 'TestCategory!=Quarantined&TestCategory!=LiveFtp' -PlatformToolset v145 -NUnitTrxPath $env:RUNNER_TEMP\runtests-v145.trx
 
       - name: Remove isolated UI test volumes after release tests
         if: always()

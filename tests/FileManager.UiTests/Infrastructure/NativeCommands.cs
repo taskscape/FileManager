@@ -32,6 +32,7 @@ internal static class NativeCommands
     private const uint LvmGetItemCount = 0x1004;
     private const uint LbFindStringExact = 0x01A2;
     private const uint BmGetCheck = 0x00F0;
+    private const uint BmSetCheck = 0x00F1;
     private const uint BmClick = 0x00F5;
     private const uint TbIsButtonEnabled = 0x0409;
     private const uint TbCommandToIndex = 0x0419;
@@ -227,6 +228,31 @@ internal static class NativeCommands
         return FindDialogControl(dialogHandle, OperationPathControl) != 0;
     }
 
+    internal static bool HasDialogControl(nint dialogHandle, int controlId)
+    {
+        // Plug-ins own distinct dialog templates, so callers need to identify their stable control without relying on translated UIA names.
+        return FindDialogControl(dialogHandle, controlId) != 0;
+    }
+
+    internal static void SetDialogControlText(nint dialogHandle, int controlId, string text)
+    {
+        var controlHandle = RequireDialogControl(dialogHandle, controlId);
+        // Send through the target window procedure so cross-process tests update the text that the native dialog will actually transfer.
+        SendMessageText(controlHandle, WmSetText, 0, text);
+    }
+
+    internal static string GetDialogControlText(nint dialogHandle, int controlId)
+    {
+        var controlHandle = RequireDialogControl(dialogHandle, controlId);
+        // Read through the same window procedure as the setter so retention checks do not observe UIA's cached title instead of the native value.
+        var length = (int)SendMessage(controlHandle, WmGetTextLength, 0, 0);
+        if (length <= 0)
+            return string.Empty;
+        var buffer = new StringBuilder(length + 1);
+        SendMessageBuffer(controlHandle, WmGetText, buffer.Capacity, buffer);
+        return buffer.ToString();
+    }
+
     internal static void SetOperationPath(nint dialogHandle, string path)
     {
         var pathControl = RequireOperationPathControl(dialogHandle);
@@ -260,6 +286,14 @@ internal static class NativeCommands
             throw new InvalidOperationException("The operation dialog did not expose its native destination/name input.");
         return pathControl;
     }
+
+    private static nint RequireDialogControl(nint dialogHandle, int controlId)
+    {
+        var controlHandle = FindDialogControl(dialogHandle, controlId);
+        if (controlHandle == 0)
+            throw new InvalidOperationException($"The dialog did not expose native control {controlId}.");
+        return controlHandle;
+    }
     /// <summary>
     /// Clicks a dialog button without waiting for the click to be handled. Use
     /// this when the button synchronously opens another modal dialog: the
@@ -291,6 +325,24 @@ internal static class NativeCommands
         var buffer = new char[GetWindowTextLength(windowHandle) + 1];
         GetWindowText(windowHandle, buffer, buffer.Length);
         return new string(buffer).TrimEnd(char.MinValue);
+    }
+
+    internal static string GetDialogText(nint dialogHandle)
+    {
+        var lines = new List<string>();
+        var title = GetWindowTitle(dialogHandle);
+        if (!string.IsNullOrWhiteSpace(title))
+            lines.Add(title);
+
+        // Message-box text lives in native child controls and is not always exposed by the legacy UIA provider.
+        EnumChildWindows(dialogHandle, (childHandle, _) =>
+        {
+            var text = GetWindowTitle(childHandle).Trim();
+            if (!string.IsNullOrWhiteSpace(text))
+                lines.Add(text);
+            return true;
+        }, 0);
+        return string.Join(Environment.NewLine, lines.Distinct(StringComparer.Ordinal));
     }
 
     internal static bool HasDialogButton(nint dialogHandle, int controlId)
@@ -336,6 +388,17 @@ internal static class NativeCommands
         if (buttonHandle == 0)
             throw new InvalidOperationException($"The dialog did not expose native button {controlId}.");
         SendMessage(buttonHandle, BmClick, 0, 0);
+    }
+
+    internal static void SetDialogCheckBoxState(nint dialogHandle, int controlId, bool isChecked)
+    {
+        var checkBoxHandle = FindDialogControl(dialogHandle, controlId);
+        if (checkBoxHandle == 0)
+            throw new InvalidOperationException($"The dialog did not expose native check box {controlId}.");
+
+        // FTP's three-state defaults can be inherited from the host profile, so
+        // set the exact per-connection state before exercising a live server.
+        SendMessage(checkBoxHandle, BmSetCheck, isChecked ? 1 : 0, 0);
     }
 
     internal static void DismissKnownStartupErrorDialogs(int processId)

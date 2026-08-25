@@ -198,6 +198,9 @@ public:
     CCertificate* GetCertificate(); // WARNING: returns the certificate only after calling its AddRef(), so the caller is responsible for releasing the certificate by calling Release()
     void SetCertificate(CCertificate* certificate);
 
+    // Copies the control endpoint used for SNI and certificate exceptions into a data socket before its passive-port connect.
+    BOOL CopyTlsTargetFrom(CSocket* source);
+
     // used by the SocketsThread object when swapping socket objects, see
     // CSocketsThread::BeginSocketsSwap(); swaps Msg and Socket
     // callable from any thread

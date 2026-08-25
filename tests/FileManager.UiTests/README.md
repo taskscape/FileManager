@@ -30,6 +30,18 @@ File-operation cases create a fresh GUID directory below `filemanager-testdata` 
 
 The FTP plug-in menu command has no compile-time host command ID: FileManager allocates it while loading plug-ins. Keep the value in the isolated test environment rather than hard-coding it into the test project. The dialog controls themselves are located by their stable plug-in resource IDs and their persistence is asserted through UIA3 after a full application restart.
 
+## Live MojeRzeczy FTPS UI lane
+
+`MojeRzeczyFtpsUiTests` contacts an external server and is deliberately marked `Explicit` and excluded from `scripts/runtests.ps1` and CI. It reads its credentials only from the variables used by `C:\Projects\FtpMojerzeczy`, configures explicit FTPS on port 21 with passive and binary transfer, accepts a hostname-invalid certificate for the disposable session only, dismisses the plug-in's modeless welcome message, then downloads `/skan.txt` into the disposable test-data root. It waits for the worker to release the file and verifies the downloaded size against `C:\Projects\FtpMojerzeczy\skan.txt`. When the Debug build shows an error dialog, the test records its native text under `TestResults\ftp-debug-error-dialogs`, dismisses it, and fails rather than waiting for desktop input. If either credential is absent, it passes without opening an FTP connection and reports that FTP UI tests have not been performed due to missing credentials.
+
+```powershell
+$env:MOJERZEC_USERNAME = "your-username"
+$env:MOJERZEC_PASSWORD = "your-password"
+.\scripts\run-ftp-test.ps1
+```
+
+Do not reuse this certificate policy outside this one test server.
+
 ## Transactional configuration fault injection
 
 The `FaultInjection` category first measures the exact registry-write count of a real configuration commit, then starts fresh executables at uniformly spaced payload writes and five named transaction mutations (checksum, completion marker, generation flush, active-generation selector, and store flush). Named atomic-tail points remain stable when earlier tests or plug-ins change the inactive snapshot's write count. The bounded structural matrix remains practical when plug-ins add thousands of values. The native test hook terminates each process immediately after the selected successful registry mutation. A clean restart must show either the complete baseline setting or the complete candidate setting; the test fails if the process did not terminate at the requested boundary or if restart exposes a mixture.

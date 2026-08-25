@@ -6,8 +6,8 @@ param(
     [switch]$KeepBuildArtifacts,
     # The release workflow provisions a fresh VHD before verifier stress instead of reusing a failed suite's filesystem state.
     [switch]$SkipLockVerifier,
-    # Match the blocking release inventory by default; the quarantine workflow opts in explicitly to diagnostic monitoring tests.
-    [string]$NUnitFilter = 'TestCategory!=Quarantined',
+    # Keep external-server tests out of the blocking inventory; their launcher opts in with the LiveFtp category.
+    [string]$NUnitFilter = 'TestCategory!=Quarantined&TestCategory!=LiveFtp',
     # The complete UI harness must match the repository-wide VS 2026 compiler contract.
     [ValidateSet('v145')]
     [string]$PlatformToolset = 'v145',
@@ -43,11 +43,11 @@ if ($ReleasePipeline) {
     $FailOnSkipped = $true
     $SkipLockVerifier = $true
     if ([string]::IsNullOrWhiteSpace($NUnitFilter)) {
-        $NUnitFilter = 'TestCategory!=Quarantined'
+        $NUnitFilter = 'TestCategory!=Quarantined&TestCategory!=LiveFtp'
     }
-    elseif ($NUnitFilter -cne 'TestCategory!=Quarantined') {
+    elseif ($NUnitFilter -cne 'TestCategory!=Quarantined&TestCategory!=LiveFtp') {
         # A custom filter would make the local inventory differ from the one that blocks the GitHub release gate.
-        throw '-ReleasePipeline requires the workflow NUnit filter: TestCategory!=Quarantined.'
+        throw '-ReleasePipeline requires the workflow NUnit filter: TestCategory!=Quarantined&TestCategory!=LiveFtp.'
     }
     if ([string]::IsNullOrWhiteSpace($BuildNumber)) {
         $BuildNumber = '0'

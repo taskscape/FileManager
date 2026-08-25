@@ -22,6 +22,8 @@ public sealed class NativeSafetyRegressionTests
         var volumeProvisioner = File.ReadAllText(Path.Combine(root, "tools", "manage-ui-test-volumes.ps1"));
         var quarantineVerifier = File.ReadAllText(Path.Combine(root, "tools", "verify-ui-test-quarantine.ps1"));
         var quarantineWorkflow = File.ReadAllText(Path.Combine(root, ".github", "workflows", "quarantined-ui-tests.yml"));
+        var liveFtpRunner = File.ReadAllText(Path.Combine(root, "scripts", "run-ftp-test.ps1"));
+        var liveFtpTest = File.ReadAllText(Path.Combine(root, "tests", "FileManager.UiTests", "MojeRzeczyFtpsUiTests.cs"));
         var sandbox = File.ReadAllText(Path.Combine(root, "tests", "FileManager.UiTests", "Infrastructure", "UiTestSandbox.cs"));
         var uiTestBase = File.ReadAllText(Path.Combine(root, "tests", "FileManager.UiTests", "Infrastructure", "FileManagerUiTestBase.cs"));
         var nightlyWorkflow = File.ReadAllText(Path.Combine(root, ".github", "workflows", "nightly-lock-stress.yml"));
@@ -54,8 +56,8 @@ public sealed class NativeSafetyRegressionTests
             Assert.That(runner, Does.Contain("[switch]$ReleasePipeline"));
             // Keep local parity from silently collapsing the workflow's staged Debug artifact hand-off into one build.
             Assert.That(runner, Does.Contain("[switch]$PrerequisiteOnly"));
-            // A plain local run must keep diagnostic quarantine tests out of the release-equivalent verdict.
-            Assert.That(runner, Does.Contain("[string]$NUnitFilter = 'TestCategory!=Quarantined'"));
+            // A plain local run must keep diagnostic and credentialed external-server tests out of the release-equivalent verdict.
+            Assert.That(runner, Does.Contain("[string]$NUnitFilter = 'TestCategory!=Quarantined&TestCategory!=LiveFtp'"));
             Assert.That(runner, Does.Contain("Get-ReleasePipelinePrerequisiteFailures"));
             Assert.That(runner, Does.Contain("Resolve-ReleasePipelineBaseCommit"));
             Assert.That(runner, Does.Contain("Build-ReleaseGateDebugArtifacts"));
@@ -86,6 +88,23 @@ public sealed class NativeSafetyRegressionTests
             Assert.That(quarantineVerifier, Does.Contain("expiresOn"));
             Assert.That(quarantineWorkflow, Does.Contain("TestCategory=Quarantined"));
             Assert.That(quarantineWorkflow, Does.Contain("continue-on-error: true"));
+            // The optional external FTPS endpoint stays isolated while missing secrets produce a truthful passed non-execution.
+            Assert.That(liveFtpRunner, Does.Contain("MOJERZEC_USERNAME"));
+            Assert.That(liveFtpRunner, Does.Contain("MOJERZEC_PASSWORD"));
+            Assert.That(liveFtpRunner, Does.Contain("FTP UI tests have not been performed due to missing credentials"));
+            Assert.That(liveFtpRunner, Does.Contain("FILEMANAGER_UI_ISOLATED"));
+            Assert.That(liveFtpRunner, Does.Contain("FILEMANAGER_UI_FTP_DEBUG_ERROR_LOG_DIRECTORY"));
+            Assert.That(liveFtpRunner, Does.Contain("TestCategory=LiveFtp"));
+            // The credentialed lane is only useful when it proves the server's documented payload was fully downloaded.
+            Assert.That(liveFtpTest, Does.Contain("GetCredentialsOrPass"));
+            Assert.That(liveFtpTest, Does.Contain("Assert.Pass(MissingCredentialsMessage)"));
+            Assert.That(liveFtpTest, Does.Contain("FTP UI tests have not been performed due to missing credentials"));
+            Assert.That(liveFtpTest, Does.Contain("RemoteSkanPath = \"/skan.txt\""));
+            Assert.That(liveFtpTest, Does.Contain("FtpDownloadTargetPathControl = 781"));
+            Assert.That(liveFtpTest, Does.Contain("FtpAddToQueueControl = 782"));
+            Assert.That(liveFtpTest, Does.Contain("DismissWelcomeMessage()"));
+            Assert.That(liveFtpTest, Does.Contain("new FileStream(downloadedFile, FileMode.Open, FileAccess.Read, FileShare.None)"));
+            Assert.That(liveFtpTest, Does.Contain("stream.Length == expectedSize"));
             // The runner must select explicit data and registry boundaries before driving the current user's desktop.
             Assert.That(runner, Does.Contain("FILEMANAGER_UI_TESTDATA_ROOT"));
             Assert.That(runner, Does.Contain("$uiTestEnvironmentSkipReason = $_.Exception.Message"));
@@ -94,7 +113,7 @@ public sealed class NativeSafetyRegressionTests
             // The release workflow must consume the root inventory rather than
             // maintaining a second list that can silently lose coverage.
             Assert.That(releaseWorkflow, Does.Contain("name: Complete automated release gate"));
-            Assert.That(releaseWorkflow, Does.Contain(".\\scripts\\runtests.ps1 -BaseCommit $env:RELEASE_BASE_COMMIT -SqliteDll $env:SQLITE_TEST_DLL -FailOnSkipped -SkipLockVerifier -NUnitFilter 'TestCategory!=Quarantined'"));
+            Assert.That(releaseWorkflow, Does.Contain(".\\scripts\\runtests.ps1 -BaseCommit $env:RELEASE_BASE_COMMIT -SqliteDll $env:SQLITE_TEST_DLL -FailOnSkipped -SkipLockVerifier -NUnitFilter 'TestCategory!=Quarantined&TestCategory!=LiveFtp'"));
             Assert.That(releaseWorkflow, Does.Contain("needs: release-tests"));
             Assert.That(releaseWorkflow, Does.Contain("fetch-depth: 0"));
             Assert.That(releaseWorkflow, Does.Contain("FILEMANAGER_UI_CONFIG_FAULT_INJECTION: '1'"));
@@ -2653,6 +2672,8 @@ public sealed class NativeSafetyRegressionTests
         var root = FindRepositoryRoot();
         var tlsHeader = File.ReadAllText(Path.Combine(root, "src", "plugins", "ftp", "ssl.h"));
         var tls = File.ReadAllText(Path.Combine(root, "src", "plugins", "ftp", "ssl.cpp"));
+        var sockets = File.ReadAllText(Path.Combine(root, "src", "plugins", "ftp", "sockets.cpp"));
+        var dataConnection = File.ReadAllText(Path.Combine(root, "src", "plugins", "ftp", "datacon1.cpp"));
         var control = File.ReadAllText(Path.Combine(root, "src", "plugins", "ftp", "ctrlcon1.cpp"));
         var operationDialog = File.ReadAllText(Path.Combine(root, "src", "plugins", "ftp", "dialogs5.cpp"));
         var configuration = File.ReadAllText(Path.Combine(root, "src", "plugins", "ftp", "ftp.cpp"));
@@ -2683,6 +2704,12 @@ public sealed class NativeSafetyRegressionTests
             Assert.That(tls, Does.Contain("IsDataConnection || pCertificate->MatchesEndpoint(HostAddress, HostPort)"));
             Assert.That(tls, Does.Contain("CertificateExceptions.IsAccepted(HostAddress, HostPort, der, derLength, &endpointKnown)"));
             Assert.That(tls, Does.Contain("else if (endpointKnown)"));
+            // Passive data sockets must retain the control DNS identity; the passive port is not a certificate endpoint.
+            Assert.That(sockets, Does.Contain("BOOL CSocket::CopyTlsTargetFrom(CSocket* source)"));
+            Assert.That(dataConnection, Does.Contain("CopyTlsTargetFrom(SSLConForReuse)"));
+            // A server may return 150 before Windows posts FD_CONNECT, so the data-channel TLS handshake must wait for that connect event.
+            Assert.That(dataConnection, Does.Contain("UsePassiveMode && ReceivedConnected && EncryptConnection && SSLConn == NULL"));
+            Assert.That(dataConnection, Does.Contain("if (EncryptConnection && SSLConn == NULL)\n                EncryptPassiveDataCon();"));
             Assert.That(control, Does.Contain("unverifiedCert->RememberException(certificateDialog.RememberException() ? cesPersistent : cesSession)"));
             Assert.That(operationDialog, Does.Contain("unverifiedCertificate->RememberException(certificateDialog.RememberException() ? cesPersistent : cesSession)"));
             Assert.That(configuration, Does.Contain("LoadCertificateExceptions(regKey, registry)"));

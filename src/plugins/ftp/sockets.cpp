@@ -176,6 +176,35 @@ CSocket::~CSocket()
         pCertificate->Release();
 }
 
+BOOL CSocket::CopyTlsTargetFrom(CSocket* source)
+{
+    if (source == NULL)
+        return FALSE;
+
+    char* sourceAddress = NULL;
+    DWORD sourceIP = INADDR_NONE;
+    unsigned short sourcePort = 0;
+    HANDLES(EnterCriticalSection(&source->SocketCritSect));
+    if (source->HostAddress != NULL)
+    {
+        sourceAddress = SalamanderGeneral->DupStr(source->HostAddress);
+        sourceIP = source->HostIP;
+        sourcePort = source->HostPort;
+    }
+    HANDLES(LeaveCriticalSection(&source->SocketCritSect));
+
+    if (sourceAddress == NULL)
+        return FALSE;
+
+    if (HostAddress != NULL)
+        SalamanderGeneral->Free(HostAddress);
+    // Passive data ports are ephemeral, but their TLS identity remains the control host and port.
+    HostAddress = sourceAddress;
+    HostIP = sourceIP;
+    HostPort = sourcePort;
+    return TRUE;
+}
+
 BOOL CSocket::Shutdown(DWORD* error)
 {
     CALL_STACK_MESSAGE1("CSocket::Shutdown()");

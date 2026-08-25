@@ -147,6 +147,16 @@ dotnet test .\tests\FileManager.UiTests\FileManager.UiTests.csproj --filter 'Tes
 dotnet test .\tests\FileManager.UiTests\FileManager.UiTests.csproj --filter 'TestCategory=LockStress'
 ```
 
+### External MojeRzeczy FTPS UI test
+
+This live-server test is `Explicit` and excluded from normal and release-pipeline runs. It uses the `MOJERZEC_USERNAME` and `MOJERZEC_PASSWORD` variables from `C:\Projects\FtpMojerzeczy`, explicit FTPS on port 21, passive mode, binary transfer, and accepts the server's invalid certificate only in the disposable test profile. Debug error dialogs are logged to `TestResults\ftp-debug-error-dialogs`, dismissed, and reported as a test failure so the external lane does not require a manual click. If either credential is absent, it passes without opening an FTP connection and reports that FTP UI tests have not been performed due to missing credentials.
+
+```powershell
+$env:MOJERZEC_USERNAME = 'your-username'
+$env:MOJERZEC_PASSWORD = 'your-password'
+.\scripts\run-ftp-test.ps1
+```
+
 See [`tests/FileManager.UiTests/README.md`](tests/FileManager.UiTests/README.md) for additional UI-lane details.
 
 ### cmark-gfm hardening probe

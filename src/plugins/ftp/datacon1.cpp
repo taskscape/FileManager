@@ -56,6 +56,9 @@ CDataConnectionBaseSocket::CDataConnectionBaseSocket(CFTPProxyForDataCon* proxyS
     memset(&ZLIBInfo, 0, sizeof(ZLIBInfo));
 
     SSLConForReuse = conForReuse;
+    // Direct passive connections bypass ConnectWithProxy, so retain the control hostname required by SChannel and the accepted-certificate lookup.
+    if (EncryptConnection && SSLConForReuse != NULL && !CopyTlsTargetFrom(SSLConForReuse))
+        TRACE_E("CDataConnectionBaseSocket: control connection did not provide a TLS target for the encrypted data connection.");
 }
 
 CDataConnectionBaseSocket::~CDataConnectionBaseSocket()
@@ -125,10 +128,7 @@ BOOL CDataConnectionBaseSocket::PassiveConnect(DWORD* error)
         }
         else
         {
-            if (!HostAddress)
-            {
-                //         HostAddress = SalamanderGeneral->DupStr();// FIXME!!
-            }
+            // The constructor inherits the control endpoint so this direct passive connect keeps its SNI and certificate identity.
             conRes = Connect(auxServerIP, auxServerPort, &err);
         }
         BOOL ret = TRUE;
@@ -589,7 +589,8 @@ void CDataConnectionBaseSocket::EncryptPassiveDataCon()
 {
     HANDLES(EnterCriticalSection(&SocketCritSect));
     int err;
-    if (UsePassiveMode && EncryptConnection &&
+    // A fast server can send 150 before the nonblocking passive connect completes; never start SChannel on that unconnected socket.
+    if (UsePassiveMode && ReceivedConnected && EncryptConnection && SSLConn == NULL &&
         !EncryptSocket(LogUID, &err, NULL, NULL, NULL, 0, SSLConForReuse))
     {
         SSLErrorOccured = err;
@@ -1249,6 +1250,9 @@ void CDataConnectionSocket::ReceiveNetEvent(LPARAM lParam, int index)
         {
             if (!ReceivedConnected)
                 JustConnected();
+            // Direct passive sockets do not flow through ConnectionAccepted, so begin their TLS handshake only after FD_CONNECT confirms the TCP endpoint.
+            if (EncryptConnection && SSLConn == NULL)
+                EncryptPassiveDataCon();
             LastActivityTime = CMonotonicClock::Now(); // the connect succeeded
             if (GlobalLastActivityTime != NULL)
                 GlobalLastActivityTime->Set(LastActivityTime);
