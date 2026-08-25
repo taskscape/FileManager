@@ -14,6 +14,8 @@ param(
     [string]$NUnitTrxPath,
     # Run the local equivalent of both release-test and installer-build jobs, excluding the GitHub-only publish job.
     [switch]$ReleasePipeline,
+    # CI callers can explicitly retain the ordinary test inventory; local invocations default to release parity.
+    [switch]$NoReleasePipeline,
     # Inspect the blocking release environment without changing disks, building binaries, or changing installed tools.
     [switch]$PrerequisiteOnly,
     # GitHub supplies its monotonically increasing run number; local pipeline runs use 0 unless callers provide one.
@@ -22,6 +24,15 @@ param(
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
+
+if ($ReleasePipeline -and $NoReleasePipeline) {
+    throw '-ReleasePipeline and -NoReleasePipeline cannot be used together.'
+}
+if (-not $ReleasePipeline -and -not $NoReleasePipeline -and -not [System.String]::Equals($env:GITHUB_ACTIONS, 'true', [System.StringComparison]::OrdinalIgnoreCase)) {
+    # A no-argument developer run must exercise the same release gate and installer pass as the pipeline.
+    $ReleasePipeline = $true
+    Write-Host 'No release mode was specified; using local release-pipeline defaults.' -ForegroundColor Cyan
+}
 
 $repositoryRoot = Split-Path -Parent $PSScriptRoot
 $testProject = Join-Path $repositoryRoot 'tests\FileManager.UiTests\FileManager.UiTests.csproj'
@@ -290,7 +301,7 @@ function Get-ReleasePipelineProvisioningNotes {
     $innoCompiler = 'C:\Program Files (x86)\Inno Setup 6\ISCC.exe'
     if (-not (Test-Path -LiteralPath $innoCompiler -PathType Leaf)) {
         # The workflow acquires the locked compiler during packaging, so report the local gap without rejecting a runnable elevated pipeline.
-        $notes.Add('Pinned Inno Setup 6.7.3 is not installed; the runner will provision the locked compiler in a per-run directory from tools\\release-inputs.json.')
+        $notes.Add('Pinned Inno Setup 6.7.3 is not installed in the machine-wide location; the release preflight will provision or reuse the verified local tool cache from tools\\release-inputs.json.')
     }
 
     $buildToolsDeveloperCommand = Join-Path ([Environment]::GetFolderPath([Environment+SpecialFolder]::ProgramFilesX86)) 'Microsoft Visual Studio\18\BuildTools\Common7\Tools\VsDevCmd.bat'
@@ -572,6 +583,17 @@ function Invoke-ReleasePipelinePackaging {
         }
     }.GetNewClosure()
     [void](Invoke-ReleasePipelineCheck -Name 'Build Installer (x64 Release)' -Action $buildInstallerAction)
+}
+
+function Invoke-PinnedInnoSetupPreflight {
+    $provisioner = Join-Path $repositoryRoot 'tools\install-pinned-inno-setup.ps1'
+    Write-Host "`n=== Preflight pinned Inno Setup ===" -ForegroundColor Cyan
+    # Use the exact provisioner consumed by the separate Build Installer pass so local failures are actionable before compilation.
+    $compiler = & $provisioner
+    if (-not (Test-Path -LiteralPath $compiler -PathType Leaf)) {
+        throw 'Pinned Inno Setup preflight did not produce ISCC.exe.'
+    }
+    Write-Host "Pinned Inno Setup preflight passed: $compiler" -ForegroundColor Green
 }
 
 function Assert-UiTestSymbolicLinkSupport {
@@ -905,6 +927,11 @@ if ($ReleasePipeline) {
     if ($releasePrerequisiteFailures.Count -ne 0) {
         throw 'Release-pipeline prerequisites are not satisfied. Run with -PrerequisiteOnly after correcting the listed items.'
     }
+}
+
+if ($ReleasePipeline) {
+    # Fail before the Debug build and aggregate tests when the external installer tool cannot be provisioned.
+    Invoke-PinnedInnoSetupPreflight
 }
 
 $testResultsDirectory = Join-Path $repositoryRoot 'TestResults'

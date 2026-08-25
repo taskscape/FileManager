@@ -16,4 +16,4 @@ $repositoryRoot = Split-Path -Parent $PSScriptRoot
 # Retain Debug-only native dialog evidence after the disposable UI profile is deleted by the test harness.
 $env:FILEMANAGER_UI_FTP_DEBUG_ERROR_LOG_DIRECTORY = Join-Path $repositoryRoot 'TestResults\ftp-debug-error-dialogs'
 $runner = Join-Path $PSScriptRoot 'runtests.ps1'
-& $runner -NUnitFilter 'TestCategory=LiveFtp' -SkipLockVerifier
+& $runner -NoReleasePipeline -NUnitFilter 'TestCategory=LiveFtp' -SkipLockVerifier

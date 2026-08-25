@@ -9,7 +9,7 @@ param(
     [string]$PlatformToolset = 'v145',
 
     # Build number for versioning
-    [string]$BuildNumber = $env:GITHUB_RUN_NUMBER,
+    [string]$BuildNumber = $(if ([string]::IsNullOrWhiteSpace($env:GITHUB_RUN_NUMBER)) { '0' } else { $env:GITHUB_RUN_NUMBER }),
 
     # Custom build directory (defaults to build_stage for Release, build_debug for Debug)
     [string]$BuildDir,
@@ -212,9 +212,8 @@ function Invoke-NativeRegressionTests() {
 function Invoke-InstallInnoSetup() {
     Write-Host "=== Checking Inno Setup Installation ===" -ForegroundColor Cyan
 
-    $installDirectory = Join-Path $script:RUNNER_TEMP 'filemanager-inno-setup-6.7.3'
-    # Reuse the workflow helper so local builds never require machine-wide Program Files access.
-    $script:INNO_SETUP_COMPILER = & (Join-Path $repositoryRoot 'tools\install-pinned-inno-setup.ps1') -InstallDirectory $installDirectory
+    # Reuse the workflow helper and its verified cache so local builds never require machine-wide Program Files access.
+    $script:INNO_SETUP_COMPILER = & (Join-Path $repositoryRoot 'tools\install-pinned-inno-setup.ps1')
     # The helper is a PowerShell contract, so validate its returned path instead of stale native-process exit state.
     if (-not (Test-Path -LiteralPath $script:INNO_SETUP_COMPILER -PathType Leaf)) {
         throw 'Pinned Inno Setup provisioning did not produce ISCC.exe.'
@@ -308,6 +307,11 @@ try {
     Write-Host "=== Starting Build Process ===" -ForegroundColor Cyan
     Write-Host ""
 
+    # Validate the external installer tool before the longer native build can fail on packaging prerequisites.
+    Write-Host "Step 0: Checking Inno Setup prerequisite..." -ForegroundColor Yellow
+    Invoke-InstallInnoSetup
+    Write-Host ""
+
     # Determine output directories based on configuration
     if ($Configuration -eq 'Release') {
         $buildOutputDir = Join-Path $script:BUILD_DIR 'Release_x64'
@@ -329,18 +333,13 @@ try {
     Invoke-NativeRegressionTests -ResultsDirectory $nativeResultsDir -OutputFile "native-$Configuration.trx"
     Write-Host ""
 
-    # Step 3: Install Inno Setup (if needed)
-    Write-Host "Step 3: Checking Inno Setup installation..." -ForegroundColor Yellow
-    Invoke-InstallInnoSetup
-    Write-Host ""
-
-    # Step 4: Stage files
-    Write-Host "Step 4: Staging files..." -ForegroundColor Yellow
+    # Step 3: Stage files
+    Write-Host "Step 3: Staging files..." -ForegroundColor Yellow
     Invoke-StageFiles -BuildDir $script:BUILD_DIR -StagingDir $script:STAGING_DIR -BuildNumber $BuildNumber
     Write-Host ""
 
-    # Step 5: Build installer
-    Write-Host "Step 5: Building installer..." -ForegroundColor Yellow
+    # Step 4: Build installer
+    Write-Host "Step 4: Building installer..." -ForegroundColor Yellow
     Invoke-BuildInstaller -StagingDir $script:STAGING_DIR -BuildNumber $BuildNumber
     Write-Host ""
 

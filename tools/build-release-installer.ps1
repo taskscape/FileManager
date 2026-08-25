@@ -22,6 +22,8 @@ $repositoryRoot = Split-Path -Parent $PSScriptRoot
 $solutionPath = Join-Path $repositoryRoot 'src\vcxproj\salamand.sln'
 $releaseBuildRoot = [IO.Path]::GetFullPath($BuildDirectory).TrimEnd('\') + '\'
 $installerStagingRoot = [IO.Path]::GetFullPath($InstallerStagingDirectory)
+$innoProvisioner = Join-Path $repositoryRoot 'tools\install-pinned-inno-setup.ps1'
+$innoCompiler = $null
 if ([string]::IsNullOrWhiteSpace($SymbolIndexPath)) {
     # Keep the CI symbol inventory in RUNNER_TEMP while giving local parity runs a disposable fallback.
     $symbolRoot = if ([string]::IsNullOrWhiteSpace($env:RUNNER_TEMP)) { Join-Path $releaseBuildRoot 'Intermediate' } else { $env:RUNNER_TEMP }
@@ -32,6 +34,11 @@ $previousBuildRoot = $env:OPENSAL_BUILD_DIR
 try {
     # The staging helper uses repository-relative inputs, so both CI and local parity execute from the same root.
     Push-Location $repositoryRoot
+    # Provision the external compiler before the long Release build so packaging failures surface as a fast prerequisite failure.
+    $innoCompiler = & $innoProvisioner
+    if (-not (Test-Path -LiteralPath $innoCompiler -PathType Leaf)) {
+        throw 'Pinned Inno Setup preflight did not produce ISCC.exe.'
+    }
     New-Item -ItemType Directory -Force -Path $releaseBuildRoot | Out-Null
     # Project property sheets consume this exact environment variable; do not override OutDir for local parity.
     $env:OPENSAL_BUILD_DIR = $releaseBuildRoot
@@ -64,17 +71,6 @@ try {
         throw "Verifying the release symbol index failed with exit code $LASTEXITCODE."
     }
 
-    $innoInstallRoot = if ([string]::IsNullOrWhiteSpace($env:RUNNER_TEMP)) {
-        Join-Path ([IO.Path]::GetTempPath()) 'filemanager-inno-setup-6.7.3'
-    }
-    else {
-        Join-Path $env:RUNNER_TEMP 'filemanager-inno-setup-6.7.3'
-    }
-    $iscc = & (Join-Path $repositoryRoot 'tools\install-pinned-inno-setup.ps1') -InstallDirectory $innoInstallRoot
-    if (-not (Test-Path -LiteralPath $iscc -PathType Leaf)) {
-        throw 'Pinned Inno Setup provisioning did not produce ISCC.exe.'
-    }
-
     # Use the same Windows PowerShell staging command and required-file gate as the Actions job.
     & powershell.exe -File (Join-Path $repositoryRoot 'tools\prepare_installer.ps1') -BuildDir $releaseBuildRoot -StagingDir $installerStagingRoot -BuildNumber $BuildNumber
     if ($LASTEXITCODE -ne 0) {
@@ -89,7 +85,7 @@ try {
     # Match the pipeline's native PowerShell argument form; Inno resolves this leaf beside setup.iss.
     $sourcePath = Split-Path -Leaf $installerStagingRoot
     # Compile the same setup script with the same source and build-number definitions used by Actions.
-    & $iscc ('/DSourcePath=' + $sourcePath) ('/DBuildNumber=' + $BuildNumber) (Join-Path $repositoryRoot 'Installer\setup.iss')
+    & $innoCompiler ('/DSourcePath=' + $sourcePath) ('/DBuildNumber=' + $BuildNumber) (Join-Path $repositoryRoot 'Installer\setup.iss')
     if ($LASTEXITCODE -ne 0) {
         throw "Building the installer failed with exit code $LASTEXITCODE."
     }

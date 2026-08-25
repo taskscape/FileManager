@@ -14,16 +14,18 @@ Visual Studio 2026 and its developer-command environment are the authoritative n
 
 ### Complete release-pipeline build
 
-The release-parity runner is the authoritative local equivalent of the GitHub Actions release gate and installer-build jobs:
+The release-parity runner is the authoritative local equivalent of the GitHub Actions release gate and installer-build jobs. Running it without arguments selects this mode automatically:
 
 ```powershell
-.\scripts\runtests.ps1 -ReleasePipeline -BaseCommit HEAD^ -BuildNumber 0
+.\scripts\runtests.ps1
 ```
+
+The defaults are `-BaseCommit HEAD^`, `-PlatformToolset v145`, `-BuildNumber 0`, the release NUnit filter, and an automatically generated TRX path. Use `-NoReleasePipeline` when you intentionally want only the ordinary test inventory.
 
 First inspect the blocking environment without mutating disks, build outputs, or installed tools:
 
 ```powershell
-.\scripts\runtests.ps1 -ReleasePipeline -PrerequisiteOnly -BaseCommit HEAD^
+.\scripts\runtests.ps1 -PrerequisiteOnly
 ```
 
 The parity command requires an interactive Windows desktop, a clean checkout with complete Git history, VS 2026 v145 C++ tools, Windows PowerShell, and PowerShell 7. It probes the host's fixed `D:\` drive; when that drive is absent or not writable, all second-volume-dependent UI tests are reported as successful capability skips. It performs the workflow's staged Debug build and strict artifact resolution, then runs the aggregate test gate. Only after that gate passes does it perform the separate Release build, PE audit, symbol validation, pinned Inno Setup installation, staging, and installer compilation. It does not publish a GitHub release.
@@ -38,7 +40,7 @@ Run every automated test whose prerequisites are available on the current machin
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass `
-  -File .\scripts\runtests.ps1
+  -File .\scripts\runtests.ps1 -NoReleasePipeline
 ```
 
 `scripts/runtests.ps1` collects all PowerShell/native probes, both x64 and x86 compatibility variants, the built 7-Zip wrapper/oracle corpus gate, the complete NUnit project, and the optional Application Verifier lane. It runs every collected check even after a failure and prints passed, failed, and explicitly skipped checks. The 7-Zip gate requires a `7z.exe`-compatible independent oracle; strict release runs fail if it is unavailable. The runner creates only the guarded `filemanager-testdata` directory and the suffixed current-user configuration key before executing the complete UI project.
@@ -55,7 +57,7 @@ Run the complete local equivalent of the GitHub release gate and installer-build
 .\scripts\runtests.ps1 -ReleasePipeline -BaseCommit HEAD^ -BuildNumber 0
 ```
 
-`-ReleasePipeline` applies the release category filter and unexpected-skip policy, omits the nightly Application Verifier diagnostic, then builds `Release|x64`, audits Release PE hardening, re-runs the native regression subset, verifies the private symbol index, validates/installs the pinned Inno Setup compiler, stages the installer, and compiles it. It deliberately does not publish a GitHub release. Pass `-KeepBuildArtifacts` to retain the isolated Debug and Release build trees after diagnosis.
+`-ReleasePipeline` applies the release category filter and unexpected-skip policy, omits the nightly Application Verifier diagnostic, then preflights the cached, SHA-256- and Authenticode-verified Inno Setup compiler before building `Release|x64`. It audits Release PE hardening, re-runs the native regression subset, verifies the private symbol index, stages the installer, and compiles it. Provisioning logs are retained below the runner temporary directory for diagnosis. It deliberately does not publish a GitHub release. Pass `-KeepBuildArtifacts` to retain the isolated Debug and Release build trees after diagnosis.
 
 Unlike the ordinary runner, release-pipeline mode refuses ambient UI roots and a dirty checkout: it must exercise the same fresh-volume topology and committed source snapshot used by Actions. Its generated `TestResults\runtests-release-gate-*\runtests-v145.trx` is the local counterpart of the uploaded GitHub test artifact.
 

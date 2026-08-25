@@ -62,7 +62,7 @@ jobs:
       - name: Run manifest-backed quarantined UI tests
         shell: pwsh
         # Filtering is the only exclusion mechanism; this preserves failure on any unexpected skipped test.
-        run: .\scripts\runtests.ps1 -BaseCommit HEAD^ -SqliteDll $env:SQLITE_TEST_DLL -FailOnSkipped -NUnitFilter 'TestCategory=Quarantined' -PlatformToolset v145 -NUnitTrxPath $env:RUNNER_TEMP\quarantined-ui-tests.trx
+        run: .\scripts\runtests.ps1 -NoReleasePipeline -BaseCommit HEAD^ -SqliteDll $env:SQLITE_TEST_DLL -FailOnSkipped -NUnitFilter 'TestCategory=Quarantined' -PlatformToolset v145 -NUnitTrxPath $env:RUNNER_TEMP\quarantined-ui-tests.trx
 
       - name: Upload quarantined UI results
         if: always()

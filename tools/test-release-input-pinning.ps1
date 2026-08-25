@@ -72,6 +72,10 @@ foreach ($requiredPattern in @(
     'Get-FileHash',
     'Get-AuthenticodeSignature',
     '/DIR=',
+    '/LOG=',
+    '/NOCANCEL',
+    'RUNNER_TOOL_CACHE',
+    'downloaded = \$false',
     'runner service account cannot write Program Files',
     'ISCC\.exe publishes a 0\.0\.0\.0 PE version'
 )) {
@@ -83,6 +87,16 @@ foreach ($requiredPattern in @(
 
 if ($releaseInstaller -notmatch 'install-pinned-inno-setup\.ps1') {
     throw 'The shared release installer helper must invoke the pinned Inno Setup provisioner.'
+}
+$preflightPosition = $releaseInstaller.IndexOf('$innoCompiler = & $innoProvisioner', [StringComparison]::Ordinal)
+$releaseBuildPosition = $releaseInstaller.IndexOf('& msbuild', [StringComparison]::Ordinal)
+if ($preflightPosition -lt 0 -or $releaseBuildPosition -lt 0 -or $preflightPosition -gt $releaseBuildPosition) {
+    throw 'The Build Installer helper must preflight Inno Setup before the Release build.'
+}
+
+if ($releaseWorkflow -notmatch 'Preflight pinned Inno Setup' -or
+    $releaseWorkflow -notmatch 'inno-setup-provisioning-logs-') {
+    throw 'The Build Installer workflow must preflight Inno Setup and preserve its provisioning logs.'
 }
 
 foreach ($scriptPath in @(
@@ -100,6 +114,9 @@ foreach ($scriptPath in @(
 $rootRunner = Get-Content -LiteralPath (Join-Path $repositoryRoot 'scripts\runtests.ps1') -Raw
 if ($rootRunner -notmatch 'test-release-input-pinning\.ps1') {
     throw 'The aggregate test runner must execute the release-input pinning contract.'
+}
+if ($rootRunner -notmatch 'No release mode was specified' -or $rootRunner -notmatch 'NoReleasePipeline') {
+    throw 'The local aggregate runner must default to release-pipeline mode while retaining an explicit CI opt-out.'
 }
 
 Write-Host "Release input pinning passed for Inno Setup $($inno.version) and $($workflowPaths.Count) workflows."

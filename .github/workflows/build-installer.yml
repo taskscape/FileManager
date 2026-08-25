@@ -98,7 +98,7 @@ jobs:
       - name: Run release tests without unexpected skips
         shell: pwsh
         # Exclude manifest quarantines and the credentialed external FTPS smoke test; Application Verifier remains an instrumented nightly diagnostic lane.
-        run: .\scripts\runtests.ps1 -BaseCommit $env:RELEASE_BASE_COMMIT -SqliteDll $env:SQLITE_TEST_DLL -FailOnSkipped -SkipLockVerifier -NUnitFilter 'TestCategory!=Quarantined&TestCategory!=LiveFtp' -PlatformToolset v145 -NUnitTrxPath $env:RUNNER_TEMP\runtests-v145.trx
+        run: .\scripts\runtests.ps1 -NoReleasePipeline -BaseCommit $env:RELEASE_BASE_COMMIT -SqliteDll $env:SQLITE_TEST_DLL -FailOnSkipped -SkipLockVerifier -NUnitFilter 'TestCategory!=Quarantined&TestCategory!=LiveFtp' -PlatformToolset v145 -NUnitTrxPath $env:RUNNER_TEMP\runtests-v145.trx
 
       - name: Upload v145 complete UI results
         if: always()
@@ -142,10 +142,29 @@ jobs:
         shell: pwsh
         run: .\tools\setup-vs2026-buildtools.ps1
 
+      - name: Preflight pinned Inno Setup
+        shell: pwsh
+        # Provision the external compiler before spending time on the Release build.
+        run: |
+          $iscc = & .\tools\install-pinned-inno-setup.ps1
+          if (-not (Test-Path -LiteralPath $iscc -PathType Leaf)) {
+            throw 'Pinned Inno Setup preflight did not produce ISCC.exe.'
+          }
+          Write-Host "Pinned Inno Setup preflight passed: $iscc" -ForegroundColor Green
+
       # Keep the separate installer job visible while sharing its exact implementation with local -ReleasePipeline runs.
       - name: Run Build Installer pass (Release | x64)
         shell: pwsh
         run: .\tools\build-release-installer.ps1 -BuildDirectory $env:OPENSAL_BUILD_DIR -InstallerStagingDirectory $env:INSTALLER_STAGING_DIR -BuildNumber '${{ github.run_number }}' -PlatformToolset $env:PLATFORM_TOOLSET
+
+      - name: Upload Inno Setup provisioning logs
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          # Preserve installer diagnostics even when the preflight or Build Installer pass fails.
+          name: inno-setup-provisioning-logs-${{ github.sha }}
+          path: ${{ runner.temp }}\FileManager\InnoSetup\logs\**
+          if-no-files-found: warn
 
       - name: Preserve verified installer for the publish job
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
