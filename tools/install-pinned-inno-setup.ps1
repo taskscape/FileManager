@@ -1,6 +1,9 @@
 [CmdletBinding()]
 param(
-    [string]$InstallDirectory
+    [string]$InstallDirectory,
+    # A blocked UAC or desktop prompt must not consume an entire workflow job.
+    [ValidateRange(30, 600)]
+    [int]$InstallTimeoutSeconds = 120
 )
 
 Set-StrictMode -Version Latest
@@ -33,6 +36,20 @@ else {
     Join-Path ([IO.Path]::GetTempPath()) 'FileManager\InnoSetup'
 }
 $logDirectory = Join-Path $logRoot 'logs'
+$diagnosticLogPath = Join-Path $logDirectory ('preflight-' + $innoInput.version + '-' + [DateTime]::UtcNow.ToString('yyyyMMddTHHmmssfffZ') + '-' + [Guid]::NewGuid().ToString('N') + '.log')
+New-Item -ItemType Directory -Path $logDirectory -Force | Out-Null
+
+function Add-DiagnosticLogEntry {
+    param([Parameter(Mandatory = $true)][string]$Message)
+
+    Add-Content -LiteralPath $diagnosticLogPath -Value ('[{0}] {1}' -f [DateTime]::UtcNow.ToString('o'), $Message) -Encoding utf8
+}
+
+Add-DiagnosticLogEntry "Pinned Inno Setup preflight started for version $($innoInput.version)."
+Add-DiagnosticLogEntry "Install root: $installRoot"
+Add-DiagnosticLogEntry "Compiler path: $compiler"
+Add-DiagnosticLogEntry "Runner identity: $([Security.Principal.WindowsIdentity]::GetCurrent().Name)"
+Add-DiagnosticLogEntry "PowerShell: $($PSVersionTable.PSVersion)"
 
 function Test-VerifiedCompiler {
     if (-not (Test-Path -LiteralPath $compiler -PathType Leaf) -or
@@ -53,15 +70,17 @@ function Test-VerifiedCompiler {
 
 if (Test-VerifiedCompiler) {
     # ISCC.exe publishes a 0.0.0.0 PE version, so the versioned cache key and verification marker are the authoritative compiler identity.
+    Add-DiagnosticLogEntry 'Verified compiler cache hit; no installer execution was required.'
     Write-Host "Using verified cached Inno Setup compiler: $compiler" -ForegroundColor Green
     Write-Output $compiler
     return
 }
 
 New-Item -ItemType Directory -Path $installRoot -Force | Out-Null
-New-Item -ItemType Directory -Path $logDirectory -Force | Out-Null
 $installer = Join-Path ([IO.Path]::GetTempPath()) ('filemanager-innosetup-' + $innoInput.version + '-' + [Guid]::NewGuid().ToString('N') + '.exe')
 $logPath = Join-Path $logDirectory ('install-' + $innoInput.version + '-' + [DateTime]::UtcNow.ToString('yyyyMMddTHHmmssfffZ') + '-' + [Guid]::NewGuid().ToString('N') + '.log')
+Add-DiagnosticLogEntry "Installer payload path: $installer"
+Add-DiagnosticLogEntry "Inno Setup log path: $logPath"
 
 try {
     # Retry only the network transfer; an installer exit code is deterministic input for diagnosis and must not be hidden by blind retries.
@@ -69,6 +88,7 @@ try {
     for ($attempt = 1; $attempt -le 3 -and -not $downloaded; $attempt++) {
         try {
             Write-Host "Downloading pinned Inno Setup payload (attempt $attempt of 3)..."
+            Add-DiagnosticLogEntry "Downloading pinned payload, attempt $attempt of 3."
             Invoke-WebRequest -Uri $innoInput.url -OutFile $installer -ErrorAction Stop
             $downloaded = $true
         }
@@ -76,6 +96,7 @@ try {
             if ($attempt -eq 3) {
                 throw "Downloading pinned Inno Setup failed after 3 attempts: $($_.Exception.Message)"
             }
+            Add-DiagnosticLogEntry "Download attempt $attempt failed: $($_.Exception.Message)"
             Start-Sleep -Seconds ([int]([math]::Pow(2, $attempt - 1)))
         }
     }
@@ -90,8 +111,10 @@ try {
         throw "Pinned Inno Setup Authenticode verification failed: $($signature.Status) $($signature.SignerCertificate.Subject)"
     }
 
-    # A runner service account cannot write Program Files; install the verified compiler into this job-owned cache directory instead.
+    # A runner service account cannot write Program Files; portable current-user mode avoids UAC and desktop-session prompts.
     $arguments = @(
+        '/PORTABLE=1',
+        '/CURRENTUSER',
         '/VERYSILENT',
         '/SUPPRESSMSGBOXES',
         '/NORESTART',
@@ -101,22 +124,47 @@ try {
         ('/DIR="' + $installRoot + '"'),
         ('/LOG="' + $logPath + '"')
     )
+    Add-DiagnosticLogEntry "Starting portable current-user installer with a $InstallTimeoutSeconds second timeout."
     Write-Host "Installing pinned Inno Setup into $installRoot..."
-    $installProcess = Start-Process -FilePath $installer -ArgumentList $arguments -Wait -PassThru -WindowStyle Hidden
+    # Start asynchronously so the explicit timeout can terminate a blocked installer instead of waiting indefinitely.
+    $installProcess = Start-Process -FilePath $installer -ArgumentList $arguments -PassThru -WindowStyle Hidden
+    if (-not $installProcess.WaitForExit($InstallTimeoutSeconds * 1000)) {
+        Add-DiagnosticLogEntry "Installer exceeded the $InstallTimeoutSeconds second timeout; terminating it."
+        try {
+            $installProcess.Kill()
+            $installProcess.WaitForExit()
+        }
+        catch {
+            Add-DiagnosticLogEntry "Unable to terminate timed-out installer: $($_.Exception.Message)"
+        }
+        throw "Inno Setup installation timed out after $InstallTimeoutSeconds seconds. Installer log: $logPath. Diagnostic log: $diagnosticLogPath"
+    }
+    Add-DiagnosticLogEntry "Installer exited with code $($installProcess.ExitCode)."
     if ($installProcess.ExitCode -ne 0) {
         # Inno exit code 2 commonly means cancellation; retain its log so CI can distinguish prompts from runner interference.
-        throw "Inno Setup installation failed with exit code $($installProcess.ExitCode). Installer log: $logPath"
+        throw "Inno Setup installation failed with exit code $($installProcess.ExitCode). Installer log: $logPath. Diagnostic log: $diagnosticLogPath"
     }
+}
+catch {
+    Add-DiagnosticLogEntry "Preflight failed: $($_.Exception.Message)"
+    Add-DiagnosticLogEntry "Inno log exists: $(Test-Path -LiteralPath $logPath -PathType Leaf)"
+    throw
 }
 finally {
     if (Test-Path -LiteralPath $installer -PathType Leaf) {
         # The verified payload is temporary input, not a release artifact; retain the diagnostic log instead.
-        Remove-Item -LiteralPath $installer -Force
+        try {
+            Remove-Item -LiteralPath $installer -Force
+        }
+        catch {
+            Add-DiagnosticLogEntry "Unable to remove temporary installer payload: $($_.Exception.Message)"
+        }
     }
 }
 
 if (-not (Test-Path -LiteralPath $compiler -PathType Leaf)) {
-    throw "Pinned Inno Setup did not install the locked compiler at $compiler. Installer log: $logPath"
+    Add-DiagnosticLogEntry "Compiler was not found after a successful installer exit."
+    throw "Pinned Inno Setup did not install the locked compiler at $compiler. Installer log: $logPath. Diagnostic log: $diagnosticLogPath"
 }
 
 $verificationRecord = [ordered]@{
@@ -129,5 +177,6 @@ $verificationRecord = [ordered]@{
 }
 # Persist the verification identity beside ISCC.exe so later jobs can reuse only this exact pinned tool.
 $verificationRecord | ConvertTo-Json | Set-Content -LiteralPath $verificationMarker -Encoding utf8
+Add-DiagnosticLogEntry 'Pinned compiler installed and verification marker written.'
 Write-Host "Pinned Inno Setup compiler verified: $compiler" -ForegroundColor Green
 Write-Output $compiler

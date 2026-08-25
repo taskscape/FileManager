@@ -78,7 +78,7 @@ Open Salamander uses [Inno Setup](https://jrsoftware.org/isinfo.php) to create t
 .\scripts\runtests.ps1
 ```
 
-With no arguments, the runner assumes `HEAD^`, build number `0`, toolset `v145`, the release test filter, and a generated TRX path. It executes the complete Debug release gate, preflights the cached and verified pinned Inno Setup compiler, builds Release x64, audits PE hardening, verifies private symbols, stages files, and compiles the installer. It does not publish a GitHub release.
+With no arguments, the runner assumes `HEAD^`, build number `0`, toolset `v145`, the release test filter, and a generated TRX path. It executes the complete Debug release gate, preflights the cached and verified pinned Inno Setup compiler in portable current-user mode, builds Release x64, audits PE hardening, verifies private symbols, stages files, and compiles the installer. It does not publish a GitHub release.
 
 `scripts\build-installer.ps1` remains useful for packaging-only iteration, but it does not replace release-pipeline validation.
 
