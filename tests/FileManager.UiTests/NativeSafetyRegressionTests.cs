@@ -19,6 +19,7 @@ public sealed class NativeSafetyRegressionTests
         var runner = File.ReadAllText(Path.Combine(root, "scripts", "runtests.ps1"));
         var releaseWorkflow = File.ReadAllText(Path.Combine(root, ".github", "workflows", "build-installer.yml"));
         var releaseInstaller = File.ReadAllText(Path.Combine(root, "tools", "build-release-installer.ps1"));
+        var installerStager = File.ReadAllText(Path.Combine(root, "tools", "prepare_installer.ps1"));
         var quarantineVerifier = File.ReadAllText(Path.Combine(root, "tools", "verify-ui-test-quarantine.ps1"));
         var quarantineWorkflow = File.ReadAllText(Path.Combine(root, ".github", "workflows", "quarantined-ui-tests.yml"));
         var liveFtpRunner = File.ReadAllText(Path.Combine(root, "scripts", "run-ftp-test.ps1"));
@@ -47,8 +48,13 @@ public sealed class NativeSafetyRegressionTests
             Assert.That(runner, Does.Contain("verify-fluent-icon-coverage.ps1"));
             Assert.That(runner, Does.Contain("Deterministic FTP/FTPS/HTTP fixture tests"));
             Assert.That(runner, Does.Contain("DeterministicNetworkFixtureTests"));
-            Assert.That(runner, Does.Contain("Resolve-FtpMenuCommand"));
-            Assert.That(runner, Does.Contain("Connect to FTP Server..."));
+            // Dynamic plug-in SUIDs must never be transferred from a probe process to the instance a UI fixture controls.
+            Assert.That(uiTestBase, Does.Contain("WaitForFtpPluginCommand"));
+            Assert.That(uiTestBase, Does.Contain("Application.ProcessId"));
+            Assert.That(uiTestBase, Does.Contain("PluginCommandMapPath"));
+            // A partial test artifact starts FileManager behind a native reporter modal, so keep both the runner staging and fixture preflight contract.
+            Assert.That(runner, Does.Contain("Stage-UiTestCrashReporter"));
+            Assert.That(uiTestBase, Does.Contain("EnsureCrashReporterIsStaged"));
             Assert.That(runner, Does.Contain("FileManager.UiTests (complete NUnit project)"));
             Assert.That(runner, Does.Contain("run-lock-verifier-stress.ps1"));
             // The opt-in local release mode must cover the packaging job as well as the Debug release gate.
@@ -74,13 +80,22 @@ public sealed class NativeSafetyRegressionTests
             Assert.That(releaseInstaller, Does.Contain("new-symbol-index.ps1"));
             Assert.That(releaseInstaller, Does.Contain("prepare_installer.ps1"));
             Assert.That(releaseInstaller, Does.Contain("setup.iss"));
+            // Packaging must contain the current Release payload, not a stale matching binary recovered from the source tree.
+            Assert.That(installerStager, Does.Contain("salamander\\Release_x64"));
+            Assert.That(installerStager, Does.Not.Contain("\"src\""));
+            Assert.That(installerStager, Does.Contain("7zwrapper.dll"));
+            Assert.That(runner, Does.Contain("Installer_Staging-runtests-"));
+            Assert.That(releaseWorkflow, Does.Contain("Installer_Staging-${{ github.run_id }}"));
+            Assert.That(releaseInstaller, Does.Contain("prepare-installer.log"));
+            Assert.That(runner, Does.Contain("Retaining failed Release installer build directory"));
             Assert.That(runner, Does.Contain("FailOnSkipped"));
             Assert.That(runner, Does.Contain("@outcome='NotExecuted'"));
-            // Local capability gates are explicit skips; strict release mode still rejects unrecognized NUnit Ignore results.
+            // Optional fixture capabilities may skip individual cases, but lacking the mandatory symlink capability blocks the whole UI lane.
             Assert.That(runner, Does.Contain("$optionalUiIgnoreMessagePrefixes"));
             Assert.That(runner, Does.Contain("SeCreateSymbolicLinkPrivilege"));
-            Assert.That(runner, Does.Contain("all UI tests were skipped"));
-            Assert.That(runner, Does.Contain("-NonBlockingSkip:$uiTestEnvironmentSkipIsNonBlocking"));
+            Assert.That(runner, Does.Contain("The complete UI test suite cannot start"));
+            Assert.That(runner, Does.Contain("$uiTestEnvironmentFailure = $_.Exception.Message"));
+            Assert.That(runner, Does.Contain("$uiPreflightFailureAction"));
             Assert.That(runner, Does.Contain("capability-gated NUnit tests were skipped despite -FailOnSkipped"));
             // Only manifest-backed categories may leave the blocking inventory; unrecognized NUnit Ignore remains a hard failure.
             Assert.That(runner, Does.Contain("verify-ui-test-quarantine.ps1"));
@@ -109,13 +124,19 @@ public sealed class NativeSafetyRegressionTests
             Assert.That(liveFtpTest, Does.Contain("stream.Length == expectedSize"));
             // The runner must select explicit data and registry boundaries before driving the current user's desktop.
             Assert.That(runner, Does.Contain("FILEMANAGER_UI_TESTDATA_ROOT"));
-            Assert.That(runner, Does.Contain("$uiTestEnvironmentSkipReason = $_.Exception.Message"));
             // A disappearing prompt provider is transport noise, not evidence that the native operation omitted its prompt.
             Assert.That(uiTestBase, Does.Contain("ElementNotAvailableException || ex is COMException || ex is TimeoutException"));
             // The release workflow must consume the root inventory rather than
             // maintaining a second list that can silently lose coverage.
             Assert.That(releaseWorkflow, Does.Contain("name: Complete automated release gate"));
-            Assert.That(releaseWorkflow, Does.Contain(".\\scripts\\runtests.ps1 -BaseCommit $env:RELEASE_BASE_COMMIT -SqliteDll $env:SQLITE_TEST_DLL -FailOnSkipped -SkipLockVerifier -NUnitFilter 'TestCategory!=Quarantined&TestCategory!=LiveFtp'"));
+            // Validate the workflow command semantically so adding an explicit mode switch cannot invalidate an otherwise compatible release gate.
+            Assert.That(releaseWorkflow, Does.Contain(".\\scripts\\runtests.ps1"));
+            Assert.That(releaseWorkflow, Does.Contain("-NoReleasePipeline"));
+            Assert.That(releaseWorkflow, Does.Contain("-BaseCommit $env:RELEASE_BASE_COMMIT"));
+            Assert.That(releaseWorkflow, Does.Contain("-SqliteDll $env:SQLITE_TEST_DLL"));
+            Assert.That(releaseWorkflow, Does.Contain("-FailOnSkipped"));
+            Assert.That(releaseWorkflow, Does.Contain("-SkipLockVerifier"));
+            Assert.That(releaseWorkflow, Does.Contain("-NUnitFilter 'TestCategory!=Quarantined&TestCategory!=LiveFtp'"));
             Assert.That(releaseWorkflow, Does.Contain("needs: release-tests"));
             Assert.That(releaseWorkflow, Does.Contain("fetch-depth: 0"));
             Assert.That(releaseWorkflow, Does.Contain("FILEMANAGER_UI_CONFIG_FAULT_INJECTION: '1'"));

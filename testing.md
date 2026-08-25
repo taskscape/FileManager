@@ -28,7 +28,7 @@ First inspect the blocking environment without mutating disks, build outputs, or
 .\scripts\runtests.ps1 -PrerequisiteOnly
 ```
 
-The parity command requires an interactive Windows desktop, a clean checkout with complete Git history, VS 2026 v145 C++ tools, Windows PowerShell, and PowerShell 7. It probes the host's fixed `D:\` drive; when that drive is absent or not writable, all second-volume-dependent UI tests are reported as successful capability skips. It performs the workflow's staged Debug build and strict artifact resolution, then runs the aggregate test gate. Only after that gate passes does it perform the separate Release build, PE audit, symbol validation, pinned Inno Setup installation, staging, and installer compilation. It does not publish a GitHub release.
+The parity command requires an interactive Windows desktop with complete Git history, VS 2026 v145 C++ tools, Windows PowerShell, and PowerShell 7. It probes the host's fixed `D:\` drive; when that drive is absent or not writable, all second-volume-dependent UI tests are reported as successful capability skips. It performs the workflow's staged Debug build and strict artifact resolution, then runs the aggregate test gate. Only after that gate passes does it perform the separate Release build, PE audit, symbol validation, pinned Inno Setup installation, staging, and installer compilation. It does not publish a GitHub release.
 
 `scripts\build-installer.ps1` remains available for packaging-only iteration, but it is not a replacement for release-pipeline validation.
 
@@ -59,7 +59,7 @@ Run the complete local equivalent of the GitHub release gate and installer-build
 
 `-ReleasePipeline` applies the release category filter and unexpected-skip policy, omits the nightly Application Verifier diagnostic, then preflights the cached, SHA-256- and Authenticode-verified Inno Setup compiler in portable current-user mode before building `Release|x64`. The preflight has a bounded installer timeout and retains a wrapper diagnostic log even when Inno Setup cannot create its own log. It audits Release PE hardening, re-runs the native regression subset, verifies the private symbol index, stages the installer, and compiles it. Provisioning logs are retained below the runner temporary directory for diagnosis. It deliberately does not publish a GitHub release. Pass `-KeepBuildArtifacts` to retain the isolated Debug and Release build trees after diagnosis.
 
-Unlike the ordinary runner, release-pipeline mode refuses ambient UI roots and a dirty checkout: it must exercise the same fresh-volume topology and committed source snapshot used by Actions. Its generated `TestResults\runtests-release-gate-*\runtests-v145.trx` is the local counterpart of the uploaded GitHub test artifact.
+Unlike the ordinary runner, release-pipeline mode refuses ambient UI roots and uses the same fresh-volume topology as Actions. It tests uncommitted local changes so developers can validate the exact snapshot they intend to push; GitHub then exercises that snapshot once committed. Its generated `TestResults\runtests-release-gate-*\runtests-v145.trx` is the local counterpart of the uploaded GitHub test artifact.
 
 The runner uses the CI pull-request base for changed-line ratchets or accepts `-BaseCommit` explicitly; it does not guess from a potentially stale local tracking branch. It discovers an existing Debug or Release x64 SQLite DLL when possible. Supply prerequisites explicitly or require a fully provisioned run with:
 

@@ -100,8 +100,10 @@ if ($preflightPosition -lt 0 -or $releaseBuildPosition -lt 0 -or $preflightPosit
 }
 
 if ($releaseWorkflow -notmatch 'Preflight pinned Inno Setup' -or
+    $releaseWorkflow -notmatch 'Validate release workflow contracts' -or
+    $releaseWorkflow -notmatch 'NativeSafetyRegressionTests\.Root_test_runner_collects_every_documented_automated_test_layer' -or
     $releaseWorkflow -notmatch 'inno-setup-provisioning-logs-') {
-    throw 'The Build Installer workflow must preflight Inno Setup and preserve its provisioning logs.'
+    throw 'The Build Installer workflow must preflight Inno Setup, validate release contracts before compiling, and preserve provisioning logs.'
 }
 
 foreach ($scriptPath in @(
@@ -122,6 +124,10 @@ if ($rootRunner -notmatch 'test-release-input-pinning\.ps1') {
 }
 if ($rootRunner -notmatch 'No release mode was specified' -or $rootRunner -notmatch 'NoReleasePipeline') {
     throw 'The local aggregate runner must default to release-pipeline mode while retaining an explicit CI opt-out.'
+}
+if ($rootRunner -notmatch 'Testing uncommitted local changes' -or $rootRunner -match 'Use a clean checkout at the selected commit') {
+    # Developers must be able to validate the uncommitted snapshot they will push; only GitHub itself requires a committed checkout.
+    throw 'The local release runner must accept uncommitted changes and report the GitHub comparison boundary as a note.'
 }
 
 Write-Host "Release input pinning passed for Inno Setup $($inno.version) and $($workflowPaths.Count) workflows."

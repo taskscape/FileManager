@@ -225,15 +225,17 @@ public abstract class FileManagerUiTestBase
 
     protected Window OpenFtpBookmarksDialog()
     {
-        // The host allocates FTP menu IDs dynamically, so the test profile provides the runtime command used to open this dialog.
-        NativeCommands.Execute(MainWindow.Properties.NativeWindowHandle.Value, UiTestSettings.RequireFtpOrganizeCommand());
+        // FTP IDs are process-local, so wait for the instance under test rather than reusing a predecessor's SUID.
+        NativeCommands.Execute(MainWindow.Properties.NativeWindowHandle.Value,
+                               WaitForFtpPluginCommand(pluginCommand: 7, "Organize Bookmarks"));
         return WaitForWindow(window => window.Properties.NativeWindowHandle.Value != MainWindow.Properties.NativeWindowHandle.Value);
     }
 
     protected Window OpenFtpConnectDialog()
     {
-        // Use the real quick-connect entry point so protocol fixtures exercise the plug-in's connection state machine.
-        NativeCommands.Execute(MainWindow.Properties.NativeWindowHandle.Value, UiTestSettings.RequireFtpConnectCommand());
+        // The quick-connect SUID must come from this launch for the protocol fixture to drive the real plug-in command.
+        NativeCommands.Execute(MainWindow.Properties.NativeWindowHandle.Value,
+                               WaitForFtpPluginCommand(pluginCommand: 1, "Connect to FTP Server"));
         return WaitForWindow(window => window.Properties.NativeWindowHandle.Value != MainWindow.Properties.NativeWindowHandle.Value);
     }
 
@@ -311,9 +313,16 @@ public abstract class FileManagerUiTestBase
     private void StartApplication(IReadOnlyDictionary<string, string>? environment = null)
     {
         var reportersBeforeLaunch = GetTestCrashReporterIds();
+        ResetPluginCommandMap();
+        var executableDirectory = Path.GetDirectoryName(UiTestSettings.ExecutablePath);
+        if (string.IsNullOrWhiteSpace(executableDirectory))
+            throw new InvalidOperationException("The FileManager executable must have a containing directory.");
+        EnsureCrashReporterIsStaged(executableDirectory);
         var startInfo = new ProcessStartInfo(UiTestSettings.ExecutablePath, ApplicationArguments)
         {
             UseShellExecute = false,
+            // Plug-ins sit beside the staged executable; the test-host directory does not contain their relative layout.
+            WorkingDirectory = executableDirectory,
         };
         // Every child process receives the same data and configuration boundaries as the test host.
         startInfo.Environment["FILEMANAGER_UI_TESTDATA_ROOT"] = UiTestSettings.TestDataRoot;
@@ -331,6 +340,56 @@ public abstract class FileManagerUiTestBase
         MainWindow = WaitForNativeMainWindow();
         // A Debug FileManager starts salmon.exe beside itself; track only new sibling reporters for fixture teardown.
         launchedCrashReporterIds.UnionWith(GetTestCrashReporterIds().Except(reportersBeforeLaunch));
+    }
+
+    private static void ResetPluginCommandMap()
+    {
+        // Deleting this harness-owned map before launch prevents a stopped instance from satisfying the next instance's readiness check.
+        File.Delete(UiTestSettings.PluginCommandMapPath);
+    }
+
+    private static void EnsureCrashReporterIsStaged(string executableDirectory)
+    {
+        var crashReporterPath = Path.Combine(executableDirectory, "salmon.exe");
+        // Fail before launch when the sibling reporter is absent, because FileManager otherwise blocks the test session with a native modal error.
+        Assert.That(File.Exists(crashReporterPath), Is.True,
+            $"FileManager UI tests require salmon.exe beside salamand.exe. Run scripts\\runtests.ps1 to stage the complete Debug x64 test artifact. Missing: {crashReporterPath}");
+    }
+
+    private int WaitForFtpPluginCommand(int pluginCommand, string commandName)
+    {
+        var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(20);
+        var lastObservedRecords = Array.Empty<string>();
+        while (DateTime.UtcNow < deadline)
+        {
+            try
+            {
+                lastObservedRecords = File.ReadLines(UiTestSettings.PluginCommandMapPath).TakeLast(12).ToArray();
+                foreach (var line in lastObservedRecords)
+                {
+                    var fields = line.Split('|');
+                    if (fields.Length == 4 &&
+                        int.TryParse(fields[0], out var processId) && processId == Application.ProcessId &&
+                        string.Equals(Path.GetFileName(fields[1]), "ftp.spl", StringComparison.OrdinalIgnoreCase) &&
+                        int.TryParse(fields[2], out var loggedPluginCommand) && loggedPluginCommand == pluginCommand &&
+                        int.TryParse(fields[3], out var salamanderCommand) && salamanderCommand > 0)
+                    {
+                        return salamanderCommand;
+                    }
+                }
+            }
+            catch (IOException)
+            {
+                // The native process appends the map while it loads plug-ins; retry its shared file on the next short poll.
+            }
+
+            Thread.Sleep(100);
+        }
+
+        // Include the bounded transcript so a future plug-in protocol mismatch is actionable rather than a generic readiness timeout.
+        var records = lastObservedRecords.Length == 0 ? "<none>" : string.Join(", ", lastObservedRecords);
+        Assert.Fail($"FileManager process {Application.ProcessId} did not register the FTP {commandName} command before it was invoked. Observed records: {records}.");
+        return 0;
     }
 
     private static HashSet<int> GetTestCrashReporterIds()

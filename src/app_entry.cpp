@@ -2711,7 +2711,7 @@ FIND_NEW_SLG_FILE:
                             // their otherwise lazy owner-drawn-menu IDs only in its sandbox.
                             CMenuPopup* pluginsMenu =
                                 (CMenuPopup*)MainMenu.GetSubMenu(CML_PLUGINS, FALSE);
-                            Plugins.InitUiTestPluginMenuItems(MainWindow->HWindow, pluginsMenu, "ftp\\ftp.spl");
+                            Plugins.InitUiTestPluginMenuItems(MainWindow->HWindow, pluginsMenu, "ftp.spl");
                         }
 
                         // Save into a new generation below the newest version root.

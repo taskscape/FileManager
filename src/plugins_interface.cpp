@@ -949,21 +949,30 @@ void CPlugins::CalculateStateCache()
     //  }
 }
 
-void CPlugins::InitUiTestPluginMenuItems(HWND parent, CMenuPopup* root, const char* dllSuffix)
+void CPlugins::InitUiTestPluginMenuItems(HWND parent, CMenuPopup* root, const char* dllName)
 {
-    if (root == NULL || dllSuffix == NULL)
+    if (root == NULL || dllName == NULL)
         return;
 
     // Populate the real root first so the selected plug-in owns the same submenu
     // object and starts from the same command range as an interactive first open.
     InitMenuItems(parent, root);
-    int suffixLength = (int)strlen(dllSuffix);
+    // Plug-in registration may preserve a directory or only a filename; menu
+    // setup must select FTP consistently across both supported record layouts.
+    const char* requestedFileName = strrchr(dllName, '\\');
+    if (requestedFileName != NULL)
+        requestedFileName++;
+    else
+        requestedFileName = dllName;
     for (int i = 0; i < Data.Count; i++)
     {
         CPluginData* plugin = Data[i];
-        int dllNameLength = (int)strlen(plugin->DLLName);
-        if (dllNameLength >= suffixLength &&
-            StrNICmp(plugin->DLLName + dllNameLength - suffixLength, dllSuffix, suffixLength) == 0 &&
+        const char* pluginFileName = strrchr(plugin->DLLName, '\\');
+        if (pluginFileName != NULL)
+            pluginFileName++;
+        else
+            pluginFileName = plugin->DLLName;
+        if (StrICmp(pluginFileName, requestedFileName) == 0 &&
             plugin->SubMenu != NULL)
         {
             plugin->InitMenuItems(parent, i, plugin->SubMenu);

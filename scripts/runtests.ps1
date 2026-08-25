@@ -11,6 +11,9 @@ param(
     # The complete UI harness must match the repository-wide VS 2026 compiler contract.
     [ValidateSet('v145')]
     [string]$PlatformToolset = 'v145',
+    # Local VS linkers can fail while concurrent resource DLLs share base-address state; CI supplies its reviewed node count explicitly.
+    [ValidateRange(1, 16)]
+    [int]$MaxBuildNodes = 1,
     [string]$NUnitTrxPath,
     # Run the local equivalent of both release-test and installer-build jobs, excluding the GitHub-only publish job.
     [switch]$ReleasePipeline,
@@ -24,6 +27,22 @@ param(
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
+
+# A plain local invocation must provision the same deterministic UI capabilities as the release workflow.
+if ([string]::IsNullOrWhiteSpace($env:FILEMANAGER_UI_ISOLATED)) {
+    $env:FILEMANAGER_UI_ISOLATED = '1'
+}
+if ([string]::IsNullOrWhiteSpace($env:FILEMANAGER_UI_CONFIG_ROOT)) {
+    $env:FILEMANAGER_UI_CONFIG_ROOT = 'Software\Open Salamander\6.0-filemanager-testdata'
+}
+if ([string]::IsNullOrWhiteSpace($env:FILEMANAGER_UI_CONFIG_FAULT_INJECTION)) {
+    $env:FILEMANAGER_UI_CONFIG_FAULT_INJECTION = '1'
+}
+if ([string]::IsNullOrWhiteSpace($env:FILEMANAGER_UI_RECYCLE_BIN)) {
+    $env:FILEMANAGER_UI_RECYCLE_BIN = '1'
+}
+# The project files enable CL /MP, so keep compiler-child fan-out aligned with the bounded MSBuild node count.
+$env:CL_MPCount = [string]$MaxBuildNodes
 
 if ($ReleasePipeline -and $NoReleasePipeline) {
     throw '-ReleasePipeline and -NoReleasePipeline cannot be used together.'
@@ -43,7 +62,6 @@ $failures = [System.Collections.Generic.List[string]]::new()
 $passed = [System.Collections.Generic.List[string]]::new()
 $skipped = [System.Collections.Generic.List[string]]::new()
 $nonBlockingSkipped = [System.Collections.Generic.List[string]]::new()
-$nonBlockingEnvironmentSkipped = [System.Collections.Generic.List[string]]::new()
 # These assertions describe optional capabilities whose absence is an explicit, documented local skip.
 $optionalUiIgnoreMessagePrefixes = @(
     'Set FILEMANAGER_UI_CONFIG_FAULT_INJECTION=1 ',
@@ -79,8 +97,7 @@ function Invoke-AutomatedCheck {
         [string]$Name,
         [Parameter(Mandatory = $true)]
         [scriptblock]$Action,
-        [string]$SkipReason,
-        [switch]$NonBlockingSkip
+        [string]$SkipReason
     )
 
     Write-Host "`n=== Running $Name ===" -ForegroundColor Cyan
@@ -88,12 +105,7 @@ function Invoke-AutomatedCheck {
         # Optional lanes must remain visible in the aggregate report even when
         # this machine cannot safely satisfy their external prerequisites.
         $skipEntry = "${Name}: $SkipReason"
-        if ($NonBlockingSkip) {
-            $nonBlockingEnvironmentSkipped.Add($skipEntry)
-        }
-        else {
-            $skipped.Add($skipEntry)
-        }
+        $skipped.Add($skipEntry)
         Write-Host "SKIPPED: $SkipReason" -ForegroundColor Yellow
         return
     }
@@ -338,7 +350,7 @@ function Build-UiTestApplication {
     $bootstrapPath = Get-VisualStudioBootstrapPath
     # Use both target architectures so the x64 solution can assemble its x86 sfx7zip dependency without inheriting a large user PATH.
     $buildCommand = 'set "PATH=' + $bootstrapPath + '" && call "' + $DeveloperCommand + '" -arch=x86 -host_arch=x64 && msbuild "' + $nativeSolution +
-        '" /m /t:Build /p:Configuration=Debug /p:Platform=x64 /p:PlatformToolset=' + $Toolset + ' /p:PreferredToolArchitecture=x64 /p:OPENSAL_BUILD_DIR=' +
+        '" /m:' + $MaxBuildNodes + ' /t:Build /p:Configuration=Debug /p:Platform=x64 /p:PlatformToolset=' + $Toolset + ' /p:PreferredToolArchitecture=x64 /p:OPENSAL_BUILD_DIR=' +
         ($BuildDirectory.TrimEnd('\') + '\') + ' /nr:false'
     & $env:ComSpec /d /s /c $buildCommand
     if ($LASTEXITCODE -ne 0) {
@@ -365,7 +377,7 @@ function Invoke-NativeSafetyTests {
     $bootstrapPath = Get-VisualStudioBootstrapPath
     # Keep the safety build on the same bounded dual-architecture environment as the product build.
     $buildCommand = 'set "PATH=' + $bootstrapPath + '" && call "' + $DeveloperCommand + '" -arch=x86 -host_arch=x64 && msbuild "' + $nativeSafetyProject +
-        '" /m /t:Build /p:Configuration=Debug /p:Platform=x64 /p:PlatformToolset=' + $Toolset + ' /nr:false'
+        '" /m:' + $MaxBuildNodes + ' /t:Build /p:Configuration=Debug /p:Platform=x64 /p:PlatformToolset=' + $Toolset + ' /nr:false'
     & $env:ComSpec /d /s /c $buildCommand
     if ($LASTEXITCODE -ne 0) {
         throw "Building the native safety tests failed with exit code $LASTEXITCODE."
@@ -400,7 +412,7 @@ function Invoke-PictViewEngineTests {
     $bootstrapPath = Get-VisualStudioBootstrapPath
     # Keep the PictView build on the same bounded dual-architecture environment as the product build.
     $buildCommand = 'set "PATH=' + $bootstrapPath + '" && call "' + $DeveloperCommand + '" -arch=x86 -host_arch=x64 && msbuild "' + $pictViewEngineProject +
-        '" /m /t:Build /p:Configuration=Debug /p:Platform=x64 /p:PlatformToolset=' + $Toolset + ' /nr:false'
+        '" /m:' + $MaxBuildNodes + ' /t:Build /p:Configuration=Debug /p:Platform=x64 /p:PlatformToolset=' + $Toolset + ' /nr:false'
     & $env:ComSpec /d /s /c $buildCommand
     if ($LASTEXITCODE -ne 0) {
         throw "Building the PictView engine tests failed with exit code $LASTEXITCODE."
@@ -538,7 +550,7 @@ function Build-ReleaseGateDebugArtifacts {
     $bootstrapPath = Get-VisualStudioBootstrapPath
     # Use both target architectures so the staged release build can assemble x86 sfx7zip while retaining x64 C++ tools.
     $buildCommand = 'set "PATH=' + $bootstrapPath + '" && call "' + $DeveloperCommand + '" -arch=x86 -host_arch=x64 && set "OPENSAL_BUILD_DIR=' + $buildRoot +
-        '" && msbuild "' + $nativeSolution + '" /m /t:Build /p:Configuration=Debug /p:Platform=x64 /p:PlatformToolset=' +
+        '" && msbuild "' + $nativeSolution + '" /m:' + $MaxBuildNodes + ' /t:Build /p:Configuration=Debug /p:Platform=x64 /p:PlatformToolset=' +
         $Toolset + ' /p:PreferredToolArchitecture=x64 /nr:false'
     & $env:ComSpec /d /s /c $buildCommand
     if ($LASTEXITCODE -ne 0) {
@@ -570,14 +582,18 @@ function Invoke-ReleasePipelinePackaging {
         [ValidateSet('v145')]
         [string]$Toolset,
         [Parameter(Mandatory = $true)]
+        [ValidateRange(1, 16)]
+        [int]$MaxBuildNodes,
+        [Parameter(Mandatory = $true)]
         [string]$ReleaseBuildNumber
     )
 
     $buildInstallerScript = Join-Path $repositoryRoot 'tools\build-release-installer.ps1'
-    $stagingDirectory = Join-Path $repositoryRoot 'Installer\Installer_Staging'
+    # A previous local installer can hold its staged executable open, so give this run an isolated sibling directory that Inno can still resolve beside setup.iss.
+    $stagingDirectory = Join-Path $repositoryRoot ('Installer\Installer_Staging-runtests-' + [Guid]::NewGuid().ToString('N'))
     $buildInstallerAction = {
         # The local release gate delegates the entire CI Build Installer job to the same script.
-        & $buildInstallerScript -BuildDirectory $BuildDirectory -InstallerStagingDirectory $stagingDirectory -BuildNumber $ReleaseBuildNumber -PlatformToolset $Toolset
+        & $buildInstallerScript -BuildDirectory $BuildDirectory -InstallerStagingDirectory $stagingDirectory -BuildNumber $ReleaseBuildNumber -PlatformToolset $Toolset -MaxBuildNodes $MaxBuildNodes
         if ($LASTEXITCODE -ne 0) {
             throw "The Build Installer pass failed with exit code $LASTEXITCODE."
         }
@@ -596,6 +612,29 @@ function Invoke-PinnedInnoSetupPreflight {
     Write-Host "Pinned Inno Setup preflight passed: $compiler" -ForegroundColor Green
 }
 
+function Invoke-ReleaseWorkflowContractValidation {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$PowerShellPath,
+        [Parameter(Mandatory = $true)]
+        [string]$DotnetPath
+    )
+
+    # This is a distinct Build Installer step in Actions, so keep its ordering
+    # here to surface the same source-contract failure before the Release build.
+    & $PowerShellPath -NoProfile -ExecutionPolicy Bypass -File (Join-Path $repositoryRoot 'tools\test-release-input-pinning.ps1')
+    if ($LASTEXITCODE -ne 0) {
+        throw "The release workflow input-contract validation failed with exit code $LASTEXITCODE."
+    }
+
+    & $DotnetPath test $testProject `
+        --filter 'FullyQualifiedName~NativeSafetyRegressionTests.Root_test_runner_collects_every_documented_automated_test_layer' `
+        --logger 'console;verbosity=minimal'
+    if ($LASTEXITCODE -ne 0) {
+        throw "The focused release workflow contract test failed with exit code $LASTEXITCODE."
+    }
+}
+
 function Assert-UiTestSymbolicLinkSupport {
     # Reparse-point setup stays below the same cleanup boundary as every UI operation.
     $root = Join-Path $env:FILEMANAGER_UI_TESTDATA_ROOT ('symlink-preflight-' + [Guid]::NewGuid().ToString('N'))
@@ -607,8 +646,8 @@ function Assert-UiTestSymbolicLinkSupport {
         New-Item -ItemType SymbolicLink -Path $link -Target $target -ErrorAction Stop | Out-Null
     }
     catch {
-        # Treat the missing SeCreateSymbolicLinkPrivilege as an honest environment skip; dependent UI tests must not run partially.
-        return "Required privilege SeCreateSymbolicLinkPrivilege is unavailable. The complete UI test suite has not been completed because required privileges are missing; all UI tests were skipped. Details: $($_.Exception.Message)"
+        # The UI suite needs this capability for topology coverage, so report a prerequisite failure before FileManager can launch partially.
+        return "Required privilege SeCreateSymbolicLinkPrivilege is unavailable. The complete UI test suite cannot start. Details: $($_.Exception.Message)"
     }
     finally {
         if (Test-Path -LiteralPath $root) {
@@ -625,170 +664,6 @@ function Assert-UiTestSymbolicLinkSupport {
                 Remove-Item -LiteralPath $env:FILEMANAGER_UI_TESTDATA_ROOT -Force
             }
         }
-    }
-}
-
-function Resolve-FtpMenuCommand {
-    param(
-        [Parameter(Mandatory = $true)]
-        [string]$ExecutablePath,
-
-        [Parameter(Mandatory = $true)]
-        [int]$PluginCommand,
-
-        [Parameter(Mandatory = $true)]
-        [string]$Caption
-    )
-
-    if ($null -eq ('FileManager.NativeMenuProbe' -as [type])) {
-        Add-Type -TypeDefinition @'
-using System;
-using System.Runtime.InteropServices;
-
-namespace FileManager {
-    public static class NativeMenuProbe {
-        [DllImport("user32.dll", CharSet = CharSet.Unicode)]
-        public static extern int GetWindowText(IntPtr hWnd, char[] lpString, int cchMax);
-
-        [DllImport("user32.dll", CharSet = CharSet.Unicode)]
-        public static extern int GetClassName(IntPtr hWnd, char[] lpClassName, int nMaxCount);
-
-        [DllImport("user32.dll")]
-        public static extern IntPtr GetDlgItem(IntPtr hDlg, int nIDDlgItem);
-
-        [DllImport("user32.dll")]
-        public static extern bool PostMessage(IntPtr hWnd, uint message, IntPtr wParam, IntPtr lParam);
-    }
-}
-'@
-    }
-
-    $getWindowText = {
-        param([IntPtr]$window)
-        $buffer = New-Object char[] 512
-        [void][FileManager.NativeMenuProbe]::GetWindowText($window, $buffer, $buffer.Length)
-        return (-join $buffer).Trim([char]0)
-    }
-
-    $getWindowClass = {
-        param([IntPtr]$window)
-        $buffer = New-Object char[] 128
-        [void][FileManager.NativeMenuProbe]::GetClassName($window, $buffer, $buffer.Length)
-        return (-join $buffer).Trim([char]0)
-    }
-
-    $acknowledgedWindows = [System.Collections.Generic.HashSet[long]]::new()
-    $acknowledgeKnownStartupDialog = {
-        param([IntPtr]$window)
-        if (-not $acknowledgedWindows.Add($window.ToInt64())) {
-            return $false
-        }
-
-        $title = & $getWindowText $window
-        $accept = $false
-        $buttonId = 1
-        if ($title -eq 'Open Salamander') {
-            $prompt = [FileManager.NativeMenuProbe]::GetDlgItem($window, 1150)
-            $accept = $prompt -ne [IntPtr]::Zero -and
-                      (& $getWindowText $prompt) -eq 'Select one of the installed languages.'
-        }
-        elseif ($title -eq 'Open Salamander Configuration') {
-            # A previously interrupted disposable-profile write can raise this
-            # warning before the main window; accepting it uses the verified fallback.
-            $accept = $true
-        }
-        elseif ($title -eq 'Check for New Versions') {
-            # A fresh profile opens the optional update plug-in after loading;
-            # close it so command discovery can observe the host's main menu.
-            $accept = $true
-            $buttonId = 2
-        }
-
-        if (-not $accept) {
-            return $false
-        }
-        $okButton = [FileManager.NativeMenuProbe]::GetDlgItem($window, $buttonId)
-        if ($okButton -eq [IntPtr]::Zero) {
-            return $false
-        }
-        # Post rather than send because accepting a startup dialog continues
-        # initialization synchronously and may create another modal window.
-        return [FileManager.NativeMenuProbe]::PostMessage($okButton, 0x00F5, [IntPtr]::Zero, [IntPtr]::Zero)
-    }
-
-    $commandMap = Join-Path $env:FILEMANAGER_UI_TESTDATA_ROOT 'ui-test-plugin-commands.log'
-    if (Test-Path -LiteralPath $commandMap -PathType Leaf) {
-        # This exact file is below the verified owned root and stale IDs must not
-        # be mistaken for commands emitted by the executable being tested.
-        Remove-Item -LiteralPath $commandMap -Force
-    }
-
-    # Plug-in SUIDs change with load order. The owner-drawn menu has no HMENU,
-    # so read the map emitted while this freshly built executable constructs it.
-    $process = Start-Process -FilePath $ExecutablePath -PassThru
-    $mainWindow = [IntPtr]::Zero
-    try {
-        $deadline = [DateTime]::UtcNow.AddSeconds(60)
-        $command = $null
-        $lastWindowTitle = ''
-        do {
-            $process.Refresh()
-            if ($process.HasExited) {
-                throw "The built FileManager executable exited with code $($process.ExitCode) during FTP command discovery."
-            }
-            if ($process.MainWindowHandle -ne [IntPtr]::Zero) {
-                $lastWindowTitle = & $getWindowText $process.MainWindowHandle
-                if ((& $getWindowClass $process.MainWindowHandle) -eq 'SalamanderMainWindowVer25') {
-                    $mainWindow = $process.MainWindowHandle
-                }
-                else {
-                    [void](& $acknowledgeKnownStartupDialog $process.MainWindowHandle)
-                }
-            }
-
-            if (Test-Path -LiteralPath $commandMap -PathType Leaf) {
-                foreach ($line in @(Get-Content -LiteralPath $commandMap -ErrorAction SilentlyContinue)) {
-                    $fields = $line -split '\|', 3
-                    $parsedPluginCommand = 0
-                    $parsedSalamanderCommand = 0
-                    if ($fields.Count -eq 3 -and
-                        [IO.Path]::GetFileName($fields[0]) -ieq 'ftp.spl' -and
-                        [int]::TryParse($fields[1], [ref]$parsedPluginCommand) -and
-                        $parsedPluginCommand -eq $PluginCommand -and
-                        [int]::TryParse($fields[2], [ref]$parsedSalamanderCommand) -and
-                        $parsedSalamanderCommand -gt 0) {
-                        $command = $parsedSalamanderCommand
-                    }
-                }
-            }
-            if ($mainWindow -ne [IntPtr]::Zero -and $null -ne $command) {
-                break
-            }
-            Start-Sleep -Milliseconds 100
-        } while ([DateTime]::UtcNow -lt $deadline)
-
-        if ($mainWindow -eq [IntPtr]::Zero) {
-            throw "The built FileManager executable did not expose its main window for FTP command discovery. Last startup window: '$lastWindowTitle'."
-        }
-        if ($null -eq $command) {
-            throw "The built FileManager executable did not publish the FTP Client $Caption command ($PluginCommand)."
-        }
-
-        return $command
-    }
-    finally {
-        if (-not $process.HasExited) {
-            if ($mainWindow -ne [IntPtr]::Zero) {
-                # A normal close lets the disposable profile finish startup
-                # persistence; force remains a bounded fallback for hung builds.
-                [void][FileManager.NativeMenuProbe]::PostMessage($mainWindow, 0x0010, [IntPtr]::Zero, [IntPtr]::Zero)
-                [void]$process.WaitForExit(10000)
-            }
-            if (-not $process.HasExited) {
-                Stop-Process -Id $process.Id -Force
-            }
-        }
-        $process.Dispose()
     }
 }
 
@@ -826,18 +701,11 @@ function Set-UiTestEnvironment {
     }
     $privilegeSkipReason = Assert-UiTestSymbolicLinkSupport
     if (-not [string]::IsNullOrWhiteSpace($privilegeSkipReason)) {
-        # Stop before launching or discovering UI fixtures so a missing privilege cannot produce a misleading partial test run.
-        return $privilegeSkipReason
+        # Do not let a host without the required filesystem capability start FileManager and report a partial UI result.
+        throw $privilegeSkipReason
     }
 
-    if ([string]::IsNullOrWhiteSpace($env:FILEMANAGER_UI_FTP_ORGANIZE_COMMAND)) {
-        # Resolve dynamic plug-in commands from this build rather than assuming a load-order-dependent SUID.
-        $env:FILEMANAGER_UI_FTP_ORGANIZE_COMMAND = Resolve-FtpMenuCommand -ExecutablePath $ExecutablePath -PluginCommand 7 -Caption 'Organize Bookmarks...'
-    }
-    if ([string]::IsNullOrWhiteSpace($env:FILEMANAGER_UI_FTP_CONNECT_COMMAND)) {
-        # The protocol fixture drives the actual quick-connect dialog through the same runtime menu surface as a user.
-        $env:FILEMANAGER_UI_FTP_CONNECT_COMMAND = Resolve-FtpMenuCommand -ExecutablePath $ExecutablePath -PluginCommand 1 -Caption 'Connect to FTP Server...'
-    }
+    # The fixture reads dynamic FTP menu IDs from the exact process it launches, avoiding a cross-process SUID hand-off.
 }
 
 function Resolve-SqliteDll {
@@ -898,14 +766,15 @@ if ($PrerequisiteOnly -and -not $ReleasePipeline) {
 }
 
 if ($ReleasePipeline) {
-    # A clean checkout and an exact base revision make the local comparison inputs identical to a fresh Actions workspace.
+    # Keep Git's base revision deterministic while allowing the local worktree snapshot under test to be uncommitted.
     $BaseCommit = Resolve-ReleasePipelineBaseCommit -RequestedCommit $BaseCommit
     $releasePrerequisiteFailures = Get-ReleasePipelinePrerequisiteFailures
+    $releaseProvisioningNotes = Get-ReleasePipelineProvisioningNotes
     $workingTreeChanges = @(& git status --porcelain)
     if ($workingTreeChanges.Count -ne 0) {
-        $releasePrerequisiteFailures.Add('Use a clean checkout at the selected commit; GitHub Actions never tests uncommitted source or documentation changes.')
+        # Local parity must test the developer's current snapshot; GitHub exercises the committed form of that same change after push.
+        $releaseProvisioningNotes.Add('Testing uncommitted local changes; push this snapshot to compare its committed form with GitHub Actions.')
     }
-    $releaseProvisioningNotes = Get-ReleasePipelineProvisioningNotes
 
     Write-Host "`n=== Release pipeline prerequisite report ===" -ForegroundColor Cyan
     Write-Host "Base commit: $BaseCommit"
@@ -927,11 +796,6 @@ if ($ReleasePipeline) {
     if ($releasePrerequisiteFailures.Count -ne 0) {
         throw 'Release-pipeline prerequisites are not satisfied. Run with -PrerequisiteOnly after correcting the listed items.'
     }
-}
-
-if ($ReleasePipeline) {
-    # Fail before the Debug build and aggregate tests when the external installer tool cannot be provisioned.
-    Invoke-PinnedInnoSetupPreflight
 }
 
 $testResultsDirectory = Join-Path $repositoryRoot 'TestResults'
@@ -986,17 +850,13 @@ $null = Stage-UiTestCrashReporter -ExecutablePath $builtUiExecutable -BuildDirec
 $builtSqliteDll = Resolve-UiTestArtifact -BuildDirectory $uiBuildDirectory -FileName 'sqlite.dll'
 $built7zWrapper = Resolve-UiTestArtifact -BuildDirectory $uiBuildDirectory -FileName '7zwrapper.dll'
 $built7zEngine = Resolve-UiTestArtifact -BuildDirectory $uiBuildDirectory -FileName '7za.dll'
-$uiTestEnvironmentSkipReason = $null
-$uiTestEnvironmentSkipIsNonBlocking = $false
+$uiTestEnvironmentFailure = $null
 try {
-    $uiTestEnvironmentSkipReason = Set-UiTestEnvironment -ExecutablePath $builtUiExecutable
-    $uiTestEnvironmentSkipIsNonBlocking = -not [string]::IsNullOrWhiteSpace($uiTestEnvironmentSkipReason)
+    Set-UiTestEnvironment -ExecutablePath $builtUiExecutable
 }
 catch {
-    # Missing disposable-profile or topology prerequisites must not hide the independent native and source checks.
-    $uiTestEnvironmentSkipReason = $_.Exception.Message
-    # A privilege or access-denied failure means the UI lane was not completed; keep that known host limitation non-blocking.
-    $uiTestEnvironmentSkipIsNonBlocking = $uiTestEnvironmentSkipReason -match '(?i)(privilege|permission|access is denied|administrator)'
+    # Keep source and native diagnostics visible, but make the unavailable UI host an explicit final failure rather than an allowed skip.
+    $uiTestEnvironmentFailure = $_.Exception.Message
 }
 
 # Fast source contracts and native compatibility probes are always collected;
@@ -1096,7 +956,6 @@ $networkFixtureAction = {
 }.GetNewClosure()
 Invoke-AutomatedCheck -Name 'Deterministic FTP/FTPS/HTTP fixture tests' -Action $networkFixtureAction
 
-$nunitSkipReason = $uiTestEnvironmentSkipReason
 $retainNunitResults = -not [string]::IsNullOrWhiteSpace($NUnitTrxPath)
 if ($retainNunitResults) {
     $nunitTrxPath = [System.IO.Path]::GetFullPath($NUnitTrxPath)
@@ -1192,8 +1051,16 @@ $nunitAction = {
         }
     }
 }.GetNewClosure()
-Invoke-AutomatedCheck -Name 'FileManager.UiTests (complete NUnit project)' -Action $nunitAction `
-    -SkipReason $nunitSkipReason -NonBlockingSkip:$uiTestEnvironmentSkipIsNonBlocking
+if (-not [string]::IsNullOrWhiteSpace($uiTestEnvironmentFailure)) {
+    $uiPreflightFailureAction = {
+        # A failed preflight deliberately prevents executable launch; this is a test-host failure, not an NUnit skip.
+        throw $uiTestEnvironmentFailure
+    }.GetNewClosure()
+    Invoke-AutomatedCheck -Name 'FileManager.UiTests (complete NUnit project)' -Action $uiPreflightFailureAction
+}
+else {
+    Invoke-AutomatedCheck -Name 'FileManager.UiTests (complete NUnit project)' -Action $nunitAction
+}
 
 if ($SkipLockVerifier) {
     # The release workflow owns verifier execution as a separate fresh-volume phase, not a skipped test result.
@@ -1233,10 +1100,28 @@ else {
 
 if ($ReleasePipeline) {
     if ($failures.Count -eq 0 -and $skipped.Count -eq 0) {
-        # Keep Release outputs separate from Debug UI artifacts so the PE audit sees the same tree as the installer job.
-        $releaseBuildDirectory = Join-Path $testResultsDirectory ('runtests-release-' + [Guid]::NewGuid().ToString('N'))
-        Invoke-ReleasePipelinePackaging -DeveloperCommand $vsDevCmd -BuildDirectory $releaseBuildDirectory `
-            -Toolset $PlatformToolset -ReleaseBuildNumber $BuildNumber
+        # Actions provisions Inno Setup only after the release-test job passes; preserve that boundary so local failures occur in the same phase.
+        $preflightAction = {
+            Invoke-PinnedInnoSetupPreflight
+        }
+        $preflightPassed = Invoke-ReleasePipelineCheck -Name 'Preflight pinned Inno Setup' -Action $preflightAction
+        # Keep a failed preflight from evaluating an uninitialized downstream result under StrictMode.
+        $contractValidationPassed = $false
+
+        if ($preflightPassed) {
+            # Keep the workflow's fast post-preflight contract gate ahead of the lengthy Release compilation.
+            $contractValidationAction = {
+                Invoke-ReleaseWorkflowContractValidation -PowerShellPath $pwsh.Source -DotnetPath $dotnet.Source
+            }
+            $contractValidationPassed = Invoke-ReleasePipelineCheck -Name 'Validate release workflow contracts' -Action $contractValidationAction
+        }
+
+        if ($preflightPassed -and $contractValidationPassed) {
+            # Keep Release outputs separate from Debug UI artifacts so the PE audit sees the same tree as the installer job.
+            $releaseBuildDirectory = Join-Path $testResultsDirectory ('runtests-release-' + [Guid]::NewGuid().ToString('N'))
+            Invoke-ReleasePipelinePackaging -DeveloperCommand $vsDevCmd -BuildDirectory $releaseBuildDirectory `
+                -Toolset $PlatformToolset -MaxBuildNodes $MaxBuildNodes -ReleaseBuildNumber $BuildNumber
+        }
     }
     else {
         # GitHub's build job depends on the release gate, so do not package when its prerequisites were not verified.
@@ -1246,11 +1131,7 @@ if ($ReleasePipeline) {
 
 Write-Host "`n=== Automated test summary ===" -ForegroundColor Cyan
 Write-Host "$($passed.Count) checks passed." -ForegroundColor Green
-$totalSkippedCount = $skipped.Count + $nonBlockingSkipped.Count + $nonBlockingEnvironmentSkipped.Count
-if ($nonBlockingEnvironmentSkipped.Count -ne 0) {
-    Write-Host "$($nonBlockingEnvironmentSkipped.Count) UI test environment checks skipped as an allowed privilege limitation:" -ForegroundColor Yellow
-    $nonBlockingEnvironmentSkipped | ForEach-Object { Write-Host "  - $_" -ForegroundColor Yellow }
-}
+$totalSkippedCount = $skipped.Count + $nonBlockingSkipped.Count
 if ($nonBlockingSkipped.Count -ne 0) {
     Write-Host "$($nonBlockingSkipped.Count) second-volume-dependent tests skipped as an allowed capability limitation:" -ForegroundColor Yellow
     $nonBlockingSkipped | ForEach-Object { Write-Host "  - $_" -ForegroundColor Yellow }
@@ -1286,10 +1167,16 @@ finally {
         # Retain the TRX artifact but discard the workflow-equivalent staged Debug tree once it is no longer needed.
         Remove-Item -LiteralPath $releaseGateBuildDirectory -Recurse -Force
     }
-    if (-not $KeepBuildArtifacts -and -not [string]::IsNullOrWhiteSpace($releaseBuildDirectory) -and
+    if (-not [string]::IsNullOrWhiteSpace($releaseBuildDirectory) -and
         (Test-Path -LiteralPath $releaseBuildDirectory -PathType Container)) {
-        # Release artifacts are likewise per-run outputs; retain them only when a packaging failure needs inspection.
-        Remove-Item -LiteralPath $releaseBuildDirectory -Recurse -Force
+        if ($KeepBuildArtifacts -or $failures.Count -ne 0) {
+            # A release packaging failure must retain its child logs and staged inputs instead of leaving only a summarized exit code.
+            Write-Host "Retaining failed Release installer build directory: $releaseBuildDirectory" -ForegroundColor Yellow
+        }
+        else {
+            # Successful Release outputs are disposable per-run artifacts unless the caller explicitly asks to inspect them.
+            Remove-Item -LiteralPath $releaseBuildDirectory -Recurse -Force
+        }
     }
     Remove-OlderUiTestBuildResults -ResultsDirectory $testResultsDirectory
 }

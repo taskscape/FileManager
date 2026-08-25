@@ -2505,7 +2505,7 @@ BOOL GetFileManagerUiTestDataRootPath(CPathW& path);
 // selected; a no-op otherwise. 'phase' is SHOW or RESULT.
 void LogUiTestDialog(const char* phase, const char* caption, const char* text, DWORD flags, int result);
 void LogUiTestOperationDialog(const char* phase, int kind, char** data, int result);
-// Publishes load-order-dependent menu IDs only inside the isolated UI-test sandbox.
+// Publishes the owning process ID with load-order-dependent menu IDs inside the isolated UI-test sandbox.
 void LogUiTestPluginMenuCommand(const char* dllName, int pluginCommand, int salamanderCommand);
 
 // creates "Open Salamander" directory on path CSIDL_APPDATA; returns TRUE if path

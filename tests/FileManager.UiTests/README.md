@@ -10,7 +10,7 @@ Set these environment variables before running:
 - `FILEMANAGER_UI_CONFIG_ROOT=Software\Open Salamander\6.0-filemanager-testdata` — selects the registry tree created and removed by the harness.
 - `FILEMANAGER_UI_EXE` — absolute path to `salamand.exe` or a debug build of the executable.
 - `FILEMANAGER_UI_ARGUMENTS` — optional command-line arguments, for example a test-only `-c` configuration file.
-- `FILEMANAGER_UI_FTP_ORGANIZE_COMMAND` — runtime command ID allocated by FileManager for the FTP Client **Organize Bookmarks** menu command. This enables the 10 FTP bookmark persistence cases; without it, only those cases are skipped with an explicit message.
+- FTP menu IDs are published with the launching process ID below the owned test-data root, so each fixture waits for the exact FileManager instance it controls before issuing a plug-in command.
 - `FILEMANAGER_UI_CONFIG_FAULT_INJECTION=1` — explicitly enables the exhaustive transactional-configuration crash-recovery lane described below.
 - `FILEMANAGER_UI_CROSS_VOLUME_ROOT` — selected automatically as `D:\filemanager-testdata` when fixed writable `D:\` is available. This enables the cross-volume move characterization fixture; the fixture creates and removes only a GUID-named child below this directory.
 - `FILEMANAGER_UI_ADS_UNSUPPORTED_TARGET_ROOT` — selected automatically when fixed writable `D:\` uses FAT/FAT32/exFAT. On NTFS `D:\`, the ADS-unsupported scenario is reported as an allowed capability skip.

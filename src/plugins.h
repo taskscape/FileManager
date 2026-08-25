@@ -3217,8 +3217,8 @@ public:
     void InitMenuItems(HWND parent, CMenuPopup* root);
 
     // Test automation sends commands without opening the lazy owner-drawn menu first;
-    // initialize one plug-in deterministically so its published SUID is executable.
-    void InitUiTestPluginMenuItems(HWND parent, CMenuPopup* root, const char* dllSuffix);
+    // initialize one plug-in by basename so staged configurations cannot change its published SUID.
+    void InitUiTestPluginMenuItems(HWND parent, CMenuPopup* root, const char* dllName);
 
     // handles WM_USER_INITMENUPOPUP for individual plugin submenus from the Plugins menu
     // 'parent' is the parent window for message boxes, 'submenu' is the specific plugin menu

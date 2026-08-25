@@ -1,122 +1,155 @@
+[CmdletBinding()]
 param(
-    [string]$BuildDir = "build_stage",
-    [string]$StagingDir = "Installer_Staging",
-    [string]$BuildNumber = "0"
+    [Parameter(Mandatory = $true)]
+    [string]$BuildDir,
+    [Parameter(Mandatory = $true)]
+    [string]$StagingDir,
+    [Parameter(Mandatory = $true)]
+    [string]$BuildNumber
 )
 
-Write-Host "=== Open Salamander Installer Staging Script ===" -ForegroundColor Cyan
+Set-StrictMode -Version Latest
+$ErrorActionPreference = 'Stop'
+
+$repositoryRoot = Split-Path -Parent $PSScriptRoot
+$buildRoot = [IO.Path]::GetFullPath($BuildDir)
+$releaseRoot = Join-Path $buildRoot 'salamander\Release_x64'
+$stagingRoot = [IO.Path]::GetFullPath($StagingDir)
+
+if (-not (Test-Path -LiteralPath $releaseRoot -PathType Container)) {
+    throw "The Release x64 artifact root is missing: $releaseRoot"
+}
+
+function Copy-ReleaseArtifact {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$RelativePath,
+        [Parameter(Mandatory = $true)]
+        [string]$DestinationDirectory,
+        [switch]$Optional
+    )
+
+    $source = Join-Path $releaseRoot $RelativePath
+    if (-not (Test-Path -LiteralPath $source -PathType Leaf)) {
+        if ($Optional) {
+            return $false
+        }
+
+        throw "The current Release x64 build did not produce required installer artifact: $source"
+    }
+
+    Copy-Item -LiteralPath $source -Destination $DestinationDirectory -Force
+    Write-Host "Staged $RelativePath from the current Release build." -ForegroundColor Green
+    return $true
+}
+
+function Copy-StandaloneReleaseArtifact {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$RelativePath,
+        [Parameter(Mandatory = $true)]
+        [string]$DestinationDirectory,
+        [switch]$Optional
+    )
+
+    $source = Join-Path $buildRoot $RelativePath
+    if (-not (Test-Path -LiteralPath $source -PathType Leaf)) {
+        if ($Optional) {
+            return $false
+        }
+
+        throw "The current Release build did not produce required installer artifact: $source"
+    }
+
+    Copy-Item -LiteralPath $source -Destination $DestinationDirectory -Force
+    Write-Host "Staged $RelativePath from the current Release build." -ForegroundColor Green
+    return $true
+}
+
+Write-Host '=== Open Salamander Installer Staging Script ===' -ForegroundColor Cyan
 Write-Host "Build Number: $BuildNumber" -ForegroundColor Cyan
-Write-Host "Staging files for Inno Setup..."
 
-if (Test-Path $StagingDir) { Remove-Item $StagingDir -Recurse -Force }
-New-Item -ItemType Directory -Path $StagingDir | Out-Null
-New-Item -ItemType Directory -Path "$StagingDir\plugins" | Out-Null
-New-Item -ItemType Directory -Path "$StagingDir\lang" | Out-Null
-New-Item -ItemType Directory -Path "$StagingDir\convert" | Out-Null
-New-Item -ItemType Directory -Path "$StagingDir\toolbars" | Out-Null
-New-Item -ItemType Directory -Path "$StagingDir\utils" | Out-Null
+if (Test-Path -LiteralPath $stagingRoot) {
+    # A stale shared staging tree can contain a running executable, so callers use a per-run directory and this removes only that owned tree.
+    Remove-Item -LiteralPath $stagingRoot -Recurse -Force -ErrorAction Stop
+}
 
-# Use an explicit UTC conversion because the pipeline invokes Windows PowerShell, which has no Get-Date -AsUTC parameter.
+New-Item -ItemType Directory -Path $stagingRoot -Force | Out-Null
+$pluginsDirectory = Join-Path $stagingRoot 'plugins'
+$languageDirectory = Join-Path $stagingRoot 'lang'
+$convertDirectory = Join-Path $stagingRoot 'convert'
+$toolbarsDirectory = Join-Path $stagingRoot 'toolbars'
+$utilsDirectory = Join-Path $stagingRoot 'utils'
+New-Item -ItemType Directory -Path $pluginsDirectory, $languageDirectory, $convertDirectory, $toolbarsDirectory, $utilsDirectory -Force | Out-Null
+
+# The build metadata identifies the exact artifact tree that was copied, rather than a stale executable found under src.
 $buildDateUtc = (Get-Date).ToUniversalTime().ToString('yyyy-MM-dd HH:mm:ss UTC')
 @"
 Build Number: $BuildNumber
 Build Date: $buildDateUtc
-"@ | Out-File -FilePath "$StagingDir\build_info.txt" -Encoding utf8
+"@ | Out-File -FilePath (Join-Path $stagingRoot 'build_info.txt') -Encoding utf8
 
-# 1. Copy license file
-Copy-Item "Installer\LICENSE" "$StagingDir\" -ErrorAction SilentlyContinue
+Copy-Item -LiteralPath (Join-Path $repositoryRoot 'Installer\LICENSE') -Destination $stagingRoot -Force
 
-# 2. Copy main executables and DLLs
-function Copy-Exe($srcPatterns, $fileName, $dest) {
-    foreach ($pattern in $srcPatterns) {
-        $found = Get-ChildItem -Path $pattern -ErrorAction SilentlyContinue | Select-Object -First 1
-        if ($found) {
-            Copy-Item $found.FullName $dest
-            Write-Host "Found $fileName at: $($found.FullName)" -ForegroundColor Green
-            return $true
-        }
-    }
-    # Fallback: search recursively in BuildDir and src
-    $found = Get-ChildItem -Path $BuildDir, "src" -Filter $fileName -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1
-    if ($found) {
-        Copy-Item $found.FullName $dest
-        Write-Host "Found $fileName (recursive) at: $($found.FullName)" -ForegroundColor Green
-        return $true
-    }
-    Write-Warning "$fileName not found in primary locations or recursively."
-    return $false
+Copy-ReleaseArtifact -RelativePath 'salamand.exe' -DestinationDirectory $stagingRoot
+Copy-ReleaseArtifact -RelativePath 'utils\salmon.exe' -DestinationDirectory $stagingRoot
+Copy-ReleaseArtifact -RelativePath 'salbroker.exe' -DestinationDirectory $stagingRoot
+Copy-ReleaseArtifact -RelativePath 'utils\salextx64.dll' -DestinationDirectory $utilsDirectory
+Copy-ReleaseArtifact -RelativePath 'utils\salextx86.dll' -DestinationDirectory $utilsDirectory
+
+# Optional utilities vary by configuration, but they must come from this build whenever they are present.
+Copy-ReleaseArtifact -RelativePath 'utils\salopen.exe' -DestinationDirectory $stagingRoot -Optional | Out-Null
+Copy-ReleaseArtifact -RelativePath 'utils\salspawn.exe' -DestinationDirectory $stagingRoot -Optional | Out-Null
+Copy-StandaloneReleaseArtifact -RelativePath 'tserver\Release\tserver.exe' -DestinationDirectory $stagingRoot -Optional | Out-Null
+Copy-StandaloneReleaseArtifact -RelativePath 'sfx7zip\Release\sfx7zip.exe' -DestinationDirectory $stagingRoot -Optional | Out-Null
+Copy-ReleaseArtifact -RelativePath 'plugins\zip\zip2sfx\zip2sfx.exe' -DestinationDirectory $stagingRoot -Optional | Out-Null
+Copy-StandaloneReleaseArtifact -RelativePath 'translator\Release\translator.exe' -DestinationDirectory $stagingRoot -Optional | Out-Null
+Copy-ReleaseArtifact -RelativePath 'plugins\filecomp\fcremote.exe' -DestinationDirectory $stagingRoot -Optional | Out-Null
+
+$languageFiles = @(Get-ChildItem -LiteralPath (Join-Path $releaseRoot 'lang') -Filter '*.slg' -File)
+if ($languageFiles.Count -eq 0) {
+    throw "The current Release x64 build did not produce main-language files below $releaseRoot."
+}
+$languageFiles | ForEach-Object { Copy-Item -LiteralPath $_.FullName -Destination $languageDirectory -Force }
+
+Copy-Item -Path (Join-Path $repositoryRoot 'convert\*') -Destination $convertDirectory -Recurse -Force
+Copy-Item -Path (Join-Path $releaseRoot 'toolbars\*') -Destination $toolbarsDirectory -Recurse -Force
+
+$pluginSourceDirectory = Join-Path $releaseRoot 'plugins'
+$pluginPayloads = @(Get-ChildItem -LiteralPath $pluginSourceDirectory -Recurse -File |
+    Where-Object { $_.FullName -notmatch '\\Intermediate\\' -and $_.Extension -in @('.dll', '.exe', '.slg', '.spl') })
+if (@($pluginPayloads | Where-Object { $_.Extension -eq '.spl' }).Count -eq 0) {
+    throw "The current Release x64 build did not produce plug-ins below $pluginSourceDirectory."
 }
 
-# Main exes
-$salamandCopied = Copy-Exe @("$BuildDir\Release_x64\salamand.exe", "src\vcxproj\salamander\Release_x64\salamand.exe") "salamand.exe" "$StagingDir\"
-$salmonCopied = Copy-Exe @("$BuildDir\Release_x64\salmon.exe", "src\vcxproj\salmon\salamander\Release_x64\utils\salmon.exe") "salmon.exe" "$StagingDir\"
-$salbrokerCopied = Copy-Exe @("$BuildDir\salamander\Release_x64\salbroker.exe", "src\vcxproj\salamander\Release_x64\salbroker.exe") "salbroker.exe" "$StagingDir\"
-
-if (-not $salamandCopied) { Write-Error "Could not find salamand.exe" }
-if (-not $salmonCopied) { Write-Error "Could not find salmon.exe" }
-if (-not $salbrokerCopied) { Write-Error "Could not find salbroker.exe" }
-
-# Shell extensions are installed from the utils directory and registered by Salamander itself.
-Copy-Exe @("$BuildDir\Release_x64\salextx64.dll", "$BuildDir\shellext\Release_x64\salextx64.dll", "src\vcxproj\shellext\salamander\Release_x64\plugins\Intermediate\salextx64\salextx64.dll", "src\vcxproj\shellext\salamander\Release_x64\salextx64.dll") "salextx64.dll" "$StagingDir\utils\"
-Copy-Exe @("$BuildDir\Release_Win32\salextx86.dll", "$BuildDir\shellext\Release_Win32\salextx86.dll", "$BuildDir\Release_x64\salextx86.dll", "src\vcxproj\shellext\salamander\Release_x86\plugins\Intermediate\salextx86\salextx86.dll", "src\vcxproj\shellext\salamander\Release_x86\salextx86.dll") "salextx86.dll" "$StagingDir\utils\"
-
-# Utils
-Copy-Exe @("$BuildDir\Release_x64\salopen.exe") "salopen.exe" "$StagingDir\"
-Copy-Exe @("$BuildDir\Release_x64\salspawn.exe") "salspawn.exe" "$StagingDir\"
-Copy-Exe @("$BuildDir\Release_x64\tserver.exe", "$BuildDir\Release_Win32\tserver.exe") "tserver.exe" "$StagingDir\"
-Copy-Exe @("$BuildDir\Release_x64\sfx7zip.exe", "$BuildDir\Release_Win32\sfx7zip.exe") "sfx7zip.exe" "$StagingDir\"
-Copy-Exe @("$BuildDir\Release_x64\zip2sfx.exe", "$BuildDir\Release_Win32\zip2sfx.exe") "zip2sfx.exe" "$StagingDir\"
-Copy-Exe @("$BuildDir\Release_x64\translator.exe", "$BuildDir\Release_Win32\translator.exe") "translator.exe" "$StagingDir\"
-Copy-Exe @("$BuildDir\Release_x64\fcremote.exe") "fcremote.exe" "$StagingDir\"
-Copy-Exe @("$BuildDir\Release_x64\7zwrapper.exe") "7zwrapper.exe" "$StagingDir\"
-
-# 3. Copy lang (main app) - must come from the freshly built Release_x64 output so its
-#    VERSIONINFO matches salamand.exe (a stale or mismatched SLG is rejected at startup).
-$langFiles = @(Get-ChildItem -Path "$BuildDir\salamander\Release_x64\lang" -Filter '*.slg' -ErrorAction SilentlyContinue)
-if ($langFiles.Count -eq 0) {
-    $langFiles = @(Get-ChildItem -Path $BuildDir -Filter '*.slg' -Recurse -ErrorAction SilentlyContinue |
-        Where-Object { $_.FullName -match 'Release_x64.*\\lang\\' -and $_.FullName -notmatch '\\plugins\\' })
-}
-if ($langFiles.Count -gt 0) {
-    $langFiles | ForEach-Object { Copy-Item $_.FullName "$StagingDir\lang\" }
-    Write-Host "Found $($langFiles.Count) main-app language file(s)." -ForegroundColor Green
-} else {
-    Write-Warning 'No freshly built main-app .slg language file was found; falling back to Installer\lang.'
-    Copy-Item "Installer\lang\*" "$StagingDir\lang\" -Recurse -ErrorAction SilentlyContinue
+foreach ($pluginPayload in $pluginPayloads) {
+    $relativePath = $pluginPayload.FullName.Substring($pluginSourceDirectory.Length).TrimStart('\')
+    $destination = Join-Path $pluginsDirectory $relativePath
+    $destinationDirectory = Split-Path -Parent $destination
+    New-Item -ItemType Directory -Path $destinationDirectory -Force | Out-Null
+    Copy-Item -LiteralPath $pluginPayload.FullName -Destination $destination -Force
 }
 
-# 4. Copy convert
-Copy-Item "convert\*" "$StagingDir\convert\" -Recurse -ErrorAction SilentlyContinue
-
-# 5. Copy toolbars
-Copy-Item "src\res\toolbars\*" "$StagingDir\toolbars\" -Recurse -ErrorAction SilentlyContinue
-
-# 6. Copy plugins
-$splFiles = Get-ChildItem -Path "src\plugins", $BuildDir -Recurse -Filter "*.spl" -ErrorAction SilentlyContinue | 
-            Where-Object { $_.FullName -match "Release_x64" -and $_.FullName -notmatch "\\Intermediate\\" }
-
-$processedSpl = New-Object System.Collections.Generic.HashSet[string]
-
-foreach ($file in $splFiles) {
-    if ($processedSpl.Contains($file.Name)) { continue }
-    $processedSpl.Add($file.Name) | Out-Null
-
-    $pluginName = $file.BaseName
-    $pluginDestDir = New-Item -ItemType Directory -Path "$StagingDir\plugins\$pluginName" -Force
-    Copy-Item $file.FullName "$pluginDestDir\"
-    Write-Host "Found plugin $pluginName at: $($file.FullName)" -ForegroundColor Green
-    
-    $stagedLangDir = $null
-    Get-ChildItem -Path $file.DirectoryName -Filter "*.slg" -Recurse | 
-        Where-Object { $_.FullName -notmatch "\\Intermediate\\" } | ForEach-Object {
-            if ($null -eq $stagedLangDir) {
-                $stagedLangDir = New-Item -ItemType Directory -Path "$pluginDestDir\lang" -Force
-            }
-            Copy-Item $_.FullName "$stagedLangDir\"
-            Write-Host "  Found lang file: $($_.Name)" -ForegroundColor Gray
-        }
+# These plug-ins load sibling binaries at runtime, so verify the generic payload copy did not regress to staging only .spl files.
+$requiredPluginPayloads = @(
+    '7zip\7za.dll',
+    '7zip\7zwrapper.dll',
+    'pictview\exif.dll',
+    'unchm\chmlib.dll'
+)
+$missingPluginPayloads = @($requiredPluginPayloads |
+    Where-Object { -not (Test-Path -LiteralPath (Join-Path $pluginsDirectory $_) -PathType Leaf) })
+if ($missingPluginPayloads.Count -ne 0) {
+    throw "The current Release plug-in staging tree is incomplete: $($missingPluginPayloads -join ', ')"
 }
 
-Write-Host "`n=== Staging Complete ===" -ForegroundColor Cyan
-Write-Host "Files staged in: $StagingDir"
-Write-Host "Ready for Inno Setup compilation."
+# Verify the input hand-off before Inno runs so a packaging failure names the missing current-build artifact.
+$requiredStagedFiles = @('salamand.exe', 'salmon.exe', 'salbroker.exe', 'LICENSE') |
+    ForEach-Object { Join-Path $stagingRoot $_ }
+$missingStagedFiles = @($requiredStagedFiles | Where-Object { -not (Test-Path -LiteralPath $_ -PathType Leaf) })
+if ($missingStagedFiles.Count -ne 0) {
+    throw "The installer staging tree is incomplete: $($missingStagedFiles -join ', ')"
+}
+
+Write-Host "Staged $($pluginPayloads.Count) current-build plug-in payload files." -ForegroundColor Green
+Write-Host "Files staged in: $stagingRoot" -ForegroundColor Cyan

@@ -2388,9 +2388,11 @@ void LogUiTestPluginMenuCommand(const char* dllName, int pluginCommand, int sala
         if (*scan == '|' || *scan == '\r' || *scan == '\n')
             *scan = '_';
 
+    // The UI harness must distinguish this instance's menu allocation from a
+    // predecessor's because plug-in SUIDs are only valid for one process.
     char line[768];
-    if (FAILED(StringCchPrintfA(line, _countof(line), "%s|%d|%d\r\n",
-                                safeDllName, pluginCommand, salamanderCommand)))
+    if (FAILED(StringCchPrintfA(line, _countof(line), "%lu|%s|%d|%d\r\n",
+                                GetCurrentProcessId(), safeDllName, pluginCommand, salamanderCommand)))
         return;
 
     const WCHAR* mapApiPath = mapPath.GetPathForWin32Api();

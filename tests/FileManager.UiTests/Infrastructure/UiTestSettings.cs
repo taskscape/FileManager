@@ -28,23 +28,8 @@ internal static class UiTestSettings
         }
     }
 
-    internal static int RequireFtpOrganizeCommand()
-    {
-        // Plug-in menu command IDs are allocated by the host at runtime, so the sandboxed test runner supplies this ID.
-        if (!int.TryParse(Environment.GetEnvironmentVariable("FILEMANAGER_UI_FTP_ORGANIZE_COMMAND"), out var command) || command <= 0)
-            Assert.Ignore("Set FILEMANAGER_UI_FTP_ORGANIZE_COMMAND to the FTP plug-in's runtime Organize Bookmarks command ID to run FTP persistence tests.");
-
-        return command;
-    }
-
-    internal static int RequireFtpConnectCommand()
-    {
-        // Plug-in menu command IDs are allocated by the host at runtime, so use the runner-discovered quick-connect command.
-        if (!int.TryParse(Environment.GetEnvironmentVariable("FILEMANAGER_UI_FTP_CONNECT_COMMAND"), out var command) || command <= 0)
-            Assert.Ignore("Set FILEMANAGER_UI_FTP_CONNECT_COMMAND to the FTP plug-in's runtime Connect to FTP Server command ID to run protocol fixture tests.");
-
-        return command;
-    }
+    // Each launched process records its dynamic plug-in menu IDs below the harness-owned test-data boundary.
+    internal static string PluginCommandMapPath => Path.Combine(TestDataRoot, "ui-test-plugin-commands.log");
 
     internal static void RequireTestSandbox()
     {

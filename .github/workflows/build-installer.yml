@@ -31,6 +31,9 @@ jobs:
       BUILD_CONFIGURATION: Debug
       SOLUTION_PATH: 'src\vcxproj\salamand.sln'
       PLATFORM_TOOLSET: v145
+      # Bound MSBuild and CL /MP fan-out to keep the complete solution stable on the self-hosted runner.
+      MSBUILD_NODE_COUNT: '4'
+      CL_MPCount: '4'
       OPENSAL_BUILD_DIR: '${{ github.workspace }}\build_stage\'
       FILEMANAGER_UI_ISOLATED: '1'
       # The deterministic release suite uses a disposable profile namespace.
@@ -57,7 +60,7 @@ jobs:
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force -Path $env:OPENSAL_BUILD_DIR | Out-Null
-          msbuild $env:SOLUTION_PATH /m /t:Build /p:Configuration=$env:BUILD_CONFIGURATION /p:Platform=x64 /p:PlatformToolset=$env:PLATFORM_TOOLSET /p:PreferredToolArchitecture=x64 /nr:false
+          msbuild $env:SOLUTION_PATH /m:$env:MSBUILD_NODE_COUNT /t:Build /p:Configuration=$env:BUILD_CONFIGURATION /p:Platform=x64 /p:PlatformToolset=$env:PLATFORM_TOOLSET /p:PreferredToolArchitecture=x64 /nr:false
 
       - name: Resolve strict runner inputs
         shell: pwsh
@@ -125,9 +128,13 @@ jobs:
       SOLUTION_PATH: 'src\vcxproj\salamand.sln'
       # OPENSAL_BUILD_DIR MUST end with a backslash as expected by props files
       OPENSAL_BUILD_DIR: '${{ github.workspace }}\build_stage\'
-      INSTALLER_STAGING_DIR: 'Installer\Installer_Staging'
+      # A self-hosted workspace can retain files from an interrupted run; isolate the Inno source tree by run while keeping it beside setup.iss.
+      INSTALLER_STAGING_DIR: 'Installer\Installer_Staging-${{ github.run_id }}'
       # The repository supports one compiler contract: VS 2026's v145 toolset.
       PLATFORM_TOOLSET: v145
+      # Keep the installer build within the same MSBuild and compiler-child budget as the release gate.
+      MSBUILD_NODE_COUNT: '4'
+      CL_MPCount: '4'
 
     steps:
       - name: Checkout
@@ -152,10 +159,19 @@ jobs:
           }
           Write-Host "Pinned Inno Setup preflight passed: $iscc" -ForegroundColor Green
 
+      - name: Validate release workflow contracts
+        shell: pwsh
+        # Run source-contract checks before the long Release build so workflow/test drift fails quickly and deterministically.
+        run: |
+          .\tools\test-release-input-pinning.ps1
+          dotnet test .\tests\FileManager.UiTests\FileManager.UiTests.csproj `
+            --filter "FullyQualifiedName~NativeSafetyRegressionTests.Root_test_runner_collects_every_documented_automated_test_layer" `
+            --logger "console;verbosity=minimal"
+
       # Keep the separate installer job visible while sharing its exact implementation with local -ReleasePipeline runs.
       - name: Run Build Installer pass (Release | x64)
         shell: pwsh
-        run: .\tools\build-release-installer.ps1 -BuildDirectory $env:OPENSAL_BUILD_DIR -InstallerStagingDirectory $env:INSTALLER_STAGING_DIR -BuildNumber '${{ github.run_number }}' -PlatformToolset $env:PLATFORM_TOOLSET
+        run: .\tools\build-release-installer.ps1 -BuildDirectory $env:OPENSAL_BUILD_DIR -InstallerStagingDirectory $env:INSTALLER_STAGING_DIR -BuildNumber '${{ github.run_number }}' -PlatformToolset $env:PLATFORM_TOOLSET -MaxBuildNodes $env:MSBUILD_NODE_COUNT
 
       - name: Upload Inno Setup provisioning logs
         if: always()
