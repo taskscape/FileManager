@@ -2676,7 +2676,10 @@ public sealed class NativeSafetyRegressionTests
         var tlsHeader = File.ReadAllText(Path.Combine(root, "src", "plugins", "ftp", "ssl.h"));
         var tls = File.ReadAllText(Path.Combine(root, "src", "plugins", "ftp", "ssl.cpp"));
         var sockets = File.ReadAllText(Path.Combine(root, "src", "plugins", "ftp", "sockets.cpp"));
-        var dataConnection = File.ReadAllText(Path.Combine(root, "src", "plugins", "ftp", "datacon1.cpp"));
+        // Normalize checkout line endings to LF so multiline source contracts verify code structure rather than Git autocrlf state.
+        var dataConnection = File.ReadAllText(Path.Combine(root, "src", "plugins", "ftp", "datacon1.cpp"))
+            .Replace("\r\n", "\n", StringComparison.Ordinal)
+            .Replace("\r", "\n", StringComparison.Ordinal);
         var control = File.ReadAllText(Path.Combine(root, "src", "plugins", "ftp", "ctrlcon1.cpp"));
         var operationDialog = File.ReadAllText(Path.Combine(root, "src", "plugins", "ftp", "dialogs5.cpp"));
         var configuration = File.ReadAllText(Path.Combine(root, "src", "plugins", "ftp", "ftp.cpp"));
