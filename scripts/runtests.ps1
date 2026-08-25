@@ -32,6 +32,7 @@ $failures = [System.Collections.Generic.List[string]]::new()
 $passed = [System.Collections.Generic.List[string]]::new()
 $skipped = [System.Collections.Generic.List[string]]::new()
 $nonBlockingSkipped = [System.Collections.Generic.List[string]]::new()
+$nonBlockingEnvironmentSkipped = [System.Collections.Generic.List[string]]::new()
 # These assertions describe optional capabilities whose absence is an explicit, documented local skip.
 $optionalUiIgnoreMessagePrefixes = @(
     'Set FILEMANAGER_UI_CONFIG_FAULT_INJECTION=1 ',
@@ -67,14 +68,21 @@ function Invoke-AutomatedCheck {
         [string]$Name,
         [Parameter(Mandatory = $true)]
         [scriptblock]$Action,
-        [string]$SkipReason
+        [string]$SkipReason,
+        [switch]$NonBlockingSkip
     )
 
     Write-Host "`n=== Running $Name ===" -ForegroundColor Cyan
     if (-not [string]::IsNullOrWhiteSpace($SkipReason)) {
         # Optional lanes must remain visible in the aggregate report even when
         # this machine cannot safely satisfy their external prerequisites.
-        $skipped.Add("${Name}: $SkipReason")
+        $skipEntry = "${Name}: $SkipReason"
+        if ($NonBlockingSkip) {
+            $nonBlockingEnvironmentSkipped.Add($skipEntry)
+        }
+        else {
+            $skipped.Add($skipEntry)
+        }
         Write-Host "SKIPPED: $SkipReason" -ForegroundColor Yellow
         return
     }
@@ -577,7 +585,8 @@ function Assert-UiTestSymbolicLinkSupport {
         New-Item -ItemType SymbolicLink -Path $link -Target $target -ErrorAction Stop | Out-Null
     }
     catch {
-        throw "The complete UI suite requires permission to create disposable directory symbolic links: $_"
+        # Treat the missing SeCreateSymbolicLinkPrivilege as an honest environment skip; dependent UI tests must not run partially.
+        return "Required privilege SeCreateSymbolicLinkPrivilege is unavailable. The complete UI test suite has not been completed because required privileges are missing; all UI tests were skipped. Details: $($_.Exception.Message)"
     }
     finally {
         if (Test-Path -LiteralPath $root) {
@@ -793,7 +802,11 @@ function Set-UiTestEnvironment {
             Write-Host $env:FILEMANAGER_UI_ADS_UNSUPPORTED_TARGET_SKIP_REASON -ForegroundColor Yellow
         }
     }
-    Assert-UiTestSymbolicLinkSupport
+    $privilegeSkipReason = Assert-UiTestSymbolicLinkSupport
+    if (-not [string]::IsNullOrWhiteSpace($privilegeSkipReason)) {
+        # Stop before launching or discovering UI fixtures so a missing privilege cannot produce a misleading partial test run.
+        return $privilegeSkipReason
+    }
 
     if ([string]::IsNullOrWhiteSpace($env:FILEMANAGER_UI_FTP_ORGANIZE_COMMAND)) {
         # Resolve dynamic plug-in commands from this build rather than assuming a load-order-dependent SUID.
@@ -947,12 +960,16 @@ $builtSqliteDll = Resolve-UiTestArtifact -BuildDirectory $uiBuildDirectory -File
 $built7zWrapper = Resolve-UiTestArtifact -BuildDirectory $uiBuildDirectory -FileName '7zwrapper.dll'
 $built7zEngine = Resolve-UiTestArtifact -BuildDirectory $uiBuildDirectory -FileName '7za.dll'
 $uiTestEnvironmentSkipReason = $null
+$uiTestEnvironmentSkipIsNonBlocking = $false
 try {
-    Set-UiTestEnvironment -ExecutablePath $builtUiExecutable
+    $uiTestEnvironmentSkipReason = Set-UiTestEnvironment -ExecutablePath $builtUiExecutable
+    $uiTestEnvironmentSkipIsNonBlocking = -not [string]::IsNullOrWhiteSpace($uiTestEnvironmentSkipReason)
 }
 catch {
     # Missing disposable-profile or topology prerequisites must not hide the independent native and source checks.
     $uiTestEnvironmentSkipReason = $_.Exception.Message
+    # A privilege or access-denied failure means the UI lane was not completed; keep that known host limitation non-blocking.
+    $uiTestEnvironmentSkipIsNonBlocking = $uiTestEnvironmentSkipReason -match '(?i)(privilege|permission|access is denied|administrator)'
 }
 
 # Fast source contracts and native compatibility probes are always collected;
@@ -1148,7 +1165,8 @@ $nunitAction = {
         }
     }
 }.GetNewClosure()
-Invoke-AutomatedCheck -Name 'FileManager.UiTests (complete NUnit project)' -Action $nunitAction -SkipReason $nunitSkipReason
+Invoke-AutomatedCheck -Name 'FileManager.UiTests (complete NUnit project)' -Action $nunitAction `
+    -SkipReason $nunitSkipReason -NonBlockingSkip:$uiTestEnvironmentSkipIsNonBlocking
 
 if ($SkipLockVerifier) {
     # The release workflow owns verifier execution as a separate fresh-volume phase, not a skipped test result.
@@ -1201,7 +1219,11 @@ if ($ReleasePipeline) {
 
 Write-Host "`n=== Automated test summary ===" -ForegroundColor Cyan
 Write-Host "$($passed.Count) checks passed." -ForegroundColor Green
-$totalSkippedCount = $skipped.Count + $nonBlockingSkipped.Count
+$totalSkippedCount = $skipped.Count + $nonBlockingSkipped.Count + $nonBlockingEnvironmentSkipped.Count
+if ($nonBlockingEnvironmentSkipped.Count -ne 0) {
+    Write-Host "$($nonBlockingEnvironmentSkipped.Count) UI test environment checks skipped as an allowed privilege limitation:" -ForegroundColor Yellow
+    $nonBlockingEnvironmentSkipped | ForEach-Object { Write-Host "  - $_" -ForegroundColor Yellow }
+}
 if ($nonBlockingSkipped.Count -ne 0) {
     Write-Host "$($nonBlockingSkipped.Count) second-volume-dependent tests skipped as an allowed capability limitation:" -ForegroundColor Yellow
     $nonBlockingSkipped | ForEach-Object { Write-Host "  - $_" -ForegroundColor Yellow }

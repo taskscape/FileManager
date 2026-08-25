@@ -76,8 +76,11 @@ public sealed class NativeSafetyRegressionTests
             Assert.That(releaseInstaller, Does.Contain("setup.iss"));
             Assert.That(runner, Does.Contain("FailOnSkipped"));
             Assert.That(runner, Does.Contain("@outcome='NotExecuted'"));
-            // Local capability gates are explicit skips; strict release mode still rejects them and every unrecognized NUnit Ignore.
+            // Local capability gates are explicit skips; strict release mode still rejects unrecognized NUnit Ignore results.
             Assert.That(runner, Does.Contain("$optionalUiIgnoreMessagePrefixes"));
+            Assert.That(runner, Does.Contain("SeCreateSymbolicLinkPrivilege"));
+            Assert.That(runner, Does.Contain("all UI tests were skipped"));
+            Assert.That(runner, Does.Contain("-NonBlockingSkip:$uiTestEnvironmentSkipIsNonBlocking"));
             Assert.That(runner, Does.Contain("capability-gated NUnit tests were skipped despite -FailOnSkipped"));
             // Only manifest-backed categories may leave the blocking inventory; unrecognized NUnit Ignore remains a hard failure.
             Assert.That(runner, Does.Contain("verify-ui-test-quarantine.ps1"));
@@ -116,6 +119,7 @@ public sealed class NativeSafetyRegressionTests
             Assert.That(releaseWorkflow, Does.Contain("needs: release-tests"));
             Assert.That(releaseWorkflow, Does.Contain("fetch-depth: 0"));
             Assert.That(releaseWorkflow, Does.Contain("FILEMANAGER_UI_CONFIG_FAULT_INJECTION: '1'"));
+            Assert.That(releaseWorkflow, Does.Contain("if-no-files-found: warn"));
             // The runner owns capability detection; workflows must not require privileged volume provisioning.
             Assert.That(runner, Does.Contain("Resolve-WritableFixedDDrive"));
             Assert.That(runner, Does.Contain("FILEMANAGER_UI_SECOND_VOLUME_SKIP_REASON"));

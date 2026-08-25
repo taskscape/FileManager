@@ -18,6 +18,10 @@ Set these environment variables before running:
 
 The test runner never mounts test virtual disks. If fixed writable `D:\` is unavailable, all second-volume-dependent tests are reported as successful, explicit capability skips.
 
+The complete UI suite also requires `SeCreateSymbolicLinkPrivilege` for its disposable reparse-point fixtures. If the
+runner lacks that privilege, it reports the missing privilege and skips the complete UI suite as an allowed environment
+limitation; the UI tests are not reported as completed.
+
 Run the suite on an interactive Windows desktop session:
 
 ```powershell
