@@ -10,14 +10,14 @@ namespace FileManager.UiTests.Infrastructure;
 [Category("UI")]
 public abstract class FileOperationUiTestBase : FileManagerUiTestBase
 {
-    // Fresh VHD-backed panels can report a completed refresh before their owner-drawn quick-search and selection states are usable.
-    private const int VhdPanelSettleMilliseconds = 750;
+    // Secondary-volume panels can report a completed refresh before their owner-drawn quick-search and selection states are usable.
+    private const int PanelSettleMilliseconds = 750;
     private FileOperationWorkspace? workspace;
 
     protected FileOperationWorkspace Workspace => workspace ??= new FileOperationWorkspace(TargetVolumeRoot);
 
-    // A characterization fixture can opt into a dedicated second volume.  The
-    // The default keeps source and target under one guarded test-data root.
+    // A characterization fixture can opt into a dedicated second volume. The
+    // default keeps source and target under one guarded test-data root.
     protected virtual string? TargetVolumeRoot => null;
 
     protected override string ApplicationArguments =>
@@ -100,13 +100,13 @@ public abstract class FileOperationUiTestBase : FileManagerUiTestBase
     protected void SelectSourceItem(string name)
     {
         var list = PrepareSourcePanelForSelection();
-        // Starting from an empty native selected set keeps an incomplete VHD refresh from carrying a prior fixture into this operation.
+        // Starting from an empty native selected set keeps an incomplete panel refresh from carrying a prior fixture into this operation.
         NativeCommands.ClearActiveSelection(MainWindow.Properties.NativeWindowHandle.Value);
         QuickSearchSourceItem(list, name);
         // Mark the focused match explicitly so Copy/Move/Delete observe the same selected-item state as an interactive user.
         NativeCommands.ToggleFocusedSelection(list.Properties.NativeWindowHandle.Value);
-        // Insert publishes selection-dependent command state on the panel's following idle turn, which is delayed for mounted VHD volumes.
-        Thread.Sleep(VhdPanelSettleMilliseconds);
+        // Insert publishes selection-dependent command state on the panel's following idle turn, which can be delayed on a secondary volume.
+        Thread.Sleep(PanelSettleMilliseconds);
         // Insert advances the caret after selecting; restore the match because Quick Rename acts on the caret rather than the selection.
         QuickSearchSourceItem(list, name);
     }
@@ -131,7 +131,7 @@ public abstract class FileOperationUiTestBase : FileManagerUiTestBase
             QuickSearchSourceItem(list, name);
             NativeCommands.ToggleFocusedSelection(list.Properties.NativeWindowHandle.Value);
             // Preserve each Insert selection until the owner-drawn panel has published it before searching for the next item.
-            Thread.Sleep(VhdPanelSettleMilliseconds);
+            Thread.Sleep(PanelSettleMilliseconds);
         }
     }
 
@@ -399,10 +399,10 @@ public abstract class FileOperationUiTestBase : FileManagerUiTestBase
     {
         var list = FindSourceList();
         NativeCommands.ActivateFilePanel(list.Properties.NativeWindowHandle.Value);
-        // A visible main window can precede VHD-backed directory enumeration, so
+        // A visible main window can precede secondary-volume directory enumeration, so
         // refresh every selection path before quick-searching a seeded fixture.
         NativeCommands.RefreshActiveFilePanel(MainWindow.Properties.NativeWindowHandle.Value);
-        Thread.Sleep(VhdPanelSettleMilliseconds);
+        Thread.Sleep(PanelSettleMilliseconds);
         return list;
     }
 
@@ -410,7 +410,7 @@ public abstract class FileOperationUiTestBase : FileManagerUiTestBase
     {
         NativeCommands.QuickSearch(list.Properties.NativeWindowHandle.Value, name);
         // Clipboard ownership is not stable in the headless runner, so wait for the panel's native quick-search update instead of probing global clipboard state.
-        Thread.Sleep(VhdPanelSettleMilliseconds);
+        Thread.Sleep(PanelSettleMilliseconds);
     }
 
     private static void SetDialogPath(Window dialog, string path)
@@ -485,7 +485,7 @@ public abstract class FileOperationUiTestBase : FileManagerUiTestBase
             if (!observedToolbarCommand && DateTime.UtcNow >= deadline - TimeSpan.FromSeconds(4))
                 return;
 
-            // Selection changes are published from the panel's next idle cycle, which is slower when a VHD is first enumerated.
+            // Selection changes are published from the panel's next idle cycle, which can be slower when a secondary volume is first enumerated.
             Thread.Sleep(100);
         }
 

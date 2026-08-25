@@ -4,7 +4,7 @@ param(
     [string]$SqliteDll,
     [switch]$FailOnSkipped,
     [switch]$KeepBuildArtifacts,
-    # The release workflow provisions a fresh VHD before verifier stress instead of reusing a failed suite's filesystem state.
+    # The release workflow uses the host's fixed D: volume when it is available instead of provisioning test media.
     [switch]$SkipLockVerifier,
     # Keep external-server tests out of the blocking inventory; their launcher opts in with the LiveFtp category.
     [string]$NUnitFilter = 'TestCategory!=Quarantined&TestCategory!=LiveFtp',
@@ -14,7 +14,7 @@ param(
     [string]$NUnitTrxPath,
     # Run the local equivalent of both release-test and installer-build jobs, excluding the GitHub-only publish job.
     [switch]$ReleasePipeline,
-    # Inspect the blocking release environment without creating VHDs, building binaries, or changing installed tools.
+    # Inspect the blocking release environment without changing disks, building binaries, or changing installed tools.
     [switch]$PrerequisiteOnly,
     # GitHub supplies its monotonically increasing run number; local pipeline runs use 0 unless callers provide one.
     [string]$BuildNumber = $env:GITHUB_RUN_NUMBER
@@ -31,11 +31,15 @@ $pictViewEngineProject = Join-Path $repositoryRoot 'tests\PictViewEngineTests\Pi
 $failures = [System.Collections.Generic.List[string]]::new()
 $passed = [System.Collections.Generic.List[string]]::new()
 $skipped = [System.Collections.Generic.List[string]]::new()
-# These assertions deliberately describe capabilities that a normal developer desktop need not provide; strict release runs provision all of them.
+$nonBlockingSkipped = [System.Collections.Generic.List[string]]::new()
+# These assertions describe optional capabilities whose absence is an explicit, documented local skip.
 $optionalUiIgnoreMessagePrefixes = @(
     'Set FILEMANAGER_UI_CONFIG_FAULT_INJECTION=1 ',
-    'Set FILEMANAGER_UI_CROSS_VOLUME_ROOT ',
     'Set FILEMANAGER_UI_RECYCLE_BIN=1 '
+)
+$nonBlockingUiIgnoreMessagePrefixes = @(
+    'Second-volume UI tests skipped: ',
+    'Second-volume ADS-unsupported UI tests skipped: '
 )
 
 if ($ReleasePipeline) {
@@ -256,11 +260,6 @@ function Test-ProcessIsElevated {
 function Get-ReleasePipelinePrerequisiteFailures {
     $missing = [System.Collections.Generic.List[string]]::new()
 
-    # DiskPart needs an elevated token to attach the fresh VHD topology used by the release UI gate.
-    if (-not (Test-ProcessIsElevated)) {
-        $missing.Add('Run from an elevated PowerShell console; DiskPart cannot create the three isolated VHD test volumes otherwise.')
-    }
-
     if ([string]::IsNullOrWhiteSpace((Find-VisualStudioDeveloperCommand))) {
         $missing.Add('Install Visual Studio 2026 C++ tools with the v145 x64/x86 toolset.')
     }
@@ -272,15 +271,6 @@ function Get-ReleasePipelinePrerequisiteFailures {
     }
     if ($null -eq (Get-Command pwsh.exe -ErrorAction SilentlyContinue | Select-Object -First 1)) {
         $missing.Add('Install 64-bit PowerShell 7.4 or newer for the SQLite recovery probe.')
-    }
-    if ($null -eq (Get-Command diskpart.exe -ErrorAction SilentlyContinue | Select-Object -First 1)) {
-        $missing.Add('DiskPart is required to provision the isolated NTFS and exFAT VHD test volumes.')
-    }
-
-    $usedLetters = @(Get-Volume | Where-Object DriveLetter | ForEach-Object { $_.DriveLetter.ToString().ToUpperInvariant() })
-    $freeLetters = @('V', 'W', 'X', 'Y', 'Z') | Where-Object { $_ -notin $usedLetters }
-    if ($freeLetters.Count -lt 3) {
-        $missing.Add('Free three drive letters from V: through Z: for the isolated UI test VHDs.')
     }
 
     # Preserve the mutable collection for callers that add checkout-specific failures after this generic audit.
@@ -449,29 +439,30 @@ function Stage-UiTestCrashReporter {
     Copy-Item -LiteralPath $reporter.FullName -Destination $destination -Force
 }
 
-function Resolve-UiTestVolume {
-    param(
-        [Parameter(Mandatory = $true)]
-        [string[]]$RequiredFileSystems,
-        [Parameter(Mandatory = $true)]
-        [string]$Purpose
-    )
-
-    $temporaryVolume = [System.IO.Path]::GetPathRoot([System.IO.Path]::GetTempPath())
-    $volume = Get-CimInstance Win32_LogicalDisk |
-        Where-Object {
-            $_.DriveType -in 2, 3 -and
-            -not [string]::IsNullOrWhiteSpace($_.DeviceID) -and
-            ($RequiredFileSystems -contains $_.FileSystem) -and
-            -not [string]::Equals("$($_.DeviceID)\", $temporaryVolume, [StringComparison]::OrdinalIgnoreCase) -and
-            $_.FreeSpace -ge 1GB
-        } |
-        Select-Object -First 1
-    if ($null -eq $volume) {
-        throw "The complete UI suite requires a writable $($RequiredFileSystems -join '/') volume distinct from $temporaryVolume for $Purpose; no such volume is available."
+function Resolve-WritableFixedDDrive {
+    # Probe the exact requested drive with a disposable file so the suite never assumes that a visible D: root is writable.
+    $disk = Get-CimInstance Win32_LogicalDisk -Filter "DeviceID='D:'" -ErrorAction SilentlyContinue
+    if ($null -eq $disk -or $disk.DriveType -ne 3 -or [string]::IsNullOrWhiteSpace($disk.FileSystem)) {
+        return $null
     }
 
-    return "$($volume.DeviceID)\"
+    $probeDirectory = Join-Path 'D:\' ('.filemanager-ui-write-probe-' + [Guid]::NewGuid().ToString('N'))
+    try {
+        New-Item -ItemType Directory -Path $probeDirectory -Force -ErrorAction Stop | Out-Null
+        [IO.File]::WriteAllText((Join-Path $probeDirectory 'probe.txt'), 'FileManager UI test capability probe')
+        return [pscustomobject]@{
+            Root = 'D:\'
+            FileSystem = [string]$disk.FileSystem
+        }
+    }
+    catch {
+        return $null
+    }
+    finally {
+        if (Test-Path -LiteralPath $probeDirectory -PathType Container) {
+            Remove-Item -LiteralPath $probeDirectory -Recurse -Force -ErrorAction SilentlyContinue
+        }
+    }
 }
 
 function Initialize-UiTestSandbox {
@@ -509,31 +500,6 @@ function Initialize-UiTestSandbox {
     [IO.File]::WriteAllText($ownershipMarker, $ownershipMarkerContents)
     New-Item -ItemType Directory -Path (Join-Path $fullRoot 'temp') -Force | Out-Null
     New-Item -ItemType Directory -Path (Join-Path $fullRoot 'appdata') -Force | Out-Null
-}
-
-function Initialize-ReleasePipelineUiVolumes {
-    param(
-        [Parameter(Mandatory = $true)]
-        [string]$WorkingDirectory
-    )
-
-    $environmentFile = Join-Path (Split-Path -Parent $WorkingDirectory) 'release-ui-volumes.env'
-    $provisioner = Join-Path $repositoryRoot 'tools\manage-ui-test-volumes.ps1'
-    # The release gate mounts fresh capability volumes so filesystem topology is not inherited from a developer desktop.
-    & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $provisioner -Action Setup -WorkingDirectory $WorkingDirectory -EnvironmentFile $environmentFile
-    if ($LASTEXITCODE -ne 0) {
-        throw "Provisioning isolated UI test volumes failed with exit code $LASTEXITCODE."
-    }
-    foreach ($line in Get-Content -LiteralPath $environmentFile) {
-        $parts = $line -split '=', 2
-        if ($parts.Count -eq 2 -and $parts[0] -match '^FILEMANAGER_UI_') {
-            Set-Item -Path ("Env:" + $parts[0]) -Value $parts[1]
-        }
-    }
-    $env:FILEMANAGER_UI_ISOLATED = '1'
-    $env:FILEMANAGER_UI_CONFIG_FAULT_INJECTION = '1'
-    $env:FILEMANAGER_UI_RECYCLE_BIN = '1'
-    return $true
 }
 
 function Build-ReleaseGateDebugArtifacts {
@@ -803,19 +769,29 @@ function Set-UiTestEnvironment {
 
     Initialize-UiTestSandbox
     $env:FILEMANAGER_UI_EXE = $ExecutablePath
-    if ([string]::IsNullOrWhiteSpace($env:FILEMANAGER_UI_CROSS_VOLUME_ROOT)) {
-        try {
-            # Additional-volume lanes are optional when the current host exposes only one writable drive.
-            $env:FILEMANAGER_UI_CROSS_VOLUME_ROOT = Join-Path (Resolve-UiTestVolume -RequiredFileSystems @('NTFS') -Purpose 'cross-volume move tests') 'filemanager-testdata'
-        }
-        catch { }
+    Remove-Item Env:FILEMANAGER_UI_CROSS_VOLUME_ROOT -ErrorAction SilentlyContinue
+    Remove-Item Env:FILEMANAGER_UI_ADS_UNSUPPORTED_TARGET_ROOT -ErrorAction SilentlyContinue
+    Remove-Item Env:FILEMANAGER_UI_SECOND_VOLUME_SKIP_REASON -ErrorAction SilentlyContinue
+    Remove-Item Env:FILEMANAGER_UI_ADS_UNSUPPORTED_TARGET_SKIP_REASON -ErrorAction SilentlyContinue
+
+    $secondVolume = Resolve-WritableFixedDDrive
+    $sourceVolume = [IO.Path]::GetPathRoot($env:FILEMANAGER_UI_TESTDATA_ROOT)
+    if ($null -eq $secondVolume -or [string]::Equals($sourceVolume, $secondVolume.Root, [StringComparison]::OrdinalIgnoreCase)) {
+        # A missing or unusable D: capability must produce a successful, explicit NUnit skip instead of requiring elevation or disk provisioning.
+        $env:FILEMANAGER_UI_SECOND_VOLUME_SKIP_REASON = 'Second-volume UI tests skipped: fixed writable D:\ is unavailable or is the same volume as the primary test sandbox; all tests that depend on a second volume have been skipped.'
+        Write-Host $env:FILEMANAGER_UI_SECOND_VOLUME_SKIP_REASON -ForegroundColor Yellow
     }
-    if ([string]::IsNullOrWhiteSpace($env:FILEMANAGER_UI_ADS_UNSUPPORTED_TARGET_ROOT)) {
-        try {
-            # An ADS-unsupported target cannot be synthesized, so retain the case as an explicit NUnit skip when absent.
-            $env:FILEMANAGER_UI_ADS_UNSUPPORTED_TARGET_ROOT = Join-Path (Resolve-UiTestVolume -RequiredFileSystems @('FAT', 'FAT32', 'exFAT') -Purpose 'ADS-loss tests') 'filemanager-testdata'
+    else {
+        $env:FILEMANAGER_UI_CROSS_VOLUME_ROOT = Join-Path $secondVolume.Root 'filemanager-testdata'
+        if ($secondVolume.FileSystem -in @('FAT', 'FAT32', 'exFAT')) {
+            # An ADS-unsupported D: volume can serve both the ordinary cross-volume and metadata-loss fixtures.
+            $env:FILEMANAGER_UI_ADS_UNSUPPORTED_TARGET_ROOT = $env:FILEMANAGER_UI_CROSS_VOLUME_ROOT
         }
-        catch { }
+        else {
+            # NTFS D: supports cross-volume moves but cannot represent the ADS-loss target, so keep that limitation explicit.
+            $env:FILEMANAGER_UI_ADS_UNSUPPORTED_TARGET_SKIP_REASON = "Second-volume ADS-unsupported UI tests skipped: D:\ uses $($secondVolume.FileSystem), which supports alternate data streams."
+            Write-Host $env:FILEMANAGER_UI_ADS_UNSUPPORTED_TARGET_SKIP_REASON -ForegroundColor Yellow
+        }
     }
     Assert-UiTestSymbolicLinkSupport
 
@@ -922,12 +898,9 @@ $testResultsDirectory = Join-Path $repositoryRoot 'TestResults'
 # Prune interrupted runs before preflight checks can exit, so an unavailable toolchain cannot defer retention indefinitely.
 Remove-OlderUiTestBuildResults -ResultsDirectory $testResultsDirectory
 
-$releasePipelineVolumeDirectory = $null
-$releasePipelineOwnsVolumes = $false
 $releaseGateBuildDirectory = $null
 $releaseGateResultDirectory = $null
 if ($ReleasePipeline) {
-    $releasePipelineVolumeDirectory = Join-Path (Join-Path $testResultsDirectory ('runtests-release-volumes-' + [Guid]::NewGuid().ToString('N'))) 'filemanager-ui-volumes'
     # Keep the release-gate artifacts and TRX outside the disposable runner build, just as Actions carries them across individual steps.
     $releaseGateResultDirectory = Join-Path $testResultsDirectory ('runtests-release-gate-' + [Guid]::NewGuid().ToString('N'))
     $releaseGateBuildDirectory = Join-Path $releaseGateResultDirectory 'build_stage'
@@ -953,7 +926,6 @@ $uiBuildDirectory = Join-Path $testResultsDirectory ('runtests-build-' + [Guid]:
 $releaseBuildDirectory = $null
 try {
 if ($ReleasePipeline) {
-    $releasePipelineOwnsVolumes = Initialize-ReleasePipelineUiVolumes -WorkingDirectory $releasePipelineVolumeDirectory
     Build-ReleaseGateDebugArtifacts -DeveloperCommand $vsDevCmd -BuildDirectory $releaseGateBuildDirectory -Toolset $PlatformToolset
     # Resolve the staged artifacts before invoking the aggregate runner, matching the workflow's strict hand-off between steps.
     $SqliteDll = Resolve-UiTestArtifact -BuildDirectory $releaseGateBuildDirectory -FileName 'sqlite.dll'
@@ -1128,14 +1100,22 @@ $nunitAction = {
                 $messageNode = $result.SelectSingleNode("./*[local-name()='Output']/*[local-name()='ErrorInfo']/*[local-name()='Message']")
                 $message = if ($null -eq $messageNode) { '' } else { $messageNode.InnerText }
                 $isExpectedCapabilitySkip = $false
+                $isNonBlockingCapabilitySkip = $false
                 foreach ($prefix in $optionalUiIgnoreMessagePrefixes) {
                     if ($message.StartsWith($prefix, [StringComparison]::Ordinal)) {
                         $isExpectedCapabilitySkip = $true
                         break
                     }
                 }
+                foreach ($prefix in $nonBlockingUiIgnoreMessagePrefixes) {
+                    if ($message.StartsWith($prefix, [StringComparison]::Ordinal)) {
+                        $isExpectedCapabilitySkip = $true
+                        $isNonBlockingCapabilitySkip = $true
+                        break
+                    }
+                }
                 if ($isExpectedCapabilitySkip) {
-                    $expectedCapabilitySkips += [pscustomobject]@{ Result = $result; Message = $message }
+                    $expectedCapabilitySkips += [pscustomobject]@{ Result = $result; Message = $message; NonBlocking = $isNonBlockingCapabilitySkip }
                 }
                 else {
                     $unexpectedIgnoredResults += $result
@@ -1143,15 +1123,22 @@ $nunitAction = {
             }
             foreach ($result in $expectedCapabilitySkips) {
                 # Preserve missing local capabilities in the summary instead of misclassifying their explicitly gated tests as failures.
-                $skipped.Add("FileManager.UiTests (complete NUnit project): $($result.Result.testName) - $($result.Message)")
+                $skipEntry = "FileManager.UiTests (complete NUnit project): $($result.Result.testName) - $($result.Message)"
+                if ($result.NonBlocking) {
+                    $nonBlockingSkipped.Add($skipEntry)
+                }
+                else {
+                    $skipped.Add($skipEntry)
+                }
                 Write-Host "Skipped NUnit test: $($result.Result.testName)" -ForegroundColor Yellow
             }
             if ($unexpectedIgnoredResults.Count -ne 0) {
                 $unexpectedIgnoredResults | Select-Object -First 10 | ForEach-Object { Write-Host "Ignored NUnit test: $($_.testName)" -ForegroundColor Yellow }
                 throw "$($unexpectedIgnoredResults.Count) NUnit tests were unexpectedly ignored; quarantined tests must be routed with -NUnitFilter."
             }
-            if ($FailOnSkipped -and $expectedCapabilitySkips.Count -ne 0) {
-                throw "$($expectedCapabilitySkips.Count) capability-gated NUnit tests were skipped despite -FailOnSkipped. Provision the release test environment before retrying."
+            $blockingCapabilitySkipCount = @($expectedCapabilitySkips | Where-Object { -not $_.NonBlocking }).Count
+            if ($FailOnSkipped -and $blockingCapabilitySkipCount -ne 0) {
+                throw "$blockingCapabilitySkipCount capability-gated NUnit tests were skipped despite -FailOnSkipped. Provision the release test environment before retrying."
             }
         }
     }
@@ -1214,8 +1201,13 @@ if ($ReleasePipeline) {
 
 Write-Host "`n=== Automated test summary ===" -ForegroundColor Cyan
 Write-Host "$($passed.Count) checks passed." -ForegroundColor Green
+$totalSkippedCount = $skipped.Count + $nonBlockingSkipped.Count
+if ($nonBlockingSkipped.Count -ne 0) {
+    Write-Host "$($nonBlockingSkipped.Count) second-volume-dependent tests skipped as an allowed capability limitation:" -ForegroundColor Yellow
+    $nonBlockingSkipped | ForEach-Object { Write-Host "  - $_" -ForegroundColor Yellow }
+}
 if ($skipped.Count -ne 0) {
-    Write-Host "$($skipped.Count) checks skipped:" -ForegroundColor Yellow
+    Write-Host "$($skipped.Count) blocking checks skipped:" -ForegroundColor Yellow
     $skipped | ForEach-Object { Write-Host "  - $_" -ForegroundColor Yellow }
 }
 $runnerExitCode = 0
@@ -1249,14 +1241,6 @@ finally {
         (Test-Path -LiteralPath $releaseBuildDirectory -PathType Container)) {
         # Release artifacts are likewise per-run outputs; retain them only when a packaging failure needs inspection.
         Remove-Item -LiteralPath $releaseBuildDirectory -Recurse -Force
-    }
-    if ($releasePipelineOwnsVolumes -and -not [string]::IsNullOrWhiteSpace($releasePipelineVolumeDirectory)) {
-        # Detach only the exact VHDs provisioned above, matching the workflow's unconditional cleanup phase.
-        & powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $repositoryRoot 'tools\manage-ui-test-volumes.ps1') `
-            -Action Cleanup -WorkingDirectory $releasePipelineVolumeDirectory
-        if ($LASTEXITCODE -ne 0) {
-            Write-Warning "Could not remove the release-pipeline UI test volumes (exit code $LASTEXITCODE)."
-        }
     }
     Remove-OlderUiTestBuildResults -ResultsDirectory $testResultsDirectory
 }

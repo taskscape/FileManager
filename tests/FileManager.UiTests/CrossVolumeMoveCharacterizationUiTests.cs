@@ -3,8 +3,8 @@ using NUnit.Framework;
 
 namespace FileManager.UiTests;
 
-// This fixture only runs when the caller explicitly supplies a dedicated
-// second volume.  It never deletes the supplied root, only its GUID child.
+// The runner supplies fixed writable D: when available; direct callers may provide
+// the same dedicated root explicitly. The fixture removes only its GUID child.
 [TestFixture]
 public sealed class CrossVolumeMoveCharacterizationUiTests : FileOperationUiTestBase
 {

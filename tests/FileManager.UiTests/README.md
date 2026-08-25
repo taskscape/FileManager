@@ -12,11 +12,11 @@ Set these environment variables before running:
 - `FILEMANAGER_UI_ARGUMENTS` — optional command-line arguments, for example a test-only `-c` configuration file.
 - `FILEMANAGER_UI_FTP_ORGANIZE_COMMAND` — runtime command ID allocated by FileManager for the FTP Client **Organize Bookmarks** menu command. This enables the 10 FTP bookmark persistence cases; without it, only those cases are skipped with an explicit message.
 - `FILEMANAGER_UI_CONFIG_FAULT_INJECTION=1` — explicitly enables the exhaustive transactional-configuration crash-recovery lane described below.
-- `FILEMANAGER_UI_CROSS_VOLUME_ROOT` — an existing dedicated directory on a different volume from `%TEMP%`. This enables the cross-volume move characterization fixture; the fixture creates and removes only a GUID-named child below this directory.
-- `FILEMANAGER_UI_ADS_UNSUPPORTED_TARGET_ROOT` — an existing dedicated directory on a different volume that does not support alternate data streams (for example FAT/FAT32/exFAT). This enables the ADS metadata-loss decision scenario and the fixture creates and removes only a GUID-named child below this directory.
+- `FILEMANAGER_UI_CROSS_VOLUME_ROOT` — selected automatically as `D:\filemanager-testdata` when fixed writable `D:\` is available. This enables the cross-volume move characterization fixture; the fixture creates and removes only a GUID-named child below this directory.
+- `FILEMANAGER_UI_ADS_UNSUPPORTED_TARGET_ROOT` — selected automatically when fixed writable `D:\` uses FAT/FAT32/exFAT. On NTFS `D:\`, the ADS-unsupported scenario is reported as an allowed capability skip.
 - `FILEMANAGER_UI_RECYCLE_BIN=1` — explicitly enables the recycle-bin characterization test. It requires the default recycle-bin delete setting in the isolated profile and adds one disposable file to that profile's recycle bin.
 
-The release workflow creates fresh NTFS source/cross-volume VHDX images and an exFAT ADS-unsupported VHDX image for each complete UI job, then detaches them in an `always()` cleanup step. Local runs may continue to point the two additional-volume variables at dedicated existing test volumes.
+The test runner never mounts test virtual disks. If fixed writable `D:\` is unavailable, all second-volume-dependent tests are reported as successful, explicit capability skips.
 
 Run the suite on an interactive Windows desktop session:
 

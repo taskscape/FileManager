@@ -3,8 +3,8 @@ using NUnit.Framework;
 
 namespace FileManager.UiTests;
 
-// This fixture needs a caller-supplied FAT/FAT32/exFAT-like volume. It creates
-// and removes only a GUID child below that dedicated root.
+// The runner supplies a FAT/FAT32/exFAT-like D: volume when available; direct
+// callers may provide the same dedicated root explicitly. Only a GUID child is removed.
 [TestFixture]
 public sealed class AlternateDataStreamsUnsupportedTargetUiTests : FileOperationUiTestBase
 {

@@ -26,7 +26,7 @@ First inspect the blocking environment without mutating disks, build outputs, or
 .\scripts\runtests.ps1 -ReleasePipeline -PrerequisiteOnly -BaseCommit HEAD^
 ```
 
-The parity command requires an elevated interactive PowerShell session, a clean checkout with complete Git history, VS 2026 v145 C++ tools, Windows PowerShell, PowerShell 7, DiskPart, and three unused letters from `V:` through `Z:`. It always provisions fresh NTFS/NTFS/exFAT VHDs, performs the workflow's staged Debug build and strict artifact resolution, then runs the aggregate test gate. Only after that gate passes does it perform the separate Release build, PE audit, symbol validation, pinned Inno Setup installation, staging, and installer compilation. It does not publish a GitHub release.
+The parity command requires an interactive Windows desktop, a clean checkout with complete Git history, VS 2026 v145 C++ tools, Windows PowerShell, and PowerShell 7. It probes the host's fixed `D:\` drive; when that drive is absent or not writable, all second-volume-dependent UI tests are reported as successful capability skips. It performs the workflow's staged Debug build and strict artifact resolution, then runs the aggregate test gate. Only after that gate passes does it perform the separate Release build, PE audit, symbol validation, pinned Inno Setup installation, staging, and installer compilation. It does not publish a GitHub release.
 
 `scripts\build-installer.ps1` remains available for packaging-only iteration, but it is not a replacement for release-pipeline validation.
 
@@ -341,9 +341,11 @@ Individual cases that look like they might reach outside do not:
   builds the deepest path the product accepts, still entirely below the workspace.
 - **Recycle Bin.** `Delete_to_recycle_bin_...` is opt-in (`FILEMANAGER_UI_RECYCLE_BIN=1`) and `ShellRecycleBin`
   exposes only `GetItemCount`. The case leaves one harness-created file in the bin and never empties or restores it.
-- **Second volumes.** The cross-volume and ADS-unsupported roots are opt-in, must also be named
-  `filemanager-testdata`, must be on a different volume, and are registered as owned roots so the same marker and
-  cleanup rules apply.
+- **Second volumes.** The runner automatically uses `D:\filemanager-testdata` when fixed writable `D:\` is
+  available and different from the primary sandbox. NTFS supports the ordinary cross-volume cases; the
+  ADS-unsupported case runs only on FAT/FAT32/exFAT. Missing or unusable `D:\` produces an explicit successful skip
+  for every test that depends on a second volume. Any selected root is registered as an owned root so the same
+  marker and cleanup rules apply.
 
 ##### The external editor, and why the lane ships its own
 
@@ -562,8 +564,8 @@ different prompt appeared".
 
 Pull-request CI runs the four changed-line ratchets, operation-completion and durable-copy contracts, zlib and bzip2 probes, cmark-gfm hardening, and the SQLite recovery probe after its Debug x64 build. The root runner additionally executes the built 7-Zip wrapper/oracle compatibility corpus whenever a `7z.exe`-compatible oracle is available; the release gate requires it.
 
-The release workflow gates installer publication on the complete root runner using the dedicated `filemanager-ui` self-hosted environment. It supplies the built executable and SQLite DLL, enables configuration fault injection and Recycle Bin coverage, obtains its two dedicated filesystem roots and FTP command ID from repository variables, and uses `-FailOnSkipped`. The release therefore fails if any runner check fails, any external prerequisite is missing, or any NUnit case reports `Assert.Ignore`/`NotExecuted`. It retrieves Inno Setup only through [`tools/release-inputs.json`](tools/release-inputs.json), checks the locked SHA-256 and Authenticode publisher before installation, then passes an immutable uploaded installer artifact to the `production`-protected publish job. Private PDB artifacts are retained for 180 days and are never attached to the public release.
+The release workflow gates installer publication on the complete root runner using the dedicated `filemanager-ui` self-hosted environment. It supplies the built executable and SQLite DLL, enables configuration fault injection and Recycle Bin coverage, detects fixed writable `D:\` for second-volume coverage, and uses `-FailOnSkipped`; second-volume capability skips are explicitly allowed. The release therefore fails if any runner check fails, any external prerequisite is missing, or any other NUnit case reports `Assert.Ignore`/`NotExecuted`. It retrieves Inno Setup only through [`tools/release-inputs.json`](tools/release-inputs.json), checks the locked SHA-256 and Authenticode publisher before installation, then passes an immutable uploaded installer artifact to the `production`-protected publish job. Private PDB artifacts are retained for 180 days and are never attached to the public release.
 
-Required release repository variables are `FILEMANAGER_UI_CROSS_VOLUME_ROOT`, `FILEMANAGER_UI_ADS_UNSUPPORTED_TARGET_ROOT`, and `FILEMANAGER_UI_FTP_ORGANIZE_COMMAND`. The dedicated runner must provide Visual Studio 2026, .NET 8, PowerShell 7.4+, Application Verifier, an unlocked desktop, symlink creation privileges, an ADS-capable second volume, and an ADS-unsupported volume.
+The dedicated runner must provide Visual Studio 2026, .NET 8, PowerShell 7.4+, Application Verifier, an unlocked desktop, and symlink creation privileges. A fixed writable `D:\` is optional: without it, the runner reports all second-volume-dependent tests as successful capability skips.
 
 The nightly native-verifier lane runs the complete `UI` category with Application Verifier's Heaps, Handles, Locks, and Exceptions layers plus full PageHeap. `gflags.exe` is required and both Verifier and PageHeap settings are cleared in `finally` even if a test fails. The existing runner profile remains dedicated; provisioning and destroying a fresh Windows profile or VM is still an external runner-management requirement.

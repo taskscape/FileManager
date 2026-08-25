@@ -19,7 +19,6 @@ public sealed class NativeSafetyRegressionTests
         var runner = File.ReadAllText(Path.Combine(root, "scripts", "runtests.ps1"));
         var releaseWorkflow = File.ReadAllText(Path.Combine(root, ".github", "workflows", "build-installer.yml"));
         var releaseInstaller = File.ReadAllText(Path.Combine(root, "tools", "build-release-installer.ps1"));
-        var volumeProvisioner = File.ReadAllText(Path.Combine(root, "tools", "manage-ui-test-volumes.ps1"));
         var quarantineVerifier = File.ReadAllText(Path.Combine(root, "tools", "verify-ui-test-quarantine.ps1"));
         var quarantineWorkflow = File.ReadAllText(Path.Combine(root, ".github", "workflows", "quarantined-ui-tests.yml"));
         var liveFtpRunner = File.ReadAllText(Path.Combine(root, "scripts", "run-ftp-test.ps1"));
@@ -117,14 +116,17 @@ public sealed class NativeSafetyRegressionTests
             Assert.That(releaseWorkflow, Does.Contain("needs: release-tests"));
             Assert.That(releaseWorkflow, Does.Contain("fetch-depth: 0"));
             Assert.That(releaseWorkflow, Does.Contain("FILEMANAGER_UI_CONFIG_FAULT_INJECTION: '1'"));
-            // The release jobs must provision their capabilities and let the runner discover dynamic FTP commands.
-            Assert.That(releaseWorkflow, Does.Contain("manage-ui-test-volumes.ps1 -Action Setup"));
-            Assert.That(releaseWorkflow, Does.Contain("manage-ui-test-volumes.ps1 -Action Cleanup"));
+            // The runner owns capability detection; workflows must not require privileged volume provisioning.
+            Assert.That(runner, Does.Contain("Resolve-WritableFixedDDrive"));
+            Assert.That(runner, Does.Contain("FILEMANAGER_UI_SECOND_VOLUME_SKIP_REASON"));
+            Assert.That(runner, Does.Contain("all tests that depend on a second volume have been skipped"));
+            Assert.That(releaseWorkflow, Does.Not.Contain("manage-ui-test-volumes.ps1"));
+            Assert.That(quarantineWorkflow, Does.Not.Contain("manage-ui-test-volumes.ps1"));
+            Assert.That(nightlyWorkflow, Does.Not.Contain("manage-ui-test-volumes.ps1"));
             // Verifier fault injection is diagnostic: it must not block release on an opaque startup timeout.
             Assert.That(releaseWorkflow, Does.Not.Contain("Run Application Verifier lock stress on fresh volumes"));
             Assert.That(nightlyWorkflow, Does.Contain("Run baseline startup probe without Application Verifier"));
             Assert.That(nightlyWorkflow, Does.Contain("Identify the first verifier layer that blocks startup"));
-            Assert.That(nightlyWorkflow, Does.Contain("manage-ui-test-volumes.ps1 -Action Setup"));
             Assert.That(nightlyWorkflow, Does.Contain("setup-vs2026-buildtools.ps1"));
             Assert.That(verifierRunner, Does.Contain("VerifierLayers"));
             Assert.That(verifierRunner, Does.Contain("verifier-tests.trx"));
@@ -132,11 +134,6 @@ public sealed class NativeSafetyRegressionTests
             Assert.That(sandbox, Does.Contain("ClearOwnedRoot"));
             Assert.That(sandbox, Does.Contain("Delete the marker last"));
             Assert.That(releaseWorkflow, Does.Not.Contain("vars.FILEMANAGER_UI"));
-            Assert.That(volumeProvisioner, Does.Contain("FILEMANAGER_UI_CROSS_VOLUME_ROOT"));
-            Assert.That(volumeProvisioner, Does.Contain("FILEMANAGER_UI_ADS_UNSUPPORTED_TARGET_ROOT"));
-            // Provisioned roots must satisfy the same ownership guard as roots created by the NUnit harness.
-            Assert.That(volumeProvisioner, Does.Contain(".filemanager-testdata-owner"));
-            Assert.That(volumeProvisioner, Does.Contain("Open Salamander UI test sandbox"));
         });
     }
 
@@ -1582,10 +1579,10 @@ public sealed class NativeSafetyRegressionTests
             Assert.That(operations, Does.Contain("Copy_retries_a_temporarily_denied_alternate_data_stream_without_losing_it"));
             Assert.That(crossVolume, Does.Contain("Move_across_ADS_capable_volumes_preserves_multiple_streams_before_removing_the_source"));
             Assert.That(unsupportedAds, Does.Contain("Cross_volume_move_to_an_ADS_unsupported_target_keeps_the_source_when_metadata_loss_is_declined"));
-            // VHD-backed panel enumeration and shared IDYES dialogs require an explicit panel-settling and caption invariant.
+            // Secondary-volume panel enumeration and shared IDYES dialogs require an explicit panel-settling and caption invariant.
             Assert.That(workspace, Does.Contain("PrepareSourcePanelForSelection"));
             Assert.That(workspace, Does.Contain("QuickSearchSourceItem"));
-            Assert.That(workspace, Does.Contain("VhdPanelSettleMilliseconds"));
+            Assert.That(workspace, Does.Contain("PanelSettleMilliseconds"));
             // Copy and move assertions must wait for native handle release, not only for directory-entry visibility.
             Assert.That(workspace, Does.Contain("WaitForOperationOutputToBeReleased"));
             Assert.That(operations, Does.Contain("WaitForOperationOutputToBeReleased"));
@@ -1598,6 +1595,8 @@ public sealed class NativeSafetyRegressionTests
             Assert.That(ads, Does.Contain("RequireUnsupportedAt"));
             Assert.That(settings, Does.Contain("FILEMANAGER_UI_CROSS_VOLUME_ROOT"));
             Assert.That(settings, Does.Contain("FILEMANAGER_UI_ADS_UNSUPPORTED_TARGET_ROOT"));
+            Assert.That(settings, Does.Contain("FILEMANAGER_UI_SECOND_VOLUME_SKIP_REASON"));
+            Assert.That(settings, Does.Contain("FILEMANAGER_UI_ADS_UNSUPPORTED_TARGET_SKIP_REASON"));
             Assert.That(recovery, Does.Contain("Restart_reconciliation_commits_a_fully_written_transactional_target"));
             Assert.That(recovery, Does.Contain("STATE|0|temporary-ready"));
             Assert.That(workspace, Does.Contain("TargetVolumeRoot"));

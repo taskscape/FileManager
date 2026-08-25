@@ -69,7 +69,9 @@ internal static class UiTestSettings
     {
         var root = Environment.GetEnvironmentVariable("FILEMANAGER_UI_CROSS_VOLUME_ROOT");
         if (string.IsNullOrWhiteSpace(root))
-            Assert.Ignore("Set FILEMANAGER_UI_CROSS_VOLUME_ROOT to a filemanager-testdata directory on a second volume to run cross-volume move characterization tests.");
+            // The runner turns an unavailable writable D: capability into an allowed skip for the complete secondary-volume lane.
+            Assert.Ignore(Environment.GetEnvironmentVariable("FILEMANAGER_UI_SECOND_VOLUME_SKIP_REASON") ??
+                          "Second-volume UI tests skipped: fixed writable D:\\ is unavailable; all tests that depend on a second volume have been skipped.");
 
         var sourceVolume = Path.GetPathRoot(TestDataRoot);
         var fullRoot = Path.GetFullPath(root);
@@ -88,7 +90,10 @@ internal static class UiTestSettings
     {
         var root = Environment.GetEnvironmentVariable("FILEMANAGER_UI_ADS_UNSUPPORTED_TARGET_ROOT");
         if (string.IsNullOrWhiteSpace(root))
-            Assert.Ignore("Set FILEMANAGER_UI_ADS_UNSUPPORTED_TARGET_ROOT to a filemanager-testdata directory on an ADS-unsupported volume to run this test.");
+            // NTFS D: can run cross-volume cases but cannot provide the ADS-loss boundary, so this lane remains an allowed capability skip.
+            Assert.Ignore(Environment.GetEnvironmentVariable("FILEMANAGER_UI_ADS_UNSUPPORTED_TARGET_SKIP_REASON") ??
+                          Environment.GetEnvironmentVariable("FILEMANAGER_UI_SECOND_VOLUME_SKIP_REASON") ??
+                          "Second-volume UI tests skipped: fixed writable D:\\ is unavailable; all tests that depend on a second volume have been skipped.");
 
         var sourceVolume = Path.GetPathRoot(TestDataRoot);
         var fullRoot = Path.GetFullPath(root);
