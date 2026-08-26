@@ -56,27 +56,22 @@ jobs:
 
       - name: Setup MSVC Developer Command Prompt (${{ matrix.platform }} target)
         run: |
-          # Align host tools and target libraries with the matrix row to avoid inheriting a mixed runner environment.
-          $architecture = if ('${{ matrix.platform }}' -eq 'Win32') { 'x86' } else { 'x64' }
-          .\tools\setup-vs2026-buildtools.ps1 -TargetArchitecture $architecture -HostArchitecture $architecture
+          # VsDevCmd controls target CRT/LIB paths; PreferredToolArchitecture below controls only the compiler host.
+          $targetArchitecture = if ('${{ matrix.platform }}' -eq 'Win32') { 'x86' } else { 'x64' }
+          .\tools\setup-vs2026-buildtools.ps1 -TargetArchitecture $targetArchitecture
 
       - name: Verify MSVC target environment
         run: |
           # Fail before compilation if a persisted runner environment exposes the wrong target libraries.
-          $expectedTargetArchitecture = if ('${{ matrix.platform }}' -eq 'Win32') { 'x86' } else { 'x64' }
-          $expectedHostArchitecture = $expectedTargetArchitecture
-          if ($env:VSCMD_ARG_TGT_ARCH -ne $expectedTargetArchitecture) {
-            throw "Expected MSVC target '$expectedTargetArchitecture', but VsDevCmd exported '$env:VSCMD_ARG_TGT_ARCH'."
-          }
-          if ($env:VSCMD_ARG_HOST_ARCH -ne $expectedHostArchitecture) {
-            throw "Expected MSVC host '$expectedHostArchitecture', but VsDevCmd exported '$env:VSCMD_ARG_HOST_ARCH'."
+          $expectedArchitecture = if ('${{ matrix.platform }}' -eq 'Win32') { 'x86' } else { 'x64' }
+          if ($env:VSCMD_ARG_TGT_ARCH -ne $expectedArchitecture) {
+            throw "Expected MSVC target '$expectedArchitecture', but VsDevCmd exported '$env:VSCMD_ARG_TGT_ARCH'."
           }
           # Check executable resolution as well as metadata so an unrelated PATH entry cannot select the opposite-architecture cross tools.
-          $expectedToolSuffix = "\bin\Host$expectedHostArchitecture\$expectedTargetArchitecture"
+          $expectedToolSuffix = "\bin\Hostx64\$expectedArchitecture"
           foreach ($toolName in @('cl.exe', 'link.exe')) {
-            $toolCommand = Get-Command $toolName -CommandType Application -ErrorAction Stop | Select-Object -First 1
-            [string]$toolPath = $toolCommand.Source
-            if ($toolPath.IndexOf([string]$expectedToolSuffix, [System.StringComparison]::OrdinalIgnoreCase) -lt 0) {
+            $toolPath = (Get-Command $toolName -CommandType Application -ErrorAction Stop).Source
+            if ($toolPath.IndexOf($expectedToolSuffix, [System.StringComparison]::OrdinalIgnoreCase) -lt 0) {
               throw "Expected $toolName below '$expectedToolSuffix', but PATH resolved '$toolPath'."
             }
             Write-Host "$toolName path: $toolPath"
