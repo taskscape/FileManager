@@ -37,15 +37,7 @@ $masm = Get-ChildItem -LiteralPath (Join-Path $visualStudioRoot 'VC\Tools\MSVC')
 if ($null -eq $masm) {
     throw "The VS 2026 x86 MASM assembler was not found below '$visualStudioRoot'."
 }
-# Preserve the target-specific developer environment while adding the x86 MASM directory used by sfx7zip.
-$developerEnvironment = @($developerEnvironment | ForEach-Object {
-    if ($_ -like 'Path=*') {
-        'Path=' + $masm.DirectoryName + ';' + $_.Substring(5)
-    }
-    else {
-        $_
-    }
-})
+# MSBuild locates this assembler through its MASM tool path; exporting its directory would also shadow cl.exe and link.exe with x86 tools.
 
 foreach ($line in $developerEnvironment) {
     $separator = $line.IndexOf('=')

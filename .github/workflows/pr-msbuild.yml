@@ -67,6 +67,15 @@ jobs:
           if ($env:VSCMD_ARG_TGT_ARCH -ne $expectedArchitecture) {
             throw "Expected MSVC target '$expectedArchitecture', but VsDevCmd exported '$env:VSCMD_ARG_TGT_ARCH'."
           }
+          # Check executable resolution as well as metadata so an unrelated PATH entry cannot select the opposite-architecture cross tools.
+          $expectedToolSuffix = "\bin\Hostx64\$expectedArchitecture"
+          foreach ($toolName in @('cl.exe', 'link.exe')) {
+            $toolPath = (Get-Command $toolName -CommandType Application -ErrorAction Stop).Source
+            if ($toolPath.IndexOf($expectedToolSuffix, [System.StringComparison]::OrdinalIgnoreCase) -lt 0) {
+              throw "Expected $toolName below '$expectedToolSuffix', but PATH resolved '$toolPath'."
+            }
+            Write-Host "$toolName path: $toolPath"
+          }
           Write-Host "MSVC target architecture: $env:VSCMD_ARG_TGT_ARCH"
           Write-Host "MSVC host architecture:   $env:VSCMD_ARG_HOST_ARCH"
 
