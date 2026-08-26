@@ -14,6 +14,8 @@ if ($LASTEXITCODE -ne 0) {
 
 function Get-CodeWithoutCommentsAndLiterals {
     param(
+        # Blank source lines are valid input while the full file is scanned for an added call.
+        [AllowEmptyString()]
         [Parameter(Mandatory = $true)]
         [string]$Line,
         [Parameter(Mandatory = $true)]

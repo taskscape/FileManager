@@ -79,10 +79,15 @@ static BOOL ExtractPublishedTime(const char* json, size_t jsonSize, ULONGLONG* p
     return TRUE;
 }
 
-static DWORD WINAPI UpdateCheckThreadF(LPVOID param)
+static DWORD WINAPI UpdateCheckThreadF(void* param, HANDLE stopEvent)
 {
+    (void)param;
+    // The shutdown owner cancels this one-shot request before UI teardown can
+    // leave a completed network callback targeting a destroyed main window.
     // without internet connectivity the check is silently skipped and never
     // retried: there is exactly one attempt per session by design
+    if (WaitForSingleObject(stopEvent, 0) == WAIT_OBJECT_0)
+        return 0;
     DWORD connFlags = 0;
     if (!InternetGetConnectedState(&connFlags, 0))
         return 0;
@@ -128,6 +133,11 @@ static DWORD WINAPI UpdateCheckThreadF(LPVOID param)
                             }
                             if (bytesRead == 0)
                                 break;
+                            if (WaitForSingleObject(stopEvent, 0) == WAIT_OBJECT_0)
+                            {
+                                readError = TRUE;
+                                break;
+                            }
                             if (bodySize + bytesRead + 1 > bodyAlloc)
                             {
                                 size_t newAlloc = bodyAlloc == 0 ? 32 * 1024 : bodyAlloc * 2;
@@ -169,6 +179,9 @@ static DWORD WINAPI UpdateCheckThreadF(LPVOID param)
         WinHttpCloseHandle(session);
     }
 
+    if (WaitForSingleObject(stopEvent, 0) == WAIT_OBJECT_0)
+        return 0;
+
     if (updateFound)
         UpdateAvailable = TRUE; // UI thread reads this only after our posted message arrives
 
@@ -182,5 +195,15 @@ void StartUpdateCheck(HWND hNotifyWindow)
     HUpdateCheckNotifyWindow = hNotifyWindow;
     if (InterlockedExchange(&UpdateCheckStarted, TRUE))
         return; // already attempted in this session; failures are never retried
-    HANDLES(CreateThread(NULL, 0, UpdateCheckThreadF, NULL, 0, NULL));
+
+    // The shared shutdown registry owns this worker until it has stopped, so
+    // no request can outlive the UI and libraries it uses during application exit.
+    CThreadOwner* updateCheckThread = new CThreadOwner;
+    if (updateCheckThread == NULL ||
+        !updateCheckThread->Start(UpdateCheckThreadF, NULL, "GitHub update check"))
+    {
+        delete updateCheckThread;
+        return;
+    }
+    AddOwnedAuxThread(updateCheckThread, "GitHub update check");
 }
