@@ -132,8 +132,14 @@ public sealed class SChannelTlsIntegrationTests
         request.CertificateExtensions.Add(new X509KeyUsageExtension(X509KeyUsageFlags.DigitalSignature | X509KeyUsageFlags.KeyEncipherment, false));
         request.CertificateExtensions.Add(new X509SubjectKeyIdentifierExtension(request.PublicKey, false));
         using var generated = request.CreateSelfSigned(DateTimeOffset.UtcNow.AddDays(-1), DateTimeOffset.UtcNow.AddDays(1));
-        // SChannel requires a persisted server key; machine-key import also avoids missing user-key directories in isolated CI profiles.
+        // SChannel requires a persisted server key; prefer the current-user store so the tests do not require machine-key write access.
+        var appData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
+        if (!string.IsNullOrWhiteSpace(appData))
+        {
+            Directory.CreateDirectory(Path.Combine(appData, "Microsoft", "Crypto", "RSA"));
+            Directory.CreateDirectory(Path.Combine(appData, "Microsoft", "Crypto", "Keys"));
+        }
         return X509CertificateLoader.LoadPkcs12(generated.Export(X509ContentType.Pfx), null,
-                                                X509KeyStorageFlags.MachineKeySet | X509KeyStorageFlags.Exportable, null);
+                                                X509KeyStorageFlags.UserKeySet | X509KeyStorageFlags.Exportable, null);
     }
 }
