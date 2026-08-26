@@ -50,6 +50,26 @@ internal static class UiTestSettings
             Assert.Ignore("Set FILEMANAGER_UI_CONFIG_FAULT_INJECTION=1 to run the structural configuration write-boundary recovery test.");
     }
 
+    internal static void RequireZipPlugin()
+    {
+        RequireTestSandbox();
+        // The opt-in confirms deployment and enablement because the public UI cannot distinguish a disabled plug-in from an absent one.
+        if (!string.Equals(Environment.GetEnvironmentVariable("FILEMANAGER_UI_ZIP_PLUGIN"), "1", StringComparison.Ordinal))
+            Assert.Ignore("Install and enable the Zip plug-in, then set FILEMANAGER_UI_ZIP_PLUGIN=1 to run ZIP navigation characterization.");
+    }
+
+    internal static (string SearchTerm, string ExpectedResult) RequireHelpSearchFixture()
+    {
+        RequireTestSandbox();
+        var term = Environment.GetEnvironmentVariable("FILEMANAGER_UI_HELP_SEARCH_TERM");
+        var expected = Environment.GetEnvironmentVariable("FILEMANAGER_UI_HELP_EXPECTED_RESULT");
+        // Language-specific input keeps the contract meaningful for every deployed CHM rather than assuming English result text.
+        if (string.IsNullOrWhiteSpace(term) || string.IsNullOrWhiteSpace(expected))
+            Assert.Ignore("Deploy salamand.chm and set FILEMANAGER_UI_HELP_SEARCH_TERM plus FILEMANAGER_UI_HELP_EXPECTED_RESULT for its language.");
+
+        return (term!, expected!);
+    }
+
     internal static string RequireCrossVolumeRoot()
     {
         var root = Environment.GetEnvironmentVariable("FILEMANAGER_UI_CROSS_VOLUME_ROOT");
