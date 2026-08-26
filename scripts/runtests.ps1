@@ -62,6 +62,8 @@ $failures = [System.Collections.Generic.List[string]]::new()
 $passed = [System.Collections.Generic.List[string]]::new()
 $skipped = [System.Collections.Generic.List[string]]::new()
 $nonBlockingSkipped = [System.Collections.Generic.List[string]]::new()
+# Keep known whole-lane host limitations distinct from individual capability-gated NUnit cases.
+$nonBlockingEnvironmentSkipped = [System.Collections.Generic.List[string]]::new()
 # These assertions describe optional capabilities whose absence is an explicit, documented local skip.
 $optionalUiIgnoreMessagePrefixes = @(
     'Set FILEMANAGER_UI_CONFIG_FAULT_INJECTION=1 ',
@@ -97,7 +99,8 @@ function Invoke-AutomatedCheck {
         [string]$Name,
         [Parameter(Mandatory = $true)]
         [scriptblock]$Action,
-        [string]$SkipReason
+        [string]$SkipReason,
+        [switch]$NonBlockingSkip
     )
 
     Write-Host "`n=== Running $Name ===" -ForegroundColor Cyan
@@ -105,7 +108,12 @@ function Invoke-AutomatedCheck {
         # Optional lanes must remain visible in the aggregate report even when
         # this machine cannot safely satisfy their external prerequisites.
         $skipEntry = "${Name}: $SkipReason"
-        $skipped.Add($skipEntry)
+        if ($NonBlockingSkip) {
+            $nonBlockingEnvironmentSkipped.Add($skipEntry)
+        }
+        else {
+            $skipped.Add($skipEntry)
+        }
         Write-Host "SKIPPED: $SkipReason" -ForegroundColor Yellow
         return
     }
@@ -288,14 +296,24 @@ function Test-ProcessIsElevated {
     return $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
 }
 
+function Test-Dotnet10Sdk {
+    param([Parameter(Mandatory = $true)][string]$DotnetPath)
+
+    # A net10.0 project cannot be restored or built reliably with an older SDK even when dotnet.exe is present.
+    $installedSdks = @(& $DotnetPath --list-sdks)
+    return @($installedSdks | Where-Object { $_ -match '^10\.\d+\.\d+\s+\[' }).Count -ne 0
+}
+
 function Get-ReleasePipelinePrerequisiteFailures {
     $missing = [System.Collections.Generic.List[string]]::new()
 
     if ([string]::IsNullOrWhiteSpace((Find-VisualStudioDeveloperCommand))) {
         $missing.Add('Install Visual Studio 2026 C++ tools with the v145 x64/x86 toolset.')
     }
-    if ($null -eq (Get-Command dotnet.exe -ErrorAction SilentlyContinue | Select-Object -First 1)) {
-        $missing.Add('Install the .NET SDK used to run the net8.0 NUnit project.')
+    $dotnet = Get-Command dotnet.exe -ErrorAction SilentlyContinue | Select-Object -First 1
+    if ($null -eq $dotnet -or -not (Test-Dotnet10Sdk -DotnetPath $dotnet.Source)) {
+        # Keep the setup guidance in sync with the UI test project's supported runtime target.
+        $missing.Add('Install the .NET 10 SDK used to run the net10.0 NUnit project.')
     }
     if ($null -eq (Get-Command powershell.exe -ErrorAction SilentlyContinue | Select-Object -First 1)) {
         $missing.Add('Windows PowerShell is required for the repository PowerShell probes.')
@@ -646,8 +664,8 @@ function Assert-UiTestSymbolicLinkSupport {
         New-Item -ItemType SymbolicLink -Path $link -Target $target -ErrorAction Stop | Out-Null
     }
     catch {
-        # The UI suite needs this capability for topology coverage, so report a prerequisite failure before FileManager can launch partially.
-        return "Required privilege SeCreateSymbolicLinkPrivilege is unavailable. The complete UI test suite cannot start. Details: $($_.Exception.Message)"
+        # Preserve the documented runner contract: without this host privilege, report an honest whole-lane skip instead of partial UI coverage.
+        return "Required privilege SeCreateSymbolicLinkPrivilege is unavailable. The complete UI test suite has not been completed because required privileges are missing; all UI tests were skipped. Details: $($_.Exception.Message)"
     }
     finally {
         if (Test-Path -LiteralPath $root) {
@@ -701,8 +719,8 @@ function Set-UiTestEnvironment {
     }
     $privilegeSkipReason = Assert-UiTestSymbolicLinkSupport
     if (-not [string]::IsNullOrWhiteSpace($privilegeSkipReason)) {
-        # Do not let a host without the required filesystem capability start FileManager and report a partial UI result.
-        throw $privilegeSkipReason
+        # Stop before launching UI fixtures so an unavailable host cannot report a misleading partial result.
+        return $privilegeSkipReason
     }
 
     # The fixture reads dynamic FTP menu IDs from the exact process it launches, avoiding a cross-process SUID hand-off.
@@ -818,8 +836,8 @@ if ([string]::IsNullOrWhiteSpace($vsDevCmd)) {
     throw 'Visual Studio 2026 C++ developer tools were not found; the complete UI suite cannot build the current solution.'
 }
 $dotnet = Get-Command dotnet.exe -ErrorAction SilentlyContinue | Select-Object -First 1
-if ($null -eq $dotnet) {
-    throw '.NET 8 SDK was not found; the complete UI suite cannot run the NUnit project.'
+if ($null -eq $dotnet -or -not (Test-Dotnet10Sdk -DotnetPath $dotnet.Source)) {
+    throw '.NET 10 SDK was not found; the complete UI suite cannot run the net10.0 NUnit project.'
 }
 if ($ReleasePipeline) {
     # Match the workflow setup step so subsequent PowerShell audit tools resolve dumpbin from the same VS 2026 toolchain.
@@ -850,13 +868,16 @@ $null = Stage-UiTestCrashReporter -ExecutablePath $builtUiExecutable -BuildDirec
 $builtSqliteDll = Resolve-UiTestArtifact -BuildDirectory $uiBuildDirectory -FileName 'sqlite.dll'
 $built7zWrapper = Resolve-UiTestArtifact -BuildDirectory $uiBuildDirectory -FileName '7zwrapper.dll'
 $built7zEngine = Resolve-UiTestArtifact -BuildDirectory $uiBuildDirectory -FileName '7za.dll'
-$uiTestEnvironmentFailure = $null
+$uiTestEnvironmentSkipReason = $null
+$uiTestEnvironmentSkipIsNonBlocking = $false
 try {
-    Set-UiTestEnvironment -ExecutablePath $builtUiExecutable
+    $uiTestEnvironmentSkipReason = Set-UiTestEnvironment -ExecutablePath $builtUiExecutable
+    $uiTestEnvironmentSkipIsNonBlocking = -not [string]::IsNullOrWhiteSpace($uiTestEnvironmentSkipReason)
 }
 catch {
-    # Keep source and native diagnostics visible, but make the unavailable UI host an explicit final failure rather than an allowed skip.
-    $uiTestEnvironmentFailure = $_.Exception.Message
+    # Keep source and native diagnostics visible; known privilege failures remain an allowed whole-lane skip.
+    $uiTestEnvironmentSkipReason = $_.Exception.Message
+    $uiTestEnvironmentSkipIsNonBlocking = $uiTestEnvironmentSkipReason -match '(?i)(privilege|permission|access is denied|administrator)'
 }
 
 # Fast source contracts and native compatibility probes are always collected;
@@ -956,6 +977,7 @@ $networkFixtureAction = {
 }.GetNewClosure()
 Invoke-AutomatedCheck -Name 'Deterministic FTP/FTPS/HTTP fixture tests' -Action $networkFixtureAction
 
+$nunitSkipReason = $uiTestEnvironmentSkipReason
 $retainNunitResults = -not [string]::IsNullOrWhiteSpace($NUnitTrxPath)
 if ($retainNunitResults) {
     $nunitTrxPath = [System.IO.Path]::GetFullPath($NUnitTrxPath)
@@ -1051,16 +1073,8 @@ $nunitAction = {
         }
     }
 }.GetNewClosure()
-if (-not [string]::IsNullOrWhiteSpace($uiTestEnvironmentFailure)) {
-    $uiPreflightFailureAction = {
-        # A failed preflight deliberately prevents executable launch; this is a test-host failure, not an NUnit skip.
-        throw $uiTestEnvironmentFailure
-    }.GetNewClosure()
-    Invoke-AutomatedCheck -Name 'FileManager.UiTests (complete NUnit project)' -Action $uiPreflightFailureAction
-}
-else {
-    Invoke-AutomatedCheck -Name 'FileManager.UiTests (complete NUnit project)' -Action $nunitAction
-}
+Invoke-AutomatedCheck -Name 'FileManager.UiTests (complete NUnit project)' -Action $nunitAction `
+    -SkipReason $nunitSkipReason -NonBlockingSkip:$uiTestEnvironmentSkipIsNonBlocking
 
 if ($SkipLockVerifier) {
     # The release workflow owns verifier execution as a separate fresh-volume phase, not a skipped test result.
@@ -1131,7 +1145,11 @@ if ($ReleasePipeline) {
 
 Write-Host "`n=== Automated test summary ===" -ForegroundColor Cyan
 Write-Host "$($passed.Count) checks passed." -ForegroundColor Green
-$totalSkippedCount = $skipped.Count + $nonBlockingSkipped.Count
+$totalSkippedCount = $skipped.Count + $nonBlockingSkipped.Count + $nonBlockingEnvironmentSkipped.Count
+if ($nonBlockingEnvironmentSkipped.Count -ne 0) {
+    Write-Host "$($nonBlockingEnvironmentSkipped.Count) UI test environment checks skipped as an allowed privilege limitation:" -ForegroundColor Yellow
+    $nonBlockingEnvironmentSkipped | ForEach-Object { Write-Host "  - $_" -ForegroundColor Yellow }
+}
 if ($nonBlockingSkipped.Count -ne 0) {
     Write-Host "$($nonBlockingSkipped.Count) second-volume-dependent tests skipped as an allowed capability limitation:" -ForegroundColor Yellow
     $nonBlockingSkipped | ForEach-Object { Write-Host "  - $_" -ForegroundColor Yellow }

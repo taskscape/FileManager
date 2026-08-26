@@ -24,7 +24,7 @@ The most accurate high-level classification is a **Win32 modular monolith with a
 - Solution scale: 93 Visual C++ projects; roughly 958 `.cpp`, 1,134 `.h`, and 212 `.c` files in the repository.
 - Shipped architectures: Win32 and x64 are represented in property sheets and the solution; the current installer workflow produces x64.
 - Local projects and CI use the VS 2026 `v145` toolset.
-- UI test project: `tests/FileManager.UiTests`, targeting .NET 8 Windows with NUnit and FlaUI/UIA3.
+- UI test project: `tests/FileManager.UiTests`, targeting .NET 10 Windows with NUnit and FlaUI/UIA3.
 - Configuration store: primarily versioned keys under `HKEY_CURRENT_USER`, with optional `config.reg` import from the executable directory or roaming AppData.
 - Localization: the host and plug-ins load `.slg` language resource modules; resources and command identifiers are central to UI composition and automation.
 

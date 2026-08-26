@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <!-- UI Automation must run on Windows because the application under test is native Win32. -->
-    <TargetFramework>net8.0-windows</TargetFramework>
+    <!-- UI Automation stays on Windows while tracking the supported .NET 10 test runtime for the native Win32 application. -->
+    <TargetFramework>net10.0-windows</TargetFramework>
     <!-- Explicit test identity keeps discovery enabled across .NET SDK versions without command-line overrides. -->
     <IsTestProject>true</IsTestProject>
     <IsPackable>false</IsPackable>

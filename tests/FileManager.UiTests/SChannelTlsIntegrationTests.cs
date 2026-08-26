@@ -93,7 +93,7 @@ public sealed class SChannelTlsIntegrationTests
         request.CertificateExtensions.Add(new X509SubjectKeyIdentifierExtension(request.PublicKey, false));
         using var generated = request.CreateSelfSigned(DateTimeOffset.UtcNow.AddDays(-1), DateTimeOffset.UtcNow.AddDays(1));
         // Windows SChannel cannot use an ephemeral private-key handle for a
-        // server credential. UserKeySet keeps the test self-contained.
-        return new X509Certificate2(generated.Export(X509ContentType.Pfx), (string?)null, X509KeyStorageFlags.UserKeySet);
+        // server credential, so use the .NET 10-compatible PFX loader with UserKeySet.
+        return X509CertificateLoader.LoadPkcs12(generated.Export(X509ContentType.Pfx), null, X509KeyStorageFlags.UserKeySet, null);
     }
 }

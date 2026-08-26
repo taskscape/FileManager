@@ -84,7 +84,7 @@ The process-scoped execution-policy bypass does not change the machine-wide poli
 
 ### NUnit contracts and integration tests
 
-The NUnit project targets .NET 8:
+The NUnit project targets .NET 10:
 
 ```powershell
 dotnet restore .\tests\FileManager.UiTests\FileManager.UiTests.csproj
@@ -568,6 +568,6 @@ Pull-request CI runs the four changed-line ratchets, operation-completion and du
 
 The release workflow gates installer publication on the complete root runner using the dedicated `filemanager-ui` self-hosted environment. It supplies the built executable and SQLite DLL, enables configuration fault injection and Recycle Bin coverage, detects fixed writable `D:\` for second-volume coverage, and uses `-FailOnSkipped`; known second-volume and missing-privilege environment skips are explicitly reported and allowed. When `SeCreateSymbolicLinkPrivilege` is unavailable, the complete UI suite is skipped as not completed rather than run partially. The release therefore fails if any runner check fails or any other NUnit case reports `Assert.Ignore`/`NotExecuted`. It retrieves Inno Setup only through [`tools/release-inputs.json`](tools/release-inputs.json), checks the locked SHA-256 and Authenticode publisher before installation, then passes an immutable uploaded installer artifact to the `production`-protected publish job. Private PDB artifacts are retained for 180 days and are never attached to the public release.
 
-The dedicated runner must provide Visual Studio 2026, .NET 8, PowerShell 7.4+, Application Verifier, and an unlocked desktop. Symlink creation privileges are required for completed UI coverage; if they are absent, the runner reports the UI lane as not completed and skips it without failing the release gate. A fixed writable `D:\` is optional: without it, the runner reports all second-volume-dependent tests as successful capability skips.
+The dedicated runner must provide Visual Studio 2026, .NET 10, PowerShell 7.4+, Application Verifier, and an unlocked desktop. Symlink creation privileges are required for completed UI coverage; if they are absent, the runner reports the UI lane as not completed and skips it without failing the release gate. A fixed writable `D:\` is optional: without it, the runner reports all second-volume-dependent tests as successful capability skips.
 
 The nightly native-verifier lane runs the complete `UI` category with Application Verifier's Heaps, Handles, Locks, and Exceptions layers plus full PageHeap. `gflags.exe` is required and both Verifier and PageHeap settings are cleared in `finally` even if a test fails. The existing runner profile remains dedicated; provisioning and destroying a fresh Windows profile or VM is still an external runner-management requirement.

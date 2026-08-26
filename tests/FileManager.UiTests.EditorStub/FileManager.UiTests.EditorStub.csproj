@@ -5,7 +5,8 @@
          between launches, which is exactly the shared-instance hazard this stub
          exists to avoid. -->
     <OutputType>WinExe</OutputType>
-    <TargetFramework>net8.0-windows</TargetFramework>
+    <!-- Keep the stub aligned with the .NET 10 UI-test host so its copied output has one compatible runtime contract. -->
+    <TargetFramework>net10.0-windows</TargetFramework>
     <UseWindowsForms>true</UseWindowsForms>
     <IsPackable>false</IsPackable>
     <ImplicitUsings>enable</ImplicitUsings>

@@ -90,12 +90,13 @@ public sealed class NativeSafetyRegressionTests
             Assert.That(runner, Does.Contain("Retaining failed Release installer build directory"));
             Assert.That(runner, Does.Contain("FailOnSkipped"));
             Assert.That(runner, Does.Contain("@outcome='NotExecuted'"));
-            // Optional fixture capabilities may skip individual cases, but lacking the mandatory symlink capability blocks the whole UI lane.
+            // A host without symlink privilege must skip the complete UI lane rather than falsely report partial coverage as a release failure.
             Assert.That(runner, Does.Contain("$optionalUiIgnoreMessagePrefixes"));
             Assert.That(runner, Does.Contain("SeCreateSymbolicLinkPrivilege"));
-            Assert.That(runner, Does.Contain("The complete UI test suite cannot start"));
-            Assert.That(runner, Does.Contain("$uiTestEnvironmentFailure = $_.Exception.Message"));
-            Assert.That(runner, Does.Contain("$uiPreflightFailureAction"));
+            Assert.That(runner, Does.Contain("The complete UI test suite has not been completed"));
+            Assert.That(runner, Does.Contain("$uiTestEnvironmentSkipReason = $_.Exception.Message"));
+            Assert.That(runner, Does.Contain("NonBlockingSkip:$uiTestEnvironmentSkipIsNonBlocking"));
+            Assert.That(runner, Does.Contain("$nonBlockingEnvironmentSkipped"));
             Assert.That(runner, Does.Contain("capability-gated NUnit tests were skipped despite -FailOnSkipped"));
             // Only manifest-backed categories may leave the blocking inventory; unrecognized NUnit Ignore remains a hard failure.
             Assert.That(runner, Does.Contain("verify-ui-test-quarantine.ps1"));
@@ -140,6 +141,9 @@ public sealed class NativeSafetyRegressionTests
             Assert.That(releaseWorkflow, Does.Contain("needs: release-tests"));
             Assert.That(releaseWorkflow, Does.Contain("fetch-depth: 0"));
             Assert.That(releaseWorkflow, Does.Contain("FILEMANAGER_UI_CONFIG_FAULT_INJECTION: '1'"));
+            // CI must install the exact SDK required by the migrated UI projects on every job that invokes dotnet test.
+            Assert.That(releaseWorkflow, Does.Contain("actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68"));
+            Assert.That(releaseWorkflow, Does.Contain("dotnet-version: '10.0.x'"));
             Assert.That(releaseWorkflow, Does.Contain("if-no-files-found: warn"));
             // The runner owns capability detection; workflows must not require privileged volume provisioning.
             Assert.That(runner, Does.Contain("Resolve-WritableFixedDDrive"));

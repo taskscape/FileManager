@@ -56,3 +56,4 @@ TestResults/codex-inno-setup-validation
 TestResults
 build_errors.txt
 Installer/Installer_Staging-runtests-9224388589a145309060a15bb5ee76bd
+Installer/Installer_Staging-runtests-*
