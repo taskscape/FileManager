@@ -304,16 +304,24 @@ function Test-Dotnet10Sdk {
     return @($installedSdks | Where-Object { $_ -match '^10\.\d+\.\d+\s+\[' }).Count -ne 0
 }
 
+function Get-Dotnet10SdkCommand {
+    $dotnet = Get-Command dotnet.exe -ErrorAction SilentlyContinue | Select-Object -First 1
+    if ($null -eq $dotnet -or -not (Test-Dotnet10Sdk -DotnetPath $dotnet.Source)) {
+        # Both developer and self-hosted CI hosts are provisioned out of band; this runner never attempts a privileged SDK installation.
+        throw '.NET 10 SDK must already be installed to run the net10.0 NUnit project.'
+    }
+
+    return $dotnet
+}
+
+# Fail before build/test work so a host-provisioning problem cannot masquerade as a repository failure.
+$dotnet = Get-Dotnet10SdkCommand
+
 function Get-ReleasePipelinePrerequisiteFailures {
     $missing = [System.Collections.Generic.List[string]]::new()
 
     if ([string]::IsNullOrWhiteSpace((Find-VisualStudioDeveloperCommand))) {
         $missing.Add('Install Visual Studio 2026 C++ tools with the v145 x64/x86 toolset.')
-    }
-    $dotnet = Get-Command dotnet.exe -ErrorAction SilentlyContinue | Select-Object -First 1
-    if ($null -eq $dotnet -or -not (Test-Dotnet10Sdk -DotnetPath $dotnet.Source)) {
-        # Keep the setup guidance in sync with the UI test project's supported runtime target.
-        $missing.Add('Install the .NET 10 SDK used to run the net10.0 NUnit project.')
     }
     if ($null -eq (Get-Command powershell.exe -ErrorAction SilentlyContinue | Select-Object -First 1)) {
         $missing.Add('Windows PowerShell is required for the repository PowerShell probes.')
@@ -834,10 +842,6 @@ if ($ReleasePipeline) {
 $vsDevCmd = Find-VisualStudioDeveloperCommand
 if ([string]::IsNullOrWhiteSpace($vsDevCmd)) {
     throw 'Visual Studio 2026 C++ developer tools were not found; the complete UI suite cannot build the current solution.'
-}
-$dotnet = Get-Command dotnet.exe -ErrorAction SilentlyContinue | Select-Object -First 1
-if ($null -eq $dotnet -or -not (Test-Dotnet10Sdk -DotnetPath $dotnet.Source)) {
-    throw '.NET 10 SDK was not found; the complete UI suite cannot run the net10.0 NUnit project.'
 }
 if ($ReleasePipeline) {
     # Match the workflow setup step so subsequent PowerShell audit tools resolve dumpbin from the same VS 2026 toolchain.

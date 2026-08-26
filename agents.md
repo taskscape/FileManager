@@ -6,6 +6,10 @@ Visual Studio 2026 is installed and builds this solution successfully. Treat the
 
 Do not infer that C++ builds are unavailable merely because a separate Build Tools installation lacks Visual C++ targets. When a build is needed, use the installed Visual Studio 2026 environment and report the exact configuration and result.
 
+## GitHub Actions runner
+
+The GitHub Actions runner is a self-hosted machine that runs without administrator rights by default. Workflows must not assume they can install into protected locations or perform privileged system configuration; required SDKs and tools must be pre-provisioned or checked explicitly.
+
 ## Source-change documentation
 
 Every source-code change must include a concise nearby comment that documents the change's intent. Keep the comment focused on the reason for the change, invariant, or compatibility constraint it preserves rather than restating the code.

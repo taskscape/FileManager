@@ -48,12 +48,6 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Setup .NET 10 SDK
-        # The UI projects target net10.0-windows, so do not rely on a mutable self-hosted SDK installation.
-        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
-        with:
-          dotnet-version: '10.0.x'
-
       - name: Setup MSBuild
         uses: microsoft/setup-msbuild@30375c66a4eea26614e0d39710365f22f8b0af57 # v3
 
@@ -106,6 +100,7 @@ jobs:
 
       - name: Run release tests without unexpected skips
         shell: pwsh
+        # The self-hosted runner must provide .NET 10; runtests validates that prerequisite before its own build/test work.
         # Exclude manifest quarantines and the credentialed external FTPS smoke test; Application Verifier remains an instrumented nightly diagnostic lane.
         run: .\scripts\runtests.ps1 -NoReleasePipeline -BaseCommit $env:RELEASE_BASE_COMMIT -SqliteDll $env:SQLITE_TEST_DLL -FailOnSkipped -SkipLockVerifier -NUnitFilter 'TestCategory!=Quarantined&TestCategory!=LiveFtp' -PlatformToolset v145 -NUnitTrxPath $env:RUNNER_TEMP\runtests-v145.trx
 
@@ -147,12 +142,6 @@ jobs:
         # Pin actions by reviewed commit to keep the release input graph immutable.
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
 
-      - name: Setup .NET 10 SDK
-        # The pre-build contract test targets net10.0-windows and must match the release-test job.
-        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
-        with:
-          dotnet-version: '10.0.x'
-
       - name: Setup MSBuild
         uses: microsoft/setup-msbuild@30375c66a4eea26614e0d39710365f22f8b0af57 # v3
 
@@ -173,6 +162,7 @@ jobs:
 
       - name: Validate release workflow contracts
         shell: pwsh
+        # The completed release-tests dependency has already validated the runner's preinstalled .NET 10 SDK.
         # Run source-contract checks before the long Release build so workflow/test drift fails quickly and deterministically.
         run: |
           .\tools\test-release-input-pinning.ps1

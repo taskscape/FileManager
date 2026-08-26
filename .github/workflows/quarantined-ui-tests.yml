@@ -33,12 +33,6 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Setup .NET 10 SDK
-        # The quarantined lane must run against the same net10.0-windows target as the blocking UI suite.
-        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
-        with:
-          dotnet-version: '10.0.x'
-
       - name: Setup MSBuild
         uses: microsoft/setup-msbuild@6fb02220983dee41ce7ae257b6f4d8f9bf5ed4ce # v2
 
@@ -67,6 +61,7 @@ jobs:
 
       - name: Run manifest-backed quarantined UI tests
         shell: pwsh
+        # This self-hosted monitor is pre-provisioned with .NET 10; runtests rejects a missing SDK before executing tests.
         # Filtering is the only exclusion mechanism; this preserves failure on any unexpected skipped test.
         run: .\scripts\runtests.ps1 -NoReleasePipeline -BaseCommit HEAD^ -SqliteDll $env:SQLITE_TEST_DLL -FailOnSkipped -NUnitFilter 'TestCategory=Quarantined' -PlatformToolset v145 -NUnitTrxPath $env:RUNNER_TEMP\quarantined-ui-tests.trx
 

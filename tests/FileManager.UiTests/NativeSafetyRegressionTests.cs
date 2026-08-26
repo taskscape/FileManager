@@ -141,9 +141,11 @@ public sealed class NativeSafetyRegressionTests
             Assert.That(releaseWorkflow, Does.Contain("needs: release-tests"));
             Assert.That(releaseWorkflow, Does.Contain("fetch-depth: 0"));
             Assert.That(releaseWorkflow, Does.Contain("FILEMANAGER_UI_CONFIG_FAULT_INJECTION: '1'"));
-            // CI must install the exact SDK required by the migrated UI projects on every job that invokes dotnet test.
-            Assert.That(releaseWorkflow, Does.Contain("actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68"));
-            Assert.That(releaseWorkflow, Does.Contain("dotnet-version: '10.0.x'"));
+            // CI hosts are provisioned out of band, so the root runner must reject an absent .NET 10 SDK without invoking a privileged installer.
+            Assert.That(runner, Does.Contain("Get-Dotnet10SdkCommand"));
+            Assert.That(releaseWorkflow, Does.Not.Contain("actions/setup-dotnet"));
+            Assert.That(nightlyWorkflow, Does.Not.Contain("actions/setup-dotnet"));
+            Assert.That(quarantineWorkflow, Does.Not.Contain("actions/setup-dotnet"));
             Assert.That(releaseWorkflow, Does.Contain("if-no-files-found: warn"));
             // The runner owns capability detection; workflows must not require privileged volume provisioning.
             Assert.That(runner, Does.Contain("Resolve-WritableFixedDDrive"));
