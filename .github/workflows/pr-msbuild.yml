@@ -137,7 +137,10 @@ jobs:
           $txtLog = Join-Path $logDir "msbuild-$($env:BUILD_CONFIGURATION)-$suffix.log"
 
           Add-Content -Path $env:GITHUB_ENV -Value "LOG_PATH=$txtLog"
-          
+
+          # Match the tool host to the matrix row as a defense against runner-specific x64 library-path leakage.
+          $preferredToolArchitecture = if ('${{ matrix.platform }}' -eq 'Win32') { 'x86' } else { 'x64' }
+
           $arguments = @(
             $env:SOLUTION_PATH
             '/m'
@@ -145,8 +148,7 @@ jobs:
             "/p:Configuration=$($env:BUILD_CONFIGURATION)"
             "/p:Platform=${{ matrix.platform }}"
             "/p:PlatformToolset=$($env:PLATFORM_TOOLSET)"
-            # This selects the x64-hosted tools; the target and its CRT paths come from Platform plus VsDevCmd -arch.
-            '/p:PreferredToolArchitecture=x64'
+            "/p:PreferredToolArchitecture=$preferredToolArchitecture"
             '/warnaserror'
             '/nr:false'
             '/v:m'
