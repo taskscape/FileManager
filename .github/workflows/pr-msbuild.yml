@@ -54,9 +54,21 @@ jobs:
       - name: Setup MSBuild
         uses: microsoft/setup-msbuild@6fb02220983dee41ce7ae257b6f4d8f9bf5ed4ce # v2
 
-      - name: Setup MSVC Developer Command Prompt (x64 toolchain)
-        # Establish the VS 2026 environment before invoking every native build.
-        run: .\tools\setup-vs2026-buildtools.ps1
+      - name: Setup MSVC Developer Command Prompt (${{ matrix.platform }} target)
+        run: |
+          # VsDevCmd controls target CRT/LIB paths; PreferredToolArchitecture below controls only the compiler host.
+          $targetArchitecture = if ('${{ matrix.platform }}' -eq 'Win32') { 'x86' } else { 'x64' }
+          .\tools\setup-vs2026-buildtools.ps1 -TargetArchitecture $targetArchitecture
+
+      - name: Verify MSVC target environment
+        run: |
+          # Fail before compilation if a persisted runner environment exposes the wrong target libraries.
+          $expectedArchitecture = if ('${{ matrix.platform }}' -eq 'Win32') { 'x86' } else { 'x64' }
+          if ($env:VSCMD_ARG_TGT_ARCH -ne $expectedArchitecture) {
+            throw "Expected MSVC target '$expectedArchitecture', but VsDevCmd exported '$env:VSCMD_ARG_TGT_ARCH'."
+          }
+          Write-Host "MSVC target architecture: $env:VSCMD_ARG_TGT_ARCH"
+          Write-Host "MSVC host architecture:   $env:VSCMD_ARG_HOST_ARCH"
 
       # Run the verifier's synthetic Git-history cases once per matrix to keep
       # vendor scoping, comment parsing, and actionable diagnostics stable.
@@ -133,6 +145,7 @@ jobs:
             "/p:Configuration=$($env:BUILD_CONFIGURATION)"
             "/p:Platform=${{ matrix.platform }}"
             "/p:PlatformToolset=$($env:PLATFORM_TOOLSET)"
+            # This selects the x64-hosted tools; the target and its CRT paths come from Platform plus VsDevCmd -arch.
             '/p:PreferredToolArchitecture=x64'
             '/warnaserror'
             '/nr:false'
