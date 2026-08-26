@@ -148,8 +148,8 @@ jobs:
 
           Add-Content -Path $env:GITHUB_ENV -Value "LOG_PATH=$txtLog"
 
-          # Match the tool host to the matrix row as a defense against runner-specific x64 library-path leakage.
-          $preferredToolArchitecture = if ('${{ matrix.platform }}' -eq 'Win32') { 'x86' } else { 'x64' }
+          # Keep MSBuild on the same x64-hosted tools verified above; Platform and VsDevCmd -arch still select the target libraries.
+          $preferredToolArchitecture = 'x64'
 
           $arguments = @(
             $env:SOLUTION_PATH
