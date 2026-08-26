@@ -70,8 +70,9 @@ jobs:
           # Check executable resolution as well as metadata so an unrelated PATH entry cannot select the opposite-architecture cross tools.
           $expectedToolSuffix = "\bin\Hostx64\$expectedArchitecture"
           foreach ($toolName in @('cl.exe', 'link.exe')) {
-            $toolPath = (Get-Command $toolName -CommandType Application -ErrorAction Stop).Source
-            if ($toolPath.IndexOf($expectedToolSuffix, [System.StringComparison]::OrdinalIgnoreCase) -lt 0) {
+            # Select and stringify one command so verification remains stable when Get-Command exposes multiple application candidates.
+            [string]$toolPath = (Get-Command $toolName -CommandType Application -ErrorAction Stop | Select-Object -First 1).Source
+            if ($toolPath -notlike "*$expectedToolSuffix*") {
               throw "Expected $toolName below '$expectedToolSuffix', but PATH resolved '$toolPath'."
             }
             Write-Host "$toolName path: $toolPath"
