@@ -129,7 +129,13 @@ try {
 finally {
     # Restore the caller's shell exactly so focused reruns cannot contaminate later commands.
     foreach ($name in $savedEnvironment.Keys) {
-        Set-Item -Path "Env:$name" -Value $savedEnvironment[$name]
+        $value = $savedEnvironment[$name]
+        if ($null -eq $value) {
+            Remove-Item -Path "Env:$name" -ErrorAction SilentlyContinue
+        }
+        else {
+            Set-Item -Path "Env:$name" -Value $value
+        }
     }
 
     # NUnit removes the marked child on a healthy run; remove only the unique empty parent created above.
