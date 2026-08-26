@@ -3,7 +3,10 @@
 [CmdletBinding()]
 param(
     [ValidateSet('x86', 'x64')]
-    [string]$TargetArchitecture = 'x64'
+    [string]$TargetArchitecture = 'x64',
+
+    [ValidateSet('x86', 'x64')]
+    [string]$HostArchitecture = 'x64'
 )
 
 $ErrorActionPreference = 'Stop'
@@ -22,16 +25,17 @@ if ([string]::IsNullOrWhiteSpace($env:GITHUB_ENV)) {
 $initialEnvironment = @{}
 Get-ChildItem Env: | ForEach-Object { $initialEnvironment[$_.Name] = $_.Value }
 
-# Select target libraries for the matrix platform while retaining the faster x64-hosted compiler for both architectures.
-$command = 'call "' + $vsDevCmd + '" -arch=' + $TargetArchitecture + ' -host_arch=x64 >nul && set'
+# Keep host and target selection explicit so each workflow matrix row receives one internally consistent tool environment.
+$command = 'call "' + $vsDevCmd + '" -arch=' + $TargetArchitecture + ' -host_arch=' + $HostArchitecture + ' >nul && set'
 $developerEnvironment = & $env:ComSpec /d /s /c $command
 if ($LASTEXITCODE -ne 0) {
     throw "VsDevCmd failed with exit code $LASTEXITCODE."
 }
 
 $visualStudioRoot = Split-Path -Parent (Split-Path -Parent (Split-Path -Parent $vsDevCmd))
+$masmPathSuffix = "\bin\Host$HostArchitecture\x86\ml.exe"
 $masm = Get-ChildItem -LiteralPath (Join-Path $visualStudioRoot 'VC\Tools\MSVC') -Filter 'ml.exe' -File -Recurse -ErrorAction SilentlyContinue |
-    Where-Object { $_.FullName -match '\\bin\\Hostx64\\x86\\ml\.exe$' } |
+    Where-Object { $_.FullName -like "*$masmPathSuffix" } |
     Sort-Object FullName -Descending |
     Select-Object -First 1
 if ($null -eq $masm) {
