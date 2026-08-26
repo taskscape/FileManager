@@ -111,6 +111,17 @@ The repository includes a GitHub Actions workflow (`.github\workflows\build-inst
 
 The workflow is triggered on pushes to `main` and produces versioned installers named `OpenSalamander_6.0.{build_number}.exe`.
 
+### Update Detection
+
+Open Salamander checks for newer builds automatically. The mechanism relies solely on the release publishing described above and requires no version files or manual steps:
+
+1. Shortly after startup, a single background thread queries `https://api.github.com/repos/taskscape/FileManager/releases/latest` (implemented in `src\update_check.cpp`).
+2. The release's `"published_at"` UTC timestamp is compared against the build time embedded in the running executable — the PE COFF header link timestamp, which stays correct regardless of installer or file-copy operations.
+3. If the newest release was published **at least one hour** after this executable was linked, an update is considered available; the margin absorbs clock skew and CI publishing delay.
+4. If there is no internet connection, the check is silently skipped and never retried — exactly one attempt is made per session.
+
+When an update is found, the main window title bar gains an `(update available)` suffix and the Help menu's **Download update** item (which replaced the former *Official Support Forum* entry) becomes enabled; it opens the [releases page](https://github.com/taskscape/FileManager/releases) in the default web browser. Until then the item stays disabled.
+
 ## Customization
 
 ### Icons

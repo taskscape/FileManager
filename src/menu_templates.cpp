@@ -5,6 +5,7 @@
 #include "precomp.h"
 
 #include "menu.h"
+#include "update_check.h"
 
 CMenuPopup MainMenu;
 CMenuPopup ArchiveMenu;
@@ -254,7 +255,9 @@ MENU_TEMPLATE_ITEM MainMenuTemplate[] =
         {MNTT_IT, IDS_MENU_HELP_CONTEXT, MNTS_B | MNTS_I | MNTS_A, CM_HELP_CONTEXT, IDX_TB_CONTEXTHELP, 0, NULL},
         //    {MNTT_IT,    IDS_MENU_HELP_TIP,              MNTS_B|MNTS_I|MNTS_A, CM_HELP_TIP,              -1,                      0,                 NULL},
         {MNTT_SP, -1, MNTS_B | MNTS_I | MNTS_A, 0, -1, 0, NULL},
-        {MNTT_IT, IDS_MENU_HELP_FORUM, MNTS_B | MNTS_I | MNTS_A, CM_FORUM, -1, 0, NULL},
+        // replaces the former "Official Support Forum" item; stays grayed until the
+        // background update check confirms a release newer than this executable
+        {MNTT_IT, IDS_MENU_HELP_UPDATE, MNTS_B | MNTS_I | MNTS_A, CM_DOWNLOAD_UPDATE, -1, 0, &EnablerUpdateAvailable},
         {MNTT_IT, IDS_MENU_HELP_TASKLIST, MNTS_B | MNTS_I | MNTS_A, CM_TASKLIST, -1, 0, NULL},
         {MNTT_SP, -1, MNTS_B | MNTS_I | MNTS_A, 0, -1, 0, NULL},
         {MNTT_PB, IDS_MENU_HELP_ABOUTPLUGINS, MNTS_B | MNTS_I | MNTS_A, CML_HELP_ABOUTPLUGINS, -1, 0, NULL},

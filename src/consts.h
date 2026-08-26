@@ -1248,6 +1248,7 @@ struct COpenViewerData
 
 #define WM_USER_USERMENUICONS_READY WM_APP + 415 // [bkgndReaderData, threadID] - notification for main window that icon reading for User Menu in thread with ID 'threadID' has completed
 #define WM_USER_ALLOCATION_EMERGENCY WM_APP + 416 // [0, 0] - pre-registered allocation-failure notification; recovery runs on the UI thread
+#define WM_USER_UPDATE_CHECK_DONE WM_APP + 417 // [0, 0] - background GitHub release check finished; title bar may need the "(update available)" suffix
 
 // states for Shift+F1 help mode
 #define HELP_INACTIVE 0 // not in Shift+F1 help mode (must be 0)

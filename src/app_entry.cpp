@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "precomp.h"
+#include "update_check.h"
 #include "operation_journal.h"
 #include <time.h>
 // Use StrSafe for the bounded process command line built below.
@@ -2623,6 +2624,9 @@ FIND_NEW_SLG_FILE:
                         SendMessage(MainWindow->HWindow, WM_COMMAND, CM_TOGGLEEDITLINE, TRUE);
                     MainWindow->SetWindowIcon();
                     MainWindow->SetWindowTitle();
+                    // one-shot background check for a newer GitHub release, started
+                    // once the main window exists so the result can update title/menu
+                    StartUpdateCheck(MainWindow->HWindow);
                     SplashScreenCloseIfExist();
                     ShowWindow(MainWindow->HWindow, cmdShow);
                     UpdateWindow(MainWindow->HWindow);

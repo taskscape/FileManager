@@ -5,6 +5,7 @@
 #include "precomp.h"
 #include <strsafe.h> // counted bounded copies (StringCchCopyNA)
 
+#include "update_check.h"
 #include "stswnd.h"
 #include "editwnd.h"
 #include "plugins.h"
@@ -2364,9 +2365,12 @@ LRESULT CMainWindow::HandleWmCommand(WPARAM wParam, LPARAM lParam)
           return 0;
         }
 */
-        case CM_FORUM:
+        case CM_DOWNLOAD_UPDATE:
         {
-            ShellExecute(HWindow, "open", "/", NULL, NULL, SW_SHOWNORMAL);
+            // former "Official Support Forum" slot: opens the GitHub releases page
+            // in the default browser; the item is enabled only while a newer
+            // release than this executable has been detected by the update check
+            ShellExecute(HWindow, "open", SALAMANDER_RELEASES_URL, NULL, NULL, SW_SHOWNORMAL);
             return 0;
         }
 

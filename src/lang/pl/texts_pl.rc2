@@ -159,7 +159,7 @@ STRINGTABLE
  IDS_MENU_HELP_KEYBOARD,     "&Skróty klawiaturowe"
  IDS_MENU_HELP_CONTEXT,      "&Co to jest?\tShift+F1"
  IDS_MENU_HELP_TASKLIST,     "Lista &zadań..."
- IDS_MENU_HELP_FORUM,        "Oficjalne &forum pomocy technicznej"
+ IDS_MENU_HELP_UPDATE,      "Pobierz &aktualizację"
  IDS_MENU_HELP_ABOUTPLUGINS, "O &wtyczce"
  IDS_MENU_HELP_ABOUT,        "&Informacje o Open Salamander"
 
@@ -1740,7 +1740,7 @@ STRINGTABLE
  IDS_ACLNOTSUPPORTEDONTGTPATH, "Nie można zachować właścicieli i uprawnień. Nie są one obsługiwane\nna ścieżce docelowej (nie jest to wolumin NTFS).\n\nCzy chcesz kontynuować?"
 
  IDS_BUGREPORTCNFRM_TITLE, "Zgłoś błąd"
- IDS_BUGREPORTCNFRM_TEXT, "W przypadku raportów o błędach lub próśb o funkcje użyj menu Pomoc > Oficjalne forum pomocy technicznej.\n\nUżyj tego raportu o błędzie tylko do wysyłania nam poufnych danych lub gdy o to poprosimy."
+ IDS_BUGREPORTCNFRM_TEXT, "W przypadku raportów o błędach lub próśb o funkcje użyj naszego systemu śledzenia zgłoszeń: https://github.com/taskscape/FileManager/issues.\n\nUżyj tego raportu o błędzie tylko do wysyłania nam poufnych danych lub gdy o to poprosimy."
 
  IDS_MSGBOXBTN_SKIP, "&Pomiń"
  IDS_MSGBOXBTN_SKIPALL, "Pomiń &wszystkie"

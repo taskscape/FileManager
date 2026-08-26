@@ -4,6 +4,7 @@
 
 #include "precomp.h"
 
+#include "update_check.h"
 #include <shobjidl.h>
 #include <shlwapi.h>
 #include <strsafe.h>
@@ -3341,6 +3342,13 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
         // UI thread owns execution it may write recovery state and close safely.
         COperationJournal::PersistEmergencyShutdownState();
         PostMessage(HWindow, WM_USER_FORCECLOSE_MAINWND, 0, 0);
+        return 0;
+
+    case WM_USER_UPDATE_CHECK_DONE:
+        // the background GitHub release check finished: recompose the title so a
+        // confirmed newer release immediately shows the "(update available)" suffix;
+        // the Help menu item state follows EnablerUpdateAvailable on next open
+        MainWindow->SetWindowTitle(NULL);
         return 0;
 
 

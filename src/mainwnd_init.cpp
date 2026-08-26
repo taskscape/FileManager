@@ -21,6 +21,7 @@
 #include "gui.h"
 #include "execute.h"
 #include "jumplist.h"
+#include "update_check.h"
 
 #include "versinfo.rh2"
 
@@ -1948,6 +1949,10 @@ void CMainWindow::SetWindowTitle(const char* text)
         if (RunningAsAdmin)
             _snprintf_s(stdWndName + strlen(stdWndName), _countof(stdWndName) - strlen(stdWndName), _TRUNCATE,
                         " (%s)", LoadStr(IDS_AS_ADMIN_TITLE));
+
+        // advertise a newer published build once the background GitHub check confirms it
+        if (IsUpdateAvailable())
+            StringCchCatA(stdWndName, _countof(stdWndName), " (update available)");
 
 #ifdef X64_STRESS_TEST
         StringCchCatA(stdWndName, _countof(stdWndName), " ST");

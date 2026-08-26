@@ -296,7 +296,7 @@
 
 #define CM_RESUMEOPER          931
 
-#define CM_FORUM               932
+#define CM_DOWNLOAD_UPDATE     932
 
 #define CM_SETSPLIMOPER        933
 

@@ -431,6 +431,8 @@
     </ClCompile>
     <ClCompile Include="..\mainwnd_init.cpp">
     </ClCompile>
+    <ClCompile Include="..\update_check.cpp">
+    </ClCompile>
     <ClCompile Include="..\mainwnd_config.cpp">
     </ClCompile>
         <ClCompile Include="..\mainwnd_help.cpp">
@@ -774,6 +776,8 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\bitmap.h">
+    </ClInclude>
+    <ClInclude Include="..\update_check.h">
     </ClInclude>
     <ClInclude Include="..\common\dep\bzip2\bzlib.h">
     </ClInclude>
