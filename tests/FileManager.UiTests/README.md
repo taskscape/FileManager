@@ -8,7 +8,7 @@ The repository runner configures the guarded test-data root, configuration root,
 
 - `FILEMANAGER_UI_TESTDATA_ROOT` — absolute path ending in `filemanager-testdata`; all test-created files live below it.
 - `FILEMANAGER_UI_CONFIG_ROOT=Software\Open Salamander\6.0-filemanager-testdata` — selects the registry tree created and removed by the harness.
-- `FILEMANAGER_UI_EXE` — absolute path to `salamand.exe` or a debug build of the executable.
+- `FILEMANAGER_UI_EXE` — absolute path to `salamand.exe` in a deployed runtime. The runtime must include `salmon.exe` and the plug-in payloads used by the selected tests; an executable by itself is not a complete UI test artifact.
 - `FILEMANAGER_UI_ARGUMENTS` — optional command-line arguments, for example a test-only `-c` configuration file.
 - FTP menu IDs are published with the launching process ID below the owned test-data root, so each fixture waits for the exact FileManager instance it controls before issuing a plug-in command.
 - `FILEMANAGER_UI_CONFIG_FAULT_INJECTION=1` — explicitly enables the exhaustive transactional-configuration crash-recovery lane described below.
@@ -21,9 +21,7 @@ The repository runner configures the guarded test-data root, configuration root,
 
 The test runner never mounts test virtual disks. If fixed writable `D:\` is unavailable, all second-volume-dependent tests are reported as successful, explicit capability skips.
 
-The complete UI suite also requires `SeCreateSymbolicLinkPrivilege` for its disposable reparse-point fixtures. If the
-runner lacks that privilege, it reports the missing privilege and skips the complete UI suite as an allowed environment
-limitation; the UI tests are not reported as completed.
+The release-equivalent repository runner requires `SeCreateSymbolicLinkPrivilege` for its disposable reparse-point fixtures. If that runner lacks the privilege, it reports the missing privilege and skips the complete UI lane as an allowed environment limitation; the UI tests are not reported as completed. A focused or direct NUnit run remains useful on such a host: junction coverage continues, while only the directory-symbolic-link case is reported as an explicit capability skip.
 
 The repository runner creates the guarded filesystem and registry sandbox automatically. On an interactive Windows desktop session, its default filter runs the complete UI category:
 
@@ -37,7 +35,7 @@ Run every discovered test in the project, including non-UI contract and TLS case
 .\run-ui-tests.ps1 -ConfirmIsolatedProfile -Filter ''
 ```
 
-The runner derives its paths from the checkout and deliberately does not fall back to an installed application, because a stale executable can turn all native-command cases into misleading failures. Build the current branch first, or pass its artifact explicitly with `-ExecutablePath`. `-NoBuild` skips both managed build and restore for a repeated run; it does not build the native application.
+The runner derives its paths from the checkout and deliberately does not fall back to an installed application, because a stale executable can turn all native-command cases into misleading failures. Build the complete current-branch solution first, or pass a deployed artifact explicitly with `-ExecutablePath`. When the selected filter can run FTP coverage and standard Visual Studio output has scattered the matching FTP build under the plug-in project, the focused runner copies `salamand.exe`, `salmon.exe`, runtime resources, `ftp.spl`, and its English language file into a disposable coherent runtime and removes that runtime afterward. It fails before FTP testing if those same-configuration artifacts are unavailable; it never combines an external executable with checkout plug-ins. `-NoBuild` skips both managed build and restore for a repeated run; it does not build the native application.
 
 The configuration dialog is opened through its stable native command ID only to avoid locale-dependent menu text. All window discovery, control inspection, focus, dialog lifecycle, and restart assertions use FlaUI/UIA3.
 

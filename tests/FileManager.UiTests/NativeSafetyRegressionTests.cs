@@ -169,6 +169,31 @@ public sealed class NativeSafetyRegressionTests
     }
 
     [Test]
+    public void Focused_ui_runner_stages_ftp_payloads_and_reparse_setup_treats_only_missing_privilege_as_optional()
+    {
+        var root = FindRepositoryRoot();
+        var focusedRunner = File.ReadAllText(Path.Combine(root, "run-ui-tests.ps1"));
+        var uiTestBase = File.ReadAllText(Path.Combine(root, "tests", "FileManager.UiTests", "Infrastructure", "FileManagerUiTestBase.cs"));
+        var reparseTests = File.ReadAllText(Path.Combine(root, "tests", "FileManager.UiTests", "ReparsePointTopologyUiTests.cs"));
+
+        // Keep focused local runs from converting missing runtime payloads or host privileges into false application failures.
+        Assert.Multiple(() =>
+        {
+            Assert.That(focusedRunner, Does.Contain("New-FtpUiTestRuntime"));
+            Assert.That(focusedRunner, Does.Contain("plugins\\ftp\\ftp.spl"));
+            Assert.That(focusedRunner, Does.Contain("plugins\\ftp\\lang\\english.slg"));
+            Assert.That(focusedRunner, Does.Contain("$ftpRuntimeRequired"));
+            Assert.That(focusedRunner, Does.Contain("Raw Visual Studio output scatters plug-ins by project"));
+            Assert.That(focusedRunner, Does.Contain("Remove-Item -LiteralPath $runtimeStagingRoot -Recurse -Force"));
+            Assert.That(uiTestBase, Does.Contain("RequireFtpPluginRuntime"));
+            Assert.That(uiTestBase, Does.Contain("FTP UI tests require a complete deployed FTP runtime"));
+            Assert.That(reparseTests, Does.Contain("ErrorPrivilegeNotHeld = 1314"));
+            Assert.That(reparseTests, Does.Contain("exception is IOException && (exception.HResult & 0xFFFF) == ErrorPrivilegeNotHeld"));
+            Assert.That(reparseTests, Does.Contain("Assert.Ignore(\"The current test host does not permit disposable directory symbolic links.\")"));
+        });
+    }
+
+    [Test]
     public void Unchecked_string_calls_are_ratchet_gated_and_external_boundaries_report_capacity_and_encoding_failures()
     {
         var root = FindRepositoryRoot();
