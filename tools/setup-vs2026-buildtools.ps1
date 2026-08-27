@@ -1,7 +1,10 @@
 # Configure the self-hosted runner from the verified VS 2026 Build Tools path because
 # the third-party action's version range excludes the installed 18.9 release.
 [CmdletBinding()]
-param()
+param(
+    [ValidateSet('x86', 'x64')]
+    [string]$TargetArchitecture = 'x64'
+)
 
 $ErrorActionPreference = 'Stop'
 
@@ -19,8 +22,8 @@ if ([string]::IsNullOrWhiteSpace($env:GITHUB_ENV)) {
 $initialEnvironment = @{}
 Get-ChildItem Env: | ForEach-Object { $initialEnvironment[$_.Name] = $_.Value }
 
-# Capture the standard x64 developer environment; the x86 MASM path is added below for the mixed-architecture solution.
-$command = 'call "' + $vsDevCmd + '" -arch=x64 -host_arch=x64 >nul && set'
+# Select target libraries for the matrix platform while retaining the faster x64-hosted compiler for both architectures.
+$command = 'call "' + $vsDevCmd + '" -arch=' + $TargetArchitecture + ' -host_arch=x64 >nul && set'
 $developerEnvironment = & $env:ComSpec /d /s /c $command
 if ($LASTEXITCODE -ne 0) {
     throw "VsDevCmd failed with exit code $LASTEXITCODE."
@@ -34,15 +37,7 @@ $masm = Get-ChildItem -LiteralPath (Join-Path $visualStudioRoot 'VC\Tools\MSVC')
 if ($null -eq $masm) {
     throw "The VS 2026 x86 MASM assembler was not found below '$visualStudioRoot'."
 }
-# Preserve the x64 developer environment while adding the x86 MASM directory used by sfx7zip.
-$developerEnvironment = @($developerEnvironment | ForEach-Object {
-    if ($_ -like 'Path=*') {
-        'Path=' + $masm.DirectoryName + ';' + $_.Substring(5)
-    }
-    else {
-        $_
-    }
-})
+# MSBuild locates this assembler through its MASM tool path; exporting its directory would also shadow cl.exe and link.exe with x86 tools.
 
 foreach ($line in $developerEnvironment) {
     $separator = $line.IndexOf('=')
