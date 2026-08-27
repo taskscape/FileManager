@@ -2001,7 +2001,10 @@ BOOL IsWin64RedirectedDirAux(const char* subDir, const char* redirectedDir, cons
 BOOL IsWin64RedirectedDir(const char* path, char** lastSubDir, BOOL failIfDirWithSameNameExists)
 {
     CWidePath pathW(path);
-    return IsWin64RedirectedDirW(pathW.CStr(), NULL, failIfDirWithSameNameExists);
+    // Redirection comparisons need the original spelling; reject failed UTF-16 conversion instead of using a removed ambiguous accessor.
+    if (!pathW.IsValid())
+        return FALSE;
+    return IsWin64RedirectedDirW(pathW.GetDisplayPath(), NULL, failIfDirWithSameNameExists);
 }
 
 BOOL ContainsWin64RedirectedDir(CFilesWindow* panel, int* indexes, int count, char* redirectedDir, BOOL onlyAdded)
@@ -2020,7 +2023,9 @@ BOOL ContainsWin64RedirectedDir(CFilesWindow* panel, int* indexes, int count, ch
                 {
                     CPathW fullPathW(pathW);
                     CWidePath dirNameW(dir->Name);
-                    fullPathW.Append(dirNameW.CStr());
+                    // Preserve the display spelling while composing the path and stop safely if conversion or allocation fails.
+                    if (!dirNameW.IsValid() || !fullPathW.Append(dirNameW.GetDisplayPath()))
+                        continue;
                     if (IsWin64RedirectedDirW(fullPathW.CStr(), NULL, onlyAdded))
                     {
                         if (FAILED(StringCchCopyA(redirectedDir, MAX_PATH, dir->Name)))
