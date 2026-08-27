@@ -225,6 +225,7 @@ public abstract class FileManagerUiTestBase
 
     protected Window OpenFtpBookmarksDialog()
     {
+        RequireFtpPluginRuntime();
         // FTP IDs are process-local, so wait for the instance under test rather than reusing a predecessor's SUID.
         NativeCommands.Execute(MainWindow.Properties.NativeWindowHandle.Value,
                                WaitForFtpPluginCommand(pluginCommand: 7, "Organize Bookmarks"));
@@ -233,6 +234,7 @@ public abstract class FileManagerUiTestBase
 
     protected Window OpenFtpConnectDialog()
     {
+        RequireFtpPluginRuntime();
         // The quick-connect SUID must come from this launch for the protocol fixture to drive the real plug-in command.
         NativeCommands.Execute(MainWindow.Properties.NativeWindowHandle.Value,
                                WaitForFtpPluginCommand(pluginCommand: 1, "Connect to FTP Server"));
@@ -354,6 +356,22 @@ public abstract class FileManagerUiTestBase
         // Fail before launch when the sibling reporter is absent, because FileManager otherwise blocks the test session with a native modal error.
         Assert.That(File.Exists(crashReporterPath), Is.True,
             $"FileManager UI tests require salmon.exe beside salamand.exe. Run scripts\\runtests.ps1 to stage the complete Debug x64 test artifact. Missing: {crashReporterPath}");
+    }
+
+    private static void RequireFtpPluginRuntime()
+    {
+        var runtimeRoot = Path.GetDirectoryName(UiTestSettings.ExecutablePath) ?? string.Empty;
+        var requiredFiles = new[]
+        {
+            Path.Combine(runtimeRoot, "plugins", "ftp", "ftp.spl"),
+            Path.Combine(runtimeRoot, "plugins", "ftp", "lang", "english.slg"),
+        };
+        var missingFiles = requiredFiles.Where(path => !File.Exists(path)).ToArray();
+        if (missingFiles.Length != 0)
+        {
+            // An absent plug-in means this scenario was not exercised; do not misreport its missing dynamic command as an application defect.
+            Assert.Ignore($"FTP UI tests require a complete deployed FTP runtime. Missing: {string.Join(", ", missingFiles)}");
+        }
     }
 
     private int WaitForFtpPluginCommand(int pluginCommand, string commandName)

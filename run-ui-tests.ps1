@@ -52,6 +52,84 @@ function Resolve-FileManagerExecutable {
     throw 'No checkout salamand.exe was found. Build the current branch or pass -ExecutablePath explicitly.'
 }
 
+function Test-FtpUiRuntime {
+    param([Parameter(Mandatory = $true)][string]$ResolvedExecutable)
+
+    $runtimeRoot = Split-Path -Parent $ResolvedExecutable
+    $requiredFiles = @(
+        (Join-Path $runtimeRoot 'salmon.exe'),
+        (Join-Path $runtimeRoot 'plugins\ftp\ftp.spl'),
+        (Join-Path $runtimeRoot 'plugins\ftp\lang\english.slg')
+    )
+
+    # FTP command IDs exist only after the plug-in loads, so an executable alone is not a valid runtime for the default UI suite.
+    return @($requiredFiles | Where-Object { -not (Test-Path -LiteralPath $_ -PathType Leaf) }).Count -eq 0
+}
+
+function New-FtpUiTestRuntime {
+    param(
+        [Parameter(Mandatory = $true)][string]$ResolvedExecutable,
+        [Parameter(Mandatory = $true)][string]$StagingRoot
+    )
+
+    if (Test-FtpUiRuntime $ResolvedExecutable) {
+        return $ResolvedExecutable
+    }
+
+    $sourceRuntimeRoot = Split-Path -Parent $ResolvedExecutable
+    $repositoryPrefix = ([IO.Path]::GetFullPath($repositoryRoot).TrimEnd('\') + '\')
+    if (-not $ResolvedExecutable.StartsWith($repositoryPrefix, [StringComparison]::OrdinalIgnoreCase)) {
+        throw "The selected FileManager runtime is incomplete. Required files include salmon.exe, plugins\ftp\ftp.spl, and plugins\ftp\lang\english.slg beside: $ResolvedExecutable"
+    }
+
+    $configuration = Split-Path -Leaf $sourceRuntimeRoot
+    $ftpBuildRoot = Join-Path $repositoryRoot "src\plugins\ftp\vcxproj\salamander\$configuration\plugins\ftp"
+    $ftpPlugin = Join-Path $ftpBuildRoot 'ftp.spl'
+    $ftpLanguage = Join-Path $ftpBuildRoot 'lang\english.slg'
+    $crashReporter = Join-Path $sourceRuntimeRoot 'salmon.exe'
+    $requiredBuildArtifacts = @($crashReporter, $ftpPlugin, $ftpLanguage)
+    $missingBuildArtifacts = @($requiredBuildArtifacts |
+        Where-Object { -not (Test-Path -LiteralPath $_ -PathType Leaf) })
+    if ($missingBuildArtifacts.Count -ne 0) {
+        throw "The checkout build is incomplete. Build the complete $configuration solution before running UI tests. Missing: $($missingBuildArtifacts -join ', ')"
+    }
+
+    try {
+        New-Item -ItemType Directory -Path $StagingRoot -Force | Out-Null
+        foreach ($fileName in @('salamand.exe', 'salmon.exe', 'salbroker.exe')) {
+            $sourceFile = Join-Path $sourceRuntimeRoot $fileName
+            if (Test-Path -LiteralPath $sourceFile -PathType Leaf) {
+                Copy-Item -LiteralPath $sourceFile -Destination $StagingRoot -Force
+            }
+        }
+        foreach ($directoryName in @('lang', 'toolbars', 'utils')) {
+            $sourceDirectory = Join-Path $sourceRuntimeRoot $directoryName
+            if (Test-Path -LiteralPath $sourceDirectory -PathType Container) {
+                Copy-Item -LiteralPath $sourceDirectory -Destination $StagingRoot -Recurse -Force
+            }
+        }
+
+        $stagedFtpRoot = Join-Path $StagingRoot 'plugins\ftp'
+        $stagedFtpLanguageRoot = Join-Path $stagedFtpRoot 'lang'
+        New-Item -ItemType Directory -Path $stagedFtpLanguageRoot -Force | Out-Null
+        # Stage only runtime payloads from the matching checkout configuration; build intermediates must not leak into the test installation.
+        Copy-Item -LiteralPath $ftpPlugin -Destination $stagedFtpRoot -Force
+        Copy-Item -LiteralPath $ftpLanguage -Destination $stagedFtpLanguageRoot -Force
+
+        $stagedExecutable = Join-Path $StagingRoot 'salamand.exe'
+        if (-not (Test-FtpUiRuntime $stagedExecutable)) {
+            throw "The temporary FileManager runtime could not be staged completely below: $StagingRoot"
+        }
+        return $stagedExecutable
+    }
+    catch {
+        if (Test-Path -LiteralPath $StagingRoot -PathType Container) {
+            Remove-Item -LiteralPath $StagingRoot -Recurse -Force
+        }
+        throw
+    }
+}
+
 if (-not $ConfirmIsolatedProfile) {
     # Explicit acknowledgement keeps interactive UI work out of a normal unattended desktop session.
     throw 'Re-run with -ConfirmIsolatedProfile to use the guarded filesystem and registry test sandbox.'
@@ -63,16 +141,20 @@ if ($null -eq (Get-Command dotnet -ErrorAction SilentlyContinue)) {
     throw 'dotnet was not found on PATH.'
 }
 
-$resolvedExecutable = Resolve-FileManagerExecutable $ExecutablePath
-$executableDirectory = Split-Path -Parent $resolvedExecutable
-$crashReporter = Join-Path $executableDirectory 'salmon.exe'
-# Fail once in preflight instead of letting every UI case stall on the application's missing-reporter dialog.
-if (-not (Test-Path -LiteralPath $crashReporter -PathType Leaf)) {
-    throw "The selected test artifact is incomplete; salmon.exe is missing beside salamand.exe: $crashReporter"
-}
-
 $sandboxParent = Join-Path ([IO.Path]::GetTempPath()) ('OpenSalamanderUiTests-' + [Guid]::NewGuid().ToString('N'))
 $testDataRoot = Join-Path $sandboxParent 'filemanager-testdata'
+$runtimeStagingRoot = Join-Path $sandboxParent 'runtime'
+$resolvedExecutable = Resolve-FileManagerExecutable $ExecutablePath
+$ftpRuntimeRequired = [string]::IsNullOrWhiteSpace($Filter) -or
+    $Filter -match '(?i)(TestCategory\s*=\s*UI|BasicUiTests|UI_007|Ftp|Quick_connect)'
+if ($ftpRuntimeRequired) {
+    # Raw Visual Studio output scatters plug-ins by project; use a disposable coherent runtime without modifying the caller's build tree.
+    $resolvedExecutable = New-FtpUiTestRuntime -ResolvedExecutable $resolvedExecutable -StagingRoot $runtimeStagingRoot
+}
+elseif (-not (Test-Path -LiteralPath (Join-Path (Split-Path -Parent $resolvedExecutable) 'salmon.exe') -PathType Leaf)) {
+    # Every UI launch needs its sibling crash reporter even when the selected fixture does not exercise FTP.
+    throw "The selected FileManager runtime is incomplete; salmon.exe is missing beside: $resolvedExecutable"
+}
 $configurationRoot = 'Software\Open Salamander\6.0-filemanager-testdata'
 $savedEnvironment = @{
     FILEMANAGER_UI_ISOLATED = $env:FILEMANAGER_UI_ISOLATED
@@ -136,6 +218,11 @@ finally {
         else {
             Set-Item -Path "Env:$name" -Value $value
         }
+    }
+
+    if (Test-Path -LiteralPath $runtimeStagingRoot -PathType Container) {
+        # The temporary runtime contains only files copied by this invocation below its GUID-owned parent.
+        Remove-Item -LiteralPath $runtimeStagingRoot -Recurse -Force
     }
 
     # NUnit removes the marked child on a healthy run; remove only the unique empty parent created above.

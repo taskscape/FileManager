@@ -12,6 +12,7 @@ namespace FileManager.UiTests;
 [Category("ReparsePoints")]
 public sealed class ReparsePointTopologyUiTests : FileOperationUiTestBase
 {
+    private const int ErrorPrivilegeNotHeld = 1314;
     private string operationRoot = null!;
     private string firstOutsideTarget = null!;
     private string changedOutsideTarget = null!;
@@ -50,7 +51,7 @@ public sealed class ReparsePointTopologyUiTests : FileOperationUiTestBase
             Directory.CreateSymbolicLink(Path.Combine(operationRoot, "outside-symlink"), changedOutsideTarget);
             directorySymlinkAvailable = true;
         }
-        catch (UnauthorizedAccessException)
+        catch (Exception ex) when (IsMissingSymbolicLinkPrivilege(ex))
         {
             // Junction coverage remains available on hosts that have not
             // enabled the Windows symbolic-link developer privilege.
@@ -119,5 +120,12 @@ public sealed class ReparsePointTopologyUiTests : FileOperationUiTestBase
         process!.WaitForExit();
         Assert.That(process.ExitCode, Is.Zero, "Creating the disposable junction failed.");
         Assert.That(Directory.Exists(linkPath), Is.True, "The disposable junction was not created.");
+    }
+
+    private static bool IsMissingSymbolicLinkPrivilege(Exception exception)
+    {
+        // Windows may surface ERROR_PRIVILEGE_NOT_HELD as IOException instead of UnauthorizedAccessException on different .NET hosts.
+        return exception is UnauthorizedAccessException ||
+               exception is IOException && (exception.HResult & 0xFFFF) == ErrorPrivilegeNotHeld;
     }
 }
