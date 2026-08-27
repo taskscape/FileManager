@@ -140,6 +140,6 @@ public sealed class SChannelTlsIntegrationTests
             Directory.CreateDirectory(Path.Combine(appData, "Microsoft", "Crypto", "Keys"));
         }
         return X509CertificateLoader.LoadPkcs12(generated.Export(X509ContentType.Pfx), null,
-                                                X509KeyStorageFlags.UserKeySet | X509KeyStorageFlags.Exportable, null);
+                                                X509KeyStorageFlags.UserKeySet, null);
     }
 }
