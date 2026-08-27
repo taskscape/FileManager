@@ -71,7 +71,11 @@ $optionalUiIgnoreMessagePrefixes = @(
 )
 $nonBlockingUiIgnoreMessagePrefixes = @(
     'Second-volume UI tests skipped: ',
-    'Second-volume ADS-unsupported UI tests skipped: '
+    'Second-volume ADS-unsupported UI tests skipped: ',
+    # These characterization cases need optional plug-in or language-specific Help deployment that the base artifact does not guarantee.
+    'Install and enable the Zip plug-in, then set FILEMANAGER_UI_ZIP_PLUGIN=1 ',
+    'Deploy salamand.chm and set FILEMANAGER_UI_HELP_SEARCH_TERM plus FILEMANAGER_UI_HELP_EXPECTED_RESULT ',
+    'Deploy help/<language>/salamand.chm beside the tested executable to run Help Search characterization.'
 )
 
 if ($ReleasePipeline) {

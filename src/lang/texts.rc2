@@ -1963,5 +1963,15 @@ STRINGTABLE
  IDS_FORCEDSHUTDOWN, "Windows is rejecting to abort shutdown. This message will block it temporarily. Please wait to abort shutdown manually before you close this message, otherwise Open Salamander will be terminated without saving configuration."
  IDS_FORCEDSHUTDOWNDISKOPER, "Windows is rejecting to abort shutdown. This message will block it temporarily.\n\nYou have some disk operations in progress. Do you want to cancel them now? Click No only if you have aborted shutdown manually, otherwise you risk having unfinished files on your disk.\n\nPlease wait to abort shutdown manually before you answer this question, otherwise Open Salamander will be terminated without saving configuration."
  IDS_CLOSINGFINDWINDOWS, "Closing Find windows, please wait..."
+
+ // Manual-close overlay status strings keep the user informed while the main window is disabled.
+ IDS_CLOSINGAPPLICATIONCAPTION, "Closing Open Salamander"
+ IDS_CLOSINGAPPLICATION, "Closing application..."
+ IDS_CLOSINGPLUGIN, "Closing plug-in ""%s""..."
+ IDS_CLOSINGPLUGINSAVECONFIG, "Closing plug-in ""%s"": saving configuration data..."
+ IDS_CLOSINGPLUGINREMOVINGTEMP, "Closing plug-in ""%s"": removing temporary files..."
+ IDS_CLOSINGPLUGINRELEASING, "Closing plug-in ""%s"": running release callbacks..."
+ IDS_CLOSINGSAVINGCONFIG, "Saving configuration data..."
+ IDS_CLOSINGWAITINGFORDISKCACHE, "Waiting for the disk cache..."
 }
 

@@ -50,6 +50,75 @@ extern "C"
 extern CWaitWindow* GlobalSaveWaitWindow;
 extern int GlobalSaveWaitWindowProgress;
 
+// The manual-close overlay is shared with teardown helpers so their status reaches the user.
+static CWaitWindow* MainWindowClosingOverlay = NULL;
+static HWND MainWindowClosingOverlayParent = NULL;
+
+static void SetMainWindowClosingOverlayTextInternal(const char* text)
+{
+    if (MainWindowClosingOverlay != NULL && text != NULL)
+        MainWindowClosingOverlay->SetText(text);
+}
+
+void BeginMainWindowClosingOverlay(HWND hMainWindow)
+{
+    if (MainWindowClosingOverlayParent != NULL)
+        return;
+
+    MainWindowClosingOverlayParent = hMainWindow;
+    if (hMainWindow != NULL)
+        EnableWindow(hMainWindow, FALSE); // Keep late input from re-entering shutdown work.
+
+    // The overlay is unowned so it remains visible after the main HWND is destroyed.
+    // The caller owns this object because WinLib otherwise deletes allocated windows during WM_DESTROY.
+    MainWindowClosingOverlay = new CWaitWindow(NULL, IDS_CLOSINGAPPLICATION, FALSE, ooStatic);
+    if (MainWindowClosingOverlay != NULL)
+    {
+        MainWindowClosingOverlay->SetCaption(LoadStr(IDS_CLOSINGAPPLICATIONCAPTION));
+        if (MainWindowClosingOverlay->Create() == NULL)
+        {
+            delete MainWindowClosingOverlay;
+            MainWindowClosingOverlay = NULL;
+        }
+    }
+}
+
+void SetMainWindowClosingOverlayText(int textResID)
+{
+    if (textResID != 0)
+        SetMainWindowClosingOverlayTextInternal(LoadStr(textResID));
+}
+
+void SetMainWindowClosingOverlayPluginText(int textResID, const char* pluginName)
+{
+    if (textResID != 0 && pluginName != NULL)
+    {
+        char text[2 * MAX_PATH + 300];
+        sprintf_s(text, LoadStr(textResID), pluginName);
+        SetMainWindowClosingOverlayTextInternal(text);
+    }
+}
+
+void EndMainWindowClosingOverlay(BOOL restoreMainWindow)
+{
+    if (MainWindowClosingOverlay != NULL)
+    {
+        if (MainWindowClosingOverlay->HWindow != NULL)
+            DestroyWindow(MainWindowClosingOverlay->HWindow);
+        delete MainWindowClosingOverlay;
+        MainWindowClosingOverlay = NULL;
+    }
+
+    if (restoreMainWindow && MainWindowClosingOverlayParent != NULL && IsWindow(MainWindowClosingOverlayParent))
+        EnableWindow(MainWindowClosingOverlayParent, TRUE); // A refused close must restore the original interactive window.
+    MainWindowClosingOverlayParent = NULL;
+}
+
+BOOL IsMainWindowClosingOverlayActive()
+{
+    return MainWindowClosingOverlayParent != NULL; // The input lock remains active even if the overlay could not be created.
+}
+
 //****************************************************************************
 //
 // Vista+: ShutdownBlockReason helpers (used only during shutdown)
@@ -406,9 +475,16 @@ LRESULT CMainWindow::HandleShutdown(UINT uMsg, WPARAM wParam, LPARAM lParam)
 
         if (uMsg != WM_ENDSESSION)
         {
+            if (uMsg == WM_USER_CLOSE_MAINWND)
+            {
+                BeginMainWindowClosingOverlay(HWindow); // The user accepted close; prevent further commands during teardown.
+                if (destroyArray.Count > 0)
+                    SetMainWindowClosingOverlayText(IDS_CLOSINGFINDWINDOWS); // Reuse the overlay instead of opening a second wait window.
+            }
+
             HCURSOR hOldCursor = NULL;
             CWaitWindow closingFindWin(HWindow, IDS_CLOSINGFINDWINDOWS, FALSE, ooStatic);
-            BOOL showCloseFindWin = destroyArray.Count > 0;
+            BOOL showCloseFindWin = destroyArray.Count > 0 && !IsMainWindowClosingOverlayActive();
             if (showCloseFindWin)
             {
                 if (uMsg == WM_QUERYENDSESSION && HLanguage != NULL &&
@@ -505,7 +581,10 @@ LRESULT CMainWindow::HandleShutdown(UINT uMsg, WPARAM wParam, LPARAM lParam)
             }
 
             if (endProcessing)
+            {
+                EndMainWindowClosingOverlay(TRUE); // Find refused to close, so leave the application usable.
                 return 0; // refuse close/shutdown/logoff; a forced shutdown will be detected later in WM_ENDSESSION
+            }
 
             // let Find windows close in their own thread
             // not done during critical shutdown: closing Find windows is pointless (column widths,
@@ -672,6 +751,7 @@ LRESULT CMainWindow::HandleShutdown(UINT uMsg, WPARAM wParam, LPARAM lParam)
                 TRACE_I("WM_QUERYENDSESSION: cancelling shutdown: unable to unload all plugins");
 
         EXIT_WM_USER_CLOSE_MAINWND:
+            EndMainWindowClosingOverlay(TRUE); // Any abort path must relinquish the modal close surface.
             if (shutdown)
             {
                 GlobalSaveWaitWindow = NULL;
@@ -794,6 +874,7 @@ LRESULT CMainWindow::HandleShutdown(UINT uMsg, WPARAM wParam, LPARAM lParam)
         }
 
         // Commit any state changed during shutdown as a final safeguard; normal changes save earlier.
+        SetMainWindowClosingOverlayText(IDS_CLOSINGSAVINGCONFIG);
         SaveConfig();
 
         if (uMsg == WM_ENDSESSION)
@@ -814,7 +895,8 @@ LRESULT CMainWindow::HandleShutdown(UINT uMsg, WPARAM wParam, LPARAM lParam)
 
         CALL_STACK_MESSAGE1("WM_USER_CLOSE_MAINWND::5");
 
-        DiskCache.PrepareForShutdown(); // clean any empty tmp directories from disk
+        SetMainWindowClosingOverlayText(IDS_CLOSINGWAITINGFORDISKCACHE);
+        DiskCache.PrepareForShutdown(); // Clean cache state only after the overlay explains an unbounded idle wait.
 
         //      if (TipOfTheDayDialog != NULL)
         //        DestroyWindow(TipOfTheDayDialog->HWindow);  // the dialog already saved its data (transfer happens there at runtime)
@@ -823,6 +905,7 @@ LRESULT CMainWindow::HandleShutdown(UINT uMsg, WPARAM wParam, LPARAM lParam)
 
         CanDestroyMainWindow = TRUE; // it's now safe to call DestroyWindow on MainWindow
 
+        // The unowned overlay remains visible until whole-process teardown releases the UI framework.
         DestroyWindow(HWindow);
 
         // WM_QUERYENDSESSION and WM_ENDSESSION: all Windows versions kill the process as soon as

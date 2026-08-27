@@ -810,4 +810,11 @@ extern CMainWindowLock MainWindowCS;
 // if CanDestroyMainWindow==FALSE and MainWindow receives WM_DESTROY, the reporting mechanism starts.
 extern BOOL CanDestroyMainWindow;
 
+// Manual close keeps this application-styled overlay active while teardown blocks normal input.
+void BeginMainWindowClosingOverlay(HWND hMainWindow);
+void SetMainWindowClosingOverlayText(int textResID);
+void SetMainWindowClosingOverlayPluginText(int textResID, const char* pluginName);
+void EndMainWindowClosingOverlay(BOOL restoreMainWindow);
+BOOL IsMainWindowClosingOverlayActive();
+
 extern CMainWindow* MainWindow;

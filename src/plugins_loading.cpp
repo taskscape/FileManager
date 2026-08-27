@@ -3458,6 +3458,7 @@ BOOL CPluginData::Unload(HWND parent, BOOL ask)
     BOOL ret = FALSE;
     if (DLL != NULL)
     {
+        SetMainWindowClosingOverlayPluginText(IDS_CLOSINGPLUGIN, Name); // Identify the plug-in before any close callback can block.
         if (MainWindow == NULL || MainWindow->CanUnloadPlugin(parent, PluginIface.GetInterface()))
         { // the plugin is no longer used by Salamander; it can be unloaded
             char buf[MAX_PATH + 300];
@@ -3465,7 +3466,10 @@ BOOL CPluginData::Unload(HWND parent, BOOL ask)
             if (SupportLoadSave)
             { // Persist plug-in state before release as one complete host generation.
                 if (MainWindow != NULL)
+                {
+                    SetMainWindowClosingOverlayPluginText(IDS_CLOSINGPLUGINSAVECONFIG, Name); // The overlay distinguishes persistence from plug-in release work.
                     MainWindow->SaveConfig(parent);
+                }
                 if (GlobalSaveWaitWindow != NULL)
                     GlobalSaveWaitWindow->SetProgressPos(++GlobalSaveWaitWindowProgress);
             }
@@ -3474,8 +3478,10 @@ BOOL CPluginData::Unload(HWND parent, BOOL ask)
             {
                 // the plugin may unload: let it delete any remaining temp files from the disk cache
                 CPluginInterfaceAbstract* unloadedPlugin = PluginIface.GetInterface();
+                SetMainWindowClosingOverlayPluginText(IDS_CLOSINGPLUGINREMOVINGTEMP, Name); // Temporary-file cleanup can wait for external handles.
                 DeleteManager.PluginMayBeUnloaded(parent, this);
 
+                SetMainWindowClosingOverlayPluginText(IDS_CLOSINGPLUGINRELEASING, Name); // Plug-in Release may run arbitrary plug-in callbacks.
                 if (PluginIface.Release(parent, CriticalShutdown) || CriticalShutdown)
                     ret = TRUE;
                 else

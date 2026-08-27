@@ -125,6 +125,7 @@ void ShutdownSalamander()
     IconPool.Shutdown(); // shutdown icon thread pool before worker
     ReleaseWorker();
     ReleaseViewer();
+    EndMainWindowClosingOverlay(FALSE); // Keep the unowned close overlay alive until all UI-owning workers are gone.
     ReleaseWinLib();
     ReleaseMenuWheelHook();
     ReleaseFind();

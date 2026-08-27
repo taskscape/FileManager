@@ -1943,4 +1943,14 @@ STRINGTABLE
  IDS_FORCEDSHUTDOWN, "System Windows odmawia przerwania zamykania. Ten komunikat tymczasowo je zablokuje. Poczekaj na ręczne przerwanie zamykania, zanim zamkniesz ten komunikat, w przeciwnym razie program Open Salamander zostanie zakończony bez zapisania konfiguracji."
  IDS_FORCEDSHUTDOWNDISKOPER, "System Windows odmawia przerwania zamykania. Ten komunikat tymczasowo je zablokuje.\n\nMasz w toku pewne operacje na dysku. Czy chcesz je teraz anulować? Kliknij Nie tylko wtedy, gdy ręcznie przerwano zamykanie, w przeciwnym razie ryzykujesz pozostawienie niedokończonych plików na dysku.\n\nPoczekaj na ręczne przerwanie zamykania, zanim odpowiesz na to pytanie, w przeciwnym razie program Open Salamander zostanie zakończony bez zapisania konfiguracji."
  IDS_CLOSINGFINDWINDOWS, "Zamykanie okien Znajdź, proszę czekać..."
+
+ // Statusy nakładki zamykania informują o postępie, gdy główne okno jest zablokowane.
+ IDS_CLOSINGAPPLICATIONCAPTION, "Zamykanie programu Open Salamander"
+ IDS_CLOSINGAPPLICATION, "Zamykanie programu..."
+ IDS_CLOSINGPLUGIN, "Zamykanie wtyczki ""%s""..."
+ IDS_CLOSINGPLUGINSAVECONFIG, "Zamykanie wtyczki ""%s"": zapisywanie danych konfiguracji..."
+ IDS_CLOSINGPLUGINREMOVINGTEMP, "Zamykanie wtyczki ""%s"": usuwanie plików tymczasowych..."
+ IDS_CLOSINGPLUGINRELEASING, "Zamykanie wtyczki ""%s"": wykonywanie wywołań zwalniających..."
+ IDS_CLOSINGSAVINGCONFIG, "Zapisywanie danych konfiguracji..."
+ IDS_CLOSINGWAITINGFORDISKCACHE, "Oczekiwanie na pamięć podręczną dysku..."
 }

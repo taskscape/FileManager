@@ -2721,6 +2721,16 @@
 // Directory listing retained only the bounded, currently usable metadata cache.
 #define IDS_DIRECTORYENUMERATIONLIMIT    14196
 
+// Manual-close overlay: report the current teardown phase while input is disabled.
+#define IDS_CLOSINGAPPLICATIONCAPTION     14197
+#define IDS_CLOSINGAPPLICATION            14198
+#define IDS_CLOSINGPLUGIN                 14199
+#define IDS_CLOSINGPLUGINSAVECONFIG       14200
+#define IDS_CLOSINGPLUGINREMOVINGTEMP     14201
+#define IDS_CLOSINGPLUGINRELEASING        14202
+#define IDS_CLOSINGSAVINGCONFIG           14203
+#define IDS_CLOSINGWAITINGFORDISKCACHE    14204
+
 //#define CM_TEXTS_MAX                  18000    // maximal texts id
 
 #endif // __TEXTS_RH2
