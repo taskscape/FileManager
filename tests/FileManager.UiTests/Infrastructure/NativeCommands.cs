@@ -13,10 +13,14 @@ internal static class NativeCommands
     internal const int MoveFiles = 728;
     internal const int DeleteFiles = 729;
     internal const int CreateDirectory = 730;
+    // CM_OPEN drives the same archive-opening path as the Files > Open action without localized menu lookup.
+    internal const int OpenFile = 732;
     // These stable host commands cover the three distinct file-discovery and file-opening paths.
     internal const int FindFiles = 741;
     internal const int ViewFile = 742;
     internal const int EditFile = 743;
+    // CM_HELP_SEARCH opens the HTML Help search tab while keeping the test independent of translated menu labels.
+    internal const int HelpSearch = 2212;
     internal const int RenameFile = 754;
     // CM_ACTIVEREFRESH synchronously refreshes the active file panel before a test quick-searches newly created files.
     internal const int RefreshActivePanel = 740;
@@ -39,6 +43,8 @@ internal static class NativeCommands
     private const int ConfigurationClearReadOnlyCheckBox = 304;
     internal const int OperationPathControl = 210;
     private const int VkEscape = 0x1B;
+    // HTML Help recognizes VK_RETURN from its search edit even when UIA exposes no reliable submit action.
+    private const int VkReturn = 0x0D;
     private const uint WmSetText = 0x000C;
     private const uint WmGetText = 0x000D;
     private const uint WmGetTextLength = 0x000E;
@@ -522,6 +528,13 @@ internal static class NativeCommands
         SendMessage(listHandle, WmKeyDown, VkEscape, 0);
         foreach (var character in name)
             SendMessage(listHandle, WmChar, character, 1);
+    }
+
+    internal static void PressEnter(nint controlHandle)
+    {
+        // HTML Help commits its search field through the native Enter key path rather than a reliable UIA action.
+        SetFocus(controlHandle);
+        SendMessage(controlHandle, WmKeyDown, VkReturn, 0);
     }
 
     internal static void ToggleFocusedSelection(nint listHandle)
