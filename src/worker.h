@@ -389,14 +389,14 @@ struct COperation
     // These values are captured when the worker starts this item, before any
     // confirmation dialog can delay its destructive phase.  They are never
     // derived from a path string: the helper records the opened object's
-    // volume serial, file ID, and final handle-resolved path fingerprint.
+    // volume serial, file ID, and opened-handle path fingerprint.
     struct CFileIdentity
     {
         DWORD State; // 0 = not captured, 1 = absent, 2 = present
         DWORD VolumeSerialNumber;
         DWORD FileIndexHigh;
         DWORD FileIndexLow;
-        unsigned __int64 FinalPathHash;
+        unsigned __int64 OpenedPathHash;
     } SourceIdentity, TargetIdentity;
 };
 

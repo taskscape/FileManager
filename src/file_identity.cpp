@@ -13,9 +13,13 @@ const DWORD FileIdentityNotCaptured = 0;
 const DWORD FileIdentityAbsent = 1;
 const DWORD FileIdentityPresent = 2;
 
-unsigned __int64 HashFinalPath(HANDLE handle, DWORD* error)
+unsigned __int64 HashOpenedPath(HANDLE handle, DWORD* error)
 {
-    DWORD length = GetFinalPathNameByHandleW(handle, NULL, 0, FILE_NAME_NORMALIZED | VOLUME_NAME_DOS);
+    // Deletion verifies thousands of sibling entries in one worker pass, so use
+    // the handle's opened NT path and avoid the expensive name normalization
+    // that can repeatedly enumerate large FAT/exFAT directories.
+    const DWORD pathFlags = FILE_NAME_OPENED | VOLUME_NAME_NT;
+    DWORD length = GetFinalPathNameByHandleW(handle, NULL, 0, pathFlags);
     if (length == 0)
     {
         *error = GetLastError();
@@ -28,7 +32,7 @@ unsigned __int64 HashFinalPath(HANDLE handle, DWORD* error)
         *error = ERROR_NOT_ENOUGH_MEMORY;
         return 0;
     }
-    DWORD copied = GetFinalPathNameByHandleW(handle, path, length + 1, FILE_NAME_NORMALIZED | VOLUME_NAME_DOS);
+    DWORD copied = GetFinalPathNameByHandleW(handle, path, length + 1, pathFlags);
     if (copied == 0 || copied > length)
     {
         *error = GetLastError();
@@ -36,8 +40,8 @@ unsigned __int64 HashFinalPath(HANDLE handle, DWORD* error)
         return 0;
     }
 
-    // FNV-1a gives a compact, case-preserving record of the path which the
-    // handle actually opened.  The file ID remains the primary identity.
+    // FNV-1a records the opened object path without retaining an allocation per
+    // operation; the volume serial and file ID remain the primary identity.
     unsigned __int64 hash = 1469598103934665603ULL;
     DWORD i;
     for (i = 0; i < copied; i++)
@@ -58,15 +62,15 @@ BOOL ReadFileIdentity(HANDLE handle, COperation::CFileIdentity* identity, DWORD*
         return FALSE;
     }
 
-    unsigned __int64 finalPathHash = HashFinalPath(handle, error);
-    if (finalPathHash == 0)
+    unsigned __int64 openedPathHash = HashOpenedPath(handle, error);
+    if (openedPathHash == 0)
         return FALSE;
 
     identity->State = FileIdentityPresent;
     identity->VolumeSerialNumber = information.dwVolumeSerialNumber;
     identity->FileIndexHigh = information.nFileIndexHigh;
     identity->FileIndexLow = information.nFileIndexLow;
-    identity->FinalPathHash = finalPathHash;
+    identity->OpenedPathHash = openedPathHash;
     return TRUE;
 }
 
@@ -111,7 +115,7 @@ BOOL SameFileIdentity(const COperation::CFileIdentity& left, const COperation::C
              left.VolumeSerialNumber == right.VolumeSerialNumber &&
              left.FileIndexHigh == right.FileIndexHigh &&
              left.FileIndexLow == right.FileIndexLow &&
-             left.FinalPathHash == right.FinalPathHash));
+             left.OpenedPathHash == right.OpenedPathHash));
 }
 
 BOOL OpenVerifiedFileForDelete(const char* path, const COperation::CFileIdentity& expected,

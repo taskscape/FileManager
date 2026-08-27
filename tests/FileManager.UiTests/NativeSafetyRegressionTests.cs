@@ -1341,6 +1341,10 @@ public sealed class NativeSafetyRegressionTests
             Assert.That(helper, Does.Contain("FILE_FLAG_OPEN_REPARSE_POINT"));
             Assert.That(helper, Does.Contain("GetFileInformationByHandle"));
             Assert.That(helper, Does.Contain("GetFinalPathNameByHandleW"));
+            // Identity verification must not normalize every entry in a large
+            // FAT/exFAT directory before the destructive handle is checked.
+            Assert.That(helper, Does.Contain("FILE_NAME_OPENED | VOLUME_NAME_NT"));
+            Assert.That(helper, Does.Not.Contain("FILE_NAME_NORMALIZED"));
             Assert.That(helper, Does.Contain("OperationExecutionFileSystem().SetFileInformationByHandle(handle.Get(), FileDispositionInfo"));
             Assert.That(operations, Does.Contain("CaptureOperationFileIdentities(op, &identityError)"));
             // Verification reports its failure through the local address before
@@ -1597,6 +1601,7 @@ public sealed class NativeSafetyRegressionTests
     {
         var root = FindRepositoryRoot();
         var operations = File.ReadAllText(Path.Combine(root, "tests", "FileManager.UiTests", "FileOperationUiTests.cs"));
+        var largeDelete = File.ReadAllText(Path.Combine(root, "tests", "FileManager.UiTests", "LargeFlatDirectoryDeleteUiTests.cs"));
         // File access commands live separately from destructive operations but remain part of the required UI characterization set.
         var access = File.ReadAllText(Path.Combine(root, "tests", "FileManager.UiTests", "FileAccessUiTests.cs"));
         var crossVolume = File.ReadAllText(Path.Combine(root, "tests", "FileManager.UiTests", "CrossVolumeMoveCharacterizationUiTests.cs"));
@@ -1623,6 +1628,10 @@ public sealed class NativeSafetyRegressionTests
             Assert.That(operations, Does.Contain("Move_skip_all_retains_conflicting_sources_but_moves_nonconflicting_siblings"));
             Assert.That(operations, Does.Contain("Delete_mixed_selection_removes_the_selected_file_and_directory_tree"));
             Assert.That(operations, Does.Contain("Delete_skip_for_locked_file_keeps_it_and_continues_with_later_items"));
+            // A dedicated fixture keeps the expensive large-directory setup out
+            // of ordinary operation cases while retaining this regression guard.
+            Assert.That(largeDelete, Does.Contain("Delete_large_flat_directory_removes_all_descendants"));
+            Assert.That(largeDelete, Does.Contain("FileCount = 2_048"));
             Assert.That(access, Does.Contain("Find_files_searches_subdirectories_from_the_active_panel"));
             Assert.That(access, Does.Contain("View_file_opens_the_selected_file_in_the_internal_viewer"));
             Assert.That(access, Does.Contain("Edit_file_opens_the_selected_file_in_the_configured_editor"));
