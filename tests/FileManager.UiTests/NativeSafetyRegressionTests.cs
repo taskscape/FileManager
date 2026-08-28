@@ -19,6 +19,7 @@ public sealed class NativeSafetyRegressionTests
         var runner = File.ReadAllText(Path.Combine(root, "scripts", "runtests.ps1"));
         var releaseWorkflow = File.ReadAllText(Path.Combine(root, ".github", "workflows", "build-installer.yml"));
         var releaseInstaller = File.ReadAllText(Path.Combine(root, "tools", "build-release-installer.ps1"));
+        var localInstaller = File.ReadAllText(Path.Combine(root, "scripts", "build-installer.ps1"));
         var installerStager = File.ReadAllText(Path.Combine(root, "tools", "prepare_installer.ps1"));
         var quarantineVerifier = File.ReadAllText(Path.Combine(root, "tools", "verify-ui-test-quarantine.ps1"));
         var quarantineWorkflow = File.ReadAllText(Path.Combine(root, ".github", "workflows", "quarantined-ui-tests.yml"));
@@ -76,6 +77,9 @@ public sealed class NativeSafetyRegressionTests
             Assert.That(releaseInstaller, Does.Contain("PlatformToolset=$PlatformToolset"));
             Assert.That(releaseInstaller, Does.Contain("PreferredToolArchitecture=x64"));
             Assert.That(releaseInstaller, Does.Contain("OPENSAL_BUILD_DIR"));
+            // Local installer builds must stage this invocation's output rather than an old build_stage tree.
+            Assert.That(localInstaller, Does.Contain("$env:OPENSAL_BUILD_DIR"));
+            Assert.That(localInstaller, Does.Contain("[IO.Path]::GetFullPath($BuildRoot).TrimEnd('\\') + '\\'"));
             Assert.That(releaseInstaller, Does.Contain("audit-pe-hardening.ps1"));
             Assert.That(releaseInstaller, Does.Contain("new-symbol-index.ps1"));
             Assert.That(releaseInstaller, Does.Contain("prepare_installer.ps1"));
@@ -84,6 +88,9 @@ public sealed class NativeSafetyRegressionTests
             Assert.That(installerStager, Does.Contain("salamander\\Release_x64"));
             Assert.That(installerStager, Does.Not.Contain("\"src\""));
             Assert.That(installerStager, Does.Contain("7zwrapper.dll"));
+            // Same-major installers need a fresh manifest to register the bundled plug-ins in an existing profile.
+            Assert.That(installerStager, Does.Contain("plugins.ver"));
+            Assert.That(installerStager, Does.Contain("ToUnixTimeSeconds"));
             Assert.That(runner, Does.Contain("Installer_Staging-runtests-"));
             Assert.That(releaseWorkflow, Does.Contain("Installer_Staging-${{ github.run_id }}"));
             Assert.That(releaseInstaller, Does.Contain("prepare-installer.log"));
@@ -352,7 +359,8 @@ public sealed class NativeSafetyRegressionTests
             Assert.That(minidump, Does.Contain("CopyBoundedExternalText"));
             Assert.That(minidump, Does.Contain("memchr(source, 0, sourceCapacity)"));
             Assert.That(minidump, Does.Contain("kMaximumCrashReportPathLength = 32767"));
-            Assert.That(minidump, Does.Contain("std::vector<char> buffer(capacity)"));
+            // The reporter no longer builds an app-local DbgHelp path; the Windows component is resolved from System32.
+            Assert.That(minidump, Does.Contain("LOAD_LIBRARY_SEARCH_SYSTEM32"));
             Assert.That(minidump, Does.Contain("std::string dumpFileName"));
             Assert.That(minidump, Does.Contain("ERROR_INVALID_DATA"));
             Assert.That(minidump, Does.Not.Contain("char szFileName[MAX_PATH]"));
@@ -2042,6 +2050,8 @@ public sealed class NativeSafetyRegressionTests
             Assert.That(startup, Does.Contain("LOAD_LIBRARY_SEARCH_APPLICATION_DIR"));
             Assert.That(startup, Does.Contain("LOAD_LIBRARY_SEARCH_SYSTEM32"));
             Assert.That(startup, Does.Contain("LOAD_LIBRARY_SEARCH_USER_DIRS"));
+            // A normal fresh profile must take the same plug-in seeding path as an isolated UI-test profile.
+            Assert.That(startup, Does.Contain("selectedPreviousConfigurationRoot || !hasCommittedConfiguration"));
             Assert.That(widePath, Does.Contain("GetFullPathNameW"));
             Assert.That(releaseHandles, Does.Contain("GetFullPathForWin32Api"));
             Assert.That(debugHandles, Does.Contain("GetFullPathForWin32Api"));
@@ -2053,6 +2063,20 @@ public sealed class NativeSafetyRegressionTests
                         "Release builds must not restore unrestricted LoadLibraryW calls.");
             Assert.That(Regex.Matches(debugHandles, @"(?m)^(?!\s*//).*?\bLoadLibraryW\s*\(").Count, Is.Zero,
                         "Debug builds must not restore unrestricted LoadLibraryW calls.");
+        });
+    }
+
+    [Test]
+    public void Crash_reporter_loads_dbghelp_from_system32_not_the_application_directory()
+    {
+        var root = FindRepositoryRoot();
+        var minidump = File.ReadAllText(Path.Combine(root, "src", "salmon", "minidump.cpp"));
+
+        // Crash reporting must still work when the installer correctly omits a copied Windows system DLL.
+        Assert.Multiple(() =>
+        {
+            Assert.That(minidump, Does.Contain("LoadLibraryExA(\"dbghelp.dll\", NULL, LOAD_LIBRARY_SEARCH_SYSTEM32)"));
+            Assert.That(minidump, Does.Not.Contain("moduleFileName.substr(0, slash + 1) + \"dbghelp.dll\""));
         });
     }
 

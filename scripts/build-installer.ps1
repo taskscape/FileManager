@@ -170,10 +170,23 @@ function Invoke-BuildSolution() {
     ) -join ' '
 
     Write-Host "Executing: $buildCommand"
-    Invoke-Expression $buildCommand
+    $previousBuildRoot = $env:OPENSAL_BUILD_DIR
+    try {
+        # Property sheets consume this exact root; set it so staging receives the binaries built by this invocation.
+        $env:OPENSAL_BUILD_DIR = [IO.Path]::GetFullPath($BuildRoot).TrimEnd('\') + '\'
+        Invoke-Expression $buildCommand
 
-    if ($LASTEXITCODE -ne 0) {
-        Write-Error "Build failed with exit code $LASTEXITCODE"
+        if ($LASTEXITCODE -ne 0) {
+            Write-Error "Build failed with exit code $LASTEXITCODE"
+        }
+    }
+    finally {
+        if ($null -eq $previousBuildRoot) {
+            Remove-Item Env:OPENSAL_BUILD_DIR -ErrorAction SilentlyContinue
+        }
+        else {
+            $env:OPENSAL_BUILD_DIR = $previousBuildRoot
+        }
     }
 
     Write-Host "Build completed successfully" -ForegroundColor Green

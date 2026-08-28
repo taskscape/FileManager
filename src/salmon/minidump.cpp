@@ -7,7 +7,6 @@
 
 #include <stdarg.h>
 #include <string>
-#include <vector>
 
 #pragma warning(push)
 #pragma warning(disable : 4091) // disable typedef warning without variable declaration
@@ -56,31 +55,6 @@ BOOL CopyBoundedExternalText(const char* source, size_t sourceCapacity, size_t m
     }
     destination->assign(source, length);
     return TRUE;
-}
-
-BOOL GetModuleFileNameOwned(std::string* moduleFileName)
-{
-    DWORD capacity = MAX_PATH;
-    for (;;)
-    {
-        std::vector<char> buffer(capacity);
-        DWORD length = GetModuleFileNameA(NULL, &buffer[0], capacity);
-        if (length == 0)
-            return FALSE;
-        if (length < capacity && buffer[length] == 0)
-        {
-            moduleFileName->assign(&buffer[0], length);
-            return TRUE;
-        }
-        if (capacity >= kMaximumCrashReportPathLength + 1)
-            break;
-        DWORD nextCapacity = capacity * 2;
-        capacity = nextCapacity > kMaximumCrashReportPathLength + 1
-                       ? (DWORD)(kMaximumCrashReportPathLength + 1)
-                       : nextCapacity;
-    }
-    SetLastError(ERROR_INSUFFICIENT_BUFFER);
-    return FALSE;
 }
 
 BOOL BuildMiniDumpFileName(CSalmonSharedMemory* mem, std::string* dumpFileName)
@@ -133,22 +107,10 @@ BOOL GenerateMiniDump(CMinidumpParams* minidumpParams, CSalmonSharedMemory* mem,
 {
     BOOL ret = FALSE;
     *overSize = FALSE;
-    std::string moduleFileName;
-    if (!GetModuleFileNameOwned(&moduleFileName))
-    {
-        SetMiniDumpError(minidumpParams, "Unable to determine the crash reporter path (%lu).", GetLastError());
-        return FALSE;
-    }
-    std::string::size_type slash = moduleFileName.find_last_of('\\');
-    if (slash == std::string::npos)
-    {
-        SetLastError(ERROR_INVALID_DATA);
-        SetMiniDumpError(minidumpParams, "The crash reporter path is invalid.");
-        return FALSE;
-    }
-    std::string dbgHelpPath = moduleFileName.substr(0, slash + 1) + "dbghelp.dll";
+    const char* const dbgHelpPath = "System32\\dbghelp.dll";
     static HMODULE hDbgHelp;
-    hDbgHelp = LoadLibraryA(dbgHelpPath.c_str());
+    // DbgHelp is a Windows component; loading it from System32 avoids a missing app-local DLL and DLL preloading.
+    hDbgHelp = LoadLibraryExA("dbghelp.dll", NULL, LOAD_LIBRARY_SEARCH_SYSTEM32);
     if (hDbgHelp != NULL)
     {
         typedef BOOL(WINAPI * MiniDumpWriteDump_t)(HANDLE, DWORD, HANDLE, MINIDUMP_TYPE, CONST PMINIDUMP_EXCEPTION_INFORMATION,
@@ -230,12 +192,12 @@ BOOL GenerateMiniDump(CMinidumpParams* minidumpParams, CSalmonSharedMemory* mem,
         }
         else
         {
-            SetMiniDumpError(minidumpParams, LoadStr(IDS_SALMON_LOAD_FAILED, HLanguage), dbgHelpPath.c_str());
+            SetMiniDumpError(minidumpParams, LoadStr(IDS_SALMON_LOAD_FAILED, HLanguage), dbgHelpPath);
         }
     }
     else
     {
-        SetMiniDumpError(minidumpParams, LoadStr(IDS_SALMON_LOAD_FAILED, HLanguage), dbgHelpPath.c_str());
+        SetMiniDumpError(minidumpParams, LoadStr(IDS_SALMON_LOAD_FAILED, HLanguage), dbgHelpPath);
     }
 
     return ret;

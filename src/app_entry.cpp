@@ -2363,9 +2363,8 @@ FIND_NEW_SLG_FILE:
     // All existing configuration readers continue to use SALAMANDER_ROOT_REG.
     SetConfigurationStoreRoot(SALAMANDER_ROOT_REG);
     BOOL hasCommittedConfiguration = SelectCommittedConfigurationGeneration();
-    // A sandbox is new only until its first complete generation exists; later starts must reload its own saved settings.
-    BOOL currentCfgDoesNotExist = autoImportConfig || selectedPreviousConfigurationRoot ||
-                                   (IsFileManagerUiTestConfigurationStore() && !hasCommittedConfiguration);
+    // A profile is new until it has a complete generation, so normal installs seed bundled plug-ins just like test sandboxes.
+    BOOL currentCfgDoesNotExist = autoImportConfig || selectedPreviousConfigurationRoot || !hasCommittedConfiguration;
     BOOL saveNewConfig = currentCfgDoesNotExist;
     const char* configurationDiagnostic = GetConfigurationSchemaDiagnostic();
     if (configurationDiagnostic != NULL)

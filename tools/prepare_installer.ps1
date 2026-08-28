@@ -130,6 +130,22 @@ foreach ($pluginPayload in $pluginPayloads) {
     Copy-Item -LiteralPath $pluginPayload.FullName -Destination $destination -Force
 }
 
+# Each installer gets a monotonic manifest so an existing 6.0 profile notices the plug-ins bundled by this build.
+$pluginManifestVersion = [DateTimeOffset]::UtcNow.ToUnixTimeSeconds()
+if ($pluginManifestVersion -gt [int]::MaxValue) {
+    throw "The generated plug-in manifest version exceeds the legacy plug-in loader range: $pluginManifestVersion"
+}
+$pluginManifestLines = @("${pluginManifestVersion}:")
+$pluginManifestLines += $pluginPayloads |
+    Where-Object { $_.Extension -eq '.spl' } |
+    ForEach-Object {
+        $relativePath = $_.FullName.Substring($pluginSourceDirectory.Length).TrimStart('\')
+        "${pluginManifestVersion}:$relativePath"
+    } |
+    Sort-Object
+[IO.File]::WriteAllLines((Join-Path $pluginsDirectory 'plugins.ver'), [string[]]$pluginManifestLines,
+    [Text.UTF8Encoding]::new($false))
+
 # These plug-ins load sibling binaries at runtime, so verify the generic payload copy did not regress to staging only .spl files.
 $requiredPluginPayloads = @(
     '7zip\7za.dll',
@@ -144,7 +160,7 @@ if ($missingPluginPayloads.Count -ne 0) {
 }
 
 # Verify the input hand-off before Inno runs so a packaging failure names the missing current-build artifact.
-$requiredStagedFiles = @('salamand.exe', 'salmon.exe', 'salbroker.exe', 'LICENSE') |
+$requiredStagedFiles = @('salamand.exe', 'salmon.exe', 'salbroker.exe', 'LICENSE', 'plugins\plugins.ver') |
     ForEach-Object { Join-Path $stagingRoot $_ }
 $missingStagedFiles = @($requiredStagedFiles | Where-Object { -not (Test-Path -LiteralPath $_ -PathType Leaf) })
 if ($missingStagedFiles.Count -ne 0) {
