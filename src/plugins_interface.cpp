@@ -16,6 +16,8 @@
 #include "dialogs.h"
 #include "utf8gui.h"
 
+#include <shlwapi.h>
+#undef PathIsPrefix // preserve the local helper with the same name from strutils.h
 #include <strsafe.h>
 
 // header for saving a DIB to the registry
@@ -1640,6 +1642,56 @@ void CPlugins::LoadOrder(HWND parent, HKEY regKey)
     }
 }
 
+static BOOL CopyUnloadedPluginConfigurationFromRoot(HKEY destinationConfigKey, const char* sourceRootName,
+                                                    const char* pluginConfigKeyName)
+{
+    if (sourceRootName == NULL || pluginConfigKeyName == NULL || pluginConfigKeyName[0] == 0)
+        return FALSE;
+
+    HKEY sourceRootKey;
+    if (!OpenKey(HKEY_CURRENT_USER, sourceRootName, sourceRootKey))
+        return FALSE;
+
+    BOOL copied = FALSE;
+    HKEY sourceConfigKey;
+    if (OpenKey(sourceRootKey, SALAMANDER_PLUGINSCONFIG, sourceConfigKey))
+    {
+        HKEY sourcePluginKey;
+        if (OpenKey(sourceConfigKey, pluginConfigKeyName, sourcePluginKey))
+        {
+            HKEY destinationPluginKey;
+            if (CreateKey(destinationConfigKey, pluginConfigKeyName, destinationPluginKey))
+            {
+                // A lazy plug-in has not loaded its state yet, so carry its complete legacy subtree into this snapshot.
+                copied = SHCopyKey(sourcePluginKey, NULL, destinationPluginKey, 0) == ERROR_SUCCESS;
+                if (!copied)
+                    TRACE_E("CPlugins::Save(): unable to preserve unloaded plug-in configuration: " << pluginConfigKeyName);
+                CloseKey(destinationPluginKey);
+            }
+            else
+                TRACE_E("CPlugins::Save(): unable to create unloaded plug-in configuration: " << pluginConfigKeyName);
+            CloseKey(sourcePluginKey);
+        }
+        CloseKey(sourceConfigKey);
+    }
+    CloseKey(sourceRootKey);
+    return copied;
+}
+
+static void CopyUnloadedPluginConfiguration(HKEY destinationConfigKey, const char* pluginConfigKeyName)
+{
+    if (CopyUnloadedPluginConfigurationFromRoot(destinationConfigKey, SALAMANDER_ROOT_REG, pluginConfigKeyName))
+        return;
+
+    const char* configurationStoreRoot = GetConfigurationStoreRoot();
+    if (configurationStoreRoot != NULL &&
+        (SALAMANDER_ROOT_REG == NULL || strcmp(configurationStoreRoot, SALAMANDER_ROOT_REG) != 0))
+    {
+        // A prior broken migration left this raw tree intact; recover it only when the active snapshot has no data.
+        CopyUnloadedPluginConfigurationFromRoot(destinationConfigKey, configurationStoreRoot, pluginConfigKeyName);
+    }
+}
+
 void CPlugins::Save(HWND parent, HKEY regKey, HKEY regKeyConfig, HKEY regKeyOrder)
 {
     CALL_STACK_MESSAGE1("CPlugins::Save(, ,)");
@@ -1798,6 +1850,8 @@ void CPlugins::Save(HWND parent, HKEY regKey, HKEY regKeyConfig, HKEY regKeyOrde
 
                 if (p->GetLoaded() && regKeyConfig != NULL)
                     p->Save(parent, regKeyConfig);
+                else if (p->SupportLoadSave && regKeyConfig != NULL)
+                    CopyUnloadedPluginConfiguration(regKeyConfig, p->RegKeyName);
 
                 CloseKey(itemKey);
             }

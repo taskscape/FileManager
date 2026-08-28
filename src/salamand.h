@@ -1276,6 +1276,8 @@ BOOL IsFileManagerUiTestConfigurationStore();
 // Configuration is stored as two complete generations below this root.  Call this after
 // selecting a version root so all existing configuration readers use the committed generation.
 void SetConfigurationStoreRoot(const char* root);
+// Exposes the immutable version root when snapshot writers need a legacy-data fallback.
+const char* GetConfigurationStoreRoot();
 BOOL SelectCommittedConfigurationGeneration();
 BOOL UsesTransactionalConfigurationStore();
 const char* GetConfigurationSchemaDiagnostic();

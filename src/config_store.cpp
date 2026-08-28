@@ -341,6 +341,12 @@ const char* GetConfigurationSchemaDiagnostic()
     return ConfigurationSchemaDiagnostic[0] == 0 ? NULL : ConfigurationSchemaDiagnostic;
 }
 
+const char* GetConfigurationStoreRoot()
+{
+    // Snapshot paths are transient; migration fallbacks must use the stable version root instead.
+    return ConfigurationStoreRoot[0] != 0 ? ConfigurationStoreRoot : NULL;
+}
+
 void SetConfigurationStoreRoot(const char* root)
 {
     ConfigurationStoreRoot[0] = 0;

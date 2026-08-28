@@ -2857,6 +2857,38 @@ BOOL CPluginData::InitDLL(HWND parent, BOOL quiet, BOOL waitCursor, BOOL showUns
                         }
                         LoadSaveToRegistryMutex.Leave();
                     }
+                    if (!loaded)
+                    {
+                        const char* configurationStoreRoot = GetConfigurationStoreRoot();
+                        if (configurationStoreRoot != NULL &&
+                            (SALAMANDER_ROOT_REG == NULL || strcmp(configurationStoreRoot, SALAMANDER_ROOT_REG) != 0))
+                        {
+                            LoadSaveToRegistryMutex.Enter();
+                            HKEY hSal;
+                            if (OpenKey(HKEY_CURRENT_USER, configurationStoreRoot, hSal))
+                            {
+                                HKEY actKey;
+                                if (OpenKey(hSal, SALAMANDER_PLUGINSCONFIG, actKey))
+                                {
+                                    HKEY regKey;
+                                    if (OpenKey(actKey, RegKeyName, regKey))
+                                    {
+                                        // Recover settings omitted by an earlier lazy-plug-in migration before defaults can replace them.
+                                        CSalamanderRegistry registry;
+                                        {
+                                            CALL_STACK_MESSAGE3("3.PluginIface.LoadConfiguration(, ,) (%s v. %s)", DLLName, Version);
+                                            PluginIface.LoadConfiguration(parent, regKey, &registry);
+                                        }
+                                        loaded = TRUE;
+                                        CloseKey(regKey);
+                                    }
+                                    CloseKey(actKey);
+                                }
+                                CloseKey(hSal);
+                            }
+                            LoadSaveToRegistryMutex.Leave();
+                        }
+                    }
                     // if the registry load did not occur, load default values
                     if (!loaded)
                     {

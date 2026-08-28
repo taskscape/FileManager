@@ -2490,6 +2490,7 @@ public sealed class NativeSafetyRegressionTests
         var configuration = ReadConfigurationSources(root);
         var registryWork = File.ReadAllText(Path.Combine(root, "src", "regwork.cpp"));
         var plugins = File.ReadAllText(Path.Combine(root, "src", "plugins_loading.cpp"));
+        var pluginPersistence = File.ReadAllText(Path.Combine(root, "src", "plugins_interface.cpp"));
         var startup = File.ReadAllText(Path.Combine(root, "src", "app_entry.cpp"));
         var architecture = File.ReadAllText(Path.Combine(root, "architecture.md"));
 
@@ -2521,6 +2522,13 @@ public sealed class NativeSafetyRegressionTests
             Assert.That(plugins, Does.Contain("MainWindow->SaveConfig(parent);"));
             Assert.That(plugins, Does.Not.Contain("CreateKey(HKEY_CURRENT_USER, SALAMANDER_ROOT_REG"),
                         "Plug-in commits must not mutate the checksum-protected active generation.");
+            // Lazy plug-ins, including FTP, must retain their private settings while a legacy profile becomes a generation.
+            Assert.That(pluginPersistence, Does.Contain("CopyUnloadedPluginConfiguration"));
+            Assert.That(pluginPersistence, Does.Contain("SHCopyKey(sourcePluginKey, NULL, destinationPluginKey, 0)"));
+            Assert.That(pluginPersistence, Does.Contain("GetConfigurationStoreRoot()"));
+            Assert.That(plugins, Does.Contain("Recover settings omitted by an earlier lazy-plug-in migration"));
+            // The raw profile remains the recovery source for snapshots created before this preservation fix.
+            Assert.That(configuration, Does.Contain("const char* GetConfigurationStoreRoot()"));
             Assert.That(architecture, Does.Contain("the root's `Active Generation` DWORD"));
         });
     }
