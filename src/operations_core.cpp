@@ -1041,8 +1041,24 @@ unsigned ThreadWorkerBody(void* parameter)
         char opChangAttrs[50];
         StringCchCopyNA(opChangAttrs, _countof(opChangAttrs), LoadStr(IDS_CHANGINGATTRS), _countof(opChangAttrs) - 1);
 
+        if (script->IsCopyOrMoveOperation)
+        {
+            pd.Operation = script->IsCopyOperation ? opStrCopying : opStrMoving;
+            pd.Source = script->WaitInQueueFrom != NULL ? script->WaitInQueueFrom :
+                        (script->WorkPath2[0] != 0 ? script->WorkPath2 : "");
+            pd.Preposition = script->IsCopyOperation ? opStrCopyingPrep : opStrMovingPrep;
+            pd.Target = script->WaitInQueueTo != NULL ? script->WaitInQueueTo :
+                        (script->WorkPath1[0] != 0 ? script->WorkPath1 : "");
+            SetProgressDialog(hProgressDlg, &pd, dlgData);
+        }
+
+        // Persist the plan on this worker so the progress dialog can paint and
+        // cancel instead of freezing at 0% while thousands of journal records flush.
+        if (!script->BeginJournal())
+            Error = TRUE;
+
         int i;
-        for (i = 0; !*dlgData.CancelWorker && i < script->Count; i++)
+        for (i = 0; !Error && !*dlgData.CancelWorker && i < script->Count; i++)
         {
             COperation* op = &script->At(i);
             int attempt = script->BeginItemAttempt(i);
@@ -1471,16 +1487,12 @@ CThreadOwner* StartWorker(COperations* script, HWND hDlg, CChangeAttrsData* attr
         }
     }
     ResetEvent(wContinue);
-    if (!script->BeginJournal())
+    // Journal creation is owned by the worker so this dialog thread can keep
+    // pumping paint and cancel messages during large plans.
+    if (!script->Start())
     {
         if (data.BufferIsAllocated)
             free(data.Buffer);
-        script->Fail();
-        return NULL;
-    }
-    if (!script->Start())
-    {
-        script->FinishJournal(TRUE, FALSE);
         return NULL;
     }
 
@@ -1492,7 +1504,6 @@ CThreadOwner* StartWorker(COperations* script, HWND hDlg, CChangeAttrsData* attr
         if (data.BufferIsAllocated)
             free(data.Buffer);
         TRACE_E("Unable to start Worker thread.");
-        script->FinishJournal(TRUE, FALSE);
         script->Fail();
         return NULL;
     }

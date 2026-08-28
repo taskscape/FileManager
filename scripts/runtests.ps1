@@ -229,14 +229,30 @@ function Get-VisualStudioBootstrapPath {
     return (($paths | Select-Object -Unique) -join ';')
 }
 
+# Start each developer-command shell without state left by an earlier VsDevCmd invocation.
+# VsDevCmd appends its tool paths to these variables; preserving an imported environment can make its batch expansion exceed cmd.exe's line limit.
+function Get-VisualStudioCleanEnvironmentPreamble {
+    $variables = @(
+        'INCLUDE', 'EXTERNAL_INCLUDE', 'LIB', 'LIBPATH',
+        'VSINSTALLDIR', 'VCINSTALLDIR', 'VCToolsInstallDir', 'VCToolsRedistDir', 'VCToolsVersion',
+        'WindowsSdkDir', 'WindowsSDKVersion', 'WindowsSDKLibVersion', 'UniversalCRTSdkDir', 'UCRTVersion',
+        'DevEnvDir', 'VisualStudioVersion', 'VS180COMNTOOLS',
+        'VSCMD_ARG_TGT_ARCH', 'VSCMD_ARG_HOST_ARCH', 'VSCMD_VER',
+        '__VSCMD_PREINIT_PATH', '__VSCMD_PREINIT_INCLUDE', '__VSCMD_PREINIT_LIB',
+        '__VSCMD_PREINIT_LIBPATH', '__VSCMD_PREINIT_EXTERNAL_INCLUDE'
+    )
+    return (($variables | ForEach-Object { 'set "' + $_ + '="' }) -join ' && ')
+}
+
 function Import-VisualStudioDeveloperEnvironment {
     param([Parameter(Mandatory = $true)][string]$DeveloperCommand)
 
     # Release audit scripts call dumpbin directly, so retain the VS 2026 environment across local steps just as GITHUB_ENV does in Actions.
     $bootstrapPath = Get-VisualStudioBootstrapPath
-    # Start VsDevCmd with a bounded PATH so a caller's oversized environment cannot exceed cmd.exe limits.
+    # Start VsDevCmd from a clean, bounded environment so previous local runs cannot compound its tool paths.
     # Request both target architectures so x86 MASM is available while PreferredToolArchitecture selects x64 C++.
-    $developerEnvironment = & $env:ComSpec /d /s /c ('set "PATH=' + $bootstrapPath + '" && call "' + $DeveloperCommand + '" -arch=x86 -host_arch=x64 >nul && set')
+    $environmentPreamble = Get-VisualStudioCleanEnvironmentPreamble
+    $developerEnvironment = & $env:ComSpec /d /s /c ($environmentPreamble + ' && set "PATH=' + $bootstrapPath + '" && call "' + $DeveloperCommand + '" -arch=x86 -host_arch=x64 >nul && set')
     if ($LASTEXITCODE -ne 0) {
         throw "Visual Studio 2026 developer environment setup failed with exit code $LASTEXITCODE."
     }
@@ -378,8 +394,9 @@ function Build-UiTestApplication {
     # Keep the toolset explicit so parity jobs test the executable they built.
     # The generated workspace path has no spaces; avoid a trailing backslash escaping the MSBuild property quote.
     $bootstrapPath = Get-VisualStudioBootstrapPath
+    $environmentPreamble = Get-VisualStudioCleanEnvironmentPreamble
     # Use both target architectures so the x64 solution can assemble its x86 sfx7zip dependency without inheriting a large user PATH.
-    $buildCommand = 'set "PATH=' + $bootstrapPath + '" && call "' + $DeveloperCommand + '" -arch=x86 -host_arch=x64 && msbuild "' + $nativeSolution +
+    $buildCommand = $environmentPreamble + ' && set "PATH=' + $bootstrapPath + '" && call "' + $DeveloperCommand + '" -arch=x86 -host_arch=x64 && msbuild "' + $nativeSolution +
         '" /m:' + $MaxBuildNodes + ' /t:Build /p:Configuration=Debug /p:Platform=x64 /p:PlatformToolset=' + $Toolset + ' /p:PreferredToolArchitecture=x64 /p:OPENSAL_BUILD_DIR=' +
         ($BuildDirectory.TrimEnd('\') + '\') + ' /nr:false'
     & $env:ComSpec /d /s /c $buildCommand
@@ -405,8 +422,9 @@ function Invoke-NativeSafetyTests {
     # Keep the native executable independent of the product solution so its
     # pure boundary checks run quickly after the main build has produced UI artifacts.
     $bootstrapPath = Get-VisualStudioBootstrapPath
+    $environmentPreamble = Get-VisualStudioCleanEnvironmentPreamble
     # Keep the safety build on the same bounded dual-architecture environment as the product build.
-    $buildCommand = 'set "PATH=' + $bootstrapPath + '" && call "' + $DeveloperCommand + '" -arch=x86 -host_arch=x64 && msbuild "' + $nativeSafetyProject +
+    $buildCommand = $environmentPreamble + ' && set "PATH=' + $bootstrapPath + '" && call "' + $DeveloperCommand + '" -arch=x86 -host_arch=x64 && msbuild "' + $nativeSafetyProject +
         '" /m:' + $MaxBuildNodes + ' /t:Build /p:Configuration=Debug /p:Platform=x64 /p:PlatformToolset=' + $Toolset + ' /nr:false'
     & $env:ComSpec /d /s /c $buildCommand
     if ($LASTEXITCODE -ne 0) {
@@ -440,8 +458,9 @@ function Invoke-PictViewEngineTests {
     # The engine links straight into a console host, so its decode, transform and
     # encode round trips run without a desktop session or the plug-in host.
     $bootstrapPath = Get-VisualStudioBootstrapPath
+    $environmentPreamble = Get-VisualStudioCleanEnvironmentPreamble
     # Keep the PictView build on the same bounded dual-architecture environment as the product build.
-    $buildCommand = 'set "PATH=' + $bootstrapPath + '" && call "' + $DeveloperCommand + '" -arch=x86 -host_arch=x64 && msbuild "' + $pictViewEngineProject +
+    $buildCommand = $environmentPreamble + ' && set "PATH=' + $bootstrapPath + '" && call "' + $DeveloperCommand + '" -arch=x86 -host_arch=x64 && msbuild "' + $pictViewEngineProject +
         '" /m:' + $MaxBuildNodes + ' /t:Build /p:Configuration=Debug /p:Platform=x64 /p:PlatformToolset=' + $Toolset + ' /nr:false'
     & $env:ComSpec /d /s /c $buildCommand
     if ($LASTEXITCODE -ne 0) {
@@ -578,8 +597,9 @@ function Build-ReleaseGateDebugArtifacts {
     # This intentionally precedes runtests' disposable build, matching the workflow's staged Debug artifact step and its strict input resolution.
     $buildRoot = $BuildDirectory.TrimEnd('\') + '\'
     $bootstrapPath = Get-VisualStudioBootstrapPath
+    $environmentPreamble = Get-VisualStudioCleanEnvironmentPreamble
     # Use both target architectures so the staged release build can assemble x86 sfx7zip while retaining x64 C++ tools.
-    $buildCommand = 'set "PATH=' + $bootstrapPath + '" && call "' + $DeveloperCommand + '" -arch=x86 -host_arch=x64 && set "OPENSAL_BUILD_DIR=' + $buildRoot +
+    $buildCommand = $environmentPreamble + ' && set "PATH=' + $bootstrapPath + '" && call "' + $DeveloperCommand + '" -arch=x86 -host_arch=x64 && set "OPENSAL_BUILD_DIR=' + $buildRoot +
         '" && msbuild "' + $nativeSolution + '" /m:' + $MaxBuildNodes + ' /t:Build /p:Configuration=Debug /p:Platform=x64 /p:PlatformToolset=' +
         $Toolset + ' /p:PreferredToolArchitecture=x64 /nr:false'
     & $env:ComSpec /d /s /c $buildCommand
@@ -829,6 +849,11 @@ if ($ReleasePipeline) {
 }
 
 $testResultsDirectory = Join-Path $repositoryRoot 'TestResults'
+# Keep per-test execution evidence outside disposable UI roots and build directories so failures remain diagnosable.
+if ([string]::IsNullOrWhiteSpace($env:FILEMANAGER_UI_TRANSCRIPT_ROOT)) {
+    $env:FILEMANAGER_UI_TRANSCRIPT_ROOT = Join-Path $testResultsDirectory ('ui-test-transcripts-' + [Guid]::NewGuid().ToString('N'))
+}
+Write-Host "UI execution transcripts: $env:FILEMANAGER_UI_TRANSCRIPT_ROOT" -ForegroundColor Cyan
 # Prune interrupted runs before preflight checks can exit, so an unavailable toolchain cannot defer retention indefinitely.
 Remove-OlderUiTestBuildResults -ResultsDirectory $testResultsDirectory
 
@@ -847,11 +872,6 @@ $vsDevCmd = Find-VisualStudioDeveloperCommand
 if ([string]::IsNullOrWhiteSpace($vsDevCmd)) {
     throw 'Visual Studio 2026 C++ developer tools were not found; the complete UI suite cannot build the current solution.'
 }
-if ($ReleasePipeline) {
-    # Match the workflow setup step so subsequent PowerShell audit tools resolve dumpbin from the same VS 2026 toolchain.
-    Import-VisualStudioDeveloperEnvironment -DeveloperCommand $vsDevCmd
-}
-
 $uiBuildDirectory = Join-Path $testResultsDirectory ('runtests-build-' + [Guid]::NewGuid().ToString('N'))
 $releaseBuildDirectory = $null
 try {
@@ -918,7 +938,8 @@ foreach ($architecture in @('x64', 'x86')) {
 $cmarkSkipReason = $null
 $cmarkScript = Join-Path $repositoryRoot 'tools\test-cmark-gfm-hardening.ps1'
 $cmarkCommand = if ($null -ne $vsDevCmd) {
-    'call "' + $vsDevCmd + '" -arch=x64 -host_arch=x64 && powershell.exe -NoProfile -ExecutionPolicy Bypass -File "' + $cmarkScript + '"'
+    # Keep this later developer shell independent of an inherited IDE prompt just as the native build shells are.
+    (Get-VisualStudioCleanEnvironmentPreamble) + ' && set "PATH=' + (Get-VisualStudioBootstrapPath) + '" && call "' + $vsDevCmd + '" -arch=x64 -host_arch=x64 && powershell.exe -NoProfile -ExecutionPolicy Bypass -File "' + $cmarkScript + '"'
 } else { $null }
 $cmarkAction = {
     & $env:ComSpec /d /s /c $cmarkCommand
@@ -1139,6 +1160,9 @@ if ($ReleasePipeline) {
         }
 
         if ($preflightPassed -and $contractValidationPassed) {
+            # Delay the process-wide import until direct Release tools need it; every Debug build enters its own
+            # bounded developer shell, and re-entering VsDevCmd after an import can exceed cmd.exe's line limit.
+            Import-VisualStudioDeveloperEnvironment -DeveloperCommand $vsDevCmd
             # Keep Release outputs separate from Debug UI artifacts so the PE audit sees the same tree as the installer job.
             $releaseBuildDirectory = Join-Path $testResultsDirectory ('runtests-release-' + [Guid]::NewGuid().ToString('N'))
             Invoke-ReleasePipelinePackaging -DeveloperCommand $vsDevCmd -BuildDirectory $releaseBuildDirectory `

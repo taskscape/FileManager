@@ -10,6 +10,18 @@ internal static class UiTestSettings
     internal static string Arguments =>
         Environment.GetEnvironmentVariable("FILEMANAGER_UI_ARGUMENTS") ?? string.Empty;
 
+    internal static string ExecutionTranscriptRoot
+    {
+        get
+        {
+            var configuredRoot = Environment.GetEnvironmentVariable("FILEMANAGER_UI_TRANSCRIPT_ROOT");
+            // Direct IDE runs still retain diagnostics even when the aggregate runner did not provide an artifact directory.
+            return Path.GetFullPath(string.IsNullOrWhiteSpace(configuredRoot)
+                ? Path.Combine(TestContext.CurrentContext.WorkDirectory, "TestResults", "ui-test-transcripts")
+                : configuredRoot);
+        }
+    }
+
     internal const string ConfigurationRegistryRoot = "Software\\Open Salamander\\6.0-filemanager-testdata";
 
     internal static string TestDataRoot

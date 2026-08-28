@@ -24,10 +24,63 @@ internal static class NativeCommands
     internal const int RenameFile = 754;
     // CM_ACTIVEREFRESH synchronously refreshes the active file panel before a test quick-searches newly created files.
     internal const int RefreshActivePanel = 740;
+    // CM_SWAPPANELS exchanges the two panel paths so Copy can be driven in the opposite direction.
+    internal const int SwapPanels = 783;
+    // CM_ACTIVEPARENTDIR / CM_ACTIVE_CHANGEDIR / CM_CHANGEFILTER keep navigation on the active panel.
+    internal const int ParentDirectory = 822;
+    internal const int ChangeDirectory = 862;
+    internal const int ChangeFilter = 779;
+    internal const int SelectByMask = 841;
+    internal const int SelectAll = 842;
     // CM_ACTIVEUNSELECTALL prevents a stale selection from being combined with the item a test is about to mark.
-    private const int UnselectAll = 844;
+    internal const int UnselectAll = 844;
+    internal const int Pack = 850;
+    internal const int Unpack = 851;
+    internal const int CompareDirectories = 737;
+    internal const int ChangeCase = 747;
+    internal const int ChangeAttributes = 748;
+    internal const int ConvertFiles = 814;
+    // Find-dialog commands are posted to the modeless Find window, not the main window.
+    internal const int FindFocus = 2225;
+    internal const int FindDelete = 2282;
+    internal const int FindDuplicates = 2292;
+    // Stable dialog control IDs from src/lang/lang.rh; used instead of translated captions.
+    internal const int FileMaskControl = 101;
+    internal const int CopyNamedCheck = 217;
+    internal const int CopyNamedMask = 216;
+    internal const int FilterDontUse = 406;
+    internal const int FilterUse = 407;
+    internal const int FilterEdit = 409;
+    internal const int PackerCombo = 511;
+    internal const int PackMoveFiles = 512;
+    internal const int UnpackDeleteArchive = 6210;
+    internal const int UpperCaseRadio = 544;
+    internal const int ReadOnlyAttribute = 244;
+    internal const int CompressedAttribute = 246;
+    internal const int EofCrlfRadio = 2494;
+    internal const int CompareByTime = 192;
+    internal const int CompareByContent = 193;
+    internal const int CompareByAttr = 194;
+    internal const int CompareSubdirs = 195;
+    internal const int CompareBySize = 197;
+    internal const int FindLookIn = 2501;
+    internal const int FindIncludeSubdirs = 2503;
+    internal const int FindContaining = 2504;
+    internal const int FindNamed = 2505;
+    internal const int FindGrep = 2508;
+    internal const int FindResults = 2510;
+    internal const int FindRegular = 2513;
+    internal const int FindWholeWords = 2514;
+    internal const int FindCaseSensitive = 2515;
+    internal const int FindHex = 2516;
+    internal const int DuplicateSameName = 2751;
+    internal const int DuplicateSameSize = 2752;
+    internal const int DuplicateSameContent = 2753;
     private const uint WmCommand = 0x0111;
     private const uint CbSetCurSel = 0x014E;
+    private const uint CbGetCount = 0x0146;
+    private const uint CbGetLbTextLen = 0x0149;
+    private const uint CbGetLbText = 0x0148;
     private const int CbnSelChange = 1;
     private const uint WmChar = 0x0102;
     private const uint WmKeyDown = 0x0100;
@@ -48,6 +101,8 @@ internal static class NativeCommands
     private const uint WmSetText = 0x000C;
     private const uint WmGetText = 0x000D;
     private const uint WmGetTextLength = 0x000E;
+    private const int GwlStyle = -16;
+    private const long EsPassword = 0x0020;
 
     // Caption of the owner-less startup notice raised when a configuration
     // generation could not be validated (src/app_entry.cpp).
@@ -60,12 +115,18 @@ internal static class NativeCommands
     [DllImport("user32.dll", CharSet = CharSet.Unicode)]
     private static extern nint SendMessage(nint hWnd, uint msg, nint wParam, nint lParam);
 
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern nint SendMessageTimeout(nint hWnd, uint msg, nint wParam, nint lParam, uint flags, uint timeoutMilliseconds, out nint result);
+
     [DllImport("user32.dll", CharSet = CharSet.Unicode, EntryPoint = "SendMessageW")]
     private static extern nint SendMessageText(nint hWnd, uint msg, nint wParam, string lParam);
 
     // FTP's legacy list box expects ANSI text, unlike the Unicode operation-path controls above.
     [DllImport("user32.dll", CharSet = CharSet.Ansi, EntryPoint = "SendMessageA")]
     private static extern nint SendMessageAnsiText(nint hWnd, uint msg, nint wParam, string lParam);
+
+    [DllImport("user32.dll", CharSet = CharSet.Ansi, EntryPoint = "SendMessageA")]
+    private static extern nint SendMessageAnsiBuffer(nint hWnd, uint msg, nint wParam, StringBuilder lParam);
 
     [DllImport("user32.dll", CharSet = CharSet.Unicode, EntryPoint = "SendMessageW")]
     private static extern nint SendMessageBuffer(nint hWnd, uint msg, nint wParam, StringBuilder lParam);
@@ -85,6 +146,10 @@ internal static class NativeCommands
     [DllImport("user32.dll")]
     [return: MarshalAs(UnmanagedType.Bool)]
     private static extern bool GetClientRect(nint hWnd, out Rect rectangle);
+
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool IsWindowEnabled(nint windowHandle);
 
     private delegate bool EnumWindowsCallback(nint windowHandle, nint parameter);
 
@@ -126,14 +191,19 @@ internal static class NativeCommands
     [DllImport("user32.dll", CharSet = CharSet.Unicode)]
     private static extern int GetClassName(nint windowHandle, char[] buffer, int maximumCount);
 
+    [DllImport("user32.dll", EntryPoint = "GetWindowLongPtrW")]
+    private static extern nint GetWindowLongPtr(nint windowHandle, int index);
+
     internal static void OpenConfiguration(nint windowHandle)
     {
+        TraceAction("open-configuration", windowHandle);
         // Send directly because the custom menu loop consumes externally posted WM_COMMAND messages before native dispatch.
         SendMessage(windowHandle, WmCommand, Configuration, 0);
     }
 
     internal static void AcceptStartupLanguage(nint dialogHandle)
     {
+        TraceAction("accept-startup-language", dialogHandle, "button=IDOK(1)");
         // The empty sandbox selects the bundled language with the standard IDOK command before the main window exists.
         SendMessage(dialogHandle, WmCommand, 1, 0);
     }
@@ -141,6 +211,7 @@ internal static class NativeCommands
     internal static void CloseStandardDialog(nint dialogHandle, bool commit)
     {
         var controlId = commit ? 5 : 2;
+        TraceAction("close-standard-dialog", dialogHandle, $"commit={commit} control={controlId}");
         var buttonHandle = GetDlgItem(dialogHandle, controlId);
         // Click the actual property-sheet child because a parent WM_COMMAND without its button handle is ignored by this legacy dialog.
         if (buttonHandle == 0)
@@ -150,6 +221,7 @@ internal static class NativeCommands
 
     internal static void SelectComboBoxItem(nint dialogHandle, nint comboHandle, int itemIndex)
     {
+        TraceAction("select-combo-item", dialogHandle, $"control={GetDlgCtrlID(comboHandle)} index={itemIndex}");
         // UIA's SelectionItem pattern updates the native combo without its parent notification, unlike a user selection.
         if (SendMessage(comboHandle, CbSetCurSel, itemIndex, 0) == -1)
             throw new InvalidOperationException($"The native combo box did not contain item {itemIndex}.");
@@ -243,6 +315,9 @@ internal static class NativeCommands
     internal static void SetDialogControlText(nint dialogHandle, int controlId, string text)
     {
         var controlHandle = RequireDialogControl(dialogHandle, controlId);
+        // Never serialize password-edit contents into a retained CI artifact.
+        var loggedText = IsPasswordControl(controlHandle) ? "<redacted-password>" : QuoteForTrace(text);
+        TraceAction("set-dialog-text", dialogHandle, $"control={controlId} text={loggedText}");
         // Send through the target window procedure so cross-process tests update the text that the native dialog will actually transfer.
         SendMessageText(controlHandle, WmSetText, 0, text);
     }
@@ -262,6 +337,7 @@ internal static class NativeCommands
     internal static void SetOperationPath(nint dialogHandle, string path)
     {
         var pathControl = RequireOperationPathControl(dialogHandle);
+        TraceAction("set-operation-path", dialogHandle, $"path={QuoteForTrace(path)}");
         // WM_SETTEXT through SendMessage, not SetWindowText: across a process
         // boundary SetWindowText updates the cached window title that
         // GetWindowText then reads back, so a write and its verification agreed
@@ -308,6 +384,7 @@ internal static class NativeCommands
     /// </summary>
     internal static void PostDialogButtonClick(nint dialogHandle, int controlId)
     {
+        TraceAction("post-dialog-button", dialogHandle, $"control={controlId}");
         var buttonHandle = FindDialogControl(dialogHandle, controlId);
         if (buttonHandle == 0)
             throw new InvalidOperationException($"The dialog did not expose native button {controlId}.");
@@ -351,6 +428,42 @@ internal static class NativeCommands
         return string.Join(Environment.NewLine, lines.Distinct(StringComparer.Ordinal));
     }
 
+    internal static string DescribeWindowForTranscript(nint windowHandle, string processRole)
+    {
+        var className = GetWindowClass(windowHandle);
+        var title = GetWindowTitle(windowHandle);
+        var lines = new List<string>
+        {
+            $"window hwnd=0x{windowHandle:X} class={QuoteForTrace(className)} title={QuoteForTrace(title)} " +
+            $"visible={IsWindowVisible(windowHandle)} enabled={IsWindowEnabled(windowHandle)}",
+        };
+
+        // The main panel tree is large and volatile; dialogs and salmon.exe carry the diagnostic text worth retaining.
+        var includeControls = !string.Equals(className, "SalamanderMainWindowVer25", StringComparison.Ordinal) ||
+                              string.Equals(processRole, "salmon.exe", StringComparison.OrdinalIgnoreCase);
+        if (!includeControls)
+            return string.Join(Environment.NewLine, lines);
+
+        var controlCount = 0;
+        EnumChildWindows(windowHandle, (childHandle, _) =>
+        {
+            if (controlCount >= 200)
+                return false;
+            controlCount++;
+            var childClass = GetWindowClass(childHandle);
+            var childText = IsPasswordControl(childHandle) ? "<redacted-password>" : GetWindowTitle(childHandle);
+            if (childText.Length > 1_000)
+                childText = childText[..1_000] + "<truncated>";
+            lines.Add($"control[{controlCount}] hwnd=0x{childHandle:X} id={GetDlgCtrlID(childHandle)} " +
+                      $"class={QuoteForTrace(childClass)} text={QuoteForTrace(childText)} " +
+                      $"visible={IsWindowVisible(childHandle)} enabled={IsWindowEnabled(childHandle)}");
+            return true;
+        }, 0);
+        if (controlCount >= 200)
+            lines.Add("controls-truncated=true limit=200");
+        return string.Join(Environment.NewLine, lines);
+    }
+
     internal static bool HasDialogButton(nint dialogHandle, int controlId)
     {
         // Standard buttons remain native controls even where the legacy provider does not publish a Button pattern.
@@ -390,6 +503,7 @@ internal static class NativeCommands
 
     internal static void ClickDialogButton(nint dialogHandle, int controlId)
     {
+        TraceAction("click-dialog-button", dialogHandle, $"control={controlId}");
         var buttonHandle = FindDialogControl(dialogHandle, controlId);
         if (buttonHandle == 0)
             throw new InvalidOperationException($"The dialog did not expose native button {controlId}.");
@@ -398,6 +512,7 @@ internal static class NativeCommands
 
     internal static void SetDialogCheckBoxState(nint dialogHandle, int controlId, bool isChecked)
     {
+        TraceAction("set-dialog-checkbox", dialogHandle, $"control={controlId} checked={isChecked}");
         var checkBoxHandle = FindDialogControl(dialogHandle, controlId);
         if (checkBoxHandle == 0)
             throw new InvalidOperationException($"The dialog did not expose native check box {controlId}.");
@@ -419,6 +534,7 @@ internal static class NativeCommands
                 string.Equals(title, "UnRAR", StringComparison.Ordinal) ||
                 string.Equals(title, ConfigurationNoticeCaption, StringComparison.Ordinal))
             {
+                TraceAction("dismiss-startup-dialog", windowHandle, $"title={QuoteForTrace(title)} button=IDOK(1)");
                 // Plug-in notices: both plug-ins that used to fail here now load
                 // cleanly (PictView decodes through WIC, UnRAR resolves its optional
                 // RARLAB library only when a RAR is opened), but this stays as a
@@ -434,6 +550,7 @@ internal static class NativeCommands
             }
             else if (string.Equals(title, "Check for New Versions", StringComparison.Ordinal))
             {
+                TraceAction("dismiss-startup-dialog", windowHandle, $"title={QuoteForTrace(title)} button=IDCANCEL(2)");
                 // A restored plug-in profile may reopen its optional update prompt; decline it so startup can expose the host window.
                 ClickDialogButton(windowHandle, 2);
             }
@@ -478,6 +595,8 @@ internal static class NativeCommands
         var originalState = SendMessage(checkBoxHandle, BmGetCheck, 0, 0);
         if (originalState != 0 && originalState != 1)
             throw new InvalidOperationException("Configuration persistence test requires a two-state checkbox.");
+        TraceAction("toggle-configuration-checkbox", dialogHandle,
+                    $"control={ConfigurationClearReadOnlyCheckBox} from={originalState} to={(originalState == 0 ? 1 : 0)}");
         SendMessage(checkBoxHandle, BmClick, 0, 0);
         return originalState == 1;
     }
@@ -503,27 +622,46 @@ internal static class NativeCommands
         return state == 1;
     }
 
+    internal static void PostCloseWindow(nint windowHandle)
+    {
+        TraceAction("post-close-window", windowHandle);
+        // UIA Window.Close can block while the Find UI thread is still in a nested search; WM_CLOSE is posted instead.
+        if (!PostMessage(windowHandle, 0x0010, 0, 0)) // WM_CLOSE
+            throw new InvalidOperationException("Could not post WM_CLOSE.");
+    }
+
     internal static void Execute(nint windowHandle, int command)
     {
+        TraceAction("post-command", windowHandle, $"command={DescribeCommand(command)}({command})");
         // Posting lets the test observe a modal operation dialog after the user-equivalent panel activation instead of blocking in its handler.
         if (!PostMessage(windowHandle, WmCommand, command, 0))
             throw new InvalidOperationException($"Could not post native command {command}.");
     }
 
+    internal static void ExecuteSynchronously(nint windowHandle, int command)
+    {
+        TraceAction("send-command", windowHandle, $"command={DescribeCommand(command)}({command})");
+        // Swap/parent must finish layout before the test reads the active path; posting would race the title and listing.
+        SendMessage(windowHandle, WmCommand, command, 0);
+    }
+
     internal static void RefreshActiveFilePanel(nint windowHandle)
     {
+        TraceAction("refresh-active-panel", windowHandle, $"command={RefreshActivePanel}");
         // Refresh is non-modal, so send it synchronously to guarantee the panel has enumerated externally-created test files.
         SendMessage(windowHandle, WmCommand, RefreshActivePanel, 0);
     }
 
     internal static void ClearActiveSelection(nint windowHandle)
     {
+        TraceAction("clear-active-selection", windowHandle, $"command={UnselectAll}");
         // Clearing through the host command synchronizes the selected set with the active panel instead of relying on a prior test's caret state.
         SendMessage(windowHandle, WmCommand, UnselectAll, 0);
     }
 
     internal static void QuickSearch(nint listHandle, string name)
     {
+        TraceAction("quick-search", listHandle, $"text={QuoteForTrace(name)}");
         SetFocus(listHandle);
         SendMessage(listHandle, WmKeyDown, VkEscape, 0);
         foreach (var character in name)
@@ -532,6 +670,7 @@ internal static class NativeCommands
 
     internal static void PressEnter(nint controlHandle)
     {
+        TraceAction("press-enter", controlHandle);
         // HTML Help commits its search field through the native Enter key path rather than a reliable UIA action.
         SetFocus(controlHandle);
         SendMessage(controlHandle, WmKeyDown, VkReturn, 0);
@@ -539,13 +678,30 @@ internal static class NativeCommands
 
     internal static void ToggleFocusedSelection(nint listHandle)
     {
+        TraceAction("toggle-focused-selection", listHandle, "key=VK_INSERT");
         // Insert is the native panel gesture that selects the focused item while preserving prior selections.
         SetFocus(listHandle);
         SendMessage(listHandle, WmKeyDown, 0x2D, 0); // VK_INSERT
     }
 
+    internal static void SelectFocusedListViewItem(nint listHandle)
+    {
+        TraceAction("select-focused-list-item", listHandle);
+        // A client click selects the focused Find-results row without the Space toggle
+        // that would deselect an item the search already marked.
+        if (!GetClientRect(listHandle, out var rectangle) || rectangle.Right <= rectangle.Left || rectangle.Bottom <= rectangle.Top)
+            throw new InvalidOperationException("The Find results list did not expose a usable client area.");
+        SetFocus(listHandle);
+        var x = Math.Min(8, rectangle.Right - 1);
+        var y = Math.Min(8, rectangle.Bottom - 1);
+        var point = unchecked((nint)((y << 16) | (x & 0xffff)));
+        PostMessage(listHandle, WmLButtonDown, 0, point);
+        PostMessage(listHandle, WmLButtonUp, 0, point);
+    }
+
     internal static void ActivateFilePanel(nint listHandle)
     {
+        TraceAction("activate-file-panel", listHandle);
         if (!GetClientRect(listHandle, out var rectangle) || rectangle.Right <= rectangle.Left || rectangle.Bottom <= rectangle.Top)
             throw new InvalidOperationException("The source file panel did not expose a usable client area.");
 
@@ -559,7 +715,154 @@ internal static class NativeCommands
 
     internal static int GetListViewItemCount(nint listHandle)
     {
-        // LVM_GETITEMCOUNT crosses process boundaries without caller-owned buffers and works for the virtual Find list.
-        return checked((int)SendMessage(listHandle, LvmGetItemCount, 0, 0));
+        // LVM_GETITEMCOUNT must not use blocking SendMessage: Find's UI thread stays inside StartSearch
+        // (especially Find Duplicates) and a synchronous send deadlocks testhost for the rest of the run.
+        const uint smtoAbortIfHung = 0x0002;
+        if (SendMessageTimeout(listHandle, LvmGetItemCount, 0, 0, smtoAbortIfHung, 300, out var count) == 0)
+            return -1;
+        return checked((int)count);
     }
+
+    internal static void SelectAllActivePanel(nint windowHandle)
+    {
+        TraceAction("select-all-active-panel", windowHandle, $"command={SelectAll}");
+        // Select All is non-modal; send it so Copy observes the same selected set a user would see.
+        SendMessage(windowHandle, WmCommand, SelectAll, 0);
+    }
+
+    internal static int GetDialogCheckBoxState(nint dialogHandle, int controlId)
+    {
+        var checkBoxHandle = FindDialogControl(dialogHandle, controlId);
+        if (checkBoxHandle == 0)
+            throw new InvalidOperationException($"The dialog did not expose native check box {controlId}.");
+        return (int)SendMessage(checkBoxHandle, BmGetCheck, 0, 0);
+    }
+
+    internal static bool IsDialogCheckBoxChecked(nint dialogHandle, int controlId)
+    {
+        return GetDialogCheckBoxState(dialogHandle, controlId) != 0;
+    }
+
+    internal static void ClickAttributeCheckBox(nint dialogHandle, int controlId, int wantedState)
+    {
+        TraceAction("set-attribute-checkbox", dialogHandle, $"control={controlId} wanted-state={wantedState}");
+        // The Compressed box is 3-state; one BM_CLICK from Checked lands on Indeterminate (leave unchanged).
+        for (var attempt = 0; attempt < 4; attempt++)
+        {
+            if (GetDialogCheckBoxState(dialogHandle, controlId) == wantedState)
+                return;
+            ClickDialogControl(dialogHandle, controlId);
+        }
+
+        throw new InvalidOperationException(
+            $"Attribute check box {controlId} stayed at {GetDialogCheckBoxState(dialogHandle, controlId)} instead of {wantedState}.");
+    }
+
+    internal static void ClickDialogControl(nint dialogHandle, int controlId)
+    {
+        TraceAction("click-dialog-control", dialogHandle, $"control={controlId}");
+        // BM_CLICK raises BN_CLICKED so 3-state attribute boxes record their dirty flag.
+        ClickDialogButton(dialogHandle, controlId);
+    }
+
+    internal static bool IsDialogControlEnabled(nint dialogHandle, int controlId)
+    {
+        var controlHandle = FindDialogControl(dialogHandle, controlId);
+        return controlHandle != 0 && IsWindowEnabled(controlHandle);
+    }
+
+    internal static void SelectComboBoxItemContaining(nint dialogHandle, int comboControlId, string text)
+    {
+        TraceAction("select-combo-item-containing", dialogHandle,
+                    $"control={comboControlId} match={QuoteForTrace(text)}");
+        var comboHandle = RequireDialogControl(dialogHandle, comboControlId);
+        var count = (int)SendMessage(comboHandle, CbGetCount, 0, 0);
+        for (var index = 0; index < count; index++)
+        {
+            var item = GetComboBoxItemText(comboHandle, index);
+            if (item.Contains(text, StringComparison.OrdinalIgnoreCase))
+            {
+                SelectComboBoxItem(dialogHandle, comboHandle, index);
+                return;
+            }
+        }
+
+        throw new InvalidOperationException($"The combo box {comboControlId} did not contain an item matching '{text}'.");
+    }
+
+    private static string GetComboBoxItemText(nint comboHandle, int itemIndex)
+    {
+        // Packer titles are stored as ANSI strings in the host combo, matching the ANSI pack dialog.
+        var length = (int)SendMessage(comboHandle, CbGetLbTextLen, itemIndex, 0);
+        if (length <= 0)
+            return string.Empty;
+        var buffer = new StringBuilder(length + 1);
+        SendMessageAnsiBuffer(comboHandle, CbGetLbText, itemIndex, buffer);
+        return buffer.ToString();
+    }
+
+    private static void TraceAction(string action, nint windowHandle, string? details = null)
+    {
+        // Central native-action records preserve user-equivalent operations in the same order as window observations.
+        var suffix = string.IsNullOrWhiteSpace(details) ? string.Empty : " " + details;
+        UiTestTrace.Record("ACTION",
+                           $"{action} hwnd=0x{windowHandle:X} class={QuoteForTrace(GetWindowClass(windowHandle))} " +
+                           $"title={QuoteForTrace(GetWindowTitle(windowHandle))}{suffix}");
+    }
+
+    private static bool IsPasswordControl(nint controlHandle)
+    {
+        return string.Equals(GetWindowClass(controlHandle), "Edit", StringComparison.OrdinalIgnoreCase) &&
+               ((long)GetWindowLongPtr(controlHandle, GwlStyle) & EsPassword) != 0;
+    }
+
+    private static string GetWindowClass(nint windowHandle)
+    {
+        var classBuffer = new char[256];
+        GetClassName(windowHandle, classBuffer, classBuffer.Length);
+        return new string(classBuffer).TrimEnd('\0');
+    }
+
+    private static string QuoteForTrace(string value)
+    {
+        var escaped = value.Replace("\\", "\\\\", StringComparison.Ordinal)
+                           .Replace("\r", "\\r", StringComparison.Ordinal)
+                           .Replace("\n", "\\n", StringComparison.Ordinal)
+                           .Replace("\"", "\\\"", StringComparison.Ordinal);
+        return $"\"{escaped}\"";
+    }
+
+    private static string DescribeCommand(int command) => command switch
+    {
+        Configuration => nameof(Configuration),
+        CustomizeTopToolbar => nameof(CustomizeTopToolbar),
+        CopyFiles => nameof(CopyFiles),
+        MoveFiles => nameof(MoveFiles),
+        DeleteFiles => nameof(DeleteFiles),
+        CreateDirectory => nameof(CreateDirectory),
+        OpenFile => nameof(OpenFile),
+        FindFiles => nameof(FindFiles),
+        ViewFile => nameof(ViewFile),
+        EditFile => nameof(EditFile),
+        HelpSearch => nameof(HelpSearch),
+        RenameFile => nameof(RenameFile),
+        RefreshActivePanel => nameof(RefreshActivePanel),
+        SwapPanels => nameof(SwapPanels),
+        ParentDirectory => nameof(ParentDirectory),
+        ChangeDirectory => nameof(ChangeDirectory),
+        ChangeFilter => nameof(ChangeFilter),
+        SelectByMask => nameof(SelectByMask),
+        SelectAll => nameof(SelectAll),
+        UnselectAll => nameof(UnselectAll),
+        Pack => nameof(Pack),
+        Unpack => nameof(Unpack),
+        CompareDirectories => nameof(CompareDirectories),
+        ChangeCase => nameof(ChangeCase),
+        ChangeAttributes => nameof(ChangeAttributes),
+        ConvertFiles => nameof(ConvertFiles),
+        FindFocus => nameof(FindFocus),
+        FindDelete => nameof(FindDelete),
+        FindDuplicates => nameof(FindDuplicates),
+        _ => "dynamic-or-unknown",
+    };
 }

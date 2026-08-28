@@ -27,6 +27,20 @@ if ([string]::IsNullOrWhiteSpace($vsDevCmd)) {
     throw 'No Visual Studio developer command environment was found.'
 }
 
+# Clear a previously imported VS shell inside the probe's cmd.exe so VsDevCmd does not duplicate compiler paths beyond cmd.exe's line limit.
+function Get-VisualStudioCleanEnvironmentPreamble {
+    $variables = @(
+        'INCLUDE', 'EXTERNAL_INCLUDE', 'LIB', 'LIBPATH',
+        'VSINSTALLDIR', 'VCINSTALLDIR', 'VCToolsInstallDir', 'VCToolsRedistDir', 'VCToolsVersion',
+        'WindowsSdkDir', 'WindowsSDKVersion', 'WindowsSDKLibVersion', 'UniversalCRTSdkDir', 'UCRTVersion',
+        'DevEnvDir', 'VisualStudioVersion', 'VS180COMNTOOLS',
+        'VSCMD_ARG_TGT_ARCH', 'VSCMD_ARG_HOST_ARCH', 'VSCMD_VER',
+        '__VSCMD_PREINIT_PATH', '__VSCMD_PREINIT_INCLUDE', '__VSCMD_PREINIT_LIB',
+        '__VSCMD_PREINIT_LIBPATH', '__VSCMD_PREINIT_EXTERNAL_INCLUDE'
+    )
+    return (($variables | ForEach-Object { 'set "' + $_ + '="' }) -join ' && ')
+}
+
 $temporaryDirectory = Join-Path ([System.IO.Path]::GetTempPath()) ('OpenSalamander-bzip2-' + [Guid]::NewGuid().ToString('N'))
 New-Item -ItemType Directory -Path $temporaryDirectory | Out-Null
 
@@ -37,7 +51,7 @@ try {
     ) | ForEach-Object { '"' + (Join-Path $bzip2Directory $_) + '"' }
     $probeExecutable = Join-Path $temporaryDirectory 'bzip2_compatibility_probe.exe'
     $compilerCommand = (
-        'call "' + $vsDevCmd + '" -arch=' + $Architecture + ' -host_arch=x64 && cd /d "' + $temporaryDirectory + '" && ' +
+        (Get-VisualStudioCleanEnvironmentPreamble) + ' && call "' + $vsDevCmd + '" -arch=' + $Architecture + ' -host_arch=x64 && cd /d "' + $temporaryDirectory + '" && ' +
         # Upstream's portability and assertion macros intentionally trigger these
         # MSVC-only constant-condition and integer-conversion diagnostics.
         'cl /nologo /TC /W4 /WX /wd4100 /wd4127 /wd4244 /wd4245 /DBZ_NO_STDIO /I"' + $bzip2Directory + '" ' +

@@ -205,6 +205,7 @@ BOOL COperations::BeginJournal()
     if (Journal != NULL)
         return FALSE;
     Journal = new COperationJournal;
+    // Called from the worker after the progress dialog is pumping messages.
     if (Journal == NULL || !Journal->Begin(*this))
     {
         delete Journal;

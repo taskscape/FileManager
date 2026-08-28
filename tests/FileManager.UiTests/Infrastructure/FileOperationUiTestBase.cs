@@ -97,38 +97,169 @@ public abstract class FileOperationUiTestBase : FileManagerUiTestBase
         }
     }
 
-    protected void SelectSourceItem(string name)
+    protected void SelectSourceItem(string name) => SelectPanelItem(left: true, name);
+
+    protected void SelectTargetItem(string name) => SelectPanelItem(left: false, name);
+
+    protected void SelectPanelItem(bool left, string name)
     {
-        var list = PrepareSourcePanelForSelection();
+        var list = left ? PrepareSourcePanelForSelection() : PreparePanelForSelection(left);
         // Starting from an empty native selected set keeps an incomplete panel refresh from carrying a prior fixture into this operation.
-        NativeCommands.ClearActiveSelection(MainWindow.Properties.NativeWindowHandle.Value);
-        QuickSearchSourceItem(list, name);
+        NativeCommands.ClearActiveSelection(NativeMainWindowHandle);
+        if (left)
+            QuickSearchSourceItem(list, name);
+        else
+            QuickSearchPanelItem(list, name);
         // Mark the focused match explicitly so Copy/Move/Delete observe the same selected-item state as an interactive user.
         NativeCommands.ToggleFocusedSelection(list.Properties.NativeWindowHandle.Value);
         // Insert publishes selection-dependent command state on the panel's following idle turn, which can be delayed on a secondary volume.
         Thread.Sleep(PanelSettleMilliseconds);
         // Insert advances the caret after selecting; restore the match because Quick Rename acts on the caret rather than the selection.
-        QuickSearchSourceItem(list, name);
+        if (left)
+            QuickSearchSourceItem(list, name);
+        else
+            QuickSearchPanelItem(list, name);
     }
 
-    protected void RefreshSourcePanel()
+    /// <summary>
+    /// Focuses a listed name without Insert so Copy uses the empty-selection focused-item rule.
+    /// </summary>
+    protected void FocusSourceItem(string name)
     {
-        var list = FindSourceList();
+        var list = PreparePanelForSelection(left: true);
+        NativeCommands.ClearActiveSelection(NativeMainWindowHandle);
+        QuickSearchPanelItem(list, name);
+    }
+
+    protected void ActivateTargetPanel()
+    {
+        var list = FindPanelList(left: false);
         NativeCommands.ActivateFilePanel(list.Properties.NativeWindowHandle.Value);
-        // Refresh the source panel after a test has changed its fixture on disk.
-        NativeCommands.RefreshActiveFilePanel(MainWindow.Properties.NativeWindowHandle.Value);
+        Thread.Sleep(PanelSettleMilliseconds);
+    }
+
+    protected void OpenFocusedItem()
+    {
+        // CM_OPEN is the same Enter path used for directories and archives.
+        NativeCommands.Execute(NativeMainWindowHandle, NativeCommands.OpenFile);
+        Thread.Sleep(PanelSettleMilliseconds);
+    }
+
+    protected void GoToParentDirectory()
+    {
+        NativeCommands.ExecuteSynchronously(NativeMainWindowHandle, NativeCommands.ParentDirectory);
+        Thread.Sleep(PanelSettleMilliseconds);
+    }
+
+    protected void SwapPanels()
+    {
+        // Pointer swap finishes inside the handler; sending keeps the next ActivateSourcePanel from reading the pre-swap layout.
+        NativeCommands.ExecuteSynchronously(NativeMainWindowHandle, NativeCommands.SwapPanels);
+        Thread.Sleep(PanelSettleMilliseconds);
+    }
+
+    protected void ActivateSourcePanel()
+    {
+        var list = FindPanelList(left: true);
+        NativeCommands.ActivateFilePanel(list.Properties.NativeWindowHandle.Value);
+        Thread.Sleep(PanelSettleMilliseconds);
+    }
+
+    protected void WaitForMainWindowTitleContaining(string text, string failureMessage)
+    {
+        WaitForFileSystem(
+            () => NativeCommands.GetWindowTitle(NativeMainWindowHandle)
+                .Contains(text, StringComparison.OrdinalIgnoreCase),
+            failureMessage);
+    }
+
+    /// <summary>
+    /// Posts WM_CLOSE and waits on the native lifetime. UIA Close and post-close handle reads
+    /// time out once Find's UI thread has started tearing down the modeless dialog.
+    /// </summary>
+    protected static void CloseModelessDialog(Window dialog)
+    {
+        nint handle;
+        try
+        {
+            handle = dialog.Properties.NativeWindowHandle.Value;
+        }
+        catch (COMException)
+        {
+            return;
+        }
+
+        CloseModelessDialog(handle);
+    }
+
+    protected static void CloseModelessDialog(nint handle)
+    {
+        if (handle == 0 || !NativeCommands.WindowExists(handle))
+            return;
+        NativeCommands.PostCloseWindow(handle);
+        WaitUntilNativeWindowClosed(handle);
+    }
+
+    protected static void WaitUntilNativeWindowClosed(nint handle)
+    {
+        var timeout = DateTime.UtcNow + TimeSpan.FromSeconds(10);
+        while (DateTime.UtcNow < timeout)
+        {
+            if (!NativeCommands.WindowExists(handle))
+                return;
+            Thread.Sleep(100);
+        }
+
+        Assert.Fail("Timed out waiting for the native window to close.");
+    }
+
+    protected void WaitUntilNoWindowTitled(string title, string failureMessage)
+    {
+        WaitForFileSystem(
+            () => NativeCommands.FindDialogByTitle(Application.ProcessId, title) == 0,
+            failureMessage);
+    }
+
+    protected void DismissOptionalOkDialog()
+    {
+        var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(3);
+        while (DateTime.UtcNow < deadline)
+        {
+            var dialog = NativeCommands.GetTopLevelWindows(Application.ProcessId)
+                .FirstOrDefault(handle => handle != NativeMainWindowHandle &&
+                                          NativeCommands.HasDialogButton(handle, 1));
+            if (dialog != 0)
+            {
+                NativeCommands.ClickDialogButton(dialog, 1); // IDOK
+                return;
+            }
+            Thread.Sleep(100);
+        }
+    }
+
+    protected void RefreshSourcePanel() => RefreshPanel(left: true);
+
+    protected void RefreshTargetPanel() => RefreshPanel(left: false);
+
+    protected void RefreshPanel(bool left)
+    {
+        var list = FindPanelList(left);
+        NativeCommands.ActivateFilePanel(list.Properties.NativeWindowHandle.Value);
+        // Refresh the panel after a test has changed its fixture on disk or navigated into a new listing.
+        NativeCommands.RefreshActiveFilePanel(NativeMainWindowHandle);
+        Thread.Sleep(PanelSettleMilliseconds);
     }
 
     protected void SelectSourceItems(params string[] names)
     {
         // Explicit Insert selection exercises commands over mixed and multiple items instead of only the focused fallback.
-        var list = PrepareSourcePanelForSelection();
+        var list = PreparePanelForSelection(left: true);
         // Multiple selection must begin empty so every subsequent Insert represents exactly one requested fixture.
-        NativeCommands.ClearActiveSelection(MainWindow.Properties.NativeWindowHandle.Value);
+        NativeCommands.ClearActiveSelection(NativeMainWindowHandle);
         // Keep multi-item gestures on the same active source panel as a user selection sequence.
         foreach (var name in names)
         {
-            QuickSearchSourceItem(list, name);
+            QuickSearchPanelItem(list, name);
             NativeCommands.ToggleFocusedSelection(list.Properties.NativeWindowHandle.Value);
             // Preserve each Insert selection until the owner-drawn panel has published it before searching for the next item.
             Thread.Sleep(PanelSettleMilliseconds);
@@ -140,7 +271,7 @@ public abstract class FileOperationUiTestBase : FileManagerUiTestBase
         if (sourceName.Length != 0)
             SelectSourceItem(sourceName);
         WaitForCommandEnabled(command);
-        NativeCommands.Execute(MainWindow.Properties.NativeWindowHandle.Value, command);
+        NativeCommands.Execute(NativeMainWindowHandle, command);
         var dialog = WaitForOperationDialog();
         SetDialogPath(dialog, path);
         CloseDialog(dialog, commit);
@@ -151,21 +282,21 @@ public abstract class FileOperationUiTestBase : FileManagerUiTestBase
     {
         SelectSourceItem(sourceName);
         WaitForCommandEnabled(command);
-        NativeCommands.Execute(MainWindow.Properties.NativeWindowHandle.Value, command);
+        NativeCommands.Execute(NativeMainWindowHandle, command);
         return WaitForOperationDialog();
     }
 
     protected Window WaitForOperationPrompt(int buttonId)
     {
         return WaitForWindow(window =>
-            window.Properties.NativeWindowHandle.Value != MainWindow.Properties.NativeWindowHandle.Value &&
+            window.Properties.NativeWindowHandle.Value != NativeMainWindowHandle &&
             NativeCommands.HasDialogButton(window.Properties.NativeWindowHandle.Value, buttonId));
     }
 
     protected Window WaitForOperationPrompt(string title, int buttonId)
     {
         return WaitForWindow(window =>
-            window.Properties.NativeWindowHandle.Value != MainWindow.Properties.NativeWindowHandle.Value &&
+            window.Properties.NativeWindowHandle.Value != NativeMainWindowHandle &&
             string.Equals(NativeCommands.GetWindowTitle(window.Properties.NativeWindowHandle.Value), title, StringComparison.Ordinal) &&
             NativeCommands.HasDialogButton(window.Properties.NativeWindowHandle.Value, buttonId));
     }
@@ -181,7 +312,7 @@ public abstract class FileOperationUiTestBase : FileManagerUiTestBase
     {
         var operationDialog = ExecuteWithPathWithoutWaitingForClose(command, sourceName, path);
         var failureDialog = WaitForWindow(window =>
-            window.Properties.NativeWindowHandle.Value != MainWindow.Properties.NativeWindowHandle.Value &&
+            window.Properties.NativeWindowHandle.Value != NativeMainWindowHandle &&
             window.Properties.NativeWindowHandle.Value != operationDialog.Properties.NativeWindowHandle.Value);
         CloseDialog(failureDialog, commit: true);
         // The host destroys and recreates its input dialog after an execution error,
@@ -200,7 +331,7 @@ public abstract class FileOperationUiTestBase : FileManagerUiTestBase
     protected void CancelThroughProgressWindow()
     {
         var progress = WaitForWindow(window =>
-            window.Properties.NativeWindowHandle.Value != MainWindow.Properties.NativeWindowHandle.Value &&
+            window.Properties.NativeWindowHandle.Value != NativeMainWindowHandle &&
             NativeCommands.HasDialogButton(window.Properties.NativeWindowHandle.Value, 2) &&
             !NativeCommands.HasDialogButton(window.Properties.NativeWindowHandle.Value, 6));
         // Post rather than send: this click opens the confirmation synchronously,
@@ -257,7 +388,7 @@ public abstract class FileOperationUiTestBase : FileManagerUiTestBase
         while (DateTime.UtcNow < timeout)
         {
             var confirmation = NativeCommands.GetTopLevelWindows(Application.ProcessId)
-                .FirstOrDefault(handle => handle != MainWindow.Properties.NativeWindowHandle.Value &&
+                .FirstOrDefault(handle => handle != NativeMainWindowHandle &&
                                           NativeCommands.HasDialogButton(handle, 6));
             if (confirmation != 0)
             {
@@ -325,6 +456,42 @@ public abstract class FileOperationUiTestBase : FileManagerUiTestBase
     }
 
     /// <summary>
+    /// Waits for a filesystem condition while confirming IDYES prompts (overwrite,
+    /// delete, NTFS compress). Compare-then-copy hits overwrite on the differing
+    /// same-name file; answering once up front leaves later prompts blocking the worker.
+    /// </summary>
+    protected void WaitForFileSystemAnsweringYes(Func<bool> predicate, string failureMessage)
+    {
+        var timeout = DateTime.UtcNow + TimeSpan.FromSeconds(30);
+        while (DateTime.UtcNow < timeout)
+        {
+            try
+            {
+                if (predicate())
+                    return;
+            }
+            catch (IOException)
+            {
+                // Destination handles can still be closing while an overwrite prompt is showing.
+            }
+            catch (UnauthorizedAccessException)
+            {
+                // A read-only destination can appear briefly while attributes are applied.
+            }
+
+            var confirmation = NativeCommands.GetTopLevelWindows(Application.ProcessId)
+                .FirstOrDefault(handle => handle != NativeMainWindowHandle &&
+                                          NativeCommands.HasDialogButton(handle, 6));
+            if (confirmation != 0)
+                NativeCommands.PostDialogButtonClick(confirmation, 6); // IDYES
+            Thread.Sleep(100);
+        }
+
+        var openWindowTitles = string.Join(", ", NativeCommands.GetTopLevelWindowTitles(Application.ProcessId));
+        Assert.Fail($"{failureMessage} Open FileManager windows: {openWindowTitles}.");
+    }
+
+    /// <summary>
     /// Waits for a filesystem condition while answering the host's Question prompts.
     /// Gated operations raise one prompt per affected item, so a single answer up
     /// front leaves the rest of the operation waiting.
@@ -384,36 +551,45 @@ public abstract class FileOperationUiTestBase : FileManagerUiTestBase
         return null!;
     }
 
-    private FlaUI.Core.AutomationElements.AutomationElement FindSourceList()
+    protected FlaUI.Core.AutomationElements.AutomationElement FindPanelList(bool left)
     {
         // Panel ordering is stable even when translated labels are unavailable to UI Automation.
-        var list = MainWindow.FindAllDescendants()
+        var lists = MainWindow.FindAllDescendants()
             .Where(element => string.Equals(element.Properties.ClassName.ValueOrDefault, "SalamanderItemsBox", StringComparison.Ordinal))
             .OrderBy(element => element.BoundingRectangle.Left)
-            .FirstOrDefault();
-        Assert.That(list, Is.Not.Null, "The left file panel did not expose its SalamanderItemsBox control.");
-        return list!;
+            .ToList();
+        Assert.That(lists.Count, Is.GreaterThanOrEqualTo(left ? 1 : 2),
+                    left
+                        ? "The left file panel did not expose its SalamanderItemsBox control."
+                        : "The right file panel did not expose its SalamanderItemsBox control.");
+        return lists[left ? 0 : 1];
     }
 
-    private FlaUI.Core.AutomationElements.AutomationElement PrepareSourcePanelForSelection()
+    private FlaUI.Core.AutomationElements.AutomationElement PrepareSourcePanelForSelection() =>
+        PreparePanelForSelection(left: true);
+
+    private FlaUI.Core.AutomationElements.AutomationElement PreparePanelForSelection(bool left)
     {
-        var list = FindSourceList();
+        var list = FindPanelList(left);
         NativeCommands.ActivateFilePanel(list.Properties.NativeWindowHandle.Value);
         // A visible main window can precede secondary-volume directory enumeration, so
         // refresh every selection path before quick-searching a seeded fixture.
-        NativeCommands.RefreshActiveFilePanel(MainWindow.Properties.NativeWindowHandle.Value);
+        NativeCommands.RefreshActiveFilePanel(NativeMainWindowHandle);
         Thread.Sleep(PanelSettleMilliseconds);
         return list;
     }
 
-    private static void QuickSearchSourceItem(FlaUI.Core.AutomationElements.AutomationElement list, string name)
+    private static void QuickSearchSourceItem(FlaUI.Core.AutomationElements.AutomationElement list, string name) =>
+        QuickSearchPanelItem(list, name);
+
+    private static void QuickSearchPanelItem(FlaUI.Core.AutomationElements.AutomationElement list, string name)
     {
         NativeCommands.QuickSearch(list.Properties.NativeWindowHandle.Value, name);
         // Clipboard ownership is not stable in the headless runner, so wait for the panel's native quick-search update instead of probing global clipboard state.
         Thread.Sleep(PanelSettleMilliseconds);
     }
 
-    private static void SetDialogPath(Window dialog, string path)
+    protected static void SetDialogPath(Window dialog, string path)
     {
         // IDE_PATH is shared by the native create/copy/move/rename templates and bypasses their incomplete UIA children.
         //
@@ -448,14 +624,14 @@ public abstract class FileOperationUiTestBase : FileManagerUiTestBase
         if (sourceName.Length != 0)
             SelectSourceItem(sourceName);
         WaitForCommandEnabled(command);
-        NativeCommands.Execute(MainWindow.Properties.NativeWindowHandle.Value, command);
+        NativeCommands.Execute(NativeMainWindowHandle, command);
         var dialog = WaitForOperationDialog();
         SetDialogPath(dialog, path);
         NativeCommands.ClickDialogButton(dialog.Properties.NativeWindowHandle.Value, 1);
         return dialog;
     }
 
-    private Window WaitForOperationDialog()
+    protected Window WaitForOperationDialog()
     {
         // Filter native top-level windows by IDE_PATH so ComboLBox helpers and progress prompts cannot be mistaken for the input dialog.
         // The main window must be excluded explicitly: the control lookup falls back
@@ -463,8 +639,75 @@ public abstract class FileOperationUiTestBase : FileManagerUiTestBase
         // same control id and be mistaken for the operation dialog. The text then goes
         // to the wrong control while the real dialog is submitted with its default.
         return WaitForWindow(window =>
-            window.Properties.NativeWindowHandle.Value != MainWindow.Properties.NativeWindowHandle.Value &&
+            window.Properties.NativeWindowHandle.Value != NativeMainWindowHandle &&
             NativeCommands.HasOperationPathControl(window.Properties.NativeWindowHandle.Value));
+    }
+
+    protected Window WaitForDialogWithControl(int controlId)
+    {
+        return WaitForWindow(window =>
+            window.Properties.NativeWindowHandle.Value != NativeMainWindowHandle &&
+            NativeCommands.HasDialogControl(window.Properties.NativeWindowHandle.Value, controlId));
+    }
+
+    protected void ApplyPanelFilter(string mask)
+    {
+        NativeCommands.Execute(NativeMainWindowHandle, NativeCommands.ChangeFilter);
+        var dialog = WaitForDialogWithControl(NativeCommands.FilterEdit);
+        var handle = dialog.Properties.NativeWindowHandle.Value;
+        NativeCommands.ClickDialogControl(handle, NativeCommands.FilterUse);
+        RetainDialogControlText(handle, NativeCommands.FilterEdit, mask);
+        CloseDialog(dialog, commit: true);
+        Thread.Sleep(PanelSettleMilliseconds);
+    }
+
+    protected void ClearPanelFilter()
+    {
+        NativeCommands.Execute(NativeMainWindowHandle, NativeCommands.ChangeFilter);
+        var dialog = WaitForDialogWithControl(NativeCommands.FilterEdit);
+        NativeCommands.ClickDialogControl(dialog.Properties.NativeWindowHandle.Value, NativeCommands.FilterDontUse);
+        CloseDialog(dialog, commit: true);
+        Thread.Sleep(PanelSettleMilliseconds);
+    }
+
+    protected void SelectByMask(string mask)
+    {
+        NativeCommands.Execute(NativeMainWindowHandle, NativeCommands.SelectByMask);
+        var dialog = WaitForDialogWithControl(NativeCommands.FileMaskControl);
+        RetainDialogControlText(dialog.Properties.NativeWindowHandle.Value, NativeCommands.FileMaskControl, mask);
+        CloseDialog(dialog, commit: true);
+        Thread.Sleep(PanelSettleMilliseconds);
+    }
+
+    private static void RetainDialogControlText(nint dialogHandle, int controlId, string text)
+    {
+        // Combo history transfer can overwrite text written the instant the dialog appears,
+        // the same race SetDialogPath already retries for IDE_PATH.
+        var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(5);
+        while (true)
+        {
+            NativeCommands.SetDialogControlText(dialogHandle, controlId, text);
+            Thread.Sleep(200);
+            if (string.Equals(NativeCommands.GetDialogControlText(dialogHandle, controlId), text, StringComparison.Ordinal))
+            {
+                Thread.Sleep(200);
+                if (string.Equals(NativeCommands.GetDialogControlText(dialogHandle, controlId), text, StringComparison.Ordinal))
+                    return;
+            }
+
+            if (DateTime.UtcNow >= deadline)
+                break;
+        }
+
+        Assert.Fail($"The native dialog did not retain control {controlId} text '{text}'.");
+    }
+
+    protected void SetCopyNamedMask(Window copyDialog, string mask)
+    {
+        var handle = copyDialog.Properties.NativeWindowHandle.Value;
+        // Criteria controls exist even while Options is collapsed; Transfer still reads them on OK.
+        NativeCommands.SetDialogCheckBoxState(handle, NativeCommands.CopyNamedCheck, isChecked: true);
+        NativeCommands.SetDialogControlText(handle, NativeCommands.CopyNamedMask, mask);
     }
 
     protected void WaitForCommandEnabled(int command)
@@ -473,7 +716,7 @@ public abstract class FileOperationUiTestBase : FileManagerUiTestBase
         var observedToolbarCommand = false;
         while (DateTime.UtcNow < deadline)
         {
-            var toolbarState = NativeCommands.TryGetToolbarCommandEnabled(MainWindow.Properties.NativeWindowHandle.Value, command);
+            var toolbarState = NativeCommands.TryGetToolbarCommandEnabled(NativeMainWindowHandle, command);
             if (toolbarState.HasValue)
             {
                 observedToolbarCommand = true;
@@ -683,10 +926,19 @@ public sealed class FileOperationWorkspace : IDisposable
             else if ((attributes & FileAttributes.Directory) != 0)
                 DeleteDirectoryTree(child);
             else
-                File.Delete(child);
+                DeleteFileAllowingReadOnly(child);
         }
 
         Directory.Delete(path);
+    }
+
+    internal static void DeleteFileAllowingReadOnly(string path)
+    {
+        // Change Attributes tests leave Read-only files that File.Delete otherwise refuses.
+        var attributes = File.GetAttributes(path);
+        if ((attributes & FileAttributes.ReadOnly) != 0)
+            File.SetAttributes(path, attributes & ~FileAttributes.ReadOnly);
+        File.Delete(path);
     }
 
     private void WriteSourceFile(string relativePath, string content)

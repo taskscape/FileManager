@@ -123,7 +123,7 @@ internal static class UiTestSandbox
             }
             else
             {
-                File.Delete(entry);
+                FileOperationWorkspace.DeleteFileAllowingReadOnly(entry);
             }
         }
 

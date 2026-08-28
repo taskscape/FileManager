@@ -47,6 +47,10 @@ powershell -NoProfile -ExecutionPolicy Bypass `
 
 Each run removes its own GUID-named `TestResults\runtests-build-*` directory, including after a failure. Pass `-KeepBuildArtifacts` only when the isolated native build outputs are needed for diagnosis.
 
+Every NUnit case that actually launches `salamand.exe` also writes a retained execution transcript below a GUID-named
+`TestResults\ui-test-transcripts-*` directory. Unlike the staged build and `filemanager-testdata` sandbox, these logs
+are kept after successful and failed runs. A run skipped before `salamand.exe` starts produces no transcript.
+
 `-PlatformToolset v145` selects the toolset used for both the built executable and native safety target. CI may supply `-NUnitTrxPath` to retain the complete executable result inventory as a workflow artifact.
 
 ### GitHub release-pipeline parity
@@ -129,6 +133,7 @@ Optional UI settings:
 | Variable | Enables |
 | --- | --- |
 | `FILEMANAGER_UI_ARGUMENTS` | Extra application arguments, such as a test-only `-c` configuration file. |
+| `FILEMANAGER_UI_TRANSCRIPT_ROOT` | Optional absolute output directory for retained per-test `salamand.exe` execution transcripts. `runtests.ps1` assigns a GUID-named directory under `TestResults`; direct `dotnet test` runs default below the NUnit work directory. |
 | `FILEMANAGER_UI_FTP_ORGANIZE_COMMAND` | The runtime command ID for FTP **Organize Bookmarks** persistence cases. |
 | `FILEMANAGER_UI_FTP_CONNECT_COMMAND` | Optional runtime Connect to FTP Server command ID for protocol UI fixture runs outside `runtests.ps1`; the runner discovers it from the freshly built menu. |
 | `FILEMANAGER_UI_CONFIG_FAULT_INJECTION=1` | Exhaustive configuration-write crash recovery. |
@@ -399,11 +404,48 @@ owner-less message box shown before the main window exists.
 The lane takes over the desktop: it opens modal confirmation prompts, drives selection, and launches the editor. Run
 it on a session that can be left alone, not alongside interactive work.
 
-##### The dialog transcript
+##### The retained execution transcript
 
-The lane's hardest failures were all the same shape: a case timed out waiting for something, and nothing in the
-harness could say whether the application had asked a question, asked a different one, or asked nothing at all. The
-product therefore writes a transcript of every dialog it raises while the sandbox is active:
+The harness creates one UTF-8 `.log` file during `[SetUp]` for every case that passes the sandbox guard and is about
+to launch `salamand.exe`. It starts before sandbox initialization and closes either from the setup-failure handler
+or from `[TearDown]`, so setup, test-body, and teardown failures are all retained. The file is attached to the NUnit result and remains under
+`FILEMANAGER_UI_TRANSCRIPT_ROOT`; `runtests.ps1` sets that to a GUID-named `TestResults\ui-test-transcripts-*`
+directory. Direct IDE or `dotnet test` runs use `<NUnit work directory>\TestResults\ui-test-transcripts` unless the
+variable is set explicitly. A prerequisite or category skip that never attempts to launch the executable does not
+create an empty log.
+
+Each record has a monotonically increasing sequence number, elapsed seconds from test setup, an absolute UTC
+timestamp, a category, and details. Read from the header downward to reconstruct the test in order. The most useful
+categories are:
+
+- `HARNESS`, `SANDBOX`, and `NUNIT`: test identity, executable and arguments, sandbox boundaries, restarts, and the
+  NUnit outcome, failure message, and stack trace visible when teardown begins.
+- `PROCESS`: launch, PID, observation, deliberate termination, and exit of `salamand.exe` and its sibling
+  `salmon.exe` crash reporter.
+- `ACTION` and `WAIT`: user-equivalent native commands, quick searches, control/button operations, and the start and
+  completion of window waits. Dynamic command IDs remain numeric when no stable host name exists.
+- `WINDOW`: an opened, changed, closed, or final-snapshot top-level HWND. Dialog and crash-reporter records include
+  their title plus a textual control tree (control ID, class, visible/enabled state, and text). The large volatile
+  main-panel child tree is intentionally omitted. Password-style edit controls are written as
+  `<redacted-password>`.
+- `PRODUCT-DIALOGS`: the native product transcript tailed into the retained log while the test runs, followed by a
+  final line-count/path record before the disposable sandbox is deleted. This is authoritative for product dialogs
+  too short-lived to meet the 100 ms HWND observer.
+- `CRASH-REPORT`, `CRASH-REPORT-TEXT`, and `OBSERVER-ERROR`: retained crash-artifact metadata and bounded textual
+  `.TXT`, `.INF`, `.OPS`, or `.BUG` content, plus any diagnostic observer failure. Binary `.DMP` and `.7Z` files are
+  copied beside the log in a `.artifacts` directory and represented in the log by path, size, and modification time.
+
+For a hang, start at the final `ACTION` or `WAIT`, then inspect the following `WINDOW` and `PRODUCT-DIALOGS` records.
+A product-side `SHOW` with no matching `RESULT` identifies an unanswered prompt. For a
+crash, find the `salamand.exe` exit, read the `salmon.exe` window/control text, then follow the retained artifact
+paths. A passing case ends with `teardown.complete` and `transcript.complete`; absence of those markers means the
+test host itself stopped before normal finalization. Secrets supplied through password edit controls or launch
+environment overrides are never logged.
+
+The `PRODUCT-DIALOGS` section comes from a second, product-side safety net. The lane's hardest failures were all the
+same shape: a case timed out waiting for something, and polling alone could not say whether the application had
+asked a question, asked a different one, or asked nothing at all. The product writes every dialog it raises while
+the sandbox is active:
 
 - `LogUiTestDialog` (`src/path_checking.cpp`) appends one line per event to `<test-data root>\ui-test-dialogs.log`,
   with a timestamp, `SHOW` or `RESULT`, the flags, the chosen button, the caption and the text. It is a no-op unless
@@ -415,7 +457,8 @@ product therefore writes a transcript of every dialog it raises while the sandbo
   the array slots a given dialog kind really passes as strings are read, because several kinds carry DWORD or BOOL
   values in the same positions.
 
-A `SHOW` with no matching `RESULT` names exactly the prompt a stalled run is waiting on. That single signal
+A `SHOW` with no matching `RESULT` names exactly the prompt a stalled run is waiting on. The harness imports this
+file before `filemanager-testdata` is removed, so it is no longer lost at teardown. That single signal
 identified four separate causes: a metadata-preservation gate raised once per item, an unanswered delete
 confirmation, the shell's own "File In Use" window appearing instead of the product's error dialog, and an overwrite
 prompt proving that a copy had been dispatched for the wrong item.
@@ -492,75 +535,548 @@ the normalization of the same grapheme, which is what that case is about.
 A timeout now names the windows that were open, which is what separates "the prompt never appeared" from "a
 different prompt appeared".
 
+### Per-test native UI catalog
+
+This catalog documents every automated test that drives the native FileManager UI (FlaUI/UIA3), plus the one loopback FTP case that opens the product Connect dialog. Source-contract NUnit cases that never launch `salamand.exe` remain in [NUnit source-contract and integration tests](#nunit-source-contract-and-integration-tests). The four `DeterministicNetworkFixtureTests` loopback sockets that never open a FileManager window are listed only in the PowerShell/native probe table.
+
+Shared assumptions for every native UI case unless a test states otherwise:
+
+- An interactive current-user Windows desktop, UIA3, and a complete deployed runtime (`salamand.exe`, `salmon.exe`, and the plug-in payloads the selected case needs).
+- Guarded `FILEMANAGER_UI_TESTDATA_ROOT` (leaf name `filemanager-testdata`), `FILEMANAGER_UI_CONFIG_ROOT`, and `FILEMANAGER_UI_EXE`.
+- Fixtures are non-parallel; they take over the desktop (modals, selection, optional editor) and must not run beside interactive work.
+- File-operation cases start with `-l`/`-r` on a fresh GUID workspace and select items through the panel’s ANSI incremental search, so fixture names must not be prefixes of other listed names.
+- Dialogs are located by native command IDs and resource/automation IDs, not translated menu text.
+- The lane never empties the Recycle Bin, never writes the live configuration hive, and never falls back to the machine’s default editor.
+
+Shared out-of-scope aspects unless a test states otherwise: visual layout and theming, performance/throughput, accessibility beyond UIA3 discovery, plug-in installation, localization of captions, operations outside the sandbox, paths longer than `PATH_MAX_PATH`, supplementary-plane names typed into ANSI dialogs, and live network except the dedicated FTP cases.
+
 #### `BasicUiTests` — risk-based lifecycle matrix
 
-`Basic_ui_scenario` generates the seven cases below. They are categorized as `LockStress` so the nightly verifier lane can repeat the compact risk matrix independently of the release gate.
+`Basic_ui_scenario` is one NUnit method parameterized by `BasicUiScenarios.All`. The seven generated names are categorized `UI` and `LockStress` so the nightly verifier lane can repeat this compact matrix independently of the release gate. Prolonged soak belongs to a separately scheduled run, not these seven cases.
 
-| Scenario family | Cases | Description |
-| --- | ---: | --- |
-| Main window | 1 | Launches the application and verifies the native main window is usable. |
-| Accessibility tree | 1 | Verifies UIA3 can discover the expected accessible descendants. |
-| Configuration cancel | 1 | Opens Configuration, cancels, and confirms the main window remains usable. |
-| Configuration commit | 1 | Opens Configuration, commits, and confirms normal dialog lifecycle. |
-| Configuration persistence | 1 | Changes a visible setting and verifies it after reopening Configuration. |
-| Restart after commit | 1 | Commits configuration and verifies the application restarts cleanly. |
-| FTP bookmark persistence | 1 | Creates and renames an FTP bookmark, restarts, and verifies the edited bookmark; requires `FILEMANAGER_UI_FTP_ORGANIZE_COMMAND`. |
+##### `UI_001_MainWindow_Cold_start`
+
+- **Does:** Launches FileManager into the isolated profile and inspects the native main window.
+- **Tests:** Cold-start attachment of UIA3 to the top-level owner window.
+- **Confirms:** The main window has a non-zero HWND, a non-empty title, is enabled, has a non-empty bounding rectangle, and can take focus.
+- **Assumptions:** Shared sandbox and executable; no leftover modal (journal recovery or configuration fallback) owns the main window.
+- **Out of scope:** Panel contents, menus, plug-in load success, and any command other than existing as a usable window.
+
+##### `UI_002_AccessibilityTree_Owner_drawn_accessibility`
+
+- **Does:** Enumerates UIA3 descendants of the main window after launch.
+- **Tests:** That the native UI exposes an automation tree at all.
+- **Confirms:** `FindAllDescendants()` returns at least one element.
+- **Assumptions:** Shared sandbox; the owner-drawn native menu is not required to appear as a UIA `MenuBar`.
+- **Out of scope:** Completeness of the tree, names/roles of controls, keyboard navigation, and screen-reader correctness.
+
+##### `UI_003_ConfigurationCancel_Discarded_settings`
+
+- **Does:** Opens Configuration by command ID, dismisses it without committing, and re-checks the main window.
+- **Tests:** Cancel/close of the configuration property sheet.
+- **Confirms:** The dialog can be opened and cancelled; the main window remains usable afterwards.
+- **Assumptions:** Shared sandbox; Configuration command ID is valid in the deployed build.
+- **Out of scope:** Whether any setting actually changed, persistence, and which page was visible.
+
+##### `UI_004_ConfigurationCommit_Committed_settings`
+
+- **Does:** Opens Configuration and accepts it without changing a control, then re-checks the main window.
+- **Tests:** The commit/close lifecycle of the configuration property sheet.
+- **Confirms:** Accepting Configuration does not disable or lose the main window.
+- **Assumptions:** Shared sandbox; a no-op commit is a valid configuration generation.
+- **Out of scope:** Whether the writer produced a new generation, checksum contents, and any visible setting change.
+
+##### `UI_005_ConfigurationPersistence_Persisted_settings_restart`
+
+- **Does:** Toggles the first Configuration checkbox, commits, waits for the asynchronous profile write, restarts FileManager, reopens Configuration, asserts the toggled value, then restores the original value.
+- **Tests:** End-to-end persistence of one committed boolean through process restart.
+- **Confirms:** The first checkbox value after restart matches the committed opposite of the original; the fixture restores independence for later cases.
+- **Assumptions:** The first checkbox is a durable, round-trippable setting; the product finishes writing the profile after the property sheet closes (`WaitForConfigurationClearReadOnlyPersistence`).
+- **Out of scope:** Other Configuration pages, migration of older schemas, crash-during-write recovery (see `ConfigurationRecoveryUiTests`), and UI layout of the sheet.
+
+##### `UI_006_RestartAfterCommit_Restart_after_settings_commit`
+
+- **Does:** Commits Configuration with no intended setting change, restarts FileManager, and re-asserts the main window.
+- **Tests:** Clean process restart after a configuration commit.
+- **Confirms:** A post-commit restart still exposes an enabled, titled, sized main window.
+- **Assumptions:** Shared sandbox; commit does not leave a blocking modal.
+- **Out of scope:** Persistence of a specific setting (covered by `UI_005`) and resource-leak budgets (covered by `LifecycleLeakUiTests`).
+
+##### `UI_007_FtpBookmarkCreationPersists_Plugin_profile_persistence`
+
+- **Does:** Opens FTP Organize Bookmarks, creates a unique bookmark, renames it, waits for the organizer list and then the isolated profile commit, restarts, and reopens the organizer.
+- **Tests:** FTP plug-in bookmark create/rename persistence across restart.
+- **Confirms:** The edited unique name is present in the organizer both before Close persists the collection and after a full restart.
+- **Assumptions:** The FTP plug-in is deployed; `FILEMANAGER_UI_FTP_ORGANIZE_COMMAND` (or the runner-discovered equivalent) identifies Organize Bookmarks; the owner-drawn list is queried natively rather than through UIA item text.
+- **Out of scope:** Connecting to a server, transferring files, certificate handling, and bookmark fields other than the displayed name.
 
 #### `FileAccessUiTests`
 
-- `Find_files_searches_subdirectories_from_the_active_panel` — searches the active panel for a unique nested file and verifies one result.
-- `View_file_opens_the_selected_file_in_the_internal_viewer` — opens the selected text file in Salamander's internal viewer.
-- `Edit_file_opens_the_selected_file_in_the_configured_editor` — launches the configured external editor with the selected file.
+##### `Find_files_searches_subdirectories_from_the_active_panel`
+
+- **Does:** Opens Find Files, sets the mask to `find-target.txt`, roots the search at `Workspace.SourceDirectory`, enables subdirectory search, disables other options that would change semantics, and clicks Find Now.
+- **Tests:** Recursive Find from the workspace source panel using stable control IDs (`2505`, `2501`, `2503`, `2508`, results `2510`).
+- **Confirms:** The results list contains exactly one row for the unique nested file.
+- **Assumptions:** The workspace seed includes that unique nested name; Find options are forced so a prior case’s saved Find state cannot change the search.
+- **Out of scope:** Content search, regular expressions, archives, other drives, result activation, and replacing files from Find.
+
+##### `View_file_opens_the_selected_file_in_the_internal_viewer`
+
+- **Does:** Selects `view-file.txt` and issues View File.
+- **Tests:** Dispatch of the internal viewer for a selected text file.
+- **Confirms:** A window of class `Salamander's Viewer Window` opens whose caption contains the file name; the test then closes only that window.
+- **Assumptions:** Internal viewer is available; selection via quick-search hits the seeded file.
+- **Out of scope:** Rendered text, encodings, hex view, plugins in the viewer, and printing.
+
+##### `Edit_file_opens_the_selected_file_in_the_configured_editor`
+
+- **Does:** Rewrites the Editors page in Configuration to `SandboxEditor.exe` (copied under the test-data root), waits for the checksum-protected profile, restarts, selects `edit-file.txt`, and issues Edit File.
+- **Tests:** Files > Edit dispatch to the configured external editor through the real Configuration UI.
+- **Confirms:** A process other than FileManager shows a window titled `SandboxEditor - edit-file.txt`. The test closes only that owned window.
+- **Assumptions:** `SandboxEditor.exe` built by `FileManager.UiTests.EditorStub` is present; Configuration Editors page is identified by content (command field seeded as `notepad.exe`); the stub must not be skipped in favor of the machine editor. Windows 11 packaged Notepad is unsafe as an assertion target because it can reuse one tabbed window.
+- **Out of scope:** Saving from the editor, associations other than `*.*`, DDE, and whatever editor the current user has installed.
 
 #### `FileOperationUiTests`
 
-- `Create_directory_creates_requested_nested_directory` — creates a nested directory through the native dialog.
-- `Copy_file_copies_content_to_other_panel` — copies one file, preserves content, and retains the source.
-- `Copy_preserves_last_write_time_metadata` — verifies copied last-write time metadata.
-- `Copy_preserves_multiple_empty_large_and_edge_named_alternate_data_streams` — copies multiple representative ADS values.
-- `Copy_overwrite_replaces_target_streams_and_removes_stale_streams` — overwrites ADS content and removes target-only streams.
-- `Copy_retries_a_temporarily_denied_alternate_data_stream_without_losing_it` — releases a locked stream and verifies Retry completes the copy.
-- `Copy_overwrite_replaces_the_existing_target_only_after_the_user_confirms` — checks single-file overwrite confirmation.
-- `Copy_overwrite_all_applies_the_choice_to_the_complete_conflicting_tree` — applies Overwrite All to every conflicting descendant.
-- `Copy_skip_keeps_the_existing_target_and_the_source` — checks single-file Skip behavior.
-- `Copy_skip_all_keeps_the_existing_conflicting_tree` — applies Skip All without changing conflicting targets.
-- `Copy_file_persists_a_completed_recovery_journal_with_item_intent` — verifies the completed durable journal, immutable plan, states, and correlation ID.
-- `Copy_directory_copies_all_descendants_to_other_panel` — copies a complete nested directory tree.
-- `Unicode_normalization_surrogate_and_long_path_operations_preserve_distinct_entries` — copies composed/decomposed Unicode and surrogate-pair names plus a deep descendant path sized to `PATH_MAX_PATH`, then renames and deletes distinct normalization forms.
-- `Rename_file_renames_without_changing_content` — renames a file and preserves content.
-- `Rename_directory_preserves_all_descendants` — renames a directory and retains its tree.
-- `Rename_case_only_change_preserves_the_file_and_updates_its_displayed_name` — verifies a case-only directory-entry rename.
-- `Rename_overwrite_replaces_the_collision_without_losing_source_metadata` — confirms file overwrite and preserves source timestamp metadata.
-- `Move_file_moves_content_to_other_panel` — performs a same-volume file move and removes the source.
-- `Move_directory_moves_all_descendants_to_other_panel` — performs a same-volume directory-tree move.
-- `Move_overwrite_replaces_the_existing_target_and_removes_the_source` — confirms a move overwrite and source removal.
-- `Move_skip_keeps_the_existing_target_and_the_unmoved_source` — checks that Skip retains both versions.
-- `Move_overwrite_all_replaces_every_conflict_before_removing_the_source_tree` — verifies all conflicts commit before source-tree removal.
-- `Move_skip_all_retains_conflicting_sources_but_moves_nonconflicting_siblings` — retains skipped sources while continuing nonconflicting moves.
-- `Delete_file_removes_the_selected_file` — deletes one file.
-- `Delete_directory_removes_all_descendants` — deletes a complete directory tree.
-- `Delete_mixed_selection_removes_the_selected_file_and_directory_tree` — deletes a selected file and directory together.
-- `Delete_to_recycle_bin_removes_the_source_and_creates_a_recoverable_shell_item` — verifies recycle-bin deletion; requires `FILEMANAGER_UI_RECYCLE_BIN=1`.
-- `Cancelling_an_in_progress_conflicting_copy_keeps_both_versions_and_records_cancellation` — cancels at a conflict prompt and verifies both files plus the journal cancellation record.
-- `Cancelling_operation_dialog_leaves_source_and_target_unchanged` — four cases cover cancelled create, copy, move, and rename dialogs.
-- `Create_directory_failure_keeps_existing_file_intact` — verifies a directory/file collision does not change the file.
-- `Copy_or_move_failure_does_not_modify_source` — two cases verify invalid copy and move destinations leave sources intact.
-- `Rename_overwrite_decline_keeps_the_original_file_and_existing_target` — chooses No at the rename overwrite prompt and retains both files.
-- `Rename_directory_collision_keeps_both_directory_trees` — verifies directory rename collisions cannot overwrite either tree.
-- `Delete_skip_for_locked_file_keeps_it_and_continues_with_later_items` — skips a sharing violation and deletes later selected items. It first switches the disposable profile to immediate deletion through the Configuration dialog, because Retry/Skip/Skip All belongs to the product’s own delete engine: with the Recycle Bin enabled the panel hands the whole selection to the shell (`CFilesWindow::DeleteThroughRecycleBin`). Nothing reaches the Recycle Bin as a result.
+All cases below seed a shared workspace (files, trees, ADS, conflict counterparts, `blocked-target` as a file). Unicode/long-path names are seeded before startup so the panel lists them. Operations wait for destination handles to close before reading content.
 
-#### Optional UI fixtures
+##### `Create_directory_creates_requested_nested_directory`
 
-- `ConfigurationRecoveryUiTests.Every_interrupted_configuration_write_restores_a_complete_profile` — measures every registry write boundary, terminates the process after each mutation, and verifies restart exposes either the complete baseline or complete candidate profile; requires `FILEMANAGER_UI_CONFIG_FAULT_INJECTION=1` and category `FaultInjection`.
-- `CrossVolumeMoveCharacterizationUiTests.Move_across_volumes_copies_the_complete_tree_before_removing_the_source` — verifies a cross-volume tree is fully copied before source removal; requires `FILEMANAGER_UI_CROSS_VOLUME_ROOT`.
-- `CrossVolumeMoveCharacterizationUiTests.Move_across_ADS_capable_volumes_preserves_multiple_streams_before_removing_the_source` — verifies ADS preservation across two ADS-capable volumes before source removal.
-- `AlternateDataStreamsUnsupportedTargetUiTests.Cross_volume_move_to_an_ADS_unsupported_target_keeps_the_source_when_metadata_loss_is_declined` — verifies default data reaches the target while declining ADS loss retains the source; requires `FILEMANAGER_UI_ADS_UNSUPPORTED_TARGET_ROOT`.
-- `OperationRecoveryCharacterizationUiTests.Restart_reconciliation_commits_a_fully_written_transactional_target` — seeds a ready temporary target and incomplete journal, then verifies startup reconciliation commits and records it.
-- `ReparsePointTopologyUiTests.Copy_does_not_traverse_changed_or_cyclic_junction_targets_outside_the_operation_root` — verifies copy ignores changed and cyclic junction targets.
-- `ReparsePointTopologyUiTests.Delete_junction_removes_only_the_link_and_never_its_target` — verifies deleting a junction preserves its target.
-- `ReparsePointTopologyUiTests.Copy_does_not_traverse_a_directory_symbolic_link_outside_the_operation_root` — verifies copy ignores an external directory symlink; skips when the host lacks symlink privileges.
-- `ToolbarIconSizeUiTests.Customize_toolbar_cycles_all_icon_sizes_and_persists_the_choice_after_restart` — exercises all three icon sizes, verifies live persistence, restarts, and restores the incoming setting.
-- `LifecycleLeakUiTests.Repeated_clean_startup_and_shutdown_does_not_accumulate_process_resources` — starts fresh native processes repeatedly and rejects excessive Handle/GDI/USER/private-byte spread.
+- **Does:** Submits Create Directory with path `created\nested` and answers the intermediate-folder `MB_OKCANCEL` prompt with IDOK.
+- **Tests:** Nested directory creation through the native dialog, including the “create the whole branch” confirmation.
+- **Confirms:** `created\nested` exists under the source panel path.
+- **Assumptions:** The intermediate folder does not already exist; the affirmative button is IDOK, not IDYES.
+- **Out of scope:** Permissions failures, existing-directory no-ops, and names that do not round-trip through the ANSI dialog.
+
+##### `Copy_file_copies_content_to_other_panel`
+
+- **Does:** Copies `copy-file.txt` to the other panel.
+- **Tests:** Single-file copy to the opposite panel path.
+- **Confirms:** Target content is `copy-file-content`; the source file still exists.
+- **Assumptions:** Same-volume workspace; default destination in the copy dialog is the other panel.
+- **Out of scope:** Overwrite, ADS, attributes other than content, and progress UI.
+
+##### `Copy_preserves_last_write_time_metadata`
+
+- **Does:** Sets source last-write time to a fixed UTC timestamp, copies, and compares timestamps after the destination handle is released.
+- **Tests:** Preservation of last-write time on copy.
+- **Confirms:** Target last-write UTC equals the source’s after copy.
+- **Assumptions:** The volume supports the timestamp precision used; metadata is only asserted after the worker closes the destination.
+- **Out of scope:** Creation time, access time, security descriptors, and ADS timestamps.
+
+##### `Copy_preserves_multiple_empty_large_and_edge_named_alternate_data_streams`
+
+- **Does:** Copies `ads-copy.txt` after requiring ADS support on both workspace roots.
+- **Tests:** Copy of default data plus named, empty, large, and dotted-name streams.
+- **Confirms:** Default content and each seeded stream (`notes`, `empty`, `large`, `edge name.with.dots`) match on the target.
+- **Assumptions:** Category `AlternateDataStreams`; both panels are on an ADS-capable filesystem (typically NTFS).
+- **Out of scope:** Streams the product cannot name, encryption, and sparse-file semantics.
+
+##### `Copy_overwrite_replaces_target_streams_and_removes_stale_streams`
+
+- **Does:** Copies `ads-overwrite.txt` onto a target that already has different default data and a `stale` stream; confirms overwrite with IDYES.
+- **Tests:** Confirmed overwrite of ADS: replacement streams appear and streams that existed only on the old target are removed (`ReplaceFileW` must not keep them).
+- **Confirms:** Default data becomes `ads-overwrite-source`; `replacement` is present; `stale` is absent.
+- **Assumptions:** ADS support on both volumes; the overwrite prompt is the operation prompt with IDYES.
+- **Out of scope:** Skip/Skip All, and copy to a filesystem that cannot store ADS.
+
+##### `Copy_retries_a_temporarily_denied_alternate_data_stream_without_losing_it`
+
+- **Does:** Holds the source stream `temporarily-denied` open for read, starts copy, waits for Retry, releases the lock, clicks Retry.
+- **Tests:** Retry after a sharing violation on an alternate stream.
+- **Confirms:** After the destination is released, stream `temporarily-denied` contains `retry-stream-content`.
+- **Assumptions:** ADS support; the worker surfaces IDRETRY rather than a shell “File In Use” window.
+- **Out of scope:** Permanent denial, Skip of the stream, and default-stream locks.
+
+##### `Copy_overwrite_replaces_the_existing_target_only_after_the_user_confirms`
+
+- **Does:** Copies `overwrite-file.txt` onto an existing different target and confirms IDYES.
+- **Tests:** Single-file overwrite confirmation.
+- **Confirms:** Target content becomes `overwrite-source-content`; source is unchanged.
+- **Assumptions:** A conflict counterpart was seeded in the target panel.
+- **Out of scope:** Overwrite All, timestamps, and ADS.
+
+##### `Copy_overwrite_all_applies_the_choice_to_the_complete_conflicting_tree`
+
+- **Does:** Copies `overwrite-all-tree` and answers the first conflict with Overwrite All (`IDB_ALL` / 185).
+- **Tests:** Overwrite All applied to every conflicting descendant without further prompts.
+- **Confirms:** `nested\first.txt` and `nested\second.txt` on the target match the source contents.
+- **Assumptions:** The tree was seeded with conflicts on those descendants.
+- **Out of scope:** Mix of overwrite and skip, and metadata-loss prompts.
+
+##### `Copy_skip_keeps_the_existing_target_and_the_source`
+
+- **Does:** Copies `skip-file.txt` and chooses Skip (`IDB_SKIP` / 173).
+- **Tests:** Single-file Skip on copy conflict.
+- **Confirms:** Target remains `skip-target-content`; source remains `skip-source-content`.
+- **Assumptions:** Conflict counterpart seeded.
+- **Out of scope:** Skip All and partial tree copy.
+
+##### `Copy_skip_all_keeps_the_existing_conflicting_tree`
+
+- **Does:** Copies `skip-all-tree` and chooses Skip All (`IDB_SKIPALL` / 174).
+- **Tests:** Skip All for a conflicting directory tree.
+- **Confirms:** Target nested files keep their original target contents; source files still exist.
+- **Assumptions:** Entire nested tree conflicts.
+- **Out of scope:** Nonconflicting siblings (see move Skip All) and source deletion.
+
+##### `Copy_file_persists_a_completed_recovery_journal_with_item_intent`
+
+- **Does:** Copies `copy-file.txt` and reads the durable `.opj` journal under the sandbox journal directory (shared-read, because the worker may still hold it).
+- **Tests:** Completed-copy journal shape: plan snapshot, item intent, correlation ID, prepared/committed states, and `OPERATION|completed`.
+- **Confirms:** A journal naming the source contains `OPERATION|completed`, a `PLANITEM` with source and target, a correlation ID reused on plan and attempt lines, and `STATE` prepared/committed records.
+- **Assumptions:** Journals are redirected into the test-data root; completion is appended after planning, so the test waits for the completed record rather than a prefix.
+- **Out of scope:** Crash recovery from this journal (see `OperationRecoveryCharacterizationUiTests`), journal encryption, and multi-item plans.
+
+##### `Copy_directory_copies_all_descendants_to_other_panel`
+
+- **Does:** Copies directory `copy-tree`.
+- **Tests:** Recursive directory copy.
+- **Confirms:** `copy-tree\nested\payload.txt` on the target is readable with `copy-tree-content`; the source tree remains.
+- **Assumptions:** Nested payload was seeded.
+- **Out of scope:** Junctions/symlinks (see `ReparsePointTopologyUiTests`) and empty directories as the only coverage.
+
+##### `Ansi_round_trippable_unicode_and_long_path_operations_preserve_distinct_entries`
+
+- **Does:** Copies two ANSI-round-trippable accented names (`é`, `ö`) selected by distinct ASCII prefixes, copies a deep tree budgeted to 247 usable path characters, then renames the first file and deletes the second.
+- **Tests:** Copy/rename/delete of non-ASCII names that survive the process ANSI code page, plus a deep path at the product `PATH_MAX_PATH` budget; file IDs prove copies are new identities.
+- **Confirms:** Both copied files and the long-path payload have the expected content and different identities from their sources; rename keeps `first-unicode-content` under the new accented name; delete removes only the second source name.
+- **Assumptions:** Category `Unicode`; Western/Central-European ANSI code pages round-trip `é`/`ö`; panel quick-search is itself ANSI, so unique ASCII prefixes are required; depth is computed from the sandbox root rather than hard-coded.
+- **Out of scope:** NFC vs NFD collapsing, supplementary-plane/surrogate names in dialogs (product gap), and paths longer than `PATH_MAX_PATH`.
+
+##### `Rename_file_renames_without_changing_content`
+
+- **Does:** Renames `rename-file.txt` to `renamed-file.txt`.
+- **Tests:** Simple file rename in the source panel.
+- **Confirms:** New name exists with original content; old name is gone.
+- **Assumptions:** No colliding target name.
+- **Out of scope:** Extension-change associations and undo.
+
+##### `Rename_directory_preserves_all_descendants`
+
+- **Does:** Renames `rename-tree` to `renamed-tree`.
+- **Tests:** Directory rename retaining descendants.
+- **Confirms:** Nested payload exists under the new name with original content; old directory is gone.
+- **Assumptions:** Nested payload seeded.
+- **Out of scope:** Cross-volume rename and junction targets.
+
+##### `Rename_case_only_change_preserves_the_file_and_updates_its_displayed_name`
+
+- **Does:** Renames `rename-case.txt` to `RENAME-CASE.txt`.
+- **Tests:** Case-only rename on a case-insensitive volume treated as identity, not overwrite.
+- **Confirms:** Directory enumeration shows `RENAME-CASE.txt`; content is unchanged.
+- **Assumptions:** NTFS-style case-preserving volume; the product does not treat this as a collision.
+- **Out of scope:** Truly case-sensitive filesystems and Explorer display vs on-disk name mismatches elsewhere.
+
+##### `Rename_overwrite_replaces_the_collision_without_losing_source_metadata`
+
+- **Does:** Sets a known last-write time on `rename-overwrite.txt`, renames onto `rename-overwrite-target.txt`, confirms IDYES.
+- **Tests:** Confirmed file-rename overwrite plus timestamp carry-over.
+- **Confirms:** Target content is the source content; source name is gone; last-write UTC matches the prepared timestamp.
+- **Assumptions:** Collision file seeded; overwrite prompt uses IDYES.
+- **Out of scope:** Directory collisions (rejected separately) and ADS on rename.
+
+##### `Move_file_moves_content_to_other_panel`
+
+- **Does:** Moves `move-file.txt` to the other panel after asserting source and target share a volume root.
+- **Tests:** Same-volume file move.
+- **Confirms:** Source is gone; target content is `move-file-content`.
+- **Assumptions:** Default workspace is same-volume (cross-volume is a different fixture).
+- **Out of scope:** Copy-then-delete across volumes and Recycle Bin.
+
+##### `Move_directory_moves_all_descendants_to_other_panel`
+
+- **Does:** Moves `move-tree`.
+- **Tests:** Same-volume recursive move.
+- **Confirms:** Nested payload is at the target with original content; source directory is gone.
+- **Assumptions:** Same-volume workspace.
+- **Out of scope:** Cross-volume metadata gates.
+
+##### `Move_overwrite_replaces_the_existing_target_and_removes_the_source`
+
+- **Does:** Moves `move-overwrite.txt` onto an existing target and confirms IDYES.
+- **Tests:** Confirmed move overwrite: destination replaced before source identity is removed.
+- **Confirms:** Target content is `move-overwrite-source-content`; source no longer exists.
+- **Assumptions:** Collision seeded on the target panel.
+- **Out of scope:** Skip, Overwrite All, and ADS.
+
+##### `Move_skip_keeps_the_existing_target_and_the_unmoved_source`
+
+- **Does:** Moves `move-skip.txt` and chooses Skip.
+- **Tests:** Skipped move collision.
+- **Confirms:** Target keeps `move-skip-target-content`; source keeps `move-skip-source-content`.
+- **Assumptions:** Collision seeded.
+- **Out of scope:** Partial tree moves.
+
+##### `Move_overwrite_all_replaces_every_conflict_before_removing_the_source_tree`
+
+- **Does:** Moves `move-overwrite-all-tree`, chooses Overwrite All, then answers per-item metadata-preservation questions with IDYES while waiting for the source tree to disappear.
+- **Tests:** Overwrite All on move plus the metadata-preservation gate that must complete before source-tree deletion.
+- **Confirms:** Conflicting descendants on the target match source contents; the source tree is eventually gone.
+- **Assumptions:** The metadata gate is raised once per affected item; `WaitForFileSystemAnsweringQuestions` must keep answering rather than clicking once.
+- **Out of scope:** Declining metadata loss (source would remain) and ADS-specific prompts.
+
+##### `Move_skip_all_retains_conflicting_sources_but_moves_nonconflicting_siblings`
+
+- **Does:** Moves `move-skip-all-tree` and chooses Skip All.
+- **Tests:** Skip All that still commits independently nonconflicting siblings.
+- **Confirms:** Conflicting target files unchanged; conflicting sources remain; `unique.txt` exists only on the target.
+- **Assumptions:** Seeded mix of conflicting nested files and one unique sibling.
+- **Out of scope:** Overwrite All and metadata-loss dialogs.
+
+##### `Delete_file_removes_the_selected_file`
+
+- **Does:** Selects `delete-file.txt`, issues Delete, confirms the delete message box if shown.
+- **Tests:** Permanent (or profile-default) deletion of one file from the panel.
+- **Confirms:** The source file no longer exists.
+- **Assumptions:** Isolated profile delete confirmation can be answered via native button click (UIA IDs are placeholders); default may be Recycle Bin unless other tests changed the profile—this case only asserts the path is gone, not the bin.
+- **Out of scope:** Recoverability, locked files, and mixed selection.
+
+##### `Delete_directory_removes_all_descendants`
+
+- **Does:** Deletes `delete-tree` after confirmation.
+- **Tests:** Recursive directory delete.
+- **Confirms:** The directory tree is gone.
+- **Assumptions:** Confirmation answered; no open handles on descendants.
+- **Out of scope:** Junction delete policy (separate fixture) and Recycle Bin item count.
+
+##### `Delete_mixed_selection_removes_the_selected_file_and_directory_tree`
+
+- **Does:** Selects `delete-mixed-file.txt` and `delete-mixed-tree` together and deletes.
+- **Tests:** A delete plan that includes both a file and a recursive directory.
+- **Confirms:** Both the file and the directory tree are gone.
+- **Assumptions:** Multi-select via sequential quick-search and toggle works on the owner-drawn list.
+- **Out of scope:** Partial failure in the mixed set (see locked-file skip).
+
+##### `Delete_to_recycle_bin_removes_the_source_and_creates_a_recoverable_shell_item`
+
+- **Does:** Records Recycle Bin item count for the volume, deletes `recycle-file.txt`, waits until the source is gone and the count increased.
+- **Tests:** Delete-to-bin through the product when Recycle Bin is enabled.
+- **Confirms:** Source path is gone; shell item count for that volume root is higher than before.
+- **Assumptions:** Category `RecycleBin`; `FILEMANAGER_UI_RECYCLE_BIN=1`; the user/profile uses the default Recycle Bin; `ShellRecycleBin` only reads `GetItemCount` and never empties or restores; one harness file is left in the bin.
+- **Out of scope:** Restore from the bin, which item appeared, other volumes’ bins, and `FOF_*` flags beyond what the product already sets.
+
+##### `Cancelling_an_in_progress_conflicting_copy_keeps_both_versions_and_records_cancellation`
+
+- **Does:** Starts copy of `cancel-conflict.txt`, waits for the overwrite prompt (proving the worker is in progress), cancels via the progress window (`RequestCancellation`), then dismisses the still-open conflict with IDCANCEL and confirms cancellation if prompted.
+- **Tests:** In-progress cancellation at a conflict, as opposed to declining the conflict (which journals as failure).
+- **Confirms:** Target still has `cancel-conflict-target-content`; source still has source content; journal contains `OPERATION|cancelled`.
+- **Assumptions:** Progress-window cancel is what writes `OPERATION|cancelled`; the worker cannot unwind until the parked conflict prompt is answered.
+- **Out of scope:** Mid-byte cancellation without a prompt, and kill-process recovery.
+
+##### `Cancelling_operation_dialog_leaves_source_and_target_unchanged` (four cases)
+
+Parameterized: Create Directory (`cancelled-directory`), Copy (`cancel-copy.txt`), Move (`cancel-move.txt`), Rename (`cancelled-rename.txt`).
+
+- **Does:** Opens the corresponding operation dialog and closes it without committing (`commit: false`).
+- **Tests:** Dialog-level cancel before the worker starts.
+- **Confirms:** Create does not create the directory; copy/move do not create a target; rename does not create the new name; existing sources remain.
+- **Assumptions:** Cancel is the dialog Close/Cancel path, not progress-window cancel.
+- **Out of scope:** Cancel after the worker has started (see the conflicting-copy case).
+
+##### `Create_directory_failure_keeps_existing_file_intact`
+
+- **Does:** Submits Create Directory with name `create-collision`, which is already a file, then cancels the resulting failure UI.
+- **Tests:** Failed create-as-directory against an existing file inside the workspace.
+- **Confirms:** File content remains `create-collision-content`.
+- **Assumptions:** Failure stays on the sandbox path; the harness uses `SubmitInvalidPathAndCancel`.
+- **Out of scope:** Privilege errors and disk-full.
+
+##### `Copy_or_move_failure_does_not_modify_source` (two cases)
+
+Parameterized: Copy `copy-file.txt` and Move `move-file.txt` to `blocked-target\child.txt`, where `blocked-target` is a file.
+
+- **Does:** Submits an impossible child path under a file and cancels the failure.
+- **Tests:** Invalid destination for copy and move without leaving the sandbox.
+- **Confirms:** Source still exists; `blocked-target` still exists as the seeded file.
+- **Assumptions:** Destination is inside the workspace; it cannot succeed, so no child is created outside the sandbox.
+- **Out of scope:** Network paths, ACL denial, and partial copy rollback beyond “source untouched.”
+
+##### `Rename_overwrite_decline_keeps_the_original_file_and_existing_target`
+
+- **Does:** Renames `rename-file.txt` onto `rename-collision.txt`, chooses IDNO on the overwrite prompt, then cancels the reopened rename dialog.
+- **Tests:** Rename-specific skip (IDNO) returning to the rename dialog without mutating files.
+- **Confirms:** Original and collision contents are unchanged.
+- **Assumptions:** IDNO is skip for rename, not the copy/move Skip control; the rename dialog reappears with a Cancel button (automation ID `2`).
+- **Out of scope:** Confirmed overwrite (separate case).
+
+##### `Rename_directory_collision_keeps_both_directory_trees`
+
+- **Does:** Attempts to rename `rename-collision-source` to `rename-collision-target` and cancels the failure.
+- **Tests:** Directory-directory name collision is rejected rather than offered file overwrite.
+- **Confirms:** Both trees’ `payload.txt` contents remain as seeded.
+- **Assumptions:** Directory overwrite is not a supported prompt in this product path.
+- **Out of scope:** Merging directory trees.
+
+##### `Delete_skip_for_locked_file_keeps_it_and_continues_with_later_items`
+
+- **Does:** Commits Configuration to immediate (Shift+Delete-style) deletion, holds `delete-locked.txt` open, selects it together with `delete-z-after-skip.txt`, deletes, confirms, and Skip on IDRETRY/Skip (`IDB_SKIP`).
+- **Tests:** Product delete engine Retry/Skip after a sharing violation, continuing with later selected items.
+- **Confirms:** The later file is gone; the locked file remains.
+- **Assumptions:** Recycle Bin must be off for this engine: with the bin enabled the panel hands the selection to the shell (`CFilesWindow::DeleteThroughRecycleBin`), which would show “File In Use” instead of Skip. Alphabetical `delete-z-after-skip.txt` is processed after the locked file.
+- **Out of scope:** Recycle Bin locked-file UI, Skip All, and Retry until success.
+
+#### `LargeFlatDirectoryDeleteUiTests`
+
+##### `Delete_large_flat_directory_removes_all_descendants`
+
+- **Does:** Seeds 2,048 files in `delete-large-flat-directory` before launch, selects the directory, deletes, and confirms.
+- **Tests:** Per-entry delete of a large flat directory without putting that cost on every ordinary file-operation case.
+- **Confirms:** The directory eventually no longer exists.
+- **Assumptions:** Confirmation answered; timeout is long enough for a realistic high-entry delete; workspace seed runs before panel enumeration.
+- **Out of scope:** Progress correctness, cancellation mid-directory, Recycle Bin of 2,048 items, and memory/handle budgets during the delete.
+
+#### `ApplicationVerifierStartupUiTests`
+
+##### `Startup_exposes_the_native_main_window_under_the_selected_verifier_layer`
+
+- **Does:** Relies on fixture launch (possibly under Application Verifier) and checks the main window class.
+- **Tests:** Process startup under the selected verifier layer, isolated from the seven lifecycle scenarios.
+- **Confirms:** Class name is `SalamanderMainWindowVer25`.
+- **Assumptions:** Category `VerifierStartup`; verifier/PageHeap, when used, are applied by the nightly runner around the process, not by this assertion.
+- **Out of scope:** Heaps/locks/exceptions diagnostics themselves, and any command after startup.
+
+#### `ToolbarIconSizeUiTests`
+
+##### `Customize_toolbar_cycles_all_icon_sizes_and_persists_the_choice_after_restart`
+
+- **Does:** Opens Customize Top Toolbar, asserts the three combo labels, selects Small/Medium/Large via native `CBN_SELCHANGE` (not UIA `Select()`), reopening between sizes, waits 500 ms after Close for the 250 ms debounce, restarts, asserts Large is restored, then restores the incoming index.
+- **Tests:** Live toolbar icon-size changes and persistence of the last choice.
+- **Confirms:** Combo items are exactly Small 16, Medium 24, Large 32; each index sticks after Close/reopen; after restart the selection is Large (index 2).
+- **Assumptions:** Resource ID `2748`; Close is automation ID `1`; English combo strings; native selection notification is required because UIA Select bypasses the legacy handler.
+- **Out of scope:** Pixel-perfect glyphs, Fluent SVG assets (see `ToolbarIconSizeContractTests` and `verify-fluent-icon-coverage.ps1`), and menu/app-icon independence.
+
+#### `LifecycleLeakUiTests`
+
+##### `Repeated_clean_startup_and_shutdown_does_not_accumulate_process_resources`
+
+- **Does:** Restarts FileManager `FILEMANAGER_UI_LEAK_CYCLES` times (default 20, nightly 100, clamped 5–200), samples handle/GDI/USER/private-byte counts, ignores cycle 1 (plug-in install), and checks spread plus early-vs-late mean shift.
+- **Tests:** Cross-restart resource growth on clean start/stop.
+- **Confirms:** After warm starts, spreads stay within 32 handles, 64 GDI, 12 USER, 64 MiB private bytes; mean shifts stay within 16 / 16 / 6 / 16 MiB.
+- **Assumptions:** Category `Leak`; currently also `Quarantined` (`quarantined-ui-tests.json`) because a remote run measured a 39-handle warm-start spread against the 32-handle budget while Verifier and lock stress passed. Budgets compare equivalent warm starts, not the first cold plug-in install.
+- **Out of scope:** Leaks that only appear while a command is in flight, GDI from user interaction, and calibrating whether a 39-handle spread is startup noise or a real leak (the quarantine expiry).
+
+#### `ConfigurationRecoveryUiTests`
+
+##### `Interrupted_configuration_writes_at_transaction_boundaries_restore_a_complete_profile`
+
+- **Does:** Requires `FILEMANAGER_UI_CONFIG_FAULT_INJECTION=1`. Establishes a baseline checkbox, measures registry write count of a real commit, samples uniformly spaced payload writes plus five named phases (`checksum`, `complete`, `generation-flush`, `selector`, `store-flush`). For each point, arms a marker file only after startup, commits a toggle, expects exit code 121, restarts, and asserts the first checkbox is either complete baseline or complete candidate—not a mixture—then restores baseline.
+- **Tests:** Crash recovery of transactional configuration generations.
+- **Confirms:** Fault injection actually stops at the requested boundary; restart never shows a mixed profile.
+- **Assumptions:** Category `FaultInjection`; `FILEMANAGER_UI_ISOLATED=1` so native hooks honor `FILEMANAGER_CONFIG_FAULT_*`; arm file prevents plug-in startup saves from consuming the boundary; named phases stay valid when plug-ins add thousands of snapshot values.
+- **Out of scope:** Every individual registry value, concurrent writers, and migrating foreign profile versions during the crash.
+
+#### `CrossVolumeMoveCharacterizationUiTests`
+
+Requires `FILEMANAGER_UI_CROSS_VOLUME_ROOT` (runner uses writable `D:\filemanager-testdata` when available). The fixture deletes only its GUID child.
+
+##### `Move_across_volumes_copies_the_complete_tree_before_removing_the_source`
+
+- **Does:** Moves `move-tree` between different volume roots, accepts the metadata-preservation gate (IDYES), waits for destination release then source removal.
+- **Tests:** Cross-volume move as copy-then-delete with an explicit metadata gate.
+- **Confirms:** Nested payload is on the target with original content; source tree is gone.
+- **Assumptions:** Category `CrossVolume`; volumes differ; timestamps often cannot be preserved, so the gate is expected.
+- **Out of scope:** ADS (next case), FAT targets, and network drives.
+
+##### `Move_across_ADS_capable_volumes_preserves_multiple_streams_before_removing_the_source`
+
+- **Does:** Writes two named streams on `ads-cross-volume.txt`, moves across volumes, accepts the metadata gate, waits for destination then source deletion.
+- **Tests:** ADS preservation when both volumes support ADS.
+- **Confirms:** Source is gone; `first` and `second` streams match on the target.
+- **Assumptions:** Categories `CrossVolume` and `AlternateDataStreams`; both roots are ADS-capable (typically NTFS on C: and D:).
+- **Out of scope:** ADS-unsupported targets (quarantined fixture below).
+
+#### `AlternateDataStreamsUnsupportedTargetUiTests`
+
+##### `Cross_volume_move_to_an_ADS_unsupported_target_keeps_the_source_when_metadata_loss_is_declined`
+
+- **Does:** Moves `ads-unsupported-target.txt` to a FAT/FAT32/exFAT-like volume, confirms ADS-loss copy of the default stream (caption `Confirm Alternate Data Streams Loss`, IDYES), then declines the following metadata-loss Question (IDNO).
+- **Tests:** Default data published to an ADS-incapable target while declining source deletion so named streams are not lost.
+- **Confirms:** Target has default content and no `must-not-silently-disappear` stream; source still exists with that stream.
+- **Assumptions:** Categories `CrossVolume`, `AlternateDataStreams`, and currently `Quarantined` because a remote run selected inherited `ads-overwrite.txt` and showed overwrite instead of ADS-loss. Requires `FILEMANAGER_UI_ADS_UNSUPPORTED_TARGET_ROOT`; source NTFS, target not ADS-capable; target must not already contain the name (overwrite would prove a panel-selection race).
+- **Out of scope:** Accepting source deletion after ADS loss, and NTFS-to-NTFS moves.
+
+#### `OperationRecoveryCharacterizationUiTests`
+
+##### `Restart_reconciliation_commits_a_fully_written_transactional_target`
+
+- **Does:** Before launch, writes `SALCPrestart-reconciled.tmp` and an incomplete `.opj` (`STATE|0|temporary-ready`) pointing at `restart-reconciled.txt`. Allows a disabled main window at startup. Answers Resume (IDYES) then the recovery summary (IDOK).
+- **Tests:** Real startup reconciliation of a ready transactional sibling.
+- **Confirms:** Target exists with `recovered-after-restart`; temporary file is gone; journal contains `OPERATION|reconciled`.
+- **Assumptions:** Category `Recovery`; this fixture must not call the base journal purge before start; leftover journals from other tests are exactly what this scenario simulates on purpose.
+- **Out of scope:** Incomplete temps that are not `temporary-ready`, user choosing not to resume, and multi-item journals.
+
+#### `ReparsePointTopologyUiTests`
+
+Topology is created before launch. Junction/symlink targets live under the workspace root but outside the selected operation root. Category `ReparsePoints`.
+
+##### `Copy_does_not_traverse_changed_or_cyclic_junction_targets_outside_the_operation_root`
+
+- **Does:** Copies `reparse-operation-root`, which contains a junction retargeted from `outside-first-target` to `outside-changed-target` and a junction that points back at the operation root.
+- **Tests:** Copy planner must not follow changed or cyclic directory junctions.
+- **Confirms:** `inside.txt` is copied; outside sentinels are unchanged; `changed-junction` and `cycle-junction` are not materialized on the target.
+- **Assumptions:** `mklink /J` works without extra privilege; retargeting by delete-and-recreate is visible to the product as a changed reparse target.
+- **Out of scope:** Copying the junction itself as a reparse point, and mount points.
+
+##### `Delete_junction_removes_only_the_link_and_never_its_target`
+
+- **Does:** Deletes `delete-junction` whose target is `delete-target` with `sentinel.txt`.
+- **Tests:** Junction delete removes the link only.
+- **Confirms:** The junction path is gone; the target sentinel content is unchanged.
+- **Assumptions:** Confirmation answered; cleanup similarly must not recurse into junction targets.
+- **Out of scope:** Recycle Bin of junctions and symlink delete.
+
+##### `Copy_does_not_traverse_a_directory_symbolic_link_outside_the_operation_root`
+
+- **Does:** Copies the same operation root when a directory symlink `outside-symlink` could be created.
+- **Tests:** Copy must not materialize or traverse a directory symbolic link to an outside target.
+- **Confirms:** `inside.txt` copied; outside sentinel unchanged; `outside-symlink` absent on the target.
+- **Assumptions:** `SeCreateSymbolicLinkPrivilege` (or equivalent); otherwise `Assert.Ignore` with an explicit capability message. Release-equivalent `runtests.ps1` skips the whole UI lane if the privilege is missing rather than reporting partial completion.
+- **Out of scope:** File symlinks, junction coverage (always attempted), and creating links as the copy result.
+
+#### `ReportedDefectCharacterizationUiTests`
+
+These cases record current product behavior for reported defects. A failed assertion is valid evidence the defect remains; a stalled or crashed host is not acceptable. They must not install plug-ins or change application behavior to make an assertion pass.
+
+##### `Zip_open_after_information_dialog_navigates_into_archive`
+
+- **Does:** Seeds `zip-open-characterization.zip` with `zip-open-payload.txt`, selects the archive, issues Open, dismisses an optional information dialog (IDOK within 3 s), waits until the main-window title contains the zip name, then quick-searches the payload name.
+- **Tests:** ZIP plug-in navigation after the information dialog.
+- **Confirms:** The panel has navigated into the archive (title + listed payload), not merely a decorative title change.
+- **Assumptions:** `FILEMANAGER_UI_ZIP_PLUGIN=1` confirms the Zip plug-in is deployed and enabled.
+- **Out of scope:** Extract, nested archives, passworded zip, and fixing the reported defect if navigation still fails.
+
+##### `Help_search_returns_the_configured_existing_help_result`
+
+- **Does:** Issues Help Search, finds HTML Help (`HH Parent`), types `FILEMANAGER_UI_HELP_SEARCH_TERM`, presses Enter, waits for a descendant whose name contains `FILEMANAGER_UI_HELP_EXPECTED_RESULT`, then closes only that captured HH window.
+- **Tests:** Language-specific compiled help search against the deployed `salamand.chm`.
+- **Confirms:** The configured existing result appears in the Help UI.
+- **Assumptions:** Both Help environment variables are set; `help/<language>/salamand.chm` exists beside the executable.
+- **Out of scope:** Full-text ranking, other CHMs, and installing help during the test.
+
+#### `DeterministicNetworkFixtureTests.ProductFtpControlConnectionTests`
+
+Loopback HTTP/FTP/FTPS/stall cases in the parent fixture never launch FileManager. The nested fixture does.
+
+##### `Quick_connect_consumes_a_fragmented_greeting_before_the_fixture_disconnects`
+
+- **Does:** Starts a loopback FTP server that sends a split multiline `220` greeting then waits for one line and disconnects. Opens the product Connect to FTP Server dialog and connects to `127.0.0.1:port`.
+- **Tests:** Native FTP reply reader across socket-read boundaries before login.
+- **Confirms:** The first client command starts with `USER `; the scripted server completes.
+- **Assumptions:** Isolated profile; Connect command ID is available; 10 s bound for login command and server completion.
+- **Out of scope:** Password/login success, TLS, data channel, bookmarks, and the live MojeRzeczy server.
+
+#### `MojeRzeczyFtpsUiTests`
+
+Explicit, `LiveFtp`, excluded from `scripts/runtests.ps1` and CI. Run via `scripts/run-ftp-test.ps1`.
+
+##### `Quick_connect_downloads_skan_txt_with_explicit_ftps_passive_binary_transfer_and_an_invalid_certificate`
+
+- **Does:** If `MOJERZEC_USERNAME`/`MOJERZEC_PASSWORD` are missing, passes immediately with a message that FTP UI tests were not performed. Otherwise quick-connects to `ftp.mojerzeczy.com` with explicit FTPS (port 21, passive, binary, AUTH TLS), accepts a hostname-invalid certificate for this session only (does not persist the exception), dismisses Welcome Message, copies `/skan.txt` into a GUID folder under the test-data root (queue checkbox off), waits until the file can be opened with `FileShare.None` at the reference size from `C:\Projects\FtpMojerzeczy\skan.txt`. Debug error dialogs are logged under `TestResults\ftp-debug-error-dialogs` (or `FILEMANAGER_UI_FTP_DEBUG_ERROR_LOG_DIRECTORY`), dismissed, and fail the test.
+- **Tests:** Live explicit FTPS download against that one server, including invalid-certificate handling in the disposable profile.
+- **Confirms:** Downloaded `skan.txt` byte length matches the local reference file.
+- **Assumptions:** External network; reference file exists and is non-empty; left panel is the post-connect remote listing; certificate policy must not be reused for other servers.
+- **Out of scope:** Upload, resume, other hosts, content equality beyond size, and CI/release-gate execution.
 
 ## Continuous-integration coverage
 

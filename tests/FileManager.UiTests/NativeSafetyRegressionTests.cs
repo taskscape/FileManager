@@ -1502,6 +1502,33 @@ public sealed class NativeSafetyRegressionTests
     }
 
     [Test]
+    public void File_operation_journal_does_not_block_the_progress_dialog_on_large_plans()
+    {
+        var root = FindRepositoryRoot();
+        var journal = File.ReadAllText(Path.Combine(root, "src", "operation_journal.cpp"));
+        var operations = File.ReadAllText(Path.Combine(root, "src", "operations_core.cpp"));
+
+        var workerBodyIndex = operations.IndexOf("unsigned ThreadWorkerBody", StringComparison.Ordinal);
+        var startWorkerIndex = operations.IndexOf("CThreadOwner* StartWorker", StringComparison.Ordinal);
+        var beginJournalIndex = operations.IndexOf("if (!script->BeginJournal())", StringComparison.Ordinal);
+
+        // Large copies froze at 0% because the dialog thread opened every source and
+        // flushed the journal after every path fragment before the worker started.
+        Assert.Multiple(() =>
+        {
+            Assert.That(journal, Does.Contain("JournalWriteBufferCapacity"));
+            Assert.That(journal, Does.Contain("FlushDurable"));
+            Assert.That(journal, Does.Not.Contain("GetPathIdentity"));
+            Assert.That(journal, Does.Contain("|unavailable"));
+            Assert.That(workerBodyIndex, Is.GreaterThanOrEqualTo(0));
+            Assert.That(startWorkerIndex, Is.GreaterThan(workerBodyIndex));
+            Assert.That(beginJournalIndex, Is.GreaterThan(workerBodyIndex));
+            Assert.That(beginJournalIndex, Is.LessThan(startWorkerIndex));
+            Assert.That(operations.IndexOf("BeginJournal", startWorkerIndex < 0 ? 0 : startWorkerIndex, StringComparison.Ordinal), Is.EqualTo(-1));
+        });
+    }
+
+    [Test]
     public void File_operation_correlation_ids_cross_plan_worker_ui_journal_and_log_boundaries()
     {
         var root = FindRepositoryRoot();

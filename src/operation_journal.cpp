@@ -22,36 +22,17 @@ BOOL GetJournalDirectory(char* directory, int directoryLen, BOOL create)
     return TRUE;
 }
 
-BOOL WriteAll(HANDLE file, const char* text)
+const int JournalWriteBufferCapacity = 64 * 1024;
+
+BOOL WriteAll(HANDLE file, const char* data, DWORD length)
 {
-    DWORD length = (DWORD)strlen(text);
     DWORD written = 0;
-    return WriteFile(file, text, length, &written, NULL) && written == length;
+    return WriteFile(file, data, length, &written, NULL) && written == length;
 }
 
-BOOL GetPathIdentity(const char* path, char* identity, int identityLen)
+BOOL WriteAll(HANDLE file, const char* text)
 {
-    // Keep the diagnostic fallback terminated within the caller's declared identity field.
-    if (identity == NULL || identityLen <= 0)
-        return FALSE;
-    StringCchCopyNA(identity, static_cast<size_t>(identityLen), "unavailable", static_cast<size_t>(identityLen) - 1);
-    if (path == NULL || path[0] == 0)
-        return FALSE;
-    HANDLE handle = HANDLES_Q(CreateFileUtf8(path, 0,
-                                              FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
-                                              NULL, OPEN_EXISTING,
-                                              FILE_FLAG_BACKUP_SEMANTICS | FILE_FLAG_OPEN_REPARSE_POINT,
-                                              NULL));
-    if (handle == INVALID_HANDLE_VALUE)
-        return FALSE;
-    BY_HANDLE_FILE_INFORMATION info;
-    BOOL result = GetFileInformationByHandle(handle, &info);
-    HANDLES(CloseHandle(handle));
-    if (!result)
-        return FALSE;
-    _snprintf_s(identity, identityLen, _TRUNCATE, "%08lX:%08lX%08lX",
-                info.dwVolumeSerialNumber, info.nFileIndexHigh, info.nFileIndexLow);
-    return TRUE;
+    return WriteAll(file, text, (DWORD)strlen(text));
 }
 
 const char* OpcodeName(COperationCode opcode)
@@ -286,16 +267,57 @@ BOOL WriteReconciliationReport(char* reportPath, int reportPathLen, TDirectArray
 }
 } // namespace
 
-COperationJournal::COperationJournal() : File(INVALID_HANDLE_VALUE), CurrentItem(-1), CurrentAttempt(0) { Path[0] = 0; }
+COperationJournal::COperationJournal()
+    : File(INVALID_HANDLE_VALUE), CurrentItem(-1), CurrentAttempt(0), Buffer(NULL), BufferUsed(0)
+{
+    Path[0] = 0;
+}
 
 COperationJournal::~COperationJournal()
 {
     if (File != INVALID_HANDLE_VALUE) HANDLES(CloseHandle(File));
+    if (Buffer != NULL) free(Buffer);
+}
+
+BOOL COperationJournal::SpillBuffer()
+{
+    if (File == INVALID_HANDLE_VALUE)
+        return FALSE;
+    if (BufferUsed <= 0)
+        return TRUE;
+    if (!WriteAll(File, Buffer, (DWORD)BufferUsed))
+        return FALSE;
+    BufferUsed = 0;
+    return TRUE;
+}
+
+BOOL COperationJournal::FlushDurable()
+{
+    // Recovery needs a complete record plus updated file-size metadata, not a
+    // WRITE_THROUGH payload whose last bytes never became part of the on-disk size.
+    return SpillBuffer() && File != INVALID_HANDLE_VALUE && FlushFileBuffers(File);
 }
 
 BOOL COperationJournal::Append(const char* text)
 {
-    return File != INVALID_HANDLE_VALUE && WriteAll(File, text) && FlushFileBuffers(File);
+    // Checkpoint durability belongs in FlushDurable; flushing every fragment of a
+    // multi-Append record stalled thousands of files at 0% for over an hour.
+    if (text == NULL || File == INVALID_HANDLE_VALUE || Buffer == NULL)
+        return FALSE;
+    const char* cursor = text;
+    int remaining = (int)strlen(text);
+    while (remaining > 0)
+    {
+        if (BufferUsed == JournalWriteBufferCapacity && !SpillBuffer())
+            return FALSE;
+        int space = JournalWriteBufferCapacity - BufferUsed;
+        int chunk = remaining < space ? remaining : space;
+        memcpy(Buffer + BufferUsed, cursor, chunk);
+        BufferUsed += chunk;
+        cursor += chunk;
+        remaining -= chunk;
+    }
+    return TRUE;
 }
 
 BOOL COperationJournal::AppendPlanOperand(EOperationPlanOperandKind kind, const char* path, DWORD value)
@@ -330,6 +352,8 @@ BOOL COperationJournal::AppendGoldenMasterPlan(COperations& operations)
 
     for (int index = 0; index < plan.GetCount(); ++index)
     {
+        if (operations.IsCancellationRequested())
+            return FALSE;
         const COperationPlanItem& item = plan.At(index);
         char prefix[192];
         _snprintf_s(prefix, _countof(prefix), _TRUNCATE,
@@ -350,8 +374,15 @@ BOOL COperationJournal::AppendGoldenMasterPlan(COperations& operations)
 
 BOOL COperationJournal::Begin(COperations& operations)
 {
+    if (File != INVALID_HANDLE_VALUE || Buffer != NULL)
+        return FALSE;
     char directory[MAX_PATH];
     if (!GetJournalDirectory(directory, _countof(directory), TRUE)) return FALSE;
+    // Allocate before CREATE_NEW so an OOM does not leave an empty journal behind.
+    Buffer = (char*)malloc(JournalWriteBufferCapacity);
+    if (Buffer == NULL)
+        return FALSE;
+    BufferUsed = 0;
     // Keep journal names fixed-width while avoiding a 49.7-day reuse of their timestamp component.
     const CMonotonicTimePoint timeSeed = CMonotonicClock::Now();
     _snprintf_s(Path, _countof(Path), _TRUNCATE, "%s\\operation-%08lX-%08lX.opj",
@@ -368,24 +399,26 @@ BOOL COperationJournal::Begin(COperations& operations)
     int i;
     for (i = 0; i < operations.Count; i++)
     {
+        if (operations.IsCancellationRequested())
+            return FALSE;
         const COperation* operation = &operations.At(i);
         const char* opcode = OpcodeName(operation->Opcode);
         if (opcode == NULL) continue;
         const char* source = operation->Opcode == ocCreateDir ? operation->TargetName : operation->SourceName;
         const char* target = operation->TargetName;
-        char identity[80];
-        GetPathIdentity(source, identity, _countof(identity));
         char prefix[160];
         char sequence[16];
         _snprintf_s(prefix, _countof(prefix), _TRUNCATE, "ITEM|%d|%s|", i, opcode);
         _snprintf_s(sequence, _countof(sequence), _TRUNCATE, "%d", i);
+        // Recovery uses source/target paths, not a pre-opened identity. Opening every
+        // source on removable/exFAT media blocked the copy dialog before any file ran.
         if (!Append(prefix) || !Append(source == NULL ? "" : source) || !Append("|") ||
-            !Append(target == NULL ? "" : target) || !Append("|") || !Append(identity) ||
+            !Append(target == NULL ? "" : target) || !Append("|unavailable") ||
             !Append("|operation=") || !Append(operations.GetCorrelationId()) ||
             !Append("|sequence=") || !Append(sequence) || !Append("|attempt=1\r\n"))
             return FALSE;
     }
-    return TRUE;
+    return FlushDurable();
 }
 
 BOOL COperationJournal::BeginItem(int itemIndex, const COperation* operation, int attempt)
@@ -395,7 +428,7 @@ BOOL COperationJournal::BeginItem(int itemIndex, const COperation* operation, in
     CurrentAttempt = attempt;
     char line[96];
     _snprintf_s(line, _countof(line), _TRUNCATE, "STATE|%d|prepared|attempt=%d\r\n", CurrentItem, CurrentAttempt);
-    return Append(line);
+    return Append(line) && FlushDurable();
 }
 
 void COperationJournal::RecordRetry(int attempt)
@@ -406,7 +439,8 @@ void COperationJournal::RecordRetry(int attempt)
         char line[80];
         // Retry history distinguishes another attempt from a duplicate callback after cancellation.
         _snprintf_s(line, _countof(line), _TRUNCATE, "RETRY|%d|attempt=%d\r\n", CurrentItem, CurrentAttempt);
-        Append(line);
+        if (Append(line))
+            FlushDurable();
     }
 }
 
@@ -415,7 +449,7 @@ BOOL COperationJournal::SetTemporaryPath(const char* temporaryPath)
     if (CurrentItem < 0 || temporaryPath == NULL) return FALSE;
     char prefix[64];
     _snprintf_s(prefix, _countof(prefix), _TRUNCATE, "TEMP|%d|", CurrentItem);
-    return Append(prefix) && Append(temporaryPath) && Append("\r\n");
+    return Append(prefix) && Append(temporaryPath) && Append("\r\n") && FlushDurable();
 }
 
 BOOL COperationJournal::MarkTemporaryReady()
@@ -423,7 +457,7 @@ BOOL COperationJournal::MarkTemporaryReady()
     if (CurrentItem < 0) return FALSE;
     char line[80];
     _snprintf_s(line, _countof(line), _TRUNCATE, "STATE|%d|temporary-ready\r\n", CurrentItem);
-    return Append(line);
+    return Append(line) && FlushDurable();
 }
 
 void COperationJournal::CompleteItem(BOOL succeeded)
@@ -433,7 +467,8 @@ void COperationJournal::CompleteItem(BOOL succeeded)
         char line[96];
         _snprintf_s(line, _countof(line), _TRUNCATE, "STATE|%d|%s|attempt=%d\r\n", CurrentItem,
                     succeeded ? "committed" : "failed", CurrentAttempt);
-        Append(line);
+        if (Append(line))
+            FlushDurable();
         CurrentItem = -1;
         CurrentAttempt = 0;
     }
@@ -444,6 +479,7 @@ void COperationJournal::Finish(BOOL failed, BOOL cancelled)
     if (File != INVALID_HANDLE_VALUE)
     {
         Append(cancelled ? "OPERATION|cancelled\r\n" : failed ? "OPERATION|failed\r\n" : "OPERATION|completed\r\n");
+        FlushDurable();
         HANDLES(CloseHandle(File));
         File = INVALID_HANDLE_VALUE;
     }

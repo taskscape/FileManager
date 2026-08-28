@@ -19,7 +19,11 @@ private:
     char Path[3 * MAX_PATH];
     int CurrentItem;
     int CurrentAttempt;
+    char* Buffer;
+    int BufferUsed;
 
+    BOOL SpillBuffer();
+    BOOL FlushDurable();
     BOOL Append(const char* text);
     BOOL AppendPlanOperand(EOperationPlanOperandKind kind, const char* path, DWORD value);
     BOOL AppendGoldenMasterPlan(COperations& operations);

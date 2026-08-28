@@ -14,6 +14,8 @@ public abstract class FileManagerUiTestBase
 {
     private readonly List<Application> launchedApplications = [];
     private readonly HashSet<int> launchedCrashReporterIds = [];
+    private UiTestExecutionLog? executionLog;
+    private bool productDiagnosticsCaptured;
 
     protected UIA3Automation Automation { get; private set; } = null!;
     protected Application Application { get; private set; } = null!;
@@ -30,24 +32,71 @@ public abstract class FileManagerUiTestBase
     public void StartFileManager()
     {
         UiTestSettings.RequireTestSandbox();
-        UiTestSandbox.EnsureInitialized();
-        Automation = new UIA3Automation();
-        BeforeFileManagerStarted();
-        StartApplication();
+        productDiagnosticsCaptured = false;
+        var test = TestContext.CurrentContext.Test;
+        // Start outside the disposable sandbox so cleanup cannot erase the diagnostic needed to explain a setup failure.
+        executionLog = UiTestExecutionLog.Start(UiTestSettings.ExecutionTranscriptRoot, test.Name, test.FullName, test.ID);
+        UiTestTrace.Attach(executionLog);
+        try
+        {
+            UiTestSandbox.EnsureInitialized();
+            // ApplicationArguments may construct a workspace, so clear stale test data before resolving its source and target paths.
+            executionLog.Record("HARNESS", $"test.start executable=\"{UiTestSettings.ExecutablePath}\" arguments=\"{ApplicationArguments}\"");
+            executionLog.Record("SANDBOX", $"initialized data-root=\"{UiTestSettings.TestDataRoot}\" registry-root=\"{UiTestSettings.ConfigurationRegistryRoot}\"");
+            executionLog.WatchProductDialogTranscript(Path.Combine(UiTestSettings.TestDataRoot, "ui-test-dialogs.log"));
+            Automation = new UIA3Automation();
+            BeforeFileManagerStarted();
+            StartApplication();
+        }
+        catch (Exception exception)
+        {
+            executionLog.RecordException("SETUP-FAILURE", exception);
+            FinishExecutionLog("setup.failed");
+            throw;
+        }
     }
 
     [TearDown]
     public void StopFileManager()
     {
+        executionLog?.Record("NUNIT", BuildNUnitOutcomeDescription());
+        try
+        {
+            StopFileManagerCore();
+        }
+        catch (Exception exception)
+        {
+            executionLog?.RecordException("TEARDOWN-FAILURE", exception);
+            throw;
+        }
+        finally
+        {
+            FinishExecutionLog("teardown.complete");
+        }
+    }
+
+    private void StopFileManagerCore()
+    {
+        executionLog?.CaptureCurrentWindows("teardown.before-process-stop");
         // Killing only processes launched by this fixture prevents a failed UI test from leaking instances.
         foreach (var application in launchedApplications)
         {
             try
             {
                 if (!application.HasExited)
+                {
+                    UiTestTrace.Record("PROCESS", $"terminate-request role=salamand.exe pid={application.ProcessId}");
                     application.Kill();
+                }
+                else
+                {
+                    // Preserve the real exit code before disposing FlaUI's process wrapper, especially for crashes and fault injection.
+                    UiTestTrace.Record("PROCESS", $"already-exited role=salamand.exe pid={application.ProcessId} code={application.ExitCode}");
+                }
                 // The native single-instance gate can otherwise hand the next test's launch to a process still shutting down.
                 WaitForApplicationExit(application);
+                var exitCode = application.HasExited ? application.ExitCode.ToString() : "<still-running>";
+                UiTestTrace.Record("PROCESS", $"stopped role=salamand.exe pid={application.ProcessId} code={exitCode}");
             }
             catch (InvalidOperationException)
             {
@@ -62,7 +111,10 @@ public abstract class FileManagerUiTestBase
             {
                 using var crashReporter = Process.GetProcessById(crashReporterId);
                 if (!crashReporter.HasExited)
+                {
+                    UiTestTrace.Record("PROCESS", $"terminate-request role=salmon.exe pid={crashReporterId}");
                     crashReporter.Kill();
+                }
             }
             catch (ArgumentException)
             {
@@ -77,6 +129,7 @@ public abstract class FileManagerUiTestBase
         }
         finally
         {
+            CaptureProductDiagnostics();
             // Preserve restart state within one test but always remove its mutations before NUnit starts the next case.
             UiTestSandbox.Cleanup();
         }
@@ -88,6 +141,7 @@ public abstract class FileManagerUiTestBase
 
     protected void RestartFileManager(IReadOnlyDictionary<string, string>? environment = null)
     {
+        UiTestTrace.Record("HARNESS", $"application.restart environment-overrides={DescribeEnvironmentNames(environment)}");
         // Restart coverage verifies that the application remains launchable after a committed configuration dialog.
         if (!Application.HasExited)
         {
@@ -101,6 +155,7 @@ public abstract class FileManagerUiTestBase
 
     protected Window OpenConfigurationDialog()
     {
+        UiTestTrace.Record("HARNESS", "open-dialog name=Configuration");
         NativeCommands.OpenConfiguration(NativeMainWindowHandle);
         // The localized configuration page keeps the stable property-sheet caption in the English test language.
         return WaitForWindow(window => string.Equals(window.Title, "Configuration", StringComparison.Ordinal));
@@ -122,11 +177,15 @@ public abstract class FileManagerUiTestBase
 
     protected int WaitForFileManagerExit(TimeSpan timeout)
     {
+        UiTestTrace.Record("WAIT", $"application.exit pid={Application.ProcessId} timeout={timeout.TotalSeconds:0.###}s");
         var deadline = DateTime.UtcNow + timeout;
         while (DateTime.UtcNow < deadline)
         {
             if (Application.HasExited)
+            {
+                UiTestTrace.Record("WAIT", $"application.exit satisfied pid={Application.ProcessId} code={Application.ExitCode}");
                 return Application.ExitCode;
+            }
 
             Thread.Sleep(50);
         }
@@ -149,11 +208,15 @@ public abstract class FileManagerUiTestBase
 
     protected void WaitForConfigurationClearReadOnlyPersistence(bool expectedValue)
     {
+        UiTestTrace.Record("WAIT", $"configuration.persistence setting=ClearReadOnly expected={expectedValue} timeout=10s");
         var timeout = DateTime.UtcNow + TimeSpan.FromSeconds(10);
         while (DateTime.UtcNow < timeout)
         {
             if (TryReadPersistedConfigurationClearReadOnly(out var value) && value == expectedValue)
+            {
+                UiTestTrace.Record("WAIT", "configuration.persistence satisfied setting=ClearReadOnly");
                 return;
+            }
 
             Thread.Sleep(50);
         }
@@ -163,11 +226,15 @@ public abstract class FileManagerUiTestBase
 
     protected void WaitForFtpBookmarkPersistence(string bookmarkName)
     {
+        UiTestTrace.Record("WAIT", $"ftp-bookmark.persistence name=\"{bookmarkName}\" timeout=10s");
         var timeout = DateTime.UtcNow + TimeSpan.FromSeconds(10);
         while (DateTime.UtcNow < timeout)
         {
             if (TryFindPersistedFtpBookmark(bookmarkName))
+            {
+                UiTestTrace.Record("WAIT", "ftp-bookmark.persistence satisfied");
                 return;
+            }
 
             Thread.Sleep(50);
         }
@@ -225,6 +292,7 @@ public abstract class FileManagerUiTestBase
 
     protected Window OpenFtpBookmarksDialog()
     {
+        UiTestTrace.Record("HARNESS", "open-dialog name=FTP-Organize-Bookmarks");
         RequireFtpPluginRuntime();
         // FTP IDs are process-local, so wait for the instance under test rather than reusing a predecessor's SUID.
         NativeCommands.Execute(MainWindow.Properties.NativeWindowHandle.Value,
@@ -234,6 +302,7 @@ public abstract class FileManagerUiTestBase
 
     protected Window OpenFtpConnectDialog()
     {
+        UiTestTrace.Record("HARNESS", "open-dialog name=FTP-Connect");
         RequireFtpPluginRuntime();
         // The quick-connect SUID must come from this launch for the protocol fixture to drive the real plug-in command.
         NativeCommands.Execute(MainWindow.Properties.NativeWindowHandle.Value,
@@ -243,6 +312,7 @@ public abstract class FileManagerUiTestBase
 
     protected void ConnectFtpServer(Window connectDialog, string hostAddress)
     {
+        UiTestTrace.Record("HARNESS", $"ftp-connect set-host=\"{hostAddress}\" invoke-connect=true");
         // IDE_HOSTADDRESS is a stable plug-in resource ID; host:port preserves the production parser path.
         var hostBox = connectDialog.FindFirstDescendant(cf => cf.ByAutomationId("563"))?.AsComboBox();
         Assert.That(hostBox, Is.Not.Null, "FTP connect dialog did not expose its host-address field.");
@@ -255,6 +325,7 @@ public abstract class FileManagerUiTestBase
 
     protected void CreateFtpBookmark(Window bookmarksDialog, string bookmarkName)
     {
+        UiTestTrace.Record("HARNESS", $"ftp-bookmark create name=\"{bookmarkName}\"");
         // These resource IDs are stable plug-in control identities, allowing UIA3 to create a bookmark without display text coupling.
         var newButton = bookmarksDialog.FindFirstDescendant(cf => cf.ByAutomationId("572"))?.AsButton();
         Assert.That(newButton, Is.Not.Null, "FTP bookmarks dialog did not expose its New button.");
@@ -275,6 +346,7 @@ public abstract class FileManagerUiTestBase
 
     protected void RenameFocusedFtpBookmark(Window bookmarksDialog, string bookmarkName)
     {
+        UiTestTrace.Record("HARNESS", $"ftp-bookmark rename-focused name=\"{bookmarkName}\"");
         // Creating a bookmark focuses it, so Rename exercises the profile-edit commit without relying on list item text.
         var renameButton = bookmarksDialog.FindFirstDescendant(cf => cf.ByAutomationId("573"))?.AsButton();
         Assert.That(renameButton, Is.Not.Null, "FTP bookmarks dialog did not expose its Rename button.");
@@ -295,6 +367,7 @@ public abstract class FileManagerUiTestBase
 
     protected void CloseFtpBookmarksDialog(Window bookmarksDialog)
     {
+        UiTestTrace.Record("HARNESS", "ftp-bookmark close-and-commit");
         // Close commits the edited bookmark collection in the FTP organizer instead of discarding it with Cancel.
         var closeButton = bookmarksDialog.FindFirstDescendant(cf => cf.ByAutomationId("575"))?.AsButton();
         Assert.That(closeButton, Is.Not.Null, "FTP bookmarks dialog did not expose its Close button.");
@@ -337,11 +410,27 @@ public abstract class FileManagerUiTestBase
                 startInfo.Environment[name] = value;
         }
 
+        UiTestTrace.Record("PROCESS",
+                           $"launch role=salamand.exe path=\"{startInfo.FileName}\" arguments=\"{startInfo.Arguments}\" " +
+                           $"working-directory=\"{startInfo.WorkingDirectory}\" environment-overrides={DescribeEnvironmentNames(environment)}");
         Application = FlaUI.Core.Application.Launch(startInfo);
         launchedApplications.Add(Application);
-        MainWindow = WaitForNativeMainWindow();
+        executionLog?.ObserveProcess(Application.ProcessId, "salamand.exe");
+        UiTestTrace.Record("PROCESS", $"launched role=salamand.exe pid={Application.ProcessId}");
+        MainWindow = WaitForNativeMainWindow(reportersBeforeLaunch);
         // A Debug FileManager starts salmon.exe beside itself; track only new sibling reporters for fixture teardown.
-        launchedCrashReporterIds.UnionWith(GetTestCrashReporterIds().Except(reportersBeforeLaunch));
+        TrackCrashReporters(reportersBeforeLaunch);
+        executionLog?.CaptureCurrentWindows("main-window-ready");
+    }
+
+    private void TrackCrashReporters(IReadOnlySet<int> reportersBeforeLaunch)
+    {
+        // Register reporters as soon as they appear so startup crashes and their modal UI are not lost behind the main-window wait.
+        foreach (var reporterId in GetTestCrashReporterIds().Except(reportersBeforeLaunch))
+        {
+            if (launchedCrashReporterIds.Add(reporterId))
+                executionLog?.ObserveProcess(reporterId, "salmon.exe");
+        }
     }
 
     private static void ResetPluginCommandMap()
@@ -376,6 +465,7 @@ public abstract class FileManagerUiTestBase
 
     private int WaitForFtpPluginCommand(int pluginCommand, string commandName)
     {
+        UiTestTrace.Record("WAIT", $"ftp-command-map plugin-command={pluginCommand} name=\"{commandName}\" timeout=20s");
         var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(20);
         var lastObservedRecords = Array.Empty<string>();
         while (DateTime.UtcNow < deadline)
@@ -392,6 +482,7 @@ public abstract class FileManagerUiTestBase
                         int.TryParse(fields[2], out var loggedPluginCommand) && loggedPluginCommand == pluginCommand &&
                         int.TryParse(fields[3], out var salamanderCommand) && salamanderCommand > 0)
                     {
+                        UiTestTrace.Record("WAIT", $"ftp-command-map satisfied salamander-command={salamanderCommand}");
                         return salamanderCommand;
                     }
                 }
@@ -436,7 +527,7 @@ public abstract class FileManagerUiTestBase
         return reporterIds;
     }
 
-    private Window WaitForNativeMainWindow()
+    private Window WaitForNativeMainWindow(IReadOnlySet<int> reportersBeforeLaunch)
     {
         // The first start against a fresh profile auto-installs every bundled
         // plug-in before the main window becomes usable, which can take far longer
@@ -445,6 +536,7 @@ public abstract class FileManagerUiTestBase
         var timeout = DateTime.UtcNow + TimeSpan.FromSeconds(60);
         while (DateTime.UtcNow < timeout)
         {
+            TrackCrashReporters(reportersBeforeLaunch);
             // UIA's application view can omit a modal Win32 error window, so acknowledge the known open-source plug-in notice natively.
             NativeCommands.DismissKnownStartupErrorDialogs(Application.ProcessId);
             var windows = Application.GetAllTopLevelWindows(Automation);
@@ -511,6 +603,7 @@ public abstract class FileManagerUiTestBase
 
     protected Window WaitForWindow(Func<Window, bool> predicate)
     {
+        UiTestTrace.Record("WAIT", "window.open timeout=10s");
         var timeout = DateTime.UtcNow + TimeSpan.FromSeconds(10);
         while (DateTime.UtcNow < timeout)
         {
@@ -518,6 +611,9 @@ public abstract class FileManagerUiTestBase
             Window? dialog = null;
             foreach (var windowHandle in NativeCommands.GetTopLevelWindows(Application.ProcessId))
             {
+                // Modal CMessageBox leaves the owner's UIA provider timing out; callers already exclude the main window by handle.
+                if (NativeMainWindowHandle != 0 && windowHandle == NativeMainWindowHandle)
+                    continue;
                 try
                 {
                     var candidate = Automation.FromHandle(windowHandle).AsWindow();
@@ -533,7 +629,11 @@ public abstract class FileManagerUiTestBase
                 }
             }
             if (dialog is not null)
+            {
+                UiTestTrace.Record("WAIT",
+                                   $"window.open satisfied hwnd=0x{dialog.Properties.NativeWindowHandle.Value:X} title=\"{dialog.Title}\"");
                 return dialog;
+            }
 
             Thread.Sleep(100);
         }
@@ -560,10 +660,14 @@ public abstract class FileManagerUiTestBase
             return;
         }
         var timeout = DateTime.UtcNow + TimeSpan.FromSeconds(10);
+        UiTestTrace.Record("WAIT", $"window.close hwnd=0x{dialogHandle:X} timeout=10s");
         while (DateTime.UtcNow < timeout)
         {
             if (!NativeCommands.WindowExists(dialogHandle))
+            {
+                UiTestTrace.Record("WAIT", $"window.close satisfied hwnd=0x{dialogHandle:X}");
                 return;
+            }
 
             Thread.Sleep(100);
         }
@@ -582,5 +686,80 @@ public abstract class FileManagerUiTestBase
         {
             // A process that has already exited has released the single-instance gate needed by the next test.
         }
+    }
+
+    private void CaptureProductDiagnostics()
+    {
+        if (executionLog is null || productDiagnosticsCaptured)
+            return;
+
+        // Capture before sandbox cleanup because native dialog and crash files deliberately live under that disposable root.
+        try
+        {
+            executionLog.CaptureProductDiagnostics(UiTestSettings.TestDataRoot);
+        }
+        catch (Exception exception)
+        {
+            // Diagnostics must explain a product failure without becoming a second teardown failure themselves.
+            executionLog.RecordException("DIAGNOSTIC-CAPTURE-FAILURE", exception);
+        }
+        finally
+        {
+            productDiagnosticsCaptured = true;
+        }
+    }
+
+    private void FinishExecutionLog(string lifecycleEvent)
+    {
+        var log = executionLog;
+        if (log is null)
+            return;
+
+        try
+        {
+            CaptureProductDiagnostics();
+        }
+        catch (Exception exception)
+        {
+            log.RecordException("DIAGNOSTIC-CAPTURE-FAILURE", exception);
+        }
+
+        log.Record("HARNESS", lifecycleEvent);
+        UiTestTrace.Detach(log);
+        var transcriptPath = log.Path;
+        try
+        {
+            log.Dispose();
+            // NUnit carries this absolute path into TRX-aware runners while the file also remains directly readable.
+            TestContext.AddTestAttachment(transcriptPath, "Open Salamander UI execution transcript");
+        }
+        catch (Exception exception)
+        {
+            TestContext.Progress.WriteLine($"Could not finalize UI execution transcript '{transcriptPath}': {exception.Message}");
+        }
+        finally
+        {
+            executionLog = null;
+        }
+    }
+
+    private static string BuildNUnitOutcomeDescription()
+    {
+        var result = TestContext.CurrentContext.Result;
+        var message = string.IsNullOrWhiteSpace(result.Message)
+            ? "<none>"
+            : result.Message.Replace("\r", " ", StringComparison.Ordinal).Replace("\n", " ", StringComparison.Ordinal);
+        var label = string.IsNullOrWhiteSpace(result.Outcome.Label) ? "<none>" : result.Outcome.Label;
+        // Keep the assertion location beside the final UI state instead of requiring a separate console or TRX lookup.
+        var stackTrace = string.IsNullOrWhiteSpace(result.StackTrace) ? "<none>" : result.StackTrace;
+        return $"test-body outcome={result.Outcome.Status} label={label} message=\"{message}\"\nstack-trace:\n{stackTrace}";
+    }
+
+    private static string DescribeEnvironmentNames(IReadOnlyDictionary<string, string>? environment)
+    {
+        // Values may contain credentials or fault payloads; names are sufficient to explain launch shape safely.
+        return environment is null || environment.Count == 0
+            ? "<none>"
+            : string.Join(",", environment.Keys.Order(StringComparer.Ordinal));
     }
 }
