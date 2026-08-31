@@ -665,10 +665,12 @@ public sealed class NativeSafetyRegressionTests
             Assert.That(workflow, Does.Contain("tools\\run-lock-verifier-stress.ps1"));
             Assert.That(workflow, Does.Contain("self-hosted"));
             // The verifier lane must retain the full diagnostic layers rather than regress to lock-only coverage.
-            Assert.That(stressRunner, Does.Contain("-enable @layers -for"));
+            Assert.That(stressRunner, Does.Contain("@('-enable') + $layers + @('-for', $targetName)"));
             Assert.That(stressRunner, Does.Contain("@('Heaps', 'Handles', 'Locks', 'Exceptions')"));
+            // appverif.exe is GUI-subsystem, so the wrapper must explicitly wait for its configuration result.
+            Assert.That(stressRunner, Does.Contain("Start-Process -FilePath $AppVerifierPath -ArgumentList $Arguments -Wait -PassThru"));
             Assert.That(stressRunner, Does.Contain("/p /enable $targetName /full"));
-            Assert.That(stressRunner, Does.Contain("-delete settings -for"));
+            Assert.That(stressRunner, Does.Contain("@('-delete', 'settings', '-for', $targetName)"));
             Assert.That(stressRunner, Does.Contain("TestCategory=LockStress"));
             Assert.That(stressRunner, Does.Contain("finally"));
             Assert.That(stressRunner, Does.Contain("LogOutputDirectory"));

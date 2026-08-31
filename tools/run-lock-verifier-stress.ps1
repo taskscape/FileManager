@@ -30,6 +30,22 @@ if (-not (Test-Path -LiteralPath $AppVerifierPath)) {
 }
 
 $targetName = Split-Path -Leaf $ExecutablePath
+
+function Invoke-ApplicationVerifier {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string[]] $Arguments
+    )
+
+    # appverif.exe is a GUI-subsystem program, so direct PowerShell invocation does not wait for or populate $LASTEXITCODE.
+    $process = Start-Process -FilePath $AppVerifierPath -ArgumentList $Arguments -Wait -PassThru
+    if ($null -eq $process) {
+        throw 'Application Verifier did not return a process handle.'
+    }
+
+    return $process.ExitCode
+}
+
 $gflagsPath = $null
 if ($VerifierProfile -eq 'Full') {
     # Full PageHeap is deliberately opt-in because it is process-persistent and expensive.
@@ -45,14 +61,9 @@ try {
     # The unary comma keeps a single layer as an array; without it, @('Locks')
     # unrolls to a scalar string and @layers splats as the character 'L'.
     $layers = if ($PSBoundParameters.ContainsKey('VerifierLayers')) { @($VerifierLayers) } elseif ($VerifierProfile -eq 'Full') { @('Heaps', 'Handles', 'Locks', 'Exceptions') } else { , @('Locks') }
-    # Define the automatic variable before launching the GUI-subsystem CLI so a non-elevated host reports the real prerequisite error under StrictMode.
-    $global:LASTEXITCODE = $null
-    & $AppVerifierPath -enable @layers -for $targetName
-    if ($null -eq $LASTEXITCODE) {
-        throw "Application Verifier could not be launched to enable $($layers -join ', ') for $targetName (the command did not set an exit code; it may require an elevated console)."
-    }
-    if ($LASTEXITCODE -ne 0) {
-        throw "Application Verifier failed to enable $($layers -join ', ') for $targetName (exit code $LASTEXITCODE)."
+    $appVerifierExitCode = Invoke-ApplicationVerifier -Arguments (@('-enable') + $layers + @('-for', $targetName))
+    if ($appVerifierExitCode -ne 0) {
+        throw "Application Verifier failed to enable $($layers -join ', ') for $targetName (exit code $appVerifierExitCode)."
     }
 
     if ($null -ne $gflagsPath) {
@@ -79,9 +90,9 @@ finally {
         }
     }
 
-    & $AppVerifierPath -delete settings -for $targetName
-    if ($LASTEXITCODE -ne 0) {
-        Write-Warning "Application Verifier settings could not be removed for $targetName (exit code $LASTEXITCODE)."
+    $appVerifierExitCode = Invoke-ApplicationVerifier -Arguments @('-delete', 'settings', '-for', $targetName)
+    if ($appVerifierExitCode -ne 0) {
+        Write-Warning "Application Verifier settings could not be removed for $targetName (exit code $appVerifierExitCode)."
     }
 
     $verifierLogDirectory = Join-Path $env:USERPROFILE 'AppVerifierLogs'
