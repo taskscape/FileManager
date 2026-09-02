@@ -183,7 +183,12 @@ static DWORD WINAPI UpdateCheckThreadF(void* param, HANDLE stopEvent)
         return 0;
 
     if (updateFound)
+    {
         UpdateAvailable = TRUE; // UI thread reads this only after our posted message arrives
+        // Help > Download update samples this DWORD on open; leaving it at zero
+        // kept the item grayed even after a newer release was confirmed.
+        EnablerUpdateAvailable = TRUE;
+    }
 
     if (HUpdateCheckNotifyWindow != NULL)
         PostMessage(HUpdateCheckNotifyWindow, WM_USER_UPDATE_CHECK_DONE, 0, 0);

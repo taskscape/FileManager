@@ -2623,9 +2623,6 @@ FIND_NEW_SLG_FILE:
                         SendMessage(MainWindow->HWindow, WM_COMMAND, CM_TOGGLEEDITLINE, TRUE);
                     MainWindow->SetWindowIcon();
                     MainWindow->SetWindowTitle();
-                    // one-shot background check for a newer GitHub release, started
-                    // once the main window exists so the result can update title/menu
-                    StartUpdateCheck(MainWindow->HWindow);
                     SplashScreenCloseIfExist();
                     ShowWindow(MainWindow->HWindow, cmdShow);
                     UpdateWindow(MainWindow->HWindow);
@@ -2654,6 +2651,11 @@ FIND_NEW_SLG_FILE:
                 {
                     if (!importCfgFromFileWasSkipped) // only if the application does not exit immediately (then it makes no sense)
                         MainWindow->ApplyCommandLineParams(&cmdLineParams, setActivePanelAndPanelPaths);
+
+                    // Run after LoadConfig succeeds or falls back: the previous call
+                    // lived only in the missing-config branch, so a saved configuration
+                    // never started the check and Help > Download update stayed disabled.
+                    StartUpdateCheck(MainWindow->HWindow);
 
                     if (Windows7AndLater)
                         CreateJumpList();

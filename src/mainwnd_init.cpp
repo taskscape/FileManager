@@ -2996,6 +2996,9 @@ void CMainWindow_RefreshCommandStates(CMainWindow* obj)
                                                     validPluginFS && activePanel->GetPluginFS()->IsServiceSupported(FS_SERVICE_CONTEXTMENU)));
     obj->CheckAndSet(&EnablerOpenActiveFolder, (onDisk ||
                                                 validPluginFS && activePanel->GetPluginFS()->IsServiceSupported(FS_SERVICE_OPENACTIVEFOLDER)));
+    // Keep Help > Download update aligned with the GitHub check; idle refresh
+    // is the same path every other menu enabler uses.
+    obj->CheckAndSet(&EnablerUpdateAvailable, IsUpdateAvailable());
     obj->CheckAndSet(&EnablerPermissions, onDisk && files && acls &&
                                               ((containsFile && !containsDir) || (!containsFile && containsDir)));
 

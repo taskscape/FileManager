@@ -3347,7 +3347,9 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
     case WM_USER_UPDATE_CHECK_DONE:
         // the background GitHub release check finished: recompose the title so a
         // confirmed newer release immediately shows the "(update available)" suffix;
-        // the Help menu item state follows EnablerUpdateAvailable on next open
+        // enable Help > Download update on this thread so the next menu open sees it
+        EnablerUpdateAvailable = IsUpdateAvailable() ? TRUE : FALSE;
+        IdleRefreshStates = TRUE; // keep other command enablers in the same idle pass
         MainWindow->SetWindowTitle(NULL);
         return 0;
 
