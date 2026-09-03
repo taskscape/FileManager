@@ -105,6 +105,7 @@ public:
         record.ExpiresAt = CertificateExceptionExpiry(scope);
 
         HANDLES(EnterCriticalSection(&CriticalSection));
+        ClampCount();
         int replace = -1;
         for (int i = 0; i < Count; ++i)
         {
@@ -121,7 +122,9 @@ public:
             // A fixed store prevents repeated hostile certificates from growing configuration without bound.
             replace = Count < FTP_CERTIFICATE_EXCEPTION_LIMIT ? Count++ : 0;
         }
-        Records[replace] = record;
+        // ClampCount keeps replace in range so a negative Count cannot write Records[-1].
+        if (replace >= 0 && replace < FTP_CERTIFICATE_EXCEPTION_LIMIT)
+            Records[replace] = record;
         HANDLES(LeaveCriticalSection(&CriticalSection));
         return true;
     }
@@ -138,11 +141,14 @@ public:
 
         bool accepted = false;
         HANDLES(EnterCriticalSection(&CriticalSection));
-        for (int i = Count - 1; i >= 0;)
+        ClampCount();
+        // Stop once i is outside the live prefix: removing the last expired slot with
+        // only `i >= 0` decrements Count through zero and Records[-1] overlays Config.ConParamsCS.
+        for (int i = Count - 1; i >= 0 && i < Count;)
         {
             if (IsExpired(Records[i].ExpiresAt))
             {
-                Records[i] = Records[--Count];
+                RemoveAt(i);
                 continue;
             }
             if (_stricmp(Records[i].Host, host) == 0 && Records[i].Port == port)
@@ -208,6 +214,7 @@ public:
 
         registry->ClearKey(exceptionsKey);
         HANDLES(EnterCriticalSection(&CriticalSection));
+        ClampCount();
         int saved = 0;
         for (int i = 0; i < Count; ++i)
         {
@@ -242,10 +249,15 @@ private:
     {
         // A configuration reload must not retain a remembered exception deleted from the profile.
         HANDLES(EnterCriticalSection(&CriticalSection));
-        for (int i = Count - 1; i >= 0; --i)
+        ClampCount();
+        for (int i = Count - 1; i >= 0 && i < Count;)
         {
             if (Records[i].Scope == cesPersistent)
-                Records[i] = Records[--Count];
+            {
+                RemoveAt(i);
+                continue;
+            }
+            --i;
         }
         HANDLES(LeaveCriticalSection(&CriticalSection));
     }
@@ -253,9 +265,27 @@ private:
     void RememberLoaded(const CCertificateExceptionRecord& record)
     {
         HANDLES(EnterCriticalSection(&CriticalSection));
-        if (Count < FTP_CERTIFICATE_EXCEPTION_LIMIT)
+        ClampCount();
+        if (Count >= 0 && Count < FTP_CERTIFICATE_EXCEPTION_LIMIT)
             Records[Count++] = record;
         HANDLES(LeaveCriticalSection(&CriticalSection));
+    }
+
+    void ClampCount()
+    {
+        // Records[-1] occupies the bytes immediately before this store, including Config.ConParamsCS.
+        if (Count < 0)
+            Count = 0;
+        if (Count > FTP_CERTIFICATE_EXCEPTION_LIMIT)
+            Count = FTP_CERTIFICATE_EXCEPTION_LIMIT;
+    }
+
+    void RemoveAt(int i)
+    {
+        // Reject indexes outside the live prefix so Count never decrements through zero.
+        if (i < 0 || i >= Count)
+            return;
+        Records[i] = Records[--Count];
     }
 
     CRITICAL_SECTION CriticalSection;

@@ -2827,6 +2827,12 @@ public sealed class NativeSafetyRegressionTests
             Assert.That(tls, Does.Contain("memcmp(Records[i].SPKIFingerprint, spkiFingerprint"));
             Assert.That(tls, Does.Contain("memcmp(Records[i].CertificateFingerprint, certificateFingerprint"));
             Assert.That(tls, Does.Contain("IsExpired(Records[i].ExpiresAt)"));
+            // Compact-from-end must keep i inside the live prefix; Records[-1] overlays Config.ConParamsCS.
+            Assert.That(tls, Does.Contain("for (int i = Count - 1; i >= 0 && i < Count;)"));
+            Assert.That(tls, Does.Contain("void ClampCount()"));
+            Assert.That(tls, Does.Contain("void RemoveAt(int i)"));
+            Assert.That(tls, Does.Contain("if (i < 0 || i >= Count)"));
+            Assert.That(tls, Does.Contain("Records[-1] occupies the bytes immediately before this store, including Config.ConParamsCS."));
             Assert.That(tls, Does.Contain("record.Scope == cesPersistent"));
             Assert.That(tls, Does.Contain("pCertificate->IsVerified() || pCertificate->IsCurrentException()"));
             Assert.That(tls, Does.Contain("IsDataConnection || pCertificate->MatchesEndpoint(HostAddress, HostPort)"));
