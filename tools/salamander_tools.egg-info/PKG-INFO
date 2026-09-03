@@ -1,0 +1,12 @@
+Metadata-Version: 2.4
+Name: salamander-tools
+Version: 0.1.0
+Summary: Python utilities for Salamander sources
+Requires-Python: >=3.13
+Requires-Dist: wordfreq>=3.1
+Requires-Dist: Unidecode>=1.3.8
+Requires-Dist: plotly>=5.22
+Requires-Dist: tree-sitter>=0.22
+Requires-Dist: tree-sitter-c>=0.22
+Requires-Dist: tree-sitter-cpp>=0.22
+Requires-Dist: msgpack>=1.2.1

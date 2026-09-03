@@ -1,0 +1,13 @@
+README.md
+pyproject.toml
+comments/__init__.py
+comments/code_guard.py
+comments/find_czech_words.py
+comments/translation_status.py
+comments/word_counter.py
+salamander_tools.egg-info/PKG-INFO
+salamander_tools.egg-info/SOURCES.txt
+salamander_tools.egg-info/dependency_links.txt
+salamander_tools.egg-info/entry_points.txt
+salamander_tools.egg-info/requires.txt
+salamander_tools.egg-info/top_level.txt

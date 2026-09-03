@@ -1,0 +1,5 @@
+[console_scripts]
+comment-code-guard = comments.code_guard:main
+comment-find-czech-words = comments.find_czech_words:main
+comment-translation-status = comments.translation_status:main
+comment-word-counter = comments.word_counter:main

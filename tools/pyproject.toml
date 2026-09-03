@@ -10,6 +10,8 @@ dependencies = [
     "tree-sitter>=0.22",
     "tree-sitter-c>=0.22",
     "tree-sitter-cpp>=0.22",
+    # Direct floor so wordfreq cannot pull msgpack<=1.2.0 (GHSA-6v7p-g79w-8964).
+    "msgpack>=1.2.1",
 ]
 
 [project.scripts]
