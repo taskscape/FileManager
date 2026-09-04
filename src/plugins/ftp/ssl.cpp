@@ -328,6 +328,13 @@ struct CSchannelConnection
     DWORD PendingWriteOffset;
     int PendingPlaintextLength;
     int LastError;
+
+    // Handshake output survives WSAEWOULDBLOCK so the next FD_WRITE can resume without blocking this socket thread.
+    BYTE* HandshakeWrite;
+    DWORD HandshakeWriteLength;
+    DWORD HandshakeWriteOffset;
+    SECURITY_STATUS HandshakeStatus;
+    bool HandshakeStarted;
 };
 
 static CredHandle SChannelCredentials;
@@ -606,6 +613,203 @@ static bool CompleteHandshake(CSchannelConnection* connection, LPCSTR target, DW
     return true;
 }
 
+static bool QueueHandshakeToken(CSchannelConnection* connection, SecBuffer* token, SECURITY_STATUS* securityError)
+{
+    bool queued = true;
+    if (token->pvBuffer != NULL && token->cbBuffer != 0)
+    {
+        // A new SChannel flight is generated only after the previous flight has drained.
+        if (connection->HandshakeWriteOffset < connection->HandshakeWriteLength)
+        {
+            *securityError = SEC_E_INTERNAL_ERROR;
+            queued = false;
+        }
+        else
+        {
+            BYTE* output = (BYTE*)realloc(connection->HandshakeWrite, token->cbBuffer);
+            if (output == NULL)
+            {
+                *securityError = SEC_E_INSUFFICIENT_MEMORY;
+                queued = false;
+            }
+            else
+            {
+                connection->HandshakeWrite = output;
+                memcpy(connection->HandshakeWrite, token->pvBuffer, token->cbBuffer);
+                connection->HandshakeWriteLength = token->cbBuffer;
+                connection->HandshakeWriteOffset = 0;
+            }
+        }
+    }
+    if (token->pvBuffer != NULL)
+        FreeContextBuffer(token->pvBuffer);
+    token->pvBuffer = NULL;
+    token->cbBuffer = 0;
+    return queued;
+}
+
+static CTlsHandshakeResult FlushHandshakeToken(CSchannelConnection* connection, DWORD* socketError)
+{
+    while (connection->HandshakeWriteOffset < connection->HandshakeWriteLength)
+    {
+        int sent = send(connection->Socket,
+                        (const char*)connection->HandshakeWrite + connection->HandshakeWriteOffset,
+                        (int)(connection->HandshakeWriteLength - connection->HandshakeWriteOffset), 0);
+        if (sent == SOCKET_ERROR)
+        {
+            DWORD error = WSAGetLastError();
+            if (error == WSAEWOULDBLOCK)
+                return thrPending;
+            *socketError = error;
+            return thrFailed;
+        }
+        if (sent == 0)
+        {
+            *socketError = WSAECONNRESET;
+            return thrFailed;
+        }
+        connection->HandshakeWriteOffset += sent;
+    }
+    connection->HandshakeWriteLength = 0;
+    connection->HandshakeWriteOffset = 0;
+    return thrCompleted;
+}
+
+static CTlsHandshakeResult ReceiveHandshakeToken(CSchannelConnection* connection, DWORD* socketError,
+                                                  SECURITY_STATUS* securityError)
+{
+    if (!EnsureBuffer(connection->Encrypted, connection->EncryptedCapacity,
+                      connection->EncryptedLength + 16384))
+    {
+        *securityError = SEC_E_INSUFFICIENT_MEMORY;
+        return thrFailed;
+    }
+    int received = recv(connection->Socket, (char*)connection->Encrypted + connection->EncryptedLength,
+                        (int)(connection->EncryptedCapacity - connection->EncryptedLength), 0);
+    if (received == SOCKET_ERROR)
+    {
+        DWORD error = WSAGetLastError();
+        if (error == WSAEWOULDBLOCK)
+            return thrPending;
+        *socketError = error;
+        return thrFailed;
+    }
+    if (received == 0)
+    {
+        *socketError = WSAECONNRESET;
+        return thrFailed;
+    }
+    connection->EncryptedLength += received;
+    return thrCompleted;
+}
+
+static CTlsHandshakeResult AdvanceHandshake(CSchannelConnection* connection, LPCSTR target, bool start,
+                                             DWORD* socketError, SECURITY_STATUS* securityError)
+{
+    const DWORD requestFlags = ISC_REQ_SEQUENCE_DETECT | ISC_REQ_REPLAY_DETECT | ISC_REQ_CONFIDENTIALITY |
+                               ISC_REQ_EXTENDED_ERROR | ISC_REQ_ALLOCATE_MEMORY | ISC_REQ_STREAM |
+                               ISC_REQ_MANUAL_CRED_VALIDATION;
+
+    if (start)
+    {
+        DWORD attributes = 0;
+        TimeStamp expiry;
+        SecBuffer output = {0, SECBUFFER_TOKEN, NULL};
+        SecBufferDesc outputDesc = {SECBUFFER_VERSION, 1, &output};
+        SECURITY_STATUS status = InitializeSecurityContextA(&SChannelCredentials, NULL, (SEC_CHAR*)target,
+                                                            requestFlags, 0, SECURITY_NATIVE_DREP, NULL, 0,
+                                                            &connection->Context, &outputDesc, &attributes, &expiry);
+        connection->ContextValid = status == SEC_I_CONTINUE_NEEDED || status == SEC_E_OK;
+        connection->HandshakeStarted = connection->ContextValid;
+        connection->HandshakeStatus = status;
+        if (!connection->ContextValid)
+        {
+            *securityError = status;
+            if (output.pvBuffer != NULL)
+                FreeContextBuffer(output.pvBuffer);
+            return thrFailed;
+        }
+        if (!QueueHandshakeToken(connection, &output, securityError))
+            return thrFailed;
+    }
+    else if (!connection->HandshakeStarted)
+    {
+        *securityError = SEC_E_INTERNAL_ERROR;
+        return thrFailed;
+    }
+
+    for (;;)
+    {
+        CTlsHandshakeResult flushResult = FlushHandshakeToken(connection, socketError);
+        if (flushResult != thrCompleted)
+            return flushResult;
+
+        if (connection->HandshakeStatus == SEC_E_OK)
+        {
+            if (QueryContextAttributes(&connection->Context, SECPKG_ATTR_STREAM_SIZES,
+                                       &connection->StreamSizes) != SEC_E_OK)
+            {
+                *securityError = SEC_E_INTERNAL_ERROR;
+                return thrFailed;
+            }
+            connection->LastError = SSL_ERROR_NONE;
+            return thrCompleted;
+        }
+        if (connection->HandshakeStatus != SEC_I_CONTINUE_NEEDED &&
+            connection->HandshakeStatus != SEC_E_INCOMPLETE_MESSAGE)
+        {
+            *securityError = connection->HandshakeStatus;
+            return thrFailed;
+        }
+
+        if (connection->HandshakeStatus == SEC_E_INCOMPLETE_MESSAGE || connection->EncryptedLength == 0)
+        {
+            CTlsHandshakeResult receiveResult = ReceiveHandshakeToken(connection, socketError, securityError);
+            if (receiveResult != thrCompleted)
+                return receiveResult;
+        }
+
+        SecBuffer inputBuffers[2] = {
+            {connection->EncryptedLength, SECBUFFER_TOKEN, connection->Encrypted},
+            {0, SECBUFFER_EMPTY, NULL}};
+        SecBufferDesc inputDesc = {SECBUFFER_VERSION, 2, inputBuffers};
+        SecBuffer output = {0, SECBUFFER_TOKEN, NULL};
+        SecBufferDesc outputDesc = {SECBUFFER_VERSION, 1, &output};
+        DWORD attributes = 0;
+        TimeStamp expiry;
+        SECURITY_STATUS status = InitializeSecurityContextA(&SChannelCredentials, &connection->Context,
+                                                            (SEC_CHAR*)target, requestFlags, 0,
+                                                            SECURITY_NATIVE_DREP, &inputDesc, 0, NULL,
+                                                            &outputDesc, &attributes, &expiry);
+        connection->HandshakeStatus = status;
+        if (status == SEC_E_INCOMPLETE_MESSAGE)
+        {
+            if (output.pvBuffer != NULL)
+                FreeContextBuffer(output.pvBuffer);
+            continue;
+        }
+        if (status != SEC_I_CONTINUE_NEEDED && status != SEC_E_OK)
+        {
+            *securityError = status;
+            if (output.pvBuffer != NULL)
+                FreeContextBuffer(output.pvBuffer);
+            return thrFailed;
+        }
+
+        // Preserve bytes beyond the final handshake record; they may already contain the file payload.
+        if (inputBuffers[1].BufferType == SECBUFFER_EXTRA)
+        {
+            memmove(connection->Encrypted, inputBuffers[1].pvBuffer, inputBuffers[1].cbBuffer);
+            connection->EncryptedLength = inputBuffers[1].cbBuffer;
+        }
+        else
+            connection->EncryptedLength = 0;
+
+        if (!QueueHandshakeToken(connection, &output, securityError))
+            return thrFailed;
+    }
+}
+
 static int FlushPendingWrite(CSchannelConnection* connection)
 {
     while (connection->PendingWriteOffset < connection->PendingWriteLength)
@@ -836,6 +1040,7 @@ void SSLFree(SSL* ssl)
     free(ssl->Encrypted);
     free(ssl->Decrypted);
     free(ssl->PendingWrite);
+    free(ssl->HandshakeWrite);
     free(ssl);
 }
 
@@ -894,86 +1099,30 @@ void SSLThreadLocalCleanup()
     // SChannel does not allocate per-thread state that callers must release.
 }
 
-BOOL CSocket::EncryptSocket(int logUID, int* sslErrorOccured, CCertificate** unverifiedCert,
-                             int* errorID, char* errorBuf, int errorBufLen, CSocket* conForReuse)
+static void ReportHandshakeFailure(int logUID, DWORD socketError, SECURITY_STATUS securityError,
+                                   int* errorID, char* errorBuf, int errorBufLen)
 {
+    char message[256];
+    if (socketError == WSAETIMEDOUT)
+        StringCchCopyNA(message, SizeOf(message), "TLS handshake deadline expired.", SizeOf(message));
+    else if (socketError != NO_ERROR)
+        StringCchCopyNA(message, SizeOf(message), SalamanderGeneral->GetErrorText(socketError), SizeOf(message));
+    else
+        SecurityStatusText(securityError, message, SizeOf(message));
     if (errorID)
-        *errorID = -1;
+        *errorID = IDS_SSL_ERR_CONNECT;
     if (errorBufLen > 0)
-        errorBuf[0] = 0;
-    if (unverifiedCert)
-        *unverifiedCert = NULL;
-    if (sslErrorOccured)
-        *sslErrorOccured = SSLConn ? SSLCONERR_NOERROR : SSLCONERR_DONOTRETRY;
-    if (SSLConn)
-        return TRUE;
-    if (!bSSLInited)
-        return FALSE;
+        _snprintf_s(errorBuf, errorBufLen, _TRUNCATE, LoadStr(IDS_SSL_ERR_CONNECT_ERR),
+                    (int)(socketError ? socketError : securityError), message);
+    Logs.LogMessage(logUID, "TLS ERROR: ", -1, TRUE);
+    Logs.LogMessage(logUID, message, -1, TRUE);
+    Logs.LogMessage(logUID, "\r\n", -1, TRUE);
+}
 
-    SSL* connection = (SSL*)calloc(1, sizeof(SSL));
-    if (!connection)
-    {
-        if (errorID)
-            *errorID = IDS_SSL_ERR_NEW;
-        return FALSE;
-    }
-    connection->Socket = Socket;
-    connection->LastError = SSL_ERROR_SSL;
-
-    if (HostAddress == NULL || HostAddress[0] == 0)
-    {
-        SSLFree(connection);
-        if (errorID)
-            *errorID = IDS_SSL_ERR_CONNECT;
-        return FALSE;
-    }
-
-    HWND window = SocketsThread->GetHiddenWindow();
-    WSAAsyncSelect(Socket, window, 0, 0);
-    u_long blocking = 0;
-    ioctlsocket(Socket, FIONBIO, &blocking);
-    // SChannel drives this legacy handshake through blocking send/recv calls;
-    // bound that narrow phase so a silent TLS peer cannot prevent shutdown.
-    DWORD tlsHandshakeTimeout = Config.GetServerRepliesTimeout() * 1000;
-    if (tlsHandshakeTimeout < 1000)
-        tlsHandshakeTimeout = 1000;
-    setsockopt(Socket, SOL_SOCKET, SO_RCVTIMEO, (const char*)&tlsHandshakeTimeout, sizeof(tlsHandshakeTimeout));
-    setsockopt(Socket, SOL_SOCKET, SO_SNDTIMEO, (const char*)&tlsHandshakeTimeout, sizeof(tlsHandshakeTimeout));
-    DWORD socketError = NO_ERROR;
-    SECURITY_STATUS securityError = SEC_E_OK;
-    bool connected = CompleteHandshake(connection, HostAddress, &socketError, &securityError);
-
-    DWORD noSocketDeadline = 0;
-    setsockopt(Socket, SOL_SOCKET, SO_RCVTIMEO, (const char*)&noSocketDeadline, sizeof(noSocketDeadline));
-    setsockopt(Socket, SOL_SOCKET, SO_SNDTIMEO, (const char*)&noSocketDeadline, sizeof(noSocketDeadline));
-    u_long nonBlocking = 1;
-    ioctlsocket(Socket, FIONBIO, &nonBlocking);
-    WSAAsyncSelect(Socket, window, Msg, FD_READ | FD_CLOSE | FD_WRITE);
-    if (!connected)
-    {
-        char message[256];
-        if (socketError == WSAETIMEDOUT)
-            StringCchCopyNA(message, SizeOf(message), "TLS handshake deadline expired.", SizeOf(message)); // counted bounded copy instead of lstrcpyn
-        else if (socketError != NO_ERROR)
-            StringCchCopyNA(message, SizeOf(message), SalamanderGeneral->GetErrorText(socketError), SizeOf(message)); // counted bounded copy instead of lstrcpyn
-        else
-            SecurityStatusText(securityError, message, SizeOf(message));
-        if (errorID)
-            *errorID = IDS_SSL_ERR_CONNECT;
-        if (errorBufLen > 0)
-            _snprintf_s(errorBuf, errorBufLen, _TRUNCATE, LoadStr(IDS_SSL_ERR_CONNECT_ERR), (int)(socketError ? socketError : securityError), message);
-        Logs.LogMessage(logUID, "TLS ERROR: ", -1, TRUE);
-        Logs.LogMessage(logUID, message, -1, TRUE);
-        Logs.LogMessage(logUID, "\r\n", -1, TRUE);
-        // A timed-out or failed handshake cannot become usable later; closing it
-        // also releases any pending socket operation before retry/error handling.
-        CloseSocket(NULL);
-        SSLFree(connection);
-        if (sslErrorOccured)
-            *sslErrorOccured = SSLCONERR_CANRETRY;
-        return FALSE;
-    }
-
+BOOL CSocket::FinishEncryptSocket(SSL* connection, int logUID, int* sslErrorOccured,
+                                  CCertificate** unverifiedCert, int* errorID, char* errorBuf,
+                                  int errorBufLen, CSocket* conForReuse)
+{
     PCCERT_CONTEXT peerCert = NULL;
     if (QueryContextAttributes(&connection->Context, SECPKG_ATTR_REMOTE_CERT_CONTEXT, &peerCert) != SEC_E_OK || peerCert == NULL)
     {
@@ -1064,6 +1213,169 @@ BOOL CSocket::EncryptSocket(int logUID, int* sslErrorOccured, CCertificate** unv
     if (sslErrorOccured)
         *sslErrorOccured = SSLCONERR_NOERROR;
     return TRUE;
+}
+
+BOOL CSocket::EncryptSocket(int logUID, int* sslErrorOccured, CCertificate** unverifiedCert,
+                             int* errorID, char* errorBuf, int errorBufLen, CSocket* conForReuse)
+{
+    if (errorID)
+        *errorID = -1;
+    if (errorBufLen > 0)
+        errorBuf[0] = 0;
+    if (unverifiedCert)
+        *unverifiedCert = NULL;
+    if (sslErrorOccured)
+        *sslErrorOccured = SSLConn ? SSLCONERR_NOERROR : SSLCONERR_DONOTRETRY;
+    if (SSLConn)
+        return TRUE;
+    if (!bSSLInited)
+        return FALSE;
+
+    SSL* connection = (SSL*)calloc(1, sizeof(SSL));
+    if (!connection)
+    {
+        if (errorID)
+            *errorID = IDS_SSL_ERR_NEW;
+        return FALSE;
+    }
+    connection->Socket = Socket;
+    connection->LastError = SSL_ERROR_SSL;
+
+    if (HostAddress == NULL || HostAddress[0] == 0)
+    {
+        SSLFree(connection);
+        if (errorID)
+            *errorID = IDS_SSL_ERR_CONNECT;
+        return FALSE;
+    }
+
+    HWND window = SocketsThread->GetHiddenWindow();
+    WSAAsyncSelect(Socket, window, 0, 0);
+    u_long blocking = 0;
+    ioctlsocket(Socket, FIONBIO, &blocking);
+    // SChannel drives this legacy handshake through blocking send/recv calls;
+    // bound that narrow phase so a silent TLS peer cannot prevent shutdown.
+    DWORD tlsHandshakeTimeout = Config.GetServerRepliesTimeout() * 1000;
+    if (tlsHandshakeTimeout < 1000)
+        tlsHandshakeTimeout = 1000;
+    setsockopt(Socket, SOL_SOCKET, SO_RCVTIMEO, (const char*)&tlsHandshakeTimeout, sizeof(tlsHandshakeTimeout));
+    setsockopt(Socket, SOL_SOCKET, SO_SNDTIMEO, (const char*)&tlsHandshakeTimeout, sizeof(tlsHandshakeTimeout));
+    DWORD socketError = NO_ERROR;
+    SECURITY_STATUS securityError = SEC_E_OK;
+    bool connected = CompleteHandshake(connection, HostAddress, &socketError, &securityError);
+
+    DWORD noSocketDeadline = 0;
+    setsockopt(Socket, SOL_SOCKET, SO_RCVTIMEO, (const char*)&noSocketDeadline, sizeof(noSocketDeadline));
+    setsockopt(Socket, SOL_SOCKET, SO_SNDTIMEO, (const char*)&noSocketDeadline, sizeof(noSocketDeadline));
+    u_long nonBlocking = 1;
+    ioctlsocket(Socket, FIONBIO, &nonBlocking);
+    WSAAsyncSelect(Socket, window, Msg, FD_READ | FD_CLOSE | FD_WRITE);
+    if (!connected)
+    {
+        ReportHandshakeFailure(logUID, socketError, securityError, errorID, errorBuf, errorBufLen);
+        // A timed-out or failed handshake cannot become usable later; closing it
+        // also releases any pending socket operation before retry/error handling.
+        CloseSocket(NULL);
+        SSLFree(connection);
+        if (sslErrorOccured)
+            *sslErrorOccured = SSLCONERR_CANRETRY;
+        return FALSE;
+    }
+    return FinishEncryptSocket(connection, logUID, sslErrorOccured, unverifiedCert, errorID,
+                               errorBuf, errorBufLen, conForReuse);
+}
+
+CTlsHandshakeResult CSocket::BeginAsyncEncryptSocket(int logUID, int* sslErrorOccured,
+                                                     CSocket* conForReuse)
+{
+    if (sslErrorOccured)
+        *sslErrorOccured = SSLConn ? SSLCONERR_NOERROR : SSLCONERR_DONOTRETRY;
+    if (SSLConn)
+        return thrCompleted;
+    if (SSLHandshakeConn)
+    {
+        if (sslErrorOccured)
+            *sslErrorOccured = SSLCONERR_NOERROR;
+        return thrPending;
+    }
+    if (!bSSLInited || HostAddress == NULL || HostAddress[0] == 0)
+        return thrFailed;
+
+    SSL* connection = (SSL*)calloc(1, sizeof(SSL));
+    if (!connection)
+        return thrFailed;
+    connection->Socket = Socket;
+    connection->LastError = SSL_ERROR_SSL;
+
+    DWORD socketError = NO_ERROR;
+    SECURITY_STATUS securityError = SEC_E_OK;
+    CTlsHandshakeResult result = AdvanceHandshake(connection, HostAddress, true,
+                                                  &socketError, &securityError);
+    if (result == thrFailed)
+    {
+        ReportHandshakeFailure(logUID, socketError, securityError, NULL, NULL, 0);
+        SSLFree(connection);
+        if (sslErrorOccured)
+            *sslErrorOccured = SSLCONERR_CANRETRY;
+        return thrFailed;
+    }
+    if (result == thrPending)
+    {
+        // Ownership stays on the socket until a readiness event completes or cancels the handshake.
+        SSLHandshakeConn = connection;
+        if (sslErrorOccured)
+            *sslErrorOccured = SSLCONERR_NOERROR;
+        return thrPending;
+    }
+
+    return FinishEncryptSocket(connection, logUID, sslErrorOccured, NULL, NULL, NULL, 0,
+                               conForReuse)
+               ? thrCompleted
+               : thrFailed;
+}
+
+CTlsHandshakeResult CSocket::ContinueAsyncEncryptSocket(int logUID, int* sslErrorOccured,
+                                                        CSocket* conForReuse)
+{
+    if (SSLConn)
+    {
+        if (sslErrorOccured)
+            *sslErrorOccured = SSLCONERR_NOERROR;
+        return thrCompleted;
+    }
+    if (SSLHandshakeConn == NULL)
+    {
+        if (sslErrorOccured)
+            *sslErrorOccured = SSLCONERR_DONOTRETRY;
+        return thrFailed;
+    }
+
+    DWORD socketError = NO_ERROR;
+    SECURITY_STATUS securityError = SEC_E_OK;
+    CTlsHandshakeResult result = AdvanceHandshake(SSLHandshakeConn, HostAddress, false,
+                                                  &socketError, &securityError);
+    if (result == thrPending)
+    {
+        if (sslErrorOccured)
+            *sslErrorOccured = SSLCONERR_NOERROR;
+        return thrPending;
+    }
+
+    SSL* connection = SSLHandshakeConn;
+    SSLHandshakeConn = NULL;
+    if (result == thrFailed)
+    {
+        ReportHandshakeFailure(logUID, socketError, securityError, NULL, NULL, 0);
+        SSLFree(connection);
+        if (sslErrorOccured)
+            *sslErrorOccured = SSLCONERR_CANRETRY;
+        return thrFailed;
+    }
+
+    return FinishEncryptSocket(connection, logUID, sslErrorOccured, NULL, NULL, NULL, 0,
+                               conForReuse)
+               ? thrCompleted
+               : thrFailed;
 }
 
 CCertificateErrDialog::CCertificateErrDialog(HWND hParent, const char* errorStr)

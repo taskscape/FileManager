@@ -24,6 +24,14 @@
 #define SSL_ERROR_SYSCALL 5
 #define SSL_ERROR_ZERO_RETURN 6
 
+// The data-socket handshake uses this tri-state so network readiness never has to be represented as an error.
+enum CTlsHandshakeResult
+{
+    thrFailed = -1,
+    thrPending = 0,
+    thrCompleted = 1,
+};
+
 // Scope is explicit so accepting an invalid chain never becomes durable without a second user choice.
 enum CCertificateExceptionScope
 {

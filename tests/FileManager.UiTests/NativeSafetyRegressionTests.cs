@@ -2853,6 +2853,31 @@ public sealed class NativeSafetyRegressionTests
     }
 
     [Test]
+    public void Ftp_data_channel_tls_handshake_is_readiness_driven()
+    {
+        var root = FindRepositoryRoot();
+        var tls = File.ReadAllText(Path.Combine(root, "src", "plugins", "ftp", "ssl.cpp"));
+        var sockets = File.ReadAllText(Path.Combine(root, "src", "plugins", "ftp", "sockets.h"));
+        var download = File.ReadAllText(Path.Combine(root, "src", "plugins", "ftp", "datacon1.cpp"));
+        var upload = File.ReadAllText(Path.Combine(root, "src", "plugins", "ftp", "datacon2.cpp"));
+
+        // Pin the nonblocking ownership and readiness gates so later FTPS fixes cannot reintroduce per-file socket-thread waits.
+        Assert.Multiple(() =>
+        {
+            Assert.That(sockets, Does.Contain("SSL* SSLHandshakeConn"));
+            Assert.That(sockets, Does.Contain("BeginAsyncEncryptSocket"));
+            Assert.That(sockets, Does.Contain("ContinueAsyncEncryptSocket"));
+            Assert.That(tls, Does.Contain("static CTlsHandshakeResult AdvanceHandshake"));
+            Assert.That(tls, Does.Contain("if (error == WSAEWOULDBLOCK)"));
+            Assert.That(download, Does.Contain("ContinueAsyncEncryptSocket(LogUID"));
+            Assert.That(upload, Does.Contain("ContinueAsyncEncryptSocket(LogUID"));
+            Assert.That(download, Does.Not.Contain("!EncryptSocket(LogUID"));
+            Assert.That(upload, Does.Not.Contain("!EncryptSocket(LogUID"));
+            Assert.That(upload, Does.Contain("!IsAsyncEncryptingSocket() &&"));
+        });
+    }
+
+    [Test]
     public void Bundled_7zip_uses_26_02_and_preserves_upgrade_compatibility_contract()
     {
         var root = FindRepositoryRoot();

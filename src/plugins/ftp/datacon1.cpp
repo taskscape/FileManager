@@ -591,7 +591,8 @@ void CDataConnectionBaseSocket::EncryptPassiveDataCon()
     int err;
     // A fast server can send 150 before the nonblocking passive connect completes; never start SChannel on that unconnected socket.
     if (UsePassiveMode && ReceivedConnected && EncryptConnection && SSLConn == NULL &&
-        !EncryptSocket(LogUID, &err, NULL, NULL, NULL, 0, SSLConForReuse))
+        !IsAsyncEncryptingSocket() &&
+        BeginAsyncEncryptSocket(LogUID, &err, SSLConForReuse) == thrFailed)
     {
         SSLErrorOccured = err;
         if (Socket != INVALID_SOCKET) // always true: the socket is connected
@@ -871,7 +872,8 @@ void CDataConnectionSocket::ConnectionAccepted(BOOL success, DWORD winError, BOO
     if (success && EncryptConnection)
     {
         int err;
-        if (!EncryptSocket(LogUID, &err, NULL, NULL, NULL, 0, SSLConForReuse))
+        // Active-mode data sockets use the same readiness-driven handshake as passive sockets.
+        if (BeginAsyncEncryptSocket(LogUID, &err, SSLConForReuse) == thrFailed)
         {
             SSLErrorOccured = err;
             if (Socket != INVALID_SOCKET) // always true: the socket is connected
@@ -914,8 +916,54 @@ void CDataConnectionSocket::ReceiveNetEvent(LPARAM lParam, int index)
 {
     SLOW_CALL_STACK_MESSAGE3("CDataConnectionSocket::ReceiveNetEvent(0x%IX, %d)", lParam, index);
     DWORD eventError = WSAGETSELECTERROR(lParam); // extract error code of event
+    int event = WSAGETSELECTEVENT(lParam);
     BOOL logLastErr = FALSE;
-    switch (WSAGETSELECTEVENT(lParam)) // extract event
+
+    if (event == FD_READ || event == FD_WRITE || event == FD_CLOSE)
+    {
+        BOOL handshakeWasPending = FALSE;
+        CTlsHandshakeResult handshakeResult = thrPending;
+        HANDLES(EnterCriticalSection(&SocketCritSect));
+        if (IsAsyncEncryptingSocket())
+        {
+            handshakeWasPending = TRUE;
+            if (eventError == NO_ERROR)
+            {
+                handshakeResult = ContinueAsyncEncryptSocket(LogUID, &SSLErrorOccured, SSLConForReuse);
+                LastActivityTime = CMonotonicClock::Now();
+                if (GlobalLastActivityTime != NULL)
+                    GlobalLastActivityTime->Set(LastActivityTime);
+            }
+            else
+            {
+                NetEventLastError = eventError;
+                SSLErrorOccured = SSLCONERR_CANRETRY;
+                handshakeResult = thrFailed;
+            }
+
+            if (handshakeResult == thrFailed)
+            {
+                // A failed handshake owns no transferable plaintext, so close it before notifying the worker.
+                CloseSocketEx(NULL);
+                DoPostMessageToWorker(WorkerMsgConnectionClosed);
+            }
+        }
+        HANDLES(LeaveCriticalSection(&SocketCritSect));
+
+        if (handshakeWasPending)
+        {
+            if (handshakeResult != thrCompleted)
+                return;
+            if (event == FD_WRITE)
+            {
+                // Completion can retain payload bytes read with the server's final TLS flight.
+                PostMessage(SocketsThread->GetHiddenWindow(), Msg, (WPARAM)Socket, FD_READ);
+                return;
+            }
+        }
+    }
+
+    switch (event) // extract event
     {
     case FD_CLOSE: // sometimes arrives before the last FD_READ, so we first try FD_READ and if it succeeds, post FD_CLOSE again (FD_READ may succeed again before it)
     case FD_READ:
@@ -933,6 +981,12 @@ void CDataConnectionSocket::ReceiveNetEvent(LPARAM lParam, int index)
                         JustConnected();
                     if (EncryptConnection && SSLConn == NULL)
                         EncryptPassiveDataCon();
+                    if (IsAsyncEncryptingSocket())
+                    {
+                        // The triggering readiness event belongs to TLS; file bytes must wait for handshake completion.
+                        HANDLES(LeaveCriticalSection(&SocketCritSect));
+                        return;
+                    }
                 }
 
                 if (WorkerPaused)

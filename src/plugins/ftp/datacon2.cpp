@@ -192,6 +192,9 @@ CKeepAliveDataConSocket::CKeepAliveDataConSocket(CControlConnectionSocket* paren
         pCertificate = certificate;
         pCertificate->AddRef();
     }
+    // Keep-alive data sockets also need the control endpoint for SNI and certificate pin matching.
+    if (EncryptConnection && ParentControlSocket != NULL && !CopyTlsTargetFrom(ParentControlSocket))
+        TRACE_E("CKeepAliveDataConSocket: control connection did not provide a TLS target for the encrypted data connection.");
 }
 
 CKeepAliveDataConSocket::~CKeepAliveDataConSocket()
@@ -389,8 +392,9 @@ void CKeepAliveDataConSocket::EncryptPassiveDataCon()
 {
     HANDLES(EnterCriticalSection(&SocketCritSect));
     int err;
-    if (UsePassiveMode && EncryptConnection &&
-        !EncryptSocket(LogUID, &err, NULL, NULL, NULL, 0, ParentControlSocket))
+    if (UsePassiveMode && ReceivedConnected && EncryptConnection && SSLConn == NULL &&
+        !IsAsyncEncryptingSocket() &&
+        BeginAsyncEncryptSocket(LogUID, &err, ParentControlSocket) == thrFailed)
     {
         SSLErrorOccured = err;
         if (Socket != INVALID_SOCKET) // always true: the socket is connected
@@ -441,7 +445,8 @@ void CKeepAliveDataConSocket::ConnectionAccepted(BOOL success, DWORD winError, B
     if (success && EncryptConnection)
     {
         int err;
-        if (!EncryptSocket(LogUID, &err, NULL, NULL, NULL, 0, ParentControlSocket))
+        // Active keep-alive transfers must not monopolize the socket thread while the peer responds.
+        if (BeginAsyncEncryptSocket(LogUID, &err, ParentControlSocket) == thrFailed)
         {
             SSLErrorOccured = err;
             if (Socket != INVALID_SOCKET) // always true: the socket is connected
@@ -469,8 +474,47 @@ void CKeepAliveDataConSocket::ReceiveNetEvent(LPARAM lParam, int index)
 {
     CALL_STACK_MESSAGE3("CKeepAliveDataConSocket::ReceiveNetEvent(0x%IX, %d)", lParam, index);
     DWORD eventError = WSAGETSELECTERROR(lParam); // extract error code of event
+    int event = WSAGETSELECTEVENT(lParam);
     BOOL logLastErr = FALSE;
-    switch (WSAGETSELECTEVENT(lParam)) // extract event
+
+    if (event == FD_READ || event == FD_WRITE || event == FD_CLOSE)
+    {
+        BOOL handshakeWasPending = FALSE;
+        CTlsHandshakeResult handshakeResult = thrPending;
+        HANDLES(EnterCriticalSection(&SocketCritSect));
+        if (IsAsyncEncryptingSocket())
+        {
+            handshakeWasPending = TRUE;
+            if (eventError == NO_ERROR)
+            {
+                handshakeResult = ContinueAsyncEncryptSocket(LogUID, &SSLErrorOccured, ParentControlSocket);
+                LastActivityTime = CMonotonicClock::Now();
+            }
+            else
+            {
+                NetEventLastError = eventError;
+                SSLErrorOccured = SSLCONERR_CANRETRY;
+                handshakeResult = thrFailed;
+            }
+            if (handshakeResult == thrFailed)
+                CloseSocketEx(NULL);
+        }
+        HANDLES(LeaveCriticalSection(&SocketCritSect));
+
+        if (handshakeWasPending)
+        {
+            if (handshakeResult != thrCompleted)
+                return;
+            if (event == FD_WRITE)
+            {
+                // A final server flight may already include keep-alive payload records.
+                PostMessage(SocketsThread->GetHiddenWindow(), Msg, (WPARAM)Socket, FD_READ);
+                return;
+            }
+        }
+    }
+
+    switch (event) // extract event
     {
     case FD_CLOSE: // sometimes arrives before the final FD_READ, so try FD_READ first and if it succeeds post FD_CLOSE again (another FD_READ may still succeed before it)
     case FD_READ:
@@ -485,6 +529,14 @@ void CKeepAliveDataConSocket::ReceiveNetEvent(LPARAM lParam, int index)
                 {
                     if (!ReceivedConnected)
                         JustConnected();
+                    if (EncryptConnection && SSLConn == NULL)
+                        EncryptPassiveDataCon();
+                    if (IsAsyncEncryptingSocket())
+                    {
+                        // Do not interpret a TLS record as keep-alive response data.
+                        HANDLES(LeaveCriticalSection(&SocketCritSect));
+                        return;
+                    }
                 }
 
                 if (Socket != INVALID_SOCKET) // the socket is connected
@@ -578,6 +630,8 @@ void CKeepAliveDataConSocket::ReceiveNetEvent(LPARAM lParam, int index)
         if (eventError == NO_ERROR)
         {
             JustConnected();
+            if (EncryptConnection && SSLConn == NULL)
+                EncryptPassiveDataCon();
             LastActivityTime = CMonotonicClock::Now(); // the connect succeeded
         }
         else
@@ -1109,8 +1163,57 @@ void CUploadDataConnectionSocket::ReceiveNetEvent(LPARAM lParam, int index)
 {
     CALL_STACK_MESSAGE3("CUploadDataConnectionSocket::ReceiveNetEvent(0x%IX, %d)", lParam, index);
     DWORD eventError = WSAGETSELECTERROR(lParam); // extract error code of event
+    int event = WSAGETSELECTEVENT(lParam);
     BOOL logLastErr = FALSE;
-    switch (WSAGETSELECTEVENT(lParam)) // extract event
+
+    if (event == FD_READ || event == FD_WRITE || event == FD_CLOSE)
+    {
+        BOOL handshakeWasPending = FALSE;
+        CTlsHandshakeResult handshakeResult = thrPending;
+        HANDLES(EnterCriticalSection(&SocketCritSect));
+        if (IsAsyncEncryptingSocket())
+        {
+            handshakeWasPending = TRUE;
+            if (eventError == NO_ERROR)
+            {
+                handshakeResult = ContinueAsyncEncryptSocket(LogUID, &SSLErrorOccured, SSLConForReuse);
+                LastActivityTime = CMonotonicClock::Now();
+                if (GlobalLastActivityTime != NULL)
+                    GlobalLastActivityTime->Set(LastActivityTime);
+            }
+            else
+            {
+                NetEventLastError = eventError;
+                SSLErrorOccured = SSLCONERR_CANRETRY;
+                handshakeResult = thrFailed;
+            }
+
+            if (handshakeResult == thrFailed)
+            {
+                // Buffered file bytes remain owned locally until TLS is ready, so failure can discard them safely.
+                CloseSocketEx(NULL);
+                FreeBufferedData();
+                DoPostMessageToWorker(WorkerMsgConnectionClosed);
+            }
+            else if (handshakeResult == thrPending)
+                WaitingForWriteEvent = TRUE;
+        }
+        HANDLES(LeaveCriticalSection(&SocketCritSect));
+
+        if (handshakeWasPending)
+        {
+            if (handshakeResult != thrCompleted)
+                return;
+            if (event != FD_CLOSE)
+            {
+                // Resume the ordinary upload path only after SChannel has authenticated the data socket.
+                PostMessage(SocketsThread->GetHiddenWindow(), Msg, (WPARAM)Socket, FD_WRITE);
+                return;
+            }
+        }
+    }
+
+    switch (event) // extract event
     {
     case FD_WRITE:
     {
@@ -1144,7 +1247,9 @@ void CUploadDataConnectionSocket::ReceiveNetEvent(LPARAM lParam, int index)
                             if (EncryptConnection)
                             {
                                 int err;
-                                if (!EncryptSocket(LogUID, &err, NULL, NULL, NULL, 0, SSLConForReuse))
+                                CTlsHandshakeResult handshakeResult =
+                                    BeginAsyncEncryptSocket(LogUID, &err, SSLConForReuse);
+                                if (handshakeResult == thrFailed)
                                 {
                                     errorOccured = TRUE;
                                     SSLErrorOccured = err;
@@ -1153,6 +1258,11 @@ void CUploadDataConnectionSocket::ReceiveNetEvent(LPARAM lParam, int index)
                                     // because we are already inside CSocketsThread::CritSect, this call is
                                     // also possible from CSocket::SocketCritSect (no risk of deadlock)
                                     DoPostMessageToWorker(WorkerMsgConnectionClosed);
+                                }
+                                else if (handshakeResult == thrPending)
+                                {
+                                    // Handshake readiness events now own FD_WRITE until completion.
+                                    WaitingForWriteEvent = TRUE;
                                 }
                             }
 
@@ -1170,7 +1280,8 @@ void CUploadDataConnectionSocket::ReceiveNetEvent(LPARAM lParam, int index)
                             DebugLogPacketSizeAndWriteSize(0, TRUE);
 #endif // DEBUGLOGPACKETSIZEANDWRITESIZE
                         }
-                        if (!errorOccured && BytesToWriteCount > BytesToWriteOffset) // we have data to send from the BytesToWrite buffer
+                        if (!errorOccured && !IsAsyncEncryptingSocket() &&
+                            BytesToWriteCount > BytesToWriteOffset) // we have data to send from the BytesToWrite buffer
                         {
                             while (1) // loop needed because of send (it does not post FD_WRITE when sentLen < bytesToWrite; it posts FD_WRITE only on a "would-block" error)
                             {
@@ -1298,7 +1409,8 @@ void CUploadDataConnectionSocket::ReceiveNetEvent(LPARAM lParam, int index)
                                 }
                             }
                         }
-                        if (BytesToWriteCount <= BytesToWriteOffset && EndOfFileReached)
+                        if (!IsAsyncEncryptingSocket() &&
+                            BytesToWriteCount <= BytesToWriteOffset && EndOfFileReached)
                         { // nothing left to send and we are at EOF => transfer is complete
                             // because we are already inside CSocketsThread::CritSect, this call is
                             // also possible from CSocket::SocketCritSect (no risk of deadlock)

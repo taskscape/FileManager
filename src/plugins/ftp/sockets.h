@@ -133,6 +133,7 @@ protected:
     int Msg;                    // message number used to receive events for this object (-1 == the object is not yet connected)
     SOCKET Socket;              // encapsulated Windows Sockets socket; if INVALID_SOCKET, the socket is not open
     SSL* SSLConn;               // SSL connection, use instead of Socket if non-NULL
+    SSL* SSLHandshakeConn;      // incomplete nonblocking data-channel handshake, never exposed to transfer reads/writes
     int ReuseSSLSession;        // reuse the SSL session of this control connection for all its data connections: 0 = try, 1 = yes, 2 = no
     BOOL ReuseSSLSessionFailed; // TRUE = reusing the SSL session for the last data connection opened failed: if we cannot do without it, we have to reconnect this control connection
     CCertificate* pCertificate; // non-NULL on FTPS connections
@@ -306,6 +307,19 @@ public:
     // and it is used from the control connection for all its data connections)
     BOOL EncryptSocket(int logUID, int* sslErrorOccured, CCertificate** unverifiedCert,
                        int* errorID, char* errorBuf, int errorBufLen, CSocket* conForReuse);
+
+    // Data channels advance SChannel only when Winsock reports readiness, preserving the single socket thread for other connections.
+    CTlsHandshakeResult BeginAsyncEncryptSocket(int logUID, int* sslErrorOccured, CSocket* conForReuse);
+    CTlsHandshakeResult ContinueAsyncEncryptSocket(int logUID, int* sslErrorOccured, CSocket* conForReuse);
+    BOOL IsAsyncEncryptingSocket() { return SSLHandshakeConn != NULL; }
+
+protected:
+    // Certificate finalization is shared by blocking control-channel and asynchronous data-channel handshakes.
+    BOOL FinishEncryptSocket(SSL* connection, int logUID, int* sslErrorOccured,
+                             CCertificate** unverifiedCert, int* errorID, char* errorBuf,
+                             int errorBufLen, CSocket* conForReuse);
+
+public:
 
     // connects to a SOCKS 4/4A/5 or HTTP 1.1 (the proxy type is in 'proxyType') proxy server
     // 'proxyIP' on port 'proxyPort' and opens a port for "listen" on it; the IP+port where it

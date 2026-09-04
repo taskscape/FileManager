@@ -133,6 +133,7 @@ CSocket::CSocket()
     Msg = -1;
     Socket = INVALID_SOCKET;
     SSLConn = NULL;
+    SSLHandshakeConn = NULL;
     ReuseSSLSession = 0 /* try */;
     ReuseSSLSessionFailed = FALSE;
     pCertificate = NULL;
@@ -160,6 +161,8 @@ CSocket::~CSocket()
         TRACE_E("CSocket::~CSocket(): Associated Windows socket object was not closed!");
     if (SSLConn != NULL)
         TRACE_E("CSocket::~CSocket(): Associated SSL connection was not closed!");
+    if (SSLHandshakeConn != NULL)
+        TRACE_E("CSocket::~CSocket(): Associated asynchronous SSL handshake was not closed!");
 #ifdef _DEBUG
     if (!InDeleteSocket)
         TRACE_E("CSocket::~CSocket(): Incorrect use of operator delete, use DeleteSocket() instead.");
@@ -222,6 +225,12 @@ BOOL CSocket::Shutdown(DWORD* error)
             SSLFree(SSLConn);
             SSLConn = NULL;
         }
+        if (SSLHandshakeConn)
+        {
+            // An incomplete context cannot send close_notify; releasing it is sufficient during cancellation.
+            SSLFree(SSLHandshakeConn);
+            SSLHandshakeConn = NULL;
+        }
         if (shutdown(Socket, SD_SEND) != SOCKET_ERROR)
         {
             ret = TRUE; // success
@@ -257,6 +266,12 @@ BOOL CSocket::CloseSocket(DWORD* error)
             int err = SSLShutdown(SSLConn);
             SSLFree(SSLConn);
             SSLConn = NULL;
+        }
+        if (SSLHandshakeConn)
+        {
+            // Hard close must also discard handshake tokens retained across socket events.
+            SSLFree(SSLHandshakeConn);
+            SSLHandshakeConn = NULL;
         }
         if (closesocket(Socket) != SOCKET_ERROR)
         {
@@ -2419,6 +2434,10 @@ void CSocket::SwapSockets(CSocket* sock)
     SSL* swapSSLConn = SSLConn;
     SSLConn = sock->SSLConn;
     sock->SSLConn = swapSSLConn;
+    // A pending context is tied to the same underlying socket and must move with it during handoff.
+    SSL* swapSSLHandshakeConn = SSLHandshakeConn;
+    SSLHandshakeConn = sock->SSLHandshakeConn;
+    sock->SSLHandshakeConn = swapSSLHandshakeConn;
     int swapReuseSSLSession = ReuseSSLSession;
     ReuseSSLSession = sock->ReuseSSLSession;
     sock->ReuseSSLSession = swapReuseSSLSession;
