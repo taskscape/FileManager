@@ -1,0 +1,6 @@
+<!-- Fluent Color Essentials: A broad disc ring replaces reflective bitmap detail at every toolbar size. -->
+<svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+<circle cx="8" cy="8" r="6" fill="#F3F2F1" stroke="#616161" stroke-width="1.5"/>
+<path d="M8 3.5A4.5 4.5 0 0 1 12.5 8M3.5 8A4.5 4.5 0 0 0 8 12.5" stroke="#0F6CBD" stroke-width="1.5" stroke-linecap="round"/>
+<circle cx="8" cy="8" r="1.5" fill="white" stroke="#616161"/>
+</svg>

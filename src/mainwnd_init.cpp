@@ -3293,6 +3293,24 @@ void CMainWindow::OnColorsChanged(BOOL reloadUMIcons)
             SendMessage(HTopRebar, RB_SETBANDINFO, index, (LPARAM)&rbbi);
         }
     }
+    // Drive-bar bands must grow and shrink with the same size preference as the command toolbar.
+    CDriveBar* sizedDriveBars[] = {DriveBar, DriveBar2};
+    const int driveBandIDs[] = {BANDID_DRIVEBAR, BANDID_DRIVEBAR2};
+    for (int i = 0; HTopRebar != NULL && i < _countof(sizedDriveBars); i++)
+    {
+        if (sizedDriveBars[i] == NULL || sizedDriveBars[i]->HWindow == NULL)
+            continue;
+        int index = (int)SendMessage(HTopRebar, RB_IDTOINDEX, driveBandIDs[i], 0);
+        if (index != -1)
+        {
+            REBARBANDINFO rbbi = {};
+            rbbi.cbSize = sizeof(rbbi);
+            rbbi.fMask = RBBIM_CHILDSIZE;
+            rbbi.cxMinChild = 10;
+            rbbi.cyMinChild = sizedDriveBars[i]->GetNeededHeight();
+            SendMessage(HTopRebar, RB_SETBANDINFO, index, (LPARAM)&rbbi);
+        }
+    }
     if (HWindow != NULL)
         LayoutWindows();
 }

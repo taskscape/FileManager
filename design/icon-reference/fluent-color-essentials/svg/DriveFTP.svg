@@ -1,0 +1,9 @@
+<!-- Reference master: 64 px inspection size with the production 16 px design grid preserved. -->
+<!-- Fluent Color Essentials: A globe and transfer arrow identify FTP without unreadable miniature text. -->
+<svg width="64" height="64" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+<circle cx="7" cy="7" r="5.25" fill="#DDEBF7" stroke="#0F6CBD" stroke-width="1.5"/>
+<ellipse cx="7" cy="7" rx="2.25" ry="5" stroke="#0F6CBD"/>
+<path d="M2 7H12" stroke="#0F6CBD"/>
+<path d="M7 12H13.5M11.5 10L13.5 12L11.5 14" stroke="white" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M7 12H13.5M11.5 10L13.5 12L11.5 14" stroke="#0F6CBD" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

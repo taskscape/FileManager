@@ -7,6 +7,9 @@ struct NSVGrasterizer;
 struct NSVGimage;
 void RenderSVGImage(NSVGrasterizer* rast, HDC hDC, int x, int y, const char* svgName, int iconSize, COLORREF bkColor, BOOL enabled);
 
+// Rasterize at the destination size with alpha intact; the caller owns the returned icon.
+HICON LoadToolbarSVGIcon(const char* svgName, int iconSize);
+
 // Returns SysColor in the format for the SVG library (BGR instead of Win32 RGB).
 DWORD GetSVGSysColor(int index);
 

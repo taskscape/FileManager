@@ -28,6 +28,12 @@ $mappedNames = [regex]::Matches(
     '(?m)^\s*(?:/\*.*?\*/\s*)?\{[^\r\n]*IDX_TB_[^\r\n]*"([A-Za-z0-9]+)"\s*\},?\s*$') |
     ForEach-Object { $_.Groups[1].Value }
 $mappedNames += 'Focus', 'Stop'
+# Drive-bar mappings include built-in locations and stable bundled plug-in module names.
+$driveDefinitions = [System.IO.File]::ReadAllText((Join-Path $repoRoot 'src\drivelst.cpp'))
+$driveMappings = [regex]::Match($driveDefinitions, '(?s)static const char\* GetDriveBarSVGName\(.*?\n}\r?\n').Value
+if (-not $driveMappings) { $errors.Add('Drive-bar SVG mapping was not found.') }
+$mappedNames += [regex]::Matches($driveMappings, '"([A-Za-z0-9]+)"') |
+    ForEach-Object { $_.Groups[1].Value }
 $mappedNames = $mappedNames | Sort-Object -Unique
 
 foreach ($name in $mappedNames)

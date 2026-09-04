@@ -1,0 +1,6 @@
+<!-- Fluent Color Essentials: A red break distinguishes an unavailable network drive independently of hover state. -->
+<svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+<path d="M3 2.5H13L14 6V8.5H2V6L3 2.5Z" fill="#F3F2F1" stroke="#616161" stroke-width="1.5" stroke-linejoin="round"/>
+<path d="M2.5 6H13.5" stroke="#616161"/>
+<path d="M2.5 12H5M11 12H13.5M6.5 10.5L9.5 13.5M9.5 10.5L6.5 13.5" stroke="#C50F1F" stroke-width="1.5" stroke-linecap="round"/>
+</svg>

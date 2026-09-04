@@ -10,7 +10,6 @@ const svgDirectory = path.join(referenceRoot, 'svg');
 const catalogPath = path.join(referenceRoot, 'fluent-color-essentials-icon-catalog.png');
 
 const catalogWidth = 3840;
-const catalogHeight = 3440;
 const columns = 7;
 const cellWidth = 520;
 const cellHeight = 240;
@@ -38,6 +37,9 @@ async function main() {
 
     if (iconNames.length === 0)
         throw new Error('No runtime toolbar SVGs were found.');
+
+    // Grow the catalog with the drive-bar family so the final rows cannot be cropped.
+    const catalogHeight = headerHeight + Math.ceil(iconNames.length / columns) * cellHeight + 80;
 
     // This directory is wholly generated, so clearing it prevents removed runtime icons from lingering in the archive.
     fs.rmSync(svgDirectory, { recursive: true, force: true });

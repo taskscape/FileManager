@@ -115,7 +115,8 @@ int CDriveBar::GetNeededHeight()
     CALL_STACK_MESSAGE_NONE
     // i v pripade, ze nedrzime zadnou ikonu budeem vracet spravnou vysku
     int height = CToolBar::GetNeededHeight();
-    int iconSize = GetIconSizeForSystemDPI(ICONSIZE_16);
+    // Empty and populated drive bars must reserve the same configurable icon height.
+    int iconSize = GetToolbarIconSizeForSystemDPI();
     int minH = 3 + iconSize + 3;
     if (height < minH)
         height = minH;

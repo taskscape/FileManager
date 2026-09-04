@@ -1,0 +1,8 @@
+<!-- Reference master: 64 px inspection size with the production 16 px design grid preserved. -->
+<!-- Fluent Color Essentials: The USB connector distinguishes removable storage without tiny lettering. -->
+<svg width="64" height="64" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+<path d="M5.5 2H10.5V6H5.5Z" fill="white" stroke="#616161"/>
+<path d="M7 3V4.5M9 3V4.5" stroke="#616161"/>
+<rect x="4.5" y="6" width="7" height="8" rx="1.5" fill="#DDEBF7" stroke="#0F6CBD" stroke-width="1.5"/>
+<path d="M7 11.5H9" stroke="#0F6CBD" stroke-width="1.5" stroke-linecap="round"/>
+</svg>

@@ -1,0 +1,8 @@
+<!-- Reference master: 64 px inspection size with the production 16 px design grid preserved. -->
+<!-- Fluent Color Essentials: A simple drive silhouette stays legible beside the drive letter at the smallest size. -->
+<svg width="64" height="64" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+<path d="M3.5 4.5H12.5L14 9V12.5H2V9L3.5 4.5Z" fill="#F3F2F1" stroke="#616161" stroke-width="1.5" stroke-linejoin="round"/>
+<path d="M2.5 9H13.5" stroke="#616161"/>
+<path d="M4.5 11H7.5" stroke="#0F6CBD" stroke-width="1.5" stroke-linecap="round"/>
+<circle cx="11.5" cy="11" r=".75" fill="#107C10"/>
+</svg>

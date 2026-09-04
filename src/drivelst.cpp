@@ -25,6 +25,7 @@
 #include "shellib.h"
 #include "toolbar.h"
 #include "shiconov.h"
+#include "svg.h" // Share the command toolbar's vector assets without changing plug-in icon ownership.
 
 CNBWNetAC3Thread NBWNetAC3Thread;
 
@@ -2601,12 +2602,53 @@ BOOL IncludeDriveInDriveBar(CDriveTypeEnum dt)
     return FALSE; // we don't want fs, ...
 }
 
+// Match stable plug-in module names, never translated captions; unknown plug-ins retain their own artwork.
+static const char* GetDriveBarSVGName(const CDriveData& item)
+{
+    switch (item.DriveType)
+    {
+    case drvtFixed: return "DriveFixed";
+    case drvtRemovable: return "DriveRemovable";
+    case drvtRemote: return item.Accessible ? "DriveRemote" : "DriveDisconnected";
+    case drvtCDROM: return "DriveOptical";
+    case drvtRAMDisk: return "DriveMemory";
+    case drvtMyDocuments: return "OpenDocuments";
+    case drvtGoogleDrive: return "DriveGoogle";
+    case drvtDropbox: return "DriveDropbox";
+    case drvtOneDrive:
+    case drvtOneDriveBus:
+    case drvtOneDriveMenu: return "DriveCloud";
+    case drvtNeighborhood: return "OpenNetwork";
+    case drvtPluginCmd:
+        if (item.DLLName != NULL)
+        {
+            const char* module = item.DLLName;
+            for (const char* p = module; *p != 0; p++)
+                if (*p == '\\' || *p == '/')
+                    module = p + 1;
+            const struct { const char* Module; const char* SVG; } icons[] = {
+                {"ftp.spl", "DriveFTP"}, {"winscp.spl", "DriveSFTP"},
+                {"folders.spl", "OpenDesktop"}, {"nethood.spl", "OpenNetwork"},
+                {"portables.spl", "DrivePortable"}, {"wmobile.spl", "DriveMobile"},
+                {"regedt.spl", "DriveRegistry"}, {"undelete.spl", "DriveUndelete"}};
+            for (int i = 0; i < _countof(icons); i++)
+                if (StrICmp(module, icons[i].Module) == 0)
+                    return icons[i].SVG;
+        }
+        break;
+    }
+    return NULL;
+}
+
 BOOL CDrivesList::FillDriveBar(CDriveBar* driveBar, BOOL bar2)
 {
     driveBar->DestroyImageLists();
-    int iconSize = GetIconSizeForSystemDPI(ICONSIZE_16);
-    driveBar->HDrivesIcons = ImageList_Create(iconSize, iconSize, GetImageListColorFlags() | ILC_MASK, 0, 1);
-    driveBar->HDrivesIconsGray = ImageList_Create(iconSize, iconSize, GetImageListColorFlags() | ILC_MASK, 0, 1);
+    // Render both toolbar rows at the configured logical size and current system DPI, preserving alpha.
+    int iconSize = GetToolbarIconSizeForSystemDPI();
+    driveBar->HDrivesIcons = ImageList_Create(iconSize, iconSize, ILC_COLOR32 | ILC_MASK, 0, 1);
+    driveBar->HDrivesIconsGray = ImageList_Create(iconSize, iconSize, ILC_COLOR32 | ILC_MASK, 0, 1);
+    if (driveBar->HDrivesIcons == NULL || driveBar->HDrivesIconsGray == NULL)
+        return FALSE;
 
     BOOL insertSeparator = FALSE;
     int imageIndex = 0;
@@ -2644,8 +2686,11 @@ BOOL CDrivesList::FillDriveBar(CDriveBar* driveBar, BOOL bar2)
             buff[1] = 0;
             tii.Text = buff;
         }
-        ImageList_AddIcon(driveBar->HDrivesIcons, item->HIcon);
-        ImageList_AddIcon(driveBar->HDrivesIconsGray, item->HGrayIcon == NULL ? item->HIcon : item->HGrayIcon);
+        // Full-color vectors match the first row in both idle and hover states; missing assets fall back safely.
+        wil::unique_hicon vectorIcon(LoadToolbarSVGIcon(GetDriveBarSVGName(*item), iconSize));
+        ImageList_AddIcon(driveBar->HDrivesIcons, vectorIcon ? vectorIcon.get() : item->HIcon);
+        ImageList_AddIcon(driveBar->HDrivesIconsGray, vectorIcon ? vectorIcon.get() :
+                         (item->HGrayIcon == NULL ? item->HIcon : item->HGrayIcon));
         tii.ImageIndex = imageIndex++;
         tii.HOverlay = NULL;
         if (item->Shared)
@@ -2656,6 +2701,8 @@ BOOL CDrivesList::FillDriveBar(CDriveBar* driveBar, BOOL bar2)
 
     driveBar->SetImageList(driveBar->HDrivesIconsGray);
     driveBar->SetHotImageList(driveBar->HDrivesIcons);
+    // Match the first row's proportional breathing room as the glyphs grow.
+    driveBar->ApplyConfiguredIconSpacing();
 
     return TRUE;
 }

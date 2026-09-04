@@ -1,0 +1,8 @@
+<!-- Reference master: 64 px inspection size with the production 16 px design grid preserved. -->
+<!-- Fluent Color Essentials: The recovery arrow distinguishes Undelete from the ordinary recycle-bin command. -->
+<svg width="64" height="64" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+<path d="M3 4H12L11 13.5H4L3 4Z" fill="white" stroke="#616161" stroke-width="1.5" stroke-linejoin="round"/>
+<path d="M4.5 4V2.5H10.5V4M2 4H13" stroke="#616161" stroke-width="1.5" stroke-linecap="round"/>
+<path d="M13.5 12C14.5 8 10 6.5 7.5 9M7.5 6.5V9.5H10.5" stroke="white" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M13.5 12C14.5 8 10 6.5 7.5 9M7.5 6.5V9.5H10.5" stroke="#0F6CBD" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

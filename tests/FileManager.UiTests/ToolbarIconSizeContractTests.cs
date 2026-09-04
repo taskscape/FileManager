@@ -140,7 +140,8 @@ public sealed class ToolbarIconSizeContractTests
 
         // The archival set must remain a complete, scalable mirror rather than a hand-picked presentation subset.
         Assert.That(referenceNames, Is.EqualTo(runtimeNames));
-        Assert.That(referenceNames, Has.Length.EqualTo(91));
+        // Preserve the original family while allowing complete drive-bar additions.
+        Assert.That(referenceNames.Length, Is.GreaterThanOrEqualTo(91));
         foreach (var name in referenceNames)
         {
             var svg = File.ReadAllText(Path.Combine(referenceSvgDirectory, name!));
@@ -154,7 +155,8 @@ public sealed class ToolbarIconSizeContractTests
         Assert.Multiple(() =>
         {
             Assert.That(width, Is.EqualTo(3840));
-            Assert.That(height, Is.EqualTo(3440));
+            // Every row needs its full card height plus the catalog header and footer.
+            Assert.That(height, Is.EqualTo(240 + (int)Math.Ceiling(runtimeNames.Length / 7.0) * 240 + 80));
         });
     }
 

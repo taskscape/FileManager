@@ -4,6 +4,7 @@
 #include "precomp.h"
 
 #include "svg.h"
+#include <strsafe.h> // Bound SVG lookup paths shared by both toolbar rows.
 
 #define NANOSVG_IMPLEMENTATION
 #include "nanosvg\nanosvg.h"
@@ -88,99 +89,149 @@ char* ReadSVGFile(const char* fileName)
     return buff;
 }
 
-// draws icons for which we have SVG representation
-void RenderSVGImage(NSVGrasterizer* rast, HDC hDC, int x, int y, const char* svgName, int iconSize, COLORREF bkColor, BOOL enabled)
+// Both toolbar rows must resolve the same deployed assets and development fallbacks.
+static char* ReadToolbarSVG(const char* svgName)
 {
     char svgFile[2 * MAX_PATH];
-    GetModuleFileName(NULL, svgFile, _countof(svgFile));
+    DWORD length = GetModuleFileName(NULL, svgFile, _countof(svgFile));
+    if (length == 0 || length >= _countof(svgFile))
+        return NULL;
     char* s = strrchr(svgFile, '\\');
-    if (s != NULL)
+    if (s == NULL)
+        return NULL;
+    *s = 0;
+    const char* directories[] = {"toolbars", "..\\src\\res\\toolbars", "..\\..\\src\\res\\toolbars"};
+    for (int i = 0; i < _countof(directories); i++)
     {
-        *s = 0; // terminate path at directory
-        
-        // 1. Try Instalator/toolbars (where executable usually is)
         char path[2 * MAX_PATH];
-        sprintf(path, "%s\\toolbars\\%s.svg", svgFile, svgName);
-        
+        if (FAILED(StringCchPrintfA(path, _countof(path), "%s\\%s\\%s.svg", svgFile, directories[i], svgName)))
+            continue;
         char* svg = ReadSVGFile(path);
-        
-        // 2. Try src/res/toolbars (relative to project root if running from Instalator)
-        if (svg == NULL)
-        {
-             // If we are in "Instalator", go up one level then to src/res/toolbars
-             sprintf(path, "%s\\..\\src\\res\\toolbars\\%s.svg", svgFile, svgName);
-             svg = ReadSVGFile(path);
-        }
-        
-        // 3. Try src/res/toolbars (relative to build output e.g. x64/Debug)
-        if (svg == NULL)
-        {
-             // Go up two levels (x64\Debug -> root) then to src/res/toolbars
-             sprintf(path, "%s\\..\\..\\src\\res\\toolbars\\%s.svg", svgFile, svgName);
-             svg = ReadSVGFile(path);
-        }
-
         if (svg != NULL)
+            return svg;
+    }
+    return NULL;
+}
+
+// Native-size alpha icons avoid stretching plug-in bitmaps and work on hover/selection backgrounds.
+HICON LoadToolbarSVGIcon(const char* svgName, int iconSize)
+{
+    if (svgName == NULL || iconSize <= 0 || iconSize > 1024)
+        return NULL;
+    char* svg = ReadToolbarSVG(svgName);
+    if (svg == NULL)
+        return NULL;
+    NSVGimage* image = nsvgParse(svg, "px", 96);
+    free(svg);
+    if (image == NULL)
+        return NULL;
+    if (image->width <= 0 || image->height <= 0 || image->shapes == NULL)
+    {
+        nsvgDelete(image);
+        return NULL;
+    }
+    NSVGrasterizer* rast = nsvgCreateRasterizer();
+    BITMAPINFO bi = {};
+    bi.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
+    bi.bmiHeader.biWidth = iconSize;
+    bi.bmiHeader.biHeight = -iconSize;
+    bi.bmiHeader.biPlanes = 1;
+    bi.bmiHeader.biBitCount = 32;
+    bi.bmiHeader.biCompression = BI_RGB;
+    BYTE* pixels = NULL;
+    HBITMAP color = CreateDIBSection(NULL, &bi, DIB_RGB_COLORS, (void**)&pixels, NULL, 0);
+    // A zero AND mask lets the 32-bit alpha channel define every transparent edge.
+    int maskBytes = ((iconSize + 15) / 16) * 2 * iconSize;
+    void* maskPixels = calloc(maskBytes, 1);
+    HBITMAP mask = maskPixels != NULL ? CreateBitmap(iconSize, iconSize, 1, 1, maskPixels) : NULL;
+    free(maskPixels);
+    HICON icon = NULL;
+    if (rast != NULL && color != NULL && pixels != NULL && mask != NULL)
+    {
+        float scale = iconSize / max(image->width, image->height);
+        nsvgRasterize(rast, image, (iconSize - image->width * scale) / 2,
+                      (iconSize - image->height * scale) / 2, scale, pixels, iconSize, iconSize, iconSize * 4);
+        // This repository's NanoSVG already emits premultiplied BGRA for Windows; do not convert twice.
+        ICONINFO info = {};
+        info.fIcon = TRUE;
+        info.hbmColor = color;
+        info.hbmMask = mask;
+        icon = CreateIconIndirect(&info);
+    }
+    if (mask != NULL)
+        DeleteObject(mask);
+    if (color != NULL)
+        DeleteObject(color);
+    if (rast != NULL)
+        nsvgDeleteRasterizer(rast);
+    nsvgDelete(image);
+    return icon;
+}
+
+// Draw command icons from the same source used by the drive bar.
+void RenderSVGImage(NSVGrasterizer* rast, HDC hDC, int x, int y, const char* svgName, int iconSize, COLORREF bkColor, BOOL enabled)
+{
+    char* svg = ReadToolbarSVG(svgName);
+    if (svg != NULL)
+    {
+        HDC hMemDC = HANDLES(CreateCompatibleDC(NULL));
+        BITMAPINFOHEADER bmhdr;
+        memset(&bmhdr, 0, sizeof(bmhdr));
+        bmhdr.biSize = sizeof(bmhdr);
+        bmhdr.biWidth = iconSize;
+        bmhdr.biHeight = -iconSize;
+        if (bmhdr.biHeight == 0)
+            bmhdr.biHeight = -1;
+        bmhdr.biPlanes = 1;
+        bmhdr.biBitCount = 32;
+        bmhdr.biCompression = BI_RGB;
+        void* lpMemBits = NULL;
+        HBITMAP hMemBmp = HANDLES(CreateDIBSection(hMemDC, (CONST BITMAPINFO*)&bmhdr, DIB_RGB_COLORS, &lpMemBits, NULL, 0));
+        SelectObject(hMemDC, hMemBmp);
+
+        RECT r;
+        r.left = x;
+        r.top = y;
+        r.right = x + iconSize;
+        r.bottom = y + iconSize;
+        SetBkColor(hDC, bkColor);
+        ExtTextOut(hDC, 0, 0, ETO_OPAQUE, &r, "", 0, NULL);
+
+        float sysDPIScale = (float)GetScaleForSystemDPI();
+        NSVGimage* image = nsvgParse(svg, "px", sysDPIScale);
+
+        if (!enabled)
         {
-            HDC hMemDC = HANDLES(CreateCompatibleDC(NULL));
-            BITMAPINFOHEADER bmhdr;
-            memset(&bmhdr, 0, sizeof(bmhdr));
-            bmhdr.biSize = sizeof(bmhdr);
-            bmhdr.biWidth = iconSize;
-            bmhdr.biHeight = -iconSize;
-            if (bmhdr.biHeight == 0)
-                bmhdr.biHeight = -1;
-            bmhdr.biPlanes = 1;
-            bmhdr.biBitCount = 32;
-            bmhdr.biCompression = BI_RGB;
-            void* lpMemBits = NULL;
-            HBITMAP hMemBmp = HANDLES(CreateDIBSection(hMemDC, (CONST BITMAPINFO*)&bmhdr, DIB_RGB_COLORS, &lpMemBits, NULL, 0));
-            SelectObject(hMemDC, hMemBmp);
-
-            RECT r;
-            r.left = x;
-            r.top = y;
-            r.right = x + iconSize;
-            r.bottom = y + iconSize;
-            SetBkColor(hDC, bkColor);
-            ExtTextOut(hDC, 0, 0, ETO_OPAQUE, &r, "", 0, NULL);
-
-            float sysDPIScale = (float)GetScaleForSystemDPI();
-            NSVGimage* image = nsvgParse(svg, "px", sysDPIScale);
-
-            if (!enabled)
+            DWORD disabledColor = GetSVGSysColor(COLOR_BTNSHADOW); // JRYFIXME - initial draft, where should we get the disabled color from?
+            NSVGshape* shape = image->shapes;
+            while (shape != NULL)
             {
-                DWORD disabledColor = GetSVGSysColor(COLOR_BTNSHADOW); // JRYFIXME - initial draft, where should we get the disabled color from?
-                NSVGshape* shape = image->shapes;
-                while (shape != NULL)
-                {
-                    if ((shape->fill.color & 0x00FFFFFF) != 0x00FFFFFF)
-                        shape->fill.color = disabledColor;
-                    shape = shape->next;
-                }
+                if ((shape->fill.color & 0x00FFFFFF) != 0x00FFFFFF)
+                    shape->fill.color = disabledColor;
+                shape = shape->next;
             }
-
-            // Fit the vector artwork to the requested image-list cell; DPI is already reflected in iconSize.
-            float scaleX = (float)iconSize / image->width;
-            float scaleY = (float)iconSize / image->height;
-            float scale = min(scaleX, scaleY);
-            float xOffset = (iconSize - image->width * scale) / 2;
-            float yOffset = (iconSize - image->height * scale) / 2;
-            nsvgRasterize(rast, image, xOffset, yOffset, scale, (BYTE*)lpMemBits, iconSize, iconSize, iconSize * 4);
-            nsvgDelete(image);
-
-            BLENDFUNCTION bf;
-            bf.BlendOp = AC_SRC_OVER;
-            bf.BlendFlags = 0;
-            bf.SourceConstantAlpha = 0xff; // want to use per-pixel alpha values
-            bf.AlphaFormat = AC_SRC_ALPHA;
-            AlphaBlend(hDC, x, y, iconSize, iconSize, hMemDC, 0, 0, iconSize, iconSize, bf);
-
-            HANDLES(DeleteObject(hMemBmp));
-            HANDLES(DeleteDC(hMemDC));
-
-            free(svg);
         }
+
+        // Fit the vector artwork to the requested image-list cell; DPI is already reflected in iconSize.
+        float scaleX = (float)iconSize / image->width;
+        float scaleY = (float)iconSize / image->height;
+        float scale = min(scaleX, scaleY);
+        float xOffset = (iconSize - image->width * scale) / 2;
+        float yOffset = (iconSize - image->height * scale) / 2;
+        nsvgRasterize(rast, image, xOffset, yOffset, scale, (BYTE*)lpMemBits, iconSize, iconSize, iconSize * 4);
+        nsvgDelete(image);
+
+        BLENDFUNCTION bf;
+        bf.BlendOp = AC_SRC_OVER;
+        bf.BlendFlags = 0;
+        bf.SourceConstantAlpha = 0xff; // want to use per-pixel alpha values
+        bf.AlphaFormat = AC_SRC_ALPHA;
+        AlphaBlend(hDC, x, y, iconSize, iconSize, hMemDC, 0, 0, iconSize, iconSize, bf);
+
+        HANDLES(DeleteObject(hMemBmp));
+        HANDLES(DeleteDC(hMemDC));
+
+        free(svg);
     }
 }
 

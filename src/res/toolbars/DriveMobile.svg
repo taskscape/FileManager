@@ -1,0 +1,6 @@
+<!-- Fluent Color Essentials: A compact handheld and keypad distinguish legacy mobile devices from portable storage. -->
+<svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+<rect x="4" y="1.5" width="8" height="13" rx="1.5" fill="white" stroke="#616161" stroke-width="1.5"/>
+<rect x="5.5" y="3.5" width="5" height="5.5" rx=".5" fill="#DDEBF7" stroke="#0F6CBD"/>
+<path d="M6 11H7M9 11H10M6 13H7M9 13H10" stroke="#616161" stroke-linecap="round"/>
+</svg>
