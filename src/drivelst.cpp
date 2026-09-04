@@ -2620,22 +2620,8 @@ static const char* GetDriveBarSVGName(const CDriveData& item)
     case drvtOneDriveMenu: return "DriveCloud";
     case drvtNeighborhood: return "OpenNetwork";
     case drvtPluginCmd:
-        if (item.DLLName != NULL)
-        {
-            const char* module = item.DLLName;
-            for (const char* p = module; *p != 0; p++)
-                if (*p == '\\' || *p == '/')
-                    module = p + 1;
-            const struct { const char* Module; const char* SVG; } icons[] = {
-                {"ftp.spl", "DriveFTP"}, {"winscp.spl", "DriveSFTP"},
-                {"folders.spl", "OpenDesktop"}, {"nethood.spl", "OpenNetwork"},
-                {"portables.spl", "DrivePortable"}, {"wmobile.spl", "DriveMobile"},
-                {"regedt.spl", "DriveRegistry"}, {"undelete.spl", "DriveUndelete"}};
-            for (int i = 0; i < _countof(icons); i++)
-                if (StrICmp(module, icons[i].Module) == 0)
-                    return icons[i].SVG;
-        }
-        break;
+        // Share plug-in identities with the dedicated plug-in toolbar and menus.
+        return GetPluginSVGName(item.DLLName);
     }
     return NULL;
 }

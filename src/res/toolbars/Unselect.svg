@@ -1,5 +1,5 @@
-<!-- Fluent Color Essentials: deselection stays non-destructive and uses the shared blue action color. -->
-<svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-<rect x="2.5" y="2.5" width="11" height="11" rx="1.5" stroke="#616161" stroke-dasharray="2 1.5"/>
-<path d="M5 8H11" stroke="#0F6CBD" stroke-width="1.5" stroke-linecap="round"/>
+<!-- Fluent System Icons: Unselect retains a simple, recognizable silhouette. 16 px optical slot from checkbox_unchecked_16_regular.svg; solid color and open counters preserve clarity. -->
+<!-- Copyright (c) Microsoft Corporation. MIT License; see LICENSE-fluent.txt. -->
+<svg width="16" height="16" viewBox="0 0 16 16" fill="#0F6CBD" xmlns="http://www.w3.org/2000/svg">
+<path d="M2 4.5A2.5 2.5 0 0 1 4.5 2h7A2.5 2.5 0 0 1 14 4.5v7a2.5 2.5 0 0 1-2.5 2.5h-7A2.5 2.5 0 0 1 2 11.5zM4.5 3C3.67 3 3 3.67 3 4.5v7c0 .83.67 1.5 1.5 1.5h7c.83 0 1.5-.67 1.5-1.5v-7c0-.83-.67-1.5-1.5-1.5z"/>
 </svg>

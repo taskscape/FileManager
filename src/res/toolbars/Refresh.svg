@@ -1,7 +1,5 @@
-<!-- Fluent Color Essentials: restrained semantic color and rounded geometry stay legible at 16 px. -->
-<svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-<path d="M8 3.5C5.51472 3.5 3.5 5.51472 3.5 8C3.5 10.4853 5.51472 12.5 8 12.5C9.82366 12.5 11.3985 11.4161 12.0911 9.875" stroke="#0F6CBD" stroke-width="1.5" stroke-linecap="round"/>
-<path d="M11.5 3.5C11.9686 4.09848 12.3168 4.77977 12.4578 5.5" stroke="#0F6CBD" stroke-width="1.5" stroke-linecap="round"/>
-<path d="M7.5 3.5H8.5" stroke="#0F6CBD" stroke-width="1.5" stroke-linecap="round"/>
-<path d="M12.5 5.5V3M12.5 5.5H10" stroke="#0F6CBD" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+<!-- Fluent System Icons: Refresh retains a simple, recognizable silhouette. 16 px optical slot from arrow_sync_16_regular.svg; solid color and open counters preserve clarity. -->
+<!-- Copyright (c) Microsoft Corporation. MIT License; see LICENSE-fluent.txt. -->
+<svg width="16" height="16" viewBox="0 0 16 16" fill="#0F6CBD" xmlns="http://www.w3.org/2000/svg">
+<path d="M7.15.65c.2-.2.5-.2.7 0l1.5 1.5c.2.2.2.5 0 .7l-1.5 1.5a.5.5 0 1 1-.7-.7L7.79 3a5 5 0 0 0-2.94 8.88.5.5 0 1 1-.63.78A5.99 5.99 0 0 1 7.8 2l-.65-.65a.5.5 0 0 1 0-.7m3.92 2.76a.5.5 0 0 1 .7-.07A5.99 5.99 0 0 1 8.2 14l.65.65a.5.5 0 0 1-.7.7l-1.5-1.5a.5.5 0 0 1 0-.7l1.5-1.5a.5.5 0 0 1 .7.7l-.64.65a5 5 0 0 0 2.94-8.88.5.5 0 0 1-.08-.7"/>
 </svg>

@@ -1,6 +1,6 @@
 <!-- Reference master: 64 px inspection size with the production 16 px design grid preserved. -->
-<!-- Fluent Color Essentials: restrained semantic color and rounded geometry stay legible at 16 px. -->
-<svg width="64" height="64" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-<path d="M3 5H13" stroke="#424242" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-<rect x="2" y="8" width="12" height="6" stroke="#424242" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+<!-- Fluent System Icons: OpenNameinOtherPanel retains a simple, recognizable silhouette. 16 px optical slot from document_arrow_left_16_regular.svg; solid color and open counters preserve clarity. -->
+<!-- Copyright (c) Microsoft Corporation. MIT License; see LICENSE-fluent.txt. -->
+<svg width="64" height="64" viewBox="0 0 16 16" fill="#0F6CBD" xmlns="http://www.w3.org/2000/svg">
+<path d="M6 1a2 2 0 0 0-2 2v2.2q.49-.13 1-.18V3a1 1 0 0 1 1-1h3v2.5c0 .83.67 1.5 1.5 1.5H13v7a1 1 0 0 1-1 1H9.74q-.47.58-1.08 1H12a2 2 0 0 0 2-2V5.41c0-.4-.16-.78-.44-1.06l-2.91-2.91A1.5 1.5 0 0 0 9.59 1zm6.8 4h-2.3a.5.5 0 0 1-.5-.5V2.2zM10 10.5a4.5 4.5 0 1 1-9 0 4.5 4.5 0 0 1 9 0m-6.85-.35a.5.5 0 0 0-.15.35.5.5 0 0 0 .15.35l2 2a.5.5 0 0 0 .7-.7L4.71 11H7.5a.5.5 0 0 0 0-1H4.7l1.15-1.15a.5.5 0 1 0-.7-.7z"/>
 </svg>

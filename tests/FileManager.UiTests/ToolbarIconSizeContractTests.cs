@@ -116,13 +116,12 @@ public sealed class ToolbarIconSizeContractTests
         var root = FindRepositoryRoot();
         var hotPathIcon = File.ReadAllText(Path.Combine(root, "src", "res", "toolbars", "GoToHotPath.svg"));
 
-        // The command should read as a saved folder destination, not as the old literal flame metaphor.
+        // A Fluent bookmark expresses the saved destination at every optical size without tiny overlays.
         Assert.Multiple(() =>
         {
             Assert.That(hotPathIcon, Does.Contain("saved destination"));
-            Assert.That(hotPathIcon, Does.Contain("fill=\"#FFD666\""));
             Assert.That(hotPathIcon, Does.Contain("fill=\"#0F6CBD\""));
-            Assert.That(hotPathIcon, Does.Contain("L11.25 8.25L10 9"));
+            Assert.That(hotPathIcon, Does.Contain("bookmark_16_regular.svg"));
             Assert.That(hotPathIcon, Does.Not.Contain("#F7630C"));
             Assert.That(hotPathIcon, Does.Not.Contain("C10.5 14.5 12.5 12.5"));
         });

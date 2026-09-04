@@ -1,6 +1,5 @@
-<!-- Fluent Color Essentials: selection stays blue while direction remains immediately scannable. -->
-<svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-<rect x="3" y="6" width="7" height="7" rx="1" fill="#DDEBF7" stroke="#616161"/>
-<path d="M12 11V3M9.5 5.5L12 3L14.5 5.5" stroke="#0F6CBD" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-<path d="M5 9.5L6.3 10.8L8.5 8.5" stroke="#0F6CBD" stroke-linecap="round" stroke-linejoin="round"/>
+<!-- Fluent System Icons: GoToPreviousSelectedName retains a simple, recognizable silhouette. 16 px optical slot from arrow_previous_16_regular.svg; solid color and open counters preserve clarity. -->
+<!-- Copyright (c) Microsoft Corporation. MIT License; see LICENSE-fluent.txt. -->
+<svg width="16" height="16" viewBox="0 0 16 16" fill="#0F6CBD" xmlns="http://www.w3.org/2000/svg">
+<path d="M12.35 3.85a.5.5 0 0 0-.7-.7l-4.5 4.5a.5.5 0 0 0 0 .7l4.5 4.5a.5.5 0 0 0 .7-.7L8.21 8zM4 3.5a.5.5 0 0 1 1 0v9a.5.5 0 0 1-1 0z"/>
 </svg>

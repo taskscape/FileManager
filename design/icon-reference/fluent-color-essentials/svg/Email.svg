@@ -1,6 +1,6 @@
 <!-- Reference master: 64 px inspection size with the production 16 px design grid preserved. -->
-<!-- Fluent Color Essentials: restrained semantic color and rounded geometry stay legible at 16 px. -->
-<svg width="64" height="64" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-<rect x="1.5" y="3.5" width="13" height="9" rx="1" fill="white" stroke="#0F6CBD" stroke-width="1.5" stroke-linejoin="round"/>
-<path d="M2 4L8 9L14 4" stroke="#0F6CBD" stroke-width="1.5" stroke-linejoin="round"/>
+<!-- Fluent System Icons: Email retains a simple, recognizable silhouette. 16 px optical slot from mail_16_regular.svg; solid color and open counters preserve clarity. -->
+<!-- Copyright (c) Microsoft Corporation. MIT License; see LICENSE-fluent.txt. -->
+<svg width="64" height="64" viewBox="0 0 16 16" fill="#424242" xmlns="http://www.w3.org/2000/svg">
+<path d="M2 6.04V11c0 1.1.9 2 2 2h8a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2zM4 4h8a1 1 0 0 1 1 1v.74l-5 2.7-5-2.7V5a1 1 0 0 1 1-1M3 6.88l4.76 2.56a.5.5 0 0 0 .48 0L13 6.88V11a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1z"/>
 </svg>

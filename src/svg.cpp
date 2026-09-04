@@ -90,7 +90,7 @@ char* ReadSVGFile(const char* fileName)
 }
 
 // Both toolbar rows must resolve the same deployed assets and development fallbacks.
-static char* ReadToolbarSVG(const char* svgName)
+static char* ReadToolbarSVG(const char* svgName, int iconSize)
 {
     char svgFile[2 * MAX_PATH];
     DWORD length = GetModuleFileName(NULL, svgFile, _countof(svgFile));
@@ -101,9 +101,19 @@ static char* ReadToolbarSVG(const char* svgName)
         return NULL;
     *s = 0;
     const char* directories[] = {"toolbars", "..\\src\\res\\toolbars", "..\\..\\src\\res\\toolbars"};
+    // A 16 px toolbar at 200% DPI still needs the simpler 16 px drawing, rasterized to 32 physical pixels.
+    int logicalSize = MulDiv(iconSize, 100, GetScaleForSystemDPI());
+    int masterSize = logicalSize <= 16 ? 16 : logicalSize <= 24 ? 24 : 32;
     for (int i = 0; i < _countof(directories); i++)
     {
         char path[2 * MAX_PATH];
+        if (masterSize != 16 && SUCCEEDED(StringCchPrintfA(path, _countof(path), "%s\\%s\\%d\\%s.svg", svgFile, directories[i], masterSize, svgName)))
+        {
+            char* variant = ReadSVGFile(path);
+            if (variant != NULL)
+                return variant;
+        }
+        // Existing deployments and third-party additions can still supply only the original 16 px master.
         if (FAILED(StringCchPrintfA(path, _countof(path), "%s\\%s\\%s.svg", svgFile, directories[i], svgName)))
             continue;
         char* svg = ReadSVGFile(path);
@@ -114,11 +124,11 @@ static char* ReadToolbarSVG(const char* svgName)
 }
 
 // Native-size alpha icons avoid stretching plug-in bitmaps and work on hover/selection backgrounds.
-HICON LoadToolbarSVGIcon(const char* svgName, int iconSize)
+HICON LoadToolbarSVGIcon(const char* svgName, int iconSize, BOOL grayscale)
 {
     if (svgName == NULL || iconSize <= 0 || iconSize > 1024)
         return NULL;
-    char* svg = ReadToolbarSVG(svgName);
+    char* svg = ReadToolbarSVG(svgName, iconSize);
     if (svg == NULL)
         return NULL;
     NSVGimage* image = nsvgParse(svg, "px", 96);
@@ -151,7 +161,25 @@ HICON LoadToolbarSVGIcon(const char* svgName, int iconSize)
         float scale = iconSize / max(image->width, image->height);
         nsvgRasterize(rast, image, (iconSize - image->width * scale) / 2,
                       (iconSize - image->height * scale) / 2, scale, pixels, iconSize, iconSize, iconSize * 4);
-        // This repository's NanoSVG already emits premultiplied BGRA for Windows; do not convert twice.
+        // NanoSVG emits premultiplied BGRA for AlphaBlend; image-list insertion premultiplies HICON channels itself.
+        if (grayscale)
+        {
+            // Luminance is linear in premultiplied channels; preserve alpha for menu hover/disabled edges.
+            for (int i = 0; i < iconSize * iconSize; i++)
+            {
+                BYTE* pixel = pixels + i * 4;
+                BYTE luminance = (BYTE)((19 * pixel[0] + 183 * pixel[1] + 54 * pixel[2] + 128) / 256);
+                pixel[0] = pixel[1] = pixel[2] = luminance;
+            }
+        }
+        // Restore straight alpha at the HICON boundary to avoid dark fringes after ImageList_AddIcon.
+        for (int i = 0; i < iconSize * iconSize; i++)
+        {
+            BYTE* pixel = pixels + i * 4;
+            if (pixel[3] != 0)
+                for (int channel = 0; channel < 3; channel++)
+                    pixel[channel] = (BYTE)min(255, (pixel[channel] * 255 + pixel[3] / 2) / pixel[3]);
+        }
         ICONINFO info = {};
         info.fIcon = TRUE;
         info.hbmColor = color;
@@ -168,10 +196,43 @@ HICON LoadToolbarSVGIcon(const char* svgName, int iconSize)
     return icon;
 }
 
+// Use one identity map for bundled plug-ins; third-party artwork remains the fallback.
+const char* GetPluginSVGName(const char* dllName)
+{
+    if (dllName == NULL)
+        return NULL;
+    const char* module = dllName;
+    for (const char* p = dllName; *p != 0; p++)
+        if (*p == '\\' || *p == '/')
+            module = p + 1;
+    const struct { const char* Module; const char* SVG; } icons[] = {
+        {"ftp.spl", "DriveFTP"}, {"winscp.spl", "DriveSFTP"},
+        {"folders.spl", "PluginFolders"}, {"nethood.spl", "PluginNetwork"},
+        {"portables.spl", "DrivePortable"}, {"wmobile.spl", "DriveMobile"},
+        {"regedt.spl", "DriveRegistry"}, {"undelete.spl", "DriveUndelete"},
+        {"7zip.spl", "PluginArchive"}, {"zip.spl", "PluginArchive"},
+        {"unrar.spl", "PluginArchive"}, {"tar.spl", "PluginArchive"},
+        {"unarj.spl", "PluginArchive"}, {"uncab.spl", "PluginArchive"},
+        {"unlha.spl", "PluginArchive"}, {"pak.spl", "PluginArchive"},
+        {"automation.spl", "PluginAutomation"}, {"checksum.spl", "PluginChecksum"},
+        {"checkver.spl", "PluginUpdate"}, {"dbviewer.spl", "PluginDatabase"},
+        {"diskmap.spl", "PluginDiskMap"}, {"filecomp.spl", "PluginCompare"},
+        {"ieviewer.spl", "PluginWeb"}, {"mmviewer.spl", "PluginMedia"},
+        {"peviewer.spl", "PluginExecutable"}, {"pictview.spl", "PluginPicture"},
+        {"renamer.spl", "PluginRename"}, {"splitcbn.spl", "PluginSplit"},
+        {"unchm.spl", "PluginHelp"}, {"unfat.spl", "PluginDiskRecovery"},
+        {"uniso.spl", "DriveOptical"}, {"unmime.spl", "Email"},
+        {"unole.spl", "PluginCompound"}};
+    for (int i = 0; i < _countof(icons); i++)
+        if (StrICmp(module, icons[i].Module) == 0)
+            return icons[i].SVG;
+    return NULL;
+}
+
 // Draw command icons from the same source used by the drive bar.
 void RenderSVGImage(NSVGrasterizer* rast, HDC hDC, int x, int y, const char* svgName, int iconSize, COLORREF bkColor, BOOL enabled)
 {
-    char* svg = ReadToolbarSVG(svgName);
+    char* svg = ReadToolbarSVG(svgName, iconSize);
     if (svg != NULL)
     {
         HDC hMemDC = HANDLES(CreateCompatibleDC(NULL));
@@ -187,7 +248,8 @@ void RenderSVGImage(NSVGrasterizer* rast, HDC hDC, int x, int y, const char* svg
         bmhdr.biCompression = BI_RGB;
         void* lpMemBits = NULL;
         HBITMAP hMemBmp = HANDLES(CreateDIBSection(hMemDC, (CONST BITMAPINFO*)&bmhdr, DIB_RGB_COLORS, &lpMemBits, NULL, 0));
-        SelectObject(hMemDC, hMemBmp);
+        // Restore the selected bitmap before releasing it, including after parse failures.
+        HGDIOBJ oldBitmap = SelectObject(hMemDC, hMemBmp);
 
         RECT r;
         r.left = x;
@@ -200,14 +262,29 @@ void RenderSVGImage(NSVGrasterizer* rast, HDC hDC, int x, int y, const char* svg
         float sysDPIScale = (float)GetScaleForSystemDPI();
         NSVGimage* image = nsvgParse(svg, "px", sysDPIScale);
 
+        // A bad optional asset must not crash an otherwise usable toolbar.
+        if (image == NULL || image->width <= 0 || image->height <= 0)
+        {
+            if (image != NULL)
+                nsvgDelete(image);
+            SelectObject(hMemDC, oldBitmap);
+            HANDLES(DeleteObject(hMemBmp));
+            HANDLES(DeleteDC(hMemDC));
+            free(svg);
+            return;
+        }
+
         if (!enabled)
         {
             DWORD disabledColor = GetSVGSysColor(COLOR_BTNSHADOW); // JRYFIXME - initial draft, where should we get the disabled color from?
             NSVGshape* shape = image->shapes;
             while (shape != NULL)
             {
-                if ((shape->fill.color & 0x00FFFFFF) != 0x00FFFFFF)
+                // Custom optical drawings use strokes too; disabled state must tint both paint kinds.
+                if (shape->fill.type == NSVG_PAINT_COLOR)
                     shape->fill.color = disabledColor;
+                if (shape->stroke.type == NSVG_PAINT_COLOR)
+                    shape->stroke.color = disabledColor;
                 shape = shape->next;
             }
         }
@@ -228,6 +305,7 @@ void RenderSVGImage(NSVGrasterizer* rast, HDC hDC, int x, int y, const char* svg
         bf.AlphaFormat = AC_SRC_ALPHA;
         AlphaBlend(hDC, x, y, iconSize, iconSize, hMemDC, 0, 0, iconSize, iconSize, bf);
 
+        SelectObject(hMemDC, oldBitmap);
         HANDLES(DeleteObject(hMemBmp));
         HANDLES(DeleteDC(hMemDC));
 

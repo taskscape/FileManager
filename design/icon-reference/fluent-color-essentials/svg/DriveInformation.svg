@@ -1,9 +1,6 @@
 <!-- Reference master: 64 px inspection size with the production 16 px design grid preserved. -->
-<!-- Fluent Color Essentials: restrained semantic color and rounded geometry stay legible at 16 px. -->
-<svg width="64" height="64" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-<rect x="2.5" y="5.5" width="11" height="6" rx="1" fill="#F3F2F1" stroke="#616161" stroke-width="1"/>
-<path d="M2.5 9.5H13.5" stroke="#616161" stroke-width="1"/>
-<path d="M4.5 8H6.5" stroke="#424242" stroke-width="1"/>
-<circle cx="12" cy="12" r="3.5" fill="white" stroke="#0F6CBD" stroke-width="1"/>
-<path d="M12 10.5V13.5M12 14.5V14.6" stroke="#0F6CBD" stroke-width="1.5" stroke-linecap="round"/>
+<!-- Fluent System Icons: DriveInformation retains a simple, recognizable silhouette. 16 px optical slot from info_16_regular.svg; solid color and open counters preserve clarity. -->
+<!-- Copyright (c) Microsoft Corporation. MIT License; see LICENSE-fluent.txt. -->
+<svg width="64" height="64" viewBox="0 0 16 16" fill="#0F6CBD" xmlns="http://www.w3.org/2000/svg">
+<path d="M8.5 7.5a.5.5 0 1 0-1 0v3a.5.5 0 0 0 1 0zm.25-2a.75.75 0 1 1-1.5 0 .75.75 0 0 1 1.5 0M8 1a7 7 0 1 0 0 14A7 7 0 0 0 8 1M2 8a6 6 0 1 1 12 0A6 6 0 0 1 2 8"/>
 </svg>

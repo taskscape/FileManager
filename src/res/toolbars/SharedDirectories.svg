@@ -1,5 +1,5 @@
-<!-- Fluent Color Essentials: restrained semantic color and rounded geometry stay legible at 16 px. -->
-<svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-<path d="M2 4.5C2 3.94772 2.44772 3.5 3 3.5H6.5L8.5 5.5H13C13.5523 5.5 14 5.94772 14 6.5V12.5C14 13.0523 13.5523 13.5 13 13.5H3C2.44772 13.5 2 13.0523 2 12.5V4.5Z" fill="#FFD666" stroke="#D89B00" stroke-width="1" stroke-linejoin="round"/>
-<path d="M2 13L4 15H12L14 13" stroke="#424242" stroke-width="1" fill="#E1C699"/>
+<!-- Fluent System Icons: SharedDirectories retains a simple, recognizable silhouette. 16 px optical slot from folder_person_16_regular.svg; solid color and open counters preserve clarity. -->
+<!-- Copyright (c) Microsoft Corporation. MIT License; see LICENSE-fluent.txt. -->
+<svg width="16" height="16" viewBox="0 0 16 16" fill="#424242" xmlns="http://www.w3.org/2000/svg">
+<path d="M2 6V4.5C2 3.67 2.67 3 3.5 3h2.09a.5.5 0 0 1 .35.15L7.29 4.5 5.94 5.85a.5.5 0 0 1-.35.15zm1.5-4A2.5 2.5 0 0 0 1 4.5v7A2.5 2.5 0 0 0 3.5 14h4.54a3 3 0 0 1 .01-1H3.5A1.5 1.5 0 0 1 2 11.5V7h3.59c.4 0 .78-.16 1.06-.44L8.2 5h4.29c.8 0 1.44.62 1.5 1.4q.6.35 1 .94V6.5A2.5 2.5 0 0 0 12.5 4H8.2L6.66 2.44A1.5 1.5 0 0 0 5.59 2zm11 7a2 2 0 1 1-4 0 2 2 0 0 1 4 0m1.5 4.5c0 1.25-1 2.5-3.5 2.5S9 14.75 9 13.5c0-.83.67-1.5 1.5-1.5h4c.83 0 1.5.67 1.5 1.5"/>
 </svg>

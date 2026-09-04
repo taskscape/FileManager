@@ -1,6 +1,5 @@
-<!-- Fluent Color Essentials: restrained semantic color and rounded geometry stay legible at 16 px. -->
-<svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-<circle cx="8" cy="8" r="6" stroke="#0F6CBD" stroke-width="1.5"/>
-<path d="M6.5 6C6.5 5 7 4 8 4C9 4 9.5 5 9.5 6C9.5 7 8 7.5 8 8.5V9" stroke="#0F6CBD" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-<circle cx="8" cy="11.5" r="0.75" fill="#0F6CBD"/>
+<!-- Fluent System Icons: HelpContents retains a simple, recognizable silhouette. 16 px optical slot from document_question_mark_16_regular.svg; solid color and open counters preserve clarity. -->
+<!-- Copyright (c) Microsoft Corporation. MIT License; see LICENSE-fluent.txt. -->
+<svg width="16" height="16" viewBox="0 0 16 16" fill="#424242" xmlns="http://www.w3.org/2000/svg">
+<path d="M6 1a2 2 0 0 0-2 2v2.2q.49-.13 1-.18V3a1 1 0 0 1 1-1h3v2.5c0 .83.67 1.5 1.5 1.5H13v7a1 1 0 0 1-1 1H9.74q-.46.57-1.07 1H12a2 2 0 0 0 2-2V5.42q-.01-.62-.44-1.06l-2.92-2.92A1.5 1.5 0 0 0 9.58 1zm4 3.5V2.21l2.8 2.8h-2.3a.5.5 0 0 1-.5-.5m0 6a4.5 4.5 0 1 0-9 0 4.5 4.5 0 0 0 9 0m-4.5 1.88a.62.62 0 1 1 0 1.25.62.62 0 0 1 0-1.25m0-4.88c1.03 0 1.85.85 1.85 1.95 0 .59-.21.91-.72 1.32l-.28.22c-.25.19-.33.3-.35.44v.16a.5.5 0 0 1-1-.09c0-.57.21-.88.72-1.29l.27-.21c.3-.23.36-.35.36-.55 0-.55-.38-.95-.85-.95-.5 0-.86.37-.85.95a.5.5 0 0 1-1 0c-.01-1.13.8-1.95 1.85-1.95"/>
 </svg>

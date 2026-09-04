@@ -1,7 +1,5 @@
-<!-- Fluent Color Essentials: three balanced nodes form a compact network metaphor. -->
-<svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-<path d="M8 5V8M4 11L8 8L12 11" stroke="#616161" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-<circle cx="8" cy="3.5" r="2" fill="#DDEBF7" stroke="#0F6CBD"/>
-<circle cx="3.5" cy="12" r="2" fill="white" stroke="#616161"/>
-<circle cx="12.5" cy="12" r="2" fill="white" stroke="#616161"/>
+<!-- Fluent System Icons: OpenNetwork retains a simple, recognizable silhouette. 16 px optical slot from virtual_network_16_regular.svg; solid color and open counters preserve clarity. -->
+<!-- Copyright (c) Microsoft Corporation. MIT License; see LICENSE-fluent.txt. -->
+<svg width="16" height="16" viewBox="0 0 16 16" fill="#0F6CBD" xmlns="http://www.w3.org/2000/svg">
+<path d="M3.12 4.68a.5.5 0 0 1 .76.64L1.65 8l2.23 2.68a.5.5 0 0 1-.76.64l-2.5-3a.5.5 0 0 1 0-.64zm9.06-.06a.5.5 0 0 1 .7.06l2.5 3a.5.5 0 0 1 0 .64l-2.5 3a.5.5 0 0 1-.76-.64L14.35 8l-2.23-2.68a.5.5 0 0 1 .06-.7m-1.05 2.51a.88.88 0 1 1 0 1.75.88.88 0 0 1 0-1.75m-6.25 0a.88.88 0 1 1 0 1.75.88.88 0 0 1 0-1.75m3.12 0a.88.88 0 1 1 0 1.75.88.88 0 0 1 0-1.75"/>
 </svg>

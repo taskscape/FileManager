@@ -1,8 +1,6 @@
 <!-- Reference master: 64 px inspection size with the production 16 px design grid preserved. -->
-<!-- Fluent Color Essentials: restrained semantic color and rounded geometry stay legible at 16 px. -->
-<svg width="64" height="64" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-<path d="M2.5 4.5H13.5V12.5H2.5V4.5Z" fill="#F3F2F1" stroke="#0F6CBD" stroke-width="1.5" stroke-linejoin="round"/>
-<path d="M8 2V4M8 14V12M2 8H4M14 8H12" stroke="#0F6CBD" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-<path d="M7 4L8 5L9 4" stroke="#0F6CBD" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"/>
-<path d="M7 12L8 11L9 12" stroke="#0F6CBD" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"/>
+<!-- Fluent System Icons: NTFSCompress retains a simple, recognizable silhouette. 16 px optical slot from arrow_minimize_16_regular.svg; solid color and open counters preserve clarity. -->
+<!-- Copyright (c) Microsoft Corporation. MIT License; see LICENSE-fluent.txt. -->
+<svg width="64" height="64" viewBox="0 0 16 16" fill="#424242" xmlns="http://www.w3.org/2000/svg">
+<path d="M13.85 2.85a.5.5 0 0 0-.7-.7L10 5.29V3.5a.5.5 0 0 0-1 0v2.9c0 .33.27.6.6.6h2.9a.5.5 0 0 0 0-1h-1.8zM6.5 13a.5.5 0 0 1-.5-.5v-1.8l-3.15 3.15a.5.5 0 0 1-.7-.7L5.29 10H3.5a.5.5 0 0 1 0-1h2.9c.33 0 .6.27.6.6v2.9a.5.5 0 0 1-.5.5"/>
 </svg>

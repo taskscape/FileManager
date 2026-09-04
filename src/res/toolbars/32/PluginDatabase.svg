@@ -1,0 +1,5 @@
+<!-- Fluent System Icons: PluginDatabase retains a simple, recognizable silhouette. 32 px optical slot from database_32_regular.svg; solid color and open counters preserve clarity. -->
+<!-- Copyright (c) Microsoft Corporation. MIT License; see LICENSE-fluent.txt. -->
+<svg width="32" height="32" viewBox="0 0 32 32" fill="#0F6CBD" xmlns="http://www.w3.org/2000/svg">
+<path d="M27 7c0-2.76-4.92-5-11-5S5 4.24 5 7v18c0 2.76 4.92 5 11 5s11-2.24 11-5zm-2 0c0 .11-.2.87-2.05 1.71A17 17 0 0 1 16 10a17 17 0 0 1-6.95-1.29C7.19 7.87 7 7.11 7 7s.2-.87 2.05-1.71A17 17 0 0 1 16 4c2.82 0 5.27.52 6.95 1.29C24.81 6.13 25 6.89 25 7m0 2.88V25c0 .11-.2.87-2.05 1.71A17 17 0 0 1 16 28a17 17 0 0 1-6.95-1.29C7.19 25.87 7 25.11 7 25V9.88C9 11.16 12.28 12 16 12s7-.84 9-2.12"/>
+</svg>

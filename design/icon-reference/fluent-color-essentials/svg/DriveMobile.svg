@@ -1,7 +1,6 @@
 <!-- Reference master: 64 px inspection size with the production 16 px design grid preserved. -->
-<!-- Fluent Color Essentials: A compact handheld and keypad distinguish legacy mobile devices from portable storage. -->
-<svg width="64" height="64" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-<rect x="4" y="1.5" width="8" height="13" rx="1.5" fill="white" stroke="#616161" stroke-width="1.5"/>
-<rect x="5.5" y="3.5" width="5" height="5.5" rx=".5" fill="#DDEBF7" stroke="#0F6CBD"/>
-<path d="M6 11H7M9 11H10M6 13H7M9 13H10" stroke="#616161" stroke-linecap="round"/>
+<!-- Fluent System Icons: DriveMobile retains a simple, recognizable silhouette. 16 px optical slot from phone_16_regular.svg; solid color and open counters preserve clarity. -->
+<!-- Copyright (c) Microsoft Corporation. MIT License; see LICENSE-fluent.txt. -->
+<svg width="64" height="64" viewBox="0 0 16 16" fill="#0F6CBD" xmlns="http://www.w3.org/2000/svg">
+<path d="M7 12a.5.5 0 0 0 0 1h2a.5.5 0 0 0 0-1zM5.75 1C4.78 1 4 1.78 4 2.75v10.5c0 .97.78 1.75 1.75 1.75h4.5c.97 0 1.75-.78 1.75-1.75V2.75C12 1.78 11.22 1 10.25 1zM5 2.75c0-.41.34-.75.75-.75h4.5c.41 0 .75.34.75.75v10.5c0 .41-.34.75-.75.75h-4.5a.75.75 0 0 1-.75-.75z"/>
 </svg>

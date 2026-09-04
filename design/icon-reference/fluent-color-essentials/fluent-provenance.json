@@ -1,0 +1,2476 @@
+{
+  "package": "@fluentui/svg-icons@1.1.339",
+  "icons": {
+    "Back": {
+      "16": {
+        "source": "arrow_left_16_regular.svg",
+        "sourceSize": 16,
+        "color": "#0F6CBD",
+        "sha256": "4839c7185a4a8217553b2c4a7d364ee65ff77b941ed7384478e3d81d9fedd12b"
+      },
+      "24": {
+        "source": "arrow_left_24_regular.svg",
+        "sourceSize": 24,
+        "color": "#0F6CBD",
+        "sha256": "af4fac96f008c5dd73830726077204210932524f5ed8c04bd3be99e4f578db31"
+      },
+      "32": {
+        "source": "arrow_left_32_regular.svg",
+        "sourceSize": 32,
+        "color": "#0F6CBD",
+        "sha256": "efd64f25637e70c4d5af82cb36533a8fbdafee6f9c2d7b67ef55624b836cd64d"
+      }
+    },
+    "CalculateDirectorySizes": {
+      "16": {
+        "source": "calculator_16_regular.svg",
+        "sourceSize": 16,
+        "color": "#424242",
+        "sha256": "de2810a6b0da608ca79bf6e250237b1a6c8019a7b3d2d19f4c2a10545163f292"
+      },
+      "24": {
+        "source": "calculator_24_regular.svg",
+        "sourceSize": 24,
+        "color": "#424242",
+        "sha256": "8acc875e96bcfcb17c5469a550093c7fafeb13801abcabd2c38de12283734717"
+      },
+      "32": {
+        "source": "calculator_24_regular.svg",
+        "sourceSize": 24,
+        "color": "#424242",
+        "sha256": "8acc875e96bcfcb17c5469a550093c7fafeb13801abcabd2c38de12283734717"
+      }
+    },
+    "CalculateOccupiedSpace": {
+      "16": {
+        "source": "data_usage_16_regular.svg",
+        "sourceSize": 16,
+        "color": "#424242",
+        "sha256": "f6d212ff083915e594104fcc966f6d822463eff71bec39e7b98e006a892f8faf"
+      },
+      "24": {
+        "source": "data_usage_24_regular.svg",
+        "sourceSize": 24,
+        "color": "#424242",
+        "sha256": "46fe84f4e6c2303e3927685c019ee7b194dbc2ffebeafcf3f8f56f69f7a30519"
+      },
+      "32": {
+        "source": "data_usage_32_regular.svg",
+        "sourceSize": 32,
+        "color": "#424242",
+        "sha256": "43375f4b01a209a6946355e3ed66b69c2e0f4cfeed63845c6bbac939acb8669a"
+      }
+    },
+    "ChangeAttributes": {
+      "16": {
+        "source": "tag_16_regular.svg",
+        "sourceSize": 16,
+        "color": "#424242",
+        "sha256": "d2532afffb1c096e08e69d0465405ead2b91e6077999cbfb04f64e4f33cb429b"
+      },
+      "24": {
+        "source": "tag_24_regular.svg",
+        "sourceSize": 24,
+        "color": "#424242",
+        "sha256": "71cd57f83a38f07cb3592e331039152763d1c6013f7214e49fad9551d1fa2a73"
+      },
+      "32": {
+        "source": "tag_32_regular.svg",
+        "sourceSize": 32,
+        "color": "#424242",
+        "sha256": "3a911781585543cc0e726b4c7f849a196b6be28518d2544639b614a5c9a0c1ca"
+      }
+    },
+    "ChangeCase": {
+      "16": {
+        "source": "text_change_case_16_regular.svg",
+        "sourceSize": 16,
+        "color": "#424242",
+        "sha256": "5083bae1def70e9e21008e24d79d47fb451cabdbccd3d88d443fd94c4ee3bdeb"
+      },
+      "24": {
+        "source": "text_change_case_24_regular.svg",
+        "sourceSize": 24,
+        "color": "#424242",
+        "sha256": "33face721ae9b23376ab5709e5d5609a6f02c3c491edae60b187831d48439a68"
+      },
+      "32": {
+        "source": "text_change_case_24_regular.svg",
+        "sourceSize": 24,
+        "color": "#424242",
+        "sha256": "33face721ae9b23376ab5709e5d5609a6f02c3c491edae60b187831d48439a68"
+      }
+    },
+    "ChangeDirectory": {
+      "16": {
+        "source": "folder_arrow_right_16_regular.svg",
+        "sourceSize": 16,
+        "color": "#424242",
+        "sha256": "b2ce9cba8555c14f8862acd8da0b33617d4f65c3d0a6d3a8b12e214c9c09afef"
+      },
+      "24": {
+        "source": "folder_arrow_right_24_regular.svg",
+        "sourceSize": 24,
+        "color": "#424242",
+        "sha256": "4c44670da65c74601945ed2900d809c47bd413ef36efc560ab6d382c1f9ef915"
+      },
+      "32": {
+        "source": "folder_arrow_right_32_regular.svg",
+        "sourceSize": 32,
+        "color": "#424242",
+        "sha256": "5a9cb4eff7a30785d8a8bbc3fc6b63ceeb5a4387eddaa186548cd5a66c3347c4"
+      }
+    },
+    "ChangeDrive": {
+      "16": {
+        "source": "hard_drive_16_regular.svg",
+        "sourceSize": 16,
+        "color": "#424242",
+        "sha256": "1589568518676074e730606f69e7a1d8ed943b10b30cebdff7f037dce11aee52"
+      },
+      "24": {
+        "source": "hard_drive_24_regular.svg",
+        "sourceSize": 24,
+        "color": "#424242",
+        "sha256": "3f8f488efe3dac7cdd160ece652484e2982dbcb6f12676f339c8f0b296061d17"
+      },
+      "32": {
+        "source": "hard_drive_32_regular.svg",
+        "sourceSize": 32,
+        "color": "#424242",
+        "sha256": "5faa6235f87222d66752faa0c6587f474ab565f31a4eb4236cf528cfd800ba92"
+      }
+    },
+    "ClipboardCopy": {
+      "16": {
+        "source": "copy_16_regular.svg",
+        "sourceSize": 16,
+        "color": "#424242",
+        "sha256": "88e79f47f8041a5aef85995fa352c0d8dd95533c5680be59924ff5edfe2e0622"
+      },
+      "24": {
+        "source": "copy_24_regular.svg",
+        "sourceSize": 24,
+        "color": "#424242",
+        "sha256": "626fa727f24d5486f97192267df0b8b125ef9519bd996f8c410ed5cbc9dda6fb"
+      },
+      "32": {
+        "source": "copy_32_regular.svg",
+        "sourceSize": 32,
+        "color": "#424242",
+        "sha256": "c424fb6db53920c60d74470833a21a64e3e67bf213bebd18cfe970bff7d4f53b"
+      }
+    },
+    "ClipboardCut": {
+      "16": {
+        "source": "cut_16_regular.svg",
+        "sourceSize": 16,
+        "color": "#424242",
+        "sha256": "1b98650e3cfa14e12ee79ec96902bf1b6c187ab7ab02995da418a632336e14e4"
+      },
+      "24": {
+        "source": "cut_24_regular.svg",
+        "sourceSize": 24,
+        "color": "#424242",
+        "sha256": "63e79523f21a1f2ec19a016bcab3e948c94156904627f3e64f54f490e441daf9"
+      },
+      "32": {
+        "source": "cut_32_regular.svg",
+        "sourceSize": 32,
+        "color": "#424242",
+        "sha256": "051cb9b3b03806b5e2a6c9a0d3f655578e123e1d7e615ea793bbfce2dedf521c"
+      }
+    },
+    "ClipboardPaste": {
+      "16": {
+        "source": "clipboard_paste_16_regular.svg",
+        "sourceSize": 16,
+        "color": "#424242",
+        "sha256": "aa1ed06e67c53f6a5f82561da53ea6190aab81d0ec5df6dc9764f94cf08eced8"
+      },
+      "24": {
+        "source": "clipboard_paste_24_regular.svg",
+        "sourceSize": 24,
+        "color": "#424242",
+        "sha256": "27d14e403eddb6182076521137f59f292b2f8c9052a720bb91c43cea5272c882"
+      },
+      "32": {
+        "source": "clipboard_paste_32_regular.svg",
+        "sourceSize": 32,
+        "color": "#424242",
+        "sha256": "f8dadea84cb021982cbf6b3e25fba43d5d858f8b3bee13f051545b49c0979feb"
+      }
+    },
+    "CommandShell": {
+      "16": {
+        "source": "application optical drawing",
+        "sourceSize": 16,
+        "color": "#424242"
+      },
+      "24": {
+        "source": "application optical drawing",
+        "sourceSize": 16,
+        "color": "#424242"
+      },
+      "32": {
+        "source": "application optical drawing",
+        "sourceSize": 16,
+        "color": "#424242"
+      }
+    },
+    "CompareDirectories": {
+      "16": {
+        "source": "folder_swap_16_regular.svg",
+        "sourceSize": 16,
+        "color": "#424242",
+        "sha256": "e77f6ea3eedc3ba587c3e04f8d92c2ca6f67ee3f259de7f0979a8b44c88375ce"
+      },
+      "24": {
+        "source": "folder_swap_24_regular.svg",
+        "sourceSize": 24,
+        "color": "#424242",
+        "sha256": "7e5da24da38017b712a84d4ca3e64baf38cc37baa6d07a1bcc8438be63b31e15"
+      },
+      "32": {
+        "source": "folder_swap_24_regular.svg",
+        "sourceSize": 24,
+        "color": "#424242",
+        "sha256": "7e5da24da38017b712a84d4ca3e64baf38cc37baa6d07a1bcc8438be63b31e15"
+      }
+    },
+    "Configuration": {
+      "16": {
+        "source": "options_16_regular.svg",
+        "sourceSize": 16,
+        "color": "#424242",
+        "sha256": "bdc56665a7aa2959f706587cd88335faa10cf35d653519ed328bb85feb05c98a"
+      },
+      "24": {
+        "source": "options_24_regular.svg",
+        "sourceSize": 24,
+        "color": "#424242",
+        "sha256": "85c15aee4e1d43a78685199a5c35697507d7e8db4bfd955ad932e9ed2b44277a"
+      },
+      "32": {
+        "source": "options_32_regular.svg",
+        "sourceSize": 32,
+        "color": "#424242",
+        "sha256": "4fa19c9eda7b4a64b78886f6984bde08d0f0e7850b6aee6d897d2c6c0e362d41"
+      }
+    },
+    "ConnectNetworkDrive": {
+      "16": {
+        "source": "plug_connected_16_regular.svg",
+        "sourceSize": 16,
+        "color": "#0F6CBD",
+        "sha256": "3296fdc1df5364f2133550a57ed3c85627932269c328342e15040595cace3b4e"
+      },
+      "24": {
+        "source": "plug_connected_24_regular.svg",
+        "sourceSize": 24,
+        "color": "#0F6CBD",
+        "sha256": "95006159752582c3c02ddbdf8889943ea23deaa74225c0b31d9f74c1ab0557d1"
+      },
+      "32": {
+        "source": "plug_connected_32_regular.svg",
+        "sourceSize": 32,
+        "color": "#0F6CBD",
+        "sha256": "efab727cb8f2671dd2a4af9b545f6b7b2aa0f29e0b8574958cc4c9b7c37ccc31"
+      }
+    },
+    "Convert": {
+      "16": {
+        "source": "arrow_repeat_all_16_regular.svg",
+        "sourceSize": 16,
+        "color": "#424242",
+        "sha256": "c2ea958d10155a47039036fcad300c3c2c34ca2a6871715ca6cac54cdc36d9d4"
+      },
+      "24": {
+        "source": "arrow_repeat_all_24_regular.svg",
+        "sourceSize": 24,
+        "color": "#424242",
+        "sha256": "63014838810b710239f6d051f8e63af90e9c371144aaeb8bef025d47aa86e925"
+      },
+      "32": {
+        "source": "arrow_repeat_all_24_regular.svg",
+        "sourceSize": 24,
+        "color": "#424242",
+        "sha256": "63014838810b710239f6d051f8e63af90e9c371144aaeb8bef025d47aa86e925"
+      }
+    },
+    "Copy": {
+      "16": {
+        "source": "folder_multiple_16_regular.svg",
+        "sourceSize": 16,
+        "color": "#424242",
+        "sha256": "a839e5949d7ac6eea9f6b0b223cf1dcdbceb6a21fdfd5401994081b0fe74bb65"
+      },
+      "24": {
+        "source": "folder_multiple_24_regular.svg",
+        "sourceSize": 24,
+        "color": "#424242",
+        "sha256": "8ec0fed5c4b378bfc822458e15398b5460fc59b482052a66d64df86bc4db3799"
+      },
+      "32": {
+        "source": "folder_multiple_32_regular.svg",
+        "sourceSize": 32,
+        "color": "#424242",
+        "sha256": "011307b9700ef15bf2d4100fe6b7cd3f95ed1fe95dd1e954e4e0de4dcbb1c86d"
+      }
+    },
+    "CreateDirectory": {
+      "16": {
+        "source": "folder_add_16_regular.svg",
+        "sourceSize": 16,
+        "color": "#424242",
+        "sha256": "fd9eea1231f2a3b8d895313fbab4e22a49497858b83d1b7d175713f342aeb3e7"
+      },
+      "24": {
+        "source": "folder_add_24_regular.svg",
+        "sourceSize": 24,
+        "color": "#424242",
+        "sha256": "1e777002b06fbbb11d172663985d5759ebbcd5935979f2f5dc61b807463a53dc"
+      },
+      "32": {
+        "source": "folder_add_32_regular.svg",
+        "sourceSize": 32,
+        "color": "#424242",
+        "sha256": "99eeb99458582d90248c01449bc74a8618c3bc61c276e351a5e8d646b49e9af1"
+      }
+    },
+    "Delete": {
+      "16": {
+        "source": "delete_16_regular.svg",
+        "sourceSize": 16,
+        "color": "#C50F1F",
+        "sha256": "b21ac3fb3aca6284e6cc347c8bfd031a8684c247659ea28ad90629f69b2796d1"
+      },
+      "24": {
+        "source": "delete_24_regular.svg",
+        "sourceSize": 24,
+        "color": "#C50F1F",
+        "sha256": "04c0fc28e66541a55699e32de594c7d50cec3ce5f6f09173d0ce8e2ea685c97d"
+      },
+      "32": {
+        "source": "delete_32_regular.svg",
+        "sourceSize": 32,
+        "color": "#C50F1F",
+        "sha256": "d01bfd8ec552a7e72d7d36d6d89095d20777e6b752165c2eaf722fb5a6e4a68a"
+      }
+    },
+    "Disconnect": {
+      "16": {
+        "source": "plug_disconnected_16_regular.svg",
+        "sourceSize": 16,
+        "color": "#424242",
+        "sha256": "bf1242a8b9eb436c525b5a6b4136d7aa06d50823e976f5829d1c2618ca8ca34a"
+      },
+      "24": {
+        "source": "plug_disconnected_24_regular.svg",
+        "sourceSize": 24,
+        "color": "#424242",
+        "sha256": "ef4e4977edf902873b1625897d9eef45c2e73e4b5533a677ab199377af591e82"
+      },
+      "32": {
+        "source": "plug_disconnected_24_regular.svg",
+        "sourceSize": 24,
+        "color": "#424242",
+        "sha256": "ef4e4977edf902873b1625897d9eef45c2e73e4b5533a677ab199377af591e82"
+      }
+    },
+    "DriveCloud": {
+      "16": {
+        "source": "cloud_16_regular.svg",
+        "sourceSize": 16,
+        "color": "#0F6CBD",
+        "sha256": "e47e384153e503fc2f7712bd436691918ae52aa522ec78f90a22da458d0b4b51"
+      },
+      "24": {
+        "source": "cloud_24_regular.svg",
+        "sourceSize": 24,
+        "color": "#0F6CBD",
+        "sha256": "f680446915313fb0590a39702bfa774238585060bd8372c6c0d8e898955d2372"
+      },
+      "32": {
+        "source": "cloud_32_regular.svg",
+        "sourceSize": 32,
+        "color": "#0F6CBD",
+        "sha256": "fc8a7ed0a72d47a4e67a53022586ac12c4ed2881153ce1e9de4392d5213dd2ea"
+      }
+    },
+    "DriveDisconnected": {
+      "16": {
+        "source": "cloud_off_16_regular.svg",
+        "sourceSize": 16,
+        "color": "#0F6CBD",
+        "sha256": "17b1889e8f85608583a5659d7a4e676928ef9da904277a938b1e5519225b4b37"
+      },
+      "24": {
+        "source": "cloud_off_24_regular.svg",
+        "sourceSize": 24,
+        "color": "#0F6CBD",
+        "sha256": "a2cc436572d2d991703f952bbee2fe757a0cd161f61803f44ef57857fa98c9f4"
+      },
+      "32": {
+        "source": "cloud_off_32_regular.svg",
+        "sourceSize": 32,
+        "color": "#0F6CBD",
+        "sha256": "46321dd9b83487364b06862b39523deaa3dc81d2a009c8900e6eb5b810477767"
+      }
+    },
+    "DriveDropbox": {
+      "16": {
+        "source": "box_16_regular.svg",
+        "sourceSize": 16,
+        "color": "#0F6CBD",
+        "sha256": "53fe38c2788d994131408de03cf32761249d519e22d22a1fe579728c2fd3dcfa"
+      },
+      "24": {
+        "source": "box_24_regular.svg",
+        "sourceSize": 24,
+        "color": "#0F6CBD",
+        "sha256": "0462b5ce36b275c9f6868eecc73eede4df999dc227e3fcac1edeb44b0e3a7e60"
+      },
+      "32": {
+        "source": "box_32_regular.svg",
+        "sourceSize": 32,
+        "color": "#0F6CBD",
+        "sha256": "a0287790bd89ba57e643d9f67dca368d2a1dc67ff2e26cac54282e5d82e5f33e"
+      }
+    },
+    "DriveFixed": {
+      "16": {
+        "source": "hard_drive_16_regular.svg",
+        "sourceSize": 16,
+        "color": "#0F6CBD",
+        "sha256": "1589568518676074e730606f69e7a1d8ed943b10b30cebdff7f037dce11aee52"
+      },
+      "24": {
+        "source": "hard_drive_24_regular.svg",
+        "sourceSize": 24,
+        "color": "#0F6CBD",
+        "sha256": "3f8f488efe3dac7cdd160ece652484e2982dbcb6f12676f339c8f0b296061d17"
+      },
+      "32": {
+        "source": "hard_drive_32_regular.svg",
+        "sourceSize": 32,
+        "color": "#0F6CBD",
+        "sha256": "5faa6235f87222d66752faa0c6587f474ab565f31a4eb4236cf528cfd800ba92"
+      }
+    },
+    "DriveFTP": {
+      "16": {
+        "source": "globe_arrow_forward_16_regular.svg",
+        "sourceSize": 16,
+        "color": "#0F6CBD",
+        "sha256": "c4ea006ac735454f3c4d0c91966d1f670313e48cc467f14a8f87afe628e6f4f0"
+      },
+      "24": {
+        "source": "globe_arrow_forward_24_regular.svg",
+        "sourceSize": 24,
+        "color": "#0F6CBD",
+        "sha256": "80549b26b98b84009b5b5094dc76c38f70f01009440d4d65d8ddaf24ec69c4cb"
+      },
+      "32": {
+        "source": "globe_arrow_forward_32_regular.svg",
+        "sourceSize": 32,
+        "color": "#0F6CBD",
+        "sha256": "45f5e198383b366a89896053d397cc297e6f421a63f502c33d4bbdd5eb69c803"
+      }
+    },
+    "DriveGoogle": {
+      "16": {
+        "source": "cloud_archive_16_regular.svg",
+        "sourceSize": 16,
+        "color": "#0F6CBD",
+        "sha256": "4d419d239248eb8bdf20970264e39a4c90d145d35bfacc9777500b4ecb339aea"
+      },
+      "24": {
+        "source": "cloud_archive_24_regular.svg",
+        "sourceSize": 24,
+        "color": "#0F6CBD",
+        "sha256": "778634bac3f2eda16928c237989272494b4eb037d4ba550acadef5e7294ea0a8"
+      },
+      "32": {
+        "source": "cloud_archive_32_regular.svg",
+        "sourceSize": 32,
+        "color": "#0F6CBD",
+        "sha256": "9c036711b9193682d4b6df858a2b3359321883dc3b5ec3665d217dbdd9370231"
+      }
+    },
+    "DriveInformation": {
+      "16": {
+        "source": "info_16_regular.svg",
+        "sourceSize": 16,
+        "color": "#0F6CBD",
+        "sha256": "0128b038bd7e9bce9257a855d3a5a82bdb20d4b8af4e2d94249524d185ad9ee0"
+      },
+      "24": {
+        "source": "info_24_regular.svg",
+        "sourceSize": 24,
+        "color": "#0F6CBD",
+        "sha256": "b3e753274db0a87c3ee5752d8d212267dd5ee32f69c1c14580e4f2348400c8a0"
+      },
+      "32": {
+        "source": "info_32_regular.svg",
+        "sourceSize": 32,
+        "color": "#0F6CBD",
+        "sha256": "9f2abcad0616c4a899671aad5834c93333a538d0dcd348549ebb706211942409"
+      }
+    },
+    "DriveMemory": {
+      "16": {
+        "source": "memory_16_regular.svg",
+        "sourceSize": 16,
+        "color": "#0F6CBD",
+        "sha256": "01e95bc8606d9be9ed77d71a4279db49c086fd30245fdf6c29640283422ca107"
+      },
+      "24": {
+        "source": "memory_16_regular.svg",
+        "sourceSize": 16,
+        "color": "#0F6CBD",
+        "sha256": "01e95bc8606d9be9ed77d71a4279db49c086fd30245fdf6c29640283422ca107"
+      },
+      "32": {
+        "source": "memory_16_regular.svg",
+        "sourceSize": 16,
+        "color": "#0F6CBD",
+        "sha256": "01e95bc8606d9be9ed77d71a4279db49c086fd30245fdf6c29640283422ca107"
+      }
+    },
+    "DriveMobile": {
+      "16": {
+        "source": "phone_16_regular.svg",
+        "sourceSize": 16,
+        "color": "#0F6CBD",
+        "sha256": "d55f87a634fe138dec8467937dc702019c53d2359f2590535596ee81514e6e1b"
+      },
+      "24": {
+        "source": "phone_24_regular.svg",
+        "sourceSize": 24,
+        "color": "#0F6CBD",
+        "sha256": "2659fd73cda299d655f35fee886e3ce1938fdcafd08d822faba0ee61032f9089"
+      },
+      "32": {
+        "source": "phone_32_regular.svg",
+        "sourceSize": 32,
+        "color": "#0F6CBD",
+        "sha256": "faba0a1b367364bfec7c1080c5faa4bf2b0dda3689115cdcece458582cd8cf57"
+      }
+    },
+    "DriveOptical": {
+      "16": {
+        "source": "cd_16_regular.svg",
+        "sourceSize": 16,
+        "color": "#0F6CBD",
+        "sha256": "a60bca051a442e9783812efa2bbabb1b7d5168713227b09ef97769c1a3460ef6"
+      },
+      "24": {
+        "source": "cd_16_regular.svg",
+        "sourceSize": 16,
+        "color": "#0F6CBD",
+        "sha256": "a60bca051a442e9783812efa2bbabb1b7d5168713227b09ef97769c1a3460ef6"
+      },
+      "32": {
+        "source": "cd_16_regular.svg",
+        "sourceSize": 16,
+        "color": "#0F6CBD",
+        "sha256": "a60bca051a442e9783812efa2bbabb1b7d5168713227b09ef97769c1a3460ef6"
+      }
+    },
+    "DrivePortable": {
+      "16": {
+        "source": "phone_laptop_16_regular.svg",
+        "sourceSize": 16,
+        "color": "#0F6CBD",
+        "sha256": "8be207c85f2ef1a1adc92261d4e42710876b623cd486826ad92a26aaaa41728d"
+      },
+      "24": {
+        "source": "phone_laptop_24_regular.svg",
+        "sourceSize": 24,
+        "color": "#0F6CBD",
+        "sha256": "a7be11719fea1392b0d100a4554f287f9871336f129b70ef08a7080041687845"
+      },
+      "32": {
+        "source": "phone_laptop_32_regular.svg",
+        "sourceSize": 32,
+        "color": "#0F6CBD",
+        "sha256": "8581eb4efba355bb94b1ed990159847b7982a33ea343c14b9ba9c3fe343ef761"
+      }
+    },
+    "DriveRegistry": {
+      "16": {
+        "source": "organization_16_regular.svg",
+        "sourceSize": 16,
+        "color": "#0F6CBD",
+        "sha256": "3c2e7130f4a5064348278648e882c73d600fc213f911ca6cc824c1ce5c5149f5"
+      },
+      "24": {
+        "source": "organization_24_regular.svg",
+        "sourceSize": 24,
+        "color": "#0F6CBD",
+        "sha256": "46447cb66efb03c082edbd8d71d603d4df4349a0854bd58ef4f94bff467c8525"
+      },
+      "32": {
+        "source": "organization_32_regular.svg",
+        "sourceSize": 32,
+        "color": "#0F6CBD",
+        "sha256": "77153d19364da74f643a620c092b093a4904c03b6e5fe4bf065ce336dc3f13ec"
+      }
+    },
+    "DriveRemote": {
+      "16": {
+        "source": "map_drive_16_regular.svg",
+        "sourceSize": 16,
+        "color": "#0F6CBD",
+        "sha256": "05334919fd204262ae9187febbe3ff56d25ac6cb395c196ecae41a6898f2e0bb"
+      },
+      "24": {
+        "source": "map_drive_24_regular.svg",
+        "sourceSize": 24,
+        "color": "#0F6CBD",
+        "sha256": "9cb85430aa0c3bea25223ebaeb1d09ebcc0134315d9c6252b8163e3695b152b8"
+      },
+      "32": {
+        "source": "map_drive_24_regular.svg",
+        "sourceSize": 24,
+        "color": "#0F6CBD",
+        "sha256": "9cb85430aa0c3bea25223ebaeb1d09ebcc0134315d9c6252b8163e3695b152b8"
+      }
+    },
+    "DriveRemovable": {
+      "16": {
+        "source": "usb_16_regular.svg",
+        "sourceSize": 16,
+        "color": "#0F6CBD",
+        "sha256": "cf369f7d4e9cbcaab18176e16206c5c2ca609da4e3b2407efbd1b77e98e05b70"
+      },
+      "24": {
+        "source": "usb_24_regular.svg",
+        "sourceSize": 24,
+        "color": "#0F6CBD",
+        "sha256": "77e19c7f285bbdd62f7bdc23667c71077c037a39d0796710ad362f4e5ed7592e"
+      },
+      "32": {
+        "source": "usb_24_regular.svg",
+        "sourceSize": 24,
+        "color": "#0F6CBD",
+        "sha256": "77e19c7f285bbdd62f7bdc23667c71077c037a39d0796710ad362f4e5ed7592e"
+      }
+    },
+    "DriveSFTP": {
+      "16": {
+        "source": "shield_globe_16_regular.svg",
+        "sourceSize": 16,
+        "color": "#0F6CBD",
+        "sha256": "828d42631c9a3d65dd0a9ffc6b3970780d302cdc5b26800aa8b4e39fb5f0d964"
+      },
+      "24": {
+        "source": "shield_globe_24_regular.svg",
+        "sourceSize": 24,
+        "color": "#0F6CBD",
+        "sha256": "5f9529588789f2f0063f4c9ad5c537a6f43c65f6c776970e63b124f7858b132c"
+      },
+      "32": {
+        "source": "shield_globe_24_regular.svg",
+        "sourceSize": 24,
+        "color": "#0F6CBD",
+        "sha256": "5f9529588789f2f0063f4c9ad5c537a6f43c65f6c776970e63b124f7858b132c"
+      }
+    },
+    "DriveUndelete": {
+      "16": {
+        "source": "delete_arrow_back_16_regular.svg",
+        "sourceSize": 16,
+        "color": "#0F6CBD",
+        "sha256": "fa8ea3de4c1942206c4c275408fbcfc309b40e5d913ab4ae9a421c9d86c311bf"
+      },
+      "24": {
+        "source": "delete_arrow_back_20_regular.svg",
+        "sourceSize": 20,
+        "color": "#0F6CBD",
+        "sha256": "9025e49fe986a7da5e7aa1a0a52d9a50005ff31042ef29dba4e34a6b60c02445"
+      },
+      "32": {
+        "source": "delete_arrow_back_20_regular.svg",
+        "sourceSize": 20,
+        "color": "#0F6CBD",
+        "sha256": "9025e49fe986a7da5e7aa1a0a52d9a50005ff31042ef29dba4e34a6b60c02445"
+      }
+    },
+    "Edit": {
+      "16": {
+        "source": "edit_16_regular.svg",
+        "sourceSize": 16,
+        "color": "#424242",
+        "sha256": "1898e80cd19caeb198555977b4631b8ff6b3e87e676b213b07539a1e10d08df6"
+      },
+      "24": {
+        "source": "edit_24_regular.svg",
+        "sourceSize": 24,
+        "color": "#424242",
+        "sha256": "90dd323abfe41ff7b0dfdc4525a9c9952b3133f5e6db9c92e3cfed3abc6ede0b"
+      },
+      "32": {
+        "source": "edit_32_regular.svg",
+        "sourceSize": 32,
+        "color": "#424242",
+        "sha256": "a58a74bd44cf859c0f57b1ed93cd66b24207bc59302869f09e3326ce52c17076"
+      }
+    },
+    "EditNewFile": {
+      "16": {
+        "source": "document_add_16_regular.svg",
+        "sourceSize": 16,
+        "color": "#424242",
+        "sha256": "83433ca81a56d9f94c4f91b30dcf0e27d17b63136761c57a36eb919f11ae7c81"
+      },
+      "24": {
+        "source": "document_add_24_regular.svg",
+        "sourceSize": 24,
+        "color": "#424242",
+        "sha256": "bf9f8ccb8a6518e928817a925983d55cf0b74e5b604b04f830387785efb26891"
+      },
+      "32": {
+        "source": "document_add_24_regular.svg",
+        "sourceSize": 24,
+        "color": "#424242",
+        "sha256": "bf9f8ccb8a6518e928817a925983d55cf0b74e5b604b04f830387785efb26891"
+      }
+    },
+    "Email": {
+      "16": {
+        "source": "mail_16_regular.svg",
+        "sourceSize": 16,
+        "color": "#424242",
+        "sha256": "ce49636a4d4fb01690d3d3bc77e302b5428f431528e0c0d056c144e05c6a2933"
+      },
+      "24": {
+        "source": "mail_24_regular.svg",
+        "sourceSize": 24,
+        "color": "#424242",
+        "sha256": "678d3d610f0ea4be3a7f17394d739e0856f4e0514ffd29d391acab4f5a8e2a23"
+      },
+      "32": {
+        "source": "mail_32_regular.svg",
+        "sourceSize": 32,
+        "color": "#424242",
+        "sha256": "c139df3780365d9baae4bb7b7e73052178203581b05fa58b8af64aa0a67fa9c9"
+      }
+    },
+    "Filter": {
+      "16": {
+        "source": "filter_16_regular.svg",
+        "sourceSize": 16,
+        "color": "#424242",
+        "sha256": "7dcbe70567e14d23e82657c77d546c6fa802461195f9a000902032abb3a3b56f"
+      },
+      "24": {
+        "source": "filter_24_regular.svg",
+        "sourceSize": 24,
+        "color": "#424242",
+        "sha256": "8b789a496b21cc9f6f1a3dd0a05b854409e8529353917a45838e1e3983fe26c9"
+      },
+      "32": {
+        "source": "filter_32_regular.svg",
+        "sourceSize": 32,
+        "color": "#424242",
+        "sha256": "4fe435fc0fbbbdf61d43e102c6717d25461c89d9ee15d9aeb3abec9c678bd5ec"
+      }
+    },
+    "FindFilesAndDirectories": {
+      "16": {
+        "source": "folder_search_16_regular.svg",
+        "sourceSize": 16,
+        "color": "#424242",
+        "sha256": "1396ff8d5acae431e1c4430b388f822579d922b9b2c43e85948ee533af56744d"
+      },
+      "24": {
+        "source": "folder_search_24_regular.svg",
+        "sourceSize": 24,
+        "color": "#424242",
+        "sha256": "9b4362d3c152e77d3331135350c3c8ffb20986b45bb636bc393f1281e8e64000"
+      },
+      "32": {
+        "source": "folder_search_24_regular.svg",
+        "sourceSize": 24,
+        "color": "#424242",
+        "sha256": "9b4362d3c152e77d3331135350c3c8ffb20986b45bb636bc393f1281e8e64000"
+      }
+    },
+    "Focus": {
+      "16": {
+        "source": "target_16_regular.svg",
+        "sourceSize": 16,
+        "color": "#0F6CBD",
+        "sha256": "a6257dbd9f4cb92642491788f73c76790029d06f5ed1f51ef4ef0aa54ca3d6eb"
+      },
+      "24": {
+        "source": "target_24_regular.svg",
+        "sourceSize": 24,
+        "color": "#0F6CBD",
+        "sha256": "cf8863e6c0aad2c13c143da1e91ffc8caf039a68ac38bcdd3a8616d9e776aa34"
+      },
+      "32": {
+        "source": "target_32_regular.svg",
+        "sourceSize": 32,
+        "color": "#0F6CBD",
+        "sha256": "1ec7ccca3e2f6e0e05678fe952c49fe4cd96d02e8c4afa103b3f65ac83f11fb2"
+      }
+    },
+    "FocusNameInOtherPanel": {
+      "16": {
+        "source": "document_target_16_regular.svg",
+        "sourceSize": 16,
+        "color": "#0F6CBD",
+        "sha256": "b295f736bbefac01ef5afd5105bbface2a28b9d248ce161418699a8722843bc6"
+      },
+      "24": {
+        "source": "document_target_24_regular.svg",
+        "sourceSize": 24,
+        "color": "#0F6CBD",
+        "sha256": "78e096c27b234138c27e97cb39d6d1b7be7e14352f6c20721ef94d76c62ad3fb"
+      },
+      "32": {
+        "source": "document_target_32_regular.svg",
+        "sourceSize": 32,
+        "color": "#0F6CBD",
+        "sha256": "0f06bc914f4c168ec590d6dd7c2546f50d0222e059a6b80015935942685cf287"
+      }
+    },
+    "Forward": {
+      "16": {
+        "source": "arrow_right_16_regular.svg",
+        "sourceSize": 16,
+        "color": "#0F6CBD",
+        "sha256": "a9686f723a5c81098dedaea7fc82d6f5b2e5e41aa43f4feb8614b93c3eea7a05"
+      },
+      "24": {
+        "source": "arrow_right_24_regular.svg",
+        "sourceSize": 24,
+        "color": "#0F6CBD",
+        "sha256": "127db653cba721d2d04ce9fd4ec5bb36b8b6b0a1a3dc53ff5a0cbfc103e44463"
+      },
+      "32": {
+        "source": "arrow_right_32_regular.svg",
+        "sourceSize": 32,
+        "color": "#0F6CBD",
+        "sha256": "8ffae7cdee681f1baf58afcd50e436b2b73f27f763428d2fb52682f628eda175"
+      }
+    },
+    "GoToHotPath": {
+      "16": {
+        "source": "bookmark_16_regular.svg",
+        "sourceSize": 16,
+        "color": "#0F6CBD",
+        "sha256": "8bfa23f827bebc9fb741de45b398fffe81d22062a454f6192b3f94d751af946a"
+      },
+      "24": {
+        "source": "bookmark_24_regular.svg",
+        "sourceSize": 24,
+        "color": "#0F6CBD",
+        "sha256": "021bbf9e8aca7ce6fecb1152576b898b9b0ea83f34fd388d0fe001d9fe943574"
+      },
+      "32": {
+        "source": "bookmark_32_regular.svg",
+        "sourceSize": 32,
+        "color": "#0F6CBD",
+        "sha256": "d4eb657b15b9b13d56dc8e04b9d6a31fa0f38efeb8f6a812112817d4b2cdb5a4"
+      }
+    },
+    "GoToNextSelectedName": {
+      "16": {
+        "source": "arrow_next_16_regular.svg",
+        "sourceSize": 16,
+        "color": "#0F6CBD",
+        "sha256": "93b444810ccc8ef892f0aa4dd04b2aacd1085e7616be115d561e4a904061a646"
+      },
+      "24": {
+        "source": "arrow_next_24_regular.svg",
+        "sourceSize": 24,
+        "color": "#0F6CBD",
+        "sha256": "181c6b77c364167eb84dc2a93744b7b487e7d54b10687311557a5101757d2f73"
+      },
+      "32": {
+        "source": "arrow_next_24_regular.svg",
+        "sourceSize": 24,
+        "color": "#0F6CBD",
+        "sha256": "181c6b77c364167eb84dc2a93744b7b487e7d54b10687311557a5101757d2f73"
+      }
+    },
+    "GoToPathfromOtherPanel": {
+      "16": {
+        "source": "folder_arrow_left_16_regular.svg",
+        "sourceSize": 16,
+        "color": "#0F6CBD",
+        "sha256": "02b024530776d95a760bbd262b870490004209a64a876f1cf070246a7a5ce93f"
+      },
+      "24": {
+        "source": "folder_arrow_left_24_regular.svg",
+        "sourceSize": 24,
+        "color": "#0F6CBD",
+        "sha256": "4ea93f726e4bd05e48bea3f4988700010dbaf05ba60f0293c5d91c0ca0f0bc2c"
+      },
+      "32": {
+        "source": "folder_arrow_left_32_regular.svg",
+        "sourceSize": 32,
+        "color": "#0F6CBD",
+        "sha256": "cfd6d0fc61f107037cf7e4c892a8877191a045b0bc82a7d31a0e0b1ea1163832"
+      }
+    },
+    "GoToPreviousSelectedName": {
+      "16": {
+        "source": "arrow_previous_16_regular.svg",
+        "sourceSize": 16,
+        "color": "#0F6CBD",
+        "sha256": "306c54a30b983d47b416507cd2971df50c0757b4c9d8c5934e75b472f14729be"
+      },
+      "24": {
+        "source": "arrow_previous_24_regular.svg",
+        "sourceSize": 24,
+        "color": "#0F6CBD",
+        "sha256": "c562bfd7f676f6b87b8ff882cd49de6783faa398661d09c8349d141400bb2aef"
+      },
+      "32": {
+        "source": "arrow_previous_24_regular.svg",
+        "sourceSize": 24,
+        "color": "#0F6CBD",
+        "sha256": "c562bfd7f676f6b87b8ff882cd49de6783faa398661d09c8349d141400bb2aef"
+      }
+    },
+    "GoToShortcutTarget": {
+      "16": {
+        "source": "link_16_regular.svg",
+        "sourceSize": 16,
+        "color": "#0F6CBD",
+        "sha256": "942980c9c311e36e565f324170224072eaf42a157ab264770ff22a1350464aa2"
+      },
+      "24": {
+        "source": "link_24_regular.svg",
+        "sourceSize": 24,
+        "color": "#0F6CBD",
+        "sha256": "a85da99fb6983ae48c63629b676dbdbad767e78f500e3d1dce9bbf4112ab891e"
+      },
+      "32": {
+        "source": "link_32_regular.svg",
+        "sourceSize": 32,
+        "color": "#0F6CBD",
+        "sha256": "0f53c8cd6c8fb02e530257f8bd58db7fd498b40ffbb3b35d8337359fcf75754c"
+      }
+    },
+    "HelpContents": {
+      "16": {
+        "source": "document_question_mark_16_regular.svg",
+        "sourceSize": 16,
+        "color": "#424242",
+        "sha256": "fab68ddacfca70f341a5f8f33464a924b22faa098c683084bcb1cf39c7264005"
+      },
+      "24": {
+        "source": "document_question_mark_24_regular.svg",
+        "sourceSize": 24,
+        "color": "#424242",
+        "sha256": "99e411879c3709faba1e7919e8e51e12ff7045110b42eef6381e18fdf1cf4726"
+      },
+      "32": {
+        "source": "document_question_mark_24_regular.svg",
+        "sourceSize": 24,
+        "color": "#424242",
+        "sha256": "99e411879c3709faba1e7919e8e51e12ff7045110b42eef6381e18fdf1cf4726"
+      }
+    },
+    "HideSelectedNames": {
+      "16": {
+        "source": "eye_off_16_regular.svg",
+        "sourceSize": 16,
+        "color": "#424242",
+        "sha256": "fb68bd27043b97143b2091b17318ef91487f3d1003e0f6cd4c5c6d29867a8880"
+      },
+      "24": {
+        "source": "eye_off_24_regular.svg",
+        "sourceSize": 24,
+        "color": "#424242",
+        "sha256": "89704bf9279aaa1df8ede9a06c0d1b524183140714489b8254faa7aca1261ae5"
+      },
+      "32": {
+        "source": "eye_off_32_regular.svg",
+        "sourceSize": 32,
+        "color": "#424242",
+        "sha256": "e0f774be31971e717fec772c02ba70db58b35f83cfa946116fdebdfa356a72f4"
+      }
+    },
+    "HideUnselectedNames": {
+      "16": {
+        "source": "eye_tracking_off_16_regular.svg",
+        "sourceSize": 16,
+        "color": "#424242",
+        "sha256": "0521dbb8cc851f54f383272ee285e3617b6c9e9b79c8be471e63e54a64a76a2a"
+      },
+      "24": {
+        "source": "eye_tracking_off_24_regular.svg",
+        "sourceSize": 24,
+        "color": "#424242",
+        "sha256": "32f8b7ecd53294bc45cd2ae7ba02af9fd53edb413c734167f3503a3ff9123805"
+      },
+      "32": {
+        "source": "eye_tracking_off_24_regular.svg",
+        "sourceSize": 24,
+        "color": "#424242",
+        "sha256": "32f8b7ecd53294bc45cd2ae7ba02af9fd53edb413c734167f3503a3ff9123805"
+      }
+    },
+    "InvertSelection": {
+      "16": {
+        "source": "checkbox_indeterminate_16_regular.svg",
+        "sourceSize": 16,
+        "color": "#0F6CBD",
+        "sha256": "d40c6733741fd479ab56bae2ee5f56d6b33418deecf13ef2b348ef333f06b3af"
+      },
+      "24": {
+        "source": "checkbox_indeterminate_24_regular.svg",
+        "sourceSize": 24,
+        "color": "#0F6CBD",
+        "sha256": "e05efe1911e655f74c07d45110b0f95061d2866f86314ffd496dab79764a80d0"
+      },
+      "32": {
+        "source": "checkbox_indeterminate_24_regular.svg",
+        "sourceSize": 24,
+        "color": "#0F6CBD",
+        "sha256": "e05efe1911e655f74c07d45110b0f95061d2866f86314ffd496dab79764a80d0"
+      }
+    },
+    "LoadSelection": {
+      "16": {
+        "source": "clipboard_arrow_right_16_regular.svg",
+        "sourceSize": 16,
+        "color": "#0F6CBD",
+        "sha256": "8526d44586293d89e128131a0fc0213db911de964ca2704f174fe002061577fa"
+      },
+      "24": {
+        "source": "clipboard_arrow_right_24_regular.svg",
+        "sourceSize": 24,
+        "color": "#0F6CBD",
+        "sha256": "b3eab77f9306fe246c34a4bcae990fbbc731c5e60fca81fb77e4767a10e58bb4"
+      },
+      "32": {
+        "source": "clipboard_arrow_right_24_regular.svg",
+        "sourceSize": 24,
+        "color": "#0F6CBD",
+        "sha256": "b3eab77f9306fe246c34a4bcae990fbbc731c5e60fca81fb77e4767a10e58bb4"
+      }
+    },
+    "MenuCheck": {
+      "16": {
+        "source": "checkmark_16_regular.svg",
+        "sourceSize": 16,
+        "color": "#0F6CBD",
+        "sha256": "953db534b6c56e385f90b2f91c1119298e19ccfdbbfdd840aabfee9be6de4abf"
+      },
+      "24": {
+        "source": "checkmark_24_regular.svg",
+        "sourceSize": 24,
+        "color": "#0F6CBD",
+        "sha256": "3b05851972b1bc66cd30e7c423d44dc59f38cae96eaa2f6dcdd22bb523df0f71"
+      },
+      "32": {
+        "source": "checkmark_32_regular.svg",
+        "sourceSize": 32,
+        "color": "#0F6CBD",
+        "sha256": "a500fce7b85d04d813e8dee89fd031191294f7d41b0d4337f343d6d143384fcb"
+      }
+    },
+    "MenuRadio": {
+      "16": {
+        "source": "application optical drawing",
+        "sourceSize": 16,
+        "color": "#0F6CBD"
+      },
+      "24": {
+        "source": "application optical drawing",
+        "sourceSize": 16,
+        "color": "#0F6CBD"
+      },
+      "32": {
+        "source": "application optical drawing",
+        "sourceSize": 16,
+        "color": "#0F6CBD"
+      }
+    },
+    "Modify": {
+      "16": {
+        "source": "edit_16_regular.svg",
+        "sourceSize": 16,
+        "color": "#424242",
+        "sha256": "1898e80cd19caeb198555977b4631b8ff6b3e87e676b213b07539a1e10d08df6"
+      },
+      "24": {
+        "source": "edit_24_regular.svg",
+        "sourceSize": 24,
+        "color": "#424242",
+        "sha256": "90dd323abfe41ff7b0dfdc4525a9c9952b3133f5e6db9c92e3cfed3abc6ede0b"
+      },
+      "32": {
+        "source": "edit_32_regular.svg",
+        "sourceSize": 32,
+        "color": "#424242",
+        "sha256": "a58a74bd44cf859c0f57b1ed93cd66b24207bc59302869f09e3326ce52c17076"
+      }
+    },
+    "Move": {
+      "16": {
+        "source": "document_arrow_right_16_regular.svg",
+        "sourceSize": 16,
+        "color": "#424242",
+        "sha256": "c948dc667288f6480cbc7f15d2d4b2404d025be6ad0c1fcf266a6e49999994b0"
+      },
+      "24": {
+        "source": "document_arrow_right_24_regular.svg",
+        "sourceSize": 24,
+        "color": "#424242",
+        "sha256": "6af411263419644ae2be6e17b2d894fd40f3308cc325d45681fd70f29103af05"
+      },
+      "32": {
+        "source": "document_arrow_right_24_regular.svg",
+        "sourceSize": 24,
+        "color": "#424242",
+        "sha256": "6af411263419644ae2be6e17b2d894fd40f3308cc325d45681fd70f29103af05"
+      }
+    },
+    "MoveItemDown": {
+      "16": {
+        "source": "arrow_down_16_regular.svg",
+        "sourceSize": 16,
+        "color": "#424242",
+        "sha256": "01dda54a2f1b1644925059c903393db5242c9cf0da91c3f226f59e1b46e64252"
+      },
+      "24": {
+        "source": "arrow_down_24_regular.svg",
+        "sourceSize": 24,
+        "color": "#424242",
+        "sha256": "2e2305fd607615f2f8c7973f019bbe45fd08816782bdc91828868e62a9596fc4"
+      },
+      "32": {
+        "source": "arrow_down_32_regular.svg",
+        "sourceSize": 32,
+        "color": "#424242",
+        "sha256": "f9588efece0d5b1dd85191cffdcdb7e6487664b7122da09ba6e31aa80fc07aa5"
+      }
+    },
+    "MoveItemUp": {
+      "16": {
+        "source": "arrow_up_16_regular.svg",
+        "sourceSize": 16,
+        "color": "#424242",
+        "sha256": "ae35dbc99cc622f3b20d5abfe31f7eb95f4f9e70de16087fdaccfb1592552a86"
+      },
+      "24": {
+        "source": "arrow_up_24_regular.svg",
+        "sourceSize": 24,
+        "color": "#424242",
+        "sha256": "0343d6edf0543e4e55a888409fa013af0badd2b092e74961f0a7b4bc0181e168"
+      },
+      "32": {
+        "source": "arrow_up_32_regular.svg",
+        "sourceSize": 32,
+        "color": "#424242",
+        "sha256": "b8036dc855f06e26d6a0ae6c053c4b340f3eda5f0c6bb834187b450780ce1653"
+      }
+    },
+    "New": {
+      "16": {
+        "source": "add_16_regular.svg",
+        "sourceSize": 16,
+        "color": "#424242",
+        "sha256": "b8b037be8992c6da600a47388aec7bc3df66b7d7748d12a6e50a7e8a1eee603e"
+      },
+      "24": {
+        "source": "add_24_regular.svg",
+        "sourceSize": 24,
+        "color": "#424242",
+        "sha256": "e5a1042750088527992b3396337a1962a36161ffe497dc9ac3cdac1a0b91ae91"
+      },
+      "32": {
+        "source": "add_32_regular.svg",
+        "sourceSize": 32,
+        "color": "#424242",
+        "sha256": "94b6479475867d962ec08404780a954f1b116f283904ae219272a191239f72d6"
+      }
+    },
+    "NTFSCompress": {
+      "16": {
+        "source": "arrow_minimize_16_regular.svg",
+        "sourceSize": 16,
+        "color": "#424242",
+        "sha256": "80fabd689454ba7e3f65590f72d92787c35915e0755be6441caff750e5df3b9f"
+      },
+      "24": {
+        "source": "arrow_minimize_24_regular.svg",
+        "sourceSize": 24,
+        "color": "#424242",
+        "sha256": "2453b272f39bd13648ba02763792a8ab7f3b1c3fe83c7b5e5dfb46654096acd5"
+      },
+      "32": {
+        "source": "arrow_minimize_24_regular.svg",
+        "sourceSize": 24,
+        "color": "#424242",
+        "sha256": "2453b272f39bd13648ba02763792a8ab7f3b1c3fe83c7b5e5dfb46654096acd5"
+      }
+    },
+    "NTFSUncompress": {
+      "16": {
+        "source": "arrow_maximize_16_regular.svg",
+        "sourceSize": 16,
+        "color": "#424242",
+        "sha256": "f0ad4d9d78087fb725dd1758e5755f3b93fdc783b43bb6143521525511ff8029"
+      },
+      "24": {
+        "source": "arrow_maximize_24_regular.svg",
+        "sourceSize": 24,
+        "color": "#424242",
+        "sha256": "7ce78ae6635d50e9d07f17d413dae1cd5738abe8389825062284959ab52441c9"
+      },
+      "32": {
+        "source": "arrow_maximize_32_regular.svg",
+        "sourceSize": 32,
+        "color": "#424242",
+        "sha256": "f7f0d0a8c2839c053b17be6176cd9628883a3d82e60c2f0c17dc6a917de0d564"
+      }
+    },
+    "OpenActiveFolder": {
+      "16": {
+        "source": "folder_open_16_regular.svg",
+        "sourceSize": 16,
+        "color": "#0F6CBD",
+        "sha256": "4adc3be577befb3ab9d44979fff1126089da72b3691d37c8d109a6ecf30f5d16"
+      },
+      "24": {
+        "source": "folder_open_24_regular.svg",
+        "sourceSize": 24,
+        "color": "#0F6CBD",
+        "sha256": "ce6a3115f9f2b48605780bdd7328f6d03b1d7c193b0d8beb63057e49ad802c3e"
+      },
+      "32": {
+        "source": "folder_open_24_regular.svg",
+        "sourceSize": 24,
+        "color": "#0F6CBD",
+        "sha256": "ce6a3115f9f2b48605780bdd7328f6d03b1d7c193b0d8beb63057e49ad802c3e"
+      }
+    },
+    "OpenComputer": {
+      "16": {
+        "source": "desktop_16_regular.svg",
+        "sourceSize": 16,
+        "color": "#0F6CBD",
+        "sha256": "1d481c4a7b9aafec9e4117b31cd9126527aeeae9a27ec200b499afad1cc2557a"
+      },
+      "24": {
+        "source": "desktop_24_regular.svg",
+        "sourceSize": 24,
+        "color": "#0F6CBD",
+        "sha256": "df126630843e995cf50c83c730a2c9f829b5c160b9e033737c5bbc56d053ba25"
+      },
+      "32": {
+        "source": "desktop_32_regular.svg",
+        "sourceSize": 32,
+        "color": "#0F6CBD",
+        "sha256": "18e3e2be7cc368c75825b9a2ef3a6e3d8af00f04ee0232b8e187fd5ddc923bac"
+      }
+    },
+    "OpenControlPanel": {
+      "16": {
+        "source": "settings_16_regular.svg",
+        "sourceSize": 16,
+        "color": "#0F6CBD",
+        "sha256": "8e1f70228f570611ca91f2345564788b984ecd1dd85ae18e2d518f801f4c0402"
+      },
+      "24": {
+        "source": "settings_24_regular.svg",
+        "sourceSize": 24,
+        "color": "#0F6CBD",
+        "sha256": "2d6d320d21346d519f87261c3ce941272b6f6bf54350ed3f00c5494e99f7804f"
+      },
+      "32": {
+        "source": "settings_32_regular.svg",
+        "sourceSize": 32,
+        "color": "#0F6CBD",
+        "sha256": "af08a6f88dc79b52e73a43f890dda01e16e9fbde3f4fac342546d86bead1cb82"
+      }
+    },
+    "OpenDesktop": {
+      "16": {
+        "source": "desktop_keyboard_16_regular.svg",
+        "sourceSize": 16,
+        "color": "#0F6CBD",
+        "sha256": "29813ef6fd274f455960119431ade50c0dec1383d9ff3a8f6926c27efc3e17d6"
+      },
+      "24": {
+        "source": "desktop_keyboard_24_regular.svg",
+        "sourceSize": 24,
+        "color": "#0F6CBD",
+        "sha256": "da640c4d440b3647dda8a8a858420ac8df23cfcf15561d4ec984c04aed5cb1ae"
+      },
+      "32": {
+        "source": "desktop_keyboard_24_regular.svg",
+        "sourceSize": 24,
+        "color": "#0F6CBD",
+        "sha256": "da640c4d440b3647dda8a8a858420ac8df23cfcf15561d4ec984c04aed5cb1ae"
+      }
+    },
+    "OpenDocuments": {
+      "16": {
+        "source": "document_text_16_regular.svg",
+        "sourceSize": 16,
+        "color": "#0F6CBD",
+        "sha256": "27909307429331392423cc7bfdc0f57713ac585f0102d8db142e642b24e5023f"
+      },
+      "24": {
+        "source": "document_text_24_regular.svg",
+        "sourceSize": 24,
+        "color": "#0F6CBD",
+        "sha256": "46d173dd6621d3a774269edddeee47bc964fbce8e93a38206b1f000cb28a8cb6"
+      },
+      "32": {
+        "source": "document_text_32_regular.svg",
+        "sourceSize": 32,
+        "color": "#0F6CBD",
+        "sha256": "9b9691a6f59796e1b8f1e529b6bd20de2b298922b7c6f9f7df8948a2bb048118"
+      }
+    },
+    "OpenFolder": {
+      "16": {
+        "source": "folder_16_regular.svg",
+        "sourceSize": 16,
+        "color": "#0F6CBD",
+        "sha256": "02537073e2e77f95f199704e7f04a68cc5a19f50ca20193a567f8ceaa6b68b4a"
+      },
+      "24": {
+        "source": "folder_24_regular.svg",
+        "sourceSize": 24,
+        "color": "#0F6CBD",
+        "sha256": "9699f588e3e77fd73f6cd7d426a1c77bef26f4816ccb6b9e1b93824fffe8a222"
+      },
+      "32": {
+        "source": "folder_32_regular.svg",
+        "sourceSize": 32,
+        "color": "#0F6CBD",
+        "sha256": "1a92be91ee933c1a4f327258f64ac9e88a380c954bccf852525054161ffaa479"
+      }
+    },
+    "OpenFonts": {
+      "16": {
+        "source": "text_font_16_regular.svg",
+        "sourceSize": 16,
+        "color": "#0F6CBD",
+        "sha256": "31a78496515eda372871bf4c1c788c39eda5c6f8869983cbca1944253e4faaa2"
+      },
+      "24": {
+        "source": "text_font_24_regular.svg",
+        "sourceSize": 24,
+        "color": "#0F6CBD",
+        "sha256": "d2f66c02522c5a24c4e5004ab2c12d0ffe2186a9b4b52a88853196e88092a210"
+      },
+      "32": {
+        "source": "text_font_24_regular.svg",
+        "sourceSize": 24,
+        "color": "#0F6CBD",
+        "sha256": "d2f66c02522c5a24c4e5004ab2c12d0ffe2186a9b4b52a88853196e88092a210"
+      }
+    },
+    "OpenNameinOtherPanel": {
+      "16": {
+        "source": "document_arrow_left_16_regular.svg",
+        "sourceSize": 16,
+        "color": "#0F6CBD",
+        "sha256": "b220a627f4c85d743c08b611721209a8746a770a3ec423226c095e203bb3f7e5"
+      },
+      "24": {
+        "source": "document_arrow_left_24_regular.svg",
+        "sourceSize": 24,
+        "color": "#0F6CBD",
+        "sha256": "f0121bb4696d8dbadb9b2b5705acc3d8cce22b85998fc539e57dbe01fed3578e"
+      },
+      "32": {
+        "source": "document_arrow_left_24_regular.svg",
+        "sourceSize": 24,
+        "color": "#0F6CBD",
+        "sha256": "f0121bb4696d8dbadb9b2b5705acc3d8cce22b85998fc539e57dbe01fed3578e"
+      }
+    },
+    "OpenNetwork": {
+      "16": {
+        "source": "virtual_network_16_regular.svg",
+        "sourceSize": 16,
+        "color": "#0F6CBD",
+        "sha256": "007200c459281a732002d2bf0f6aeedefad92e128a3569802b5706681eaaf55f"
+      },
+      "24": {
+        "source": "virtual_network_24_regular.svg",
+        "sourceSize": 24,
+        "color": "#0F6CBD",
+        "sha256": "2ab414c54f256d43e51642d05c864f77ecfa4cc4e7841212e361aa68a1ddf8a2"
+      },
+      "32": {
+        "source": "virtual_network_24_regular.svg",
+        "sourceSize": 24,
+        "color": "#0F6CBD",
+        "sha256": "2ab414c54f256d43e51642d05c864f77ecfa4cc4e7841212e361aa68a1ddf8a2"
+      }
+    },
+    "OpenPrinters": {
+      "16": {
+        "source": "print_16_regular.svg",
+        "sourceSize": 16,
+        "color": "#0F6CBD",
+        "sha256": "f70fc674bddfbbac9ea224f884328accf69d4f538be670de3f7a313bdd6c1851"
+      },
+      "24": {
+        "source": "print_24_regular.svg",
+        "sourceSize": 24,
+        "color": "#0F6CBD",
+        "sha256": "2c560a618286a4ec22796aabc74159d36962d951fc985f34749771759d3716c5"
+      },
+      "32": {
+        "source": "print_32_regular.svg",
+        "sourceSize": 32,
+        "color": "#0F6CBD",
+        "sha256": "b86b4faee614eb087ca910964f6b480881bb0c086ae48ba01d23b526323223e8"
+      }
+    },
+    "OpenRecycleBin": {
+      "16": {
+        "source": "application optical drawing",
+        "sourceSize": 16,
+        "color": "#0F6CBD"
+      },
+      "24": {
+        "source": "bin_recycle_24_regular.svg",
+        "sourceSize": 24,
+        "color": "#0F6CBD",
+        "sha256": "62bafcbb6c691b3f9986d8dc8592291474a36f15a382d57e67274c1933a5c79e"
+      },
+      "32": {
+        "source": "bin_recycle_24_regular.svg",
+        "sourceSize": 24,
+        "color": "#0F6CBD",
+        "sha256": "62bafcbb6c691b3f9986d8dc8592291474a36f15a382d57e67274c1933a5c79e"
+      }
+    },
+    "Pack": {
+      "16": {
+        "source": "archive_16_regular.svg",
+        "sourceSize": 16,
+        "color": "#424242",
+        "sha256": "c921516bf285fa8b5372544ba8eacf4a6996db187cbd683b24c48bc1135625b9"
+      },
+      "24": {
+        "source": "archive_24_regular.svg",
+        "sourceSize": 24,
+        "color": "#424242",
+        "sha256": "9ff53ff5b658312674d176c15e82d3800cdc14a5eea96ccfe46475eb193dc89a"
+      },
+      "32": {
+        "source": "archive_32_regular.svg",
+        "sourceSize": 32,
+        "color": "#424242",
+        "sha256": "7de8feee1f72a8cdf8e1873802bb35c167caf39dd9cfebf775ed5e9189f45c3b"
+      }
+    },
+    "ParentDirectory": {
+      "16": {
+        "source": "folder_arrow_up_16_regular.svg",
+        "sourceSize": 16,
+        "color": "#0F6CBD",
+        "sha256": "a449bdbaac039348d03a3168bf9777b5b7e6bd24928ec7d8da589b187e36ed5e"
+      },
+      "24": {
+        "source": "folder_arrow_up_24_regular.svg",
+        "sourceSize": 24,
+        "color": "#0F6CBD",
+        "sha256": "44c3b67268d64d3a64edc43da943a557d7ec009a2b116297284290c0b401aca1"
+      },
+      "32": {
+        "source": "folder_arrow_up_32_regular.svg",
+        "sourceSize": 32,
+        "color": "#0F6CBD",
+        "sha256": "a0352161cc9a890c7daec34c65bbaa90f335038b3b03b5bb3113233e3ce6aecc"
+      }
+    },
+    "PasteShortcut": {
+      "16": {
+        "source": "clipboard_link_16_regular.svg",
+        "sourceSize": 16,
+        "color": "#424242",
+        "sha256": "e984abedf9072f5926adddf535b14b87d7b4cdfd5740a94935222a16e97b90ae"
+      },
+      "24": {
+        "source": "clipboard_link_24_regular.svg",
+        "sourceSize": 24,
+        "color": "#424242",
+        "sha256": "8b93949338ca1d2131b6a37e712e340eccdaad89d7656351928caf4225322b21"
+      },
+      "32": {
+        "source": "clipboard_link_24_regular.svg",
+        "sourceSize": 24,
+        "color": "#424242",
+        "sha256": "8b93949338ca1d2131b6a37e712e340eccdaad89d7656351928caf4225322b21"
+      }
+    },
+    "PluginArchive": {
+      "16": {
+        "source": "folder_zip_16_regular.svg",
+        "sourceSize": 16,
+        "color": "#0F6CBD",
+        "sha256": "de1a06a08032bb8b625266a911957eb934650f6dc0b6be955c992db4c3e55634"
+      },
+      "24": {
+        "source": "folder_zip_24_regular.svg",
+        "sourceSize": 24,
+        "color": "#0F6CBD",
+        "sha256": "2d8fa00219013412adeaa29c47d97571b546e508678757a403408694dea2cb1e"
+      },
+      "32": {
+        "source": "folder_zip_24_regular.svg",
+        "sourceSize": 24,
+        "color": "#0F6CBD",
+        "sha256": "2d8fa00219013412adeaa29c47d97571b546e508678757a403408694dea2cb1e"
+      }
+    },
+    "PluginAutomation": {
+      "16": {
+        "source": "code_16_regular.svg",
+        "sourceSize": 16,
+        "color": "#0F6CBD",
+        "sha256": "6eacd95ccaab22aa9f7521efb753870f0aab4bb7fbff5d64ec8890212947fab2"
+      },
+      "24": {
+        "source": "code_24_regular.svg",
+        "sourceSize": 24,
+        "color": "#0F6CBD",
+        "sha256": "511189746149c7343686ce1c1e9117ed75adb9ce67843986c526b8412c8438d6"
+      },
+      "32": {
+        "source": "code_24_regular.svg",
+        "sourceSize": 24,
+        "color": "#0F6CBD",
+        "sha256": "511189746149c7343686ce1c1e9117ed75adb9ce67843986c526b8412c8438d6"
+      }
+    },
+    "PluginChecksum": {
+      "16": {
+        "source": "shield_checkmark_16_regular.svg",
+        "sourceSize": 16,
+        "color": "#0F6CBD",
+        "sha256": "44a96f68a9b49038ac02b8b7c910bf5769a27aa04779cfcf4f7458f30002a710"
+      },
+      "24": {
+        "source": "shield_checkmark_24_regular.svg",
+        "sourceSize": 24,
+        "color": "#0F6CBD",
+        "sha256": "b2d60da29dce77e7da4bf4ff57057cac533806838ce417bcf312c27b6b0743e6"
+      },
+      "32": {
+        "source": "shield_checkmark_32_regular.svg",
+        "sourceSize": 32,
+        "color": "#0F6CBD",
+        "sha256": "02f5c2eb18ad95a29ab99f840f0bb4d716c824eada18f33f05608e09ce205cfd"
+      }
+    },
+    "PluginCompare": {
+      "16": {
+        "source": "document_multiple_16_regular.svg",
+        "sourceSize": 16,
+        "color": "#0F6CBD",
+        "sha256": "6b534c8167f8a1dfd308b7c505aef26bb6dd0cd23ee797f904fd6407d86465a8"
+      },
+      "24": {
+        "source": "document_multiple_24_regular.svg",
+        "sourceSize": 24,
+        "color": "#0F6CBD",
+        "sha256": "51c4f7666a553adf359c6230883fd98a86ad3652cf6b4c3e35a282f5a79ee5c5"
+      },
+      "32": {
+        "source": "document_multiple_24_regular.svg",
+        "sourceSize": 24,
+        "color": "#0F6CBD",
+        "sha256": "51c4f7666a553adf359c6230883fd98a86ad3652cf6b4c3e35a282f5a79ee5c5"
+      }
+    },
+    "PluginCompound": {
+      "16": {
+        "source": "document_bullet_list_cube_16_regular.svg",
+        "sourceSize": 16,
+        "color": "#0F6CBD",
+        "sha256": "96bfc875fa58383b598d59d009708dbc2e33d78ecc736bfd03ddcf9c8f1bb909"
+      },
+      "24": {
+        "source": "document_bullet_list_cube_24_regular.svg",
+        "sourceSize": 24,
+        "color": "#0F6CBD",
+        "sha256": "5c70429e88e99e3ccb9c23b540d54d063a78c5bd3935d66decc84091cdedbca8"
+      },
+      "32": {
+        "source": "document_bullet_list_cube_24_regular.svg",
+        "sourceSize": 24,
+        "color": "#0F6CBD",
+        "sha256": "5c70429e88e99e3ccb9c23b540d54d063a78c5bd3935d66decc84091cdedbca8"
+      }
+    },
+    "PluginDatabase": {
+      "16": {
+        "source": "database_16_regular.svg",
+        "sourceSize": 16,
+        "color": "#0F6CBD",
+        "sha256": "d4305eba54050a83858c90b8f7db6443549ed7081eafc2859706c7b485fa2ed7"
+      },
+      "24": {
+        "source": "database_24_regular.svg",
+        "sourceSize": 24,
+        "color": "#0F6CBD",
+        "sha256": "121a2f4214d2be39d45ed7aa2c6a1ad6cb7d8d4dae151ab3498eb0b4c3069950"
+      },
+      "32": {
+        "source": "database_32_regular.svg",
+        "sourceSize": 32,
+        "color": "#0F6CBD",
+        "sha256": "496cbdabd51d1004da564b4801612791c271188d71f762b1af12001900d94f28"
+      }
+    },
+    "PluginDiskMap": {
+      "16": {
+        "source": "application optical drawing",
+        "sourceSize": 16,
+        "color": "#0F6CBD"
+      },
+      "24": {
+        "source": "data_treemap_24_regular.svg",
+        "sourceSize": 24,
+        "color": "#0F6CBD",
+        "sha256": "e8665ceddd9e8d17eb67d9009ef355cec33c35358540f414e6bc79bee7bffede"
+      },
+      "32": {
+        "source": "data_treemap_24_regular.svg",
+        "sourceSize": 24,
+        "color": "#0F6CBD",
+        "sha256": "e8665ceddd9e8d17eb67d9009ef355cec33c35358540f414e6bc79bee7bffede"
+      }
+    },
+    "PluginDiskRecovery": {
+      "16": {
+        "source": "arrow_counterclockwise_16_regular.svg",
+        "sourceSize": 16,
+        "color": "#0F6CBD",
+        "sha256": "2d36deecccbbafb46d8d850771d587e8afb8795810154736c00989a7b86f4055"
+      },
+      "24": {
+        "source": "arrow_counterclockwise_24_regular.svg",
+        "sourceSize": 24,
+        "color": "#0F6CBD",
+        "sha256": "d344828b06e5790416b263b7eb85df42602d95bffeab1a5a4a9f02de8ac72884"
+      },
+      "32": {
+        "source": "arrow_counterclockwise_32_regular.svg",
+        "sourceSize": 32,
+        "color": "#0F6CBD",
+        "sha256": "d64172d32325d5ea77a907982046ba0a02f8546f9219fac544b7fcdd89b8702c"
+      }
+    },
+    "PluginExecutable": {
+      "16": {
+        "source": "window_dev_tools_16_regular.svg",
+        "sourceSize": 16,
+        "color": "#0F6CBD",
+        "sha256": "abfd49c2771c565d268d067de32b0d95062540c937910103dafcaaf4c140c339"
+      },
+      "24": {
+        "source": "window_dev_tools_24_regular.svg",
+        "sourceSize": 24,
+        "color": "#0F6CBD",
+        "sha256": "6538e1786a6dbea20048e92a8be77d6ec5a1f3afd9db9257520ebb3bdecbbabe"
+      },
+      "32": {
+        "source": "window_dev_tools_24_regular.svg",
+        "sourceSize": 24,
+        "color": "#0F6CBD",
+        "sha256": "6538e1786a6dbea20048e92a8be77d6ec5a1f3afd9db9257520ebb3bdecbbabe"
+      }
+    },
+    "PluginFolders": {
+      "16": {
+        "source": "app_folder_16_regular.svg",
+        "sourceSize": 16,
+        "color": "#0F6CBD",
+        "sha256": "546ac8b19e78363964db4b62b0663cd476a6c3b9b8720002dba384861cfbb2b9"
+      },
+      "24": {
+        "source": "app_folder_24_regular.svg",
+        "sourceSize": 24,
+        "color": "#0F6CBD",
+        "sha256": "eb9a9f50687665c8ae5d530255c4d6e918fd0f295e369c2a538ee7ccdd5e811c"
+      },
+      "32": {
+        "source": "app_folder_32_regular.svg",
+        "sourceSize": 32,
+        "color": "#0F6CBD",
+        "sha256": "8c25eaf69cc9156f0c44cb991745fd8645806fa88c4aa0a1f228f3816816d6ca"
+      }
+    },
+    "PluginHelp": {
+      "16": {
+        "source": "book_16_regular.svg",
+        "sourceSize": 16,
+        "color": "#0F6CBD",
+        "sha256": "7b2ea2bb826081f962ebe8168cca6411f468aa0c0800f76dc703cdefe4f8d5e0"
+      },
+      "24": {
+        "source": "book_24_regular.svg",
+        "sourceSize": 24,
+        "color": "#0F6CBD",
+        "sha256": "57d27c95fb8fa3224598562af6ff6c133cc2957b4b42b9a7caf95129b6d9178e"
+      },
+      "32": {
+        "source": "book_32_regular.svg",
+        "sourceSize": 32,
+        "color": "#0F6CBD",
+        "sha256": "bcdeeb4b8bb8247201bdb3a94d3c9452279a14b4ef37b6b7139ebb165bfd45f1"
+      }
+    },
+    "PluginMedia": {
+      "16": {
+        "source": "video_16_regular.svg",
+        "sourceSize": 16,
+        "color": "#0F6CBD",
+        "sha256": "2d379736421e73fc5a311818f0be0d48c04b45f3cda9fac30c1d95d5bfee187c"
+      },
+      "24": {
+        "source": "video_24_regular.svg",
+        "sourceSize": 24,
+        "color": "#0F6CBD",
+        "sha256": "e3f8e2b1d8f856098a9c66d8d7dfe5d7a2110343ae37042d00449b59c2dcf95b"
+      },
+      "32": {
+        "source": "video_32_regular.svg",
+        "sourceSize": 32,
+        "color": "#0F6CBD",
+        "sha256": "ffb074cc5dcfca9809a6deceb8e1aabf56a2a13c36fba0a5d5d00f13440f9af0"
+      }
+    },
+    "PluginNetwork": {
+      "16": {
+        "source": "desktop_sync_16_regular.svg",
+        "sourceSize": 16,
+        "color": "#0F6CBD",
+        "sha256": "daf28d822f48c709951da6707f46124d6d52b054c80140f46a3a41a72552af30"
+      },
+      "24": {
+        "source": "desktop_sync_24_regular.svg",
+        "sourceSize": 24,
+        "color": "#0F6CBD",
+        "sha256": "80ca25f0f6a5b03f0e334f8dc3623ce34fd7d5d4d655764be98c89e138cb5a62"
+      },
+      "32": {
+        "source": "desktop_sync_24_regular.svg",
+        "sourceSize": 24,
+        "color": "#0F6CBD",
+        "sha256": "80ca25f0f6a5b03f0e334f8dc3623ce34fd7d5d4d655764be98c89e138cb5a62"
+      }
+    },
+    "PluginPicture": {
+      "16": {
+        "source": "image_16_regular.svg",
+        "sourceSize": 16,
+        "color": "#0F6CBD",
+        "sha256": "78103d19e457ea13c5bb1a30f23311e1366472b3a0f76c8ae3fd989ed1159159"
+      },
+      "24": {
+        "source": "image_24_regular.svg",
+        "sourceSize": 24,
+        "color": "#0F6CBD",
+        "sha256": "028a9cc4eba4b6f9c2264ace17983661011703ab28977258c16040d83e98aa5d"
+      },
+      "32": {
+        "source": "image_32_regular.svg",
+        "sourceSize": 32,
+        "color": "#0F6CBD",
+        "sha256": "cb6e507ffbef1f081c3323d0a44334bcd4e8648e6dfa51cc1b5640f62844d2ff"
+      }
+    },
+    "PluginRename": {
+      "16": {
+        "source": "rename_16_regular.svg",
+        "sourceSize": 16,
+        "color": "#0F6CBD",
+        "sha256": "65fcfedac72cc646f9925e2e5f38dc70010ee748e73c4efc8363e730536acac1"
+      },
+      "24": {
+        "source": "rename_24_regular.svg",
+        "sourceSize": 24,
+        "color": "#0F6CBD",
+        "sha256": "c45d1b1de2459b601cd628e7cf47503407c220f004a4d8c2b25ee4fbf4d9303c"
+      },
+      "32": {
+        "source": "rename_24_regular.svg",
+        "sourceSize": 24,
+        "color": "#0F6CBD",
+        "sha256": "c45d1b1de2459b601cd628e7cf47503407c220f004a4d8c2b25ee4fbf4d9303c"
+      }
+    },
+    "PluginSplit": {
+      "16": {
+        "source": "arrow_split_16_regular.svg",
+        "sourceSize": 16,
+        "color": "#0F6CBD",
+        "sha256": "681fad5333ec74ad81181dbfacc12d1a469af1052e3d90c10591324811bb9650"
+      },
+      "24": {
+        "source": "arrow_split_24_regular.svg",
+        "sourceSize": 24,
+        "color": "#0F6CBD",
+        "sha256": "d036f70451dd9ba5ed4003d8c7273a1b4c0fe5b88cfb694a14c6559ccbd656a8"
+      },
+      "32": {
+        "source": "arrow_split_24_regular.svg",
+        "sourceSize": 24,
+        "color": "#0F6CBD",
+        "sha256": "d036f70451dd9ba5ed4003d8c7273a1b4c0fe5b88cfb694a14c6559ccbd656a8"
+      }
+    },
+    "PluginUpdate": {
+      "16": {
+        "source": "window_arrow_up_16_regular.svg",
+        "sourceSize": 16,
+        "color": "#0F6CBD",
+        "sha256": "0603c16de7afd2e71b58c00bb3d470f4a75e70a272db51e108c7cd2a9393e604"
+      },
+      "24": {
+        "source": "window_arrow_up_24_regular.svg",
+        "sourceSize": 24,
+        "color": "#0F6CBD",
+        "sha256": "ff6bba95bfac2cad04bc8066fbcd3a78bbac4ce93509e3a0be74e00e824c38a7"
+      },
+      "32": {
+        "source": "window_arrow_up_24_regular.svg",
+        "sourceSize": 24,
+        "color": "#0F6CBD",
+        "sha256": "ff6bba95bfac2cad04bc8066fbcd3a78bbac4ce93509e3a0be74e00e824c38a7"
+      }
+    },
+    "PluginWeb": {
+      "16": {
+        "source": "document_globe_16_regular.svg",
+        "sourceSize": 16,
+        "color": "#0F6CBD",
+        "sha256": "b97cefb8e0e4d8dd04ac48bc001053a20929f3f4022ae16289c7d8818318f2de"
+      },
+      "24": {
+        "source": "document_globe_24_regular.svg",
+        "sourceSize": 24,
+        "color": "#0F6CBD",
+        "sha256": "a7b080fd0cb90b5c21620a8ce2d1e0e9a4734be4d98268b36a72dbf68c7d08c7"
+      },
+      "32": {
+        "source": "document_globe_24_regular.svg",
+        "sourceSize": 24,
+        "color": "#0F6CBD",
+        "sha256": "a7b080fd0cb90b5c21620a8ce2d1e0e9a4734be4d98268b36a72dbf68c7d08c7"
+      }
+    },
+    "Properties": {
+      "16": {
+        "source": "document_settings_16_regular.svg",
+        "sourceSize": 16,
+        "color": "#424242",
+        "sha256": "246b4d7536a971f170fbb60cc4bf3a5cb5b9fb366c9b01506df1956c06a36f8d"
+      },
+      "24": {
+        "source": "document_settings_20_regular.svg",
+        "sourceSize": 20,
+        "color": "#424242",
+        "sha256": "1b172686c0c04f24a3d720308797f2e39379705bdd95be4df1b1b1a9037f1d9a"
+      },
+      "32": {
+        "source": "document_settings_20_regular.svg",
+        "sourceSize": 20,
+        "color": "#424242",
+        "sha256": "1b172686c0c04f24a3d720308797f2e39379705bdd95be4df1b1b1a9037f1d9a"
+      }
+    },
+    "QuickRename": {
+      "16": {
+        "source": "text_edit_style_16_regular.svg",
+        "sourceSize": 16,
+        "color": "#424242",
+        "sha256": "d9276ab88e129747439640c73cd6ab7aa6cb45346fa7c6a3d5cbaffc26b0ec01"
+      },
+      "24": {
+        "source": "text_edit_style_24_regular.svg",
+        "sourceSize": 24,
+        "color": "#424242",
+        "sha256": "154e585b05d6538a1377ec381ee6763c36eb8c2e9c1c9ed84e8f63c7c2647b72"
+      },
+      "32": {
+        "source": "text_edit_style_24_regular.svg",
+        "sourceSize": 24,
+        "color": "#424242",
+        "sha256": "154e585b05d6538a1377ec381ee6763c36eb8c2e9c1c9ed84e8f63c7c2647b72"
+      }
+    },
+    "Refresh": {
+      "16": {
+        "source": "arrow_sync_16_regular.svg",
+        "sourceSize": 16,
+        "color": "#0F6CBD",
+        "sha256": "fdb15ade1d9ef149abe9c790b0e22cf2d08f037cd5998c419f05cb5861b9a4c0"
+      },
+      "24": {
+        "source": "arrow_sync_24_regular.svg",
+        "sourceSize": 24,
+        "color": "#0F6CBD",
+        "sha256": "54305365aa4d78a40d2b771a7c6ebff0a73485d60949b1b64e9ce7d5f79b6eaf"
+      },
+      "32": {
+        "source": "arrow_sync_24_regular.svg",
+        "sourceSize": 24,
+        "color": "#0F6CBD",
+        "sha256": "54305365aa4d78a40d2b771a7c6ebff0a73485d60949b1b64e9ce7d5f79b6eaf"
+      }
+    },
+    "RestoreSelection": {
+      "16": {
+        "source": "checkbox_checked_sync_16_regular.svg",
+        "sourceSize": 16,
+        "color": "#0F6CBD",
+        "sha256": "2b1554a8bb281f1dc8ca4be6e6efa1243a90ee88e3019660a8739b673e46c999"
+      },
+      "24": {
+        "source": "checkbox_checked_sync_20_regular.svg",
+        "sourceSize": 20,
+        "color": "#0F6CBD",
+        "sha256": "c4686b3d94ddc5c592785ad654e314a27078fdae55bf044eaad224dd118336b8"
+      },
+      "32": {
+        "source": "checkbox_checked_sync_20_regular.svg",
+        "sourceSize": 20,
+        "color": "#0F6CBD",
+        "sha256": "c4686b3d94ddc5c592785ad654e314a27078fdae55bf044eaad224dd118336b8"
+      }
+    },
+    "RootDirectory": {
+      "16": {
+        "source": "arrow_step_out_16_regular.svg",
+        "sourceSize": 16,
+        "color": "#0F6CBD",
+        "sha256": "4f9e6b663054fbad5cd8ebf7e1269e619207870a51f2c804f242074896828fe1"
+      },
+      "24": {
+        "source": "arrow_step_out_24_regular.svg",
+        "sourceSize": 24,
+        "color": "#0F6CBD",
+        "sha256": "08a0296b505d61e0e9bf45bad2bfb8395071abbe913f899f61a4dbdd7ca4ceaa"
+      },
+      "32": {
+        "source": "arrow_step_out_24_regular.svg",
+        "sourceSize": 24,
+        "color": "#0F6CBD",
+        "sha256": "08a0296b505d61e0e9bf45bad2bfb8395071abbe913f899f61a4dbdd7ca4ceaa"
+      }
+    },
+    "SaveSelection": {
+      "16": {
+        "source": "save_16_regular.svg",
+        "sourceSize": 16,
+        "color": "#0F6CBD",
+        "sha256": "074c7fc2b2682b4fe529beb92150baf314fcc8dac75bd7327d4c5c5a36a101cc"
+      },
+      "24": {
+        "source": "save_24_regular.svg",
+        "sourceSize": 24,
+        "color": "#0F6CBD",
+        "sha256": "d6ece7d88c36652b5b18652fa803988cacdca099620375bd03e581410f7daaf7"
+      },
+      "32": {
+        "source": "save_32_regular.svg",
+        "sourceSize": 32,
+        "color": "#0F6CBD",
+        "sha256": "7de7d5203f8da4c917a3d789480fc9aa551709a52e1090ff637e59942b7d659d"
+      }
+    },
+    "Security": {
+      "16": {
+        "source": "lock_closed_16_regular.svg",
+        "sourceSize": 16,
+        "color": "#424242",
+        "sha256": "48206c003cd04530f5f8297426433d137dc827fdff6da3c239867f2acfe438f3"
+      },
+      "24": {
+        "source": "lock_closed_24_regular.svg",
+        "sourceSize": 24,
+        "color": "#424242",
+        "sha256": "19b5446492f774cfb30f0f6daf0f5aa46237083cd3555c1bc5f0d49b2fdfefd8"
+      },
+      "32": {
+        "source": "lock_closed_32_regular.svg",
+        "sourceSize": 32,
+        "color": "#424242",
+        "sha256": "f553a0c6dd926522c8c3b122fca29e97ea0c6e464b4512f25674fb14966fe562"
+      }
+    },
+    "Select": {
+      "16": {
+        "source": "checkbox_checked_16_regular.svg",
+        "sourceSize": 16,
+        "color": "#0F6CBD",
+        "sha256": "7c93a423ba96aa1c9b0a74042b6d9433b92ab164af03090d54c574ef6e23d4c1"
+      },
+      "24": {
+        "source": "checkbox_checked_24_regular.svg",
+        "sourceSize": 24,
+        "color": "#0F6CBD",
+        "sha256": "c937d38cf1d163b4dbe098bbbbf475748d3a102642a893780017df341a760bb9"
+      },
+      "32": {
+        "source": "checkbox_checked_24_regular.svg",
+        "sourceSize": 24,
+        "color": "#0F6CBD",
+        "sha256": "c937d38cf1d163b4dbe098bbbbf475748d3a102642a893780017df341a760bb9"
+      }
+    },
+    "SelectAll": {
+      "16": {
+        "source": "select_all_on_16_regular.svg",
+        "sourceSize": 16,
+        "color": "#0F6CBD",
+        "sha256": "e0e40b6b5f4af2f9d6a1ac17d4d646d73c0fc2b7ee4bcf2db973389d2a054afe"
+      },
+      "24": {
+        "source": "select_all_on_24_regular.svg",
+        "sourceSize": 24,
+        "color": "#0F6CBD",
+        "sha256": "8babc38ac5273d1b7369bf0528c5836d0e3d8650898b647f1d67b65e10b903a8"
+      },
+      "32": {
+        "source": "select_all_on_24_regular.svg",
+        "sourceSize": 24,
+        "color": "#0F6CBD",
+        "sha256": "8babc38ac5273d1b7369bf0528c5836d0e3d8650898b647f1d67b65e10b903a8"
+      }
+    },
+    "SelectFilesWithSameExtension": {
+      "16": {
+        "source": "document_checkmark_16_regular.svg",
+        "sourceSize": 16,
+        "color": "#0F6CBD",
+        "sha256": "c69f7dc17eee5ac33355feb6d9cf67c621e435c6472ac80da80a95038e648ef8"
+      },
+      "24": {
+        "source": "document_checkmark_24_regular.svg",
+        "sourceSize": 24,
+        "color": "#0F6CBD",
+        "sha256": "42dac9e8d68e8eb54e463a00bdfce7a9a0e15ed9729094a544f44834a22c98e6"
+      },
+      "32": {
+        "source": "document_checkmark_24_regular.svg",
+        "sourceSize": 24,
+        "color": "#0F6CBD",
+        "sha256": "42dac9e8d68e8eb54e463a00bdfce7a9a0e15ed9729094a544f44834a22c98e6"
+      }
+    },
+    "SelectFilesWithSameName": {
+      "16": {
+        "source": "textbox_checkmark_16_regular.svg",
+        "sourceSize": 16,
+        "color": "#0F6CBD",
+        "sha256": "eb06d0d6e92d0d5a1db8392dfb88ec38a789a29af923e30dabc16300c4662bec"
+      },
+      "24": {
+        "source": "textbox_checkmark_24_regular.svg",
+        "sourceSize": 24,
+        "color": "#0F6CBD",
+        "sha256": "2ad7c585ec8a1aa4d77a3ee12d6579094aa7b35b14d536fd38137d047dec37bf"
+      },
+      "32": {
+        "source": "textbox_checkmark_32_regular.svg",
+        "sourceSize": 32,
+        "color": "#0F6CBD",
+        "sha256": "363769830902078bfa2c6d1d3df5a05297a7654f47bd7b7e4ab009aa4d1d4e2f"
+      }
+    },
+    "SharedDirectories": {
+      "16": {
+        "source": "folder_person_16_regular.svg",
+        "sourceSize": 16,
+        "color": "#424242",
+        "sha256": "e0e57dc8beb6284f76e393e75915033d2173a90fb8e6457e6692899ebea5155c"
+      },
+      "24": {
+        "source": "folder_person_24_regular.svg",
+        "sourceSize": 24,
+        "color": "#424242",
+        "sha256": "7373af233d73508897dcdde17f1d5e6192b9ef6b9cf67bc2e7e98543b3abc3c9"
+      },
+      "32": {
+        "source": "folder_person_32_regular.svg",
+        "sourceSize": 32,
+        "color": "#424242",
+        "sha256": "1e7e1664f128d3a5294c58d4d24af1de032e3383048350c153886d51f6f9541b"
+      }
+    },
+    "ShowHiddenNames": {
+      "16": {
+        "source": "eye_16_regular.svg",
+        "sourceSize": 16,
+        "color": "#424242",
+        "sha256": "6d8ee27e1ffa1780aa7a662c06e0033f118cbd6106b7026aa58b68fbdf7a3312"
+      },
+      "24": {
+        "source": "eye_24_regular.svg",
+        "sourceSize": 24,
+        "color": "#424242",
+        "sha256": "97e7dbff6e40422a84db3034b3086f0403de8f665cf590ee8ddc02cb9cda1097"
+      },
+      "32": {
+        "source": "eye_32_regular.svg",
+        "sourceSize": 32,
+        "color": "#424242",
+        "sha256": "4bd9322bb1fc003beb7bceb4b11840ade40c0d03dad95878354067ce0f73039a"
+      }
+    },
+    "SmartColumnMode": {
+      "16": {
+        "source": "table_resize_column_16_regular.svg",
+        "sourceSize": 16,
+        "color": "#424242",
+        "sha256": "cbc66563c953e0efa36c29ed2d7aba706d8348e2403c7dc02a6335f8887e09a1"
+      },
+      "24": {
+        "source": "table_resize_column_24_regular.svg",
+        "sourceSize": 24,
+        "color": "#424242",
+        "sha256": "1b1d54d5ec957e77db54edf43cd39fcf447e175a69235991855d3fb6766856cd"
+      },
+      "32": {
+        "source": "table_resize_column_24_regular.svg",
+        "sourceSize": 24,
+        "color": "#424242",
+        "sha256": "1b1d54d5ec957e77db54edf43cd39fcf447e175a69235991855d3fb6766856cd"
+      }
+    },
+    "SortByAttributes": {
+      "16": {
+        "source": "tag_multiple_16_regular.svg",
+        "sourceSize": 16,
+        "color": "#424242",
+        "sha256": "8456b0d88ef94c86d4185d335be8e9aa37fd239c997f2617e3204e32f6b51eb5"
+      },
+      "24": {
+        "source": "tag_multiple_24_regular.svg",
+        "sourceSize": 24,
+        "color": "#424242",
+        "sha256": "bf39fb038f0a0e206e347c2a5d1760249a476895cf5f6c16d576da71e92293dc"
+      },
+      "32": {
+        "source": "tag_multiple_24_regular.svg",
+        "sourceSize": 24,
+        "color": "#424242",
+        "sha256": "bf39fb038f0a0e206e347c2a5d1760249a476895cf5f6c16d576da71e92293dc"
+      }
+    },
+    "SortByDate": {
+      "16": {
+        "source": "calendar_16_regular.svg",
+        "sourceSize": 16,
+        "color": "#424242",
+        "sha256": "c1ecfe28a5160c77cb05bf14d86a7709304515193dde729694954cd85fc61f04"
+      },
+      "24": {
+        "source": "calendar_24_regular.svg",
+        "sourceSize": 24,
+        "color": "#424242",
+        "sha256": "14532a4c17274355bb2689361ab070b79ad450febf489b796fd92bc18955f5ea"
+      },
+      "32": {
+        "source": "calendar_32_regular.svg",
+        "sourceSize": 32,
+        "color": "#424242",
+        "sha256": "a4c6c638fd1f374e58da3b8ef22283324aa4c6fd89d3c09bb34a2dd57d9ee6b4"
+      }
+    },
+    "SortByExtension": {
+      "16": {
+        "source": "document_text_extract_16_regular.svg",
+        "sourceSize": 16,
+        "color": "#424242",
+        "sha256": "ffa47c29c4ca59d8f3b0235dff5fd3fd75956f61a44406dab958621695bd0558"
+      },
+      "24": {
+        "source": "document_text_extract_24_regular.svg",
+        "sourceSize": 24,
+        "color": "#424242",
+        "sha256": "51d13b88b0ea34db112a066bce4712bd52c0473405f8af0945ddd76be0bea484"
+      },
+      "32": {
+        "source": "document_text_extract_32_regular.svg",
+        "sourceSize": 32,
+        "color": "#424242",
+        "sha256": "f09b71bae0ee3d83bad9bded897a6ee132ce3df891d731063137f92712c4c96f"
+      }
+    },
+    "SortByName": {
+      "16": {
+        "source": "text_sort_ascending_16_regular.svg",
+        "sourceSize": 16,
+        "color": "#424242",
+        "sha256": "b0e0ed1f415f4cc84d781f94de7328d2d7f41e8d181b55bfd3f8ac0cbcf2739c"
+      },
+      "24": {
+        "source": "text_sort_ascending_24_regular.svg",
+        "sourceSize": 24,
+        "color": "#424242",
+        "sha256": "001d644c5c9b4ec16408c07cd8ba656e56c0409d37fe65b442210c4af628fba5"
+      },
+      "32": {
+        "source": "text_sort_ascending_24_regular.svg",
+        "sourceSize": 24,
+        "color": "#424242",
+        "sha256": "001d644c5c9b4ec16408c07cd8ba656e56c0409d37fe65b442210c4af628fba5"
+      }
+    },
+    "SortBySize": {
+      "16": {
+        "source": "data_bar_horizontal_descending_16_regular.svg",
+        "sourceSize": 16,
+        "color": "#424242",
+        "sha256": "a9fcd3293c308141442a293ff2213b83d4522c4b85da7d6610ee6792526f3753"
+      },
+      "24": {
+        "source": "data_bar_horizontal_descending_16_regular.svg",
+        "sourceSize": 16,
+        "color": "#424242",
+        "sha256": "a9fcd3293c308141442a293ff2213b83d4522c4b85da7d6610ee6792526f3753"
+      },
+      "32": {
+        "source": "data_bar_horizontal_descending_16_regular.svg",
+        "sourceSize": 16,
+        "color": "#424242",
+        "sha256": "a9fcd3293c308141442a293ff2213b83d4522c4b85da7d6610ee6792526f3753"
+      }
+    },
+    "Stop": {
+      "16": {
+        "source": "stop_16_filled.svg",
+        "sourceSize": 16,
+        "color": "#C50F1F",
+        "sha256": "a724bf689f40cb65b0ced295137d6898d04dbfadb33ec4e7a5cdc37023a5d28f"
+      },
+      "24": {
+        "source": "stop_24_filled.svg",
+        "sourceSize": 24,
+        "color": "#C50F1F",
+        "sha256": "904a657833af0bdd82aa121c0f01373ee9e728ad8e011057ace81cace58f208a"
+      },
+      "32": {
+        "source": "stop_24_filled.svg",
+        "sourceSize": 24,
+        "color": "#C50F1F",
+        "sha256": "904a657833af0bdd82aa121c0f01373ee9e728ad8e011057ace81cace58f208a"
+      }
+    },
+    "SwapPanels": {
+      "16": {
+        "source": "arrow_swap_16_regular.svg",
+        "sourceSize": 16,
+        "color": "#0F6CBD",
+        "sha256": "1bbcbc5d465a75793da530793428ec921e12521a38ccf17f1b282160c9254b6f"
+      },
+      "24": {
+        "source": "arrow_swap_24_regular.svg",
+        "sourceSize": 24,
+        "color": "#0F6CBD",
+        "sha256": "3c9c995f39938960e53045f4261cb52980ef91bbc10b2742f380bbad85cf5dfd"
+      },
+      "32": {
+        "source": "arrow_swap_24_regular.svg",
+        "sourceSize": 24,
+        "color": "#0F6CBD",
+        "sha256": "3c9c995f39938960e53045f4261cb52980ef91bbc10b2742f380bbad85cf5dfd"
+      }
+    },
+    "Unpack": {
+      "16": {
+        "source": "archive_arrow_back_16_regular.svg",
+        "sourceSize": 16,
+        "color": "#424242",
+        "sha256": "48b5a72e7c19bec315c76052c32c0be20d5356ef7ec003058a61a2f5a28b1964"
+      },
+      "24": {
+        "source": "archive_arrow_back_24_regular.svg",
+        "sourceSize": 24,
+        "color": "#424242",
+        "sha256": "73d661f2bd8550dca2e51e429eac1a401c5985316c8ed4d965e2c8cbab93d63e"
+      },
+      "32": {
+        "source": "archive_arrow_back_32_regular.svg",
+        "sourceSize": 32,
+        "color": "#424242",
+        "sha256": "7b1be275fc923d6348c2c496c2af3b5fb9838a0afe6ef57c54134d0104d21ccf"
+      }
+    },
+    "Unselect": {
+      "16": {
+        "source": "checkbox_unchecked_16_regular.svg",
+        "sourceSize": 16,
+        "color": "#0F6CBD",
+        "sha256": "7d8363f14ec3d91d07faabba16559eb3ef4c53cb612ac70aecf57a649a3c1363"
+      },
+      "24": {
+        "source": "checkbox_unchecked_24_regular.svg",
+        "sourceSize": 24,
+        "color": "#0F6CBD",
+        "sha256": "0edc68fd58267a5d7d3a4d14373028b9b039e776a7a8d8e071d1d7a9449e195b"
+      },
+      "32": {
+        "source": "checkbox_unchecked_24_regular.svg",
+        "sourceSize": 24,
+        "color": "#0F6CBD",
+        "sha256": "0edc68fd58267a5d7d3a4d14373028b9b039e776a7a8d8e071d1d7a9449e195b"
+      }
+    },
+    "UnselectAll": {
+      "16": {
+        "source": "select_all_off_16_regular.svg",
+        "sourceSize": 16,
+        "color": "#0F6CBD",
+        "sha256": "513e3936863d102322875f5a7dec8362e35c89c914913c50f2b6a83479ce08a6"
+      },
+      "24": {
+        "source": "select_all_off_24_regular.svg",
+        "sourceSize": 24,
+        "color": "#0F6CBD",
+        "sha256": "23004c6e9db13105a15a220a7ef16070f9d4524805bde9d9e9a8a5edd8ad579f"
+      },
+      "32": {
+        "source": "select_all_off_24_regular.svg",
+        "sourceSize": 24,
+        "color": "#0F6CBD",
+        "sha256": "23004c6e9db13105a15a220a7ef16070f9d4524805bde9d9e9a8a5edd8ad579f"
+      }
+    },
+    "UnselectFilesWithSameExtension": {
+      "16": {
+        "source": "document_dismiss_16_regular.svg",
+        "sourceSize": 16,
+        "color": "#0F6CBD",
+        "sha256": "257e0c306535eeedff7129e4ebe0fe03942645108284f38ab5b5d8501a7e38d6"
+      },
+      "24": {
+        "source": "document_dismiss_24_regular.svg",
+        "sourceSize": 24,
+        "color": "#0F6CBD",
+        "sha256": "d1114a2891da82d7563be7a0d3b02a8e6438a605dd34a119ca60a3ee4f7249a8"
+      },
+      "32": {
+        "source": "document_dismiss_24_regular.svg",
+        "sourceSize": 24,
+        "color": "#0F6CBD",
+        "sha256": "d1114a2891da82d7563be7a0d3b02a8e6438a605dd34a119ca60a3ee4f7249a8"
+      }
+    },
+    "UnselectFilesWithSameName": {
+      "16": {
+        "source": "application optical drawing",
+        "sourceSize": 16,
+        "color": "#0F6CBD"
+      },
+      "24": {
+        "source": "text_grammar_dismiss_24_regular.svg",
+        "sourceSize": 24,
+        "color": "#0F6CBD",
+        "sha256": "e8a38d391d3946af74f659423ee10986848b2801e38a67e9fa28a7e7036d3695"
+      },
+      "32": {
+        "source": "text_grammar_dismiss_24_regular.svg",
+        "sourceSize": 24,
+        "color": "#0F6CBD",
+        "sha256": "e8a38d391d3946af74f659423ee10986848b2801e38a67e9fa28a7e7036d3695"
+      }
+    },
+    "UserMenu": {
+      "16": {
+        "source": "person_16_regular.svg",
+        "sourceSize": 16,
+        "color": "#424242",
+        "sha256": "18ee7d53b7c2f579ded921164db4deff986a1a20ae55879b579ff7bffbb45ffb"
+      },
+      "24": {
+        "source": "person_24_regular.svg",
+        "sourceSize": 24,
+        "color": "#424242",
+        "sha256": "252544bd3290eb6e67f074cee87557b04680537ab8e207ea5b2ec003aa0f3ece"
+      },
+      "32": {
+        "source": "person_32_regular.svg",
+        "sourceSize": 32,
+        "color": "#424242",
+        "sha256": "6a0f6eeca59e51648dd364f68df4d0ed528d647e04f2b3678da6f2bc36985711"
+      }
+    },
+    "View": {
+      "16": {
+        "source": "document_search_16_regular.svg",
+        "sourceSize": 16,
+        "color": "#424242",
+        "sha256": "9749ee45f66f4eac3b9b81434250e1aaa09f7a3cdb031cc8afbf3cdd56d782ec"
+      },
+      "24": {
+        "source": "document_search_24_regular.svg",
+        "sourceSize": 24,
+        "color": "#424242",
+        "sha256": "890d156f2b0d6e6a764e3a0421f83cd39a9bb87c80b72a14a3158471462eac67"
+      },
+      "32": {
+        "source": "document_search_32_regular.svg",
+        "sourceSize": 32,
+        "color": "#424242",
+        "sha256": "ed7b010a97a59d214f6e77ea8a2d270efd235568d5d0a6223dbe57e400ed2dbb"
+      }
+    },
+    "Views": {
+      "16": {
+        "source": "grid_16_regular.svg",
+        "sourceSize": 16,
+        "color": "#424242",
+        "sha256": "49589e590f5ce51c1dd4bc509f725f70ae1b4c611bcb27f2447c5def960d9a60"
+      },
+      "24": {
+        "source": "grid_24_regular.svg",
+        "sourceSize": 24,
+        "color": "#424242",
+        "sha256": "53f7ff58057d675df7161fe24f8a63fd4e8f53f20451da00a53aaf22ba10f1eb"
+      },
+      "32": {
+        "source": "grid_24_regular.svg",
+        "sourceSize": 24,
+        "color": "#424242",
+        "sha256": "53f7ff58057d675df7161fe24f8a63fd4e8f53f20451da00a53aaf22ba10f1eb"
+      }
+    },
+    "WhatIsThis": {
+      "16": {
+        "source": "cursor_hover_16_regular.svg",
+        "sourceSize": 16,
+        "color": "#424242",
+        "sha256": "33c05db1d7cb8d6d8c1a60b9a4a2dae9a07d6fa68127fb7189fe76590c0beff5"
+      },
+      "24": {
+        "source": "cursor_hover_24_regular.svg",
+        "sourceSize": 24,
+        "color": "#424242",
+        "sha256": "a36f64314bed92fd0ba01729f35f33f6623749d2f64114190da3c1244a8b337a"
+      },
+      "32": {
+        "source": "cursor_hover_32_regular.svg",
+        "sourceSize": 32,
+        "color": "#424242",
+        "sha256": "b7635d8fae6674122ffab89bc5fb87139bcf7730f46e7c853c0ea7c02e60d5d2"
+      }
+    }
+  }
+}

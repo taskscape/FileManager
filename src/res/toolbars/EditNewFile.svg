@@ -1,7 +1,5 @@
-<!-- Fluent Color Essentials: restrained semantic color and rounded geometry stay legible at 16 px. -->
-<svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-<rect x="3.5" y="2.5" width="9" height="11" rx="1" fill="white" stroke="#616161" stroke-width="1"/>
-<path d="M12.5 12.5L15 15" stroke="#107C10" stroke-width="2" stroke-linecap="round"/>
-<path d="M12.5 15L15 12.5" stroke="#107C10" stroke-width="2" stroke-linecap="round"/>
-<path d="M6 5H10" stroke="#616161" stroke-width="1" stroke-linecap="round"/>
+<!-- Fluent System Icons: EditNewFile retains a simple, recognizable silhouette. 16 px optical slot from document_add_16_regular.svg; solid color and open counters preserve clarity. -->
+<!-- Copyright (c) Microsoft Corporation. MIT License; see LICENSE-fluent.txt. -->
+<svg width="16" height="16" viewBox="0 0 16 16" fill="#424242" xmlns="http://www.w3.org/2000/svg">
+<path d="M6 1a2 2 0 0 0-2 2v2.2q.49-.13 1-.18V3a1 1 0 0 1 1-1h3v2.5c0 .83.67 1.5 1.5 1.5H13v7a1 1 0 0 1-1 1H9.74q-.47.58-1.08 1H12a2 2 0 0 0 2-2V5.41c0-.4-.16-.78-.44-1.06l-2.91-2.91A1.5 1.5 0 0 0 9.59 1zm6.8 4h-2.3a.5.5 0 0 1-.5-.5V2.2zM10 10.5a4.5 4.5 0 1 1-9 0 4.5 4.5 0 0 1 9 0m-4-2a.5.5 0 0 0-1 0V10H3.5a.5.5 0 0 0 0 1H5v1.5a.5.5 0 0 0 1 0V11h1.5a.5.5 0 0 0 0-1H6z"/>
 </svg>

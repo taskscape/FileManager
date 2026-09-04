@@ -1,8 +1,6 @@
 <!-- Reference master: 64 px inspection size with the production 16 px design grid preserved. -->
-<!-- Fluent Color Essentials: matched file endings share one blue terminal marker. -->
-<svg width="64" height="64" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-<path d="M2.5 2.5H7.5L9.5 4.5V12.5H2.5V2.5Z" fill="white" stroke="#616161"/>
-<path d="M7.5 2.5V4.5H9.5" stroke="#616161"/>
-<path d="M4 10H8" stroke="#0F6CBD" stroke-width="1.5" stroke-linecap="round"/>
-<path d="M10 8.5L11.5 10L14 7.5" stroke="#107C10" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+<!-- Fluent System Icons: SelectFilesWithSameExtension retains a simple, recognizable silhouette. 16 px optical slot from document_checkmark_16_regular.svg; solid color and open counters preserve clarity. -->
+<!-- Copyright (c) Microsoft Corporation. MIT License; see LICENSE-fluent.txt. -->
+<svg width="64" height="64" viewBox="0 0 16 16" fill="#0F6CBD" xmlns="http://www.w3.org/2000/svg">
+<path d="M6 1a2 2 0 0 0-2 2v2.2q.49-.13 1-.18V3a1 1 0 0 1 1-1h3v2.5c0 .83.67 1.5 1.5 1.5H13v7a1 1 0 0 1-1 1H9.74q-.47.58-1.08 1H12a2 2 0 0 0 2-2V5.41c0-.4-.16-.78-.44-1.06l-2.91-2.91A1.5 1.5 0 0 0 9.59 1zm6.8 4h-2.3a.5.5 0 0 1-.5-.5V2.2zM10 10.5a4.5 4.5 0 1 1-9 0 4.5 4.5 0 0 1 9 0M7.85 8.65a.5.5 0 0 0-.7 0L4.5 11.29l-.65-.64a.5.5 0 0 0-.7.7l1 1c.2.2.5.2.7 0l3-3a.5.5 0 0 0 0-.7"/>
 </svg>

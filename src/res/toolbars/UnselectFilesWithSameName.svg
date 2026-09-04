@@ -1,6 +1,4 @@
-<!-- Fluent Color Essentials: matching name lines use the non-destructive blue minus action. -->
-<svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-<path d="M2.5 2.5H7.5L9.5 4.5V12.5H2.5V2.5Z" fill="white" stroke="#616161"/>
-<path d="M7.5 2.5V4.5H9.5M4 7H8M4 9H7" stroke="#616161" stroke-linecap="round"/>
-<path d="M10.5 9.5H14" stroke="#0F6CBD" stroke-width="1.5" stroke-linecap="round"/>
+<!-- Fluent System Icons: UnselectFilesWithSameName retains a simple, recognizable silhouette. 16 px optical slot from application optical drawing; solid color and open counters preserve clarity. -->
+<svg width="16" height="16" viewBox="0 0 16 16" fill="#0F6CBD" xmlns="http://www.w3.org/2000/svg">
+<path d="M7.5 12.5H2.5C2 12.5 1.5 12 1.5 11.5V4.5C1.5 4 2 3.5 2.5 3.5H13.5C14 3.5 14.5 4 14.5 4.5V8M4 6.5H12M4 9.5H7" fill="none" stroke="#0F6CBD" stroke-linecap="round"/><path d="M9.5 10.5L13.5 14.5M13.5 10.5L9.5 14.5" fill="none" stroke="#0F6CBD" stroke-width="1.5" stroke-linecap="round"/>
 </svg>

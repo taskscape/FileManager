@@ -1,8 +1,6 @@
 <!-- Reference master: 64 px inspection size with the production 16 px design grid preserved. -->
-<!-- Fluent Color Essentials: a neutral drive gains one blue change affordance. -->
-<svg width="64" height="64" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-<rect x="2.5" y="3.5" width="11" height="8" rx="1.5" fill="white" stroke="#616161" stroke-width="1.5"/>
-<path d="M3 8.5H13" stroke="#616161"/>
-<circle cx="5" cy="10" r="0.75" fill="#0F6CBD"/>
-<path d="M8 6H12M10.5 4.5L12 6L10.5 7.5" stroke="#0F6CBD" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+<!-- Fluent System Icons: ChangeDrive retains a simple, recognizable silhouette. 16 px optical slot from hard_drive_16_regular.svg; solid color and open counters preserve clarity. -->
+<!-- Copyright (c) Microsoft Corporation. MIT License; see LICENSE-fluent.txt. -->
+<svg width="64" height="64" viewBox="0 0 16 16" fill="#424242" xmlns="http://www.w3.org/2000/svg">
+<path d="M13.85 7.85 11.9 3.73v-.01A1.2 1.2 0 0 0 10.75 3h-5.5a1.2 1.2 0 0 0-1.13.72L2.15 7.86Q2 8.16 2 8.5v2A1.5 1.5 0 0 0 3.5 12h9a1.5 1.5 0 0 0 1.5-1.5v-2q0-.33-.15-.65M5.25 4h5.5a.24.24 0 0 1 .23.14L12.34 7H3.66l1.36-2.86A.24.24 0 0 1 5.25 4M13 10.5a.5.5 0 0 1-.5.5h-9a.5.5 0 0 1-.5-.5v-2a.5.5 0 0 1 .5-.5h9a.5.5 0 0 1 .5.5zm-1-1a.5.5 0 1 1-1 0 .5.5 0 0 1 1 0"/>
 </svg>

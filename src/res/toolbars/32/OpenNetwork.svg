@@ -1,0 +1,5 @@
+<!-- Fluent System Icons: OpenNetwork retains a simple, recognizable silhouette. 32 px optical slot from virtual_network_24_regular.svg; solid color and open counters preserve clarity. -->
+<!-- Copyright (c) Microsoft Corporation. MIT License; see LICENSE-fluent.txt. -->
+<svg width="32" height="32" viewBox="0 0 32 32" fill="#0F6CBD" xmlns="http://www.w3.org/2000/svg">
+<g transform="scale(1.3333333333333333)"><path d="M4.67 7.27a.75.75 0 0 1 1.16.96L2.73 12l3.1 3.77a.75.75 0 0 1-1.16.96l-3.5-4.25a.75.75 0 0 1 0-.96zm13.6-.1a.75.75 0 0 1 1.06.1l3.5 4.25c.23.28.23.68 0 .96l-3.5 4.25a.75.75 0 0 1-1.16-.96l3.1-3.77-3.1-3.77a.75.75 0 0 1 .1-1.06M7.5 10.75a1.25 1.25 0 1 1 0 2.5 1.25 1.25 0 0 1 0-2.5m4.5 0a1.25 1.25 0 1 1 0 2.5 1.25 1.25 0 0 1 0-2.5m4.5 0a1.25 1.25 0 1 1 0 2.5 1.25 1.25 0 0 1 0-2.5"/></g>
+</svg>

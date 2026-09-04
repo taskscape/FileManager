@@ -1,7 +1,6 @@
 <!-- Reference master: 64 px inspection size with the production 16 px design grid preserved. -->
-<!-- Fluent Color Essentials: restrained semantic color and rounded geometry stay legible at 16 px. -->
-<svg width="64" height="64" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-<rect x="2.5" y="3.5" width="11" height="10" rx="0.5" fill="#D2B48C" stroke="#8E562E" stroke-width="1"/>
-<path d="M8 3.5V13.5" stroke="#8E562E" stroke-width="1" stroke-dasharray="2 2"/>
-<path d="M2.5 6.5H13.5" stroke="#8E562E" stroke-width="1"/>
+<!-- Fluent System Icons: Pack retains a simple, recognizable silhouette. 16 px optical slot from archive_16_regular.svg; solid color and open counters preserve clarity. -->
+<!-- Copyright (c) Microsoft Corporation. MIT License; see LICENSE-fluent.txt. -->
+<svg width="64" height="64" viewBox="0 0 16 16" fill="#424242" xmlns="http://www.w3.org/2000/svg">
+<path d="M6.5 8a.5.5 0 0 0 0 1h3a.5.5 0 0 0 0-1zM1 3.5C1 2.67 1.67 2 2.5 2h11c.83 0 1.5.67 1.5 1.5v1c0 .65-.42 1.2-1 1.41v5.59a2.5 2.5 0 0 1-2.5 2.5h-7A2.5 2.5 0 0 1 2 11.5V5.91c-.58-.2-1-.76-1-1.41zM2.5 3a.5.5 0 0 0-.5.5v1c0 .28.22.5.5.5h11a.5.5 0 0 0 .5-.5v-1a.5.5 0 0 0-.5-.5zM3 6v5.5c0 .83.67 1.5 1.5 1.5h7c.83 0 1.5-.67 1.5-1.5V6z"/>
 </svg>

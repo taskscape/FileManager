@@ -1,8 +1,5 @@
-<!-- Fluent Color Essentials: restrained semantic color and rounded geometry stay legible at 16 px. -->
-<svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-<rect x="2.5" y="2.5" width="11" height="11" fill="white" stroke="#616161" stroke-width="1"/>
-<path d="M2.5 6.5H13.5" stroke="#616161" stroke-width="1"/>
-<path d="M6.5 2.5V13.5" stroke="#616161" stroke-width="1"/>
-<path d="M10.5 2.5V13.5" stroke="#616161" stroke-width="1"/>
-<path d="M4.5 4.5H8.5M4.5 4.5L5.5 3.5M4.5 4.5L5.5 5.5M8.5 4.5L7.5 3.5M8.5 4.5L7.5 5.5" stroke="#0F6CBD" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"/>
+<!-- Fluent System Icons: SmartColumnMode retains a simple, recognizable silhouette. 16 px optical slot from table_resize_column_16_regular.svg; solid color and open counters preserve clarity. -->
+<!-- Copyright (c) Microsoft Corporation. MIT License; see LICENSE-fluent.txt. -->
+<svg width="16" height="16" viewBox="0 0 16 16" fill="#424242" xmlns="http://www.w3.org/2000/svg">
+<path d="M6.35 6.15c.2.2.2.5 0 .7l-.64.65h4.58l-.64-.65a.5.5 0 1 1 .7-.7l1.5 1.5c.2.2.2.5 0 .7l-1.5 1.5a.5.5 0 0 1-.7-.7l.64-.65H5.71l.64.65a.5.5 0 1 1-.7.7l-1.5-1.5a.5.5 0 0 1 0-.7l1.5-1.5c.2-.2.5-.2.7 0M11.5 2A2.5 2.5 0 0 1 14 4.5v7a2.5 2.5 0 0 1-2.5 2.5h-7A2.5 2.5 0 0 1 2 11.5v-7A2.5 2.5 0 0 1 4.5 2zm.5 1.09v3.29l-.94-.94-.06-.06V3H5v2.38l-.06.06-.94.94v-3.3c-.58.21-1 .77-1 1.42v7c0 .65.42 1.2 1 1.41V9.62l.94.94.06.06V13h6v-2.38l.06-.06.94-.94v3.3c.58-.21 1-.77 1-1.42v-7c0-.65-.42-1.2-1-1.41m-.94 7.47L11 10.5Z"/>
 </svg>

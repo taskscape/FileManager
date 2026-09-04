@@ -1,0 +1,5 @@
+<!-- Fluent System Icons: PluginChecksum retains a simple, recognizable silhouette. 16 px optical slot from shield_checkmark_16_regular.svg; solid color and open counters preserve clarity. -->
+<!-- Copyright (c) Microsoft Corporation. MIT License; see LICENSE-fluent.txt. -->
+<svg width="16" height="16" viewBox="0 0 16 16" fill="#0F6CBD" xmlns="http://www.w3.org/2000/svg">
+<path d="M7.65 2.15c.2-.2.5-.2.7 0A5.7 5.7 0 0 0 12.5 4c.28 0 .5.22.5.5v1.1q-.48-.24-1-.4v-.22a6.6 6.6 0 0 1-4-1.8 6.7 6.7 0 0 1-4 1.8V7.5q.02 2.13 1.02 3.44.08 1 .48 1.86Q3 10.98 3 7.5v-3c0-.28.22-.5.5-.5q2.29 0 4.15-1.85M15 10.5a4.5 4.5 0 1 1-9 0 4.5 4.5 0 0 1 9 0m-2.15-1.85a.5.5 0 0 0-.7 0L9.5 11.29l-.65-.64a.5.5 0 0 0-.7.7l1 1c.2.2.5.2.7 0l3-3a.5.5 0 0 0 0-.7"/>
+</svg>

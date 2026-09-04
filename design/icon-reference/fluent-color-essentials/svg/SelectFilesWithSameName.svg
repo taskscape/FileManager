@@ -1,7 +1,6 @@
 <!-- Reference master: 64 px inspection size with the production 16 px design grid preserved. -->
-<!-- Fluent Color Essentials: matching name lines pair with a restrained positive check. -->
-<svg width="64" height="64" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-<path d="M2.5 2.5H7.5L9.5 4.5V12.5H2.5V2.5Z" fill="white" stroke="#616161"/>
-<path d="M7.5 2.5V4.5H9.5M4 7H8M4 9H7" stroke="#616161" stroke-linecap="round"/>
-<path d="M10 8.5L11.5 10L14 7.5" stroke="#107C10" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+<!-- Fluent System Icons: SelectFilesWithSameName retains a simple, recognizable silhouette. 16 px optical slot from textbox_checkmark_16_regular.svg; solid color and open counters preserve clarity. -->
+<!-- Copyright (c) Microsoft Corporation. MIT License; see LICENSE-fluent.txt. -->
+<svg width="64" height="64" viewBox="0 0 16 16" fill="#0F6CBD" xmlns="http://www.w3.org/2000/svg">
+<path d="M5.5 5a.5.5 0 0 0 0 1h5a.5.5 0 0 0 0-1zm0 2.5a.5.5 0 0 0 0 1h1.39q.36-.55.84-1zm0 2.5h.7q-.13.48-.18 1H5.5a.5.5 0 0 1 0-1m-1 3h1.7q.16.52.4 1H4.5A2.5 2.5 0 0 1 2 11.5v-7A2.5 2.5 0 0 1 4.5 2h7A2.5 2.5 0 0 1 14 4.5v2.1q-.48-.24-1-.4V4.5c0-.83-.67-1.5-1.5-1.5h-7C3.67 3 3 3.67 3 4.5v7c0 .83.67 1.5 1.5 1.5M16 11.5a4.5 4.5 0 1 1-9 0 4.5 4.5 0 0 1 9 0m-2.85-1.85-2.65 2.64-.65-.64a.5.5 0 0 0-.7.7l1 1c.2.2.5.2.7 0l3-3a.5.5 0 0 0-.7-.7"/>
 </svg>

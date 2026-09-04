@@ -1,7 +1,6 @@
 <!-- Reference master: 64 px inspection size with the production 16 px design grid preserved. -->
-<!-- Fluent Color Essentials: The modern phone silhouette keeps portable devices recognizable without bitmap shading. -->
-<svg width="64" height="64" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-<rect x="4" y="1.5" width="8" height="13" rx="1.5" fill="white" stroke="#616161" stroke-width="1.5"/>
-<rect x="5.5" y="4" width="5" height="6.5" rx=".5" fill="#DDEBF7"/>
-<path d="M7 3H9M7 12.5H9" stroke="#0F6CBD" stroke-width="1.25" stroke-linecap="round"/>
+<!-- Fluent System Icons: DrivePortable retains a simple, recognizable silhouette. 16 px optical slot from phone_laptop_16_regular.svg; solid color and open counters preserve clarity. -->
+<!-- Copyright (c) Microsoft Corporation. MIT License; see LICENSE-fluent.txt. -->
+<svg width="64" height="64" viewBox="0 0 16 16" fill="#0F6CBD" xmlns="http://www.w3.org/2000/svg">
+<path d="M3 4c0-.83.67-1.5 1.5-1.5h8c.83 0 1.5.67 1.5 1.5v5c0 .83-.67 1.5-1.5 1.5h-4v-1h4A.5.5 0 0 0 13 9V4a.5.5 0 0 0-.5-.5h-8A.5.5 0 0 0 4 4h-.5a2 2 0 0 0-.5.06zm11.5 8.5h-6v-1h6a.5.5 0 0 1 0 1m-10 0a.5.5 0 1 0 0-1 .5.5 0 0 0 0 1m-3-6C1.5 5.67 2.17 5 3 5h3c.83 0 1.5.67 1.5 1.5v6c0 .83-.67 1.5-1.5 1.5H3a1.5 1.5 0 0 1-1.5-1.5zM3 6a.5.5 0 0 0-.5.5v6c0 .28.22.5.5.5h3a.5.5 0 0 0 .5-.5v-6A.5.5 0 0 0 6 6z"/>
 </svg>

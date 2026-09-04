@@ -1,7 +1,6 @@
 <!-- Reference master: 64 px inspection size with the production 16 px design grid preserved. -->
-<!-- Fluent Color Essentials: A broad disc ring replaces reflective bitmap detail at every toolbar size. -->
-<svg width="64" height="64" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-<circle cx="8" cy="8" r="6" fill="#F3F2F1" stroke="#616161" stroke-width="1.5"/>
-<path d="M8 3.5A4.5 4.5 0 0 1 12.5 8M3.5 8A4.5 4.5 0 0 0 8 12.5" stroke="#0F6CBD" stroke-width="1.5" stroke-linecap="round"/>
-<circle cx="8" cy="8" r="1.5" fill="white" stroke="#616161"/>
+<!-- Fluent System Icons: DriveOptical retains a simple, recognizable silhouette. 16 px optical slot from cd_16_regular.svg; solid color and open counters preserve clarity. -->
+<!-- Copyright (c) Microsoft Corporation. MIT License; see LICENSE-fluent.txt. -->
+<svg width="64" height="64" viewBox="0 0 16 16" fill="#0F6CBD" xmlns="http://www.w3.org/2000/svg">
+<path d="M8 6a2 2 0 1 0 0 4 2 2 0 0 0 0-4M7 8a1 1 0 1 1 2 0 1 1 0 0 1-2 0m1-6a6 6 0 1 0 0 12A6 6 0 0 0 8 2M3 8a5 5 0 1 1 10 0A5 5 0 0 1 3 8"/>
 </svg>

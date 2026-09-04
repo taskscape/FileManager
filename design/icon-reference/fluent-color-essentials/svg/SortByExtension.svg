@@ -1,8 +1,6 @@
 <!-- Reference master: 64 px inspection size with the production 16 px design grid preserved. -->
-<!-- Fluent Color Essentials: restrained semantic color and rounded geometry stay legible at 16 px. -->
-<svg width="64" height="64" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-<path d="M2 4H6" stroke="#616161" stroke-width="2" stroke-linecap="round"/>
-<path d="M2 8H5" stroke="#616161" stroke-width="2" stroke-linecap="round"/>
-<path d="M2 12H7" stroke="#616161" stroke-width="2" stroke-linecap="round"/>
-<path d="M11 4V12M11 12L9 10M11 12L13 10" stroke="#0F6CBD" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+<!-- Fluent System Icons: SortByExtension retains a simple, recognizable silhouette. 16 px optical slot from document_text_extract_16_regular.svg; solid color and open counters preserve clarity. -->
+<!-- Copyright (c) Microsoft Corporation. MIT License; see LICENSE-fluent.txt. -->
+<svg width="64" height="64" viewBox="0 0 16 16" fill="#424242" xmlns="http://www.w3.org/2000/svg">
+<path d="M8.59 1q.62.01 1.06.44l2.91 2.91c.28.28.44.67.44 1.06V13a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-1h1v1a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V6H9.5A1.5 1.5 0 0 1 8 4.5V2H5a1 1 0 0 0-1 1v6H3V3c0-1.1.9-2 2-2zm1.91 11a.5.5 0 0 1 0 1h-5a.5.5 0 0 1 0-1zm-4-2a.5.5 0 0 1 0 1h-5a.5.5 0 0 1 0-1zm4-2a.5.5 0 0 1 0 1h-5a.5.5 0 0 1 0-1zM9 4.5c0 .28.22.5.5.5h2.3L9 2.2z"/>
 </svg>

@@ -3183,7 +3183,8 @@ public:
     // creates an image list (colorful, if gray == FALSE, otherwise grayscale)
     // each plugin is represented by a single icon in the imagelist
     // a default plug icon (plug symbol) is used when the plugin lacks its own icon
-    HIMAGELIST CreateIconsList(BOOL gray);
+    // An omitted size retains compact menu/list icons; toolbars supply their DPI-scaled preference.
+    HIMAGELIST CreateIconsList(BOOL gray, int iconSize = 0);
 
     // adds all plugin names to the list view; if setOnly is TRUE, only thevalues are set;
     // 'numOfLoaded' returns the number of loaded plugins

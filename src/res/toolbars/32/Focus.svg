@@ -1,0 +1,5 @@
+<!-- Fluent System Icons: Focus retains a simple, recognizable silhouette. 32 px optical slot from target_32_regular.svg; solid color and open counters preserve clarity. -->
+<!-- Copyright (c) Microsoft Corporation. MIT License; see LICENSE-fluent.txt. -->
+<svg width="32" height="32" viewBox="0 0 32 32" fill="#0F6CBD" xmlns="http://www.w3.org/2000/svg">
+<path d="M16 18a2 2 0 1 0 0-4 2 2 0 0 0 0 4m-7-2a7 7 0 1 1 14 0 7 7 0 0 1-14 0m7-5a5 5 0 1 0 0 10 5 5 0 0 0 0-10M4 16a12 12 0 1 1 24 0 12 12 0 0 1-24 0M16 6a10 10 0 1 0 0 20 10 10 0 0 0 0-20"/>
+</svg>

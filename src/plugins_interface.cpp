@@ -15,6 +15,7 @@
 #include "pack.h"
 #include "dialogs.h"
 #include "utf8gui.h"
+#include "svg.h" // Use the same vector identity in plug-in menus, lists, and toolbars.
 
 #include <shlwapi.h>
 #undef PathIsPrefix // preserve the local helper with the same name from strutils.h
@@ -1029,10 +1030,12 @@ BOOL CPlugins::HelpForMenuItem(HWND parent, int suid)
 }
 
 HIMAGELIST
-CPlugins::CreateIconsList(BOOL gray)
+CPlugins::CreateIconsList(BOOL gray, int iconSize)
 {
-    int iconSize = GetIconSizeForSystemDPI(ICONSIZE_16);
-    HIMAGELIST hIL = ImageList_Create(iconSize, iconSize, GetImageListColorFlags() | ILC_MASK, 0, 1);
+    // Menu callers keep their existing dimensions; toolbar callers request native-size alpha glyphs.
+    if (iconSize <= 0)
+        iconSize = GetIconSizeForSystemDPI(ICONSIZE_16);
+    HIMAGELIST hIL = ImageList_Create(iconSize, iconSize, ILC_COLOR32 | ILC_MASK, 0, 1);
     if (hIL != NULL)
     {
         HICON hDefIcon = SalLoadIcon(HInstance, IDI_PLUGIN, iconSize);
@@ -1040,6 +1043,14 @@ CPlugins::CreateIconsList(BOOL gray)
         for (i = 0; i < Data.Count; i++)
         {
             CPluginData* p = Data[i];
+            // Keep the Data index stable even for unloaded plug-ins, missing SVGs, and custom artwork.
+            HICON vectorIcon = LoadToolbarSVGIcon(GetPluginSVGName(p->DLLName), iconSize, gray);
+            if (vectorIcon != NULL)
+            {
+                ImageList_AddIcon(hIL, vectorIcon);
+                DestroyIcon(vectorIcon); // The SVG loader returns an untracked caller-owned Windows handle.
+                continue;
+            }
             if (p->PluginIcons != NULL && p->PluginIconIndex != -1)
             {
                 CIconList* iconList = gray ? p->PluginIconsGray : p->PluginIcons;

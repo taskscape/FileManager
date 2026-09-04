@@ -44,6 +44,8 @@ async function main() {
     // This directory is wholly generated, so clearing it prevents removed runtime icons from lingering in the archive.
     fs.rmSync(svgDirectory, { recursive: true, force: true });
     fs.mkdirSync(svgDirectory, { recursive: true });
+    // Keep attribution with the exported Microsoft-derived reference artwork.
+    fs.copyFileSync(path.join(sourceDirectory, 'LICENSE-fluent.txt'), path.join(referenceRoot, 'LICENSE-fluent.txt'));
 
     const referenceIcons = iconNames.map((name) => {
         const source = fs.readFileSync(path.join(sourceDirectory, name), 'utf8');
@@ -69,7 +71,7 @@ async function main() {
     const catalogSvg = `
 <svg xmlns="http://www.w3.org/2000/svg" width="${catalogWidth}" height="${catalogHeight}" viewBox="0 0 ${catalogWidth} ${catalogHeight}">
   <rect width="${catalogWidth}" height="${catalogHeight}" fill="#F5F5F5"/>
-  <text x="100" y="100" font-family="Segoe UI, Arial, sans-serif" font-size="64" font-weight="700" fill="#201F1E">Fluent Color Essentials</text>
+  <text x="100" y="100" font-family="Segoe UI, Arial, sans-serif" font-size="64" font-weight="700" fill="#201F1E">Fluent System Icons</text>
   <text x="100" y="158" font-family="Segoe UI, Arial, sans-serif" font-size="30" fill="#605E5C">Open Salamander toolbar and menu icon reference - ${referenceIcons.length} vector glyphs</text>
   <line x1="100" y1="198" x2="3740" y2="198" stroke="#C8C6C4" stroke-width="2"/>
   ${cards}

@@ -3208,6 +3208,7 @@ void CMainWindow::OnColorsChanged(BOOL reloadUMIcons)
     if (PluginsBar != NULL)
     {
         PluginsBar->OnColorsChanged();
+        PluginsBar->CreatePluginButtons(); // Rerasterize identities when DPI, theme, or toolbar size changes.
     }
 
     // user menu toolbar
@@ -3293,9 +3294,9 @@ void CMainWindow::OnColorsChanged(BOOL reloadUMIcons)
             SendMessage(HTopRebar, RB_SETBANDINFO, index, (LPARAM)&rbbi);
         }
     }
-    // Drive-bar bands must grow and shrink with the same size preference as the command toolbar.
-    CDriveBar* sizedDriveBars[] = {DriveBar, DriveBar2};
-    const int driveBandIDs[] = {BANDID_DRIVEBAR, BANDID_DRIVEBAR2};
+    // Drive and plug-in bands must grow and shrink with the command toolbar's size preference.
+    CToolBar* sizedDriveBars[] = {DriveBar, DriveBar2, PluginsBar};
+    const int driveBandIDs[] = {BANDID_DRIVEBAR, BANDID_DRIVEBAR2, BANDID_PLUGINSBAR};
     for (int i = 0; HTopRebar != NULL && i < _countof(sizedDriveBars); i++)
     {
         if (sizedDriveBars[i] == NULL || sizedDriveBars[i]->HWindow == NULL)

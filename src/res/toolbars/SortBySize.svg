@@ -1,7 +1,5 @@
-<!-- Fluent Color Essentials: restrained semantic color and rounded geometry stay legible at 16 px. -->
-<svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-<rect x="2" y="10" width="2" height="3" fill="#616161"/>
-<rect x="5" y="7" width="2" height="6" fill="#616161"/>
-<rect x="8" y="4" width="2" height="9" fill="#616161"/>
-<path d="M13 3V13M13 13L11 11M13 13L15 11" stroke="#0F6CBD" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+<!-- Fluent System Icons: SortBySize retains a simple, recognizable silhouette. 16 px optical slot from data_bar_horizontal_descending_16_regular.svg; solid color and open counters preserve clarity. -->
+<!-- Copyright (c) Microsoft Corporation. MIT License; see LICENSE-fluent.txt. -->
+<svg width="16" height="16" viewBox="0 0 16 16" fill="#424242" xmlns="http://www.w3.org/2000/svg">
+<path d="M13 5a2 2 0 1 0 0-4H3a2 2 0 1 0 0 4zM2 3a1 1 0 0 1 1-1h10a1 1 0 1 1 0 2H3a1 1 0 0 1-1-1m5 12a2 2 0 1 0 0-4H3a2 2 0 1 0 0 4zm-5-2a1 1 0 0 1 1-1h4a1 1 0 1 1 0 2H3a1 1 0 0 1-1-1m9-5a2 2 0 0 1-2 2H3a2 2 0 1 1 0-4h6a2 2 0 0 1 2 2m-1 0a1 1 0 0 0-1-1H3a1 1 0 1 0 0 2h6a1 1 0 0 0 1-1"/>
 </svg>

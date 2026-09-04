@@ -1,8 +1,5 @@
 <!-- Reference master: 64 px inspection size with the production 16 px design grid preserved. -->
-<!-- Fluent Color Essentials: restrained semantic color and rounded geometry stay legible at 16 px. -->
-<svg width="64" height="64" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-<rect x="1.5" y="2.5" width="13" height="11" rx="1" fill="#424242" stroke="#424242" stroke-width="1"/>
-<path d="M2 5.5H14" stroke="#424242" stroke-width="1"/>
-<path d="M4 8L6 10L4 12" stroke="#FFFFFF" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-<path d="M8 12H11" stroke="#FFFFFF" stroke-width="1.5" stroke-linecap="round"/>
+<!-- Fluent System Icons: CommandShell retains a simple, recognizable silhouette. 16 px optical slot from application optical drawing; solid color and open counters preserve clarity. -->
+<svg width="64" height="64" viewBox="0 0 16 16" fill="#424242" xmlns="http://www.w3.org/2000/svg">
+<rect x="1.5" y="2.5" width="13" height="11" rx="1" fill="none" stroke="#424242"/><path d="M4 5.5L6.5 8L4 10.5M8 10.5H12" fill="none" stroke="#424242" stroke-linecap="round" stroke-linejoin="round"/>
 </svg>

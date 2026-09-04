@@ -1,0 +1,5 @@
+<!-- Fluent System Icons: ConnectNetworkDrive retains a simple, recognizable silhouette. 32 px optical slot from plug_connected_32_regular.svg; solid color and open counters preserve clarity. -->
+<!-- Copyright (c) Microsoft Corporation. MIT License; see LICENSE-fluent.txt. -->
+<svg width="32" height="32" viewBox="0 0 32 32" fill="#0F6CBD" xmlns="http://www.w3.org/2000/svg">
+<path d="M13.45 6.53a3.25 3.25 0 0 0 0 4.6l7.43 7.42a3.25 3.25 0 0 0 4.6 0l.03-.04a8.5 8.5 0 0 0 .67-11.27L29.7 3.7a1 1 0 0 0-1.42-1.42l-3.53 3.53a8.5 8.5 0 0 0-11.27.67zm1.42 3.18a1.25 1.25 0 0 1 0-1.77l.04-.04a6.5 6.5 0 1 1 9.19 9.2l-.04.03c-.49.49-1.28.49-1.77 0zm3.68 15.76a3.25 3.25 0 0 0 0-4.6l-7.43-7.42a3.25 3.25 0 0 0-4.6 0l-.03.04a8.5 8.5 0 0 0-.66 11.27L2.3 28.3a1 1 0 1 0 1.41 1.42l3.53-3.53a8.5 8.5 0 0 0 11.27-.67zm-1.41-3.18c.48.49.48 1.28 0 1.77l-.04.04a6.5 6.5 0 0 1-9.2-9.2l.04-.03a1.25 1.25 0 0 1 1.77 0z"/>
+</svg>

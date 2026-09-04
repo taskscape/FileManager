@@ -1,4 +1,5 @@
-<!-- Fluent Color Essentials: checked menu state uses the shared Windows-blue action color. -->
-<svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-<path d="M3.5 8L6.5 11L12.5 5" stroke="#0F6CBD" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<!-- Fluent System Icons: MenuCheck retains a simple, recognizable silhouette. 16 px optical slot from checkmark_16_regular.svg; solid color and open counters preserve clarity. -->
+<!-- Copyright (c) Microsoft Corporation. MIT License; see LICENSE-fluent.txt. -->
+<svg width="16" height="16" viewBox="0 0 16 16" fill="#0F6CBD" xmlns="http://www.w3.org/2000/svg">
+<path d="M13.86 3.66a.5.5 0 0 1-.02.7l-7.93 7.48a.6.6 0 0 1-.84-.02L2.4 9.1a.5.5 0 0 1 .72-.7l2.4 2.44 7.65-7.2a.5.5 0 0 1 .7.02"/>
 </svg>

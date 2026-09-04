@@ -1,0 +1,5 @@
+<!-- Reference master: 64 px inspection size with the production 16 px design grid preserved. -->
+<!-- Fluent System Icons: PluginDiskMap retains a simple, recognizable silhouette. 16 px optical slot from application optical drawing; solid color and open counters preserve clarity. -->
+<svg width="64" height="64" viewBox="0 0 16 16" fill="#0F6CBD" xmlns="http://www.w3.org/2000/svg">
+<rect x="1.5" y="2.5" width="13" height="11" rx="1" fill="none" stroke="#0F6CBD"/><path d="M3 4H7V12H3ZM8 4H13V7H8ZM8 8H13V12H8Z"/>
+</svg>

@@ -1,0 +1,5 @@
+<!-- Fluent System Icons: Unselect retains a simple, recognizable silhouette. 32 px optical slot from checkbox_unchecked_24_regular.svg; solid color and open counters preserve clarity. -->
+<!-- Copyright (c) Microsoft Corporation. MIT License; see LICENSE-fluent.txt. -->
+<svg width="32" height="32" viewBox="0 0 32 32" fill="#0F6CBD" xmlns="http://www.w3.org/2000/svg">
+<g transform="scale(1.3333333333333333)"><path d="M3 6.25C3 4.45 4.46 3 6.25 3h11.5C19.55 3 21 4.46 21 6.25v11.5c0 1.8-1.46 3.25-3.25 3.25H6.25A3.25 3.25 0 0 1 3 17.75zM6.25 4.5c-.97 0-1.75.78-1.75 1.75v11.5c0 .97.78 1.75 1.75 1.75h11.5c.97 0 1.75-.78 1.75-1.75V6.25c0-.97-.78-1.75-1.75-1.75z"/></g>
+</svg>

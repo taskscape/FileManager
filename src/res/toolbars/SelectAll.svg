@@ -1,9 +1,5 @@
-<!-- Fluent Color Essentials: restrained semantic color and rounded geometry stay legible at 16 px. -->
-<svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-<rect x="2" y="2" width="12" height="3" rx="0.5" fill="#F3F2F1" stroke="#616161" stroke-width="1"/>
-<rect x="2" y="6.5" width="12" height="3" rx="0.5" fill="#F3F2F1" stroke="#616161" stroke-width="1"/>
-<rect x="2" y="11" width="12" height="3" rx="0.5" fill="#F3F2F1" stroke="#616161" stroke-width="1"/>
-<path d="M11 3L12 4.5L14.5 1.5" stroke="#0F6CBD" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-<path d="M11 7.5L12 9L14.5 6" stroke="#0F6CBD" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-<path d="M11 12L12 13.5L14.5 10.5" stroke="#0F6CBD" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+<!-- Fluent System Icons: SelectAll retains a simple, recognizable silhouette. 16 px optical slot from select_all_on_16_regular.svg; solid color and open counters preserve clarity. -->
+<!-- Copyright (c) Microsoft Corporation. MIT License; see LICENSE-fluent.txt. -->
+<svg width="16" height="16" viewBox="0 0 16 16" fill="#0F6CBD" xmlns="http://www.w3.org/2000/svg">
+<path d="M9.85 5.85a.5.5 0 0 0-.7-.7L6.5 7.79 5.35 6.65a.5.5 0 1 0-.7.7l1.5 1.5c.2.2.5.2.7 0zM2 4.5A2.5 2.5 0 0 1 4.5 2h5A2.5 2.5 0 0 1 12 4.5v5A2.5 2.5 0 0 1 9.5 12h-5A2.5 2.5 0 0 1 2 9.5zM4.5 3C3.67 3 3 3.67 3 4.5v5c0 .83.67 1.5 1.5 1.5h5c.83 0 1.5-.67 1.5-1.5v-5c0-.83-.67-1.5-1.5-1.5zM7 14a2.5 2.5 0 0 1-2-1h4.5A3.5 3.5 0 0 0 13 9.5V4c.6.46 1 1.18 1 2v3.5A4.5 4.5 0 0 1 9.5 14z"/>
 </svg>

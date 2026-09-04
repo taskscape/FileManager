@@ -1,31 +1,28 @@
-# Fluent Color Essentials icon reference
+# Fluent toolbar icon reference
 
-This folder is the archival presentation set for the toolbar and menu glyphs in
-`src/res/toolbars`. It is intentionally separate from runtime resources.
+All 124 application-owned command, drive, and bundled plug-in toolbar icon families use simple Fluent silhouettes and a single foreground color. The historical folder name is retained for compatibility. See [research and decisions](FLUENT-RESEARCH.md).
 
-- `svg/` contains one 64 x 64 reference SVG for each runtime icon. The original
-  16 x 16 view box is preserved so the reference art remains identical to the
-  production glyph at every configured toolbar size.
-- `fluent-color-essentials-icon-catalog.png` is the complete labeled catalog at
-  3840 pixels wide; its height grows to fit every icon (4160 pixels for 106 icons).
-- `generate-reference.cjs` rebuilds both deliverables from the runtime SVG set.
+Runtime assets in src/res/toolbars are authoritative: root SVGs are 16 px masters, with complete 24/ and 32/ variants. The renderer selects the logical size before applying DPI; a small toolbar at 200% uses the 16 px master at 32 physical pixels. Where Microsoft does not supply an exact size, the provenance records the source size used. Menus retain compact icons independently of toolbar configuration.
 
-The runtime folder remains authoritative. Regenerate this reference after an
-icon is added, removed, renamed, or visually changed.
+Bundled plug-ins share GetPluginSVGName across drive and plug-in toolbars, menus, and plug-in lists. Related archive handlers share their archive metaphor. Unknown modules retain supplied artwork; missing optional SVGs retain bitmap fallbacks.
 
-The drive bar reuses the Documents, Desktop, and Network masters and adds the
-`Drive*.svg` storage and bundled plug-in glyphs. Both toolbar rows use 16, 24, or
-32 logical pixels, rasterized at the current DPI. Unknown plug-ins and missing
-SVG assets retain their supplied icons. Drive-bar artwork uses native alpha for
-hover and selection backgrounds; the bundled NanoSVG already emits Windows
-premultiplied BGRA.
+NanoSVG emits premultiplied BGRA for the command toolbar's AlphaBlend path. The HICON path restores straight alpha before Windows image-list insertion, preventing double premultiplication and dark edges. Grayscale preserves coverage, and disabled rendering tints both fills and strokes.
 
-## Regeneration
+- fluent-map.json pins Microsoft package version and command-to-glyph mappings.
+- fluent-provenance.json records original filenames, sizes, colors, and SHA-256.
+- LICENSE-fluent.txt accompanies the Microsoft MIT-licensed artwork.
+- svg/ contains enlarged inspection copies of the **16 px** masters only.
+- fluent-color-essentials-icon-catalog.png is the complete labeled overview.
+- size-review-*.png show actual Windows-rendered icons at 16/24/32 px, plus grayscale and disabled states, without enlarging the samples.
 
-Run the generator with Node.js and Sharp available through `NODE_PATH`:
+## Regeneration and verification
 
-```powershell
-$env:NODE_PATH = '<node_modules directory containing sharp>'
-node .\design\icon-reference\fluent-color-essentials\generate-reference.cjs
-```
+Use Node.js, an extracted @fluentui/svg-icons@1.1.339 package, and Sharp available through NODE_PATH. The import requires no network access or package execution.
 
+    node tools/update-fluent-icons.cjs '<extracted package directory>'
+    node design/icon-reference/fluent-color-essentials/generate-reference.cjs
+    ./tools/verify-fluent-icon-coverage.ps1
+    ./tools/verify-fluent-icon-rendering.ps1
+    node tools/preview-fluent-icons.cjs
+
+The native verifier uses installed Visual Studio 2026. It compiles the current production loader and renderer, checks all 2,976 logical-size/DPI combinations, compares command rendering with Windows image lists on three backgrounds, checks grayscale alpha and geometry bounds, and detects GDI resource growth. The preview script uses its actual raster output. UI tests separately exercise live toolbar size changes and persistence with an isolated profile.

@@ -1,0 +1,5 @@
+<!-- Fluent System Icons: WhatIsThis retains a simple, recognizable silhouette. 32 px optical slot from cursor_hover_32_regular.svg; solid color and open counters preserve clarity. -->
+<!-- Copyright (c) Microsoft Corporation. MIT License; see LICENSE-fluent.txt. -->
+<svg width="32" height="32" viewBox="0 0 32 32" fill="#424242" xmlns="http://www.w3.org/2000/svg">
+<path d="M2 10a4 4 0 0 1 4-4h20a4 4 0 0 1 4 4v10a4 4 0 0 1-2.33 3.64 3 3 0 0 0-.55-.76l-.89-.9A2 2 0 0 0 28 20V10a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v10c0 1.1.9 2 2 2h8v2H6a4 4 0 0 1-4-4zm15.7 6.3a1 1 0 0 0-1.7.7v12a1 1 0 0 0 1.8.6l2.7-3.6H25a1 1 0 0 0 .7-1.7zM18 26v-6.59L22.59 24H20a1 1 0 0 0-.8.4z"/>
+</svg>

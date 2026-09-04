@@ -1,5 +1,5 @@
-<!-- Fluent Color Essentials: restrained semantic color and rounded geometry stay legible at 16 px. -->
-<svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-<path d="M8 3L13 8L8 13" stroke="#0F6CBD" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-<path d="M13 8H3" stroke="#0F6CBD" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+<!-- Fluent System Icons: Forward retains a simple, recognizable silhouette. 16 px optical slot from arrow_right_16_regular.svg; solid color and open counters preserve clarity. -->
+<!-- Copyright (c) Microsoft Corporation. MIT License; see LICENSE-fluent.txt. -->
+<svg width="16" height="16" viewBox="0 0 16 16" fill="#0F6CBD" xmlns="http://www.w3.org/2000/svg">
+<path d="M2.5 7.5a.5.5 0 1 0 0 1h9.7l-4.03 3.63a.5.5 0 1 0 .66.74l5-4.5a.5.5 0 0 0 0-.74l-5-4.5a.5.5 0 0 0-.66.74L12.2 7.5z"/>
 </svg>

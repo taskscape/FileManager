@@ -1,0 +1,5 @@
+<!-- Fluent System Icons: ChangeDirectory retains a simple, recognizable silhouette. 32 px optical slot from folder_arrow_right_32_regular.svg; solid color and open counters preserve clarity. -->
+<!-- Copyright (c) Microsoft Corporation. MIT License; see LICENSE-fluent.txt. -->
+<svg width="32" height="32" viewBox="0 0 32 32" fill="#424242" xmlns="http://www.w3.org/2000/svg">
+<path d="M4 8.5V11h6.46q.62-.01 1.07-.44l2.06-2.06-2.06-2.06A1.5 1.5 0 0 0 10.46 6H6.5A2.5 2.5 0 0 0 4 8.5m-2 0A4.5 4.5 0 0 1 6.5 4h3.96c.93 0 1.82.37 2.48 1.03L15.4 7.5H25.5A4.5 4.5 0 0 1 30 12v4.3q-.9-.82-2-1.36V12a2.5 2.5 0 0 0-2.5-2.5H15.41l-2.47 2.47A3.5 3.5 0 0 1 10.46 13H4v10.5A2.5 2.5 0 0 0 6.5 26h9.01q.39 1.07 1 2H6.5A4.5 4.5 0 0 1 2 23.5zM31.5 23a7.5 7.5 0 1 0-15 0 7.5 7.5 0 0 0 15 0m-12.25-1h7.69l-2.72-2.72a.75.75 0 1 1 1.06-1.06l4 4c.3.3.3.77 0 1.06l-4 4a.75.75 0 1 1-1.06-1.06l2.72-2.72h-7.69a.75.75 0 0 1 0-1.5"/>
+</svg>

@@ -1,0 +1,5 @@
+<!-- Fluent System Icons: ShowHiddenNames retains a simple, recognizable silhouette. 32 px optical slot from eye_32_regular.svg; solid color and open counters preserve clarity. -->
+<!-- Copyright (c) Microsoft Corporation. MIT License; see LICENSE-fluent.txt. -->
+<svg width="32" height="32" viewBox="0 0 32 32" fill="#424242" xmlns="http://www.w3.org/2000/svg">
+<path d="M28.03 17.29A1 1 0 0 0 29 18v-.01q.15 0 .3-.04a1 1 0 0 0 .66-1.24C29.92 16.61 26.61 6 16 6S2.07 16.61 2.04 16.72a1 1 0 0 0 1.92.57C4.06 16.91 6.89 8 16 8s11.91 8.9 12.03 9.29M12 18a4 4 0 1 1 8 0 4 4 0 0 1-8 0m4-6a6 6 0 1 0 0 12 6 6 0 0 0 0-12"/>
+</svg>

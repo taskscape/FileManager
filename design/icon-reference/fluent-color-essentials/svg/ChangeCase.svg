@@ -1,8 +1,6 @@
 <!-- Reference master: 64 px inspection size with the production 16 px design grid preserved. -->
-<!-- Fluent Color Essentials: restrained semantic color and rounded geometry stay legible at 16 px. -->
-<svg width="64" height="64" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-<path d="M4 13L7 5L10 13" stroke="#424242" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-<path d="M5 11H9" stroke="#424242" stroke-width="1.5" stroke-linecap="round"/>
-<path d="M11 13V9C11 9 11 8 12 8C13 8 13 9 13 9V13" stroke="#424242" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-<path d="M11 10C11 10 12 10 13 10V10" stroke="#424242" stroke-width="1.5" stroke-linecap="round"/>
+<!-- Fluent System Icons: ChangeCase retains a simple, recognizable silhouette. 16 px optical slot from text_change_case_16_regular.svg; solid color and open counters preserve clarity. -->
+<!-- Copyright (c) Microsoft Corporation. MIT License; see LICENSE-fluent.txt. -->
+<svg width="64" height="64" viewBox="0 0 16 16" fill="#424242" xmlns="http://www.w3.org/2000/svg">
+<path d="M11 2.5c.21 0 .4.13.47.33l3.5 9.5a.5.5 0 0 1-.94.34L13.05 10h-4.1l-.98 2.67a.5.5 0 0 1-.94-.34l3.5-9.5A.5.5 0 0 1 11 2.5m0 1.95L9.32 9h3.36zM6 8.7v3.81a.5.5 0 0 1-.43.49H5.5a.5.5 0 0 1-.5-.43v-.14Q4 13 3.17 13A2.1 2.1 0 0 1 1 10.83c0-1.15.8-2 2.1-2.16a5 5 0 0 1 1.9.14c0-.74-.37-1.1-1.2-1.14q-.94-.05-1.35.24a.5.5 0 0 1-.57-.82q.65-.45 1.79-.43h.19c1.3.07 2.08.83 2.14 2.04M4.8 9.82a4 4 0 0 0-1.57-.13c-.82.1-1.23.53-1.23 1.17 0 .73.47 1.16 1.17 1.16a3 3 0 0 0 1.66-.64l.17-.11v-1.4z"/>
 </svg>

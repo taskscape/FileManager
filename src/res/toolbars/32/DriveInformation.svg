@@ -1,0 +1,5 @@
+<!-- Fluent System Icons: DriveInformation retains a simple, recognizable silhouette. 32 px optical slot from info_32_regular.svg; solid color and open counters preserve clarity. -->
+<!-- Copyright (c) Microsoft Corporation. MIT License; see LICENSE-fluent.txt. -->
+<svg width="32" height="32" viewBox="0 0 32 32" fill="#0F6CBD" xmlns="http://www.w3.org/2000/svg">
+<path d="M16 13a1 1 0 0 1 1 1v9a1 1 0 1 1-2 0v-9a1 1 0 0 1 1-1m0-2a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3M2 16a14 14 0 1 1 28 0 14 14 0 0 1-28 0M16 4a12 12 0 1 0 0 24 12 12 0 0 0 0-24"/>
+</svg>

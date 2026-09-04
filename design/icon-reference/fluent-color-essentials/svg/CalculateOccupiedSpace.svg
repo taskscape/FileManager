@@ -1,7 +1,6 @@
 <!-- Reference master: 64 px inspection size with the production 16 px design grid preserved. -->
-<!-- Fluent Color Essentials: restrained semantic color and rounded geometry stay legible at 16 px. -->
-<svg width="64" height="64" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-<path d="M8 14.5C11.5899 14.5 14.5 11.5899 14.5 8C14.5 4.41015 11.5899 1.5 8 1.5C4.41015 1.5 1.5 4.41015 1.5 8C1.5 11.5899 4.41015 14.5 8 14.5Z" fill="#F3F2F1" stroke="#616161" stroke-width="1"/>
-<path d="M8 8L12.5962 3.40381C13.8462 4.65381 14.5 6.27381 14.5 8L8 8Z" fill="#0F6CBD" stroke="#0F6CBD" stroke-width="1"/>
-<path d="M8 1.5V8" stroke="#616161" stroke-width="1"/>
+<!-- Fluent System Icons: CalculateOccupiedSpace retains a simple, recognizable silhouette. 16 px optical slot from data_usage_16_regular.svg; solid color and open counters preserve clarity. -->
+<!-- Copyright (c) Microsoft Corporation. MIT License; see LICENSE-fluent.txt. -->
+<svg width="64" height="64" viewBox="0 0 16 16" fill="#424242" xmlns="http://www.w3.org/2000/svg">
+<path d="M3.75 2C2.78 2 2 2.78 2 3.75v8.5c0 .97.78 1.75 1.75 1.75h8.5c.97 0 1.75-.78 1.75-1.75v-8.5C14 2.78 13.22 2 12.25 2zM3 3.75c0-.41.34-.75.75-.75h8.5c.41 0 .75.34.75.75v8.5c0 .41-.34.75-.75.75h-8.5a.75.75 0 0 1-.75-.75zM6 6.5a.5.5 0 0 0-1 0v4a.5.5 0 0 0 1 0zM8 8c.28 0 .5.22.5.5v2a.5.5 0 0 1-1 0v-2c0-.28.22-.5.5-.5m3-2.5a.5.5 0 0 0-1 0v5a.5.5 0 0 0 1 0z"/>
 </svg>

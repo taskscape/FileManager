@@ -1,7 +1,5 @@
-<!-- Fluent Color Essentials: restrained semantic color and rounded geometry stay legible at 16 px. -->
-<svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-<path d="M4.5 6.5H11.5V9.5H4.5V6.5Z" fill="#F3F2F1" stroke="#0F6CBD" stroke-width="1.5" stroke-linejoin="round"/>
-<path d="M8 4V2M8 12V14M4 8H2M12 8H14" stroke="#0F6CBD" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-<path d="M7 2L8 1L9 2" stroke="#0F6CBD" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"/>
-<path d="M7 14L8 15L9 14" stroke="#0F6CBD" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"/>
+<!-- Fluent System Icons: NTFSUncompress retains a simple, recognizable silhouette. 16 px optical slot from arrow_maximize_16_regular.svg; solid color and open counters preserve clarity. -->
+<!-- Copyright (c) Microsoft Corporation. MIT License; see LICENSE-fluent.txt. -->
+<svg width="16" height="16" viewBox="0 0 16 16" fill="#424242" xmlns="http://www.w3.org/2000/svg">
+<path d="M12.4 3c.33 0 .6.27.6.6v4.9a.5.5 0 0 1-1 0V4.7L4.7 12h3.8a.5.5 0 0 1 0 1H3.6a.6.6 0 0 1-.6-.6V7.5a.5.5 0 0 1 1 0v3.8L11.3 4H7.5a.5.5 0 0 1 0-1z"/>
 </svg>

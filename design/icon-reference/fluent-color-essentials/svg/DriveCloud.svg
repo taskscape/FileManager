@@ -1,6 +1,6 @@
 <!-- Reference master: 64 px inspection size with the production 16 px design grid preserved. -->
-<!-- Fluent Color Essentials: The familiar folder and blue cloud connect cloud storage to local files. -->
-<svg width="64" height="64" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-<path d="M1.5 4H6L7.5 5.5H13V13H1.5V4Z" fill="#FFD666" stroke="#D89B00" stroke-width="1.5" stroke-linejoin="round"/>
-<path d="M7 12.5C4.5 12.5 4.5 8.5 7 8.5C7.5 5 12.5 5 13 8.5C15.5 8.5 15.5 12.5 13 12.5Z" fill="#DDEBF7" stroke="#0F6CBD" stroke-width="1.25" stroke-linejoin="round"/>
+<!-- Fluent System Icons: DriveCloud retains a simple, recognizable silhouette. 16 px optical slot from cloud_16_regular.svg; solid color and open counters preserve clarity. -->
+<!-- Copyright (c) Microsoft Corporation. MIT License; see LICENSE-fluent.txt. -->
+<svg width="64" height="64" viewBox="0 0 16 16" fill="#0F6CBD" xmlns="http://www.w3.org/2000/svg">
+<path d="M8 3a3 3 0 0 0-3 3 .5.5 0 0 1-.5.5h-.25a2.25 2.25 0 0 0 0 4.5h7.5a2.25 2.25 0 0 0 0-4.5h-.25A.5.5 0 0 1 11 6a3 3 0 0 0-3-3M4.03 5.5a4 4 0 0 1 7.94 0 3.25 3.25 0 0 1-.22 6.5h-7.5a3.25 3.25 0 0 1-.22-6.5"/>
 </svg>

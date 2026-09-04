@@ -1,0 +1,5 @@
+<!-- Fluent System Icons: PluginDiskRecovery retains a simple, recognizable silhouette. 32 px optical slot from arrow_counterclockwise_32_regular.svg; solid color and open counters preserve clarity. -->
+<!-- Copyright (c) Microsoft Corporation. MIT License; see LICENSE-fluent.txt. -->
+<svg width="32" height="32" viewBox="0 0 32 32" fill="#0F6CBD" xmlns="http://www.w3.org/2000/svg">
+<path d="M27 16A11 11 0 0 0 8.45 8H11a1 1 0 1 1 0 2H6a1 1 0 0 1-1-1V4a1 1 0 0 1 2 0v2.62a13 13 0 1 1-3.96 8.3 1 1 0 0 1 2 .16Q5 15.53 5 16a11 11 0 0 0 22 0"/>
+</svg>

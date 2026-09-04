@@ -53,11 +53,14 @@ BOOL CPluginsBar::CreatePluginButtons()
 
     DestroyImageLists();
 
-    HPluginsIcons = Plugins.CreateIconsList(FALSE);
-    HPluginsIconsGray = Plugins.CreateIconsList(TRUE);
+    // Full-color identities and native-size rasterization match the main and drive toolbars.
+    int iconSize = GetToolbarIconSizeForSystemDPI();
+    HPluginsIcons = Plugins.CreateIconsList(FALSE, iconSize);
+    HPluginsIconsGray = Plugins.CreateIconsList(FALSE, iconSize);
 
     SetImageList(HPluginsIconsGray);
     SetHotImageList(HPluginsIcons);
+    ApplyConfiguredIconSpacing(); // Keep padding proportional at every configured size.
 
     Plugins.InitPluginsBar(this);
     /*
@@ -85,7 +88,8 @@ int CPluginsBar::GetNeededHeight()
     CALL_STACK_MESSAGE_NONE
     // i v pripade, ze nedrzime zadnou ikonu budeem vracet spravnou vysku
     int height = CToolBar::GetNeededHeight();
-    int iconSize = GetIconSizeForSystemDPI(ICONSIZE_16);
+    // Empty bars reserve the same icon height as populated bars.
+    int iconSize = GetToolbarIconSizeForSystemDPI();
     int minH = 3 + iconSize + 3;
     if (height < minH)
         height = minH;
