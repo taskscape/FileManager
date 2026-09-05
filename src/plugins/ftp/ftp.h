@@ -996,6 +996,30 @@ enum CTransferMode
     trmAutodetect
 };
 
+// How many workers one operation aims to run. "Fixed" keeps the historic,
+// fully deterministic behaviour (including the single worker this plug-in used
+// to hardcode), which is what a large-file control benchmark needs; "Auto" grows
+// the pool only while ready work exists and throughput keeps improving.
+enum CTransferParallelismMode
+{
+    tpmFixed,
+    tpmAuto
+};
+
+#define TRANSFERWORKERS_MIN 1
+#define TRANSFERWORKERS_MAX 8
+#define TRANSFERWORKERS_DEFAULT 4
+
+// Preference for RFC 3659 machine-readable listings. "Auto" negotiates through
+// FEAT and silently keeps using LIST when the server does not advertise MLST;
+// "Never" is the compatibility escape hatch for servers whose MLSD output is
+// broken in ways FEAT does not reveal.
+enum CMLSDMode
+{
+    mlsdNever,
+    mlsdAuto
+};
+
 class CConfiguration
 {
 public:
@@ -1014,6 +1038,22 @@ public:
     double ServerSpeedLimit;         // default overall speed limit for the server
     int UseListingsCache;            // cache for viewed files and listings: use cache by default?
     int TransferMode;                // file transfer mode (binary/ascii/auto) (values of type CTransferMode)
+
+    // Operation parallelism is a separate control from MaxConcurrentConnections:
+    // the limit above is what the server/account tolerates, while the target
+    // below is how many workers one operation actually wants. Keeping them apart
+    // means raising the target can never silently exceed a configured maximum.
+    int TransferParallelismMode; // values of type CTransferParallelismMode
+    int TransferWorkerLimit;     // worker target: cap for Auto, exact count for Fixed (TRANSFERWORKERS_MIN..TRANSFERWORKERS_MAX)
+
+    // Machine-readable listings (RFC 3659). Negotiation is per authenticated
+    // session, so this is only the user's preference, never an assumption about
+    // what a previously contacted server supported.
+    int UseMLSD; // values of type CMLSDMode
+
+    // Section 1 instrumentation. Off by default so a normal copy never pays for
+    // measurement it did not ask for.
+    int EnableTransferMetrics;
 
     CSalamanderMaskGroup* ASCIIFileMasks; // for automatic transfer mode - masks for the "ascii" mode (others will be "binary")
 

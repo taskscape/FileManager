@@ -1066,9 +1066,18 @@ void CFTPWorker::HandleEvent(CFTPWorkerEvent event, char* reply, int replySize, 
             {
                 if (CurItem != NULL)
                     TRACE_E("Unexpected situation in CFTPWorker::HandleEvent(): CurItem is not NULL in state fwsLookingForWork!");
-                CurItem = Queue->GetNextWaitingItem(Oper); // try to find an item in the queue
-                if (CurItem != NULL)                       // found an item in the queue to process
+                // The scheduler needs the worker count (to decide how many
+                // workers may explore at once) and this worker's remote
+                // directory (to prefer work that needs no CWD). Growth itself is
+                // decided in the operation dialog's periodic refresh, which runs
+                // without any socket critical section held - creating a socket
+                // from inside this handler would nest the sockets thread's
+                // section into the worker's.
+                CurItem = Queue->GetNextWaitingItem(Oper, Oper->GetWorkersCount(),
+                                                    HaveWorkingPath ? WorkingPath : NULL, NULL);
+                if (CurItem != NULL) // found an item in the queue to process
                 {
+                    ItemStartTime = CMonotonicClock::Now(); // per-file latency is measured from here
                     State = fwsPreparing; // no need to call Oper->OperationStatusMaybeChanged(); it does not change the operation state (it is not paused and will not be after this change)
                     SubState = fwssNone;
                     postActivate = TRUE; // post an activation for the worker's next state

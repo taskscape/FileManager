@@ -544,7 +544,12 @@ BOOL CPluginFSInterface::ChangePath(int currentFSNameIndex, char* fsName, int fs
                                                        server->ProxyServerUID,
                                                        encControlConn,
                                                        encDataConn,
-                                                       compressData);
+                                                       compressData,
+                                                       // The bookmark's tri-state maximum is resolved once, here,
+                                                       // so browsing and every operation started from this
+                                                       // connection enforce the same number.
+                                                       GetEffectiveMaxConnections(server->UseMaxConcurrentConnections,
+                                                                                  server->MaxConcurrentConnections));
             memset(password, 0, strlen(password)); // clear the buffer with the password
         }
         else // connection based on changing the path in the FTP file system (e.g. Shift+F7 + "ftp://ftp.taskscape.com/")
@@ -620,7 +625,10 @@ BOOL CPluginFSInterface::ChangePath(int currentFSNameIndex, char* fsName, int fs
                                                        NULL, Config.KeepAlive, Config.KeepAliveSendEvery,
                                                        Config.KeepAliveStopAfter, Config.KeepAliveCommand,
                                                        -2 /* default proxy server */,
-                                                       encControlAndDataConn, encControlAndDataConn, Config.CompressData);
+                                                       encControlAndDataConn, encControlAndDataConn, Config.CompressData,
+                                                       // A path-change connection has no bookmark, so the
+                                                       // global default decides (tri-state 2 = "use default").
+                                                       GetEffectiveMaxConnections(2, 0));
             TransferMode = Config.TransferMode;
 
             // password - if not NULL, contains the password for the connection

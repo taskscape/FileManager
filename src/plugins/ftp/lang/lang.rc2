@@ -922,5 +922,14 @@ STRINGTABLE
  IDS_CLEARPASSWORD_CONFIRMATION, "Are you sure you wish to clear this password?"
  IDS_SHOWPASSWORD_CONFIRMATION, "Are you sure you wish to show this password?"
  IDS_PASSWORDIS, "The password is: %s\n\nDo you want to copy the password to clipboard?"
+
+ IDS_MAXCONREACHED, "The configured limit of %d concurrent connections to this server has been reached.\n\nClose another connection to this server or raise the limit in the server's advanced settings."
+ IDS_LOGMSGCONREFUSED, "INFO: Server refused another connection, reducing the number of connections to %d\r\n"
+ IDS_LOGMSGMLSDENABLED, "INFO: Server supports MLST/MLSD, using machine-readable listings\r\n"
+ IDS_LOGMSGMLSDUNSUP, "INFO: Server does not support MLST/MLSD, using %s\r\n"
+ IDS_LOGMSGMLSDFALLBACK, "INFO: MLSD failed on this directory, falling back to %s\r\n"
+ IDS_SSL_LOG_SESSIONRESUMED, "TLS INFO: session resumed (abbreviated handshake)\r\n"
+ IDS_SSL_LOG_SESSIONFULL, "TLS INFO: full handshake performed\r\n"
+ IDS_SSL_LOG_SESSIONUNKNOWN, "TLS INFO: the provider does not report whether the session was resumed\r\n"
 }
 

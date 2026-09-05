@@ -87,10 +87,17 @@ CControlConnectionSocket::CControlConnectionSocket() : Events(5, 5)
     KeepAliveDataConState = kadcsNone;
     EncryptControlConnection = EncryptDataConnection = 0;
     CompressData = 0;
+    // Until SetConnectionParameters() runs there is no server, so no bound
+    // either; the lease is only taken once the connection is actually opened.
+    MaxConcurrentConnections = FTPADMISSION_UNLIMITED;
 }
 
 CControlConnectionSocket::~CControlConnectionSocket()
 {
+    // Every close path eventually destroys this object, so releasing here is the
+    // one place that cannot be forgotten if the connection ends unexpectedly.
+    ReleaseConnectionLease();
+
     if (KeepAliveFinishedEvent != NULL)
         HANDLES(CloseHandle(KeepAliveFinishedEvent));
 
@@ -336,7 +343,7 @@ void CControlConnectionSocket::SetConnectionParameters(const char* host, unsigne
                                                        int keepAliveSendEvery, int keepAliveStopAfter,
                                                        int keepAliveCommand, int proxyServerUID,
                                                        int encryptControlConnection, int encryptDataConnection,
-                                                       int compressData)
+                                                       int compressData, int maxConcurrentConnections)
 {
     CALL_STACK_MESSAGE14("CControlConnectionSocket::SetConnectionParameters(%s, %u, %s, %s, %d, %s, %d, %s, %d, %d, %d, %d, %d)",
                          host, (unsigned)port, user, password, useListingsCache, initFTPCommands,
@@ -396,7 +403,55 @@ void CControlConnectionSocket::SetConnectionParameters(const char* host, unsigne
     EncryptControlConnection = encryptControlConnection;
     EncryptDataConnection = encryptDataConnection;
     CompressData = compressData;
+    // Non-positive values are stored as "unlimited": a bound of zero would mean
+    // no connection could ever be opened, which is never what the user selected.
+    MaxConcurrentConnections = maxConcurrentConnections > 0 ? maxConcurrentConnections : FTPADMISSION_UNLIMITED;
     HANDLES(LeaveCriticalSection(&SocketCritSect));
+}
+
+int CControlConnectionSocket::GetMaxConcurrentConnections()
+{
+    CALL_STACK_MESSAGE1("CControlConnectionSocket::GetMaxConcurrentConnections()");
+    HANDLES(EnterCriticalSection(&SocketCritSect));
+    int ret = MaxConcurrentConnections;
+    HANDLES(LeaveCriticalSection(&SocketCritSect));
+    return ret;
+}
+
+BOOL CControlConnectionSocket::AcquireConnectionLease()
+{
+    CALL_STACK_MESSAGE1("CControlConnectionSocket::AcquireConnectionLease()");
+    // The identity is copied out of the section first: the admission controller
+    // is a leaf critical section and must not be entered while holding this one.
+    char host[HOST_MAX_SIZE];
+    char user[USER_MAX_SIZE];
+    unsigned short port;
+    int proxyUID;
+    int maxCon;
+    int encCtrl, encData;
+    HANDLES(EnterCriticalSection(&SocketCritSect));
+    if (ConnectionLease.IsHeld())
+    {
+        HANDLES(LeaveCriticalSection(&SocketCritSect));
+        return TRUE; // already counted; a reconnect on the same object must not take a second slot
+    }
+    StringCchCopyNA(host, HOST_MAX_SIZE, Host, HOST_MAX_SIZE);
+    StringCchCopyNA(user, USER_MAX_SIZE, User, USER_MAX_SIZE);
+    port = Port;
+    proxyUID = ProxyServer != NULL ? ProxyServer->ProxyUID : -1;
+    maxCon = MaxConcurrentConnections;
+    encCtrl = EncryptControlConnection;
+    encData = EncryptDataConnection;
+    HANDLES(LeaveCriticalSection(&SocketCritSect));
+
+    return FTPConnectionAdmission.Acquire(&ConnectionLease, host, port, user, proxyUID,
+                                          encCtrl != 0, encData != 0, maxCon);
+}
+
+void CControlConnectionSocket::ReleaseConnectionLease()
+{
+    CALL_STACK_MESSAGE1("CControlConnectionSocket::ReleaseConnectionLease()");
+    FTPConnectionAdmission.Release(&ConnectionLease);
 }
 
 enum CStartCtrlConStates // states of the automaton for CControlConnectionSocket::StartControlConnection
@@ -529,6 +584,19 @@ BOOL CControlConnectionSocket::StartControlConnection(HWND parent, char* user, i
         workDir[0] = 0;
     if (retryMsg != NULL)
         reconnect = TRUE; // in this case it certainly is a reconnect
+
+    // Admission is checked before the socket is opened, so a configured maximum
+    // is enforced on the panel path too, not only on operation workers. A
+    // reconnect on an object that already holds its lease is not charged again,
+    // so losing a connection can never lock the user out of their own slot.
+    if (!AcquireConnectionLease())
+    {
+        char admissionBuf[300];
+        _snprintf_s(admissionBuf, _TRUNCATE, LoadStr(IDS_MAXCONREACHED), GetMaxConcurrentConnections());
+        SalamanderGeneral->SalMessageBox(parent, admissionBuf, LoadStr(IDS_FTPERRORTITLE),
+                                         MB_OK | MSGBOXEX_ESCAPEENABLED | MB_ICONEXCLAMATION);
+        return FALSE;
+    }
 
     BOOL ret = FALSE;
     int fatalErrorTextID = 0;
@@ -2160,7 +2228,13 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
     if (ret)
         SetupKeepAliveTimer(); // if everything is OK, set the timer for keep-alive
     else
+    {
         ReleaseKeepAlive(); // on error release keep-alive (cannot be used without an established connection)
+        // The connection was not established, so the slot this attempt reserved
+        // has to go back immediately - otherwise a run of failed attempts would
+        // exhaust the configured maximum without a single live connection.
+        ReleaseConnectionLease();
+    }
     return ret;
 }
 

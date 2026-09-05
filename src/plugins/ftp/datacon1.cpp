@@ -43,6 +43,7 @@ CDataConnectionBaseSocket::CDataConnectionBaseSocket(CFTPProxyForDataCon* proxyS
     DataTransferPostponed = 0;
 
     GlobalTransferSpeedMeter = NULL;
+    OperationMetrics = NULL; // set by the worker when this connection belongs to an operation
 
     ListenOnIP = INADDR_NONE;
     ListenOnPort = 0;
@@ -287,6 +288,15 @@ void CDataConnectionBaseSocket::SetGlobalTransferSpeedMeter(CTransferSpeedMeter*
 
     HANDLES(EnterCriticalSection(&SocketCritSect));
     GlobalTransferSpeedMeter = globalTransferSpeedMeter;
+    HANDLES(LeaveCriticalSection(&SocketCritSect));
+}
+
+void CDataConnectionBaseSocket::SetOperationMetrics(CFTPTransferMetrics* metrics)
+{
+    CALL_STACK_MESSAGE1("CDataConnectionBaseSocket::SetOperationMetrics()");
+
+    HANDLES(EnterCriticalSection(&SocketCritSect));
+    OperationMetrics = metrics;
     HANDLES(LeaveCriticalSection(&SocketCritSect));
 }
 
@@ -1018,7 +1028,19 @@ void CDataConnectionSocket::ReceiveNetEvent(LPARAM lParam, int index)
                                 }
                                 ReadBytes = (char*)malloc(DATACON_FLUSHBUFFERSIZE);
                                 if (ReadBytes != NULL)
+                                {
                                     ReadBytesAllocatedSize = DATACON_FLUSHBUFFERSIZE;
+                                    // Section 8 asks whether re-allocating this
+                                    // 64 KiB handoff buffer for every small file
+                                    // is worth removing. That change is
+                                    // measurement-gated, so what lands here is
+                                    // the measurement: the count of fresh
+                                    // allocations appears in the operation's
+                                    // document next to the throughput it would
+                                    // be traded against.
+                                    if (OperationMetrics != NULL)
+                                        OperationMetrics->NoteBuffer(FALSE);
+                                }
                                 else // not enough memory to store the data in our buffer (only TRACE reports the error)
                                 {
                                     TRACE_E(LOW_MEMORY);
@@ -1055,6 +1077,14 @@ void CDataConnectionSocket::ReceiveNetEvent(LPARAM lParam, int index)
                                             TransferSpeedMeter.BytesReceived(len, LastActivityTime);
                                             if (GlobalTransferSpeedMeter != NULL)
                                                 GlobalTransferSpeedMeter->BytesReceived(len, LastActivityTime);
+                                            // Payload accounting for the operation document: bytes/s and the
+                                            // time to the first payload byte are recorded where the bytes
+                                            // actually arrive (ftp-improvements.md section 1).
+                                            if (OperationMetrics != NULL)
+                                            {
+                                                OperationMetrics->NoteFirstPayloadByte();
+                                                OperationMetrics->AddPayloadBytes((unsigned __int64)len);
+                                            }
                                             StatusHasChanged();
 
                                             if (ReadBytesAllocatedSize - ValidBytesInReadBytesBuf == 0)
@@ -1214,6 +1244,12 @@ void CDataConnectionSocket::ReceiveNetEvent(LPARAM lParam, int index)
                                         TransferSpeedMeter.BytesReceived(len, LastActivityTime);
                                         if (GlobalTransferSpeedMeter != NULL)
                                             GlobalTransferSpeedMeter->BytesReceived(len, LastActivityTime);
+                                        // Same payload accounting as the plain-socket path above.
+                                        if (OperationMetrics != NULL)
+                                        {
+                                            OperationMetrics->NoteFirstPayloadByte();
+                                            OperationMetrics->AddPayloadBytes((unsigned __int64)len);
+                                        }
                                         StatusHasChanged();
                                         if (WSAGETSELECTEVENT(lParam) == FD_CLOSE)
                                             sendFDCloseAgain = TRUE;

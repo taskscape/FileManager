@@ -140,6 +140,13 @@ protected:
     BOOL OurShutdown;           // TRUE if this side (the FTP client) initiated the shutdown
     BOOL IsDataConnection;      // TRUE = socket for data transfer, set larger buffers (speed up listing, downloads and uploads)
 
+    // What SChannel reported about the most recent completed handshake on this
+    // socket (ftp-improvements.md section 5.2). It is an observation, never an
+    // assumption: fmhUnknown means the provider did not answer, which is a
+    // distinct result from "a full handshake happened".
+    CFTPMeteredHandshake LastHandshakeResult;
+    CMonotonicTimePoint HandshakeStartTime; // when the current handshake began, for its measured duration
+
     CSocketState SocketState; // socket state
 
     // data for connecting through proxy servers (firewalls)
@@ -312,6 +319,26 @@ public:
     CTlsHandshakeResult BeginAsyncEncryptSocket(int logUID, int* sslErrorOccured, CSocket* conForReuse);
     CTlsHandshakeResult ContinueAsyncEncryptSocket(int logUID, int* sslErrorOccured, CSocket* conForReuse);
     BOOL IsAsyncEncryptingSocket() { return SSLHandshakeConn != NULL; }
+
+    // Asynchronous handshake for the control connection. Unlike the data-channel
+    // variants above it can return an unverified certificate, because a control
+    // login must be able to hand one to the worker's error/prompt flow; the
+    // data-oriented calls have no such output and would simply fail
+    // (ftp-improvements.md section 5.4).
+    CTlsHandshakeResult BeginAsyncEncryptControlSocket(int logUID, int* sslErrorOccured,
+                                                       CCertificate** unverifiedCert, int* errorID,
+                                                       char* errorBuf, int errorBufLen);
+    CTlsHandshakeResult ContinueAsyncEncryptControlSocket(int logUID, int* sslErrorOccured,
+                                                          CCertificate** unverifiedCert, int* errorID,
+                                                          char* errorBuf, int errorBufLen);
+
+    // Result and duration of the last completed handshake on this socket, for
+    // the operation's measurement document.
+    CFTPMeteredHandshake GetLastHandshakeResult() { return LastHandshakeResult; }
+    CMonotonicDuration GetLastHandshakeDuration()
+    {
+        return HandshakeStartTime != 0 ? CMonotonicClock::Elapsed(HandshakeStartTime, CMonotonicClock::Now()) : 0;
+    }
 
 protected:
     // Certificate finalization is shared by blocking control-channel and asynchronous data-channel handshakes.

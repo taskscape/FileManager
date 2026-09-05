@@ -171,6 +171,16 @@ BEGIN
     LTEXT           "&Number of bytes to verify (at end of file) when resuming copying from server:",IDC_STATIC_12,5,91,264,8
     EDITTEXT        IDE_RESUMEOVERLAP,269,89,35,12,ES_AUTOHSCROLL | WS_GROUP
     LTEXT           "bytes",IDC_STATIC_13,308,91,22,8
+    CONTROL         "",IDC_STATIC_14,"Static",SS_ETCHEDHORZ | WS_GROUP,120,116,211,1
+    LTEXT           "Large folder transfers",IDC_STATIC_15,5,112,80,8
+    CONTROL         "Use se&veral connections for one operation, up to:",IDC_AUTOPARALLELISM,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,5,122,180,12
+    EDITTEXT        IDE_TRANSFERWORKERLIMIT,190,122,28,12,ES_AUTOHSCROLL
+    LTEXT           "connections (1 to 8, never above the server's connection limit)",IDC_STATIC_16,222,124,215,8
+    CONTROL         "Use machine-readable directory &listings (MLSD) when the server supports them",IDC_USEMLSD,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,5,136,300,12
+    CONTROL         "Collect transfer measurements (writes one &JSON report per operation)",IDC_TRANSFERMETRICS,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,5,150,300,12
 END
 
 IDD_CFGLOGS DIALOGEX 23, 39, 339, 218

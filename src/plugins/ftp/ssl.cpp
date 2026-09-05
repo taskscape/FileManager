@@ -1155,6 +1155,25 @@ BOOL CSocket::FinishEncryptSocket(SSL* connection, int logUID, int* sslErrorOccu
         Logs.LogMessage(logUID, details, -1);
     }
 
+    // Whether this handshake actually resumed a cached session is asked of
+    // SChannel, not inferred. The ReuseSSLSession value set at the end of this
+    // function only records that SChannel owns the session cache; it says
+    // nothing about what happened here, so it must never be read as evidence of
+    // resumption (ftp-improvements.md section 5.2). A provider that does not
+    // answer leaves the result genuinely unknown rather than optimistic.
+    SecPkgContext_SessionInfo sessionInfo = {};
+    if (QueryContextAttributes(&connection->Context, SECPKG_ATTR_SESSION_INFO, &sessionInfo) == SEC_E_OK)
+    {
+        BOOL reconnected = (sessionInfo.dwFlags & SSL_SESSION_RECONNECT) != 0;
+        Logs.LogMessage(logUID, LoadStr(reconnected ? IDS_SSL_LOG_SESSIONRESUMED : IDS_SSL_LOG_SESSIONFULL), -1, TRUE);
+        LastHandshakeResult = reconnected ? fmhResumed : fmhFull;
+    }
+    else
+    {
+        Logs.LogMessage(logUID, LoadStr(IDS_SSL_LOG_SESSIONUNKNOWN), -1, TRUE);
+        LastHandshakeResult = fmhUnknown;
+    }
+
     bool accepted = false;
     // Reconnects must recheck exception expiry; data sockets intentionally inherit the already pinned control identity.
     if (pCertificate && pCertificate->IsSame(der, derLength, NULL, 0) &&
@@ -1209,7 +1228,13 @@ BOOL CSocket::FinishEncryptSocket(SSL* connection, int logUID, int* sslErrorOccu
     free(der);
     SSLConn = connection;
     if (conForReuse)
-        conForReuse->ReuseSSLSession = 2; // SChannel maintains its own target-name session cache.
+    {
+        // SChannel maintains its own target-name session cache, so there is no
+        // client-side session object to hand over. This records that fact; it is
+        // NOT a statement that this handshake resumed anything - the resumption
+        // result comes from SECPKG_ATTR_SESSION_INFO above.
+        conForReuse->ReuseSSLSession = 2;
+    }
     if (sslErrorOccured)
         *sslErrorOccured = SSLCONERR_NOERROR;
     return TRUE;
@@ -1285,6 +1310,134 @@ BOOL CSocket::EncryptSocket(int logUID, int* sslErrorOccured, CCertificate** unv
                                errorBuf, errorBufLen, conForReuse);
 }
 
+CTlsHandshakeResult CSocket::BeginAsyncEncryptControlSocket(int logUID, int* sslErrorOccured,
+                                                            CCertificate** unverifiedCert, int* errorID,
+                                                            char* errorBuf, int errorBufLen)
+{
+    // Same state machine as the data-channel handshake, with the certificate
+    // outputs the worker's login flow needs. Migrating the control login off the
+    // blocking EncryptSocket() is what lets one worker's stalled TLS handshake
+    // stop blocking the other workers' payload progress: releasing
+    // WorkerCritSect around a blocking call never made the socket thread
+    // asynchronous (ftp-improvements.md section 5.4).
+    if (errorID != NULL)
+        *errorID = -1;
+    if (errorBufLen > 0)
+        errorBuf[0] = 0;
+    if (unverifiedCert != NULL)
+        *unverifiedCert = NULL;
+    if (sslErrorOccured != NULL)
+        *sslErrorOccured = SSLConn ? SSLCONERR_NOERROR : SSLCONERR_DONOTRETRY;
+    if (SSLConn)
+        return thrCompleted;
+    if (SSLHandshakeConn)
+    {
+        if (sslErrorOccured != NULL)
+            *sslErrorOccured = SSLCONERR_NOERROR;
+        return thrPending;
+    }
+    if (!bSSLInited || HostAddress == NULL || HostAddress[0] == 0)
+    {
+        if (errorID != NULL)
+            *errorID = IDS_SSL_ERR_CONNECT;
+        return thrFailed;
+    }
+
+    SSL* connection = (SSL*)calloc(1, sizeof(SSL));
+    if (connection == NULL)
+    {
+        if (errorID != NULL)
+            *errorID = IDS_SSL_ERR_NEW;
+        return thrFailed;
+    }
+    connection->Socket = Socket;
+    connection->LastError = SSL_ERROR_SSL;
+
+    HandshakeStartTime = CMonotonicClock::Now(); // measured duration starts with the first token
+
+    DWORD socketError = NO_ERROR;
+    SECURITY_STATUS securityError = SEC_E_OK;
+    CTlsHandshakeResult result = AdvanceHandshake(connection, HostAddress, true,
+                                                  &socketError, &securityError);
+    if (result == thrFailed)
+    {
+        ReportHandshakeFailure(logUID, socketError, securityError, errorID, errorBuf, errorBufLen);
+        SSLFree(connection);
+        if (sslErrorOccured != NULL)
+            *sslErrorOccured = SSLCONERR_CANRETRY;
+        return thrFailed;
+    }
+    if (result == thrPending)
+    {
+        // Ownership stays on the socket until a readiness event completes or
+        // cancels the handshake; the caller resumes it from its socket events.
+        SSLHandshakeConn = connection;
+        if (sslErrorOccured != NULL)
+            *sslErrorOccured = SSLCONERR_NOERROR;
+        return thrPending;
+    }
+
+    // 'conForReuse' is deliberately NULL here: this *is* the control connection,
+    // and its data connections reuse it, not the other way round.
+    return FinishEncryptSocket(connection, logUID, sslErrorOccured, unverifiedCert, errorID,
+                               errorBuf, errorBufLen, NULL)
+               ? thrCompleted
+               : thrFailed;
+}
+
+CTlsHandshakeResult CSocket::ContinueAsyncEncryptControlSocket(int logUID, int* sslErrorOccured,
+                                                               CCertificate** unverifiedCert, int* errorID,
+                                                               char* errorBuf, int errorBufLen)
+{
+    if (errorID != NULL)
+        *errorID = -1;
+    if (errorBufLen > 0)
+        errorBuf[0] = 0;
+    if (unverifiedCert != NULL)
+        *unverifiedCert = NULL;
+    if (SSLConn)
+    {
+        if (sslErrorOccured != NULL)
+            *sslErrorOccured = SSLCONERR_NOERROR;
+        return thrCompleted;
+    }
+    if (SSLHandshakeConn == NULL)
+    {
+        if (sslErrorOccured != NULL)
+            *sslErrorOccured = SSLCONERR_DONOTRETRY;
+        if (errorID != NULL)
+            *errorID = IDS_SSL_ERR_CONNECT;
+        return thrFailed;
+    }
+
+    DWORD socketError = NO_ERROR;
+    SECURITY_STATUS securityError = SEC_E_OK;
+    CTlsHandshakeResult result = AdvanceHandshake(SSLHandshakeConn, HostAddress, false,
+                                                  &socketError, &securityError);
+    if (result == thrPending)
+    {
+        if (sslErrorOccured != NULL)
+            *sslErrorOccured = SSLCONERR_NOERROR;
+        return thrPending;
+    }
+
+    SSL* connection = SSLHandshakeConn;
+    SSLHandshakeConn = NULL;
+    if (result == thrFailed)
+    {
+        ReportHandshakeFailure(logUID, socketError, securityError, errorID, errorBuf, errorBufLen);
+        SSLFree(connection);
+        if (sslErrorOccured != NULL)
+            *sslErrorOccured = SSLCONERR_CANRETRY;
+        return thrFailed;
+    }
+
+    return FinishEncryptSocket(connection, logUID, sslErrorOccured, unverifiedCert, errorID,
+                               errorBuf, errorBufLen, NULL)
+               ? thrCompleted
+               : thrFailed;
+}
+
 CTlsHandshakeResult CSocket::BeginAsyncEncryptSocket(int logUID, int* sslErrorOccured,
                                                      CSocket* conForReuse)
 {
@@ -1309,6 +1462,7 @@ CTlsHandshakeResult CSocket::BeginAsyncEncryptSocket(int logUID, int* sslErrorOc
 
     DWORD socketError = NO_ERROR;
     SECURITY_STATUS securityError = SEC_E_OK;
+    HandshakeStartTime = CMonotonicClock::Now(); // measured duration starts with the first token
     CTlsHandshakeResult result = AdvanceHandshake(connection, HostAddress, true,
                                                   &socketError, &securityError);
     if (result == thrFailed)

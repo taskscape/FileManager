@@ -362,6 +362,7 @@ void CFTPWorker::HandleEventInWorkingState3(CFTPWorkerEvent event, BOOL& sendQui
                                                                        WORKER_DATACON_FLUSHDATA,
                                                                        WORKER_DATACON_LISTENINGFORCON);
                                 WorkerDataCon->SetGlobalTransferSpeedMeter(Oper->GetGlobalTransferSpeedMeter());
+                                WorkerDataCon->SetOperationMetrics(Oper->GetMetrics()); // payload bytes and time-to-first-byte are measured on the data connection
                                 WorkerDataCon->SetGlobalLastActivityTime(Oper->GetGlobalLastActivityTime());
                                 HANDLES(EnterCriticalSection(&WorkerCritSect));
 
@@ -1129,6 +1130,12 @@ void CFTPWorker::HandleEventInWorkingState3(CFTPWorkerEvent event, BOOL& sendQui
 
             case fwssWorkCopyDone: // copy/move of a file: done, close the file and move to the next item
             {
+                // Per-file completion latency is measured from when this worker
+                // took the item, which is what "time to first completed file"
+                // and the p50/p95 figures are built from (section 1).
+                Oper->GetMetrics()->NoteFileCompleted(ItemStartTime != 0
+                                                          ? CMonotonicClock::Elapsed(ItemStartTime, CMonotonicClock::Now())
+                                                          : 0);
                 // the item finished successfully, record this state in it
                 Queue->UpdateItemState(CurItem, sqisDone, ITEMPR_OK, NO_ERROR, NULL, Oper);
                 lookForNewWork = TRUE;

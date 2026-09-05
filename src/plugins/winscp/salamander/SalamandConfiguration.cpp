@@ -39,7 +39,23 @@ void __fastcall TSalamandConfiguration::Default()
     FConfirmUpload = true;
     FQueueViewLayout = "70,170,170,80,80";
     FPanelColumns = "1,1;2,1;3,1;4,0";
+    // A bounded number of transfer sessions replaces the previous "no limit"
+    // (ftp-improvements.md section 6.2), and ordinary copies no longer walk the
+    // whole tree before moving the first byte (section 6.4).
+    FQueueTransfersLimit = SALAMAND_DEFAULT_QUEUE_TRANSFERS;
+    FPrecalculateTransferSize = false;
     memset(FColumnsWidths, 0, sizeof(FColumnsWidths));
+}
+//---------------------------------------------------------------------------
+void __fastcall TSalamandConfiguration::SetQueueTransfersLimit(int value)
+{
+    // A stored value outside the supported range selects the default rather
+    // than being passed through to the queue, where 0 would mean "unlimited".
+    if ((value < SALAMAND_MIN_QUEUE_TRANSFERS) || (value > SALAMAND_MAX_QUEUE_TRANSFERS))
+    {
+        value = SALAMAND_DEFAULT_QUEUE_TRANSFERS;
+    }
+    FQueueTransfersLimit = value;
 }
 //---------------------------------------------------------------------------
 // duplicated from core\configuration.cpp
@@ -59,6 +75,8 @@ void __fastcall TSalamandConfiguration::Default()
     BLOCK("Salamander", CANCREATE, \
           KEY(Bool, ConfirmDetach); \
           KEY(Bool, ConfirmUpload); \
+          KEY(Integer, QueueTransfersLimit); \
+          KEY(Bool, PrecalculateTransferSize); \
           KEY(String, QueueViewLayout); \
           KEY(String, PanelColumns); \
           KEY(String, LeftColumnsWidths); \

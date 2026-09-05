@@ -1237,6 +1237,26 @@ void CConfigPageAdvanced::Validate(CTransferInfo& ti)
         ti.ErrorOn(IDE_RESUMEOVERLAP);
         return;
     }
+
+    // The worker target is validated only when automatic parallelism is on:
+    // in fixed mode the field holds the exact number of connections, and in
+    // both cases a value outside 1..8 is rejected here rather than being
+    // silently clamped at connect time.
+    int autoParallelism;
+    ti.CheckBox(IDC_AUTOPARALLELISM, autoParallelism);
+    if (autoParallelism)
+    {
+        ti.EditLine(IDE_TRANSFERWORKERLIMIT, num);
+        if (!ti.IsGood())
+            return; // an error has already occurred
+        if (num < TRANSFERWORKERS_MIN || num > TRANSFERWORKERS_MAX)
+        {
+            SalamanderGeneral->SalMessageBox(HWindow, LoadStr(IDS_MUSTBEGRTHANZERO),
+                                             LoadStr(IDS_FTPERRORTITLE), MB_OK | MB_ICONEXCLAMATION);
+            ti.ErrorOn(IDE_TRANSFERWORKERLIMIT);
+            return;
+        }
+    }
 }
 
 void CConfigPageAdvanced::Transfer(CTransferInfo& ti)
@@ -1254,6 +1274,30 @@ void CConfigPageAdvanced::Transfer(CTransferInfo& ti)
     ti.EditLine(IDE_RESUMEOVERLAP, Config.ResumeOverlap);
     ti.EditLine(IDE_NODATATRTIMEOUT, Config.NoDataTransferTimeout);
     HANDLES(LeaveCriticalSection(&Config.ConParamsCS));
+
+    // The checkbox is the parallelism mode and the edit field is the worker
+    // target. Unchecking it means Fixed 1, which reproduces the plug-in's
+    // historic single-connection behaviour exactly - the fallback the plan
+    // requires to stay available.
+    int autoParallelism = Config.TransferParallelismMode == tpmAuto;
+    ti.CheckBox(IDC_AUTOPARALLELISM, autoParallelism);
+    int workerLimit = Config.TransferWorkerLimit;
+    ti.EditLine(IDE_TRANSFERWORKERLIMIT, workerLimit);
+    if (ti.Type == ttDataFromWindow)
+    {
+        Config.TransferParallelismMode = autoParallelism ? tpmAuto : tpmFixed;
+        if (autoParallelism)
+            Config.TransferWorkerLimit = workerLimit;
+        else
+            Config.TransferWorkerLimit = TRANSFERWORKERS_MIN; // Fixed mode without a number means one connection
+    }
+
+    int useMLSD = Config.UseMLSD == mlsdAuto;
+    ti.CheckBox(IDC_USEMLSD, useMLSD);
+    if (ti.Type == ttDataFromWindow)
+        Config.UseMLSD = useMLSD ? mlsdAuto : mlsdNever;
+
+    ti.CheckBox(IDC_TRANSFERMETRICS, Config.EnableTransferMetrics);
 }
 
 //

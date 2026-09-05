@@ -183,6 +183,15 @@ public:
     char* Path; // path to the processed file/directory (local path on the server or a Windows path)
     char* Name; // name of the processed file/directory (name without the path)
 
+    // Position of this item in CFTPQueue::Items, maintained by the queue itself
+    // (ftp-improvements.md section 3). Storing it here turns UID lookup into a
+    // hash probe plus a field read instead of a linear scan; the array already
+    // pays an O(n) move for every expansion, so keeping these in step costs no
+    // extra order of work.
+    // CAUTION: valid only while the item is in the queue, and only readable from
+    //          the queue critical section.
+    int QueueIndex;
+
 public:
     CFTPQueueItem();
     virtual ~CFTPQueueItem();
@@ -507,6 +516,14 @@ public:
 #define FTP_OPERATION_QUEUE_LIMIT 100000
 #define FTP_DISK_WORK_QUEUE_LIMIT 512
 
+// Scheduling tuning (ftp-improvements.md section 3). The window bounds how far
+// item selection looks ahead for work in the worker's current remote directory,
+// so directory affinity can never turn selection into a full queue scan. The
+// batch is how many transfers a single worker performs between discovery items,
+// which is what lets copying start before the last directory is enumerated.
+#define FTPQUEUE_AFFINITY_WINDOW 512
+#define FTPQUEUE_AFFINITY_BATCH 64
+
 class CFTPQueue
 {
 protected:
@@ -516,12 +533,35 @@ protected:
 
     TIndirectArray<CFTPQueueItem> Items; // queue items
 
+    // UID -> item index, so a lookup no longer walks the whole array as trees
+    // and completed-item history grow (ftp-improvements.md section 3). Open
+    // addressing with linear probing: entries are pointers into Items, and the
+    // table is rebuilt only when it grows, not on every expansion - the
+    // per-item QueueIndex carries position changes instead.
+    // An empty slot is NULL; there are no tombstones because items are only ever
+    // removed together with a full rebuild.
+    CFTPQueueItem** UIDIndex;
+    int UIDIndexSize;  // always a power of two, or 0 when the index is not built
+    int UIDIndexCount; // number of occupied slots
+    BOOL UIDIndexValid; // FALSE after an allocation failure: lookups fall back to the linear scan
+
     // single-entry cache for speeding up FindItemWithUID() - beware: it may not be valid:
     int LastFoundUID;   // UID of the last found item
     int LastFoundIndex; // index of the last found item (always a non-negative number, even after initialization)
 
-    int FirstWaitingItemIndex;          // first item in the queue (array Items) that can (but does not have to) be in state sqisWaiting and if GetOnlyExploreAndResolveItems==TRUE it can also be an "explore" or "resolve" item (there simply are none before this index)
-    BOOL GetOnlyExploreAndResolveItems; // TRUE = for now we return only "explore" and "resolve" items from the queue (FALSE only when no such item is in the "waiting" state) (Type < fqitLastResolveOrExploreItem)
+    // Hint meaning "no item before this index is in state sqisWaiting". It only
+    // ever moves backwards; the discovery-only variant of this hint is gone,
+    // because discovery and transfer work are now selected together.
+    int FirstWaitingItemIndex;
+
+    // Scheduling counters (ftp-improvements.md section 3). They separate ready
+    // discovery work from ready transfer work, which the single
+    // GetOnlyExploreAndResolveItems preference could not express: that flag made
+    // every worker prefer exploration, so a large tree spent its first minutes
+    // enumerating instead of copying.
+    int DiscoveryInProgressCount;    // "explore"/"resolve" items currently assigned to a worker
+    int ReadyNonDiscoveryCount;      // items in sqisWaiting that are not "explore"/"resolve"
+    int TransfersSinceLastDiscovery; // single-worker alternation: transfers handed out since the last discovery item
 
     int ExploreAndResolveItemsCount;            // number of queue items of type "explore" and "resolve" (Type < fqitLastResolveOrExploreItem)
     int DoneOrSkippedItemsCount;                // number of queue items in state sqisDone or sqisSkipped
@@ -629,7 +669,21 @@ public:
     // searches the queue for the first item in state sqisWaiting, returns a pointer to it (or NULL
     // if such item does not exist); switches the found item into state sqisProcessing
     // (so that it cannot be found again immediately)
-    CFTPQueueItem* GetNextWaitingItem(CFTPOperation* oper);
+    //
+    // Scheduling (ftp-improvements.md section 3): 'workerCount' is how many
+    // workers this operation currently runs and 'workingPath' is the caller's
+    // current remote directory (NULL when it has none). Discovery no longer
+    // blocks transfers - with more than one worker at most one discovery item is
+    // handed out while ready transfer work exists, and a worker is preferentially
+    // given work in the directory it is already in, so scheduling reduces CWD
+    // traffic instead of a second directory cache doing it afterwards.
+    // 'readyTransferItems' (if not NULL) returns the number of ready
+    // non-discovery items, which the worker-growth decision needs.
+    CFTPQueueItem* GetNextWaitingItem(CFTPOperation* oper, int workerCount,
+                                      const char* workingPath, int* readyTransferItems);
+
+    // Number of ready (sqisWaiting) items that are not discovery work.
+    int GetReadyTransferItemCount();
 
     // returns the item 'item' to state sqisWaiting (the worker cannot process it, this
     // allows other workers to process the item)
@@ -758,11 +812,23 @@ protected:
     // CAUTION: call only in the QueueCritSect critical section!!!
     CFTPQueueItem* FindItemWithUID(int UID);
 
-    // updates GetOnlyExploreAndResolveItems and FirstWaitingItemIndex when changing an item
-    // to state sqisWaiting; 'itemIndex' is the index of the item being changed; 'exploreOrResolveItem'
-    // is the result of the item's IsExploreOrResolveItem() method
+    // Moves FirstWaitingItemIndex back to 'itemIndex' when an item at that
+    // position becomes sqisWaiting. The hint never moves forward, so no waiting
+    // item can be stepped over and left unassigned.
     // CAUTION: call only in the QueueCritSect critical section!!!
-    void HandleFirstWaitingItemIndex(BOOL exploreOrResolveItem, int itemIndex);
+    void HandleFirstWaitingItemIndex(int itemIndex);
+
+    // Inserts one item into the UID index, growing the table when it passes the
+    // load factor. Silently marks the index invalid on allocation failure - the
+    // linear fallback in FindItemWithUID() keeps the queue correct, only slower.
+    // CAUTION: call only in the QueueCritSect critical section!!!
+    void IndexAddItem(CFTPQueueItem* item);
+
+    // Rebuilds the UID index from Items and refreshes every item's QueueIndex.
+    // Used after removals and after multi-item insertions, where individual
+    // fix-ups would cost the same as one pass anyway.
+    // CAUTION: call only in the QueueCritSect critical section!!!
+    void RebuildUIDIndex();
 };
 
 //
@@ -984,6 +1050,12 @@ enum CFTPWorkerSubState // substates for individual states from CFTPWorkerState
     fwssConWaitForPrompt,       // wait for the login prompt from the server
     fwssConSendAUTH,            // send AUTH TLS before login script
     fwssConWaitForAUTHCmdRes,   // wait for response to AUTH TLS
+    // Control-connection TLS handshake driven by socket readiness events instead
+    // of a blocking call (ftp-improvements.md section 5.4). Advancing it from
+    // fweConTLSHandshake keeps one worker's stalled handshake from holding up
+    // the other workers' payload progress; PBSZ/PROT are only sent once it
+    // completes successfully.
+    fwssConTLSHandshake,        // asynchronous control-connection TLS handshake in progress
     fwssConSendPBSZ,            // send PBSZ before login script
     fwssConWaitForPBSZCmdRes,   // wait for response to PBSZ
     fwssConSendPROT,            // send PROT before login script
@@ -996,7 +1068,20 @@ enum CFTPWorkerSubState // substates for individual states from CFTPWorkerState
     fwssConWaitForInitCmdRes,   // wait for the result of the executed initialization command
     fwssConSendSyst,            // determine the server system (send the "SYST" command)
     fwssConWaitForSystRes,      // wait for the server system information (result of the "SYST" command)
+    // FEAT is sent once per authenticated session (ftp-improvements.md section
+    // 4.1). Its answer decides whether this session may use MLSD; a session that
+    // never gets an answer keeps using the configured LIST command, because an
+    // assumption carried over from an earlier connection is not a capability.
+    fwssConSendFEAT,       // send the "FEAT" command (negotiate machine-readable listings)
+    fwssConWaitForFEATRes, // wait for the result of the "FEAT" command
+    fwssConLoginFinished,  // login complete (whether or not FEAT was sent): switch the worker to fwsWorking
     fwssConReconnect,           // decide whether to perform reconnect or report a worker error (CAUTION: ErrorDescr must be set on input)
+
+    // FEAT negotiation for a worker that inherited an already authenticated
+    // connection from the panel and therefore never ran the login sequence
+    // above (ftp-improvements.md section 4.1). It happens before the first
+    // directory listing, so that listing can already use MLSD.
+    fwssWorkWaitForFEATRes, // wait for the result of "FEAT" sent before the first listing
 
     // substates of fwsWorking:
     fwssWorkStopped, // work stopped (if the connection was open, the "QUIT" command was already sent), now only waiting for the worker to be released (the same for all work types)
@@ -1130,6 +1215,14 @@ enum CFTPWorkerEvent
 
     fweConnected,      // requested connection established (FD_CONNECT received)
     fweConnectFailure, // error while establishing the connection (FD_CONNECT received with an error); error description is in ErrorDescr
+
+    // Results of the asynchronous control-connection TLS handshake
+    // (ftp-improvements.md section 5.4). They arrive from socket readiness
+    // events, so a stalled handshake occupies only this worker; details of a
+    // failure (including an unverified certificate) are in the TLSHandshake*
+    // members, which keeps the existing AUTH error and prompt handling intact.
+    fweTLSHandshakeDone,   // control-connection TLS handshake completed successfully
+    fweTLSHandshakeFailed, // control-connection TLS handshake failed or was refused
 
     fweReconTimeout, // timeout for the next connect attempt (see WORKER_RECONTIMEOUTTIMID)
 
@@ -1367,6 +1460,21 @@ protected:
 
     BOOL UploadDirGetTgtPathListing; // only when processing upload-dir-explore or upload-file items: TRUE = the target path listing should be fetched
 
+    // TRUE when the listing currently being fetched was requested with MLSD, so
+    // its result is parsed with the RFC 3659 parser rather than the server-type
+    // parsers (ftp-improvements.md section 4).
+    BOOL UsedMLSDForListing;
+
+    // Monotonic start of the listing command currently in flight, so its
+    // duration is measured rather than inferred (ftp-improvements.md section 1).
+    CMonotonicTimePoint ListingCommandStartTime;
+
+    // Monotonic time at which this worker took CurItem, used for per-file
+    // completion latency. It is set where the item is assigned, so it measures
+    // the whole per-file cost (CWD, TYPE, data connection, transfer, reply), not
+    // just the payload.
+    CMonotonicTimePoint ItemStartTime;
+
     int UploadAutorenamePhase;              // upload: current phase of generating names for the target directory/file (see FTPGenerateNewName()); 0 = beginning of the autorename process; -1 = it was the last generation phase, we simply cannot generate another name of that type
     char UploadAutorenameNewName[MAX_PATH]; // upload: buffer for the last generated name for the target directory/file
 
@@ -1385,10 +1493,39 @@ protected:
     // data without the need for a critical section (written only in the sockets thread and disk thread, synchronization via FTPDiskThread and DiskWorkIsUsed):
     CFTPDiskWork DiskWork; // work data submitted to the FTPDiskThread object (thread performing disk operations)
 
+    // Admission lease for this worker's authenticated control connection. It is
+    // taken when the worker is created and released on every failure and
+    // shutdown path, so the number of leases matches the number of workers that
+    // may hold a connection - not the number that happen to be connected right
+    // now, which would let a reconnect storm exceed the configured maximum.
+    // The lease has its own synchronization inside the admission controller.
+    CFTPConnectionLease ConnectionLease;
+
+    // Outcome of the asynchronous control-connection TLS handshake, filled by
+    // the socket-readiness path and consumed once by the AUTH substate. They are
+    // touched only from the sockets thread inside SocketCritSect, like the other
+    // handshake state on CSocket.
+    int TLSHandshakeError;                      // SSLCONERR_XXX
+    int TLSHandshakeErrorID;                    // resource id of the error text, or -1
+    CCertificate* TLSHandshakeUnverifiedCert;   // certificate to hand to the Solve Error flow (NULL = none)
+    char TLSHandshakeErrorBuf[FTPWORKER_ERRDESCR_BUFSIZE];
+
 public:
     CFTPWorker(CFTPOperation* oper, CFTPQueue* queue, const char* host, unsigned short port,
                const char* user);
     ~CFTPWorker();
+
+    // Takes the admission lease for this worker. Returns FALSE when the
+    // configured maximum for the server is already reached; the caller must then
+    // not start the worker.
+    BOOL AcquireConnectionLease();
+
+    // Releases this worker's lease (harmless when none is held).
+    void ReleaseConnectionLease();
+
+    // Direct access for the panel<->worker connection handover, which moves an
+    // existing lease instead of taking a new one.
+    CFTPConnectionLease* GetConnectionLease() { return &ConnectionLease; }
 
     // returns ID (in the WorkerCritSect critical section)
     int GetID();
@@ -1595,6 +1732,16 @@ protected:
     void HandleEventInPreparingState(CFTPWorkerEvent event, BOOL& sendQuitCmd, BOOL& postActivate,
                                      BOOL& reportWorkerChange);
 
+    // Applies the outcome of the asynchronous control-connection TLS handshake
+    // to the login state machine (ftp-improvements.md section 5.4). Returns TRUE
+    // when the login may continue - SubState is advanced to PBSZ or to the next
+    // login-script command. Returns FALSE and fills ErrorDescr otherwise, with
+    // 'retryLoginWithoutAsking' set when a plain reconnect may succeed; an
+    // unverified certificate is moved into UnverifiedCertificate for the
+    // existing Solve Error flow.
+    // CAUTION: call only inside WorkerCritSect.
+    BOOL ApplyControlTLSHandshakeResult(BOOL succeeded, BOOL* retryLoginWithoutAsking);
+
     // helper method solely to make HandleEvent() easier to follow
     void HandleEventInConnectingState(CFTPWorkerEvent event, BOOL& sendQuitCmd, BOOL& postActivate,
                                       BOOL& reportWorkerChange, char* buf, char* errBuf, char* host,
@@ -1639,6 +1786,20 @@ protected:
                                     BOOL& handleShouldStop, BOOL& quitCmdWasSent);
 
     // helper method solely to make HandleEventInWorkingState() easier to follow
+    // Parses an MLSD listing (RFC 3659) into operation queue items
+    // (ftp-improvements.md section 4). Unlike the LIST path there is no server
+    // type to autodetect: the grammar is defined, so an entry is either
+    // understood or the whole directory is reported as unparsed - a partially
+    // parsed listing must never be recorded as a complete directory.
+    // Returns TRUE on success; 'lowMem' reports an allocation or parse failure.
+    BOOL ParseMLSDListingToFTPQueue(TIndirectArray<CFTPQueueItem>* ftpQueueItems,
+                                    const char* allocatedListing, int allocatedListingLen,
+                                    BOOL* lowMem, int transferMode, CQuadWord* totalSize,
+                                    BOOL* sizeInBytes, BOOL selFiles, BOOL selDirs,
+                                    BOOL includeSubdirs, DWORD attrAndMask, DWORD attrOrMask,
+                                    int operationsUnknownAttrs, int operationsHiddenFileDel,
+                                    int operationsHiddenDirDel);
+
     BOOL ParseListingToFTPQueue(TIndirectArray<CFTPQueueItem>* ftpQueueItems,
                                 const char* allocatedListing, int allocatedListingLen,
                                 CServerType* serverType, BOOL* lowMem,
@@ -2135,6 +2296,37 @@ protected:
     BOOL EncryptDataConnection;
     int CompressData;
     CCertificate* pCertificate;
+
+    // Effective connection maximum for this server (FTPADMISSION_UNLIMITED = no
+    // limit), inherited from the panel connection the operation was started
+    // from. Enforcement happens in CFTPConnectionAdmission; this is the number
+    // the operation hands it.
+    int MaxConcurrentConnections;
+
+    // How many workers this operation currently wants. It is a target, not a
+    // guarantee: admission, memory and the amount of ready work all cap the
+    // number actually created. Kept distinct from MaxConcurrentConnections so a
+    // higher target can never widen a configured limit.
+    int WorkerTarget;
+    int WorkerTargetCeiling;                       // upper bound from the configuration and from admission at start-up
+    CMonotonicTimePoint LastWorkerTargetChangeTime; // monotonic time of the last growth/shrink decision
+    unsigned __int64 LastThroughputSample;          // payload bytes at the previous sampling point
+    unsigned __int64 LastThroughputRate;            // bytes/s measured over the previous sampling interval
+
+    // Per-operation measurement (section 1). It has its own synchronization, so
+    // it deliberately sits outside OperCritSect.
+    CFTPTransferMetrics Metrics;
+
+    // Machine-readable listing capability for this operation's authenticated
+    // sessions (section 4). Negotiated once per login via FEAT and propagated to
+    // workers; renegotiated after a reconnect.
+    CFTPMLSxSupport MLSxSupport;
+
+    // TRUE after a definitive "command not supported" reply to MLSD. This is the
+    // single, explicit fallback the plan allows: it is set only for that reply,
+    // so one permission-denied directory or one timed-out data connection does
+    // not disable MLSD for the whole operation.
+    BOOL MLSDDisabledForOperation;
 
     CExploredPaths ExploredPaths; // list of explored paths (paths where workers have already performed "explore-dir")
 
@@ -2786,6 +2978,81 @@ public:
     // HOST_MAX_SIZE; 'user' (if not NULL) is a buffer for 'User' of size USER_MAX_SIZE;
     // 'port' (if not NULL) returns 'Port'
     void GetUserHostPort(char* user, char* host, unsigned short* port);
+
+    // ****************************************************************************
+    // Bounded worker pool and admission (ftp-improvements.md section 2)
+    // ****************************************************************************
+
+    // UID of the proxy server used by this operation (-1 = direct connection).
+    // Part of the admission identity, so two operations that reach the same host
+    // through different proxies are still counted against the same server bound
+    // but can be told apart in diagnostics.
+    int GetProxyServerUID();
+
+    // Effective connection maximum for this server (FTPADMISSION_UNLIMITED = none).
+    int GetMaxConcurrentConnections();
+
+    // Sets the maximum inherited from the panel connection the operation was
+    // started from. Called once, before the operation is added to the list.
+    void SetMaxConcurrentConnections(int maxConcurrentConnections);
+
+    // Number of workers this operation should start with. In Fixed mode this is
+    // the configured count; in Auto mode it is one, because growth is driven by
+    // measured progress rather than by an optimistic guess. Both are clamped by
+    // the currently available admission slots.
+    int GetInitialWorkerCount();
+
+    // Decides whether one more worker should be added right now. Returns TRUE at
+    // most once per sampling interval and only when all of the following hold:
+    // Auto mode, the target is below its ceiling, enough ready file work exists,
+    // an admission slot is free, and throughput has not stopped improving.
+    // 'readyFileItems' is the number of transfer items waiting in the queue.
+    BOOL ShouldAddWorker(int currentWorkerCount, int readyFileItems);
+
+    // Reduces the worker target after the server classified a connection as
+    // refused for capacity reasons. Healthy in-flight transfers are never
+    // aborted for this: only the target changes, so idle workers retire.
+    void ReduceWorkerTargetAfterRefusal(int currentWorkerCount);
+
+    // Current worker target (diagnostics and the operation dialog).
+    int GetWorkerTarget();
+
+    // Number of workers currently in this operation's list. Synchronization is
+    // inside CFTPWorkersList, so OperCritSect is not needed.
+    int GetWorkersCount() { return WorkersList.GetCount(); }
+
+    // Adds one worker to this operation when the target allows it and an
+    // admission slot is free. Returns TRUE when a worker was actually created.
+    // CAUTION: must not be called from inside CFTPWorker::WorkerCritSect or the
+    //          worker's socket section - it enters the sockets thread.
+    BOOL GrowWorkerPool();
+
+    // Per-operation measurement block (section 1). It has its own
+    // synchronization, so it may be used without OperCritSect.
+    CFTPTransferMetrics* GetMetrics() { return &Metrics; }
+
+    // Machine-readable listing capability shared by this operation's sessions
+    // (section 4). Its state is interlocked, so no critical section is needed.
+    CFTPMLSxSupport* GetMLSxSupport() { return &MLSxSupport; }
+
+    // TRUE when this operation may use MLSD: the user allowed it and the
+    // authenticated session advertised MLST. A server whose capability is still
+    // unknown keeps using the configured LIST command.
+    BOOL CanUseMLSD();
+
+    // Returns the command that discovery should send to list a directory, with
+    // its CRLF. Returns TRUE when that command is MLSD, so the caller knows to
+    // parse the result with the RFC 3659 parser rather than the server-type
+    // parsers. An explicitly configured LIST command always wins.
+    BOOL GetListingCommandForDiscovery(char* buf, int bufSize);
+
+    // Records a definitive "MLSD not supported" reply so this operation falls
+    // back to LIST once, rather than probing MLSD in every directory.
+    void DisableMLSDForOperation();
+
+    // Writes the operation's measurement document, including the queue bounds
+    // that explain its scheduling behaviour. Safe to call more than once.
+    void ReportMetrics();
 };
 
 //
@@ -3472,23 +3739,50 @@ public:
 //
 // ****************************************************************************
 
+// Metadata a machine-readable (MLSx) listing already established for one entry
+// (ftp-improvements.md section 4.2). The item-creation helpers normally read
+// size, timestamp, rights and attributes through a server-type plugin data
+// interface built from parser columns; MLSD has no such columns, but it does
+// have better data. Passing this struct lets the helpers use it directly and
+// keeps every "unknown" genuinely unknown - a missing MLSx fact must not become
+// a zero size or an epoch timestamp.
+struct CFTPKnownEntryMetadata
+{
+    BOOL IsLink; // established from the MLSx "type" fact, not guessed from a rights string
+
+    BOOL SizeKnown;
+    CQuadWord Size; // always in bytes for MLSx
+
+    BOOL DateAndTimeValid;
+    CFTPDate Date;
+    CFTPTime Time;
+
+    BOOL AttrsKnown;
+    WORD Attrs; // UNIX.mode, when the server sent it
+};
+
 // creates an item for the Delete operation for file/directory 'f'
+// 'known' (may be NULL) overrides what would otherwise be read through 'dataIface'
 CFTPQueueItem* CreateItemForDeleteOperation(const CFileData* f, BOOL isDir, int rightsCol,
                                             CFTPListingPluginDataInterface* dataIface,
                                             CFTPQueueItemType* type, BOOL* ok, BOOL isTopLevelDir,
                                             int hiddenFileDel, int hiddenDirDel,
                                             CFTPQueueItemState* state, DWORD* problemID,
-                                            int* skippedItems, int* uiNeededItems);
+                                            int* skippedItems, int* uiNeededItems,
+                                            const CFTPKnownEntryMetadata* known = NULL);
 
 // creates an item for the Copy or Move operation for file/directory 'f'
+// 'known' (may be NULL) overrides what would otherwise be read through 'dataIface'
 CFTPQueueItem* CreateItemForCopyOrMoveOperation(const CFileData* f, BOOL isDir, int rightsCol,
                                                 CFTPListingPluginDataInterface* dataIface,
                                                 CFTPQueueItemType* type, int transferMode,
                                                 CFTPOperation* oper, BOOL copy, const char* targetPath,
                                                 const char* targetName, CQuadWord* size,
-                                                BOOL* sizeInBytes, CQuadWord* totalSize);
+                                                BOOL* sizeInBytes, CQuadWord* totalSize,
+                                                const CFTPKnownEntryMetadata* known = NULL);
 
 // creates an item for the Change Attributes operation for file/directory 'f'
+// 'known' (may be NULL) overrides what would otherwise be read through 'dataIface'
 CFTPQueueItem* CreateItemForChangeAttrsOperation(const CFileData* f, BOOL isDir, int rightsCol,
                                                  CFTPListingPluginDataInterface* dataIface,
                                                  CFTPQueueItemType* type, BOOL* ok,
@@ -3497,7 +3791,8 @@ CFTPQueueItem* CreateItemForChangeAttrsOperation(const CFileData* f, BOOL isDir,
                                                  BOOL* skip, BOOL selFiles,
                                                  BOOL selDirs, BOOL includeSubdirs,
                                                  DWORD attrAndMask, DWORD attrOrMask,
-                                                 int operationsUnknownAttrs);
+                                                 int operationsUnknownAttrs,
+                                                 const CFTPKnownEntryMetadata* known = NULL);
 
 // creates an item for Copy or Move from disk to the file system for file/directory 'name'
 CFTPQueueItem* CreateItemForCopyOrMoveUploadOperation(const char* name, BOOL isDir, const CQuadWord* size,

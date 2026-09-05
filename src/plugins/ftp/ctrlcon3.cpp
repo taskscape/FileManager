@@ -1514,6 +1514,12 @@ void CControlConnectionSocket::GiveConnectionToWorker(CFTPWorker* newWorker, HWN
 
                 ResetBuffersAndEvents(); // clear the event queue (it should contain only ccsevNewBytesRead)
 
+                // The connection itself moved, so its admission lease moves with
+                // it. Releasing and re-acquiring instead could fail against an
+                // already full bound and would briefly under-count a connection
+                // that never actually closed.
+                FTPConnectionAdmission.Transfer(&ConnectionLease, newWorker->GetConnectionLease());
+
                 // inform the log that the "control connection" has been handed to the worker (and is thus "inactive")
                 Logs.LogMessage(logUID, LoadStr(IDS_LOGMSGCONINWORKER), -1, TRUE);
                 Logs.SetIsConnected(logUID, IsConnected());
@@ -1586,6 +1592,11 @@ void CControlConnectionSocket::GetConnectionFromWorker(CFTPWorker* workerWithCon
             HANDLES(LeaveCriticalSection(&SocketCritSect));
 
             workerWithCon->ResetBuffersAndEvents(); // clear the event queue (it should contain only ccsevNewBytesRead)
+
+            // The connection came back, so its lease does too. The worker may
+            // have taken the lease from this object in the first place, so the
+            // total never changes across a lend-and-return cycle.
+            FTPConnectionAdmission.Transfer(workerWithCon->GetConnectionLease(), &ConnectionLease);
 
             // inform the log that the "control connection" has been taken from the worker (and is therefore "active" again)
             Logs.LogMessage(logUID, LoadStr(IDS_LOGMSGCONFROMWORKER), -1, TRUE);

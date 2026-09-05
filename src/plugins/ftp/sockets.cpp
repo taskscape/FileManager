@@ -139,6 +139,10 @@ CSocket::CSocket()
     pCertificate = NULL;
     OurShutdown = FALSE;
     IsDataConnection = FALSE;
+    // No handshake has run yet, so its result is unknown and its start time is
+    // "never" (0), which GetLastHandshakeDuration() reports as zero.
+    LastHandshakeResult = fmhUnknown;
+    HandshakeStartTime = 0;
     SocketState = ssNotOpened;
     HostAddress = NULL;
     HostIP = INADDR_NONE;

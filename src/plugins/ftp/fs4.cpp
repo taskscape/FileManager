@@ -539,12 +539,16 @@ CFTPQueueItem* CreateItemForDeleteOperation(const CFileData* f, BOOL isDir, int 
                                             CFTPQueueItemType* type, BOOL* ok, BOOL isTopLevelDir,
                                             int hiddenFileDel, int hiddenDirDel,
                                             CFTPQueueItemState* state, DWORD* problemID,
-                                            int* skippedItems, int* uiNeededItems)
+                                            int* skippedItems, int* uiNeededItems,
+                                            const CFTPKnownEntryMetadata* known)
 {
     CFTPQueueItem* item = NULL;
     *type = fqitNone;
     BOOL isFile = TRUE;
-    if (rightsCol != -1 && IsUNIXLink(dataIface->GetStringFromColumn(*f, rightsCol)))
+    // A machine-readable listing states the entry type outright, so there is no
+    // rights string to interpret and no guess to make.
+    if (known != NULL ? known->IsLink
+                      : (rightsCol != -1 && IsUNIXLink(dataIface->GetStringFromColumn(*f, rightsCol))))
     { // link
         *type = fqitDeleteLink;
         item = new CFTPQueueItemDel;
@@ -811,7 +815,8 @@ CFTPQueueItem* CreateItemForCopyOrMoveOperation(const CFileData* f, BOOL isDir, 
                                                 CFTPQueueItemType* type, int transferMode,
                                                 CFTPOperation* oper, BOOL copy, const char* targetPath,
                                                 const char* targetName, CQuadWord* size,
-                                                BOOL* sizeInBytes, CQuadWord* totalSize)
+                                                BOOL* sizeInBytes, CQuadWord* totalSize,
+                                                const CFTPKnownEntryMetadata* known)
 {
     CFTPQueueItem* item = NULL;
     *type = fqitNone;
@@ -819,12 +824,15 @@ CFTPQueueItem* CreateItemForCopyOrMoveOperation(const CFileData* f, BOOL isDir, 
     char *name, *ext;               // helper variables for auto-detect transfer mode
     BOOL asciiTransferMode = FALSE; // helper variable for auto-detect transfer mode
     char buffer[MAX_PATH];          // helper variable for auto-detect transfer mode
-    BOOL isLink = rightsCol != -1 && IsUNIXLink(dataIface->GetStringFromColumn(*f, rightsCol));
+    // A machine-readable listing states the entry type outright, so there is no
+    // rights string to interpret and no guess to make.
+    BOOL isLink = known != NULL ? known->IsLink
+                                : (rightsCol != -1 && IsUNIXLink(dataIface->GetStringFromColumn(*f, rightsCol)));
     if (isLink || !isDir) // when 'asciiTransferMode' is used, calculate it
     {
         if (transferMode == trmAutodetect)
         {
-            if (dataIface != NULL) // on VMS we must trim the name to the base (the version number gets in the way when matching masks)
+            if (dataIface != NULL && known == NULL) // on VMS we must trim the name to the base (the version number gets in the way when matching masks)
                 dataIface->GetBasicName(*f, &name, &ext, buffer);
             else
             {
@@ -843,7 +851,13 @@ CFTPQueueItem* CreateItemForCopyOrMoveOperation(const CFileData* f, BOOL isDir, 
         BOOL dateAndTimeValid = FALSE;
         CFTPDate date;
         CFTPTime time;
-        if (dataIface != NULL)
+        if (known != NULL)
+        {
+            dateAndTimeValid = known->DateAndTimeValid;
+            date = known->Date;
+            time = known->Time;
+        }
+        else if (dataIface != NULL)
             dataIface->GetLastWriteDateAndTime(*f, &dateAndTimeValid, &date, &time);
         if (!dateAndTimeValid)
         {
@@ -872,7 +886,21 @@ CFTPQueueItem* CreateItemForCopyOrMoveOperation(const CFileData* f, BOOL isDir, 
         {
             *type = copy ? fqitCopyFileOrFileLink : fqitMoveFileOrFileLink;
             item = new CFTPQueueItemCopyOrMove;
-            if (dataIface != NULL && dataIface->GetSize(*f, *size, *sizeInBytes))
+            if (known != NULL)
+            {
+                // MLSx sizes are always in bytes. A size fact the server did not
+                // send, or one this client refused as out of range, stays
+                // unknown - never zero, which would break resume decisions.
+                if (known->SizeKnown)
+                {
+                    *size = known->Size;
+                    *sizeInBytes = TRUE;
+                    *totalSize += *size;
+                }
+                else
+                    size->Set(-1, -1); // unknown file size
+            }
+            else if (dataIface != NULL && dataIface->GetSize(*f, *size, *sizeInBytes))
                 *totalSize += *size;
             else
                 size->Set(-1, -1); // unknown file size
@@ -880,7 +908,13 @@ CFTPQueueItem* CreateItemForCopyOrMoveOperation(const CFileData* f, BOOL isDir, 
             BOOL dateAndTimeValid = FALSE;
             CFTPDate date;
             CFTPTime time;
-            if (dataIface != NULL)
+            if (known != NULL)
+            {
+                dateAndTimeValid = known->DateAndTimeValid;
+                date = known->Date;
+                time = known->Time;
+            }
+            else if (dataIface != NULL)
                 dataIface->GetLastWriteDateAndTime(*f, &dateAndTimeValid, &date, &time);
             if (!dateAndTimeValid)
             {
@@ -1205,7 +1239,8 @@ CFTPQueueItem* CreateItemForChangeAttrsOperation(const CFileData* f, BOOL isDir,
                                                  BOOL* skip, BOOL selFiles,
                                                  BOOL selDirs, BOOL includeSubdirs,
                                                  DWORD attrAndMask, DWORD attrOrMask,
-                                                 int operationsUnknownAttrs)
+                                                 int operationsUnknownAttrs,
+                                                 const CFTPKnownEntryMetadata* known)
 {
     CFTPQueueItem* item = NULL;
     *type = fqitNone;
@@ -1213,7 +1248,32 @@ CFTPQueueItem* CreateItemForChangeAttrsOperation(const CFileData* f, BOOL isDir,
     *problemID = ITEMPR_OK;
     *skip = FALSE; // TRUE if the file/directory/link should not be processed at all (unrelated to skippedItems)
     char* rights = NULL;
-    if (rightsCol != -1 && IsUNIXLink((rights = dataIface->GetStringFromColumn(*f, rightsCol))))
+    // MLSx reports the entry type as a fact and the mode as an octal number, so
+    // no rights string is parsed. When the server sends no UNIX.mode the
+    // permissions stay genuinely unknown, which the code below already handles.
+    char knownRights[16];
+    if (known != NULL)
+    {
+        rights = NULL;
+        if (known->AttrsKnown)
+        {
+            // Rebuild the rwx form the attribute helpers below expect; the type
+            // character is '-' because the link case is handled separately.
+            WORD mode = known->Attrs;
+            knownRights[0] = '-';
+            for (int i = 0; i < 3; i++)
+            {
+                int shift = 6 - 3 * i;
+                knownRights[1 + 3 * i] = (mode >> (shift + 2)) & 1 ? 'r' : '-';
+                knownRights[2 + 3 * i] = (mode >> (shift + 1)) & 1 ? 'w' : '-';
+                knownRights[3 + 3 * i] = (mode >> shift) & 1 ? 'x' : '-';
+            }
+            knownRights[10] = 0;
+            rights = knownRights;
+        }
+    }
+    if (known != NULL ? known->IsLink
+                      : (rightsCol != -1 && IsUNIXLink((rights = dataIface->GetStringFromColumn(*f, rightsCol)))))
     {                       // link
         if (includeSubdirs) // try whether it is a link to a directory (otherwise there is nothing to do)
         {
@@ -1229,7 +1289,10 @@ CFTPQueueItem* CreateItemForChangeAttrsOperation(const CFileData* f, BOOL isDir,
         DWORD actAttr;
         DWORD attrDiff = 0;
         BOOL attrErr = FALSE;
-        if (rightsCol != -1 && GetAttrsFromUNIXRights(&actAttr, &attrDiff, rights))
+        // With MLSx, 'rights' comes from the UNIX.mode fact (NULL when the
+        // server did not send it), so the column index is irrelevant there.
+        if ((known != NULL ? rights != NULL : rightsCol != -1) &&
+            GetAttrsFromUNIXRights(&actAttr, &attrDiff, rights))
         {
             DWORD changeMask = (~attrAndMask | attrOrMask) & 0777;
             if ((!includeSubdirs || !isDir) &&                                                   // cannot optimize "explore dir" this way

@@ -80,6 +80,14 @@ const char* CONFIG_TRANSFERMODE = "Transfer Mode";
 const char* CONFIG_USELISTINGSCACHE = "Use Listings Cache";
 const char* CONFIG_ASCIIMASKS = "ASCII File Masks";
 const char* CONFIG_COMPRESSDATA = "Compress Data";
+// New in the large-folder transfer work: the worker target and the machine-readable
+// listing preference are stored under their own names so an older build reading
+// this profile simply keeps its previous single-worker/LIST behaviour.
+const char* CONFIG_TRANSFERPARALLELISM = "Transfer Parallelism Mode";
+const char* CONFIG_TRANSFERWORKERLIMIT = "Transfer Worker Limit";
+const char* CONFIG_USEMLSD = "Use MLSD Listings";
+const char* CONFIG_ENABLETRANSFERMETRICS = "Enable Transfer Metrics";
+const char* CONFIG_TRANSFERMETRICSDIR = "Transfer Metrics Directory";
 
 const char* CONFIG_SRVREPTIMEOUT = "Server Replies Timeout";
 const char* CONFIG_NODATATRTIMEOUT = "No Data Transfer Timeout";
@@ -525,6 +533,30 @@ void CPluginInterface::LoadConfiguration(HWND parent, HKEY regKey, CSalamanderRe
             Config.UseServerSpeedLimit = FALSE;
         registry->GetValue(regKey, CONFIG_USELISTINGSCACHE, REG_DWORD, &Config.UseListingsCache, sizeof(DWORD));
         registry->GetValue(regKey, CONFIG_TRANSFERMODE, REG_DWORD, &Config.TransferMode, sizeof(DWORD));
+
+        // Migration: a profile written before automatic parallelism existed has
+        // no value here and is moved to Auto. The already stored maximum-connection
+        // setting is deliberately not reinterpreted - a disabled maximum whose
+        // stored value happens to be 1 is not an active cap of one connection.
+        if (!registry->GetValue(regKey, CONFIG_TRANSFERPARALLELISM, REG_DWORD, &Config.TransferParallelismMode, sizeof(DWORD)))
+            Config.TransferParallelismMode = tpmAuto;
+        if (Config.TransferParallelismMode != tpmFixed && Config.TransferParallelismMode != tpmAuto)
+            Config.TransferParallelismMode = tpmAuto;
+        if (!registry->GetValue(regKey, CONFIG_TRANSFERWORKERLIMIT, REG_DWORD, &Config.TransferWorkerLimit, sizeof(DWORD)))
+            Config.TransferWorkerLimit = TRANSFERWORKERS_DEFAULT;
+        // A corrupted or out-of-range stored value selects the safe default
+        // instead of letting an operation request an unbounded number of sessions.
+        if (Config.TransferWorkerLimit < TRANSFERWORKERS_MIN || Config.TransferWorkerLimit > TRANSFERWORKERS_MAX)
+            Config.TransferWorkerLimit = TRANSFERWORKERS_DEFAULT;
+        if (!registry->GetValue(regKey, CONFIG_USEMLSD, REG_DWORD, &Config.UseMLSD, sizeof(DWORD)))
+            Config.UseMLSD = mlsdAuto;
+        if (Config.UseMLSD != mlsdNever && Config.UseMLSD != mlsdAuto)
+            Config.UseMLSD = mlsdAuto;
+        if (!registry->GetValue(regKey, CONFIG_ENABLETRANSFERMETRICS, REG_DWORD, &Config.EnableTransferMetrics, sizeof(DWORD)))
+            Config.EnableTransferMetrics = FALSE;
+        if (!registry->GetValue(regKey, CONFIG_TRANSFERMETRICSDIR, REG_SZ, FTPMetricsOutputDir, MAX_PATH))
+            FTPMetricsOutputDir[0] = 0; // empty selects %TEMP%
+
         char masks[MAX_GROUPMASK];
         if (registry->GetValue(regKey, CONFIG_ASCIIMASKS, REG_SZ, masks, MAX_GROUPMASK))
             Config.ASCIIFileMasks->SetMasksString(masks, FALSE);
@@ -745,6 +777,11 @@ void CPluginInterface::SaveConfiguration(HWND parent, HKEY regKey, CSalamanderRe
     registry->SetValue(regKey, CONFIG_SPEEDLIM, REG_SZ, num, -1);
     registry->SetValue(regKey, CONFIG_USELISTINGSCACHE, REG_DWORD, &Config.UseListingsCache, sizeof(DWORD));
     registry->SetValue(regKey, CONFIG_TRANSFERMODE, REG_DWORD, &Config.TransferMode, sizeof(DWORD));
+    registry->SetValue(regKey, CONFIG_TRANSFERPARALLELISM, REG_DWORD, &Config.TransferParallelismMode, sizeof(DWORD));
+    registry->SetValue(regKey, CONFIG_TRANSFERWORKERLIMIT, REG_DWORD, &Config.TransferWorkerLimit, sizeof(DWORD));
+    registry->SetValue(regKey, CONFIG_USEMLSD, REG_DWORD, &Config.UseMLSD, sizeof(DWORD));
+    registry->SetValue(regKey, CONFIG_ENABLETRANSFERMETRICS, REG_DWORD, &Config.EnableTransferMetrics, sizeof(DWORD));
+    registry->SetValue(regKey, CONFIG_TRANSFERMETRICSDIR, REG_SZ, FTPMetricsOutputDir, -1);
     char masks[MAX_GROUPMASK];
     Config.ASCIIFileMasks->GetMasksString(masks);
     registry->SetValue(regKey, CONFIG_ASCIIMASKS, REG_SZ, masks, -1);

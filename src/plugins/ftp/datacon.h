@@ -72,6 +72,11 @@ protected:
     CTransferSpeedMeter ComprTransferSpeedMeter;   // object for measuring the speed of compressed data transfer in this data connection (used only when MODE Z is enabled)
     CTransferSpeedMeter* GlobalTransferSpeedMeter; // object for measuring the overall data transfer speed (all data connection workers of the FTP operation); if NULL, it does not exist
 
+    // Per-operation measurement block (ftp-improvements.md section 1); NULL when
+    // this connection does not belong to an operation. It has its own
+    // synchronization, so it is used without this socket's critical section.
+    CFTPTransferMetrics* OperationMetrics;
+
     DWORD ListenOnIP;            // IP on which the proxy server listens (waits for a connection); if INADDR_NONE, the ListeningForConnection() method has not been called yet or the proxy server reported an error
     unsigned short ListenOnPort; // port on which the proxy server listens (waits for a connection)
     CSalZLIB ZLIBInfo;           // Control structure for ZLIB compression
@@ -143,6 +148,11 @@ public:
     // sets the object for measuring overall data transfer speed (all data connection workers of the FTP operation)
     // can be called from any thread
     void SetGlobalTransferSpeedMeter(CTransferSpeedMeter* globalTransferSpeedMeter);
+
+    // Sets the operation's measurement block, so payload bytes and the time to
+    // the first payload byte are recorded where the bytes actually arrive.
+    // Can be called from any thread.
+    void SetOperationMetrics(CFTPTransferMetrics* metrics);
 
     // just wraps a call to CSocket::OpenForListeningWithProxy() with parameters from 'ProxyServer'
     BOOL OpenForListeningWithProxy(DWORD listenOnIP, unsigned short listenOnPort,

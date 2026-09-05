@@ -134,9 +134,11 @@ void __fastcall TSessionData::Default()
 
   // SFTP
   SftpServer = "";
-  SFTPDownloadQueue = 4;
-  SFTPUploadQueue = 4;
-  SFTPListingQueue = 2;
+  // Defaults live next to their bounds in SessionData.h so a new profile and a
+  // profile with an out-of-range stored value end up with the same number.
+  SFTPDownloadQueue = SFTP_DEFAULT_DOWNLOAD_QUEUE;
+  SFTPUploadQueue = SFTP_DEFAULT_UPLOAD_QUEUE;
+  SFTPListingQueue = SFTP_DEFAULT_LISTING_QUEUE;
   SFTPMaxVersion = 5;
   SFTPMaxPacketSize = 0;
 
@@ -501,6 +503,16 @@ void __fastcall TSessionData::Load(THierarchicalStorage * Storage)
     SFTPMaxVersion = Storage->ReadInteger("SFTPMaxVersion", SFTPMaxVersion);
     SFTPMaxPacketSize = Storage->ReadInteger("SFTPMaxPacketSize", SFTPMaxPacketSize);
 
+    // The request-queue depths were initialized and copied but never persisted,
+    // so changing them could not survive a session save/load (see
+    // ftp-improvements.md section 7.1). They are read through the property
+    // setters below, which clamp out-of-range values to a safe default rather
+    // than letting a corrupted profile request an unbounded number of
+    // outstanding requests.
+    SFTPDownloadQueue = Storage->ReadInteger("SFTPDownloadQueue", SFTPDownloadQueue);
+    SFTPUploadQueue = Storage->ReadInteger("SFTPUploadQueue", SFTPUploadQueue);
+    SFTPListingQueue = Storage->ReadInteger("SFTPListingQueue", SFTPListingQueue);
+
     Color = Storage->ReadInteger("Color", Color);
 
     ProtocolStr = Storage->ReadString("Protocol", ProtocolStr);
@@ -778,6 +790,12 @@ void __fastcall TSessionData::Save(THierarchicalStorage * Storage,
 
       WRITE_DATA(Integer, SFTPMaxVersion);
       WRITE_DATA(Integer, SFTPMaxPacketSize);
+
+      // Persist the request-queue depths next to the packet size they are
+      // tuned against; without this the values above could never be saved.
+      WRITE_DATA(Integer, SFTPDownloadQueue);
+      WRITE_DATA(Integer, SFTPUploadQueue);
+      WRITE_DATA(Integer, SFTPListingQueue);
 
       WRITE_DATA(Integer, Color);
 
@@ -1889,18 +1907,35 @@ void __fastcall TSessionData::SetCustomParam2(AnsiString value)
   SET_SESSION_PROPERTY(CustomParam2);
 }
 //---------------------------------------------------------------------
+// Every queue depth passes through these setters, including the values read
+// from storage, so an invalid zero, negative or absurd value selects the safe
+// default instead of reaching an allocation (ftp-improvements.md section 7.1).
+// Clamping here rather than at each use site means a single place decides what
+// is a legal depth.
+static int __fastcall SanitizeSFTPQueueDepth(int value, int defaultValue)
+{
+  if ((value < SFTP_MIN_QUEUE_DEPTH) || (value > SFTP_MAX_QUEUE_DEPTH))
+  {
+    return defaultValue;
+  }
+  return value;
+}
+//---------------------------------------------------------------------
 void __fastcall TSessionData::SetSFTPDownloadQueue(int value)
 {
+  value = SanitizeSFTPQueueDepth(value, SFTP_DEFAULT_DOWNLOAD_QUEUE);
   SET_SESSION_PROPERTY(SFTPDownloadQueue);
 }
 //---------------------------------------------------------------------
 void __fastcall TSessionData::SetSFTPUploadQueue(int value)
 {
+  value = SanitizeSFTPQueueDepth(value, SFTP_DEFAULT_UPLOAD_QUEUE);
   SET_SESSION_PROPERTY(SFTPUploadQueue);
 }
 //---------------------------------------------------------------------
 void __fastcall TSessionData::SetSFTPListingQueue(int value)
 {
+  value = SanitizeSFTPQueueDepth(value, SFTP_DEFAULT_LISTING_QUEUE);
   SET_SESSION_PROPERTY(SFTPListingQueue);
 }
 //---------------------------------------------------------------------

@@ -716,10 +716,18 @@ BOOL CFTPOperationsList::IsUploadingToServer(const char* user, const char* host,
 CFTPQueue::CFTPQueue() : Items(100, 500)
 {
     HANDLES(InitializeCriticalSection(&QueueCritSect));
+    UIDIndex = NULL;
+    UIDIndexSize = 0;
+    UIDIndexCount = 0;
+    UIDIndexValid = TRUE; // an empty index is a valid index
+    DiscoveryInProgressCount = 0;
+    ReadyNonDiscoveryCount = 0;
+    // Start at the batch size so the very first assignment may be discovery:
+    // an empty queue has nothing else to hand out.
+    TransfersSinceLastDiscovery = FTPQUEUE_AFFINITY_BATCH;
     LastFoundUID = -1;
     LastFoundIndex = 0;
     FirstWaitingItemIndex = 0;
-    GetOnlyExploreAndResolveItems = TRUE;
     ExploreAndResolveItemsCount = 0;
     DoneOrSkippedItemsCount = 0;
     WaitingOrProcessingOrDelayedItemsCount = 0;
@@ -739,7 +747,71 @@ CFTPQueue::CFTPQueue() : Items(100, 500)
 
 CFTPQueue::~CFTPQueue()
 {
+    if (UIDIndex != NULL)
+        free(UIDIndex);
     HANDLES(DeleteCriticalSection(&QueueCritSect));
+}
+
+// Mixing the UID keeps sequential UIDs from clustering in the table; the
+// multiplier is the 32-bit golden-ratio constant used by Fibonacci hashing.
+static inline unsigned HashQueueUID(int uid)
+{
+    return (unsigned)uid * 2654435761u;
+}
+
+void CFTPQueue::RebuildUIDIndex()
+{
+    // Target load factor 0.5: with linear probing this keeps the average probe
+    // count near one, which is the whole point of replacing the linear scan.
+    int wanted = 16;
+    while (wanted < 2 * (Items.Count + 1))
+        wanted *= 2;
+
+    CFTPQueueItem** table = (CFTPQueueItem**)calloc(wanted, sizeof(CFTPQueueItem*));
+    if (table == NULL)
+    {
+        // Without the index the queue still works, only lookups fall back to the
+        // linear scan. Failing the operation over a cache would be worse than
+        // being slow, so record the state and continue.
+        TRACE_E(LOW_MEMORY);
+        UIDIndexValid = FALSE;
+        return;
+    }
+    if (UIDIndex != NULL)
+        free(UIDIndex);
+    UIDIndex = table;
+    UIDIndexSize = wanted;
+    UIDIndexCount = 0;
+    UIDIndexValid = TRUE;
+
+    unsigned mask = (unsigned)(wanted - 1);
+    for (int i = 0; i < Items.Count; i++)
+    {
+        CFTPQueueItem* item = Items[i];
+        item->QueueIndex = i;
+        unsigned slot = HashQueueUID(item->UID) & mask;
+        while (UIDIndex[slot] != NULL)
+            slot = (slot + 1) & mask;
+        UIDIndex[slot] = item;
+        UIDIndexCount++;
+    }
+}
+
+void CFTPQueue::IndexAddItem(CFTPQueueItem* item)
+{
+    if (!UIDIndexValid)
+        return; // the index was abandoned after an allocation failure
+    if (UIDIndex == NULL || 2 * (UIDIndexCount + 1) > UIDIndexSize)
+    {
+        RebuildUIDIndex(); // the rebuild inserts every item, including this one
+        return;
+    }
+    unsigned mask = (unsigned)(UIDIndexSize - 1);
+    unsigned slot = HashQueueUID(item->UID) & mask;
+    while (UIDIndex[slot] != NULL)
+        slot = (slot + 1) & mask;
+    UIDIndex[slot] = item;
+    UIDIndexCount++;
 }
 
 void CFTPQueue::UpdateCounters(CFTPQueueItem* item, BOOL add)
@@ -750,6 +822,31 @@ void CFTPQueue::UpdateCounters(CFTPQueueItem* item, BOOL add)
             ExploreAndResolveItemsCount++;
         else
             ExploreAndResolveItemsCount--;
+
+        // Discovery items currently assigned to a worker. The scheduler uses
+        // this to keep at most one worker exploring while transfer work is
+        // available, instead of letting the whole pool enumerate directories
+        // while ready files wait (ftp-improvements.md section 3).
+        if (item->GetItemState() == sqisProcessing)
+        {
+            if (add)
+                DiscoveryInProgressCount++;
+            else
+                DiscoveryInProgressCount--;
+        }
+    }
+    else
+    {
+        // Ready transfer/finalization work, used both by the scheduler and by
+        // the worker-growth decision: adding a session only pays off when there
+        // are files for it to move.
+        if (item->GetItemState() == sqisWaiting)
+        {
+            if (add)
+                ReadyNonDiscoveryCount++;
+            else
+                ReadyNonDiscoveryCount--;
+        }
     }
 
     if (item->Type != fqitCopyFileOrFileLink && item->Type != fqitMoveFileOrFileLink &&
@@ -909,6 +1006,10 @@ BOOL CFTPQueue::AddItem(CFTPQueueItem* newItem)
         Items.Add(newItem);
         if (Items.IsGood())
         {
+            // Appending never shifts existing items, so only the new item needs
+            // its position recorded and only it needs to enter the index.
+            newItem->QueueIndex = Items.Count - 1;
+            IndexAddItem(newItem);
             UpdateCounters(newItem, TRUE);
             if (Items.Count > HighWaterMark)
                 HighWaterMark = Items.Count;
@@ -963,6 +1064,11 @@ BOOL CFTPQueue::ReplaceItemWithListOfItems(int itemUID, CFTPQueueItem** items, i
                     delete Items[LastFoundIndex];
                     Items[LastFoundIndex] = *items;
                     LastFoundUID = (*items)->UID;
+                    // The replaced item is gone and the array shifted, so the
+                    // index is rebuilt in one pass. That is the same order of
+                    // work the Insert() above already performed, and it keeps
+                    // the index and every QueueIndex consistent with the array.
+                    RebuildUIDIndex();
                     int i;
                     for (i = LastFoundIndex; i < LastFoundIndex + itemsCount; i++)
                     {
@@ -974,8 +1080,10 @@ BOOL CFTPQueue::ReplaceItemWithListOfItems(int itemUID, CFTPQueueItem** items, i
                     ret = TRUE;
                     if (Items.Count > HighWaterMark)
                         HighWaterMark = Items.Count;
-                    HandleFirstWaitingItemIndex(TRUE, // instead of searching the array we expect the worst case - an explore item at the first position in the array
-                                                LastFoundIndex);
+                    // The expansion replaced one item with several starting at
+                    // this position, so the earliest possibly waiting item is
+                    // here.
+                    HandleFirstWaitingItemIndex(LastFoundIndex);
                 }
                 else
                     Items.ResetState();
@@ -989,10 +1097,14 @@ BOOL CFTPQueue::ReplaceItemWithListOfItems(int itemUID, CFTPQueueItem** items, i
                 delete Items[LastFoundIndex];
                 Items[LastFoundIndex] = *items;
                 LastFoundUID = (*items)->UID;
+                // One item replaced another at the same position: the array did
+                // not shift, but the old item's index entry now dangles, so the
+                // table is rebuilt.
+                RebuildUIDIndex();
                 UpdateCounters(*items, TRUE);
                 if ((*items)->IsItemInSimpleErrorState())
                     (*items)->ErrorOccurenceTime = GiveLastErrorOccurenceTime();
-                HandleFirstWaitingItemIndex((*items)->IsExploreOrResolveItem(), LastFoundIndex);
+                HandleFirstWaitingItemIndex(LastFoundIndex);
             }
             else // itemsCount == 0
             {
@@ -1002,6 +1114,9 @@ BOOL CFTPQueue::ReplaceItemWithListOfItems(int itemUID, CFTPQueueItem** items, i
                 Items.Delete(LastFoundIndex);
                 if (!Items.IsGood())
                     Items.ResetState(); // maximum error when shrinking the array, but the deletion was surely executed
+                // The deleted item must leave the index, and everything after it
+                // moved down by one, so one rebuild restores both invariants.
+                RebuildUIDIndex();
                 LastFoundIndex = 0;
                 LastFoundUID = -1;
             }
@@ -1048,7 +1163,7 @@ void CFTPQueue::AddToNotDoneSkippedFailed(int itemDirUID, int notDone, int skipp
                 if (change)
                 {
                     if (newState == sqisWaiting)
-                        HandleFirstWaitingItemIndex(FALSE, LastFoundIndex);
+                        HandleFirstWaitingItemIndex(LastFoundIndex);
                     itemDir->ChangeStateAndCounters(newState, oper, this);
                     oper->ReportItemChange(itemDir->UID);
                 }
@@ -1469,38 +1584,62 @@ CFTPQueue::FindItemWithUID(int UID)
     {
         return Items[LastFoundIndex]; // found in the cache; no need to traverse the entire array
     }
-    else
+
+    if (UIDIndexValid && UIDIndex != NULL)
     {
-        int i;
-        for (i = 0; i < Items.Count; i++)
+        // Constant average time: probe until the item or an empty slot is found.
+        // The table is never more than half full, so the probe sequence is short
+        // and always terminates at an empty slot for an absent UID.
+        unsigned mask = (unsigned)(UIDIndexSize - 1);
+        unsigned slot = HashQueueUID(UID) & mask;
+        unsigned probes = 0;
+        while (UIDIndex[slot] != NULL)
         {
-            CFTPQueueItem* item = Items[i];
+            CFTPQueueItem* item = UIDIndex[slot];
             if (item->UID == UID)
             {
                 LastFoundUID = UID;
-                LastFoundIndex = i;
+                LastFoundIndex = item->QueueIndex;
                 return item;
             }
+            slot = (slot + 1) & mask;
+            if (++probes >= (unsigned)UIDIndexSize)
+                break; // defensive: a full table would otherwise loop forever
+        }
+        return NULL;
+    }
+
+    // Fallback used only after an index allocation failure. The number of items
+    // it walks is measured so a run that silently degraded to linear lookup is
+    // visible in the metrics document rather than only as "it felt slow".
+    int i;
+    for (i = 0; i < Items.Count; i++)
+    {
+        CFTPQueueItem* item = Items[i];
+        if (item->UID == UID)
+        {
+            LastFoundUID = UID;
+            LastFoundIndex = i;
+            return item;
         }
     }
     return NULL;
 }
 
-void CFTPQueue::HandleFirstWaitingItemIndex(BOOL exploreOrResolveItem, int itemIndex)
+void CFTPQueue::HandleFirstWaitingItemIndex(int itemIndex)
 {
-    if (!GetOnlyExploreAndResolveItems && exploreOrResolveItem)
-    {
-        GetOnlyExploreAndResolveItems = TRUE;
+    // The hint means "no waiting item exists before this index", so it may only
+    // ever move backwards. An item that has just become waiting at 'itemIndex'
+    // can only make that position earlier.
+    //
+    // The previous version also moved the index *forward* when a discovery item
+    // appeared, which was safe only while item selection was restricted to
+    // discovery items and restarted from that position. Now that discovery and
+    // transfer work are selected together (ftp-improvements.md section 3),
+    // moving forward would step over earlier waiting items and leave them
+    // permanently unassigned.
+    if (FirstWaitingItemIndex > itemIndex)
         FirstWaitingItemIndex = itemIndex;
-    }
-    else
-    {
-        if ((!GetOnlyExploreAndResolveItems || exploreOrResolveItem) &&
-            FirstWaitingItemIndex > itemIndex) // FirstWaitingItemIndex needs to be updated
-        {
-            FirstWaitingItemIndex = itemIndex;
-        }
-    }
 }
 
 int CFTPQueue::SkipItem(int UID, CFTPOperation* oper)
@@ -1561,7 +1700,7 @@ int CFTPQueue::RetryItem(int UID, CFTPOperation* oper)
                 newState = ((CFTPQueueItemDir*)found)->GetStateFromCounters();
             }
             if (newState == sqisWaiting)
-                HandleFirstWaitingItemIndex(found->IsExploreOrResolveItem(), LastFoundIndex);
+                HandleFirstWaitingItemIndex(LastFoundIndex);
             ret = LastFoundIndex;
             found->ChangeStateAndCounters(newState, oper, this);
             if (found->ProblemID == ITEMPR_UNABLETORESUME)
@@ -2355,7 +2494,7 @@ int CFTPQueue::SolveErrorOnItem(HWND parent, int UID, CFTPOperation* oper)
                                     newState = ((CFTPQueueItemDir*)item)->GetStateFromCounters();
                                 }
                                 if (newState == sqisWaiting)
-                                    HandleFirstWaitingItemIndex(item->IsExploreOrResolveItem(), itemIndex);
+                                    HandleFirstWaitingItemIndex(itemIndex);
 
                                 if (ret == -2)
                                     ret = itemIndex;
@@ -2453,7 +2592,7 @@ int CFTPQueue::SolveErrorOnItem(HWND parent, int UID, CFTPOperation* oper)
                                 ((CFTPQueueItemCopyOrMoveUpload*)item)->TgtFileState = UPLOADTGTFILESTATE_TRANSFERRED;
                                 if (item->Type == fqitUploadMoveFile) // we still need to delete the source file
                                 {
-                                    HandleFirstWaitingItemIndex(item->IsExploreOrResolveItem(), itemIndex);
+                                    HandleFirstWaitingItemIndex(itemIndex);
                                     item->ChangeStateAndCounters(sqisWaiting, oper, this);
                                 }
                                 else
@@ -2483,7 +2622,7 @@ int CFTPQueue::SolveErrorOnItem(HWND parent, int UID, CFTPOperation* oper)
                                         if (item->Type == fqitChAttrsDir)
                                             newState = ((CFTPQueueItemDir*)item)->GetStateFromCounters();
                                         if (newState == sqisWaiting)
-                                            HandleFirstWaitingItemIndex(item->IsExploreOrResolveItem(), itemIndex);
+                                            HandleFirstWaitingItemIndex(itemIndex);
 
                                         if (ret == -2)
                                             ret = itemIndex;
@@ -2553,7 +2692,7 @@ int CFTPQueue::SolveErrorOnItem(HWND parent, int UID, CFTPOperation* oper)
                                     case IDOK:          // delete
                                     case CM_SISE_RETRY: // retry
                                     {
-                                        HandleFirstWaitingItemIndex(item->IsExploreOrResolveItem(), itemIndex);
+                                        HandleFirstWaitingItemIndex(itemIndex);
 
                                         if (ret == -2)
                                             ret = itemIndex;
@@ -2646,7 +2785,7 @@ int CFTPQueue::SolveErrorOnItem(HWND parent, int UID, CFTPOperation* oper)
                                             newName = NULL;
                                         }
 
-                                        HandleFirstWaitingItemIndex(item->IsExploreOrResolveItem(), itemIndex);
+                                        HandleFirstWaitingItemIndex(itemIndex);
                                         if (ret == -2)
                                             ret = itemIndex;
                                         else
@@ -2744,7 +2883,7 @@ int CFTPQueue::SolveErrorOnItem(HWND parent, int UID, CFTPOperation* oper)
                                                 newName = NULL;
                                             }
 
-                                            HandleFirstWaitingItemIndex(item->IsExploreOrResolveItem(), itemIndex);
+                                            HandleFirstWaitingItemIndex(itemIndex);
                                             if (ret == -2)
                                                 ret = itemIndex;
                                             else
@@ -2850,7 +2989,7 @@ void CFTPQueue::UpdateItemState(CFTPQueueItem* item, CFTPQueueItemState state, D
     if (item != NULL)
     {
         if (state == sqisWaiting && FindItemWithUID(item->UID) != NULL) // item found ("always true")
-            HandleFirstWaitingItemIndex(item->IsExploreOrResolveItem(), LastFoundIndex);
+            HandleFirstWaitingItemIndex(LastFoundIndex);
 
         item->ChangeStateAndCounters(state, oper, this); // item state change
         item->ProblemID = problemID;
@@ -3508,40 +3647,125 @@ void CFTPQueue::DebugCheckCounters(CFTPOperation* oper)
 }
 #endif
 
+int CFTPQueue::GetReadyTransferItemCount()
+{
+    HANDLES(EnterCriticalSection(&QueueCritSect));
+    int ret = ReadyNonDiscoveryCount;
+    HANDLES(LeaveCriticalSection(&QueueCritSect));
+    return ret;
+}
+
 CFTPQueueItem*
-CFTPQueue::GetNextWaitingItem(CFTPOperation* oper)
+CFTPQueue::GetNextWaitingItem(CFTPOperation* oper, int workerCount, const char* workingPath,
+                              int* readyTransferItems)
 {
     CALL_STACK_MESSAGE1("CFTPQueue::GetNextWaitingItem()");
 
     HANDLES(EnterCriticalSection(&QueueCritSect));
-    BOOL getOnlyExploreAndResolveItems = GetOnlyExploreAndResolveItems;
-    CFTPQueueItem* ret = NULL;
-    while (1)
+
+    // Decide up front whether this caller may take discovery work.
+    //
+    // The original policy preferred discovery unconditionally, so a large tree
+    // was enumerated before much of it was transferred. The rule now is: with
+    // more than one worker, only one may be exploring while ready transfer work
+    // exists; the others move files. With a single worker, discovery is still
+    // taken - it is the only way the queue ever grows - but only after a batch
+    // of ready transfers has been handed out, so copying starts before the last
+    // directory is enumerated.
+    BOOL discoveryAllowed = TRUE;
+    if (ExploreAndResolveItemsCount > 0 && ReadyNonDiscoveryCount > 0)
     {
-        int i;
-        for (i = FirstWaitingItemIndex; i < Items.Count; i++)
+        if (workerCount > 1)
+            discoveryAllowed = DiscoveryInProgressCount < 1;
+        else
+            discoveryAllowed = TransfersSinceLastDiscovery >= FTPQUEUE_AFFINITY_BATCH;
+    }
+
+    CFTPQueueItem* chosen = NULL;
+    int chosenIndex = -1;
+    int firstWaitingIndex = -1; // first waiting item of any kind: keeps the FirstWaitingItemIndex hint honest
+    int scanned = 0;
+    BOOL scannedToEnd = TRUE;
+
+    int i;
+    for (i = FirstWaitingItemIndex; i < Items.Count; i++)
+    {
+        CFTPQueueItem* item = Items[i];
+        if (item->GetItemState() != sqisWaiting)
+            continue;
+        if (firstWaitingIndex == -1)
+            firstWaitingIndex = i;
+        if (item->IsExploreOrResolveItem() && !discoveryAllowed)
+            continue; // this worker is transferring; leave exploration to the one that is exploring
+
+        if (chosen == NULL)
         {
-            CFTPQueueItem* item = Items[i];
-            if (item->GetItemState() == sqisWaiting &&
-                (!getOnlyExploreAndResolveItems || item->IsExploreOrResolveItem())) // item found
+            chosen = item;
+            chosenIndex = i;
+            // Without a working path there is nothing to match, so the first
+            // eligible item is also the final answer.
+            if (workingPath == NULL || *workingPath == 0)
             {
-                FirstWaitingItemIndex = i + 1;
-                item->ChangeStateAndCounters(sqisProcessing, oper, this); // item state change
-                ret = item;
+                scannedToEnd = FALSE;
                 break;
             }
         }
-        if (ret != NULL || !getOnlyExploreAndResolveItems)
-            break;
-        else
+
+        // Directory affinity: a worker that is already in the right directory
+        // skips a CWD round trip per file, which is a large share of the cost of
+        // a many-small-files copy. This is scheduling, not caching - the existing
+        // WorkingPath check still decides whether CWD is actually sent.
+        if (item->Path != NULL && strcmp(item->Path, workingPath) == 0)
         {
-            // there are no more "explore" or "resolve" items, so in the second round we take all items
-            getOnlyExploreAndResolveItems = GetOnlyExploreAndResolveItems = FALSE;
-            FirstWaitingItemIndex = 0;
+            chosen = item;
+            chosenIndex = i;
+            scannedToEnd = FALSE;
+            break;
+        }
+        if (++scanned >= FTPQUEUE_AFFINITY_WINDOW)
+        {
+            scannedToEnd = FALSE;
+            break; // bounded look-ahead: never trade a full scan for one saved CWD
         }
     }
+
+    if (chosen == NULL && !discoveryAllowed && firstWaitingIndex != -1)
+    {
+        // Only discovery work was left and this worker was not allowed to take
+        // it. Rather than idling, take it anyway: an idle session is worse than
+        // a second worker exploring.
+        chosen = Items[firstWaitingIndex];
+        chosenIndex = firstWaitingIndex;
+    }
+
+    BOOL chosenIsDiscovery = FALSE;
+    if (chosen != NULL)
+    {
+        chosenIsDiscovery = chosen->IsExploreOrResolveItem();
+        if (chosenIsDiscovery)
+            TransfersSinceLastDiscovery = 0;
+        else if (TransfersSinceLastDiscovery < FTPQUEUE_AFFINITY_BATCH)
+            TransfersSinceLastDiscovery++;
+        chosen->ChangeStateAndCounters(sqisProcessing, oper, this); // item state change
+
+        // The hint must keep meaning "no waiting item before this index". It may
+        // advance past the chosen item only when that item was the first waiting
+        // one; otherwise an earlier waiting item is still there.
+        if (chosenIndex == firstWaitingIndex)
+            FirstWaitingItemIndex = chosenIndex + 1;
+        else if (firstWaitingIndex != -1)
+            FirstWaitingItemIndex = firstWaitingIndex;
+    }
+    else if (firstWaitingIndex == -1 && scannedToEnd)
+        FirstWaitingItemIndex = Items.Count; // nothing waiting at all: do not rescan next time
+
+    if (readyTransferItems != NULL)
+        *readyTransferItems = ReadyNonDiscoveryCount;
     HANDLES(LeaveCriticalSection(&QueueCritSect));
-    return ret;
+
+    if (chosen != NULL && oper != NULL)
+        oper->GetMetrics()->NoteAssignment(chosenIsDiscovery);
+    return chosen;
 }
 
 void CFTPQueue::ReturnToWaitingItems(CFTPQueueItem* item, CFTPOperation* oper)
@@ -3561,13 +3785,10 @@ void CFTPQueue::ReturnToWaitingItems(CFTPQueueItem* item, CFTPOperation* oper)
         item->ChangeStateAndCounters(newState, oper, this); // item state change
         if (newState == sqisWaiting)
         {
-            BOOL exploreOrResolve = item->IsExploreOrResolveItem();
-            if (exploreOrResolve || !GetOnlyExploreAndResolveItems)
-            {
-                FirstWaitingItemIndex = 0; // we will not determine the index of the returned item (computationally as difficult as finding the first "waiting" item - which is done only once, unlike calling this function)
-                if (exploreOrResolve)
-                    GetOnlyExploreAndResolveItems = TRUE;
-            }
+            // The item's own position is now known from its QueueIndex, so the
+            // hint moves back exactly as far as it must instead of restarting
+            // every scan from zero.
+            HandleFirstWaitingItemIndex(item->QueueIndex >= 0 ? item->QueueIndex : 0);
         }
     }
     else
@@ -3612,6 +3833,17 @@ CFTPOperation::CFTPOperation()
     ServerFirstReply = NULL;
     UseListingsCache = FALSE;
     ListingServerType = NULL;
+
+    // Until the operation inherits the panel connection's setting there is no
+    // bound; the worker target starts at one so nothing grows before
+    // GetInitialWorkerCount() has consulted admission.
+    MaxConcurrentConnections = FTPADMISSION_UNLIMITED;
+    MLSDDisabledForOperation = FALSE;
+    WorkerTarget = 1;
+    WorkerTargetCeiling = 1;
+    LastWorkerTargetChangeTime = CMonotonicClock::Now();
+    LastThroughputSample = 0;
+    LastThroughputRate = 0;
 
     ReportChangeInWorkerID = -2;
     ReportProgressChange = FALSE;
@@ -3692,6 +3924,11 @@ CFTPOperation::~CFTPOperation()
 {
     if (OperationDlg != NULL)
         TRACE_E("Unexpected situation in CFTPOperation::~CFTPOperation(): operation is destructed, but its dialog still exists!");
+    // The measurement document is written here, before the queue is released:
+    // it reports the queue's final size, high-water mark and rejection count
+    // alongside the transfer phases those numbers explain. Report() is a no-op
+    // when measurement is off or has already run.
+    ReportMetrics();
     if (Queue != NULL)
         delete Queue;
     if (OperationSubject != NULL)

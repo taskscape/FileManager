@@ -568,6 +568,50 @@ void CFTPWorker::HandleEventInPreparingState(CFTPWorkerEvent event, BOOL& sendQu
     }
 }
 
+BOOL CFTPWorker::ApplyControlTLSHandshakeResult(BOOL succeeded, BOOL* retryLoginWithoutAsking)
+{
+    // One place decides what a finished control-connection handshake means,
+    // whether it completed inside BeginAsyncEncryptControlSocket() or arrived
+    // later as a readiness event. Keeping it in one function is what makes the
+    // asynchronous migration behaviour-preserving: certificate validation,
+    // change detection, exception expiry and the Solve Error prompt all follow
+    // exactly the path they took with the blocking call.
+    *retryLoginWithoutAsking = FALSE;
+
+    // An unverified certificate is reported even on a completed handshake: the
+    // transport is up, but the peer is not trusted yet, so the connection is
+    // closed and retried only after the user accepts the certificate.
+    if (TLSHandshakeUnverifiedCert != NULL)
+    {
+        if (UnverifiedCertificate != NULL)
+            UnverifiedCertificate->Release();
+        UnverifiedCertificate = TLSHandshakeUnverifiedCert; // ownership moves to the worker's error flow
+        TLSHandshakeUnverifiedCert = NULL;
+        StringCchCopyNA(ErrorDescr, FTPWORKER_ERRDESCR_BUFSIZE, LoadStr(IDS_SSLNEWUNVERIFIEDCERT), FTPWORKER_ERRDESCR_BUFSIZE);
+        return FALSE;
+    }
+
+    if (succeeded)
+    {
+        // Record what SChannel said about resumption; the operation's document
+        // reports full/resumed/unknown separately, never a guess.
+        Oper->GetMetrics()->NoteHandshake(GetLastHandshakeResult(), GetLastHandshakeDuration());
+        // PBSZ/PROT only after the handshake actually completed - RFC 4217
+        // requires the data-channel protection level to be negotiated over the
+        // protected control connection.
+        SubState = Oper->GetEncryptDataConnection() ? fwssConSendPBSZ : fwssConSendNextScriptCmd;
+        return TRUE;
+    }
+
+    int errID = TLSHandshakeErrorID != -1 ? TLSHandshakeErrorID : IDS_SSL_ERR_CONNECT;
+    if (TLSHandshakeErrorBuf[0] == 0)
+        StringCchCopyNA(ErrorDescr, FTPWORKER_ERRDESCR_BUFSIZE, LoadStr(errID), FTPWORKER_ERRDESCR_BUFSIZE);
+    else
+        _snprintf_s(ErrorDescr, _TRUNCATE, LoadStr(errID), TLSHandshakeErrorBuf);
+    *retryLoginWithoutAsking = TLSHandshakeError == SSLCONERR_CANRETRY;
+    return FALSE;
+}
+
 void CFTPWorker::HandleEventInConnectingState(CFTPWorkerEvent event, BOOL& sendQuitCmd, BOOL& postActivate,
                                               BOOL& reportWorkerChange, char* buf, char* errBuf, char* host,
                                               int& cmdLen, BOOL& sendCmd, char* reply, int replySize,
@@ -876,6 +920,34 @@ void CFTPWorker::HandleEventInConnectingState(CFTPWorkerEvent event, BOOL& sendQ
                                 CorrectErrorDescr();
                                 closeSocket = TRUE; // close the connection (no point in continuing)
 
+                                // A 421 in place of the greeting, while this
+                                // operation already has other workers connected,
+                                // is the classic "too many connections" refusal:
+                                // the server closed us before login, not during
+                                // it (ftp-improvements.md section 2.5). The
+                                // condition is deliberately narrow - only reply
+                                // 421, and only when another worker exists - so
+                                // an ordinary "service not available" on a
+                                // single-worker operation is not misread as a
+                                // connection limit. Only the target is reduced;
+                                // no healthy in-flight transfer is disturbed,
+                                // and this worker still follows its normal
+                                // reconnect path below.
+                                if (replyCode == 421)
+                                {
+                                    int workerCount = Oper->GetWorkersCount();
+                                    if (workerCount > 1)
+                                    {
+                                        HANDLES(LeaveCriticalSection(&WorkerCritSect));
+                                        Oper->ReduceWorkerTargetAfterRefusal(workerCount);
+                                        int newTarget = Oper->GetWorkerTarget();
+                                        HANDLES(EnterCriticalSection(&WorkerCritSect));
+                                        _snprintf_s(errBuf, 50 + FTP_MAX_PATH, _TRUNCATE,
+                                                    LoadStr(IDS_LOGMSGCONREFUSED), newTarget);
+                                        Logs.LogMessage(LogUID, errBuf, -1, TRUE);
+                                    }
+                                }
+
                                 SubState = fwssConReconnect;
                                 run = TRUE;
                             }
@@ -1032,39 +1104,54 @@ void CFTPWorker::HandleEventInConnectingState(CFTPWorkerEvent event, BOOL& sendQ
                             int errID;
                             if (InitSSL(LogUID, &errID))
                             {
-                                int err;
-                                HANDLES(LeaveCriticalSection(&WorkerCritSect));
-                                CCertificate* unverifiedCert;
-                                BOOL ret = EncryptSocket(LogUID, &err, &unverifiedCert, &errID, errBuf,
-                                                         50 + FTP_MAX_PATH,
-                                                         NULL /* for the control connection this is always NULL */);
-                                HANDLES(EnterCriticalSection(&WorkerCritSect));
-                                if (ret)
+                                // The handshake is started here and finished from
+                                // socket readiness events (ftp-improvements.md
+                                // section 5.4). The previous code called the
+                                // blocking EncryptSocket(); releasing
+                                // WorkerCritSect around it did not make it
+                                // asynchronous - the sockets thread still sat in
+                                // blocking send/recv, so one slow TLS peer
+                                // stalled every other worker's payload progress.
+                                // PBSZ/PROT are only sent once fweTLSHandshakeDone
+                                // arrives.
+                                ProxyScriptLastCmdReply = replyCode;
+                                TLSHandshakeError = SSLCONERR_NOERROR;
+                                TLSHandshakeErrorID = -1;
+                                TLSHandshakeErrorBuf[0] = 0;
+                                if (TLSHandshakeUnverifiedCert != NULL)
                                 {
-                                    if (unverifiedCert != NULL) // close the connection and retry only after the user learns about the untrusted certificate and accepts it or ensures it becomes trusted (in the Solve Error dialog)
-                                    {
-                                        if (UnverifiedCertificate != NULL)
-                                            UnverifiedCertificate->Release();
-                                        UnverifiedCertificate = unverifiedCert;
-                                        StringCchCopyNA(ErrorDescr, FTPWORKER_ERRDESCR_BUFSIZE, LoadStr(IDS_SSLNEWUNVERIFIEDCERT), FTPWORKER_ERRDESCR_BUFSIZE); // counted bounded copy instead of lstrcpyn
-                                        failed = TRUE;
-                                    }
-                                    else
-                                    {
-                                        SubState = Oper->GetEncryptDataConnection() ? fwssConSendPBSZ : fwssConSendNextScriptCmd;
-                                        ProxyScriptLastCmdReply = replyCode;
-                                        run = TRUE;
-                                    }
+                                    TLSHandshakeUnverifiedCert->Release();
+                                    TLSHandshakeUnverifiedCert = NULL;
+                                }
+                                HANDLES(LeaveCriticalSection(&WorkerCritSect));
+                                CTlsHandshakeResult handshake =
+                                    BeginAsyncEncryptControlSocket(LogUID, &TLSHandshakeError,
+                                                                   &TLSHandshakeUnverifiedCert,
+                                                                   &TLSHandshakeErrorID,
+                                                                   TLSHandshakeErrorBuf,
+                                                                   FTPWORKER_ERRDESCR_BUFSIZE);
+                                HANDLES(EnterCriticalSection(&WorkerCritSect));
+                                if (handshake == thrPending)
+                                {
+                                    // Give the handshake its own monotonic
+                                    // deadline so a peer that stops sending
+                                    // tokens cannot hold this worker forever.
+                                    int handshakeTimeout = Config.GetServerRepliesTimeout() * 1000;
+                                    if (handshakeTimeout < 1000)
+                                        handshakeTimeout = 1000; // at least one second
+                                    // because we are already inside CSocketsThread::CritSect, this call is also possible
+                                    // from within CSocket::SocketCritSect and CFTPWorker::WorkerCritSect (no risk of dead-lock)
+                                    SocketsThread->AddTimer(Msg, UID, CMonotonicClock::DeadlineAfter(handshakeTimeout),
+                                                            WORKER_CONTIMEOUTTIMID, NULL); // ignore the error, at worst the user hits Stop
+                                    SubState = fwssConTLSHandshake;
+                                }
+                                else if (ApplyControlTLSHandshakeResult(handshake == thrCompleted,
+                                                                        &retryLoginWithoutAsking))
+                                {
+                                    run = TRUE; // the handshake was already finished; continue with PBSZ/PROT
                                 }
                                 else
-                                {
-                                    if (errBuf[0] == 0)
-                                        StringCchCopyNA(ErrorDescr, FTPWORKER_ERRDESCR_BUFSIZE, LoadStr(errID), FTPWORKER_ERRDESCR_BUFSIZE); // counted bounded copy instead of lstrcpyn
-                                    else
-                                        _snprintf_s(ErrorDescr, _TRUNCATE, LoadStr(errID), errBuf);
-                                    failed = TRUE;
-                                    retryLoginWithoutAsking = err == SSLCONERR_CANRETRY;
-                                }
+                                    failed = TRUE; // ApplyControlTLSHandshakeResult() filled ErrorDescr
                             }
                             else
                             {
@@ -1115,6 +1202,73 @@ void CFTPWorker::HandleEventInConnectingState(CFTPWorkerEvent event, BOOL& sendQ
                 }
                 case fweCmdConClosed:
                 {
+                    SubState = fwssConReconnect;
+                    run = TRUE;
+                    break;
+                }
+                }
+                break;
+            }
+
+            case fwssConTLSHandshake: // asynchronous control-connection TLS handshake in progress
+            {
+                // While the handshake runs, this worker's socket carries TLS
+                // tokens rather than FTP replies; the readiness path in
+                // ReceiveNetEvent() advances it and reports the outcome here.
+                // Other workers keep transferring throughout, which is exactly
+                // what the blocking handshake prevented.
+                switch (event)
+                {
+                case fweTLSHandshakeDone:
+                case fweTLSHandshakeFailed:
+                {
+                    // because we are already inside CSocketsThread::CritSect, this call is also possible
+                    // from within CSocket::SocketCritSect and CFTPWorker::WorkerCritSect (no risk of dead-lock)
+                    SocketsThread->DeleteTimer(UID, WORKER_CONTIMEOUTTIMID);
+
+                    BOOL retryLoginWithoutAsking = FALSE;
+                    if (ApplyControlTLSHandshakeResult(event == fweTLSHandshakeDone, &retryLoginWithoutAsking))
+                        run = TRUE; // advance to PBSZ/PROT or the login script
+                    else
+                    {
+                        CorrectErrorDescr();
+                        closeSocket = TRUE; // close the connection (no point in continuing)
+                        if (retryLoginWithoutAsking)
+                        {
+                            SubState = fwssConReconnect;
+                            run = TRUE;
+                        }
+                        else
+                        {
+                            State = fwsConnectionError;
+                            operStatusMaybeChanged = TRUE;
+                            ErrorOccurenceTime = Oper->GiveLastErrorOccurenceTime();
+                            SubState = fwssNone;
+                            postActivate = TRUE; // post an activation for the next worker state
+                            reportWorkerChange = TRUE;
+                        }
+                    }
+                    break;
+                }
+
+                case fweConTimeout:
+                {
+                    // The deadline expired with the handshake unfinished. A
+                    // half-open TLS context can never become usable, so the
+                    // connection is closed and the attempt is retried.
+                    StringCchCopyNA(ErrorDescr, FTPWORKER_ERRDESCR_BUFSIZE, LoadStr(IDS_OPENCONTIMEOUT), FTPWORKER_ERRDESCR_BUFSIZE);
+                    CorrectErrorDescr();
+                    closeSocket = TRUE;
+                    SubState = fwssConReconnect;
+                    run = TRUE;
+                    break;
+                }
+
+                case fweCmdConClosed:
+                {
+                    // because we are already inside CSocketsThread::CritSect, this call is also possible
+                    // from within CSocket::SocketCritSect and CFTPWorker::WorkerCritSect (no risk of dead-lock)
+                    SocketsThread->DeleteTimer(UID, WORKER_CONTIMEOUTTIMID);
                     SubState = fwssConReconnect;
                     run = TRUE;
                     break;
@@ -1317,16 +1471,19 @@ void CFTPWorker::HandleEventInConnectingState(CFTPWorkerEvent event, BOOL& sendQ
                 {
                     Oper->SetServerSystem(reply, replySize); // store the server system (source of information about the server version)
 
-                    // the connection is established, start working
-                    State = fwsWorking; // no need to call Oper->OperationStatusMaybeChanged(), the operation state does not change (it is not paused and will not be after this change)
-                    if (UploadDirGetTgtPathListing)
-                        TRACE_E("CFTPWorker::HandleEventInPreparingState(): UploadDirGetTgtPathListing==TRUE!");
-                    SubState = fwssNone;
-                    StatusType = wstNone;
-                    postActivate = TRUE;      // post an activation for the next worker state
-                    ConnectAttemptNumber = 1; // the connection is established, reset to one so the next reconnect attempt is ready again
-                    ErrorDescr[0] = 0;        // start collecting error messages again
-                    reportWorkerChange = TRUE;
+                    // Negotiate machine-readable listings before the worker
+                    // starts, so its very first listing already uses MLSD when
+                    // the server supports it. Sending FEAT once per session is
+                    // the whole cost; the alternative - probing MLSD per
+                    // directory - costs a failed data connection each time.
+                    // FEAT is sent on every login, including after a reconnect:
+                    // the same address can be answered by a different server in
+                    // a load-balanced deployment, so capabilities are
+                    // renegotiated rather than carried over. One command per
+                    // login is cheap - logins scale with worker creation and
+                    // recovery, not with file count.
+                    SubState = Config.UseMLSD == mlsdAuto ? fwssConSendFEAT : fwssConLoginFinished;
+                    run = TRUE;
                     break;
                 }
 
@@ -1337,6 +1494,82 @@ void CFTPWorker::HandleEventInConnectingState(CFTPWorkerEvent event, BOOL& sendQ
                     break;
                 }
                 }
+                break;
+            }
+
+            case fwssConSendFEAT: // negotiate machine-readable listings (RFC 3659)
+            {
+                strcpy(buf, "FEAT\r\n");
+                cmdLen = (int)strlen(buf);
+                strcpy(errBuf, buf); // for the log
+                sendCmd = TRUE;
+                SubState = fwssConWaitForFEATRes;
+                break;
+            }
+
+            case fwssConWaitForFEATRes: // result of "FEAT"
+            {
+                switch (event)
+                {
+                // case fweCmdInfoReceived:  // ignore "1xx" replies (they are only written to the Log)
+                case fweCmdReplyReceived:
+                {
+                    // A 211 reply lists the features; anything else means the
+                    // server does not implement FEAT, which is not an error -
+                    // the session simply keeps its configured LIST command. The
+                    // result is per authenticated session, so it is stored on the
+                    // operation and reset on reconnect, never persisted as an
+                    // assumption about this address.
+                    CFTPMLSxState mlsxState = mlsxUnsupported;
+                    if (FTP_DIGIT_1(replyCode) == FTP_D1_SUCCESS &&
+                        FEATReplyAdvertisesMLSx(reply, replySize))
+                    {
+                        mlsxState = mlsxSupported;
+                    }
+                    Oper->GetMLSxSupport()->Set(mlsxState);
+                    if (mlsxState == mlsxSupported)
+                        Logs.LogMessage(LogUID, LoadStr(IDS_LOGMSGMLSDENABLED), -1, TRUE);
+                    else
+                    {
+                        char listCmd[200 + FTP_MAX_PATH];
+                        Oper->GetListCommand(listCmd, 200 + FTP_MAX_PATH);
+                        char* eol = strchr(listCmd, '\r');
+                        if (eol != NULL)
+                            *eol = 0;
+                        _snprintf_s(errBuf, 50 + FTP_MAX_PATH, _TRUNCATE, LoadStr(IDS_LOGMSGMLSDUNSUP), listCmd);
+                        Logs.LogMessage(LogUID, errBuf, -1, TRUE);
+                    }
+                    Oper->GetMetrics()->NoteCommand(fmcFeat, 0);
+                    SubState = fwssConLoginFinished;
+                    run = TRUE;
+                    break;
+                }
+
+                case fweCmdConClosed:
+                {
+                    SubState = fwssConReconnect;
+                    run = TRUE;
+                    break;
+                }
+                }
+                break;
+            }
+
+            case fwssConLoginFinished: // login complete (with or without FEAT): start working
+            {
+                State = fwsWorking; // no need to call Oper->OperationStatusMaybeChanged(), the operation state does not change (it is not paused and will not be after this change)
+                if (UploadDirGetTgtPathListing)
+                    TRACE_E("CFTPWorker::HandleEventInPreparingState(): UploadDirGetTgtPathListing==TRUE!");
+                SubState = fwssNone;
+                StatusType = wstNone;
+                postActivate = TRUE;      // post an activation for the next worker state
+                ConnectAttemptNumber = 1; // the connection is established, reset to one so the next reconnect attempt is ready again
+                ErrorDescr[0] = 0;        // start collecting error messages again
+                reportWorkerChange = TRUE;
+                // Login count is what should scale with worker creation and
+                // recovery, not with file count - the measurement document makes
+                // that checkable.
+                Oper->GetMetrics()->NoteLogin();
                 break;
             }
 
@@ -1595,6 +1828,204 @@ BOOL CFTPWorker::ParseListingToFTPQueue(TIndirectArray<CFTPQueueItem>* ftpQueueI
     }
     *lowMem = err;
     return ret;
+}
+
+BOOL CFTPWorker::ParseMLSDListingToFTPQueue(TIndirectArray<CFTPQueueItem>* ftpQueueItems,
+                                            const char* allocatedListing, int allocatedListingLen,
+                                            BOOL* lowMem, int transferMode, CQuadWord* totalSize,
+                                            BOOL* sizeInBytes, BOOL selFiles, BOOL selDirs,
+                                            BOOL includeSubdirs, DWORD attrAndMask, DWORD attrOrMask,
+                                            int operationsUnknownAttrs, int operationsHiddenFileDel,
+                                            int operationsHiddenDirDel)
+{
+    // MLSD output has a defined grammar (RFC 3659), so there is no server type
+    // to autodetect and no parser to compile: every entry is either understood
+    // or explicitly rejected. Items are created through the same helpers the
+    // LIST path uses, with the metadata this listing already established, so
+    // overwrite policy, hidden-file handling and target-name generation stay
+    // identical between the two listing formats.
+    BOOL err = FALSE;
+    *lowMem = FALSE;
+    ftpQueueItems->DestroyMembers();
+    totalSize->Set(0, 0);
+    *sizeInBytes = TRUE; // MLSx sizes are always in bytes, never in blocks
+
+    char targetPath[MAX_PATH];
+    if (CurItem->Type == fqitCopyExploreDir ||
+        CurItem->Type == fqitMoveExploreDir ||
+        CurItem->Type == fqitMoveExploreDirLink)
+    {
+        CFTPQueueItemCopyMoveExplore* cmItem = (CFTPQueueItemCopyMoveExplore*)CurItem;
+        StringCchCopyNA(targetPath, MAX_PATH, cmItem->TgtPath, MAX_PATH);
+        SalamanderGeneral->SalPathAppend(targetPath, cmItem->TgtName, MAX_PATH); // must succeed, the directory already exists on disk
+    }
+    else
+        targetPath[0] = 0;
+
+    const char* listing = allocatedListing;
+    const char* listingEnd = allocatedListing + allocatedListingLen;
+    const char* lineStart;
+    int lineLen;
+    CQuadWord size(-1, -1);
+
+    while (!err && GetNextMLSxLine(&listing, listingEnd, &lineStart, &lineLen))
+    {
+        CMLSxEntry entry;
+        if (!ParseMLSxLine(lineStart, lineLen, &entry))
+        {
+            // A malformed line means this directory was not understood. Failing
+            // here (rather than skipping the line) is deliberate: a partially
+            // parsed listing must never be recorded as a complete directory.
+            err = TRUE;
+            break;
+        }
+
+        // cdir and pdir are the listed directory itself and its parent. Following
+        // them would walk the tree in circles, so they are never queued.
+        if (entry.Kind == mlsxEntryCurrentDir || entry.Kind == mlsxEntryParentDir)
+            continue;
+        // "." and ".." can also arrive with type=dir on non-conforming servers.
+        if (entry.NameLen <= 2 && entry.Name[0] == '.' &&
+            (entry.Name[1] == 0 || (entry.Name[1] == '.' && entry.Name[2] == 0)))
+        {
+            continue;
+        }
+        // An entry whose type this client does not act on (device, socket, ...)
+        // is skipped rather than guessed at. Links are kept: they are resolved
+        // later, exactly as with LIST.
+        if (entry.Kind == mlsxEntryUnknown || (entry.Kind == mlsxEntryOther && !entry.IsLink))
+            continue;
+
+        BOOL isDir = entry.Kind == mlsxEntryDir;
+
+        CFTPKnownEntryMetadata known;
+        memset(&known, 0, sizeof(known));
+        known.IsLink = entry.IsLink;
+        known.SizeKnown = entry.SizeKnown && !isDir;
+        known.Size = entry.Size;
+        if (entry.ModifyKnown)
+        {
+            // RFC 3659 timestamps are UTC; the rest of the plug-in stores local
+            // time, so the conversion is done here, explicitly and once.
+            SYSTEMTIME local;
+            FILETIME utcFile, localFile;
+            if (SystemTimeToFileTime(&entry.ModifyUTC, &utcFile) &&
+                FileTimeToLocalFileTime(&utcFile, &localFile) &&
+                FileTimeToSystemTime(&localFile, &local))
+            {
+                known.DateAndTimeValid = TRUE;
+                known.Date.Year = local.wYear;
+                known.Date.Month = (BYTE)local.wMonth;
+                known.Date.Day = (BYTE)local.wDay;
+                known.Time.Hour = (BYTE)local.wHour;
+                known.Time.Minute = (BYTE)local.wMinute;
+                known.Time.Second = (BYTE)local.wSecond;
+                known.Time.Millisecond = local.wMilliseconds;
+            }
+            // A conversion failure leaves the timestamp unknown rather than
+            // recording a wrong one.
+        }
+        known.AttrsKnown = entry.UnixModeKnown;
+        known.Attrs = entry.UnixMode;
+
+        // Build the CFileData the item helpers expect. PluginData stays NULL:
+        // there are no parser columns behind an MLSx entry, which is why the
+        // helpers receive 'known' instead.
+        CFileData file;
+        memset(&file, 0, sizeof(file));
+        file.Name = SalamanderGeneral->DupStr(entry.Name);
+        if (file.Name == NULL)
+        {
+            TRACE_E(LOW_MEMORY);
+            err = TRUE;
+            break;
+        }
+        file.NameLen = entry.NameLen;
+        file.Ext = strrchr(file.Name, '.');
+        if (file.Ext == NULL || file.Ext == file.Name)
+            file.Ext = file.Name + file.NameLen; // no extension
+        else
+            file.Ext++;
+        file.Size = known.SizeKnown ? known.Size : CQuadWord(0, 0);
+        file.Attr = 0;
+        file.Hidden = entry.Name[0] == '.' ? 1 : 0; // the UNIX convention the LIST parsers also use
+        file.IsLink = entry.IsLink ? 1 : 0;
+        file.IsOffline = 0;
+        file.PluginData = -1;
+
+        CFTPQueueItem* item = NULL;
+        CFTPQueueItemType type;
+        BOOL ok = TRUE;
+        CFTPQueueItemState state = sqisWaiting;
+        DWORD problemID = ITEMPR_OK;
+        BOOL skip = FALSE;
+        switch (CurItem->Type)
+        {
+        case fqitDeleteExploreDir:
+        {
+            int skippedItems = 0;  // unused
+            int uiNeededItems = 0; // unused
+            item = CreateItemForDeleteOperation(&file, isDir, -1, NULL, &type, &ok, FALSE,
+                                                operationsHiddenFileDel, operationsHiddenDirDel,
+                                                &state, &problemID, &skippedItems, &uiNeededItems, &known);
+            break;
+        }
+
+        case fqitCopyExploreDir:
+        case fqitMoveExploreDir:
+        case fqitMoveExploreDirLink:
+        {
+            item = CreateItemForCopyOrMoveOperation(&file, isDir, -1, NULL, &type, transferMode, Oper,
+                                                    CurItem->Type == fqitCopyExploreDir,
+                                                    targetPath, file.Name, // we are in a subdirectory, names are no longer generated from the operation mask here
+                                                    &size, sizeInBytes, totalSize, &known);
+            break;
+        }
+
+        case fqitChAttrsExploreDir:
+        case fqitChAttrsExploreDirLink:
+        {
+            int skippedItems = 0;  // unused
+            int uiNeededItems = 0; // unused
+            item = CreateItemForChangeAttrsOperation(&file, isDir, -1, NULL, &type, &ok, &state, &problemID,
+                                                     &skippedItems, &uiNeededItems, &skip, selFiles,
+                                                     selDirs, includeSubdirs, attrAndMask,
+                                                     attrOrMask, operationsUnknownAttrs, &known);
+            break;
+        }
+        }
+
+        if (item != NULL)
+        {
+            if (ok)
+            {
+                item->SetItem(-1, type, state, problemID, WorkingPath, file.Name);
+                ftpQueueItems->Add(item);
+                if (!ftpQueueItems->IsGood())
+                {
+                    ftpQueueItems->ResetState();
+                    ok = FALSE;
+                }
+            }
+            if (!ok)
+            {
+                err = TRUE;
+                delete item;
+            }
+        }
+        else
+        {
+            if (!skip) // only if this is not skipping the item but a low-memory error
+            {
+                TRACE_E(LOW_MEMORY);
+                err = TRUE;
+            }
+        }
+        SalamanderGeneral->Free(file.Name);
+    }
+
+    *lowMem = err;
+    return !err;
 }
 
 //

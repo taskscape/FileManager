@@ -10,6 +10,20 @@ Sekce bez vstupu do jinych sekci (primitivni):
   CTransferSpeedMeter::TransferSpeedMeterCS
   CSynchronizedQWORD::ValueCS
   CFTPProxyServerList::ProxyServerListCS
+  CFTPTransferMetrics::MetricsCritSect
+  CFTPConnectionAdmission::AdmissionCritSect
+
+Poznamka k dvema novym sekcim (viz ftp-improvements.md, sekce 1 a 2):
+
+  CFTPTransferMetrics::MetricsCritSect drzi jen citace jedne operace. Nevstupuje
+  se z ni nikam - formatovani JSON dokumentu probiha uvnitr sekce, ale zapis
+  souboru az mimo ni, takze pomaly disk nikdy neblokuje worker, ktery jeste
+  aktualizuje citace.
+
+  CFTPConnectionAdmission::AdmissionCritSect drzi jen tabulku poctu spojeni na
+  server. Volajici (CControlConnectionSocket::AcquireConnectionLease a
+  CFTPWorker::AcquireConnectionLease) si nejdriv zkopiruji identitu serveru ze
+  sve sekce a teprve pak vstupuji sem, takze se sekce nikdy nevnoruji.
 
 Ze sekce CClosedCtrlConChecker::DataSect se vstupuje do:
   CControlConnectionSocket::EventCritSect

@@ -43,6 +43,9 @@
 #include "lang\lang.rh"
 #include "ftputils.h"
 #include "ftp.h"
+#include "opermeter.h" // per-operation transfer measurement (see ftp-improvements.md section 1)
+#include "conadmit.h"  // process-wide FTP connection admission control (section 2)
+#include "mlsx.h"      // RFC 3659 machine-readable listing parser (section 4)
 #include "dialogs.h"
 #include "ssl.h"
 #include "sockets.h"

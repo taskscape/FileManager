@@ -39,6 +39,12 @@
 #define IDE_RESUMEOVERLAP               550
 #define IDE_MEMCACHESIZELIMIT           551
 #define IDE_NODATATRTIMEOUT             552
+// Large-folder transfer settings (see ftp-improvements.md): worker pool,
+// machine-readable listings and transfer measurement.
+#define IDC_AUTOPARALLELISM             553
+#define IDE_TRANSFERWORKERLIMIT         554
+#define IDC_USEMLSD                     555
+#define IDC_TRANSFERMETRICS             556
 #define IDE_PASSWORD_LOCKED             559
 #define IDD_CONNECT                     560
 #define IDL_BOOKMARKS                   561

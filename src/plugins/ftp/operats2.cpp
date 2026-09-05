@@ -89,6 +89,11 @@ BOOL CFTPOperation::SetConnection(CFTPProxyServer* proxyServer, const char* host
 {
     CALL_STACK_MESSAGE1("CFTPOperation::SetConnection()");
 
+    // Every operation type reaches this method before any worker exists, so it
+    // is where measurement starts. The operation type is not decided yet and is
+    // recorded later, when the document is written.
+    Metrics.Start(NULL);
+
     BOOL err = (host == NULL || *host == 0);
     Host = SalamanderGeneral->DupStr(host);
     Port = port;
@@ -146,6 +151,13 @@ BOOL CFTPOperation::SetConnection(CFTPProxyServer* proxyServer, const char* host
             TRACE_E("CFTPOperation::SetConnection(): proxy script error: " << errBuf);
         }
     }
+
+    // Start measuring here: this is the earliest point at which the operation
+    // knows which server it is talking to, and it runs before any worker exists.
+    // Only endpoint identity is recorded - the password and account collected
+    // above are never handed to the metrics object.
+    Metrics.SetTarget(Host, Port, ServerSystem,
+                      EncryptControlConnection ? (EncryptDataConnection ? "ftps-data" : "ftps-control") : "plain");
     return !err;
 }
 
@@ -1774,6 +1786,37 @@ void CFTPOperation::GetListCommand(char* buf, int bufSize)
     HANDLES(LeaveCriticalSection(&OperCritSect));
 }
 
+BOOL CFTPOperation::GetListingCommandForDiscovery(char* buf, int bufSize)
+{
+    CALL_STACK_MESSAGE2("CFTPOperation::GetListingCommandForDiscovery(, %d)", bufSize);
+
+    // An explicitly configured LIST command is the user's decision about this
+    // server and is never silently replaced: MLSD only takes over the default
+    // (ftp-improvements.md section 4.3). MLSDDisabledForOperation is set after a
+    // definitive unsupported-command reply, which is why one denied directory or
+    // one timed-out data connection does not turn MLSD off globally.
+    HANDLES(EnterCriticalSection(&OperCritSect));
+    BOOL hasCustomListCommand = ListCommand != NULL && *ListCommand != 0;
+    BOOL disabled = MLSDDisabledForOperation;
+    HANDLES(LeaveCriticalSection(&OperCritSect));
+
+    if (!hasCustomListCommand && !disabled && CanUseMLSD())
+    {
+        StringCchCopyNA(buf, bufSize, "MLSD\r\n", bufSize);
+        return TRUE;
+    }
+    GetListCommand(buf, bufSize);
+    return FALSE;
+}
+
+void CFTPOperation::DisableMLSDForOperation()
+{
+    CALL_STACK_MESSAGE1("CFTPOperation::DisableMLSDForOperation()");
+    HANDLES(EnterCriticalSection(&OperCritSect));
+    MLSDDisabledForOperation = TRUE;
+    HANDLES(LeaveCriticalSection(&OperCritSect));
+}
+
 BOOL CFTPOperation::GetUseListingsCache()
 {
     CALL_STACK_MESSAGE1("CFTPOperation::GetUseListingsCache()");
@@ -2062,6 +2105,243 @@ void CFTPOperation::GetUserHostPort(char* user, char* host, unsigned short* port
 
 //
 // ****************************************************************************
+// Bounded worker pool and admission (ftp-improvements.md section 2)
+//
+
+int CFTPOperation::GetProxyServerUID()
+{
+    CALL_STACK_MESSAGE1("CFTPOperation::GetProxyServerUID()");
+    HANDLES(EnterCriticalSection(&OperCritSect));
+    int ret = ProxyServer != NULL ? ProxyServer->ProxyUID : -1;
+    HANDLES(LeaveCriticalSection(&OperCritSect));
+    return ret;
+}
+
+int CFTPOperation::GetMaxConcurrentConnections()
+{
+    CALL_STACK_MESSAGE1("CFTPOperation::GetMaxConcurrentConnections()");
+    HANDLES(EnterCriticalSection(&OperCritSect));
+    int ret = MaxConcurrentConnections;
+    HANDLES(LeaveCriticalSection(&OperCritSect));
+    return ret;
+}
+
+void CFTPOperation::SetMaxConcurrentConnections(int maxConcurrentConnections)
+{
+    CALL_STACK_MESSAGE2("CFTPOperation::SetMaxConcurrentConnections(%d)", maxConcurrentConnections);
+    HANDLES(EnterCriticalSection(&OperCritSect));
+    // A non-positive stored value means "no limit", never "no connections".
+    MaxConcurrentConnections = maxConcurrentConnections > 0 ? maxConcurrentConnections : FTPADMISSION_UNLIMITED;
+    HANDLES(LeaveCriticalSection(&OperCritSect));
+}
+
+int CFTPOperation::GetInitialWorkerCount()
+{
+    CALL_STACK_MESSAGE1("CFTPOperation::GetInitialWorkerCount()");
+
+    // Configuration is read outside OperCritSect and admission is queried
+    // outside it as well, so this method never nests two sections.
+    int configuredLimit = Config.TransferWorkerLimit;
+    if (configuredLimit < TRANSFERWORKERS_MIN)
+        configuredLimit = TRANSFERWORKERS_MIN;
+    if (configuredLimit > TRANSFERWORKERS_MAX)
+        configuredLimit = TRANSFERWORKERS_MAX;
+    BOOL fixedMode = Config.TransferParallelismMode == tpmFixed;
+
+    char host[HOST_MAX_SIZE];
+    unsigned short port;
+    GetUserHostPort(NULL, host, &port);
+    int maxCon = GetMaxConcurrentConnections();
+    // The panel connection this operation inherits already holds a lease, so it
+    // is counted here; asking for its slot again would make an operation on a
+    // one-connection server fail before it starts.
+    int available = FTPConnectionAdmission.GetAvailable(host, port, maxCon) + 1;
+
+    // Auto starts with the inherited worker only. Growth is driven by measured
+    // ready work and throughput in ShouldAddWorker(), so an operation over a
+    // handful of files never opens sessions it cannot use.
+    int initial = fixedMode ? configuredLimit : 1;
+    if (initial > available)
+        initial = available;
+    if (initial < TRANSFERWORKERS_MIN)
+        initial = TRANSFERWORKERS_MIN;
+
+    HANDLES(EnterCriticalSection(&OperCritSect));
+    WorkerTargetCeiling = fixedMode ? initial : configuredLimit;
+    WorkerTarget = initial;
+    LastWorkerTargetChangeTime = CMonotonicClock::Now();
+    LastThroughputSample = 0;
+    LastThroughputRate = 0;
+    HANDLES(LeaveCriticalSection(&OperCritSect));
+
+    Metrics.SetWorkerTarget(initial);
+    return initial;
+}
+
+int CFTPOperation::GetWorkerTarget()
+{
+    HANDLES(EnterCriticalSection(&OperCritSect));
+    int ret = WorkerTarget;
+    HANDLES(LeaveCriticalSection(&OperCritSect));
+    return ret;
+}
+
+// Sampling interval for growth decisions. Adding at most one worker per interval
+// keeps the effect of each addition observable, which is what makes "only while
+// throughput improves" a meaningful rule rather than a guess.
+#define FTPOPER_WORKERGROWTH_INTERVAL 2000 // ms
+// Below this many ready transfer items an extra session would mostly idle, and
+// its login cost would not be repaid.
+#define FTPOPER_WORKERGROWTH_MINREADY 32
+
+BOOL CFTPOperation::ShouldAddWorker(int currentWorkerCount, int readyFileItems)
+{
+    CALL_STACK_MESSAGE3("CFTPOperation::ShouldAddWorker(%d, %d)", currentWorkerCount, readyFileItems);
+
+    // Fixed mode is deterministic by contract: the user asked for exactly this
+    // many connections, so nothing here may change the count.
+    if (Config.TransferParallelismMode != tpmAuto)
+        return FALSE;
+    if (readyFileItems < FTPOPER_WORKERGROWTH_MINREADY)
+        return FALSE;
+
+    CMonotonicTimePoint now = CMonotonicClock::Now();
+
+    HANDLES(EnterCriticalSection(&OperCritSect));
+    BOOL grow = FALSE;
+    if (currentWorkerCount >= WorkerTarget && WorkerTarget < WorkerTargetCeiling &&
+        CMonotonicClock::HasElapsed(LastWorkerTargetChangeTime, FTPOPER_WORKERGROWTH_INTERVAL, now))
+    {
+        // Compare the throughput of the interval just finished with the previous
+        // one. The very first interval has no predecessor, so it always grows -
+        // that is the step from one worker to two, which the plan calls for as
+        // soon as enough ready work exists.
+        CMonotonicDuration elapsed = CMonotonicClock::Elapsed(LastWorkerTargetChangeTime, now);
+        unsigned __int64 transferred = TotalSizeInBytes.Value; // approximate, and only used as a trend
+        unsigned __int64 delta = transferred > LastThroughputSample ? transferred - LastThroughputSample : 0;
+        unsigned __int64 rate = elapsed > 0 ? delta * 1000 / elapsed : 0;
+
+        // Allow a 10% margin so ordinary jitter is not read as a regression.
+        grow = LastThroughputRate == 0 || rate + rate / 10 >= LastThroughputRate;
+
+        LastThroughputSample = transferred;
+        LastThroughputRate = rate;
+        LastWorkerTargetChangeTime = now;
+        if (grow)
+            WorkerTarget++;
+    }
+    int newTarget = WorkerTarget;
+    HANDLES(LeaveCriticalSection(&OperCritSect));
+
+    if (grow)
+        Metrics.SetWorkerTarget(newTarget);
+    return grow;
+}
+
+void CFTPOperation::ReduceWorkerTargetAfterRefusal(int currentWorkerCount)
+{
+    CALL_STACK_MESSAGE2("CFTPOperation::ReduceWorkerTargetAfterRefusal(%d)", currentWorkerCount);
+
+    int newTarget;
+    HANDLES(EnterCriticalSection(&OperCritSect));
+    // Retreat to below the count that was refused, but never below one: the
+    // operation still needs a connection to make progress at all. Only the
+    // target moves - a worker in the middle of a transfer keeps running and
+    // retires when it next looks for work.
+    int limit = currentWorkerCount > TRANSFERWORKERS_MIN ? currentWorkerCount - 1 : TRANSFERWORKERS_MIN;
+    if (WorkerTarget > limit)
+        WorkerTarget = limit;
+    if (WorkerTargetCeiling > WorkerTarget)
+        WorkerTargetCeiling = WorkerTarget; // do not try to grow back into a refusal
+    LastWorkerTargetChangeTime = CMonotonicClock::Now();
+    newTarget = WorkerTarget;
+    HANDLES(LeaveCriticalSection(&OperCritSect));
+
+    Metrics.NoteConnectionRefusal();
+    Metrics.SetWorkerTarget(newTarget);
+}
+
+BOOL CFTPOperation::GrowWorkerPool()
+{
+    CALL_STACK_MESSAGE1("CFTPOperation::GrowWorkerPool()");
+
+    if (WorkersList.GetCount() >= GetWorkerTarget())
+        return FALSE; // the target was already reached by another thread
+
+    CFTPWorker* newWorker = AllocNewWorker();
+    if (newWorker == NULL)
+        return FALSE; // AllocNewWorker() already reported the allocation failure
+
+    // Admission is the authority, not the target: another operation or the panel
+    // may have taken the last slot since the target was raised.
+    if (!newWorker->AcquireConnectionLease())
+    {
+        Metrics.NoteAdmissionDenial();
+        DeleteSocket(newWorker);
+        return FALSE;
+    }
+    if (!SocketsThread->AddSocket(newWorker) ||
+        !newWorker->RefreshCopiesOfUIDAndMsg() ||
+        !AddWorker(newWorker))
+    {
+        newWorker->ReleaseConnectionLease(); // the worker never started; give its slot back
+        DeleteSocket(newWorker);
+        return FALSE;
+    }
+    Metrics.NoteWorkerCount(WorkersList.GetCount());
+    newWorker->PostActivateMsg(); // an added worker has to connect on its own
+    return TRUE;
+}
+
+BOOL CFTPOperation::CanUseMLSD()
+{
+    // Two independent conditions: the user's preference and what this
+    // authenticated session actually advertised. An unknown capability keeps the
+    // configured LIST command, because guessing costs a failed data connection
+    // per directory.
+    return Config.UseMLSD == mlsdAuto && MLSxSupport.Get() == mlsxSupported;
+}
+
+void CFTPOperation::ReportMetrics()
+{
+    CALL_STACK_MESSAGE1("CFTPOperation::ReportMetrics()");
+
+    // The operation type is only known after SetOperationXxx(), so the name is
+    // recorded here rather than at Start().
+    const char* typeName = "unknown";
+    switch (GetOperationType())
+    {
+    case fotDelete:
+        typeName = "delete";
+        break;
+    case fotCopyDownload:
+        typeName = "copy-download";
+        break;
+    case fotMoveDownload:
+        typeName = "move-download";
+        break;
+    case fotCopyUpload:
+        typeName = "copy-upload";
+        break;
+    case fotMoveUpload:
+        typeName = "move-upload";
+        break;
+    case fotChangeAttrs:
+        typeName = "change-attrs";
+        break;
+    }
+    Metrics.SetOperationName(typeName);
+
+    int queueCount = 0, queueRejected = 0, queueHighWaterMark = 0;
+    CFTPQueue* queue = GetQueue();
+    if (queue != NULL)
+        queue->GetQueueMetrics(&queueCount, &queueRejected, &queueHighWaterMark);
+    Metrics.NoteOperationEnd();
+    Metrics.Report(queueCount, queueRejected, queueHighWaterMark);
+}
+
+//
+// ****************************************************************************
 // CFTPQueueItem
 //
 
@@ -2083,6 +2363,10 @@ CFTPQueueItem::CFTPQueueItem()
 
     Path = NULL;
     Name = NULL;
+
+    // -1 marks "not in a queue yet"; CFTPQueue assigns the real position when
+    // the item is added and keeps it in step afterwards.
+    QueueIndex = -1;
 }
 
 CFTPQueueItem::~CFTPQueueItem()

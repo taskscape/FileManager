@@ -181,6 +181,12 @@
     </ClCompile>
     <ClCompile Include="..\menu.cpp">
     </ClCompile>
+    <ClCompile Include="..\conadmit.cpp">
+    </ClCompile>
+    <ClCompile Include="..\mlsx.cpp">
+    </ClCompile>
+    <ClCompile Include="..\opermeter.cpp">
+    </ClCompile>
     <ClCompile Include="..\operats1.cpp">
     </ClCompile>
     <ClCompile Include="..\operats2.cpp">
@@ -245,9 +251,15 @@
     </ClInclude>
     <ClInclude Include="..\..\shared\winliblt.h">
     </ClInclude>
+    <ClInclude Include="..\conadmit.h">
+    </ClInclude>
     <ClInclude Include="..\ctrlcon.h">
     </ClInclude>
     <ClInclude Include="..\datacon.h">
+    </ClInclude>
+    <ClInclude Include="..\mlsx.h">
+    </ClInclude>
+    <ClInclude Include="..\opermeter.h">
     </ClInclude>
     <ClInclude Include="..\dialogs.h">
     </ClInclude>

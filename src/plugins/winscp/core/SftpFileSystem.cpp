@@ -1053,6 +1053,7 @@ public:
       }
 
       FRequests->Delete(0);
+      RequestCompleted(Request); // release this request's share of the window
       delete Request;
       FResponses->Delete(0);
       delete Response;
@@ -1104,6 +1105,14 @@ public:
     }
     __finally
     {
+      // The request is no longer outstanding, whether its response arrived or
+      // an error unwound out of ReceiveResponse. Subclasses that enforce a
+      // window release its capacity here, so a failed transfer cannot leave the
+      // window permanently consumed (ftp-improvements.md section 7.3).
+      if (Request != NULL)
+      {
+        RequestCompleted(Request);
+      }
       delete Request;
       delete Response;
     }
@@ -1128,14 +1137,27 @@ protected:
       TSFTPPacket()
     {
       Token = NULL;
+      PayloadSize = 0;
     }
 
     void * Token;
+    // Bytes of file payload this request carries. Only the upload queue sets
+    // it: a request count alone is not a memory bound, because block sizes vary
+    // with the transfer's speed limit (ftp-improvements.md section 7.3).
+    unsigned long PayloadSize;
   };
 
   virtual bool __fastcall InitRequest(TSFTPQueuePacket * Request) = 0;
 
   virtual bool __fastcall End(TSFTPPacket * Response) = 0;
+
+  // Called once per request after its response has been consumed or its error
+  // unwound. The default does nothing; queues that enforce an outstanding-work
+  // window override it to give the capacity back.
+  virtual void __fastcall RequestCompleted(TSFTPQueuePacket * /*Request*/)
+  {
+    // noop
+  }
 
   virtual void __fastcall SendPacket(TSFTPQueuePacket * Packet)
   {
@@ -1343,6 +1365,35 @@ public:
     FLastBlockSize = 0;
     FEnd = false;
     FConvertToken = false;
+    FOutstandingBytes = 0;
+  }
+
+  // The upload loop used to call Continue() - i.e. SendRequest() - without any
+  // bound, so a server that answered slowly could make this client hold an
+  // unbounded number of WRITE requests and their payload buffers in memory.
+  // Both the request count and the bytes they represent are now bounded, and
+  // responses are pumped until there is capacity for the next write
+  // (ftp-improvements.md section 7.3).
+  bool __fastcall Continue()
+  {
+    while ((FRequests->Count > 0) &&
+           ((FRequests->Count >= SFTP_MAX_OUTSTANDING_UPLOAD_REQUESTS) ||
+            (FOutstandingBytes >= SFTP_MAX_OUTSTANDING_UPLOAD_BYTES)))
+    {
+      // Cancellation is serviced between pumps, so a user who cancels does not
+      // have to wait for the whole window to drain. Abort() unwinds through the
+      // same path a cancel from the caller's loop takes, so the transfer is
+      // reported as cancelled rather than as finished.
+      if ((OperationProgress != NULL) && OperationProgress->Cancel)
+      {
+        Abort();
+      }
+      // ReceivePacket() removes one request, which calls RequestCompleted() and
+      // releases its bytes; the asynchronous queue's SendRequests() is a noop,
+      // so this cannot re-fill the window from inside the loop.
+      ReceivePacket(NULL, SSH_FXP_STATUS);
+    }
+    return TSFTPAsynchronousQueue::Continue();
   }
 
   virtual __fastcall ~TSFTPUploadQueue()
@@ -1407,6 +1458,9 @@ protected:
         Request->AddInt64(FTransfered);
         Request->AddData(BlockBuf.Data, BlockBuf.Size);
         FLastBlockSize = BlockBuf.Size;
+        // Recorded per request, because the block size follows the transfer's
+        // speed limit and is not constant across a file.
+        Request->PayloadSize = (unsigned long)BlockBuf.Size;
 
         FTransfered += BlockBuf.Size;
       }
@@ -1418,7 +1472,18 @@ protected:
   virtual void __fastcall SendPacket(TSFTPQueuePacket * Packet)
   {
     TSFTPAsynchronousQueue::SendPacket(Packet);
+    FOutstandingBytes += Packet->PayloadSize;
     OperationProgress->AddTransfered(FLastBlockSize);
+  }
+
+  virtual void __fastcall RequestCompleted(TSFTPQueuePacket * Request)
+  {
+    // Defensive subtraction: an accounting slip must reduce the window to zero
+    // rather than wrap to a huge value and disable the bound entirely. The cast
+    // keeps the comparison signed, so no unsigned promotion can turn a small
+    // negative difference into an enormous positive one.
+    __int64 Payload = (__int64)Request->PayloadSize;
+    FOutstandingBytes = (FOutstandingBytes > Payload) ? (FOutstandingBytes - Payload) : 0;
   }
 
   virtual bool __fastcall ReceivePacketAsynchronously()
@@ -1451,6 +1516,8 @@ private:
   __int64 FTransfered;
   AnsiString FHandle;
   bool FConvertToken;
+  // Bytes of file payload in requests that have been sent but not yet answered.
+  __int64 FOutstandingBytes;
 };
 //---------------------------------------------------------------------------
 class TSFTPLoadFilesPropertiesQueue : public TSFTPFixedLenQueue
@@ -2990,6 +3057,15 @@ void __fastcall TSFTPFileSystem::ReadDirectory(TRemoteFileList * FileList)
     int Total = 0;
     TRemoteFile * File;
 
+    // SFTPListingQueue is now actually consulted (ftp-improvements.md section
+    // 7.4). Depth 2 is the behaviour this loop always had: the next READDIR is
+    // sent before the current reply is parsed, so parsing overlaps the round
+    // trip. Depth 1 makes the loop strictly sequential, which is the
+    // compatibility fallback for servers that demonstrably mishandle a second
+    // outstanding READDIR - it costs a round trip per packet but never hides a
+    // real permission or I/O error.
+    bool PipelineReadDir = (FTerminal->SessionData->SFTPListingQueue > 1);
+
     Packet.ChangeType(SSH_FXP_READDIR);
     Packet.AddString(Handle);
 
@@ -3002,11 +3078,14 @@ void __fastcall TSFTPFileSystem::ReadDirectory(TRemoteFileList * FileList)
       {
         TSFTPPacket ListingPacket = Response;
 
-        Packet.ChangeType(SSH_FXP_READDIR);
-        Packet.AddString(Handle);
+        if (PipelineReadDir)
+        {
+          Packet.ChangeType(SSH_FXP_READDIR);
+          Packet.AddString(Handle);
 
-        SendPacket(&Packet);
-        ReserveResponse(&Packet, &Response);
+          SendPacket(&Packet);
+          ReserveResponse(&Packet, &Response);
+        }
 
         unsigned int Count = ListingPacket.GetCardinal();
 
@@ -3034,6 +3113,16 @@ void __fastcall TSFTPFileSystem::ReadDirectory(TRemoteFileList * FileList)
         {
           FTerminal->LogEvent("Empty directory listing packet. Aborting directory reading.");
           isEOF = true;
+        }
+        else if (!PipelineReadDir && !isEOF)
+        {
+          // Sequential mode: the next READDIR is issued only after this reply
+          // has been fully consumed, so exactly one request is ever in flight.
+          Packet.ChangeType(SSH_FXP_READDIR);
+          Packet.AddString(Handle);
+
+          SendPacket(&Packet);
+          ReserveResponse(&Packet, &Response);
         }
       }
       else if (Response.Type == SSH_FXP_STATUS)

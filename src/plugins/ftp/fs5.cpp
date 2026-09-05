@@ -261,17 +261,41 @@ BOOL CPluginFSInterface::RunOperation(HWND parent, int operUID, CFTPOperation* o
 
     BOOL ok = TRUE;
 
+    // The operation inherits the server's connection maximum from the panel
+    // connection it was started from, so a bookmark's limit governs transfers
+    // and browsing alike. Without this the stored setting had no enforcement
+    // path at all (see ftp-improvements.md section 2).
+    oper->SetMaxConcurrentConnections(ControlConnection->GetMaxConcurrentConnections());
+
+    // How many workers to start: the configured count in Fixed mode, one in
+    // Auto mode (growth is measured, not guessed), clamped by the admission
+    // slots that are actually free right now.
+    int workerCount = oper->GetInitialWorkerCount();
+
     CFTPWorker* workerWithCon = NULL; // if we passed the connection, this points to who received it
     int i;
-    for (i = 0; i < 1; i++) // FIXME: eventually we may place the initial number of operation workers into the configuration: just replace "1" with the appropriate count...
+    for (i = 0; i < workerCount; i++)
     {
         CFTPWorker* newWorker = oper->AllocNewWorker();
         if (newWorker != NULL)
         {
+            // Worker 0 inherits the panel's already authenticated connection, so
+            // it takes over the panel's existing lease instead of asking for a
+            // new one - the number of connections to the server is unchanged.
+            // Every other worker must be admitted on its own.
+            if (i > 0 && !newWorker->AcquireConnectionLease())
+            {
+                // Not an error: the server's limit simply allows fewer workers
+                // than configured. The operation continues with what it has.
+                oper->GetMetrics()->NoteAdmissionDenial();
+                DeleteSocket(newWorker);
+                break;
+            }
             if (!SocketsThread->AddSocket(newWorker) ||   // add it to the sockets thread
                 !newWorker->RefreshCopiesOfUIDAndMsg() || // refresh copies of UID+Msg (they changed)
                 !oper->AddWorker(newWorker))              // add it among the operation workers
             {
+                newWorker->ReleaseConnectionLease(); // the worker never started; do not keep its slot
                 DeleteSocket(newWorker);
                 ok = FALSE;
                 break;
@@ -282,7 +306,22 @@ BOOL CPluginFSInterface::RunOperation(HWND parent, int operUID, CFTPOperation* o
                 {
                     ControlConnection->GiveConnectionToWorker(newWorker, parent);
                     workerWithCon = newWorker;
+                    // The handover moves the panel's lease with the connection.
+                    // It does nothing when the connection turned out not to be
+                    // open, and this worker would then connect on its own - so
+                    // it must be admitted like any other worker rather than
+                    // opening an uncounted connection.
+                    if (!newWorker->GetConnectionLease()->IsHeld() &&
+                        !newWorker->AcquireConnectionLease())
+                    {
+                        oper->GetMetrics()->NoteAdmissionDenial();
+                        ok = FALSE;
+                        break;
+                    }
                 }
+                else
+                    newWorker->PostActivateMsg(); // workers beyond the first must connect on their own
+                oper->GetMetrics()->NoteWorkerCount(i + 1);
             }
         }
         else // error, cancel the operation
@@ -813,7 +852,10 @@ BOOL CPluginFSInterface::CopyOrMoveFromDiskToFS(BOOL copy, int mode, const char*
                                                        NULL, Config.KeepAlive, Config.KeepAliveSendEvery,
                                                        Config.KeepAliveStopAfter, Config.KeepAliveCommand,
                                                        -2 /* default proxy server */,
-                                                       isFTPS, isFTPS, Config.CompressData);
+                                                       isFTPS, isFTPS, Config.CompressData,
+                                                       // Quick connect has no bookmark, so the global default
+                                                       // decides (tri-state 2 = "use default").
+                                                       GetEffectiveMaxConnections(2, 0));
             TransferMode = Config.TransferMode;
 
             // connect to the server

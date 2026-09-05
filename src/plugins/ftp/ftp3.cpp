@@ -508,6 +508,13 @@ CConfiguration::CConfiguration()
     ServerSpeedLimit = 2;
     UseListingsCache = TRUE;
     TransferMode = trmAutodetect;
+    // A fresh profile starts in Auto: the growth logic never exceeds a server's
+    // configured maximum, and a user who needs the old deterministic behaviour
+    // still has Fixed 1. Existing profiles are migrated in LoadConfiguration().
+    TransferParallelismMode = tpmAuto;
+    TransferWorkerLimit = TRANSFERWORKERS_DEFAULT;
+    UseMLSD = mlsdAuto;
+    EnableTransferMetrics = FALSE;
     ASCIIFileMasks = NULL;
 
     ServerRepliesTimeout = 30;

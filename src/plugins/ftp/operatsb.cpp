@@ -1368,6 +1368,7 @@ void CFTPWorker::HandleEventInWorkingState5(CFTPWorkerEvent event, BOOL& sendQui
                                                                  WORKER_UPLDATACON_PREPAREDATA,
                                                                  WORKER_UPLDATACON_LISTENINGFORCON);
                     WorkerUploadDataCon->SetGlobalTransferSpeedMeter(Oper->GetGlobalTransferSpeedMeter());
+                    WorkerUploadDataCon->SetOperationMetrics(Oper->GetMetrics()); // payload bytes and time-to-first-byte are measured on the data connection
                     WorkerUploadDataCon->SetGlobalLastActivityTime(Oper->GetGlobalLastActivityTime());
                     HANDLES(EnterCriticalSection(&WorkerCritSect));
 
@@ -2274,6 +2275,11 @@ void CFTPWorker::HandleEventInWorkingState5(CFTPWorkerEvent event, BOOL& sendQui
 
             case fwssWorkUploadCopyDone: // upload copy/move file: finished, move on to the next item
             {
+                // Uploads are measured the same way as downloads, so the two
+                // directions can be compared in one document (section 1).
+                Oper->GetMetrics()->NoteFileCompleted(ItemStartTime != 0
+                                                          ? CMonotonicClock::Elapsed(ItemStartTime, CMonotonicClock::Now())
+                                                          : 0);
                 // the item was completed successfully, store this state in it
                 Queue->UpdateItemState(CurItem, sqisDone, ITEMPR_OK, NO_ERROR, NULL, Oper);
                 lookForNewWork = TRUE;

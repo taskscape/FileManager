@@ -682,10 +682,26 @@ COperationDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                 CFTPWorker* newWorker = Oper->AllocNewWorker();
                 if (newWorker != NULL)
                 {
+                    // Manual addition goes through the same admission controller
+                    // as automatic growth, so a configured server maximum cannot
+                    // be bypassed by clicking Add repeatedly.
+                    if (!newWorker->AcquireConnectionLease())
+                    {
+                        Oper->GetMetrics()->NoteAdmissionDenial();
+                        DeleteSocket(newWorker);
+                        char admissionBuf[300];
+                        _snprintf_s(admissionBuf, _TRUNCATE, LoadStr(IDS_MAXCONREACHED),
+                                    Oper->GetMaxConcurrentConnections());
+                        SalamanderGeneral->SalMessageBox(HWindow, admissionBuf,
+                                                         TitleText != NULL ? TitleText : "",
+                                                         MB_OK | MSGBOXEX_ESCAPEENABLED | MB_ICONEXCLAMATION);
+                        return TRUE; // do not process further
+                    }
                     if (!SocketsThread->AddSocket(newWorker) ||   // adding to the sockets thread
                         !newWorker->RefreshCopiesOfUIDAndMsg() || // refresh the copies of UID+Msg (they changed)
                         !Oper->AddWorker(newWorker))              // adding among the operation workers
                     {
+                        newWorker->ReleaseConnectionLease(); // the worker never started; give its slot back
                         DeleteSocket(newWorker);
                     }
                     else
@@ -948,6 +964,24 @@ COperationDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
             {
                 IsDirtyStatus = TRUE;
                 ScheduleDelayedUpdate();
+            }
+
+            // Automatic worker growth (ftp-improvements.md section 2) is decided
+            // here rather than inside a worker's socket event: this thread holds
+            // no socket or worker critical section, so creating a socket cannot
+            // nest sections the wrong way round. The dialog exists for the whole
+            // operation - closing it stops the workers - so this is also a
+            // reliable heartbeat, and the growth logic keeps its own 2 s
+            // sampling interval independent of this 1 s timer.
+            if (Oper->ShouldAddWorker(WorkersList->GetCount(), Queue->GetReadyTransferItemCount()))
+            {
+                if (Oper->GrowWorkerPool())
+                {
+                    RefreshConnections(FALSE);
+                    EnablePauseButton();
+                    IsDirtyStatus = TRUE;
+                    ScheduleDelayedUpdate();
+                }
             }
             break;
         }

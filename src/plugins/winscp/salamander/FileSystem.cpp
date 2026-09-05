@@ -109,7 +109,13 @@ void __fastcall CPluginFSInterface::Connect(TSessionData* Data)
 
             assert(FQueue == NULL);
             FQueue = new TTerminalQueue(FTerminal, Configuration);
-            FQueue->TransfersLimit = 0; // no limit
+            // A bounded, persisted number of transfer sessions replaces the
+            // previous "no limit" (ftp-improvements.md section 6.2). Splitting a
+            // folder into many jobs against an unlimited queue would open one
+            // SSH session per job, which most servers refuse; the panel session
+            // this queue was created from is a further connection to the same
+            // endpoint, so the bound has to be a real number, not zero.
+            FQueue->TransfersLimit = SalamandConfiguration->QueueTransfersLimit;
 
             FQueueController = new TSalamandQueueController(
                 SalamanderGeneral()->GetMainWindowHWND(), FPlugin, FQueue);
@@ -2472,6 +2478,19 @@ BOOL WINAPI CPluginFSInterface::CopyOrMoveFromFS(BOOL Copy, int Mode,
 
                     if (!CancelOrHandlePath)
                     {
+                        // An ordinary download no longer walks the whole tree to
+                        // produce an exact total before the first byte moves
+                        // (ftp-improvements.md section 6.4). Progress then shows
+                        // discovered bytes and files with an explicitly
+                        // incomplete total, which is what
+                        // TFileOperationProgressType already reports when the
+                        // total size is unknown. The explicit "calculate size"
+                        // command is a separate operation and is unaffected.
+                        if (!SalamandConfiguration->PrecalculateTransferSize)
+                        {
+                            CopyParam.CalculateSize = false;
+                        }
+
                         if (DoRemoteTransfer)
                         {
                             // display the dialog for d&d (mode == 5)
@@ -2632,6 +2651,17 @@ BOOL WINAPI CPluginFSInterface::CopyOrMoveFromDiskToFS(BOOL Copy, int Mode,
 
                     if (!AInvalidPathOrCancel)
                     {
+                        // Symmetric with the download path: an ordinary upload
+                        // does not walk the local tree for an exact total before
+                        // transferring (ftp-improvements.md section 6.4). The
+                        // temporary-file and edit workflows keep their existing
+                        // constrained path, because they build their own
+                        // TCopyParamType above rather than going through here.
+                        if (!SalamandConfiguration->PrecalculateTransferSize)
+                        {
+                            CopyParam.CalculateSize = false;
+                        }
+
                         // these parameters are known only after transfer dialog
                         Params |=
                             FLAGMASK(CopyParam.NewerOnly, cpNewerOnly);

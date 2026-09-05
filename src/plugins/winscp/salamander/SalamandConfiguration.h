@@ -8,6 +8,13 @@
 //---------------------------------------------------------------------------
 class CPluginInterface;
 //---------------------------------------------------------------------------
+// Bounds for the background queue's transfer-session count
+// (ftp-improvements.md section 6.2). Four is the plan's starting point for
+// trials; one is the sequential compatibility mode.
+#define SALAMAND_MIN_QUEUE_TRANSFERS 1
+#define SALAMAND_MAX_QUEUE_TRANSFERS 8
+#define SALAMAND_DEFAULT_QUEUE_TRANSFERS 4
+//---------------------------------------------------------------------------
 const pcRights = 1;
 const pcOwner = 2;
 const pcGroup = 3;
@@ -27,6 +34,20 @@ public:
 
     __property bool ConfirmDetach = {read = FConfirmDetach, write = FConfirmDetach};
     __property bool ConfirmUpload = {read = FConfirmUpload, write = FConfirmUpload};
+
+    // Maximum number of concurrent transfer sessions in the background queue
+    // (ftp-improvements.md section 6.2). The adapter previously set
+    // TTerminalQueue::TransfersLimit to 0, which means "no limit" - a folder
+    // split across many jobs could then open as many SSH sessions as it had
+    // work, which most servers refuse. 1 reproduces the strictly sequential
+    // behaviour and is the compatibility fallback.
+    __property int QueueTransfersLimit = {read = FQueueTransfersLimit, write = SetQueueTransfersLimit};
+
+    // When false, an ordinary copy does not walk the whole tree to compute an
+    // exact total before transferring anything (section 6.4). Progress then
+    // shows discovered bytes and files and an explicitly incomplete total. The
+    // explicit "calculate size" command is unaffected.
+    __property bool PrecalculateTransferSize = {read = FPrecalculateTransferSize, write = FPrecalculateTransferSize};
     __property AnsiString QueueViewLayout = {read = FQueueViewLayout, write = FQueueViewLayout};
     __property AnsiString PanelColumns = {read = FPanelColumns, write = FPanelColumns};
     __property int LeftColumnWidth[int Index] = {read = GetColumnWidth, write = SetColumnWidth, index = 0};
@@ -51,9 +72,15 @@ protected:
     __property AnsiString RightColumnsFixedWidths = {read = GetColumnsWidths, write = SetColumnsWidths, index = 3};
 
 private:
+    // Clamps the stored value so a corrupted profile cannot ask for an
+    // unbounded or zero number of transfer sessions.
+    void __fastcall SetQueueTransfersLimit(int value);
+
     CPluginInterface* FPlugin;
     bool FConfirmDetach;
     bool FConfirmUpload;
+    int FQueueTransfersLimit;
+    bool FPrecalculateTransferSize;
     AnsiString FQueueViewLayout;
     AnsiString FPanelColumns;
     int FColumnsWidths[4][pcLast];

@@ -119,11 +119,19 @@ CFTPWorker::CFTPWorker(CFTPOperation* oper, CFTPQueue* queue, const char* host,
     PrepareDataError = pderNone;
 
     UploadDirGetTgtPathListing = FALSE;
+    UsedMLSDForListing = FALSE;
+    ListingCommandStartTime = 0;
+    ItemStartTime = 0;
 
     UploadAutorenamePhase = 0;
     UploadAutorenameNewName[0] = 0;
     UploadType = utNone;
     UseDeleteForOverwrite = FALSE;
+
+    TLSHandshakeError = SSLCONERR_NOERROR;
+    TLSHandshakeErrorID = -1;
+    TLSHandshakeUnverifiedCert = NULL;
+    TLSHandshakeErrorBuf[0] = 0;
 
     if (Config.EnableLogging && !Config.DisableLoggingOfWorkers) // without synchronization, not needed
     {
@@ -157,8 +165,35 @@ CFTPWorker::~CFTPWorker()
         free(BytesToWrite);
     if (ReadBytes != NULL)
         free(ReadBytes);
+    if (TLSHandshakeUnverifiedCert != NULL)
+        TLSHandshakeUnverifiedCert->Release(); // an unconsumed certificate must not leak its reference
+    // Releasing here is the backstop for any path that forgets to; the lease's
+    // own destructor would otherwise complain after this object is gone.
+    ReleaseConnectionLease();
     if (LogUID != -1)
         Logs.ClosingConnection(LogUID);
+}
+
+BOOL CFTPWorker::AcquireConnectionLease()
+{
+    CALL_STACK_MESSAGE1("CFTPWorker::AcquireConnectionLease()");
+    if (ConnectionLease.IsHeld())
+        return TRUE; // a reconnect must not charge a second slot for the same worker
+
+    char host[HOST_MAX_SIZE];
+    char user[USER_MAX_SIZE];
+    unsigned short port;
+    Oper->GetUserHostPort(user, host, &port);
+    return FTPConnectionAdmission.Acquire(&ConnectionLease, host, port, user,
+                                          Oper->GetProxyServerUID(),
+                                          Oper->GetEncryptControlConnection() != 0,
+                                          Oper->GetEncryptDataConnection() != 0,
+                                          Oper->GetMaxConcurrentConnections());
+}
+
+void CFTPWorker::ReleaseConnectionLease()
+{
+    FTPConnectionAdmission.Release(&ConnectionLease);
 }
 
 int CFTPWorker::GetID()
@@ -1644,7 +1679,61 @@ void CFTPWorker::ReceiveNetEvent(LPARAM lParam, int index)
 {
     CALL_STACK_MESSAGE3("CFTPWorker::ReceiveNetEvent(0x%IX, %d)", lParam, index);
     DWORD eventError = WSAGETSELECTERROR(lParam); // extract error code of event
-    switch (WSAGETSELECTEVENT(lParam))            // extract event
+
+    // Control-connection TLS handshake in progress (ftp-improvements.md section
+    // 5.4). While it is pending the socket carries handshake tokens, not FTP
+    // replies, so readiness events advance the handshake instead of being parsed
+    // as protocol data. This is the same ownership rule the data connections
+    // already follow, and it is what lets other workers keep transferring while
+    // this one waits for a slow TLS peer.
+    {
+        int netEvent = WSAGETSELECTEVENT(lParam);
+        if (netEvent == FD_READ || netEvent == FD_WRITE || netEvent == FD_CLOSE)
+        {
+            BOOL handshakeWasPending = FALSE;
+            CTlsHandshakeResult handshakeResult = thrPending;
+            HANDLES(EnterCriticalSection(&SocketCritSect));
+            if (IsAsyncEncryptingSocket())
+            {
+                handshakeWasPending = TRUE;
+                if (eventError == NO_ERROR)
+                {
+                    HANDLES(EnterCriticalSection(&WorkerCritSect));
+                    int logUID = LogUID;
+                    HANDLES(LeaveCriticalSection(&WorkerCritSect));
+                    handshakeResult = ContinueAsyncEncryptControlSocket(logUID, &TLSHandshakeError,
+                                                                        &TLSHandshakeUnverifiedCert,
+                                                                        &TLSHandshakeErrorID,
+                                                                        TLSHandshakeErrorBuf,
+                                                                        FTPWORKER_ERRDESCR_BUFSIZE);
+                }
+                else
+                {
+                    TLSHandshakeError = SSLCONERR_CANRETRY;
+                    TLSHandshakeErrorID = IDS_SSL_ERR_CONNECT;
+                    handshakeResult = thrFailed;
+                }
+            }
+            HANDLES(LeaveCriticalSection(&SocketCritSect));
+
+            if (handshakeWasPending)
+            {
+                if (handshakeResult == thrPending)
+                    return; // still waiting for more tokens; nothing else to do with this event
+                // Completed or failed: let the login state machine act on it.
+                // The result is reported through a dedicated event so the AUTH
+                // substate keeps its existing error and prompt handling.
+                HANDLES(EnterCriticalSection(&SocketCritSect));
+                HandleEvent(handshakeResult == thrCompleted ? fweTLSHandshakeDone : fweTLSHandshakeFailed,
+                            NULL, 0, 0);
+                HANDLES(LeaveCriticalSection(&SocketCritSect));
+                if (netEvent != FD_CLOSE)
+                    return; // FD_CLOSE still needs its normal processing below
+            }
+        }
+    }
+
+    switch (WSAGETSELECTEVENT(lParam)) // extract event
     {
     case FD_CLOSE: // sometimes arrives before the last FD_READ, so we must first try FD_READ and if it succeeds, post FD_CLOSE again (another FD_READ may succeed before it)
     case FD_READ:

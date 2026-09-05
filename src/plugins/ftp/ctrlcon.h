@@ -675,6 +675,17 @@ protected:
 
     int CompressData;
 
+    // Effective connection maximum for this server, already resolved from the
+    // bookmark and the global default (FTPADMISSION_UNLIMITED = no limit). The
+    // panel connection previously never learned this value, so no code path
+    // could enforce it; operations started from this connection inherit it.
+    int MaxConcurrentConnections;
+
+    // Lease for this panel connection. It is taken when the control connection
+    // becomes usable and handed to worker 0 when the connection is lent to an
+    // operation, so lending never changes the number of connections we count.
+    CFTPConnectionLease ConnectionLease;
+
 public:
     CControlConnectionSocket();
     virtual ~CControlConnectionSocket();
@@ -695,7 +706,23 @@ public:
                                  int keepAliveSendEvery, int keepAliveStopAfter,
                                  int keepAliveCommand, int proxyServerUID,
                                  int encryptControlConnection, int encryptDataConnection,
-                                 int compressData);
+                                 int compressData,
+                                 // already resolved from the bookmark and the global default;
+                                 // FTPADMISSION_UNLIMITED when the user configured no limit
+                                 int maxConcurrentConnections);
+
+    // Returns the resolved connection maximum for this server (in the critical
+    // section). Operations started from this connection enforce the same value,
+    // so a bookmark's limit governs panel browsing and transfers alike.
+    int GetMaxConcurrentConnections();
+
+    // Takes the admission lease for this panel connection when it does not hold
+    // one yet. Returns FALSE when the configured maximum is already reached, in
+    // which case the caller must not keep the connection open.
+    BOOL AcquireConnectionLease();
+
+    // Releases the panel connection's lease (harmless when none is held).
+    void ReleaseConnectionLease();
 
     // methods for tracking the duration of an operation with the socket:
     // WARNING: not synchronized - use from one thread or apply other synchronization

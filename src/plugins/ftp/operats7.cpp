@@ -476,6 +476,24 @@ void CFTPWorker::HandleEventInWorkingState2(CFTPWorkerEvent event, BOOL& sendQui
         {
         case fwssWorkStartWork: // determine which path to switch to on the server and send CWD
         {
+            // Worker 0 inherits the panel's already authenticated connection and
+            // therefore never runs the login sequence that sends FEAT. Negotiate
+            // here, before the first listing, so the very first directory can
+            // already use MLSD (ftp-improvements.md section 4.1). The capability
+            // is per session and shared by the operation, so this happens at most
+            // once; the check runs before the log line below, so re-entering this
+            // substate after the reply does not log the path twice.
+            if (Config.UseMLSD == mlsdAuto && Oper->GetMLSxSupport()->Get() == mlsxUnknown &&
+                !UploadDirGetTgtPathListing)
+            {
+                strcpy(buf, "FEAT\r\n");
+                cmdLen = (int)strlen(buf);
+                strcpy(errBuf, buf); // for the log
+                sendCmd = TRUE;
+                SubState = fwssWorkWaitForFEATRes;
+                break;
+            }
+
             // before exploring a directory for delete/change-attr and listing the path for upload we must reset
             // the speed meter (explore speed and upload listing are not measured) - this will display "(unknown)" time-left in the operation dialog
             if (CurItem->Type == fqitDeleteExploreDir ||
@@ -511,6 +529,46 @@ void CFTPWorker::HandleEventInWorkingState2(CFTPWorkerEvent event, BOOL& sendQui
                 if (listingNotAccessible != NULL)
                     *listingNotAccessible = TRUE;
                 lookForNewWork = TRUE;
+            }
+            break;
+        }
+
+        case fwssWorkWaitForFEATRes: // result of the "FEAT" sent before the first listing
+        {
+            switch (event)
+            {
+            // case fweCmdInfoReceived:  // ignore "1xx" replies (they are only written to the Log)
+            case fweCmdReplyReceived:
+            {
+                // A server that does not implement FEAT is not an error: the
+                // session simply keeps the configured LIST command.
+                CFTPMLSxState mlsxState = mlsxUnsupported;
+                if (FTP_DIGIT_1(replyCode) == FTP_D1_SUCCESS && FEATReplyAdvertisesMLSx(reply, replySize))
+                    mlsxState = mlsxSupported;
+                Oper->GetMLSxSupport()->Set(mlsxState);
+                if (mlsxState == mlsxSupported)
+                    Logs.LogMessage(LogUID, LoadStr(IDS_LOGMSGMLSDENABLED), -1, TRUE);
+                else
+                {
+                    char listCmd[200 + FTP_MAX_PATH];
+                    Oper->GetListCommand(listCmd, 200 + FTP_MAX_PATH);
+                    char* eol = strchr(listCmd, '\r');
+                    if (eol != NULL)
+                        *eol = 0;
+                    _snprintf_s(errText, 200 + FTP_MAX_PATH, _TRUNCATE, LoadStr(IDS_LOGMSGMLSDUNSUP), listCmd);
+                    Logs.LogMessage(LogUID, errText, -1, TRUE);
+                }
+                Oper->GetMetrics()->NoteCommand(fmcFeat, 0);
+                SubState = fwssWorkStartWork; // the capability is now known, so this pass proceeds to CWD
+                nextLoop = TRUE;
+                break;
+            }
+
+            case fweCmdConClosed: // connection closed/timed out (description see ErrorDescr) -> try to restore it
+            {
+                conClosedRetryItem = TRUE;
+                break;
+            }
             }
             break;
         }
@@ -667,6 +725,7 @@ void CFTPWorker::HandleEventInWorkingState2(CFTPWorkerEvent event, BOOL& sendQui
                                         !UploadDirGetTgtPathListing)
                                     {
                                         WorkerDataCon->SetGlobalTransferSpeedMeter(Oper->GetGlobalTransferSpeedMeter());
+                                        WorkerDataCon->SetOperationMetrics(Oper->GetMetrics()); // payload bytes and time-to-first-byte are measured on the data connection
                                     }
                                     HANDLES(EnterCriticalSection(&WorkerCritSect));
 
@@ -774,8 +833,21 @@ void CFTPWorker::HandleEventInWorkingState2(CFTPWorkerEvent event, BOOL& sendQui
                 // Obtain the date when the listing was created (we assume the server creates it first and sends it afterwards).
                 GetLocalTime(&StartTimeOfListing);
                 StartLstTimeOfListing = IncListingCounter();
+                // Discovery starts with the first listing this operation sends;
+                // its duration is what "time to first transfer" is measured
+                // against (ftp-improvements.md section 1).
+                Oper->GetMetrics()->NoteDiscoveryStart();
+                ListingCommandStartTime = CMonotonicClock::Now();
 
-                Oper->GetListCommand(buf, 200 + FTP_MAX_PATH);
+                // Remember which command produced this listing: MLSD output has
+                // a defined grammar and is parsed by the RFC 3659 parser, while
+                // LIST output still goes through the server-type parsers. The
+                // upload target-path listing keeps LIST, because the upload
+                // listing cache and its parsers are shared with the panel.
+                UsedMLSDForListing = !UploadDirGetTgtPathListing &&
+                                     Oper->GetListingCommandForDiscovery(buf, 200 + FTP_MAX_PATH);
+                if (!UsedMLSDForListing)
+                    Oper->GetListCommand(buf, 200 + FTP_MAX_PATH);
                 StringCchCopyNA(errBuf, 50 + FTP_MAX_PATH, buf, 50 + FTP_MAX_PATH); // counted bounded copy instead of lstrcpyn
                 cmdLen = (int)strlen(buf);
                 CommandTransfersData = TRUE;
@@ -1004,6 +1076,18 @@ void CFTPWorker::HandleEventInWorkingState2(CFTPWorkerEvent event, BOOL& sendQui
                                                   FTP_DIGIT_1(listCmdReplyCode) != FTP_D1_SUCCESS &&
                                                       FTP_DIGIT_2(listCmdReplyCode) != FTP_D2_CONNECTION &&
                                                       !isVMSFileNotFound;
+                            // One measured listing per visited directory is the
+                            // number section 4's acceptance criterion is stated
+                            // in, so it is counted here - where the server's
+                            // final reply has actually arrived - rather than
+                            // where the command was sent.
+                            Oper->GetMetrics()->NoteListing(!listingIsNotOK);
+                            Oper->GetMetrics()->NoteCommand(fmcListing,
+                                                            ListingCommandStartTime != 0
+                                                                ? CMonotonicClock::Elapsed(ListingCommandStartTime, CMonotonicClock::Now())
+                                                                : 0);
+                            ListingCommandStartTime = 0;
+
                             BOOL decomprErr = FALSE;
                             int allocatedListingLen = 0;
                             char* allocatedListing = NULL;
@@ -1026,7 +1110,33 @@ void CFTPWorker::HandleEventInWorkingState2(CFTPWorkerEvent event, BOOL& sendQui
                             HANDLES(EnterCriticalSection(&WorkerCritSect));
                             WorkerDataConState = wdcsDoesNotExist;
 
-                            if (listingIsNotOK)
+                            // MLSD fallback (ftp-improvements.md section 4.3):
+                            // only a definitive "command unrecognized / not
+                            // implemented" reply turns MLSD off, and it does so
+                            // once for the whole operation. A permission-denied
+                            // directory (550) or a timed-out data connection is
+                            // not evidence about the command, so those keep
+                            // MLSD enabled and follow the normal error paths.
+                            if (listingIsNotOK && UsedMLSDForListing &&
+                                (listCmdReplyCode == 500 || listCmdReplyCode == 502 ||
+                                 listCmdReplyCode == 504))
+                            {
+                                Oper->DisableMLSDForOperation();
+                                char listCmd[200 + FTP_MAX_PATH];
+                                Oper->GetListCommand(listCmd, 200 + FTP_MAX_PATH);
+                                char* eol = strchr(listCmd, '\r');
+                                if (eol != NULL)
+                                    *eol = 0;
+                                _snprintf_s(errText, 200 + FTP_MAX_PATH, _TRUNCATE, LoadStr(IDS_LOGMSGMLSDFALLBACK), listCmd);
+                                Logs.LogMessage(LogUID, errText, -1, TRUE);
+                                // Put the item back so it is listed again with
+                                // the configured LIST command; nothing about the
+                                // directory has been recorded yet.
+                                Queue->UpdateItemState(CurItem, sqisWaiting, ITEMPR_OK, NO_ERROR, NULL, Oper);
+                                listingIsNotOK = FALSE; // handled here; skip the generic error handling below
+                                lookForNewWork = TRUE;
+                            }
+                            else if (listingIsNotOK)
                             {
                                 if (sslErrorOccured == SSLCONERR_UNVERIFIEDCERT ||
                                     ReuseSSLSessionFailed && (FTP_DIGIT_1(listCmdReplyCode) == FTP_D1_TRANSIENTERROR ||
@@ -1178,7 +1288,28 @@ void CFTPWorker::HandleEventInWorkingState2(CFTPWorkerEvent event, BOOL& sendQui
 
                                     CServerType* serverType = NULL;
                                     err2 |= ftpQueueItems == NULL || !HaveWorkingPath;
-                                    if (!err2)
+
+                                    // A listing fetched with MLSD has a defined
+                                    // grammar, so it bypasses server-type
+                                    // autodetection entirely. If it does not
+                                    // parse, the directory is reported as
+                                    // unparsed rather than being retried through
+                                    // parsers written for a different format -
+                                    // that could only produce wrong metadata.
+                                    if (!err2 && UsedMLSDForListing)
+                                    {
+                                        if (ParseMLSDListingToFTPQueue(ftpQueueItems, allocatedListing, allocatedListingLen,
+                                                                       &err2, transferMode, &totalSize, &sizeInBytes,
+                                                                       selFiles, selDirs, includeSubdirs, attrAndMask,
+                                                                       attrOrMask, operationsUnknownAttrs,
+                                                                       operationsHiddenFileDel, operationsHiddenDirDel))
+                                        {
+                                            needSimpleListing = FALSE;
+                                            StringCchCopyNA(listingServerType, SERVERTYPE_MAX_SIZE, "MLSD", SERVERTYPE_MAX_SIZE); // for the "parsed by" log line
+                                        }
+                                    }
+
+                                    if (!err2 && needSimpleListing && !UsedMLSDForListing)
                                     {
                                         if (listingServerType[0] != 0) // this is not autodetection; find listingServerType
                                         {

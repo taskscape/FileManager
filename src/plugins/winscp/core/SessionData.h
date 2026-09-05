@@ -28,6 +28,31 @@ enum TSshBug { sbIgnore1, sbPlainPW1, sbRSA1, sbHMAC2, sbDeriveKey2, sbRSAPad2,
 #define BUG_COUNT (sbMaxPkt2+1)
 enum TSftpBug { sbSymlink, sbSignedTS };
 #define SFTP_BUG_COUNT (sbSignedTS+1)
+//---------------------------------------------------------------------------
+// SFTP request-queue depths (see ftp-improvements.md section 7).
+//
+// The bounds exist so a corrupted profile or a hand-edited registry value can
+// never turn into an unbounded number of outstanding requests: every value
+// passes through TSessionData's setters, which clamp to the default when it
+// falls outside this range.
+//
+// The download default is raised from 4 to 32 as the plan's starting point for
+// trials. With 32 KiB payloads, four outstanding reads permit roughly 128 KiB
+// in flight, which at 50 ms round-trip time is a window-only ceiling near
+// 2.5 MiB/s - an illustrative bound, not a measured speed. A deeper window
+// cannot help many-small-files copies, which is what the parent folder-copy
+// scheduling addresses instead.
+#define SFTP_MIN_QUEUE_DEPTH 1
+#define SFTP_MAX_QUEUE_DEPTH 256
+#define SFTP_DEFAULT_DOWNLOAD_QUEUE 32
+#define SFTP_DEFAULT_UPLOAD_QUEUE 32
+#define SFTP_DEFAULT_LISTING_QUEUE 2
+//---------------------------------------------------------------------------
+// Bounds on the asynchronous upload path (section 7.3). A request count alone
+// is not a memory bound, because packet sizes vary, so bytes in flight are
+// bounded separately. Both are per session.
+#define SFTP_MAX_OUTSTANDING_UPLOAD_REQUESTS 32
+#define SFTP_MAX_OUTSTANDING_UPLOAD_BYTES (2 * 1024 * 1024)
 enum TPingType { ptOff, ptNullPacket, ptDummyCommand };
 enum TAddressFamily { afAuto, afIPv4, afIPv6 };
 enum TFtps { ftpsNone, ftpsImplicit, ftpsExplicitSsl, ftpsExplicitTls };
