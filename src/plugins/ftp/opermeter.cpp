@@ -10,7 +10,8 @@
 
 // Populated from the configuration; empty selects %TEMP%. Written once during
 // configuration load, read while formatting a finished operation's document.
-char FTPMetricsOutputDir[MAX_PATH] = "";
+// Own the complete Unicode directory instead of truncating it to MAX_PATH.
+CPathW FTPMetricsOutputDir;
 
 // Names are stable identifiers in the exported JSON: a benchmark comparison
 // script matches on them, so they must not be localized.
@@ -668,8 +669,8 @@ void CFTPTransferMetrics::Report(int queueCount, int queueRejected, int queueHig
     }
     buf[0] = 0;
 
-    char fileName[MAX_PATH];
-    fileName[0] = 0;
+    // Keep the entire output path dynamic, including the generated leaf name.
+    CPathW fileName;
     BOOL write = FALSE;
 
     HANDLES(EnterCriticalSection(&MetricsCritSect));
@@ -684,39 +685,43 @@ void CFTPTransferMetrics::Report(int queueCount, int queueRejected, int queueHig
         // document itself comes from the monotonic clock.
         SYSTEMTIME st;
         GetLocalTime(&st);
-        char dir[MAX_PATH];
-        if (FTPMetricsOutputDir[0] != 0)
-            StringCchCopyNA(dir, SizeOf(dir), FTPMetricsOutputDir, SizeOf(dir));
-        else if (GetTempPathA(SizeOf(dir), dir) == 0)
-            dir[0] = 0;
-        if (dir[0] != 0)
-        {
-            // GetTempPath already ends with a backslash; a configured directory
-            // may not, so normalize before composing the file name.
-            int dirLen = (int)strlen(dir);
-            if (dirLen > 0 && dir[dirLen - 1] != '\\' && dirLen + 1 < SizeOf(dir))
-            {
-                dir[dirLen] = '\\';
-                dir[dirLen + 1] = 0;
-            }
-            _snprintf_s(fileName, SizeOf(fileName), _TRUNCATE,
-                        "%sftp-metrics-%04d%02d%02d-%02d%02d%02d-%lu.json",
-                        dir, st.wYear, st.wMonth, st.wDay, st.wHour, st.wMinute, st.wSecond,
-                        GetCurrentProcessId());
-        }
+        BOOL pathReady = FALSE;
+        if (!FTPMetricsOutputDir.IsEmpty())
+            pathReady = fileName.Set(FTPMetricsOutputDir.CStr());
         else
+        {
+            // Probe in UTF-16; TEMP may contain characters outside the ANSI code page.
+            DWORD required = GetTempPathW(0, NULL);
+            WCHAR* tempPath = required != 0 ? fileName.GetBuffer(required) : NULL;
+            if (tempPath != NULL)
+            {
+                DWORD copied = GetTempPathW(required, tempPath);
+                pathReady = copied != 0 && copied < required;
+                fileName.ReleaseBuffer(pathReady ? (int)copied : 0);
+            }
+        }
+        // Only the fixed-format leaf has a fixed buffer; reject formatting or allocation failure.
+        WCHAR leaf[96];
+        if (!pathReady || FAILED(StringCchPrintfW(leaf, SizeOf(leaf),
+                                                  L"ftp-metrics-%04d%02d%02d-%02d%02d%02d-%lu.json",
+                                                  st.wYear, st.wMonth, st.wDay, st.wHour, st.wMinute, st.wSecond,
+                                                  GetCurrentProcessId())) ||
+            !fileName.Append(leaf))
             write = FALSE;
     }
     HANDLES(LeaveCriticalSection(&MetricsCritSect));
 
     // File I/O happens outside the counter section: a slow or full disk must not
     // block a worker that is still updating counters during teardown.
-    if (write && fileName[0] != 0)
+    if (write && !fileName.IsEmpty())
     {
-        // The plug-in's UTF-8 wrapper, so a metrics directory outside the ANSI
-        // code page still works.
-        HANDLE file = HANDLES_Q(CreateFileUtf8Local(fileName, GENERIC_WRITE, 0, NULL, CREATE_ALWAYS,
-                                                    FILE_ATTRIBUTE_NORMAL, NULL));
+        // Adapt long paths only at the Win32 boundary, preserving the configured display spelling.
+        const WCHAR* apiPath = fileName.GetPathForWin32Api();
+        HANDLE file = apiPath != NULL ? NOHANDLES(CreateFileW(apiPath, GENERIC_WRITE, 0, NULL, CREATE_ALWAYS,
+                                                             FILE_ATTRIBUTE_NORMAL, NULL))
+                                      : INVALID_HANDLE_VALUE;
+        // The SDK monitor lacks a wide CreateFile overload; register its handle explicitly.
+        HANDLES_ADD_EX(__otQuiet, file != INVALID_HANDLE_VALUE, __htFile, __hoCreateFile, file, GetLastError(), TRUE);
         if (file != INVALID_HANDLE_VALUE)
         {
             DWORD written = 0;
@@ -726,7 +731,7 @@ void CFTPTransferMetrics::Report(int queueCount, int queueRejected, int queueHig
             HANDLES(CloseHandle(file));
         }
         else
-            TRACE_E("CFTPTransferMetrics::Report(): unable to create " << fileName);
+            TRACE_E("CFTPTransferMetrics::Report(): unable to create the metrics document");
     }
     free(buf);
 }

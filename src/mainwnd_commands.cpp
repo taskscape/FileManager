@@ -1895,6 +1895,12 @@ LRESULT CMainWindow::HandleWmCommand(WPARAM wParam, LPARAM lParam)
             CancelPanelsUI(); // cancel QuickSearch and QuickEdit
         }
 
+        // Selection and caret changes defer command enablers to idle. A queued
+        // command can arrive first, so refresh pending state before its guard
+        // decides whether Copy/Move/Delete (or another command) may execute.
+        if (IdleRefreshStates && !DisableIdleProcessing)
+            RefreshCommandStates();
+
         if (LOWORD(wParam) >= CM_NEWMENU_MIN && LOWORD(wParam) <= CM_NEWMENU_MAX)
         { // ---- stage 2a: "New" menu -> invoke the shell context-menu verb by index
             if (ContextMenuNew->MenuIsAssigned() && activePanel->CheckPath(TRUE) == ERROR_SUCCESS)

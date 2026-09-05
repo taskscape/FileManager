@@ -3,6 +3,7 @@
 
 #pragma once
 
+#include "..\\..\\common\\wide_path.h" // metrics output paths must survive Unicode and long-path Win32 boundaries
 #include "..\\..\\common\\monotonic_time.h" // 64-bit monotonic time: phase durations must survive a GetTickCount wrap
 
 // ****************************************************************************
@@ -239,4 +240,4 @@ protected:
 
 // Directory that receives the JSON documents. Empty means "use %TEMP%". The
 // value is configuration, not a command line, so it is never executed.
-extern char FTPMetricsOutputDir[MAX_PATH];
+extern CPathW FTPMetricsOutputDir;

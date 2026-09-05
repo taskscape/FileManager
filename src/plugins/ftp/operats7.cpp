@@ -486,9 +486,10 @@ void CFTPWorker::HandleEventInWorkingState2(CFTPWorkerEvent event, BOOL& sendQui
             if (Config.UseMLSD == mlsdAuto && Oper->GetMLSxSupport()->Get() == mlsxUnknown &&
                 !UploadDirGetTgtPathListing)
             {
-                strcpy(buf, "FEAT\r\n");
+                // Both buffers use the worker event contract's capacities; this literal always fits.
+                StringCchCopyA(buf, 200 + FTP_MAX_PATH, "FEAT\r\n");
                 cmdLen = (int)strlen(buf);
-                strcpy(errBuf, buf); // for the log
+                StringCchCopyA(errBuf, 50 + FTP_MAX_PATH, "FEAT\r\n"); // identical command in the log
                 sendCmd = TRUE;
                 SubState = fwssWorkWaitForFEATRes;
                 break;

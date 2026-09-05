@@ -1499,9 +1499,10 @@ void CFTPWorker::HandleEventInConnectingState(CFTPWorkerEvent event, BOOL& sendQ
 
             case fwssConSendFEAT: // negotiate machine-readable listings (RFC 3659)
             {
-                strcpy(buf, "FEAT\r\n");
+                // Match the event buffer capacities for both the wire command and its log copy.
+                StringCchCopyA(buf, 200 + FTP_MAX_PATH, "FEAT\r\n");
                 cmdLen = (int)strlen(buf);
-                strcpy(errBuf, buf); // for the log
+                StringCchCopyA(errBuf, 50 + FTP_MAX_PATH, "FEAT\r\n"); // this literal always fits
                 sendCmd = TRUE;
                 SubState = fwssConWaitForFEATRes;
                 break;

@@ -40,6 +40,26 @@ public sealed class FileOperationUiTests : FileOperationUiTestBase
     }
 
     [Test]
+    public void Copy_immediately_after_quick_search_uses_current_command_state()
+    {
+        var list = FindPanelList(left: true);
+        var listHandle = list.Properties.NativeWindowHandle.Value;
+        NativeCommands.ActivateFilePanel(listHandle);
+        NativeCommands.ClearActiveSelection(NativeMainWindowHandle);
+        NativeCommands.QuickSearch(listHandle, "copy-file.txt");
+        // Dispatch without the harness's settling sleeps or toolbar wait: the
+        // command must observe the new caret even before the next idle update.
+        NativeCommands.Execute(NativeMainWindowHandle, NativeCommands.CopyFiles);
+        var dialog = WaitForOperationDialog();
+        SetDialogPath(dialog, Workspace.TargetDirectory);
+        CloseDialog(dialog, commit: true);
+
+        WaitForOperationOutputToBeReleased(Workspace.TargetPath("copy-file.txt"), "Immediate Copy did not release the destination file.");
+        Assert.That(File.ReadAllText(Workspace.TargetPath("copy-file.txt")), Is.EqualTo("copy-file-content"));
+        Assert.That(File.ReadAllText(Workspace.SourcePath("copy-file.txt")), Is.EqualTo("copy-file-content"));
+    }
+
+    [Test]
     public void Copy_preserves_last_write_time_metadata()
     {
         var source = Workspace.SourcePath("copy-file.txt");

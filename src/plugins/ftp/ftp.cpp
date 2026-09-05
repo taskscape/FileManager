@@ -554,8 +554,22 @@ void CPluginInterface::LoadConfiguration(HWND parent, HKEY regKey, CSalamanderRe
             Config.UseMLSD = mlsdAuto;
         if (!registry->GetValue(regKey, CONFIG_ENABLETRANSFERMETRICS, REG_DWORD, &Config.EnableTransferMetrics, sizeof(DWORD)))
             Config.EnableTransferMetrics = FALSE;
-        if (!registry->GetValue(regKey, CONFIG_TRANSFERMETRICSDIR, REG_SZ, FTPMetricsOutputDir, MAX_PATH))
-            FTPMetricsOutputDir[0] = 0; // empty selects %TEMP%
+        // Preserve the UTF-8 registry format while sizing storage for the complete path.
+        // Bound corrupt values by the maximum UTF-8 size of a Win32 Unicode path.
+        FTPMetricsOutputDir.Clear();
+        DWORD metricsDirSize = 0;
+        if (registry->GetSize(regKey, CONFIG_TRANSFERMETRICSDIR, REG_SZ, metricsDirSize) &&
+            metricsDirSize > 0 && metricsDirSize <= 4 * 32767)
+        {
+            char* metricsDir = (char*)calloc((size_t)metricsDirSize + 1, 1);
+            if (metricsDir != NULL)
+            {
+                if (registry->GetValue(regKey, CONFIG_TRANSFERMETRICSDIR, REG_SZ, metricsDir, metricsDirSize) &&
+                    !FTPMetricsOutputDir.Set(metricsDir))
+                    TRACE_E("Unable to load the FTP metrics directory");
+                free(metricsDir);
+            }
+        }
 
         char masks[MAX_GROUPMASK];
         if (registry->GetValue(regKey, CONFIG_ASCIIMASKS, REG_SZ, masks, MAX_GROUPMASK))
@@ -781,7 +795,15 @@ void CPluginInterface::SaveConfiguration(HWND parent, HKEY regKey, CSalamanderRe
     registry->SetValue(regKey, CONFIG_TRANSFERWORKERLIMIT, REG_DWORD, &Config.TransferWorkerLimit, sizeof(DWORD));
     registry->SetValue(regKey, CONFIG_USEMLSD, REG_DWORD, &Config.UseMLSD, sizeof(DWORD));
     registry->SetValue(regKey, CONFIG_ENABLETRANSFERMETRICS, REG_DWORD, &Config.EnableTransferMetrics, sizeof(DWORD));
-    registry->SetValue(regKey, CONFIG_TRANSFERMETRICSDIR, REG_SZ, FTPMetricsOutputDir, -1);
+    // Keep saved profiles compatible with the existing UTF-8 REG_SZ representation.
+    int metricsDirSize = WideCharToMultiByte(CP_UTF8, 0, FTPMetricsOutputDir.CStr(), -1, NULL, 0, NULL, NULL);
+    char* metricsDir = metricsDirSize > 0 ? (char*)malloc(metricsDirSize) : NULL;
+    if (metricsDir != NULL)
+    {
+        if (WideCharToMultiByte(CP_UTF8, 0, FTPMetricsOutputDir.CStr(), -1, metricsDir, metricsDirSize, NULL, NULL) != 0)
+            registry->SetValue(regKey, CONFIG_TRANSFERMETRICSDIR, REG_SZ, metricsDir, metricsDirSize);
+        free(metricsDir);
+    }
     char masks[MAX_GROUPMASK];
     Config.ASCIIFileMasks->GetMasksString(masks);
     registry->SetValue(regKey, CONFIG_ASCIIMASKS, REG_SZ, masks, -1);

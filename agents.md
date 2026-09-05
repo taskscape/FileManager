@@ -10,6 +10,12 @@ Do not infer that C++ builds are unavailable merely because a separate Build Too
 
 The GitHub Actions runner is a self-hosted machine that runs without administrator rights by default. Workflows must not assume they can install into protected locations or perform privileged system configuration; required SDKs and tools must be pre-provisioned or checked explicitly.
 
+## Testing parity and regression checks
+
+The GitHub Actions pipelines and `scripts/runtests.ps1` must reproduce the same testing conditions and follow the same testing process. Keep both in parity, including toolchain and build configuration, prerequisites, environment settings, test inputs and filters, check ordering, and failure and skip policies. When either testing path changes, update the other as needed to preserve parity.
+
+Before declaring source-code or build/test configuration changes complete, execute `scripts/runtests.ps1` under the corresponding pipeline conditions to check for regressions. A successful build or a subset of checks does not replace this required run. Report the invocation and result, including any failures, skips, or unavailable prerequisites; do not claim regression validation is complete if the required run could not finish.
+
 ## Source-change documentation
 
 Every source-code change must include a concise nearby comment that documents the change's intent. Keep the comment focused on the reason for the change, invariant, or compatibility constraint it preserves rather than restating the code.
