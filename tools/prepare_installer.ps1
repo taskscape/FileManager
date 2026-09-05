@@ -116,8 +116,13 @@ Copy-Item -Path (Join-Path $repositoryRoot 'convert\*') -Destination $convertDir
 Copy-Item -Path (Join-Path $releaseRoot 'toolbars\*') -Destination $toolbarsDirectory -Recurse -Force
 
 $pluginSourceDirectory = Join-Path $releaseRoot 'plugins'
+# DemoPlug is an SDK sample kept in the solution for local builds; never stage it for official distribution.
 $pluginPayloads = @(Get-ChildItem -LiteralPath $pluginSourceDirectory -Recurse -File |
-    Where-Object { $_.FullName -notmatch '\\Intermediate\\' -and $_.Extension -in @('.dll', '.exe', '.slg', '.spl') })
+    Where-Object {
+        $_.FullName -notmatch '\\Intermediate\\' -and
+        $_.FullName -notmatch '\\demoplug\\' -and
+        $_.Extension -in @('.dll', '.exe', '.slg', '.spl')
+    })
 if (@($pluginPayloads | Where-Object { $_.Extension -eq '.spl' }).Count -eq 0) {
     throw "The current Release x64 build did not produce plug-ins below $pluginSourceDirectory."
 }

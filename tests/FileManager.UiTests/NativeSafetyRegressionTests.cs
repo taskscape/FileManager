@@ -91,6 +91,9 @@ public sealed class NativeSafetyRegressionTests
             // Same-major installers need a fresh manifest to register the bundled plug-ins in an existing profile.
             Assert.That(installerStager, Does.Contain("plugins.ver"));
             Assert.That(installerStager, Does.Contain("ToUnixTimeSeconds"));
+            // DemoPlug is an SDK sample; official packaging must keep excluding it from staged plug-in payloads and plugins.ver.
+            Assert.That(installerStager, Does.Contain("never stage it for official distribution"));
+            Assert.That(installerStager, Does.Contain(@"-notmatch '\\demoplug\\'"));
             Assert.That(runner, Does.Contain("Installer_Staging-runtests-"));
             Assert.That(releaseWorkflow, Does.Contain("Installer_Staging-${{ github.run_id }}"));
             Assert.That(releaseInstaller, Does.Contain("prepare-installer.log"));
