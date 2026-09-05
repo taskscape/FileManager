@@ -1810,9 +1810,10 @@ void CFTPWorker::ReceiveNetEvent(LPARAM lParam, int index)
                     }
                     else
                     {
-                        if (SSLPending(SSLConn) > 0) // if the internal TLS buffer is not empty recv() is never called, so no additional FD_READ arrives; post it ourselves, otherwise the transfer stops
-                            PostMessage(SocketsThread->GetHiddenWindow(), Msg, (WPARAM)Socket, FD_READ);
                         int len = SSLRead(SSLConn, ReadBytes + ReadBytesCount, ReadBytesAllocatedSize - ReadBytesCount);
+                        // Drain records buffered by this read; a partial record that would block must wait for the network.
+                        if (len > 0 && SSLPending(SSLConn) > 0)
+                            PostMessage(SocketsThread->GetHiddenWindow(), Msg, (WPARAM)Socket, FD_READ);
                         if (len >= 0) // we may have read something (0 = connection already closed)
                         {
                             if (len > 0)

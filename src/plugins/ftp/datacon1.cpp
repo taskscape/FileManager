@@ -1060,10 +1060,11 @@ void CDataConnectionSocket::ReceiveNetEvent(LPARAM lParam, int index)
                                                    ReadBytesAllocatedSize - ValidBytesInReadBytesBuf, 0);
                                     else
                                     {
-                                        if (SSLPending(SSLConn) > 0) // if the internal TLS buffer is not empty, recv() is not called and no further FD_READ arrives, so we must post it ourselves, otherwise the data transfer stops
-                                            PostMessage(SocketsThread->GetHiddenWindow(), Msg, (WPARAM)Socket, FD_READ);
                                         len = SSLRead(SSLConn, ReadBytes + ValidBytesInReadBytesBuf,
                                                               ReadBytesAllocatedSize - ValidBytesInReadBytesBuf);
+                                        // Continue buffered TLS records after progress, without spinning on an incomplete record.
+                                        if (len > 0 && SSLPending(SSLConn) > 0)
+                                            PostMessage(SocketsThread->GetHiddenWindow(), Msg, (WPARAM)Socket, FD_READ);
                                     }
                                     if (len >= 0) // we may have read something (0 = the connection is already closed)
                                     {
@@ -1227,10 +1228,11 @@ void CDataConnectionSocket::ReceiveNetEvent(LPARAM lParam, int index)
                                                ReadBytesAllocatedSize - ValidBytesInReadBytesBuf, 0);
                                 else
                                 {
-                                    if (SSLPending(SSLConn) > 0) // if the internal TLS buffer is not empty, recv() is not called and no further FD_READ arrives, so we must post it ourselves, otherwise the data transfer stops
-                                        PostMessage(SocketsThread->GetHiddenWindow(), Msg, (WPARAM)Socket, FD_READ);
                                     len = SSLRead(SSLConn, ReadBytes + ValidBytesInReadBytesBuf,
                                                           ReadBytesAllocatedSize - ValidBytesInReadBytesBuf);
+                                    // Continue buffered TLS records after progress, without spinning on an incomplete record.
+                                    if (len > 0 && SSLPending(SSLConn) > 0)
+                                        PostMessage(SocketsThread->GetHiddenWindow(), Msg, (WPARAM)Socket, FD_READ);
                                 }
                                 if (len >= 0) // we may have read something (0 = the connection is already closed)
                                 {

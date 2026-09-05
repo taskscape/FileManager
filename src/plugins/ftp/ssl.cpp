@@ -999,7 +999,9 @@ int SSLRead(SSL* ssl, void* data, int size)
 
 int SSLPending(SSL* ssl)
 {
-    return ssl ? (int)ssl->DecryptedLength : 0;
+    // SChannel may retain additional encrypted records from the same recv().
+    // Callers use this as a readiness hint after a successful read, not a byte count.
+    return ssl ? (ssl->DecryptedLength != 0 || ssl->EncryptedLength != 0) : 0;
 }
 
 int SSLGetError(SSL* ssl, int result)

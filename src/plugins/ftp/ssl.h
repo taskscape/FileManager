@@ -101,6 +101,8 @@ void SSLThreadLocalCleanup();
 
 int SSLRead(SSL* ssl, void* data, int size);
 int SSLWrite(SSL* ssl, const void* data, int size);
+// Readiness hint, not a plaintext byte count: check after a successful SSLRead
+// so coalesced TLS records drain, but an incomplete record cannot spin FD_READ.
 int SSLPending(SSL* ssl);
 int SSLGetError(SSL* ssl, int result);
 int SSLShutdown(SSL* ssl);
