@@ -160,6 +160,7 @@ public:
 //
 // ****************************************************************************
 
+// Growable array of CFileData entries for one panel listing, with optional string arena.
 class CFilesArray : public TDirectArray<CFileData>
 {
 protected:
@@ -278,9 +279,7 @@ public:
     BOOL LoadFromClipboard(HWND hWindow);
 };
 
-//
-// ****************************************************************************
-
+// One remembered panel path (disk, archive, or plugin FS) for Back/Forward history.
 class CPathHistoryItem
 {
 protected:
@@ -313,6 +312,7 @@ public:
     friend class CPathHistory;
 };
 
+// Back/Forward stack of panel paths, including archive and plugin-FS locations.
 class CPathHistory
 {
 protected:
@@ -403,6 +403,7 @@ enum CFileHistoryItemTypeEnum
     fhitOpen,
 };
 
+// One View/Edit/Open history entry: file name, handler ID, and associated icon.
 class CFileHistoryItem
 {
 protected:
@@ -683,6 +684,7 @@ struct CSharesItem
     BOOL IsGood() { return LocalPath != NULL; } // if the LocalPath is allocated, the rest will be as well
 };
 
+// Cached list of Windows network shares used to mark shared folders in the panels.
 class CShares
 {
 protected:
@@ -1035,6 +1037,7 @@ struct CWayPoint
     DWORD Time;         // insertion time
 };
 
+// Circular log of debug waypoints with timestamps for reconstructing recent code paths.
 class CWayPointsKeeper
 {
 private:
@@ -1180,6 +1183,7 @@ int EnumCShellExecuteWnd(HWND hParent, char* text, int textMax);
 //
 // ****************************************************************************
 
+// Safe file create/open helpers that report errors and honor silent-mask skip/overwrite answers.
 class CSalamanderSafeFile : public CSalamanderSafeFileAbstract
 {
 public:

@@ -13,6 +13,7 @@
 #pragma once
 
 /// Icon cache.
+// Caches shell icons used in the Network Neighborhood listing.
 class CNethoodIcons
 {
 public:

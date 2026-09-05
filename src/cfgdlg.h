@@ -475,6 +475,7 @@ struct CConfiguration
 //
 // ****************************************************************************
 
+// Mutex serializing configuration load/save so two Salamander processes do not write the Registry together.
 class CLoadSaveToRegistryMutex
 {
 protected:
@@ -496,6 +497,7 @@ extern CLoadSaveToRegistryMutex LoadSaveToRegistryMutex; // mutex for synchroniz
 //
 // ****************************************************************************
 
+// Configuration page for general application options such as startup behavior.
 class CConfigPageGeneral : public CCommonPropSheetPage
 {
 public:
@@ -513,6 +515,7 @@ protected:
 //
 // ****************************************************************************
 
+// Configuration page for UI language and other regional settings.
 class CConfigPageRegional : public CCommonPropSheetPage
 {
 public:
@@ -535,6 +538,7 @@ protected:
 
 class CToolbarHeader;
 
+// Configuration page for panel view templates and their column layouts.
 class CConfigPageView : public CCommonPropSheetPage
 {
 protected:
@@ -573,6 +577,7 @@ protected:
 //
 // ****************************************************************************
 
+// Configuration page for enabling and listing shell icon overlay handlers.
 class CCfgPageIconOvrls : public CCommonPropSheetPage
 {
 protected:
@@ -592,6 +597,7 @@ protected:
 //
 // ****************************************************************************
 
+// Configuration page for security options, including master-password protection.
 class CCfgPageSecurity : public CCommonPropSheetPage
 {
 public:
@@ -610,6 +616,7 @@ protected:
 
 //class CColorButton;
 
+// Configuration page for the internal viewer's font and color scheme.
 class CCfgPageViewer : public CCommonPropSheetPage
 {
 protected:
@@ -656,6 +663,7 @@ class CSmallIconWindow : public CWindow
 };
 */
 
+// Configuration page for editing User Menu commands, arguments, and icons.
 class CCfgPageUserMenu : public CCommonPropSheetPage
 {
 public:
@@ -687,6 +695,7 @@ protected:
 
 class CHotPathItems;
 
+// Configuration page for named hot paths used as quick directory shortcuts.
 class CCfgPageHotPath : public CCommonPropSheetPage
 {
 protected:
@@ -722,6 +731,7 @@ protected:
 //
 // ****************************************************************************
 
+// Configuration page for system-integration options such as associations and Recycle Bin use.
 class CCfgPageSystem : public CCommonPropSheetPage
 {
 public:
@@ -740,6 +750,7 @@ protected:
 
 #define CFG_COLORS_BUTTONS 5
 
+// Configuration page for panel colors, highlight masks, and color schemes.
 class CCfgPageColors : public CCommonPropSheetPage
 {
 protected:
@@ -782,6 +793,7 @@ struct CConfirmationItem
     int Checked;
 };
 
+// Configuration page for which confirmation and warning dialogs are shown.
 class CCfgPageConfirmations : public CCommonPropSheetPage
 {
 protected:
@@ -812,6 +824,7 @@ protected:
 //
 // ****************************************************************************
 
+// Configuration page for drive visibility and the fallback path when a path is inaccessible.
 class CCfgPageDrives : public CCommonPropSheetPage
 {
 protected:
@@ -830,6 +843,7 @@ protected:
 //
 // ****************************************************************************
 
+// Parent configuration page that hosts the Viewers and Editors subpages.
 class CCfgPageViewEdit : public CCommonPropSheetPage
 {
 public:
@@ -839,6 +853,7 @@ public:
 //
 // ****************************************************************************
 
+// Configuration page listing viewers and the file masks that open them.
 class CCfgPageViewers : public CCommonPropSheetPage
 {
 protected:
@@ -866,6 +881,7 @@ protected:
 //
 // ****************************************************************************
 
+// Configuration page listing editors and the file masks that open them.
 class CCfgPageEditors : public CCommonPropSheetPage
 {
 public:
@@ -890,6 +906,7 @@ protected:
 //
 // ****************************************************************************
 
+// Configuration page for viewing and customizing keyboard shortcuts.
 class CCfgPageKeyboard : public CCommonPropSheetPage
 {
 public:
@@ -902,6 +919,7 @@ protected:
 //
 // ****************************************************************************
 
+// Configuration page showing usage statistics collected by the application.
 class CConfigurationPageStats : public CCommonPropSheetPage
 {
 public:
@@ -917,6 +935,7 @@ protected:
 //
 // ****************************************************************************
 
+// Configuration page introducing packer and unpacker settings.
 class CCfgPageArchivers : public CCommonPropSheetPage
 {
 public:
@@ -930,6 +949,7 @@ public:
 
 class CPackerConfig;
 
+// Configuration page for custom packer command lines used to create archives.
 class CCfgPagePackers : public CCommonPropSheetPage
 {
 protected:
@@ -956,6 +976,7 @@ protected:
 
 class CUnpackerConfig;
 
+// Configuration page for custom unpacker command lines used to extract archives.
 class CCfgPageUnpackers : public CCommonPropSheetPage
 {
 protected:
@@ -982,6 +1003,7 @@ protected:
 
 class CArchiverConfig;
 
+// Configuration page mapping well-known external archiver tools to executable paths.
 class CCfgPageExternalArchivers : public CCommonPropSheetPage
 {
 protected:
@@ -1008,6 +1030,7 @@ protected:
 
 class CPackerFormatConfig;
 
+// Configuration page associating archive extensions with packers and unpackers.
 class CCfgPageArchivesAssoc : public CCommonPropSheetPage
 {
 protected:
@@ -1054,6 +1077,7 @@ class CCfgPageShellExt: public CCommonPropSheetPage
 //
 // ****************************************************************************
 
+// Configuration page for panel fonts and other visual appearance options.
 class CCfgPageAppearance : public CCommonPropSheetPage
 {
 protected:
@@ -1079,6 +1103,7 @@ protected:
 //
 // ****************************************************************************
 
+// Configuration page for main-window layout, title-bar icon, and related options.
 class CCfgPageMainWindow : public CCommonPropSheetPage
 {
 protected:
@@ -1103,6 +1128,7 @@ protected:
 //
 // ****************************************************************************
 
+// Configuration page for which drives appear in the Change Drive menu.
 class CCfgPageChangeDrive : public CCommonPropSheetPage
 {
 protected:
@@ -1124,6 +1150,7 @@ protected:
 //
 // ****************************************************************************
 
+// Configuration page for file-panel behavior and display options.
 class CCfgPagePanels : public CCommonPropSheetPage
 {
 public:
@@ -1140,6 +1167,7 @@ protected:
 //
 // ****************************************************************************
 
+// Configuration page for command and path history retention and clearing.
 class CCfgPageHistory : public CCommonPropSheetPage
 {
 public:
@@ -1159,6 +1187,7 @@ protected:
 //
 // ****************************************************************************
 
+// Tree property-sheet dialog that hosts all application configuration pages.
 class CConfigurationDlg : public CTreePropDialog
 {
 public:

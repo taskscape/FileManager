@@ -643,6 +643,7 @@ BOOL CCalculateDialog::GetFileList()
     return ret;
 }
 
+// Background thread that fills the calculate dialog with file hashes.
 class CCalculateThread : public CCRCMD5Thread
 {
 public:
@@ -1863,6 +1864,7 @@ BOOL CVerifyDialog::LoadSourceFile()
     return ret;
 }
 
+// Background thread that checks files against hashes from a digest file.
 class CVerifyThread : public CCRCMD5Thread
 {
 public:

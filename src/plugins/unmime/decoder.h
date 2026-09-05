@@ -13,6 +13,7 @@ extern int iErrorStr;
 
 /// export for parser.cpp /////////////////////////////////////////////////////
 
+// Base decoder that writes decoded bytes (or just counts size) into a target file.
 class CDecoder
 {
 public:
@@ -34,6 +35,7 @@ protected:
     virtual BOOL BufferedWrite(const void* pData, int nBytes);
 };
 
+// No-op decoder used for blocks that should not produce output.
 class CNullDecoder : public CDecoder
 {
 public:
@@ -41,12 +43,14 @@ public:
     virtual BOOL End() { return TRUE; };
 };
 
+// Copies 7bit/8bit/binary text lines unchanged into the output file.
 class CTextDecoder : public CDecoder
 {
 public:
     virtual BOOL DecodeLine(LPTSTR pszLine, BOOL bLastLine);
 };
 
+// Quoted-printable decoder for MIME body parts.
 class CQPDecoder : public CDecoder
 {
 public:
@@ -57,6 +61,7 @@ private:
     BYTE table[256];
 };
 
+// Base64 decoder for MIME body parts.
 class CBase64Decoder : public CDecoder
 {
 public:
@@ -73,6 +78,7 @@ private:
     BYTE table[256];
 };
 
+// UUencode/XXencode decoder (bXX selects the alphabet).
 class CUUXXDecoder : public CDecoder
 {
 public:
@@ -84,6 +90,7 @@ private:
     BYTE table[256];
 };
 
+// BinHex 4.0 decoder that extracts the data fork and reports CRC failures.
 class CBinHexDecoder : public CDecoder
 {
 public:
@@ -135,6 +142,7 @@ private:
     BYTE table[256];
 };
 
+// yEnc decoder for Usenet attachments, including CRC32 checking.
 class CYEncDecoder : public CDecoder
 {
 public:

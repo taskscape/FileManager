@@ -3,6 +3,7 @@
 
 #pragma once
 
+// Builds a Salamander directory listing from a ZIP central directory.
 class CZipList : public CZipCommon
 {
 public:

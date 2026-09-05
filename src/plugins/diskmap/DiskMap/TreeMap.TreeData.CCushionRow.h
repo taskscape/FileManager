@@ -11,6 +11,7 @@
 class CCushion;
 class CCushionDirectory;
 
+// Horizontal or vertical strip of sibling cushions in the treemap layout.
 class CCushionRow
 {
 protected:

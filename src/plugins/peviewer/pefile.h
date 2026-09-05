@@ -43,6 +43,7 @@
 
 BOOL TimeDateStampToString(DWORD timeDateStamp, char* buffer);
 
+// Mapped PE image: DOS/NT headers, sections, and directory lookups.
 class CPEFile
 {
 public:
@@ -82,6 +83,7 @@ private:
     PIMAGE_SECTION_HEADER pISH;
 };
 
+// FILE* wrapper that dumpers use to write (and optionally mute) PE dumps.
 class CFileStream
 {
 private:
@@ -117,6 +119,7 @@ public:
     BOOL IsEmpty() { return Empty; }
 };
 
+// RAII helper that temporarily enables or disables dump output.
 class CFileStreamEnabler
 {
 private:
@@ -136,6 +139,7 @@ public:
     }
 };
 
+// Abstract dumper that writes one PE region to a CFileStream.
 class CPEDumper
 {
 private:
@@ -168,6 +172,7 @@ public:
     virtual void Dump(CFileStream* outStream) = 0;
 };
 
+// PE dumper that catches SEH exceptions while walking possibly corrupt images.
 class CNTDumperWithExceptionHandler : public CPEDumper
 {
 public:
@@ -205,6 +210,7 @@ public:
     }
 };
 
+// Dumps IMAGE_FILE_HEADER (machine, sections, characteristics).
 class CFileHeaderDumper : public CNTDumperWithExceptionHandler
 {
 public:
@@ -223,6 +229,7 @@ protected:
     virtual const _TCHAR* GetExceptionMessage();
 };
 
+// Dumps IMAGE_OPTIONAL_HEADER (image base, subsystems, data directories).
 class COptionalFileHeaderDumper : public CNTDumperWithExceptionHandler
 {
 public:
@@ -241,6 +248,7 @@ protected:
     virtual const _TCHAR* GetExceptionMessage();
 };
 
+// Dumps the export directory (DLL names, ordinals, RVAs).
 class CExportTableDumper : public CNTDumperWithExceptionHandler
 {
 public:
@@ -259,6 +267,7 @@ protected:
     virtual const _TCHAR* GetExceptionMessage();
 };
 
+// Dumps the import directory (DLLs and imported symbols).
 class CImportTableDumper : public CNTDumperWithExceptionHandler
 {
 public:
@@ -277,6 +286,7 @@ protected:
     virtual const _TCHAR* GetExceptionMessage();
 };
 
+// Dumps PE section headers (name, RVA, size, characteristics).
 class CSectionTableDumper : public CNTDumperWithExceptionHandler
 {
 public:
@@ -295,6 +305,7 @@ protected:
     virtual const _TCHAR* GetExceptionMessage();
 };
 
+// Dumps the debug directory (CodeView, misc, timestamps).
 class CDebugDirectoryDumper : public CNTDumperWithExceptionHandler
 {
 private:
@@ -317,6 +328,7 @@ protected:
     virtual const _TCHAR* GetExceptionMessage();
 };
 
+// Dumps the resource directory tree.
 class CResourceDirectoryDumper : public CNTDumperWithExceptionHandler
 {
 public:
@@ -335,6 +347,7 @@ protected:
     virtual const _TCHAR* GetExceptionMessage();
 };
 
+// Dumps IMAGE_LOAD_CONFIG_DIRECTORY (GS cookie, CFG, etc.).
 class CLoadConfigDumper : public CNTDumperWithExceptionHandler
 {
 public:
@@ -356,6 +369,7 @@ protected:
 #undef EnumResourceTypes
 #undef FindResource
 
+// Shared helpers for dumpers that walk the PE resource tree.
 class CBaseResourceDumper : public CNTDumperWithExceptionHandler
 {
 private:
@@ -457,6 +471,7 @@ protected:
     virtual const _TCHAR* GetExceptionMessage();
 };
 
+// Dumps the RT_MANIFEST resource as text.
 class CManifestResourceDumper : public CBaseResourceDumper
 {
 public:
@@ -475,6 +490,7 @@ protected:
     virtual const _TCHAR* GetExceptionMessage();
 };
 
+// Dumps the .NET IMAGE_COR20_HEADER.
 class CCorHeaderDumper : public CNTDumperWithExceptionHandler
 {
 public:
@@ -504,6 +520,7 @@ protected:
 
 #include "SortedStringList.h"
 
+// Dumps .NET metadata tables from the COR20 header.
 class CCorMetadataDumper : public CNTDumperWithExceptionHandler
 {
 public:

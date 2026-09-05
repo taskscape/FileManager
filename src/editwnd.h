@@ -9,6 +9,7 @@
 //
 // ****************************************************************************
 
+// Subclassed edit control for the command line, including drag-and-drop text insert.
 class CEditLine : public CWindow
 {
 protected:
@@ -60,6 +61,7 @@ protected:
 //
 // ****************************************************************************
 
+// Command-line window that hosts the edit control and the inner prompt text.
 class CEditWindow : public CWindow
 {
 protected:

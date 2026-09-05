@@ -17,6 +17,7 @@
 #include "abortmodal.h"
 #include "lang\lang.rh"
 
+// Modal prompt dialog that scripts use to collect a single text response.
 class CInputBoxDlg : public CDialogImpl
 {
 private:

@@ -65,6 +65,7 @@ struct CKey
     BOOL Conflict;
 };
 
+// Detects duplicate accelerator keys among menu/dialog items.
 class CKeyConflict
 {
 protected:

@@ -412,6 +412,7 @@ BOOL VerifyFileDeletable(const char* path, const COperation::CFileIdentity& expe
 BOOL VerifyFileHandleIdentity(HANDLE handle, const COperation::CFileIdentity& expected, DWORD* error);
 BOOL DeleteFileWithVerifiedIdentity(const char* path, const COperation::CFileIdentity& expected, DWORD* error);
 
+// Script of file operations (copy, move, delete, attributes, convert) plus progress totals and options.
 class COperations : public TDirectArray<COperation>
 {
 public:

@@ -174,6 +174,7 @@ struct CAssociationIndexAndFlag
     DWORD Flag : 1;   // can *.ExtensionAndData be opened?
 };
 
+// Cached shell association for one file extension, including icon indexes per size.
 class CAssociationData
 {
 public:
@@ -245,6 +246,7 @@ public:
     }
 };
 
+// Table of file-extension associations and their cached icons used by the panels.
 class CAssociations : public TDirectArray<CAssociationData>
 {
 protected:

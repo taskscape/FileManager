@@ -89,6 +89,7 @@ enum ETooltipPathFormat
 	{ 41.97, 22.09,  9.76, 22.55 }
 };*/
 
+// Popup tooltip with icon, path, and size for the cushion under the cursor.
 class CFileInfoTooltip : public CFrameWindow
 {
 protected:

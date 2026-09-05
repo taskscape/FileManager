@@ -23,6 +23,7 @@ enum CFTPAutodetCondLexElement
     lexFunction,         // function including one parameter in parentheses
 };
 
+// Lexer for FTP server-type autodetection condition strings.
 class CFTPAutodetCondLexAn
 {
 protected:

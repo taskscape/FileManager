@@ -91,6 +91,7 @@ public:
     static CScriptEngineShim* Create(CScriptInfo* pScript);
 };
 
+// Workarounds for Python Active Scripting enter/leave-script notifications.
 class CPythonScriptEngineShim : public CScriptEngineShim
 {
 private:
@@ -105,6 +106,7 @@ public:
     static CScriptEngineShim* Create(CScriptInfo* pScript);
 };
 
+// Workarounds for the Global Ruby engine's source positions and interrupt handling.
 class CGlobalRubyScriptEngineShim : public CScriptEngineShim
 {
 private:

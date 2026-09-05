@@ -5,6 +5,7 @@
 
 #include <strsafe.h> // counted bounded copies (StringCchCopyNA)
 
+// Shared unpacker dialog helper that owns the HWND, centers the dialog, and subclasses statics.
 class CDlgRoot
 {
 public:
@@ -21,6 +22,7 @@ public:
     void SubClassStatic(DWORD wID, BOOL subclass);
 };
 
+// Prompts for the next RAR volume when a multi-volume unpack continues.
 class CNextVolumeDialog : public CDlgRoot
 {
     LPTSTR VolumeName;
@@ -45,6 +47,7 @@ public:
 
 INT_PTR NextVolumeDialog(HWND parent, LPTSTR volumeName, LPCTSTR message = NULL);
 
+// Warns that a file continues from a previous RAR volume and asks how to proceed.
 class CContinuedFileDialog : public CDlgRoot
 {
     const char* File;
@@ -63,6 +66,7 @@ public:
 
 INT_PTR ContinuedFileDialog(HWND parent, const char* file);
 
+// UnRAR configuration dialog (skip continued files, volume warnings, packed-size column).
 class CConfigDialog : public CDlgRoot
 {
 
@@ -82,6 +86,7 @@ INT_PTR ConfigDialog(HWND parent);
 #define PD_NOSKIPALL 0x02
 #define PD_NOALL 0x04
 
+// Asks for the RAR password before encrypted members can be opened.
 class CPasswordDialog : public CDlgRoot
 {
     char* Password;
@@ -104,6 +109,7 @@ public:
 
 INT_PTR PasswordDialog(HWND parent, const char* fileName, char* password, DWORD flags);
 
+// Warns that the RAR archive cannot be listed completely (missing volumes).
 class CAttentionDialog : public CDlgRoot
 {
 public:

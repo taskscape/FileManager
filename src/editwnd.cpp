@@ -1061,6 +1061,7 @@ CEditLine::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
     return CWindow::WindowProc(uMsg, wParam, lParam);
 }
 
+// OLE drop target that inserts dragged text into the command-line edit control.
 class CEditDropTarget : public IDropTarget
 {
 private:

@@ -13,6 +13,7 @@ typedef DWORD_PTR(WINAPI* PWORKERTHREAD_START_ROUTINE)(
     CWorkerThread* thread,
     LPVOID lpThreadParameter);
 
+// DiskMap thread queue that records worker and window thread handles.
 class CMyThreadQueue : public CThreadQueue
 {
 public:

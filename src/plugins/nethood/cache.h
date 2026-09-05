@@ -1173,6 +1173,7 @@ public:
 #endif
 };
 
+// Starts enumerating a dependent cache node once its parent is ready.
 class CNethoodCacheBeginDependentEnumerationConsumer : public CNethoodCacheEventConsumer
 {
 protected:
@@ -1201,6 +1202,7 @@ public:
     }
 };
 
+// Unregisters a dependent enumerator when its cache node is updated or dropped.
 class CNethoodCacheHitmanConsumer : public CNethoodCacheEventConsumer
 {
 protected:
@@ -1226,6 +1228,7 @@ public:
     virtual void OnCacheNodeUpdated(__in CNethoodCache::Node node);
 };
 
+// Worker thread that enumerates Windows network resources into the cache.
 class CNethoodCacheEnumerationThread : public CThread
 {
 private:

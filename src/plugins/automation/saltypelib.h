@@ -13,6 +13,7 @@
 
 #pragma once
 
+// Loads and caches the Automation type library used by IDispatch implementations.
 class CSalamanderTypeLib
 {
 private:

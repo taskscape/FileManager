@@ -3,6 +3,7 @@
 
 #pragma once
 
+// Modal About box for the DiskMap plugin.
 class CAboutDialog
 {
 protected:

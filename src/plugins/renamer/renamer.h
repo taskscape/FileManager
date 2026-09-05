@@ -14,6 +14,7 @@ extern CSalamanderGeneralAbstract* SG;
 
 extern CSalamanderGUIAbstract* SalGUI;
 
+// Window queue that can return the last Renamer dialog HWND.
 class CWindowQueueEx : public CWindowQueue
 {
 public:
@@ -70,6 +71,7 @@ void OnConfiguration(HWND hParent);
 // Plugin interface
 //
 
+// Plugin entry point that registers Renamer with Salamander.
 class CPluginInterface : public CPluginInterfaceAbstract
 {
 public:

@@ -27,6 +27,7 @@ class CPluginDataInterfaceAbstract;
 // ****************************************************************************
 // CPluginInterfaceForArchiverAbstract
 //
+// Plugin API for listing, packing, and unpacking archives.
 
 class CPluginInterfaceForArchiverAbstract
 {

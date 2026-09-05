@@ -54,6 +54,7 @@ int WINAPI HandlePluginCallbackException(const void* pluginInterface, const char
                                          EXCEPTION_POINTERS* exceptionInfo);
 void HandlePluginCallbackFailure(const void* pluginInterface, const char* callback);
 
+// Abstract callback invoked inside the SEH-protected host-to-plug-in call boundary.
 class CPluginCallbackInvoker
 {
 public:
@@ -65,6 +66,7 @@ public:
 BOOL CallPluginCallback(const void* pluginInterface, const char* callback,
                         CPluginCallbackInvoker* invoker);
 
+// Template adapter that runs a captured lambda as a CPluginCallbackInvoker.
 template <class T>
 class CPluginCallbackInvokerImpl : public CPluginCallbackInvoker
 {
@@ -107,6 +109,7 @@ static BOOL ValidatePluginOutputString(char* buffer, int capacity, const char* d
     return FALSE;
 }
 
+// Host wrapper that calls a plug-in archiver interface with EnterPlugin/LeavePlugin around each method.
 class CPluginInterfaceForArchiverEncapsulation
 {
 protected:
@@ -227,6 +230,7 @@ public:
     // ********************************************************************************
 };
 
+// Host wrapper that calls a plug-in viewer interface with EnterPlugin/LeavePlugin around each method.
 class CPluginInterfaceForViewerEncapsulation
 {
 protected:
@@ -267,6 +271,7 @@ public:
     }
 };
 
+// Host wrapper that calls a plug-in menu-extension interface with EnterPlugin/LeavePlugin around each method.
 class CPluginInterfaceForMenuExtEncapsulation
 {
 protected:
@@ -330,6 +335,7 @@ public:
     }
 };
 
+// Host wrapper that calls a plug-in filesystem interface with EnterPlugin/LeavePlugin around each method.
 class CPluginInterfaceForFSEncapsulation
 {
 protected:
@@ -414,6 +420,7 @@ public:
     }
 };
 
+// Host wrapper that calls a plug-in thumbnail-loader interface (no panel Enter/Leave, any-thread safe methods only).
 class CPluginInterfaceForThumbLoaderEncapsulation
 {
 protected:
@@ -460,6 +467,7 @@ public:
     }
 };
 
+// Host wrapper for the plug-in's main CPluginInterfaceAbstract, with EnterPlugin/LeavePlugin around each method.
 class CPluginInterfaceEncapsulation
 {
 protected:
@@ -1745,6 +1753,7 @@ public:
 // ****************************************************************************
 // CSalamanderDebug
 //
+// Per-plugin TRACE/call-stack debug interface bound to that plugin's DLL name.
 
 struct CPluginData;
 
@@ -1799,6 +1808,7 @@ public:
 // ****************************************************************************
 // CGUIProgressBar
 //
+// Plugin-facing wrapper around the host CProgressBar control.
 
 class CProgressBar;
 
@@ -1826,6 +1836,7 @@ public:
 // ****************************************************************************
 // CGUIStaticText
 //
+// Plugin-facing wrapper around the host CStaticText control.
 
 class CStaticText;
 
@@ -1852,6 +1863,7 @@ public:
 // ****************************************************************************
 // CGUIHyperLink
 //
+// Plugin-facing wrapper around the host CHyperLink control.
 
 class CHyperLink;
 
@@ -1880,6 +1892,7 @@ public:
 // ****************************************************************************
 // CGUIButton
 //
+// Plugin-facing wrapper around the host CButton control.
 
 class CButton;
 
@@ -1903,6 +1916,7 @@ public:
 // ****************************************************************************
 // CGUIColorArrowButton
 //
+// Plugin-facing wrapper around the host CColorArrowButton control.
 
 class CColorArrowButton;
 
@@ -1929,6 +1943,7 @@ public:
 // ****************************************************************************
 // CGUIToolbarHeader
 //
+// Plugin-facing wrapper around the host CToolbarHeader control.
 
 class CToolbarHeader;
 
@@ -2001,6 +2016,7 @@ protected:
     BOOL CheckControlAndDeleteOnError(CWindow* control);
 };
 
+// Per-plugin password-manager API bound to that plugin's DLL identity.
 class CSalamanderPasswordManager : public CSalamanderPasswordManagerAbstract
 {
 private:
@@ -2977,6 +2993,7 @@ struct CPluginFSTimer
     }
 };
 
+// Loaded-plugin table: DLL lifetime, interfaces, menus, timers, and configuration.
 class CPlugins
 {
 protected:

@@ -503,6 +503,7 @@ static void PvRefreshFormatControls(IFileDialogCustomize* cust, PvSaveAsUiState*
     cust->SetControlState(PVSAVE_TIFF_STRIP_SIZE, tiffState);
 }
 
+// IFileDialogEvents that enable JPEG/TIFF options as the save format changes.
 class CPvSaveAsEvents : public IFileDialogEvents
 {
 public:

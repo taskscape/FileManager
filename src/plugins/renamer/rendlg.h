@@ -40,6 +40,7 @@ struct CUndoStackEntry
     ~CUndoStackEntry();
 };
 
+// Main batch-rename dialog: mask, new name, preview, and undo.
 class CRenamerDialog : public CDialog
 {
 protected:

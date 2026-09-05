@@ -59,6 +59,7 @@ typedef struct treSIZEF
 
 class CCushionRow;
 
+// Strategy that decides row direction and when to start a new cushion row.
 class CTreeMapRendererBase
 {
 protected:

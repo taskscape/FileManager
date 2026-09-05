@@ -5,6 +5,7 @@
 
 class CMappedFont;
 
+// Cache of character-mapped fonts used to draw compared text.
 class CMappedFontFactory
 {
 public:
@@ -31,6 +32,7 @@ private:
 
 extern CMappedFontFactory MappedFontFactory;
 
+// Draws compared text using a mapped font so glyphs match across encodings.
 template <class CChar>
 class TMappedTextOut
 {

@@ -110,6 +110,7 @@ struct ATTRIBUTE_VOLUME_INFORMATION
 
 #pragma pack(pop, ntfs_h)
 
+// NTFS MFT snapshot: parses records, rebuilds the directory tree, and estimates damage.
 template <typename CHAR>
 class CMFTSnapshot : public CSnapshot<CHAR>
 {

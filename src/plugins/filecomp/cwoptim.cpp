@@ -35,6 +35,7 @@ struct identity
     CChar operator()(const CChar& c) const { return c; }
 };
 
+// Iterator that skips whitespace when comparing lines.
 template <class CChar>
 class CIgnoringSpace
 {

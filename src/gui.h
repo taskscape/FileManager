@@ -8,6 +8,7 @@
 // CProgressBar
 //
 // Class is always allocated (CObjectOrigin origin = ooAllocated)
+// Determinate or marquee progress control used in dialogs and operation windows.
 
 class CProgressBar : public CWindow
 {
@@ -57,6 +58,7 @@ protected:
 // CStaticText
 //
 // Class is always allocated (CObjectOrigin origin = ooAllocated)
+// Static label with ellipsis, tooltip, and optional hyperlink styling.
 
 class CStaticText : public CWindow
 {
@@ -143,6 +145,7 @@ protected:
 //
 // CHyperLink
 //
+// Clickable static text that opens a URL or posts a command to the parent.
 
 class CHyperLink : public CStaticText
 {
@@ -194,6 +197,7 @@ protected:
 //
 // CColorGraph
 //
+// Small pie/bar graph control used to visualize color or usage samples.
 
 class CColorGraph : public CWindow
 {
@@ -225,6 +229,7 @@ protected:
 // CBitmapButton
 //
 
+// Owner-drawn push button with optional drop-down, tooltip, and XP-theme hot tracking.
 class CButton : public CWindow
 {
 protected:
@@ -316,6 +321,7 @@ protected:
 
 class CToolBar;
 
+// Small header toolbar (New/Modify/Delete/Up/Down) placed above list boxes.
 class CToolbarHeader : public CWindow
 {
 protected:

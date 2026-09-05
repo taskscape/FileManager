@@ -28,6 +28,7 @@ struct COneDriveBusinessStorage
     }
 };
 
+// Sorted list of OneDrive for Business display names mapped to their local folders.
 class COneDriveBusinessStorages : public TIndirectArray<COneDriveBusinessStorage>
 {
 public:

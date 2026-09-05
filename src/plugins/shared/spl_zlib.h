@@ -63,6 +63,7 @@ struct CSalZLIB
    Single instance can be used many times, using different zlibInfo structs.
    For usage howtos, see the comment at the top of this file. */
 
+// Host API: zlib deflate/inflate helpers Salamander exposes to plugins.
 class CSalamanderZLIBAbstract
 {
 public:

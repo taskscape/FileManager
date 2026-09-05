@@ -17,6 +17,7 @@
 #include "fxfs.h"
 #include "wpdfs.h"
 
+// Registers the Portables virtual file system with Salamander.
 class CWpdPluginInterfaceForFS : public TFxPluginInterfaceForFS<CWpdFS>
 {
 public:

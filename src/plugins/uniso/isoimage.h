@@ -33,6 +33,7 @@ class CUnISOFSAbstract;
 // CISOImage
 //
 
+// Disk-image container that detects tracks/sessions and lists or unpacks ISO/UDF/HFS/APFS filesystems.
 class CISOImage
 {
 public:

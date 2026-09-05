@@ -237,6 +237,7 @@ enum CFTPParserFunctionCode
     fpfSkip_to_number,
 };
 
+// One function in an FTP listing-parser rule (assign, skip, cut whitespace, …).
 class CFTPParserFunction
 {
 protected:
@@ -459,6 +460,7 @@ enum CFTPAutodetCondNodeType
     acntFunc,       // function with a string-search algorithm (see CFTPAutodetCondFunction)
 };
 
+// Node in the boolean expression used to autodetect an FTP server type.
 class CFTPAutodetCondNode
 {
 public:

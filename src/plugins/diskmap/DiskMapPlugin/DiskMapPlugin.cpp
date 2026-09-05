@@ -66,6 +66,7 @@ BOOL APIENTRY DllMain(HMODULE hModule,
     return TRUE;
 }
 
+// Bridges DiskMap UI actions (focus/open path) back to Salamander panels.
 class CSalamanderCallback : public CSalamanderCallbackAbstract
 {
     TCHAR FocusPathBuf[MAX_PATH];

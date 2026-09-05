@@ -57,6 +57,7 @@ struct COperationPlanItem
     BOOL IsGood() const;
 };
 
+// Immutable snapshot of a planned file-operation script, captured before the worker runs.
 class COperationPlan
 {
 private:

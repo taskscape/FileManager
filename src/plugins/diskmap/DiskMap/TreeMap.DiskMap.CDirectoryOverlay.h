@@ -20,6 +20,7 @@ struct SCDO_DirectoryItem
     int height;
 };
 
+// Overlay that paints folder rectangles on top of the treemap.
 class CDirectoryOverlay : public CDiskMapOverlay
 {
 protected:

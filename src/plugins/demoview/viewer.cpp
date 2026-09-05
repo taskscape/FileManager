@@ -116,6 +116,7 @@ void ReleaseViewer()
     ViewerAccels = NULL;
 }
 
+// Thread that creates and runs one DemoView viewer window.
 class CViewerThread : public CThread
 {
 protected:

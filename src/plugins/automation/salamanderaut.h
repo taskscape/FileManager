@@ -16,6 +16,7 @@
 #include "dispimpl.h"
 #include "scriptlist.h"
 
+// Root Salamander automation object that scripts use to reach panels, GUI, and progress UI.
 class CSalamanderAutomation : public CDispatchImpl<CSalamanderAutomation, ISalamander>
 {
 private:

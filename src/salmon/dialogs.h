@@ -11,6 +11,7 @@ enum CDialogTaskEnum
     dteDialog
 };
 
+// Salmon main window: compress dump, upload, minidump, and status.
 class CMainDialog : public CDialog
 {
 protected:

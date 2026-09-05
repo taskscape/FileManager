@@ -29,6 +29,7 @@ DWORD LoadedScriptSize = 0;
 
 class CModules;
 
+// One installed Salamander module as reported by EnumInstalledModules.
 class CSalModuleInfo // modules returned by CSalamanderGeneral::EnumInstalledModules
 {
 public:
@@ -64,6 +65,7 @@ enum CModuleTypeEnum
     mteInstalled,
 };
 
+// Version-check catalog entry for a module, including name, URL, and notes.
 class CModuleInfo : public CSalModuleInfo
 {
 public:

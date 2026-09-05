@@ -39,6 +39,7 @@ BOOL Windows7AndLater = FALSE;
 
 // ****************************************************************************
 
+// Critical section guarding LoadString of Translator UI strings.
 class CStringResourceLock
 {
 public:

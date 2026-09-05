@@ -115,6 +115,7 @@ enum CProxyErrorCode
 
 enum CFTPProxyServerType;
 
+// WinSock wrapper used by FTP control and data connections (async events, proxy).
 class CSocket
 {
 public:
@@ -566,6 +567,7 @@ struct CPostMsgData // data for WM_APP_SOCKET_POSTMSG
     }
 };
 
+// Hidden window thread that dispatches WinSock messages to CSocket objects.
 class CSocketsThread : public CThread
 {
 protected:

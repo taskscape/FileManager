@@ -44,6 +44,7 @@ protected:
 // CNewDialog
 //
 
+// Dialog that imports MUI translation resources.
 class CImportMUIDialog : public CCommonDialog
 {
 public:
@@ -84,6 +85,7 @@ class CNewDialog: public CCommonDialog
 // CPropertiesDialog
 //
 
+// Enumerates installed locales for Translator combo boxes.
 class CLocales
 {
 public:
@@ -99,6 +101,7 @@ public:
 
 extern CLocales Locales;
 
+// Dialog that edits project properties (language, author, …).
 class CPropertiesDialog : public CCommonDialog
 {
 public:

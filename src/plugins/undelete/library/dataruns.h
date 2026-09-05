@@ -61,6 +61,7 @@ RUN0          |RUN1     |RUN2          |RUN3          |RUN4     |END
 //   CRunsBuffer
 //
 
+// Grows a buffer of NTFS/exFAT data-run encodings for a file stream.
 template <typename CHAR>
 class CRunsBuffer
 {
@@ -226,6 +227,7 @@ struct CRunsWalkerQuery
     DWORD DPFlags;
 };
 
+// Walks encoded data runs and reports the next cluster range for a stream.
 template <typename CHAR>
 class CRunsWalker
 {

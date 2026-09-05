@@ -15,6 +15,7 @@ typedef BYTE UInt8;
 typedef DWORD UInt32;
 typedef unsigned __int64 UInt64;
 
+// APFS on-disk structures used to recognize and walk Apple File System images.
 class CAPFS
 {
 public:

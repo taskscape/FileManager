@@ -3,10 +3,12 @@
 
 #pragma once
 
+// Parses a rename pattern with $(variables) and expands it per file.
 class CVarString
 {
 public:
     // classes
+    // One $(variable) in a rename pattern; parses arguments and expands to text.
     class CVariable
     {
     public:

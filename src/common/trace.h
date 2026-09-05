@@ -581,6 +581,7 @@ struct C__TraceCacheData
     DWORD UID;
 };
 
+// Per-thread cache mapping native thread IDs to unique trace identifiers.
 class C__TraceThreadCache
 {
 protected:
@@ -608,6 +609,7 @@ public:
 
 #endif // MULTITHREADED_TRACE_ENABLE
 
+// Process-wide TRACE facility: formats messages and sends them to the trace viewer.
 class C__Trace
 {
 public:

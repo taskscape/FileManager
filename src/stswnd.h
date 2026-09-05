@@ -58,6 +58,7 @@ struct CHotTrackItem
     WORD Pixels;       // their length in pixels
 };
 
+// Panel status bar showing the current path, selection size, filter state, and optional throbber.
 class CPanelStatusBar : public CWindow
 {
 public:

@@ -146,6 +146,7 @@ struct CMenuItem
     int ConflictGroup; // Items with the same ConflictGroup are compared for hotkey conflicts; 0 is top level, 1 is the first nested level, etc.
 };
 
+// One translated menu (items, conflict groups, MENUEX flag).
 class CMenuData
 {
 public:
@@ -216,6 +217,7 @@ enum CEdgeEnum
     edgeBottom
 };
 
+// One dialog control: original/translated geometry, style, and text.
 class CControl
 {
 public:
@@ -307,6 +309,7 @@ enum CTransformationEnum
     eloPreviewLayout,       // [] Preview a different layout version.
 };
 
+// One recorded layout editor command (align, space, preview, …).
 class CTransformation
 {
 public:
@@ -340,6 +343,7 @@ public:
     DWORD ReadStream(const BYTE* stream);
 };
 
+// Translated dialog template: style, size, and child controls.
 class CDialogData
 {
 public:
@@ -699,6 +703,7 @@ struct CIgnoreLstItem
     }
 };
 
+// Mapping from a Salamander menu section to related dialogs and strings.
 class CSalMenuSection
 {
 private:
@@ -776,6 +781,7 @@ struct CBookmark
     WORD TextItem;
 };
 
+// Preview lines/texts shown when checking a translated menu.
 class CMenuPreview
 {
 public:
@@ -822,6 +828,7 @@ public:
     }
 };
 
+// Loaded translation project: strings, menus, dialogs, bookmarks, progress.
 class CData
 {
 private:

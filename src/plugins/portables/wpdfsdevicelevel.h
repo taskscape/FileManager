@@ -15,6 +15,7 @@
 
 #include "device.h"
 
+// Listing item for a connected portable device.
 class CWpdDeviceItem final : public CWpdItem
 {
 private:

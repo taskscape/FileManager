@@ -147,6 +147,7 @@ struct CSalamanderDirectoryAddCache
     CSalamanderDirectory* Dir; // pointer to the CSalamanderDirectory to which files and directories with the 'Path' path are being added
 };
 
+// Directory listing built while browsing an archive or plugin filesystem (files, dirs, and nested sal-dirs).
 class CSalamanderDirectory : public CSalamanderDirectoryAbstract
 {
 protected:
@@ -296,6 +297,7 @@ extern SPackCustomUnpacker CustomUnpackers[];
 
 #define CUSTOMPACKER_EXTERNAL 0
 
+// One configured packer: display title, extension, and either an internal type or external command lines.
 class CPackerConfigData
 {
 public:

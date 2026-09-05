@@ -40,6 +40,7 @@ extern const char* STR_NONE;
 extern CSalamanderDirectory GlobalEmptySalDir;
 extern HWND ProgressDialogActivateDrop;
 
+// Plug-in ABI adapter around the host Boyer-Moore search helper.
 class CSalamanderBMSearchDataImp : public CSalamanderBMSearchData
 {
 protected:
@@ -75,6 +76,7 @@ void CSalamanderGeneral::FreeSalamanderBMSearchData(CSalamanderBMSearchData* dat
         delete ((CSalamanderBMSearchDataImp*)data);
 }
 
+// Plug-in ABI adapter around the host regular-expression search helper.
 class CSalamanderREGEXPSearchDataImp : public CSalamanderREGEXPSearchData
 {
 protected:
@@ -309,6 +311,7 @@ void CSalamanderGeneral::StoreSelectionOnPanelPath(int panel)
         p->StoreSelection();
 }
 
+// Plug-in ABI adapter around CMaskGroup for filename mask matching.
 class CSalamanderMaskGroupImp : public CSalamanderMaskGroup
 {
 protected:
@@ -352,6 +355,7 @@ CSalamanderGeneral::UpdateCrc32(const void* buffer, DWORD count, DWORD crcVal)
     return ::UpdateCrc32(buffer, count, crcVal);
 }
 
+// Plug-in ABI adapter around the host MD5 implementation.
 class CSalamanderMD5Imp : public CSalamanderMD5
 {
 protected:
@@ -1076,6 +1080,7 @@ BOOL CSalamanderGeneral::GetFileIcon(const char* path, BOOL pathIsPIDL, HICON* h
     return ::GetFileIcon(path, pathIsPIDL, hIcon, salIconSize, fallbackToDefIcon, defIconIsDir);
 }
 
+// Plug-in ABI adapter that loads PNG bitmaps from resources or raw buffers.
 class CSalamanderPNG : public CSalamanderPNGAbstract
 {
 public:
@@ -1122,6 +1127,7 @@ CSalamanderGeneral::GetSalamanderPasswordManager()
     return NULL;
 }
 
+// Plug-in ABI adapter for AES and related cryptographic helpers used by archives and passwords.
 class CSalamanderCrypt : public CSalamanderCryptAbstract
 {
 public:

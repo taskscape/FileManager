@@ -16,6 +16,7 @@
 #include "dispimpl.h"
 #include "itemaut.h"
 
+// Scriptable left or right panel: path, listing, focus, and selection.
 class CSalamanderPanelAutomation : public CDispatchImpl<CSalamanderPanelAutomation, ISalamanderPanel>
 {
 private:

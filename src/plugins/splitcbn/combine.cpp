@@ -52,6 +52,7 @@ static BOOL PromoteFileUtf8Local(const char* stagedName, const char* targetName)
     return ok;
 }
 
+// RAII wrapper that closes a Salamander SAFE_FILE opened during combine.
 class CScopedSafeFile
 {
 public:
@@ -74,6 +75,7 @@ private:
     BOOL IsOpen;
 };
 
+// Staging file reserved beside the combine target so promotion never copies across volumes.
 class CCombineTemporaryOutput
 {
 public:

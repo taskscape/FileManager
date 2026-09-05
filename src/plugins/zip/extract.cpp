@@ -111,6 +111,7 @@ static BOOL HasReparsePointInExtractionPath(char* targetPath, int rootLength)
     }
 }
 
+// Holds the extraction root directory so later path checks cannot follow a replaced junction.
 class CExtractionRootHandle
 {
 public:

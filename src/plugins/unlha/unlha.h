@@ -15,6 +15,7 @@ extern CSalamanderGeneralAbstract* SalamanderGeneral;
 // CPluginInterface
 //
 
+// Salamander archiver interface used to list and unpack LHA/LZH archives.
 class CPluginInterfaceForArchiver : public CPluginInterfaceForArchiverAbstract
 {
 private:
@@ -63,6 +64,7 @@ public:
     friend BOOL ProgressCallback(int);
 };
 
+// Salamander plugin entry point that registers UnLHA and exposes its feature interfaces.
 class CPluginInterface : public CPluginInterfaceAbstract
 {
 public:

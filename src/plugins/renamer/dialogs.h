@@ -39,6 +39,7 @@ inline HWND GetParent()
     return ret == (HWND)-1 ? SG->GetMsgBoxParent() : ret;
 }
 
+// Pushes a dialog HWND onto the parent stack for nested message boxes.
 class CDialogStackAutoObject
 {
 public:

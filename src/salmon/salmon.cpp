@@ -43,6 +43,7 @@ static WCHAR* AllocUtf8ToWide(const char* text)
 
 // ****************************************************************************
 
+// Critical section guarding LoadString of Salmon UI strings.
 class CStringResourceLock
 {
 public:
@@ -889,6 +890,7 @@ BOOL GetStringSid(LPTSTR* stringSid)
 
 #define SALMON_MAINDLG_MUTEX_NAME "TaskscapeLtdSalamanderSalmonMainDialog"
 
+// Named mutex so only one Salmon main dialog runs at a time.
 class CMainDialogMutex
 {
 protected:

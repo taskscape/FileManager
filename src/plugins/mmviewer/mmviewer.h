@@ -79,6 +79,7 @@ void MMViewerAbout(HWND parent);
 // CPluginInterface
 //
 
+// Opens audio/module files in the multimedia metadata viewer.
 class CPluginInterfaceForViewer : public CPluginInterfaceForViewerAbstract
 {
 public:
@@ -89,6 +90,7 @@ public:
     virtual BOOL WINAPI CanViewFile(const char* name) { return TRUE; }
 };
 
+// Plugin entry point that registers MM Viewer with Salamander.
 class CPluginInterface : public CPluginInterfaceAbstract
 {
 public:
@@ -117,6 +119,7 @@ public:
     virtual void WINAPI PasswordManagerEvent(HWND parent, int event) {}
 };
 
+// Menu command that exports viewed media metadata to HTML.
 class CPluginInterfaceForMenuExt : public CPluginInterfaceForMenuExtAbstract
 {
 public:
@@ -139,6 +142,7 @@ enum CViewerWindowEnablerEnum
     vweCount
 };
 
+// Frame window that shows parsed multimedia tags and properties.
 class CViewerWindow : public CWindow
 {
 public:

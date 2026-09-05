@@ -48,6 +48,7 @@ char* LoadStr(int resID);
 // CPluginInterface
 //
 
+// Opens files in the DemoView sample viewer.
 class CPluginInterfaceForViewer : public CPluginInterfaceForViewerAbstract
 {
 public:
@@ -58,6 +59,7 @@ public:
     virtual BOOL WINAPI CanViewFile(const char* name) { return TRUE; }
 };
 
+// DemoView menu command that views a bitmap from the clipboard.
 class CPluginInterfaceForMenuExt : public CPluginInterfaceForMenuExtAbstract
 {
 public:
@@ -68,6 +70,7 @@ public:
     virtual void WINAPI BuildMenu(HWND parent, CSalamanderBuildMenuAbstract* salamander) {}
 };
 
+// Supplies sample thumbnails for files handled by DemoView.
 class CPluginInterfaceForThumbLoader : public CPluginInterfaceForThumbLoaderAbstract
 {
 public:
@@ -76,6 +79,7 @@ public:
                                       BOOL fastThumbnail);
 };
 
+// Plugin entry point that registers DemoView with Salamander.
 class CPluginInterface : public CPluginInterfaceAbstract
 {
 public:
@@ -122,6 +126,7 @@ enum CViewerWindowEnablerEnum
 
 class CViewerWindow;
 
+// Inner window that paints the DemoView sample viewer contents.
 class CRendererWindow : public CWindow
 {
 public:
@@ -137,6 +142,7 @@ protected:
     virtual LRESULT WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam);
 };
 
+// Frame window for the DemoView sample viewer (menu, toolbar, renderer).
 class CViewerWindow : public CWindow
 {
 public:

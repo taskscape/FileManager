@@ -34,6 +34,7 @@ typedef struct drlDIRNODE
     int xright;
 } TDIRNODE, *PTDIRNODE;
 
+// Breadcrumb path bar showing the current treemap directory and disk size.
 class CDirectoryLine : public CChildWindow
 {
 protected:

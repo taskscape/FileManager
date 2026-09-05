@@ -262,6 +262,7 @@ struct SCommonHeader
     CQuadWord MTime;
 };
 
+// Abstract archive backend used by the TAR plugin to list and unpack a stream.
 class CArchiveAbstract
 {
 public:
@@ -277,6 +278,7 @@ public:
     virtual BOOL IsOk() = 0;
 };
 
+// TAR (and tar-in-compress) archive that lists and unpacks members from a decompressed stream.
 class CArchive : public CArchiveAbstract
 {
 private:

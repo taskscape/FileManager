@@ -25,6 +25,7 @@ protected:
     BOOL Persistent;
 };
 
+// Typed growable byte buffer used while parsing media-file metadata.
 template <class DATA_TYPE>
 class TBuffer : public CBuffer
 {

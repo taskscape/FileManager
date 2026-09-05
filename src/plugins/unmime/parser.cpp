@@ -756,6 +756,7 @@ public:
     char*& q;
 };
 
+// Quoted-printable decoder that writes a single decoded name into a caller buffer.
 class CQPMiniDecoder : public CQPDecoder
 {
 public:

@@ -325,6 +325,7 @@ protected: // prevention against calling non-functional code (shifts elements,..
 //   and reduced array range
 
 template <class DATA_TYPE, WORD Base, WORD Delta> // only 65535 elements
+// Compact non-object array capped at 65535 elements to reduce per-instance overhead.
 class TSmallerDirectArray
 {
 public:

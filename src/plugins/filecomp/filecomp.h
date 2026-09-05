@@ -22,6 +22,7 @@ extern BOOL LoadOnStart;
 // Plugin interface
 //
 
+// Plugin entry point that registers File Comparator with Salamander.
 class CPluginInterface : public CPluginInterfaceAbstract
 {
 public:

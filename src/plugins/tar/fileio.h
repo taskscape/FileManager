@@ -6,6 +6,7 @@
 // size of file read buffer
 #define BUFSIZE 0x8000 // buffer will be 32 KB
 
+// Sequential reader for an on-disk archive; factory CreateInstance picks a decompressor subclass.
 class CDecompressFile
 {
 public:
@@ -62,6 +63,7 @@ protected:
     unsigned char* DataEnd;   // end of unused data
 };
 
+// Compressed archive stream that decompresses into a sliding window on demand.
 class CZippedFile : public CDecompressFile
 {
 public:

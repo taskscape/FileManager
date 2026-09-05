@@ -66,6 +66,7 @@ public:
                                      // "radio" mark; without this flag it is a "check" mark
 #define MENU_ITEM_STATE_HIDDEN 0x08  // item must not appear in the menu at all
 
+// Plugin API for Plugins-menu commands and their enabled/checked state.
 class CPluginInterfaceForMenuExtAbstract
 {
 #ifdef INSIDE_SALAMANDER

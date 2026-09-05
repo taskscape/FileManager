@@ -9,6 +9,7 @@
 
 #define SHGFI_ICONMASK (SHGFI_ICON | SHGFI_SELECTED | SHGFI_LARGEICON | SHGFI_SMALLICON | SHGFI_OPENICON | SHGFI_SHELLICONSIZE | SHGFI_ADDOVERLAYS | SHGFI_USEFILEATTRIBUTES)
 
+// Loads a shell icon for a path on a worker thread.
 class CZIconLoader
 {
 protected:

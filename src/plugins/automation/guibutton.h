@@ -15,6 +15,7 @@
 
 #include "dispimpl.h"
 
+// Scriptable push-button wrapper around a Win32 button control.
 class CSalamanderGuiButton : public CSalamanderGuiComponentImpl<CSalamanderGuiButton, ISalamanderGuiButton>
 {
 private:

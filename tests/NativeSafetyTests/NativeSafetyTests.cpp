@@ -90,6 +90,7 @@ int TestNativeFileOperationCharacterization()
     return failure != NULL ? Fail(failure) : 0;
 }
 
+// Test double that fails a chosen file-system phase with a given Win32 error.
 class CPhaseFailingFileSystem : public COperationExecutionFileSystem
 {
 public:

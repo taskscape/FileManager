@@ -46,6 +46,7 @@ void GetDefaultViewerLogFont(LOGFONT* lf);
 
 // ****************************************************************************
 
+// Find-text dialog for the internal viewer (direction, case, hex, and regular-expression options).
 class CFindSetDialog : public CCommonDialog
 {
 public:
@@ -90,6 +91,7 @@ protected:
 
 // ****************************************************************************
 
+// Dialog for jumping the internal viewer to a numeric file offset.
 class CViewerGoToOffsetDialog : public CCommonDialog
 {
 public:
@@ -114,6 +116,7 @@ enum CViewType
     vtHex
 };
 
+// Internal file viewer window for text and hex display, search, and encoding selection.
 class CViewerWindow : public CWindow
 {
 public:

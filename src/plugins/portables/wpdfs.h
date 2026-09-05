@@ -16,6 +16,7 @@
 #include "fx.h"
 #include "fxfs.h"
 
+// Open Portable Devices path presented as a Salamander file system.
 class CWpdFS final : public TFxPluginFSInterface<CWpdFS>
 {
 protected:
@@ -47,6 +48,7 @@ typedef enum _WPDFS_LEVEL
     WPDFS_LEVEL_CONTENT = 3,
 } WPDFS_LEVEL;
 
+// Distinguishes device, storage, and content levels in the WPD tree.
 class CWpdType
 {
 protected:
@@ -74,6 +76,7 @@ public:
     }
 };
 
+// Listing item in the Portables FS (device, storage, or content object).
 class CWpdItem : public CFxItem, public CWpdType
 {
 protected:
@@ -83,6 +86,7 @@ protected:
     }
 };
 
+// Enumerator of children at one WPD tree level.
 class CWpdEnumerator : public CFxItemEnumerator, public CWpdType
 {
 protected:
@@ -95,6 +99,7 @@ public:
     virtual class CWpdPluginDataInterface* WINAPI CreatePluginData(CFxPluginFSInterface& owner) = 0;
 };
 
+// Plugin-data interface for items listed at one WPD tree level.
 class CWpdPluginDataInterface : public CFxPluginFSDataInterface, public CWpdType
 {
 protected:

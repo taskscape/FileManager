@@ -274,6 +274,7 @@ CPluginInterfaceForViewer::ViewFile(const char *name, int left, int top, int wid
 }
 */
 
+// Thread that creates and runs one DemoPlug viewer window.
 class CViewerThread : public CThread
 {
 protected:

@@ -13,6 +13,7 @@
 
 #pragma once
 
+// Shared storage and layout for a scriptable form that owns child GUI components.
 class CSalamanderGuiContainerBase
 {
 protected:

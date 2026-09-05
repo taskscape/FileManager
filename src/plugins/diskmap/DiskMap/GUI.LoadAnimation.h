@@ -13,6 +13,7 @@
 
 #define LA_LID_MAX (LA_LID_DIRS + 1)
 
+// Overlay animation that reports scan progress (size, files, folders).
 class CLoadAnimation : public CAnimation
 {
 protected:

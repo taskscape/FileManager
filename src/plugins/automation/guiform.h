@@ -15,6 +15,7 @@
 
 class CScriptInfo;
 
+// Scriptable dialog form that hosts Automation GUI controls.
 class CSalamanderGuiForm : public CSalamanderGuiContainerImpl<CSalamanderGuiForm, ISalamanderGuiForm>
 {
 private:

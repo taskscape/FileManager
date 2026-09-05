@@ -39,6 +39,7 @@ enum CCertificateExceptionScope
     cesPersistent = 2,
 };
 
+// SSL certificate presented by an FTP server, with optional user exception.
 class CCertificate
 {
 public:

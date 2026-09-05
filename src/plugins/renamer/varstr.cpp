@@ -17,6 +17,7 @@ BOOL CVarString::CVariable::SetArguments(const char* argStart, const char* argEn
     return TRUE;
 }
 
+// Literal text segment in a rename pattern.
 class CPlainText : public CVarString::CVariable
 {
     char* Text;

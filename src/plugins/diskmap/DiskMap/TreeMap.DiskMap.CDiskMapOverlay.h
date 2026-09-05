@@ -16,6 +16,7 @@ public:
     virtual BOOL Paint(CZBitmap* pix, HDC refDC) = 0;
 };
 
+// Overlay that highlights the currently selected cushion.
 class CSelectedCushionOverlay : public CDiskMapOverlay
 {
 protected:

@@ -8,6 +8,7 @@
 // CColumn
 //
 
+// One DBF/CSV column: name, alignment, width, and type metadata.
 class CDatabaseColumn
 {
 public:

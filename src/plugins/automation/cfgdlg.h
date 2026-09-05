@@ -13,6 +13,7 @@
 
 #pragma once
 
+// Configuration dialog for Automation script directories and related options.
 class CAutomationConfigDialog : public CDialog
 {
 protected:

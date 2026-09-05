@@ -3,6 +3,7 @@
 
 #pragma once
 
+// Min-heap of FAT directory clusters waiting to be scanned while reconstructing a snapshot.
 template <typename CHAR>
 class CClusterHeap
 {
@@ -59,6 +60,7 @@ struct DIR_ENTRY_LONG
 
 #pragma pack(pop, fat_h)
 
+// FAT12/16/32 snapshot of deleted files and directories on a volume.
 template <typename CHAR>
 class CFATSnapshot : public CSnapshot<CHAR>
 {

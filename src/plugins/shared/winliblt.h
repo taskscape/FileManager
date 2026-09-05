@@ -71,6 +71,7 @@ enum CObjectType // for object type recognition
 
 // ****************************************************************************
 
+// Base for lightweight WinLib HWND objects (windows, dialogs, property pages).
 class CWindowsObject // ancestor of all MS-Windows objects
 {
 public:
@@ -112,6 +113,7 @@ protected:
 
 // ****************************************************************************
 
+// Subclassable HWND wrapper used by plugin WinLib dialogs and controls.
 class CWindow : public CWindowsObject
 {
 public:
@@ -196,6 +198,7 @@ enum CTransferType
 
 // ****************************************************************************
 
+// Moves dialog-control values to/from C++ members (Validate/Transfer).
 class CTransferInfo
 {
 public:
@@ -291,6 +294,7 @@ protected:
 
 class CPropertyDialog;
 
+// One page of a plugin property-sheet dialog.
 class CPropSheetPage : protected CDialog
 {
 public:
@@ -413,6 +417,7 @@ struct CWindowQueueItem
     }
 };
 
+// Thread-safe list of plugin window HWNDs (close-all, last window).
 class CWindowQueue
 {
 protected:

@@ -35,6 +35,7 @@
 // of getting "fast" thumbnails tries to get "quality" thumbnail for this image
 #define SSTHUMB_ONLY_PREVIEW 8
 
+// Host API a thumbnail loader uses to feed pixel buffers and image orientation.
 class CSalamanderThumbnailMakerAbstract
 {
 public:
@@ -96,6 +97,7 @@ public:
 // ****************************************************************************
 // CPluginInterfaceForThumbLoaderAbstract
 //
+// Plugin API for producing thumbnails of files for panel thumbnail view.
 
 class CPluginInterfaceForThumbLoaderAbstract
 {

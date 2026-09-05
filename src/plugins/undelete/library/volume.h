@@ -112,6 +112,7 @@ enum CFATType
     ftFAT32
 };
 
+// Opened volume or disk image providing sector/cluster I/O and boot-sector geometry.
 template <typename CHAR>
 class CVolume
 {

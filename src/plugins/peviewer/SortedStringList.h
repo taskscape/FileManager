@@ -21,6 +21,7 @@
 #define nullptr 0
 #endif
 
+// Sorted unique string list used while dumping PE tables.
 template <typename TChar, class TTraits>
 class CSortedStringListT
 {
@@ -160,6 +161,7 @@ public:
     }
 };
 
+// ANSI string compare traits for CSortedStringListT.
 class CSortedStringListTraitsA
 {
 public:
@@ -174,6 +176,7 @@ public:
     }
 };
 
+// Unicode string compare traits for CSortedStringListT.
 class CSortedStringListTraitsW
 {
 public:

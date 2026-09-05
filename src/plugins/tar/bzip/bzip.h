@@ -1,6 +1,7 @@
 ﻿#ifndef __BZIP_H__
 #define __BZIP_H__
 
+// bzip2 inflater used for .bz2 archives wrapping TAR.
 class CBZip: public CZippedFile
 {
   public:

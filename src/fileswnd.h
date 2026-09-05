@@ -73,7 +73,7 @@ struct CTmpDragDropOperData
     CDragDropOperData* Data;
 };
 
-class CCriteriaData // data pro atCopy/atMove
+class CCriteriaData // Copy/Move options: overwrite, security, masks, and filters
 {
 public:
     BOOL OverwriteOlder;      // overwrite older, skip newer ones
@@ -193,6 +193,7 @@ struct CFilesMapItem
     unsigned Selected : 1; // file selected in the file box
 };
 
+// Spatial map of panel items used to select files by dragging a rubber-band box.
 class CFilesMap
 {
 protected:
@@ -294,6 +295,7 @@ struct CFileTimeStampsItem
 
 class CFilesWindow;
 
+// Tracks extracted archive files and their timestamps so changed copies can be packed back.
 class CFileTimeStamps
 {
 protected:
@@ -708,6 +710,7 @@ typedef PVOID HDEVNOTIFY;
 
 enum CViewModeEnum;
 
+// File panel window: lists a directory, archive, or plugin FS and handles selection and viewing.
 class CFilesWindow : public CFilesWindowAncestor
 {
 public:

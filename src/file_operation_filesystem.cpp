@@ -7,6 +7,7 @@
 
 namespace
 {
+// Win32 implementation of path attribute and free-space queries used by file operations.
 class CWin32FileOperationFileSystem : public CFileOperationFileSystem
 {
 public:
@@ -31,6 +32,7 @@ public:
 CWin32FileOperationFileSystem Win32FileOperationFileSystem;
 CFileOperationFileSystem* TestFileOperationFileSystem = NULL;
 
+// Win32 implementation of create/write/replace/move used while executing an operation script.
 class CWin32OperationExecutionFileSystem : public COperationExecutionFileSystem
 {
 public:

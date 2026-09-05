@@ -15,6 +15,7 @@
 
 #include "dispimpl.h"
 
+// Scriptable metadata for the currently running script (name and path).
 class CSalamanderScriptInfoAutomation : public CDispatchImpl<CSalamanderScriptInfoAutomation, ISalamanderScriptInfo>
 {
 private:

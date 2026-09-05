@@ -148,6 +148,7 @@ protected:
 
 #define FIND_TEXT_LEN 201 // +1
 
+// Find-text dialog for searching cells in the opened database.
 class CFindDialog : public CCommonDialog
 {
 public:

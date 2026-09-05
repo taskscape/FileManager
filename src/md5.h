@@ -3,6 +3,7 @@
 
 #pragma once
 
+// Incremental MD5 hash: feed bytes with update() and read the digest after finalize().
 class MD5
 {
 

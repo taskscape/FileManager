@@ -48,6 +48,7 @@ extern CBandParams BandsParams[2];
 
 extern const char* MAINWINDOW_CLASSNAME;
 
+// File Comparator main window: two panes, headers, rebar, and worker control.
 class CMainWindow : public CWindow
 {
 protected:

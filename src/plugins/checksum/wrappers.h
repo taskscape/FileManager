@@ -3,6 +3,7 @@
 
 #pragma once
 
+// Abstract hash algorithm used to compute and parse file checksums.
 class CHashAlgo
 {
 public:

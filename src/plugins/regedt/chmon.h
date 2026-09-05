@@ -18,6 +18,7 @@ enum CActionEvent
 
 class CChangeMonitor;
 
+// Worker that waits on RegNotifyChangeKeyValue and refreshes open registry FS views.
 class CChangeMonitorThread : public CThread
 {
     CChangeMonitorThreadState State;
@@ -38,6 +39,7 @@ public:
     friend class CChangeMonitor;
 };
 
+// Owns change-monitor threads and maps registry paths to open FS instances.
 class CChangeMonitor
 {
     TIndirectArray<CChangeMonitorThread> Threads;

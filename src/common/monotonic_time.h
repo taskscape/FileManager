@@ -11,6 +11,7 @@
 typedef ULONGLONG CMonotonicTimePoint;
 typedef ULONGLONG CMonotonicDuration;
 
+// 64-bit monotonic clock used for timeouts and UI cadence after GetTickCount wrap.
 class CMonotonicClock
 {
 public:

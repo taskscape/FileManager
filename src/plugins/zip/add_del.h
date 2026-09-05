@@ -72,6 +72,7 @@ enum CSfxSettingsComments
     SFX_COMMENT_REQUIRESADMIN
 };
 
+// ZIP packing, deletion, and SFX/multivolume update operations on an existing or new archive.
 class CZipPack : public CZipCommon
 {
 public:

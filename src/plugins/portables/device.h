@@ -15,6 +15,7 @@
 
 #include "fx.h"
 
+// One Windows Portable Device (PnP id, content, icons) used by the Portables FS.
 class CWpdDevice : public CFxRefCounted
 {
 private:

@@ -23,6 +23,7 @@
 #define INBUF_EXTRA 64
 #define OUTBUF_EXTRA 2048
 
+// Unix compress (LZW) inflater used for .Z archives wrapping TAR.
 class CCompress : public CZippedFile
 {
 public:

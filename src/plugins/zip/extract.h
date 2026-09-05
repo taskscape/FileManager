@@ -14,6 +14,7 @@ int ExtractFiles(const char *targetDir, CExtractInfo *info);
 int ExtractSingleFile(char * targetDir, int targetDirLen,
                       CFileInfo * fileInfo, CExtractInfo * info);
 */
+// ZIP unpacking: inflate/explode/shrink/bzip2 decode, overwrite handling, and extraction I/O.
 class CZipUnpack : public CZipCommon
 {
 public:

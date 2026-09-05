@@ -122,6 +122,7 @@ struct COffsets
     DWORD DirRootOffset;
 };
 
+// Writes a rebuilt PE resource directory, strings, and data blobs.
 class CSaveRes : public CResEditRoot
 {
 public:
@@ -180,6 +181,7 @@ public:
     }
 };
 
+// One node in the PE resource tree (type/name/language/data).
 class CResTreeNode : public CResEditRoot
 {
 public:

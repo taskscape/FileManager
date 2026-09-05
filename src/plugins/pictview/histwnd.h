@@ -8,6 +8,7 @@
 // CHistogramWindow
 //
 
+// Control that paints RGB/luminosity histograms for the current image.
 class CHistogramControl : public CWindow
 {
 public:

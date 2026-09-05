@@ -21,6 +21,7 @@ BOOL Error(HRESULT hr, int error, ...);
 // CPluginInterface
 //
 
+// Salamander archiver interface used to list and unpack OLE compound documents.
 class CPluginInterfaceForArchiver : public CPluginInterfaceForArchiverAbstract
 {
 
@@ -55,6 +56,7 @@ public:
     BOOL Init();
 };
 
+// Salamander plugin entry point that registers UnOLE and exposes its feature interfaces.
 class CPluginInterface : public CPluginInterfaceAbstract
 {
 public:

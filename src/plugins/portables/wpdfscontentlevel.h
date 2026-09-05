@@ -15,6 +15,7 @@
 
 #include "device.h"
 
+// WPD object (name, attributes, device) shown as a file or folder.
 class CWpdBaseContentItem : public CWpdItem
 {
 private:
@@ -53,6 +54,7 @@ public:
     virtual DWORD WINAPI GetAttributes() override;
 };
 
+// Storage volume on a portable device.
 class CWpdStorageItem final : public CWpdBaseContentItem
 {
 private:
@@ -68,6 +70,7 @@ public:
     virtual int WINAPI GetSimpleIconIndex() override;
 };
 
+// File or folder object stored on a portable-device volume.
 class CWpdContentItem final : public CWpdBaseContentItem
 {
 private:
@@ -95,6 +98,7 @@ public:
     virtual HRESULT WINAPI GetLastWriteTime(FILETIME& time) override;
 };
 
+// Enumerates WPD child objects using IEnumPortableDeviceObjectIDs.
 class CWpdBaseContentEnumerator : public CWpdEnumerator
 {
 private:
@@ -198,6 +202,7 @@ protected:
     CWpdBaseContentPluginDataInterface(CFxPluginFSInterface& owner, WPDFS_LEVEL level);
 };
 
+// Plugin-data for storage volumes listed under a portable device.
 class CWpdStoragePluginDataInterface final : public CWpdBaseContentPluginDataInterface
 {
 public:

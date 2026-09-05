@@ -15,6 +15,7 @@ class CZFile;
 class CZDirectory;
 class CZRoot;
 
+// Directory node in the scanned disk tree; owns child files and subfolders.
 class CZDirectory : public CZFile
 {
 protected:

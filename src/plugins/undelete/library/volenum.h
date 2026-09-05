@@ -20,6 +20,7 @@ struct VolumeDetails
     CQuadWord BytesFree;          // The total free space on the volume
 };
 
+// Array of mounted volumes discovered for the connect dialog.
 template <typename CHAR>
 class VolumeListing : public TDirectArray<VolumeDetails<CHAR>>
 {
@@ -41,6 +42,7 @@ struct DiskRecord
     CHAR* DiskName;
 };
 
+// Indirect array of DiskRecord entries used while enumerating physical disks.
 template <typename CHAR>
 class DiskRecArray : public TIndirectArray<DiskRecord<CHAR>>
 {
@@ -71,6 +73,7 @@ struct VolumeRecord
     TDirectArray<CHAR*> MountPoints;
 };
 
+// Indirect array of VolumeRecord entries used while enumerating volume mount points.
 template <typename CHAR>
 class VolumeRecArray : public TIndirectArray<VolumeRecord<CHAR>>
 {

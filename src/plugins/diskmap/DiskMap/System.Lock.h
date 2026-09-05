@@ -3,6 +3,7 @@
 
 #pragma once
 
+// Spin-style mutual exclusion used by DiskMap workers and the logger.
 class CLock
 {
 protected:

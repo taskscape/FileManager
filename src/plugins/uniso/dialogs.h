@@ -26,6 +26,7 @@ protected:
 // CConfigurationDialog
 //
 
+// UnISO configuration dialog (read-only, sessions, boot image as file).
 class CConfigurationDialog : public CCommonDialog
 {
 private:

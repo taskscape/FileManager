@@ -7,6 +7,7 @@
 //
 // ****************************************************************************
 
+// Dialog for entering a wildcard mask to select or unselect panel items.
 class CSelectDialog : public CCommonDialog
 {
 public:
@@ -27,6 +28,7 @@ protected:
 //
 // ****************************************************************************
 
+// Dialog prompting for a Copy or Move destination path, with optional history and folder browser.
 class CCopyMoveDialog : public CCommonDialog
 {
 protected:
@@ -69,6 +71,7 @@ protected:
 class CCriteriaData;
 class CButton;
 
+// Copy/Move dialog that can expand to show extra filter and metadata-preservation options.
 class CCopyMoveMoreDialog : public CCommonDialog
 {
 protected:
@@ -163,6 +166,7 @@ protected:
 //
 // ****************************************************************************
 
+// Dialog for changing file attributes and timestamps, including recursive directory application.
 class CChangeAttrDialog : public CCommonDialog
 {
 private:
@@ -237,6 +241,7 @@ struct CProgressDlgArrItem
     }
 };
 
+// Thread-safe list of in-flight operation progress dialogs running on worker threads.
 class CProgressDlgArray
 {
 protected:
@@ -309,6 +314,7 @@ BOOL StartProgressDialog(COperations* script, const char* caption,
 
 class CThreadOwner;
 
+// Progress UI for a disk-operation script, including cancel, pause, and status updates.
 class CProgressDialog : public CCommonDialog
 {
 public:
@@ -401,6 +407,7 @@ protected:
 //
 // ****************************************************************************
 
+// Error dialog shown when alternate data streams cannot be read during copy or move.
 class CErrorReadingADSDlg : public CCommonDialog
 {
 public:
@@ -417,6 +424,7 @@ protected:
 //
 // ****************************************************************************
 
+// Error dialog shown when target file attributes cannot be set to the requested values.
 class CErrorSettingAttrsDlg : public CCommonDialog
 {
 public:
@@ -433,6 +441,7 @@ protected:
 //
 // ****************************************************************************
 
+// Error dialog shown when NTFS permissions cannot be copied to the target.
 class CErrorCopyingPermissionsDlg : public CCommonDialog
 {
 public:
@@ -450,6 +459,7 @@ protected:
 //
 // ****************************************************************************
 
+// Error dialog shown when a directory's timestamps cannot be applied on the target.
 class CErrorCopyingDirTimeDlg : public CCommonDialog
 {
 public:
@@ -465,6 +475,7 @@ protected:
 //
 // ****************************************************************************
 
+// Confirmation dialog asking whether to overwrite an existing target file.
 class COverwriteDlg : public CCommonDialog
 {
 public:
@@ -484,6 +495,7 @@ protected:
 //
 // ****************************************************************************
 
+// Confirmation dialog for operating on hidden or system files.
 class CHiddenOrSystemDlg : public CCommonDialog
 {
 public:
@@ -501,6 +513,7 @@ protected:
 //
 // ****************************************************************************
 
+// Warns that the copy or move target will not preserve alternate data streams.
 class CConfirmADSLossDlg : public CCommonDialog
 {
 public:
@@ -518,6 +531,7 @@ protected:
 //
 // ****************************************************************************
 
+// Asks whether to copy a shell link's target rather than the link itself.
 class CConfirmLinkTgtCopyDlg : public CCommonDialog
 {
 public:
@@ -533,6 +547,7 @@ protected:
 //
 // ****************************************************************************
 
+// Warns that encryption cannot be preserved on the copy or move target.
 class CConfirmEncryptionLossDlg : public CCommonDialog
 {
 public:
@@ -549,6 +564,7 @@ protected:
 //
 // ****************************************************************************
 
+// Reports that a Move cannot proceed and offers alternatives such as Copy or Skip.
 class CCannotMoveDlg : public CCommonDialog
 {
 public:
@@ -566,6 +582,7 @@ protected:
 //
 // ****************************************************************************
 
+// Shows the total size and item counts computed by Calculate Occupied Space.
 class CSizeResultsDlg : public CCommonDialog
 {
 public:
@@ -589,6 +606,7 @@ protected:
 
 class CColorGraph;
 
+// Dialog displaying capacity, usage, and filesystem details for a drive.
 class CDriveInfo : public CCommonDialog
 {
 protected:
@@ -612,6 +630,7 @@ protected:
 //
 // ****************************************************************************
 
+// Dialog for changing filename letter case according to a chosen rule.
 class CChangeCaseDlg : public CCommonDialog
 {
 private:
@@ -630,6 +649,7 @@ public:
 //
 // ****************************************************************************
 
+// Dialog for converting selected files' character encoding and end-of-line format.
 class CConvertFilesDlg : public CCommonDialog
 {
 private:
@@ -684,6 +704,7 @@ protected:
 //
 // ****************************************************************************
 
+// Dialog for setting a transfer speed limit in bytes per second.
 class CSetSpeedLimDialog : public CCommonDialog
 {
 protected:
@@ -709,6 +730,7 @@ protected:
 #define PASSWORD_MAXLEN (256 + 1)
 #define DOMAIN_MAXLEN (256 + 1)
 
+// Prompts for a password, typically when opening a protected archive.
 class CPasswordDialog : public CCommonDialog
 {
 public:
@@ -729,6 +751,7 @@ protected:
 //
 // ****************************************************************************
 
+// Dialog for typing or browsing a path to change the current panel directory.
 class CChangeDirDlg : public CCommonDialog
 {
 public:
@@ -748,6 +771,7 @@ protected:
 
 class CPackerConfig;
 
+// Dialog for packing selected files into an archive with a chosen packer.
 class CPackDialog : public CCommonDialog
 {
 public:
@@ -801,6 +825,7 @@ protected:
 //
 // ****************************************************************************
 
+// Shows packed size and item counts after calculating archive contents.
 class CZipSizeResultsDialog : public CCommonDialog
 {
 public:
@@ -816,6 +841,7 @@ protected:
 //
 // ****************************************************************************
 
+// Startup splash window that paints the product bitmap and status text.
 class CSplashScreen : public CDialog
 {
 public:
@@ -850,6 +876,7 @@ protected:
 //
 // ****************************************************************************
 
+// About box with version, license, and related product information.
 class CAboutDialog : public CCommonDialog
 {
 protected:
@@ -871,6 +898,7 @@ protected:
 struct CExecuteItem;
 class CComboboxEdit;
 
+// Dialog for creating a listing (file list) of selected panel items.
 class CFileListDialog : public CCommonDialog
 {
 protected:
@@ -894,6 +922,7 @@ protected:
 
 #ifdef USE_BETA_EXPIRATION_DATE
 
+// Notifies that a beta build has expired and the application should be updated.
 class CBetaExpiredDialog : public CCommonDialog
 {
 protected:
@@ -914,6 +943,7 @@ protected:
 //
 // ****************************************************************************
 
+// Shows other running Salamander instances for debugging or unique-instance handling.
 class CTaskListDialog : public CCommonDialog
 {
 protected:
@@ -932,6 +962,7 @@ protected:
 //
 // ****************************************************************************
 
+// Dialog for picking an icon from a file or icon library.
 class CChangeIconDialog : public CCommonDialog
 {
 protected:
@@ -1042,6 +1073,7 @@ protected:
 
 class CFileTimeStamps;
 class CFilesWindow;
+// Lists extracted archive files whose timestamps changed so they can be packed back.
 class CArchiveUpdateDlg : public CCommonDialog
 {
 protected:
@@ -1132,6 +1164,7 @@ class CTipOfTheDayWindow: public CWindow
   friend class CTipOfTheDayDialog;
 };
 
+// Dialog that displays a rotating tip-of-the-day at startup.
 class CTipOfTheDayDialog: public CCommonDialog
 {
   protected:
@@ -1168,6 +1201,7 @@ struct CImportOldKey
     char* SalamanderPath;
 };
 
+// Dialog for importing configuration from a previous Salamander installation.
 class CImportConfigDialog : public CCommonDialog
 {
 public:
@@ -1414,6 +1448,7 @@ enum CLoadSelectionOperation
     lsoAND
 };
 
+// Dialog for restoring a saved panel selection using copy, or, and, or diff operations.
 class CLoadSelectionDialog : public CCommonDialog
 {
 public:
@@ -1553,6 +1588,7 @@ protected:
 //
 // ****************************************************************************
 
+// Error dialog when a selected drive cannot be accessed, with optional retry timing.
 class CDriveSelectErrDlg : public CCommonDialog
 {
 public:
@@ -1570,6 +1606,7 @@ protected:
 //
 // ****************************************************************************
 
+// Dialog for confirming or editing the two paths passed to Compare Directories or Files.
 class CCompareArgsDlg : public CCommonDialog
 {
 public:

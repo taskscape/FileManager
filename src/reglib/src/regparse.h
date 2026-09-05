@@ -31,6 +31,7 @@ typedef enum eRPE_ERROR
 #define CSalamanderRegistryExAbstract CSalamanderRegistryExAbstractA
 #endif
 
+// Host API: extra registry enum/hidden-key methods beyond CSalamanderRegistryAbstract.
 class CSalamanderRegistryExAbstract : public CSalamanderRegistryAbstract
 {
 public: // Methods added by Jan Patera

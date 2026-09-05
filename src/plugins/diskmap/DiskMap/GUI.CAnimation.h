@@ -3,6 +3,7 @@
 
 #pragma once
 
+// Timed frame animation used while DiskMap loads or paints.
 class CAnimation
 {
 protected:

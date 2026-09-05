@@ -1711,6 +1711,7 @@ bool CFileVersionResourceDumper::ReadStringTable(CFileStream* outStream, BinaryR
 
 #define STRCONV_STATIC_BUFFER_SIZE 64
 
+// Converts a wide string to ANSI, using a small stack buffer when possible.
 class W2A
 {
 private:

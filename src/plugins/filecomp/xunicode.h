@@ -5,11 +5,13 @@
 
 #define IS_COMBINING_DIACRITIC(c) (((c) >= 0x300) && ((c) <= 0x36f))
 
+// Character-type traits for ANSI vs Unicode compare rendering.
 template <class CChar>
 class TCharSpecific
 {
 };
 
+// ANSI (char) specializations for compare text metrics and conversion.
 template <>
 class TCharSpecific<char>
 {
@@ -27,6 +29,7 @@ public:
     static bool IsValidChar(char c) { return true; }
 };
 
+// Unicode (wchar_t) specializations for compare text metrics and conversion.
 template <>
 class TCharSpecific<wchar_t>
 {

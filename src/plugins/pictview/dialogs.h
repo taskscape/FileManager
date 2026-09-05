@@ -91,6 +91,7 @@ struct CExifItem
     char* Value;
 };
 
+// Dialog that lists EXIF tags for the currently viewed image.
 class CExifDialog : public CCommonDialog
 {
 protected:
@@ -388,6 +389,7 @@ enum CUnitsEnum
 
 class CPrintDlg;
 
+// Print layout and units used by PictView's print dialog.
 class CPrintParams
 {
 public:

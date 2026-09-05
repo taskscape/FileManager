@@ -53,7 +53,7 @@ struct CFileHeader
 // general Salamander interface - valid from startup until the plugin ends
 extern CSalamanderGeneralAbstract* SalamanderGeneral;
 
-// used in CFileData.PluginData
+// Extra per-item RAR data stored in CFileData.PluginData (packed size and item index).
 class CRARFileData
 {
 public:
@@ -76,6 +76,7 @@ struct CRARExtractInfo
 
 #define NUM_PASSWORDS 8
 
+// Per-listing RAR data: first volume name, password cache, silent flags, and extra columns.
 class CPluginDataInterface : public CPluginDataInterfaceAbstract
 {
 public:
@@ -127,6 +128,7 @@ public:
 // CPluginInterface
 //
 
+// Salamander archiver interface used to list and unpack RAR archives (including volumes).
 class CPluginInterfaceForArchiver : public CPluginInterfaceForArchiverAbstract
 {
 protected:
@@ -199,6 +201,7 @@ public:
     BOOL UnpackWholeArchiveCalculateProgress(TIndirectArray2<char>& masks);
 };
 
+// Salamander plugin entry point that registers UnRAR and exposes its feature interfaces.
 class CPluginInterface : public CPluginInterfaceAbstract
 {
 public:

@@ -51,6 +51,7 @@ enum
 
 typedef Uint16 UDF_TAG_ID;
 
+// UDF filesystem reader for tracks inside a disk image.
 class CUDF : public CUnISOFSAbstract
 {
 public:

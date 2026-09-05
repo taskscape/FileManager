@@ -6,6 +6,7 @@
 #define MAX_BLOCK_COUNT 256
 #define DEFAULT_BLOCK_SIZE 1024 * 1024 * 1 //1MB
 
+// Bump allocator that hands out memory from large blocks.
 class CRegionAllocator
 {
 protected:

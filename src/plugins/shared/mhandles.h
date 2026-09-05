@@ -251,6 +251,7 @@ struct C__HandlesData
     C__HandlesHandle Handle;
 };
 
+// Dynamic array of tracked HANDLES debug records.
 class C_HandlesDataArray
 {
 public:
@@ -273,6 +274,7 @@ protected:
     void Move(int direction, int first, int count);
 };
 
+// MessageBox wrappers used while reporting HANDLE leaks in debug builds.
 class C__Messages
 {
 public:
@@ -293,6 +295,7 @@ public:
 typedef unsigned int uintptr_t;
 #endif // __BORLANDC__
 
+// Debug tracker that records HANDLE allocations and reports leaks.
 class C__Handles
 {
 public:

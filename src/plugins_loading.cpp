@@ -149,6 +149,7 @@ static BOOL StorePluginOutputIndex(int* output, int value)
     }
 }
 
+// RAII lock around Plugins.EnterDataCS/LeaveDataCS for exclusive access to plug-in table data.
 class CPluginDataLock
 {
 public:

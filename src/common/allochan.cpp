@@ -71,6 +71,7 @@ void ActivateAllocationEmergency()
     NotifyAllocationEmergency();
 }
 
+// Installs the CRT new-handler and an emergency heap reserve used when allocations fail.
 class C__AllocHandlerInit
 {
 public:

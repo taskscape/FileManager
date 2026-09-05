@@ -75,6 +75,7 @@ int OurReportingFunction(int reportType, char* userMessage, int* retVal)
     return FALSE;
 }
 
+// Debug CRT heap checkpoint that reports leaks against the process start snapshot.
 class C__GCHeapInit
 {
 public:

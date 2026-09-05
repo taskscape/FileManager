@@ -15,6 +15,7 @@
 
 #include "..\\..\\common\\monotonic_time.h"
 
+// One Automation script file: engine, source, and execution/debug state.
 class CScriptInfo
 {
 public:
@@ -263,6 +264,7 @@ public:
     CScriptContainer* FirstChild(PCTSTR pszPath, bool bFullPath);
 };
 
+// Indexes script repositories so scripts can be listed and resolved by path.
 class CScriptLookup
 {
 private:

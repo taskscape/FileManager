@@ -323,6 +323,7 @@ protected: // blocks access to helpers that would shift items, etc.
 //  - smaller footprint at the cost of instantiating the template for various
 //    'Base' and 'Delta' values and a reduced array range
 
+// Compact WORD-sized array for classes that have many instances.
 template <class DATA_TYPE, WORD Base, WORD Delta> // only 65535 items
 class TSmallerDirectArray
 {

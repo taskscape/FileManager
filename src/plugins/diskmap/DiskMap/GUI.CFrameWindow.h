@@ -5,6 +5,7 @@
 
 #include "GUI.CWindow.h"
 
+// Top-level owned window (main DiskMap window, log, tooltip).
 class CFrameWindow : public CWindow
 {
 protected:

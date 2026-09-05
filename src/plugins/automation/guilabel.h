@@ -15,6 +15,7 @@
 
 #include "dispimpl.h"
 
+// Scriptable static-text wrapper around a Win32 label control.
 class CSalamanderGuiLabel : public CSalamanderGuiComponentImpl<CSalamanderGuiLabel, ISalamanderGuiComponent>
 {
 protected:

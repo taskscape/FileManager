@@ -5,6 +5,7 @@
 
 #include "System.Lock.h"
 
+// Reader-writer lock allowing concurrent DiskMap readers or one writer.
 class CRWLock
 {
 protected:

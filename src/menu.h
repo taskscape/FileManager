@@ -236,6 +236,7 @@ HWindowsMenu
   and WM_MEASUREITEM are sent.
 */
 
+// Owner-drawn popup menu that can wrap a native HMENU and host Salamander menu items.
 class CMenuPopup : public CWindow, public CGUIMenuPopupAbstract
 {
 protected:

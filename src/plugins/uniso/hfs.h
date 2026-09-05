@@ -34,6 +34,7 @@ typedef wchar_t UniChar;
 
 UInt64 FromM64(UInt64 x);
 
+// HFS+/HFS filesystem reader for tracks inside a disk image.
 class CHFS : public CUnISOFSAbstract
 {
 public:
@@ -370,6 +371,7 @@ public:
 
 #pragma pack(pop)
 
+    // Catalog or extents B-tree loaded from an HFS+ fork.
     class BTree
     {
     private:

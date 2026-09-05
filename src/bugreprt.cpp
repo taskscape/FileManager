@@ -315,6 +315,7 @@ struct CModuleInfo
     DWORD Size;        // module size in memory
 };
 
+// Holds names, base addresses, and sizes of loaded modules for crash-report stack mapping.
 class CModulesInfo
 {
 public:

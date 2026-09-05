@@ -66,6 +66,7 @@ struct CSalBZIP2
    Single instance can be used many times, using different bzip2Info structs.
    For usage howtos, see the comment at the top of this file. */
 
+// Host API: bzip2 compress/decompress helpers Salamander exposes to plugins.
 class CSalamanderBZIP2Abstract
 {
 public:

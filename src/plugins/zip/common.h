@@ -25,7 +25,7 @@ extern CSalamanderGUIAbstract* SalamanderGUI;
 
 #define INIT_CRC 0L
 
-// used in CFileData.PluginData
+// Extra per-item ZIP data stored in CFileData.PluginData (packed size, CD index, Unix flag).
 class CZIPFileData
 {
 public:
@@ -154,6 +154,7 @@ struct CFile
     unsigned BigFile : 1; // the file can be larger than 4GB
 };
 
+// Shared ZIP archive state used by listing, packing, and unpacking (central directory, I/O, progress).
 class CZipCommon
 {
 public:

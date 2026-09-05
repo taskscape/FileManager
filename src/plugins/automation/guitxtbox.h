@@ -15,6 +15,7 @@
 
 #include "dispimpl.h"
 
+// Scriptable edit-box wrapper around a Win32 text control.
 class CSalamanderGuiTextBox : public CSalamanderGuiComponentImpl<CSalamanderGuiTextBox, ISalamanderGuiComponent>
 {
 private:

@@ -35,6 +35,7 @@ extern BOOL IsWindowsVistaAndLater;
 //
 //  Auxiliary functions
 //
+// Dynamically loaded volume-mount-point and volume-name helpers (ANSI/Unicode).
 template <typename CHAR>
 class OS
 {

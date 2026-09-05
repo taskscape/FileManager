@@ -12,6 +12,7 @@
 
 class CISOImage;
 
+// Audio-track filesystem that lists and extracts a CDDA track as a WAV file.
 class CAudio : public CUnISOFSAbstract
 {
 public:

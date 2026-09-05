@@ -16,6 +16,7 @@
 #ifdef PAK_DLL
 // ****************************************************************************
 
+// Serializes LoadStr access to the PAK DLL string table.
 class CStringResourceLock
 {
 public:

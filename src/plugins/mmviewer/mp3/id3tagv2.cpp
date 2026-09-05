@@ -147,6 +147,7 @@ public:
     virtual BOOL IsValid(void) const = 0;
 };
 
+// ID3v2.2 frame header (3-byte id and size).
 class ID3TagV22FrameHeader : public ID3TagV2FrameHeaderAbstract
 {
 protected:
@@ -180,6 +181,7 @@ public:
     virtual BOOL CompareID(ID3TAGV2_FRAME_HANDLE& h) const { return (memcmp(id, h.id22, sizeof(id)) == 0); }
 };
 
+// ID3v2.3 frame header (4-byte id, size, and flags).
 class ID3TagV23FrameHeader : public ID3TagV2FrameHeaderAbstract
 {
 protected:

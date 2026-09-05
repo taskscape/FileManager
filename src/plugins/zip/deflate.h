@@ -355,6 +355,7 @@ typedef struct config
 #define FLUSH_BLOCK(eof) \
     flush_block(block_start >= 0L ? (char*)&window[(unsigned)block_start] : (char*)NULL, (long)strstart - block_start, (eof))
 
+// Deflate compressor used when adding files to a ZIP archive.
 class CDeflate
 {
 

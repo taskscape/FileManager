@@ -18,6 +18,7 @@
 
 #define ISO_MAX_PATH_LEN 1024
 
+// ISO 9660 (and Joliet/Rock Ridge where present) filesystem reader for a disk-image track.
 class CISO9660 : public CUnISOFSAbstract
 {
 protected:

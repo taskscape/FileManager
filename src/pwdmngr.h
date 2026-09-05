@@ -91,6 +91,7 @@ struct CMasterPasswordVerifier
 };
 #pragma pack(pop)
 
+// Stores the optional master password and encrypts or decrypts plug-in and core secrets.
 class CPasswordManager
 {
 private:

@@ -739,6 +739,7 @@ public:
 #define SALPNG_GETALPHA 0x00000002    // when creating DIB alpha channel will also be set (otherwise will be 0)
 #define SALPNG_PREMULTIPLE 0x00000004 // has meaning if SALPNG_GETALPHA is set; premultiplies RGB components so that AlphaBlend() can be called on bitmap with BLENDFUNCTION::AlphaFormat==AC_SRC_ALPHA
 
+// Host API that decodes PNG resources into DIBs for plugin UI.
 class CSalamanderPNGAbstract
 {
 public:
@@ -763,6 +764,7 @@ public:
     //             condition is 8 bits per channel
 };
 
+// Host API for encrypting secrets with Salamander's optional master password.
 // all methods can only be called from main thread
 class CSalamanderPasswordManagerAbstract
 {
@@ -823,6 +825,7 @@ class CSalamanderBZIP2Abstract;
 
 class CSalamanderCryptAbstract;
 
+// Primary host API plugins use for panels, messages, configuration, paths, and file helpers.
 class CSalamanderGeneralAbstract
 {
 public:

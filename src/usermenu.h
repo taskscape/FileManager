@@ -25,6 +25,7 @@ struct CUserMenuIconData
     void Clear();
 };
 
+// Array of user-menu icon load requests, tagged with the background reader thread that owns them.
 class CUserMenuIconDataArr : public TIndirectArray<CUserMenuIconData>
 {
 protected:
@@ -39,6 +40,7 @@ public:
     HICON GiveIconForUMI(const char* fileName, DWORD iconIndex, const char* umCommand);
 };
 
+// Background thread that extracts User Menu icons so the configuration dialog stays responsive.
 class CUserMenuIconBkgndReader
 {
 protected:

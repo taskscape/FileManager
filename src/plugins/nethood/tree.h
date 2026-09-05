@@ -29,6 +29,7 @@ protected:
     };
 
     /// Tree node.
+    // One node in TTree: parent, children, and sibling links.
     class CNode : public _ITERATOR
     {
     private:

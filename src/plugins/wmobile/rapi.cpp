@@ -85,6 +85,7 @@
                                                                                                                                                                                                                                                                                                                     Func_Operator(CeEnumDBVolumes) \
                                                                                                                                                                                                                                                                                                                         Func_Operator(CeOidGetInfoEx)
 
+// Dynamically loads rapi.dll and binds Ce* function pointers.
 class CDynRapi
 {
     static HINSTANCE m_hLib;

@@ -51,6 +51,7 @@ typedef struct
 
 class CEditListBox;
 
+// In-place edit control used by CEditListBox while an item is being renamed.
 class CEditLBEdit : public CWindow
 {
 protected:
@@ -67,6 +68,7 @@ protected:
 
 class CToolbarHeader;
 
+// Owner-drawn list box that supports in-place editing, icons, and item reordering.
 class CEditListBox : public CWindow
 {
 protected:

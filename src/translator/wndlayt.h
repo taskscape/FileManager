@@ -21,6 +21,7 @@ enum CDraggingModeEnum
     edmResize   // resizing a control
 };
 
+// Interactive editor for translating dialog layouts (move, align, preview).
 class CLayoutEditor : public CWindow
 {
 public:

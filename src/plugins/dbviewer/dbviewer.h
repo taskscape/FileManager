@@ -47,6 +47,7 @@ extern CSalamanderGUIAbstract* SalamanderGUI;
 // CPluginInterface
 //
 
+// Opens DBF/CSV files in the database viewer window.
 class CPluginInterfaceForViewer : public CPluginInterfaceForViewerAbstract
 {
 public:
@@ -57,6 +58,7 @@ public:
     virtual BOOL WINAPI CanViewFile(const char* name) { return TRUE; }
 };
 
+// Plugin entry point that registers DB Viewer with Salamander.
 class CPluginInterface : public CPluginInterfaceAbstract
 {
 public:
@@ -106,6 +108,7 @@ enum CViewerWindowEnablerEnum
     vweCount
 };
 
+// Frame window for the database viewer: menus, toolbar, and renderer child.
 class CViewerWindow : public CWindow
 {
 public:

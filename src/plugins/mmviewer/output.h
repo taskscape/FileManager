@@ -40,6 +40,7 @@ struct COutputItem
     HWND hwnd; //edit box
 };
 
+// Name/value list of parsed media properties shown in the viewer and exports.
 class COutput : public COutputInterface
 {
 private:

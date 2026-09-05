@@ -91,6 +91,7 @@ private:
     DWORD RecoveryDeadline;
 };
 
+// Owns a CRT worker thread and its stop/completion handles until a safe join.
 class CThreadOwner
 {
 public:

@@ -30,6 +30,7 @@ enum CFTPMLSxState
     mlsxUnsupported
 };
 
+// Per-session MLSD/MLST capability learned from FEAT (never persisted).
 class CFTPMLSxSupport
 {
 protected:

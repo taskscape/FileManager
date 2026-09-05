@@ -31,6 +31,7 @@ typedef enum eMarkerType
 #define BADBLOCK_DAMAGED 1
 #define BADBLOCK_CRC 2
 
+// Line marker bounding a MIME/mail block (start or end).
 class CMarker
 {
 public:
@@ -38,6 +39,7 @@ public:
     int iLine;               // line number; for StartMarker this line belongs to the block,
 }; // for EndMarker the line no longer belongs to the block
 
+// Start of an encoded block: type, encoding, filename, charset, and decode flags.
 class CStartMarker : public CMarker
 {
 public:
@@ -55,6 +57,7 @@ public:
 
 typedef CMarker CEndMarker;
 
+// Result of parsing a mail/MIME file: nested start/end markers and selection state.
 class CParserOutput
 {
 public:
@@ -76,6 +79,7 @@ extern int iErrorStr;
 
 //// export for decoder.cpp ///////////////////////////////////////////////////
 
+// Buffered byte/line reader used by the MIME parser and decoders.
 class CInputFile
 {
 public:

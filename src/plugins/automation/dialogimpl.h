@@ -57,6 +57,7 @@
         return fn(msg, wParam, lParam); \
     }
 
+// Lightweight Win32 dialog host used by Automation GUI wrappers.
 class CDialogImpl
 {
 public:

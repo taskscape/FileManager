@@ -16,6 +16,7 @@ const TCHAR szDiskMapViewClass[] = TEXT("Zar.DM.DMView.WC");
 
 class CLogger;
 
+// Child view that hosts the treemap and load animation.
 class CDiskMapView : public CChildWindow
 {
 protected:

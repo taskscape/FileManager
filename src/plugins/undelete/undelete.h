@@ -79,6 +79,7 @@ struct CSnapshotState
     }
 };
 
+// Per-listing FS data that tracks whether the undelete snapshot is still valid.
 class CPluginFSDataInterface : public CPluginDataInterfaceAbstract
 {
 protected:
@@ -157,6 +158,7 @@ public:
     BOOL FindAndPop(const char* path, int& topIndex); // search top-index for given path, FALSE->not found
 };
 
+// Salamander FS plugin interface that opens, closes, and navigates undelete volumes.
 class CPluginInterfaceForFS : public CPluginInterfaceForFSAbstract
 {
 protected:
@@ -192,6 +194,7 @@ public:
     virtual void WINAPI ExecuteChangeDrivePostCommand(int panel, int postCmd, void* postCmdParam) {}
 };
 
+// Salamander menu-extension interface that adds undelete commands to the menu.
 class CPluginInterfaceForMenuExt : public CPluginInterfaceForMenuExtAbstract
 {
 public:
@@ -202,6 +205,7 @@ public:
     virtual void WINAPI BuildMenu(HWND parent, CSalamanderBuildMenuAbstract* salamander) {}
 };
 
+// Salamander plugin entry point that registers Undelete and exposes its FS and menu interfaces.
 class CPluginInterface : public CPluginInterfaceAbstract
 {
 public:
@@ -232,6 +236,7 @@ public:
 
 class CFileList;
 
+// Plugin filesystem session: one scanned volume snapshot presented as a Salamander panel path.
 class CPluginFSInterface : public CPluginFSInterfaceAbstract
 {
 protected:

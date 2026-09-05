@@ -12,6 +12,7 @@
 
 #pragma once
 
+// Plugin entry point that registers Network Neighborhood with Salamander.
 class CNethoodPluginInterface : public CPluginInterfaceAbstract
 {
 protected:

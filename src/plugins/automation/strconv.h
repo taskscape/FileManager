@@ -16,6 +16,7 @@
 
 #define STRCONV_STATIC_BUFFER_SIZE 64
 
+// Converts an OLE/Unicode string to ANSI, using a small stack buffer when possible.
 class OLE2A
 {
 private:
@@ -30,6 +31,7 @@ public:
     operator const char*();
 };
 
+// Converts an ANSI string to OLE/Unicode, using a small stack buffer when possible.
 class A2OLE
 {
 private:

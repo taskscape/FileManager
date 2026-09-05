@@ -40,6 +40,7 @@ struct CDelRegion
 char* LoadStr(int resID);
 void FreeRegion(void* region);
 
+// Concrete PAK engine that reads and writes Quake-style PACK archives.
 class CPakIface : public CPakIfaceAbstract
 {
     CPakCallbacksAbstract* Callbacks;

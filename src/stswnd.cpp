@@ -1401,6 +1401,7 @@ void CPanelStatusBar::InvalidateAndUpdate(BOOL update)
         UpdateWindow(HWindow);
 }
 
+// OLE drop target that accepts dropped text as a path change for the associated file panel.
 class CTextDropTarget : public IDropTarget
 {
 private:

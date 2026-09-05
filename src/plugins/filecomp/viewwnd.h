@@ -56,6 +56,7 @@ extern const char* FILEVIEWWINDOW_CLASSNAME;
 
 BOOL TestHScrollWParam(WPARAM wParam);
 
+// One compare pane showing text (or a hex subclass) with difference highlighting.
 class CFileViewWindow : public CWindow
 {
 protected:
@@ -245,6 +246,7 @@ __inline __int64 Abs64(__int64 n) { return n >= 0 ? n : -n; }
 char* QWord2Ascii(QWORD qw, char* buffer, int digits);
 int ComputeAddressCharWidth(QWORD size1, QWORD size2);
 
+// Hex dump pane for binary file comparison.
 class CHexFileViewWindow : public CFileViewWindow
 {
 protected:

@@ -45,6 +45,7 @@ extern CSalamanderGUIAbstract* SalGUI;
 // FS name assigned by Salamander after loading the plugin
 extern char AssignedFSName[MAX_PATH];
 
+// Window queue that can return the last Registry Editor dialog HWND.
 class CWindowQueueEx : public CWindowQueue
 {
 public:
@@ -100,6 +101,7 @@ int SalPrintfW(LPWSTR buffer, unsigned count, LPCWSTR format, ...);
 // Plug-in interface
 //
 
+// Plugin entry point that registers Registry Editor with Salamander.
 class CPluginInterface : public CPluginInterfaceAbstract
 {
 public:
@@ -202,6 +204,7 @@ extern WCHAR RecentFullPath[MAX_FULL_KEYNAME];
 BOOL InitFS();
 void ReleaseFS();
 
+// Registers the Registry Editor virtual file system with Salamander.
 class CPluginInterfaceForFS : public CPluginInterfaceForFSAbstract
 {
 public:
@@ -294,6 +297,7 @@ BOOL CopyOrMoveValue(int sourceRoot, LPWSTR sourcePath, LPWSTR sourceName,
 
 class CChangeMonitor;
 
+// One open registry key presented as a Salamander file-system path.
 class CPluginFSInterface : public CPluginFSInterfaceAbstract
 {
 public:
@@ -453,6 +457,7 @@ struct CPluginData
     }
 };
 
+// Extra data for registry values listed in the Registry Editor FS.
 class CPluginDataInterface : public CPluginDataInterfaceAbstract
 {
     virtual BOOL WINAPI CallReleaseForFiles() { return TRUE; }

@@ -11,6 +11,7 @@
   Binary reader.
 */
 
+// Sequential reader over a mapped PE image (bounds-checked).
 class BinaryReader
 {
 private:

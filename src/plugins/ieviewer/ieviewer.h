@@ -15,6 +15,7 @@ extern CSalamanderGeneralAbstract* SalamanderGeneral;
 // CPluginInterface
 //
 
+// Opens HTML/documents in the Internet Explorer-based viewer.
 class CPluginInterfaceForViewer : public CPluginInterfaceForViewerAbstract
 {
 public:
@@ -25,6 +26,7 @@ public:
     virtual BOOL WINAPI CanViewFile(const char* name) { return TRUE; }
 };
 
+// Plugin entry point that registers IE Viewer with Salamander.
 class CPluginInterface : public CPluginInterfaceAbstract
 {
 public:
@@ -418,6 +420,7 @@ struct CIEMainWindowQueueItem
     }
 };
 
+// Thread-safe list of open IE Viewer main windows.
 class CIEMainWindowQueue
 {
 protected:

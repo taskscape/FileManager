@@ -188,6 +188,7 @@ typedef DWORD TwoDWords[2];
 // CPluginInterface
 //
 
+// Opens images in the PictView viewer window.
 class CPluginInterfaceForViewer : public CPluginInterfaceForViewerAbstract
 {
 public:
@@ -198,6 +199,7 @@ public:
     virtual BOOL WINAPI CanViewFile(LPCTSTR name);
 };
 
+// PictView menu commands (scan, clipboard, slideshow helpers).
 class CPluginInterfaceForMenuExt : public CPluginInterfaceForMenuExtAbstract
 {
 public:
@@ -208,6 +210,7 @@ public:
     virtual void WINAPI BuildMenu(HWND parent, CSalamanderBuildMenuAbstract* salamander) {}
 };
 
+// Loads image thumbnails for files PictView can decode.
 class CPluginInterfaceForThumbLoader : public CPluginInterfaceForThumbLoaderAbstract
 {
 public:
@@ -216,6 +219,7 @@ public:
                                       BOOL fastThumbnail);
 };
 
+// Plugin entry point that registers PictView with Salamander.
 class CPluginInterface : public CPluginInterfaceAbstract
 {
 public:
@@ -324,6 +328,7 @@ enum CViewerWindowEnablerEnum
     vweCount
 };
 
+// Frame window for the image viewer (toolbar, renderer, EXIF, print).
 class CViewerWindow : public CWindow
 {
 public:

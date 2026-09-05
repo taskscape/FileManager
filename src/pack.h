@@ -495,6 +495,7 @@ public:
 };
 
 // configuration class
+// Holds configured external archivers and the paths to their pack/unpack executables.
 class CArchiverConfig
 {
 protected:
@@ -560,6 +561,7 @@ protected:
     int Index;
 };
 
+// Alphabetically sorted unique list of archive extensions used while building format lookup tables.
 class CStringArray : public TDirectArray<CExtItem>
 {
 public:
@@ -586,6 +588,7 @@ public:
 };
 
 // data item
+// One archive-format association: extensions plus packer and unpacker indexes.
 class CPackerFormatConfigData
 {
 public:
@@ -632,6 +635,7 @@ public:
 };
 
 // configuration class
+// Maps archive filename extensions to packers and unpackers used to open and create them.
 class CPackerFormatConfig
 {
 protected:

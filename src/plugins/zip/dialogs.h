@@ -18,6 +18,7 @@
 #define WM_USER_GETICON (WM_APP + 1)
 #define WM_USER_SETVOLSIZE (WM_APP + 2)
 
+// Shared ZIP dialog helper that owns the HWND, centers the dialog, and subclasses statics/icons.
 class CDlgRoot
 {
 public:
@@ -35,6 +36,7 @@ public:
     void SubClassSmallIcon(DWORD wID, bool subclass);
 };
 
+// Pack-options dialog for creating or updating a ZIP (method, volume size, encryption, SFX).
 class CPackDialog : public CDlgRoot
 {
     CZipPack* PackObject; //used in adcanced self-extr settings dialog
@@ -83,6 +85,7 @@ public:
 INT_PTR PackDialog(HWND parent, CZipPack* packObject, CConfiguration* config,
                    CExtendedOptions* packOptions, const char* zipFile, unsigned flags);
 
+// ZIP plugin configuration dialog.
 class CConfigDialog : public CDlgRoot
 {
     CConfiguration* Config;
@@ -100,6 +103,7 @@ public:
     BOOL OnDefault(WORD wNotifyCode, WORD wID, HWND hwndCtl);
 };
 
+// Asks for the ZIP password before encrypted members can be opened.
 class CPasswordDialog : public CDlgRoot
 {
     HICON Lock;
@@ -122,6 +126,7 @@ public:
 
 INT_PTR PasswordDialog(HWND parent, const char* file, char* password);
 
+// Warns that the target volume does not have enough free space for the ZIP operation.
 class CLowDiskSpaceDialog : public CDlgRoot
 {
     const char* Text;
@@ -150,6 +155,7 @@ public:
 INT_PTR LowDiskSpaceDialog(HWND parent, const char* text, const char* path,
                            __INT64 freeSpace, __INT64 volumeSize, int flags);
 
+// Prompts the user to insert or select the next ZIP volume.
 class CChangeDiskDialog : public CDlgRoot
 {
     const char* Text;
@@ -168,6 +174,7 @@ public:
 
 INT_PTR ChangeDiskDialog(HWND parent, const char* text);
 
+// Lets the user browse for the next ZIP volume file during unpack.
 class CChangeDiskDialog2 : public CDlgRoot
 {
     //int     VolumeNumber;
@@ -193,6 +200,7 @@ public:
 
 INT_PTR ChangeDiskDialog2(HWND parent, /*int volNum,*/ char* fileName);
 
+// Prompts for the next output volume when creating a multi-volume ZIP.
 class CChangeDiskDialog3 : public CDlgRoot
 {
     int VolumeNumber;
@@ -226,6 +234,7 @@ public:
 INT_PTR ChangeDiskDialog3(HWND parent, int volNum, bool last,
                           char* fileName, unsigned* flags);
 
+// Asks whether to overwrite an existing file during ZIP extraction.
 class COverwriteDialog : public CDlgRoot
 {
     const char* File;
@@ -246,6 +255,7 @@ public:
 
 INT_PTR OverwriteDialog(HWND parent, const char* file, const char* attr);
 
+// Asks whether to overwrite an existing file during ZIP packing.
 class COverwriteDialog2 : public CDlgRoot
 {
     const char* File;
@@ -266,6 +276,7 @@ public:
 
 INT_PTR OverwriteDialog2(HWND parent, const char* file, const char* attr);
 
+// Advanced self-extractor settings (texts, icons, favorites, wait-for, language).
 class CAdvancedSEDialog : public CDlgRoot
 {
     CExtendedOptions* PackOptions;
@@ -332,6 +343,7 @@ public:
     BOOL LoadFavSettings(CSfxSettings* sfxSettings);
 };
 
+// Edits self-extractor UI texts (title, button, message box, vendor, URL).
 class CSfxTextsDialog : public CDlgRoot
 {
     CSfxSettings* SfxSettings;
@@ -355,6 +367,7 @@ public:
     BOOL OnReset();
 };
 
+// Manages saved favorite self-extractor setting presets.
 class CManageFavoritiesDialog : public CDlgRoot
 {
 public:
@@ -378,6 +391,7 @@ public:
 
 INT_PTR ManageFavoritiesDialog(HWND parent);
 
+// Creates or renames a favorite self-extractor preset.
 class CRenFavDialog : public CDlgRoot
 {
     bool Rename;
@@ -397,6 +411,7 @@ public:
     BOOL OnOK(WORD wNotifyCode, WORD wID, HWND hwndCtl);
 };
 
+// Converts an existing ZIP into a self-extracting executable.
 class CCreateSFXDialog : public CDlgRoot
 {
     CZipPack* PackObject; //used in adcanced self-extr settings dialog
@@ -422,6 +437,7 @@ public:
     BOOL OnAdvanced(WORD wNotifyCode, WORD wID, HWND hwndCtl);
 };
 
+// Views and edits the ZIP archive comment.
 class CCommentDialog : public CDlgRoot
 {
     HWND CommentHWnd;
@@ -444,6 +460,7 @@ public:
     BOOL Save();
 };
 
+// Chooses which process the self-extractor should wait for after launching.
 class CWaitForDialog : public CDlgRoot
 {
     char* WaitFor;
@@ -464,6 +481,7 @@ public:
 INT_PTR
 WaitForDialog(HWND parent, char* waitFor);
 
+// Asks how SFX texts should change when the self-extractor language is switched.
 class CChangeTextsDialog : public CDlgRoot
 {
     int* ChangeLangReaction;

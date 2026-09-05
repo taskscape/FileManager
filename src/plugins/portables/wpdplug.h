@@ -15,6 +15,7 @@
 
 #include "fx.h"
 
+// Plugin entry point that registers Portables (WPD) with Salamander.
 class CWpdPluginInterface : public CFxPluginInterface
 {
 private:

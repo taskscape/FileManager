@@ -49,9 +49,11 @@ enum CRegistryWorkType
 
 class CThreadOwner;
 
+// Worker thread that performs registry load/save work so the UI thread can keep pumping messages.
 class CRegistryWorkerThread
 {
 protected:
+    // Marks the worker as busy for the duration of one registry request so nested use is rejected.
     class CInUseHandler
     {
     protected:

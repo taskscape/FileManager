@@ -19,6 +19,7 @@ inline void __TraceXEmptyFunction() {};
 //  Auxiliary functions
 //
 
+// Char-type string helpers and a shared scratch buffer for undelete messages.
 template <typename CHAR>
 class String
 {

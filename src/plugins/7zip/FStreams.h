@@ -5,6 +5,7 @@
 
 #include "7za/CPP/7zip/Common/FileStreams.h"
 
+// Output file stream that retries failed writes through Salamander instead of aborting immediately.
 class CRetryableOutFileStream : public IOutStream,
                                 public CMyUnknownImp
 {
@@ -24,6 +25,7 @@ private:
     CMyComPtr<IOutStream> Stream;
 };
 
+// Input file stream that retries failed reads through Salamander while opening archives.
 class CRetryableInFileStream : public IInStream,
                                public CMyUnknownImp
 {

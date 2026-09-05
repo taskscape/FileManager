@@ -15,6 +15,7 @@ const char* VarTime = "Time";
 const char* VarDate = "Date";
 const char* VarCounter = "Counter";
 
+// Variable that splits comma-separated arguments before SetArgument().
 class CVariableEx : public CVarString::CVariable
 {
 public:
@@ -140,6 +141,7 @@ public:
     }
 };
 
+// $(OriginalName) — the source file's full original name.
 class CVarOriginalName : public CVarAlterableString
 {
 public:
@@ -166,6 +168,7 @@ public:
     }
 };
 
+// $(Drive) — drive letter (or UNC share) of the source path.
 class CVarDrive : public CVarAlterableString
 {
 public:
@@ -197,6 +200,7 @@ public:
     }
 };
 
+// $(Path) — directory portion of the source path without the file name.
 class CVarPath : public CVarAlterableString
 {
 public:
@@ -230,6 +234,7 @@ public:
     }
 };
 
+// $(RelativePath) — path relative to the rename root, without the file name.
 class CVarRelativePath : public CVarAlterableString
 {
 public:
@@ -250,6 +255,7 @@ public:
     }
 };
 
+// $(Name) — file name including extension.
 class CVarName : public CVarAlterableString
 {
 public:
@@ -267,6 +273,7 @@ public:
     }
 };
 
+// $(NamePart) — file name without the extension.
 class CVarNamePart : public CVarAlterableString
 {
 public:
@@ -286,6 +293,7 @@ public:
     }
 };
 
+// $(ExtPart) — file extension without the leading dot.
 class CVarExtPart : public CVarAlterableString
 {
 public:
@@ -303,6 +311,7 @@ public:
     }
 };
 
+// $(Size) — file size in bytes.
 class CVarSize : public CVarString::CVariable
 {
 public:
@@ -322,6 +331,7 @@ public:
     }
 };
 
+// $(Time) — file last-write time using a user format string.
 class CVarTime : public CVariableEx
 {
     char* Format;
@@ -398,6 +408,7 @@ public:
     }
 };
 
+// $(Date) — file last-write date using a user format string.
 class CVarDate : public CVariableEx
 {
     char* Format;
@@ -474,6 +485,7 @@ public:
     }
 };
 
+// $(Counter) — incrementing sequence number with optional width and base.
 class CVarCounter : public CVariableEx
 {
     int Start;

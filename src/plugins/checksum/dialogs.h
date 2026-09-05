@@ -10,6 +10,7 @@ class CVerifyThread;
 #define WM_USER_STARTWORK WM_APP + 555 // start work when dialog is visible (instead of in WM_INITDIALOG)
 #define WM_USER_ENDWORK WM_APP + 556   // end work when worker thread ends
 
+// One file row in the calculate/verify list, including optional per-algorithm hashes.
 class FILELISTITEM
 {
 public:
@@ -101,6 +102,7 @@ protected:
     friend class CSFVMD5ListView;
 };
 
+// List-view that turns off autoscroll when the user scrolls manually.
 class CSFVMD5ListView : public CWindow
 {
 public:
@@ -117,6 +119,7 @@ protected:
     CSFVMD5Dialog* Parent;
 };
 
+// Worker thread base that hashes files until the dialog asks it to stop.
 class CCRCMD5Thread : public CThread
 {
 public:
@@ -138,6 +141,7 @@ typedef struct _SEEDFILEINFO
 
 typedef TIndirectArray<SEEDFILEINFO> TSeedFileList;
 
+// Dialog that computes checksums for selected files and can save digest files.
 class CCalculateDialog : public CSFVMD5Dialog
 {
 public:

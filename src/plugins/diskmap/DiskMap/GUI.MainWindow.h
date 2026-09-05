@@ -36,6 +36,7 @@
 
 const TCHAR szMainWindowWindowClass[] = TEXT("Zar.DM.MainWin.WC");
 
+// Forwards zoom/path updates between the treemap view, directory line, and Salamander.
 class CDiskMapViewConnector : public CViewConnectorBase
 {
 protected:
@@ -81,6 +82,7 @@ public:
 #endif
 };
 
+// DiskMap main window: treemap, path bar, tooltip, shell menu, and log.
 class CMainWindow : public CFrameWindow
 {
 protected:

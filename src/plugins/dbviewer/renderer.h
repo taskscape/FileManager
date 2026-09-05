@@ -193,6 +193,7 @@ enum CDragSelectionMode
 
 class CViewerWindow;
 
+// Child window that paints the database grid, selection, and bookmarks.
 class CRendererWindow : public CWindow
 {
 public:

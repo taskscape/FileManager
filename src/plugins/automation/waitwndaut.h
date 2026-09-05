@@ -15,6 +15,7 @@
 
 #include "dispimpl.h"
 
+// Scriptable wait window that scripts show while a long operation runs.
 class CSalamanderWaitWndAutomation : public CDispatchImpl<CSalamanderWaitWndAutomation, ISalamanderWaitWindow>
 {
 private:

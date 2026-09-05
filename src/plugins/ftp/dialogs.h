@@ -218,6 +218,7 @@ protected:
 
 class CConfigPageServers;
 
+// List box of configured FTP server types on the Servers config page.
 class CServersListbox : public CWindow
 {
 protected:
@@ -232,6 +233,7 @@ protected:
     virtual LRESULT WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam);
 };
 
+// Configuration page that edits the list of FTP server types.
 class CConfigPageServers : public CCommonPropSheetPage
 {
 protected:
@@ -315,6 +317,7 @@ public:
 
 class CConnectDlg;
 
+// Bookmarks list on the Connect dialog (move, context menu, keyboard).
 class CBookmarksListbox : public CWindow
 {
 protected:
@@ -330,6 +333,7 @@ protected:
     virtual LRESULT WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam);
 };
 
+// Connect-to-FTP dialog: bookmarks, host, user, and connection options.
 class CConnectDlg : public CCenteredDialog
 {
 protected:
@@ -660,6 +664,7 @@ protected:
     virtual LRESULT WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam);
 };
 
+// Shows the FTP server welcome message or a command reply.
 class CWelcomeMsgDlg : public CCenteredDialog
 {
 public:
@@ -784,6 +789,7 @@ protected:
     virtual LRESULT WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam);
 };
 
+// Dialog that edits an FTP server-type listing parser (columns and rules).
 class CEditServerTypeDlg : public CCenteredDialog
 {
 protected:
@@ -1013,6 +1019,7 @@ class CFTPQueue;
 class CFTPWorkersList;
 class COperationDlg;
 
+// Worker that queries free disk space for the operation dialog.
 class CGetDiskFreeSpaceThread : public CThread
 {
 protected:
@@ -1294,6 +1301,7 @@ enum CSolveItemErrorDlgType
     sidtUploadStoreFileFailed,
 };
 
+// Resolves a failed FTP queue item (retry, skip, overwrite, rename, …).
 class CSolveItemErrorDlg : public CCenteredDialog
 {
 protected:
@@ -1418,6 +1426,7 @@ enum CSolveItemErrorSimpleDlgType
     sisdtDelNonEmptyDir, // Delete: directory is non-empty
 };
 
+// Simple skip/retry prompt for hidden or non-empty delete targets.
 class CSolveItemErrorSimpleDlg : public CCenteredDialog
 {
 protected:
@@ -1452,6 +1461,7 @@ enum CSolveItemErrorSrvCmdDlgType
     siscdtDeleteDir,  // Delete: unable to delete directory
 };
 
+// Error dialog when an FTP delete (or similar) server command fails.
 class CSolveServerCmdErr : public CCenteredDialog
 {
 protected:
@@ -1488,6 +1498,7 @@ enum CSolveItemErrorSrvCmdDlgType2
     siscdt2UploadTestIfFinished, // upload: cannot verify whether the file uploaded successfully
 };
 
+// Error dialog for resume/store failures with extra retry options.
 class CSolveServerCmdErr2 : public CCenteredDialog
 {
 protected:
@@ -1543,6 +1554,7 @@ protected:
     virtual LRESULT WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam);
 };
 
+// Add/edit dialog for one FTP proxy-server definition.
 class CProxyServerDlg : public CCenteredDialog
 {
 public:

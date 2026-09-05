@@ -15,6 +15,7 @@
 
 #include "dispimpl.h"
 
+// Scriptable checkbox wrapper around a Win32 button control.
 class CSalamanderGuiCheckBox : public CSalamanderGuiComponentImpl<CSalamanderGuiCheckBox, ISalamanderGuiCheckBox>
 {
 private:

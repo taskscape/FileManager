@@ -42,6 +42,7 @@ extern CSalamanderGeneralAbstract* SalamanderGeneral;
 extern CSalamanderGUIAbstract* SalamanderGUI;
 extern CSalamanderCryptAbstract* SalamanderCrypt;
 
+// Plugin entry point that registers Checksum with Salamander.
 class CPluginInterface : public CPluginInterfaceAbstract
 {
 public:
@@ -70,6 +71,7 @@ public:
     virtual void WINAPI PasswordManagerEvent(HWND parent, int event) {}
 };
 
+// Menu commands that open hash calculate and verify dialogs.
 class CPluginInterfaceForMenuExt : public CPluginInterfaceForMenuExtAbstract
 {
 public:

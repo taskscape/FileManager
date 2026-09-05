@@ -53,6 +53,7 @@ struct CCABCacheEntry
 // CPluginInterface
 //
 
+// Salamander archiver interface used to list and unpack Microsoft CAB archives.
 class CPluginInterfaceForArchiver : public CPluginInterfaceForArchiverAbstract
 {
 protected:
@@ -162,6 +163,7 @@ public:
     INT_PTR Notify(FDINOTIFICATIONTYPE fdint, PFDINOTIFICATION pfdin);
 };
 
+// Salamander plugin entry point that registers UnCAB and exposes its feature interfaces.
 class CPluginInterface : public CPluginInterfaceAbstract
 {
 public:

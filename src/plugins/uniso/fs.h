@@ -5,6 +5,7 @@
 
 class CISOImage;
 
+// Abstract filesystem reader bound to a CISOImage track (list and unpack).
 class CUnISOFSAbstract
 {
 protected:

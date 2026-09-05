@@ -104,6 +104,7 @@ BOOL BuildCompressionWrapperPath(std::wstring* wrapperPath)
     return TRUE;
 }
 
+// RAII holder that frees a loaded 7zwrapper.dll after crash compression.
 class CScopedCompressionLibrary
 {
 public:
@@ -157,6 +158,7 @@ BOOL IsCompressionStopRequested(HANDLE stopEvent)
     return stopEvent != NULL && WaitForSingleObject(stopEvent, 0) == WAIT_OBJECT_0;
 }
 
+// Background worker that compresses a crash dump for upload.
 class CCrashCompressionWorker
 {
 public:

@@ -192,6 +192,7 @@ public:
     virtual BOOL WINAPI PrematureDeleteTmpCopy(HWND parent, int copiesCount);
 };
 
+// Opens files in the DemoPlug sample viewer.
 class CPluginInterfaceForViewer : public CPluginInterfaceForViewerAbstract
 {
 public:
@@ -202,6 +203,7 @@ public:
     virtual BOOL WINAPI CanViewFile(const char* name) { return TRUE; }
 };
 
+// Sample plugin menu commands for DemoPlug.
 class CPluginInterfaceForMenuExt : public CPluginInterfaceForMenuExtAbstract
 {
 public:
@@ -212,6 +214,7 @@ public:
     virtual void WINAPI BuildMenu(HWND parent, CSalamanderBuildMenuAbstract* salamander);
 };
 
+// Supplies sample thumbnails for files handled by DemoPlug.
 class CPluginInterfaceForThumbLoader : public CPluginInterfaceForThumbLoaderAbstract
 {
 public:
@@ -220,6 +223,7 @@ public:
                                       BOOL fastThumbnail);
 };
 
+// Registers DemoPlug's sample virtual file system with Salamander.
 class CPluginInterfaceForFS : public CPluginInterfaceForFSAbstract
 {
 protected:
@@ -255,6 +259,7 @@ public:
     virtual void WINAPI EnsureShareExistsOnServer(int panel, const char* server, const char* share) {}
 };
 
+// Plugin entry point that registers DemoPlug (viewer, FS, archiver, menu) with Salamander.
 class CPluginInterface : public CPluginInterfaceAbstract
 {
 public:
@@ -306,6 +311,7 @@ enum CViewerWindowEnablerEnum
 
 class CViewerWindow;
 
+// Inner window that paints the DemoPlug sample viewer contents.
 class CRendererWindow : public CWindow
 {
 public:
@@ -321,6 +327,7 @@ protected:
     virtual LRESULT WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam);
 };
 
+// Frame window for the DemoPlug sample viewer (menu, toolbar, renderer).
 class CViewerWindow : public CWindow
 {
 public:
@@ -454,6 +461,7 @@ struct CFSData
     BOOL IsGood() { return TypeName != NULL; }
 };
 
+// Extra per-item data shown in DemoPlug's sample file-system listing.
 class CPluginFSDataInterface : public CPluginDataInterfaceAbstract
 {
 protected:

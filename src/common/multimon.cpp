@@ -194,6 +194,7 @@ void MultiMonCenterWindowByRect(HWND hWindow, const RECT& clipR, const RECT& byR
                  SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE);
 }
 
+// Hidden overlapped window used to query the system's default window position on a monitor.
 class CGetDefWndPos : public CWindow
 {
 public:

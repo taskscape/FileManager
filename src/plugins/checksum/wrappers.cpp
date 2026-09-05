@@ -7,6 +7,7 @@
 #include "misc.h"
 #include "tomcrypt\tomcrypt.h"
 
+// CRC-32 implementation of CHashAlgo.
 class CCRCAlgo : public CHashAlgo
 {
 public:
@@ -24,6 +25,7 @@ private:
     DWORD crc;
 };
 
+// Shared parser for digest files that name the algorithm (MD5, SHA-1, …).
 class CGenericHashAlgo : public CHashAlgo
 {
 public:
@@ -35,6 +37,7 @@ protected:
     virtual int GetDigestLen() = 0;
 };
 
+// MD5 implementation of CHashAlgo.
 class CMD5Algo : public CGenericHashAlgo
 {
 public:
@@ -56,6 +59,7 @@ private:
     CSalamanderMD5* md5;
 };
 
+// SHA-1 implementation of CHashAlgo.
 class CSHA1Algo : public CGenericHashAlgo
 {
 public:
@@ -77,6 +81,7 @@ private:
     CSalSHA1 sha1;
 };
 
+// SHA-256 implementation of CHashAlgo.
 class CSHA256Algo : public CGenericHashAlgo
 {
 public:
@@ -98,6 +103,7 @@ private:
     hash_state sha256;
 };
 
+// SHA-512 implementation of CHashAlgo.
 class CSHA512Algo : public CGenericHashAlgo
 {
 public:

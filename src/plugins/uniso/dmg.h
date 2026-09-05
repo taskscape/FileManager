@@ -52,6 +52,7 @@ private:
 
 #pragma pack(pop)
 
+    // Apple Data Compression (ADC) block used by some DMG images.
     class CADCBlock : public CBlockedFile::CCachedBlock
     { // Apple Data Compression
     public:

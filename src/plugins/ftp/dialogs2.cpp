@@ -1265,6 +1265,7 @@ void CListWaitWindow::SetPath(const char* path, CFTPServerPathType pathType)
 
 // ***************************************************************************
 
+// Wait dialog shown while computing sizes of selected FTP listing items.
 class CGetSizesOfListWaitDlg : public CDialog
 {
 public:

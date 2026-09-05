@@ -31,6 +31,7 @@ extern int SortByExtDirsAsFiles;
 // CPluginInterface
 //
 
+// Salamander archiver interface used to list and unpack FAT disk images.
 class CPluginInterfaceForArchiver : public CPluginInterfaceForArchiverAbstract
 {
 public:
@@ -60,6 +61,7 @@ public:
     virtual BOOL WINAPI PrematureDeleteTmpCopy(HWND parent, int copiesCount) { return FALSE; }
 };
 
+// Salamander plugin entry point that registers UnFAT and exposes its feature interfaces.
 class CPluginInterface : public CPluginInterfaceAbstract
 {
 public:

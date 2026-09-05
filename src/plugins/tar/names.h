@@ -19,6 +19,7 @@ struct SBranch
     CNameTree* next;
 };
 
+// Trie of names selected for unpack, used to match TAR members against a mask or selection.
 class CNameTree
 {
 private:
@@ -32,6 +33,7 @@ public:
     BOOL IsNamePresent(const char* name, const BOOL hasExtension);
 };
 
+// Set of archive member names used to decide which TAR entries to extract.
 class CNames
 {
 private:

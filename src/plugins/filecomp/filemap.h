@@ -17,6 +17,7 @@ enum CAccessType
     atWriteCopy
 };
 
+// Memory-mapped view of a compared file for hex and binary modes.
 class CFileMapping
 {
     HANDLE File;

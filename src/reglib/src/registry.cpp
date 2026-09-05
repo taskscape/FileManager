@@ -12,6 +12,7 @@ BOOL StrEndsWith(LPCTSTR txt, LPCTSTR pattern, size_t patternLen);
 namespace RegLib
 {
 
+    // Live Windows registry implementation of CSalamanderRegistryExAbstract.
     class CSystemRegistry : public CSalamanderRegistryExAbstract
     {
     public:

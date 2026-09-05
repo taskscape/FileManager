@@ -28,6 +28,7 @@ char* LoadStr(int resID);
 // CPluginInterface
 //
 
+// DemoMenu commands shown in Salamander's Plugins menu.
 class CPluginInterfaceForMenuExt : public CPluginInterfaceForMenuExtAbstract
 {
 public:
@@ -38,6 +39,7 @@ public:
     virtual void WINAPI BuildMenu(HWND parent, CSalamanderBuildMenuAbstract* salamander) {}
 };
 
+// Plugin entry point that registers DemoMenu with Salamander.
 class CPluginInterface : public CPluginInterfaceAbstract
 {
 public:

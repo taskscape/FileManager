@@ -105,6 +105,7 @@ VCN = 0x019 LEN = 0x07                  CU1
 #define FLAG_ENCRYPTED 0x4000
 #define FLAG_SPARSE 0x8000
 
+// Reads a file stream from a volume using data runs, including compressed and sparse NTFS ranges.
 template <typename CHAR>
 class CStreamReader
 {

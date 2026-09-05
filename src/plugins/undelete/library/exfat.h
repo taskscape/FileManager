@@ -131,6 +131,7 @@ union EXFAT_DIRENTRY
 template <typename CHAR>
 class CRunsBuffer; // defined in fat.h
 
+// exFAT snapshot of deleted files and directories on a volume.
 template <typename CHAR>
 class CExFATSnapshot : public CSnapshot<CHAR>
 {

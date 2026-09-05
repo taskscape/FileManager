@@ -25,6 +25,7 @@ struct CParserBrokerQueueMetrics
     LONGLONG HighWaterMark;
 };
 
+// Host client for the out-of-process parser broker used for thumbnails and archive metadata.
 class CParserBrokerClient
 {
 private:

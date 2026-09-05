@@ -7,6 +7,7 @@ extern CSalamanderGeneralAbstract* SalamanderGeneral;
 extern CSalamanderSafeFileAbstract* SalamanderSafeFile;
 extern CSalamanderGUIAbstract* SalamanderGUI;
 
+// Salamander plugin entry point that registers Split/Combine and exposes its menu commands.
 class CPluginInterface : public CPluginInterfaceAbstract
 {
 public:
@@ -35,6 +36,7 @@ public:
     virtual void WINAPI PasswordManagerEvent(HWND parent, int event) {}
 };
 
+// Salamander menu-extension interface that runs split and combine file commands.
 class CPluginInterfaceForMenuExt : public CPluginInterfaceForMenuExtAbstract
 {
 public:

@@ -17,6 +17,7 @@
 
 // ****************************************************************************
 
+// Critical section guarding access to the string-resource load buffers.
 class CStringResourceLock
 {
 public:
@@ -275,6 +276,7 @@ unsigned SafeWaitMessageCallerID = 0;
 BOOL SafeWaitWindowClosePressed = FALSE;
 HANDLE SafeWaitWindowCancelEvent = NULL;
 
+// Critical section guarding the thread ID allowed to show the safe wait-message window.
 class C__SafeWaitMessageCallerSetSection
 {
 public:

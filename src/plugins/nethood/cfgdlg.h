@@ -16,6 +16,7 @@
 #pragma once
 #endif
 
+// Configuration dialog for Network Neighborhood options.
 class CNethoodConfigDialog : public CDialog
 {
 protected:

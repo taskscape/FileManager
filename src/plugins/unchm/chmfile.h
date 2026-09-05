@@ -17,6 +17,7 @@ typedef LONGINT64 (*CHM_RETRIEVE_OBJECT_PROC)(struct chmFile* h, struct chmUnitI
 //
 //
 //
+// CHM (Compiled HTML Help) file opened through chmlib for listing and extracting objects.
 class CCHMFile
 {
 public:

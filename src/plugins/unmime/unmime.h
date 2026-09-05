@@ -22,6 +22,7 @@ typedef struct tagGlobals
 
 extern SGlobals G;
 
+// Parsed MIME/message archive payload shared by listed items (markers, timestamp, refcount).
 class CArchiveData
 {
 public:
@@ -30,6 +31,7 @@ public:
     int RefCount;
 };
 
+// Per-listing plugin data that releases CArchiveData when MIME items leave the panel.
 class CPluginDataInterface : public CPluginDataInterfaceAbstract
 {
 public:
@@ -61,6 +63,7 @@ public:
     virtual BOOL WINAPI GetLastWriteTime(const CFileData* file, BOOL isDir, SYSTEMTIME* time) { return FALSE; }
 };
 
+// Salamander archiver interface used to list and unpack MIME/mail encoded files.
 class CPluginInterfaceForArchiver : public CPluginInterfaceForArchiverAbstract
 {
 private:
@@ -91,6 +94,7 @@ public:
     virtual BOOL WINAPI PrematureDeleteTmpCopy(HWND parent, int copiesCount) { return FALSE; }
 };
 
+// Salamander plugin entry point that registers UnMIME and exposes its feature interfaces.
 class CPluginInterface : public CPluginInterfaceAbstract
 {
 public:

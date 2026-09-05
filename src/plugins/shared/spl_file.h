@@ -104,6 +104,7 @@ struct SAFE_FILE
                                                 // mutually exclusive with SILENT_SKIP_FILE_SYSHID
 #define SILENT_RESERVED_FOR_PLUGINS 0xFFFF0000  // this space is available to plugins for their own flags
 
+// Host API for opening, copying, and closing files with overwrite/skip prompts.
 class CSalamanderSafeFileAbstract
 {
 public:

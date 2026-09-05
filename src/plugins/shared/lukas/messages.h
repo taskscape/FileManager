@@ -14,12 +14,14 @@ struct CMessage
 
 #pragma pack(pop)
 
+// Receives messages posted through CMessageCenter.
 class CMessageListener
 {
 public:
     virtual void RecieveMessage(const CMessage* message) = 0;
 };
 
+// Named pipe / shared-memory hub that routes CMessage to listeners.
 class CMessageCenter
 {
 public:

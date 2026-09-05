@@ -522,6 +522,7 @@ extern C__Trace __Trace;
 
 #ifndef CALLSTK_DISABLE
 
+// RAII object that pushes a CALL_STACK_MESSAGE for the current function.
 class CCallStackMessage
 {
 #if (defined(_DEBUG) || defined(CALLSTK_MEASURETIMES)) && !defined(CALLSTK_DISABLEMEASURETIMES)

@@ -7,6 +7,7 @@
 
 class CStringFormatter;
 
+// Owned TCHAR string used throughout DiskMap.
 class CZString
 {
 protected:
@@ -39,6 +40,7 @@ public:
     size_t GetLength() const { return this->_l; }
 };
 
+// Growable TCHAR buffer used by CStringFormatter.
 class CZStringBuffer
 {
     friend class CStringFormatter;

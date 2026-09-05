@@ -20,6 +20,7 @@ void ReleaseFS();
 // CPluginInterface
 //
 
+// Registers the Folders virtual file system (shell namespace) with Salamander.
 class CPluginInterfaceForFS : public CPluginInterfaceForFSAbstract
 {
 protected:
@@ -58,6 +59,7 @@ public:
     virtual void WINAPI ExecuteChangeDrivePostCommand(int panel, int postCmd, void* postCmdParam) {}
 };
 
+// Plugin entry point that registers Folders with Salamander.
 class CPluginInterface : public CPluginInterfaceAbstract
 {
 public:
@@ -100,6 +102,7 @@ struct CShellColumn
     SHCOLSTATEF Flags; // Default column state (SHCOLSTATEF)
 };
 
+// Shell-column metadata and icons for items listed in the Folders FS.
 class CPluginDataInterface : public CPluginDataInterfaceAbstract
 {
 protected:
@@ -178,6 +181,7 @@ enum CFSErrorState
     fesInaccessiblePath, // the path cannot be listed; it is necessary to shorten the path
 };
 
+// One open shell-namespace folder presented as a Salamander file-system path.
 class CPluginFSInterface : public CPluginFSInterfaceAbstract
 {
 public:

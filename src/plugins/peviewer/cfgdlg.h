@@ -17,6 +17,7 @@
 #pragma once
 #endif
 
+// Configuration dialog for PE Viewer dump options.
 class CPeViewerConfigDialog : public CDialog
 {
 protected:

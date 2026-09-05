@@ -38,6 +38,7 @@ struct CShellIconOverlayItem
     ~CShellIconOverlayItem();
 };
 
+// Loads shell icon-overlay handlers, caches their icons, and tests which overlay applies to a path.
 class CShellIconOverlays
 {
 protected:

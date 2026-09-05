@@ -7,6 +7,7 @@
 
 #define NO_MARGIN -1
 
+// Positioned child window hosted inside a DiskMap frame.
 class CChildWindow : public CWindow
 {
 protected:

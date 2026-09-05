@@ -3,6 +3,7 @@
 
 #pragma once
 
+// Thin file I/O abstraction used when listing and extracting image contents.
 class CFile
 {
 public:

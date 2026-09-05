@@ -9,6 +9,7 @@
 
 #define MINSIZE 3.0
 
+// Treemap cell for a directory, holding child rows of cushions.
 class CCushionDirectory : public CCushion
 {
 protected:

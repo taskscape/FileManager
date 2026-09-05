@@ -148,6 +148,7 @@ void ModulesChangeShowDetails(int index);
 
 void EnumSalModules();
 
+// Menu commands that open the version-check window and related actions.
 class CPluginInterfaceForMenuExt : public CPluginInterfaceForMenuExtAbstract
 {
 public:
@@ -158,6 +159,7 @@ public:
     virtual void WINAPI BuildMenu(HWND parent, CSalamanderBuildMenuAbstract* salamander) {}
 };
 
+// Plugin entry point that registers CheckVer with Salamander.
 class CPluginInterface : public CPluginInterfaceAbstract
 {
 public:

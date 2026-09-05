@@ -20,6 +20,7 @@
 #define Uint32 DWORD
 #define Uint64 unsigned __int64
 
+// Xbox DVD (XDVDFS) filesystem reader for tracks inside a disk image.
 class CXDVDFS : public CUnISOFSAbstract
 {
 protected:

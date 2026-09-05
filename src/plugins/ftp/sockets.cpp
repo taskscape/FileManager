@@ -758,6 +758,7 @@ BOOL CSocket::OpenForListeningWithProxy(DWORD listenOnIP, unsigned short listenO
     }
 }
 
+// Background DNS lookup that posts the result back to a CSocket.
 class CGetHostByNameThread : public CThread
 {
 protected:

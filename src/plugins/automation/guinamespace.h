@@ -17,6 +17,7 @@
 
 class CScriptInfo;
 
+// Salamander.Forms factory that scripts use to create forms and controls.
 class CSalamanderGuiNamespace : public CDispatchImpl<CSalamanderGuiNamespace, ISalamanderGui>
 {
 private:

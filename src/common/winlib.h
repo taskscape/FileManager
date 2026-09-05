@@ -36,6 +36,7 @@ void ReleaseWinLib();
 // must be called before using help
 BOOL SetupWinLibHelp(CWinLibHelp* winLibHelp);
 
+// Optional help callback used by WinLib dialogs for F1 and context-menu help.
 class CWinLibHelp
 {
 public:
@@ -129,6 +130,7 @@ protected:
 
 // ****************************************************************************
 
+// HWND wrapper with a WinLib window procedure, subclassing, and lifetime origin.
 class CWindow : public CWindowsObject
 {
 public:
@@ -283,6 +285,7 @@ enum CTransferType
 
 // ****************************************************************************
 
+// Transfers dialog control values to and from application data (edit lines, checks, radios).
 class CTransferInfo
 {
 public:
@@ -320,6 +323,7 @@ protected:
 
 // ****************************************************************************
 
+// WinLib dialog base: resource loading, data transfer/validation, and modal or modeless execution.
 class CDialog : public CWindowsObject
 {
 public:
@@ -413,6 +417,7 @@ struct CWinLibCS
     void Leave() { HANDLES(LeaveCriticalSection(&cs)); }
 };
 
+// Maps HWND values to CWindowsObject instances for WinLib message dispatch.
 class CWindowsManager : protected TDirectArray<CWindowData>
 {
 public:
@@ -499,6 +504,7 @@ struct CWindowQueueItem
     }
 };
 
+// Thread-safe list of HWNDs used to broadcast messages to a set of open windows.
 class CWindowQueue
 {
 protected:

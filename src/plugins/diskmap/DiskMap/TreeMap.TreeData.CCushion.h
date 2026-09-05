@@ -11,6 +11,7 @@ class CCushionDirectory;
 class CCushionHitInfo;
 class CZFile;
 
+// One treemap cell bound to a file, with size and hit-testing bounds.
 class CCushion
 {
     friend CCushionRow;

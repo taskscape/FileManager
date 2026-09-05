@@ -3,6 +3,7 @@
 
 #include "precomp.h"
 
+// One cached HFONT plus a character-to-glyph mapping table.
 class CMappedFont
 {
 public:

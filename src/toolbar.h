@@ -271,6 +271,7 @@ enum CMainToolBarType
     mtbtRight,
 };
 
+// Main, middle, or panel toolbar with Salamander commands, tooltips, and persistable layout.
 class CMainToolBar : public CToolBar
 {
 protected:
@@ -319,6 +320,7 @@ enum CBottomTBStateEnum
     btbsCount
 };
 
+// Status-line toolbar whose buttons change with Ctrl/Alt/Shift modifier combinations.
 class CBottomToolBar : public CToolBar
 {
 public:

@@ -46,6 +46,7 @@ extern const char* SPLITBARWINDOW_CLASSNAME;
 
 class CToolTipWindow;
 
+// Draggable splitter between the two file-compare panes.
 class CSplitBarWindow : public CWindow
 {
 protected:
@@ -68,6 +69,7 @@ protected:
 
 // ****************************************************************************
 
+// Tiny tooltip shown while dragging the split bar (position text).
 class CToolTipWindow : public CWindow
 {
 protected:
@@ -87,6 +89,7 @@ protected:
 
 // ****************************************************************************
 
+// Edit control hosted inside the file-compare combo box.
 class CComboBoxEdit : public CWindow
 {
 protected:
@@ -99,6 +102,7 @@ protected:
 
 // ****************************************************************************
 
+// Owner-drawn combo used in the file-compare rebar (difference list).
 class CComboBox : public CWindow
 {
 protected:
@@ -125,6 +129,7 @@ struct CBandParams
     int Index;
 };
 
+// Rebar that hosts the compare toolbar and difference-list combo.
 class CRebar : public CWindow
 {
 protected:

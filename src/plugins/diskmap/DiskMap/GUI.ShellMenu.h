@@ -52,6 +52,7 @@ http://blogs.msdn.com/oldnewthing/archive/2004/10/07/239197.aspx
 #define IDM_OPEN 0x7010
 #define IDM_GOTO 0x7011
 
+// Hosts the Explorer IContextMenu for a file or folder shown in DiskMap.
 class CShellMenu
 {
 protected:

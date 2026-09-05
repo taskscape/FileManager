@@ -5,6 +5,7 @@
 
 #include "..\\..\\common\\monotonic_time.h"
 
+// Progress dialog shown while scanning a volume for deleted files.
 class CSnapshotProgressDlg : public CDialog
 {
 protected:
@@ -22,6 +23,7 @@ protected:
     virtual INT_PTR DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam);
 };
 
+// Dual-progress dialog used while copying recovered files to disk.
 class CCopyProgressDlg : public CDialog
 {
 protected:
@@ -46,6 +48,7 @@ protected:
     virtual INT_PTR DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam);
 };
 
+// Connect dialog that picks a volume or image to scan for deleted files.
 class CConnectDialog : public CDialog
 {
 public:
@@ -69,6 +72,7 @@ public:
     virtual INT_PTR DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam);
 };
 
+// Prompts for a new file name when recovering a file with an invalid or duplicate name.
 class CFileNameDialog : public CDialog
 {
 public:
@@ -82,6 +86,7 @@ protected:
     virtual INT_PTR DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam);
 };
 
+// Undelete plugin configuration dialog (scan options, temp path, warnings).
 class CConfigDialog : public CDialog
 {
 public:
@@ -92,6 +97,7 @@ protected:
     virtual INT_PTR DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam);
 };
 
+// Asks for the target folder when restoring encrypted files.
 class CRestoreDialog : public CDialog
 {
 public:
@@ -103,6 +109,7 @@ protected:
     virtual INT_PTR DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam);
 };
 
+// Progress dialog shown while restoring encrypted files.
 class CRestoreProgressDlg : public CCopyProgressDlg
 {
 public:

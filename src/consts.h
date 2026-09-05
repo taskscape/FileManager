@@ -63,6 +63,7 @@ extern CRITICAL_SECTION OpenHtmlHelpCS; // critical section for OpenHtmlHelp()
   CEnterCriticalSection enterCS(cs);
 */
 
+// Owns a Windows CRITICAL_SECTION and exposes Enter/Leave for mutual exclusion.
 class CCriticalSection
 {
 public:
@@ -75,6 +76,7 @@ public:
     void Leave() { LeaveCriticalSection(&cs); }
 };
 
+// Enters a CCriticalSection on construction and leaves it on destruction.
 class CEnterCriticalSection
 {
 protected:

@@ -3,6 +3,7 @@
 
 #pragma once
 
+// Sequential file reader with an in-memory window used by binary compare.
 class CCachedFile
 {
     HANDLE File;

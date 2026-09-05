@@ -80,6 +80,7 @@ static bool GetCertificateFingerprints(const BYTE* der, int derLength, BYTE* spk
     return ok;
 }
 
+// Remembers per-host certificate exceptions accepted for this session or persistently.
 class CCertificateExceptionStore
 {
 public:

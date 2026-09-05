@@ -87,6 +87,7 @@ struct CSalSHA1
    Single instance can be used many times, using different control structs.
  */
 
+// Host API: AES/SHA/MD5 and related crypto helpers Salamander exposes to plugins.
 class CSalamanderCryptAbstract
 {
 public:

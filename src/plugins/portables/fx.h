@@ -62,6 +62,7 @@ namespace Fx
         return g_hFxLangInst;
     }
 
+    // ATL string traits that load resources from the plugin language module.
     template <typename TChar>
     class StrTraitFx : public ATL::ChTraitsCRT<TChar>
     {

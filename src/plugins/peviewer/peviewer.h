@@ -14,6 +14,7 @@ extern CSalamanderGeneralAbstract* SalGeneral;
 // CPluginInterface
 //
 
+// Opens PE/COFF binaries in the PE Viewer dump window.
 class CPluginInterfaceForViewer : public CPluginInterfaceForViewerAbstract
 {
 public:
@@ -24,6 +25,7 @@ public:
     virtual BOOL WINAPI CanViewFile(LPCTSTR name);
 };
 
+// Plugin entry point that registers PE Viewer with Salamander.
 class CPluginInterface : public CPluginInterfaceAbstract
 {
 public:

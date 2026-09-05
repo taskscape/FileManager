@@ -283,6 +283,7 @@ BOOL GetNextFileFromPanel(int index, char* path, char* name, void* param);
 struct CUserMenuAdvancedData;
 struct IContextMenu2;
 
+// Tracks which file panel is currently active (left or right).
 class CMainWindowAncestor : public CWindow
 {
 private:

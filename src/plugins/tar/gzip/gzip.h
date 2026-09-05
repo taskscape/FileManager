@@ -55,6 +55,7 @@ struct SGzipExtraHeader
 // forward declaration
 struct SHufTable;
 
+// gzip inflater that yields the original stream (typically a TAR) from a .gz file.
 class CGZip : public CZippedFile
 {
 public:

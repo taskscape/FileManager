@@ -103,6 +103,7 @@ struct CCallStackMsgContext
 struct CCallStackMsgContext;
 #endif // (defined(_DEBUG) || defined(CALLSTK_MEASURETIMES)) && !defined(CALLSTK_DISABLEMEASURETIMES)
 
+// Host API: TRACE, call-stack, and debug helpers Salamander exposes to plugins.
 class CSalamanderDebugAbstract
 {
 public:
@@ -245,6 +246,7 @@ public:
 // if user assigns own hot key to this command in Plugin Manager, hint will be suppressed
 #define SALHOTKEY_HINT ((DWORD)0x00020000)
 
+// Host API used while a plugin registers packers, viewers, menus, and FS names.
 class CSalamanderConnectAbstract
 {
 public:
@@ -466,6 +468,7 @@ public:
 #define PME_MASTERPASSWORDCHANGED 2 // user changed master password (passwords need to be decrypted and then encrypted again)
 #define PME_MASTERPASSWORDREMOVED 3 // user removed master password (passwords need to be decrypted)
 
+// Root plugin API: load/unload, configuration, and accessors for the other plugin interfaces.
 class CPluginInterfaceAbstract
 {
 #ifdef INSIDE_SALAMANDER
@@ -712,6 +715,7 @@ public:
                                          // of all)
 #define LOADINFO_LOADONSTART 0x0008      // load occurred because "load on start" flag was found
 
+// Host API passed to SalamanderPluginEntry so the plugin can identify itself and obtain interfaces.
 class CSalamanderPluginEntryAbstract
 {
 public:

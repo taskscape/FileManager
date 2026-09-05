@@ -284,6 +284,7 @@ struct C__HandlesData
     C__HandlesHandle Handle;
 };
 
+// Growable array of monitored handle records used by C__Handles.
 class C_HandlesDataArray
 {
 public:
@@ -306,6 +307,7 @@ protected:
     void Move(int direction, int first, int count);
 };
 
+// Debug tracker for Win32 handles: records origin and reports leaks on process exit.
 class C__Handles
 {
 protected:

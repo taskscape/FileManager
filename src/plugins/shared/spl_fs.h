@@ -230,6 +230,7 @@ public:
 
 #define SALCMDLINE_MAXLEN 8192 // maximum length of command from Salamander command line
 
+// Plugin object that represents one open custom file-system connection in a panel.
 class CPluginFSInterfaceAbstract
 {
 #ifdef INSIDE_SALAMANDER
@@ -767,6 +768,7 @@ public:
 // ****************************************************************************
 // CPluginInterfaceForFSAbstract
 //
+// Plugin API for a custom file-system namespace in the panels.
 
 class CPluginInterfaceForFSAbstract
 {

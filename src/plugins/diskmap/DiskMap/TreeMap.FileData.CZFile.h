@@ -19,6 +19,7 @@
 class CZFile;
 class CZDirectory;
 
+// File node in the scanned disk tree (name, sizes, parent directory).
 class CZFile
 {
 protected:

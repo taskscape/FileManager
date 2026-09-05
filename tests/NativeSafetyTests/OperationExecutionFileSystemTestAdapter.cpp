@@ -5,6 +5,7 @@
 
 namespace
 {
+// Default FS adapter that fails closed so tests cannot accidentally hit real I/O.
 class CUnreachableDefaultOperationExecutionFileSystem : public COperationExecutionFileSystem
 {
 public:

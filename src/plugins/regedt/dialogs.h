@@ -48,6 +48,7 @@ inline HWND GetParent()
     return ret == (HWND)-1 ? SG->GetMsgBoxParent() : ret;
 }
 
+// Pushes a dialog HWND onto the parent stack for nested message boxes.
 class CDialogStackAutoObject
 {
 public:
@@ -62,6 +63,7 @@ class CTransferInfoEx;
 void HistoryComboBox(CTransferInfoEx& ti, int id, LPWSTR text, int textMax,
                      int historySize, LPWSTR* history);
 
+// Transfer helper that fills Unicode edit lines from/to dialog controls.
 class CTransferInfoEx : public CTransferInfo
 {
 public:
@@ -70,6 +72,7 @@ public:
     void EditLineW(int ctrlID, LPWSTR buffer, DWORD bufferSize, BOOL select = TRUE);
 };
 
+// Registry Editor dialog that can center on a chosen owner window.
 class CDialogEx : public CDialog
 {
 protected:
@@ -94,6 +97,7 @@ protected:
     virtual void NotifDlgJustCreated();
 };
 
+// Dialog to create a new registry key.
 class CNewKeyDialog : public CDialogEx
 {
 protected:
@@ -123,6 +127,7 @@ enum CValDlgType
     vdtEditValDialog
 };
 
+// Dialog to create a new registry value (name and type).
 class CNewValDialog : public CNewKeyDialog
 {
 protected:
@@ -141,6 +146,7 @@ public:
     virtual void Transfer(CTransferInfoEx& ti);
 };
 
+// Dialog to edit a registry value in its native type.
 class CEditValDialog : public CNewValDialog
 {
 protected:
@@ -170,6 +176,7 @@ protected:
     virtual INT_PTR DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam);
 };
 
+// Dialog to edit a registry value as raw hex/binary data.
 class CRawEditValDialog : public CNewValDialog
 {
 protected:
@@ -214,6 +221,7 @@ public:
     virtual void Transfer(CTransferInfoEx& ti);
 };
 
+// Configuration dialog for the Registry Editor plugin.
 class CConfigDialog : public CDialogEx
 {
 protected:
@@ -230,6 +238,7 @@ protected:
     virtual INT_PTR DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam);
 };
 
+// Dialog that exports a registry key to a .reg file.
 class CExportDialog : public CDialogEx
 {
 protected:

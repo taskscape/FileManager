@@ -33,6 +33,7 @@ static void SafeRelease(T*& p)
     }
 }
 
+// Initializes COM for WIC save and uninitializes it in the destructor.
 class CComApartmentSave
 {
 public:

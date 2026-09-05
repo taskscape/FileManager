@@ -19,6 +19,7 @@ class CBasicLogItem;
 class CStaticLogItem;
 class CSmartLogItem;
 
+// One DiskMap log entry with severity, text, and optional path.
 class CLogItemBase
 {
 protected:
@@ -35,6 +36,7 @@ public:
     virtual TCHAR const* GetPath() const = 0;
 };
 
+// Log item that holds borrowed (non-owned) text and path pointers.
 class CBasicLogItem : public CLogItemBase
 {
 protected:
@@ -52,6 +54,7 @@ public:
     TCHAR const* GetPath() const { return this->_path; }
 };
 
+// Log item that owns the path string and borrows the message text.
 class CStaticLogItem : public CLogItemBase
 {
 protected:
@@ -74,6 +77,7 @@ public:
     TCHAR const* GetPath() const { return this->_path->GetString(); }
 };
 
+// Log item that owns both the message text and path strings.
 class CSmartLogItem : public CLogItemBase
 {
 protected:
@@ -99,6 +103,7 @@ public:
     TCHAR const* GetPath() const { return this->_path->GetString(); }
 };
 
+// Thread-safe list of log items that can notify a log window.
 class CLogger
 {
 protected:

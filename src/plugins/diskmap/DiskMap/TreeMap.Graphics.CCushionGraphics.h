@@ -12,6 +12,7 @@
 
 extern BYTE CCushionGraphics_defaultdata[];
 
+// Draws cushion (squarified treemap cell) shading into a pixmap.
 class CCushionGraphics
 {
 protected:

@@ -14,6 +14,7 @@
 
 class CNethoodFSInterface;
 
+// Forwards network-cache updates into an open Nethood file-system listing.
 class CNethoodFSCacheConsumer : public CNethoodCacheEventConsumer
 {
 private:

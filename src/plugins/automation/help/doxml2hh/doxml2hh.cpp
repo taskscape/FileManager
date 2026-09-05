@@ -138,6 +138,7 @@ struct Link
     }
 };
 
+// ATL list that inserts elements in sorted order for help-link lookup.
 template <typename E>
 class CSortedAtlList : public CAtlList<E>
 {

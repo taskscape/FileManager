@@ -66,6 +66,7 @@ BOOL ValidateHexString(LPWSTR text);
 
 // ****************************************************************************
 
+// Growable byte buffer used by Registry Editor dialogs.
 class CBuffer
 {
 public:
@@ -90,6 +91,7 @@ protected:
     int Allocated;
 };
 
+// Typed wrapper around CBuffer for arrays of DATA_TYPE.
 template <class DATA_TYPE>
 class TBuffer : public CBuffer
 {

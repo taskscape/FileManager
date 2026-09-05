@@ -3,6 +3,7 @@
 
 #pragma once
 
+// Locale-aware formatter for DiskMap sizes and numeric strings.
 class CStringFormatter
 {
 protected:

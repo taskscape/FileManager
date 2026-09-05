@@ -64,6 +64,7 @@
 // ****************************************************************************
 // CGUIProgressBarAbstract
 //
+// Host API for a Salamander progress bar (determinate or marquee).
 
 class CGUIProgressBarAbstract
 {
@@ -184,6 +185,7 @@ public:
                                          // ellipsis "..." will be inserted so that end is visible
 #define STF_HANDLEPREFIX 0x0000000080    // characters after '&' will be underlined; cannot be used with STF_END_ELLIPSIS or STF_PATH_ELLIPSIS
 
+// Host API for a static text control with ellipsis, tooltip, and optional bold/underline.
 class CGUIStaticTextAbstract
 {
     // All methods can be called only from parent window thread in which
@@ -215,6 +217,7 @@ public:
 // ****************************************************************************
 // CGUIHyperLinkAbstract
 //
+// Host API for a clickable static text control that opens a URL or command.
 
 class CGUIHyperLinkAbstract
 {
@@ -262,6 +265,7 @@ public:
 // ****************************************************************************
 // CGUIButtonAbstract
 //
+// Host API for attaching a tooltip to a Salamander-styled button.
 
 class CGUIButtonAbstract
 {
@@ -279,6 +283,7 @@ public:
 // ****************************************************************************
 // CGUIColorArrowButtonAbstract
 //
+// Host API for a two-color button with a drop-down arrow (used in color pickers).
 
 class CGUIColorArrowButtonAbstract
 {
@@ -474,6 +479,7 @@ Enabler
   If NULL, item will be enabled.
 */
 
+// Host API: popup menu builder plugins attach to Salamander windows.
 class CGUIMenuPopupAbstract
 {
     // All methods can be called only from parent window thread in which
@@ -1070,6 +1076,7 @@ public:
 // ****************************************************************************
 // CGUIMenuBarAbstract
 //
+// Host API for a menu bar window created from a popup-menu template.
 
 class CGUIMenuBarAbstract
 {
@@ -1328,6 +1335,7 @@ struct TOOLBAR_TOOLTIP
                       // by default message has terminator inserted at zero position
 };
 
+// Host API for creating and filling a Salamander toolbar.
 class CGUIToolBarAbstract
 {
     // All methods can be called only from parent window thread in which
@@ -1919,6 +1927,7 @@ public:
 // Pocet polozek
 #define TLBHDR_COUNT 6
 
+// Host API for the small header toolbar above list boxes (New/Delete/Up/Down).
 class CGUIToolbarHeaderAbstract
 {
 public:
@@ -1952,6 +1961,7 @@ public:
 #define BTF_RIGHTARROW 0x00000008  // button has arrow pointing right at the end
 #define BTF_MORE 0x00000010        // button has symbol for expanding dialog at the end
 
+// Host API for creating Salamander-styled progress bars, buttons, and other GUI controls.
 class CSalamanderGUIAbstract
 {
 public:

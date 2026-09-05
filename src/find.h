@@ -258,6 +258,7 @@ enum CFindIgnoreItemType
     fiitRelative, // Path without a root: 'aaa' 'aaa\bbbb\ccc'
 };
 
+// One ignored directory path used by Find to skip subtrees during a search.
 class CFindIgnoreItem
 {
 public:
@@ -436,6 +437,7 @@ struct CFindLogItem
     char* Path;
 };
 
+// Collects errors and informational messages produced while a Find search runs.
 class CFindLog
 {
 protected:
@@ -680,6 +682,7 @@ enum CStateOfFindCloseQueryEnum
 class CComboboxEdit;
 class CButton;
 
+// Find Files dialog: search criteria, results list, and commands to act on matches.
 class CFindDialog : public CCommonDialog
 {
 protected:

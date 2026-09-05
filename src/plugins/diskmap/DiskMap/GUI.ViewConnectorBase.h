@@ -6,6 +6,7 @@
 #include "TreeMap.FileData.CZDirectory.h"
 
 #ifdef SALAMANDER
+// Host callbacks DiskMap uses to focus/open paths and read plugin settings.
 class CSalamanderCallbackAbstract
 {
 public:
@@ -27,6 +28,7 @@ public:
 };
 #endif
 
+// Abstract link between the treemap view and the directory line (and Salamander).
 class CViewConnectorBase
 {
 public:

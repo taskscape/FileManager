@@ -73,6 +73,7 @@ typedef void (*IconPoolResultCallback)(CIconWorkItem* item, void* context);
 
 class CThreadOwner;
 
+// Worker pool that extracts panel icons in parallel and delivers results via callback.
 class CIconThreadPool
 {
 protected:

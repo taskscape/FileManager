@@ -138,6 +138,7 @@ Methods
 
 --*/
 
+// Array of COM interface pointers with automatic AddRef/Release.
 template <class T>
 class CComPtrArray
 {
@@ -509,6 +510,7 @@ Methods
 
 --*/
 
+// WIA transfer progress dialog shown while scanning or acquiring images.
 class CProgressDlg : public IUnknown
 {
 public:
@@ -1224,6 +1226,7 @@ Methods
 
 --*/
 
+// WIA data callback that receives scanned image streams.
 class CDataCallback : public IWiaDataCallback
 {
 public:

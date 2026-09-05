@@ -12,6 +12,7 @@ const TCHAR szLogWindowClass[] = TEXT("Zar.DM.LogWin.WC");
 
 #define LV_MARGIN 4
 
+// Diagnostic log window listing DiskMap logger messages.
 class CLogWindow : public CFrameWindow
 {
 protected:

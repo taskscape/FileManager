@@ -8,6 +8,7 @@
 // CPluginInterface
 //
 
+// Salamander archiver interface used to list and unpack TAR and related compressed archives.
 class CPluginInterfaceForArchiver : public CPluginInterfaceForArchiverAbstract
 {
 public:
@@ -46,6 +47,7 @@ public:
     virtual BOOL WINAPI PrematureDeleteTmpCopy(HWND parent, int copiesCount) { return FALSE; }
 };
 
+// Salamander viewer interface used to preview RPM/DEB package metadata.
 class CPluginInterfaceForViewer : public CPluginInterfaceForViewerAbstract
 {
 public:
@@ -56,6 +58,7 @@ public:
     virtual BOOL WINAPI CanViewFile(const char* name) { return TRUE; }
 };
 
+// Salamander plugin entry point that registers TAR and exposes its feature interfaces.
 class CPluginInterface : public CPluginInterfaceAbstract
 {
 public:

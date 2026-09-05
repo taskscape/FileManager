@@ -22,6 +22,7 @@ struct SARBlock
 
 #pragma pack(pop)
 
+// Debian .deb archive: ar wrapper with control.tar and data.tar members.
 class CDEBArchive : public CArchiveAbstract
 {
 private:

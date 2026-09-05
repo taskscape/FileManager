@@ -15,6 +15,7 @@
 
 #include "dispimpl.h"
 
+// Scriptable collection of panel items or the current selection.
 class CSalamanderPanelItemCollection : public CDispatchImpl<CSalamanderPanelItemCollection, ISalamanderPanelItemCollection>
 {
 public:

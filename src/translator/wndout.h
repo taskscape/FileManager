@@ -36,6 +36,7 @@ struct COutLine
     wchar_t* Text;            // stored text
 };
 
+// Output window listing translation validation messages.
 class COutWindow : public CWindow
 {
 protected:

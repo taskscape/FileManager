@@ -1571,6 +1571,7 @@ void ReleaseViewer()
     }
 }
 
+// Thread that creates and runs one PictView viewer window.
 class CViewerThread : public CThread
 {
 protected:

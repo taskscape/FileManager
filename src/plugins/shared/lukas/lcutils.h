@@ -100,6 +100,7 @@ public:
 
 extern CDialogStack DialogStack;
 
+// Pushes a dialog HWND onto CDialogStack for nested message boxes.
 class CDialogStackAutoObject
 {
 public:

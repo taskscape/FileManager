@@ -26,6 +26,8 @@ protected:
 //
 // CCompressParamsDlg
 //
+// Hosts compression level, method, dictionary, word size, and solid-archive controls.
+//
 
 class CCompressParamsDlg
 {
@@ -60,6 +62,8 @@ protected:
 //
 // CConfigurationDialog
 //
+// Plugin configuration dialog for listing options and default 7-Zip compression settings.
+//
 
 class CConfigurationDialog : public CCommonDialog
 {
@@ -82,6 +86,7 @@ protected:
 
 #define PASSWORD_LEN 128
 
+// Extended options shown when creating or updating a 7-Zip archive (method, password, “not again”).
 class CExtOptionsDialog : public CCommonDialog
 {
 private:
@@ -116,6 +121,8 @@ protected:
 //****************************************************************************
 //
 // CEnterPasswordDialog
+//
+// Prompts for the password needed to open an encrypted 7-Zip archive.
 //
 
 class CEnterPasswordDialog : public CCommonDialog

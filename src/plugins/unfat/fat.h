@@ -144,6 +144,7 @@ enum CAllocWholeFileEnum
     awfDisabled
 };
 
+// FAT12/16/32 image opened as an archive: lists directories and extracts files.
 class CFATImage
 {
 protected:

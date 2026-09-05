@@ -12,6 +12,7 @@
 
 #define PAK_MAXPATH 256
 
+// Callbacks the PAK engine uses to report I/O, progress, and errors to the plugin.
 class CPakCallbacksAbstract
 {
 public:
@@ -38,6 +39,7 @@ public:
     virtual BOOL DelNotify(const char* fileName, unsigned fileProgressTotal) = 0;
 };
 
+// Abstract PAK archive engine used to list, extract, add, delete, and optimize PAK files.
 class CPakIfaceAbstract
 {
 public:

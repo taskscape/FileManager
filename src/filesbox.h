@@ -58,6 +58,7 @@ enum CHeaderHitTestEnum
     hhtDivider, // divider of an item with adjustable width
 };
 
+// Custom header control that paints and resizes columns of the file list.
 class CFileListHeader : public CWindow
 {
 protected:

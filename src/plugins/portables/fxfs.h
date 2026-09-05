@@ -23,6 +23,7 @@ namespace Fx
 
     class CFxPathComponentToken;
 
+    // Path string for a plugin file system (components, separators, FS name).
     class CFxPath : public CFxString
     {
     protected:
@@ -75,6 +76,7 @@ namespace Fx
         CFxPath::XCHAR sep,
         CFxPath::XCHAR altSep);
 
+    // One path component token within a CFxPath.
     class CFxPathComponentToken
     {
     protected:
@@ -158,10 +160,12 @@ namespace Fx
         }
     };
 
+    // Path with traits (separators, case, relative-path rules) for a plugin FS.
     template <typename TTraits>
     class TFxPath : public CFxPath
     {
     private:
+        // Lets TFxPath construct and fill CFxPathComponentToken internals.
         class CFxPathComponentTokenFriend : public CFxPathComponentToken
         {
             friend class TFxPath<TTraits>;
@@ -405,6 +409,7 @@ namespace Fx
 
     typedef TFxPath<CFxStandardPathTraits> CFxStandardPath;
 
+    // Framework implementation of CPluginInterfaceForFSAbstract for FS plugins.
     class CFxPluginInterfaceForFS : public CPluginInterfaceForFSAbstract
     {
     protected:

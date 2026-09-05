@@ -214,6 +214,7 @@ public:
 
 typedef WORD HRegistryPath;
 
+// Trace-server persistent settings stored in the Windows registry.
 class CRegistry
 {
 protected:

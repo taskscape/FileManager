@@ -25,6 +25,7 @@ struct CSalamanderPluginViewerData;
 // ****************************************************************************
 // CPluginInterfaceForViewerAbstract
 //
+// Plugin API for opening a file in the plugin's viewer window.
 
 class CPluginInterfaceForViewerAbstract
 {

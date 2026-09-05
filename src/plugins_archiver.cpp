@@ -630,8 +630,9 @@ void CGUIToolbarHeader::SetNotifyWindow(HWND hWnd)
 }
 
 //
-// CButtonForPlugin
+// CToolbarHeaderForPlugin
 //
+// Host toolbar-header control that also exposes the CGUIToolbarHeaderAbstract plug-in interface.
 
 class CToolbarHeaderForPlugin : public CToolbarHeader
 {

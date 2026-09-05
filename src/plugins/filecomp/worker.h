@@ -119,6 +119,7 @@ typedef std::vector<CBinaryChange> CBinaryChanges;
 // CLineScript
 //
 
+// One displayed line in a text compare: class (change/blank) and intra-line change ranges.
 class CLineSpec
 {
 public:
@@ -275,26 +276,26 @@ struct CWorkerFileData
 class CFilecompWorker : public CThread
 {
 public:
-    // generic failure
+    // Generic compare failure with an error message for the UI.
     class CException : public std::exception
     {
     public:
         CException(const char* s = "Unspecified Error.") : exception(s) {}
         static void Raise(int error, int lastError, ...);
     };
-    // aborted by the user
+    // Thrown when the user cancels an in-progress compare.
     class CAbortByUserException : public std::exception
     {
     public:
         CAbortByUserException() : exception("") {}
     };
-    // files are identical
+    // Thrown when the compared files are identical.
     class CFilesDontDifferException : public std::exception
     {
     public:
         CFilesDontDifferException() : exception("") {}
     };
-    // files are identical
+    // Thrown when remaining differences were all ignored by compare options.
     class CAllDiffsIgnoredException : public std::exception
     {
     public:

@@ -3,6 +3,7 @@
 
 #pragma once
 
+// Minimal HWND wrapper that routes messages to a virtual WndProc.
 class CWindow
 {
 private:

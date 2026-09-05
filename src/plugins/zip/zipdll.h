@@ -41,6 +41,7 @@ public:
 // CPluginInterface
 //
 
+// Salamander archiver interface used to list, unpack, pack, and delete ZIP archives.
 class CPluginInterfaceForArchiver : public CPluginInterfaceForArchiverAbstract
 {
 public:
@@ -70,6 +71,7 @@ public:
     virtual BOOL WINAPI PrematureDeleteTmpCopy(HWND parent, int copiesCount) { return FALSE; }
 };
 
+// Salamander menu-extension interface that adds ZIP plugin commands to the menu.
 class CPluginInterfaceForMenuExt : public CPluginInterfaceForMenuExtAbstract
 {
 public:
@@ -80,6 +82,7 @@ public:
     virtual void WINAPI BuildMenu(HWND parent, CSalamanderBuildMenuAbstract* salamander) {}
 };
 
+// Salamander plugin entry point that registers ZIP and exposes its feature interfaces.
 class CPluginInterface : public CPluginInterfaceAbstract
 {
 public:

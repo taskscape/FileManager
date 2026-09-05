@@ -13,6 +13,7 @@
 #define BF_BLOCKTYPE_ADC 4
 #define BF_BLOCKTYPE_UNKNOWN 255
 
+// Image file that presents compressed, copied, or zero blocks as a linear stream.
 class CBlockedFile : public CFile
 {
 
@@ -27,6 +28,7 @@ public:
         int blockType;
     };
 
+    // Cached decoded block of a CBlockedFile.
     class CCachedBlock
     {
     public:
@@ -38,6 +40,7 @@ public:
         virtual DWORD Read(char* buf, DWORD BytesToRead) = 0;
     };
 
+    // Block filled with zeros.
     class CZeroBlock : public CCachedBlock
     {
     public:
@@ -46,6 +49,7 @@ public:
         virtual DWORD Read(char* buf, DWORD BytesToRead);
     };
 
+    // Block decompressed with zlib.
     class CZLIBBlock : public CCachedBlock
     {
     public:
@@ -59,6 +63,7 @@ public:
         char* Buffer;
     };
 
+    // Block decompressed with bzip2.
     class CBZIP2Block : public CCachedBlock
     {
     public:
@@ -72,6 +77,7 @@ public:
         char* Buffer;
     };
 
+    // Uncompressed block copied from the source file.
     class CCopyBlock : public CCachedBlock
     {
     public:

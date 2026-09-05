@@ -3,6 +3,7 @@
 
 #pragma once
 
+// Shared unpacker dialog helper that owns the HWND, centers the dialog, and subclasses statics.
 class CDlgRoot
 {
 public:

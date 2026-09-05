@@ -14,6 +14,7 @@ extern int CBHistoryEntries;
 
 void AddToHistory(const char* path);
 
+// Dialog that picks the two files (or folders) to compare.
 class CCompareFilesDialog : public CCommonDialog
 {
 protected:
@@ -299,6 +300,7 @@ protected:
 
 extern DWORD LastCfgPage;
 
+// Property-sheet dialog for File Comparator options and colors.
 class CConfigurationDialog : public CPropertyDialog
 {
 public:

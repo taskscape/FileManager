@@ -8,6 +8,7 @@
 class CCushion;
 class CCushionHitInfo;
 
+// Hit-test result naming the cushion under a point and its parent chain.
 class CCushionHitInfo
 {
 protected:

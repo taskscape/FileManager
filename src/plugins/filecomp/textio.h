@@ -79,6 +79,7 @@ public:
     }
 
 protected:
+    // Buffered sequential reader that also feeds an MD5 digest.
     class CByteReader
     {
     public:

@@ -106,6 +106,7 @@ typedef ULONG(FAR PASCAL* PFNMAPISENDMAIL)(LHANDLE lhSession,
 #define MAPI_E_INVALID_RECIPS 25
 #define MAPI_E_NOT_SUPPORTED 26
 
+// Loads MAPI32 and sends the collected file list as an email attachment.
 class CSimpleMAPI
 {
 protected:

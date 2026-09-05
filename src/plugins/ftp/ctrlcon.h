@@ -585,6 +585,7 @@ class CKeepAliveDataConSocket;
 class CFTPOperation;
 class CFTPWorker;
 
+// FTP control-channel socket: login, commands, listing, and keep-alive.
 class CControlConnectionSocket : public CSocket
 {
 private:

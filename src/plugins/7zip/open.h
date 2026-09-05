@@ -9,6 +9,7 @@
 #include "7za/CPP/7zip/IPassword.h"
 #include "7za/CPP/7zip/Archive/IArchive.h"
 
+// 7-Zip open callback that supplies passwords and additional volumes while an archive is opened.
 class CArchiveOpenCallbackImp : public IArchiveOpenCallback,
                                 public IArchiveOpenVolumeCallback,
                                 public ICryptoGetTextPassword,

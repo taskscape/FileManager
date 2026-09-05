@@ -5,6 +5,7 @@
 
 #include "../compress/compress.h"
 
+// LZH-compressed wrapper around a TAR stream.
 class CLZH : public CZippedFile
 {
 public:

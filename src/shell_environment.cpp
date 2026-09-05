@@ -75,6 +75,7 @@ struct CEnvVariable
     DWORD Type;        // 0
 };
 
+// Snapshot of process environment variables used to detect and apply env-block differences.
 class CEnvVariables
 {
 protected:

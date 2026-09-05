@@ -47,6 +47,7 @@ public:
     BOOL IsHeld() const { return Held; }
 };
 
+// Process-wide cap on concurrent FTP control connections per host:port.
 class CFTPConnectionAdmission
 {
 protected:

@@ -32,6 +32,7 @@
 	crashes.
 */
 
+// Implements IDispatch/IDispatchEx so scripts can call a Salamander COM object.
 template <typename T, typename Interface>
 class CDispatchImpl : public Interface,
                       public IDispatchEx,

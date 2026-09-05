@@ -15,6 +15,7 @@
 
 #include "dispimpl.h"
 
+// Scriptable progress dialog wrapping Salamander's one- or two-bar operation UI.
 class CSalamanderProgressAutomation : public CDispatchImpl<CSalamanderProgressAutomation, ISalamanderProgressDialog>
 {
 public:

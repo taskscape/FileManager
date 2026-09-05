@@ -14,6 +14,7 @@
 
 #pragma once
 
+// Hidden window that receives WPD device-arrival and removal notifications.
 class CWpdNotifier
 {
 private:

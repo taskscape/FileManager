@@ -40,6 +40,7 @@ enum CFilterCriteriaTimeUnitsEnum
     fctuYears
 };
 
+// Size, date, time, and attribute tests used to filter files in Find, Copy, and panel filters.
 class CFilterCriteria
 {
 protected:

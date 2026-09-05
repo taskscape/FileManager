@@ -38,6 +38,7 @@ struct COptDlgData
 
 #define OPTIMIZE_MENUID 0x01
 
+// Salamander archiver interface used to list, unpack, pack, and delete PAK archives.
 class CPluginInterfaceForArchiver : public CPluginInterfaceForArchiverAbstract
 {
 public:
@@ -103,6 +104,7 @@ public:
     void DeleteSourceFiles(TIndirectArray2<CFileInfo>& files, const char* sourcePath);
 };
 
+// Salamander menu-extension interface that adds PAK optimize commands to the menu.
 class CPluginInterfaceForMenuExt : public CPluginInterfaceForMenuExtAbstract
 {
 public:
@@ -113,6 +115,7 @@ public:
     virtual void WINAPI BuildMenu(HWND parent, CSalamanderBuildMenuAbstract* salamander) {}
 };
 
+// Salamander plugin entry point that registers PAK and exposes its feature interfaces.
 class CPluginInterface : public CPluginInterfaceAbstract
 {
 public:
@@ -141,6 +144,7 @@ public:
     virtual void WINAPI PasswordManagerEvent(HWND parent, int event) {}
 };
 
+// Plugin-side PAK callbacks that drive Salamander progress, SafeSeek, and error UI.
 class CPakCallbacks : public CPakCallbacksAbstract
 {
     BOOL UserBreak;

@@ -138,6 +138,7 @@ enum CFTPQueueItemAction
     fqiaUploadTestIfFinished,     // upload: we sent the entire file + the server "just" did not respond, most likely the file is OK, we will test it
 };
 
+// Base that tracks a queue item's state and parent counters.
 class CFTPQueueItemAncestor
 {
 private:
@@ -941,6 +942,7 @@ struct CFTPFileToClose
                     BOOL deleteFile, CQuadWord* setEndOfFile);
 };
 
+// Background thread that opens/closes local files for FTP transfers.
 class CFTPDiskThread : public CThread
 {
 protected:
@@ -1356,6 +1358,7 @@ enum CUploadType
 
 class CUploadDataConnectionSocket;
 
+// Operation worker: one FTP control socket that processes queue items.
 class CFTPWorker : public CSocket
 {
 protected:
@@ -2249,6 +2252,7 @@ enum COperationState
 
 #define SMPLCMD_APPROXBYTESIZE 1000 // approximate size of processing a single item in bytes for measuring the speed of Delete and ChangeAttrs operations
 
+// One FTP copy/move/delete/chmod operation and its worker pool and queue.
 class CFTPOperation
 {
 public:
@@ -3067,6 +3071,7 @@ enum CWorkerWaitSatisfiedReason // events monitored in CFTPOperationsList::WaitF
     wwsrWorkerSocketClosure, // a worker's socket was closed
 };
 
+// Global list of running FTP operations (progress dialogs and wait-for-ESC).
 class CFTPOperationsList
 {
 protected:
@@ -3203,6 +3208,7 @@ struct CReturningConnectionData
     }
 };
 
+// Queue of control connections being returned from workers to the panel.
 class CReturningConnections
 {
 protected:
@@ -3675,6 +3681,7 @@ enum CFTPFileAccessType
     ffatRename, // during renaming (for both the old and new name)
 };
 
+// Tracks a file currently open for FTP download, upload, delete, or rename.
 class CFTPOpenedFile
 {
 protected:

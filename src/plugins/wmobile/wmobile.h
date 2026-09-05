@@ -57,6 +57,7 @@ extern char TitleWMobileQuestion[];
 // CPluginInterface
 //
 
+// Registers the Windows Mobile / RAPI virtual file system with Salamander.
 class CPluginInterfaceForFS : public CPluginInterfaceForFSAbstract
 {
 protected:
@@ -92,6 +93,7 @@ public:
     virtual void WINAPI ExecuteChangeDrivePostCommand(int panel, int postCmd, void* postCmdParam);
 };
 
+// Plugin entry point that registers Windows Mobile with Salamander.
 class CPluginInterface : public CPluginInterfaceAbstract
 {
 public:
@@ -260,6 +262,7 @@ struct CFileInfo
 
 typedef TDirectArray<CFileInfo> CFileInfoArray;
 
+// Static wrapper around Remote API (RAPI) for Windows CE device access.
 class CRAPI
 {
 public:

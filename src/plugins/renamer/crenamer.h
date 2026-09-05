@@ -101,6 +101,7 @@ enum CRenamerErrorType
 
 // ****************************************************************************
 
+// Applies a rename spec (mask, case, pattern) to one source file.
 class CRenamer
 {
 protected:

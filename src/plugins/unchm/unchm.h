@@ -28,6 +28,7 @@ class CPluginInterfaceForViewer: public CPluginInterfaceForViewerAbstract
 };
 */
 
+// Salamander archiver interface used to list and unpack CHM archives.
 class CPluginInterfaceForArchiver : public CPluginInterfaceForArchiverAbstract
 {
 protected:
@@ -76,6 +77,7 @@ class CPluginInterfaceForMenuExt: public CPluginInterfaceForMenuExtAbstract
 };
 */
 
+// Salamander plugin entry point that registers UnCHM and exposes its feature interfaces.
 class CPluginInterface : public CPluginInterfaceAbstract
 {
 public:
@@ -104,6 +106,7 @@ public:
     virtual void WINAPI PasswordManagerEvent(HWND parent, int event) {}
 };
 
+// Per-listing plugin data attached to CHM items (release of per-file plugin pointers).
 class CPluginDataInterface : public CPluginDataInterfaceAbstract
 {
 public:

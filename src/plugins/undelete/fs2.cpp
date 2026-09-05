@@ -573,6 +573,7 @@ struct FL_ITEM
     ~FL_ITEM() { delete[] Name; }
 };
 
+// Collects recovered names for CopyOrMoveFromFS and disambiguates duplicates.
 class CFileList : public TIndirectArray<FL_ITEM>
 {
 public:

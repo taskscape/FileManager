@@ -13,6 +13,7 @@
 // CUDFISO
 //
 
+// Bridge filesystem that lists ISO 9660, UDF, and/or HFS trees from the same track.
 class CUDFISO : public CUnISOFSAbstract
 {
 public:

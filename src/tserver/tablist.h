@@ -32,6 +32,7 @@ protected:
     void GotoError(int nVirtKey);
 };
 
+// List-view of TRACE messages with process, thread, and timing columns.
 class CTabList : public CWindow
 {
 protected:

@@ -12,6 +12,7 @@ enum ELockState
     ELS_GDI
 };
 
+// Bitmap that can be locked as a pixmap or as a GDI HBITMAP.
 class CZBitmap
 {
 protected:

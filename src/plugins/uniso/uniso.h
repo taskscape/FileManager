@@ -30,6 +30,7 @@ class CISOImage;
 // CPluginInterface
 //
 
+// Salamander viewer interface used to dump ISO image metadata to a text view.
 class CPluginInterfaceForViewer : public CPluginInterfaceForViewerAbstract
 {
 public:
@@ -40,6 +41,7 @@ public:
     virtual BOOL WINAPI CanViewFile(const char* name);
 };
 
+// Salamander archiver interface used to list and unpack ISO and related disk images.
 class CPluginInterfaceForArchiver : public CPluginInterfaceForArchiverAbstract
 {
 protected:
@@ -76,6 +78,7 @@ public:
     BOOL Init();
 };
 
+// Salamander plugin entry point that registers UnISO and exposes its feature interfaces.
 class CPluginInterface : public CPluginInterfaceAbstract
 {
 public:
@@ -104,6 +107,7 @@ public:
     virtual void WINAPI PasswordManagerEvent(HWND parent, int event) {}
 };
 
+// Per-listing plugin data for ISO items (CCD warning flag and plugin-data cleanup).
 class CPluginDataInterface : public CPluginDataInterfaceAbstract
 {
 public:

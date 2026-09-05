@@ -5,6 +5,7 @@
 
 #include "Utils.CZIconLoader.h"
 
+// Queues shell-icon loads and posts the result to an owner window.
 class CZSmartIconLoader
 {
 protected:

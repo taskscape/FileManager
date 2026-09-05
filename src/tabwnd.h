@@ -6,6 +6,7 @@
 //
 // ****************************************************************************
 
+// Directory-tab strip associated with a file panel (reserved for future multi-tab panels).
 class CTabWindow : public CWindow
 {
 public:

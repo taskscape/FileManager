@@ -285,6 +285,7 @@ typedef enum rpmTag_e
 unsigned short RPMToShort(unsigned short value);
 unsigned long RPMToLong(unsigned long value);
 
+// RPM package reader that skips headers and exposes the compressed payload stream.
 class CRPM : public CDecompressFile
 {
 private:

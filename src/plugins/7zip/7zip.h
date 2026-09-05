@@ -43,6 +43,7 @@ class CPluginInterfaceForViewer: public CPluginInterfaceForViewerAbstract
 };
 */
 
+// Salamander archiver interface used to list, unpack, pack, and delete 7-Zip archives.
 class CPluginInterfaceForArchiver : public CPluginInterfaceForArchiverAbstract
 {
 protected:
@@ -79,6 +80,7 @@ public:
     BOOL Init();
 };
 
+// Salamander menu-extension interface that adds 7-Zip plugin commands to the menu.
 class CPluginInterfaceForMenuExt : public CPluginInterfaceForMenuExtAbstract
 {
 public:
@@ -88,6 +90,7 @@ public:
     virtual void WINAPI BuildMenu(HWND parent, CSalamanderBuildMenuAbstract* salamander) {}
 };
 
+// Salamander plugin entry point that registers 7-Zip and exposes its feature interfaces.
 class CPluginInterface : public CPluginInterfaceAbstract
 {
 public:
@@ -119,6 +122,7 @@ protected:
     void SetDefaultConfiguration();
 };
 
+// Per-listing plugin data that holds the 7-Zip client, password, and extra list columns.
 class CPluginDataInterface : public CPluginDataInterfaceAbstract
 {
 protected:

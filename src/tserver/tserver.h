@@ -200,6 +200,7 @@ public:
 // CGlobalDataArray
 //
 
+// One TRACE message received from a Salamander process.
 class CGlobalDataMessage
 {
 public:
@@ -235,6 +236,7 @@ struct CThreadInformation
     WCHAR* Name;
 };
 
+// In-memory TRACE store: messages, processes, threads, and editor connection.
 class CGlobalData
 {
 public:

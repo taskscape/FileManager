@@ -28,6 +28,7 @@ struct CArchiveItemInfo;
 
 typedef std::map<UINT32, CArchiveItemInfo*> ItemsToExtractMap;
 
+// 7-Zip extract callback that writes files, reports progress, and handles overwrite/password prompts.
 class CExtractCallbackImp : public IArchiveExtractCallback,
                             //  public IFolderArchiveExtractCallback,
                             public ICryptoGetTextPassword,

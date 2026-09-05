@@ -249,6 +249,7 @@ enum CIDTTgtType
     idtttFullPluginFSPath, // FS to FS
 };
 
+// IDropTarget that routes shell drag-and-drop onto a panel, archive, or plugin filesystem.
 class CImpDropTarget : public IDropTarget
 {
 private:
@@ -374,6 +375,7 @@ struct IShellFolder;
 struct IContextMenu;
 struct IContextMenu2;
 
+// Holds the Explorer "New" submenu (IContextMenu2 + HMENU) for creating files from templates.
 class CMenuNew
 {
 protected:

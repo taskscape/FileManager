@@ -15,6 +15,7 @@
 
 #include "dispimpl.h"
 
+// Scriptable view of one panel file or directory (path, size, dates, attributes).
 class CSalamanderPanelItemAutomation : public CDispatchImpl<CSalamanderPanelItemAutomation, ISalamanderPanelItem>
 {
 private:

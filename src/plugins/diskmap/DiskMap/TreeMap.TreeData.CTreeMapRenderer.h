@@ -6,6 +6,7 @@
 #include "TreeMap.TreeData.h"
 #include "TreeMap.TreeData.CCushionRow.h"
 
+// Layouts cushions with a maximum aspect-ratio constraint.
 class CTreeMapRendererMaxRatio : public CTreeMapRendererBase
 {
 protected:

@@ -12,6 +12,7 @@
 
 #pragma once
 
+// Registers the Network Neighborhood virtual file system with Salamander.
 class CNethoodPluginInterfaceForFS : public CPluginInterfaceForFSAbstract
 {
 private:

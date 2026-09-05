@@ -13,6 +13,7 @@
 
 #pragma once
 
+// Active Scripting host site that binds a script engine to Salamander automation.
 class CScriptSite : public IActiveScriptSite,
                     public IActiveScriptSiteWindow,
                     public IActiveScriptSiteDebug32,

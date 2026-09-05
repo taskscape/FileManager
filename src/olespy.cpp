@@ -366,6 +366,7 @@ struct SPYBLK
     char szStackTail[SPYBLK_STACKLEN]; // the last line from the call stack
 };
 
+// IMallocSpy implementation that tracks OLE allocations to detect leaks and peak usage.
 class CMallocSpy : public IMallocSpy
 {
 private:

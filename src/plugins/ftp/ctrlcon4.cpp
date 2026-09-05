@@ -812,6 +812,7 @@ BOOL CControlConnectionSocket::ListWorkingPath(HWND parent, const char* path, ch
     return ret;
 }
 
+// Wait-window callbacks used while finishing a keep-alive command.
 class CFinishingKeepAliveUserIface : public CSendCmdUserIfaceAbstract
 {
 protected:

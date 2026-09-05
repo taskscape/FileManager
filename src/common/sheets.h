@@ -42,6 +42,7 @@ protected:
     TDirectArray<CElasticLayoutCtrl> MoveCtrls;
 };
 
+// One page of a Win32 property sheet, with optional elastic control layout.
 class CPropSheetPage : protected CDialog
 {
 public:
@@ -95,6 +96,7 @@ protected:
 
 // ****************************************************************************
 
+// Modal property sheet that owns a list of CPropSheetPage pages.
 class CPropertyDialog : public TIndirectArray<CPropSheetPage>
 {
 public:

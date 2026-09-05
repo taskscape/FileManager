@@ -303,6 +303,7 @@ BOOL GetColumnEmptyValueForType(char* buf, int bufSize, CSrvTypeColumnTypes type
 BOOL GetColumnEmptyValue(const char* empty, CSrvTypeColumnTypes type, CQuadWord* qwVal,
                          __int64* int64Val, SYSTEMTIME* stVal, BOOL skipDateCheck);
 
+// Shared left/right panel column widths for one FTP server-type column.
 class CSrvTypeColWidths
 {
 protected:
@@ -1020,6 +1021,7 @@ enum CMLSDMode
     mlsdAuto
 };
 
+// Persistent FTP client settings (defaults, keep-alive, MLSD, proxies, …).
 class CConfiguration
 {
 public:
@@ -1208,6 +1210,7 @@ void PersistFTPConfigurationAfterUserCommit(HWND parent);
 // CPluginInterface
 //
 
+// Registers the FTP virtual file system with Salamander.
 class CPluginInterfaceForFS : public CPluginInterfaceForFSAbstract
 {
 protected:
@@ -1243,6 +1246,7 @@ public:
     virtual void WINAPI ExecuteChangeDrivePostCommand(int panel, int postCmd, void* postCmdParam);
 };
 
+// FTP menu commands (disconnect, send command, show logs, …).
 class CPluginInterfaceForMenuExt : public CPluginInterfaceForMenuExtAbstract
 {
 public:
@@ -1253,6 +1257,7 @@ public:
     virtual void WINAPI BuildMenu(HWND parent, CSalamanderBuildMenuAbstract* salamander) {}
 };
 
+// Plugin entry point that registers the FTP client with Salamander.
 class CPluginInterface : public CPluginInterfaceAbstract
 {
 public:
@@ -1385,6 +1390,7 @@ struct CFTPTime // structure for storing a value for a column of type stctGenera
 
 #pragma pack(pop, enter_include_ftp_h_dt)
 
+// Per-item listing fields (size, date, rights) for FTP panel columns.
 class CFTPListingPluginDataInterface : public CPluginDataInterfaceAbstract
 {
 protected:
@@ -1538,6 +1544,7 @@ enum CFTPErrorState
     fesInaccessiblePath, // the path cannot be listed, the path must be shortened
 };
 
+// One connected FTP site presented as a Salamander file-system path.
 class CPluginFSInterface : public CPluginFSInterfaceAbstract
 {
 protected:

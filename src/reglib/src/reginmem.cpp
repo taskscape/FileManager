@@ -33,6 +33,7 @@ namespace RegLib
         VT_INVALID = -1
     } eVT_VALUE_TYPE;
 
+    // One registry value stored in the in-memory hive.
     class CValue
     {
     public:
@@ -84,6 +85,7 @@ namespace RegLib
         virtual BOOL RemoveHiddenKeysAndValues();
     };
 
+    // Root key of the in-memory registry tree.
     class CRootKey : public CKey
     {
     public:
@@ -92,6 +94,7 @@ namespace RegLib
         virtual BOOL Dump(HANDLE hFile, LPCTSTR fullKeyName, LPTSTR name, size_t maxlen);
     };
 
+    // In-memory implementation of CSalamanderRegistryExAbstract (import/export).
     class CMemoryRegistry : public CSalamanderRegistryExAbstract
     {
     public:

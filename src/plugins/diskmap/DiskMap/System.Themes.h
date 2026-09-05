@@ -5,6 +5,7 @@
 
 #include <Uxtheme.h>
 
+// Placeholder for visual-styles setup; currently a no-op.
 class CThemes
 {
 protected:

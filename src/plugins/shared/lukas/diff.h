@@ -161,6 +161,7 @@ struct binary_function
     using result_type = Result;
 };
 
+// First-party comparator: tests equality of two random-access sequences at indexes i and j.
 template <class iterator>
 class sequence_comparator_t : binary_function<size_t, size_t, bool>
 {
@@ -196,6 +197,7 @@ public:
 // diff
 //
 
+// Shared Myers-diff state: match/delete/insert opcodes and forward/reverse traces.
 class diff_base
 {
 public:
@@ -227,6 +229,7 @@ protected:
     ptrdiff_t rv(ptrdiff_t k) { return rvi[k]; }
 };
 
+// Myers shortest-edit-script over two sequences using caller-supplied equal/edit functors.
 template <class equal_t, class edit_t>
 class diff_t : public diff_base
 {

@@ -289,6 +289,7 @@ struct CFileData // destructor must not be added here!
 
 class CPluginDataInterfaceAbstract;
 
+// Listing of files and directories a plugin fills for an archive or file system.
 class CSalamanderDirectoryAbstract
 {
 public:
@@ -547,6 +548,7 @@ struct CColumn
 // CPluginDataInterfaceAbstract). If plugin changes view mode, change is permanent
 // (e.g. switching to Thumbnails mode remains even after leaving plugin path).
 
+// Host API for reading and adjusting the current panel view mode and columns.
 class CSalamanderViewAbstract
 {
 public:

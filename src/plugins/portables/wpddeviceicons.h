@@ -13,6 +13,7 @@
 
 #pragma once
 
+// Image list of simple icons for WPD device types.
 class CWpdDeviceIcons
 {
 public:

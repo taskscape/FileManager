@@ -20,6 +20,7 @@ extern CSalamanderGeneralAbstract* SalamanderGeneral;
 // CPluginInterface
 //
 
+// Salamander archiver interface used to list and unpack ARJ archives (including volumes).
 class CPluginInterfaceForArchiver : public CPluginInterfaceForArchiverAbstract
 {
 protected:
@@ -81,6 +82,7 @@ public:
     BOOL ConstructMaskArray(TIndirectArray2<char>& maskArray, const char* masks);
 };
 
+// Salamander plugin entry point that registers UnARJ and exposes its feature interfaces.
 class CPluginInterface : public CPluginInterfaceAbstract
 {
 public:

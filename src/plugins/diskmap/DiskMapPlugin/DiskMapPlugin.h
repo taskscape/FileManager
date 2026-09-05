@@ -19,6 +19,7 @@ extern int SalamanderVersion;
 // CPluginInterface
 //
 
+// Menu command that opens the DiskMap treemap window.
 class CPluginInterfaceForMenuExt : public CPluginInterfaceForMenuExtAbstract
 {
 public:
@@ -29,6 +30,7 @@ public:
     virtual void WINAPI BuildMenu(HWND parent, CSalamanderBuildMenuAbstract* salamander) {}
 };
 
+// Plugin entry point that registers DiskMap with Salamander.
 class CPluginInterface : public CPluginInterfaceAbstract
 {
 public:

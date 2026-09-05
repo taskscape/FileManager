@@ -3,6 +3,7 @@
 
 #pragma once
 
+// 32-bit pixmap buffer used while composing treemap graphics.
 class CPixMap
 {
     friend class CZBitmap;

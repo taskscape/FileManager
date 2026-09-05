@@ -101,6 +101,7 @@ struct IUpdateCallbackUI
   virtual HRESULT CloseProgress() { return S_OK; };
 };
 */
+// 7-Zip update callback that feeds files, properties, and an optional password into archive packing.
 class CArchiveUpdateCallback : public IArchiveUpdateCallback2,
                                public ICryptoGetTextPassword2,
                                public CMyUnknownImp

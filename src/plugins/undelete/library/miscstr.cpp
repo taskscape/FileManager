@@ -19,6 +19,7 @@
 // LoadStr() - helper function for reading strings from resources
 //
 
+// Serializes LoadStr access to the undelete plugin string table.
 class CStringResourceLock
 {
 public:

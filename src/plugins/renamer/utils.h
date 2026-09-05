@@ -29,6 +29,7 @@ int FormatUserDateTimeAnsi(const SYSTEMTIME* time, DWORD flags, const char* form
 
 // ****************************************************************************
 
+// Growable byte buffer used by Renamer dialogs.
 class CBuffer
 {
 public:
@@ -55,6 +56,7 @@ protected:
     BOOL Persistent;
 };
 
+// Typed wrapper around CBuffer for arrays of DATA_TYPE.
 template <class DATA_TYPE>
 class TBuffer : public CBuffer
 {

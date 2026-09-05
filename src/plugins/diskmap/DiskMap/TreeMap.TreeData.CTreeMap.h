@@ -12,6 +12,7 @@ class CCushion;
 class CCushionRow;
 class CCushionDirectory;
 
+// Built treemap: root directory, cushion tree, and renderer.
 class CTreeMap
 {
 protected:

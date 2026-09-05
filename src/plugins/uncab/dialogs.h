@@ -5,6 +5,7 @@
 
 #include <strsafe.h> // counted bounded copies (StringCchCopyNA)
 
+// Shared unpacker dialog helper that owns the HWND, centers the dialog, and subclasses statics.
 class CDlgRoot
 {
 public:
@@ -21,6 +22,7 @@ public:
     void SubClassStatic(DWORD wID, BOOL subclass);
 };
 
+// Prompts for the next CAB cabinet when a multi-volume unpack continues.
 class CNextVolumeDialog : public CDlgRoot
 {
     char* VolumeName;
@@ -50,6 +52,7 @@ public:
 
 INT_PTR NextVolumeDialog(HWND parent, char* volumeName, char* volumePath, char* diskName, int cabNumber);
 
+// Warns that a file continues from a previous CAB cabinet and asks how to proceed.
 class CContinuedFileDialog : public CDlgRoot
 {
     const char* File;
@@ -68,6 +71,7 @@ public:
 
 INT_PTR ContinuedFileDialog(HWND parent, const char* file);
 
+// UnCAB configuration dialog.
 class CConfigDialog : public CDlgRoot
 {
 
@@ -83,6 +87,7 @@ public:
 
 INT_PTR ConfigDialog(HWND parent);
 
+// Warns that the CAB archive cannot be listed completely (missing cabinets).
 class CAttentionDialog : public CDlgRoot
 {
 public:
