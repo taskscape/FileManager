@@ -551,6 +551,9 @@ static ECopyCommitPhase VerifyAndCommitCopyTarget(COperation* op, HWND hProgress
             }
         }
         *transactionalTargetCommitted = TRUE;
+        // A committed replacement cannot be retried; report attribute loss separately.
+        if (commitResult.CleanupErrorCount != 0)
+            RecordMetadataLoss(dlgData, mmlAttributes, op->SourceName, requestedTargetName);
         if (copyADS)
         {
             // The commit merged the replaced file's streams into the

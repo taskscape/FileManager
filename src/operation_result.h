@@ -28,7 +28,9 @@ enum EOperationCleanupPhase
 {
     orcpNone,
     orcpCloseVerificationHandle,
-    orcpDeleteUnverifiedTarget
+    orcpDeleteUnverifiedTarget,
+    // Attribute rollback must not hide a failed commit or cause it to run twice.
+    orcpRestoreReadOnlyAttribute
 };
 
 struct COperationCleanupError
@@ -103,6 +105,8 @@ struct COperationResult
         {
         case orcpCloseVerificationHandle: return "close-verification-handle";
         case orcpDeleteUnverifiedTarget: return "delete-unverified-target";
+        // Keep restoration failures distinguishable in copy-dialog diagnostics.
+        case orcpRestoreReadOnlyAttribute: return "restore-read-only-attribute";
         default: return "none";
         }
     }

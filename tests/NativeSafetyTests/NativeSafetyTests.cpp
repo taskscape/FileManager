@@ -7,6 +7,7 @@
 
 #include "../../src/common/checked_arithmetic.h"
 #include "../../src/operation_execution_filesystem.h"
+#include "../../src/common/scoped_readonly_file.h"
 
 namespace
 {
@@ -164,6 +165,87 @@ CPhaseFailingFileSystem::EFailingPhase RunTransactionalFaultSequence(COperationE
     return CPhaseFailingFileSystem::fpSuccess;
 }
 
+// Exercise actual Windows replacement, including Git-style read-only files and
+// a sharing failure, so rollback and handle-based restoration are verified on disk.
+int TestReadOnlyReplacement()
+{
+    wchar_t temporaryPath[MAX_PATH];
+    wchar_t target[MAX_PATH];
+    wchar_t stage[MAX_PATH];
+    if (!GetTempPathW(_countof(temporaryPath), temporaryPath) ||
+        !GetTempFileNameW(temporaryPath, L"rot", 0, target))
+        return Fail("could not reserve read-only replacement target");
+    if (!GetTempFileNameW(temporaryPath, L"ros", 0, stage))
+    {
+        DeleteFileW(target);
+        return Fail("could not reserve read-only replacement stage");
+    }
+
+    const char* failure = NULL;
+    for (int scenario = 0; scenario < 8 && failure == NULL; ++scenario)
+    {
+        const DWORD targetAttrs = (scenario & 1) ? FILE_ATTRIBUTE_READONLY : FILE_ATTRIBUTE_NORMAL;
+        const DWORD stageAttrs = (scenario & 2) ? FILE_ATTRIBUTE_READONLY : FILE_ATTRIBUTE_NORMAL;
+        const BOOL blockReplacement = (scenario & 4) != 0;
+        HANDLE files[2] = {
+            CreateFileW(target, GENERIC_WRITE, 0, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL),
+            CreateFileW(stage, GENERIC_WRITE, 0, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL)};
+        for (int i = 0; i < 2; ++i)
+        {
+            DWORD written;
+            if (files[i] == INVALID_HANDLE_VALUE ||
+                !WriteFile(files[i], i == 0 ? "old" : "new", 3, &written, NULL) || written != 3)
+                failure = "could not write read-only replacement fixture";
+            if (files[i] != INVALID_HANDLE_VALUE)
+                CloseHandle(files[i]);
+        }
+        if (!SetFileAttributesW(target, targetAttrs) || !SetFileAttributesW(stage, stageAttrs))
+            failure = "could not set replacement fixture attributes";
+
+        HANDLE blocker = blockReplacement ? CreateFileW(target, GENERIC_READ,
+            FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_EXISTING, 0, NULL) : INVALID_HANDLE_VALUE;
+        if (blockReplacement && blocker == INVALID_HANDLE_VALUE)
+            failure = "could not block replacement for rollback test";
+        {
+            CScopedReadOnlyFile original;
+            CScopedReadOnlyFile replacement;
+            if (failure == NULL && (!original.MakeWritable(target) || !replacement.MakeWritable(stage)))
+                failure = "could not prepare read-only replacement";
+            if (failure == NULL)
+            {
+                const BOOL committed = ReplaceFileW(target, stage, NULL, REPLACEFILE_WRITE_THROUGH, NULL, NULL);
+                if (committed)
+                    original.Dismiss();
+                if (committed == blockReplacement)
+                    failure = "replacement did not match the expected sharing outcome";
+                if (!replacement.Restore() || (!committed && !original.Restore()))
+                    failure = "read-only restoration failed after replacement";
+            }
+        }
+        if (blocker != INVALID_HANDLE_VALUE)
+            CloseHandle(blocker);
+        const DWORD expected = blockReplacement ? targetAttrs : stageAttrs;
+        if ((GetFileAttributesW(target) & FILE_ATTRIBUTE_READONLY) != (expected & FILE_ATTRIBUTE_READONLY))
+            failure = "replacement did not preserve destination read-only state";
+        if (blockReplacement &&
+            (GetFileAttributesW(stage) & FILE_ATTRIBUTE_READONLY) != (stageAttrs & FILE_ATTRIBUTE_READONLY))
+            failure = "failed replacement changed stage read-only state";
+        HANDLE check = CreateFileW(target, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, 0, NULL);
+        char actual[3];
+        DWORD read = 0;
+        if (check == INVALID_HANDLE_VALUE || !ReadFile(check, actual, sizeof(actual), &read, NULL) ||
+            read != 3 || memcmp(actual, blockReplacement ? "old" : "new", 3) != 0)
+            failure = "replacement did not preserve the expected file content";
+        if (check != INVALID_HANDLE_VALUE)
+            CloseHandle(check);
+        SetFileAttributesW(target, FILE_ATTRIBUTE_NORMAL);
+        SetFileAttributesW(stage, FILE_ATTRIBUTE_NORMAL);
+    }
+    DeleteFileW(target);
+    DeleteFileW(stage);
+    return failure != NULL ? Fail(failure) : 0;
+}
+
 int TestExecutionAdapterFaultInjection()
 {
     const CPhaseFailingFileSystem::EFailingPhase phases[] = {
@@ -201,5 +283,8 @@ int main()
     if (result != 0)
         return result;
     result = TestNativeFileOperationCharacterization();
+    // Run the real-filesystem regression before deterministic fault injection.
+    if (result == 0)
+        result = TestReadOnlyReplacement();
     return result != 0 ? result : TestExecutionAdapterFaultInjection();
 }

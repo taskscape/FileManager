@@ -14,6 +14,7 @@
 #include "worker.h"
 
 #include "async_copy_internals.h"
+#include "common/scoped_readonly_file.h"
 
 // Transactional target creation/commit, durability verification, SHA-256 content
 // verification, and SalCreateFileEx extracted from async_copy.cpp as a mechanical
@@ -219,21 +220,39 @@ COperationResult CommitTransactionalTargetFile(const char* targetName, const cha
         return COperationResult::Failure(orpVerifyDestinationIdentity, error, temporaryName, targetName,
                                          IsRetryableOperationError(error), opeTemporaryTargetReady);
 
-    if (OperationExecutionFileSystem().ReplaceFile(targetName, temporaryName))
-        return COperationResult::Success(orpCommitTransactionalTarget, temporaryName, targetName,
-                                         opeTemporaryTargetReady | opeDestinationCommitted);
-
-    error = GetLastError();
-    if (error == ERROR_FILE_NOT_FOUND &&
-        OperationExecutionFileSystem().MoveFile(temporaryName, targetName))
+    // Git pack files are read-only on both sides. Clear that bit only for the
+    // commit, restoring both files on failure and the replacement after success.
+    CScopedReadOnlyFile targetAttributes;
+    CScopedReadOnlyFile temporaryAttributes;
+    CPathW targetPathW(targetName);
+    CPathW temporaryPathW(temporaryName);
+    BOOL committed = FALSE;
+    if (targetAttributes.MakeWritable(targetPathW.GetPathForWin32Api(), TRUE) &&
+        temporaryAttributes.MakeWritable(temporaryPathW.GetPathForWin32Api()))
     {
-        return COperationResult::Success(orpCommitTransactionalTarget, temporaryName, targetName,
-                                         opeTemporaryTargetReady | opeDestinationCommitted);
+        committed = OperationExecutionFileSystem().ReplaceFile(targetName, temporaryName);
+        error = committed ? ERROR_SUCCESS : GetLastError();
+        if (!committed && error == ERROR_FILE_NOT_FOUND)
+        {
+            committed = OperationExecutionFileSystem().MoveFile(temporaryName, targetName);
+            error = committed ? ERROR_SUCCESS : GetLastError();
+        }
     }
-    if (error == ERROR_FILE_NOT_FOUND)
+    else
         error = GetLastError();
-    return COperationResult::Failure(orpCommitTransactionalTarget, error, temporaryName, targetName,
-                                     IsRetryableOperationError(error), opeTemporaryTargetReady);
+
+    COperationResult result = committed ?
+        COperationResult::Success(orpCommitTransactionalTarget, temporaryName, targetName,
+                                  opeTemporaryTargetReady | opeDestinationCommitted) :
+        COperationResult::Failure(orpCommitTransactionalTarget, error, temporaryName, targetName,
+                                  IsRetryableOperationError(error), opeTemporaryTargetReady);
+    if (committed)
+        targetAttributes.Dismiss();
+    else if (!targetAttributes.Restore())
+        result.AppendCleanupError(orcpRestoreReadOnlyAttribute, GetLastError(), targetName);
+    if (!temporaryAttributes.Restore())
+        result.AppendCleanupError(orcpRestoreReadOnlyAttribute, GetLastError(), committed ? targetName : temporaryName);
+    return result;
 }
 
 // TRUE when the source carries a stream of this name. Files hold a handful of
