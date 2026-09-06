@@ -451,7 +451,9 @@ CHECK_CERT_AGAIN:
     {
         ok = false;
         AddNewLine(buf, maxlen);
-        StringCchCopyNA(buf, maxlen, LoadStr(timeResult < 0 ? IDS_SSL_ERR_NOTYETVALID : IDS_SSL_ERR_EXPIRED), maxlen); // counted bounded copy instead of lstrcpyn
+        // Keep translated validity details in the same UTF-8 encoding as GetErrorText diagnostics.
+        WideToUtf8Buffer(SalamanderGeneral->LoadStrW(HLanguage, timeResult < 0 ? IDS_SSL_ERR_NOTYETVALID : IDS_SSL_ERR_EXPIRED),
+                         buf, maxlen);
     }
     CertFreeCertificateChain(chainContext);
     CertFreeCertificateContext(certContext);
@@ -1545,8 +1547,16 @@ INT_PTR CCertificateErrDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lPara
     switch (uMsg)
     {
     case WM_INITDIALOG:
-        SetDlgItemText(HWindow, IDT_CERTIFICATE_ERROR, ErrorStr);
+    {
+        // Certificate diagnostics are UTF-8; bypass ANSI decoding so localized system text retains its characters.
+        WCHAR* errorText = Utf8AllocWide(ErrorStr);
+        if (errorText != NULL)
+        {
+            SetDlgItemTextW(HWindow, IDT_CERTIFICATE_ERROR, errorText);
+            free(errorText);
+        }
         break;
+    }
     case WM_COMMAND:
         if (LOWORD(wParam) == IDOK)
             RememberedException = IsDlgButtonChecked(HWindow, IDB_CERTIFICATE_REMEMBER) == BST_CHECKED;
