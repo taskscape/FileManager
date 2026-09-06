@@ -169,6 +169,10 @@ public sealed class FileAccessUiTests : FileOperationUiTestBase
         WaitForFileSystem(() => NativeCommands.GetListViewItemCount(results!.Properties.NativeWindowHandle.Value) == 1,
                           "Find did not return the unique nested file.");
 
+        // Find publishes rows before its worker clears SearchInProgress; wait for the re-enabled input that follows native completion.
+        WaitForFileSystem(() => NativeCommands.IsDialogControlEnabled(findHandle, NativeCommands.FindNamed),
+                          "Find did not complete before Focus was requested.");
+
         NativeCommands.SelectFocusedListViewItem(results!.Properties.NativeWindowHandle.Value);
         NativeCommands.Execute(findHandle, NativeCommands.FindFocus);
         WaitForMainWindowTitleContaining("find-tree",
