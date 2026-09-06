@@ -77,7 +77,8 @@ CFTPWorker::CFTPWorker(CFTPOperation* oper, CFTPQueue* queue, const char* host,
     IPRequestUID = 0;
     NextInitCmd = 0;
 
-    memset(&DiskWork, 0, sizeof(DiskWork));
+    // Value initialization preserves the nontrivial owners retained by disk work.
+    DiskWork = CFTPDiskWork{};
     DiskWorkIsUsed = FALSE;
 
     ReceivingWakeup = FALSE;
@@ -385,6 +386,14 @@ void CFTPWorker::InitDiskWork(DWORD msgID, CFTPDiskWorkType type, const char* pa
     DiskWork.EOLsInFlushDataBuffer = 0;
     // Non-direct work must never inherit the direct-download append marker from a reused work record.
     DiskWork.AppendToFile = FALSE;
+    // Every queued read/write/finalization retains the same stage through cancellation.
+    DiskWork.Download.reset();
+    DiskWork.RemoteIdentity.reset();
+    DiskWork.ExpectedLengthKnown = FALSE;
+    DiskWork.ExpectedLength = 0;
+    DiskWork.SetDownloadTime = FALSE;
+    if (CurItem != NULL && (CurItem->Type == fqitCopyFileOrFileLink || CurItem->Type == fqitMoveFileOrFileLink))
+        DiskWork.Download = ((CFTPQueueItemCopyOrMove*)CurItem)->Download;
 }
 
 void CFTPWorker::GetListViewData(LVITEM* itemData, char* buf, int bufSize)
@@ -1265,15 +1274,22 @@ void CFTPWorker::CloseOpenedFile(BOOL transferAborted, BOOL setDateAndTime, cons
             case fqitCopyFileOrFileLink: // copying a file or link to a file (object of class CFTPQueueItemCopyOrMove)
             case fqitMoveFileOrFileLink: // moving a file or link to a file (object of class CFTPQueueItemCopyOrMove)
             {
-                // let the file be closed (if adding to the disk thread fails the file remains open,
-                // because we cannot close it directly; the disk thread might be using its handle)
+                // The item and any in-flight disk copy retain ownership even if
+                // the close queue rejects this checkpoint request.
                 BOOL delEmptyFile = (transferAborted ? CanDeleteEmptyFile : FALSE);
-                FTPDiskThread->AddFileToClose(((CFTPQueueItemCopyOrMove*)CurItem)->TgtPath,
+                if (!FTPDiskThread->AddFileToClose(((CFTPQueueItemCopyOrMove*)CurItem)->TgtPath,
                                               ((CFTPQueueItemCopyOrMove*)CurItem)->TgtName,
                                               OpenedFile, delEmptyFile, setDateAndTime, date,
-                                              time, deleteFile, setEndOfFile, NULL);
-                if (deleteFile || delEmptyFile && OpenedFileSize == CQuadWord(0, 0)) // the file will almost certainly be deleted - either by direct command or because the transfer never started, so reset TgtFileState (avoid bothering with "transfer has failed")
-                    Queue->UpdateTgtFileState((CFTPQueueItemCopyOrMove*)CurItem, TGTFILESTATE_UNKNOWN);
+                                              time, deleteFile, setEndOfFile, NULL,
+                                              ((CFTPQueueItemCopyOrMove*)CurItem)->Download))
+                {
+                    Queue->UpdateItemState(CurItem, sqisFailed, ITEMPR_INCOMPLETEDOWNLOAD, GetLastError(), NULL, Oper);
+                    Oper->ReportItemChange(CurItem->UID);
+                }
+                // Discarding private bytes leaves the owned stage available for
+                // retry; the old published destination was never removed.
+                if (deleteFile || (delEmptyFile && OpenedFileSize == CQuadWord(0, 0)))
+                    Queue->UpdateTgtFileState((CFTPQueueItemCopyOrMove*)CurItem, TGTFILESTATE_CREATED);
                 OpenedFile = NULL;
                 OpenedFileSize.Set(0, 0);
                 OpenedFileOriginalSize.Set(0, 0);

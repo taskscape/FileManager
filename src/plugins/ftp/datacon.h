@@ -231,7 +231,11 @@ protected:
     BOOL AsciiTrModeForBinFileProblemOccured; // TRUE = the "ASCII mode for binary file" error was detected
     int AsciiTrModeForBinFileHowToSolve;      // how to solve the "ASCII mode for binary file" problem: 0 = ask the user, 1 = download again in binary mode, 2 = interrupt the file download (cancel), 3 = ignore (finish the download in ASCII mode)
     BOOL TgtDiskFileClosed;                   // TRUE = the file used for flushing data is already closed (no additional writing will occur)
-    int TgtDiskFileCloseIndex;                // file close index in the disk-work thread (-1 = unused)
+    // Per-request completion survives early notification and keeps failed or
+    // timed-out local I/O distinct from a successful download.
+    std::shared_ptr<CFileCloseCompletion> TgtDiskFileCompletion;
+    std::shared_ptr<CFtpTransactionalDownload> TgtDownload;
+    DWORD TgtCloseSubmissionError = ERROR_SUCCESS;
     BOOL DiskWorkIsUsed;                      // TRUE if DiskWork is queued in FTPDiskThread
 
     BOOL NoDataTransTimeout;  // TRUE = a no-data-transfer timeout occurred - we closed the data connection
@@ -299,7 +303,8 @@ public:
     // sets TgtDiskFileName and CurrentTransferMode, while also enabling flushing data
     // directly into the TgtDiskFileName file (uses FTPDiskThread)
     void SetDirectFlushParams(const char* tgtFileName, CCurrentTransferMode currentTransferMode,
-                              const CQuadWord& resumeOffset);
+                              const CQuadWord& resumeOffset,
+                              const std::shared_ptr<CFtpTransactionalDownload>& download);
 
     // returns the state of the target file when flushing data directly to the TgtDiskFileName file;
     // in 'fileCreated' it returns TRUE if the file was created; in 'fileSize' it returns the size

@@ -313,11 +313,21 @@ public:
 #define TGTFILESTATE_CREATED 2     // the file was created directly by the FTP client or resumed with the option to overwrite
 #define TGTFILESTATE_RESUMED 3     // the file was resumed by the FTP client without the option to overwrite (overwriting can happen only if the already downloaded part of the file is too small, see Config.ResumeMinFileSize)
 
+// Resume evidence binds to the observed server version and transfer mode, with
+// length-delimited text encoding and no password or credential material.
+std::string BuildFtpDownloadIdentity(const char* user, const char* host, unsigned short port,
+    const char* path, const char* name, const CQuadWord& size, BOOL ascii,
+    BOOL dateValid, const CFTPDate& date, const CFTPTime& time);
+BOOL FtpDownloadWriteTime(HANDLE file, const CFTPDate& date, const CFTPTime& time, FILETIME& result);
+
 class CFTPQueueItemCopyOrMove : public CFTPQueueItem
 {
 public:
     char* TgtPath; // path to the target file (Windows path)
     char* TgtName; // name of the target file (name without the path)
+
+    // Retries and asynchronous disk work share the owner of the private stage.
+    std::shared_ptr<CFtpTransactionalDownload> Download;
 
     CQuadWord Size; // file size (CQuadWord(-1, -1) = size is unknown - e.g. links)
 
@@ -852,6 +862,7 @@ enum CFTPDiskWorkType
     fdwtReadFile,           // reading part of a file into a buffer (for upload)
     fdwtReadFileInASCII,    // reading part of a file for ASCII transfer mode (converting all EOLs to CRLF) into a buffer (for upload)
     fdwtDeleteFile,         // deleting a file on disk (source file for upload-Move)
+    fdwtFinalizeDownload,   // durable staged publication; success alone permits remote deletion
 };
 
 struct CDiskListingItem
@@ -912,6 +923,15 @@ struct CFTPDiskWork
     HANDLE WorkFile;
     BOOL AppendToFile; // direct staged download: preserve only a verified prefix before the first write
 
+    // A cancelled work record may disappear while its local disk-thread copy runs.
+    std::shared_ptr<CFtpTransactionalDownload> Download;
+    std::shared_ptr<const std::string> RemoteIdentity; // copying disk work cannot allocate while holding its lock
+    BOOL ExpectedLengthKnown = FALSE;
+    ULONGLONG ExpectedLength = 0;
+    BOOL SetDownloadTime = FALSE;
+    CFTPDate DownloadDate = {};
+    CFTPTime DownloadTime = {};
+
     // the result of the disk operation is returned in the following variables:
     DWORD ProblemID;                               // if not ITEMPR_OK, this is the error that occurred
     DWORD WinError;                                // complements some ProblemID values (ignored when ITEMPR_OK)
@@ -937,6 +957,10 @@ struct CFTPFileToClose
     BOOL AlwaysDeleteFile;   // TRUE = delete the file after closing
     CQuadWord EndOfFile;     // if not CQuadWord(-1, -1), this is the offset at which the file will be truncated
 
+    // Each request keeps its completion and file owner alive until the disk result.
+    std::shared_ptr<CFileCloseCompletion> Completion;
+    std::shared_ptr<CFtpTransactionalDownload> Download;
+
     CFTPFileToClose(const char* path, const char* name, HANDLE file, BOOL deleteIfEmpty,
                     BOOL setDateAndTime, const CFTPDate* date, const CFTPTime* time,
                     BOOL deleteFile, CQuadWord* setEndOfFile);
@@ -958,12 +982,6 @@ protected:
     BOOL WorkIsInProgress; // TRUE = processing of item Work[0] is in progress
     int WorkRejectedCount; // bounded admission protects a slow local disk from remote producers
     int WorkHighWaterMark;
-
-    int NextFileCloseIndex; // sequence number of the next file close operation
-    int DoneFileCloseIndex; // sequence number of the last completed file close (-1 = none closed yet)
-
-    // critical section without synchronization (access outside DiskCritSect)
-    HANDLE FileClosedEvent; // pulsed after a file is closed (handles waiting for file closure)
 
 public:
     CFTPDiskThread();
@@ -992,17 +1010,14 @@ public:
     // is set to 'date'+'time' (CAUTION: if date->Day==0 or time->Hour==24, these are
     // "empty values" for the date or time); if 'deleteFile' is TRUE, delete the file
     // immediately after closing it; if 'setEndOfFile' is not NULL, the file will be truncated
-    // to the offset 'setEndOfFile' after closing; if 'fileCloseIndex' is not NULL, it returns
-    // the sequence number of the file close (you can wait for this closure later,
-    // see WaitForFileClose)
+    // to the offset 'setEndOfFile' before closing. A returned completion persists
+    // across early completion, timeout and multiple waiters. A staging owner is
+    // checkpointed instead of closing a borrowed handle or deleting its target.
     BOOL AddFileToClose(const char* path, const char* name, HANDLE file, BOOL deleteIfEmpty,
                         BOOL setDateAndTime, const CFTPDate* date, const CFTPTime* time,
-                        BOOL deleteFile, CQuadWord* setEndOfFile, int* fileCloseIndex);
-
-    // waits for the file with sequence number 'fileCloseIndex' to be closed or for a timeout
-    // ('timeout' in milliseconds or the value INFINITE = no timeout); returns TRUE
-    // if the closure happened, FALSE on timeout
-    BOOL WaitForFileClose(int fileCloseIndex, DWORD timeout);
+                        BOOL deleteFile, CQuadWord* setEndOfFile,
+                        std::shared_ptr<CFileCloseCompletion>* completion,
+                        const std::shared_ptr<CFtpTransactionalDownload>& download = {});
 
     virtual unsigned Body();
 };
@@ -1127,6 +1142,7 @@ enum CFTPWorkerSubState // substates for individual states from CFTPWorkerState
     fwssWorkCopyProcessRETRRes,                // copy/move file: process the result of "RETR" (after ending the "data connection", flushing data to disk and receiving the server response to "RETR")
     fwssWorkCopyDelayedAutoRetry,              // copy/move file: wait WORKER_DELAYEDAUTORETRYTIMEOUT milliseconds for auto-retry (so that all unexpected responses from the server can arrive)
     fwssWorkCopyTransferFinished,              // copy/move file: file transferred, in case of Move delete the source file
+    fwssWorkCopyWaitForCommit,                 // wait for durable local publication before success or DELE
     fwssWorkCopyMoveWaitForDELERes,            // copy/move file: waiting for the result of "DELE" (Move: delete the source file/link after finishing the file transfer)
     fwssWorkCopyDone,                          // copy/move file: done, close the file and go to the next item
     fwssWorkUploadWaitForListing,              // upload copy/move file: wait for another worker to finish listing the target path on the server (to detect collisions)

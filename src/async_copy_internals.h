@@ -5,6 +5,8 @@
 
 #include "operation_result.h"
 #include "worker.h"
+#include "common/stable_move_source.h" // retain the move source across reader retries and destination commit
+#include "common/recovery_evidence.h" // readiness must refer to the staging object opened by the writer
 
 // Declarations shared between async_copy.cpp and the helper files extracted from it
 // (ads_operations.cpp, copy_commit.cpp, copy_loop.cpp), so cross-file internals
@@ -23,17 +25,21 @@ BOOL CheckTailOfOutFile(CAsyncCopyParams* asyncPar, HANDLE in, HANDLE out, const
 BOOL DoCopyADS(HWND hProgressDlg, const char* sourceName, BOOL isDir, const char* targetName,
                CQuadWord const& totalDone, CQuadWord& operDone, CQuadWord const& operTotal,
                CProgressDlgData& dlgData, COperations* script, BOOL* skip, void* buffer,
-               int optimalBufferSize = 0);
+               int optimalBufferSize = 0, BOOL stableMoveSource = FALSE);
 
 // transactional target handling (copy_commit.cpp)
 BOOL CreateTransactionalTargetFileName(const char* targetName, char* temporaryName, int temporaryNameLen);
 HANDLE OpenTransactionalTargetFile(const char* temporaryName, DWORD desiredAccess,
                                    DWORD flagsAndAttributes, BOOL* encryptionNotSupported);
 COperationResult CommitTransactionalTargetFile(const char* targetName, const char* temporaryName,
-                                               const COperation::CFileIdentity& expectedTargetIdentity);
+                                                       const COperation::CFileIdentity& expectedTargetIdentity,
+                                                       const CRecoveryObjectEvidence& expectedTemporaryIdentity,
+                                                       ULONGLONG expectedSize,
+                                                       COperations* script);
 COperationResult VerifyDurableCopyCommit(const char* targetName, const CQuadWord& expectedSize);
-void RemoveCommittedStreamsMissingFromSource(const char* sourceName, const char* targetName);
 BOOL VerifyFullFileContentSha256(const char* sourceName, const char* targetName, DWORD* error);
+// Reopen the held source object for moves; ordinary copies retain their sharing policy.
+HANDLE OpenCopySourceForRead(const char* sourceName, CStableMoveSource* stableMoveSource, DWORD flags);
 
 // copy loop plumbing (copy_loop.cpp)
 // SetProgressWithoutSuspend remains defined in async_copy.cpp; it had no prior
@@ -49,7 +55,8 @@ void DoCopyFileLoopOrig(HANDLE& in, HANDLE& out, void* buffer, int& limitBufferS
                         COperations* script, CProgressDlgData& dlgData, BOOL wholeFileAllocated,
                         COperation* op, const CQuadWord& totalDone, BOOL& copyError, BOOL& skipCopy,
                         HWND hProgressDlg, CQuadWord& operationDone, CQuadWord& fileSize,
-                        int bufferSize, int& allocWholeFileOnStart, BOOL& copyAgain);
+                        int bufferSize, int& allocWholeFileOnStart, BOOL& copyAgain,
+                        CStableMoveSource* stableMoveSource = NULL);
 void DoCopyFileLoopAsync(CAsyncCopyParams* asyncPar, HANDLE& in, HANDLE& out, void* buffer, int& limitBufferSize,
                          COperations* script, CProgressDlgData& dlgData, BOOL wholeFileAllocated, COperation* op,
                          const CQuadWord& totalDone, BOOL& copyError, BOOL& skipCopy, HWND hProgressDlg,

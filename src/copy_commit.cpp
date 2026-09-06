@@ -14,13 +14,13 @@
 #include "worker.h"
 
 #include "async_copy_internals.h"
-#include "common/scoped_readonly_file.h"
+#include "common/conditional_file_publication.h"
 
 // Transactional target creation/commit, durability verification, SHA-256 content
 // verification, and SalCreateFileEx extracted from async_copy.cpp as a mechanical
 // move. Helpers previously file-local were promoted to external linkage with
 // declarations in async_copy_internals.h because their callers remain in
-// async_copy.cpp; SourceHasStream and CalculateFileSha256 stay file-local.
+// async_copy.cpp; CalculateFileSha256 stays file-local.
 DWORD GetTemporaryNameSeed()
 {
     // Preserve the legacy 12-bit, 10 ms filename seed while avoiding a 32-bit uptime wrap.
@@ -160,10 +160,20 @@ HANDLE SalCreateFileEx(const char* fileName, DWORD desiredAccess,
         return out;
     }
 
-// Reserve a unique file in the destination directory.  The reservation is opened with
-// CREATE_ALWAYS by DoCopyFile and is never visible under the requested target name.
-// Keeping the temporary file beside its final name guarantees that ReplaceFileW is a
-// same-volume commit.
+// Preserve normal-copy sharing while moves reopen their retained source object.
+HANDLE OpenCopySourceForRead(const char* sourceName, CStableMoveSource* stableMoveSource, DWORD flags)
+{
+    if (stableMoveSource == NULL)
+        return HANDLES_Q(CreateFileUtf8(sourceName, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE,
+                                         NULL, OPEN_EXISTING, flags, NULL));
+    // A retry must read the locked object, including after the pathname changes.
+    HANDLE reader = stableMoveSource->OpenReader(flags);
+    if (reader != INVALID_HANDLE_VALUE)
+        HANDLES_ADD(__htFile, __hoCreateFile, reader);
+    return reader;
+}
+
+// Reserve a sibling so publication stays on the destination volume.
 BOOL CreateTransactionalTargetFileName(const char* targetName, char* temporaryName, int temporaryNameLen)
 {
     WCHAR targetDirectoryW[3 * MAX_PATH];
@@ -206,121 +216,71 @@ HANDLE OpenTransactionalTargetFile(const char* temporaryName, DWORD desiredAcces
     return out;
 }
 
-// ReplaceFileW preserves the previous destination until the file system commits the
-// replacement.  If another actor removed the destination after the overwrite prompt,
-// a write-through same-volume rename is the equivalent commit for a newly absent file.
-COperationResult CommitTransactionalTargetFile(const char* targetName, const char* temporaryName,
-                                                       const COperation::CFileIdentity& expectedTargetIdentity)
+// The journal owns durable publication facts; the shared native helper owns
+// handles and never substitutes a different pathname occupant for either file.
+static BOOL RecordCopyPublication(void* context, const char* state, const WCHAR* backup)
 {
-    // A name can be swapped while the temporary copy is being written.  Reopen
-    // it without following reparse points and compare both its object ID and
-    // handle-resolved final path before ReplaceFileW can touch it.
+    return ((COperations*)context)->JournalRecordPublicationState(state, backup);
+}
+
+COperationResult CommitTransactionalTargetFile(const char* targetName, const char* temporaryName,
+                                                       const COperation::CFileIdentity& expectedTargetIdentity,
+                                                       const CRecoveryObjectEvidence& expectedTemporaryIdentity,
+                                                       ULONGLONG expectedSize,
+                                                       COperations* script)
+{
+    // Keep the approved destination open through its rename to a recoverable
+    // backup. Relative publication cannot follow a retargeted ancestor junction.
     DWORD error = ERROR_SUCCESS;
-    if (!VerifyFileIdentity(targetName, expectedTargetIdentity, &error))
+    CPathW targetPathW(targetName);
+    CPathW temporaryPathW(temporaryName);
+    CConditionalFilePublication publication;
+    if (script == NULL || (expectedTargetIdentity.State != 1 && expectedTargetIdentity.State != 2))
+        error = ERROR_INVALID_DATA;
+    else if (!publication.Open(targetPathW.GetPathForWin32Api(), temporaryPathW.GetPathForWin32Api(),
+                                expectedTargetIdentity.State == 2, !script->CopySecurity))
+        error = GetLastError();
+    else if (expectedTargetIdentity.State == 2 &&
+             !VerifyFileHandleIdentity(publication.TargetHandle(), expectedTargetIdentity, &error))
+    {
+        // Identity mismatch is a conflict, even if the name still exists.
+    }
+    if (error != ERROR_SUCCESS)
         return COperationResult::Failure(orpVerifyDestinationIdentity, error, temporaryName, targetName,
                                          IsRetryableOperationError(error), opeTemporaryTargetReady);
 
-    // Git pack files are read-only on both sides. Clear that bit only for the
-    // commit, restoring both files on failure and the replacement after success.
-    CScopedReadOnlyFile targetAttributes;
-    CScopedReadOnlyFile temporaryAttributes;
-    CPathW targetPathW(targetName);
-    CPathW temporaryPathW(temporaryName);
-    BOOL committed = FALSE;
-    if (targetAttributes.MakeWritable(targetPathW.GetPathForWin32Api(), TRUE) &&
-        temporaryAttributes.MakeWritable(temporaryPathW.GetPathForWin32Api()))
-    {
-        committed = OperationExecutionFileSystem().ReplaceFile(targetName, temporaryName);
-        error = committed ? ERROR_SUCCESS : GetLastError();
-        if (!committed && error == ERROR_FILE_NOT_FOUND)
-        {
-            committed = OperationExecutionFileSystem().MoveFile(temporaryName, targetName);
-            error = committed ? ERROR_SUCCESS : GetLastError();
-        }
-    }
-    else
-        error = GetLastError();
+    // A same-name substitute or a truncated stage must not become recoverable
+    // merely because an earlier copy attempt wrote a ready marker.
+    CRecoveryObjectEvidence actualTemporary;
+    if (!ReadRecoveryObjectIdentity(publication.TemporaryHandle(), actualTemporary)) error = GetLastError();
+    else if (!SameRecoveryObject(expectedTemporaryIdentity, actualTemporary) || actualTemporary.Length != expectedSize)
+        error = ERROR_INVALID_DATA;
+    if (error == ERROR_SUCCESS && !script->JournalMarkTemporaryReady(targetName, temporaryName,
+        publication.DirectoryHandle(), publication.TargetHandle(), publication.TemporaryHandle(), !script->CopySecurity))
+        error = ERROR_WRITE_FAULT;
+    if (error != ERROR_SUCCESS)
+        return COperationResult::Failure(orpVerifyDurableCopy, error, temporaryName, targetName,
+                                         IsRetryableOperationError(error), opeTemporaryTargetReady);
 
-    COperationResult result = committed ?
+    const CPublicationOutcome outcome = publication.Commit(OperationExecutionFileSystem(), RecordCopyPublication, script);
+    DWORD effects = opeTemporaryTargetReady;
+    if (outcome.Committed) effects |= opeDestinationCommitted;
+    if (outcome.BackupRetained) effects |= opePublicationBackupRetained;
+    // Failure to finish backup cleanup is reported with the committed effect;
+    // the caller keeps a move source and cannot retry an already published file.
+    error = outcome.Error != ERROR_SUCCESS ? outcome.Error : outcome.CleanupError;
+    COperationResult result = error == ERROR_SUCCESS ?
         COperationResult::Success(orpCommitTransactionalTarget, temporaryName, targetName,
-                                  opeTemporaryTargetReady | opeDestinationCommitted) :
+                                  effects) :
         COperationResult::Failure(orpCommitTransactionalTarget, error, temporaryName, targetName,
-                                  IsRetryableOperationError(error), opeTemporaryTargetReady);
-    if (committed)
-        targetAttributes.Dismiss();
-    else if (!targetAttributes.Restore())
-        result.AppendCleanupError(orcpRestoreReadOnlyAttribute, GetLastError(), targetName);
-    if (!temporaryAttributes.Restore())
-        result.AppendCleanupError(orcpRestoreReadOnlyAttribute, GetLastError(), committed ? targetName : temporaryName);
+                                  !outcome.Committed && IsRetryableOperationError(error), effects);
+    // The journal records the precise '<temporary>.previous' backup name.
+    result.AppendCleanupError(orcpPublicationBackup, outcome.CleanupError, temporaryName);
     return result;
 }
 
-// TRUE when the source carries a stream of this name. Files hold a handful of
-// streams, so re-enumerating per candidate is cheaper than building an index.
-static BOOL SourceHasStream(const WCHAR* sourcePath, const WCHAR* streamName)
-{
-    WIN32_FIND_STREAM_DATA stream;
-    HANDLE find = FindFirstStreamW(sourcePath, FindStreamInfoStandard, &stream, 0);
-    if (find == INVALID_HANDLE_VALUE)
-        return FALSE;
-
-    BOOL found = FALSE;
-    do
-    {
-        if (_wcsicmp(stream.cStreamName, streamName) == 0)
-        {
-            found = TRUE;
-            break;
-        }
-    } while (FindNextStreamW(find, &stream));
-    FindClose(find);
-    return found;
-}
-
-// ReplaceFileW deliberately merges the replaced file's alternate data streams
-// into the committed result, so a stream that existed only on the old
-// destination would outlive the file it belonged to. An overwrite has to leave
-// the destination equal to the source, so remove what the source does not
-// carry. This runs after the commit, never before: the transactional target
-// exists precisely so that a failed commit leaves the old file untouched.
-void RemoveCommittedStreamsMissingFromSource(const char* sourceName, const char* targetName)
-{
-    CPathW sourcePathW(sourceName);
-    CPathW targetPathW(targetName);
-
-    WIN32_FIND_STREAM_DATA targetStream;
-    HANDLE find = FindFirstStreamW(targetPathW.CStr(), FindStreamInfoStandard, &targetStream, 0);
-    if (find == INVALID_HANDLE_VALUE)
-        return;
-
-    do
-    {
-        if (_wcsicmp(targetStream.cStreamName, L"::$DATA") == 0)
-            continue; // the file's own contents, replaced by the commit itself
-        if (SourceHasStream(sourcePathW.CStr(), targetStream.cStreamName))
-            continue;
-
-        // An ADS name is a suffix rather than a child path, so append it into
-        // growable storage without inserting a slash and preserve long paths.
-        CPathW streamPath(targetPathW.CStr());
-        size_t targetLength = streamPath.GetLength();
-        size_t streamLength = wcslen(targetStream.cStreamName);
-        WCHAR* streamPathBuffer = streamPath.GetBuffer(targetLength + streamLength + 1);
-        if (streamPathBuffer == NULL)
-            continue;
-        memcpy(streamPathBuffer + targetLength, targetStream.cStreamName,
-               (streamLength + 1) * sizeof(WCHAR));
-        streamPath.ReleaseBuffer((int)(targetLength + streamLength));
-        const WCHAR* streamApiPath = streamPath.GetPathForWin32Api();
-        if (streamApiPath == NULL || !DeleteFileW(streamApiPath))
-        {
-            DWORD err = GetLastError();
-            TRACE_E("RemoveCommittedStreamsMissingFromSource(): unable to remove a stale alternate data stream from "
-                    << targetName << ", error: " << GetErrorText(err));
-        }
-    } while (FindNextStreamW(find, &targetStream));
-    FindClose(find);
-}
+// Conditional publication carries only the staged streams. No post-commit ADS
+// deletion is needed, so an enumeration error cannot remove a valid copied stream.
 
 // A successful write is not a copy commit.  Reopen the closed destination and
 // verify its on-disk file metadata before reporting success, replacing an old

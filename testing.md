@@ -53,6 +53,20 @@ are kept after successful and failed runs. A run skipped before `salamand.exe` s
 
 `-PlatformToolset v145` selects the toolset used for both the built executable and native safety target. CI may supply `-NUnitTrxPath` to retain the complete executable result inventory as a workflow artifact.
 
+The native safety target also exercises the production `CStableMoveSource` owner against real temporary files. Its cases reject an already-open writer, block writes and renames after copy readers close, reopen the same contents for retries, and verify normal/read-only deletion plus read-only restoration after an injected deletion failure. These checks run through the existing native-safety lane in both the local runner and CI.
+
+The same target exercises conditional overwrite publication through retained file and directory handles. It forces destination writes/renames after acquisition, creates unexpected occupants before publication, injects journal/rename/flush/backup-cleanup failures, and checks read-only preservation. A junction is retargeted between acquisition and publication; only the originally opened directory may change. These native cases require no additional administrator privileges or separate CI lane.
+
+`OperationRecoveryTests.h`, included by that native target, executes the production recovery parser and publication code. It covers changed destinations, same-name staging substitutes, truncated data, same-length corruption with restored timestamps, changed parent identity/junction resolution, new named streams, legacy/manual-only evidence, retries/new temporary records, sharing failures, occupied backups, and unavailable parent directories. Both Resume and Discard must preserve unverifiable files. Faults at rename, deletion, journal write, journal flush, and torn-record boundaries keep recovery pending; a failed discard outcome can be persisted after restart without deleting another file. Mixed journals skip previously resolved items, and Cancel remains discoverable. Real incompatible handles exercise the live-writer and exclusive-recoverer lifetime contract.
+
+The native journal-size cases place a ready item at the end of complete journals one byte below, exactly at, and one byte above 16 MiB. Parsing uses a 64 KiB input buffer and bounded records, with no total file-size cutoff; item state grows with the plan. A malformed, overlong, NUL-containing, unsupported, or truncated record prevents mutation of that journal. Named-stream and reparse files remain manual-only because this evidence format fingerprints the main data stream. Interrupted publications with ambiguous backup state are also retained for manual inspection.
+
+`FtpDownloadTests.h` exercises the production FTP staging owner on real files: conditional overwrite, empty and read-only destinations, verified resume, changed target/stage/version, exclusive ownership, incomplete checkpoints, short writes, and failures in flush, metadata, rename, close, and backup cleanup. Mode/version retries must durably revoke the previous checkpoint before replacing private bytes while retaining the approved destination handle. Per-request completion tests cover early completion, persistent errors, concurrent waiters, timeout, and cancellation of a wait without cancelling disk completion.
+
+`FtpDownloadReliabilityUiTests` drives the actual FTP quick-connect, queued copy/move, and direct-view paths against `LoopbackFtpDownloadServer`. Payload barriers exercise interruption and cancellation, and guarded finalization faults verify that `DELE` cannot precede a successful local durable result. These deterministic tests run in the normal NUnit inventory under the existing isolated UI profile, with no external server or credentials. The application preserves the harness's temporary directory through environment regeneration so viewer-cache files also remain inside `filemanager-testdata`.
+
+The FTP fixture sets `FILEMANAGER_UI_FTP_FAULT` to `pause`, `flush`, `metadata`, `commit`, `close`, `admission`, or `close-admission`. Injection additionally requires `FILEMANAGER_UI_ISOLATED=1`, the exact sandbox configuration root, a validated `filemanager-testdata` directory, and an exclusively claimed one-use `.ftp-reliability.arm` file there. The pause is bounded; `.entered`, `.release`, and `.completed` files in that same directory coordinate only the selected test request. Normal invocations do not enable these faults. Hardware power-loss behavior is outside these software failure fixtures.
+
 ### GitHub release-pipeline parity
 
 Run the complete local equivalent of the GitHub release gate and installer-build jobs with:
@@ -474,11 +488,10 @@ Both are fixed, and neither was visible without the transcript.
   `IFileOperationProgressSink`, because `PerformOperations` reports the batch rather than the item. The recycle-bin
   branches additionally verify through a handle opened for deletion (`VerifyFileDeletable`): an attribute-only open
   bypasses the sharing check entirely, so the previous check accepted a file nobody could delete.
-- **`ReplaceFileW` merged stale alternate data streams.** The transactional copy commits by replacing the
-  destination, and `ReplaceFileW` deliberately carries the replaced file's streams into the result. A stream that
-  existed only on the old destination therefore outlived the file it belonged to, so an overwrite did not leave the
-  destination equal to the source. `RemoveCommittedStreamsMissingFromSource` prunes them, after the commit rather
-  than before it, so a failed commit still leaves the old file untouched.
+- **Overwrites must not inherit stale alternate data streams.** Conditional publication now moves the approved
+  destination to an owned backup, then renames only the staged file into an empty destination name. It never
+  merges the old file's streams. The existing ADS overwrite case still requires destination-only streams to
+  disappear and source streams to survive; post-commit stream enumeration/deletion is no longer needed.
 
 ##### Two product limits the lane respects
 
@@ -675,7 +688,7 @@ All cases below seed a shared workspace (files, trees, ADS, conflict counterpart
 ##### `Copy_overwrite_replaces_target_streams_and_removes_stale_streams`
 
 - **Does:** Copies `ads-overwrite.txt` onto a target that already has different default data and a `stale` stream; confirms overwrite with IDYES.
-- **Tests:** Confirmed overwrite of ADS: replacement streams appear and streams that existed only on the old target are removed (`ReplaceFileW` must not keep them).
+- **Tests:** Confirmed overwrite of ADS: replacement streams appear and streams that existed only on the old target are absent after conditional publication.
 - **Confirms:** Default data becomes `ads-overwrite-source`; `replacement` is present; `stale` is absent.
 - **Assumptions:** ADS support on both volumes; the overwrite prompt is the operation prompt with IDYES.
 - **Out of scope:** Skip/Skip All, and copy to a filesystem that cannot store ADS.
@@ -958,6 +971,8 @@ Parameterized: Copy `copy-file.txt` and Move `move-file.txt` to `blocked-target\
 
 #### `ConfigurationRecoveryUiTests`
 
+`ConfigurationPayloadTests.h` also runs in the existing native-safety target. It checks first-error retention across a worker-thread write and later successful calls, reset for a subsequent transaction, intended child counts, holes in numbered collections, and missing, empty, or incorrectly typed required fields against a private GUID registry key.
+
 ##### `Interrupted_configuration_writes_at_transaction_boundaries_restore_a_complete_profile`
 
 - **Does:** Requires `FILEMANAGER_UI_CONFIG_FAULT_INJECTION=1`. Establishes a baseline checkbox, measures registry write count of a real commit, samples uniformly spaced payload writes plus five named phases (`checksum`, `complete`, `generation-flush`, `selector`, `store-flush`). For each point, arms a marker file only after startup, commits a toggle, expects exit code 121, restarts, and asserts the first checkbox is either complete baseline or complete candidate—not a mixture—then restores baseline.
@@ -965,6 +980,20 @@ Parameterized: Copy `copy-file.txt` and Move `move-file.txt` to `blocked-target\
 - **Confirms:** Fault injection actually stops at the requested boundary; restart never shows a mixed profile.
 - **Assumptions:** Category `FaultInjection`; `FILEMANAGER_UI_ISOLATED=1` so native hooks honor `FILEMANAGER_CONFIG_FAULT_*`; arm file prevents plug-in startup saves from consuming the boundary; named phases stay valid when plug-ins add thousands of snapshot values.
 - **Out of scope:** Every individual registry value, concurrent writers, and migrating foreign profile versions during the crash.
+
+#### `ConfigurationPayloadFailureUiTests`
+
+Four cases inject one returned error into a nonmandatory value write or highlighting child-key creation, then allow subsequent writes to succeed. They require the unchanged selector, preserved saved checkbox, absent completion marker on the failed payload, one actionable error, and either recovery of the old value after process termination or successful retry of the in-memory candidate. These cases require the existing `FILEMANAGER_UI_CONFIG_FAULT_INJECTION=1` capability and run in the normal complete pipeline inventory.
+
+The fixture sets `FILEMANAGER_CONFIG_RETURN_ERROR` to `value:Title bar prefix text` or `key:Panel Items Hilighting`, using `FILEMANAGER_CONFIG_FAULT_ARM_FILE` to exclude startup saves. Native injection requires the exact sandbox registry root. `FILEMANAGER_UI_CONFIG_STATUS=1` writes `.config-save-status` inside the validated sandbox only after all coalesced saves finish, so observations cannot race an earlier startup save.
+
+The crash reporter receives the sandbox's `appdata\Open Salamander` directory before the child process starts. An isolated crash must not leave a report in the user's Local AppData that blocks a later launch. The ADS retry regression waits for both the durable operation journal and closure of the progress window before teardown; released output handles alone cannot confirm successful worker finalization.
+
+#### `ConfigurationRetirementUiTests`
+
+Three cases start a second isolated process against the same sandbox profile. Barriers before retirement locks and after it reads the selector exercise intervening commits, reuse of the loaded slot with a new GUID, and exclusion of another process from the save mutex. They verify active/fallback preservation and restored settings on restart. Both processes and their crash reporters belong to fixture teardown.
+
+`FILEMANAGER_CONFIG_RETIRE_BARRIER=before-lock` or `after-selector` requires the exact sandbox registry root, a validated test-data directory, and an exclusively claimed one-use `.config-retirement.arm` file. Sibling `.entered`, `.release`, `.completed`, and `.finish-release` markers coordinate bounded waits before cleanup and after unlocking; a timeout before cleanup preserves the fallback. The fixture stops the second process after inspecting its decision, before later startup saves can change the observation. These tests use the ordinary isolated NUnit lane, with no external service or administrator prerequisite.
 
 #### `CrossVolumeMoveCharacterizationUiTests`
 
@@ -1000,11 +1029,11 @@ Requires `FILEMANAGER_UI_CROSS_VOLUME_ROOT` (runner uses writable `D:\filemanage
 
 ##### `Restart_reconciliation_commits_a_fully_written_transactional_target`
 
-- **Does:** Before launch, writes `SALCPrestart-reconciled.tmp` and an incomplete `.opj` (`STATE|0|temporary-ready`) pointing at `restart-reconciled.txt`. Allows a disabled main window at startup. Answers Resume (IDYES) then the recovery summary (IDOK).
-- **Tests:** Real startup reconciliation of a ready transactional sibling.
-- **Confirms:** Target exists with `recovered-after-restart`; temporary file is gone; journal contains `OPERATION|reconciled`.
-- **Assumptions:** Category `Recovery`; this fixture must not call the base journal purge before start; leftover journals from other tests are exactly what this scenario simulates on purpose.
-- **Out of scope:** Incomplete temps that are not `temporary-ready`, user choosing not to resume, and multi-item journals.
+- **Does:** Seeds a journal immediately before each launch, then answers the recovery choice and summary. Version-2 fixtures record actual file IDs, creation/write times, lengths, SHA-256 digests, parent identity, attempt, and security policy. The eight cases cover verified overwrite, absent target, discard, Cancel, legacy resume/discard, changed destination, and changed stage.
+- **Tests:** Real startup admission, evidence validation, conditional publication, and conservative handling of older journals. The normal and ADS overwrite tests separately check readiness emitted by the actual copy worker, including the SHA-256 digest or manual-only marker, so hand-seeded fixtures cannot conceal writer/reader format drift.
+- **Confirms:** Verified Resume publishes the staged contents; verified Discard retains the old destination. Both persist terminal reconciliation. Cancel, legacy evidence and changed files preserve the files and leave the journal pending.
+- **Assumptions:** Category `Recovery`; the fixture purges unrelated old journals before creating its own and allows the disabled owner window during the recovery prompt.
+- **Out of scope:** Power loss and real removable-volume disconnection. Deterministic native cases cover mixed-item restart, claimed ownership, unavailable parents and persistence faults.
 
 #### `ReparsePointTopologyUiTests`
 

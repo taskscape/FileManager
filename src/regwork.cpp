@@ -3,8 +3,10 @@
 // CommentsTranslationProject: TRANSLATED
 
 #include "precomp.h"
+#include "common/configuration_payload.h"
 
 #include "mainwnd.h"
+#include "regwork.h"
 #include <string>
 
 // Scoped registry key: closes through the tracked handle API on every exit so
@@ -28,7 +30,8 @@ struct CScopedRegKey
     {
         if (Key != NULL)
         {
-            HANDLES(RegCloseKey(Key));
+            const LONG result = HANDLES(RegCloseKey(Key));
+            if (result != ERROR_SUCCESS) RecordConfigurationPayloadFailure(result);
             Key = NULL;
         }
     }
@@ -36,6 +39,14 @@ struct CScopedRegKey
 } // namespace
 
 CRegistryWorkerThread RegistryWorkerThread;
+
+// Shared across synchronous plug-in callbacks and the registry worker; the
+// existing save mutex serializes ownership of this one transaction scope.
+static CConfigurationPayloadStatus ConfigurationPayloadStatus;
+void BeginConfigurationPayloadWrites() { ConfigurationPayloadStatus.Begin(); }
+LONG EndConfigurationPayloadWrites() { return ConfigurationPayloadStatus.End(); }
+BOOL ConfigurationPayloadWritesSucceeded() { return ConfigurationPayloadStatus.Error() == ERROR_SUCCESS; }
+void RecordConfigurationPayloadFailure(LONG error) { ConfigurationPayloadStatus.Record(error); }
 
 // The injector deliberately lives at the registry boundary rather than in SaveConfig's
 // individual sections.  That keeps the test matrix complete when a new subkey/value is
@@ -46,6 +57,8 @@ static volatile LONG ConfigurationWriteFaultAfter = 0;
 static volatile LONG ConfigurationWriteCount = 0;
 static std::string ConfigurationWriteFaultReport;
 static std::string ConfigurationWriteFaultPhase;
+static std::string ConfigurationReturnedFault;
+static volatile LONG ConfigurationReturnedFaultConsumed = 0;
 
 // Environment variables are external input.  Query their required length first
 // and retain an owned value only when it fits the documented Win32 limit.
@@ -140,6 +153,8 @@ void BeginConfigurationWriteFaultInjection()
     InterlockedExchange(&ConfigurationWriteFaultAfter, 0);
     ConfigurationWriteFaultReport.clear();
     ConfigurationWriteFaultPhase.clear();
+    ConfigurationReturnedFault.clear();
+    InterlockedExchange(&ConfigurationReturnedFaultConsumed, 0);
 
     if (!IsSandboxedConfigurationFaultTest() || !IsConfigurationWriteFaultArmed())
         return;
@@ -155,7 +170,84 @@ void BeginConfigurationWriteFaultInjection()
     }
     ReadConfigurationFaultEnvironment("FILEMANAGER_CONFIG_FAULT_REPORT", &ConfigurationWriteFaultReport);
     ReadConfigurationFaultEnvironment("FILEMANAGER_CONFIG_FAULT_PHASE", &ConfigurationWriteFaultPhase);
+    // Returned failures exercise partial payloads while later writes still succeed.
+    ReadConfigurationFaultEnvironment("FILEMANAGER_CONFIG_RETURN_ERROR", &ConfigurationReturnedFault);
     InterlockedExchange(&ConfigurationWriteFaultInjectionActive, 1);
+}
+
+static BOOL InjectConfigurationReturnedFailure(const char* operation, const char* name)
+{
+    if (InterlockedCompareExchange(&ConfigurationWriteFaultInjectionActive, 0, 0) == 0 ||
+        name == NULL || ConfigurationReturnedFault.empty()) return FALSE;
+    const std::string expected = std::string(operation) + ":" + name;
+    return ConfigurationReturnedFault == expected &&
+           InterlockedCompareExchange(&ConfigurationReturnedFaultConsumed, 1, 0) == 0;
+}
+
+BOOL ConfigurationRetirementTestBarrier(const char* phase)
+{
+    if (!IsSandboxedConfigurationFaultTest()) return TRUE;
+    std::string selected;
+    if (ReadConfigurationFaultEnvironment("FILEMANAGER_CONFIG_RETIRE_BARRIER", &selected) != cferSuccess ||
+        (selected != "before-lock" && selected != "after-selector")) return TRUE;
+    CPathW root;
+    if (!GetFileManagerUiTestDataRootPath(root)) return FALSE;
+    const auto marker = [&](const WCHAR* name) {
+        CPathW path(root);
+        if (!path.Append(name)) return FALSE;
+        HANDLE file = CreateFileW(path.CStr(), GENERIC_WRITE, FILE_SHARE_READ, NULL, CREATE_NEW, FILE_FLAG_WRITE_THROUGH, NULL);
+        if (file == INVALID_HANDLE_VALUE) return FALSE;
+        DWORD written = 0;
+        const BOOL ok = WriteFile(file, phase, (DWORD)strlen(phase), &written, NULL);
+        CloseHandle(file);
+        return ok;
+    };
+    if (strcmp(phase, "finished") == 0)
+    {
+        // Pause after unlocking so the fixture can inspect retirement before
+        // any later startup auto-save changes the registry again.
+        marker(L".config-retirement.completed");
+        CPathW finishRelease(root);
+        if (!finishRelease.Append(L".config-retirement.finish-release")) return FALSE;
+        const auto started = CMonotonicClock::Now();
+        while (GetFileAttributesW(finishRelease.CStr()) == INVALID_FILE_ATTRIBUTES &&
+               CMonotonicClock::Elapsed(started, CMonotonicClock::Now()) < 20000) Sleep(10);
+        return TRUE;
+    }
+    if (selected != phase) return TRUE;
+    CPathW arm(root), release(root);
+    if (!arm.Append(L".config-retirement.arm") || !release.Append(L".config-retirement.release")) return FALSE;
+    HANDLE lease = CreateFileW(arm.CStr(), GENERIC_READ | DELETE, 0, NULL, OPEN_EXISTING,
+                               FILE_FLAG_DELETE_ON_CLOSE | FILE_FLAG_OPEN_REPARSE_POINT, NULL);
+    if (lease == INVALID_HANDLE_VALUE) return TRUE;
+    BY_HANDLE_FILE_INFORMATION information;
+    const BOOL owned = GetFileInformationByHandle(lease, &information) &&
+        (information.dwFileAttributes & (FILE_ATTRIBUTE_DIRECTORY | FILE_ATTRIBUTE_REPARSE_POINT)) == 0;
+    CloseHandle(lease);
+    if (!owned || !marker(L".config-retirement.entered")) return FALSE;
+    const auto start = CMonotonicClock::Now();
+    while (GetFileAttributesW(release.CStr()) == INVALID_FILE_ATTRIBUTES)
+    {
+        if (CMonotonicClock::Elapsed(start, CMonotonicClock::Now()) >= 20000) return FALSE;
+        Sleep(10);
+    }
+    return TRUE;
+}
+
+void ReportConfigurationSaveIdleForTest(BOOL success)
+{
+    std::string requested;
+    if (!IsSandboxedConfigurationFaultTest() ||
+        ReadConfigurationFaultEnvironment("FILEMANAGER_UI_CONFIG_STATUS", &requested) != cferSuccess || requested != "1") return;
+    CPathW path;
+    if (!GetFileManagerUiTestDataRootPath(path) || !path.Append(L".config-save-status")) return;
+    // Emit only after the outer save and all coalesced follow-ups have finished.
+    HANDLE file = CreateFileW(path.CStr(), GENERIC_WRITE, FILE_SHARE_READ, NULL, CREATE_ALWAYS, FILE_FLAG_WRITE_THROUGH, NULL);
+    if (file == INVALID_HANDLE_VALUE) return;
+    const char* text = success ? "complete" : "failed";
+    DWORD written = 0;
+    WriteFile(file, text, (DWORD)strlen(text), &written, NULL);
+    CloseHandle(file);
 }
 
 BOOL PassConfigurationTransactionFaultPoint(BOOL succeeded, const char* phase)
@@ -194,46 +286,64 @@ LONG FlushConfigurationRegistryKey(HKEY key)
     LONG result = RegFlushKey(key);
     if (result == ERROR_SUCCESS)
         RecordConfigurationWrite();
+    else
+        RecordConfigurationPayloadFailure(result);
     return result;
 }
 
 // ****************************************************************************
 
 BOOL ClearKeyAux(HKEY key)
+try
 {
-    char name[MAX_PATH];
-    while (RegEnumKey(key, 0, name, MAX_PATH) == ERROR_SUCCESS)
+    // Only ERROR_NO_MORE_ITEMS means an empty collection. Names can grow while
+    // clearing, and enumeration/deletion failures must poison the transaction.
+    std::vector<char> name(256);
+    for (;;)
     {
+        DWORD length = (DWORD)name.size();
+        LONG result = RegEnumKeyExA(key, 0, name.data(), &length, NULL, NULL, NULL, NULL);
+        if (result == ERROR_NO_MORE_ITEMS) break;
+        if (result == ERROR_MORE_DATA && name.size() < 32768)
+        { name.resize(name.size() * 2); continue; }
+        if (result != ERROR_SUCCESS) { RecordConfigurationPayloadFailure(result); return FALSE; }
         HKEY subKey;
-        if (HANDLES_Q(RegOpenKeyEx(key, name, 0, KEY_READ | KEY_WRITE, &subKey)) == ERROR_SUCCESS)
+        result = HANDLES_Q(RegOpenKeyExA(key, name.data(), 0, KEY_READ | KEY_WRITE, &subKey));
+        if (result == ERROR_SUCCESS)
         {
             // Close the child before deleting it by name; an open registry key
             // can make RegDeleteKey fail even after its contents were cleared.
             CScopedRegKey subKeyScope(subKey);
             BOOL cleared = ClearKeyAux(subKey);
             subKeyScope.Close();
-            if (!cleared || RegDeleteKey(key, name) != ERROR_SUCCESS)
-                return FALSE;
+            if (!cleared) return FALSE;
+            result = RegDeleteKeyA(key, name.data());
+            if (result != ERROR_SUCCESS) { RecordConfigurationPayloadFailure(result); return FALSE; }
             RecordConfigurationWrite();
         }
         else
-            return FALSE;
+        { RecordConfigurationPayloadFailure(result); return FALSE; }
     }
 
-    DWORD size = MAX_PATH;
-    while (RegEnumValue(key, 0, name, &size, NULL, NULL, NULL, NULL) == ERROR_SUCCESS)
-        if (RegDeleteValue(key, name) != ERROR_SUCCESS)
-        {
-            TRACE_E("Unable to delete values in specified key (in registry).");
-            break;
-        }
-        else
-        {
-            RecordConfigurationWrite();
-            size = MAX_PATH;
-        }
-
+    for (;;)
+    {
+        DWORD length = (DWORD)name.size();
+        LONG result = RegEnumValueA(key, 0, name.data(), &length, NULL, NULL, NULL, NULL);
+        if (result == ERROR_NO_MORE_ITEMS) break;
+        if (result == ERROR_MORE_DATA && name.size() < 32768)
+        { name.resize(name.size() * 2); continue; }
+        if (result == ERROR_SUCCESS) result = RegDeleteValueA(key, name.data());
+        if (result != ERROR_SUCCESS) { RecordConfigurationPayloadFailure(result); return FALSE; }
+        RecordConfigurationWrite();
+    }
     return TRUE;
+}
+catch (const std::bad_alloc&)
+{
+    // An allocation failure while enumerating must reject the incomplete save
+    // just like a registry failure, including on the registry worker thread.
+    RecordConfigurationPayloadFailure(ERROR_NOT_ENOUGH_MEMORY);
+    return FALSE;
 }
 
 // ****************************************************************************
@@ -241,7 +351,9 @@ BOOL ClearKeyAux(HKEY key)
 BOOL CreateKeyAux(HWND parent, HKEY hKey, const char* name, HKEY& createdKey, BOOL quiet)
 {
     DWORD createType; // info whether the key was created or just opened
-    LONG res = HANDLES(RegCreateKeyEx(hKey, name, 0, NULL, REG_OPTION_NON_VOLATILE,
+    createdKey = NULL;
+    LONG res = InjectConfigurationReturnedFailure("key", name) ? ERROR_WRITE_FAULT :
+        HANDLES(RegCreateKeyEx(hKey, name, 0, NULL, REG_OPTION_NON_VOLATILE,
                                       KEY_READ | KEY_WRITE, NULL, &createdKey,
                                       &createType));
     if (res == ERROR_SUCCESS)
@@ -251,7 +363,9 @@ BOOL CreateKeyAux(HWND parent, HKEY hKey, const char* name, HKEY& createdKey, BO
     }
     else
     {
-        if (!quiet)
+        // One save-level result is shown after the worker and mutex are released.
+        RecordConfigurationPayloadFailure(res);
+        if (!quiet && !ConfigurationPayloadStatus.IsActive())
         {
             if (HLanguage == NULL)
             {
@@ -298,7 +412,9 @@ BOOL OpenKeyAux(HWND parent, HKEY hKey, const char* name, HKEY& openedKey, BOOL 
 
 void CloseKeyAux(HKEY hKey)
 {
-    HANDLES(RegCloseKey(hKey));
+    // Closing payload keys belongs to the same checked save result as writes.
+    const LONG result = HANDLES(RegCloseKey(hKey));
+    if (result != ERROR_SUCCESS) RecordConfigurationPayloadFailure(result);
 }
 
 // ****************************************************************************
@@ -308,6 +424,8 @@ BOOL DeleteKeyAux(HKEY hKey, const char* name)
     LONG result = RegDeleteKey(hKey, name);
     if (result == ERROR_SUCCESS)
         RecordConfigurationWrite();
+    else
+        ConfigurationPayloadStatus.Record(result, TRUE); // deleting an absent optional key is already satisfied
     return result == ERROR_SUCCESS;
 }
 
@@ -414,7 +532,8 @@ BOOL SetValueAux(HWND parent, HKEY hKey, const char* name, DWORD type,
 {
     if (dataSize == -1)
         dataSize = (DWORD)strlen((char*)data) + 1;
-    LONG res = RegSetValueEx(hKey, name, 0, type, (CONST BYTE*)data, dataSize);
+    LONG res = InjectConfigurationReturnedFailure("value", name) ? ERROR_WRITE_FAULT :
+        RegSetValueEx(hKey, name, 0, type, (CONST BYTE*)data, dataSize);
     if (res == ERROR_SUCCESS)
     {
         RecordConfigurationWrite();
@@ -422,7 +541,8 @@ BOOL SetValueAux(HWND parent, HKEY hKey, const char* name, DWORD type,
     }
     else
     {
-        if (!quiet)
+        RecordConfigurationPayloadFailure(res);
+        if (!quiet && !ConfigurationPayloadStatus.IsActive())
         {
             if (HLanguage == NULL)
             {
@@ -446,6 +566,8 @@ BOOL DeleteValueAux(HKEY hKey, const char* name)
     LONG result = RegDeleteValue(hKey, name);
     if (result == ERROR_SUCCESS)
         RecordConfigurationWrite();
+    else
+        ConfigurationPayloadStatus.Record(result, TRUE); // missing optional values do not poison a save
     return result == ERROR_SUCCESS;
 }
 

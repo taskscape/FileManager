@@ -43,11 +43,13 @@ The highlights below cover repository work from **March through September 2026**
 - Internal paths are full UTF-16, so Unicode names, UI text, and long paths are handled without the old `MAX_PATH` / ANSI bottlenecks.
 - Common file dialogs use the modern Shell interfaces (`IFileOpenDialog` / `IFileDialog`) instead of the legacy `GetOpenFileName` path.
 - A **Copy full path** command is available from the panel context menu.
-- Configuration can be saved immediately and silently during a session, including a follow-up save when FTP would otherwise nest a registry transaction.
+- Configuration can be saved immediately during a session, including a follow-up save when FTP would otherwise nest a registry transaction. A failed payload write keeps the previous saved profile and reports how to retry the settings retained in memory. Concurrent instances preserve generations that their own startup did not load and confirm.
 
 ### File operations and reliability
 
 - Copy, move, overwrite, and cancel now use durable commit boundaries, recoverable journaling, and cross-volume move protection.
+- Native overwrites retain the approved destination through publication. A conflicting new destination is preserved; the previous version is restored or retained as a sibling ending in `.previous`, with its location recorded in the operation journal. A failed publication or durability check retains a move's source. Retained backups should be kept until the conflict is resolved.
+- Startup recovery resumes or removes a temporary file only when its recorded identity and content still match, including the destination and parent directory. Cancel, conflicts, unavailable storage, and failed recovery remain pending. Live operations in another instance are excluded. Legacy journals, partial copies, files with named streams, and interrupted publications with retained backups are preserved for manual recovery; the report lists their paths. Large journals are read incrementally, and unreadable journals are reported instead of silently skipped.
 - Native workers revalidate file identity, track NTFS/ReFS/FAT/SMB metadata loss, and exercise junctions, symlinks, mount points, and cloud placeholders.
 - Resource cleanup uses RAII owners (`CScopedKernelHandle` and related scoped types) on the paths that were refurbished.
 - Crash reporting uploads over HTTPS; release symbols stay private and are indexed by CodeView GUID/age plus SHA-256 for exact-build symbolization.
@@ -56,6 +58,7 @@ The highlights below cover repository work from **March through September 2026**
 
 - **PictView** decodes and encodes through [WIC](https://learn.microsoft.com/en-us/windows/win32/wic/-wic-about-windows-imaging-codec). The closed-source `pvw32cnv.dll` engine and `salpvenv.exe` envelope are gone. WIC covers mainstream formats plus OS codecs (HEIF, WebP, AVIF, camera RAW), but not the long tail of legacy formats the original engine handled.
 - **FTP/FTPS** uses Windows SChannel (no bundled TLS DLLs). Transfers are transactional and resumable, certificate exceptions are stored more safely, and passive FTPS data-channel TLS plus expired-exception compaction crashes were fixed.
+- FTP downloads keep an existing local file intact while receiving data into a unique sibling `.salftp-*.part` file. The matching `.meta` file records ownership and verified resume checkpoints. A move deletes its remote source only after local validation, flush, metadata, publication, and checked completion succeed. Cancellation or failure can leave these private files for a later retry; keep them together. Resume requires a matching remote version and unchanged local evidence. Legacy, corrupted, named-stream, reparse-point, or ambiguous publication states require manual inspection; a `.previous` sibling retains the old destination when publication cleanup cannot finish. Restart never replays remote deletion.
 - Bundled engines were upgraded: [7-Zip 26.02](src/plugins/7zip/doc/upgrade-26.02.md), zlib, SQLite (with defined recovery behavior), bzip2, and cmark-gfm.
 - UnRAR plugin loading was restored; 64-bit file-size handling was applied to the active plug-in readers.
 

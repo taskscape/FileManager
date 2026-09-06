@@ -881,6 +881,14 @@ void CFTPDiskWork::CopyFrom(CFTPDiskWork* work)
     EOLsInFlushDataBuffer = work->EOLsInFlushDataBuffer;
     WorkFile = work->WorkFile;
     AppendToFile = work->AppendToFile;
+    // The disk-local snapshot outlives cancellation of the original work record.
+    Download = work->Download;
+    RemoteIdentity = work->RemoteIdentity;
+    ExpectedLengthKnown = work->ExpectedLengthKnown;
+    ExpectedLength = work->ExpectedLength;
+    SetDownloadTime = work->SetDownloadTime;
+    DownloadDate = work->DownloadDate;
+    DownloadTime = work->DownloadTime;
 
     ProblemID = work->ProblemID;
     WinError = work->WinError;
@@ -903,11 +911,7 @@ CFTPDiskThread::CFTPDiskThread() : CThread("FTP Disk Thread"), Work(20, 50, dtNo
     WorkIsInProgress = FALSE;
     WorkRejectedCount = 0;
     WorkHighWaterMark = 0;
-    NextFileCloseIndex = 0;
-    DoneFileCloseIndex = -1;
-    FileClosedEvent = HANDLES(CreateEvent(NULL, TRUE, FALSE, NULL)); // manual, nonsignaled
-    if (FileClosedEvent == NULL)
-        TRACE_E("CFTPDiskThread::CFTPDiskThread(): Unable to create FileClosedEvent object.");
+    // Close requests carry persistent completion objects; no shared pulse is needed.
 }
 
 CFTPDiskThread::~CFTPDiskThread()
@@ -924,9 +928,6 @@ CFTPDiskThread::~CFTPDiskThread()
         TRACE_I("CFTPDiskThread::~CFTPDiskThread(): array with files to close is not empty!");
     if (ContEvent != NULL)
         HANDLES(CloseHandle(ContEvent));
-    if (FileClosedEvent != NULL)
-        HANDLES(CloseHandle(FileClosedEvent));
-    FileClosedEvent = NULL;
     HANDLES(DeleteCriticalSection(&DiskCritSect));
 }
 
@@ -941,6 +942,8 @@ void CFTPDiskThread::Terminate()
 BOOL CFTPDiskThread::AddWork(CFTPDiskWork* work)
 {
     CALL_STACK_MESSAGE1("CFTPDiskThread::AddWork()");
+    // Admission faults exercise the same retained-owner failure path as allocation pressure.
+    if (work->Type == fdwtFinalizeDownload && CFtpDownloadTestFaults::RejectAdmission(L"admission")) return FALSE;
     HANDLES(EnterCriticalSection(&DiskCritSect));
     BOOL ret = TRUE;
     // Remote producers must receive backpressure before a slow local disk retains an unbounded backlog.
@@ -1013,75 +1016,44 @@ BOOL CFTPDiskThread::CancelWork(const CFTPDiskWork* work, BOOL* workIsInProgress
 
 BOOL CFTPDiskThread::AddFileToClose(const char* path, const char* name, HANDLE file, BOOL deleteIfEmpty,
                                     BOOL setDateAndTime, const CFTPDate* date, const CFTPTime* time,
-                                    BOOL deleteFile, CQuadWord* setEndOfFile, int* fileCloseIndex)
+                                    BOOL deleteFile, CQuadWord* setEndOfFile,
+                                    std::shared_ptr<CFileCloseCompletion>* completion,
+                                    const std::shared_ptr<CFtpTransactionalDownload>& download)
 {
     CALL_STACK_MESSAGE1("CFTPDiskThread::AddFileToClose()");
+    if (completion != NULL) completion->reset();
+    if (download && CFtpDownloadTestFaults::RejectAdmission(L"close-admission")) return FALSE;
+    // Allocate before admission. Rejection leaves the staging owner with its
+    // producer and in-flight disk snapshots; it never transfers a raw handle.
+    std::unique_ptr<CFTPFileToClose> request;
+    try
+    {
+        request.reset(new CFTPFileToClose(path, name, file, deleteIfEmpty, setDateAndTime,
+                                         date, time, deleteFile, setEndOfFile));
+        if (!request) { SetLastError(ERROR_NOT_ENOUGH_MEMORY); return FALSE; }
+        request->Download = download;
+        if (completion != NULL) request->Completion = std::make_shared<CFileCloseCompletion>();
+    }
+    catch (const std::bad_alloc&)
+    { SetLastError(ERROR_NOT_ENOUGH_MEMORY); return FALSE; }
     HANDLES(EnterCriticalSection(&DiskCritSect));
-    BOOL ret = FALSE;
-    if (fileCloseIndex != NULL)
-        *fileCloseIndex = -1;
-    CFTPFileToClose* n = new CFTPFileToClose(path, name, file, deleteIfEmpty, setDateAndTime,
-                                             date, time, deleteFile, setEndOfFile);
-    if (n != NULL)
+    BOOL accepted = !ShouldTerminate;
+    if (accepted)
     {
-        FilesToClose.Add(n);
-        if (!FilesToClose.IsGood())
-        {
-            FilesToClose.ResetState();
-            delete n;
-        }
-        else
-        {
-            ret = TRUE;
-            if (fileCloseIndex != NULL)
-                *fileCloseIndex = NextFileCloseIndex;
-            NextFileCloseIndex++;
-        }
-        if (FilesToClose.Count == 1)
-            SetEvent(ContEvent);
+        FilesToClose.Add(request.get());
+        accepted = FilesToClose.IsGood();
+        if (!accepted) FilesToClose.ResetState();
     }
-    else
-        TRACE_E(LOW_MEMORY);
+    if (accepted)
+    {
+        if (completion != NULL) *completion = request->Completion;
+        request.release();
+        SetEvent(ContEvent);
+    }
     HANDLES(LeaveCriticalSection(&DiskCritSect));
-    return ret;
+    if (!accepted) SetLastError(ERROR_NOT_ENOUGH_MEMORY);
+    return accepted;
 }
-
-BOOL CFTPDiskThread::WaitForFileClose(int fileCloseIndex, DWORD timeout)
-{
-    CALL_STACK_MESSAGE3("CFTPDiskThread::WaitForFileClose(%d, %u)", fileCloseIndex, timeout);
-    // The timeout is a Win32 boundary, while elapsed-time accounting stays private and non-wrapping.
-    const CMonotonicTimePoint started = CMonotonicClock::Now();
-    const CMonotonicTimePoint deadline = timeout == INFINITE ? 0 : started + timeout;
-    BOOL closed = FALSE;
-    while (1)
-    {
-        HANDLES(EnterCriticalSection(&DiskCritSect));
-        if (DoneFileCloseIndex != -1 && fileCloseIndex <= DoneFileCloseIndex)
-            closed = TRUE;
-        HANDLES(LeaveCriticalSection(&DiskCritSect));
-        if (closed)
-            break;
-        const CMonotonicTimePoint now = CMonotonicClock::Now();
-        if (FileClosedEvent != NULL)
-        {
-            DWORD res = WaitForSingleObject(FileClosedEvent,
-                                            timeout == INFINITE ? INFINITE : CMonotonicClock::RemainingWin32TimerDelay(deadline, now));
-            if (res != WAIT_OBJECT_0)
-            {
-                TRACE_I("CFTPDiskThread::WaitForFileClose(): waiting for file closure has timed out!");
-                break; // timeout or abandoned (should not be needed)
-            }
-        }
-        else // always false (only if creating FileClosedEvent failed) -> use "active" waiting
-        {
-            if (timeout != INFINITE && CMonotonicClock::HasReached(deadline, now))
-                break; // timeout
-            Sleep(timeout == INFINITE ? 100 : min(100UL, CMonotonicClock::RemainingWin32TimerDelay(deadline, now)));
-        }
-    }
-    return closed;
-}
-
 #ifndef INVALID_FILE_ATTRIBUTES
 #define INVALID_FILE_ATTRIBUTES (-1)
 #endif // INVALID_FILE_ATTRIBUTES
@@ -1338,6 +1310,60 @@ CFTPQueueItemState DoCreateFileGetWantedErrorState(CFTPDiskWork& localWork)
     return state;
 }
 
+std::string BuildFtpDownloadIdentity(const char* user, const char* host, unsigned short port,
+    const char* path, const char* name, const CQuadWord& size, BOOL ascii,
+    BOOL dateValid, const CFTPDate& date, const CFTPTime& time)
+{
+    // Delimit encoded fields so server names cannot forge another resume identity.
+    return FtpMetadataHex(user) + "|" + FtpMetadataHex(host) + "|" + RecoveryHex(port) + "|" +
+        FtpMetadataHex(path) + "|" + FtpMetadataHex(name) + "|" + RecoveryHex(size.Value) + "|" +
+        (ascii ? "ascii|" : "binary|") + (dateValid ? RecoveryHex(date.Year) + "," +
+        RecoveryHex(date.Month) + "," + RecoveryHex(date.Day) + "," + RecoveryHex(time.Hour) + "," +
+        RecoveryHex(time.Minute) + "," + RecoveryHex(time.Second) + "," + RecoveryHex(time.Millisecond) : "unknown");
+}
+
+static HANDLE OpenQueuedDownload(CFTPDiskWork& work, const char* fullName, DWORD disposition)
+{
+    if (!work.RemoteIdentity) { SetLastError(ERROR_INVALID_DATA); return INVALID_HANDLE_VALUE; }
+    WCHAR* converted = Utf8AllocWide(fullName);
+    if (converted == NULL) { SetLastError(ERROR_INVALID_NAME); return INVALID_HANDLE_VALUE; }
+    std::wstring target(converted);
+    free(converted);
+    CFtpDownloadFileSystem fileSystem;
+    try
+    {
+        if (work.Download && work.Download->MatchesTarget(target))
+        {
+            if (!work.Download->IsUsable()) { SetLastError(ERROR_INVALID_STATE); return INVALID_HANDLE_VALUE; }
+            if (disposition == CREATE_NEW) { SetLastError(ERROR_FILE_EXISTS); return INVALID_HANDLE_VALUE; }
+            if (!work.Download->Matches(target, *work.RemoteIdentity))
+            {
+                // An incompatible prefix needs an explicit fresh transfer, with
+                // the original destination still protected by this same owner.
+                if (disposition != CREATE_ALWAYS) { SetLastError(ERROR_INVALID_DATA); return INVALID_HANDLE_VALUE; }
+                return work.Download->RestartIdentity(*work.RemoteIdentity, fileSystem) ?
+                    work.Download->File() : INVALID_HANDLE_VALUE;
+            }
+            return work.Download->BeginWriting(fileSystem, disposition == CREATE_ALWAYS) ?
+                work.Download->File() : INVALID_HANDLE_VALUE;
+        }
+        std::shared_ptr<CFtpTransactionalDownload> download;
+        // Unknown server versions and ASCII conversion cannot validate a persisted prefix.
+        if (disposition == OPEN_ALWAYS && work.ExpectedLengthKnown && work.SetDownloadTime)
+            download = CFtpTransactionalDownload::TryResume(target.c_str(), *work.RemoteIdentity, fileSystem);
+        if (!download)
+        {
+            download = std::make_shared<CFtpTransactionalDownload>();
+            if (!download->Create(target.c_str(), *work.RemoteIdentity, disposition != CREATE_NEW,
+                                   disposition == OPEN_ALWAYS, fileSystem)) return INVALID_HANDLE_VALUE;
+        }
+        work.Download = download;
+        return download->File();
+    }
+    catch (const std::bad_alloc&)
+    { SetLastError(ERROR_NOT_ENOUGH_MEMORY); return INVALID_HANDLE_VALUE; }
+}
+
 void DoCreateFileUtf8Local(CFTPDiskWork& localWork, char* fullName, BOOL& workDone, BOOL& needCopyBack,
                   char* nameBackup, char* suffix)
 {
@@ -1356,11 +1382,9 @@ void DoCreateFileUtf8Local(CFTPDiskWork& localWork, char* fullName, BOOL& workDo
         }
         else
         {
-            DWORD salCrErr;
-            file = SalamanderGeneral->SalCreateFileEx(fullName, GENERIC_WRITE, FILE_SHARE_READ, FILE_FLAG_SEQUENTIAL_SCAN, &salCrErr);
-            SetLastError(salCrErr);
-            HANDLES_ADD_EX(__otQuiet, file != INVALID_HANDLE_VALUE, __htFile,
-                           __hoCreateFile, file, salCrErr, TRUE);
+            // Collision policy still concerns the final name; all returned handles
+            // belong to a unique stage and never truncate that final destination.
+            file = OpenQueuedDownload(localWork, fullName, CREATE_NEW);
             if (file == INVALID_HANDLE_VALUE) // cannot create a new file
             {
                 winErr = GetLastError();
@@ -1373,7 +1397,9 @@ void DoCreateFileUtf8Local(CFTPDiskWork& localWork, char* fullName, BOOL& workDo
                 if (winErr == ERROR_ALREADY_EXISTS || winErr == ERROR_FILE_EXISTS)
                 {
                     DWORD attr = SalamanderGeneral->SalGetFileAttributes(fullName);
-                    if (attr == INVALID_FILE_ATTRIBUTES)
+                    if (localWork.Download && winErr == ERROR_FILE_EXISTS)
+                        alreadyExists = TRUE; // a private partial file also participates in retry policy
+                    else if (attr == INVALID_FILE_ATTRIBUTES)
                         winErr = GetLastError();
                     else
                     {
@@ -1568,8 +1594,7 @@ void DoCreateFileUtf8Local(CFTPDiskWork& localWork, char* fullName, BOOL& workDo
             }
         }
 
-        DWORD attr = 0;
-        BOOL readonly = FALSE;
+        // The old destination's attributes and bytes stay unchanged until publication.
         switch (action)
         {
         case 1: // autorename (for already exists, transfer failed, cannot create, and force action)
@@ -1686,8 +1711,7 @@ void DoCreateFileUtf8Local(CFTPDiskWork& localWork, char* fullName, BOOL& workDo
                     break;
                 }
                 // try another file name
-                file = HANDLES_Q(CreateFileUtf8Local(fullName, GENERIC_WRITE, FILE_SHARE_READ, NULL,
-                                            CREATE_NEW, FILE_FLAG_SEQUENTIAL_SCAN, NULL));
+                file = OpenQueuedDownload(localWork, fullName, CREATE_NEW);
                 if (file == INVALID_HANDLE_VALUE)
                 {
                     winErr = GetLastError();
@@ -1725,158 +1749,64 @@ void DoCreateFileUtf8Local(CFTPDiskWork& localWork, char* fullName, BOOL& workDo
             break;
         }
 
-        case 2: // resume (for already exists, transfer failed, and force action) + if reduceFileSize==TRUE we also need to shrink the file
-        case 3: // resume or overwrite (for already exists, transfer failed, and force action)
+        case 2: // resume: clone or reopen the owned stage, preserving the visible file
+        case 3: // resume or overwrite: only staged bytes may be discarded
         {
-            file = HANDLES_Q(CreateFileUtf8Local(fullName,
-                                        GENERIC_READ /* we will read and check the overlap */ |
-                                            GENERIC_WRITE,
-                                        FILE_SHARE_READ, NULL,
-                                        OPEN_ALWAYS, FILE_FLAG_SEQUENTIAL_SCAN, NULL));
-            if (file == INVALID_HANDLE_VALUE) // cannot open the file
+            file = OpenQueuedDownload(localWork, fullName, OPEN_ALWAYS);
+            BOOL denyOverwrite = file != INVALID_HANDLE_VALUE;
+            if (file != INVALID_HANDLE_VALUE)
             {
-                winErr = GetLastError();
-                // check whether it happens to be read-only (only via the attribute)
-                attr = SalamanderGeneral->SalGetFileAttributes(fullName);
-                if (attr != INVALID_FILE_ATTRIBUTES && (attr & FILE_ATTRIBUTE_READONLY))
-                { // try to clear the read-only attribute and open the file again
-                    readonly = TRUE;
-                    SetFileAttributesUtf8Local(fullName, attr & (~FILE_ATTRIBUTE_READONLY));
-                    file = HANDLES_Q(CreateFileUtf8Local(fullName,
-                                                GENERIC_READ /* we will read and check the overlap */ |
-                                                    GENERIC_WRITE,
-                                                FILE_SHARE_READ, NULL,
-                                                OPEN_ALWAYS, FILE_FLAG_SEQUENTIAL_SCAN, NULL));
-                    winErr = GetLastError();
-                }
-            }
-            BOOL denyOverwrite = FALSE;
-            if (file != INVALID_HANDLE_VALUE) // the file is open
-            {
-                denyOverwrite = TRUE; // the file was opened successfully; no point overwriting it if determining its size fails
                 CQuadWord size;
-                if (GetFileSizeQuadWord(file, &size))
+                BOOL ok = GetFileSizeQuadWord(file, &size);
+                if (ok && reduceFileSize)
                 {
-                    BOOL ok = TRUE;
-                    if (reduceFileSize) // we still need to shorten the file, so let's do it
-                    {
-                        DWORD resumeOverlap = Config.GetResumeOverlap();
-                        if (resumeOverlap == 0)
-                            resumeOverlap = 1; // at least by one byte (this threatens only if the user just changed it in configuration)
-                        if (size < CQuadWord(resumeOverlap, 0))
-                            resumeOverlap = (DWORD)size.Value;
-                        size -= CQuadWord(resumeOverlap, 0);
-
-                        if (!SeekFileToQuadWord(file, size))
-                        { // error: cannot set seek in the file
-                            ok = FALSE;
-                            winErr = GetLastError();
-                            HANDLES(CloseHandle(file)); // no need to delete the file because it existed a moment ago (it likely hasn't disappeared => we did not create it)
-                        }
-                        else
-                        {
-                            if (!SetEndOfFile(file))
-                            { // error: the file cannot be truncated
-                                ok = FALSE;
-                                winErr = GetLastError();
-                                HANDLES(CloseHandle(file)); // no need to delete the file because it existed a moment ago (it likely hasn't disappeared => we did not create it)
-                            }
-                            else
-                            {
-                                CQuadWord startOffset(0, 0);
-                                if (!SeekFileToQuadWord(file, startOffset))
-                                { // error: cannot seek back to the start of the file
-                                    ok = FALSE;
-                                    winErr = GetLastError();
-                                    HANDLES(CloseHandle(file)); // no need to delete the file because it existed a moment ago (it likely hasn't disappeared => we did not create it)
-                                }
-                            }
-                        }
-                    }
-
-                    if (ok)
-                    {
-                        // workDone = TRUE;  // when cancelling the operation we will not delete the file, it's a resume
-                        localWork.OpenedFile = file;
-                        localWork.FileSize = size;
-                        localWork.CanOverwrite = (action == 3 /* resume or overwrite */); // FALSE = the file was resumed
-                        localWork.CanDeleteEmptyFile = FALSE;                             // the file was resumed (do not delete it even if it has zero size)
-                        needCopyBack = TRUE;
-                        break; // success, we are done
-                    }
+                    DWORD overlap = Config.GetResumeOverlap();
+                    if (overlap == 0) overlap = 1;
+                    if (size < CQuadWord(overlap, 0)) overlap = (DWORD)size.Value;
+                    size -= CQuadWord(overlap, 0);
+                    CFtpDownloadFileSystem fileSystem;
+                    // Truncation is confined to a retained stage, including resume-overlap retries.
+                    ok = fileSystem.Truncate(file, size.Value) && SeekFileToQuadWord(file, CQuadWord(0, 0));
                 }
-                else // error when determining the file size, close the file and finish with an error
+                if (ok)
                 {
-                    winErr = GetLastError();
-                    HANDLES(CloseHandle(file)); // no need to delete the file because it existed a moment ago (it likely hasn't disappeared => we did not create it)
+                    localWork.OpenedFile = file; // borrowed; Download owns it through asynchronous work
+                    localWork.FileSize = size;
+                    localWork.CanOverwrite = action == 3;
+                    localWork.CanDeleteEmptyFile = FALSE;
+                    needCopyBack = TRUE;
+                    break;
                 }
             }
-
-            if (action == 2 /* resume */ || denyOverwrite)
+            winErr = GetLastError();
+            if (action == 2 || denyOverwrite)
             {
-                if (readonly)
-                    SetFileAttributesUtf8Local(fullName, attr); // restore the read-only attribute (failed to open the file)
-
                 localWork.ProblemID = ITEMPR_CANNOTCREATETGTFILE;
                 localWork.WinError = winErr;
                 localWork.State = DoCreateFileGetWantedErrorState(localWork);
                 needCopyBack = TRUE;
-                break; // resume failed, abort
+                break;
             }
-            // break;  // resume or overwrite - if resume fails we try overwrite as well
+            // A failed resume may restart privately; it cannot delete the final pathname.
         }
-        // case 3:  // resume or overwrite - if resume fails we try overwrite as well
-        case 4: // overwrite (pri already exists, transfer failed i force action)
+        [[fallthrough]];
+        case 4: // overwrite creates or resets a private stage
         {
-            if (action == 4) // check whether it happens to be read-only (only via the attribute), but only if we have not done so already
+            file = OpenQueuedDownload(localWork, fullName, CREATE_ALWAYS);
+            if (file != INVALID_HANDLE_VALUE)
             {
-                attr = SalamanderGeneral->SalGetFileAttributes(fullName);
-                if (attr != INVALID_FILE_ATTRIBUTES && (attr & FILE_ATTRIBUTE_READONLY))
-                { // try to clear the read-only attribute
-                    readonly = TRUE;
-                    SetFileAttributesUtf8Local(fullName, attr & (~FILE_ATTRIBUTE_READONLY));
-                }
-            }
-            file = HANDLES_Q(CreateFileUtf8Local(fullName, GENERIC_WRITE, FILE_SHARE_READ, NULL,
-                                        CREATE_ALWAYS, FILE_FLAG_SEQUENTIAL_SCAN, NULL));
-            if (file == INVALID_HANDLE_VALUE) // cannot open the file
-            {
-                winErr = GetLastError();
-
-                // handles the situation where a file needs to be overwritten on Samba:
-                // the file has 440+different_owner and is in a directory where the current user has write access
-                // (it can be deleted, but not overwritten directly (cannot be opened for writing) - we work around it:
-                //  delete + create the file again)
-                // (on Samba it is possible to allow deleting read-only files, which makes deleting a read-only file possible,
-                //  otherwise it cannot be deleted because Windows cannot remove a read-only file and at the same time
-                //  the "read-only" attribute cannot be cleared on that file because the current user is not the owner)
-                if (DeleteFileUtf8Local(fullName)) // if it is read-only, it can be deleted only on Samba with "delete readonly" enabled
-                {
-                    file = HANDLES_Q(CreateFileUtf8Local(fullName, GENERIC_WRITE, FILE_SHARE_READ, NULL,
-                                                CREATE_ALWAYS, FILE_FLAG_SEQUENTIAL_SCAN, NULL));
-                    winErr = GetLastError();
-                }
-            }
-
-            if (file != INVALID_HANDLE_VALUE) // the file is open
-            {
-                workDone = TRUE; // if the operation is cancelled, delete the newly created file
                 localWork.OpenedFile = file;
                 localWork.FileSize.Set(0, 0);
                 localWork.CanOverwrite = TRUE;
-                localWork.CanDeleteEmptyFile = TRUE; // the file was newly created (not resumed)
-                needCopyBack = TRUE;
+                localWork.CanDeleteEmptyFile = TRUE;
             }
             else
             {
-                if (readonly)
-                    SetFileAttributesUtf8Local(fullName, attr); // restore the read-only attribute (failed to delete the file)
-
                 localWork.ProblemID = ITEMPR_CANNOTCREATETGTFILE;
-                localWork.WinError = winErr;
+                localWork.WinError = GetLastError();
                 localWork.State = DoCreateFileGetWantedErrorState(localWork);
-                needCopyBack = TRUE;
             }
+            needCopyBack = TRUE;
             break;
         }
         }
@@ -2014,67 +1944,41 @@ void DoCheckOrWriteToFile(CFTPDiskWork& localWork, BOOL& needCopyBack)
     }
 }
 
-void DoCreateAndWriteFile(CFTPDiskWork& localWork, BOOL& needCopyBack, BOOL& workDone)
+void DoCreateAndWriteFile(CFTPDiskWork& localWork, BOOL& needCopyBack, BOOL& /*workDone*/)
 {
-    HANDLE file = NULL;
-    if (localWork.WorkFile == NULL) // the file has not been created yet
+    // Every direct download owns its stage before receiving data. Missing
+    // ownership fails closed instead of reopening a caller-supplied pathname.
+    if (!localWork.Download || !localWork.Download->IsUsable())
     {
-        SetFileAttributesUtf8Local(localWork.Name, FILE_ATTRIBUTE_NORMAL); // to allow overwriting a read-only file as well
-        HANDLE f = HANDLES_Q(CreateFileUtf8Local(localWork.Name, GENERIC_WRITE,
-                                        FILE_SHARE_READ, NULL,
-                                        localWork.AppendToFile ? OPEN_ALWAYS : CREATE_ALWAYS,
-                                        FILE_FLAG_SEQUENTIAL_SCAN,
-                                        NULL));
-        if (f != INVALID_HANDLE_VALUE)
-        {
-            if (localWork.AppendToFile)
-            {
-                LARGE_INTEGER offset;
-                offset.QuadPart = localWork.WriteOrReadFromOffset.Value;
-                // The REST offset was derived from durable metadata and must remain the write offset.
-                LARGE_INTEGER existingSize;
-                BOOL haveExistingSize = GetFileSizeEx(f, &existingSize);
-                if (!haveExistingSize || existingSize.QuadPart < offset.QuadPart ||
-                    !SetFilePointerEx(f, offset, NULL, FILE_BEGIN))
-                {
-                    localWork.State = sqisFailed;
-                    localWork.WinError = !haveExistingSize ? GetLastError() :
-                                             (existingSize.QuadPart < offset.QuadPart ? ERROR_INVALID_DATA : GetLastError());
-                    HANDLES(CloseHandle(f));
-                    needCopyBack = TRUE;
-                    return;
-                }
-            }
-            file = f;
-            localWork.OpenedFile = f;
-            workDone = TRUE;     // if cancelled, close the file handle and delete the file
-            needCopyBack = TRUE; // return the handle of the created file
-        }
-        else // error while creating the file
-        {
-            localWork.State = sqisFailed;
-            localWork.WinError = GetLastError();
-            needCopyBack = TRUE; // return the error
-        }
+        localWork.State = sqisFailed;
+        localWork.WinError = ERROR_INVALID_HANDLE;
+        needCopyBack = TRUE;
+        return;
     }
-    else
-        file = localWork.WorkFile; // write only
-
-    if (file != NULL && localWork.ValidBytesInFlushDataBuffer > 0) // write to the file
+    HANDLE file = localWork.Download->File();
+    if (!SeekFileToQuadWord(file, localWork.WriteOrReadFromOffset))
     {
-        DWORD writtenBytes;
-        if (!WriteFile(file, localWork.FlushDataBuffer, localWork.ValidBytesInFlushDataBuffer,
-                       &writtenBytes, NULL) ||
-            writtenBytes != (DWORD)localWork.ValidBytesInFlushDataBuffer)
+        localWork.State = sqisFailed;
+        localWork.WinError = GetLastError();
+        needCopyBack = TRUE;
+        return;
+    }
+    int offset = 0;
+    while (offset < localWork.ValidBytesInFlushDataBuffer)
+    {
+        DWORD written = 0;
+        const DWORD remaining = localWork.ValidBytesInFlushDataBuffer - offset;
+        if (!WriteFile(file, localWork.FlushDataBuffer + offset, remaining, &written, NULL) ||
+            written == 0 || written > remaining)
         {
             localWork.State = sqisFailed;
-            localWork.WinError = GetLastError();
-            needCopyBack = TRUE; // return the error
+            localWork.WinError = GetLastError() == ERROR_SUCCESS ? ERROR_WRITE_FAULT : GetLastError();
+            needCopyBack = TRUE;
+            return;
         }
-        // else;  // successfully written, we are successfully done
+        offset += written;
     }
 }
-
 void DoListDirectory(CFTPDiskWork& localWork, BOOL& needCopyBack)
 {
     char srcPath[MAX_PATH + 10];
@@ -2373,6 +2277,94 @@ void DoReadFile(CFTPDiskWork& localWork, BOOL& needCopyBack, BOOL isASCIITrMode)
     needCopyBack = TRUE;
 }
 
+BOOL FtpDownloadWriteTime(HANDLE file, const CFTPDate& date, const CFTPTime& time, FILETIME& result)
+{
+    // Partial server dates inherit missing fields only from a successfully read
+    // timestamp; a conversion failure is a finalization failure.
+    SYSTEMTIME system = {};
+    FILETIME utc, local;
+    if ((date.Day == 0 || time.Hour == 24) &&
+        (!GetFileTime(file, NULL, NULL, &utc) || !FileTimeToLocalFileTime(&utc, &local) ||
+         !FileTimeToSystemTime(&local, &system))) return FALSE;
+    if (date.Day != 0)
+    { system.wYear = date.Year; system.wMonth = date.Month; system.wDay = date.Day; }
+    if (time.Hour != 24)
+    {
+        system.wHour = time.Hour; system.wMinute = time.Minute;
+        system.wSecond = time.Second; system.wMilliseconds = time.Millisecond;
+    }
+    return SystemTimeToFileTime(&system, &local) && LocalFileTimeToFileTime(&local, &result);
+}
+
+static DWORD CloseFtpDiskFile(CFTPFileToClose& request)
+{
+    CFtpDownloadFileSystem fileSystem;
+    DWORD error = ERROR_SUCCESS;
+    LARGE_INTEGER size = {};
+    BOOL discard = request.AlwaysDeleteFile;
+    if (!discard && request.DeleteIfEmpty)
+    {
+        if (!fileSystem.GetSize(request.File, size)) error = GetLastError();
+        else discard = size.QuadPart == 0;
+    }
+    if (request.Download && !request.Download->IsUsable()) return ERROR_OPERATION_ABORTED;
+    // Cancellation can discard staged bytes but cannot truncate the visible file.
+    if (request.Download && (discard || request.EndOfFile != CQuadWord(-1, -1)) &&
+        !request.Download->BeginWriting(fileSystem, discard)) error = GetLastError();
+    if (error == ERROR_SUCCESS && !discard && request.EndOfFile != CQuadWord(-1, -1))
+    {
+        if (!fileSystem.GetSize(request.File, size)) error = GetLastError();
+        else if (size.QuadPart < 0 || request.EndOfFile.Value > (ULONGLONG)size.QuadPart) error = ERROR_INVALID_DATA;
+        else if (!fileSystem.Truncate(request.File, request.EndOfFile.Value)) error = GetLastError();
+    }
+    if (error == ERROR_SUCCESS && !discard && request.SetDateAndTime &&
+        (request.Date.Day != 0 || request.Time.Hour != 24))
+    {
+        FILETIME time;
+        if (!FtpDownloadWriteTime(request.File, request.Date, request.Time, time) ||
+            !fileSystem.SetFileTime(request.File, NULL, NULL, &time)) error = GetLastError();
+    }
+    if (request.Download)
+    {
+        if (error == ERROR_SUCCESS && !request.Download->Checkpoint(fileSystem)) error = GetLastError();
+        // The owner keeps the borrowed handle until publication; completion
+        // proves earlier I/O has stopped before a caller can reuse the stage.
+    }
+    else
+    {
+        if (request.Completion && !discard && !fileSystem.FlushFileBuffers(request.File) && error == ERROR_SUCCESS)
+            error = GetLastError();
+        if (!fileSystem.CloseFile(request.File) && error == ERROR_SUCCESS) error = GetLastError();
+        if (discard && !DeleteFileUtf8Local(request.FileName) && error == ERROR_SUCCESS) error = GetLastError();
+    }
+    return error;
+}
+
+static void FinalizeQueuedDownload(CFTPDiskWork& work)
+{
+    CFtpDownloadTestFaults fileSystem(work.Download ? work.Download->File() : INVALID_HANDLE_VALUE);
+    FILETIME time;
+    BOOL ok = work.Download && work.Download->IsUsable();
+    DWORD error = ERROR_INVALID_HANDLE;
+    if (ok && work.SetDownloadTime)
+    { ok = FtpDownloadWriteTime(work.Download->File(), work.DownloadDate, work.DownloadTime, time); error = GetLastError(); }
+    if (ok)
+    {
+        // This result includes length, metadata, flush, publication and checked
+        // closure. Network success alone cannot authorize a remote deletion.
+        ok = work.Download->Finish(fileSystem, work.ExpectedLength, work.ExpectedLengthKnown,
+                                   work.SetDownloadTime ? &time : NULL);
+        error = GetLastError();
+    }
+    if (!ok)
+    {
+        work.State = sqisFailed;
+        work.ProblemID = ITEMPR_INCOMPLETEDOWNLOAD;
+        work.WinError = error == ERROR_SUCCESS ? ERROR_WRITE_FAULT : error;
+    }
+    fileSystem.Completed(ok ? ERROR_SUCCESS : work.WinError);
+}
+
 unsigned
 CFTPDiskThread::Body()
 {
@@ -2385,9 +2377,6 @@ CFTPDiskThread::Body()
     char fullName[MAX_PATH];
     char nameBackup[MAX_PATH];
     char suffix[20];
-#ifdef TRACE_ENABLE
-    char errBuf[300];
-#endif // TRACE_ENABLE
     while (1)
     {
         // check if there is any work or if the thread should terminate
@@ -2432,98 +2421,13 @@ CFTPDiskThread::Body()
 
         if (fileToClose != NULL) // close the file and optionally delete an empty file
         {
-            CQuadWord size;
-            BOOL delFile = FALSE;
-            if (fileToClose->AlwaysDeleteFile)
-                delFile = TRUE;
-            else
-            {
-                if (fileToClose->DeleteIfEmpty)
-                {
-                    delFile = GetFileSizeQuadWord(fileToClose->File, &size) &&
-                              size == CQuadWord(0, 0); // do not delete when the size query fails
-                }
-            }
-            if (!delFile && fileToClose->SetDateAndTime &&
-                (fileToClose->Date.Day != 0 || fileToClose->Time.Hour != 24)) // only if at least something will be set (otherwise the following block makes no sense)
-            {
-                SYSTEMTIME st;
-                FILETIME ft, ft2;
-                if ((fileToClose->Date.Day == 0 || fileToClose->Time.Hour == 24) && // the date or time are "empty values" (we must obtain them from the file)
-                    (!GetFileTime(fileToClose->File, NULL, NULL, &ft) ||
-                     !FileTimeToLocalFileTime(&ft, &ft2) ||
-                     !FileTimeToSystemTime(&ft2, &st)))
-                {
-                    GetLocalTime(&st); // cannot read date&time from the file, so take the current time at least (we have to fill the "empty values" somehow)
-                }
-                if (fileToClose->Date.Day != 0) // if the date is not an "empty value"
-                {
-                    st.wYear = fileToClose->Date.Year;
-                    st.wMonth = fileToClose->Date.Month;
-                    st.wDayOfWeek = 0;
-                    st.wDay = fileToClose->Date.Day;
-                }
-                if (fileToClose->Time.Hour != 24) // if the time is not an "empty value"
-                {
-                    st.wHour = fileToClose->Time.Hour;
-                    st.wMinute = fileToClose->Time.Minute;
-                    st.wSecond = fileToClose->Time.Second;
-                    st.wMilliseconds = fileToClose->Time.Millisecond;
-                }
-                if (!SystemTimeToFileTime(&st, &ft2) ||
-                    !LocalFileTimeToFileTime(&ft2, &ft))
-                {
-                    DWORD err = GetLastError();
-                    TRACE_E("CFTPDiskThread::Body(): SystemTimeToFileTime() or LocalFileTimeToFileTime() failed: " << FTPGetErrorText(err, errBuf, 300));
-                }
-                else
-                {
-                    if (!SetFileTime(fileToClose->File, NULL, NULL, &ft))
-                    {
-                        DWORD err = GetLastError();
-                        TRACE_E("CFTPDiskThread::Body(): SetFileTime() failed: " << FTPGetErrorText(err, errBuf, 300));
-                    }
-                }
-            }
-            if (!delFile && fileToClose->EndOfFile != CQuadWord(-1, -1))
-            {
-                if (GetFileSizeQuadWord(fileToClose->File, &size))
-                {
-                    if (fileToClose->EndOfFile <= size)
-                    {
-                        if (SeekFileToQuadWord(fileToClose->File, fileToClose->EndOfFile))
-                        {
-                            if (SetEndOfFile(fileToClose->File) == 0)
-                            {
-                                DWORD err = GetLastError();
-                                TRACE_E("CFTPDiskThread::Body(): SetEndOfFile failed: " << FTPGetErrorText(err, errBuf, 300));
-                            }
-                        }
-                        else
-                        {
-                            DWORD err = GetLastError();
-                            TRACE_E("CFTPDiskThread::Body(): SetFilePointerEx failed: " << FTPGetErrorText(err, errBuf, 300));
-                        }
-                    }
-                    else
-                        TRACE_E("CFTPDiskThread::Body(): fileToClose->EndOfFile > size!");
-                }
-                else
-                {
-                    DWORD err = GetLastError();
-                    TRACE_E("CFTPDiskThread::Body(): GetFileSize failed: " << FTPGetErrorText(err, errBuf, 300));
-                }
-            }
-            HANDLES(CloseHandle(fileToClose->File));
-            if (delFile)
-                DeleteFileUtf8Local(fileToClose->FileName);
+            // Completion is stored before releasing the request. Late and multiple
+            // waiters observe the same final error without an event pulse.
+            const DWORD closeError = CloseFtpDiskFile(*fileToClose);
+            if (fileToClose->Completion) fileToClose->Completion->Complete(closeError);
+            if (closeError != ERROR_SUCCESS)
+                TRACE_E("FTP local finalization failed: " << closeError);
             delete fileToClose;
-
-            HANDLES(EnterCriticalSection(&DiskCritSect));
-            DoneFileCloseIndex++; // from -1 (none closed yet) go to zero, then increment by one
-            HANDLES(LeaveCriticalSection(&DiskCritSect));
-            if (FileClosedEvent != NULL)
-                PulseEvent(FileClosedEvent);
         }
         else
         {
@@ -2551,6 +2455,13 @@ CFTPDiskThread::Body()
                 case fdwtCheckOrWriteFile:
                 {
                     DoCheckOrWriteToFile(localWork, needCopyBack);
+                    break;
+                }
+
+                case fdwtFinalizeDownload:
+                {
+                    FinalizeQueuedDownload(localWork);
+                    needCopyBack = TRUE;
                     break;
                 }
 
@@ -2630,7 +2541,8 @@ CFTPDiskThread::Body()
                 }
                 if (localWork.OpenedFile != NULL) // on cancel close the opened file handle
                 {
-                    HANDLES(CloseHandle(localWork.OpenedFile));
+                    // Download handles are borrowed from the retained local snapshot.
+                    if (!localWork.Download) HANDLES(CloseHandle(localWork.OpenedFile));
                     localWork.OpenedFile = NULL;
                 }
                 if (localWork.DiskListing != NULL) // on cancel deallocate the allocated listing
@@ -2660,17 +2572,14 @@ CFTPDiskThread::Body()
                     case fdwtRetryCreatedFile:
                     case fdwtRetryResumedFile:
                     {
-                        if (workDone)
-                        {
-                            if (!DeleteFileUtf8Local(fullName)) // the created file cannot have the read-only attribute; otherwise it could not be opened for writing
-                                TRACE_E("CFTPDiskThread::Body(): cancelling disk operation: unable to remove file: " << fullName);
-                        }
+                        // A cancelled prepare preserves its stage and never deletes
+                        // the final name stored in the original work request.
                         break;
                     }
 
                     case fdwtCreateAndWriteFile:
                     {
-                        if (workDone)
+                        if (workDone && !localWork.Download)
                         {
                             if (!DeleteFileUtf8Local(localWork.Name)) // the created file cannot have the read-only attribute
                                 TRACE_E("CFTPDiskThread::Body(): cancelling disk operation: unable to remove target file: " << localWork.Name);
@@ -2707,6 +2616,8 @@ CFTPDiskThread::Body()
 
                     case fdwtDeleteFile:
                         break; // nothing to do when cancelling file deletion
+                    case fdwtFinalizeDownload:
+                        break; // a cancelled completion cannot trigger remote deletion
 
                     default:
                         TRACE_E("CFTPDiskThread::Body(), cancel: unknown type of work: " << localWork.Type);
@@ -2714,6 +2625,10 @@ CFTPDiskThread::Body()
                     }
                 }
             }
+            // The result or close request retains any continuing ownership;
+            // an idle disk thread must not pin the last completed target forever.
+            localWork.Download.reset();
+            localWork.RemoteIdentity.reset();
         }
     }
     return 0;

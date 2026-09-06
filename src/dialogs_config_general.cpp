@@ -214,12 +214,13 @@ void CLoadSaveToRegistryMutex::Init()
     PACL paclNewDacl;
     SECURITY_ATTRIBUTES sa;
     SECURITY_DESCRIPTOR sd;
-    SECURITY_ATTRIBUTES* saPtr = CreateAccessableSecurityAttributes(&sa, &sd, SYNCHRONIZE /*| MUTEX_MODIFY_STATE*/, &psidEveryone, &paclNewDacl);
+    // Every process acquiring the shared mutex must also be allowed to release it.
+    SECURITY_ATTRIBUTES* saPtr = CreateAccessableSecurityAttributes(&sa, &sd, SYNCHRONIZE | MUTEX_MODIFY_STATE, &psidEveryone, &paclNewDacl);
 
     Mutex = HANDLES_Q(CreateMutex(saPtr, FALSE, buff));
     if (Mutex == NULL)
     {
-        Mutex = HANDLES_Q(OpenMutex(SYNCHRONIZE, FALSE, buff));
+        Mutex = HANDLES_Q(OpenMutex(SYNCHRONIZE | MUTEX_MODIFY_STATE, FALSE, buff));
         if (Mutex == NULL)
         {
             DWORD err = GetLastError();
@@ -246,6 +247,15 @@ void CLoadSaveToRegistryMutex::Enter()
     }
     else
         TRACE_E("CLoadSaveToRegistryMutex::Enter(): the Mutex==NULL! Not initialized?");
+}
+
+BOOL CLoadSaveToRegistryMutex::EnterChecked()
+{
+    if (Mutex == NULL) { SetLastError(ERROR_INVALID_HANDLE); return FALSE; }
+    const DWORD result = WaitForSingleObject(Mutex, INFINITE);
+    if (result != WAIT_OBJECT_0 && result != WAIT_ABANDONED) return FALSE;
+    ++DebugCheck;
+    return TRUE;
 }
 
 void CLoadSaveToRegistryMutex::Leave()

@@ -526,7 +526,11 @@ public:
     int RecordItemRetry();
     BOOL JournalBeginItem(int itemIndex, const COperation* operation, int attempt);
     BOOL JournalSetTemporaryPath(const char* temporaryPath);
-    BOOL JournalMarkTemporaryReady();
+    // Ready evidence is captured while publication holds the directory and both files.
+    BOOL JournalMarkTemporaryReady(const char* targetPath, const char* temporaryPath,
+                                    HANDLE directory, HANDLE target, HANDLE temporary, BOOL preserveTargetSecurity);
+    // Publication cannot remove an approved destination without a durable intent.
+    BOOL JournalRecordPublicationState(const char* state, const WCHAR* backupPath);
     void JournalCompleteItem(BOOL succeeded);
     void FinishJournal(BOOL failed, BOOL cancelled);
     const char* GetCorrelationId() const { return CorrelationId; }

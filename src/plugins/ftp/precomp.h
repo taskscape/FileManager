@@ -18,6 +18,12 @@
 #include <stdio.h>
 #include <time.h>
 
+// Standard owners must be declared before the debug allocation macro; disk
+// requests retain staging and completion even after their worker is cancelled.
+#include "../../common/ftp_transactional_download.h"
+#include "../../common/file_close_completion.h"
+#include "../../common/ftp_download_test_faults.h" // one-shot, sandbox-guarded product fault injection
+
 #if defined(_DEBUG) && defined(_MSC_VER) // without passing file+line to 'new' operator, list of memory leaks shows only 'crtdbg.h(552)'
 #define new new (_NORMAL_BLOCK, __FILE__, __LINE__)
 #endif

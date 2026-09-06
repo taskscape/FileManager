@@ -245,9 +245,18 @@ BOOL COperations::JournalSetTemporaryPath(const char* temporaryPath)
     return Journal == NULL || Journal->SetTemporaryPath(temporaryPath);
 }
 
-BOOL COperations::JournalMarkTemporaryReady()
+BOOL COperations::JournalMarkTemporaryReady(const char* targetPath, const char* temporaryPath,
+                                            HANDLE directory, HANDLE target, HANDLE temporary, BOOL preserveTargetSecurity)
 {
-    return Journal == NULL || Journal->MarkTemporaryReady();
+    // Incomplete evidence cannot authorize a later destructive recovery action.
+    return Journal != NULL && Journal->MarkTemporaryReady(targetPath, temporaryPath,
+                                                          directory, target, temporary, preserveTargetSecurity);
+}
+
+// A missing journal must fail closed before an overwrite creates a backup.
+BOOL COperations::JournalRecordPublicationState(const char* state, const WCHAR* backupPath)
+{
+    return Journal != NULL && Journal->RecordPublicationState(state, backupPath);
 }
 
 void COperations::JournalCompleteItem(BOOL succeeded)

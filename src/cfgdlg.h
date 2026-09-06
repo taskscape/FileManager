@@ -489,6 +489,8 @@ public:
     void Init();
 
     void Enter();
+    // Optional destructive cleanup must fail closed if this mutex is unavailable.
+    BOOL EnterChecked();
     void Leave();
 };
 

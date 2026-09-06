@@ -409,7 +409,8 @@ void DoCopyFileLoopOrig(HANDLE& in, HANDLE& out, void* buffer, int& limitBufferS
                         COperations* script, CProgressDlgData& dlgData, BOOL wholeFileAllocated,
                         COperation* op, const CQuadWord& totalDone, BOOL& copyError, BOOL& skipCopy,
                         HWND hProgressDlg, CQuadWord& operationDone, CQuadWord& fileSize,
-                        int bufferSize, int& allocWholeFileOnStart, BOOL& copyAgain)
+                        int bufferSize, int& allocWholeFileOnStart, BOOL& copyAgain,
+                        CStableMoveSource* stableMoveSource)
 {
     int autoRetryAttemptsSNAP = 0;
     DWORD read;
@@ -590,9 +591,8 @@ void DoCopyFileLoopOrig(HANDLE& in, HANDLE& out, void* buffer, int& limitBufferS
 
                 if (in != NULL)
                     HANDLES(CloseHandle(in)); // close the invalid handle
-                in = HANDLES_Q(CreateFileUtf8(op->SourceName, GENERIC_READ,
-                                          FILE_SHARE_READ | FILE_SHARE_WRITE, NULL,
-                                          OPEN_EXISTING, FILE_FLAG_SEQUENTIAL_SCAN, NULL));
+                // Retrying a move must keep reading the source held by its owner.
+                in = OpenCopySourceForRead(op->SourceName, stableMoveSource, FILE_FLAG_SEQUENTIAL_SCAN);
                 if (in != INVALID_HANDLE_VALUE) // opened successfully; now adjust the offset
                 {
                     CFileOffsetResult inputSize = SalGetFileSizeEx(in);

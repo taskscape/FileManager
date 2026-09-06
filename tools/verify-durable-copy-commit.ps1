@@ -51,10 +51,12 @@ if ($flush -ge $close -or $close -ge $commitPhase -or $verify -ge $verifyRetry -
 $moveBody = $copyEngine.Substring($moveStart)
 $copyThenDelete = $moveBody.IndexOf('BOOL notError = DoCopyFile(', [StringComparison]::Ordinal)
 $fullHash = $moveBody.IndexOf('while (suspiciousIoRetry && !VerifyFullFileContentSha256(op->SourceName, op->TargetName, &err))', [StringComparison]::Ordinal)
-# Identity-verified deletion prevents a path replacement race after the source
-# digest is accepted and before a cross-volume move removes the original file.
-$deleteSource = $moveBody.IndexOf('if (DeleteFileWithVerifiedIdentity(op->SourceName, op->SourceIdentity, &err))', [StringComparison]::Ordinal)
+# A retained source owner closes both content-change and pathname-replacement
+# races across reader retries, optional digest verification, and deletion.
+$sourceLease = $moveBody.IndexOf('CStableMoveSource stableMoveSource;', [StringComparison]::Ordinal)
+$deleteSource = $moveBody.IndexOf('if (stableMoveSource.Delete(OperationExecutionFileSystem()))', [StringComparison]::Ordinal)
 if ($copyThenDelete -lt 0 -or $fullHash -lt 0 -or $deleteSource -lt 0 -or
+    $sourceLease -lt 0 -or $sourceLease -ge $copyThenDelete -or
     $copyThenDelete -ge $fullHash -or $fullHash -ge $deleteSource) {
     throw 'Cross-volume move no longer verifies a retried copy before deleting its source.'
 }

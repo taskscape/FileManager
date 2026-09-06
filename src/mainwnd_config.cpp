@@ -1,4 +1,4 @@
-﻿// SPDX-FileCopyrightText: 2023 Taskscape Ltd
+// SPDX-FileCopyrightText: 2023 Taskscape Ltd
 // SPDX-License-Identifier: GPL-2.0-or-later
 // CommentsTranslationProject: TRANSLATED
 
@@ -863,13 +863,29 @@ void CMainWindow::SaveConfig(HWND parent)
     }
 
     ConfigSaveInProgress = TRUE;
+    // This attempt consumes older pending work; only newer commits requeue it.
+    ConfigSaveQueued = FALSE;
     BeginConfigurationWriteFaultInjection();
     // Normal saves use the existing worker so registry I/O yields to the UI message loop without a modal wait window.
     const BOOL registryWorkerStarted = GlobalSaveWaitWindow == NULL && !CriticalShutdown &&
                                       RegistryWorkerThread.StartThread();
 
-    LoadSaveToRegistryMutex.Enter();
+    if (!LoadSaveToRegistryMutex.EnterChecked())
+    {
+        // No staging mutation is allowed when cross-process serialization fails.
+        const DWORD error = GetLastError();
+        if (registryWorkerStarted) RegistryWorkerThread.StopThread();
+        EndConfigurationWriteFaultInjection();
+        ConfigSaveInProgress = FALSE;
+        ConfigSaveQueued = TRUE;
+        ReportConfigurationSaveIdleForTest(FALSE);
+        if (!CriticalShutdown)
+            SalMessageBox(parent, GetErrorText(error), LoadStr(IDS_ERRORSAVECONFIG), MB_OK | MB_ICONEXCLAMATION);
+        return;
+    }
 
+    BeginConfigurationPayloadWrites();
+    BOOL saveCommitted = FALSE;
     HKEY storeKey;
     HKEY salamander;
     DWORD transactionGeneration;
@@ -986,17 +1002,19 @@ void CMainWindow::SaveConfig(HWND parent)
             }
 
             //---  Plugins
-            HKEY configKey;
-            HKEY orderKey;
+            // Earlier key creations still need closing if a later creation fails.
+            HKEY configKey = NULL;
+            HKEY orderKey = NULL;
+            actKey = NULL;
             if (CreateKey(salamander, SALAMANDER_PLUGINS, actKey) &&
                 CreateKey(salamander, SALAMANDER_PLUGINSCONFIG, configKey) &&
                 CreateKey(salamander, SALAMANDER_PLUGINSORDER, orderKey))
             {
                 Plugins.Save(parent, actKey, configKey, orderKey);
-                CloseKey(orderKey);
-                CloseKey(actKey);
-                CloseKey(configKey);
             }
+            if (orderKey != NULL) CloseKey(orderKey);
+            if (actKey != NULL) CloseKey(actKey);
+            if (configKey != NULL) CloseKey(configKey);
 
             if (GlobalSaveWaitWindow != NULL)
                 GlobalSaveWaitWindow->SetProgressPos(++GlobalSaveWaitWindowProgress); // 1
@@ -1012,6 +1030,8 @@ void CMainWindow::SaveConfig(HWND parent)
                 if (CreateKey(actKey, SALAMANDER_CUSTOMPACKERS, actSubKey))
                 {
                     ClearKey(actSubKey);
+                    // Preserve the intended count even if a later child cannot be written.
+                    SetConfigurationCollectionExpectedCount(actSubKey, PackerConfig.GetPackersCount());
                     HKEY itemKey;
                     char buf[30];
                     int i;
@@ -1040,6 +1060,8 @@ void CMainWindow::SaveConfig(HWND parent)
                 if (CreateKey(actKey, SALAMANDER_CUSTOMUNPACKERS, actSubKey))
                 {
                     ClearKey(actSubKey);
+                    // Preserve the intended count even if a later child cannot be written.
+                    SetConfigurationCollectionExpectedCount(actSubKey, UnpackerConfig.GetUnpackersCount());
                     HKEY itemKey;
                     char buf[30];
                     int i;
@@ -1070,6 +1092,8 @@ void CMainWindow::SaveConfig(HWND parent)
                 if (CreateKey(actKey, SALAMANDER_PREDPACKERS, actSubKey))
                 {
                     ClearKey(actSubKey);
+                    // Preserve the intended count even if a later child cannot be written.
+                    SetConfigurationCollectionExpectedCount(actSubKey, ArchiverConfig.GetArchiversCount());
                     HKEY itemKey;
                     char buf[30];
                     int i;
@@ -1091,6 +1115,8 @@ void CMainWindow::SaveConfig(HWND parent)
                 if (CreateKey(actKey, SALAMANDER_ARCHIVEASSOC, actSubKey))
                 {
                     ClearKey(actSubKey);
+                    // Preserve the intended count even if a later child cannot be written.
+                    SetConfigurationCollectionExpectedCount(actSubKey, PackerFormatConfig.GetFormatsCount());
                     HKEY itemKey;
                     char buf[30];
                     int i;
@@ -1628,6 +1654,8 @@ void CMainWindow::SaveConfig(HWND parent)
             if (CreateKey(salamander, SALAMANDER_USERMENU_REG, actKey))
             {
                 ClearKey(actKey);
+                // Preserve the intended count even if a later child cannot be written.
+                SetConfigurationCollectionExpectedCount(actKey, UserMenuItems->Count);
 
                 HKEY subKey;
                 char buf[30];
@@ -1765,6 +1793,8 @@ void CMainWindow::SaveConfig(HWND parent)
                 if (CreateKey(actKey, SALAMANDER_HLT, hHltKey))
                 {
                     ClearKey(hHltKey);
+                    // Preserve the intended count even if a later child cannot be written.
+                    SetConfigurationCollectionExpectedCount(hHltKey, HighlightMasks->Count);
                     HKEY hSubKey;
                     char buf[30];
                     int i;
@@ -1800,13 +1830,15 @@ void CMainWindow::SaveConfig(HWND parent)
             if (GlobalSaveWaitWindow != NULL)
                 GlobalSaveWaitWindow->SetProgressPos(++GlobalSaveWaitWindowProgress); // 8
 
-            if (!CommitConfigurationTransaction(storeKey, salamander, transactionGeneration))
-                TRACE_E("CMainWindow::SaveConfig(): staged configuration failed validation; active generation was not changed");
+            saveCommitted = CommitConfigurationTransaction(storeKey, salamander, transactionGeneration);
+            if (!saveCommitted)
+                TRACE_E("CMainWindow::SaveConfig(): configuration did not report a complete durable commit");
         }
         CloseKey(salamander);
         CloseKey(storeKey);
     }
 
+    const LONG payloadError = EndConfigurationPayloadWrites();
     LoadSaveToRegistryMutex.Leave();
 
     // Stop only the worker this in-session save started; shutdown owns and stops its shared worker separately.
@@ -1815,6 +1847,21 @@ void CMainWindow::SaveConfig(HWND parent)
 
     ConfigSaveInProgress = FALSE;
     EndConfigurationWriteFaultInjection();
+    if (!saveCommitted || payloadError != ERROR_SUCCESS)
+    {
+        // Preserve the pending snapshot without recursively retrying a failed
+        // device. A later explicit save or settings commit can retry it.
+        ConfigSaveQueued = TRUE;
+        ReportConfigurationSaveIdleForTest(FALSE);
+        if (!CriticalShutdown)
+        {
+            std::string message = "The configuration could not be saved completely. Your settings remain in memory. "
+                                  "Retry saving after resolving the registry error.\n\n";
+            message += GetErrorText(payloadError != ERROR_SUCCESS ? payloadError : ERROR_INVALID_DATA);
+            SalMessageBox(parent, message.c_str(), LoadStr(IDS_ERRORSAVECONFIG), MB_OK | MB_ICONEXCLAMATION);
+        }
+        return;
+    }
     if (ConfigSaveQueued && !CriticalShutdown)
     {
         // A later commit arrived while this save yielded to the UI.  Flush that
@@ -1823,6 +1870,7 @@ void CMainWindow::SaveConfig(HWND parent)
         ConfigSaveQueued = FALSE;
         SaveConfig(parent);
     }
+    ReportConfigurationSaveIdleForTest(!ConfigSaveQueued);
 }
 
 void CMainWindow::LoadPanelConfig(char* panelPath, CFilesWindow* panel, HKEY hSalamander, const char* reg)
@@ -1977,6 +2025,7 @@ BOOL CMainWindow::LoadConfig(BOOL importingOldConfig, const CCommandLineParams* 
     HKEY salamander;
     if (OpenKey(HKEY_CURRENT_USER, SALAMANDER_ROOT_REG, salamander))
     {
+        CaptureConfigurationGenerationForStartup(salamander);
         HKEY actKey;
         BOOL ret = TRUE;
 

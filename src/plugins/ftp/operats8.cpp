@@ -1001,27 +1001,36 @@ void CFTPWorker::HandleEventInWorkingState3(CFTPWorkerEvent event, BOOL& sendQui
                                         }
                                         else
                                         {
-                                            CQuadWord size = OpenedFileSize; // backup of the file size, CloseOpenedFile resets the size to zero
-
-                                            // transfer finished successfully, close the file with transferAborted == FALSE
-                                            CloseOpenedFile(FALSE, curItem->DateAndTimeValid, &curItem->Date, &curItem->Time, FALSE, NULL);
-
-                                            // mark the file as already transferred (for a Move we must distinguish this if deleting the source file fails)
-                                            Queue->UpdateTgtFileState(curItem, TGTFILESTATE_TRANSFERRED);
-
-                                            // if the size is in blocks, add the corresponding size pair for computing the average block size
-                                            if (!curItem->SizeInBytes)
-                                                Oper->AddBlkSizeInfo(size, curItem->Size);
-
-                                            // write the actual file size into the item (for overall progress + conversion of block/record/etc. sizes to bytes)
-                                            if (!curItem->SizeInBytes || curItem->Size != size)
+                                            // Finalization is disk work with an owned result. The
+                                            // socket thread remains responsive while durability is pending.
+                                            InitDiskWork(WORKER_DISKWORKFINISHED, fdwtFinalizeDownload,
+                                                NULL, NULL, fqiaNone, FALSE, NULL, NULL, NULL, 0, NULL);
+                                            DiskWork.FileSize = OpenedFileSize;
+                                            DiskWork.ExpectedLengthKnown = curItem->SizeInBytes && !curItem->AsciiTransferMode &&
+                                                curItem->Size != CQuadWord(-1, -1);
+                                            DiskWork.ExpectedLength = curItem->Size.Value;
+                                            DiskWork.SetDownloadTime = curItem->DateAndTimeValid &&
+                                                (curItem->Date.Day != 0 || curItem->Time.Hour != 24);
+                                            DiskWork.DownloadDate = curItem->Date;
+                                            DiskWork.DownloadTime = curItem->Time;
+                                            if (FTPDiskThread->AddWork(&DiskWork))
                                             {
-                                                Queue->UpdateFileSize(curItem, size, TRUE, Oper);
-                                                Oper->ReportItemChange(CurItem->UID); // request the item to be redrawn
+                                                DiskWorkIsUsed = TRUE;
+                                                OpenedFile = NULL; // the accepted request retains its owner
+                                                OpenedFileSize.Set(0, 0);
+                                                OpenedFileOriginalSize.Set(0, 0);
+                                                CanDeleteEmptyFile = FALSE;
+                                                OpenedFileCurOffset.Set(0, 0);
+                                                OpenedFileResumedAtOffset.Set(0, 0);
+                                                ResumingOpenedFile = FALSE;
+                                                SubState = fwssWorkCopyWaitForCommit;
                                             }
-
-                                            SubState = fwssWorkCopyTransferFinished;
-                                            nextLoopCopy = TRUE;
+                                            else
+                                            {
+                                                Queue->UpdateItemState(CurItem, sqisFailed, ITEMPR_INCOMPLETEDOWNLOAD,
+                                                    ERROR_NOT_ENOUGH_MEMORY, NULL, Oper);
+                                                lookForNewWork = TRUE; // retains both original files
+                                            }
                                         }
                                     }
                                 }
@@ -1038,6 +1047,37 @@ void CFTPWorker::HandleEventInWorkingState3(CFTPWorkerEvent event, BOOL& sendQui
                 break;
             }
 
+            case fwssWorkCopyWaitForCommit:
+            {
+                if (event == fweDiskWorkFinished)
+                {
+                    DiskWorkIsUsed = FALSE;
+                    ReportWorkerMayBeClosed();
+                    if (DiskWork.State != sqisNone)
+                    {
+                        Queue->UpdateItemState(CurItem, sqisFailed, DiskWork.ProblemID, DiskWork.WinError, NULL, Oper);
+                        lookForNewWork = TRUE;
+                    }
+                    else
+                    {
+                        // Only the completed durable result can transition to
+                        // transferred and consequently permit the remote DELE.
+                        Queue->UpdateTgtFileState(curItem, TGTFILESTATE_TRANSFERRED);
+                        const CQuadWord size = DiskWork.FileSize;
+                        if (!curItem->SizeInBytes) Oper->AddBlkSizeInfo(size, curItem->Size);
+                        if (!curItem->SizeInBytes || curItem->Size != size)
+                        {
+                            Queue->UpdateFileSize(curItem, size, TRUE, Oper);
+                            Oper->ReportItemChange(CurItem->UID);
+                        }
+                        SubState = fwssWorkCopyTransferFinished;
+                        if (ShouldStop) handleShouldStop = TRUE;
+                        else if (SocketClosed && CurItem->Type == fqitMoveFileOrFileLink) conClosedRetryItem = TRUE;
+                        else nextLoopCopy = TRUE;
+                    }
+                }
+                break;
+            }
             case fwssWorkCopyDelayedAutoRetry: // copy/move of a file: wait WORKER_DELAYEDAUTORETRYTIMEOUT milliseconds for the auto-retry (so all unexpected server responses can arrive)
             {
                 if (event == fweDelayedAutoRetry) // it is time to perform the auto-retry

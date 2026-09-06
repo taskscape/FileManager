@@ -5,151 +5,6 @@
 #include "precomp.h"
 #include <strsafe.h> // counted bounded copies (StringCchCopyNA)
 
-namespace
-{
-const DWORD FtpTransactionalDownloadMagic = 0x44505446; // "FTPD"
-const DWORD FtpTransactionalDownloadVersion = 1;
-const char FtpIncompleteSuffix[] = ".ftp-incomplete";
-const char FtpIncompleteMetadataSuffix[] = ".meta";
-
-struct CFTPTransactionalDownloadMetadata
-{
-    DWORD Magic;
-    DWORD Version;
-    unsigned __int64 RemoteSize;
-    BOOL RemoteDateAndTimeValid;
-    CFTPDate RemoteDate;
-    CFTPTime RemoteTime;
-    unsigned short Port;
-    char User[USER_MAX_SIZE];
-    char Host[HOST_MAX_SIZE];
-    char RemotePath[FTP_MAX_PATH];
-    char RemoteName[FTP_MAX_PATH];
-};
-
-BOOL BuildTransactionalDownloadPaths(const char* target, char* stagedTarget, int stagedTargetSize,
-                                     char* metadata, int metadataSize)
-{
-    const size_t targetLength = strlen(target);
-    const size_t stagedLength = targetLength + sizeof(FtpIncompleteSuffix);
-    const size_t metadataLength = stagedLength + sizeof(FtpIncompleteMetadataSuffix) - 1;
-    if (stagedLength > (size_t)stagedTargetSize || metadataLength > (size_t)metadataSize)
-    {
-        SetLastError(ERROR_FILENAME_EXCED_RANGE);
-        return FALSE;
-    }
-
-    memcpy(stagedTarget, target, targetLength);
-    memcpy(stagedTarget + targetLength, FtpIncompleteSuffix, sizeof(FtpIncompleteSuffix));
-    memcpy(metadata, stagedTarget, stagedLength - 1);
-    memcpy(metadata + stagedLength - 1, FtpIncompleteMetadataSuffix, sizeof(FtpIncompleteMetadataSuffix));
-    return TRUE;
-}
-
-void BuildTransactionalDownloadMetadata(CFTPTransactionalDownloadMetadata* metadata,
-                                        const char* user, const char* host, unsigned short port,
-                                        const char* remotePath, const char* remoteName,
-                                        const CQuadWord& remoteSize, BOOL remoteDateAndTimeValid,
-                                        const CFTPDate* remoteDate, const CFTPTime* remoteTime)
-{
-    memset(metadata, 0, sizeof(*metadata));
-    metadata->Magic = FtpTransactionalDownloadMagic;
-    metadata->Version = FtpTransactionalDownloadVersion;
-    metadata->RemoteSize = remoteSize.Value;
-    metadata->RemoteDateAndTimeValid = remoteDateAndTimeValid;
-    if (remoteDateAndTimeValid)
-    {
-        metadata->RemoteDate = *remoteDate;
-        metadata->RemoteTime = *remoteTime;
-    }
-    metadata->Port = port;
-    StringCchCopyNA(metadata->User, USER_MAX_SIZE, user, USER_MAX_SIZE); // counted bounded copy instead of lstrcpyn
-    StringCchCopyNA(metadata->Host, HOST_MAX_SIZE, host, HOST_MAX_SIZE); // counted bounded copy instead of lstrcpyn
-    StringCchCopyNA(metadata->RemotePath, FTP_MAX_PATH, remotePath, FTP_MAX_PATH); // counted bounded copy instead of lstrcpyn
-    StringCchCopyNA(metadata->RemoteName, FTP_MAX_PATH, remoteName, FTP_MAX_PATH); // counted bounded copy instead of lstrcpyn
-}
-
-BOOL WriteTransactionalDownloadMetadata(const char* metadataPath, const CFTPTransactionalDownloadMetadata& metadata)
-{
-    HANDLE file = HANDLES_Q(CreateFileUtf8Local(metadataPath, GENERIC_WRITE, FILE_SHARE_READ, NULL,
-                                                 CREATE_ALWAYS, FILE_ATTRIBUTE_HIDDEN | FILE_FLAG_WRITE_THROUGH, NULL));
-    if (file == INVALID_HANDLE_VALUE)
-        return FALSE;
-
-    DWORD written = 0;
-    // The sidecar is flushed before REST so an interruption never resumes an unidentified prefix.
-    BOOL success = WriteFile(file, &metadata, sizeof(metadata), &written, NULL) && written == sizeof(metadata) &&
-                   FlushFileBuffers(file);
-    DWORD error = success ? NO_ERROR : GetLastError();
-    HANDLES(CloseHandle(file));
-    if (!success)
-        SetLastError(error);
-    return success;
-}
-
-BOOL GetTransactionalDownloadResumeOffset(const char* stagedTarget, const char* metadataPath,
-                                          const CFTPTransactionalDownloadMetadata& expected,
-                                          CQuadWord* resumeOffset)
-{
-    resumeOffset->Set(0, 0);
-    HANDLE metadataFile = HANDLES_Q(CreateFileUtf8Local(metadataPath, GENERIC_READ, FILE_SHARE_READ, NULL,
-                                                         OPEN_EXISTING, FILE_FLAG_SEQUENTIAL_SCAN, NULL));
-    if (metadataFile == INVALID_HANDLE_VALUE)
-        return FALSE;
-
-    CFTPTransactionalDownloadMetadata actual;
-    DWORD read = 0;
-    BOOL metadataMatches = ReadFile(metadataFile, &actual, sizeof(actual), &read, NULL) &&
-                           read == sizeof(actual) && memcmp(&actual, &expected, sizeof(actual)) == 0;
-    HANDLES(CloseHandle(metadataFile));
-    if (!metadataMatches)
-        return FALSE;
-
-    HANDLE stagedFile = HANDLES_Q(CreateFileUtf8Local(stagedTarget, GENERIC_READ, FILE_SHARE_READ, NULL,
-                                                       OPEN_EXISTING, FILE_FLAG_SEQUENTIAL_SCAN, NULL));
-    if (stagedFile == INVALID_HANDLE_VALUE)
-        return FALSE;
-
-    LARGE_INTEGER size;
-    BOOL haveSize = GetFileSizeEx(stagedFile, &size);
-    HANDLES(CloseHandle(stagedFile));
-    if (!haveSize || size.QuadPart < 0 || (unsigned __int64)size.QuadPart > expected.RemoteSize)
-        return FALSE;
-
-    resumeOffset->Value = (unsigned __int64)size.QuadPart;
-    return *resumeOffset != CQuadWord(0, 0);
-}
-
-BOOL CommitTransactionalDownload(const char* stagedTarget, const char* target, const char* metadataPath,
-                                 const CQuadWord& expectedSize, BOOL expectedSizeKnown)
-{
-    HANDLE stagedFile = HANDLES_Q(CreateFileUtf8Local(stagedTarget, GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ, NULL,
-                                                       OPEN_EXISTING, FILE_FLAG_SEQUENTIAL_SCAN, NULL));
-    if (stagedFile == INVALID_HANDLE_VALUE)
-        return FALSE;
-
-    LARGE_INTEGER actualSize;
-    // A successful FTP reply is insufficient: verify the durable staged length before publishing it.
-    BOOL success = FlushFileBuffers(stagedFile) && GetFileSizeEx(stagedFile, &actualSize) && actualSize.QuadPart >= 0 &&
-                   (!expectedSizeKnown || (unsigned __int64)actualSize.QuadPart == expectedSize.Value);
-    DWORD error = success ? NO_ERROR : GetLastError();
-    HANDLES(CloseHandle(stagedFile));
-    if (!success)
-    {
-        if (error == NO_ERROR)
-            error = ERROR_INVALID_DATA;
-        SetLastError(error);
-        return FALSE;
-    }
-
-    // Staging shares the destination directory, making this replacement atomic on the target volume.
-    if (!MoveFileExUtf8Local(stagedTarget, target, MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH))
-        return FALSE;
-    DeleteFileUtf8Local(metadataPath); // a committed file has no resumable state
-    return TRUE;
-}
-}
-
 //
 // ****************************************************************************
 // CControlConnectionSocket
@@ -210,37 +65,48 @@ void CControlConnectionSocket::DownloadOneFile(HWND parent, const char* fileName
         else
         {
             char stagedTargetName[MAX_PATH];
-            char metadataName[MAX_PATH];
-            if (!BuildTransactionalDownloadPaths(tgtFileName, stagedTargetName, MAX_PATH, metadataName, MAX_PATH))
-            {
-                _snprintf_s(errBuf, _TRUNCATE, LoadStr(IDS_DOWNLOADFILEERROR), fileName, workPath);
-                SalamanderGeneral->SalMessageBox(parent, errBuf, LoadStr(IDS_FTPERRORTITLE), MB_OK | MB_ICONEXCLAMATION);
-                DeleteSocket(dataConnection);
-                FTPOpenedFiles.CloseFile(lockedFileUID);
-                return;
-            }
-
-            CFTPTransactionalDownloadMetadata transactionalMetadata;
-            BuildTransactionalDownloadMetadata(&transactionalMetadata, userBuffer, hostBuf, portBuf, workPath, fileName,
-                                               fileSizeInBytes, remoteDateAndTimeValid, remoteDate, remoteTime);
+            CFtpDownloadFileSystem fileSystem;
+            std::shared_ptr<CFtpTransactionalDownload> download;
             CQuadWord stagedResumeOffset(0, 0);
-            BOOL canResumeStagedDownload = !asciiMode && fileSizeInBytes != CQuadWord(-1, -1) &&
-                                           GetTransactionalDownloadResumeOffset(stagedTargetName, metadataName,
-                                                                                transactionalMetadata, &stagedResumeOffset);
-            if (canResumeStagedDownload && stagedResumeOffset > CQuadWord(Config.GetResumeOverlap(), 0))
+            WCHAR* targetWide = Utf8AllocWide(tgtFileName);
+            BOOL stageReady = targetWide != NULL;
+            try
             {
-                // Re-request the tail so a complete-looking side file still proves the resumed server boundary.
-                stagedResumeOffset -= CQuadWord(Config.GetResumeOverlap(), 0);
+                CFTPDate emptyDate = {};
+                CFTPTime emptyTime = {}; emptyTime.Hour = 24;
+                const std::string identity = BuildFtpDownloadIdentity(userBuffer, hostBuf, portBuf,
+                    workPath, fileName, fileSizeInBytes, asciiMode, remoteDateAndTimeValid,
+                    remoteDateAndTimeValid ? *remoteDate : emptyDate,
+                    remoteDateAndTimeValid ? *remoteTime : emptyTime);
+                // Direct and queued downloads share ownership, resume evidence and
+                // conditional publication; legacy deterministic side files are preserved.
+                if (stageReady && !asciiMode && remoteDateAndTimeValid && fileSizeInBytes != CQuadWord(-1, -1))
+                    download = CFtpTransactionalDownload::TryResume(targetWide, identity, fileSystem);
+                if (stageReady && !download)
+                {
+                    download = std::make_shared<CFtpTransactionalDownload>();
+                    stageReady = download->Create(targetWide, identity, TRUE, FALSE, fileSystem);
+                }
+                if (stageReady)
+                {
+                    LARGE_INTEGER size;
+                    stageReady = fileSystem.GetSize(download->File(), size) && size.QuadPart >= 0;
+                    if (stageReady)
+                    {
+                        stagedResumeOffset.Value = size.QuadPart;
+                        if (stagedResumeOffset > fileSizeInBytes && fileSizeInBytes != CQuadWord(-1, -1))
+                            stageReady = FALSE;
+                        else if (stagedResumeOffset > CQuadWord(Config.GetResumeOverlap(), 0))
+                            stagedResumeOffset -= CQuadWord(Config.GetResumeOverlap(), 0);
+                        // The re-requested tail replaces only bytes in the owned stage.
+                        if (stageReady) stageReady = fileSystem.Truncate(download->File(), stagedResumeOffset.Value);
+                    }
+                    if (stageReady) stageReady = WideToUtf8Buffer(download->StagePath().c_str(), stagedTargetName, MAX_PATH);
+                }
             }
-            if (!canResumeStagedDownload)
-            {
-                // A mismatched or oversized prefix is never allowed to contaminate the next RETR.
-                SetFileAttributesUtf8Local(stagedTargetName, FILE_ATTRIBUTE_NORMAL);
-                DeleteFileUtf8Local(stagedTargetName);
-                DeleteFileUtf8Local(metadataName);
-                stagedResumeOffset.Set(0, 0);
-            }
-            if (!WriteTransactionalDownloadMetadata(metadataName, transactionalMetadata))
+            catch (const std::bad_alloc&) { stageReady = FALSE; SetLastError(ERROR_NOT_ENOUGH_MEMORY); }
+            free(targetWide);
+            if (!stageReady)
             {
                 _snprintf_s(errBuf, _TRUNCATE, LoadStr(IDS_DOWNLOADFILEERROR), fileName, workPath);
                 SalamanderGeneral->SalMessageBox(parent, errBuf, LoadStr(IDS_FTPERRORTITLE), MB_OK | MB_ICONEXCLAMATION);
@@ -248,7 +114,6 @@ void CControlConnectionSocket::DownloadOneFile(HWND parent, const char* fileName
                 FTPOpenedFiles.CloseFile(lockedFileUID);
                 return;
             }
-
             char cmdBuf[50 + FTP_MAX_PATH];
             char logBuf[50 + FTP_MAX_PATH];
             const char* retryMsgAux = NULL;
@@ -398,7 +263,7 @@ void CControlConnectionSocket::DownloadOneFile(HWND parent, const char* fileName
                 {
                     // The final cache name stays untouched until the staged file has passed all completion checks.
                     dataConnection->SetDirectFlushParams(stagedTargetName, asciiMode ? ctrmASCII : ctrmBinary,
-                                                         stagedResumeOffset);
+                                                         stagedResumeOffset, download);
 
                     if (fileSizeInBytes != CQuadWord(-1, -1)) // if the file size in bytes is known, set it
                         dataConnection->SetDataTotalSize(fileSizeInBytes);
@@ -432,12 +297,11 @@ void CControlConnectionSocket::DownloadOneFile(HWND parent, const char* fileName
                                  FTP_DIGIT_1(ftpReplyCode) != FTP_D1_SUCCESS)
                         {
                             // Never append if REST was refused; restart the staged file from a known boundary.
-                            SetFileAttributesUtf8Local(stagedTargetName, FILE_ATTRIBUTE_NORMAL);
-                            DeleteFileUtf8Local(stagedTargetName);
+                            if (!download->BeginWriting(fileSystem, TRUE))
+                            { ok = FALSE; run = FALSE; }
                             stagedResumeOffset.Set(0, 0);
                             dataConnection->SetDirectFlushParams(stagedTargetName, asciiMode ? ctrmASCII : ctrmBinary,
-                                                                 stagedResumeOffset);
-                            WriteTransactionalDownloadMetadata(metadataName, transactionalMetadata);
+                                                                 stagedResumeOffset, download);
                         }
                     }
 
@@ -470,15 +334,31 @@ void CControlConnectionSocket::DownloadOneFile(HWND parent, const char* fileName
                         }
                         if (asciiTrForBinFileHowToSolve == 1) // download again in binary mode
                         {
-                            // wait for the file to close in the disk cache; otherwise the file cannot be deleted
-                            dataConnection->WaitForFileClose(5000); // max. 5 seconds
-
-                            SetFileAttributesUtf8Local(stagedTargetName, FILE_ATTRIBUTE_NORMAL);
-                            DeleteFileUtf8Local(stagedTargetName);
+                            // A timeout leaves the stage with the disk owner and
+                            // prevents a new transfer from reusing its handle.
+                            BOOL reusable = dataConnection->WaitForFileClose(5000);
+                            if (reusable)
+                            {
+                                try
+                                {
+                                    CFTPDate emptyDate = {};
+                                    CFTPTime emptyTime = {}; emptyTime.Hour = 24;
+                                    const std::string identity = BuildFtpDownloadIdentity(userBuffer, hostBuf, portBuf,
+                                        workPath, fileName, fileSizeInBytes, FALSE, remoteDateAndTimeValid,
+                                        remoteDateAndTimeValid ? *remoteDate : emptyDate,
+                                        remoteDateAndTimeValid ? *remoteTime : emptyTime);
+                                    // Persist the new mode before any binary bytes replace the old prefix.
+                                    reusable = download->RestartIdentity(identity, fileSystem);
+                                }
+                                catch (const std::bad_alloc&)
+                                { SetLastError(ERROR_NOT_ENOUGH_MEMORY); reusable = FALSE; }
+                            }
+                            stagedResumeOffset.Set(0, 0);
                             asciiMode = FALSE; // download again in binary mode
 
                             ok = FALSE; // repeat the download
-                            run = TRUE;
+                            run = reusable;
+                            if (!reusable) *newFileIncomplete = TRUE;
                             retryMsgAux = NULL;
                             setStartTimeIfConnected = FALSE;
                         }
@@ -486,11 +366,9 @@ void CControlConnectionSocket::DownloadOneFile(HWND parent, const char* fileName
                         {
                             if (asciiTrForBinFileHowToSolve == 2) // cancel the file download
                             {
-                                // wait for the file to close in the disk cache; otherwise the file cannot be deleted
-                                dataConnection->WaitForFileClose(5000); // max. 5 seconds
-
-                                SetFileAttributesUtf8Local(stagedTargetName, FILE_ATTRIBUTE_NORMAL);
-                                DeleteFileUtf8Local(stagedTargetName);
+                                // Cancellation preserves private evidence; an unknown
+                                // close remains an incomplete download for the caller.
+                                if (!dataConnection->WaitForFileClose(5000)) *newFileIncomplete = TRUE;
                                 ok = FALSE; // do not show any message; the user already confirmed the cancel
                             }
                         }
@@ -618,67 +496,50 @@ void CControlConnectionSocket::DownloadOneFile(HWND parent, const char* fileName
                             }
                         }
 
-                        // wait for the file to close in the disk cache; otherwise it cannot be deleted and
-                        // viewers might not open it either (without SHARE_WRITE it cannot be opened)
-                        dataConnection->WaitForFileClose(5000); // max. 5 seconds
-
-                        if (run) // discard only this attempt's staged bytes; the final cache entry remains intact
-                        {        // we are not in any critical section, so even if the disk operation stalls for a while, nothing happens
-                            SetFileAttributesUtf8Local(stagedTargetName, FILE_ATTRIBUTE_NORMAL);
-                            DeleteFileUtf8Local(stagedTargetName);
-                        }
-                        else // finish the download
+                        // Only a persistent successful disk result authorizes reuse
+                        // or publication. A slow close retains the stage with its owner.
+                        const BOOL diskCompleted = dataConnection->WaitForFileClose(5000);
+                        if (!diskCompleted)
                         {
-                            dataConnection->GetTgtFileState(newFileCreated, newFileSize); // find out whether the file exists + its size
-                            if (!*newFileCreated &&                                       // the data connection cannot create empty files (it creates the file only just before writing), so we must do it here
-                                !fileIncomplete &&                                        // this is not merely an error when obtaining the file
-                                !tgtFileError)                                            // just in case no target file error occurred (to avoid it happening again here)
+                            ok = FALSE;
+                            run = FALSE;
+                            *newFileCreated = FALSE;
+                            *newFileIncomplete = TRUE;
+                            _snprintf_s(errBuf, _TRUNCATE, LoadStr(IDS_DOWNLOADFILEERROR), fileName, workPath);
+                            SalamanderGeneral->SalMessageBox(parent, errBuf, LoadStr(IDS_FTPERRORTITLE), MB_OK | MB_ICONEXCLAMATION);
+                        }
+                        else if (run)
+                        {
+                            stagedResumeOffset.Set(0, 0);
+                            if (!download->BeginWriting(fileSystem, TRUE))
                             {
-                                if (*newFileSize != CQuadWord(0, 0))
-                                    TRACE_E("CControlConnectionSocket::DownloadOneFile(): unexpected situation: file was not created, but its size is not null!");
-
-                                // we are not in any critical section, so even if the disk operation stalls for a while, nothing happens
-                                SetFileAttributesUtf8Local(stagedTargetName, FILE_ATTRIBUTE_NORMAL); // the visible target is never opened for writing
-                                HANDLE file = HANDLES_Q(CreateFileUtf8Local(stagedTargetName, GENERIC_WRITE,
-                                                                   FILE_SHARE_READ, NULL,
-                                                                   CREATE_ALWAYS,
-                                                                   FILE_FLAG_SEQUENTIAL_SCAN | FILE_FLAG_WRITE_THROUGH,
-                                                                   NULL));
-                                if (file != INVALID_HANDLE_VALUE)
-                                {
-                                    *newFileCreated = TRUE;
-                                    FlushFileBuffers(file);
-                                    HANDLES(CloseHandle(file));
-                                }
-                                else
-                                {
-                                    DWORD err = GetLastError();
-
-                                    // display the message "Unable to download file from server"
-                                    _snprintf_s(errBuf, _TRUNCATE, LoadStr(IDS_DOWNLOADFILEERROR), fileName, workPath);
-                                    int len = (int)strlen(errBuf);
-                                    if (err != NO_ERROR)
-                                        FTPGetErrorText(err, replyBuf, 700);
-                                    else
-                                        StringCchCopyNA(replyBuf, 700, LoadStr(IDS_UNKNOWNERROR), 700); // counted bounded copy instead of lstrcpyn
-                                    _snprintf_s(errBuf + len, 900 + FTP_MAX_PATH - len, _TRUNCATE, LoadStr(IDS_DOWNLOADFILEERRORSUFIX3), replyBuf);
-                                    SalamanderGeneral->SalMessageBox(parent, errBuf,
-                                                                     LoadStr(IDS_FTPERRORTITLE),
-                                                                     MB_OK | MB_ICONEXCLAMATION);
-                                }
-                            }
-                            if (*newFileCreated && !fileIncomplete &&
-                                !CommitTransactionalDownload(stagedTargetName, tgtFileName, metadataName,
-                                                             fileSizeInBytes, fileSizeInBytes != CQuadWord(-1, -1)))
-                            {
-                                // Keep the sidecar and staged bytes visible for a later verified resume.
+                                run = FALSE;
                                 *newFileCreated = FALSE;
-                                fileIncomplete = TRUE;
-                                _snprintf_s(errBuf, _TRUNCATE, LoadStr(IDS_DOWNLOADFILEERROR), fileName, workPath);
-                                SalamanderGeneral->SalMessageBox(parent, errBuf,
-                                                                 LoadStr(IDS_FTPERRORTITLE), MB_OK | MB_ICONEXCLAMATION);
+                                *newFileIncomplete = TRUE;
                             }
-                            *newFileIncomplete = fileIncomplete; // a staged failure is not exposed as a completed cache file
+                        }
+                        else
+                        {
+                            dataConnection->GetTgtFileState(newFileCreated, newFileSize);
+                            BOOL published = FALSE;
+                            if (*newFileCreated && !fileIncomplete && !tgtFileError)
+                            {
+                                FILETIME writeTime;
+                                const BOOL setTime = remoteDateAndTimeValid &&
+                                    (remoteDate->Day != 0 || remoteTime->Hour != 24);
+                                const BOOL timeReady = !setTime || FtpDownloadWriteTime(download->File(),
+                                    *remoteDate, *remoteTime, writeTime);
+                                published = timeReady && download->Finish(fileSystem, fileSizeInBytes.Value,
+                                    !asciiMode && fileSizeInBytes != CQuadWord(-1, -1), setTime ? &writeTime : NULL);
+                                if (!published)
+                                {
+                                    _snprintf_s(errBuf, _TRUNCATE, LoadStr(IDS_DOWNLOADFILEERROR), fileName, workPath);
+                                    SalamanderGeneral->SalMessageBox(parent, errBuf, LoadStr(IDS_FTPERRORTITLE), MB_OK | MB_ICONEXCLAMATION);
+                                }
+                            }
+                            // A private partial file is never returned as a completed cache entry.
+                            *newFileCreated = published;
+                            *newFileIncomplete = !published;
                         }
                     }
                 }

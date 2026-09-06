@@ -21,6 +21,7 @@ private:
     int CurrentAttempt;
     char* Buffer;
     int BufferUsed;
+    BOOL WriteFailed; // a partial checkpoint must never be followed by an apparent successful one
 
     BOOL SpillBuffer();
     BOOL FlushDurable();
@@ -36,7 +37,12 @@ public:
     BOOL BeginItem(int itemIndex, const COperation* operation, int attempt);
     void RecordRetry(int attempt);
     BOOL SetTemporaryPath(const char* temporaryPath);
-    BOOL MarkTemporaryReady();
+    // Readiness belongs to a held staging object and its verified destination context.
+    BOOL MarkTemporaryReady(const char* targetPath, const char* temporaryPath,
+                             HANDLE directory, HANDLE target, HANDLE temporary, BOOL preserveTargetSecurity);
+    // Flush intent before the destination name is vacated, then record each
+    // publication boundary so an interrupted overwrite retains its backup path.
+    BOOL RecordPublicationState(const char* state, const WCHAR* backupPath);
     void CompleteItem(BOOL succeeded);
     void Finish(BOOL failed, BOOL cancelled);
 

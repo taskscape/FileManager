@@ -24,12 +24,14 @@ extern NTQUERYINFORMATIONFILE DynNtQueryInformationFile;
 extern NTFSCONTROLFILE DynNtFsControlFile;
 
 // Forward declaration of the top-level copy entry point defined in async_copy.cpp
+class CStableMoveSource; // only cross-volume moves supply an owned source lease
 BOOL DoCopyFile(COperation* op, HWND hProgressDlg, void* buffer,
                 COperations* script, CQuadWord& totalDone,
                 DWORD clearReadonlyMask, BOOL* skip, BOOL lantasticCheck,
                 int& mustDeleteFileBeforeOverwrite, int& allocWholeFileOnStart,
                 CProgressDlgData& dlgData, BOOL copyADS, BOOL copyAsEncrypted,
-                BOOL isMove, CAsyncCopyParams*& asyncPar, BOOL* suspiciousIoRetry);
+                BOOL isMove, CAsyncCopyParams*& asyncPar, BOOL* suspiciousIoRetry,
+                CStableMoveSource* stableMoveSource = NULL);
 
 struct TMN_REPARSE_DATA_BUFFER
 {

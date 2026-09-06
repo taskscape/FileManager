@@ -301,6 +301,14 @@ void CEnvVariables::ApplyDifferencesToCurrentProcess(CEnvVariables* diffVars)
     // occurs in x86 processes running on x64 Windows, where reload incorrectly sets the value to AMD64
     SetEnvironmentVariable("PROCESSOR_ARCHITECTURE", "x86");
 #endif // _WIN64
+    // Regeneration replaces inherited TEMP/TMP values. Keep viewer-cache and
+    // plug-in files inside the same validated sandbox used by the UI harness.
+    CPathW sandboxTemp;
+    if (GetFileManagerUiTestDataRootPath(sandboxTemp) && sandboxTemp.Append(L"temp"))
+    {
+        SetEnvironmentVariableW(L"TEMP", sandboxTemp.CStr());
+        SetEnvironmentVariableW(L"TMP", sandboxTemp.CStr());
+    }
 }
 
 CEnvVariables EnvVariablesDiff;

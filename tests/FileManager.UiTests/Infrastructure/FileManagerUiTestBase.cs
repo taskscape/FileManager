@@ -153,6 +153,46 @@ public abstract class FileManagerUiTestBase
         StartApplication(environment);
     }
 
+    protected Application StartAdditionalFileManager(IReadOnlyDictionary<string, string> environment)
+    {
+        // Concurrency fixtures need a second process paused during startup. Keep
+        // the normal profile boundaries and teardown ownership without waiting for its UI.
+        var reportersBeforeLaunch = GetTestCrashReporterIds();
+        var directory = Path.GetDirectoryName(UiTestSettings.ExecutablePath)!;
+        EnsureCrashReporterIsStaged(directory);
+        var start = new ProcessStartInfo(UiTestSettings.ExecutablePath, ApplicationArguments)
+        { UseShellExecute = false, WorkingDirectory = directory };
+        start.Environment["FILEMANAGER_UI_ISOLATED"] = "1";
+        start.Environment["FILEMANAGER_UI_TESTDATA_ROOT"] = UiTestSettings.TestDataRoot;
+        start.Environment["FILEMANAGER_UI_CONFIG_ROOT"] = UiTestSettings.ConfigurationRegistryRoot;
+        start.Environment["TEMP"] = Path.Combine(UiTestSettings.TestDataRoot, "temp");
+        start.Environment["TMP"] = Path.Combine(UiTestSettings.TestDataRoot, "temp");
+        foreach (var (name, value) in environment) start.Environment[name] = value;
+        var application = FlaUI.Core.Application.Launch(start);
+        launchedApplications.Add(application);
+        executionLog?.ObserveProcess(application.ProcessId, "salamand.exe (second instance)");
+        var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(10);
+        while (!application.HasExited && DateTime.UtcNow < deadline)
+        {
+            // The isolated profile can ask for its language again in a second
+            // process; acknowledge it before the fixture waits on a startup barrier.
+            NativeCommands.DismissKnownStartupErrorDialogs(application.ProcessId);
+            var windows = NativeCommands.GetTopLevelWindows(application.ProcessId);
+            var language = windows.FirstOrDefault(window =>
+                NativeCommands.GetWindowTitle(window) == "Open Salamander" &&
+                NativeCommands.GetDialogText(window).Contains("Select one of the installed languages.", StringComparison.Ordinal));
+            if (language != 0)
+            {
+                NativeCommands.AcceptStartupLanguage(language);
+                break;
+            }
+            if (windows.Any(window => NativeCommands.GetWindowTitle(window).Contains(" - Open Salamander", StringComparison.Ordinal))) break;
+            Thread.Sleep(50);
+        }
+        TrackCrashReporters(reportersBeforeLaunch);
+        return application;
+    }
+
     protected Window OpenConfigurationDialog()
     {
         UiTestTrace.Record("HARNESS", "open-dialog name=Configuration");

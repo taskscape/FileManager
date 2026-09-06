@@ -2,6 +2,7 @@ using FileManager.UiTests.Infrastructure;
 using FlaUI.Core.AutomationElements;
 using NUnit.Framework;
 using System.Text.RegularExpressions;
+using System.Security.Cryptography;
 
 namespace FileManager.UiTests;
 
@@ -120,6 +121,7 @@ public sealed class FileOperationUiTests : FileOperationUiTestBase
             AlternateDataStreams.AssertContent(target, "replacement", "replacement-stream-content"u8.ToArray());
             AlternateDataStreams.AssertAbsent(target, "stale");
         });
+        AssertRecoveryReadiness("ads-overwrite.txt", automatic: false);
     }
 
     [Test]
@@ -134,10 +136,13 @@ public sealed class FileOperationUiTests : FileOperationUiTestBase
         var target = Workspace.TargetPath("ads-retry.txt");
 
         var deniedStream = AlternateDataStreams.LockForRead(source, "temporarily-denied");
+        nint progressWindow = 0;
         try
         {
             ExecuteWithPath(NativeCommands.CopyFiles, "ads-retry.txt", Workspace.TargetDirectory, commit: true);
             var retryPrompt = WaitForOperationPrompt(4); // IDRETRY
+            progressWindow = NativeCommands.GetTopLevelWindows(Application.ProcessId)
+                .Single(window => NativeCommands.GetWindowTitle(window).Contains("Copy [#", StringComparison.Ordinal));
             deniedStream.Dispose();
             ChooseOperationPrompt(retryPrompt, 4);
         }
@@ -149,6 +154,13 @@ public sealed class FileOperationUiTests : FileOperationUiTestBase
         // The retry prompt closes before the worker necessarily releases every copied stream handle.
         WaitForOperationOutputToBeReleased(target, "Retry did not release the ADS copy target.");
         AlternateDataStreams.AssertContent(target, "temporarily-denied", "retry-stream-content"u8.ToArray());
+        // Released stream handles alone cannot prove that the native worker
+        // survived finalization; retain the process until its completion is durable.
+        WaitForFileSystem(() => ReadJournalFor(source).Contains("OPERATION|completed", StringComparison.Ordinal),
+                          "The retried ADS copy did not complete its operation journal.");
+        // The completion message must also retire the progress UI before teardown.
+        WaitForFileSystem(() => !NativeCommands.WindowExists(progressWindow),
+                          "The retried ADS copy did not close its progress window.");
     }
 
     [Test]
@@ -160,6 +172,29 @@ public sealed class FileOperationUiTests : FileOperationUiTestBase
         WaitForFileSystem(() => File.ReadAllText(Workspace.TargetPath("overwrite-file.txt")) == "overwrite-source-content",
                           "Confirmed overwrite did not replace the target content.");
         Assert.That(File.ReadAllText(Workspace.SourcePath("overwrite-file.txt")), Is.EqualTo("overwrite-source-content"));
+        AssertRecoveryReadiness("overwrite-file.txt", automatic: true);
+    }
+
+    private void AssertRecoveryReadiness(string fileName, bool automatic)
+    {
+        // Check the real copy worker's journal, including its digest, so seeded
+        // restart fixtures cannot hide a mismatch between writer and reader formats.
+        var source = Workspace.SourcePath(fileName);
+        WaitForFileSystem(() => ReadJournalFor(source).Contains("OPERATION|completed", StringComparison.Ordinal),
+                          "The overwrite did not complete its recovery journal.");
+        var journal = ReadJournalFor(source);
+        var ready = journal.Split('\n').Select(line => line.TrimEnd('\r').Split('|'))
+            .Single(fields => fields[0] == "READY2" && fields[4] == Workspace.TargetPath(fileName));
+        Assert.Multiple(() =>
+        {
+            Assert.That(journal, Does.StartWith("FORMAT|2"));
+            Assert.That(ready, Has.Length.EqualTo(11));
+            Assert.That(ready[2], Does.StartWith("attempt="));
+            Assert.That(ready[3], Is.EqualTo(automatic ? "auto=1" : "auto=0"));
+            Assert.That(ready[10], Is.EqualTo("end"));
+            if (automatic)
+                Assert.That(ready[7].Split(',')[6], Is.EqualTo(Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(Workspace.TargetPath(fileName)))).ToLowerInvariant()));
+        });
     }
 
     [Test]

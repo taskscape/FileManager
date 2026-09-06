@@ -3210,6 +3210,10 @@ void CFTPQueue::UpdateAsciiTransferMode(CFTPQueueItemCopyOrMove* item, BOOL asci
     CALL_STACK_MESSAGE1("CFTPQueue::UpdateAsciiTransferMode()");
 
     HANDLES(EnterCriticalSection(&QueueCritSect));
+    // Mode conversion invalidates a private prefix, including a user-selected
+    // binary retry. Restart it without relinquishing the approved destination.
+    if (item->Download && item->AsciiTransferMode != asciiTransferMode)
+        item->ForceAction = fqiaOverwrite;
     item->AsciiTransferMode = asciiTransferMode;
     HANDLES(LeaveCriticalSection(&QueueCritSect));
 }

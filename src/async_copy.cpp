@@ -443,13 +443,14 @@ enum ECopyCommitPhase
 };
 
 // Durable-copy verification plus, for transactional overwrites, the
-// ReplaceFile-based commit and stale-stream cleanup extracted from DoCopyFile.
+// conditional publication extracted from DoCopyFile.
 // Former inline goto exits map onto the returned phase; retry loops stay inside.
 static ECopyCommitPhase VerifyAndCommitCopyTarget(COperation* op, HWND hProgressDlg,
                                                   const char* requestedTargetName,
                                                   COperations* script, CProgressDlgData& dlgData,
                                                   BOOL transactionalTarget, BOOL* transactionalTargetCommitted,
-                                                  BOOL copyADS, BOOL* suspiciousIoRetry)
+                                                  const CRecoveryObjectEvidence& temporaryIdentity,
+                                                  BOOL* suspiciousIoRetry)
 {
     DWORD verificationError = NO_ERROR;
     COperationResult verificationResult = VerifyDurableCopyCommit(op->TargetName, op->FileSize);
@@ -503,16 +504,16 @@ static ECopyCommitPhase VerifyAndCommitCopyTarget(COperation* op, HWND hProgress
     if (transactionalTarget)
     {
         DWORD err = NO_ERROR;
-        if (!script->JournalMarkTemporaryReady())
-        {
-            return cpcrCancel; // ERROR_WRITE_FAULT path of the former goto COPY_ERROR_2
-        }
         // The dialog keeps its legacy BOOL/error contract while the
         // worker preserves the phase and temporary-target effect for migration.
         COperationResult commitResult = CommitTransactionalTargetFile(requestedTargetName, op->TargetName,
-                                                                       op->TargetIdentity);
+                                                                       op->TargetIdentity, temporaryIdentity, op->FileSize.Value, script);
         while (!commitResult.ToLegacyBool(&err))
         {
+            // A post-publication flush/journal error retains the move source.
+            // Never clean up or retry the already-published destination by name.
+            const BOOL alreadyPublished = (commitResult.PartialEffects & opeDestinationCommitted) != 0;
+            if (alreadyPublished) *transactionalTargetCommitted = TRUE;
             TRACE_I("DoCopyFile(): unable to commit transactional overwrite of " << requestedTargetName << ": " << GetErrorText(err));
             WaitForSingleObject(dlgData.WorkerNotSuspended, INFINITE); // if we should be in suspend mode, wait ...
             if (*dlgData.CancelWorker)
@@ -537,8 +538,9 @@ static ECopyCommitPhase VerifyAndCommitCopyTarget(COperation* op, HWND hProgress
             switch (ret)
             {
             case IDRETRY:
+                if (alreadyPublished) return cpcrCancel;
                 commitResult = CommitTransactionalTargetFile(requestedTargetName, op->TargetName,
-                                                             op->TargetIdentity);
+                                                             op->TargetIdentity, temporaryIdentity, op->FileSize.Value, script);
                 break;
 
             case IDB_SKIPALL:
@@ -551,15 +553,8 @@ static ECopyCommitPhase VerifyAndCommitCopyTarget(COperation* op, HWND hProgress
             }
         }
         *transactionalTargetCommitted = TRUE;
-        // A committed replacement cannot be retried; report attribute loss separately.
-        if (commitResult.CleanupErrorCount != 0)
-            RecordMetadataLoss(dlgData, mmlAttributes, op->SourceName, requestedTargetName);
-        if (copyADS)
-        {
-            // The commit merged the replaced file's streams into the
-            // result; only the source's streams belong on it.
-            RemoveCommittedStreamsMissingFromSource(op->SourceName, requestedTargetName);
-        }
+        // Conditional rename publishes only the staged streams; no old streams
+        // are merged, and no post-commit pathname cleanup may touch a new occupant.
     }
     return cpcrProceed;
 }
@@ -656,7 +651,8 @@ BOOL DoCopyFile(COperation* op, HWND hProgressDlg, void* buffer,
                 DWORD clearReadonlyMask, BOOL* skip, BOOL lantasticCheck,
                 int& mustDeleteFileBeforeOverwrite, int& allocWholeFileOnStart,
                 CProgressDlgData& dlgData, BOOL copyADS, BOOL copyAsEncrypted,
-                BOOL isMove, CAsyncCopyParams*& asyncPar, BOOL* suspiciousIoRetry)
+                BOOL isMove, CAsyncCopyParams*& asyncPar, BOOL* suspiciousIoRetry,
+                CStableMoveSource* stableMoveSource = NULL)
 {
     if (suspiciousIoRetry != NULL)
         *suspiciousIoRetry = FALSE;
@@ -664,6 +660,7 @@ BOOL DoCopyFile(COperation* op, HWND hProgressDlg, void* buffer,
     char transactionalTargetName[3 * MAX_PATH];
     BOOL transactionalTarget = FALSE;
     BOOL transactionalTargetCommitted = FALSE;
+    CRecoveryObjectEvidence temporaryIdentity; // capture from the actual writer, not its earlier name reservation
     struct CRestoreRequestedTargetName
     {
         COperation* Operation;
@@ -677,18 +674,29 @@ BOOL DoCopyFile(COperation* op, HWND hProgressDlg, void* buffer,
         char* TargetName;
         BOOL* IsTransactionalTarget;
         BOOL* IsCommitted;
-        CCleanupTransactionalTarget(char* targetName, BOOL* isTransactionalTarget, BOOL* isCommitted)
-            : TargetName(targetName), IsTransactionalTarget(isTransactionalTarget), IsCommitted(isCommitted) {}
+        CRecoveryObjectEvidence* Identity;
+        COperations* Script;
+        CCleanupTransactionalTarget(char* targetName, BOOL* isTransactionalTarget, BOOL* isCommitted,
+                                     CRecoveryObjectEvidence* identity, COperations* script)
+            : TargetName(targetName), IsTransactionalTarget(isTransactionalTarget), IsCommitted(isCommitted), Identity(identity), Script(script) {}
         ~CCleanupTransactionalTarget()
         {
             if (*IsTransactionalTarget && !*IsCommitted)
             {
-                ClearReadOnlyAttr(TargetName);
-                if (!DeleteFileUtf8(TargetName))
-                    TRACE_I("DoCopyFile(): unable to remove uncommitted transactional target " << TargetName << ": " << GetErrorText(GetLastError()));
+                // A failed identity check must not be followed by pathname cleanup
+                // of the very substitute it rejected. Delete only our held object.
+                CPathW path(TargetName);
+                CStableMoveSource owner;
+                CRecoveryObjectEvidence actual;
+                if (Identity->Present && owner.Open(path.GetPathForWin32Api()) &&
+                    ReadRecoveryObjectIdentity(owner.Get(), actual) && SameRecoveryObject(*Identity, actual) &&
+                    owner.Delete(OperationExecutionFileSystem()))
+                    Script->JournalRecordPublicationState("temporary-discarded", L"");
+                else
+                    TRACE_I("DoCopyFile(): preserved uncommitted transactional target " << TargetName << ": " << GetErrorText(GetLastError()));
             }
         }
-    } CleanupTransactionalTarget(transactionalTargetName, &transactionalTarget, &transactionalTargetCommitted);
+    } CleanupTransactionalTarget(transactionalTargetName, &transactionalTarget, &transactionalTargetCommitted, &temporaryIdentity, script);
 
     if (script->CopyAttrs && copyAsEncrypted)
         TRACE_E("DoCopyFile(): unexpected parameter value: copyAsEncrypted is TRUE when script->CopyAttrs is TRUE!");
@@ -767,9 +775,9 @@ COPY_AGAIN:
     {
         if (!invalidSrcName && !asyncPar->Failed())
         {
-            in = HANDLES_Q(CreateFileUtf8(op->SourceName, GENERIC_READ,
-                                      FILE_SHARE_READ | FILE_SHARE_WRITE, NULL,
-                                      OPEN_EXISTING, asyncPar->GetOverlappedFlag() | FILE_FLAG_SEQUENTIAL_SCAN, NULL));
+            // The move lease survives every reader close, dialog, and retry.
+            in = OpenCopySourceForRead(op->SourceName, stableMoveSource,
+                                        asyncPar->GetOverlappedFlag() | FILE_FLAG_SEQUENTIAL_SCAN);
         }
         else
         {
@@ -886,6 +894,17 @@ COPY_AGAIN:
 
                 COPY:
 
+                    // A retry may recreate a stage. Bind this attempt to the
+                    // handle that will actually receive the copied bytes.
+                    if (transactionalTarget && !ReadRecoveryObjectIdentity(out, temporaryIdentity))
+                    {
+                        const DWORD identityError = GetLastError();
+                        HANDLES(CloseHandle(out));
+                        out = INVALID_HANDLE_VALUE;
+                        SetLastError(identityError);
+                        goto CREATE_ERROR;
+                    }
+
                     // if possible, allocate the required space for the file (prevents disk fragmentation + smoother writes to floppies)
                     BOOL wholeFileAllocated = FALSE;
                     if (!skipAllocWholeFileOnStart &&               // last time failed, so the same would probably happen now
@@ -961,7 +980,7 @@ COPY_AGAIN:
                     {
                         DoCopyFileLoopOrig(in, out, buffer, limitBufferSize, script, dlgData, wholeFileAllocated, op,
                                            totalDone, copyError, skipCopy, hProgressDlg, operationDone, fileSize,
-                                           bufferSize, allocWholeFileOnStart, copyAgain);
+                                           bufferSize, allocWholeFileOnStart, copyAgain, stableMoveSource);
                     }
 
                     if (copyError)
@@ -1120,7 +1139,8 @@ COPY_AGAIN:
                         // Pass the optimal buffer size computed from op->OpFlags for ADS copy
                         int adsBufferSize = GetOptimalSyncCopyBufferSize(script, op->OpFlags);
                         if (!DoCopyADS(hProgressDlg, op->SourceName, FALSE, op->TargetName, totalDone,
-                                       operDone, op->Size, dlgData, script, &adsSkip, buffer, adsBufferSize) ||
+                                       operDone, op->Size, dlgData, script, &adsSkip, buffer, adsBufferSize,
+                                       stableMoveSource != NULL) ||
                             adsSkip) // user hit cancel or skipped at least one ADS
                         {
                             if (out != NULL)
@@ -1329,7 +1349,7 @@ COPY_AGAIN:
                     // transactional overwrite, swap in the committed target.
                     switch (VerifyAndCommitCopyTarget(op, hProgressDlg, requestedTargetName, script, dlgData,
                                                       transactionalTarget, &transactionalTargetCommitted,
-                                                      copyADS, suspiciousIoRetry))
+                                                      temporaryIdentity, suspiciousIoRetry))
                     {
                     case cpcrProceed:
                         break;
@@ -1475,9 +1495,8 @@ COPY_AGAIN:
                                 case IDYES:
                                 default: // for safety (to prevent exiting this block with the 'in' handle closed)
                                 {
-                                    in = HANDLES_Q(CreateFileUtf8(op->SourceName, GENERIC_READ,
-                                                              FILE_SHARE_READ | FILE_SHARE_WRITE, NULL,
-                                                              OPEN_EXISTING, asyncPar->GetOverlappedFlag() | FILE_FLAG_SEQUENTIAL_SCAN, NULL));
+                                    in = OpenCopySourceForRead(op->SourceName, stableMoveSource,
+                                                                asyncPar->GetOverlappedFlag() | FILE_FLAG_SEQUENTIAL_SCAN);
                                     if (in == INVALID_HANDLE_VALUE)
                                         goto OPEN_IN_ERROR;
                                     break;
@@ -1536,9 +1555,8 @@ COPY_AGAIN:
                                     case IDYES:
                                     default: // for safety (to prevent exiting this block with the 'in' handle closed)
                                     {
-                                        in = HANDLES_Q(CreateFileUtf8(op->SourceName, GENERIC_READ,
-                                                                  FILE_SHARE_READ | FILE_SHARE_WRITE, NULL,
-                                                                  OPEN_EXISTING, asyncPar->GetOverlappedFlag() | FILE_FLAG_SEQUENTIAL_SCAN, NULL));
+                                        in = OpenCopySourceForRead(op->SourceName, stableMoveSource,
+                                                                    asyncPar->GetOverlappedFlag() | FILE_FLAG_SEQUENTIAL_SCAN);
                                         if (in == INVALID_HANDLE_VALUE)
                                             goto OPEN_IN_ERROR;
                                         attr = SalGetFileAttributes(op->TargetName); // refresh attributes in case the user changed them
@@ -2454,10 +2472,45 @@ BOOL DoMoveFile(COperation* op, HWND hProgressDlg, void* buffer,
         BOOL skip;
         BOOL suspiciousIoRetry;
         DWORD err = NO_ERROR;
+        // Own the verified source through copy, metadata, optional hashing, and
+        // handle-based deletion. Refuse an active writer before touching the target.
+        CStableMoveSource stableMoveSource;
+        CPathW stableSourcePath(op->SourceName);
+        while (!stableMoveSource.Open(stableSourcePath.GetPathForWin32Api()) ||
+               !VerifyFileHandleIdentity(stableMoveSource.Get(), op->SourceIdentity, &err))
+        {
+            if (err == NO_ERROR)
+                err = GetLastError();
+            stableMoveSource.Close();
+            WaitForSingleObject(dlgData.WorkerNotSuspended, INFINITE);
+            if (*dlgData.CancelWorker)
+                return FALSE;
+            int ret = dlgData.SkipAllFileOpenIn ? IDB_SKIP : IDCANCEL;
+            if (!dlgData.SkipAllFileOpenIn)
+            {
+                char* data[4] = {(char*)&ret, LoadStr(IDS_ERROROPENINGFILE), op->SourceName, GetErrorText(err)};
+                SendMessage(hProgressDlg, WM_USER_DIALOG, 0, (LPARAM)data);
+            }
+            if (ret == IDRETRY)
+            {
+                err = NO_ERROR;
+                continue;
+            }
+            if (ret == IDB_SKIPALL)
+                dlgData.SkipAllFileOpenIn = TRUE;
+            if (ret == IDB_SKIP || ret == IDB_SKIPALL)
+            {
+                totalDone += op->Size;
+                script->SetProgressSize(totalDone);
+                SetProgress(hProgressDlg, 0, CalculateProgressPercent(totalDone, script->TotalSize), dlgData);
+                return TRUE;
+            }
+            return FALSE;
+        }
         BOOL notError = DoCopyFile(op, hProgressDlg, buffer, script, totalDone,
                                    clearReadonlyMask, &skip, lantasticCheck,
                                    mustDeleteFileBeforeOverwrite, allocWholeFileOnStart,
-                                   dlgData, copyADS, copyAsEncrypted, TRUE, asyncPar, &suspiciousIoRetry);
+                                   dlgData, copyADS, copyAsEncrypted, TRUE, asyncPar, &suspiciousIoRetry, &stableMoveSource);
         if (notError && !skip) // still need to clean up the file from the source
         {
             RecordPlannedMetadataLosses(dlgData, script, op->SourceName, op->TargetName);
@@ -2501,9 +2554,11 @@ BOOL DoMoveFile(COperation* op, HWND hProgressDlg, void* buffer,
 
                     while (1)
                     {
-                if (DeleteFileWithVerifiedIdentity(op->SourceName, op->SourceIdentity, &err))
+                // Deletion uses the same locked object, never a reopened pathname.
+                if (stableMoveSource.Delete(OperationExecutionFileSystem()))
                     break;
                 {
+                    err = GetLastError();
                     WaitForSingleObject(dlgData.WorkerNotSuspended, INFINITE); // if we should be in suspend mode, wait ...
                     if (*dlgData.CancelWorker)
                         return FALSE;

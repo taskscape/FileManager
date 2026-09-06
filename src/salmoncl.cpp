@@ -110,8 +110,14 @@ BOOL SalmonSharedMemInit(CSalmonSharedMemory* mem)
 
     // cestu pro bug reporty nove davame do LOCAL_APPDATA, kam standardne minidumpy uklada Windows WER
     // cestu hned nevytvarime, o to se postarame az v okamziku padu
-    // Resolve Local AppData through Known Folders before writing the legacy shared-memory ANSI field.
-    if (GetKnownFolderPathToAnsi(FOLDERID_LocalAppData, mem->BugPath, _countof(mem->BugPath)))
+    // The reporter starts before normal profile configuration. Route its shared
+    // path now so an isolated crash cannot leave reports that block later tests
+    // in the user's live Local AppData directory. The ANSI helper needs no global objects.
+    const BOOL reportRootReady = IsFileManagerUiTestSandboxRequested()
+        ? GetFileManagerUiTestDataRoot(mem->BugPath, _countof(mem->BugPath)) &&
+          SUCCEEDED(StringCchCatA(mem->BugPath, _countof(mem->BugPath), "\\appdata"))
+        : GetKnownFolderPathToAnsi(FOLDERID_LocalAppData, mem->BugPath, _countof(mem->BugPath));
+    if (reportRootReady)
     {
         int len = (int)strlen(mem->BugPath);
         if (len > 0 && mem->BugPath[len - 1] == '\\') // better verify the trailing backslash at the end of the path
@@ -120,6 +126,8 @@ BOOL SalmonSharedMemInit(CSalmonSharedMemory* mem)
         if (FAILED(StringCchCatA(mem->BugPath, _countof(mem->BugPath), "\\Open Salamander")))
             mem->BugPath[0] = 0;
     }
+    else
+        mem->BugPath[0] = 0; // Never retain a partial or unvalidated report destination.
 
     // zaklad jmena pro bug reporty
     strcpy(mem->BugName, "AS" VERSINFO_SAL_SHORT_VERSION);

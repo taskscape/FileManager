@@ -127,7 +127,7 @@ void DoLongName(char* buf, const char* name, int bufSize)
 BOOL DoCopyADS(HWND hProgressDlg, const char* sourceName, BOOL isDir, const char* targetName,
                CQuadWord const& totalDone, CQuadWord& operDone, CQuadWord const& operTotal,
                CProgressDlgData& dlgData, COperations* script, BOOL* skip, void* buffer,
-               int optimalBufferSize)
+               int optimalBufferSize, BOOL stableMoveSource)
 {
     BOOL doCopyADSRet = TRUE;
     BOOL lowMemory;
@@ -186,7 +186,9 @@ COPY_ADS_AGAIN:
             BOOL doNextFile = FALSE;
             while (1)
             {
-                HANDLE in = CreateFileW(srcName, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL,
+                // The retained move owner has DELETE access; ADS readers must share it.
+                DWORD sourceSharing = FILE_SHARE_READ | (stableMoveSource ? FILE_SHARE_DELETE : FILE_SHARE_WRITE);
+                HANDLE in = CreateFileW(srcName, GENERIC_READ, sourceSharing, NULL,
                                         OPEN_EXISTING, FILE_FLAG_SEQUENTIAL_SCAN, NULL);
                 HANDLES_ADD_EX(__otQuiet, in != INVALID_HANDLE_VALUE, __htFile,
                                __hoCreateFile, in, GetLastError(), TRUE);
@@ -449,7 +451,7 @@ COPY_ADS_AGAIN:
                                         if (in != NULL)
                                             HANDLES(CloseHandle(in)); // close the invalid handle
 
-                                        in = CreateFileW(srcName, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL,
+                                        in = CreateFileW(srcName, GENERIC_READ, sourceSharing, NULL,
                                                          OPEN_EXISTING, FILE_FLAG_SEQUENTIAL_SCAN, NULL);
                                         HANDLES_ADD_EX(__otQuiet, in != INVALID_HANDLE_VALUE, __htFile,
                                                        __hoCreateFile, in, GetLastError(), TRUE);

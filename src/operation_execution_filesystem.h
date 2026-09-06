@@ -4,6 +4,7 @@
 #pragma once
 
 #include <windows.h>
+#include "common/relative_file_operations.h"
 
 // Execution remains separate from planning so deterministic native tests can
 // fail one durable I/O phase without changing the operation plan or UI flow.
@@ -21,6 +22,12 @@ public:
     virtual BOOL FlushFileBuffers(HANDLE file) = 0;
     virtual BOOL ReplaceFile(const char* replacedFileName, const char* replacementFileName) = 0;
     virtual BOOL MoveFile(const char* existingFileName, const char* newFileName) = 0;
+    // Tests can pause the actual non-replacing publication boundary without
+    // substituting pathname-based replacement for a retained directory object.
+    virtual BOOL RenameFileByHandle(HANDLE file, HANDLE directory, const WCHAR* name)
+    {
+        return RenameRelativePublicationFile(file, directory, name);
+    }
     virtual BOOL SetFileInformationByHandle(HANDLE file, FILE_INFO_BY_HANDLE_CLASS informationClass,
                                             void* information, DWORD informationSize) = 0;
 };

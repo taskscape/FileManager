@@ -3,6 +3,7 @@
 // CommentsTranslationProject: TRANSLATED
 
 #include "precomp.h"
+#include "common/configuration_payload.h"
 
 #include <shlwapi.h>
 #undef PathIsPrefix // otherwise, collision with CSalamanderGeneral::PathIsPrefix
@@ -47,6 +48,87 @@ static const char* CONFIGURATION_TRANSACTION_COMPLETE_REG = "Transaction Complet
 static const char* CONFIGURATION_TRANSACTION_CHECKSUM_REG = "Transaction Checksum";
 static const char* CONFIGURATION_SCHEMA_VERSION_REG = "Configuration Schema Version";
 static const DWORD CONFIGURATION_SCHEMA_VERSION = 1;
+static const char* const CONFIGURATION_PAYLOAD_VERSION_REG = "Payload Integrity Version";
+static const char* const CONFIGURATION_EXPECTED_COUNT_REG = "Expected Item Count";
+static const char* const CONFIGURATION_GENERATION_TOKEN_REG = "Transaction Identity";
+static GUID LoadedConfigurationToken = {};
+static BOOL LoadedConfigurationTokenValid = FALSE;
+
+static BOOL ReadConfigurationGenerationToken(HKEY generation, GUID& token)
+{
+    DWORD type = 0, size = sizeof(token);
+    const GUID absent = {};
+    return RegQueryValueExA(generation, CONFIGURATION_GENERATION_TOKEN_REG, NULL, &type, (BYTE*)&token, &size) == ERROR_SUCCESS &&
+           type == REG_BINARY && size == sizeof(token) && memcmp(&token, &absent, sizeof(token)) != 0;
+}
+
+void CaptureConfigurationGenerationForStartup(HKEY generation)
+{
+    // Slot numbers are reused; only the identity of the actually loaded snapshot
+    // authorizes later deletion of its fallback, even after same-process saves.
+    LoadedConfigurationTokenValid = UsesTransactionalConfigurationStore() &&
+                                    ReadConfigurationGenerationToken(generation, LoadedConfigurationToken);
+}
+
+BOOL SetConfigurationCollectionExpectedCount(HKEY collection, int count)
+{
+    if (count < 0) { RecordConfigurationPayloadFailure(ERROR_INVALID_DATA); return FALSE; }
+    const DWORD expected = (DWORD)count;
+    return SetValue(collection, CONFIGURATION_EXPECTED_COUNT_REG, REG_DWORD, &expected, sizeof(expected));
+}
+
+static BOOL ValidateConfigurationPayloadCollections(HKEY generation)
+{
+    DWORD version = 0, type = 0, length = sizeof(version);
+    const LONG result = RegQueryValueExA(generation, CONFIGURATION_PAYLOAD_VERSION_REG, NULL,
+                                        &type, (BYTE*)&version, &length);
+    if (result == ERROR_FILE_NOT_FOUND) return TRUE; // older verified profiles have no collection manifest
+    if (result != ERROR_SUCCESS || type != REG_DWORD || length != sizeof(version) || version != 1) return FALSE;
+    GUID identity;
+    if (!ReadConfigurationGenerationToken(generation, identity)) return FALSE;
+    // Verify the fields each host collection always writes. Conditional command
+    // fields also remain protected by the first-error latch and full-tree checksum.
+    const CConfigurationRequiredField custom[] = {
+        {"Type", REG_DWORD}, {"Title", REG_SZ}, {"Ext", REG_SZ}};
+    const CConfigurationRequiredField predefined[] = {
+        {"Packer UID", REG_DWORD}, {"Packer Executable", REG_SZ}, {"Use Packer Executable To Unpack", REG_DWORD}};
+    const CConfigurationRequiredField association[] = {
+        {"Extension List", REG_SZ}, {"Packer Supported", REG_DWORD}, {"Packer Index", REG_DWORD}, {"Unpacker Index", REG_DWORD}};
+    const CConfigurationRequiredField highlight[] = {
+        {"Masks", REG_SZ}, {"Attributes", REG_DWORD}, {"Valid Attributes", REG_DWORD},
+        {"Item Fg Normal", REG_DWORD}, {"Item Fg Selected", REG_DWORD}, {"Item Fg Focused", REG_DWORD},
+        {"Item Fg Focused and Selected", REG_DWORD}, {"Item Fg Highlight", REG_DWORD},
+        {"Item Bk Normal", REG_DWORD}, {"Item Bk Selected", REG_DWORD}, {"Item Bk Focused", REG_DWORD},
+        {"Item Bk Focused and Selected", REG_DWORD}, {"Item Bk Highlight", REG_DWORD}};
+    const CConfigurationRequiredField menu[] = {
+        {"Item Name", REG_SZ}, {"Command", REG_SZ}, {"Arguments", REG_SZ}, {"Initial Directory", REG_SZ},
+        {"Execute Through Shell", REG_DWORD}, {"Open Shell Window", REG_DWORD}, {"Close Shell Window", REG_DWORD},
+        {"Icon", REG_SZ}, {"Type", REG_DWORD}, {"Show In Toolbar", REG_DWORD}};
+    const struct { const char* Path; const CConfigurationRequiredField* Fields; size_t FieldCount; } collections[] = {
+        {"Packers & Unpackers\\Custom Packers", custom, ARRAYSIZE(custom)},
+        {"Packers & Unpackers\\Custom Unpackers", custom, ARRAYSIZE(custom)},
+        {"Packers & Unpackers\\Predefined Packers", predefined, ARRAYSIZE(predefined)},
+        {"Packers & Unpackers\\Archive Association", association, ARRAYSIZE(association)},
+        {"User Menu", menu, ARRAYSIZE(menu)}, {"Colors\\Panel Items Hilighting", highlight, ARRAYSIZE(highlight)}};
+    for (size_t index = 0; index < ARRAYSIZE(collections); ++index)
+    {
+        HKEY collection = NULL;
+        if (!OpenKeyAux(NULL, generation, collections[index].Path, collection)) return FALSE;
+        DWORD count = 0;
+        BOOL valid = GetValueAux(NULL, collection, CONFIGURATION_EXPECTED_COUNT_REG, REG_DWORD, &count, sizeof(count));
+        if (valid)
+        {
+            try
+            {
+                valid = ValidateConfigurationCollection(collection, count, collections[index].Fields, collections[index].FieldCount);
+            }
+            catch (const std::bad_alloc&) { valid = FALSE; }
+        }
+        CloseKeyAux(collection);
+        if (!valid) return FALSE;
+    }
+    return TRUE;
+}
 
 BOOL ConfigureFileManagerUiTestConfigurationStore()
 {
@@ -243,7 +325,8 @@ static BOOL ValidateCompleteConfigurationSchema(HKEY generationKey)
                  OpenKeyAux(NULL, generationKey, "Viewer", viewerKey) &&
                  ValidateRequiredDwordRange(viewerKey, "Tabelator Size", 1, 30) &&
                  ValidateRequiredDwordRange(viewerKey, "Default Mode", 0, 2) &&
-                 ValidateWindowConfigurationSchema(generationKey);
+                 ValidateWindowConfigurationSchema(generationKey) &&
+                 ValidateConfigurationPayloadCollections(generationKey);
     if (viewerKey != NULL)
         CloseKeyAux(viewerKey);
     if (configKey != NULL)
@@ -351,6 +434,7 @@ void SetConfigurationStoreRoot(const char* root)
 {
     ConfigurationStoreRoot[0] = 0;
     ActiveConfigurationRoot[0] = 0;
+    LoadedConfigurationTokenValid = FALSE;
     SALAMANDER_ROOT_REG = root;
     if (root != NULL)
     {
@@ -434,10 +518,19 @@ BOOL BeginConfigurationTransaction(HKEY& storeKey, HKEY& generationKey, DWORD& g
         !CreateKey(HKEY_CURRENT_USER, ConfigurationStoreRoot, storeKey))
         return FALSE;
 
-    DWORD activeGeneration = 1;
-    GetValueAux(NULL, storeKey, CONFIGURATION_ACTIVE_GENERATION_REG, REG_DWORD,
-                &activeGeneration, sizeof(activeGeneration));
-    generation = activeGeneration <= 1 ? 1 - activeGeneration : 0;
+    DWORD activeGeneration = 1, selectorType = 0, selectorLength = sizeof(activeGeneration);
+    const LONG selectorResult = RegQueryValueExA(storeKey, CONFIGURATION_ACTIVE_GENERATION_REG, NULL,
+        &selectorType, (BYTE*)&activeGeneration, &selectorLength);
+    // A failed selector read must never choose and clear a possibly active slot.
+    if (selectorResult != ERROR_FILE_NOT_FOUND &&
+        (selectorResult != ERROR_SUCCESS || selectorType != REG_DWORD ||
+         selectorLength != sizeof(activeGeneration) || activeGeneration > 1))
+    {
+        RecordConfigurationPayloadFailure(selectorResult != ERROR_SUCCESS ? selectorResult : ERROR_INVALID_DATA);
+        CloseKey(storeKey);
+        return FALSE;
+    }
+    generation = selectorResult == ERROR_FILE_NOT_FOUND ? 0 : 1 - activeGeneration;
 
     HKEY generationsKey = NULL;
     if (!CreateKey(storeKey, CONFIGURATION_GENERATIONS_REG, generationsKey) ||
@@ -455,6 +548,24 @@ BOOL BeginConfigurationTransaction(HKEY& storeKey, HKEY& generationKey, DWORD& g
         CloseKey(storeKey);
         return FALSE;
     }
+    // New payloads require intended collection counts; legacy profiles remain
+    // readable, and this marker participates in the full-tree checksum.
+    const DWORD payloadVersion = 1;
+    GUID identity;
+    if (FAILED(CoCreateGuid(&identity)))
+    {
+        RecordConfigurationPayloadFailure(ERROR_NOT_ENOUGH_MEMORY);
+        CloseKey(generationKey);
+        CloseKey(storeKey);
+        return FALSE;
+    }
+    if (!SetValue(generationKey, CONFIGURATION_GENERATION_TOKEN_REG, REG_BINARY, &identity, sizeof(identity)) ||
+        !SetValue(generationKey, CONFIGURATION_PAYLOAD_VERSION_REG, REG_DWORD, &payloadVersion, sizeof(payloadVersion)))
+    {
+        CloseKey(generationKey);
+        CloseKey(storeKey);
+        return FALSE;
+    }
     return TRUE;
 }
 
@@ -463,7 +574,8 @@ BOOL CommitConfigurationTransaction(HKEY storeKey, HKEY generationKey, DWORD gen
     DWORD checksum = 2166136261u;
     DWORD complete = 1;
     // Named fault points make the atomic tail independently testable without inferring its indices from plug-in payload size.
-    BOOL committed = MigrateConfigurationSchema(generationKey) &&
+    BOOL committed = ConfigurationPayloadWritesSucceeded() &&
+                     MigrateConfigurationSchema(generationKey) &&
                      ValidateCompleteConfigurationSchema(generationKey) &&
                      CalculateConfigurationChecksum(generationKey, checksum) &&
                      PassConfigurationTransactionFaultPoint(
@@ -478,6 +590,7 @@ BOOL CommitConfigurationTransaction(HKEY storeKey, HKEY generationKey, DWORD gen
                          FlushConfigurationRegistryKey(generationKey) == ERROR_SUCCESS,
                          "generation-flush") &&
                      IsCommittedConfigurationGeneration(generationKey) &&
+                     ConfigurationPayloadWritesSucceeded() &&
                      PassConfigurationTransactionFaultPoint(
                          SetValue(storeKey, CONFIGURATION_ACTIVE_GENERATION_REG, REG_DWORD,
                                   &generation, sizeof(generation)),
@@ -497,22 +610,38 @@ BOOL CommitConfigurationTransaction(HKEY storeKey, HKEY generationKey, DWORD gen
 void RetirePreviousConfigurationGenerationAfterSuccessfulStartup()
 {
     // Do not discard the fallback until this process has successfully restored the chosen generation.
-    if (ConfigurationStoreRoot[0] == 0 || SALAMANDER_ROOT_REG != ActiveConfigurationRoot)
+    if (ConfigurationStoreRoot[0] == 0 || SALAMANDER_ROOT_REG != ActiveConfigurationRoot ||
+        !LoadedConfigurationTokenValid)
         return;
+    // Keep selector revalidation and optional deletion in the same cross-process
+    // critical section used by staging, committing, and loading generations.
+    if (!ConfigurationRetirementTestBarrier("before-lock")) return;
+    if (!LoadSaveToRegistryMutex.EnterChecked()) return;
     HKEY storeKey;
     if (OpenKeyAux(NULL, HKEY_CURRENT_USER, ConfigurationStoreRoot, storeKey))
     {
         DWORD activeGeneration;
         if (GetValueAux(NULL, storeKey, CONFIGURATION_ACTIVE_GENERATION_REG, REG_DWORD,
-                        &activeGeneration, sizeof(activeGeneration)) && activeGeneration <= 1)
+                        &activeGeneration, sizeof(activeGeneration)) && activeGeneration <= 1 &&
+            ConfigurationRetirementTestBarrier("after-selector"))
         {
-            HKEY generationsKey;
-            if (OpenKeyAux(NULL, storeKey, CONFIGURATION_GENERATIONS_REG, generationsKey))
+            HKEY activeKey = NULL;
+            GUID activeToken;
+            if (OpenCommittedConfigurationGeneration(storeKey, activeGeneration, activeKey))
             {
-                SHDeleteKey(generationsKey, GetConfigurationGenerationName(1 - activeGeneration));
-                CloseKeyAux(generationsKey);
+                const BOOL confirmed = ReadConfigurationGenerationToken(activeKey, activeToken) &&
+                    memcmp(&activeToken, &LoadedConfigurationToken, sizeof(activeToken)) == 0;
+                CloseKeyAux(activeKey);
+                HKEY generationsKey;
+                if (confirmed && OpenKeyAux(NULL, storeKey, CONFIGURATION_GENERATIONS_REG, generationsKey))
+                {
+                    SHDeleteKey(generationsKey, GetConfigurationGenerationName(1 - activeGeneration));
+                    CloseKeyAux(generationsKey);
+                }
             }
         }
         CloseKeyAux(storeKey);
     }
+    LoadSaveToRegistryMutex.Leave();
+    ConfigurationRetirementTestBarrier("finished");
 }

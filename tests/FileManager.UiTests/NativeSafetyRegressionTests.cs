@@ -1362,7 +1362,8 @@ public sealed class NativeSafetyRegressionTests
             Assert.That(operations, Does.Contain("CaptureOperationFileIdentities(op, &identityError)"));
             // Verification reports its failure through the local address before
             // the typed result preserves that code for the legacy dialog path.
-            Assert.That(copy, Does.Contain("VerifyFileIdentity(targetName, expectedTargetIdentity, &error)"));
+            // Publication must verify its retained object, never close an identity handle before replacement.
+            Assert.That(copy, Does.Contain("VerifyFileHandleIdentity(publication.TargetHandle(), expectedTargetIdentity, &error)"));
             Assert.That(copy, Does.Contain("DeleteFileWithVerifiedIdentity(name, operation->SourceIdentity, &err)"));
         });
     }
@@ -1626,8 +1627,9 @@ public sealed class NativeSafetyRegressionTests
             Assert.That(copy, Does.Contain("OperationExecutionFileSystem().WriteFile"));
             Assert.That(copy, Does.Contain("OperationExecutionFileSystem().SetFileTime"));
             Assert.That(copy, Does.Contain("OperationExecutionFileSystem().FlushFileBuffers"));
-            Assert.That(copy, Does.Contain("OperationExecutionFileSystem().ReplaceFile"));
-            Assert.That(copy, Does.Contain("OperationExecutionFileSystem().MoveFile"));
+            // The production helper retains the adapter at the conditional rename/flush boundary.
+            Assert.That(copy, Does.Contain("publication.Commit(OperationExecutionFileSystem()"));
+            Assert.That(executionHeader, Does.Contain("virtual BOOL RenameFileByHandle"));
             Assert.That(identities, Does.Contain("OperationExecutionFileSystem().SetFileInformationByHandle"));
             Assert.That(journal, Does.Contain("STATE|%d|prepared"));
             Assert.That(journal, Does.Contain("STATE|%d|temporary-ready"));
@@ -2514,10 +2516,11 @@ public sealed class NativeSafetyRegressionTests
             Assert.That(configuration, Does.Contain("FlushConfigurationRegistryKey(generationKey) == ERROR_SUCCESS"));
             Assert.That(registryWork, Does.Contain("LONG result = RegFlushKey(key)"));
             // A recursive registry deletion must close its child handle before
-            // deleting the child name, or Windows can reject the deletion.
+            // deleting the child name from its growable ANSI enumeration buffer,
+            // or Windows can reject the deletion.
             Assert.That(registryWork, Does.Contain("subKeyScope.Close();"));
             Assert.That(registryWork.IndexOf("subKeyScope.Close();", StringComparison.Ordinal),
-                        Is.GreaterThanOrEqualTo(0).And.LessThan(registryWork.IndexOf("RegDeleteKey(key, name)", StringComparison.Ordinal)));
+                        Is.GreaterThanOrEqualTo(0).And.LessThan(registryWork.IndexOf("RegDeleteKeyA(key, name.data())", StringComparison.Ordinal)));
             Assert.That(configuration, Does.Contain("SetValue(storeKey, CONFIGURATION_ACTIVE_GENERATION_REG"));
             Assert.That(configuration, Does.Contain("RetirePreviousConfigurationGenerationAfterSuccessfulStartup"));
             Assert.That(configuration, Does.Contain("OpenCommittedConfigurationGeneration(storeKey, fallbackGeneration"));
@@ -2604,8 +2607,9 @@ public sealed class NativeSafetyRegressionTests
             Assert.That(copy, Does.Contain("RecordMetadataLoss(dlgData, mmlSecurity"));
             Assert.That(copy, Does.Contain("RecordPlannedMetadataLosses(dlgData, script, op->SourceName, op->TargetName)"));
             Assert.That(copy, Does.Contain("ConfirmMetadataLossesBeforeSourceDeletion(hProgressDlg, dlgData, op->SourceName, op->TargetName)"));
+            // Source ownership now spans verification and deletion; keep the metadata gate before that handle is disposed.
             Assert.That(copy.IndexOf("ConfirmMetadataLossesBeforeSourceDeletion(hProgressDlg, dlgData, op->SourceName, op->TargetName)", StringComparison.Ordinal),
-                        Is.LessThan(copy.IndexOf("DeleteFileWithVerifiedIdentity(op->SourceName", StringComparison.Ordinal)),
+                        Is.LessThan(copy.IndexOf("stableMoveSource.Delete(OperationExecutionFileSystem())", StringComparison.Ordinal)),
                         "A cross-volume move must ask about recorded metadata loss before deleting its source.");
             Assert.That(operations, Does.Contain("RecordPlannedMetadataLosses(dlgData, script, op->SourceName, NULL)"));
             Assert.That(operations, Does.Contain("ConfirmMetadataLossesBeforeSourceDeletion(hProgressDlg, dlgData, op->SourceName, NULL)"));
@@ -2770,30 +2774,26 @@ public sealed class NativeSafetyRegressionTests
         var dataConnection = File.ReadAllText(Path.Combine(root, "src", "plugins", "ftp", "datacon1.cpp"));
         var disk = File.ReadAllText(Path.Combine(root, "src", "plugins", "ftp", "operats5.cpp"));
 
-        // Network loss must leave an explicitly incomplete side file; only a fully verified transfer can replace the cache entry.
+        var worker = File.ReadAllText(Path.Combine(root, "src", "plugins", "ftp", "operats8.cpp"));
+        var staging = File.ReadAllText(Path.Combine(root, "src", "common", "ftp_transactional_download.h"));
+        // Keep both public download routes bound to the native-tested owner and
+        // completion gate; the native and loopback cases verify actual outcomes.
         Assert.Multiple(() =>
         {
-            Assert.That(control, Does.Contain("FtpIncompleteSuffix[] = \".ftp-incomplete\""));
-            Assert.That(control, Does.Contain("CFTPTransactionalDownloadMetadata"));
-            Assert.That(control, Does.Contain("RemoteSize"));
-            Assert.That(control, Does.Contain("RemoteDateAndTimeValid"));
-            Assert.That(control, Does.Contain("WriteTransactionalDownloadMetadata"));
-            Assert.That(control, Does.Contain("FILE_FLAG_WRITE_THROUGH"));
-            Assert.That(control, Does.Contain("memcmp(&actual, &expected, sizeof(actual)) == 0"));
-            Assert.That(control, Does.Contain("size.QuadPart < 0 || (unsigned __int64)size.QuadPart > expected.RemoteSize"));
-            Assert.That(control, Does.Contain("!asciiMode && fileSizeInBytes != CQuadWord(-1, -1)"));
-            Assert.That(control, Does.Contain("ftpcmdRestartTransfer"));
-            Assert.That(control, Does.Contain("FTP_D1_PARTIALSUCCESS"));
-            Assert.That(control, Does.Contain("CommitTransactionalDownload(stagedTargetName, tgtFileName, metadataName"));
-            Assert.That(control, Does.Contain("FlushFileBuffers(stagedFile)"));
-            Assert.That(control, Does.Contain("MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH"));
-            Assert.That(dataConnection, Does.Contain("TgtDiskFileResumeOffset = resumeOffset"));
-            Assert.That(dataConnection, Does.Contain("DiskWork.AppendToFile = TgtDiskFile == NULL && TgtDiskFileAppend"));
-            Assert.That(disk, Does.Contain("localWork.AppendToFile ? OPEN_ALWAYS : CREATE_ALWAYS"));
-            Assert.That(disk, Does.Contain("SetFilePointerEx(f, offset, NULL, FILE_BEGIN)"));
+            Assert.That(control, Does.Contain("CFtpTransactionalDownload::TryResume"));
+            Assert.That(control, Does.Contain("download->Finish(fileSystem"));
+            Assert.That(control, Does.Not.Contain("MOVEFILE_REPLACE_EXISTING"));
+            Assert.That(control, Does.Not.Contain("DeleteFileUtf8Local(stagedTargetName)"));
+            Assert.That(worker, Does.Contain("fdwtFinalizeDownload"));
+            Assert.That(worker, Does.Contain("case fwssWorkCopyWaitForCommit:"));
+            Assert.That(disk, Does.Contain("FinalizeQueuedDownload(localWork)"));
+            Assert.That(disk, Does.Not.Contain("PulseEvent("));
+            Assert.That(dataConnection, Does.Contain("completion->Wait(timeout, error)"));
+            Assert.That(dataConnection, Does.Contain("return completed && error == ERROR_SUCCESS"));
+            Assert.That(staging, Does.Contain("Publication.Commit(fileSystem"));
+            Assert.That(staging, Does.Contain("Publication.CloseChecked(fileSystem)"));
         });
     }
-
     [Test]
     public void Ftp_certificate_exceptions_are_endpoint_bound_expiring_and_pinned()
     {

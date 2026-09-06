@@ -21,7 +21,9 @@ enum EOperationPartialEffect
 {
     opeNone = 0,
     opeTemporaryTargetReady = 0x0001,
-    opeDestinationCommitted = 0x0002
+    opeDestinationCommitted = 0x0002,
+    // A conditional overwrite may retain the previous version for recovery.
+    opePublicationBackupRetained = 0x0004
 };
 
 enum EOperationCleanupPhase
@@ -30,7 +32,9 @@ enum EOperationCleanupPhase
     orcpCloseVerificationHandle,
     orcpDeleteUnverifiedTarget,
     // Attribute rollback must not hide a failed commit or cause it to run twice.
-    orcpRestoreReadOnlyAttribute
+    orcpRestoreReadOnlyAttribute,
+    // Report backup cleanup separately from the successful publication itself.
+    orcpPublicationBackup
 };
 
 struct COperationCleanupError
@@ -107,6 +111,7 @@ struct COperationResult
         case orcpDeleteUnverifiedTarget: return "delete-unverified-target";
         // Keep restoration failures distinguishable in copy-dialog diagnostics.
         case orcpRestoreReadOnlyAttribute: return "restore-read-only-attribute";
+        case orcpPublicationBackup: return "publication-backup";
         default: return "none";
         }
     }

@@ -243,9 +243,25 @@ void CFTPWorker::HandleEventInPreparingState(CFTPWorkerEvent event, BOOL& sendQu
                                      CurItem->ForceAction,
                                      strcmp(CurItem->Name, ((CFTPQueueItemCopyOrMove*)CurItem)->TgtName) != 0,
                                      NULL, NULL, NULL, 0, NULL);
+                        // The disk owner binds a resumable stage to this observed server version.
+                        CFTPQueueItemCopyOrMove* downloadItem = (CFTPQueueItemCopyOrMove*)CurItem;
+                        char remoteUser[USER_MAX_SIZE], remoteHost[HOST_MAX_SIZE];
+                        unsigned short remotePort;
+                        Oper->GetUserHostPort(remoteUser, remoteHost, &remotePort);
+                        try
+                        {
+                            DiskWork.RemoteIdentity = std::make_shared<const std::string>(BuildFtpDownloadIdentity(
+                                remoteUser, remoteHost, remotePort, CurItem->Path, CurItem->Name,
+                                downloadItem->Size, downloadItem->AsciiTransferMode, downloadItem->DateAndTimeValid,
+                                downloadItem->Date, downloadItem->Time));
+                        }
+                        catch (const std::bad_alloc&) { DiskWork.RemoteIdentity.reset(); }
+                        DiskWork.ExpectedLengthKnown = downloadItem->SizeInBytes && !downloadItem->AsciiTransferMode &&
+                            downloadItem->Size != CQuadWord(-1, -1);
+                        DiskWork.SetDownloadTime = downloadItem->DateAndTimeValid;
                         if (CurItem->ForceAction != fqiaNone) // the forced action stops being valid here
                             Queue->UpdateForceAction(CurItem, fqiaNone);
-                        if (FTPDiskThread->AddWork(&DiskWork))
+                        if (DiskWork.RemoteIdentity && FTPDiskThread->AddWork(&DiskWork))
                         {
                             DiskWorkIsUsed = TRUE;
                             SubState = fwssPrepWaitForDisk; // wait for the result
@@ -269,6 +285,9 @@ void CFTPWorker::HandleEventInPreparingState(CFTPWorkerEvent event, BOOL& sendQu
                     {
                         DiskWorkIsUsed = FALSE;
                         ReportWorkerMayBeClosed(); // announce the worker has finished (for other waiting threads)
+
+                        // Preserve the private stage on errors as well as successful preparation.
+                        ((CFTPQueueItemCopyOrMove*)CurItem)->Download = DiskWork.Download;
 
                         // if we have already sent QUIT, prevent sending QUIT again from the new state
                         quitSent = SubState == fwssPrepWaitForDiskAfterQuitSent;

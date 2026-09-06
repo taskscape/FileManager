@@ -3,6 +3,8 @@
 
 #include "precomp.h"
 #include <strsafe.h>
+#include <memory>
+#include "common/operation_recovery.h" // startup uses the same claimed recovery boundary as native tests
 
 #include "operation_journal.h"
 #include "worker.h"
@@ -26,8 +28,16 @@ const int JournalWriteBufferCapacity = 64 * 1024;
 
 BOOL WriteAll(HANDLE file, const char* data, DWORD length)
 {
-    DWORD written = 0;
-    return WriteFile(file, data, length, &written, NULL) && written == length;
+    // Short writes are legal; zero progress or an error makes the record incomplete.
+    DWORD offset = 0;
+    while (offset < length)
+    {
+        DWORD written = 0;
+        if (!WriteFile(file, data + offset, length - offset, &written, NULL)) return FALSE;
+        if (written == 0 || written > length - offset) { SetLastError(ERROR_WRITE_FAULT); return FALSE; }
+        offset += written;
+    }
+    return TRUE;
 }
 
 BOOL WriteAll(HANDLE file, const char* text)
@@ -50,197 +60,16 @@ const char* OpcodeName(COperationCode opcode)
     }
 }
 
-BOOL IsTerminalJournal(const char* content)
-{
-    return strstr(content, "OPERATION|completed") != NULL ||
-           strstr(content, "OPERATION|cancelled") != NULL ||
-           strstr(content, "OPERATION|failed") != NULL ||
-           strstr(content, "OPERATION|reconciled") != NULL;
-}
-
-char* ReadJournal(const char* path)
-{
-    HANDLE file = HANDLES_Q(CreateFileUtf8(path, GENERIC_READ,
-                                            FILE_SHARE_READ | FILE_SHARE_WRITE,
-                                            NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL));
-    if (file == INVALID_HANDLE_VALUE)
-        return NULL;
-    LARGE_INTEGER fileSize;
-    // Recovery journals are deliberately bounded, so reject large values before narrowing to the read-buffer size.
-    if (!GetFileSizeEx(file, &fileSize) || fileSize.QuadPart < 0 ||
-        (ULONGLONG)fileSize.QuadPart > 16 * 1024 * 1024)
-    {
-        HANDLES(CloseHandle(file));
-        return NULL;
-    }
-    DWORD size = (DWORD)fileSize.QuadPart;
-    char* content = (char*)malloc(size + 1);
-    DWORD read = 0;
-    BOOL ok = content != NULL && ReadFile(file, content, size, &read, NULL) && read == size;
-    HANDLES(CloseHandle(file));
-    if (!ok)
-    {
-        if (content != NULL)
-            free(content);
-        return NULL;
-    }
-    content[size] = 0;
-    return content;
-}
-
-void AppendRecoveryRecord(const char* path, const char* record)
-{
-    HANDLE file = HANDLES_Q(CreateFileUtf8(path, FILE_APPEND_DATA, FILE_SHARE_READ, NULL,
-                                            OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL | FILE_FLAG_WRITE_THROUGH, NULL));
-    if (file != INVALID_HANDLE_VALUE)
-    {
-        WriteAll(file, record);
-        FlushFileBuffers(file);
-        HANDLES(CloseHandle(file));
-    }
-}
-
-struct CRecoveryItem
-{
-    int Index;
-    char* Target;
-    char* Temporary;
-    BOOL TemporaryReady;
-    CRecoveryItem() : Index(-1), Target(NULL), Temporary(NULL), TemporaryReady(FALSE) {}
-    ~CRecoveryItem()
-    {
-        if (Target != NULL) free(Target);
-        if (Temporary != NULL) free(Temporary);
-    }
-};
-
-CRecoveryItem* FindRecoveryItem(TDirectArray<CRecoveryItem*>& items, int index)
-{
-    int i;
-    for (i = 0; i < items.Count; i++)
-        if (items[i]->Index == index) return items[i];
-    return NULL;
-}
-
-void SplitFields(char* line, char** fields, int fieldCount)
-{
-    int i;
-    fields[0] = line;
-    for (i = 1; i < fieldCount; i++)
-    {
-        char* separator = strchr(fields[i - 1], '|');
-        if (separator == NULL)
-            fields[i] = (char*)"";
-        else
-        {
-            *separator = 0;
-            fields[i] = separator + 1;
-        }
-    }
-}
-
-void ParseRecoveryItems(char* content, TDirectArray<CRecoveryItem*>& items)
-{
-    char* line = content;
-    while (line != NULL && *line != 0)
-    {
-        char* next = strchr(line, '\n');
-        if (next != NULL) *next++ = 0;
-        int length = (int)strlen(line);
-        if (length > 0 && line[length - 1] == '\r') line[length - 1] = 0;
-        char* fields[6];
-        SplitFields(line, fields, _countof(fields));
-        if (strcmp(fields[0], "ITEM") == 0)
-        {
-            CRecoveryItem* item = new CRecoveryItem;
-            if (item != NULL)
-            {
-                item->Index = atoi(fields[1]);
-                item->Target = _strdup(fields[4]);
-                // TDirectArray::Add returns the inserted index (including zero), so only -1 means ownership was not transferred.
-                if (items.Add(item) == -1) delete item;
-            }
-        }
-        else if (strcmp(fields[0], "TEMP") == 0)
-        {
-            CRecoveryItem* item = FindRecoveryItem(items, atoi(fields[1]));
-            if (item != NULL)
-            {
-                if (item->Temporary != NULL) free(item->Temporary);
-                item->Temporary = _strdup(fields[2]);
-            }
-        }
-        else if (strcmp(fields[0], "STATE") == 0 && strcmp(fields[2], "temporary-ready") == 0)
-        {
-            CRecoveryItem* item = FindRecoveryItem(items, atoi(fields[1]));
-            if (item != NULL) item->TemporaryReady = TRUE;
-        }
-        line = next;
-    }
-}
-
-BOOL IsSiblingTransactionalTemporary(const char* temporaryPath, const char* targetPath)
-{
-    if (temporaryPath == NULL || targetPath == NULL) return FALSE;
-    char temporaryDirectory[3 * MAX_PATH];
-    char targetDirectory[3 * MAX_PATH];
-    // Transactional sibling checks must compare complete directories, not clipped prefixes.
-    if (FAILED(StringCchCopyA(temporaryDirectory, _countof(temporaryDirectory), temporaryPath)) ||
-        FAILED(StringCchCopyA(targetDirectory, _countof(targetDirectory), targetPath)))
-        return FALSE;
-    if (!CutDirectory(temporaryDirectory) || !CutDirectory(targetDirectory) ||
-        StrICmp(temporaryDirectory, targetDirectory) != 0) return FALSE;
-    const char* name = strrchr(temporaryPath, '\\');
-    name = name == NULL ? temporaryPath : name + 1;
-    return _strnicmp(name, "SALCP", 5) == 0;
-}
-
-BOOL MoveTemporaryToTarget(const char* temporaryPath, const char* targetPath)
-{
-    CStrP temporaryPathW(ConvertAllocUtf8ToWide(temporaryPath, -1));
-    CStrP targetPathW(ConvertAllocUtf8ToWide(targetPath, -1));
-    return temporaryPathW != NULL && targetPathW != NULL &&
-           MoveFileExW(temporaryPathW, targetPathW, MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH);
-}
-
-void ReconcileJournal(const char* path, int action, int& resumed, int& rolledBack, int& unresolved)
-{
-    char* content = ReadJournal(path);
-    if (content == NULL) { unresolved++; return; }
-    TDirectArray<CRecoveryItem*> items(8, 8);
-    ParseRecoveryItems(content, items);
-    int i;
-    for (i = 0; i < items.Count; i++)
-    {
-        CRecoveryItem* item = items[i];
-        if (item->Temporary == NULL || item->Target == NULL ||
-            !IsSiblingTransactionalTemporary(item->Temporary, item->Target) || !FileExists(item->Temporary))
-            continue;
-        if (action == IDYES && item->TemporaryReady)
-        {
-            if (MoveTemporaryToTarget(item->Temporary, item->Target)) resumed++; else unresolved++;
-        }
-        else if (action == IDNO)
-        {
-            if (DeleteFileUtf8(item->Temporary)) rolledBack++; else unresolved++;
-        }
-        else unresolved++;
-    }
-    for (i = 0; i < items.Count; i++) delete items[i];
-    free(content);
-    AppendRecoveryRecord(path, "OPERATION|reconciled\r\n");
-}
-
-BOOL WriteReconciliationReport(char* reportPath, int reportPathLen, TDirectArray<char*>& journals,
+BOOL WriteReconciliationReport(char* reportPath, int reportPathLen,
+                               const std::vector<std::unique_ptr<COperationRecovery>>& journals,
                                int resumed, int rolledBack, int unresolved)
 {
     char directory[MAX_PATH];
     if (!GetJournalDirectory(directory, _countof(directory), TRUE)) return FALSE;
-    // Preserve the fixed recovery-report name while folding uptime beyond the 32-bit tick cycle.
     const CMonotonicTimePoint timeSeed = CMonotonicClock::Now();
     _snprintf_s(reportPath, reportPathLen, _TRUNCATE, "%s\\reconciliation-%08lX.txt", directory,
                 (DWORD)(timeSeed ^ (timeSeed >> 32)));
-    HANDLE report = HANDLES_Q(CreateFileUtf8(reportPath, GENERIC_WRITE, 0, NULL, CREATE_ALWAYS,
+    HANDLE report = HANDLES_Q(CreateFileUtf8(reportPath, GENERIC_WRITE, 0, NULL, CREATE_NEW,
                                               FILE_ATTRIBUTE_NORMAL | FILE_FLAG_WRITE_THROUGH, NULL));
     if (report == INVALID_HANDLE_VALUE) return FALSE;
     char summary[256];
@@ -248,27 +77,30 @@ BOOL WriteReconciliationReport(char* reportPath, int reportPathLen, TDirectArray
                 "Open Salamander operation recovery report\r\nResumed commits: %d\r\nRolled back temporary files: %d\r\nUnresolved items: %d\r\n\r\n",
                 resumed, rolledBack, unresolved);
     BOOL ok = WriteAll(report, summary);
-    int i;
-    for (i = 0; ok && i < journals.Count; i++)
+    // Report from the claimed snapshot; reopening a pathname would relinquish
+    // ownership and can read another operation or fail against our own lease.
+    for (const auto& journal : journals)
     {
-        char heading[3 * MAX_PATH + 32];
-        _snprintf_s(heading, _countof(heading), _TRUNCATE, "Journal: %s\r\n", journals.At(i));
-        char* content = ReadJournal(journals.At(i));
-        ok = WriteAll(report, heading) && content != NULL;
-        if (content != NULL)
+        const std::string heading = "Journal: " + journal->Path + "\r\n" + journal->Detail + "\r\n";
+        ok = ok && WriteAll(report, heading.c_str());
+        for (const auto& entry : journal->Items)
         {
-            ok = ok && WriteAll(report, content) && WriteAll(report, "\r\n");
-            free(content);
+            const CRecoveryItem& item = entry.second;
+            if (item.Temporary.empty()) continue;
+            const std::string line = "Item " + std::to_string(item.Index) + ": " + item.Detail +
+                "\r\n  Target: " + item.Target + "\r\n  Temporary: " + item.Temporary +
+                "\r\n  Backup: " + item.Backup + "\r\n";
+            ok = ok && WriteAll(report, line.c_str());
         }
     }
     if (ok) ok = FlushFileBuffers(report);
-    HANDLES(CloseHandle(report));
+    if (!HANDLES(CloseHandle(report))) ok = FALSE;
     return ok;
 }
 } // namespace
 
 COperationJournal::COperationJournal()
-    : File(INVALID_HANDLE_VALUE), CurrentItem(-1), CurrentAttempt(0), Buffer(NULL), BufferUsed(0)
+    : File(INVALID_HANDLE_VALUE), CurrentItem(-1), CurrentAttempt(0), Buffer(NULL), BufferUsed(0), WriteFailed(FALSE)
 {
     Path[0] = 0;
 }
@@ -281,12 +113,15 @@ COperationJournal::~COperationJournal()
 
 BOOL COperationJournal::SpillBuffer()
 {
-    if (File == INVALID_HANDLE_VALUE)
+    if (File == INVALID_HANDLE_VALUE || WriteFailed)
         return FALSE;
     if (BufferUsed <= 0)
         return TRUE;
     if (!WriteAll(File, Buffer, (DWORD)BufferUsed))
+    {
+        WriteFailed = TRUE;
         return FALSE;
+    }
     BufferUsed = 0;
     return TRUE;
 }
@@ -295,14 +130,16 @@ BOOL COperationJournal::FlushDurable()
 {
     // Recovery needs a complete record plus updated file-size metadata, not a
     // WRITE_THROUGH payload whose last bytes never became part of the on-disk size.
-    return SpillBuffer() && File != INVALID_HANDLE_VALUE && FlushFileBuffers(File);
+    if (!SpillBuffer() || File == INVALID_HANDLE_VALUE) return FALSE;
+    if (!FlushFileBuffers(File)) { WriteFailed = TRUE; return FALSE; }
+    return TRUE;
 }
 
 BOOL COperationJournal::Append(const char* text)
 {
     // Checkpoint durability belongs in FlushDurable; flushing every fragment of a
     // multi-Append record stalled thousands of files at 0% for over an hour.
-    if (text == NULL || File == INVALID_HANDLE_VALUE || Buffer == NULL)
+    if (text == NULL || File == INVALID_HANDLE_VALUE || Buffer == NULL || WriteFailed)
         return FALSE;
     const char* cursor = text;
     int remaining = (int)strlen(text);
@@ -393,7 +230,7 @@ BOOL COperationJournal::Begin(COperations& operations)
     char line[160];
     // Persist the ID independently of filenames so recovery matches an unfinished journal to diagnostics.
     _snprintf_s(line, _countof(line), _TRUNCATE,
-                "FORMAT|1\r\nCORRELATION|operation=%s\r\nOPERATION|planned|items=%d\r\n",
+                "FORMAT|2\r\nCORRELATION|operation=%s\r\nOPERATION|planned|items=%d\r\n",
                 operations.GetCorrelationId(), operations.Count);
     if (!Append(line) || !AppendGoldenMasterPlan(operations)) return FALSE;
     int i;
@@ -452,12 +289,26 @@ BOOL COperationJournal::SetTemporaryPath(const char* temporaryPath)
     return Append(prefix) && Append(temporaryPath) && Append("\r\n") && FlushDurable();
 }
 
-BOOL COperationJournal::MarkTemporaryReady()
+BOOL COperationJournal::MarkTemporaryReady(const char* targetPath, const char* temporaryPath,
+                                           HANDLE directory, HANDLE target, HANDLE temporary, BOOL preserveTargetSecurity)
 {
-    if (CurrentItem < 0) return FALSE;
-    char line[80];
-    _snprintf_s(line, _countof(line), _TRUNCATE, "STATE|%d|temporary-ready\r\n", CurrentItem);
-    return Append(line) && FlushDurable();
+    if (CurrentItem < 0 || targetPath == NULL || temporaryPath == NULL) return FALSE;
+    CRecoveryObjectEvidence parent, targetEvidence, temporaryEvidence;
+    if (!ReadRecoveryObjectIdentity(directory, parent) || !ReadRecoveryObjectIdentity(temporary, temporaryEvidence) ||
+        (target != INVALID_HANDLE_VALUE && !ReadRecoveryObjectIdentity(target, targetEvidence))) return FALSE;
+    // Readiness is captured only after copy verification from the retained
+    // publication handles. Unsupported stream/reparse cases stay manual-only.
+    const BOOL automatic = temporaryEvidence.PlainFile && RecoveryHasOnlyPrimaryStream(temporary) &&
+        (target == INVALID_HANDLE_VALUE || (targetEvidence.PlainFile && RecoveryHasOnlyPrimaryStream(target)));
+    if (automatic && (!CaptureRecoveryEvidence(temporary, temporaryEvidence) ||
+                      (target != INVALID_HANDLE_VALUE && !CaptureRecoveryEvidence(target, targetEvidence)))) return FALSE;
+    const std::string record = "READY2|" + std::to_string(CurrentItem) + "|attempt=" + std::to_string(CurrentAttempt) +
+        (automatic ? "|auto=1|" : "|auto=0|") + targetPath + "|" + temporaryPath + "|" +
+        SerializeRecoveryEvidence(targetEvidence) + "|" + SerializeRecoveryEvidence(temporaryEvidence) + "|" +
+        SerializeRecoveryEvidence(parent) + (preserveTargetSecurity ? "|security=1|end\r\n" : "|security=0|end\r\n");
+    char line[96];
+    _snprintf_s(line, _countof(line), _TRUNCATE, "STATE|%d|temporary-ready|attempt=%d\r\n", CurrentItem, CurrentAttempt);
+    return Append(record.c_str()) && Append(line) && FlushDurable();
 }
 
 void COperationJournal::CompleteItem(BOOL succeeded)
@@ -472,6 +323,21 @@ void COperationJournal::CompleteItem(BOOL succeeded)
         CurrentItem = -1;
         CurrentAttempt = 0;
     }
+}
+
+BOOL COperationJournal::RecordPublicationState(const char* state, const WCHAR* backupPath)
+{
+    // Keep the backup name in every durable boundary record so even a truncated
+    // later append leaves enough information to locate the previous version.
+    if (CurrentItem < 0 || state == NULL || backupPath == NULL) return FALSE;
+    char* backupUtf8 = ConvertAllocWideToUtf8(backupPath, -1);
+    if (backupUtf8 == NULL) return FALSE;
+    char prefix[96];
+    _snprintf_s(prefix, _countof(prefix), _TRUNCATE, "PUBLICATION|%d|%s|attempt=%d|",
+                CurrentItem, state, CurrentAttempt);
+    BOOL ok = Append(prefix) && Append(backupUtf8) && Append("\r\n") && FlushDurable();
+    free(backupUtf8);
+    return ok;
 }
 
 void COperationJournal::Finish(BOOL failed, BOOL cancelled)
@@ -518,48 +384,47 @@ void COperationJournal::OfferRecovery(HWND parent)
     WIN32_FIND_DATAW findData;
     HANDLE find = HANDLES_Q(FindFirstFileW(apiPattern, &findData));
     if (find == INVALID_HANDLE_VALUE) return;
-    TDirectArray<char*> journals(4, 4);
+    std::vector<std::unique_ptr<COperationRecovery>> journals;
     do
     {
-        if ((findData.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) == 0)
+        if ((findData.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) != 0) continue;
+        // Keep the complete Unicode name from enumeration through acquisition;
+        // an unreadable journal must not disappear because a UTF-8 buffer clipped it.
+        std::wstring journalPath(apiPattern);
+        journalPath.resize(journalPath.rfind(L'\\') + 1);
+        journalPath += findData.cFileName;
+        std::unique_ptr<COperationRecovery> journal(new COperationRecovery);
+        // The exclusive handle is acquired before parsing and retained across
+        // the prompt, mutation, durable outcomes and report generation.
+        if (!journal->Load(journalPath.c_str()))
         {
-            char name[MAX_PATH * 3];
-            if (ConvertWideToUtf8(findData.cFileName, -1, name, _countof(name)) == 0)
-                continue;
-            char path[3 * MAX_PATH];
-            _snprintf_s(path, _countof(path), _TRUNCATE, "%s\\%s", directory, name);
-            char* content = ReadJournal(path);
-            if (content != NULL)
-            {
-                if (!IsTerminalJournal(content))
-                {
-                    char* copy = _strdup(path);
-                    // Preserve the first discovered journal: index zero is a successful insertion, not an allocation failure.
-                    if (copy != NULL && journals.Add(copy) == -1) free(copy);
-                }
-                free(content);
-            }
+            if (journal->Error == ERROR_SHARING_VIOLATION || journal->Error == ERROR_LOCK_VIOLATION) continue;
+            journal->Detail += " Win32 error " + std::to_string(journal->Error) + ".";
         }
+        if (journal->NeedsRecovery()) journals.push_back(std::move(journal));
     } while (FindNextFileW(find, &findData));
     HANDLES(FindClose(find));
-    if (journals.Count == 0) return;
-    int action = SalMessageBox(parent,
-                               "Open Salamander found incomplete file operations.\r\n\r\n"
-                               "Yes resumes only fully written transactional targets.\r\n"
-                               "No rolls back known uncommitted transactional targets.\r\n"
-                               "Cancel leaves files unchanged and writes a reconciliation report.",
+    if (journals.empty()) return;
+    const int action = SalMessageBox(parent,
+                               "Open Salamander found incomplete or unreadable file operations.\r\n\r\n"
+                               "Yes resumes verified transactional targets.\r\n"
+                               "No removes verified uncommitted temporary files.\r\n"
+                               "Changed, partial or unverified files are preserved for manual recovery.\r\n"
+                               "Cancel leaves recovery pending and writes a report.",
                                "Recover file operations", MB_YESNOCANCEL | MB_ICONEXCLAMATION | MB_DEFBUTTON3);
     int resumed = 0, rolledBack = 0, unresolved = 0;
-    int i;
-    for (i = 0; i < journals.Count; i++) ReconcileJournal(journals[i], action, resumed, rolledBack, unresolved);
+    for (const auto& journal : journals)
+        journal->Reconcile(action, OperationExecutionFileSystem(), resumed, rolledBack, unresolved);
     char reportPath[3 * MAX_PATH];
     if (WriteReconciliationReport(reportPath, _countof(reportPath), journals, resumed, rolledBack, unresolved))
     {
         char message[3 * MAX_PATH + 160];
         _snprintf_s(message, _countof(message), _TRUNCATE,
-                    "Recovery reconciliation completed.\r\nResumed: %d\r\nRolled back: %d\r\nUnresolved: %d\r\n\r\nReport: %s",
+                    "Recovery attempt finished.\r\nResumed: %d\r\nRolled back: %d\r\nUnresolved: %d\r\n\r\nReport: %s",
                     resumed, rolledBack, unresolved, reportPath);
         SalMessageBox(parent, message, "File operation recovery", MB_OK | MB_ICONINFORMATION);
     }
-    for (i = 0; i < journals.Count; i++) free(journals[i]);
+    else
+        SalMessageBox(parent, "The recovery report could not be saved. Unresolved operations remain pending.",
+                       "File operation recovery", MB_OK | MB_ICONEXCLAMATION);
 }

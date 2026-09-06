@@ -442,14 +442,15 @@ CDataConnectionSocket::CDataConnectionSocket(BOOL flushData, CFTPProxyForDataCon
     AsciiTrModeForBinFileProblemOccured = FALSE;
     AsciiTrModeForBinFileHowToSolve = 0 /* ask the user */;
     TgtDiskFileClosed = FALSE;
-    TgtDiskFileCloseIndex = -1;
+    TgtDiskFileCompletion.reset();
     DiskWorkIsUsed = FALSE;
 
     NoDataTransTimeout = FALSE;
     DecomprErrorOccured = FALSE;
     //DecomprMissingStreamEnd = FlushData && CompressData != 0;
 
-    memset(&DiskWork, 0, sizeof(DiskWork));
+    // Shared staging/completion members require their constructors, including on retries.
+    DiskWork = CFTPDiskWork{};
 }
 
 CDataConnectionSocket::~CDataConnectionSocket()
@@ -578,7 +579,8 @@ void CDataConnectionSocket::ClearBeforeConnect()
     AsciiTrModeForBinFileProblemOccured = FALSE;
     DataTotalSize.Set(-1, -1);
     TgtDiskFileClosed = FALSE;
-    TgtDiskFileCloseIndex = -1;
+    TgtDiskFileCompletion.reset();
+    TgtCloseSubmissionError = ERROR_SUCCESS;
     TgtDiskFileSize.Set(0, 0);
     TgtDiskFileCreated = FALSE;
     if (CompressData)
@@ -685,8 +687,13 @@ void CDataConnectionSocket::DirectFlushData()
             {
                 if (TgtDiskFile != NULL)
                 {
-                    FTPDiskThread->AddFileToClose("", TgtDiskFileName, TgtDiskFile, FALSE, FALSE, NULL, NULL,
-                                                  TRUE, NULL, &TgtDiskFileCloseIndex);
+                    // Queue rejection leaves the borrowed file with its shared owner.
+                    if (!FTPDiskThread->AddFileToClose("", TgtDiskFileName, TgtDiskFile, FALSE, FALSE, NULL, NULL,
+                                                  TRUE, NULL, &TgtDiskFileCompletion, TgtDownload))
+                    {
+                        const DWORD error = GetLastError();
+                        TgtFileLastError = TgtCloseSubmissionError = error != ERROR_SUCCESS ? error : ERROR_NOT_ENOUGH_MEMORY;
+                    }
                     TgtDiskFile = NULL; // the closing + deletion is only scheduled, but we will no longer work with the file
                     TgtDiskFileCreated = FALSE;
                     TgtDiskFileSize.Set(0, 0);
@@ -721,8 +728,9 @@ void CDataConnectionSocket::DirectFlushData()
                     DiskWork.FlushDataBuffer = flushBuffer;
                     DiskWork.ValidBytesInFlushDataBuffer = validBytesInFlushBuffer;
                     DiskWork.WorkFile = TgtDiskFile;
+                    DiskWork.Download = TgtDownload; // retains the file through CancelWork's local copy
                     DiskWork.AppendToFile = TgtDiskFile == NULL && TgtDiskFileAppend;
-                    DiskWork.WriteOrReadFromOffset = TgtDiskFileResumeOffset;
+                    DiskWork.WriteOrReadFromOffset = TgtDiskFileSize;
                     if (FTPDiskThread->AddWork(&DiskWork))
                         DiskWorkIsUsed = TRUE;
                     else // unable to flush the data, cannot continue with the download
@@ -1451,7 +1459,8 @@ void CDataConnectionSocket::SetPostMessagesToWorker(BOOL post, int msg, int uid,
 }
 
 void CDataConnectionSocket::SetDirectFlushParams(const char* tgtFileName, CCurrentTransferMode currentTransferMode,
-                                                  const CQuadWord& resumeOffset)
+                                                  const CQuadWord& resumeOffset,
+                                                  const std::shared_ptr<CFtpTransactionalDownload>& download)
 {
     CALL_STACK_MESSAGE1("CDataConnectionSocket::SetDirectFlushParams()");
 
@@ -1462,6 +1471,10 @@ void CDataConnectionSocket::SetDirectFlushParams(const char* tgtFileName, CCurre
     TgtDiskFileResumeOffset = resumeOffset;
     TgtDiskFileAppend = resumeOffset != CQuadWord(0, 0);
     TgtDiskFileSize = resumeOffset;
+    // Direct and queued downloads use the same owned stage, including empty files.
+    TgtDownload = download;
+    TgtDiskFile = download ? download->File() : NULL;
+    TgtDiskFileCreated = TgtDiskFile != NULL && TgtDiskFile != INVALID_HANDLE_VALUE;
     HANDLES(LeaveCriticalSection(&SocketCritSect));
 }
 
@@ -1530,8 +1543,12 @@ void CDataConnectionSocket::CloseTgtFile()
         }
         if (TgtDiskFile != NULL)
         {
-            FTPDiskThread->AddFileToClose("", TgtDiskFileName, TgtDiskFile, FALSE, FALSE, NULL, NULL,
-                                          FALSE, NULL, &TgtDiskFileCloseIndex);
+            if (!FTPDiskThread->AddFileToClose("", TgtDiskFileName, TgtDiskFile, FALSE, FALSE, NULL, NULL,
+                                          FALSE, NULL, &TgtDiskFileCompletion, TgtDownload))
+            {
+                const DWORD error = GetLastError();
+                TgtFileLastError = TgtCloseSubmissionError = error != ERROR_SUCCESS ? error : ERROR_NOT_ENOUGH_MEMORY;
+            }
             TgtDiskFile = NULL; // the closing is only scheduled, but we will no longer work with the file
         }
         TgtDiskFileClosed = TRUE;
@@ -1544,12 +1561,24 @@ BOOL CDataConnectionSocket::WaitForFileClose(DWORD timeout)
     CALL_STACK_MESSAGE2("CDataConnectionSocket::WaitForFileClose(%u)", timeout);
 
     HANDLES(EnterCriticalSection(&SocketCritSect));
-    int tgtDiskFileCloseIndex = TgtDiskFileCloseIndex;
+    const std::shared_ptr<CFileCloseCompletion> completion = TgtDiskFileCompletion;
+    const DWORD submissionError = TgtCloseSubmissionError;
+    // A staged download always requires an accepted completion token. Clearing
+    // a borrowed handle after rejected admission cannot mean successful close.
+    const BOOL closedWithoutFile = !TgtDownload && TgtDiskFileClosed && TgtDiskFile == NULL && !DiskWorkIsUsed;
     HANDLES(LeaveCriticalSection(&SocketCritSect));
 
-    if (tgtDiskFileCloseIndex != -1)
-        return FTPDiskThread->WaitForFileClose(tgtDiskFileCloseIndex, timeout);
-    return FALSE; // the file probably was not opened at all (or the closing+delete is handled on the disk-work thread - cancellation during the first create+flush disk job)
+    // Waiting never holds the socket lock. A timeout does not authorize stage reuse.
+    DWORD error = submissionError;
+    if (error == ERROR_SUCCESS && completion)
+    {
+        const BOOL completed = completion->Wait(timeout, error);
+        SetLastError(error);
+        return completed && error == ERROR_SUCCESS;
+    }
+    if (error == ERROR_SUCCESS && !closedWithoutFile) error = ERROR_IO_PENDING;
+    SetLastError(error);
+    return error == ERROR_SUCCESS;
 }
 
 void CDataConnectionSocket::SetDataTotalSize(CQuadWord const& size)

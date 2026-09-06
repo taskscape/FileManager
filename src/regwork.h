@@ -29,6 +29,16 @@ void EndConfigurationWriteFaultInjection();
 // Wraps a successful structural commit mutation with a name that remains stable as snapshot size changes.
 BOOL PassConfigurationTransactionFaultPoint(BOOL succeeded, const char* phase);
 LONG FlushConfigurationRegistryKey(HKEY key);
+// The save owns this scope across UI and registry-worker calls. Any required
+// payload failure prevents a later successful write from legitimizing the tree.
+void BeginConfigurationPayloadWrites();
+LONG EndConfigurationPayloadWrites();
+BOOL ConfigurationPayloadWritesSucceeded();
+void RecordConfigurationPayloadFailure(LONG error);
+// Bounded, isolated two-process startup/save interleavings; inert without the
+// dedicated profile, selected phase, and a one-use file in the owned sandbox.
+BOOL ConfigurationRetirementTestBarrier(const char* phase);
+void ReportConfigurationSaveIdleForTest(BOOL success);
 const DWORD CONFIGURATION_WRITE_FAULT_EXIT_CODE = 121;
 
 enum CRegistryWorkType
