@@ -86,7 +86,7 @@ public sealed class FilterCompareAttributesUiTests : FileOperationUiTestBase
         var compareTarget = Workspace.TargetPath("cmp-right");
         WaitForCommandEnabled(NativeCommands.CopyFiles);
         NativeCommands.Execute(MainWindow.Properties.NativeWindowHandle.Value, NativeCommands.CopyFiles);
-        var copyDialog = WaitForOperationDialog();
+        var copyDialog = WaitForOperationDialog(NativeCommands.CopyFiles);
         SetDialogPath(copyDialog, compareTarget);
         NativeCommands.PostDialogButtonClick(copyDialog.Properties.NativeWindowHandle.Value, 1);
         WaitForWindowToClose(copyDialog);
@@ -182,7 +182,7 @@ public sealed class FilterCompareAttributesUiTests : FileOperationUiTestBase
         SelectSourceItem("mask-tree");
         WaitForCommandEnabled(NativeCommands.CopyFiles);
         NativeCommands.Execute(MainWindow.Properties.NativeWindowHandle.Value, NativeCommands.CopyFiles);
-        var dialog = WaitForOperationDialog();
+        var dialog = WaitForOperationDialog(NativeCommands.CopyFiles);
         SetDialogPath(dialog, Workspace.TargetDirectory);
         SetCopyNamedMask(dialog, "*.txt");
         CloseDialog(dialog, commit: true);

@@ -30,7 +30,7 @@ public sealed class ArchiveOperationUiTests : FileOperationUiTestBase
         SelectSourceItems("pack-one.txt", "pack-two.txt");
         WaitForCommandEnabled(NativeCommands.Pack);
         NativeCommands.Execute(MainWindow.Properties.NativeWindowHandle.Value, NativeCommands.Pack);
-        var packDialog = WaitForOperationDialog();
+        var packDialog = WaitForOperationDialog(NativeCommands.Pack);
         SetDialogPath(packDialog, Path.Combine(Workspace.TargetDirectory, "session.zip"));
         NativeCommands.SetDialogCheckBoxState(packDialog.Properties.NativeWindowHandle.Value,
                                               NativeCommands.PackMoveFiles, isChecked: false);
@@ -53,7 +53,7 @@ public sealed class ArchiveOperationUiTests : FileOperationUiTestBase
         SelectTargetItem("session.zip");
         WaitForCommandEnabled(NativeCommands.Unpack);
         NativeCommands.Execute(MainWindow.Properties.NativeWindowHandle.Value, NativeCommands.Unpack);
-        var unpackDialog = WaitForOperationDialog();
+        var unpackDialog = WaitForOperationDialog(NativeCommands.Unpack);
         var unpackRoot = Workspace.SourcePath("unpacked-session");
         SetDialogPath(unpackDialog, unpackRoot);
         NativeCommands.SetDialogCheckBoxState(unpackDialog.Properties.NativeWindowHandle.Value,
@@ -101,7 +101,7 @@ public sealed class ArchiveOperationUiTests : FileOperationUiTestBase
         SelectSourceItem(ZipName);
         WaitForCommandEnabled(NativeCommands.Unpack);
         NativeCommands.Execute(MainWindow.Properties.NativeWindowHandle.Value, NativeCommands.Unpack);
-        var unpackDialog = WaitForOperationDialog();
+        var unpackDialog = WaitForOperationDialog(NativeCommands.Unpack);
         var unpackRoot = Workspace.TargetPath("unpacked-zip");
         SetDialogPath(unpackDialog, unpackRoot);
         NativeCommands.SetDialogCheckBoxState(unpackDialog.Properties.NativeWindowHandle.Value,

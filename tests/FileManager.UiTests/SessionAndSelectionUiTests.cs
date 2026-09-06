@@ -66,7 +66,7 @@ public sealed class SessionAndSelectionUiTests : FileOperationUiTestBase
             "Copy into the created session folder did not release the destination.");
 
         NativeCommands.Execute(MainWindow.Properties.NativeWindowHandle.Value, NativeCommands.ChangeDirectory);
-        var changeDir = WaitForOperationDialog();
+        var changeDir = WaitForOperationDialog(NativeCommands.ChangeDirectory);
         SetDialogPath(changeDir, Workspace.SourcePath("created\\session"));
         CloseDialog(changeDir, commit: true);
         WaitForMainWindowTitleContaining("session",

@@ -643,12 +643,24 @@ public abstract class FileManagerUiTestBase
 
     protected Window WaitForWindow(Func<Window, bool> predicate)
     {
-        UiTestTrace.Record("WAIT", "window.open timeout=10s");
-        var timeout = DateTime.UtcNow + TimeSpan.FromSeconds(10);
+        var dialog = WaitForWindowOrNull(predicate, 10_000);
+        if (dialog is null)
+        {
+            FailWaitForWindow();
+            return null!; // unreachable; Assert.Fail throws
+        }
+        return dialog;
+    }
+
+    // Bounded variant for callers that can recover from a missed window (for example
+    // by re-posting a swallowed command); returns null instead of failing the case.
+    protected Window? WaitForWindowOrNull(Func<Window, bool> predicate, int timeoutMilliseconds)
+    {
+        UiTestTrace.Record("WAIT", $"window.open timeout={timeoutMilliseconds}ms");
+        var timeout = DateTime.UtcNow + TimeSpan.FromMilliseconds(timeoutMilliseconds);
         while (DateTime.UtcNow < timeout)
         {
             // Convert handles one at a time because one stale provider must not abort discovery of another live dialog.
-            Window? dialog = null;
             foreach (var windowHandle in NativeCommands.GetTopLevelWindows(Application.ProcessId))
             {
                 // Modal CMessageBox leaves the owner's UIA provider timing out; callers already exclude the main window by handle.
@@ -659,8 +671,9 @@ public abstract class FileManagerUiTestBase
                     var candidate = Automation.FromHandle(windowHandle).AsWindow();
                     if (predicate(candidate))
                     {
-                        dialog = candidate;
-                        break;
+                        UiTestTrace.Record("WAIT",
+                                           $"window.open satisfied hwnd=0x{candidate.Properties.NativeWindowHandle.Value:X} title=\"{candidate.Title}\"");
+                        return candidate;
                     }
                 }
                 catch (Exception ex) when (ex is ElementNotAvailableException || ex is COMException || ex is TimeoutException)
@@ -668,22 +681,20 @@ public abstract class FileManagerUiTestBase
                     // A native window can close or its UIA provider can detach between enumeration and conversion; retry the remaining live handles.
                 }
             }
-            if (dialog is not null)
-            {
-                UiTestTrace.Record("WAIT",
-                                   $"window.open satisfied hwnd=0x{dialog.Properties.NativeWindowHandle.Value:X} title=\"{dialog.Title}\"");
-                return dialog;
-            }
 
             Thread.Sleep(100);
         }
 
-        // Naming what was on screen instead separates "the prompt never appeared"
-        // from "the prompt appeared but did not match", which the bare timeout
-        // message left indistinguishable.
+        return null;
+    }
+
+    // Naming what was on screen instead separates "the prompt never appeared"
+    // from "the prompt appeared but did not match", which the bare timeout
+    // message left indistinguishable.
+    protected void FailWaitForWindow()
+    {
         var titles = string.Join(", ", NativeCommands.GetTopLevelWindowTitles(Application.ProcessId));
         Assert.Fail($"Timed out waiting for the requested FileManager window. Open FileManager windows: {(titles.Length == 0 ? "none" : titles)}.");
-        return null!;
     }
 
     protected static void WaitForWindowToClose(Window dialog)

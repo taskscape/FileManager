@@ -300,6 +300,13 @@ internal static class NativeCommands
         return IsWindow(windowHandle);
     }
 
+    internal static bool IsWindowEnabledWindow(nint windowHandle)
+    {
+        // Callers distinguish "no modal dialog is up" from "a modal dialog owns input"
+        // through the owner's enabled state before re-posting a swallowed command.
+        return IsWindow(windowHandle) && IsWindowEnabled(windowHandle);
+    }
+
     internal static bool HasOperationPathControl(nint dialogHandle)
     {
         // The legacy copy/move templates use IDE_PATH even when UIA omits the inner edit of a combo box.

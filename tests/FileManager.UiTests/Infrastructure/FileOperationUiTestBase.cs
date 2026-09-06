@@ -272,7 +272,7 @@ public abstract class FileOperationUiTestBase : FileManagerUiTestBase
             SelectSourceItem(sourceName);
         WaitForCommandEnabled(command);
         NativeCommands.Execute(NativeMainWindowHandle, command);
-        var dialog = WaitForOperationDialog();
+        var dialog = WaitForOperationDialog(command);
         SetDialogPath(dialog, path);
         CloseDialog(dialog, commit);
         return dialog;
@@ -283,7 +283,7 @@ public abstract class FileOperationUiTestBase : FileManagerUiTestBase
         SelectSourceItem(sourceName);
         WaitForCommandEnabled(command);
         NativeCommands.Execute(NativeMainWindowHandle, command);
-        return WaitForOperationDialog();
+        return WaitForOperationDialog(command);
     }
 
     protected Window WaitForOperationPrompt(int buttonId)
@@ -625,22 +625,57 @@ public abstract class FileOperationUiTestBase : FileManagerUiTestBase
             SelectSourceItem(sourceName);
         WaitForCommandEnabled(command);
         NativeCommands.Execute(NativeMainWindowHandle, command);
-        var dialog = WaitForOperationDialog();
+        var dialog = WaitForOperationDialog(command);
         SetDialogPath(dialog, path);
         NativeCommands.ClickDialogButton(dialog.Properties.NativeWindowHandle.Value, 1);
         return dialog;
     }
 
+    // Filter native top-level windows by IDE_PATH so ComboLBox helpers and progress prompts cannot be mistaken for the input dialog.
+    // The main window must be excluded explicitly: the control lookup falls back
+    // to a recursive child scan, so a descendant of the panel window can carry the
+    // same control id and be mistaken for the operation dialog. The text then goes
+    // to the wrong control while the real dialog is submitted with its default.
+    private bool IsOperationDialog(Window window) =>
+        window.Properties.NativeWindowHandle.Value != NativeMainWindowHandle &&
+        NativeCommands.HasOperationPathControl(window.Properties.NativeWindowHandle.Value);
+
     protected Window WaitForOperationDialog()
     {
-        // Filter native top-level windows by IDE_PATH so ComboLBox helpers and progress prompts cannot be mistaken for the input dialog.
-        // The main window must be excluded explicitly: the control lookup falls back
-        // to a recursive child scan, so a descendant of the panel window can carry the
-        // same control id and be mistaken for the operation dialog. The text then goes
-        // to the wrong control while the real dialog is submitted with its default.
-        return WaitForWindow(window =>
-            window.Properties.NativeWindowHandle.Value != NativeMainWindowHandle &&
-            NativeCommands.HasOperationPathControl(window.Properties.NativeWindowHandle.Value));
+        return WaitForWindow(IsOperationDialog);
+    }
+
+    // A posted WM_COMMAND can transiently arrive while the panel is between idle
+    // refreshes: the toolbar still reports the command enabled, yet the handler
+    // reads a stale enabler or an intermediate listing and returns without opening
+    // any dialog or prompt. A user simply triggers the command again, so after the
+    // caller's own post stayed silent for one wait window this helper re-posts
+    // 'postedCommand' on a bounded budget instead of failing the case on one lost
+    // message. The first pass must not post: callers already did, and a duplicate
+    // would open a second dialog that later operation waits would then match. The
+    // re-post is skipped while the main window is disabled because that means a
+    // modal dialog is already up (possibly mid-initialization) and the wait must
+    // observe it rather than queue a duplicate command behind it. A genuinely
+    // broken dialog still ends in the standard WaitForWindow timeout diagnostics.
+    protected Window WaitForOperationDialog(int postedCommand)
+    {
+        const int repostWaitMilliseconds = 4000;
+        var retryDeadline = DateTime.UtcNow + TimeSpan.FromSeconds(20);
+        bool firstPass = true;
+        while (true)
+        {
+            if (!firstPass && postedCommand != 0 && NativeCommands.IsWindowEnabledWindow(NativeMainWindowHandle))
+                NativeCommands.Execute(NativeMainWindowHandle, postedCommand);
+            firstPass = false;
+            var dialog = WaitForWindowOrNull(IsOperationDialog, repostWaitMilliseconds);
+            if (dialog is not null)
+                return dialog;
+            if (DateTime.UtcNow >= retryDeadline)
+            {
+                FailWaitForWindow();
+                return null!; // unreachable; Assert.Fail throws
+            }
+        }
     }
 
     protected Window WaitForDialogWithControl(int controlId)

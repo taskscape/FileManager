@@ -85,7 +85,7 @@ public sealed class PanelNavigationUiTests : FileOperationUiTestBase
     public void Change_directory_to_the_sandbox_target_then_copy_from_that_path()
     {
         NativeCommands.Execute(MainWindow.Properties.NativeWindowHandle.Value, NativeCommands.ChangeDirectory);
-        var dialog = WaitForOperationDialog();
+        var dialog = WaitForOperationDialog(NativeCommands.ChangeDirectory);
         SetDialogPath(dialog, Workspace.TargetDirectory);
         CloseDialog(dialog, commit: true);
         WaitForMainWindowTitleContaining("target",

@@ -2446,6 +2446,7 @@ CWaitWindow::CWaitWindow(HWND hParent, int textResID, BOOL showCloseButton, CObj
     ShowProgressBar = showProgressBar;
     BarMax = 0;
     BarPos = 0;
+    WidthMultiplier = 1; // default keeps the window fitted to the current text
     NeedWrap = FALSE;
     CacheBitmap = NULL;
 }
@@ -2492,6 +2493,11 @@ void CWaitWindow::SetCaption(const char* text)
     if (Caption != NULL)
         free(Caption);
     Caption = DupStr(text);
+}
+
+void CWaitWindow::SetWidthMultiplier(int multiplier)
+{
+    WidthMultiplier = max(1, multiplier); // a multiplier below 1 would shrink the window below the text size
 }
 
 #define WAITWINDOW_HMARGIN 21
@@ -2556,6 +2562,12 @@ HWND CWaitWindow::Create(HWND hForegroundWnd)
 
     int width = TextSize.cx + 2 * WAITWINDOW_HMARGIN;
     int height = TextSize.cy + 2 * WAITWINDOW_VMARGIN;
+
+    if (WidthMultiplier > 1)
+    {
+        // the window must stay on-screen even when the multiplier enlarges it past the monitor width
+        width = min(width * WidthMultiplier, scrW);
+    }
 
     if (ShowProgressBar)
     {

@@ -51,7 +51,7 @@ public sealed class FileOperationUiTests : FileOperationUiTestBase
         // Dispatch without the harness's settling sleeps or toolbar wait: the
         // command must observe the new caret even before the next idle update.
         NativeCommands.Execute(NativeMainWindowHandle, NativeCommands.CopyFiles);
-        var dialog = WaitForOperationDialog();
+        var dialog = WaitForOperationDialog(NativeCommands.CopyFiles);
         SetDialogPath(dialog, Workspace.TargetDirectory);
         CloseDialog(dialog, commit: true);
 
