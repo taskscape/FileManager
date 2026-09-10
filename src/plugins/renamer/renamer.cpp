@@ -81,10 +81,13 @@ BOOL ErrorHelper(HWND parent, const char* message, int lastError, va_list arglis
     vsprintf(buf, message, arglist);
     if (lastError != ERROR_SUCCESS)
     {
-        // buf is a terminated local diagnostic buffer before FormatMessage appends the system text.
+        // Salamander's dialog uses UTF-8; the standalone MessageBox fallback retains its ANSI contract.
         int l = static_cast<int>(strlen(buf));
-        FormatMessage(FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS, NULL, lastError,
-                      MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), buf + l, 1024 - l, NULL);
+        if (SG)
+            SG->GetErrorText(lastError, buf + l, 1024 - l);
+        else
+            FormatMessageA(FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS, NULL, lastError,
+                           MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), buf + l, 1024 - l, NULL);
     }
     if (SG)
     {

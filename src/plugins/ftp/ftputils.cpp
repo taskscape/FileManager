@@ -943,17 +943,28 @@ BOOL FTPHasTheSameRootPath(const char* p1, const char* p2, int userLength)
 
 char* FTPGetErrorText(int err, char* buf, int bufSize)
 {
+    if (buf == NULL || bufSize <= 0)
+        return buf;
+
     int l = 0;
     if (bufSize > 20)
         l = sprintf(buf, "(%d) ", err);
-    if (FormatMessage(FORMAT_MESSAGE_FROM_SYSTEM,
-                      NULL,
-                      err,
-                      MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
-                      buf + l,
-                      bufSize - l,
-                      NULL) == 0 ||
-        bufSize > l && *(buf + l) == 0)
+    WCHAR* systemText = NULL;
+    DWORD chars = FormatMessageW(FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_IGNORE_INSERTS,
+                                 NULL,
+                                 err,
+                                 MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
+                                 reinterpret_cast<LPWSTR>(&systemText),
+                                 0,
+                                 NULL);
+
+    // FTP diagnostics enter UTF-8-aware dialogs, so retain Windows' Unicode text before encoding it for those callers.
+    BOOL haveSystemText = chars != 0 && systemText != NULL && *systemText != 0 &&
+                          WideToUtf8Buffer(systemText, buf + l, bufSize - l);
+    if (systemText != NULL)
+        LocalFree(systemText);
+
+    if (!haveSystemText)
     {
         char txt[100];
         sprintf(txt, "System error %d, text description is not available.", err);

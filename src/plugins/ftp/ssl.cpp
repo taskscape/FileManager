@@ -495,11 +495,13 @@ static bool ViewCertificate(HWND hParent, BYTE* certData, int certDataLen, BYTE*
 
 static void SecurityStatusText(SECURITY_STATUS status, char* buffer, int bufferSize)
 {
-    if (bufferSize <= 0)
+    if (buffer == NULL || bufferSize <= 0)
         return;
-    DWORD chars = FormatMessageA(FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
-                                 NULL, status, 0, buffer, bufferSize, NULL);
-    if (chars == 0)
+    WCHAR systemText[256];
+    // TLS diagnostics are logged through UTF-8 buffers, so convert localized system text explicitly.
+    DWORD chars = FormatMessageW(FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
+                                 NULL, status, 0, systemText, _countof(systemText), NULL);
+    if (chars == 0 || !WideToUtf8Buffer(systemText, buffer, bufferSize))
         _snprintf_s(buffer, bufferSize, _TRUNCATE, "SChannel status 0x%08lX", (DWORD)status);
 }
 

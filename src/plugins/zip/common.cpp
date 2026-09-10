@@ -680,11 +680,8 @@ int CZipCommon::ProcessError(int errorID, int lastError, const char* fileName,
         {
             char lastErrorBuf[1024]; //temp variable
             *lastErrorBuf = 0;
-            FormatMessage(FORMAT_MESSAGE_FROM_SYSTEM |
-                              FORMAT_MESSAGE_IGNORE_INSERTS,
-                          NULL, lastError,
-                          MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), // Default language
-                          lastErrorBuf, 1024, NULL);
+            // The extraction error dialog consumes UTF-8 text from the plug-in API.
+            SalamanderGeneral->GetErrorText(lastError, lastErrorBuf, _countof(lastErrorBuf));
             if (extText)
                 sprintf(errorBuf, "%s\n%s\n%s", LoadStr(errorID), lastErrorBuf, extText);
             else
@@ -2581,9 +2578,10 @@ char* FormatMessage(char* buffer, int errorID, int lastError)
         buffer[0] = 0;
     const size_t prefixLength = strlen(buffer);
     if (lastError && prefixLength < 511)
-        ::FormatMessage(FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS, NULL, lastError,
-                        MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), buffer + prefixLength,
-                        static_cast<DWORD>(512 - prefixLength), NULL);
+    {
+        // Callers display this legacy buffer in UTF-8 plug-in dialogs.
+        SalamanderGeneral->GetErrorText(lastError, buffer + prefixLength, static_cast<int>(512 - prefixLength));
+    }
     return buffer;
 }
 

@@ -21,8 +21,8 @@ BOOL Error(HWND hParent, int lastErr, int title, int error, ...)
     {
         strcat(buf, " ");
         size_t l = strlen(buf);
-        FormatMessage(FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS, NULL, lastErr,
-                      MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), buf + l, (DWORD)(1024 - l), NULL);
+        // Salamander's message box expects UTF-8 localized system text.
+        SalamanderGeneral->GetErrorText(lastErr, buf + l, static_cast<int>(1024 - l));
     }
     SalamanderGeneral->SalMessageBox(hParent, buf, LoadStr(title), MSGBOXEX_OK | MSGBOXEX_ICONEXCLAMATION);
 
@@ -43,8 +43,8 @@ BOOL SafeReadFile(HANDLE hFile, LPVOID lpBuffer, DWORD nBytesToRead, DWORD* pnBy
         }
         int lastErr = GetLastError();
         char error[1024];
-        FormatMessage(FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS, NULL, lastErr,
-                      MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), error, 1024, NULL);
+        // DialogError renders diagnostics as UTF-8.
+        SalamanderGeneral->GetErrorText(lastErr, error, _countof(error));
         DWORD buttons = skippedReadError == NULL ? BUTTONS_RETRYCANCEL : BUTTONS_RETRYSKIPCANCEL;
         int result = SalamanderGeneral->DialogError(parent, buttons, fileName, error, LoadStr(IDS_READERROR));
         switch (result)
@@ -73,8 +73,8 @@ BOOL SafeWriteFile(HANDLE hFile, LPVOID lpBuffer, DWORD nBytesToWrite, DWORD* pn
     {
         int lastErr = GetLastError();
         char error[1024];
-        FormatMessage(FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS, NULL, lastErr,
-                      MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), error, 1024, NULL);
+        // DialogError renders diagnostics as UTF-8.
+        SalamanderGeneral->GetErrorText(lastErr, error, _countof(error));
         if (SalamanderGeneral->DialogError(parent, BUTTONS_RETRYCANCEL, fileName, error,
                                            LoadStr(IDS_WRITEERROR)) != DIALOG_RETRY)
             return FALSE;
@@ -97,8 +97,8 @@ BOOL SafeOpenCreateFileUtf8Local(LPCTSTR fileName, DWORD desiredAccess, DWORD sh
         strcpy(error, LoadStr(IDS_ERROROPENING));
         strcat(error, ": ");
         size_t l = strlen(error);
-        FormatMessage(FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS, NULL, lastErr,
-                      MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), error + l, (DWORD)(1024 - l), NULL);
+        // DialogError renders diagnostics as UTF-8.
+        SalamanderGeneral->GetErrorText(lastErr, error + l, static_cast<int>(1024 - l));
         int result;
         if (skip == NULL)
             result = SalamanderGeneral->DialogError(parent, BUTTONS_RETRYCANCEL, fileName, error, NULL);

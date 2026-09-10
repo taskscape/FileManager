@@ -425,8 +425,8 @@ void CConnectDialog::InitDrives()
         {
             strcat(buf, " ");
             int l = (int)strlen(buf);
-            FormatMessage(FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS, NULL, err,
-                          MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), buf + l, 1024 - l, NULL);
+            // Salamander's message box expects UTF-8 localized system text.
+            SalamanderGeneral->GetErrorText(err, buf + l, 1024 - l);
         }
         SalamanderGeneral->SalMessageBox(HWindow, buf, String<char>::LoadStr(IDS_UNDELETE), MSGBOXEX_OK);
     }

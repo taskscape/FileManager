@@ -456,9 +456,11 @@ static void FormatSfxDirectoryError(char (&buffer)[512], DWORD error)
         buffer[0] = 0;
     const size_t prefixLength = strlen(buffer);
     if (prefixLength < _countof(buffer) - 1)
-        FormatMessage(FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS, NULL, error,
-                      MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), buffer + prefixLength,
-                      static_cast<DWORD>(_countof(buffer) - prefixLength), NULL);
+    {
+        // This SFX error is presented by a UTF-8 plug-in dialog.
+        SalamanderGeneral->GetErrorText(error, buffer + prefixLength,
+                                        static_cast<int>(_countof(buffer) - prefixLength));
+    }
 }
 
 BOOL LoadSfxLangs(HWND dlg, char* selectedSfxFile, bool isConfig)

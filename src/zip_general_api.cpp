@@ -1244,14 +1244,17 @@ char* CSalamanderGeneral::GetErrorText(int err, char* buf, int bufSize)
     int l = 0;
     if (bufSize > 20)
         l = sprintf(buf, "(%d) ", err);
-    if (FormatMessage(FORMAT_MESSAGE_FROM_SYSTEM,
-                      NULL,
-                      err,
-                      MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
-                      buf + l,
-                      bufSize - l,
-                      NULL) == 0 ||
-        bufSize > l && *(buf + l) == 0)
+    WCHAR systemText[MAX_PATH + 20];
+    // Plug-in caller buffers feed UTF-8 dialogs, so retain localized system text through Unicode conversion.
+    if (FormatMessageW(FORMAT_MESSAGE_FROM_SYSTEM,
+                       NULL,
+                       err,
+                       MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
+                       systemText,
+                       _countof(systemText),
+                       NULL) == 0 ||
+        WideCharToMultiByte(CP_UTF8, 0, systemText, -1, buf + l, bufSize - l, NULL, NULL) == 0 ||
+        *(buf + l) == 0)
     {
         char txt[100];
         sprintf(txt, "System error %d, text description is not available.", err);

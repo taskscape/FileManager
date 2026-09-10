@@ -1182,10 +1182,9 @@ CHexFileViewWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         strcpy(buf, LoadStr(IDS_ACCESFILE2));
         if (lParam != ERROR_SUCCESS)
         {
-            // buf is a terminated local diagnostic buffer before FormatMessage appends the system text.
+            // DialogError renders UTF-8 diagnostics, including localized system text.
             int l = static_cast<int>(strlen(buf));
-            FormatMessage(FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS, NULL, DWORD(lParam),
-                          MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), buf + l, 1024 - l, NULL);
+            SG->GetErrorText(static_cast<int>(lParam), buf + l, 1024 - l);
         }
         if (SG->DialogError(GetParent(HWindow), BUTTONS_RETRYCANCEL, (char*)wParam, buf, LoadStr(IDS_ERROR)) != DIALOG_RETRY)
         {

@@ -51,8 +51,8 @@ BOOL SafeWriteFile(HANDLE hFile, LPVOID lpBuffer, DWORD nBytesToWrite, DWORD* pn
     {
         int lastErr = GetLastError();
         char error[1024];
-        FormatMessage(FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS, NULL, lastErr,
-                      MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), error, 1024, NULL);
+        // DialogError renders diagnostics as UTF-8.
+        SalamanderGeneral->GetErrorText(lastErr, error, _countof(error));
         if (SalamanderGeneral->DialogError(parent == NULL ? SalamanderGeneral->GetMsgBoxParent() : parent, BUTTONS_RETRYCANCEL,
                                            fileName, error, LoadStr(IDS_WRITEERROR)) != DIALOG_RETRY)
             return FALSE;

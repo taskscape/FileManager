@@ -165,10 +165,9 @@ void CFilecompWorker::CException::Raise(int error, int lastError, ...)
     va_end(arglist);
     if (lastError != ERROR_SUCCESS)
     {
-        // buf is a terminated local diagnostic buffer before FormatMessage appends the system text.
+        // The exception reaches UTF-8 UI, so append the localized system text in UTF-8.
         int l = static_cast<int>(strlen(buf));
-        FormatMessage(FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS, NULL, lastError,
-                      MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), buf + l, 1024 - l, NULL);
+        SG->GetErrorText(lastError, buf + l, 1024 - l);
     }
     throw CException(buf);
 }

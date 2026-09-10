@@ -152,17 +152,19 @@ const char* GetInetErrorText(DWORD dError)
     static char tempErrorText[1024];
     tempErrorText[0] = 0;
 
-    DWORD count = FormatMessage(FORMAT_MESSAGE_FROM_HMODULE, GetModuleHandle("wininet.dll"), dError, 0,
-                                tempErrorText, 1024, NULL);
+    WCHAR wideErrorText[1024];
+    // WinINet supplies localized UTF-16 text; the update log stores messages as UTF-8.
+    DWORD count = FormatMessageW(FORMAT_MESSAGE_FROM_HMODULE, GetModuleHandleW(L"wininet.dll"), dError, 0,
+                                 wideErrorText, _countof(wideErrorText), NULL);
 
-    if (count > 0)
+    if (count > 0 && WideCharToMultiByte(CP_UTF8, 0, wideErrorText, -1, tempErrorText,
+                                         _countof(tempErrorText), NULL, NULL) > 0)
     {
-        // trim garbage on the right
-        char* p = tempErrorText + count - 1;
-        while (p > tempErrorText && (*p == '\n' || *p == '\r' || *p == ' '))
+        // Trim ASCII line endings after conversion; a UTF-8 byte length can differ from the UTF-16 count.
+        char* p = tempErrorText + strlen(tempErrorText);
+        while (p > tempErrorText && (p[-1] == '\n' || p[-1] == '\r' || p[-1] == ' '))
         {
-            *p = 0;
-            p--;
+            *--p = 0;
         }
     }
     else

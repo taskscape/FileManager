@@ -2767,6 +2767,63 @@ public sealed class NativeSafetyRegressionTests
     }
 
     [Test]
+    public void Ftp_system_error_text_is_encoded_for_the_utf8_message_box()
+    {
+        var root = FindRepositoryRoot();
+        var ftpUtilities = File.ReadAllText(Path.Combine(root, "src", "plugins", "ftp", "ftputils.cpp"));
+
+        // Windows error messages are localized Unicode; avoid reintroducing ACP bytes into the FTP warning dialog.
+        Assert.Multiple(() =>
+        {
+            Assert.That(ftpUtilities, Does.Contain("FormatMessageW(FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_IGNORE_INSERTS"));
+            Assert.That(ftpUtilities, Does.Contain("WideToUtf8Buffer(systemText, buf + l, bufSize - l)"));
+            Assert.That(ftpUtilities, Does.Contain("LocalFree(systemText)"));
+            Assert.That(ftpUtilities, Does.Not.Contain("FormatMessage(FORMAT_MESSAGE_FROM_SYSTEM,"));
+        });
+    }
+
+    [Test]
+    public void Plugin_system_error_text_uses_utf8_before_reaching_the_ui()
+    {
+        var root = FindRepositoryRoot();
+        string ReadSource(string relativePath) => File.ReadAllText(Path.Combine(root, "src", relativePath));
+        var generalApi = ReadSource("zip_general_api.cpp");
+        var checksum = ReadSource(Path.Combine("plugins", "checksum", "misc.cpp"));
+        var unchm = ReadSource(Path.Combine("plugins", "unchm", "unchm.cpp"));
+        var unchmFile = ReadSource(Path.Combine("plugins", "unchm", "chmfile.cpp"));
+        var undelete = ReadSource(Path.Combine("plugins", "undelete", "dialogs.cpp"));
+        var undeleteLibrary = ReadSource(Path.Combine("plugins", "undelete", "library", "miscstr.cpp"));
+        var fileComparator = ReadSource(Path.Combine("plugins", "filecomp", "worker.cpp"));
+        var fileComparatorView = ReadSource(Path.Combine("plugins", "filecomp", "viewwnd3.cpp"));
+        var renamer = ReadSource(Path.Combine("plugins", "renamer", "renamer.cpp"));
+        var zipCommon = ReadSource(Path.Combine("plugins", "zip", "common.cpp"));
+        var zipDialogs = ReadSource(Path.Combine("plugins", "zip", "dialogs3.cpp"));
+        var checkVer = ReadSource(Path.Combine("plugins", "checkver", "internet.cpp"));
+        var ftpTls = ReadSource(Path.Combine("plugins", "ftp", "ssl.cpp"));
+
+        // These paths send localized Windows diagnostics to UTF-8 dialogs or logs; keep them out of the ACP APIs.
+        Assert.Multiple(() =>
+        {
+            Assert.That(generalApi, Does.Contain("FormatMessageW(FORMAT_MESSAGE_FROM_SYSTEM"));
+            Assert.That(generalApi, Does.Contain("WideCharToMultiByte(CP_UTF8"));
+            Assert.That(checksum, Does.Contain("SalamanderGeneral->GetErrorText(lastErr"));
+            Assert.That(unchm, Does.Contain("SalamanderGeneral->GetErrorText(lastErr"));
+            Assert.That(unchmFile, Does.Contain("SalamanderGeneral->GetErrorText(lastErr"));
+            Assert.That(undelete, Does.Contain("SalamanderGeneral->GetErrorText(err"));
+            Assert.That(undeleteLibrary, Does.Contain("SalamanderGeneral->GetErrorText(lastErr"));
+            Assert.That(fileComparator, Does.Contain("SG->GetErrorText(lastError"));
+            Assert.That(fileComparatorView, Does.Contain("SG->GetErrorText(static_cast<int>(lParam)"));
+            Assert.That(renamer, Does.Contain("SG->GetErrorText(lastError"));
+            Assert.That(zipCommon, Does.Contain("SalamanderGeneral->GetErrorText(lastError"));
+            Assert.That(zipDialogs, Does.Contain("SalamanderGeneral->GetErrorText(error"));
+            Assert.That(checkVer, Does.Contain("FormatMessageW(FORMAT_MESSAGE_FROM_HMODULE"));
+            Assert.That(checkVer, Does.Contain("WideCharToMultiByte(CP_UTF8"));
+            Assert.That(ftpTls, Does.Contain("FormatMessageW(FORMAT_MESSAGE_FROM_SYSTEM"));
+            Assert.That(ftpTls, Does.Contain("WideToUtf8Buffer(systemText, buffer, bufferSize)"));
+        });
+    }
+
+    [Test]
     public void Ftp_downloads_stage_identity_validate_resume_and_publish_only_after_a_durable_commit()
     {
         var root = FindRepositoryRoot();
