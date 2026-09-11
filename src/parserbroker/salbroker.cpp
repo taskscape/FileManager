@@ -156,6 +156,13 @@ static EParserBrokerStatus GetArchiveMetadata(const BYTE* request, DWORD request
 
 static BOOL Serve(HANDLE pipe)
 {
+    // The payload buffers must not live on the stack: two PARSER_BROKER_MAX_PAYLOAD
+    // (1 MB) frames exceeded this executable's default 1 MB stack reserve and crashed
+    // every request with STATUS_STACK_OVERFLOW, which the host reported as a silent
+    // archive-open failure. The broker serves its single pipe from one thread, so the
+    // request/response buffers can be reused across iterations.
+    static BYTE request[PARSER_BROKER_MAX_PAYLOAD];
+    static BYTE response[PARSER_BROKER_MAX_PAYLOAD];
     for (;;)
     {
         CParserBrokerMessageHeader requestHeader;
@@ -164,11 +171,9 @@ static BOOL Serve(HANDLE pipe)
         if (requestHeader.Magic != PARSER_BROKER_MAGIC || requestHeader.Version != PARSER_BROKER_VERSION ||
             requestHeader.PayloadLength > PARSER_BROKER_MAX_PAYLOAD)
             return FALSE;
-        BYTE request[PARSER_BROKER_MAX_PAYLOAD];
         if (requestHeader.PayloadLength != 0 && !ReadExact(pipe, request, requestHeader.PayloadLength))
             return FALSE;
 
-        BYTE response[PARSER_BROKER_MAX_PAYLOAD];
         DWORD responseLength = 0;
         WORD responseType = 0;
         EParserBrokerStatus status = pbsUnsupported;

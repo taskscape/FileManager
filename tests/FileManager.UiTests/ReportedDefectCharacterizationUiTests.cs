@@ -10,6 +10,9 @@ public sealed class ReportedDefectCharacterizationUiTests : FileOperationUiTestB
 {
     private const string ZipName = "zip-open-characterization.zip";
     private const string ZipPayloadName = "zip-open-payload.txt";
+    private const string NestedZipName = "zip-open-browse-characterization.zip";
+    private const string NestedZipFolderName = "zip-open-browse-folder";
+    private const string NestedZipInnerFileName = "zip-open-browse-payload.txt";
 
     protected override void SeedWorkspaceBeforeFileManagerStart(FileOperationWorkspace workspace)
     {
@@ -18,6 +21,16 @@ public sealed class ReportedDefectCharacterizationUiTests : FileOperationUiTestB
         var entry = archive.CreateEntry(ZipPayloadName);
         using var writer = new StreamWriter(entry.Open());
         writer.Write("zip-characterization-content");
+
+        // The browse fixture mirrors the reported scenario with files and folders: the
+        // archive must open and its directory structure must stay navigable afterwards.
+        using var nested = ZipFile.Open(workspace.SourcePath(NestedZipName), ZipArchiveMode.Create);
+        var rootEntry = nested.CreateEntry("zip-open-browse-root.txt");
+        using (var rootWriter = new StreamWriter(rootEntry.Open()))
+            rootWriter.Write("zip-open-browse-root-content");
+        var innerEntry = nested.CreateEntry(NestedZipFolderName + "/" + NestedZipInnerFileName);
+        using (var innerWriter = new StreamWriter(innerEntry.Open()))
+            innerWriter.Write("zip-open-browse-inner-content");
     }
 
     [Test]
@@ -29,13 +42,35 @@ public sealed class ReportedDefectCharacterizationUiTests : FileOperationUiTestB
         NativeCommands.Execute(MainWindow.Properties.NativeWindowHandle.Value, NativeCommands.OpenFile);
         DismissOptionalInformationDialog();
 
-        WaitForFileSystem(
-            () => NativeCommands.GetWindowTitle(MainWindow.Properties.NativeWindowHandle.Value)
-                .Contains(ZipName, StringComparison.OrdinalIgnoreCase),
+        WaitForMainWindowTitleContaining(ZipName,
             "After accepting the ZIP-open message, FileManager did not navigate into the selected archive.");
 
         // Quick search exercises the archive listing after navigation instead of accepting a decorative title change alone.
         SelectSourceItem(ZipPayloadName);
+    }
+
+    [Test]
+    public void Zip_open_browses_folder_contents_after_the_information_dialog()
+    {
+        UiTestSettings.RequireZipPlugin();
+
+        SelectSourceItem(NestedZipName);
+        NativeCommands.Execute(MainWindow.Properties.NativeWindowHandle.Value, NativeCommands.OpenFile);
+        DismissOptionalInformationDialog();
+
+        WaitForMainWindowTitleContaining(NestedZipName,
+            "After accepting the ZIP-open message, FileManager did not navigate into the selected archive.");
+
+        // The archive root must list the seeded folder, proving the reported listing is browsable.
+        SelectSourceItem(NestedZipFolderName);
+
+        // Entering the listed folder must navigate inside the archive instead of failing silently.
+        OpenFocusedItem();
+        WaitForMainWindowTitleContaining(NestedZipFolderName,
+            "Entering the archived folder did not navigate into its contents.");
+
+        // The nested member must be listed inside the folder, so its contents are accessible.
+        SelectSourceItem(NestedZipInnerFileName);
     }
 
     [Test]

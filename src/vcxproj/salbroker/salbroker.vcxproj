@@ -36,6 +36,9 @@
       <SubSystem>Windows</SubSystem>
       <AdditionalDependencies>shell32.lib;ole32.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <GenerateDebugInformation>true</GenerateDebugInformation>
+      <!-- Keep headroom above the default 1 MB reserve so IPC payload handling can never
+           exhaust the stack the way the 2 MB Serve() frame did (STATUS_STACK_OVERFLOW). -->
+      <StackReserveSize>4194304</StackReserveSize>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)'=='Debug'"><ClCompile><PreprocessorDefinitions>_DEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions></ClCompile></ItemDefinitionGroup>

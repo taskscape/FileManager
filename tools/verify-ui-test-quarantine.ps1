@@ -54,7 +54,9 @@ foreach ($entry in @($manifest.tests)) {
         throw "Quarantine entry references a missing source file: $($entry.sourceFile)"
     }
     $source = Get-Content -LiteralPath $sourcePath -Raw
-    $methodPattern = '(?s)\[Test\](?<attributes>.*?)public\s+void\s+' + [regex]::Escape($entry.testName) + '\s*\('
+    # Parameterized cases declare [TestCase] instead of [Test], so inspect the whole attribute
+    # block before the method and accept both spellings when validating quarantine coverage.
+    $methodPattern = '(?s)(?<attributes>(?:\s*\[[^\]]+\]\s*)+)public\s+void\s+' + [regex]::Escape($entry.testName) + '\s*\('
     $matches = [regex]::Matches($source, $methodPattern)
     if ($matches.Count -ne 1) {
         throw "Quarantine entry must identify exactly one [Test] method: $($entry.fullyQualifiedName)"
@@ -66,6 +68,9 @@ foreach ($entry in @($manifest.tests)) {
     }
     if ($attributes -match '\[Ignore(?:\(|\])') {
         throw "Quarantine entry must not use [Ignore]: $($entry.fullyQualifiedName)"
+    }
+    if ($attributes -notmatch '\[Test(?:\]|Case)') {
+        throw ('Quarantine entry is missing a [Test] or [TestCase] attribute: {0}' -f $entry.fullyQualifiedName)
     }
     if (-not $entry.fullyQualifiedName.EndsWith(".$($entry.testName)", [StringComparison]::Ordinal)) {
         throw "Quarantine entry testName does not match its fullyQualifiedName: $($entry.fullyQualifiedName)"
@@ -93,7 +98,8 @@ Get-ChildItem -LiteralPath $uiTestSourceRoot -Filter '*.cs' -Recurse | ForEach-O
     $source = Get-Content -LiteralPath $_.FullName -Raw
     foreach ($match in [regex]::Matches($source, '(?s)(?<attributes>(?:\s*\[[^\]]+\]\s*)+)public\s+void\s+(?<name>[A-Za-z_][A-Za-z0-9_]*)\s*\(')) {
         $attributes = $match.Groups['attributes'].Value
-        if ($attributes -match '\[Test\]' -and $attributes -match '\[Category\("Quarantined"\)\]') {
+        # Mirror the manifest-side pattern: [TestCase] parameterized tests are quarantinable too.
+        if ($attributes -match '\[Test(?:\]|Case)' -and $attributes -match '\[Category\("Quarantined"\)\]') {
             [void]$categorizedLocations.Add($relativePath + '::' + $match.Groups['name'].Value)
         }
     }

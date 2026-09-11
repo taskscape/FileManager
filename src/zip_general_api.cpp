@@ -1244,23 +1244,31 @@ char* CSalamanderGeneral::GetErrorText(int err, char* buf, int bufSize)
     int l = 0;
     if (bufSize > 20)
         l = sprintf(buf, "(%d) ", err);
-    WCHAR systemText[MAX_PATH + 20];
-    // Plug-in caller buffers feed UTF-8 dialogs, so retain localized system text through Unicode conversion.
-    if (FormatMessageW(FORMAT_MESSAGE_FROM_SYSTEM,
+    // Plug-in caller buffers feed UTF-8 dialogs, so retain localized system text through Unicode
+    // conversion. FormatMessageW allocates its own storage because the MAX_PATH ratchet prohibits
+    // a new fixed buffer here, and IGNORE_INSERTS keeps parameterized system messages renderable
+    // without an Arguments array.
+    WCHAR* systemText = NULL;
+    if (FormatMessageW(FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_IGNORE_INSERTS,
                        NULL,
                        err,
                        MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
-                       systemText,
-                       _countof(systemText),
+                       reinterpret_cast<LPWSTR>(&systemText),
+                       0,
                        NULL) == 0 ||
+        systemText == NULL || *systemText == 0 ||
         WideCharToMultiByte(CP_UTF8, 0, systemText, -1, buf + l, bufSize - l, NULL, NULL) == 0 ||
         *(buf + l) == 0)
     {
+        if (systemText != NULL)
+            LocalFree(systemText);
         char txt[100];
         sprintf(txt, "System error %d, text description is not available.", err);
         // Caller-provided error text is a compact presentation field with deliberate clipping.
         StringCchCopyNA(buf, bufSize, txt, bufSize - 1);
     }
+    else
+        LocalFree(systemText);
     return buf;
 }
 

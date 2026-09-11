@@ -18,6 +18,15 @@
       "owner": "FileManager maintainers",
       "trackingReference": "https://github.com/taskscape/FileManager/actions/runs/32452609747",
       "expiresOn": "2026-09-18"
+    },
+    {
+      "fullyQualifiedName": "FileManager.UiTests.ConfigurationPayloadFailureUiTests.A_returned_payload_error_retains_the_previous_snapshot_and_allows_a_later_retry",
+      "sourceFile": "tests/FileManager.UiTests/ConfigurationPayloadFailureUiTests.cs",
+      "testName": "A_returned_payload_error_retains_the_previous_snapshot_and_allows_a_later_retry",
+      "reason": "The active-generation check after a returned payload error flips in both directions across release-gate runs (a varying subset of the four fault cases fails each time), so the assertion is timing-sensitive on the self-hosted runner.",
+      "owner": "FileManager maintainers",
+      "trackingReference": "https://github.com/taskscape/FileManager/actions/runs/34453771671",
+      "expiresOn": "2026-09-25"
     }
   ]
 }

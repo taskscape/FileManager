@@ -8,11 +8,16 @@ namespace FileManager.UiTests;
 [NonParallelizable]
 public sealed class ConfigurationPayloadFailureUiTests : FileManagerUiTestBase
 {
+    // Quarantined: the active-generation assertion at the retained-snapshot check flips in both
+    // directions across release-gate runs (runs 34008707042, 34056775024, 34453771671) while the
+    // fault-injected save is still armed, so the release gate cannot rely on this timing yet.
+    // The quarantined-ui-tests monitor keeps executing these cases for diagnosis.
     [TestCase("value:Title bar prefix text", false)]
     [TestCase("key:Panel Items Hilighting", false)]
     [TestCase("value:Title bar prefix text", true)]
     [TestCase("key:Panel Items Hilighting", true)]
     [Category("FaultInjection")]
+    [Category("Quarantined")]
     public void A_returned_payload_error_retains_the_previous_snapshot_and_allows_a_later_retry(string fault, bool retry)
     {
         UiTestSettings.RequireConfigurationFaultInjection();
