@@ -37,8 +37,7 @@ public sealed class FtpDownloadReliabilityUiTests : FileOperationUiTestBase
         AssertOriginal();
         Assert.That(server.DeleteReceived.Task.IsCompleted, Is.False, "Remote deletion preceded local completion.");
         File.WriteAllText(Marker("release"), "continue");
-        await WaitFor(() => File.Exists(Marker("completed")), "FTP finalization did not finish after release.");
-        Assert.That(File.ReadAllText(Marker("completed")), Is.EqualTo("0"));
+        await WaitFor(() => ReadMarker("completed") == "0", "FTP finalization did not finish after release.");
         WaitForOperationOutputToBeReleased(Target, "FTP publication did not release the local target.");
         Assert.That(File.ReadAllBytes(Target), Is.EqualTo(server.Payload));
         if (move) await WaitFor(() => server.DeleteReceived.Task.IsCompleted, "Durable FTP move did not delete the remote fixture.");
@@ -59,8 +58,9 @@ public sealed class FtpDownloadReliabilityUiTests : FileOperationUiTestBase
         AssertOriginal();
         File.WriteAllText(Marker("arm"), "armed");
         server.ReleaseTransfer.TrySetResult();
-        await WaitFor(() => File.Exists(Marker("completed")), "FTP did not exercise its selected local failure.");
-        Assert.That(File.ReadAllText(Marker("completed")), Is.Not.EqualTo("0"));
+        string? completion = null;
+        await WaitFor(() => (completion = ReadMarker("completed")) is { Length: > 0 }, "FTP did not exercise its selected local failure.");
+        Assert.That(completion, Is.Not.EqualTo("0"));
         // The failed result has returned to the worker; give its event queue a
         // turn before checking that it cannot advance to the remote DELE state.
         await Task.Delay(300);
@@ -137,8 +137,9 @@ public sealed class FtpDownloadReliabilityUiTests : FileOperationUiTestBase
         server.ReleaseTransfer.TrySetResult();
         if (rejectCloseAdmission)
         {
-            await WaitFor(() => File.Exists(Marker("completed")), "Direct FTP view did not exercise close admission failure.");
-            Assert.That(File.ReadAllText(Marker("completed")), Is.Not.EqualTo("0"));
+            string? completion = null;
+            await WaitFor(() => (completion = ReadMarker("completed")) is { Length: > 0 }, "Direct FTP view did not exercise close admission failure.");
+            Assert.That(completion, Is.Not.EqualTo("0"));
             await Task.Delay(300);
             Assert.That(File.Exists(target), Is.False, "Failed disk completion published the viewer cache.");
             Assert.That(File.Exists(metadata[..^5]), Is.True, "Failed disk completion lost its private staged bytes.");
@@ -212,6 +213,23 @@ public sealed class FtpDownloadReliabilityUiTests : FileOperationUiTestBase
     }
 
     private void AssertOriginal() => Assert.That(ReadShared(Target), Is.EqualTo(Original));
+    private static string? ReadMarker(string name)
+    {
+        var path = Marker(name);
+        if (!File.Exists(path)) return null;
+
+        try
+        {
+            // The worker creates the marker before it closes its write handle, so
+            // share reads and retry through WaitFor instead of racing File.ReadAllText.
+            return Encoding.UTF8.GetString(ReadShared(path));
+        }
+        catch (IOException)
+        {
+            return null;
+        }
+    }
+
     private static byte[] ReadShared(string path)
     {
         using var file = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
