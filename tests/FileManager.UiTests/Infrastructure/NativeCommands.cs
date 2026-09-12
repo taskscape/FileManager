@@ -24,12 +24,19 @@ internal static class NativeCommands
     internal const int RenameFile = 754;
     // CM_ACTIVEREFRESH synchronously refreshes the active file panel before a test quick-searches newly created files.
     internal const int RefreshActivePanel = 740;
+    // CM_TOGGLEMIDDLETOOLBAR exposes the documented default middle-bar commands in a fresh disposable profile.
+    internal const int ToggleMiddleToolbar = 860;
     // CM_SWAPPANELS exchanges the two panel paths so Copy can be driven in the opposite direction.
     internal const int SwapPanels = 783;
     // CM_ACTIVEPARENTDIR / CM_ACTIVE_CHANGEDIR / CM_CHANGEFILTER keep navigation on the active panel.
     internal const int ParentDirectory = 822;
     internal const int ChangeDirectory = 862;
     internal const int ChangeFilter = 779;
+    // CM_ACTIVEBACK / CM_ACTIVEFORWARD replay the active panel's native path-history stack.
+    internal const int ActiveBack = 832;
+    internal const int ActiveForward = 833;
+    // CM_ACTIVE_AS_OTHER changes only the active panel to the other panel's current path.
+    internal const int ActiveAsOtherPanel = 847;
     internal const int SelectByMask = 841;
     internal const int SelectAll = 842;
     // CM_ACTIVEUNSELECTALL prevents a stale selection from being combined with the item a test is about to mark.
@@ -91,8 +98,11 @@ internal static class NativeCommands
     private const uint BmGetCheck = 0x00F0;
     private const uint BmSetCheck = 0x00F1;
     private const uint BmClick = 0x00F5;
+    // Legacy standard-toolbars remain visible in some dialogs, so retain their state-query constants alongside the custom main-toolbar path.
     private const uint TbIsButtonEnabled = 0x0409;
     private const uint TbCommandToIndex = 0x0419;
+    private const int DefaultMiddleToolbarButtonCount = 18;
+    private const string UniversalWindowClass = "WinLib Universal Window2";
     private const int ConfigurationClearReadOnlyCheckBox = 304;
     internal const int OperationPathControl = 210;
     private const int VkEscape = 0x1B;
@@ -508,6 +518,83 @@ internal static class NativeCommands
         return enabled;
     }
 
+    internal static bool HasDefaultMiddleToolbar(nint windowHandle) => FindDefaultMiddleToolbar(windowHandle) != 0;
+
+    internal static bool TryInvokeToolbarCommand(nint windowHandle, int command, out string failure)
+    {
+        var index = command switch
+        {
+            CreateDirectory => 0,
+            FindFiles => 1,
+            SwapPanels => 2,
+            CopyFiles => 3,
+            ViewFile => 12,
+            _ => -1,
+        };
+        if (index < 0)
+        {
+            failure = $"Command {DescribeCommand(command)} ({command}) is not in the documented default middle-toolbar layout.";
+            return false;
+        }
+
+        var toolbar = FindDefaultMiddleToolbar(windowHandle);
+        if (toolbar == 0)
+        {
+            failure = "The main window did not expose the visible default middle toolbar.";
+            return false;
+        }
+
+        if (!GetClientRect(toolbar, out var rectangle) || rectangle.Right <= rectangle.Left || rectangle.Bottom <= rectangle.Top)
+        {
+            failure = $"Default middle toolbar command {DescribeCommand(command)} ({command}) has no clickable client rectangle.";
+            return false;
+        }
+
+        var cellHeight = rectangle.Right - rectangle.Left;
+        if (cellHeight <= 0 || (long)cellHeight * DefaultMiddleToolbarButtonCount > rectangle.Bottom - rectangle.Top)
+        {
+            failure = "Default middle toolbar does not expose the complete equal-height default button stack.";
+            return false;
+        }
+
+        var x = rectangle.Left + cellHeight / 2;
+        var y = rectangle.Top + index * cellHeight + cellHeight / 2;
+        var point = unchecked((nint)((y << 16) | (x & 0xffff)));
+        TraceAction("click-toolbar-command", toolbar,
+                    $"command={DescribeCommand(command)}({command}) index={index} x={x} y={y}");
+        // The default vertical bar's square icon cells use its client width as their height; this avoids treating its unused lower area as buttons.
+        if (!PostMessage(toolbar, WmLButtonDown, 0, point) || !PostMessage(toolbar, WmLButtonUp, 0, point))
+        {
+            failure = $"Could not queue a mouse click for default middle-toolbar command {DescribeCommand(command)} ({command}).";
+            return false;
+        }
+
+        failure = string.Empty;
+        return true;
+    }
+
+    private static nint FindDefaultMiddleToolbar(nint windowHandle)
+    {
+        nint toolbar = 0;
+        // The host uses one shared WinLib class for panels and toolbars, so identify the middle bar by its narrow vertical geometry.
+        EnumChildWindows(windowHandle, (childHandle, _) =>
+        {
+            if (!IsWindowVisible(childHandle) || !string.Equals(GetWindowClass(childHandle), UniversalWindowClass, StringComparison.Ordinal) ||
+                !GetClientRect(childHandle, out var rectangle))
+                return true;
+
+            var width = rectangle.Right - rectangle.Left;
+            var height = rectangle.Bottom - rectangle.Top;
+            if (width > 0 && width <= 96 && height >= 200 && height >= width * 6)
+            {
+                toolbar = childHandle;
+                return false;
+            }
+            return true;
+        }, 0);
+        return toolbar;
+    }
+
     internal static void ClickDialogButton(nint dialogHandle, int controlId)
     {
         TraceAction("click-dialog-button", dialogHandle, $"control={controlId}");
@@ -854,10 +941,14 @@ internal static class NativeCommands
         HelpSearch => nameof(HelpSearch),
         RenameFile => nameof(RenameFile),
         RefreshActivePanel => nameof(RefreshActivePanel),
+        ToggleMiddleToolbar => nameof(ToggleMiddleToolbar),
         SwapPanels => nameof(SwapPanels),
         ParentDirectory => nameof(ParentDirectory),
         ChangeDirectory => nameof(ChangeDirectory),
         ChangeFilter => nameof(ChangeFilter),
+        ActiveBack => nameof(ActiveBack),
+        ActiveForward => nameof(ActiveForward),
+        ActiveAsOtherPanel => nameof(ActiveAsOtherPanel),
         SelectByMask => nameof(SelectByMask),
         SelectAll => nameof(SelectAll),
         UnselectAll => nameof(UnselectAll),
