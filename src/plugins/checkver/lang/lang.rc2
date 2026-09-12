@@ -70,5 +70,9 @@ STRINGTABLE
  IDS_FILE_OPENERROR, "Unable to open file '%s'."
  IDS_FILE_READERROR, "Unable to read from the file '%s'."
  IDS_FILE_OPENED, "File %s was successfully read."
+ IDS_APP_UPDATE_CHECKING, "Checking for an Open Salamander update..."
+ IDS_APP_UPDATE_AVAILABLE, "An Open Salamander update is available. Choose Help > Download update to open it."
+ IDS_APP_UPDATE_CURRENT, "Open Salamander is up to date."
+ IDS_APP_UPDATE_FAILED, "The Open Salamander update check failed. You can try again later."
 }
 

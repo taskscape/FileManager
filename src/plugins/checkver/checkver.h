@@ -10,6 +10,10 @@
 // the user pressed one of the buttons for scrolling through the list
 #define WM_USER_KEYDOWN WM_APP + 667
 
+// The host-owned application-release coordinator posts this independently of
+// CheckVer's legacy module-feed worker, keeping both result channels explicit.
+#define WM_USER_APPLICATION_UPDATE_CHECK_DONE WM_APP + 668
+
 // configuration data
 enum CAutoCheckModeEnum // how often the plugin window is activated
 {

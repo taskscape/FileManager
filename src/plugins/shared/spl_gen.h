@@ -825,6 +825,18 @@ class CSalamanderBZIP2Abstract;
 
 class CSalamanderCryptAbstract;
 
+// State reported by the host-owned application-release coordinator. It is
+// intentionally distinct from CheckVer's module-feed result because plugins
+// may still have their own update metadata and filtering rules.
+enum CSalamanderApplicationUpdateState
+{
+    sausUnknown,
+    sausChecking,
+    sausUpToDate,
+    sausUpdateAvailable,
+    sausFailed
+};
+
 // Primary host API plugins use for panels, messages, configuration, paths, and file helpers.
 class CSalamanderGeneralAbstract
 {
@@ -3464,6 +3476,14 @@ public:
     // used during critical shutdown to unblock a window/dialog over which modal dialogs are open,
     // if multiple layers are threatened, it is necessary to call repeatedly
     virtual void WINAPI CloseAllOwnedEnabledDialogs(HWND parent, DWORD tid = 0) = 0;
+
+    // Requests the host's shared application-release check. Completion is
+    // posted to the supplied window, allowing CheckVer and Help to reuse one
+    // request without the plugin linking against salamander.exe internals.
+    virtual BOOL WINAPI RequestApplicationUpdateCheck(HWND notifyWindow, UINT notifyMessage, BOOL force) = 0;
+
+    // Returns CSalamanderApplicationUpdateState for the same shared check.
+    virtual int WINAPI GetApplicationUpdateState() = 0;
 };
 
 // Adapt the stable plug-in ABI's success/error out parameters to the shared

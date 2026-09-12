@@ -4,6 +4,8 @@
 
 #include "precomp.h"
 
+#include "update_check.h"
+
 #include "menu.h"
 #include "cfgdlg.h"
 #include "dialogs.h"
@@ -1864,6 +1866,18 @@ void CSalamanderGeneral::CloseAllOwnedEnabledDialogs(HWND parent, DWORD tid)
 {
     CALL_STACK_MESSAGE2("CSalamanderGeneral::CloseAllOwnedEnabledDialogs(, %d)", tid);
     ::CloseAllOwnedEnabledDialogs(parent, tid);
+}
+
+BOOL CSalamanderGeneral::RequestApplicationUpdateCheck(HWND notifyWindow, UINT notifyMessage, BOOL force)
+{
+    // Keep plug-ins on the host coordinator so simultaneous CheckVer and Help
+    // actions share one request and one application-release verdict.
+    return ::RequestApplicationUpdateCheck(notifyWindow, notifyMessage, force);
+}
+
+int CSalamanderGeneral::GetApplicationUpdateState()
+{
+    return ::GetApplicationUpdateState();
 }
 
 //

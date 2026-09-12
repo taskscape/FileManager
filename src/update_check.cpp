@@ -32,13 +32,83 @@ DWORD EnablerUpdateAvailable = FALSE;
 // link timestamp without opening the file
 extern "C" IMAGE_DOS_HEADER __ImageBase;
 
-static volatile LONG UpdateCheckStarted = FALSE; // guards the single per-session attempt
-static BOOL UpdateAvailable = FALSE;
-static HWND HUpdateCheckNotifyWindow = NULL;
+struct CUpdateCheckListener
+{
+    HWND Window;
+    UINT Message;
+};
+
+// The coordinator has a tiny fixed listener list because only application UI
+// surfaces subscribe (currently Help and one CheckVer dialog), not arbitrary
+// release consumers.
+static CUpdateCheckListener UpdateCheckListeners[8];
+static int UpdateCheckListenerCount = 0;
+static CRITICAL_SECTION UpdateCheckListenersCS;
+static INIT_ONCE UpdateCheckListenersInit = INIT_ONCE_STATIC_INIT;
+static volatile LONG UpdateCheckInProgress = FALSE;
+static volatile LONG UpdateCheckHasCompleted = FALSE;
+static volatile LONG ApplicationUpdateState = sausUnknown;
+static volatile LONG UpdateAvailable = FALSE;
+
+static BOOL CALLBACK InitializeUpdateCheckListeners(PINIT_ONCE, PVOID, PVOID*)
+{
+    InitializeCriticalSection(&UpdateCheckListenersCS);
+    return TRUE;
+}
+
+static void AddUpdateCheckListenerLocked(HWND window, UINT message)
+{
+    if (window == NULL || message == 0)
+        return;
+
+    for (int i = 0; i < UpdateCheckListenerCount; i++)
+    {
+        if (UpdateCheckListeners[i].Window == window && UpdateCheckListeners[i].Message == message)
+            return;
+    }
+    if (UpdateCheckListenerCount < _countof(UpdateCheckListeners))
+    {
+        UpdateCheckListeners[UpdateCheckListenerCount].Window = window;
+        UpdateCheckListeners[UpdateCheckListenerCount].Message = message;
+        UpdateCheckListenerCount++;
+    }
+}
+
+static int TakeUpdateCheckListenersLocked(CUpdateCheckListener* listeners)
+{
+    int listenerCount = UpdateCheckListenerCount;
+    memcpy(listeners, UpdateCheckListeners, listenerCount * sizeof(CUpdateCheckListener));
+    UpdateCheckListenerCount = 0;
+    return listenerCount;
+}
+
+static void NotifyUpdateCheckListeners(const CUpdateCheckListener* listeners, int listenerCount)
+{
+    for (int i = 0; i < listenerCount; i++)
+        PostMessage(listeners[i].Window, listeners[i].Message, 0, 0);
+}
+
+static void CompleteUpdateCheck()
+{
+    CUpdateCheckListener listeners[_countof(UpdateCheckListeners)];
+
+    // Clearing in-progress and detaching this request's listeners under one
+    // lock prevents a just-started forced retry from consuming an old result.
+    EnterCriticalSection(&UpdateCheckListenersCS);
+    InterlockedExchange(&UpdateCheckInProgress, FALSE);
+    int listenerCount = TakeUpdateCheckListenersLocked(listeners);
+    LeaveCriticalSection(&UpdateCheckListenersCS);
+    NotifyUpdateCheckListeners(listeners, listenerCount);
+}
 
 BOOL IsUpdateAvailable()
 {
-    return UpdateAvailable;
+    return InterlockedCompareExchange(&UpdateAvailable, FALSE, FALSE) != FALSE;
+}
+
+int GetApplicationUpdateState()
+{
+    return (int)InterlockedCompareExchange(&ApplicationUpdateState, sausUnknown, sausUnknown);
 }
 
 // returns UTC link time of salamander.exe as seconds since January 1, 1970
@@ -82,124 +152,151 @@ static BOOL ExtractPublishedTime(const char* json, size_t jsonSize, ULONGLONG* p
 static DWORD WINAPI UpdateCheckThreadF(void* param, HANDLE stopEvent)
 {
     (void)param;
-    // The shutdown owner cancels this one-shot request before UI teardown can
-    // leave a completed network callback targeting a destroyed main window.
-    // without internet connectivity the check is silently skipped and never
-    // retried: there is exactly one attempt per session by design
+    // The shutdown owner cancels this request before UI teardown can leave a
+    // completed notification targeting a consumer that is going away.
     if (WaitForSingleObject(stopEvent, 0) == WAIT_OBJECT_0)
         return 0;
     DWORD connFlags = 0;
-    if (!InternetGetConnectedState(&connFlags, 0))
-        return 0;
 
     BOOL updateFound = FALSE;
-    HINTERNET session = WinHttpOpen(L"OpenSalamander-UpdateCheck",
-                                    WINHTTP_ACCESS_TYPE_NO_PROXY,
-                                    WINHTTP_NO_PROXY_NAME, WINHTTP_NO_PROXY_BYPASS, 0);
-    if (session != NULL)
+    BOOL requestSucceeded = FALSE;
+    if (InternetGetConnectedState(&connFlags, 0))
     {
-        WinHttpSetTimeouts(session, 15000, 15000, 30000, 30000);
-        HINTERNET connection = WinHttpConnect(session, UPDATE_CHECK_API_HOST,
-                                              INTERNET_DEFAULT_HTTPS_PORT, 0);
-        if (connection != NULL)
+        HINTERNET session = WinHttpOpen(L"OpenSalamander-UpdateCheck",
+                                        WINHTTP_ACCESS_TYPE_NO_PROXY,
+                                        WINHTTP_NO_PROXY_NAME, WINHTTP_NO_PROXY_BYPASS, 0);
+        if (session != NULL)
         {
-            HINTERNET request = WinHttpOpenRequest(connection, L"GET", UPDATE_CHECK_API_PATH,
-                                                   NULL, WINHTTP_NO_REFERER,
-                                                   WINHTTP_DEFAULT_ACCEPT_TYPES, WINHTTP_FLAG_SECURE);
-            if (request != NULL)
+            WinHttpSetTimeouts(session, 15000, 15000, 30000, 30000);
+            HINTERNET connection = WinHttpConnect(session, UPDATE_CHECK_API_HOST,
+                                                  INTERNET_DEFAULT_HTTPS_PORT, 0);
+            if (connection != NULL)
             {
-                if (WinHttpSendRequest(request, WINHTTP_NO_ADDITIONAL_HEADERS, 0,
-                                       WINHTTP_NO_REQUEST_DATA, 0, 0, 0) &&
-                    WinHttpReceiveResponse(request, NULL))
+                HINTERNET request = WinHttpOpenRequest(connection, L"GET", UPDATE_CHECK_API_PATH,
+                                                       NULL, WINHTTP_NO_REFERER,
+                                                       WINHTTP_DEFAULT_ACCEPT_TYPES, WINHTTP_FLAG_SECURE);
+                if (request != NULL)
                 {
-                    DWORD status = 0, statusSize = sizeof(status);
-                    if (WinHttpQueryHeaders(request, WINHTTP_QUERY_STATUS_CODE | WINHTTP_QUERY_FLAG_NUMBER,
-                                            WINHTTP_HEADER_NAME_BY_INDEX, &status, &statusSize,
-                                            WINHTTP_NO_HEADER_INDEX) &&
-                        status == HTTP_STATUS_OK)
+                    if (WinHttpSendRequest(request, WINHTTP_NO_ADDITIONAL_HEADERS, 0,
+                                           WINHTTP_NO_REQUEST_DATA, 0, 0, 0) &&
+                        WinHttpReceiveResponse(request, NULL))
                     {
-                        // read the whole JSON body into a growing heap buffer
-                        char* body = NULL;
-                        size_t bodySize = 0, bodyAlloc = 0;
-                        BOOL readError = FALSE;
-                        DWORD bytesRead = 0;
-                        for (;;)
+                        DWORD status = 0, statusSize = sizeof(status);
+                        if (WinHttpQueryHeaders(request, WINHTTP_QUERY_STATUS_CODE | WINHTTP_QUERY_FLAG_NUMBER,
+                                                WINHTTP_HEADER_NAME_BY_INDEX, &status, &statusSize,
+                                                WINHTTP_NO_HEADER_INDEX) &&
+                            status == HTTP_STATUS_OK)
                         {
-                            char chunk[4096];
-                            if (!WinHttpReadData(request, chunk, sizeof(chunk), &bytesRead))
+                            // Read the whole JSON body into a growing heap buffer.
+                            char* body = NULL;
+                            size_t bodySize = 0, bodyAlloc = 0;
+                            BOOL readError = FALSE;
+                            DWORD bytesRead = 0;
+                            for (;;)
                             {
-                                readError = TRUE;
-                                break;
-                            }
-                            if (bytesRead == 0)
-                                break;
-                            if (WaitForSingleObject(stopEvent, 0) == WAIT_OBJECT_0)
-                            {
-                                readError = TRUE;
-                                break;
-                            }
-                            if (bodySize + bytesRead + 1 > bodyAlloc)
-                            {
-                                size_t newAlloc = bodyAlloc == 0 ? 32 * 1024 : bodyAlloc * 2;
-                                while (bodySize + bytesRead + 1 > newAlloc)
-                                    newAlloc *= 2;
-                                char* newBody = (char*)realloc(body, newAlloc);
-                                if (newBody == NULL)
+                                char chunk[4096];
+                                if (!WinHttpReadData(request, chunk, sizeof(chunk), &bytesRead))
                                 {
                                     readError = TRUE;
                                     break;
                                 }
-                                body = newBody;
-                                bodyAlloc = newAlloc;
+                                if (bytesRead == 0)
+                                    break;
+                                if (WaitForSingleObject(stopEvent, 0) == WAIT_OBJECT_0)
+                                {
+                                    readError = TRUE;
+                                    break;
+                                }
+                                if (bodySize + bytesRead + 1 > bodyAlloc)
+                                {
+                                    size_t newAlloc = bodyAlloc == 0 ? 32 * 1024 : bodyAlloc * 2;
+                                    while (bodySize + bytesRead + 1 > newAlloc)
+                                        newAlloc *= 2;
+                                    char* newBody = (char*)realloc(body, newAlloc);
+                                    if (newBody == NULL)
+                                    {
+                                        readError = TRUE;
+                                        break;
+                                    }
+                                    body = newBody;
+                                    bodyAlloc = newAlloc;
+                                }
+                                memcpy(body + bodySize, chunk, bytesRead);
+                                bodySize += bytesRead;
                             }
-                            memcpy(body + bodySize, chunk, bytesRead);
-                            bodySize += bytesRead;
-                        }
-                        // terminate for strstr/sscanf_s; every allocation
-                        // reserved one extra byte for this terminator
-                        if (body != NULL)
-                            body[bodySize] = '\0';
-                        if (!readError && body != NULL && bodySize > 0)
-                        {
-                            ULONGLONG publishedSeconds;
-                            if (ExtractPublishedTime(body, bodySize, &publishedSeconds) &&
-                                publishedSeconds > GetOwnModuleLinkTimestamp() + UPDATE_CHECK_MIN_AGE_SECONDS)
+                            // Terminate for strstr/sscanf_s; every allocation
+                            // reserved one extra byte for this terminator.
+                            if (body != NULL)
+                                body[bodySize] = '\0';
+                            if (!readError && body != NULL && bodySize > 0)
                             {
-                                updateFound = TRUE;
+                                ULONGLONG publishedSeconds;
+                                if (ExtractPublishedTime(body, bodySize, &publishedSeconds))
+                                {
+                                    requestSucceeded = TRUE;
+                                    updateFound = publishedSeconds > GetOwnModuleLinkTimestamp() + UPDATE_CHECK_MIN_AGE_SECONDS;
+                                }
                             }
-                        }
 
-                        free(body);
+                            free(body);
+                        }
                     }
+                    WinHttpCloseHandle(request);
                 }
-                WinHttpCloseHandle(request);
+                WinHttpCloseHandle(connection);
             }
-            WinHttpCloseHandle(connection);
+            WinHttpCloseHandle(session);
         }
-        WinHttpCloseHandle(session);
     }
 
     if (WaitForSingleObject(stopEvent, 0) == WAIT_OBJECT_0)
         return 0;
 
-    if (updateFound)
+    if (requestSucceeded)
     {
-        UpdateAvailable = TRUE; // UI thread reads this only after our posted message arrives
-        // Help > Download update samples this DWORD on open; leaving it at zero
-        // kept the item grayed even after a newer release was confirmed.
-        EnablerUpdateAvailable = TRUE;
+        InterlockedExchange(&UpdateAvailable, updateFound);
+        // Help > Download update samples this DWORD on open; update it with
+        // the coordinator state so a later successful no-update result clears it.
+        EnablerUpdateAvailable = updateFound ? TRUE : FALSE;
+        InterlockedExchange(&ApplicationUpdateState, updateFound ? sausUpdateAvailable : sausUpToDate);
     }
+    else
+        InterlockedExchange(&ApplicationUpdateState, sausFailed);
 
-    if (HUpdateCheckNotifyWindow != NULL)
-        PostMessage(HUpdateCheckNotifyWindow, WM_USER_UPDATE_CHECK_DONE, 0, 0);
+    InterlockedExchange(&UpdateCheckHasCompleted, TRUE);
+    CompleteUpdateCheck();
     return 0;
 }
 
-void StartUpdateCheck(HWND hNotifyWindow)
+BOOL RequestApplicationUpdateCheck(HWND notifyWindow, UINT notifyMessage, BOOL force)
 {
-    HUpdateCheckNotifyWindow = hNotifyWindow;
-    if (InterlockedExchange(&UpdateCheckStarted, TRUE))
-        return; // already attempted in this session; failures are never retried
+    CUpdateCheckListener listeners[_countof(UpdateCheckListeners)];
+    int listenerCount = 0;
+
+    InitOnceExecuteOnce(&UpdateCheckListenersInit, InitializeUpdateCheckListeners, NULL, NULL);
+    EnterCriticalSection(&UpdateCheckListenersCS);
+    AddUpdateCheckListenerLocked(notifyWindow, notifyMessage);
+    if (InterlockedCompareExchange(&UpdateCheckInProgress, TRUE, FALSE) != FALSE)
+    {
+        LeaveCriticalSection(&UpdateCheckListenersCS);
+        return TRUE; // another UI surface already owns the in-flight request
+    }
+
+    if (!force && InterlockedCompareExchange(&UpdateCheckHasCompleted, FALSE, FALSE) != FALSE)
+    {
+        // A late subscriber observes the cached automatic result without an
+        // unnecessary network request; manual callers pass force == TRUE.
+        listenerCount = TakeUpdateCheckListenersLocked(listeners);
+        LeaveCriticalSection(&UpdateCheckListenersCS);
+        NotifyUpdateCheckListeners(listeners, listenerCount);
+        return TRUE;
+    }
+
+    // Claim the next request before unlocking so a simultaneous Help or
+    // CheckVer action joins this run and receives its own completion signal.
+    InterlockedExchange(&UpdateCheckInProgress, TRUE);
+    InterlockedExchange(&ApplicationUpdateState, sausChecking);
+    LeaveCriticalSection(&UpdateCheckListenersCS);
 
     // The shared shutdown registry owns this worker until it has stopped, so
     // no request can outlive the UI and libraries it uses during application exit.
@@ -208,7 +305,18 @@ void StartUpdateCheck(HWND hNotifyWindow)
         !updateCheckThread->Start(UpdateCheckThreadF, NULL, "GitHub update check"))
     {
         delete updateCheckThread;
-        return;
+        InterlockedExchange(&ApplicationUpdateState, sausFailed);
+        InterlockedExchange(&UpdateCheckHasCompleted, TRUE);
+        CompleteUpdateCheck();
+        return FALSE;
     }
     AddOwnedAuxThread(updateCheckThread, "GitHub update check");
+    return TRUE;
+}
+
+void StartUpdateCheck(HWND hNotifyWindow)
+{
+    // Startup is intentionally non-forced: it begins the initial shared check
+    // or consumes a CheckVer request that was already made during plug-in load.
+    RequestApplicationUpdateCheck(hNotifyWindow, WM_USER_UPDATE_CHECK_DONE, FALSE);
 }

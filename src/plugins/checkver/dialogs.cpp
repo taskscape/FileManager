@@ -529,6 +529,10 @@ MENU_TEMPLATE_ITEM AppendToSystemMenu[] =
         AddLogLine(buff, FALSE);
         AddLogLine(LoadStr(IDS_COPYRIGHT2), FALSE);
 
+        // Subscribe after the log is ready: this dialog displays the host's
+        // application-release result while its own worker checks plug-ins.
+        SalGeneral->RequestApplicationUpdateCheck(hWindow, WM_USER_APPLICATION_UPDATE_CHECK_DONE, FALSE);
+
         if (LastCheckTime.wYear != 0)
         {
             char date[50];
@@ -740,6 +744,14 @@ MENU_TEMPLATE_ITEM AppendToSystemMenu[] =
 
             if (lParam != 0) // if the message was not posted from autorun, clear the log
                 ClearLogWindow();
+            // A button click is the same forced application check as Help >
+            // Check for Updates; the auto-open post has lParam == 0 and keeps
+            // the startup request cached instead of immediately retrying it.
+            if (LOWORD(wParam) == IDC_MAIN_CHECK && lParam != 0)
+            {
+                AddLogLine(LoadStr(IDS_APP_UPDATE_CHECKING), FALSE);
+                SalGeneral->RequestApplicationUpdateCheck(hWindow, WM_USER_APPLICATION_UPDATE_CHECK_DONE, TRUE);
+            }
             ModulesCleanup();
             HDownloadThread = StartDownloadThread(LOWORD(wParam) == CM_CHECK_FIRSTLOAD);
             if (HDownloadThread != NULL)
@@ -790,6 +802,30 @@ MENU_TEMPLATE_ITEM AppendToSystemMenu[] =
         }
         }
         break;
+    }
+
+    case WM_USER_APPLICATION_UPDATE_CHECK_DONE:
+    {
+        // Do not infer the application verdict from CheckVer's module script:
+        // the host owns that data so Help and this dialog cannot disagree.
+        switch ((CSalamanderApplicationUpdateState)SalGeneral->GetApplicationUpdateState())
+        {
+        case sausUpdateAvailable:
+            AddLogLine(LoadStr(IDS_APP_UPDATE_AVAILABLE), TRUE);
+            break;
+
+        case sausUpToDate:
+            AddLogLine(LoadStr(IDS_APP_UPDATE_CURRENT), TRUE);
+            break;
+
+        case sausFailed:
+            AddLogLine(LoadStr(IDS_APP_UPDATE_FAILED), TRUE);
+            break;
+
+        default:
+            break; // the completion message can race a forced follow-up check
+        }
+        return TRUE;
     }
 
     case WM_USER_DOWNLOADTHREAD_EXIT:

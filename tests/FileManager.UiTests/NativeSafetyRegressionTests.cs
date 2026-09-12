@@ -2714,6 +2714,36 @@ public sealed class NativeSafetyRegressionTests
     }
 
     [Test]
+    public void Application_update_check_is_coordinated_between_help_and_checkver()
+    {
+        var root = FindRepositoryRoot();
+        string ReadSource(string relativePath) => File.ReadAllText(Path.Combine(root, "src", relativePath));
+        var coordinator = ReadSource("update_check.cpp");
+        var coordinatorHeader = ReadSource("update_check.h");
+        var menu = ReadSource("menu_templates.cpp");
+        var commands = ReadSource("mainwnd_commands.cpp");
+        var checkver = ReadSource(Path.Combine("plugins", "checkver", "dialogs.cpp"));
+        var pluginApi = ReadSource(Path.Combine("plugins", "shared", "spl_gen.h"));
+
+        // Pin one coalescing host request so Help and CheckVer cannot regress
+        // into independent application-release checks while retaining CheckVer's module feed.
+        Assert.Multiple(() =>
+        {
+            Assert.That(coordinatorHeader, Does.Contain("BOOL RequestApplicationUpdateCheck(HWND notifyWindow, UINT notifyMessage, BOOL force)"));
+            Assert.That(coordinator, Does.Contain("UpdateCheckInProgress"));
+            Assert.That(coordinator, Does.Contain("NotifyUpdateCheckListeners(listeners, listenerCount)"));
+            Assert.That(coordinator, Does.Contain("manual callers pass force == TRUE"));
+            Assert.That(menu, Does.Contain("CM_CHECK_FOR_UPDATES"));
+            Assert.That(commands, Does.Contain("RequestApplicationUpdateCheck(HWindow, WM_USER_UPDATE_CHECK_DONE, TRUE)"));
+            Assert.That(checkver, Does.Contain("RequestApplicationUpdateCheck(hWindow, WM_USER_APPLICATION_UPDATE_CHECK_DONE, TRUE)"));
+            Assert.That(checkver, Does.Contain("LOWORD(wParam) == IDC_MAIN_CHECK && lParam != 0"));
+            Assert.That(checkver, Does.Contain("GetApplicationUpdateState()"));
+            Assert.That(pluginApi, Does.Contain("virtual BOOL WINAPI RequestApplicationUpdateCheck"));
+            Assert.That(pluginApi, Does.Contain("enum CSalamanderApplicationUpdateState"));
+        });
+    }
+
+    [Test]
     public void Network_operations_have_phase_deadlines_cancellation_and_failure_classification()
     {
         var root = FindRepositoryRoot();

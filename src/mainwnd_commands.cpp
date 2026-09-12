@@ -2371,6 +2371,14 @@ LRESULT CMainWindow::HandleWmCommand(WPARAM wParam, LPARAM lParam)
           return 0;
         }
 */
+        case CM_CHECK_FOR_UPDATES:
+        {
+            // Manual Help checks may retry a failed startup attempt and join an
+            // already-running CheckVer request instead of creating another one.
+            RequestApplicationUpdateCheck(HWindow, WM_USER_UPDATE_CHECK_DONE, TRUE);
+            return 0;
+        }
+
         case CM_DOWNLOAD_UPDATE:
         {
             // former "Official Support Forum" slot: opens the GitHub releases page

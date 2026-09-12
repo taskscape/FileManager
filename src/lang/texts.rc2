@@ -160,6 +160,7 @@ STRINGTABLE
  IDS_MENU_HELP_CONTEXT,      "&What is This?\tShift+F1"
 // IDS_MENU_HELP_TIP,          "&Tip of the Day"
  IDS_MENU_HELP_TASKLIST,     "Task &List..."
+ IDS_MENU_HELP_CHECK_UPDATES, "Check for &Updates..."
  IDS_MENU_HELP_UPDATE,      "&Download update"
  IDS_MENU_HELP_ABOUTPLUGINS, "About &Plugin"
  IDS_MENU_HELP_ABOUT,        "&About Open Salamander"

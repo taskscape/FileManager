@@ -12,11 +12,21 @@
 // non-zero enables it once a newer published release is confirmed
 extern DWORD EnablerUpdateAvailable;
 
-// TRUE after the background check found a release newer than this executable;
-// read on the UI thread only (worker stores it before posting the result message)
+// TRUE after the most recent successful check found a release newer than this
+// executable. A failed refresh deliberately preserves a previous positive
+// result, so users never lose a confirmed download route because of a timeout.
 BOOL IsUpdateAvailable();
 
-// starts the one-shot asynchronous check for a newer GitHub release; the given
-// window receives WM_USER_UPDATE_CHECK_DONE when the attempt finishes, no
-// matter whether it succeeded or was skipped (e.g. offline)
+// Starts or joins the process-wide check for a newer GitHub release. Callers
+// receive notifyMessage on notifyWindow when this shared request completes.
+// A non-forced request reuses a completed result; a manual forced request may
+// retry after an offline or stale automatic check.
+BOOL RequestApplicationUpdateCheck(HWND notifyWindow, UINT notifyMessage, BOOL force);
+
+// Returns one of CSalamanderApplicationUpdateState from spl_gen.h. Keeping the
+// state in the host lets the Help menu and CheckVer describe the same request.
+int GetApplicationUpdateState();
+
+// Compatibility wrapper for startup code. New callers should use the
+// coordinator entry point above so they can coalesce with CheckVer requests.
 void StartUpdateCheck(HWND hNotifyWindow);

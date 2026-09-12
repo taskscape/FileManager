@@ -2220,6 +2220,7 @@
 #define IDS_MENU_HELP_ABOUTPLUGINS   13199
 #define IDS_MENU_HELP_ABOUT          13200
 #define IDS_MENU_HELP_UPDATE        13202
+#define IDS_MENU_HELP_CHECK_UPDATES 13203
 
 //
 // find file menu

@@ -159,6 +159,7 @@ STRINGTABLE
  IDS_MENU_HELP_KEYBOARD,     "&Skróty klawiaturowe"
  IDS_MENU_HELP_CONTEXT,      "&Co to jest?\tShift+F1"
  IDS_MENU_HELP_TASKLIST,     "Lista &zadań..."
+ IDS_MENU_HELP_CHECK_UPDATES, "Sprawdź &aktualizacje..."
  IDS_MENU_HELP_UPDATE,      "Pobierz &aktualizację"
  IDS_MENU_HELP_ABOUTPLUGINS, "O &wtyczce"
  IDS_MENU_HELP_ABOUT,        "&Informacje o Open Salamander"

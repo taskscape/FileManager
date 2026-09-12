@@ -8,7 +8,7 @@
 #include <strsafe.h>
 
 // when changing this header search for "BuiltForVersion" - tests for older plugin versions will no longer make sense and should be removed
-#define PLUGIN_REQVER 103 // ("5.0") load only plugins that return at least this required Salamander version
+#define PLUGIN_REQVER 104 // shared application-update coordinator host API
 
 //
 // ****************************************************************************
@@ -2542,6 +2542,9 @@ public:
     virtual BOOL WINAPI IsCriticalShutdown();
 
     virtual void WINAPI CloseAllOwnedEnabledDialogs(HWND parent, DWORD tid = 0);
+
+    virtual BOOL WINAPI RequestApplicationUpdateCheck(HWND notifyWindow, UINT notifyMessage, BOOL force);
+    virtual int WINAPI GetApplicationUpdateState();
 };
 
 //
