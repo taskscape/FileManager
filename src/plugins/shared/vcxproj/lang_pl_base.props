@@ -4,7 +4,8 @@
   </ImportGroup>
   <PropertyGroup Label="UserMacros"></PropertyGroup>
   <PropertyGroup>
-    <OutDir>$(OPENSAL_BUILD_DIR)salamander\$(Configuration)_$(ShortPlatform)\lang\</OutDir>
+    <OutDir>$(OPENSAL_BUILD_DIR)salamander\$(Configuration)_$(ShortPlatform)\plugins\$(ShortProjectName)\lang\</OutDir>
+    <!-- Per-project intermediate keeps the Polish .res away from the English pack's shared Intermediate directory. -->
     <IntDir>$(OutDir)Intermediate\$(ProjectName)\</IntDir>
     <GenerateManifest>false</GenerateManifest>
     <TargetName>polish</TargetName>
@@ -22,10 +23,10 @@
       <LinkLibraryDependencies>false</LinkLibraryDependencies>
     </ProjectReference>
     <ResourceCompile>
-      <AdditionalIncludeDirectories>..\plugins\shared;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\..\shared;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <!-- Polish (Poland): 0x0415, matching the core polish.slg language identity. -->
       <Culture>0x0415</Culture>
-      <!-- Polish is a main-application pack, so emit the mandatory selector metadata shared by english.slg. -->
-      <PreprocessorDefinitions>WINVER=0x0601;_LANG;_LANG_SALAMANDER;_LANG_POLISH;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>WINVER=0x0601;_LANG;_LANG_POLISH;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ResourceCompile>
   </ItemDefinitionGroup>
 </Project>

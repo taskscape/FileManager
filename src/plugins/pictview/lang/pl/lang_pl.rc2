@@ -1,0 +1,756 @@
+//
+// lang_pl.rc2 - Polish language resources (not edited by Visual Studio)
+//
+
+#ifdef APSTUDIO_INVOKED
+#error this file is not editable by Microsoft Visual C++
+#endif //APSTUDIO_INVOKED
+
+#ifdef RC_INVOKED
+#define _T(x) x
+#endif
+
+// The Polish VERSIONINFO identity is applied before the shared VERSIONINFO
+// template include; the plugin's versinfo.rh2 is include-guarded, so these
+// overrides survive the template chain and keep POLISH.SLG valid for
+// IsSLGFileValid (version match + 0x0415 translation language).
+#include "..\versinfo.rh2"
+#undef VERSINFO_INTERNAL
+#define VERSINFO_INTERNAL    "POLISH"
+#undef VERSINFO_ORIGINAL
+#define VERSINFO_ORIGINAL    VERSINFO_INTERNAL ".SLG"
+#undef VERSINFO_SLG_COMMENT
+#define VERSINFO_SLG_COMMENT "Wersja polska"
+#define VERSINFO_TRANSLATION_LANG    0x0415
+#define VERSINFO_TRANSLATION_SUBLANG 0x0415
+#include "versinfo.rc2"
+
+STRINGTABLE
+{
+//  IDS_DLL+1
+//  IDS_DLL+2,   "ZSoft PC-PaintBrush PCX"  ;do not translate, it's a name
+  IDS_DLL+3,   "Importowana bitmapa"
+  IDS_DLL+4,   "Importowana bitmapa w trybie CMYK"
+//  IDS_DLL+5,   "Zoner Bitmap"             ;do not translate, it's a name
+  IDS_DLL+6,   "Nieznany typ kompresji!"
+  IDS_DLL+7,   "Brak pamięci!"
+//  IDS_DLL+8,   "TIFF"                     ;do not translate, it's a name
+  IDS_DLL+9,   "Zbyt wiele bitów na płaszczyznę bitową!"
+//  IDS_DLL+10:
+//  IDS_DLL+11
+//  IDS_DLL+12:
+//  IDS_DLL+13,   "Macintosh PICT"          ;do not translate, it's a name
+//  IDS_DLL+14,   "Interchange File Format" ;do not translate, it's a name
+  IDS_DLL+15,   "Zawiera # klatek"        ;for 5,6,... frames ;see readme.txt
+//  IDS_DLL+16,   "Slow scan television"    ;do not translate, it's a name
+  IDS_DLL+17,   "Bezstratne pliki JPEG nie są jeszcze obsługiwane!"
+//  IDS_DLL+18,   "MS Windows 2.x"          ;do not translate, it's a name
+  IDS_DLL+19,   "RLE"
+//  IDS_DLL+20,   "Sun Microsystems"        ;do not translate, it's a name
+  IDS_DLL+21,   "Format eksperymentalny"
+//  IDS_DLL+22,   "SGI Image File Format"   ;do not translate, it's a name
+//  IDS_DLL+23,   "ColorRIX"                ;do not translate, it's a name
+//  IDS_DLL+24,   "Utah RunLength Encoded"  ;do not translate, it's a name
+//  IDS_DLL+25,   "Img software set"        ;do not translate, it's a name
+//  IDS_DLL+26,   "GEM IMG"                 ;do not translate, it's a name
+  IDS_DLL+27,   "Ikona MS Windows"
+  IDS_DLL+28,   "Ikony MS Windows"
+  IDS_DLL+29,   "Plik zawiera # ikon"   ;for 5,6,7,.... icons ;see readme.txt
+  IDS_DLL+30,   "Plik zawiera # ikony"  ;for 2,3,4 icons
+//  IDS_DLL+31,   "TrueVision Targa mono"   ;do not translate, it's a name
+//  IDS_DLL+32,   "TrueVision Targa8"       ;do not translate, it's a name
+//  IDS_DLL+33,   "WordPerfect Graphics"    ;do not translate, it's a name
+//  IDS_DLL+34,   "TrueVision Targa16"      ;do not translate, it's a name
+//  IDS_DLL+35,   "TrueVision Targa24"      ;do not translate, it's a name
+//  IDS_DLL+36,   "TrueVision Targa32"      ;do not translate, it's a name
+  IDS_DLL+37,   "Ikona OS/2"
+  IDS_DLL+38,   "Bez obrazu"
+  IDS_DLL+39,   "Skompresowany"
+//  IDS_DLL+40,   "Pictor"                  ;do not translate, it's a name
+//  IDS_DLL+41,   "PC Paint"                ;do not translate, it's a name
+  IDS_DLL+42,   "Plik zawiera paletę EGA"
+  IDS_DLL+43,   "Paleta w osobnym pliku" ;will be followed by filename
+  IDS_DLL+44,   "Bez palety"
+//  IDS_DLL+45,   "SmoothMove Pan Viewer"   ;do not translate, it's a name
+//  IDS_DLL+46,   "Zoner Metafile"          ;do not translate, it's a name
+//  IDS_DLL+47,   "Amiga Deluxe Paint ILBM" ;do not translate, it's a name
+//  IDS_DLL+48,   "QuickLink II Fax"        ;do not translate, it's a name
+  IDS_DLL+49,   "PackBits"      ;LBM,TIFF 2x
+//  IDS_DLL+50,   "Windows BMP-JPEG"        ;do not translate, it's a name
+//  IDS_DLL+51,   "At Work Document Fax"    ;do not translate, it's a name
+  IDS_DLL+52,   "Format niestandardowy"	;this is (unlike msg 242) supported format
+//  IDS_DLL+53,   "Wireless Bitmap"         ;do not translate, it's a name
+//  IDS_DLL+54,   "Encapsulated Postscript" ;do not translate, it's a name
+//  IDS_DLL+55,   "EPOC Psion Multiple Bitmap" ;do not translate, it's a name
+  IDS_DLL+56,   "Digital Journal"
+  IDS_DLL+57,   "Bez kompresji"
+  IDS_DLL+58,   "Huffman"
+  IDS_DLL+59,   "LZW"
+//  IDS_DLL+60
+//  IDS_DLL+61,   "CALS Raster Type I"      ;do not translate, it's a name
+//  IDS_DLL+62,   "Hemera Photo"            ;do not translate, it's a name
+  IDS_DLL+63,   "Tekstura"
+  IDS_DLL+64,   "OS/2 PM BitMap"
+  IDS_DLL+65,   "OS/2 BitMap"
+  IDS_DLL+66,   "MS Windows 3.x BitMap"
+  IDS_DLL+67,   "Bezstratny JPEG"
+  IDS_DLL+68,   "Metaplik Windows"
+  IDS_DLL+69,   "Tekstura DirectX"
+//  IDS_DLL+70
+  IDS_DLL+71,   "Obraz w dokumencie AmiPro"
+//  IDS_DLL+72,   "Dr.Genius / Dr.Halo"     ;do not translate, it's a name
+  IDS_DLL+73,   "Wycięto z Dr.Genius/Dr.Halo"
+  IDS_DLL+74,   "Model kolorów CMYK nie jest jeszcze obsługiwany!"
+  IDS_DLL+75,   "Model kolorów YIQ nie jest jeszcze obsługiwany!"
+  IDS_DLL+76,   "Nieznany model kolorów!"
+  IDS_DLL+77,   "Kompresja arytmetyczna nie jest jeszcze obsługiwana!"
+  IDS_DLL+78,   "Napotkano nieoczekiwany koniec pliku!"
+  IDS_DLL+79,   "W pliku znaleziono nieoczekiwany znacznik!"
+  IDS_DLL+80,   "W danych znaleziono nieoczekiwany znacznik!"
+  IDS_DLL+81,   "Zbyt wiele tablic Huffmana do dekompresji!"
+  IDS_DLL+82,   "Zbyt wiele składowych koloru w obrazie!"   ;2x
+  IDS_DLL+83,   "Brak przeplotu składowych koloru — jeszcze nieobsługiwane!"
+  IDS_DLL+84,   "Nieprawidłowa liczba składowych koloru!"  ;number there means this:
+  IDS_DLL+85,   "Nietypowy rozmiar znacznika DRI!"
+  IDS_DLL+86,   "Wysokość obrazu musi być znana przed dekompresją!"
+  IDS_DLL+87,   "Znaleziono nieznany znacznik!"
+  IDS_DLL+88,   "Jeszcze nieobsługiwany typ subsamplingu składowych koloru!"
+  IDS_DLL+89,   "Zbyt wiele tablic kwantyzacji!"
+  IDS_DLL+90,   "Nieznany"
+  IDS_DLL+91,   "Wymiary obrazu są nieprawidłowe lub nieokreślone."
+  IDS_DLL+92,   "Odczytywanie"
+  IDS_DLL+93,   "Rozszerzony metaplik"
+  IDS_DLL+94,   "Nieobsługiwany typ pliku!"   ;tiff,sgi,tga...  or:
+//  IDS_DLL+95:
+  IDS_DLL+96,   "Nie można odczytać skompresowanych obrazów TrueColor!"
+  IDS_DLL+97,   "Struktura pliku nie została rozpoznana!"
+//  IDS_DLL+98:
+  IDS_DLL+99,   "Nie można otworzyć pliku!"
+  IDS_DLL+100,   "Ten dokument AmiPro nie zawiera obrazu!"
+//  IDS_DLL+101:
+  IDS_DLL+102,   "Obraz monochromatyczny"
+//  IDS_DLL+103
+//  IDS_DLL+104
+//  IDS_DLL+105
+//  IDS_DLL+106,   "Corel Metafile Exchange" ;do not translate, it's a name
+  IDS_DLL+107,   "Funkcja obsługiwana tylko dla obrazów o 256 kolorach!"
+  IDS_DLL+108,   "Funkcja obsługiwana tylko dla obrazów o 256 kolorach i TrueColor!"
+//  IDS_DLL+109
+//  IDS_DLL+110
+  IDS_DLL+111,   "Nie zdefiniowano tablicy Huffmana do dekompresji!"
+  IDS_DLL+112,   "Nieobsługiwany bajt sterujący!"   ;rle,img
+//  IDS_DLL+113:
+//  IDS_DLL+114,   "Intergraph Raster"       ;do not translate, it's a name
+  IDS_DLL+115,   "Błąd zapisu danych — dysk pełny?"
+//  IDS_DLL+116,   "JPEG"                    ;do not translate, it's a name
+  IDS_DLL+117,   "Błąd odczytu danych — plik jest uszkodzony!"
+//  IDS_DLL+118:
+  IDS_DLL+119,   "Model kolorów YIQ"
+  IDS_DLL+120,   "Model kolorów YCbCr"
+  IDS_DLL+121,   "Model kolorów CMYK"
+  IDS_DLL+122,   "Nieznany model kolorów"
+  IDS_DLL+123,   "Kompresja stratna + Huffmana"
+  IDS_DLL+124,   "Kompresja stratna + arytmetyczna"
+  IDS_DLL+125,   "Tryb progresywny"
+  IDS_DLL+126,   "Jeszcze nieobsługiwana liczba kolorów!"  ;ras,rle
+//  IDS_DLL+127,
+//  IDS_DLL+128:
+//  IDS_DLL+129:
+  IDS_DLL+130,   "Ikony i kursory muszą być kwadratowe o rozmiarach będących wielokrotnością 16 pikseli!"
+//  IDS_DLL+131:
+//  IDS_DLL+132:
+//  IDS_DLL+133:
+//  IDS_DLL+134:
+//  IDS_DLL+135:
+//  IDS_DLL+136:
+//  IDS_DLL+137:
+//  IDS_DLL+138:
+//  IDS_DLL+139:
+//  IDS_DLL+140:
+//  IDS_DLL+141:
+//  IDS_DLL+142:
+//  IDS_DLL+143:
+//  IDS_DLL+144:
+//  IDS_DLL+145:
+//  IDS_DLL+146:
+//  IDS_DLL+147:
+//  IDS_DLL+148:
+//  IDS_DLL+149:
+//  IDS_DLL+150:
+//  IDS_DLL+151:
+//  IDS_DLL+152
+//  IDS_DLL+153
+//  IDS_DLL+154
+//  IDS_DLL+155
+//  IDS_DLL+156
+//  IDS_DLL+157
+//  IDS_DLL+158
+//  IDS_DLL+159
+//  IDS_DLL+160
+//  IDS_DLL+161
+//  IDS_DLL+162
+//  IDS_DLL+163:
+//  IDS_DLL+164
+  IDS_DLL+165,   "Obraz przeplatany"
+//  IDS_DLL+166:
+//  IDS_DLL+167:
+//  IDS_DLL+168:
+//  IDS_DLL+169:
+//  IDS_DLL+170:
+//  IDS_DLL+171
+//  IDS_DLL+172
+//  IDS_DLL+173
+//  IDS_DLL+174
+//  IDS_DLL+175
+//  IDS_DLL+176
+//  IDS_DLL+177:
+//  IDS_DLL+178:
+//  IDS_DLL+179:
+  IDS_DLL+180,   "Nie znaleziono plików!"
+//  IDS_DLL+181:
+//  IDS_DLL+182:
+//  IDS_DLL+183:
+//  IDS_DLL+184:
+//  IDS_DLL+185:
+//  IDS_DLL+186:
+//  IDS_DLL+187:
+//  IDS_DLL+188:
+//  IDS_DLL+189:
+//  IDS_DLL+190:
+//  IDS_DLL+191:
+//  IDS_DLL+192:
+//  IDS_DLL+193:
+//  IDS_DLL+194:
+  IDS_DLL+195,   "Jeszcze nieobsługiwany typ kompresji!" ;RAS
+//  IDS_DLL+196
+//  IDS_DLL+197
+//  IDS_DLL+198
+//  IDS_DLL+199
+//  IDS_DLL+200
+//  IDS_DLL+201:
+//  IDS_DLL+202:
+//  IDS_DLL+203,   "CCITT Group 3"         ;do not translate, it's a name
+//  IDS_DLL+204,   "CCITT Group 4"         ;do not translate, it's a name
+  IDS_DLL+205,   "Nieznany" ;PVCS_UNKNOWN - unknown compression scheme
+  IDS_DLL+206    "Matryca filtrów kolorów (CFA)"
+  IDS_DLL+207,   "Nieprawidłowy rozmiar nagłówka pliku!"
+//  IDS_DLL+208:
+  IDS_DLL+209,   "Nieoczekiwane przepełnienie tablicy Huffmana!"
+  IDS_DLL+210,   "Kalkulator Texas Instruments"
+//  IDS_DLL+211:
+//  IDS_DLL+212,   "Autodesk Animator Pro"   ;do not translate, it's a name
+//  IDS_DLL+213:
+//  IDS_DLL+214,   "Amiga Deluxe Paint HAM#" ;do not translate, it's a name
+//  IDS_DLL+215
+//  IDS_DLL+216
+//  IDS_DLL+217
+//  IDS_DLL+218
+  IDS_DLL+219,   "Miniatura z PC PaintBrush"
+  IDS_DLL+220,   "Zawiera # klatki"        ;for 2,3,4 frames
+//  IDS_DLL+221,
+//  IDS_DLL+222,
+  IDS_DLL+223,   "Nieobsługiwana liczba składowych koloru!"
+  IDS_DLL+224,   "Różna liczba bitów na próbkę w poszczególnych próbkach nie jest obsługiwana!"  ;example:
+//  IDS_DLL+225
+//  IDS_DLL+226
+//  IDS_DLL+227
+//  IDS_DLL+228
+//  IDS_DLL+229
+//  IDS_DLL+230
+//  IDS_DLL+231
+  IDS_DLL+232,   "Nieznany typ przeplotu!"
+//  IDS_DLL+233:
+//  IDS_DLL+234,   "Amiga Deluxe Paint PBM"      ;do not translate, it's a name
+//  IDS_DLL+235,   "Portable Network Graphics"   ;do not translate, it's a name
+  IDS_DLL+236,   "Dekompresowanie"
+//  IDS_DLL+237:
+//  IDS_DLL+238:
+//  IDS_DLL+239:
+//  IDS_DLL+240:
+  IDS_DLL+241,   "Copyright (c) 1996-2019, Dement - quantization"
+  IDS_DLL+242,   "Format niestandardowy"
+  IDS_DLL+243,   "Wymagany zbyt duży bufor dekompresji — nieobsługiwane!"
+  IDS_DLL+244,   "Nieprawidłowy rozmiar bloku po dekompresji!"
+  IDS_DLL+245,   "Użyto # kolorów"
+  IDS_DLL+246,   "Błędna suma CRC nagłówka pliku!"
+//  IDS_DLL+247,   "HSI JPEG"                     ;do not translate, it's a name
+  IDS_DLL+248,   "Pliki HSI JPEG nie są jeszcze obsługiwane!"
+//  IDS_DLL+249,   "Lumena BigPix"              ;do not translate, it's a name
+  IDS_DLL+250,   "Nieznany typ filtru!"
+//  IDS_DLL+251:
+  IDS_DLL+252,   "Przeplot Adam7"
+  IDS_DLL+253,   "Dwuwymiarowa kompresja CCITT Group 3 nie jest jeszcze obsługiwana!"
+  IDS_DLL+254,   "Nieskompresowane dokumenty CCITT Group 3 nie są jeszcze obsługiwane!"
+//  IDS_DLL+255,   "DEGAS Elite"                ;do not translate, it's a name
+//  IDS_DLL+256,   "MacPaint"                   ;do not translate, it's a name
+  IDS_DLL+257,   "Model kolorów CIE L*a*b*"
+//  IDS_DLL+258,   "Exif JPEG"                  ;do not translate, it's a name
+  IDS_DLL+259,   "Zawiera kanał alfa"
+  IDS_DLL+260,   "Błąd odczytu pliku konfiguracji!"
+  IDS_DLL+261,   "Plik konfiguracji pochodzi ze starszej wersji programu PictView!"
+  IDS_DLL+262,   "Kursor MS Windows"
+  IDS_DLL+263,   "Kursory MS Windows"
+  IDS_DLL+264,   "Plik zawiera # kursorów"   ;for 5,6,... cursors
+  IDS_DLL+265,   "Plik zawiera # kursory"   ;for 2,3,4 cursors
+  IDS_DLL+266,   "Miniatura obrazu"
+//  IDS_DLL+267,   "CorelDraw! #.0"            ;do not translate, it's a name
+//  IDS_DLL+268
+  IDS_DLL+269,   "Bufor jest zbyt mały!"
+  IDS_DLL+270,   "W pliku nie ma takiej strony!"
+  IDS_DLL+271,   "Nieprawidłowy parametr!"
+//  IDS_DLL+272:
+//  IDS_DLL+273:
+//  IDS_DLL+274:
+//  IDS_DLL+275:
+//  IDS_DLL+276:
+//  IDS_DLL+277:
+//  IDS_DLL+278:
+//  IDS_DLL+279,   "Corel PhotoPaint! 6.0" ;do not translate, it's a name
+  IDS_DLL+280,   "Błąd w definicji skanu!"
+  IDS_DLL+281,   "Nieobsługiwana liczba składowych w skanie!"
+//  IDS_DLL+282,   "GIF87a"             ;do not translate, it's a name
+//  IDS_DLL+283,   "GIF89a"             ;do not translate, it's a name
+//  IDS_DLL+284,   "Microsoft Paint"    ;do not translate, it's a name
+//  IDS_DLL+285,   "Autodesk Animator"  ;do not translate, it's a name
+  IDS_DLL+286,   "Obraz jest podzielony na kafle"
+  IDS_DLL+287,   "Nie można utworzyć pliku"
+//  IDS_DLL+288,   "Pareniste" ;Used by Pareniste images in the Czech edition ;do not translate, it's a name
+//  IDS_DLL+289,   "Aldus Placeable Win MetaFile" ;do not translate, it's a name
+//  IDS_DLL+290:
+//  IDS_DLL+291,   "Dement's X" ;Used by Pareniste images in the Czech edition
+//  IDS_DLL+292,   "Vivid Raytracer"    ;do not translate, it's a name
+//  IDS_DLL+293,   "Portable BitMap"    ;do not translate, it's a name
+//  IDS_DLL+294,   "Portable GrayMap"   ;do not translate, it's a name
+//  IDS_DLL+295,   "Portable PixelMap"  ;do not translate, it's a name
+  IDS_DLL+296,   "Format tekstowy"
+  IDS_DLL+297,   "Format tekstowy nie jest jeszcze obsługiwany!"
+  IDS_DLL+298,   "Wielostronicowy format faksu Intel"
+  IDS_DLL+299,   "DPI%"
+  IDS_DLL+300,   "Zawiera # stron"   ;for 5,6,... pages
+  IDS_DLL+301,   "Zawiera # strony"   ;for 2,3,4 pages
+  IDS_DLL+302,   "Obraz Olifax"
+  IDS_DLL+303,   "Animowany GIF"
+//  IDS_DLL+304,   "TrueVision Targa15" ;do not translate, it's a name
+//  IDS_DLL+305,   "Corel R.A.V.E #.0"  ;do not translate, it's a name
+//  IDS_DLL+306,   "Multiple Network Graphics" ;do not translate, it's a name
+  IDS_DLL+307,   "Pamięć: "
+  IDS_DLL+308,   " Plik: "
+  IDS_DLL+309,   "Wysokość%"
+  IDS_DLL+310,   "Nieprawidłowa definicja tablicy Huffmana!"
+//  IDS_DLL+311:
+//  IDS_DLL+312
+  IDS_DLL+313,   "Plik nie zawiera podglądu!"
+//  IDS_DLL+314,   "Autodesk Animator CEL" ;do not translate, it's a name
+  IDS_DLL+315,   "Zawiera 1 klatkę"
+//  IDS_DLL+316
+//  IDS_DLL+317:
+//  IDS_DLL+318:
+  IDS_DLL+319,   "Format docelowy nie obsługuje żądanej głębi kolorów! Konwersja została przerwana!"
+//  IDS_DLL+320:
+//  IDS_DLL+321
+  IDS_DLL+322,   "JFIF #.#"
+  IDS_DLL+323,   "JFIF #.# z miniaturą" ;thumbnail is a small version of the image added as a preview
+  IDS_DLL+324,   "Przechwycony ekran"
+//  IDS_DLL+325:
+  IDS_DLL+326,   "Obraz nie zawiera bitmap. Nieobsługiwane."
+//  IDS_DLL+327,   "Microsoft AVI"   ;do not translate, it's a name
+//  IDS_DLL+328,   "Adobe Photoshop" ;do not translate, it's a name
+  IDS_DLL+329,   "Zoner Zebra for Windows"
+  IDS_DLL+330,   "Obrazy z aparatów cyfrowych w surowym formacie CCD nie są jeszcze obsługiwane."
+  IDS_DLL+331,   "Schowek Windows"
+  IDS_DLL+332,   "Pliki audio nie są obsługiwane."
+//  IDS_DLL+333: ;must remain unused!
+//  IDS_DLL+334:
+//  IDS_DLL+335:
+//  IDS_DLL+336:
+//  IDS_DLL+337:
+//  IDS_DLL+338:
+//  IDS_DLL+339:
+  IDS_DLL+340,   "Piksele"
+//  IDS_DLL+341:
+//  IDS_DLL+342,   "Kodak PhotoCD"   ;do not translate, it's a name
+//  IDS_DLL+343:
+  IDS_DLL+344,   "Obraz jest zbyt duży!"
+  IDS_DLL+345,   "Obraz jest zbyt szeroki!"
+  IDS_DLL+346,   "Nieobsługiwane połączenie formatu wyjściowego, kompresji i głębi bitowej."
+  IDS_DLL+347,   "Nie można odnaleźć podanego koloru przezroczystego."
+//  IDS_DLL+348:
+//  IDS_DLL+349:
+//  IDS_DLL+350:
+//  IDS_DLL+351:
+//  IDS_DLL+352:
+//  IDS_DLL+353:
+//  IDS_DLL+354:
+//  IDS_DLL+355:
+//  IDS_DLL+356:
+//  IDS_DLL+357:
+//  IDS_DLL+358:
+//  IDS_DLL+359:
+//  IDS_DLL+360:
+//  IDS_DLL+361:
+//  IDS_DLL+362:
+//  IDS_DLL+363:
+//  IDS_DLL+364:
+//  IDS_DLL+365:
+//  IDS_DLL+366:
+//  IDS_DLL+367:
+//  IDS_DLL+368:
+//  IDS_DLL+369:
+//  IDS_DLL+370:
+//  IDS_DLL+371:
+//  IDS_DLL+372:
+//  IDS_DLL+373:
+//  IDS_DLL+374:
+//  IDS_DLL+375:
+//  IDS_DLL+376:
+//  IDS_DLL+377:
+//  IDS_DLL+378:
+//  IDS_DLL+379:
+//  IDS_DLL+380:
+//  IDS_DLL+381:
+//  IDS_DLL+382:
+//  IDS_DLL+383:
+//  IDS_DLL+384:
+//  IDS_DLL+385:
+//  IDS_DLL+386:
+//  IDS_DLL+387:
+//  IDS_DLL+388:
+//  IDS_DLL+389:
+//  IDS_DLL+390:
+//  IDS_DLL+391:
+//  IDS_DLL+392:
+//  IDS_DLL+393:
+//  IDS_DLL+394:
+//  IDS_DLL+395:
+//  IDS_DLL+396:
+//  IDS_DLL+397:
+//  IDS_DLL+398:
+//  IDS_DLL+399:
+//  IDS_DLL+400
+//  IDS_DLL+401
+//  IDS_DLL+402
+//  IDS_DLL+403
+//  IDS_DLL+404
+//  IDS_DLL+405
+//  IDS_DLL+406
+//  IDS_DLL+407
+//  IDS_DLL+408
+//  IDS_DLL+409
+//  IDS_DLL+410
+//  IDS_DLL+411
+//  IDS_DLL+412
+//  IDS_DLL+413
+//  IDS_DLL+414
+//  IDS_DLL+415
+//  IDS_DLL+416
+//  IDS_DLL+417
+  IDS_DLL+418,   "Zawiera informacje EXIF"
+//  IDS_DLL+419
+//  IDS_DLL+420
+//  IDS_DLL+421
+//  IDS_DLL+422
+//  IDS_DLL+423
+//  IDS_DLL+424
+//  IDS_DLL+425
+}
+
+STRINGTABLE
+{
+  IDS_PLUGINNAME, "PictView"
+  IDS_PLUGIN_DESCRIPTION, "Szybka przeglądarka i konwerter obrazów."
+  IDS_LOWMEMORY, "Mało pamięci"
+  IDS_SOME_WINS_OPENED, "Część okien programu PictView jest otwarta. Czy chcesz je zamknąć?"
+  IDS_ERROR_OPENING, "Nie można otworzyć pliku %s:\n%s"
+  IDS_ERROR_OPENING_CONTINUE, "(%d) %hs Tego pliku nie można przetworzyć. Kontynuować?"
+  IDS_TITLE, "%s (%d x %d x %s - %i%%) - %s"
+  IDS_TITLE_MULTI, "%s (%d x %d x %s [%d z %d] - %i%%) - %s"
+  IDS_NCOLORS, "{!}%d kolor{ów|0||1|y|4|ów|11|y|14|ów}"
+  IDS_NCOLORS_CMYK, "CMYK"
+  IDS_NCOLORS_LAB, "LAB"
+
+  IDS_ERROR_CALLING_PVW32_DLL, "Błąd dekodowania obrazu"
+  IDS_CLIPBOARD_TITLE, "<Schowek>"
+  IDS_CAPTURE_TITLE, "<Przechwytywanie ekranu>"
+  IDS_SCAN_TITLE, "<Skanowanie>"
+  IDS_DELETED_TITLE, "<Usunięte>"
+  IDS_CLIPBOARD_FNAME, "Schowek"
+  IDS_CAPTURE_FNAME, "Zrzut"
+  IDS_SCAN_FNAME, "Skan"
+  IDS_RGB, "Czerwony: %i, Zielony: %i, Niebieski: %i"
+  IDS_RGB_HEX, "Czerwony: %#02x, Zielony: %#02x, Niebieski: %#02x"
+  IDS_RGBXY, "(%i, %i): Czerwony: %i, Zielony: %i, Niebieski: %i"
+  IDS_RGBXY_HEX, "(%i, %i): Czerwony: %#02x, Zielony: %#02x, Niebieski: %#02x"
+  IDS_INDEX, ", Indeks: %i"
+
+  IDS_VIEW_BMP_IN_CLIPBOARD, "Pokaż bitmapę ze &schowka"
+  IDS_PLUGINSMENU_SCREEN_CAPTURE, "&Przechwytywanie ekranu..."
+  IDS_PLUGINSMENU_REGENERATE_THUMBNAIL, "&Aktualizuj miniaturę"
+  IDS_PLUGINSMENU_SCAN, "Z&eskanuj obraz..."
+  IDS_PIXELS, "{!}%d piksel{ów|0||1|ele|4|ów|11|ele|14|ów}"
+  IDS_BYTES, "{!}%d bajt{ów|0||1|y|4|ów|11|y|14|ów}"
+  IDS_OF, "%d z %d"
+  IDS_FRAMES, "Kla&tka:"
+  IDS_IMGPROP_GRAY_NBIT, "Skala szarości %d bit"
+  IDS_UNKNOWN, "Nieznany"
+  IDS_CFG_CONFLICT, "Konfiguracja jest już otwarta."
+  IDS_CONFIGURATION_TITLE, "Konfiguracja programu PictView"
+  IDS_ERRORTITLE, "Błąd programu PictView"
+  IDS_BADTIMER, "Opóźnienie musi mieścić się w zakresie od 1 do 360 sekund."
+  IDS_BADHOTKEY, "Przypisz dostępny skrót klawiszowy."
+  IDS_CAPTURECANCELED, "Przechwytywanie ekranu zostało anulowane."
+  IDS_CAPTURING, "Przechwytywanie ekranu"
+  IDS_EMPTY, "Pusty"
+  IDS_SELECTTARGETDIR, "Wybierz katalog docelowy."
+  IDS_SPECIFYPATH, "Należy tu podać poprawną ścieżkę bezwzględną lub względną."
+  IDS_PICTVIEWPLUGINNAME, "Wtyczka PictView (przeglądarka i konwerter obrazów)"
+
+
+  // !WARNING! 2 following variables must be synchronized with IDS_SAVEASFILTERMONO & IDS_SAVEASFILTERCOLOR:
+  // G.LastSaveAsFilterIndexMono  = 5; // index is 1-based (IDS_SAVEASFILTERMONO: 5=BMP)
+  // G.LastSaveAsFilterIndexColor = 5; // index is 1-based (IDS_SAVEASFILTERCOLOR: 5=BMP)
+  // !WARNING! !WARNING! !WARNING! !WARNING! !WARNING! !WARNING! !WARNING! !WARNING!
+
+  IDS_SAVEASFILTERMONO, "CompuServe GIF (*.gif)|*.gif|JPEG (*.jpg,*.jpeg)|*.jpg;*.jpeg|Portable Network Graphics (*.png)|*.png|TIFF (*.tif)|*.tif;*.tiff|Bitmapa Windows (*.bmp)|*.bmp|"
+  IDS_SAVEASFILTERCOLOR, "CompuServe GIF (*.gif)|*.gif|JPEG (*.jpg,*.jpeg)|*.jpg;*.jpeg|Portable Network Graphics (*.png)|*.png|TIFF (*.tif)|*.tif;*.tiff|Bitmapa Windows (*.bmp)|*.bmp|"
+  IDS_SAVEERROR, "Nie można zapisać obrazu.\nBłąd: %hs"
+  IDS_SAVE_AS_SUCCESS, "Obraz został pomyślnie zapisany."
+  IDS_SAVE_LOST_ALPHA, "Oryginalny obraz zawiera kanał alfa. Został on jednak połączony z danymi obrazu i bieżącym tłem.\nW związku z tym kanał alfa nie zostanie zapisany. Zapisać mimo to?"
+  IDS_CANCELED_BY_USER, "Zapisywanie obrazu zostało anulowane przez użytkownika. Plik wyjściowy nie został utworzony."
+  IDS_OPENFILTER, "Popularne pliki graficzne (*.bmp;*.dib;*.gif;*.ico;*.jpg;*.jpeg;*.png;*.tif;*.tiff;*.dds;*.heic;*.webp;*.avif)|*.bmp;*.dib;*.gif;*.ico;*.jpg;*.jpeg;*.png;*.tif;*.tiff;*.dds;*.heic;*.webp;*.avif|Wszystkie pliki (*.*)|*.*|"
+  IDS_CUSTOM_COLOR, "&Własny kolor..."
+  IDS_AUTOMATIC_COLOR, "&Kolor automatyczny"
+  IDS_SAL_IS_BUSY, "Program Open Salamander jest zajęty. Żądanego polecenia nie można wykonać, spróbuj ponownie później."
+  IDS_RENAME_TO, "Zmień nazwę pliku ""%s"" na"
+  IDS_ERRORRENAMINGFILE, "Błąd zmiany nazwy pliku"
+  IDS_TOOLONGNAME, "Nie można ukończyć operacji z powodu zbyt długiej nazwy."
+  IDS_LOADEXIF, "Nie można załadować biblioteki EXIF %s."
+  IDS_EXIF_TAG, "Znacznik"
+  IDS_EXIF_VALUE, "Wartość"
+  IDS_EXIF_LOCALIZATION_FNAME, "en.po"
+
+  IDS_MENU_FILE, "&Plik"
+  IDS_MENU_FILE_OPEN, "&Otwórz...\tCtrl+O"
+  IDS_MENU_FILE_REFRESH, "&Przywróć\tCtrl+R"
+  IDS_MENU_FILE_PREV, "Poprzed&ni\tBackspace"
+  IDS_MENU_FILE_NEXT, "&Następny\tSpace"
+  IDS_MENU_FILE_SAVEAS, "Z&apisz jako...\tCtrl+S"
+  IDS_MENU_FILE_WALLPAPER, "Ustaw jako &tapetę"
+  IDS_MENU_WALLPARER_CENTER, "Wyśrodku&j"
+  IDS_MENU_WALLPARER_TILE, "&Kafelkowo"
+  IDS_MENU_WALLPARER_STRETCH, "Roz&ciągnij"
+  IDS_MENU_WALLPARER_RESTORE, "&Przywróć poprzednią"
+  IDS_MENU_WALLPARER_NONE, "&Brak"
+  IDS_MENU_FILE_CAPTURE, "&Przechwytywanie ekranu...\tQ"
+  IDS_MENU_FILE_SCAN, "Z&eskanuj obraz...\tW"
+  IDS_MENU_FILE_SCAN_SOURCE, "Wy&bierz źródło skanera..."
+  IDS_MENU_FILE_PROP, "&Właściwości...\tI"
+  IDS_MENU_FILE_EXIF, "Pokaż &EXIF...\tE"
+  IDS_MENU_FILE_HISTOGRAM, "Pokaż &histogram...\tCtrl+H"
+  IDS_MENU_FILE_PAGE, "Ustawienia &strony...\tCtrl+Shift+P"
+  IDS_MENU_FILE_PRINT, "&Drukuj...\tCtrl+P"
+  IDS_MENU_FILE_FILES, "Ostatnie &pliki"
+  IDS_MENU_FILE_DIRS, "Ostatnie katalo&gi"
+  IDS_MENU_FILE_EXIT, "Za&kończ\tEsc"
+  IDS_MENU_FILE_OTHER, "&Inne pliki"
+  IDS_MENU_FILE_FIRST, "&Pierwszy\tShift+Backspace"
+  IDS_MENU_FILE_LAST, "&Ostatni\tShift+Space"
+  IDS_MENU_FILE_FOCUS, "&Fokus\tF"
+  IDS_MENU_FILE_SELCRCFILE, "Zaznacz/odznacz otwarty plik w panelu lub znajdź\tInsert"
+  IDS_MENU_FILE_RENAME, "Zmień &nazwę...\tF2"
+  IDS_MENU_FILE_DELETE, "&Usuń\tDel"
+  IDS_MENU_FILE_PREVSEL, "Poprzedni za&znaczony\tCtrl+Backspace"
+  IDS_MENU_FILE_NEXTSEL, "Następny za&znaczony\tCtrl+Space"
+  IDS_MENU_FILE_COPYTO, "Kopiuj &do...\tX"
+
+  IDS_MENU_EDIT, "&Edycja"
+  IDS_MENU_EDIT_COPY, "&Kopiuj\tCtrl+C"
+  IDS_MENU_EDIT_PASTE, "&Wklej\tCtrl+V"
+  IDS_MENU_EDIT_SELECTALL, "Zaznacz &wszystko\tCtrl+A"
+  IDS_MENU_EDIT_DESELECT, "Odznacz &wszystko\tCtrl+D"
+  IDS_MENU_EDIT_CROP, "&Przytnij\tC"
+  IDS_MENU_EDIT_180, "Obróć o &180°\tT"
+  IDS_MENU_EDIT_RIGHT, "Obróć w &prawo\tR"
+  IDS_MENU_EDIT_LEFT, "Obróć w &lewo\tL"
+  IDS_MENU_EDIT_FLIPH, "Odbij &poziomo\tH"
+  IDS_MENU_EDIT_FLIPV, "Odbij w pionie\tV"
+
+  IDS_MENU_VIEW, "&Widok"
+  IDS_MENU_VIEW_ZOOMIN, "Po&większ\t+"
+  IDS_MENU_VIEW_ZOOMOUT, "Pom&niejsz\t-"
+  IDS_MENU_VIEW_ZOOM, "&Powiększenie...\tM"
+  IDS_MENU_VIEW_WHOLE, "Dopasuj do &okna\tF5"
+  IDS_MENU_VIEW_WIDTH, "Dopasuj &szerokość\tF6"
+  IDS_MENU_VIEW_ACTUAL, "Rozmiar &rzeczywisty (1:1)\tF7"
+  IDS_MENU_VIEW_WINDOW, "&Dopasuj rozmiar okna\tF8"
+  IDS_MENU_VIEW_TOOLBAR, "Pasek &narzędzi\tF9"
+  IDS_MENU_VIEW_STATUSBAR, "Pasek &stanu"
+  IDS_MENU_VIEW_FULLSCREEN, "Pełny &ekran\tF11"
+
+  IDS_MENU_MULTIPAGE, "Obrazy &wielostronicowe"
+  IDS_MENU_NEXTPAGE, "&Następna strona\tCtrl+Page Down"
+  IDS_MENU_PREVPAGE, "&Poprzednia strona\tCtrl+Page Up"
+  IDS_MENU_FIRSTPAGE, "&Pierwsza strona\tCtrl+Home"
+  IDS_MENU_LASTPAGE, "&Ostatnia strona\tCtrl+End"
+  IDS_MENU_PAGE, "&Przejdź do strony...\tG"
+
+  IDS_MENU_TOOLS, "&Narzędzia"
+  IDS_MENU_TOOLS_HAND, "&Ręka\tA"
+  IDS_MENU_TOOLS_ZOOM, "&Lupa\tZ"
+  IDS_MENU_TOOLS_SELECT, "&Zaznaczanie\tS"
+  IDS_MENU_TOOLS_PICK, "&Pipeta\tP"
+  IDS_MENU_TOOLS_OPTIONS, "&Konfiguracja..."
+
+  IDS_MENU_HELP, "Pomo&c"
+  IDS_MENU_HELP_CONTENTS, "&Spis treści\tF1"
+  IDS_MENU_HELP_INDEX, "&Indeks..."
+  IDS_MENU_HELP_SEARCH, "&Szukaj..."
+//  IDS_MENU_HELP_KEYBOARD, "&Keyboard Shortcuts"
+//  IDS_MENU_HELP_MOUSE, "&Mouse Shortcuts"
+  IDS_MENU_HELP_ABOUT, "&Informacje o PictView..."
+
+  IDS_TT_OPEN, "Otwórz\tCtrl+O"
+  IDS_TT_SAVE, "Zapisz jako\tCtrl+S"
+  IDS_TT_PROPERTIES, "Właściwości obrazu\tI"
+  IDS_TT_PREV, "Otwórz poprzedni plik\tBackspace"
+  IDS_TT_NEXT, "Otwórz następny plik\tSpace"
+  IDS_TT_PREVSELFILE, "Otwórz poprzedni zaznaczony plik\tCtrl+Backspace"
+  IDS_TT_NEXTSELFILE, "Otwórz następny zaznaczony plik\tCtrl+Space"
+  IDS_TT_COPY, "Kopiuj\tCtrl+C"
+  IDS_TT_PASTE, "Wklej\tCtrl+V"
+  IDS_TT_TOOL_HAND, "Ręka\tA"
+  IDS_TT_TOOL_ZOOM, "Lupa\tZ"
+  IDS_TT_TOOL_SELECT, "Zaznaczanie\tS"
+  IDS_TT_TOOL_PIPETTE, "Pipeta\tP"
+  IDS_TT_LEFT, "Obróć w lewo\tL"
+  IDS_TT_RIGHT, "Obróć w prawo\tR"
+  IDS_TT_CROP, "Przytnij\tC"
+  IDS_TT_ZOOM_OUT, "Pomniejsz\t-"
+  IDS_TT_ZOOM_IN, "Powiększ\t+"
+  IDS_TT_ZOOM_TO, "Powiększenie\tM"
+  IDS_TT_ZOOM_WIDTH, "Dopasuj szerokość\tF6"
+  IDS_TT_ZOOM_WHOLE, "Dopasuj całość\tF5"
+  IDS_TT_ZOOM_ACTUAL, "Rozmiar rzeczywisty\tF7"
+  IDS_TT_FULL_SCREEN, "Pełny ekran\tF11"
+  IDS_TT_SELSRCFILE, "Zaznacz/odznacz otwarty plik w panelu lub oknie znajdź\tInsert"
+  IDS_TT_PRINT, "Drukuj\tCtrl+P"
+
+  IDS_TWAIN_OPEN, "Nie można otworzyć menedżera źródeł TWAIN.\nJeśli skaner jest zgodny ze standardem TWAIN,\nzainstaluj ponownie jego oprogramowanie."
+  IDS_TWAIN_ERROR, "Błąd TWAIN"
+  IDS_TWCC_BUMMER, "Niepowodzenie z nieznanych przyczyn."
+  IDS_TWCC_LOWMEMORY, "Za mało pamięci do wykonania operacji."
+  IDS_TWCC_NODS, "Brak źródła danych."
+  IDS_TWCC_MAXCONNECTIONS, "Źródło danych jest połączone z maksymalną liczbą aplikacji."
+  IDS_TWCC_OPERATIONERROR, "Źródło danych lub menedżer zgłosiły błąd, aplikacja nie powinna."
+  IDS_TWCC_BADCAP, "Nieznana możliwość."
+  IDS_TWCC_BADPROTOCOL, "Nierozpoznana kombinacja MSG DG DAT."
+  IDS_TWCC_BADVALUE, "Parametr danych poza zakresem."
+  IDS_TWCC_SEQERROR, "DG DAT MSG poza oczekiwaną sekwencją."
+  IDS_TWCC_BADDEST, "Nieznana aplikacja/źródło docelowe w DSM_Entry."
+  IDS_TWCC_CAPUNSUPPORTED, "Możliwość nieobsługiwana przez źródło."
+  IDS_TWCC_CAPBADOPERATION, "Operacja nieobsługiwana przez tę możliwość."
+  IDS_TWCC_CAPSEQERROR, "Możliwość zależy od innej możliwości."
+  IDS_TWCC_DENIED, "Operacja systemu plików została odrzucona (plik jest chroniony)."
+  IDS_TWCC_FILEEXISTS, "Operacja nie powiodła się, ponieważ plik już istnieje."
+  IDS_TWCC_FILENOTFOUND, "Nie znaleziono pliku."
+  IDS_TWCC_NOTEMPTY, "Operacja nie powiodła się, ponieważ katalog nie jest pusty."
+  IDS_TWCC_PAPERJAM, "Zacięcie się podajnika."
+  IDS_TWCC_PAPERDOUBLEFEED, "Podajnik wykrył wiele stron."
+  IDS_TWCC_FILEWRITEERROR, "Błąd zapisu pliku (dysk pełny?)."
+  IDS_TWCC_CHECKDEVICEONLINE, "Urządzenie przeszło w tryb offline przed tą operacją lub w jej trakcie."
+
+  IDS_CAPTHINT_APPL, "Całe okno aplikacji ze wszystkimi jego podoknami i oknami podrzędnymi."
+  IDS_CAPTHINT_WINDOW, "Okno (okno dialogowe, komunikat...), które ma fokus wejścia."
+  IDS_CAPTHINT_CLIENT, "Jak okno pierwszoplanowe, ale bez paska tytułu, ramki i menu okna."
+
+  IDS_DONT_SHOW_AGAIN, "&Nie pokazuj tego ponownie"
+  IDS_DONT_SHOW_AGAIN_SLA, "&Nie pokazuj tego ponownie i zapisz bez kanału alfa"
+  IDS_DONT_SHOW_AGAIN_UTH, "&Aktualizuj miniaturę bez pytania następnym razem"
+  IDS_REGENERATE_THUMBNAIL_TITLE, "PictView - Aktualizowanie miniatur..."
+  IDS_REGENERATE_THUMB_WARNING, "Ta funkcja zaktualizuje miniaturę w sekcji EXIF pliku(ów) obrazu. Reszta pliku nie zostanie zmodyfikowana. Kontynuować?"
+  IDS_REGENERATE_THUMB_WRITEFILE, "Nie można utworzyć pliku z nową miniaturą. Dysk pełny? Stary plik „%s” pozostaje niezmodyfikowany."
+
+  IDS_N_OF_N_FILES_PROCESSED "{!}Przetworzono tylko %d z %d plik{ów}{. Pozostałe pliki nie zostały zmodyfikowane.}"
+  IDS_NO_FILES_FOUND, "Nie znaleziono plików JPEG z danymi EXIF. Żaden plik nie został zmodyfikowany."
+  IDS_NOT_JPEG_FILE, "Ten plik nie jest plikiem JPEG — nie ma miniatury do aktualizacji."
+  IDS_NOT_EXIF_CREATE_JFXX, "Ten plik nie zawiera danych EXIF — nie ma miniatury EXIF do aktualizacji. Czy zamiast tego utworzyć miniaturę JFIF JFXX?"
+  IDS_READ_ONLY_MODIFY, "Plik jest tylko do odczytu. Modyfikować mimo to?"
+  IDS_READ_ONLY_REWRITE, "Plik %s jest tylko do odczytu. Nadpisać mimo to?"
+
+  IDS_CLRS_MONO, "2 kolory"
+  IDS_CLRS_16, "16 kolorów"
+  IDS_CLRS_256, "256 kolorów"
+  IDS_CLRS_HC15, "15-bitowy HiColor"
+  IDS_CLRS_HC16, "16-bitowy HiColor"
+  IDS_CLRS_TC24, "24-bitowy TrueColor"
+  IDS_CLRS_TC32, "32-bitowy TrueColor"
+  IDS_CLRS_256GR, "256 poziomów szarości"
+  IDS_FLIP_NONE, "Brak"
+  IDS_FLIP_VERT, "Pionowo"
+  IDS_FLIP_HOR, "Poziomo"
+  IDS_ROT_NONE, "Brak"
+  IDS_ROT_90, "90° w prawo"
+  IDS_ROT_180, "180°"
+  IDS_ROT_270, "270° w prawo"
+  IDS_SAVE_DEFAULT, "Domyślny"
+
+  IDS_HIST_HISTOGRAM, "Histogram"
+  IDS_HIST_LUMINOSITY, "Luminancja"
+  IDS_HIST_RED, "Czerwony"
+  IDS_HIST_GREEN, "Zielony"
+  IDS_HIST_BLUE, "Niebieski"
+  IDS_HIST_RGBSUM, "RGB"
+  IDS_HIST_MENU_LUMINOSITY, "Luminancja\tL"
+  IDS_HIST_MENU_RED, "Czerwony\tR"
+  IDS_HIST_MENU_GREEN, "Zielony\tG"
+  IDS_HIST_MENU_BLUE, "Niebieski\tB"
+  IDS_HIST_MENU_RGBSUM, "RGB\tA"
+  IDS_HIST_TIP_LUMINOSITY, "Luminancja (L)"
+  IDS_HIST_TIP_RED, "Czerwony (R)"
+  IDS_HIST_TIP_GREEN, "Zielony (G)"
+  IDS_HIST_TIP_BLUE, "Niebieski (B)"
+  IDS_HIST_TIP_RGBSUM, "RGB (A)"
+  IDS_HIST_TIP_OTHERCHANELS, "Pokaż inne kanały (O)"
+  IDS_DLL_NOTFOUND, "Komponent obrazowania Windows jest niedostępny, więc obrazy nie mogą zostać zdekodowane."
+  IDS_DLL_WRONG_VERSION, "Znaleziono niewłaściwą wersję pliku PVW32Cnv.dll."
+  IDS_SELECT_REGION, "Najpierw zaznacz obszar."
+  IDS_SAVE_ERR_EXISTS_OVERWRITE, "Plik ""%s"" już istnieje.\nCzy chcesz go zastąpić?"
+
+  IDS_SB_XY, "X:%d  Y:%d"
+  IDS_SB_WH, "S:%d  W:%d"
+  IDS_SB_RGB, "R:%d  G:%d  B:%d"
+  IDS_SB_CAGE, "Rysuje obrys prostokątnego zaznaczenia. Shift i Space to dodatkowe opcje."
+  IDS_SB_ZOOM, "Kliknij obraz, aby powiększyć; kliknij i przeciągnij, aby powiększyć obszar. Space do przeciągania ramki."
+  IDS_SB_HAND, "Kliknij i przeciągnij, aby przewinąć obraz w żądanym kierunku."
+
+  IDS_SB_AUTOROTATING, "Obracanie..."
+
+  IDS_UNIT_INCHES, "cale"
+  IDS_UNIT_CM, "cm"
+  IDS_UNIT_MM, "mm"
+  IDS_UNIT_POINTS, "punkty"
+  IDS_UNIT_PICAS, "cycero"
+
+  IDS_PRINT_NODEFPRINTER, "Nie znaleziono systemowej drukarki domyślnej. Zainstaluj drukarkę domyślną."
+  IDS_PRINT_NOPRINTERS, "Brak zainstalowanych drukarek."
+  IDS_PRINT_SETUPFAILED, "Nie można otworzyć okna ustawień drukarki."
+  IDS_PRINTING, "Drukowanie..."
+  IDS_PRINTING_FAILED,  "Drukowanie nie powiodło się.\n%s"
+  IDS_UNKNOWN_ERROR,    "Wystąpił nieznany błąd.\n"
+  IDS_CHECK_EVENTLOG,   "Dokładny komunikat o błędzie można znaleźć w Podglądzie zdarzeń."
+  // The following 2 strings are concatenated together
+  IDS_EXCEPT_INFO1,     "W programie PictView wystąpił wyjątek — powiadom autorów!\nJeśli w momencie wystąpienia wyjątku pracował(a) Pan/Pani z jakimś plikiem obrazu,\n"
+  IDS_EXCEPT_INFO2,     "spróbuj odtworzyć ten błąd z tym obrazem, a jeśli wyjątek\nwystąpi ponownie, prześlij nam ten obraz (odtworzymy i naprawimy błąd).\nDziękujemy za współpracę!"
+
+  IDS_NO_MORE_IMAGES,   "Brak dostępnych obrazów"
+  IDS_UNSUPPORTED_IMAGE_TYPE, "Ten obraz jest w formacie, który nie jest obsługiwany."
+  IDS_MUSTBEPOSITIVE,   "Podaj liczbę większą od zera."
+  IDS_SB_TIP_SELECT_SQUARE, "Wskazówka: stałe prostokąty o różnych proporcjach można wybrać w konfiguracji narzędzi."
+
+  IDS_WIA_ERROR_ACQUIREIMG, "Nie można pobrać obrazu z urządzenia. Sprawdź, czy urządzenie jest prawidłowo podłączone, i spróbuj ponownie. Błąd: (0x%08X) %s"
+  IDS_WIA_WAIT, "Czekaj..."
+  IDS_WIA_STATUS_TRANSFER_FROM_DEVICE, "Odczytywanie danych z urządzenia (ukończono %d%%)"
+  IDS_WIA_STATUS_PROCESSING_DATA, "Przetwarzanie danych (ukończono %d%%)"
+  IDS_WIA_STATUS_TRANSFER_TO_CLIENT, "Przesyłanie danych (ukończono %d%%)"
+
+  IDS_SCAN_OPEN_EXTRA_IMGS, "Odebrano więcej obrazów ze skanera. Pierwszy obraz został otwarty w tym oknie. Czy otworzyć pozostałe obrazy, każdy w osobnym oknie? Jeśli nie, obrazy zostaną zignorowane.\n\nLiczba nowych okien: %d"
+}
