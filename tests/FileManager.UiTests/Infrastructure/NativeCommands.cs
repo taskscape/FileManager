@@ -793,6 +793,15 @@ internal static class NativeCommands
         PostMessage(listHandle, WmLButtonUp, 0, point);
     }
 
+    internal static void SelectDialogListViewItemByPrefix(nint dialogHandle, int controlId, char prefix)
+    {
+        var listHandle = RequireDialogControl(dialogHandle, controlId);
+        TraceAction("select-list-item-prefix", listHandle, $"control={controlId} prefix={QuoteForTrace(prefix.ToString())}");
+        // The selector's standard list view applies type-ahead selection, avoiding a translated item name or file-order dependency.
+        SetFocus(listHandle);
+        SendMessage(listHandle, WmChar, prefix, 1);
+    }
+
     internal static void ActivateFilePanel(nint listHandle)
     {
         TraceAction("activate-file-panel", listHandle);

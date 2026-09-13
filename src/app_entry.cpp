@@ -2096,12 +2096,16 @@ int WinMainBody(HINSTANCE hInstance, HINSTANCE /*hPrevInstance*/, LPSTR cmdLine,
         goto EXIT_1;
     }
     const char* configKey = autoImportConfig ? autoImportConfigFromKey : SalamanderConfigurationRoots[0];
+    // The language is needed before the full configuration loads, but it must come from the
+    // committed snapshot rather than the version-root container that holds its generations.
+    SetConfigurationStoreRoot(configKey);
+    SelectCommittedConfigurationGeneration();
 
     // zkusime z aktualni konfigurace vytahnout klic urcujici jazyk
     LoadSaveToRegistryMutex.Enter();
     HKEY hSalamander;
     DWORD langChanged = FALSE; // TRUE = starting Salamander for the first time with another language (load all plugins to verify we have this language version for them too, or let user choose fallback versions)
-    if (OpenKey(HKEY_CURRENT_USER, configKey, hSalamander))
+    if (OpenKey(HKEY_CURRENT_USER, SALAMANDER_ROOT_REG, hSalamander))
     {
         HKEY actKey;
         DWORD configVersion = 1; // toto je konfig od 1.52 a starsi

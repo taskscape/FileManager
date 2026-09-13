@@ -28,6 +28,9 @@ internal static class ConfigurationDialogPages
     // (IDR_RECYCLE1 in src/lang/lang.rh).
     private const int ImmediateDeletionRadio = 538;
 
+    // Regional page: the language picker is the stable route to the configured SLG module.
+    private const int LanguageButton = 387;
+
     private const uint BmClick = 0x00F5;
     private const uint BmGetCheck = 0x00F0;
 
@@ -131,6 +134,10 @@ internal static class ConfigurationDialogPages
         SendMessage(radio, BmClick, 0, 0);
         return SendMessage(radio, BmGetCheck, 0, 0) == 1;
     }
+
+    /// <summary>Activates the Regional page without depending on its translated tree label.</summary>
+    internal static bool SelectLanguagePage(nint configurationDialog) =>
+        SelectPageWithControl(configurationDialog, LanguageButton) != 0;
 
     /// <summary>
     /// Walks the page tree until the created page carries <paramref name="controlId"/>.
