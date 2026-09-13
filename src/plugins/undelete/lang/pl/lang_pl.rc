@@ -1,0 +1,200 @@
+// Microsoft Visual C++ generated resource script.
+//
+#pragma code_page(65001)
+
+#include "..\lang.rh"
+
+#define APSTUDIO_READONLY_SYMBOLS
+/////////////////////////////////////////////////////////////////////////////
+//
+// Generated from the TEXTINCLUDE 2 resource.
+//
+#include "winresrc.h"
+
+#include "..\..\undelete.rh2"
+
+/////////////////////////////////////////////////////////////////////////////
+#undef APSTUDIO_READONLY_SYMBOLS
+
+/////////////////////////////////////////////////////////////////////////////
+// Neutral resources
+
+#if !defined(AFX_RESOURCE_DLL) || defined(AFX_TARG_NEU)
+LANGUAGE LANG_NEUTRAL, SUBLANG_NEUTRAL
+
+#ifdef APSTUDIO_INVOKED
+/////////////////////////////////////////////////////////////////////////////
+//
+// TEXTINCLUDE
+//
+
+1 TEXTINCLUDE
+BEGIN
+    "lang.rh\0"
+END
+
+2 TEXTINCLUDE
+BEGIN
+    "#include ""winresrc.h""\r\n"
+    "\r\n"
+    "#include ""..\\undelete.rh2""\r\n"
+    "\0"
+END
+
+3 TEXTINCLUDE
+BEGIN
+    "#if !defined(AFX_RESOURCE_DLL) || defined(AFX_TARG_NEU)\r\n"
+    "LANGUAGE LANG_NEUTRAL,SUBLANG_NEUTRAL\r\n"
+    "#include ""lang.rc2""   // non-Microsoft Visual C++ edited resources\r\n"
+    "#endif\r\n"
+    "\0"
+END
+
+#endif    // APSTUDIO_INVOKED
+
+
+/////////////////////////////////////////////////////////////////////////////
+//
+// Dialog
+//
+
+IDD_SNAPSHOTPROGRESSDLG DIALOGEX 18, 80, 341, 77
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION
+CAPTION "Undelete"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    CONTROL         "",IDC_LABEL_FILENAME,"Static",SS_LEFTNOWORDWRAP | SS_NOPREFIX | WS_GROUP,12,12,323,8
+    LTEXT           "",IDC_PROGRESSBAR,35,32,292,12,NOT WS_GROUP
+    DEFPUSHBUTTON   "Anuluj",IDCANCEL,144,54,50,14
+    LTEXT           "Razem:",IDC_STATIC_1,12,33,22,8
+END
+
+IDD_CONNECT DIALOGEX 18, 80, 443, 285
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Undelete"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    GROUPBOX        "Wybór &dysku do analizy",IDC_STATIC_1,6,7,430,193,WS_GROUP
+    CONTROL         "",IDC_LIST_VOLUMES,"SysListView32",LVS_REPORT | LVS_SINGLESEL | LVS_SHOWSELALWAYS | LVS_SORTASCENDING | LVS_NOSORTHEADER | WS_BORDER | WS_GROUP | WS_TABSTOP,14,21,414,139
+    CONTROL         "&Obraz dysku",IDC_CHECK_IMAGE,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,14,166,51,10
+    EDITTEXT        IDC_EDIT_IMAGE,14,178,361,14,ES_AUTOHSCROLL
+    PUSHBUTTON      "&Przeglądaj...",IDC_BUTTON_BROWSE,379,178,50,14,WS_GROUP
+    CONTROL         "Skanuj &wolne klastry na partycjach FAT",IDC_CHECK_SCANVACANT,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,7,208,184,10
+    CONTROL         "Pokaż &istniejące pliki i katalogi",IDC_CHECK_SHOWEXISTING,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,7,220,184,10
+    CONTROL         "Pokaż pliki o &zerowym rozmiarze",IDC_CHECK_SHOWZEROFILES,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,7,232,184,10
+    CONTROL         "Pokaż pu&ste katalogi",IDC_CHECK_SHOWEMPTYDIRS,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,7,244,184,10
+    CONTROL         "Pokaż &metapliki",IDC_CHECK_SHOWMETAFILES,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,7,256,184,10
+    CONTROL         "Szacuj &uszkodzenia plików",IDC_CHECK_ESTIMATEDAMAGE,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,7,268,184,10
+    DEFPUSHBUTTON   "OK",IDOK,278,264,50,14,WS_GROUP
+    PUSHBUTTON      "Anuluj",IDCANCEL,332,264,50,14
+    PUSHBUTTON      "Pomoc",IDHELP,386,264,50,14
+END
+
+IDD_COPYPROGRESSDLG DIALOGEX 18, 80, 353, 102
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION
+CAPTION "Undelete"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    RTEXT           "Odzyskiwanie",IDC_LABEL_UNDELETING,3,11,40,8
+    CONTROL         "",IDC_LABEL_SOURCE,"Static",SS_LEFTNOWORDWRAP | SS_NOPREFIX | WS_GROUP,47,11,301,8
+    RTEXT           "do",IDC_STATIC_1,3,23,40,8
+    CONTROL         "",IDC_LABEL_DEST,"Static",SS_LEFTNOWORDWRAP | SS_NOPREFIX | WS_GROUP,47,23,301,8
+    RTEXT           "Plik:",IDC_STATIC_2,3,41,40,8
+    LTEXT           "",IDC_PROGRESS_FILE,47,40,293,12,NOT WS_GROUP
+    RTEXT           "Razem:",IDC_STATIC_3,3,56,40,8
+    LTEXT           "",IDC_PROGRESS_TOTAL,47,55,293,12,NOT WS_GROUP
+    DEFPUSHBUTTON   "Anuluj",IDCANCEL,151,78,50,14
+END
+
+IDD_FILENAME DIALOGEX 0, 0, 213, 74
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Uszkodzona nazwa pliku"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "Nie można odzyskać pierwszej litery następującej nazwy pliku. Wprowadź oryginalny znak.",IDC_STATIC_1,7,7,199,16
+    EDITTEXT        IDC_EDIT_FILENAME,7,27,199,14,ES_AUTOHSCROLL
+    DEFPUSHBUTTON   "OK",IDOK,44,53,50,14
+    PUSHBUTTON      "&Wszystkie",IDC_BUTTON_ALL,100,53,50,14
+    PUSHBUTTON      "Anuluj",IDCANCEL,156,53,50,14
+END
+
+IDD_CONFIG DIALOGEX 0, 0, 257, 100
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Konfiguracja programu Undelete"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "Zapasowy katalog &tymczasowy do przeglądania plików:",IDC_STATIC_1,7,7,163,8
+    EDITTEXT        IDC_EDIT_TEMPPATH,7,17,222,14,ES_AUTOHSCROLL
+    PUSHBUTTON      "...",IDC_BUTTON_BROWSE,235,17,16,14,WS_GROUP
+    CONTROL         "Zawsze ponownie &używaj informacji z poprzedniego skanowania klastrów na FAT",IDC_CHECK_ALWAYSREUSE,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,7,39,194,10
+    CONTROL         "Nie ostrzegaj przy odzyskiwaniu na ten &sam dysk logiczny",IDC_CHECK_SAMEPARTITION,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,7,50,193,10
+    CONTROL         "Nie ostrzegaj przed odzyskiwaniem &zaszyfrowanych plików na FAT lub exFAT",IDC_CHECK_EFS,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,7,61,223,10
+    DEFPUSHBUTTON   "OK",IDOK,91,80,50,14,WS_GROUP
+    PUSHBUTTON      "Anuluj",IDCANCEL,146,80,50,14
+    PUSHBUTTON      "Pomoc",IDHELP,201,80,50,14
+END
+
+IDD_RESTORE DIALOGEX 0, 0, 276, 95
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Odzyskaj zaszyfrowane pliki z kopii zapasowej"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "Ta funkcja przywróci zaszyfrowane pliki, które wcześniej odzyskano na partycję bez obsługi systemu szyfrowania plików (EFS), np. FAT. Zwykłe pliki (inne niż *.bak) zostaną skopiowane bez zmian.",IDC_STATIC_1,7,7,262,24
+    LTEXT           "&Odzyskaj %s do:",IDC_LABEL_SOURCE,7,41,262,8
+    EDITTEXT        IDC_EDIT_TARGET,7,51,244,14,ES_AUTOHSCROLL
+    PUSHBUTTON      "...",IDC_BUTTON_BROWSE,255,51,14,14,WS_GROUP
+    DEFPUSHBUTTON   "OK",IDOK,57,74,50,14,WS_GROUP
+    PUSHBUTTON      "Anuluj",IDCANCEL,113,74,50,14
+    PUSHBUTTON      "Pomoc",IDHELP,169,74,50,14
+END
+
+
+/////////////////////////////////////////////////////////////////////////////
+//
+// DESIGNINFO
+//
+
+#ifdef APSTUDIO_INVOKED
+GUIDELINES DESIGNINFO
+BEGIN
+    IDD_CONNECT, DIALOG
+    BEGIN
+        BOTTOMMARGIN, 273
+    END
+END
+#endif    // APSTUDIO_INVOKED
+
+
+/////////////////////////////////////////////////////////////////////////////
+//
+// AFX_DIALOG_LAYOUT
+//
+
+IDD_CONNECT AFX_DIALOG_LAYOUT
+BEGIN
+    0
+END
+
+#endif    // Neutral resources
+/////////////////////////////////////////////////////////////////////////////
+
+
+
+#ifndef APSTUDIO_INVOKED
+/////////////////////////////////////////////////////////////////////////////
+//
+// Generated from the TEXTINCLUDE 3 resource.
+//
+#if !defined(AFX_RESOURCE_DLL) || defined(AFX_TARG_NEU)
+LANGUAGE LANG_NEUTRAL,SUBLANG_NEUTRAL
+#include "lang_pl.rc2"   // Polish language resources
+#endif
+
+/////////////////////////////////////////////////////////////////////////////
+#endif    // not APSTUDIO_INVOKED

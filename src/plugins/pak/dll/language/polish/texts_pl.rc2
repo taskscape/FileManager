@@ -1,0 +1,28 @@
+//
+// texts_pl.rc2 - Polish language resources (not edited by Visual Studio)
+//
+
+#ifdef APSTUDIO_INVOKED
+#error this file is not editable by Microsoft Visual C++
+#endif //APSTUDIO_INVOKED
+
+/////////////////////////////////////////////////////////////////////////////
+// Add manually edited resources here...
+
+#include "..\..\texts.rh2"
+
+STRINGTABLE
+{
+ IDS_PAK_ERROPEN, "Nie można otworzyć pliku: %s"
+ IDS_PAK_ERRINIT, "Nie można zainicjować interfejsu paklib. Jeden plik jest już otwarty."
+ IDS_PAK_ERROPEN2, "Nie można otworzyć pliku. Jeden plik jest już otwarty."
+ IDS_PAK_ERRGETFILESIZE, "Nie można pobrać rozmiaru pliku: %s"
+ IDS_PAK_INVLAIDDATA, "Nieprawidłowy format danych."
+ IDS_PAK_LOWMEMORY, "Za mało pamięci."
+ IDS_PAK_CENTRDIR, "bieżący katalog centralny PAK"
+ IDS_PAK_ERRSETFILEPTR, "Nie można ustawić wskaźnika pliku: %s"
+ IDS_PAK_ERRREADFILE, "Nie można odczytać z pliku: %s"
+ IDS_PAK_ERRGETFILEPTR, "Nie można pobrać wskaźnika pliku: %s"
+ IDS_PAK_ERRWRITEFILE, "Nie można zapisać do pliku: %s"
+ IDS_PAK_TOOLONGNAME, "Nie można dodać pliku z powodu zbyt długiej nazwy."
+}

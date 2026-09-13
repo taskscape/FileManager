@@ -105,4 +105,42 @@ lang_renamer    0x39c00000
 portables       0x29d00000
 lang_portables  0x39d00000
 regliba         0x29e00000
+; Polish plug-in language modules: one fixed slot per pack, allocated as a
+; contiguous block above all other modules. A plugin loads its English or
+; Polish .slg, never both, so these slots never collide with the lang_* ones.
+lang_pl_7zip        0x40000000
+lang_pl_automation  0x40200000
+lang_pl_checksum    0x40400000
+lang_pl_checkver    0x40600000
+lang_pl_dbviewer    0x40800000
+lang_pl_demomenu    0x40a00000
+lang_pl_demoplug    0x40c00000
+lang_pl_demoview    0x40e00000
+lang_pl_diskmap     0x41000000
+lang_pl_filecomp    0x41200000
+lang_pl_folders     0x41400000
+lang_pl_ftp         0x41600000
+lang_pl_ieviewer    0x41800000
+lang_pl_mmviewer    0x41a00000
+lang_pl_nethood     0x41c00000
+lang_pl_pak         0x41e00000
+lang_pl_peviewer    0x42000000
+lang_pl_pictview    0x42200000
+lang_pl_portables   0x42400000
+lang_pl_regedt      0x42600000
+lang_pl_renamer     0x42800000
+lang_pl_splitcbn    0x42a00000
+lang_pl_tar         0x42c00000
+lang_pl_unarj       0x42e00000
+lang_pl_uncab       0x43000000
+lang_pl_unchm       0x43200000
+lang_pl_undelete    0x43400000
+lang_pl_uniso       0x43600000
+lang_pl_unfat       0x43800000
+lang_pl_unlha       0x43a00000
+lang_pl_unmime      0x43c00000
+lang_pl_unole       0x43e00000
+lang_pl_unrar       0x44000000
+lang_pl_wmobile     0x44200000
+lang_pl_zip         0x44400000
 

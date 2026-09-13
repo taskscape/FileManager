@@ -1,0 +1,31 @@
+//
+// lang_pl.rc2 - Polish language resources (not edited by Visual Studio)
+//
+
+#ifdef APSTUDIO_INVOKED
+#error this file is not editable by Microsoft Visual C++
+#endif //APSTUDIO_INVOKED
+
+// The Polish VERSIONINFO identity is applied before the shared VERSIONINFO
+// template include; the plugin's versinfo.rh2 is include-guarded, so these
+// overrides survive the template chain and keep POLISH.SLG valid for
+// IsSLGFileValid (version match + 0x0415 translation language).
+#include "..\..\versinfo.rh2"
+#undef VERSINFO_INTERNAL
+#define VERSINFO_INTERNAL    "POLISH"
+#undef VERSINFO_ORIGINAL
+#define VERSINFO_ORIGINAL    VERSINFO_INTERNAL ".SLG"
+#undef VERSINFO_SLG_COMMENT
+#define VERSINFO_SLG_COMMENT "Wersja polska"
+#define VERSINFO_TRANSLATION_LANG    0x0415
+#define VERSINFO_TRANSLATION_SUBLANG 0x0415
+#include "versinfo.rc2"
+
+// String Table
+STRINGTABLE
+{
+    IDS_PLUGINNAME              "Foldery"
+    IDS_ABOUT                   "Informacje o wtyczce"
+    IDS_PLUGIN_DESCRIPTION      "Przeglądanie folderów, takich jak Pulpit, Panel sterowania, Kosz itd."
+    IDS_DRIVEMENUTEXT,          "'\tPulpit"
+}

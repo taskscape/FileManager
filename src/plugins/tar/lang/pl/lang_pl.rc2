@@ -1,0 +1,67 @@
+//
+// lang_pl.rc2 - Polish language resources (not edited by Visual Studio)
+//
+
+#ifdef APSTUDIO_INVOKED
+#error this file is not editable by Microsoft Visual C++
+#endif //APSTUDIO_INVOKED
+
+// The Polish VERSIONINFO identity is applied before the shared VERSIONINFO
+// template include; the plugin's versinfo.rh2 is include-guarded, so these
+// overrides survive the template chain and keep POLISH.SLG valid for
+// IsSLGFileValid (version match + 0x0415 translation language).
+#include "..\..\versinfo.rh2"
+#undef VERSINFO_INTERNAL
+#define VERSINFO_INTERNAL    "POLISH"
+#undef VERSINFO_ORIGINAL
+#define VERSINFO_ORIGINAL    VERSINFO_INTERNAL ".SLG"
+#undef VERSINFO_SLG_COMMENT
+#define VERSINFO_SLG_COMMENT "Wersja polska"
+#define VERSINFO_TRANSLATION_LANG    0x0415
+#define VERSINFO_TRANSLATION_SUBLANG 0x0415
+#include "versinfo.rc2"
+
+STRINGTABLE
+{
+ IDS_PLUGINNAME, "TAR"
+ IDS_PLUGIN_DESCRIPTION, "Przeglądanie i rozpakowywanie archiwów Unixa."
+ IDS_ABOUT, "Informacje o wtyczce"
+ IDS_TARERR_TITLE, "Błąd wtyczki TAR"
+ IDS_TARERR_UNKNOWN, "Nierozpoznany lub nieobsługiwany format archiwum."
+ IDS_TARERR_HEADER, "Nieprawidłowe dane w nagłówku TAR - archiwum jest uszkodzone."
+ IDS_TARERR_CHECKSUM, "Błędna suma kontrolna pliku lub nagłówka - archiwum jest uszkodzone."
+ IDS_TARERR_FDATA, "Błąd wewnętrzny: uszkodzona struktura danych pliku."
+ IDS_TARERR_BADSIG, "Nieznany podpis bloku - pomijanie."
+ IDS_TARERR_NOTFOUND, "Nie znaleziono wymaganego pliku w archiwum."
+ IDS_TARERR_MEMORY, "Błąd alokacji pamięci."
+ IDS_UNPACKPROGRESS_TITLE, "Rozpakowywanie"
+ IDS_UNPACKPROGRESS_TEXT, "Rozpakowywanie "
+ IDS_SKIPPROGRESS_TEXT, "Pomijanie "
+ IDS_GZERR_TITLE, "Błąd GZip"
+ IDS_GZERR_BADMETHOD, "Nieznana metoda kompresji, nie można rozpakować."
+ IDS_GZERR_ENCRYPTED, "Ten plik jest zaszyfrowany. Szyfrowanie nie jest obsługiwane w archiwach GZip."
+ IDS_GZERR_MULTIPART, "Ten plik jest częścią archiwum wieloczęściowego. Wieloczęściowe archiwa GZip nie są obsługiwane."
+ IDS_GZERR_BADFLAGS, "Napotkano nieznane flagi w nagłówku GZip, nie można rozpakować."
+ IDS_GZERR_FOPEN, "Błąd otwierania pliku archiwum: "
+ IDS_ERR_FREAD, "Błąd odczytu pliku archiwum: "
+ IDS_TARERR_FWRITE, "Błąd zapisu do pliku wyjściowego: "
+ IDS_TARERR_WRSIZE, "Funkcja WriteFile odmówiła zapisania wszystkich żądanych danych."
+ IDS_GZERR_BADBLOCKTYPE, "Napotkano nieprawidłowy blok w strumieniu GZip, nie można rozpakować."
+ IDS_ERR_INTERNAL, "Błąd wewnętrzny wtyczki TAR, powiadom nas o nim e-mailem na adres support@taskscape.com."
+ IDS_ERR_MEMORY, "Błąd alokacji pamięci."
+ IDS_GZERR_CRC, "Błąd CRC."
+ IDS_ERR_CORRUPT, "Nieoczekiwane dane w strumieniu skompresowanym, archiwum jest uszkodzone."
+ IDS_ERR_EOF, "Napotkano przedwczesny koniec pliku."
+ IDS_GZERR_SEEK, "Błąd przesuwania wskaźnika w pliku archiwum: "
+ IDS_RPM_VIEWTITLE, "Przeglądarka RPM"
+ IDS_ERR_RPMTITLE, "Błąd RPM"
+ IDS_RPMERR_TMPNAME, "Błąd tworzenia nazwy pliku tymczasowego."
+ IDS_RPMERR_TMPFILE, "Błąd tworzenia pliku tymczasowego."
+ IDS_ERR_NORPM, "Plik nie został rozpoznany jako archiwum RPM."
+ IDS_ERR_BADRPMVERSION, "Wersja formatu RPM żądana przez to archiwum nie jest obsługiwana."
+ IDS_ERR_BADSIGNATURE, "Napotkano nieznany podpis archiwum RPM."
+ IDS_CPIOERR_BADSIG, "Rekord pliku ma nieprawidłowy podpis."
+ IDS_CPIOERR_HEADER, "Uszkodzony rekord nagłówka pliku."
+ IDS_CPIOERR_FORMAT, "Nieznany format nagłówka cpio."
+ IDS_LZH_NOT_IMPLEMENTED, "Archiwa LZH nie są jeszcze obsługiwane."
+}

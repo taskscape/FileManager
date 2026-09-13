@@ -1,0 +1,81 @@
+//
+// lang_pl.rc2 - Polish language resources (not edited by Visual Studio)
+//
+
+#ifdef APSTUDIO_INVOKED
+#error this file is not editable by Microsoft Visual C++
+#endif //APSTUDIO_INVOKED
+
+// The Polish VERSIONINFO identity is applied before the shared VERSIONINFO
+// template include; the plugin's versinfo.rh2 is include-guarded, so these
+// overrides survive the template chain and keep POLISH.SLG valid for
+// IsSLGFileValid (version match + 0x0415 translation language).
+#include "..\..\versinfo.rh2"
+#undef VERSINFO_INTERNAL
+#define VERSINFO_INTERNAL    "POLISH"
+#undef VERSINFO_ORIGINAL
+#define VERSINFO_ORIGINAL    VERSINFO_INTERNAL ".SLG"
+#undef VERSINFO_SLG_COMMENT
+#define VERSINFO_SLG_COMMENT "Wersja polska"
+#define VERSINFO_TRANSLATION_LANG    0x0415
+#define VERSINFO_TRANSLATION_SUBLANG 0x0415
+#include "versinfo.rc2"
+
+#include "..\..\library\texts_pl.rc2"
+
+STRINGTABLE
+{
+  IDS_UNDELETE, "Undelete"
+  IDS_DESCRIPTION, "Odzyskuje pliki usunięte z partycji FAT lub NTFS."
+  IDS_ABOUTTITLE, "Informacje o wtyczce"
+  //IDS_ERRORMETADAMAGED, "Error reading MFT: one or more of the metafile records are damaged."
+  IDS_METAFILES, "{Metapliki}"
+  IDS_PATHDISK, "Ścieżka musi zawierać dysk."
+  IDS_PATHFILE, "Ścieżka prowadzi do pliku. Nie można otworzyć pliku."
+  IDS_PATHNOTFOUND, "Nie znaleziono ścieżki."
+  IDS_IMAGENOTFOUND, "Nie znaleziono podanego pliku."
+  IDS_ERROROPENINGPROGRESS, "Błąd otwierania okna postępu."
+  IDS_VOLENUMERATE, "Błąd wyliczania woluminów systemowych."
+  IDS_OPENINGVOLUME, "Otwieranie woluminu..."
+  IDS_SCANNINGFOUND, "{!}Skanowanie wolnych klastrów... (znaleziono %d klastr{ów|0||1|y|4|ów|11|y|14|ów} katalogów)"
+  IDS_ALWAYSCHOOSEYES, "Zawsze wybieraj Tak (w razie potrzeby można to zresetować w oknie Konfiguracja)"
+  IDS_PATHTOOLONG, "Ścieżka docelowa jest zbyt długa"
+  IDS_QUESTION, "Pytanie"
+  IDS_WANTCANCEL, "Czy chcesz anulować tę operację?"
+  IDS_BADPATH, "Odzyskiwanie do archiwów lub systemów plików wtyczek nie jest obsługiwane."
+  IDS_ERROR, "Błąd" // title of error messages
+  IDS_VIEW, "Podgląd" // the function "F3"
+  IDS_TEMPDIR, "Aby przeglądać pliki na %c:, należy określić zapasowy katalog tymczasowy na innym dysku logicznym niż %c:"
+  IDS_WAIT, "Odzyskiwanie pliku do katalogu tymczasowego, czekaj"
+  IDS_ENCRYPTEDWARNING, "Wolumin docelowy nie obsługuje systemu szyfrowania plików (EFS).\n\nZaszyfrowane pliki zostaną odzyskane w formacie kopii zapasowej, który można później wykorzystać do przywrócenia plików na partycji NTFS za pomocą polecenia ""Wtyczki/Undelete/Odzyskaj zaszyfrowane pliki z kopii zapasowej""."
+  IDS_DONTSHOWAGAIN, "Nie pokazuj tego ponownie"
+  IDS_CHOOSETEMPDIR, "Wybierz zapasowy katalog tymczasowy:"
+  IDS_SAMEPARTITION, "Wygląda na to, że odzyskujesz pliki na ten sam dysk logiczny, na którym znajdują się usunięte pliki. Zawsze odzyskuj pliki na inną partycję — w przeciwnym razie odzyskiwane pliki mogą zostać nadpisane same przez siebie albo możesz stracić inne usunięte pliki.\n\nWskazówka: jeśli nie masz wielu partycji, możesz też odzyskiwać pliki na dyskietkę lub dysk USB."
+  IDS_UNDELETECMD, "&Odzyskaj usunięte pliki i katalogi..."
+  IDS_ERRORENCRYPTED, "Nie można odzyskać zaszyfrowanego pliku: "
+  IDS_RESTORECMD, "Odzyskaj &zaszyfrowane pliki z kopii zapasowej..."
+  IDS_CANNOTVIEW, "Nie można przeglądać pliku — katalog tymczasowy nie obsługuje systemu szyfrowania plików (EFS)"
+  IDS_CHOOSETARGET, "Wybierz katalog docelowy"
+  IDS_RESTORE, "Odzyskiwanie" // title of Restore Encrypted Files progress dialog
+  IDS_RESTORING, "Odzyskiwanie" // label inside the progress dialog
+  IDS_READINGTREE, "Odczytywanie drzewa katalogów..." //, press the ESC key to cancel..."
+  IDS_NOEFS, "Wolumin docelowy nie obsługuje systemu szyfrowania plików (EFS)."
+  IDS_VOLUME_MOUNT, "Punkt instalacji"
+  IDS_VOLUME_NAME, "Nazwa"
+  IDS_VOLUME_FORMAT, "Format"
+  IDS_VOLUME_SIZE, "Rozmiar"
+  IDS_VOLUME_FREE, "Wolne"
+  IDS_VOLUME_FREEPROC, "% wolne"
+  IDS_VOLUME_VOLID, "Ścieżka GUID"
+  IDS_CONDITION, "Stan"
+  IDS_CONDITIONDESC, "Szacowanie uszkodzeń plików"
+  IDS_CONDITION_GOOD, "Dobry"
+  IDS_CONDITION_FAIR, "Zadowalający"
+  IDS_CONDITION_POOR, "Słaby"
+  IDS_CONDITION_LOST, "Utracony"
+  IDS_CONDITION_UNKNOWN, "Nieznany"
+  IDS_UNDELETEINCHDRVMENU, "\tUndelete"
+  IDS_PARTIALRECOVER, "Następującego pliku nie można odzyskać w całości: %s\n\nCzy odzyskać tylko część pliku?"
+  IDS_PARTIALRECOVER_DONTASK, "Wybierz tę samą odpowiedź następnym razem"
+  IDS_ERRORRECOVER, "Błąd odzyskiwania pliku %s"
+}

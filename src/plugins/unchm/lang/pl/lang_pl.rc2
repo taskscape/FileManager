@@ -1,0 +1,53 @@
+//
+// lang_pl.rc2 - Polish language resources (not edited by Visual Studio)
+//
+
+#ifdef APSTUDIO_INVOKED
+#error this file is not editable by Microsoft Visual C++
+#endif //APSTUDIO_INVOKED
+
+// The Polish VERSIONINFO identity is applied before the shared VERSIONINFO
+// template include; the plugin's versinfo.rh2 is include-guarded, so these
+// overrides survive the template chain and keep POLISH.SLG valid for
+// IsSLGFileValid (version match + 0x0415 translation language).
+#include "..\..\versinfo.rh2"
+#undef VERSINFO_INTERNAL
+#define VERSINFO_INTERNAL    "POLISH"
+#undef VERSINFO_ORIGINAL
+#define VERSINFO_ORIGINAL    VERSINFO_INTERNAL ".SLG"
+#undef VERSINFO_SLG_COMMENT
+#define VERSINFO_SLG_COMMENT "Wersja polska"
+#define VERSINFO_TRANSLATION_LANG    0x0415
+#define VERSINFO_TRANSLATION_SUBLANG 0x0415
+#include "versinfo.rc2"
+
+// String Table
+STRINGTABLE DISCARDABLE
+{
+    IDS_PLUGINNAME              "UnCHM"
+    IDS_CANT_OPEN               "Nie można otworzyć pliku."
+    IDS_UNKNOW_ERROR            "Nieokreślony błąd."
+    IDS_UNPACKING_ARCHIVE       "Rozpakowywanie archiwum CHM"
+    IDS_ERROR_UNPACKING         "Błąd rozpakowywania pliku."
+    IDS_CANT_HANDLE_FILE        "Nie można obsłużyć tego pliku."
+    IDS_INSUFFICIENT_MEMORY     "Za mało pamięci."
+    IDS_ABOUT                   "Informacje o wtyczce"
+    IDS_PLUGIN_DESCRIPTION      "Przeglądanie i rozpakowywanie plików CHM."
+    IDS_CANT_CREATE_TEMP        "Nie można utworzyć katalogu tymczasowego."
+    IDS_CANT_DELETE_TEMP_FILE   "Nie można usunąć pliku tymczasowego."
+    IDS_UNKNOWN_FILE_FORMAT     "Nieznany format pliku lub nieprawidłowy obraz CHM.\n\nJeśli masz pewność, że to prawidłowy obraz CHM, skontaktuj się z nami na adres support@taskscape.com i pomóż nam dodać obsługę tego formatu."
+    IDS_CANT_OPEN_FILE          "Nie można otworzyć tego pliku."
+    IDS_ERR_TMP                 "Utworzenie pliku tymczasowego nie powiodło się."
+    IDS_CANT_SET_ATTRS          "Nie można ustawić atrybutów pliku."
+    IDS_CANT_CREATE_DIR         "Nie można utworzyć katalogu '%s'."
+    IDS_YES                     "Tak"
+    IDS_NO                      "Nie"
+    IDS_ERROR                   "Błąd"
+    IDS_WARNING                 "Ostrzeżenie"
+    IDS_READERROR               "Błąd odczytu"
+    IDS_WRITEERROR              "Błąd zapisu"
+    IDS_INTERNAL_PLUGIN_ERROR   "Błąd wewnętrzny wtyczki."
+    IDS_INVALIDNUMBER           "Nieprawidłowa liczba."
+    IDS_CANCELOPER              "anulowanie operacji, czekaj..."
+    IDS_CHMLIBCOPYRIGHT         "CHMLIB Library Copyright © 2001-2010 Jed Wing"
+}

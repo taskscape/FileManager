@@ -1,0 +1,47 @@
+//
+// lang_pl.rc2 - Polish language resources (not edited by Visual Studio)
+//
+
+#ifdef APSTUDIO_INVOKED
+#error this file is not editable by Microsoft Visual C++
+#endif //APSTUDIO_INVOKED
+
+// The Polish VERSIONINFO identity is applied before the shared VERSIONINFO
+// template include; the plugin's versinfo.rh2 is include-guarded, so these
+// overrides survive the template chain and keep POLISH.SLG valid for
+// IsSLGFileValid (version match + 0x0415 translation language).
+#include "..\..\versinfo.rh2"
+#undef VERSINFO_INTERNAL
+#define VERSINFO_INTERNAL    "POLISH"
+#undef VERSINFO_ORIGINAL
+#define VERSINFO_ORIGINAL    VERSINFO_INTERNAL ".SLG"
+#undef VERSINFO_SLG_COMMENT
+#define VERSINFO_SLG_COMMENT "Wersja polska"
+#define VERSINFO_TRANSLATION_LANG    0x0415
+#define VERSINFO_TRANSLATION_SUBLANG 0x0415
+#include "versinfo.rc2"
+
+STRINGTABLE
+{
+ IDS_PLUGIN_DESCRIPTION, "Przeglądanie i rozpakowywanie archiwów LHA."
+ IDS_ABOUT, "Informacje o wtyczce"
+ IDS_FILECORRUPT, "Nieprawidłowy plik LZH lub nieznany format pliku."
+ IDS_CHECKSUMERROR, "Błąd sumy kontrolnej nagłówka.\nArchiwum jest uszkodzone - nie wszystkie pliki można wyświetlić."
+ IDS_LOWMEM, "Za mało pamięci."
+ IDS_WRITEERROR, "Błąd zapisu"
+ IDS_PLUGINNAME, "UnLHA"
+ IDS_OPENERROR, "Błąd otwierania archiwum."
+ IDS_LIST, "Nie można dodać wpisu archiwum do listy plików."
+ IDS_SYMLINK, "Archiwum zawiera jedno lub więcej łączy symbolicznych UNIX, które nie zostaną wyświetlone."
+ IDS_UNPACKERROR, "Nie można rozpakować pliku."
+ IDS_CRCERROR, "Błąd w danych skompresowanych. Suma CRC się nie zgadza."
+ IDS_READERROR, "Błąd odczytu archiwum."
+ IDS_EXTRPROGTITLE, "Rozpakowywanie archiwum LHA - %s"
+ IDS_PREPAREDATA, "przygotowywanie danych i tworzenie katalogów..."
+ IDS_UNPACKING, "rozpakowywanie: "
+ IDS_EXTRACTFILES, "rozpakowywanie..."
+ IDS_TOOLONGNAME, "Nie można ukończyć operacji z powodu zbyt długiej nazwy ścieżki."
+ IDS_TOOLONGMASK, "Nie można ukończyć operacji z powodu zbyt długiej maski."
+ IDS_METHOD, "Nieznana metoda kompresji. Plik nie może zostać rozpakowany."
+ IDS_METHOD2, "pomijanie nieznanej metody..."
+}

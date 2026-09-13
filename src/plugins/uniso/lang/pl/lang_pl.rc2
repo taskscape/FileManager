@@ -1,0 +1,108 @@
+//
+// lang_pl.rc2 - Polish language resources (not edited by Visual Studio)
+//
+
+#ifdef APSTUDIO_INVOKED
+#error this file is not editable by Microsoft Visual C++
+#endif //APSTUDIO_INVOKED
+
+// The Polish VERSIONINFO identity is applied before the shared VERSIONINFO
+// template include; the plugin's versinfo.rh2 is include-guarded, so these
+// overrides survive the template chain and keep POLISH.SLG valid for
+// IsSLGFileValid (version match + 0x0415 translation language).
+#include "..\versinfo.rh2"
+#undef VERSINFO_INTERNAL
+#define VERSINFO_INTERNAL    "POLISH"
+#undef VERSINFO_ORIGINAL
+#define VERSINFO_ORIGINAL    VERSINFO_INTERNAL ".SLG"
+#undef VERSINFO_SLG_COMMENT
+#define VERSINFO_SLG_COMMENT "Wersja polska"
+#define VERSINFO_TRANSLATION_LANG    0x0415
+#define VERSINFO_TRANSLATION_SUBLANG 0x0415
+#include "versinfo.rc2"
+
+// String Table
+STRINGTABLE DISCARDABLE
+{
+    IDS_PLUGINNAME              "UnISO"
+    IDS_CANT_OPEN               "Nie można otworzyć pliku."
+    IDS_UNKNOW_ERROR            "Nieokreślony błąd."
+    IDS_UNPACKING_ARCHIVE       "Rozpakowywanie archiwum ISO"
+    IDS_ERROR_UNPACKING         "Błąd rozpakowywania archiwum."
+    IDS_CANT_HANDLE_FILE        "Nie można obsłużyć tego pliku."
+    IDS_INSUFFICIENT_MEMORY     "Za mało pamięci."
+    IDS_ERR_TOO_LONG_NAME       "Nie można ukończyć operacji z powodu zbyt długiej nazwy."
+    IDS_ABOUT                   "Informacje o wtyczce"
+    IDS_PLUGIN_DESCRIPTION      "Przeglądanie i rozpakowywanie obrazów płyt CD/DVD w formacie ISO."
+    IDS_CANT_CREATE_TEMP        "Nie można utworzyć katalogu tymczasowego."
+    IDS_CANT_DELETE_TEMP_FILE   "Nie można usunąć pliku tymczasowego."
+    IDS_UNKNOWN_FILE_FORMAT     "Nieznany format pliku lub nieprawidłowy obraz ISO.\n\nJeśli masz pewność, że to prawidłowy obraz ISO, skontaktuj się z nami na adres support@taskscape.com i pomóż nam dodać obsługę tego formatu."
+    IDS_CANT_OPEN_FILE          "Nie można otworzyć pliku '%s'."
+    IDS_ERR_TMP                 "Tworzenie pliku tymczasowego nie powiodło się."
+    IDS_CANT_SET_ATTRS          "Nie można ustawić atrybutów pliku."
+    IDS_CANT_CREATE_DIR         "Nie można utworzyć katalogu '%s'."
+    IDS_YES                     "Tak"
+    IDS_NO                      "Nie"
+    IDS_ERROR                   "Błąd"
+    IDS_WARNING                 "Ostrzeżenie"
+    IDS_ERROR_OPENING_MULTISESSION  "Podczas odczytywania obrazu wielosesyjnego wystąpiły błędy.\n\nWyświetlane są tylko poprawnie odczytane sesje."
+    IDS_UNKNOWN_TRACK_TYPE      "Nieznany typ ścieżki."
+    IDS_READERROR               "Błąd odczytu"
+    IDS_WRITEERROR              "Błąd zapisu"
+    IDS_CCD_BAD_FORMAT          "Nieprawidłowy format pliku .CCD.\n\nWyświetlany obraz może być niekompletny."
+    IDS_CCD_MISSING             "Brak pliku .CCD.\n\nWyświetlany obraz może być niekompletny."
+    IDS_ERROR_READING_SECTOR    "Nie można odczytać sektora #%08X."
+    IDS_ERROR_LISTING_IMAGE     "Błąd odczytu struktury katalogów w sektorze #%08X.\n\nZawartość obrazu ISO jest niekompletna."
+    IDS_INTERNAL_PLUGIN_ERROR   "Wewnętrzny błąd wtyczki."
+    IDS_UDF_UNKNOWN_ALLOCATION_STRATEGY  "Nieznana strategia alokacji (%d).\n\nSkontaktuj się z nami na adres support@taskscape.com i pomóż nam naprawić ten problem."
+    IDS_UDF_INVALID_TAG_ID      "Nieprawidłowy identyfikator znacznika UDF (Tag ID)."
+    IDS_UDF_ERROR_READING_VAT   "Błąd odczytu wirtualnej tablicy alokacji w sektorze #%08X."
+    IDS_UDF_MISSING_VAT         "Brak wirtualnej tablicy alokacji."
+    IDS_UDF_BAD_ROOT_ICB        "Nieprawidłowy główny ICB.\n\nNie można odczytać struktury katalogów."
+    IDS_UDF_ICB_AND_FILESIZE_MISMATCH "Nie można rozpakować pliku ""%s"".\n\nNiezgodność między rozmiarem pliku a blokami ICB."
+    IDS_CANT_OPEN_TRACK         "Nie można otworzyć ścieżki #%d."
+    IDS_BOOT_OR_MBR             "Ten plik wygląda na obraz dyskietki, dysku twardego lub partycji dysku twardego.\nSpróbuj zmienić rozszerzenie pliku na .ima, aby aktywować wtyczkę UnFAT."
+    IDS_UNSUPPORTED_APFS        "Ten obraz dysku zawiera system plików APFS.\nTen system plików nie jest jeszcze obsługiwany."
+
+    IDS_ERR_HFS_READ            "Nie można odczytać nagłówka partycji. Plik jest zbyt mały."
+    IDS_ERR_HFS_INVALID_PARTITION "Uszkodzone struktury menedżera partycji."
+    IDS_ERR_HFS_UNRECOGNIZED    "Ten obraz dysku nie zawiera partycji HFS Plus."
+    IDS_ERR_HFS_ORIGINAL_HFS    "Ten obraz dysku zawiera system plików HFS, a nie HFS Plus.\nSystem HFS nie jest obsługiwany."
+    IDS_ERR_HFS_SEEK_BLOCK_EXTR "Nie można ustawić pozycji na bloku #%08X.\nPlik %s nie zostanie rozpakowany."
+    IDS_ERR_HFS_SEEK            "Nie można ustawić pozycji na bloku #%08X."
+    IDS_ERR_HFS_BTREE_NODETYPE  "Nieobsługiwany typ węzła głównego BTree w pliku katalogu (Catalog)."
+    IDS_ERR_HFS_BTREE_FRAGMENTED "Plik katalogu (Catalog) jest pofragmentowany na więcej niż 8 fragmentów, co nie jest obsługiwane."
+    IDS_ERR_HFS_FILE_FRAGMENTED "Plik '%s' jest pofragmentowany na więcej niż 8 fragmentów, co nie jest obsługiwane.\nPlik nie zostanie rozpakowany."
+
+    IDS_ERR_TOO_LONG_PATH       "Ten obraz dysku zawiera ścieżkę zbyt długą, aby program Open Salamander mógł ją obsłużyć."
+
+    IDS_ERR_DMG_READ_HDR        "Nie można odczytać nagłówka pakietu. Plik jest zbyt mały."
+    IDS_ERR_DMG_ENCRYPTED       "Ten pakiet jest zaszyfrowany.\nZaszyfrowane pakiety nie są obsługiwane."
+    IDS_ERR_DMG_NO_FOOTER       "Ten plik nie wygląda na pakiet DMG lub jest niekompletny.\nNie zawiera prawidłowej stopki DMG."
+    IDS_ERR_DMG_PLIST           "Ten plik nie wygląda na prawidłowy pakiet DMG lub jest niekompletny.\nNie zawiera prawidłowej listy właściwości (Property List)."
+    IDS_ERR_DMG_BLOCK_UNDEFINED "Ten pakiet nie zawiera bloku danych partycji HFS Plus zaczynającego się na %I64u.\nTen blok jest potrzebny do prawidłowej obsługi pakietu."
+
+    IDS_ERR_BF_READ             "Nie można odczytać danych z obrazu dysku na pozycji %I64u."
+    IDS_ERR_BF_SEEK             "Nie można ustawić pozycji w obrazie dysku na %I64u."
+    IDS_ERR_BF_UNSUPPORTED_SEEK_METHOD "Błąd wewnętrzny: nieobsługiwana metoda ustawiania pozycji."
+    IDS_ERR_BF_BLOCK_UNK_TYPE   "Ten obraz dysku zawiera blok skompresowany nieznaną metodą.\nTakie obrazy dysków nie są obsługiwane."
+    IDS_ERR_BF_ZLIB             "Rozpakowywanie bloku skompresowanego algorytmem ZLIB nie powiodło się. Obraz dysku wygląda na uszkodzony."
+    IDS_ERR_BF_BZIP2            "Rozpakowywanie bloku skompresowanego algorytmem BZIP2 nie powiodło się. Obraz dysku wygląda na uszkodzony."
+
+    IDS_ERR_ISZ_NO_HEADER       "Ten plik nie wygląda na skompresowany obraz ISZ lub jest niekompletny.\nNie zawiera prawidłowego nagłówka ISZ."
+    IDS_ERR_ISZ_READ_HDR        "Nie można odczytać nagłówka skompresowanego obrazu. Plik jest zbyt mały."
+    IDS_ERR_ISZ_SEGMENTED       "Ten obraz jest podzielony na segmenty.\nObrazy podzielone na segmenty nie są obsługiwane."
+    IDS_ERR_ISZ_ENCRYPTED       "Ten obraz jest zaszyfrowany.\nZaszyfrowane obrazy nie są obsługiwane."
+
+    IDS_AUDIO_NOT_EXTRACTABLE   "Nie można rozpakować ścieżek dźwiękowych."
+
+    IDS_CANCELING_OPERATION     "Anulowanie operacji, czekaj..."
+
+    IDS_INFO_LABEL              "Informacje o obrazie\n\n"
+    IDS_INFO_LABEL_LABEL        "Informacje o obrazie ""%s""\n\n"
+    IDS_INFO_CNT_SESSIONS       "Liczba sesji: %d"
+    IDS_INFO_SESSION_NUM        "\nSesja %d\n"
+    IDS_INFO_CNT_TRACKS         "  Liczba ścieżek: %d\n"
+    IDS_INFO_TRACK_TYPE_SIZE    "  Ścieżka: %d, %s, Rozmiar: %d KB\n"
+    IDS_INFO_TRACK_TYPE_SIZE_LABEL "  Ścieżka: %d, %s, Rozmiar: %d KB - ""%s""\n"
+}

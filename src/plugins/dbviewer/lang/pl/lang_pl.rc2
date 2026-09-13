@@ -1,0 +1,160 @@
+//
+// lang_pl.rc2 - Polish language resources (not edited by Visual Studio)
+//
+
+#ifdef APSTUDIO_INVOKED
+#error this file is not editable by Microsoft Visual C++
+#endif //APSTUDIO_INVOKED
+
+// The Polish VERSIONINFO identity is applied before the shared VERSIONINFO
+// template include; the plugin's versinfo.rh2 is include-guarded, so these
+// overrides survive the template chain and keep POLISH.SLG valid for
+// IsSLGFileValid (version match + 0x0415 translation language).
+#include "..\..\versinfo.rh2"
+#undef VERSINFO_INTERNAL
+#define VERSINFO_INTERNAL    "POLISH"
+#undef VERSINFO_ORIGINAL
+#define VERSINFO_ORIGINAL    VERSINFO_INTERNAL ".SLG"
+#undef VERSINFO_SLG_COMMENT
+#define VERSINFO_SLG_COMMENT "Wersja polska"
+#define VERSINFO_TRANSLATION_LANG    0x0415
+#define VERSINFO_TRANSLATION_SUBLANG 0x0415
+#include "versinfo.rc2"
+
+STRINGTABLE
+{
+ IDS_PLUGINNAME, "Database Viewer"
+ IDS_PLUGIN_DESCRIPTION, "Wyświetla pliki baz danych dBase, FoxPro i CSV."
+ IDS_ABOUT, "Informacje o wtyczce"
+ IDS_OPENED_WINDOWS, "Część okien programu Database Viewer jest otwarta. Czy chcesz je zamknąć?"
+
+ IDS_DBFE_OOM, "Brak pamięci."
+ IDS_DBFE_NOT_XBASE, "Plik ma nierozpoznany format bazy danych."
+ IDS_DBFE_FILE_NOT_FOUND, "Nie znaleziono pliku."
+ IDS_DBFE_READ_ERROR, "Błąd odczytu pliku bazy danych. Może być obcięty."
+ IDS_DBFE_WRITE_ERROR, "Błąd zapisu pliku bazy danych."
+ IDS_DBFE_SEEK_ERROR, "Błąd przesuwania wskaźnika w pliku bazy danych."
+ IDS_DBFE_NO_MEMO_FILE, "Plik memo jest niedostępny."
+ IDS_DBFE_INVALID_BLOCK, "Plik memo jest uszkodzony."
+
+ IDS_USEDEFAULTFONT, "Użyj &domyślnej czcionki"
+ IDS_USECUSTOMFONT, "Użyj &własnej czcionki..."
+ IDS_DEFAULTFONT, "czcionka domyślna"
+ IDS_CUSTOMFONT, "czcionka własna"
+
+ IDS_VIEWERFILTER, "Pliki baz danych (*.csv;*.dbf;*.txt)|*.csv;*.dbf;*.txt|Wszystkie pliki (*.*)|*.*|"
+ IDS_FONTDESCRIPTION, "%d pt. %s (%s)"
+ IDS_CFG_CONFLICT, "Konfiguracja jest już otwarta."
+ IDS_COLUMNS_NAME, "Nazwa"
+ IDS_COLUMNS_TYPE, "Typ"
+ IDS_COLUMNS_LENGTH, "Szerokość"
+ IDS_COLUMNS_DECIMALS, "Miejsca dziesiętne"
+
+ IDS_FILEVER_DBASE2, "dBase II"
+ IDS_FILEVER_DBASE3, "dBase III"
+ IDS_FILEVER_DBASE4, "dBase IV"
+ IDS_FILEVER_DBASE5, "dBase V"
+ IDS_FILEVER_VISUALDBASE7, "Visual dBase 7"
+ IDS_FILEVER_FOXPRO, "FoxPro"
+ IDS_FILEVER_UNKNOWN, "Nieznany"
+
+ IDS_FTYPE_CHAR, "Znakowy"
+ IDS_FTYPE_NUM, "Liczbowy"
+ IDS_FTYPE_LOGICAL, "Logiczny"
+ IDS_FTYPE_DATE, "Data"
+ IDS_FTYPE_MEMO, "Memo"
+ IDS_FTYPE_FLOAT, "Zmiennoprzecinkowy"
+ IDS_FTYPE_BIN, "Binarny"
+ IDS_FTYPE_GEN, "Ogólny"
+ IDS_FTYPE_PIC, "Grafika"
+ IDS_FTYPE_CUR, "Walutowy"
+ IDS_FTYPE_DTIME, "Data/Czas"
+ IDS_FTYPE_INT, "Całkowity"
+ IDS_FTYPE_UNKOWN, "Nieznany"
+ IDS_FTYPE_DOUBLE, "Podwójnej precyzji"
+ IDS_FTYPE_TSTAMP, "Znacznik czasu"
+ IDS_FTYPE_AUTOINC, "Autonumeracja"
+
+ IDS_NOVISIBLE_FIELD, "Przynajmniej jedno pole musi być widoczne."
+ IDS_NOVALIDCOLUMN, "Ta baza danych nie zawiera prawidłowych pól."
+
+ IDS_TRUE, "Prawda"
+ IDS_FALSE, "Fałsz"
+
+ IDS_FINFO_MODIFIED, "Zmodyfikowano"
+ IDS_FINFO_SIZE, "Rozmiar"
+ IDS_FINFO_VERSION, "Wersja"
+ IDS_FINFO_RECCOUNT, "Liczba rekordów"
+ IDS_FINFO_FIELDCOUNT, "Liczba pól"
+ IDS_FINFO_MEMOCOUNT, "Liczba pól memo"
+ IDS_FINFO_HDRSIZE, "Rozmiar nagłówka"
+ IDS_FINFO_RECSIZE, "Rozmiar rekordu"
+ IDS_FINFO_CODEPAGE, "Strona kodowa"
+
+ IDS_REGEXP_ERROR, "Błąd wyrażenia regularnego"
+ IDS_FIND, "Szukaj"
+ IDS_FIND_NOMATCH, "Nie można znaleźć ciągu '%s'."
+ IDS_FIND_NOREGEXPMATCH, "Nie można znaleźć dopasowania dla wyrażenia regularnego '%s'."
+
+ // Menu
+
+ // File
+ IDS_MENU_FILE, "&Plik"
+ IDS_MENU_FILE_OPEN, "&Otwórz...\tCtr+O"
+ IDS_MENU_FILE_REFRESH, "&Odśwież\tCtr+R"
+ IDS_MENU_FILE_PROPERTIES, "&Właściwości...\tCtrl+F1"
+ IDS_MENU_FILE_OTHER, "&Inne pliki"
+ IDS_MENU_FILE_PREV, "&Poprzedni\tBackspace"
+ IDS_MENU_FILE_NEXT, "&Następny\tSpace"
+ IDS_MENU_FILE_PREVSEL, "Poprzedni za&znaczony\tCtrl+Backspace"
+ IDS_MENU_FILE_NEXTSEL, "Następny za&znaczony\tCtrl+Space"
+ IDS_MENU_FILE_FIRST, "&Pierwszy\tShift+Backspace"
+ IDS_MENU_FILE_LAST, "&Ostatni\tShift+Space"
+ IDS_MENU_FILE_EXIT, "Za&kończ\tAlt+F4"
+
+ // Edit
+ IDS_MENU_EDIT, "&Edycja"
+ IDS_MENU_EDIT_COPY, "&Kopiuj\tCtrl+C"
+ IDS_MENU_EDIT_SELECT_ALL, "Zaznacz &wszystko\tCtrl+A"
+ IDS_MENU_EDIT_FIND, "&Szukaj...\tCtrl+F"
+ IDS_MENU_EDIT_FIND_NEXT, "Znajdź &następny\tCtrl+N"
+ IDS_MENU_EDIT_FIND_PREV, "Znajdź &poprzedni\tCtrl+P"
+ IDS_MENU_EDIT_TOGGLE_BM, "Przełącz za&kładkę\tCtrl+F2"
+ IDS_MENU_EDIT_NEXT_BM, "&Następna zakładka\tF2"
+ IDS_MENU_EDIT_PREV_BM, "&Poprzednia zakładka\tShift+F2"
+ IDS_MENU_EDIT_CLEAR_ALL_BM, "Usuń &wszystkie zakładki\tCtrl+Shift+F2"
+
+ // View
+ IDS_MENU_VIEW, "&Widok"
+ IDS_MENU_VIEW_GOTO "&Przejdź do rekordu...\tG"
+ IDS_MENU_VIEW_FIELDS, "&Pola...\tI"
+ IDS_MENU_VIEW_FULLSCREEN, "Pełny &ekran\tF11"
+
+ // Convert
+ IDS_MENU_CONVERT, "&Konwersja"
+ IDS_MENU_CONVERT_RECOGNIZE, "Wybór &automatyczny"
+ IDS_MENU_CONVERT_CODING_FIRST, "&Nie konwertuj"
+ IDS_MENU_CONVERT_CODING_DEF, "Ustaw jako domyślne"
+ IDS_MENU_CONVERT_CODING_NEXT, "Następny\tF8"
+ IDS_MENU_CONVERT_CODING_PREV, "Poprzedni\tShift+F8"
+
+ // Options
+ IDS_MENU_OPTIONS, "&Opcje"
+ IDS_MENU_OPTIONS_CSV_OPTIONS, "Opcje &CSV..."
+ IDS_MENU_OPTIONS_CONFIG, "&Konfiguracja..."
+
+ // Help
+ IDS_MENU_HELP, "Pomo&c"
+ IDS_MENU_HELP_CONTENTS, "&Spis treści\tF1"
+ IDS_MENU_HELP_INDEX, "&Indeks..."
+ IDS_MENU_HELP_SEARCH, "&Szukaj..."
+ IDS_MENU_HELP_ABOUT, "&Informacje..."
+
+ // Toolbar Tooltips
+ IDS_TBTT_COPY, "Kopiuj\tCtrl+C"
+ IDS_TBTT_OPEN, "Otwórz\tCtrl+O"
+ IDS_TBTT_FIND, "Szukaj\tCtrl+F"
+ IDS_TBTT_PROPERTIES, "Właściwości\tCtrl+F1"
+ IDS_TBTT_FULLSCREEN, "Pełny ekran\tF11"
+ IDS_TBTT_GOTO, "Bieżący rekord/liczba rekordów\tG"
+}

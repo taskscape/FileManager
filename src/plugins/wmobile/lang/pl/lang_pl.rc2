@@ -1,0 +1,76 @@
+//
+// lang_pl.rc2 - Polish language resources (not edited by Visual Studio)
+//
+
+#ifdef APSTUDIO_INVOKED
+#error this file is not editable by Microsoft Visual C++
+#endif //APSTUDIO_INVOKED
+
+// The Polish VERSIONINFO identity is applied before the shared VERSIONINFO
+// template include; the plugin's versinfo.rh2 is include-guarded, so these
+// overrides survive the template chain and keep POLISH.SLG valid for
+// IsSLGFileValid (version match + 0x0415 translation language).
+#include "..\versinfo.rh2"
+#undef VERSINFO_INTERNAL
+#define VERSINFO_INTERNAL    "POLISH"
+#undef VERSINFO_ORIGINAL
+#define VERSINFO_ORIGINAL    VERSINFO_INTERNAL ".SLG"
+#undef VERSINFO_SLG_COMMENT
+#define VERSINFO_SLG_COMMENT "Wersja polska"
+#define VERSINFO_TRANSLATION_LANG    0x0415
+#define VERSINFO_TRANSLATION_SUBLANG 0x0415
+#include "versinfo.rc2"
+
+STRINGTABLE
+{
+  IDS_PLUGINNAME, "Windows Mobile"
+  IDS_PLUGIN_DESCRIPTION, "Dostęp do plików na urządzeniu Windows Mobile."
+  IDS_ABOUT, "Informacje o wtyczce"
+}
+
+STRINGTABLE
+BEGIN
+  IDS_WMPLUGINTITLE          "Wtyczka Windows Mobile"
+  IDS_WMPLUGINTITLE_ERROR    "Błąd wtyczki Windows Mobile"
+  IDS_WMPLUGINTITLE_QUESTION "Pytanie wtyczki Windows Mobile"
+  IDS_ERR_CONNECTION         "Nie można połączyć się z urządzeniem.\n\nUpewnij się, że zainstalowano wymagany transport (np. ActiveSync) i że podłączone jest urządzenie."
+  IDS_CONNECTING             "Łączenie z urządzeniem, czekaj..."
+  IDS_PATH_ERROR             "Ścieżka: %s\nBłąd: %s"
+  IDS_YESNO_CANCEL           "Czy chcesz anulować tę operację?"
+  IDS_ERR_MEMORYLOW          "Brak pamięci."
+  IDS_ERR_PATHTOOLONG        "Nie można ukończyć operacji z powodu zbyt długiej ścieżki."
+  IDS_ERR_CREATEDIR          "Nie można utworzyć katalogu ""%s""."
+  IDS_YESNO_CREATEDIR        "Katalog ""%s"" nie istnieje.\n\nCzy chcesz go utworzyć?"
+  IDS_ERR_DIRNAMEISFILE      "Nazwa ""%s"" jest już używana przez plik."
+  IDS_ERR_INVALIDDATEFORMAT  "Data ma nieprawidłowy format."
+  IDS_ERR_NAMETOOLONG        "Nie można ukończyć operacji z powodu zbyt długiej nazwy."
+  IDS_ERR_FILEINPATH         "Podana ścieżka wskazuje na plik. Nie można otworzyć pliku."
+  IDS_YESNO_CONNETCLOSEPLUGIN "Nie można połączyć się z urządzeniem.\r\n\r\nCzy chcesz zamknąć wtyczkę?"
+  IDS_SORRY_CREATEDIR1       "Niestety, ta wtyczka nie potrafi utworzyć katalogu na ścieżce dysku lub archiwum."
+  IDS_SORRY_CREATEDIR2       "Niestety, ta wtyczka nie potrafi utworzyć katalogu na podanym systemie plików."
+  IDS_SORRY_CREATEDIR3       "Niestety, ta wtyczka nie potrafi utworzyć katalogu poza aktualnie otwartym dyskiem."
+  IDS_ERR_INVALIDPATH        "Podana ścieżka jest nieprawidłowa."
+  IDS_READ                   "Odczyt"
+  IDS_READING                "Odczytywanie"
+  IDS_WAIT_READINGDIRTREE    "Odczytywanie drzewa katalogów, czekaj..."
+  IDS_DELETE                 "Usuń"
+  IDS_DELETING               "Usuwanie"
+  IDS_YESNO_DELETENOEMPTYDIR "Katalog ""%s"" nie jest pusty\nCzy chcesz go usunąć?"
+  IDS_YESNO_DELETEHIDDENFILE "Czy chcesz usunąć plik z atrybutem SYSTEM lub UKRYTY?"
+  IDS_YESNO_DELETEHIDDENDIR  "Czy chcesz usunąć katalog z atrybutem SYSTEM lub UKRYTY?"
+  IDS_ERR_TARGETPATHNOEXISTS "Ścieżka docelowa nie istnieje. Wtyczka Windows Mobile nie obsługuje tworzenia ścieżki docelowej."
+  IDS_ERR_COPYTOOTHERFS      "Wtyczka Windows Mobile nie obsługuje kopiowania ani przenoszenia do systemów plików innych wtyczek."
+  IDS_ERR_COPYTOARCHIVES     "Wtyczka Windows Mobile nie obsługuje kopiowania ani przenoszenia do archiwów."
+  IDS_COPY                   "Kopiuj"
+  IDS_COPYING                "Kopiowanie"
+  IDS_MOVE                   "Przenieś"
+  IDS_MOVING                 "Przenoszenie"
+  IDS_TO                     "do"
+  IDS_ERR_COPYDIRTOITSELF    "Nie można skopiować katalogu na samego siebie."
+  IDS_ERR_COPYFILETOITSELF   "Nie można skopiować pliku na niego samego."
+  IDS_YESNO_OVERWRITEHIDDENFILE "Czy chcesz nadpisać plik z atrybutem SYSTEM lub UKRYTY?"
+  IDS_ERR_MOVEDIRTOITSELF    "Nie można przenieść katalogu na samego siebie."
+  IDS_ERR_MOVEFILETOITSELF   "Nie można przenieść pliku na niego samego."
+  IDS_ATTRIBUTES             "Atrybuty"
+  IDS_CHANGING               "Zmienianie"
+END

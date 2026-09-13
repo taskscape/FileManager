@@ -1,0 +1,332 @@
+// Microsoft Visual C++ generated resource script.
+//
+#pragma code_page(65001)
+
+#include "..\lang.rh"
+
+#define APSTUDIO_READONLY_SYMBOLS
+/////////////////////////////////////////////////////////////////////////////
+//
+// Generated from the TEXTINCLUDE 2 resource.
+//
+#include "winresrc.h"
+
+#include "..\..\filecomp.rh2"
+
+/////////////////////////////////////////////////////////////////////////////
+#undef APSTUDIO_READONLY_SYMBOLS
+
+/////////////////////////////////////////////////////////////////////////////
+// Neutral resources
+
+#if !defined(AFX_RESOURCE_DLL) || defined(AFX_TARG_NEU)
+LANGUAGE LANG_NEUTRAL, SUBLANG_NEUTRAL
+
+#ifdef APSTUDIO_INVOKED
+/////////////////////////////////////////////////////////////////////////////
+//
+// TEXTINCLUDE
+//
+
+1 TEXTINCLUDE
+BEGIN
+    "lang.rh\0"
+END
+
+2 TEXTINCLUDE
+BEGIN
+    "#include ""winresrc.h""\r\n"
+    "\r\n"
+    "#include ""..\\filecomp.rh2""\r\n"
+    "\0"
+END
+
+3 TEXTINCLUDE
+BEGIN
+    "#if !defined(AFX_RESOURCE_DLL) || defined(AFX_TARG_NEU)\r\n"
+    "LANGUAGE LANG_NEUTRAL,SUBLANG_NEUTRAL\r\n"
+    "#include ""lang.rc2""   // non-Microsoft Visual C++ edited resources\r\n"
+    "#endif\r\n"
+    "\0"
+END
+
+#endif    // APSTUDIO_INVOKED
+
+
+/////////////////////////////////////////////////////////////////////////////
+//
+// Menu
+//
+
+IDM_MENU MENU
+BEGIN
+    POPUP "&Plik"
+    BEGIN
+        MENUITEM "Porównaj...\tCtrl+O",         CM_COMPARE
+        MENUITEM "Porównaj ponownie\tCtrl+R",   CM_RECOMPARE
+        MENUITEM SEPARATOR
+        MENUITEM "Za&kończ\tAlt+F4",            CM_EXIT
+    END
+    POPUP "&Edycja"
+    BEGIN
+        MENUITEM "Kopiuj\tCtrl+C",              CM_COPY
+    END
+    POPUP "&Widok"
+    BEGIN
+        MENUITEM "Pokaż &białe znaki\tCtrl+W",  CM_SHOWWHITESPACE
+        MENUITEM "Pokaż tylko &różnice\tCtrl+D", CM_ONLYDIFFERENCES
+        MENUITEM "Różnice &szczegółowe\tF4",    CM_DETAILDIFF
+        MENUITEM SEPARATOR
+        MENUITEM "&Pierwsza różnica\tAlt+Home", CM_FIRSTDIFF
+        MENUITEM "Poprze&dnia różnica\tAlt+Strzałka w górę", CM_PREVDIFF
+        MENUITEM "&Następna różnica\tAlt+Strzałka w dół", CM_NEXTDIFF
+        MENUITEM "&Ostatnia różnica\tAlt+End",  CM_LASTDIFF
+        MENUITEM SEPARATOR
+        MENUITEM "Pokaż &karetkę\tF2",          CM_SHOWCARET
+        MENUITEM SEPARATOR
+        MENUITEM "Maksymalizuj widok &lewego pliku\tCtrl+,", CM_MAXLEFTVIEW
+        MENUITEM "Maksymalizuj widok pra&wego pliku\tCtrl+.", CM_MAXRIGHTVIEW
+        MENUITEM "Równe ro&zmiary widoków\tCtrl+E", CM_SAMESIZEVIEW
+        MENUITEM "Przełącz pełny &ekran\tF11",  CM_MAXIMIZE
+        MENUITEM "W&idok poziomy\tCtrl+H",      CM_VIEW_HORIZONTAL
+    END
+    POPUP "&Opcje"
+    BEGIN
+        MENUITEM "&Auto-kopiowanie zaznaczenia do schowka", CM_AUTOCOPY
+        MENUITEM SEPARATOR
+        MENUITEM "&Konfiguracja...",            CM_OPTIONS
+    END
+    POPUP "Pomo&c"
+    BEGIN
+        MENUITEM "&Spis treści\tF1",            CM_HELP
+        MENUITEM "&Skróty klawiszowe",          CM_HELPKEYBOARD
+        MENUITEM SEPARATOR
+        MENUITEM "&Informacje...",              CM_ABOUT
+    END
+END
+
+IDM_CTX_MENU MENU
+BEGIN
+    POPUP ""
+    BEGIN
+        MENUITEM "Zaznacz &wszystko",           CM_SELECTALL
+        MENUITEM "&Kopiuj",                     CM_COPY
+    END
+END
+
+IDM_CTX_1COLOR_MENU MENU
+BEGIN
+    POPUP ""
+    BEGIN
+        MENUITEM "Własny kolor...",             CM_CUSTOMBACKGROUND
+        MENUITEM "Kolor automatyczny",          CM_AUTOBACKGROUND
+    END
+END
+
+IDM_CTX_2COLOR_MENU MENU
+BEGIN
+    POPUP ""
+    BEGIN
+        MENUITEM "Własny kolor tekstu...",      CM_CUSTOMTEXT
+        MENUITEM "Automatyczny kolor tekstu",   CM_AUTOTEXT
+        MENUITEM SEPARATOR
+        MENUITEM "Własny kolor tła...",         CM_CUSTOMBACKGROUND
+        MENUITEM "Automatyczny kolor tła",      CM_AUTOBACKGROUND
+    END
+END
+
+IDM_CTX_FONT_MENU MENU
+BEGIN
+    POPUP ""
+    BEGIN
+        MENUITEM "Własna czcionka...",          CM_CUSTOMFONT
+        MENUITEM "Automatyczna czcionka",       CM_AUTOFONT
+    END
+END
+
+
+/////////////////////////////////////////////////////////////////////////////
+//
+// Dialog
+//
+
+IDD_COMPAREFILES DIALOGEX 10, 24, 227, 93
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Porównanie plików"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "Porównywany &plik:",IDC_STATIC_1,10,9,207,8
+    COMBOBOX        IDE_PATH1,10,19,195,130,CBS_DROPDOWN | CBS_AUTOHSCROLL | WS_VSCROLL | WS_TABSTOP
+    PUSHBUTTON      "...",IDB_BROWSE1,207,19,13,12
+    CONTROL         "Porównywany &z plikiem:",IDC_STATIC_2,"Static",SS_LEFTNOWORDWRAP | WS_GROUP,10,37,207,8
+    COMBOBOX        IDE_PATH2,10,47,195,130,CBS_DROPDOWN | CBS_AUTOHSCROLL | WS_VSCROLL | WS_TABSTOP
+    PUSHBUTTON      "...",IDB_BROWSE2,207,47,13,12
+    DEFPUSHBUTTON   "OK",IDOK,29,71,50,14,WS_GROUP
+    PUSHBUTTON      "Anuluj",IDCANCEL,88,71,50,14
+    PUSHBUTTON      "&Zaawansowane...",IDADVANCED,147,71,50,14
+END
+
+IDD_CFGCOLORS DIALOGEX 15, 24, 254, 221
+STYLE DS_SETFONT | DS_FIXEDSYS | DS_CONTROL | WS_CHILD | WS_CAPTION
+CAPTION "Kolory"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "&Element",IDC_STATIC_1,6,6,20,8,NOT WS_GROUP
+    COMBOBOX        IDC_ITEMS,6,16,149,82,CBS_DROPDOWNLIST | WS_TABSTOP
+    LTEXT           "Numery wierszy:",IDC_STATIC_2,163,38,51,8,NOT WS_GROUP
+    LTEXT           "Tekst:",IDC_STATIC_3,216,38,24,8,NOT WS_GROUP
+    RTEXT           "",IDS_DESCRIPTION1,11,51,144,8,NOT WS_GROUP
+    RTEXT           "",IDS_DESCRIPTION2,11,67,144,8,NOT WS_GROUP
+    RTEXT           "",IDS_DESCRIPTION3,11,83,144,8,NOT WS_GROUP
+    RTEXT           "",IDS_DESCRIPTION4,11,99,144,8,NOT WS_GROUP
+    PUSHBUTTON      "tekst",IDB_LINENUM1,163,48,30,14
+    PUSHBUTTON      "tekst",IDB_TEXT1,216,48,30,14
+    PUSHBUTTON      "tekst",IDB_LINENUM2,163,64,30,14
+    PUSHBUTTON      "tekst",IDB_TEXT2,216,64,30,14
+    PUSHBUTTON      "tekst",IDB_LINENUM3,163,80,30,14
+    PUSHBUTTON      "tekst",IDB_TEXT3,216,80,30,14
+    PUSHBUTTON      "tekst",IDB_LINENUM4,163,96,30,14
+    PUSHBUTTON      "tekst",IDB_TEXT4,216,96,30,14
+    PUSHBUTTON      "Przywróć &domyślne",IDB_DEFAULT,176,202,70,14
+    LTEXT           "",IDS_PREVIEW2,127,129,119,68,NOT WS_GROUP,WS_EX_STATICEDGE
+    LTEXT           "",IDS_PREVIEW1,6,129,120,68,NOT WS_GROUP,WS_EX_STATICEDGE
+    LTEXT           "Podgląd",IDC_STATIC_4,6,120,60,8,NOT WS_GROUP
+END
+
+IDD_ADVANCEDOPTIONS DIALOGEX 70, 33, 217, 286
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Opcje zaawansowane"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "Ignorowanie",IDC_STATIC_1,5,6,28,8
+    CONTROL         "",IDC_STATIC_2,"Static",SS_ETCHEDHORZ | WS_GROUP,35,10,178,1
+    CONTROL         "Wszystkie &białe znaki",IDC_IGNOREALLSPACE,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,11,16,160,12
+    CONTROL         "Zmiany &ilości białych znaków",IDC_IGNORESPACECHANGE,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,11,28,160,12
+    CONTROL         "&Wielkość liter",IDC_IGNORECASE,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,11,40,160,12
+    LTEXT           "Typ plików",IDC_STATIC_3,5,60,36,8
+    CONTROL         "",IDC_STATIC_4,"Static",SS_ETCHEDHORZ | WS_GROUP,43,64,170,1
+    CONTROL         "&Autodetekcja",IDR_AUTO,"Button",BS_AUTORADIOBUTTON | BS_NOTIFY | WS_GROUP | WS_TABSTOP,11,70,60,12
+    CONTROL         "&Binarne",IDR_ALWAYSBINARY,"Button",BS_AUTORADIOBUTTON | BS_NOTIFY,11,82,60,12
+    CONTROL         "&Tekstowe",IDR_ALWAYSTEXT,"Button",BS_AUTORADIOBUTTON | BS_NOTIFY,11,94,60,12
+    LTEXT           "Kodowanie plików tekstowych:",IDC_STATIC_15,11,111,75,8
+    LTEXT           "Pierwszy plik:",IDC_STATIC_5,11,126,31,8
+    LTEXT           "Drugi plik:",IDC_STATIC_6,11,143,45,8,NOT WS_GROUP
+    EDITTEXT        IDE_LEFTENC,56,124,137,12,ES_READONLY | NOT WS_TABSTOP
+    EDITTEXT        IDE_RIGHTENC,56,141,137,12,ES_READONLY | NOT WS_TABSTOP
+    PUSHBUTTON      "",IDB_LEFTENC,196,124,14,12,WS_GROUP
+    PUSHBUTTON      "",IDB_RIGHTENC,196,141,14,12
+    LTEXT           "Końce wierszy",IDC_STATIC_7,5,163,35,8
+    CONTROL         "",IDC_STATIC_8,"Static",SS_ETCHEDHORZ | WS_GROUP,42,167,171,1
+    LTEXT           "&Pierwszy plik:",IDC_STATIC_9,11,175,31,8
+    CONTROL         "CR/LF",IDC_CRLF1,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,59,173,35,12
+    CONTROL         "CR",IDC_CR1,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,98,173,35,12
+    CONTROL         "LF",IDC_LF1,"Button",BS_AUTOCHECKBOX | WS_DISABLED | WS_TABSTOP,137,173,35,12
+    CONTROL         "NULL",IDC_NULL1,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,176,173,33,12
+    CONTROL         "CR/LF",IDC_CRLF2,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,59,185,35,12
+    CONTROL         "CR",IDC_CR2,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,98,185,35,12
+    CONTROL         "LF",IDC_LF2,"Button",BS_AUTOCHECKBOX | WS_DISABLED | WS_TABSTOP,137,185,35,12
+    CONTROL         "NULL",IDC_NULL2,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,176,185,33,12
+    LTEXT           "Drugi plik:",IDC_STATIC_10,11,187,45,8
+    LTEXT           "Opcje Unicode",IDC_STATIC_11,5,205,57,8
+    CONTROL         "",IDC_STATIC_12,"Static",SS_ETCHEDHORZ | WS_GROUP,64,209,149,1
+    CONTROL         "Połącz &znaki diakrytyczne w znaki prekomponowane",IDC_NORMALIZATION_FORM,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,11,215,186,12
+    CONTROL         "",IDC_STATIC_13,"Static",SS_ETCHEDHORZ | WS_GROUP,4,237,209,1
+    CONTROL         "&Użyj tych ustawień w kolejnych porównaniach",IDC_USEINFUTURE,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,11,242,160,12
+    CONTROL         "",IDC_STATIC_14,"Static",SS_ETCHEDHORZ | WS_GROUP,4,257,209,1
+    DEFPUSHBUTTON   "OK",IDOK,48,266,50,14,WS_GROUP
+    PUSHBUTTON      "Anuluj",IDCANCEL,104,266,50,14
+    PUSHBUTTON      "Pomoc",IDHELP,160,266,50,14
+END
+
+IDD_CFGGENERAL DIALOGEX 28, 34, 254, 221
+STYLE DS_SETFONT | DS_FIXEDSYS | DS_CONTROL | WS_CHILD | WS_CAPTION
+CAPTION "Ogólne"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "Wybór plików",IDC_STATIC_1,6,7,49,8
+    CONTROL         "",IDC_STATIC_2,"Static",SS_ETCHEDHORZ | WS_GROUP,57,11,191,1
+    CONTROL         "&Potwierdzaj wybór plików przed uruchomieniem Porównywarki plików",IDC_CONFIRM,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,12,17,199,12
+    LTEXT           "Opcje widoku plików",IDC_STATIC_3,6,36,58,8
+    CONTROL         "",IDC_STATIC_4,"Static",SS_ETCHEDHORZ | WS_GROUP,66,40,182,1
+    LTEXT           "&Liczba wierszy kontekstu wyświetlanych, gdy widoczne są tylko różnice:",IDC_STATIC_5,12,48,214,8,NOT WS_GROUP
+    EDITTEXT        IDE_CONTEXT,227,46,16,12,ES_AUTOHSCROLL
+    LTEXT           "&Szerokość tabulatora:",IDC_STATIC_6,12,62,33,8,NOT WS_GROUP
+    EDITTEXT        IDE_TABSIZE,92,60,16,12
+    LTEXT           "&Znak białych znaków:",IDC_STATIC_7,12,76,79,8
+    COMBOBOX        IDC_WHITESPACE,92,74,55,98,CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+    CONTROL         "Domyślnie pokazuj &szczegółowe różnice",IDC_DETAILDIFFS,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,12,91,189,12
+    CONTROL         "Podziel widok plików &poziomo",IDC_VIEW_HORIZONTAL,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,12,103,189,12
+    LTEXT           "Czcionka widoku plików",IDC_STATIC_8,6,121,46,8
+    CONTROL         "",IDC_STATIC_9,"Static",SS_ETCHEDHORZ | WS_GROUP,54,125,194,1
+    PUSHBUTTON      "&Czcionka",IDB_FONT,12,134,50,14
+    EDITTEXT        IDE_FONT,65,134,165,14,ES_AUTOHSCROLL | ES_READONLY | NOT WS_TABSTOP
+    LTEXT           "Inne",IDC_STATIC_10,6,156,21,8
+    CONTROL         "",IDC_STATIC_11,"Static",SS_ETCHEDHORZ | WS_GROUP,29,160,219,1
+    CONTROL         "&Załaduj wtyczkę podczas uruchamiania Open Salamander",IDC_LOADONSTART,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,12,166,162,12
+END
+
+IDD_CFGDEFOPTIONS DIALOGEX 31, 27, 254, 221
+STYLE DS_SETFONT | DS_FIXEDSYS | DS_CONTROL | WS_CHILD | WS_CAPTION
+CAPTION "Domyślne opcje porównania"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "Ignorowanie",IDC_STATIC_1,6,7,28,8
+    CONTROL         "",IDC_STATIC_2,"Static",SS_ETCHEDHORZ | WS_GROUP,36,11,212,1
+    CONTROL         "Wszystkie &białe znaki",IDC_IGNOREALLSPACE,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,13,17,160,12
+    CONTROL         "Zmiany &ilości białych znaków",IDC_IGNORESPACECHANGE,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,13,29,160,12
+    CONTROL         "&Wielkość liter",IDC_IGNORECASE,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,13,41,160,12
+    LTEXT           "Typ plików",IDC_STATIC_3,6,59,36,8
+    CONTROL         "",IDC_STATIC_4,"Static",SS_ETCHEDHORZ | WS_GROUP,44,63,204,1
+    CONTROL         "&Autodetekcja",IDR_AUTO,"Button",BS_AUTORADIOBUTTON | WS_GROUP | WS_TABSTOP,13,69,74,12
+    CONTROL         "&Binarne",IDR_ALWAYSBINARY,"Button",BS_AUTORADIOBUTTON,13,81,74,12
+    CONTROL         "&Tekstowe",IDR_ALWAYSTEXT,"Button",BS_AUTORADIOBUTTON,13,93,74,12
+    LTEXT           "Kodowanie plików tekstowych:",IDC_STATIC_13,13,110,74,8
+    LTEXT           "Pierwszy plik:",IDC_STATIC_5,13,125,45,8
+    LTEXT           "Drugi plik:",IDC_STATIC_6,13,142,45,8,NOT WS_GROUP
+    EDITTEXT        IDE_LEFTENC,61,123,164,12,ES_READONLY | NOT WS_TABSTOP
+    EDITTEXT        IDE_RIGHTENC,61,140,164,12,ES_READONLY | NOT WS_TABSTOP
+    PUSHBUTTON      "",IDB_LEFTENC,228,123,14,12,WS_GROUP
+    PUSHBUTTON      "",IDB_RIGHTENC,228,140,14,12
+    LTEXT           "Końce wierszy",IDC_STATIC_7,6,158,35,8
+    CONTROL         "",IDC_STATIC_8,"Static",SS_ETCHEDHORZ | WS_GROUP,43,162,205,1
+    LTEXT           "&Pierwszy plik:",IDC_STATIC_9,13,170,47,8
+    CONTROL         "CR/LF",IDC_CRLF1,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,61,168,39,12
+    CONTROL         "CR",IDC_CR1,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,101,168,39,12
+    CONTROL         "LF",IDC_LF1,"Button",BS_AUTOCHECKBOX | WS_DISABLED | WS_TABSTOP,141,168,39,12
+    CONTROL         "NULL",IDC_NULL1,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,181,168,39,12
+    CONTROL         "CR/LF",IDC_CRLF2,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,61,180,39,12
+    CONTROL         "CR",IDC_CR2,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,101,180,39,12
+    CONTROL         "LF",IDC_LF2,"Button",BS_AUTOCHECKBOX | WS_DISABLED | WS_TABSTOP,141,180,39,12
+    CONTROL         "NULL",IDC_NULL2,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,181,180,39,12
+    LTEXT           "Drugi plik:",IDC_STATIC_10,13,182,47,8
+    LTEXT           "Opcje Unicode",IDC_STATIC_11,6,197,57,8
+    CONTROL         "",IDC_STATIC_12,"Static",SS_ETCHEDHORZ | WS_GROUP,65,201,183,1
+    CONTROL         "Połącz &znaki diakrytyczne w znaki prekomponowane",IDC_NORMALIZATION_FORM,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,13,207,186,12
+END
+
+#endif    // Neutral resources
+/////////////////////////////////////////////////////////////////////////////
+
+
+
+#ifndef APSTUDIO_INVOKED
+/////////////////////////////////////////////////////////////////////////////
+//
+// Generated from the TEXTINCLUDE 3 resource.
+//
+#if !defined(AFX_RESOURCE_DLL) || defined(AFX_TARG_NEU)
+LANGUAGE LANG_NEUTRAL,SUBLANG_NEUTRAL
+#include "lang_pl.rc2"   // Polish language resources
+#endif
+
+/////////////////////////////////////////////////////////////////////////////
+#endif    // not APSTUDIO_INVOKED

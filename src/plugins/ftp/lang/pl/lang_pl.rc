@@ -1,0 +1,1524 @@
+// Microsoft Visual C++ generated resource script.
+//
+#pragma code_page(65001)
+
+#include "..\lang.rh"
+
+#define APSTUDIO_READONLY_SYMBOLS
+/////////////////////////////////////////////////////////////////////////////
+//
+// Generated from the TEXTINCLUDE 2 resource.
+//
+#include "winresrc.h"
+
+#include "..\..\ftp.rh2"
+
+/////////////////////////////////////////////////////////////////////////////
+#undef APSTUDIO_READONLY_SYMBOLS
+
+/////////////////////////////////////////////////////////////////////////////
+// Neutral resources
+
+#if !defined(AFX_RESOURCE_DLL) || defined(AFX_TARG_NEU)
+LANGUAGE LANG_NEUTRAL, SUBLANG_NEUTRAL
+
+#ifdef APSTUDIO_INVOKED
+/////////////////////////////////////////////////////////////////////////////
+//
+// TEXTINCLUDE
+//
+
+1 TEXTINCLUDE 
+BEGIN
+    "lang.rh\0"
+END
+
+2 TEXTINCLUDE 
+BEGIN
+    "#include ""winresrc.h""\r\n"
+    "\r\n"
+    "#include ""..\\ftp.rh2""\r\n"
+    "\0"
+END
+
+3 TEXTINCLUDE 
+BEGIN
+    "#if !defined(AFX_RESOURCE_DLL) || defined(AFX_TARG_NEU)\r\n"
+    "LANGUAGE LANG_NEUTRAL,SUBLANG_NEUTRAL\r\n"
+    "#include ""lang.rc2""   // non-Microsoft Visual C++ edited resources\r\n"
+    "#endif\r\n"
+    "\0"
+END
+
+#endif    // APSTUDIO_INVOKED
+
+
+/////////////////////////////////////////////////////////////////////////////
+//
+// Dialog
+//
+
+IDD_CFGGENERAL DIALOGEX 37, 31, 339, 218
+STYLE DS_SETFONT | DS_FIXEDSYS | DS_CONTROL | WS_CHILD | WS_CAPTION
+CAPTION "Ogólne"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    CONTROL         "Poka&zuj okno z komunikatem powitalnym serwera po połączeniu",IDC_WELCOMEMESSAGE,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,5,5,226,12
+    CONTROL         "&Priorytet dla połączeń używanych w panelach (szybsze przeglądanie)",IDC_PRIORITYTOPANELCON,
+                    "Button",BS_AUTOCHECKBOX | WS_DISABLED | WS_TABSTOP,361,130,214,12
+    CONTROL         "&Całkowity limit prędkości dla klienta FTP:",IDC_ENABLETOTSPEEDLIM,
+                    "Button",BS_AUTOCHECKBOX | WS_DISABLED | WS_TABSTOP,361,143,117,12
+    EDITTEXT        IDE_TOTALSPEEDLIMIT,480,143,28,12,ES_AUTOHSCROLL | WS_DISABLED
+    CONTROL         "A&kceptuj sekwencje ucieczkowe hex w ścieżkach (znane z przeglądarek, np. ""%20"" jako "" "")",IDC_ACCEPTHEXESCSEQ,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,5,18,301,12
+    CONTROL         "&Zamykaj automatycznie okno operacji po jej pomyślnym zakończeniu, jeśli nie było w nim zmian",IDC_CLOSEOPERDLGIFSUCCESS,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,5,31,333,12
+    CONTROL         "&Otwieraj automatycznie okna rozwiązywania błędów, gdy okno operacji jest bezczynne",IDC_OPENSOLVEERRIFIDLE,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,5,44,259,12
+    LTEXT           "KB/s",IDC_STATIC_1,512,145,22,8,WS_DISABLED
+    LTEXT           "&Hasło dla połączeń anonimowych (Twój adres e-mail):",IDC_STATIC_2,5,69,176,8
+    EDITTEXT        IDE_ANONYMOUSPASSWD,182,67,152,12,ES_AUTOHSCROLL | WS_GROUP
+END
+
+IDD_CFGDEFAULTS DIALOGEX 37, 31, 339, 218
+STYLE DS_SETFONT | DS_FIXEDSYS | DS_CONTROL | WS_CHILD | WS_CAPTION
+CAPTION "Domyślne"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    CONTROL         "",IDC_STATIC_1,"Static",SS_ETCHEDHORZ | WS_GROUP,148,9,183,1
+    LTEXT           "Domyślne opcje zaawansowane dla połączeń",IDC_STATIC_2,5,5,141,8
+    LTEXT           "Serwer p&roxy:",IDC_STATIC_3,14,17,45,8
+    COMBOBOX        IDC_PROXYSERVER,60,15,214,89,CBS_DROPDOWNLIST | WS_VSCROLL | WS_GROUP | WS_TABSTOP
+    PUSHBUTTON      "&Dodaj...",IDB_ADDPROXYSRV,281,14,50,14,WS_GROUP
+    CONTROL         "Użyj trybu przesyłu &pasywnego (może pomóc, gdy jesteś za zaporą lub serwerem proxy)",IDC_PASSIVE,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,14,29,278,12
+    CONTROL         "U&trzymuj połączenia (zapobiega rozłączeniu przez serwer z powodu braku aktywności)",IDC_KEEPALIVE,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,14,42,289,12
+    CONTROL         "&Maksymalna liczba równoległych połączeń z serwerem:",IDC_MAXCONCURRENTCON,
+                    "Button",BS_AUTOCHECKBOX | WS_DISABLED | WS_TABSTOP,376,137,192,12
+    EDITTEXT        IDE_MAXCONCURRENTCON,569,137,29,12,ES_AUTOHSCROLL | WS_DISABLED
+    CONTROL         "Całkowity li&mit prędkości dla serwera:",IDC_SRVSPEEDLIMIT,
+                    "Button",BS_AUTOCHECKBOX | WS_DISABLED | WS_TABSTOP,376,151,114,12
+    EDITTEXT        IDE_SRVSPEEDLIMIT,569,151,29,12,ES_AUTOHSCROLL | WS_DISABLED
+    CONTROL         "U&żywaj pamięci podręcznej dla oglądanych plików oraz list plików i katalogów na serwerze (szybsze przeglądanie)",IDC_USELISTINGSCACHE,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,14,55,298,12
+    CONTROL         "&Kompresuj transfery danych, jeśli serwer obsługuje kompresję (MODE Z)",IDC_COMPRESSDATA,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,14,68,284,12
+    LTEXT           "KB/s",IDC_STATIC_4,602,153,21,8,WS_DISABLED
+    CONTROL         "",IDC_STATIC_5,"Static",SS_ETCHEDHORZ | WS_GROUP,161,95,170,1
+    LTEXT           "Domyślne ustawienia podtrzymywania połączeń",IDC_STATIC_6,5,91,154,8
+    LTEXT           "&Wysyłaj:",IDC_STATIC_7,14,105,23,8
+    COMBOBOX        IDC_KEEPALIVESEND,37,103,114,62,CBS_DROPDOWNLIST | WS_VSCROLL | WS_GROUP | WS_TABSTOP
+    LTEXT           "&co:",IDC_STATIC_8,156,105,23,8
+    EDITTEXT        IDE_KEEPALIVEEVERY,181,103,29,12,ES_AUTOHSCROLL | WS_GROUP
+    LTEXT           "sekund",IDC_STATIC_9,214,105,34,8
+    LTEXT           "&Zatrzymaj wysyłanie po:",IDC_STATIC_10,14,120,67,8
+    EDITTEXT        IDE_KEEPALIVESTOPAFTER,122,118,29,12,ES_AUTOHSCROLL | WS_GROUP
+    LTEXT           "minutach",IDC_STATIC_11,156,120,34,8
+    CONTROL         "",IDC_STATIC_12,"Static",SS_ETCHEDHORZ | WS_GROUP,95,145,236,1
+    LTEXT           "Domyślny tryb przesyłu plików",IDC_STATIC_13,5,141,88,8
+    CONTROL         "Tryb &binarny (bez zmian podczas przesyłu)",IDC_BINARYMODE,
+                    "Button",BS_AUTORADIOBUTTON | WS_GROUP | WS_TABSTOP,14,151,154,12
+    CONTROL         "Tryb A&SCII (konwertuj pliki do domyślnych końców wierszy systemu)",IDC_ASCIIMODE,
+                    "Button",BS_AUTORADIOBUTTON,14,164,207,12
+    CONTROL         "&Automatyczny - tryb ASCII dla:",IDC_AUTODETECT,"Button",BS_AUTORADIOBUTTON,14,177,108,12
+    EDITTEXT        IDE_ASCIIMASKS,122,177,209,12,ES_AUTOHSCROLL
+    RTEXT           "podpowiedzi masek",IDT_ASCIIMASKHINTS,291,191,39,8,WS_TABSTOP
+END
+
+IDD_CFGCONFIRMATIONS DIALOGEX 37, 31, 339, 218
+STYLE DS_SETFONT | DS_FIXEDSYS | DS_CONTROL | WS_CHILD | WS_CAPTION
+CAPTION "Potwierdzenia"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    CONTROL         "&Pokazuj komunikat ""Opuszczasz serwer. Czy chcesz rozłączyć się, czy zachować połączenie?""",IDC_ALWAYSNOTCLOSE,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,5,5,317,12
+    CONTROL         "&Wyświetlaj komunikat ""Czy chcesz się rozłączyć?""",IDC_ALWAYSDISCONNECT,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,5,18,164,12
+    CONTROL         "W&yświetlaj komunikat ""Połączenie zostało zamknięte. Czy chcesz połączyć się ponownie?""",IDC_ALWAYSRECONNECT,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,5,31,234,12
+    CONTROL         "Pokazuj komunikat ""Nazwa docelowa jest już używana. Czy chcesz ją nadpisać?"" przy &szybkiej zmianie nazwy",IDC_ALWAYSOVERWRITE,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,5,44,325,12
+    CONTROL         "Pokaż ko&munikat ""Połączenie z serwerem FTP zostało utracone""",IDC_WARNWHENCONLOST,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,5,57,202,12
+    CONTROL         "Pokaż komunikat ""Jeśli zawsze chcesz wyświetlać &ukryte pliki i katalogi na tym serwerze FTP, ...""",IDC_HINTLISTHIDDENFILES,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,5,70,321,12
+END
+
+IDD_CFGADVANCED DIALOGEX 37, 31, 339, 218
+STYLE DS_SETFONT | DS_FIXEDSYS | DS_CONTROL | WS_CHILD | WS_CAPTION
+CAPTION "Zaawansowane"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "&Limit rozmiaru pamięci podręcznej:",IDC_STATIC_1,5,7,98,8
+    EDITTEXT        IDE_MEMCACHESIZELIMIT,134,5,28,12,ES_AUTOHSCROLL | WS_GROUP
+    LTEXT           "KB",IDC_STATIC_2,166,7,16,8
+    LTEXT           "Limit czasu &na operacje sieciowe:",IDC_STATIC_3,5,21,99,8
+    EDITTEXT        IDE_SRVREPLIESTIMEOUT,134,19,28,12,ES_AUTOHSCROLL | WS_GROUP
+    LTEXT           "sekund",IDC_STATIC_4,166,21,36,8
+    LTEXT           "&Odstęp między próbami połączenia:",IDC_STATIC_5,5,35,107,8
+    EDITTEXT        IDE_DELAYBETWCONRETR,134,33,28,12,ES_AUTOHSCROLL | WS_GROUP
+    LTEXT           "sekund",IDC_STATIC_6,166,35,33,8
+    LTEXT           "Liczba prób &połączenia:",IDC_STATIC_7,5,49,93,8
+    EDITTEXT        IDE_CONNECTRETRIES,134,47,28,12,ES_AUTOHSCROLL | WS_GROUP
+    LTEXT           "&Anuluj połączenie danych, jeśli jest bezczynne przez:",IDC_STATIC_8,5,63,129,8
+    EDITTEXT        IDE_NODATATRTIMEOUT,134,61,28,12,ES_AUTOHSCROLL | WS_GROUP
+    LTEXT           "sekund",IDC_STATIC_9,166,63,36,8
+    LTEXT           "Próbuj &wznawiać kopiowanie tylko, jeśli już skopiowana część pliku wynosi co najmniej:",IDC_STATIC_10,5,77,224,8
+    EDITTEXT        IDE_RESUMEMINFILESIZE,269,75,35,12,ES_AUTOHSCROLL | WS_GROUP
+    LTEXT           "bajtów",IDC_STATIC_11,308,77,22,8
+    LTEXT           "Liczba &bajtów do weryfikacji (na końcu pliku) przy wznawianiu kopiowania z serwera:",IDC_STATIC_12,5,91,264,8
+    EDITTEXT        IDE_RESUMEOVERLAP,269,89,35,12,ES_AUTOHSCROLL | WS_GROUP
+    LTEXT           "bajtów",IDC_STATIC_13,308,91,22,8
+    CONTROL         "",IDC_STATIC_14,"Static",SS_ETCHEDHORZ | WS_GROUP,120,116,211,1
+    LTEXT           "Transfery dużych katalogów",IDC_STATIC_15,5,112,80,8
+    CONTROL         "Używa&j wielu połączeń dla jednej operacji, do:",IDC_AUTOPARALLELISM,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,5,122,180,12
+    EDITTEXT        IDE_TRANSFERWORKERLIMIT,190,122,28,12,ES_AUTOHSCROLL
+    LTEXT           "połączeń (od 1 do 8, nigdy powyżej limitu połączeń serwera)",IDC_STATIC_16,222,124,215,8
+    CONTROL         "Używaj czytelnych maszynowo listowań katalogów (&MLSD), gdy serwer je obsługuje",IDC_USEMLSD,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,5,136,300,12
+    CONTROL         "Zbieraj pomiary transferów (zapisuje jeden raport &JSON na operację)",IDC_TRANSFERMETRICS,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,5,150,300,12
+END
+
+IDD_CFGLOGS DIALOGEX 23, 39, 339, 218
+STYLE DS_SETFONT | DS_FIXEDSYS | DS_CONTROL | WS_CHILD | WS_CAPTION
+CAPTION "Dzienniki"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "KB",IDC_STATIC_1,258,23,14,8
+    CONTROL         "",IDC_STATIC_2,"Static",SS_ETCHEDHORZ | WS_GROUP,174,12,157,1
+    CONTROL         "&Zapisuj komunikację z serwerami do dziennika",IDC_ENABLELOGGING,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,5,7,167,12
+    CONTROL         "&Ogranicz rozmiar dziennika jednego serwera do:",IDC_LOGMAXSIZE,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,14,21,125,12
+    EDITTEXT        IDE_LOGMAXSIZE,226,21,28,12,ES_AUTOHSCROLL
+    CONTROL         "&Maksymalna liczba przechowywanych dzienników rozłączonych połączeń:",IDC_MAXCLOSEDCONLOGS,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,14,35,212,12
+    EDITTEXT        IDE_MAXCLOSEDCONLOGS,226,35,28,12,ES_AUTOHSCROLL
+    CONTROL         "&Wyłącz zapisywanie dziennika dla połączeń używanych do operacji na plikach",IDC_DISABLELOGWORKERS,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,14,49,196,12
+END
+
+IDD_CONNECT DIALOGEX 23, 72, 415, 164
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Połącz z serwerem FTP"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LISTBOX         IDL_BOOKMARKS,7,7,160,129,LBS_NOINTEGRALHEIGHT | WS_VSCROLL | WS_GROUP | WS_TABSTOP
+    LTEXT           "&Adres:",IDT_HOSTADDRESS,181,9,31,8
+    COMBOBOX        IDE_HOSTADDRESS,222,7,186,130,CBS_DROPDOWN | CBS_AUTOHSCROLL | WS_VSCROLL | WS_GROUP | WS_TABSTOP
+    LTEXT           "Ścieżka &początkowa:",IDT_INITIALPATH,181,23,41,8
+    COMBOBOX        IDE_INITIALPATH,222,21,186,117,CBS_DROPDOWN | CBS_AUTOHSCROLL | WS_VSCROLL | WS_GROUP | WS_TABSTOP
+    CONTROL         "",IDC_STATIC_1,"Static",SS_ETCHEDHORZ | WS_GROUP,255,47,153,1
+    CONTROL         " Logowanie anoni&mowe",IDC_ANONYMOUSLOGIN,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,181,42,72,12
+    LTEXT           "Nazwa &użytkownika:",IDT_USERNAME,191,58,41,8
+    EDITTEXT        IDE_USERNAME,234,56,174,12,ES_AUTOHSCROLL | WS_GROUP
+    LTEXT           "&Hasło:",IDT_PASSWORD,191,72,39,8
+    EDITTEXT        IDE_PASSWORD,234,70,58,12,ES_PASSWORD | ES_AUTOHSCROLL | WS_GROUP
+    EDITTEXT        IDE_PASSWORD_LOCKED,297,70,58,12,ES_AUTOHSCROLL | WS_GROUP
+    PUSHBUTTON      "O&dblokuj...",IDB_PASSWORD_CHANGE,358,69,50,14
+    CONTROL         "Zapi&sz hasło",IDC_SAVEPASSWORD,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,191,84,64,12
+    LTEXT           "nie jest to bezpieczne",IDC_SAVEPASSWORD_HINT,257,86,149,8,WS_TABSTOP
+    PUSHBUTTON      "Za&awansowane...",IDB_ADVACED,181,107,50,14,WS_GROUP
+    EDITTEXT        IDE_ADVANCEDINFO,234,108,174,12,ES_AUTOHSCROLL | ES_READONLY | WS_GROUP
+    PUSHBUTTON      "N&owy...",IDB_NEWBOOKMARK,6,142,50,14,WS_GROUP
+    PUSHBUTTON      "Zmień &nazwę...",IDB_RENAMEBOOKMARK,61,142,50,14
+    PUSHBUTTON      "&Usuń...",IDB_REMOVEBOOKMARK,116,142,50,14
+    DEFPUSHBUTTON   "Połącz",IDOK,193,142,50,14,WS_GROUP
+    PUSHBUTTON      "&Zamknij",IDB_CLOSE,248,142,50,14
+    PUSHBUTTON      "Anuluj",IDCANCEL,303,142,50,14
+    PUSHBUTTON      "Pomoc",IDHELP,358,142,50,14
+END
+
+IDD_CONNECTADVANCED DIALOGEX 22, 28, 328, 301
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Opcje zaawansowane"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "Serwer p&roxy:",IDC_STATIC_1,7,10,45,8
+    COMBOBOX        IDC_PROXYSERVER,84,8,179,89,CBS_DROPDOWNLIST | WS_VSCROLL | WS_GROUP | WS_TABSTOP
+    PUSHBUTTON      "&Dodaj...",IDB_ADDPROXYSRV,270,7,50,14,WS_GROUP
+    LTEXT           "Ścież&ka panelu docelowego:",IDC_STATIC_2,7,25,71,8
+    EDITTEXT        IDE_TARGETPATH,84,23,179,12,ES_AUTOHSCROLL | WS_GROUP
+    PUSHBUTTON      "&Przeglądaj...",IDB_BROWSE,270,22,50,14,WS_GROUP
+    LTEXT           "Połącz z port&em:",IDC_STATIC_3,7,40,65,8
+    EDITTEXT        IDC_CONNECTTOPORT,84,38,28,12,ES_AUTOHSCROLL | WS_GROUP
+    LTEXT           "&Typ serwera:",IDC_STATIC_4,7,54,51,8
+    COMBOBOX        IDC_SERVERTYPE,84,52,238,61,CBS_DROPDOWNLIST | CBS_AUTOHSCROLL | WS_VSCROLL | WS_GROUP | WS_TABSTOP
+    LTEXT           "Tr&yb przesyłu plików:",IDC_STATIC_5,7,69,69,8
+    COMBOBOX        IDC_TRANSFERMODE,84,67,238,57,CBS_DROPDOWNLIST | CBS_AUTOHSCROLL | WS_VSCROLL | WS_GROUP | WS_TABSTOP
+    LTEXT           "Polecenie &listowania:",IDC_STATIC_6,7,84,72,8
+    COMBOBOX        IDC_LISTCOMMAND,84,82,88,57,CBS_DROPDOWN | CBS_AUTOHSCROLL | WS_VSCROLL | WS_GROUP | WS_TABSTOP
+    LTEXT           "Początkowe polecenia &FTP:",IDC_STATIC_7,7,99,77,8
+    EDITTEXT        IDE_INITFTPCOMMANDS,84,97,237,12,ES_AUTOHSCROLL | WS_GROUP
+    RTEXT           "polecenia rozdziela średnik (CWD []; HELP)",IDC_STATIC_8,128,111,191,8
+    GROUPBOX        "     ",IDC_STATIC_9,7,129,314,46
+    CONTROL         " Utrzymu&j połączenia (zapobiega rozłączeniu przez serwer z powodu braku aktywności)",IDC_USEKEEPALIVE,
+                    "Button",BS_AUTO3STATE | WS_TABSTOP,15,127,291,12
+    LTEXT           "&Wysyłaj:",IDC_STATIC_10,15,143,22,8
+    COMBOBOX        IDC_KEEPALIVESEND,37,141,114,62,CBS_DROPDOWNLIST | WS_VSCROLL | WS_GROUP | WS_TABSTOP
+    LTEXT           "&co:",IDC_STATIC_11,156,143,23,8
+    EDITTEXT        IDE_KEEPALIVEEVERY,182,141,28,12,ES_AUTOHSCROLL | WS_GROUP
+    LTEXT           "sekund",IDC_STATIC_12,214,143,34,8
+    LTEXT           "&Zatrzymaj wysyłanie po:",IDC_STATIC_13,15,158,67,8
+    EDITTEXT        IDE_KEEPALIVESTOPAFTER,123,156,28,12,ES_AUTOHSCROLL | WS_GROUP
+    LTEXT           "minutach",IDC_STATIC_14,156,158,34,8
+    CONTROL         "Użyj trybu przesyłu p&asywnego (może pomóc, gdy jesteś za zaporą lub serwerem proxy)",IDC_USEPASSIVEMODE,
+                    "Button",BS_AUTO3STATE | WS_GROUP | WS_TABSTOP,7,186,278,12
+    CONTROL         "Maksymalna liczba równoległych &połączeń:",IDC_MAXCONCURRENTCON,
+                    "Button",BS_AUTO3STATE | WS_DISABLED | WS_TABSTOP,376,206,161,12
+    EDITTEXT        IDE_MAXCONCURRENTCON,538,206,28,12,ES_AUTOHSCROLL | WS_DISABLED
+    CONTROL         "C&ałkowity limit prędkości dla tego serwera:",IDC_SRVSPEEDLIMIT,
+                    "Button",BS_AUTO3STATE | WS_DISABLED | WS_TABSTOP,376,220,124,12
+    EDITTEXT        IDE_SRVSPEEDLIMIT,538,220,28,12,ES_AUTOHSCROLL | WS_DISABLED
+    CONTROL         "&Używaj pamięci podręcznej dla oglądanych plików oraz list plików i katalogów na serwerze (szybsze przeglądanie)",IDC_USELISTINGSCACHE,
+                    "Button",BS_AUTO3STATE | WS_TABSTOP,7,200,298,12
+    CONTROL         "Szyfruj połączenie &sterujące (TLS/SSL)",IDC_ENCRYPTCONTROLCONN,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,7,214,284,12
+    CONTROL         "Szyfruj połączenia da&nych (transfery plików i listowania katalogów) (TLS/SSL)",IDC_ENCRYPTDATACONN,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,7,228,284,12
+    CONTROL         "&Kompresuj transfery danych, jeśli serwer obsługuje kompresję (MODE Z)",IDC_COMPRESSDATA,
+                    "Button",BS_AUTO3STATE | WS_TABSTOP,7,242,284,12
+    LTEXT           "Uwaga: trzeci stan = użyj wartości domyślnej (zobacz stronę Domyślne w konfiguracji)",IDC_STATIC_15,7,258,248,8
+    LTEXT           "KB/s",IDC_STATIC_16,575,236,21,8,WS_DISABLED
+    DEFPUSHBUTTON   "OK",IDOK,78,279,50,14,WS_GROUP
+    PUSHBUTTON      "Anuluj",IDCANCEL,139,279,50,14
+    PUSHBUTTON      "Pomoc",IDHELP,200,279,50,14
+END
+
+IDD_RENAMEDLG DIALOGEX 10, 24, 227, 64
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Zmień nazwę zakładki"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    CONTROL         "",IDT_SUBJECT,"Static",SS_LEFTNOWORDWRAP | SS_NOPREFIX | WS_GROUP,10,9,207,8
+    EDITTEXT        IDE_NAME,10,19,208,12,ES_AUTOHSCROLL
+    DEFPUSHBUTTON   "OK",IDOK,57,42,50,14,WS_GROUP
+    PUSHBUTTON      "Anuluj",IDCANCEL,119,42,50,14
+END
+
+IDD_NEWBOOKMARKDLG DIALOGEX 10, 24, 227, 78
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Nowa zakładka"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    CONTROL         "&Nazwa zakładki:",IDT_NEWNAME,"Static",SS_LEFTNOWORDWRAP | WS_GROUP,10,9,207,8
+    EDITTEXT        IDE_NAME,10,19,208,12,ES_AUTOHSCROLL
+    CONTROL         "",IDC_COPYFOCUSEDSRV,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,10,35,199,12
+    DEFPUSHBUTTON   "OK",IDOK,57,55,50,14,WS_GROUP
+    PUSHBUTTON      "Anuluj",IDCANCEL,119,55,50,14
+END
+
+IDD_ENTERSTRDLG DIALOGEX 10, 24, 243, 82
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Podaj nazwę użytkownika"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    CONTROL         "",IDT_CONNECTINGTOAS,"Static",SS_LEFTNOWORDWRAP | WS_GROUP,9,8,227,8
+    LTEXT           "Nazwa &użytkownika:",IDT_STRING,9,23,223,8
+    EDITTEXT        IDE_STRING,9,33,225,12,ES_PASSWORD | ES_AUTOHSCROLL | WS_GROUP
+    DEFPUSHBUTTON   "OK",IDOK,65,60,50,14,WS_GROUP
+    PUSHBUTTON      "Anuluj",IDCANCEL,127,60,50,14
+END
+
+IDD_LOGINERRORDLG DIALOGEX 10, 24, 264, 165
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Błąd łączenia z serwerem FTP"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "Nazwa &użytkownika:",IDC_STATIC_1,7,55,40,8
+    EDITTEXT        IDE_USERNAME,48,53,210,12,ES_AUTOHSCROLL | WS_GROUP
+    LTEXT           "&Hasło:",IDC_STATIC_2,7,70,36,8
+    EDITTEXT        IDE_PASSWORD,48,68,210,12,ES_PASSWORD | ES_AUTOHSCROLL | WS_GROUP
+    LTEXT           "&Konto:",IDC_STATIC_3,7,85,34,8
+    EDITTEXT        IDE_ACCOUNT,48,83,210,12,ES_PASSWORD | ES_AUTOHSCROLL | WS_GROUP
+    DEFPUSHBUTTON   "Ponów",IDOK,76,110,50,14,WS_GROUP
+    PUSHBUTTON      "Anuluj",IDCANCEL,138,110,50,14
+    CONTROL         "",IDC_STATIC_4,"Static",SS_ETCHEDHORZ | WS_GROUP,7,132,251,1
+    CONTROL         "&Ponów bez pytania następnym razem (tylko dla tego połączenia)",IDC_RETRYWITHOUTASK,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,7,137,250,12
+    CONTROL         "Zastosuj do &wszystkich połączeń z błędem już teraz",IDC_APPLYTOALL,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,7,149,250,12
+    CONTROL         "",IDT_CONNECTINGTO,"Static",SS_LEFTNOWORDWRAP | WS_GROUP,7,7,250,8
+    LTEXT           "Odpowiedź serwera:",IDT_ERRORTITLE,7,22,252,8
+    EDITTEXT        IDE_SERVERREPLY,5,32,252,18,ES_MULTILINE | ES_AUTOVSCROLL | ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+END
+
+IDD_LOGINERRORDLGEX DIALOGEX 10, 24, 267, 195
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Błąd łączenia z serwerem FTP"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "Nazwa &użytkownika:",IDC_STATIC_1,7,55,40,8
+    EDITTEXT        IDE_USERNAME,68,53,193,12,ES_AUTOHSCROLL | WS_GROUP
+    LTEXT           "&Hasło:",IDC_STATIC_2,7,70,36,8
+    EDITTEXT        IDE_PASSWORD,68,68,193,12,ES_PASSWORD | ES_AUTOHSCROLL | WS_GROUP
+    LTEXT           "&Konto:",IDC_STATIC_3,7,85,34,8
+    EDITTEXT        IDE_ACCOUNT,68,83,193,12,ES_PASSWORD | ES_AUTOHSCROLL | WS_GROUP
+    LTEXT           "Nazwa użytkownika &proxy:",IDC_STATIC_4,7,100,61,8
+    EDITTEXT        IDE_PROXYUSER,68,98,193,12,ES_AUTOHSCROLL | WS_GROUP
+    LTEXT           "Hasło pr&oxy:",IDC_STATIC_5,7,115,57,8
+    EDITTEXT        IDE_PROXYPASSWD,68,113,193,12,ES_PASSWORD | ES_AUTOHSCROLL | WS_GROUP
+    DEFPUSHBUTTON   "Ponów",IDOK,77,140,50,14,WS_GROUP
+    PUSHBUTTON      "Anuluj",IDCANCEL,139,140,50,14
+    CONTROL         "",IDC_STATIC_6,"Static",SS_ETCHEDHORZ | WS_GROUP,7,162,254,1
+    CONTROL         "&Ponów bez pytania następnym razem (tylko dla tego połączenia)",IDC_RETRYWITHOUTASK,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,7,167,200,12
+    CONTROL         "Zastosuj do połą&czeń z błędem już teraz",IDC_APPLYTOALL,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,7,179,133,12
+    CONTROL         "",IDT_CONNECTINGTO,"Static",SS_LEFTNOWORDWRAP | WS_GROUP,7,7,253,8
+    LTEXT           "Odpowiedź serwera:",IDT_ERRORTITLE,7,22,255,8
+    EDITTEXT        IDE_SERVERREPLY,5,32,255,18,ES_MULTILINE | ES_AUTOVSCROLL | ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+END
+
+IDD_WELCOMEMSGDLG DIALOGEX 10, 24, 396, 170
+STYLE DS_SETFONT | DS_FIXEDSYS | WS_MAXIMIZEBOX | WS_POPUP | WS_VISIBLE | WS_CLIPCHILDREN | WS_CAPTION | WS_SYSMENU | WS_THICKFRAME
+CAPTION "Komunikat powitalny"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    EDITTEXT        IDE_WELCOMEMSG,5,5,386,141,ES_MULTILINE | ES_AUTOVSCROLL | ES_AUTOHSCROLL | ES_READONLY | WS_VSCROLL | WS_HSCROLL | WS_GROUP
+    DEFPUSHBUTTON   "Zamknij",IDOK,141,152,50,14,WS_GROUP
+    PUSHBUTTON      "Zapisz &jako",IDB_SAVEMSGAS,204,152,50,14
+END
+
+IDD_LOGSDLG DIALOGEX 17, 51, 396, 165
+STYLE DS_SETFONT | DS_FIXEDSYS | WS_MINIMIZEBOX | WS_MAXIMIZEBOX | WS_POPUP | WS_VISIBLE | WS_CLIPCHILDREN | WS_CAPTION | WS_SYSMENU | WS_THICKFRAME
+CAPTION "Dzienniki FTP"
+MENU IDM_LOGSMENU
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    CONTROL         "",IDC_MENULINE,"Static",SS_ETCHEDHORZ | WS_GROUP,0,0,396,1
+    COMBOBOX        IDC_LISTOFLOGS,5,5,386,104,CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+    EDITTEXT        IDE_SERVERLOG,5,19,386,141,ES_MULTILINE | ES_AUTOVSCROLL | ES_AUTOHSCROLL | ES_READONLY | WS_VSCROLL | WS_HSCROLL | WS_GROUP
+END
+
+IDD_SENDCOMMANDDLG DIALOGEX 10, 24, 285, 100
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Wyślij polecenie FTP"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "&Polecenie:",IDC_STATIC_1,9,9,39,8
+    COMBOBOX        IDC_FTPCOMMAND,9,19,267,90,CBS_DROPDOWN | CBS_AUTOHSCROLL | WS_VSCROLL | WS_GROUP | WS_TABSTOP
+    EDITTEXT        IDE_FTPCOMMAND_PASSWD,9,19,267,12,ES_PASSWORD | ES_AUTOHSCROLL | NOT WS_VISIBLE | WS_GROUP
+    CONTROL         "&Tajne polecenie (ukryj wpisywanie oraz nie zapamiętuj i nie pokazuj go w dzienniku)",IDC_SECRETCOMMAND,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,9,34,260,12
+    CONTROL         "Polecenie może &zmienić ścieżkę roboczą na serwerze (zmień też ścieżkę w panelu)",IDC_CHANGEPATHINPANEL,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,9,46,260,12
+    CONTROL         "Polecenie może &modyfikować zawartość ścieżki roboczej (odśwież ścieżkę roboczą)",IDC_REFRESHWORKINGPATH,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,9,58,247,12
+    DEFPUSHBUTTON   "OK",IDOK,57,79,50,14,WS_GROUP
+    PUSHBUTTON      "Anuluj",IDCANCEL,117,79,50,14
+    PUSHBUTTON      "Pomoc",IDHELP,177,79,50,14
+END
+
+IDD_LISTWAITDLG DIALOGEX 10, 24, 357, 91
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Klient FTP"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "",IDT_ACTION,9,9,341,16
+    LTEXT           "Ścieżka:",IDT_PATHONFTP1,9,27,20,8
+    LTEXT           "",IDT_PATHONFTP2,30,27,320,8
+    LTEXT           "Szacowany pozostały czas:",IDT_ESTIMATEDTIME1,9,38,68,8
+    LTEXT           "",IDT_ESTIMATEDTIME2,78,38,272,8
+    LTEXT           "Czas, który upłynął:",IDT_ELAPSEDTIME1,9,49,68,8
+    LTEXT           "",IDT_ELAPSEDTIME2,78,49,272,8
+    LTEXT           "Status:",IDT_OPERSTATUS1,9,60,26,8
+    LTEXT           "",IDT_OPERSTATUS2,36,60,314,8
+    CONTROL         "",IDC_OPERPROGRESS,"Static",0,9,71,340,12
+END
+
+IDD_CFGSERVERTYPES DIALOGEX 37, 31, 339, 218
+STYLE DS_SETFONT | DS_FIXEDSYS | DS_CONTROL | WS_CHILD | WS_CAPTION
+CAPTION "Serwery"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "&Obsługiwane typy serwerów:",IDC_STATIC_1,5,5,95,8
+    LISTBOX         IDL_SUPPORTEDSERVERS,5,15,268,197,LBS_HASSTRINGS | LBS_NOINTEGRALHEIGHT | WS_VSCROLL | WS_GROUP | WS_TABSTOP
+    PUSHBUTTON      "N&owy...",IDB_NEWSERVER,282,14,50,14,WS_GROUP
+    PUSHBUTTON      "&Edytuj...",IDB_EDITSERVER,282,32,50,14
+    PUSHBUTTON      "Przenieś &wyżej",IDB_MOVESERVERUP,282,50,50,14
+    PUSHBUTTON      "Przenieś &niżej",IDB_MOVESERVERDOWN,282,68,50,14
+    PUSHBUTTON      "&Inne",IDB_OTHERSERVERACT,282,86,50,14
+END
+
+IDD_EDITSERVERTYPE DIALOGEX 22, 28, 421, 241
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Edytuj typ serwera"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "&Warunek automatycznego wykrywania:",IDC_STATIC_1,7,7,80,8
+    EDITTEXT        IDE_AUTODETECTCOND,7,17,390,12,ES_AUTOHSCROLL | WS_GROUP
+    PUSHBUTTON      "",IDB_ADCONDINSERT,402,17,12,12,WS_GROUP
+    RTEXT           "(puste = zawsze prawda)",IDC_STATIC_2,320,31,76,8
+    LTEXT           "&Kolumny w panelu:",IDC_STATIC_3,7,39,91,8
+    CONTROL         "",IDL_SRVTYPECOLUMNS,"SysListView32",LVS_REPORT | LVS_SINGLESEL | LVS_SHOWSELALWAYS | LVS_NOSORTHEADER | WS_CLIPSIBLINGS | WS_CLIPCHILDREN | WS_BORDER | WS_GROUP | WS_TABSTOP,7,49,347,68
+    PUSHBUTTON      "N&owy...",IDB_NEWCOLUMN,364,49,50,14,WS_GROUP
+    PUSHBUTTON      "&Edytuj...",IDB_EDITCOLUMN,364,67,50,14
+    PUSHBUTTON      "&Usuń...",IDB_REMOVECOLUMN,364,85,50,14
+    PUSHBUTTON      "&Przenieś",IDB_MOVECOLUMN,364,103,50,14
+    LTEXT           "&Reguły analizy listowania:",IDC_STATIC_4,7,127,92,8
+    EDITTEXT        IDE_PARSINGRULES,7,137,407,76,ES_MULTILINE | ES_AUTOVSCROLL | ES_AUTOHSCROLL | ES_WANTRETURN | WS_VSCROLL | WS_GROUP
+    PUSHBUTTON      "&Testuj analizator...",IDB_TESTPARSER,7,221,64,14,WS_GROUP
+    DEFPUSHBUTTON   "OK",IDOK,242,221,50,14,WS_GROUP
+    PUSHBUTTON      "Anuluj",IDCANCEL,303,221,50,14
+    PUSHBUTTON      "Pomoc",IDHELP,364,221,50,14
+END
+
+IDD_EDITSRVTYCOLUMN DIALOGEX 58, 53, 245, 136
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Edytuj kolumnę"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "&Identyfikator:",IDC_STATIC_1,11,12,36,8
+    EDITTEXT        IDE_COL_ID,58,10,177,12,ES_AUTOHSCROLL | WS_GROUP
+    LTEXT           "&Nazwa:",IDC_STATIC_2,11,27,26,8
+    COMBOBOX        IDC_COL_NAME,58,25,177,65,CBS_DROPDOWN | CBS_AUTOHSCROLL | CBS_HASSTRINGS | WS_VSCROLL | WS_GROUP | WS_TABSTOP
+    LTEXT           "&Typ:",IDC_STATIC_3,11,43,26,8
+    COMBOBOX        IDC_COL_TYPE,58,41,177,65,CBS_DROPDOWNLIST | CBS_AUTOHSCROLL | CBS_HASSTRINGS | WS_VSCROLL | WS_GROUP | WS_TABSTOP
+    LTEXT           "&Pusta wartość:",IDC_STATIC_4,11,59,45,8
+    EDITTEXT        IDE_COL_EMPTY,58,57,134,12,ES_AUTOHSCROLL | WS_GROUP
+    LTEXT           "",IDT_COL_FORMHELP,196,59,43,8
+    LTEXT           "&Opis:",IDC_STATIC_5,11,74,42,8
+    COMBOBOX        IDC_COL_DESCR,58,72,177,65,CBS_DROPDOWN | CBS_AUTOHSCROLL | CBS_HASSTRINGS | WS_VSCROLL | WS_GROUP | WS_TABSTOP
+    LTEXT           "&Wyrównanie:",IDC_STATIC_6,11,89,38,8
+    COMBOBOX        IDC_COL_ALIGNMENT,58,87,94,37,CBS_DROPDOWNLIST | CBS_AUTOHSCROLL | WS_VSCROLL | WS_GROUP | WS_TABSTOP
+    DEFPUSHBUTTON   "OK",IDOK,37,113,50,14,WS_GROUP
+    PUSHBUTTON      "Anuluj",IDCANCEL,97,113,50,14
+    PUSHBUTTON      "Pomoc",IDHELP,157,113,50,14
+END
+
+IDD_SRVTYPETESTPARSER DIALOGEX 30, 34, 410, 262
+STYLE DS_SETFONT | DS_FIXEDSYS | WS_MAXIMIZEBOX | WS_POPUP | WS_VISIBLE | WS_CLIPCHILDREN | WS_CAPTION | WS_SYSMENU | WS_THICKFRAME
+CAPTION "Test analizatora"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "&Surowe listowanie:",IDC_STATIC_1,7,7,43,8
+    EDITTEXT        IDE_PARSER_RAWLIST,7,17,395,83,ES_MULTILINE | ES_AUTOVSCROLL | ES_AUTOHSCROLL | ES_NOHIDESEL | ES_WANTRETURN | WS_VSCROLL | WS_GROUP
+    CONTROL         "Symuluj &niekompletne (zakończone) surowe listowanie",IDC_PARSER_LISTINCOMPL,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,7,108,167,12
+    PUSHBUTTON      "&Analizuj surowe listowanie",IDB_PARSER_PARSELIST,208,107,78,14,WS_GROUP
+    PUSHBUTTON      "&Wczytaj surowe listowanie z pliku...",IDB_PARSER_LOADLIST,293,107,109,14
+    LTEXT           "Wyn&iki analizy:",IDC_STATIC_2,7,129,64,8
+    CONTROL         "",IDL_PARSER_COLUMNS,"SysListView32",LVS_REPORT | LVS_SINGLESEL | LVS_SHOWSELALWAYS | LVS_NOSORTHEADER | WS_CLIPSIBLINGS | WS_CLIPCHILDREN | WS_BORDER | WS_GROUP | WS_TABSTOP,7,139,395,94
+    DEFPUSHBUTTON   "Zamknij",IDOK,292,241,50,14,WS_GROUP
+    PUSHBUTTON      "Pomoc",IDHELP,352,241,50,14
+END
+
+IDD_OPERATIONDLG DIALOGEX 25, 31, 398, 268
+STYLE DS_SETFONT | DS_FIXEDSYS | WS_MINIMIZEBOX | WS_MAXIMIZEBOX | WS_POPUP | WS_VISIBLE | WS_CLIPCHILDREN | WS_CAPTION | WS_SYSMENU | WS_THICKFRAME
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    RTEXT           "",IDT_OPSOURCETITLE,5,8,48,8
+    CONTROL         "",IDT_OPSOURCETEXT,"Static",SS_LEFTNOWORDWRAP | WS_GROUP,57,8,336,8
+    RTEXT           "",IDT_OPTARGETTITLE,5,19,48,8
+    CONTROL         "",IDT_OPTARGETTEXT,"Static",SS_LEFTNOWORDWRAP | WS_GROUP,57,19,336,8
+    RTEXT           "Pozostały czas:",IDC_STATIC_1,5,30,48,8
+    CONTROL         "",IDT_OPTIMELEFT,"Static",SS_LEFTNOWORDWRAP | WS_GROUP,57,30,336,8
+    RTEXT           "Czas, który upłynął:",IDC_STATIC_2,5,41,48,8
+    CONTROL         "",IDT_OPELAPSEDTIME,"Static",SS_LEFTNOWORDWRAP | WS_GROUP,57,41,336,8
+    RTEXT           "Status:",IDC_STATIC_3,5,52,48,8
+    CONTROL         "",IDT_OPSTATUS,"Static",SS_LEFTNOWORDWRAP | WS_GROUP,57,52,336,8
+    ICON            "",IDI_ERRORICON,328,51,18,20,WS_GROUP
+    CONTROL         "mało miejsca na dysku",IDT_ERRORMSG,"Static",SS_LEFTNOWORDWRAP | WS_GROUP | WS_TABSTOP,342,52,51,8
+    RTEXT           "Postęp:",IDC_STATIC_4,5,64,48,8
+    CONTROL         "",IDC_OPPROGRESS,"Static",WS_GROUP,57,63,334,12
+    PUSHBUTTON      "&Szczegóły >>",IDB_SHOWDETAILS,113,100,50,14,WS_GROUP
+    PUSHBUTTON      "&Błędy >>",IDB_SHOWERRORS,170,100,50,14
+    PUSHBUTTON      "&Ukryj",IDB_HIDE,56,100,50,14,WS_DISABLED
+    PUSHBUTTON      "&Wstrzymaj",IDB_PAUSERESUME,227,100,50,14
+    PUSHBUTTON      "",IDCANCEL,284,100,50,14
+    PUSHBUTTON      "Pomoc",IDHELP,341,100,50,14
+    CONTROL         "",IDC_DLGSPLITBAR,"Static",SS_ETCHEDHORZ | WS_GROUP,7,122,384,1
+    LTEXT           "Połącz&enia:",IDT_CONNECTIONS,7,129,60,8
+    CONTROL         "",IDL_CONNECTIONS,"SysListView32",LVS_REPORT | LVS_SINGLESEL | LVS_SHOWSELALWAYS | LVS_OWNERDATA | LVS_NOSORTHEADER | WS_CLIPSIBLINGS | WS_CLIPCHILDREN | WS_BORDER | WS_GROUP | WS_TABSTOP,7,139,383,35
+    PUSHBUTTON      "&Rozwiąż błąd",IDB_OPCONSSOLVEERROR,170,181,50,14,WS_GROUP
+    PUSHBUTTON      "&Dodaj",IDB_OPCONSADD,227,181,50,14
+    PUSHBUTTON      "&Zatrzymaj",IDB_OPCONSSTOP,284,181,50,14
+    PUSHBUTTON      "Wstrzy&maj",IDB_OPCONSPAUSERESUME,341,181,50,14
+    LTEXT           "&Operacje:",IDT_OPERATIONSTEXT,7,195,381,8
+    CONTROL         "",IDL_OPERATIONS,"SysListView32",LVS_REPORT | LVS_SINGLESEL | LVS_SHOWSELALWAYS | LVS_OWNERDATA | LVS_NOSORTHEADER | WS_CLIPSIBLINGS | WS_CLIPCHILDREN | WS_BORDER | WS_GROUP | WS_TABSTOP,7,205,383,35
+    CONTROL         "Pokazuj &tylko błędy",IDB_OPOPERSSHOWONLYERR,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,7,247,70,12
+    PUSHBUTTON      "Roz&wiąż błąd",IDB_OPOPERSSOLVEERROR,227,247,50,14,WS_GROUP
+    PUSHBUTTON      "&Ponów",IDB_OPOPERSRETRY,284,247,50,14
+    PUSHBUTTON      "P&omiń",IDB_OPOPERSSKIP,341,247,50,14
+    CONTROL         "Zam&ykaj to okno po zakończeniu operacji",IDC_OPCLOSEWINWHENDONE,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,7,81,150,12
+END
+
+IDD_COPYMOVEDLG DIALOGEX 10, 24, 244, 64
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    CONTROL         "",IDT_TGTPATHSUBJECT,"Static",SS_LEFTNOWORDWRAP | SS_NOPREFIX | WS_GROUP,10,9,226,8
+    COMBOBOX        IDC_TGTPATH,10,19,225,130,CBS_DROPDOWN | CBS_AUTOHSCROLL | WS_VSCROLL | WS_GROUP | WS_TABSTOP
+    CONTROL         "&Tylko dodaj do kolejki (nie wykonuj w aktywnym połączeniu)",IDC_ADDTOQUEUE,
+                    "Button",BS_AUTOCHECKBOX | WS_DISABLED | WS_GROUP | WS_TABSTOP,292,47,197,12
+    DEFPUSHBUTTON   "OK",IDOK,37,42,50,14,WS_GROUP
+    PUSHBUTTON      "Anuluj",IDCANCEL,97,42,50,14
+    PUSHBUTTON      "Pomoc",IDHELP,157,42,50,14
+END
+
+IDD_CONFIRMDELETEDLG DIALOGEX 10, 24, 331, 61
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Potwierdź usunięcie"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    DEFPUSHBUTTON   "&Tak",IDOK,112,39,50,14,WS_GROUP
+    PUSHBUTTON      "&Nie",IDCANCEL,169,39,50,14
+    ICON            "",IDC_DELICON,8,8,18,20,WS_GROUP
+    LTEXT           "",IDT_DELSUBJECT,41,12,284,16,SS_NOPREFIX
+    CONTROL         "&Tylko dodaj do kolejki (nie wykonuj w aktywnym połączeniu)",IDC_DELADDTOQUEUE,
+                    "Button",BS_AUTOCHECKBOX | WS_DISABLED | WS_GROUP | WS_TABSTOP,352,40,197,12
+END
+
+IDD_CHANGEATTRSDLG DIALOGEX 10, 24, 278, 200
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Zmień atrybuty"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    CONTROL         "",IDT_CHATTRSUBJECT,"Static",SS_LEFTNOWORDWRAP | SS_NOPREFIX | WS_GROUP,7,10,264,8
+    GROUPBOX        " Właściciel ",IDC_STATIC_1,7,26,84,51,WS_GROUP
+    GROUPBOX        " Grupa ",IDC_STATIC_2,97,26,84,51,WS_GROUP
+    GROUPBOX        " Pozostali ",IDC_STATIC_3,187,26,84,51,WS_GROUP
+    CONTROL         "&Odczyt",IDC_READOWNER,"Button",BS_AUTO3STATE | WS_GROUP | WS_TABSTOP,16,36,71,12
+    CONTROL         "&Zapis",IDC_WRITEOWNER,"Button",BS_AUTO3STATE | WS_TABSTOP,16,48,71,12
+    CONTROL         "&Wykonywanie (Dostęp)",IDC_EXECUTEOWNER,"Button",BS_AUTO3STATE | WS_TABSTOP,16,60,71,12
+    CONTROL         "Od&czyt",IDC_READGROUP,"Button",BS_AUTO3STATE | WS_TABSTOP,106,36,71,12
+    CONTROL         "Za&pis",IDC_WRITEGROUP,"Button",BS_AUTO3STATE | WS_TABSTOP,106,48,71,12
+    CONTROL         "Wyko&nywanie (Dostęp)",IDC_EXECUTEGROUP,"Button",BS_AUTO3STATE | WS_TABSTOP,106,60,71,12
+    CONTROL         "Odczy&t",IDC_READOTHERS,"Button",BS_AUTO3STATE | WS_TABSTOP,196,36,71,12
+    CONTROL         "Zapi&s",IDC_WRITEOTHERS,"Button",BS_AUTO3STATE | WS_TABSTOP,196,48,71,12
+    CONTROL         "Wykonywan&ie (Dostęp)",IDC_EXECUTEOTHERS,"Button",BS_AUTO3STATE | WS_TABSTOP,196,60,71,12
+    LTEXT           "Uwaga: trzeci stan = nie zmieniaj",IDC_STATIC_4,7,81,119,8
+    LTEXT           "Wartość &liczbowa:",IDC_STATIC_5,7,101,53,8
+    EDITTEXT        IDE_NUMATTRVALUE,61,99,26,12,ES_AUTOHSCROLL | WS_GROUP
+    LTEXT           "(1 = wykonywanie, 2 = zapis, 4 = odczyt)",IDC_STATIC_6,93,101,122,8
+    CONTROL         "",IDC_STATIC_7,"Static",SS_ETCHEDHORZ | WS_GROUP,36,126,235,1
+    LTEXT           "Opcje",IDC_STATIC_8,7,122,29,8
+    CONTROL         "Uwzględnij &podkatalogi",IDC_INCLUDESUBDIRS,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,16,132,87,12
+    CONTROL         "Zmień &atrybuty plików",IDC_CHATTRSETFILES,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,16,144,96,12
+    CONTROL         "Zmień atrybuty &katalogów",IDC_CHATTRSETDIRS,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,16,156,118,12
+    CONTROL         "&Tylko dodaj do kolejki (nie wykonuj w aktywnym połączeniu)",IDC_CHATTRADDTOQUEUE,
+                    "Button",BS_AUTOCHECKBOX | WS_DISABLED | WS_TABSTOP,320,160,202,12
+    DEFPUSHBUTTON   "OK",IDOK,54,178,50,14,WS_GROUP
+    PUSHBUTTON      "Anuluj",IDCANCEL,114,178,50,14
+    PUSHBUTTON      "Pomoc",IDHELP,174,178,50,14
+END
+
+IDD_CFGOPERATIONS DIALOGEX 37, 31, 339, 218
+STYLE DS_SETFONT | DS_FIXEDSYS | DS_CONTROL | WS_CHILD | WS_CAPTION
+CAPTION "Operacje 1"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    CONTROL         "",IDC_STATIC_1,"Static",SS_ETCHEDHORZ | WS_GROUP,117,9,220,1
+    LTEXT           "Kopiowanie i przenoszenie z serwera FTP",IDC_STATIC_2,5,5,110,8
+    LTEXT           "Jeśli plik &docelowy już istnieje:",IDC_STATIC_3,9,17,92,8
+    COMBOBOX        IDC_FILEALREADYEXISTS,244,15,92,70,CBS_DROPDOWNLIST | WS_TABSTOP
+    LTEXT           "Jeśli katalog docel&owy już istnieje:",IDC_STATIC_4,9,31,112,8
+    COMBOBOX        IDC_DIRALREADYEXISTS,244,29,92,70,CBS_DROPDOWNLIST | WS_TABSTOP
+    LTEXT           "Jeśli nie można utworzyć nazwy &pliku docelowego:",IDC_STATIC_5,9,45,130,8
+    COMBOBOX        IDC_CANNOTCREATEFILE,244,43,92,70,CBS_DROPDOWNLIST | WS_TABSTOP
+    LTEXT           "Jeśli nie można utworzyć nazwy &katalogu docelowego:",IDC_STATIC_6,9,59,149,8
+    COMBOBOX        IDC_CANNOTCREATEDIR,244,57,92,70,CBS_DROPDOWNLIST | WS_TABSTOP
+    LTEXT           "Jeśli t&ransfer się nie powiedzie, jak go ponowić, gdy plik docelowy został utworzony:",IDC_STATIC_7,9,73,209,8
+    COMBOBOX        IDC_RETRYONCREATED,244,71,92,70,CBS_DROPDOWNLIST | WS_TABSTOP
+    LTEXT           "Jeśli transfer się nie powiedzie, jak go ponowić, gdy plik docelowy został &wznowiony:",IDC_STATIC_8,9,87,213,8
+    COMBOBOX        IDC_RETRYONRESUMED,244,85,92,70,CBS_DROPDOWNLIST | WS_TABSTOP
+    LTEXT           "Jeśli tryb przesyłu &ASCII jest ustawiony dla pliku o zawartości binarnej:",IDC_STATIC_9,9,101,191,8
+    COMBOBOX        IDC_ASCIITRFORBINFILE,244,99,92,70,CBS_DROPDOWNLIST | WS_TABSTOP
+    CONTROL         "",IDC_STATIC_10,"Static",SS_ETCHEDHORZ | WS_GROUP,118,124,219,1
+    LTEXT           "Zmiana atrybutów na serwerze FTP",IDC_STATIC_11,5,120,111,8
+    LTEXT           "Jeśli nie można zachować istniejących &atrybutów (np. tryb 's' w systemie Unix):",IDC_STATIC_12,9,132,212,8
+    COMBOBOX        IDC_UNKNOWNATTRS,244,130,92,70,CBS_DROPDOWNLIST | WS_TABSTOP
+    CONTROL         "",IDC_STATIC_13,"Static",SS_ETCHEDHORZ | WS_GROUP,79,155,258,1
+    LTEXT           "Usuwanie na serwerze FTP",IDC_STATIC_14,5,151,72,8
+    LTEXT           "Jeśli katalog &nie jest pusty:",IDC_STATIC_15,9,163,86,8
+    COMBOBOX        IDC_NONEMPTYDIRDEL,244,161,92,70,CBS_DROPDOWNLIST | WS_TABSTOP
+    LTEXT           "Jeśli plik jest &ukryty:",IDC_STATIC_16,9,177,55,8
+    COMBOBOX        IDC_HIDDENFILEDEL,244,175,92,70,CBS_DROPDOWNLIST | WS_TABSTOP
+    LTEXT           "Jeśli katalog jest ukry&ty:",IDC_STATIC_17,9,191,75,8
+    COMBOBOX        IDC_HIDDENDIRDEL,244,189,92,70,CBS_DROPDOWNLIST | WS_TABSTOP
+END
+
+IDD_CFGOPERATIONS2 DIALOGEX 37, 31, 339, 218
+STYLE DS_SETFONT | DS_FIXEDSYS | DS_CONTROL | WS_CHILD | WS_CAPTION
+CAPTION "Operacje 2"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    CONTROL         "",IDC_STATIC_1,"Static",SS_ETCHEDHORZ | WS_GROUP,108,9,229,1
+    LTEXT           "Kopiowanie i przenoszenie na serwer FTP",IDC_STATIC_2,5,5,101,8
+    LTEXT           "Jeśli plik &docelowy już istnieje:",IDC_STATIC_3,9,17,92,8
+    COMBOBOX        IDC_FILEALREADYEXISTS,244,15,92,70,CBS_DROPDOWNLIST | WS_TABSTOP
+    LTEXT           "Jeśli katalog docel&owy już istnieje:",IDC_STATIC_4,9,31,112,8
+    COMBOBOX        IDC_DIRALREADYEXISTS,244,29,92,70,CBS_DROPDOWNLIST | WS_TABSTOP
+    LTEXT           "Jeśli nie można utworzyć nazwy &pliku docelowego:",IDC_STATIC_5,9,45,130,8
+    COMBOBOX        IDC_CANNOTCREATEFILE,244,43,92,70,CBS_DROPDOWNLIST | WS_TABSTOP
+    LTEXT           "Jeśli nie można utworzyć nazwy &katalogu docelowego:",IDC_STATIC_6,9,59,149,8
+    COMBOBOX        IDC_CANNOTCREATEDIR,244,57,92,70,CBS_DROPDOWNLIST | WS_TABSTOP
+    LTEXT           "Jeśli t&ransfer się nie powiedzie, jak go ponowić, gdy plik docelowy został utworzony:",IDC_STATIC_7,9,73,209,8
+    COMBOBOX        IDC_RETRYONCREATED,244,71,92,70,CBS_DROPDOWNLIST | WS_TABSTOP
+    LTEXT           "Jeśli transfer się nie powiedzie, jak go ponowić, gdy plik docelowy został &wznowiony:",IDC_STATIC_8,9,87,213,8
+    COMBOBOX        IDC_RETRYONRESUMED,244,85,92,70,CBS_DROPDOWNLIST | WS_TABSTOP
+    LTEXT           "Jeśli tryb przesyłu &ASCII jest ustawiony dla pliku o zawartości binarnej:",IDC_STATIC_9,9,101,191,8
+    COMBOBOX        IDC_ASCIITRFORBINFILE,244,99,92,70,CBS_DROPDOWNLIST | WS_TABSTOP
+END
+
+IDD_SOLVEITEMERRDETAILED DIALOGEX 10, 24, 327, 136
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    DEFPUSHBUTTON   "Ponów",IDOK,45,88,50,14,WS_GROUP
+    PUSHBUTTON      "&Pomiń",IDB_SCRD_SKIP,107,88,50,14
+    PUSHBUTTON      "Anuluj",IDCANCEL,169,88,50,14
+    PUSHBUTTON      "Pomoc",IDHELP,231,88,50,14
+    CONTROL         "",IDC_STATIC_1,"Static",SS_ETCHEDHORZ | WS_GROUP,7,111,312,1
+    CONTROL         "&Zapamiętaj wybór i nie pokazuj więcej tego okna dla operacji z tym samym błędem",IDC_SCRD_APPLYTOALL,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,7,119,306,12
+    LTEXT           "&Szczegóły:",IDC_STATIC_3,7,9,50,8
+    EDITTEXT        IDE_SCRD_DETAILS,59,9,260,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+    LTEXT           "Ścieżk&a źródłowa:",IDC_STATIC_4,7,27,50,8
+    EDITTEXT        IDE_SCRD_SRCPATH,59,27,260,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+    LTEXT           "Nazwa źr&ódłowa:",IDC_STATIC_5,7,39,50,8
+    EDITTEXT        IDE_SCRD_SRCNAME,59,39,260,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+    LTEXT           "Ścieżka &docelowa:",IDC_STATIC_6,7,51,50,8
+    EDITTEXT        IDE_SCRD_TGTPATH,59,51,260,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+    LTEXT           "Nazwa do&celowa:",IDC_STATIC_7,7,65,50,8
+    EDITTEXT        IDE_SCRD_TGTNAME,59,63,261,12,ES_AUTOHSCROLL | WS_GROUP
+END
+
+IDD_SOLVEITEMERRDETAILEDEX DIALOGEX 10, 24, 345, 136
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    DEFPUSHBUTTON   "Ponów",IDOK,10,88,50,14,WS_GROUP
+    PUSHBUTTON      "&Wznów",CM_SIED_RESUME,65,88,50,14
+    PUSHBUTTON      "&Nadpisz",CM_SIED_OVERWRITE,120,88,50,14
+    PUSHBUTTON      "&Pomiń",IDB_SCRD_SKIP,175,88,50,14
+    PUSHBUTTON      "Anuluj",IDCANCEL,230,88,50,14
+    PUSHBUTTON      "Pomoc",IDHELP,285,88,50,14
+    CONTROL         "",IDC_STATIC_1,"Static",SS_ETCHEDHORZ | WS_GROUP,7,111,330,1
+    CONTROL         "&Zapamiętaj wybór i nie pokazuj więcej tego okna dla operacji z tym samym błędem",IDC_SCRD_APPLYTOALL,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,7,119,306,12
+    LTEXT           "&Szczegóły:",IDC_STATIC_3,7,9,50,8
+    EDITTEXT        IDE_SCRD_DETAILS,59,9,279,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+    LTEXT           "Ścieżk&a źródłowa:",IDC_STATIC_4,7,27,50,8
+    EDITTEXT        IDE_SCRD_SRCPATH,59,27,279,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+    LTEXT           "Nazwa źr&ódłowa:",IDC_STATIC_5,7,39,50,8
+    EDITTEXT        IDE_SCRD_SRCNAME,59,39,279,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+    LTEXT           "Ścieżka &docelowa:",IDC_STATIC_6,7,51,50,8
+    EDITTEXT        IDE_SCRD_TGTPATH,59,51,279,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+    LTEXT           "Nazwa do&celowa:",IDC_STATIC_7,7,65,50,8
+    EDITTEXT        IDE_SCRD_TGTNAME,59,63,279,12,ES_AUTOHSCROLL | WS_GROUP
+END
+
+IDD_SOLVEITEMERRDETAILED2 DIALOGEX 10, 24, 327, 147
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    DEFPUSHBUTTON   "Ponów",IDOK,45,101,50,14,WS_GROUP
+    PUSHBUTTON      "&Pomiń",IDB_SCRD_SKIP,107,101,50,14
+    PUSHBUTTON      "Anuluj",IDCANCEL,169,101,50,14
+    PUSHBUTTON      "Pomoc",IDHELP,231,101,50,14
+    CONTROL         "",IDC_STATIC_1,"Static",SS_ETCHEDHORZ | WS_GROUP,7,124,313,1
+    CONTROL         "&Zapamiętaj wybór i nie pokazuj więcej tego okna dla operacji z tym samym błędem",IDC_SCRD_APPLYTOALL,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,7,131,306,12
+    LTEXT           "&Opis błędu:",IDC_STATIC_3,7,9,66,8
+    EDITTEXT        IDE_SCRD_DETAILS,5,19,313,18,ES_MULTILINE | ES_AUTOVSCROLL | ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+    LTEXT           "Ścieżk&a źródłowa:",IDC_STATIC_4,7,40,50,8
+    EDITTEXT        IDE_SCRD_SRCPATH,59,40,259,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+    LTEXT           "Nazwa źr&ódłowa:",IDC_STATIC_5,7,52,50,8
+    EDITTEXT        IDE_SCRD_SRCNAME,59,52,259,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+    LTEXT           "Ścieżka &docelowa:",IDC_STATIC_6,7,64,50,8
+    EDITTEXT        IDE_SCRD_TGTPATH,59,64,259,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+    LTEXT           "Nazwa do&celowa:",IDC_STATIC_7,7,78,50,8
+    EDITTEXT        IDE_SCRD_TGTNAME,59,76,259,12,ES_AUTOHSCROLL | WS_GROUP
+END
+
+IDD_SOLVEITEMERRDETAILED3 DIALOGEX 10, 24, 279, 146
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Błąd tworzenia katalogu docelowego o alternatywnej nazwie"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    DEFPUSHBUTTON   "Ponów",IDOK,21,101,50,14,WS_GROUP
+    PUSHBUTTON      "&Pomiń",IDB_SCRD_SKIP,83,101,50,14
+    PUSHBUTTON      "Anuluj",IDCANCEL,145,101,50,14
+    PUSHBUTTON      "Pomoc",IDHELP,207,101,50,14
+    CONTROL         "",IDC_STATIC_1,"Static",SS_ETCHEDHORZ | WS_GROUP,7,124,265,1
+    CONTROL         "&Zastosuj do operacji z tym samym błędem już teraz",IDC_SCRD_APPLYTOALL,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,7,130,162,12
+    LTEXT           "&Opis błędu:",IDC_STATIC_2,7,9,66,8
+    EDITTEXT        IDE_SCRD_DETAILS,5,19,267,18,ES_MULTILINE | ES_AUTOVSCROLL | ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+    LTEXT           "Ścieżk&a źródłowa:",IDC_STATIC_3,7,40,50,8
+    EDITTEXT        IDE_SCRD_SRCPATH,59,40,213,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+    LTEXT           "Nazwa źr&ódłowa:",IDC_STATIC_4,7,52,50,8
+    EDITTEXT        IDE_SCRD_SRCNAME,59,52,213,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+    LTEXT           "Ścieżka &docelowa:",IDC_STATIC_5,7,64,50,8
+    EDITTEXT        IDE_SCRD_TGTPATH,59,64,213,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+    LTEXT           "Nazwa do&celowa:",IDC_STATIC_6,7,78,50,8
+    EDITTEXT        IDE_SCRD_TGTNAME,59,76,213,12,ES_AUTOHSCROLL | WS_GROUP
+END
+
+IDD_SOLVEITEMERRDETAILED3EX DIALOGEX 10, 24, 345, 146
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Błąd tworzenia katalogu docelowego o alternatywnej nazwie"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    DEFPUSHBUTTON   "Ponów",IDOK,10,101,50,14,WS_GROUP
+    PUSHBUTTON      "&Wznów",CM_SIED_RESUME,65,101,50,14
+    PUSHBUTTON      "&Nadpisz",CM_SIED_OVERWRITE,120,101,50,14
+    PUSHBUTTON      "&Pomiń",IDB_SCRD_SKIP,175,101,50,14
+    PUSHBUTTON      "Anuluj",IDCANCEL,230,101,50,14
+    PUSHBUTTON      "Pomoc",IDHELP,285,101,50,14
+    CONTROL         "",IDC_STATIC_1,"Static",SS_ETCHEDHORZ | WS_GROUP,7,124,330,1
+    CONTROL         "&Zastosuj do operacji z tym samym błędem już teraz",IDC_SCRD_APPLYTOALL,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,7,130,162,12
+    LTEXT           "&Opis błędu:",IDC_STATIC_2,7,9,66,8
+    EDITTEXT        IDE_SCRD_DETAILS,5,19,333,18,ES_MULTILINE | ES_AUTOVSCROLL | ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+    LTEXT           "Ścieżk&a źródłowa:",IDC_STATIC_3,7,40,50,8
+    EDITTEXT        IDE_SCRD_SRCPATH,59,40,279,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+    LTEXT           "Nazwa źr&ódłowa:",IDC_STATIC_4,7,52,50,8
+    EDITTEXT        IDE_SCRD_SRCNAME,59,52,279,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+    LTEXT           "Ścieżka &docelowa:",IDC_STATIC_5,7,64,50,8
+    EDITTEXT        IDE_SCRD_TGTPATH,59,64,279,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+    LTEXT           "Nazwa do&celowa:",IDC_STATIC_6,7,78,50,8
+    EDITTEXT        IDE_SCRD_TGTNAME,59,76,279,12,ES_AUTOHSCROLL | WS_GROUP
+END
+
+IDD_SOLVEITEMERRSIMPLE DIALOGEX 10, 24, 328, 117
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    DEFPUSHBUTTON   "Ponów",IDOK,46,70,50,14,WS_GROUP
+    PUSHBUTTON      "&Pomiń",IDB_SCRD_SKIP,108,70,50,14
+    PUSHBUTTON      "Anuluj",IDCANCEL,170,70,50,14
+    PUSHBUTTON      "Pomoc",IDHELP,232,70,50,14
+    CONTROL         "",IDC_STATIC_1,"Static",SS_ETCHEDHORZ | WS_GROUP,7,93,314,1
+    CONTROL         "&Zapamiętaj wybór i nie pokazuj więcej tego okna dla operacji z tym samym błędem",IDC_SCRD_APPLYTOALL,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,7,100,306,12
+    LTEXT           "Ścieżk&a źródłowa:",IDC_STATIC_3,7,9,50,8
+    EDITTEXT        IDE_SCRD_SRCPATH,59,9,262,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+    LTEXT           "Nazwa źr&ódłowa:",IDC_STATIC_4,7,21,50,8
+    EDITTEXT        IDE_SCRD_SRCNAME,59,21,262,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+    LTEXT           "Ścieżka &docelowa:",IDC_STATIC_5,7,33,50,8
+    EDITTEXT        IDE_SCRD_TGTPATH,59,33,262,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+    LTEXT           "Nazwa do&celowa:",IDC_STATIC_6,7,47,50,8
+    EDITTEXT        IDE_SCRD_TGTNAME,59,45,262,12,ES_AUTOHSCROLL | WS_GROUP
+END
+
+IDD_SOLVEITEMERRSIMPLEEX DIALOGEX 10, 24, 373, 116
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    DEFPUSHBUTTON   "Ponów",IDOK,9,70,55,14,WS_GROUP
+    PUSHBUTTON      "&Nadpisz",CM_SIED_OVERWRITE,69,70,55,14
+    PUSHBUTTON      "Nadpisz &wszystkie",CM_SIED_OVERWRITEALL,129,70,55,14
+    PUSHBUTTON      "&Pomiń",IDB_SCRD_SKIP,189,70,55,14
+    PUSHBUTTON      "Anuluj",IDCANCEL,249,70,55,14
+    PUSHBUTTON      "Pomoc",IDHELP,309,70,55,14
+    CONTROL         "",IDC_STATIC_1,"Static",SS_ETCHEDHORZ | WS_GROUP,7,93,359,1
+    CONTROL         "&Zapamiętaj wybór i nie pokazuj więcej tego okna dla operacji z tym samym błędem",IDC_SCRD_APPLYTOALL,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,7,100,306,12
+    LTEXT           "Ścieżk&a źródłowa:",IDC_STATIC_3,7,9,50,8
+    EDITTEXT        IDE_SCRD_SRCPATH,59,9,308,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+    LTEXT           "Nazwa źr&ódłowa:",IDC_STATIC_4,7,21,50,8
+    EDITTEXT        IDE_SCRD_SRCNAME,59,21,308,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+    LTEXT           "Ścieżka &docelowa:",IDC_STATIC_5,7,33,50,8
+    EDITTEXT        IDE_SCRD_TGTPATH,59,33,308,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+    LTEXT           "Nazwa do&celowa:",IDC_STATIC_6,7,47,50,8
+    EDITTEXT        IDE_SCRD_TGTNAME,59,45,306,12,ES_AUTOHSCROLL | WS_GROUP
+END
+
+IDD_SOLVEITEMERRASCIITR DIALOGEX 16, 27, 344, 118
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Tryb przesyłu ASCII jest ustawiony dla pliku o zawartości binarnej"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    DEFPUSHBUTTON   "Użyj trybu binarnego",IDOK,13,70,78,14,WS_GROUP
+    PUSHBUTTON      "&Ignoruj",CM_SATR_IGNORE,101,70,50,14
+    PUSHBUTTON      "&Pomiń",IDB_SCRD_SKIP,161,70,50,14
+    PUSHBUTTON      "Anuluj",IDCANCEL,221,70,50,14
+    PUSHBUTTON      "Pomoc",IDHELP,281,70,50,14
+    CONTROL         "",IDC_STATIC_1,"Static",SS_ETCHEDHORZ | WS_GROUP,7,93,329,1
+    CONTROL         "&Zapamiętaj wybór i nie pokazuj więcej tego okna dla operacji z tym samym błędem",IDC_SCRD_APPLYTOALL,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,7,101,306,12
+    LTEXT           "Ścieżk&a źródłowa:",IDC_STATIC_3,7,9,50,8
+    EDITTEXT        IDE_SCRD_SRCPATH,59,9,276,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+    LTEXT           "Nazwa źr&ódłowa:",IDC_STATIC_4,7,21,50,8
+    EDITTEXT        IDE_SCRD_SRCNAME,59,21,276,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+    LTEXT           "Ścieżka &docelowa:",IDC_STATIC_5,7,33,50,8
+    EDITTEXT        IDE_SCRD_TGTPATH,59,33,276,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+    LTEXT           "Nazwa do&celowa:",IDC_STATIC_6,7,45,50,8
+    EDITTEXT        IDE_SCRD_TGTNAME,59,45,276,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+END
+
+IDD_SOLVEITEMERRUNKATTR DIALOGEX 10, 24, 327, 117
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Części istniejących atrybutów nie można zachować"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    DEFPUSHBUTTON   "Ignoruj",IDOK,45,70,50,14,WS_GROUP
+    PUSHBUTTON      "&Pomiń",IDB_SCRD_SKIP,107,70,50,14
+    PUSHBUTTON      "Anuluj",IDCANCEL,169,70,50,14
+    PUSHBUTTON      "Pomoc",IDHELP,231,70,50,14
+    CONTROL         "",IDC_STATIC_1,"Static",SS_ETCHEDHORZ | WS_GROUP,7,93,314,1
+    CONTROL         "&Zapamiętaj wybór i nie pokazuj więcej tego okna dla operacji z tym samym błędem",IDC_SCRD_APPLYTOALL,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,7,100,306,12
+    LTEXT           "Ścieżk&a:",IDC_STATIC_3,7,9,63,8
+    EDITTEXT        IDE_SCRD_SRCPATH,71,9,250,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+    LTEXT           "&Nazwa:",IDC_STATIC_4,7,21,63,8
+    EDITTEXT        IDE_SCRD_SRCNAME,71,21,250,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+    LTEXT           "&Bieżące atrybuty:",IDC_STATIC_5,7,33,63,8
+    EDITTEXT        IDE_SCRD_CURATTR,71,33,250,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+    LTEXT           "Nowe &atrybuty:",IDC_STATIC_6,7,45,63,8
+    EDITTEXT        IDE_SCRD_NEWATTR,71,45,250,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+END
+
+IDD_SOLVEITEMSETNEWATTR DIALOGEX 10, 24, 278, 190
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Ustaw nowe atrybuty"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    GROUPBOX        " Właściciel ",IDC_STATIC_1,7,56,84,51,WS_GROUP
+    GROUPBOX        " Grupa ",IDC_STATIC_2,97,56,84,51,WS_GROUP
+    GROUPBOX        " Pozostali ",IDC_STATIC_3,187,56,84,51,WS_GROUP
+    CONTROL         "&Odczyt",IDC_READOWNER,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,16,66,71,12
+    CONTROL         "&Zapis",IDC_WRITEOWNER,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,16,78,71,12
+    CONTROL         "&Wykonywanie (Dostęp)",IDC_EXECUTEOWNER,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,16,90,71,12
+    CONTROL         "Od&czyt",IDC_READGROUP,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,106,66,71,12
+    CONTROL         "Za&pis",IDC_WRITEGROUP,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,106,78,71,12
+    CONTROL         "Wyko&nywanie (Dostęp)",IDC_EXECUTEGROUP,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,106,90,71,12
+    CONTROL         "Odczy&t",IDC_READOTHERS,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,196,66,71,12
+    CONTROL         "Zapi&s",IDC_WRITEOTHERS,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,196,78,71,12
+    CONTROL         "Wykonywan&ie (Dostęp)",IDC_EXECUTEOTHERS,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,196,90,71,12
+    LTEXT           "Wartość &liczbowa:",IDC_STATIC_4,7,117,53,8
+    EDITTEXT        IDE_NUMATTRVALUE,61,115,26,12,ES_AUTOHSCROLL | WS_GROUP
+    LTEXT           "(1 = wykonywanie, 2 = zapis, 4 = odczyt)",IDC_STATIC_5,93,117,122,8
+    DEFPUSHBUTTON   "Ustaw nowe atrybuty",IDOK,39,144,80,14,WS_GROUP
+    PUSHBUTTON      "Anuluj",IDCANCEL,129,144,50,14
+    PUSHBUTTON      "Pomoc",IDHELP,189,144,50,14
+    CONTROL         "",IDC_STATIC_6,"Static",SS_ETCHEDHORZ | WS_GROUP,7,165,263,1
+    CONTROL         "U&żyj tych atrybutów w operacjach z tym samym błędem już teraz",IDC_SCRD_APPLYTOALL,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,7,172,209,12
+    LTEXT           "Ścieżk&a:",IDC_STATIC_7,7,9,63,8
+    EDITTEXT        IDE_SCRD_SRCPATH,71,9,196,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+    LTEXT           "&Nazwa:",IDC_STATIC_8,7,21,63,8
+    EDITTEXT        IDE_SCRD_SRCNAME,71,21,196,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+    LTEXT           "Bieżące atrybu&ty:",IDC_STATIC_9,7,33,63,8
+    EDITTEXT        IDE_SCRD_CURATTR,71,33,196,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+END
+
+IDD_SOLVELOWMEMORYERR DIALOGEX 10, 24, 274, 90
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Niewystarczające zasoby systemowe do ukończenia operacji"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    DEFPUSHBUTTON   "Ponów",IDOK,19,46,50,14,WS_GROUP
+    PUSHBUTTON      "&Pomiń",IDB_SCRD_SKIP,81,46,50,14
+    PUSHBUTTON      "Anuluj",IDCANCEL,143,46,50,14
+    PUSHBUTTON      "Pomoc",IDHELP,205,46,50,14
+    CONTROL         "",IDC_STATIC_1,"Static",SS_ETCHEDHORZ | WS_GROUP,7,67,260,1
+    CONTROL         "&Zastosuj do operacji z tym samym błędem już teraz",IDC_SCRD_APPLYTOALL,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,7,72,162,12
+    LTEXT           "Ścieżk&a:",IDC_STATIC_2,7,9,24,8
+    EDITTEXT        IDE_SCRD_SRCPATH,32,9,235,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+    LTEXT           "&Nazwa:",IDC_STATIC_3,7,21,24,8
+    EDITTEXT        IDE_SCRD_SRCNAME,32,21,235,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+END
+
+IDD_SOLVEITEMSIMPLEERR DIALOGEX 10, 24, 327, 93
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    DEFPUSHBUTTON   "Usuń",IDOK,45,46,50,14,WS_GROUP
+    PUSHBUTTON      "&Pomiń",IDB_SISE_SKIP,107,46,50,14
+    PUSHBUTTON      "Anuluj",IDCANCEL,169,46,50,14
+    PUSHBUTTON      "Pomoc",IDHELP,231,46,50,14
+    CONTROL         "",IDC_STATIC_1,"Static",SS_ETCHEDHORZ | WS_GROUP,7,69,313,1
+    CONTROL         "&Zapamiętaj wybór i nie pokazuj więcej tego okna dla operacji z tym samym błędem",IDC_SISE_APPLYTOALL,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,7,76,306,12
+    LTEXT           "Ścieżk&a:",IDC_STATIC_3,7,9,27,8
+    EDITTEXT        IDE_SISE_PATH,37,9,282,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+    LTEXT           "&Nazwa:",IDC_STATIC_4,7,21,27,8
+    EDITTEXT        IDE_SISE_NAME,37,21,282,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+END
+
+IDD_SOLVESERVERCMDERR DIALOGEX 10, 24, 274, 124
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    DEFPUSHBUTTON   "Ponów",IDOK,19,82,50,14,WS_GROUP
+    PUSHBUTTON      "&Pomiń",IDB_SSCD_SKIP,81,82,50,14
+    PUSHBUTTON      "Anuluj",IDCANCEL,143,82,50,14
+    PUSHBUTTON      "Pomoc",IDHELP,205,82,50,14
+    CONTROL         "",IDC_STATIC_1,"Static",SS_ETCHEDHORZ | WS_GROUP,7,103,260,1
+    CONTROL         "&Zastosuj do operacji z tym samym błędem już teraz",IDC_SSCD_APPLYTOALL,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,7,108,162,12
+    LTEXT           "Ścieżk&a:",IDC_STATIC_2,7,9,24,8
+    EDITTEXT        IDE_SSCD_PATH,32,9,235,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+    LTEXT           "&Nazwa:",IDC_STATIC_3,7,21,24,8
+    EDITTEXT        IDE_SSCD_NAME,32,21,235,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+    LTEXT           "Opis błędu:",IDC_STATIC_4,7,40,66,8
+    EDITTEXT        IDE_SSCD_ERRDSCR,5,50,262,18,ES_MULTILINE | ES_AUTOVSCROLL | ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+END
+
+IDD_SOLVESERVERCMDERR2 DIALOGEX 10, 24, 284, 148
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    DEFPUSHBUTTON   "Ponów",IDOK,24,106,50,14,WS_GROUP
+    PUSHBUTTON      "&Pomiń",IDB_SSCD_SKIP,86,106,50,14
+    PUSHBUTTON      "Anuluj",IDCANCEL,148,106,50,14
+    PUSHBUTTON      "Pomoc",IDHELP,210,106,50,14
+    CONTROL         "",IDC_STATIC_1,"Static",SS_ETCHEDHORZ | WS_GROUP,7,127,270,1
+    CONTROL         "&Zastosuj do operacji z tym samym błędem już teraz",IDC_SSCD_APPLYTOALL,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,7,132,162,12
+    LTEXT           "Ścieżk&a źródłowa:",IDC_STATIC_2,7,9,51,8
+    EDITTEXT        IDE_SSCD_SRCPATH,58,9,219,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+    LTEXT           "Nazwa źr&ódłowa:",IDC_STATIC_3,7,21,51,8
+    EDITTEXT        IDE_SSCD_SRCNAME,58,21,219,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+    LTEXT           "Ścieżka &docelowa:",IDC_STATIC_4,7,33,51,8
+    EDITTEXT        IDE_SSCD_TGTPATH,58,33,219,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+    LTEXT           "Nazwa do&celowa:",IDC_STATIC_5,7,45,51,8
+    EDITTEXT        IDE_SSCD_TGTNAME,58,45,219,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+    LTEXT           "Opis błędu:",IDC_STATIC_6,7,64,66,8
+    EDITTEXT        IDE_SSCD_ERRDSCR,5,74,272,18,ES_MULTILINE | ES_AUTOVSCROLL | ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+END
+
+IDD_SOLVESERVERCMDERR2EX DIALOGEX 10, 24, 345, 148
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    DEFPUSHBUTTON   "Ponów",IDOK,10,106,50,14,WS_GROUP
+    PUSHBUTTON      "&Wznów",CM_SSCD_RESUME,65,106,50,14
+    PUSHBUTTON      "&Nadpisz",CM_SSCD_OVERWRITE,120,106,50,14
+    PUSHBUTTON      "&Pomiń",IDB_SSCD_SKIP,175,106,50,14
+    PUSHBUTTON      "Anuluj",IDCANCEL,230,106,50,14
+    PUSHBUTTON      "Pomoc",IDHELP,285,106,50,14
+    CONTROL         "",IDC_STATIC_1,"Static",SS_ETCHEDHORZ | WS_GROUP,7,127,330,1
+    CONTROL         "&Zastosuj do operacji z tym samym błędem już teraz",IDC_SSCD_APPLYTOALL,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,7,132,162,12
+    LTEXT           "Ścieżk&a źródłowa:",IDC_STATIC_2,7,9,51,8
+    EDITTEXT        IDE_SSCD_SRCPATH,58,9,279,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+    LTEXT           "Nazwa źr&ódłowa:",IDC_STATIC_3,7,21,51,8
+    EDITTEXT        IDE_SSCD_SRCNAME,58,21,279,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+    LTEXT           "Ścieżka &docelowa:",IDC_STATIC_4,7,33,51,8
+    EDITTEXT        IDE_SSCD_TGTPATH,58,33,279,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+    LTEXT           "Nazwa do&celowa:",IDC_STATIC_5,7,45,51,8
+    EDITTEXT        IDE_SSCD_TGTNAME,58,45,279,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+    LTEXT           "&Opis błędu:",IDC_STATIC_6,7,64,66,8
+    EDITTEXT        IDE_SSCD_ERRDSCR,5,74,333,18,ES_MULTILINE | ES_AUTOVSCROLL | ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+END
+
+IDD_SOLVESERVERCMDERR3 DIALOGEX 10, 24, 274, 112
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    DEFPUSHBUTTON   "Ponów",IDOK,19,70,50,14,WS_GROUP
+    PUSHBUTTON      "&Pomiń",IDB_SSCD_SKIP,81,70,50,14
+    PUSHBUTTON      "Anuluj",IDCANCEL,143,70,50,14
+    PUSHBUTTON      "Pomoc",IDHELP,205,70,50,14
+    CONTROL         "",IDC_STATIC_1,"Static",SS_ETCHEDHORZ | WS_GROUP,7,91,260,1
+    CONTROL         "&Zastosuj do operacji z tym samym błędem już teraz",IDC_SSCD_APPLYTOALL,
+                    "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,7,96,162,12
+    LTEXT           "Ścieżk&a:",IDC_STATIC_2,7,9,24,8
+    EDITTEXT        IDE_SSCD_PATH,32,9,235,9,ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+    LTEXT           "Opis błędu:",IDC_STATIC_3,7,28,66,8
+    EDITTEXT        IDE_SSCD_ERRDSCR,5,38,262,18,ES_MULTILINE | ES_AUTOVSCROLL | ES_AUTOHSCROLL | ES_READONLY | NOT WS_BORDER | WS_GROUP
+END
+
+IDD_VIEWERRASCIITRFORBINFILE DIALOGEX 25, 38, 340, 79
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Klient FTP"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    DEFPUSHBUTTON   "Użyj trybu binarnego",IDOK,74,57,78,14,WS_GROUP
+    PUSHBUTTON      "&Ignoruj",IDIGNORE,159,57,50,14
+    PUSHBUTTON      "Anuluj",IDCANCEL,216,57,50,14
+    CONTROL         "Pobieranie pliku o zawartości binarnej w trybie przesyłu ASCII. Może to spowodować uszkodzenie",IDC_STATIC_1,
+                    "Static",SS_LEFTNOWORDWRAP | WS_GROUP,40,7,295,8
+    CONTROL         "pliku w wyniku niepożądanej konwersji do domyślnych końców wierszy systemu. Ten plik można pobrać",IDC_STATIC_2,
+                    "Static",SS_LEFTNOWORDWRAP | WS_GROUP,40,16,295,8
+    CONTROL         "ponownie w trybie przesyłu binarnego (bez tej niepożądanej konwersji). Jeśli jednak wiesz, że",IDC_STATIC_3,
+                    "Static",SS_LEFTNOWORDWRAP | WS_GROUP,40,25,295,8
+    CONTROL         "plik to zwykły tekst, naciśnij Ignoruj, aby zignorować ten komunikat.",IDC_STATIC_4,
+                    "Static",SS_LEFTNOWORDWRAP | WS_GROUP,40,34,295,8
+    ICON            "",IDI_INFOICON,7,7,18,20
+END
+
+IDD_PROXYSERVER DIALOGEX 10, 24, 231, 231
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Dodaj serwer proxy"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    CONTROL         "&Nazwa:",IDC_STATIC_1,"Static",SS_LEFTNOWORDWRAP | WS_GROUP,7,10,24,8
+    EDITTEXT        IDE_PRXSRV_NAME,49,8,174,12,ES_AUTOHSCROLL
+    LTEXT           "&Typ:",IDC_STATIC_2,7,25,21,8
+    COMBOBOX        IDC_PRXSRV_TYPE,49,23,175,170,CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+    CONTROL         "&Adres:",IDC_STATIC_3,"Static",SS_LEFTNOWORDWRAP | WS_GROUP,7,40,31,8
+    EDITTEXT        IDE_PRXSRV_ADDRESS,49,38,174,12,ES_AUTOHSCROLL
+    CONTROL         "&Port:",IDC_STATIC_4,"Static",SS_LEFTNOWORDWRAP | WS_GROUP,7,55,18,8
+    EDITTEXT        IDE_PRXSRV_PORT,49,53,39,12,ES_AUTOHSCROLL
+    CONTROL         "Nazwa &użytkownika:",IDC_STATIC_5,"Static",SS_LEFTNOWORDWRAP | WS_GROUP,7,70,41,8
+    EDITTEXT        IDE_PRXSRV_USER,49,68,174,12,ES_AUTOHSCROLL
+    CONTROL         "&Hasło:",IDC_STATIC_6,"Static",SS_LEFTNOWORDWRAP | WS_GROUP,7,85,41,8
+    EDITTEXT        IDE_PRXSRV_PASSWD,49,83,58,12,ES_PASSWORD | ES_AUTOHSCROLL
+    EDITTEXT        IDE_PRXSRV_PASSWD_LOCKED,112,83,58,12,ES_AUTOHSCROLL | WS_GROUP
+    PUSHBUTTON      "O&dblokuj...",IDB_PRXSRV_PASSWD_CHANGE,173,82,50,14
+    CONTROL         "Zapi&sz hasło",IDC_PRXSRV_SAVEPASSWD,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,7,99,62,12
+    LTEXT           "nie jest to bezpieczne",IDC_PRXSRV_SAVEPASSWD_HINT,74,101,125,8,WS_TABSTOP
+    LTEXT           "&Skrypt logowania:",IDC_STATIC_7,7,120,44,8
+    EDITTEXT        IDE_PRXSRV_SCRIPT,7,130,216,68,ES_MULTILINE | ES_AUTOVSCROLL | ES_AUTOHSCROLL | ES_WANTRETURN
+    DEFPUSHBUTTON   "OK",IDOK,53,210,50,14,WS_GROUP
+    PUSHBUTTON      "Anuluj",IDCANCEL,113,210,50,14
+    PUSHBUTTON      "Pomoc",IDHELP,173,210,50,14
+END
+
+IDD_CERTIFICATE DIALOGEX 10, 24, 270, 138
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Problem z tożsamością serwera"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    CONTROL         "Serwer przedstawił certyfikat z następującymi problemami:",IDC_STATIC_1,
+                    "Static",SS_LEFTNOWORDWRAP | WS_GROUP,7,9,258,8
+    GROUPBOX        " Podsumowanie weryfikacji certyfikatu ",IDC_STATIC_2,9,21,252,54
+    LTEXT           "",IDT_CERTIFICATE_ERROR,16,32,238,40
+    LTEXT           "Zaakceptowanie certyfikatu jest potencjalnie niebezpieczne i niezalecane.",IDC_STATIC_3,7,80,258,8,NOT WS_GROUP
+    CONTROL         "Zapamiętaj ten wyjątek na 30 dni (tylko ten host, port i certyfikat)",IDB_CERTIFICATE_REMEMBER,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,10,93,250,10
+    LTEXT           "",IDC_STATIC_4,5,112,261,1,SS_ETCHEDHORZ | WS_GROUP
+    PUSHBUTTON      "&Pokaż certyfikat",IDB_CERTIFICATE_VIEW,10,118,80,14,WS_GROUP
+    PUSHBUTTON      "&Zaakceptuj certyfikat",IDOK,95,118,80,14
+    DEFPUSHBUTTON   "Anuluj",IDCANCEL,180,118,80,14
+END
+
+
+/////////////////////////////////////////////////////////////////////////////
+//
+// Menu
+//
+
+IDM_SRVCONTEXTMENU MENU 
+BEGIN
+    POPUP ""
+    BEGIN
+        MENUITEM "&Połącz\tEnter",              IDOK
+        MENUITEM SEPARATOR
+        MENUITEM "N&owy...\tInsert",            IDB_NEWBOOKMARK
+        MENUITEM "Kopiuj &do...",               CM_COPYSRVTO
+        MENUITEM "Z&mień nazwę...\tF2",         IDB_RENAMEBOOKMARK
+        MENUITEM "&Usuń...\tDelete",            IDB_REMOVEBOOKMARK
+        MENUITEM SEPARATOR
+        MENUITEM "Przenieś &wyżej\tAlt+Up Arrow",      CM_MOVEUPBOOKMARK
+        MENUITEM "Przenieś &niżej\tAlt+Down Arrow",    CM_MOVEDOWNBOOKMARK
+    END
+END
+
+IDM_SRVCONTEXTMENU2 MENU 
+BEGIN
+    POPUP ""
+    BEGIN
+        MENUITEM "N&owy...\tInsert",            IDB_NEWBOOKMARK
+        MENUITEM "Kopiuj &do...",               CM_COPYSRVTO
+        MENUITEM "Z&mień nazwę...\tF2",         IDB_RENAMEBOOKMARK
+        MENUITEM "&Usuń...\tDelete",            IDB_REMOVEBOOKMARK
+        MENUITEM SEPARATOR
+        MENUITEM "Przenieś &wyżej\tAlt+Up Arrow",      CM_MOVEUPBOOKMARK
+        MENUITEM "Przenieś &niżej\tAlt+Down Arrow",    CM_MOVEDOWNBOOKMARK
+    END
+END
+
+IDM_ACTPATHCONTEXTMENU MENU 
+BEGIN
+    POPUP ""
+    BEGIN
+        MENUITEM "&Rozłącz...",                 CM_DISCONNECTSRV
+        MENUITEM "Pokaż &certyfikat...",        CM_SHOWCERT
+        POPUP "Tryb &przesyłu"
+        BEGIN
+            MENUITEM "&Automatyczny",               CM_TRMODEAUTO
+            MENUITEM "A&SCII",                      CM_TRMODEASCII
+            MENUITEM "&Binarny",                    CM_TRMODEBINARY
+        END
+        MENUITEM "&Odśwież",                    CM_REFRESHPATH
+        MENUITEM SEPARATOR
+        MENUITEM "&Dodaj zakładkę...",          CM_ADDBOOKMARK
+        MENUITEM "Pokaż d&ziennik...",          CM_SHOWLOG
+        MENUITEM "&Wyślij polecenie FTP...",    CM_SENDFTPCOMMAND
+        MENUITEM "Po&każ surowe listowanie...", CM_SHOWRAWLISTING
+        MENUITEM "Wyświetlaj &ukryte pliki i katalogi (Unix)", CM_LISTHIDDENFILES
+    END
+END
+
+IDM_CHNGDRVCONTMENU MENU 
+BEGIN
+    POPUP ""
+    BEGIN
+        MENUITEM "&Połącz z serwerem FTP...",   CM_CONNECTSRV
+        MENUITEM "&Zarządzaj zakładkami...",    CM_ORGBOOKMARKS
+        MENUITEM "Pokaż &dzienniki...",         CM_SHOWLOGS
+    END
+END
+
+IDM_DETPATHCONTEXTMENU MENU 
+BEGIN
+    POPUP ""
+    BEGIN
+        MENUITEM "&Pokaż w panelu",             CM_OPENDETACHED
+        MENUITEM SEPARATOR
+        MENUITEM "&Rozłącz",                    CM_DISCONNECTSRV
+        MENUITEM SEPARATOR
+        MENUITEM "&Dodaj zakładkę...",          CM_ADDBOOKMARK
+        MENUITEM "Pokaż d&ziennik...",          CM_SHOWLOG
+    END
+END
+
+IDM_LOGSMENU MENU 
+BEGIN
+    POPUP "&Dziennik"
+    BEGIN
+        MENUITEM "&Kopiuj",                     CM_COPYLOG
+        MENUITEM "Kopiuj &wszystko",            CM_COPYALLLOGS
+        MENUITEM SEPARATOR
+        MENUITEM "Zapisz &jako...",             CM_SAVELOG
+        MENUITEM "Zapisz wszy&stkie jako...",   CM_SAVEALLLOGS
+        MENUITEM SEPARATOR
+        MENUITEM "Wy&czyść...",                 CM_CLEARLOG
+        MENUITEM "&Usuń...",                    CM_REMOVELOG
+        MENUITEM "Usuń wszystk&ie...",          CM_REMOVEALLLOGS
+        MENUITEM SEPARATOR
+        MENUITEM "&Zamknij\tAlt+F4",            IDCANCEL
+    END
+    POPUP "&Opcje"
+    BEGIN
+        MENUITEM "&Zawsze pokazuj dziennik dla aktywnego panelu", CM_SHOWLOGFORPANEL
+    END
+    POPUP "Pomo&c"
+    BEGIN
+        MENUITEM "&Dzienniki FTP\tF1",          CM_HELPFORLOGSWND
+    END
+END
+
+IDM_SERVERSOTHERACT MENU 
+BEGIN
+    POPUP ""
+    BEGIN
+        MENUITEM "Kopiuj &do...",               CM_COPYSERVERTO
+        MENUITEM "Z&mień nazwę...\tF2",         CM_RENAMESERVER
+        MENUITEM "&Usuń...\tDelete",            CM_REMOVESERVER
+        MENUITEM SEPARATOR
+        MENUITEM "&Importuj z pliku...",        CM_IMPORTSERVER
+        MENUITEM "&Eksportuj do pliku...",      CM_EXPORTSERVER
+    END
+END
+
+IDM_SERVERSACTIONS MENU 
+BEGIN
+    POPUP ""
+    BEGIN
+        MENUITEM "N&owy...\tInsert",           IDB_NEWSERVER
+        MENUITEM "&Edytuj...",                  IDB_EDITSERVER
+        MENUITEM "Kopiuj &do...",               CM_COPYSERVERTO
+        MENUITEM "Z&mień nazwę...\tF2",         CM_RENAMESERVER
+        MENUITEM "&Usuń...\tDelete",            CM_REMOVESERVER
+        MENUITEM SEPARATOR
+        MENUITEM "Przenieś &wyżej\tAlt+Up Arrow",      IDB_MOVESERVERUP
+        MENUITEM "Przenieś &niżej\tAlt+Down Arrow",    IDB_MOVESERVERDOWN
+        MENUITEM SEPARATOR
+        MENUITEM "&Importuj z pliku...",        CM_IMPORTSERVER
+        MENUITEM "E&ksportuj do pliku...",      CM_EXPORTSERVER
+    END
+END
+
+IDM_SRVTYPEMOVECOLUMN MENU 
+BEGIN
+    POPUP ""
+    BEGIN
+        MENUITEM "&Wyżej\tAlt+Up Arrow",        CM_MOVECOLUMNUP
+        MENUITEM "&Niżej\tAlt+Down Arrow",      CM_MOVECOLUMNDOWN
+    END
+END
+
+IDM_SRVTYPERULESMENU MENU 
+BEGIN
+    POPUP ""
+    BEGIN
+        POPUP "W&staw"
+        BEGIN
+            MENUITEM "Początek &reguły",            CM_STRM_RULESTART
+            MENUITEM "&Koniec reguły",              CM_STRM_RULEEND
+            MENUITEM "Komentarz &wiersza",          CM_STRM_COMMENT
+            MENUITEM SEPARATOR
+            POPUP "&Pomiń"
+            BEGIN
+                MENUITEM "Białe znaki (jeśli występują)",       CM_STRM_SKIPWSIFANY
+                MENUITEM "Białe znaki (co najmniej jeden)",     CM_STRM_SKIPWS
+                MENUITEM "Dokładna liczba białych znaków",      CM_STRM_SKIPNUMOFWS
+                MENUITEM "Białe znaki i końce wierszy (co najmniej jeden)", CM_STRM_SKIPWSENDEOLS
+                MENUITEM "Reszta wiersza (co najmniej jeden znak)", CM_STRM_SKIPRESTOFLINE
+                MENUITEM "Słowo",                       CM_STRM_SKIPWORD
+                MENUITEM "Dokładna liczba znaków",      CM_STRM_SKIPNUMOFLETTERS
+                MENUITEM "Wszystkie znaki do końca szukanego tekstu", CM_STRM_SKIPALLTO
+                MENUITEM "Wszystkie znaki do najbliższej liczby", CM_STRM_SKIPALLTONUMBER
+            END
+            POPUP "Przypisz do &kolumny"
+            BEGIN
+                MENUITEM "Reszta wiersza (co najmniej jeden znak)", CM_STRM_ASGNRESTOFLINE
+                MENUITEM "Słowo",                       CM_STRM_ASGNWORD
+                MENUITEM "Liczba",                      CM_STRM_ASGNNUM
+                MENUITEM "Liczba dodatnia",             CM_STRM_ASGNPOSNUM
+                MENUITEM "Liczba z separatorami",       CM_STRM_ASGNNUMWITHSEP
+                MENUITEM "Miesiąc trzyliterowy (angielski, niemiecki)", CM_STRM_ASGN3LETTERMONTH
+                MENUITEM "Miesiąc trzyliterowy (zdefiniowany przez użytkownika)", CM_STRM_ASGN3LETMONTHGEN
+                MENUITEM "Miesiąc tekstowy (niemiecki)", CM_STRM_ASGNTEXTMONTH
+                MENUITEM "Miesiąc tekstowy (zdefiniowany przez użytkownika)", CM_STRM_ASGNTEXTMONTHGEN
+                MENUITEM "Numer miesiąca",              CM_STRM_ASGNMONTH
+                MENUITEM "Numer dnia",                  CM_STRM_ASGNDAY
+                MENUITEM "Numer roku",                  CM_STRM_ASGNYEAR
+                MENUITEM "Czas",                        CM_STRM_ASGNTIME
+                MENUITEM "Rok lub czas",                CM_STRM_ASGNYEARORTIME
+                MENUITEM "Dokładna liczba znaków",      CM_STRM_ASGNNUMOFLETTERS
+                MENUITEM "Wszystkie znaki do końca szukanego tekstu", CM_STRM_ASGNALLTO
+                MENUITEM "Wszystkie znaki do szukanego tekstu", CM_STRM_ASGNALLUPTO
+                MENUITEM "Łącze uniksowe (rozdziel nazwę i cel łącza)", CM_STRM_ASGNUNIXLINK
+                MENUITEM "Urządzenie uniksowe",         CM_STRM_ASGNUNIXDEV
+                MENUITEM "Wyrażenie",                   CM_STRM_ASGNEXPR
+            END
+            POPUP "Wytnij &białe znaki w kolumnie"
+            BEGIN
+                MENUITEM "Początkowe",                  CM_STRM_CUTWSINIT
+                MENUITEM "Końcowe",                     CM_STRM_CUTWSTRAIL
+                MENUITEM "Początkowe i końcowe",        CM_STRM_CUTWSBOTH
+            END
+            POPUP "Zmienne &stanu i operatory dla wyrażeń"
+            BEGIN
+                MENUITEM "To pierwszy niepusty wiersz", CM_STRM_STVARISFIRSTNELINE
+                MENUITEM "To ostatni niepusty wiersz",  CM_STRM_STVARISLASTNELINE
+                MENUITEM "Następny znak",               CM_STRM_STVARNEXTCHAR
+                MENUITEM "Następne słowo",              CM_STRM_STVARNEXTWORD
+                MENUITEM "Reszta wiersza",              CM_STRM_STVARRESTOFLINE
+                MENUITEM SEPARATOR
+                MENUITEM "Równe",                       CM_STRM_OPEREQUAL
+                MENUITEM "Różne",                       CM_STRM_OPERNOTEQUAL
+                MENUITEM "Tekst równy (bez rozróżniania wielkości liter)", CM_STRM_OPERSTREQUAL
+                MENUITEM "Tekst różny (bez rozróżniania wielkości liter)", CM_STRM_OPERSTRNOTEQUAL
+                MENUITEM "Podtekst jest w tekście",     CM_STRM_OPERISINSTR
+                MENUITEM "Podtekstu nie ma w tekście",  CM_STRM_OPERISNOTINSTR
+                MENUITEM "Tekst kończy się tekstem",    CM_STRM_OPERENDWITH
+                MENUITEM "Tekst nie kończy się tekstem", CM_STRM_OPERNOTENDWITH
+            END
+            POPUP "&Inne"
+            BEGIN
+                MENUITEM "Kontynuuj tylko, jeśli",      CM_STRM_IF
+                MENUITEM "Dodaj tekst do kolumny",      CM_STRM_ADDSTRTOCOL
+                MENUITEM "Cofnij się o liczbę znaków",  CM_STRM_BACK
+                MENUITEM "Utetnij koniec tekstu w kolumnie", CM_STRM_CUTENDOFSTR
+            END
+        END
+        MENUITEM SEPARATOR
+        MENUITEM "&Cofnij",                     CM_STRM_UNDO
+        MENUITEM SEPARATOR
+        MENUITEM "Wy&tnij",                     CM_STRM_CUT
+        MENUITEM "&Kopiuj",                     CM_STRM_COPY
+        MENUITEM "&Wklej",                      CM_STRM_PASTE
+        MENUITEM "&Usuń",                       CM_STRM_DELETE
+        MENUITEM SEPARATOR
+        MENUITEM "Zazna&cz wszystko",           CM_STRM_SELECTALL
+    END
+END
+
+IDM_SRVTYPECOLUMNS MENU 
+BEGIN
+    POPUP ""
+    BEGIN
+        MENUITEM "N&owy...\tInsert",           IDB_NEWCOLUMN
+        MENUITEM "&Edytuj...",                  IDB_EDITCOLUMN
+        MENUITEM "&Usuń...\tDelete",            IDB_REMOVECOLUMN
+        MENUITEM SEPARATOR
+        MENUITEM "Przenieś &wyżej\tAlt+Up Arrow",      CM_MOVECOLUMNUP
+        MENUITEM "Przenieś &niżej\tAlt+Down Arrow",    CM_MOVECOLUMNDOWN
+    END
+END
+
+IDM_DIREXISTSERRRETRY MENU 
+BEGIN
+    POPUP ""
+    BEGIN
+        MENUITEM "&Ponów",                      IDOK
+        MENUITEM "Użyj &istniejącego katalogu", CM_SDEX_USEEXISTINGDIR
+        MENUITEM "Użyj &alternatywnej nazwy",   CM_SCRD_USEALTNAME
+    END
+END
+
+IDM_FILEEXISTSERRRETRY MENU 
+BEGIN
+    POPUP ""
+    BEGIN
+        MENUITEM "&Ponów",                      IDOK
+        MENUITEM "&Wznów",                      CM_SIED_RESUME
+        MENUITEM "Wzno&w lub nadpisz",          CM_SIED_RESUMEOROVR
+        MENUITEM "Użyj &alternatywnej nazwy",   CM_SCRD_USEALTNAME
+    END
+END
+
+IDM_TRANSFERFAILEDERRRETRY MENU 
+BEGIN
+    POPUP ""
+    BEGIN
+        MENUITEM "&Ponów",                      IDOK
+        MENUITEM "Użyj &alternatywnej nazwy",   CM_SCRD_USEALTNAME
+        MENUITEM "Wzno&w lub nadpisz",          CM_SIED_RESUMEOROVR
+    END
+END
+
+IDM_CANTCRFILEERRRETRY MENU 
+BEGIN
+    POPUP ""
+    BEGIN
+        MENUITEM "&Ponów",                      IDOK
+        MENUITEM "Użyj &alternatywnej nazwy",   CM_SCRD_USEALTNAME
+    END
+END
+
+IDM_UNKATTRSERRIGNORE MENU 
+BEGIN
+    POPUP ""
+    BEGIN
+        MENUITEM "&Ignoruj",                    IDOK
+        MENUITEM "&Ponów",                      CM_SIEA_RETRY
+        MENUITEM "Ustaw &nowe atrybuty...",     CM_SIEA_SETNEWATTRS
+    END
+END
+
+IDM_DELETEERRORRETRY MENU 
+BEGIN
+    POPUP ""
+    BEGIN
+        MENUITEM "&Usuń",                       IDOK
+        MENUITEM "&Ponów",                      CM_SISE_RETRY
+    END
+END
+
+IDM_DELETEERRORONSRVRETRY MENU 
+BEGIN
+    POPUP ""
+    BEGIN
+        MENUITEM "&Ponów",                      IDOK
+        MENUITEM "Oznacz jako &usunięte",       CM_SSCD_MARKASDELETED
+    END
+END
+
+IDM_RESUMEERRORONRETRY MENU 
+BEGIN
+    POPUP ""
+    BEGIN
+        MENUITEM "&Ponów",                      IDOK
+        MENUITEM "Użyj &alternatywnej nazwy",   CM_SSCD_USEALTNAME
+        MENUITEM "Wzno&w lub nadpisz",          CM_SSCD_RESUMEOROVR
+    END
+END
+
+IDM_RESUMETESTFAILEDONRETRY MENU 
+BEGIN
+    POPUP ""
+    BEGIN
+        MENUITEM "&Ponów",                      IDOK
+        MENUITEM "Użyj &alternatywnej nazwy",   CM_SSCD_USEALTNAME
+        MENUITEM "Wzno&w lub nadpisz",          CM_SSCD_RESUMEOROVR
+        MENUITEM "Zmniejsz &rozmiar pliku i spróbuj wznowić ponownie", CM_SSCD_REDUCEFILESIZE
+    END
+END
+
+IDM_UPLTESTIFFINISHEDONRETRY MENU 
+BEGIN
+    POPUP ""
+    BEGIN
+        MENUITEM "&Ponów",                      IDOK
+        MENUITEM "Użyj &alternatywnej nazwy",   CM_SSCD_USEALTNAME
+        MENUITEM "Wzno&w lub nadpisz",          CM_SSCD_RESUMEOROVR
+        MENUITEM "Oznacz plik jako pomyślnie &wysłany", CM_SSCD_MARKASUPLOADED
+    END
+END
+
+IDM_ASCIITRFORBINFILE MENU 
+BEGIN
+    POPUP ""
+    BEGIN
+        MENUITEM "Użyj trybu &binarnego",       IDOK
+        MENUITEM "&Ponów",                      CM_SATR_RETRY
+    END
+END
+
+IDM_ADDPROXYSERVER MENU 
+BEGIN
+    POPUP ""
+    BEGIN
+        MENUITEM "&Dodaj...",                   IDB_ADDPROXYSRV
+        MENUITEM "&Edytuj...",                  CM_EDITPROXYSRV
+        MENUITEM "&Usuń...",                    CM_DELETEPROXYSRV
+        MENUITEM SEPARATOR
+        MENUITEM "Przenieś &wyżej",             CM_MOVEUPPROXYSRV
+        MENUITEM "Przenieś &niżej",             CM_MOVEDOWNPROXYSRV
+    END
+END
+
+IDM_PRXSRVSCRIPTMENU MENU 
+BEGIN
+    POPUP ""
+    BEGIN
+        POPUP "W&staw"
+        BEGIN
+            MENUITEM "&3xx: (wyślij tylko, jeśli serwer wymaga hasła/konta)", CM_PSS_3XX
+            MENUITEM SEPARATOR
+            MENUITEM "Adres &proxy",                CM_PSS_PROXYHOST
+            MENUITEM "Port p&roxy",                 CM_PSS_PROXYPORT
+            MENUITEM "Nazwa użytkownik&a proxy",    CM_PSS_PROXYUSER
+            MENUITEM "Hasło pr&oxy",                CM_PSS_PROXYPASSWD
+            MENUITEM "&Adres",                      CM_PSS_HOST
+            MENUITEM "Por&t",                       CM_PSS_PORT
+            MENUITEM "Nazwa &użytkownika",          CM_PSS_USER
+            MENUITEM "&Hasło",                      CM_PSS_PASSWD
+            MENUITEM "&Konto",                      CM_PSS_ACCOUNT
+        END
+        MENUITEM SEPARATOR
+        MENUITEM "&Cofnij",                     CM_PSS_UNDO
+        MENUITEM SEPARATOR
+        MENUITEM "Wy&tnij",                     CM_PSS_CUT
+        MENUITEM "&Kopiuj",                     CM_PSS_COPY
+        MENUITEM "&Wklej",                      CM_PSS_PASTE
+        MENUITEM "&Usuń",                       CM_PSS_DELETE
+        MENUITEM SEPARATOR
+        MENUITEM "Zazna&cz wszystko",           CM_PSS_SELECTALL
+    END
+END
+
+IDM_UNLOCKPASSWORD MENU 
+BEGIN
+    POPUP ""
+    BEGIN
+        MENUITEM "&Odblokuj hasło...",          CM_UNLOCKPASSWORD
+        MENUITEM "&Wyczyść hasło",              CM_CLEARPASSWORD
+    END
+END
+
+#endif    // Neutral resources
+/////////////////////////////////////////////////////////////////////////////
+
+
+
+#ifndef APSTUDIO_INVOKED
+/////////////////////////////////////////////////////////////////////////////
+//
+// Generated from the TEXTINCLUDE 3 resource.
+//
+#if !defined(AFX_RESOURCE_DLL) || defined(AFX_TARG_NEU)
+LANGUAGE LANG_NEUTRAL,SUBLANG_NEUTRAL
+#include "lang_pl.rc2"   // non-Microsoft Visual C++ edited resources
+#endif
+
+/////////////////////////////////////////////////////////////////////////////
+#endif    // not APSTUDIO_INVOKED

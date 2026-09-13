@@ -1,0 +1,44 @@
+//
+// lang_pl.rc2 - Polish language resources (not edited by Visual Studio)
+//
+
+#ifdef APSTUDIO_INVOKED
+#error this file is not editable by Microsoft Visual C++
+#endif //APSTUDIO_INVOKED
+
+// The Polish VERSIONINFO identity is applied before the shared VERSIONINFO
+// template include; the plugin's versinfo.rh2 is include-guarded, so these
+// overrides survive the template chain and keep POLISH.SLG valid for
+// IsSLGFileValid (version match + 0x0415 translation language).
+#include "..\..\versinfo.rh2"
+#undef VERSINFO_INTERNAL
+#define VERSINFO_INTERNAL    "POLISH"
+#undef VERSINFO_ORIGINAL
+#define VERSINFO_ORIGINAL    VERSINFO_INTERNAL ".SLG"
+#undef VERSINFO_SLG_COMMENT
+#define VERSINFO_SLG_COMMENT "Wersja polska"
+#define VERSINFO_TRANSLATION_LANG    0x0415
+#define VERSINFO_TRANSLATION_SUBLANG 0x0415
+#include "versinfo.rc2"
+
+STRINGTABLE
+{
+  IDS_PLUGINNAME, "UnOLE2"
+  IDS_LOWMEM, "Za mało pamięci."
+  IDS_CANNOT_OPEN, "Nie można otworzyć pliku Compound File %s.\n"
+  IDS_MEMORY_ALLOCATOR, "Nie można uzyskać alokatora pamięci.\n"
+  IDS_CANNOT_WRITE, "Nie można zapisać do pliku.\n"
+  IDS_CANNOT_CREATE_FILE, "Nie można utworzyć pliku %s.\n"
+  IDS_CANNOT_OPEN_STREAM, "Nie można otworzyć strumienia %s.\n"
+  IDS_CANNOT_READ, "Nie można zapisać do pliku.\n"
+  IDS_UNKNOWN, "Wystąpił nieznany błąd."
+  IDS_LIST, "Nie można dodać wpisu archiwum do listy plików."
+  IDS_EXTRPROGTITLE, "Rozpakowywanie pliku Compound File"
+  IDS_EXTRACTFILES, "rozpakowywanie..."
+  IDS_EXTRACTING, "rozpakowywanie: "
+  IDS_EXPIRE, "Niestety, okres ważności wtyczki wygasł. Sprawdź na naszej stronie internetowej, czy dostępna jest nowsza wersja."
+  IDS_PLUGIN_DESCRIPTION, "Przeglądanie i rozpakowywanie plików OLE Compound."
+  IDS_ABOUT, "Informacje o wtyczce"
+
+  IDS_ERROR, "Błąd"
+}

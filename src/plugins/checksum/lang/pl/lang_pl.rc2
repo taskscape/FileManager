@@ -1,0 +1,85 @@
+//
+// lang_pl.rc2 - Polish language resources (not edited by Visual Studio)
+//
+
+#ifdef APSTUDIO_INVOKED
+#error this file is not editable by Microsoft Visual C++
+#endif //APSTUDIO_INVOKED
+
+// The Polish VERSIONINFO identity is applied before the shared VERSIONINFO
+// template include; the plugin's versinfo.rh2 is include-guarded, so these
+// overrides survive the template chain and keep POLISH.SLG valid for
+// IsSLGFileValid (version match + 0x0415 translation language).
+#include "..\versinfo.rh2"
+#undef VERSINFO_INTERNAL
+#define VERSINFO_INTERNAL    "POLISH"
+#undef VERSINFO_ORIGINAL
+#define VERSINFO_ORIGINAL    VERSINFO_INTERNAL ".SLG"
+#undef VERSINFO_SLG_COMMENT
+#define VERSINFO_SLG_COMMENT "Wersja polska"
+#define VERSINFO_TRANSLATION_LANG    0x0415
+#define VERSINFO_TRANSLATION_SUBLANG 0x0415
+#include "versinfo.rc2"
+
+STRINGTABLE
+{
+ IDS_PLUGINNAME "Checksum"
+ IDS_ABOUTTITLE "Informacje o wtyczce"
+ IDS_PLUGIN_DESCRIPTION "Weryfikator i kalkulator sum kontrolnych SFV, MD5, SHA-1, SHA-256 i SHA-512."
+ IDS_OUTOFMEM "Brak pamięci"
+ IDS_ERROROPENING, "Błąd otwierania pliku"
+ IDS_READERROR "Błąd odczytu"
+ IDS_WRITEERROR "Błąd zapisu"
+ IDS_SKIPPED "Pominięto"
+ IDS_CALCULATING "Obliczanie..."
+ IDS_CANCELED "Anulowano"
+ IDS_HINT "Kliknij element prawym przyciskiem myszy, aby skopiować sumę kontrolną do schowka."
+ IDS_COPYTOCBOARD_CRC "Skopiuj wartość &CRC do schowka\tCtrl+C"
+ IDS_COPYTOCBOARD_MD5 "Skopiuj sumę kontrolną &MD5 do schowka\tCtrl+M"
+ IDS_COPYTOCBOARD_SHA1 "Skopiuj sumę kontrolną SHA-&1 do schowka\tCtrl+1"
+ IDS_COPYTOCBOARD_SHA256 "Skopiuj sumę kontrolną SHA-&256 do schowka\tCtrl+2"
+ IDS_COPYTOCBOARD_SHA512 "Skopiuj sumę kontrolną SHA-&512 do schowka\tCtrl+5"
+ IDS_REMOVEITEM "&Usuń element\tDelete"
+ IDS_SAVE_TITLE  "Zapisz plik sum kontrolnych"
+ IDS_SAVE_FILTER_CRC  "Pliki SFV (*.sfv)|*.sfv|"
+ IDS_SAVE_FILTER_MD5  "Pliki MD5 (*.md5)|*.md5|"
+ IDS_SAVE_FILTER_SHA1 "Pliki SHA-1 (*.sha1)|*.sha1|"
+ IDS_SAVE_FILTER_SHA256 "Pliki SHA-256 (*.sha256)|*.sha256|"
+ IDS_SAVE_FILTER_SHA512 "Pliki SHA-512 (*.sha512)|*.sha512|"
+ IDS_SAVE_OVERWRITE, "Plik '%s' już istnieje.\nCzy chcesz go nadpisać?"
+ IDS_ERRORCREATINGFILE "Błąd tworzenia pliku."
+ IDS_SKIPPEDFILES "Pliki pominięte lub anulowane podczas obliczania nie zostały zapisane."
+ IDS_ERROROPENING2 "Błąd otwierania pliku '%s'."
+ IDS_MISSING "Brak"
+ IDS_BADEXT "Wybrany plik nie ma rozszerzenia SFV, MD5, SHA1, SHA256 ani SHA512. Czy mimo to kontynuować?"
+ IDS_BADFILE "Wybrany plik nie jest prawidłowym plikiem SFV, MD5, SHA-1, SHA-256 ani SHA-512."
+ IDS_VERIFYING "Weryfikowanie..."
+ IDS_OK "OK"
+ IDS_CORRUPT "Uszkodzony"
+ IDS_MENU_CALCULATE "&Oblicz sumy kontrolne..."
+ IDS_MENU_VERIFY "&Zweryfikuj sumy kontrolne..."
+ IDS_CONFIG_CONFLICT "Konfiguracja jest już otwarta."
+ IDS_CONFIG_CHANGES_EFFECT "Zmiany zostaną zastosowane przy następnym otwarciu okna 'Obliczanie sum kontrolnych'."
+ IDS_ALLOK "Wszystkie pliki OK"
+ IDS_RESULT "%d uszkodzonych, %d brakujących, %d pominiętych"
+ IDS_BUSY "Program Open Salamander jest zajęty. Żądanego polecenia nie można wykonać, spróbuj ponownie później."
+ IDS_CLOSE "&Zamknij"
+ IDS_READINGTREE "Odczytywanie drzewa katalogów, czekaj..."
+ IDS_ERRORREADINGDIR "Błąd odczytu katalogu"
+ IDS_NOFILES "Brak plików"
+ IDS_VERIFYTITLE "Weryfikacja sum kontrolnych"
+ IDS_VERIFY_CRC "Weryfikuj CRC"
+ IDS_VERIFY_MD5 "Weryfikuj MD5"
+ IDS_VERIFY_SHA1 "Weryfikuj SHA-1"
+ IDS_VERIFY_SHA256 "Weryfikuj SHA-256"
+ IDS_VERIFY_SHA512 "Weryfikuj SHA-512"
+ IDS_COLUMN_FILE "Plik"
+ IDS_COLUMN_SIZE "Rozmiar"
+ IDS_COLUMN_STATUS "Stan"
+ IDS_COLUMN_CRC "CRC"
+ IDS_COLUMN_MD5 "MD5"
+ IDS_COLUMN_SHA1 "SHA-1"
+ IDS_COLUMN_SHA256 "SHA-256"
+ IDS_COLUMN_SHA512 "SHA-512"
+ IDS_TOOLONGNAME, "Nie można ukończyć operacji z powodu zbyt długiej nazwy."
+}

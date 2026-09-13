@@ -1,0 +1,33 @@
+//
+// lang_pl.rc2 - Polish language resources (not edited by Visual Studio)
+//
+
+#ifdef APSTUDIO_INVOKED
+#error this file is not editable by Microsoft Visual C++
+#endif //APSTUDIO_INVOKED
+
+// The Polish VERSIONINFO identity is applied before the shared VERSIONINFO
+// template include; the plugin's versinfo.rh2 is include-guarded, so these
+// overrides survive the template chain and keep POLISH.SLG valid for
+// IsSLGFileValid (version match + 0x0415 translation language).
+#include "..\..\versinfo.rh2"
+#undef VERSINFO_INTERNAL
+#define VERSINFO_INTERNAL    "POLISH"
+#undef VERSINFO_ORIGINAL
+#define VERSINFO_ORIGINAL    VERSINFO_INTERNAL ".SLG"
+#undef VERSINFO_SLG_COMMENT
+#define VERSINFO_SLG_COMMENT "Wersja polska"
+#define VERSINFO_TRANSLATION_LANG    0x0415
+#define VERSINFO_TRANSLATION_SUBLANG 0x0415
+#include "versinfo.rc2"
+
+STRINGTABLE
+{
+ IDS_PLUGIN_NAME, "Portable Executable Viewer"
+ IDS_PLUGIN_DESCRIPTION, "Wyświetla informacje o plikach Portable Executable, takich jak EXE, DLL itd."
+ IDS_ABOUT, "Informacje o wtyczce"
+ IDS_ERR_OPEN_FILE, "Nie można otworzyć pliku %s."
+ IDS_ERR_TMP, "Utworzenie pliku tymczasowego nie powiodło się."
+ IDS_EXCEPTION, "Wystąpił wyjątek.\n\nPrzeglądany plik: %s\n\nJeśli uważasz, że przeglądany plik nie jest uszkodzony, prześlij go na adres support@taskscape.com.\nOdtworzymy i naprawimy błąd przeglądarki. Dziękujemy za współpracę!"
+ IDS_HIDDEN_SECTIONS, "Nie znaleziono żadnej sekcji Portable Executable wybranej w konfiguracji wtyczki.\nUżyj menu Opcje > Konfiguracja wtyczek > Portable Executable Viewer\nw głównym oknie programu Open Salamander, aby ustawić widoczne sekcje."
+}

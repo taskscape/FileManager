@@ -1,0 +1,100 @@
+//
+// lang_pl.rc2 - Polish language resources (not edited by Visual Studio)
+//
+
+#ifdef APSTUDIO_INVOKED
+#error this file is not editable by Microsoft Visual C++
+#endif //APSTUDIO_INVOKED
+
+// The Polish VERSIONINFO identity is applied before the shared VERSIONINFO
+// template include; the plugin's versinfo.rh2 is include-guarded, so these
+// overrides survive the template chain and keep POLISH.SLG valid for
+// IsSLGFileValid (version match + 0x0415 translation language).
+#include "..\versinfo.rh2"
+#undef VERSINFO_INTERNAL
+#define VERSINFO_INTERNAL    "POLISH"
+#undef VERSINFO_ORIGINAL
+#define VERSINFO_ORIGINAL    VERSINFO_INTERNAL ".SLG"
+#undef VERSINFO_SLG_COMMENT
+#define VERSINFO_SLG_COMMENT "Wersja polska"
+#define VERSINFO_TRANSLATION_LANG    0x0415
+#define VERSINFO_TRANSLATION_SUBLANG 0x0415
+#include "versinfo.rc2"
+
+STRINGTABLE
+{
+ IDS_PLUGINNAME, "Split & Combine"
+ IDS_PLUGIN_DESCRIPTION, "Podział i łączenie plików."
+ IDS_OPENERROR, "Błąd otwierania pliku."
+ IDS_SELECTDIR, "Wybierz katalog docelowy."
+ IDS_ZEROSIZE, "Plik nie jest wystarczająco duży, aby można go było podzielić."
+ IDS_INSERTDISK, "Włóż sformatowany dysk z wystarczającą ilością wolnego miejsca."
+ IDS_FIXEDNOSENSE, "Automatyczne wykrywanie nie ma sensu na dysku stałym.\nCzy chcesz kontynuować?"
+ IDS_OUTOFSPACE, "Za mało wolnego miejsca na dysku docelowym."
+ IDS_OUTOFMEM, "Brak pamięci."
+ IDS_READERROR, "Błąd odczytu"
+ IDS_WRITEERROR, "Błąd zapisu"
+ IDS_INSERTNEXT, "Włóż następny dysk i kliknij OK."
+ IDS_SPLIT, "Podziel"
+ IDS_COMBINE, "Połącz"
+ IDS_TOOMANYPARTS, "Liczba części jest większa niż 100.\nCzy na pewno chcesz kontynuować?"
+ IDS_WRITING, "Zapisywanie"
+ IDS_TOOLONGNAME, "Oryginalna nazwa pliku jest zbyt długa i wynikowy plik wsadowy może nie działać na niektórych systemach. Czy chcesz kontynuować?"
+ IDS_ADDFILTER, "Wszystkie pliki (*.*)"
+ IDS_ADDTITLE, "Dodaj pliki częściowe"
+ IDS_BROWSETITLE, "Wybierz plik docelowy"
+ IDS_CRCERROR, "Weryfikacja CRC nie powiodła się.\n\nPliki częściowe są uszkodzone, niekompletne lub zostały połączone\nw niewłaściwej kolejności. Plik wyjściowy jest prawdopodobnie nieprawidłowy."
+ IDS_PROCESSING, "Przetwarzanie"
+ IDS_ZEROFILES, "Nie ma czego łączyć."
+ IDS_CANCEL, "Czy chcesz anulować tę operację?"
+ IDS_CRCTITLE, "Test CRC"
+ IDS_CRCDEC, "%lu (dec)"
+ IDS_CRCHEX, "%X (hex)"
+ IDS_CRCNOTFOUND, "NIE ZNALEZIONO"
+ IDS_CALCCRC, "Oblicz CRC"
+ IDS_SPLITTITLE, "Podziel ""%%s"" (%s bajtów) na:"
+ IDS_144FLOPPY, "1,44 MB (dyskietka 3,5\042)"
+ IDS_720FLOPPY, "720 KB (dyskietka 3,5\042)"
+ IDS_12FLOPPY, "1,2 MB (dyskietka 5,25\042)"
+ IDS_360FLOPPY, "360 KB (dyskietka 5,25\042)"
+ IDS_AUTODETECT, "Automatyczne wykrywanie"
+ IDS_FILECRCTITLE, "CRC32 pliku ""%s"" wynosi:"
+ IDS_BATTOOLONG, "Błąd tworzenia pliku wsadowego."
+ IDS_BYTES, "bajtów"
+ IDS_BYTE, "bajt"
+ IDS_PATHERROR, "Błąd ścieżki"
+ IDS_TARGETPATHEXIST, "Ścieżka docelowa nie istnieje. Czy chcesz ją utworzyć?"
+ IDS_WINPATH, "Nie można łączyć do ścieżki nienależącej do systemu Windows."
+ IDS_SPECIFYFILE, "Podana ścieżka nie określa pliku."
+ IDS_MENU1 "&Podziel plik..."
+ IDS_MENU2 "&Połącz pliki..."
+ IDS_ABOUTTITLE "Informacje o wtyczce"
+ IDS_BATFILE_GENBYSAL, "Wygenerowano przez program Open Salamander"
+ IDS_BATFILE_CTRL_C_TO_QUIT, "Aby zakończyć, naciśnij Ctrl-C."
+ IDS_BATFILE_DESCR, "Ten plik wsadowy odtworzy plik '%s'."
+ IDS_SIZE_B, "B"
+ IDS_SIZE_KB, "KB"
+ IDS_SIZE_K, "K"
+ IDS_SIZE_MB, "MB"
+ IDS_SIZE_GB, "GB"
+ IDS_100MB_ZIP, "100 MB (ZIP)"
+ IDS_250MB_ZIP, "250 MB (ZIP)"
+ IDS_120MB_LS120, "120 MB (LS-120)"
+ IDS_650MB_CDR, "650 MB (CD-R)"
+ IDS_700MB_CDR, "700 MB (CD-R)"
+ IDS_TOOLONGNAME2, "Nie można ukończyć operacji z powodu zbyt długiej nazwy."
+}
+
+/*IDD_FILECRC DIALOGEX 20, 34, 183, 63
+STYLE DS_SETFONT | DS_FIXEDSYS | DS_MODALFRAME | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "File CRC"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+{
+ DEFPUSHBUTTON "Close", IDCANCEL, 127,43,50,14
+ LTEXT "", IDC_STATIC_CRCTITLE, 7,7,170,8
+ EDITTEXT IDC_EDIT_CRC1, 24,23,62,12, ES_AUTOHSCROLL | ES_READONLY |
+NOT WS_BORDER | NOT WS_TABSTOP
+ EDITTEXT IDC_EDIT_CRC2, 89,23,69,12, ES_AUTOHSCROLL | ES_READONLY |
+NOT WS_BORDER | NOT WS_TABSTOP
+ ICON "", IDC_ICON_OK, 7,22,21,20, SS_REALSIZEIMAGE
+}*/

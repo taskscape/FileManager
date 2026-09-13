@@ -1,0 +1,200 @@
+// Microsoft Visual C++ generated resource script.
+//
+#pragma code_page(65001)
+
+#include "..\lang.rh"
+
+#define APSTUDIO_READONLY_SYMBOLS
+/////////////////////////////////////////////////////////////////////////////
+//
+// Generated from the TEXTINCLUDE 2 resource.
+//
+#include "winresrc.h"
+
+/////////////////////////////////////////////////////////////////////////////
+#undef APSTUDIO_READONLY_SYMBOLS
+
+/////////////////////////////////////////////////////////////////////////////
+// Neutral resources
+
+#if !defined(AFX_RESOURCE_DLL) || defined(AFX_TARG_NEU)
+LANGUAGE LANG_NEUTRAL, SUBLANG_NEUTRAL
+
+#ifdef APSTUDIO_INVOKED
+/////////////////////////////////////////////////////////////////////////////
+//
+// TEXTINCLUDE
+//
+
+1 TEXTINCLUDE 
+BEGIN
+    "lang.rh\0"
+END
+
+2 TEXTINCLUDE 
+BEGIN
+    "#include ""winresrc.h""\r\n"
+    "\0"
+END
+
+3 TEXTINCLUDE 
+BEGIN
+    "#if !defined(AFX_RESOURCE_DLL) || defined(AFX_TARG_NEU)\r\n"
+    "LANGUAGE LANG_NEUTRAL,SUBLANG_NEUTRAL\r\n"
+    "#include ""..\\version.rc2""\r\n"
+    "#endif\r\n"
+    "\0"
+END
+
+#endif    // APSTUDIO_INVOKED
+
+
+/////////////////////////////////////////////////////////////////////////////
+//
+// Dialog
+//
+
+IDD_INPUTBOX DIALOGEX 75, 140, 205, 64
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Pole wprowadzania"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "Zapytanie:",IDC_PROMPT,8,8,189,8
+    EDITTEXT        IDC_INPUTBOX,8,18,189,12,ES_AUTOHSCROLL
+    DEFPUSHBUTTON   "OK",1,48,42,50,14,WS_GROUP
+    PUSHBUTTON      "Anuluj",2,107,42,50,14
+END
+
+IDD_CONFIG DIALOGEX 75, 140, 332, 143
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Konfiguracja wtyczki Automation"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "Katalogi &skryptów:",IDC_DIRLISTHEADER,8,9,67,8
+    CONTROL         "",IDC_DIRLIST,"SysListView32",LVS_REPORT | LVS_SINGLESEL | LVS_SHOWSELALWAYS | LVS_EDITLABELS | LVS_NOCOLUMNHEADER | LVS_NOSORTHEADER | WS_BORDER | WS_TABSTOP,8,19,316,73
+    CONTROL         "Włącz &debugowanie skryptów",IDC_ENABLEDBG,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,8,102,105,10
+    DEFPUSHBUTTON   "OK",IDOK,75,121,50,14,WS_GROUP
+    PUSHBUTTON      "Anuluj",IDCANCEL,141,121,50,14
+    PUSHBUTTON      "&Pomoc",IDHELP,207,121,50,14
+END
+
+
+/////////////////////////////////////////////////////////////////////////////
+//
+// DESIGNINFO
+//
+
+#ifdef APSTUDIO_INVOKED
+GUIDELINES DESIGNINFO
+BEGIN
+    IDD_INPUTBOX, DIALOG
+    BEGIN
+        LEFTMARGIN, 8
+        RIGHTMARGIN, 197
+        TOPMARGIN, 8
+        BOTTOMMARGIN, 56
+    END
+
+    IDD_CONFIG, DIALOG
+    BEGIN
+        LEFTMARGIN, 8
+        RIGHTMARGIN, 324
+        TOPMARGIN, 8
+        BOTTOMMARGIN, 135
+    END
+END
+#endif    // APSTUDIO_INVOKED
+
+
+/////////////////////////////////////////////////////////////////////////////
+//
+// Menu
+//
+
+IDM_BROWSE MENU
+BEGIN
+    POPUP "[POPUP]"
+    BEGIN
+        MENUITEM "Przeglądaj…",                 ID_BROWSE
+        MENUITEM SEPARATOR
+        MENUITEM "Katalog programu Salamander", ID_SALDIR
+        MENUITEM "Zmienna środowiskowa",        ID_ENVVAR
+    END
+END
+
+
+/////////////////////////////////////////////////////////////////////////////
+//
+// String Table
+//
+
+STRINGTABLE
+BEGIN
+    IDS_SCRIPTERROR         "Błąd skryptu wtyczki Automation"
+    IDS_LINE                "Wiersz:\t%u\r\n"
+    IDS_COLUMN              "Kolumna:\t%u\r\n"
+    IDS_ERROR               "Błąd:\t%s"
+    IDS_RUNFOCUSED          "Uruchom skrypt z fokusem"
+    IDS_PROGRESSTITLE       "Postęp operacji"
+    IDS_SOURCE              "Źródło:\t%s\r\n"
+    IDS_SCRIPTPOPUPMENU     "Otwórz menu skryptu"
+    IDS_MENUEMPTY           "(brak skryptu)"
+    IDS_LOADERRFMT          "Nie można wykonać skryptu '%s'.\r\n%s"
+    IDS_UNKERROR            "Nieznany błąd."
+    IDS_ABORT               "1\t&Przerwij"
+    IDS_DEBUGABORT          "1\t&Debuguj\t2\t&Przerwij"
+    IDS_ADDDIRTITLE         "Katalog skryptów"
+    IDS_ADDDIRDESCR         "Wybierz katalog repozytorium skryptów."
+END
+
+STRINGTABLE
+BEGIN
+    IDS_PLUGINNAME          "Automation"
+    IDS_DESCRIPTION         "Automatyzuje typowe zadania za pomocą skryptów."
+    IDS_ABOUT               "Informacje o wtyczce"
+END
+
+STRINGTABLE
+BEGIN
+    IDS_E_INVALIDARCHIVE    "Nieprawidłowe archiwum."
+    IDS_E_CANNOTCLOSEPATH   "Nie można zamknąć bieżącej ścieżki."
+    IDS_E_SHORTERPATH       "Ścieżka została skrócona."
+    IDS_E_READONLYWHILEPROGRESSSHOWN 
+                            "Nie można zmienić właściwości ani wywołać metody %s, gdy okno jest widoczne."
+    IDS_E_READONLYWHILEPROGRESSHIDDEN 
+                            "Nie można zmienić właściwości ani wywołać metody %s, gdy okno jest ukryte."
+    IDS_E_PLUGLOADFAIL      "Nie można załadować wtyczki."
+    IDS_E_PLUGERROR         "Błąd wtyczki."
+    IDS_E_CACHEERROR        "Nie można przenieść pliku do pamięci podręcznej dysku."
+    IDS_E_FILEMASKSYNTAX    "Błąd składni maski plików."
+    IDS_E_NOTCOMPONENT      "Do kontenera można dodawać tylko komponenty."
+    IDS_E_FORMPUT           "Formularzy nie można dodawać do kontenera."
+    IDS_E_SCRIPTABORTED     "Wykonywanie skryptu zostało przerwane przez użytkownika."
+END
+
+STRINGTABLE
+BEGIN
+    IDS_ABORTCAPTION        "Przerwanie skryptu"
+    IDS_ABORTTIP            "Przerwij uruchomiony skrypt\tCtrl+Break"
+    IDS_MAINWINDOWLOCKED    "Okno programu Open Salamander jest zablokowane przez wtyczkę Automation. Dokończ wykonywany skrypt."
+    IDS_ENGINECREATEFAIL    "Nie można zainicjalizować aparatu skryptów."
+END
+
+#endif    // Neutral resources
+/////////////////////////////////////////////////////////////////////////////
+
+
+
+#ifndef APSTUDIO_INVOKED
+/////////////////////////////////////////////////////////////////////////////
+//
+// Generated from the TEXTINCLUDE 3 resource.
+//
+#if !defined(AFX_RESOURCE_DLL) || defined(AFX_TARG_NEU)
+LANGUAGE LANG_NEUTRAL,SUBLANG_NEUTRAL
+// Polish pack: replace the English version-info chain with the Polish override file.
+#include "versinfo_pl.rc2"
+#endif
+
+/////////////////////////////////////////////////////////////////////////////
+#endif    // not APSTUDIO_INVOKED

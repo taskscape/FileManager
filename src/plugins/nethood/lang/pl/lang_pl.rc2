@@ -1,0 +1,42 @@
+//
+// lang_pl.rc2 - Polish language resources (not edited by Visual Studio)
+//
+
+#ifdef APSTUDIO_INVOKED
+#error this file is not editable by Microsoft Visual C++
+#endif //APSTUDIO_INVOKED
+
+// The Polish VERSIONINFO identity is applied before the shared VERSIONINFO
+// template include; the plugin's versinfo.rh2 is include-guarded, so these
+// overrides survive the template chain and keep POLISH.SLG valid for
+// IsSLGFileValid (version match + 0x0415 translation language).
+#include "..\..\versinfo.rh2"
+#undef VERSINFO_INTERNAL
+#define VERSINFO_INTERNAL    "POLISH"
+#undef VERSINFO_ORIGINAL
+#define VERSINFO_ORIGINAL    VERSINFO_INTERNAL ".SLG"
+#undef VERSINFO_SLG_COMMENT
+#define VERSINFO_SLG_COMMENT "Wersja polska"
+#define VERSINFO_TRANSLATION_LANG    0x0415
+#define VERSINFO_TRANSLATION_SUBLANG 0x0415
+#include "versinfo.rc2"
+
+STRINGTABLE 
+BEGIN
+    IDS_COLUMN_COMMENTS     "Komentarz"
+    IDS_INFOLINE_SELECTION_PLURAL "{!}<%d> zaznaczon{y obiekt|1|e obiekty|4|ych obiektów}"
+    IDS_MENUITEM            "Sieć"
+    IDS_REFRESHING          "Przeszukiwanie sieci…"
+    IDS_NETWORK_UNAVAILABLE "Sieć nie jest dostępna."
+    IDS_ABOUT               "Informacje o wtyczce"
+    IDS_TSCLIENT            "%1 na %2"
+    IDS_TSFOLDER            "Komputer lokalny"
+    IDS_TSHOST              "Komputer hosta"
+    IDS_TSFOLDERCOMMENT     "Dyski komputera %s"
+END
+
+STRINGTABLE 
+BEGIN
+    IDS_PLUGIN_NAME         "Sieć"
+    IDS_DESCRIPTION         "Zapewnia dostęp do komputerów w sieci."
+END

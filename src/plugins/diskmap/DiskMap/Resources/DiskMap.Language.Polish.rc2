@@ -1,0 +1,184 @@
+//
+// DiskMap.Language.Polish.rc2 - resources Microsoft Visual C++ does not edit directly
+//
+
+#if defined(APSTUDIO_INVOKED) && !defined(APSTUDIO_READONLY_SYMBOLS)
+#error this file is not editable by Microsoft Visual C++
+#endif //defined(APSTUDIO_INVOKED) && !defined(APSTUDIO_READONLY_SYMBOLS)
+
+//
+// Menu
+//
+
+IDC_ZAREVAKDISKMAP MENU 
+BEGIN
+    POPUP "&Plik"
+    BEGIN
+        MENUITEM "&Otwórz plik",                     IDM_FILE_OPEN
+#ifdef SALAMANDER
+        MENUITEM "&Fokus w panelu\tF",        IDM_FILE_FOCUSINSALAMANDER
+#endif
+        MENUITEM SEPARATOR
+        MENUITEM "&Przerwij\tEsc",                   IDM_FILE_ABORT
+        MENUITEM "&Odśwież\tCtrl+R",                 IDM_FILE_REFRESH
+        MENUITEM SEPARATOR
+#ifdef SALAMANDER
+        MENUITEM "&Zamknij\tAlt+F4",                 IDM_FILE_EXIT
+#else
+        MENUITEM "&Zakończ\tAlt+F4",                 IDM_FILE_EXIT
+#endif
+    END
+    POPUP "&Widok"
+    BEGIN
+        MENUITEM "Po&większ\t+",                 IDM_VIEW_ZOOMIN
+        MENUITEM "Pom&niejsz\t -",               IDM_VIEW_ZOOMOUT
+        MENUITEM "Pokaż &całość\t Shift+Backspace", IDM_VIEW_GOTOROOT
+        MENUITEM SEPARATOR
+        MENUITEM "Okno &dziennika...\tCtrl+L",          IDM_VIEW_LOG
+    END
+
+    POPUP "&Opcje"
+    BEGIN
+#ifdef _DEBUG_provizorne_blokuju_Petr
+        POPUP "Wygląd poduszek"
+        BEGIN
+            MENUITEM "&Podstawowy",       IDM_DESIGN_BASIC
+            MENUITEM "&Plastik",          IDM_DESIGN_PLASTIC
+            MENUITEM "&Szkło",            IDM_DESIGN_GLASS
+            MENUITEM "&Gładki",           IDM_DESIGN_SLEEK
+            MENUITEM "&Test",             IDM_DESIGN_TEST
+        END
+        MENUITEM SEPARATOR
+#endif
+	MENUITEM "Pod&świetl foldery",          IDM_OPTIONS_SHOWFOLDERS, CHECKED
+	MENUITEM "Pokaż &dymek\tCtrl+D",        IDM_OPTIONS_SHOWTOOLTIP, CHECKED
+        POPUP "&Format ścieżki w dymku"
+        BEGIN
+            MENUITEM "&Nazwa pliku",         IDM_PATHFORMAT_FILENAME
+            MENUITEM "&Względna",            IDM_PATHFORMAT_RELATIVEVIEW
+//            MENUITEM "Względna do &korzenia", IDM_PATHFORMAT_RELATIVEROOT
+            MENUITEM "&Bezwzględna",         IDM_PATHFORMAT_ABSOLUTE
+        END
+#ifdef SALAMANDER
+        MENUITEM SEPARATOR
+        MENUITEM "Potwierdzaj &zamknięcie klawiszem Esc", IDM_OPTIONS_CONSFIRMCLOSE, CHECKED
+#endif
+    END
+    POPUP "Pomo&c"
+    BEGIN
+//        POPUP "&Debugowanie"
+//        BEGIN
+//            MENUITEM "&Eksportuj strukturę katalogów...", IDM_DEBUG_EXPORTDIR
+//        END
+//        MENUITEM SEPARATOR
+        MENUITEM "&Informacje...",             IDM_HELP_ABOUT
+    END
+END
+
+
+
+
+//
+// Accelerator
+//
+
+IDC_ZAREVAKDISKMAP ACCELERATORS 
+BEGIN
+    "R",         IDM_FILE_REFRESH,   VIRTKEY, CONTROL
+    VK_F5,       IDM_FILE_REFRESH,   VIRTKEY
+
+    VK_BACK,     IDM_VIEW_ZOOMOUT,   VIRTKEY
+    VK_SUBTRACT, IDM_VIEW_ZOOMOUT,   VIRTKEY
+
+    VK_RETURN,   IDM_VIEW_ZOOMIN,    VIRTKEY
+    VK_ADD,      IDM_VIEW_ZOOMIN,    VIRTKEY
+
+    VK_BACK,     IDM_VIEW_GOTOROOT,  VIRTKEY, SHIFT
+    VK_BACK,     IDM_VIEW_GOTOROOT,  VIRTKEY, CONTROL
+
+    "L",         IDM_VIEW_LOG,       VIRTKEY, CONTROL
+
+    "D",         IDM_OPTIONS_SHOWTOOLTIP,      VIRTKEY, CONTROL
+
+#ifdef SALAMANDER
+    "F",         IDM_FILE_FOCUSINSALAMANDER,   VIRTKEY
+    VK_SPACE,    IDM_FILE_FOCUSINSALAMANDER,   VIRTKEY
+#endif
+END
+
+
+
+
+//
+// Dialog
+//
+#ifndef SALAMANDER
+
+IDD_ABOUTBOX DIALOGEX 22, 17, 260, 75
+STYLE DS_SHELLFONT | DS_MODALFRAME | WS_CAPTION | WS_SYSMENU
+CAPTION "Informacje o DiskMap"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    ICON            IDI_ZAREVAKDISKMAP, IDC_MYICON, 14,9,20,20
+    LTEXT           "DiskMap - wersja 1.0", IDC_STATIC_1, 50,10,120,9, SS_NOPREFIX
+    LTEXT           "Copyright (C) 2009-2023 Ondrej Zarevucky", IDC_STATIC_2, 50,20,140,9
+    DEFPUSHBUTTON   "OK", IDOK, 200,8,50,14, WS_GROUP
+END
+
+#endif
+
+
+
+//
+// String Table
+//
+
+STRINGTABLE 
+BEGIN
+    IDS_PLUGIN_NAME,            "DiskMap"
+    IDS_PLUGIN_DESCRIPTION,     "Wyświetla mapę drzewa plików na dysku."
+    IDS_PLUGIN_ABOUT,           "Informacje o wtyczce Salamander DiskMap"
+    IDS_PLUGIN_MENU,            "Pokaż &DiskMap"
+    IDS_CLOSE_CONFIRMATION,     "Czy chcesz zamknąć DiskMap?"
+    IDS_CLOSE_CONFIRMATION_CHECKBOX, "Nie pokazuj tego komunikatu ponownie i zamykaj DiskMap bez pytania"
+
+    IDS_DISKMAP_TITLE,               "DiskMap"
+    IDS_DISKMAP_TITLEPREFIX,         "DiskMap - "
+
+    IDS_DISKMAP_LOAD_TITLE,          "Wyszukiwanie plików..."
+    IDS_DISKMAP_LOAD_FOOTER,         "...naciśnij klawisz Esc, aby przerwać"
+    IDS_DISKMAP_LOAD_HSIZE,          "Rozmiar:"
+    IDS_DISKMAP_LOAD_HFILE,          "Pliki:"
+    IDS_DISKMAP_LOAD_HDIRS,          "Foldery:"
+
+    IDS_DISKMAP_ABORT_TITLE,         "Wyszukiwanie plików anulowane..."
+    IDS_DISKMAP_ABORT_FOOTER,        "...naciśnij Ctrl+R, aby odświeżyć widok"
+
+    IDS_DISKMAP_LOG_TITLE,           "Dziennik"
+    IDS_DISKMAP_LOG_HTYPE,           "Typ"
+    IDS_DISKMAP_LOG_HTEXT,           "Tekst"
+    IDS_DISKMAP_LOG_HFILE,           "Plik lub katalog"
+    IDS_DISKMAP_LOG_LINFO,           "Informacja"
+    IDS_DISKMAP_LOG_LWARN,           "Ostrzeżenie"
+    IDS_DISKMAP_LOG_LERROR,          "Błąd"
+
+    IDS_DISKMAP_SHELL_FOCUS,         "&Fokus w panelu"
+    IDS_DISKMAP_SHELL_ZOOMIN,        "Po&większ"
+    IDS_DISKMAP_SHELL_ZOOMOUT,       "Pom&niejsz"
+    IDS_DISKMAP_SHELL_DIROPEN,       "&Otwórz w panelu"
+    IDS_DISKMAP_SHELL_DIRCHANGE,     "Zmień &katalog"
+
+    IDS_DISKMAP_TTIP_TIMECREATE,     "Utworzono:"
+    IDS_DISKMAP_TTIP_TIMEMODIFY,     "Zmodyfikowano:"
+    IDS_DISKMAP_TTIP_TIMEACCESS,     "Dostęp:"
+    IDS_DISKMAP_TTIP_SIZEDATA,       "Rozmiar danych:"
+    IDS_DISKMAP_TTIP_SIZEREAL,       "Rozmiar rzeczywisty:"
+    IDS_DISKMAP_TTIP_SIZEDISK,       "Rozmiar na dysku:"
+    IDS_DISKMAP_TTIP_COUNTFILE,      "Pliki:"
+    IDS_DISKMAP_TTIP_COUNTDIRS,      "Foldery:"
+
+    IDS_DISKMAP_FORMAT_BYTE0,        "bajtów"
+    IDS_DISKMAP_FORMAT_BYTE1,        "bajt"
+    IDS_DISKMAP_FORMAT_BYTEN,        "bajtów"
+END
+

@@ -1,0 +1,41 @@
+//
+// lang_pl.rc2 - Polish language resources (not edited by Visual Studio)
+//
+
+#ifdef APSTUDIO_INVOKED
+#error this file is not editable by Microsoft Visual C++
+#endif //APSTUDIO_INVOKED
+
+// The Polish VERSIONINFO identity is applied before the shared VERSIONINFO
+// template include; the plugin's versinfo.rh2 is include-guarded, so these
+// overrides survive the template chain and keep POLISH.SLG valid for
+// IsSLGFileValid (version match + 0x0415 translation language).
+#include "..\..\versinfo.rh2"
+#undef VERSINFO_INTERNAL
+#define VERSINFO_INTERNAL    "POLISH"
+#undef VERSINFO_ORIGINAL
+#define VERSINFO_ORIGINAL    VERSINFO_INTERNAL ".SLG"
+#undef VERSINFO_SLG_COMMENT
+#define VERSINFO_SLG_COMMENT "Wersja polska"
+#define VERSINFO_TRANSLATION_LANG    0x0415
+#define VERSINFO_TRANSLATION_SUBLANG 0x0415
+#include "versinfo.rc2"
+
+STRINGTABLE
+{
+ IDS_PLUGINNAME, "UnMIME"
+ IDS_OPENERROR, "Nie można otworzyć pliku."
+ IDS_LOWMEM, "Za mało pamięci."
+ IDS_LIST, "Nie można dodać wpisu archiwum do listy plików."
+ IDS_UNKNOWN, "Ten plik zawiera jeden lub więcej bloków o nieznanym kodowaniu.\nTe bloki nie zostaną zdekodowane."
+ IDS_WRITEERROR, "Błąd zapisu"
+ IDS_EXTRTITLE, "Rozpakowywanie pliku pocztowego - %s"
+ IDS_UNPACKING, "rozpakowywanie: "
+ IDS_PARSE, "Analizowanie pliku..."
+ IDS_BADBLOCK_DAMAGED, "Jeden lub więcej bloków %s jest uszkodzonych lub ma\nnieznany format i nie zostaną zdekodowane."
+ IDS_BADBLOCK_CRC, "Błędna suma CRC w jednym lub więcej blokach %s.\nTe bloki nie zostaną zdekodowane."
+ IDS_PLUGIN_DESCRIPTION, "Przeglądanie i rozpakowywanie plików MIME/Base64, UU/XXEncode, yEncode i BinHex."
+ IDS_ABOUT_TITLE, "Informacje o wtyczce"
+ IDS_RESOURCE_FORK_LOST, "Ostrzeżenie: ten plik zawiera zasoby Mac (resource fork).\nNie zostaną one rozpakowane."
+ IDS_DONT_SHOW_AGAIN, "&Nie pokazuj tego ponownie"
+}

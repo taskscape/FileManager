@@ -1,0 +1,61 @@
+//
+// lang_pl.rc2 - Polish language resources (not edited by Visual Studio)
+//
+
+#ifdef APSTUDIO_INVOKED
+#error this file is not editable by Microsoft Visual C++
+#endif //APSTUDIO_INVOKED
+
+// The Polish VERSIONINFO identity is applied before the shared VERSIONINFO
+// template include; the plugin's versinfo.rh2 is include-guarded, so these
+// overrides survive the template chain and keep POLISH.SLG valid for
+// IsSLGFileValid (version match + 0x0415 translation language).
+#include "..\versinfo.rh2"
+#undef VERSINFO_INTERNAL
+#define VERSINFO_INTERNAL    "POLISH"
+#undef VERSINFO_ORIGINAL
+#define VERSINFO_ORIGINAL    VERSINFO_INTERNAL ".SLG"
+#undef VERSINFO_SLG_COMMENT
+#define VERSINFO_SLG_COMMENT "Wersja polska"
+#define VERSINFO_TRANSLATION_LANG    0x0415
+#define VERSINFO_TRANSLATION_SUBLANG 0x0415
+#include "versinfo.rc2"
+
+STRINGTABLE
+{
+  IDS_PLUGINNAME, "UnCAB"
+  IDS_PLUGIN_DESCRIPTION, "Przeglądanie i rozpakowywanie archiwów CAB."
+  IDS_ABOUT, "Informacje o wtyczce"
+  IDS_LOWMEM, "Za mało pamięci."
+  IDS_UNKNOWN, "Wystąpił nieznany błąd."
+  IDS_BROWSEARCHIVETITLE, "Wybierz folder"
+  IDS_LIST, "Nie można dodać wpisu archiwum do listy plików."
+  IDS_EXTRPROGTITLE, "Rozpakowywanie archiwum CAB - %s"
+  IDS_PREPAREDATA, "przygotowywanie danych i tworzenie katalogów..."
+  IDS_EXTRACTFILES, "rozpakowywanie..."
+  IDS_EXTRACTING, "rozpakowywanie: "
+  IDS_UNABLEGETFIELPOS, "Nie można pobrać pozycji w pliku: "
+  IDS_UNABLEWRITE, "Nie można zapisać do pliku:"
+  IDS_UNABLESEEK, "Nie można ustawić pozycji w pliku: "
+  IDS_TOOLONGNAME, "Nie można ukończyć operacji z powodu zbyt długiej nazwy ścieżki."
+  IDS_TOOLONGMASK, "Nie można ukończyć operacji z powodu zbyt długiej maski."
+  IDS_EXPIRE, "Niestety, okres ważności wtyczki upłynął. Sprawdź na naszej stronie internetowej nowszą wersję."
+  IDS_UNABLECREATE, "Nie można utworzyć ani otworzyć pliku."
+  IDS_UNABLEREAD, "Nie można odczytać pliku."
+  IDS_BROWSEFOLDERTEXT, "Wybierz folder zawierający '%s'."
+  IDS_NOTFOUND, "Nie znaleziono pliku."
+  IDS_SKIPPING, "pomijanie pliku"
+  IDS_NEXTVOLTEXT, "Włóż dysk z częścią cabinet o numerze %d lub znajdź odpowiedni plik cabinet na dysku.\n\nGdy będzie gotowe, kliknij OK."
+
+  // FDIERROR - Error codes returned in erf.erfOper field
+  IDS_CABINET_NOT_FOUND, "Nie znaleziono pliku cabinet."
+  IDS_NOT_A_CABINET, "Plik cabinet ma nieprawidłowy format."
+  IDS_UNKNOWN_CABINET_VERSION, "Plik cabinet ma nieznany numer wersji."
+  IDS_CORRUPT_CABINET, "Plik cabinet jest uszkodzony."
+  IDS_BAD_COMPR_TYPE, "Nieznany typ kompresji w folderze pliku cabinet."
+  IDS_MDI_FAIL, "Błąd dekompresowania danych z pliku cabinet."
+  IDS_RESERVE_MISMATCH, "Pliki cabinet w zestawie nie mają takich samych rozmiarów RESERVE."
+  IDS_WRONG_CABINET, "Nieprawidłowy plik cabinet."
+  IDS_USER_ABORT, "Przerwano przez użytkownika."
+  IDS_ERROR, "Błąd"
+}

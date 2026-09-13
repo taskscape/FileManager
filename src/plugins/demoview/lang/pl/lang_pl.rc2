@@ -1,0 +1,64 @@
+//****************************************************************************
+//
+// Copyright (c) 2023 Taskscape Ltd
+//
+// This is a part of the Open Salamander SDK library.
+//
+//****************************************************************************
+
+//
+// lang_pl.rc2 - Polish language resources (not edited by Visual Studio)
+//
+
+#ifdef APSTUDIO_INVOKED
+#error this file is not editable by Microsoft Visual C++
+#endif //APSTUDIO_INVOKED
+
+// The Polish VERSIONINFO identity is applied before the shared VERSIONINFO
+// template include; the plugin's versinfo.rh2 is include-guarded, so these
+// overrides survive the template chain and keep POLISH.SLG valid for
+// IsSLGFileValid (version match + 0x0415 translation language).
+#include "..\..\versinfo.rh2"
+#undef VERSINFO_INTERNAL
+#define VERSINFO_INTERNAL    "POLISH"
+#undef VERSINFO_ORIGINAL
+#define VERSINFO_ORIGINAL    VERSINFO_INTERNAL ".SLG"
+#undef VERSINFO_SLG_COMMENT
+#define VERSINFO_SLG_COMMENT "Wersja polska"
+#define VERSINFO_TRANSLATION_LANG    0x0415
+#define VERSINFO_TRANSLATION_SUBLANG 0x0415
+#include "versinfo.rc2"
+
+STRINGTABLE
+{
+ IDS_PLUGINNAME,             "DemoView"
+ IDS_ABOUT,                  "Informacje o wtyczce"
+ IDS_PLUGIN_DESCRIPTION,     "Ta wtyczka ma pomóc Ci w stworzeniu własnej wtyczki przeglądarki."
+ IDS_PLUGIN_HOME,            "www.taskscape.com"
+ IDS_PLUGIN_BUGREP,          "W wtyczce DemoView wystąpił wyjątek, powiadom autorów!\nJeśli w momencie wystąpienia wyjątku pracował(a) Pan/Pani z jakimś plikiem .DMV,\nspróbuj odtworzyć ten błąd z tym plikiem .DMV, a jeśli wyjątek\nwystąpi ponownie, prześlij nam ten plik .DMV (odtworzymy i naprawimy błąd).\nDziękujemy!"
+ IDS_PLUGIN_EMAIL,           "support@taskscape.com"
+ IDS_CFG_ALREADY_OPENED,     "Konfiguracja jest już otwarta."
+ IDS_VIEWER_OPENWNDS,        "Część okien przeglądarki DemoView jest otwarta. Czy chcesz je zamknąć?"
+ IDS_CFG_TITLE,              "Konfiguracja programu DemoView"
+ IDS_INVALID_NUM,            "Nieprawidłowa liczba!"
+ IDS_DMV_FILES_FILTER,       "Pliki DemoView (*.dmv)|*.dmv|Wszystkie pliki (*.*)|*.*|"
+
+ IDS_MENU_FILES,             "&Plik"
+ IDS_MENU_FILES_OPEN,        "&Otwórz\tCtrl+O"
+ IDS_MENU_FILES_EXIT,        "Za&kończ"
+ IDS_MENU_EDIT,              "&Edycja"
+ IDS_MENU_EDIT_CUT,          "Wy&tnij\tCtrl+X"
+ IDS_MENU_EDIT_COPY,         "&Kopiuj\tCtrl+C"
+ IDS_MENU_EDIT_PASTE,        "&Wklej\tCtrl+V"
+ IDS_MENU_VIEW,              "&Widok"
+ IDS_MENU_FILTER,            "&Filtr"
+ IDS_MENU_OPTIONS,           "&Opcje"
+ IDS_MENU_OPTIONS_CFG,       "&Konfiguracja..."
+ IDS_MENU_HELP,              "Pomo&c"
+ IDS_MENU_HELP_ABOUT,        "&Informacje"
+ IDS_TBTT_CUT,               "Wytnij\tCtrl+X"
+ IDS_TBTT_COPY,              "Kopiuj\tCtrl+C"
+ IDS_TBTT_PASTE,             "Wklej\tCtrl+V"
+ IDS_TBTT_FILTER,            "Filtr\tCtrl+U"
+ IDS_FILTER,                 "Filtr"
+}

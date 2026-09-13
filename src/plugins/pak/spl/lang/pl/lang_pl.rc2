@@ -1,0 +1,60 @@
+//
+// lang_pl.rc2 - Polish language resources (not edited by Visual Studio)
+//
+
+#ifdef APSTUDIO_INVOKED
+#error this file is not editable by Microsoft Visual C++
+#endif //APSTUDIO_INVOKED
+
+// The Polish VERSIONINFO identity is applied before the shared VERSIONINFO
+// template include; the plugin's versinfo.rh2 is include-guarded, so these
+// overrides survive the template chain and keep POLISH.SLG valid for
+// IsSLGFileValid (version match + 0x0415 translation language).
+#include "..\..\versinfo.rh2"
+#undef VERSINFO_INTERNAL
+#define VERSINFO_INTERNAL    "POLISH"
+#undef VERSINFO_ORIGINAL
+#define VERSINFO_ORIGINAL    VERSINFO_INTERNAL ".SLG"
+#undef VERSINFO_SLG_COMMENT
+#define VERSINFO_SLG_COMMENT "Wersja polska"
+#define VERSINFO_TRANSLATION_LANG    0x0415
+#define VERSINFO_TRANSLATION_SUBLANG 0x0415
+#include "versinfo.rc2"
+
+#include "..\..\..\dll\language\polish\texts_pl.rc2"
+
+STRINGTABLE
+{
+ IDS_PLUGINNAME, "PAK"
+ IDS_PLUGIN_DESCRIPTION, "Przeglądanie i rozpakowywanie archiwów Quake PAK."
+ IDS_ABOUT, "Informacje o wtyczce"
+ IDS_LOWMEM, "Za mało pamięci."
+ IDS_ERRLIST, "Nie można dodać pliku do listy."
+ IDS_ERRLOADPAKLIB, "Nie można załadować paklib.dll ani uzyskać adresu procedury: "
+ IDS_EXTRPROGTITLE, "Rozpakowywanie archiwum PAK - %s"
+ IDS_PREPAREDATA, "przygotowywanie danych..."
+ IDS_EXTRACTFILES, "rozpakowywanie..."
+ IDS_EXTRACTING, "rozpakowywanie: "
+ IDS_TOOLONGNAME, "Nie można ukończyć operacji z powodu zbyt długiej nazwy ścieżki."
+ IDS_UNABLESEEK, "Nie można ustawić wskaźnika pliku: "
+ IDS_UNABLEGETFIELPOS, "Nie można pobrać wskaźnika pliku: "
+ IDS_UNABLEWRITE, "Nie można zapisać do pliku:"
+ IDS_ERROPEN, "Nie można otworzyć pliku: "
+ IDS_TOOLONGMASK, "Nie można ukończyć operacji z powodu zbyt długiej maski."
+ IDS_DELPROGTITLE, "Usuwanie z archiwum PAK - %s"
+ IDS_DELFILES, "usuwanie..."
+ IDS_DELETING, "usuwanie: "
+ IDS_CANCELING, "anulowanie operacji, czekaj..."
+ IDS_ADDPROGTITLE, "Pakowanie do archiwum PAK - %s"
+ IDS_TOOLARGE, "Nie można dodać pliku: Plik jest zbyt duży."
+ IDS_ADDFILES, "pakowanie..."
+ IDS_TOOLONGNAME2, "Nie można dodać pliku z powodu zbyt długiej nazwy."
+ IDS_PACKING, "pakowanie: "
+ IDS_UNABLEREAD, "Nie można odczytać z pliku: "
+ IDS_ERRCONNECT, "Nie można połączyć wtyczki z programem Open Salamander."
+ IDS_OPTIMIZING, "optymalizowanie, czekaj..."
+ IDS_OPTPROGTITLE, "Optymalizowanie archiwum PAK - %s"
+ IDS_NEEDOPT, "Usuwanie plików nie zostało pomyślnie zakończone. Może być konieczne uruchomienie optymalizacji PAK z menu wtyczki PAK, aby zapobiec marnowaniu miejsca na dysku."
+ IDS_MENUOPTIMIZE, "&Optymalizuj PAK"
+ IDS_EXPIRE, "Niestety, okres ważności wtyczki wygasł. Sprawdź na naszej stronie internetowej, czy dostępna jest nowsza wersja."
+}

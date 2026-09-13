@@ -1,0 +1,81 @@
+//****************************************************************************
+//
+// Copyright (c) 2023 Taskscape Ltd
+//
+// This is a part of the Open Salamander SDK library.
+//
+//****************************************************************************
+
+//
+// lang_pl.rc2 - Polish language resources (not edited by Visual Studio)
+//
+
+#ifdef APSTUDIO_INVOKED
+#error this file is not editable by Microsoft Visual C++
+#endif //APSTUDIO_INVOKED
+
+/////////////////////////////////////////////////////////////////////////////
+// Add manually edited resources here...
+
+// The Polish VERSIONINFO identity is applied before the shared VERSIONINFO
+// template include; the plugin's versinfo.rh2 is include-guarded, so these
+// overrides survive the template chain and keep POLISH.SLG valid for
+// IsSLGFileValid (version match + 0x0415 translation language).
+#include "..\versinfo.rh2"
+#undef VERSINFO_INTERNAL
+#define VERSINFO_INTERNAL    "POLISH"
+#undef VERSINFO_ORIGINAL
+#define VERSINFO_ORIGINAL    VERSINFO_INTERNAL ".SLG"
+#undef VERSINFO_SLG_COMMENT
+#define VERSINFO_SLG_COMMENT "Wersja polska"
+#define VERSINFO_TRANSLATION_LANG    0x0415
+#define VERSINFO_TRANSLATION_SUBLANG 0x0415
+#include "versinfo.rc2"
+
+// String Table
+STRINGTABLE DISCARDABLE
+{
+    IDS_PLUGINNAME              "UnFAT"
+    IDS_ABOUT                   "Informacje o wtyczce"
+    IDS_PLUGIN_DESCRIPTION      "Przeglądanie i rozpakowywanie obrazów dysków FAT 12, 16 i 32."
+
+    IDS_ERROR_OPENING_FILE,     "Błąd otwierania pliku ""%s""."
+    IDS_ERROR_READING_FILE,     "Błąd odczytu pliku ""%s""."
+    IDS_ERROR_PARSING_FILE,     "Błąd analizy pliku ""%s"".\n\n%s"
+    IDS_ERROR_BS_CORRUPTED,     "Sektor rozruchowy jest uszkodzony albo ten plik nie jest obrazem FAT 12, 16 ani 32."
+    IDS_ERROR_READING_DIR,      "Błąd odczytu katalogu z pliku ""%s"".\n%s\nSektor: %d, Przesunięcie: 0x%s\n\nPlik nie jest prawidłowym obrazem FAT 12, 16 ani 32."
+    IDS_ERROR_READING_FILE2,    "Błąd odczytu pliku z pliku ""%s"".\n%s\nKlaster: %d\n\nPlik nie jest prawidłowym obrazem FAT 12, 16 ani 32."
+    IDS_ERROR_WRITE,            "Błąd zapisu pliku"
+    IDS_ERROR_MBR_UNSUPPORTED   "Plik ""%s"" wygląda na obraz całego dysku twardego.\nTakie obrazy nie są obsługiwane przez wtyczkę UnFAT."
+    IDS_EXTRACTING_ARCHIVE,     "Rozpakowywanie obrazu FAT - %s"
+    IDS_EXTRACTING,             "rozpakowywanie: %s"
+
+/*
+    IDS_CANT_OPEN               "Can not open file."
+    IDS_UNKNOW_ERROR            "Unspecified error."
+    IDS_UNPACKING_ARCHIVE       "Unpacking ISO Archive."
+    IDS_ERROR_UNPACKING         "Error unpacking archive."
+    IDS_CANT_HANDLE_FILE        "Can not handle this file."
+    IDS_INSUFFICIENT_MEMORY     "Insufficient memory."
+    IDS_CANT_CREATE_TEMP        "Can not create temporary directory."
+    IDS_CANT_DELETE_TEMP_FILE   "Can not delete temporary file."
+    IDS_UNKNOWN_FILE_FORMAT     "Unknown file format or not valid ISO image."
+    IDS_CANT_OPEN_FILE          "Can not open this file."
+    IDS_ERR_TMP,                "Creation of temporary file has failed."
+    IDS_CANT_SET_ATTRS,         "Can not set file attributes."
+    IDS_CANT_CREATE_DIR,        "Can not create directory '%s'."
+    IDS_MAKEISOHEAD,            "Create file sample for UnISO troubleshooting..."
+    IDS_MAKEISOHEAD_TITLE,      "UnISO troubleshooting"
+    IDS_MAKEISOHEAD_MSG,        "If you cannot open ISO image or content is incorrect, you can send us first 1MB of this file.\nWe will support this format in new version of UnISO plugin.\n\nPress OK to copy part of ISO image to the temporary directory and focus it in the panel.\nPack this file using Alt+F5 and email it to the support@taskscape.com.\n\nThank you for helping us to make UnISO plugin better!"
+    IDS_YES,                    "Yes"
+    IDS_NO,                     "No"
+    IDS_PVD_NOT_FOUND,          "Primary Volume Descriptor not found."
+    IDS_PVD_CORRUPTED,          "Can not open, Primary Volume Descriptor corrupted."
+    IDS_CANT_GET_FILESIZE,      "Can not obtain file size\n\n%s."
+    IDS_ERROR,                  "Error"
+    IDS_WARNING,                "Warning"
+    IDS_CANT_READ,              "Reading problem\n\n"
+    IDS_CANT_SEEK_IN_FILE,      "Can not seek in file\n\n"
+    IDS_ERROR_OPENING_MULTISESSION, "Some error(s) occured while reading multisession image.\n\nShowing only correctly read sessions."
+*/
+}

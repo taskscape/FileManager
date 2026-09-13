@@ -1,0 +1,66 @@
+//
+// lang_pl.rc2 - Polish language resources (not edited by Visual Studio)
+//
+
+#ifdef APSTUDIO_INVOKED
+#error this file is not editable by Microsoft Visual C++
+#endif //APSTUDIO_INVOKED
+
+/////////////////////////////////////////////////////////////////////////////
+// Add manually edited resources here...
+
+// The Polish VERSIONINFO identity is applied before the shared VERSIONINFO
+// template include; the plugin's versinfo.rh2 is include-guarded, so these
+// overrides survive the template chain and keep POLISH.SLG valid for
+// IsSLGFileValid (version match + 0x0415 translation language).
+#include "..\..\versinfo.rh2"
+#undef VERSINFO_INTERNAL
+#define VERSINFO_INTERNAL    "POLISH"
+#undef VERSINFO_ORIGINAL
+#define VERSINFO_ORIGINAL    VERSINFO_INTERNAL ".SLG"
+#undef VERSINFO_SLG_COMMENT
+#define VERSINFO_SLG_COMMENT "Wersja polska"
+#define VERSINFO_TRANSLATION_LANG    0x0415
+#define VERSINFO_TRANSLATION_SUBLANG 0x0415
+#include "versinfo.rc2"
+
+STRINGTABLE
+{
+  IDS_PLUGINNAME, "UnRAR"
+  IDS_PLUGIN_DESCRIPTION, "Przegląda i rozpakowuje archiwa RAR."
+  IDS_ABOUT, "Informacje o wtyczce"
+  IDS_LOWMEM, "Za mało pamięci."
+  IDS_ERRMODULEFN, "Nie można pobrać nazwy pliku modułu."
+  IDS_ERRLOADLIB, "Nie można załadować '%s'.\n\nObsługa RAR wymaga biblioteki unrar.dll z serwisu RARLAB, której nie można rozpowszechniać w ramach tego pakietu GPL. Pobierz ją ze strony https://www.rarlab.com/rar_add.htm i umieść obok wtyczki."
+  IDS_ERRGETPROCADDR, "Nie można pobrać adresu procedury."
+  IDS_BADDATA, "Archiwum jest uszkodzone. (Błędne hasło?)"
+  IDS_BADPASSWORD, "Hasło jest nieprawidłowe. Litery w haśle muszą być wpisane z zachowaniem poprawnej wielkości liter. Upewnij się, że klawisz CapsLock nie jest przypadkowo włączony."
+  IDS_BADARC, "Plik ma nieznany format albo nie jest poprawnym archiwum RAR. (Błędne hasło?)"
+  IDS_ERROPENARC, "Nie można otworzyć pliku archiwum."
+  IDS_UNKNOWN, "Wystąpił nieznany błąd."
+  IDS_VOLUMEERR, "Nie można otworzyć woluminu archiwum."
+  IDS_ERRREADARC, "Nie można odczytać pliku archiwum."
+  IDS_RARARCHIVES, "Pliki archiwów RAR (*.R*)"
+  IDS_BROWSEARCHIVETITLE, "Wybierz plik archiwum"
+  IDS_CRC, "Błąd w danych skompresowanych. Suma CRC się nie zgadza. (Błędne hasło?)"
+  IDS_LIST, "Nie można dodać wpisu archiwum do listy plików."
+  IDS_EXTRPROGTITLE, "Rozpakowywanie archiwum RAR - %s"
+  IDS_PREPAREDATA, "przygotowywanie danych i tworzenie katalogów..."
+  IDS_EXTRACTFILES, "rozpakowywanie..."
+  IDS_EXTRACTING, "rozpakowywanie: "
+  IDS_UNABLEGETFIELPOS, "Nie można pobrać wskaźnika pliku: "
+  IDS_UNABLEWRITE, "Nie można zapisać do pliku:"
+  IDS_UNABLESEEK, "Nie można ustawić wskaźnika pliku: "
+  IDS_TOOLONGNAME, "Nie można ukończyć operacji z powodu zbyt długiej nazwy ścieżki."
+  IDS_TOOLONGMASK, "Nie można ukończyć operacji z powodu zbyt długiej maski."
+  IDS_ENTERPWD, "Wprowadź co najmniej jeden znak."
+  IDS_ALLFILES, "Wszystkie pliki (*.*)"
+  IDS_ERROR, "Błąd"
+  IDS_NOTFOUND, "Nie znaleziono pliku"
+  IDS_BADDLL, "Niepoprawna wersja pliku unrar.dll. Zainstaluj ponownie wtyczkę UnRAR."
+  IDS_SELECTFIRST, "Wygląda na to, że to jest archiwum wielowoluminowe. Jeśli tak, wybierz pierwszy wolumin archiwum i naciśnij OK.\n\nJeśli to nie jest archiwum wielowoluminowe, naciśnij Anuluj."
+  IDS_SELECTFIRSTTITLE, "Wybierz pierwszy wolumin"
+  IDS_FILENOTFOUND "Nie znaleziono pliku w archiwum."
+  IDS_LISTINFO_PAKEDSIZE      "Spakowano"
+  IDS_LISTINFO_PAKEDSIZE_DESC "Rozmiar pliku po spakowaniu"
+}

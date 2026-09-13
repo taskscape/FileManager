@@ -1,0 +1,86 @@
+//
+// lang_pl.rc2 - Polish language resources (not edited by Visual Studio)
+//
+
+#ifdef APSTUDIO_INVOKED
+#error this file is not editable by Microsoft Visual C++
+#endif //APSTUDIO_INVOKED
+
+// The Polish VERSIONINFO identity is applied before the shared VERSIONINFO
+// template include; the plugin's versinfo.rh2 is include-guarded, so these
+// overrides survive the template chain and keep POLISH.SLG valid for
+// IsSLGFileValid (version match + 0x0415 translation language).
+#include "..\versinfo.rh2"
+#undef VERSINFO_INTERNAL
+#define VERSINFO_INTERNAL    "POLISH"
+#undef VERSINFO_ORIGINAL
+#define VERSINFO_ORIGINAL    VERSINFO_INTERNAL ".SLG"
+#undef VERSINFO_SLG_COMMENT
+#define VERSINFO_SLG_COMMENT "Wersja polska"
+#define VERSINFO_TRANSLATION_LANG    0x0415
+#define VERSINFO_TRANSLATION_SUBLANG 0x0415
+#include "versinfo.rc2"
+
+STRINGTABLE
+{
+ IDS_PLUGIN_DESCRIPTION, "Sprawdzanie aktualizacji programu Open Salamander i wtyczek."
+ IDS_ABOUT, "Informacje o wtyczce"
+ IDS_CTXMENU_OPEN, "Otwórz"
+ IDS_CTXMENU_COPY, "Kopiuj adres URL do schowka"
+ IDS_CTXMENU_FILTER, "Ignoruj %s..."
+ IDS_PLUGINNAME, "Check Version"
+ IDS_FILTER_CONFIRM, "Czy chcesz zignorować %s? Moduł zostanie dodany do filtrów i wszystkie jego wersje będą ignorowane.\nUwaga: moduł można usunąć z filtrów w oknie konfiguracji wtyczki Check Version."
+ IDS_FILTERVER_CONFIRM, "Czy chcesz zignorować %s? Ta wersja modułu zostanie dodana do filtrów i będzie ignorowana.\nUwaga: tę wersję modułu można usunąć z filtrów w oknie konfiguracji wtyczki Check Version."
+ IDS_REMOVE_CNFRM, "Czy chcesz usunąć %s z filtrów?"
+ IDS_SETDEF_CNFRM, "Lista filtrów zostanie opróżniona.\n\nCzy chcesz przywrócić wartości domyślne?"
+ IDS_OPENED_WINDOWS, "Część okien Check Version jest otwarta.\nCzy chcesz je zamknąć?"
+ IDS_ABORT_DOWNLOAD, "Wtyczka korzysta z Internetu.\nCzy chcesz przerwać tę sesję internetową?"
+ IDS_INET_INIT, "Inicjowanie połączenia internetowego..."
+ IDS_INET_INIT_FAILED, "Inicjowanie nie powiodło się: %s"
+ IDS_INET_CONNECT, "Łączenie z \tuwww.taskscape.com\tlhttps://www.taskscape.com\tn..."
+ IDS_INET_CONNECT_FAILED, "Łączenie nie powiodło się: %s"
+ IDS_INET_READ, "Odczytywanie informacji o nowych wersjach..."
+ IDS_INET_READ_FAILED, "Odczytywanie nie powiodło się: %s"
+ IDS_INET_SUCCESS, "Informacje o nowych wersjach zostały pomyślnie odczytane."
+ IDS_INET_ABORTED, "Połączenie internetowe zostało przerwane"
+ IDS_CFG_CONFLICT1, "Konfiguracja jest już otwarta."
+ IDS_CFG_CONFLICT2, "Konfiguracja jest otwarta. Najpierw ją zamknij."
+ IDS_CFG_CONFLICT3, "Wtyczka łączy się z Internetem. Nie można otworzyć konfiguracji."
+ IDS_CLOSE_CONFLICT, "Wtyczka łączy się z Internetem. Czekaj..."
+ IDS_PLUGIN_BUSY, "Tego polecenia nie można wykonać, ponieważ wtyczka jest zajęta."
+ IDS_INFO_CORRUPTED, "Pobrane dane są uszkodzone. Spróbuj ponownie później."
+ IDS_FILTERED_MODULES, "Ignorowane moduły:"
+ IDS_INSTALLED_MODULES, "Zainstalowane moduły w starszej lub takiej samej wersji:"
+ IDS_NEWREL_MODULES, "Nowe moduły wydania (release):"
+ IDS_NEWBETA_MODULES, "Nowe moduły beta:"
+ IDS_NEWPB_MODULES, "Nowe moduły podglądowe (preview build):"
+ IDS_NONEW_MODULES, "Obecnie nie są dostępne żadne nowe moduły."
+ IDS_BTN_CHECK, "Sprawdź &teraz"
+ IDS_BTN_STOP, "&Stop"
+ IDS_COPYRIGHT1, "CheckVer %s - sprawdzanie najnowszych wersji programu Open Salamander i wtyczek."
+ IDS_COPYRIGHT2, "Kliknij przycisk Konfiguracja, aby zmienić ustawienia połączenia internetowego lub częstotliwość sprawdzania."
+ IDS_LAST_CHECK, "Data ostatniego sprawdzenia: %s."
+ IDS_SKIP_CHECK, "Aby pominąć sprawdzanie, kliknij przycisk Zamknij."
+ IDS_MENU_ABOUT, "&Informacje o CheckVer..."
+ IDS_INTERNET_PHONE, "Łączę się przez linię telefoniczną i modem"
+ IDS_INTERNET_LAN, "Łączę się przez sieć lokalną (LAN)"
+ IDS_INTERNET_NONE, "Nie łączę się z Internetem"
+ IDS_INET_PROTOCOL, "Jeśli nie można się połączyć, kliknij przycisk Konfiguracja i zmień protokół internetowy."
+ IDS_CHECK_FOR_NEW_VER, "&Sprawdź nowe wersje..."
+ IDS_UPDATE_SCRIPT_LANG, "EN"
+ IDS_DONOTUSEFTP, "Wybrano protokół FTP. Wtyczka Check Version nie potrafi pobrać informacji o zaktualizowanych lub nowych wtyczkach za pośrednictwem protokołu FTP. Jeśli możesz korzystać z protokołu HTTP, zdecydowanie go zalecamy.\n\nCzy chcesz używać protokołu HTTP zamiast FTP?"
+ IDS_LOGWNDHELP1, "Kliknij nazwę modułu, aby pobrać zaktualizowaną wersję."
+ IDS_LOGWNDHELP2, "Kliknij nazwę modułu prawym przyciskiem myszy, aby zobaczyć wszystkie dostępne czynności."
+ IDS_SHOWDETAILS, "pokaż szczegóły"
+ IDS_HIDEDETAILS, "ukryj szczegóły"
+ IDS_CTXMENU_DOWNLOAD, "Pobierz zaktualizowaną wersję"
+ IDS_FILTERTHISVER, "ignoruj tę wersję"
+ IDS_MENU_OPENFILE, "&Otwórz plik..."
+ IDS_FILE_OPENERROR, "Nie można otworzyć pliku '%s'."
+ IDS_FILE_READERROR, "Nie można odczytać pliku '%s'."
+ IDS_FILE_OPENED, "Plik %s został pomyślnie odczytany."
+ IDS_APP_UPDATE_CHECKING, "Sprawdzanie aktualizacji programu Open Salamander..."
+ IDS_APP_UPDATE_AVAILABLE, "Dostępna jest aktualizacja programu Open Salamander. Wybierz Pomoc > Pobierz aktualizację, aby ją otworzyć."
+ IDS_APP_UPDATE_CURRENT, "Program Open Salamander jest aktualny."
+ IDS_APP_UPDATE_FAILED, "Sprawdzanie aktualizacji programu Open Salamander nie powiodło się. Możesz spróbować ponownie później."
+}

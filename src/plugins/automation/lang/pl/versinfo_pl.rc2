@@ -1,0 +1,23 @@
+//
+// versinfo_pl.rc2 - Polish VERSIONINFO for the automation language pack
+//
+
+#ifdef APSTUDIO_INVOKED
+#error this file is not editable by Microsoft Visual C++
+#endif //APSTUDIO_INVOKED
+
+// The plugin has no lang.rc2; this file replaces the "..\version.rc2" include of
+// lang.rc. versinfo.rh2 is include-guarded, so the Polish overrides applied here
+// survive the template chain inside version.rc2 and keep POLISH.SLG valid for
+// IsSLGFileValid (version match + 0x0415 translation language). The shared
+// versinfo.rc2 template is still included exactly once via version.rc2.
+#include "..\..\versinfo.rh2"
+#undef VERSINFO_INTERNAL
+#define VERSINFO_INTERNAL    "POLISH"
+#undef VERSINFO_ORIGINAL
+#define VERSINFO_ORIGINAL    VERSINFO_INTERNAL ".SLG"
+#undef VERSINFO_SLG_COMMENT
+#define VERSINFO_SLG_COMMENT "Wersja polska"
+#define VERSINFO_TRANSLATION_LANG    0x0415
+#define VERSINFO_TRANSLATION_SUBLANG 0x0415
+#include "..\..\version.rc2"

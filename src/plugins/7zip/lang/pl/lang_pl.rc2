@@ -1,0 +1,137 @@
+//
+// lang_pl.rc2 - Polish language resources (not edited by Visual Studio)
+//
+
+#ifdef APSTUDIO_INVOKED
+#error this file is not editable by Microsoft Visual C++
+#endif //APSTUDIO_INVOKED
+
+// The Polish VERSIONINFO identity is applied before the shared VERSIONINFO
+// template include; the plugin's versinfo.rh2 is include-guarded, so these
+// overrides survive the template chain and keep POLISH.SLG valid for
+// IsSLGFileValid (version match + 0x0415 translation language).
+#include "..\..\versinfo.rh2"
+#undef VERSINFO_INTERNAL
+#define VERSINFO_INTERNAL    "POLISH"
+#undef VERSINFO_ORIGINAL
+#define VERSINFO_ORIGINAL    VERSINFO_INTERNAL ".SLG"
+#undef VERSINFO_SLG_COMMENT
+#define VERSINFO_SLG_COMMENT "Wersja polska"
+#define VERSINFO_TRANSLATION_LANG    0x0415
+#define VERSINFO_TRANSLATION_SUBLANG 0x0415
+#include "versinfo.rc2"
+
+// dialogs
+IDD_ENTERPASSWORD DIALOGEX 6, 15, 257, 87
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+CAPTION "Wprowadź hasło 7-Zip"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    ICON            "",IDC_LOCK_ICON,16,12,20,20
+    LTEXT           "Ten plik jest zaszyfrowany. Wprowadź hasło, aby go odszyfrować.",IDC_STATIC_1,48,12,204,8
+/*    LTEXT           "File:",IDC_STATIC_2,48,26,17,8
+    LTEXT           "",IDC_FILE,65,26,175,8 */
+    LTEXT           "Hasło:",IDC_STATIC_3,48,40,37,8
+    EDITTEXT        IDC_PASSWORD,88,38,151,12,ES_PASSWORD | ES_AUTOHSCROLL
+/*
+ // preparation for skip and skip all
+    DEFPUSHBUTTON   "OK",IDOK,12,63,50,14
+    PUSHBUTTON      "Skip",IDC_SKIP,72,63,50,14
+    PUSHBUTTON      "Skip all",IDC_SKIPALL,132,63,50,14
+    PUSHBUTTON      "Cancel",IDCANCEL,192,63,50,14
+*/
+    DEFPUSHBUTTON   "OK",IDOK,132,63,50,14
+    PUSHBUTTON      "Anuluj",IDCANCEL,192,63,50,14
+END
+
+// String Table
+STRINGTABLE
+{
+  IDS_PLUGINNAME,             "7-Zip"
+  IDS_ABOUT,                  "Informacje o wtyczce"
+  IDS_PLUGIN_DESCRIPTION,     "Tworzy, przegląda i rozpakowuje archiwa 7-Zip."
+  IDS_INSUFFICIENT_MEMORY,    "Za mało pamięci."
+  IDS_CANT_LOAD_LIBRARY,      "Nie można załadować biblioteki 7za.dll."
+  IDS_CANT_GET_CRATEOBJECT,   "Nie można uzyskać metody CreateObject."
+  IDS_CANT_GET_CLASS_OBJECT,  "Nie można uzyskać obiektu klasy."
+  IDS_CANT_OPEN_ARCHIVE,      "Nie można otworzyć archiwum '%s'."
+  IDS_CANT_OPEN_ARCHIVE_PWD,  "Nie można otworzyć archiwum '%s'.\nMoże zostać wprowadzone nieprawidłowe hasło archiwum."
+  IDS_ERROR,                  "Błąd wewnętrzny."
+  IDS_PACKING_ARCHIVE,        "Pakowanie archiwum 7-Zip"
+  IDS_UNPACKING_ARCHIVE,      "Rozpakowywanie archiwum 7-Zip"
+  IDS_UPDATING_ARCHIVE,       "Aktualizowanie archiwum 7-Zip"
+  IDS_TESTING_ARCHIVE,        "Testowanie archiwum 7-Zip"
+  IDS_TESTING_ARCHIVE_NAME    "Testowanie archiwum '%s'..."
+  IDS_READING_DIRTREE,        "Odczytywanie drzewa katalogów..."
+  IDS_CANT_CREATE_ARCHIVE,    "Nie można utworzyć archiwum."
+  IDS_TESTARCHIVE,            "Testuj archiwum"
+  IDS_TESTARCHIVECORRUPTED,   "Archiwum '%s' jest uszkodzone."
+  IDS_TESTARCHIVEOK,          "Archiwum '%s' jest prawidłowe."
+  IDS_INCORRECTPASSWORD,      "Nieprawidłowe hasło"
+  IDS_INCORRECTPASSWORDBODY,  "Hasło jest nieprawidłowe. Wpisz je ponownie. Wielkość liter w haśle\nmusi być zachowana. Upewnij się, że nie jest przypadkiem włączony CapsLock."
+  IDS_PASSWORDSNOTMATCH,      "Wpisane hasła nie są zgodne."
+  IDS_EMPTYPASSWORD,          "Hasło musi mieć co najmniej jeden znak."
+  IDS_UPDATE_NOT_SUPPORTED,   "Operacje aktualizacji nie są obsługiwane dla tego archiwum."
+  IDS_CANT_MOVE_TMPARCHIVE,   "Nie można przenieść archiwum tymczasowego '%s'."
+  IDS_CANT_DELETE_TMPARCHIVE, "Nie można usunąć archiwum tymczasowego '%s'."
+  IDS_7Z_UPDATE_ERROR,        "Podczas aktualizacji archiwum wystąpił błąd.\n\nNie jest to błąd wtyczki 7zip programu Open Salamander. Problem leży w bibliotece 7za.dll,\nwięc prosimy NIE wysyłać nam zgłoszeń błędów — wiemy o tym problemie."
+  IDS_7Z_SOLID_DELETE_UNSUP,  "Usuwanie plików z archiwów solid nie jest obsługiwane."
+  IDS_CANT_UPDATE_ARCHIVE,    "Nie można zaktualizować archiwum '%s'."
+  IDS_CANT_CREATE_TMPFILE,    "Nie można utworzyć pliku tymczasowego."
+//  IDS_CANT_CREATEMUTEX,       "Cannot create mutex."
+  IDS_ARCHIVE_CHANGED,        "Plik archiwum '%s' został zmieniony. Archiwum zostanie ponownie otwarte w panelu."
+  IDS_DELETE_ERROR,           "Błąd usuwania"
+  IDS_ADD_FILES_TO_ARCHIVE,   "Dodaj pliki do archiwum"
+  IDS_CREATE_NEW_ARCHIVE,     "Utwórz nowe archiwum"
+  IDS_REMOVING_FILES,         "Usuwanie plików..."
+  IDS_READING_ARCHIVEITEMS,   "Odczytywanie elementów archiwum..."
+  IDS_UNPACKING,              "Rozpakowywanie..."
+  IDS_PACKING,                "Pakowanie..."
+  IDS_REMOVING,               "Usuwanie..."
+  IDS_UPDATING,               "Aktualizowanie..."
+  IDS_CANCELING_OPERATION,    "Anulowanie operacji, czekaj..."
+  IDS_UNSUPPORTED_METHOD,     "Nieobsługiwana metoda."
+  IDS_CRC_FAILED,             "Błąd CRC."
+  IDS_UNKNOWN_ERROR,          "Nieznany błąd."
+  IDS_DATA_ERROR,             "Błąd danych podczas rozpakowywania pliku '%s'."
+  IDS_DATA_ERROR_PWD,         "Błąd danych podczas rozpakowywania pliku '%s'.\nMoże zostać wprowadzone nieprawidłowe hasło."
+  IDS_BTN_DELETE,             "&Usuń"
+  IDS_BTN_DELETE_ALL,         "U&suń wszystkie"
+  IDS_BTN_KEEP,               "&Zachowaj"
+  IDS_BTN_KEEP_ALL,           "Za&chowaj wszystkie"
+  IDS_ERROR_PROCESSING_FILE,  "Błąd przetwarzania pliku '%s'.\n\nCzy chcesz usunąć czy zachować ten plik?"
+  IDS_ERROR_PROCESSING_FILE_PWD, "Błąd przetwarzania pliku '%s'.\nMoże zostać wprowadzone nieprawidłowe hasło.\n\nCzy chcesz usunąć czy zachować ten plik?"
+  IDS_OVERWRITE_FILE,         "Nadpisz plik";
+  IDS_READONLY_ARCHIVE,       "Plik archiwum jest tylko do odczytu. Najpierw usuń atrybut tylko do odczytu."
+  IDS_CANT_REMOVE_DIRECTORY,  "Nie można usunąć katalogu '%s'"
+  IDS_CANT_READ_ARCHIVE       "Błąd odczytu pliku archiwum."
+  IDS_CANT_READ               "Błąd odczytu pliku wejściowego."
+  IDS_CANT_WRITE              "{!}Nie można zapisać %d bajt{ów|0||1|y|4|ów|11|y|14|ów}."
+  IDS_BTN_RETRY               "Ponów"
+  IDS_BTN_ABORT               "Przerwij"
+  IDS_STORE,                  "Przechowywanie"
+  IDS_FASTEST,                "Najszybszy"
+  IDS_FAST,                   "Szybki"
+  IDS_NORMAL,                 "Zwykły"
+  IDS_MAXIMUM,                "Maksymalny"
+  IDS_ULTRA,                  "Ultra"
+  IDS_METHOD_LZMA,            "LZMA"
+  IDS_METHOD_LZMA2,           "LZMA2"
+  IDS_METHOD_PPMD,            "PPMd"
+  IDS_PACK_UPDATE_ERROR,      "Podczas pakowania/aktualizacji archiwum wystąpił błąd."
+  IDS_UNPACK_ERROR,           "Podczas rozpakowywania archiwum wystąpił błąd."
+  IDS_TEST_ERROR,             "Podczas testowania archiwum wystąpił błąd."
+  IDS_UNSUPPORTED_ARCHIVE,    "Nieobsługiwany lub nierozpoznany typ archiwum.\nPlik archiwum może być poważnie uszkodzony."
+  IDS_7Z_FATAL_ERROR          "Archiwum nie zostało utworzone z powodu błędu krytycznego."
+  IDS_7Z_UPDATE_UNKNOWN_ERROR "Archiwum nie zostało zaktualizowane z powodu nieznanego błędu %x."
+  IDS_7Z_CREATE_UNKNOWN_ERROR "Archiwum nie zostało utworzone z powodu nieznanego błędu %x."
+//  IDS_7Z_SOLID_UPDATE_UNSUP   "Updating files in solid archives is not supported."
+  IDS_LISTINFO_PAKEDSIZE      "Spakowane"
+  IDS_LISTINFO_PAKEDSIZE_DESC "Rozmiar spakowanego pliku"
+  IDS_LISTINFO_METHOD         "Metoda"
+  IDS_LISTINFO_METHOD_DESC    "Metoda kompresji"
+  IDS_ARCLOCK_ERROR           "Błąd blokady archiwum"
+  IDS_ERRADDFILE_TOOLONG,     "Nie można dodać jednego lub większej liczby plików do listy. Całkowita ścieżka jest zbyt długa.\nNiektóre katalogi lub pliki mogą być nieobecne na liście archiwum."
+  IDS_ERRADDDIR_TOOLONG,      "Nie można dodać jednego lub większej liczby katalogów do listy. Całkowita ścieżka jest zbyt długa.\nNiektóre katalogi lub pliki mogą być nieobecne na liście archiwum."
+  IDS_NAMEISTOOLONG,          "Nazwa ""%s"" z pełną ścieżką jest zbyt długa.\n\nŚcieżka: %s"
+}

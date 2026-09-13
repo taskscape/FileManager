@@ -1,0 +1,43 @@
+#ifdef APSTUDIO_INVOKED
+#error this file is not editable by Microsoft Visual C++
+#endif //APSTUDIO_INVOKED
+
+// here are texts shared between Undelete plugin and DLL (Polish resources)
+STRINGTABLE
+{
+  IDS_LOWMEM, "Za mało pamięci."
+  IDS_ERRORREADINGMFT, "Błąd odczytu klastrów MFT."
+  IDS_MFTRECORDDAMAGED, "Błąd odczytu MFT: pierwszy rekord jest uszkodzony."
+  IDS_ROOTNOTFOUND, "Nie można odnaleźć katalogu głównego."
+  IDS_VDIRECTORY, "Katalog%06d"
+  IDS_ALLDELETEDFILES, "{Wszystkie usunięte pliki}"
+  IDS_ERRORNOTNTFS, "Błąd wewnętrzny: wolumin nie jest woluminem NTFS."
+  IDS_ERRORNOTOPEN, "Błąd wewnętrzny: wolumin nie jest otwarty."
+  IDS_ERROROPENINGVOLUME, "Błąd otwierania woluminu."
+  IDS_ERRORREADINGBOOT, "Błąd odczytu sektora rozruchowego."
+  IDS_ERRORVOLUMETYPE, "Nierozpoznany typ woluminu, obsługiwane są tylko woluminy FAT 12, 16, 32 i NTFS."
+  IDS_READINGMFT, "Odczytywanie MFT..."
+  IDS_ERRORREADINGFAT, "Błąd odczytu FAT."
+  IDS_ERRORREADINGDIRCLUSTERS, "Błąd odczytu klastrów katalogu."
+  IDS_ERRORNOTFAT, "Błąd wewnętrzny: wolumin nie jest woluminem FAT."
+  IDS_LOADINGFAT, "Odczytywanie FAT..."
+  IDS_READINGDIRS, "Odczytywanie katalogów..."
+  IDS_READINGEXISTINGDIRS, "Odczytywanie istniejących katalogów..."
+  IDS_READINGDELETEDDIRS, "Odczytywanie usuniętych katalogów..."
+  IDS_SCANNINGVACANTCLUSTERS, "Skanowanie wolnych klastrów..."
+  IDS_REUSESCANNEDINFO, "Czy chcesz ponownie użyć informacji z poprzedniego skanowania klastrów?"
+  IDS_RELOADINGCLUSTERS, "Ponowne odczytywanie wcześniej znalezionych klastrów..."
+  IDS_FLOPPY350, "Dyskietka 3,5"
+  IDS_FLOPPY525, "Dyskietka 5,25"
+  IDS_FLOPPY800, "Dyskietka 8,0"
+  IDS_COMPACT_DISK, "Płyta CD"
+  IDS_LOCAL_DISK, "Dysk lokalny"
+  IDS_REMOVABLE_DISK, "Dysk wymienny"
+  IDS_ANALYZINGDIRS, "Analizowanie katalogów..."
+  IDS_INCOMPLETEMFT, "Program Undelete nie mógł przeskanować całego MFT (Master File Table). Czy chcesz wyświetlić częściowe wyniki?"
+  IDS_BITMAPNOTFOUND, "Nie można odnaleźć pliku $Bitmap na tym woluminie. Szacowanie uszkodzeń plików zostało przerwane."
+  IDS_BITMAPNOSTREAM, "Nie można odnaleźć domyślnego strumienia pliku $Bitmap. Szacowanie uszkodzeń plików zostało przerwane."
+  IDS_LOWMEMBITMAP, "Za mało pamięci, aby załadować plik mapy bitowej klastrów. Szacowanie uszkodzeń plików zostanie przerwane."
+  IDS_ERRORREADINGBMP, "Błąd odczytu pliku $Bitmap. Szacowanie uszkodzeń plików zostało przerwane."
+  IDS_BITMAPISEMPTY, "Plik $Bitmap ma zerowy rozmiar. Szacowanie uszkodzeń plików zostało przerwane."
+}
