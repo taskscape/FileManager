@@ -1,6 +1,8 @@
-# Open Salamander
+# Taskscape File Manager
 
-Open Salamander is a fast and reliable two-panel file manager for Windows.
+File Manager is an Open Salamander based fast and reliable two-panel file manager for Windows.
+
+![Screenshot](img/screenshot.png)
 
 [![Latest release](https://img.shields.io/github/v/release/taskscape/FileManager)](https://github.com/taskscape/FileManager/releases/latest)
 [![License: GPL v2](https://img.shields.io/badge/license-GPLv2-blue.svg)](doc/license_gpl.txt)
