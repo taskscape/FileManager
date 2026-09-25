@@ -5,28 +5,28 @@
       "fullyQualifiedName": "FileManager.UiTests.AlternateDataStreamsUnsupportedTargetUiTests.Cross_volume_move_to_an_ADS_unsupported_target_keeps_the_source_when_metadata_loss_is_declined",
       "sourceFile": "tests/FileManager.UiTests/AlternateDataStreamsUnsupportedTargetUiTests.cs",
       "testName": "Cross_volume_move_to_an_ADS_unsupported_target_keeps_the_source_when_metadata_loss_is_declined",
-      "reason": "The remote panel can select inherited ads-overwrite.txt and show the overwrite dialog instead of the ADS-loss dialog.",
+      "reason": "Renewed 2026-09-25: no runner exposes an ADS-unsupported second volume, so the monitor skipped this case in every run from 2026-09-14 to 2026-09-25 and the later selection hardening (clear selection, re-search after Insert) against the original ads-overwrite.txt collision is unverified.",
       "owner": "FileManager maintainers",
-      "trackingReference": "https://github.com/taskscape/FileManager/actions/runs/32452609747",
-      "expiresOn": "2026-09-18"
+      "trackingReference": "https://github.com/taskscape/FileManager/actions/runs/36115682581",
+      "expiresOn": "2026-10-23"
     },
     {
       "fullyQualifiedName": "FileManager.UiTests.LifecycleLeakUiTests.Repeated_clean_startup_and_shutdown_does_not_accumulate_process_resources",
       "sourceFile": "tests/FileManager.UiTests/LifecycleLeakUiTests.cs",
       "testName": "Repeated_clean_startup_and_shutdown_does_not_accumulate_process_resources",
-      "reason": "The remote runner measured a 39-handle warm-start spread against the 32-handle budget while Application Verifier and lock stress passed.",
+      "reason": "Renewed 2026-09-25: the remote runner still fails the 32-handle warm-start budget in 6 of 12 monitor runs (spreads 109-256), while five local runs stayed within budget, so the variation is runner-specific and needs sampler or product investigation rather than a budget change.",
       "owner": "FileManager maintainers",
-      "trackingReference": "https://github.com/taskscape/FileManager/actions/runs/32452609747",
-      "expiresOn": "2026-09-18"
+      "trackingReference": "https://github.com/taskscape/FileManager/actions/runs/36115682581",
+      "expiresOn": "2026-10-23"
     },
     {
       "fullyQualifiedName": "FileManager.UiTests.ConfigurationPayloadFailureUiTests.A_returned_payload_error_retains_the_previous_snapshot_and_allows_a_later_retry",
       "sourceFile": "tests/FileManager.UiTests/ConfigurationPayloadFailureUiTests.cs",
       "testName": "A_returned_payload_error_retains_the_previous_snapshot_and_allows_a_later_retry",
-      "reason": "The active-generation check after a returned payload error flips in both directions across release-gate runs (a varying subset of the four fault cases fails each time), so the assertion is timing-sensitive on the self-hosted runner.",
+      "reason": "Renewed 2026-09-25: the active-generation check after a returned payload error remains timing-sensitive; it failed in monitor run 35201453024 and in one of twenty local case executions (key:Panel Items Hilighting, retry=false).",
       "owner": "FileManager maintainers",
-      "trackingReference": "https://github.com/taskscape/FileManager/actions/runs/34453771671",
-      "expiresOn": "2026-09-25"
+      "trackingReference": "https://github.com/taskscape/FileManager/actions/runs/35201453024",
+      "expiresOn": "2026-10-23"
     }
   ]
 }

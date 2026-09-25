@@ -12,6 +12,7 @@ public sealed class AlternateDataStreamsUnsupportedTargetUiTests : FileOperation
 
     // Quarantined pending a dedicated source fixture: remote run 32452609747 selected inherited ads-overwrite.txt and showed Confirm File Overwrite instead of the ADS-loss prompt.
     // The manifest records an owner, tracking reference, and expiry so the shared-panel collision cannot become a permanent silent exclusion.
+    // Renewed 2026-09-25 because no runner provides an ADS-unsupported volume, so later selection hardening has never executed this case.
     [Test]
     [Category("Quarantined")]
     [Category("CrossVolume")]

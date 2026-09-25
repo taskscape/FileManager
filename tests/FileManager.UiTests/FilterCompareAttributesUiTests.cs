@@ -170,6 +170,9 @@ public sealed class FilterCompareAttributesUiTests : FileOperationUiTestBase
         CloseDialog(dialog, commit: true);
 
         var path = Workspace.SourcePath("convert-lf.txt");
+        // Convert rewrites an existing file on a worker after the dialog closes, so the release probe alone
+        // can pass before the worker has even opened it; wait for the converted bytes, then for the handle.
+        WaitForFileSystem(() => File.ReadAllBytes(path).Contains((byte)'\r'), "Convert did not write CRLF line endings to convert-lf.txt.");
         WaitForOperationOutputToBeReleased(path, "Convert did not release convert-lf.txt.");
         Assert.That(File.ReadAllText(path).Replace("\r\n", "\n"), Is.EqualTo("line1\nline2"));
         Assert.That(File.ReadAllBytes(path), Does.Contain((byte)'\r'));

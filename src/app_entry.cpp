@@ -2168,8 +2168,12 @@ FIND_NEW_SLG_FILE:
         Configuration.UseAsAltSLGInOtherPlugins = FALSE;
         Configuration.AltPluginSLGName[0] = 0;
 
+        // UI tests match English window text, so their sandbox must not inherit a language from the
+        // host's Windows display language or from an older Salamander installation. It always shows
+        // the picker (which the harness accepts) with English preselected.
+        BOOL uiTestSandbox = IsFileManagerUiTestSandboxRequested();
         char prevVerSLGName[MAX_PATH];
-        if (!autoImportConfig &&                            // pri UPGRADE toto nema smysl (jazyk se cte o par radek vyse, tahle rutina by ho jen precetla znovu)
+        if (!autoImportConfig && !uiTestSandbox &&          // pri UPGRADE toto nema smysl (jazyk se cte o par radek vyse, tahle rutina by ho jen precetla znovu)
             FindLanguageFromPrevVerOfSal(prevVerSLGName) && // importneme jazyk z predchozi verze, je dost pravdepodobne, ze ho user opet chce pouzit (jde o import stare konfigurace Salama)
             slgDialog.SLGNameExists(prevVerSLGName) &&
             // A malformed previous setting must fall back to the normal picker.
@@ -2178,9 +2182,12 @@ FIND_NEW_SLG_FILE:
         }
         else
         {
-            int langIndex = slgDialog.GetPreferredLanguageIndex(NULL, TRUE);
+            int langIndex = uiTestSandbox ? -1 : slgDialog.GetPreferredLanguageIndex(NULL, TRUE);
             if (langIndex == -1) // tato instalace neobsahuje jazyk souhlasici s aktualnim user-locale ve Windows
             {
+                // The picker preselects Configuration.SLGName, which the dialog shares as its SLG buffer.
+                if (uiTestSandbox && slgDialog.SLGNameExists("english.slg"))
+                    CopyStringChecked(Configuration.SLGName, _countof(Configuration.SLGName), "english.slg");
 
 // kdyz se tohle zakomentuje, nebudeme posilat lidi tahat jazykove verze z webu (napr. kdyz tam zadne nejsou)
 // JRY: pro AS 2.53, kery jde s cestinou, nemcinou a anglictinou je pro ostatni jazyky posleme na forum do sekce

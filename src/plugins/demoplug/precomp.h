@@ -35,7 +35,9 @@
 // (otherwise it is compiled for current version of Salamander and later).
 // NOTE: the ideal is to define DEMOPLUG_COMPATIBLE_WITH_500 for whole plugin project
 //       in Project Settings. DemoPlug defines it here just to make adding/removing easier.
-#define DEMOPLUG_COMPATIBLE_WITH_500
+// Disabled because the host now requires PLUGIN_REQVER 104; a plug-in declaring 103 is rejected
+// with an "unsupported plug-in" error on every start. Re-enable only if the host accepts 103 again.
+// #define DEMOPLUG_COMPATIBLE_WITH_500
 
 #ifdef DEMOPLUG_COMPATIBLE_WITH_500
 #define SALSDK_COMPATIBLE_WITH_VER 103 // 103 = Open Salamander 5.0 (SDK will be defined to be compatible with version 5.0)

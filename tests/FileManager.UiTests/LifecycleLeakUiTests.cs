@@ -10,6 +10,7 @@ public sealed class LifecycleLeakUiTests : FileManagerUiTestBase
 {
     // Quarantined pending lifecycle metric calibration: remote run 32452609747 measured a 39-handle warm-start spread against this test's 32-handle budget while Application Verifier and lock stress passed.
     // The manifest records an owner, tracking reference, and expiry until the sampler distinguishes startup variation from a sustained cross-restart resource leak.
+    // Renewed 2026-09-25: the remote runner now shows 109-256 handle spreads in half of its monitor runs while local runs stay within budget.
     [Test]
     [Category("Quarantined")]
     public void Repeated_clean_startup_and_shutdown_does_not_accumulate_process_resources()

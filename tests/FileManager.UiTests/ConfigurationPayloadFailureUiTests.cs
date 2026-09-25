@@ -12,6 +12,7 @@ public sealed class ConfigurationPayloadFailureUiTests : FileManagerUiTestBase
     // directions across release-gate runs (runs 34008707042, 34056775024, 34453771671) while the
     // fault-injected save is still armed, so the release gate cannot rely on this timing yet.
     // The quarantined-ui-tests monitor keeps executing these cases for diagnosis.
+    // Renewed 2026-09-25: it still failed in monitor run 35201453024 and in 1 of 20 local case executions.
     [TestCase("value:Title bar prefix text", false)]
     [TestCase("key:Panel Items Hilighting", false)]
     [TestCase("value:Title bar prefix text", true)]
