@@ -162,14 +162,16 @@ BOOL CSplashScreen::PrepareBitmap()
     svgHand.GetSize(&handSize);
 
     svgText.AlphaBlend(hDC, OpenSalR.left, OpenSalR.top, textSize.cx, textSize.cy, SVGSTATE_ORIGINAL);
-    svgGrad.AlphaBlend(hDC, 0, GradientY, gradSize.cx, Height - GradientY, SVGSTATE_ORIGINAL);
+    // The hero art spans the full height, so paint it before the opaque graphite status band that must stay on top.
     svgHand.AlphaBlend(hDC, Width - handSize.cx, 0, handSize.cx, handSize.cy, SVGSTATE_ORIGINAL);
+    svgGrad.AlphaBlend(hDC, 0, GradientY, gradSize.cx, Height - GradientY, SVGSTATE_ORIGINAL);
 
     // fixed texts
+    // Muted graphite matches the refreshed splash palette in res\gradspl.svg and res\logo.svg.
     PaintText(SALAMANDER_TEXT_VERSION,
               VersionR.left,
               VersionR.top,
-              FALSE, RGB(128, 128, 128));
+              FALSE, RGB(78, 84, 85));
 
     PaintText(VERSINFO_COPYRIGHT,
               CopyrightR.left,
@@ -319,7 +321,7 @@ HWND GetSplashScreenHandle()
 CAboutDialog::CAboutDialog(HWND parent)
     : CCommonDialog(HLanguage, IDD_ABOUT, parent)
 {
-    HGradientBkBrush = HANDLES(CreateSolidBrush(RGB(221, 151, 4))); // must be the yellow from res\logoline.png
+    HGradientBkBrush = HANDLES(CreateSolidBrush(RGB(59, 62, 63))); // must be the graphite footer surface from res\gradabt.svg
     BackgroundBitmap = NULL;
 }
 
@@ -435,13 +437,14 @@ CAboutDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         HWND hwndStatic = (HWND)lParam;
         // Read the control ID through the pointer-width API to avoid retaining a 32-bit window-data contract.
         int resID = (int)GetWindowLongPtr(hwndStatic, GWL_ID);
-        COLORREF textClr = RGB(70, 70, 70);
+        // Graphite text tones follow the refreshed About artwork palette (res\logo.svg, res\gradabt.svg).
+        COLORREF textClr = RGB(59, 62, 63);
         switch (resID)
         {
         case IDC_STATIC_6:
         case IDC_STATIC_7:
         case IDC_STATIC_8:
-            textClr = RGB(128, 128, 128);
+            textClr = RGB(112, 118, 120);
             break;
         }
         SetTextColor(hdcStatic, textClr);
