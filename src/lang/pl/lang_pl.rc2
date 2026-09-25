@@ -15,3 +15,98 @@
 
 #include "texts_pl.rc2"
 
+
+// The internal viewer loads these menus from the language DLL during startup; without them
+// InitializeViewer() fails and Salamander exits. Keep the item order and IDs identical to
+// ..\lang.rc2 because VIEWER_FILE_MENU_OTHFILESINDEX and CODING_MENU_INDEX depend on them.
+IDM_VIEWERMENU MENU
+{
+ POPUP "&Plik"
+ {
+  MENUITEM "&Otwórz...\tCtrl+O", CM_OPENFILE
+  MENUITEM "O&dśwież\tCtrl+R", CM_REREADFILE
+  MENUITEM SEPARATOR
+
+// CAUTION: if this submenu index changes, VIEWER_FILE_MENU_OTHFILESINDEX must be changed too.
+  POPUP "&Inne pliki"
+  {
+   MENUITEM "&Poprzedni\tBackspace", CM_PREVFILE
+   MENUITEM "&Następny\tSpace", CM_NEXTFILE
+   MENUITEM SEPARATOR
+   MENUITEM "Popr&zedni zaznaczony\tCtrl+Backspace", CM_PREVSELFILE
+   MENUITEM "Nas&tępny zaznaczony\tCtrl+Space", CM_NEXTSELFILE
+   MENUITEM SEPARATOR
+   MENUITEM "P&ierwszy\tShift+Backspace", CM_FIRSTFILE
+   MENUITEM "&Ostatni\tShift+Space", CM_LASTFILE
+  }
+
+  MENUITEM SEPARATOR
+  MENUITEM "Za&kończ\tAlt+F4", CM_EXIT
+ }
+
+ POPUP "&Edycja"
+ {
+  MENUITEM "&Kopiuj\tCtrl+C", CM_COPYTOCLIP
+  MENUITEM "Kopiuj &do pliku...\tCtrl+S", CM_COPYTOFILE
+  MENUITEM SEPARATOR
+  MENUITEM "Zaznacz &wszystko\tCtrl+A", CM_SELECTALLTEXT
+ }
+
+ POPUP "&Szukaj"
+ {
+  MENUITEM "&Znajdź...\tCtrl+F", CM_FINDSET
+  MENUITEM "Znajdź &następny\tCtrl+N", CM_FINDNEXT
+  MENUITEM "Znajdź &poprzedni\tCtrl+P", CM_FINDPREV
+ }
+
+ POPUP "&Widok"
+ {
+  MENUITEM "&Automatyczny wybór", CM_VIEW_AUTOSEL
+  MENUITEM SEPARATOR
+  MENUITEM "&Szesnastkowo\tCtrl+H", CM_TO_HEX
+  MENUITEM "&Tekst\tCtrl+T", CM_TO_TEXT
+  MENUITEM SEPARATOR
+  MENUITEM "&Ustaw jako domyślny", CM_VIEW_SETDEFAULT
+  MENUITEM SEPARATOR
+  MENUITEM "&Pełny ekran\tF11", CM_VIEW_FULLSCREEN
+  MENUITEM SEPARATOR
+  MENUITEM "Przejdź do p&rzesunięcia...\tCtrl+G", CM_GOTOOFFSET
+  MENUITEM SEPARATOR
+  MENUITEM "&Zawijaj wiersze\tCtrl+W", CM_WRAPED
+ }
+
+ POPUP "&Opcje"
+ {
+  MENUITEM "&Konfiguracja...", CM_VIEWER_CONFIG
+  MENUITEM SEPARATOR
+  MENUITEM "Automatycznie &kopiuj zaznaczenie do schowka", CM_VIEWER_AUTOCOPY
+ }
+
+ POPUP "Pomo&c"
+ {
+  MENUITEM "&Spis treści\tF1", CM_VIEWERHLP_INTRO
+  MENUITEM "S&króty klawiaturowe", CM_VIEWERHLP_KEYBOARD
+ }
+}
+
+IDM_VIEWERCONTEXTMENU MENU
+{
+ POPUP ""
+ {
+  MENUITEM "&Kopiuj\tCtrl+C", CM_COPYTOCLIP
+  MENUITEM "Kopiuj &do...", CM_COPYTOFILE
+  MENUITEM SEPARATOR
+  MENUITEM "Zaznacz &wszystko\tCtrl+A", CM_SELECTALLTEXT
+  MENUITEM SEPARATOR
+  MENUITEM "&Znajdź...\tCtrl+F", CM_FINDSET
+  MENUITEM "Znajdź &następny\tCtrl+N", CM_FINDNEXT
+  MENUITEM "Znajdź &poprzedni\tCtrl+P", CM_FINDPREV
+  MENUITEM SEPARATOR
+  MENUITEM "&Szesnastkowo\tCtrl+H", CM_TO_HEX
+  MENUITEM "&Tekst\tCtrl+T", CM_TO_TEXT
+  MENUITEM SEPARATOR
+  MENUITEM "Przejdź do p&rzesunięcia...\tCtrl+G", CM_GOTOOFFSET
+  MENUITEM SEPARATOR
+  MENUITEM "Zawijaj w&iersze\tCtrl+W", CM_WRAPED
+ }
+}

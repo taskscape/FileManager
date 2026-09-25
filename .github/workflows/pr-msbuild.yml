@@ -171,6 +171,13 @@ jobs:
             exit $LASTEXITCODE
           }
 
+      # Mirrors scripts/runtests.ps1: every built translation must carry the resources english.slg has,
+      # because a missing menu or dialog only fails at startup on machines whose locale selects it.
+      # PR builds leave OPENSAL_BUILD_DIR unset, so core and plug-in outputs sit beside their projects under src.
+      - name: Verify language resource parity
+        if: matrix.platform == 'x64'
+        run: .\tools\verify-language-resource-parity.ps1 -BuildDirectory .\src -IncludePattern '*\salamander\Debug_x64\*'
+
       - name: Exercise SQLite WAL recovery and corrupt-page detection
         # The native DLL must be built first; this x64 probe owns only a GUID-named temporary database.
         if: matrix.platform == 'x64'

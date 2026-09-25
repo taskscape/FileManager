@@ -993,6 +993,9 @@ foreach ($relativePath in @(
 }
 
 Invoke-WindowsPowerShellScript -RelativePath 'tools\verify-fluent-icon-coverage.ps1'
+# Translations are selected by user locale, so an incomplete .slg must fail here rather than at a user's startup.
+Invoke-WindowsPowerShellScript -RelativePath 'tools\verify-language-resource-parity.ps1' `
+    -ScriptArguments @('-BuildDirectory', (Join-Path $uiBuildDirectory 'salamander\Debug_x64'))
 Invoke-WindowsPowerShellScript -RelativePath 'tools\verify-ui-test-quarantine.ps1'
 
 $networkFixtureAction = {

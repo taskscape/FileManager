@@ -1868,6 +1868,24 @@ BOOL ParseCommandLineParameters(LPSTR cmdLine, CCommandLineParams* cmdLineParams
     return TRUE;
 }
 
+// Startup subsystems fail before the main window exists, and their TRACE_E output is invisible
+// in release builds; without this report the process just exits with code 1. The text stays in
+// English because an incomplete language file is one of the likely causes.
+static void ReportStartupInitializationFailure(const char* stage)
+{
+    char text[MAX_PATH + 400];
+    if (FormatStringChecked(text, _countof(text),
+                            "Open Salamander cannot start because initialization of %s failed.\n\n"
+                            "The language file \"%s\" may be incomplete or damaged. "
+                            "Please reinstall Open Salamander or choose another language.",
+                            stage, Configuration.LoadedSLGName) != bsrSuccess)
+        CopyStringChecked(text, _countof(text), "Open Salamander cannot start because its initialization failed.");
+    SplashScreenCloseIfExist();
+    LogUiTestDialog("SHOW", SALAMANDER_TEXT_VERSION, text, MB_OK | MB_ICONERROR, 0);
+    int result = MessageBox(NULL, text, SALAMANDER_TEXT_VERSION, MB_OK | MB_ICONERROR);
+    LogUiTestDialog("RESULT", SALAMANDER_TEXT_VERSION, text, MB_OK | MB_ICONERROR, result);
+}
+
 int WinMainBody(HINSTANCE hInstance, HINSTANCE /*hPrevInstance*/, LPSTR cmdLine, int cmdShow)
 {
     int myExitCode = 1;
@@ -2418,14 +2436,14 @@ FIND_NEW_SLG_FILE:
 
     if (!InitPreloadedStrings())
     {
-        SplashScreenCloseIfExist();
+        ReportStartupInitializationFailure("preloaded strings");
     EXIT_4:
         ReleasePreloadedStrings();
         goto EXIT_3;
     }
     if (!InitializeCheckThread() || !InitializeFind())
     {
-        SplashScreenCloseIfExist();
+        ReportStartupInitializationFailure("the path check and Find services");
     EXIT_5:
         ReleaseCheckThreads();
         goto EXIT_4;
@@ -2434,40 +2452,41 @@ FIND_NEW_SLG_FILE:
     SetupWinLibHelp(&SalamanderHelp);
     if (!InitializeDiskCache())
     {
-        SplashScreenCloseIfExist();
+        ReportStartupInitializationFailure("the disk cache");
     EXIT_6:
         ReleaseFind();
         goto EXIT_5;
     }
     if (!InitializeConstGraphics())
     {
-        SplashScreenCloseIfExist();
+        ReportStartupInitializationFailure("constant graphics");
     EXIT_7:
         ReleaseConstGraphics();
         goto EXIT_6;
     }
     if (!InitializeGraphics(FALSE))
     {
-        SplashScreenCloseIfExist();
+        ReportStartupInitializationFailure("graphics");
     EXIT_8:
         ReleaseGraphics(FALSE);
         goto EXIT_7;
     }
     if (!InitializeMenu() || !BuildSalamanderMenus())
     {
-        SplashScreenCloseIfExist();
+        ReportStartupInitializationFailure("the main menu");
         goto EXIT_8;
     }
     if (!InitializeThread())
     {
-        SplashScreenCloseIfExist();
+        ReportStartupInitializationFailure("the worker thread");
     EXIT_9:
         TerminateThread();
         goto EXIT_8;
     }
     if (!InitializeViewer())
     {
-        SplashScreenCloseIfExist();
+        // A language file without the viewer menus used to end startup here without any visible error.
+        ReportStartupInitializationFailure("the internal viewer");
         ReleaseViewer();
         goto EXIT_9;
     }
