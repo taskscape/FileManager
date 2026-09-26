@@ -173,9 +173,8 @@ public sealed class FileAccessUiTests : FileOperationUiTestBase
         WaitForFileSystem(() => NativeCommands.IsDialogControlEnabled(findHandle, NativeCommands.FindNamed),
                           "Find did not complete before Focus was requested.");
 
-        NativeCommands.SelectFocusedListViewItem(results!.Properties.NativeWindowHandle.Value);
-        NativeCommands.Execute(findHandle, NativeCommands.FindFocus);
-        WaitForMainWindowTitleContaining("find-tree",
+        ExecuteFindFocusWithBusyRetry(findHandle, results!.Properties.NativeWindowHandle.Value,
+            () => NativeCommands.GetWindowTitle(NativeMainWindowHandle).Contains("find-tree", StringComparison.OrdinalIgnoreCase),
             "Find Focus did not change the active panel to the directory that contains find-target.txt.");
 
         // Leave Find open: WM_CLOSE after Focus corrupts the debug heap and raises a CRT assertion instead of the Copy dialog.
@@ -241,9 +240,7 @@ public sealed class FileAccessUiTests : FileOperationUiTestBase
         WaitForFileSystem(() => NativeCommands.GetListViewItemCount(resultsHandle) >= 2,
                           "Find Duplicates did not list both identical copies.");
 
-        NativeCommands.SelectFocusedListViewItem(resultsHandle);
-        NativeCommands.Execute(findHandle, NativeCommands.FindFocus);
-        WaitForFileSystem(
+        ExecuteFindFocusWithBusyRetry(findHandle, resultsHandle,
             () =>
             {
                 var title = NativeCommands.GetWindowTitle(NativeMainWindowHandle);
@@ -268,6 +265,47 @@ public sealed class FileAccessUiTests : FileOperationUiTestBase
         return WaitForWindow(window =>
             window.Properties.NativeWindowHandle.Value != MainWindow.Properties.NativeWindowHandle.Value &&
             window.FindFirstDescendant(cf => cf.ByAutomationId(NativeCommands.FindResults.ToString())) is not null);
+    }
+
+    private void ExecuteFindFocusWithBusyRetry(nint findHandle, nint resultsHandle,
+                                               Func<bool> focusCompleted, string failureMessage)
+    {
+        // Find completion and host idleness are separate states. Retry only when the product explicitly rejects Focus with its busy response.
+        var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(20);
+        NativeCommands.SelectFocusedListViewItem(resultsHandle);
+        NativeCommands.Execute(findHandle, NativeCommands.FindFocus);
+        while (DateTime.UtcNow < deadline)
+        {
+            if (focusCompleted())
+                return;
+
+            if (DismissFindBusyDialog())
+            {
+                Thread.Sleep(100);
+                NativeCommands.SelectFocusedListViewItem(resultsHandle);
+                NativeCommands.Execute(findHandle, NativeCommands.FindFocus);
+            }
+
+            Thread.Sleep(50);
+        }
+
+        WaitForFileSystem(focusCompleted, failureMessage);
+    }
+
+    private bool DismissFindBusyDialog()
+    {
+        foreach (var windowHandle in NativeCommands.GetTopLevelWindows(Application.ProcessId))
+        {
+            if (NativeCommands.GetWindowTitle(windowHandle) == "Information" &&
+                NativeCommands.GetDialogText(windowHandle).Contains("Open Salamander is busy", StringComparison.Ordinal))
+            {
+                // The busy message means Focus was not executed, so acknowledging it is the deterministic signal to retry the same idempotent navigation.
+                NativeCommands.ClickDialogButton(windowHandle, 1);
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private static void InvokeFindNow(Window findDialog)

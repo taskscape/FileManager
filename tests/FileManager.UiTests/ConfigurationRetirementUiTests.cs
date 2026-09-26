@@ -66,7 +66,7 @@ public sealed class ConfigurationRetirementUiTests : FileManagerUiTestBase
         }
         var dialog = OpenConfigurationDialog();
         ToggleFirstConfigurationCheckBox(dialog);
-        File.Delete(SaveStatus);
+        await DeleteSaveStatusWhenReleased();
         CommitConfigurationDialogWithoutWaiting(dialog);
         Assert.That(Snapshot(), Is.EqualTo(original));
         File.WriteAllText(Marker("release"), "continue");
@@ -88,7 +88,7 @@ public sealed class ConfigurationRetirementUiTests : FileManagerUiTestBase
 
     private async Task SaveExplicitly()
     {
-        File.Delete(SaveStatus);
+        await DeleteSaveStatusWhenReleased();
         NativeCommands.Execute(NativeMainWindowHandle, 687); // explicit Save Configuration
         await WaitFor(() => File.Exists(SaveStatus) && File.ReadAllText(SaveStatus) == "complete", "Baseline save did not finish.");
     }
@@ -108,9 +108,33 @@ public sealed class ConfigurationRetirementUiTests : FileManagerUiTestBase
     {
         var dialog = OpenConfigurationDialog();
         ToggleFirstConfigurationCheckBox(dialog);
-        File.Delete(SaveStatus);
+        await DeleteSaveStatusWhenReleased();
         CommitConfigurationDialogWithoutWaiting(dialog);
         await WaitFor(() => File.Exists(SaveStatus) && File.ReadAllText(SaveStatus) == "complete", "Concurrent save did not finish.");
+    }
+
+    private static async Task DeleteSaveStatusWhenReleased()
+    {
+        // Reading "complete" can win the final native CloseHandle; wait until the prior marker is actually deletable before arming another save.
+        var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(5);
+        while (DateTime.UtcNow < deadline)
+        {
+            try
+            {
+                File.Delete(SaveStatus);
+                return;
+            }
+            catch (IOException)
+            {
+                await Task.Delay(50);
+            }
+            catch (UnauthorizedAccessException)
+            {
+                await Task.Delay(50);
+            }
+        }
+
+        File.Delete(SaveStatus);
     }
 
     private static (int Generation, string Token) Snapshot()
