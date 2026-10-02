@@ -1,0 +1,13 @@
+// SPDX-FileCopyrightText: 2026 Taskscape Ltd
+// SPDX-License-Identifier: GPL-2.0-or-later
+
+// Keep diacritics in the compiled UTF-16 resources so the test exercises the real Win32 resource boundary.
+#pragma code_page(65001)
+#include <windows.h>
+
+STRINGTABLE
+BEGIN
+    4001 "&Utwórz katalog...\tF7"
+    4002 "Zażółć gęślą jaźń"
+    4003 "&Create Directory...\tF7"
+END

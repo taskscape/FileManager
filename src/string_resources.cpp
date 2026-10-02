@@ -7,6 +7,7 @@
 
 #include <cwctype>
 #include "common/strutils.h"
+#include "common/resource_strings_utf8.h" // keep language resources independent of the host ANSI code page
 #include "cfgdlg.h"
 #include "mainwnd.h"
 #include "dialogs.h"
@@ -53,22 +54,15 @@ char* LoadStr(int resID, HINSTANCE hInstance)
         TRACE_E("LoadStr: hInstance == NULL");
 #endif // _DEBUG
 
-RELOAD:
-    int size = LoadString(hInstance, resID, act, 10000 - (int)(act - buffer));
-    // size contains the number of copied characters without the terminator
-    //  DWORD error = GetLastError();
-    char* ret;
-    if (size != 0 /* || error == NO_ERROR*/) // error is NO_ERROR even if the string does not exist - useless
+    // Measure encoded bytes before wrapping the ring, so UTF-8 expansion cannot truncate localized labels.
+    const int size = LoadStringUtf8(hInstance, resID, NULL, 0);
+    static char bufferError[] = "ERROR LOADING STRING";
+    char* ret = bufferError;
+    if (size > 0 && size < static_cast<int>(sizeof(buffer)))
     {
-        if ((10000 - (act - buffer) == size + 1) && (act > buffer))
-        {
-            // if the string was exactly at the end of the buffer, it may
-            // have been truncated -- if we can move the window
-            // to the beginning of the buffer, load the string once more
+        if (sizeof(buffer) - (act - buffer) <= static_cast<size_t>(size))
             act = buffer;
-            goto RELOAD;
-        }
-        else
+        if (LoadStringUtf8(hInstance, resID, act, static_cast<int>(sizeof(buffer) - (act - buffer))) == size)
         {
             ret = act;
             act += size + 1;
@@ -76,9 +70,7 @@ RELOAD:
     }
     else
     {
-        TRACE_E("Error in LoadStr(" << resID << ")." /*"): " << GetErrorText(error)*/);
-        static char bufferError[] = "ERROR LOADING STRING";
-        ret = bufferError;
+        TRACE_E("Error in LoadStr(" << resID << ").");
     }
 
     HANDLES(LeaveCriticalSection(&__StrCriticalSection.cs));

@@ -35,5 +35,9 @@
     <ClCompile Include="OperationExecutionFileSystemTestAdapter.cpp" />
     <ClCompile Include="..\..\src\operation_execution_filesystem.cpp" />
   </ItemGroup>
+  <!-- Embed actual multilingual resources for the UTF-16 to UTF-8 loader regression. -->
+  <ItemGroup>
+    <ResourceCompile Include="ResourceStrings.rc" />
+  </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
 </Project>

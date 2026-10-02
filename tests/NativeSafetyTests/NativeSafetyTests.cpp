@@ -4,6 +4,7 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <string>
+#include "../../src/common/resource_strings_utf8.h" // exercise the production resource loader with real multilingual resources
 
 #include "../../src/common/checked_arithmetic.h"
 #include "../../src/operation_execution_filesystem.h"
@@ -48,6 +49,29 @@ int TestCheckedArithmeticBoundaries()
         return Fail("CheckedCastUInt64ToDword accepted a truncated value");
     if (!CheckedCastUInt64ToSize(1, &size) || size != 1)
         return Fail("CheckedCastUInt64ToSize rejected a valid value");
+    return 0;
+}
+
+int TestResourceStringsUtf8()
+{
+    const HINSTANCE instance = GetModuleHandleW(NULL);
+    const char* expected[] = {u8"&Utw\u00f3rz katalog...\tF7", u8"Za\u017c\u00f3\u0142\u0107 g\u0119\u015bl\u0105 ja\u017a\u0144", "&Create Directory...\tF7"};
+    for (int index = 0; index < static_cast<int>(_countof(expected)); ++index)
+    {
+        const int bytes = static_cast<int>(strlen(expected[index]));
+        if (LoadStringUtf8(instance, 4001 + index, NULL, 0) != bytes)
+            return Fail("resource loader measured characters instead of UTF-8 bytes");
+        std::string buffer(bytes + 2, '#');
+        // A buffer without terminator space must fail without publishing a partial character or overwriting its sentinel.
+        if (LoadStringUtf8(instance, 4001 + index, &buffer[0], bytes) != 0 || buffer[0] != 0 || buffer[bytes] != '#')
+            return Fail("resource loader accepted or overran an undersized UTF-8 destination");
+        if (LoadStringUtf8(instance, 4001 + index, &buffer[0], bytes + 1) != bytes ||
+            strcmp(buffer.c_str(), expected[index]) != 0 || buffer[bytes + 1] != '#')
+            return Fail("resource loader corrupted a localized label or its terminator boundary");
+    }
+    char missing[] = "sentinel";
+    if (LoadStringUtf8(instance, 4999, missing, sizeof(missing)) != 0 || missing[0] != 0)
+        return Fail("missing resources left stale display text in the destination");
     return 0;
 }
 
@@ -656,6 +680,8 @@ int TestExecutionAdapterFaultInjection()
 int main()
 {
     int result = TestCheckedArithmeticBoundaries();
+    if (result == 0)
+        result = TestResourceStringsUtf8(); // Polish bytes must reach the UTF-8 menu renderer unchanged
     if (result != 0)
         return result;
     result = TestNativeFileOperationCharacterization();
