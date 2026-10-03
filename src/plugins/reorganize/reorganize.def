@@ -1,0 +1,4 @@
+LIBRARY reorganize.spl
+
+EXPORTS SalamanderPluginEntry
+EXPORTS SalamanderPluginGetReqVer

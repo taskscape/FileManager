@@ -25,6 +25,7 @@
       <WarningLevel>Level4</WarningLevel>
       <SDLCheck>true</SDLCheck>
       <LanguageStandard>stdcpp17</LanguageStandard>
+      <AdditionalIncludeDirectories>..\..\src\plugins\reorganize\core;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -34,6 +35,22 @@
     <ClCompile Include="NativeSafetyTests.cpp" />
     <ClCompile Include="OperationExecutionFileSystemTestAdapter.cpp" />
     <ClCompile Include="..\..\src\operation_execution_filesystem.cpp" />
+    <ClCompile Include="..\..\src\plugins\reorganize\core\util.cpp" />
+    <ClCompile Include="..\..\src\plugins\reorganize\core\json.cpp" />
+    <ClCompile Include="..\..\src\plugins\reorganize\core\fsprobe.cpp" />
+    <ClCompile Include="..\..\src\plugins\reorganize\core\snapshot.cpp" />
+    <ClCompile Include="..\..\src\plugins\reorganize\core\rules.cpp" />
+    <ClCompile Include="..\..\src\plugins\reorganize\core\overlay.cpp" />
+    <ClCompile Include="..\..\src\plugins\reorganize\core\plan.cpp" />
+    <ClCompile Include="..\..\src\plugins\reorganize\core\planio.cpp" />
+    <ClCompile Include="..\..\src\plugins\reorganize\core\validate.cpp" />
+    <ClCompile Include="..\..\src\plugins\reorganize\core\compiler.cpp" />
+    <ClCompile Include="..\..\src\plugins\reorganize\core\journal.cpp" />
+    <ClCompile Include="..\..\src\plugins\reorganize\core\reconcile.cpp" />
+    <ClCompile Include="..\..\src\plugins\reorganize\core\revert.cpp" />
+    <ClCompile Include="..\..\src\plugins\reorganize\core\mapping.cpp" />
+    <ClCompile Include="..\..\src\plugins\reorganize\core\report.cpp" />
+    <ClCompile Include="..\..\src\plugins\reorganize\core\scanners\scanner.cpp" />
   </ItemGroup>
   <!-- Embed actual multilingual resources for the UTF-16 to UTF-8 loader regression. -->
   <ItemGroup>

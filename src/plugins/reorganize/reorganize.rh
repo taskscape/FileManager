@@ -1,0 +1,39 @@
+// SPDX-FileCopyrightText: 2026 Taskscape Ltd
+// SPDX-License-Identifier: GPL-2.0-or-later
+
+#define CMD_NEW 1
+#define CMD_OPEN 2
+#define CMD_SAVE 3
+#define CMD_SAVEAS 4
+#define CMD_REVIEW 5
+#define CMD_ADDRULE 6
+#define CMD_RULES 7
+#define CMD_MAPPING 8
+#define CMD_PROPOSED 9
+#define CMD_ORIGINAL 10
+#define CMD_SELECTCHANGED 11
+#define CMD_UNDO 12
+#define CMD_REDO 13
+#define CMD_VALIDATE 14
+#define CMD_APPLY 15
+#define CMD_RECOVERY 16
+#define CMD_CLOSE 17
+
+#define IDD_REORG_NEWPLAN 200
+#define IDD_REORG_REMOVEFROMPLAN 201
+#define IDD_REORG_REVIEW 202
+#define IDD_REORG_APPLY 203
+#define IDD_REORG_RULE 204
+#define IDD_REORG_CONFIG 205
+#define IDD_REORG_RECOVERY 206
+
+#define IDE_NAME 1001
+#define IDE_SCOPE 1002
+#define IDE_DEST 1003
+#define IDE_MASK 1004
+#define IDE_TEMPLATE 1005
+#define IDC_ISSUES 1006
+#define IDC_UNSTAGE 1007
+#define IDC_CLEANUP 1008
+#define IDE_RECENT 1009
+#define IDC_STATIC -1

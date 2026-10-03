@@ -1,0 +1,8 @@
+// SPDX-FileCopyrightText: 2026 Taskscape Ltd
+// SPDX-License-Identifier: GPL-2.0-or-later
+
+#pragma code_page(65001)
+
+#include "reorganize.rh"
+#include "winresrc.h"
+#include "reorganize.rc2"

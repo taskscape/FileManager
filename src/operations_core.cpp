@@ -6,6 +6,7 @@
 
 #include "cfgdlg.h"
 #include "worker.h"
+#include "operation_steps.h"
 // Compression/encryption and security helpers moved out of async_copy.cpp;
 // these headers replace the previous ad-hoc extern declarations.
 #include "file_attributes.h"
@@ -1016,6 +1017,7 @@ unsigned ThreadWorkerBody(void* parameter)
     int setDirTimeAfterMove = script->PreserveDirTime && script->SourcePathIsNetwork ? 0 /* need test */ : 2 /* no */; // e.g. on Samba, moving/renaming a directory changes its date and time - 0/1/2 = need-test/yes/no
 
     BOOL Error = FALSE;
+    int planCompletedThrough = -1;
     CQuadWord totalDone;
     totalDone = CQuadWord(0, 0);
     CProgressData pd;
@@ -1064,11 +1066,40 @@ unsigned ThreadWorkerBody(void* parameter)
         {
             COperation* op = &script->At(i);
             int attempt = script->BeginItemAttempt(i);
+            BOOL planStep = script->StepBridge != NULL && (op->OpFlags & OPFL_PLAN_STEP) != 0;
+
+            // A plug-in skip must not depend on the source still being present.
+            if (planStep && !script->StepBridge->BeforeStep(op->PlanStepIndex))
+            {
+                if (!script->JournalBeginItem(i, op, attempt))
+                {
+                    Error = TRUE;
+                    break;
+                }
+                script->StepBridge->AfterStep(op->PlanStepIndex, SALOPSTEP_RESULT_SKIPPED, 0, 0, 0);
+                planCompletedThrough = i;
+                script->JournalCompleteItem(TRUE);
+                WaitForSingleObject(dlgData.WorkerNotSuspended, INFINITE);
+                continue;
+            }
 
             DWORD identityError;
             if (!CaptureOperationFileIdentities(op, &identityError))
             {
                 TRACE_E("Unable to capture handle identity before file-operation item " << i << ": " << GetErrorText(identityError));
+                if (planStep && !script->StepBridge->StopOnError())
+                {
+                    if (!script->JournalBeginItem(i, op, attempt))
+                    {
+                        Error = TRUE;
+                        break;
+                    }
+                    script->StepBridge->AfterStep(op->PlanStepIndex, SALOPSTEP_RESULT_FAILED, identityError, 0, 0);
+                    planCompletedThrough = i;
+                    script->JournalCompleteItem(FALSE);
+                    WaitForSingleObject(dlgData.WorkerNotSuspended, INFINITE);
+                    continue;
+                }
                 Error = TRUE;
                 break;
             }
@@ -1080,7 +1111,30 @@ unsigned ThreadWorkerBody(void* parameter)
                 break;
             }
 
-            switch (op->Opcode)
+            // Plan steps report skip and precondition failures without entering the opcode.
+            // A skipped step is a completed journal item so later steps can still run.
+            BOOL planHandled = FALSE;
+            DWORD planResult = SALOPSTEP_RESULT_DONE;
+            DWORD planError = 0;
+            if (planStep)
+            {
+                BOOL acceptExisting = FALSE;
+                DWORD preError = 0;
+                if (!RejectPlanStepPrecondition(op, op->Opcode == ocCreateDir, &acceptExisting, &preError))
+                {
+                    planHandled = TRUE;
+                    planResult = SALOPSTEP_RESULT_FAILED;
+                    planError = preError;
+                    if (script->StepBridge->StopOnError())
+                        Error = TRUE;
+                }
+                else if (acceptExisting)
+                {
+                    planHandled = TRUE;
+                }
+            }
+
+            if (!planHandled) switch (op->Opcode)
             {
             case ocCopyFile:
             {
@@ -1194,6 +1248,36 @@ unsigned ThreadWorkerBody(void* parameter)
 
             case ocCopyDirTime:
             {
+                if ((op->OpFlags & OPFL_PLAN_STEP) != 0)
+                {
+                    // Directory time is read when the step runs. A missing source is non-fatal:
+                    // the directory may already have been removed by an earlier cleanup step.
+                    HANDLE src = CreateFileUtf8(op->SourceName, FILE_READ_ATTRIBUTES,
+                                               FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+                                               NULL, OPEN_EXISTING, FILE_FLAG_BACKUP_SEMANTICS, NULL);
+                    if (src == INVALID_HANDLE_VALUE)
+                    {
+                        DWORD err = GetLastError();
+                        Error = err != ERROR_FILE_NOT_FOUND && err != ERROR_PATH_NOT_FOUND;
+                        break;
+                    }
+                    FILETIME modified;
+                    BOOL got = GetFileTime(src, NULL, NULL, &modified);
+                    CloseHandle(src);
+                    if (!got)
+                    {
+                        Error = TRUE;
+                        break;
+                    }
+                    Error = !DoCopyDirTime(hProgressDlg, op->TargetName, &modified, dlgData, TRUE);
+                    if (Error)
+                    {
+                        DWORD err = GetLastError();
+                        if (err == ERROR_FILE_NOT_FOUND || err == ERROR_PATH_NOT_FOUND)
+                            Error = FALSE;
+                    }
+                    break;
+                }
                 BOOL skipSetDirTime = FALSE;
                 // locate the skip-label; it stores the index of the create-dir operation along with
                 // whether the target directory already existed or was created (date/time are copied
@@ -1290,9 +1374,25 @@ unsigned ThreadWorkerBody(void* parameter)
                 {
                     if (op->Opcode == ocDeleteDir)
                     {
-                        Error = !DoDeleteDir(hProgressDlg, op, op->Size,
-                                              script, totalDone, op->Attr, (DWORD)(DWORD_PTR)op->TargetName != -1,
-                                             dlgData);
+                        if ((op->OpFlags & OPFL_PLAN_STEP) != 0)
+                        {
+                            // Cleanup removes one already-empty directory. It never recurses into children.
+                            if (!RemoveDirectoryUtf8(op->SourceName))
+                            {
+                                Error = TRUE;
+                            }
+                            else
+                            {
+                                totalDone += op->Size;
+                                script->SetProgressSize(totalDone);
+                            }
+                        }
+                        else
+                        {
+                            Error = !DoDeleteDir(hProgressDlg, op, op->Size,
+                                                  script, totalDone, op->Attr, (DWORD)(DWORD_PTR)op->TargetName != -1,
+                                                 dlgData);
+                        }
                     }
                     else
                     {
@@ -1362,7 +1462,27 @@ unsigned ThreadWorkerBody(void* parameter)
             case ocLabelForSkipOfCreateDir:
                 break; // no action
             }
-            script->JournalCompleteItem(!Error);
+            script->JournalCompleteItem(planHandled ? planResult != SALOPSTEP_RESULT_FAILED : !Error);
+            if (planStep)
+            {
+                if (!planHandled)
+                {
+                    if (*dlgData.CancelWorker)
+                        planResult = SALOPSTEP_RESULT_CANCELLED;
+                    else if (Error)
+                    {
+                        planResult = SALOPSTEP_RESULT_FAILED;
+                        planError = GetLastError();
+                    }
+                }
+                DWORD losses = OperationStepsFilterAcceptedLosses(dlgData.MetadataLosses.LossMask,
+                                                                  op->ExpectedMetadataLosses,
+                                                                  op->PlanMetadataLossAccepted);
+                script->StepBridge->AfterStep(op->PlanStepIndex, planResult, planError, 0, losses);
+                planCompletedThrough = i;
+                if (planResult == SALOPSTEP_RESULT_FAILED && !script->StepBridge->StopOnError())
+                    Error = FALSE;
+            }
             if (Error)
                 break;
             WaitForSingleObject(dlgData.WorkerNotSuspended, INFINITE); // if we should be in suspend mode, wait ...
@@ -1407,6 +1527,11 @@ unsigned ThreadWorkerBody(void* parameter)
     // this thread while a close/shutdown cancellation is in progress.  Release
     // all worker-owned data first, then transfer the small, self-contained
     // result to the UI by a posted message.
+    if (script->StepBridge != NULL)
+    {
+        script->StepBridge->NoteNotStarted(script->Count - (planCompletedThrough + 1));
+        script->StepBridge->QueueFinished(script->IsCancellationRequested());
+    }
     CWorkerCompletion* completion = new CWorkerCompletion(finalState, cancellationRequested, script->GetCorrelationId());
     FreeScript(script);
     if (!PostMessage(hProgressDlg, WM_USER_PROGRDLG_WORKERCOMPLETE,
@@ -1524,7 +1649,9 @@ void FreeScript(COperations* script)
     for (i = 0; i < script->Count; i++)
     {
         COperation* op = &script->At(i);
-        if (op->SourceName != NULL && op->Opcode != ocCopyDirTime && op->Opcode != ocLabelForSkipOfCreateDir)
+        // Legacy ocCopyDirTime stores a FILETIME in SourceName. Plan steps store a real path.
+        if (op->SourceName != NULL && op->Opcode != ocLabelForSkipOfCreateDir &&
+            (op->Opcode != ocCopyDirTime || (op->OpFlags & OPFL_PLAN_STEP) != 0))
             free(op->SourceName);
         if (op->TargetName != NULL && op->Opcode != ocChangeAttrs && op->Opcode != ocLabelForSkipOfCreateDir)
             free(op->TargetName);

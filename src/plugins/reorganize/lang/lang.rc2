@@ -1,0 +1,53 @@
+// SPDX-FileCopyrightText: 2026 Taskscape Ltd
+// SPDX-License-Identifier: GPL-2.0-or-later
+
+#ifdef APSTUDIO_INVOKED
+#error this file is not editable by Microsoft Visual C++
+#endif
+
+#include "..\versinfo.rh2"
+#include "versinfo.rc2"
+
+STRINGTABLE
+{
+  IDS_PLUGINNAME, "Reorganize"
+  IDS_DESCRIPTION, "Preview a reorganization, then apply it with the host's move engine."
+  IDS_MENU_NEW, "&New Plan..."
+  IDS_MENU_OPEN, "&Open Plan..."
+  IDS_MENU_SAVE, "&Save Plan"
+  IDS_MENU_SAVEAS, "Save Plan &As..."
+  IDS_MENU_REVIEW, "Plan &Review..."
+  IDS_MENU_ADDRULE, "Add &Rule..."
+  IDS_MENU_RULES, "&Manage Rules..."
+  IDS_MENU_MAPPING, "&Import Mapping (CSV)..."
+  IDS_MENU_PROPOSED, "Go to &Proposed Location"
+  IDS_MENU_ORIGINAL, "Go to &Original"
+  IDS_MENU_SELECTCHANGED, "Select &Changed Items in Source Panel"
+  IDS_MENU_UNDO, "&Undo Plan Edit"
+  IDS_MENU_REDO, "&Redo Plan Edit"
+  IDS_MENU_VALIDATE, "&Validate Now"
+  IDS_MENU_APPLY, "&Apply Plan..."
+  IDS_MENU_RECOVERY, "Recovery &Journals..."
+  IDS_MENU_CLOSE, "&Close Plan"
+  IDS_CHANGEDRIVE, "Reorganization plan"
+  IDS_COL_CHANGE, "Change"
+  IDS_COL_FROM, "From"
+  IDS_COL_ISSUES, "Issues"
+  IDS_COL_REVERSIBLE, "Reversible"
+  IDS_COL_CHANGE_TIP, "How this item changes"
+  IDS_COL_FROM_TIP, "Original location"
+  IDS_COL_ISSUES_TIP, "Validation issues"
+  IDS_COL_REVERSIBLE_TIP, "Whether the change can be undone exactly"
+  IDS_EMPTY, "This folder will be empty"
+  IDS_NO_PLAN, "Open or create a reorganization plan first."
+  IDS_COPY_UNSUPPORTED, "Reorganize does not copy files. Use Move."
+  IDS_APPLY_BLOCKED, "The plan still has blocking issues. Review them before applying."
+  IDS_APPLY_DONE, "Apply finished. Done %d, skipped %d, failed %d, cancelled %d, not started %d."
+  IDS_SAVED, "The plan was saved."
+  IDS_DIRTY_CLOSE, "The plan has unsaved edits. Close it anyway?"
+  IDS_REMOVE_PROMPT, "Remove the selected items from the plan? No files are deleted."
+  IDS_NEW_OR_OPEN, "No plan is open. Create a new plan?"
+  IDS_CYCLE, "That move would create a cycle."
+  IDS_NOT_DISK, "The target must be a disk path inside this plan."
+  IDS_ANALYZING, "Analyzing..."
+}

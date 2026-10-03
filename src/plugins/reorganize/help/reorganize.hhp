@@ -1,0 +1,9 @@
+[OPTIONS]
+Compatibility=1.1 or later
+Compiled file=reorganize.chm
+Default topic=introduction.htm
+Language=0x409 English (United States)
+Title=Reorganize Help
+
+[FILES]
+introduction.htm

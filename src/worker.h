@@ -297,6 +297,16 @@ public:
 #define OPFL_TGTPATH_IS_NET 0x00000020       // the target path is a network path
 #define OPFL_TGTPATH_IS_FAST 0x00000040      // the target path is a disk, USB disk, flash drive, flash-card reader, CD, DVD, or RAM disk (not a network or floppy)
 #define OPFL_IGNORE_INVALID_NAME 0x00000080  // skip the name validity test (for directories: unchanged name = do not flag as invalid)
+// Plan steps fail closed: an existing target is an error, never an overwrite prompt.
+#define OPFL_FAIL_IF_TARGET_EXISTS 0x00000100
+// A same-volume plan step must not fall back to copy-and-delete when the volume changes under it.
+#define OPFL_NO_CROSS_VOLUME 0x00000200
+// Compare the source with the identity captured when the plan was reviewed before mutating it.
+#define OPFL_VERIFY_SOURCE_IDENTITY 0x00000400
+// Creating a directory that is already a directory is success and is reported to the observer.
+#define OPFL_CREATEDIR_ACCEPT_EXISTING 0x00000800
+// The item comes from ExecuteOperationSteps and must not ask the interactive overwrite questions.
+#define OPFL_PLAN_STEP 0x00001000
 
 // The preservation contract is intentionally kept close to the operation
 // model.  A cross-volume move is a copy followed by a destructive step, so
@@ -398,6 +408,15 @@ struct COperation
         DWORD FileIndexLow;
         unsigned __int64 OpenedPathHash;
     } SourceIdentity, TargetIdentity;
+    // -1 unless the item was built by ExecuteOperationSteps. Not part of the plug-in ABI.
+    int PlanStepIndex;
+    DWORD ExpectedVolumeSerial;
+    BYTE ExpectedFileId[16];
+    CQuadWord ExpectedSize;
+    FILETIME ExpectedLastWrite;
+    BOOL ExpectedIdentityValid;
+    BOOL PlanMetadataLossAccepted;
+    DWORD ExpectedMetadataLosses;
 };
 
 // Handle-based identity helpers implemented in file_identity.cpp.  The
@@ -411,6 +430,17 @@ BOOL VerifyFileIdentity(const char* path, const COperation::CFileIdentity& expec
 BOOL VerifyFileDeletable(const char* path, const COperation::CFileIdentity& expected, DWORD* error);
 BOOL VerifyFileHandleIdentity(HANDLE handle, const COperation::CFileIdentity& expected, DWORD* error);
 BOOL DeleteFileWithVerifiedIdentity(const char* path, const COperation::CFileIdentity& expected, DWORD* error);
+
+// Worker-facing observer for plug-in plan steps. Implemented in operation_steps.cpp.
+class CStepExecutionBridge
+{
+public:
+    virtual BOOL BeforeStep(int index) = 0;
+    virtual void AfterStep(int index, DWORD result, DWORD error, DWORD resultFlags, DWORD metadataLosses) = 0;
+    virtual BOOL StopOnError() const = 0;
+    virtual void NoteNotStarted(int count) = 0;
+    virtual void QueueFinished(BOOL cancelled) = 0;
+};
 
 // Script of file operations (copy, move, delete, attributes, convert) plus progress totals and options.
 class COperations : public TDirectArray<COperation>
@@ -462,6 +492,10 @@ public:
     BOOL ChangeSpeedLimit; // TRUE = the speed limit might change (the worker should reach a state where changing it is easy)
 
     BOOL SkipAllCountSizeErrors; // should all subsequent count-size errors be skipped?
+
+    // Non-NULL only for scripts built by ExecuteOperationSteps. The worker calls it
+    // without holding StatusCS. The bridge outlives the script until Finished returns.
+    class CStepExecutionBridge* StepBridge;
 
     char CorrelationId[OPERATION_CORRELATION_ID_LENGTH];
 

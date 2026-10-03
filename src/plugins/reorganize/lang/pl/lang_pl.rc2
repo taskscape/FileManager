@@ -1,0 +1,61 @@
+// SPDX-FileCopyrightText: 2026 Taskscape Ltd
+// SPDX-License-Identifier: GPL-2.0-or-later
+
+#ifdef APSTUDIO_INVOKED
+#error this file is not editable by Microsoft Visual C++
+#endif
+
+#include "..\..\versinfo.rh2"
+#undef VERSINFO_INTERNAL
+#define VERSINFO_INTERNAL "POLISH"
+#undef VERSINFO_ORIGINAL
+#define VERSINFO_ORIGINAL VERSINFO_INTERNAL ".SLG"
+#undef VERSINFO_SLG_COMMENT
+#define VERSINFO_SLG_COMMENT "Wersja polska"
+#define VERSINFO_TRANSLATION_LANG 0x0415
+#define VERSINFO_TRANSLATION_SUBLANG 0x0415
+#include "versinfo.rc2"
+
+STRINGTABLE
+{
+  IDS_PLUGINNAME, "Reorganize"
+  IDS_DESCRIPTION, "Podgląd reorganizacji, a następnie wykonanie jej silnikiem przenoszenia hosta."
+  IDS_MENU_NEW, "&Nowy plan..."
+  IDS_MENU_OPEN, "&Otwórz plan..."
+  IDS_MENU_SAVE, "&Zapisz plan"
+  IDS_MENU_SAVEAS, "Zapisz plan &jako..."
+  IDS_MENU_REVIEW, "&Przegląd planu..."
+  IDS_MENU_ADDRULE, "Dodaj &regułę..."
+  IDS_MENU_RULES, "&Zarządzaj regułami..."
+  IDS_MENU_MAPPING, "&Importuj mapowanie (CSV)..."
+  IDS_MENU_PROPOSED, "Idź do &proponowanej lokalizacji"
+  IDS_MENU_ORIGINAL, "Idź do &oryginału"
+  IDS_MENU_SELECTCHANGED, "Zaznacz &zmienione elementy w panelu źródłowym"
+  IDS_MENU_UNDO, "&Cofnij edycję planu"
+  IDS_MENU_REDO, "&Ponów edycję planu"
+  IDS_MENU_VALIDATE, "&Sprawdź teraz"
+  IDS_MENU_APPLY, "&Zastosuj plan..."
+  IDS_MENU_RECOVERY, "&Dzienniki odzyskiwania..."
+  IDS_MENU_CLOSE, "&Zamknij plan"
+  IDS_CHANGEDRIVE, "Plan reorganizacji"
+  IDS_COL_CHANGE, "Zmiana"
+  IDS_COL_FROM, "Skąd"
+  IDS_COL_ISSUES, "Problemy"
+  IDS_COL_REVERSIBLE, "Odwracalność"
+  IDS_COL_CHANGE_TIP, "Jak zmieni się ten element"
+  IDS_COL_FROM_TIP, "Pierwotna lokalizacja"
+  IDS_COL_ISSUES_TIP, "Wyniki kontroli"
+  IDS_COL_REVERSIBLE_TIP, "Czy zmianę da się dokładnie cofnąć"
+  IDS_EMPTY, "Ten folder będzie pusty"
+  IDS_NO_PLAN, "Najpierw otwórz lub utwórz plan reorganizacji."
+  IDS_COPY_UNSUPPORTED, "Reorganize nie kopiuje plików. Użyj przeniesienia."
+  IDS_APPLY_BLOCKED, "Plan nadal ma blokujące problemy. Przejrzyj je przed zastosowaniem."
+  IDS_APPLY_DONE, "Zastosowanie zakończone. Gotowe %d, pominięte %d, nieudane %d, anulowane %d, nierozpoczęte %d."
+  IDS_SAVED, "Plan został zapisany."
+  IDS_DIRTY_CLOSE, "Plan ma niezapisane zmiany. Zamknąć go mimo to?"
+  IDS_REMOVE_PROMPT, "Usunąć zaznaczone elementy z planu? Żadne pliki nie są usuwane."
+  IDS_NEW_OR_OPEN, "Nie ma otwartego planu. Utworzyć nowy?"
+  IDS_CYCLE, "To przeniesienie utworzyłoby cykl."
+  IDS_NOT_DISK, "Cel musi być ścieżką dyskową wewnątrz tego planu."
+  IDS_ANALYZING, "Analizowanie..."
+}

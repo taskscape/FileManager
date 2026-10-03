@@ -221,7 +221,7 @@ const char* GetPluginSVGName(const char* dllName)
         {"diskmap.spl", "PluginDiskMap"}, {"filecomp.spl", "PluginCompare"},
         {"ieviewer.spl", "PluginWeb"}, {"mmviewer.spl", "PluginMedia"},
         {"peviewer.spl", "PluginExecutable"}, {"pictview.spl", "PluginPicture"},
-        {"renamer.spl", "PluginRename"}, {"splitcbn.spl", "PluginSplit"},
+        {"renamer.spl", "PluginRename"}, {"reorganize.spl", "PluginReorganize"}, {"splitcbn.spl", "PluginSplit"},
         {"unchm.spl", "PluginHelp"}, {"unfat.spl", "PluginDiskRecovery"},
         {"uniso.spl", "DriveOptical"}, {"unmime.spl", "Email"},
         {"unole.spl", "PluginCompound"}};

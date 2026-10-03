@@ -56,6 +56,7 @@ const char* OpcodeName(COperationCode opcode)
     case ocMoveDir: return "move-dir";
     case ocDeleteDir: return "delete-dir";
     case ocDeleteDirLink: return "delete-dir-link";
+    case ocCopyDirTime: return "copy-dir-time";
     default: return NULL;
     }
 }

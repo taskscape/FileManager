@@ -837,6 +837,86 @@ enum CSalamanderApplicationUpdateState
     sausFailed
 };
 
+// Reorganization steps are appended in SDK 105. Layout stays inside the file's pack(4)
+// region so a plug-in built against this header matches the host vtable and structs.
+#define SALOPSTEP_CREATEDIR 1
+#define SALOPSTEP_MOVE 2
+#define SALOPSTEP_REMOVEEMPTYDIR 3
+#define SALOPSTEP_COPYDIRTIME 4
+
+#define SALOPSTEPF_SOURCE_IS_DIR 0x0001
+#define SALOPSTEPF_TARGET_MUST_NOT_EXIST 0x0002
+#define SALOPSTEPF_ALLOW_CROSS_VOLUME 0x0004
+#define SALOPSTEPF_VERIFY_SOURCE_IDENTITY 0x0008
+#define SALOPSTEPF_METADATA_LOSS_ACCEPTED 0x0010
+#define SALOPSTEPF_CREATEDIR_ACCEPT_EXISTING 0x0020
+
+#define SALMDLOSS_LASTWRITE 0x0001
+#define SALMDLOSS_ATTRIBUTES 0x0002
+#define SALMDLOSS_SECURITY 0x0004
+#define SALMDLOSS_ADS 0x0008
+#define SALMDLOSS_COMPRESSION_EFS 0x0010
+#define SALMDLOSS_CREATION_LASTACCESS 0x0020
+
+struct CSalamanderFileIdentity
+{
+    DWORD Valid;
+    DWORD VolumeSerial;
+    BYTE FileId[16];
+    CQuadWord Size;
+    FILETIME LastWrite;
+};
+
+struct CSalamanderOperationStep
+{
+    DWORD StructSize;
+    DWORD Kind;
+    DWORD Flags;
+    const WCHAR* Source;
+    const WCHAR* Target;
+    CSalamanderFileIdentity ExpectedIdentity;
+    DWORD ExpectedMetadataLosses;
+    DWORD_PTR UserData;
+};
+
+#define SALOPSTEP_RESULT_DONE 0
+#define SALOPSTEP_RESULT_SKIPPED 1
+#define SALOPSTEP_RESULT_FAILED 2
+#define SALOPSTEP_RESULT_CANCELLED 3
+#define SALOPSTEP_RESULT_NOT_STARTED 4
+
+#define SALOPSTEP_RESULTF_ALREADY_EXISTED 0x0001
+#define SALOPSTEP_RESULTF_CROSS_VOLUME 0x0002
+
+#define SALEXECF_STOP_ON_ERROR 0x0001
+
+struct CSalamanderOperationStepsSummary
+{
+    DWORD StructSize;
+    int Done, Skipped, Failed, Cancelled, NotStarted;
+    BOOL UserCancelled;
+};
+
+class CSalamanderOperationStepObserverAbstract
+{
+public:
+    // Worker thread. Return FALSE to skip the step. No UI and no host SDK calls.
+    virtual BOOL WINAPI BeforeStep(int index, DWORD_PTR userData) = 0;
+    virtual void WINAPI AfterStep(int index, DWORD_PTR userData, DWORD result, DWORD error,
+                                  DWORD resultFlags, DWORD metadataLosses,
+                                  const CSalamanderFileIdentity* targetIdentity) = 0;
+    // Main thread, posted exactly once, including cancel and startup failure after acceptance.
+    virtual void WINAPI Finished(const CSalamanderOperationStepsSummary* summary,
+                                 const char* operationId) = 0;
+};
+
+typedef BOOL(WINAPI* SalEnumPathReferenceCallback)(DWORD kind, int index, const char* displayName,
+                                                   const char* path, void* param);
+#define SALPATHREF_HOTPATH 1
+#define SALPATHREF_USERMENU_DIR 2
+#define SALPATHREF_USERMENU_ARGS 3
+#define SALPATHREF_PANEL 4
+
 // Primary host API plugins use for panels, messages, configuration, paths, and file helpers.
 class CSalamanderGeneralAbstract
 {
@@ -3484,6 +3564,28 @@ public:
 
     // Returns CSalamanderApplicationUpdateState for the same shared check.
     virtual int WINAPI GetApplicationUpdateState() = 0;
+
+    // Starts asynchronous execution of 'count' already-reviewed steps. The host copies 'steps'.
+    // Returns FALSE without calling the observer when the request is invalid; GetLastError explains why.
+    // On TRUE, 'operationIdBuf' receives the host journal correlation id and the plug-in stays loaded
+    // until Finished returns on the main thread.
+    // limitation: main thread
+    virtual BOOL WINAPI ExecuteOperationSteps(HWND parent, const char* caption,
+                                              const CSalamanderOperationStep* steps, int count,
+                                              DWORD flags,
+                                              CSalamanderOperationStepObserverAbstract* observer,
+                                              char* operationIdBuf, int operationIdBufSize) = 0;
+
+    // Enumerates hot paths, user-menu directories and arguments, and the current panel paths.
+    // Enumeration stops when the callback returns FALSE.
+    // limitation: main thread
+    virtual void WINAPI EnumApplicationPathReferences(SalEnumPathReferenceCallback callback,
+                                                      void* param) = 0;
+
+    // Roaming data directory, UTF-8, no trailing backslash. Honours the UI-test sandbox.
+    // 'create' TRUE creates the directory when it is missing.
+    // can be called from any thread
+    virtual BOOL WINAPI GetApplicationDataDirectory(char* buf, int bufSize, BOOL create) = 0;
 };
 
 // Adapt the stable plug-in ABI's success/error out parameters to the shared
