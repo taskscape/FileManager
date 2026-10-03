@@ -10,4 +10,7 @@ BEGIN
     4001 "&Utwórz katalog...\tF7"
     4002 "Zażółć gęślą jaźń"
     4003 "&Create Directory...\tF7"
+    // Exercise the plug-in hint and network-status shapes as well as menu captions.
+    4004 "Przeszukiwanie sieci…"
+    4005 "Odzyskiwanie usuniętych plików"
 END

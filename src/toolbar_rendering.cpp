@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "precomp.h"
+#include "utf8gui.h" // toolbar caption measurement and painting must match UTF-8 tooltip text
 
 #include "bitmap.h"
 #include "toolbar.h"
@@ -302,7 +303,7 @@ BOOL CToolBar::Refresh()
                 r.right = 0;
                 r.bottom = 0;
                 DWORD noPrefix = item->Style & TLBI_STYLE_NOPREFIX ? DT_NOPREFIX : 0;
-                DrawText(CacheBitmap->HMemDC, item->Text, item->TextLen,
+                DrawTextUtf8(CacheBitmap->HMemDC, item->Text, item->TextLen,
                          &r, DT_NOCLIP | DT_LEFT | DT_SINGLELINE | noPrefix | DT_CALCRECT);
                 textWidth = r.right;
                 textPresent = TRUE;
@@ -674,13 +675,13 @@ void CToolBar::DrawItem(HDC hDC, int index)
                 textR2.right++;
                 textR2.bottom++;
                 SetTextColor(CacheBitmap->HMemDC, GetSysColor(COLOR_BTNHILIGHT));
-                DrawText(CacheBitmap->HMemDC, item->Text, item->TextLen,
+                DrawTextUtf8(CacheBitmap->HMemDC, item->Text, item->TextLen,
                          &textR2, noPrefix | DT_NOCLIP | DT_LEFT | DT_SINGLELINE | DT_VCENTER);
                 SetTextColor(CacheBitmap->HMemDC, GetSysColor(COLOR_BTNSHADOW));
             }
             else
                 SetTextColor(CacheBitmap->HMemDC, GetSysColor(COLOR_BTNTEXT));
-            DrawText(CacheBitmap->HMemDC, item->Text, item->TextLen, &r,
+            DrawTextUtf8(CacheBitmap->HMemDC, item->Text, item->TextLen, &r,
                      noPrefix | DT_NOCLIP | DT_LEFT | DT_VCENTER | DT_SINGLELINE);
             if (hOldFont != NULL)
                 SelectObject(CacheBitmap->HMemDC, hOldFont);

@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "precomp.h"
+#include "utf8gui.h" // dragged toolbar captions retain the same localized glyphs as the source toolbar
 
 #include "cfgdlg.h"
 #include "toolbar.h"
@@ -532,7 +533,7 @@ CTBCustomizeDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         int normalColor = index == -1 ? COLOR_GRAYTEXT : COLOR_WINDOWTEXT;
         SetTextColor(hDC, GetSysColor(selected && focused ? COLOR_HIGHLIGHTTEXT : normalColor));
         SetBkMode(hDC, TRANSPARENT);
-        DrawText(hDC, text, -1, &r, DT_SINGLELINE | DT_LEFT | DT_VCENTER);
+        DrawTextUtf8(hDC, text, -1, &r, DT_SINGLELINE | DT_LEFT | DT_VCENTER);
         r.left -= imageWidth;
         if (selected && !focused)
         {

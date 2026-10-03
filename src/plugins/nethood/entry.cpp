@@ -13,6 +13,7 @@
 */
 
 #include "precomp.h"
+#include "../../common/resource_strings_utf8.h" // plug-in metadata is consumed by UTF-8 host controls
 #include "nethood.h"
 #include "nethoodfs.h"
 #include "globals.h"
@@ -158,7 +159,7 @@ SalamanderPluginEntry(
     }
     SetupWinLibHelp(HTMLHelpCallback);
 
-    LoadString(hLangInst, IDS_DESCRIPTION, szDescription, COUNTOF(szDescription));
+    LoadStringUtf8(hLangInst, IDS_DESCRIPTION, szDescription, COUNTOF(szDescription));
 
     // Setup basic plugin information.
     salamander->SetBasicPluginData(

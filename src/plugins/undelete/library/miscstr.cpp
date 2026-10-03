@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "precomp.h"
+#include "../../../common/resource_strings_utf8.h" // char resources must match the host's UTF-8 plug-in API
 
 #include "..\undelete.rh2"
 
@@ -65,24 +66,19 @@ char* String<char>::LoadStr(int resID)
             TRACE_E("LoadStr: hInstance == NULL");
 #endif // _DEBUG
 
-    RELOAD:
-        int size = LoadStringA(hInstance, resID, StrAct, STRBUFSIZE - (int)(StrAct - StringBuffer));
-        // size contains number of copied characters without terminator
-        //    DWORD error = GetLastError();
-        if (size != 0 /* || error == NO_ERROR*/) // error is NO_ERROR even if string doesn't exist, we cannot use it
+        // Measure encoded bytes before wrapping; UTF-8 expansion must never publish a truncated hint or caption.
+        int size = LoadStringUtf8(hInstance, resID, NULL, 0);
+        if (size > 0 && size < STRBUFSIZE)
         {
-            if (STRBUFSIZE - (StrAct - StringBuffer) == size + 1 && StrAct > StringBuffer)
-            {
-                // if string was placed exactly on the buffer end, it could be incomplete
-                // we will read it again to the beginning of buffer
+            if (STRBUFSIZE - (StrAct - StringBuffer) <= size)
                 StrAct = StringBuffer;
-                goto RELOAD;
-            }
-            else
+            if (LoadStringUtf8(hInstance, resID, StrAct, STRBUFSIZE - (int)(StrAct - StringBuffer)) == size)
             {
                 ret = StrAct;
                 StrAct += size + 1;
             }
+            else
+                ret = errorBuff;
         }
         else
         {

@@ -282,7 +282,8 @@ BOOL WINAPI CWpdDevicePluginDataInterface::GetInfoLineContent(
     }
     else
     {
-        ::LoadString(FxGetLangInstance(), IDS_NODEVICEINFOLINE, buffer, 1000);
+        // The host draws information lines as UTF-8, including the no-device message.
+        LoadStringUtf8(FxGetLangInstance(), IDS_NODEVICEINFOLINE, buffer, 1000);
         return TRUE;
     }
 }

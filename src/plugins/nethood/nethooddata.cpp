@@ -11,6 +11,7 @@
 */
 
 #include "precomp.h"
+#include "../../common/resource_strings_utf8.h" // selection text and column captions share the host's UTF-8 encoding
 #include "nethood.h"
 #include "nethoodfs.h"
 #include "cache.h"
@@ -214,7 +215,7 @@ CNethoodPluginDataInterface::GetInfoLineContent(
 
         cSelected.SetUI64(selectedFiles + selectedDirs);
 
-        LoadString(GetLangInstance(), IDS_INFOLINE_SELECTION_PLURAL,
+        LoadStringUtf8(GetLangInstance(), IDS_INFOLINE_SELECTION_PLURAL,
                    szPluralString, COUNTOF(szPluralString));
 
         SalamanderGeneral->ExpandPluralString(szExpandedString,
@@ -306,7 +307,7 @@ void CNethoodPluginDataInterface::AddDescriptionColumn(
         0,
     };
 
-    LoadString(GetLangInstance(), IDS_COLUMN_COMMENTS, column.Name,
+    LoadStringUtf8(GetLangInstance(), IDS_COLUMN_COMMENTS, column.Name,
                COUNTOF(column.Name));
     column.GetText = &CNethoodPluginDataInterface::GetCommentColumnText;
     column.LeftAlignment = TRUE;

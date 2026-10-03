@@ -3238,7 +3238,11 @@ void CPlugins::HandleLoadOnStartFlag(HWND parent)
     int i;
     for (i = 0; i < Data.Count; i++)
     {
-        if (!Data[i]->GetLoaded() && Data[i]->LoadOnStart)
+        // Older profiles cached ACP resource text. Reload its owner once to refresh hints and menus from UTF-8 resources,
+        // while retaining the user's LoadOnStart preference for subsequent sessions.
+        BOOL legacyText = MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, Data[i]->Name, -1, NULL, 0) == 0 ||
+                          MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, Data[i]->Description, -1, NULL, 0) == 0;
+        if (!Data[i]->GetLoaded() && (Data[i]->LoadOnStart || legacyText))
         {
             Data[i]->InitDLL(parent, TRUE);
         }

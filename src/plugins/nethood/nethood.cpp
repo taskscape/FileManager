@@ -11,6 +11,7 @@
 */
 
 #include "precomp.h"
+#include "../../common/resource_strings_utf8.h" // host drive-menu captions must contain UTF-8 bytes
 #include "nethood.h"
 #include "cache.h"
 #include "nethoodfs.h"
@@ -184,7 +185,7 @@ CNethoodPluginInterface::Connect(
     szFileMenu[0] = TEXT(',');
     szFileMenu[1] = TEXT('\t');
 
-    LoadString(GetLangInstance(), IDS_MENUITEM, &szFileMenu[2], COUNTOF(szFileMenu) - 2);
+    LoadStringUtf8(GetLangInstance(), IDS_MENUITEM, &szFileMenu[2], COUNTOF(szFileMenu) - 2);
 
     g_oIcons.Load();
 

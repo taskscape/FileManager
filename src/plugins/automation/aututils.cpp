@@ -12,6 +12,7 @@
 */
 
 #include "precomp.h"
+#include "../../common/resource_strings_utf8.h" // resource fallback errors must match the UTF-8 host message API
 #include "aututils.h"
 #include "lang\lang.rh"
 #include "knownengines.h"
@@ -263,7 +264,7 @@ void FormatErrorText(
         }
         else
         {
-            LoadString(g_hLangInst, IDS_UNKERROR, end, (int)remaining);
+            LoadStringUtf8(g_hLangInst, IDS_UNKERROR, end, (int)remaining);
         }
     }
 }

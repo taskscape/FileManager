@@ -212,45 +212,8 @@ CSalamanderCallback SalamanderCallback;
 
 char* LoadStr(int resID)
 {
-    static char buffer[5000]; // buffer for many strings
-    static char* act = buffer;
-
-    //HANDLES(EnterCriticalSection(&__StrCriticalSection.cs));
-
-    if (5000 - (act - buffer) < 200)
-        act = buffer;
-
-RELOAD:
-    int size = LoadString(HLanguage, resID, act, 5000 - (int)(act - buffer));
-    // size contains the number of copied characters without the terminator
-    //  DWORD error = GetLastError();
-    char* ret;
-    if (size != 0 /* || error == NO_ERROR*/) // error is NO_ERROR even when the string does not exist - unusable
-    {
-        if ((5000 - (act - buffer) == size + 1) && (act > buffer))
-        {
-            // if the string was exactly at the end of the buffer, it could
-            // be a truncated string -- if we can move the window
-            // to the beginning of the buffer, load the string once again
-            act = buffer;
-            goto RELOAD;
-        }
-        else
-        {
-            ret = act;
-            act += size + 1;
-        }
-    }
-    else
-    {
-        //TRACE_E("Error in LoadStr(" << resID << ")." /*"): " << GetErrorText(error)*/);
-        static char errorBuff[] = "ERROR LOADING STRING";
-        ret = errorBuff;
-    }
-
-    //HANDLES(LeaveCriticalSection(&__StrCriticalSection.cs));
-
-    return ret;
+    // Host metadata, menu captions and toolbar hints share the host's counted UTF-8 resource loader.
+    return SalamanderGeneral->LoadStr(HLanguage, resID);
 }
 
 int WINAPI SalamanderPluginGetReqVer()

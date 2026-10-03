@@ -3,6 +3,7 @@
 // CommentsTranslationProject: TRANSLATED
 
 #include "precomp.h"
+#include "common/resource_strings_utf8.h" // selected-language button captions must bypass the system ANSI code page
 #include <strsafe.h>
 
 #include "cfgdlg.h"
@@ -818,7 +819,7 @@ int CLanguageSelectorDialog::Execute()
         if (hTmpLanguage != NULL)
             Modul = hTmpLanguage;
     }
-    if (!LoadString(Modul, IDS_SELLANGEXITBUTTON, ExitButtonLabel, 100))
+    if (!LoadStringUtf8(Modul, IDS_SELLANGEXITBUTTON, ExitButtonLabel, 100))
         strcpy(ExitButtonLabel, "Exit");
     int ret = (int)CCommonDialog::Execute();
     if (hTmpLanguage != NULL)

@@ -14,6 +14,7 @@
 #pragma once
 
 #include "fx_errcodes.h"
+#include "../../common/resource_strings_utf8.h" // ATL narrow resource loading otherwise returns ACP bytes to the UTF-8 host
 
 namespace Fx
 {
@@ -84,6 +85,18 @@ namespace Fx
     typedef ATL::CStringT<char, StrTraitFx<char>> CFxString;
 
 #endif // _FX_ATL_INTERWORK
+
+    inline bool FxLoadStringUtf8(CFxString& text, UINT id)
+    {
+        // Allocate for encoded bytes, not UTF-16 characters, and never expose a partial localized resource.
+        int bytes = LoadStringUtf8(FxGetLangInstance(), id, NULL, 0);
+        text.Empty();
+        if (bytes <= 0)
+            return false;
+        int copied = LoadStringUtf8(FxGetLangInstance(), id, text.GetBuffer(bytes), bytes + 1);
+        text.ReleaseBuffer(copied);
+        return copied == bytes;
+    }
 
     /// Maintains object lifetime by keeping track of number of references.
     class CFxRefCounted

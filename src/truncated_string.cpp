@@ -3,6 +3,7 @@
 // CommentsTranslationProject: TRANSLATED
 
 #include "precomp.h"
+#include "common/unicode_text_layout.h" // truncation offsets must follow decoded characters, not ANSI/UTF-8 bytes
 
 #include "cfgdlg.h"
 #include "plugins.h"
@@ -158,96 +159,32 @@ CTruncatedString::Get()
 
 BOOL CTruncatedString::TruncateText(HWND hWindow, BOOL forMessageBox)
 {
-    // if there is nothing to truncate, exit
     if (SubStrIndex == -1)
         return TRUE;
-
-    BOOL ret = TRUE;
-
     HDC hDC = HANDLES(GetDC(hWindow));
+    if (hDC == NULL)
+        return FALSE;
     HFONT hFont = (HFONT)SendMessage(hWindow, WM_GETFONT, 0, 0);
     HFONT hOldFont = (HFONT)SelectObject(hDC, hFont);
-
-    int fitChars;
-    int alpDx[8000]; // for measuring widths
-    int textLen = (int)strlen(Text);
-    char* truncated = (char*)malloc(textLen + 1 + 3); // 3: reserve for an ellipsis in the extreme case
-    if (truncated == NULL)
+    RECT rect = {};
+    GetClientRect(hWindow, &rect);
+    std::string shortened;
+    // Measure complete Unicode characters while preserving the byte-offset API and the unshortenable suffix.
+    BOOL result = TruncateUtf8Substring(hDC, Text, SubStrIndex, SubStrLen,
+                                       forMessageBox ? 400 : rect.right, forMessageBox != FALSE, shortened);
+    if (result)
     {
-        TRACE_E(LOW_MEMORY);
-        ret = FALSE;
-    }
-    else
-    {
-        if (TruncatedText != NULL)
+        char* replacement = DupStr(shortened.c_str());
+        result = replacement != NULL;
+        if (result)
+        {
             free(TruncatedText);
-        TruncatedText = truncated;
-
-        if (forMessageBox)
-        {
-            // for message boxes -- we just ensure that the substring is not larger than 400 points (so it fits even on 640x480)
-            int chars = SubStrLen;
-            int maxWidth = 400;
-            SIZE sz;
-            GetTextExtentExPoint(hDC, Text + SubStrIndex, SubStrLen, maxWidth, &fitChars, alpDx, &sz);
-            if (fitChars < SubStrLen)
-            {
-                // first part with the truncated substring
-                memcpy(TruncatedText, Text, SubStrIndex + fitChars);
-                // ellipsis
-                memcpy(TruncatedText + SubStrIndex + fitChars, "...", 3);
-                // the rest
-                strcpy(TruncatedText + SubStrIndex + fitChars + 3, Text + SubStrIndex + SubStrLen);
-            }
-            else
-                memcpy(TruncatedText, Text, textLen + 1); // just copy -— we still fit
-        }
-        else
-        {
-            // single-line layout for dialogs
-            // determine the maximum width we can afford
-            RECT r;
-            GetClientRect(hWindow, &r);
-            int maxWidth = r.right;
-
-            SIZE sz;
-            if (textLen > 8000)
-            {
-                TRACE_E("Text was truncated (to 7999 characters)");
-                Text[7999] = 0;
-                textLen = 7999;
-            }
-            GetTextExtentExPoint(hDC, Text, textLen, 0, NULL, alpDx, &sz);
-            if (sz.cx > maxWidth)
-            {
-                int width = sz.cx;
-
-                GetTextExtentPoint32(hDC, "...", 3, &sz);
-                int ellipsisWidth = sz.cx;
-
-                // we will subtract from the part that can be shortened
-                int index = SubStrIndex + SubStrLen - 1;
-                maxWidth -= ellipsisWidth;
-                while (width > maxWidth && index >= SubStrIndex)
-                {
-                    width -= (alpDx[index] - alpDx[index - 1]);
-                    index--;
-                }
-                // the first part with the shortened substring
-                memcpy(TruncatedText, Text, index);
-                // ellipsis
-                memcpy(TruncatedText + index, "...", 3);
-                // the rest
-                strcpy(TruncatedText + index + 3, Text + SubStrIndex + SubStrLen);
-            }
-            else
-                memcpy(TruncatedText, Text, textLen + 1); // just copy -— we still fit
+            TruncatedText = replacement;
         }
     }
-
     SelectObject(hDC, hOldFont);
     HANDLES(ReleaseDC(hWindow, hDC));
-    return ret;
+    return result;
 }
 
 //****************************************************************************

@@ -12,6 +12,7 @@
 */
 
 #include "precomp.h"
+#include "../../common/unicode_text_layout.h" // system errors must use the same UTF-8 encoding as resource errors
 #include "fx.h"
 #include "fxfs.h"
 #include "fx.rh"
@@ -190,7 +191,7 @@ namespace Fx
 
         GetPluginName(name);
         GetPluginDescription(description);
-        caption.LoadString(IDS_FX_ABOUT);
+        FxLoadStringUtf8(caption, IDS_FX_ABOUT); // host message-box captions also use UTF-8
 
         message.Format(TEXT("%s ") TEXT(VERSINFO_VERSION) TEXT("\n\n")
                            TEXT(VERSINFO_COPYRIGHT) TEXT("\n\n")
@@ -365,14 +366,14 @@ namespace Fx
 
     void WINAPI CFxPluginInterface::GetPluginName(CFxString& name) const
     {
-        // Load the name from the language module.
-        name.LoadString(IDS_FX_PLUGIN_NAME);
+        // Toolbar hints and drive-menu labels consume the UTF-8 plug-in name.
+        FxLoadStringUtf8(name, IDS_FX_PLUGIN_NAME);
     }
 
     void WINAPI CFxPluginInterface::GetPluginDescription(CFxString& description) const
     {
-        // Load the description from the language module.
-        description.LoadString(IDS_FX_PLUGIN_DESCRIPTION);
+        // Metadata uses the same encoding as the name, regardless of the Windows ANSI locale.
+        FxLoadStringUtf8(description, IDS_FX_PLUGIN_DESCRIPTION);
     }
 
     void WINAPI CFxPluginInterface::GetPluginConfigKey(CFxString& key) const
@@ -757,34 +758,14 @@ namespace Fx
 
     bool WINAPI FxGetWin32ErrorDescription(HRESULT hr, CFxString& text)
     {
-        PTSTR szMessage = nullptr;
-        DWORD dwLangId = 0U;
-
-        if (FormatMessage(
-                FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
-                nullptr,
-                hr,
-                dwLangId,
-                (PTSTR)&szMessage,
-                0,
-                nullptr) == 0)
+        // The host displays UTF-8; FormatMessageA would reintroduce localized ACP bytes here.
+        std::string message;
+        if (!Win32ErrorTextUtf8(hr, 0, message))
         {
-            // Unknown HRESULT.
             text.Empty();
             return false;
         }
-
-        text = szMessage;
-        LocalFree(szMessage);
-
-        int nLen = text.GetLength();
-        while (nLen > 0 && (text[nLen - 1] == '\r' || text[nLen - 1] == '\n'))
-        {
-            nLen--;
-        }
-
-        text.Truncate(nLen);
-
+        text = message.c_str();
         return true;
     }
 
@@ -794,7 +775,7 @@ namespace Fx
 
         if (HRESULT_FACILITY(hr) == __FX_HRFACILITY)
         {
-            found = !!text.LoadString(IDS_FX_ERRDESCRIPTION_BASE + HRESULT_CODE(hr));
+            found = FxLoadStringUtf8(text, IDS_FX_ERRDESCRIPTION_BASE + HRESULT_CODE(hr)); // keep resource errors valid UTF-8
         }
         else
         {

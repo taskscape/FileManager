@@ -3,6 +3,7 @@
 // CommentsTranslationProject: TRANSLATED
 
 #include "precomp.h"
+#include "common/unicode_text_layout.h" // measure and clip decoded Unicode, never UTF-8 bytes
 
 #include <strsafe.h>
 
@@ -25,7 +26,11 @@
 //
 
 CStaticText::CStaticText(HWND hDlg, int ctrlID, DWORD flags)
-    : CWindow(hDlg, ctrlID, ooAllocated)
+    : CWindow(hDlg, ctrlID, ooAllocated
+#ifndef _UNICODE
+              , TRUE // Native text messages must retain UTF-16 instead of passing through an ANSI subclass thunk.
+#endif
+              )
 {
     if ((flags & STF_HANDLEPREFIX) && ((flags & STF_END_ELLIPSIS) || (flags & STF_PATH_ELLIPSIS)))
     {
@@ -42,9 +47,6 @@ CStaticText::CStaticText(HWND hDlg, int ctrlID, DWORD flags)
     Text2Len = 0;
     Text2W = NULL;
     Text2LenW = 0;
-    AlpDX = NULL;
-    Allocated = 0;
-    AllocatedW = 0;
     Bitmap = NULL;
     HFont = NULL;
     DestroyFont = FALSE;
@@ -108,11 +110,23 @@ CStaticText::CStaticText(HWND hDlg, int ctrlID, DWORD flags)
     }
 
     // obtain the initial text of the static
-    char buff[4096];
-    CWindow::WindowProc(WM_GETTEXT, 4096, (LPARAM)buff);
-    buff[4095] = 0; // just to be sure...
-    if (buff[0] != 0)
-        SetText(buff);
+    // Read the original resource caption through the Unicode procedure before replacing its text storage.
+    int captionLength = (int)CWindow::WindowProc(WM_GETTEXTLENGTH, 0, 0);
+    if (captionLength > 0)
+    {
+        try
+        {
+            std::wstring caption((size_t)captionLength + 1, L'\0');
+            int copied = (int)CWindow::WindowProc(WM_GETTEXT, caption.size(), (LPARAM)&caption[0]);
+            std::string utf8;
+            if (WideTextToUtf8(caption.c_str(), copied, utf8))
+                SetText(utf8.c_str());
+        }
+        catch (const std::bad_alloc&)
+        {
+            TRACE_E(LOW_MEMORY); // keep an empty control instead of falling back to a corrupted ANSI caption
+        }
+    }
 }
 
 CStaticText::~CStaticText()
@@ -127,94 +141,55 @@ CStaticText::~CStaticText()
         free(Text2);
     if (Text2W != NULL)
         free(Text2W);
-    if (AlpDX != NULL)
-        free(AlpDX);
     if (Bitmap != NULL)
         delete Bitmap;
     if (HFont != NULL && DestroyFont)
         HANDLES(DeleteObject(HFont));
 }
 
-// prevents numerous reallocations when gradually allocating larger and larger strings
-#define ST_ALLOC_GRANULARITY 20
-
 BOOL CStaticText::SetText(const char* text)
 {
     CALL_STACK_MESSAGE2("CStaticText::SetText(%s)", text);
-
     if (text == NULL)
         text = "";
     if (Text != NULL && strcmp(Text, text) == 0)
         return TRUE;
 
-    int l = (int)strlen(text) + 1;
-    if (Allocated < l)
+    // Publish matching UTF-8/UTF-16 buffers together; a failed conversion/allocation must retain the previous label.
+    std::wstring wide;
+    if (!Utf8TextToWide(text, -1, wide))
+        return FALSE;
+    size_t bytes = strlen(text) + 1;
+    if (bytes > INT_MAX - 3 || wide.size() > INT_MAX - 4)
+        return FALSE;
+    char* next = (char*)malloc(bytes);
+    wchar_t* nextWide = (wchar_t*)malloc((wide.size() + 1) * sizeof(wchar_t));
+    BOOL ellipsis = (Flags & (STF_PATH_ELLIPSIS | STF_END_ELLIPSIS)) != 0;
+    char* nextShort = ellipsis ? (char*)malloc(bytes + 3) : NULL;
+    wchar_t* nextShortWide = ellipsis ? (wchar_t*)malloc((wide.size() + 4) * sizeof(wchar_t)) : NULL;
+    if (next == NULL || nextWide == NULL || (ellipsis && (nextShort == NULL || nextShortWide == NULL)))
     {
-        char* newText = (char*)realloc(Text, l + ST_ALLOC_GRANULARITY);
-        if (newText == NULL)
-        {
-            TRACE_E(LOW_MEMORY);
-            return FALSE;
-        }
-        if (Flags & (STF_PATH_ELLIPSIS | STF_END_ELLIPSIS))
-        {
-            int* newAlpDX = (int*)realloc(AlpDX, (l + ST_ALLOC_GRANULARITY) * sizeof(int));
-            if (newAlpDX == NULL)
-            {
-                TRACE_E(LOW_MEMORY);
-                free(newText);
-                return FALSE;
-            }
-            char* newText2 = (char*)realloc(Text2, l + ST_ALLOC_GRANULARITY + 3); // 3: space for "..." (I can remove W and add "...")
-            if (newText2 == NULL)
-            {
-                TRACE_E(LOW_MEMORY);
-                free(newText);
-                free(newAlpDX);
-                return FALSE;
-            }
-            AlpDX = newAlpDX;
-            Text2 = newText2;
-        }
-        Text = newText;
-        Allocated = l + ST_ALLOC_GRANULARITY;
+        free(next);
+        free(nextWide);
+        free(nextShort);
+        free(nextShortWide);
+        TRACE_E(LOW_MEMORY);
+        return FALSE;
     }
-    memmove(Text, text, l);
-    TextLen = l - 1;
-
-    // Convert UTF-8 to wide characters for proper Unicode display
-    int wideLen = MultiByteToWideChar(CP_UTF8, 0, text, -1, NULL, 0);
-    if (wideLen > 0)
-    {
-        if (AllocatedW < wideLen)
-        {
-            wchar_t* newTextW = (wchar_t*)realloc(TextW, (wideLen + ST_ALLOC_GRANULARITY) * sizeof(wchar_t));
-            if (newTextW == NULL)
-            {
-                TRACE_E(LOW_MEMORY);
-                // Continue without wide text - will fall back to ANSI display
-            }
-            else
-            {
-                TextW = newTextW;
-                AllocatedW = wideLen + ST_ALLOC_GRANULARITY;
-            }
-            if (Flags & (STF_PATH_ELLIPSIS | STF_END_ELLIPSIS))
-            {
-                wchar_t* newText2W = (wchar_t*)realloc(Text2W, (wideLen + ST_ALLOC_GRANULARITY + 3) * sizeof(wchar_t));
-                if (newText2W != NULL)
-                    Text2W = newText2W;
-            }
-        }
-        if (TextW != NULL)
-        {
-            MultiByteToWideChar(CP_UTF8, 0, text, -1, TextW, AllocatedW);
-            TextLenW = wideLen - 1;
-        }
-    }
-
+    memcpy(next, text, bytes);
+    memcpy(nextWide, wide.c_str(), (wide.size() + 1) * sizeof(wchar_t));
+    free(Text);
+    free(TextW);
+    free(Text2);
+    free(Text2W);
+    Text = next;
+    TextW = nextWide;
+    Text2 = nextShort;
+    Text2W = nextShortWide;
+    TextLen = (int)bytes - 1;
+    TextLenW = (int)wide.size();
+    Text2Len = Text2LenW = 0;
     PrepareForPaint();
-
     InvalidateRect(HWindow, NULL, FALSE);
     UpdateWindow(HWindow);
     return TRUE;
@@ -237,283 +212,53 @@ BOOL CStaticText::SetTextToDblQuotesIfNeeded(const char* text)
     return SetText(text);
 }
 
-// Precomputes the text layout for painting: measures the text with the
-// control font (wide API when available) and prepares ellipsis handling
-// (PATH/END ellipsis flags), clipping decisions, and word-wrap state so
-// WM_PAINT can render without measuring again.
+// Layout and painting share UTF-16 positions; UTF-8 byte offsets must never select an ellipsis boundary.
 void CStaticText::PrepareForPaint()
 {
     ClipDraw = FALSE;
     Text2Draw = FALSE;
-
-    if (Text == NULL || TextLen == 0) // the algorithm is designed only for a non-zero number of characters
-    {
-        TextWidth = 0;
-        TextHeight = 0;
+    TextWidth = TextHeight = 0;
+    if (TextW == NULL || TextLenW == 0)
         return;
-    }
-
     HDC hDC = HANDLES(GetDC(HWindow));
+    if (hDC == NULL)
+        return;
     HFONT hOldFont = (HFONT)SelectObject(hDC, HFont);
-    SIZE sz;
-    
-    // Use wide character APIs for proper Unicode support
-    BOOL useWide = (TextW != NULL && TextLenW > 0);
-    
+    SIZE size = {};
     if (Flags & (STF_PATH_ELLIPSIS | STF_END_ELLIPSIS))
     {
-        if (Flags & STF_END_ELLIPSIS)
+        std::wstring original, shortened;
+        std::string utf8;
+        if (Utf8TextToWide(Text, TextLen, original) &&
+            EllipsizeUnicodeText(hDC, original, Width, (Flags & STF_PATH_ELLIPSIS) != 0,
+                                (wchar_t)(unsigned char)PathSeparator, shortened, size) &&
+            WideTextToUtf8(shortened.c_str(), (int)shortened.size(), utf8))
         {
-            // STF_END_ELLIPSIS: the string will end with an ellipsis
-            // we need lengths only for the characters that fit
-            int fitChars;
-            if (useWide)
-                GetTextExtentExPointW(hDC, TextW, TextLenW, Width, &fitChars, AlpDX, &sz);
-            else
-                GetTextExtentExPoint(hDC, Text, TextLen, Width, &fitChars, AlpDX, &sz);
-            
-            int textLen = useWide ? TextLenW : TextLen;
-
-            if (fitChars < textLen)
-            {
-                //we it did not fit -- we must insert an ellipsis
-
-                // we get the width of "..." for the ellipsis
-                SIZE ellipsisSZ;
-                GetTextExtentPoint32W(hDC, L"...", 3, &ellipsisSZ);
-                int ellipsisWidth = ellipsisSZ.cx;
-
-                // we search from the right end to find how much to trim so we can append the ellipsis
-                while (fitChars > 0 && AlpDX[fitChars - 1] + ellipsisWidth > Width)
-                    fitChars--;
-                if (fitChars > 0)
-                {
-                    if (useWide && Text2W != NULL)
-                    {
-                        memmove(Text2W, TextW, fitChars * sizeof(wchar_t));
-                        Text2LenW = fitChars;
-                    }
-                    memmove(Text2, Text, fitChars);
-                    TextWidth = AlpDX[fitChars - 1];
-                    Text2Len = fitChars;
-                }
-                else
-                {
-                    TextWidth = 0;
-                    Text2Len = 0;
-                    Text2LenW = 0;
-                }
-                strcpy(Text2 + fitChars, "...");
-                if (useWide && Text2W != NULL)
-                    wcscpy(Text2W + fitChars, L"...");
-                TextWidth += ellipsisWidth;
-                Text2Len += 3;
-                Text2LenW = Text2Len;
-
-                Text2Draw = TRUE;
-            }
-            else
-            {
-                TextWidth = sz.cx;
-            }
+            // Both representations are derived from the same complete character sequence.
+            memcpy(Text2W, shortened.c_str(), (shortened.size() + 1) * sizeof(wchar_t));
+            memcpy(Text2, utf8.c_str(), utf8.size() + 1);
+            Text2LenW = (int)shortened.size();
+            Text2Len = (int)utf8.size();
+            Text2Draw = TRUE;
         }
         else
-        {
-            // STF_PATH_ELLIPSIS: the ellipsis will be inside the text
-            // we need lengths of all substrings
-            if (useWide)
-                GetTextExtentExPointW(hDC, TextW, TextLenW, 0, NULL, AlpDX, &sz);
-            else
-                GetTextExtentExPoint(hDC, Text, TextLen, 0, NULL, AlpDX, &sz);
-            
-            int textLen = useWide ? TextLenW : TextLen;
-
-            if (sz.cx > Width)
-            {
-                // we did not fit -- we must insert an ellipsis
-
-                // get the width of "..." for the ellipsis
-                SIZE ellipsisSZ;
-                GetTextExtentPoint32W(hDC, L"...", 3, &ellipsisSZ);
-                int ellipsisWidth = ellipsisSZ.cx;
-
-                // search from the right end for the path separator
-                int pIndex;
-                if (useWide)
-                {
-                    const wchar_t* p = TextW + TextLenW - 1;
-                    wchar_t pathSepW = (wchar_t)PathSeparator;
-                    while (*p != pathSepW && p > TextW)
-                        p--;
-                    const wchar_t* p2 = p;
-                    if (p > TextW)
-                        p--;
-                    pIndex = (int)(p - TextW);
-                    
-                    // the text from 'p' and further should fit entirely including the ellipsis
-                    if (ellipsisWidth + sz.cx - AlpDX[pIndex] > Width)
-                    {
-                        // it did not fit =>we search from the left end for a place to insert the ellipsis
-                        while (pIndex < TextLenW && (ellipsisWidth + sz.cx - AlpDX[pIndex] > Width))
-                            pIndex++;
-
-                        // we insert the ellipsis and then the rest of the text behind it
-                        pIndex++;
-                        if (Text2W != NULL)
-                            wcscpy(Text2W, L"...");
-                        strcpy(Text2, "...");
-                        Text2Len = 3;
-                        Text2LenW = 3;
-                        TextWidth = ellipsisWidth;
-                        if (pIndex < TextLenW)
-                        {
-                            if (Text2W != NULL)
-                            {
-                                memmove(Text2W + 3, TextW + pIndex, (TextLenW - pIndex + 1) * sizeof(wchar_t));
-                                Text2LenW += TextLenW - pIndex;
-                            }
-                            memmove(Text2 + 3, Text + pIndex, TextLen - pIndex + 1);
-                            Text2Len += TextLen - pIndex;
-                            TextWidth += sz.cx - AlpDX[pIndex - 1];
-                        }
-                    }
-                    else
-                    {
-                        int rightPartWidth = sz.cx - AlpDX[pIndex];
-                        // we determine how many characters to keep on the left side of the ellipsis
-                        while (pIndex >= 0 && (AlpDX[pIndex] + ellipsisWidth + rightPartWidth) > Width)
-                            pIndex--;
-                        // left part
-                        Text2Len = 0;
-                        Text2LenW = 0;
-                        TextWidth = 0;
-                        if (pIndex >= 0)
-                        {
-                            if (Text2W != NULL)
-                            {
-                                memmove(Text2W, TextW, (pIndex + 1) * sizeof(wchar_t));
-                                Text2LenW += pIndex + 1;
-                            }
-                            memmove(Text2, Text, pIndex + 1);
-                            Text2Len += pIndex + 1;
-                            TextWidth += AlpDX[pIndex];
-                        }
-                        // ellipsis
-                        if (Text2W != NULL)
-                        {
-                            memmove(Text2W + Text2LenW, L"...", 3 * sizeof(wchar_t));
-                            Text2LenW += 3;
-                        }
-                        memmove(Text2 + Text2Len, "...", 3);
-                        Text2Len += 3;
-                        TextWidth += ellipsisWidth;
-                        // right part
-                        int rightPartLen = TextLenW - (int)(p2 - TextW);
-                        if (Text2W != NULL)
-                        {
-                            memmove(Text2W + Text2LenW, p2, (rightPartLen + 1) * sizeof(wchar_t));
-                            Text2LenW += rightPartLen;
-                        }
-                        int rightPartLenA = TextLen - (int)((Text + TextLen) - (Text + pIndex + 1 + (p2 - (TextW + pIndex + 1))));
-                        // Approximate - use same ratio
-                        rightPartLenA = TextLen - pIndex - 1;
-                        const char* p2A = Text + TextLen - rightPartLen;
-                        memmove(Text2 + Text2Len, p2A, rightPartLen + 1);
-                        Text2Len += rightPartLen;
-                        TextWidth += rightPartWidth;
-                    }
-                }
-                else
-                {
-                    // ANSI fallback
-                    const char* p = Text + TextLen - 1;
-                    while (*p != PathSeparator && p > Text)
-                        p--;
-                    const char* p2 = p;
-                    if (p > Text)
-                        p--;
-                    pIndex = (int)(p - Text);
-
-                    // the text from 'p' and further should fit entirely including the ellipsis
-                    if (ellipsisWidth + sz.cx - AlpDX[pIndex] > Width)
-                    {
-                        // it did not fit =>we search from the left end for a place to insert the ellipsis
-                        while (pIndex < TextLen && (ellipsisWidth + sz.cx - AlpDX[pIndex] > Width))
-                            pIndex++;
-
-                        // we insert the ellipsis and then the rest of the text behind it
-                        pIndex++;
-                        strcpy(Text2, "...");
-                        Text2Len = 3;
-                        TextWidth = ellipsisWidth;
-                        if (pIndex < TextLen)
-                        {
-                            memmove(Text2 + 3, Text + pIndex, TextLen - pIndex + 1); // including the terminator
-                            Text2Len += TextLen - pIndex;
-                            TextWidth += sz.cx - AlpDX[pIndex - 1];
-                        }
-                    }
-                    else
-                    {
-                        int rightPartWidth = sz.cx - AlpDX[pIndex];
-                        // we determine how many characters to keep on the left side of the ellipsis
-                        while (pIndex >= 0 && (AlpDX[pIndex] + ellipsisWidth + rightPartWidth) > Width)
-                            pIndex--;
-                        // left part
-                        Text2Len = 0;
-                        TextWidth = 0;
-                        if (pIndex >= 0)
-                        {
-                            memmove(Text2, Text, pIndex + 1);
-                            Text2Len += pIndex + 1;
-                            TextWidth += AlpDX[pIndex];
-                        }
-                        // ellipsis
-                        memmove(Text2 + Text2Len, "...", 3);
-                        Text2Len += 3;
-                        TextWidth += ellipsisWidth;
-                        // right part
-                        int rightPartLen = TextLen - (int)(p2 - Text);
-                        memmove(Text2 + Text2Len, p2, rightPartLen + 1);
-                        Text2Len += rightPartLen;
-                        TextWidth += rightPartWidth;
-                    }
-                }
-
-                Text2Draw = TRUE;
-            }
-            else
-            {
-                TextWidth = sz.cx;
-            }
-        }
-        TextHeight = sz.cy;
+            GetTextExtentPoint32W(hDC, TextW, TextLenW, &size);
+        TextWidth = size.cx;
+        TextHeight = size.cy;
+    }
+    else if (Flags & STF_HANDLEPREFIX)
+    {
+        RECT r = {0, 0, Width, Height};
+        DrawTextW(hDC, TextW, TextLenW, &r, DT_CALCRECT | DT_SINGLELINE | DT_LEFT);
+        TextWidth = r.right;
+        TextHeight = r.bottom;
     }
     else
     {
-        // the overall dimensions are sufficient
-        if (Flags & STF_HANDLEPREFIX)
-        {
-            RECT r;
-            GetClientRect(HWindow, &r);
-            if (useWide)
-                DrawTextW(hDC, TextW, TextLenW, &r, DT_CALCRECT | DT_SINGLELINE | DT_LEFT);
-            else
-                DrawText(hDC, Text, TextLen, &r, DT_CALCRECT | DT_SINGLELINE | DT_LEFT);
-            TextWidth = r.right;
-            TextHeight = r.bottom;
-        }
-        else
-        {
-            if (useWide)
-                GetTextExtentPoint32W(hDC, TextW, TextLenW, &sz);
-            else
-                GetTextExtentPoint32(hDC, Text, TextLen, &sz);
-            TextWidth = sz.cx + 1;
-            TextHeight = sz.cy;
-        }
+        GetTextExtentPoint32W(hDC, TextW, TextLenW, &size);
+        TextWidth = size.cx + 1;
+        TextHeight = size.cy;
     }
-    // if the text would cross the window boundary, we must clip during drawing
     if (TextWidth > Width)
     {
         TextWidth = Width;
@@ -766,20 +511,28 @@ CStaticText::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 
     case WM_SETTEXT:
     {
-        return SetText((char*)lParam);
+        // Win32 delivers UTF-16 to this Unicode subclass; SetText retains the plug-in API's UTF-8 contract.
+        std::string utf8;
+        const wchar_t* wide = lParam != 0 ? (const wchar_t*)lParam : L"";
+        return WideTextToUtf8(wide, -1, utf8) && SetText(utf8.c_str());
     }
+
+    case WM_GETTEXTLENGTH:
+        return TextLenW;
 
     case WM_GETTEXT:
     {
-        if (Text == NULL || wParam < 2)
+        if (lParam == 0 || wParam == 0)
             return 0;
-
-        int len = (int)strlen(Text);
-        if (len > (int)wParam - 1)
-            len = (int)wParam - 1;
-        memcpy((char*)lParam, Text, len);
-        ((char*)lParam)[len + 1] = 0;
-        return len;
+        size_t count = (size_t)TextLenW < wParam - 1 ? (size_t)TextLenW : wParam - 1;
+        // A short destination must not receive half of a supplementary character or lose its terminator.
+        if (count > 0 && count < (size_t)TextLenW && TextW[count - 1] >= 0xd800 && TextW[count - 1] <= 0xdbff &&
+            TextW[count] >= 0xdc00 && TextW[count] <= 0xdfff)
+            --count;
+        if (count != 0)
+            memcpy((wchar_t*)lParam, TextW, count * sizeof(wchar_t));
+        ((wchar_t*)lParam)[count] = 0;
+        return count;
     }
 
     case WM_GETDLGCODE:
@@ -865,9 +618,7 @@ CStaticText::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
             HFONT hOldFont = (HFONT)SelectObject(hDC, HFont);
 
             // we draw the text
-            // Use wide character APIs for proper Unicode support
-            BOOL useWide = (TextW != NULL && TextLenW > 0);
-            
+            // The stored text and every shortened variant have validated UTF-16 counterparts.
             if (Flags & STF_HANDLEPREFIX)
             {
                 DWORD drawFlags = DT_SINGLELINE | DT_TOP;
@@ -886,10 +637,7 @@ CStaticText::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                 if (UIState & UISF_HIDEACCEL)
                     drawFlags |= DT_HIDEPREFIX;
 
-                if (useWide)
-                    DrawTextW(hDC, TextW, TextLenW, &r, drawFlags);
-                else
-                    DrawText(hDC, Text, TextLen, &r, drawFlags);
+                DrawTextW(hDC, TextW, TextLenW, &r, drawFlags);
             }
             else
             {
@@ -899,38 +647,9 @@ CStaticText::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 
                 int xOffset = GetTextXOffset();
                 
-                if (useWide)
-                {
-                    const wchar_t* textW;
-                    int textLenW;
-                    if (Text2Draw && Text2W != NULL)
-                    {
-                        textW = Text2W;
-                        textLenW = Text2LenW;
-                    }
-                    else
-                    {
-                        textW = TextW;
-                        textLenW = TextLenW;
-                    }
-                    ExtTextOutW(hDC, r.left + xOffset, r.top, drawFlags, &r, textW, textLenW, NULL);
-                }
-                else
-                {
-                    const char* text;
-                    int textLen;
-                    if (Text2Draw)
-                    {
-                        text = Text2;
-                        textLen = Text2Len;
-                    }
-                    else
-                    {
-                        text = Text;
-                        textLen = TextLen;
-                    }
-                    ExtTextOut(hDC, r.left + xOffset, r.top, drawFlags, &r, text, textLen, NULL);
-                }
+                const wchar_t* textW = Text2Draw ? Text2W : TextW;
+                int drawLength = Text2Draw ? Text2LenW : TextLenW;
+                ExtTextOutW(hDC, r.left + xOffset, r.top, drawFlags, &r, textW, drawLength, NULL);
             }
 
             if (Flags & STF_DOTUNDERLINE)

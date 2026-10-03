@@ -13,6 +13,8 @@
 */
 
 #include "precomp.h"
+#include "../../common/network_resources_utf8.h" // preserve localized network-provider names at the UTF-8 boundary
+#include "../../common/unicode_shell_link.h" // shortcut targets and RDP labels must not cross an ANSI boundary
 
 #include <strsafe.h>
 #include "nethood.h"
@@ -1755,17 +1757,21 @@ void CNethoodCache::WTSSessionChange(DWORD dwSessionId, int nStatus)
 
     TRACE_I("WTS session change, session id=" << dwSessionId << ", status=" << (nStatus < COUNTOF(STATUS_NAMES) ? STATUS_NAMES[nStatus] : "???"));
 
-    LPTSTR pszClientName;
+    LPWSTR pszClientName = NULL;
     DWORD cbReturned;
 
-    if (WTSQuerySessionInformation(
+    if (WTSQuerySessionInformationW(
             WTS_CURRENT_SERVER_HANDLE,
             dwSessionId,
             WTSClientName,
             &pszClientName,
             &cbReturned))
     {
-        TRACE_I("Client name=" << pszClientName);
+        // Diagnostic text follows the same UTF-8 contract as cached client names.
+        char* utf8 = NULL;
+        if (CopyNetworkText(pszClientName, utf8) == NO_ERROR)
+            TRACE_I("Client name=" << utf8);
+        free(utf8);
 
         WTSFreeMemory(pszClientName);
     }
@@ -1832,7 +1838,7 @@ unsigned CNethoodCacheEnumerationThread::Body()
     NETRESOURCE sNetResource = {
         0,
     };
-    NETRESOURCE* pBuffer = NULL;
+    NETRESOURCEW* pBuffer = NULL; // provider output must bypass the system ANSI code page
     DWORD cEntries = 0;
 
 #if DBG_TRUNCATE_EVERY_NTH_ENUM || DBG_FAIL_EVERY_NTH_ENUM
@@ -1915,7 +1921,7 @@ unsigned CNethoodCacheEnumerationThread::Body()
 
     if (dwError == NO_ERROR)
     {
-        pBuffer = reinterpret_cast<NETRESOURCE*>(new BYTE[ENUM_BUFFER_SIZE]);
+        pBuffer = reinterpret_cast<NETRESOURCEW*>(new BYTE[ENUM_BUFFER_SIZE]);
         assert(pBuffer != NULL); // should never fail if connected to Salamander's heap
 
         m_pCache->LockCache();
@@ -1935,7 +1941,13 @@ unsigned CNethoodCacheEnumerationThread::Body()
                 }
 #endif
 
-                ProcessEnumeration(pBuffer, cEntries, 0);
+                // Keep the native enumeration batch intact; UTF-8 expansion happens in owned per-entry buffers.
+                DWORD conversionError = ProcessWideEnumeration(m_node, pBuffer, cEntries, 0);
+                if (conversionError != NO_ERROR)
+                {
+                    dwError = conversionError;
+                    break;
+                }
             }
             else
             {
@@ -2029,6 +2041,21 @@ unsigned CNethoodCacheEnumerationThread::Body()
     }
 
     return 0;
+}
+
+DWORD CNethoodCacheEnumerationThread::ProcessWideEnumeration(
+    CNethoodCache::Node nodeParent, const NETRESOURCEW* resources,
+    DWORD count, UINT flags, const CTsClientName* clientName)
+{
+    // The cache copies each converted resource, so no provider-owned pointer survives the enumeration buffer.
+    for (DWORD index = 0; index < count; ++index)
+    {
+        CNetworkResourceUtf8 converted(resources[index]);
+        if (converted.Error != NO_ERROR)
+            return converted.Error;
+        ProcessEnumeration(nodeParent, &converted.Resource, 1, flags, clientName);
+    }
+    return NO_ERROR;
 }
 
 void CNethoodCacheEnumerationThread::ProcessEnumeration(
@@ -2126,17 +2153,16 @@ void CNethoodCacheEnumerationThread::ProcessShareInfo(
                     pszServerName, sShareInfo.shi1_netname);
     sNetResource.lpComment = sShareInfo.shi1_remark;
 #else
-    StringCchPrintf(szRemoteName, COUNTOF(szRemoteName), "%s\\%ls",
-                    pszServerName, sShareInfo.shi1_netname);
-    char szComment[MAX_PATH];
-    if (sShareInfo.shi1_remark && *sShareInfo.shi1_remark != L'\0')
-    {
-        if (WideCharToMultiByte(CP_ACP, 0, sShareInfo.shi1_remark,
-                                -1, szComment, COUNTOF(szComment), NULL, NULL) > 0)
-        {
-            sNetResource.lpComment = szComment;
-        }
-    }
+    // CRT %ls uses ACP in a narrow format; convert share names explicitly before assembling the UTF-8 path.
+    NETRESOURCEW share = {};
+    share.lpRemoteName = sShareInfo.shi1_netname;
+    share.lpComment = sShareInfo.shi1_remark;
+    CNetworkResourceUtf8 converted(share);
+    if (converted.Error != NO_ERROR ||
+        FAILED(StringCchPrintf(szRemoteName, COUNTOF(szRemoteName), "%s\\%s",
+                              pszServerName, converted.Resource.lpRemoteName)))
+        return;
+    sNetResource.lpComment = converted.Resource.lpComment;
 #endif
     sNetResource.lpRemoteName = szRemoteName;
 
@@ -2309,13 +2335,20 @@ DWORD CNethoodCacheEnumerationThread::OpenEnum(
 {
     DWORD dwError;
 
-    dwError = WNetOpenEnum(dwScope, dwType, dwUsage, pNetResource, phEnum);
+    // The same UTF-8 cache names must round-trip to the provider when a user enters a localized container.
+    NETRESOURCEA empty = {};
+    CNetworkResourceWide converted(pNetResource != NULL ? *pNetResource : empty);
+    if (converted.Error != NO_ERROR)
+        return converted.Error;
+    NETRESOURCEW* resourceW = pNetResource != NULL ? &converted.Resource : NULL;
+    dwError = WNetOpenEnumW(dwScope, dwType, dwUsage, resourceW, phEnum);
     if (IsLogonFailure(dwError))
     {
         // Access to the network resource was denied; try to
         // authenticate the user.
 
-        dwError = SalamanderGeneral->SalWNetAddConnection2Interactive(pNetResource);
+        // Keep authentication on the same Unicode resource; the host's legacy helper calls WNetAddConnection2A.
+        dwError = WNetAddConnection2W(resourceW, NULL, NULL, CONNECT_INTERACTIVE);
         /*
                 // It seems that the CONNECT_TEMPORARY flag vanished from
                 // recent MSDN documentation, so let's see what an older SDK
@@ -2333,8 +2366,8 @@ DWORD CNethoodCacheEnumerationThread::OpenEnum(
         if (dwError == NO_ERROR)
         {
             // Try once more.
-            dwError = WNetOpenEnum(dwScope, dwType, dwUsage,
-                                   pNetResource, phEnum);
+            dwError = WNetOpenEnumW(dwScope, dwType, dwUsage,
+                                    resourceW, phEnum);
         }
     }
 
@@ -2344,13 +2377,14 @@ DWORD CNethoodCacheEnumerationThread::OpenEnum(
 DWORD CNethoodCacheEnumerationThread::EnumResource(
     __in HANDLE hEnum,
     __out DWORD& cEntries,
-    __out NETRESOURCE* pBuffer,
+    __out NETRESOURCEW* pBuffer, // retain UTF-16 until ProcessWideEnumeration converts each entry
     __in DWORD cbBuffer)
 {
     DWORD dwError;
 
     cEntries = -1;
-    dwError = WNetEnumResource(hEnum, &cEntries, pBuffer, &cbBuffer);
+    // Explicit W calls prevent Polish provider/container names from becoming ACP bytes in the cache.
+    dwError = WNetEnumResourceW(hEnum, &cEntries, pBuffer, &cbBuffer);
 
     return dwError;
 }
@@ -2364,7 +2398,8 @@ DWORD CNethoodCacheEnumerationThread::EnumHiddenSharesNt(__in PCTSTR pszServerNa
 
 #ifndef _UNICODE
     WCHAR szServerNameW[MAX_PATH];
-    if (!MultiByteToWideChar(CP_ACP, 0, pszServerName, -1, szServerNameW, COUNTOF(szServerNameW)))
+    // Server names now originate in the UTF-8 cache, including non-ASCII UNC names.
+    if (!MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, pszServerName, -1, szServerNameW, COUNTOF(szServerNameW)))
     {
         return GetLastError();
     }
@@ -2415,14 +2450,14 @@ DWORD CNethoodCacheEnumerationThread::EnumHiddenShares(__in PCTSTR pszServerName
 BOOL CNethoodCacheEnumerationThread::GetShortcutsDir(__out_ecount(MAX_PATH) PTSTR pszPath)
 {
     PWSTR widePath = NULL;
-    // Resolve Network Shortcuts through Known Folders, then preserve this ANSI plug-in's fixed buffer contract.
+    // Resolve Network Shortcuts through Known Folders without changing the cache's UTF-8 path encoding.
     if (FAILED(SHGetKnownFolderPath(FOLDERID_NetHood, KF_FLAG_DEFAULT, NULL, &widePath)) || widePath == NULL)
         return FALSE;
 
 #ifdef UNICODE
     BOOL copied = SUCCEEDED(StringCchCopyW(pszPath, MAX_PATH, widePath));
 #else
-    BOOL copied = WideCharToMultiByte(CP_ACP, 0, widePath, -1, pszPath, MAX_PATH, NULL, NULL) != 0;
+    BOOL copied = WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, widePath, -1, pszPath, MAX_PATH, NULL, NULL) != 0;
 #endif
     CoTaskMemFree(widePath);
     return copied;
@@ -2524,24 +2559,22 @@ BOOL CNethoodCacheEnumerationThread::ResolveNetShortcut(
             {
                 HANDLES(FindClose(find));
 
-                IShellLink* link;
+                IShellLinkW* link; // retrieve localized UNC targets without an ACP round trip
                 if (CoCreateInstance(CLSID_ShellLink, NULL,
-                                     CLSCTX_INPROC_SERVER, IID_IShellLink,
+                                     CLSCTX_INPROC_SERVER, IID_IShellLinkW,
                                      (LPVOID*)&link) == S_OK)
                 {
                     IPersistFile* fileInt;
                     if (link->QueryInterface(IID_IPersistFile, (LPVOID*)&fileInt) == S_OK)
                     {
                         OLECHAR oleName[MAX_PATH];
-                        MultiByteToWideChar(CP_ACP, MB_PRECOMPOSED, name, -1, oleName, MAX_PATH);
-                        oleName[MAX_PATH - 1] = 0;
-                        if (fileInt->Load(oleName, STGM_READ) == S_OK)
+                        // Shortcut names came from FindFirstFileUtf8Local and must stay UTF-8 on the COM boundary.
+                        // Failed conversion must not send uninitialized path bytes to COM.
+                        if (MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, name, -1, oleName, MAX_PATH) > 0 &&
+                            fileInt->Load(oleName, STGM_READ) == S_OK)
                         {
-                            if (link->GetPath(name, MAX_PATH, &data, SLGP_UNCPRIORITY) == NOERROR)
-                            {                                        // Skip Resolve; it's not critical here and would slow things down.
-                                StringCchCopy(path, MAX_PATH, name); // Finally we know where the shortcut points.
-                                ok = TRUE;
-                            }
+                            // Skip Resolve as before; commit only a complete UTF-8 target that fits the fixed path contract.
+                            ok = ShellLinkTargetUtf8(link, path, MAX_PATH);
                         }
                         fileInt->Release();
                     }
@@ -2618,7 +2651,7 @@ DWORD CNethoodCacheEnumerationThread::EnumTSClientVolumes()
     };
     HANDLE hEnum;
     char achEnumBuffer[1024];
-    NETRESOURCE* pEnumResource = (NETRESOURCE*)achEnumBuffer;
+    NETRESOURCEW* pEnumResource = (NETRESOURCEW*)achEnumBuffer; // redirected-volume names also come from Unicode providers
     DWORD dwError;
     DWORD cEntries = 0;
     CNethoodCache::Node nodeParent;
@@ -2653,7 +2686,8 @@ DWORD CNethoodCacheEnumerationThread::EnumTSClientVolumes()
 
         if (dwError == NO_ERROR)
         {
-            ProcessEnumeration(nodeParent, pEnumResource, cEntries, ProcessTSCVolume, &oClientName);
+            // Use the same Unicode-to-UTF-8 cache boundary for redirected client volumes.
+            dwError = ProcessWideEnumeration(nodeParent, pEnumResource, cEntries, ProcessTSCVolume, &oClientName);
         }
         CloseEnum(hEnum);
     }
@@ -3089,37 +3123,29 @@ LRESULT WINAPI CNethoodCacheManagementThread::WtsNotifyWndProc(
 
 CTsClientName::CTsClientName(CNethoodCache* pCache)
 {
-    DWORD cbReturned;
-
+    DWORD cbReturned = 0;
+    LPWSTR client = NULL;
     assert(pCache != NULL);
-
     m_pCache = pCache;
-
-    if (WTSQuerySessionInformation(
-            WTS_CURRENT_SERVER_HANDLE,
-            WTS_CURRENT_SESSION,
-            WTSClientName,
-            &m_pszClientName, &cbReturned))
+    m_pszClientName = NULL;
+    m_cchClientName = 0;
+    // WTS owns the UTF-16 reply; the cache owns a separate UTF-8 copy after that reply is released.
+    if (WTSQuerySessionInformationW(WTS_CURRENT_SERVER_HANDLE, WTS_CURRENT_SESSION,
+                                   WTSClientName, &client, &cbReturned) &&
+        client != NULL && cbReturned >= sizeof(wchar_t) && CopyNetworkText(client, m_pszClientName) == NO_ERROR)
     {
-        m_cchClientName = (cbReturned / sizeof(TCHAR)) - 1; // exclude nul-terminator
-        assert(m_cchClientName >= 0);
+        m_cchClientName = (DWORD)strlen(m_pszClientName);
     }
     else
-    {
-        // Either an error occurred or this is not a remote session.
-        TRACE_E("Failed to retrieve client name, error " << GetLastError());
-
-        m_pszClientName = NULL;
-        m_cchClientName = 0;
-    }
+        TRACE_E("Failed to retrieve Unicode client name, error " << GetLastError());
+    if (client != NULL)
+        WTSFreeMemory(client);
 }
 
 CTsClientName::~CTsClientName()
 {
-    if (m_pszClientName != NULL)
-    {
-        WTSFreeMemory(m_pszClientName);
-    }
+    // The cached name is our converted allocation, not the original WTS reply.
+    free(m_pszClientName);
 }
 
 //------------------------------------------------------------------------------
@@ -3145,7 +3171,10 @@ void CTsNameFormatter::Format(
         poClientName == NULL ||
         poClientName->Length() == 0)
     {
-        StringCchCopy(pszDisplayName, cchMax, pszVolumeName);
+        // A short presentation buffer must never end inside a UTF-8 volume name.
+        pszDisplayName[0] = 0;
+        if (strlen(pszVolumeName) < cchMax)
+            memcpy(pszDisplayName, pszVolumeName, strlen(pszVolumeName) + 1);
         return;
     }
 
@@ -3156,20 +3185,11 @@ void CTsNameFormatter::Format(
         assert(m_pszFormat != NULL);
     }
 
-    // Use FormatMessage to take advantage of the indexed insertion
-    // points, since position of the volume name and client name may
-    // differ in different languages.
-
-    DWORD_PTR args[2];
-    args[0] = reinterpret_cast<DWORD_PTR>(pszVolumeName);
-    args[1] = reinterpret_cast<DWORD_PTR>((PCTSTR)(*poClientName));
-
-    FormatMessage(
-        FORMAT_MESSAGE_FROM_STRING | FORMAT_MESSAGE_ARGUMENT_ARRAY, // flags
-        m_pszFormat,                                                // source
-        0,                                                          // message id
-        0,                                                          // lang id
-        pszDisplayName,                                             // buffer
-        static_cast<DWORD>(cchMax),                                 // buffer size
-        reinterpret_cast<va_list*>(args));
+    // Format complete Unicode labels before checking the host's UTF-8 byte capacity.
+    std::string utf8;
+    pszDisplayName[0] = 0;
+    if (FormatUtf8Pair(m_pszFormat, pszVolumeName, (PCTSTR)(*poClientName), utf8) && utf8.size() < cchMax)
+        memcpy(pszDisplayName, utf8.c_str(), utf8.size() + 1);
+    else if (strlen(pszVolumeName) < cchMax)
+        memcpy(pszDisplayName, pszVolumeName, strlen(pszVolumeName) + 1); // retain the volume without a partial client label
 }

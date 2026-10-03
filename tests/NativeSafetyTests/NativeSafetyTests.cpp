@@ -5,6 +5,8 @@
 #include <stdio.h>
 #include <string>
 #include "../../src/common/resource_strings_utf8.h" // exercise the production resource loader with real multilingual resources
+#include "../../src/common/network_resources_utf8.h" // verify the exact provider/cache conversion used by net: enumeration
+#include "../../src/common/unicode_shell_link.h" // exercise production Unicode layout and COM/system text boundaries
 
 #include "../../src/common/checked_arithmetic.h"
 #include "../../src/operation_execution_filesystem.h"
@@ -55,7 +57,9 @@ int TestCheckedArithmeticBoundaries()
 int TestResourceStringsUtf8()
 {
     const HINSTANCE instance = GetModuleHandleW(NULL);
-    const char* expected[] = {u8"&Utw\u00f3rz katalog...\tF7", u8"Za\u017c\u00f3\u0142\u0107 g\u0119\u015bl\u0105 ja\u017a\u0144", "&Create Directory...\tF7"};
+    // Resource boundaries cover toolbar hints and pending-network labels as well as menu captions.
+    const char* expected[] = {u8"&Utw\u00f3rz katalog...\tF7", u8"Za\u017c\u00f3\u0142\u0107 g\u0119\u015bl\u0105 ja\u017a\u0144", "&Create Directory...\tF7",
+                              u8"Przeszukiwanie sieci\u2026", u8"Odzyskiwanie usuni\u0119tych plik\u00f3w"};
     for (int index = 0; index < static_cast<int>(_countof(expected)); ++index)
     {
         const int bytes = static_cast<int>(strlen(expected[index]));
@@ -73,6 +77,148 @@ int TestResourceStringsUtf8()
     if (LoadStringUtf8(instance, 4999, missing, sizeof(missing)) != 0 || missing[0] != 0)
         return Fail("missing resources left stale display text in the destination");
     return 0;
+}
+
+int TestNetworkResourcesUtf8()
+{
+    // Names returned by WNetEnumResourceW must remain navigable after caching and converting back for WNetOpenEnumW.
+    WCHAR remote[] = L"Ca\u0142a sie\u0107";
+    WCHAR comment[] = L"Za\u017c\u00f3\u0142\u0107 \u6771\u4eac \U0001f4c1";
+    WCHAR provider[] = L"Sie\u0107 Microsoft Windows";
+    WCHAR local[] = L"";
+    NETRESOURCEW source = {RESOURCE_GLOBALNET, RESOURCETYPE_DISK, RESOURCEDISPLAYTYPE_NETWORK,
+                          RESOURCEUSAGE_CONTAINER, local, remote, comment, provider};
+    CNetworkResourceUtf8 utf8(source);
+    if (utf8.Error != NO_ERROR || strcmp(utf8.Resource.lpRemoteName, u8"Ca\u0142a sie\u0107") != 0 ||
+        strcmp(utf8.Resource.lpComment, u8"Za\u017c\u00f3\u0142\u0107 \u6771\u4eac \U0001f4c1") != 0 ||
+        strcmp(utf8.Resource.lpProvider, u8"Sie\u0107 Microsoft Windows") != 0 ||
+        utf8.Resource.lpLocalName == NULL || utf8.Resource.lpLocalName[0] != 0)
+        return Fail("network provider text was converted through ANSI or lost empty fields");
+    remote[0] = L'X';
+    CNetworkResourceWide wide(utf8.Resource);
+    if (wide.Error != NO_ERROR || wcscmp(wide.Resource.lpRemoteName, L"Ca\u0142a sie\u0107") != 0 ||
+        wcscmp(wide.Resource.lpComment, comment) != 0 || wcscmp(wide.Resource.lpProvider, provider) != 0 ||
+        wide.Resource.dwScope != source.dwScope || wide.Resource.dwType != source.dwType ||
+        wide.Resource.dwDisplayType != source.dwDisplayType || wide.Resource.dwUsage != source.dwUsage)
+        return Fail("cached network text lost ownership, flags or its Unicode navigation identity");
+    NETRESOURCEW empty = {};
+    CNetworkResourceUtf8 nullFields(empty);
+    if (nullFields.Error != NO_ERROR || nullFields.Resource.lpRemoteName != NULL ||
+        nullFields.Resource.lpLocalName != NULL || nullFields.Resource.lpComment != NULL || nullFields.Resource.lpProvider != NULL)
+        return Fail("network conversion changed absent fields into empty strings");
+    char invalidUtf8[] = "\xc5";
+    NETRESOURCEA invalid = {};
+    invalid.lpRemoteName = invalidUtf8;
+    CNetworkResourceWide rejected(invalid);
+    WCHAR invalidUtf16[] = {0xd800, 0};
+    empty.lpRemoteName = invalidUtf16;
+    CNetworkResourceUtf8 rejectedWide(empty);
+    if (rejected.Error != ERROR_NO_UNICODE_TRANSLATION || rejectedWide.Error != ERROR_NO_UNICODE_TRANSLATION)
+        return Fail("network conversion accepted malformed text and changed its identity");
+    return 0;
+}
+
+int TestUnicodeTextBoundaries()
+{
+    // Sweep real GDI widths: Polish, CJK and supplementary characters must stay valid through both ellipsis modes.
+    HDC dc = CreateCompatibleDC(NULL);
+    if (dc == NULL)
+        return Fail("could not create the Unicode layout DC");
+    const std::wstring path = L"C:\\Za\u017c\u00f3\u0142\u0107\\\u6771\u4eac\\\U0001f4c1plik.txt";
+    SIZE originalSize, dots;
+    GetTextExtentPoint32W(dc, path.c_str(), (int)path.size(), &originalSize);
+    GetTextExtentPoint32W(dc, L"...", 3, &dots);
+    bool valid = true;
+    for (int width = 0; width <= originalSize.cx + 10; ++width)
+    {
+        for (int mode = 0; mode != 2; ++mode)
+        {
+            std::wstring clipped, decoded;
+            std::string utf8;
+            SIZE measured;
+            if (!EllipsizeUnicodeText(dc, path, width, mode != 0, L'\\', clipped, measured) ||
+                !WideTextToUtf8(clipped.c_str(), (int)clipped.size(), utf8) || !Utf8TextToWide(utf8.c_str(), -1, decoded) ||
+                decoded != clipped || (width >= dots.cx && measured.cx > width) ||
+                (width >= originalSize.cx && clipped != path))
+                valid = false;
+        }
+    }
+    // The full filename survives path shortening when it and the ellipsis fit.
+    const std::wstring leaf = path.substr(path.rfind(L'\\'));
+    SIZE leafSize, measured;
+    GetTextExtentPoint32W(dc, leaf.c_str(), (int)leaf.size(), &leafSize);
+    std::wstring clipped;
+    if (!EllipsizeUnicodeText(dc, path, leafSize.cx + dots.cx, true, L'\\', clipped, measured) ||
+        clipped.size() < leaf.size() || clipped.substr(clipped.size() - leaf.size()) != leaf)
+        valid = false;
+    const std::string prefix = u8"Sie\u0107: ";
+    const std::string body = u8"Za\u017c\u00f3\u0142\u0107 \u6771\u4eac \U0001f4c1 plik";
+    const std::string suffix = u8" - b\u0142\u0105d";
+    const std::string source = prefix + body + suffix;
+    for (int width = 0; width != 220; ++width)
+    {
+        for (int mode = 0; mode != 2; ++mode)
+        {
+            std::string truncated;
+            std::wstring wide;
+            if (!TruncateUtf8Substring(dc, source.c_str(), (int)prefix.size(), (int)body.size(), width, mode != 0, truncated) ||
+                !Utf8TextToWide(truncated.c_str(), -1, wide) || truncated.compare(0, prefix.size(), prefix) != 0 ||
+                truncated.size() < prefix.size() + suffix.size() ||
+                truncated.substr(truncated.size() - suffix.size()) != suffix)
+                valid = false;
+        }
+    }
+    std::string zeroStart, emptyBody, longResult;
+    std::string longText(12000, 'x');
+    std::wstring rejected;
+    if (!TruncateUtf8Substring(dc, body.c_str(), 0, (int)body.size(), 0, false, zeroStart) || zeroStart != "..." ||
+        !TruncateUtf8Substring(dc, body.c_str(), 0, 0, 0, false, emptyBody) || emptyBody != body ||
+        !TruncateUtf8Substring(dc, longText.c_str(), 0, (int)longText.size(), 120, false, longResult) || longText.size() != 12000 ||
+        TruncateUtf8Substring(dc, body.c_str(), 3, (int)body.size() - 3, 120, false, longResult) ||
+        Utf8TextToWide("\xc5", -1, rejected))
+        valid = false;
+    DeleteDC(dc);
+    if (!valid)
+        return Fail("Unicode ellipsis split a character, changed fixed text, or exceeded its measured width");
+
+    std::string formatted;
+    if (!FormatUtf8Pair(u8"Sie\u0107 %2!s! / %1!s!", u8"\u017b:\\", u8"\u6771\u4eac\U0001f4c1", formatted) ||
+        formatted != u8"Sie\u0107 \u6771\u4eac\U0001f4c1 / \u017b:\\")
+        return Fail("RDP indexed formatting lost Unicode or locale-specific insertion order");
+    wchar_t* system = NULL;
+    DWORD count = FormatMessageW(FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
+                                 NULL, ERROR_ACCESS_DENIED, 0, (wchar_t*)&system, 0, NULL);
+    std::string error;
+    std::wstring errorWide;
+    bool converted = Win32ErrorTextUtf8(ERROR_ACCESS_DENIED, 0, error) && Utf8TextToWide(error.c_str(), -1, errorWide);
+    std::wstring expected = count != 0 ? std::wstring(system, count) : L"";
+    LocalFree(system);
+    while (!expected.empty() && (expected.back() == L'\r' || expected.back() == L'\n'))
+        expected.pop_back();
+    if (count == 0 || !converted || errorWide != expected || Win32ErrorTextUtf8(0xdeadbeef, 0, error) || !error.empty())
+        return Fail("system-error text used ACP, retained CRLF, or published stale text for an unknown code");
+    return 0;
+}
+
+int TestUnicodeShellLinkTarget()
+{
+    // Use a real COM shortcut target; no network connection or target-file creation is needed for this boundary check.
+    HRESULT initialized = CoInitializeEx(NULL, COINIT_APARTMENTTHREADED);
+    if (FAILED(initialized))
+        return Fail("could not initialize the shortcut COM test");
+    IShellLinkW* link = NULL;
+    HRESULT created = CoCreateInstance(CLSID_ShellLink, NULL, CLSCTX_INPROC_SERVER, IID_IShellLinkW, (void**)&link);
+    const wchar_t* path = L"C:\\Za\u017c\u00f3\u0142\u0107\\\u6771\u4eac\\\U0001f4c1.txt";
+    char buffer[1024] = {};
+    char shortBuffer[] = "sentinel";
+    bool valid = SUCCEEDED(created) && SUCCEEDED(link->SetPath(path)) && ShellLinkTargetUtf8(link, buffer, sizeof(buffer));
+    std::wstring decoded;
+    valid = valid && Utf8TextToWide(buffer, -1, decoded) && decoded == path &&
+            !ShellLinkTargetUtf8(link, shortBuffer, sizeof(shortBuffer)) && strcmp(shortBuffer, "sentinel") == 0;
+    if (link != NULL)
+        link->Release();
+    CoUninitialize();
+    return valid ? 0 : Fail("shortcut target lost Unicode or partially overwrote an undersized destination");
 }
 
 int TestNativeFileOperationCharacterization()
@@ -682,6 +828,12 @@ int main()
     int result = TestCheckedArithmeticBoundaries();
     if (result == 0)
         result = TestResourceStringsUtf8(); // Polish bytes must reach the UTF-8 menu renderer unchanged
+    if (result == 0)
+        result = TestNetworkResourcesUtf8(); // provider names must survive both display and subsequent navigation
+    if (result == 0)
+        result = TestUnicodeTextBoundaries(); // layout must preserve character boundaries and UTF-8 system/RDP messages
+    if (result == 0)
+        result = TestUnicodeShellLinkTarget(); // COM targets must return complete UTF-8 paths
     if (result != 0)
         return result;
     result = TestNativeFileOperationCharacterization();

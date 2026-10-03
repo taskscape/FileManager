@@ -766,7 +766,7 @@ namespace Fx
     void WINAPI CFxPluginFSInterface::ShowChangePathError(PCTSTR path, PCTSTR error)
     {
         CFxString title, message;
-        title.LoadString(IDS_FX_CHANGEPATHERRORTITLE);
+        FxLoadStringUtf8(title, IDS_FX_CHANGEPATHERRORTITLE); // navigation error titles are shown by the UTF-8 host
         CFxString fullPath;
         PTSTR fullPathBuffer = fullPath.GetBuffer(MAX_PATH);
         SalamanderGeneral->GetPluginFSName(fullPathBuffer, 0);

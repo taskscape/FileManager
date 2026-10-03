@@ -110,6 +110,7 @@ protected:
 
     BOOL ShowHint();
 
+    // Keep the UTF-8 interface separate from UTF-16 layout/message positions; widths are temporary Unicode-layout data.
     DWORD Flags;         // flags for control behavior
     char* Text;          // allocated text (UTF-8)
     int TextLen;         // string length in bytes
@@ -119,11 +120,8 @@ protected:
     int Text2Len;        // length of Text2
     wchar_t* Text2W;     // wide char version of Text2
     int Text2LenW;       // length of Text2W in wchar_t
-    int* AlpDX;          // array of substring lengths; used only with STF_END_ELLIPSIS or STF_PATH_ELLIPSIS
     int TextWidth;       // text width in points
     int TextHeight;      // text height in points
-    int Allocated;       // size of allocated buffer 'Text' and 'AlpDX'
-    int AllocatedW;      // size of allocated buffer 'TextW'
     int Width, Height;   // static dimensions
     CBitmap* Bitmap;     // cache for drawing; used only with STF_CACHED_PAINT
     HFONT HFont;         // font handle used for text rendering

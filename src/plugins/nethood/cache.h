@@ -1271,6 +1271,10 @@ private:
     void BeginEnumeration(__in EnumerationPhase phase);
     void EndEnumeration(__in DWORD dwResult);
 
+    // Convert provider text once at the cache boundary, before names are compared or displayed.
+    DWORD ProcessWideEnumeration(CNethoodCache::Node nodeParent, const NETRESOURCEW* resources,
+                                 DWORD count, UINT flags, const CTsClientName* clientName = NULL);
+
     void ProcessEnumeration(
         __in CNethoodCache::Node nodeParent,
         __in const NETRESOURCE* pNetResource,
@@ -1343,7 +1347,7 @@ private:
     static DWORD EnumResource(
         __in HANDLE hEnum,
         __out DWORD& cEntries,
-        __inout NETRESOURCE* pBuffer,
+        __inout NETRESOURCEW* pBuffer, // enumeration buffers retain the provider's UTF-16 strings
         __in DWORD cbBuffer);
 
     /// Enumerates hidden system shares (C$ etc).

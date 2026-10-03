@@ -12,6 +12,7 @@
 */
 
 #include "precomp.h"
+#include "../../common/resource_strings_utf8.h" // run-script captions are passed to the UTF-8 host menu API
 #include "automationplug.h"
 #include "scriptlist.h"
 #include "automation.rh2"
@@ -153,7 +154,7 @@ MENU_TEMPLATE_ITEM ExecuteScriptMenu[] =
     mii.Type = MENU_TYPE_STRING;
     mii.ID = CmdRunFocusedScript;
     mii.State = CanExecuteFocusedItem() ? 0 : MENU_STATE_GRAYED;
-    LoadString(g_hLangInst, IDS_RUNFOCUSED, szText, _countof(szText));
+    LoadStringUtf8(g_hLangInst, IDS_RUNFOCUSED, szText, _countof(szText));
     if (SalamanderGeneral->GetMenuItemHotKey(mii.ID, NULL, szHotKeyText, _countof(szHotKeyText)))
     {
         StringCchCat(szText, _countof(szText), TEXT("\t"));

@@ -11,6 +11,7 @@
 */
 
 #include "precomp.h"
+#include "../../common/resource_strings_utf8.h" // empty-panel status text is painted by the UTF-8 host renderer
 #include "nethood.h"
 #include "nethoodfs.h"
 #include "cache.h"
@@ -1176,14 +1177,14 @@ CNethoodFSInterface::GetNoItemsInPanelText(
     if (bPending)
     {
         // Enumeration pending...
-        LoadString(GetLangInstance(), IDS_REFRESHING, textBuf, textBufSize);
-        return TRUE;
+        // Reject undersized replies instead of returning a partial multibyte status label.
+        return LoadStringUtf8(GetLangInstance(), IDS_REFRESHING, textBuf, textBufSize) > 0;
     }
 #if 0
 	else
 	{
 		// No items in the panel.
-		LoadString(GetLangInstance(), IDS_NETWORK_UNAVAILABLE, textBuf, textBufSize);
+		LoadStringUtf8(GetLangInstance(), IDS_NETWORK_UNAVAILABLE, textBuf, textBufSize);
 	}
 
 	return TRUE;
