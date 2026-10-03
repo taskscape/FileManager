@@ -1,0 +1,53 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head>
+<title>Reviewing and Building a Package</title>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+<link rel="stylesheet" type="text/css" href="../salamander_help.css" />
+<link rel="stylesheet" type="text/css" href="../salamander_help_shared.css" />
+</head>
+
+<body>
+<div id="help_page">
+<div class="header">Open Salamander: Plugins: Delivery Handoff: Using Delivery Handoff</div>
+<div class="page">
+<h1>Reviewing and Building a Package</h1>
+<p>The <b>Review Delivery Package</b> window scans the working material, inspects the candidate
+files, and shows what the package will contain. It is not modal: you can keep working in Open
+Salamander while you review.</p>
+
+<h3>Lists</h3>
+<table>
+ <tr><td class="hdr">Rules</td><td>Each rule of the specification with its role, required flag, selected and expected counts, and status (OK, Errors, Warnings, Missing). Select <i>All rules</i> or one rule to filter the other lists.</td></tr>
+ <tr><td class="hdr">Items</td><td>Candidate files with their target path in the package, size, details (pages, page size, pixel size, resolution), approval, licence, and status. Clear the check box to exclude a file; excluding all files of a required rule is reported as an omission. Missing expected items are listed as <i>Missing</i>.</td></tr>
+ <tr><td class="hdr">Findings</td><td>Errors, warnings, and notes with their code. Double-click a finding (or press Enter) to focus the file in the working panel.</td></tr>
+</table>
+<p>The filter offers <i>All items</i>, <i>Problems only</i>, <i>Omissions</i>, <i>Not included</i> (files no rule selected, and forbidden content that is never packaged), and <i>Superseded</i> (older revisions).</p>
+
+<h3>Actions</h3>
+<table>
+ <tr><td class="hdr">Approve</td><td>Approves the selected items of rules that require reviewer approval.</td></tr>
+ <tr><td class="hdr">Approve all in rule</td><td>Approves all included items of the selected rule.</td></tr>
+ <tr><td class="hdr">Show in panel</td><td>Focuses the selected file in the working panel.</td></tr>
+ <tr><td class="hdr">Override</td><td>Shown only when the specification allows it: accepts an error with a recorded reason of at least 10 characters. Some errors can never be overridden.</td></tr>
+ <tr><td class="hdr">Re-scan</td><td>Scans and inspects again. Decisions are kept for files that did not change.</td></tr>
+ <tr><td class="hdr">Save report</td><td>Saves a plain-text report of rules, items, and findings.</td></tr>
+ <tr><td class="hdr">Build</td><td>Enabled when no errors remain and, if warnings exist, <b>I have reviewed all warnings</b> is checked. Any change clears the check box.</td></tr>
+</table>
+
+<h3>What a build does</h3>
+<ol>
+<li>Creates a hidden unfinished package folder in the staging location.</li>
+<li>Copies every included file (never moves it), keeping the last-write time, and verifies each copy by SHA-256. Only the main data of a file is copied.</li>
+<li>Writes <code>CONTENTS.txt</code>, <code>manifest.csv</code>, and <code>manifest.json</code> (names can be changed by the specification).</li>
+<li>Checks that the folder contains exactly the planned files, then publishes it under the final name.</li>
+<li>Writes a build record <code>&lt;package&gt;.handoff-build.json</code> beside the package. It contains internal paths, the user and computer name, reviewer decisions, and the full specification, so keep it out of the delivery if that information must stay internal.</li>
+</ol>
+<p>Cancelling, an error, or a changed source file stops the build: the files copied so far are
+removed and nothing appears under the final package name. The <b>Result</b> dialog shows
+<i>Verified &#8212; ready for review</i>, <i>Verified with warnings</i>, or <i>Not built</i> with the reason.</p>
+</div>
+<div class="footer">&#169; 2026 Taskscape Ltd</div>
+</div>
+</body>
+</html>

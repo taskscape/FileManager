@@ -1,0 +1,7 @@
+{
+  "handoffSpec": 1,
+  "id": "t.minimal",
+  "name": "Minimal",
+  "package": { "folderName": "Package_{date}" },
+  "rules": [ { "id": "all", "select": { "include": ["**/*"] }, "formats": ["nosuchformat"] } ]
+}

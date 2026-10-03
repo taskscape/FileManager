@@ -134,6 +134,11 @@ jobs:
         if: matrix.platform == 'x64'
         run: .\tools\test-cmark-gfm-hardening.ps1
 
+      - name: Exercise Handoff specification parser corpus
+        if: matrix.platform == 'x64'
+        # Same invocation as scripts/runtests.ps1: shared specifications are untrusted input.
+        run: .\tools\test-handoff-spec-parser.ps1 -Architecture x64
+
       - name: Register MSVC problem matcher
         # This reviewed commit replaces the mutable master branch in PR builds.
         uses: ammaraskar/msvc-problem-matcher@541aa4360062d76d9620af6b8bd35cfa0c5ef19f

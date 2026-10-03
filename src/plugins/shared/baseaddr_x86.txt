@@ -53,6 +53,8 @@ splitcbn        0x21800000
 lang_splitcbn   0x31800000
 automation      0x21a00000
 lang_automation 0x31a00000
+handoff         0x2a800000
+lang_handoff    0x31b00000
 folders         0x22000000
 lang_folders    0x32000000
 salextx86       0x22100000
@@ -143,4 +145,5 @@ lang_pl_unole       0x43e00000
 lang_pl_unrar       0x44000000
 lang_pl_wmobile     0x44200000
 lang_pl_zip         0x44400000
+lang_pl_handoff     0x44600000
 

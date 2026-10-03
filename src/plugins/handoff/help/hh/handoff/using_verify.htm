@@ -1,0 +1,41 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head>
+<title>Verifying a Delivery Package</title>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+<link rel="stylesheet" type="text/css" href="../salamander_help.css" />
+<link rel="stylesheet" type="text/css" href="../salamander_help_shared.css" />
+</head>
+
+<body>
+<div id="help_page">
+<div class="header">Open Salamander: Plugins: Delivery Handoff: Using Delivery Handoff</div>
+<div class="page">
+<h1>Verifying a Delivery Package</h1>
+<p>Verification checks a package before you send it, or after someone else has handled it.</p>
+
+<h3>To verify a package:</h3>
+<ol>
+<li>Focus the package folder (or open it) in a panel and make that panel active.</li>
+<li>Open the window:
+<table>
+ <tr><td class="hdr">Menu:</td><td>Plugins/Delivery Handoff/Verify Delivery Package...</td></tr>
+</table>
+If neither the focused folder nor the current folder contains a manifest, choose the package folder.</li>
+<li>Read the result: <i>Verified</i>, <i>Verified with warnings</i>, or <i>Failed</i>.</li>
+</ol>
+
+<p>Verification recomputes SHA-256 for every file listed in the manifest and reports missing,
+modified, and unlisted files. When the build record beside the package is found, the manifest
+itself is authenticated against it. When the specification used for the build is found (in the
+build record, the library folder, the recent list, or chosen with <b>Browse</b>), its content,
+naming, format, PDF, image, and count rules are checked again. A specification that changed since
+the build is used with a warning. Approvals cannot be re-derived from a package; they are listed as
+recorded.</p>
+<p><b>Save report</b> writes a plain-text report to a location you choose; reports are never saved
+inside the package.</p>
+</div>
+<div class="footer">&#169; 2026 Taskscape Ltd</div>
+</div>
+</body>
+</html>

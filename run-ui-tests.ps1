@@ -66,13 +66,27 @@ function Test-FtpUiRuntime {
     return @($requiredFiles | Where-Object { -not (Test-Path -LiteralPath $_ -PathType Leaf) }).Count -eq 0
 }
 
+function Test-HandoffUiRuntime {
+    param([Parameter(Mandatory = $true)][string]$ResolvedExecutable)
+
+    $runtimeRoot = Split-Path -Parent $ResolvedExecutable
+    # Delivery Handoff UI tests fail (not skip) without the plug-in, so the focused runner must provide it like FTP.
+    $requiredFiles = @(
+        (Join-Path $runtimeRoot 'plugins\handoff\handoff.spl'),
+        (Join-Path $runtimeRoot 'plugins\handoff\lang\english.slg')
+    )
+    return @($requiredFiles | Where-Object { -not (Test-Path -LiteralPath $_ -PathType Leaf) }).Count -eq 0
+}
+
 function New-FtpUiTestRuntime {
     param(
         [Parameter(Mandatory = $true)][string]$ResolvedExecutable,
-        [Parameter(Mandatory = $true)][string]$StagingRoot
+        [Parameter(Mandatory = $true)][string]$StagingRoot,
+        # Also stage Delivery Handoff when the filter can select its fixtures.
+        [switch]$IncludeHandoff
     )
 
-    if (Test-FtpUiRuntime $ResolvedExecutable) {
+    if ((Test-FtpUiRuntime $ResolvedExecutable) -and (-not $IncludeHandoff -or (Test-HandoffUiRuntime $ResolvedExecutable))) {
         return $ResolvedExecutable
     }
 
@@ -88,6 +102,12 @@ function New-FtpUiTestRuntime {
     $ftpLanguage = Join-Path $ftpBuildRoot 'lang\english.slg'
     $crashReporter = Join-Path $sourceRuntimeRoot 'salmon.exe'
     $requiredBuildArtifacts = @($crashReporter, $ftpPlugin, $ftpLanguage)
+    $handoffBuildRoot = Join-Path $repositoryRoot "src\plugins\handoff\vcxproj\salamander\$configuration\plugins\handoff"
+    $handoffPlugin = Join-Path $handoffBuildRoot 'handoff.spl'
+    $handoffLanguage = Join-Path $handoffBuildRoot 'lang\english.slg'
+    if ($IncludeHandoff) {
+        $requiredBuildArtifacts += @($handoffPlugin, $handoffLanguage)
+    }
     $missingBuildArtifacts = @($requiredBuildArtifacts |
         Where-Object { -not (Test-Path -LiteralPath $_ -PathType Leaf) })
     if ($missingBuildArtifacts.Count -ne 0) {
@@ -115,9 +135,15 @@ function New-FtpUiTestRuntime {
         # Stage only runtime payloads from the matching checkout configuration; build intermediates must not leak into the test installation.
         Copy-Item -LiteralPath $ftpPlugin -Destination $stagedFtpRoot -Force
         Copy-Item -LiteralPath $ftpLanguage -Destination $stagedFtpLanguageRoot -Force
+        if ($IncludeHandoff) {
+            $stagedHandoffLanguageRoot = Join-Path $StagingRoot 'plugins\handoff\lang'
+            New-Item -ItemType Directory -Path $stagedHandoffLanguageRoot -Force | Out-Null
+            Copy-Item -LiteralPath $handoffPlugin -Destination (Join-Path $StagingRoot 'plugins\handoff') -Force
+            Copy-Item -LiteralPath $handoffLanguage -Destination $stagedHandoffLanguageRoot -Force
+        }
 
         $stagedExecutable = Join-Path $StagingRoot 'salamand.exe'
-        if (-not (Test-FtpUiRuntime $stagedExecutable)) {
+        if (-not (Test-FtpUiRuntime $stagedExecutable) -or ($IncludeHandoff -and -not (Test-HandoffUiRuntime $stagedExecutable))) {
             throw "The temporary FileManager runtime could not be staged completely below: $StagingRoot"
         }
         return $stagedExecutable
@@ -147,9 +173,12 @@ $runtimeStagingRoot = Join-Path $sandboxParent 'runtime'
 $resolvedExecutable = Resolve-FileManagerExecutable $ExecutablePath
 $ftpRuntimeRequired = [string]::IsNullOrWhiteSpace($Filter) -or
     $Filter -match '(?i)(TestCategory\s*=\s*UI|BasicUiTests|UI_007|Ftp|Quick_connect)'
-if ($ftpRuntimeRequired) {
+$handoffRuntimeRequired = [string]::IsNullOrWhiteSpace($Filter) -or
+    $Filter -match '(?i)(TestCategory\s*=\s*UI|Handoff)'
+if ($ftpRuntimeRequired -or $handoffRuntimeRequired) {
     # Raw Visual Studio output scatters plug-ins by project; use a disposable coherent runtime without modifying the caller's build tree.
-    $resolvedExecutable = New-FtpUiTestRuntime -ResolvedExecutable $resolvedExecutable -StagingRoot $runtimeStagingRoot
+    $resolvedExecutable = New-FtpUiTestRuntime -ResolvedExecutable $resolvedExecutable -StagingRoot $runtimeStagingRoot `
+        -IncludeHandoff:$handoffRuntimeRequired
 }
 elseif (-not (Test-Path -LiteralPath (Join-Path (Split-Path -Parent $resolvedExecutable) 'salmon.exe') -PathType Leaf)) {
     # Every UI launch needs its sibling crash reporter even when the selected fixture does not exercise FTP.

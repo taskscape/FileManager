@@ -1,0 +1,54 @@
+{
+  "$comment": "Consultancy report delivery: the final report approved by a sidecar file, appendices, and data files. Drafts and review comments never leave the working folder.",
+  "handoffSpec": 1,
+  "id": "consultancy.report-delivery",
+  "name": "Consultancy report delivery",
+  "revision": "2026.1",
+  "description": "Final report with appendices and data.",
+  "variables": {
+    "client":     { "label": "Client", "required": true, "pattern": "^[A-Za-z0-9-]{2,24}$" },
+    "engagement": { "label": "Engagement code", "required": true, "pattern": "^[A-Z0-9-]{3,16}$" }
+  },
+  "package": {
+    "folderName": "{client}_{engagement}_Report_{date}",
+    "contents": { "title": "{client} {engagement} — report delivery" },
+    "limits": { "maxFiles": 500, "maxTotalBytes": "2 GB" }
+  },
+  "naming": { "charset": "portable", "allowSpaces": false, "maxNameLength": 100 },
+  "content": {
+    "allowedFormats": ["pdf", "xlsx", "csv", "docx"],
+    "forbid": ["**/Thumbs.db", "**/.DS_Store", "**/desktop.ini", "**/~$*", "**/*.tmp", "**/*.bak", "**/*draft*", "**/*comments*", "**/*.approved"],
+    "emptyFiles": "forbid",
+    "unassigned": "info"
+  },
+  "rules": [
+    {
+      "id": "report",
+      "title": "Final report",
+      "role": "deliverable",
+      "required": true,
+      "count": { "min": 1, "max": 1 },
+      "select": { "include": ["Final/*.pdf"] },
+      "formats": ["pdf"],
+      "pdf": { "pages": { "min": 1 }, "pageSizes": ["A4", "Letter"], "orientation": "portrait", "allowPasswordProtected": false },
+      "approval": { "mode": "evidence", "evidence": { "sidecar": ["{stem}.approved"] } },
+      "target": { "folder": "", "name": "{client}_{engagement}_Report{ext}" }
+    },
+    {
+      "id": "appendices",
+      "title": "Appendices",
+      "role": "document",
+      "select": { "include": ["Final/Appendices/*.{pdf,docx}"] },
+      "formats": ["pdf", "docx"],
+      "target": { "folder": "Appendices", "name": "Appendix_{seq:00}_{stem}{ext}" }
+    },
+    {
+      "id": "data",
+      "title": "Data files",
+      "role": "supporting",
+      "select": { "include": ["Data/Final/**/*.{xlsx,csv}"] },
+      "formats": ["xlsx", "csv"],
+      "target": { "folder": "Data", "keepSubfolders": true }
+    }
+  ]
+}

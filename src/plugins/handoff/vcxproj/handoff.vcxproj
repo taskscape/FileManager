@@ -1,0 +1,357 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Debug|Win32">
+      <Configuration>Debug</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Debug|x64">
+      <Configuration>Debug</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|Win32">
+      <Configuration>Release</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|x64">
+      <Configuration>Release</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <VCProjectVersion>16.0</VCProjectVersion>
+    <ProjectGuid>{5E3C2A71-4B8F-4D2E-9A61-7C0D1E2F3A41}</ProjectGuid>
+    <RootNamespace>handoff</RootNamespace>
+    <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props">
+  </Import>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="Configuration">
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <PlatformToolset>v145</PlatformToolset>
+    <ConfigurationType>DynamicLibrary</ConfigurationType>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
+    <UseDebugLibraries>true</UseDebugLibraries>
+    <PlatformToolset>v145</PlatformToolset>
+    <ConfigurationType>DynamicLibrary</ConfigurationType>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <PlatformToolset>v145</PlatformToolset>
+    <ConfigurationType>DynamicLibrary</ConfigurationType>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
+    <UseDebugLibraries>true</UseDebugLibraries>
+    <PlatformToolset>v145</PlatformToolset>
+    <ConfigurationType>DynamicLibrary</ConfigurationType>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props">
+  </Import>
+  <ImportGroup Label="ExtensionSettings">
+  </ImportGroup>
+  <ImportGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="PropertySheets">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform">
+    </Import>
+    <Import Project="..\..\shared\vcxproj\x86.props">
+    </Import>
+    <Import Project="..\..\shared\vcxproj\plugin_base.props">
+    </Import>
+    <Import Project="..\..\shared\vcxproj\plugin_release.props">
+    </Import>
+    <Import Project="handoff.props">
+    </Import>
+  </ImportGroup>
+  <ImportGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="PropertySheets">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform">
+    </Import>
+    <Import Project="..\..\shared\vcxproj\x86.props">
+    </Import>
+    <Import Project="..\..\shared\vcxproj\plugin_base.props">
+    </Import>
+    <Import Project="..\..\shared\vcxproj\plugin_debug.props">
+    </Import>
+    <Import Project="handoff.props">
+    </Import>
+  </ImportGroup>
+  <ImportGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="PropertySheets">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform">
+    </Import>
+    <Import Project="..\..\shared\vcxproj\x64.props">
+    </Import>
+    <Import Project="..\..\shared\vcxproj\plugin_base.props">
+    </Import>
+    <Import Project="..\..\shared\vcxproj\plugin_release.props">
+    </Import>
+    <Import Project="handoff.props">
+    </Import>
+  </ImportGroup>
+  <ImportGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="PropertySheets">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform">
+    </Import>
+    <Import Project="..\..\shared\vcxproj\x64.props">
+    </Import>
+    <Import Project="..\..\shared\vcxproj\plugin_base.props">
+    </Import>
+    <Import Project="..\..\shared\vcxproj\plugin_debug.props">
+    </Import>
+    <Import Project="handoff.props">
+    </Import>
+  </ImportGroup>
+  <PropertyGroup Label="UserMacros">
+  </PropertyGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <ClCompile>
+      <LanguageStandard>stdcpplatest</LanguageStandard>
+    </ClCompile>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <ClCompile>
+      <LanguageStandard>stdcpplatest</LanguageStandard>
+    </ClCompile>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <ClCompile>
+      <LanguageStandard>stdcpplatest</LanguageStandard>
+    </ClCompile>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <ClCompile>
+      <LanguageStandard>stdcpplatest</LanguageStandard>
+    </ClCompile>
+  </ItemDefinitionGroup>
+  <ItemGroup>
+    <ClCompile Include="..\..\shared\auxtools.cpp">
+    </ClCompile>
+    <ClCompile Include="..\..\shared\dbg.cpp">
+    </ClCompile>
+    <ClCompile Include="..\..\shared\mhandles.cpp">
+    </ClCompile>
+    <ClCompile Include="..\..\shared\winliblt.cpp">
+    </ClCompile>
+    <ClCompile Include="..\config.cpp">
+    </ClCompile>
+    <ClCompile Include="..\handoff.cpp">
+    </ClCompile>
+    <ClCompile Include="..\precomp.cpp">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Create</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Create</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Create</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Create</PrecompiledHeader>
+    </ClCompile>
+    <ClCompile Include="..\ui\dlg_config.cpp">
+    </ClCompile>
+    <ClCompile Include="..\ui\dlg_newspec.cpp">
+    </ClCompile>
+    <ClCompile Include="..\ui\dlg_override.cpp">
+    </ClCompile>
+    <ClCompile Include="..\ui\dlg_result.cpp">
+    </ClCompile>
+    <ClCompile Include="..\ui\dlg_review.cpp">
+    </ClCompile>
+    <ClCompile Include="..\ui\dlg_session.cpp">
+    </ClCompile>
+    <ClCompile Include="..\ui\dlg_validate.cpp">
+    </ClCompile>
+    <ClCompile Include="..\ui\dlg_verify.cpp">
+    </ClCompile>
+    <ClCompile Include="..\ui\listview_util.cpp">
+    </ClCompile>
+    <ClCompile Include="..\ui\report_text.cpp">
+    </ClCompile>
+    <ClCompile Include="..\ui\sdk_strings.cpp">
+    </ClCompile>
+    <ClCompile Include="..\ui\session.cpp">
+    </ClCompile>
+    <ClCompile Include="..\ui\spec_source.cpp">
+    </ClCompile>
+    <ClCompile Include="..\ui\ui_thread.cpp">
+    </ClCompile>
+    <ClCompile Include="..\ui\wdialog.cpp">
+    </ClCompile>
+    <ClCompile Include="..\ui\worker_bridge.cpp">
+    </ClCompile>
+    <ClCompile Include="..\engine\build.cpp">
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+    </ClCompile>
+    <ClCompile Include="..\engine\csv.cpp">
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+    </ClCompile>
+    <ClCompile Include="..\engine\file_system.cpp">
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+    </ClCompile>
+    <ClCompile Include="..\engine\findings.cpp">
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+    </ClCompile>
+    <ClCompile Include="..\engine\formats.cpp">
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+    </ClCompile>
+    <ClCompile Include="..\engine\image_probe.cpp">
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+    </ClCompile>
+    <ClCompile Include="..\engine\json.cpp">
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+    </ClCompile>
+    <ClCompile Include="..\engine\name_template.cpp">
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+    </ClCompile>
+    <ClCompile Include="..\engine\outputs.cpp">
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+    </ClCompile>
+    <ClCompile Include="..\engine\patterns.cpp">
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+    </ClCompile>
+    <ClCompile Include="..\engine\pdf_pages_winrt.cpp">
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+    </ClCompile>
+    <ClCompile Include="..\engine\pdf_structure.cpp">
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+    </ClCompile>
+    <ClCompile Include="..\engine\plan.cpp">
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+    </ClCompile>
+    <ClCompile Include="..\engine\review.cpp">
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+    </ClCompile>
+    <ClCompile Include="..\engine\scanner.cpp">
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+    </ClCompile>
+    <ClCompile Include="..\engine\spec.cpp">
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+    </ClCompile>
+    <ClCompile Include="..\engine\text_util.cpp">
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+    </ClCompile>
+    <ClCompile Include="..\engine\verify.cpp">
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\..\shared\arraylt.h">
+    </ClInclude>
+    <ClInclude Include="..\..\shared\auxtools.h">
+    </ClInclude>
+    <ClInclude Include="..\..\shared\dbg.h">
+    </ClInclude>
+    <ClInclude Include="..\..\shared\spl_base.h">
+    </ClInclude>
+    <ClInclude Include="..\..\shared\spl_com.h">
+    </ClInclude>
+    <ClInclude Include="..\..\shared\spl_gen.h">
+    </ClInclude>
+    <ClInclude Include="..\..\shared\spl_gui.h">
+    </ClInclude>
+    <ClInclude Include="..\..\shared\spl_menu.h">
+    </ClInclude>
+    <ClInclude Include="..\..\shared\spl_vers.h">
+    </ClInclude>
+    <ClInclude Include="..\..\shared\winliblt.h">
+    </ClInclude>
+    <ClInclude Include="..\config.h">
+    </ClInclude>
+    <ClInclude Include="..\handoff.h">
+    </ClInclude>
+    <ClInclude Include="..\precomp.h">
+    </ClInclude>
+    <ClInclude Include="..\ui\build_session.h">
+    </ClInclude>
+    <ClInclude Include="..\ui\handoff_ui.h">
+    </ClInclude>
+    <ClInclude Include="..\ui\listview_util.h">
+    </ClInclude>
+    <ClInclude Include="..\ui\report_text.h">
+    </ClInclude>
+    <ClInclude Include="..\ui\sdk_strings.h">
+    </ClInclude>
+    <ClInclude Include="..\ui\session.h">
+    </ClInclude>
+    <ClInclude Include="..\ui\spec_source.h">
+    </ClInclude>
+    <ClInclude Include="..\ui\ui_thread.h">
+    </ClInclude>
+    <ClInclude Include="..\ui\wdialog.h">
+    </ClInclude>
+    <ClInclude Include="..\ui\worker_bridge.h">
+    </ClInclude>
+    <ClInclude Include="..\engine\build.h">
+    </ClInclude>
+    <ClInclude Include="..\engine\csv.h">
+    </ClInclude>
+    <ClInclude Include="..\engine\file_system.h">
+    </ClInclude>
+    <ClInclude Include="..\engine\findings.h">
+    </ClInclude>
+    <ClInclude Include="..\engine\formats.h">
+    </ClInclude>
+    <ClInclude Include="..\engine\inspect.h">
+    </ClInclude>
+    <ClInclude Include="..\engine\json.h">
+    </ClInclude>
+    <ClInclude Include="..\engine\name_template.h">
+    </ClInclude>
+    <ClInclude Include="..\engine\outputs.h">
+    </ClInclude>
+    <ClInclude Include="..\engine\patterns.h">
+    </ClInclude>
+    <ClInclude Include="..\engine\plan.h">
+    </ClInclude>
+    <ClInclude Include="..\engine\progress.h">
+    </ClInclude>
+    <ClInclude Include="..\engine\review.h">
+    </ClInclude>
+    <ClInclude Include="..\engine\scanner.h">
+    </ClInclude>
+    <ClInclude Include="..\engine\spec.h">
+    </ClInclude>
+    <ClInclude Include="..\engine\text_util.h">
+    </ClInclude>
+    <ClInclude Include="..\engine\verify.h">
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <Image Include="..\handoff.bmp">
+    </Image>
+  </ItemGroup>
+  <ItemGroup>
+    <ResourceCompile Include="..\handoff.rc">
+    </ResourceCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="..\handoff.def">
+    </None>
+    <None Include="..\handoff.rc2">
+    </None>
+    <None Include="..\handoff.rh">
+    </None>
+    <None Include="..\handoff.rh2">
+    </None>
+    <None Include="..\lang\lang.rh">
+    </None>
+    <None Include="..\versinfo.rh2">
+    </None>
+    <None Include="..\engine\catalog.inc">
+    </None>
+    <None Include="..\engine\labels.inc">
+    </None>
+    <None Include="..\engine\text_ids.rh">
+    </None>
+    <None Include="..\templates\architecture-issue.handoff.json">
+    </None>
+    <None Include="..\templates\client-delivery-example.handoff.json">
+    </None>
+    <None Include="..\templates\consultancy-report.handoff.json">
+    </None>
+    <None Include="..\templates\design-studio.handoff.json">
+    </None>
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="lang_handoff.vcxproj">
+      <Project>{6f4d3b82-5c9a-4e3f-8b72-8d1e2f304b52}</Project>
+      <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
+    </ProjectReference>
+  </ItemGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets">
+  </Import>
+  <ImportGroup Label="ExtensionTargets">
+  </ImportGroup>
+</Project>

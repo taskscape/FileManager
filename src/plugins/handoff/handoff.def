@@ -1,0 +1,4 @@
+LIBRARY handoff.spl
+
+EXPORTS SalamanderPluginEntry
+EXPORTS SalamanderPluginGetReqVer

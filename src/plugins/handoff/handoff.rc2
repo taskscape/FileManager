@@ -1,0 +1,22 @@
+﻿//
+// handoff.rc2 - resources Microsoft Visual C++ does not edit directly
+//
+
+#ifdef APSTUDIO_INVOKED
+#error this file is not editable by Microsoft Visual C++
+#endif //APSTUDIO_INVOKED
+
+/////////////////////////////////////////////////////////////////////////////
+// Add manually edited resources here...
+
+#include "versinfo.rh2"
+#include "versinfo.rc2"
+
+IDB_HANDOFF             BITMAP "handoff.bmp"
+
+// Starter specifications for "New Specification from Template..." (handoff-spec.md C.4.14).
+// Every file in templates\ must be listed here (checked by HandoffSourceContractTests).
+IDR_TEMPLATE_DESIGN       RCDATA "templates\\design-studio.handoff.json"
+IDR_TEMPLATE_ARCHITECTURE RCDATA "templates\\architecture-issue.handoff.json"
+IDR_TEMPLATE_CONSULTANCY  RCDATA "templates\\consultancy-report.handoff.json"
+IDR_TEMPLATE_EXAMPLE      RCDATA "templates\\client-delivery-example.handoff.json"

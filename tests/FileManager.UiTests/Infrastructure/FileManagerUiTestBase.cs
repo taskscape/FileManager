@@ -503,26 +503,44 @@ public abstract class FileManagerUiTestBase
         }
     }
 
-    private int WaitForFtpPluginCommand(int pluginCommand, string commandName)
+    // Delivery Handoff is built with the solution, so a missing plug-in is a packaging defect rather than an optional capability.
+    protected static void RequireHandoffPluginRuntime()
     {
-        UiTestTrace.Record("WAIT", $"ftp-command-map plugin-command={pluginCommand} name=\"{commandName}\" timeout=20s");
+        var runtimeRoot = Path.GetDirectoryName(UiTestSettings.ExecutablePath) ?? string.Empty;
+        var requiredFiles = new[]
+        {
+            Path.Combine(runtimeRoot, "plugins", "handoff", "handoff.spl"),
+            Path.Combine(runtimeRoot, "plugins", "handoff", "lang", "english.slg"),
+        };
+        var missingFiles = requiredFiles.Where(path => !File.Exists(path)).ToArray();
+        Assert.That(missingFiles, Is.Empty,
+                    $"Delivery Handoff UI tests require the plug-in beside the executable under test. Missing: {string.Join(", ", missingFiles)}");
+    }
+
+    // The FTP wrapper keeps its documented name for the runner contract while sharing the generic lookup.
+    private int WaitForFtpPluginCommand(int pluginCommand, string commandName) =>
+        WaitForPluginCommand("ftp.spl", pluginCommand, commandName);
+
+    protected int WaitForPluginCommand(string dllLeaf, int pluginCommand, string commandName)
+    {
+        UiTestTrace.Record("WAIT", $"plugin-command-map dll={dllLeaf} plugin-command={pluginCommand} name=\"{commandName}\" timeout=20s");
         var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(20);
         var lastObservedRecords = Array.Empty<string>();
         while (DateTime.UtcNow < deadline)
         {
             try
             {
-                lastObservedRecords = File.ReadLines(UiTestSettings.PluginCommandMapPath).TakeLast(12).ToArray();
+                lastObservedRecords = File.ReadLines(UiTestSettings.PluginCommandMapPath).TakeLast(64).ToArray();
                 foreach (var line in lastObservedRecords)
                 {
                     var fields = line.Split('|');
                     if (fields.Length == 4 &&
                         int.TryParse(fields[0], out var processId) && processId == Application.ProcessId &&
-                        string.Equals(Path.GetFileName(fields[1]), "ftp.spl", StringComparison.OrdinalIgnoreCase) &&
+                        string.Equals(Path.GetFileName(fields[1]), dllLeaf, StringComparison.OrdinalIgnoreCase) &&
                         int.TryParse(fields[2], out var loggedPluginCommand) && loggedPluginCommand == pluginCommand &&
                         int.TryParse(fields[3], out var salamanderCommand) && salamanderCommand > 0)
                     {
-                        UiTestTrace.Record("WAIT", $"ftp-command-map satisfied salamander-command={salamanderCommand}");
+                        UiTestTrace.Record("WAIT", $"plugin-command-map satisfied dll={dllLeaf} salamander-command={salamanderCommand}");
                         return salamanderCommand;
                     }
                 }
@@ -537,7 +555,7 @@ public abstract class FileManagerUiTestBase
 
         // Include the bounded transcript so a future plug-in protocol mismatch is actionable rather than a generic readiness timeout.
         var records = lastObservedRecords.Length == 0 ? "<none>" : string.Join(", ", lastObservedRecords);
-        Assert.Fail($"FileManager process {Application.ProcessId} did not register the FTP {commandName} command before it was invoked. Observed records: {records}.");
+        Assert.Fail($"FileManager process {Application.ProcessId} did not register the {dllLeaf} {commandName} command before it was invoked. Observed records: {records}.");
         return 0;
     }
 

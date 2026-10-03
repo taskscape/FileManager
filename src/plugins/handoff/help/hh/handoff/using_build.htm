@@ -1,0 +1,39 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head>
+<title>Building a Delivery Package</title>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+<link rel="stylesheet" type="text/css" href="../salamander_help.css" />
+<link rel="stylesheet" type="text/css" href="../salamander_help_shared.css" />
+</head>
+
+<body>
+<div id="help_page">
+<div class="header">Open Salamander: Plugins: Delivery Handoff: Using Delivery Handoff</div>
+<div class="page">
+<h1>Building a Delivery Package</h1>
+<p>The <b>Build Delivery Package</b> dialog starts a build session. It opens for the active
+panel (the working folder) and the inactive panel (the staging folder); both must show folders on
+a disk or network share, and neither may contain the other.</p>
+
+<h3>To build a delivery package:</h3>
+<ol>
+<li>Open the dialog:
+<table>
+ <tr><td class="hdr">Menu:</td><td>Plugins/Delivery Handoff/Build Delivery Package...</td></tr>
+</table></li>
+<li>Check the <b>Working folder</b> and <b>Staging folder</b>. <b>Swap</b> exchanges them.</li>
+<li>Choose the <b>Scope</b>: the entire working folder, or only the items selected in the panel.</li>
+<li>Choose the <b>Specification</b>. The list contains specifications from the nearest <code>.handoff</code> folder above the working folder, from the specification library folder (see <a href="dlgboxes_config.htm">Configuration</a>), and recently used ones. <b>Browse</b> opens any other file; <b>Validate</b> checks the selected file; <b>Show in panel</b> focuses it so you can edit it (for example with F4).</li>
+<li>Enter the <b>Variables</b>. Select a variable and type its value below the list, or choose it from the drop-down list. Required variables are marked.</li>
+<li>Check the <b>Package folder</b> preview. It must be available: an existing folder is never overwritten.</li>
+<li>Choose <b>Scan</b>. The <a href="using_review.htm">Review Delivery Package</a> window opens.</li>
+</ol>
+
+<p>When a previous build was interrupted, the dialog offers to remove its unfinished hidden
+package folders from the staging location. Only folders that no running build is using are offered.</p>
+</div>
+<div class="footer">&#169; 2026 Taskscape Ltd</div>
+</div>
+</body>
+</html>

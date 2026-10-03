@@ -1,0 +1,49 @@
+{
+  "handoffSpec": 1,
+  "id": "corpus.all-sections",
+  "name": "All sections",
+  "revision": "1",
+  "variables": {
+    "client": { "label": "Client", "required": true, "pattern": "^[A-Z]{2,8}$" },
+    "purpose": { "label": "Purpose", "default": "Final", "choices": ["Draft", "Final"] }
+  },
+  "package": {
+    "folderName": "{client}_{date:yyyyMMdd}",
+    "outputs": { "manifestJson": "manifest.json", "manifestCsv": null, "contents": "CONTENTS.txt" },
+    "contents": { "title": "{client} delivery", "groupBy": "rule", "notes": ["Purpose: {purpose}"] },
+    "limits": { "maxFiles": 100, "maxTotalBytes": "1 GB", "maxRelativePathLength": 150 },
+    "preserveModifiedTime": false,
+    "buildRecord": "none",
+    "manifest": { "includeSourcePaths": true }
+  },
+  "naming": { "charset": "unicode", "allowSpaces": true, "case": "lower", "maxNameLength": 80, "replacement": "-" },
+  "content": { "forbid": ["**/*.tmp"], "hidden": "allow", "emptyFiles": "warn", "duplicates": "forbid", "unassigned": "warn" },
+  "formats": { "rvt": { "extensions": [".rvt"], "magic": [ { "offset": 0, "hex": "D0CF11E0A1B11AE1" } ], "label": "Revit model" } },
+  "rules": [
+    {
+      "id": "sheets",
+      "title": "Sheets",
+      "required": true,
+      "count": { "min": 1, "max": 50 },
+      "select": { "include": ["Sheets/**/*.pdf"], "latestRevision": { "regex": "_([PC]\\d{2})$", "prefixOrder": ["P", "C"] } },
+      "expect": { "keyRegex": "^(A-\\d{3})_", "keys": ["A-101"], "allowUnexpected": true },
+      "formats": ["pdf"],
+      "fileSize": { "max": "50 MB" },
+      "pdf": { "pages": { "min": 1, "max": 1 }, "pageSizes": ["A1", { "widthMm": 841, "heightMm": 594 }], "orientation": "landscape" },
+      "approval": { "mode": "evidence", "evidence": { "sidecar": ["{stem}.approved"] } },
+      "target": { "folder": "Sheets/{rev}", "name": "{key}-{rev}{ext}" },
+      "severity": { "HO-NAME-010": "off" }
+    },
+    {
+      "id": "images",
+      "select": { "include": ["Images/**/*.{png,jpg}"] },
+      "formats": ["png", "jpeg"],
+      "image": { "longEdge": { "min": 1000 }, "aspectRatio": { "value": "16:9" }, "dpi": { "min": 150 }, "colorModel": ["rgb"], "forbidGps": true },
+      "license": { "required": false, "sidecar": ["{stem}.licence.txt"], "includeEvidence": true },
+      "target": { "folder": "Images", "name": "{seq:000}_{name}" }
+    },
+    { "id": "models", "role": "source", "select": { "include": ["Models/*.rvt"] }, "formats": ["rvt"] }
+  ],
+  "severity": { "HO-IMG-020": "error" },
+  "policy": { "allowErrorOverride": true, "requireWarningAcknowledgement": false }
+}

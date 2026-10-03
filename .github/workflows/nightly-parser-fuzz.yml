@@ -33,3 +33,8 @@ jobs:
       - name: Replay Markdown extension-combination corpus
         shell: pwsh
         run: .\tools\test-cmark-gfm-hardening.ps1 -Iterations 250
+
+      - name: Replay Handoff specification hostile corpus
+        shell: pwsh
+        # Deterministic mutations of every delivery specification input, as in the bzip2 soak.
+        run: .\tools\test-handoff-spec-parser.ps1 -Architecture x64 -Iterations 250

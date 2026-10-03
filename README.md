@@ -63,6 +63,7 @@ The highlights below cover repository work from **March through September 2026**
 - FTP downloads keep an existing local file intact while receiving data into a unique sibling `.salftp-*.part` file. The matching `.meta` file records ownership and verified resume checkpoints. A move deletes its remote source only after local validation, flush, metadata, publication, and checked completion succeed. Cancellation or failure can leave these private files for a later retry; keep them together. Resume requires a matching remote version and unchanged local evidence. Legacy, corrupted, named-stream, reparse-point, or ambiguous publication states require manual inspection; a `.previous` sibling retains the old destination when publication cleanup cannot finish. Restart never replays remote deletion.
 - Bundled engines were upgraded: [7-Zip 26.02](src/plugins/7zip/doc/upgrade-26.02.md), zlib, SQLite (with defined recovery behavior), bzip2, and cmark-gfm.
 - UnRAR plugin loading was restored; 64-bit file-size handling was applied to the active plug-in readers.
+- New **Delivery Handoff** plug-in builds and verifies professional delivery packages: a reusable `*.handoff.json` specification defines required documents, naming, formats, PDF page sizes, image dimensions, allowed content, and approval and licence evidence; the plug-in assembles candidates from the working panel, flags omissions, copies them into a hash-verified package in the other panel, and writes `manifest.json`, `manifest.csv`, and `CONTENTS.txt`.
 
 ### Build, tests, and releases
 

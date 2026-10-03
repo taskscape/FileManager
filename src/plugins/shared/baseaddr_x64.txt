@@ -53,6 +53,8 @@ splitcbn        0x0000010021800000
 lang_splitcbn   0x0000010031800000
 automation      0x0000010021a00000
 lang_automation 0x0000010031a00000
+handoff         0x000001002a800000
+lang_handoff    0x0000010031b00000
 folders         0x0000010022000000
 lang_folders    0x0000010032000000
 salextx64       0x0000010022100000
@@ -143,4 +145,5 @@ lang_pl_unole       0x0000010043e00000
 lang_pl_unrar       0x0000010044000000
 lang_pl_wmobile     0x0000010044200000
 lang_pl_zip         0x0000010044400000
+lang_pl_handoff     0x0000010044600000
 

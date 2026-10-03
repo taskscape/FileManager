@@ -1,0 +1,61 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head>
+<title>Specification Reference</title>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+<link rel="stylesheet" type="text/css" href="../salamander_help.css" />
+<link rel="stylesheet" type="text/css" href="../salamander_help_shared.css" />
+</head>
+
+<body>
+<div id="help_page">
+<div class="header">Open Salamander: Plugins: Delivery Handoff: Reference</div>
+<div class="page">
+<h1>Specification Reference</h1>
+<p>A delivery specification is a UTF-8 JSON file named <code>*.handoff.json</code> (at most 1 MiB).
+Member names are case-sensitive; <code>$comment</code> members are ignored; unknown members are
+reported as warnings. Paths are always relative, use <code>/</code>, and are matched
+case-insensitively.</p>
+
+<h3>Top level</h3>
+<table>
+ <tr><td class="hdr">handoffSpec</td><td>Format version, must be 1 (required).</td></tr>
+ <tr><td class="hdr">id</td><td>Stable identifier, lower-case letters, digits, <code>.</code>, <code>_</code>, <code>-</code> (required). Recorded in manifests and used to find the specification during verification.</td></tr>
+ <tr><td class="hdr">name, revision, description</td><td>Display name (required), revision label, and description.</td></tr>
+ <tr><td class="hdr">variables</td><td>Values entered in the build dialog: <code>label</code>, <code>required</code>, <code>default</code>, <code>pattern</code> (regular expression), <code>choices</code>. Built-in variables: <code>date</code>, <code>specId</code>, <code>specName</code>, <code>specRevision</code>.</td></tr>
+ <tr><td class="hdr">package</td><td><code>folderName</code> template (required); <code>outputs</code> (<code>manifestJson</code>, <code>manifestCsv</code>, <code>contents</code>; <code>null</code> disables the last two); <code>contents</code> (<code>title</code>, <code>groupBy</code> folder/rule, <code>notes</code>); <code>limits</code> (<code>maxFiles</code>, <code>maxTotalBytes</code>, <code>maxRelativePathLength</code>); <code>preserveModifiedTime</code>; <code>buildRecord</code> (beside/none); <code>manifest.includeSourcePaths</code>.</td></tr>
+ <tr><td class="hdr">naming</td><td><code>charset</code> (portable/unicode), <code>allowSpaces</code>, <code>case</code> (keep/lower/upper), <code>maxNameLength</code>, <code>transliterate</code>, <code>replacement</code>, <code>sourceNameRegex</code>.</td></tr>
+ <tr><td class="hdr">content</td><td><code>allowedFormats</code>, <code>forbid</code> globs (default: Thumbs.db, .DS_Store, desktop.ini, ~$*, *.tmp, *.bak, __MACOSX, .git), <code>hidden</code>, <code>system</code>, <code>emptyFiles</code>, <code>maxFileSize</code>, <code>duplicates</code>, <code>unassigned</code>.</td></tr>
+ <tr><td class="hdr">formats</td><td>Custom formats: <code>extensions</code>, <code>magic</code> signatures (<code>offset</code> with <code>hex</code> or <code>ascii</code>), <code>text</code>, <code>label</code>.</td></tr>
+ <tr><td class="hdr">rules</td><td>1 to 256 rules, evaluated in order (see below; required).</td></tr>
+ <tr><td class="hdr">severity</td><td>Finding code mapped to <code>error</code>, <code>warning</code>, <code>info</code>, or <code>off</code>.</td></tr>
+ <tr><td class="hdr">policy</td><td><code>allowErrorOverride</code> (default false), <code>requireWarningAcknowledgement</code> (default true).</td></tr>
+</table>
+
+<h3>Rules</h3>
+<table>
+ <tr><td class="hdr">id, title, description, role</td><td>Identifier, display title, description, and role (deliverable, source, asset, document, supporting).</td></tr>
+ <tr><td class="hdr">required, count</td><td>Whether the rule must select something, and <code>min</code>/<code>max</code> counts.</td></tr>
+ <tr><td class="hdr">select</td><td><code>include</code> and <code>exclude</code> globs (<code>*</code>, <code>**</code>, <code>?</code>, <code>[a-z]</code>, <code>{a,b}</code>), <code>nameRegex</code>, <code>pathRegex</code>, <code>shared</code>, and <code>latestRevision</code> (<code>regex</code> with one group, <code>scope</code> name/folder, <code>prefixOrder</code>) to keep only the newest revision.</td></tr>
+ <tr><td class="hdr">expect</td><td><code>keyRegex</code> (group 1 is the item key), <code>keys</code>, <code>registerCsv</code> (<code>path</code>, <code>column</code>, optional <code>where</code>), <code>allowUnexpected</code>. Each missing key is reported.</td></tr>
+ <tr><td class="hdr">formats, fileSize</td><td>Allowed format IDs (pdf, ai, eps, psd, svg, indd, png, jpeg, tiff, gif, bmp, webp, heic, avif, zip, docx, xlsx, pptx, dwg, dxf, ifc, otf, ttf, ttc, woff, woff2, mp4, mov, txt, csv, md, or custom) and size limits such as <code>"200 MB"</code>.</td></tr>
+ <tr><td class="hdr">pdf</td><td><code>version</code>, <code>pages</code>, <code>pageSizes</code> (A0&#8211;A6, B1&#8211;B4, Letter, Legal, Tabloid, ARCH-A&#8211;ARCH-E, or <code>widthMm</code>/<code>heightMm</code>), <code>orientation</code>, <code>toleranceMm</code>, <code>allPagesSameSize</code>, <code>allowPasswordProtected</code>.</td></tr>
+ <tr><td class="hdr">image</td><td><code>width</code>, <code>height</code>, <code>longEdge</code>, <code>shortEdge</code>, <code>exact</code>, <code>aspectRatio</code>, <code>dpi</code>, <code>colorModel</code>, <code>alpha</code>, <code>bitDepth</code>, <code>frames</code>, <code>forbidGps</code>.</td></tr>
+ <tr><td class="hdr">approval</td><td><code>mode</code> (none, evidence, confirm, evidenceAndConfirm) and <code>evidence</code> (<code>pathRegex</code>, <code>nameRegex</code>, <code>sidecar</code>, <code>registerCsv</code>).</td></tr>
+ <tr><td class="hdr">license</td><td><code>required</code>, <code>sidecar</code>, <code>registerCsv</code> (file, licence, licensor, expiry, scope columns and <code>allowedScopes</code>), <code>includeEvidence</code>, <code>evidenceFolder</code>, <code>expiryWarningDays</code>.</td></tr>
+ <tr><td class="hdr">target</td><td><code>folder</code> and <code>name</code> templates and <code>keepSubfolders</code>.</td></tr>
+ <tr><td class="hdr">severity</td><td>Severity changes that apply to this rule only.</td></tr>
+</table>
+
+<h3>Templates</h3>
+<p>Names and folders use tokens in braces: variables, <code>{date}</code> and <code>{date:yyyyMMdd}</code>,
+and per file <code>{stem}</code>, <code>{ext}</code>, <code>{name}</code>, <code>{key}</code>,
+<code>{rev}</code>, <code>{rule}</code>, <code>{relDir}</code>, and <code>{seq}</code>/<code>{seq:000}</code>.
+Results are cleaned up by the naming policy; a changed name is reported so you can see the original and the new name.</p>
+
+<p>The <i>Client delivery (example)</i> template shows every part in use.</p>
+</div>
+<div class="footer">&#169; 2026 Taskscape Ltd</div>
+</div>
+</body>
+</html>

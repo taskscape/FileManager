@@ -1,0 +1,66 @@
+{
+  "$comment": "Architecture drawing issue: every sheet in the drawing register, latest revision only, issued on A1 or A3, with DWG and IFC models. Sheet keys look like A-101; revisions follow ISO 19650 status codes (P01..., C01...).",
+  "handoffSpec": 1,
+  "id": "architecture.drawing-issue",
+  "name": "Architecture drawing issue",
+  "revision": "2026.1",
+  "description": "Drawing issue checked against the drawing register.",
+  "variables": {
+    "project": { "label": "Project number", "required": true, "pattern": "^[A-Z0-9]{3,10}$" },
+    "issue":   { "label": "Issue number", "default": "I01", "pattern": "^I\\d{2}$" },
+    "purpose": { "label": "Issue purpose", "default": "For information", "choices": ["For information", "For comment", "For approval", "For construction"] }
+  },
+  "package": {
+    "folderName": "{project}_Drawing-Issue_{issue}_{date}",
+    "contents": { "title": "{project} drawing issue {issue}", "groupBy": "folder", "notes": ["Issued for: {purpose}"] },
+    "limits": { "maxFiles": 5000, "maxRelativePathLength": 180 }
+  },
+  "naming": { "charset": "portable", "case": "upper", "maxNameLength": 80 },
+  "content": {
+    "allowedFormats": ["pdf", "dwg", "dxf", "ifc", "csv"],
+    "emptyFiles": "forbid",
+    "duplicates": "warn",
+    "unassigned": "info"
+  },
+  "rules": [
+    {
+      "id": "sheets",
+      "title": "Drawing sheets (PDF)",
+      "role": "deliverable",
+      "required": true,
+      "select": {
+        "include": ["Drawings/**/*.pdf"],
+        "exclude": ["**/Superseded/**"],
+        "latestRevision": { "regex": "_([PC]\\d{2})$", "prefixOrder": ["P", "C"] }
+      },
+      "expect": {
+        "keyRegex": "^([A-Z]-\\d{3})_",
+        "registerCsv": { "path": "Register/drawing-register.csv", "column": "Sheet" }
+      },
+      "formats": ["pdf"],
+      "pdf": { "pageSizes": ["A1", "A3"], "allowPasswordProtected": false },
+      "target": { "folder": "01_Drawings", "name": "{project}-{key}-{rev}{ext}" }
+    },
+    {
+      "id": "models",
+      "title": "Models (DWG, IFC)",
+      "role": "source",
+      "select": {
+        "include": ["Models/**/*.{dwg,ifc}"],
+        "latestRevision": { "regex": "_([PC]\\d{2})$", "prefixOrder": ["P", "C"] }
+      },
+      "formats": ["dwg", "ifc"],
+      "target": { "folder": "02_Models" }
+    },
+    {
+      "id": "register",
+      "title": "Drawing register",
+      "role": "supporting",
+      "required": true,
+      "count": { "min": 1, "max": 1 },
+      "select": { "include": ["Register/drawing-register.csv"], "shared": true },
+      "formats": ["csv"],
+      "target": { "folder": "", "name": "{project}_Drawing-Register_{issue}{ext}" }
+    }
+  ]
+}

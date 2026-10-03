@@ -401,7 +401,7 @@ Representative plug-in families in the solution are:
 - archive/compression: 7-Zip, ZIP, TAR, PAK, ARJ, CAB, CHM, FAT, ISO, LHA, MIME, OLE, and RAR readers/writers;
 - virtual filesystems: FTP, Network Neighborhood, Folders, Registry Editor, portable devices, and Windows Mobile;
 - viewers/analyzers: database, browser, multimedia, PE, image, disk-map, and file-comparison tools;
-- utilities: automation, checksum, version check, renamer, and split/combine;
+- utilities: automation, checksum, delivery handoff, version check, renamer, and split/combine;
 - SDK demonstrations: archive/menu/viewer/sample plug-ins.
 
 ### 5.4 Archive integration

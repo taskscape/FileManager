@@ -1,0 +1,137 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head>
+<title>Findings Reference</title>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+<link rel="stylesheet" type="text/css" href="../salamander_help.css" />
+<link rel="stylesheet" type="text/css" href="../salamander_help_shared.css" />
+</head>
+
+<body>
+<div id="help_page">
+<div class="header">Open Salamander: Plugins: Delivery Handoff: Reference</div>
+<div class="page">
+<h1>Findings Reference</h1>
+<p>Every problem or note has a stable code. The severity shown is the default; a specification can
+change it with <code>severity</code> unless it is marked <i>fixed</i>. Placeholders such as
+<code>{0}</code> are replaced by details of the finding.</p>
+<table>
+ <tr><td class="hdr">Code</td><td class="hdr">Severity</td><td class="hdr">Message</td></tr>
+ <tr><td class="hdr">HO-SPEC-001</td><td>Error (fixed)</td><td>JSON syntax error: {0}.</td></tr>
+ <tr><td class="hdr">HO-SPEC-002</td><td>Warning</td><td>Unknown member &quot;{0}&quot;{1}.</td></tr>
+ <tr><td class="hdr">HO-SPEC-003</td><td>Error (fixed)</td><td>Required member &quot;{0}&quot; is missing.</td></tr>
+ <tr><td class="hdr">HO-SPEC-004</td><td>Error (fixed)</td><td>&quot;{0}&quot; has an invalid type or value: {1}.</td></tr>
+ <tr><td class="hdr">HO-SPEC-005</td><td>Error (fixed)</td><td>Specification format version {0} is not supported (supported: 1).</td></tr>
+ <tr><td class="hdr">HO-SPEC-006</td><td>Error (fixed)</td><td>Limit exceeded: {0}.</td></tr>
+ <tr><td class="hdr">HO-SPEC-007</td><td>Error (fixed)</td><td>Duplicate {0}.</td></tr>
+ <tr><td class="hdr">HO-SPEC-010</td><td>Error (fixed)</td><td>Invalid regular expression: {0}.</td></tr>
+ <tr><td class="hdr">HO-SPEC-011</td><td>Error (fixed)</td><td>Invalid pattern: {0}.</td></tr>
+ <tr><td class="hdr">HO-SPEC-012</td><td>Error (fixed)</td><td>Unknown or unavailable token &quot;{token}&quot;.</td></tr>
+ <tr><td class="hdr">HO-SPEC-013</td><td>Error (fixed)</td><td>Path &quot;{0}&quot; must be relative and stay inside its folder.</td></tr>
+ <tr><td class="hdr">HO-SPEC-014</td><td>Error (fixed)</td><td>Unknown or conflicting format &quot;{0}&quot;.</td></tr>
+ <tr><td class="hdr">HO-SPEC-015</td><td>Error (fixed)</td><td>Output name &quot;{0}&quot; is invalid or used twice.</td></tr>
+ <tr><td class="hdr">HO-SPEC-016</td><td>Warning</td><td>Constraint &quot;{0}&quot; does not apply to any format of rule &quot;{1}&quot;.</td></tr>
+ <tr><td class="hdr">HO-SPEC-017</td><td>Error (fixed)</td><td>Severity of &quot;{0}&quot; cannot be changed.</td></tr>
+ <tr><td class="hdr">HO-SPEC-018</td><td>Error (fixed)</td><td>Unknown page size &quot;{0}&quot;.</td></tr>
+ <tr><td class="hdr">HO-SES-001</td><td>Error (fixed)</td><td>The working pane must show a folder on a disk or network share.</td></tr>
+ <tr><td class="hdr">HO-SES-002</td><td>Error (fixed)</td><td>The staging pane must show a folder on a disk or network share.</td></tr>
+ <tr><td class="hdr">HO-SES-003</td><td>Error (fixed)</td><td>The staging location and the working folder must not contain each other.</td></tr>
+ <tr><td class="hdr">HO-SES-004</td><td>Error (fixed)</td><td>Variable &quot;{0}&quot;: {1}.</td></tr>
+ <tr><td class="hdr">HO-SES-005</td><td>Error (fixed)</td><td>Package folder &quot;{0}&quot; already exists or is not a valid name.</td></tr>
+ <tr><td class="hdr">HO-SES-006</td><td>Warning</td><td>{0} unfinished package folder(s) from interrupted builds were found.</td></tr>
+ <tr><td class="hdr">HO-SCAN-001</td><td>Warning</td><td>Folder could not be read: {0} ({1}).</td></tr>
+ <tr><td class="hdr">HO-SCAN-002</td><td>Info</td><td>Linked folder not scanned: {0}.</td></tr>
+ <tr><td class="hdr">HO-SCAN-003</td><td>Info</td><td>Linked file skipped: {0}.</td></tr>
+ <tr><td class="hdr">HO-SCAN-004</td><td>Error (fixed)</td><td>Too many items to scan (limit {0}).</td></tr>
+ <tr><td class="hdr">HO-SCAN-005</td><td>Info</td><td>Online-only file; it will be downloaded and checked during the build.</td></tr>
+ <tr><td class="hdr">HO-SEL-001</td><td>Info</td><td>Superseded by revision {0}.</td></tr>
+ <tr><td class="hdr">HO-SEL-002</td><td>Info</td><td>Also matches rule &quot;{0}&quot;; assigned to &quot;{1}&quot;.</td></tr>
+ <tr><td class="hdr">HO-SEL-003</td><td>Info</td><td>Not included by any rule.</td></tr>
+ <tr><td class="hdr">HO-SEL-004</td><td>Info</td><td>Excluded by reviewer.</td></tr>
+ <tr><td class="hdr">HO-SEL-006</td><td>Warning</td><td>Revision could not be read from the name.</td></tr>
+ <tr><td class="hdr">HO-SEL-007</td><td>Warning</td><td>Path too long for pattern matching; not matched.</td></tr>
+ <tr><td class="hdr">HO-SEL-008</td><td>Warning</td><td>Pattern &quot;{0}&quot; was too complex to evaluate for this name; not matched.</td></tr>
+ <tr><td class="hdr">HO-REQ-001</td><td>Error</td><td>Required item missing: {0}.</td></tr>
+ <tr><td class="hdr">HO-REQ-002</td><td>Error</td><td>{0}: {1} selected, at least {2} required.</td></tr>
+ <tr><td class="hdr">HO-REQ-003</td><td>Error</td><td>{0}: {1} selected, at most {2} allowed.</td></tr>
+ <tr><td class="hdr">HO-REQ-010</td><td>Error</td><td>Expected item &quot;{0}&quot; is missing.</td></tr>
+ <tr><td class="hdr">HO-REQ-011</td><td>Warning</td><td>Item &quot;{0}&quot; is not in the expected list.</td></tr>
+ <tr><td class="hdr">HO-REQ-012</td><td>Error</td><td>Several files provide item &quot;{0}&quot;.</td></tr>
+ <tr><td class="hdr">HO-REQ-013</td><td>Error</td><td>Expected-items register cannot be read: {0}.</td></tr>
+ <tr><td class="hdr">HO-NAME-001</td><td>Warning</td><td>Name does not follow the naming convention.</td></tr>
+ <tr><td class="hdr">HO-NAME-010</td><td>Info</td><td>Renamed for delivery: &quot;{0}&quot; → &quot;{1}&quot;.</td></tr>
+ <tr><td class="hdr">HO-NAME-011</td><td>Error (fixed)</td><td>Target name is empty or invalid after cleanup.</td></tr>
+ <tr><td class="hdr">HO-NAME-012</td><td>Error (fixed)</td><td>Target &quot;{0}&quot; is produced by more than one file.</td></tr>
+ <tr><td class="hdr">HO-NAME-013</td><td>Error</td><td>Path in package is {0} characters (limit {1}).</td></tr>
+ <tr><td class="hdr">HO-NAME-014</td><td>Error (fixed)</td><td>&quot;{0}&quot; is a reserved or invalid Windows name.</td></tr>
+ <tr><td class="hdr">HO-NAME-015</td><td>Warning</td><td>Name shortened to {0} characters.</td></tr>
+ <tr><td class="hdr">HO-FMT-001</td><td>Error</td><td>Format {0} is not allowed for &quot;{1}&quot;.</td></tr>
+ <tr><td class="hdr">HO-FMT-002</td><td>Error</td><td>Content does not match the &quot;{0}&quot; extension.</td></tr>
+ <tr><td class="hdr">HO-FMT-003</td><td>Error</td><td>Format {0} is not allowed in this package.</td></tr>
+ <tr><td class="hdr">HO-FMT-004</td><td>Warning</td><td>Unknown file format.</td></tr>
+ <tr><td class="hdr">HO-PDF-001</td><td>Error</td><td>Not a valid PDF file.</td></tr>
+ <tr><td class="hdr">HO-PDF-002</td><td>Error</td><td>PDF version {0} is outside {1}.</td></tr>
+ <tr><td class="hdr">HO-PDF-010</td><td>Error</td><td>PDF is password-protected or encrypted.</td></tr>
+ <tr><td class="hdr">HO-PDF-020</td><td>Error</td><td>{0} pages; expected {1}.</td></tr>
+ <tr><td class="hdr">HO-PDF-021</td><td>Error</td><td>Page {0} size {1} is not allowed ({2}).</td></tr>
+ <tr><td class="hdr">HO-PDF-022</td><td>Warning</td><td>Pages have different sizes.</td></tr>
+ <tr><td class="hdr">HO-PDF-023</td><td>Error</td><td>Page {0} orientation is {1}; expected {2}.</td></tr>
+ <tr><td class="hdr">HO-PDF-030</td><td>Warning</td><td>Page details could not be read.</td></tr>
+ <tr><td class="hdr">HO-PDF-031</td><td>Error</td><td>Page rules cannot be checked: {0}.</td></tr>
+ <tr><td class="hdr">HO-IMG-001</td><td>Error</td><td>Image cannot be read: {0}.</td></tr>
+ <tr><td class="hdr">HO-IMG-010</td><td>Error</td><td>Image is {0} × {1} px; expected {2}.</td></tr>
+ <tr><td class="hdr">HO-IMG-011</td><td>Error</td><td>Image size {0} × {1} px is not one of {2}.</td></tr>
+ <tr><td class="hdr">HO-IMG-012</td><td>Error</td><td>Aspect ratio {0}; expected {1}.</td></tr>
+ <tr><td class="hdr">HO-IMG-013</td><td>Error</td><td>{0} is {1} px; expected {2}.</td></tr>
+ <tr><td class="hdr">HO-IMG-020</td><td>Warning</td><td>Resolution {0} dpi is below {1} dpi.</td></tr>
+ <tr><td class="hdr">HO-IMG-021</td><td>Error</td><td>Colour model {0} is not allowed ({1}).</td></tr>
+ <tr><td class="hdr">HO-IMG-022</td><td>Error</td><td>Transparency requirement not met ({0}).</td></tr>
+ <tr><td class="hdr">HO-IMG-023</td><td>Error</td><td>Bit depth {0} is below {1}.</td></tr>
+ <tr><td class="hdr">HO-IMG-024</td><td>Error</td><td>{0} frames; at most {1} allowed.</td></tr>
+ <tr><td class="hdr">HO-IMG-025</td><td>Warning</td><td>Image contains GPS location data.</td></tr>
+ <tr><td class="hdr">HO-IMG-030</td><td>Warning</td><td>No decoder installed for this image format.</td></tr>
+ <tr><td class="hdr">HO-IMG-031</td><td>Error</td><td>Image rules cannot be checked: no decoder installed.</td></tr>
+ <tr><td class="hdr">HO-IMG-032</td><td>Warning</td><td>Resolution unknown; dpi rule not checked.</td></tr>
+ <tr><td class="hdr">HO-APP-001</td><td>Error</td><td>Approval evidence not found.</td></tr>
+ <tr><td class="hdr">HO-APP-002</td><td>Error</td><td>Awaiting reviewer approval.</td></tr>
+ <tr><td class="hdr">HO-APP-003</td><td>Error</td><td>Approval register cannot be read: {0}.</td></tr>
+ <tr><td class="hdr">HO-LIC-001</td><td>Error</td><td>Licence evidence not found.</td></tr>
+ <tr><td class="hdr">HO-LIC-002</td><td>Error</td><td>Licence expired on {0}.</td></tr>
+ <tr><td class="hdr">HO-LIC-003</td><td>Warning</td><td>Licence expires on {0}.</td></tr>
+ <tr><td class="hdr">HO-LIC-004</td><td>Error</td><td>Licence scope &quot;{0}&quot; is not allowed.</td></tr>
+ <tr><td class="hdr">HO-LIC-005</td><td>Error</td><td>Licence register cannot be read: {0}.</td></tr>
+ <tr><td class="hdr">HO-CONT-001</td><td>Info</td><td>Forbidden content; never packaged.</td></tr>
+ <tr><td class="hdr">HO-CONT-002</td><td>Error</td><td>Hidden file.</td></tr>
+ <tr><td class="hdr">HO-CONT-003</td><td>Error</td><td>System file.</td></tr>
+ <tr><td class="hdr">HO-CONT-004</td><td>Error</td><td>Empty file.</td></tr>
+ <tr><td class="hdr">HO-CONT-005</td><td>Error</td><td>File size {0} is outside {1}.</td></tr>
+ <tr><td class="hdr">HO-CONT-006</td><td>Warning</td><td>Same content as &quot;{0}&quot;.</td></tr>
+ <tr><td class="hdr">HO-CONT-007</td><td>Info</td><td>Additional data streams are not copied.</td></tr>
+ <tr><td class="hdr">HO-PKG-001</td><td>Error</td><td>{0} files; limit {1}.</td></tr>
+ <tr><td class="hdr">HO-PKG-002</td><td>Error</td><td>Total size {0}; limit {1}.</td></tr>
+ <tr><td class="hdr">HO-PKG-003</td><td>Error (fixed)</td><td>Not enough free space in the staging location ({0} needed).</td></tr>
+ <tr><td class="hdr">HO-BUILD-001</td><td>Error (fixed)</td><td>Package folder &quot;{0}&quot; already exists.</td></tr>
+ <tr><td class="hdr">HO-BUILD-002</td><td>Error (fixed)</td><td>Source changed since review: {0}.</td></tr>
+ <tr><td class="hdr">HO-BUILD-003</td><td>Error (fixed)</td><td>Cannot copy {0}: {1}.</td></tr>
+ <tr><td class="hdr">HO-BUILD-004</td><td>Error (fixed)</td><td>Copy verification failed: {0}.</td></tr>
+ <tr><td class="hdr">HO-BUILD-005</td><td>Error (fixed)</td><td>Downloaded file failed its checks: {0}.</td></tr>
+ <tr><td class="hdr">HO-BUILD-006</td><td>Error (fixed)</td><td>The package could not be published ({0}); it was kept at {1}.</td></tr>
+ <tr><td class="hdr">HO-BUILD-007</td><td>Warning</td><td>Build record could not be written: {0}.</td></tr>
+ <tr><td class="hdr">HO-BUILD-008</td><td>Warning</td><td>Unfinished package folder could not be removed: {0}.</td></tr>
+ <tr><td class="hdr">HO-BUILD-009</td><td>Info</td><td>Build cancelled.</td></tr>
+ <tr><td class="hdr">HO-VER-001</td><td>Error (fixed)</td><td>Manifest missing or invalid: {0}.</td></tr>
+ <tr><td class="hdr">HO-VER-002</td><td>Error (fixed)</td><td>Listed file missing.</td></tr>
+ <tr><td class="hdr">HO-VER-003</td><td>Error (fixed)</td><td>File was modified after the build.</td></tr>
+ <tr><td class="hdr">HO-VER-004</td><td>Error (fixed)</td><td>File is not listed in the manifest.</td></tr>
+ <tr><td class="hdr">HO-VER-005</td><td>Error (fixed)</td><td>Contents list or CSV manifest was modified.</td></tr>
+ <tr><td class="hdr">HO-VER-006</td><td>Error</td><td>File matches forbidden content &quot;{0}&quot;.</td></tr>
+ <tr><td class="hdr">HO-VER-007</td><td>Error (fixed)</td><td>Manifest differs from the one recorded at build time.</td></tr>
+ <tr><td class="hdr">HO-VER-010</td><td>Warning</td><td>The specification changed since the build.</td></tr>
+ <tr><td class="hdr">HO-VER-011</td><td>Warning</td><td>Specification &quot;{0}&quot; not found; rule checks skipped.</td></tr>
+ <tr><td class="hdr">HO-VER-012</td><td>Info</td><td>Approval recorded at build time: {0}.</td></tr>
+</table>
+</div>
+<div class="footer">&#169; 2026 Taskscape Ltd</div>
+</div>
+</body>
+</html>
