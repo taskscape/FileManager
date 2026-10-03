@@ -1,0 +1,71 @@
+[OPTIONS]
+Auto Index=Yes
+Compatibility=1.1 or later
+Compiled file=handoff.chm
+Contents file=handoff.hhc
+Default Window=$global_ssdefault
+Default topic=hh\handoff\introduction_intro.htm
+Display compile progress=No
+Full text search stop list file=..\..\shared\help\en\stop.stp
+Full-text search=Yes
+Index file=handoff.hhk
+Language=0x409 English (United States)
+Title=Delivery Handoff Help
+
+[WINDOWS]
+$global_ssdefault=,"salamand.chm::\salamand.hhc","handoff.hhk","hh\handoff\introduction_intro.htm","hh\handoff\introduction_intro.htm",,,,"Web Help",0x3520,,0x180e,,,,,,,,0
+
+[FILES]
+hh\salamander_help.css
+hh\salamander_help_shared.css
+
+[ALIAS]
+IDH_HANDOFF_BUILD=hh\handoff\using_build.htm
+IDH_HANDOFF_VERIFY=hh\handoff\using_verify.htm
+IDH_HANDOFF_VALIDATE=hh\handoff\using_validate.htm
+IDH_HANDOFF_NEWSPEC=hh\handoff\using_newspec.htm
+IDH_HANDOFF_REVIEW=hh\handoff\using_review.htm
+IDH_HANDOFF_CONFIG=hh\handoff\dlgboxes_config.htm
+IDH_HANDOFF_SPECREF=hh\handoff\reference_spec.htm
+IDH_HANDOFF_FINDINGS=hh\handoff\reference_findings.htm
+
+[MAP]
+#include "..\handoff.rh2"
+
+[MERGE FILES]
+salamand.chm
+zip.chm
+demoplug.chm
+demoview.chm
+filecomp.chm
+7zip.chm
+dbviewer.chm
+ftp.chm
+checkver.chm
+ieviewer.chm
+mmviewer.chm
+pak.chm
+peviewer.chm
+pictview.chm
+regedt.chm
+renamer.chm
+splitcbn.chm
+tar.chm
+unarj.chm
+uncab.chm
+undelete.chm
+unfat.chm
+uniso.chm
+unlha.chm
+unmime.chm
+unrar.chm
+wmobile.chm
+winscp.chm
+nethood.chm
+unchm.chm
+automation.chm
+diskmap.chm
+demomenu.chm
+
+[INFOTYPES]
+

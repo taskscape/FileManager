@@ -1,0 +1,88 @@
+{
+  "$comment": "Client delivery (example): approved PDFs, source artwork, licensed assets, and a contents list. Adjust folders and patterns to your project layout.",
+  "handoffSpec": 1,
+  "id": "studio.client-delivery",
+  "name": "Client delivery: approved PDFs, source artwork, licensed assets",
+  "revision": "2026.1",
+  "description": "Final client handoff with a contents list.",
+  "variables": {
+    "client":   { "label": "Client code", "required": true, "pattern": "^[A-Z0-9]{2,12}$" },
+    "project":  { "label": "Project code", "required": true, "pattern": "^[A-Za-z0-9-]{2,32}$" },
+    "revision": { "label": "Delivery revision", "default": "R01", "pattern": "^R\\d{2}$" }
+  },
+  "package": {
+    "folderName": "{client}-{project}_Delivery_{date}_{revision}",
+    "outputs": { "manifestJson": "manifest.json", "manifestCsv": "manifest.csv", "contents": "CONTENTS.txt" },
+    "contents": { "title": "{client} {project} — delivery contents", "groupBy": "folder" },
+    "limits": { "maxFiles": 2000, "maxTotalBytes": "10 GB", "maxRelativePathLength": 180 },
+    "buildRecord": "beside"
+  },
+  "naming": { "charset": "portable", "allowSpaces": false, "case": "keep", "maxNameLength": 100 },
+  "content": {
+    "allowedFormats": ["pdf", "ai", "psd", "svg", "eps", "tiff", "png", "jpeg", "otf", "ttf", "woff2"],
+    "forbid": ["**/Thumbs.db", "**/.DS_Store", "**/desktop.ini", "**/~$*", "**/*.tmp", "**/__MACOSX/**"],
+    "hidden": "forbid",
+    "emptyFiles": "forbid",
+    "duplicates": "warn",
+    "unassigned": "info"
+  },
+  "rules": [
+    {
+      "id": "approved-pdfs",
+      "title": "Approved PDFs",
+      "role": "deliverable",
+      "required": true,
+      "select": {
+        "include": ["Approved/**/*.pdf"],
+        "exclude": ["**/*draft*"],
+        "latestRevision": { "regex": "_v(\\d+)$" }
+      },
+      "formats": ["pdf"],
+      "pdf": { "pages": { "min": 1 }, "allowPasswordProtected": false },
+      "approval": { "mode": "evidenceAndConfirm", "evidence": { "pathRegex": "^Approved/" } },
+      "target": { "folder": "01_Approved_PDFs", "name": "{client}-{project}_{stem}{ext}" }
+    },
+    {
+      "id": "source-artwork",
+      "title": "Source artwork",
+      "role": "source",
+      "required": true,
+      "select": { "include": ["Artwork/Final/**/*.{ai,psd,svg,eps}"] },
+      "formats": ["ai", "psd", "svg", "eps"],
+      "image": { "longEdge": { "min": 2000 } },
+      "target": { "folder": "02_Source_Artwork", "keepSubfolders": true }
+    },
+    {
+      "id": "licensed-fonts",
+      "title": "Licensed fonts",
+      "role": "asset",
+      "select": { "include": ["Assets/Fonts/**/*.{otf,ttf,woff2}"] },
+      "formats": ["otf", "ttf", "woff2"],
+      "license": {
+        "required": true,
+        "registerCsv": {
+          "path": "Assets/licences.csv",
+          "fileColumn": "File", "licenceColumn": "Licence", "licensorColumn": "Licensor",
+          "expiresColumn": "Expires", "scopeColumn": "Scope",
+          "allowedScopes": ["Client delivery", "Unlimited"]
+        }
+      },
+      "target": { "folder": "03_Licensed_Assets/Fonts" }
+    },
+    {
+      "id": "licensed-images",
+      "title": "Licensed stock images",
+      "role": "asset",
+      "select": { "include": ["Assets/Stock/**/*.{jpg,jpeg,tif,tiff,png}"] },
+      "formats": ["jpeg", "tiff", "png"],
+      "image": { "longEdge": { "min": 3000 }, "dpi": { "min": 300 }, "forbidGps": true },
+      "license": {
+        "required": true,
+        "sidecar": ["{stem}.licence.pdf", "{stem}.licence.txt"],
+        "includeEvidence": true,
+        "evidenceFolder": "03_Licensed_Assets/Licences"
+      },
+      "target": { "folder": "03_Licensed_Assets/Images" }
+    }
+  ]
+}

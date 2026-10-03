@@ -58,6 +58,8 @@ $testProject = Join-Path $repositoryRoot 'tests\FileManager.UiTests\FileManager.
 $nativeSolution = Join-Path $repositoryRoot 'src\vcxproj\salamand.sln'
 $nativeSafetyProject = Join-Path $repositoryRoot 'tests\NativeSafetyTests\NativeSafetyTests.vcxproj'
 $pictViewEngineProject = Join-Path $repositoryRoot 'tests\PictViewEngineTests\PictViewEngineTests.vcxproj'
+# Delivery Handoff's host-independent engine has its own console test host (handoff-spec.md C.12.1).
+$handoffEngineProject = Join-Path $repositoryRoot 'tests\HandoffEngineTests\HandoffEngineTests.vcxproj'
 $failures = [System.Collections.Generic.List[string]]::new()
 $passed = [System.Collections.Generic.List[string]]::new()
 $skipped = [System.Collections.Generic.List[string]]::new()
@@ -477,6 +479,42 @@ function Invoke-PictViewEngineTests {
     }
 }
 
+function Invoke-HandoffEngineTests {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$DeveloperCommand,
+        [Parameter(Mandatory = $true)]
+        # Handoff coverage shares the single supported VS 2026 toolchain.
+        [ValidateSet('v145')]
+        [string]$Toolset
+    )
+
+    if (-not (Test-Path -LiteralPath $handoffEngineProject -PathType Leaf)) {
+        throw "The Handoff engine test project was not found: $handoffEngineProject"
+    }
+
+    # The engine (specification, scanning, inspection, staging, publication, and
+    # verification) links into a console host, so its fixtures run without the plug-in host.
+    $bootstrapPath = Get-VisualStudioBootstrapPath
+    $environmentPreamble = Get-VisualStudioCleanEnvironmentPreamble
+    # Keep the Handoff build on the same bounded dual-architecture environment as the product build.
+    $buildCommand = $environmentPreamble + ' && set "PATH=' + $bootstrapPath + '" && call "' + $DeveloperCommand + '" -arch=x86 -host_arch=x64 && msbuild "' + $handoffEngineProject +
+        '" /m:' + $MaxBuildNodes + ' /t:Build /p:Configuration=Debug /p:Platform=x64 /p:PlatformToolset=' + $Toolset + ' /nr:false'
+    & $env:ComSpec /d /s /c $buildCommand
+    if ($LASTEXITCODE -ne 0) {
+        throw "Building the Handoff engine tests failed with exit code $LASTEXITCODE."
+    }
+
+    $testExecutable = Join-Path $repositoryRoot 'tests\HandoffEngineTests\x64\Debug\HandoffEngineTests.exe'
+    if (-not (Test-Path -LiteralPath $testExecutable -PathType Leaf)) {
+        throw "The Handoff engine test executable was not produced: $testExecutable"
+    }
+    & $testExecutable
+    if ($LASTEXITCODE -ne 0) {
+        throw "The Handoff engine tests failed with exit code $LASTEXITCODE."
+    }
+}
+
 function Resolve-UiTestArtifact {
     param(
         [Parameter(Mandatory = $true)]
@@ -891,6 +929,10 @@ $pictViewEngineAction = {
     Invoke-PictViewEngineTests -DeveloperCommand $vsDevCmd -Toolset $PlatformToolset
 }
 Invoke-AutomatedCheck -Name 'PictViewEngineTests (Debug x64)' -Action $pictViewEngineAction
+$handoffEngineAction = {
+    Invoke-HandoffEngineTests -DeveloperCommand $vsDevCmd -Toolset $PlatformToolset
+}
+Invoke-AutomatedCheck -Name 'HandoffEngineTests (Debug x64)' -Action $handoffEngineAction
 $builtUiExecutable = Resolve-UiTestArtifact -BuildDirectory $uiBuildDirectory -FileName 'salamand.exe'
 $null = Stage-UiTestCrashReporter -ExecutablePath $builtUiExecutable -BuildDirectory $uiBuildDirectory
 $builtSqliteDll = Resolve-UiTestArtifact -BuildDirectory $uiBuildDirectory -FileName 'sqlite.dll'
@@ -933,6 +975,10 @@ foreach ($architecture in @('x64', 'x86')) {
     Invoke-WindowsPowerShellScript -RelativePath 'tools\test-bzip2-compatibility.ps1' `
         -ScriptArguments @('-Architecture', $architecture) `
         -DisplayName "tools\test-bzip2-compatibility.ps1 ($architecture)"
+    # Delivery Handoff specifications are shared between organizations, so their parser is probed like the archive decoders.
+    Invoke-WindowsPowerShellScript -RelativePath 'tools\test-handoff-spec-parser.ps1' `
+        -ScriptArguments @('-Architecture', $architecture) `
+        -DisplayName "tools\test-handoff-spec-parser.ps1 ($architecture)"
 }
 
 $cmarkSkipReason = $null

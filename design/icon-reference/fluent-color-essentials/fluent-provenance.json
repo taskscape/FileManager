@@ -1713,6 +1713,26 @@
         "sha256": "8c25eaf69cc9156f0c44cb991745fd8645806fa88c4aa0a1f228f3816816d6ca"
       }
     },
+    "PluginHandoff": {
+      "16": {
+        "source": "box_16_regular.svg",
+        "sourceSize": 16,
+        "color": "#0F6CBD",
+        "sha256": "53fe38c2788d994131408de03cf32761249d519e22d22a1fe579728c2fd3dcfa"
+      },
+      "24": {
+        "source": "box_24_regular.svg",
+        "sourceSize": 24,
+        "color": "#0F6CBD",
+        "sha256": "0462b5ce36b275c9f6868eecc73eede4df999dc227e3fcac1edeb44b0e3a7e60"
+      },
+      "32": {
+        "source": "box_32_regular.svg",
+        "sourceSize": 32,
+        "color": "#0F6CBD",
+        "sha256": "a0287790bd89ba57e643d9f67dca368d2a1dc67ff2e26cac54282e5d82e5f33e"
+      }
+    },
     "PluginHelp": {
       "16": {
         "source": "book_16_regular.svg",

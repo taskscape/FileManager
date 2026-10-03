@@ -1,0 +1,210 @@
+﻿// Microsoft Visual C++ generated resource script.
+//
+#pragma code_page(65001)
+
+#include "..\lang.rh"
+
+#define APSTUDIO_READONLY_SYMBOLS
+/////////////////////////////////////////////////////////////////////////////
+//
+// Generated from the TEXTINCLUDE 2 resource.
+//
+#include "winresrc.h"
+
+#include "..\..\handoff.rh2"
+
+/////////////////////////////////////////////////////////////////////////////
+#undef APSTUDIO_READONLY_SYMBOLS
+
+/////////////////////////////////////////////////////////////////////////////
+// Neutral resources
+
+#if !defined(AFX_RESOURCE_DLL) || defined(AFX_TARG_NEU)
+LANGUAGE LANG_NEUTRAL, SUBLANG_NEUTRAL
+
+/////////////////////////////////////////////////////////////////////////////
+//
+// Dialog
+//
+// Control IDs are frozen (lang.rh); the English and Polish modules share one layout.
+//
+
+IDD_HO_SESSION DIALOGEX 0, 0, 340, 273
+STYLE DS_SETFONT | DS_FIXEDSYS | WS_POPUP | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX | WS_CLIPCHILDREN
+EXSTYLE WS_EX_APPWINDOW
+CAPTION "Budowanie paczki dostawy"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "Folder &roboczy:", -1, 7, 9, 66, 8
+    EDITTEXT        IDC_HO_WORKING_PATH, 76, 7, 206, 12, ES_AUTOHSCROLL | ES_READONLY
+    PUSHBUTTON      "Za&mień", IDC_HO_SWAP, 288, 6, 45, 14
+    LTEXT           "Folder &docelowy:", -1, 7, 25, 66, 8
+    EDITTEXT        IDC_HO_STAGING_PATH, 76, 23, 206, 12, ES_AUTOHSCROLL | ES_READONLY
+    LTEXT           "Zakres:", -1, 7, 41, 66, 8
+    CONTROL         "Cały &folder roboczy", IDC_HO_SCOPE_ALL, "Button", BS_AUTORADIOBUTTON | WS_GROUP | WS_TABSTOP, 76, 40, 100, 10
+    CONTROL         "Tylko &zaznaczone elementy", IDC_HO_SCOPE_SELECTION, "Button", BS_AUTORADIOBUTTON, 179, 40, 154, 10
+    LTEXT           "&Specyfikacja:", -1, 7, 58, 66, 8
+    COMBOBOX        IDC_HO_SPEC_COMBO, 76, 56, 206, 120, CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP | WS_GROUP
+    PUSHBUTTON      "&Przeglądaj...", IDC_HO_SPEC_BROWSE, 288, 55, 45, 14
+    PUSHBUTTON      "Spr&awdź", IDC_HO_SPEC_VALIDATE, 76, 73, 60, 14
+    PUSHBUTTON      "Pokaż w pa&nelu", IDC_HO_SPEC_SHOW, 141, 73, 70, 14
+    LTEXT           "", IDC_HO_SPEC_SUMMARY, 76, 91, 257, 18, SS_NOPREFIX
+    LTEXT           "Zmienn&e:", -1, 7, 113, 66, 8
+    CONTROL         "", IDC_HO_VARIABLES, "SysListView32", LVS_REPORT | LVS_SINGLESEL | LVS_SHOWSELALWAYS | LVS_NOSORTHEADER | WS_BORDER | WS_TABSTOP, 76, 112, 257, 80
+    LTEXT           "&Wartość:", -1, 7, 199, 66, 8
+    EDITTEXT        IDC_HO_VARIABLE_VALUE, 76, 197, 257, 12, ES_AUTOHSCROLL
+    COMBOBOX        IDC_HO_VARIABLE_CHOICE, 76, 197, 257, 100, CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+    LTEXT           "Folder paczki:", -1, 7, 216, 66, 8
+    LTEXT           "", IDC_HO_PACKAGE_NAME, 76, 216, 257, 8, SS_NOPREFIX
+    LTEXT           "", IDC_HO_PACKAGE_STATUS, 76, 228, 257, 18, SS_NOPREFIX
+    DEFPUSHBUTTON   "S&kanuj...", IDOK, 171, 252, 50, 14
+    PUSHBUTTON      "Anuluj", IDCANCEL, 227, 252, 50, 14
+    PUSHBUTTON      "Pomo&c", IDHELP, 283, 252, 50, 14
+END
+
+IDD_HO_REVIEW DIALOGEX 0, 0, 530, 332
+STYLE DS_SETFONT | DS_FIXEDSYS | WS_POPUP | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX | WS_CLIPCHILDREN | WS_MAXIMIZEBOX | WS_THICKFRAME
+EXSTYLE WS_EX_APPWINDOW
+CAPTION "Przegląd paczki dostawy"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "", IDC_HO_STATUS_BANNER, 7, 7, 516, 10, SS_NOPREFIX
+    LTEXT           "&Reguły:", IDC_HO_LABEL_RULES, 7, 21, 120, 8
+    CONTROL         "", IDC_HO_RULES, "SysListView32", LVS_REPORT | LVS_SINGLESEL | LVS_SHOWSELALWAYS | LVS_NOSORTHEADER | WS_BORDER | WS_TABSTOP, 7, 31, 516, 62
+    LTEXT           "&Elementy:", IDC_HO_LABEL_ITEMS, 7, 99, 120, 8
+    COMBOBOX        IDC_HO_FILTER, 403, 97, 120, 100, CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+    CONTROL         "", IDC_HO_ITEMS, "SysListView32", LVS_REPORT | LVS_SHOWSELALWAYS | LVS_NOSORTHEADER | WS_BORDER | WS_TABSTOP, 7, 112, 516, 98
+    LTEXT           "&Ustalenia:", IDC_HO_LABEL_FINDINGS, 7, 214, 120, 8
+    CONTROL         "", IDC_HO_FINDINGS, "SysListView32", LVS_REPORT | LVS_SINGLESEL | LVS_SHOWSELALWAYS | LVS_NOSORTHEADER | WS_BORDER | WS_TABSTOP, 7, 224, 516, 56
+    PUSHBUTTON      "&Zatwierdź", IDC_HO_APPROVE, 7, 285, 60, 14
+    PUSHBUTTON      "Zatwierdź całą re&gułę", IDC_HO_APPROVE_ALL, 71, 285, 92, 14
+    PUSHBUTTON      "Pokaż w &panelu", IDC_HO_SHOW_IN_PANEL, 167, 285, 66, 14
+    PUSHBUTTON      "Za&akceptuj...", IDC_HO_OVERRIDE, 237, 285, 60, 14
+    PUSHBUTTON      "Skanuj p&onownie", IDC_HO_RESCAN, 301, 285, 66, 14
+    PUSHBUTTON      "Zapi&sz raport...", IDC_HO_SAVE_REPORT, 371, 285, 66, 14
+    CONTROL         "Przejrzałem wszystkie ostrzeże&nia", IDC_HO_ACK_WARNINGS, "Button", BS_AUTOCHECKBOX | WS_TABSTOP, 7, 304, 220, 10
+    LTEXT           "", IDC_HO_PROGRESS_TEXT, 7, 303, 340, 8, SS_NOPREFIX | SS_PATHELLIPSIS
+    CONTROL         "", IDC_HO_PROGRESS_TOTAL, "msctls_progress32", PBS_SMOOTH | WS_BORDER, 7, 313, 340, 7
+    CONTROL         "", IDC_HO_PROGRESS_FILE, "msctls_progress32", PBS_SMOOTH | WS_BORDER, 7, 322, 340, 7
+    DEFPUSHBUTTON   "&Buduj", IDOK, 361, 311, 50, 14
+    PUSHBUTTON      "Zamknij", IDCANCEL, 417, 311, 50, 14
+    PUSHBUTTON      "Pomo&c", IDHELP, 473, 311, 50, 14
+END
+
+IDD_HO_RESULT DIALOGEX 0, 0, 341, 186
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "Wynik budowania paczki"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    CONTROL         "", IDC_HO_RESULT_ICON, "Static", SS_ICON, 7, 7, 20, 20
+    LTEXT           "", IDC_HO_RESULT_TEXT, 34, 9, 300, 10, SS_NOPREFIX
+    EDITTEXT        IDC_HO_RESULT_PATH, 34, 22, 300, 12, ES_AUTOHSCROLL | ES_READONLY
+    LTEXT           "", IDC_HO_RESULT_TOTALS, 34, 38, 300, 18, SS_NOPREFIX
+    LTEXT           "&Ustalenia:", -1, 7, 60, 100, 8
+    CONTROL         "", IDC_HO_FINDINGS, "SysListView32", LVS_REPORT | LVS_SINGLESEL | LVS_SHOWSELALWAYS | LVS_NOSORTHEADER | WS_BORDER | WS_TABSTOP, 7, 70, 327, 88
+    PUSHBUTTON      "&Pokaż paczkę", IDC_HO_FOCUS_PACKAGE, 7, 165, 70, 14
+    PUSHBUTTON      "Zapisz &raport...", IDC_HO_SAVE_REPORT, 81, 165, 70, 14
+    DEFPUSHBUTTON   "Zamknij", IDOK, 284, 165, 50, 14
+END
+
+IDD_HO_VERIFY DIALOGEX 0, 0, 447, 268
+STYLE DS_SETFONT | DS_FIXEDSYS | WS_POPUP | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX | WS_CLIPCHILDREN | WS_MAXIMIZEBOX | WS_THICKFRAME
+EXSTYLE WS_EX_APPWINDOW
+CAPTION "Weryfikacja paczki dostawy"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "Paczka:", -1, 7, 9, 58, 8
+    EDITTEXT        IDC_HO_VERIFY_PATH, 68, 7, 372, 12, ES_AUTOHSCROLL | ES_READONLY
+    LTEXT           "Specyfikacja:", -1, 7, 24, 58, 8
+    LTEXT           "", IDC_HO_VERIFY_SPEC, 68, 24, 312, 18, SS_NOPREFIX
+    PUSHBUTTON      "Prze&glądaj...", IDC_HO_VERIFY_SPEC_BROWSE, 385, 22, 55, 14
+    LTEXT           "", IDC_HO_STATUS_BANNER, 7, 46, 433, 10, SS_NOPREFIX
+    LTEXT           "&Ustalenia:", -1, 7, 59, 100, 8
+    CONTROL         "", IDC_HO_FINDINGS, "SysListView32", LVS_REPORT | LVS_SINGLESEL | LVS_SHOWSELALWAYS | LVS_NOSORTHEADER | WS_BORDER | WS_TABSTOP, 7, 69, 433, 150
+    LTEXT           "", IDC_HO_PROGRESS_TEXT, 7, 224, 433, 8, SS_NOPREFIX | SS_PATHELLIPSIS
+    CONTROL         "", IDC_HO_PROGRESS_TOTAL, "msctls_progress32", PBS_SMOOTH | WS_BORDER, 7, 234, 433, 7
+    PUSHBUTTON      "Pokaż w &panelu", IDC_HO_SHOW_IN_PANEL, 7, 247, 66, 14
+    PUSHBUTTON      "Zapisz &raport...", IDC_HO_SAVE_REPORT, 77, 247, 66, 14
+    PUSHBUTTON      "Weryfikuj p&onownie", IDC_HO_VERIFY_AGAIN, 147, 247, 80, 14
+    PUSHBUTTON      "Zamknij", IDCANCEL, 334, 247, 50, 14
+    PUSHBUTTON      "Pomo&c", IDHELP, 390, 247, 50, 14
+END
+
+IDD_HO_NEWSPEC DIALOGEX 0, 0, 300, 138
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "Nowa specyfikacja z szablonu"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "&Szablon:", -1, 7, 7, 120, 8
+    LISTBOX         IDC_HO_TEMPLATES, 7, 17, 120, 64, LBS_NOTIFY | WS_VSCROLL | WS_BORDER | WS_TABSTOP
+    LTEXT           "", IDC_HO_TEMPLATE_DESC, 133, 17, 160, 64, SS_NOPREFIX
+    LTEXT           "Zapisz &jako:", -1, 7, 87, 120, 8
+    EDITTEXT        IDC_HO_NEWSPEC_PATH, 7, 97, 231, 12, ES_AUTOHSCROLL
+    PUSHBUTTON      "&Przeglądaj...", IDC_HO_NEWSPEC_BROWSE, 243, 96, 50, 14
+    DEFPUSHBUTTON   "&Utwórz", IDOK, 131, 117, 50, 14
+    PUSHBUTTON      "Anuluj", IDCANCEL, 187, 117, 50, 14
+    PUSHBUTTON      "Pomo&c", IDHELP, 243, 117, 50, 14
+END
+
+IDD_HO_VALIDATE DIALOGEX 0, 0, 392, 192
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "Sprawdzanie specyfikacji"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "Specyfikacja:", -1, 7, 9, 52, 8
+    EDITTEXT        IDC_HO_VALIDATE_PATH, 62, 7, 268, 12, ES_AUTOHSCROLL | ES_READONLY
+    PUSHBUTTON      "&Przeglądaj...", IDC_HO_VALIDATE_BROWSE, 335, 6, 50, 14
+    LTEXT           "&Ustalenia:", -1, 7, 25, 100, 8
+    CONTROL         "", IDC_HO_FINDINGS, "SysListView32", LVS_REPORT | LVS_SINGLESEL | LVS_SHOWSELALWAYS | LVS_NOSORTHEADER | WS_BORDER | WS_TABSTOP, 7, 35, 378, 130
+    PUSHBUTTON      "Sprawdź p&onownie", IDC_HO_VALIDATE_AGAIN, 7, 171, 75, 14
+    PUSHBUTTON      "&Kopiuj", IDC_HO_COPY, 86, 171, 50, 14
+    DEFPUSHBUTTON   "Zamknij", IDOK, 279, 171, 50, 14
+    PUSHBUTTON      "Pomo&c", IDHELP, 335, 171, 50, 14
+END
+
+IDD_HO_OVERRIDE DIALOGEX 0, 0, 280, 128
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "Akceptacja ustalenia"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "Ustalenie:", -1, 7, 7, 120, 8
+    LTEXT           "", IDC_HO_OVERRIDE_FINDING, 7, 17, 266, 26, SS_NOPREFIX
+    LTEXT           "&Uzasadnienie (co najmniej 10 znaków):", -1, 7, 47, 266, 8
+    EDITTEXT        IDC_HO_OVERRIDE_REASON, 7, 57, 266, 44, ES_MULTILINE | ES_AUTOVSCROLL | ES_WANTRETURN | WS_VSCROLL
+    DEFPUSHBUTTON   "OK", IDOK, 167, 107, 50, 14
+    PUSHBUTTON      "Anuluj", IDCANCEL, 223, 107, 50, 14
+END
+
+IDD_HO_CONFIG DIALOGEX 0, 0, 274, 122
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "Konfiguracja przekazania dostawy"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "Folder &biblioteki specyfikacji:", -1, 7, 7, 260, 8
+    EDITTEXT        IDC_HO_CFG_LIBRARY, 7, 17, 205, 12, ES_AUTOHSCROLL
+    PUSHBUTTON      "P&rzeglądaj...", IDC_HO_CFG_LIBRARY_BROWSE, 217, 16, 50, 14
+    CONTROL         "Pokazuj pliki &nieobjęte żadną regułą", IDC_HO_CFG_SHOW_UNASSIGNED, "Button", BS_AUTOCHECKBOX | WS_TABSTOP, 7, 37, 260, 10
+    CONTROL         "&Zaznacz nową paczkę w panelu docelowym", IDC_HO_CFG_FOCUS_PACKAGE, "Button", BS_AUTOCHECKBOX | WS_TABSTOP, 7, 50, 260, 10
+    CONTROL         "Zachowuj nieudane foldery &tymczasowe do diagnostyki", IDC_HO_CFG_KEEP_PARTIAL, "Button", BS_AUTOCHECKBOX | WS_TABSTOP, 7, 63, 260, 10
+    PUSHBUTTON      "Wyczyść ostatnie specyfikacje", IDC_HO_CFG_CLEAR_RECENT, 7, 79, 120, 14
+    DEFPUSHBUTTON   "OK", IDOK, 105, 101, 50, 14
+    PUSHBUTTON      "Anuluj", IDCANCEL, 161, 101, 50, 14
+    PUSHBUTTON      "Pomo&c", IDHELP, 217, 101, 50, 14
+END
+
+#endif    // Neutral resources
+/////////////////////////////////////////////////////////////////////////////
+
+
+#ifndef APSTUDIO_INVOKED
+/////////////////////////////////////////////////////////////////////////////
+//
+// Generated from the TEXTINCLUDE 3 resource.
+//
+#if !defined(AFX_RESOURCE_DLL) || defined(AFX_TARG_NEU)
+LANGUAGE LANG_NEUTRAL,SUBLANG_NEUTRAL
+#include "lang_pl.rc2"   // non-Microsoft Visual C++ edited resources
+#endif
+
+/////////////////////////////////////////////////////////////////////////////
+#endif    // not APSTUDIO_INVOKED

@@ -1,0 +1,68 @@
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML//EN">
+<HTML>
+<HEAD>
+<meta name="GENERATOR" content="Microsoft&reg; HTML Help Workshop 4.1">
+<!-- Sitemap 1.0 -->
+</HEAD>
+<BODY>
+	<OBJECT type="text/site properties">
+		<param name="Window Styles" value="0x800027">
+	</OBJECT>
+	<LI> <OBJECT type="text/sitemap">
+		<param name="Name" value="Introduction">
+	</OBJECT>
+	<UL>
+		<LI> <OBJECT type="text/sitemap">
+			<param name="Name" value="Introducing Delivery Handoff">
+			<param name="Local" value="hh\handoff\introduction_intro.htm">
+			</OBJECT>
+	</UL>
+	<LI> <OBJECT type="text/sitemap">
+		<param name="Name" value="Using Delivery Handoff">
+	</OBJECT>
+	<UL>
+		<LI> <OBJECT type="text/sitemap">
+			<param name="Name" value="Building a Delivery Package">
+			<param name="Local" value="hh\handoff\using_build.htm">
+			</OBJECT>
+		<LI> <OBJECT type="text/sitemap">
+			<param name="Name" value="Reviewing and Building a Package">
+			<param name="Local" value="hh\handoff\using_review.htm">
+			</OBJECT>
+		<LI> <OBJECT type="text/sitemap">
+			<param name="Name" value="Verifying a Delivery Package">
+			<param name="Local" value="hh\handoff\using_verify.htm">
+			</OBJECT>
+		<LI> <OBJECT type="text/sitemap">
+			<param name="Name" value="Validating a Specification">
+			<param name="Local" value="hh\handoff\using_validate.htm">
+			</OBJECT>
+		<LI> <OBJECT type="text/sitemap">
+			<param name="Name" value="Creating a Specification">
+			<param name="Local" value="hh\handoff\using_newspec.htm">
+			</OBJECT>
+	</UL>
+	<LI> <OBJECT type="text/sitemap">
+		<param name="Name" value="Reference">
+	</OBJECT>
+	<UL>
+		<LI> <OBJECT type="text/sitemap">
+			<param name="Name" value="Specification Reference">
+			<param name="Local" value="hh\handoff\reference_spec.htm">
+			</OBJECT>
+		<LI> <OBJECT type="text/sitemap">
+			<param name="Name" value="Findings Reference">
+			<param name="Local" value="hh\handoff\reference_findings.htm">
+			</OBJECT>
+	</UL>
+	<LI> <OBJECT type="text/sitemap">
+		<param name="Name" value="Dialog Boxes">
+	</OBJECT>
+	<UL>
+		<LI> <OBJECT type="text/sitemap">
+			<param name="Name" value="Delivery Handoff Configuration">
+			<param name="Local" value="hh\handoff\dlgboxes_config.htm">
+			</OBJECT>
+	</UL>
+</BODY>
+</HTML>

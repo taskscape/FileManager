@@ -88,6 +88,7 @@
     "PluginDiskRecovery": "arrow_counterclockwise",
     "PluginExecutable": "window_dev_tools",
     "PluginFolders": "app_folder",
+    "PluginHandoff": "box",
     "PluginHelp": "book",
     "PluginMedia": "video",
     "PluginNetwork": "desktop_sync",

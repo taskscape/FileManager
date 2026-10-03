@@ -2742,11 +2742,13 @@ FIND_NEW_SLG_FILE:
 
                         if (IsFileManagerUiTestSandboxRequested())
                         {
-                            // The UI suite invokes FTP commands directly; eagerly assign
-                            // their otherwise lazy owner-drawn-menu IDs only in its sandbox.
+                            // The UI suite invokes FTP and Delivery Handoff commands directly;
+                            // eagerly assign their otherwise lazy owner-drawn-menu IDs only in its sandbox.
                             CMenuPopup* pluginsMenu =
                                 (CMenuPopup*)MainMenu.GetSubMenu(CML_PLUGINS, FALSE);
-                            Plugins.InitUiTestPluginMenuItems(MainWindow->HWindow, pluginsMenu, "ftp.spl");
+                            static const char* const uiTestPlugins[] = {"ftp.spl", "handoff.spl"};
+                            Plugins.InitUiTestPluginMenuItems(MainWindow->HWindow, pluginsMenu, uiTestPlugins,
+                                                              (int)_countof(uiTestPlugins));
                         }
 
                         // Save into a new generation below the newest version root.

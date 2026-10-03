@@ -920,6 +920,15 @@
 		</UL>
 
 		<LI> <OBJECT type="text/sitemap">
+			<param name="Name" value="Delivery Handoff">
+			</OBJECT>
+		<UL>
+			<OBJECT type="text/sitemap">
+				<param name="Merge" value="handoff.chm::\handoff.hhc">
+			</OBJECT>
+		</UL>
+
+		<LI> <OBJECT type="text/sitemap">
 			<param name="Name" value="Check Version">
 			</OBJECT>
 		<UL>

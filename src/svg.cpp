@@ -215,6 +215,8 @@ const char* GetPluginSVGName(const char* dllName)
         {"unarj.spl", "PluginArchive"}, {"uncab.spl", "PluginArchive"},
         {"unlha.spl", "PluginArchive"}, {"pak.spl", "PluginArchive"},
         {"automation.spl", "PluginAutomation"}, {"checksum.spl", "PluginChecksum"},
+        // Delivery Handoff: a package (box) glyph, like other bundled plug-ins drawn from the shared set.
+        {"handoff.spl", "PluginHandoff"},
         {"checkver.spl", "PluginUpdate"}, {"dbviewer.spl", "PluginDatabase"},
         {"diskmap.spl", "PluginDiskMap"}, {"filecomp.spl", "PluginCompare"},
         {"ieviewer.spl", "PluginWeb"}, {"mmviewer.spl", "PluginMedia"},

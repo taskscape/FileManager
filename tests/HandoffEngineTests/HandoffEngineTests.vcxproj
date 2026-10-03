@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Debug|x64">
+      <Configuration>Debug</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <VCProjectVersion>16.0</VCProjectVersion>
+    <ProjectGuid>{8D3C6A12-4F7B-4E2D-9A61-3B5E0C7D2F94}</ProjectGuid>
+    <RootNamespace>HandoffEngineTests</RootNamespace>
+    <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>true</UseDebugLibraries>
+    <PlatformToolset>v145</PlatformToolset>
+    <!-- The engine is UTF-16 internally and calls the W APIs explicitly. -->
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <ClCompile>
+      <WarningLevel>Level4</WarningLevel>
+      <TreatWarningAsError>true</TreatWarningAsError>
+      <SDLCheck>true</SDLCheck>
+      <LanguageStandard>stdcpplatest</LanguageStandard>
+      <!-- Fixture JSON is written as narrow UTF-8 literals; /utf-8 keeps them UTF-8 at run time. -->
+      <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
+      <!-- The engine compiles exactly as in the plug-in: no precompiled header and only
+           the Windows SDK, the C++ library, and src/common as dependencies (D-11). -->
+      <AdditionalIncludeDirectories>..\..\src\plugins\handoff\engine;..\..\src;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>WINVER=0x0A00;_WIN32_WINNT=0x0A00;_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+    </ClCompile>
+    <Link>
+      <SubSystem>Console</SubSystem>
+      <AdditionalDependencies>Normaliz.lib;bcrypt.lib;windowscodecs.lib;ole32.lib;oleaut32.lib;shlwapi.lib;shcore.lib;runtimeobject.lib;%(AdditionalDependencies)</AdditionalDependencies>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemGroup>
+    <ClCompile Include="TestMain.cpp" />
+    <ClCompile Include="Fixtures.cpp" />
+    <ClCompile Include="ParserTests.cpp" />
+    <ClCompile Include="ReviewTests.cpp" />
+    <ClCompile Include="BuildTests.cpp" />
+    <ClCompile Include="..\..\src\plugins\handoff\engine\build.cpp" />
+    <ClCompile Include="..\..\src\plugins\handoff\engine\csv.cpp" />
+    <ClCompile Include="..\..\src\plugins\handoff\engine\file_system.cpp" />
+    <ClCompile Include="..\..\src\plugins\handoff\engine\findings.cpp" />
+    <ClCompile Include="..\..\src\plugins\handoff\engine\formats.cpp" />
+    <ClCompile Include="..\..\src\plugins\handoff\engine\image_probe.cpp" />
+    <ClCompile Include="..\..\src\plugins\handoff\engine\json.cpp" />
+    <ClCompile Include="..\..\src\plugins\handoff\engine\name_template.cpp" />
+    <ClCompile Include="..\..\src\plugins\handoff\engine\outputs.cpp" />
+    <ClCompile Include="..\..\src\plugins\handoff\engine\patterns.cpp" />
+    <ClCompile Include="..\..\src\plugins\handoff\engine\pdf_pages_winrt.cpp" />
+    <ClCompile Include="..\..\src\plugins\handoff\engine\pdf_structure.cpp" />
+    <ClCompile Include="..\..\src\plugins\handoff\engine\plan.cpp" />
+    <ClCompile Include="..\..\src\plugins\handoff\engine\review.cpp" />
+    <ClCompile Include="..\..\src\plugins\handoff\engine\scanner.cpp" />
+    <ClCompile Include="..\..\src\plugins\handoff\engine\spec.cpp" />
+    <ClCompile Include="..\..\src\plugins\handoff\engine\text_util.cpp" />
+    <ClCompile Include="..\..\src\plugins\handoff\engine\verify.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="TestFramework.h" />
+    <ClInclude Include="Fixtures.h" />
+  </ItemGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+</Project>

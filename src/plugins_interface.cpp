@@ -952,34 +952,42 @@ void CPlugins::CalculateStateCache()
     //  }
 }
 
-void CPlugins::InitUiTestPluginMenuItems(HWND parent, CMenuPopup* root, const char* dllName)
+void CPlugins::InitUiTestPluginMenuItems(HWND parent, CMenuPopup* root, const char* const* dllNames, int dllCount)
 {
-    if (root == NULL || dllName == NULL)
+    if (root == NULL || dllNames == NULL)
         return;
 
-    // Populate the real root first so the selected plug-in owns the same submenu
-    // object and starts from the same command range as an interactive first open.
+    // Populate the real root first so the selected plug-ins own the same submenu
+    // objects and start from the same command range as an interactive first open.
+    // The root pass runs once: it resets every SUID, so repeating it per plug-in
+    // would invalidate IDs already published for an earlier one.
     InitMenuItems(parent, root);
-    // Plug-in registration may preserve a directory or only a filename; menu
-    // setup must select FTP consistently across both supported record layouts.
-    const char* requestedFileName = strrchr(dllName, '\\');
-    if (requestedFileName != NULL)
-        requestedFileName++;
-    else
-        requestedFileName = dllName;
-    for (int i = 0; i < Data.Count; i++)
+    for (int n = 0; n < dllCount; n++)
     {
-        CPluginData* plugin = Data[i];
-        const char* pluginFileName = strrchr(plugin->DLLName, '\\');
-        if (pluginFileName != NULL)
-            pluginFileName++;
+        const char* dllName = dllNames[n];
+        if (dllName == NULL)
+            continue;
+        // Plug-in registration may preserve a directory or only a filename; menu
+        // setup must select each plug-in consistently across both supported record layouts.
+        const char* requestedFileName = strrchr(dllName, '\\');
+        if (requestedFileName != NULL)
+            requestedFileName++;
         else
-            pluginFileName = plugin->DLLName;
-        if (StrICmp(pluginFileName, requestedFileName) == 0 &&
-            plugin->SubMenu != NULL)
+            requestedFileName = dllName;
+        for (int i = 0; i < Data.Count; i++)
         {
-            plugin->InitMenuItems(parent, i, plugin->SubMenu);
-            break;
+            CPluginData* plugin = Data[i];
+            const char* pluginFileName = strrchr(plugin->DLLName, '\\');
+            if (pluginFileName != NULL)
+                pluginFileName++;
+            else
+                pluginFileName = plugin->DLLName;
+            if (StrICmp(pluginFileName, requestedFileName) == 0 &&
+                plugin->SubMenu != NULL)
+            {
+                plugin->InitMenuItems(parent, i, plugin->SubMenu);
+                break;
+            }
         }
     }
 }

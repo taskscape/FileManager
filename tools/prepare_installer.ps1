@@ -156,7 +156,10 @@ $requiredPluginPayloads = @(
     '7zip\7za.dll',
     '7zip\7zwrapper.dll',
     'pictview\exif.dll',
-    'unchm\chmlib.dll'
+    'unchm\chmlib.dll',
+    # Delivery Handoff ships with the product; a staging regression that drops it must fail packaging.
+    'handoff\handoff.spl',
+    'handoff\lang\english.slg'
 )
 $missingPluginPayloads = @($requiredPluginPayloads |
     Where-Object { -not (Test-Path -LiteralPath (Join-Path $pluginsDirectory $_) -PathType Leaf) })

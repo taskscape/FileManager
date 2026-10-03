@@ -38,6 +38,9 @@ public sealed class NativeSafetyRegressionTests
             Assert.That(runner, Does.Contain("verify-durable-copy-commit.ps1"));
             Assert.That(runner, Does.Contain("test-zlib-compatibility.ps1"));
             Assert.That(runner, Does.Contain("test-bzip2-compatibility.ps1"));
+            // Delivery Handoff's shared specifications are untrusted input; keep its parser probe and engine host collected.
+            Assert.That(runner, Does.Contain("test-handoff-spec-parser.ps1"));
+            Assert.That(runner, Does.Contain("HandoffEngineTests"));
             Assert.That(runner, Does.Contain("foreach ($architecture in @('x64', 'x86'))"));
             Assert.That(runner, Does.Contain("test-cmark-gfm-hardening.ps1"));
             Assert.That(runner, Does.Contain("test-sqlite-recovery.ps1"));

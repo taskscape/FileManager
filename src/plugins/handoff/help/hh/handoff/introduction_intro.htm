@@ -1,0 +1,58 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head>
+<title>Introducing Delivery Handoff</title>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+<link rel="stylesheet" type="text/css" href="../salamander_help.css" />
+<link rel="stylesheet" type="text/css" href="../salamander_help_shared.css" />
+</head>
+
+<body>
+<div id="help_page">
+<div class="header">Open Salamander: Plugins: Delivery Handoff: Introduction</div>
+<div class="page">
+<h1>Introducing Delivery Handoff</h1>
+<p>Delivery Handoff builds and verifies professional delivery packages. One panel shows your
+<b>working material</b>; the other panel shows the <b>staging location</b> where the delivery
+package is created. A reusable <b>delivery specification</b> (a <code>*.handoff.json</code> file)
+describes what a package must contain: required documents, naming conventions, file formats,
+PDF page sizes, image dimensions, allowed content, approval and licence evidence, and supporting assets.</p>
+
+<p>The plugin assembles the candidate files, flags omissions and problems, lets you review and
+approve them, copies the files into a new package folder, and writes a manifest
+(<code>manifest.json</code>, <code>manifest.csv</code>) and a contents list (<code>CONTENTS.txt</code>).
+Every copied file is verified by SHA-256 before the package is published under its final name.
+Working files are never moved or modified.</p>
+
+<h3>Quick start: "Prepare the client delivery"</h3>
+<ol>
+<li>Show the project folder in the left panel and the folder for deliveries (for example <code>D:\Deliveries</code>) in the right panel. Keep the left panel active.</li>
+<li>If the project has no specification yet, choose <b>Plugins / Delivery Handoff / New Specification from Template</b> and pick <i>Client delivery (example)</i>. It is saved in the project's <code>.handoff</code> folder.</li>
+<li>Choose <b>Plugins / Delivery Handoff / Build Delivery Package</b>. The specification from the <code>.handoff</code> folder is preselected. Enter the variables (for example the client code, project code, and revision) and choose <b>Scan</b>.</li>
+<li>In the <b>Review Delivery Package</b> window, resolve the reported errors, approve documents that need reviewer approval, and choose <b>Build</b>.</li>
+<li>The result reads <i>Verified &#8212; ready for review</i> and the new package folder is focused in the staging panel.</li>
+</ol>
+
+<h3>Commands</h3>
+<table>
+ <tr><td class="hdr">Build Delivery Package</td><td>Opens a build session for the active panel (working material) and the inactive panel (staging location). See <a href="using_build.htm">Building a Delivery Package</a>.</td></tr>
+ <tr><td class="hdr">Verify Delivery Package</td><td>Verifies the focused package folder, the current folder, or a folder you choose. See <a href="using_verify.htm">Verifying a Delivery Package</a>.</td></tr>
+ <tr><td class="hdr">Validate Specification</td><td>Checks a specification file and lists problems with line and column. See <a href="using_validate.htm">Validating a Specification</a>.</td></tr>
+ <tr><td class="hdr">New Specification from Template</td><td>Creates a starter specification. See <a href="using_newspec.htm">Creating a Specification</a>.</td></tr>
+</table>
+<p>No hot keys are assigned by default; you can assign them in Plugins Manager.</p>
+
+<h3>Troubleshooting</h3>
+<table>
+ <tr><td class="hdr">Build is disabled</td><td>Errors remain, or warnings have not been acknowledged. Use the <i>Problems only</i> filter.</td></tr>
+ <tr><td class="hdr">Package folder already exists</td><td>Packages are never overwritten. Increase the revision variable or remove the old package.</td></tr>
+ <tr><td class="hdr">Source changed since review</td><td>A working file was edited after the scan. Choose <b>Re-scan</b>.</td></tr>
+ <tr><td class="hdr">Publication blocked</td><td>Another program (indexer, antivirus, Explorer preview) used a file in the unfinished package. Try again; the unfinished folder is kept and offered for removal next time.</td></tr>
+ <tr><td class="hdr">Page inspection unavailable</td><td>Windows could not open the PDF for page inspection (damaged file, unusual encryption, or Windows PDF component unavailable).</td></tr>
+ <tr><td class="hdr">Hidden <code>.&#8230;handoff-&#8230;.partial</code> folder</td><td>A build was interrupted. The next build in that staging location offers to remove it.</td></tr>
+</table>
+</div>
+<div class="footer">&#169; 2026 Taskscape Ltd</div>
+</div>
+</body>
+</html>

@@ -1,0 +1,8 @@
+{
+  "handoffSpec": 1,
+  "id": "t.minimal",
+  "name": "Minimal",
+  "description": "Dostawa Łódź — 日本語 😀",
+  "package": { "folderName": "Package_{date}" },
+  "rules": [ { "id": "all", "select": { "include": ["**/*"] } } ]
+}

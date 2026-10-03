@@ -96,6 +96,14 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\verify-durable-copy-
 powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\test-release-input-pinning.ps1
 powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\test-zlib-compatibility.ps1
 powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\test-bzip2-compatibility.ps1
+powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\test-handoff-spec-parser.ps1 -Architecture x64
+```
+
+The Delivery Handoff engine tests build and run without the application:
+
+```powershell
+msbuild .\tests\HandoffEngineTests\HandoffEngineTests.vcxproj /p:Configuration=Debug /p:Platform=x64
+.\tests\HandoffEngineTests\x64\Debug\HandoffEngineTests.exe
 ```
 
 The process-scoped execution-policy bypass does not change the machine-wide policy.
@@ -235,6 +243,8 @@ The toolbar icon coverage check has no parameters:
 | `test-unsafe-api-baseline.ps1` | Compares every repository unsafe API fingerprint with the reviewed generated baseline and rejects new or duplicated unsafe calls. |
 | `test-zlib-compatibility.ps1` | Compiles the checked-in zlib sources and replays the retained legacy, checksum-error, invalid-deflate, and truncated-stream vectors. Supports `-Architecture x64` and `x86`. |
 | `test-bzip2-compatibility.ps1` | Compiles the checked-in bzip2 sources and checks golden and legacy streams, truncation rejection, and the malformed fuzz-vector corpus. Supports `-Architecture x64` and `x86`. |
+| `test-handoff-spec-parser.ps1` | Compiles the Delivery Handoff specification parser from the plug-in's engine sources, checks that every template and `tests/handoff-specs/valid` input validates cleanly, compares each `invalid` and `hostile` input with its `.expected` findings (`CODE line:column`), and with `-Iterations N` soaks deterministic byte-flip, truncation, duplication, and deep-nesting mutations (each parse under one second). Supports `-Architecture x64` and `x86`; the nightly workflow runs 250 iterations. |
+| `HandoffEngineTests` (Debug x64) | Native console host for the Delivery Handoff engine: JSON and specification validation, globs and bounded regular expressions, naming templates and transliteration, scanning (junctions, links, limits, cancellation), selection and revisions, format signatures, generated PDFs (Windows.Data.Pdf) and images (WIC, PSD headers), evidence, planning, outputs, staging with fault injection at every file-system call, publication by handle, stale partial folders, and package verification. All fixtures live below a GUID folder in `%TEMP%` and are removed. |
 | `test-cmark-gfm-hardening.ps1` | Compiles the production Markdown renderer, compares retained snapshots, checks safe link and raw-HTML behavior, exercises extension combinations, and enforces input, nesting, node, and output limits. |
 | `test-7zip-compatibility.ps1` | Archives the retained corpus through the exact built wrapper/library pair, compares independent-oracle extraction manifests, and rejects named header, payload, and footer corruption regressions. |
 | `test-sqlite-recovery.ps1` | Exercises the supplied SQLite DLL with WAL/FULL settings, interrupted transactions, committed-row recovery, integrity checks, and controlled b-tree corruption detection. |
@@ -255,6 +265,14 @@ These tests do not drive the FileManager UI and can run in a normal developer pr
 #### `ApplicationVersionContractTests`
 
 - `Product_major_is_6_and_build_components_remain_automatic` — keeps native, manifest, configuration, shell-extension, installer, workflow, and README version declarations synchronized at product major 6 while preserving automatic build numbering.
+
+#### `HandoffSourceContractTests`
+
+- `Publication_renames_by_handle_without_replacement` — the package is published through `RenameRelativePublicationFile`.
+- `Plugin_sources_never_replace_or_shell_copy_files` — no `MOVEFILE_REPLACE_EXISTING`, `CopyFile*`, or `MoveFile*` in the plug-in.
+- `Raw_deletions_exist_only_in_the_owned_delete_boundary` — `DeleteFile`/`RemoveDirectory` appear only in `engine/file_system.cpp`.
+- `Every_template_is_embedded_in_the_plugin` — every `templates/*.handoff.json` is an RCDATA resource.
+- `Every_finding_and_label_has_english_and_polish_text` — every `HO-*` code and engine label has a string in both language modules.
 
 #### `SChannelTlsIntegrationTests`
 
@@ -938,6 +956,21 @@ Parameterized: Copy `copy-file.txt` and Move `move-file.txt` to `blocked-target\
 - **Confirms:** The directory eventually no longer exists.
 - **Assumptions:** Confirmation answered; timeout is long enough for a realistic high-entry delete; workspace seed runs before panel enumeration.
 - **Out of scope:** Progress correctness, cancellation mid-directory, Recycle Bin of 2,048 items, and memory/handle budgets during the delete.
+
+#### `HandoffUiTests` — Delivery Handoff plug-in
+
+Every case seeds the quick-start working material of `handoff-spec.md` A.5.1 (the *Client delivery (example)* template in `.handoff`, approved PDFs with two revisions, source artwork, a font with a licence register, and `Thumbs.db`) in the left panel and an empty staging folder in the right panel, then drives the plug-in through its process-specific menu IDs and frozen dialog control IDs. The plug-in must be deployed beside the executable; its absence fails the fixture.
+
+- `Build_creates_verified_package_with_manifest_and_contents` — enters the variables, approves the approved-PDF rule, builds, and checks the exact package tree, every `manifest.json` SHA-256, the build record beside the package, no remaining partial folder, and unchanged working material.
+- `Missing_required_item_blocks_build_and_lists_omission` — without `Artwork/Final`, `HO-REQ-001` is listed, Build stays disabled, and nothing is created in the staging folder.
+- `Image_below_minimum_is_reported` — a 1 800 px PSD reports `HO-IMG-013`.
+- `Superseded_revision_is_excluded` — `_v3` is reported as superseded (`HO-SEL-001`) and only `_v4` is staged.
+- `Existing_package_name_is_refused` — with the package folder already present, Scan stays disabled and the folder is untouched.
+- `Cancel_during_build_leaves_no_package` — a source held open without sharing triggers the retry prompt; cancelling leaves no final or partial folder and unchanged working files.
+- `Verify_detects_modified_and_unlisted_files` — after a build, an edited and an added file are reported as `HO-VER-003` and `HO-VER-004`.
+- `Invalid_specification_reports_line_and_column` — the validate dialog lists `HO-SPEC-001` at line 3 with a column.
+- `New_specification_from_template_never_overwrites` — the template is written byte-for-byte to `.handoff`, and a second create on the same path is refused without changing the file.
+- `Unicode_and_long_paths_are_staged` — a Polish name is transliterated and a CJK name below a working path longer than 300 characters is staged under a portable name.
 
 #### `ApplicationVerifierStartupUiTests`
 

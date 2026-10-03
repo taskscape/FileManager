@@ -1,0 +1,7 @@
+{
+  "handoffSpec": 1,
+  "id": "t.minimal",
+  "name": "Minimal",
+  "package": { "outputs": { "manifestCsv": "MANIFEST.JSON" }, "folderName": "Package_{date}" },
+  "rules": [ { "id": "all", "select": { "include": ["**/*"] } } ]
+}

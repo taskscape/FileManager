@@ -1,0 +1,23 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ImportGroup Label="PropertySheets">
+  </ImportGroup>
+  <PropertyGroup Label="UserMacros"></PropertyGroup>
+  <ItemDefinitionGroup>
+    <ClCompile>
+      <!-- Windows 10 APIs (per-monitor DPI, Windows.Data.Pdf) are used directly. The engine
+           and src (for common\relative_file_operations.h) come after the SDK folder, so SDK
+           headers always win over same-named files in src. -->
+      <PreprocessorDefinitions>WINVER=0x0A00;_WIN32_WINNT=0x0A00;_WIN32_IE=0x0A00;_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);..\engine;..\..\..</AdditionalIncludeDirectories>
+      <LanguageStandard>stdcpplatest</LanguageStandard>
+    </ClCompile>
+    <Link>
+      <AdditionalDependencies>Normaliz.lib;bcrypt.lib;windowscodecs.lib;ole32.lib;oleaut32.lib;shlwapi.lib;shcore.lib;runtimeobject.lib;%(AdditionalDependencies)</AdditionalDependencies>
+    </Link>
+    <ResourceCompile>
+      <PreprocessorDefinitions>WINVER=0x0A00;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories>..;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ResourceCompile>
+  </ItemDefinitionGroup>
+</Project>
