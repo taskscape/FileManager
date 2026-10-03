@@ -823,6 +823,8 @@ int TestExecutionAdapterFaultInjection()
 }
 }
 
+#include "ReorganizeTests.h" // reorganization plan core must link the real reorg namespace, not an anonymous one
+
 int main()
 {
     int result = TestCheckedArithmeticBoundaries();
@@ -852,5 +854,7 @@ int main()
         result = TestFtpDownloadReliability(); // a failed local outcome must preserve the original files
     if (result == 0)
         result = TestConfigurationPayloadReliability(); // incomplete optional collections cannot become accepted snapshots
+    if (result == 0)
+        result = TestReorganizeCore(); // plan preview must not depend on the host UI
     return result != 0 ? result : TestExecutionAdapterFaultInjection();
 }

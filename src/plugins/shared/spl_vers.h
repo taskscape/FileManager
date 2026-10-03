@@ -199,8 +199,9 @@
 //   102 - 4.0
 //   103 - 5.0
 //   104 - shared application-update coordinator API
+//   105 - reorganization step execution API
 
-#define LAST_VERSION_OF_SALAMANDER 104
+#define LAST_VERSION_OF_SALAMANDER 105
 #define REQUIRE_LAST_VERSION_OF_SALAMANDER "This plugin requires Open Salamander 5." VERSINFO_SALAMANDER_BUILDDATE " (" SAL_VER_PLATFORM ") or later."
 
 #endif // __SPL_VERS_H

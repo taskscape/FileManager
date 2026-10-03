@@ -132,6 +132,7 @@ COperations::COperations(int base, int delta, char* waitInQueueSubject, char* wa
         TRACE_E("Unable to create file-operation cancellation event.");
     OperationState = opsPlanned;
     Journal = NULL;
+    StepBridge = NULL;
     CurrentItemSequence = -1;
     CurrentItemAttempt = 0;
     CreateOperationCorrelationId(CorrelationId, _countof(CorrelationId));

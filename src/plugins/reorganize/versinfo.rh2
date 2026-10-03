@@ -1,0 +1,28 @@
+// SPDX-FileCopyrightText: 2026 Taskscape Ltd
+// SPDX-License-Identifier: GPL-2.0-or-later
+
+#ifndef __REORGANIZE_VERSINFO_RH2
+#define __REORGANIZE_VERSINFO_RH2
+
+#define VERSINFO_MAJOR 1
+#define VERSINFO_MINORA 0
+#define VERSINFO_MINORB 0
+
+#include "spl_vers.h"
+
+#define VERSINFO_COPYRIGHT "Copyright (C) 2026 Taskscape Ltd"
+#define VERSINFO_COMPANY "Open Salamander"
+#define VERSINFO_DESCRIPTION "Reorganize plugin for Open Salamander"
+
+#ifdef _LANG
+#define VERSINFO_INTERNAL "ENGLISH"
+#define VERSINFO_ORIGINAL VERSINFO_INTERNAL ".SLG"
+#else
+#define VERSINFO_INTERNAL "REORGANIZE"
+#define VERSINFO_ORIGINAL VERSINFO_INTERNAL ".SPL"
+#endif
+
+#define VERSINFO_SLG_WEB "www.taskscape.com"
+#define VERSINFO_SLG_COMMENT "English version"
+
+#endif

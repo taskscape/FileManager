@@ -641,6 +641,8 @@
     </ClCompile>
     <ClCompile Include="..\operation_journal.cpp">
     </ClCompile>
+    <ClCompile Include="..\operation_steps.cpp">
+    </ClCompile>
     <ClCompile Include="..\operation_plan.cpp">
     </ClCompile>
     <ClCompile Include="..\file_operation_filesystem.cpp">

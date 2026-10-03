@@ -17,6 +17,7 @@
 #include "parserbroker.h"
 #include <uxtheme.h>
 #include "dialogs.h"
+#include "operation_steps.h"
 #include "execlog.h"
 #include "release_diagnostics.h"
 
@@ -3491,6 +3492,9 @@ BOOL CPluginData::Unload(HWND parent, BOOL ask)
     BOOL ret = FALSE;
     if (DLL != NULL)
     {
+        // A step script still posts Finished to this plug-in. Unload waits until that returns.
+        if (PluginIface.NotEmpty() && OperationStepsBlockUnload(PluginIface.GetInterface()))
+            return FALSE;
         SetMainWindowClosingOverlayPluginText(IDS_CLOSINGPLUGIN, Name); // Identify the plug-in before any close callback can block.
         if (MainWindow == NULL || MainWindow->CanUnloadPlugin(parent, PluginIface.GetInterface()))
         { // the plugin is no longer used by Salamander; it can be unloaded

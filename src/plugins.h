@@ -2545,6 +2545,13 @@ public:
 
     virtual BOOL WINAPI RequestApplicationUpdateCheck(HWND notifyWindow, UINT notifyMessage, BOOL force);
     virtual int WINAPI GetApplicationUpdateState();
+    virtual BOOL WINAPI ExecuteOperationSteps(HWND parent, const char* caption,
+                                              const CSalamanderOperationStep* steps, int count,
+                                              DWORD flags,
+                                              CSalamanderOperationStepObserverAbstract* observer,
+                                              char* operationIdBuf, int operationIdBufSize);
+    virtual void WINAPI EnumApplicationPathReferences(SalEnumPathReferenceCallback callback, void* param);
+    virtual BOOL WINAPI GetApplicationDataDirectory(char* buf, int bufSize, BOOL create);
 };
 
 //

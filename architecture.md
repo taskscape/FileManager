@@ -382,10 +382,12 @@ Loading (`CPluginData::InitDLL`, `src/plugins_loading.cpp:2142`) follows this pr
 
 1. Resolve the module path and load the DLL.
 2. Obtain `SalamanderPluginEntry`, `SalamanderPluginGetReqVer`, and optional SDK-version exports.
-3. Reject incompatible required versions (the current SDK constant is version 103).
+3. Reject incompatible required versions (the current SDK constant is version 105).
 4. Create the host-side `CSalamanderPluginEntry` gateway and call the plug-in entry point.
 5. Obtain `CPluginInterfaceAbstract`, query capability subinterfaces, load configuration, and invoke `Connect`.
 6. Register menus, file masks, archive formats, viewer associations, filesystem names, thumbnails, and icons through `CSalamanderConnectAbstract`.
+
+SDK 105 appends `ExecuteOperationSteps`, `EnumApplicationPathReferences`, and `GetApplicationDataDirectory` on `CSalamanderGeneralAbstract`. The Reorganize plug-in (`src/plugins/reorganize`) plans moves in a `reorg:` panel and asks the host to run the compiled steps through the existing durable operation script. The host does not copy or permanently delete for those steps. A step script keeps the plug-in loaded until `Finished` is delivered on the main thread.
 
 `CPluginInterfaceAbstract` (`src/plugins/shared/spl_base.h:469`) is the root contract. Capability flags and getters expose optional archive, viewer, menu-extension, filesystem, and thumbnail-loader interfaces. Common callbacks cover configuration, lifecycle events, history clearing, password-manager events, and path changes.
 
