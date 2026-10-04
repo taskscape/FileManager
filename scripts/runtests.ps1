@@ -196,13 +196,23 @@ function Find-VisualStudioDeveloperCommand {
     $vswhere = Join-Path $programFilesX86 'Microsoft Visual Studio\Installer\vswhere.exe'
     if (Test-Path -LiteralPath $vswhere) {
         # Restrict discovery to VS 2026 so an older installation cannot supply the test compiler.
-        $installationPath = & $vswhere -latest -products * -version '[18.0,19.0)' -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
-        if (-not [string]::IsNullOrWhiteSpace($installationPath)) {
-            $candidates.Add((Join-Path $installationPath.Trim() 'Common7\Tools\VsDevCmd.bat'))
+        $installationPaths = & $vswhere -all -products * -version '[18.0,19.0)' -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
+        foreach ($installationPath in $installationPaths) {
+            if (-not [string]::IsNullOrWhiteSpace($installationPath)) {
+                $candidates.Add((Join-Path $installationPath.Trim() 'Common7\Tools\VsDevCmd.bat'))
+            }
         }
     }
 
-    return $candidates | Where-Object { Test-Path -LiteralPath $_ } | Select-Object -First 1
+    # PictView and Portables require ATL; a separate VS 2026 Build Tools install may omit it even when the IDE is complete.
+    foreach ($candidate in $candidates | Select-Object -Unique) {
+        $installationPath = Split-Path -Parent (Split-Path -Parent (Split-Path -Parent $candidate))
+        $atlHeader = Join-Path $installationPath 'VC\Tools\MSVC\*\atlmfc\include\atlbase.h'
+        if ((Test-Path -LiteralPath $candidate -PathType Leaf) -and (Resolve-Path $atlHeader -ErrorAction SilentlyContinue)) {
+            return $candidate
+        }
+    }
+    return $null
 }
 
 # Keep cmd.exe's initial environment bounded so PowerShell callers with oversized PATH values can still start VsDevCmd.

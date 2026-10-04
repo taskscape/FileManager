@@ -101,7 +101,6 @@ internal static class NativeCommands
     // Legacy standard-toolbars remain visible in some dialogs, so retain their state-query constants alongside the custom main-toolbar path.
     private const uint TbIsButtonEnabled = 0x0409;
     private const uint TbCommandToIndex = 0x0419;
-    private const int DefaultMiddleToolbarButtonCount = 18;
     private const string UniversalWindowClass = "WinLib Universal Window2";
     private const int ConfigurationClearReadOnlyCheckBox = 304;
     internal const int OperationPathControl = 210;
@@ -156,6 +155,16 @@ internal static class NativeCommands
     [DllImport("user32.dll")]
     [return: MarshalAs(UnmanagedType.Bool)]
     private static extern bool GetClientRect(nint hWnd, out Rect rectangle);
+
+    [DllImport("user32.dll")]
+    private static extern bool ShowWindow(nint hWnd, int command);
+
+    internal static void MaximizeWindow(nint windowHandle)
+    {
+        // The vertical toolbar is clipped by the main window, so expose its command buttons before hit testing them.
+        const int swMaximize = 3;
+        ShowWindow(windowHandle, swMaximize);
+    }
 
     [DllImport("user32.dll")]
     [return: MarshalAs(UnmanagedType.Bool)]
@@ -550,14 +559,17 @@ internal static class NativeCommands
             return false;
         }
 
-        var cellHeight = rectangle.Right - rectangle.Left;
-        if (cellHeight <= 0 || (long)cellHeight * DefaultMiddleToolbarButtonCount > rectangle.Bottom - rectangle.Top)
+        // Native Refresh balances the vertical icon inset with both horizontal edges, yielding square button cells.
+        var cellWidth = rectangle.Right - rectangle.Left;
+        var cellHeight = cellWidth;
+        if (cellWidth <= 0 || (long)(index + 1) * cellHeight > rectangle.Bottom - rectangle.Top)
         {
-            failure = "Default middle toolbar does not expose the complete equal-height default button stack.";
+            failure = $"Default middle toolbar command {DescribeCommand(command)} ({command}) is clipped: " +
+                      $"button {index + 1} needs {(index + 1) * cellHeight}px, client is {cellWidth}x{rectangle.Bottom - rectangle.Top}px.";
             return false;
         }
 
-        var x = rectangle.Left + cellHeight / 2;
+        var x = rectangle.Left + cellWidth / 2;
         var y = rectangle.Top + index * cellHeight + cellHeight / 2;
         var point = unchecked((nint)((y << 16) | (x & 0xffff)));
         TraceAction("click-toolbar-command", toolbar,

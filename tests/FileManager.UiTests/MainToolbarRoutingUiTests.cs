@@ -9,6 +9,8 @@ public sealed class MainToolbarRoutingUiTests : FileOperationUiTestBase
     [Test]
     public void Default_middle_toolbar_buttons_route_to_their_user_observable_commands()
     {
+        // Give the vertical command bar the available desktop height before asserting that its buttons can be clicked.
+        NativeCommands.MaximizeWindow(NativeMainWindowHandle);
         EnsureMiddleToolbarIsVisible();
 
         // Copy opens a modal operation through the button route and preserves the owned source file after committing to the other panel.
