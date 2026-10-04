@@ -11,6 +11,9 @@ File Manager is an Open Salamander based fast and reliable two-panel file manage
 
 ## Contents
 
+- [Features](#features)
+  - [Reorganize](#reorganize)
+  - [Delivery Handoff](#delivery-handoff)
 - [Origin](#origin)
 - [What's new in 6.0](#whats-new-in-60)
 - [Open Salamander 5.0](#open-salamander-50)
@@ -25,6 +28,25 @@ File Manager is an Open Salamander based fast and reliable two-panel file manage
 - [Architecture](#architecture-and-code-structure)
 - [License](#license)
 
+## Features
+
+- **Two-panel file management:** Browse local and network folders, archive contents, and virtual file systems supplied by plugins. Copy, move, rename, delete, and change file attributes from the panels.
+- **Find and inspect files:** Use quick search in a panel, the Find dialog, file viewers, and configurable file associations.
+- **Archives and network access:** Open, pack, and unpack supported archives; use the FTP plugin for FTP/FTPS transfers. Plugins also extend the file systems, viewers, and other commands available in the manager.
+- **Reorganize and Delivery Handoff:** Preview and review a folder rearrangement before applying it, or assemble and verify a delivery package from a reusable specification. Both workflows are described below.
+
+### Reorganize
+
+The **Reorganize** plugin lets you plan folder changes before touching the files. Create a plan for source and destination folders, stage moves and renames directly or through a rule or CSV mapping, and inspect the proposed layout in a `reorg:` virtual panel. Its columns show where each item came from, what will change, any issues, and whether the change is reversible. You can undo and redo edits to the plan and save it as a UTF-8 `.reorgplan` file.
+
+Use **Plan Review** to check the exact operation steps and mark them as reviewed. **Apply** rescans the folders and runs only the reviewed steps through the file manager's durable operation engine; changes to the plan or folders require another review. Optional cleanup moves emptied folders into a recovery store. The plugin does not permanently delete files.
+
+### Delivery Handoff
+
+The **Delivery Handoff** plugin builds a new delivery package from files in the active panel and places it in the inactive panel. Both panels must show disk or network folders. A reusable `*.handoff.json` specification defines required items, naming and format rules, PDF page sizes, image requirements, allowed content, and approval or licence evidence. You can create a starter specification from a template or validate an existing one.
+
+**Build Delivery Package** scans the working folder or selected items, reports missing or nonconforming files, and lets you review the candidates before building. It copies included files without changing the originals, verifies each copy with SHA-256, and publishes a new package. By default, the package contains `manifest.json`, `manifest.csv`, and `CONTENTS.txt`; the specification can change those output names or omit the optional CSV and contents list. **Verify Delivery Package** checks a package again for missing, changed, or unlisted files. By default, an internal build record is saved beside the package, outside the client-facing folder.
+
 ## Origin
 
 The original version of Servant Salamander was developed by Petr Šolín during his studies at the Czech Technical University. He released it as freeware in 1997. After graduation, Petr Šolín founded the company [Altap](https://www.altap.cz/) in cooperation with Jan Ryšavý. In 2001 they released the first shareware version of the program. In 2007 a new version was renamed to Altap Salamander 2.5. Many other programmers and translators [contributed](AUTHORS) to the project. In 2019, Altap was acquired by [Fine](https://www.finesoftware.eu/). After this acquisition, Altap Salamander 4.0 was released as freeware. In 2023, the project was open sourced under the GPLv2 license as Open Salamander 5.0.
@@ -37,7 +59,7 @@ We would like to thank [Fine](https://www.finesoftware.eu/) for making the open-
 
 ## What's new in 6.0
 
-The highlights below cover repository work from **March through September 2026**, spanning the last 5.0.x builds and the 6.0 line (current GitHub releases are versioned `6.0.{build}`).
+The highlights below cover repository work from **March through October 2026**, spanning the last 5.0.x builds and the 6.0 line (current GitHub releases are versioned `6.0.{build}`).
 
 ### User interface and Unicode
 
@@ -58,12 +80,12 @@ The highlights below cover repository work from **March through September 2026**
 
 ### Plugins and network
 
-- **Reorganize** previews a folder reorganization in a `reorg:` panel and applies the reviewed moves through the host operation script. Plans are UTF-8 `.reorgplan` files. The plug-in does not copy files or delete them permanently.
+- **Reorganize** adds a [reviewable folder-reorganization workflow](#reorganize) with a `reorg:` preview panel, reusable `.reorgplan` files, and recovery-oriented moves.
 - **FTP/FTPS** uses Windows SChannel (no bundled TLS DLLs). Transfers are transactional and resumable, certificate exceptions are stored more safely, and passive FTPS data-channel TLS plus expired-exception compaction crashes were fixed.
 - FTP downloads keep an existing local file intact while receiving data into a unique sibling `.salftp-*.part` file. The matching `.meta` file records ownership and verified resume checkpoints. A move deletes its remote source only after local validation, flush, metadata, publication, and checked completion succeed. Cancellation or failure can leave these private files for a later retry; keep them together. Resume requires a matching remote version and unchanged local evidence. Legacy, corrupted, named-stream, reparse-point, or ambiguous publication states require manual inspection; a `.previous` sibling retains the old destination when publication cleanup cannot finish. Restart never replays remote deletion.
 - Bundled engines were upgraded: [7-Zip 26.02](src/plugins/7zip/doc/upgrade-26.02.md), zlib, SQLite (with defined recovery behavior), bzip2, and cmark-gfm.
 - UnRAR plugin loading was restored; 64-bit file-size handling was applied to the active plug-in readers.
-- New **Delivery Handoff** plug-in builds and verifies professional delivery packages: a reusable `*.handoff.json` specification defines required documents, naming, formats, PDF page sizes, image dimensions, allowed content, and approval and licence evidence; the plug-in assembles candidates from the working panel, flags omissions, copies them into a hash-verified package in the other panel, and writes `manifest.json`, `manifest.csv`, and `CONTENTS.txt`.
+- New **Delivery Handoff** plugin [builds and verifies delivery packages](#delivery-handoff) from reusable `*.handoff.json` specifications, with reviewable findings and hash-verified manifests.
 
 ### Build, tests, and releases
 
