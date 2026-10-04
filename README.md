@@ -14,6 +14,7 @@ File Manager is an Open Salamander based fast and reliable two-panel file manage
 - [Features](#features)
   - [Reorganize](#reorganize)
   - [Delivery Handoff](#delivery-handoff)
+- [User manual](manual.md)
 - [Origin](#origin)
 - [What's new in 6.0](#whats-new-in-60)
 - [Open Salamander 5.0](#open-salamander-50)
@@ -533,6 +534,7 @@ Each plugin is its own `.vcxproj` linked into the solution and produces a DLL pl
 
 ## Resources
 
+- [User manual](manual.md)
 - [Open Salamander website](https://www.opensalamander.org/)
 - [GitHub releases](https://github.com/taskscape/FileManager/releases)
 - [Automated testing](testing.md)
