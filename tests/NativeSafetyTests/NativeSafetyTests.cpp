@@ -821,6 +821,32 @@ int TestExecutionAdapterFaultInjection()
     }
     return 0;
 }
+
+int TestBottomToolbarUtf8Captions()
+{
+    // The old 15-byte slot kept the lead byte of ż and the ANSI text fallback painted mojibake.
+    const char* paths = u8"Szybkie \u015bcie\u017cki";
+    std::wstring wide;
+    int legacy = Utf8BoundedPrefixLength(paths, (int)strlen(paths), 15);
+    if (legacy != 13 || !Utf8TextToWide(paths, legacy, wide) || wide != L"Szybkie \u015bcie")
+        return Fail("bottom-toolbar truncation kept a partial Polish character");
+    const char* row = u8"Pomoc,Zmie\u0144 nazw\u0119,Podgl\u0105d,Edytuj,Kopiuj,Przenie\u015b,Utw\u00f3rz katalog,Usu\u0144,Menu u\u017cytkownika,Menu,Po\u0142\u0105cz,Roz\u0142\u0105cz";
+    const wchar_t* expected[] = {L"Pomoc", L"Zmie\u0144 nazw\u0119", L"Podgl\u0105d", L"Edytuj", L"Kopiuj", L"Przenie\u015b",
+                                 L"Utw\u00f3rz katalog", L"Usu\u0144", L"Menu u\u017cytkownika", L"Menu", L"Po\u0142\u0105cz", L"Roz\u0142\u0105cz"};
+    const char* field = row;
+    for (int index = 0; index < 12; ++index)
+    {
+        const char* comma = strchr(field, index == 11 ? '\0' : ',');
+        if (index < 11 && comma == NULL)
+            return Fail("bottom-toolbar row did not contain twelve captions");
+        int bytes = index == 11 ? (int)strlen(field) : (int)(comma - field);
+        int keep = Utf8BoundedPrefixLength(field, bytes, 64);
+        if (keep != bytes || !Utf8TextToWide(field, keep, wide) || wide != expected[index])
+            return Fail("bottom-toolbar caption lost Polish diacritics");
+        field = comma + 1;
+    }
+    return 0;
+}
 }
 
 #include "ReorganizeTests.h" // reorganization plan core must link the real reorg namespace, not an anonymous one
@@ -834,6 +860,8 @@ int main()
         result = TestNetworkResourcesUtf8(); // provider names must survive both display and subsequent navigation
     if (result == 0)
         result = TestUnicodeTextBoundaries(); // layout must preserve character boundaries and UTF-8 system/RDP messages
+    if (result == 0)
+        result = TestBottomToolbarUtf8Captions(); // function-key captions must stay valid UTF-8 Polish
     if (result == 0)
         result = TestUnicodeShellLinkTarget(); // COM targets must return complete UTF-8 paths
     if (result != 0)

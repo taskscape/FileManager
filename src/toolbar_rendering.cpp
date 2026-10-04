@@ -372,6 +372,13 @@ BOOL CToolBar::Refresh()
             // Center only the visible icon/text group for opted-in fixed-width command slots.
             if (!vertical && CenterContent && (item->Style & TLBI_STYLE_FIXEDWIDTH))
             {
+                // Measure the caption that fits the slot. The full UTF-8 width shifts the origin negative and clips a Polish glyph.
+                if (textPresent)
+                {
+                    int budget = item->Width - item->TextX - (int)Padding.TextRight;
+                    if (budget < textWidth)
+                        textWidth = budget > 0 ? budget : 0;
+                }
                 int contentLeft = 0;
                 int contentRight = 0;
                 BOOL contentPresent = FALSE;
@@ -666,7 +673,16 @@ void CToolBar::DrawItem(HDC hDC, int index)
             r.top = centerOffset + offset;
             r.bottom = r.top + item->Height;
             DWORD noPrefix = item->Style & TLBI_STYLE_NOPREFIX ? DT_NOPREFIX : 0;
+            // Fixed slots ellipsize on character boundaries. DT_NOCLIP drew past the button and sliced multibyte Polish letters.
+            DWORD clip = item->Style & TLBI_STYLE_FIXEDWIDTH ? DT_END_ELLIPSIS : DT_NOCLIP;
+            if (item->Style & TLBI_STYLE_FIXEDWIDTH)
+            {
+                r.right = width - (int)Padding.TextRight;
+                if (r.right < r.left)
+                    r.right = r.left;
+            }
             HFONT hOldFont = (HFONT)SelectObject(CacheBitmap->HMemDC, HFont);
+            int oldBkMode = SetBkMode(CacheBitmap->HMemDC, TRANSPARENT);
             if (grayed)
             {
                 RECT textR2 = r;
@@ -676,13 +692,14 @@ void CToolBar::DrawItem(HDC hDC, int index)
                 textR2.bottom++;
                 SetTextColor(CacheBitmap->HMemDC, GetSysColor(COLOR_BTNHILIGHT));
                 DrawTextUtf8(CacheBitmap->HMemDC, item->Text, item->TextLen,
-                         &textR2, noPrefix | DT_NOCLIP | DT_LEFT | DT_SINGLELINE | DT_VCENTER);
+                         &textR2, noPrefix | clip | DT_LEFT | DT_SINGLELINE | DT_VCENTER);
                 SetTextColor(CacheBitmap->HMemDC, GetSysColor(COLOR_BTNSHADOW));
             }
             else
                 SetTextColor(CacheBitmap->HMemDC, GetSysColor(COLOR_BTNTEXT));
             DrawTextUtf8(CacheBitmap->HMemDC, item->Text, item->TextLen, &r,
-                     noPrefix | DT_NOCLIP | DT_LEFT | DT_VCENTER | DT_SINGLELINE);
+                     noPrefix | clip | DT_LEFT | DT_VCENTER | DT_SINGLELINE);
+            SetBkMode(CacheBitmap->HMemDC, oldBkMode);
             if (hOldFont != NULL)
                 SelectObject(CacheBitmap->HMemDC, hOldFont);
         }

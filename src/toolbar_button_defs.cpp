@@ -12,6 +12,7 @@
 #include "fileswnd.h"
 
 #include <strsafe.h>
+#include "common/unicode_text_layout.h" // caption copies must end on a UTF-8 character, not a raw byte
 
 #include "nanosvg\nanosvg.h"
 #include "nanosvg\nanosvgrast.h"
@@ -1220,12 +1221,13 @@ void CMainToolBar::SetType(CMainToolBarType type)
 // CBottomToolBar
 //
 
-#define BOTTOMTB_TEXT_MAX 15 // maximum string length for one key
+// Terminated UTF-8 caption. The previous 15-byte unterminated field split Polish letters such as ń and ą.
+#define BOTTOMTB_TEXT_MAX 64
 struct CBottomTBData
 {
     DWORD Index;
-    BYTE TextLen;                 // number of characters in 'Text'
-    char Text[BOTTOMTB_TEXT_MAX]; // text without a terminator
+    BYTE TextLen;                 // UTF-8 bytes in 'Text', excluding the terminator
+    char Text[BOTTOMTB_TEXT_MAX]; // terminated; never a partial code point
 };
 
 CBottomTBData BottomTBData[btbsCount][12] =
@@ -1350,13 +1352,17 @@ CBottomToolBar::CBottomToolBar(HWND hNotifyWindow, CObjectOrigin origin)
 
 // Fills the BottomTBData 'Text' field from a resource string.
 // 'state' specifies the row in the BottomTBData array and 'BottomTBData' denotes the string with texts
-// Text for individual keys is separated by semicolons.
+// Text for individual keys is separated by commas.
 BOOL CBottomToolBar::InitDataResRow(CBottomTBStateEnum state, int textResID)
 {
     CALL_STACK_MESSAGE2("CBottomToolBar::InitDataResRow(, %d)", textResID);
-    char buff[BOTTOMTB_TEXT_MAX * 12];
-    // Bottom-toolbar resource text is intentionally bounded to its parser's fixed row field.
-    StringCchCopyNA(buff, _countof(buff), LoadStr(textResID), _countof(buff) - 1);
+    char buff[2048];
+    // Copy the whole comma-separated row before splitting. The old 15*12 buffer cut a Polish caption mid-character.
+    if (FAILED(StringCchCopyA(buff, _countof(buff), LoadStr(textResID))))
+    {
+        TRACE_E("Bottom Toolbar text state:" << state << " does not fit the row buffer.");
+        return FALSE;
+    }
 
     int index = 0;
     const char* begin = buff;
@@ -1369,16 +1375,18 @@ BOOL CBottomToolBar::InitDataResRow(CBottomTBStateEnum state, int textResID)
         if (index < 12)
         {
             int count = (int)(end - begin);
-            if (count > BOTTOMTB_TEXT_MAX)
+            // A raw 15-byte cut left an orphan UTF-8 lead byte, so DrawText fell back to ANSI and corrupted the label.
+            int keep = Utf8BoundedPrefixLength(begin, count, BOTTOMTB_TEXT_MAX);
+            if (keep < count)
             {
-                TRACE_E("Bottom Toolbar text state:" << state << " index:" << index << " exceeds " << BOTTOMTB_TEXT_MAX << " chars");
-                count = BOTTOMTB_TEXT_MAX;
+                TRACE_E("Bottom Toolbar text state:" << state << " index:" << index << " exceeds " << (BOTTOMTB_TEXT_MAX - 1) << " bytes");
             }
             if (BottomTBData[state][index].Index == TBBE_TERMINATOR)
-                count = 0;
-            BottomTBData[state][index].TextLen = count;
-            if (count > 0)
-                memmove(BottomTBData[state][index].Text, begin, count);
+                keep = 0;
+            BottomTBData[state][index].TextLen = (BYTE)keep;
+            if (keep > 0)
+                memmove(BottomTBData[state][index].Text, begin, keep);
+            BottomTBData[state][index].Text[keep] = 0;
             begin = end + 1;
         }
         else

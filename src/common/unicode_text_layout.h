@@ -9,6 +9,24 @@
 #include <limits.h>
 #include <string.h>
 
+// Longest complete UTF-8 prefix that fits in a terminated buffer of `capacity` bytes.
+// A raw byte cut leaves a partial Polish character; ANSI text APIs then paint that caption as mojibake.
+inline int Utf8BoundedPrefixLength(const char* text, int bytes, int capacity)
+{
+    if (text == NULL || bytes < 0 || capacity <= 1)
+        return 0;
+    int keep = bytes;
+    if (keep > capacity - 1)
+        keep = capacity - 1;
+    // Only inspect the following byte after a real cut; a fitting prefix has no extra byte to read.
+    if (keep < bytes)
+    {
+        while (keep > 0 && (static_cast<unsigned char>(text[keep]) & 0xC0) == 0x80)
+            --keep;
+    }
+    return keep;
+}
+
 // Narrow UI strings are UTF-8; conversions must never silently substitute ACP characters.
 inline bool Utf8TextToWide(const char* text, int length, std::wstring& wide)
 {
