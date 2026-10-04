@@ -87,10 +87,23 @@ CPluginFSInterface::CPluginFSInterface()
     Path[0] = 0;
 }
 
+// The SDK user-part buffers are MAX_PATH bytes while Path holds up to 4096. A path that does not fit
+// is reported as a failure instead of overflowing the host buffer or silently naming another folder.
+static BOOL CopyUserPart(char* userPart, const char* path)
+{
+    size_t length = strlen(path);
+    if (length >= MAX_PATH)
+    {
+        userPart[0] = 0;
+        return FALSE;
+    }
+    memcpy(userPart, path, length + 1);
+    return TRUE;
+}
+
 BOOL WINAPI CPluginFSInterface::GetCurrentPath(char* userPart)
 {
-    lstrcpyA(userPart, Path);
-    return TRUE;
+    return CopyUserPart(userPart, Path);
 }
 
 BOOL WINAPI CPluginFSInterface::GetFullName(CFileData& file, int, char* buf, int bufSize)
@@ -112,10 +125,9 @@ BOOL WINAPI CPluginFSInterface::GetRootPath(char* userPart)
     if (Session().Open && !Session().Plan.DestinationRoots.empty())
     {
         std::string root = ToUtf8(Session().Plan.DestinationRoots[0].Path);
-        lstrcpyA(userPart, root.c_str());
+        return CopyUserPart(userPart, root.c_str());
     }
-    else
-        userPart[0] = 0;
+    userPart[0] = 0;
     return TRUE;
 }
 

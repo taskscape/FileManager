@@ -2,6 +2,10 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "overlay.h"
+#include "validate.h"
+
+#include <algorithm>
+#include <set>
 
 namespace reorg
 {
@@ -16,7 +20,9 @@ void IndexChildren(COverlay& overlay)
     {
         if (!it->second.ParentKey.empty())
             overlay.Children[it->second.ParentKey].push_back(it->first);
-        if (!it->second.ProposedPath.empty())
+        // A displaced occupant keeps its path until the store move runs; the proposed path
+        // belongs to the item that replaces it.
+        if (!it->second.ProposedPath.empty() && !it->second.Displaced)
             overlay.PathToKey[it->second.ProposedPath] = it->first;
     }
 }
@@ -172,7 +178,302 @@ bool HasExplicit(const CPlanDocument& plan, const std::wstring& source)
     return explicitEdit;
 }
 
+bool IsStayingChange(EChangeKind change)
+{
+    return change == ChangeUnchanged || change == ChangeContains || change == ChangeMovedWithFolder;
+}
+
+// Case-folded form for occupancy lookups, so a scan of every node does not fall back to the
+// linear case-insensitive search of CSnapshot::Find and COverlay::FindProposed.
+std::wstring FoldPath(const std::wstring& path)
+{
+    std::wstring folded = path;
+    if (!folded.empty())
+        LCMapStringEx(LOCALE_NAME_INVARIANT, LCMAP_UPPERCASE, path.c_str(), (int)path.size(),
+                      &folded[0], (int)folded.size(), NULL, NULL, 0);
+    return folded;
+}
+
+struct CResolvedConflict
+{
+    std::wstring Key;
+    std::wstring NodeKey;
+    std::wstring OccupantKey;
+    std::wstring ProposedPath;
+    EResolutionChoice Choice;
+    std::wstring ResultName;
+};
+
+// Mirrors the COL-002 test in validate.cpp so a saved resolution is found by the same issue key the
+// user resolved. Only conflicts with a saved resolution or a non-Ask default are returned.
+std::vector<CResolvedConflict> FindResolvedConflicts(const COverlay& overlay, const CPlanDocument& plan,
+                                                     const std::map<std::wstring, std::wstring>& snapshotByFolded)
+{
+    std::vector<CResolvedConflict> conflicts;
+    for (std::map<std::wstring, COverlayNode>::const_iterator it = overlay.Nodes.begin(); it != overlay.Nodes.end(); ++it)
+    {
+        const COverlayNode& node = it->second;
+        if (node.Synthetic || node.Displaced || IsStayingChange(node.Change))
+            continue;
+        std::map<std::wstring, std::wstring>::const_iterator occupant = snapshotByFolded.find(FoldPath(node.ProposedPath));
+        if (occupant == snapshotByFolded.end())
+            continue;
+        const COverlayNode* occupantNode = overlay.FindKey(occupant->second);
+        if (occupantNode != NULL && (occupantNode->Displaced || !IsStayingChange(occupantNode->Change)))
+            continue;
+        if (PathsEqual(occupant->second, node.OriginalPath, false))
+            continue;
+        std::vector<std::wstring> paths;
+        paths.push_back(node.OriginalPath);
+        paths.push_back(node.ProposedPath);
+        CResolvedConflict conflict;
+        conflict.Key = MakeIssueKey(L"COL-002", paths);
+        conflict.NodeKey = it->first;
+        conflict.OccupantKey = occupant->second;
+        conflict.ProposedPath = node.ProposedPath;
+        const CResolution* saved = NULL;
+        for (size_t i = 0; i < plan.Resolutions.size(); ++i)
+        {
+            if (plan.Resolutions[i].IssueKey == conflict.Key)
+                saved = &plan.Resolutions[i];
+        }
+        if (saved != NULL)
+        {
+            conflict.Choice = saved->Choice;
+            conflict.ResultName = saved->ResultName;
+        }
+        else if (plan.Options.ConflictDefault == ConflictKeepBoth)
+            conflict.Choice = ResKeepBoth;
+        else if (plan.Options.ConflictDefault == ConflictSkip)
+            conflict.Choice = ResSkip;
+        else
+            continue; // Ask: the conflict stays an Error until the user resolves it
+        conflicts.push_back(conflict);
+    }
+    return conflicts;
+}
+
+// The occupant and the content it physically holds travel to the store as one move. Items the plan
+// moves into the occupant are not part of it, so they stay visible and keep their own conflicts.
+void MarkDisplaced(COverlay& overlay, const std::wstring& key)
+{
+    std::vector<std::wstring> stack(1, key);
+    while (!stack.empty())
+    {
+        std::wstring current = stack.back();
+        stack.pop_back();
+        std::map<std::wstring, COverlayNode>::iterator node = overlay.Nodes.find(current);
+        if (node == overlay.Nodes.end() || node->second.Displaced)
+            continue;
+        if (current != key && (node->second.Synthetic || !IsStayingChange(node->second.Change)))
+            continue;
+        node->second.Displaced = true;
+        std::map<std::wstring, std::vector<std::wstring>>::const_iterator kids = overlay.Children.find(current);
+        if (kids != overlay.Children.end())
+            stack.insert(stack.end(), kids->second.begin(), kids->second.end());
+    }
+}
+
+void ApplyResolution(COverlay& overlay, const CSnapshot& snapshot, const CPlanDocument& plan,
+                     const CResolvedConflict& conflict, std::set<std::wstring>& taken)
+{
+    std::map<std::wstring, COverlayNode>::iterator node = overlay.Nodes.find(conflict.NodeKey);
+    if (node == overlay.Nodes.end())
+        return;
+    COverlayNode& incoming = node->second;
+    switch (conflict.Choice)
+    {
+    case ResKeepBoth:
+    case ResRename:
+    {
+        std::wstring parent = ParentPath(incoming.ProposedPath);
+        std::wstring name = conflict.ResultName;
+        if (name.empty())
+        {
+            if (conflict.Choice == ResRename)
+                return; // a rename resolution is only valid with the chosen name
+            for (int n = 2; n < 10000 && name.empty(); ++n)
+            {
+                std::wstring candidate = ExpandKeepBoth(plan.Options.KeepBothPattern, incoming.Name, n);
+                if (!candidate.empty() && taken.find(FoldPath(JoinPath(parent, candidate))) == taken.end())
+                    name = candidate;
+            }
+            if (name.empty())
+                return;
+        }
+        incoming.Name = name;
+        incoming.ResolutionNote = conflict.Choice == ResKeepBoth ? L"keepBoth" : L"rename";
+        taken.insert(FoldPath(JoinPath(parent, name)));
+        break;
+    }
+    case ResSkip:
+        // The item stays where it is, exactly as if its move had been unstaged.
+        incoming.ParentKey = snapshot.Items.find(incoming.OriginalParent) != snapshot.Items.end() ? incoming.OriginalParent : std::wstring();
+        incoming.Name = incoming.OriginalName;
+        incoming.ResolutionNote = L"skip";
+        break;
+    case ResReplace:
+        // The occupant cannot be moved to the store while the incoming item still sits inside it.
+        if (IsUnderPath(incoming.OriginalPath, conflict.OccupantKey, false))
+            return;
+        MarkDisplaced(overlay, conflict.OccupantKey);
+        incoming.ResolutionNote = L"replace";
+        break;
+    case ResMerge:
+    {
+        std::map<std::wstring, COverlayNode>::iterator occupant = overlay.Nodes.find(conflict.OccupantKey);
+        if (occupant == overlay.Nodes.end() || !incoming.IsDir || !occupant->second.IsDir)
+            return; // merge is only defined for a directory onto a directory
+        // The children move individually into the existing folder; each child clash becomes its own conflict.
+        std::vector<std::wstring> children = overlay.Children[conflict.NodeKey];
+        for (size_t i = 0; i < children.size(); ++i)
+        {
+            std::map<std::wstring, COverlayNode>::iterator child = overlay.Nodes.find(children[i]);
+            if (child == overlay.Nodes.end())
+                continue;
+            child->second.ParentKey = conflict.OccupantKey;
+            child->second.ResolutionNote = L"merge";
+        }
+        incoming.ParentKey = snapshot.Items.find(incoming.OriginalParent) != snapshot.Items.end() ? incoming.OriginalParent : std::wstring();
+        incoming.Name = incoming.OriginalName;
+        incoming.ResolutionNote = L"mergedInto";
+        incoming.ResolutionTarget = conflict.ProposedPath;
+        break;
+    }
+    }
+    RecomputePaths(overlay);
+}
+
+// Saved resolutions (and the plan's non-Ask default) are applied to the proposed tree itself, so
+// validation, the panel, and the compiler all see the resolved result rather than an occupied target.
+void ApplyResolutions(COverlay& overlay, const CSnapshot& snapshot, const CPlanDocument& plan)
+{
+    if (plan.Resolutions.empty() && plan.Options.ConflictDefault == ConflictAsk)
+        return;
+    std::map<std::wstring, std::wstring> snapshotByFolded;
+    for (std::map<std::wstring, CSnapshotItem>::const_iterator it = snapshot.Items.begin(); it != snapshot.Items.end(); ++it)
+        snapshotByFolded[FoldPath(it->first)] = it->first;
+    std::set<std::wstring> processed;
+    // A merge exposes child conflicts, which are resolved in the next round.
+    for (int round = 0; round < 64; ++round)
+    {
+        Classify(overlay, false);
+        std::vector<CResolvedConflict> conflicts = FindResolvedConflicts(overlay, plan, snapshotByFolded);
+        std::set<std::wstring> taken;
+        for (std::map<std::wstring, std::wstring>::const_iterator it = snapshotByFolded.begin(); it != snapshotByFolded.end(); ++it)
+            taken.insert(it->first);
+        for (std::map<std::wstring, COverlayNode>::const_iterator it = overlay.Nodes.begin(); it != overlay.Nodes.end(); ++it)
+        {
+            if (!it->second.Displaced && !it->second.ProposedPath.empty())
+                taken.insert(FoldPath(it->second.ProposedPath));
+        }
+        bool applied = false;
+        for (size_t i = 0; i < conflicts.size(); ++i)
+        {
+            if (!processed.insert(conflicts[i].Key).second)
+                continue;
+            ApplyResolution(overlay, snapshot, plan, conflicts[i], taken);
+            applied = true;
+        }
+        if (!applied)
+            break;
+    }
+}
+
+// Orders (depth, key) pairs deepest first, then by key, for bottom-up folder decisions.
+bool DeeperFirst(const std::pair<int, std::wstring>& a, const std::pair<int, std::wstring>& b)
+{
+    if (a.first != b.first)
+        return a.first > b.first;
+    return ComparePaths(a.second, b.second, true) < 0;
+}
+
 } // namespace
+
+const COverlayNode* FindLocationNode(const COverlay& overlay, const std::wstring& path)
+{
+    std::wstring cursor = path;
+    for (int guard = 0; !cursor.empty() && guard < 32768; ++guard)
+    {
+        // A real object captured at this path proves where the path lives, even if the plan moves it away.
+        const COverlayNode* original = overlay.FindKey(cursor);
+        if (original != NULL && !original->Synthetic && !original->OriginalPath.empty())
+            return original;
+        const COverlayNode* proposed = overlay.FindProposed(cursor);
+        if (proposed != NULL && !proposed->Synthetic && !proposed->OriginalPath.empty() &&
+            PathsEqual(proposed->ProposedPath, proposed->OriginalPath, false))
+            return proposed;
+        std::wstring parent = ParentPath(cursor);
+        if (parent == cursor)
+            break;
+        cursor = parent;
+    }
+    return NULL;
+}
+
+std::vector<std::wstring> FindEmptiedFolders(const COverlay& overlay, const CPlanDocument& plan)
+{
+    // Classify leaves an emptied folder Unchanged because it only counts the children the folder still
+    // holds, so emptied folders are recognized from the proposed tree's shape, not their change kind.
+    std::set<std::wstring> hadChildren;
+    std::vector<std::pair<int, std::wstring>> candidates; // (depth, key)
+    for (std::map<std::wstring, COverlayNode>::const_iterator it = overlay.Nodes.begin(); it != overlay.Nodes.end(); ++it)
+    {
+        const COverlayNode& node = it->second;
+        if (node.Synthetic || node.OriginalPath.empty())
+            continue;
+        if (!node.OriginalParent.empty())
+            hadChildren.insert(node.OriginalParent);
+        // A capture root has no parent node; it and the other plan roots hold the recovery store.
+        if (!node.IsDir || node.Displaced || node.Excluded || node.ParentKey.empty() ||
+            (node.Change != ChangeUnchanged && node.Change != ChangeContains))
+            continue;
+        int depth = 0;
+        for (size_t i = 0; i < node.OriginalPath.size(); ++i)
+        {
+            if (node.OriginalPath[i] == L'\\')
+                ++depth;
+        }
+        candidates.push_back(std::make_pair(depth, it->first));
+    }
+    // A staying folder's children are one level deeper, so deepest-first decides every child before
+    // its parent; the path order keeps the result, and the compiled hash, deterministic.
+    std::sort(candidates.begin(), candidates.end(), DeeperFirst);
+    const std::vector<CRoot>* roots[] = {&plan.ScopeRoots, &plan.DestinationRoots};
+    std::set<std::wstring> emptied;
+    std::vector<std::wstring> result;
+    for (size_t c = 0; c < candidates.size(); ++c)
+    {
+        const COverlayNode* folder = overlay.FindKey(candidates[c].second);
+        if (folder == NULL || hadChildren.find(folder->OriginalPath) == hadChildren.end())
+            continue;
+        bool planRoot = false;
+        for (int g = 0; g < 2 && !planRoot; ++g)
+        {
+            for (size_t r = 0; r < roots[g]->size() && !planRoot; ++r)
+                planRoot = PathsEqual((*roots[g])[r].Path, folder->OriginalPath, false);
+        }
+        if (planRoot)
+            continue;
+        bool empty = true;
+        std::map<std::wstring, std::vector<std::wstring>>::const_iterator kids = overlay.Children.find(folder->Key);
+        if (kids != overlay.Children.end())
+        {
+            for (size_t k = 0; k < kids->second.size() && empty; ++k)
+            {
+                // A displaced occupant leaves for the store; anything else must itself be emptied.
+                const COverlayNode* child = overlay.FindKey(kids->second[k]);
+                if (child != NULL && !child->Displaced && emptied.find(child->Key) == emptied.end())
+                    empty = false;
+            }
+        }
+        if (!empty)
+            continue;
+        emptied.insert(folder->Key);
+        result.push_back(folder->Key);
+    }
+    return result;
+}
 
 const COverlayNode* COverlay::FindKey(const std::wstring& key) const
 {
@@ -327,10 +628,21 @@ COverlay BuildOverlay(const CSnapshot& snapshot, const CPlanDocument& plan)
             if (occupant == NULL || occupant->Key == node->first)
             {
                 COverlayNode* residual = EnsureImplicit(overlay, stayParent, L"kept for items that stay");
-                if (residual)
+                // Re-key the map entry, not only the Key field: children name their parent by map key, so
+                // a renamed field alone left the excluded item under a missing parent with no path.
+                if (residual != NULL && residual->Key.rfind(L"new:imp:", 0) == 0)
                 {
-                    residual->Key = L"residual:" + stayParent;
-                    node = overlay.Nodes.find(edit.Source);
+                    std::wstring oldKey = residual->Key;
+                    COverlayNode copy = *residual;
+                    copy.Key = L"residual:" + stayParent;
+                    overlay.Nodes.erase(oldKey);
+                    for (std::map<std::wstring, COverlayNode>::iterator child = overlay.Nodes.begin(); child != overlay.Nodes.end(); ++child)
+                    {
+                        if (child->second.ParentKey == oldKey)
+                            child->second.ParentKey = copy.Key;
+                    }
+                    overlay.Nodes[copy.Key] = copy;
+                    RecomputePaths(overlay);
                 }
             }
             node = overlay.Nodes.find(edit.Source);
@@ -407,6 +719,7 @@ COverlay BuildOverlay(const CSnapshot& snapshot, const CPlanDocument& plan)
         RecomputePaths(overlay);
     }
 
+    ApplyResolutions(overlay, snapshot, plan);
     Classify(overlay, false);
     for (size_t i = 0; i < plan.Applies.size(); ++i)
     {

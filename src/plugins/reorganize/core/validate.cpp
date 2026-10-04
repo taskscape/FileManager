@@ -34,16 +34,6 @@ bool Acknowledged(const CPlanDocument& plan, const std::wstring& key)
     return false;
 }
 
-const CResolution* ResolutionFor(const CPlanDocument& plan, const std::wstring& key)
-{
-    for (size_t i = 0; i < plan.Resolutions.size(); ++i)
-    {
-        if (plan.Resolutions[i].IssueKey == key)
-            return &plan.Resolutions[i];
-    }
-    return NULL;
-}
-
 void CheckCollisions(const CAnalysisContext& context, CIssueSink& sink)
 {
     std::map<std::wstring, std::vector<std::wstring>> byPath;
@@ -107,12 +97,15 @@ void CheckCollisions(const CAnalysisContext& context, CIssueSink& sink)
     }
     for (std::map<std::wstring, COverlayNode>::const_iterator it = context.Overlay->Nodes.begin(); it != context.Overlay->Nodes.end(); ++it)
     {
-        if (it->second.Synthetic || it->second.Change == ChangeUnchanged || it->second.Change == ChangeContains || it->second.Change == ChangeMovedWithFolder)
+        if (it->second.Synthetic || it->second.Displaced || it->second.Change == ChangeUnchanged || it->second.Change == ChangeContains || it->second.Change == ChangeMovedWithFolder)
             continue;
         const CSnapshotItem* occupant = context.Snapshot->Find(it->second.ProposedPath);
         if (occupant == NULL)
             continue;
         const COverlayNode* occupantNode = context.Overlay->FindKey(occupant->Path);
+        // A displaced occupant goes to the recovery store before the incoming move (replace).
+        if (occupantNode && occupantNode->Displaced)
+            continue;
         if (occupantNode && occupantNode->Change != ChangeUnchanged && occupantNode->Change != ChangeContains && occupantNode->Change != ChangeMovedWithFolder)
             continue;
         if (PathsEqual(occupant->Path, it->second.OriginalPath, false))
@@ -127,13 +120,18 @@ void CheckCollisions(const CAnalysisContext& context, CIssueSink& sink)
         AddRes(issue, ResRename);
         if (it->second.IsDir && occupant->IsDir)
             AddRes(issue, ResMerge);
-        if (ResolutionFor(*context.Plan, issue.Key) == NULL && context.Plan->Options.ConflictDefault == ConflictAsk)
-            sink.Add(issue);
-        else if (ResolutionFor(*context.Plan, issue.Key) && ResolutionFor(*context.Plan, issue.Key)->Choice == ResMerge)
-        {
-            CIssue merge = MakeIssue(L"COL-006", SevWarning, paths, L"Folders will be merged.");
-            sink.Add(merge);
-        }
+        // BuildOverlay already applied saved resolutions and the conflict default. A conflict that is
+        // still present was not resolved by them (for example merge onto a file), so it keeps blocking.
+        sink.Add(issue);
+    }
+    for (std::map<std::wstring, COverlayNode>::const_iterator it = context.Overlay->Nodes.begin(); it != context.Overlay->Nodes.end(); ++it)
+    {
+        if (it->second.ResolutionNote != L"mergedInto")
+            continue;
+        std::vector<std::wstring> paths;
+        paths.push_back(it->second.OriginalPath);
+        paths.push_back(it->second.ResolutionTarget);
+        sink.Add(MakeIssue(L"COL-006", SevWarning, paths, L"Folders will be merged."));
     }
 }
 
@@ -144,8 +142,12 @@ void CheckDestinations(const CAnalysisContext& context, CIssueSink& sink)
         const COverlayNode& node = it->second;
         if (node.Change == ChangeUnchanged || node.Change == ChangeContains)
             continue;
+        // node.Info describes the item where it is now. Name, read-only, and size limits depend on the
+        // folder that will hold it, which may be synthetic or moved, so walk to the real location.
+        const COverlayNode* location = FindLocationNode(*context.Overlay, ParentPath(node.ProposedPath));
+        const CSnapshotItem& destination = location != NULL ? location->Info : node.Info;
         std::wstring reason;
-        if (!node.Name.empty() && IsInvalidTargetName(node.Name, node.Info.FileSystem, reason))
+        if (!node.Name.empty() && IsInvalidTargetName(node.Name, destination.FileSystem, reason))
         {
             std::vector<std::wstring> paths;
             paths.push_back(node.ProposedPath);
@@ -165,15 +167,15 @@ void CheckDestinations(const CAnalysisContext& context, CIssueSink& sink)
             paths.push_back(node.ProposedPath);
             sink.Add(MakeIssue(L"DST-005", SevWarning, paths, L"Some applications may not open this file."));
         }
-        if (node.Info.ReadOnlyVolume && node.Change != ChangeMovedWithFolder)
+        if (destination.ReadOnlyVolume && node.Change != ChangeMovedWithFolder)
         {
             std::vector<std::wstring> paths;
             paths.push_back(node.ProposedPath);
             sink.Add(MakeIssue(L"DST-002", SevError, paths, L"The destination volume is read-only."));
         }
-        if (!node.Info.FileSystem.empty())
+        if (!destination.FileSystem.empty())
         {
-            std::wstring fs = node.Info.FileSystem;
+            std::wstring fs = destination.FileSystem;
             if (fs.find(L"FAT32") != std::wstring::npos && !node.IsDir && node.Info.Size > 0xFFFFFFFFull)
             {
                 std::vector<std::wstring> paths;

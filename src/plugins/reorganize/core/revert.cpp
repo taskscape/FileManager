@@ -36,6 +36,52 @@ std::wstring ChooseRecoveryStore(const CPlanDocument& plan, const CSnapshotItem&
     return std::wstring();
 }
 
+bool MaterializeRecoveryStores(CCompiledPlan& compiled, const CPlanDocument& plan, const COverlay& overlay,
+                               const std::wstring& applyId, std::wstring& error)
+{
+    error.clear();
+    if (applyId.empty())
+    {
+        error = L"An apply id is required for the recovery store.";
+        return false;
+    }
+    std::map<std::wstring, std::wstring> bases; // volume serial text -> <root>\.reorg-recovery
+    for (size_t i = 0; i < compiled.Steps.size(); ++i)
+    {
+        CCompiledStep& step = compiled.Steps[i];
+        if (step.StorePlaceholder.empty())
+            continue;
+        bool base = step.Target.rfind(L"{storebase:", 0) == 0;
+        size_t open = step.Target.find(L':');
+        size_t close = step.Target.find(L'}');
+        if ((!base && step.Target.rfind(L"{store:", 0) != 0) || close == std::wstring::npos || open > close)
+        {
+            error = L"A recovery-store step has no store placeholder.";
+            return false;
+        }
+        std::wstring serial = step.Target.substr(open + 1, close - open - 1);
+        std::map<std::wstring, std::wstring>::iterator found = bases.find(serial);
+        if (found == bases.end())
+        {
+            // The compiler names the stored item as each store step's node, so its location picks
+            // the root on the same volume (spec 7.6.4).
+            const COverlayNode* node = overlay.FindKey(step.Node);
+            std::wstring storeError;
+            std::wstring root = node != NULL ? ChooseRecoveryStore(plan, node->Info, node->ProposedPath, storeError) : std::wstring();
+            if (root.empty())
+            {
+                error = L"DST-011: no recovery store is available on volume " + serial + L".";
+                return false;
+            }
+            found = bases.insert(std::make_pair(serial, root)).first;
+        }
+        std::wstring store = JoinPath(found->second, applyId);
+        step.Target = (base ? found->second : store) + step.Target.substr(close + 1);
+        compiled.StoreRoots[serial] = store;
+    }
+    return true;
+}
+
 CPlanDocument BuildRevertPlan(const CPlanDocument& original, const CCompiledPlan& compiled, const CJournal& journal, bool finalized)
 {
     CPlanDocument plan;
@@ -48,6 +94,9 @@ CPlanDocument BuildRevertPlan(const CPlanDocument& original, const CCompiledPlan
     plan.ScopeRoots = original.ScopeRoots;
     plan.DestinationRoots = original.DestinationRoots;
     plan.FormatVersion = 1;
+    // A revert restores the pre-apply tree: folders it empties existed before the apply (or are removed
+    // by removeEmptyFolder edits), so sweeping them into a recovery store would not restore that tree.
+    plan.Options.CleanupEmptiedFolders = false;
     std::map<int, std::string> done;
     for (size_t i = 0; i < journal.Records.size(); ++i)
     {

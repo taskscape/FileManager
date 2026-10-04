@@ -29,12 +29,17 @@ void CSnapshot::Add(const CSnapshotItem& item)
 bool CSnapshot::CaptureDirectory(IFileSystemProbe& probe, const std::wstring& directory, bool recursive, bool identities, const CCancellation& cancel)
 {
     if (cancel.IsCancelled())
+    {
+        LastError = ERROR_CANCELLED;
+        LastErrorPath = directory;
         return false;
+    }
     std::wstring normalized;
     std::wstring errorText;
     if (!NormalizePath(directory, normalized, errorText))
     {
         LastError = ERROR_INVALID_NAME;
+        LastErrorPath = directory;
         return false;
     }
     if (Items.find(normalized) == Items.end())
@@ -69,12 +74,17 @@ bool CSnapshot::CaptureDirectory(IFileSystemProbe& probe, const std::wstring& di
     if (!probe.Enumerate(normalized, children, error))
     {
         LastError = error;
+        LastErrorPath = normalized;
         return false;
     }
     for (size_t i = 0; i < children.size(); ++i)
     {
         if (cancel.IsCancelled())
+        {
+            LastError = ERROR_CANCELLED;
+            LastErrorPath = normalized;
             return false;
+        }
         CSnapshotItem item = children[i];
         const CSnapshotItem* parent = Find(normalized);
         if (parent)
@@ -119,6 +129,12 @@ bool CSnapshot::CaptureDirectory(IFileSystemProbe& probe, const std::wstring& di
 
 bool CSnapshot::Capture(IFileSystemProbe& probe, const std::vector<std::wstring>& roots, bool identities, const CCancellation& cancel)
 {
+    // A capture describes the filesystem at one moment. Starting empty keeps deleted items and
+    // duplicate child entries from an earlier capture out of the result.
+    Items.clear();
+    Children.clear();
+    LastError = ERROR_SUCCESS;
+    LastErrorPath.clear();
     for (size_t i = 0; i < roots.size(); ++i)
     {
         if (!CaptureDirectory(probe, roots[i], true, identities, cancel))

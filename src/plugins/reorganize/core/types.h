@@ -379,6 +379,14 @@ struct CCompiledStep
     bool CrossVolume;
     std::vector<int> Deps;
     std::wstring StorePlaceholder; // non-empty when the path uses {store:serial}
+
+    // Apply marshals every field, so steps built field-by-field (createDir, copyDirTime,
+    // store folders) must not carry indeterminate VerifyIdentity or loss bits to the host.
+    CCompiledStep()
+        : Kind(StepMove), Flags(0), VerifyIdentity(false), ExpectedMetadataLosses(0), Class(RevExact),
+          Role(RoleEdit), Dir(false), CrossVolume(false)
+    {
+    }
 };
 
 struct CCompiledPlan

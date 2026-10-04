@@ -1087,8 +1087,10 @@ unsigned ThreadWorkerBody(void* parameter)
             if (!CaptureOperationFileIdentities(op, &identityError))
             {
                 TRACE_E("Unable to capture handle identity before file-operation item " << i << ": " << GetErrorText(identityError));
-                if (planStep && !script->StepBridge->StopOnError())
+                if (planStep)
                 {
+                    // BeforeStep already ran, so the observer and journal must see this step as
+                    // FAILED in both error modes; otherwise the summary counts it as NotStarted.
                     if (!script->JournalBeginItem(i, op, attempt))
                     {
                         Error = TRUE;
@@ -1097,8 +1099,11 @@ unsigned ThreadWorkerBody(void* parameter)
                     script->StepBridge->AfterStep(op->PlanStepIndex, SALOPSTEP_RESULT_FAILED, identityError, 0, 0);
                     planCompletedThrough = i;
                     script->JournalCompleteItem(FALSE);
-                    WaitForSingleObject(dlgData.WorkerNotSuspended, INFINITE);
-                    continue;
+                    if (!script->StepBridge->StopOnError())
+                    {
+                        WaitForSingleObject(dlgData.WorkerNotSuspended, INFINITE);
+                        continue;
+                    }
                 }
                 Error = TRUE;
                 break;
@@ -1116,6 +1121,8 @@ unsigned ThreadWorkerBody(void* parameter)
             BOOL planHandled = FALSE;
             DWORD planResult = SALOPSTEP_RESULT_DONE;
             DWORD planError = 0;
+            // SDK result flags describe how a completed step was satisfied; they are reported only with DONE.
+            DWORD planResultFlags = 0;
             if (planStep)
             {
                 BOOL acceptExisting = FALSE;
@@ -1131,6 +1138,12 @@ unsigned ThreadWorkerBody(void* parameter)
                 else if (acceptExisting)
                 {
                     planHandled = TRUE;
+                    planResultFlags |= SALOPSTEP_RESULTF_ALREADY_EXISTED;
+                }
+                else if (PlanStepCrossesVolume(op))
+                {
+                    // Decided before the move runs: afterwards the source path no longer resolves.
+                    planResultFlags |= SALOPSTEP_RESULTF_CROSS_VOLUME;
                 }
             }
 
@@ -1235,7 +1248,12 @@ unsigned ThreadWorkerBody(void* parameter)
                     else
                     {
                         if (alreadyExisted)
+                        {
                             op->Attr = 0x10000000 /* dir already existed */;
+                            // A plan create-dir without the accept-existing precondition can still find the folder present.
+                            if (planStep)
+                                planResultFlags |= SALOPSTEP_RESULTF_ALREADY_EXISTED;
+                        }
                         else
                             op->Attr = 0x01000000 /* dir was created */;
                     }
@@ -1478,7 +1496,8 @@ unsigned ThreadWorkerBody(void* parameter)
                 DWORD losses = OperationStepsFilterAcceptedLosses(dlgData.MetadataLosses.LossMask,
                                                                   op->ExpectedMetadataLosses,
                                                                   op->PlanMetadataLossAccepted);
-                script->StepBridge->AfterStep(op->PlanStepIndex, planResult, planError, 0, losses);
+                script->StepBridge->AfterStep(op->PlanStepIndex, planResult, planError,
+                                              planResult == SALOPSTEP_RESULT_DONE ? planResultFlags : 0, losses);
                 planCompletedThrough = i;
                 if (planResult == SALOPSTEP_RESULT_FAILED && !script->StepBridge->StopOnError())
                     Error = FALSE;

@@ -30,6 +30,7 @@ struct COverlayNode
     int IssueWarnings;
     int ContainsChanges;
     std::wstring ResolutionNote;
+    std::wstring ResolutionTarget; // for a merged directory: the occupied folder that received its children
 
     COverlayNode()
         : IsDir(false), Synthetic(false), Excluded(false), Carried(false), Displaced(false),
@@ -56,5 +57,17 @@ public:
 
 COverlay BuildOverlay(const CSnapshot& snapshot, const CPlanDocument& plan);
 bool WouldCreateCycle(const COverlay& overlay, const std::wstring& sourceKey, const std::wstring& newParentKey);
+
+// Returns the real node that physically holds 'path' (the path itself or its nearest ancestor that
+// exists at its original location). Its Info describes the volume and filesystem an item placed at
+// 'path' will live on. Synthetic folders and moved nodes are skipped because their Info describes
+// another location. NULL when no captured ancestor is known.
+const COverlayNode* FindLocationNode(const COverlay& overlay, const std::wstring& path);
+
+// Real folders the plan empties while leaving them at their original location (spec 7.6.2 step 5):
+// each had captured children, and every child it still holds in the proposed tree is displaced or is
+// itself such a folder. Plan roots and synthetic, displaced, excluded, or moved folders never qualify.
+// Keys are returned deepest first, so a nested folder precedes the folder that holds it.
+std::vector<std::wstring> FindEmptiedFolders(const COverlay& overlay, const CPlanDocument& plan);
 
 } // namespace reorg

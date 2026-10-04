@@ -41,3 +41,4 @@
 #define IDS_CYCLE 59
 #define IDS_NOT_DISK 60
 #define IDS_ANALYZING 61
+#define IDS_APPLY_NOT_REVIEWED 62

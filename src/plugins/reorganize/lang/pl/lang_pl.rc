@@ -41,6 +41,9 @@ CAPTION "Przegląd planu"
 FONT 8, "MS Shell Dlg", 400, 0, 0x1
 BEGIN
     LISTBOX IDC_ISSUES, 7, 7, 306, 148, LBS_NOINTEGRALHEIGHT | WS_VSCROLL | WS_TABSTOP
+    // Cleanup changes the compiled steps, so it is toggled where those steps are reviewed.
+    CONTROL "&Posprzątaj opróżnione foldery", IDC_CLEANUP, "Button", BS_AUTOCHECKBOX | WS_TABSTOP, 7, 162, 150, 10
+    PUSHBUTTON "&Oznacz jako przejrzany", IDC_MARK_REVIEWED, 163, 160, 94, 14
     DEFPUSHBUTTON "Zamknij", IDOK, 263, 160, 50, 14
 END
 
@@ -50,7 +53,8 @@ CAPTION "Zastosuj plan"
 FONT 8, "MS Shell Dlg", 400, 0, 0x1
 BEGIN
     LTEXT "Zastosuj przejrzane kroki. Pliki są przenoszone, nigdy kopiowane ani trwale usuwane.", IDC_STATIC, 7, 8, 246, 20
-    CONTROL "Posprzątaj opróżnione foldery", IDC_CLEANUP, "Button", BS_AUTOCHECKBOX | WS_TABSTOP, 7, 32, 180, 10
+    // Read-only here: Apply runs only the reviewed steps, so the choice is made in Plan Review.
+    CONTROL "Posprzątaj opróżnione foldery (ustawiane w Przeglądzie planu)", IDC_CLEANUP, "Button", BS_AUTOCHECKBOX | WS_TABSTOP, 7, 32, 246, 10
     DEFPUSHBUTTON "Zastosuj", IDOK, 144, 50, 50, 14
     PUSHBUTTON "Anuluj", IDCANCEL, 200, 50, 50, 14
 END

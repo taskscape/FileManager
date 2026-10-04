@@ -19,23 +19,15 @@ std::vector<std::string> ParseCsvRecords(const std::string& csv)
     for (size_t i = 0; i < text.size(); ++i)
     {
         char ch = text[i];
-        if (quote)
+        // Quotes are only tracked here to keep quoted line breaks inside one record. They stay in
+        // the record so SplitCsv still sees which commas are quoted ("" toggles twice and survives).
+        if (ch == '"')
         {
-            if (ch == '"')
-            {
-                if (i + 1 < text.size() && text[i + 1] == '"')
-                {
-                    current.push_back('"');
-                    ++i;
-                }
-                else
-                    quote = false;
-            }
-            else
-                current.push_back(ch);
+            quote = !quote;
+            current.push_back(ch);
         }
-        else if (ch == '"')
-            quote = true;
+        else if (quote)
+            current.push_back(ch);
         else if (ch == '\n')
         {
             if (!current.empty() && current.back() == '\r')

@@ -50,4 +50,5 @@ STRINGTABLE
   IDS_CYCLE, "That move would create a cycle."
   IDS_NOT_DISK, "The target must be a disk path inside this plan."
   IDS_ANALYZING, "Analyzing..."
+  IDS_APPLY_NOT_REVIEWED, "The compiled steps differ from the last review, or the plan was never reviewed. Open Plan Review, check the steps, and press Mark as Reviewed before applying."
 }

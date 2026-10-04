@@ -58,4 +58,5 @@ STRINGTABLE
   IDS_CYCLE, "To przeniesienie utworzyłoby cykl."
   IDS_NOT_DISK, "Cel musi być ścieżką dyskową wewnątrz tego planu."
   IDS_ANALYZING, "Analizowanie..."
+  IDS_APPLY_NOT_REVIEWED, "Skompilowane kroki różnią się od ostatniego przeglądu albo plan nie został przejrzany. Otwórz Przegląd planu, sprawdź kroki i naciśnij Oznacz jako przejrzany przed zastosowaniem."
 }

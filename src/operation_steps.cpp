@@ -40,10 +40,14 @@ struct CStepBridge : public CStepExecutionBridge
     char OperationId[64];
     HWND Notify;
     CRITICAL_SECTION Guard;
+    // The host copies the caller's steps, so it must also keep each step's UserData:
+    // observers correlate callbacks with their own step objects through it.
+    DWORD_PTR* UserData;
 
     CStepBridge()
         : Observer(NULL), Plugin(NULL), Flags(0), Count(0), Done(0), Skipped(0), Failed(0),
-          Cancelled(0), NotStarted(0), UserCancelled(FALSE), FinishedPosted(FALSE), Notify(NULL)
+          Cancelled(0), NotStarted(0), UserCancelled(FALSE), FinishedPosted(FALSE), Notify(NULL),
+          UserData(NULL)
     {
         OperationId[0] = 0;
         InitializeCriticalSection(&Guard);
@@ -53,14 +57,20 @@ struct CStepBridge : public CStepExecutionBridge
     {
         if (Notify)
             DestroyWindow(Notify);
+        delete[] UserData;
         DeleteCriticalSection(&Guard);
+    }
+
+    DWORD_PTR UserDataFor(int index) const
+    {
+        return UserData != NULL && index >= 0 && index < Count ? UserData[index] : 0;
     }
 
     virtual BOOL BeforeStep(int index)
     {
         if (Observer == NULL || index < 0)
             return TRUE;
-        return Observer->BeforeStep(index, 0);
+        return Observer->BeforeStep(index, UserDataFor(index));
     }
 
     virtual void AfterStep(int index, DWORD result, DWORD error, DWORD resultFlags, DWORD metadataLosses)
@@ -77,7 +87,7 @@ struct CStepBridge : public CStepExecutionBridge
         LeaveCriticalSection(&Guard);
         // The worker reports host EMetadataLoss bits; the SDK observer receives SALMDLOSS bits.
         if (Observer != NULL)
-            Observer->AfterStep(index, 0, result, error, resultFlags, MapLosses(metadataLosses), NULL);
+            Observer->AfterStep(index, UserDataFor(index), result, error, resultFlags, MapLosses(metadataLosses), NULL);
     }
 
     virtual BOOL StopOnError() const { return (Flags & SALEXECF_STOP_ON_ERROR) != 0; }
@@ -139,15 +149,53 @@ char* DupUtf8FromWide(const WCHAR* text)
     return out;
 }
 
+BOOL IsStepSlash(WCHAR ch)
+{
+    return ch == L'\\' || ch == L'/';
+}
+
+BOOL IsDriveAbsolute(const WCHAR* path)
+{
+    return ((path[0] >= L'A' && path[0] <= L'Z') || (path[0] >= L'a' && path[0] <= L'z')) &&
+           path[1] == L':' && IsStepSlash(path[2]);
+}
+
+// Accepts "\\server\share" followed by the end of the path or a separator.
+BOOL IsUncShareAbsolute(const WCHAR* afterSlashes)
+{
+    const WCHAR* server = afterSlashes;
+    const WCHAR* p = server;
+    while (*p != 0 && !IsStepSlash(*p))
+        ++p;
+    if (p == server || *p == 0)
+        return FALSE;
+    const WCHAR* share = p + 1;
+    p = share;
+    while (*p != 0 && !IsStepSlash(*p))
+        ++p;
+    return p != share;
+}
+
+// A reviewed step must name one absolute object. Drive-relative forms such as "C:foo",
+// rooted-relative "\foo" and device namespaces resolve through process state instead.
 BOOL ValidDiskStepPath(const WCHAR* path)
 {
     if (path == NULL || path[0] == 0)
         return FALSE;
-    if (path[0] != L'\\' && !(path[0] != 0 && path[1] == L':'))
+    if (IsDriveAbsolute(path))
+        return TRUE;
+    if (!IsStepSlash(path[0]) || !IsStepSlash(path[1]))
         return FALSE;
-    if (wcsncmp(path, L"\\\\.\\", 4) == 0 || wcsncmp(path, L"\\\\?\\GLOBALROOT", 14) == 0)
+    if (path[2] == L'?' && path[3] == L'\\')
+    {
+        const WCHAR* rest = path + 4;
+        if (IsDriveAbsolute(rest))
+            return TRUE;
+        return _wcsnicmp(rest, L"UNC\\", 4) == 0 && IsUncShareAbsolute(rest + 4);
+    }
+    if (path[2] == L'.' || path[2] == L'?')
         return FALSE;
-    return TRUE;
+    return IsUncShareAbsolute(path + 2);
 }
 
 DWORD MapLosses(DWORD hostMask)
@@ -236,8 +284,15 @@ BOOL RejectPlanStepPrecondition(COperation* op, BOOL creatingDirectory, BOOL* ac
             return FALSE;
         }
         DWORD serial = ok ? (DWORD)info.VolumeSerialNumber : basic.dwVolumeSerialNumber;
-        const BYTE* id = ok ? info.Identifier : NULL;
-        if (serial != op->ExpectedVolumeSerial || (id != NULL && memcmp(id, op->ExpectedFileId, 16) != 0))
+        // Without FileIdInfo the 64-bit file index is the only identity. It is laid out as the
+        // plug-in probe stores it (low DWORD, high DWORD, zero padding) so a replacement object,
+        // including a directory that skips the size/time check below, cannot match.
+        BYTE legacyId[16];
+        memset(legacyId, 0, sizeof(legacyId));
+        memcpy(legacyId, &basic.nFileIndexLow, 4);
+        memcpy(legacyId + 4, &basic.nFileIndexHigh, 4);
+        const BYTE* id = ok ? info.Identifier : legacyId;
+        if (serial != op->ExpectedVolumeSerial || memcmp(id, op->ExpectedFileId, 16) != 0)
         {
             if (error)
                 *error = ERROR_FILE_INVALID;
@@ -290,36 +345,71 @@ BOOL RejectPlanStepPrecondition(COperation* op, BOOL creatingDirectory, BOOL* ac
     return TRUE;
 }
 
-static BOOL IsDrivePath(const char* path)
+// Drive letters do not identify volumes: another volume can be mounted on a folder below
+// a drive-letter path. Both paths are therefore always resolved to their mount roots.
+// The mount root is a prefix of the absolute path (plus a separator, or a \\?\Volume{...}\ name),
+// so a buffer sized from the path itself also serves long paths without a fixed MAX_PATH limit.
+static WCHAR* AllocVolumeRoot(CWidePath& path)
 {
-    return path[0] != 0 && path[1] == ':' &&
-           ((path[0] >= 'A' && path[0] <= 'Z') || (path[0] >= 'a' && path[0] <= 'z'));
+    const WCHAR* apiPath = path.GetPathForWin32Api();
+    if (apiPath == NULL)
+        return NULL;
+    size_t capacity = wcslen(apiPath) + 64;
+    if (capacity > MAXDWORD)
+        return NULL;
+    WCHAR* root = (WCHAR*)malloc(capacity * sizeof(WCHAR));
+    if (root != NULL && !GetVolumePathNameW(apiPath, root, (DWORD)capacity))
+    {
+        free(root);
+        root = NULL;
+    }
+    return root;
 }
 
 static BOOL PlanPathsShareVolume(const char* source, const char* target)
 {
-    if (IsDrivePath(source) && IsDrivePath(target))
-        return (source[0] & ~0x20) == (target[0] & ~0x20);
-    WCHAR* sourceW = ConvertAllocUtf8ToWide(source, -1);
-    WCHAR* targetW = ConvertAllocUtf8ToWide(target, -1);
-    WCHAR sourceRoot[MAX_PATH];
-    WCHAR targetRoot[MAX_PATH];
+    CWidePath sourcePath(source);
+    CWidePath targetPath(target);
+    WCHAR* sourceRoot = AllocVolumeRoot(sourcePath);
+    WCHAR* targetRoot = AllocVolumeRoot(targetPath);
     BOOL same = FALSE;
-    if (sourceW != NULL && targetW != NULL &&
-        GetVolumePathNameW(sourceW, sourceRoot, MAX_PATH) &&
-        GetVolumePathNameW(targetW, targetRoot, MAX_PATH))
+    if (sourceRoot != NULL && targetRoot != NULL)
     {
-        DWORD sourceSerial = 0;
-        DWORD targetSerial = 0;
-        DWORD component = 0;
-        DWORD flags = 0;
-        if (GetVolumeInformationW(sourceRoot, NULL, 0, &sourceSerial, &component, &flags, NULL, 0) &&
-            GetVolumeInformationW(targetRoot, NULL, 0, &targetSerial, &component, &flags, NULL, 0))
-            same = sourceSerial == targetSerial;
+        WCHAR sourceVolume[64];
+        WCHAR targetVolume[64];
+        if (GetVolumeNameForVolumeMountPointW(sourceRoot, sourceVolume, _countof(sourceVolume)) &&
+            GetVolumeNameForVolumeMountPointW(targetRoot, targetVolume, _countof(targetVolume)))
+        {
+            // Local volumes have unique GUID names, which also distinguishes volumes whose serials collide.
+            same = _wcsicmp(sourceVolume, targetVolume) == 0;
+        }
+        else
+        {
+            // Network shares have no volume GUID name; the serial is the best identity available.
+            DWORD sourceSerial = 0;
+            DWORD targetSerial = 0;
+            DWORD component = 0;
+            DWORD flags = 0;
+            if (GetVolumeInformationW(sourceRoot, NULL, 0, &sourceSerial, &component, &flags, NULL, 0) &&
+                GetVolumeInformationW(targetRoot, NULL, 0, &targetSerial, &component, &flags, NULL, 0))
+                same = sourceSerial == targetSerial;
+        }
     }
-    free(sourceW);
-    free(targetW);
+    free(sourceRoot);
+    free(targetRoot);
     return same;
+}
+
+BOOL PlanStepCrossesVolume(const COperation* op)
+{
+    if (op == NULL || (op->OpFlags & OPFL_PLAN_STEP) == 0 || op->SourceName == NULL || op->TargetName == NULL)
+        return FALSE;
+    if (op->Opcode != ocMoveFile && op->Opcode != ocMoveDir)
+        return FALSE;
+    // A step that forbids crossing was already proven same-volume by its precondition.
+    if ((op->OpFlags & OPFL_NO_CROSS_VOLUME) != 0)
+        return FALSE;
+    return !PlanPathsShareVolume(op->SourceName, op->TargetName);
 }
 
 BOOL WINAPI CSalamanderGeneral::ExecuteOperationSteps(HWND parent, const char* caption,
@@ -371,6 +461,9 @@ BOOL WINAPI CSalamanderGeneral::ExecuteOperationSteps(HWND parent, const char* c
     bridge->Plugin = Plugin;
     bridge->Flags = flags;
     bridge->Count = count;
+    bridge->UserData = new DWORD_PTR[count];
+    for (int i = 0; i < count; ++i)
+        bridge->UserData[i] = steps[i].UserData;
     WNDCLASS wc;
     memset(&wc, 0, sizeof(wc));
     wc.lpfnWndProc = StepBridgeProc;

@@ -49,11 +49,27 @@ bool ParseJournal(const std::string& text, CJournal& journal)
         }
         std::string body = line.substr(0, crcPos);
         std::string crcText = line.substr(crcPos + 5);
+        // The checksum must be the record's last field and exactly 8 hex digits. A scanf-style
+        // parse would accept a shorter prefix and ignore bytes appended after it.
+        bool crcWellFormed = crcText.size() == 8;
         unsigned crc = 0;
-        sscanf_s(crcText.c_str(), "%08x", &crc);
+        for (size_t c = 0; crcWellFormed && c < crcText.size(); ++c)
+        {
+            char ch = crcText[c];
+            unsigned digit = 0;
+            if (ch >= '0' && ch <= '9')
+                digit = (unsigned)(ch - '0');
+            else if (ch >= 'A' && ch <= 'F')
+                digit = (unsigned)(ch - 'A' + 10);
+            else if (ch >= 'a' && ch <= 'f')
+                digit = (unsigned)(ch - 'a' + 10);
+            else
+                crcWellFormed = false;
+            crc = (crc << 4) | digit;
+        }
         DWORD actual = Crc32(body.data(), body.size());
         CJournalRecord record;
-        record.ValidCrc = actual == crc;
+        record.ValidCrc = crcWellFormed && actual == crc;
         size_t bar = body.find('|');
         record.Type = bar == std::string::npos ? body : body.substr(0, bar);
         size_t field = bar == std::string::npos ? body.size() : bar + 1;

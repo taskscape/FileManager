@@ -72,22 +72,28 @@ std::vector<CReconcileResult> Reconcile(const CCompiledPlan& plan, const CJourna
         result.Evidence = result.State == RecDone ? L"done" : (result.State == RecNotDone ? L"notDone" : L"manual");
         results.push_back(result);
     }
+    // Spec 7.6.6: a not-done step that depends on a manual step is blocked, and so is one that depends
+    // on a blocked step, because Resume runs neither. The compiler only names earlier steps as
+    // dependencies, so one pass in step order settles every chain. The state changes in place so each
+    // step keeps one result; a step with a terminal record or done on disk is never blocked.
+    std::vector<int> resultOf(plan.Steps.size(), -1);
     for (size_t i = 0; i < results.size(); ++i)
+        resultOf[results[i].Index] = (int)i;
+    for (size_t s = 0; s < plan.Steps.size(); ++s)
     {
-        if (results[i].State != RecManual)
+        if (resultOf[s] < 0 || results[resultOf[s]].State != RecNotDone)
             continue;
-        for (size_t s = 0; s < plan.Steps.size(); ++s)
+        const std::vector<int>& deps = plan.Steps[s].Deps;
+        for (size_t d = 0; d < deps.size(); ++d)
         {
-            for (size_t d = 0; d < plan.Steps[s].Deps.size(); ++d)
+            if (deps[d] < 0 || deps[d] >= (int)s || resultOf[deps[d]] < 0)
+                continue;
+            EReconcileState state = results[resultOf[deps[d]]].State;
+            if (state == RecManual || state == RecBlocked)
             {
-                if (plan.Steps[s].Deps[d] == results[i].Index)
-                {
-                    CReconcileResult blocked;
-                    blocked.Index = (int)s;
-                    blocked.State = RecBlocked;
-                    blocked.Evidence = L"blocked";
-                    results.push_back(blocked);
-                }
+                results[resultOf[s]].State = RecBlocked;
+                results[resultOf[s]].Evidence = L"blocked";
+                break;
             }
         }
     }

@@ -39,7 +39,9 @@ std::string ToUtf8(const std::wstring& text);
 const char* ChangeText(reorg::EChangeKind kind);
 const char* ReversibleText(reorg::EReversibility value);
 
-bool RefreshAnalysis();
+// Rescans the plan roots and revalidates. FALSE when no plan is open or a folder could not be
+// scanned; the scan failure is then the only (blocking) issue and 'error' describes it.
+bool RefreshAnalysis(std::wstring* error = NULL);
 bool CreatePlan(const std::wstring& name, const std::wstring& scope, const std::wstring& destination, std::wstring& error);
 bool OpenPlanFile(const std::wstring& path, std::wstring& error);
 bool SavePlanFileAs(const std::wstring& path, std::wstring& error);

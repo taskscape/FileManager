@@ -14,6 +14,7 @@ public:
     std::map<std::wstring, CSnapshotItem> Items;
     std::map<std::wstring, std::vector<std::wstring>> Children;
     DWORD LastError;
+    std::wstring LastErrorPath; // the directory whose capture failed, for the analysis error
 
     CSnapshot() : LastError(ERROR_SUCCESS) {}
 

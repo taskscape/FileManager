@@ -41,6 +41,9 @@ CAPTION "Plan review"
 FONT 8, "MS Shell Dlg", 400, 0, 0x1
 BEGIN
     LISTBOX IDC_ISSUES, 7, 7, 306, 148, LBS_NOINTEGRALHEIGHT | WS_VSCROLL | WS_TABSTOP
+    // Cleanup changes the compiled steps, so it is toggled where those steps are reviewed.
+    CONTROL "Clean &up emptied folders", IDC_CLEANUP, "Button", BS_AUTOCHECKBOX | WS_TABSTOP, 7, 162, 160, 10
+    PUSHBUTTON "&Mark as Reviewed", IDC_MARK_REVIEWED, 173, 160, 84, 14
     DEFPUSHBUTTON "Close", IDOK, 263, 160, 50, 14
 END
 
@@ -50,7 +53,8 @@ CAPTION "Apply plan"
 FONT 8, "MS Shell Dlg", 400, 0, 0x1
 BEGIN
     LTEXT "Apply the reviewed steps. Files are moved, never copied or permanently deleted.", IDC_STATIC, 7, 8, 246, 20
-    CONTROL "Clean up emptied folders", IDC_CLEANUP, "Button", BS_AUTOCHECKBOX | WS_TABSTOP, 7, 32, 180, 10
+    // Read-only here: Apply runs only the reviewed steps, so the choice is made in Plan Review.
+    CONTROL "Clean up emptied folders (set in Plan Review)", IDC_CLEANUP, "Button", BS_AUTOCHECKBOX | WS_TABSTOP, 7, 32, 246, 10
     DEFPUSHBUTTON "Apply", IDOK, 144, 50, 50, 14
     PUSHBUTTON "Cancel", IDCANCEL, 200, 50, 50, 14
 END

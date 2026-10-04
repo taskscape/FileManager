@@ -5,6 +5,7 @@
 #include <shobjidl.h>
 #include "reorganize.h"
 #include "session.h"
+#include "revert.h"
 
 HINSTANCE DLLInstance = NULL;
 HINSTANCE HLanguage = NULL;
@@ -158,14 +159,26 @@ public:
     }
 };
 
-static INT_PTR CALLBACK ApplyProc(HWND dlg, UINT msg, WPARAM wParam, LPARAM)
+static INT_PTR CALLBACK ApplyProc(HWND dlg, UINT msg, WPARAM wParam, LPARAM lParam)
 {
+    if (msg == WM_INITDIALOG)
+    {
+        // Cleanup changes the compiled steps, so it is chosen in Plan Review and covered by the review
+        // hash Apply has already checked; here it is shown read-only and can never diverge from it.
+        HWND cleanup = GetDlgItem(dlg, IDC_CLEANUP);
+        if (cleanup != NULL)
+        {
+            CheckDlgButton(dlg, IDC_CLEANUP, lParam != 0 ? BST_CHECKED : BST_UNCHECKED);
+            EnableWindow(cleanup, FALSE);
+        }
+        return TRUE;
+    }
     if (msg == WM_COMMAND && (LOWORD(wParam) == IDOK || LOWORD(wParam) == IDCANCEL))
     {
         EndDialog(dlg, LOWORD(wParam));
         return TRUE;
     }
-    return msg == WM_INITDIALOG;
+    return FALSE;
 }
 
 static void ApplyPlanBody(HWND parent)
@@ -175,25 +188,47 @@ static void ApplyPlanBody(HWND parent)
         ShowInfo(parent, LoadStr(IDS_NO_PLAN));
         return;
     }
-    RefreshAnalysis();
+    // A scan failure must stop Apply even though it leaves the last complete analysis in place.
+    std::wstring analysisError;
+    if (!RefreshAnalysis(&analysisError))
+    {
+        ShowError(parent, analysisError);
+        return;
+    }
     if (reorg::HasBlockingErrors(Session().Issues))
     {
         ShowInfo(parent, LoadStr(IDS_APPLY_BLOCKED));
         return;
     }
-    if (DialogBox(HLanguage, MAKEINTRESOURCE(IDD_REORG_APPLY), parent, ApplyProc) != IDOK)
-        return;
     reorg::CCompiledPlan compiled = reorg::CompilePlan(Session().Overlay, Session().Plan, Session().Issues);
     if (!compiled.Ok || compiled.Steps.empty())
     {
         ShowError(parent, compiled.Error.empty() ? L"The plan did not compile." : compiled.Error);
         return;
     }
+    // Apply runs only the exact step list a Plan Review confirmed (PLN-003): the same compiled hash
+    // and step count. Any edit, rule, resolution, or disk change since then requires a new review.
+    const reorg::CReviewMark& review = Session().Plan.Review;
+    if (!review.Present || review.CompiledSha256 != compiled.Hash || review.StepCount != (int)compiled.Steps.size())
+    {
+        ShowInfo(parent, LoadStr(IDS_APPLY_NOT_REVIEWED));
+        return;
+    }
+    if (DialogBoxParam(HLanguage, MAKEINTRESOURCE(IDD_REORG_APPLY), parent, ApplyProc,
+                       (LPARAM)(Session().Plan.Options.CleanupEmptiedFolders ? 1 : 0)) != IDOK)
+        return;
+    // Store paths stay placeholders until now so the reviewed hash does not depend on the apply id.
+    std::wstring storeError;
+    if (!reorg::MaterializeRecoveryStores(compiled, Session().Plan, Session().Overlay, reorg::NewGuid(), storeError))
+    {
+        ShowError(parent, storeError);
+        return;
+    }
     std::vector<CSalamanderOperationStep> steps(compiled.Steps.size());
     for (size_t i = 0; i < compiled.Steps.size(); ++i)
     {
         const reorg::CCompiledStep& src = compiled.Steps[i];
-        if (!src.StorePlaceholder.empty())
+        if (src.Source.find(L"{store") != std::wstring::npos || src.Target.find(L"{store") != std::wstring::npos)
         {
             ShowError(parent, L"A recovery store path is still a placeholder.");
             return;
@@ -225,15 +260,12 @@ static void ApplyPlanBody(HWND parent)
     char operationId[64];
     operationId[0] = 0;
     CApplyObserver* observer = new CApplyObserver();
+    // The review was recorded before execution by Plan Review; nothing is marked after the host starts.
     if (!Salamander()->ExecuteOperationSteps(parent, LoadStr(IDS_PLUGINNAME), &steps[0], (int)steps.size(),
                                             SALEXECF_STOP_ON_ERROR, observer, operationId, (int)sizeof(operationId)))
     {
         delete observer;
         ShowError(parent, L"The host did not accept the steps.");
-    }
-    else
-    {
-        reorg::MarkReviewed(Session().Plan, compiled.Hash, (int)compiled.Steps.size());
     }
 }
 
@@ -290,6 +322,10 @@ BOOL WINAPI CPluginInterface::Release(HWND parent, BOOL force)
 
 void WINAPI CPluginInterface::LoadConfiguration(HWND, HKEY key, CSalamanderRegistryAbstract* registry)
 {
+    // A NULL key means "use defaults" (no saved configuration yet). Reading values from it fails with
+    // an invalid handle and makes the host show "Error Loading Configuration" on every fresh start.
+    if (key == NULL)
+        return;
     char path[4096];
     for (int i = 0; i < 10; ++i)
     {
@@ -382,24 +418,134 @@ DWORD WINAPI CPluginInterfaceForMenuExt::GetMenuItemState(int id, DWORD)
     return MENU_ITEM_STATE_ENABLED;
 }
 
-static INT_PTR CALLBACK ReviewProc(HWND dlg, UINT msg, WPARAM wParam, LPARAM)
+// Plan Review shows the compiled steps next to the issues so "Mark as Reviewed" confirms exactly the
+// step list whose hash and count Apply later requires. Other commands reuse the dialog without steps.
+struct CReviewDialogData
+{
+    reorg::CCompiledPlan* Compiled; // NULL: list issues only and hide the plan controls
+    bool CanMark;
+    bool Analyzed;           // the last RefreshAnalysis completed
+    size_t ValidationIssues; // issues from that analysis; compile notes are appended after them
+};
+
+// Compiles the step list Plan Review shows. A plan option that changes the steps (cleanup) is toggled
+// in this dialog and recompiles without rescanning, so Mark as Reviewed binds the list on screen.
+static void CompileForReview(CReviewDialogData& data)
+{
+    std::vector<reorg::CIssue>& issues = Session().Issues.Issues;
+    if (issues.size() > data.ValidationIssues)
+        issues.erase(issues.begin() + (ptrdiff_t)data.ValidationIssues, issues.end());
+    *data.Compiled = reorg::CCompiledPlan();
+    data.CanMark = false;
+    if (data.Analyzed && !reorg::HasBlockingErrors(Session().Issues))
+    {
+        *data.Compiled = reorg::CompilePlan(Session().Overlay, Session().Plan, Session().Issues);
+        data.CanMark = data.Compiled->Ok && !data.Compiled->Steps.empty() && !reorg::HasBlockingErrors(Session().Issues);
+    }
+}
+
+static std::wstring DescribeStep(size_t index, const reorg::CCompiledStep& step)
+{
+    const wchar_t* kind = L"Move";
+    if (step.Kind == reorg::StepCreateDir)
+        kind = L"Create folder";
+    else if (step.Kind == reorg::StepCopyDirTime)
+        kind = L"Copy folder time";
+    else if (step.Kind == reorg::StepRemoveEmptyDir)
+        kind = L"Remove empty folder";
+    // A cleanup is a move into the recovery store; naming it lets the reviewer see what the
+    // Clean up emptied folders option adds before marking the steps as reviewed.
+    if (step.Role == reorg::RoleCleanup)
+        kind = L"Cleanup";
+    wchar_t number[32];
+    swprintf_s(number, L"%u. ", (unsigned)(index + 1));
+    std::wstring text = std::wstring(number) + kind + L": " + step.Source;
+    if (!step.Source.empty() && !step.Target.empty())
+        text += L" -> ";
+    return text + step.Target;
+}
+
+// Refilled after a cleanup toggle, so the list never shows steps from an earlier compile.
+static void FillReviewList(HWND dlg, const CReviewDialogData* data)
+{
+    HWND list = GetDlgItem(dlg, IDC_ISSUES);
+    SendMessageA(list, LB_RESETCONTENT, 0, 0);
+    for (size_t i = 0; i < Session().Issues.Issues.size(); ++i)
+    {
+        std::string line = ToUtf8(Session().Issues.Issues[i].Code + L" " + Session().Issues.Issues[i].Text);
+        SendMessageA(list, LB_ADDSTRING, 0, (LPARAM)line.c_str());
+    }
+    if (data == NULL || data->Compiled == NULL)
+        return;
+    for (size_t i = 0; i < data->Compiled->Steps.size(); ++i)
+    {
+        std::string line = ToUtf8(DescribeStep(i, data->Compiled->Steps[i]));
+        SendMessageA(list, LB_ADDSTRING, 0, (LPARAM)line.c_str());
+    }
+    EnableWindow(GetDlgItem(dlg, IDC_MARK_REVIEWED), data->CanMark ? TRUE : FALSE);
+}
+
+static INT_PTR CALLBACK ReviewProc(HWND dlg, UINT msg, WPARAM wParam, LPARAM lParam)
 {
     if (msg == WM_INITDIALOG)
     {
-        HWND list = GetDlgItem(dlg, IDC_ISSUES);
-        for (size_t i = 0; i < Session().Issues.Issues.size(); ++i)
+        CReviewDialogData* data = (CReviewDialogData*)lParam;
+        SetWindowLongPtr(dlg, GWLP_USERDATA, lParam);
+        FillReviewList(dlg, data);
+        if (data == NULL || data->Compiled == NULL)
         {
-            std::string line = ToUtf8(Session().Issues.Issues[i].Code + L" " + Session().Issues.Issues[i].Text);
-            SendMessageA(list, LB_ADDSTRING, 0, (LPARAM)line.c_str());
+            ShowWindow(GetDlgItem(dlg, IDC_MARK_REVIEWED), SW_HIDE);
+            ShowWindow(GetDlgItem(dlg, IDC_CLEANUP), SW_HIDE);
+        }
+        else
+            CheckDlgButton(dlg, IDC_CLEANUP, Session().Plan.Options.CleanupEmptiedFolders ? BST_CHECKED : BST_UNCHECKED);
+        return TRUE;
+    }
+    if (msg == WM_COMMAND && LOWORD(wParam) == IDC_CLEANUP && HIWORD(wParam) == BN_CLICKED)
+    {
+        // The option is part of the plan, and the recompiled steps replace the listed ones, so a later
+        // Mark as Reviewed (and therefore Apply) covers exactly the cleanup choice made here.
+        CReviewDialogData* data = (CReviewDialogData*)GetWindowLongPtr(dlg, GWLP_USERDATA);
+        bool cleanup = IsDlgButtonChecked(dlg, IDC_CLEANUP) == BST_CHECKED;
+        if (data != NULL && data->Compiled != NULL && cleanup != Session().Plan.Options.CleanupEmptiedFolders)
+        {
+            Session().Plan.Options.CleanupEmptiedFolders = cleanup;
+            Session().Plan.Dirty = true;
+            CompileForReview(*data);
+            FillReviewList(dlg, data);
         }
         return TRUE;
     }
-    if (msg == WM_COMMAND && LOWORD(wParam) == IDOK)
+    if (msg == WM_COMMAND && LOWORD(wParam) == IDC_MARK_REVIEWED)
+    {
+        EndDialog(dlg, IDC_MARK_REVIEWED);
+        return TRUE;
+    }
+    if (msg == WM_COMMAND && (LOWORD(wParam) == IDOK || LOWORD(wParam) == IDCANCEL))
     {
         EndDialog(dlg, IDOK);
         return TRUE;
     }
     return FALSE;
+}
+
+static void ReviewPlanBody(HWND parent)
+{
+    if (!Session().Open)
+    {
+        ShowInfo(parent, LoadStr(IDS_NO_PLAN));
+        return;
+    }
+    reorg::CCompiledPlan compiled;
+    CReviewDialogData data;
+    data.Compiled = &compiled;
+    data.CanMark = false;
+    data.Analyzed = RefreshAnalysis();
+    data.ValidationIssues = Session().Issues.Issues.size();
+    CompileForReview(data);
+    // The dialog may recompile after a cleanup toggle, so the mark uses the final compile and state.
+    if (DialogBoxParam(HLanguage, MAKEINTRESOURCE(IDD_REORG_REVIEW), parent, ReviewProc, (LPARAM)&data) == IDC_MARK_REVIEWED && data.CanMark)
+        reorg::MarkReviewed(Session().Plan, compiled.Hash, (int)compiled.Steps.size());
 }
 
 static INT_PTR CALLBACK RuleProc(HWND dlg, UINT msg, WPARAM wParam, LPARAM)
@@ -416,8 +562,9 @@ static INT_PTR CALLBACK RuleProc(HWND dlg, UINT msg, WPARAM wParam, LPARAM)
         rule.Enabled = true;
         rule.Match.NameMask = ToWide(mask);
         rule.Destination = ToWide(templ);
-        if (!Session().Plan.DestinationRoots.empty())
-            rule.Match.ScopeRoot = Session().Plan.DestinationRoots[0].Path;
+        // Rules select items to move, so they match under the plan scope; MatchRule only resolves scope roots.
+        if (!Session().Plan.ScopeRoots.empty())
+            rule.Match.ScopeRoot = Session().Plan.ScopeRoots[0].Path;
         std::wstring ignored;
         reorg::AddRule(Session().Plan, Session().History, rule);
         std::vector<reorg::CRuleHit> hits = reorg::ApplyRules(Session().Plan, Session().Snapshot);
@@ -465,8 +612,10 @@ BOOL WINAPI CPluginInterfaceForMenuExt::ExecuteMenuItem(CSalamanderForOperations
         else if (!path.empty())
             ShowError(parent, error);
     }
-    else if (id == CMD_REVIEW || id == CMD_RULES || id == CMD_RECOVERY)
-        DialogBox(HLanguage, MAKEINTRESOURCE(IDD_REORG_REVIEW), parent, ReviewProc);
+    else if (id == CMD_REVIEW)
+        ReviewPlanBody(parent);
+    else if (id == CMD_RULES || id == CMD_RECOVERY)
+        DialogBoxParam(HLanguage, MAKEINTRESOURCE(IDD_REORG_REVIEW), parent, ReviewProc, 0);
     else if (id == CMD_ADDRULE)
         DialogBox(HLanguage, MAKEINTRESOURCE(IDD_REORG_RULE), parent, RuleProc);
     else if (id == CMD_MAPPING)
@@ -533,8 +682,9 @@ void WINAPI CPluginInterfaceForFS::ExecuteOnFS(int panel, CPluginFSInterfaceAbst
     CPluginFSInterface* fs = (CPluginFSInterface*)pluginFS;
     if (isDir == 2)
     {
-        char cut[MAX_PATH];
-        lstrcpynA(cut, fs->Path, MAX_PATH);
+        // Sized like the FS path itself so going up from a long proposed path is never truncated.
+        char cut[sizeof(fs->Path)];
+        lstrcpynA(cut, fs->Path, (int)sizeof(cut));
         char* name = NULL;
         if (Salamander()->CutDirectory(cut, &name))
             Salamander()->ChangePanelPathToPluginFS(panel, pluginFSName, cut, NULL, -1, name);

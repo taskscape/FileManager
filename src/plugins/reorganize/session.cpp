@@ -96,10 +96,24 @@ static void AddRoot(std::vector<reorg::CRoot>& roots, const std::wstring& path)
     roots.push_back(root);
 }
 
-bool RefreshAnalysis()
+static bool IsUnderDestination(const std::wstring& path)
+{
+    for (size_t i = 0; i < Session().Plan.DestinationRoots.size(); ++i)
+    {
+        if (reorg::IsUnderPath(path, Session().Plan.DestinationRoots[i].Path, false))
+            return true;
+    }
+    return false;
+}
+
+bool RefreshAnalysis(std::wstring* error)
 {
     if (!Session().Open)
+    {
+        if (error)
+            *error = L"No plan is open.";
         return false;
+    }
     Session().Analyzing = true;
     std::vector<std::wstring> roots;
     for (size_t i = 0; i < Session().Plan.ScopeRoots.size(); ++i)
@@ -107,7 +121,31 @@ bool RefreshAnalysis()
     for (size_t i = 0; i < Session().Plan.DestinationRoots.size(); ++i)
         roots.push_back(Session().Plan.DestinationRoots[i].Path);
     reorg::CCancellation cancel;
-    Session().Snapshot.Capture(Session().Probe, roots, true, cancel);
+    // Capture into a fresh snapshot and publish it only when complete. A partial scan would hide
+    // missing sources or occupied targets from validation and from Apply, so a failure keeps the
+    // last complete state for display and replaces the issues with one blocking error.
+    reorg::CSnapshot snapshot;
+    if (!snapshot.Capture(Session().Probe, roots, true, cancel))
+    {
+        wchar_t code[32];
+        swprintf_s(code, L"%lu", snapshot.LastError);
+        std::wstring text = L"The folder " + snapshot.LastErrorPath + L" could not be scanned (error " + code +
+                            L"). The plan cannot be validated or applied until it can be read.";
+        std::vector<std::wstring> paths(1, snapshot.LastErrorPath);
+        reorg::CIssue issue;
+        issue.Code = IsUnderDestination(snapshot.LastErrorPath) ? L"DST-001" : L"SRC-002";
+        issue.Severity = reorg::SevError;
+        issue.Nodes = paths;
+        issue.Text = text;
+        issue.Key = reorg::MakeIssueKey(issue.Code, paths);
+        Session().Issues.Issues.clear();
+        Session().Issues.Add(issue);
+        Session().Analyzing = false;
+        if (error)
+            *error = text;
+        return false;
+    }
+    std::swap(Session().Snapshot, snapshot);
     Session().Overlay = reorg::BuildOverlay(Session().Snapshot, Session().Plan);
     reorg::CAnalysisContext context;
     context.Plan = &Session().Plan;
@@ -144,7 +182,16 @@ bool CreatePlan(const std::wstring& name, const std::wstring& scope, const std::
     AddRoot(Session().Plan.DestinationRoots, destPath);
     Session().Plan.Dirty = true;
     Session().Open = true;
-    return RefreshAnalysis();
+    // A failed scan keeps the previous state, which must not be another plan's tree.
+    Session().Snapshot = reorg::CSnapshot();
+    Session().Overlay = reorg::COverlay();
+    if (!RefreshAnalysis(&error))
+    {
+        // The New Plan dialog stays open so the user can correct a folder that cannot be read.
+        ClosePlan();
+        return false;
+    }
+    return true;
 }
 
 bool OpenPlanFile(const std::wstring& path, std::wstring& error)
@@ -168,8 +215,12 @@ bool OpenPlanFile(const std::wstring& path, std::wstring& error)
     Session().Plan.FilePath = path;
     Session().History.Clear();
     Session().Open = true;
+    // A failed scan keeps the previous state, which must not be another plan's tree.
+    Session().Snapshot = reorg::CSnapshot();
+    Session().Overlay = reorg::COverlay();
     RememberRecent(path);
-    return RefreshAnalysis();
+    // The plan stays open when its folders cannot be scanned, so its blocking issue can be reviewed.
+    return RefreshAnalysis(&error);
 }
 
 bool SavePlanFileAs(const std::wstring& path, std::wstring& error)
