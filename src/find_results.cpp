@@ -1121,7 +1121,7 @@ CFoundFilesListView::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 BOOL CFoundFilesListView::InitColumns()
 {
     CALL_STACK_MESSAGE1("CFoundFilesListView::InitColumns()");
-    LV_COLUMN lvc;
+    LV_COLUMNW lvc;
     int header[] = {IDS_FOUNDFILESCOLUMN1, IDS_FOUNDFILESCOLUMN2,
                     IDS_FOUNDFILESCOLUMN3, IDS_FOUNDFILESCOLUMN4,
                     IDS_FOUNDFILESCOLUMN5, IDS_FOUNDFILESCOLUMN6,
@@ -1134,9 +1134,13 @@ BOOL CFoundFilesListView::InitColumns()
     {
         if (i == 2)
             lvc.fmt = LVCFMT_RIGHT;
-        lvc.pszText = LoadStr(header[i]);
+        // Resource strings are UTF-8; the Unicode list-view message preserves localized column captions.
+        CStrP columnTextW(ConvertAllocUtf8ToWide(LoadStr(header[i]), -1));
+        if (columnTextW == NULL)
+            return FALSE;
+        lvc.pszText = columnTextW.Ptr;
         lvc.iSubItem = i;
-        if (ListView_InsertColumn(HWindow, i, &lvc) == -1)
+        if (SendMessageW(HWindow, LVM_INSERTCOLUMNW, i, (LPARAM)&lvc) == -1)
             return FALSE;
     }
 

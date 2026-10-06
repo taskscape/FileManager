@@ -1,5 +1,6 @@
 using FileManager.UiTests.Infrastructure;
 using FlaUI.Core.AutomationElements;
+using FlaUI.Core.Definitions;
 using Microsoft.Win32;
 using NUnit.Framework;
 
@@ -50,6 +51,16 @@ public sealed class LanguageSwitchingUiTests : FileManagerUiTestBase
                     Does.Contain("Język"),
                     "Restart loaded English resources instead of the persisted Polish language module.");
         CloseConfigurationDialog(reloadedConfiguration, commit: false);
+
+        NativeCommands.Execute(NativeMainWindowHandle, NativeCommands.FindFiles);
+        var findDialog = WaitForWindow(window =>
+            window.FindFirstDescendant(cf => cf.ByAutomationId(NativeCommands.FindResults.ToString())) is not null);
+        var results = findDialog.FindFirstDescendant(cf => cf.ByAutomationId(NativeCommands.FindResults.ToString()))!;
+        // Check the rendered header so an ANSI list-view call cannot silently corrupt UTF-8 resource text.
+        var columnNames = results.FindAllDescendants(cf => cf.ByControlType(ControlType.HeaderItem))
+            .Select(column => column.Name).ToArray();
+        Assert.That(columnNames, Does.Contain("Ścieżka"),
+                    "The Polish Find results header did not render Ścieżka correctly.");
     }
 
     private Window OpenConfigurationDialogInAnyLanguage()
