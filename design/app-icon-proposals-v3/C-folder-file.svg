@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256">
+  <!-- A document inside one folder states file management with only two large shapes. -->
+  <defs>
+    <linearGradient id="folder" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop stop-color="#B5B4FF"/>
+      <stop offset="1" stop-color="#5C85DE"/>
+    </linearGradient>
+    <linearGradient id="face" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop stop-color="#8DD4FF"/>
+      <stop offset="1" stop-color="#3D9ED9"/>
+    </linearGradient>
+  </defs>
+  <g>
+    <path d="M28 87c0-12 10-22 22-22h50l17 19h89c12 0 22 10 22 22v87c0 13-10 23-23 23H51c-13 0-23-10-23-23Z" fill="url(#folder)"/>
+    <path d="M96 42h57l23 23v112H80V58c0-9 7-16 16-16Z" fill="#F7FAFC" stroke="#B6C7D0" stroke-width="3"/>
+    <path d="M153 42v19c0 4 3 7 7 7h19Z" fill="#FFC269"/>
+    <path d="M28 119c0-11 9-20 20-20h159c12 0 21 9 21 21v73c0 13-10 23-23 23H51c-13 0-23-10-23-23Z" fill="url(#face)"/>
+  </g>
+</svg>

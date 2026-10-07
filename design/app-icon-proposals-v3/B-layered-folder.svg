@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256">
+  <!-- Two offset folder planes use the layered storage metaphor seen in modern file managers. -->
+  <defs>
+    <linearGradient id="rear" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop stop-color="#8DD4FF"/>
+      <stop offset="1" stop-color="#5C8FDE"/>
+    </linearGradient>
+    <linearGradient id="front" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop stop-color="#FFE1AA"/>
+      <stop offset=".55" stop-color="#FFC269"/>
+      <stop offset="1" stop-color="#F6A144"/>
+    </linearGradient>
+  </defs>
+  <g>
+    <path d="M25 69c0-12 9-21 21-21h58l17 18h71c12 0 21 9 21 21v91c0 12-9 21-21 21H46c-12 0-21-9-21-21Z" fill="url(#rear)"/>
+    <path d="M45 111c0-12 9-21 21-21h52l17 17h66c13 0 23 10 23 23v64c0 13-10 23-23 23H68c-13 0-23-10-23-23Z" fill="url(#front)"/>
+  </g>
+</svg>

@@ -26,7 +26,8 @@ DefaultDirName={autopf}\{#MyAppName}
 DefaultGroupName={#MyAppName}
 AllowNoIcons=yes
 LicenseFile=LICENSE
-; SetupIconFile=..\src\setup\res\setup.ico
+; Use the same approved file-manager icon for the installer and installed shortcuts.
+SetupIconFile=..\src\res\salamand.ico
 OutputBaseFilename=OpenSalamander_{#MyAppVersion}.{#BuildNumber}
 Compression=lzma2/ultra64
 SolidCompression=yes

@@ -107,7 +107,8 @@ foreach ($file in Get-ChildItem -LiteralPath $toolbarDirectory -Filter '*.svg' -
 if (-not (Test-Path (Join-Path $toolbarDirectory 'LICENSE-fluent.txt'))) { $errors.Add('Missing Fluent MIT license.') }
 
 $protectedAppIcons = @{
-    'salamand.ico' = 'BBBC4E66BC304E4FD539D122D5515326B2CDCE6FD089B74CC4C679E4FB1543C1'
+    # Pin the approved layered-folder launch icon independently of the Fluent toolbar glyphs.
+    'salamand.ico' = 'C70FB5020B66EDB49CA794536A0CD67A39F49BEAB68BA4C93C5DA018D6AD1E41'
     'sal_r.ico' = '9DE6AF5D00BBAEA5729CFFC17517C0CFE42142C5871657CA189AD8BA5CA28B2E'
     'sal_g.ico' = '15073BE8CEEFFAA1D13D7E0DC3D5FF093E955F39F562F3AEB75DA01FC2A4BF9F'
     'sal_b.ico' = 'E30044D9DC474F59B4EDB79F4528372869A9D95B8F576CD10C2B571AE21C22E1'

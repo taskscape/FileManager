@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256">
+  <!-- One folder with two front faces suggests the app's dual-pane view without miniature UI detail. -->
+  <defs>
+    <linearGradient id="back" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop stop-color="#8DD4FF"/>
+      <stop offset="1" stop-color="#4D9FDB"/>
+    </linearGradient>
+    <linearGradient id="left" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop stop-color="#D4C8FF"/>
+      <stop offset="1" stop-color="#A49DEB"/>
+    </linearGradient>
+    <linearGradient id="right" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop stop-color="#A1DDFB"/>
+      <stop offset="1" stop-color="#58B3EA"/>
+    </linearGradient>
+  </defs>
+  <g>
+    <path d="M26 73c0-12 10-22 22-22h48l17 19h93c13 0 23 10 23 23v101c0 13-10 23-23 23H49c-13 0-23-10-23-23Z" fill="url(#back)"/>
+    <path d="M26 108c0-12 10-22 22-22h77v131H49c-13 0-23-10-23-23Z" fill="url(#left)"/>
+    <path d="M131 86h75c13 0 23 10 23 23v85c0 13-10 23-23 23h-75Z" fill="url(#right)"/>
+    <path d="M128 89v125" stroke="#FFFFFF" stroke-width="7" stroke-linecap="round" opacity=".86"/>
+  </g>
+</svg>
