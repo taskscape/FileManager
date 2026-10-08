@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "precomp.h"
+#include "../../common/utf8_control_text.h"
 
 #include <strsafe.h>
 
@@ -865,7 +866,8 @@ BOOL CFoundFilesListView::InitColumns()
     {
         lvc.pszText = (LPSTR)LoadStr(header[i]);
         lvc.iSubItem = i;
-        if (ListView_InsertColumn(HWindow, i, &lvc) == -1)
+        // The localized column text is UTF-8; insert its UTF-16 form.
+        if (InsertListViewColumnUtf8(HWindow, i, &lvc) == -1)
             return FALSE;
     }
 

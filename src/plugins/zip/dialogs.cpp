@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "precomp.h"
+#include "../../common/utf8_control_text.h"
 #include <crtdbg.h>
 #include <ostream>
 #include <stdio.h>
@@ -316,14 +317,17 @@ BOOL CPackDialog::OnInit(WPARAM wParam, LPARAM lParam)
         DecimalSeparator[DecimalSeparatorLen] = 0; // make sure there is a zero terminator at the end
     }
 
-    SendDlgItemMessage(Dlg, IDC_UNITS, CB_ADDSTRING, 0, (LPARAM)LoadStr(IDS_SIZE_KB));
-    SendDlgItemMessage(Dlg, IDC_UNITS, CB_ADDSTRING, 0, (LPARAM)LoadStr(IDS_SIZE_MB));
+    // Localized resource bytes are UTF-8; the control receives UTF-16.
+    SendUtf8DialogControlString(Dlg, IDC_UNITS, CB_ADDSTRING, 0, LoadStr(IDS_SIZE_KB));
+    // Localized resource bytes are UTF-8; the control receives UTF-16.
+    SendUtf8DialogControlString(Dlg, IDC_UNITS, CB_ADDSTRING, 0, LoadStr(IDS_SIZE_MB));
     for (i = 0; i < 5 && Config->VolSizeCache[i][0] != 0; i++)
     {
         sprintf(buf, "%s %s", Config->VolSizeCache[i], LoadStr(Config->VolSizeUnits[i] == 0 ? IDS_SIZE_KB : IDS_SIZE_MB));
         SendDlgItemMessage(Dlg, IDC_VOLSIZE, CB_ADDSTRING, 0, (LPARAM)buf);
     }
-    SendDlgItemMessage(Dlg, IDC_VOLSIZE, CB_ADDSTRING, 0, (LPARAM)LoadStr(IDS_AUTO));
+    // Localized resource bytes are UTF-8; the control receives UTF-16.
+    SendUtf8DialogControlString(Dlg, IDC_VOLSIZE, CB_ADDSTRING, 0, LoadStr(IDS_AUTO));
 
     SendDlgItemMessage(Dlg, IDC_VOLSIZE, CB_LIMITTEXT, MAX_VOL_STR - 1, 0);
     SendDlgItemMessage(Dlg, IDC_PASSWORD1, EM_SETLIMITTEXT, MAX_PASSWORD - 1, 0);
@@ -341,7 +345,8 @@ BOOL CPackDialog::OnInit(WPARAM wParam, LPARAM lParam)
 
     if (Config->LastUsedAuto)
     {
-        SendDlgItemMessage(Dlg, IDC_VOLSIZE, CB_SELECTSTRING, -1, (LPARAM)LoadStr(IDS_AUTO));
+        // Match the same Unicode choice that was inserted into this combo box.
+        SendUtf8DialogControlString(Dlg, IDC_VOLSIZE, CB_SELECTSTRING, -1, LoadStr(IDS_AUTO));
         SendDlgItemMessage(Dlg, IDC_UNITS, CB_SETCURSEL, 0, 0);
     }
     else
@@ -378,7 +383,8 @@ BOOL CPackDialog::OnMultiVol(WORD wNotifyCode, WORD wID, HWND hwndCtl)
                 InvalidateRect(GetDlgItem(Dlg, IDC_ARCHIVE), NULL, TRUE);
                 UpdateWindow(GetDlgItem(Dlg, IDC_ARCHIVE));
             }
-            SetWindowText(Dlg, LoadStr(IDS_CREAETARCH));
+            // Localized UTF-8 text must reach the native control as UTF-16.
+            SendUtf8ControlString(Dlg, WM_SETTEXT, 0, LoadStr(IDS_CREAETARCH));
         }
         else
         {
@@ -394,7 +400,8 @@ BOOL CPackDialog::OnMultiVol(WORD wNotifyCode, WORD wID, HWND hwndCtl)
             if ((Flags & PD_NEWARCHIVE) == 0 &&
                 SendDlgItemMessage(Dlg, IDC_SELFEXTR, BM_GETCHECK, 0, 0) == BST_UNCHECKED)
             {
-                SetWindowText(Dlg, LoadStr(IDS_ADDTOARCHIVE));
+                // Localized UTF-8 text must reach the native control as UTF-16.
+                SendUtf8ControlString(Dlg, WM_SETTEXT, 0, LoadStr(IDS_ADDTOARCHIVE));
             }
         }
         return TRUE;
@@ -441,7 +448,8 @@ BOOL CPackDialog::OnSelfExtr(WORD wNotifyCode, WORD wID, HWND hwndCtl)
                 SendDlgItemMessage(Dlg, IDC_ARCHIVE, WM_SETTEXT, 0, (LPARAM)path);
             InvalidateRect(GetDlgItem(Dlg, IDC_ARCHIVE), NULL, TRUE);
             UpdateWindow(GetDlgItem(Dlg, IDC_ARCHIVE));
-            SetWindowText(Dlg, LoadStr(IDS_CREAETARCH));
+            // Localized UTF-8 text must reach the native control as UTF-16.
+            SendUtf8ControlString(Dlg, WM_SETTEXT, 0, LoadStr(IDS_CREAETARCH));
         }
         else
         {
@@ -461,7 +469,8 @@ BOOL CPackDialog::OnSelfExtr(WORD wNotifyCode, WORD wID, HWND hwndCtl)
             if ((Flags & PD_NEWARCHIVE) == 0 &&
                 SendDlgItemMessage(Dlg, IDC_MULTIVOL, BM_GETCHECK, 0, 0) == BST_UNCHECKED)
             {
-                SetWindowText(Dlg, LoadStr(IDS_ADDTOARCHIVE));
+                // Localized UTF-8 text must reach the native control as UTF-16.
+                SendUtf8ControlString(Dlg, WM_SETTEXT, 0, LoadStr(IDS_ADDTOARCHIVE));
             }
         }
         return TRUE;
@@ -1920,7 +1929,8 @@ BOOL CRenFavDialog::OnInit(WPARAM wParam, LPARAM lParam)
     SendDlgItemMessage(Dlg, IDC_NAME, WM_SETTEXT, 0, (LPARAM)Name);
     SendDlgItemMessage(Dlg, IDC_NAME, EM_SETLIMITTEXT, MAX_FAVNAME - 1, 0);
     if (Rename)
-        SetWindowText(Dlg, LoadStr(IDS_RENAMEFAVSET));
+        // Localized UTF-8 text must reach the native control as UTF-16.
+        SendUtf8ControlString(Dlg, WM_SETTEXT, 0, LoadStr(IDS_RENAMEFAVSET));
     CenterDlgToParent();
     return TRUE;
 }
@@ -2029,8 +2039,10 @@ BOOL CCreateSFXDialog::OnInit(WPARAM wParam, LPARAM lParam)
     if (!PackObject)
     {
         EnableWindow(GetDlgItem(Dlg, IDC_ADVANCED), FALSE);
-        SetWindowText(GetDlgItem(Dlg, IDC_SOURCE), LoadStr(IDS_SOURCEHEADING));
-        SetWindowText(GetDlgItem(Dlg, IDC_TARGET), LoadStr(IDS_TARGETHEADING));
+        // Localized UTF-8 text must reach the native control as UTF-16.
+        SendUtf8ControlString(GetDlgItem(Dlg, IDC_SOURCE), WM_SETTEXT, 0, LoadStr(IDS_SOURCEHEADING));
+        // Localized UTF-8 text must reach the native control as UTF-16.
+        SendUtf8ControlString(GetDlgItem(Dlg, IDC_TARGET), WM_SETTEXT, 0, LoadStr(IDS_TARGETHEADING));
     }
 
     CenterDlgToParent();

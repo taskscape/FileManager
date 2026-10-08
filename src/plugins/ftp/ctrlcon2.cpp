@@ -3,6 +3,7 @@
 // CommentsTranslationProject: TRANSLATED
 
 #include "precomp.h"
+#include "../../common/utf8_control_text.h"
 #include <strsafe.h> // counted bounded copies (StringCchCopyNA)
 #include "..\\..\\common\\monotonic_time.h"
 
@@ -1496,7 +1497,8 @@ void CLogs::AddLogsToCombo(HWND combo, int prevItemUID, int* focusIndex, BOOL* e
     }
     else
     {
-        SendMessage(combo, CB_ADDSTRING, 0, (LPARAM)LoadStr(IDS_NOLOGS));
+        // Localized resource bytes are UTF-8; the control receives UTF-16.
+        SendUtf8ControlString(combo, CB_ADDSTRING, 0, LoadStr(IDS_NOLOGS));
         SendMessage(combo, CB_SETITEMDATA, 0, -1);
     }
     HANDLES(LeaveCriticalSection(&LogCritSect));

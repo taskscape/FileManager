@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "precomp.h"
+#include "../../common/utf8_control_text.h"
 
 #include "data.h"
 #include "renderer.h"
@@ -677,25 +678,26 @@ CColumnsDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         lvc.cx = r.right - 2 * colWidth - (int)(colWidth / 1.4) - GetSystemMetrics(SM_CXVSCROLL);
         lvc.fmt = LVCFMT_LEFT;
         lvc.iSubItem = 0;
-        ListView_InsertColumn(HListView, 0, &lvc);
+        // Database column labels come from UTF-8 resources, not the ANSI code page.
+        InsertListViewColumnUtf8(HListView, 0, &lvc);
 
         lvc.mask |= LVCF_SUBITEM;
         lvc.pszText = LoadStr(IDS_COLUMNS_TYPE);
         lvc.cx = colWidth;
         lvc.iSubItem = 1;
-        ListView_InsertColumn(HListView, 1, &lvc);
+        InsertListViewColumnUtf8(HListView, 1, &lvc);
 
         lvc.mask |= LVCF_SUBITEM;
         lvc.pszText = LoadStr(IDS_COLUMNS_LENGTH);
         lvc.cx = colWidth;
         lvc.iSubItem = 2;
-        ListView_InsertColumn(HListView, 2, &lvc);
+        InsertListViewColumnUtf8(HListView, 2, &lvc);
 
         lvc.mask |= LVCF_SUBITEM;
         lvc.pszText = LoadStr(IDS_COLUMNS_DECIMALS);
         lvc.cx = (int)(colWidth / 1.4);
         lvc.iSubItem = 3;
-        ListView_InsertColumn(HListView, 3, &lvc);
+        InsertListViewColumnUtf8(HListView, 3, &lvc);
         GetClientRect(HWindow, &r);
         MinDlgW = PrevDlgW = r.right;
         MinDlgH = PrevDlgH = r.bottom;

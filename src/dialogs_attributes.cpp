@@ -3,6 +3,7 @@
 // CommentsTranslationProject: TRANSLATED
 
 #include "precomp.h"
+#include "common/utf8_control_text.h"
 
 // Use StrSafe for bounded formatting of localized menu text.
 #include <strsafe.h>
@@ -815,10 +816,14 @@ void CCopyMoveMoreDialog::TransferCriteriaControls(CTransferInfo& ti)
 
         HWND speedLimitUnits = GetDlgItem(HWindow, IDC_CM_SPEEDLIMITUNITS);
         SendMessage(speedLimitUnits, CB_RESETCONTENT, 0, 0);
-        SendMessage(speedLimitUnits, CB_ADDSTRING, 0, (LPARAM)LoadStr(IDS_SPEED_B_per_s));
-        SendMessage(speedLimitUnits, CB_ADDSTRING, 0, (LPARAM)LoadStr(IDS_SPEED_KB_per_s));
-        SendMessage(speedLimitUnits, CB_ADDSTRING, 0, (LPARAM)LoadStr(IDS_SPEED_MB_per_s));
-        SendMessage(speedLimitUnits, CB_ADDSTRING, 0, (LPARAM)LoadStr(IDS_SPEED_GB_per_s));
+        // Localized resource bytes are UTF-8; the control receives UTF-16.
+        SendUtf8ControlString(speedLimitUnits, CB_ADDSTRING, 0, LoadStr(IDS_SPEED_B_per_s));
+        // Localized resource bytes are UTF-8; the control receives UTF-16.
+        SendUtf8ControlString(speedLimitUnits, CB_ADDSTRING, 0, LoadStr(IDS_SPEED_KB_per_s));
+        // Localized resource bytes are UTF-8; the control receives UTF-16.
+        SendUtf8ControlString(speedLimitUnits, CB_ADDSTRING, 0, LoadStr(IDS_SPEED_MB_per_s));
+        // Localized resource bytes are UTF-8; the control receives UTF-16.
+        SendUtf8ControlString(speedLimitUnits, CB_ADDSTRING, 0, LoadStr(IDS_SPEED_GB_per_s));
         SendMessage(speedLimitUnits, CB_SETCURSEL, speedLimUnits, 0);
 
         HWND speedLimit = GetDlgItem(HWindow, IDE_CM_SPEEDLIMIT);
@@ -2447,6 +2452,7 @@ CWaitWindow::CWaitWindow(HWND hParent, int textResID, BOOL showCloseButton, CObj
     BarMax = 0;
     BarPos = 0;
     WidthMultiplier = 1; // default keeps the window fitted to the current text
+    TextWidthPercent = 100; // default paints only the width required by the current text
     NeedWrap = FALSE;
     CacheBitmap = NULL;
 }
@@ -2500,6 +2506,11 @@ void CWaitWindow::SetWidthMultiplier(int multiplier)
     WidthMultiplier = max(1, multiplier); // a multiplier below 1 would shrink the window below the text size
 }
 
+void CWaitWindow::SetTextWidthPercent(int percent)
+{
+    TextWidthPercent = max(100, percent); // preserve room for the current text when callers reserve status-message space
+}
+
 #define WAITWINDOW_HMARGIN 21
 #define WAITWINDOW_VMARGIN 14
 
@@ -2530,6 +2541,7 @@ HWND CWaitWindow::Create(HWND hForegroundWnd)
 
     // compute the text size => window size
     NeedWrap = FALSE;
+    int measuredTextWidth = 0;
     HDC dc = HANDLES(GetDC(NULL));
     if (dc != NULL)
     {
@@ -2548,8 +2560,11 @@ HWND CWaitWindow::Create(HWND hForegroundWnd)
             DrawTextUtf8(dc, Text, -1, &tR, DT_CALCRECT | DT_LEFT | DT_NOPREFIX | DT_WORDBREAK);
             NeedWrap = TRUE;
         }
-        TextSize.cx = tR.right;
+        measuredTextWidth = tR.right;
+        // Keep the status paint area fixed while letting callers choose a wider shell independently.
+        TextSize.cx = (measuredTextWidth * TextWidthPercent) / 100;
         TextSize.cy = tR.bottom;
+
         SelectObject(dc, old);
         HANDLES(ReleaseDC(NULL, dc));
     }
@@ -2560,7 +2575,9 @@ HWND CWaitWindow::Create(HWND hForegroundWnd)
     // so we use a hack: create the window first, then measure the client area and adjust the window size after
     // note: AdjustWindowRectEx is unusable because it lies; the original frame addition is unusable too, see the links above
 
-    int width = TextSize.cx + 2 * WAITWINDOW_HMARGIN;
+    // The shell multiplier remains relative to the naturally measured text, not the reserved paint area.
+    // This keeps a deliberately wider status label from also making the whole window wider.
+    int width = measuredTextWidth + 2 * WAITWINDOW_HMARGIN;
     int height = TextSize.cy + 2 * WAITWINDOW_VMARGIN;
 
     if (WidthMultiplier > 1)
@@ -2828,17 +2845,20 @@ void CConversionTablesDialog::Transfer(CTransferInfo& ti)
         lvc.pszText = LoadStr(IDS_CONVERSION_DESCRIPTION);
         lvc.iSubItem = 0;
         lvc.fmt = LVCFMT_LEFT;
-        ListView_InsertColumn(HListView, 0, &lvc);
+        // The localized column text is UTF-8; insert its UTF-16 form.
+        InsertListViewColumnUtf8(HListView, 0, &lvc);
 
         lvc.pszText = LoadStr(IDS_CONVERSION_CODEPAGE);
         lvc.iSubItem = 1;
         lvc.fmt = LVCFMT_RIGHT;
-        ListView_InsertColumn(HListView, 1, &lvc);
+        // The localized column text is UTF-8; insert its UTF-16 form.
+        InsertListViewColumnUtf8(HListView, 1, &lvc);
 
         lvc.pszText = LoadStr(IDS_CONVERSION_PATH);
         lvc.iSubItem = 2;
         lvc.fmt = LVCFMT_LEFT;
-        ListView_InsertColumn(HListView, 2, &lvc);
+        // The localized column text is UTF-8; insert its UTF-16 form.
+        InsertListViewColumnUtf8(HListView, 2, &lvc);
 
         RECT r;
         GetClientRect(HListView, &r);

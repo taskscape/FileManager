@@ -3,6 +3,7 @@
 // CommentsTranslationProject: TRANSLATED
 
 #include "precomp.h"
+#include "../../common/utf8_control_text.h"
 #include <strsafe.h> // counted bounded copies (StringCchCopyNA)
 
 //****************************************************************************
@@ -506,7 +507,8 @@ void CConnectAdvancedDlg::Transfer(CTransferInfo& ti)
         if (ti.Type == ttDataToWindow)
         {
             SendMessage(combo, CB_RESETCONTENT, 0, 0);
-            SendMessage(combo, CB_ADDSTRING, 0, (LPARAM)LoadStr(IDS_SRVTYPEAUTODETECT));
+            // Localized resource bytes are UTF-8; the control receives UTF-16.
+            SendUtf8ControlString(combo, CB_ADDSTRING, 0, LoadStr(IDS_SRVTYPEAUTODETECT));
             int index;
             Config.LockServerTypeList()->AddNamesToCombo(combo, Server->ServerType, index);
             Config.UnlockServerTypeList();
@@ -539,7 +541,8 @@ void CConnectAdvancedDlg::Transfer(CTransferInfo& ti)
             int i;
             for (i = 0; resIDs[i] != -1; i++)
             {
-                SendMessage(combo, CB_ADDSTRING, 0, (LPARAM)LoadStr(resIDs[i]));
+                // Localized resource bytes are UTF-8; the control receives UTF-16.
+                SendUtf8ControlString(combo, CB_ADDSTRING, 0, LoadStr(resIDs[i]));
             }
             if (Server->TransferMode < 0)
                 Server->TransferMode = 0;
@@ -607,7 +610,8 @@ void CConnectAdvancedDlg::Transfer(CTransferInfo& ti)
             int i;
             for (i = 0; strID[i] != -1; i++)
             {
-                SendMessage(combo, CB_ADDSTRING, 0, (LPARAM)LoadStr(strID[i]));
+                // Localized resource bytes are UTF-8; the control receives UTF-16.
+                SendUtf8ControlString(combo, CB_ADDSTRING, 0, LoadStr(strID[i]));
             }
             // verify that KeepAliveCommand stays within bounds (perhaps only a direct registry edit could break it)
             if (Config.KeepAliveCommand >= i)
@@ -952,12 +956,15 @@ CRenameDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
     if (uMsg == WM_INITDIALOG)
     {
         if (ServerTypes)
-            SetWindowText(HWindow, LoadStr(NewServer ? IDS_SRVTYPENEWTITLE : IDS_SRVTYPERENAMETITLE));
+            // Localized UTF-8 text must reach the native control as UTF-16.
+            SendUtf8ControlString(HWindow, WM_SETTEXT, 0, LoadStr(NewServer ? IDS_SRVTYPENEWTITLE : IDS_SRVTYPERENAMETITLE));
         char buf[BOOKMSRVTYPE_MAX_SIZE + 200];
         if (AddBookmark)
         {
-            SetWindowText(HWindow, LoadStr(IDS_ADDBOOKMARKTITLE));
-            SetDlgItemText(HWindow, IDT_SUBJECT, LoadStr(IDS_ADDBOOKMARKTEXT));
+            // Localized UTF-8 text must reach the native control as UTF-16.
+            SendUtf8ControlString(HWindow, WM_SETTEXT, 0, LoadStr(IDS_ADDBOOKMARKTITLE));
+            // Localized UTF-8 text must reach the native control as UTF-16.
+            SendUtf8DialogControlString(HWindow, IDT_SUBJECT, WM_SETTEXT, 0, LoadStr(IDS_ADDBOOKMARKTEXT));
         }
         else
         {
@@ -984,7 +991,8 @@ CRenameDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                 if (!ServerTypes && !CopyDataFromFocusedServer)
                     Name[0] = 0; // empty name for a new server (it will be set in Transfer())
                 if (ServerTypes)
-                    SetDlgItemText(HWindow, IDT_NEWNAME, LoadStr(IDS_SRVTYPENEWSUBJECT));
+                    // Localized UTF-8 text must reach the native control as UTF-16.
+                    SendUtf8DialogControlString(HWindow, IDT_NEWNAME, WM_SETTEXT, 0, LoadStr(IDS_SRVTYPENEWSUBJECT));
             }
         }
     }
@@ -1944,14 +1952,16 @@ CProxyServerDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         CSalamanderPasswordManagerAbstract* passwordManager = SalamanderGeneral->GetSalamanderPasswordManager();
         // if the user uses the password manager, change the "it is not secure" message
         if (passwordManager->IsUsingMasterPassword())
-            SetDlgItemText(HWindow, IDC_PRXSRV_SAVEPASSWD_HINT, LoadStr(IDS_SAVEPASSWORD_PROTECTED));
+            // Localized UTF-8 text must reach the native control as UTF-16.
+            SendUtf8DialogControlString(HWindow, IDC_PRXSRV_SAVEPASSWD_HINT, WM_SETTEXT, 0, LoadStr(IDS_SAVEPASSWORD_PROTECTED));
 
         // disable select-all on focus and ensure a custom context menu for the script variables edit
         CProxyScriptControlWindow* wnd = new CProxyScriptControlWindow(HWindow, IDE_PRXSRV_SCRIPT);
         if (wnd != NULL && wnd->HWindow == NULL)
             delete wnd; // attaching failed - it will not deallocate itself
         if (Edit)
-            SetWindowText(HWindow, LoadStr(IDS_EDITPROXYSRVTITLE));
+            // Localized UTF-8 text must reach the native control as UTF-16.
+            SendUtf8ControlString(HWindow, WM_SETTEXT, 0, LoadStr(IDS_EDITPROXYSRVTITLE));
         break;
     }
 

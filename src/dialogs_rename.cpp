@@ -3,6 +3,7 @@
 // CommentsTranslationProject: TRANSLATED
 
 #include "precomp.h"
+#include "common/utf8_control_text.h"
 #include "common/resource_strings_utf8.h" // selected-language button captions must bypass the system ANSI code page
 #include <strsafe.h>
 
@@ -643,7 +644,8 @@ void CImportConfigDialog::Transfer(CTransferInfo& ti)
         SetWindowText(HWindow, buff2);
 
         // COMBOBOX Import Configuration
-        SendDlgItemMessage(HWindow, IDC_IMPORTCONFIG, CB_ADDSTRING, 0, (LPARAM)LoadStr(IDS_IMPORTCFG_DEFCFG));
+        // Localized resource bytes are UTF-8; the control receives UTF-16.
+        SendUtf8DialogControlString(HWindow, IDC_IMPORTCONFIG, CB_ADDSTRING, 0, LoadStr(IDS_IMPORTCFG_DEFCFG));
         int selIndex = 0; // use the default item if nothing better is found
         int i;
         for (i = 0; i < SALCFG_ROOTS_COUNT; i++)
@@ -1237,7 +1239,8 @@ CCompareArgsDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
     {
         if (!ComparingFiles)
         {
-            SetWindowText(HWindow, LoadStr(IDS_USERMENUCOMPAREARGSTITLE));
+            // Localized UTF-8 text must reach the native control as UTF-16.
+            SendUtf8ControlString(HWindow, WM_SETTEXT, 0, LoadStr(IDS_USERMENUCOMPAREARGSTITLE));
             SetDlgItemTextUtf8(HWindow, IDT_UMC_NAME1, LoadStr(IDS_USERMENUCOMPAREARG1));
             SetDlgItemTextUtf8(HWindow, IDT_UMC_NAME2, LoadStr(IDS_USERMENUCOMPAREARG2));
         }

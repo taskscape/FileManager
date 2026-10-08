@@ -52,6 +52,13 @@ public sealed class LanguageSwitchingUiTests : FileManagerUiTestBase
                     "Restart loaded English resources instead of the persisted Polish language module.");
         CloseConfigurationDialog(reloadedConfiguration, commit: false);
 
+        // Query the live FTP string table after restart; correct .rc2 bytes alone do not prove the dialog renders them.
+        var connectDialog = OpenFtpConnectDialog();
+        Assert.That(NativeCommands.FtpBookmarksContains(connectDialog.Properties.NativeWindowHandle.Value, "Szybkie połączenie"), Is.True,
+                    "The FTP bookmark list did not render Szybkie połączenie correctly.");
+        NativeCommands.ClickDialogButton(connectDialog.Properties.NativeWindowHandle.Value, 2);
+        WaitForWindowToClose(connectDialog);
+
         NativeCommands.Execute(NativeMainWindowHandle, NativeCommands.FindFiles);
         var findDialog = WaitForWindow(window =>
             window.FindFirstDescendant(cf => cf.ByAutomationId(NativeCommands.FindResults.ToString())) is not null);
@@ -61,6 +68,7 @@ public sealed class LanguageSwitchingUiTests : FileManagerUiTestBase
             .Select(column => column.Name).ToArray();
         Assert.That(columnNames, Does.Contain("Ścieżka"),
                     "The Polish Find results header did not render Ścieżka correctly.");
+
     }
 
     private Window OpenConfigurationDialogInAnyLanguage()

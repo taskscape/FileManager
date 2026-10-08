@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "precomp.h"
+#include "../../common/utf8_control_text.h"
 
 #include "7zip.h"
 #include "dialogs.h"
@@ -202,7 +203,8 @@ void CCompressParamsDlg::FillCompressLevelCombo()
     for (i = 0; i < sizeof(CompressLevel) / sizeof(CResDataPair); i++)
     {
         // insert an item
-        int res = (int)SendMessage(GetDlgItem(HWindow, IDCfgCompressLevel), CB_ADDSTRING, 0, (LPARAM)LoadStr(CompressLevel[i].ResId));
+        // Localized choices must enter the native combo box as Unicode.
+        int res = (int)SendUtf8ControlString(GetDlgItem(HWindow, IDCfgCompressLevel), CB_ADDSTRING, 0, LoadStr(CompressLevel[i].ResId));
         if (res != CB_ERR)
             // set the data
             SendMessage(GetDlgItem(HWindow, IDCfgCompressLevel), CB_SETITEMDATA, (WPARAM)res, (LPARAM)CompressLevel[i].Data);
@@ -217,7 +219,8 @@ void CCompressParamsDlg::FillCompressMethodCombo()
     for (i = 0; i < sizeof(CompressMethod) / sizeof(CResDataPair); i++)
     {
         // insert an item
-        int res = (int)SendMessage(GetDlgItem(HWindow, IDCfgCompressMethod), CB_ADDSTRING, 0, (LPARAM)LoadStr(CompressMethod[i].ResId));
+        // Localized choices must enter the native combo box as Unicode.
+        int res = (int)SendUtf8ControlString(GetDlgItem(HWindow, IDCfgCompressMethod), CB_ADDSTRING, 0, LoadStr(CompressMethod[i].ResId));
         if (res != CB_ERR)
             // set the data
             SendMessage(GetDlgItem(HWindow, IDCfgCompressMethod), CB_SETITEMDATA, (WPARAM)res, (LPARAM)CompressMethod[i].Data);

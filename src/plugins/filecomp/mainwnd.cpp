@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "precomp.h"
+#include "../../common/utf8_control_text.h"
 
 using namespace std;
 
@@ -1290,7 +1291,8 @@ CMainWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                         SG->SalMessageBox(HWindow, LoadStr(IDS_CANCELED), LoadStr(IDS_PLUGINNAME), MB_ICONINFORMATION);
                     }
                     SendMessage(ComboBox->HWindow, CB_RESETCONTENT, 0, 0);
-                    SetWindowText(HWindow, LoadStr(IDS_PLUGINNAME));
+                    // Localized UTF-8 text must reach the native control as UTF-16.
+                    SendUtf8ControlString(HWindow, WM_SETTEXT, 0, LoadStr(IDS_PLUGINNAME));
                 }
                 SetWait(FALSE);
             }
@@ -1430,7 +1432,8 @@ CMainWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 
             ResetComboBox();
 
-            SetWindowText(HWindow, LoadStr(IDS_PLUGINNAME));
+            // Localized UTF-8 text must reach the native control as UTF-16.
+            SendUtf8ControlString(HWindow, WM_SETTEXT, 0, LoadStr(IDS_PLUGINNAME));
 
             UpdateToolbarButtons(UTB_ALL);
 
@@ -2200,7 +2203,8 @@ CMainWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                                 SG->SalMessageBox(HWindow, LoadStr(IDS_CANCELED), LoadStr(IDS_PLUGINNAME), MB_ICONINFORMATION);
                             }
                             SendMessage(ComboBox->HWindow, CB_RESETCONTENT, 0, 0);
-                            SetWindowText(HWindow, LoadStr(IDS_PLUGINNAME));
+                            // Localized UTF-8 text must reach the native control as UTF-16.
+                            SendUtf8ControlString(HWindow, WM_SETTEXT, 0, LoadStr(IDS_PLUGINNAME));
                         }
                         SetWait(FALSE);
                     }

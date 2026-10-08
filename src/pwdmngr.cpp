@@ -3,6 +3,7 @@
 // CommentsTranslationProject: TRANSLATED
 
 #include "precomp.h"
+#include "common/utf8_control_text.h"
 #include <time.h>
 
 #include "cfgdlg.h"
@@ -230,7 +231,8 @@ void CChangeMasterPassword::Transfer(CTransferInfo& ti)
             // remove the ES_PASSWORD style from the current password field so we can display the "not set" text
             HWND hEdit = GetDlgItem(HWindow, IDC_CHMP_CURRENTPWD);
             SendMessage(hEdit, EM_SETPASSWORDCHAR, 0, 0);
-            SetWindowText(hEdit, LoadStr(IDS_MASTERPASSWORD_NOTSET));
+            // Localized UTF-8 text must reach the native control as UTF-16.
+            SendUtf8ControlString(hEdit, WM_SETTEXT, 0, LoadStr(IDS_MASTERPASSWORD_NOTSET));
             EnableWindow(hEdit, FALSE);
         }
 

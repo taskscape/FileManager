@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "precomp.h"
+#include "../../common/utf8_control_text.h"
 
 TDirectArray<DWORD_PTR> DialogStack(4, 4);
 CCS DialogStackCS;
@@ -306,7 +307,8 @@ void TransferCombo(CTransferInfo& ti, int id, int* comboContent, int& value)
         int i;
         for (i = 0; comboContent[i + 1] != -1; i += 2)
         {
-            SendMessage(combo, CB_ADDSTRING, 0, (LPARAM)LoadStr(comboContent[i + 1]));
+            // Localized resource bytes are UTF-8; the control receives UTF-16.
+            SendUtf8ControlString(combo, CB_ADDSTRING, 0, LoadStr(comboContent[i + 1]));
             if (value == comboContent[i])
                 SendMessage(combo, CB_SETCURSEL, i / 2, 0);
         }
@@ -845,7 +847,8 @@ void CProgressDialog::CancelOperation()
                                    MB_YESNO | MB_ICONQUESTION | MB_SETFOREGROUND) == IDYES;
         if (Cancel)
         {
-            SetDlgItemText(HWindow, IDS_MESSAGE, LoadStr(IDS_CANCELING));
+            // Localized UTF-8 text must reach the native control as UTF-16.
+            SendUtf8DialogControlString(HWindow, IDS_MESSAGE, WM_SETTEXT, 0, LoadStr(IDS_CANCELING));
             // disable the close button
             // Keep this close-button style change portable to x64 window data.
             LONG_PTR l = GetWindowLongPtr(HWindow, GWL_STYLE);

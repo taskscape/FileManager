@@ -4,6 +4,7 @@
 
 #include "precomp.h"
 #include <strsafe.h> // counted bounded copies (StringCchCopyNA)
+#include "../../common/utf8_control_text.h"
 
 TIndirectArray<CDialog> ModelessDlgs(2, 2, dtNoDelete); // array of "Welcome Message" dialogs
 
@@ -444,7 +445,8 @@ void CConfigPageDefaults::Transfer(CTransferInfo& ti)
             int i;
             for (i = 0; strID[i] != -1; i++)
             {
-                SendMessage(combo, CB_ADDSTRING, 0, (LPARAM)LoadStr(strID[i]));
+                // Keep localized keep-alive choices in Unicode at the combo-box boundary.
+                SendUtf8ControlString(combo, CB_ADDSTRING, 0, LoadStr(strID[i]));
             }
             // verify that KeepAliveCommand is within bounds (only direct registry editing could break it)
             if (Config.KeepAliveCommand >= i)
@@ -893,7 +895,8 @@ void CConnectDlg::Transfer(CTransferInfo& ti)
         {
             SendMessage(list, WM_SETREDRAW, FALSE, 0);
             SendMessage(list, LB_RESETCONTENT, 0, 0);
-            SendMessage(list, LB_ADDSTRING, 0, (LPARAM)LoadStr(IDS_QUICKCONNECT));
+            // The bookmark list receives UTF-8 resource text through its Unicode string table.
+            SendUtf8ControlString(list, LB_ADDSTRING, 0, LoadStr(IDS_QUICKCONNECT));
             TmpFTPServerList.AddNamesToListbox(list);
             if (Config.LastBookmark > TmpFTPServerList.Count)
             {
@@ -1210,7 +1213,8 @@ void CConnectDlg::RefreshList(BOOL focusLast)
     int topIndex = (int)SendMessage(list, LB_GETTOPINDEX, 0, 0);
     SendMessage(list, WM_SETREDRAW, FALSE, 0);
     SendMessage(list, LB_RESETCONTENT, 0, 0);
-    SendMessage(list, LB_ADDSTRING, 0, (LPARAM)LoadStr(IDS_QUICKCONNECT));
+    // Refresh must rebuild the same Unicode entry as the initial transfer.
+    SendUtf8ControlString(list, LB_ADDSTRING, 0, LoadStr(IDS_QUICKCONNECT));
     TmpFTPServerList.AddNamesToListbox(list);
     int count = (int)SendMessage(list, LB_GETCOUNT, 0, 0);
     if (focus >= count)
@@ -1242,7 +1246,8 @@ void CConnectDlg::MoveItem(HWND list, int fromIndex, int toIndex, int topIndex)
                 if (topIndex == -1)
                     topIndex = (int)SendMessage(list, LB_GETTOPINDEX, 0, 0);
                 SendMessage(list, LB_DELETESTRING, fromIndex + 1, 0);
-                SendMessage(list, LB_INSERTSTRING, toIndex + 1, (LPARAM)HandleNULLStr(s->ItemName));
+                // Legacy bookmark names may be stored in the active ANSI code page.
+                SendUtf8OrAcpControlString(list, LB_INSERTSTRING, toIndex + 1, HandleNULLStr(s->ItemName));
                 SendMessage(list, LB_SETTOPINDEX, topIndex, 0);
                 SendMessage(list, LB_SETCURSEL, toIndex + 1, 0);
                 SendMessage(list, WM_SETREDRAW, TRUE, 0);
@@ -1283,6 +1288,30 @@ BOOL CConnectDlg::GetCurSelServer(CFTPServer** server, int* index)
 
 UINT DragListboxMsg = 0; // message ID corresponding to the DRAGLISTMSGSTRING (drag&drop listbox)
 
+static void UseUnicodeBookmarksList(HWND dialog)
+{
+    HWND oldList = GetDlgItem(dialog, IDL_BOOKMARKS);
+    if (oldList == NULL || IsWindowUnicode(oldList))
+        return;
+    RECT bounds;
+    GetWindowRect(oldList, &bounds);
+    MapWindowPoints(NULL, dialog, (LPPOINT)&bounds, 2);
+    HWND previous = GetWindow(oldList, GW_HWNDPREV);
+    DWORD style = (DWORD)GetWindowLongPtr(oldList, GWL_STYLE);
+    DWORD extendedStyle = (DWORD)GetWindowLongPtr(oldList, GWL_EXSTYLE);
+    HFONT font = (HFONT)SendMessage(oldList, WM_GETFONT, 0, 0);
+    // The plug-in creates ANSI dialogs; this one text-bearing list must retain Unicode characters.
+    HWND list = CreateWindowExW(extendedStyle, L"ListBox", L"", style,
+                                bounds.left, bounds.top, bounds.right - bounds.left, bounds.bottom - bounds.top,
+                                dialog, (HMENU)(INT_PTR)IDL_BOOKMARKS, GetModuleHandleW(NULL), NULL);
+    if (list == NULL)
+        return;
+    SendMessage(list, WM_SETFONT, (WPARAM)font, FALSE);
+    DestroyWindow(oldList);
+    SetWindowPos(list, previous != NULL ? previous : HWND_TOP, 0, 0, 0, 0,
+                 SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
+}
+
 INT_PTR
 CConnectDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 {
@@ -1291,11 +1320,13 @@ CConnectDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
     {
     case WM_INITDIALOG:
     {
+        UseUnicodeBookmarksList(HWindow);
         SalamanderGeneral->InstallWordBreakProc(GetDlgItem(HWindow, IDE_HOSTADDRESS));
         SalamanderGeneral->InstallWordBreakProc(GetDlgItem(HWindow, IDE_INITIALPATH));
         if (AddBookmarkMode != 0)
         {
-            SetWindowText(HWindow, LoadStr(IDS_ORGANIZEBOOKMARKS));
+            // Localized UTF-8 text must reach the native control as UTF-16.
+            SendUtf8ControlString(HWindow, WM_SETTEXT, 0, LoadStr(IDS_ORGANIZEBOOKMARKS));
             HWND ok = GetDlgItem(HWindow, IDOK);
             HWND close = GetDlgItem(HWindow, IDB_CLOSE);
             SendMessage(HWindow, DM_SETDEFID, IDB_CLOSE, 0);
@@ -1320,7 +1351,8 @@ CConnectDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         CSalamanderPasswordManagerAbstract* passwordManager = SalamanderGeneral->GetSalamanderPasswordManager();
         // if the user uses the password manager, change the "it is not secure" message
         if (passwordManager->IsUsingMasterPassword())
-            SetDlgItemText(HWindow, IDC_SAVEPASSWORD_HINT, LoadStr(IDS_SAVEPASSWORD_PROTECTED));
+            // Localized UTF-8 text must reach the native control as UTF-16.
+            SendUtf8DialogControlString(HWindow, IDC_SAVEPASSWORD_HINT, WM_SETTEXT, 0, LoadStr(IDS_SAVEPASSWORD_PROTECTED));
 
         // attach to the listbox (because Alt+arrow keys do not reach WM_VKEYTOITEM)
         CBookmarksListbox* list = new CBookmarksListbox(this, IDL_BOOKMARKS);

@@ -3,6 +3,7 @@
 // CommentsTranslationProject: TRANSLATED
 
 #include "precomp.h"
+#include "common/utf8_control_text.h"
 
 #include "tasklist.h"
 #include "mainwnd.h"
@@ -54,7 +55,8 @@ void CPluginsDlg::InitColumns()
     {
         lvc.pszText = LoadStr(header[i]);
         lvc.iSubItem = i;
-        ListView_InsertColumn(HListView, i, &lvc);
+        // The localized column text is UTF-8; insert its UTF-16 form.
+        InsertListViewColumnUtf8(HListView, i, &lvc);
         //    ListView_SetColumnWidth(HListView, i, LVSCW_AUTOSIZE_USEHEADER);   // widths will be set later in SetColumnWidths()
     }
 }
@@ -1043,7 +1045,8 @@ void CPluginKeys::InitColumns()
     {
         lvc.pszText = LoadStr(header[i]);
         lvc.iSubItem = i;
-        ListView_InsertColumn(HListView, i, &lvc);
+        // The localized column text is UTF-8; insert its UTF-16 form.
+        InsertListViewColumnUtf8(HListView, i, &lvc);
     }
 }
 
@@ -1952,8 +1955,10 @@ void CCfgPageViewers::Transfer(CTransferInfo& ti)
         Dirty = FALSE;
         // populate the combo box with viewers
         HWND hCombo = GetDlgItem(HWindow, IDC_VIEW_TYPE);
-        SendMessage(hCombo, CB_ADDSTRING, 0, (LPARAM)LoadStr(IDS_VIEWER_EXTERNAL));
-        SendMessage(hCombo, CB_ADDSTRING, 0, (LPARAM)LoadStr(IDS_VIEWER_INTERNAL));
+        // Localized resource bytes are UTF-8; the control receives UTF-16.
+        SendUtf8ControlString(hCombo, CB_ADDSTRING, 0, LoadStr(IDS_VIEWER_EXTERNAL));
+        // Localized resource bytes are UTF-8; the control receives UTF-16.
+        SendUtf8ControlString(hCombo, CB_ADDSTRING, 0, LoadStr(IDS_VIEWER_INTERNAL));
         int count = 0;
         int index;
         while ((index = Plugins.GetViewerIndex(count++)) != -1) // while "file viewer" plug-ins exist
@@ -2773,7 +2778,8 @@ void CCfgPageMainWindow::Transfer(CTransferInfo& ti)
         int resIDs[3] = {IDS_TITLEBAR_DIRECTORY, IDS_TITLEBAR_COMPOSITE, IDS_TITLEBAR_FULLPATH}; // must correspond with TITLE_BAR_MODE_xxx
         int i;
         for (i = 0; i < 3; i++)
-            SendDlgItemMessage(HWindow, IDC_TITLEBAR_MODE, CB_ADDSTRING, 0, (LPARAM)LoadStr(resIDs[i]));
+            // Localized resource bytes are UTF-8; the control receives UTF-16.
+            SendUtf8DialogControlString(HWindow, IDC_TITLEBAR_MODE, CB_ADDSTRING, 0, LoadStr(resIDs[i]));
     }
 
     ti.CheckBox(IDC_STATUSAREA, Configuration.StatusArea);
@@ -3401,7 +3407,8 @@ void CCfgPagePanels::Transfer(CTransferInfo& ti)
         int i;
         for (i = 0; i < MANGLE_ITEMS; i++)
         {
-            SendDlgItemMessage(HWindow, IDC_NAMEMANGLE, CB_ADDSTRING, 0, (LPARAM)LoadStr(resIDs[i]));
+            // Localized resource bytes are UTF-8; the control receives UTF-16.
+            SendUtf8DialogControlString(HWindow, IDC_NAMEMANGLE, CB_ADDSTRING, 0, LoadStr(resIDs[i]));
             if (!selected && Configuration.FileNameFormat == mangles[i])
             {
                 SendDlgItemMessage(HWindow, IDC_NAMEMANGLE, CB_SETCURSEL, i, 0);
@@ -3415,7 +3422,8 @@ void CCfgPagePanels::Transfer(CTransferInfo& ti)
         selected = FALSE;
         for (i = 0; i < SIZE_ITEMS; i++)
         {
-            SendDlgItemMessage(HWindow, IDC_SIZEFORMAT, CB_ADDSTRING, 0, (LPARAM)LoadStr(resID2s[i]));
+            // Localized resource bytes are UTF-8; the control receives UTF-16.
+            SendUtf8DialogControlString(HWindow, IDC_SIZEFORMAT, CB_ADDSTRING, 0, LoadStr(resID2s[i]));
             if (!selected && Configuration.SizeFormat == sizes[i])
             {
                 SendDlgItemMessage(HWindow, IDC_SIZEFORMAT, CB_SETCURSEL, i, 0);

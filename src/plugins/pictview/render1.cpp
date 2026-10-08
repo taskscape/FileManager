@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "precomp.h"
+#include "../../common/utf8_control_text.h"
 #include <strsafe.h> // counted bounded copies (StringCchCopyNA)
 #include <zmouse.h>
 #include <shobjidl.h>
@@ -4328,7 +4329,8 @@ LRESULT CRendererWindow::OnCommand(WPARAM wParam, LPARAM lParam, BOOL* closingVi
         }
 
         ShowWindow(Viewer->HWindow, SW_MINIMIZE);
-        SetWindowText(Viewer->HWindow, LoadStr(IDS_CAPTURING));
+        // Localized UTF-8 text must reach the native control as UTF-16.
+        SendUtf8ControlString(Viewer->HWindow, WM_SETTEXT, 0, LoadStr(IDS_CAPTURING));
         Capturing = TRUE;
 
         return 0;

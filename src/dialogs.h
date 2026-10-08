@@ -1116,6 +1116,7 @@ protected:
     DWORD BarPos;
 
     int WidthMultiplier; // widens the window beyond the measured text; for callers that swap in longer texts via SetText(), which never resizes the window
+    int TextWidthPercent; // reserves a fixed wider paint rectangle for later status text without dynamically resizing the window
 
     CBitmap* CacheBitmap; // used for flicker-free text drawing
 
@@ -1126,6 +1127,7 @@ public:
     void SetCaption(const char* text); // if not called, the caption will be "Open Salamander"
     void SetText(const char* text);
     void SetWidthMultiplier(int multiplier); // must be called before Create(); 1 keeps the window sized to the text
+    void SetTextWidthPercent(int percent); // must be called before Create(); 100 keeps the measured text width
 
     void SetProgressMax(DWORD max);
     void SetProgressPos(DWORD pos);

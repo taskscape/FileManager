@@ -3,6 +3,7 @@
 // CommentsTranslationProject: TRANSLATED
 
 #include "precomp.h"
+#include "../../common/utf8_control_text.h"
 
 #include <strsafe.h>
 
@@ -89,7 +90,8 @@ CWelcomeMsgDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
             SetWindowText(HWindow, buf);
         }
         if (RawListing)
-            SetWindowText(HWindow, LoadStr(IDS_RAWLISTINGTITLE));
+            // Localized UTF-8 text must reach the native control as UTF-16.
+            SendUtf8ControlString(HWindow, WM_SETTEXT, 0, LoadStr(IDS_RAWLISTINGTITLE));
         else
             ShowWindow(GetDlgItem(HWindow, IDB_SAVEMSGAS), SW_HIDE);
 

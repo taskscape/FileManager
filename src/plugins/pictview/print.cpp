@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "precomp.h"
+#include "../../common/utf8_control_text.h"
 #include <math.h>
 
 #include "lib\\pvw32dll.h"
@@ -437,7 +438,8 @@ void FillUnits(HWND hDlg, int cbResID, CUnitsEnum select, double value)
     int i;
     for (i = 0; UnitsIDs[i] != -1; i++)
     {
-        LRESULT index = SendMessage(hCombo, CB_ADDSTRING, 0, (LPARAM)LoadStr(UnitsIDs[i]));
+        // Printed units are UTF-8 resources and need a Unicode control message.
+        LRESULT index = SendUtf8ControlString(hCombo, CB_ADDSTRING, 0, LoadStr(UnitsIDs[i]));
         SendMessage(hCombo, CB_SETITEMDATA, index, (LPARAM)Units[i]);
         if (select == Units[i])
             selectIndex = i;

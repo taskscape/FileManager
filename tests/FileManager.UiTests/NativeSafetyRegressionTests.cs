@@ -2026,17 +2026,17 @@ public sealed class NativeSafetyRegressionTests
     }
 
     [Test]
-    public void Ftp_bookmark_verification_uses_the_legacy_ansi_list_box()
+    public void Ftp_bookmark_verification_uses_the_unicode_list_box()
     {
         var root = FindRepositoryRoot();
         var basicUiTests = File.ReadAllText(Path.Combine(root, "tests", "FileManager.UiTests", "BasicUiTests.cs"));
         var nativeCommands = File.ReadAllText(Path.Combine(root, "tests", "FileManager.UiTests", "Infrastructure", "NativeCommands.cs"));
 
-        // An ANSI list box misreads a SendMessageW string at its first UTF-16 terminator, and a forced restart must wait for the committed generation.
+        // Unicode bookmark lookup must match the rendered Polish label and still wait for committed persistence.
         Assert.Multiple(() =>
         {
-            Assert.That(nativeCommands, Does.Contain("EntryPoint = \"SendMessageA\""));
-            Assert.That(nativeCommands, Does.Contain("SendMessageAnsiText(listHandle, LbFindStringExact"));
+            Assert.That(nativeCommands, Does.Contain("IsWindowUnicode(listHandle)"));
+            Assert.That(nativeCommands, Does.Contain("SendMessageText(listHandle, LbFindStringExact"));
             Assert.That(basicUiTests, Does.Contain("WaitForFtpBookmark(bookmarksDialog"));
             Assert.That(basicUiTests, Does.Contain("WaitForFtpBookmarkPersistence(editedBookmarkName)"));
             Assert.That(basicUiTests, Does.Contain("WaitForFtpBookmark(reloadedDialog"));

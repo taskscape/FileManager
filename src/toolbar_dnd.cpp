@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "precomp.h"
+#include "common/utf8_control_text.h"
 #include "utf8gui.h" // dragged toolbar captions retain the same localized glyphs as the source toolbar
 
 #include "cfgdlg.h"
@@ -420,7 +421,8 @@ CTBCustomizeDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         int selectedSizeIndex = 0;
         for (int i = 0; i < _countof(CustomizeToolbarIconSizes); i++)
         {
-            SendMessage(hIconSize, CB_ADDSTRING, 0, (LPARAM)LoadStr(sizeStringIDs[i]));
+            // Localized resource bytes are UTF-8; the control receives UTF-16.
+            SendUtf8ControlString(hIconSize, CB_ADDSTRING, 0, LoadStr(sizeStringIDs[i]));
             if (CustomizeToolbarIconSizes[i] == SelectedIconSize)
                 selectedSizeIndex = i;
         }

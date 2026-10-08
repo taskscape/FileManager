@@ -2,6 +2,8 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "precomp.h"
+#include "../../common/utf8_control_text.h"
+#include "../../common/utf8_control_text.h"
 
 #include <strsafe.h>
 #include <objbase.h>
@@ -95,7 +97,8 @@ void CSFVMD5Dialog::InitList(int columns[], int widths[], int numcols, SHashInfo
         lvc.cchTextMax = (int)_tcslen(lvc.pszText);
         lvc.cx = widths[j];
         lvc.fmt = (j == 1) ? LVCFMT_RIGHT : 0;
-        ListView_InsertColumn(hList, j, &lvc);
+        // Hash result headers are UTF-8 resources and must be inserted as Unicode.
+        InsertListViewColumnUtf8(hList, j, &lvc);
     }
     if (pHashInfo)
     {
@@ -109,7 +112,7 @@ void CSFVMD5Dialog::InitList(int columns[], int widths[], int numcols, SHashInfo
                 lvc.cchTextMax = (int)_tcslen(lvc.pszText);
                 lvc.cx = widths[numcols + k];
                 lvc.fmt = 0;
-                ListView_InsertColumn(hList, numcols + l, &lvc);
+                InsertListViewColumnUtf8(hList, numcols + l, &lvc);
                 l++;
             }
     }
@@ -180,7 +183,8 @@ void CSFVMD5Dialog::ConvertPath(char* str, char from, char to)
 void CSFVMD5Dialog::OnThreadEnd()
 {
     CALL_STACK_MESSAGE1("CSFVMD5Dialog::OnThreadEnd()");
-    SetDlgItemText(HWindow, IDC_BUTTON_CLOSE, LoadStr(IDS_CLOSE));
+    // Localized UTF-8 text must reach the native control as UTF-16.
+    SendUtf8DialogControlString(HWindow, IDC_BUTTON_CLOSE, WM_SETTEXT, 0, LoadStr(IDS_CLOSE));
     ShowWindow(GetDlgItem(HWindow, IDC_LABEL), SW_HIDE);
     ShowWindow(GetDlgItem(HWindow, IDC_PROGRESS), SW_HIDE);
     bThreadRunning = FALSE;
@@ -2019,7 +2023,8 @@ INT_PTR CVerifyDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         nMissing = nCorrupt = nSkipped = 0;
         bCanceled = FALSE;
         ModelessQueue.Add(new CWindowQueueItem(HWindow));
-        SetWindowText(HWindow, LoadStr(IDS_VERIFYTITLE)); // provisional title (avoid empty caption if an error pops up)
+        // Localized UTF-8 text must reach the native control as UTF-16.
+        SendUtf8ControlString(HWindow, WM_SETTEXT, 0, LoadStr(IDS_VERIFYTITLE)); // provisional title (avoid empty caption if an error pops up)
 
         PostMessage(HWindow, WM_USER_STARTWORK, 0, 0);
         break;
@@ -2033,7 +2038,8 @@ INT_PTR CVerifyDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         }
         else
         {
-            SetWindowText(HWindow, LoadStr(pHashInfo->idVerifyTitle));
+            // Localized UTF-8 text must reach the native control as UTF-16.
+            SendUtf8ControlString(HWindow, WM_SETTEXT, 0, LoadStr(pHashInfo->idVerifyTitle));
             bTerminateThread = FALSE;
             hThread = NULL;
             iThreadID = 0;

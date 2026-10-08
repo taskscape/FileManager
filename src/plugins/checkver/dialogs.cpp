@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "precomp.h"
+#include "../../common/utf8_control_text.h"
 
 #include <strsafe.h>
 
@@ -243,7 +244,8 @@ void LoadCfgDlgControls(HWND hWindow)
         TRACE_E("InternetConnection=" << InternetConnection);
         break;
     }
-    SetDlgItemText(hWindow, IDC_CFG_INTERNET, LoadStr(resID));
+    // Localized UTF-8 text must reach the native control as UTF-16.
+    SendUtf8DialogControlString(hWindow, IDC_CFG_INTERNET, WM_SETTEXT, 0, LoadStr(resID));
 
     int i;
     for (i = 0; i < achmCount; i++)
@@ -426,12 +428,14 @@ void MainEnableControls(BOOL downloading)
     if (downloading)
     {
         // set the button text
-        SetDlgItemText(HMainDialog, IDC_MAIN_CHECK, LoadStr(IDS_BTN_STOP));
+        // Localized UTF-8 text must reach the native control as UTF-16.
+        SendUtf8DialogControlString(HMainDialog, IDC_MAIN_CHECK, WM_SETTEXT, 0, LoadStr(IDS_BTN_STOP));
     }
     else
     {
         // set the button text
-        SetDlgItemText(HMainDialog, IDC_MAIN_CHECK, LoadStr(IDS_BTN_CHECK));
+        // Localized UTF-8 text must reach the native control as UTF-16.
+        SendUtf8DialogControlString(HMainDialog, IDC_MAIN_CHECK, WM_SETTEXT, 0, LoadStr(IDS_BTN_CHECK));
     }
     HWND hCfgButton = GetDlgItem(HMainDialog, IDC_MAIN_CFG);
     HWND hCheckButton = GetDlgItem(HMainDialog, IDC_MAIN_CHECK);
@@ -556,7 +560,8 @@ MENU_TEMPLATE_ITEM AppendToSystemMenu[] =
                     (LPARAM)LoadIcon(DLLInstance, MAKEINTRESOURCE(IDI_CHECKVER)));
 
         // set the button text
-        SetDlgItemText(hWindow, IDC_MAIN_CHECK, LoadStr(IDS_BTN_CHECK));
+        // Localized UTF-8 text must reach the native control as UTF-16.
+        SendUtf8DialogControlString(hWindow, IDC_MAIN_CHECK, WM_SETTEXT, 0, LoadStr(IDS_BTN_CHECK));
 
         MainDlgAutoOpen = tvData->AutoOpen;
         if (MainDlgAutoOpen)

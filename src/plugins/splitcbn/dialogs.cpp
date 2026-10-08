@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "precomp.h"
+#include "../../common/utf8_control_text.h"
 #include "splitcbn.h"
 #include "splitcbn.rh"
 #include "splitcbn.rh2"
@@ -219,16 +220,26 @@ namespace split
             SendMessage(GetDlgItem(hWnd, IDC_EDIT_NUMBER), EM_SETLIMITTEXT, 3, 0);
 
             HWND h = GetDlgItem(hWnd, IDC_COMBO_SIZE);
-            SendMessage(h, CB_ADDSTRING, 0, (LPARAM)LoadStr(IDS_144FLOPPY));
-            SendMessage(h, CB_ADDSTRING, 0, (LPARAM)LoadStr(IDS_720FLOPPY));
-            SendMessage(h, CB_ADDSTRING, 0, (LPARAM)LoadStr(IDS_12FLOPPY));
-            SendMessage(h, CB_ADDSTRING, 0, (LPARAM)LoadStr(IDS_360FLOPPY));
-            SendMessage(h, CB_ADDSTRING, 0, (LPARAM)LoadStr(IDS_100MB_ZIP));
-            SendMessage(h, CB_ADDSTRING, 0, (LPARAM)LoadStr(IDS_250MB_ZIP));
-            SendMessage(h, CB_ADDSTRING, 0, (LPARAM)LoadStr(IDS_120MB_LS120));
-            SendMessage(h, CB_ADDSTRING, 0, (LPARAM)LoadStr(IDS_650MB_CDR));
-            SendMessage(h, CB_ADDSTRING, 0, (LPARAM)LoadStr(IDS_700MB_CDR));
-            SendMessage(h, CB_ADDSTRING, 0, (LPARAM)LoadStr(IDS_AUTODETECT));
+            // Localized resource bytes are UTF-8; the control receives UTF-16.
+            SendUtf8ControlString(h, CB_ADDSTRING, 0, LoadStr(IDS_144FLOPPY));
+            // Localized resource bytes are UTF-8; the control receives UTF-16.
+            SendUtf8ControlString(h, CB_ADDSTRING, 0, LoadStr(IDS_720FLOPPY));
+            // Localized resource bytes are UTF-8; the control receives UTF-16.
+            SendUtf8ControlString(h, CB_ADDSTRING, 0, LoadStr(IDS_12FLOPPY));
+            // Localized resource bytes are UTF-8; the control receives UTF-16.
+            SendUtf8ControlString(h, CB_ADDSTRING, 0, LoadStr(IDS_360FLOPPY));
+            // Localized resource bytes are UTF-8; the control receives UTF-16.
+            SendUtf8ControlString(h, CB_ADDSTRING, 0, LoadStr(IDS_100MB_ZIP));
+            // Localized resource bytes are UTF-8; the control receives UTF-16.
+            SendUtf8ControlString(h, CB_ADDSTRING, 0, LoadStr(IDS_250MB_ZIP));
+            // Localized resource bytes are UTF-8; the control receives UTF-16.
+            SendUtf8ControlString(h, CB_ADDSTRING, 0, LoadStr(IDS_120MB_LS120));
+            // Localized resource bytes are UTF-8; the control receives UTF-16.
+            SendUtf8ControlString(h, CB_ADDSTRING, 0, LoadStr(IDS_650MB_CDR));
+            // Localized resource bytes are UTF-8; the control receives UTF-16.
+            SendUtf8ControlString(h, CB_ADDSTRING, 0, LoadStr(IDS_700MB_CDR));
+            // Localized resource bytes are UTF-8; the control receives UTF-16.
+            SendUtf8ControlString(h, CB_ADDSTRING, 0, LoadStr(IDS_AUTODETECT));
             SendMessage(h, CB_SETCURSEL, 0, 0);
             OnComboSelChange();
             SetFocus(h);
@@ -930,7 +941,8 @@ static INT_PTR CALLBACK CRCDlgProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM l
             ShowWindow(GetDlgItem(hWnd, calcCrc == originalCrc ? IDC_ICON_OK : IDC_ICON_WARN), SW_SHOW);
         }
         else
-            SetDlgItemText(hWnd, IDC_EDIT_CRC3, LoadStr(IDS_CRCNOTFOUND));
+            // Localized UTF-8 text must reach the native control as UTF-16.
+            SendUtf8DialogControlString(hWnd, IDC_EDIT_CRC3, WM_SETTEXT, 0, LoadStr(IDS_CRCNOTFOUND));
 
         return TRUE;
     }

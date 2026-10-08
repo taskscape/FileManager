@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "precomp.h"
+#include "../../common/utf8_control_text.h"
 #include "..\\..\\common\\checked_arithmetic.h"
 #include <crtdbg.h>
 #include <ostream>
@@ -1910,24 +1911,33 @@ BOOL CSfxTextsDialog::OnInit(WPARAM wParam, LPARAM lParam)
 
     //!note: below we rely strictly on the order
     int i = 0;
-    SendDlgItemMessage(Dlg, IDC_MBOXBUTTONS, CB_ADDSTRING, 0, (LPARAM)LoadStr(IDS_MBOK));
+    // Localized resource bytes are UTF-8; the control receives UTF-16.
+    SendUtf8DialogControlString(Dlg, IDC_MBOXBUTTONS, CB_ADDSTRING, 0, LoadStr(IDS_MBOK));
     SendDlgItemMessage(Dlg, IDC_MBOXBUTTONS, CB_SETITEMDATA, i++, (LPARAM)MB_OK);
-    SendDlgItemMessage(Dlg, IDC_MBOXBUTTONS, CB_ADDSTRING, 0, (LPARAM)LoadStr(IDS_MBOKCANCEL));
+    // Localized resource bytes are UTF-8; the control receives UTF-16.
+    SendUtf8DialogControlString(Dlg, IDC_MBOXBUTTONS, CB_ADDSTRING, 0, LoadStr(IDS_MBOKCANCEL));
     SendDlgItemMessage(Dlg, IDC_MBOXBUTTONS, CB_SETITEMDATA, i++, MB_OKCANCEL);
-    SendDlgItemMessage(Dlg, IDC_MBOXBUTTONS, CB_ADDSTRING, 0, (LPARAM)LoadStr(IDS_MBYESNO));
+    // Localized resource bytes are UTF-8; the control receives UTF-16.
+    SendUtf8DialogControlString(Dlg, IDC_MBOXBUTTONS, CB_ADDSTRING, 0, LoadStr(IDS_MBYESNO));
     SendDlgItemMessage(Dlg, IDC_MBOXBUTTONS, CB_SETITEMDATA, i++, MB_YESNO);
-    SendDlgItemMessage(Dlg, IDC_MBOXBUTTONS, CB_ADDSTRING, 0, (LPARAM)LoadStr(IDS_MBAGREEDISAGREE));
+    // Localized resource bytes are UTF-8; the control receives UTF-16.
+    SendUtf8DialogControlString(Dlg, IDC_MBOXBUTTONS, CB_ADDSTRING, 0, LoadStr(IDS_MBAGREEDISAGREE));
     SendDlgItemMessage(Dlg, IDC_MBOXBUTTONS, CB_SETITEMDATA, i++, SE_MBAGREEDISAGREE);
     i = 0;
-    SendDlgItemMessage(Dlg, IDC_MBOXICON, CB_ADDSTRING, 0, (LPARAM)LoadStr(IDS_MBNOICON));
+    // Localized resource bytes are UTF-8; the control receives UTF-16.
+    SendUtf8DialogControlString(Dlg, IDC_MBOXICON, CB_ADDSTRING, 0, LoadStr(IDS_MBNOICON));
     SendDlgItemMessage(Dlg, IDC_MBOXICON, CB_SETITEMDATA, i++, (LPARAM)0);
-    SendDlgItemMessage(Dlg, IDC_MBOXICON, CB_ADDSTRING, 0, (LPARAM)LoadStr(IDS_MBEXCLAMATION));
+    // Localized resource bytes are UTF-8; the control receives UTF-16.
+    SendUtf8DialogControlString(Dlg, IDC_MBOXICON, CB_ADDSTRING, 0, LoadStr(IDS_MBEXCLAMATION));
     SendDlgItemMessage(Dlg, IDC_MBOXICON, CB_SETITEMDATA, i++, MB_ICONEXCLAMATION);
-    SendDlgItemMessage(Dlg, IDC_MBOXICON, CB_ADDSTRING, 0, (LPARAM)LoadStr(IDS_MBINFORMATION));
+    // Localized resource bytes are UTF-8; the control receives UTF-16.
+    SendUtf8DialogControlString(Dlg, IDC_MBOXICON, CB_ADDSTRING, 0, LoadStr(IDS_MBINFORMATION));
     SendDlgItemMessage(Dlg, IDC_MBOXICON, CB_SETITEMDATA, i++, MB_ICONINFORMATION);
-    SendDlgItemMessage(Dlg, IDC_MBOXICON, CB_ADDSTRING, 0, (LPARAM)LoadStr(IDS_MBQUESTION));
+    // Localized resource bytes are UTF-8; the control receives UTF-16.
+    SendUtf8DialogControlString(Dlg, IDC_MBOXICON, CB_ADDSTRING, 0, LoadStr(IDS_MBQUESTION));
     SendDlgItemMessage(Dlg, IDC_MBOXICON, CB_SETITEMDATA, i++, MB_ICONQUESTION);
-    SendDlgItemMessage(Dlg, IDC_MBOXICON, CB_ADDSTRING, 0, (LPARAM)LoadStr(IDS_LONGMESSAGE));
+    // Localized resource bytes are UTF-8; the control receives UTF-16.
+    SendUtf8DialogControlString(Dlg, IDC_MBOXICON, CB_ADDSTRING, 0, LoadStr(IDS_LONGMESSAGE));
     SendDlgItemMessage(Dlg, IDC_MBOXICON, CB_SETITEMDATA, i++, SE_LONGMESSAGE);
 
     ResetControls(SfxSettings->MBoxStyle, SfxSettings->MBoxTitle, SfxSettings->MBoxText,

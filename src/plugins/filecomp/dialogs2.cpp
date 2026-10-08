@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "precomp.h"
+#include "../../common/utf8_control_text.h"
 
 CColorsCfgButton CommonColors[2] =
     {
@@ -125,7 +126,8 @@ void CPropPageColors::ItemChanged(int i)
             continue;
         }
         ShowWindow(GetDlgItem(HWindow, DescriptionIDs[j]), SW_SHOW);
-        SetWindowText(GetDlgItem(HWindow, DescriptionIDs[j]), LoadStr(ColorItems[i].Buttons[j].TextID));
+        // Localized UTF-8 text must reach the native control as UTF-16.
+        SendUtf8ControlString(GetDlgItem(HWindow, DescriptionIDs[j]), WM_SETTEXT, 0, LoadStr(ColorItems[i].Buttons[j].TextID));
 
         if (ColorItems[i].Buttons[j].ColorLineNumBK == -1)
             ShowWindow(GetDlgItem(HWindow, LineNumIDs[j]), SW_HIDE);
@@ -287,7 +289,8 @@ CPropPageColors::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         int j;
         for (j = 0; j < CD_NUMBER_OF_ITEMS; j++)
         {
-            SendMessage(combo, CB_ADDSTRING, 0, (LPARAM)LoadStr(ColorItems[j].TextID));
+            // Localized resource bytes are UTF-8; the control receives UTF-16.
+            SendUtf8ControlString(combo, CB_ADDSTRING, 0, LoadStr(ColorItems[j].TextID));
         }
         SendMessage(combo, CB_SETCURSEL, 0, 0);
         ItemChanged(0);

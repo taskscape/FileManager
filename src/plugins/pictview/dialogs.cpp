@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "precomp.h"
+#include "../../common/utf8_control_text.h"
 
 // Use StrSafe for bounded formatting of resource-controlled dialog text.
 #include <strsafe.h>
@@ -175,7 +176,8 @@ CImgPropDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 
         if (nFrames > 0)
         {
-            SetDlgItemText(HWindow, IDC_IMGPROP_PAGENUM_LBL, LoadStr(IDS_FRAMES));
+            // Localized UTF-8 text must reach the native control as UTF-16.
+            SendUtf8DialogControlString(HWindow, IDC_IMGPROP_PAGENUM_LBL, WM_SETTEXT, 0, LoadStr(IDS_FRAMES));
             _stprintf(buffer, _T("%d"), nFrames);
         }
         else
@@ -1328,11 +1330,12 @@ void CExifDialog::InitListView()
     lvc.pszText = buff;
     lvc.iSubItem = 0;
     _tcscpy(buff, LoadStr(IDS_EXIF_TAG));
-    ListView_InsertColumn(HListView, 0, &lvc);
+    // EXIF column captions come from UTF-8 resources, even in this ANSI plug-in dialog.
+    InsertListViewColumnUtf8(HListView, 0, &lvc);
 
     lvc.iSubItem = 1;
     _tcscpy(buff, LoadStr(IDS_EXIF_VALUE));
-    ListView_InsertColumn(HListView, 1, &lvc);
+    InsertListViewColumnUtf8(HListView, 1, &lvc);
 }
 
 int CExifDialog::GetHighlightIndex(DWORD tag)

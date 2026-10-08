@@ -3,6 +3,7 @@
 // CommentsTranslationProject: TRANSLATED
 
 #include "precomp.h"
+#include "common/utf8_control_text.h"
 
 #include <strsafe.h>
 
@@ -2425,10 +2426,14 @@ void CSetSpeedLimDialog::Transfer(CTransferInfo& ti)
 
         HWND speedLimitUnits = GetDlgItem(HWindow, IDC_SETSPLIMUNITS);
         SendMessage(speedLimitUnits, CB_RESETCONTENT, 0, 0);
-        SendMessage(speedLimitUnits, CB_ADDSTRING, 0, (LPARAM)LoadStr(IDS_SPEED_B_per_s));
-        SendMessage(speedLimitUnits, CB_ADDSTRING, 0, (LPARAM)LoadStr(IDS_SPEED_KB_per_s));
-        SendMessage(speedLimitUnits, CB_ADDSTRING, 0, (LPARAM)LoadStr(IDS_SPEED_MB_per_s));
-        SendMessage(speedLimitUnits, CB_ADDSTRING, 0, (LPARAM)LoadStr(IDS_SPEED_GB_per_s));
+        // Localized resource bytes are UTF-8; the control receives UTF-16.
+        SendUtf8ControlString(speedLimitUnits, CB_ADDSTRING, 0, LoadStr(IDS_SPEED_B_per_s));
+        // Localized resource bytes are UTF-8; the control receives UTF-16.
+        SendUtf8ControlString(speedLimitUnits, CB_ADDSTRING, 0, LoadStr(IDS_SPEED_KB_per_s));
+        // Localized resource bytes are UTF-8; the control receives UTF-16.
+        SendUtf8ControlString(speedLimitUnits, CB_ADDSTRING, 0, LoadStr(IDS_SPEED_MB_per_s));
+        // Localized resource bytes are UTF-8; the control receives UTF-16.
+        SendUtf8ControlString(speedLimitUnits, CB_ADDSTRING, 0, LoadStr(IDS_SPEED_GB_per_s));
         SendMessage(speedLimitUnits, CB_SETCURSEL, speedLimUnits, 0);
 
         HWND speedLimit = GetDlgItem(HWindow, IDE_SETSPLIMNUMBER);

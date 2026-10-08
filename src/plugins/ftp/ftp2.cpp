@@ -3,6 +3,7 @@
 // CommentsTranslationProject: TRANSLATED
 
 #include "precomp.h"
+#include "../../common/utf8_control_text.h"
 #include <strsafe.h> // counted bounded copies (StringCchCopyNA)
 
 // ****************************************************************************
@@ -2674,9 +2675,11 @@ void CFTPProxyServerList::InitCombo(HWND combo, int focusProxyUID, BOOL addDefau
 {
     HANDLES(EnterCriticalSection(&ProxyServerListCS));
     SendMessage(combo, CB_RESETCONTENT, 0, 0);
-    SendMessage(combo, CB_ADDSTRING, 0, (LPARAM)LoadStr(IDS_PROXYSERVER_NOTUSED));
+    // Localized resource bytes are UTF-8; the control receives UTF-16.
+    SendUtf8ControlString(combo, CB_ADDSTRING, 0, LoadStr(IDS_PROXYSERVER_NOTUSED));
     if (addDefault)
-        SendMessage(combo, CB_ADDSTRING, 0, (LPARAM)LoadStr(IDS_PROXYSERVER_DEFAULT));
+        // Localized resource bytes are UTF-8; the control receives UTF-16.
+        SendUtf8ControlString(combo, CB_ADDSTRING, 0, LoadStr(IDS_PROXYSERVER_DEFAULT));
     int focusIndex = addDefault ? 1 : 0;
     if (focusProxyUID == -1 && addDefault)
         focusIndex = 0;

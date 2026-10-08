@@ -3,6 +3,7 @@
 // CommentsTranslationProject: TRANSLATED
 
 #include "precomp.h"
+#include "../../common/utf8_control_text.h"
 #include <strsafe.h> // counted bounded copies (StringCchCopyNA)
 
 //
@@ -750,7 +751,8 @@ void COperationDlg::InitColumns()
     {
         lvc.pszText = LoadStr(header[i]);
         lvc.iSubItem = i;
-        ListView_InsertColumn(ConsListView, i, &lvc);
+        // FTP operation headings are UTF-8 resources, even in the legacy dialog.
+        InsertListViewColumnUtf8(ConsListView, i, &lvc);
     }
     int header2[2] = {IDS_OPERDLGOPERS_DESCR, IDS_OPERDLGOPERS_STATUS};
     int j;
@@ -758,7 +760,7 @@ void COperationDlg::InitColumns()
     {
         lvc.pszText = LoadStr(header2[j]);
         lvc.iSubItem = j;
-        ListView_InsertColumn(ItemsListView, j, &lvc);
+        InsertListViewColumnUtf8(ItemsListView, j, &lvc);
     }
     if (ConsImageList != NULL)
         ListView_SetImageList(ConsListView, ConsImageList, LVSIL_SMALL);
@@ -1013,7 +1015,11 @@ void COperationDlg::EnablePauseButton()
     if (PauseButtonIsResume != showResume)
     {
         PauseButtonIsResume = showResume;
-        SetWindowText(button, PauseButtonIsResume ? LoadStr(IDS_OPERDLGRESUMEBUTTON) : PauseButtonPauseText);
+        // The resume resource is UTF-8; the saved dialog caption remains in its original ANSI encoding.
+        if (PauseButtonIsResume)
+            SendUtf8ControlString(button, WM_SETTEXT, 0, LoadStr(IDS_OPERDLGRESUMEBUTTON));
+        else
+            SetWindowText(button, PauseButtonPauseText);
     }
     PauseButtonIsEnabled = someIsWorking;
     if ((IsWindowEnabled(button) != 0) != someIsWorking)
@@ -1049,7 +1055,11 @@ void COperationDlg::EnablePauseConButton(int index)
     if (ConPauseButtonIsResume != showResume)
     {
         ConPauseButtonIsResume = showResume;
-        SetWindowText(button, ConPauseButtonIsResume ? LoadStr(IDS_OPERDLGRESUMECONBUTTON) : ConPauseButtonPauseText);
+        // Preserve the resource and captured dialog caption in their respective encodings.
+        if (ConPauseButtonIsResume)
+            SendUtf8ControlString(button, WM_SETTEXT, 0, LoadStr(IDS_OPERDLGRESUMECONBUTTON));
+        else
+            SetWindowText(button, ConPauseButtonPauseText);
     }
     if ((IsWindowEnabled(button) != 0) != isWorking)
     {

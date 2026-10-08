@@ -3,6 +3,7 @@
 // CommentsTranslationProject: TRANSLATED
 
 #include "precomp.h"
+#include "common/utf8_control_text.h"
 
 #include <strsafe.h>
 
@@ -1358,18 +1359,21 @@ CConfigPageView::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         lvc.cx = 1; // dummy
         lvc.fmt = LVCFMT_LEFT;
         lvc.iSubItem = 0;
-        ListView_InsertColumn(HListView, 0, &lvc);
+        // The localized column text is UTF-8; insert its UTF-16 form.
+        InsertListViewColumnUtf8(HListView, 0, &lvc);
 
         lvc.mask |= LVCF_SUBITEM;
         lvc.pszText = LoadStr(IDS_VIEW_MODE);
         lvc.iSubItem = 1;
-        ListView_InsertColumn(HListView, 1, &lvc);
+        // The localized column text is UTF-8; insert its UTF-16 form.
+        InsertListViewColumnUtf8(HListView, 1, &lvc);
         ListView_SetColumnWidth(HListView, 1, LVSCW_AUTOSIZE_USEHEADER);
 
         lvc.mask |= LVCF_SUBITEM;
         lvc.pszText = LoadStr(IDS_HOTPATH_HOTKEY);
         lvc.iSubItem = 2;
-        ListView_InsertColumn(HListView, 2, &lvc);
+        // The localized column text is UTF-8; insert its UTF-16 form.
+        InsertListViewColumnUtf8(HListView, 2, &lvc);
         ListView_SetColumnWidth(HListView, 2, LVSCW_AUTOSIZE_USEHEADER);
 
         // insert the Name column into the list view with columns
@@ -1378,7 +1382,8 @@ CConfigPageView::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         lvc.pszText = LoadStr(IDS_COLUMN_NAME);
         lvc.fmt = LVCFMT_LEFT;
         lvc.iSubItem = 0;
-        ListView_InsertColumn(HListView2, 0, &lvc);
+        // The localized column text is UTF-8; insert its UTF-16 form.
+        InsertListViewColumnUtf8(HListView2, 0, &lvc);
 
         // dialog elements should stretch with the dialog size, set split controls
         ElasticVerticalLayout(2, IDC_VIEW_LIST, IDC_VIEW_LIST2);
@@ -3030,13 +3035,15 @@ CCfgPageHotPath::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         lvc.pszText = LoadStr(IDS_HOTPATH_NAME);
         lvc.cx = 1;
         lvc.fmt = LVCFMT_LEFT;
-        ListView_InsertColumn(HListView, 0, &lvc);
+        // The localized column text is UTF-8; insert its UTF-16 form.
+        InsertListViewColumnUtf8(HListView, 0, &lvc);
 
         lvc.mask |= LVCF_SUBITEM;
         lvc.pszText = LoadStr(IDS_HOTPATH_HOTKEY);
         lvc.cx = 1;
         lvc.iSubItem = 1;
-        ListView_InsertColumn(HListView, 1, &lvc);
+        // The localized column text is UTF-8; insert its UTF-16 form.
+        InsertListViewColumnUtf8(HListView, 1, &lvc);
 
         ChangeToArrowButton(HWindow, IDC_HOTPATH_BROWSE);
 
@@ -3394,10 +3401,12 @@ void CCfgPageColors::Transfer(CTransferInfo& ti)
 
         int schemes[5] = {IDS_COLORSCHEME_SALAMANDER, IDS_COLORSCHEME_EXPLORER, IDS_COLORSCHEME_NORTON, IDS_COLORSCHEME_NAVIGATOR, IDS_COLORSCHEME_CUSTOM};
         for (i = 0; i < 5; i++)
-            SendMessage(HScheme, CB_ADDSTRING, 0, (LPARAM)LoadStr(schemes[i]));
+            // Localized resource bytes are UTF-8; the control receives UTF-16.
+            SendUtf8ControlString(HScheme, CB_ADDSTRING, 0, LoadStr(schemes[i]));
 
         for (i = 0; i < PAGE7DATA_COUNT; i++)
-            SendMessage(HItem, CB_ADDSTRING, 0, (LPARAM)LoadStr(Page7Data[i].ItemLabel));
+            // Localized resource bytes are UTF-8; the control receives UTF-16.
+            SendUtf8ControlString(HItem, CB_ADDSTRING, 0, LoadStr(Page7Data[i].ItemLabel));
 
         int labels[CFG_COLORS_BUTTONS] = {IDS_COLORLABEL_NORMAL, IDS_COLORLABEL_FOCUSED, IDS_COLORLABEL_SELECTED, IDS_COLORLABEL_FOCUSEDSELECTED, IDS_COLORLABEL_HIGHLIGHTED};
         for (i = 0; i < CFG_COLORS_BUTTONS; i++)

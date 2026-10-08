@@ -3,6 +3,7 @@
 // CommentsTranslationProject: TRANSLATED
 
 #include "precomp.h"
+#include "../../common/utf8_control_text.h"
 #include <strsafe.h> // counted bounded copies (StringCchCopyNA)
 
 //
@@ -704,8 +705,10 @@ BOOL CFTPOperation::InitOperDlg(COperationDlg* dlg)
         if (Type == fotCopyDownload || Type == fotMoveDownload ||
             Type == fotCopyUpload || Type == fotMoveUpload)
         {
-            SetDlgItemText(dlg->HWindow, IDT_OPSOURCETITLE, LoadStr(IDS_OPERDLGSRCPATH));
-            SetDlgItemText(dlg->HWindow, IDT_OPTARGETTITLE, LoadStr(IDS_OPERDLGTGTPATH));
+            // Localized UTF-8 text must reach the native control as UTF-16.
+            SendUtf8DialogControlString(dlg->HWindow, IDT_OPSOURCETITLE, WM_SETTEXT, 0, LoadStr(IDS_OPERDLGSRCPATH));
+            // Localized UTF-8 text must reach the native control as UTF-16.
+            SendUtf8DialogControlString(dlg->HWindow, IDT_OPTARGETTITLE, WM_SETTEXT, 0, LoadStr(IDS_OPERDLGTGTPATH));
             dlg->Target->SetPathSeparator(TgtPathSeparator);
             if (!dlg->Source->SetText(SourcePath) ||
                 !dlg->Target->SetText(TargetPath))
@@ -713,7 +716,8 @@ BOOL CFTPOperation::InitOperDlg(COperationDlg* dlg)
         }
         else // move + ch-attrs
         {
-            SetDlgItemText(dlg->HWindow, IDT_OPSOURCETITLE, LoadStr(IDS_OPERDLGPATH));
+            // Localized UTF-8 text must reach the native control as UTF-16.
+            SendUtf8DialogControlString(dlg->HWindow, IDT_OPSOURCETITLE, WM_SETTEXT, 0, LoadStr(IDS_OPERDLGPATH));
             if (!dlg->Source->SetText(SourcePath))
                 ok = FALSE;
         }

@@ -3,6 +3,7 @@
 // CommentsTranslationProject: TRANSLATED
 
 #include "precomp.h"
+#include "common/utf8_control_text.h"
 
 #include "cfgdlg.h"
 #include "salamand.h"
@@ -1500,7 +1501,8 @@ BOOL CPackACListView::InitColumns()
         // column number
         lvc.iSubItem = i;
         // and create the column
-        if (ListView_InsertColumn(HWindow, i, &lvc) == -1)
+        // The localized column text is UTF-8; insert its UTF-16 form.
+        if (InsertListViewColumnUtf8(HWindow, i, &lvc) == -1)
             return FALSE;
     }
 

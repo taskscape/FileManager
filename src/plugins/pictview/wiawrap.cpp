@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "precomp.h"
+#include "../../common/utf8_control_text.h"
 
 #ifdef ENABLE_WIA
 
@@ -723,7 +724,8 @@ CProgressDlg::DialogProc(
             // the user will see the cancel command is received and
             // is being processed
 
-            SetDlgItemText(hDlg, IDCANCEL, LoadStr(IDS_WIA_WAIT));
+            // Localized UTF-8 text must reach the native control as UTF-16.
+            SendUtf8DialogControlString(hDlg, IDCANCEL, WM_SETTEXT, 0, LoadStr(IDS_WIA_WAIT));
 
             return TRUE;
         }

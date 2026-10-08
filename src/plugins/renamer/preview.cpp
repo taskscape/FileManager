@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "precomp.h"
+#include "../../common/utf8_control_text.h"
 
 #include <strsafe.h>
 
@@ -51,7 +52,8 @@ BOOL CPreviewWindow::InitColumns()
             lvc.fmt = LVCFMT_RIGHT;
         if (i == 5)
             lvc.fmt = LVCFMT_LEFT;
-        if (ListView_InsertColumn(HWindow, i, &lvc) == -1)
+        // The localized column text is UTF-8; insert its UTF-16 form.
+        if (InsertListViewColumnUtf8(HWindow, i, &lvc) == -1)
             return FALSE;
     }
 
@@ -661,7 +663,8 @@ void CPreviewWindow::SetItemCount(int count, DWORD flags, int state)
         else
         {
             if (State != state)
-                SetWindowText(Static, LoadStr(message));
+                // Localized UTF-8 text must reach the native control as UTF-16.
+                SendUtf8ControlString(Static, WM_SETTEXT, 0, LoadStr(message));
         }
     }
     else

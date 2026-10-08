@@ -3,6 +3,7 @@
 // CommentsTranslationProject: TRANSLATED
 
 #include "precomp.h"
+#include "common/utf8_control_text.h"
 
 #include "cfgdlg.h"
 #include "edtlbwnd.h"
@@ -59,8 +60,8 @@ void CCfgPagePackers::Transfer(CTransferInfo& ti)
     CALL_STACK_MESSAGE1("CCfgPagePackers::Transfer()");
     if (ti.Type == ttDataToWindow)
     {
-        SendDlgItemMessage(HWindow, IDC_P1_TYPE, CB_ADDSTRING, 0,
-                           (LPARAM)LoadStr(IDS_PUT_EXTERNAL));
+        // Localized resource bytes are UTF-8; the control receives UTF-16.
+        SendUtf8DialogControlString(HWindow, IDC_P1_TYPE, CB_ADDSTRING, 0, LoadStr(IDS_PUT_EXTERNAL));
         int count = 0;
         int index;
         while ((index = Plugins.GetCustomPackerIndex(count++)) != -1) // while "custom pack" plug-ins exist
@@ -483,8 +484,8 @@ void CCfgPageUnpackers::Transfer(CTransferInfo& ti)
     CALL_STACK_MESSAGE1("CCfgPageUnpackers::Transfer()");
     if (ti.Type == ttDataToWindow)
     {
-        SendDlgItemMessage(HWindow, IDC_P2_TYPE, CB_ADDSTRING, 0,
-                           (LPARAM)LoadStr(IDS_PUT_EXTERNAL));
+        // Localized resource bytes are UTF-8; the control receives UTF-16.
+        SendUtf8DialogControlString(HWindow, IDC_P2_TYPE, CB_ADDSTRING, 0, LoadStr(IDS_PUT_EXTERNAL));
         int count = 0;
         int index;
         while ((index = Plugins.GetCustomUnpackerIndex(count++)) != -1) // while "custom unpack" plug-ins exist

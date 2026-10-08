@@ -3,6 +3,7 @@
 // CommentsTranslationProject: TRANSLATED
 
 #include "precomp.h"
+#include "../../common/utf8_control_text.h"
 #include <strsafe.h> // counted bounded copies (StringCchCopyNA)
 
 //
@@ -306,7 +307,8 @@ void CFTPServerList::AddNamesToListbox(HWND list)
     for (i = 0; i < Count; i++)
     {
         CFTPServer* s = At(i);
-        SendMessage(list, LB_ADDSTRING, 0, (LPARAM)(s->ItemName == NULL ? "" : s->ItemName));
+        // Existing ANSI bookmark names and newer UTF-8 names both belong in the Unicode list.
+        SendUtf8OrAcpControlString(list, LB_ADDSTRING, 0, s->ItemName == NULL ? "" : s->ItemName);
     }
 }
 

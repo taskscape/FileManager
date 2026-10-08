@@ -130,9 +130,9 @@ internal static class NativeCommands
     [DllImport("user32.dll", CharSet = CharSet.Unicode, EntryPoint = "SendMessageW")]
     private static extern nint SendMessageText(nint hWnd, uint msg, nint wParam, string lParam);
 
-    // FTP's legacy list box expects ANSI text, unlike the Unicode operation-path controls above.
-    [DllImport("user32.dll", CharSet = CharSet.Ansi, EntryPoint = "SendMessageA")]
-    private static extern nint SendMessageAnsiText(nint hWnd, uint msg, nint wParam, string lParam);
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool IsWindowUnicode(nint hWnd);
 
     [DllImport("user32.dll", CharSet = CharSet.Ansi, EntryPoint = "SendMessageA")]
     private static extern nint SendMessageAnsiBuffer(nint hWnd, uint msg, nint wParam, StringBuilder lParam);
@@ -498,12 +498,15 @@ internal static class NativeCommands
 
     internal static bool FtpBookmarksContains(nint dialogHandle, string bookmarkName)
     {
-        // The FTP list box is ANSI and owner-drawn, so query its native ANSI string table instead of UIA descendants.
+        // The FTP bookmark list is Unicode so its native string table retains Polish text on every system code page.
         const int ftpBookmarksList = 561; // IDL_BOOKMARKS in src/plugins/ftp/lang/lang.rh.
         var listHandle = FindDialogControl(dialogHandle, ftpBookmarksList);
         if (listHandle == 0)
             throw new InvalidOperationException("FTP bookmarks dialog did not expose its native bookmark list.");
-        return SendMessageAnsiText(listHandle, LbFindStringExact, -1, bookmarkName) != -1;
+        // A code-page-backed ANSI list could appear correct on Polish Windows but lose characters elsewhere.
+        if (!IsWindowUnicode(listHandle))
+            throw new InvalidOperationException("FTP bookmarks list was not created as a Unicode control.");
+        return SendMessageText(listHandle, LbFindStringExact, -1, bookmarkName) != -1;
     }
 
     internal static bool? TryGetToolbarCommandEnabled(nint windowHandle, int command)

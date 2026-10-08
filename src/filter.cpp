@@ -3,6 +3,7 @@
 // CommentsTranslationProject: TRANSLATED
 
 #include "precomp.h"
+#include "common/utf8_control_text.h"
 
 #include <strsafe.h>
 
@@ -957,7 +958,8 @@ void CFilterCriteriaDialog::FillUnits(int editID, int comboID, int* units, BOOL 
     {
         int sizes[] = {IDS_SIZE_KB, IDS_SIZE_MB, IDS_SIZE_GB, IDS_SIZE_TB, IDS_SIZE_PB, IDS_SIZE_EB, 0};
         for (i = 0; sizes[i] != 0; i++)
-            SendMessage(hCombo, CB_ADDSTRING, 0, (LPARAM)LoadStr(sizes[i]));
+            // Localized resource bytes are UTF-8; the control receives UTF-16.
+            SendUtf8ControlString(hCombo, CB_ADDSTRING, 0, LoadStr(sizes[i]));
     }
 
     SendMessage(hCombo, CB_SETCURSEL, curSel, 0);

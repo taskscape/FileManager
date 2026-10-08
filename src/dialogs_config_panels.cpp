@@ -3,6 +3,7 @@
 // CommentsTranslationProject: TRANSLATED
 
 #include "precomp.h"
+#include "common/utf8_control_text.h"
 
 // Use StrSafe for the bounded confirmation message below.
 #include <strsafe.h>
@@ -432,7 +433,8 @@ void CSharesDialog::InitColumns()
     {
         lvc.pszText = LoadStr(header[i]);
         lvc.iSubItem = i;
-        ListView_InsertColumn(HListView, i, &lvc);
+        // The localized column text is UTF-8; insert its UTF-16 form.
+        InsertListViewColumnUtf8(HListView, i, &lvc);
     }
     ListView_SetColumnWidth(HListView, 0, LVSCW_AUTOSIZE_USEHEADER);
     int width = ListView_GetColumnWidth(HListView, 0);
@@ -932,7 +934,8 @@ void CDisconnectDialog::InitColumns()
     {
         lvc.pszText = LoadStr(header[i]);
         lvc.iSubItem = i;
-        ListView_InsertColumn(HListView, i, &lvc);
+        // The localized column text is UTF-8; insert its UTF-16 form.
+        InsertListViewColumnUtf8(HListView, i, &lvc);
     }
     ListView_SetColumnWidth(HListView, 0, LVSCW_AUTOSIZE_USEHEADER);
     int width = ListView_GetColumnWidth(HListView, 0);
@@ -2620,12 +2623,14 @@ CCfgPageIconOvrls::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         lvc.mask = LVCF_TEXT | LVCF_FMT;
         lvc.pszText = LoadStr(IDS_ICONOVRLS_NAME);
         lvc.fmt = LVCFMT_LEFT;
-        ListView_InsertColumn(HListView, 0, &lvc);
+        // The localized column text is UTF-8; insert its UTF-16 form.
+        InsertListViewColumnUtf8(HListView, 0, &lvc);
 
         lvc.mask |= LVCF_SUBITEM;
         lvc.pszText = LoadStr(IDS_ICONOVRLS_DESCR);
         lvc.iSubItem = 1;
-        ListView_InsertColumn(HListView, 1, &lvc);
+        // The localized column text is UTF-8; insert its UTF-16 form.
+        InsertListViewColumnUtf8(HListView, 1, &lvc);
 
         // dialog elements should stretch depending on its size, set split controls
         ElasticVerticalLayout(1, IDC_ICONOVRLS_LIST);

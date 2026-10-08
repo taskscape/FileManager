@@ -75,9 +75,9 @@ void BeginMainWindowClosingOverlay(HWND hMainWindow)
     if (MainWindowClosingOverlay != NULL)
     {
         MainWindowClosingOverlay->SetCaption(LoadStr(IDS_CLOSINGAPPLICATIONCAPTION));
-        // the window is sized to the short "Closing application..." text, but SetText() later swaps in
-        // much longer plug-in status lines without resizing; 3x width keeps those lines fully visible
-        MainWindowClosingOverlay->SetWidthMultiplier(3);
+        // Keep the teardown overlay compact while reserving a fixed 150% label for longer progress text.
+        MainWindowClosingOverlay->SetWidthMultiplier(2);
+        MainWindowClosingOverlay->SetTextWidthPercent(150);
         if (MainWindowClosingOverlay->Create() == NULL)
         {
             delete MainWindowClosingOverlay;

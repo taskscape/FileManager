@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "precomp.h"
+#include "../../common/utf8_control_text.h"
 
 WNDPROC OrigTextControlProc;
 
@@ -132,7 +133,8 @@ BOOL CNextVolumeDialog::OnInit(WPARAM wParam, LPARAM lParam)
     if (Message)
     {
         SendDlgItemMessage(Dlg, IDS_NEXTDISK, WM_SETTEXT, 0, (LPARAM)Message);
-        SetWindowText(Dlg, LoadStr(IDS_SELECTFIRSTTITLE));
+        // Localized UTF-8 text must reach the native control as UTF-16.
+        SendUtf8ControlString(Dlg, WM_SETTEXT, 0, LoadStr(IDS_SELECTFIRSTTITLE));
     }
 
     CenterDlgToParent();

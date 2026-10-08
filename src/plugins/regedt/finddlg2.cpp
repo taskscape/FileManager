@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "precomp.h"
+#include "../../common/utf8_control_text.h"
 
 #include <strsafe.h>
 
@@ -322,7 +323,8 @@ void CFindDialog::StartSearch()
     List->DestroyMembers();
     ListView_SetItemCountEx(List->HWindow, 0, 0);
     UpdateWindow(List->HWindow);
-    SetWindowText(GetDlgItem(HWindow, IDC_FOUND_FILES), LoadStr(IDS_FOUNDITEMS1));
+    // Localized UTF-8 text must reach the native control as UTF-16.
+    SendUtf8ControlString(GetDlgItem(HWindow, IDC_FOUND_FILES), WM_SETTEXT, 0, LoadStr(IDS_FOUNDITEMS1));
     FoundVisibleCount = 0;
     // The old strict comparison allowed the first refresh after the next millisecond tick.
     NextUpdate = CMonotonicClock::DeadlineAfter(1);
@@ -382,7 +384,8 @@ void CFindDialog::StartSearch()
     {
         SearchInProgress = TRUE;
         Stopped = FALSE;
-        SetWindowText(GetDlgItem(HWindow, IDOK), LoadStr(IDS_STOP));
+        // Localized UTF-8 text must reach the native control as UTF-16.
+        SendUtf8ControlString(GetDlgItem(HWindow, IDOK), WM_SETTEXT, 0, LoadStr(IDS_STOP));
         SetTimer(HWindow, IDT_REFRESH_LISTVIEW, 500, NULL);
         //UpdateStatusText();
         EnableControls(FALSE);
@@ -392,7 +395,8 @@ void CFindDialog::StartSearch()
 
     /*
   SearchInProgress = FALSE;
-  SetWindowText( GetDlgItem(HWindow, IDOK), LoadStr(IDS_START));
+  // Localized UTF-8 text must reach the native control as UTF-16.
+  SendUtf8ControlString(GetDlgItem(HWindow, IDOK), WM_SETTEXT, 0, LoadStr(IDS_START));
   UpdateListViewItems();
   //UpdateStatusText();
   //EnableControls(TRUE);
@@ -1083,7 +1087,8 @@ CFindDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
     {
         // the search has finished
         SearchInProgress = FALSE;
-        SetWindowText(GetDlgItem(HWindow, IDOK), LoadStr(IDS_START));
+        // Localized UTF-8 text must reach the native control as UTF-16.
+        SendUtf8ControlString(GetDlgItem(HWindow, IDOK), WM_SETTEXT, 0, LoadStr(IDS_START));
         CloseHandle(CancelEvent); // we will not need it anymore
         UpdateListViewItems();
         //UpdateStatusText();

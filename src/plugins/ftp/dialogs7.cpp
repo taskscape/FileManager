@@ -3,6 +3,7 @@
 // CommentsTranslationProject: TRANSLATED
 
 #include "precomp.h"
+#include "../../common/utf8_control_text.h"
 #include <strsafe.h> // counted bounded copies (StringCchCopyNA)
 
 // ****************************************************************************
@@ -36,7 +37,8 @@ void HandleOperationsCombo(int* value, CTransferInfo& ti, int resID, int arrValu
             int i = 0;
             while (arrValuesResID[i] != -1)
             {
-                SendMessage(combo, CB_ADDSTRING, 0, (LPARAM)LoadStr(arrValuesResID[i]));
+                // Localized resource bytes are UTF-8; the control receives UTF-16.
+                SendUtf8ControlString(combo, CB_ADDSTRING, 0, LoadStr(arrValuesResID[i]));
                 i++;
             }
             if (*value < 0 || *value >= i)
@@ -450,7 +452,8 @@ CSolveItemErrorDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
             break;
         }
         if (titleID != -1)
-            SetWindowText(HWindow, LoadStr(titleID));
+            // Localized UTF-8 text must reach the native control as UTF-16.
+            SendUtf8ControlString(HWindow, WM_SETTEXT, 0, LoadStr(titleID));
         SalamanderGUI->AttachButton(HWindow, IDOK, BTF_DROPDOWN);
 
         if (DlgType == sidtTgtFileAlreadyExists ||
@@ -924,7 +927,8 @@ CSolveLowMemoryErr::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
     case WM_INITDIALOG:
     {
         if (TitleID != -1)
-            SetWindowText(HWindow, LoadStr(TitleID));
+            // Localized UTF-8 text must reach the native control as UTF-16.
+            SendUtf8ControlString(HWindow, WM_SETTEXT, 0, LoadStr(TitleID));
         break;
     }
 
@@ -1502,7 +1506,8 @@ CSolveItemErrorSimpleDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
             TRACE_E("Unexpected situation in CSolveItemErrorSimpleDlg::DialogProc(): unknown DlgType!");
             break;
         }
-        SetWindowText(HWindow, LoadStr(titleID));
+        // Localized UTF-8 text must reach the native control as UTF-16.
+        SendUtf8ControlString(HWindow, WM_SETTEXT, 0, LoadStr(titleID));
         SalamanderGUI->AttachButton(HWindow, IDOK, BTF_DROPDOWN);
         break;
     }
@@ -1611,7 +1616,8 @@ CSolveServerCmdErr::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
     {
     case WM_INITDIALOG:
     {
-        SetWindowText(HWindow, LoadStr(TitleID));
+        // Localized UTF-8 text must reach the native control as UTF-16.
+        SendUtf8ControlString(HWindow, WM_SETTEXT, 0, LoadStr(TitleID));
         if (DlgType != siscdtSimple)
             SalamanderGUI->AttachButton(HWindow, IDOK, BTF_DROPDOWN);
         break;
@@ -1731,7 +1737,8 @@ CSolveServerCmdErr2::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
     {
     case WM_INITDIALOG:
     {
-        SetWindowText(HWindow, LoadStr(TitleID));
+        // Localized UTF-8 text must reach the native control as UTF-16.
+        SendUtf8ControlString(HWindow, WM_SETTEXT, 0, LoadStr(TitleID));
         if (DlgType != siscdt2Simple)
             SalamanderGUI->AttachButton(HWindow, IDOK, BTF_DROPDOWN);
         break;

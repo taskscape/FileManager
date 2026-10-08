@@ -3,6 +3,7 @@
 // CommentsTranslationProject: TRANSLATED
 
 #include "precomp.h"
+#include "../../common/utf8_control_text.h"
 #include <strsafe.h> // counted bounded copies (StringCchCopyNA)
 
 //
@@ -811,7 +812,8 @@ void CEditServerTypeDlg::InitColumns()
     {
         lvc.pszText = LoadStr(header[i]);
         lvc.iSubItem = i;
-        ListView_InsertColumn(HListView, i, &lvc);
+        // Column resources are UTF-8 and the list view stores UTF-16 headers.
+        InsertListViewColumnUtf8(HListView, i, &lvc);
         //    ListView_SetColumnWidth(HListView, i, LVSCW_AUTOSIZE_USEHEADER);  // set the widths later in SetColumnWidths()
     }
 }
@@ -897,7 +899,8 @@ void CEditServerTypeDlg::RefreshListView(BOOL onlySet, int selIndex)
 
         // column alignment
         char emptyBuff[] = "";
-        ListView_SetItemText(HListView, i, 5, col->Type >= stctFirstGeneral ? LoadStr(col->LeftAlignment ? IDS_SRVTYPECOL_ALIGNLEFT : IDS_SRVTYPECOL_ALIGNRIGHT) : emptyBuff);
+        // Keep localized alignment labels intact in the list view string table.
+        SetListViewItemTextUtf8(HListView, i, 5, col->Type >= stctFirstGeneral ? LoadStr(col->LeftAlignment ? IDS_SRVTYPECOL_ALIGNLEFT : IDS_SRVTYPECOL_ALIGNRIGHT) : emptyBuff);
     }
 
     int count = ListView_GetItemCount(HListView);

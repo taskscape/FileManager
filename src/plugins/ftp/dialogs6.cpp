@@ -3,6 +3,7 @@
 // CommentsTranslationProject: TRANSLATED
 
 #include "precomp.h"
+#include "../../common/utf8_control_text.h"
 
 //
 // ****************************************************************************
@@ -1304,7 +1305,8 @@ void COperationDlg::SetupCloseButton(BOOL flashTitle)
     switch (state)
     {
     case opstInProgress:
-        SetDlgItemText(HWindow, IDCANCEL, LoadStr(IDS_OPERDLGCLOSEBUTTON2));
+        // Localized UTF-8 text must reach the native control as UTF-16.
+        SendUtf8DialogControlString(HWindow, IDCANCEL, WM_SETTEXT, 0, LoadStr(IDS_OPERDLGCLOSEBUTTON2));
         break;
 
     case opstFinishedWithSkips:
@@ -1340,7 +1342,8 @@ void COperationDlg::SetupCloseButton(BOOL flashTitle)
         // break is intentionally omitted here;
     case opstFinishedWithErrors:
     {
-        SetDlgItemText(HWindow, IDCANCEL, LoadStr(IDS_OPERDLGCLOSEBUTTON1));
+        // Localized UTF-8 text must reach the native control as UTF-16.
+        SendUtf8DialogControlString(HWindow, IDCANCEL, WM_SETTEXT, 0, LoadStr(IDS_OPERDLGCLOSEBUTTON1));
         if (flashTitle)
         {
             HWND wnd = GetForegroundWindow();

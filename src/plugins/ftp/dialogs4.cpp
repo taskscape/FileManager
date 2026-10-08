@@ -3,6 +3,7 @@
 // CommentsTranslationProject: TRANSLATED
 
 #include "precomp.h"
+#include "../../common/utf8_control_text.h"
 #include <strsafe.h> // counted bounded copies (StringCchCopyNA)
 
 //
@@ -255,8 +256,10 @@ void CEditSrvTypeColumnDlg::Transfer(CTransferInfo& ti)
         if (ti.Type == ttDataToWindow)
         {
             SendMessage(combo, CB_RESETCONTENT, 0, 0);
-            SendMessage(combo, CB_ADDSTRING, 0, (LPARAM)LoadStr(IDS_SRVTYPECOL_ALIGNLEFT));  // add the string "left"
-            SendMessage(combo, CB_ADDSTRING, 0, (LPARAM)LoadStr(IDS_SRVTYPECOL_ALIGNRIGHT)); // add the string "right"
+            // Localized resource bytes are UTF-8; the control receives UTF-16.
+            SendUtf8ControlString(combo, CB_ADDSTRING, 0, LoadStr(IDS_SRVTYPECOL_ALIGNLEFT));  // add the string "left"
+            // Localized resource bytes are UTF-8; the control receives UTF-16.
+            SendUtf8ControlString(combo, CB_ADDSTRING, 0, LoadStr(IDS_SRVTYPECOL_ALIGNRIGHT)); // add the string "right"
             SendMessage(combo, CB_SETCURSEL, ColumnsData->At(*EditedColumn)->Type >= stctFirstGeneral ? (ColumnsData->At(*EditedColumn)->LeftAlignment ? 0 : 1) : -1, 0);
         }
         else
@@ -363,7 +366,8 @@ CEditSrvTypeColumnDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
     case WM_INITDIALOG:
     {
         if (!Edit)
-            SetWindowText(HWindow, LoadStr(IDS_SRVTYPECOL_NEWTITLE));
+            // Localized UTF-8 text must reach the native control as UTF-16.
+            SendUtf8ControlString(HWindow, WM_SETTEXT, 0, LoadStr(IDS_SRVTYPECOL_NEWTITLE));
         break;
     }
 
@@ -430,7 +434,8 @@ CEditSrvTypeColumnDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                             leftAlignment = FALSE;
                             break;
                         }
-                        SetDlgItemText(HWindow, IDT_COL_FORMHELP, LoadStr(resID));
+                        // Localized UTF-8 text must reach the native control as UTF-16.
+                        SendUtf8DialogControlString(HWindow, IDT_COL_FORMHELP, WM_SETTEXT, 0, LoadStr(resID));
 
                         // enable the Empty Value edit line
                         BOOL enable = (type != stctName && type != stctExt && type != stctType);
@@ -627,7 +632,11 @@ void CSrvTypeTestParserDlg::InitColumns()
         else
             lvc.pszText = HandleNULLStr(col->NameStr);
         lvc.iSubItem = i;
-        ListView_InsertColumn(HListView, i, &lvc);
+        // Localized standard headers are UTF-8; custom profile headers keep their legacy encoding.
+        if (col->NameID != -1)
+            InsertListViewColumnUtf8(HListView, i, &lvc);
+        else
+            ListView_InsertColumn(HListView, i, &lvc);
         //    ListView_SetColumnWidth(HListView, i, LVSCW_AUTOSIZE_USEHEADER); // widths will be set later in SetColumnWidths()
     }
     if (SymbolsImageList != NULL)
