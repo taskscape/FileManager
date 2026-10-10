@@ -329,7 +329,8 @@ void CRendererWindow::SetTitle()
     }
     else
         _tcscpy(buff, LoadStr(IDS_PLUGINNAME));
-    SetWindowText(Viewer->HWindow, buff);
+    // Formatted and indirect localized strings must bypass the ANSI code page.
+    SendUtf8ControlString(Viewer->HWindow, WM_SETTEXT, 0, buff);
 }
 
 BOOL CRendererWindow::OnFileOpen(LPCTSTR defaultDirectory)

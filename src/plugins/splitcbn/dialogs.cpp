@@ -922,9 +922,11 @@ static INT_PTR CALLBACK CRCDlgProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM l
         CenterWindow(hWnd);
         char text[100];
         sprintf(text, LoadStr(IDS_CRCHEX), calcCrc);
-        SetDlgItemText(hWnd, IDC_EDIT_CRC1, text);
+        // Formatted and indirect localized strings must bypass the ANSI code page.
+        SendUtf8DialogControlString(hWnd, IDC_EDIT_CRC1, WM_SETTEXT, 0, text);
         sprintf(text, LoadStr(IDS_CRCDEC), calcCrc);
-        SetDlgItemText(hWnd, IDC_EDIT_CRC2, text);
+        // Formatted and indirect localized strings must bypass the ANSI code page.
+        SendUtf8DialogControlString(hWnd, IDC_EDIT_CRC2, WM_SETTEXT, 0, text);
 
         // WARNING! the obtained icon must be destroyed in WM_DESTROY
         HICON icon = (HICON)LoadImage(DLLInstance, MAKEINTRESOURCE(IDI_WARN), IMAGE_ICON, 16, 16, LR_DEFAULTCOLOR);
@@ -935,9 +937,11 @@ static INT_PTR CALLBACK CRCDlgProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM l
         if (bCrcFound)
         {
             sprintf(text, LoadStr(IDS_CRCHEX), originalCrc);
-            SetDlgItemText(hWnd, IDC_EDIT_CRC3, text);
+            // Formatted and indirect localized strings must bypass the ANSI code page.
+            SendUtf8DialogControlString(hWnd, IDC_EDIT_CRC3, WM_SETTEXT, 0, text);
             sprintf(text, LoadStr(IDS_CRCDEC), originalCrc);
-            SetDlgItemText(hWnd, IDC_EDIT_CRC4, text);
+            // Formatted and indirect localized strings must bypass the ANSI code page.
+            SendUtf8DialogControlString(hWnd, IDC_EDIT_CRC4, WM_SETTEXT, 0, text);
             ShowWindow(GetDlgItem(hWnd, calcCrc == originalCrc ? IDC_ICON_OK : IDC_ICON_WARN), SW_SHOW);
         }
         else

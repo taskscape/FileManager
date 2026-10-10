@@ -324,7 +324,8 @@ BOOL CPackDialog::OnInit(WPARAM wParam, LPARAM lParam)
     for (i = 0; i < 5 && Config->VolSizeCache[i][0] != 0; i++)
     {
         sprintf(buf, "%s %s", Config->VolSizeCache[i], LoadStr(Config->VolSizeUnits[i] == 0 ? IDS_SIZE_KB : IDS_SIZE_MB));
-        SendDlgItemMessage(Dlg, IDC_VOLSIZE, CB_ADDSTRING, 0, (LPARAM)buf);
+        // Formatted and indirect localized strings must bypass the ANSI code page.
+        SendUtf8DialogControlString(Dlg, IDC_VOLSIZE, CB_ADDSTRING, 0, buf);
     }
     // Localized resource bytes are UTF-8; the control receives UTF-16.
     SendUtf8DialogControlString(Dlg, IDC_VOLSIZE, CB_ADDSTRING, 0, LoadStr(IDS_AUTO));
@@ -1208,10 +1209,12 @@ BOOL CLowDiskSpaceDialog::OnInit(WPARAM wParam, LPARAM lParam)
         EnableWindow(GetDlgItem(Dlg, IDC_ALL), FALSE);
     }
     SubClassStatic(IDC_PATH, true);
-    SendDlgItemMessage(Dlg, IDC_TEXT, WM_SETTEXT, 0, (LPARAM)Text);
+    // Formatted and indirect localized strings must bypass the ANSI code page.
+    SendUtf8DialogControlString(Dlg, IDC_TEXT, WM_SETTEXT, 0, Text);
     SendDlgItemMessage(Dlg, IDC_PATH, WM_SETTEXT, 0, (LPARAM)Path);
     FormatNumber(FreeSpace, buf, _countof(buf), LoadStr(IDS_BYTES));
-    SendDlgItemMessage(Dlg, IDC_FREESPACE, WM_SETTEXT, 0, (LPARAM)buf);
+    // Formatted and indirect localized strings must bypass the ANSI code page.
+    SendUtf8DialogControlString(Dlg, IDC_FREESPACE, WM_SETTEXT, 0, buf);
     if (VolumeSize != -1)
     {
         FormatNumber(VolumeSize, buf, _countof(buf), LoadStr(IDS_BYTES));
@@ -1221,7 +1224,8 @@ BOOL CLowDiskSpaceDialog::OnInit(WPARAM wParam, LPARAM lParam)
         // The fixed disk-space dialog label is cleared if a localized value cannot fit.
         CopyZipDialogText(buf, LoadStr(IDS_AUTO));
     }
-    SendDlgItemMessage(Dlg, IDC_VOLUMESIZE, WM_SETTEXT, 0, (LPARAM)buf);
+    // Formatted and indirect localized strings must bypass the ANSI code page.
+    SendUtf8DialogControlString(Dlg, IDC_VOLUMESIZE, WM_SETTEXT, 0, buf);
     CenterDlgToParent();
     return TRUE;
 }
@@ -1537,7 +1541,8 @@ BOOL CChangeDiskDialog3::OnInit(WPARAM wParam, LPARAM lParam)
     char buf2[MAX_PATH + 1];
 
     sprintf(buf, LoadStr(IDS_CHDISKTEXT2), VolumeNumber);
-    SendDlgItemMessage(Dlg, IDC_CHDISKTEXT, WM_SETTEXT, 0, (LPARAM)buf);
+    // Formatted and indirect localized strings must bypass the ANSI code page.
+    SendUtf8DialogControlString(Dlg, IDC_CHDISKTEXT, WM_SETTEXT, 0, buf);
     SendDlgItemMessage(Dlg, IDC_FILENAME, EM_SETLIMITTEXT, MAX_PATH - 1, 0);
     if (*Flags & CHD_SEQNAMES)
     {

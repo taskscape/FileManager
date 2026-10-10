@@ -3,6 +3,7 @@
 // CommentsTranslationProject: TRANSLATED
 
 #include "precomp.h"
+#include "common/utf8_control_text.h"
 
 #include "menu.h"
 #include "cfgdlg.h"
@@ -602,10 +603,12 @@ void CSalamanderGUI::SetSubjectTruncatedText(HWND subjectWnd, const char* subjec
             // Reserve the subject field's fixed presentation capacity for ampersand escaping.
             StringCchCopyNA(buff, _countof(buff), subject.Get(), _countof(buff) - 1);
             DuplicateAmpersands(buff, 1000, TRUE);
-            SetWindowText(subjectWnd, buff);
+            // Formatted and indirect localized strings must bypass the ANSI code page.
+            SendUtf8ControlString(subjectWnd, WM_SETTEXT, 0, buff);
         }
         else
-            SetWindowText(subjectWnd, subject.Get());
+            // Formatted and indirect localized strings must bypass the ANSI code page.
+            SendUtf8ControlString(subjectWnd, WM_SETTEXT, 0, subject.Get());
     }
 }
 

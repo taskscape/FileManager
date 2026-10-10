@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "precomp.h"
+#include "../../common/utf8_menu_text.h" // Localized menu captions are UTF-8, while native HMENU strings are Unicode.
 #include <strsafe.h> // counted bounded copies (StringCchCopyNA)
 
 //
@@ -3185,7 +3186,8 @@ CPluginFSInterface::ContextMenu(const char* fsName, HWND parent, int menuX, int 
                     mi.cbSize = sizeof(mi);
                     mi.fMask = MIIM_TYPE;
                     mi.fType = MFT_SEPARATOR;
-                    InsertMenuItem(menu, i++, TRUE, &mi);
+                    // Preserve UTF-8 command captions through the native Unicode menu.
+                    InsertMenuItemUtf8(menu, i++, TRUE, &mi);
                 }
                 lastType = type;
 
@@ -3198,7 +3200,7 @@ CPluginFSInterface::ContextMenu(const char* fsName, HWND parent, int menuX, int 
                 mi.dwTypeData = nameBuf;
                 mi.cch = (UINT)strlen(nameBuf);
                 mi.fState = enabled ? MFS_ENABLED : MFS_DISABLED;
-                InsertMenuItem(menu, i++, TRUE, &mi);
+                InsertMenuItemUtf8(menu, i++, TRUE, &mi);
             }
         }
         if (i > 0)

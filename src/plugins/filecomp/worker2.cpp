@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "precomp.h"
+#include "../../common/utf8_control_text.h"
 
 #include "..\\..\\common\\monotonic_time.h"
 
@@ -72,7 +73,8 @@ void CFilecompWorker::CompareBinaryFiles()
                     _stprintf(report, fmt, j + 1,
                               _ui64toa(changes[j].Length, buf1, 10),
                               QWord2Ascii(changes[j].Offset, buf2, digits));
-                    LRESULT ret2 = SendMessage(comboHWnd, CB_ADDSTRING, 0, (LPARAM)report);
+                    // Formatted and indirect localized strings must bypass the ANSI code page.
+                    LRESULT ret2 = SendUtf8ControlString(comboHWnd, CB_ADDSTRING, 0, report);
                     if (ret2 == CB_ERR || ret2 == CB_ERRSPACE)
                     {
                         TRACE_E("CB_ADDSTRING has failed, j = " << j);
@@ -99,7 +101,8 @@ void CFilecompWorker::CompareBinaryFiles()
                     _stprintf(buf, LoadStr(IDS_MAINWNDHEADERTOOMANY),
                               SG->SalPathFindFileName(Files[0].Name), SG->SalPathFindFileName(Files[1].Name));
                 }
-                SetWindowText(MainWindow, buf);
+                // Formatted and indirect localized strings must bypass the ANSI code page.
+                SendUtf8ControlString(MainWindow, WM_SETTEXT, 0, buf);
                 PostMessage(MainWindow, WM_USER_WORKERNOTIFIES, WN_CBINIT_FINISHED, 0);
             }
         }
@@ -300,7 +303,8 @@ int CFilecompWorker::FindDifferencesBody(CCachedFile (&cf)[2], QWORD changeOffs,
                           QWord2Ascii(offsetSave, buf2, digits));
                 if (changes.size() == 1)
                     SendMessage(hComboWnd, CB_RESETCONTENT, 0, 0); // Hack
-                LRESULT ret = SendMessage(hComboWnd, CB_ADDSTRING, 0, (LPARAM)report);
+                // Formatted and indirect localized strings must bypass the ANSI code page.
+                LRESULT ret = SendUtf8ControlString(hComboWnd, CB_ADDSTRING, 0, report);
                 if (changes.size() == 1)
                     SendMessage(hComboWnd, CB_SETCURSEL, 0, 0); // Hack
                 if (ret == CB_ERR || ret == CB_ERRSPACE)

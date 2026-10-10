@@ -2068,7 +2068,8 @@ CConfirmLinkTgtCopyDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
     {
         CStaticText* name = new CStaticText(HWindow, IDS_FILENAME, STF_PATH_ELLIPSIS);
         name->SetTextToDblQuotesIfNeeded(Name);
-        SetDlgItemText(HWindow, IDS_DETAILS, Details);
+        // Formatted and indirect localized strings must bypass the ANSI code page.
+        SetDlgItemTextUtf8(HWindow, IDS_DETAILS, Details);
         break;
     }
 
@@ -2408,7 +2409,8 @@ CDriveSelectErrDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         LastDriveSelectErrDlgHWnd = HWindow;
         HICON hIcon = HANDLES(LoadIcon(NULL, IDI_EXCLAMATION));
         SendDlgItemMessage(HWindow, IDI_EXCLAMATIONICON, STM_SETICON, (WPARAM)hIcon, 0);
-        SetDlgItemText(HWindow, IDT_ERRTEXT, ErrText);
+        // Formatted and indirect localized strings must bypass the ANSI code page.
+        SetDlgItemTextUtf8(HWindow, IDT_ERRTEXT, ErrText);
         MessageBeep(MB_ICONEXCLAMATION);
 
         // check whether periodic drive readiness tests make sense (except for noisy floppies and network drives which may be slow)

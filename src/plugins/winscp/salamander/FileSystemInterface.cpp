@@ -5,6 +5,7 @@
 #define NO_WIN32_LEAN_AND_MEAN
 #include <vcl.h>
 #pragma hdrstop
+#include "../../../common/utf8_menu_native.h" // Salamander's shared resource captions are UTF-8 even in legacy plug-ins.
 
 #include "Salamand.h"
 #include "Salamander.rh"
@@ -349,7 +350,8 @@ int CPluginInterfaceForFS::SessionMenu(HWND Parent,
         {
             MI.fState = MFS_ENABLED;
         }
-        InsertMenuItem(Menu, i, TRUE, &MI);
+        // Convert shared UTF-8 command captions before Windows stores the native menu text.
+        InsertMenuItemUtf8(Menu, i, TRUE, &MI);
     }
 
     int Result = TrackPopupMenuEx(Menu,

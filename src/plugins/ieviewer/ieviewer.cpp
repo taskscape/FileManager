@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "precomp.h"
+#include "../../common/utf8_control_text.h"
 
 #include "..\\..\\common\\monotonic_time.h"
 
@@ -1343,8 +1344,9 @@ STDMETHODIMP CImpIDispatch::Invoke(DISPID dispID,
             char title[1024];
             title[0] = 0;
 
-            WideCharToMultiByte(CP_ACP, 0, pDispParams->rgvarg[0].bstrVal, -1, title, 1024, NULL, NULL);
-            title[1024 - 1] = 0;
+            // COM titles and localized suffixes must use the same UTF-8 representation.
+            if (WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, pDispParams->rgvarg[0].bstrVal, -1, title, _countof(title), NULL, NULL) == 0)
+                title[0] = 0;
 
             char locationURL[1024];
             locationURL[0] = 0;
@@ -1352,8 +1354,10 @@ STDMETHODIMP CImpIDispatch::Invoke(DISPID dispID,
             if (m_pSite->m_pIWebBrowser != NULL &&
                 m_pSite->m_pIWebBrowser->get_LocationURL(&pbstrLocationURL) == S_OK)
             {
-                WideCharToMultiByte(CP_ACP, 0, pbstrLocationURL, -1, locationURL, 1024, NULL, NULL);
-                locationURL[1024 - 1] = 0;
+                // Keep non-ASCII locations intact when composing the viewer caption.
+                if (WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, pbstrLocationURL, -1, locationURL, _countof(locationURL), NULL, NULL) == 0)
+                    locationURL[0] = 0;
+                SysFreeString(pbstrLocationURL);
 
                 BOOL file = CanonizeURL(locationURL);
 
@@ -1372,7 +1376,8 @@ STDMETHODIMP CImpIDispatch::Invoke(DISPID dispID,
                     buff[0] = 0;
                 }
 
-                SetWindowText(m_pSite->m_hParentWnd, buff);
+                // Formatted UTF-8 titles reach the native window through Unicode messages.
+                SendUtf8ControlString(m_pSite->m_hParentWnd, WM_SETTEXT, 0, buff);
             }
             m_pSite->DoVerb(OLEIVERB_UIACTIVATE);
         }

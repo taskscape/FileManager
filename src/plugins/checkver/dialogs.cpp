@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "precomp.h"
+#include "../../common/utf8_menu_text.h" // Localized menu captions are UTF-8, while native HMENU strings are Unicode.
 #include "../../common/utf8_control_text.h"
 
 #include <strsafe.h>
@@ -507,9 +508,10 @@ MENU_TEMPLATE_ITEM AppendToSystemMenu[] =
 	{MNTT_PE, 0
 };
 */
-            AppendMenu(hMenu, MF_SEPARATOR, 0, NULL);
-            AppendMenu(hMenu, MF_STRING | MF_ENABLED, CM_OPENFILE, LoadStr(IDS_MENU_OPENFILE));
-            AppendMenu(hMenu, MF_STRING | MF_ENABLED, CM_ABOUT, LoadStr(IDS_MENU_ABOUT));
+            // Preserve UTF-8 command captions through the native Unicode menu.
+            AppendMenuUtf8(hMenu, MF_SEPARATOR, 0, NULL);
+            AppendMenuUtf8(hMenu, MF_STRING | MF_ENABLED, CM_OPENFILE, LoadStr(IDS_MENU_OPENFILE));
+            AppendMenuUtf8(hMenu, MF_STRING | MF_ENABLED, CM_ABOUT, LoadStr(IDS_MENU_ABOUT));
 
             EnableMenuItem(hMenu, SC_MAXIMIZE, MF_BYCOMMAND | MF_GRAYED);
             EnableMenuItem(hMenu, SC_RESTORE, MF_BYCOMMAND | MF_GRAYED);

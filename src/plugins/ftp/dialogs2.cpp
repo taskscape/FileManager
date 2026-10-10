@@ -87,7 +87,8 @@ CWelcomeMsgDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                 TRACE_E("Unexpected situation in CWelcomeMsgDlg::DialogProc().");
             char buf[300];
             _snprintf_s(buf, _TRUNCATE, LoadStr(IDS_SERVERREPLYTITLE), (SentCommand == NULL ? "" : SentCommand));
-            SetWindowText(HWindow, buf);
+            // Formatted and indirect localized strings must bypass the ANSI code page.
+            SendUtf8ControlString(HWindow, WM_SETTEXT, 0, buf);
         }
         if (RawListing)
             // Localized UTF-8 text must reach the native control as UTF-16.
@@ -1249,7 +1250,8 @@ void CListWaitWindow::SetText(const char* text)
         SalamanderGeneral->Free(Text);
     Text = SalamanderGeneral->DupStr(text);
     if (HWindow != NULL && Text != NULL)
-        SendDlgItemMessage(HWindow, IDT_ACTION, WM_SETTEXT, 0, (LPARAM)Text);
+        // Formatted and indirect localized strings must bypass the ANSI code page.
+        SendUtf8DialogControlString(HWindow, IDT_ACTION, WM_SETTEXT, 0, Text);
 }
 
 void CListWaitWindow::SetPath(const char* path, CFTPServerPathType pathType)
@@ -1384,7 +1386,8 @@ HWND CListWaitWindow::Create(DWORD showTime)
         }
 
         if (Text != NULL)
-            SendDlgItemMessage(HWindow, IDT_ACTION, WM_SETTEXT, 0, (LPARAM)Text);
+            // Formatted and indirect localized strings must bypass the ANSI code page.
+            SendUtf8DialogControlString(HWindow, IDT_ACTION, WM_SETTEXT, 0, Text);
         if (PathOnFTPText != NULL && Path != NULL)
         {
             PathOnFTPText->SetPathSeparator(FTPGetPathDelimiter(PathType));

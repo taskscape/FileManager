@@ -3,6 +3,7 @@
 // CommentsTranslationProject: TRANSLATED
 
 #include "precomp.h"
+#include "common/utf8_menu_text.h" // Localized menu captions are UTF-8, while native HMENU strings are Unicode.
 #include "common/utf8_control_text.h"
 
 #include "tasklist.h"
@@ -1629,7 +1630,9 @@ void CCfgPageConfirmations::Transfer(CTransferInfo& ti)
 HTREEITEM
 CCfgPageConfirmations::AddItem(HTREEITEM hParent, int iImage, int textResID, int* value)
 {
-    TVINSERTSTRUCT tvis;
+    // Confirmation categories and leaves contain localized UTF-8 text, not ANSI labels.
+    CStrP label(ConvertAllocUtf8ToWide(LoadStr(textResID), -1));
+    TVINSERTSTRUCTW tvis = {};
     tvis.hParent = hParent;
     tvis.hInsertAfter = TVI_LAST;
     tvis.item.mask = TVIF_TEXT | TVIF_STATE; // | TVIF_PARAM;
@@ -1642,10 +1645,10 @@ CCfgPageConfirmations::AddItem(HTREEITEM hParent, int iImage, int textResID, int
         tvis.item.state |= TVIS_EXPANDED;
     }
 
-    tvis.item.pszText = LoadStr(textResID);
+    tvis.item.pszText = label != NULL ? label.Ptr : (WCHAR*)L"";
     tvis.item.stateMask = tvis.item.state;
 
-    HTREEITEM ret = TreeView_InsertItem(HTreeView, &tvis);
+    HTREEITEM ret = (HTREEITEM)SendMessageW(HTreeView, TVM_INSERTITEMW, 0, (LPARAM)&tvis);
     if (iImage == -1)
     {
         CConfirmationItem item;
@@ -1968,7 +1971,8 @@ void CCfgPageViewers::Transfer(CTransferInfo& ti)
             {
                 char buf[MAX_PATH];
                 p->GetDisplayName(buf, MAX_PATH);
-                SendMessage(hCombo, CB_ADDSTRING, 0, (LPARAM)buf);
+                // Formatted and indirect localized strings must bypass the ANSI code page.
+                SendUtf8ControlString(hCombo, CB_ADDSTRING, 0, buf);
             }
             else
                 TRACE_E("Unexpected situation in CCfgPageViewers::Transfer().");
@@ -3096,8 +3100,9 @@ MENU_TEMPLATE_ITEM CfgPageAppearanceMenu[] =
 */
             HMENU hMenu = CreatePopupMenu();
             BOOL cstFont = LocalUseCustomPanelFont;
-            InsertMenu(hMenu, 0xFFFFFFFF, cstFont ? 0 : MF_CHECKED | MF_BYCOMMAND | MF_STRING, 1, LoadStr(IDS_USEDEFAULTFONT));
-            InsertMenu(hMenu, 0xFFFFFFFF, cstFont ? MF_CHECKED : 0 | MF_BYCOMMAND | MF_STRING, 2, LoadStr(IDS_USECUSTOMFONT));
+            // Preserve UTF-8 command captions through the native Unicode menu.
+            InsertMenuUtf8(hMenu, 0xFFFFFFFF, cstFont ? 0 : MF_CHECKED | MF_BYCOMMAND | MF_STRING, 1, LoadStr(IDS_USEDEFAULTFONT));
+            InsertMenuUtf8(hMenu, 0xFFFFFFFF, cstFont ? MF_CHECKED : 0 | MF_BYCOMMAND | MF_STRING, 2, LoadStr(IDS_USECUSTOMFONT));
 
             TPMPARAMS tpmPar;
             tpmPar.cbSize = sizeof(tpmPar);
@@ -3508,8 +3513,13 @@ void CTaskListDialog::Refresh()
 
     // save the text of the previously selected item
     char oldSelected[250];
+    WCHAR oldSelectedWide[250];
     int oldIndex = (int)SendMessage(list, LB_GETCURSEL, 0, 0);
-    if (oldIndex == LB_ERR || SendMessage(list, LB_GETTEXT, oldIndex, (LPARAM)oldSelected) == LB_ERR)
+    // Selection restoration compares UTF-8 labels, including the localized current-process suffix.
+    int oldLength = oldIndex == LB_ERR ? LB_ERR : (int)SendMessageW(list, LB_GETTEXTLEN, oldIndex, 0);
+    if (oldLength == LB_ERR || oldLength >= (int)_countof(oldSelectedWide) ||
+        SendMessageW(list, LB_GETTEXT, oldIndex, (LPARAM)oldSelectedWide) == LB_ERR ||
+        WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, oldSelectedWide, -1, oldSelected, _countof(oldSelected), NULL, NULL) == 0)
         oldSelected[0] = 0;
 
     SendMessage(list, LB_RESETCONTENT, 0, 0);
@@ -3535,7 +3545,8 @@ void CTaskListDialog::Refresh()
         char buf[100];
         sprintf(buf, LoadStr(IDS_TASKLISTLINE), items[i].PID, date, time,
                 (items[i].PID == PID ? LoadStr(IDS_TASKLISTCURLINE) : ""));
-        SendMessage(list, LB_ADDSTRING, 0, (LPARAM)buf);
+        // Formatted and indirect localized strings must bypass the ANSI code page.
+        SendUtf8ControlString(list, LB_ADDSTRING, 0, buf);
 
         if (strcmp(buf, oldSelected) == 0)
             SendMessage(list, LB_SETCURSEL, i, 0);

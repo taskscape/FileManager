@@ -71,7 +71,8 @@ void CCfgPagePackers::Transfer(CTransferInfo& ti)
             {
                 char buf[MAX_PATH];
                 p->GetDisplayName(buf, MAX_PATH);
-                SendDlgItemMessage(HWindow, IDC_P1_TYPE, CB_ADDSTRING, 0, (LPARAM)buf);
+                // Formatted and indirect localized strings must bypass the ANSI code page.
+                SendUtf8DialogControlString(HWindow, IDC_P1_TYPE, CB_ADDSTRING, 0, buf);
             }
             else
                 TRACE_E("Unexpected situation in CCfgPagePackers::Transfer().");
@@ -495,7 +496,8 @@ void CCfgPageUnpackers::Transfer(CTransferInfo& ti)
             {
                 char buf[MAX_PATH];
                 p->GetDisplayName(buf, MAX_PATH);
-                SendDlgItemMessage(HWindow, IDC_P2_TYPE, CB_ADDSTRING, 0, (LPARAM)buf);
+                // Formatted and indirect localized strings must bypass the ANSI code page.
+                SendUtf8DialogControlString(HWindow, IDC_P2_TYPE, CB_ADDSTRING, 0, buf);
             }
             else
                 TRACE_E("Unexpected situation in CCfgPageUnpackers::Transfer().");
@@ -1116,7 +1118,8 @@ void CCfgPageArchivesAssoc::Transfer(CTransferInfo& ti)
         {
             s = ArchiverConfig.GetArchiverTitle(i);
             SendDlgItemMessage(HWindow, IDC_P4_VIEW, CB_ADDSTRING, 0, (LPARAM)s);
-            SendDlgItemMessage(HWindow, IDC_P4_EDIT, CB_ADDSTRING, 0, (LPARAM)s);
+            // Formatted and indirect localized strings must bypass the ANSI code page.
+            SendUtf8DialogControlString(HWindow, IDC_P4_EDIT, CB_ADDSTRING, 0, s);
         }
 
         int count = 0;
@@ -1148,7 +1151,8 @@ void CCfgPageArchivesAssoc::Transfer(CTransferInfo& ti)
         }
 
         s = LoadStr(IDS_PUT_NONE);
-        SendDlgItemMessage(HWindow, IDC_P4_EDIT, CB_ADDSTRING, 0, (LPARAM)s);
+        // Formatted and indirect localized strings must bypass the ANSI code page.
+        SendUtf8DialogControlString(HWindow, IDC_P4_EDIT, CB_ADDSTRING, 0, s);
 
         for (i = 0; i < Config->GetFormatsCount(); i++)
             EditLB->AddItem();

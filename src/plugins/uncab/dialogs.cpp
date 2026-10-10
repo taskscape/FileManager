@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "precomp.h"
+#include "../../common/utf8_control_text.h"
 
 #include <shobjidl.h>
 
@@ -141,7 +142,8 @@ BOOL CNextVolumeDialog::OnInit(WPARAM wParam, LPARAM lParam)
     CALL_STACK_MESSAGE3("CNextVolumeDialog::OnInit(0x%IX, 0x%IX)", wParam, lParam);
     char buf[1024];
     sprintf(buf, LoadStr(IDS_NEXTVOLTEXT), CabNumber);
-    SendDlgItemMessage(Dlg, IDC_TEXT, WM_SETTEXT, 0, (LPARAM)buf);
+    // Formatted and indirect localized strings must bypass the ANSI code page.
+    SendUtf8DialogControlString(Dlg, IDC_TEXT, WM_SETTEXT, 0, buf);
     SendDlgItemMessage(Dlg, IDC_DISKNAME, WM_SETTEXT, 0, (LPARAM)DiskName);
     SendDlgItemMessage(Dlg, IDC_CABNAME, WM_SETTEXT, 0, (LPARAM)VolumeName);
     SendDlgItemMessage(Dlg, IDC_FILENAME, EM_SETLIMITTEXT, MAX_PATH - 1, 0);

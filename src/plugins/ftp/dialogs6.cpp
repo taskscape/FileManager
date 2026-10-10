@@ -40,8 +40,9 @@ COperationDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
     case WM_INITDIALOG:
     {
         BOOL preventSystemFromSettingFocus = FALSE;
-        GetDlgItemText(HWindow, IDB_PAUSERESUME, PauseButtonPauseText, 50);
-        GetDlgItemText(HWindow, IDB_OPCONSPAUSERESUME, ConPauseButtonPauseText, 50);
+        // Save captions as UTF-8 so later restoration works on every Windows code page.
+        ReadUtf8ControlText(GetDlgItem(HWindow, IDB_PAUSERESUME), PauseButtonPauseText, _countof(PauseButtonPauseText));
+        ReadUtf8ControlText(GetDlgItem(HWindow, IDB_OPCONSPAUSERESUME), ConPauseButtonPauseText, _countof(ConPauseButtonPauseText));
         LastFocusedControl = GetDlgItem(HWindow, IDB_SHOWDETAILS);
         CFTPOperationType operType = Oper->GetOperationType();
         if (operType == fotCopyDownload || operType == fotMoveDownload)
@@ -86,12 +87,16 @@ COperationDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         Progress = SalamanderGUI->AttachProgressBar(HWindow, IDC_OPPROGRESS);
         ConsListView = GetDlgItem(HWindow, IDL_CONNECTIONS);
         ItemsListView = GetDlgItem(HWindow, IDL_OPERATIONS);
+        // Owner-data status strings are UTF-8, so request Unicode display notifications.
+        SendMessageW(ConsListView, LVM_SETUNICODEFORMAT, TRUE, 0);
+        SendMessageW(ItemsListView, LVM_SETUNICODEFORMAT, TRUE, 0);
 
         LowDiskSpaceHint = SalamanderGUI->AttachHyperLink(HWindow, IDT_ERRORMSG, STF_DOTUNDERLINE);
         SendDlgItemMessage(HWindow, IDI_ERRORICON, STM_SETICON, (WPARAM)WarningIcon, 0);
 
         char buf[100];
-        if (GetWindowText(GetDlgItem(HWindow, IDT_OPERATIONSTEXT), buf, 100))
+        // Progress updates append counts to this localized UTF-8 label.
+        if (ReadUtf8ControlText(GetDlgItem(HWindow, IDT_OPERATIONSTEXT), buf, _countof(buf)))
         {
             if (OperationsTextOrig != NULL)
                 SalamanderGeneral->Free(OperationsTextOrig); // just in case...
@@ -775,7 +780,8 @@ COperationDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 
     case WM_NOTIFY:
     {
-        if (((LPNMHDR)lParam)->code == HDN_ENDTRACK)
+        // Preserve column-width updates whether the header sends ANSI or Unicode notifications.
+        if (((LPNMHDR)lParam)->code == HDN_ENDTRACKA || ((LPNMHDR)lParam)->code == HDN_ENDTRACKW)
         {
             ConsListViewObj.HideToolTip();
             ItemsListViewObj.HideToolTip();
@@ -787,11 +793,14 @@ COperationDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
             switch (nmh->code)
             {
             case LVN_GETDISPINFO:
+            case LVN_GETDISPINFOW:
             {
-                int index = ((NMLVDISPINFO*)lParam)->item.iItem;
+                // Bridge the queue's UTF-8 data into the control's Unicode notification buffer.
+                CUtf8ListViewDispInfo display(lParam);
+                int index = display.Get()->item.iItem;
                 if (ShowOnlyErrors && index >= 0 && index < ErrorsIndexes.Count)
                     index = ErrorsIndexes[index];
-                Queue->GetListViewDataFor(index, (NMLVDISPINFO*)lParam, ItemsTextBuf[ItemsActTextBuf], OPERDLG_ITEMSTEXTBUFSIZE);
+                Queue->GetListViewDataFor(index, display.Get(), ItemsTextBuf[ItemsActTextBuf], OPERDLG_ITEMSTEXTBUFSIZE);
                 if (++ItemsActTextBuf > 2)
                     ItemsActTextBuf = 0;
                 return FALSE; // continue processing
@@ -839,8 +848,11 @@ COperationDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                 switch (nmh->code)
                 {
                 case LVN_GETDISPINFO:
+                case LVN_GETDISPINFOW:
                 {
-                    WorkersList->GetListViewDataFor(((NMLVDISPINFO*)lParam)->item.iItem, (NMLVDISPINFO*)lParam,
+                    // Preserve localized connection states in owner-data cells as UTF-16.
+                    CUtf8ListViewDispInfo display(lParam);
+                    WorkersList->GetListViewDataFor(display.Get()->item.iItem, display.Get(),
                                                     ConsTextBuf[ConsActTextBuf], OPERDLG_CONSTEXTBUFSIZE);
                     if (++ConsActTextBuf > 2)
                         ConsActTextBuf = 0;

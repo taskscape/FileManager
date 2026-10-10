@@ -75,9 +75,9 @@ void BeginMainWindowClosingOverlay(HWND hMainWindow)
     if (MainWindowClosingOverlay != NULL)
     {
         MainWindowClosingOverlay->SetCaption(LoadStr(IDS_CLOSINGAPPLICATIONCAPTION));
-        // Keep the teardown overlay compact while reserving a fixed 150% label for longer progress text.
+        // Keep the teardown overlay compact while reserving a fixed 175% label for longer progress text.
         MainWindowClosingOverlay->SetWidthMultiplier(2);
-        MainWindowClosingOverlay->SetTextWidthPercent(150);
+        MainWindowClosingOverlay->SetTextWidthPercent(175);
         if (MainWindowClosingOverlay->Create() == NULL)
         {
             delete MainWindowClosingOverlay;

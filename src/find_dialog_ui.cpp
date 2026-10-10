@@ -982,7 +982,8 @@ void CFindDialog::StartSearch(WORD command)
 
     char buff[MAX_PATH + 100];
     _snprintf_s(buff, _TRUNCATE, NORMAL_FINDING_CAPTION, LoadStr(IDS_FF_NAME), LoadStr(IDS_FF_NAMED), SearchForData[0]->MasksGroup.GetMasksString());
-    SetWindowText(HWindow, buff);
+    // Formatted and indirect localized strings must bypass the ANSI code page.
+    SetWindowTextUtf8(HWindow, buff);
 
     EnableControls();
 }

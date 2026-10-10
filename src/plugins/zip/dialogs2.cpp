@@ -2,7 +2,8 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "precomp.h"
-#include "../../common/utf8_control_text.h"
+#include "../../common/utf8_control_text.h" // Saved favorite names may retain their legacy ACP encoding.
+#include "../../common/utf8_menu_text.h" // Localized menu captions are UTF-8, while native HMENU strings are Unicode.
 #include "..\\..\\common\\checked_arithmetic.h"
 #include <crtdbg.h>
 #include <ostream>
@@ -914,7 +915,8 @@ BOOL CAdvancedSEDialog::InitMenu()
         mi.cbSize = sizeof(mi);
         mi.fMask = MIIM_STATE;
         mi.fState = MFS_DISABLED;
-        SetMenuItemInfo(Menu, CM_SFX_LASTUSED, FALSE, &mi);
+        // Preserve UTF-8 command captions through the native Unicode menu.
+        SetMenuItemInfoUtf8(Menu, CM_SFX_LASTUSED, FALSE, &mi);
     }
 
     // ensure the window keeps the correct size even after adding the menu
@@ -943,7 +945,8 @@ BOOL CAdvancedSEDialog::CreateFavoritesMenu()
         mi.cbSize = sizeof(mi);
         mi.fMask = MIIM_SUBMENU;
         mi.hSubMenu = NULL;
-        SetMenuItemInfo(Menu, CM_SFX_FAVORITIES, FALSE, &mi);
+        // Preserve UTF-8 command captions through the native Unicode menu.
+        SetMenuItemInfoUtf8(Menu, CM_SFX_FAVORITIES, FALSE, &mi);
         DestroyMenu(FavoritiesMenu);
     }
     FavoritiesMenu = CreatePopupMenu();
@@ -963,7 +966,7 @@ BOOL CAdvancedSEDialog::CreateFavoritesMenu()
         mi.dwTypeData = LoadStr(IDS_EMPTY);
         // Menu labels are terminated resource strings; retain their character count for InsertMenuItem.
         mi.cch = static_cast<UINT>(strlen(mi.dwTypeData));
-        InsertMenuItem(FavoritiesMenu, 0, TRUE, &mi);
+        InsertMenuItemUtf8(FavoritiesMenu, 0, TRUE, &mi);
     }
     else
     {
@@ -980,16 +983,18 @@ BOOL CAdvancedSEDialog::CreateFavoritesMenu()
             mi.fType = MFT_STRING;
             mi.wID = CM_SFX_FAVORITE + i;
             mi.dwItemData = (ULONG_PTR)fav;
-            mi.dwTypeData = fav->Name;
+            std::string favoriteNameUtf8 = LegacyControlTextToUtf8(fav->Name);
+            mi.dwTypeData = const_cast<char*>(favoriteNameUtf8.c_str());
             // Favorite names are terminated menu-label strings.
             mi.cch = static_cast<UINT>(strlen(mi.dwTypeData));
-            InsertMenuItem(FavoritiesMenu, i, TRUE, &mi);
+            // Preserve UTF-8 command captions through the native Unicode menu.
+            InsertMenuItemUtf8(FavoritiesMenu, i, TRUE, &mi);
         }
         memset(&mi, 0, sizeof(mi));
         mi.cbSize = sizeof(mi);
         mi.fMask = MIIM_TYPE;
         mi.fType = MFT_SEPARATOR;
-        InsertMenuItem(FavoritiesMenu, Favorities.Count /*i++*/, TRUE, &mi);
+        InsertMenuItemUtf8(FavoritiesMenu, Favorities.Count /*i++*/, TRUE, &mi);
 
         memset(&mi, 0, sizeof(mi));
         mi.cbSize = sizeof(mi);
@@ -999,7 +1004,7 @@ BOOL CAdvancedSEDialog::CreateFavoritesMenu()
         mi.dwTypeData = LoadStr(IDS_MANAGE);
         // Menu labels are terminated resource strings; retain their character count for InsertMenuItem.
         mi.cch = static_cast<UINT>(strlen(mi.dwTypeData));
-        InsertMenuItem(FavoritiesMenu, Favorities.Count + 1 /*i*/, TRUE, &mi);
+        InsertMenuItemUtf8(FavoritiesMenu, Favorities.Count + 1 /*i*/, TRUE, &mi);
     }
 
     // assign the submenu to the 'Favorities' item
@@ -1007,7 +1012,7 @@ BOOL CAdvancedSEDialog::CreateFavoritesMenu()
     mi.cbSize = sizeof(mi);
     mi.fMask = MIIM_SUBMENU;
     mi.hSubMenu = FavoritiesMenu;
-    SetMenuItemInfo(Menu, CM_SFX_FAVORITIES, FALSE, &mi);
+    SetMenuItemInfoUtf8(Menu, CM_SFX_FAVORITIES, FALSE, &mi);
 
     return TRUE;
 }

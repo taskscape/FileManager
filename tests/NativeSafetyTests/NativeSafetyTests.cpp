@@ -7,6 +7,9 @@
 #include "../../src/common/resource_strings_utf8.h" // exercise the production resource loader with real multilingual resources
 #include "../../src/common/network_resources_utf8.h" // verify the exact provider/cache conversion used by net: enumeration
 #include "../../src/common/unicode_shell_link.h" // exercise production Unicode layout and COM/system text boundaries
+#include "../../src/common/utf8_control_text.h" // verify actual control text independently of the host ANSI code page
+#include "../../src/common/utf8_menu_text.h" // Exercise menu storage and rasterized captions through the production UTF-8 boundary.
+#pragma comment(lib, "comctl32.lib") // Exercise the real list-view display-notification boundary.
 
 #include "../../src/common/checked_arithmetic.h"
 #include "../../src/operation_execution_filesystem.h"
@@ -77,6 +80,237 @@ int TestResourceStringsUtf8()
     if (LoadStringUtf8(instance, 4999, missing, sizeof(missing)) != 0 || missing[0] != 0)
         return Fail("missing resources left stale display text in the destination");
     return 0;
+}
+
+struct CUtf8ListTestState
+{
+    const char* Text;
+    bool Copied;
+    bool Notified;
+};
+
+LRESULT CALLBACK Utf8ListTestWindowProc(HWND window, UINT message, WPARAM wParam, LPARAM lParam)
+{
+    if (message == WM_NOTIFY && ((NMHDR*)lParam)->code == LVN_GETDISPINFOW)
+    {
+        // Exercise both provider styles: text copied into the request and a returned persistent pointer.
+        CUtf8ListTestState* state = (CUtf8ListTestState*)GetWindowLongPtrW(window, GWLP_USERDATA);
+        CUtf8ListViewDispInfo display(lParam);
+        if (state->Copied)
+            strcpy_s(display.Get()->item.pszText, display.Get()->item.cchTextMax, state->Text);
+        else
+            display.Get()->item.pszText = (char*)state->Text;
+        state->Notified = true;
+        return 0;
+    }
+    return DefWindowProcW(window, message, wParam, lParam);
+}
+
+int TestNativeControlTextUtf8()
+{
+    // Exercise formatted captions, checkbox labels, lists and saved captions through real Unicode controls.
+    HWND window = CreateWindowExW(0, L"STATIC", L"", WS_POPUP, 0, 0, 200, 100, NULL, NULL, GetModuleHandleW(NULL), NULL);
+    if (window == NULL)
+        return Fail("could not create UTF-8 control test window");
+    HWND checkbox = CreateWindowExW(0, L"BUTTON", L"", WS_CHILD | BS_AUTOCHECKBOX, 0, 0, 200, 20, window, (HMENU)1, NULL, NULL);
+    HWND list = CreateWindowExW(0, L"LISTBOX", L"", WS_CHILD | LBS_HASSTRINGS, 0, 20, 200, 40, window, (HMENU)2, NULL, NULL);
+    HWND combo = CreateWindowExW(0, L"COMBOBOX", L"", WS_CHILD | CBS_DROPDOWNLIST, 0, 60, 200, 40, window, (HMENU)3, NULL, NULL);
+    INITCOMMONCONTROLSEX controls = {sizeof(controls), ICC_LISTVIEW_CLASSES};
+    InitCommonControlsEx(&controls);
+    HWND cells = CreateWindowExW(0, WC_LISTVIEWW, L"", WS_CHILD | LVS_REPORT, 0, 0, 200, 100, window, (HMENU)4, NULL, NULL);
+    CUtf8ListTestState state = {"", false, false};
+    SetWindowLongPtrW(window, GWLP_USERDATA, (LONG_PTR)&state);
+    SetWindowLongPtrW(window, GWLP_WNDPROC, (LONG_PTR)Utf8ListTestWindowProc);
+    SendMessageW(cells, LVM_SETUNICODEFORMAT, TRUE, 0);
+    LVITEMW callbackItem = {};
+    callbackItem.mask = LVIF_TEXT;
+    callbackItem.pszText = LPSTR_TEXTCALLBACKW;
+    bool valid = checkbox != NULL && list != NULL && combo != NULL && cells != NULL &&
+                 SendMessageW(cells, LVM_INSERTITEMW, 0, (LPARAM)&callbackItem) == 0;
+    const char* labels[] = {u8"&Kopiuj dane z zak\u0142adki \"Szybkie po\u0142\u0105czenie\"",
+                            u8"Za\u017c\u00f3\u0142\u0107 g\u0119\u015bl\u0105 ja\u017a\u0144", u8"\u6771\u4eac \U0001f4c1"};
+    for (int index = 0; valid && index < (int)_countof(labels); ++index)
+    {
+        WCHAR expected[200], actual[200];
+        char captured[600];
+        valid = MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, labels[index], -1, expected, _countof(expected)) != 0;
+        valid = valid && SendUtf8ControlString(window, WM_SETTEXT, 0, labels[index]) != 0 &&
+                SendUtf8DialogControlString(window, 1, WM_SETTEXT, 0, labels[index]) != 0;
+        GetWindowTextW(checkbox, actual, _countof(actual));
+        valid = valid && wcscmp(actual, expected) == 0;
+        valid = valid && LegacyControlTextToUtf8(labels[index]) == labels[index];
+        for (int copied = 0; valid && copied < 2; ++copied)
+        {
+            state.Text = labels[index];
+            state.Copied = copied != 0;
+            state.Notified = false;
+            LVITEMW cell = {};
+            cell.pszText = actual;
+            cell.cchTextMax = _countof(actual);
+            SendMessageW(cells, LVM_GETITEMTEXTW, 0, (LPARAM)&cell);
+            valid = state.Notified && wcscmp(actual, expected) == 0;
+        }
+        GetWindowTextW(window, actual, _countof(actual));
+        valid = valid && wcscmp(actual, expected) == 0 &&
+                ReadUtf8ControlText(window, captured, _countof(captured)) == (int)strlen(labels[index]) &&
+                strcmp(captured, labels[index]) == 0;
+        // Restoring a captured caption must not lose accents or supplementary characters.
+        SendUtf8ControlString(checkbox, WM_SETTEXT, 0, captured);
+        GetWindowTextW(checkbox, actual, _countof(actual));
+        valid = valid && wcscmp(actual, expected) == 0;
+        valid = valid && SendUtf8ControlString(list, LB_ADDSTRING, 0, labels[index]) == index &&
+                SendUtf8ControlString(combo, CB_ADDSTRING, 0, labels[index]) == index;
+        SendMessageW(list, LB_GETTEXT, index, (LPARAM)actual);
+        valid = valid && wcscmp(actual, expected) == 0;
+        SendMessageW(combo, CB_GETLBTEXT, index, (LPARAM)actual);
+        valid = valid && wcscmp(actual, expected) == 0;
+        char shortCaption[] = {'#', '#', '#'};
+        valid = valid && ReadUtf8ControlText(window, shortCaption, 2) == 0 && shortCaption[0] == 0 && shortCaption[2] == '#';
+        valid = valid && SendUtf8ControlString(checkbox, WM_SETTEXT, 0, "\xc5") == -1;
+        GetWindowTextW(checkbox, actual, _countof(actual));
+        valid = valid && wcscmp(actual, expected) == 0;
+    }
+    // Short display requests must clip at Unicode boundaries and leave the caller's guard untouched.
+    WCHAR clipped[] = {L'#', L'#', L'#'};
+    NMLVDISPINFOW shortRequest = {};
+    shortRequest.hdr.code = LVN_GETDISPINFOW;
+    shortRequest.item.mask = LVIF_TEXT;
+    shortRequest.item.pszText = clipped;
+    shortRequest.item.cchTextMax = 2;
+    {
+        CUtf8ListViewDispInfo display((LPARAM)&shortRequest);
+        display.Get()->item.pszText = (char*)u8"\U0001f4c1x";
+        display.Get()->item.iImage = 7;
+    }
+    valid = valid && clipped[0] == 0 && clipped[2] == L'#' && shortRequest.item.iImage == 7;
+    // Old bookmark bytes are normalized before formatting, while their stored representation remains untouched.
+    const char legacyName[] = "B\xe9";
+    WCHAR legacyExpected[10], legacyActual[10];
+    std::string normalized = LegacyControlTextToUtf8(legacyName);
+    valid = valid && MultiByteToWideChar(CP_ACP, 0, legacyName, -1, legacyExpected, _countof(legacyExpected)) != 0 &&
+            MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, normalized.c_str(), -1, legacyActual, _countof(legacyActual)) != 0 &&
+            wcscmp(legacyActual, legacyExpected) == 0;
+    DestroyWindow(window);
+    return valid ? 0 : Fail("UTF-8 caption, checkbox, list or capture/restore text was corrupted");
+}
+
+int TestNativeMenusUtf8()
+{
+    // The FTP context menu inserts these commands into HMENU before the custom popup reads them back.
+    const char* labels[] = {u8"&Podgl\u0105d\tF3", u8"Podgl\u0105d za pomoc\u0105...\tCtrl+Shift+F3",
+                            u8"Przenie\u015b/Zmie\u0144 nazw\u0119...\tF6", u8"Usu\u0144\tF8",
+                            u8"Zmie\u0144 atrybuty...\tCtrl+F2", u8"&Za\u017c\u00f3\u0142\u0107 \u6771\u4eac \U0001f4c1"};
+    const wchar_t* expected[] = {L"&Podgl\u0105d\tF3", L"Podgl\u0105d za pomoc\u0105...\tCtrl+Shift+F3",
+                                L"Przenie\u015b/Zmie\u0144 nazw\u0119...\tF6", L"Usu\u0144\tF8",
+                                L"Zmie\u0144 atrybuty...\tCtrl+F2", L"&Za\u017c\u00f3\u0142\u0107 \u6771\u4eac \U0001f4c1"};
+    HMENU menu = CreatePopupMenu();
+    HDC actualDC = CreateCompatibleDC(NULL), expectedDC = CreateCompatibleDC(NULL);
+    BITMAPINFO bitmapInfo = {};
+    bitmapInfo.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
+    bitmapInfo.bmiHeader.biWidth = 768;
+    bitmapInfo.bmiHeader.biHeight = -64;
+    bitmapInfo.bmiHeader.biPlanes = 1;
+    bitmapInfo.bmiHeader.biBitCount = 32;
+    void *actualPixels = NULL, *expectedPixels = NULL;
+    HBITMAP actualBitmap = CreateDIBSection(actualDC, &bitmapInfo, DIB_RGB_COLORS, &actualPixels, NULL, 0);
+    HBITMAP expectedBitmap = CreateDIBSection(expectedDC, &bitmapInfo, DIB_RGB_COLORS, &expectedPixels, NULL, 0);
+    bool valid = menu != NULL && actualDC != NULL && expectedDC != NULL && actualBitmap != NULL && expectedBitmap != NULL;
+    HGDIOBJ oldActual = SelectObject(actualDC, actualBitmap), oldExpected = SelectObject(expectedDC, expectedBitmap);
+    SelectObject(actualDC, GetStockObject(DEFAULT_GUI_FONT));
+    SelectObject(expectedDC, GetStockObject(DEFAULT_GUI_FONT));
+    RECT canvas = {0, 0, 768, 64};
+    for (int index = 0; valid && index < _countof(labels); ++index)
+    {
+        MENUITEMINFOA item = {};
+        item.cbSize = sizeof(item);
+        item.fMask = MIIM_ID | MIIM_STATE | MIIM_DATA |
+                     (index % 2 == 0 ? MIIM_STRING | MIIM_FTYPE | MIIM_BITMAP : MIIM_TYPE);
+        item.fType = MFT_RADIOCHECK;
+        item.fState = MFS_CHECKED;
+        item.wID = 100 + index;
+        item.dwItemData = 0x12345678;
+        item.hbmpItem = index % 2 == 0 ? HBMMENU_CALLBACK : NULL;
+        item.dwTypeData = const_cast<char*>(labels[index]);
+        // Deliberately wrong byte count: insertion consumes a terminated caption, not an ACP character count.
+        item.cch = 1;
+        valid = InsertMenuItemUtf8(menu, index, TRUE, &item) != FALSE;
+        wchar_t nativeText[256] = {};
+        MENUITEMINFOW native = {};
+        native.cbSize = sizeof(native);
+        native.fMask = item.fMask;
+        native.dwTypeData = nativeText;
+        native.cch = _countof(nativeText);
+        std::string restored;
+        valid = valid && GetMenuItemInfoW(menu, index, TRUE, &native) && wcscmp(nativeText, expected[index]) == 0 &&
+                native.wID == item.wID && native.fState == item.fState && native.fType == item.fType &&
+                native.dwItemData == item.dwItemData && native.hbmpItem == item.hbmpItem &&
+                GetMenuItemTextUtf8(menu, index, TRUE, restored) && restored == labels[index];
+
+        for (int capacity = 1; capacity <= static_cast<int>(strlen(labels[index])) + 2; ++capacity)
+        {
+            char clipped[256];
+            memset(clipped, '#', sizeof(clipped));
+            CopyMenuTextUtf8(clipped, capacity, labels[index]);
+            std::wstring decoded;
+            valid = valid && clipped[capacity] == '#' && Utf8TextToWide(clipped, -1, decoded) &&
+                    std::wstring(expected[index]).compare(0, decoded.size(), decoded) == 0;
+        }
+
+        // Compare actual pixels and measured bounds with Unicode GDI, including counted columns and hidden mnemonics.
+        const char* tab = strchr(labels[index], '\t');
+        int length = tab == NULL ? static_cast<int>(strlen(labels[index])) : static_cast<int>(tab - labels[index]);
+        const wchar_t* wideTab = wcschr(expected[index], L'\t');
+        int wideLength = wideTab == NULL ? static_cast<int>(wcslen(expected[index])) : static_cast<int>(wideTab - expected[index]);
+        for (UINT flags : {UINT(DT_SINGLELINE | DT_HIDEPREFIX), UINT(DT_SINGLELINE | DT_NOPREFIX)})
+        {
+            RECT measuredActual = {}, measuredExpected = {};
+            int actualHeight = DrawMenuTextUtf8(actualDC, labels[index], length, &measuredActual, flags | DT_CALCRECT);
+            int expectedHeight = DrawTextW(expectedDC, expected[index], wideLength, &measuredExpected, flags | DT_CALCRECT);
+            valid = valid && actualHeight == expectedHeight && EqualRect(&measuredActual, &measuredExpected);
+            FillRect(actualDC, &canvas, static_cast<HBRUSH>(GetStockObject(WHITE_BRUSH)));
+            FillRect(expectedDC, &canvas, static_cast<HBRUSH>(GetStockObject(WHITE_BRUSH)));
+            RECT actualRect = canvas, expectedRect = canvas;
+            DrawMenuTextUtf8(actualDC, labels[index], length, &actualRect, flags);
+            DrawTextW(expectedDC, expected[index], wideLength, &expectedRect, flags);
+            GdiFlush();
+            valid = valid && memcmp(actualPixels, expectedPixels, 768 * 64 * 4) == 0;
+        }
+    }
+    std::string longCaption;
+    for (int index = 0; index < 2500; ++index)
+        longCaption += u8"\u0142\u6771";
+    valid = valid && AppendMenuUtf8(menu, MF_STRING, 500, longCaption.c_str());
+    std::string restored;
+    valid = valid && GetMenuItemTextUtf8(menu, 500, FALSE, restored) && restored == longCaption &&
+            ModifyMenuUtf8(menu, 500, MF_BYCOMMAND | MF_STRING | MF_GRAYED, 500, labels[3]) &&
+            GetMenuItemTextUtf8(menu, 500, FALSE, restored) && restored == labels[3];
+    MENUITEMINFOA replacement = {};
+    replacement.cbSize = sizeof(replacement);
+    replacement.fMask = MIIM_STRING;
+    replacement.dwTypeData = const_cast<char*>(labels[4]);
+    valid = valid && SetMenuItemInfoUtf8(menu, 500, FALSE, &replacement) &&
+            GetMenuItemTextUtf8(menu, 500, FALSE, restored) && restored == labels[4];
+    int count = GetMenuItemCount(menu);
+    replacement.dwTypeData = const_cast<char*>("\xc5");
+    valid = valid && !SetMenuItemInfoUtf8(menu, 500, FALSE, &replacement) &&
+            !AppendMenuUtf8(menu, MF_STRING, 501, "\xc5") && GetMenuItemCount(menu) == count &&
+            GetMenuItemTextUtf8(menu, 500, FALSE, restored) && restored == labels[4];
+    HMENU submenu = CreatePopupMenu();
+    valid = valid && InsertMenuUtf8(menu, 0, MF_BYPOSITION | MF_POPUP | MF_CHECKED, reinterpret_cast<UINT_PTR>(submenu), labels[0]) &&
+            GetSubMenu(menu, 0) == submenu && AppendMenuUtf8(menu, MF_SEPARATOR, 0, NULL) &&
+            AppendMenuUtf8(menu, MF_OWNERDRAW, 502, reinterpret_cast<const char*>(0x76543210));
+    MENUITEMINFOW owner = {};
+    owner.cbSize = sizeof(owner);
+    owner.fMask = MIIM_DATA | MIIM_FTYPE;
+    valid = valid && GetMenuItemInfoW(menu, 502, FALSE, &owner) && owner.dwItemData == 0x76543210 && (owner.fType & MFT_OWNERDRAW) != 0;
+    SelectObject(actualDC, oldActual);
+    SelectObject(expectedDC, oldExpected);
+    DeleteObject(actualBitmap);
+    DeleteObject(expectedBitmap);
+    DeleteDC(actualDC);
+    DeleteDC(expectedDC);
+    DestroyMenu(menu);
+    return valid ? 0 : Fail("native menus corrupted UTF-8 captions, metadata, measured widths or rendered pixels");
 }
 
 int TestNetworkResourcesUtf8()
@@ -856,6 +1090,10 @@ int main()
     int result = TestCheckedArithmeticBoundaries();
     if (result == 0)
         result = TestResourceStringsUtf8(); // Polish bytes must reach the UTF-8 menu renderer unchanged
+    if (result == 0)
+        result = TestNativeControlTextUtf8(); // formatted text and caption round trips must bypass ACP
+    if (result == 0)
+        result = TestNativeMenusUtf8(); // HMENU round trips and popup painting must preserve the same Unicode commands.
     if (result == 0)
         result = TestNetworkResourcesUtf8(); // provider names must survive both display and subsequent navigation
     if (result == 0)

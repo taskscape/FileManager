@@ -404,7 +404,8 @@ void CConfigurationDialog::SetFontText()
                 MulDiv(-oldHeight, 72, dpi),
                 logFont.lfFaceName,
                 LoadStr(UseCustomFont ? IDS_CUSTOMFONT : IDS_DEFAULTFONT));
-    SetWindowText(hEdit, buf);
+    // Formatted and indirect localized strings must bypass the ANSI code page.
+    SendUtf8ControlString(hEdit, WM_SETTEXT, 0, buf);
     ReleaseDC(HWindow, hDC);
 }
 

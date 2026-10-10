@@ -1,8 +1,9 @@
-﻿// SPDX-FileCopyrightText: 2023 Taskscape Ltd
+// SPDX-FileCopyrightText: 2023 Taskscape Ltd
 // SPDX-License-Identifier: GPL-2.0-or-later
 // CommentsTranslationProject: TRANSLATED
 
 #include "precomp.h"
+#include "common/utf8_menu_text.h" // Localized menu captions are UTF-8, while native HMENU strings are Unicode.
 
 #include "svg.h"
 #include "gui.h"
@@ -95,7 +96,8 @@ MENU_TEMPLATE_ITEM HyperLinkMenu[] =
 };
 */
     HMENU hMenu = CreatePopupMenu();
-    InsertMenu(hMenu, 0, MF_BYPOSITION, 1, LoadStr(IDS_COPYTOCLIPBOARD));
+    // Preserve UTF-8 command captions through the native Unicode menu.
+    InsertMenuUtf8(hMenu, 0, MF_BYPOSITION, 1, LoadStr(IDS_COPYTOCLIPBOARD));
     DWORD cmd = TrackPopupMenuEx(hMenu, TPM_RETURNCMD | TPM_LEFTALIGN | TPM_RIGHTBUTTON,
                                  x, y, HWindow, NULL);
     DestroyMenu(hMenu);

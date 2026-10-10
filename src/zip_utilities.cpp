@@ -1,8 +1,9 @@
-﻿// SPDX-FileCopyrightText: 2023 Taskscape Ltd
+// SPDX-FileCopyrightText: 2023 Taskscape Ltd
 // SPDX-License-Identifier: GPL-2.0-or-later
 // CommentsTranslationProject: TRANSLATED
 
 #include "precomp.h"
+#include "common/utf8_menu_text.h" // Shared command names remain valid UTF-8 in plug-in menu buffers.
 
 #include "update_check.h"
 
@@ -182,8 +183,8 @@ BOOL CSalamanderGeneral::GetSalamanderCommand(int salCmd, char* nameBuf, int nam
 
             if (nameBuf != NULL && nameBufSize > 0)
             {
-                // Plug-ins supply this command-label display field; retain its explicit clipping limit.
-                StringCchCopyNA(nameBuf, nameBufSize, ::LoadStr(SalCommandsArray[index].TextID), nameBufSize - 1);
+                // Preserve whole UTF-8 characters when a plug-in supplies a short command-label buffer.
+                CopyMenuTextUtf8(nameBuf, nameBufSize, ::LoadStr(SalCommandsArray[index].TextID));
             }
             if (SalCommandsArray[index].Enabled != NULL)
             {
@@ -225,8 +226,8 @@ BOOL CSalamanderGeneral::EnumSalamanderCommands(int* index, int* salCmd, char* n
             *salCmd = SalCommandsArray[*index].SalCmd;
         if (nameBuf != NULL && nameBufSize > 0)
         {
-            // Plug-ins supply this command-label display field; retain its explicit clipping limit.
-            StringCchCopyNA(nameBuf, nameBufSize, ::LoadStr(SalCommandsArray[*index].TextID), nameBufSize - 1);
+            // Preserve whole UTF-8 characters when a plug-in supplies a short command-label buffer.
+            CopyMenuTextUtf8(nameBuf, nameBufSize, ::LoadStr(SalCommandsArray[*index].TextID));
         }
         if (SalCommandsArray[*index].Enabled != NULL)
         {

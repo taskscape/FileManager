@@ -4,6 +4,7 @@
 #include "precomp.h"
 
 #include <strsafe.h>
+#include <string> // Localized rebar captions stay Unicode through measurement and painting.
 
 #include <uxtheme.h>
 
@@ -707,23 +708,35 @@ BOOL CRebar::InsertBand(UINT uIndex, LPREBARBANDINFO lprbbi)
 
     if (lprbbi->fMask & RBBIM_TEXT)
     {
-        // drop the prefix
-        char buffer[512];
-        strcpy(buffer, lprbbi->lpText);
-        char* prefix = strchr(buffer, '&');
-        if (prefix)
-            strcpy(prefix, prefix + 1);
+        // Measure and store localized captions as UTF-16 so diacritics and header widths agree.
+        const char* source = lprbbi->lpText != NULL ? lprbbi->lpText : "";
+        int length = MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, source, -1, NULL, 0);
+        if (length == 0)
+            return FALSE;
+        std::wstring text(length, L'\0');
+        if (MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, source, -1, &text[0], length) == 0)
+            return FALSE;
+        std::wstring measured(text.c_str());
+        size_t prefix = measured.find(L'&');
+        if (prefix != std::wstring::npos)
+            measured.erase(prefix, 1);
 
         // measure the string length
         HDC hdc = GetDC(NULL);
         HFONT oldFont = (HFONT)SelectObject(hdc, EnvFont);
-        SIZE s;
-        GetTextExtentPoint32(hdc, buffer, int(strlen(buffer)), &s);
+        SIZE s = {};
+        GetTextExtentPoint32W(hdc, measured.c_str(), (int)measured.size(), &s);
         SelectObject(hdc, oldFont);
         ReleaseDC(NULL, hdc);
 
         lprbbi->fMask |= RBBIM_HEADERSIZE;
         lprbbi->cxHeader = s.cx + 13;
+        REBARBANDINFOW band = {};
+        // ANSI and Unicode band structures share their scalar layout; only lpText changes encoding.
+        static_assert(sizeof(REBARBANDINFOA) == sizeof(REBARBANDINFOW), "rebar band layouts must match");
+        memcpy(&band, lprbbi, sizeof(band));
+        band.lpText = &text[0];
+        return SendMessageW(HWindow, RB_INSERTBANDW, uIndex, (LPARAM)&band) != 0;
     }
     return SendMessage(HWindow, RB_INSERTBAND, (WPARAM)uIndex, (LPARAM)lprbbi) != 0;
 }
@@ -802,14 +815,15 @@ CRebar::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         int i;
         for (i = 0; i < bandCount; i++)
         {
-            char text[512];
+            // Retrieve and paint the stored Unicode caption without a lossy ANSI round trip.
+            WCHAR text[512];
             *text = 0;
-            REBARBANDINFO rbbi;
+            REBARBANDINFOW rbbi = {};
             rbbi.cbSize = sizeof(REBARBANDINFO);
             rbbi.fMask = RBBIM_TEXT | RBBIM_HEADERSIZE;
             rbbi.lpText = text;
             rbbi.cch = 512;
-            SendMessage(HWindow, RB_GETBANDINFO, i, (LPARAM)&rbbi);
+            SendMessageW(HWindow, RB_GETBANDINFOW, i, (LPARAM)&rbbi);
 
             if (*text)
             {
@@ -830,7 +844,7 @@ CRebar::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                 HDC hdc = GetDC(HWindow);
                 HFONT oldFont = (HFONT)SelectObject(hdc, (HFONT)EnvFont);
                 SetBkColor(hdc, GetSysColor(COLOR_BTNFACE));
-                DrawText(hdc, text, -1, &r, DT_SINGLELINE | DT_TOP);
+                DrawTextW(hdc, text, -1, &r, DT_SINGLELINE | DT_TOP);
 
                 // line under the text
                 r.top += EnvFontHeight;

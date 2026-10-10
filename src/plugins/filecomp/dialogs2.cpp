@@ -609,7 +609,8 @@ CPreviewWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
             SetTextColor(dc, GetPALETTERGB(Colors[PreviewScript[i].TextColor + side]));
             SetBkColor(dc, GetPALETTERGB(Colors[PreviewScript[i].BkgndColor + side]));
             char* text = LoadStr(PreviewScript[i].TextID);
-            ExtTextOut(dc, r2.left, text_y, ETO_OPAQUE | ETO_CLIPPED, &r2, text, UINT(strlen(text)), NULL);
+            // Formatted and indirect localized strings must bypass the ANSI code page.
+            PaintUtf8ControlText(dc, r2.left, text_y, ETO_OPAQUE | ETO_CLIPPED, &r2, text);
         }
 
         if (r1.bottom < cr.bottom)

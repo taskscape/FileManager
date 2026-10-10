@@ -641,7 +641,8 @@ void CImportConfigDialog::Transfer(CTransferInfo& ti)
         // CAPTION: Welcome to %s
         GetWindowText(HWindow, buff, 5000);
         _snprintf_s(buff2, _TRUNCATE, buff, SALAMANDER_TEXT_VERSION);
-        SetWindowText(HWindow, buff2);
+        // Formatted and indirect localized strings must bypass the ANSI code page.
+        SetWindowTextUtf8(HWindow, buff2);
 
         // COMBOBOX Import Configuration
         // Localized resource bytes are UTF-8; the control receives UTF-16.

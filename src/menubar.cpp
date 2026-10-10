@@ -6,7 +6,7 @@
 
 #include "menu.h"
 #include "mainwnd.h"
-#include "utf8gui.h" // menu captions and their hit-test widths must use the same Unicode decoding as popups
+#include "common/utf8_menu_text.h" // Menu captions and their hit-test widths use the same Unicode decoding as popups.
 
 //*****************************************************************************
 //
@@ -194,7 +194,7 @@ void CMenuBar::DrawItem(HDC hDC, int index, int x)
     if ((UIState & UISF_HIDEACCEL) && !ForceAccelVisible)
         dtFlags |= DT_HIDEPREFIX;
     // Resource labels now contain UTF-8; ANSI drawing would misinterpret Polish diacritics.
-    DrawTextUtf8(hDC, string, stringLen, &r, dtFlags);
+    DrawMenuTextUtf8(hDC, string, stringLen, &r, dtFlags);
 
     //  TRACE_I("DrawText "<<string<<" selected:"<< (HotIndex == index && !Closing));
 }
@@ -258,7 +258,7 @@ void CMenuBar::RefreshMinWidths()
         r.right = 0;
         r.bottom = 0;
         // Match Unicode painting so multibyte captions retain correct spacing and click targets.
-        DrawTextUtf8(hDC, item->String, item->ColumnL1Len,
+        DrawMenuTextUtf8(hDC, item->String, item->ColumnL1Len,
                  &r, DT_NOCLIP | DT_LEFT | DT_SINGLELINE | DT_CALCRECT);
         item->MinWidth = r.right;
     }

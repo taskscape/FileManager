@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "precomp.h"
+#include "../../common/utf8_control_text.h"
 
 int DialogWidth;
 int DialogHeight;
@@ -792,6 +793,8 @@ BOOL CRenamerDialog::Init()
     LayoutControls();
     ShowControls();
     Preview->InitColumns();
+    // Preview errors and generated names are UTF-8, including localized expression diagnostics.
+    SendMessageW(Preview->HWindow, LVM_SETUNICODEFORMAT, TRUE, 0);
     Preview->SetItemCount(0, 0, 0);
 
     // attach the SalGUI controls to the buttons
@@ -2085,8 +2088,11 @@ CRenamerDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
             }
 
             case LVN_GETDISPINFO:
+            case LVN_GETDISPINFOW:
             {
-                Preview->GetDispInfo((LV_DISPINFO*)lParam);
+                // Return generated UTF-8 preview text through Unicode display notifications.
+                CUtf8ListViewDispInfo display(lParam);
+                Preview->GetDispInfo(display.Get());
                 break;
             }
 

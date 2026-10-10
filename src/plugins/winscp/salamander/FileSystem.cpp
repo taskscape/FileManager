@@ -5,6 +5,7 @@
 #define NO_WIN32_LEAN_AND_MEAN
 #include <vcl.h>
 #pragma hdrstop
+#include "../../../common/utf8_menu_native.h" // Host command labels use UTF-8 independently of the plug-in's own resource encoding.
 
 #include <Consts.hpp>
 #include "Salamand.h"
@@ -1288,7 +1289,8 @@ int __fastcall CPluginFSInterface::FileMenu(HWND Parent, int X, int Y)
                 MI.cbSize = sizeof(MI);
                 MI.fMask = MIIM_TYPE;
                 MI.fType = MFT_SEPARATOR;
-                InsertMenuItem(Menu, ItemIndex, TRUE, &MI);
+                // Preserve separator metadata through the same Unicode menu boundary as the commands.
+                InsertMenuItemUtf8(Menu, ItemIndex, TRUE, &MI);
                 ItemIndex++;
             }
             LastType = Type;
@@ -1301,7 +1303,8 @@ int __fastcall CPluginFSInterface::FileMenu(HWND Parent, int X, int Y)
             MI.dwTypeData = Name;
             MI.cch = strlen(Name);
             MI.fState = Enabled ? MFS_ENABLED : MFS_DISABLED;
-            InsertMenuItem(Menu, ItemIndex, TRUE, &MI);
+            // GetSalamanderCommand returns UTF-8; InsertMenuItemA would decode it using ACP.
+            InsertMenuItemUtf8(Menu, ItemIndex, TRUE, &MI);
             ItemIndex++;
 
             if ((SalamCommands[Index] == SALCMD_COPY) ||

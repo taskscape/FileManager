@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "precomp.h"
+#include "../../common/utf8_control_text.h"
 
 DWORD LastCfgPage;
 
@@ -109,10 +110,11 @@ void CPropPageGeneral::LoadControls(BOOL initCombo)
         dpi = GetDeviceCaps(hDC, LOGPIXELSY);
 
     SendMessage(hEdit, WM_SETFONT, (WPARAM)HFont, MAKELPARAM(TRUE, 0));
-    sprintf(logFont.lfFaceName, LoadStr(IDS_FONTDESCRIPTION),
-            MulDiv(-LogFont.lfHeight, 72, dpi),
-            LogFont.lfFaceName);
-    SetWindowText(hEdit, logFont.lfFaceName);
+    // A formatted UTF-8 description can exceed LOGFONT's fixed face-name field.
+    char description[LF_FACESIZE * 3 + 200];
+    _snprintf_s(description, _TRUNCATE, LoadStr(IDS_FONTDESCRIPTION),
+                MulDiv(-LogFont.lfHeight, 72, dpi), LogFont.lfFaceName);
+    SendUtf8ControlString(hEdit, WM_SETTEXT, 0, description);
 
     // initialize the combo boxes for character selection
     HWND whiteSpace = GetDlgItem(HWindow, IDC_WHITESPACE);

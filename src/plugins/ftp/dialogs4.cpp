@@ -1316,8 +1316,10 @@ CCopyMoveDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
     case WM_INITDIALOG:
     {
         SalamanderGeneral->InstallWordBreakProc(GetDlgItem(HWindow, IDC_TGTPATH)); // install WordBreakProc into the combo box
-        SetWindowText(HWindow, Title);
-        SetDlgItemText(HWindow, IDT_TGTPATHSUBJECT, Subject);
+        // Formatted and indirect localized strings must bypass the ANSI code page.
+        SendUtf8ControlString(HWindow, WM_SETTEXT, 0, Title);
+        // Formatted and indirect localized strings must bypass the ANSI code page.
+        SendUtf8DialogControlString(HWindow, IDT_TGTPATHSUBJECT, WM_SETTEXT, 0, Subject);
         break;
     }
     }
@@ -1349,7 +1351,8 @@ CConfirmDeleteDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
     {
     case WM_INITDIALOG:
     {
-        SetDlgItemText(HWindow, IDT_DELSUBJECT, Subject);
+        // Formatted and indirect localized strings must bypass the ANSI code page.
+        SendUtf8DialogControlString(HWindow, IDT_DELSUBJECT, WM_SETTEXT, 0, Subject);
         SendDlgItemMessage(HWindow, IDC_DELICON, STM_SETICON,
                            (WPARAM)(Icon == NULL ? HANDLES(LoadIcon(NULL, IDI_QUESTION)) : Icon), 0);
         break;
@@ -1538,7 +1541,8 @@ CChangeAttrsDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
     {
     case WM_INITDIALOG:
     {
-        SetDlgItemText(HWindow, IDT_CHATTRSUBJECT, Subject);
+        // Formatted and indirect localized strings must bypass the ANSI code page.
+        SendUtf8DialogControlString(HWindow, IDT_CHATTRSUBJECT, WM_SETTEXT, 0, Subject);
         EnableWindow(GetDlgItem(HWindow, IDC_INCLUDESUBDIRS), SelDirs);
         EnableWindow(GetDlgItem(HWindow, IDC_CHATTRSETFILES), SelDirs);
         EnableWindow(GetDlgItem(HWindow, IDC_CHATTRSETDIRS), SelDirs);

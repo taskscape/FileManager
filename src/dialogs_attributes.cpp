@@ -1,8 +1,9 @@
-﻿// SPDX-FileCopyrightText: 2023 Taskscape Ltd
+// SPDX-FileCopyrightText: 2023 Taskscape Ltd
 // SPDX-License-Identifier: GPL-2.0-or-later
 // CommentsTranslationProject: TRANSLATED
 
 #include "precomp.h"
+#include "common/utf8_menu_text.h" // Localized menu captions are UTF-8, while native HMENU strings are Unicode.
 #include "common/utf8_control_text.h"
 
 // Use StrSafe for bounded formatting of localized menu text.
@@ -535,7 +536,8 @@ CCopyMoveDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
             VerticalAlignChildToChild(HWindow, IDB_BROWSE, IDE_PATH); // place the button precisely after the editline
         }
 
-        SetWindowText(HWindow, Title);
+        // Formatted and indirect localized strings must bypass the ANSI code page.
+        SetWindowTextUtf8(HWindow, Title);
         HWND hSubject = GetDlgItem(HWindow, IDS_SUBJECT);
         if (Subject->TruncateText(hSubject))
             SetWindowTextUtf8(hSubject, Subject->Get());
@@ -606,11 +608,12 @@ MENU_TEMPLATE_ITEM EditNewFileDialogMenu[] =
 };
 */
             HMENU hMenu = CreatePopupMenu();
-            InsertMenu(hMenu, 0xFFFFFFFF, MF_BYCOMMAND | MF_STRING, 1, LoadStr(IDS_EDITNEWFILE_SAVEASDEFAULT));
+            // Preserve UTF-8 command captions through the native Unicode menu.
+            InsertMenuUtf8(hMenu, 0xFFFFFFFF, MF_BYCOMMAND | MF_STRING, 1, LoadStr(IDS_EDITNEWFILE_SAVEASDEFAULT));
             char buff[2 * MAX_PATH];
             // Do not add a command whose localized label does not fit its fixed menu buffer.
             if (SUCCEEDED(StringCchPrintfA(buff, ARRAYSIZE(buff), LoadStr(IDS_EDITNEWFILE_REVERTDEFAULT), LoadStr(IDS_EDITNEWFILE_DEFAULTNAME))))
-                InsertMenu(hMenu, 0xFFFFFFFF, MF_BYCOMMAND | MF_STRING, 2, buff);
+                InsertMenuUtf8(hMenu, 0xFFFFFFFF, MF_BYCOMMAND | MF_STRING, 2, buff);
 
             TPMPARAMS tpmPar;
             tpmPar.cbSize = sizeof(tpmPar);
@@ -1035,7 +1038,8 @@ CCopyMoveMoreDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         if (hl != NULL)
             hl->SetActionShowHint(LoadStr(IDS_MASKS_HINT));
 
-        SetWindowText(HWindow, Title);
+        // Formatted and indirect localized strings must bypass the ANSI code page.
+        SetWindowTextUtf8(HWindow, Title);
         HWND hSubject = GetDlgItem(HWindow, IDS_SUBJECT);
         if (Subject->TruncateText(hSubject))
         {

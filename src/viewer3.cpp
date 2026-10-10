@@ -3,6 +3,8 @@
 // CommentsTranslationProject: TRANSLATED
 
 #include "precomp.h"
+#include "common/utf8_menu_text.h" // Localized menu captions are UTF-8, while native HMENU strings are Unicode.
+#include "common/utf8_control_text.h"
 #include <strsafe.h>
 
 #include "cfgdlg.h"
@@ -53,7 +55,8 @@ void CViewerWindow::SetViewerCaption()
             sprintf(caption + strlen(caption), " - [%s]", codeName);
         }
     }
-    SetWindowText(HWindow, caption);
+    // Formatted and indirect localized strings must bypass the ANSI code page.
+    SendUtf8ControlString(HWindow, WM_SETTEXT, 0, caption);
 }
 
 //
@@ -3210,16 +3213,17 @@ MENU_TEMPLATE_ITEM ViewerCodingMenu[] =
                     mi.fType = MFT_STRING;
                     mi.wID = CM_RECOGNIZE_CODEPAGE;
                     mi.dwTypeData = LoadStr(IDS_VIEWERAUTOCODING);
-                    InsertMenuItem(subMenu, 0, TRUE, &mi);
+                    // Preserve UTF-8 command captions through the native Unicode menu.
+                    InsertMenuItemUtf8(subMenu, 0, TRUE, &mi);
                     count++;
 
                     mi.fMask = MIIM_TYPE;
                     mi.fType = MFT_SEPARATOR;
-                    InsertMenuItem(subMenu, 1, TRUE, &mi);
+                    InsertMenuItemUtf8(subMenu, 1, TRUE, &mi);
                     count++;
 
                     // append another separator at the end of the submenu
-                    InsertMenuItem(subMenu, count++, TRUE, &mi);
+                    InsertMenuItemUtf8(subMenu, count++, TRUE, &mi);
 
                     // now append the rest of the commands
                     mi.fMask = MIIM_TYPE | MIIM_ID;
@@ -3227,15 +3231,15 @@ MENU_TEMPLATE_ITEM ViewerCodingMenu[] =
 
                     mi.wID = CM_SETDEFAULT_CODING;
                     mi.dwTypeData = LoadStr(IDS_VIEWERSETDEFAULTCODING);
-                    InsertMenuItem(subMenu, count++, TRUE, &mi);
+                    InsertMenuItemUtf8(subMenu, count++, TRUE, &mi);
 
                     mi.wID = CM_NEXTCODING;
                     mi.dwTypeData = LoadStr(IDS_VIEWERNEXTCODING);
-                    InsertMenuItem(subMenu, count++, TRUE, &mi);
+                    InsertMenuItemUtf8(subMenu, count++, TRUE, &mi);
 
                     mi.wID = CM_PREVCODING;
                     mi.dwTypeData = LoadStr(IDS_VIEWERPREVIOUSCODING);
-                    InsertMenuItem(subMenu, count++, TRUE, &mi);
+                    InsertMenuItemUtf8(subMenu, count++, TRUE, &mi);
                 }
 
                 CheckMenuItem(subMenu, CM_RECOGNIZE_CODEPAGE, MF_BYCOMMAND | (CodePageAutoSelect ? MF_CHECKED : MF_UNCHECKED));

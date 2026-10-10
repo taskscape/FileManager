@@ -3,6 +3,7 @@
 // CommentsTranslationProject: TRANSLATED
 
 #include "precomp.h"
+#include "../../common/utf8_menu_text.h" // Localized menu captions are UTF-8, while native HMENU strings are Unicode.
 #include <strsafe.h> // counted bounded copies (StringCchCopyNA)
 
 //
@@ -945,7 +946,8 @@ void CPluginFSInterface::ContextMenu(const char* fsName, HWND parent, int menuX,
                             mi.cbSize = sizeof(mi);
                             mi.fMask = MIIM_TYPE;
                             mi.fType = MFT_SEPARATOR;
-                            InsertMenuItem(subMenu, i++, TRUE, &mi);
+                            // Preserve UTF-8 command captions through the native Unicode menu.
+                            InsertMenuItemUtf8(subMenu, i++, TRUE, &mi);
                         }
                         lastType = type2;
 
@@ -958,7 +960,7 @@ void CPluginFSInterface::ContextMenu(const char* fsName, HWND parent, int menuX,
                         mi.dwTypeData = nameBuf;
                         mi.cch = (UINT)strlen(nameBuf);
                         mi.fState = MFS_ENABLED;
-                        InsertMenuItem(subMenu, i++, TRUE, &mi);
+                        InsertMenuItemUtf8(subMenu, i++, TRUE, &mi);
                     }
                 }
 

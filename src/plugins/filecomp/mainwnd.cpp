@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "precomp.h"
+#include "../../common/utf8_menu_text.h" // Localized menu captions are UTF-8, while native HMENU strings are Unicode.
 #include "../../common/utf8_control_text.h"
 
 using namespace std;
@@ -453,7 +454,8 @@ void CMainWindow::SelectDifference(int i, int cmd, BOOL setSel, BOOL center)
                 SG->ExpandPluralString(fmt, sizeof(fmt), LoadStr(IDS_BINREPORT2), 1, &CQuadWord().SetUI64(length));
                 sprintf(report, fmt, _ui64toa(length, buf1, 10),
                         QWord2Ascii(offset, buf2, FileView[fviLeft]->GetLineNumDigits()));
-                SendMessage(ComboBox->HWindow, WM_SETTEXT, 0, (WPARAM)report);
+                // Formatted and indirect localized strings must bypass the ANSI code page.
+                SendUtf8ControlString(ComboBox->HWindow, WM_SETTEXT, 0, report);
                 SendMessage(GetWindow(ComboBox->HWindow, GW_CHILD), EM_SETSEL, 0, -1);
             }
             else
@@ -581,8 +583,9 @@ void CMainWindow::UpdateToolbarButtons(DWORD flags)
             CheckMenuItem(menu, CM_VIEW_HORIZONTAL, bHorizontalView ? (MF_BYCOMMAND | MF_CHECKED) : (MF_BYCOMMAND | MF_UNCHECKED));
             if (bHorizontalView)
             {
-                ModifyMenu(menu, CM_MAXLEFTVIEW, MF_BYCOMMAND | MF_STRING, CM_MAXLEFTVIEW, LoadStr(IDS_MAXTOPVIEW));
-                ModifyMenu(menu, CM_MAXRIGHTVIEW, MF_BYCOMMAND | MF_STRING, CM_MAXRIGHTVIEW, LoadStr(IDS_MAXBOTTOMVIEW));
+                // Preserve UTF-8 command captions through the native Unicode menu.
+                ModifyMenuUtf8(menu, CM_MAXLEFTVIEW, MF_BYCOMMAND | MF_STRING, CM_MAXLEFTVIEW, LoadStr(IDS_MAXTOPVIEW));
+                ModifyMenuUtf8(menu, CM_MAXRIGHTVIEW, MF_BYCOMMAND | MF_STRING, CM_MAXRIGHTVIEW, LoadStr(IDS_MAXBOTTOMVIEW));
             }
             EnableMenuItem(menu, CM_RECOMPARE, MF_BYCOMMAND | MF_ENABLED);
             EnableToolbarButton(CM_RECOMPARE, TRUE);
@@ -772,7 +775,8 @@ void CMainWindow::ResetComboBox(BOOL* cancel)
                     sprintf(buf, LoadStr(IDS_ADD1), i, line1 + 1, path0, line0, path1);
             }
 
-            LRESULT ret = SendMessage(ComboBox->HWindow, CB_ADDSTRING, 0, (LPARAM)buf);
+            // Formatted and indirect localized strings must bypass the ANSI code page.
+            LRESULT ret = SendUtf8ControlString(ComboBox->HWindow, CB_ADDSTRING, 0, buf);
             if (ret == CB_ERR || ret == CB_ERRSPACE)
             {
                 TRACE_E("CB_ADDSTRING has failed, i = " << DWORD(i));
@@ -890,7 +894,8 @@ void CMainWindow::SpawnWorker(const char* path1, const char* path2,
             char buf[MAX_PATH * 2 + 200];
             sprintf(buf, LoadStr(IDS_MAINWNDHEADERCOMPUTING), SG->SalPathFindFileName(path1),
                     SG->SalPathFindFileName(path2));
-            SetWindowText(HWindow, buf);
+            // Formatted and indirect localized strings must bypass the ANSI code page.
+            SendUtf8ControlString(HWindow, WM_SETTEXT, 0, buf);
             SetWait(TRUE);
         }
     }
@@ -1116,8 +1121,9 @@ CMainWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 
             SplitBar->SetType(bHoriz ? sbHorizontal : sbVertical);
             CheckMenuItem(hMenu, CM_VIEW_HORIZONTAL, MF_BYCOMMAND | (bHoriz ? MF_CHECKED : MF_UNCHECKED));
-            ModifyMenu(hMenu, CM_MAXLEFTVIEW, MF_BYCOMMAND | MF_STRING, CM_MAXLEFTVIEW, LoadStr(bHoriz ? IDS_MAXTOPVIEW : IDS_MAXLEFTVIEW));
-            ModifyMenu(hMenu, CM_MAXRIGHTVIEW, MF_BYCOMMAND | MF_STRING, CM_MAXRIGHTVIEW, LoadStr(bHoriz ? IDS_MAXBOTTOMVIEW : IDS_MAXRIGHTVIEW));
+            // Preserve UTF-8 command captions through the native Unicode menu.
+            ModifyMenuUtf8(hMenu, CM_MAXLEFTVIEW, MF_BYCOMMAND | MF_STRING, CM_MAXLEFTVIEW, LoadStr(bHoriz ? IDS_MAXTOPVIEW : IDS_MAXLEFTVIEW));
+            ModifyMenuUtf8(hMenu, CM_MAXRIGHTVIEW, MF_BYCOMMAND | MF_STRING, CM_MAXRIGHTVIEW, LoadStr(bHoriz ? IDS_MAXBOTTOMVIEW : IDS_MAXRIGHTVIEW));
             LayoutChilds();
             return 0;
         }
@@ -2032,7 +2038,8 @@ CMainWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
             }
             _stprintf(buf, fmt, SG->SalPathFindFileName(Path1), SG->SalPathFindFileName(Path2),
                       LOWORD(lParam), HIWORD(lParam));
-            SetWindowText(HWindow, buf);
+            // Formatted and indirect localized strings must bypass the ANSI code page.
+            SendUtf8ControlString(HWindow, WM_SETTEXT, 0, buf);
             return 0;
         }
 
@@ -2121,7 +2128,8 @@ CMainWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         else
             _tcscpy(buf, LoadStr(IDS_PLUGINNAME));
 
-        SetWindowText(HWindow, buf);
+        // Formatted and indirect localized strings must bypass the ANSI code page.
+        SendUtf8ControlString(HWindow, WM_SETTEXT, 0, buf);
 
         if ((wParam != WN_TEXT_FILES_DIFFER) && (wParam != WN_UNICODE_FILES_DIFFER) && (wParam != WN_BINARY_FILES_DIFFER))
         {

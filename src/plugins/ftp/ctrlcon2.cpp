@@ -1488,7 +1488,8 @@ void CLogs::AddLogsToCombo(HWND combo, int prevItemUID, int* focusIndex, BOOL* e
                 sprintf(buf + strlen(buf), " (%s)", LoadStr(fsPosID));
 
             // add the assembled name + log UID
-            if (i == SendMessage(combo, CB_ADDSTRING, 0, (LPARAM)buf))
+            // Formatted and indirect localized strings must bypass the ANSI code page.
+            if (i == SendUtf8ControlString(combo, CB_ADDSTRING, 0, buf))
                 SendMessage(combo, CB_SETITEMDATA, i, d->UID);
             if (d->UID == prevItemUID)
                 *focusIndex = i;

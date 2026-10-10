@@ -83,6 +83,8 @@ void CSFVMD5Dialog::InitList(int columns[], int widths[], int numcols, SHashInfo
 #define LVS_EX_DOUBLEBUFFER 0x00010000
 #endif
     hList = GetDlgItem(HWindow, IDC_LIST_FILES);
+    // Calculating, verifying and missing-file status cells must return Unicode text.
+    SendMessageW(hList, LVM_SETUNICODEFORMAT, TRUE, 0);
     ListView_SetExtendedListViewStyleEx(hList, LVS_EX_FULLROWSELECT, LVS_EX_FULLROWSELECT);
     if (SalIsWindowsVersionOrGreater(6, 0, 0)) // WindowsVistaAndLater: Vista and later (CommonControls 6.0+)
         ListView_SetExtendedListViewStyleEx(hList, LVS_EX_DOUBLEBUFFER, LVS_EX_DOUBLEBUFFER);
@@ -1452,8 +1454,11 @@ INT_PTR CCalculateDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
             switch (nmh->code)
             {
             case LVN_GETDISPINFO:
+            case LVN_GETDISPINFOW:
             {
-                NMLVDISPINFO* plvdi = (NMLVDISPINFO*)nmh;
+                // Keep the existing UTF-8 provider while returning UTF-16 to the native list.
+                CUtf8ListViewDispInfo display(lParam);
+                NMLVDISPINFO* plvdi = display.Get();
                 int index = plvdi->item.iItem;
                 if (index < 0 || index >= FileList.Count) // while the worker thread runs, the array is not modified
                     break;                                // array size does not change = no synchronization
@@ -1999,7 +2004,8 @@ void CVerifyDialog::OnThreadEnd()
             sprintf(text, LoadStr(IDS_RESULT), nCorrupt, nMissing, nSkipped);
         }
     }
-    SetDlgItemText(HWindow, IDC_LABEL_RESULT, text);
+    // Formatted and indirect localized strings must bypass the ANSI code page.
+    SendUtf8DialogControlString(HWindow, IDC_LABEL_RESULT, WM_SETTEXT, 0, text);
     CSFVMD5Dialog::OnThreadEnd();
 }
 
@@ -2110,8 +2116,11 @@ INT_PTR CVerifyDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
             switch (nmh->code)
             {
             case LVN_GETDISPINFO:
+            case LVN_GETDISPINFOW:
             {
-                NMLVDISPINFO* plvdi = (NMLVDISPINFO*)nmh;
+                // Verification labels share the same Unicode owner-data boundary.
+                CUtf8ListViewDispInfo display(lParam);
+                NMLVDISPINFO* plvdi = display.Get();
                 int index = plvdi->item.iItem;
                 // while the worker thread runs, the array is not modified (item count + indices
                 // do not change = no need to synchronize access)

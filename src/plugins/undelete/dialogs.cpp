@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "precomp.h"
+#include "../../common/utf8_control_text.h"
 #include <strsafe.h> // counted bounded copies (StringCchCopyNA)
 
 #include <objbase.h>
@@ -38,7 +39,8 @@ CSnapshotProgressDlg::CSnapshotProgressDlg(HWND parent, CObjectOrigin origin)
 void CSnapshotProgressDlg::SetProgressText(int resID)
 {
     CALL_STACK_MESSAGE2("CSnapshotProgressDlg::SetProgressText(%d)", resID);
-    SetDlgItemText(HWindow, IDC_LABEL_FILENAME, String<char>::LoadStr(resID));
+    // Formatted and indirect localized strings must bypass the ANSI code page.
+    SendUtf8DialogControlString(HWindow, IDC_LABEL_FILENAME, WM_SETTEXT, 0, String<char>::LoadStr(resID));
 }
 
 void CSnapshotProgressDlg::SetProgressText(int resID, int number)
@@ -49,7 +51,8 @@ void CSnapshotProgressDlg::SetProgressText(int resID, int number)
     SalamanderGeneral->ExpandPluralString(plural, _countof(plural), String<char>::LoadStr(resID), 1, &qwnumber);
     char text[200];
     _snprintf_s(text, _TRUNCATE, plural, number);
-    SetDlgItemText(HWindow, IDC_LABEL_FILENAME, text);
+    // Formatted and indirect localized strings must bypass the ANSI code page.
+    SendUtf8DialogControlString(HWindow, IDC_LABEL_FILENAME, WM_SETTEXT, 0, text);
 }
 
 void CSnapshotProgressDlg::SetProgress(DWORD progress)
@@ -882,8 +885,10 @@ INT_PTR CRestoreProgressDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
     CALL_STACK_MESSAGE4("CRestoreProgressDlg::DialogProc(0x%X, 0x%IX, 0x%IX)", uMsg, wParam, lParam);
     if (uMsg == WM_INITDIALOG)
     {
-        SetDlgItemText(HWindow, IDC_LABEL_UNDELETING, String<char>::LoadStr(IDS_RESTORING));
-        SetWindowText(HWindow, String<char>::LoadStr(IDS_RESTORE));
+        // Formatted and indirect localized strings must bypass the ANSI code page.
+        SendUtf8DialogControlString(HWindow, IDC_LABEL_UNDELETING, WM_SETTEXT, 0, String<char>::LoadStr(IDS_RESTORING));
+        // Formatted and indirect localized strings must bypass the ANSI code page.
+        SendUtf8ControlString(HWindow, WM_SETTEXT, 0, String<char>::LoadStr(IDS_RESTORE));
     }
     return CCopyProgressDlg::DialogProc(uMsg, wParam, lParam);
 }

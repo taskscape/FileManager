@@ -184,15 +184,18 @@ CImgPropDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         {
             _stprintf(buffer, LoadStr(IDS_OF), PVII->CurrentImage + 1, PVII->NumOfImages);
         }
-        SetDlgItemText(HWindow, IDC_IMGPROP_PAGENUM, buffer);
+        // Formatted image properties include localized words as well as numeric values.
+        SendUtf8DialogControlString(HWindow, IDC_IMGPROP_PAGENUM, WM_SETTEXT, 0, buffer);
         CQuadWord qW(PVII->Width, 0);
         SalamanderGeneral->ExpandPluralString(fmt, sizeof(fmt), LoadStr(IDS_PIXELS), 1, &qW);
         _stprintf(buffer, fmt, PVII->Width);
-        SetDlgItemText(HWindow, IDC_IMGPROP_WIDTH, buffer);
+        // Pixel units are UTF-8 plural resources.
+        SendUtf8DialogControlString(HWindow, IDC_IMGPROP_WIDTH, WM_SETTEXT, 0, buffer);
         CQuadWord qH(PVII->Height, 0);
         SalamanderGeneral->ExpandPluralString(fmt, sizeof(fmt), LoadStr(IDS_PIXELS), 1, &qH);
         _stprintf(buffer, fmt, PVII->Height);
-        SetDlgItemText(HWindow, IDC_IMGPROP_HEIGHT, buffer);
+        // Pixel units are UTF-8 plural resources.
+        SendUtf8DialogControlString(HWindow, IDC_IMGPROP_HEIGHT, WM_SETTEXT, 0, buffer);
 
         if (PVII->TotalBitDepth > 0)
         {
@@ -233,16 +236,19 @@ CImgPropDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         {
             s = _T("CIE Lab");
         }
-        Static_SetText(GetDlgItem(HWindow, IDC_IMGPROP_COLORS), s);
+        // Native static-text macros also interpret narrow localized values as ANSI.
+        SendUtf8DialogControlString(HWindow, IDC_IMGPROP_COLORS, WM_SETTEXT, 0, s);
 
         CQuadWord q1(PVII->BytesPerLine * PVII->Height, 0);
         SalamanderGeneral->ExpandPluralString(fmt, sizeof(fmt), LoadStr(IDS_BYTES), 1, &q1);
         _stprintf(buffer, fmt, PVII->BytesPerLine * PVII->Height);
-        Static_SetText(GetDlgItem(HWindow, IDC_IMGPROP_SIZE), buffer);
+        // Keep localized byte units in UTF-8 until the control boundary.
+        SendUtf8DialogControlString(HWindow, IDC_IMGPROP_SIZE, WM_SETTEXT, 0, buffer);
         CQuadWord qFS(PVII->FileSize, 0);
         SalamanderGeneral->ExpandPluralString(fmt, sizeof(fmt), LoadStr(IDS_BYTES), 1, &qFS);
         _stprintf(buffer, fmt, PVII->FileSize);
-        Static_SetText(GetDlgItem(HWindow, IDC_IMGPROP_FSIZE), buffer);
+        // Keep localized byte units in UTF-8 until the control boundary.
+        SendUtf8DialogControlString(HWindow, IDC_IMGPROP_FSIZE, WM_SETTEXT, 0, buffer);
 
         if (PVII->VerDPI)
         {
@@ -253,7 +259,8 @@ CImgPropDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         {
             s = LoadStr(IDS_UNKNOWN);
         }
-        SetDlgItemText(HWindow, IDC_IMGPROP_DPI, s);
+        // Missing DPI uses a localized UTF-8 resource.
+        SendUtf8DialogControlString(HWindow, IDC_IMGPROP_DPI, WM_SETTEXT, 0, s);
 
         SetDlgItemTextA(HWindow, IDC_IMGPROP_FMT, PVII->Info1); //PVW32DLL.PVGetErrorText(PVII->Format));
         SetDlgItemTextA(HWindow, IDC_IMGPROP_COMPR, PVW32DLL.PVGetErrorText(PVII->Compression));

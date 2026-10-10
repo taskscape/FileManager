@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "precomp.h"
+#include "../../common/utf8_menu_text.h" // Localized menu captions are UTF-8, while native HMENU strings are Unicode.
 
 #include "checkver.h"
 #include "checkver.rh"
@@ -541,20 +542,21 @@ MENU_TEMPLATE_ITEM LogWindowMenu2[] =
 };
 */
             HMENU hMenu = CreatePopupMenu();
-            AppendMenu(hMenu, MF_STRING | MF_ENABLED, 1, LoadStr(item[0] == 0 ? IDS_CTXMENU_OPEN : IDS_CTXMENU_DOWNLOAD));
-            AppendMenu(hMenu, MF_STRING | MF_ENABLED, 2, LoadStr(IDS_CTXMENU_COPY));
+            // Preserve UTF-8 command captions through the native Unicode menu.
+            AppendMenuUtf8(hMenu, MF_STRING | MF_ENABLED, 1, LoadStr(item[0] == 0 ? IDS_CTXMENU_OPEN : IDS_CTXMENU_DOWNLOAD));
+            AppendMenuUtf8(hMenu, MF_STRING | MF_ENABLED, 2, LoadStr(IDS_CTXMENU_COPY));
             if (item[0] != 0)
             {
-                AppendMenu(hMenu, MF_SEPARATOR, 0, "");
+                AppendMenuUtf8(hMenu, MF_SEPARATOR, 0, "");
                 char buff[1024];
                 sprintf(buff, LoadStr(IDS_CTXMENU_FILTER), item);
-                AppendMenu(hMenu, MF_STRING | (HConfigurationDialog != NULL ? MF_GRAYED : MF_ENABLED), 3, buff);
+                AppendMenuUtf8(hMenu, MF_STRING | (HConfigurationDialog != NULL ? MF_GRAYED : MF_ENABLED), 3, buff);
                 if (itemVer != NULL)
                 {
                     *itemVer = ' ';
                     sprintf(buff, LoadStr(IDS_CTXMENU_FILTER), item);
                     *itemVer = 0;
-                    AppendMenu(hMenu, MF_STRING | (HConfigurationDialog != NULL ? MF_GRAYED : MF_ENABLED), 4, buff);
+                    AppendMenuUtf8(hMenu, MF_STRING | (HConfigurationDialog != NULL ? MF_GRAYED : MF_ENABLED), 4, buff);
                 }
             }
             ClientToScreen(HWindow, &p);

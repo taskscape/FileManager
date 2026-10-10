@@ -10,6 +10,7 @@
 //****************************************************************************
 
 #include "precomp.h"
+#include "../../common/utf8_menu_text.h" // Localized menu captions are UTF-8, while native HMENU strings are Unicode.
 #include <strsafe.h> // counted bounded copies (StringCchCopyNA)
 
 //
@@ -3083,7 +3084,8 @@ CPluginFSInterface::ContextMenu(const char* fsName, HWND parent, int menuX, int 
         mi.dwTypeData = nameBuf;
         mi.cch = (UINT)strlen(nameBuf);
         mi.fState = MFS_ENABLED;
-        InsertMenuItem(menu, i++, TRUE, &mi);
+        // Preserve UTF-8 command captions through the native Unicode menu.
+        InsertMenuItemUtf8(menu, i++, TRUE, &mi);
 
         int index = 0;
         int salCmd;
@@ -3097,7 +3099,7 @@ CPluginFSInterface::ContextMenu(const char* fsName, HWND parent, int menuX, int 
                 mi.cbSize = sizeof(mi);
                 mi.fMask = MIIM_TYPE;
                 mi.fType = MFT_SEPARATOR;
-                InsertMenuItem(menu, i++, TRUE, &mi);
+                InsertMenuItemUtf8(menu, i++, TRUE, &mi);
             }
             lastType = type2;
 
@@ -3110,7 +3112,8 @@ CPluginFSInterface::ContextMenu(const char* fsName, HWND parent, int menuX, int 
             mi.dwTypeData = nameBuf;
             mi.cch = (UINT)strlen(nameBuf);
             mi.fState = enabled ? MFS_ENABLED : MFS_DISABLED;
-            InsertMenuItem(menu, i++, TRUE, &mi);
+            // Preserve UTF-8 command captions through the native Unicode menu.
+            InsertMenuItemUtf8(menu, i++, TRUE, &mi);
         }
         DWORD cmd = TrackPopupMenuEx(menu, TPM_RETURNCMD | TPM_LEFTALIGN | TPM_RIGHTBUTTON,
                                      menuX, menuY, parent, NULL);
@@ -3153,7 +3156,8 @@ CPluginFSInterface::ContextMenu(const char* fsName, HWND parent, int menuX, int 
         mi.dwTypeData = nameBuf;
         mi.cch = (UINT)strlen(nameBuf);
         mi.fState = MFS_ENABLED;
-        InsertMenuItem(menu, i++, TRUE, &mi);
+        // Preserve UTF-8 command captions through the native Unicode menu.
+        InsertMenuItemUtf8(menu, i++, TRUE, &mi);
 
         strcpy(nameBuf, "&Disconnect");
         memset(&mi, 0, sizeof(mi));
@@ -3164,7 +3168,7 @@ CPluginFSInterface::ContextMenu(const char* fsName, HWND parent, int menuX, int 
         mi.dwTypeData = nameBuf;
         mi.cch = (UINT)strlen(nameBuf);
         mi.fState = MFS_ENABLED;
-        InsertMenuItem(menu, i++, TRUE, &mi);
+        InsertMenuItemUtf8(menu, i++, TRUE, &mi);
 
         DWORD cmd = TrackPopupMenuEx(menu, TPM_RETURNCMD | TPM_LEFTALIGN | TPM_RIGHTBUTTON,
                                      menuX, menuY, parent, NULL);
@@ -3187,7 +3191,8 @@ CPluginFSInterface::ContextMenu(const char* fsName, HWND parent, int menuX, int 
         mi.dwTypeData = nameBuf;
         mi.cch = (UINT)strlen(nameBuf);
         mi.fState = MFS_ENABLED;
-        InsertMenuItem(menu, i++, TRUE, &mi);
+        // Preserve UTF-8 command captions through the native Unicode menu.
+        InsertMenuItemUtf8(menu, i++, TRUE, &mi);
 
         strcpy(nameBuf, "&Disconnect");
         memset(&mi, 0, sizeof(mi));
@@ -3198,7 +3203,7 @@ CPluginFSInterface::ContextMenu(const char* fsName, HWND parent, int menuX, int 
         mi.dwTypeData = nameBuf;
         mi.cch = (UINT)strlen(nameBuf);
         mi.fState = MFS_ENABLED;
-        InsertMenuItem(menu, i++, TRUE, &mi);
+        InsertMenuItemUtf8(menu, i++, TRUE, &mi);
 
         DWORD cmd = TrackPopupMenuEx(menu, TPM_RETURNCMD | TPM_LEFTALIGN | TPM_RIGHTBUTTON,
                                      menuX, menuY, parent, NULL);

@@ -1,8 +1,9 @@
-﻿// SPDX-FileCopyrightText: 2023 Taskscape Ltd
+// SPDX-FileCopyrightText: 2023 Taskscape Ltd
 // SPDX-License-Identifier: GPL-2.0-or-later
 // CommentsTranslationProject: TRANSLATED
 
 #include "precomp.h"
+#include "common/utf8_menu_text.h" // Localized menu captions are UTF-8, while native HMENU strings are Unicode.
 #include "common/utf8_control_text.h"
 
 #include <strsafe.h>
@@ -1124,13 +1125,15 @@ void CConfigPageView::LoadControls()
         int i;
         for (i = 0; i < CFGP2ItemsCount; i++)
         {
-            LVITEM lvi;
+            // These localized option names must be inserted as Unicode, just like their column headers.
+            CStrP label(ConvertAllocUtf8ToWide(LoadStr(CFGP2ResID[i]), -1));
+            LVITEMW lvi = {};
             lvi.mask = LVIF_TEXT | LVIF_STATE;
             lvi.iItem = i;
             lvi.iSubItem = 0;
             lvi.state = 0;
-            lvi.pszText = LoadStr(CFGP2ResID[i]);
-            ListView_InsertItem(HListView2, &lvi);
+            lvi.pszText = label != NULL ? label.Ptr : (WCHAR*)L"";
+            SendMessageW(HListView2, LVM_INSERTITEMW, 0, (LPARAM)&lvi);
         }
         ListView_SetItemState(HListView2, 0, LVIS_FOCUSED | LVIS_SELECTED, LVIS_FOCUSED | LVIS_SELECTED);
         ListView_SetColumnWidth(HListView2, 0, LVSCW_AUTOSIZE_USEHEADER);
@@ -1853,8 +1856,9 @@ MENU_TEMPLATE_ITEM CfgPageViewerMenu[] =
 */
                 HMENU hMenu = CreatePopupMenu();
                 BOOL cstFont = LocalUseCustomViewerFont;
-                InsertMenu(hMenu, 0xFFFFFFFF, cstFont ? 0 : MF_CHECKED | MF_BYCOMMAND | MF_STRING, 1, LoadStr(IDS_USEDEFAULTFONT));
-                InsertMenu(hMenu, 0xFFFFFFFF, cstFont ? MF_CHECKED : 0 | MF_BYCOMMAND | MF_STRING, 2, LoadStr(IDS_USECUSTOMFONT));
+                // Preserve UTF-8 command captions through the native Unicode menu.
+                InsertMenuUtf8(hMenu, 0xFFFFFFFF, cstFont ? 0 : MF_CHECKED | MF_BYCOMMAND | MF_STRING, 1, LoadStr(IDS_USEDEFAULTFONT));
+                InsertMenuUtf8(hMenu, 0xFFFFFFFF, cstFont ? MF_CHECKED : 0 | MF_BYCOMMAND | MF_STRING, 2, LoadStr(IDS_USECUSTOMFONT));
 
                 TPMPARAMS tpmPar;
                 tpmPar.cbSize = sizeof(tpmPar);
@@ -1912,11 +1916,12 @@ MENU_TEMPLATE_ITEM CfgPageViewerMenu[] =
                     BOOL normal = button == NormalText;
                     BOOL checkedDefaultFg = GetFValue(TmpColors[normal ? VIEWER_FG_NORMAL : VIEWER_FG_SELECTED]) & SCF_DEFAULT;
                     BOOL checkedDefaultBk = GetFValue(TmpColors[normal ? VIEWER_BK_NORMAL : VIEWER_BK_SELECTED]) & SCF_DEFAULT;
-                    InsertMenu(hMenu, 0xFFFFFFFF, checkedDefaultFg ? 0 : MF_CHECKED | MF_BYCOMMAND | MF_STRING, 1, LoadStr(IDS_SETCOLOR_CUSTOM_FG));
-                    InsertMenu(hMenu, 0xFFFFFFFF, checkedDefaultFg ? MF_CHECKED : 0 | MF_BYCOMMAND | MF_STRING, 2, LoadStr(IDS_SETCOLOR_SYSTEM_FG));
-                    InsertMenu(hMenu, 0xFFFFFFFF, MF_BYCOMMAND | MF_SEPARATOR, 0, NULL);
-                    InsertMenu(hMenu, 0xFFFFFFFF, checkedDefaultBk ? 0 : MF_CHECKED | MF_BYCOMMAND | MF_STRING, 3, LoadStr(IDS_SETCOLOR_CUSTOM_BK));
-                    InsertMenu(hMenu, 0xFFFFFFFF, checkedDefaultBk ? MF_CHECKED : 0 | MF_BYCOMMAND | MF_STRING, 4, LoadStr(IDS_SETCOLOR_SYSTEM_BK));
+                    // Preserve UTF-8 command captions through the native Unicode menu.
+                    InsertMenuUtf8(hMenu, 0xFFFFFFFF, checkedDefaultFg ? 0 : MF_CHECKED | MF_BYCOMMAND | MF_STRING, 1, LoadStr(IDS_SETCOLOR_CUSTOM_FG));
+                    InsertMenuUtf8(hMenu, 0xFFFFFFFF, checkedDefaultFg ? MF_CHECKED : 0 | MF_BYCOMMAND | MF_STRING, 2, LoadStr(IDS_SETCOLOR_SYSTEM_FG));
+                    InsertMenuUtf8(hMenu, 0xFFFFFFFF, MF_BYCOMMAND | MF_SEPARATOR, 0, NULL);
+                    InsertMenuUtf8(hMenu, 0xFFFFFFFF, checkedDefaultBk ? 0 : MF_CHECKED | MF_BYCOMMAND | MF_STRING, 3, LoadStr(IDS_SETCOLOR_CUSTOM_BK));
+                    InsertMenuUtf8(hMenu, 0xFFFFFFFF, checkedDefaultBk ? MF_CHECKED : 0 | MF_BYCOMMAND | MF_STRING, 4, LoadStr(IDS_SETCOLOR_SYSTEM_BK));
 
                     //            int i;
                     //            for (i = 0; i < 4; i++)
@@ -3823,8 +3828,9 @@ MENU_TEMPLATE_ITEM CfgPageColorsMenu1[] =
   {MNTT_PE, 0
 };
 */
-                InsertMenu(hMenu, 0xFFFFFFFF, checkedDefaultFg ? 0 : MF_CHECKED | MF_BYCOMMAND | MF_STRING, 1, LoadStr(IDS_SETCOLOR_CUSTOM));
-                InsertMenu(hMenu, 0xFFFFFFFF, checkedDefaultFg ? MF_CHECKED : 0 | MF_BYCOMMAND | MF_STRING | enabledFg ? 0
+                // Preserve UTF-8 command captions through the native Unicode menu.
+                InsertMenuUtf8(hMenu, 0xFFFFFFFF, checkedDefaultFg ? 0 : MF_CHECKED | MF_BYCOMMAND | MF_STRING, 1, LoadStr(IDS_SETCOLOR_CUSTOM));
+                InsertMenuUtf8(hMenu, 0xFFFFFFFF, checkedDefaultFg ? MF_CHECKED : 0 | MF_BYCOMMAND | MF_STRING | enabledFg ? 0
                                                                                                                        : MF_GRAYED,
                            2, LoadStr(IDS_SETCOLOR_SYSTEM));
                 maxCmd = 2;
@@ -3852,15 +3858,16 @@ MENU_TEMPLATE_ITEM CfgPageColorsMenu3[] =
   {MNTT_PE, 0
 };
 */
-                InsertMenu(hMenu, 0xFFFFFFFF, checkedDefaultFg ? 0 : MF_CHECKED | MF_BYCOMMAND | MF_STRING, 1, LoadStr(IDS_SETCOLOR_CUSTOM_FG));
+                // Preserve UTF-8 command captions through the native Unicode menu.
+                InsertMenuUtf8(hMenu, 0xFFFFFFFF, checkedDefaultFg ? 0 : MF_CHECKED | MF_BYCOMMAND | MF_STRING, 1, LoadStr(IDS_SETCOLOR_CUSTOM_FG));
                 int textResID = (item || id == IDC_C_MASK5_C) ? IDS_SETCOLOR_SYSTEM_FG : IDS_SETCOLOR_DEFAULT_FG;
-                InsertMenu(hMenu, 0xFFFFFFFF, checkedDefaultFg ? MF_CHECKED : 0 | MF_BYCOMMAND | MF_STRING | enabledFg ? 0
+                InsertMenuUtf8(hMenu, 0xFFFFFFFF, checkedDefaultFg ? MF_CHECKED : 0 | MF_BYCOMMAND | MF_STRING | enabledFg ? 0
                                                                                                                        : MF_GRAYED,
                            2, LoadStr(textResID));
-                InsertMenu(hMenu, 0xFFFFFFFF, MF_BYCOMMAND | MF_SEPARATOR, 0, NULL);
-                InsertMenu(hMenu, 0xFFFFFFFF, checkedDefaultBk ? 0 : MF_CHECKED | MF_BYCOMMAND | MF_STRING, 3, LoadStr(IDS_SETCOLOR_CUSTOM_BK));
+                InsertMenuUtf8(hMenu, 0xFFFFFFFF, MF_BYCOMMAND | MF_SEPARATOR, 0, NULL);
+                InsertMenuUtf8(hMenu, 0xFFFFFFFF, checkedDefaultBk ? 0 : MF_CHECKED | MF_BYCOMMAND | MF_STRING, 3, LoadStr(IDS_SETCOLOR_CUSTOM_BK));
                 textResID = (item || id == IDC_C_MASK5_C) ? IDS_SETCOLOR_SYSTEM_BK : IDS_SETCOLOR_DEFAULT_BK;
-                InsertMenu(hMenu, 0xFFFFFFFF, checkedDefaultBk ? MF_CHECKED : 0 | MF_BYCOMMAND | MF_STRING | enabledBk ? 0
+                InsertMenuUtf8(hMenu, 0xFFFFFFFF, checkedDefaultBk ? MF_CHECKED : 0 | MF_BYCOMMAND | MF_STRING | enabledBk ? 0
                                                                                                                        : MF_GRAYED,
                            4, LoadStr(textResID));
                 maxCmd = 4;

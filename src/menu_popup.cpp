@@ -3,6 +3,7 @@
 // CommentsTranslationProject: TRANSLATED
 
 #include "precomp.h"
+#include "common/utf8_menu_text.h" // Localized menu captions are UTF-8, while native HMENU strings are Unicode.
 
 #include <strsafe.h>
 
@@ -682,7 +683,8 @@ BOOL CMenuPopup::GetItemInfo(DWORD position, BOOL byPosition, MENU_ITEM_INFO* mi
         else if (mii->String != NULL && mii->StringLen > 0)
         {
             // Preserve the caller-declared menu-label display limit explicitly.
-            StringCchCopyNA(mii->String, mii->StringLen, item->String, mii->StringLen - 1);
+            // Menu queries use byte-sized buffers, so clipping must end at a complete UTF-8 character.
+            CopyMenuTextUtf8(mii->String, static_cast<int>(mii->StringLen), item->String);
         }
     }
 
@@ -1022,7 +1024,8 @@ BOOL CMenuPopup::FillMenuHandle(HMENU hMenu)
         mii.fType = MFT_STRING;
         mii.wID = item->ID;
         mii.dwTypeData = item->String;
-        if (!InsertMenuItem(hMenu, i, TRUE, &mii))
+        // Preserve UTF-8 command captions through the native Unicode menu.
+        if (!InsertMenuItemUtf8(hMenu, i, TRUE, &mii))
         {
             TRACE_E("InsertMenuItem failed");
             return FALSE;
@@ -1062,34 +1065,11 @@ BOOL CMenuPopup::GetStatesFromHWindowsMenu(HMENU hMenu)
     return TRUE;
 }
 
-// This version works since W2K; we use it from Vista where MS introduced
-// alpha blended icons in menus (Wide character version for Unicode support)
-typedef struct
-{
-    UINT cbSize;
-    UINT fMask;
-    UINT fType;            // used if MIIM_TYPE (4.0) or MIIM_FTYPE (>4.0)
-    UINT fState;           // used if MIIM_STATE
-    UINT wID;              // used if MIIM_ID
-    HMENU hSubMenu;        // used if MIIM_SUBMENU
-    HBITMAP hbmpChecked;   // used if MIIM_CHECKMARKS
-    HBITMAP hbmpUnchecked; // used if MIIM_CHECKMARKS
-    ULONG_PTR dwItemData;  // used if MIIM_DATA
-    LPWSTR dwTypeData;     // used if MIIM_TYPE (4.0) or MIIM_STRING (>4.0) - wide char for Unicode
-    UINT cch;              // used if MIIM_TYPE (4.0) or MIIM_STRING (>4.0)
-    HBITMAP hbmpItem;      // used if MIIM_BITMAP
-} MENUITEMINFOW_NEW, FAR* LPMENUITEMINFOW_NEW;
-
-#define MIIM_STRING 0x00000040
-#define MIIM_BITMAP 0x00000080
-#define MIIM_FTYPE 0x00000100
-
 BOOL CMenuPopup::LoadFromHandle()
 {
     CALL_STACK_MESSAGE1("CMenuPopup::LoadFromHandle()");
-    wchar_t buffW[2048];  // Wide character buffer for Unicode
-    char buff[4096];      // UTF-8 buffer (4x size for worst case)
-    MENUITEMINFOW_NEW mii;
+    // Native menus are Unicode; query captions at their actual length before decoding to UTF-8.
+    MENUITEMINFOW mii = {};
     mii.cbSize = sizeof(mii);
     mii.fMask = MIIM_CHECKMARKS | MIIM_DATA | MIIM_ID | MIIM_STATE | MIIM_SUBMENU | MIIM_FTYPE | MIIM_BITMAP | MIIM_STRING;
     // convert all menu items to our data structures
@@ -1098,10 +1078,10 @@ BOOL CMenuPopup::LoadFromHandle()
     int i;
     for (i = 0; i < count; i++)
     {
-        mii.dwTypeData = buffW;
-        mii.cch = 2048;
+        mii.dwTypeData = NULL;
+        mii.cch = 0;
         // retrieve all available information about the item from the menu using Unicode API
-        if (!GetMenuItemInfoW(HWindowsMenu, i, TRUE, (MENUITEMINFOW*)&mii))
+        if (!GetMenuItemInfoW(HWindowsMenu, i, TRUE, &mii))
         {
             TRACE_E("GetMenuItemInfoW failed");
             return FALSE;
@@ -1161,28 +1141,9 @@ BOOL CMenuPopup::LoadFromHandle()
         // in the case of a string, copy the string (convert from Unicode to UTF-8)
         if (item->Type & MENU_TYPE_STRING)
         {
-            const wchar_t* pW = mii.dwTypeData;
-            int len = 0;
-            if (pW == NULL || pW[0] == 0)
-            {
-                buff[0] = 0;
-                len = 0;
-            }
-            else
-            {
-                // Convert wide char to UTF-8
-                len = WideCharToMultiByte(CP_UTF8, 0, pW, mii.cch, buff, sizeof(buff) - 1, NULL, NULL);
-                if (len <= 0)
-                {
-                    buff[0] = 0;
-                    len = 0;
-                }
-                else
-                {
-                    buff[len] = 0;
-                }
-            }
-            if (!item->SetText(buff, len))
+            std::string textUtf8;
+            if (!GetMenuItemTextUtf8(HWindowsMenu, i, TRUE, textUtf8) ||
+                !item->SetText(textUtf8.c_str(), static_cast<int>(textUtf8.size())))
             {
                 TRACE_E(LOW_MEMORY);
                 Items.Detach(index);
@@ -1190,8 +1151,7 @@ BOOL CMenuPopup::LoadFromHandle()
                 return FALSE;
             }
         }
-        else if (item->Type & MENU_TYPE_BITMAP)
-            item->HBmpItem = (HBITMAP)mii.dwTypeData;
+        // MIIM_BITMAP already supplied the bitmap handle; a string query must not overwrite it.
 
         if (mii.hSubMenu != NULL)
         {
@@ -1228,10 +1188,10 @@ BOOL CMenuPopup::LoadFromTemplate2(HINSTANCE hInstance, const MENU_TEMPLATE_ITEM
     SetImageList(hImageList);
     SetHotImageList(hHotImageList);
 
-    char stringBuff[1000];
+    // Own the full resource caption across recursive submenu construction; byte clipping can split UTF-8.
+    std::string templateCaption;
     MENU_ITEM_INFO mii;
     ZeroMemory(&mii, sizeof(mii));
-    mii.String = stringBuff;
 
     const MENU_TEMPLATE_ITEM* row = menuTemplate;
     if (addedRows == 0)
@@ -1255,8 +1215,8 @@ BOOL CMenuPopup::LoadFromTemplate2(HINSTANCE hInstance, const MENU_TEMPLATE_ITEM
                        MENU_MASK_SKILLLEVEL;
             mii.Type = MENU_TYPE_STRING;
             mii.ID = row->ID;
-            // Template labels use a fixed presentation buffer with an explicit clipping limit.
-            StringCchCopyNA(stringBuff, _countof(stringBuff), LoadStr(row->TextResID, hInstance), _countof(stringBuff) - 1);
+            templateCaption = LoadStr(row->TextResID, hInstance);
+            mii.String = const_cast<char*>(templateCaption.c_str());
             mii.ImageIndex = row->ImageIndex;
             mii.State = row->State;
             mii.SkillLevel = row->SkillLevel;
@@ -1305,8 +1265,8 @@ BOOL CMenuPopup::LoadFromTemplate2(HINSTANCE hInstance, const MENU_TEMPLATE_ITEM
                        MENU_MASK_ENABLER | MENU_MASK_SKILLLEVEL;
             mii.Type = MENU_TYPE_STRING;
             mii.ID = row->ID;
-            // Template labels use a fixed presentation buffer with an explicit clipping limit.
-            StringCchCopyNA(stringBuff, _countof(stringBuff), LoadStr(row->TextResID, hInstance), _countof(stringBuff) - 1);
+            templateCaption = LoadStr(row->TextResID, hInstance);
+            mii.String = const_cast<char*>(templateCaption.c_str());
             mii.ImageIndex = row->ImageIndex;
             mii.SubMenu = subMenu;
             mii.State = row->State;

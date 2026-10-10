@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "precomp.h"
+#include "common/utf8_menu_text.h" // Localized menu captions are UTF-8, while native HMENU strings are Unicode.
 
 #include "menu.h"
 #include "cfgdlg.h"
@@ -72,13 +73,14 @@ MENU_TEMPLATE_ITEM MouseDropMenu2[] =
         if (item1 == NULL && item2 == NULL && item3 == NULL)
             item4 = LoadStr(IDS_DROPUNKNOWN);
 
-        if ((item1 == NULL || AppendMenu(menu, MF_ENABLED | MF_STRING, 1, item1)) &&
-            (item2 == NULL || AppendMenu(menu, MF_ENABLED | MF_STRING, 2, item2)) &&
-            (item3 == NULL || AppendMenu(menu, MF_ENABLED | MF_STRING, 3, item3)) &&
-            (item4 == NULL || AppendMenu(menu, MF_ENABLED | MF_STRING | MF_DEFAULT,
+        // Preserve UTF-8 command captions through the native Unicode menu.
+        if ((item1 == NULL || AppendMenuUtf8(menu, MF_ENABLED | MF_STRING, 1, item1)) &&
+            (item2 == NULL || AppendMenuUtf8(menu, MF_ENABLED | MF_STRING, 2, item2)) &&
+            (item3 == NULL || AppendMenuUtf8(menu, MF_ENABLED | MF_STRING, 3, item3)) &&
+            (item4 == NULL || AppendMenuUtf8(menu, MF_ENABLED | MF_STRING | MF_DEFAULT,
                                          4, item4)) &&
-            AppendMenu(menu, MF_SEPARATOR, 0, NULL) &&
-            AppendMenu(menu, MF_ENABLED | MF_STRING | MF_DEFAULT, 5, LoadStr(IDS_DROPCANCEL)))
+            AppendMenuUtf8(menu, MF_SEPARATOR, 0, NULL) &&
+            AppendMenuUtf8(menu, MF_ENABLED | MF_STRING | MF_DEFAULT, 5, LoadStr(IDS_DROPCANCEL)))
         {
             int defItem = 0;
             if (item1 != NULL && (defEffect & DROPEFFECT_MOVE))
@@ -94,7 +96,7 @@ MENU_TEMPLATE_ITEM MouseDropMenu2[] =
                 item.cbSize = sizeof(item);
                 item.fMask = MIIM_STATE;
                 item.fState = MFS_DEFAULT | MFS_ENABLED;
-                SetMenuItemInfo(menu, defItem, FALSE, &item);
+                SetMenuItemInfoUtf8(menu, defItem, FALSE, &item);
             }
             POINT p;
             GetCursorPos(&p);
@@ -970,7 +972,8 @@ void InsertCopyFullPathContextMenuItem(HMENU hMenu, IContextMenu2* contextMenu)
         mi.fMask = MIIM_TYPE;
         mi.fType = MFT_SEPARATOR;
         mi.dwTypeData = NULL;
-        if (InsertMenuItem(hMenu, insertPos, TRUE, &mi))
+        // Preserve UTF-8 command captions through the native Unicode menu.
+        if (InsertMenuItemUtf8(hMenu, insertPos, TRUE, &mi))
             insertPos++;
     }
 
@@ -982,7 +985,7 @@ void InsertCopyFullPathContextMenuItem(HMENU hMenu, IContextMenu2* contextMenu)
     mi.fState = MFS_ENABLED;
     mi.dwTypeData = CONTEXTMENU_COPYFULLPATH_TEXT;
     mi.wID = CM_CONTEXTMENU_COPYFULLPATH;
-    if (!InsertMenuItem(hMenu, insertPos, TRUE, &mi))
+    if (!InsertMenuItemUtf8(hMenu, insertPos, TRUE, &mi))
     {
         DWORD err = GetLastError();
         TRACE_E("Unable to insert Copy full path command into context menu: " << GetErrorText(err));
@@ -2172,9 +2175,8 @@ void ShellAction(CFilesWindow* panel, CShellAction action, BOOL useSelection,
                             {
                                 memset(&mi, 0, sizeof(mi)); // required here
                                 mi.cbSize = sizeof(mi);
-                                mi.fMask = MIIM_STATE | MIIM_TYPE | MIIM_ID | MIIM_SUBMENU;
-                                mi.dwTypeData = itemName;
-                                mi.cch = 500;
+                                // Read shell metadata separately so its Unicode caption never passes through ACP.
+                                mi.fMask = MIIM_STATE | MIIM_FTYPE | MIIM_ID | MIIM_SUBMENU | MIIM_BITMAP | MIIM_DATA | MIIM_CHECKMARKS;
                                 if (GetMenuItemInfo(h, i, TRUE, &mi))
                                 {
                                     if (mi.hSubMenu == NULL && (mi.fType & MFT_SEPARATOR) == 0) // neni submenu ani separator
@@ -2183,7 +2185,13 @@ void ShellAction(CFilesWindow* panel, CShellAction action, BOOL useSelection,
                                         {
                                             if (stricmp(cmdName, "explore") == 0 || stricmp(cmdName, "open") == 0)
                                             {
-                                                InsertMenuItem(bckgndMenu, bckgndMenuInsert++, TRUE, &mi);
+                                                std::string shellCaption;
+                                                if (!GetMenuItemTextUtf8(h, i, TRUE, shellCaption))
+                                                    continue;
+                                                mi.fMask |= MIIM_STRING;
+                                                mi.dwTypeData = const_cast<char*>(shellCaption.c_str());
+                                                // Preserve UTF-8 command captions through the native Unicode menu.
+                                                InsertMenuItemUtf8(bckgndMenu, bckgndMenuInsert++, TRUE, &mi);
                                                 if (bckgndMenuInsert == 2)
                                                     break; // vic polozek odsud nepotrebujeme
                                             }
@@ -2203,7 +2211,7 @@ void ShellAction(CFilesWindow* panel, CShellAction action, BOOL useSelection,
                                 mi.fMask = MIIM_TYPE;
                                 mi.fType = MFT_SEPARATOR;
                                 mi.dwTypeData = NULL;
-                                InsertMenuItem(bckgndMenu, bckgndMenuInsert++, TRUE, &mi);
+                                InsertMenuItemUtf8(bckgndMenu, bckgndMenuInsert++, TRUE, &mi);
                             }
 
                             /* slouzi pro skript export_mnu.py, ktery generuje salmenu.mnu pro Translator
@@ -2238,7 +2246,8 @@ MENU_TEMPLATE_ITEM PanelBkgndMenu[] =
                             mi.fState = EnablerPastePath || EnablerPasteFiles ? MFS_ENABLED : MFS_DISABLED;
                             mi.dwTypeData = itemName;
                             mi.wID = 10000;
-                            InsertMenuItem(bckgndMenu, bckgndMenuInsert++, TRUE, &mi);
+                            // Preserve UTF-8 command captions through the native Unicode menu.
+                            InsertMenuItemUtf8(bckgndMenu, bckgndMenuInsert++, TRUE, &mi);
 
                             // pridame prikaz Paste Shortcuts
                             mi.cbSize = sizeof(mi);
@@ -2247,7 +2256,7 @@ MENU_TEMPLATE_ITEM PanelBkgndMenu[] =
                             mi.fState = EnablerPasteLinksOnDisk ? MFS_ENABLED : MFS_DISABLED;
                             mi.dwTypeData = LoadStr(IDS_MENU_EDIT_PASTELINKS);
                             mi.wID = 10001;
-                            InsertMenuItem(bckgndMenu, bckgndMenuInsert++, TRUE, &mi);
+                            InsertMenuItemUtf8(bckgndMenu, bckgndMenuInsert++, TRUE, &mi);
 
                             // if it is not there yet, insert separator
                             MENUITEMINFO mi2;
@@ -2261,7 +2270,7 @@ MENU_TEMPLATE_ITEM PanelBkgndMenu[] =
                                 mi.fMask = MIIM_TYPE;
                                 mi.fType = MFT_SEPARATOR;
                                 mi.dwTypeData = NULL;
-                                InsertMenuItem(bckgndMenu, bckgndMenuInsert++, TRUE, &mi);
+                                InsertMenuItemUtf8(bckgndMenu, bckgndMenuInsert++, TRUE, &mi);
                             }
 
                             DestroyMenu(h);
@@ -2282,7 +2291,8 @@ MENU_TEMPLATE_ITEM PanelBkgndMenu[] =
                             mi.fMask = MIIM_TYPE;
                             mi.fType = MFT_SEPARATOR;
                             mi.dwTypeData = NULL;
-                            InsertMenuItem(h, -1, TRUE, &mi);
+                            // Preserve UTF-8 command captions through the native Unicode menu.
+                            InsertMenuItemUtf8(h, -1, TRUE, &mi);
 
                             // New submenu
                             mi.cbSize = sizeof(mi);
@@ -2291,7 +2301,7 @@ MENU_TEMPLATE_ITEM PanelBkgndMenu[] =
                             mi.fState = MFS_ENABLED;
                             mi.hSubMenu = panel->ContextSubmenuNew->GetMenu();
                             mi.dwTypeData = LoadStr(IDS_MENUNEWTITLE);
-                            InsertMenuItem(h, -1, TRUE, &mi);
+                            InsertMenuItemUtf8(h, -1, TRUE, &mi);
                         }
                     }
 

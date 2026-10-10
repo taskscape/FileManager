@@ -56,6 +56,15 @@ public sealed class LanguageSwitchingUiTests : FileManagerUiTestBase
         var connectDialog = OpenFtpConnectDialog();
         Assert.That(NativeCommands.FtpBookmarksContains(connectDialog.Properties.NativeWindowHandle.Value, "Szybkie połączenie"), Is.True,
                     "The FTP bookmark list did not render Szybkie połączenie correctly.");
+        // The composed label follows a separate path from the list entry and previously sent UTF-8 to SetDlgItemTextA.
+        NativeCommands.PostDialogButtonClick(connectDialog.Properties.NativeWindowHandle.Value, 572); // IDB_NEWBOOKMARK
+        var newBookmark = WaitForWindow(window =>
+            NativeCommands.HasDialogControl(window.Properties.NativeWindowHandle.Value, 611)); // IDC_COPYFOCUSEDSRV
+        Assert.That(NativeCommands.GetDialogControlText(newBookmark.Properties.NativeWindowHandle.Value, 611),
+                    Is.EqualTo("&Kopiuj dane z zakładki \"Szybkie połączenie\""),
+                    "The New Bookmark checkbox corrupted the formatted Polish UTF-8 label.");
+        NativeCommands.ClickDialogButton(newBookmark.Properties.NativeWindowHandle.Value, 2);
+        WaitForWindowToClose(newBookmark);
         NativeCommands.ClickDialogButton(connectDialog.Properties.NativeWindowHandle.Value, 2);
         WaitForWindowToClose(connectDialog);
 

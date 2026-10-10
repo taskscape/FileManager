@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "precomp.h"
+#include "../../common/utf8_control_text.h"
 #include <crtdbg.h>
 #include <ostream>
 #include <commctrl.h>
@@ -184,7 +185,8 @@ BOOL CCommentDialog::OnInit(WPARAM wParam, LPARAM lParam)
 
     char title[MAX_PATH + 128];
     sprintf(title, LoadStr(IDS_COMMENTDLGTITLE), PackObject->ZipName);
-    SetWindowText(Dlg, title);
+    // Formatted and indirect localized strings must bypass the ANSI code page.
+    SendUtf8ControlString(Dlg, WM_SETTEXT, 0, title);
     SendMessage(Dlg, WM_SETICON, ICON_SMALL, (WPARAM)LoadIcon(DLLInstance, MAKEINTRESOURCE(IDI_COMMENT)));
 
     // disable the 'save' item

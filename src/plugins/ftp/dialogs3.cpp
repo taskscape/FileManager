@@ -3,6 +3,7 @@
 // CommentsTranslationProject: TRANSLATED
 
 #include "precomp.h"
+#include "../../common/utf8_menu_text.h" // Localized menu captions are UTF-8, while native HMENU strings are Unicode.
 #include "../../common/utf8_control_text.h"
 #include <strsafe.h> // counted bounded copies (StringCchCopyNA)
 
@@ -1434,9 +1435,10 @@ MENU_TEMPLATE_ITEM EditServerTypeADCondMenu[] =
                 while (*r != 0)
                 {
                     if (*r != -1)
-                        AppendMenu(menu, MF_STRING, (UINT_PTR)index, LoadStr(*r));
+                        // Preserve UTF-8 command captions through the native Unicode menu.
+                        AppendMenuUtf8(menu, MF_STRING, (UINT_PTR)index, LoadStr(*r));
                     else
-                        AppendMenu(menu, MF_SEPARATOR, NULL, NULL);
+                        AppendMenuUtf8(menu, MF_SEPARATOR, NULL, NULL);
                     index++;
                     s++;
                     r++;

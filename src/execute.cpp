@@ -3,6 +3,7 @@
 // CommentsTranslationProject: TRANSLATED
 
 #include "precomp.h"
+#include "common/utf8_menu_text.h" // Localized menu captions are UTF-8, while native HMENU strings are Unicode.
 
 #include "plugins.h"
 #include "usermenu.h"
@@ -2103,21 +2104,22 @@ TrackExecuteMenu(HWND hParent, int buttonResID, int editlineResID,
             while (item[i].Keyword != EXECUTE_SUBMENUEND && item[i].Keyword != EXECUTE_TERMINATOR)
             {
                 if (item[i].Keyword == EXECUTE_SEPARATOR)
-                    InsertMenu(hSubMenu, 0xFFFFFFFF, MF_BYPOSITION | MF_SEPARATOR, 1, NULL);
+                    // Preserve UTF-8 command captions through the native Unicode menu.
+                    InsertMenuUtf8(hSubMenu, 0xFFFFFFFF, MF_BYPOSITION | MF_SEPARATOR, 1, NULL);
                 else
-                    InsertMenu(hSubMenu, 0xFFFFFFFF, MF_BYPOSITION | MF_STRING, (UINT_PTR)i + 1,
+                    InsertMenuUtf8(hSubMenu, 0xFFFFFFFF, MF_BYPOSITION | MF_STRING, (UINT_PTR)i + 1,
                                LoadStr(item[i].NameResID));
                 i++;
             }
-            InsertMenu(hMenu, 0xFFFFFFFF, MF_BYPOSITION | MF_POPUP, (UINT_PTR)hSubMenu,
+            InsertMenuUtf8(hMenu, 0xFFFFFFFF, MF_BYPOSITION | MF_POPUP, (UINT_PTR)hSubMenu,
                        LoadStr(item[subMenuIndex].NameResID));
         }
         else
         {
             if (item[i].Keyword == EXECUTE_SEPARATOR)
-                InsertMenu(hMenu, 0xFFFFFFFF, MF_BYPOSITION | MF_SEPARATOR, 1, NULL);
+                InsertMenuUtf8(hMenu, 0xFFFFFFFF, MF_BYPOSITION | MF_SEPARATOR, 1, NULL);
             else
-                InsertMenu(hMenu, 0xFFFFFFFF, MF_BYPOSITION | MF_STRING, (UINT_PTR)i + 1,
+                InsertMenuUtf8(hMenu, 0xFFFFFFFF, MF_BYPOSITION | MF_STRING, (UINT_PTR)i + 1,
                            LoadStr(item[i].NameResID));
         }
         i++;

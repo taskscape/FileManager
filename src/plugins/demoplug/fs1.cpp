@@ -1,4 +1,4 @@
-﻿// SPDX-FileCopyrightText: 2023 Taskscape Ltd
+// SPDX-FileCopyrightText: 2023 Taskscape Ltd
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 //****************************************************************************
@@ -10,6 +10,7 @@
 //****************************************************************************
 
 #include "precomp.h"
+#include "../../common/utf8_menu_text.h" // Localized menu captions are UTF-8, while native HMENU strings are Unicode.
 
 #include <strsafe.h>
 
@@ -277,7 +278,8 @@ CPluginInterfaceForFS::ChangeDriveMenuItemContextMenu(HWND parent, int panel, in
         mi.wID = i + 1;
         mi.dwTypeData = p;
         mi.cch = (UINT)strlen(p);
-        InsertMenuItem(menu, i, TRUE, &mi);
+        // Preserve UTF-8 command captions through the native Unicode menu.
+        InsertMenuItemUtf8(menu, i, TRUE, &mi);
     }
     DWORD cmd = TrackPopupMenuEx(menu, TPM_RETURNCMD | TPM_LEFTALIGN | TPM_RIGHTBUTTON,
                                  x, y, parent, NULL);

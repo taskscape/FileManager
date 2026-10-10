@@ -3,6 +3,7 @@
 // CommentsTranslationProject: TRANSLATED
 
 #include "precomp.h"
+#include "common/utf8_menu_text.h" // Localized menu captions are UTF-8, while native HMENU strings are Unicode.
 
 #include "update_check.h"
 #include <shobjidl.h>
@@ -763,8 +764,9 @@ MENU_TEMPLATE_ITEM AddToSystemMenu[] =
   {MNTT_PE, 0
 };
 */
-            InsertMenu(h, pos, MF_BYPOSITION | MF_SEPARATOR, 0, NULL);
-            InsertMenu(h, pos + 1, MF_BYPOSITION | MF_STRING | MF_ENABLED | (Configuration.AlwaysOnTop ? MF_CHECKED : MF_UNCHECKED),
+            // Preserve UTF-8 command captions through the native Unicode menu.
+            InsertMenuUtf8(h, pos, MF_BYPOSITION | MF_SEPARATOR, 0, NULL);
+            InsertMenuUtf8(h, pos + 1, MF_BYPOSITION | MF_STRING | MF_ENABLED | (Configuration.AlwaysOnTop ? MF_CHECKED : MF_UNCHECKED),
                        CM_ALWAYSONTOP, LoadStr(IDS_ALWAYSONTOP));
         }
         SetWindowPos(HWindow,
@@ -3580,7 +3582,8 @@ MENU_TEMPLATE_ITEM TaskBarIconMenu[] =
 };
 */
             HMENU hMenu = CreatePopupMenu();
-            InsertMenu(hMenu, 0, MF_BYPOSITION | MF_STRING, CM_EXIT, LoadStr(IDS_CONTEXTMENU_EXIT));
+            // Preserve UTF-8 command captions through the native Unicode menu.
+            InsertMenuUtf8(hMenu, 0, MF_BYPOSITION | MF_STRING, CM_EXIT, LoadStr(IDS_CONTEXTMENU_EXIT));
 
             POINT p;
             GetCursorPos(&p);

@@ -958,7 +958,8 @@ CRenameDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         if (ServerTypes)
             // Localized UTF-8 text must reach the native control as UTF-16.
             SendUtf8ControlString(HWindow, WM_SETTEXT, 0, LoadStr(NewServer ? IDS_SRVTYPENEWTITLE : IDS_SRVTYPERENAMETITLE));
-        char buf[BOOKMSRVTYPE_MAX_SIZE + 200];
+        // Legacy bookmark names can expand when converted to UTF-8 and when ampersands are escaped.
+        char buf[BOOKMSRVTYPE_MAX_SIZE * 6 + 200];
         if (AddBookmark)
         {
             // Localized UTF-8 text must reach the native control as UTF-16.
@@ -970,19 +971,26 @@ CRenameDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         {
             if (!NewServer) // rename
             {
-                sprintf(buf, LoadStr(IDS_RENAMESRVTO), Name);
-                SetDlgItemText(HWindow, IDT_SUBJECT, buf);
+                // Normalize stored names before combining them with a UTF-8 resource template.
+                std::string nameUtf8 = LegacyControlTextToUtf8(Name);
+                _snprintf_s(buf, _TRUNCATE, LoadStr(IDS_RENAMESRVTO), nameUtf8.c_str());
+                // Formatted and indirect localized strings must bypass the ANSI code page.
+                SendUtf8DialogControlString(HWindow, IDT_SUBJECT, WM_SETTEXT, 0, buf);
             }
             else // new
             {
                 if (!ServerTypes || CopyFromName != NULL)
                 {
-                    char checkboxName[BOOKMSRVTYPE_MAX_SIZE];
-                    StringCchCopyNA(checkboxName, ServerTypes ? SERVERTYPE_MAX_SIZE - 1 : BOOKMARKNAME_MAX_SIZE, ServerTypes ? CopyFromName : Name, ServerTypes ? SERVERTYPE_MAX_SIZE - 1 : BOOKMARKNAME_MAX_SIZE); // counted bounded copy instead of lstrcpyn
-                    SalamanderGeneral->DuplicateAmpersands(checkboxName, ServerTypes ? SERVERTYPE_MAX_SIZE - 1 : BOOKMARKNAME_MAX_SIZE);
-                    sprintf(buf, LoadStr(ServerTypes ? IDS_SRVTYPECOPYFROM : IDS_COPYDATAFROM),
+                    // The caption alone is normalized; retain the stored bookmark's original data encoding.
+                    std::string copyNameUtf8 = LegacyControlTextToUtf8(ServerTypes ? CopyFromName : Name);
+                    char checkboxName[BOOKMSRVTYPE_MAX_SIZE * 6];
+                    if (FAILED(StringCchCopyA(checkboxName, _countof(checkboxName), copyNameUtf8.c_str())))
+                        checkboxName[0] = 0;
+                    SalamanderGeneral->DuplicateAmpersands(checkboxName, _countof(checkboxName));
+                    _snprintf_s(buf, _TRUNCATE, LoadStr(ServerTypes ? IDS_SRVTYPECOPYFROM : IDS_COPYDATAFROM),
                             checkboxName[0] != 0 ? checkboxName : LoadStr(IDS_QUICKCONNECT));
-                    SetDlgItemText(HWindow, IDC_COPYFOCUSEDSRV, buf);
+                    // Formatted and indirect localized strings must bypass the ANSI code page.
+                    SendUtf8DialogControlString(HWindow, IDC_COPYFOCUSEDSRV, WM_SETTEXT, 0, buf);
                 }
                 else // new server type + empty list = necessary to hide/disable the "copy from" checkbox
                 {
@@ -1041,11 +1049,14 @@ CEnterStrDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         if (!HideChars)
             SendDlgItemMessage(HWindow, IDE_STRING, EM_SETPASSWORDCHAR, NULL, 0);
         if (Title != NULL)
-            SetWindowText(HWindow, Title);
+            // Formatted and indirect localized strings must bypass the ANSI code page.
+            SendUtf8ControlString(HWindow, WM_SETTEXT, 0, Title);
         if (Text != NULL)
-            SetDlgItemText(HWindow, IDT_STRING, Text);
+            // Formatted and indirect localized strings must bypass the ANSI code page.
+            SendUtf8DialogControlString(HWindow, IDT_STRING, WM_SETTEXT, 0, Text);
         if (ConnectingToAs != NULL)
-            SetDlgItemText(HWindow, IDT_CONNECTINGTOAS, ConnectingToAs);
+            // Formatted and indirect localized strings must bypass the ANSI code page.
+            SendUtf8DialogControlString(HWindow, IDT_CONNECTINGTOAS, WM_SETTEXT, 0, ConnectingToAs);
     }
     return CCenteredDialog::DialogProc(uMsg, wParam, lParam);
 }
@@ -1122,15 +1133,19 @@ CLoginErrorDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
     if (uMsg == WM_INITDIALOG)
     {
         if (Title != NULL)
-            SetWindowText(HWindow, Title);
+            // Formatted and indirect localized strings must bypass the ANSI code page.
+            SendUtf8ControlString(HWindow, WM_SETTEXT, 0, Title);
 
         SetDlgItemText(HWindow, IDE_SERVERREPLY, ServerReply);
         if (ConnectingTo != NULL)
-            SetDlgItemText(HWindow, IDT_CONNECTINGTO, ConnectingTo);
+            // Formatted and indirect localized strings must bypass the ANSI code page.
+            SendUtf8DialogControlString(HWindow, IDT_CONNECTINGTO, WM_SETTEXT, 0, ConnectingTo);
         if (RetryWithoutAskingText != NULL)
-            SetDlgItemText(HWindow, IDC_RETRYWITHOUTASK, RetryWithoutAskingText);
+            // Formatted and indirect localized strings must bypass the ANSI code page.
+            SendUtf8DialogControlString(HWindow, IDC_RETRYWITHOUTASK, WM_SETTEXT, 0, RetryWithoutAskingText);
         if (ErrorTitle != NULL)
-            SetDlgItemText(HWindow, IDT_ERRORTITLE, ErrorTitle);
+            // Formatted and indirect localized strings must bypass the ANSI code page.
+            SendUtf8DialogControlString(HWindow, IDT_ERRORTITLE, WM_SETTEXT, 0, ErrorTitle);
 
         if (HideApplyToAll)
         {

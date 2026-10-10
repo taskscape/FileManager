@@ -3,6 +3,7 @@
 // CommentsTranslationProject: TRANSLATED
 
 #include "precomp.h"
+#include "common/utf8_menu_text.h" // Localized menu captions are UTF-8, while native HMENU strings are Unicode.
 #include <strsafe.h>
 
 #include "viewer.h"
@@ -1568,7 +1569,8 @@ BOOL InitializeViewer()
     mi.fType = MFT_STRING;
     mi.hSubMenu = CreatePopupMenu();
     mi.dwTypeData = LoadStr(IDS_VIEWERCODINGMENU);
-    InsertMenuItem(ViewerMenu, CODING_MENU_INDEX, TRUE, &mi);
+    // Preserve UTF-8 command captions through the native Unicode menu.
+    InsertMenuItemUtf8(ViewerMenu, CODING_MENU_INDEX, TRUE, &mi);
 
     ViewerTable = HANDLES(LoadAccelerators(HInstance, MAKEINTRESOURCE(IDA_VIEWERACCELS)));
     if (ViewerTable == NULL)

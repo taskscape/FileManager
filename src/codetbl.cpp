@@ -3,6 +3,8 @@
 // CommentsTranslationProject: TRANSLATED
 
 #include "precomp.h"
+#include "common/utf8_control_text.h" // Preserve legacy code-table names when composing Unicode menu captions.
+#include "common/utf8_menu_text.h" // Localized menu captions are UTF-8, while native HMENU strings are Unicode.
 
 #include "codetbl.h"
 #include "cfgdlg.h"
@@ -668,7 +670,8 @@ void CCodeTables::InitMenu(HMENU menu, int& codeType)
         mi.fType = MFT_STRING;
         mi.wID = CM_CODING_MIN;
         mi.dwTypeData = LoadStr(IDS_VIEWERNONECODING);
-        InsertMenuItem(menu, count++, TRUE, &mi);
+        // Preserve UTF-8 command captions through the native Unicode menu.
+        InsertMenuItemUtf8(menu, count++, TRUE, &mi);
 
         int i;
         for (i = 0; i < Table->Data.Count; i++)
@@ -683,7 +686,7 @@ void CCodeTables::InitMenu(HMENU menu, int& codeType)
                 mi.cbSize = sizeof(mi);
                 mi.fMask = MIIM_TYPE;
                 mi.fType = MFT_SEPARATOR;
-                InsertMenuItem(menu, count++, TRUE, &mi);
+                InsertMenuItemUtf8(menu, count++, TRUE, &mi);
             }
             else
             {
@@ -697,8 +700,10 @@ void CCodeTables::InitMenu(HMENU menu, int& codeType)
                     TRACE_E("mi.wID > CM_CODING_MAX");
                     break;
                 }
-                mi.dwTypeData = Table->Data[i]->Name;
-                InsertMenuItem(menu, count++, TRUE, &mi);
+                std::string tableNameUtf8 = LegacyControlTextToUtf8(Table->Data[i]->Name);
+                mi.dwTypeData = const_cast<char*>(tableNameUtf8.c_str());
+                // Preserve UTF-8 command captions through the native Unicode menu.
+                InsertMenuItemUtf8(menu, count++, TRUE, &mi);
             }
         }
     }

@@ -241,7 +241,8 @@ void CFindDialog::UpdateListViewItems()
         // write the item count above the list view
         char buff[50];
         SalPrintf(buff, 50, LoadStr(IDS_FOUNDITEMS2), count);
-        SetWindowText(GetDlgItem(HWindow, IDC_FOUND_FILES), buff);
+        // Formatted and indirect localized strings must bypass the ANSI code page.
+        SendUtf8ControlString(GetDlgItem(HWindow, IDC_FOUND_FILES), WM_SETTEXT, 0, buff);
 
         /*
     // if we are minimized, display the item count in the caption

@@ -293,9 +293,10 @@ void COperationDlg::SetDlgTitle(int progressValue, const char* state)
             else
                 text = TitleText; // progress unknown, status also unknown (shows plain title)
         }
-        if (!GetWindowText(HWindow, txt2, 500) || strcmp(text, txt2) != 0)
+        // Compare the same UTF-8 representation that is used to build the progress title.
+        if (!ReadUtf8ControlText(HWindow, txt2, _countof(txt2)) || strcmp(text, txt2) != 0)
         {
-            SetWindowText(HWindow, text);
+            SendUtf8ControlString(HWindow, WM_SETTEXT, 0, text);
             HWND foreground = GetForegroundWindow();
             while (foreground != HWindow && (foreground = ::GetParent(foreground)) != NULL)
                 ;
@@ -398,7 +399,8 @@ BOOL COperationDlg::UpdateDataInDialog()
         {
             char buf[200];
             _snprintf_s(buf, _TRUNCATE, "%s (%d / %d)", OperationsTextOrig, doneOrSkippedCount, totalCount);
-            SetWindowText(GetDlgItem(HWindow, IDT_OPERATIONSTEXT), buf);
+            // The captured label and its numeric suffix share the application's UTF-8 encoding.
+            SendUtf8DialogControlString(HWindow, IDT_OPERATIONSTEXT, WM_SETTEXT, 0, buf);
             DisplayedDoneOrSkippedCount = doneOrSkippedCount;
             DisplayedTotalCount = totalCount;
         }
@@ -1015,11 +1017,11 @@ void COperationDlg::EnablePauseButton()
     if (PauseButtonIsResume != showResume)
     {
         PauseButtonIsResume = showResume;
-        // The resume resource is UTF-8; the saved dialog caption remains in its original ANSI encoding.
+        // Both resource and captured captions remain UTF-8 across repeated pause/resume changes.
         if (PauseButtonIsResume)
             SendUtf8ControlString(button, WM_SETTEXT, 0, LoadStr(IDS_OPERDLGRESUMEBUTTON));
         else
-            SetWindowText(button, PauseButtonPauseText);
+            SendUtf8ControlString(button, WM_SETTEXT, 0, PauseButtonPauseText);
     }
     PauseButtonIsEnabled = someIsWorking;
     if ((IsWindowEnabled(button) != 0) != someIsWorking)
@@ -1055,11 +1057,11 @@ void COperationDlg::EnablePauseConButton(int index)
     if (ConPauseButtonIsResume != showResume)
     {
         ConPauseButtonIsResume = showResume;
-        // Preserve the resource and captured dialog caption in their respective encodings.
+        // Restore the captured caption without converting through the host ANSI code page.
         if (ConPauseButtonIsResume)
             SendUtf8ControlString(button, WM_SETTEXT, 0, LoadStr(IDS_OPERDLGRESUMECONBUTTON));
         else
-            SetWindowText(button, ConPauseButtonPauseText);
+            SendUtf8ControlString(button, WM_SETTEXT, 0, ConPauseButtonPauseText);
     }
     if ((IsWindowEnabled(button) != 0) != isWorking)
     {
@@ -1103,7 +1105,8 @@ void COperationDlg::EnableRetryItem(int index)
 void COperationDlg::ToggleSimpleLook()
 {
     char text[100];
-    GetDlgItemText(HWindow, IDB_SHOWDETAILS, text, 100);
+    // Changing only the ASCII arrows must preserve every localized character in the label.
+    ReadUtf8ControlText(GetDlgItem(HWindow, IDB_SHOWDETAILS), text, _countof(text));
     SimpleLook = !SimpleLook;
     char c = SimpleLook ? '>' : '<';
     int len = (int)strlen(text);
@@ -1112,7 +1115,7 @@ void COperationDlg::ToggleSimpleLook()
         text[len - 1] = c;
         text[len - 2] = c;
     }
-    SetDlgItemText(HWindow, IDB_SHOWDETAILS, text);
+    SendUtf8DialogControlString(HWindow, IDB_SHOWDETAILS, WM_SETTEXT, 0, text);
     ShowControlsAndChangeSize(SimpleLook);
 }
 

@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "precomp.h"
+#include "../../common/utf8_control_text.h"
 
 #include <strsafe.h>
 
@@ -288,7 +289,8 @@ void CRendererWindow::SetViewerTitle()
     else
         sprintf(title, "%s", LoadStr(IDS_PLUGINNAME));
 
-    SetWindowText(GetParent(HWindow), title);
+    // Formatted and indirect localized strings must bypass the ANSI code page.
+    SendUtf8ControlString(GetParent(HWindow), WM_SETTEXT, 0, title);
 }
 
 BOOL CRendererWindow::OpenFile(const char* name, BOOL useDefaultConfig)
