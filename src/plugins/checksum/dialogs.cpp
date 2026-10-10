@@ -295,6 +295,14 @@ INT_PTR CSFVMD5Dialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 
         switch (uMsg)
     {
+    case WM_NOTIFYFORMAT:
+        // A notification-format requery must not revert localized checksum status cells to ACP.
+        if (GetDlgCtrlID((HWND)wParam) == IDC_LIST_FILES)
+        {
+            SetWindowLongPtr(HWindow, DWLP_MSGRESULT, NFR_UNICODE);
+            return TRUE;
+        }
+        break;
     case WM_INITDIALOG:
     {
         bScrollToItem = TRUE;

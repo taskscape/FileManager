@@ -509,6 +509,14 @@ internal static class NativeCommands
         return SendMessageText(listHandle, LbFindStringExact, -1, bookmarkName) != -1;
     }
 
+    internal static bool RequeryListViewUnicodeFormat(nint dialogHandle, int controlId)
+    {
+        // Exercise the parent negotiation that can reset a list's one-time LVM_SETUNICODEFORMAT setting.
+        var list = RequireDialogControl(dialogHandle, controlId);
+        SendMessage(list, 0x0055, dialogHandle, 4); // WM_NOTIFYFORMAT, NF_REQUERY.
+        return SendMessage(list, 0x2006, 0, 0) != 0; // LVM_GETUNICODEFORMAT.
+    }
+
     internal static bool? TryGetToolbarCommandEnabled(nint windowHandle, int command)
     {
         bool? enabled = null;

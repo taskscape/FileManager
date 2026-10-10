@@ -37,6 +37,14 @@ COperationDlg::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
     int sysCmdShowCmd; // helper variable
     switch (uMsg)
     {
+    case WM_NOTIFYFORMAT:
+        // Common controls can requery an ANSI dialog after initialization; keep owner-data notifications UTF-16.
+        if (GetDlgCtrlID((HWND)wParam) == IDL_CONNECTIONS || GetDlgCtrlID((HWND)wParam) == IDL_OPERATIONS)
+        {
+            SetWindowLongPtr(HWindow, DWLP_MSGRESULT, NFR_UNICODE);
+            return TRUE;
+        }
+        break;
     case WM_INITDIALOG:
     {
         BOOL preventSystemFromSettingFocus = FALSE;

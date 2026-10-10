@@ -1642,6 +1642,14 @@ CRenamerDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                              wParam, lParam);
     switch (uMsg)
     {
+    case WM_NOTIFYFORMAT:
+        // Preview callbacks already supply UTF-16; retain that format if common controls requery the dialog.
+        if (Preview != NULL && (HWND)wParam == Preview->HWindow)
+        {
+            SetWindowLongPtr(HWindow, DWLP_MSGRESULT, NFR_UNICODE);
+            return TRUE;
+        }
+        break;
     case WM_INITDIALOG:
     {
         if (AlwaysOnTop)

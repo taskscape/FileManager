@@ -33,7 +33,8 @@ void WINAPI GetTextFromGeneralDateColumn()
         GlobalGeneralDateTimeStruct.wMonth = date->Month;
         GlobalGeneralDateTimeStruct.wYear = date->Year;
         int len;
-        if ((len = FormatUserDateTimeAnsi(&GlobalGeneralDateTimeStruct, DATE_SHORTDATE,
+        // Locale-formatted values join UTF-8 labels and must not introduce ACP bytes.
+        if ((len = FormatUserDateTimeUtf8(&GlobalGeneralDateTimeStruct, DATE_SHORTDATE,
                                           TransferBuffer, TRANSFER_BUFFER_MAX, TRUE)) == 0)
         {
             len = 1 + sprintf(TransferBuffer, "%u.%u.%u", GlobalGeneralDateTimeStruct.wDay,
@@ -55,7 +56,8 @@ void WINAPI GetTextFromGeneralTimeColumn()
         GlobalGeneralDateTimeStruct.wSecond = time->Second;
         GlobalGeneralDateTimeStruct.wMilliseconds = time->Millisecond;
         int len;
-        if ((len = FormatUserDateTimeAnsi(&GlobalGeneralDateTimeStruct, 0,
+        // Locale-formatted values join UTF-8 labels and must not introduce ACP bytes.
+        if ((len = FormatUserDateTimeUtf8(&GlobalGeneralDateTimeStruct, 0,
                                           TransferBuffer, TRANSFER_BUFFER_MAX, FALSE)) == 0)
         {
             len = 1 + sprintf(TransferBuffer, "%u:%02u:%02u", GlobalGeneralDateTimeStruct.wHour,
@@ -401,12 +403,14 @@ BOOL CFTPListingPluginDataInterface::GetInfoLineContent(int panel, const CFileDa
                 beg = s;
                 if (Columns->At(i)->Type == stctDate)
                 {
-                    if (FormatUserDateTimeAnsi(&st, DATE_SHORTDATE, buf, 1000, TRUE) == 0)
+                    // Locale-formatted values join UTF-8 labels and must not introduce ACP bytes.
+                    if (FormatUserDateTimeUtf8(&st, DATE_SHORTDATE, buf, 1000, TRUE) == 0)
                         sprintf(buf, "%u.%u.%u", st.wDay, st.wMonth, st.wYear);
                 }
                 else
                 {
-                    if (FormatUserDateTimeAnsi(&st, 0, buf, 1000, FALSE) == 0)
+                    // Locale-formatted values join UTF-8 labels and must not introduce ACP bytes.
+                    if (FormatUserDateTimeUtf8(&st, 0, buf, 1000, FALSE) == 0)
                     {
                         // The locale fallback must fit the fixed column-rendering scratch buffer.
                         _snprintf_s(buf, 1000, _TRUNCATE, "%u:%02u:%02u", st.wHour, st.wMinute, st.wSecond);
@@ -450,7 +454,8 @@ BOOL CFTPListingPluginDataInterface::GetInfoLineContent(int panel, const CFileDa
                     GlobalGeneralDateTimeStruct.wDay = date->Day;
                     GlobalGeneralDateTimeStruct.wMonth = date->Month;
                     GlobalGeneralDateTimeStruct.wYear = date->Year;
-                    if (FormatUserDateTimeAnsi(&GlobalGeneralDateTimeStruct, DATE_SHORTDATE,
+                    // Locale-formatted values join UTF-8 labels and must not introduce ACP bytes.
+                    if (FormatUserDateTimeUtf8(&GlobalGeneralDateTimeStruct, DATE_SHORTDATE,
                                                 buf, 1000, TRUE) == 0)
                     {
                         sprintf(buf, "%u.%u.%u", GlobalGeneralDateTimeStruct.wDay,
@@ -477,7 +482,8 @@ BOOL CFTPListingPluginDataInterface::GetInfoLineContent(int panel, const CFileDa
                     GlobalGeneralDateTimeStruct.wMinute = time->Minute;
                     GlobalGeneralDateTimeStruct.wSecond = time->Second;
                     GlobalGeneralDateTimeStruct.wMilliseconds = time->Millisecond;
-                    if (FormatUserDateTimeAnsi(&GlobalGeneralDateTimeStruct, 0,
+                    // Locale-formatted values join UTF-8 labels and must not introduce ACP bytes.
+                    if (FormatUserDateTimeUtf8(&GlobalGeneralDateTimeStruct, 0,
                                                 buf, 1000, FALSE) == 0)
                     {
                         sprintf(buf, "%u:%02u:%02u", GlobalGeneralDateTimeStruct.wHour,

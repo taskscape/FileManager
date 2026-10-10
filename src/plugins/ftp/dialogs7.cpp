@@ -1079,8 +1079,8 @@ void COperDlgListView::Attach(HWND hListView, COperationDlg* operDlg, BOOL consO
 
     if (HToolTip != NULL)
     {
-        static char emptyBuff[] = "";
-        TOOLINFO ti;
+        static WCHAR emptyBuff[] = L"";
+        TOOLINFOW ti;
         ti.cbSize = sizeof(ti);
         ti.hwnd = HWindow;
         ti.hinst = 0;
@@ -1091,7 +1091,7 @@ void COperDlgListView::Attach(HWND hListView, COperationDlg* operDlg, BOOL consO
         ti.rect.top = 0;
         ti.rect.right = 100;
         ti.rect.bottom = 100;
-        ::SendMessage(HToolTip, TTM_ADDTOOL, 0, (LPARAM)(LPTOOLINFO)&ti);
+        ::SendMessageW(HToolTip, TTM_ADDTOOLW, 0, (LPARAM)&ti);
     }
 }
 
@@ -1157,7 +1157,10 @@ COperDlgListView::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                     OperDlg->WorkersList->GetListViewDataFor(index, &lvdi, buff, 1000);
                 else
                     OperDlg->Queue->GetListViewDataFor(index, &lvdi, buff, 1000);
-                LastWidth = ListView_GetStringWidth(HWindow, buff);
+                // Measure and display the same UTF-16 text; the ANSI tooltip path corrupts localized status cells.
+                WCHAR wideText[1000] = {};
+                MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, lvdi.item.pszText, -1, wideText, _countof(wideText));
+                LastWidth = (int)SendMessageW(HWindow, LVM_GETSTRINGWIDTHW, 0, (LPARAM)wideText);
 
                 LastItem = hti.iItem;
                 LastSubItem = hti.iSubItem;
@@ -1168,7 +1171,7 @@ COperDlgListView::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                 else
                     ListView_GetSubItemRect(HWindow, hti.iItem, hti.iSubItem, LVIR_BOUNDS, &rect);
 
-                TOOLINFO ti;
+                TOOLINFOW ti;
                 ti.cbSize = sizeof(ti);
                 ti.hwnd = HWindow;
                 ti.hinst = 0;
@@ -1182,14 +1185,14 @@ COperDlgListView::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                     rect.right = cr.right;
 
                 if (LastWidth > rect.right - rect.left - (hti.iSubItem == 0 ? 4 : 12))
-                    ti.lpszText = buff;
+                    ti.lpszText = wideText;
                 else
                 {
-                    static char emptyBuff[] = "";
+                    static WCHAR emptyBuff[] = L"";
                     ti.lpszText = emptyBuff;
                     LastItem = -1;
                 }
-                ::SendMessage(HToolTip, TTM_SETTOOLINFO, 0, (LPARAM)(LPTOOLINFO)&ti);
+                ::SendMessageW(HToolTip, TTM_SETTOOLINFOW, 0, (LPARAM)&ti);
 
                 // proportionally set the display duration of the tooltip (longer text = longer display)
                 int len = (int)strlen(buff);
@@ -1279,15 +1282,15 @@ void COperDlgListView::HideToolTip(int onlyIfOnIndex)
 {
     if (HToolTip != NULL && (onlyIfOnIndex == -1 || onlyIfOnIndex == LastItem))
     {
-        static char emptyBuff[] = "";
-        TOOLINFO ti;
+        static WCHAR emptyBuff[] = L"";
+        TOOLINFOW ti;
         ti.cbSize = sizeof(ti);
         ti.hwnd = HWindow;
         ti.hinst = 0;
         ti.uId = 0;
         ti.uFlags = TTF_TRANSPARENT;
         ti.lpszText = emptyBuff;
-        ::SendMessage(HToolTip, TTM_SETTOOLINFO, 0, (LPARAM)(LPTOOLINFO)&ti);
+        ::SendMessageW(HToolTip, TTM_SETTOOLINFOW, 0, (LPARAM)&ti);
         LastItem = -1;
     }
 }

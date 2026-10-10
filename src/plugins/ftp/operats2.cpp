@@ -384,11 +384,13 @@ void CFTPOperation::SendHeaderToLog(int logUID)
 
         SYSTEMTIME st;
         GetLocalTime(&st);
-        if (FormatUserDateTimeAnsi(&st, DATE_SHORTDATE, timeBuf, 50, TRUE) == 0)
+        // Locale-formatted values join UTF-8 labels and must not introduce ACP bytes.
+        if (FormatUserDateTimeUtf8(&st, DATE_SHORTDATE, timeBuf, 50, TRUE) == 0)
             sprintf(timeBuf, "%u.%u.%u", st.wDay, st.wMonth, st.wYear);
         strcat(timeBuf, " - ");
         size_t timeOffset = strlen(timeBuf);
-        if (timeOffset < 50 && FormatUserDateTimeAnsi(&st, 0, timeBuf + timeOffset, 50 - (int)timeOffset, FALSE) == 0)
+        // Locale-formatted values join UTF-8 labels and must not introduce ACP bytes.
+        if (timeOffset < 50 && FormatUserDateTimeUtf8(&st, 0, timeBuf + timeOffset, 50 - (int)timeOffset, FALSE) == 0)
             _snprintf_s(timeBuf + timeOffset, 50 - timeOffset, _TRUNCATE, "%u:%02u:%02u", st.wHour, st.wMinute, st.wSecond);
         sprintf(buf, LoadStr(IDS_WORKERLOGHEADER), Host, Port, logUID, timeBuf);
         Logs.LogMessage(logUID, buf, -1);

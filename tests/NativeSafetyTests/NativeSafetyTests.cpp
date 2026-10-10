@@ -138,6 +138,11 @@ int TestNativeControlTextUtf8()
                 SendUtf8DialogControlString(window, 1, WM_SETTEXT, 0, labels[index]) != 0;
         GetWindowTextW(checkbox, actual, _countof(actual));
         valid = valid && wcscmp(actual, expected) == 0;
+        // Tooltip text must remain valid after the conversion helper returns and owns no temporary buffer.
+        NMTTDISPINFOW tooltip = {};
+        tooltip.hdr.code = TTN_GETDISPINFOW;
+        SetTooltipDispInfoTextUtf8((LPARAM)&tooltip, labels[index]);
+        valid = valid && tooltip.lpszText == tooltip.szText && wcscmp(tooltip.lpszText, expected) == 0;
         valid = valid && LegacyControlTextToUtf8(labels[index]) == labels[index];
         for (int copied = 0; valid && copied < 2; ++copied)
         {
@@ -170,6 +175,44 @@ int TestNativeControlTextUtf8()
         GetWindowTextW(checkbox, actual, _countof(actual));
         valid = valid && wcscmp(actual, expected) == 0;
     }
+    // Stored first-column and subitem text must survive independently of owner-data notifications and ACP.
+    LVCOLUMNA storedColumn = {};
+    storedColumn.mask = LVCF_TEXT | LVCF_WIDTH;
+    storedColumn.pszText = (char*)"Text";
+    storedColumn.cx = 100;
+    valid = valid && InsertListViewColumnUtf8(cells, 0, &storedColumn) == 0 &&
+            InsertListViewColumnUtf8(cells, 1, &storedColumn) == 1;
+    for (int index = 0; valid && index < (int)_countof(labels); ++index)
+    {
+        LVITEMA stored = {};
+        stored.mask = LVIF_TEXT | LVIF_PARAM;
+        stored.iItem = index + 1;
+        stored.pszText = (char*)labels[index];
+        stored.lParam = index + 42;
+        valid = InsertListViewItemUtf8(cells, &stored) == index + 1;
+        valid = valid && SetListViewItemTextUtf8(cells, index + 1, 1, labels[index]);
+        for (int column = 0; valid && column < 2; ++column)
+        {
+            WCHAR actual[200], expected[200];
+            LVITEMW read = {};
+            read.iItem = index + 1;
+            read.iSubItem = column;
+            read.mask = LVIF_TEXT | LVIF_PARAM;
+            read.pszText = actual;
+            read.cchTextMax = _countof(actual);
+            MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, labels[index], -1, expected, _countof(expected));
+            SendMessageW(cells, LVM_GETITEMTEXTW, index + 1, (LPARAM)&read);
+            valid = wcscmp(actual, expected) == 0;
+            read.mask = LVIF_PARAM;
+            read.iSubItem = 0;
+            valid = valid && SendMessageW(cells, LVM_GETITEMW, 0, (LPARAM)&read) != 0 && read.lParam == index + 42;
+        }
+    }
+    LVITEMA invalidItem = {};
+    invalidItem.mask = LVIF_TEXT;
+    invalidItem.pszText = (char*)"\xc5";
+    int countBeforeInvalid = ListView_GetItemCount(cells);
+    valid = valid && InsertListViewItemUtf8(cells, &invalidItem) == -1 && ListView_GetItemCount(cells) == countBeforeInvalid;
     // Short display requests must clip at Unicode boundaries and leave the caller's guard untouched.
     WCHAR clipped[] = {L'#', L'#', L'#'};
     NMLVDISPINFOW shortRequest = {};

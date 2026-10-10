@@ -2,6 +2,7 @@ using FileManager.UiTests.Infrastructure;
 using FlaUI.Core.AutomationElements;
 using NUnit.Framework;
 using System.Text;
+using Microsoft.Win32;
 
 namespace FileManager.UiTests;
 
@@ -18,6 +19,64 @@ public sealed class FtpDownloadReliabilityUiTests : FileOperationUiTestBase
         // A complete pre-existing destination makes premature overwrite observable.
         File.WriteAllBytes(workspace.TargetPath(LoopbackFtpDownloadServer.FileName), Original);
         foreach (var name in new[] { "arm", "entered", "release", "completed" }) File.Delete(Marker(name));
+    }
+
+    [Test]
+    public async Task Polish_progress_lists_preserve_localized_cell_text()
+    {
+        // Select and persist the real language module, rather than injecting untranslated fixture strings.
+        NativeCommands.OpenConfiguration(NativeMainWindowHandle);
+        var configuration = WaitForWindow(window => NativeCommands.HasDialogControl(window.Properties.NativeWindowHandle.Value, 1));
+        Assert.That(ConfigurationDialogPages.SelectLanguagePage(configuration.Properties.NativeWindowHandle.Value), Is.True);
+        NativeCommands.PostDialogButtonClick(configuration.Properties.NativeWindowHandle.Value, 387);
+        var selector = WaitForWindow(window => window.Title == "Select Language");
+        NativeCommands.SelectDialogListViewItemByPrefix(selector.Properties.NativeWindowHandle.Value, 1031, 'P');
+        NativeCommands.ClickDialogButton(selector.Properties.NativeWindowHandle.Value, 1);
+        WaitForWindowToClose(selector);
+        NativeCommands.PostDialogButtonClick(configuration.Properties.NativeWindowHandle.Value, 5);
+        var notice = WaitForWindow(window => NativeCommands.GetDialogText(window.Properties.NativeWindowHandle.Value)
+            .Contains("Language changes do not take effect", StringComparison.Ordinal));
+        NativeCommands.ClickDialogButton(notice.Properties.NativeWindowHandle.Value, 1);
+        WaitForWindowToClose(notice);
+        WaitForWindowToClose(configuration);
+        // The dialog closes before its configuration transaction has necessarily committed.
+        await WaitFor(() =>
+        {
+            using var root = Registry.CurrentUser.OpenSubKey(UiTestSettings.ConfigurationRegistryRoot);
+            if (root?.GetValue("Active Generation") is not int generation) return false;
+            using var saved = root.OpenSubKey($"Configuration Generations\\Generation {generation}\\Configuration");
+            return saved?.GetValue("Language") as string == "polish.slg";
+        }, "Polish language selection did not commit before restart.");
+        RestartFileManager();
+        await using var server = new LoopbackFtpDownloadServer();
+        await BeginTransfer(server, move: false);
+        await WaitFor(() => server.TransferPaused.Task.IsCompleted, "Polish FTP transfer did not reach its payload barrier.");
+        var progress = WaitForWindow(window => NativeCommands.HasDialogControl(window.Properties.NativeWindowHandle.Value, 761));
+        var handle = progress.Properties.NativeWindowHandle.Value;
+        // Keep the real operation dialog available after completion, then expose both owner-data lists.
+        if (NativeCommands.GetDialogCheckBoxState(handle, 778) != 0)
+            NativeCommands.ClickDialogButton(handle, 778);
+        if (NativeCommands.GetDialogControlText(handle, 758).Contains(">>", StringComparison.Ordinal))
+            NativeCommands.ClickDialogButton(handle, 758);
+        await WaitFor(() => progress.FindFirstDescendant(cf => cf.ByAutomationId("763")) is not null,
+                      "The FTP Connections list did not become visible.");
+        Assert.That(NativeCommands.RequeryListViewUnicodeFormat(handle, 763), Is.True,
+                    "Connections reverted to ANSI notifications after a format requery.");
+        Assert.That(NativeCommands.RequeryListViewUnicodeFormat(handle, 769), Is.True,
+                    "Operations reverted to ANSI notifications after a format requery.");
+        var connections = progress.FindFirstDescendant(cf => cf.ByAutomationId("763"))!;
+        Assert.That(connections.FindAllDescendants().Select(cell => cell.Name),
+                    Has.Some.Contains("Kopiowanie"), "Connections did not expose the Polish action text.");
+        server.ReleaseTransfer.TrySetResult();
+        var operations = progress.FindFirstDescendant(cf => cf.ByAutomationId("769"))!;
+        await WaitFor(() => operations.FindAllDescendants().Any(cell => cell.Name == "Zakończono"),
+                      "Operations corrupted the Polish completed status.");
+        var names = operations.FindAllDescendants().Select(cell => cell.Name).ToArray();
+        Assert.That(names, Has.Some.Contains("Kopiuj"));
+        Assert.That(names, Has.None.Contains("ZakoÅ"));
+        // Retain the rendered dialog alongside the transcript, not just the resource-source assertion.
+        using var capture = progress.Capture();
+        capture.Save(Path.Combine(UiTestSettings.ExecutionTranscriptRoot, "ftp-polish-progress.png"), System.Drawing.Imaging.ImageFormat.Png);
     }
 
     [TestCase(false)]
@@ -165,7 +224,8 @@ public sealed class FtpDownloadReliabilityUiTests : FileOperationUiTestBase
         var host = connect.FindFirstDescendant(cf => cf.ByAutomationId("563"))!.AsComboBox();
         host.Value = "127.0.0.1";
         NativeCommands.PostDialogButtonClick(handle, 570);
-        var advanced = WaitForWindow(window => window.Title == "Advanced Options");
+        // Stable control identity also works with localized advanced-option captions.
+        var advanced = WaitForWindow(window => NativeCommands.HasDialogControl(window.Properties.NativeWindowHandle.Value, 585));
         var advancedHandle = advanced.Properties.NativeWindowHandle.Value;
         NativeCommands.SetDialogControlText(advancedHandle, 585, server.Port.ToString(System.Globalization.CultureInfo.InvariantCulture));
         var mode = advanced.FindFirstDescendant(cf => cf.ByAutomationId("584"))!.AsComboBox();
@@ -177,7 +237,8 @@ public sealed class FtpDownloadReliabilityUiTests : FileOperationUiTestBase
         WaitForWindowToClose(advanced);
         NativeCommands.PostDialogButtonClick(handle, 1);
         await WaitFor(() => server.ListingSent.Task.IsCompleted && !NativeCommands.WindowExists(handle), "FTP fixture did not populate the panel.");
-        var welcome = NativeCommands.FindDialogByTitle(Application.ProcessId, "Welcome Message");
+        var welcome = NativeCommands.GetTopLevelWindows(Application.ProcessId)
+            .FirstOrDefault(window => NativeCommands.HasDialogControl(window, 641));
         if (welcome != 0) NativeCommands.ClickDialogButton(welcome, 1);
         SelectSourceItem(LoopbackFtpDownloadServer.FileName);
     }
@@ -204,7 +265,7 @@ public sealed class FtpDownloadReliabilityUiTests : FileOperationUiTestBase
             {
                 // Overwrite approval is a real worker prompt for this exact test file.
                 if (NativeCommands.HasDialogButton(window, 1308)) NativeCommands.PostDialogButtonClick(window, 1308);
-                if (NativeCommands.GetWindowTitle(window) == "Welcome Message") NativeCommands.PostDialogButtonClick(window, 1);
+                if (NativeCommands.HasDialogControl(window, 641)) NativeCommands.PostDialogButtonClick(window, 1);
             }
             await Task.Delay(50);
         }

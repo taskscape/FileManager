@@ -517,19 +517,20 @@ void CColumnsDialog::SetLVTexts(int index)
     }
 
     // type
-    ListView_SetItemText(HListView, index, 1, column->Type);
+    // Type captions are localized UTF-8; field names above retain the database's declared encoding.
+    SetListViewItemTextUtf8(HListView, index, 1, column->Type);
 
     // len
     buff[0] = 0;
     if (column->FieldLen != -1)
         SalGeneral->PrintDiskSize(buff, CQuadWord(column->FieldLen, 0), 2);
-    ListView_SetItemText(HListView, index, 2, buff);
+    SetListViewItemTextUtf8(HListView, index, 2, buff);
 
     // digits
     buff[0] = 0;
     if (column->Decimals != -1)
         sprintf(buff, "%d", column->Decimals);
-    ListView_SetItemText(HListView, index, 3, buff);
+    SetListViewItemTextUtf8(HListView, index, 3, buff);
 
     // visibility
     UINT state = INDEXTOSTATEIMAGEMASK((column->Visible ? 2 : 1));

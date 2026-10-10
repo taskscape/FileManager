@@ -1809,6 +1809,14 @@ CFindDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
     SLOW_CALL_STACK_MESSAGE4("CFindDialog::DialogProc(0x%X, 0x%IX, 0x%IX)", uMsg, wParam, lParam);
     switch (uMsg)
     {
+    case WM_NOTIFYFORMAT:
+        // Result names and metadata use UTF-8; keep the Unicode callback path after control-format requeries.
+        if (GetDlgCtrlID((HWND)wParam) == IDC_FIND_RESULTS)
+        {
+            SetWindowLongPtr(HWindow, DWLP_MSGRESULT, NFR_UNICODE);
+            return TRUE;
+        }
+        break;
     case WM_INITDIALOG:
     {
         FindDialogQueue.Add(new CWindowQueueItem(HWindow));

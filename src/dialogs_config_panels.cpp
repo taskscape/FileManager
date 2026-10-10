@@ -516,7 +516,8 @@ void CSharesDialog::Refresh()
             lvi.state = INDEXTOOVERLAYMASK(1);
             lvi.pszText = (char*)remoteName;
             lvi.lParam = i; // for later sorting
-            int index = ListView_InsertItem(HListView, &lvi);
+            // First-column names are UTF-8 just like the localized subitems.
+            int index = InsertListViewItemUtf8(HListView, &lvi);
             ListViewSetItemTextUtf8(HListView, index, 1, (char*)localPath);
             ListViewSetItemTextUtf8(HListView, index, 2, (char*)comment);
         }
@@ -1312,7 +1313,8 @@ void CDisconnectDialog::Refresh()
         lvi.pszText = Connections[i].Name;
         lvi.lParam = i; // for later sorting
         lvi.iIndent = (Connections[i].Type == citGroup) ? 0 : 1;
-        int index = ListView_InsertItem(HListView, &lvi);
+        // First-column names are UTF-8 just like the localized subitems.
+        int index = InsertListViewItemUtf8(HListView, &lvi);
         ListViewSetItemTextUtf8(HListView, index, 1, Connections[i].Path);
         if (Connections[i].Default)
         {
@@ -2558,7 +2560,8 @@ void CCfgPageIconOvrls::Transfer(CTransferInfo& ti)
             lvi.iItem = i;
             lvi.iSubItem = 0;
             lvi.pszText = item->IconOverlayName;
-            ListView_InsertItem(HListView, &lvi);
+            // First-column names are UTF-8 just like the localized subitems.
+            InsertListViewItemUtf8(HListView, &lvi);
 
             ListViewSetItemTextUtf8(HListView, i, 1, item->IconOverlayDescr);
 

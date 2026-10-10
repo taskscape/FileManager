@@ -72,6 +72,9 @@ public sealed class LanguageSwitchingUiTests : FileManagerUiTestBase
         var findDialog = WaitForWindow(window =>
             window.FindFirstDescendant(cf => cf.ByAutomationId(NativeCommands.FindResults.ToString())) is not null);
         var results = findDialog.FindFirstDescendant(cf => cf.ByAutomationId(NativeCommands.FindResults.ToString()))!;
+        // A parent-format requery must retain the UTF-16 callback path for localized result cells.
+        Assert.That(NativeCommands.RequeryListViewUnicodeFormat(findDialog.Properties.NativeWindowHandle.Value, NativeCommands.FindResults),
+                    Is.True, "Find results reverted to ANSI notifications after a format requery.");
         // Check the rendered header so an ANSI list-view call cannot silently corrupt UTF-8 resource text.
         var columnNames = results.FindAllDescendants(cf => cf.ByControlType(ControlType.HeaderItem))
             .Select(column => column.Name).ToArray();

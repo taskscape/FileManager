@@ -1041,7 +1041,8 @@ void CConfigPageView::Transfer(CTransferInfo& ti)
             lvi.iSubItem = 0;
             lvi.state = 0;
             lvi.pszText = Config.Items[i].Name;
-            ListView_InsertItem(HListView, &lvi);
+            // First-column names are UTF-8 just like the localized subitems.
+            InsertListViewItemUtf8(HListView, &lvi);
 
             const char* modeName = NULL;
             switch (Config.Items[i].Mode)

@@ -854,10 +854,11 @@ void CEditServerTypeDlg::RefreshListView(BOOL onlySet, int selIndex)
             lvi.iItem = i;
             lvi.iSubItem = 0;
             lvi.pszText = HandleNULLStr(col->ID);
-            ListView_InsertItem(HListView, &lvi);
+            // Column identifiers and composed labels share the plug-in's UTF-8 contract.
+            InsertListViewItemUtf8(HListView, &lvi);
         }
         else
-            ListView_SetItemText(HListView, i, 0, HandleNULLStr(col->ID));
+            SetListViewItemTextUtf8(HListView, i, 0, HandleNULLStr(col->ID));
 
         // checkbox visible
         // unfortunately this is not available in the header: ListView_SetCheckState(HListView, i, col->Visible != FALSE);
@@ -871,12 +872,13 @@ void CEditServerTypeDlg::RefreshListView(BOOL onlySet, int selIndex)
             LoadStdColumnStrName(bufName, STC_NAME_MAX_SIZE, col->NameID);
         else
             _snprintf_s(bufName, _TRUNCATE, "\"%s\"", HandleNULLStr(col->NameStr));
-        ListView_SetItemText(HListView, i, 1, bufName);
+        // Localized names, types, empty values and descriptions must bypass the ANSI string table.
+        SetListViewItemTextUtf8(HListView, i, 1, bufName);
 
         // column type
         char bufType[100];
         GetColumnTypeName(bufType, 100, col->Type);
-        ListView_SetItemText(HListView, i, 2, bufType);
+        SetListViewItemTextUtf8(HListView, i, 2, bufType);
 
         // column empty value
         char* emptyVal;
@@ -888,7 +890,7 @@ void CEditServerTypeDlg::RefreshListView(BOOL onlySet, int selIndex)
         }
         else
             emptyVal = col->EmptyValue;
-        ListView_SetItemText(HListView, i, 3, emptyVal);
+        SetListViewItemTextUtf8(HListView, i, 3, emptyVal);
 
         // column description
         char bufDescr[STC_DESCR_MAX_SIZE + 2];
@@ -896,7 +898,7 @@ void CEditServerTypeDlg::RefreshListView(BOOL onlySet, int selIndex)
             LoadStdColumnStrDescr(bufDescr, STC_DESCR_MAX_SIZE, col->DescrID);
         else
             _snprintf_s(bufDescr, _TRUNCATE, "\"%s\"", HandleNULLStr(col->DescrStr));
-        ListView_SetItemText(HListView, i, 4, bufDescr);
+        SetListViewItemTextUtf8(HListView, i, 4, bufDescr);
 
         // column alignment
         char emptyBuff[] = "";

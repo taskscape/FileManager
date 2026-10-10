@@ -28,6 +28,7 @@ CMainWindow::CMainWindow(char* path1, char* path2, CCompareOptions* options, UIN
     Path2 = path2;
     FileView[fviLeft] = NULL;
     FileView[fviRight] = NULL;
+    HToolbar = NULL; // Tooltip format negotiation can arrive while CreateToolbarEx is still constructing it.
     Active = 0;
     Initialized = FALSE;
     SelectedDifference = -1;
@@ -121,6 +122,11 @@ BOOL CMainWindow::Init()
         TRACE_E("CreateToolbarEx has failed; last error: " << GetLastError());
         return FALSE;
     }
+
+    // Requery once the toolbar owner is assigned so initial ANSI creation cannot cache an ANSI hint format.
+    HWND toolbarToolTip = (HWND)SendMessage(HToolbar, TB_GETTOOLTIPS, 0, 0);
+    if (toolbarToolTip != NULL)
+        SendMessageW(toolbarToolTip, WM_NOTIFYFORMAT, (WPARAM)HWindow, NF_REQUERY);
 
     ComboBox = new CComboBox();
     if (!ComboBox)
@@ -1027,6 +1033,11 @@ CMainWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
     //TRACE_I("CMainWindow::WindowProc(uMsg " << (void *)uMsg << " wParam " << wParam << " lParam " << lParam);
     switch (uMsg)
     {
+    case WM_NOTIFYFORMAT:
+        // Localized toolbar hints must use Unicode notifications even though the main window is ANSI.
+        if (HToolbar != NULL && (HWND)wParam == (HWND)SendMessage(HToolbar, TB_GETTOOLTIPS, 0, 0))
+            return NFR_UNICODE;
+        break;
     case WM_CREATE:
     {
         if (!Init())
@@ -1683,31 +1694,34 @@ CMainWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
             switch (pnmh->code)
             {
             case TTN_GETDISPINFO:
+            case TTN_GETDISPINFOW:
             {
-                LPNMTTDISPINFO lpnmtdi = (LPNMTTDISPINFO)lParam;
+                const char* text = NULL; // Resolve UTF-8 first, then encode into the notification's own storage.
 
                 switch (wParam)
                 {
                 case CM_COPY:
-                    lpnmtdi->lpszText = LoadStr(IDS_COPYCLIP);
+                    text = LoadStr(IDS_COPYCLIP);
                     break;
                 case CM_RECOMPARE:
-                    lpnmtdi->lpszText = LoadStr(IDS_RECOMPARE);
+                    text = LoadStr(IDS_RECOMPARE);
                     break;
                 case CM_FIRSTDIFF:
-                    lpnmtdi->lpszText = LoadStr(IDS_FIRSTDIFF);
+                    text = LoadStr(IDS_FIRSTDIFF);
                     break;
                 case CM_PREVDIFF:
-                    lpnmtdi->lpszText = LoadStr(IDS_PREVDIFF);
+                    text = LoadStr(IDS_PREVDIFF);
                     break;
                 case CM_NEXTDIFF:
-                    lpnmtdi->lpszText = LoadStr(IDS_NEXTDIFF);
+                    text = LoadStr(IDS_NEXTDIFF);
                     break;
                 case CM_LASTDIFF:
-                    lpnmtdi->lpszText = LoadStr(IDS_LASTDIFF);
+                    text = LoadStr(IDS_LASTDIFF);
                     break;
                 }
 
+                if (text != NULL)
+                    SetTooltipDispInfoTextUtf8(lParam, text);
                 return 0;
             }
             }

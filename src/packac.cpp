@@ -53,6 +53,14 @@ CPackACDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
     SLOW_CALL_STACK_MESSAGE4("CPackACDialog::DialogProc(0x%X, 0x%IX, 0x%IX)", uMsg, wParam, lParam);
     switch (uMsg)
     {
+    case WM_NOTIFYFORMAT:
+        // Preserve Unicode detection cells when the common control requeries its ANSI dialog parent.
+        if (GetDlgCtrlID((HWND)wParam) == IDC_ACLIST)
+        {
+            SetWindowLongPtr(HWindow, DWLP_MSGRESULT, NFR_UNICODE);
+            return TRUE;
+        }
+        break;
     case WM_INITDIALOG:
     {
         // construct the listview
@@ -65,6 +73,8 @@ CPackACDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         }
         // subclass listview
         ListView->AttachToControl(HWindow, IDC_ACLIST);
+        // Request UTF-16 cells instead of interpreting localized detection states as ACP.
+        SendMessageW(ListView->HWindow, LVM_SETUNICODEFORMAT, TRUE, 0);
         // create status bar
         HStatusBar = CreateWindowEx(0, STATUSCLASSNAME, (LPCTSTR)NULL,
                                     SBARS_SIZEGRIP | WS_CHILD | CCS_BOTTOM | WS_VISIBLE | WS_GROUP,
@@ -188,9 +198,11 @@ CPackACDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
             switch (((LPNMHDR)lParam)->code)
             {
             case LVN_GETDISPINFO:
+            case LVN_GETDISPINFOW:
             {
                 // show the item and its state (we hold the data, not the listview)
-                LV_DISPINFO* info = (LV_DISPINFO*)lParam;
+                CUtf8ListViewDispInfo display(lParam); // Convert provider text before the native list paints it.
+                LV_DISPINFO* info = display.Get();
                 int index;
                 CPackACPacker* packer = ListView->GetPacker(info->item.iItem, &index);
                 // if text was requested, provide it

@@ -59,6 +59,36 @@ inline BOOL PaintUtf8ControlText(HDC dc, int x, int y, UINT options, const RECT*
     return ExtTextOutW(dc, x, y, options, rect, wide.c_str(), length - 1, NULL);
 }
 
+// Tooltip notifications own their inline storage; never return a pointer into a temporary conversion buffer.
+inline void SetTooltipDispInfoTextUtf8(LPARAM notification, const char* text)
+{
+    NMTTDISPINFOA* ansi = (NMTTDISPINFOA*)notification;
+    int length = MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, text, -1, NULL, 0);
+    if (length == 0)
+        return;
+    std::wstring wide(length, L'\0');
+    if (MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, text, -1, &wide[0], length) == 0)
+        return;
+    if (ansi->hdr.code == TTN_GETDISPINFOW)
+    {
+        NMTTDISPINFOW* info = (NMTTDISPINFOW*)notification;
+        int copied = length - 1 < (int)_countof(info->szText) - 1 ? length - 1 : (int)_countof(info->szText) - 1;
+        if (copied > 0 && wide[copied - 1] >= 0xd800 && wide[copied - 1] <= 0xdbff)
+            --copied;
+        memcpy(info->szText, wide.c_str(), copied * sizeof(WCHAR));
+        info->szText[copied] = 0;
+        info->lpszText = info->szText;
+    }
+    else
+    {
+        // Older ANSI tooltip callers consume ACP, never the application's UTF-8 byte representation.
+        ansi->szText[0] = 0;
+        if (WideCharToMultiByte(CP_ACP, 0, wide.c_str(), -1, ansi->szText, _countof(ansi->szText), NULL, NULL) == 0)
+            ansi->szText[0] = 0;
+        ansi->lpszText = ansi->szText;
+    }
+}
+
 // Owner-data providers still produce UTF-8 LVITEMA data; Unicode notifications must return UTF-16 to the list.
 class CUtf8ListViewDispInfo
 {
@@ -189,6 +219,29 @@ inline int InsertListViewColumnUtf8(HWND control, int index, const LVCOLUMNA* co
     if (column->mask & LVCF_IDEALWIDTH)
         wideColumn.cxIdeal = column->cxIdeal;
     return (int)SendMessageW(control, LVM_INSERTCOLUMNW, index, (LPARAM)&wideColumn);
+}
+
+// First-column text needs the same UTF-16 boundary as subitems; retain callback and non-text item semantics.
+inline int InsertListViewItemUtf8(HWND control, const LVITEMA* item)
+{
+    if (item == NULL)
+        return -1;
+    LVITEMW wideItem = {};
+    static_assert(sizeof(LVITEMA) == sizeof(LVITEMW), "list-view item layouts must match");
+    memcpy(&wideItem, item, sizeof(wideItem));
+    std::wstring text;
+    if ((item->mask & LVIF_TEXT) && item->pszText != NULL && item->pszText != LPSTR_TEXTCALLBACKA)
+    {
+        int length = MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, item->pszText, -1, NULL, 0);
+        if (length == 0)
+            return -1;
+        text.resize(length, L'\0');
+        if (MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, item->pszText, -1, &text[0], length) == 0)
+            return -1;
+        wideItem.pszText = &text[0];
+        wideItem.cchTextMax = length;
+    }
+    return (int)SendMessageW(control, LVM_INSERTITEMW, 0, (LPARAM)&wideItem);
 }
 
 inline BOOL SetListViewItemTextUtf8(HWND control, int item, int subItem, const char* text)
