@@ -58,6 +58,8 @@ BOOL CFTPWorkersList::AddWorker(CFTPWorker* newWorker)
         Workers.ResetState();
         ret = FALSE;
     }
+    // Publish the actual count even when allocation failed and no worker was added.
+    WorkerCount.Publish(Workers.Count);
     HANDLES(LeaveCriticalSection(&WorkersListCritSect));
     return ret;
 }
@@ -223,6 +225,7 @@ BOOL CFTPWorkersList::DeleteWorkers(int workerInd, CFTPWorker** victims,
                 CFTPWorker* worker = Workers[workerInd];
                 worker->ReleaseData(uploadFirstWaitingWorker);
                 Workers.Detach(workerInd);
+                WorkerCount.Publish(Workers.Count); // readers must see removals in both deletion paths
                 if (!Workers.IsGood())
                     Workers.ResetState(); // disconnection must always succeed (error = cannot shrink the array)
                 if (worker->CanDeleteFromDelWorkers())
@@ -239,6 +242,7 @@ BOOL CFTPWorkersList::DeleteWorkers(int workerInd, CFTPWorker** victims,
             CFTPWorker* worker = Workers[Workers.Count - 1];
             worker->ReleaseData(uploadFirstWaitingWorker);
             Workers.Detach(Workers.Count - 1);
+            WorkerCount.Publish(Workers.Count); // publish each removal in a batched shutdown
             if (!Workers.IsGood())
                 Workers.ResetState(); // disconnection must always succeed (error = cannot shrink the array)
             if (worker->CanDeleteFromDelWorkers())
@@ -254,10 +258,8 @@ int CFTPWorkersList::GetCount()
 {
     CALL_STACK_MESSAGE1("CFTPWorkersList::GetCount()");
 
-    HANDLES(EnterCriticalSection(&WorkersListCritSect));
-    int ret = Workers.Count;
-    HANDLES(LeaveCriticalSection(&WorkersListCritSect));
-    return ret;
+    // Workers call this with WorkerCritSect held; the UI takes list then worker.
+    return WorkerCount.Get();
 }
 
 int CFTPWorkersList::GetFirstErrorIndex()

@@ -69,6 +69,8 @@ The same fixture compares uncompressed Unix listings, MODE Z Unix listings, and 
 
 The FTP fixture sets `FILEMANAGER_UI_FTP_FAULT` to `pause`, `flush`, `metadata`, `commit`, `close`, `admission`, or `close-admission`. Injection additionally requires `FILEMANAGER_UI_ISOLATED=1`, the exact sandbox configuration root, a validated `filemanager-testdata` directory, and an exclusively claimed one-use `.ftp-reliability.arm` file there. The pause is bounded; `.entered`, `.release`, and `.completed` files in that same directory coordinate only the selected test request. Normal invocations do not enable these faults. Hardware power-loss behavior is outside these software failure fixtures.
 
+`FtpWorkerCountTests.h` exercises the production atomic worker-count snapshot while a simulated UI thread holds the list lock and another thread holds a worker lock. It checks initialization, publication after removals/shutdown, and alignment inside packed FTP owners. It runs through the existing native-safety lane in both the local runner and CI; it does not reproduce a remote-server deletion session.
+
 ### GitHub release-pipeline parity
 
 Run the complete local equivalent of the GitHub release gate and installer-build jobs with:

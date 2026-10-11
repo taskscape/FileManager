@@ -1080,6 +1080,7 @@ int TestPublicationDirectoryRedirection()
 
 #include "OperationRecoveryTests.h" // shared fixture helpers above keep recovery tests within their owned directories
 #include "FtpDownloadTests.h" // exercise private staging, restart evidence and persistent multi-waiter completion
+#include "FtpWorkerCountTests.h" // worker-count reads must finish while UI list ownership overlaps worker ownership
 #include "ConfigurationPayloadTests.h" // require intended registry entries, fields and one save-wide error result
 
 int TestExecutionAdapterFaultInjection()
@@ -1174,6 +1175,8 @@ int main()
         result = TestOperationRecovery(); // changed or unresolved objects must survive another startup
     if (result == 0)
         result = TestFtpDownloadReliability(); // a failed local outcome must preserve the original files
+    if (result == 0)
+        result = TestFtpWorkerCountSnapshot(); // protect packed alignment and the confirmation/worker lock boundary
     if (result == 0)
         result = TestConfigurationPayloadReliability(); // incomplete optional collections cannot become accepted snapshots
     if (result == 0)

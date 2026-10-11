@@ -13,6 +13,11 @@ Sekce bez vstupu do jinych sekci (primitivni):
   CFTPTransferMetrics::MetricsCritSect
   CFTPConnectionAdmission::AdmissionCritSect
 
+Worker-count reads use CFTPWorkerCountSnapshot, published under WorkersListCritSect
+after each addition/removal. GetCount/GetWorkersCount acquire no critical section:
+WorkerCritSect must never enter WorkersListCritSect, because UI rendering and
+confirmation wake-ups take WorkersListCritSect before WorkerCritSect.
+
 Poznamka k dvema novym sekcim (viz ftp-improvements.md, sekce 1 a 2):
 
   CFTPTransferMetrics::MetricsCritSect drzi jen citace jedne operace. Nevstupuje

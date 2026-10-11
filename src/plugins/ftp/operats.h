@@ -5,6 +5,7 @@
 #pragma once
 
 #include "..\\..\\common\\monotonic_time.h" // 64-bit monotonic time for operation/speed timestamps
+#include "worker_count.h" // count reads must not reverse the UI's list-to-worker lock order
 
 #pragma pack(push, enter_include_operats_h_dt) // so that all structures are as small as possible (speed is not needed, we mainly save space)
 #pragma pack(1)
@@ -1923,6 +1924,7 @@ protected:
     CRITICAL_SECTION WorkersListCritSect;
 
     TIndirectArray<CFTPWorker> Workers; // array of workers
+    CFTPWorkerCountSnapshot WorkerCount; // published under the list lock, read without nesting that lock
     int NextWorkerID;                   // counter for worker IDs (displayed in the Connections listview in the operation dialog)
 
     DWORD LastFoundErrorOccurenceTime; // "time" of the last worker found with an error or the "time" before which no such worker exists
@@ -1982,7 +1984,8 @@ public:
     BOOL DeleteWorkers(int workerInd, CFTPWorker** victims, int maxVictims, int* foundVictims,
                        CUploadWaitingWorker** uploadFirstWaitingWorker);
 
-    // returns the number of workers
+    // Returns a published count without taking WorkersListCritSect, so callers
+    // holding WorkerCritSect cannot deadlock UI rendering or confirmation.
     int GetCount();
 
     // returns the index of the first worker that reports an error (state fwsConnectionError);
@@ -3037,8 +3040,8 @@ public:
     // Current worker target (diagnostics and the operation dialog).
     int GetWorkerTarget();
 
-    // Number of workers currently in this operation's list. Synchronization is
-    // inside CFTPWorkersList, so OperCritSect is not needed.
+    // Atomic count snapshot: safe inside WorkerCritSect, but does not grant
+    // access to the list or retain any worker's lifetime.
     int GetWorkersCount() { return WorkersList.GetCount(); }
 
     // Adds one worker to this operation when the target allows it and an
