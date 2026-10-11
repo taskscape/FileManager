@@ -5,6 +5,7 @@
 #include "precomp.h"
 #include <strsafe.h> // counted bounded copies (StringCchCopyNA)
 #include "../../common/utf8_control_text.h"
+#include "../../common/unicode_text_layout.h"
 
 TIndirectArray<CDialog> ModelessDlgs(2, 2, dtNoDelete); // array of "Welcome Message" dialogs
 
@@ -965,6 +966,21 @@ void AddToAdvancedStr(char* buf, int bufSize, const char* str)
         strcpy(buf + len, str);
 }
 
+// Stored FTP values can predate UTF-8; normalize them before composing resource text and clip only whole characters.
+void AddAdvancedValue(char* buf, int bufSize, const char* format, const char* value)
+{
+    std::string valueUtf8 = LegacyControlTextToUtf8(value);
+    char preview[100];
+    _snprintf_s(preview, _TRUNCATE, format, valueUtf8.c_str());
+    int bytes = (int)strlen(preview);
+    if (bytes > 36)
+    {
+        int keep = Utf8BoundedPrefixLength(preview, bytes, 37);
+        StringCchCopyA(preview + keep, _countof(preview) - keep, "...");
+    }
+    AddToAdvancedStr(buf, bufSize, preview);
+}
+
 void CConnectDlg::SelChanged()
 {
     CFTPServer* s;
@@ -1018,14 +1034,10 @@ void CConnectDlg::SelChanged()
     char num[100];
     if (s->ProxyServerUID != -2)
     {
-        num[36] = 0;
         char proxyNameBuf[PROXYSRVNAME_MAX_SIZE];
         if (TmpFTPProxyServerList.GetProxyName(proxyNameBuf, PROXYSRVNAME_MAX_SIZE, s->ProxyServerUID))
         {
-            _snprintf_s(num, 38, _TRUNCATE, LoadStr(IDS_ADVSTRPROXYSRV), proxyNameBuf);
-            if (num[36] != 0)
-                strcpy(num + 36, "...");
-            AddToAdvancedStr(buf, 300, num);
+            AddAdvancedValue(buf, 300, LoadStr(IDS_ADVSTRPROXYSRV), proxyNameBuf);
         }
         else
             TRACE_E("Unexpected situation in CConnectDlg::SelChanged(): invalid ProxyServerUID!");
@@ -1082,21 +1094,13 @@ void CConnectDlg::SelChanged()
     }
     if (s->ServerType != NULL)
     {
-        num[36] = 0;
         char typeBuf[SERVERTYPE_MAX_SIZE + 101];
-        _snprintf_s(num, 38, _TRUNCATE, LoadStr(IDS_ADVSTRSERVERTYPE),
-                    GetTypeNameForUser(s->ServerType, typeBuf, SERVERTYPE_MAX_SIZE + 101));
-        if (num[36] != 0)
-            strcpy(num + 36, "...");
-        AddToAdvancedStr(buf, 300, num);
+        AddAdvancedValue(buf, 300, LoadStr(IDS_ADVSTRSERVERTYPE),
+                         GetTypeNameForUser(s->ServerType, typeBuf, SERVERTYPE_MAX_SIZE + 101));
     }
     if (s->TargetPanelPath != NULL && *s->TargetPanelPath != 0)
     {
-        num[36] = 0;
-        _snprintf_s(num, 38, _TRUNCATE, LoadStr(IDS_ADVSTRTARGETPATH), s->TargetPanelPath);
-        if (num[36] != 0)
-            strcpy(num + 36, "...");
-        AddToAdvancedStr(buf, 300, num);
+        AddAdvancedValue(buf, 300, LoadStr(IDS_ADVSTRTARGETPATH), s->TargetPanelPath);
     }
     if (s->UseListingsCache != 2)
     {
@@ -1113,23 +1117,16 @@ void CConnectDlg::SelChanged()
 
     if (s->ListCommand != NULL)
     {
-        num[36] = 0;
-        _snprintf_s(num, 38, _TRUNCATE, LoadStr(IDS_ADVSTRLISTCOMMAND), s->ListCommand);
-        if (num[36] != 0)
-            strcpy(num + 36, "...");
-        AddToAdvancedStr(buf, 300, num);
+        AddAdvancedValue(buf, 300, LoadStr(IDS_ADVSTRLISTCOMMAND), s->ListCommand);
     }
     if (s->InitFTPCommands != NULL && *s->InitFTPCommands != 0)
     {
-        num[36] = 0;
-        _snprintf_s(num, 38, _TRUNCATE, LoadStr(IDS_ADVSTRINITFTPCMDS), s->InitFTPCommands);
-        if (num[36] != 0)
-            strcpy(num + 36, "...");
-        AddToAdvancedStr(buf, 300, num);
+        AddAdvancedValue(buf, 300, LoadStr(IDS_ADVSTRINITFTPCMDS), s->InitFTPCommands);
     }
     if (buf[0] == 0)
         strcpy(buf, LoadStr(IDS_ADVSTRNONE));
-    ti.EditLine(IDE_ADVANCEDINFO, buf, 300);
+    // The summary is composed from UTF-8 resources; EditLine's legacy ANSI data contract corrupts Polish accents.
+    SendUtf8DialogControlString(HWindow, IDE_ADVANCEDINFO, WM_SETTEXT, 0, buf);
 }
 
 void CConnectDlg::EnableControls()

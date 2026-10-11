@@ -12,6 +12,7 @@
 #include "precomp.h"
 #include <strsafe.h> // counted bounded copies (StringCchCopyNA)
 #include "..\\..\\common\\monotonic_time.h"
+#include "..\\..\\common\\utf8_message_box.h" // Localized validation messages are UTF-8, not ACP.
 //#include <windows.h>
 #ifdef _MSC_VER
 #include <crtdbg.h>
@@ -1127,7 +1128,7 @@ void CTransferInfo::EditLine(int ctrlID, double& value, char* format, BOOL selec
                     {
                         if (*s < '0' || *s > '9')
                         {
-                            MessageBox(HWindow, WinLibStrings[WLS_INVALID_NUMBER], WinLibStrings[WLS_ERROR],
+                            MessageBoxUtf8(HWindow, WinLibStrings[WLS_INVALID_NUMBER], WinLibStrings[WLS_ERROR],
                                        MB_OK | MB_ICONEXCLAMATION);
                             ErrorOn(ctrlID);
                             break;
@@ -1174,7 +1175,7 @@ void CTransferInfo::EditLine(int ctrlID, int& value, BOOL select)
             {
                 if (*s < '0' || *s > '9')
                 {
-                    MessageBox(HWindow, WinLibStrings[WLS_INVALID_NUMBER], WinLibStrings[WLS_ERROR],
+                    MessageBoxUtf8(HWindow, WinLibStrings[WLS_INVALID_NUMBER], WinLibStrings[WLS_ERROR],
                                MB_OK | MB_ICONEXCLAMATION);
                     ErrorOn(ctrlID);
                     break;

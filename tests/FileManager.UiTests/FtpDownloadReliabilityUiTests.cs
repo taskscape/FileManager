@@ -14,6 +14,22 @@ public sealed class FtpDownloadReliabilityUiTests : FileOperationUiTestBase
     private string Target => Workspace.TargetPath(LoopbackFtpDownloadServer.FileName);
     private static string Marker(string name) => Path.Combine(UiTestSettings.TestDataRoot, ".ftp-reliability." + name);
 
+    [TestCase(false, false)]
+    [TestCase(true, false)]
+    [TestCase(true, true)]
+    public async Task Compressed_listing_populates_the_panel_and_preserves_download_size(bool compression, bool machineReadable)
+    {
+        // A real queued copy proves the panel produced usable file metadata instead of numbered raw-listing rows.
+        await using var server = new LoopbackFtpDownloadServer { MachineReadableList = machineReadable, RequestCompression = compression };
+        server.ReleaseTransfer.TrySetResult();
+        await BeginTransfer(server, move: false);
+        await WaitFor(() => File.Exists(Target) && ReadShared(Target).SequenceEqual(server.Payload),
+                      "Compressed listing did not yield a complete downloadable panel item.");
+        Assert.That(server.Commands, Has.Some.EqualTo("LIST"));
+        Assert.That(server.Commands.Any(command => command == "MODE Z"), Is.EqualTo(compression));
+        Assert.That(server.Commands.Any(command => command.StartsWith("RETR ", StringComparison.Ordinal) && command.EndsWith(LoopbackFtpDownloadServer.FileName, StringComparison.Ordinal)), Is.True);
+    }
+
     protected override void SeedWorkspaceBeforeFileManagerStart(FileOperationWorkspace workspace)
     {
         // A complete pre-existing destination makes premature overwrite observable.
@@ -233,6 +249,8 @@ public sealed class FtpDownloadReliabilityUiTests : FileOperationUiTestBase
         NativeCommands.SetDialogCheckBoxState(advancedHandle, 587, isChecked: true);
         NativeCommands.SetDialogCheckBoxState(advancedHandle, 596, isChecked: false);
         NativeCommands.SetDialogCheckBoxState(advancedHandle, 597, isChecked: false);
+        // Select compression explicitly so persisted defaults cannot change the protocol exercised by a case.
+        NativeCommands.SetDialogCheckBoxState(advancedHandle, 598, isChecked: server.RequestCompression);
         NativeCommands.ClickDialogButton(advancedHandle, 1);
         WaitForWindowToClose(advanced);
         NativeCommands.PostDialogButtonClick(handle, 1);

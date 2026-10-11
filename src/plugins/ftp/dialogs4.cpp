@@ -149,8 +149,9 @@ void CEditSrvTypeColumnDlg::Transfer(CTransferInfo& ti)
             {
                 LoadStdColumnStrName(bufName, STC_NAME_MAX_SIZE, i);
                 LoadStdColumnStrDescr(bufDescr, STC_DESCR_MAX_SIZE, i);
-                SendMessage(comboName, CB_ADDSTRING, 0, (LPARAM)bufName);
-                SendMessage(comboDescr, CB_ADDSTRING, 0, (LPARAM)bufDescr);
+                // Standard column names and descriptions are composed from UTF-8 resources.
+                SendUtf8ControlString(comboName, CB_ADDSTRING, 0, bufName);
+                SendUtf8ControlString(comboDescr, CB_ADDSTRING, 0, bufDescr);
             }
             // set text limits
             SendMessage(comboName, CB_LIMITTEXT, STC_NAME_MAX_SIZE - 1, 0);
@@ -175,8 +176,9 @@ void CEditSrvTypeColumnDlg::Transfer(CTransferInfo& ti)
                 }
                 else
                     StringCchCopyNA(bufDescr, STC_DESCR_MAX_SIZE, HandleNULLStr(col->DescrStr), STC_DESCR_MAX_SIZE); // counted bounded copy instead of lstrcpyn
-                SetWindowText(comboName, bufName);
-                SetWindowText(comboDescr, bufDescr);
+                // Custom column text may come from old ACP profiles; resource-derived text is UTF-8.
+                SendUtf8OrAcpControlString(comboName, WM_SETTEXT, 0, bufName);
+                SendUtf8OrAcpControlString(comboDescr, WM_SETTEXT, 0, bufDescr);
             }
         }
         else
@@ -221,7 +223,8 @@ void CEditSrvTypeColumnDlg::Transfer(CTransferInfo& ti)
                 }
                 if (add && GetColumnTypeName(buf, 100, (CSrvTypeColumnTypes)i))
                 {
-                    SendMessage(combo, CB_ADDSTRING, 0, (LPARAM)buf); // add the string and
+                    // Type descriptions share the UTF-8 resource contract with names and descriptions.
+                    SendUtf8ControlString(combo, CB_ADDSTRING, 0, buf); // add the string and
                     SendMessage(combo, CB_SETITEMDATA, count++, i);   // associate which column type it is
                     if (Edit && (int)(ColumnsData->At(*EditedColumn)->Type) == i)
                     {

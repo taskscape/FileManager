@@ -138,6 +138,19 @@ int TestNativeControlTextUtf8()
                 SendUtf8DialogControlString(window, 1, WM_SETTEXT, 0, labels[index]) != 0;
         GetWindowTextW(checkbox, actual, _countof(actual));
         valid = valid && wcscmp(actual, expected) == 0;
+        // Compare production wait-text measurement with Windows' UTF-16 measurement, including wrapping.
+        HDC dc = GetDC(window);
+        for (int wrap = 0; valid && dc != NULL && wrap < 2; ++wrap)
+        {
+            RECT utf8Rect = {0, 0, 120, 1}, wideRect = utf8Rect;
+            UINT format = DT_CALCRECT | DT_LEFT | DT_NOPREFIX | (wrap ? DT_WORDBREAK : 0);
+            valid = DrawUtf8ControlText(dc, labels[index], &utf8Rect, format) ==
+                        DrawTextW(dc, expected, -1, &wideRect, format) &&
+                    EqualRect(&utf8Rect, &wideRect);
+        }
+        valid = valid && dc != NULL;
+        if (dc != NULL)
+            ReleaseDC(window, dc);
         // Tooltip text must remain valid after the conversion helper returns and owns no temporary buffer.
         NMTTDISPINFOW tooltip = {};
         tooltip.hdr.code = TTN_GETDISPINFOW;

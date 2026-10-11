@@ -864,7 +864,8 @@ void CProgressDialog::CancelOperation()
 void CProgressDialog::SetText(const char* text)
 {
     CALL_STACK_MESSAGE_NONE
-    SetDlgItemText(HWindow, IDS_MESSAGE, text);
+    // Progress messages are composed from localized UTF-8 resources.
+    SendUtf8DialogControlString(HWindow, IDS_MESSAGE, WM_SETTEXT, 0, text);
 }
 
 void CProgressDialog::EmptyMessageLoop()

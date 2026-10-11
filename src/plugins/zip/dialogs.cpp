@@ -748,7 +748,8 @@ void CPackDialog::ResetControls()
     if (PackOptions->Encrypt)
         SendDlgItemMessage(Dlg, IDC_ENCRYPT, BM_SETCHECK, (WPARAM)BST_CHECKED, 0);
 
-    SetWindowText(Dlg, Flags & PD_NEWARCHIVE || PackOptions->Action & (PA_MULTIVOL | PA_SELFEXTRACT)
+    // Both archive-action captions come from UTF-8 resources and must bypass SetWindowTextA.
+    SendUtf8ControlString(Dlg, WM_SETTEXT, 0, Flags & PD_NEWARCHIVE || PackOptions->Action & (PA_MULTIVOL | PA_SELFEXTRACT)
                            ? LoadStr(IDS_CREAETARCH)
                            : LoadStr(IDS_ADDTOARCHIVE));
     // Preserve the complete initial archive path before applying any preview transformation.

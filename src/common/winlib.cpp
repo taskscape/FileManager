@@ -11,6 +11,7 @@
 #include <commctrl.h> // need LPCOLORMAP
 #include <tchar.h>
 #include <strsafe.h>
+#include "utf8_message_box.h"
 
 #if defined(_DEBUG) && defined(_MSC_VER) // without passing file+line to 'new' operator, list of memory leaks shows only 'crtdbg.h(552)'
 #define new new (_NORMAL_BLOCK, __FILE__, __LINE__)
@@ -25,6 +26,13 @@
 #include "array.h"
 
 #include "winlib.h"
+
+// Narrow builds load UTF-8 resources; retain native UTF-16 behavior for the Unicode WinLib consumers.
+#ifdef _UNICODE
+#define WinLibMessageBox MessageBoxW
+#else
+#define WinLibMessageBox MessageBoxUtf8
+#endif
 
 // precaution against runtime check failure in debug version: original macro version casts rgb to WORD,
 // thus reporting data loss (RED component)
@@ -1150,7 +1158,7 @@ void CTransferInfo::EditLine(int ctrlID, double& value, TCHAR* format, BOOL sele
                     {
                         if (*s < _T('0') || *s > _T('9'))
                         {
-                            MessageBox(HWindow, WinLibStrings[WLS_INVALID_NUMBER], WinLibStrings[WLS_ERROR],
+                            WinLibMessageBox(HWindow, WinLibStrings[WLS_INVALID_NUMBER], WinLibStrings[WLS_ERROR],
                                        MB_OK | MB_ICONEXCLAMATION);
                             ErrorOn(ctrlID);
                             break;
@@ -1201,7 +1209,7 @@ void CTransferInfo::EditLine(int ctrlID, int& value, BOOL select)
             {
                 if (*s < _T('0') || *s > _T('9'))
                 {
-                    MessageBox(HWindow, WinLibStrings[WLS_INVALID_NUMBER], WinLibStrings[WLS_ERROR],
+                    WinLibMessageBox(HWindow, WinLibStrings[WLS_INVALID_NUMBER], WinLibStrings[WLS_ERROR],
                                MB_OK | MB_ICONEXCLAMATION);
                     ErrorOn(ctrlID);
                     break;
@@ -1259,7 +1267,7 @@ void CTransferInfo::EditLine(int ctrlID, __int64& value, BOOL select, BOOL unsig
                 {
                     if (!quiet)
                     {
-                        MessageBox(HWindow, WinLibStrings[WLS_INVALID_NUMBER], WinLibStrings[WLS_ERROR],
+                        WinLibMessageBox(HWindow, WinLibStrings[WLS_INVALID_NUMBER], WinLibStrings[WLS_ERROR],
                                    MB_OK | MB_ICONEXCLAMATION);
                     }
                     ErrorOn(ctrlID);
@@ -1325,7 +1333,7 @@ void CTransferInfo::EditLine(int ctrlID, __int64& value, BOOL select, BOOL unsig
                 {
                     if (!quiet)
                     {
-                        MessageBox(HWindow, WinLibStrings[WLS_INVALID_NUMBER], WinLibStrings[WLS_ERROR],
+                        WinLibMessageBox(HWindow, WinLibStrings[WLS_INVALID_NUMBER], WinLibStrings[WLS_ERROR],
                                    MB_OK | MB_ICONEXCLAMATION);
                     }
                     ErrorOn(ctrlID);

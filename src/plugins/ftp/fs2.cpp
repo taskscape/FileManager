@@ -1040,6 +1040,197 @@ BOOL CPluginFSInterface::ParseListing(CSalamanderDirectoryAbstract* dir,
     return ret;
 }
 
+// Some servers return MLSx facts for LIST in MODE Z. Validate the entire format
+// before publishing any entries, then use the normal listing data interface so
+// panel copy/delete/attributes retain their existing metadata and ownership paths.
+static BOOL ParseMLSxPanelListing(const char* listing, int listingLen, BOOL needUpDir,
+                                 CSalamanderDirectoryAbstract* dir,
+                                 CPluginDataInterfaceAbstract*& pluginData, BOOL* lowMem)
+{
+    *lowMem = FALSE;
+    const char* end = listing + listingLen;
+    const char* cursor = listing;
+    const char* line;
+    int lineLen;
+    BOOL foundEntry = FALSE;
+    BOOL allSizesKnown = TRUE;
+    while (GetNextMLSxLine(&cursor, end, &line, &lineLen))
+    {
+        CMLSxEntry entry;
+        if (!ParseMLSxLine(line, lineLen, &entry) || entry.Kind == mlsxEntryUnknown)
+            return FALSE;
+        // A recognisable type in a Unix filename is insufficient: every fact
+        // must have the RFC 3659 name=value; syntax, with no embedded NUL.
+        const char* factsEnd = (const char*)memchr(line, ' ', lineLen);
+        if (factsEnd == line || factsEnd[-1] != ';' || memchr(line, 0, lineLen) != NULL)
+            return FALSE;
+        for (const char* fact = line; fact < factsEnd;)
+        {
+            const char* semi = (const char*)memchr(fact, ';', factsEnd - fact);
+            const char* eq = semi == NULL ? NULL : (const char*)memchr(fact, '=', semi - fact);
+            if (eq == NULL || eq == fact)
+                return FALSE;
+            fact = semi + 1;
+        }
+        foundEntry = TRUE;
+        if ((entry.Kind == mlsxEntryFile || entry.IsLink) && !entry.SizeKnown)
+            allSizesKnown = FALSE;
+    }
+    if (!foundEntry)
+        return FALSE; // Empty LIST output stays on the existing server-type path.
+
+    TIndirectArray<CSrvTypeColumn>* columns = new TIndirectArray<CSrvTypeColumn>(6, 6);
+    const CSrvTypeColumnTypes types[] = {stctName, stctExt, stctSize, stctGeneralDate, stctGeneralTime, stctGeneralText};
+    const int names[] = {0, 1, 2, 3, 4, 6}; // Standard translated headers, including Rights.
+    if (columns != NULL && columns->IsGood())
+    {
+        for (int i = 0; i < 6; i++)
+        {
+            CSrvTypeColumn* column = new CSrvTypeColumn;
+            if (column == NULL || !column->IsGood())
+            {
+                delete column;
+                *lowMem = TRUE;
+                break;
+            }
+            column->Visible = TRUE;
+            column->Type = types[i];
+            column->NameID = column->DescrID = names[i];
+            columns->Add(column);
+            if (!columns->IsGood())
+            {
+                delete column;
+                *lowMem = TRUE;
+                break;
+            }
+        }
+    }
+    else
+        *lowMem = TRUE;
+    if (*lowMem)
+    {
+        delete columns;
+        return FALSE;
+    }
+
+    // Missing timestamps remain empty generic values; UTC facts are converted
+    // once for those local-time columns. Never invent a date or a known size.
+    DWORD mask = VALID_DATA_EXTENSION | VALID_DATA_HIDDEN | VALID_DATA_ISLINK;
+    if (allSizesKnown)
+        mask |= VALID_DATA_SIZE;
+    CFTPListingPluginDataInterface* dataIface = new CFTPListingPluginDataInterface(columns, TRUE, mask, FALSE);
+    if (dataIface == NULL || !dataIface->IsGood())
+    {
+        if (dataIface != NULL)
+            delete dataIface;
+        else
+            delete columns;
+        *lowMem = TRUE;
+        return FALSE;
+    }
+    dir->SetValidData(mask | dataIface->GetPLValidDataMask());
+    dir->SetFlags(SALDIRFLAG_CASESENSITIVE | SALDIRFLAG_IGNOREDUPDIRS);
+    cursor = listing;
+    while (!*lowMem)
+    {
+        CMLSxEntry entry;
+        BOOL isUpDir = FALSE;
+        if (GetNextMLSxLine(&cursor, end, &line, &lineLen))
+        {
+            ParseMLSxLine(line, lineLen, &entry); // Already validated in full above.
+            if (entry.Kind == mlsxEntryCurrentDir || entry.Kind == mlsxEntryParentDir ||
+                (entry.Name[0] == '.' && (entry.NameLen == 1 || (entry.NameLen == 2 && entry.Name[1] == '.'))) ||
+                (entry.Kind == mlsxEntryOther && !entry.IsLink))
+                continue; // Dot entries must not become selectable recursive operations.
+        }
+        else
+        {
+            if (!needUpDir)
+                break;
+            needUpDir = FALSE;
+            memset(&entry, 0, sizeof(entry));
+            entry.Name[0] = entry.Name[1] = '.';
+            entry.NameLen = 2;
+            entry.Kind = mlsxEntryDir;
+            isUpDir = TRUE; // The synthetic parent uses the panel's special extension/visibility rules.
+        }
+
+        BOOL isDir = entry.Kind == mlsxEntryDir;
+        CFileData file;
+        memset(&file, 0, sizeof(file));
+        file.Name = SalamanderGeneral->DupStr(entry.Name);
+        if (file.Name == NULL)
+        {
+            *lowMem = TRUE;
+            break;
+        }
+        file.NameLen = entry.NameLen;
+        file.Ext = file.Name + file.NameLen;
+        if (!isUpDir && (!isDir || SortByExtDirsAsFiles))
+        {
+            char* dot = strrchr(file.Name, '.');
+            if (dot != NULL)
+                file.Ext = dot + 1;
+        }
+        file.Size = entry.SizeKnown && !isDir ? entry.Size : CQuadWord(0, 0);
+        file.Hidden = entry.Name[0] == '.' && !isUpDir;
+        file.IsLink = entry.IsLink;
+        if (!dataIface->AllocPluginData(file))
+        {
+            SalamanderGeneral->Free(file.Name);
+            *lowMem = TRUE;
+            break;
+        }
+        dataIface->StoreTimeToColumn(file, 4, 24, 0, 0, 0);
+        if (entry.ModifyKnown)
+        {
+            FILETIME utc, localFile;
+            SYSTEMTIME local;
+            if (SystemTimeToFileTime(&entry.ModifyUTC, &utc) && FileTimeToLocalFileTime(&utc, &localFile) &&
+                FileTimeToSystemTime(&localFile, &local))
+            {
+                dataIface->StoreDateToColumn(file, 3, (BYTE)local.wDay, (BYTE)local.wMonth, local.wYear);
+                dataIface->StoreTimeToColumn(file, 4, (BYTE)local.wHour, (BYTE)local.wMinute, (BYTE)local.wSecond, local.wMilliseconds);
+            }
+        }
+        if (entry.UnixModeKnown || entry.IsLink)
+        {
+            char rights[11] = "----------";
+            rights[0] = entry.IsLink ? 'l' : (isDir ? 'd' : '-');
+            if (entry.UnixModeKnown)
+            {
+                for (int i = 0; i < 9; i++)
+                    if (entry.UnixMode & (1 << (8 - i)))
+                        rights[i + 1] = "rwx"[i % 3];
+                if (entry.UnixMode & 04000) rights[3] = rights[3] == 'x' ? 's' : 'S';
+                if (entry.UnixMode & 02000) rights[6] = rights[6] == 'x' ? 's' : 'S';
+                if (entry.UnixMode & 01000) rights[9] = rights[9] == 'x' ? 't' : 'T';
+            }
+            else
+                memset(rights + 1, '?', 9); // A link's type is known even when its permissions are not.
+            char* savedRights = SalamanderGeneral->DupStr(rights);
+            if (savedRights == NULL)
+                *lowMem = TRUE;
+            else
+                dataIface->StoreStringToColumn(file, 5, savedRights);
+        }
+        if (*lowMem || !(isDir ? dir->AddDir(NULL, file, NULL) : dir->AddFile(NULL, file, NULL)))
+        {
+            dataIface->ReleasePluginData(file, isDir);
+            SalamanderGeneral->Free(file.Name);
+            *lowMem = TRUE;
+        }
+    }
+    if (*lowMem)
+    {
+        dir->Clear(dataIface);
+        delete dataIface;
+        return FALSE;
+    }
+    pluginData = dataIface;
+    return TRUE;
+}
+
 BOOL CPluginFSInterface::ListCurrentPath(CSalamanderDirectoryAbstract* dir,
                                          CPluginDataInterfaceAbstract*& pluginData,
                                          int& iconsType, BOOL forceRefresh)
@@ -1237,6 +1428,18 @@ BOOL CPluginFSInterface::ListCurrentPath(CSalamanderDirectoryAbstract* dir,
             if (systReply != NULL)
                 SalamanderGeneral->Free(systReply);
 
+            // Compression can change a server's LIST format without changing
+            // its SYST reply. Recognise complete MLSx output after legacy parsers
+            // fail, including cached output, before falling back to raw text.
+            BOOL parsedMLSx = FALSE;
+            if (!err && needSimpleListing && !PathListingIsBroken && !PathListingIsIncomplete)
+            {
+                parsedMLSx = ParseMLSxPanelListing(PathListing, PathListingLen,
+                                                  FTPIsValidAndNotRootPath(pathType, Path), dir, pluginData, &err);
+                if (parsedMLSx)
+                    needSimpleListing = FALSE;
+            }
+
             if (!err)
             {
                 if (needSimpleListing) // unknown listing; show a message about sending the information to Taskscape Ltd
@@ -1252,9 +1455,9 @@ BOOL CPluginFSInterface::ListCurrentPath(CSalamanderDirectoryAbstract* dir,
                 }
                 else // log which parser handled it
                 {
-                    if (LastServerType[0] != 0) // "always true"
+                    if (parsedMLSx || LastServerType[0] != 0)
                     {
-                        _snprintf_s(logBuf, _TRUNCATE, LoadStr(IDS_LOGMSGPARSEDBYSRVTYPE), LastServerType);
+                        _snprintf_s(logBuf, _TRUNCATE, LoadStr(IDS_LOGMSGPARSEDBYSRVTYPE), parsedMLSx ? "MLSD" : LastServerType);
                         ControlConnection->LogMessage(logBuf, -1, TRUE);
                     }
                 }

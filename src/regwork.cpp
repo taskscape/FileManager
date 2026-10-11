@@ -4,6 +4,7 @@
 
 #include "precomp.h"
 #include "common/configuration_payload.h"
+#include "common/utf8_message_box.h" // Early registry failures already receive UTF-8 system error text, even before resources load.
 
 #include "mainwnd.h"
 #include "regwork.h"
@@ -369,7 +370,7 @@ BOOL CreateKeyAux(HWND parent, HKEY hKey, const char* name, HKEY& createdKey, BO
         {
             if (HLanguage == NULL)
             {
-                MessageBox(parent, GetErrorText(res), "Error Saving Configuration",
+                MessageBoxUtf8(parent, GetErrorText(res), "Error Saving Configuration",
                            MB_OK | MB_ICONEXCLAMATION);
             }
             else
@@ -395,7 +396,7 @@ BOOL OpenKeyAux(HWND parent, HKEY hKey, const char* name, HKEY& openedKey, BOOL 
         {
             if (HLanguage == NULL)
             {
-                MessageBox(parent, GetErrorText(res),
+                MessageBoxUtf8(parent, GetErrorText(res),
                            "Error Loading Configuration", MB_OK | MB_ICONEXCLAMATION);
             }
             else
@@ -463,7 +464,7 @@ BOOL GetValueAux(HWND parent, HKEY hKey, const char* name, DWORD type, void* buf
             {
                 if (HLanguage == NULL)
                 {
-                    MessageBox(parent, GetErrorText(res),
+                    MessageBoxUtf8(parent, GetErrorText(res),
                                "Error Loading Configuration", MB_OK | MB_ICONEXCLAMATION);
                 }
                 else
@@ -507,7 +508,7 @@ BOOL GetValue2Aux(HWND parent, HKEY hKey, const char* name, DWORD type1, DWORD t
         {
             if (HLanguage == NULL)
             {
-                MessageBox(parent, GetErrorText(res),
+                MessageBoxUtf8(parent, GetErrorText(res),
                            "Error Loading Configuration", MB_OK | MB_ICONEXCLAMATION);
             }
             else
@@ -546,7 +547,7 @@ BOOL SetValueAux(HWND parent, HKEY hKey, const char* name, DWORD type,
         {
             if (HLanguage == NULL)
             {
-                MessageBox(parent, GetErrorText(res),
+                MessageBoxUtf8(parent, GetErrorText(res),
                            "Error Saving Configuration", MB_OK | MB_ICONEXCLAMATION);
             }
             else
@@ -600,7 +601,7 @@ BOOL GetSizeAux(HWND parent, HKEY hKey, const char* name, DWORD type, DWORD& buf
         {
             if (HLanguage == NULL)
             {
-                MessageBox(parent, GetErrorText(res),
+                MessageBoxUtf8(parent, GetErrorText(res),
                            "Error Loading Configuration", MB_OK | MB_ICONEXCLAMATION);
             }
             else

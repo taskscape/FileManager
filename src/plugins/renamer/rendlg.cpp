@@ -1271,7 +1271,8 @@ void CRenamerDialog::ReloadSourceFiles()
             char buf[200];
             SG->ExpandPluralFilesDirs(buf, 200, SourceFiles.Count - dirs, dirs,
                                       epfdmNormal, FALSE);
-            SetDlgItemText(HWindow, IDS_COUNT, buf);
+            // The host's plural formatter returns localized UTF-8, including Polish file/directory counts.
+            SendUtf8DialogControlString(HWindow, IDS_COUNT, WM_SETTEXT, 0, buf);
         }
         else
             SetDlgItemText(HWindow, IDS_COUNT, "");

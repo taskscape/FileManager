@@ -59,6 +59,20 @@ inline BOOL PaintUtf8ControlText(HDC dc, int x, int y, UINT options, const RECT*
     return ExtTextOutW(dc, x, y, options, rect, wide.c_str(), length - 1, NULL);
 }
 
+// Owner-painted localized text must use the same UTF-16 boundary for measurement and painting.
+inline int DrawUtf8ControlText(HDC dc, const char* text, RECT* rect, UINT format)
+{
+    if (text == NULL)
+        return 0;
+    int length = MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, text, -1, NULL, 0);
+    if (length == 0)
+        return 0;
+    std::wstring wide(length, L'\0');
+    if (MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, text, -1, &wide[0], length) == 0)
+        return 0;
+    return DrawTextW(dc, &wide[0], length - 1, rect, format);
+}
+
 // Tooltip notifications own their inline storage; never return a pointer into a temporary conversion buffer.
 inline void SetTooltipDispInfoTextUtf8(LPARAM notification, const char* text)
 {

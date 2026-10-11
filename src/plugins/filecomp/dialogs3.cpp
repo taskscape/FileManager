@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "precomp.h"
+#include "../../common/utf8_control_text.h"
 
 bool SelectConversion(int x, int y, HWND wnd, CCompareOptions& options, int file)
 {
@@ -302,7 +303,8 @@ void CAdvancedOptionsDialog::UpdateEncodingInfo()
                 break;
             }
         }
-        SetDlgItemText(HWindow, IDE_LEFTENC + f, buffer);
+        // Encoding descriptions combine UTF-8 resource labels and must reach the control as UTF-16.
+        SendUtf8DialogControlString(HWindow, IDE_LEFTENC + f, WM_SETTEXT, 0, buffer);
     }
 }
 
@@ -489,7 +491,8 @@ void CPropPageDefaultOptions::UpdateEncodingInfo()
                 strcat(buffer, ", big endian");
             break;
         }
-        SetDlgItemText(HWindow, IDE_LEFTENC + f, buffer);
+        // The Defaults page uses the same UTF-8 descriptions as the Advanced Options dialog.
+        SendUtf8DialogControlString(HWindow, IDE_LEFTENC + f, WM_SETTEXT, 0, buffer);
     }
 }
 

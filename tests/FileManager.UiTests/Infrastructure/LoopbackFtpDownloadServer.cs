@@ -2,6 +2,7 @@ using System.Collections.Concurrent;
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
+using System.IO.Compression; // MODE Z fixtures must send actual zlib streams to the native data socket.
 
 namespace FileManager.UiTests.Infrastructure;
 
@@ -22,6 +23,8 @@ internal sealed class LoopbackFtpDownloadServer : IAsyncDisposable
     internal TaskCompletionSource NetworkCompleted { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
     internal TaskCompletionSource DeleteReceived { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
     internal bool DisconnectAtPause { get; set; }
+    internal bool MachineReadableList { get; set; }
+    internal bool RequestCompression { get; set; } // The UI fixture selects MODE Z independently of the server's listing format.
     internal int Port => ((IPEndPoint)listener.LocalEndpoint).Port;
     internal const string FileName = "reliability-payload.bin";
 
@@ -53,6 +56,7 @@ internal sealed class LoopbackFtpDownloadServer : IAsyncDisposable
             using var reader = new StreamReader(stream, Encoding.ASCII, false, leaveOpen: true);
             var token = cancellation.Token;
             long offset = 0;
+            bool compressed = false; // Compression belongs to each authenticated control connection.
             try
             {
                 await Reply("220 FileManager loopback fixture ready");
@@ -71,6 +75,7 @@ internal sealed class LoopbackFtpDownloadServer : IAsyncDisposable
                         case "PWD": case "XPWD": await Reply("257 \"/\" is current directory"); break;
                         case "CWD": case "CDUP": await Reply("250 Directory changed"); break;
                         case "TYPE": case "OPTS": case "NOOP": await Reply("200 OK"); break;
+                        case "MODE": compressed = argument == "Z"; await Reply("200 MODE accepted"); break;
                         case "SIZE": await Reply($"213 {Payload.Length}"); break;
                         case "MDTM": await Reply("213 20260905000000"); break;
                         case "PASV": case "EPSV":
@@ -96,9 +101,19 @@ internal sealed class LoopbackFtpDownloadServer : IAsyncDisposable
                             await Reply("150 Opening listing data connection");
                             using (var data = await DataConnection())
                             {
-                                var listing = command == "MLSD" ? $"type=file;size={Payload.Length};modify=20260905000000; {FileName}\r\n" :
+                                // Reproduce servers returning MLSx facts for compressed LIST, including dot entries and vendor facts.
+                                var listing = compressed && MachineReadableList ?
+                                              "modify=20261010211001;perm=flcdmpe;type=dir;unique=802U29A45C4;UNIX.group=6597;UNIX.groupname=ftp;UNIX.mode=0755;UNIX.owner=1598;UNIX.ownername=ftp; state\r\n" +
+                                              "type=dir;UNIX.mode=0755; .\r\ntype=dir;UNIX.mode=0755; ..\r\n" +
+                                              $"modify=20260905000000;perm=adfrw;size={Payload.Length};type=file;UNIX.mode=0644; {FileName}\r\n" :
+                                              command == "MLSD" ? $"type=file;size={Payload.Length};modify=20260905000000; {FileName}\r\n" :
                                               command == "NLST" ? FileName + "\r\n" : $"-rw-r--r-- 1 fixture fixture {Payload.Length} Sep 05 2026 {FileName}\r\n";
-                                await data.GetStream().WriteAsync(Encoding.ASCII.GetBytes(listing), token);
+                                if (compressed)
+                                {
+                                    await using var zipped = new ZLibStream(data.GetStream(), CompressionLevel.SmallestSize, leaveOpen: true);
+                                    await zipped.WriteAsync(Encoding.ASCII.GetBytes(listing), token);
+                                }
+                                else await data.GetStream().WriteAsync(Encoding.ASCII.GetBytes(listing), token);
                             }
                             await Reply("226 Listing complete");
                             ListingSent.TrySetResult();
@@ -109,13 +124,15 @@ internal sealed class LoopbackFtpDownloadServer : IAsyncDisposable
                             await Reply($"150 Opening binary data connection ({Payload.Length} bytes)");
                             using (var data = await DataConnection())
                             {
+                                // Keep the same payload barriers while testing production MODE Z downloads.
+                                await using Stream payloadStream = compressed ? new ZLibStream(data.GetStream(), CompressionLevel.SmallestSize, leaveOpen: true) : data.GetStream();
                                 var start = (int)offset;
                                 var boundary = Math.Max(start, pauseAfterBytes);
-                                await data.GetStream().WriteAsync(Payload.AsMemory(start, boundary - start), token);
+                                await payloadStream.WriteAsync(Payload.AsMemory(start, boundary - start), token);
                                 TransferPaused.TrySetResult();
                                 await ReleaseTransfer.Task.WaitAsync(token);
                                 if (!DisconnectAtPause)
-                                    await data.GetStream().WriteAsync(Payload.AsMemory(boundary), token);
+                                    await payloadStream.WriteAsync(Payload.AsMemory(boundary), token);
                             }
                             offset = 0;
                             await Reply(DisconnectAtPause ? "426 Transfer interrupted" : "226 Transfer complete");

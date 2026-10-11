@@ -3,6 +3,7 @@
 // CommentsTranslationProject: TRANSLATED
 
 #include "precomp.h"
+#include "../../common/utf8_message_box.h" // Winsock failures combine UTF-8 resource text and system error text.
 #include <strsafe.h> // counted bounded copies (StringCchCopyNA)
 
 WSADATA WinSocketsData; // information about the Windows Sockets implementation
@@ -34,7 +35,7 @@ BOOL InitSockets(HWND parent)
         char buf[500];
         char errBuf[300];
         sprintf(buf, LoadStr(IDS_WINSOCKETSERROR), FTPGetErrorText(err, errBuf, 300));
-        MessageBox(parent, buf, LoadStr(IDS_FTPPLUGINTITLE), MB_OK | MB_ICONERROR);
+        MessageBoxUtf8(parent, buf, LoadStr(IDS_FTPPLUGINTITLE), MB_OK | MB_ICONERROR);
         return FALSE;
     }
 

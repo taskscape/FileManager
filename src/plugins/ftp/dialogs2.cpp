@@ -977,12 +977,13 @@ HWND CWaitWindow::Create(DWORD showTime)
         tR.top = 0;
         tR.right = 1;
         tR.bottom = 1;
-        DrawText(dc, Text, -1, &tR, DT_CALCRECT | DT_LEFT | DT_NOPREFIX);
+        // Wait messages are localized UTF-8; measure the same UTF-16 glyphs that will be painted.
+        DrawUtf8ControlText(dc, Text, &tR, DT_CALCRECT | DT_LEFT | DT_NOPREFIX);
         if (tR.right + 2 * WAITWINDOW_HMARGIN > parW)
         {
             tR.right = parW - 2 * WAITWINDOW_HMARGIN;
             tR.bottom = 1;
-            DrawText(dc, Text, -1, &tR, DT_CALCRECT | DT_LEFT | DT_NOPREFIX | DT_WORDBREAK);
+            DrawUtf8ControlText(dc, Text, &tR, DT_CALCRECT | DT_LEFT | DT_NOPREFIX | DT_WORDBREAK);
             NeedWrap = TRUE;
         }
         TextSize.cx = tR.right;
@@ -1009,6 +1010,8 @@ HWND CWaitWindow::Create(DWORD showTime)
 
     if (HWindow != NULL)
     {
+        // The legacy window factory accepts ANSI names; restore the UTF-8 caption before the wait window is shown.
+        SendUtf8ControlString(HWindow, WM_SETTEXT, 0, Caption == NULL ? LoadStr(IDS_FTPPLUGINTITLE) : Caption);
         SalamanderGeneral->MultiMonCenterWindow(HWindow, hCenterWnd, TRUE);
         if (showTime != 0)
         {
@@ -1156,7 +1159,8 @@ CWaitWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
             SetTextColor(dc, GetSysColor(COLOR_BTNTEXT));
             // do not clip so we survive a slight text extension that
             // may occur while calling SetText
-            DrawText(dc, Text, (int)strlen(Text), &r, DT_LEFT | DT_NOPREFIX | DT_NOCLIP | (NeedWrap ? DT_WORDBREAK : 0));
+            // Match the Unicode measurement above so accents remain readable in wrapped wait messages.
+            DrawUtf8ControlText(dc, Text, &r, DT_LEFT | DT_NOPREFIX | DT_NOCLIP | (NeedWrap ? DT_WORDBREAK : 0));
             SetBkMode(dc, prevBkMode);
             if (hOldFont != NULL)
                 SelectObject(dc, hOldFont);

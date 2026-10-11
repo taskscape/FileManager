@@ -65,6 +65,8 @@ The native journal-size cases place a ready item at the end of complete journals
 
 `FtpDownloadReliabilityUiTests` drives the actual FTP quick-connect, queued copy/move, and direct-view paths against `LoopbackFtpDownloadServer`. Payload barriers exercise interruption and cancellation, and guarded finalization faults verify that `DELE` cannot precede a successful local durable result. These deterministic tests run in the normal NUnit inventory under the existing isolated UI profile, with no external server or credentials. The application preserves the harness's temporary directory through environment regeneration so viewer-cache files also remain inside `filemanager-testdata`.
 
+The same fixture compares uncompressed Unix listings, MODE Z Unix listings, and MODE Z listings containing MLSx facts with vendor fields and `.`/`..` entries. It sends real zlib streams and verifies that the resulting panel item can be copied with the expected file size and exact payload. These cases run in both the ordinary and release-pipeline inventories.
+
 The FTP fixture sets `FILEMANAGER_UI_FTP_FAULT` to `pause`, `flush`, `metadata`, `commit`, `close`, `admission`, or `close-admission`. Injection additionally requires `FILEMANAGER_UI_ISOLATED=1`, the exact sandbox configuration root, a validated `filemanager-testdata` directory, and an exclusively claimed one-use `.ftp-reliability.arm` file there. The pause is bounded; `.entered`, `.release`, and `.completed` files in that same directory coordinate only the selected test request. Normal invocations do not enable these faults. Hardware power-loss behavior is outside these software failure fixtures.
 
 ### GitHub release-pipeline parity

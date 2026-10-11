@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "precomp.h"
+#include "common/utf8_message_box.h" // These diagnostics use the host's UTF-8 resource loader.
 
 #include "salmoncl.h"
 
@@ -340,7 +341,7 @@ void SalmonSetSLG(const char* slgName)
     {
         if (!SalmonNotRunningReported && HLanguage != NULL)
         {
-            MessageBox(NULL, LoadStr(IDS_SALMON_NOT_RUNNING), SALAMANDER_TEXT_VERSION, MB_OK | MB_ICONERROR);
+            MessageBoxUtf8(NULL, LoadStr(IDS_SALMON_NOT_RUNNING), SALAMANDER_TEXT_VERSION, MB_OK | MB_ICONERROR);
             SalmonNotRunningReported = TRUE;
         }
     }
@@ -361,7 +362,7 @@ void SalmonCheckBugs()
     {
         if (!SalmonNotRunningReported && HLanguage != NULL)
         {
-            MessageBox(NULL, LoadStr(IDS_SALMON_NOT_RUNNING), SALAMANDER_TEXT_VERSION, MB_OK | MB_ICONERROR);
+            MessageBoxUtf8(NULL, LoadStr(IDS_SALMON_NOT_RUNNING), SALAMANDER_TEXT_VERSION, MB_OK | MB_ICONERROR);
             SalmonNotRunningReported = TRUE;
         }
     }

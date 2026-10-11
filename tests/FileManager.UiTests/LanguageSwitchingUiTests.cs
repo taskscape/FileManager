@@ -56,6 +56,40 @@ public sealed class LanguageSwitchingUiTests : FileManagerUiTestBase
         var connectDialog = OpenFtpConnectDialog();
         Assert.That(NativeCommands.FtpBookmarksContains(connectDialog.Properties.NativeWindowHandle.Value, "Szybkie połączenie"), Is.True,
                     "The FTP bookmark list did not render Szybkie połączenie correctly.");
+        // Exercise the reported composed summary through the real Advanced Options dialog after the Polish restart.
+        NativeCommands.PostDialogButtonClick(connectDialog.Properties.NativeWindowHandle.Value, 570); // IDB_ADVACED
+        var advanced = WaitForWindow(window => NativeCommands.HasDialogControl(window.Properties.NativeWindowHandle.Value, 584));
+        var advancedHandle = advanced.Properties.NativeWindowHandle.Value;
+        NativeCommands.SelectComboBoxItemContaining(advancedHandle, 584, "binarny");
+        NativeCommands.SetDialogCheckBoxState(advancedHandle, 587, true); // passive mode
+        NativeCommands.SetDialogCheckBoxState(advancedHandle, 593, false); // listings cache
+        NativeCommands.SetDialogCheckBoxState(advancedHandle, 596, true); // control encryption
+        NativeCommands.SetDialogCheckBoxState(advancedHandle, 597, false); // control-only encryption, matching the reported summary
+        NativeCommands.SetDialogCheckBoxState(advancedHandle, 598, false); // MODE Z
+        // Numeric validation has its own shared native message-box boundary, distinct from the summary control.
+        NativeCommands.SetDialogControlText(advancedHandle, 585, "invalid");
+        NativeCommands.PostDialogButtonClick(advancedHandle, 1);
+        var invalidNumber = WaitForWindow(window => NativeCommands.GetDialogText(window.Properties.NativeWindowHandle.Value)
+            .Contains("Nieprawidłowa liczba.", StringComparison.Ordinal));
+        // Windows' single-button MessageBox may expose its OK button as IDCANCEL rather than IDOK.
+        var invalidHandle = invalidNumber.Properties.NativeWindowHandle.Value;
+        NativeCommands.ClickDialogButton(invalidHandle, NativeCommands.HasDialogControl(invalidHandle, 1) ? 1 : 2);
+        WaitForWindowToClose(invalidNumber);
+        NativeCommands.SetDialogControlText(advancedHandle, 585, "21");
+        NativeCommands.ClickDialogButton(advancedHandle, 1);
+        WaitForWindowToClose(advanced);
+        Assert.That(NativeCommands.GetDialogControlText(connectDialog.Properties.NativeWindowHandle.Value, 571),
+                    Is.EqualTo("Tryb przesyłu: binarny, Tryb pasywny, Bez pamięci podręcznej, Szyfrowanie, Bez MODE Z"),
+                    "The composed FTP summary sent UTF-8 bytes through an ANSI control message.");
+        // The 36-byte preview limit falls inside a Polish character here; the summary must still be valid UTF-8.
+        NativeCommands.PostDialogButtonClick(connectDialog.Properties.NativeWindowHandle.Value, 570);
+        advanced = WaitForWindow(window => NativeCommands.HasDialogControl(window.Properties.NativeWindowHandle.Value, 584));
+        NativeCommands.SetDialogControlText(advanced.Properties.NativeWindowHandle.Value, 592, new string('ó', 40));
+        NativeCommands.ClickDialogButton(advanced.Properties.NativeWindowHandle.Value, 1);
+        WaitForWindowToClose(advanced);
+        Assert.That(NativeCommands.GetDialogControlText(connectDialog.Properties.NativeWindowHandle.Value, 571),
+                    Does.EndWith("Początkowe polecenia: óóóóóó..."),
+                    "Clipping an advanced field split a UTF-8 character or prevented the summary from updating.");
         // The composed label follows a separate path from the list entry and previously sent UTF-8 to SetDlgItemTextA.
         NativeCommands.PostDialogButtonClick(connectDialog.Properties.NativeWindowHandle.Value, 572); // IDB_NEWBOOKMARK
         var newBookmark = WaitForWindow(window =>

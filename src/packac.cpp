@@ -247,7 +247,8 @@ CPackACDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         if (IsIconic(HWindow))
             ShowWindow(HWindow, SW_RESTORE);
         // and display the error
-        MessageBox(HWindow, (char*)wParam, LoadStr(IDS_ERRORFINDINGFILE), MB_OK | MB_ICONEXCLAMATION);
+        // Auto-configuration errors use the host's UTF-8-aware message box for both text and title.
+        SalMessageBox(HWindow, (char*)wParam, LoadStr(IDS_ERRORFINDINGFILE), MB_OK | MB_ICONEXCLAMATION);
         return TRUE;
     }
     case WM_USER_ACSEARCHING:
