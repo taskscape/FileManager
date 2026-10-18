@@ -540,6 +540,24 @@ static bool SendSecurityToken(SOCKET socket, SecBuffer* token, DWORD* error)
     return ok;
 }
 
+// SECBUFFER_EXTRA's cbBuffer is only a count of unprocessed input bytes. pvBuffer is not a pointer to them and is left null, so copying from it reads address 0. Those bytes are the tail of the token already stored in 'buffer' and must remain available for the next handshake or decrypt call.
+static bool RetainUnprocessedInput(BYTE* buffer, DWORD bufferLength, const SecBuffer* extra, DWORD* retainedLength)
+{
+    if (extra == NULL || extra->BufferType != SECBUFFER_EXTRA || extra->cbBuffer == 0)
+    {
+        *retainedLength = 0;
+        return true;
+    }
+    // A count past the token that was supplied is not a usable tail.
+    if (buffer == NULL || extra->cbBuffer > bufferLength)
+        return false;
+    DWORD consumed = bufferLength - extra->cbBuffer;
+    if (consumed != 0)
+        memmove(buffer, buffer + consumed, extra->cbBuffer);
+    *retainedLength = extra->cbBuffer;
+    return true;
+}
+
 static bool CompleteHandshake(CSchannelConnection* connection, LPCSTR target, DWORD* socketError, SECURITY_STATUS* securityError)
 {
     DWORD attributes = 0;
@@ -602,13 +620,13 @@ static bool CompleteHandshake(CSchannelConnection* connection, LPCSTR target, DW
         }
         if (!SendSecurityToken(connection->Socket, &output, socketError))
             return false;
-        if (inputBuffers[1].BufferType == SECBUFFER_EXTRA)
+        // Keep a following record in Encrypted; SChannel does not point pvBuffer at it.
+        if (!RetainUnprocessedInput(connection->Encrypted, connection->EncryptedLength, &inputBuffers[1],
+                                    &connection->EncryptedLength))
         {
-            memmove(connection->Encrypted, inputBuffers[1].pvBuffer, inputBuffers[1].cbBuffer);
-            connection->EncryptedLength = inputBuffers[1].cbBuffer;
+            *securityError = SEC_E_INTERNAL_ERROR;
+            return false;
         }
-        else
-            connection->EncryptedLength = 0;
     }
     if (QueryContextAttributes(&connection->Context, SECPKG_ATTR_STREAM_SIZES, &connection->StreamSizes) != SEC_E_OK)
     {
@@ -801,14 +819,15 @@ static CTlsHandshakeResult AdvanceHandshake(CSchannelConnection* connection, LPC
             return thrFailed;
         }
 
-        // Preserve bytes beyond the final handshake record; they may already contain the file payload.
-        if (inputBuffers[1].BufferType == SECBUFFER_EXTRA)
+        // Preserve bytes beyond the consumed handshake record; they may already be the next record or the file payload.
+        if (!RetainUnprocessedInput(connection->Encrypted, connection->EncryptedLength, &inputBuffers[1],
+                                    &connection->EncryptedLength))
         {
-            memmove(connection->Encrypted, inputBuffers[1].pvBuffer, inputBuffers[1].cbBuffer);
-            connection->EncryptedLength = inputBuffers[1].cbBuffer;
+            *securityError = SEC_E_INTERNAL_ERROR;
+            if (output.pvBuffer != NULL)
+                FreeContextBuffer(output.pvBuffer);
+            return thrFailed;
         }
-        else
-            connection->EncryptedLength = 0;
 
         if (!QueueHandshakeToken(connection, &output, securityError))
             return thrFailed;
@@ -982,18 +1001,16 @@ int SSLRead(SSL* ssl, void* data, int size)
                 return -1;
             }
             ssl->Decrypted = decrypted;
-            // DecryptMessage points into Encrypted. Copy before moving the
-            // SECBUFFER_EXTRA tail to the beginning of that input buffer.
+            // DecryptMessage points into Encrypted. Copy plaintext out before sliding any unprocessed tail.
             memcpy(ssl->Decrypted, dataBuffer->pvBuffer, dataBuffer->cbBuffer);
             ssl->DecryptedLength = dataBuffer->cbBuffer;
         }
-        if (extraBuffer)
+        if (!RetainUnprocessedInput(ssl->Encrypted, ssl->EncryptedLength, extraBuffer, &ssl->EncryptedLength))
         {
-            memmove(ssl->Encrypted, extraBuffer->pvBuffer, extraBuffer->cbBuffer);
-            ssl->EncryptedLength = extraBuffer->cbBuffer;
+            ssl->EncryptedLength = 0; // do not feed the already consumed record to DecryptMessage again
+            ssl->LastError = SSL_ERROR_SSL;
+            return -1;
         }
-        else
-            ssl->EncryptedLength = 0;
         if (dataBuffer && dataBuffer->cbBuffer)
         {
             ssl->LastError = SSL_ERROR_NONE;

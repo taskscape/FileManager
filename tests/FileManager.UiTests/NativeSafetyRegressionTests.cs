@@ -2971,6 +2971,24 @@ public sealed class NativeSafetyRegressionTests
     }
 
     [Test]
+    public void Ftp_schannel_extra_input_is_taken_from_the_token_tail()
+    {
+        var root = FindRepositoryRoot();
+        var tls = File.ReadAllText(Path.Combine(root, "src", "plugins", "ftp", "ssl.cpp"));
+
+        // SECBUFFER_EXTRA leaves pvBuffer null. Copying from it crashed the FTPS handshake on the sockets thread.
+        Assert.Multiple(() =>
+        {
+            Assert.That(tls, Does.Contain("static bool RetainUnprocessedInput"));
+            Assert.That(tls, Does.Contain("memmove(buffer, buffer + consumed, extra->cbBuffer)"));
+            Assert.That(Regex.Matches(tls, "RetainUnprocessedInput\\(connection->Encrypted, connection->EncryptedLength, &inputBuffers\\[1\\]").Count, Is.EqualTo(2));
+            Assert.That(tls, Does.Contain("RetainUnprocessedInput(ssl->Encrypted, ssl->EncryptedLength, extraBuffer, &ssl->EncryptedLength)"));
+            Assert.That(tls, Does.Not.Contain("memmove(connection->Encrypted, inputBuffers[1].pvBuffer"));
+            Assert.That(tls, Does.Not.Contain("memmove(ssl->Encrypted, extraBuffer->pvBuffer"));
+        });
+    }
+
+    [Test]
     public void Bundled_7zip_uses_26_02_and_preserves_upgrade_compatibility_contract()
     {
         var root = FindRepositoryRoot();
