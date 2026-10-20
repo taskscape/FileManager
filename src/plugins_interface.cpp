@@ -1208,7 +1208,21 @@ BOOL CPlugins::AddItemsToChangeDrvMenu(CDrivesList* drvList, int& currentFSIndex
             drv.DriveText = DupStr(p->ChDrvMenuFSItemName);
             if (drv.DriveText == NULL)
                 return FALSE;
-            if (p->PluginIcons != NULL && p->ChDrvMenuFSItemIconIndex != -1)
+            // Share the toolbar's Fluent identities; each drive entry owns its rendered icons until menu cleanup.
+            const char* svgName = GetPluginSVGName(p->DLLName);
+            int iconSize = GetIconSizeForSystemDPI(ICONSIZE_16);
+            drv.HIcon = LoadToolbarSVGIcon(svgName, iconSize);
+            if (drv.HIcon != NULL)
+            {
+                drv.HGrayIcon = getGrayIcons ? LoadToolbarSVGIcon(svgName, iconSize, TRUE) : NULL;
+                // DestroyDrives uses tracked destruction in Debug, unlike the toolbar's untracked temporary icons.
+                HANDLES_ADD(__htIcon, __hoCreateIconIndirect, drv.HIcon);
+                if (drv.HGrayIcon != NULL)
+                    HANDLES_ADD(__htIcon, __hoCreateIconIndirect, drv.HGrayIcon);
+                drv.DestroyIcon = TRUE;
+            }
+            // Preserve third-party artwork and the existing fallback when the shared asset is unavailable.
+            else if (p->PluginIcons != NULL && p->ChDrvMenuFSItemIconIndex != -1)
             {
                 drv.HIcon = p->PluginIcons->GetIcon(p->ChDrvMenuFSItemIconIndex, TRUE);
                 if (getGrayIcons && p->PluginIconsGray != NULL)
