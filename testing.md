@@ -73,6 +73,10 @@ The FTP fixture sets `FILEMANAGER_UI_FTP_FAULT` to `pause`, `flush`, `metadata`,
 
 ### GitHub release-pipeline parity
 
+`InfostackerUiTests` drives the shipped plugin through the existing isolated native command map and publishing dialog. `LoopbackInfostackerServer` records real multipart uploads and returns fragmented JSON. Cases cover binary bytes and Unicode filenames, Markdown titles/attachments and deduplication, escaped IDs, HTTP errors/redirects, invalid responses, retry, invalid embeds, oversized/locked files, waiting/cancellation, clipboard contention/recovery, and closing without upload. They run in the existing NUnit UI inventory in both the local runner and release CI, without an additional category, external service, credentials, or privileged configuration.
+
+The fixture's `FILEMANAGER_UI_INFOSTACKER_URL` accepts only `http://127.0.0.1:<port>/` while `FILEMANAGER_UI_ISOLATED=1` and the exact `Software\Open Salamander\6.0-filemanager-testdata` configuration root are active. Normal runs always use production HTTPS. These cases verify the protocol and UI; they do not prove the external service's live availability or rendering behavior.
+
 Run the complete local equivalent of the GitHub release gate and installer-build jobs with:
 
 ```powershell

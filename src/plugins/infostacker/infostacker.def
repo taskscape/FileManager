@@ -1,0 +1,3 @@
+LIBRARY INFOSTACKER.SPL
+EXPORTS SalamanderPluginEntry
+EXPORTS SalamanderPluginGetReqVer

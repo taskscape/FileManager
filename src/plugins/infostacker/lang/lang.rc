@@ -1,0 +1,41 @@
+// The review step makes the public upload explicit before any network request.
+#pragma code_page(65001)
+#include <winresrc.h>
+#include "../resource.h"
+#include "../versinfo.rh2"
+#include "versinfo.rc2"
+LANGUAGE LANG_ENGLISH, SUBLANG_ENGLISH_US
+IDD_PUBLISH DIALOGEX 0, 0, 360, 178
+STYLE DS_SETFONT | DS_MODALFRAME | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "Publish to Infostacker"
+FONT 9, "Segoe UI"
+BEGIN
+    LTEXT "File to publish:", -1, 12, 10, 336, 12
+    // Wrap the review path so the filename remains visible in deeply nested folders.
+    EDITTEXT IDC_FILE, 12, 25, 336, 28, ES_READONLY | ES_MULTILINE
+    LTEXT "", IDC_STATUS, 12, 60, 336, 32
+    CONTROL "", IDC_PROGRESS, "msctls_progress32", WS_BORDER, 12, 95, 336, 10
+    EDITTEXT IDC_URL, 12, 113, 336, 15, ES_READONLY | ES_AUTOHSCROLL
+    PUSHBUTTON "Copy link", IDC_COPY, 12, 146, 70, 20
+    DEFPUSHBUTTON "Publish", IDOK, 194, 146, 74, 20
+    PUSHBUTTON "Close", IDCANCEL, 276, 146, 72, 20
+END
+STRINGTABLE
+BEGIN
+    IDS_DESCRIPTION "Publish a selected file and copy its Infostacker public link."
+    IDS_COMMAND "&Publish to Infostacker..."
+    IDS_SELECTION "Select exactly one local file (no folders or archive entries)."
+    IDS_READY "Publishing creates a public link. Click Publish to upload this file."
+    IDS_UPLOADING "Publishing..."
+    IDS_SUCCESS "Published successfully. The public URL has been copied to the clipboard."
+    IDS_COPY_FAILED "Published, but the clipboard is unavailable. Use Copy link or copy the URL below."
+    IDS_CANCELLED "Publishing cancelled. A request already received by the service may still create a public link."
+    IDS_ERROR "Publishing failed: "
+    IDS_SIZE "The file and attachments exceed the 100 MB upload limit."
+    IDS_READ "The file cannot be read or is being modified: "
+    IDS_RESPONSE "Infostacker returned an invalid publishing response."
+    IDS_WAITING "Upload sent. Waiting for Infostacker..."
+    IDS_CANCELLING "Cancelling... waiting for the current network operation to finish."
+    IDS_ATTACHMENT "Cannot include this embed (missing, outside the selected folder, or ambiguous filename): "
+    IDS_ENCODING "The Markdown file must contain valid UTF-8 text."
+END

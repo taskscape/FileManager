@@ -159,7 +159,11 @@ $requiredPluginPayloads = @(
     'unchm\chmlib.dll',
     # Delivery Handoff ships with the product; a staging regression that drops it must fail packaging.
     'handoff\handoff.spl',
-    'handoff\lang\english.slg'
+    'handoff\lang\english.slg',
+    # Publishing and both supported languages must be present in the installer payload.
+    'infostacker\infostacker.spl',
+    'infostacker\lang\english.slg',
+    'infostacker\lang\polish.slg'
 )
 $missingPluginPayloads = @($requiredPluginPayloads |
     Where-Object { -not (Test-Path -LiteralPath (Join-Path $pluginsDirectory $_) -PathType Leaf) })

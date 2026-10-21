@@ -1,0 +1,41 @@
+// Polish controls use the same IDs and geometry as the English publishing flow.
+#pragma code_page(65001)
+#include <winresrc.h>
+#include "../../resource.h"
+#include "../../versinfo.rh2"
+#include "versinfo.rc2"
+LANGUAGE LANG_POLISH, SUBLANG_DEFAULT
+IDD_PUBLISH DIALOGEX 0, 0, 360, 178
+STYLE DS_SETFONT | DS_MODALFRAME | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "Publikuj w Infostacker"
+FONT 9, "Segoe UI"
+BEGIN
+    LTEXT "Plik do opublikowania:", -1, 12, 10, 336, 12
+    // Wrap the review path so the filename remains visible in deeply nested folders.
+    EDITTEXT IDC_FILE, 12, 25, 336, 28, ES_READONLY | ES_MULTILINE
+    LTEXT "", IDC_STATUS, 12, 60, 336, 32
+    CONTROL "", IDC_PROGRESS, "msctls_progress32", WS_BORDER, 12, 95, 336, 10
+    EDITTEXT IDC_URL, 12, 113, 336, 15, ES_READONLY | ES_AUTOHSCROLL
+    PUSHBUTTON "Kopiuj link", IDC_COPY, 12, 146, 80, 20
+    DEFPUSHBUTTON "Publikuj", IDOK, 194, 146, 74, 20
+    PUSHBUTTON "Zamknij", IDCANCEL, 276, 146, 72, 20
+END
+STRINGTABLE
+BEGIN
+    IDS_DESCRIPTION "Opublikuj wybrany plik i skopiuj publiczny link Infostacker."
+    IDS_COMMAND "&Publikuj w Infostacker..."
+    IDS_SELECTION "Wybierz dokładnie jeden plik lokalny (bez folderów i elementów archiwum)."
+    IDS_READY "Publikacja tworzy publiczny link. Kliknij Publikuj, aby wysłać ten plik."
+    IDS_UPLOADING "Publikowanie..."
+    IDS_SUCCESS "Opublikowano. Publiczny adres URL został skopiowany do schowka."
+    IDS_COPY_FAILED "Opublikowano, ale schowek jest niedostępny. Użyj Kopiuj link lub skopiuj adres poniżej."
+    IDS_CANCELLED "Anulowano publikowanie. Żądanie już odebrane przez usługę może nadal utworzyć publiczny link."
+    IDS_ERROR "Publikowanie nie powiodło się: "
+    IDS_SIZE "Plik i załączniki przekraczają limit wysyłania 100 MB."
+    IDS_READ "Nie można odczytać pliku lub jest on modyfikowany: "
+    IDS_RESPONSE "Infostacker zwrócił nieprawidłową odpowiedź publikowania."
+    IDS_WAITING "Wysłano plik. Oczekiwanie na Infostacker..."
+    IDS_CANCELLING "Anulowanie... oczekiwanie na zakończenie bieżącej operacji sieciowej."
+    IDS_ATTACHMENT "Nie można dołączyć osadzonego pliku (brak, poza wybranym folderem lub niejednoznaczna nazwa): "
+    IDS_ENCODING "Plik Markdown musi zawierać poprawny tekst UTF-8."
+END

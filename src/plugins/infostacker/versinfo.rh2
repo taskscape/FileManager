@@ -1,0 +1,22 @@
+// Shared version identity lets the host select matching English and Polish packs.
+#define VERSINFO_MAJOR 1
+#define VERSINFO_MINORA 0
+#define VERSINFO_MINORB 0
+#include "spl_vers.h"
+#define VERSINFO_COPYRIGHT "Copyright (c) 2026 Taskscape Ltd"
+#define VERSINFO_COMPANY "Open Salamander"
+#define VERSINFO_DESCRIPTION "Infostacker publishing plugin for Open Salamander"
+#ifdef _LANG
+#ifdef _LANG_POLISH
+#define VERSINFO_INTERNAL "POLISH"
+#define VERSINFO_TRANSLATION_LANG 0x0415
+#else
+#define VERSINFO_INTERNAL "ENGLISH"
+#endif
+#define VERSINFO_ORIGINAL VERSINFO_INTERNAL ".SLG"
+#else
+#define VERSINFO_INTERNAL "INFOSTACKER"
+#define VERSINFO_ORIGINAL "INFOSTACKER.SPL"
+#endif
+#define VERSINFO_SLG_WEB "www.taskscape.com"
+#define VERSINFO_SLG_COMMENT "Infostacker"

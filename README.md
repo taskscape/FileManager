@@ -14,6 +14,7 @@ File Manager is an Open Salamander based fast and reliable two-panel file manage
 - [Features](#features)
   - [Reorganize](#reorganize)
   - [Delivery Handoff](#delivery-handoff)
+  - [Infostacker publishing](#infostacker-publishing)
 - [User manual](manual.md)
 - [Origin](#origin)
 - [What's new in 6.0](#whats-new-in-60)
@@ -35,6 +36,7 @@ File Manager is an Open Salamander based fast and reliable two-panel file manage
 - **Find and inspect files:** Use quick search in a panel, the Find dialog, file viewers, and configurable file associations.
 - **Archives and network access:** Open, pack, and unpack supported archives; use the FTP plugin for FTP/FTPS transfers. Plugins also extend the file systems, viewers, and other commands available in the manager.
 - **Reorganize and Delivery Handoff:** Preview and review a folder rearrangement before applying it, or assemble and verify a delivery package from a reusable specification. Both workflows are described below.
+- **Infostacker publishing:** Publish one selected file from a review window and automatically copy its public link, with a Fluent document-upload icon and English/Polish UI.
 
 ### Reorganize
 
@@ -47,6 +49,12 @@ Use **Plan Review** to check the exact operation steps and mark them as reviewed
 The **Delivery Handoff** plugin builds a new delivery package from files in the active panel and places it in the inactive panel. Both panels must show disk or network folders. A reusable `*.handoff.json` specification defines required items, naming and format rules, PDF page sizes, image requirements, allowed content, and approval or licence evidence. You can create a starter specification from a template or validate an existing one.
 
 **Build Delivery Package** scans the working folder or selected items, reports missing or nonconforming files, and lets you review the candidates before building. It copies included files without changing the originals, verifies each copy with SHA-256, and publishes a new package. By default, the package contains `manifest.json`, `manifest.csv`, and `CONTENTS.txt`; the specification can change those output names or omit the optional CSV and contents list. **Verify Delivery Package** checks a package again for missing, changed, or unlisted files. By default, an internal build record is saved beside the package, outside the client-facing folder.
+
+### Infostacker publishing
+
+Select one file in a local or UNC folder, then choose **Plugins → Infostacker → Publish to Infostacker…**. Check the file path and click **Publish**. The window shows upload progress and the result. After success, the public URL is copied to the clipboard and remains visible; **Copy link** retries copying if another application holds the clipboard. Closing the review before publishing sends nothing.
+
+The plugin follows NoteManager's Infostacker integration: anonymous multipart upload to `https://shr.infostacker.com/sharing/uploadmarkdownwithfiles`, using `markdown` and `files` fields, followed by a public `/sharing/{id}` link. Other file types are attached to a generated Markdown page. UTF-8 `.md`/`.markdown` files publish their text with a filename title and explicitly embedded `![[files]]` from the selected file's folder tree. See the [manual](manual.md#infostacker-publishing) for limits and attachment resolution.
 
 ## Origin
 

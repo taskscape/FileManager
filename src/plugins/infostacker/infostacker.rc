@@ -1,0 +1,4 @@
+// Keep binary version metadata in the standard plug-in resource format.
+#include <winresrc.h>
+#include "versinfo.rh2"
+#include "versinfo.rc2"

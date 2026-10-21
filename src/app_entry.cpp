@@ -2746,7 +2746,8 @@ FIND_NEW_SLG_FILE:
                             // eagerly assign their otherwise lazy owner-drawn-menu IDs only in its sandbox.
                             CMenuPopup* pluginsMenu =
                                 (CMenuPopup*)MainMenu.GetSubMenu(CML_PLUGINS, FALSE);
-                            static const char* const uiTestPlugins[] = {"ftp.spl", "handoff.spl"};
+                            // Publish commands participate in the same isolated command discovery as FTP and Handoff.
+                            static const char* const uiTestPlugins[] = {"ftp.spl", "handoff.spl", "infostacker.spl"};
                             Plugins.InitUiTestPluginMenuItems(MainWindow->HWindow, pluginsMenu, uiTestPlugins,
                                                               (int)_countof(uiTestPlugins));
                         }

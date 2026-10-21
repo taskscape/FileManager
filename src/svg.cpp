@@ -217,6 +217,8 @@ const char* GetPluginSVGName(const char* dllName)
         {"automation.spl", "PluginAutomation"}, {"checksum.spl", "PluginChecksum"},
         // Delivery Handoff: a package (box) glyph, like other bundled plug-ins drawn from the shared set.
         {"handoff.spl", "PluginHandoff"},
+        // Publishing shares the Fluent document-upload identity across plug-in surfaces.
+        {"infostacker.spl", "PluginInfostacker"},
         {"checkver.spl", "PluginUpdate"}, {"dbviewer.spl", "PluginDatabase"},
         {"diskmap.spl", "PluginDiskMap"}, {"filecomp.spl", "PluginCompare"},
         {"ieviewer.spl", "PluginWeb"}, {"mmviewer.spl", "PluginMedia"},

@@ -150,3 +150,8 @@ lang_pl_zip         0x44400000
 lang_pl_handoff     0x44600000
 lang_pl_reorganize  0x44800000
 
+
+; Infostacker reserves distinct debug slots for the plugin and both language packs.
+infostacker              0x2b000000
+lang_infostacker         0x2b100000
+lang_pl_infostacker      0x2b200000

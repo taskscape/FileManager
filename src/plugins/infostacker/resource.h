@@ -1,0 +1,23 @@
+// Stable control IDs keep the publishing window accessible to native UI automation.
+#define IDD_PUBLISH 100
+#define IDC_FILE 1000
+#define IDC_STATUS 1001
+#define IDC_PROGRESS 1002
+#define IDC_URL 1003
+#define IDC_COPY 1004
+#define IDS_DESCRIPTION 2000
+#define IDS_COMMAND 2001
+#define IDS_SELECTION 2002
+#define IDS_READY 2003
+#define IDS_UPLOADING 2004
+#define IDS_SUCCESS 2005
+#define IDS_COPY_FAILED 2006
+#define IDS_CANCELLED 2007
+#define IDS_ERROR 2008
+#define IDS_SIZE 2009
+#define IDS_READ 2010
+#define IDS_RESPONSE 2011
+#define IDS_WAITING 2012
+#define IDS_CANCELLING 2013
+#define IDS_ATTACHMENT 2014
+#define IDS_ENCODING 2015

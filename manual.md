@@ -18,6 +18,7 @@ File Manager is the Windows two-panel file manager built from Open Salamander. T
   - [Transfer, storage, and recovery plugins](#transfer-storage-and-recovery-plugins)
   - [Archive plugins](#archive-plugins)
   - [Inspection and productivity plugins](#inspection-and-productivity-plugins)
+  - [Infostacker publishing](#infostacker-publishing)
   - [Developer sample plugins](#developer-sample-plugins)
 - [When an operation does not go as expected](#when-an-operation-does-not-go-as-expected)
 
@@ -373,6 +374,16 @@ To issue checksums yourself, select files and folders, choose **Plugins → Chec
 #### Portable Executable Viewer
 
 **Scenario — identify what a vendor DLL contains without running it.** Focus an `.exe` or `.dll` and open it in **Portable Executable Viewer**. Inspect the machine type, timestamps, import and export tables, debug information, and resources. Compare architecture and exported names with what the application expects. The viewer reads file structure; it does not prove publisher identity, compatibility, or absence of malicious code.
+
+### Infostacker publishing
+
+**Scenario — share a PDF, image, document, or Markdown file.** Select one file in a disk or UNC folder and choose **Plugins → Infostacker → Publish to Infostacker…**. If nothing is marked, the focused file is used. The command requires one file; folders, multiple selections, archive contents, and virtual filesystem entries cannot be published directly. Extract or download those files first.
+
+The review window shows the full path. Click **Publish** to create a public link on Infostacker. The progress bar shows bytes sent; **Waiting for Infostacker** means the upload is sent and the service has not yet returned a result. Success copies the public URL to the clipboard and displays it in a selectable field. If the clipboard is busy, use **Copy link** or copy that field manually without uploading again. A failed request displays an error and allows a manual retry. Closing the window before clicking Publish sends nothing. Closing during publishing requests cancellation and keeps the window alive until the current network operation finishes; a request already received by the service may still create a link.
+
+The combined Markdown text and attachments must fit within 100 MiB (the same 100 MB limit used by NoteManager). UTF-8 Markdown files receive a filename title and include explicit Obsidian embeds such as `![[image.png]]`, `![[subfolder/document.pdf]]`, or `![[image.png|200]]`. Relative paths resolve from the selected file's directory. A bare filename can also resolve to one unambiguous file in that directory tree (up to 10,000 entries). Duplicate references upload once. Missing, unreadable, ambiguous, or outside-folder embeds cause validation to fail before a request is sent, including junction/symlink escapes. Distinct attachments with the same basename are rejected because the service addresses them by filename. Ordinary Markdown links, remote resources, and implicit original-PDF discovery are not collected. Other file types are uploaded as the original binary attached to a generated Markdown page.
+
+Publishing uses NoteManager's anonymous Infostacker endpoint and requires no configured account or token. Files remain unchanged. Network errors, rejected requests, invalid service responses, and files already open for writing appear in the window. The plugin uses normal HTTPS certificate validation and does not automatically retry uploads. Its menu, dialog, and errors are available in English and Polish, matching the selected application language.
 
 ### Developer sample plugins
 

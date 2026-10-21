@@ -1,5 +1,7 @@
 # FileManager UI tests
 
+`InfostackerUiTests` uses the normal UI sandbox and shipped plugin to verify public-link publishing against `LoopbackInfostackerServer`. It checks multipart file contents, Markdown embeds, progress/cancellation, errors/retry, and clipboard success/recovery. It is part of the default local and CI inventories and requires no external credentials. The server override is accepted only on loopback in the isolated profile; see [testing.md](../../testing.md) for its contract.
+
 This project contains parameterized FlaUI/UIA3 lifecycle cases together with focused file-operation, recovery, plug-in, toolbar, TLS, and native-safety characterization tests for the native FileManager UI. The cases cover application launch, accessibility-tree discovery, Configuration dialog cancel/commit/restart flows, a committed setting verified after restart, FTP bookmark creation plus edit verified after restart, and native disk create/copy/rename/move/delete/find/view/edit commands.
 
 The tests run as the current interactive Windows user only when a guarded filesystem and registry sandbox are selected. The harness creates and deletes its own `filemanager-testdata` directory and the suffixed registry key after each run.

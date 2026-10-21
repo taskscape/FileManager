@@ -1,0 +1,3 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Keep both language packs beside the publishing plugin. -->
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003"><PropertyGroup><ShortProjectName>infostacker</ShortProjectName></PropertyGroup></Project>
