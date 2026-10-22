@@ -68,8 +68,14 @@ internal sealed class LoopbackInfostackerServer : IDisposable
                 var response = Encoding.UTF8.GetBytes(Response);
                 var responseHeaders = Encoding.ASCII.GetBytes($"HTTP/1.1 {Status} Fixture\r\nContent-Type: application/json\r\nContent-Length: {response.Length}\r\nConnection: close\r\n\r\n");
                 // Fragment JSON to exercise the production response accumulation path.
-                await stream.WriteAsync(responseHeaders, stop.Token);
-                foreach (var chunk in response.Chunk(3)) await stream.WriteAsync(chunk, stop.Token);
+                try
+                {
+                    await stream.WriteAsync(responseHeaders, stop.Token);
+                    foreach (var chunk in response.Chunk(3)) await stream.WriteAsync(chunk, stop.Token);
+                }
+                // A cancelled client may reset its held response; keep request parsing and other I/O failures visible.
+                catch (IOException error) when (HoldResponse && error.InnerException is SocketException
+                    { SocketErrorCode: SocketError.ConnectionReset or SocketError.ConnectionAborted }) { }
             }
         }
         catch (OperationCanceledException) when (stop.IsCancellationRequested) { }
