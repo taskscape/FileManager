@@ -416,7 +416,9 @@ public:
 #endif
 
             CCushionDirectory* cshr = this->_map->GetRoot();
-            BYTE* pix = this->_mapPix->AllocatePixMap(width, height);
+            // Cleared because a layout cut short by allocation failure leaves areas no cushion paints;
+            // a complete layout overwrites every pixel, so this changes nothing visible there.
+            BYTE* pix = this->_mapPix->AllocatePixMap(width, height, TRUE);
             // A layout whose root could not be allocated has nothing to draw; the view keeps its placeholder.
             if (pix != NULL && cshr != NULL)
             {
