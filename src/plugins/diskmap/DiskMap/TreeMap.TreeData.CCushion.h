@@ -39,7 +39,8 @@ public:
     {
         //empty - all handled by the CRegionAllocator
     }
-    void* operator new(size_t stAllocateBlock, CRegionAllocator* mem)
+    // Non-throwing, so an exhausted region makes the new-expression yield NULL without running the constructor.
+    void* operator new(size_t stAllocateBlock, CRegionAllocator* mem) noexcept
     {
         return mem->Allocate(stAllocateBlock);
     }

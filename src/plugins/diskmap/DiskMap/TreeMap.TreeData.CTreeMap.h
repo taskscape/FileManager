@@ -49,6 +49,8 @@ public:
         if (this->_cshroot != NULL)
             this->_allocator->FreeAll(FALSE);
         this->_cshroot = new (this->_allocator) CCushionDirectory(this->_root, NULL, sortorder);
+        if (this->_cshroot == NULL)
+            return FALSE; // region exhausted; GetRoot() stays NULL and callers skip drawing
         this->_cshroot->SetBounds(0, 0, this->_w, this->_h);
         this->_cshroot->FillFiles(this->_allocator, this->_renderer, 0, dirNULL);
         return TRUE;
