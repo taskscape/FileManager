@@ -417,7 +417,8 @@ public:
 
             CCushionDirectory* cshr = this->_map->GetRoot();
             BYTE* pix = this->_mapPix->AllocatePixMap(width, height);
-            if (pix != NULL)
+            // A layout whose root could not be allocated has nothing to draw; the view keeps its placeholder.
+            if (pix != NULL && cshr != NULL)
             {
 #ifdef TIMINGTEST
                 this->_cushionCount = 0;

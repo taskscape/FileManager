@@ -73,8 +73,10 @@ public:
 
         int i = 0;
         int filecount = dir->GetFileCount();
+        // Set when the region allocator is exhausted: the map then shows what was laid out so far instead of crashing.
+        BOOL outOfMemory = FALSE;
 
-        while (i < filecount)
+        while (i < filecount && !outOfMemory)
         {
             /*
 			 *   Create new Row
@@ -96,6 +98,10 @@ public:
                 length = h;
                 maxwidth = w;
                 csr = new (alloc) CCushionRow(loc, (int)(y + length + PRECISSION_THRESHOLD) - (int)(y + PRECISSION_THRESHOLD), lastdir);
+            }
+            if (csr == NULL)
+            {
+                break; // nothing was linked, so the rows built so far stay consistent
             }
 
             /*
@@ -123,18 +129,25 @@ public:
                 {
                     if ((rdr->Decide(csr, maxwidth, length, datasize, remainingdata) == rdSameRow) || csr->IsEmpty())
                     {
-                        remainingdata -= datasize;
+                        CCushion* cs;
                         if (f->IsDirectory())
                         {
-                            CCushionDirectory* cs = new (alloc) CCushionDirectory((CZDirectory*)f, this, this->_sortorder);
-                            csr->AddCushion(cs);
+                            cs = new (alloc) CCushionDirectory((CZDirectory*)f, this, this->_sortorder);
                         }
                         else
                         {
-                            CCushion* cs = new (alloc) CCushion(f, this, this->_sortorder);
-                            cs->SetColor(cs->Colorize(cs));
-                            csr->AddCushion(cs);
+                            cs = new (alloc) CCushion(f, this, this->_sortorder);
+                            if (cs != NULL)
+                                cs->SetColor(cs->Colorize(cs));
                         }
+                        if (cs == NULL)
+                        {
+                            // Leave through the row-closing code below, which assigns every added cushion its size.
+                            outOfMemory = TRUE;
+                            break;
+                        }
+                        remainingdata -= datasize;
+                        csr->AddCushion(cs);
                         i++;
                     }
                     else
