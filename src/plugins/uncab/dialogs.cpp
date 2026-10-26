@@ -147,7 +147,9 @@ BOOL CNextVolumeDialog::OnInit(WPARAM wParam, LPARAM lParam)
     SendDlgItemMessage(Dlg, IDC_DISKNAME, WM_SETTEXT, 0, (LPARAM)DiskName);
     SendDlgItemMessage(Dlg, IDC_CABNAME, WM_SETTEXT, 0, (LPARAM)VolumeName);
     SendDlgItemMessage(Dlg, IDC_FILENAME, EM_SETLIMITTEXT, MAX_PATH - 1, 0);
-    SendDlgItemMessage(Dlg, IDC_FILENAME, WM_SETTEXT, 0, (LPARAM)VolumePath);
+    // VolumePath is the host's UTF-8 archive path and is read back with ReadUtf8ControlText in OnBrowse,
+    // so it must be written through the same UTF-8 adapter rather than an ANSI WM_SETTEXT.
+    SendUtf8DialogControlString(Dlg, IDC_FILENAME, WM_SETTEXT, 0, VolumePath);
 
     CenterDlgToParent();
     return TRUE;

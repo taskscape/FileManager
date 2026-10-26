@@ -68,6 +68,36 @@ BOOL ExtIsExe(LPCTSTR szExt)
 #define SHIL_JUMBO 4      // Windows Vista and later. The image is normally 256x256 pixels.
 // regarding icon sizes on Windows Vista: see "Creating a DPI-Aware Application" (http://msdn.microsoft.com/en-us/library/ms701681(VS.85).aspx)
 
+// ExtractIcons() decodes its path as UTF-8, but IExtractIconA::GetIconLocation fills an ACP buffer that
+// must stay ACP for IExtractIconA::Extract. Produce an owned UTF-8 copy for the ExtractIcons fallback;
+// the IExtractIconW path already stored UTF-8, so it is duplicated as-is. The caller frees the result.
+static char* IconLocationToUtf8(const char* iconFile, BOOL alreadyUtf8)
+{
+    if (alreadyUtf8)
+        return _strdup(iconFile);
+    int wide = MultiByteToWideChar(CP_ACP, 0, iconFile, -1, NULL, 0);
+    if (wide <= 0)
+        return NULL;
+    WCHAR* wideBuf = (WCHAR*)malloc((size_t)wide * sizeof(WCHAR));
+    if (wideBuf == NULL)
+        return NULL;
+    char* utf8 = NULL;
+    if (MultiByteToWideChar(CP_ACP, 0, iconFile, -1, wideBuf, wide) > 0)
+    {
+        int bytes = WideCharToMultiByte(CP_UTF8, 0, wideBuf, -1, NULL, 0, NULL, NULL);
+        if (bytes > 0 && (utf8 = (char*)malloc((size_t)bytes)) != NULL)
+        {
+            if (WideCharToMultiByte(CP_UTF8, 0, wideBuf, -1, utf8, bytes, NULL, NULL) == 0)
+            {
+                free(utf8);
+                utf8 = NULL;
+            }
+        }
+    }
+    free(wideBuf);
+    return utf8;
+}
+
 BOOL SalGetIconFromPIDL(IShellFolder* psf, const char* path, LPCITEMIDLIST pidl, HICON* hIcon,
                         CIconSizeEnum iconSize, BOOL fallbackToDefIcon, BOOL defIconIsDir)
 {
@@ -242,7 +272,10 @@ BOOL SalGetIconFromPIDL(IShellFolder* psf, const char* path, LPCITEMIDLIST pidl,
         if (hIconSmall == NULL && hIconLarge == NULL && !(wFlags & GIL_NOTFILENAME))
         {
             HICON hIcons[2] = {0, 0};
-            UINT u = ExtractIcons(iconFile, iconIndex, MAKELONG(IconSizes[largeIconSize], IconSizes[ICONSIZE_16]), MAKELONG(IconSizes[largeIconSize], IconSizes[ICONSIZE_16]), hIcons, NULL, 2, IconLRFlags);
+            // ExtractIcons decodes UTF-8; the IExtractIconA path left iconFile in ACP, so normalize it here.
+            char* iconFileUtf8 = IconLocationToUtf8(iconFile, isIExtractIconW);
+            UINT u = ExtractIcons(iconFileUtf8 != NULL ? iconFileUtf8 : iconFile, iconIndex, MAKELONG(IconSizes[largeIconSize], IconSizes[ICONSIZE_16]), MAKELONG(IconSizes[largeIconSize], IconSizes[ICONSIZE_16]), hIcons, NULL, 2, IconLRFlags);
+            free(iconFileUtf8);
             if (u != -1)
             {
                 hIconLarge = hIcons[0];

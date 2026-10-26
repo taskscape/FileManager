@@ -25,7 +25,9 @@
 
 static BOOL FormatDBViewerDateTimeAnsi(const SYSTEMTIME* time, DWORD flags, char* buffer, int bufferSize, BOOL isDate)
 {
-    // DBViewer column text is UTF-8, including locale-formatted dates.
+    // This date/time text is consumed only by the DBF cell path (CParserInterfaceDBF::GetCellText), which
+    // remains IsUnicode == FALSE and is painted with ExtTextOutA after CodeCharacters remapping. Emit ACP
+    // so a localized date is not double-mangled; a Unicode DBF rendering path would be needed for UTF-8.
     WCHAR localeName[LOCALE_NAME_MAX_LENGTH];
     WCHAR formatted[100];
     if (GetUserDefaultLocaleName(localeName, ARRAYSIZE(localeName)) == 0)
@@ -33,7 +35,7 @@ static BOOL FormatDBViewerDateTimeAnsi(const SYSTEMTIME* time, DWORD flags, char
     int length = isDate
                      ? GetDateFormatEx(localeName, flags, time, NULL, formatted, ARRAYSIZE(formatted), NULL)
                      : GetTimeFormatEx(localeName, flags, time, NULL, formatted, ARRAYSIZE(formatted));
-    return length != 0 && WideCharToMultiByte(CP_UTF8, 0, formatted, -1, buffer, bufferSize, NULL, NULL) != 0;
+    return length != 0 && WideCharToMultiByte(CP_ACP, 0, formatted, -1, buffer, bufferSize, NULL, NULL) != 0;
 }
 
 bool IsUTF8Encoded(const char* s, int cnt)
