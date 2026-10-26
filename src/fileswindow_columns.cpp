@@ -675,9 +675,10 @@ void CFilesWindow::ClipboardPastePath()
             {
                 while (*path != 0 && *path <= ' ')
                     path++; // trim spaces+CR+LF before the path
-                // CF_TEXT is ANSI; ChangeDir consumes UTF-8.
-                WCHAR widePath[2 * MAX_PATH];
-                if (ConvertA2U(path, -1, widePath, _countof(widePath), CP_ACP) &&
+                // CF_TEXT is ANSI; ChangeDir consumes UTF-8. Transcode through a heap-owned wide buffer
+                // so a long clipboard path is not capped by a fixed-size stack array.
+                CStrP widePath(ConvertAllocA2U(path, -1, CP_ACP));
+                if (widePath != NULL &&
                     ConvertWideToUtf8(widePath, -1, buff, _countof(buff)))
                     changePath = TRUE;
                 HANDLES(GlobalUnlock(handle));

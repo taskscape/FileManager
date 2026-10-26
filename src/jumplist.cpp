@@ -162,14 +162,27 @@ HRESULT CreateShellLink(const char* path, const char* name, IShellLinkW** psl)
                                 IID_PPV_ARGS(&ret));
         if (SUCCEEDED(hres))
         {
-            WCHAR pathName[MAX_PATH];
-            // The jump list stores Unicode; GetModuleFileNameA would clip a non-ANSI install path.
-            if (GetModuleFileNameW(NULL, pathName, _countof(pathName)) == 0)
-                pathName[0] = 0;
+            // The jump list stores Unicode; GetModuleFileNameA would clip a non-ANSI install path. Our own
+            // module path can also exceed MAX_PATH on a long install directory, so grow a heap-owned wide
+            // buffer until GetModuleFileNameW reports the name fit, rather than using a fixed array.
+            CStrP pathName(NULL);
+            for (DWORD cap = MAX_PATH; cap <= 0x10000; cap *= 2)
+            {
+                WCHAR* buf = (WCHAR*)malloc(cap * sizeof(WCHAR));
+                if (buf == NULL)
+                    break;
+                DWORD copied = GetModuleFileNameW(NULL, buf, cap);
+                if (copied != 0 && copied < cap)
+                {
+                    pathName = buf; // fit; CStrP takes ownership
+                    break;
+                }
+                free(buf);
+                if (copied == 0)
+                    break;
+            }
 
             WCHAR paramsW[HOTPATHITEM_MAXPATH + 100];
-            WCHAR descW[MAX_PATH];
-            WCHAR nameW[MAX_PATH];
             if (ConvertUtf8ToWide(params, -1, paramsW, _countof(paramsW)) == 0)
                 paramsW[0] = 0;
             char desc[MAX_PATH];
@@ -181,15 +194,14 @@ HRESULT CreateShellLink(const char* path, const char* name, IShellLinkW** psl)
             }
             else
                 StringCchCopyA(desc, _countof(desc), path);
-            if (ConvertUtf8ToWide(desc, -1, descW, _countof(descW)) == 0)
-                descW[0] = 0;
-            if (ConvertUtf8ToWide(name, -1, nameW, _countof(nameW)) == 0)
-                nameW[0] = 0;
+            // Description and title are owned wide conversions instead of fixed MAX_PATH arrays.
+            CStrP descW(ConvertAllocUtf8ToWide(desc, -1));
+            CStrP nameW(ConvertAllocUtf8ToWide(name, -1));
 
             // Set path, parameters, icon and description.
-            ret->SetPath(pathName);
+            ret->SetPath(pathName != NULL ? (const WCHAR*)pathName : L"");
             ret->SetArguments(paramsW);
-            ret->SetDescription(descW);                   // MAX_PATH+1 is the limit (at least on Windows 7 where I'm testing now); longer = the jump list won't show at all
+            ret->SetDescription(descW != NULL ? (const WCHAR*)descW : L""); // MAX_PATH+1 is the limit (at least on Windows 7 where I'm testing now); longer = the jump list won't show at all
             ret->SetIconLocation(L"shell32.dll", -319);   // this icon exists from Windows XP onwards
 
             // To set the link title, we require the property store of the link.
@@ -200,7 +212,8 @@ HRESULT CreateShellLink(const char* path, const char* name, IShellLinkW** psl)
                 PROPVARIANT pv;
                 PropVariantInit(&pv);
                 pv.vt = VT_LPWSTR;
-                pv.pwszVal = nameW;
+                // SetValue copies the string; a failed conversion falls back to an empty title.
+                pv.pwszVal = const_cast<LPWSTR>(nameW != NULL ? (const WCHAR*)nameW : L"");
                 pPS->SetValue(PKEY_Title, pv);
                 pPS->Commit();
                 pPS->Release();

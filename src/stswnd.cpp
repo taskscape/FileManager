@@ -1502,9 +1502,10 @@ public:
                         int l = (int)strlen(fileA);
                         if (*(fileA + l + 1) == 0)
                         {
-                            // Legacy ANSI HDROP entries still have to enter the UTF-8 path cache.
-                            WCHAR wide[MAX_PATH];
-                            if (ConvertA2U(fileA, -1, wide, _countof(wide), CP_ACP) &&
+                            // Legacy ANSI HDROP entries still have to enter the UTF-8 path cache. Transcode
+                            // through a heap-owned wide buffer rather than a fixed-size stack array.
+                            CStrP wide(ConvertAllocA2U(fileA, -1, CP_ACP));
+                            if (wide != NULL &&
                                 ConvertWideToUtf8(wide, -1, path, MAX_PATH))
                                 ret = TRUE;
                         }

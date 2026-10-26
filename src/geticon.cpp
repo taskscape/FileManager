@@ -11,10 +11,12 @@ UINT WINAPI ExtractIcons(LPCTSTR szFileName, int nIconIndex, int cxIcon, int cyI
     HICON hLarge{};
     HICON hSmall{};
     // Callers pass UTF-8 paths; the ANSI extractor would split characters outside the system code page.
-    WCHAR wideName[MAX_PATH];
-    if (ConvertUtf8ToWide(szFileName, -1, wideName, _countof(wideName)) == 0)
+    // CWidePath owns the wide conversion without a fixed length cap; the shell extractor takes the plain
+    // display path (shell APIs do not accept the \\?\ extended-length prefix).
+    CWidePath wideName(szFileName);
+    if (!wideName.IsValid())
         return 0;
-    auto shRet = SHDefExtractIconW(wideName, nIconIndex, 0, &hLarge, &hSmall, nIconSize);
+    auto shRet = SHDefExtractIconW(wideName.GetDisplayPath(), nIconIndex, 0, &hLarge, &hSmall, nIconSize);
     if (shRet == S_OK)
     {
         if (phicon)
