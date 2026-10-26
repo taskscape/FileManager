@@ -65,7 +65,9 @@ static BOOL WideToUtf8Buffer(const WCHAR* src, char* dst, int dstSize)
     return len != 0;
 }
 
-// ZIP metadata stores LANGIDs, while the modern locale APIs require a locale name; the plug-in UI is UTF-8.
+// ZIP metadata stores LANGIDs, while the modern locale APIs require a locale name. The only consumers of
+// this name are the plug-in's ANSI combo boxes (CB_ADDSTRING/CB_SELECTSTRING), so emit ACP here to match
+// them; converting those combo-box boundaries to Unicode is the alternative but is left to that migration.
 static BOOL GetLanguageNameFromLangId(DWORD languageId, char* dst, int dstSize)
 {
     WCHAR localeName[LOCALE_NAME_MAX_LENGTH];
@@ -78,7 +80,7 @@ static BOOL GetLanguageNameFromLangId(DWORD languageId, char* dst, int dstSize)
     dst[0] = 0;
     return LCIDToLocaleName(languageLcid, localeName, _countof(localeName), 0) != 0 &&
            GetLocaleInfoEx(localeName, LOCALE_SLANGUAGE, languageName, _countof(languageName)) != 0 &&
-           WideCharToMultiByte(CP_UTF8, 0, languageName, -1, dst, dstSize, NULL, NULL) != 0;
+           WideCharToMultiByte(CP_ACP, 0, languageName, -1, dst, dstSize, NULL, NULL) != 0;
 }
 
 static BOOL ConvertFindDataWToUtf8Local(const WIN32_FIND_DATAW* src, WIN32_FIND_DATAA* dst)

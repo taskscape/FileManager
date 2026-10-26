@@ -390,7 +390,9 @@ void CConnectDialog::InitDrives()
                     strcat(sourcePanelPath, "\\");
                     strncat(sourcePanelPath, data->Name, len - 1);
                     sourcePanelPath[MAX_PATH - 1] = 0;
-                    SetDlgItemText(HWindow, IDC_EDIT_IMAGE, sourcePanelPath);
+                    // IDC_EDIT_IMAGE is read back with ReadUtf8ControlText; initialize it through the
+                    // UTF-8 adapter so a non-ASCII panel path is not double-encoded on readback.
+                    SendUtf8DialogControlString(HWindow, IDC_EDIT_IMAGE, WM_SETTEXT, 0, sourcePanelPath);
                 }
             }
             break;

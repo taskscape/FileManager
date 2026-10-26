@@ -2070,32 +2070,47 @@ static BOOL InternalIFileDialog(LPOPENFILENAME lpofn, BOOL isSave)
                                 lpofn->nFileOffset = (WORD)(dirLen + 1);
                                 lpofn->nFileExtension = 0;
 
-                                for (DWORD i = 0; i < itemCount; i++)
+                                // A selected name that cannot be represented (UTF-8 form exceeds the item
+                                // buffer, or no longer fits the result buffer) must fail the whole
+                                // selection rather than silently returning a subset.
+                                BOOL allItemsFit = TRUE;
+                                for (DWORD i = 0; i < itemCount && allItemsFit; i++)
                                 {
                                     wil::com_ptr<IShellItem> pItem;
-                                    if (SUCCEEDED(pItemArray->GetItemAt(i, &pItem)))
+                                    if (FAILED(pItemArray->GetItemAt(i, &pItem)))
                                     {
-                                        wil::unique_cotaskmem_string pszItemName;
-                                        if (SUCCEEDED(pItem->GetDisplayName(SIGDN_FILESYSPATH, &pszItemName)))
-                                        {
-                                            char itemPath[MAX_PATH];
-                                            if (WideCharToMultiByte(CP_UTF8, 0, pszItemName.get(), -1, itemPath, sizeof(itemPath), NULL, NULL) > 0)
-                                            {
-                                                const char* fn = strrchr(itemPath, '\\');
-                                                fn = fn ? (fn + 1) : itemPath;
-                                                size_t fnLen = strlen(fn);
-                                                if (fnLen + 2 <= remaining)
-                                                {
-                                                    StringCchCopyA(pBuf, remaining, fn);
-                                                    pBuf += fnLen + 1;
-                                                    remaining -= (fnLen + 1);
-                                                }
-                                            }
-                                        }
+                                        allItemsFit = FALSE;
+                                        break;
                                     }
+                                    wil::unique_cotaskmem_string pszItemName;
+                                    if (FAILED(pItem->GetDisplayName(SIGDN_FILESYSPATH, &pszItemName)))
+                                    {
+                                        allItemsFit = FALSE;
+                                        break;
+                                    }
+                                    char itemPath[MAX_PATH];
+                                    if (WideCharToMultiByte(CP_UTF8, 0, pszItemName.get(), -1, itemPath, sizeof(itemPath), NULL, NULL) <= 0)
+                                    {
+                                        allItemsFit = FALSE; // UTF-8 expansion did not fit itemPath
+                                        break;
+                                    }
+                                    const char* fn = strrchr(itemPath, '\\');
+                                    fn = fn ? (fn + 1) : itemPath;
+                                    size_t fnLen = strlen(fn);
+                                    if (fnLen + 2 > remaining)
+                                    {
+                                        allItemsFit = FALSE; // would overflow the caller's result buffer
+                                        break;
+                                    }
+                                    StringCchCopyA(pBuf, remaining, fn);
+                                    pBuf += fnLen + 1;
+                                    remaining -= (fnLen + 1);
                                 }
-                                *pBuf = 0;
-                                success = TRUE;
+                                if (allItemsFit)
+                                {
+                                    *pBuf = 0;
+                                    success = TRUE;
+                                }
                             }
                         }
                     }

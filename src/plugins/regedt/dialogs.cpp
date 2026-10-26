@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "precomp.h"
+#include "../../common/utf8_control_text.h" // UTF-8-aware dialog-control read/write for browse-result paths
 
 TDirectArray<DWORD_PTR> DialogStack(4, 4);
 CCS DialogStackCS;
@@ -1036,9 +1037,11 @@ CConfigDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                 {
                     char path[MAX_PATH];
                     path[0] = 0;
-                    GetDlgItemText(HWindow, IDE_COMMAND, path, MAX_PATH);
+                    // GetOpenFileName returns UTF-8; read and write IDE_COMMAND through the UTF-8
+                    // adapters so a non-ASCII path round-trips instead of being mangled through ACP.
+                    ReadUtf8ControlText(GetDlgItem(HWindow, IDE_COMMAND), path, MAX_PATH);
                     if (GetOpenFileName(HWindow, NULL, LoadStr(IDS_EXEFILES), path))
-                        SetDlgItemText(HWindow, IDE_COMMAND, path);
+                        SendUtf8DialogControlString(HWindow, IDE_COMMAND, WM_SETTEXT, 0, path);
                 }
                 else if (cmd == 30)
                 {
@@ -1243,12 +1246,13 @@ CExportDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         {
             char path[MAX_PATH];
             path[0] = 0;
-            GetDlgItemText(HWindow, IDE_FILE, path, MAX_PATH);
+            // IDE_FILE holds a UTF-8 path; use the UTF-8 adapters so non-ASCII names survive the round-trip.
+            ReadUtf8ControlText(GetDlgItem(HWindow, IDE_FILE), path, MAX_PATH);
             SG->SalPathRemoveBackslash(path);
             if (GetOpenFileName(HWindow, NULL, LoadStr(IDS_REGFILES), path, TRUE))
             {
                 SG->SalPathAddExtension(path, ".reg", MAX_PATH);
-                SetDlgItemText(HWindow, IDE_FILE, path);
+                SendUtf8DialogControlString(HWindow, IDE_FILE, WM_SETTEXT, 0, path);
             }
             return TRUE;
         }

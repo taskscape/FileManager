@@ -370,7 +370,10 @@ CEditLine::CEditLine()
 
 void CEditLine::InsertText(char* s)
 {
-    SendMessage(HWindow, EM_REPLACESEL, TRUE, (LPARAM)s);
+    // The edit control is Unicode; send the UTF-8 text as UTF-16 so a non-ASCII insertion is not
+    // reinterpreted through the ANSI code page by an A-form EM_REPLACESEL.
+    CStrP wide(ConvertAllocUtf8ToWide(s != NULL ? s : "", -1));
+    SendMessageW(HWindow, EM_REPLACESEL, TRUE, (LPARAM)(wide != NULL ? wide.Ptr : L""));
 }
 
 BOOL SkipNextSysCharacter = FALSE;
@@ -1202,7 +1205,9 @@ public:
             if (ImageDragging)
                 ImageDragShow(FALSE);
             SendMessage(EditLine->HWindow, EM_SETSEL, xPos, xPos);
-            SendMessage(EditLine->HWindow, EM_REPLACESEL, TRUE, (LPARAM)start);
+            // Insert the dropped UTF-8 path as UTF-16 so non-ASCII names are not mangled through ACP.
+            CStrP startWide(ConvertAllocUtf8ToWide(start != NULL ? start : "", -1));
+            SendMessageW(EditLine->HWindow, EM_REPLACESEL, TRUE, (LPARAM)(startWide != NULL ? startWide.Ptr : L""));
             UpdateWindow(EditLine->HWindow);
             if (ImageDragging)
                 ImageDragShow(TRUE);

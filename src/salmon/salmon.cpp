@@ -173,7 +173,9 @@ GetItemIdListForFileName(LPSHELLFOLDER folder, const char* fileName,
     OLECHAR olePath[MAX_PATH];
     if (addUNCPrefix)
         olePath[0] = olePath[1] = L'\\';
-    MultiByteToWideChar(CP_ACP, MB_PRECOMPOSED, fileName, -1, olePath + (addUNCPrefix ? 2 : 0),
+    // fileName is UTF-8 (the crash reporter's BugPath is now UTF-8); decode it as UTF-8 so a non-ASCII
+    // user-profile path resolves. CP_UTF8 does not accept MB_PRECOMPOSED, so no flags are passed.
+    MultiByteToWideChar(CP_UTF8, 0, fileName, -1, olePath + (addUNCPrefix ? 2 : 0),
                         MAX_PATH - (addUNCPrefix ? 2 : 0));
     olePath[MAX_PATH - 1] = 0;
 

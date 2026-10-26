@@ -1036,9 +1036,11 @@ CConfigDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                 {
                     char path[MAX_PATH];
                     path[0] = 0;
-                    GetDlgItemText(HWindow, IDE_COMMAND, path, MAX_PATH);
+                    // GetOpenFileName returns UTF-8; read and write IDE_COMMAND through the UTF-8
+                    // adapters so a non-ASCII path round-trips instead of being mangled through ACP.
+                    ReadUtf8ControlText(GetDlgItem(HWindow, IDE_COMMAND), path, MAX_PATH);
                     if (GetOpenFileName(HWindow, NULL, LoadStr(IDS_EXEFILES), path))
-                        SetDlgItemText(HWindow, IDE_COMMAND, path);
+                        SendUtf8DialogControlString(HWindow, IDE_COMMAND, WM_SETTEXT, 0, path);
                 }
                 else if (cmd == 30)
                 {

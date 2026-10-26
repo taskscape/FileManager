@@ -21,6 +21,19 @@ CThreadQueue ThreadQueue("CheckSum Dialogs and Workers"); // list of all dialog 
 
 #define BUFSIZE (4 * 65536) // buffer size for reading
 
+// Checksum file paths are UTF-8 (from the UTF-8 file dialog); open them through the wide CRT so a
+// non-ASCII name is not reinterpreted through the ANSI code page the way _tfopen/fopen would.
+static FILE* Utf8Fopen(const char* path, const wchar_t* mode)
+{
+    int n = MultiByteToWideChar(CP_UTF8, 0, path, -1, NULL, 0);
+    if (n <= 0)
+        return NULL;
+    std::wstring wide((size_t)n, L'\0');
+    if (MultiByteToWideChar(CP_UTF8, 0, path, -1, &wide[0], n) == 0)
+        return NULL;
+    return _wfopen(wide.c_str(), mode);
+}
+
 #define GET_X_LPARAM(lp) ((int)(short)LOWORD(lp))
 #define GET_Y_LPARAM(lp) ((int)(short)HIWORD(lp))
 
@@ -1095,7 +1108,7 @@ BOOL CCalculateDialog::GetSaveFileName(LPTSTR buffer, LPCTSTR title)
             else
                 _tcscat(buffer, HashInfo[Config.HashType].sSaveAsExt); // no extension -> add the default one
 
-            FILE* f = _tfopen(buffer, "r");
+            FILE* f = Utf8Fopen(buffer, L"r");
             if (!f)
             {
                 ret = TRUE;
@@ -1149,7 +1162,7 @@ void CCalculateDialog::SaveHashes()
     if (GetSaveFileName(filename, LoadStr(IDS_SAVE_TITLE)))
     {
         FILE* f;
-        if ((f = _tfopen(filename, _T("w"))) == NULL)
+        if ((f = Utf8Fopen(filename, L"w")) == NULL)
         {
             Error(HWindow, GetLastError(), IDS_SAVE_TITLE, IDS_ERRORCREATINGFILE);
             return;

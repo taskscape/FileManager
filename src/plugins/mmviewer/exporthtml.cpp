@@ -444,7 +444,17 @@ int ExportToHTML(const char* fname, COutput& Output)
     // write to file
     BOOL r = FALSE;
 
-    FILE* f = fopen(fname, "wt");
+    // fname is a UTF-8 path; open through the wide CRT so a non-ASCII export name is not reinterpreted
+    // through the ANSI code page the way fopen would.
+    FILE* f = NULL;
+    int wlen = MultiByteToWideChar(CP_UTF8, 0, fname, -1, NULL, 0);
+    if (wlen > 0)
+    {
+        WCHAR* wfname = (WCHAR*)malloc(wlen * sizeof(WCHAR));
+        if (wfname != NULL && MultiByteToWideChar(CP_UTF8, 0, fname, -1, wfname, wlen) != 0)
+            f = _wfopen(wfname, L"wt");
+        free(wfname);
+    }
     if (f)
     {
         if (fwrite(&text[0], text.Count, 1, f) < 1)

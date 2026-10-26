@@ -1526,18 +1526,26 @@ wchar_t* UTF8ToWide(const char* chars, int len)
     return wc;
 }
 
+static WCHAR* DupWideFromAnsi(const char* text); // defined below; converts UTF-8 to an owned wide string
+
 void ExecuteFile(LPCTSTR fname)
 {
-    if (int((INT_PTR)ShellExecute(::GetDesktopWindow(), _T("open"), fname, _T(""), _T("."), SW_SHOW)) <= 32)
+    // fname is a UTF-8 path; the ANSI ShellExecute would misread a non-ASCII name, so convert and use
+    // the Unicode shell APIs (the OpenAs_RunDLL parameter string embeds the same path and converts too).
+    WCHAR* wfname = DupWideFromAnsi(fname);
+    if (int((INT_PTR)ShellExecuteW(::GetDesktopWindow(), L"open", wfname != NULL ? wfname : L"", L"", L".", SW_SHOW)) <= 32)
     {
         // let the user choose what to associate it with
-        ShellExecute(NULL,
-                     _T("open"),
-                     _T("rundll32.exe"),
-                     FStr("shell32.dll, OpenAs_RunDLL %s", fname),
-                     NULL,
-                     SW_SHOW);
+        WCHAR* paramsW = DupWideFromAnsi(FStr("shell32.dll, OpenAs_RunDLL %s", fname));
+        ShellExecuteW(NULL,
+                      L"open",
+                      L"rundll32.exe",
+                      paramsW != NULL ? paramsW : L"",
+                      NULL,
+                      SW_SHOW);
+        free(paramsW);
     }
+    free(wfname);
 }
 
 // The Shell file dialog is Unicode-only; plug-in text and paths are UTF-8.
