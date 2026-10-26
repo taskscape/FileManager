@@ -1298,9 +1298,10 @@ public:
                             BOOL pathFits = TRUE;
                             if (path != NULL)
                             {
-                                // Legacy ANSI HDROP entries are opened through UTF-8 file APIs.
-                                WCHAR wide[MAX_PATH];
-                                pathFits = ConvertA2U(fileA, -1, wide, _countof(wide), CP_ACP) &&
+                                // Legacy ANSI HDROP entries are opened through UTF-8 file APIs. The ANSI
+                                // source is transcoded through a heap-owned wide buffer, not a fixed one.
+                                CStrP wide(ConvertAllocA2U(fileA, -1, CP_ACP));
+                                pathFits = wide != NULL &&
                                            ConvertWideToUtf8(wide, -1, path, MAX_PATH) != 0;
                                 if (!pathFits)
                                     path[0] = 0;
