@@ -95,9 +95,9 @@ BOOL ErrorHelper(HWND parent, const char* message, int lastError, va_list arglis
         if (*buf != 0 && *(buf + strlen(buf) - 1) != ' ')
             strcat(buf, " ");
         // The error prefix is a terminated local buffer before FormatMessage appends to it.
+        // SalMessageBox displays UTF-8, including localized system text.
         int l = static_cast<int>(strlen(buf));
-        FormatMessage(FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS, NULL, lastError,
-                      MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), buf + l, 2048 - l, NULL);
+        SG->GetErrorText(lastError, buf + l, 2048 - l);
     }
     if (SG)
     {

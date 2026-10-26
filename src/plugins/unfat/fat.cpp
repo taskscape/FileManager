@@ -698,14 +698,14 @@ void GetFileInfo(char* buffer, int bufferLen, const CFileData* fileData)
     char date[100], time[100], number[100];
     WCHAR localeName[LOCALE_NAME_MAX_LENGTH];
     WCHAR formattedValue[100];
-    // FAT error text crosses an ANSI plug-in boundary only after Unicode locale formatting.
+    // FAT info text is UTF-8, including locale-formatted dates.
     if (!GetUserDefaultLocaleName(localeName, ARRAYSIZE(localeName)) ||
         GetTimeFormatEx(localeName, 0, &st, NULL, formattedValue, ARRAYSIZE(formattedValue)) == 0 ||
-        WideCharToMultiByte(CP_ACP, 0, formattedValue, -1, time, ARRAYSIZE(time), NULL, NULL) == 0)
+        WideCharToMultiByte(CP_UTF8, 0, formattedValue, -1, time, ARRAYSIZE(time), NULL, NULL) == 0)
         sprintf(time, "%u:%02u:%02u", st.wHour, st.wMinute, st.wSecond);
     if (!GetUserDefaultLocaleName(localeName, ARRAYSIZE(localeName)) ||
         GetDateFormatEx(localeName, DATE_SHORTDATE, &st, NULL, formattedValue, ARRAYSIZE(formattedValue), NULL) == 0 ||
-        WideCharToMultiByte(CP_ACP, 0, formattedValue, -1, date, ARRAYSIZE(date), NULL, NULL) == 0)
+        WideCharToMultiByte(CP_UTF8, 0, formattedValue, -1, date, ARRAYSIZE(date), NULL, NULL) == 0)
         sprintf(date, "%u.%u.%u", st.wDay, st.wMonth, st.wYear);
     int len = _snprintf_s(buffer, bufferLen, _TRUNCATE, "%s, %s, %s", SalamanderGeneral->NumberToStr(number, fileData->Size), date, time);
     if (len < 0)

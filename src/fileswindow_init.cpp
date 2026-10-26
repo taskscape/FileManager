@@ -514,9 +514,18 @@ unsigned IconThreadThreadFBody(void* parameter)
                         path[l++] = '\\';
                     name = path + l; // pointer to the location of the name in the full path
                     *name = 0;
-                    MultiByteToWideChar(CP_ACP, MB_PRECOMPOSED, path, l, wPath, MAX_PATH + 10);
-                    wName = wPath + l;
-                    *wName = 0;
+                    // Panel paths are UTF-8; the wide length is not the UTF-8 byte length.
+                    int wideChars = MultiByteToWideChar(CP_UTF8, 0, path, l, wPath, MAX_PATH + 10);
+                    if (wideChars <= 0)
+                    {
+                        wPath[0] = 0;
+                        wName = wPath;
+                    }
+                    else
+                    {
+                        wName = wPath + wideChars;
+                        *wName = 0;
+                    }
                     pathIsInvalid = !PathContainsValidComponents(path, FALSE);
                     if (pathIsInvalid)
                         TRACE_I("Path contains invalid components, shell cannot read icons from such paths! Path: " << path);

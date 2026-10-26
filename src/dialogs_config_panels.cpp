@@ -562,7 +562,8 @@ int CSharesDialog::GetFocusedIndex()
 void CSharesDialog::DeleteShare(const char* shareName)
 {
     OLECHAR oleShareName[MAX_PATH];
-    MultiByteToWideChar(CP_ACP, MB_PRECOMPOSED, shareName, -1, oleShareName, MAX_PATH);
+    // Share names follow the UTF-8 path convention used by the panel.
+    MultiByteToWideChar(CP_UTF8, 0, shareName, -1, oleShareName, MAX_PATH);
     oleShareName[MAX_PATH - 1] = 0;
     NetShareDel(NULL, oleShareName, 0);
 }

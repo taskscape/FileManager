@@ -136,10 +136,9 @@ CPluginInterfaceAbstract* WINAPI SalamanderPluginEntry(CSalamanderPluginEntryAbs
   if (!ok)
   {
     lstrcpy(buf, LoadStr(IDS_ERRLOADPAKLIB));
-    FormatMessage(FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS, NULL,
-                GetLastError(), MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
-                buf + lstrlen(buf), 1024 - lstrlen(buf), NULL);
-    MessageBox(salamander->GetParentWindow(), buf, LoadStr(IDS_PLUGINNAME), MB_OK | MB_ICONERROR);
+    // ShowMessageBox displays UTF-8, including localized system text.
+    SalamanderGeneral->GetErrorText(GetLastError(), buf + lstrlen(buf), 1024 - lstrlen(buf));
+    SalamanderGeneral->ShowMessageBox(buf, LoadStr(IDS_PLUGINNAME), MSGBOX_ERROR);
     return NULL;
   }
 */
@@ -640,8 +639,8 @@ BOOL CPluginInterfaceForArchiver::UnpackOneFile(CSalamanderForOperationsAbstract
 
                         CopyPakErrorPrefix(buf, _countof(buf), IDS_ERROPEN);
                         const DWORD prefixLength = static_cast<DWORD>(strlen(buf)); // buf is bounded to 1,024 bytes for FormatMessage.
-                        FormatMessage(FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS, NULL,
-                                      GetLastError(), MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), buf + prefixLength, _countof(buf) - prefixLength, NULL);
+                        // Dialog text is UTF-8, so append the localized system message through the plug-in API.
+        SalamanderGeneral->GetErrorText(GetLastError(), buf + prefixLength, (int)(_countof(buf) - prefixLength));
                         SalamanderGeneral->ShowMessageBox(buf, LoadStr(IDS_PLUGINNAME), MSGBOX_ERROR);
                     }
                     else
@@ -905,8 +904,8 @@ BOOL CPakCallbacks::SafeSeek64(const LARGE_INTEGER& position)
             return TRUE;
         CopyPakErrorPrefix(buf, _countof(buf), IDS_UNABLESEEK);
         const DWORD prefixLength = static_cast<DWORD>(strlen(buf)); // buf is bounded to 1,024 bytes for FormatMessage.
-        FormatMessage(FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS, NULL,
-                      GetLastError(), MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), buf + prefixLength, _countof(buf) - prefixLength, NULL);
+        // Dialog text is UTF-8, so append the localized system message through the plug-in API.
+        SalamanderGeneral->GetErrorText(GetLastError(), buf + prefixLength, (int)(_countof(buf) - prefixLength));
         if (Plugin->Silent & SF_IOERRORS)
         {
             Plugin->Abort = FALSE;
@@ -941,8 +940,8 @@ BOOL CPakCallbacks::Write(void* buffer, DWORD size)
             break;
         CopyPakErrorPrefix(buf, _countof(buf), IDS_UNABLEGETFIELPOS);
         const DWORD prefixLength = static_cast<DWORD>(strlen(buf)); // buf is bounded to 1,024 bytes for FormatMessage.
-        FormatMessage(FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS, NULL,
-                      GetLastError(), MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), buf + prefixLength, _countof(buf) - prefixLength, NULL);
+        // Dialog text is UTF-8, so append the localized system message through the plug-in API.
+        SalamanderGeneral->GetErrorText(GetLastError(), buf + prefixLength, (int)(_countof(buf) - prefixLength));
         if (Plugin->Silent & SF_IOERRORS)
         {
             Plugin->Abort = FALSE;
@@ -967,8 +966,8 @@ BOOL CPakCallbacks::Write(void* buffer, DWORD size)
             return TRUE;
         CopyPakErrorPrefix(buf, _countof(buf), IDS_UNABLEWRITE);
         const DWORD prefixLength = static_cast<DWORD>(strlen(buf)); // buf is bounded to 1,024 bytes for FormatMessage.
-        FormatMessage(FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS, NULL,
-                      GetLastError(), MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), buf + prefixLength, _countof(buf) - prefixLength, NULL);
+        // Dialog text is UTF-8, so append the localized system message through the plug-in API.
+        SalamanderGeneral->GetErrorText(GetLastError(), buf + prefixLength, (int)(_countof(buf) - prefixLength));
         if (Plugin->Silent & SF_IOERRORS)
         {
             Plugin->Abort = FALSE;
@@ -1025,11 +1024,11 @@ void GetInfo(char* buffer, FILETIME* lastWrite, unsigned size)
     // Format through the locale-name APIs, converting only at PAK's ANSI presentation boundary.
     if (!GetUserDefaultLocaleName(localeName, ARRAYSIZE(localeName)) ||
         GetTimeFormatEx(localeName, 0, &st, NULL, formattedValue, ARRAYSIZE(formattedValue)) == 0 ||
-        WideCharToMultiByte(CP_ACP, 0, formattedValue, -1, time, ARRAYSIZE(time), NULL, NULL) == 0)
+        WideCharToMultiByte(CP_UTF8, 0, formattedValue, -1, time, ARRAYSIZE(time), NULL, NULL) == 0)
         sprintf(time, "%u:%02u:%02u", st.wHour, st.wMinute, st.wSecond);
     if (!GetUserDefaultLocaleName(localeName, ARRAYSIZE(localeName)) ||
         GetDateFormatEx(localeName, DATE_SHORTDATE, &st, NULL, formattedValue, ARRAYSIZE(formattedValue), NULL) == 0 ||
-        WideCharToMultiByte(CP_ACP, 0, formattedValue, -1, date, ARRAYSIZE(date), NULL, NULL) == 0)
+        WideCharToMultiByte(CP_UTF8, 0, formattedValue, -1, date, ARRAYSIZE(date), NULL, NULL) == 0)
         sprintf(date, "%u.%u.%u", st.wDay, st.wMonth, st.wYear);
     sprintf(buffer, "%s, %s, %s", SalamanderGeneral->NumberToStr(number, CQuadWord(size, 0)), date, time);
 }

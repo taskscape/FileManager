@@ -291,7 +291,8 @@ public:
         WCHAR* wFileName = filename;
 #else
         WCHAR wFileName[2 * MAX_PATH + 2];
-        int wl = MultiByteToWideChar(CP_ACP, MB_PRECOMPOSED, filename, -1, wFileName, ARRAYSIZE(wFileName));
+        // Panel file names are UTF-8; the shell command needs UTF-16.
+        int wl = MultiByteToWideChar(CP_UTF8, 0, filename, -1, wFileName, ARRAYSIZE(wFileName));
         if (wl == 0)
             return FALSE;
 #endif
@@ -343,7 +344,8 @@ public:
         WCHAR* wFileName = filename;
 #else
         WCHAR wFileName[2 * MAX_PATH + 2];
-        int wl = MultiByteToWideChar(CP_ACP, MB_PRECOMPOSED, filename, -1, wFileName, ARRAYSIZE(wFileName));
+        // Panel file names are UTF-8; the shell command needs UTF-16.
+        int wl = MultiByteToWideChar(CP_UTF8, 0, filename, -1, wFileName, ARRAYSIZE(wFileName));
         if (wl == 0)
             return FALSE;
 #endif
@@ -479,7 +481,8 @@ MENU_TEMPLATE_ITEM FileMenu[] =
         WCHAR* wFileName = filename;
 #else
         WCHAR wFileName[2 * MAX_PATH + 2];
-        int wl = MultiByteToWideChar(CP_ACP, MB_PRECOMPOSED, filename, -1, wFileName, ARRAYSIZE(wFileName));
+        // Panel file names are UTF-8; the shell command needs UTF-16.
+        int wl = MultiByteToWideChar(CP_UTF8, 0, filename, -1, wFileName, ARRAYSIZE(wFileName));
         if (wl == 0)
             return FALSE;
 #endif

@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "precomp.h"
+#include "common/unicode_shell_link.h"
 
 #include "shellib.h"
 #include "cfgdlg.h"
@@ -2486,30 +2487,16 @@ void ResolveNetHoodPath(char* path)
         if (SalPathAppend(name, "target.lnk", MAX_PATH))
         {
             WIN32_FIND_DATAW dataW;
-            WIN32_FIND_DATAA data;
             CStrP nameW(ConvertAllocUtf8ToWide(name, -1));
             HANDLE find = nameW != NULL ? HANDLES_Q(FindFirstFileW(nameW, &dataW)) : INVALID_HANDLE_VALUE;
-            if (find != INVALID_HANDLE_VALUE) // file exists and we have its 'data'
+            if (find != INVALID_HANDLE_VALUE) // shortcut file exists
             {
                 HANDLES(FindClose(find));
-                ZeroMemory(&data, sizeof(data));
-                data.dwFileAttributes = dataW.dwFileAttributes;
-                data.ftCreationTime = dataW.ftCreationTime;
-                data.ftLastAccessTime = dataW.ftLastAccessTime;
-                data.ftLastWriteTime = dataW.ftLastWriteTime;
-                data.nFileSizeHigh = dataW.nFileSizeHigh;
-                data.nFileSizeLow = dataW.nFileSizeLow;
-                data.dwReserved0 = dataW.dwReserved0;
-                data.dwReserved1 = dataW.dwReserved1;
-                if (ConvertWideToUtf8(dataW.cFileName, -1, data.cFileName, _countof(data.cFileName)) == 0)
-                    data.cFileName[0] = 0;
-                if (ConvertWideToUtf8(dataW.cAlternateFileName, -1, data.cAlternateFileName, _countof(data.cAlternateFileName)) == 0)
-                    data.cAlternateFileName[0] = 0;
 
                 HCURSOR oldCur = SetCursor(LoadCursor(NULL, IDC_WAIT));
-                IShellLink* link;
+                IShellLinkW* link;
                 if (CoCreateInstance(CLSID_ShellLink, NULL,
-                                     CLSCTX_INPROC_SERVER, IID_IShellLink,
+                                     CLSCTX_INPROC_SERVER, IID_IShellLinkW,
                                      (LPVOID*)&link) == S_OK)
                 {
                     IPersistFile* fileInt;
@@ -2520,7 +2507,8 @@ void ResolveNetHoodPath(char* path)
                         oleName[MAX_PATH - 1] = 0;
                         if (fileInt->Load(oleName, STGM_READ) == S_OK)
                         {
-                            if (link->GetPath(name, MAX_PATH, &data, SLGP_UNCPRIORITY) == NOERROR)
+                            // Network shortcut targets are navigated as UTF-8 paths.
+                            if (ShellLinkTargetUtf8(link, name, MAX_PATH))
                             {                       // we won't use Resolve, because it's not that critical here and would slow things down considerably
                                 strcpy(path, name); // eureka, we finally know where the link points to
                             }
@@ -2723,21 +2711,49 @@ STDMETHODIMP CTextDataObject::GetData(FORMATETC* formatEtc, STGMEDIUM* medium)
             BOOL ok = FALSE;
             if (formatEtc->cfFormat == CF_TEXT)
             {
-                SIZE_T size = GlobalSize(Data);
-                dataDup = NOHANDLES(GlobalAlloc(GMEM_MOVEABLE | GMEM_DDESHARE, size));
-                if (dataDup != NULL)
+                const char* ptr2 = (const char*)HANDLES(GlobalLock(Data));
+                if (ptr2 != NULL)
                 {
-                    void* ptr1 = HANDLES(GlobalLock(dataDup));
-                    void* ptr2 = HANDLES(GlobalLock(Data));
-                    if (ptr1 != NULL && ptr2 != NULL)
+                    if (!TextIsUtf8)
                     {
-                        memcpy(ptr1, ptr2, size);
-                        ok = TRUE;
+                        SIZE_T size = GlobalSize(Data);
+                        dataDup = NOHANDLES(GlobalAlloc(GMEM_MOVEABLE | GMEM_DDESHARE, size));
+                        if (dataDup != NULL)
+                        {
+                            void* ptr1 = HANDLES(GlobalLock(dataDup));
+                            if (ptr1 != NULL)
+                            {
+                                memcpy(ptr1, ptr2, size);
+                                ok = TRUE;
+                                HANDLES(GlobalUnlock(dataDup));
+                            }
+                        }
                     }
-                    if (ptr2 != NULL)
-                        HANDLES(GlobalUnlock(Data));
-                    if (ptr1 != NULL)
-                        HANDLES(GlobalUnlock(dataDup));
+                    else
+                    {
+                        // CF_TEXT stays ANSI for external drop targets; the stored path is UTF-8.
+                        WCHAR* wide = ConvertAllocA2U(ptr2, -1, CP_UTF8);
+                        if (wide != NULL)
+                        {
+                            int ansiLen = WideCharToMultiByte(CP_ACP, 0, wide, -1, NULL, 0, NULL, NULL);
+                            if (ansiLen > 0)
+                            {
+                                dataDup = NOHANDLES(GlobalAlloc(GMEM_MOVEABLE | GMEM_DDESHARE, ansiLen));
+                                if (dataDup != NULL)
+                                {
+                                    char* ptr1 = (char*)HANDLES(GlobalLock(dataDup));
+                                    if (ptr1 != NULL)
+                                    {
+                                        if (WideCharToMultiByte(CP_ACP, 0, wide, -1, ptr1, ansiLen, NULL, NULL) != 0)
+                                            ok = TRUE;
+                                        HANDLES(GlobalUnlock(dataDup));
+                                    }
+                                }
+                            }
+                            free(wide);
+                        }
+                    }
+                    HANDLES(GlobalUnlock(Data));
                 }
             }
             else // formatEtc->cfFormat == CF_UNICODETEXT
@@ -2745,7 +2761,8 @@ STDMETHODIMP CTextDataObject::GetData(FORMATETC* formatEtc, STGMEDIUM* medium)
                 const char* ptr2 = (const char*)HANDLES(GlobalLock(Data));
                 if (ptr2 != NULL)
                 {
-                    int len = MultiByteToWideChar(CP_ACP, 0, ptr2, -1, NULL, 0);
+                    UINT codePage = TextIsUtf8 ? CP_UTF8 : CP_ACP;
+                    int len = MultiByteToWideChar(codePage, 0, ptr2, -1, NULL, 0);
                     if (len > 0)
                     {
                         dataDup = NOHANDLES(GlobalAlloc(GMEM_MOVEABLE | GMEM_DDESHARE, len * sizeof(WCHAR)));
@@ -2754,10 +2771,10 @@ STDMETHODIMP CTextDataObject::GetData(FORMATETC* formatEtc, STGMEDIUM* medium)
                             WCHAR* ptr1 = (WCHAR*)HANDLES(GlobalLock(dataDup));
                             if (ptr1 != NULL)
                             {
-                                if (ConvertA2U(ptr2, -1, ptr1, len))
+                                if (ConvertA2U(ptr2, -1, ptr1, len, codePage))
                                     ok = TRUE;
                                 else
-                                    TRACE_E("ConvertA2U() failed to make unicode translation for our ANSI text.");
+                                    TRACE_E("ConvertA2U() failed to make unicode translation for drag text.");
                                 HANDLES(GlobalUnlock(dataDup));
                             }
                         }

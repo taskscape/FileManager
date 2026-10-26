@@ -108,9 +108,15 @@ STDMETHODIMP SE_QueryContextMenu(THIS_
                         do
                         {
                             l = lstrlenW(fileW);
-                            WideCharToMultiByte(CP_ACP, 0, fileW, l + 1, path, l + 1, NULL, NULL);
-                            path[l] = 0;
-                            IncFilesDirs(path, &filesCount, &dirsCount);
+                            // Count the Unicode HDROP entry directly; an ANSI conversion drops characters.
+                            DWORD attrs = GetFileAttributesW(fileW);
+                            if (attrs != INVALID_FILE_ATTRIBUTES)
+                            {
+                                if (attrs & FILE_ATTRIBUTE_DIRECTORY)
+                                    dirsCount++;
+                                else
+                                    filesCount++;
+                            }
                             fileW += l + 1;
                         } while (*fileW != 0);
                     }

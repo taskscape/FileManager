@@ -4,6 +4,7 @@
 
 #include "precomp.h"
 #include "common/utf8_menu_text.h" // Localized menu captions are UTF-8, while native HMENU strings are Unicode.
+#include "common/utf8_control_text.h"
 
 #include "plugins.h"
 #include "usermenu.h"
@@ -2224,20 +2225,12 @@ BOOL BrowseCommand(HWND hParent, int editlineResID, int filterResID)
 {
     CALL_STACK_MESSAGE2("BrowseCommand(, %d)", editlineResID);
 
-    // Get current file path
-    char file[MAX_PATH];
-    SendMessage(GetDlgItem(hParent, editlineResID), WM_GETTEXT,
-                MAX_PATH, (LPARAM)file);
-
-    // Convert to wide string for IFileDialog
-    // WM_GETTEXT capped this buffer at MAX_PATH, making the API's int length safe.
-    int fileLen = (int)strlen(file);
-    int fileLenW = MultiByteToWideChar(CP_ACP, 0, file, fileLen, NULL, 0);
-    // An empty or unconvertible name must still open the dialog (without a default
-    // file name), matching the previous allocation of at least one WCHAR.
+    // The command edit holds UTF-8; read it through the Unicode window text.
+    HWND edit = GetDlgItem(hParent, editlineResID);
+    int fileLenW = GetWindowTextLengthW(edit);
     std::vector<WCHAR> fileW((fileLenW > 0 ? fileLenW : 0) + 1);
     if (fileLenW > 0)
-        MultiByteToWideChar(CP_ACP, 0, file, fileLen, fileW.data(), fileLenW + 1);
+        GetWindowTextW(edit, fileW.data(), fileLenW + 1);
     fileW[fileLenW > 0 ? fileLenW : 0] = 0;
 
     // Create IFileOpenDialog; released automatically on every return path.
@@ -2285,7 +2278,8 @@ BOOL BrowseCommand(HWND hParent, int editlineResID, int filterResID)
     // Convert filter strings to wide
     if (descLen > 0) {
         filterDescW.resize(descLen + 1);
-        MultiByteToWideChar(CP_ACP, 0, descStart, descLen, filterDescW.data(), descLen + 1);
+        // Filter captions come from UTF-8 resources.
+        MultiByteToWideChar(CP_UTF8, 0, descStart, descLen, filterDescW.data(), descLen + 1);
         filterDescW[descLen] = 0;
     }
 
@@ -2299,7 +2293,7 @@ BOOL BrowseCommand(HWND hParent, int editlineResID, int filterResID)
         }
         if (patternLenW > 0) {
             filterPatternW.resize(patternLenW + 1);
-            MultiByteToWideChar(CP_ACP, 0, patternStart, patternLenW, filterPatternW.data(), patternLenW + 1);
+            MultiByteToWideChar(CP_UTF8, 0, patternStart, patternLenW, filterPatternW.data(), patternLenW + 1);
             filterPatternW[patternLenW] = 0;
         }
     }
@@ -2332,15 +2326,14 @@ BOOL BrowseCommand(HWND hParent, int editlineResID, int filterResID)
             wil::unique_cotaskmem_string resultPathW;
             hr = item->GetDisplayName(SIGDN_FILESYSPATH, &resultPathW);
             if (SUCCEEDED(hr)) {
-                // Convert wide string back to ANSI for the control
-                int resultLen = WideCharToMultiByte(CP_ACP, 0, resultPathW.get(), -1, NULL, 0, NULL, NULL);
+                // Return a UTF-8 path to the command edit.
+                int resultLen = WideCharToMultiByte(CP_UTF8, 0, resultPathW.get(), -1, NULL, 0, NULL, NULL);
                 if (resultLen > 0 && resultLen <= MAX_PATH) {
                     char resultPath[MAX_PATH];
-                    WideCharToMultiByte(CP_ACP, 0, resultPathW.get(), -1, resultPath, resultLen, NULL, NULL);
+                    WideCharToMultiByte(CP_UTF8, 0, resultPathW.get(), -1, resultPath, resultLen, NULL, NULL);
 
-                    // Update the control
                     CALL_STACK_MESSAGE2("BrowseCommand::SendMessage( , , ,%s)", resultPath);
-                    SendMessage(GetDlgItem(hParent, editlineResID), WM_SETTEXT, 0, (LPARAM)resultPath);
+                    SendUtf8ControlString(GetDlgItem(hParent, editlineResID), WM_SETTEXT, 0, resultPath);
                     return TRUE;
                 }
             }

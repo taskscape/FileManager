@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "precomp.h"
+#include "common/unicode_shell_link.h"
 #include "common/utf8_menu_text.h" // Localized menu captions are UTF-8, while native HMENU strings are Unicode.
 
 #include "menu.h"
@@ -543,19 +544,19 @@ const char* GetCurrentDir(POINTL& pt, void* param, DWORD* effect, BOOL rButton, 
             linkTgt[0] = 0;
             if (StrICmp(file->Ext, "lnk") == 0) // isn't it a directory short-cut?
             {
-                IShellLink* link;
+                IShellLinkW* link;
                 if (CoCreateInstance(CLSID_ShellLink, NULL,
-                                     CLSCTX_INPROC_SERVER, IID_IShellLink,
+                                     CLSCTX_INPROC_SERVER, IID_IShellLinkW,
                                      (LPVOID*)&link) == S_OK)
                 {
                     IPersistFile* fileInt;
                     if (link->QueryInterface(IID_IPersistFile, (LPVOID*)&fileInt) == S_OK)
                     {
                         OLECHAR oleName[MAX_PATH];
-                        MultiByteToWideChar(CP_ACP, MB_PRECOMPOSED, fullName, -1, oleName, MAX_PATH);
-                        oleName[MAX_PATH - 1] = 0;
-                        if (fileInt->Load(oleName, STGM_READ) == S_OK &&
-                            link->GetPath(linkTgt, MAX_PATH, NULL, SLGP_UNCPRIORITY) == NOERROR)
+                        // Drop-target resolution must keep characters that are not in the ANSI code page.
+                        if (ConvertUtf8ToWide(fullName, -1, oleName, _countof(oleName)) != 0 &&
+                            fileInt->Load(oleName, STGM_READ) == S_OK &&
+                            ShellLinkTargetUtf8(link, linkTgt, _countof(linkTgt)))
                         {
                             DWORD attr = SalGetFileAttributes(linkTgt);
                             if (attr != INVALID_FILE_ATTRIBUTES && (attr & FILE_ATTRIBUTE_DIRECTORY))
@@ -1246,7 +1247,8 @@ BOOL ResourceGetDialogName(WCHAR* buff, int buffSize, char* name, int nameMax)
     }
 
     // window name
-    WideCharToMultiByte(CP_ACP, WC_COMPOSITECHECK, buff, (int)wcslen(buff) + 1, name, nameMax, NULL, NULL);
+    // Dialog template captions are shown as UTF-8.
+    WideCharToMultiByte(CP_UTF8, 0, buff, (int)wcslen(buff) + 1, name, nameMax, NULL, NULL);
 
     return TRUE;
 }

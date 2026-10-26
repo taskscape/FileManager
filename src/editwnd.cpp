@@ -1282,8 +1282,9 @@ public:
                         {
                             if (path != NULL)
                             {
-                                WideCharToMultiByte(CP_ACP, 0, fileW, l + 1, path, MAX_PATH, NULL, NULL);
-                                path[MAX_PATH - 1] = 0;
+                                // Dropped file names are opened through UTF-8 file APIs.
+                                if (ConvertWideToUtf8(fileW, -1, path, MAX_PATH) == 0)
+                                    path[0] = 0;
                             }
                             ret = TRUE;
                         }
@@ -1297,8 +1298,10 @@ public:
                             BOOL pathFits = TRUE;
                             if (path != NULL)
                             {
-                                // A one-item file drop must retain its complete path identity.
-                                pathFits = SUCCEEDED(StringCchCopyA(path, MAX_PATH, fileA));
+                                // Legacy ANSI HDROP entries are opened through UTF-8 file APIs.
+                                WCHAR wide[MAX_PATH];
+                                pathFits = ConvertA2U(fileA, -1, wide, _countof(wide), CP_ACP) &&
+                                           ConvertWideToUtf8(wide, -1, path, MAX_PATH) != 0;
                                 if (!pathFits)
                                     path[0] = 0;
                             }
@@ -1492,7 +1495,7 @@ public:
             {
                 // change the path
                 if (UseUnicode)
-                    path = ConvertAllocU2A((const WCHAR*)path, -1);
+                    path = ConvertAllocU2A((const WCHAR*)path, -1, FALSE, CP_UTF8);
                 if (path != NULL)
                 {
                     InsertText(pt, path);

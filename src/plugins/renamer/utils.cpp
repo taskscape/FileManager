@@ -10,7 +10,7 @@
 int FormatUserDateTimeAnsi(const SYSTEMTIME* time, DWORD flags, const char* format,
                            char* buffer, int bufferSize, BOOL isDate)
 {
-    // Renamer expressions retain ANSI format strings, so bridge both format and output around the named-locale API.
+    // Renamer expressions and their results are UTF-8, including locale-formatted dates.
     if (buffer == NULL || bufferSize <= 0)
         return 0;
     WCHAR localeName[LOCALE_NAME_MAX_LENGTH];
@@ -19,11 +19,11 @@ int FormatUserDateTimeAnsi(const SYSTEMTIME* time, DWORD flags, const char* form
     WCHAR* wideFormat = NULL;
     if (format != NULL)
     {
-        int formatLength = MultiByteToWideChar(CP_ACP, 0, format, -1, NULL, 0);
+        int formatLength = MultiByteToWideChar(CP_UTF8, 0, format, -1, NULL, 0);
         if (formatLength == 0)
             return 0;
         wideFormat = new WCHAR[formatLength];
-        if (wideFormat == NULL || MultiByteToWideChar(CP_ACP, 0, format, -1, wideFormat, formatLength) == 0)
+        if (wideFormat == NULL || MultiByteToWideChar(CP_UTF8, 0, format, -1, wideFormat, formatLength) == 0)
         {
             delete[] wideFormat;
             return 0;
@@ -34,7 +34,7 @@ int FormatUserDateTimeAnsi(const SYSTEMTIME* time, DWORD flags, const char* form
                      ? GetDateFormatEx(localeName, flags, time, wideFormat, formatted, ARRAYSIZE(formatted), NULL)
                      : GetTimeFormatEx(localeName, flags, time, wideFormat, formatted, ARRAYSIZE(formatted));
     delete[] wideFormat;
-    return result != 0 ? WideCharToMultiByte(CP_ACP, 0, formatted, -1, buffer, bufferSize, NULL, NULL) : 0;
+    return result != 0 ? WideCharToMultiByte(CP_UTF8, 0, formatted, -1, buffer, bufferSize, NULL, NULL) : 0;
 }
 
 void LoadHistory(HKEY regKey, const char* keyPattern, char** history,
@@ -135,10 +135,8 @@ char* GetFileData(const char* file, char* buffer)
     HANDLE h = FindFirstFileUtf8Local(file, &fd);
     if (h == INVALID_HANDLE_VALUE)
     {
-        if (!FormatMessage(FORMAT_MESSAGE_FROM_SYSTEM |
-                               FORMAT_MESSAGE_IGNORE_INSERTS,
-                           NULL, GetLastError(),
-                           MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), buffer, 100, NULL))
+        // The rename preview shows this text as UTF-8.
+        if (SG->GetErrorText(GetLastError(), buffer, 100) == NULL)
             buffer[0] = 0;
     }
     else
@@ -680,14 +678,14 @@ char* Replace(char* string, char s, char d)
     }
     return string;
 }
-// The Shell file dialog is Unicode-only, so ANSI plug-in text converts at this boundary.
+// The Shell file dialog is Unicode-only; plug-in text and paths are UTF-8.
 static WCHAR* DupWideFromAnsi(const char* text)
 {
-    int len = MultiByteToWideChar(CP_ACP, 0, text, -1, NULL, 0);
+    int len = MultiByteToWideChar(CP_UTF8, 0, text, -1, NULL, 0);
     if (len == 0)
         return NULL;
     WCHAR* wide = (WCHAR*)malloc(len * sizeof(WCHAR));
-    if (wide != NULL && MultiByteToWideChar(CP_ACP, 0, text, -1, wide, len) == 0)
+    if (wide != NULL && MultiByteToWideChar(CP_UTF8, 0, text, -1, wide, len) == 0)
     {
         free(wide);
         return NULL;
@@ -808,7 +806,7 @@ BOOL GetOpenFileName(HWND parent, const char* title, const char* filter, char* b
                 SUCCEEDED(item->GetDisplayName(SIGDN_FILESYSPATH, &pathW)) && pathW != NULL)
             {
                 char fileName[MAX_PATH];
-                int converted = WideCharToMultiByte(CP_ACP, 0, pathW, -1, fileName, MAX_PATH, NULL, NULL);
+                int converted = WideCharToMultiByte(CP_UTF8, 0, pathW, -1, fileName, MAX_PATH, NULL, NULL);
                 CoTaskMemFree(pathW);
                 // a result that cannot fit the fixed caller field fails instead of truncating
                 ret = converted > 0 && strlen(fileName) < MAX_PATH;

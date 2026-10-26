@@ -263,7 +263,7 @@ protected:
     int FindPartition(int partnum, CUDF::CPartition* part);
 
     int ScanDir(CUDF::CAD dirICB, char* path,
-                CSalamanderDirectoryAbstract* dir, CPluginDataInterfaceAbstract*& pluginData);
+                CSalamanderDirectoryAbstract* dir, CPluginDataInterfaceAbstract*& pluginData, int depth = 0);
 
     void ReadExtentAd(BYTE sector[], CExtentAd* extent);
     void ReadEntityID(BYTE sector[], CEntityID* entityID);
@@ -280,7 +280,7 @@ protected:
     int MapICB(CUDF::CAD icb, CICBTag* icbTag, CUDF::CAD* file);
     int MapICB(CUDF::CAD icb, CFileEntry* fe);
     int ReadFileEntry(Uint8* data, bool bEFE, Uint16 part, CICBTag* icbTag, CUDF::CAD* ad, int maxAds);
-    int ReadFileIdentifier(Uint8* sector, Uint8* fileChar, char* fileName, CAD* fileICB);
+    int ReadFileIdentifier(Uint8* sector, DWORD avail, Uint8* fileChar, char* fileName, CAD* fileICB);
 
     void ReadStrategy(BYTE data[], Uint16* entries, Uint16* strategy, Uint16* strategyParam);
 
@@ -288,7 +288,7 @@ protected:
     int CheckForVAT(BYTE sector[], bool bEFE, CPartitionMapping* pm, BOOL quiet);
 
     void ReadFileEntry(BYTE sector[], bool bEFE, CFileEntry* fe);
-    int ReadAllocDesc(BYTE data[], CFileEntry* fe, BYTE* vat, DWORD* o);
+    int ReadAllocDesc(BYTE data[], DWORD dataAvail, CFileEntry* fe, BYTE* vat, DWORD* o, DWORD vatCapacity);
 
     int ReadVAT(BYTE fileEntry[], bool bEFE, BYTE** vat, DWORD* length, BOOL quiet);
     Uint32 LogSector(Uint32 lbNum, Uint16 part);

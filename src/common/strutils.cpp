@@ -131,7 +131,8 @@ BOOL GetKnownFolderPathToAnsi(REFKNOWNFOLDERID folderId, char* destination, int 
     if (FAILED(result) || widePath == NULL)
         return FALSE;
 
-    return ConvertU2A(widePath.get(), -1, destination, destinationCapacity) != 0;
+    // Known-folder paths join the UTF-8 path convention used by the file APIs.
+    return ConvertWideToUtf8(widePath.get(), -1, destination, destinationCapacity) != 0;
 }
 
 int ConvertU2A(const WCHAR* src, int srcLen, char* buf, int bufSize, BOOL compositeCheck, UINT codepage)

@@ -419,12 +419,15 @@ class CTextDataObject : public IDataObject
 private:
     long RefCount;
     HGLOBAL Data;
+    BOOL TextIsUtf8;
 
 public:
-    CTextDataObject(HGLOBAL data)
+    CTextDataObject(HGLOBAL data, BOOL textIsUtf8 = FALSE)
     {
         RefCount = 1;
         Data = data;
+        // Directory-line drags store UTF-8; viewer selections keep the file's own bytes.
+        TextIsUtf8 = textIsUtf8;
     }
     virtual ~CTextDataObject()
     {

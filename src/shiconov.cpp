@@ -109,9 +109,8 @@ BOOL GetGoogleDrivePath(char* gdPath, int gdPathMax, CSQLite3DynLoadBase** sqlit
                 sqlite3_stmt* pStmt;
                 char utf8Select[] = "SELECT data_value FROM data WHERE entry_key = 'local_sync_root_path';"; // UTF8 string (if any extra character is added, it needs to be converted ANSI->UTF8)
 
-                // sqlite3_open_v2 requires UTF8 path, so we convert it from ANSI to UTF8
-                if (ConvertA2U(sDbPath, -1, widePath, _countof(widePath)) &&
-                    ConvertU2A(widePath, -1, mbPath, _countof(mbPath), FALSE, CP_UTF8))
+                // sqlite3_open_v2 requires a UTF-8 path, which is already the narrow path encoding.
+                if (strcpy_s(mbPath, sDbPath) == 0)
                 {
                     // Google Drive owns this database, so its data is never a FileManager recovery or write target.
                     int iSts = sqlite3_Dyn->open_v2(mbPath, &pDb, SQLITE_OPEN_READONLY, NULL);
@@ -126,8 +125,8 @@ BOOL GetGoogleDrivePath(char* gdPath, int gdPathMax, CSQLite3DynLoadBase** sqlit
                                 const unsigned char* utf8Path = sqlite3_Dyn->column_text(pStmt, 0);
                                 int utf8PathLen = sqlite3_Dyn->column_bytes(pStmt, 0);
                                 if (utf8Path != NULL && utf8PathLen > 0 &&
-                                    ConvertA2U((const char*)utf8Path, utf8PathLen, widePath, _countof(widePath), CP_UTF8) &&
-                                    ConvertU2A(widePath, -1, mbPath, _countof(mbPath)) &&
+                                    ConvertUtf8ToWide((const char*)utf8Path, utf8PathLen, widePath, _countof(widePath)) &&
+                                    ConvertWideToUtf8(widePath, -1, mbPath, _countof(mbPath)) &&
                                     (int)strlen(mbPath) < gdPathMax)
                                 {
                                     if (strnicmp(mbPath, "\\\\?\\UNC\\", 8) == 0)
@@ -229,8 +228,9 @@ void InitShellIconOverlaysAuxAux(CLSID* clsid, const char* name)
                     iconIndex = 0;
 
                 char iconFileMB[MAX_PATH];
-                WideCharToMultiByte(CP_ACP, 0, (wchar_t*)iconFile, -1, iconFileMB, MAX_PATH, NULL, NULL);
-                iconFileMB[MAX_PATH - 1] = 0;
+                // ExtractIcons decodes UTF-8 before calling the Unicode shell extractor.
+                if (ConvertWideToUtf8((wchar_t*)iconFile, -1, iconFileMB, _countof(iconFileMB)) == 0)
+                    iconFileMB[0] = 0;
 
                 // load icons of all sizes for this icon-overlay
                 HICON hIcons[2] = {0};
@@ -818,7 +818,8 @@ CShellIconOverlays::GetIconOverlayIndex(WCHAR* wPath, WCHAR* wName, char* aPath,
         TRACE_I("CShellIconOverlays::GetIconOverlayIndex(): too long file name: " << name);
         return ICONOVERLAYINDEX_NOTUSED;
     }
-    MultiByteToWideChar(CP_ACP, MB_PRECOMPOSED, name, -1, wName, MAX_PATH - (int)(wName - wPath));
+    // Overlay handlers match the Unicode path; name is the panel's UTF-8 file name.
+    MultiByteToWideChar(CP_UTF8, 0, name, -1, wName, MAX_PATH - (int)(wName - wPath));
     wPath[MAX_PATH - 1] = 0; // just for safety
     strcpy(aName, name);
 
@@ -873,8 +874,9 @@ void ColorsChangedAuxAux(CShellIconOverlayItem* item)
                 iconIndex = 0;
 
             char iconFileMB[MAX_PATH];
-            WideCharToMultiByte(CP_ACP, 0, (wchar_t*)iconFile, -1, iconFileMB, MAX_PATH, NULL, NULL);
-            iconFileMB[MAX_PATH - 1] = 0;
+            // ExtractIcons decodes UTF-8 before calling the Unicode shell extractor.
+            if (ConvertWideToUtf8((wchar_t*)iconFile, -1, iconFileMB, _countof(iconFileMB)) == 0)
+                iconFileMB[0] = 0;
 
             // load icons of all sizes for this icon-overlay
             HICON hIcons[2] = {0};

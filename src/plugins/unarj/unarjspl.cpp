@@ -679,9 +679,9 @@ BOOL CPluginInterfaceForArchiver::Error(int error, ...)
     if (lastErr != ERROR_SUCCESS)
     {
         // The formatted localized error is terminated before the system detail is appended.
+        // ShowMessageBox displays UTF-8, including localized system text.
         int l = static_cast<int>(strlen(buf));
-        FormatMessage(FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS, NULL, lastErr,
-                      MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), buf + l, 1024 - l, NULL);
+        SalamanderGeneral->GetErrorText(lastErr, buf + l, 1024 - l);
     }
     SalamanderGeneral->ShowMessageBox(buf, LoadStr(IDS_PLUGINNAME), MSGBOX_ERROR);
 
@@ -716,8 +716,8 @@ BOOL CPluginInterfaceForArchiver::SafeSeek(const LARGE_INTEGER& position)
             return TRUE; // success
         CopyArjErrorPrefix(buf, _countof(buf), IDS_UNABLESEEK);
         const DWORD prefixLength = static_cast<DWORD>(strlen(buf)); // buf is bounded to 1,024 bytes for FormatMessage.
-        FormatMessage(FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS, NULL,
-                      GetLastError(), MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), buf + prefixLength, _countof(buf) - prefixLength, NULL);
+        // Dialog text is UTF-8, so append the localized system message through the plug-in API.
+        SalamanderGeneral->GetErrorText(GetLastError(), buf + prefixLength, (int)(_countof(buf) - prefixLength));
 
         if (Silent & SF_IOERRORS)
             return FALSE;
@@ -753,8 +753,8 @@ int CPluginInterfaceForArchiver::ProcessDataProc(const void* buffer, DWORD size)
             break;
         CopyArjErrorPrefix(buf, _countof(buf), IDS_UNABLEGETFIELPOS);
         const DWORD prefixLength = static_cast<DWORD>(strlen(buf)); // buf is bounded to 1,024 bytes for FormatMessage.
-        FormatMessage(FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS, NULL,
-                      GetLastError(), MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), buf + prefixLength, _countof(buf) - prefixLength, NULL);
+        // Dialog text is UTF-8, so append the localized system message through the plug-in API.
+        SalamanderGeneral->GetErrorText(GetLastError(), buf + prefixLength, (int)(_countof(buf) - prefixLength));
 
         if (Silent & SF_IOERRORS)
             return 0;
@@ -786,8 +786,8 @@ int CPluginInterfaceForArchiver::ProcessDataProc(const void* buffer, DWORD size)
         }
         CopyArjErrorPrefix(buf, _countof(buf), IDS_UNABLEWRITE);
         const DWORD prefixLength = static_cast<DWORD>(strlen(buf)); // buf is bounded to 1,024 bytes for FormatMessage.
-        FormatMessage(FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS, NULL,
-                      GetLastError(), MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), buf + prefixLength, _countof(buf) - prefixLength, NULL);
+        // Dialog text is UTF-8, so append the localized system message through the plug-in API.
+        SalamanderGeneral->GetErrorText(GetLastError(), buf + prefixLength, (int)(_countof(buf) - prefixLength));
 
         if (Silent & SF_IOERRORS)
             return 0;
@@ -1162,11 +1162,11 @@ void GetInfo(char* buffer, FILETIME* lastWrite, unsigned size)
     // The plug-in remains ANSI at its UI boundary, while locale formatting uses the modern Unicode API.
     if (!GetUserDefaultLocaleName(localeName, ARRAYSIZE(localeName)) ||
         GetTimeFormatEx(localeName, 0, &st, NULL, formattedValue, ARRAYSIZE(formattedValue)) == 0 ||
-        WideCharToMultiByte(CP_ACP, 0, formattedValue, -1, time, ARRAYSIZE(time), NULL, NULL) == 0)
+        WideCharToMultiByte(CP_UTF8, 0, formattedValue, -1, time, ARRAYSIZE(time), NULL, NULL) == 0)
         sprintf(time, "%u:%02u:%02u", st.wHour, st.wMinute, st.wSecond);
     if (!GetUserDefaultLocaleName(localeName, ARRAYSIZE(localeName)) ||
         GetDateFormatEx(localeName, DATE_SHORTDATE, &st, NULL, formattedValue, ARRAYSIZE(formattedValue), NULL) == 0 ||
-        WideCharToMultiByte(CP_ACP, 0, formattedValue, -1, date, ARRAYSIZE(date), NULL, NULL) == 0)
+        WideCharToMultiByte(CP_UTF8, 0, formattedValue, -1, date, ARRAYSIZE(date), NULL, NULL) == 0)
         sprintf(date, "%u.%u.%u", st.wDay, st.wMonth, st.wYear);
     sprintf(buffer, "%s, %s, %s", SalamanderGeneral->NumberToStr(number, CQuadWord(size, 0)), date, time);
 }

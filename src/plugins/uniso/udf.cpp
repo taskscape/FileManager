@@ -39,6 +39,9 @@ typedef wchar_t unicode_t;
 /* This is wrong with regard to endianess */
 #define GETN(data, p, n, target) memcpy(target, &data[p], n)
 
+// Shared overflow-safe range check used to validate every image-supplied offset/length below.
+#include "udf_bounds.h"
+
 static void
 UDFTimeStampToSystemTime(CUDF::CTimeStamp& stamp, SYSTEMTIME* st)
 {
@@ -218,7 +221,8 @@ Uint32 CUDF::LogSector(Uint32 lbNum, Uint16 part)
         break;
 
     case mapVirtual:
-        if (lbNum >= 0 && lbNum <= PartitionMapping.Entries)
+        // Translation holds Entries items (indices 0..Entries-1); "<= Entries" would read one past the table.
+        if (lbNum < PartitionMapping.Entries)
             physBlock = PartitionMapping.Translation[lbNum] - ExtentOffset;
         else
             physBlock = INVALID_SECTOR_NUMBER;
@@ -372,8 +376,20 @@ void CUDF::ReadLVD(BYTE sector[], CLVD* lvd)
     DWORD mapCount = GET_DWORD(sector, 268);
     int offset = 440;
     DWORD i;
+    // mapCount and each map's length come from the image. A real LVD carries only a few maps, so cap
+    // the count, keep every map read inside this sector, and stop on a zero-length map that would
+    // otherwise never advance the offset.
+    if (mapCount > 64)
+        mapCount = 64;
     for (i = 0; i < mapCount; i++)
-        offset += ReadPartitionMap(sector + offset);
+    {
+        if (!UDFRangeInBounds(offset, 64, SECTOR_SIZE))
+            break;
+        int mapSize = ReadPartitionMap(sector + offset);
+        if (mapSize <= 0)
+            break;
+        offset += mapSize;
+    }
 }
 
 void CUDF::ReadDescriptorTag(BYTE sector[], CDescriptorTag* tag)
@@ -480,6 +496,13 @@ int CUDF::ReadFileEntry(Uint8* data, bool bEFE, Uint16 part, CICBTag* icbTag, CU
     }
     l_ea = GET_DWORD(data, p - 8);
     l_ad = GET_DWORD(data, p - 4);
+    // The extended-attribute and allocation-descriptor areas are stored within this single sector;
+    // reject a File Entry whose image-supplied L_EA/L_AD would reach past it.
+    if (!UDFRangeInBounds(p, l_ea, SECTOR_SIZE) || !UDFRangeInBounds(p + l_ea, l_ad, SECTOR_SIZE))
+    {
+        TRACE_E("UnISO: UDF File Entry allocation area exceeds sector");
+        return 0;
+    }
     p += l_ea;
     l_ea = p;
     while (p < l_ea + l_ad)
@@ -489,27 +512,35 @@ int CUDF::ReadFileEntry(Uint8* data, bool bEFE, Uint16 part, CICBTag* icbTag, CU
             switch (icbTag->Flags & 0x0007)
             {
             case 0:
+                if (!UDFRangeInBounds(p, 8, SECTOR_SIZE))
+                    return cnt - maxAds;
                 ShortAD(&data[p], ad, part);
                 p += 8;
                 ad++;
                 maxAds--;
                 break;
             case 1:
+                if (!UDFRangeInBounds(p, 16, SECTOR_SIZE))
+                    return cnt - maxAds;
                 LongAD(&data[p], ad);
                 p += 16;
                 ad++;
                 maxAds--;
                 break;
             case 2:
+                if (!UDFRangeInBounds(p, 20, SECTOR_SIZE))
+                    return cnt - maxAds;
                 ExtAD(&data[p], ad);
                 p += 20;
                 ad++;
                 maxAds--;
                 break;
             case 3:
+                // Inlined data starts at p; clamp its length to the sector so the caller, which later
+                // reads data+Offset for Length bytes, cannot run past this buffer on a crafted image.
                 ad->Offset = p;
                 ad->Flags = UDF_EXT_ALLOCATED;
-                ad->Length = l_ad;
+                ad->Length = UDFRangeInBounds(p, l_ad, SECTOR_SIZE) ? l_ad : (SECTOR_SIZE - p);
                 ad->Location = 0; // To be determined by the caller
                 ad->Partition = part;
                 return -1; // -1 tells the caller the data is inlined, but Location is not set
@@ -534,16 +565,24 @@ int CUDF::ReadFileEntry(Uint8* data, bool bEFE, Uint16 part, CICBTag* icbTag, CU
     return cnt;
 }
 
-int CUDF::ReadFileIdentifier(Uint8* sector, Uint8* fileChar, char* fileName, CAD* fileICB)
+int CUDF::ReadFileIdentifier(Uint8* sector, DWORD avail, Uint8* fileChar, char* fileName, CAD* fileICB)
 {
     Uint8 fi;
     Uint16 iu;
 
+    // The 38-byte FID header, then the implementation-use (iu) and identifier (fi) areas, are all
+    // sized by the image; refuse a descriptor that reaches past the directory bytes now in memory.
+    if (avail < 38)
+    {
+        *fileChar = 0;
+        fileName[0] = '\0';
+        return -1;
+    }
     *fileChar = GET_BYTE(sector, 18);
     fi = GET_BYTE(sector, 19);
     LongAD(sector + 20, fileICB);
     iu = GET_WORD(sector, 36);
-    if (fi)
+    if (fi && UDFRangeInBounds(38 + iu, fi, avail))
         DecodeOSTACompressed(sector + 38 + iu, fi, fileName);
     else
         fileName[0] = '\0';
@@ -712,7 +751,7 @@ void CUDF::ReadFileEntry(BYTE sector[], bool bEFE, CFileEntry* fe)
 
 //
 // returns the length of the allocation descriptor read
-int CUDF::ReadAllocDesc(BYTE data[], CFileEntry* fe, BYTE* vat, DWORD* o)
+int CUDF::ReadAllocDesc(BYTE data[], DWORD dataAvail, CFileEntry* fe, BYTE* vat, DWORD* o, DWORD vatCapacity)
 {
     CAD ad;
     int len = 0;
@@ -720,23 +759,36 @@ int CUDF::ReadAllocDesc(BYTE data[], CFileEntry* fe, BYTE* vat, DWORD* o)
     switch (fe->ICBTag.Flags & 0x0007)
     {
     case 0:
+        if (dataAvail < 8)
+            return -1;
         ShortAD(data, &ad, PD.PartitionNumber);
         len = 8;
         break;
     case 1:
+        if (dataAvail < 16)
+            return -1;
         LongAD(data, &ad);
         len = 16;
         break;
     case 2:
+        if (dataAvail < 20)
+            return -1;
         ExtAD(data, &ad);
         len = 20;
         break;
     case 3:
+        // Inlined data: L_AD bytes are copied from the sector into the VAT buffer; both the source
+        // read and the destination write must stay within their buffers on a crafted image.
+        if (!UDFRangeInBounds(0, fe->L_AD, dataAvail) || !UDFRangeInBounds(*o, fe->L_AD, vatCapacity))
+            return -1;
         memcpy(vat + *o, data, fe->L_AD);
         *o += fe->L_AD;
         return fe->L_AD;
     }
 
+    // The extent length is image-supplied; refuse a read that would overflow the VAT buffer.
+    if (!UDFRangeInBounds(*o, ad.Length, vatCapacity))
+        return -1;
     if (!Image->ReadBlock(PD.Start + ad.Location - ExtentOffset, ad.Length, vat + *o))
     {
         return -1;
@@ -901,13 +953,18 @@ BOOL CUDF::ListDirectory(char* path, int session, CSalamanderDirectoryAbstract* 
 }
 
 int CUDF::ScanDir(CUDF::CAD dirICB, char* path,
-                  CSalamanderDirectoryAbstract* dir, CPluginDataInterfaceAbstract*& pluginData)
+                  CSalamanderDirectoryAbstract* dir, CPluginDataInterfaceAbstract*& pluginData, int depth)
 {
     char fileName[MAX_UDF_FILE_NAME_LEN + 1];
     Uint8 directory[2 * SECTOR_SIZE];
     Uint32 lbNum;
     Uint8 fileChar;
     unsigned int p;
+
+    // A crafted image can nest directories without limit (or cycle), which would exhaust the stack
+    // through this recursion; stop descending at a depth no real UDF tree reaches.
+    if (depth > 100)
+        return ERR_CONTINUE;
 
     // Scan dir for ICB of file
     lbNum = LogSector(dirICB.Location, dirICB.Partition);
@@ -938,11 +995,17 @@ int CUDF::ScanDir(CUDF::CAD dirICB, char* path,
             }
         } // if
 
+        // The 16-byte descriptor tag must lie within the two sectors currently loaded.
+        if (!UDFRangeInBounds(p, 16, 2 * SECTOR_SIZE))
+            break;
         ReadDescriptorTag(directory + p, &tag);
         if (UDF_TAGID_FID == tag.ID)
         {
             CAD icb;
-            p += ReadFileIdentifier(directory + p, &fileChar, fileName, &icb);
+            int fidLen = ReadFileIdentifier(directory + p, 2 * SECTOR_SIZE - p, &fileChar, fileName, &icb);
+            if (fidLen < 0)
+                break; // a File Identifier that does not fit the loaded window ends this directory
+            p += fidLen;
 
             if (!(fileChar & UDF_PARENT))
             {
@@ -952,20 +1015,30 @@ int CUDF::ScanDir(CUDF::CAD dirICB, char* path,
                 if (fileChar & UDF_DIRECTORY)
                 {
                     char newPath[2 * MAX_PATH];
-                    ZeroMemory(newPath, 2 * MAX_PATH);
-                    strcpy(newPath, path);
-                    strcat(newPath, "\\");
-                    strcat(newPath, fileName);
-
-                    CAD fileICB;
-                    CICBTag icbTag;
-                    // descend when everything is OK
-                    if (MapICB(icb, &icbTag, &fileICB) && ret == ERR_OK)
+                    // Bounded path join: a long or deeply nested image name must not overflow newPath
+                    // the way strcpy/strcat did. If the joined path would not fit, skip this subtree.
+                    int pathLen = (int)strlen(path);
+                    int nameLen = (int)strlen(fileName);
+                    if (pathLen + 1 + nameLen + 1 > (int)sizeof(newPath))
                     {
-                        ret = ScanDir(fileICB, newPath, dir, pluginData);
-                        // if we surface with a termination error, keep processing as much as possible
-                        if (ret == ERR_TERMINATE)
-                            ret = ERR_CONTINUE;
+                        ret = ERR_CONTINUE;
+                    }
+                    else
+                    {
+                        memcpy(newPath, path, pathLen);
+                        newPath[pathLen] = '\\';
+                        memcpy(newPath + pathLen + 1, fileName, nameLen + 1);
+
+                        CAD fileICB;
+                        CICBTag icbTag;
+                        // descend when everything is OK
+                        if (MapICB(icb, &icbTag, &fileICB) && ret == ERR_OK)
+                        {
+                            ret = ScanDir(fileICB, newPath, dir, pluginData, depth + 1);
+                            // if we surface with a termination error, keep processing as much as possible
+                            if (ret == ERR_TERMINATE)
+                                ret = ERR_CONTINUE;
+                        }
                     }
                 }
             }
@@ -1139,6 +1212,13 @@ int CUDF::UnpackFile(CSalamanderForOperationsAbstract* salamander, const char* s
                 if (remain < nbytes)
                     nbytes = remain;
 
+                // Inlined data is written from sector+picb->Offset; keep that source range inside the
+                // one sector even if a crafted File Entry paired a large Offset with a large Length.
+                if (picb->Offset + nbytes > SECTOR_SIZE)
+                    nbytes = (picb->Offset < SECTOR_SIZE) ? (SECTOR_SIZE - picb->Offset) : 0;
+                if (nbytes == 0)
+                    break;
+
                 if (!ReadBlockPhys(block, 1, sector))
                 {
                     if (silent == 0)
@@ -1292,6 +1372,13 @@ int CUDF::ReadVAT(BYTE fileEntry[], bool bEFE, BYTE** vat, DWORD* vatLength, BOO
     } // switch
 
     DWORD length = (int)fe.InformationLength;
+    // InformationLength is image-supplied; a wild value must not drive an unbounded allocation.
+    // A virtual allocation table holds one 4-byte entry per sector, so 64 MB is well beyond any real disc.
+    if (length == 0 || length > 64 * 1024 * 1024)
+    {
+        Error(IDS_UDF_MISSING_VAT, quiet);
+        return ERR_TERMINATE;
+    }
     *vatLength = length;
     *vat = new BYTE[length];
     if (*vat == NULL)
@@ -1304,14 +1391,24 @@ int CUDF::ReadVAT(BYTE fileEntry[], bool bEFE, BYTE** vat, DWORD* vatLength, BOO
 
     if (bEFE)
         offset += 40;
+    // The allocation descriptors are stored inside the one-sector file entry; bound the walk to it
+    // so neither the start offset nor L_AD can steer the reads below past the sector buffer.
+    if (!UDFRangeInBounds(offset, fe.L_AD, SECTOR_SIZE))
+    {
+        delete[] *vat;
+        *vat = NULL;
+        Error(IDS_UDF_MISSING_VAT, quiet);
+        return ERR_TERMINATE;
+    }
     end = offset + fe.L_AD;
 
     DWORD o = 0;
     while (offset < end)
     {
-        int ret = ReadAllocDesc(fileEntry + offset, &fe, *vat, &o);
+        int ret = ReadAllocDesc(fileEntry + offset, SECTOR_SIZE - offset, &fe, *vat, &o, length);
 
-        if (ret < 0)
+        // ret <= 0 also stops a zero-length descriptor from spinning the loop forever.
+        if (ret <= 0)
         {
             delete[] *vat;
             *vat = NULL;
@@ -1341,10 +1438,21 @@ int CUDF::CheckForVAT(BYTE sector[], bool bEFE, CPartitionMapping* pm, BOOL quie
         if ((ret = ReadVAT(sector, bEFE, &vat, &vatLen, quiet)) != ERR_OK)
             return ret;
 
-        // decode VAT header
+        // decode VAT header; the header length and the entry table it precedes must fit the VAT
+        // that was actually read, not the InformationLength the image claimed.
+        if (vatLen < sizeof(WORD))
+        {
+            delete[] vat;
+            return ERR_CONTINUE;
+        }
         WORD l_hd = GET_WORD(vat, 0);
+        if (!UDFRangeInBounds(l_hd, sizeof(DWORD), vatLen))
+        {
+            delete[] vat;
+            return ERR_CONTINUE;
+        }
 
-        pm->Entries = (fe.InformationLength - l_hd) / 4; // definition
+        pm->Entries = (vatLen - l_hd) / 4; // bounded by the real VAT size
         pm->Length = vatLen;
         pm->Translation = (DWORD*)(vat + l_hd);
         pm->VAT = vat;
@@ -1355,9 +1463,15 @@ int CUDF::CheckForVAT(BYTE sector[], bool bEFE, CPartitionMapping* pm, BOOL quie
             return ret;
 
         // check the old UDF 1.50 VAT
+        if (vatLen < 36)
+        {
+            delete[] vat;
+            return ERR_CONTINUE;
+        }
         Uint32 entries = (vatLen - 36) / 4; // definition
 
-        if (entries * 4 >= vatLen)
+        // The trailing EntityID (32 bytes read by ReadEntityID) must also lie within the VAT.
+        if (entries * 4 >= vatLen || !UDFRangeInBounds(entries * 4, 32, vatLen))
         {
             delete[] vat;
             return ERR_CONTINUE;

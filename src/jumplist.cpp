@@ -149,25 +149,29 @@ DEFINE_PROPERTYKEY(PKEY_AppUserModel_IsDestListSeparator, 0x9F4C2855, 0x9F79, 0x
 //    return hr;
 //}
 
-HRESULT CreateShellLink(const char* path, const char* name, IShellLink** psl)
+HRESULT CreateShellLink(const char* path, const char* name, IShellLinkW** psl)
 {
     char params[HOTPATHITEM_MAXPATH + 100];
     sprintf(params, "-AJ \"%s\"", path);
     if (strlen(params) < INFOTIPSIZE) // length limit for W2K+ when using SetArguments
     {
         HRESULT hres;
-        IShellLink* ret;
+        IShellLinkW* ret = NULL;
         hres = CoCreateInstance(CLSID_ShellLink, NULL,
                                 CLSCTX_INPROC_SERVER,
                                 IID_PPV_ARGS(&ret));
         if (SUCCEEDED(hres))
         {
-            char pathName[MAX_PATH];
-            GetModuleFileName(NULL, pathName, sizeof(pathName) - 1);
+            WCHAR pathName[MAX_PATH];
+            // The jump list stores Unicode; GetModuleFileNameA would clip a non-ANSI install path.
+            if (GetModuleFileNameW(NULL, pathName, _countof(pathName)) == 0)
+                pathName[0] = 0;
 
-            // Set path, parameters, icon and description.
-            ret->SetPath(pathName);
-            ret->SetArguments(params);
+            WCHAR paramsW[HOTPATHITEM_MAXPATH + 100];
+            WCHAR descW[MAX_PATH];
+            WCHAR nameW[MAX_PATH];
+            if (ConvertUtf8ToWide(params, -1, paramsW, _countof(paramsW)) == 0)
+                paramsW[0] = 0;
             char desc[MAX_PATH];
             if (strlen(path) >= _countof(desc))
             {
@@ -177,8 +181,16 @@ HRESULT CreateShellLink(const char* path, const char* name, IShellLink** psl)
             }
             else
                 StringCchCopyA(desc, _countof(desc), path);
-            ret->SetDescription(desc);                    // MAX_PATH+1 is the limit (at least on Windows 7 where I'm testing now); longer = the jump list won't show at all
-            ret->SetIconLocation("shell32.dll", -319);    // this icon exists from Windows XP onwards
+            if (ConvertUtf8ToWide(desc, -1, descW, _countof(descW)) == 0)
+                descW[0] = 0;
+            if (ConvertUtf8ToWide(name, -1, nameW, _countof(nameW)) == 0)
+                nameW[0] = 0;
+
+            // Set path, parameters, icon and description.
+            ret->SetPath(pathName);
+            ret->SetArguments(paramsW);
+            ret->SetDescription(descW);                   // MAX_PATH+1 is the limit (at least on Windows 7 where I'm testing now); longer = the jump list won't show at all
+            ret->SetIconLocation(L"shell32.dll", -319);   // this icon exists from Windows XP onwards
 
             // To set the link title, we require the property store of the link.
             IPropertyStore* pPS;
@@ -187,8 +199,8 @@ HRESULT CreateShellLink(const char* path, const char* name, IShellLink** psl)
             {
                 PROPVARIANT pv;
                 PropVariantInit(&pv);
-                pv.vt = VT_LPSTR;
-                pv.pszVal = (LPSTR)name;
+                pv.vt = VT_LPWSTR;
+                pv.pwszVal = nameW;
                 pPS->SetValue(PKEY_Title, pv);
                 pPS->Commit();
                 pPS->Release();
@@ -218,7 +230,7 @@ HRESULT AddTasksToList(ICustomDestinationList* pcdl)
     HRESULT hr = CoCreateInstance(CLSID_EnumerableObjectCollection, NULL, CLSCTX_INPROC, IID_PPV_ARGS(&poc));
     if (SUCCEEDED(hr))
     {
-        IShellLink* psl;
+        IShellLinkW* psl;
 
         int count = 0;
         for (int i = 0; i < HOT_PATHS_COUNT; i++)

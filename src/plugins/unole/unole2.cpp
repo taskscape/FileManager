@@ -538,9 +538,9 @@ BOOL Error(HRESULT hr, int error, ...)
     if (hr != S_OK)
     {
         // FormatMessage uses an int-compatible buffer remainder, and buf is fixed at 1024 bytes.
+        // ShowMessageBox displays UTF-8, including localized system text.
         int l = static_cast<int>(strlen(buf));
-        FormatMessage(FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS, NULL, hr,
-                      MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), buf + l, 1024 - l, NULL);
+        SalamanderGeneral->GetErrorText(hr, buf + l, 1024 - l);
     }
     SalamanderGeneral->ShowMessageBox(buf, LoadStr(IDS_PLUGINNAME), MSGBOX_ERROR);
 

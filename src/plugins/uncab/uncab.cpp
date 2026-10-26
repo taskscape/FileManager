@@ -689,10 +689,9 @@ BOOL CPluginInterfaceForArchiver::Error(int error, ...)
     va_end(arglist);
     if (lastErr != ERROR_SUCCESS)
     {
-        // FormatMessage uses an int-compatible buffer remainder, and buf is fixed at 1024 bytes.
+        // ShowMessageBox displays UTF-8, including localized system text.
         int l = static_cast<int>(strlen(buf));
-        FormatMessage(FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS, NULL, lastErr,
-                      MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), buf + l, 1024 - l, NULL);
+        SalamanderGeneral->GetErrorText(lastErr, buf + l, 1024 - l);
     }
     SalamanderGeneral->ShowMessageBox(buf, LoadStr(IDS_PLUGINNAME), MSGBOX_ERROR);
 
@@ -1263,8 +1262,8 @@ CPluginInterfaceForArchiver::Open(char* pszFile, int oflag, int pmode)
         char buf[1024];
         CopyUncabErrorPrefix(buf, _countof(buf), IDS_UNABLECREATE);
         const DWORD prefixLength = static_cast<DWORD>(strlen(buf)); // FormatMessage receives the fixed buffer's DWORD remainder.
-        FormatMessage(FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS, NULL,
-                      GetLastError(), MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), buf + prefixLength, 1024 - prefixLength, NULL);
+        // Dialog text is UTF-8, so append the localized system message through the plug-in API.
+        SalamanderGeneral->GetErrorText(GetLastError(), buf + prefixLength, 1024 - (int)prefixLength);
         if (SalamanderGeneral->DialogError(SalamanderGeneral->GetMsgBoxParent(), BUTTONS_RETRYCANCEL, pszFile, buf, NULL) != DIALOG_RETRY)
         {
             Abort = TRUE;
@@ -1293,8 +1292,8 @@ UINT CPluginInterfaceForArchiver::Read(INT_PTR hf, void* pv, UINT cb)
             break;
         CopyUncabErrorPrefix(buf, _countof(buf), IDS_UNABLEGETFIELPOS);
         const DWORD prefixLength = static_cast<DWORD>(strlen(buf)); // FormatMessage receives the fixed buffer's DWORD remainder.
-        FormatMessage(FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS, NULL,
-                      GetLastError(), MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), buf + prefixLength, 1024 - prefixLength, NULL);
+        // Dialog text is UTF-8, so append the localized system message through the plug-in API.
+        SalamanderGeneral->GetErrorText(GetLastError(), buf + prefixLength, 1024 - (int)prefixLength);
 
         if (Silent & SF_IOERRORS && file->Flags & FF_EXTRFILE)
             return -1;
@@ -1326,8 +1325,8 @@ UINT CPluginInterfaceForArchiver::Read(INT_PTR hf, void* pv, UINT cb)
         }
         CopyUncabErrorPrefix(buf, _countof(buf), IDS_UNABLEREAD);
         const DWORD prefixLength = static_cast<DWORD>(strlen(buf)); // FormatMessage receives the fixed buffer's DWORD remainder.
-        FormatMessage(FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS, NULL,
-                      GetLastError(), MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), buf + prefixLength, 1024 - prefixLength, NULL);
+        // Dialog text is UTF-8, so append the localized system message through the plug-in API.
+        SalamanderGeneral->GetErrorText(GetLastError(), buf + prefixLength, 1024 - (int)prefixLength);
 
         if (Silent & SF_IOERRORS && file->Flags & FF_EXTRFILE)
             return -1;
@@ -1379,8 +1378,8 @@ UINT CPluginInterfaceForArchiver::Write(INT_PTR hf, void* pv, UINT cb)
             break;
         CopyUncabErrorPrefix(buf, _countof(buf), IDS_UNABLEGETFIELPOS);
         const DWORD prefixLength = static_cast<DWORD>(strlen(buf)); // FormatMessage receives the fixed buffer's DWORD remainder.
-        FormatMessage(FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS, NULL,
-                      GetLastError(), MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), buf + prefixLength, 1024 - prefixLength, NULL);
+        // Dialog text is UTF-8, so append the localized system message through the plug-in API.
+        SalamanderGeneral->GetErrorText(GetLastError(), buf + prefixLength, 1024 - (int)prefixLength);
 
         if (Silent & SF_IOERRORS && file->Flags & FF_EXTRFILE)
         {
@@ -1442,8 +1441,8 @@ UINT CPluginInterfaceForArchiver::Write(INT_PTR hf, void* pv, UINT cb)
 
         CopyUncabErrorPrefix(buf, _countof(buf), IDS_UNABLEWRITE);
         const DWORD prefixLength = static_cast<DWORD>(strlen(buf)); // FormatMessage receives the fixed buffer's DWORD remainder.
-        FormatMessage(FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS, NULL,
-                      GetLastError(), MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), buf + prefixLength, 1024 - prefixLength, NULL);
+        // Dialog text is UTF-8, so append the localized system message through the plug-in API.
+        SalamanderGeneral->GetErrorText(GetLastError(), buf + prefixLength, 1024 - (int)prefixLength);
 
         if (Silent & SF_IOERRORS && file->Flags & FF_EXTRFILE)
         {
@@ -1530,8 +1529,8 @@ long CPluginInterfaceForArchiver::SafeSeek(CFile* file, DWORD distance, DWORD me
         }
         CopyUncabErrorPrefix(buf, _countof(buf), IDS_UNABLESEEK);
         const DWORD prefixLength = static_cast<DWORD>(strlen(buf)); // FormatMessage receives the fixed buffer's DWORD remainder.
-        FormatMessage(FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS, NULL,
-                      GetLastError(), MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), buf + prefixLength, 1024 - prefixLength, NULL);
+        // Dialog text is UTF-8, so append the localized system message through the plug-in API.
+        SalamanderGeneral->GetErrorText(GetLastError(), buf + prefixLength, 1024 - (int)prefixLength);
 
         if (Silent & SF_IOERRORS && file->Flags & FF_EXTRFILE)
         {
@@ -1576,8 +1575,8 @@ BOOL CPluginInterfaceForArchiver::SafeSeekAbsolute(CFile* file, const LARGE_INTE
             return TRUE;
         CopyUncabErrorPrefix(buf, _countof(buf), IDS_UNABLESEEK);
         const DWORD prefixLength = static_cast<DWORD>(strlen(buf)); // FormatMessage receives the fixed buffer's DWORD remainder.
-        FormatMessage(FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS, NULL,
-                      GetLastError(), MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), buf + prefixLength, 1024 - prefixLength, NULL);
+        // Dialog text is UTF-8, so append the localized system message through the plug-in API.
+        SalamanderGeneral->GetErrorText(GetLastError(), buf + prefixLength, 1024 - (int)prefixLength);
 
         if (Silent & SF_IOERRORS && file->Flags & FF_EXTRFILE)
         {
@@ -1777,14 +1776,14 @@ void GetInfo(char* buffer, FILETIME* lastWrite, unsigned size)
     char date[50], time[50], number[50];
     WCHAR localeName[LOCALE_NAME_MAX_LENGTH];
     WCHAR formattedValue[50];
-    // CAB metadata is displayed through an ANSI plug-in interface, after Unicode locale formatting.
+    // CAB metadata is displayed as UTF-8, including locale-formatted dates.
     if (!GetUserDefaultLocaleName(localeName, ARRAYSIZE(localeName)) ||
         GetTimeFormatEx(localeName, 0, &st, NULL, formattedValue, ARRAYSIZE(formattedValue)) == 0 ||
-        WideCharToMultiByte(CP_ACP, 0, formattedValue, -1, time, ARRAYSIZE(time), NULL, NULL) == 0)
+        WideCharToMultiByte(CP_UTF8, 0, formattedValue, -1, time, ARRAYSIZE(time), NULL, NULL) == 0)
         sprintf(time, "%u:%02u:%02u", st.wHour, st.wMinute, st.wSecond);
     if (!GetUserDefaultLocaleName(localeName, ARRAYSIZE(localeName)) ||
         GetDateFormatEx(localeName, DATE_SHORTDATE, &st, NULL, formattedValue, ARRAYSIZE(formattedValue), NULL) == 0 ||
-        WideCharToMultiByte(CP_ACP, 0, formattedValue, -1, date, ARRAYSIZE(date), NULL, NULL) == 0)
+        WideCharToMultiByte(CP_UTF8, 0, formattedValue, -1, date, ARRAYSIZE(date), NULL, NULL) == 0)
         sprintf(date, "%u.%u.%u", st.wDay, st.wMonth, st.wYear);
     sprintf(buffer, "%s, %s, %s", SalamanderGeneral->NumberToStr(number, CQuadWord(size, 0)), date, time);
 }

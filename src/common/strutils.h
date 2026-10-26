@@ -31,7 +31,7 @@ EBoundedStringResult ConvertWideToUtf8Checked(const WCHAR* source, char* destina
                                                size_t destinationCapacity);
 
 // Resolves a Known Folder through the UTF-16 shell API and converts its result
-// into the ANSI buffer used by the legacy application boundary.
+// into the UTF-8 buffer used by narrow application paths.
 BOOL GetKnownFolderPathToAnsi(REFKNOWNFOLDERID folderId, char* destination, int destinationCapacity);
 
 // SAFE_ALLOC macro removes code that tests if memory allocation succeeded (see allochan.*)

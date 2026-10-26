@@ -26,6 +26,7 @@ extern "C"
 }
 #include "salshlib.h"
 #include "shellib.h"
+#include "common/unicode_shell_link.h"
 
 //
 // ****************************************************************************
@@ -68,7 +69,6 @@ void CFilesWindow::Execute(int index)
     char path[MAX_PATH];
     char fullName[MAX_PATH + 10];
     char doublePath[2 * MAX_PATH];
-    WIN32_FIND_DATA data;
 
     BeginStopRefresh();
 
@@ -124,9 +124,9 @@ void CFilesWindow::Execute(int index)
                 oleName[MAX_PATH - 1] = 0;
 
                 HCURSOR oldCur = SetCursor(LoadCursor(NULL, IDC_WAIT));
-                IShellLink* link;
+                IShellLinkW* link;
                 if (CoCreateInstance(CLSID_ShellLink, NULL,
-                                     CLSCTX_INPROC_SERVER, IID_IShellLink,
+                                     CLSCTX_INPROC_SERVER, IID_IShellLinkW,
                                      (LPVOID*)&link) == S_OK)
                 {
                     IPersistFile* fileInt;
@@ -134,7 +134,8 @@ void CFilesWindow::Execute(int index)
                     {
                         if (fileInt->Load(oleName, STGM_READ) == S_OK)
                         {
-                            if (link->GetPath(fullName, MAX_PATH, &data, SLGP_UNCPRIORITY) == NOERROR)
+                            // Shortcut targets are UTF-16; CheckPath consumes the panel's UTF-8 path.
+                            if (ShellLinkTargetUtf8(link, fullName, _countof(fullName)))
                             {                                     // the obtained path will be used for accessibility test, after Resolve it may change
                                 err = CheckPath(FALSE, fullName); // fullName is a full path (shortcuts support no other)
                                 if (err != ERROR_USER_TERMINATED) // if user didn't press ESC, ignore the error
@@ -146,13 +147,13 @@ void CFilesWindow::Execute(int index)
                             {
                                 if (link->Resolve(HWindow, SLR_ANY_MATCH | SLR_UPDATE) == NOERROR)
                                 {
-                                    if (link->GetPath(fullName, MAX_PATH, &data, SLGP_UNCPRIORITY) == NOERROR)
+                                    if (ShellLinkTargetUtf8(link, fullName, _countof(fullName)))
                                     {
                                         // final form of fullName - we verify if it is OK
                                         err = CheckPath(TRUE, fullName); // fullName is a full path (links support no other)
                                         if (err == ERROR_SUCCESS)
                                         {
-                                            DWORD attr = SalGetFileAttributes(fullName); // obtained here because data.dwFileAttributes isn't filled
+                                            DWORD attr = SalGetFileAttributes(fullName); // IShellLink does not fill attributes for this target
                                             if (attr != INVALID_FILE_ATTRIBUTES && (attr & FILE_ATTRIBUTE_DIRECTORY))
                                             {
                                                 linkIsDir = TRUE; // OK we try change-path-to-disk
@@ -167,7 +168,7 @@ void CFilesWindow::Execute(int index)
                                     {
                                         if (Plugins.GetFirstNethoodPluginFSName(netFSName))
                                         {
-                                            if (link->GetPath(fullName, MAX_PATH, NULL, SLGP_RAWPATH) != NOERROR)
+                                            if (!ShellLinkTargetUtf8(link, fullName, _countof(fullName), SLGP_RAWPATH))
                                             { // path is not stored in the link as text, only as an ID list
                                                 fullName[0] = 0;
                                                 ITEMIDLIST* pidl;
@@ -3781,34 +3782,33 @@ void CFilesWindow::RefreshListBox(int suggestedXOffset,
         {
             // determine whether we can estimate the widths
             WCHAR datePattern[50];
+            // Skip formats that expand to weekday or month names; those widths are not stable.
             if (GetUserDefaultLocaleName(dateLocaleName, _countof(dateLocaleName)) != 0 &&
                 GetLocaleInfoEx(dateLocaleName, LOCALE_SSHORTDATE, datePattern, _countof(datePattern)) != 0 &&
-                WideCharToMultiByte(CP_ACP, 0, datePattern, -1, text, _countof(text), NULL, NULL) != 0)
+                wcsstr(datePattern, L"dddd") == NULL && wcsstr(datePattern, L"MMMM") == NULL)
             {
-                // check if the date format contains words (dddd || MMMM),
-                // which would be rendered as text: (Monday || May)
-                if (strstr(text, "dddd") == NULL && strstr(text, "MMMM") == NULL)
+                SYSTEMTIME st;
+                st.wMilliseconds = 0;
+                st.wMinute = 59;
+                st.wSecond = 59;
+                st.wHour = 10;
+                st.wYear = 2000;
+                st.wMonth = 12;
+                st.wDay = 24;
+                st.wDayOfWeek = 0; // Sunday
+                WCHAR dateText[50];
+                // Measure the UTF-16 date the panel later stores as UTF-8.
+                if (GetDateFormatEx(dateLocaleName, DATE_SHORTDATE, &st, NULL, dateText, _countof(dateText), NULL) != 0)
+                    GetTextExtentPoint32W(dc, dateText, (int)wcslen(dateText), &act);
+                else
                 {
-                    SYSTEMTIME st;
-                    st.wMilliseconds = 0;
-                    st.wMinute = 59;
-                    st.wSecond = 59;
-                    st.wHour = 10;
-                    st.wYear = 2000;
-                    st.wMonth = 12;
-                    st.wDay = 24;
-                    st.wDayOfWeek = 0; // Sunday
-                    WCHAR dateText[50];
-                    if (GetDateFormatEx(dateLocaleName, DATE_SHORTDATE, &st, NULL, dateText, _countof(dateText), NULL) == 0 ||
-                        WideCharToMultiByte(CP_ACP, 0, dateText, -1, text, _countof(text), NULL, NULL) == 0)
-                        sprintf(text, "%u.%u.%u", st.wDay, st.wMonth, st.wYear);
-                    // Rendering still consumes the ANSI list buffer, but locale formatting now uses the explicit user locale name.
+                    sprintf(text, "%u.%u.%u", st.wDay, st.wMonth, st.wYear);
                     GetTextExtentPoint32(dc, text, (int)strlen(text), &act);
-                    act.cx += SPACE_WIDTH;
-                    if (columnWidthDate < act.cx)
-                        columnWidthDate = act.cx;
-                    computeDate = FALSE;
                 }
+                act.cx += SPACE_WIDTH;
+                if (columnWidthDate < act.cx)
+                    columnWidthDate = act.cx;
+                computeDate = FALSE;
             }
         }
 

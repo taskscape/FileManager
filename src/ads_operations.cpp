@@ -50,7 +50,8 @@ BOOL DeleteAllADS(HANDLE file, const char* fileName)
                 {
                     if (adsFullName[0] == 0) // convert the file name only when needed for the first time to save CPU time
                     {
-                        if (ConvertA2U(fileName, -1, adsFullName, 2 * MAX_PATH) == 0)
+                        // fileName is a UTF-8 path; DeleteFileW needs the real Unicode spelling.
+                        if (ConvertUtf8ToWide(fileName, -1, adsFullName, 2 * MAX_PATH) == 0)
                             return FALSE; // "always false"
                         adsPart = adsFullName + wcslen(adsFullName);
                         adsPartSize = (int)((adsFullName + 2 * MAX_PATH) - adsPart);

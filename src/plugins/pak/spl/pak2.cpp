@@ -112,8 +112,8 @@ BOOL CPluginInterfaceForArchiver::MakeFileList3(TIndirectArray2<CFileInfo>& file
                     char buf[1024];
                     CopyPak2ErrorPrefix(buf, _countof(buf), IDS_ERROPEN);
                     const DWORD prefixLength = static_cast<DWORD>(strlen(buf)); // buf is bounded to 1,024 bytes for FormatMessage.
-                    FormatMessage(FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS, NULL,
-                                  GetLastError(), MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), buf + prefixLength, _countof(buf) - prefixLength, NULL);
+                    // Dialog text is UTF-8, so append the localized system message through the plug-in API.
+                    SalamanderGeneral->GetErrorText(GetLastError(), buf + prefixLength, (int)(_countof(buf) - prefixLength));
                     switch (SalamanderGeneral->DialogError(SalamanderGeneral->GetMsgBoxParent(), BUTTONS_RETRYSKIPCANCEL, sourName, buf, NULL))
                     {
                     case DIALOG_SKIPALL:
@@ -247,8 +247,8 @@ BOOL CPluginInterfaceForArchiver::AddFiles(TIndirectArray2<CFileInfo>& files, un
             char buf[1024];
             CopyPak2ErrorPrefix(buf, _countof(buf), IDS_ERROPEN);
             const DWORD prefixLength = static_cast<DWORD>(strlen(buf)); // buf is bounded to 1,024 bytes for FormatMessage.
-            FormatMessage(FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS, NULL,
-                          GetLastError(), MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), buf + prefixLength, _countof(buf) - prefixLength, NULL);
+            // Dialog text is UTF-8, so append the localized system message through the plug-in API.
+            SalamanderGeneral->GetErrorText(GetLastError(), buf + prefixLength, (int)(_countof(buf) - prefixLength));
             switch (SalamanderGeneral->DialogError(SalamanderGeneral->GetMsgBoxParent(), BUTTONS_RETRYSKIPCANCEL, f->Name, buf, NULL))
             {
             case DIALOG_SKIPALL:
@@ -543,8 +543,8 @@ BOOL CPakCallbacks::Read(void* buffer, DWORD size)
             break;
         CopyPak2ErrorPrefix(buf, _countof(buf), IDS_UNABLEGETFIELPOS);
         const DWORD prefixLength = static_cast<DWORD>(strlen(buf)); // buf is bounded to 1,024 bytes for FormatMessage.
-        FormatMessage(FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS, NULL,
-                      GetLastError(), MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), buf + prefixLength, _countof(buf) - prefixLength, NULL);
+        // Dialog text is UTF-8, so append the localized system message through the plug-in API.
+        SalamanderGeneral->GetErrorText(GetLastError(), buf + prefixLength, (int)(_countof(buf) - prefixLength));
         if (Plugin->Silent & SF_IOERRORS)
         {
             Plugin->Abort = FALSE;
@@ -569,8 +569,8 @@ BOOL CPakCallbacks::Read(void* buffer, DWORD size)
             return TRUE;
         CopyPak2ErrorPrefix(buf, _countof(buf), IDS_UNABLEREAD);
         const DWORD prefixLength = static_cast<DWORD>(strlen(buf)); // buf is bounded to 1,024 bytes for FormatMessage.
-        FormatMessage(FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS, NULL,
-                      GetLastError(), MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), buf + prefixLength, _countof(buf) - prefixLength, NULL);
+        // Dialog text is UTF-8, so append the localized system message through the plug-in API.
+        SalamanderGeneral->GetErrorText(GetLastError(), buf + prefixLength, (int)(_countof(buf) - prefixLength));
         if (Plugin->Silent & SF_IOERRORS)
         {
             Plugin->Abort = FALSE;

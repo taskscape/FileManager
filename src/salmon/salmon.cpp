@@ -133,15 +133,18 @@ char* GetErrorText(DWORD error)
     // NOTE: sprintf_s in the debug build fills the entire buffer, so we cannot pass it the whole buffer (it
     // also contains other strings); handle it via _CrtSetDebugFillThreshold or by specifying a smaller size
     int l = sprintf(act, ((int)error < 0 ? "(%08X) " : "(%d) "), error);
-    int fl;
-    if ((fl = FormatMessage(FORMAT_MESSAGE_FROM_SYSTEM,
-                            NULL,
-                            error,
-                            MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
-                            act + l,
-                            MAX_PATH + 20 - l,
-                            NULL)) == 0 ||
-        *(act + l) == 0)
+    WCHAR wideErrorText[MAX_PATH + 20];
+    // Crash-report text is UTF-8, so localized system messages must not stay in the ANSI code page.
+    int utf8Length = 0;
+    if (FormatMessageW(FORMAT_MESSAGE_FROM_SYSTEM,
+                       NULL,
+                       error,
+                       MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
+                       wideErrorText,
+                       _countof(wideErrorText),
+                       NULL) != 0)
+        utf8Length = WideCharToMultiByte(CP_UTF8, 0, wideErrorText, -1, act + l, MAX_PATH + 20 - l, NULL, NULL);
+    if (utf8Length <= 1)
     {
         if ((int)error < 0)
             act += sprintf(act, "System error %08X, text description is not available.", error) + 1;
@@ -149,7 +152,7 @@ char* GetErrorText(DWORD error)
             act += sprintf(act, "System error %u, text description is not available.", error) + 1;
     }
     else
-        act += l + fl + 1;
+        act += l + utf8Length;
 
     HANDLES(LeaveCriticalSection(&__StrCriticalSection2.cs));
 
