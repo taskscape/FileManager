@@ -494,6 +494,18 @@ int CUDF::ReadFileEntry(Uint8* data, bool bEFE, Uint16 part, CICBTag* icbTag, CU
     {
         p = 176; // File Entry
     }
+    // MapICB treats any result other than the -1 inline sentinel as a successful mapping and reads the
+    // first descriptor, so every early return below (bounds failure, truncated descriptor) must leave it
+    // in a defined empty state rather than whatever uninitialized CAD the caller passed in.
+    if (maxAds > 0)
+    {
+        ad->Length = 0;
+        ad->Flags = 0;
+        ad->Location = 0;
+        ad->Partition = part;
+        ad->Offset = 0;
+    }
+
     l_ea = GET_DWORD(data, p - 8);
     l_ad = GET_DWORD(data, p - 4);
     // The extended-attribute and allocation-descriptor areas are stored within this single sector;
@@ -582,7 +594,16 @@ int CUDF::ReadFileIdentifier(Uint8* sector, DWORD avail, Uint8* fileChar, char* 
     fi = GET_BYTE(sector, 19);
     LongAD(sector + 20, fileICB);
     iu = GET_WORD(sector, 36);
-    if (fi && UDFRangeInBounds(38 + iu, fi, avail))
+    // The implementation-use (iu) and identifier (fi) areas extend the descriptor past its 38-byte
+    // header. Reject the whole FID when that declared extent leaves the loaded window, rather than
+    // returning a positive length that would let the caller process a descriptor it could not read.
+    if (!UDFRangeInBounds(38 + iu, fi, avail))
+    {
+        *fileChar = 0;
+        fileName[0] = '\0';
+        return -1;
+    }
+    if (fi)
         DecodeOSTACompressed(sector + 38 + iu, fi, fileName);
     else
         fileName[0] = '\0';
@@ -1031,12 +1052,16 @@ int CUDF::ScanDir(CUDF::CAD dirICB, char* path,
 
                         CAD fileICB;
                         CICBTag icbTag;
-                        // descend when everything is OK
-                        if (MapICB(icb, &icbTag, &fileICB) && ret == ERR_OK)
+                        // Traverse each subdirectory on its own. A sibling that was rejected earlier
+                        // (path too long, depth limit, a failed subtree) must be recorded as a partial
+                        // listing without suppressing the remaining siblings, so the recursion decision
+                        // is independent of the accumulated status.
+                        if (MapICB(icb, &icbTag, &fileICB))
                         {
-                            ret = ScanDir(fileICB, newPath, dir, pluginData, depth + 1);
-                            // if we surface with a termination error, keep processing as much as possible
-                            if (ret == ERR_TERMINATE)
+                            int childRet = ScanDir(fileICB, newPath, dir, pluginData, depth + 1);
+                            // Any non-OK child (including a surfaced termination) downgrades to a partial
+                            // listing but keeps this directory's remaining entries flowing.
+                            if (childRet != ERR_OK)
                                 ret = ERR_CONTINUE;
                         }
                     }
@@ -1380,7 +1405,9 @@ int CUDF::ReadVAT(BYTE fileEntry[], bool bEFE, BYTE** vat, DWORD* vatLength, BOO
         return ERR_TERMINATE;
     }
     *vatLength = length;
-    *vat = new BYTE[length];
+    // Value-initialize to zero: the allocation-descriptor walk below may fill fewer than 'length' bytes,
+    // and CheckForVAT reads the whole buffer, so unwritten tail bytes must not expose uninitialized heap.
+    *vat = new BYTE[length]();
     if (*vat == NULL)
     {
         Error(IDS_INSUFFICIENT_MEMORY, quiet);
