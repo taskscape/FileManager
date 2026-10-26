@@ -3,6 +3,7 @@
 // CommentsTranslationProject: TRANSLATED
 
 #include "precomp.h"
+#include "common/unicode_shell_link.h"
 #include <strsafe.h>
 
 #include "cfgdlg.h"
@@ -255,17 +256,17 @@ void CFilesWindow::FocusShortcutTarget(CFilesWindow* panel)
             wrongPath = TRUE;
         else
         {
-            IShellLink* link;
-            if (CoCreateInstance(CLSID_ShellLink, NULL, CLSCTX_INPROC_SERVER, IID_IShellLink, (LPVOID*)&link) == S_OK)
+            IShellLinkW* link;
+            if (CoCreateInstance(CLSID_ShellLink, NULL, CLSCTX_INPROC_SERVER, IID_IShellLinkW, (LPVOID*)&link) == S_OK)
             {
                 IPersistFile* fileInt;
                 if (link->QueryInterface(IID_IPersistFile, (LPVOID*)&fileInt) == S_OK)
                 {
                     HRESULT res = 2;
                     OLECHAR oleName[MAX_PATH];
-                    MultiByteToWideChar(CP_ACP, MB_PRECOMPOSED, fullName, -1, oleName, MAX_PATH);
-                    oleName[MAX_PATH - 1] = 0;
-                    if (fileInt->Load(oleName, STGM_READ) == S_OK)
+                    // fullName is the panel's UTF-8 path to the shortcut.
+                    if (ConvertUtf8ToWide(fullName, -1, oleName, _countof(oleName)) != 0 &&
+                        fileInt->Load(oleName, STGM_READ) == S_OK)
                     {
                         res = link->Resolve(HWindow, SLR_ANY_MATCH | SLR_UPDATE);
                         // if it finds the object, it returns NOERROR (0)
@@ -273,8 +274,7 @@ void CFilesWindow::FocusShortcutTarget(CFilesWindow* panel)
                         // if loading the link fails, it returns other errors (0x80004005)
                         if (res == NOERROR)
                         {
-                            WIN32_FIND_DATA dummyData;
-                            if (link->GetPath(fullName, MAX_PATH, &dummyData, SLGP_UNCPRIORITY) == NOERROR &&
+                            if (ShellLinkTargetUtf8(link, fullName, MAX_PATH) &&
                                 fullName[0] != 0 && CheckPath(FALSE, fullName) == ERROR_SUCCESS)
                             {
                                 panel->ChangeDir(fullName);
@@ -285,7 +285,7 @@ void CFilesWindow::FocusShortcutTarget(CFilesWindow* panel)
                                 char netFSName[MAX_PATH];
                                 if (Plugins.GetFirstNethoodPluginFSName(netFSName))
                                 {
-                                    if (link->GetPath(fullName, MAX_PATH, NULL, SLGP_RAWPATH) != NOERROR)
+                                    if (!ShellLinkTargetUtf8(link, fullName, MAX_PATH, SLGP_RAWPATH))
                                     { // the path is not stored in the link as text, but only as an ID-list
                                         fullName[0] = 0;
                                         ITEMIDLIST* pidl;

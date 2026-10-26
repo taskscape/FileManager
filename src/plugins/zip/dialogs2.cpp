@@ -1021,14 +1021,14 @@ BOOL CAdvancedSEDialog::CreateFavoritesMenu()
 #define SFX_SET_CURRENTVERSION 1
 #define SFX_SETTINGS_IMPORT_MAX_BYTES (1024 * 1024)
 
-// The Shell file dialog is Unicode-only, so ANSI plug-in text converts at this boundary.
+// The Shell file dialog is Unicode-only; plug-in text and paths are UTF-8.
 static WCHAR* DupWideFromAnsi(const char* text)
 {
-    int len = MultiByteToWideChar(CP_ACP, 0, text, -1, NULL, 0);
+    int len = MultiByteToWideChar(CP_UTF8, 0, text, -1, NULL, 0);
     if (len == 0)
         return NULL;
     WCHAR* wide = (WCHAR*)malloc(len * sizeof(WCHAR));
-    if (wide != NULL && MultiByteToWideChar(CP_ACP, 0, text, -1, wide, len) == 0)
+    if (wide != NULL && MultiByteToWideChar(CP_UTF8, 0, text, -1, wide, len) == 0)
     {
         free(wide);
         return NULL;
@@ -1122,7 +1122,7 @@ static BOOL ZipGetSettingsFileName(HWND parent, BOOL save, BOOL includeAllFiles,
             if (SUCCEEDED(fileDialog->GetResult(&item)) && item != NULL &&
                 SUCCEEDED(item->GetDisplayName(SIGDN_FILESYSPATH, &pathW)) && pathW != NULL)
             {
-                int converted = WideCharToMultiByte(CP_ACP, 0, pathW, -1, fileName, MAX_PATH, NULL, NULL);
+                int converted = WideCharToMultiByte(CP_UTF8, 0, pathW, -1, fileName, MAX_PATH, NULL, NULL);
                 CoTaskMemFree(pathW);
                 // a result that cannot fit the fixed caller field fails instead of truncating
                 ret = converted > 0 && strlen(fileName) < MAX_PATH;

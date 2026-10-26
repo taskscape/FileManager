@@ -300,7 +300,7 @@ BOOL SysError(int title, int error, ...)
 
 static BOOL FormatArchiveDateTimeAnsi(const SYSTEMTIME* time, DWORD flags, char* buffer, int bufferSize, BOOL isDate)
 {
-    // The 7-Zip wrapper keeps its ANSI UI boundary while obtaining user formatting from locale-name APIs.
+    // 7-Zip info lines are UTF-8, including locale-formatted dates.
     WCHAR localeName[LOCALE_NAME_MAX_LENGTH];
     WCHAR formatted[100];
     if (GetUserDefaultLocaleName(localeName, ARRAYSIZE(localeName)) == 0)
@@ -308,7 +308,7 @@ static BOOL FormatArchiveDateTimeAnsi(const SYSTEMTIME* time, DWORD flags, char*
     int length = isDate
                      ? GetDateFormatEx(localeName, flags, time, NULL, formatted, ARRAYSIZE(formatted), NULL)
                      : GetTimeFormatEx(localeName, flags, time, NULL, formatted, ARRAYSIZE(formatted));
-    return length != 0 && WideCharToMultiByte(CP_ACP, 0, formatted, -1, buffer, bufferSize, NULL, NULL) != 0;
+    return length != 0 && WideCharToMultiByte(CP_UTF8, 0, formatted, -1, buffer, bufferSize, NULL, NULL) != 0;
 }
 
 void GetInfo(char* buffer, const FILETIME* lastWrite, CQuadWord size)

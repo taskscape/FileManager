@@ -864,14 +864,14 @@ void CCalculateDialog::DeleteItem(int index)
         EnableButtons(FALSE);
 }
 
-// The Shell file dialog is Unicode-only, so ANSI plug-in text converts at this boundary.
+// The Shell file dialog is Unicode-only; plug-in text and paths are UTF-8.
 static WCHAR* DupWideFromTchar(LPCTSTR text)
 {
-    int len = MultiByteToWideChar(CP_ACP, 0, text, -1, NULL, 0);
+    int len = MultiByteToWideChar(CP_UTF8, 0, text, -1, NULL, 0);
     if (len == 0)
         return NULL;
     WCHAR* wide = (WCHAR*)malloc(len * sizeof(WCHAR));
-    if (wide != NULL && MultiByteToWideChar(CP_ACP, 0, text, -1, wide, len) == 0)
+    if (wide != NULL && MultiByteToWideChar(CP_UTF8, 0, text, -1, wide, len) == 0)
     {
         free(wide);
         return NULL;
@@ -1050,7 +1050,7 @@ BOOL CCalculateDialog::GetSaveFileName(LPTSTR buffer, LPCTSTR title)
                 ret = FALSE;
                 break;
             }
-            int converted = WideCharToMultiByte(CP_ACP, 0, pathW, -1, buffer, MAX_PATH, NULL, NULL);
+            int converted = WideCharToMultiByte(CP_UTF8, 0, pathW, -1, buffer, MAX_PATH, NULL, NULL);
             CoTaskMemFree(pathW);
             item->Release();
             if (converted == 0 || strlen(buffer) >= MAX_PATH)

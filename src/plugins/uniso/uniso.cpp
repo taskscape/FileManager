@@ -217,8 +217,8 @@ BOOL SysError(int title, int error, ...)
     {
         strcat(buf, " ");
         int l = (int)strlen(buf);
-        FormatMessage(FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS, NULL, lastErr,
-                      MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), buf + l, 1024 - l, NULL);
+        // ShowMessageBox displays UTF-8, including localized system text.
+        SalamanderGeneral->GetErrorText(lastErr, buf + l, 1024 - l);
     }
     SalamanderGeneral->ShowMessageBox(buf, LoadStr(title), MSGBOX_ERROR);
     return FALSE;

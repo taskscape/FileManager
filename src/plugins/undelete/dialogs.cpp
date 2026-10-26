@@ -496,7 +496,7 @@ BOOL CConnectDialog::OnDialogOK()
     if (BST_CHECKED == SendMessage(GetDlgItem(HWindow, IDC_CHECK_IMAGE), BM_GETCHECK, 0, 0))
     {
         // disk image
-        GetDlgItemText(HWindow, IDC_EDIT_IMAGE, Volume, MAX_PATH);
+        ReadUtf8ControlText(GetDlgItem(HWindow, IDC_EDIT_IMAGE), Volume, MAX_PATH);
 
         // reset the volume if the image file does not exist
         DWORD attr = SalamanderGeneral->SalGetFileAttributes(Volume);
@@ -546,7 +546,7 @@ BOOL CConnectDialog::OnDialogOK()
 
 void CConnectDialog::OnImageBrowse()
 {
-    GetDlgItemText(HWindow, IDC_EDIT_IMAGE, Volume, MAX_PATH);
+    ReadUtf8ControlText(GetDlgItem(HWindow, IDC_EDIT_IMAGE), Volume, MAX_PATH);
 
     // open dialog through the modern Shell interface (IFileOpenDialog); the former
     // retry around invalid initial directories is unnecessary because a location the
@@ -575,12 +575,12 @@ void CConnectDialog::OnImageBrowse()
         fileDialog->SetFileTypeIndex(1);
 
         // Allocate the complete UTF-16 spelling so a long persisted image path is never truncated before shell navigation.
-        int requiredChars = MultiByteToWideChar(CP_ACP, 0, Volume, -1, NULL, 0);
+        int requiredChars = MultiByteToWideChar(CP_UTF8, 0, Volume, -1, NULL, 0);
         std::vector<WCHAR> volumeW;
         if (requiredChars > 0)
         {
             volumeW.resize(requiredChars);
-            int converted = MultiByteToWideChar(CP_ACP, 0, Volume, -1, volumeW.data(), requiredChars);
+            int converted = MultiByteToWideChar(CP_UTF8, 0, Volume, -1, volumeW.data(), requiredChars);
             if (converted <= 0)
                 volumeW.clear();
         }
@@ -615,7 +615,7 @@ void CConnectDialog::OnImageBrowse()
             if (SUCCEEDED(fileDialog->GetResult(&item)) && item != NULL &&
                 SUCCEEDED(item->GetDisplayName(SIGDN_FILESYSPATH, &pathW)) && pathW != NULL)
             {
-                int backConverted = WideCharToMultiByte(CP_ACP, 0, pathW, -1, Volume, MAX_PATH, NULL, NULL);
+                int backConverted = WideCharToMultiByte(CP_UTF8, 0, pathW, -1, Volume, MAX_PATH, NULL, NULL);
                 ret = backConverted > 0 && strlen(Volume) < MAX_PATH; // refuse instead of truncating the identity
                 CoTaskMemFree(pathW);
             }
@@ -628,7 +628,7 @@ void CConnectDialog::OnImageBrowse()
         CoUninitialize();
 
     if (ret)
-        SetDlgItemText(HWindow, IDC_EDIT_IMAGE, Volume);
+        SendUtf8DialogControlString(HWindow, IDC_EDIT_IMAGE, WM_SETTEXT, 0, Volume);
 }
 
 INT_PTR CConnectDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)

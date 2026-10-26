@@ -102,10 +102,13 @@ BOOL ErrorHelper(HWND parent, const char* message, int lastError, va_list arglis
     vsprintf(buf, message, arglist);
     if (lastError != ERROR_SUCCESS)
     {
-        // FormatMessage uses an int-compatible buffer remainder, and buf is fixed at 1024 bytes.
+        // SalMessageBox displays UTF-8; the standalone MessageBox fallback retains its ANSI contract.
         int l = static_cast<int>(strlen(buf));
-        FormatMessage(FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS, NULL, lastError,
-                      MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), buf + l, 1024 - l, NULL);
+        if (SG)
+            SG->GetErrorText(lastError, buf + l, 1024 - l);
+        else
+            FormatMessageA(FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS, NULL, lastError,
+                           MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), buf + l, 1024 - l, NULL);
     }
     if (SG)
     {

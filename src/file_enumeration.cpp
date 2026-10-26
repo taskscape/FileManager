@@ -939,11 +939,12 @@ BOOL CNames::LoadFromClipboard(HWND hWindow)
                     s++;
                 size = s - textW; // ted uz ve WCHARech
 
-                text = ConvertAllocU2A(textW, (int)size);
+                // Clipboard Unicode names become the UTF-8 names stored by the panel.
+                text = ConvertAllocU2A(textW, (int)size, FALSE, CP_UTF8);
                 if (text != NULL)
                     textIsAlloc = TRUE;
                 else
-                    TRACE_E("CNames::LoadFromClipboard(): unable to convert unicode from clipboard to ANSI.");
+                    TRACE_E("CNames::LoadFromClipboard(): unable to convert unicode from clipboard to UTF-8.");
                 HANDLES(GlobalUnlock(handle));
             }
         }
@@ -951,7 +952,22 @@ BOOL CNames::LoadFromClipboard(HWND hWindow)
         {
             handle = GetClipboardData(CF_TEXT);
             if (handle != NULL)
-                text = (const char*)HANDLES(GlobalLock(handle));
+            {
+                const char* ansi = (const char*)HANDLES(GlobalLock(handle));
+                if (ansi != NULL)
+                {
+                    // CF_TEXT is the Windows ANSI code page; names consumed below are UTF-8.
+                    WCHAR* wide = ConvertAllocA2U(ansi, -1, CP_ACP);
+                    if (wide != NULL)
+                    {
+                        text = ConvertAllocWideToUtf8(wide, -1);
+                        free(wide);
+                        if (text != NULL)
+                            textIsAlloc = TRUE;
+                    }
+                    HANDLES(GlobalUnlock(handle));
+                }
+            }
         }
 
         if (text != NULL)
@@ -1029,7 +1045,7 @@ BOOL CNames::LoadFromClipboard(HWND hWindow)
             }
 
             if (textIsAlloc)
-                free((void*)text); // we use an allocated ANSI copy of the Unicode clipboard text
+                free((void*)text); // we use an allocated UTF-8 copy of the clipboard text
             else
                 HANDLES(GlobalUnlock(handle)); // we use the text directly from the clipboard (it is locked)
         }
@@ -1765,6 +1781,7 @@ CTargetPathState GetTargetPathState(CTargetPathState upperDirState, const char* 
 // GetSaveFileName when hooks/templates are requested (unsupported here), COM
 // initialization is missing (it initializes STA temporarily), or instantiation
 // fails. Returns TRUE with the chosen path written back into lpofn->lpstrFile.
+// Narrow OPENFILENAME strings are UTF-8, so every shell boundary uses CP_UTF8.
 static BOOL InternalIFileDialog(LPOPENFILENAME lpofn, BOOL isSave)
 {
     if (lpofn == NULL || lpofn->lpstrFile == NULL || lpofn->nMaxFile == 0)
@@ -1811,7 +1828,7 @@ static BOOL InternalIFileDialog(LPOPENFILENAME lpofn, BOOL isSave)
     if (lpofn->lpstrTitle && *lpofn->lpstrTitle)
     {
         WCHAR titleW[1024];
-        if (MultiByteToWideChar(CP_ACP, 0, lpofn->lpstrTitle, -1, titleW, (int)_countof(titleW)) > 0)
+        if (MultiByteToWideChar(CP_UTF8, 0, lpofn->lpstrTitle, -1, titleW, (int)_countof(titleW)) > 0)
             pfd->SetTitle(titleW);
     }
 
@@ -1819,7 +1836,7 @@ static BOOL InternalIFileDialog(LPOPENFILENAME lpofn, BOOL isSave)
     if (lpofn->lpstrDefExt && *lpofn->lpstrDefExt)
     {
         WCHAR defExtW[256];
-        if (MultiByteToWideChar(CP_ACP, 0, lpofn->lpstrDefExt, -1, defExtW, (int)_countof(defExtW)) > 0)
+        if (MultiByteToWideChar(CP_UTF8, 0, lpofn->lpstrDefExt, -1, defExtW, (int)_countof(defExtW)) > 0)
             pfd->SetDefaultExtension(defExtW);
     }
 
@@ -1861,15 +1878,15 @@ static BOOL InternalIFileDialog(LPOPENFILENAME lpofn, BOOL isSave)
                         const char* s = p;
                         p += strlen(p) + 1;
 
-                        int dLen = MultiByteToWideChar(CP_ACP, 0, d, -1, NULL, 0);
-                        int sLen = MultiByteToWideChar(CP_ACP, 0, s, -1, NULL, 0);
+                        int dLen = MultiByteToWideChar(CP_UTF8, 0, d, -1, NULL, 0);
+                        int sLen = MultiByteToWideChar(CP_UTF8, 0, s, -1, NULL, 0);
                         descW[idx] = (WCHAR*)malloc(dLen * sizeof(WCHAR));
                         specW[idx] = (WCHAR*)malloc(sLen * sizeof(WCHAR));
 
                         if (descW[idx] && specW[idx])
                         {
-                            MultiByteToWideChar(CP_ACP, 0, d, -1, descW[idx], dLen);
-                            MultiByteToWideChar(CP_ACP, 0, s, -1, specW[idx], sLen);
+                            MultiByteToWideChar(CP_UTF8, 0, d, -1, descW[idx], dLen);
+                            MultiByteToWideChar(CP_UTF8, 0, s, -1, specW[idx], sLen);
                             specs[idx].pszName = descW[idx];
                             specs[idx].pszSpec = specW[idx];
                             idx++;
@@ -1923,7 +1940,7 @@ static BOOL InternalIFileDialog(LPOPENFILENAME lpofn, BOOL isSave)
     if (initDir[0] != 0)
     {
         WCHAR initDirW[MAX_PATH];
-        if (MultiByteToWideChar(CP_ACP, 0, initDir, -1, initDirW, (int)_countof(initDirW)) > 0)
+        if (MultiByteToWideChar(CP_UTF8, 0, initDir, -1, initDirW, (int)_countof(initDirW)) > 0)
         {
             SHCreateItemFromParsingName(initDirW, NULL, IID_PPV_ARGS(&psiFolder));
         }
@@ -1935,7 +1952,7 @@ static BOOL InternalIFileDialog(LPOPENFILENAME lpofn, BOOL isSave)
         if (GetMyDocumentsOrDesktopPath(initDir, MAX_PATH))
         {
             WCHAR initDirW[MAX_PATH];
-            if (MultiByteToWideChar(CP_ACP, 0, initDir, -1, initDirW, (int)_countof(initDirW)) > 0)
+            if (MultiByteToWideChar(CP_UTF8, 0, initDir, -1, initDirW, (int)_countof(initDirW)) > 0)
             {
                 SHCreateItemFromParsingName(initDirW, NULL, IID_PPV_ARGS(&psiFolder));
             }
@@ -1959,7 +1976,7 @@ static BOOL InternalIFileDialog(LPOPENFILENAME lpofn, BOOL isSave)
         if (*fileNameOnly)
         {
             WCHAR fileW[MAX_PATH];
-            if (MultiByteToWideChar(CP_ACP, 0, fileNameOnly, -1, fileW, (int)_countof(fileW)) > 0)
+            if (MultiByteToWideChar(CP_UTF8, 0, fileNameOnly, -1, fileW, (int)_countof(fileW)) > 0)
                 pfd->SetFileName(fileW);
         }
     }
@@ -2001,7 +2018,7 @@ static BOOL InternalIFileDialog(LPOPENFILENAME lpofn, BOOL isSave)
                     if (SUCCEEDED(pItem->GetDisplayName(SIGDN_FILESYSPATH, &pszName)))
                     {
                         char fullPath[MAX_PATH];
-                        if (WideCharToMultiByte(CP_ACP, 0, pszName.get(), -1, fullPath, sizeof(fullPath), NULL, NULL) > 0)
+                        if (WideCharToMultiByte(CP_UTF8, 0, pszName.get(), -1, fullPath, sizeof(fullPath), NULL, NULL) > 0)
                         {
                             StringCchCopyA(lpofn->lpstrFile, lpofn->nMaxFile, fullPath);
                             const char* pFileName = strrchr(lpofn->lpstrFile, '\\');
@@ -2035,7 +2052,7 @@ static BOOL InternalIFileDialog(LPOPENFILENAME lpofn, BOOL isSave)
                     if (SUCCEEDED(pItem0->GetDisplayName(SIGDN_FILESYSPATH, &pszName0)))
                     {
                         char dirPath[MAX_PATH];
-                        if (WideCharToMultiByte(CP_ACP, 0, pszName0.get(), -1, dirPath, sizeof(dirPath), NULL, NULL) > 0)
+                        if (WideCharToMultiByte(CP_UTF8, 0, pszName0.get(), -1, dirPath, sizeof(dirPath), NULL, NULL) > 0)
                         {
                             char* lastBS = strrchr(dirPath, '\\');
                             if (lastBS) *lastBS = 0;
@@ -2062,7 +2079,7 @@ static BOOL InternalIFileDialog(LPOPENFILENAME lpofn, BOOL isSave)
                                         if (SUCCEEDED(pItem->GetDisplayName(SIGDN_FILESYSPATH, &pszItemName)))
                                         {
                                             char itemPath[MAX_PATH];
-                                            if (WideCharToMultiByte(CP_ACP, 0, pszItemName.get(), -1, itemPath, sizeof(itemPath), NULL, NULL) > 0)
+                                            if (WideCharToMultiByte(CP_UTF8, 0, pszItemName.get(), -1, itemPath, sizeof(itemPath), NULL, NULL) > 0)
                                             {
                                                 const char* fn = strrchr(itemPath, '\\');
                                                 fn = fn ? (fn + 1) : itemPath;
@@ -2095,7 +2112,7 @@ static BOOL InternalIFileDialog(LPOPENFILENAME lpofn, BOOL isSave)
             if (SUCCEEDED(pItem->GetDisplayName(SIGDN_FILESYSPATH, &pszName)))
             {
                 char fullPath[MAX_PATH];
-                if (WideCharToMultiByte(CP_ACP, 0, pszName.get(), -1, fullPath, sizeof(fullPath), NULL, NULL) > 0)
+                if (WideCharToMultiByte(CP_UTF8, 0, pszName.get(), -1, fullPath, sizeof(fullPath), NULL, NULL) > 0)
                 {
                     StringCchCopyA(lpofn->lpstrFile, lpofn->nMaxFile, fullPath);
                     const char* pFileName = strrchr(lpofn->lpstrFile, '\\');

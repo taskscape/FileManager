@@ -23,6 +23,7 @@
 #include <process.h>
 //#include <commctrl.h>
 #include <ostream>
+#include "../../common/utf8_message_box.h"
 #include <stdio.h>
 
 #if defined(_DEBUG) && defined(_MSC_VER) // without passing file+line to 'new' operator, list of memory leaks shows only 'crtdbg.h(552)'
@@ -195,7 +196,7 @@ struct C__MessageBoxData
 int CALLBACK __MessagesMessageBoxThreadF(C__MessageBoxData* data)
 { // must not wait for response from calling thread, because it will not respond
     // therefore parent==NULL -> no window disabling etc.
-    data->Return = MessageBox(NULL, data->Text, data->Caption, data->Type | MB_SETFOREGROUND);
+    data->Return = MessageBoxUtf8(NULL, data->Text, data->Caption, data->Type | MB_SETFOREGROUND);
     return 0;
 }
 
@@ -252,7 +253,7 @@ int C__Messages::MessageBox(HWND hWnd, LPCTSTR lpText, LPCTSTR lpCaption, UINT u
 
     if (!IsWindow(hWnd))
         hWnd = NULL;
-    int ret = ::MessageBox(hWnd, txt, lpCaption, uType);
+    int ret = MessageBoxUtf8(hWnd, txt, lpCaption, uType);
 
     if (message != NULL)
         free(message);
@@ -284,13 +285,18 @@ const char* err(DWORD error)
     if (sprintf_s(__ErrorBuffer, _countof(__ErrorBuffer), "(%lu) ", error) < 0)
         __ErrorBuffer[0] = 0;
     int len = (int)strlen(__ErrorBuffer);
-    FormatMessage(FORMAT_MESSAGE_FROM_SYSTEM,
-                  NULL,
-                  error,
-                  MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
-                  __ErrorBuffer + len,
-                  __ERROR_BUFFER_SIZE - len,
-                  NULL);
+    WCHAR wideErrorText[512];
+    // Handle diagnostics are shown as UTF-8, so keep localized system text out of the ANSI code page.
+    if (FormatMessageW(FORMAT_MESSAGE_FROM_SYSTEM,
+                       NULL,
+                       error,
+                       MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
+                       wideErrorText,
+                       _countof(wideErrorText),
+                       NULL) == 0 ||
+        WideCharToMultiByte(CP_UTF8, 0, wideErrorText, -1, __ErrorBuffer + len,
+                            __ERROR_BUFFER_SIZE - len, NULL, NULL) == 0)
+        __ErrorBuffer[len] = 0;
     return __ErrorBuffer;
 }
 

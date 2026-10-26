@@ -1445,8 +1445,9 @@ void InitDropboxPath()
                                 {
                                     WCHAR widePath[MAX_PATH]; // we can't do longer paths anyway
                                     char mbPath[MAX_PATH];    // ANSI or UTF8 path
-                                    if (ConvertA2U(secRow, -1, widePath, _countof(widePath), CP_UTF8) &&
-                                        ConvertU2A(widePath, -1, mbPath, _countof(mbPath)))
+                                    // Dropbox stores the folder as UTF-8; keep that encoding in DropboxPath.
+                                    if (ConvertUtf8ToWide(secRow, -1, widePath, _countof(widePath)) &&
+                                        ConvertWideToUtf8(widePath, -1, mbPath, _countof(mbPath)))
                                     {
                                         TRACE_I("Dropbox path: " << mbPath);
                                         strcpy_s(DropboxPath, mbPath);
@@ -1560,7 +1561,8 @@ void InitOneDrivePath()
             {
                 if (path.get()[0] != 0) // FOLDERID_SkyDrive was introduced in Windows 8.1 = we should not need to hunt it in the registry
                 {
-                    done = ConvertU2A(path.get(), -1, OneDrivePath, _countof(OneDrivePath)) != 0;
+                    // OneDrivePath is compared with UTF-8 panel paths.
+                    done = ConvertWideToUtf8(path.get(), -1, OneDrivePath, _countof(OneDrivePath)) != 0;
                     if (!done)
                         OneDrivePath[0] = 0; // just for sync
                                              //else TRACE_I("OneDrive path (FOLDERID_SkyDrive): " << OneDrivePath);

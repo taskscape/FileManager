@@ -254,7 +254,7 @@ void CenterWindow(HWND hWnd)
 
 static BOOL FormatSplitDateTimeAnsi(const SYSTEMTIME* time, DWORD flags, char* buffer, int bufferSize, BOOL isDate)
 {
-    // Split/Combine's existing ANSI UI receives one bounded conversion after named-locale formatting.
+    // Split/Combine UI text is UTF-8, including locale-formatted dates.
     WCHAR localeName[LOCALE_NAME_MAX_LENGTH];
     WCHAR formatted[100];
     if (GetUserDefaultLocaleName(localeName, ARRAYSIZE(localeName)) == 0)
@@ -262,7 +262,7 @@ static BOOL FormatSplitDateTimeAnsi(const SYSTEMTIME* time, DWORD flags, char* b
     int length = isDate
                      ? GetDateFormatEx(localeName, flags, time, NULL, formatted, ARRAYSIZE(formatted), NULL)
                      : GetTimeFormatEx(localeName, flags, time, NULL, formatted, ARRAYSIZE(formatted));
-    return length != 0 && WideCharToMultiByte(CP_ACP, 0, formatted, -1, buffer, bufferSize, NULL, NULL) != 0;
+    return length != 0 && WideCharToMultiByte(CP_UTF8, 0, formatted, -1, buffer, bufferSize, NULL, NULL) != 0;
 }
 
 void GetInfo(char* buffer, CQuadWord& size)
@@ -301,8 +301,8 @@ BOOL Error(int title, int error, ...)
     {
         strcat(buf, " ");
         DWORD l = (DWORD)strlen(buf);
-        FormatMessage(FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS, NULL, lastErr,
-                      MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), buf + l, 1024 - l, NULL);
+        // Message boxes display UTF-8, including localized system text.
+        SalamanderGeneral->GetErrorText(lastErr, buf + l, 1024 - (int)l);
     }
     SalamanderGeneral->ShowMessageBox(buf, LoadStr(title), MSGBOX_ERROR);
 
@@ -323,8 +323,8 @@ BOOL Error2(HWND hParent, int title, int error, ...)
     {
         strcat(buf, " ");
         DWORD l = (DWORD)strlen(buf);
-        FormatMessage(FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS, NULL, lastErr,
-                      MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), buf + l, 1024 - l, NULL);
+        // Message boxes display UTF-8, including localized system text.
+        SalamanderGeneral->GetErrorText(lastErr, buf + l, 1024 - (int)l);
     }
     SalamanderGeneral->SalMessageBox(hParent, buf, LoadStr(title), MSGBOXEX_OK | MSGBOXEX_ICONEXCLAMATION);
 

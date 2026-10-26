@@ -543,8 +543,8 @@ static BOOL GetUserLocaleInfoAnsi(LCTYPE type, char* buffer, int bufferSize)
     if (GetUserDefaultLocaleName(localeName, _countof(localeName)) == 0 ||
         GetLocaleInfoEx(localeName, type, value, _countof(value)) == 0)
         return FALSE;
-    // Renamer expressions are ANSI strings, so convert only after the modern named-locale query succeeds.
-    return WideCharToMultiByte(CP_ACP, 0, value, -1, buffer, bufferSize, NULL, NULL) != 0;
+    // Renamer expressions store locale text as UTF-8.
+    return WideCharToMultiByte(CP_UTF8, 0, value, -1, buffer, bufferSize, NULL, NULL) != 0;
 }
 
 BOOL GetTimeParamFormat(HWND parent, char* buffer)

@@ -157,7 +157,8 @@ BOOL CNextVolumeDialog::OnBrowse(WORD wNotifyCode, WORD wID, HWND hwndCtl)
 {
     CALL_STACK_MESSAGE3("CNextVolumeDialog::OnBrowse(0x%X, 0x%X, )", wNotifyCode,
                         wID);
-    GetDlgItemText(Dlg, IDC_FILENAME, VolumePath, MAX_PATH);
+    // The volume edit stores a UTF-8 path used by SalPathAppend.
+    ReadUtf8ControlText(GetDlgItem(Dlg, IDC_FILENAME), VolumePath, MAX_PATH);
 
     char buf[1024];
     sprintf(buf, LoadStr(IDS_BROWSEFOLDERTEXT), VolumeName);
@@ -175,12 +176,13 @@ BOOL CNextVolumeDialog::OnBrowse(WORD wNotifyCode, WORD wID, HWND hwndCtl)
                 dialog->SetOptions(options | FOS_PICKFOLDERS | FOS_FORCEFILESYSTEM);
 
             WCHAR titleW[_countof(buf)];
-            if (MultiByteToWideChar(CP_ACP, 0, buf, -1, titleW, _countof(titleW)) != 0)
+            // The prompt is a UTF-8 resource string.
+            if (MultiByteToWideChar(CP_UTF8, 0, buf, -1, titleW, _countof(titleW)) != 0)
                 dialog->SetTitle(titleW);
 
             WCHAR initialPathW[MAX_PATH];
             IShellItem* initialFolder = NULL;
-            if (MultiByteToWideChar(CP_ACP, 0, VolumePath, -1, initialPathW, _countof(initialPathW)) != 0 &&
+            if (MultiByteToWideChar(CP_UTF8, 0, VolumePath, -1, initialPathW, _countof(initialPathW)) != 0 &&
                 SUCCEEDED(SHCreateItemFromParsingName(initialPathW, NULL, IID_PPV_ARGS(&initialFolder))))
             {
                 dialog->SetFolder(initialFolder);
@@ -198,8 +200,8 @@ BOOL CNextVolumeDialog::OnBrowse(WORD wNotifyCode, WORD wID, HWND hwndCtl)
                     result = selectedFolder->GetDisplayName(SIGDN_FILESYSPATH, &selectedPathW);
                     if (SUCCEEDED(result))
                     {
-                        if (WideCharToMultiByte(CP_ACP, 0, selectedPathW, -1, VolumePath, MAX_PATH, NULL, NULL) != 0)
-                            SetDlgItemText(Dlg, IDC_FILENAME, VolumePath);
+                        if (WideCharToMultiByte(CP_UTF8, 0, selectedPathW, -1, VolumePath, MAX_PATH, NULL, NULL) != 0)
+                            SendUtf8DialogControlString(Dlg, IDC_FILENAME, WM_SETTEXT, 0, VolumePath);
                         CoTaskMemFree(selectedPathW);
                     }
                     selectedFolder->Release();
@@ -216,7 +218,8 @@ BOOL CNextVolumeDialog::OnBrowse(WORD wNotifyCode, WORD wID, HWND hwndCtl)
 BOOL CNextVolumeDialog::OnOK(WORD wNotifyCode, WORD wID, HWND hwndCtl)
 {
     CALL_STACK_MESSAGE3("CNextVolumeDialog::OnOK(0x%X, 0x%X, )", wNotifyCode, wID);
-    GetDlgItemText(Dlg, IDC_FILENAME, VolumePath, MAX_PATH);
+    // The volume edit stores a UTF-8 path used by SalPathAppend.
+    ReadUtf8ControlText(GetDlgItem(Dlg, IDC_FILENAME), VolumePath, MAX_PATH);
     SalamanderGeneral->SalPathAddBackslash(VolumePath, MAX_PATH);
 
     char fullName[MAX_PATH];

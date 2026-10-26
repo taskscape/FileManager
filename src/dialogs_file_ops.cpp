@@ -2065,7 +2065,8 @@ void BrowseFileName(HWND hParent, int editlineResID, const char* name)
     {
         if (SalGetFullName(file))
         {
-            SendMessage(GetDlgItem(hParent, editlineResID), WM_SETTEXT, 0, (LPARAM)file);
+            // SafeGetSaveFileName writes a UTF-8 path; the edit must not reinterpret it as ANSI.
+            SendUtf8ControlString(GetDlgItem(hParent, editlineResID), WM_SETTEXT, 0, file);
         }
     }
 }

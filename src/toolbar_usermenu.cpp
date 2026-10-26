@@ -169,9 +169,9 @@ public:
                         int l = static_cast<int>(wcslen(fileW));
                         if (*(fileW + l + 1) == 0)
                         {
-                            WideCharToMultiByte(CP_ACP, 0, fileW, l + 1, path, l + 1, NULL, NULL);
-                            path[l] = 0;
-                            ret = TRUE;
+                            // User-menu drops keep the UTF-8 path used by command expansion.
+                            if (ConvertWideToUtf8(fileW, -1, path, MAX_PATH) != 0)
+                                ret = TRUE;
                         }
                     }
                     else
@@ -180,8 +180,11 @@ public:
                         int l = (int)strlen(fileA);
                         if (*(fileA + l + 1) == 0)
                         {
-                            strcpy(path, fileA);
-                            ret = TRUE;
+                            // Legacy ANSI HDROP entries still have to enter the UTF-8 path cache.
+                            WCHAR wide[MAX_PATH];
+                            if (ConvertA2U(fileA, -1, wide, _countof(wide), CP_ACP) &&
+                                ConvertWideToUtf8(wide, -1, path, MAX_PATH))
+                                ret = TRUE;
                         }
                     }
 

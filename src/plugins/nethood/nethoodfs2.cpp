@@ -1291,8 +1291,7 @@ bool CNethoodFSInterface::IsRootPath(__in PCTSTR pszPath)
 
 void CNethoodFSInterface::DisplayError(DWORD dwError)
 {
-    TCHAR szErrorMessage[512];
-    void* pAllocatedErrorDescription;
+    char szErrorMessage[512];
 
     if (m_bShowThrobber)
     {
@@ -1307,28 +1306,8 @@ void CNethoodFSInterface::DisplayError(DWORD dwError)
         return;
     }
 
-    if (FormatMessage(
-            FORMAT_MESSAGE_ALLOCATE_BUFFER |
-                FORMAT_MESSAGE_FROM_SYSTEM |
-                FORMAT_MESSAGE_IGNORE_INSERTS,
-            NULL,
-            dwError,
-            MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
-            reinterpret_cast<PTSTR>(&pAllocatedErrorDescription),
-            0, NULL) > 0)
-    {
-        StringCchPrintf(szErrorMessage, COUNTOF(szErrorMessage),
-                        TEXT("(%lu) "), dwError);
-        StringCchCat(szErrorMessage, COUNTOF(szErrorMessage),
-                     static_cast<PTSTR>(pAllocatedErrorDescription));
-        LocalFree(pAllocatedErrorDescription);
-    }
-    else
-    {
-        StringCchPrintf(szErrorMessage, COUNTOF(szErrorMessage),
-                        TEXT("(%lu)"), dwError);
-    }
-
+    // ShowMessageBox displays UTF-8. GetErrorText already includes the numeric prefix.
+    SalamanderGeneral->GetErrorText((int)dwError, szErrorMessage, (int)_countof(szErrorMessage));
     SalamanderGeneral->ShowMessageBox(szErrorMessage, NULL, MSGBOX_WARNING);
 }
 

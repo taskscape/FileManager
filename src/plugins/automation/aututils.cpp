@@ -243,24 +243,23 @@ void FormatErrorText(
 
     if (SUCCEEDED(hr))
     {
-        DWORD len = FormatMessage(
+        WCHAR systemText[512];
+        // Callers display this buffer as UTF-8, including the LoadStringUtf8 fallback below.
+        DWORD len = FormatMessageW(
             FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
             NULL,
             code,
             0,
-            end,
-            (DWORD)remaining,
+            systemText,
+            _countof(systemText),
             NULL);
 
         if (len > 0)
         {
-            // trim CRLF
-            end += len - 1;
-            while (end > pszBuffer && _istspace(*end))
-            {
-                *end = _T('\0');
-                --end;
-            }
+            while (len > 0 && iswspace(systemText[len - 1]))
+                systemText[--len] = 0;
+            if (WideCharToMultiByte(CP_UTF8, 0, systemText, -1, end, (int)remaining, NULL, NULL) == 0)
+                LoadStringUtf8(g_hLangInst, IDS_UNKERROR, end, (int)remaining);
         }
         else
         {

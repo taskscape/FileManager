@@ -2857,6 +2857,34 @@ public sealed class NativeSafetyRegressionTests
     }
 
     [Test]
+    public void Narrow_paths_and_messages_stay_utf8_at_shell_and_dialog_boundaries()
+    {
+        var root = FindRepositoryRoot();
+        string ReadSource(string relativePath) => File.ReadAllText(Path.Combine(root, "src", relativePath));
+        var knownFolders = ReadSource(Path.Combine("common", "strutils.cpp"));
+        var fileDialog = ReadSource("file_enumeration.cpp");
+        var messages = ReadSource(Path.Combine("common", "messages.cpp"));
+        var shortcuts = ReadSource("fileswindow_execute.cpp");
+        var nethood = ReadSource(Path.Combine("plugins", "nethood", "nethoodfs2.cpp"));
+        var zipDialog = ReadSource(Path.Combine("plugins", "zip", "dialogs2.cpp"));
+
+        // These boundaries used to reinterpret UTF-8 application text as the ANSI code page.
+        Assert.Multiple(() =>
+        {
+            Assert.That(knownFolders, Does.Contain("return ConvertWideToUtf8(widePath.get(), -1, destination, destinationCapacity) != 0;"));
+            Assert.That(fileDialog, Does.Contain("Narrow OPENFILENAME strings are UTF-8, so every shell boundary uses CP_UTF8."));
+            Assert.That(fileDialog, Does.Not.Contain("MultiByteToWideChar(CP_ACP"));
+            Assert.That(messages, Does.Contain("MessageBoxUtf8(NULL, data->Text, data->Caption"));
+            Assert.That(messages, Does.Contain("FormatMessageW(FORMAT_MESSAGE_FROM_SYSTEM"));
+            Assert.That(messages, Does.Not.Contain("FormatMessageA("));
+            Assert.That(shortcuts, Does.Contain("ShellLinkTargetUtf8(link, fullName, _countof(fullName))"));
+            Assert.That(nethood, Does.Contain("SalamanderGeneral->GetErrorText((int)dwError, szErrorMessage"));
+            Assert.That(zipDialog, Does.Contain("MultiByteToWideChar(CP_UTF8, 0, text, -1, NULL, 0);"));
+            Assert.That(zipDialog, Does.Contain("WideCharToMultiByte(CP_UTF8, 0, pathW, -1, fileName, MAX_PATH, NULL, NULL);"));
+        });
+    }
+
+    [Test]
     public void Ftp_downloads_stage_identity_validate_resume_and_publish_only_after_a_durable_commit()
     {
         var root = FindRepositoryRoot();

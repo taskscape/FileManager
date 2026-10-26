@@ -928,9 +928,9 @@ BOOL CPluginInterfaceForArchiver::Error(int error, ...)
     if (lastErr != ERROR_SUCCESS)
     {
         // The formatted localized error is terminated before the system detail is appended.
+        // ShowMessageBox displays UTF-8, including localized system text.
         int l = static_cast<int>(_tcslen(buf));
-        FormatMessage(FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS, NULL, lastErr,
-                      MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), buf + l, 1024 - l, NULL);
+        SalamanderGeneral->GetErrorText(lastErr, buf + l, 1024 - l);
     }
     SalamanderGeneral->ShowMessageBox(buf, LoadStr(IDS_PLUGINNAME), MSGBOX_ERROR);
 
@@ -1287,9 +1287,9 @@ BOOL CPluginInterfaceForArchiver::SafeSeek(CQuadWord position)
         if (SetFilePointerEx(TargetFile, pos, NULL, FILE_BEGIN))
             return TRUE; // success
         CopyRarErrorPrefix(buf, _countof(buf), IDS_UNABLESEEK);
-        const DWORD prefixLength = static_cast<DWORD>(strlen(buf)); // buf is bounded to 1,024 bytes for FormatMessage.
-        FormatMessage(FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS, NULL,
-                      GetLastError(), MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), buf + prefixLength, _countof(buf) - prefixLength, NULL);
+        const DWORD prefixLength = static_cast<DWORD>(strlen(buf));
+        // Dialog text is UTF-8, so append the localized system message through the plug-in API.
+        SalamanderGeneral->GetErrorText(GetLastError(), buf + prefixLength, (int)(_countof(buf) - prefixLength));
 
         if (PluginData->Silent & SF_IOERRORS)
             return FALSE;
@@ -1333,9 +1333,9 @@ int CPluginInterfaceForArchiver::ProcessDataProc(unsigned char* addr, int size)
             break;
         }
         CopyRarErrorPrefix(buf, _countof(buf), IDS_UNABLEGETFIELPOS);
-        const DWORD prefixLength = static_cast<DWORD>(strlen(buf)); // buf is bounded to 1,024 bytes for FormatMessage.
-        FormatMessage(FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS, NULL,
-                      GetLastError(), MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), buf + prefixLength, _countof(buf) - prefixLength, NULL);
+        const DWORD prefixLength = static_cast<DWORD>(strlen(buf));
+        // Dialog text is UTF-8, so append the localized system message through the plug-in API.
+        SalamanderGeneral->GetErrorText(GetLastError(), buf + prefixLength, (int)(_countof(buf) - prefixLength));
 
         if (PluginData->Silent & SF_IOERRORS)
             return -1;
@@ -1366,9 +1366,9 @@ int CPluginInterfaceForArchiver::ProcessDataProc(unsigned char* addr, int size)
             return 1; // sucess
         }
         CopyRarErrorPrefix(buf, _countof(buf), IDS_UNABLEWRITE);
-        const DWORD prefixLength = static_cast<DWORD>(strlen(buf)); // buf is bounded to 1,024 bytes for FormatMessage.
-        FormatMessage(FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS, NULL,
-                      GetLastError(), MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), buf + prefixLength, _countof(buf) - prefixLength, NULL);
+        const DWORD prefixLength = static_cast<DWORD>(strlen(buf));
+        // Dialog text is UTF-8, so append the localized system message through the plug-in API.
+        SalamanderGeneral->GetErrorText(GetLastError(), buf + prefixLength, (int)(_countof(buf) - prefixLength));
 
         if (PluginData->Silent & SF_IOERRORS)
             return -1;
@@ -1831,7 +1831,7 @@ BOOL CPluginInterfaceForArchiver::UnpackWholeArchiveCalculateProgress(TIndirectA
 
 static BOOL FormatUserDateTimeAnsi(const SYSTEMTIME* time, DWORD flags, char* buffer, int bufferSize, BOOL isDate)
 {
-    // Locale-name APIs avoid LCID defaults while retaining UnRAR's existing bounded ANSI plug-in boundary.
+    // UnRAR info lines are UTF-8, including locale-formatted dates.
     WCHAR localeName[LOCALE_NAME_MAX_LENGTH];
     WCHAR formatted[100];
     if (GetUserDefaultLocaleName(localeName, ARRAYSIZE(localeName)) == 0)
@@ -1839,7 +1839,7 @@ static BOOL FormatUserDateTimeAnsi(const SYSTEMTIME* time, DWORD flags, char* bu
     int length = isDate
                      ? GetDateFormatEx(localeName, flags, time, NULL, formatted, ARRAYSIZE(formatted), NULL)
                      : GetTimeFormatEx(localeName, flags, time, NULL, formatted, ARRAYSIZE(formatted));
-    return length != 0 && WideCharToMultiByte(CP_ACP, 0, formatted, -1, buffer, bufferSize, NULL, NULL) != 0;
+    return length != 0 && WideCharToMultiByte(CP_UTF8, 0, formatted, -1, buffer, bufferSize, NULL, NULL) != 0;
 }
 
 void GetInfo(char* buffer, FILETIME* lastWrite, CQuadWord& size)

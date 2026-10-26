@@ -10,7 +10,11 @@ UINT WINAPI ExtractIcons(LPCTSTR szFileName, int nIconIndex, int cxIcon, int cyI
     UINT nIconSize = cxIcon;
     HICON hLarge{};
     HICON hSmall{};
-    auto shRet = SHDefExtractIcon(szFileName, nIconIndex, 0, &hLarge, &hSmall, nIconSize);
+    // Callers pass UTF-8 paths; the ANSI extractor would split characters outside the system code page.
+    WCHAR wideName[MAX_PATH];
+    if (ConvertUtf8ToWide(szFileName, -1, wideName, _countof(wideName)) == 0)
+        return 0;
+    auto shRet = SHDefExtractIconW(wideName, nIconIndex, 0, &hLarge, &hSmall, nIconSize);
     if (shRet == S_OK)
     {
         if (phicon)
@@ -97,9 +101,9 @@ BOOL SalGetIconFromPIDL(IShellFolder* psf, const char* path, LPCITEMIDLIST pidl,
             hres = ((IExtractIconW*)pxi)->GetIconLocation(GIL_FORSHELL, iconFileW, MAX_PATH, &iconIndex, &wFlags);
             if (SUCCEEDED(hres))
             {
-                // Convert the UNICODE string to ANSI
-                WideCharToMultiByte(CP_ACP, 0, iconFileW, -1, iconFile, MAX_PATH, NULL, NULL);
-                iconFile[MAX_PATH - 1] = 0;
+                // ExtractIcons decodes this buffer as UTF-8.
+                if (ConvertWideToUtf8(iconFileW, -1, iconFile, MAX_PATH) == 0)
+                    iconFile[0] = 0;
                 //TRACE_I("  SalGetIconFromPIDL() IID_IExtractIconW iconFile="<<iconFile<<" iconIndex="<<iconIndex<<" wFlags="<<wFlags);
             }
         }
@@ -331,7 +335,8 @@ LPITEMIDLIST SHILCreateFromPath(LPCSTR pszPath)
         ULONG cchEaten;
         WCHAR wszPath[MAX_PATH];
 
-        MultiByteToWideChar(CP_ACP, 0, pszPath, -1, wszPath, MAX_PATH);
+        // pszPath is a UTF-8 filesystem path.
+        MultiByteToWideChar(CP_UTF8, 0, pszPath, -1, wszPath, MAX_PATH);
         wszPath[MAX_PATH - 1] = 0;
 
         psfDesktop->ParseDisplayName(NULL, NULL, wszPath, &cchEaten, &pidl, NULL);

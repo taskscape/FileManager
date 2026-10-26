@@ -2829,7 +2829,8 @@ void CCfgPageHotPath::Transfer(CTransferInfo& ti)
             {
                 wchar_t buffW[20];
                 sprintf(buff, "%s+%d", LoadStr(IDS_CTRL), i < 9 ? i + 1 : 0);
-                MultiByteToWideChar(CP_ACP, 0, buff, -1, buffW, 20);
+                // LoadStr is UTF-8, same as the hot-path name inserted above.
+                MultiByteToWideChar(CP_UTF8, 0, buff, -1, buffW, 20);
                 LVITEMW lviHotKey;
                 lviHotKey.mask = LVIF_TEXT;
                 lviHotKey.iItem = i;

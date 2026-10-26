@@ -525,9 +525,9 @@ BOOL Error(int error, ...)
     if (lastErr != ERROR_SUCCESS)
     {
         strcat(buf, " ");
+        // ShowMessageBox displays UTF-8, including localized system text.
         int l = (int)strlen(buf);
-        FormatMessage(FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS, NULL, lastErr,
-                      MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), buf + l, 1024 - l, NULL);
+        SalamanderGeneral->GetErrorText(lastErr, buf + l, 1024 - l);
     }
     SalamanderGeneral->ShowMessageBox(buf, LoadStr(IDS_PLUGINNAME), MSGBOX_ERROR);
 
@@ -554,8 +554,8 @@ BOOL SafeWriteFile(HANDLE hFile, LPVOID lpBuffer, DWORD nBytesToWrite, DWORD* pn
     {
         int lastErr = GetLastError();
         char error[1024];
-        FormatMessage(FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS, NULL, lastErr,
-                      MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), error, 1024, NULL);
+        // DialogError displays UTF-8, including localized system text.
+        SalamanderGeneral->GetErrorText(lastErr, error, 1024);
         if (SalamanderGeneral->DialogError(SalamanderGeneral->GetMsgBoxParent(), BUTTONS_RETRYCANCEL, fileName, error,
                                            LoadStr(IDS_WRITEERROR)) != DIALOG_RETRY)
             return FALSE;

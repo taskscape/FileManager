@@ -61,6 +61,7 @@ void Initialize__Messages()
 
 #include "trace.h"
 #include "messages.h"
+#include "utf8_message_box.h"
 #include "thread_owner.h"
 
 char __ResourceStringBuffer[__RESOURCE_STRING_BUFFER_SIZE] = "";
@@ -179,7 +180,8 @@ struct C__MessageBoxData
 int CALLBACK __MessagesMessageBoxThreadF(C__MessageBoxData* data)
 { // must not wait for response from calling thread, because it will not respond
     // therefore parent==NULL -> no window disabling etc.
-    data->Return = MessageBoxA(NULL, data->Text, data->Caption, data->Type | MB_SETFOREGROUND);
+    // Message text is UTF-8; MessageBoxA would paint localized characters as ANSI.
+    data->Return = MessageBoxUtf8(NULL, data->Text, data->Caption, data->Type | MB_SETFOREGROUND);
     return 0;
 }
 
@@ -219,7 +221,7 @@ int C__Messages::MessageBoxT(const char* lpCaption, UINT uType)
 
     // Keep the stack-owned message data alive through a named owner rather than an unowned raw handle.
     CThreadOwner messageBoxOwner;
-    if (messageBoxOwner.Start(MessagesMessageBoxOwnedThreadF, &data, "AnsiMessageBox"))
+    if (messageBoxOwner.Start(MessagesMessageBoxOwnedThreadF, &data, "Utf8MessageBox"))
     {
         messageBoxOwner.StopAndJoin(INFINITE); // wait until user dismisses it
     }
@@ -242,7 +244,7 @@ int C__Messages::MessageBox(HWND hWnd, const char* lpCaption, UINT uType)
 #ifndef MULTITHREADED_MESSAGES_ENABLE
     if (!IsWindow(hWnd))
         hWnd = NULL;
-    ret = ::MessageBoxA(hWnd, MessagesStringBuf.c_str(), lpCaption, uType);
+    ret = MessageBoxUtf8(hWnd, MessagesStringBuf.c_str(), lpCaption, uType);
     MessagesStringBuf.erase(); // preparation for next message
 #else                          // MULTITHREADED_MESSAGES_ENABLE
     size_t len = MessagesStringBuf.length() + 1;
@@ -259,7 +261,7 @@ int C__Messages::MessageBox(HWND hWnd, const char* lpCaption, UINT uType)
 
     if (!IsWindow(hWnd))
         hWnd = NULL;
-    ret = ::MessageBoxA(hWnd, txt, lpCaption, uType);
+    ret = MessageBoxUtf8(hWnd, txt, lpCaption, uType);
 
     if (message != NULL)
         HeapFree(GetProcessHeap(), 0, message);
@@ -570,16 +572,20 @@ const char* err(DWORD error)
         __MessagesOwnerThreadID == GetCurrentThreadId())
     {
 #endif // MULTITHREADED_MESSAGES_ENABLE
-        // Keep the error prefix bounded before appending the system message.
+        // Keep the error prefix bounded before appending the localized UTF-8 system message.
         _snprintf_s(__ErrorBuffer, _countof(__ErrorBuffer), _TRUNCATE, "(%d) ", error);
         int len = (int)strlen(__ErrorBuffer);
-        FormatMessageA(FORMAT_MESSAGE_FROM_SYSTEM,
-                       NULL,
-                       error,
-                       MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
-                       __ErrorBuffer + len,
-                       __ERROR_BUFFER_SIZE - len,
-                       NULL);
+        WCHAR wideErrorText[MAX_PATH + 20];
+        if (FormatMessageW(FORMAT_MESSAGE_FROM_SYSTEM,
+                           NULL,
+                           error,
+                           MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
+                           wideErrorText,
+                           _countof(wideErrorText),
+                           NULL) == 0 ||
+            WideCharToMultiByte(CP_UTF8, 0, wideErrorText, -1, __ErrorBuffer + len,
+                                __ERROR_BUFFER_SIZE - len, NULL, NULL) == 0)
+            __ErrorBuffer[len] = 0;
         return __ErrorBuffer;
 #ifdef MULTITHREADED_MESSAGES_ENABLE
     }
@@ -633,7 +639,8 @@ void SetMessagesTitle(const char* title)
     // Message titles are bounded presentation fields; retain their explicit clip before conversion.
     StringCchCopyNA(__MessagesTitleBuf, _countof(__MessagesTitleBuf), title, _countof(__MessagesTitleBuf) - 1);
     __MessagesTitle = __MessagesTitleBuf;
-    MultiByteToWideChar(CP_ACP, MB_PRECOMPOSED, __MessagesTitleBuf, -1,
+    // Titles are UTF-8, matching the message body shown by MessageBoxUtf8.
+    MultiByteToWideChar(CP_UTF8, 0, __MessagesTitleBuf, -1,
                         __MessagesTitleBufW, _countof(__MessagesTitleBufW));
     __MessagesTitleBufW[_countof(__MessagesTitleBufW) - 1] = 0;
     __MessagesTitleW = __MessagesTitleBufW;
@@ -644,7 +651,7 @@ void SetMessagesTitleW(const WCHAR* title)
     // Keep the Unicode title within the shared presentation buffer before ANSI conversion.
     StringCchCopyNW(__MessagesTitleBufW, _countof(__MessagesTitleBufW), title, _countof(__MessagesTitleBufW) - 1);
     __MessagesTitleW = __MessagesTitleBufW;
-    WideCharToMultiByte(CP_ACP, 0, __MessagesTitleBufW, -1,
+    WideCharToMultiByte(CP_UTF8, 0, __MessagesTitleBufW, -1,
                         __MessagesTitleBuf, _countof(__MessagesTitleBuf), NULL, NULL);
     __MessagesTitleBuf[_countof(__MessagesTitleBuf) - 1] = 0;
     __MessagesTitle = __MessagesTitleBuf;

@@ -656,7 +656,8 @@ void CFilesWindow::ClipboardPastePath()
             {
                 while (*pathW != 0 && *pathW <= L' ')
                     pathW++; // trim spaces+CR+LF before the path
-                if (ConvertU2A(pathW, -1, buff, _countof(buff)))
+                // Pasted Unicode paths are navigated as UTF-8.
+                if (ConvertU2A(pathW, -1, buff, _countof(buff), FALSE, CP_UTF8))
                     changePath = TRUE;
                 else
                 {
@@ -674,10 +675,11 @@ void CFilesWindow::ClipboardPastePath()
             {
                 while (*path != 0 && *path <= ' ')
                     path++; // trim spaces+CR+LF before the path
-                // Shell-provided paths are displayed in this fixed text field.
-                StringCchCopyNA(buff, _countof(buff), path, _countof(buff) - 1);
-
-                changePath = TRUE;
+                // CF_TEXT is ANSI; ChangeDir consumes UTF-8.
+                WCHAR widePath[2 * MAX_PATH];
+                if (ConvertA2U(path, -1, widePath, _countof(widePath), CP_ACP) &&
+                    ConvertWideToUtf8(widePath, -1, buff, _countof(buff)))
+                    changePath = TRUE;
                 HANDLES(GlobalUnlock(handle));
             }
         }

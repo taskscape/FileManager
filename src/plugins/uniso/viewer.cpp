@@ -39,14 +39,14 @@ char* ViewerPrintSystemTime(SYSTEMTIME* st)
     char date[50], time[50];
     WCHAR localeName[LOCALE_NAME_MAX_LENGTH];
     WCHAR formattedValue[50];
-    // Viewer text crosses an ANSI plug-in boundary only after Unicode locale formatting.
+    // ISO viewer text is UTF-8, including locale-formatted dates.
     if (!GetUserDefaultLocaleName(localeName, ARRAYSIZE(localeName)) ||
         GetTimeFormatEx(localeName, 0, st, NULL, formattedValue, ARRAYSIZE(formattedValue)) == 0 ||
-        WideCharToMultiByte(CP_ACP, 0, formattedValue, -1, time, ARRAYSIZE(time), NULL, NULL) == 0)
+        WideCharToMultiByte(CP_UTF8, 0, formattedValue, -1, time, ARRAYSIZE(time), NULL, NULL) == 0)
         sprintf(time, "%u:%02u:%02u", st->wHour, st->wMinute, st->wSecond);
     if (!GetUserDefaultLocaleName(localeName, ARRAYSIZE(localeName)) ||
         GetDateFormatEx(localeName, DATE_SHORTDATE, st, NULL, formattedValue, ARRAYSIZE(formattedValue), NULL) == 0 ||
-        WideCharToMultiByte(CP_ACP, 0, formattedValue, -1, date, ARRAYSIZE(date), NULL, NULL) == 0)
+        WideCharToMultiByte(CP_UTF8, 0, formattedValue, -1, date, ARRAYSIZE(date), NULL, NULL) == 0)
         sprintf(date, "%u.%u.%u", st->wDay, st->wMonth, st->wYear);
 
     sprintf(buffer, "%s %s", date, time);

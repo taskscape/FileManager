@@ -17,7 +17,7 @@
 
 static BOOL FormatChmDateTimeAnsi(const SYSTEMTIME* time, DWORD flags, char* buffer, int bufferSize, BOOL isDate)
 {
-    // UnCHM retains an ANSI metadata display, so perform its sole conversion after named-locale formatting.
+    // UnCHM info lines are UTF-8, including locale-formatted dates.
     WCHAR localeName[LOCALE_NAME_MAX_LENGTH];
     WCHAR formatted[100];
     if (GetUserDefaultLocaleName(localeName, ARRAYSIZE(localeName)) == 0)
@@ -25,7 +25,7 @@ static BOOL FormatChmDateTimeAnsi(const SYSTEMTIME* time, DWORD flags, char* buf
     int length = isDate
                      ? GetDateFormatEx(localeName, flags, time, NULL, formatted, ARRAYSIZE(formatted), NULL)
                      : GetTimeFormatEx(localeName, flags, time, NULL, formatted, ARRAYSIZE(formatted));
-    return length != 0 && WideCharToMultiByte(CP_ACP, 0, formatted, -1, buffer, bufferSize, NULL, NULL) != 0;
+    return length != 0 && WideCharToMultiByte(CP_UTF8, 0, formatted, -1, buffer, bufferSize, NULL, NULL) != 0;
 }
 
 void GetInfo(char* buffer, FILETIME* lastWrite, CQuadWord size)

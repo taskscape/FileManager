@@ -5,7 +5,7 @@
 #include "unicode_text_layout.h"
 #include <shobjidl.h>
 
-inline bool ShellLinkTargetUtf8(IShellLinkW* link, char* target, size_t capacity)
+inline bool ShellLinkTargetUtf8(IShellLinkW* link, char* target, size_t capacity, DWORD flags = SLGP_UNCPRIORITY)
 {
     if (link == NULL || target == NULL || capacity == 0 || capacity > INT_MAX)
         return false;
@@ -16,7 +16,7 @@ inline bool ShellLinkTargetUtf8(IShellLinkW* link, char* target, size_t capacity
         size_t wideCapacity = capacity < MAX_PATH ? MAX_PATH : capacity;
         std::wstring wide(wideCapacity, L'\0');
         std::string utf8;
-        if (link->GetPath(&wide[0], static_cast<int>(wideCapacity), NULL, SLGP_UNCPRIORITY) != S_OK ||
+        if (link->GetPath(&wide[0], static_cast<int>(wideCapacity), NULL, flags) != S_OK ||
             !WideTextToUtf8(wide.c_str(), -1, utf8) || utf8.size() >= capacity)
             return false;
         memcpy(target, utf8.c_str(), utf8.size() + 1);

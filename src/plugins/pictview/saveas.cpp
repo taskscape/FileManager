@@ -227,18 +227,19 @@ static BOOL PvGetFormatInfo(const TCHAR* filterDoubled, UINT typeIndex, DWORD* p
     return FALSE;
 }
 
+// PictView dialog labels and paths are UTF-8 at the Unicode shell boundary.
 static HRESULT PvAddComboItem(IFileDialogCustomize* cust, DWORD ctrl, DWORD itemID, LPCTSTR label)
 {
 #ifdef UNICODE
     return cust->AddControlItem(ctrl, itemID, label);
 #else
-    int len = MultiByteToWideChar(CP_ACP, 0, label, -1, NULL, 0);
+    int len = MultiByteToWideChar(CP_UTF8, 0, label, -1, NULL, 0);
     if (len == 0)
         return E_FAIL;
     WCHAR* wide = (WCHAR*)malloc(len * sizeof(WCHAR));
     if (wide == NULL)
         return E_OUTOFMEMORY;
-    MultiByteToWideChar(CP_ACP, 0, label, -1, wide, len);
+    MultiByteToWideChar(CP_UTF8, 0, label, -1, wide, len);
     HRESULT hr = cust->AddControlItem(ctrl, itemID, wide);
     free(wide);
     return hr;
@@ -250,13 +251,13 @@ static HRESULT PvSetEditTextTchar(IFileDialogCustomize* cust, DWORD ctrl, LPCTST
 #ifdef UNICODE
     return cust->SetEditBoxText(ctrl, text);
 #else
-    int len = MultiByteToWideChar(CP_ACP, 0, text, -1, NULL, 0);
+    int len = MultiByteToWideChar(CP_UTF8, 0, text, -1, NULL, 0);
     if (len == 0)
         return E_FAIL;
     WCHAR* wide = (WCHAR*)malloc(len * sizeof(WCHAR));
     if (wide == NULL)
         return E_OUTOFMEMORY;
-    MultiByteToWideChar(CP_ACP, 0, text, -1, wide, len);
+    MultiByteToWideChar(CP_UTF8, 0, text, -1, wide, len);
     HRESULT hr = cust->SetEditBoxText(ctrl, wide);
     free(wide);
     return hr;
@@ -282,7 +283,7 @@ static HRESULT PvGetEditTextTchar(IFileDialogCustomize* cust, DWORD ctrl, LPTSTR
     memcpy(buffer, textW, (len - 1) * sizeof(TCHAR));
     buffer[len - 1] = 0;
 #else
-    int needed = WideCharToMultiByte(CP_ACP, 0, textW, -1, NULL, 0, NULL, NULL);
+    int needed = WideCharToMultiByte(CP_UTF8, 0, textW, -1, NULL, 0, NULL, NULL);
     if (needed <= 0)
     {
         CoTaskMemFree(textW);
@@ -296,7 +297,7 @@ static HRESULT PvGetEditTextTchar(IFileDialogCustomize* cust, DWORD ctrl, LPTSTR
         buffer[0] = 0;
         return E_OUTOFMEMORY;
     }
-    WideCharToMultiByte(CP_ACP, 0, textW, -1, wide, needed, NULL, NULL);
+    WideCharToMultiByte(CP_UTF8, 0, textW, -1, wide, needed, NULL, NULL);
     // clip deliberately like the former EM_LIMITTEXT + GetDlgItemText pair
     size_t copyLen = strlen(wide);
     if (copyLen >= bufferCount)
@@ -326,11 +327,11 @@ static WCHAR* DupPictViewWide(LPCTSTR text)
         memcpy(wide, text, len * sizeof(WCHAR));
     return wide;
 #else
-    int len = MultiByteToWideChar(CP_ACP, 0, text, -1, NULL, 0);
+    int len = MultiByteToWideChar(CP_UTF8, 0, text, -1, NULL, 0);
     if (len == 0)
         return NULL;
     WCHAR* wide = (WCHAR*)malloc(len * sizeof(WCHAR));
-    if (wide != NULL && MultiByteToWideChar(CP_ACP, 0, text, -1, wide, len) == 0)
+    if (wide != NULL && MultiByteToWideChar(CP_UTF8, 0, text, -1, wide, len) == 0)
     {
         free(wide);
         return NULL;
@@ -358,7 +359,7 @@ static BOOL DupPictViewTcharFromWide(const WCHAR* wide, LPTSTR buffer, DWORD buf
     memcpy(buffer, wide, len * sizeof(TCHAR));
     return TRUE;
 #else
-    int converted = WideCharToMultiByte(CP_ACP, 0, wide, -1, buffer, (int)bufferCount, NULL, NULL);
+    int converted = WideCharToMultiByte(CP_UTF8, 0, wide, -1, buffer, (int)bufferCount, NULL, NULL);
     // WideCharToMultiByte fails (instead of writing) when the buffer is too small
     return converted > 0 && strlen(buffer) < bufferCount; // refuse instead of truncating
 #endif

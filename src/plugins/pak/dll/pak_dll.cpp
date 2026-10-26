@@ -386,9 +386,13 @@ BOOL CPakIface::HandleError(DWORD flags, int errorID, ...)
 char* CPakIface::LastErrorString(int lastError, char* buffer)
 {
     *buffer = 0;
-    ::FormatMessage(FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS, NULL,
-                    lastError, MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
-                    buffer, 1024, NULL);
+    WCHAR wide[1024];
+    // The plug-in displays this buffer as UTF-8.
+    if (::FormatMessageW(FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS, NULL,
+                         lastError, MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
+                         wide, _countof(wide), NULL) == 0 ||
+        WideCharToMultiByte(CP_UTF8, 0, wide, -1, buffer, 1024, NULL, NULL) == 0)
+        buffer[0] = 0;
     return buffer;
 }
 

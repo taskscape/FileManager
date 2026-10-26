@@ -1491,9 +1491,9 @@ public:
                         int l = (int)wcslen(fileW);
                         if (*(fileW + l + 1) == 0)
                         {
-                            WideCharToMultiByte(CP_ACP, 0, fileW, l + 1, path, l + 1, NULL, NULL);
-                            path[l] = 0;
-                            ret = TRUE;
+                            // HDROP names are navigated with the UTF-8 file APIs.
+                            if (ConvertWideToUtf8(fileW, -1, path, MAX_PATH) != 0)
+                                ret = TRUE;
                         }
                     }
                     else
@@ -1502,8 +1502,11 @@ public:
                         int l = (int)strlen(fileA);
                         if (*(fileA + l + 1) == 0)
                         {
-                            strcpy(path, fileA);
-                            ret = TRUE;
+                            // Legacy ANSI HDROP entries still have to enter the UTF-8 path cache.
+                            WCHAR wide[MAX_PATH];
+                            if (ConvertA2U(fileA, -1, wide, _countof(wide), CP_ACP) &&
+                                ConvertWideToUtf8(wide, -1, path, MAX_PATH))
+                                ret = TRUE;
                         }
                     }
 
@@ -1674,7 +1677,7 @@ public:
             if (path != NULL)
             {
                 if (UseUnicode)
-                    path = ConvertAllocU2A((const WCHAR*)path, -1);
+                    path = ConvertAllocU2A((const WCHAR*)path, -1, FALSE, CP_UTF8);
                 if (path != NULL)
                 {
                     // zmenim cestu
@@ -2022,7 +2025,7 @@ CPanelStatusBar::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                         }
 
                         CImpIDropSource* dropSource = new CImpIDropSource(FALSE);
-                        IDataObject* dataObject = new CTextDataObject(h);
+                        IDataObject* dataObject = new CTextDataObject(h, TRUE);
                         if (IDropTargetPtr != NULL)
                             ((CTextDropTarget*)IDropTargetPtr)->SetForbiddenDataObject(dataObject);
                         if (dataObject != NULL && dropSource != NULL)
