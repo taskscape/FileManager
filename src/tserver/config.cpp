@@ -18,8 +18,8 @@
 #include "registry.h"
 #include "config.h"
 
-// Trace Server settings follow the name presented to users.
-#define PATH_SOFTWARE_TSERVER L"Software\\File Manager\\Trace Server"
+// Keep the persisted identity stable so upgrades retain configuration and column settings.
+#define PATH_SOFTWARE_TSERVER L"Software\\Open Salamander\\Trace Server"
 
 CRegistry Registry;
 CConfigData ConfigData;
