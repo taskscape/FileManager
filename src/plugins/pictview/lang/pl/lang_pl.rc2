@@ -519,7 +519,7 @@ STRINGTABLE
   IDS_OPENFILTER, "Popularne pliki graficzne (*.bmp;*.dib;*.gif;*.ico;*.jpg;*.jpeg;*.png;*.tif;*.tiff;*.dds;*.heic;*.webp;*.avif)|*.bmp;*.dib;*.gif;*.ico;*.jpg;*.jpeg;*.png;*.tif;*.tiff;*.dds;*.heic;*.webp;*.avif|Wszystkie pliki (*.*)|*.*|"
   IDS_CUSTOM_COLOR, "&Własny kolor..."
   IDS_AUTOMATIC_COLOR, "&Kolor automatyczny"
-  IDS_SAL_IS_BUSY, "Program Open Salamander jest zajęty. Żądanego polecenia nie można wykonać, spróbuj ponownie później."
+  IDS_SAL_IS_BUSY, "Program File Manager jest zajęty. Żądanego polecenia nie można wykonać, spróbuj ponownie później."
   IDS_RENAME_TO, "Zmień nazwę pliku ""%s"" na"
   IDS_ERRORRENAMINGFILE, "Błąd zmiany nazwy pliku"
   IDS_TOOLONGNAME, "Nie można ukończyć operacji z powodu zbyt długiej nazwy."

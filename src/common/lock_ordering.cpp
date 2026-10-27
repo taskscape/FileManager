@@ -29,7 +29,7 @@ static void ReportLockWaitTimeout(CRITICAL_SECTION* criticalSection, CLockRank r
 
     // Avoid trace infrastructure here: a diagnostic must not acquire another application lock while one is stalled.
     _snprintf_s(message, _countof(message), _TRUNCATE,
-                "Open Salamander lock wait timeout: waiter=%lu lock=%s rank=%d owner=%lu recursion=%ld held-rank=%d timeout-ms=%lu\n",
+                "File Manager lock wait timeout: waiter=%lu lock=%s rank=%d owner=%lu recursion=%ld held-rank=%d timeout-ms=%lu\n",
                 waiterThreadId, lockName != NULL ? lockName : "unnamed", (int)rank, ownerThreadId, recursionCount,
                 (int)heldRank, timeoutMilliseconds);
     OutputDebugStringA(message);

@@ -117,7 +117,7 @@ BEGIN
     BEGIN
         MENUITEM "Przeglądaj…",                 ID_BROWSE
         MENUITEM SEPARATOR
-        MENUITEM "Katalog programu Salamander", ID_SALDIR
+        MENUITEM "Katalog programu File Manager", ID_SALDIR
         MENUITEM "Zmienna środowiskowa",        ID_ENVVAR
     END
 END
@@ -176,7 +176,7 @@ STRINGTABLE
 BEGIN
     IDS_ABORTCAPTION        "Przerwanie skryptu"
     IDS_ABORTTIP            "Przerwij uruchomiony skrypt\tCtrl+Break"
-    IDS_MAINWINDOWLOCKED    "Okno programu Open Salamander jest zablokowane przez wtyczkę Automation. Dokończ wykonywany skrypt."
+    IDS_MAINWINDOWLOCKED    "Okno programu File Manager jest zablokowane przez wtyczkę Automation. Dokończ wykonywany skrypt."
     IDS_ENGINECREATEFAIL    "Nie można zainicjalizować aparatu skryptów."
 END
 

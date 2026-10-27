@@ -5,7 +5,7 @@ The imported source archive is `7z2602-src.7z` from
 `https://github.com/ip7z/7zip/releases/download/26.02/7z2602-src.7z` with SHA-256
 `C7502DD4557481F52CCF1B3E680329F1FDD207E79A25544AFEB3106325474944`.
 
-Open Salamander keeps three compatibility seams: the ANSI file-name boundary, the
+File Manager keeps three compatibility seams: the ANSI file-name boundary, the
 two worker-thread crash-stack hooks, and the `7zwrapper` `CompressFiles` export used
 by crash-report packaging. The old corrupt-output ordering patch was deliberately
 not reapplied because upstream's modern extraction path already closes/flushed

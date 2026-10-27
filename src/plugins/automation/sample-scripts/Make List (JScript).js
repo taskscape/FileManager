@@ -2,7 +2,7 @@
 	Make List (JScript).js
 	Creates the CSV list from the selected items.
 
-	Sample Open Salamander Automation Script.
+	Sample File Manager Automation Script.
 
 	www.manison.cz
 */

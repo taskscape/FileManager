@@ -163,7 +163,7 @@ BOOL ExportReleaseDiagnosticRingBuffer(const char* fileName)
     if (file == INVALID_HANDLE_VALUE)
         return FALSE;
 
-    const char* header = "Open Salamander release diagnostic ring buffer (sanitized; paths and file names are excluded):\r\n";
+    const char* header = "File Manager release diagnostic ring buffer (sanitized; paths and file names are excluded):\r\n";
     BOOL result = WriteDiagnosticText(file, header);
     if (result)
         EnumerateReleaseDiagnosticEntries([&](const CReleaseDiagnosticEntry& entry) {

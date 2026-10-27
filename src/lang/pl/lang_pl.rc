@@ -60,7 +60,7 @@ END
 
 IDD_BETAEXPIRED DIALOGEX 84, 53, 291, 80
 STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
-CAPTION "Open Salamander"
+CAPTION "File Manager"
 FONT 8, "MS Shell Dlg", 400, 0, 0x1
 BEGIN
     DEFPUSHBUTTON   "Zakoń&cz",IDCANCEL,92,57,50,14,WS_GROUP
@@ -103,7 +103,7 @@ FONT 8, "MS Shell Dlg", 400, 0, 0x1
 BEGIN
     CONTROL         "&Czyść atrybut tylko do odczytu przy kopiowaniu z dysku kompaktowego",IDC_CLEARREADONLY,
                     "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,1,3,209,12
-    CONTROL         "Z&ezwól tylko na jedno wystąpienie programu Salamander jednocześnie",IDC_ONLYONEINSTANCE,
+    CONTROL         "Z&ezwól tylko na jedno wystąpienie programu File Manager jednocześnie",IDC_ONLYONEINSTANCE,
                     "Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,29,182,12
     CONTROL         "&Użyj sygnału dźwiękowego głośnika do ogłaszania zakończenia pracy w nieaktywnym oknie",IDC_MINBEEPWHENDONE,
                     "Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,42,238,12
@@ -140,7 +140,7 @@ BEGIN
     GROUPBOX        " Tabele konwersji strony kodowej ",IDC_STATIC_2,1,77,295,40
     LTEXT           "Aby wyświetlić lub zmienić tabele konwersji używane w przeglądarkach i poleceniu Konwertuj, kliknij przycisk Szczegóły.",IDC_STATIC_3,8,91,220,16
     PUSHBUTTON      "Sz&czegóły...",IDB_CONVERSION,237,93,52,14,WS_GROUP
-    LTEXT           "Wybierz język dla programu Open Salamander. Ustawienie wpływa na język tekstu wyświetlanego w oknach dialogowych, menu, paskach narzędzi i pomocach.",IDC_STATIC_4,8,17,281,16
+    LTEXT           "Wybierz język dla programu File Manager. Ustawienie wpływa na język tekstu wyświetlanego w oknach dialogowych, menu, paskach narzędzi i pomocach.",IDC_STATIC_4,8,17,281,16
     LTEXT           "",IDC_CFGREG_INCOMPLETE_TITLE,5,153,287,8
     LTEXT           "",IDC_CFGREG_INCOMPLETE_TEXT,5,165,287,16
     LTEXT           "",IDC_CFGREG_INCOMPLETE_URL,5,185,287,8
@@ -218,7 +218,7 @@ BEGIN
     LTEXT           "Pozycja okna",IDC_STATIC_5,1,43,57,8
     CONTROL         "",IDC_STATIC_16,"Static",SS_ETCHEDHORZ | WS_GROUP,60,47,236,1
     CONTROL         "&Zapisuj przy zamykaniu",IDC_SAVEONCLOSE,"Button",BS_AUTORADIOBUTTON | WS_GROUP | WS_TABSTOP,10,54,63,12
-    CONTROL         "U&staw na pozycję okna głównego programu Salamander",IDC_SETBYMAINWINDOW,
+    CONTROL         "U&staw na pozycję okna głównego programu File Manager",IDC_SETBYMAINWINDOW,
                     "Button",BS_AUTORADIOBUTTON,86,54,163,12
     LTEXT           "Opcje ogólne",IDC_STATIC_6,1,71,56,8
     CONTROL         "",IDC_STATIC_17,"Static",SS_ETCHEDHORZ | WS_GROUP,59,75,237,1
@@ -636,7 +636,7 @@ BEGIN
     LTEXT           "Copyright © 1997-2026 Taskscape Ltd",IDC_STATIC_1,10,97,196,8
     LTEXT           "WWW:",IDC_STATIC_3,10,108,20,8
     LTEXT           "www.taskscape.com",IDC_ABOUT_WWW,31,108,64,8,WS_TABSTOP
-    LTEXT           "Open Salamander jest wolnym oprogramowaniem",IDC_STATIC_4,10,119,165,8
+    LTEXT           "File Manager jest wolnym oprogramowaniem",IDC_STATIC_4,10,119,165,8
     LTEXT           "Na licencji Powszechnej Licencji Publicznej GNU w wersji 2 lub nowszej",IDC_STATIC_5,10,130,214,8
     CONTROL         "",IDC_ABOUT_BOTTOM,"Static",SS_ETCHEDHORZ | WS_GROUP,2,154,294,1
 END
@@ -860,7 +860,7 @@ BEGIN
     CONTROL         "",IDC_STATIC_7,"Static",SS_ETCHEDHORZ | WS_GROUP,55,125,238,1
     CONTROL         "Użyj au&tomatycznego odświeżania",IDC_DRVSPEC_REMOTEMON,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,13,131,104,12
     CONTROL         "Użyj prosty&ch ikon",IDC_DRVSPEC_REMOTESIMPLE,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,13,143,69,12
-    CONTROL         "&Nie odświeżaj przy aktywacji programu Salamander (odświeżenie ręczne może być konieczne)",IDC_DRVSPEC_REMOTEACT,
+    CONTROL         "&Nie odświeżaj przy aktywacji programu File Manager (odświeżenie ręczne może być konieczne)",IDC_DRVSPEC_REMOTEACT,
                     "Button",BS_AUTOCHECKBOX | WS_TABSTOP,13,155,276,12
     LTEXT           "Jeśli ścieżka w panelu jest niedostęp&na, przejdź do:",IDC_STATIC_9,1,180,128,8
     EDITTEXT        IDE_DRVSPEC_ONERRGOTO,130,178,146,12,ES_AUTOHSCROLL | WS_GROUP
@@ -1116,7 +1116,7 @@ CAPTION "Okno główne"
 FONT 8, "MS Shell Dlg", 400, 0, 0x1
 BEGIN
     CONTROL         "Pokazuj ekran &powitalny przy uruchomieniu",IDC_SPLASHSCREEN,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,3,113,12
-    CONTROL         "Pokazuj &ikonę Open Salamander w obszarze powiadomień paska zadań",IDC_STATUSAREA,
+    CONTROL         "Pokazuj &ikonę File Manager w obszarze powiadomień paska zadań",IDC_STATUSAREA,
                     "Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,17,217,12
     CONTROL         "&Wyświetlaj bieżącą ścieżkę w tytule okna głównego jako:",IDC_TITLEBAR_PATH,
                     "Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,31,162,12
@@ -1164,7 +1164,7 @@ STYLE DS_SETFONT | DS_FIXEDSYS | DS_CONTROL | WS_CHILD | WS_CAPTION
 CAPTION "Klawiatura"
 FONT 8, "MS Shell Dlg", 400, 0, 0x1
 BEGIN
-    LTEXT           "Skróty klawiszowe poleceń Open Salamander nie mogą być zmieniane w tej wersji.",IDC_STATIC_1,2,4,264,8
+    LTEXT           "Skróty klawiszowe poleceń File Manager nie mogą być zmieniane w tej wersji.",IDC_STATIC_1,2,4,264,8
     LTEXT           "Obszerną listę skrótów klawiszowych znajdziesz w",IDC_STATIC_2,2,17,196,8
     LTEXT           "pomoc",IDC_KEYBOARD_SHORTCUTS,198,17,17,8,WS_TABSTOP
     LTEXT           "Możesz zdefiniować skróty klawiszowe dla poleceń wtyczek:\r  1. Z menu Wtyczki wybierz polecenie Menedżer wtyczek\r  2. Wybierz żądaną wtyczkę\r  3. Kliknij przycisk Klawiatura",IDC_STATIC_3,2,31,282,32
@@ -1193,10 +1193,10 @@ END
 
 IDD_TASKLIST DIALOGEX 12, 24, 324, 149
 STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
-CAPTION "Lista zadań Open Salamander"
+CAPTION "Lista zadań File Manager"
 FONT 8, "MS Shell Dlg", 400, 0, 0x1
 BEGIN
-    LTEXT           "&Lista uruchomionych zadań Open Salamander:",IDC_STATIC_1,6,4,150,8
+    LTEXT           "&Lista uruchomionych zadań File Manager:",IDC_STATIC_1,6,4,150,8
     LISTBOX         IDC_SALAMLIST,6,14,252,129,LBS_NOINTEGRALHEIGHT | WS_GROUP | WS_TABSTOP
     DEFPUSHBUTTON   "&Wyróżnij",IDB_SHOWTASK,267,14,50,14,WS_GROUP
     PUSHBUTTON      "&Przerwij...",IDB_BREAKTASK,267,33,50,14
@@ -1560,7 +1560,7 @@ BEGIN
     DEFPUSHBUTTON   "OK",IDOK,36,109,50,14,WS_GROUP
     PUSHBUTTON      "Anuluj",IDCANCEL,94,109,50,14
     PUSHBUTTON      "Pomoc",IDHELP,152,109,50,14
-    LTEXT           "Wraz ze wzrostem poziomu zaawansowania będziesz stopniowo zyskiwać kontrolę nad pełną mocą Open Salamander.",IDC_STATIC_2,6,28,224,16
+    LTEXT           "Wraz ze wzrostem poziomu zaawansowania będziesz stopniowo zyskiwać kontrolę nad pełną mocą File Manager.",IDC_STATIC_2,6,28,224,16
 END
 
 IDD_CFGPAGE_HISTORY DIALOGEX 65, 18, 299, 231
@@ -1568,7 +1568,7 @@ STYLE DS_SETFONT | DS_FIXEDSYS | DS_CONTROL | WS_CHILD | WS_CAPTION
 CAPTION "Historia"
 FONT 8, "MS Shell Dlg", 400, 0, 0x1
 BEGIN
-    LTEXT           "Możesz wybrać, czy ostatnio używane wartości (historia) będą zapisywane w rejestrze jako część konfiguracji Open Salamander i wtyczek.",IDC_STATIC_2,1,4,254,16
+    LTEXT           "Możesz wybrać, czy ostatnio używane wartości (historia) będą zapisywane w rejestrze jako część konfiguracji File Manager i wtyczek.",IDC_STATIC_2,1,4,254,16
     CONTROL         "&Zapisuj historię",IDC_HISTORY_SAVEHISTORY,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,1,24,54,12
     CONTROL         "Zapisuj listę &katalogów roboczych",IDC_HISTORY_WORKDIRS,
                     "Button",BS_AUTOCHECKBOX | WS_TABSTOP,11,37,118,12
@@ -1742,11 +1742,11 @@ END
 
 IDD_EXITINGOPENSAL DIALOGEX 10, 24, 259, 88
 STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
-CAPTION "Zamykanie Open Salamander"
+CAPTION "Zamykanie File Manager"
 FONT 8, "MS Shell Dlg", 400, 0, 0x1
 BEGIN
     DEFPUSHBUTTON   "Anuluj",IDCANCEL,195,67,50,14
-    LTEXT           "Nie można zamknąć Open Salamander, dopóki wszystkie operacje dyskowe nie zostaną zakończone. Poczekaj, aż te operacje się zakończą, lub anuluj je teraz. Jeśli nie chcesz teraz zamykać Open Salamander, naciśnij przycisk Anuluj.",IDC_STATIC_1,8,9,244,32
+    LTEXT           "Nie można zamknąć File Manager, dopóki wszystkie operacje dyskowe nie zostaną zakończone. Poczekaj, aż te operacje się zakończą, lub anuluj je teraz. Jeśli nie chcesz teraz zamykać File Manager, naciśnij przycisk Anuluj.",IDC_STATIC_1,8,9,244,32
     LTEXT           "Liczba uruchomionych operacji:",IDC_STATIC_2,8,45,107,8
     LTEXT           "",IDT_RUNNINGOPERS,116,45,60,8
     PUSHBUTTON      "Anuluj &wszystkie operacje",IDB_CANCELALLOPERS,13,67,86,14,WS_GROUP
@@ -1755,20 +1755,20 @@ END
 
 IDD_COMPATIBILITY_MODE DIALOGEX 35, 37, 254, 148
 STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
-CAPTION "Open Salamander"
+CAPTION "File Manager"
 FONT 8, "MS Shell Dlg", 400, 0, 0x1
 BEGIN
     DEFPUSHBUTTON   "&Tak",IDOK,71,127,50,14,WS_GROUP
     PUSHBUTTON      "&Nie",IDCANCEL,132,127,50,14
-    LTEXT           "Wygląda na to, że uruchamiasz Open Salamander w trybie zgodności.",IDC_STATIC_1,8,7,234,8
-    LTEXT           "Może to prowadzić do niestabilności Open Salamander lub powodować inne problemy.",IDC_STATIC_2,8,16,239,8
+    LTEXT           "Wygląda na to, że uruchamiasz File Manager w trybie zgodności.",IDC_STATIC_1,8,7,234,8
+    LTEXT           "Może to prowadzić do niestabilności File Manager lub powodować inne problemy.",IDC_STATIC_2,8,16,239,8
     LTEXT           "Możesz wyłączyć tryb zgodności:",IDC_STATIC_3,8,31,131,8
-    LTEXT           "1) Kliknij ikonę Open Salamander prawym przyciskiem myszy",IDC_STATIC_4,17,41,184,8
+    LTEXT           "1) Kliknij ikonę File Manager prawym przyciskiem myszy",IDC_STATIC_4,17,41,184,8
     LTEXT           "2) Kliknij Właściwości",IDC_STATIC_5,17,50,130,8
     LTEXT           "3) Kliknij kartę Zgodność",IDC_STATIC_9,17,59,118,8
     LTEXT           "4) Odznacz Uruchom ten program w trybie zgodności",IDC_STATIC_6,17,69,223,8
-    LTEXT           "Uwaga: jeśli nie możesz tego wyłączyć, uruchom Open Salamander, otwórz menu Pomoc, wybierz pozycję Pomoc techniczna i wyślij nam raport o błędzie.",IDC_STATIC_7,8,85,239,16
-    LTEXT           "Czy chcesz uruchomić Open Salamander?",IDC_STATIC_8,8,109,137,8
+    LTEXT           "Uwaga: jeśli nie możesz tego wyłączyć, uruchom File Manager, otwórz menu Pomoc, wybierz pozycję Pomoc techniczna i wyślij nam raport o błędzie.",IDC_STATIC_7,8,85,239,16
+    LTEXT           "Czy chcesz uruchomić File Manager?",IDC_STATIC_8,8,109,137,8
 END
 
 IDD_CONFIRMADSLOSS DIALOGEX 15, 34, 352, 100
@@ -1995,7 +1995,7 @@ CAPTION "Zabezpieczenia"
 FONT 8, "MS Shell Dlg", 400, 0, 0x1
 BEGIN
     GROUPBOX        " Hasło główne ",IDC_STATIC_1,1,4,293,77
-    LTEXT           "Hasło główne służy do ochrony poufnych informacji, takich jak hasła FTP lub WinSCP, przy użyciu silnego szyfru AES. Jeśli utworzysz hasło główne, zostaniesz poproszony o jego podanie raz na sesję, gdy Open Salamander pobiera chronione informacje.",IDC_STATIC_2,9,20,267,32
+    LTEXT           "Hasło główne służy do ochrony poufnych informacji, takich jak hasła FTP lub WinSCP, przy użyciu silnego szyfru AES. Jeśli utworzysz hasło główne, zostaniesz poproszony o jego podanie raz na sesję, gdy File Manager pobiera chronione informacje.",IDC_STATIC_2,9,20,267,32
     CONTROL         "&Używaj hasła głównego",IDC_SEC_ENABLE_MASTERPWD,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,9,60,168,12
     PUSHBUTTON      "Zmień &hasło główne...",IDC_SEC_CHANGE_MASTERPWD,180,59,104,14
 END
@@ -2068,10 +2068,10 @@ END
 
 IDD_SALMON_MAIN DIALOGEX 81, 47, 351, 215
 STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
-CAPTION "Zgłaszanie błędów Open Salamander"
+CAPTION "Zgłaszanie błędów File Manager"
 FONT 8, "MS Shell Dlg", 400, 0, 0x1
 BEGIN
-    LTEXT           "Wystąpił problem, który zmusił Open Salamander do zamknięcia. Aby pomóc nam uniknąć podobnych problemów w przyszłości, wyślij poniższy raport o błędzie.",IDC_SALMON_INTRO,8,9,336,16
+    LTEXT           "Wystąpił problem, który zmusił File Manager do zamknięcia. Aby pomóc nam uniknąć podobnych problemów w przyszłości, wyślij poniższy raport o błędzie.",IDC_SALMON_INTRO,8,9,336,16
     // Split the disclosure into fixed lines so the Polish translation stays within RC's string limit.
     LTEXT           "Zgoda: Wyślij raport przesyła archiwum awarii (zrzut,",IDC_SALMON_PRIVACY,8,31,336,8
     LTEXT           "opcjonalny opis i adres e-mail) na reports.taskscape.com przez HTTPS.",IDC_SALMON_PRIVACY_LINE2,8,37,336,8
@@ -2084,7 +2084,7 @@ BEGIN
     EDITTEXT        IDC_SALMON_ACTION,8,94,336,54,ES_MULTILINE | ES_AUTOVSCROLL | ES_AUTOHSCROLL | ES_WANTRETURN | WS_VSCROLL
     LTEXT           "&Adres e-mail kontaktowy:",IDC_SALMON_EMAIL_LABEL,8,159,50,8
     EDITTEXT        IDC_SALMON_EMAIL,8,169,336,14,ES_AUTOHSCROLL
-    CONTROL         "&Uruchom ponownie Open Salamander",IDC_SALMON_RESTART,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,8,193,98,10
+    CONTROL         "&Uruchom ponownie File Manager",IDC_SALMON_RESTART,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,8,193,98,10
     DEFPUSHBUTTON   "&Wyślij raport",IDOK,158,191,90,14
     PUSHBUTTON      "&Nie wysyłaj raportu",IDCANCEL,254,191,90,14
 END

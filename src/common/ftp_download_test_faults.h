@@ -83,7 +83,7 @@ private:
     BOOL Claim(const WCHAR* required)
     {
         if (Environment(L"FILEMANAGER_UI_ISOLATED") != L"1" ||
-            Environment(L"FILEMANAGER_UI_CONFIG_ROOT") != L"Software\\Open Salamander\\6.0-filemanager-testdata") return FALSE;
+            Environment(L"FILEMANAGER_UI_CONFIG_ROOT") != L"Software\\File Manager\\6.0-filemanager-testdata") return FALSE;
         const std::wstring requested = Environment(L"FILEMANAGER_UI_FTP_FAULT");
         if (requested != L"pause" && requested != L"flush" && requested != L"metadata" &&
             requested != L"commit" && requested != L"close" && requested != L"admission" &&

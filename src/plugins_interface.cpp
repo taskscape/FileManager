@@ -1624,12 +1624,12 @@ void CPlugins::Load(HWND parent, HKEY regKey)
         if (!AddPlugin("ZIP", "zip\\zip.spl",
                        TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, FALSE, FALSE, FALSE, "1.32",
                        "Copyright © 2000-2023 Taskscape Ltd",
-                       "ZIP archives support for Open Salamander.",
+                       "ZIP archives support for File Manager.",
                        "ZIP", "zip;pk3;jar", NULL, FALSE, NULL, NULL) ||
             !AddPlugin("TAR", "tar\\tar.spl",
                        TRUE, FALSE, FALSE, TRUE, FALSE, TRUE, TRUE, FALSE, FALSE, "3.3",
                        "Copyright © 1999-2023 Taskscape Ltd",
-                       "Unix archives readonly support for Open Salamander.",
+                       "Unix archives readonly support for File Manager.",
                        "TAR", "tar;tgz;taz;tbz;gz;bz;bz2;z;rpm;cpio", NULL, FALSE, NULL, NULL) ||
             !AddPlugin("PAK", "pak\\pak.spl",
                        TRUE, TRUE, TRUE, TRUE, FALSE, FALSE, FALSE, FALSE, FALSE, "1.68",
@@ -1639,7 +1639,7 @@ void CPlugins::Load(HWND parent, HKEY regKey)
             !AddPlugin("Internet Explorer Viewer", "ieviewer\\ieviewer.spl",
                        FALSE, FALSE, FALSE, FALSE, FALSE, TRUE, TRUE, FALSE, FALSE,
                        "1.1", "Copyright © 1999-2023 Taskscape Ltd",
-                       "Internet Explorer Viewer for Open Salamander.",
+                       "Internet Explorer Viewer for File Manager.",
                        "IEVIEWER", "", NULL, FALSE, NULL, NULL))
         {
             HANDLES(EnterCriticalSection(&DataCS));

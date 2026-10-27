@@ -74,7 +74,7 @@ STRINGTABLE
   IDS_UPDATE_NOT_SUPPORTED,   "Operacje aktualizacji nie są obsługiwane dla tego archiwum."
   IDS_CANT_MOVE_TMPARCHIVE,   "Nie można przenieść archiwum tymczasowego '%s'."
   IDS_CANT_DELETE_TMPARCHIVE, "Nie można usunąć archiwum tymczasowego '%s'."
-  IDS_7Z_UPDATE_ERROR,        "Podczas aktualizacji archiwum wystąpił błąd.\n\nNie jest to błąd wtyczki 7zip programu Open Salamander. Problem leży w bibliotece 7za.dll,\nwięc prosimy NIE wysyłać nam zgłoszeń błędów — wiemy o tym problemie."
+  IDS_7Z_UPDATE_ERROR,        "Podczas aktualizacji archiwum wystąpił błąd.\n\nNie jest to błąd wtyczki 7zip programu File Manager. Problem leży w bibliotece 7za.dll,\nwięc prosimy NIE wysyłać nam zgłoszeń błędów — wiemy o tym problemie."
   IDS_7Z_SOLID_DELETE_UNSUP,  "Usuwanie plików z archiwów solid nie jest obsługiwane."
   IDS_CANT_UPDATE_ARCHIVE,    "Nie można zaktualizować archiwum '%s'."
   IDS_CANT_CREATE_TMPFILE,    "Nie można utworzyć pliku tymczasowego."

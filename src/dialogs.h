@@ -1124,7 +1124,7 @@ public:
     CWaitWindow(HWND hParent, int textResID, BOOL showCloseButton, CObjectOrigin origin = ooAllocated, BOOL showProgressBar = FALSE);
     ~CWaitWindow();
 
-    void SetCaption(const char* text); // if not called, the caption will be "Open Salamander"
+    void SetCaption(const char* text); // if not called, the caption will be "File Manager"
     void SetText(const char* text);
     void SetWidthMultiplier(int multiplier); // must be called before Create(); 1 keeps the window sized to the text
     void SetTextWidthPercent(int percent); // must be called before Create(); 100 keeps the measured text width

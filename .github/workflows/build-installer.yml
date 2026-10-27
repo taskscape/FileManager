@@ -37,7 +37,7 @@ jobs:
       OPENSAL_BUILD_DIR: '${{ github.workspace }}\build_stage\'
       FILEMANAGER_UI_ISOLATED: '1'
       # The deterministic release suite uses a disposable profile namespace.
-      FILEMANAGER_UI_CONFIG_ROOT: 'Software\Open Salamander\6.0-filemanager-testdata'
+      FILEMANAGER_UI_CONFIG_ROOT: 'Software\File Manager\6.0-filemanager-testdata'
       FILEMANAGER_UI_CONFIG_FAULT_INJECTION: '1'
       FILEMANAGER_UI_RECYCLE_BIN: '1'
 
@@ -189,7 +189,7 @@ jobs:
         with:
           # Artifact immutability prevents publish from receiving a rebuilt installer.
           name: release-installer-${{ github.sha }}
-          path: Installer\Output\OpenSalamander_6.0.${{ github.run_number }}.exe
+          path: Installer\Output\FileManager_6.0.${{ github.run_number }}.exe
           if-no-files-found: error
 
       - name: Preserve private symbols for crash analysis
@@ -227,8 +227,8 @@ jobs:
         uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
         env:
           RELEASE_TAG: 6.0.${{ github.run_number }}
-          RELEASE_NAME: Open Salamander 6.0.${{ github.run_number }}
-          INSTALLER_PATH: Installer/Output/OpenSalamander_6.0.${{ github.run_number }}.exe
+          RELEASE_NAME: File Manager 6.0.${{ github.run_number }}
+          INSTALLER_PATH: Installer/Output/FileManager_6.0.${{ github.run_number }}.exe
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           # Retry transient GitHub API/upload failures without masking authentication or validation errors.

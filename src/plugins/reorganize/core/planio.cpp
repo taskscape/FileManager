@@ -455,7 +455,7 @@ std::string SavePlanJson(const CPlanDocument& plan)
         root.Object["createdOn"] = CJsonValue::MakeStringW(plan.CreatedOn);
     CJsonValue app;
     app.Kind = JsonObject;
-    app.Object["name"] = CJsonValue::MakeString("Open Salamander");
+    app.Object["name"] = CJsonValue::MakeString("File Manager");
     app.Object["version"] = CJsonValue::MakeStringW(plan.ApplicationVersion.empty() ? L"6.0" : plan.ApplicationVersion);
     app.Object["pluginVersion"] = CJsonValue::MakeStringW(plan.PluginVersion.empty() ? L"1.0" : plan.PluginVersion);
     root.Object["application"] = app;

@@ -150,7 +150,7 @@
 			<param name="Local" value="hh\salamand\dlgboxes_setspeedlim.htm">
 			</OBJECT>
 		<LI> <OBJECT type="text/sitemap">
-			<param name="Name" value="Open Salamander Task List">
+			<param name="Name" value="File Manager Task List">
 			<param name="Local" value="hh\salamand\dlgboxes_tasks.htm">
 			</OBJECT>
 		<LI> <OBJECT type="text/sitemap">
@@ -603,7 +603,7 @@
 		<param name="Local" value="hh\salamand\customize_arccfg.htm">
 		</OBJECT>
 	<LI> <OBJECT type="text/sitemap">
-		<param name="Name" value="Configuring Open Salamander">
+		<param name="Name" value="Configuring File Manager">
 		<param name="Local" value="hh\salamand\customize_configuration.htm">
 		</OBJECT>
 	<LI> <OBJECT type="text/sitemap">
@@ -707,7 +707,7 @@
 		<param name="Local" value="hh\salamand\appendix_filesystems.htm">
 		</OBJECT>
 	<LI> <OBJECT type="text/sitemap">
-		<param name="Name" value="Open Salamander">
+		<param name="Name" value="File Manager">
 		<param name="Local" value="hh\salamand\introduction_intro.htm">
 		</OBJECT>
 	<LI> <OBJECT type="text/sitemap">
@@ -803,7 +803,7 @@
 		<param name="Local" value="hh\salamand\othertask_shell.htm">
 		</OBJECT>
 	<LI> <OBJECT type="text/sitemap">
-		<param name="Name" value="Open Salamander Task List">
+		<param name="Name" value="File Manager Task List">
 		<param name="Local" value="hh\salamand\othertask_tasklist.htm">
 		</OBJECT>
 	<LI> <OBJECT type="text/sitemap">

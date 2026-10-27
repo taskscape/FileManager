@@ -155,8 +155,8 @@ void mainCRTStartup()
     {
         DWORD written;
         WriteFile(GetStdHandle(STD_OUTPUT_HANDLE),
-                  "SALSPAWN: Spawn for Open Salamander, Copyright (C) 1998-2023 Taskscape Ltd\n\nUsage: salspawn [-|/<switch>] <executable> [exe params]\n\nAvailable switches:\n  ?,h,H - this help screen\n  c<num> - sets base of SALSPAWN error level to <num>\n\n",
-                  221, &written, NULL);
+                  "SALSPAWN: Spawn for File Manager, Copyright (C) 1998-2023 Taskscape Ltd\n\nUsage: salspawn [-|/<switch>] <executable> [exe params]\n\nAvailable switches:\n  ?,h,H - this help screen\n  c<num> - sets base of SALSPAWN error level to <num>\n\n",
+                  218, &written, NULL);
         ExitProcess(retBase + 1);
     }
 

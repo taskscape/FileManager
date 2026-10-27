@@ -305,6 +305,6 @@ STRINGTABLE
   IDS_EXP_DOSSYSDIR, "Katalog systemowy DOS"
   IDS_EXP_ENVVAR, "Zmienna środowiskowa"
   IDS_EXP_BROWSE, "Przeglądaj..."
-  IDS_EXP_SALDIR, "Katalog Salamandera"
+  IDS_EXP_SALDIR, "Katalog File Managera"
   IDS_CFG_CONFLICT, "Konfiguracja jest już otwarta."
 }

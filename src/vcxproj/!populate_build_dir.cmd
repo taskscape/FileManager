@@ -6,7 +6,7 @@ set MSVC_REDIST_PATH=C:\Program Files\Microsoft Visual Studio\2022\Community\VC\
 set UCRT_REDIST_PATH=C:\Program Files (x86)\Windows Kits\10\Redist\10.0.22621.0
 set UCRTD_REDIST_PATH=C:\Program Files (x86)\Microsoft SDKs\Windows Kits\10\ExtensionSDKs\Microsoft.UniversalCRT.Debug\10.0.22621.0
 
-echo Populate Open Salamander Build directory with redistributable DLLs and optionally
+echo Populate File Manager Build directory with redistributable DLLs and optionally
 echo with SFX packages and helps.
 echo.
 echo Please UPDATE paths to redistributable DLLs MANUALLY for VC2022 and last SDK:

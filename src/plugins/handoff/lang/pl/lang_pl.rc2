@@ -33,7 +33,7 @@ STRINGTABLE
  IDS_MENU_VALIDATE "Sprawdź &specyfikację..."
  IDS_MENU_NEWSPEC "&Nowa specyfikacja z szablonu..."
  IDS_TITLE "Przekazanie dostawy"
- IDS_ERR_BUSY "Open Salamander jest zajęty. Spróbuj ponownie później."
+ IDS_ERR_BUSY "File Manager jest zajęty. Spróbuj ponownie później."
  IDS_ERR_START "Nie można otworzyć okna z powodu braku zasobów systemowych."
  IDS_COL_VARIABLE "Zmienna"
  IDS_COL_VALUE "Wartość"

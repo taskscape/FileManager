@@ -27,7 +27,8 @@
 
 #include <strsafe.h>
 
-const char* SALAMANDER_TEXT_VERSION = "Open Salamander " VERSINFO_VERSION;
+// Message-box caption. The version is appended to the name presented to users.
+const char* SALAMANDER_TEXT_VERSION = "File Manager " VERSINFO_VERSION;
 
 //****************************************************************************
 //

@@ -6,7 +6,7 @@
     type="win32"
     version="1.0.2.0">
 </assemblyIdentity>
-<description>SalSpawn, Spawn for Open Salamander</description>
+<description>SalSpawn, Spawn for File Manager</description>
 <trustInfo xmlns="urn:schemas-microsoft-com:asm.v3">
   <security>
   <requestedPrivileges>

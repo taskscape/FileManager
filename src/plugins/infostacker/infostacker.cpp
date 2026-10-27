@@ -219,7 +219,7 @@ std::wstring BaseUrl()
     GetEnvironmentVariableW(L"FILEMANAGER_UI_CONFIG_ROOT", root, _countof(root));
     DWORD length = GetEnvironmentVariableW(L"FILEMANAGER_UI_INFOSTACKER_URL", url, _countof(url));
     if (wcscmp(isolated, L"1") == 0 &&
-        wcscmp(root, L"Software\\Open Salamander\\6.0-filemanager-testdata") == 0 && length && length < _countof(url))
+        wcscmp(root, L"Software\\File Manager\\6.0-filemanager-testdata") == 0 && length && length < _countof(url))
     {
         std::wstring value(url);
         const std::wstring prefix = L"http://127.0.0.1:";

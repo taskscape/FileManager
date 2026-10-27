@@ -119,7 +119,7 @@ static BOOL IsSandboxedConfigurationFaultTest()
     std::string root;
     // Fault injection may terminate a process only when the dedicated configuration key is explicitly selected.
     return ReadConfigurationFaultEnvironment("FILEMANAGER_UI_CONFIG_ROOT", &root) == cferSuccess &&
-           root == "Software\\Open Salamander\\6.0-filemanager-testdata";
+           root == "Software\\File Manager\\6.0-filemanager-testdata";
 }
 
 static BOOL IsConfigurationWriteFaultArmed()

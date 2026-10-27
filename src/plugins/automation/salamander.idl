@@ -1,5 +1,5 @@
 /*
-	Automation Plugin for Open Salamander
+	Automation Plugin for File Manager
 	
 	Copyright (c) 2009-2023 Milan Kase <manison@manison.cz>
 	Copyright (c) 2010-2023 Taskscape Ltd
@@ -23,7 +23,7 @@ interface ISalamanderScriptInfo;
 
 /// \brief Salamander Object
 ///
-/// The \b Salamander object is the root object of the Open Salamander
+/// The \b Salamander object is the root object of the File Manager
 /// Automation object model hierarchy. It never needs to be instantiated
 /// before invoking its properties and methods, and it is always available
 /// from any script file.
@@ -197,7 +197,7 @@ interface ISalamander : IUnknown
 	HRESULT TargetPanel(
 		[out, retval] ISalamanderPanel **panel);
 
-	/// \brief Gets the Open Salamander version number. 
+	/// \brief Gets the File Manager version number. 
 	[id(6), propget]
 	HRESULT Version(
 		[out, retval] int *version);
@@ -306,9 +306,9 @@ interface ISalamander : IUnknown
 	/// \return This method does not return a value.
 	///
 	/// \remarks The Trace Server is the debugging tool available
-	///          as a part of Preview Build Open Salamander installations
-	///          or as a part of the Open Salamander Plugin SDK.
-	///          In release versions of the Open Salamander this method
+	///          as a part of Preview Build File Manager installations
+	///          or as a part of the File Manager Plugin SDK.
+	///          In release versions of the File Manager this method
 	///          does nothing.
 	[id(12)]
 	HRESULT TraceI(
@@ -324,9 +324,9 @@ interface ISalamander : IUnknown
 	/// \return This method does not return a value.
 	///
 	/// \remarks The Trace Server is the debugging tool available
-	///          as a part of Preview Build Open Salamander installations
-	///          or as a part of the Open Salamander Plugin SDK.
-	///          In release versions of the Open Salamander this method
+	///          as a part of Preview Build File Manager installations
+	///          or as a part of the File Manager Plugin SDK.
+	///          In release versions of the File Manager this method
 	///          does nothing.
 	[id(13)]
 	HRESULT TraceE(
@@ -792,7 +792,7 @@ interface ISalamanderPanel : IUnknown
 	///
 	/// \return This method does not return a value.
 	///
-	/// \remarks To be consistent with other Open Salamander
+	/// \remarks To be consistent with other File Manager
 	///          operations the script should use this method to cancel
 	///          the selection after it finishes the operation in the panel.
 	///          Before deselecting the items the script should use the
@@ -839,7 +839,7 @@ interface ISalamanderPanel : IUnknown
 	///
 	/// \return This method does not return a value.
 	///
-	/// \remarks To be consistent with other Open Salamander
+	/// \remarks To be consistent with other File Manager
 	///          operations the script should cancel the selection
 	///          with the <a name="panel_deselectall">DeselectAll</a> method
 	///          after it finishes the operation in the panel. Before

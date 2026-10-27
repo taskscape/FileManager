@@ -19,7 +19,7 @@ extern TDirectArray<CBugReport> BugReports(1, 10);
 char LatestBugReport[MAX_PATH] = {0}; // name of the most recent bug report (name only, without extension)
 BOOL ReportOldBugs = TRUE;            // the user allowed uploading old reports as well
 
-const char* APP_NAME = "Open Salamander Bug Reporter";
+const char* APP_NAME = "File Manager Bug Reporter";
 
 // ****************************************************************************
 

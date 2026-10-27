@@ -9,7 +9,7 @@
 
 <body>
 <div id="help_page">
-<div class="header">Open Salamander: Plugins: Automation: Reference</div>
+<div class="header">File Manager: Plugins: Automation: Reference</div>
 <div class="page">
 
 <h1>Items Collection</h1>
@@ -36,10 +36,10 @@
 <h3>VBScript</h3>
 <pre><code>Dim TotalSize
 TotalSize = 0
-for each Item in Salamander.SourcePanel.Items
+for each Item in File Manager.SourcePanel.Items
   TotalSize = TotalSize + Item.Size
 next
-Salamander.MsgBox("Total size of all items in the panel: " +
+File Manager.MsgBox("Total size of all items in the panel: " +
   CStr(TotalSize) + " bytes")</code></pre>
 
 <h2>See Also</h2>

@@ -66,7 +66,7 @@ function Copy-StandaloneReleaseArtifact {
     return $true
 }
 
-Write-Host '=== Open Salamander Installer Staging Script ===' -ForegroundColor Cyan
+Write-Host '=== File Manager Installer Staging Script ===' -ForegroundColor Cyan
 Write-Host "Build Number: $BuildNumber" -ForegroundColor Cyan
 
 if (Test-Path -LiteralPath $stagingRoot) {

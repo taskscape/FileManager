@@ -4,8 +4,8 @@
 #define VERSINFO_MINORB 0
 #include "spl_vers.h"
 #define VERSINFO_COPYRIGHT "Copyright (c) 2026 Taskscape Ltd"
-#define VERSINFO_COMPANY "Open Salamander"
-#define VERSINFO_DESCRIPTION "Infostacker publishing plugin for Open Salamander"
+#define VERSINFO_COMPANY "File Manager"
+#define VERSINFO_DESCRIPTION "Infostacker publishing plugin for File Manager"
 #ifdef _LANG
 #ifdef _LANG_POLISH
 #define VERSINFO_INTERNAL "POLISH"

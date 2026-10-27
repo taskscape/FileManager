@@ -75,7 +75,7 @@ BOOL WriteReconciliationReport(char* reportPath, int reportPathLen,
     if (report == INVALID_HANDLE_VALUE) return FALSE;
     char summary[256];
     _snprintf_s(summary, _countof(summary), _TRUNCATE,
-                "Open Salamander operation recovery report\r\nResumed commits: %d\r\nRolled back temporary files: %d\r\nUnresolved items: %d\r\n\r\n",
+                "File Manager operation recovery report\r\nResumed commits: %d\r\nRolled back temporary files: %d\r\nUnresolved items: %d\r\n\r\n",
                 resumed, rolledBack, unresolved);
     BOOL ok = WriteAll(report, summary);
     // Report from the claimed snapshot; reopening a pathname would relinquish
@@ -407,7 +407,7 @@ void COperationJournal::OfferRecovery(HWND parent)
     HANDLES(FindClose(find));
     if (journals.empty()) return;
     const int action = SalMessageBox(parent,
-                               "Open Salamander found incomplete or unreadable file operations.\r\n\r\n"
+                               "File Manager found incomplete or unreadable file operations.\r\n\r\n"
                                "Yes resumes verified transactional targets.\r\n"
                                "No removes verified uncommitted temporary files.\r\n"
                                "Changed, partial or unverified files are preserved for manual recovery.\r\n"

@@ -117,7 +117,7 @@ BEGIN
     BEGIN
         MENUITEM "Browse…",                     ID_BROWSE
         MENUITEM SEPARATOR
-        MENUITEM "Salamander Directory",        ID_SALDIR
+        MENUITEM "File Manager Directory",        ID_SALDIR
         MENUITEM "Environment Variable",        ID_ENVVAR
     END
 END
@@ -176,7 +176,7 @@ STRINGTABLE
 BEGIN
     IDS_ABORTCAPTION        "Abort Script"
     IDS_ABORTTIP            "Abort Running Script\tCtrl+Break"
-    IDS_MAINWINDOWLOCKED    "Open Salamander window is locked by Automation plugin. Please finish running script."
+    IDS_MAINWINDOWLOCKED    "File Manager window is locked by Automation plugin. Please finish running script."
     IDS_ENGINECREATEFAIL    "Failed to initialize the scripting engine."
 END
 

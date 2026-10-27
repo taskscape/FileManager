@@ -482,7 +482,7 @@ STRINGTABLE
  IDS_STPAR_UNABLECOMPAUTODCOND, "Warunek automatycznego wykrywania zawiera błąd.\n\nBłąd: %s"
 
  IDS_LOGMSGUNKNOWNSRVTYPE, "Nieznany typ serwera, nie można przeanalizować tekstowego listowania...\r\n"
- IDS_UNKNOWNSRVTYPEINFO, "Nie można przeanalizować listowania plików i katalogów z serwera. W panelu zostanie wyświetlony tylko zwykły tekst listowania.\n\nSprawdź nasze strony internetowe pod kątem nowszej wersji programu Open Salamander. Jeśli używasz najnowszej wersji, prześlij nam surowe listowanie (jeśli nie jest poufne; kliknij prawym przyciskiem myszy w panelu > Pokaż surowe listowanie > Zapisz jako) na adres e-mail support@taskscape.com. Pomóż nam obsługiwać jak najwięcej typów serwerów."
+ IDS_UNKNOWNSRVTYPEINFO, "Nie można przeanalizować listowania plików i katalogów z serwera. W panelu zostanie wyświetlony tylko zwykły tekst listowania.\n\nSprawdź nasze strony internetowe pod kątem nowszej wersji programu File Manager. Jeśli używasz najnowszej wersji, prześlij nam surowe listowanie (jeśli nie jest poufne; kliknij prawym przyciskiem myszy w panelu > Pokaż surowe listowanie > Zapisz jako) na adres e-mail support@taskscape.com. Pomóż nam obsługiwać jak najwięcej typów serwerów."
  IDS_LOGMSGUNKNOWNSRVTYPE2, "Nie można przeanalizować tekstowego listowania przy użyciu wybranego typu serwera...\r\n"
  IDS_UNKNOWNSRVTYPEINFO2, "Nie można przeanalizować listowania plików i katalogów z serwera. W panelu zostanie wyświetlony tylko zwykły tekst listowania.\n\nSpróbuj wybrać inny typ serwera albo pozwól klientowi FTP wykryć go automatycznie (użyj przycisku Zaawansowane w oknie Połącz z serwerem FTP)."
  IDS_LOGMSGPARSEDBYSRVTYPE, "Tekstowe listowanie zostało przeanalizowane przez typ serwera ""%s""...\r\n"

@@ -297,7 +297,7 @@ public sealed class FileAccessUiTests : FileOperationUiTestBase
         foreach (var windowHandle in NativeCommands.GetTopLevelWindows(Application.ProcessId))
         {
             if (NativeCommands.GetWindowTitle(windowHandle) == "Information" &&
-                NativeCommands.GetDialogText(windowHandle).Contains("Open Salamander is busy", StringComparison.Ordinal))
+                NativeCommands.GetDialogText(windowHandle).Contains("File Manager is busy", StringComparison.Ordinal))
             {
                 // The busy message means Focus was not executed, so acknowledging it is the deterministic signal to retry the same idempotent navigation.
                 NativeCommands.ClickDialogButton(windowHandle, 1);

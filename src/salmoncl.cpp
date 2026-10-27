@@ -38,7 +38,7 @@ HANDLE GetBugReporterRegistryMutex()
 
 BOOL SalmonGetBugReportUID(DWORD64* uid)
 {
-    const char* BUG_REPORTER_KEY = "Software\\Open Salamander\\Bug Reporter";
+    const char* BUG_REPORTER_KEY = "Software\\File Manager\\Bug Reporter";
     const char* BUG_REPORTER_UID = "ID";
 
     // this section runs during Salamander startup and theoretically concurrent registry read/write may occur
@@ -124,7 +124,7 @@ BOOL SalmonSharedMemInit(CSalmonSharedMemory* mem)
         if (len > 0 && mem->BugPath[len - 1] == '\\') // better verify the trailing backslash at the end of the path
             mem->BugPath[len - 1] = 0;
         // The shared-memory bug-report path must remain complete for the child reporter.
-        if (FAILED(StringCchCatA(mem->BugPath, _countof(mem->BugPath), "\\Open Salamander")))
+        if (!AdoptPresentedApplicationDataDirectory(mem->BugPath, _countof(mem->BugPath)))
             mem->BugPath[0] = 0;
     }
     else

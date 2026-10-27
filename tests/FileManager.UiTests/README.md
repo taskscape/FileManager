@@ -9,7 +9,7 @@ The tests run as the current interactive Windows user only when a guarded filesy
 The repository runner configures the guarded test-data root, configuration root, and executable automatically. Set variables manually only when invoking `dotnet test` directly or enabling an optional lane:
 
 - `FILEMANAGER_UI_TESTDATA_ROOT` — absolute path ending in `filemanager-testdata`; all test-created files live below it.
-- `FILEMANAGER_UI_CONFIG_ROOT=Software\Open Salamander\6.0-filemanager-testdata` — selects the registry tree created and removed by the harness.
+- `FILEMANAGER_UI_CONFIG_ROOT=Software\File Manager\6.0-filemanager-testdata` — selects the registry tree created and removed by the harness.
 - `FILEMANAGER_UI_EXE` — absolute path to `salamand.exe` in a deployed runtime. The runtime must include `salmon.exe` and the plug-in payloads used by the selected tests; an executable by itself is not a complete UI test artifact.
 - `FILEMANAGER_UI_ARGUMENTS` — optional command-line arguments, for example a test-only `-c` configuration file.
 - FTP and Delivery Handoff menu IDs are published with the launching process ID below the owned test-data root, so each fixture waits for the exact FileManager instance it controls before issuing a plug-in command (`WaitForPluginCommand`).

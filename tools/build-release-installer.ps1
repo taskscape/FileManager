@@ -108,7 +108,7 @@ try {
         throw "Building the installer failed with exit code $installerCompileExitCode. See $installerCompileLogPath"
     }
 
-    $installerPath = Join-Path $repositoryRoot ('Installer\Output\OpenSalamander_6.0.' + $BuildNumber + '.exe')
+    $installerPath = Join-Path $repositoryRoot ('Installer\Output\FileManager_6.0.' + $BuildNumber + '.exe')
     if (-not (Test-Path -LiteralPath $installerPath -PathType Leaf)) {
         throw "The expected installer was not produced: $installerPath"
     }

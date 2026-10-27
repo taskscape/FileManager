@@ -4,7 +4,7 @@ STRINGTABLE
 BEGIN
   SAL_PLUGIN_NAME, "WinSCP (SFTP/SCP Client)"
   SAL_FS_NAME, "\tSFTP/SCP Client (WinSCP)"
-  SAL_PLUGIN_DESCRIPTION, "SFTP/SCP client for Open Salamander"
+  SAL_PLUGIN_DESCRIPTION, "SFTP/SCP client for File Manager"
   SAL_PATH_NOT_SUPPORTED, "Plugin cannot work with path '%s'."
   SAL_DISCONNECT, "&Disconnect"
   SAL_DISCONNECT_F12, "&Disconnect...\tF12"

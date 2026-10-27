@@ -26,7 +26,7 @@ param(
 
 <#
 .SYNOPSIS
-    Builds the Open Salamander installer locally, mirroring the GitHub Actions workflow.
+    Builds the File Manager installer locally, mirroring the GitHub Actions workflow.
 
 .DESCRIPTION
     This script reproduces the GitHub Actions build-installer.yml workflow locally:
@@ -97,7 +97,7 @@ if (-not (Test-Path $script:RUNNER_TEMP)) {
     New-Item -ItemType Directory -Path $script:RUNNER_TEMP | Out-Null
 }
 
-Write-Host "=== Open Salamander Installer Build Script ===" -ForegroundColor Cyan
+Write-Host "=== File Manager Installer Build Script ===" -ForegroundColor Cyan
 Write-Host "Repository root: $repositoryRoot"
 Write-Host "Configuration: $Configuration"
 Write-Host "Platform Toolset: $PlatformToolset"
@@ -302,7 +302,7 @@ function Invoke-BuildInstaller() {
         Write-Error "Inno Setup compilation failed with exit code $LASTEXITCODE"
     }
 
-    $outputFile = Join-Path $repositoryRoot "Installer\Output\OpenSalamander_6.0.$BuildNumber.exe"
+    $outputFile = Join-Path $repositoryRoot "Installer\Output\FileManager_6.0.$BuildNumber.exe"
     if (-not (Test-Path $outputFile)) {
         Write-Warning "Expected output file not found: $outputFile"
         # Try to find the actual output

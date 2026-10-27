@@ -586,10 +586,10 @@ void WINAPI CAutomationPluginInterface::LoadConfiguration(
 
     if (bLoadDefaultDirs)
     {
-        dir.Set(_T("$[AppData]\\Open Salamander\\Automation\\scripts"));
+        dir.Set(_T("$[AppData]\\File Manager\\Automation\\scripts"));
         m_aDirectories.Add(dir);
 
-        dir.Set(_T("$[AllUsersProfile]\\Open Salamander\\Automation\\scripts"));
+        dir.Set(_T("$[AllUsersProfile]\\File Manager\\Automation\\scripts"));
         m_aDirectories.Add(dir);
 
         dir.Set(_T("$(SalDir)\\plugins\\automation\\scripts"));

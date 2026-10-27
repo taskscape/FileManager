@@ -56,7 +56,7 @@ void TSalamandForm::LocalSystemSettings()
     FPreviousForm = Screen->ActiveForm;
 }
 //---------------------------------------------------------------------------
-const AnsiString AppName = "WinSCP for Open Salamander";
+const AnsiString AppName = "WinSCP for File Manager";
 //---------------------------------------------------------------------------
 TConfiguration* __fastcall CreateConfiguration()
 {

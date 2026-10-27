@@ -16,7 +16,7 @@ env:
   OPENSAL_BUILD_DIR: '${{ github.workspace }}\\build_stage\\'
   FILEMANAGER_UI_ISOLATED: '1'
   # The diagnostic lane must use the same disposable profile boundary as the blocking release suite.
-  FILEMANAGER_UI_CONFIG_ROOT: 'Software\Open Salamander\6.0-filemanager-testdata'
+  FILEMANAGER_UI_CONFIG_ROOT: 'Software\File Manager\6.0-filemanager-testdata'
   FILEMANAGER_UI_CONFIG_FAULT_INJECTION: '1'
   FILEMANAGER_UI_RECYCLE_BIN: '1'
   # Nightly retains the longer resource-growth sample after the provider startup probes pass.

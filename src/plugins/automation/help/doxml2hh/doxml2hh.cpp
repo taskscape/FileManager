@@ -18,7 +18,7 @@ static const TCHAR HTML_HEADER[] =
     _T("\n")
     _T("<body>\n")
     _T("<div id=\"help_page\">\n")
-    _T("<div class=\"header\">Open Salamander: Plugins: Automation: Reference%s</div>\n")
+    _T("<div class=\"header\">File Manager: Plugins: Automation: Reference%s</div>\n")
     _T("<div class=\"page\">\n")
     _T("\n")
     _T("<h1>%s</h1>\n")

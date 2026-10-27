@@ -1,10 +1,10 @@
-; Open Salamander Inno Setup Script
+; File Manager Inno Setup Script
 ; This installer maintains all features from the previous custom installer
 
-#define MyAppName "Open Salamander"
+#define MyAppName "File Manager"
 #define MyAppVersion "6.0"
 #define MyAppPublisher "Taskscape Ltd"
-#define MyAppURL "https://www.opensalamander.com/"
+#define MyAppURL "https://github.com/taskscape/FileManager"
 #define MyAppExeName "salamand.exe"
 
 ; The product major is release-managed; the build number remains supplied by CI.
@@ -28,7 +28,7 @@ AllowNoIcons=yes
 LicenseFile=LICENSE
 ; Use the same approved file-manager icon for the installer and installed shortcuts.
 SetupIconFile=..\src\res\salamand.ico
-OutputBaseFilename=OpenSalamander_{#MyAppVersion}.{#BuildNumber}
+OutputBaseFilename=FileManager_{#MyAppVersion}.{#BuildNumber}
 Compression=lzma2/ultra64
 SolidCompression=yes
 WizardStyle=modern
@@ -116,7 +116,7 @@ Type: dirifempty; Name: "{app}\utils"
 Type: dirifempty; Name: "{app}"
 
 [Code]
-// Check if Open Salamander is currently running and offer to close it
+// Check if File Manager is currently running and offer to close it
 function InitializeSetup(): Boolean;
 begin
   Result := True;
@@ -124,7 +124,7 @@ begin
   // Check if salamand.exe is running (uses process list mutex from src/tasklist.cpp)
   while CheckForMutexes('TaskscapeLtdSalamander3bProcessListMutex') do
   begin
-    if MsgBox('Open Salamander is currently running. Please close it before continuing installation.' + #13#10 + #13#10 + 
+    if MsgBox('File Manager is currently running. Please close it before continuing installation.' + #13#10 + #13#10 + 
               'Click OK to retry or Cancel to exit setup.', mbError, MB_OKCANCEL) = IDCANCEL then
     begin
       Result := False;
@@ -140,7 +140,7 @@ begin
   
   if CheckForMutexes('TaskscapeLtdSalamander3bProcessListMutex') then
   begin
-    MsgBox('Open Salamander is currently running. Please close it before uninstalling.', mbError, MB_OK);
+    MsgBox('File Manager is currently running. Please close it before uninstalling.', mbError, MB_OK);
     Result := False;
   end;
 end;
@@ -157,7 +157,7 @@ begin
     if FileExists(ExpandConstant('{app}\remove.exe')) then
     begin
       // Run the old uninstaller silently
-      if MsgBox('A previous version of Open Salamander was detected. Would you like to uninstall it first?', 
+      if MsgBox('A previous version of File Manager was detected. Would you like to uninstall it first?', 
                 mbConfirmation, MB_YESNO) = IDYES then
       begin
         Exec(ExpandConstant('{app}\remove.exe'), '/S', '', SW_SHOW, ewWaitUntilTerminated, ResultCode);

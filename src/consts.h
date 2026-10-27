@@ -1774,7 +1774,7 @@ extern char WindowsDirectory[MAX_PATH]; // cached result of GetWindowsDirectory
 extern char RTCErrorDescription[RTC_ERROR_DESCRIPTION_SIZE];
 //#endif // MSVC_RUNTIME_CHECKS
 
-// path where we create bug report and minidump, location: up to Vista at salamand.exe, in Vista (and later) in CSIDL_APPDATA + "\\Open Salamander"
+// path where we create bug report and minidump, location: up to Vista at salamand.exe, in Vista (and later) in CSIDL_APPDATA + "\\File Manager"
 extern char BugReportPath[MAX_PATH];
 
 // name of file that will be imported (if it exists) into registry
@@ -2156,8 +2156,9 @@ int GetWMCommandFromSalCmd(int salCmd);
 
 //******************************************************************************
 
-// number of items in SalamanderConfigurationRoots array
-#define SALCFG_ROOTS_COUNT 84
+// Number of items in SalamanderConfigurationRoots. Includes the previous 6.0
+// registry location so an existing profile can be imported under File Manager.
+#define SALCFG_ROOTS_COUNT 85
 
 // main thread id (valid only after entering WinMain())
 extern DWORD MainThreadID;
@@ -2495,8 +2496,11 @@ void GetCommonFileTypeStr(char* buf, int* resLen, const char* ext);
 // separators in context menu on .bar files)
 void RemoveUselessSeparatorsFromMenu(HMENU h);
 
-// returns "Open Salamander" directory on path CSIDL_APPDATA in 'buf'
+// Returns the File Manager directory under CSIDL_APPDATA in 'buf'.
 BOOL GetOurPathInRoamingAPPDATA(char* buf, int bufSize);
+// Appends "File Manager" to a parent data directory. A leftover directory from
+// the previous product name is renamed first so existing journals stay available.
+BOOL AdoptPresentedApplicationDataDirectory(char* parentPath, int parentPathSize);
 // legacy compatibility overload ('buf' must be at least MAX_PATH)
 BOOL GetOurPathInRoamingAPPDATA(char* buf);
 // UI automation may redirect its application data only into a deliberately named disposable tree.
@@ -2511,7 +2515,7 @@ void LogUiTestOperationDialog(const char* phase, int kind, char** data, int resu
 // Publishes the owning process ID with load-order-dependent menu IDs inside the isolated UI-test sandbox.
 void LogUiTestPluginMenuCommand(const char* dllName, int pluginCommand, int salamanderCommand);
 
-// creates "Open Salamander" directory on path CSIDL_APPDATA; returns TRUE if path
+// creates the File Manager directory on path CSIDL_APPDATA; returns TRUE if path
 // fits in MAX_PATH (its existence is not guaranteed, CreateDirectory result is not checked);
 // if 'buf' is not NULL, it is output buffer of size 'bufSize', in which this path is returned
 // WARNING: use only Vista+

@@ -1,10 +1,10 @@
-# Open Salamander Technical Architecture
+# File Manager Technical Architecture
 
 ## Document status and scope
 
 This document describes the architecture present in repository commit `ab8a3e827ed7f58eebf3c95bc5c88141f12a69a9` on branch `main` (reviewed 2026-08-09). It is an implementation guide, not a target-state redesign. Statements are based on the solution graph, headers, entry points, core implementation files, plug-in SDK, build workflows, installer, and executable-level UI tests.
 
-The primary system is Open Salamander, a two-panel Windows file manager. It is written as a native Win32 C/C++ application without MFC, Qt, or another UI framework. The code uses a substantial internal framework, a versioned in-process plug-in SDK, worker threads, helper executables, shell extensions, registry-backed configuration, and resource DLLs.
+The primary system is File Manager, a two-panel Windows file manager. It is written as a native Win32 C/C++ application without MFC, Qt, or another UI framework. The code uses a substantial internal framework, a versioned in-process plug-in SDK, worker threads, helper executables, shell extensions, registry-backed configuration, and resource DLLs.
 
 ## Architectural summary
 
@@ -712,7 +712,7 @@ The following rules are implicit in the current implementation and should be tre
 
 ## 14. Architectural summary for change planning
 
-Open Salamander's architecture is optimized around a responsive native twin-panel shell with long-lived compatibility. Its central design decisions are:
+File Manager's architecture is optimized around a responsive native twin-panel shell with long-lived compatibility. Its central design decisions are:
 
 - keep the core close to Win32 and its message/handle model;
 - present disk directories, archives, and remote/virtual stores through one panel interaction model;

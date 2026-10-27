@@ -16,9 +16,9 @@
 #include "spl_vers.h" // pull version and build numbers
 
 #define VERSINFO_COPYRIGHT   "Copyright © 2005-2023 Taskscape Ltd"
-#define VERSINFO_COMPANY     "Open Salamander"
+#define VERSINFO_COMPANY     "File Manager"
 
-#define VERSINFO_DESCRIPTION "UnOLE plugin for Open Salamander"
+#define VERSINFO_DESCRIPTION "UnOLE plugin for File Manager"
 
 #ifdef _LANG
 #define VERSINFO_INTERNAL    "ENGLISH"

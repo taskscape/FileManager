@@ -4,7 +4,7 @@ Status: source audit of commit `ab579e5` on 2026-09-12.
 
 This document identifies user-facing commands on the main menu and main toolbars that still have no behavioral UI test. It is deliberately limited to functionality that is common, deterministic, and reasonably easy to automate within the current NUnit/FlaUI test framework.
 
-The audit compares the command surface in [`src/menu_templates.cpp`](src/menu_templates.cpp) and [`src/toolbar_button_defs.cpp`](src/toolbar_button_defs.cpp) with the tests and command adapters under [`tests/FileManager.UiTests`](tests/FileManager.UiTests). A command is considered covered only when a test launches Open Salamander, invokes that behavior, and verifies a user-observable result. Source-contract tests, icon rendering tests, and merely checking that a toolbar command is enabled do not count as behavioral coverage.
+The audit compares the command surface in [`src/menu_templates.cpp`](src/menu_templates.cpp) and [`src/toolbar_button_defs.cpp`](src/toolbar_button_defs.cpp) with the tests and command adapters under [`tests/FileManager.UiTests`](tests/FileManager.UiTests). A command is considered covered only when a test launches File Manager, invokes that behavior, and verifies a user-observable result. Source-contract tests, icon rendering tests, and merely checking that a toolbar command is enabled do not count as behavioral coverage.
 
 An older inventory exists as `missing_tests.md`. It predates several current fixtures. The following scenarios from that inventory are now implemented and therefore are **not** gaps: entering/ascending folders, swapping and refreshing panels, Change Directory, mask selection, a multi-command session, copy-then-View/Edit, Pack/Unpack, ZIP copy-out, Find focus/content/duplicates, filtering, Compare Directories, Change Attributes, Change Case, text conversion, copy masks, NTFS compression, and real default-middle-toolbar button routing for Copy, Swap Panels, Find, Create Directory, and View.
 
@@ -264,7 +264,7 @@ Reuse `UiTestSettings.RequireZipPlugin`, `OpenFocusedItem`, panel activation, `W
 
 **Pass criteria**
 
-Add/delete updates only the requested members, preserves unrelated entries and contents, and leaves Open Salamander usable.
+Add/delete updates only the requested members, preserves unrelated entries and contents, and leaves File Manager usable.
 
 ### 9. Hot paths: assign, navigate, and persist
 
@@ -379,7 +379,7 @@ When these are eventually tested, use an explicit capability category or a harne
 4. Invoke the real product UI path. Direct `WM_COMMAND` is consistent for command-handler scenarios; physical toolbar routing tests should additionally click a toolbar hit rectangle. Do not call product implementation methods from test code.
 5. Assert user-observable results: exact files/bytes, selected paths, owned child windows, stable control values, or restart persistence. “No crash” and “dialog appeared” are sufficient only for explicitly named smoke tests.
 6. Use bounded condition waits (`WaitForFileSystem`, `WaitForWindow`, `WaitForWindowToClose`, and handle-release checks). Avoid unconditional sleeps except for the documented configuration debounce or a short native idle-settle step already required by this legacy UI.
-7. Keep every created or modified path below `FILEMANAGER_UI_TESTDATA_ROOT`, keep configuration under `Software\Open Salamander\6.0-filemanager-testdata`, and close/kill only processes launched by the fixture. Do not empty the Recycle Bin or modify machine-wide associations.
+7. Keep every created or modified path below `FILEMANAGER_UI_TESTDATA_ROOT`, keep configuration under `Software\File Manager\6.0-filemanager-testdata`, and close/kill only processes launched by the fixture. Do not empty the Recycle Bin or modify machine-wide associations.
 8. Capability-dependent cases must use explicit, actionable skip messages that are admitted by `scripts/runtests.ps1`; do not turn a missing required runtime payload into an ordinary pass.
 9. Add a focused source-contract assertion when a new helper depends on default toolbar composition or a stable resource identifier. Such a contract supplements the UI test; it does not replace it.
 10. After implementation, run the focused test first, then execute the authoritative parity command under the matching pipeline conditions:

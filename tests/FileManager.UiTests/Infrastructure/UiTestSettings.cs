@@ -22,7 +22,7 @@ internal static class UiTestSettings
         }
     }
 
-    internal const string ConfigurationRegistryRoot = "Software\\Open Salamander\\6.0-filemanager-testdata";
+    internal const string ConfigurationRegistryRoot = "Software\\File Manager\\6.0-filemanager-testdata";
 
     internal static string TestDataRoot
     {
@@ -143,5 +143,5 @@ internal static class UiTestSettings
         return cycles;
     }
 
-    internal static string JournalDirectory => Path.Combine(TestDataRoot, "appdata", "Open Salamander", "operation-journals");
+    internal static string JournalDirectory => Path.Combine(TestDataRoot, "appdata", "File Manager", "operation-journals");
 }

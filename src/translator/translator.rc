@@ -103,8 +103,8 @@ BEGIN
         MENUITEM "&Validate Translation...\tCtrl+Q", CM_HOTKEY_CONFLICTS
         MENUITEM "&Edit Dialog Layout...\tCtrl+L", ID_TOOLS_EDITLAYOUT
         MENUITEM SEPARATOR
-        MENUITEM "&Save All and Restart Open Salamander\tF5", ID_TOOLS_RESTART
-        MENUITEM "&Kill Open Salamander\tShift+F5", ID_TOOLS_KILL
+        MENUITEM "&Save All and Restart File Manager\tF5", ID_TOOLS_RESTART
+        MENUITEM "&Kill File Manager\tShift+F5", ID_TOOLS_KILL
         MENUITEM SEPARATOR
         MENUITEM "&Mark Changed Strings as Translated\tCtrl+K", ID_TOOLS_MARKASTR
         MENUITEM "&Reset Dialogs Layouts to Original\tCtrl+N", ID_TOOLS_RESETDLGSTOORIG

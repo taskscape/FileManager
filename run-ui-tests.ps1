@@ -184,7 +184,7 @@ elseif (-not (Test-Path -LiteralPath (Join-Path (Split-Path -Parent $resolvedExe
     # Every UI launch needs its sibling crash reporter even when the selected fixture does not exercise FTP.
     throw "The selected FileManager runtime is incomplete; salmon.exe is missing beside: $resolvedExecutable"
 }
-$configurationRoot = 'Software\Open Salamander\6.0-filemanager-testdata'
+$configurationRoot = 'Software\File Manager\6.0-filemanager-testdata'
 $savedEnvironment = @{
     FILEMANAGER_UI_ISOLATED = $env:FILEMANAGER_UI_ISOLATED
     FILEMANAGER_UI_EXE = $env:FILEMANAGER_UI_EXE

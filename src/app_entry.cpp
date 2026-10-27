@@ -157,7 +157,7 @@ int MyEntryPoint()
         ret = WinMainCRTStartup();
     }
     else
-        MessageBox(NULL, "Open Salamander Bug Reporter (salmon.exe) initialization has failed. Please reinstall Open Salamander.",
+        MessageBox(NULL, "File Manager Bug Reporter (salmon.exe) initialization has failed. Please reinstall File Manager.",
                    SALAMANDER_TEXT_VERSION, MB_OK | MB_ICONSTOP);
 
     // debugger doesn't come here anymore, it gets killed in RTL (tested under VC 2008 with our RTL)
@@ -1875,11 +1875,11 @@ static void ReportStartupInitializationFailure(const char* stage)
 {
     char text[MAX_PATH + 400];
     if (FormatStringChecked(text, _countof(text),
-                            "Open Salamander cannot start because initialization of %s failed.\n\n"
+                            "File Manager cannot start because initialization of %s failed.\n\n"
                             "The language file \"%s\" may be incomplete or damaged. "
-                            "Please reinstall Open Salamander or choose another language.",
+                            "Please reinstall File Manager or choose another language.",
                             stage, Configuration.LoadedSLGName) != bsrSuccess)
-        CopyStringChecked(text, _countof(text), "Open Salamander cannot start because its initialization failed.");
+        CopyStringChecked(text, _countof(text), "File Manager cannot start because its initialization failed.");
     SplashScreenCloseIfExist();
     LogUiTestDialog("SHOW", SALAMANDER_TEXT_VERSION, text, MB_OK | MB_ICONERROR, 0);
     int result = MessageBox(NULL, text, SALAMANDER_TEXT_VERSION, MB_OK | MB_ICONERROR);
@@ -1899,7 +1899,7 @@ int WinMainBody(HINSTANCE hInstance, HINSTANCE /*hPrevInstance*/, LPSTR cmdLine,
     {
         char errorText[300];
         _snprintf_s(errorText, _TRUNCATE,
-                    "Open Salamander cannot enable secure DLL loading (error %lu).\n"
+                    "File Manager cannot enable secure DLL loading (error %lu).\n"
                     "Install the Windows security update required for SetDefaultDllDirectories and try again.",
                     GetLastError());
         MessageBox(NULL, errorText, SALAMANDER_TEXT_VERSION, MB_OK | MB_ICONERROR);
@@ -2161,7 +2161,7 @@ FIND_NEW_SLG_FILE:
         if (slgDialog.GetLanguagesCount() == 0)
         {
             MessageBox(NULL, "Unable to find any language file (.SLG) in subdirectory LANG.\n"
-                             "Please reinstall Open Salamander.",
+                             "Please reinstall File Manager.",
                        SALAMANDER_TEXT_VERSION, MB_OK | MB_ICONERROR);
             goto EXIT_1a;
         }
@@ -2239,7 +2239,7 @@ FIND_NEW_SLG_FILE:
         if (!newSLGFile) // remembered .SLG file probably stopped existing, try to find another one
         {
             if (FormatStringChecked(errorText, _countof(errorText),
-                                    "File %s was not found or is not valid language file.\nOpen Salamander "
+                                    "File %s was not found or is not valid language file.\nFile Manager "
                                     "will try to search for some other language file (.SLG).",
                                     path) != bsrSuccess)
                 CopyStringChecked(errorText, _countof(errorText), "The selected language file is invalid.");
@@ -2251,10 +2251,10 @@ FIND_NEW_SLG_FILE:
         {
             if (FormatStringChecked(errorText, _countof(errorText),
                                     "File %s was not found or is not valid language file.\n"
-                                    "Please run Open Salamander again and try to choose some other language file.",
+                                    "Please run File Manager again and try to choose some other language file.",
                                     path) != bsrSuccess)
                 CopyStringChecked(errorText, _countof(errorText), "The selected language file is invalid.");
-            MessageBox(NULL, errorText, "Open Salamander", MB_OK | MB_ICONERROR);
+            MessageBox(NULL, errorText, "File Manager", MB_OK | MB_ICONERROR);
             goto EXIT_1a;
         }
     }
@@ -2400,10 +2400,10 @@ FIND_NEW_SLG_FILE:
     {
         // Raised before the main window exists and outside SalMessageBox, so it
         // needs its own transcript record to be visible to a UI-test run.
-        LogUiTestDialog("SHOW", "Open Salamander Configuration", configurationDiagnostic, MB_OK | MB_ICONWARNING, 0);
-        int diagnosticResult = MessageBox(NULL, configurationDiagnostic, "Open Salamander Configuration",
+        LogUiTestDialog("SHOW", "File Manager Configuration", configurationDiagnostic, MB_OK | MB_ICONWARNING, 0);
+        int diagnosticResult = MessageBox(NULL, configurationDiagnostic, "File Manager Configuration",
                                           MB_OK | MB_ICONWARNING);
-        LogUiTestDialog("RESULT", "Open Salamander Configuration", configurationDiagnostic,
+        LogUiTestDialog("RESULT", "File Manager Configuration", configurationDiagnostic,
                         MB_OK | MB_ICONWARNING, diagnosticResult);
     }
 
@@ -2904,7 +2904,7 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
                                         HWND hParent = NULL;
                                         if (MainWindow != NULL)
                                             hParent = MainWindow->HWindow;
-                                        MessageBox(hParent, "_CrtCheckMemory failed. Look to the Trace Server for details.", "Open Salamander", MB_OK | MB_ICONERROR);
+                                        MessageBox(hParent, "_CrtCheckMemory failed. Look to the Trace Server for details.", "File Manager", MB_OK | MB_ICONERROR);
                                     }
                                     LastCrtCheckMemoryTime = CMonotonicClock::Now();
                                 }

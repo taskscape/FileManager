@@ -16,9 +16,9 @@
 #include "spl_vers.h" // vytahneme cisla verzi + buildu
 
 #define VERSINFO_COPYRIGHT   "Copyright © 2004-2023 Taskscape Ltd"
-#define VERSINFO_COMPANY     "Open Salamander"
+#define VERSINFO_COMPANY     "File Manager"
 
-#define VERSINFO_DESCRIPTION "Folders plugin for Open Salamander"
+#define VERSINFO_DESCRIPTION "Folders plugin for File Manager"
 
 #ifdef _LANG
 #define VERSINFO_INTERNAL    "ENGLISH"
