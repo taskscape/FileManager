@@ -43,5 +43,25 @@ int TestUdfBoundsCheck()
     if (UDFRangeInBounds(0, 4096, 16))
         return Fail("UDFRangeInBounds accepted a write larger than the VAT buffer");
 
+    // A 50 GB image needs about 93 MiB of entries; the former 64 MiB cutoff rejected it.
+    const unsigned __int64 largeTrack = 50000000000ull;
+    const unsigned int largePartition = (unsigned int)(largeTrack / sector);
+    const unsigned __int64 largeVat = (unsigned __int64)largePartition * 4 + 152;
+    if (!UDFVatLengthInBounds(largeVat, largePartition, largeTrack, (unsigned int)sector))
+        return Fail("VAT length validation rejected a valid large virtual partition");
+    if (!UDFVatLengthInBounds((unsigned __int64)largePartition * 4 + 0xFFFF,
+                              largePartition, largeTrack, (unsigned int)sector))
+        return Fail("VAT length validation rejected the largest representable header");
+    if (UDFVatLengthInBounds((unsigned __int64)largePartition * 4 + 0x10000,
+                             largePartition, largeTrack, (unsigned int)sector))
+        return Fail("VAT length validation accepted a table beyond partition geometry");
+    if (UDFVatLengthInBounds(largeVat, largePartition, 1024 * sector, (unsigned int)sector))
+        return Fail("VAT length validation trusted a partition larger than the backing track");
+    if (UDFVatLengthInBounds(0x100000010ull, 0xFFFFFFFFu, maxU64, (unsigned int)sector) ||
+        UDFVatLengthInBounds(0, largePartition, largeTrack, (unsigned int)sector) ||
+        UDFVatLengthInBounds(16, 0, largeTrack, (unsigned int)sector) ||
+        UDFVatLengthInBounds(16, largePartition, largeTrack, 0))
+        return Fail("VAT length validation accepted a truncated length or invalid geometry");
+
     return 0;
 }

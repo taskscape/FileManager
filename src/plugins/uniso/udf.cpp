@@ -1396,18 +1396,29 @@ int CUDF::ReadVAT(BYTE fileEntry[], bool bEFE, BYTE** vat, DWORD* vatLength, BOO
         return ERR_TERMINATE;
     } // switch
 
-    DWORD length = (int)fe.InformationLength;
-    // InformationLength is image-supplied; a wild value must not drive an unbounded allocation.
-    // A virtual allocation table holds one 4-byte entry per sector, so 64 MB is well beyond any real disc.
-    if (length == 0 || length > 64 * 1024 * 1024)
+    // Validate the full 64-bit length against real track geometry before narrowing or allocating.
+    // Large virtual partitions legitimately need more than 64 MiB of VAT entries.
+    LONGLONG trackBytes = Image->GetCurrentTrackEnd(TrackTryingToOpen);
+    if (trackBytes <= 0 || !UDFVatLengthInBounds(fe.InformationLength, PD.Length,
+                                               (unsigned __int64)trackBytes,
+                                               Image->GetTrack(TrackTryingToOpen)->SectorSize))
     {
         Error(IDS_UDF_MISSING_VAT, quiet);
         return ERR_TERMINATE;
     }
+    DWORD length = (DWORD)fe.InformationLength;
     *vatLength = length;
     // Value-initialize to zero: the allocation-descriptor walk below may fill fewer than 'length' bytes,
     // and CheckForVAT reads the whole buffer, so unwritten tail bytes must not expose uninitialized heap.
-    *vat = new BYTE[length]();
+    // A geometrically valid table can still exceed available memory; report the existing allocation error.
+    try
+    {
+        *vat = new BYTE[length]();
+    }
+    catch (const std::bad_alloc&)
+    {
+        *vat = NULL;
+    }
     if (*vat == NULL)
     {
         Error(IDS_INSUFFICIENT_MEMORY, quiet);

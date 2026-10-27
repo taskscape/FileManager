@@ -11,3 +11,17 @@ static inline bool UDFRangeInBounds(unsigned __int64 offset, unsigned __int64 le
 {
     return offset <= bufferSize && length <= bufferSize - offset;
 }
+
+// A VAT has four bytes per logical block plus a UDF 2.x header whose length is a Uint16.
+// Bound entries by both the partition and the backing track before multiplying, and reject
+// lengths that the reader's DWORD offsets cannot represent without first narrowing them.
+static inline bool UDFVatLengthInBounds(unsigned __int64 length, unsigned int partitionBlocks,
+                                       unsigned __int64 trackBytes, unsigned int rawSectorSize)
+{
+    if (length == 0 || length > 0xFFFFFFFFull || partitionBlocks == 0 || rawSectorSize == 0)
+        return false;
+    unsigned __int64 blocks = trackBytes / rawSectorSize;
+    if (blocks > partitionBlocks)
+        blocks = partitionBlocks;
+    return blocks != 0 && length <= blocks * 4 + 0xFFFFull && length <= trackBytes;
+}

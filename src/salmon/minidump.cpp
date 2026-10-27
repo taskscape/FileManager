@@ -116,11 +116,8 @@ BOOL GenerateMiniDump(CMinidumpParams* minidumpParams, CSalmonSharedMemory* mem,
         typedef BOOL(WINAPI * MiniDumpWriteDump_t)(HANDLE, DWORD, HANDLE, MINIDUMP_TYPE, CONST PMINIDUMP_EXCEPTION_INFORMATION,
                                                    CONST PMINIDUMP_USER_STREAM_INFORMATION, CONST PMINIDUMP_CALLBACK_INFORMATION);
         static MiniDumpWriteDump_t funcMiniDumpWriteDump;
-        typedef BOOL(WINAPI * MakeSureDirectoryPathExists_t)(PCSTR);
-        static MakeSureDirectoryPathExists_t funcMakeSureDirectoryPathExists;
         funcMiniDumpWriteDump = (MiniDumpWriteDump_t)GetProcAddress(hDbgHelp, "MiniDumpWriteDump");
-        funcMakeSureDirectoryPathExists = (MakeSureDirectoryPathExists_t)GetProcAddress(hDbgHelp, "MakeSureDirectoryPathExists");
-        if (funcMiniDumpWriteDump != NULL && funcMakeSureDirectoryPathExists != NULL)
+        if (funcMiniDumpWriteDump != NULL)
         {
             std::string dumpFileName;
             if (!BuildMiniDumpFileName(mem, &dumpFileName))
@@ -130,8 +127,18 @@ BOOL GenerateMiniDump(CMinidumpParams* minidumpParams, CSalmonSharedMemory* mem,
                 return FALSE;
             }
 
-            // the path may not exist yet - create it
-            funcMakeSureDirectoryPathExists(dumpFileName.c_str()); // the file name is ignored
+            // Creation, encryption and dump writing must resolve the same UTF-8 report directory.
+            std::string directory = dumpFileName.substr(0, dumpFileName.find_last_of('\\'));
+            CWidePath directoryPath(directory.c_str());
+            CWidePath dumpPath(dumpFileName.c_str());
+            if (!directoryPath.IsValid() || dumpPath.GetFullPathForWin32Api() == NULL)
+                return FALSE;
+            int directoryResult = SHCreateDirectoryExW(NULL, directoryPath.GetDisplayPath(), NULL);
+            if (directoryResult != ERROR_SUCCESS && directoryResult != ERROR_ALREADY_EXISTS)
+            {
+                SetMiniDumpError(minidumpParams, "Unable to create the crash-report directory (%lu).", (DWORD)directoryResult);
+                return FALSE;
+            }
 
             if (!EnsureCrashReportDirectoryEncrypted(dumpFileName.c_str()))
             {
@@ -140,7 +147,7 @@ BOOL GenerateMiniDump(CMinidumpParams* minidumpParams, CSalmonSharedMemory* mem,
             }
 
             HANDLE hDumpFile;
-            hDumpFile = CreateFileA(dumpFileName.c_str(), GENERIC_READ | GENERIC_WRITE,
+            hDumpFile = CreateFileW(dumpPath.GetFullPathForWin32Api(), GENERIC_READ | GENERIC_WRITE,
                                    FILE_SHARE_WRITE | FILE_SHARE_READ, 0, CREATE_ALWAYS, 0, 0);
             if (hDumpFile != INVALID_HANDLE_VALUE)
             {

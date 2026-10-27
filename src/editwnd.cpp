@@ -1496,20 +1496,30 @@ public:
 
         if (pDataObject->GetData(&formatEtc, &stgMedium) == S_OK)
         {
-            char* path = (char*)HANDLES(GlobalLock(stgMedium.hGlobal));
-            if (path != NULL)
+            const void* lockedText = HANDLES(GlobalLock(stgMedium.hGlobal));
+            if (lockedText != NULL)
             {
-                // change the path
+                // Both clipboard formats enter InsertText as UTF-8; only converted buffers are heap-owned.
+                char* path = NULL;
                 if (UseUnicode)
-                    path = ConvertAllocU2A((const WCHAR*)path, -1, FALSE, CP_UTF8);
+                    path = ConvertAllocU2A((const WCHAR*)lockedText, -1, FALSE, CP_UTF8);
+                else
+                {
+                    WCHAR* wideText = ConvertAllocA2U((const char*)lockedText, -1, CP_ACP);
+                    if (wideText != NULL)
+                    {
+                        path = ConvertAllocU2A(wideText, -1, FALSE, CP_UTF8);
+                        free(wideText);
+                    }
+                }
                 if (path != NULL)
                 {
                     InsertText(pt, path);
-                    if (UseUnicode)
-                        free(path);
+                    free(path);
                 }
                 HANDLES(GlobalUnlock(stgMedium.hGlobal));
             }
+            ReleaseStgMedium(&stgMedium);
         }
         else
         {

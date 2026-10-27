@@ -1084,6 +1084,7 @@ int TestPublicationDirectoryRedirection()
 #include "FtpDownloadTests.h" // exercise private staging, restart evidence and persistent multi-waiter completion
 #include "FtpWorkerCountTests.h" // worker-count reads must finish while UI list ownership overlaps worker ownership
 #include "DiskMapRegionAllocatorTests.h" // whole-volume treemaps must grow the block list instead of overrunning the heap
+#include "UdfBoundsCheckTests.h" // execute range and large-image VAT checks in the collected native safety lane
 #include "ConfigurationPayloadTests.h" // require intended registry entries, fields and one save-wide error result
 
 int TestExecutionAdapterFaultInjection()
@@ -1182,6 +1183,8 @@ int main()
         result = TestFtpWorkerCountSnapshot(); // protect packed alignment and the confirmation/worker lock boundary
     if (result == 0)
         result = TestDiskMapRegionAllocator(); // DiskMap layouts past 256 MB must not write outside the allocator
+    if (result == 0)
+        result = TestUdfBoundsCheck(); // malformed lengths must be rejected without excluding large virtual partitions
     if (result == 0)
         result = TestConfigurationPayloadReliability(); // incomplete optional collections cannot become accepted snapshots
     if (result == 0)

@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 // CommentsTranslationProject: TRANSLATED
 #include "precomp.h"
+#include <string> // Own the Unicode registry value before converting the icon path to UTF-8.
 #include "operation_journal.h"
 #include <time.h>
 // Use StrSafe for the bounded process command line built below.
@@ -533,11 +534,18 @@ BOOL GetShortcutOverlay()
                                "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Explorer\\Shell Icons",
                                0, KEY_QUERY_VALUE, &hKey)) == ERROR_SUCCESS)
     {
-        char buff[MAX_PATH + 10];
-        DWORD buffLen = sizeof(buff);
-        buff[0] = 0;
-        SalRegQueryValueEx(hKey, "29", NULL, NULL, (LPBYTE)buff, &buffLen);
-        if (buff[0] != 0)
+        // Registry strings are UTF-16; ExtractIcons expects UTF-8 even when the system ACP differs.
+        std::wstring registryValue(32768, L'\0');
+        DWORD buffLen = (DWORD)(registryValue.size() * sizeof(WCHAR));
+        DWORD valueType = 0;
+        char* buff = NULL;
+        if (RegQueryValueExW(hKey, L"29", NULL, &valueType, (LPBYTE)&registryValue[0], &buffLen) == ERROR_SUCCESS &&
+            (valueType == REG_SZ || valueType == REG_EXPAND_SZ))
+        {
+            registryValue[registryValue.size() - 1] = L'\0';
+            buff = ConvertAllocU2A(registryValue.c_str(), -1, FALSE, CP_UTF8);
+        }
+        if (buff != NULL && buff[0] != 0)
         {
             char* num = strrchr(buff, ','); // cislo ikony je za posledni carkou
             if (num != NULL)
@@ -566,6 +574,7 @@ BOOL GetShortcutOverlay()
                         HANDLES_ADD(__htIcon, __hoLoadImage, HShortcutOverlays[i]);
             }
         }
+        free(buff);
         NOHANDLES(RegCloseKey(hKey));
     }
 

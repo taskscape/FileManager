@@ -10,7 +10,7 @@
 int FormatUserDateTimeAnsi(const SYSTEMTIME* time, DWORD flags, const char* format,
                            char* buffer, int bufferSize, BOOL isDate)
 {
-    // Renamer expressions and their results are UTF-8, including locale-formatted dates.
+    // EditLine, expression history and ReplaceText still use ACP; preserve that contract in both directions.
     if (buffer == NULL || bufferSize <= 0)
         return 0;
     WCHAR localeName[LOCALE_NAME_MAX_LENGTH];
@@ -19,11 +19,11 @@ int FormatUserDateTimeAnsi(const SYSTEMTIME* time, DWORD flags, const char* form
     WCHAR* wideFormat = NULL;
     if (format != NULL)
     {
-        int formatLength = MultiByteToWideChar(CP_UTF8, 0, format, -1, NULL, 0);
+        int formatLength = MultiByteToWideChar(CP_ACP, 0, format, -1, NULL, 0);
         if (formatLength == 0)
             return 0;
         wideFormat = new WCHAR[formatLength];
-        if (wideFormat == NULL || MultiByteToWideChar(CP_UTF8, 0, format, -1, wideFormat, formatLength) == 0)
+        if (wideFormat == NULL || MultiByteToWideChar(CP_ACP, 0, format, -1, wideFormat, formatLength) == 0)
         {
             delete[] wideFormat;
             return 0;
@@ -34,7 +34,7 @@ int FormatUserDateTimeAnsi(const SYSTEMTIME* time, DWORD flags, const char* form
                      ? GetDateFormatEx(localeName, flags, time, wideFormat, formatted, ARRAYSIZE(formatted), NULL)
                      : GetTimeFormatEx(localeName, flags, time, wideFormat, formatted, ARRAYSIZE(formatted));
     delete[] wideFormat;
-    return result != 0 ? WideCharToMultiByte(CP_UTF8, 0, formatted, -1, buffer, bufferSize, NULL, NULL) : 0;
+    return result != 0 ? WideCharToMultiByte(CP_ACP, 0, formatted, -1, buffer, bufferSize, NULL, NULL) : 0;
 }
 
 void LoadHistory(HKEY regKey, const char* keyPattern, char** history,
