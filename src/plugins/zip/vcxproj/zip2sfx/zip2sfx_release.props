@@ -25,8 +25,11 @@
       <PreprocessorDefinitions>NDEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ResourceCompile>
     <PostBuildEvent>
-      <Command>call ..\..\..\..\..\tools\codesign\sign_with_retry.cmd "$(TargetPath)"
-               call copytozip2sfxdir.bat "$(OutDir)" $(TargetFileName)</Command>
+      <!-- zip2sfx is an x86 project inside the x64 solution build, so its post-build runs with the
+           working directory set to the MSBuild invocation dir (the repo root), not $(ProjectDir).
+           Reference both scripts through $(ProjectDir) so they resolve regardless of that directory. -->
+      <Command>call "$(ProjectDir)..\..\..\..\..\tools\codesign\sign_with_retry.cmd" "$(TargetPath)"
+               call "$(ProjectDir)copytozip2sfxdir.bat" "$(OutDir)" $(TargetFileName)</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
 </Project>
