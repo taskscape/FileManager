@@ -859,6 +859,46 @@ function Remove-OlderUiTestBuildResults {
     }
 }
 
+function Remove-ExpiredTestResults {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$ResultsDirectory,
+        [int]$MaxAgeDays = 7
+    )
+
+    # Each run leaves a multi-gigabyte build directory under TestResults; without pruning, a long
+    # series of local runs exhausts the disk and fails a later run mid-build. TestResults is a
+    # gitignored, fully disposable location, so drop every entry older than the retention window on
+    # every invocation. Cleanup is best effort and must never fail the test run; the current run's
+    # own fresh directories are newer than the cutoff and are always kept.
+    if (-not (Test-Path -LiteralPath $ResultsDirectory -PathType Container)) {
+        return
+    }
+
+    $cutoffUtc = [DateTime]::UtcNow.AddDays(-$MaxAgeDays)
+    foreach ($entry in @(Get-ChildItem -LiteralPath $ResultsDirectory -Force -ErrorAction SilentlyContinue)) {
+        if ($entry.LastWriteTimeUtc -ge $cutoffUtc) {
+            continue
+        }
+        $expiredPath = $entry.FullName
+        $removed = $false
+        for ($attempt = 1; $attempt -le 3 -and -not $removed; $attempt++) {
+            try {
+                Remove-Item -LiteralPath $expiredPath -Recurse -Force -ErrorAction Stop
+                $removed = $true
+            }
+            catch {
+                if ($attempt -lt 3) {
+                    Start-Sleep -Seconds 1
+                }
+                else {
+                    Write-Warning "Could not remove expired TestResults entry '$expiredPath': $($_.Exception.Message)"
+                }
+            }
+        }
+    }
+}
+
 if ($PrerequisiteOnly -and -not $ReleasePipeline) {
     throw '-PrerequisiteOnly is reserved for -ReleasePipeline because the ordinary runner intentionally allows optional diagnostic lanes.'
 }
@@ -904,6 +944,8 @@ if ([string]::IsNullOrWhiteSpace($env:FILEMANAGER_UI_TRANSCRIPT_ROOT)) {
 Write-Host "UI execution transcripts: $env:FILEMANAGER_UI_TRANSCRIPT_ROOT" -ForegroundColor Cyan
 # Prune interrupted runs before preflight checks can exit, so an unavailable toolchain cannot defer retention indefinitely.
 Remove-OlderUiTestBuildResults -ResultsDirectory $testResultsDirectory
+# Drop TestResults entries older than the 7-day retention window so repeated local runs do not fill the disk.
+Remove-ExpiredTestResults -ResultsDirectory $testResultsDirectory -MaxAgeDays 7
 
 $releaseGateBuildDirectory = $null
 $releaseGateResultDirectory = $null
