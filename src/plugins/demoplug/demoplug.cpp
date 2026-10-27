@@ -385,7 +385,7 @@ CPluginInterfaceAbstract* WINAPI SalamanderPluginEntry(CSalamanderPluginEntryAbs
     {                            // reject older versions
         MessageBox(salamander->GetParentWindow(),
 #ifdef DEMOPLUG_COMPATIBLE_WITH_500
-                   "This plugin requires Open Salamander 5.0 or later.",
+                   "This plugin requires File Manager 5.0 or later.",
 #else  // DEMOPLUG_COMPATIBLE_WITH_500
                    REQUIRE_LAST_VERSION_OF_SALAMANDER,
 #endif // DEMOPLUG_COMPATIBLE_WITH_500
@@ -702,7 +702,7 @@ CPluginInterface::Connect(HWND parent, CSalamanderConnectAbstract* salamander)
     salamander->AddSubmenuEnd();
     salamander->AddSubmenuEnd();
     salamander->AddMenuItem(-1, NULL, 0, 0, FALSE, 0, 0, MENU_SKILLLEVEL_ALL); // separator
-    salamander->AddMenuItem(-1, "&Controls provided by Open Salamander...", 0, MENUCMD_SHOWCONTROLS, FALSE, MENU_EVENT_TRUE, MENU_EVENT_TRUE,
+    salamander->AddMenuItem(-1, "&Controls provided by File Manager...", 0, MENUCMD_SHOWCONTROLS, FALSE, MENU_EVENT_TRUE, MENU_EVENT_TRUE,
                             MENU_SKILLLEVEL_BEGINNER | MENU_SKILLLEVEL_INTERMEDIATE | MENU_SKILLLEVEL_ADVANCED);
     salamander->AddMenuItem(-1, NULL, 0, MENUCMD_SEP, TRUE, 0, 0, MENU_SKILLLEVEL_ADVANCED); // separator
     salamander->AddMenuItem(-1, "Press Shift key when opening menu to hide this item", 0, MENUCMD_HIDDENITEM, TRUE, 0, 0, MENU_SKILLLEVEL_ADVANCED);

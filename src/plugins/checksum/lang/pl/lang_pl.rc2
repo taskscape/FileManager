@@ -62,7 +62,7 @@ STRINGTABLE
  IDS_CONFIG_CHANGES_EFFECT "Zmiany zostaną zastosowane przy następnym otwarciu okna 'Obliczanie sum kontrolnych'."
  IDS_ALLOK "Wszystkie pliki OK"
  IDS_RESULT "%d uszkodzonych, %d brakujących, %d pominiętych"
- IDS_BUSY "Program Open Salamander jest zajęty. Żądanego polecenia nie można wykonać, spróbuj ponownie później."
+ IDS_BUSY "Program File Manager jest zajęty. Żądanego polecenia nie można wykonać, spróbuj ponownie później."
  IDS_CLOSE "&Zamknij"
  IDS_READINGTREE "Odczytywanie drzewa katalogów, czekaj..."
  IDS_ERRORREADINGDIR "Błąd odczytu katalogu"

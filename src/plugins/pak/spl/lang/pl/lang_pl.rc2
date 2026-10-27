@@ -51,7 +51,7 @@ STRINGTABLE
  IDS_TOOLONGNAME2, "Nie można dodać pliku z powodu zbyt długiej nazwy."
  IDS_PACKING, "pakowanie: "
  IDS_UNABLEREAD, "Nie można odczytać z pliku: "
- IDS_ERRCONNECT, "Nie można połączyć wtyczki z programem Open Salamander."
+ IDS_ERRCONNECT, "Nie można połączyć wtyczki z programem File Manager."
  IDS_OPTIMIZING, "optymalizowanie, czekaj..."
  IDS_OPTPROGTITLE, "Optymalizowanie archiwum PAK - %s"
  IDS_NEEDOPT, "Usuwanie plików nie zostało pomyślnie zakończone. Może być konieczne uruchomienie optymalizacji PAK z menu wtyczki PAK, aby zapobiec marnowaniu miejsca na dysku."

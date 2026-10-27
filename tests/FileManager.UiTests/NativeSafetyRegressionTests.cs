@@ -2567,7 +2567,7 @@ public sealed class NativeSafetyRegressionTests
             Assert.That(configuration, Does.Contain("GetConfigurationSchemaDiagnostic"));
             Assert.That(configuration, Does.Contain("The default profile will be used."));
             Assert.That(startup, Does.Contain("GetConfigurationSchemaDiagnostic()"));
-            Assert.That(startup, Does.Contain("Open Salamander Configuration"));
+            Assert.That(startup, Does.Contain("File Manager Configuration"));
             Assert.That(architecture, Does.Contain("Each transactional generation has a schema version."));
         });
     }

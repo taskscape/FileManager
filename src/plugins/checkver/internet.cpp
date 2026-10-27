@@ -15,7 +15,7 @@ const char* SCRIPT_URL_FTP_CZ = "ftp://ftp.taskscape.com/pub/taskscape/salamand/
 const char* SCRIPT_URL_HTTP = "https://www.taskscape.com/salupdate40/";
 const char* SCRIPT_URL_HTTP_AFTERINSTALL = "https://www.taskscape.com/salupdatenew40/";
 
-const char* AGENT_NAME = "Open Salamander CheckVer Plugin";
+const char* AGENT_NAME = "File Manager CheckVer Plugin";
 const char* GetInetErrorText(DWORD dError);
 
 namespace

@@ -115,7 +115,7 @@ internal static class NativeCommands
 
     // Caption of the owner-less startup notice raised when a configuration
     // generation could not be validated (src/app_entry.cpp).
-    private const string ConfigurationNoticeCaption = "Open Salamander Configuration";
+    private const string ConfigurationNoticeCaption = "File Manager Configuration";
 
     [DllImport("user32.dll", SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]

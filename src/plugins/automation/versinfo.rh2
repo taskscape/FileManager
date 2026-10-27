@@ -1,5 +1,5 @@
 /*
-	Automation Plugin for Open Salamander
+	Automation Plugin for File Manager
 	
 	Copyright (c) 2009-2023 Milan Kase <manison@manison.cz>
 	Copyright (c) 2010-2023 Taskscape Ltd
@@ -23,9 +23,9 @@
 #include "spl_vers.h" // get version and build numbers
 
 #define VERSINFO_COPYRIGHT   "Copyright © 2009-2023 Taskscape Ltd"
-#define VERSINFO_COMPANY     "Open Salamander"
+#define VERSINFO_COMPANY     "File Manager"
 
-#define VERSINFO_DESCRIPTION "Automation plugin for Open Salamander"
+#define VERSINFO_DESCRIPTION "Automation plugin for File Manager"
 
 #ifdef _LANG
 #define VERSINFO_INTERNAL    "ENGLISH"

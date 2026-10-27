@@ -7,7 +7,7 @@ Build and verify a professional delivery package: one pane holds the working mat
 | Document | `handoff-spec.md` |
 | Status | Ready for implementation (v1) |
 | Date | 2026-10-03 |
-| Baseline | `main` at `165a2c9` (Open Salamander 6.0 line) |
+| Baseline | `main` at `165a2c9` (File Manager 6.0 line) |
 | Deliverable | New menu-extension plug-in `handoff.spl` (display name **Delivery Handoff**), its language modules, help, tests, CI and documentation updates |
 | SDK impact | None. Uses the existing plug-in SDK (`LAST_VERSION_OF_SALAMANDER`); no ABI change |
 | Supported OS | The installer floor, Windows 10 1809 (`Installer/setup.iss:38`, `MinVersion=10.0.17763`) and later; Win32 and x64 builds |
@@ -198,7 +198,7 @@ The **Specification** list in the build dialog is populated in this order (dupli
 3. Recently used specifications (up to 10) that still exist.
 4. **Browse…** for any other file.
 
-A specification is plain UTF-8 JSON. Edit it in any editor (for example focus it and press F4 in Open Salamander), then use **Validate**. **New Specification from Template…** creates a starting point: *Design studio handoff*, *Architecture drawing issue*, *Consultancy report delivery*, and *Client delivery (example)* — the last one implements the quick-start request.
+A specification is plain UTF-8 JSON. Edit it in any editor (for example focus it and press F4 in File Manager), then use **Validate**. **New Specification from Template…** creates a starting point: *Design studio handoff*, *Architecture drawing issue*, *Consultancy report delivery*, and *Client delivery (example)* — the last one implements the quick-start request.
 
 ### A.5.4 The review screen
 
@@ -257,7 +257,7 @@ Check each box when its acceptance criteria are met. Task IDs are stable; cite t
   - [x] Set `<LanguageStandard>stdcpplatest</LanguageStandard>` (precedent `src/plugins/ftp/vcxproj/ftp.vcxproj:105`) and add `..\..\..` to `AdditionalIncludeDirectories` so `common/relative_file_operations.h` resolves (precedent `src/plugins/ftp/vcxproj/ftp.props:8`, `src/plugins/ftp/precomp.h:23`).
   - [x] Add `vcxproj/lang_handoff.vcxproj` + `lang_handoff.props` (`ShortProjectName=handoff`) and `vcxproj/lang_pl_handoff.vcxproj` mirroring `src/plugins/checksum/vcxproj/lang_*.vcxproj`; outputs are `plugins\handoff\lang\english.slg` and `polish.slg` (`src/plugins/shared/vcxproj/lang_base.props:7-18`, `lang_pl_base.props:7-19`).
   - [x] `handoff.def` exports `SalamanderPluginEntry` and `SalamanderPluginGetReqVer` (copy `src/plugins/checksum/checksum.def`).
-  - [x] `versinfo.rh2` with plug-in version `1.0.0`, description "Delivery Handoff plugin for Open Salamander", copyright "Copyright © 2026 Taskscape Ltd".
+  - [x] `versinfo.rh2` with plug-in version `1.0.0`, description "Delivery Handoff plugin for File Manager", copyright "Copyright © 2026 Taskscape Ltd".
   - [x] Add the three projects to `src/vcxproj/salamand.sln` with all four solution configurations mapped, next to the other plug-in projects.
   - [x] Add base addresses (Debug builds link with `/BASE:@file,key`, `src/plugins/shared/vcxproj/plugin_debug.props:19`): `handoff 0x0000010021b00000`, `lang_handoff 0x0000010031b00000`, `lang_pl_handoff 0x0000010044600000` in `baseaddr_x64.txt`; `0x21b00000`, `0x31b00000`, `0x44600000` in `baseaddr_x86.txt`. These slots are unused at `165a2c9`; confirm with `dumpbin /headers` that `handoff.spl` (Debug) does not overlap the next module and move it if it does.
     - *Implementation note:* Done with a correction: the Debug x64 image (5.5 MB, C++/WinRT and debug STL) overlapped `folders` at `0x22000000`, so `handoff` moved to `0x000001002a800000` / `0x2a800000` (free up to `lang`). See C.13.1.
@@ -1433,7 +1433,7 @@ UTF-8 without BOM, LF line endings, two-space indentation, members in the order 
 ```json
 {
   "handoffManifest": 1,
-  "generator": { "name": "Open Salamander Delivery Handoff", "version": "1.0.0", "host": "6.0.1234" },
+  "generator": { "name": "File Manager Delivery Handoff", "version": "1.0.0", "host": "6.0.1234" },
   "package": {
     "name": "ACME-Rebrand_Delivery_2026-10-03_R01",
     "createdUtc": "2026-10-03T14:22:05Z",
@@ -1506,7 +1506,7 @@ Files:          8 (117.7 MB)
 SHA-256 checksums for every file are listed in manifest.csv and manifest.json.
 ```
 
-Sizes are formatted by the engine itself (it does not call the host) with binary multiples and one decimal (`310 KB`, `2.2 MB`), consistent with how Open Salamander displays sizes. With `groupBy: "rule"` sections are rule titles instead of folders. Variables are written only when they are used in `contents.title`/`notes` or the package name.
+Sizes are formatted by the engine itself (it does not call the host) with binary multiples and one decimal (`310 KB`, `2.2 MB`), consistent with how File Manager displays sizes. With `groupBy: "rule"` sections are rule titles instead of folders. Variables are written only when they are used in `contents.title`/`notes` or the package name.
 
 ### C.7.4 Build record
 

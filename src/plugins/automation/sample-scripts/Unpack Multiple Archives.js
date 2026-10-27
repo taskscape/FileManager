@@ -2,7 +2,7 @@
 //
 // Unpack Multiple Archives using 7-Zip archiver
 //
-// Microsoft JScript for Open Salamander Automation plugin
+// Microsoft JScript for File Manager Automation plugin
 // Contact us 
 //
 // Copyright (c) 2010-2023 Taskscape Ltd
@@ -79,7 +79,7 @@ var archivesMask = "*";                        // only archives with name matchi
 //   with opearation summary.
 //
 // Installation and Requirements:
-//   Open Salamander: https://www.taskscape.com/
+//   File Manager: https://www.taskscape.com/
 //   7-Zip: http://www.7-zip.org/ (download any Windows x86 or x64 version)
 //   Install both applications
 //   OPTIONAL: Set 'pathTo7Zip' variable to the 7z.exe.
@@ -394,8 +394,8 @@ function CheckVersions()
   {
     if (typeof(WScript) != "undefined")
     {
-      var infText = "This script requires Open Salamander with Automation plugin installed.\n";
-      infText += "Please download latest version of Open Salamander from www.taskscape.com.\n";
+      var infText = "This script requires File Manager with Automation plugin installed.\n";
+      infText += "Please download latest version of File Manager from www.taskscape.com.\n";
       infText += "Install it and use menu Plugins > Automation > Run Focused Script to start this script.";
       try
       {

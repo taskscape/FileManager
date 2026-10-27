@@ -16,9 +16,9 @@
 #include "spl_vers.h" // get version & build numbers
 
 #define VERSINFO_COPYRIGHT   _T("Copyright © 2000-2023 Taskscape Ltd")
-#define VERSINFO_COMPANY     _T("Open Salamander")
+#define VERSINFO_COMPANY     _T("File Manager")
 
-#define VERSINFO_DESCRIPTION "Picture Viewer for Open Salamander"
+#define VERSINFO_DESCRIPTION "Picture Viewer for File Manager"
 
 #ifdef _LANG
 # ifndef VERSINFO_INTERNAL

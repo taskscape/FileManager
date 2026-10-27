@@ -162,7 +162,7 @@ STRINGTABLE
  IDS_MENU_HELP_CHECK_UPDATES, "Sprawdź &aktualizacje..."
  IDS_MENU_HELP_UPDATE,      "Pobierz &aktualizację"
  IDS_MENU_HELP_ABOUTPLUGINS, "O &wtyczce"
- IDS_MENU_HELP_ABOUT,        "&Informacje o Open Salamander"
+ IDS_MENU_HELP_ABOUT,        "&Informacje o File Manager"
 
 //
 // menu znajdowania plików
@@ -312,7 +312,7 @@ STRINGTABLE
  IDS_DONTSHOWAGAINSS, "&Przerwij wyszukiwanie bez pytania następnym razem\tjak cofnąć\tMożesz zmienić tę opcję później na stronie Potwierdzenia w Konfiguracji."
  IDS_DONTSHOWAGAINCF, "&Zamknij okno Znajdź bez pytania następnym razem\tjak cofnąć\tMożesz zmienić tę opcję później na stronie Potwierdzenia w Konfiguracji."
  IDS_DONTSHOWAGAINAT, "&Włącz opcję Zawsze na wierzchu bez pytania następnym razem\tjak cofnąć\tMożesz zmienić tę opcję później na stronie Potwierdzenia w Konfiguracji."
- IDS_DONTSHOWAGAINCS, "&Zamknij program Open Salamander bez pytania następnym razem\tjak cofnąć\tMożesz zmienić tę opcję później na stronie Potwierdzenia w Konfiguracji."
+ IDS_DONTSHOWAGAINCS, "&Zamknij program File Manager bez pytania następnym razem\tjak cofnąć\tMożesz zmienić tę opcję później na stronie Potwierdzenia w Konfiguracji."
  IDS_DONTSHOWAGAINCD, "&Utwórz katalog bez pytania następnym razem\tjak cofnąć\tMożesz zmienić tę opcję później na stronie Potwierdzenia w Konfiguracji."
 
  IDS_CANTSHOWRESULTS, "Nie można pokazać wyników, brak pamięci."
@@ -546,7 +546,7 @@ STRINGTABLE
  IDS_PASTE_CHANGE_DIRECTORY, "Zmień katalog"
 
  IDS_ALWAYSONTOP, "Zawsze na wier&zchu"
- IDS_WANTALWAYSONTOP, "Opcja Zawsze na wierzchu uniemożliwia otwieranie innych okien aplikacji nad oknami programu Open Salamander. Nie będzie można otwierać tych okien na wierzchu, dopóki nie wyłączysz opcji Zawsze na wierzchu."
+ IDS_WANTALWAYSONTOP, "Opcja Zawsze na wierzchu uniemożliwia otwieranie innych okien aplikacji nad oknami programu File Manager. Nie będzie można otwierać tych okien na wierzchu, dopóki nie wyłączysz opcji Zawsze na wierzchu."
 
  IDS_EMPTYHOTPATHS, "Puste (użyj Ctrl+Shift+klawisz numeryczny, aby przypisać szybką ścieżkę)"
  IDS_NEWHOTPATH, "(Nowa szybka ścieżka)\tCtrl+Shift+="
@@ -604,7 +604,7 @@ STRINGTABLE
  IDS_EXECUTE_FULLPATH,    "Pełna ścieżka"
  IDS_EXECUTE_WINDIR,      "Katalog systemu Windows"
  IDS_EXECUTE_SYSDIR,      "Katalog systemowy"
- IDS_EXECUTE_SALDIR,      "Katalog programu Salamander"
+ IDS_EXECUTE_SALDIR,      "Katalog programu File Manager"
  IDS_EXECUTE_BROWSE,      "Przeglądaj..."
  IDS_EXECUTE_DOSFULLPATH, "Pełna ścieżka DOS"
  IDS_EXECUTE_DOSWINDIR,   "Katalog systemu Windows w formacie DOS"
@@ -812,7 +812,7 @@ STRINGTABLE
 
  IDS_TBTT_MENU,                 "Wejdź lub opuść menu"
  IDS_TBTT_ALTVIEW,              "Podgląd alternatywny"
- IDS_TBTT_EXIT,                 "Zakończ program Open Salamander"
+ IDS_TBTT_EXIT,                 "Zakończ program File Manager"
  IDS_TBTT_OCCUPIEDSPACE,        "Oblicz zajmowane miejsce\tAlt+F10"
  IDS_TBTT_EDITNEW,              "Edytuj nowy plik\tShift+F4"
  IDS_TBTT_CHANGEDIR,            "Zmień katalog\tShift+F7"
@@ -871,7 +871,7 @@ STRINGTABLE
  IDS_TEXTCOPIED, "Tekst został pomyślnie skopiowany do schowka."
  IDS_COPYTOCLIPBOARD, "&Kopiuj do schowka"
 
- IDS_CONFIGHOWTOIMPORT, "Importowanie konfiguracji jest proste. Wystarczy znaleźć plik z konfiguracją i go otworzyć (klawisz Enter lub podwójne kliknięcie). Powinien zostać otwarty w Edytorze rejestru. Gdy pojawi się pytanie, czy chcesz dodać informacje z pliku do rejestru, zamknij wszystkie uruchomione wystąpienia programu Open Salamander. Zapobiegnie to nadpisaniu nowo zaimportowanej konfiguracji przez automatyczny zapis konfiguracji przy zamykaniu programu Open Salamander. Gdy żadne wystąpienie programu Open Salamander nie jest uruchomione, naciśnij Tak w oknie pytania Edytora rejestru. Wtedy konfiguracja zostanie zaimportowana z pliku do rejestru."
+ IDS_CONFIGHOWTOIMPORT, "Importowanie konfiguracji jest proste. Wystarczy znaleźć plik z konfiguracją i go otworzyć (klawisz Enter lub podwójne kliknięcie). Powinien zostać otwarty w Edytorze rejestru. Gdy pojawi się pytanie, czy chcesz dodać informacje z pliku do rejestru, zamknij wszystkie uruchomione wystąpienia programu File Manager. Zapobiegnie to nadpisaniu nowo zaimportowanej konfiguracji przez automatyczny zapis konfiguracji przy zamykaniu programu File Manager. Gdy żadne wystąpienie programu File Manager nie jest uruchomione, naciśnij Tak w oknie pytania Edytora rejestru. Wtedy konfiguracja zostanie zaimportowana z pliku do rejestru."
 
  IDS_ERRORUNPACK, "Błąd rozpakowywania archiwum"
 
@@ -1161,7 +1161,7 @@ STRINGTABLE
 
 // schemat kolorów
  IDS_COLORSCHEME_CUSTOM, "Niestandardowy"
- IDS_COLORSCHEME_SALAMANDER, "Open Salamander"
+ IDS_COLORSCHEME_SALAMANDER, "File Manager"
  IDS_COLORSCHEME_EXPLORER, "Windows Explorer"
  IDS_COLORSCHEME_NORTON, "Norton Commander"
  IDS_COLORSCHEME_NAVIGATOR, "DOS Navigator"
@@ -1203,7 +1203,7 @@ STRINGTABLE
 
  IDS_CUSTOMIZE_HOTPATHS, "Dostosuj..."
 
- IDS_CONTEXTMENU_EXIT, "Zakończ program Open Salamander"
+ IDS_CONTEXTMENU_EXIT, "Zakończ program File Manager"
 
 // Podpowiedzi wiersza katalogu i wiersza stanu
  IDS_PANELFILTER, "Filtr jest włączony"
@@ -1236,12 +1236,12 @@ STRINGTABLE
  IDS_DROPCANCEL, "Anuluj"
 
  IDS_UNABLETOLOADPLUGIN, "Nie można załadować wtyczki %s (%s) lub niektórych jej składników.\nBłąd: %s\nZobacz szczegóły wtyczki w menu Wtyczki / Menedżer wtyczek."
- IDS_UNABLETOFINDPLUGINENTRY, "Plik SPL %s nie jest wtyczką programu Open Salamander."
+ IDS_UNABLETOFINDPLUGINENTRY, "Plik SPL %s nie jest wtyczką programu File Manager."
  IDS_REINSTALLPLUGIN, "Wtyczka %s (%s) została zmieniona. Zainstaluj ponownie (usuń i dodaj) tę wtyczkę (w menu Wtyczki / Menedżer wtyczek)."
- IDS_PLUGININVALID, "Wtyczka %s (%s) nie została załadowana. Wtyczka nie jest prawidłową wtyczką programu Open Salamander lub wystąpił wewnętrzny błąd wtyczki."
- IDS_PLUGININVALID2, "Ta wtyczka (%s) nie została załadowana. Wtyczka nie jest prawidłową wtyczką programu Open Salamander lub wystąpił wewnętrzny błąd wtyczki."
- IDS_OLDPLUGINVERSION, "Wtyczka %s (%s) nie jest obsługiwana przez tę wersję programu Open Salamander. Pobierz zaktualizowaną wersję tej wtyczki."
- IDS_OLDPLUGINVERSION2, "Wtyczka (%s) nie jest obsługiwana przez tę wersję programu Open Salamander. Pobierz zaktualizowaną wersję tej wtyczki."
+ IDS_PLUGININVALID, "Wtyczka %s (%s) nie została załadowana. Wtyczka nie jest prawidłową wtyczką programu File Manager lub wystąpił wewnętrzny błąd wtyczki."
+ IDS_PLUGININVALID2, "Ta wtyczka (%s) nie została załadowana. Wtyczka nie jest prawidłową wtyczką programu File Manager lub wystąpił wewnętrzny błąd wtyczki."
+ IDS_OLDPLUGINVERSION, "Wtyczka %s (%s) nie jest obsługiwana przez tę wersję programu File Manager. Pobierz zaktualizowaną wersję tej wtyczki."
+ IDS_OLDPLUGINVERSION2, "Wtyczka (%s) nie jest obsługiwana przez tę wersję programu File Manager. Pobierz zaktualizowaną wersję tej wtyczki."
 
  IDS_UPDATEFAILED, "Spakowanie zaktualizowanych plików do archiwum nie powiodło się. Czy chcesz spróbować ponownie? Jeśli wybierzesz NIE, powrócisz do okna dialogowego Aktualizacja archiwum, dzięki czemu będzie można skopiować zaktualizowane pliki do wybranego katalogu na dysku (do późniejszego spakowania do archiwum)."
 
@@ -1272,8 +1272,8 @@ STRINGTABLE
  IDS_EMPTYNAMENOTALLOWED, "Pusta nazwa nie ma tu sensu."
  IDS_INCOMLETEFILENAME, "Podana ścieżka jest niekompletna, podaj pełną ścieżkę."
 
- IDS_SALAMANDBUSY, "Uruchomione wystąpienie programu Open Salamander jest zajęte.\nCzy chcesz uruchomić nowe wystąpienie?"
- IDS_SALAMANDBUSY2, "Program Open Salamander jest zajęty. Nie można wykonać żądanego polecenia, spróbuj ponownie później."
+ IDS_SALAMANDBUSY, "Uruchomione wystąpienie programu File Manager jest zajęte.\nCzy chcesz uruchomić nowe wystąpienie?"
+ IDS_SALAMANDBUSY2, "Program File Manager jest zajęty. Nie można wykonać żądanego polecenia, spróbuj ponownie później."
 
  IDS_VIEWERCOPYTOFILE, "Kopiuj do pliku"
 
@@ -1317,7 +1317,7 @@ STRINGTABLE
  IDS_ERRORCREATINGROOTDIR, "Katalog jest katalogiem głównym."
  IDS_ERR_FILEOPEN, "Błąd pobierania właściwości pliku."
 
- IDS_NOTARCHIVEPATH, "Podana ścieżka zawiera ścieżkę do pliku. Plik nie jest zarejestrowanym plikiem archiwum (patrz Konfiguracja/Archiwizatory panelu/Rozszerzenia), więc program Open Salamander nie wie, jak go otworzyć."
+ IDS_NOTARCHIVEPATH, "Podana ścieżka zawiera ścieżkę do pliku. Plik nie jest zarejestrowanym plikiem archiwum (patrz Konfiguracja/Archiwizatory panelu/Rozszerzenia), więc program File Manager nie wie, jak go otworzyć."
  IDS_PATHNOTFOUND, "Nie znaleziono podanej ścieżki."
  IDS_NOTPLUGINFS, "Podana ścieżka zawiera nieznany system plików wtyczki (jego nazwa znajduje się przed ':',\npatrz menu Wtyczki / Menedżer wtyczek, aby poznać znane systemy plików wtyczek)."
 
@@ -1337,7 +1337,7 @@ STRINGTABLE
  IDS_SAVINGCONFIGURATION, "Zapisywanie konfiguracji do rejestru, proszę czekać..."
  IDS_DELETINGCONFIGURATION, "Usuwanie starej konfiguracji z rejestru, proszę czekać..."
 
- IDS_SAVECFG_EXPFILEEXISTS, "Znaleziono plik „%s”. Ten plik zawiera wyeksportowaną konfigurację, która jest ładowana przy każdym uruchomieniu programu Open Salamander. Jeśli nie chcesz ładować konfiguracji z tego pliku, zmień jego nazwę lub usuń go. Naciśnij OK, aby zapisać konfigurację, lub Anuluj, aby skupić plik."
+ IDS_SAVECFG_EXPFILEEXISTS, "Znaleziono plik „%s”. Ten plik zawiera wyeksportowaną konfigurację, która jest ładowana przy każdym uruchomieniu programu File Manager. Jeśli nie chcesz ładować konfiguracji z tego pliku, zmień jego nazwę lub usuń go. Naciśnij OK, aby zapisać konfigurację, lub Anuluj, aby skupić plik."
 
  IDS_FSFORCECLOSE, "Ścieżka „%s” odmówiła zamknięcia.\nCzy chcesz wymusić jej zamknięcie?"
 
@@ -1358,7 +1358,7 @@ STRINGTABLE
 
  IDS_NEWISNOTAVAILABLE, "Menu Nowy jest niedostępne."
 
- IDS_TMPDIRERROR, "Katalog określony przez zmienne środowiskowe TMP lub TEMP nie istnieje lub nie jest dostępny. Program Open Salamander użyje katalogu systemowego dla plików tymczasowych."
+ IDS_TMPDIRERROR, "Katalog określony przez zmienne środowiskowe TMP lub TEMP nie istnieje lub nie jest dostępny. Program File Manager użyje katalogu systemowego dla plików tymczasowych."
 
  IDS_UPDIRTYPENAME, "Katalog nadrzędny"
 
@@ -1377,7 +1377,7 @@ STRINGTABLE
 
  IDS_PLUGINSUFFIX, " (Wtyczka)"
 
- IDS_CURRENTPROCESSBREAK, "Nie można przerwać tego zadania (nie ma to sensu). Użyj innego zadania programu Open Salamander, aby przerwać to zadanie."
+ IDS_CURRENTPROCESSBREAK, "Nie można przerwać tego zadania (nie ma to sensu). Użyj innego zadania programu File Manager, aby przerwać to zadanie."
  IDS_CURRENTPROCESSTERMINATE, "Czy na pewno chcesz zakończyć bieżący proces?\n\nOSTRZEŻENIE: Wszystkie niezapisane dane w bieżącym procesie zostaną utracone!"
  IDS_CONFIRM_TERMINATE, "Czy na pewno chcesz zakończyć określony proces?\n\nOSTRZEŻENIE: Wszystkie niezapisane dane w określonym procesie zostaną utracone!"
  IDS_CONFIRM_BREAK, "Czy na pewno chcesz przerwać określony proces i wysłać nam raport o błędzie?\n\nOSTRZEŻENIE: Wszystkie niezapisane dane w określonym procesie zostaną utracone!"
@@ -1393,14 +1393,14 @@ STRINGTABLE
 
  IDS_INVALIDNUMBER, "Nieprawidłowa liczba."
 
- IDS_CLEARHISTORY_CNFRM, "Czy na pewno chcesz, aby program Open Salamander usunął wszystkie dane dotyczące historii?\n\nHistoria wiersza poleceń, kopiowania, przenoszenia, zaznaczania, katalogów roboczych, otwartych plików, znajdowania, wtyczek itp. zostanie usunięta."
- IDS_HISTORY_WAS_CLEARED, "Wszystkie dane dotyczące historii zostały wyczyszczone z pamięci.\n\nRozważ zapisanie konfiguracji programu Open Salamander.\nSpowoduje to usunięcie danych dotyczących historii również z rejestru."
+ IDS_CLEARHISTORY_CNFRM, "Czy na pewno chcesz, aby program File Manager usunął wszystkie dane dotyczące historii?\n\nHistoria wiersza poleceń, kopiowania, przenoszenia, zaznaczania, katalogów roboczych, otwartych plików, znajdowania, wtyczek itp. zostanie usunięta."
+ IDS_HISTORY_WAS_CLEARED, "Wszystkie dane dotyczące historii zostały wyczyszczone z pamięci.\n\nRozważ zapisanie konfiguracji programu File Manager.\nSpowoduje to usunięcie danych dotyczących historii również z rejestru."
 
  IDS_UNPACK_ONLYDISK, "Rozpakowywanie do archiwów lub systemów plików wtyczek nie jest jeszcze obsługiwane."
  IDS_UNPACK_OPMASKSNOTSUP, "Maski operacji nie są obsługiwane podczas rozpakowywania z archiwów (ścieżka docelowa musi istnieć lub kończyć się znakiem ukośnika odwrotnego)."
 
- IDS_LANGUAGE_CHANGE, "Zmiany języka zaczną obowiązywać dopiero po ponownym uruchomieniu programu Open Salamander."
- IDS_CONVERSION_CHANGE, "Zmiany tabeli konwersji zaczną obowiązywać dopiero po ponownym uruchomieniu programu Open Salamander."
+ IDS_LANGUAGE_CHANGE, "Zmiany języka zaczną obowiązywać dopiero po ponownym uruchomieniu programu File Manager."
+ IDS_CONVERSION_CHANGE, "Zmiany tabeli konwersji zaczną obowiązywać dopiero po ponownym uruchomieniu programu File Manager."
 
  IDS_FSCOPYMOVE_ONLYDISK_A, "Ten system plików wtyczki nie obsługuje kopiowania ani przenoszenia do archiwów."
  IDS_FSCOPYMOVE_ONLYDISK_FS, "Ten system plików wtyczki nie obsługuje kopiowania ani przenoszenia do określonego systemu plików wtyczki."
@@ -1424,7 +1424,7 @@ STRINGTABLE
  IDS_CONFIRM_DELETE, "Czy na pewno chcesz usunąć %s?"
  IDS_CONFIRM_DELETE2, "Czy na pewno chcesz usunąć %s?\n\nWszystkie pliki pasujące do masek kosza zostaną wysłane do Kosza."
 
- IDS_DELETETMPSALDIRS, "{!}Czy chcesz usunąć %d tymczasow{y|1|e|e} katalog{||1|i|ów} używany{e|1|e|e} przez poprzednie wystąpienia programu Open Salamander?"
+ IDS_DELETETMPSALDIRS, "{!}Czy chcesz usunąć %d tymczasow{y|1|e|e} katalog{||1|i|ów} używany{e|1|e|e} przez poprzednie wystąpienia programu File Manager?"
  IDS_DELETETMPSALDIRS_YES, "&Tak";
  IDS_DELETETMPSALDIRS_NO, "&Nie";
  IDS_DELETETMPSALDIRS_FOCUS, "&Skup";
@@ -1488,7 +1488,7 @@ STRINGTABLE
  IDS_UNABLETOEDITDUPFILES, "Nie można edytować ani otwierać pliku z archiwum. Nazwa tego pliku jest używana przez więcej niż jeden plik w archiwum (takie pliki można otwierać tylko w przeglądarkach)."
  IDS_UNABLETOEDITINVFILES, "Nie można edytować ani otwierać pliku z archiwum. Nazwa tego pliku jest nieprawidłowa w systemach plików Windows (takie pliki można otwierać tylko w przeglądarkach)."
 
- IDS_EDITPACKNOTSUPPORTED, "Pakowanie do tego typu archiwum nie jest obsługiwane. Program Open Salamander nie będzie w stanie zaktualizować pliku w archiwum.\n\nCzy nadal chcesz edytować ten plik?"
+ IDS_EDITPACKNOTSUPPORTED, "Pakowanie do tego typu archiwum nie jest obsługiwane. Program File Manager nie będzie w stanie zaktualizować pliku w archiwum.\n\nCzy nadal chcesz edytować ten plik?"
 
  IDS_UNPACKINGFILEFROMARC, "Rozpakowywanie pliku z archiwum, proszę czekać..."
  IDS_LISTINGARCHIVE, "Odczyt listy plików i katalogów z archiwum, proszę czekać..."
@@ -1565,8 +1565,8 @@ STRINGTABLE
 
  IDS_ARCFILESNOTFOUND, "Nie można rozpakować plików i katalogów określonych w schowku. Nie ma ich już w archiwum."
  IDS_ARCFILESNOTFOUND2, "Niektóre pliki lub katalogi określone w schowku nie zostały znalezione w archiwum.\n\nCzy chcesz kontynuować?"
- IDS_ARCUNABLETOPASTE1, "Nie można wkleić plików i katalogów ze schowka tutaj. Główne okno programu Open Salamander\nmusi być dostępne, aby przetworzyć polecenie Wklej."
- IDS_ARCUNABLETOPASTE2, "Nie można teraz wkleić plików i katalogów ze schowka. Główne okno programu Open Salamander\nmusi być dostępne, aby przetworzyć polecenie Wklej."
+ IDS_ARCUNABLETOPASTE1, "Nie można wkleić plików i katalogów ze schowka tutaj. Główne okno programu File Manager\nmusi być dostępne, aby przetworzyć polecenie Wklej."
+ IDS_ARCUNABLETOPASTE2, "Nie można teraz wkleić plików i katalogów ze schowka. Główne okno programu File Manager\nmusi być dostępne, aby przetworzyć polecenie Wklej."
 
  IDS_INFODLGFLAG7, "obsługuje strumienie nazwane"
  IDS_INFODLGFLAG8, "wolumin tylko do odczytu"
@@ -1584,7 +1584,7 @@ STRINGTABLE
 
  IDS_EDITNEWALREADYEX, "Plik już istnieje. Czy chcesz edytować ten istniejący plik?"
 
- IDS_SRCPATHUNICODEONLY, "Ścieżki źródłowej nie można przetłumaczyć z formatu Unicode na format wielobajtowy, więc program Open Salamander nie może na niej pracować."
+ IDS_SRCPATHUNICODEONLY, "Ścieżki źródłowej nie można przetłumaczyć z formatu Unicode na format wielobajtowy, więc program File Manager nie może na niej pracować."
  IDS_SRCFILESNOTFOUND, "Niektóre pliki lub katalogi określone w operacji przeciągnij i upuść lub w schowku nie zostały znalezione.\n\nCzy chcesz kontynuować?"
 
  IDS_PLUGINPACKERNOTFOUND, "Nie można znaleźć pakowacza dla wtyczki %s (zobacz Pakowacze na stronie okna dialogowego Pakowanie w Konfiguracji)."
@@ -1664,21 +1664,21 @@ STRINGTABLE
  IDS_CNFRM_STOPFIND, "Czy chcesz przerwać wyszukiwanie? (w poleceniu Znajdź pliki i katalogi)"
  IDS_CNFRM_CREATEPATH, "Czy chcesz utworzyć ścieżkę docelową? (w operacjach Kopiuj/Przenieś)"
  IDS_CNFRM_ALWAYSONTOP, "Czy chcesz włączyć opcję Zawsze na wierzchu?"
- IDS_CNFRM_ONSALCLOSE, "Czy chcesz zamknąć program Open Salamander?"
+ IDS_CNFRM_ONSALCLOSE, "Czy chcesz zamknąć program File Manager?"
  IDS_CNFRM_ONSENDEMAIL, "Czy chcesz wysłać zaznaczone pliki e-mailem?"
  IDS_CNFRM_ONADDTOARCHIVE, "Czy chcesz dodać pliki do istniejącego archiwum?"
  IDS_CNFRM_ONCREATEDIR, "Katalog nie istnieje. Czy chcesz go utworzyć?"
  IDS_CNFRM_COPYMOVEOPTNS, "Kopiuj/Przenieś do archiwów i systemu plików wtyczek: opcje zostaną zignorowane."
 
- IDS_CANCLOSESALAMANDER, "Czy chcesz zamknąć program Open Salamander?"
+ IDS_CANCLOSESALAMANDER, "Czy chcesz zamknąć program File Manager?"
 
  IDS_PLUGINURLNONE, "(brak)"
 
- IDS_SHELLEXTBREAK, "Główne okno programu Open Salamander zostało zniszczone przez wadliwe rozszerzenie powłoki. Wyślij nam następujący raport o błędzie, aby pomóc nam rozwiązać ten problem.\n\nNaciśnij OK, aby otworzyć okno dialogowe Raport o błędzie."
+ IDS_SHELLEXTBREAK, "Główne okno programu File Manager zostało zniszczone przez wadliwe rozszerzenie powłoki. Wyślij nam następujący raport o błędzie, aby pomóc nam rozwiązać ten problem.\n\nNaciśnij OK, aby otworzyć okno dialogowe Raport o błędzie."
  IDS_SHELLEXTBREAK2, "Wadliwe rozszerzenie powłoki zniszczyło nasze okno. Wyślij nam następujący raport o błędzie, aby pomóc nam rozwiązać ten problem.\n\nNaciśnij OK, aby otworzyć okno dialogowe Raport o błędzie."
- IDS_SHELLEXTCRASH, "Program Open Salamander staje się niestabilny z powodu wadliwego rozszerzenia powłoki. Wyślij nam następujący raport o błędzie, aby pomóc nam rozwiązać ten problem.\n\nNaciśnij OK, aby otworzyć okno dialogowe Raport o błędzie."
- IDS_SHELLEXTBREAK3, "To okno nie może zostać teraz zamknięte, ponieważ istnieje oczekujące zadanie, które go używa. Naciśnij Kontynuuj i poczekaj, aż zadanie zostanie zakończone.\n\nJeśli nie ma takiego zadania, naciśnij Przerwij i wyślij nam raport o błędzie, aby pomóc nam rozwiązać ten problem. Program Open Salamander zostanie zakończony."
- IDS_SHELLEXTBREAK4, "Nie można wykonać nowego zadania, ponieważ wykonywanie poprzedniego zadania nie zostało jeszcze zakończone. Naciśnij Kontynuuj i poczekaj na wykonanie poprzedniego zadania.\n\nJeśli nie ma takiego zadania, naciśnij Przerwij i wyślij nam raport o błędzie, aby pomóc nam rozwiązać ten problem. Program Open Salamander zostanie zakończony."
+ IDS_SHELLEXTCRASH, "Program File Manager staje się niestabilny z powodu wadliwego rozszerzenia powłoki. Wyślij nam następujący raport o błędzie, aby pomóc nam rozwiązać ten problem.\n\nNaciśnij OK, aby otworzyć okno dialogowe Raport o błędzie."
+ IDS_SHELLEXTBREAK3, "To okno nie może zostać teraz zamknięte, ponieważ istnieje oczekujące zadanie, które go używa. Naciśnij Kontynuuj i poczekaj, aż zadanie zostanie zakończone.\n\nJeśli nie ma takiego zadania, naciśnij Przerwij i wyślij nam raport o błędzie, aby pomóc nam rozwiązać ten problem. Program File Manager zostanie zakończony."
+ IDS_SHELLEXTBREAK4, "Nie można wykonać nowego zadania, ponieważ wykonywanie poprzedniego zadania nie zostało jeszcze zakończone. Naciśnij Kontynuuj i poczekaj na wykonanie poprzedniego zadania.\n\nJeśli nie ma takiego zadania, naciśnij Przerwij i wyślij nam raport o błędzie, aby pomóc nam rozwiązać ten problem. Program File Manager zostanie zakończony."
 
  IDS_NEWLYCREATEDFILE, "Plik już istnieje. Czy chcesz go zastąpić?"
 
@@ -1703,7 +1703,7 @@ STRINGTABLE
  IDS_NAMEMANGLE_LOWERCASE, "Małymi literami"
  IDS_NAMEMANGLE_UPPERCASE, "Wielkimi literami"
 
- IDS_SIZEMODE_BYTES, "W bajtach (domyślne dla programu Open Salamander)"
+ IDS_SIZEMODE_BYTES, "W bajtach (domyślne dla programu File Manager)"
  IDS_SIZEMODE_KB, "W kilobajtach (domyślne dla Eksploratora Windows)"
  IDS_SIZEMODE_MIXED, "W formacie skróconym (na przykład 15 B, 3,41 KB lub 12,5 MB)"
 
@@ -1722,7 +1722,7 @@ STRINGTABLE
  IDS_DONTSHOWAGAIN2, "&Nie pokazuj tego komunikatu ponownie"
 
  IDS_HOTKEY_PLUGIN_CONFLICT, "Obecnie przypisany do: %s"
- IDS_HOTKEY_SAL_CONFLICT, "Ten skrót należy do programu Open Salamander. Wybierz inny."
+ IDS_HOTKEY_SAL_CONFLICT, "Ten skrót należy do programu File Manager. Wybierz inny."
 
  IDS_FINDIGNORE_RESET, "Czy na pewno chcesz ustawić ścieżki na wartości domyślne?"
 
@@ -1747,14 +1747,14 @@ STRINGTABLE
  IDS_MSGBOXBTN_SKIPALL, "Pomiń &wszystkie"
  IDS_MSGBOXBTN_FOCUS, "&Skup"
 
- IDS_CANTLOADPLUGINSLG1, "Nie można załadować tej wtyczki w aktualnie używanym języku. Plik języka wtyczki %s nie został znaleziony lub jest nieprawidłowy. Program Open Salamander spróbuje wyszukać inny plik języka wtyczki (.SLG)."
- IDS_CANTLOADPLUGINSLG2, "Nie można załadować modułu języka wtyczki, który był wcześniej używany przez tę wtyczkę. Plik języka wtyczki %s nie został znaleziony lub jest nieprawidłowy. Program Open Salamander spróbuje wyszukać inny plik języka wtyczki (.SLG)."
+ IDS_CANTLOADPLUGINSLG1, "Nie można załadować tej wtyczki w aktualnie używanym języku. Plik języka wtyczki %s nie został znaleziony lub jest nieprawidłowy. Program File Manager spróbuje wyszukać inny plik języka wtyczki (.SLG)."
+ IDS_CANTLOADPLUGINSLG2, "Nie można załadować modułu języka wtyczki, który był wcześniej używany przez tę wtyczkę. Plik języka wtyczki %s nie został znaleziony lub jest nieprawidłowy. Program File Manager spróbuje wyszukać inny plik języka wtyczki (.SLG)."
  IDS_PLUGINSLGNOTFOUND, "Wygląda na to, że nie masz żadnych modułów języka (.SLG) dla tej wtyczki (patrz podkatalog LANG wtyczki)."
  IDS_DONOTSHOWCANTLOADPLUGINSLG, "&Nie pokazuj tego komunikatu dla innych wtyczek"
 
- IDS_CORRUPTEDCONFIGFOUND, "Konfiguracja zapisana w rejestrze jest uszkodzona, więc nie można jej załadować. Program Open Salamander został prawdopodobnie zakończony podczas zapisywania konfiguracji. Dzieje się tak głównie, gdy program Open Salamander nadal działa podczas zamykania systemu (lub wylogowania). Aby zapobiec temu problemowi, zamknij program Open Salamander przed zamknięciem systemu (lub wylogowaniem).\n\nMożesz teraz wykonać kopię zapasową uszkodzonej konfiguracji (uruchom RegEdit.exe, zmień nazwę klucza HKEY_CURRENT_USER\\%s). Później możesz spróbować pobrać niektóre ustawienia z tej kopii zapasowej (Menu użytkownika, Szybkie ścieżki, zakładki FTP itp.).\n\nUszkodzona konfiguracja musi zostać usunięta z rejestru przed uruchomieniem programu Open Salamander."
+ IDS_CORRUPTEDCONFIGFOUND, "Konfiguracja zapisana w rejestrze jest uszkodzona, więc nie można jej załadować. Program File Manager został prawdopodobnie zakończony podczas zapisywania konfiguracji. Dzieje się tak głównie, gdy program File Manager nadal działa podczas zamykania systemu (lub wylogowania). Aby zapobiec temu problemowi, zamknij program File Manager przed zamknięciem systemu (lub wylogowaniem).\n\nMożesz teraz wykonać kopię zapasową uszkodzonej konfiguracji (uruchom RegEdit.exe, zmień nazwę klucza HKEY_CURRENT_USER\\%s). Później możesz spróbować pobrać niektóre ustawienia z tej kopii zapasowej (Menu użytkownika, Szybkie ścieżki, zakładki FTP itp.).\n\nUszkodzona konfiguracja musi zostać usunięta z rejestru przed uruchomieniem programu File Manager."
  IDS_CORRUPTEDCONFIGREMOVEBTN, "&Usuń konfigurację"
- IDS_CHANGEDSHUTDOWNPARS, "Używasz niestandardowych wartości następujących parametrów używanych podczas wylogowywania i zamykania systemu. Prawdopodobnie powoduje to uszkodzenie konfiguracji programu Open Salamander (jest ona kończona podczas zapisywania konfiguracji).\n\nHKEY_CURRENT_USER\\Control Panel\\Desktop\\WaitToKillAppTimeout powinno mieć wartość 20000.\nHKEY_CURRENT_USER\\Control Panel\\Desktop\\AutoEndTasks powinno mieć wartość 0."
+ IDS_CHANGEDSHUTDOWNPARS, "Używasz niestandardowych wartości następujących parametrów używanych podczas wylogowywania i zamykania systemu. Prawdopodobnie powoduje to uszkodzenie konfiguracji programu File Manager (jest ona kończona podczas zapisywania konfiguracji).\n\nHKEY_CURRENT_USER\\Control Panel\\Desktop\\WaitToKillAppTimeout powinno mieć wartość 20000.\nHKEY_CURRENT_USER\\Control Panel\\Desktop\\AutoEndTasks powinno mieć wartość 0."
 
  IDS_COMPAREFILESORDIRS, "Określ, czy chcesz porównać pliki, czy katalogi."
  IDS_MSGBOXBTN_FILES, "&Pliki"
@@ -1764,7 +1764,7 @@ STRINGTABLE
 
  IDS_INVALIDESCAPEPATH, "Ścieżka, do której należy przejść, gdy ścieżka w panelu jest niedostępna, jest nieprawidłowa. Popraw tę ścieżkę w konfiguracji na stronie Napędy."
  
- IDS_SHEXT_NOTLOADEDYET, "Operacja przeciągnij i upuść z archiwum lub systemu plików wtyczki nie powiodła się. Usuń niechcianie utworzony katalog DROPFAKE (jeśli istnieje) z katalogu docelowego.\n\nPowinno to mieć miejsce tylko bezpośrednio po instalacji lub jeśli cel upuszczenia nie jest ani Eksploratorem Windows, ani programem Open Salamander. Jeśli celem upuszczenia jest Eksplorator Windows, uruchom ponownie system Windows, aby rozwiązać ten problem (zaawansowani użytkownicy mogą po prostu zakończyć proces explorer.exe i uruchomić go ponownie)."
+ IDS_SHEXT_NOTLOADEDYET, "Operacja przeciągnij i upuść z archiwum lub systemu plików wtyczki nie powiodła się. Usuń niechcianie utworzony katalog DROPFAKE (jeśli istnieje) z katalogu docelowego.\n\nPowinno to mieć miejsce tylko bezpośrednio po instalacji lub jeśli cel upuszczenia nie jest ani Eksploratorem Windows, ani programem File Manager. Jeśli celem upuszczenia jest Eksplorator Windows, uruchom ponownie system Windows, aby rozwiązać ten problem (zaawansowani użytkownicy mogą po prostu zakończyć proces explorer.exe i uruchomić go ponownie)."
  
  IDS_SALAMANDERICON_DEFAULT, "Domyślna"
  IDS_SALAMANDERICON_RED, "Czerwona"
@@ -1788,17 +1788,17 @@ STRINGTABLE
  
  IDS_SELLANGEXITBUTTON, "&Zakończ"
  
- IDS_PLUGINSAVEFAILED, "Nie można zapisać konfiguracji wtyczki %s (błąd otwierania klucza konfiguracji programu Open Salamander).\n\nCzy nadal chcesz ją zwolnić?"
+ IDS_PLUGINSAVEFAILED, "Nie można zapisać konfiguracji wtyczki %s (błąd otwierania klucza konfiguracji programu File Manager).\n\nCzy nadal chcesz ją zwolnić?"
  
  IDS_ICONOVRLS_NAME, "Nazwa"
  IDS_ICONOVRLS_DESCR, "Opis"
- IDS_ICONOVRLS_CHANGE, "Zmiany nakładek ikon zaczną obowiązywać dopiero po ponownym uruchomieniu programu Open Salamander."
- IDS_ICONOVRLS_CRASH, "Program Open Salamander stał się niestabilny. Wystąpił nieobsłużony wyjątek w programie obsługi nakładek ikon %s. Możesz zapobiec podobnym awariom, jeśli program Open Salamander nie będzie używał tego programu obsługi (kliknij przycisk Ten) lub przestanie wyświetlać niestandardowe nakładki ikon w ogóle (kliknij przycisk Wszystkie). Możesz też spróbować uaktualnić oprogramowanie udostępniające ten program obsługi ().\n\nKtóre programy obsługi nakładek ikon chcesz wyłączyć?\n\nUwaga: nakładki ikon można skonfigurować w oknie dialogowym konfiguracji (patrz strona Nakładki ikon)."
+ IDS_ICONOVRLS_CHANGE, "Zmiany nakładek ikon zaczną obowiązywać dopiero po ponownym uruchomieniu programu File Manager."
+ IDS_ICONOVRLS_CRASH, "Program File Manager stał się niestabilny. Wystąpił nieobsłużony wyjątek w programie obsługi nakładek ikon %s. Możesz zapobiec podobnym awariom, jeśli program File Manager nie będzie używał tego programu obsługi (kliknij przycisk Ten) lub przestanie wyświetlać niestandardowe nakładki ikon w ogóle (kliknij przycisk Wszystkie). Możesz też spróbować uaktualnić oprogramowanie udostępniające ten program obsługi ().\n\nKtóre programy obsługi nakładek ikon chcesz wyłączyć?\n\nUwaga: nakładki ikon można skonfigurować w oknie dialogowym konfiguracji (patrz strona Nakładki ikon)."
  IDS_ICONOVRLS_DISTHIS, "&Ten"
  IDS_ICONOVRLS_DISALL, "&Wszystkie"
  
- IDS_IMPORTCFGFROMFILESKIPPED, "Plik config.reg (lub inny plik określony parametrem -c) nie został zaimportowany do rejestru z powodu importu konfiguracji ze starszej wersji programu Open Salamander. Zamknij teraz program Open Salamander i uruchom go ponownie, aby rozwiązać ten problem."
- IDS_NOTALLPLUGINSCFGIMPORTED, "Dokonano uaktualnienia do nowej wersji programu Open Salamander. Trwa teraz importowanie konfiguracji starej wersji. Stara wersja zawierała pewne wtyczki (wymienione poniżej), których brakuje (lub które nie działają) w nowej wersji, więc ich konfiguracji nie można teraz zaimportować. Możesz teraz uruchomić program Open Salamander bez tych wtyczek (konfiguracja starej wersji pozostaje w rejestrze, więc możesz ją zaimportować później). Lub zamknij teraz program Open Salamander, zainstaluj brakujące wtyczki i uruchom program Open Salamander ponownie.\n\nBrakujące (lub niedziałające) wtyczki: %s%s."
+ IDS_IMPORTCFGFROMFILESKIPPED, "Plik config.reg (lub inny plik określony parametrem -c) nie został zaimportowany do rejestru z powodu importu konfiguracji ze starszej wersji programu File Manager. Zamknij teraz program File Manager i uruchom go ponownie, aby rozwiązać ten problem."
+ IDS_NOTALLPLUGINSCFGIMPORTED, "Dokonano uaktualnienia do nowej wersji programu File Manager. Trwa teraz importowanie konfiguracji starej wersji. Stara wersja zawierała pewne wtyczki (wymienione poniżej), których brakuje (lub które nie działają) w nowej wersji, więc ich konfiguracji nie można teraz zaimportować. Możesz teraz uruchomić program File Manager bez tych wtyczek (konfiguracja starej wersji pozostaje w rejestrze, więc możesz ją zaimportować później). Lub zamknij teraz program File Manager, zainstaluj brakujące wtyczki i uruchom program File Manager ponownie.\n\nBrakujące (lub niedziałające) wtyczki: %s%s."
  IDS_NUMOFSKIPPEDPLUGINNAMES, ", pominięto %d więcej wtyczek"
  IDS_STARTWITHOUTMISSINGPLUGINS, "&Uruchom bez brakujących wtyczek"
  
@@ -1843,8 +1843,8 @@ STRINGTABLE
  IDS_COPYMOVE_SAVEASDEF, "Zapisz opcje jako domyślne"
  IDS_COPYMOVE_RESETDEFS, "Zresetuj opcje i wartości domyślne"
  
- IDS_CONFIGEXPUPTOXP, "Jeśli chcesz importować konfigurację przy każdym uruchomieniu programu Open Salamander, wyeksportuj ją do katalogu instalacyjnego do pliku o nazwie config.reg. Aby zaimportować inny plik konfiguracji, użyj parametru wiersza poleceń -C (np. „salamand.exe -C myconfig.reg”).\n\nZalecamy dodanie czyszczenia klucza rejestru z konfiguracją bezpośrednio do wyeksportowanego pliku. W przeciwnym razie zaimportowana konfiguracja zostanie scalona z bieżącą w rejestrze i może spowodować niespójną konfigurację."
- IDS_CONFIGEXPVISTA, "Jeśli chcesz importować konfigurację przy każdym uruchomieniu programu Open Salamander, wyeksportuj ją do katalogu danych aplikacji (lub katalogu instalacyjnego) do pliku o nazwie config.reg. Aby zaimportować inny plik konfiguracji, użyj parametru wiersza poleceń -C (np. „salamand.exe -C myconfig.reg”).\n\nZalecamy dodanie czyszczenia klucza rejestru z konfiguracją bezpośrednio do wyeksportowanego pliku. W przeciwnym razie zaimportowana konfiguracja zostanie scalona z bieżącą w rejestrze i może spowodować niespójną konfigurację."
+ IDS_CONFIGEXPUPTOXP, "Jeśli chcesz importować konfigurację przy każdym uruchomieniu programu File Manager, wyeksportuj ją do katalogu instalacyjnego do pliku o nazwie config.reg. Aby zaimportować inny plik konfiguracji, użyj parametru wiersza poleceń -C (np. „salamand.exe -C myconfig.reg”).\n\nZalecamy dodanie czyszczenia klucza rejestru z konfiguracją bezpośrednio do wyeksportowanego pliku. W przeciwnym razie zaimportowana konfiguracja zostanie scalona z bieżącą w rejestrze i może spowodować niespójną konfigurację."
+ IDS_CONFIGEXPVISTA, "Jeśli chcesz importować konfigurację przy każdym uruchomieniu programu File Manager, wyeksportuj ją do katalogu danych aplikacji (lub katalogu instalacyjnego) do pliku o nazwie config.reg. Aby zaimportować inny plik konfiguracji, użyj parametru wiersza poleceń -C (np. „salamand.exe -C myconfig.reg”).\n\nZalecamy dodanie czyszczenia klucza rejestru z konfiguracją bezpośrednio do wyeksportowanego pliku. W przeciwnym razie zaimportowana konfiguracja zostanie scalona z bieżącą w rejestrze i może spowodować niespójną konfigurację."
  IDS_CONFIGEXPCLEARKEY, "&Dodaj czyszczenie klucza rejestru z konfiguracją bezpośrednio do wyeksportowanego pliku"
  
  IDS_IMPORTCFG_OPENERR, "Nie można otworzyć ani odczytać pliku konfiguracji.\n\nPlik: %s\nBłąd: %s"
@@ -1853,7 +1853,7 @@ STRINGTABLE
  IDS_IMPORTCFG_INVALIDFORMAT, "Nie można zaimportować pliku konfiguracji. Ma nieprawidłowy format.\n\nPlik: %s"
  IDS_IMPORTCFG_REGERR, "Nie można zaimportować pliku konfiguracji do rejestru. Błąd zapisu do rejestru.\n\nPlik: %s"
  
- IDS_IMPORTCFG_NOTOURVER, "Plik konfiguracji (%s) nie zawiera konfiguracji dla tej wersji programu Open Salamander.\n\nCzy chcesz go zaimportować mimo to?"
+ IDS_IMPORTCFG_NOTOURVER, "Plik konfiguracji (%s) nie zawiera konfiguracji dla tej wersji programu File Manager.\n\nCzy chcesz go zaimportować mimo to?"
  
  IDS_EXPORTCFG_REGERR, "Nie można wyeksportować konfiguracji do pliku. Błąd odczytu konfiguracji z rejestru."
  IDS_EXPORTCFG_FILEERR, "Nie można wyeksportować konfiguracji do pliku. Błąd zapisu konfiguracji do pliku.\n\nPlik: %s"
@@ -1907,31 +1907,31 @@ STRINGTABLE
  IDS_SALMON_OUT_OF_MEMORY, "Brak pamięci" 
  IDS_SALMON_FILE_SIZE, "Pobranie rozmiaru pliku nie powiodło się dla %s"
  IDS_SALMON_FILE_OPEN, "Nie można otworzyć %s"
- IDS_SALMON_MORE_REPORTS, "Znaleziono starsze raporty o błędach. Czy chcesz zgłosić również te błędy i pomóc nam ulepszyć program Open Salamander?\n\nNaciśnij Tak, aby przetworzyć stare raporty o błędach. Naciśnij Nie, aby usunąć stare raporty o błędach."
- IDS_SALMON_TITLE, "Narzędzie do zgłaszania błędów programu Open Salamander"
+ IDS_SALMON_MORE_REPORTS, "Znaleziono starsze raporty o błędach. Czy chcesz zgłosić również te błędy i pomóc nam ulepszyć program File Manager?\n\nNaciśnij Tak, aby przetworzyć stare raporty o błędach. Naciśnij Nie, aby usunąć stare raporty o błędach."
+ IDS_SALMON_TITLE, "Narzędzie do zgłaszania błędów programu File Manager"
  IDS_SALMON_COMPRESSING, "Kompresowanie, proszę czekać..."
  IDS_SALMON_UPLOADING, "Przekazywanie, proszę czekać..."
- IDS_SALMON_UPLOADSUCCESS, "Raport został pomyślnie przekazany.\n\nDziękujemy za pomoc w ulepszaniu programu Open Salamander!" 
+ IDS_SALMON_UPLOADSUCCESS, "Raport został pomyślnie przekazany.\n\nDziękujemy za pomoc w ulepszaniu programu File Manager!" 
  IDS_SALMON_UPLOADFAILED, "Przekazanie raportu nie powiodło się, powód: %s\n\nWyślij nam raport e-mailem na adres support@taskscape.com i usuń je z dysku. Kliknij OK, aby pokazać raport."
  IDS_SALMON_COMPRESSFAILED, "Kompresja raportu nie powiodła się, powód: %s\n\nSpakuj raport o błędzie przy użyciu programu 7-Zip, wyślij go e-mailem na adres support@taskscape.com i usuń pliki raportu z dysku. Kliknij OK, aby pokazać raport."
  IDS_SALMON_LOAD_FAILED, "Ładowanie %s nie powiodło się."
- IDS_SALMON_WRONG_CMDLINE, "To jest wewnętrzne narzędzie programu Open Salamander, nie uruchamiaj go bezpośrednio."
- IDS_SALMON_WRONG_VERSION, "Nieprawidłowa wersja narzędzia do zgłaszania błędów programu Open Salamander. Skontaktuj się z nami pod adresem support@taskscape.com."
- IDS_SALMON_MINIDUMP, "Wystąpił problem wymuszający zamknięcie programu Open Salamander.\nTworzenie raportu o błędzie, proszę czekać..."
+ IDS_SALMON_WRONG_CMDLINE, "To jest wewnętrzne narzędzie programu File Manager, nie uruchamiaj go bezpośrednio."
+ IDS_SALMON_WRONG_VERSION, "Nieprawidłowa wersja narzędzia do zgłaszania błędów programu File Manager. Skontaktuj się z nami pod adresem support@taskscape.com."
+ IDS_SALMON_MINIDUMP, "Wystąpił problem wymuszający zamknięcie programu File Manager.\nTworzenie raportu o błędzie, proszę czekać..."
  IDS_SALMON_BUGREPORT_PROBLEM, "Wystąpił problem podczas tworzenia raportu o błędzie:\n%s"
  IDS_SALMON_MINIDUMP_CREATE, "Nie można utworzyć pliku zrzutu minidump %s. Kod: %d."
  IDS_SALMON_MINIDUMP_CALL, "Błąd podczas tworzenia zrzutu minidump. Kod: %d."
  IDS_SALMON_HTTP_ERROR, "Nie można bezpiecznie przekazać raportu. Kod: %d."
  IDS_SALMON_HTTP_STATUS, "Bezpieczna usługa zgłaszania awarii zwróciła kod stanu HTTP %d."
 
- IDS_SALMON_NOT_RUNNING, "Narzędzie do zgłaszania błędów programu Open Salamander (salmon.exe) nie działa. Program Open Salamander nie będzie w stanie obsłużyć potencjalnych awarii. Uruchom ponownie program Open Salamander."
+ IDS_SALMON_NOT_RUNNING, "Narzędzie do zgłaszania błędów programu File Manager (salmon.exe) nie działa. Program File Manager nie będzie w stanie obsłużyć potencjalnych awarii. Uruchom ponownie program File Manager."
 
- IDS_SLGINCOMPLETE_TITLE, "Niedokończone tłumaczenie programu Open Salamander"
- IDS_SLGINCOMPLETE_TEXT, "Tłumaczenie programu Open Salamander na Twój język nie jest ukończone. Rozważ odwiedzenie naszego forum dyskusyjnego i dołączenie do prac nad tłumaczeniem:"
+ IDS_SLGINCOMPLETE_TITLE, "Niedokończone tłumaczenie programu File Manager"
+ IDS_SLGINCOMPLETE_TEXT, "Tłumaczenie programu File Manager na Twój język nie jest ukończone. Rozważ odwiedzenie naszego forum dyskusyjnego i dołączenie do prac nad tłumaczeniem:"
  
  IDS_RECYCLEBINERROR, "Nie można wysłać pliku lub katalogu do Kosza, ponieważ ma nieprawidłową nazwę.\n\nNieprawidłowa część nazwy: „%s”\n\nWskazówka: Spróbuj zmienić jego nazwę przed wysłaniem do Kosza lub usuń go trwale (spróbuj klawisza Shift+Delete)."
  
- IDS_PLUGINISX86ONLY, "Nie można załadować wtyczki %s. Ta wtyczka jest dostępna tylko w wersji x86 (32-bitowej) programu Open Salamander. Uruchom wersję x86 programu Open Salamander, aby użyć tej wtyczki. Przepraszamy za niedogodności."
+ IDS_PLUGINISX86ONLY, "Nie można załadować wtyczki %s. Ta wtyczka jest dostępna tylko w wersji x86 (32-bitowej) programu File Manager. Uruchom wersję x86 programu File Manager, aby użyć tej wtyczki. Przepraszamy za niedogodności."
  
  IDS_UNABLETORESOLVELINK, "nie można rozwiązać łącza"
  IDS_VOLMOUNTPOINT, "punkt instalacji woluminu"
@@ -1941,12 +1941,12 @@ STRINGTABLE
  IDS_BLOCKSHUTDOWNDISKOPER, "Operacja na dysku jest w toku."
  IDS_BLOCKSHUTDOWNFINDFILES, "Wyszukiwanie jest w toku."
  IDS_BLOCKSHUTDOWNSAVECFG, "Zapisywanie konfiguracji, proszę poczekać kilka sekund."
- IDS_FORCEDSHUTDOWN, "System Windows odmawia przerwania zamykania. Ten komunikat tymczasowo je zablokuje. Poczekaj na ręczne przerwanie zamykania, zanim zamkniesz ten komunikat, w przeciwnym razie program Open Salamander zostanie zakończony bez zapisania konfiguracji."
- IDS_FORCEDSHUTDOWNDISKOPER, "System Windows odmawia przerwania zamykania. Ten komunikat tymczasowo je zablokuje.\n\nMasz w toku pewne operacje na dysku. Czy chcesz je teraz anulować? Kliknij Nie tylko wtedy, gdy ręcznie przerwano zamykanie, w przeciwnym razie ryzykujesz pozostawienie niedokończonych plików na dysku.\n\nPoczekaj na ręczne przerwanie zamykania, zanim odpowiesz na to pytanie, w przeciwnym razie program Open Salamander zostanie zakończony bez zapisania konfiguracji."
+ IDS_FORCEDSHUTDOWN, "System Windows odmawia przerwania zamykania. Ten komunikat tymczasowo je zablokuje. Poczekaj na ręczne przerwanie zamykania, zanim zamkniesz ten komunikat, w przeciwnym razie program File Manager zostanie zakończony bez zapisania konfiguracji."
+ IDS_FORCEDSHUTDOWNDISKOPER, "System Windows odmawia przerwania zamykania. Ten komunikat tymczasowo je zablokuje.\n\nMasz w toku pewne operacje na dysku. Czy chcesz je teraz anulować? Kliknij Nie tylko wtedy, gdy ręcznie przerwano zamykanie, w przeciwnym razie ryzykujesz pozostawienie niedokończonych plików na dysku.\n\nPoczekaj na ręczne przerwanie zamykania, zanim odpowiesz na to pytanie, w przeciwnym razie program File Manager zostanie zakończony bez zapisania konfiguracji."
  IDS_CLOSINGFINDWINDOWS, "Zamykanie okien Znajdź, proszę czekać..."
 
  // Statusy nakładki zamykania informują o postępie, gdy główne okno jest zablokowane.
- IDS_CLOSINGAPPLICATIONCAPTION, "Zamykanie programu Open Salamander"
+ IDS_CLOSINGAPPLICATIONCAPTION, "Zamykanie programu File Manager"
  IDS_CLOSINGAPPLICATION, "Zamykanie programu..."
  IDS_CLOSINGPLUGIN, "Zamykanie wtyczki ""%s""..."
  IDS_CLOSINGPLUGINSAVECONFIG, "Zamykanie wtyczki ""%s"": zapisywanie danych konfiguracji..."

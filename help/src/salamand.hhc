@@ -14,7 +14,7 @@
 		</OBJECT>
 	<UL>
 		<LI> <OBJECT type="text/sitemap">
-			<param name="Name" value="Introducing Open Salamander">
+			<param name="Name" value="Introducing File Manager">
 			<param name="Local" value="hh\salamand\introduction_intro.htm">
 			</OBJECT>
 		<LI> <OBJECT type="text/sitemap">
@@ -121,7 +121,7 @@
 			</OBJECT>
 	</UL>
 	<LI> <OBJECT type="text/sitemap">
-		<param name="Name" value="Using Open Salamander">
+		<param name="Name" value="Using File Manager">
 		</OBJECT>
 	<UL>
 		<LI> <OBJECT type="text/sitemap">
@@ -481,11 +481,11 @@
 				</OBJECT>
 		</UL>
 		<LI> <OBJECT type="text/sitemap">
-			<param name="Name" value="Customizing Open Salamander">
+			<param name="Name" value="Customizing File Manager">
 			</OBJECT>
 		<UL>
 			<LI> <OBJECT type="text/sitemap">
-				<param name="Name" value="Configuring Open Salamander">
+				<param name="Name" value="Configuring File Manager">
 				<param name="Local" value="hh\salamand\customize_configuration.htm">
 				</OBJECT>
 			<LI> <OBJECT type="text/sitemap">
@@ -538,15 +538,15 @@
 				<param name="Local" value="hh\salamand\othertask_help.htm">
 				</OBJECT>
 			<LI> <OBJECT type="text/sitemap">
-				<param name="Name" value="Using Open Salamander Task List">
+				<param name="Name" value="Using File Manager Task List">
 				<param name="Local" value="hh\salamand\othertask_tasklist.htm">
 				</OBJECT>
 			<LI> <OBJECT type="text/sitemap">
-				<param name="Name" value="Starting Open Salamander with Parameters">
+				<param name="Name" value="Starting File Manager with Parameters">
 				<param name="Local" value="hh\salamand\othertask_param.htm">
 				</OBJECT>
 			<LI> <OBJECT type="text/sitemap">
-				<param name="Name" value="Exiting Open Salamander">
+				<param name="Name" value="Exiting File Manager">
 				<param name="Local" value="hh\salamand\othertask_exit.htm">
 				</OBJECT>
 		</UL>
@@ -720,7 +720,7 @@
 				</OBJECT>
 		</UL>
 		<LI> <OBJECT type="text/sitemap">
-			<param name="Name" value="Open Salamander Task List">
+			<param name="Name" value="File Manager Task List">
 			<param name="Local" value="hh\salamand\dlgboxes_tasks.htm">
 			</OBJECT>
 		<LI> <OBJECT type="text/sitemap">

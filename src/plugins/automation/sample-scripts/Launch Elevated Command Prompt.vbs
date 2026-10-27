@@ -2,7 +2,7 @@
 '	Launch Elevated Command Prompt.vbs
 '	Launches elevated command prompt on the current path.
 '
-'	Sample Open Salamander Automation Script.
+'	Sample File Manager Automation Script.
 '	Requires Windows Vista or later.
 '
 '	www.manison.cz

@@ -6,7 +6,7 @@
     type="win32"
     version="1.0.0.0">
 </assemblyIdentity>
-<description>Controls File Comparator in Open Salamander</description>
+<description>Controls File Comparator in File Manager</description>
 <trustInfo xmlns="urn:schemas-microsoft-com:asm.v3">
   <security>
   <requestedPrivileges>

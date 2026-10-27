@@ -2602,7 +2602,7 @@ HWND CWaitWindow::Create(HWND hForegroundWnd)
 
     CreateEx(WS_EX_DLGMODALFRAME | WS_EX_TOOLWINDOW,
              SAVEBITS_CLASSNAME,
-             Caption == NULL ? "Open Salamander" : Caption,
+             Caption == NULL ? "File Manager" : Caption,
              WS_BORDER | WS_OVERLAPPED | (ShowCloseButton ? WS_SYSMENU : 0),
              0, 0, width, height,
              HParent,

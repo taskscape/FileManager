@@ -45,7 +45,7 @@ internal sealed class UiTestExecutionLog : IDisposable
         };
 
         // A self-describing header lets a retained file be understood without its TRX container.
-        writer.WriteLine("Open Salamander UI test execution transcript");
+        writer.WriteLine("File Manager UI test execution transcript");
         writer.WriteLine("format-version: 1");
         writer.WriteLine($"test: {fullTestName}");
         writer.WriteLine($"test-id: {testId}");
@@ -118,7 +118,7 @@ internal sealed class UiTestExecutionLog : IDisposable
                    ? $"complete lines={productDialogLinesRead} path={Quote(productDialogTranscriptPath)}"
                    : $"absent path={Quote(productDialogTranscriptPath)}");
 
-        var reportRoot = System.IO.Path.Combine(testDataRoot, "appdata", "Open Salamander");
+        var reportRoot = System.IO.Path.Combine(testDataRoot, "appdata", "File Manager");
         if (!Directory.Exists(reportRoot))
         {
             Record("CRASH-REPORT", $"artifact-directory absent path={Quote(reportRoot)}");

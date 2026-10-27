@@ -162,7 +162,8 @@ static DWORD WINAPI UpdateCheckThreadF(void* param, HANDLE stopEvent)
     BOOL requestSucceeded = FALSE;
     if (InternetGetConnectedState(&connFlags, 0))
     {
-        HINTERNET session = WinHttpOpen(L"OpenSalamander-UpdateCheck",
+        // Identify update checks as File Manager rather than the previous product name.
+        HINTERNET session = WinHttpOpen(L"FileManager-UpdateCheck",
                                         WINHTTP_ACCESS_TYPE_NO_PROXY,
                                         WINHTTP_NO_PROXY_NAME, WINHTTP_NO_PROXY_BYPASS, 0);
         if (session != NULL)

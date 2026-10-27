@@ -11,8 +11,8 @@
 #include "spl_vers.h"
 
 #define VERSINFO_COPYRIGHT "Copyright (C) 2026 Taskscape Ltd"
-#define VERSINFO_COMPANY "Open Salamander"
-#define VERSINFO_DESCRIPTION "Reorganize plugin for Open Salamander"
+#define VERSINFO_COMPANY "File Manager"
+#define VERSINFO_DESCRIPTION "Reorganize plugin for File Manager"
 
 #ifdef _LANG
 #define VERSINFO_INTERNAL "ENGLISH"

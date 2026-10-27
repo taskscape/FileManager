@@ -92,7 +92,7 @@ FONT 8, "MS Shell Dlg", 400, 0, 0x1
 BEGIN
     GROUPBOX        "Pozycja okna",IDC_STATIC_1,4,6,199,41
     CONTROL         "&Zapamiętaj przy zamykaniu",IDC_CFG_SAVEPOSONCLOSE,"Button",BS_AUTORADIOBUTTON | WS_GROUP | WS_TABSTOP,11,17,63,12
-    CONTROL         "Ust&aw na pozycji okna programu Salamander",IDC_CFG_SETBYMAINWINDOW,
+    CONTROL         "Ust&aw na pozycji okna programu File Manager",IDC_CFG_SETBYMAINWINDOW,
                     "Button",BS_AUTORADIOBUTTON,11,29,156,12
 END
 
@@ -134,7 +134,7 @@ END
 
 IDD_CTRLEXAMPLE DIALOGEX 32, 40, 463, 236
 STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
-CAPTION "Kontrolki udostępniane przez Open Salamander"
+CAPTION "Kontrolki udostępniane przez File Manager"
 FONT 8, "MS Shell Dlg", 400, 0, 0x1
 BEGIN
     GROUPBOX        "CGUIStaticTextAbstract",IDC_STATIC_1,6,4,254,108

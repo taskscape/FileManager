@@ -123,7 +123,7 @@ const char* SALSHEXT_DOPASTEEVENTNAME = "SalExten_DoPasteEvent4";     // salextx
 const char* SHEXREG_OPENSALAMANDER = "OpenSalamanderVer" SALSHEXT_SHAREDNAMESAPPENDIX;
 #ifdef INSIDE_SALAMANDER
 #include "versinfo.rh2"
-const char* SHEXREG_OPENSALAMANDER_DESCR = "Shell Extension (%s) for Open Salamander " VERSINFO_VERSION;
+const char* SHEXREG_OPENSALAMANDER_DESCR = "Shell Extension (%s) for File Manager " VERSINFO_VERSION;
 #endif // INSIDE_SALAMANDER
 
 #ifdef ENABLE_SH_MENU_EXT

@@ -65,7 +65,7 @@ STRINGTABLE DISCARDABLE
     IDS_ERR_HFS_BTREE_FRAGMENTED "The Catalog file is fragmented into more than 8 fragments which is not supported."
     IDS_ERR_HFS_FILE_FRAGMENTED "The file '%s' is fragmented into more than 8 fragments which is not supported.\nThe file will not be extracted."
 
-    IDS_ERR_TOO_LONG_PATH       "This disk image contains a too long path that Open Salamander cannot handle."
+    IDS_ERR_TOO_LONG_PATH       "This disk image contains a too long path that File Manager cannot handle."
 
     IDS_ERR_DMG_READ_HDR        "Cannot read package header. File too small."
     IDS_ERR_DMG_ENCRYPTED       "This package is encrypted.\nEncrypted packages are not supported."

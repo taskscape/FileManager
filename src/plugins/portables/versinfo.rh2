@@ -2,7 +2,7 @@
 //
 // Copyright (c) 2023 Taskscape Ltd
 //
-// This is a part of the Open Salamander SDK library.
+// This is a part of the File Manager SDK library.
 //
 //****************************************************************************
 
@@ -24,9 +24,9 @@
 #include "spl_vers.h" // get version and build numbers
 
 #define VERSINFO_COPYRIGHT   "Copyright © 2023 Taskscape Ltd"
-#define VERSINFO_COMPANY     "Open Salamander"
+#define VERSINFO_COMPANY     "File Manager"
 
-#define VERSINFO_DESCRIPTION "Windows Portable Devices for Open Salamander"
+#define VERSINFO_DESCRIPTION "Windows Portable Devices for File Manager"
 
 #ifdef _LANG
 #define VERSINFO_INTERNAL    "ENGLISH"

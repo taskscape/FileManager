@@ -29,5 +29,5 @@ STRINGTABLE
  IDS_ERR_OPEN_FILE, "Nie można otworzyć pliku %s."
  IDS_ERR_TMP, "Utworzenie pliku tymczasowego nie powiodło się."
  IDS_EXCEPTION, "Wystąpił wyjątek.\n\nPrzeglądany plik: %s\n\nJeśli uważasz, że przeglądany plik nie jest uszkodzony, prześlij go na adres support@taskscape.com.\nOdtworzymy i naprawimy błąd przeglądarki. Dziękujemy za współpracę!"
- IDS_HIDDEN_SECTIONS, "Nie znaleziono żadnej sekcji Portable Executable wybranej w konfiguracji wtyczki.\nUżyj menu Opcje > Konfiguracja wtyczek > Portable Executable Viewer\nw głównym oknie programu Open Salamander, aby ustawić widoczne sekcje."
+ IDS_HIDDEN_SECTIONS, "Nie znaleziono żadnej sekcji Portable Executable wybranej w konfiguracji wtyczki.\nUżyj menu Opcje > Konfiguracja wtyczek > Portable Executable Viewer\nw głównym oknie programu File Manager, aby ustawić widoczne sekcje."
 }

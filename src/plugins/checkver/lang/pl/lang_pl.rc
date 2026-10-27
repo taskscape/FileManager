@@ -78,7 +78,7 @@ BEGIN
     LTEXT           "Ustawienia połączenia internetowego:",IDC_STATIC_1,5,7,101,8
     LTEXT           "",IDC_CFG_INTERNET,107,7,190,8
     PUSHBUTTON      "Z&mień",IDC_CFG_CHANGE,301,4,50,14,WS_GROUP
-    GROUPBOX        "&Otwieraj okno Sprawdzanie nowych wersji przy uruchamianiu programu Open Salamander",IDC_STATIC_2,5,21,347,81,WS_GROUP
+    GROUPBOX        "&Otwieraj okno Sprawdzanie nowych wersji przy uruchamianiu programu File Manager",IDC_STATIC_2,5,21,347,81,WS_GROUP
     CONTROL         "Nigdy",IDC_CFG_NEVER,"Button",BS_AUTORADIOBUTTON | WS_GROUP | WS_TABSTOP,13,32,60,12
     CONTROL         "Codziennie",IDC_CFG_DAY,"Button",BS_AUTORADIOBUTTON,107,32,60,12
     CONTROL         "Co tydzień",IDC_CFG_WEEK,"Button",BS_AUTORADIOBUTTON,232,32,60,12
@@ -89,16 +89,16 @@ BEGIN
                     "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,13,62,325,12
     CONTROL         "&Zamknij okno, jeśli nie znaleziono nowej wersji, w przeciwnym razie pokaż okno",IDC_CFG_AUTOCLOSE,
                     "Button",BS_AUTOCHECKBOX | WS_TABSTOP,13,74,270,12
-    LTEXT           "Uwaga: to okno można otworzyć z menu Open Salamander Wtyczki / Sprawdź nowe wersje.",IDC_STATIC_3,13,88,330,8
+    LTEXT           "Uwaga: to okno można otworzyć z menu File Manager Wtyczki / Sprawdź nowe wersje.",IDC_STATIC_3,13,88,330,8
     GROUPBOX        "&Filtry",IDC_STATIC_4,5,109,347,110,WS_GROUP
     LISTBOX         IDC_CFG_FILTER,13,122,191,54,WS_VSCROLL | WS_TABSTOP
     PUSHBUTTON      "&Usuń zaznaczony element z filtrów",IDC_CFG_REMOVE,210,122,135,14
     LTEXT           "Uwaga: jeden lub wszystkie moduły można dodać do filtrów z okna Sprawdzanie nowych wersji. Użyj menu kontekstowego pod prawym przyciskiem myszy na nazwie modułu.",IDC_STATIC_5,210,138,135,40
-    CONTROL         "Sprawdzaj w&ydania (release) programu Open Salamander i wtyczek",IDC_CFG_RELEASE,
+    CONTROL         "Sprawdzaj w&ydania (release) programu File Manager i wtyczek",IDC_CFG_RELEASE,
                     "Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,13,178,270,12
-    CONTROL         "Sprawdzaj wersje &beta programu Open Salamander i wtyczek",IDC_CFG_BETA,
+    CONTROL         "Sprawdzaj wersje &beta programu File Manager i wtyczek",IDC_CFG_BETA,
                     "Button",BS_AUTOCHECKBOX | WS_TABSTOP,13,190,270,12
-    CONTROL         "Sprawdzaj wersje &podglądowe (preview build) programu Open Salamander i wtyczek",IDC_CFG_PB,
+    CONTROL         "Sprawdzaj wersje &podglądowe (preview build) programu File Manager i wtyczek",IDC_CFG_PB,
                     "Button",BS_AUTOCHECKBOX | WS_TABSTOP,13,202,270,12
     PUSHBUTTON      "Przywróć &domyślne",IDC_CFG_DEFAULTS,6,227,60,14,WS_GROUP
     DEFPUSHBUTTON   "OK",IDOK,183,227,50,14,WS_GROUP
@@ -112,7 +112,7 @@ CAPTION "Ustawienia połączenia internetowego CheckVer"
 FONT 8, "MS Shell Dlg", 400, 0, 0x1
 BEGIN
     ICON            "",IDC_INTERNET_ICON,8,8,20,20,WS_GROUP
-    LTEXT           "Wtyczka CheckVer informuje o najnowszych wersjach programu Open Salamander i wtyczek. Do odczytania informacji o nowych wersjach potrzebne jest połączenie z Internetem.",IDC_STATIC_1,39,7,202,24
+    LTEXT           "Wtyczka CheckVer informuje o najnowszych wersjach programu File Manager i wtyczek. Do odczytania informacji o nowych wersjach potrzebne jest połączenie z Internetem.",IDC_STATIC_1,39,7,202,24
     GROUPBOX        "Sposób łączenia się z Internetem",IDC_STATIC_2,40,38,211,67,WS_GROUP
     CONTROL         "Łączę się przez linię &telefoniczną i modem",IDC_INET_PHONE,
                     "Button",BS_AUTORADIOBUTTON | WS_GROUP | WS_TABSTOP,47,51,166,12

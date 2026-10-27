@@ -456,7 +456,7 @@ src/plugins/reorganize/
 - [ ] **T4.11** Lifetime. The host takes a plug-in usage reference when `ExecuteOperationSteps` succeeds and releases it after `Finished` returns. Use the existing mechanism that defers plug-in unload while plug-in callbacks, windows, or objects are in use (architecture.md §7). If none fits, add a counter on `CPluginData` that the deferred-unload path checks. Unloading during apply is deferred. `Finished` is posted to the main thread exactly once, also on cancel, worker start failure after acceptance, and dialog-thread startup timeout (`dialogs.h:305-311` semantics).
 - [ ] **T4.12** `EnumApplicationPathReferences` (§7.3.4): enumerates hot paths (`CHotPathItems`, `src/mainwnd.h:121`), user-menu items (initial directory and arguments as text; `CUserMenuItems`), and the current panel paths. Main thread only. The callback can stop the enumeration.
 - [ ] **T4.13** The host journal (`COperationJournal`) keeps writing as today for plug-in-originated scripts. Its `PLAN|1|operation=<id>` header carries the `operationId` returned to the plug-in, which provides cross-referencing (§7.2). Extend `OpcodeName` in `src/operation_journal.cpp` only if an opcode used by steps is missing (today `ocCopyDirTime` has no name). An unnamed opcode must not break journaling.
-- [ ] **T4.14** `GetApplicationDataDirectory` (§7.3.1) returns the host's roaming data folder by calling `GetOurPathInRoamingAPPDATA`/`CreateOurPathInRoamingAPPDATA` (`src/path_checking.cpp:2205`). That function is sandbox-aware: under `FILEMANAGER_UI_TESTDATA_ROOT` it resolves to `<test-data root>\appdata\Open Salamander`. The plug-in must use this method and **never** resolve `%APPDATA%` itself, so its journals follow the host's test isolation.
+- [ ] **T4.14** `GetApplicationDataDirectory` (§7.3.1) returns the host's roaming data folder by calling `GetOurPathInRoamingAPPDATA`/`CreateOurPathInRoamingAPPDATA` (`src/path_checking.cpp:2205`). That function is sandbox-aware: under `FILEMANAGER_UI_TESTDATA_ROOT` it resolves to `<test-data root>\appdata\File Manager`. The plug-in must use this method and **never** resolve `%APPDATA%` itself, so its journals follow the host's test isolation.
 
 ### Milestone M5 — Compiler, apply, recovery journal
 
@@ -509,7 +509,7 @@ UTF-8 without BOM (a BOM is accepted on read), LF line endings, JSON object. Fie
   "modifiedUtc": "2026-10-03T11:40:02Z",                 // ★
   "createdBy": "AGENCY\\jsmith",                         //   omitted when option recordAuthor=false
   "createdOn": "WS-0142",                                //   computer name; same option
-  "application": { "name": "Open Salamander", "version": "6.0.1234", "pluginVersion": "1.0" },
+  "application": { "name": "File Manager", "version": "6.0.1234", "pluginVersion": "1.0" },
   "scopeRoots": [                                        // ★ ≥ 0
     { "id": "s1", "path": "\\\\nas\\clients\\Inherited", "volumeSerial": "0x5A1C33D0", "fileSystem": "NTFS" }
   ],
@@ -577,7 +577,7 @@ Semantics:
 
 ### 7.2 Recovery journal format (`.reorgjournal`, version 1)
 
-Location: `<application data directory>\reorganize\journals\<applyId>.reorgjournal`. The application data directory is obtained from `GetApplicationDataDirectory` (T4.14): normally `%APPDATA%\Open Salamander`, and `<test-data root>\appdata\Open Salamander` under the UI-test sandbox (testing.md "Journals must not leak between cases").
+Location: `<application data directory>\reorganize\journals\<applyId>.reorgjournal`. The application data directory is obtained from `GetApplicationDataDirectory` (T4.14): normally `%APPDATA%\File Manager`, and `<test-data root>\appdata\File Manager` under the UI-test sandbox (testing.md "Journals must not leak between cases").
 
 Encoding: UTF-8, CRLF-terminated records. Each record is `TYPE|f1|f2|…|crc=XXXXXXXX`, where `crc` is the CRC-32 (`src/common/crc32.h`) of the record bytes before `|crc=`. In field values, `%`, `|`, CR, and LF are percent-encoded (`%25`, `%7C`, `%0D`, `%0A`). Key/value fields are `key=value`.
 
@@ -1234,7 +1234,7 @@ Moving whole directories as single steps is the main lever: the compiler must ne
   - `journal-write`: fail the next journal append.
 
   Injection is active **only** when `FILEMANAGER_UI_ISOLATED=1`, the sandbox config root matches, and an exclusively claimed one-use arm file `.reorg-fault.arm` exists in `filemanager-testdata`. This uses exactly the guard pattern of the FTP fault fixture (testing.md §FTP fixture), and normal runs never enable faults.
-- [ ] **T9.3b** Extend `FileOperationUiTestBase` to purge `<test-data root>\appdata\Open Salamander\reorganize\journals` before start and after stop, with the same retry as the host journals. A leaked interrupted journal would otherwise raise the Interrupted dialog in later cases. The interrupted-apply test overrides this, as `OperationRecoveryCharacterizationUiTests` does.
+- [ ] **T9.3b** Extend `FileOperationUiTestBase` to purge `<test-data root>\appdata\File Manager\reorganize\journals` before start and after stop, with the same retry as the host journals. A leaked interrupted journal would otherwise raise the Interrupted dialog in later cases. The interrupted-apply test overrides this, as `OperationRecoveryCharacterizationUiTests` does.
 - [ ] **T9.3c** Add the automation IDs or names that the tests rely on to the resource scripts, and document them in `tests/FileManager.UiTests/README.md`.
 
 ### 9.4 Regression run and parity

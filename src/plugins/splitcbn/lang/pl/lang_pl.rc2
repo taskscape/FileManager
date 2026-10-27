@@ -69,7 +69,7 @@ STRINGTABLE
  IDS_MENU1 "&Podziel plik..."
  IDS_MENU2 "&Połącz pliki..."
  IDS_ABOUTTITLE "Informacje o wtyczce"
- IDS_BATFILE_GENBYSAL, "Wygenerowano przez program Open Salamander"
+ IDS_BATFILE_GENBYSAL, "Wygenerowano przez program File Manager"
  IDS_BATFILE_CTRL_C_TO_QUIT, "Aby zakończyć, naciśnij Ctrl-C."
  IDS_BATFILE_DESCR, "Ten plik wsadowy odtworzy plik '%s'."
  IDS_SIZE_B, "B"

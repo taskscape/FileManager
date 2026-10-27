@@ -137,7 +137,7 @@ STRINGTABLE
 BEGIN
     IDS_PLUGIN_NAME,            "DiskMap"
     IDS_PLUGIN_DESCRIPTION,     "Wyświetla mapę drzewa plików na dysku."
-    IDS_PLUGIN_ABOUT,           "Informacje o wtyczce Salamander DiskMap"
+    IDS_PLUGIN_ABOUT,           "Informacje o wtyczce File Manager DiskMap"
     IDS_PLUGIN_MENU,            "Pokaż &DiskMap"
     IDS_CLOSE_CONFIRMATION,     "Czy chcesz zamknąć DiskMap?"
     IDS_CLOSE_CONFIRMATION_CHECKBOX, "Nie pokazuj tego komunikatu ponownie i zamykaj DiskMap bez pytania"

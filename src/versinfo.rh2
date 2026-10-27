@@ -17,9 +17,9 @@
 #define VERSINFO_VERSION     VERSINFO_SALAMANDER_VERSION
 
 #define VERSINFO_COPYRIGHT   "Copyright \xa9 1997-2026 Taskscape Ltd"
-#define VERSINFO_COMPANY     "Open Salamander"
+#define VERSINFO_COMPANY     "File Manager"
 
-#define VERSINFO_DESCRIPTION "Open Salamander, File Manager"
+#define VERSINFO_DESCRIPTION "File Manager, File Manager"
 #define VERSINFO_COMMENT     "A small and fast two-pane file manager with open plugin architecture."
 
 #ifdef _LANG

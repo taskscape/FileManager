@@ -43,7 +43,7 @@ std::string ManifestJsonText(const ManifestData& data, const ITextCatalog& catal
     writer.MemberInt(L"handoffManifest", 1);
     writer.Key(L"generator");
     writer.BeginObject();
-    writer.Member(L"name", L"Open Salamander Delivery Handoff");
+    writer.Member(L"name", L"File Manager Delivery Handoff");
     writer.Member(L"version", data.GeneratorVersion);
     writer.Member(L"host", data.HostVersion);
     writer.EndObject();

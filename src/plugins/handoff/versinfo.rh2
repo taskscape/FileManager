@@ -20,9 +20,9 @@
 #include "spl_vers.h" // version and build numbers
 
 #define VERSINFO_COPYRIGHT   "Copyright © 2026 Taskscape Ltd"
-#define VERSINFO_COMPANY     "Open Salamander"
+#define VERSINFO_COMPANY     "File Manager"
 
-#define VERSINFO_DESCRIPTION "Delivery Handoff plugin for Open Salamander"
+#define VERSINFO_DESCRIPTION "Delivery Handoff plugin for File Manager"
 
 #ifdef _LANG
 #define VERSINFO_INTERNAL    "ENGLISH"

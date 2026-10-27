@@ -75,7 +75,7 @@ The FTP fixture sets `FILEMANAGER_UI_FTP_FAULT` to `pause`, `flush`, `metadata`,
 
 `InfostackerUiTests` drives the shipped plugin through the existing isolated native command map and publishing dialog. `LoopbackInfostackerServer` records real multipart uploads and returns fragmented JSON. Cases cover binary bytes and Unicode filenames, Markdown titles/attachments and deduplication, escaped IDs, HTTP errors/redirects, invalid responses, retry, invalid embeds, oversized/locked files, waiting/cancellation, clipboard contention/recovery, and closing without upload. They run in the existing NUnit UI inventory in both the local runner and release CI, without an additional category, external service, credentials, or privileged configuration.
 
-The fixture's `FILEMANAGER_UI_INFOSTACKER_URL` accepts only `http://127.0.0.1:<port>/` while `FILEMANAGER_UI_ISOLATED=1` and the exact `Software\Open Salamander\6.0-filemanager-testdata` configuration root are active. Normal runs always use production HTTPS. These cases verify the protocol and UI; they do not prove the external service's live availability or rendering behavior.
+The fixture's `FILEMANAGER_UI_INFOSTACKER_URL` accepts only `http://127.0.0.1:<port>/` while `FILEMANAGER_UI_ISOLATED=1` and the exact `Software\File Manager\6.0-filemanager-testdata` configuration root are active. Normal runs always use production HTTPS. These cases verify the protocol and UI; they do not prove the external service's live availability or rendering behavior.
 
 Run the complete local equivalent of the GitHub release gate and installer-build jobs with:
 
@@ -149,14 +149,14 @@ UI tests run against the interactive current user only after selecting the guard
 
 ```powershell
 $env:FILEMANAGER_UI_TESTDATA_ROOT = "$env:USERPROFILE\filemanager-testdata"
-$env:FILEMANAGER_UI_CONFIG_ROOT = 'Software\Open Salamander\6.0-filemanager-testdata'
+$env:FILEMANAGER_UI_CONFIG_ROOT = 'Software\File Manager\6.0-filemanager-testdata'
 $env:FILEMANAGER_UI_EXE = 'C:\path\to\salamand.exe'
 
 dotnet test .\tests\FileManager.UiTests\FileManager.UiTests.csproj `
   --filter 'TestCategory=UI'
 ```
 
-The harness creates and removes only `filemanager-testdata` and its subfolders, and creates then removes only `HKCU\Software\Open Salamander\6.0-filemanager-testdata`. Recycle-bin tests inspect the current user's bin but never empty or remove it.
+The harness creates and removes only `filemanager-testdata` and its subfolders, and creates then removes only `HKCU\Software\File Manager\6.0-filemanager-testdata`. Recycle-bin tests inspect the current user's bin but never empty or remove it.
 
 Optional UI settings:
 
@@ -371,7 +371,7 @@ The boundaries are enforced rather than assumed:
 | --- | --- |
 | Test-data root | `UiTestSettings.TestDataRoot` skips the lane unless the path is absolute and its leaf is literally `filemanager-testdata`. |
 | Deletion safety | `UiTestSandbox` writes a `.filemanager-testdata-owner` marker into every root it creates and refuses to reuse or delete a directory that lacks it. |
-| Registry | Writes are confined to `HKCU\Software\Open Salamander\6.0-filemanager-testdata`; the lane never touches the live configuration root. |
+| Registry | Writes are confined to `HKCU\Software\File Manager\6.0-filemanager-testdata`; the lane never touches the live configuration root. |
 | Temporary files | Each launched process gets `TEMP` and `TMP` redirected below the test-data root. |
 | Processes | Teardown kills only the instances the fixture launched, plus crash reporters matched by full path next to the executable under test. |
 | Reparse points | Cleanup deletes a junction or symlink itself and never recurses into its target. |
@@ -427,7 +427,7 @@ If the stub is missing the case is skipped with an explicit message; it never fa
 ##### Journals must not leak between cases
 
 Teardown kills the application, which can interrupt an operation and leave an incomplete journal in the shared
-`<test-data root>\appdata\Open Salamander\operation-journals` folder. The next start then raises the modal
+`<test-data root>\appdata\File Manager\operation-journals` folder. The next start then raises the modal
 **Recover file operations** prompt, which owns the main window. `WaitForNativeMainWindow` deliberately skips a
 disabled main window, so a single leaked journal strands every remaining case in the run behind a window that never
 becomes usable. `FileOperationUiTestBase` therefore purges that folder both after the application stops and before
@@ -435,7 +435,7 @@ the next start, retrying briefly because an exiting process can hold its journal
 `OperationRecoveryCharacterizationUiTests` seeds a journal on purpose and overrides `BeforeFileManagerStarted`
 without calling base, so its own scenario is unaffected.
 
-For the same reason the harness now acknowledges the **Open Salamander Configuration** notice at startup: an
+For the same reason the harness now acknowledges the **File Manager Configuration** notice at startup: an
 interrupted profile write makes the product report that it fell back to the last verified profile, through an
 owner-less message box shown before the main window exists.
 
@@ -1028,7 +1028,7 @@ Four cases inject one returned error into a nonmandatory value write or highligh
 
 The fixture sets `FILEMANAGER_CONFIG_RETURN_ERROR` to `value:Title bar prefix text` or `key:Panel Items Hilighting`, using `FILEMANAGER_CONFIG_FAULT_ARM_FILE` to exclude startup saves. Native injection requires the exact sandbox registry root. `FILEMANAGER_UI_CONFIG_STATUS=1` writes `.config-save-status` inside the validated sandbox only after all coalesced saves finish, so observations cannot race an earlier startup save.
 
-The crash reporter receives the sandbox's `appdata\Open Salamander` directory before the child process starts. An isolated crash must not leave a report in the user's Local AppData that blocks a later launch. The ADS retry regression waits for both the durable operation journal and closure of the progress window before teardown; released output handles alone cannot confirm successful worker finalization.
+The crash reporter receives the sandbox's `appdata\File Manager` directory before the child process starts. An isolated crash must not leave a report in the user's Local AppData that blocks a later launch. The ADS retry regression waits for both the durable operation journal and closure of the progress window before teardown; released output handles alone cannot confirm successful worker finalization.
 
 #### `ConfigurationRetirementUiTests`
 

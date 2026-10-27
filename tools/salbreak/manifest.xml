@@ -6,7 +6,7 @@
     type="win32"
     version="1.0.0.0">
 </assemblyIdentity>
-<description>SalBreak for Open Salamander</description>
+<description>SalBreak for File Manager</description>
 <dependency>
     <dependentAssembly>
         <assemblyIdentity

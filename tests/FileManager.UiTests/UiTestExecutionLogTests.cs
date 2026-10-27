@@ -16,7 +16,7 @@ internal sealed class UiTestExecutionLogTests
             string transcriptPath;
             var testDataRoot = Path.Combine(outputRoot, "filemanager-testdata");
             var dialogTranscript = Path.Combine(testDataRoot, "ui-test-dialogs.log");
-            var crashDirectory = Path.Combine(testDataRoot, "appdata", "Open Salamander");
+            var crashDirectory = Path.Combine(testDataRoot, "appdata", "File Manager");
             Directory.CreateDirectory(crashDirectory);
             // Exercise the real writer without launching native UI so its format remains a fast source-independent contract.
             using (var log = UiTestExecutionLog.Start(outputRoot, "format/test", "Fixture.format/test", "contract"))
@@ -35,7 +35,7 @@ internal sealed class UiTestExecutionLogTests
             var transcript = File.ReadAllText(transcriptPath);
             Assert.Multiple(() =>
             {
-                Assert.That(transcript, Does.Contain("Open Salamander UI test execution transcript"));
+                Assert.That(transcript, Does.Contain("File Manager UI test execution transcript"));
                 Assert.That(transcript, Does.Contain("000001").And.Contain("ACTION | first"));
                 Assert.That(transcript, Does.Contain("000002").And.Contain("WINDOW | second"));
                 Assert.That(transcript.IndexOf("ACTION | first", StringComparison.Ordinal),

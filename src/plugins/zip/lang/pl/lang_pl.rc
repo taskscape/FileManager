@@ -112,7 +112,7 @@ BEGIN
                     "Button",BS_AUTOCHECKBOX | WS_TABSTOP,14,70,240,12
     CONTROL         "Używaj nazw plików zgodnych z WinZip dla archiwów wielowolumenowych (z wyjątkiem archiwów samo-",IDC_WINZIPNAMES,
                     "Button",BS_AUTOCHECKBOX | WS_TABSTOP,14,82,279,12
-    LTEXT           "rozpakowujących, które zawsze używają konwencji nazewniczych Open Salamander)",IDC_STATIC_5,26,94,262,8
+    LTEXT           "rozpakowujących, które zawsze używają konwencji nazewniczych File Manager)",IDC_STATIC_5,26,94,262,8
     LTEXT           "Poziom &kompresji (0 - 9, 9 najlepsza kompresja, najdłuższy czas):",IDC_STATIC_6,14,107,203,8
     EDITTEXT        IDC_LEVEL,218,105,16,12
     LTEXT           "Domyślny język modułu &samorozpakowującego:",IDC_STATIC_7,14,120,109,8

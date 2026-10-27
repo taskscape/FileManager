@@ -33,7 +33,7 @@ if ([string]::IsNullOrWhiteSpace($env:FILEMANAGER_UI_ISOLATED)) {
     $env:FILEMANAGER_UI_ISOLATED = '1'
 }
 if ([string]::IsNullOrWhiteSpace($env:FILEMANAGER_UI_CONFIG_ROOT)) {
-    $env:FILEMANAGER_UI_CONFIG_ROOT = 'Software\Open Salamander\6.0-filemanager-testdata'
+    $env:FILEMANAGER_UI_CONFIG_ROOT = 'Software\File Manager\6.0-filemanager-testdata'
 }
 if ([string]::IsNullOrWhiteSpace($env:FILEMANAGER_UI_CONFIG_FAULT_INJECTION)) {
     $env:FILEMANAGER_UI_CONFIG_FAULT_INJECTION = '1'
@@ -604,10 +604,10 @@ function Initialize-UiTestSandbox {
         throw 'FILEMANAGER_UI_TESTDATA_ROOT must name a filemanager-testdata directory.'
     }
     $env:FILEMANAGER_UI_TESTDATA_ROOT = $fullRoot
-    $env:FILEMANAGER_UI_CONFIG_ROOT = 'Software\Open Salamander\6.0-filemanager-testdata'
+    $env:FILEMANAGER_UI_CONFIG_ROOT = 'Software\File Manager\6.0-filemanager-testdata'
 
     $ownershipMarker = Join-Path $fullRoot '.filemanager-testdata-owner'
-    $ownershipMarkerContents = 'Open Salamander UI test sandbox'
+    $ownershipMarkerContents = 'File Manager UI test sandbox'
     if (Test-Path -LiteralPath $fullRoot -PathType Container) {
         $entries = @(Get-ChildItem -LiteralPath $fullRoot -Force)
         if (Test-Path -LiteralPath $ownershipMarker -PathType Leaf) {
@@ -1227,7 +1227,7 @@ if ($SkipLockVerifier) {
 }
 else {
     $sandboxedUi = -not [string]::IsNullOrWhiteSpace($env:FILEMANAGER_UI_TESTDATA_ROOT) -and
-                   [string]::Equals($env:FILEMANAGER_UI_CONFIG_ROOT, 'Software\Open Salamander\6.0-filemanager-testdata', [StringComparison]::OrdinalIgnoreCase)
+                   [string]::Equals($env:FILEMANAGER_UI_CONFIG_ROOT, 'Software\File Manager\6.0-filemanager-testdata', [StringComparison]::OrdinalIgnoreCase)
     $uiExecutable = $env:FILEMANAGER_UI_EXE
     $appVerifierPath = Find-ApplicationVerifier
     $lockStressSkipReason = $null

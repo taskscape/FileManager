@@ -1805,7 +1805,7 @@
                     {
                         "path":  "src/plugins/pictview/pvtwain.cpp",
                         "api":  "strcpy",
-                        "fingerprint":  "3c9bfb38aa1d25484fc96fc3d248f0bd7833b452d19c037ebe3aad0d84a699db",
+                        "fingerprint":  "308942e7cab98a50d41c48fe26843821ccc1c20de5e37fdc72924578c7ad5b97",
                         "count":  1
                     },
                     {
@@ -4175,7 +4175,7 @@
                     {
                         "path":  "src/plugins/pictview/pvtwain.cpp",
                         "api":  "strcpy",
-                        "fingerprint":  "7f4855a5b15e2bab360b129cd2175d2a1dc61f49985fa82ccc32fd35aa60556a",
+                        "fingerprint":  "2650b80e1baa74fadc361bb49b91c436d4b8cc2b4cb0973f420c13f9f88509ee",
                         "count":  1
                     },
                     {
@@ -8729,7 +8729,7 @@
                     {
                         "path":  "src/dialogs_rename.cpp",
                         "api":  "sprintf",
-                        "fingerprint":  "48f4cc192fbc961a8f4001092439cc7738274644dc7885bb1d1c2596817d154d",
+                        "fingerprint":  "c556c080fb15c62c86ebb993042e4ba9b2c1ff82b21abc5ee913dded1a3345ee",
                         "count":  2
                     },
                     {

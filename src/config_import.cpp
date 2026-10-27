@@ -138,7 +138,7 @@ BOOL GetUpgradeInfo(BOOL* autoImportConfig, char* autoImportConfigFromKey, int a
                                  "configuration for the new version. You can use this existing configuration (the configuration of "
                                  "the old version remains in registry, so you can import it later). Or you can overwrite "
                                  "this existing configuration (it would be lost) with the configuration of the old version. "
-                                 "Or you can exit Open Salamander and solve this problem later.",
+                                 "Or you can exit File Manager and solve this problem later.",
                             keyName, SALAMANDER_TEXT_VERSION);
                     params.Text = buf;
                     char aliasBtnNames[200];

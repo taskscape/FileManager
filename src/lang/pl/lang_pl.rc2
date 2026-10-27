@@ -17,7 +17,7 @@
 
 
 // The internal viewer loads these menus from the language DLL during startup; without them
-// InitializeViewer() fails and Salamander exits. Keep the item order and IDs identical to
+// InitializeViewer() fails and File Manager exits. Keep the item order and IDs identical to
 // ..\lang.rc2 because VIEWER_FILE_MENU_OTHFILESINDEX and CODING_MENU_INDEX depend on them.
 IDM_VIEWERMENU MENU
 {

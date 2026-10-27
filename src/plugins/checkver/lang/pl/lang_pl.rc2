@@ -23,7 +23,7 @@
 
 STRINGTABLE
 {
- IDS_PLUGIN_DESCRIPTION, "Sprawdzanie aktualizacji programu Open Salamander i wtyczek."
+ IDS_PLUGIN_DESCRIPTION, "Sprawdzanie aktualizacji programu File Manager i wtyczek."
  IDS_ABOUT, "Informacje o wtyczce"
  IDS_CTXMENU_OPEN, "Otwórz"
  IDS_CTXMENU_COPY, "Kopiuj adres URL do schowka"
@@ -57,7 +57,7 @@ STRINGTABLE
  IDS_NONEW_MODULES, "Obecnie nie są dostępne żadne nowe moduły."
  IDS_BTN_CHECK, "Sprawdź &teraz"
  IDS_BTN_STOP, "&Stop"
- IDS_COPYRIGHT1, "CheckVer %s - sprawdzanie najnowszych wersji programu Open Salamander i wtyczek."
+ IDS_COPYRIGHT1, "CheckVer %s - sprawdzanie najnowszych wersji programu File Manager i wtyczek."
  IDS_COPYRIGHT2, "Kliknij przycisk Konfiguracja, aby zmienić ustawienia połączenia internetowego lub częstotliwość sprawdzania."
  IDS_LAST_CHECK, "Data ostatniego sprawdzenia: %s."
  IDS_SKIP_CHECK, "Aby pominąć sprawdzanie, kliknij przycisk Zamknij."
@@ -79,8 +79,8 @@ STRINGTABLE
  IDS_FILE_OPENERROR, "Nie można otworzyć pliku '%s'."
  IDS_FILE_READERROR, "Nie można odczytać pliku '%s'."
  IDS_FILE_OPENED, "Plik %s został pomyślnie odczytany."
- IDS_APP_UPDATE_CHECKING, "Sprawdzanie aktualizacji programu Open Salamander..."
- IDS_APP_UPDATE_AVAILABLE, "Dostępna jest aktualizacja programu Open Salamander. Wybierz Pomoc > Pobierz aktualizację, aby ją otworzyć."
- IDS_APP_UPDATE_CURRENT, "Program Open Salamander jest aktualny."
- IDS_APP_UPDATE_FAILED, "Sprawdzanie aktualizacji programu Open Salamander nie powiodło się. Możesz spróbować ponownie później."
+ IDS_APP_UPDATE_CHECKING, "Sprawdzanie aktualizacji programu File Manager..."
+ IDS_APP_UPDATE_AVAILABLE, "Dostępna jest aktualizacja programu File Manager. Wybierz Pomoc > Pobierz aktualizację, aby ją otworzyć."
+ IDS_APP_UPDATE_CURRENT, "Program File Manager jest aktualny."
+ IDS_APP_UPDATE_FAILED, "Sprawdzanie aktualizacji programu File Manager nie powiodło się. Możesz spróbować ponownie później."
 }

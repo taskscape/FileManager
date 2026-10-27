@@ -74,7 +74,7 @@ STRINGTABLE DISCARDABLE
     IDS_ERR_HFS_BTREE_FRAGMENTED "Plik katalogu (Catalog) jest pofragmentowany na więcej niż 8 fragmentów, co nie jest obsługiwane."
     IDS_ERR_HFS_FILE_FRAGMENTED "Plik '%s' jest pofragmentowany na więcej niż 8 fragmentów, co nie jest obsługiwane.\nPlik nie zostanie rozpakowany."
 
-    IDS_ERR_TOO_LONG_PATH       "Ten obraz dysku zawiera ścieżkę zbyt długą, aby program Open Salamander mógł ją obsłużyć."
+    IDS_ERR_TOO_LONG_PATH       "Ten obraz dysku zawiera ścieżkę zbyt długą, aby program File Manager mógł ją obsłużyć."
 
     IDS_ERR_DMG_READ_HDR        "Nie można odczytać nagłówka pakietu. Plik jest zbyt mały."
     IDS_ERR_DMG_ENCRYPTED       "Ten pakiet jest zaszyfrowany.\nZaszyfrowane pakiety nie są obsługiwane."

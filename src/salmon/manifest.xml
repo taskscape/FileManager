@@ -6,7 +6,7 @@
     type="win32"
     version="1.0.3.0">
 </assemblyIdentity>
-<description>Open Salamander Bug Reporter</description>
+<description>File Manager Bug Reporter</description>
 <dependency>
     <dependentAssembly>
         <assemblyIdentity

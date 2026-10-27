@@ -106,10 +106,10 @@ LoadStr(int resID)
         ret = "Cannot send message to File Comparator plugin.";
         break;
     case IDS_LAUNCHSAL:
-        ret = "Unable to launch Open Salamander.";
+        ret = "Unable to launch File Manager.";
         break;
     case IDS_MSGERR2:
-        ret = "Cannot send message to File Comparator plugin. Ensure 'Load plugin on Open Salamander start' option is set in File Comparator configuration.";
+        ret = "Cannot send message to File Comparator plugin. Ensure 'Load plugin on File Manager start' option is set in File Comparator configuration.";
         break;
     default:
         ret = "ERROR LOADING STRING";

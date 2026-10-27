@@ -578,7 +578,7 @@ public:
     {
         LanguageID = 0x0409;
         // Signature defaults must remain fully formed before they are saved to resource fields.
-        StringCchCopyW(Author, _countof(Author), L"Open Salamander");
+        StringCchCopyW(Author, _countof(Author), L"File Manager");
         StringCchCopyW(Web, _countof(Web), L"www.taskscape.com");
         StringCchCopyW(Comment, _countof(Comment), L"");
         StringCchCopyW(HelpDir, _countof(HelpDir), L"");

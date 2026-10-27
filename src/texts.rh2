@@ -983,7 +983,7 @@
 
 #define IDS_CONTEXTMENU_EXIT         10771
 
-// Always on Top prevents other application windows from open above Open Salamander windows. You will not be able to open these windows on top until you turn off Always on Top.
+// Always on Top prevents other application windows from open above File Manager windows. You will not be able to open these windows on top until you turn off Always on Top.
 #define IDS_WANTALWAYSONTOP          10779
 
 // regular expressions menu
@@ -1713,10 +1713,10 @@
 #define IDS_PLUGINSUFFIX             12235
 
 // task list dialog: You cannot break this task. Use another
-// Open Salamander task to break this one.
+// File Manager task to break this one.
 #define IDS_CURRENTPROCESSBREAK      12240
 // task list dialog: You cannot terminate this task. Use another
-// Open Salamander task to terminate this one.
+// File Manager task to terminate this one.
 #define IDS_CURRENTPROCESSTERMINATE  12241
 // task list dialog: process terminate confirmation
 #define IDS_CONFIRM_TERMINATE        12242
@@ -1758,10 +1758,10 @@
 // unpacking from archives - operation masks are not supported when unpacking from archives
 #define IDS_UNPACK_OPMASKSNOTSUP      12306
 
-// Language changes do not take affect until the Open Salamander is restarted.
+// Language changes do not take affect until the File Manager is restarted.
 #define IDS_LANGUAGE_CHANGE           12307
 
-// Conversion Table changes do not take affect until the Open Salamander is restarted.
+// Conversion Table changes do not take affect until the File Manager is restarted.
 #define IDS_CONVERSION_CHANGE         12308
 
 // copying/moving from FS - this plug-in FS doesn't support copying/moving to archives and general support for these operations is not implemented yet
@@ -1811,9 +1811,9 @@
 // Options/Configuration/User Menu; (Submenu End)
 #define IDS_ENDUSERSUBMENU            12357
 
-// start of first instance of Open Salamander: it has found Salamander's
+// start of first instance of File Manager: it has found Salamander's
 // temporary files in TEMP directory: Do you want to delete %d temporary
-// directories used by previous instances of Open Salamander?
+// directories used by previous instances of File Manager?
 #define IDS_DELETETMPSALDIRS          12360
 // Yes/No/Focus buttons for message box
 #define IDS_DELETETMPSALDIRS_YES    12361
@@ -1827,9 +1827,9 @@
 #define IDS_ARCFILESNOTFOUND          12370
 // Copy&Paste from archive: some of specified files or directories (names are placed in clipboard) were not found in archive, do you want to continue?
 #define IDS_ARCFILESNOTFOUND2         12371
-// Copy&Paste from archive: Unable to paste files and directories from clipboard here. Open Salamander's main window must be accessible to process Paste command
+// Copy&Paste from archive: Unable to paste files and directories from clipboard here. File Manager's main window must be accessible to process Paste command
 #define IDS_ARCUNABLETOPASTE1         12372
-// Copy&Paste from archive: Unable to paste files and directories from clipboard now. Open Salamander's\nmain window must be accessible to process Paste command
+// Copy&Paste from archive: Unable to paste files and directories from clipboard now. File Manager's\nmain window must be accessible to process Paste command
 #define IDS_ARCUNABLETOPASTE2         12373
 
 // file system flags for NTFS 5.0 in Drive Information dialog:
@@ -1855,7 +1855,7 @@
 // Edit New File: File already exists. Do you want to edit existing file?
 #define IDS_EDITNEWALREADYEX          12395
 
-// drag&drop to archive or FS: Source path can't be translated from Unicode to multibyte, so Open Salamander is not able to work on it
+// drag&drop to archive or FS: Source path can't be translated from Unicode to multibyte, so File Manager is not able to work on it
 #define IDS_SRCPATHUNICODEONLY        12400
 // drag&drop or Paste to archive or FS: Some files or directories specified in drag&drop or clipboard operation were not found.\n\nDo you want to continue?
 #define IDS_SRCFILESNOTFOUND          12401
@@ -2365,7 +2365,7 @@
 #define IDS_DONTSHOWAGAINCF             13561
 // Always on Top: turning on confirmation
 #define IDS_DONTSHOWAGAINAT             13562
-// Close Open Salamander confirmation
+// Close File Manager confirmation
 #define IDS_DONTSHOWAGAINCS             13563
 // create non-existing directory confirmation
 #define IDS_DONTSHOWAGAINCD             13564
@@ -2629,7 +2629,7 @@
 // when Salamander runs "As Admin", display in main window title: Administrator
 #define IDS_AS_ADMIN_TITLE              14005
 
-// Open Salamander Bug Reporter
+// File Manager Bug Reporter
 #define IDS_SALMON_INVALIDEMAIL         14010
 #define IDS_SALMON_WAITFORUPLOAD        14011
 #define IDS_SALMON_CONFIRMEXIT          14012
@@ -2674,7 +2674,7 @@
 // salmon.exe is not running
 #define IDS_SALMON_NOT_RUNNING          14100
 
-// Translation of Open Salamander into your language is not finished. Please join the translation effort.
+// Translation of File Manager into your language is not finished. Please join the translation effort.
 #define IDS_SLGINCOMPLETE_TITLE         14150
 #define IDS_SLGINCOMPLETE_TEXT          14151
 

@@ -6,7 +6,7 @@
     type="win32"
     version="1.0.3.0">
 </assemblyIdentity>
-<description>SalOpen, Open Salamander Opener</description>
+<description>SalOpen, File Manager Opener</description>
 <trustInfo xmlns="urn:schemas-microsoft-com:asm.v3">
   <security>
   <requestedPrivileges>

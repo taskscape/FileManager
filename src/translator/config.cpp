@@ -9,7 +9,8 @@
 #include "config.h"
 #include "translator.h"
 
-const char* DB_ROOT_KEY = "Software\\Open Salamander\\Translator";
+// Translator settings follow the name presented to users.
+const char* DB_ROOT_KEY = "Software\\File Manager\\Translator";
 const char* WINDOW_LEFT_REG = "Left";
 const char* WINDOW_RIGHT_REG = "Right";
 const char* WINDOW_TOP_REG = "Top";

@@ -22,7 +22,7 @@ STRINGTABLE
  IDS_MENU_VALIDATE "Validate &Specification..."
  IDS_MENU_NEWSPEC "&New Specification from Template..."
  IDS_TITLE "Delivery Handoff"
- IDS_ERR_BUSY "Open Salamander is busy. Please try again later."
+ IDS_ERR_BUSY "File Manager is busy. Please try again later."
  IDS_ERR_START "The window could not be opened because there are not enough system resources."
  IDS_COL_VARIABLE "Variable"
  IDS_COL_VALUE "Value"

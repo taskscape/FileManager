@@ -35,22 +35,25 @@ public sealed class ApplicationVersionContractTests
 
             Assert.That(installer, Does.Contain("#define MyAppVersion \"6.0\""));
             Assert.That(installer, Does.Contain("AppVersion={#MyAppVersion}.{#BuildNumber}"));
-            Assert.That(installer, Does.Contain("OutputBaseFilename=OpenSalamander_{#MyAppVersion}.{#BuildNumber}"));
+            Assert.That(installer, Does.Contain("OutputBaseFilename=FileManager_{#MyAppVersion}.{#BuildNumber}"));
             // The workflow delegates the installer command to one shared helper, which owns the build-number argument.
             Assert.That(workflow, Does.Contain("build-release-installer.ps1"));
             Assert.That(releaseInstaller, Does.Contain("('/DBuildNumber=' + $BuildNumber)"));
             // The Node 24 GitHub Script release action receives the generated tag through its environment.
             Assert.That(workflow, Does.Contain("RELEASE_TAG: 6.0.${{ github.run_number }}"));
-            Assert.That(workflow, Does.Contain("OpenSalamander_6.0.${{ github.run_number }}.exe"));
+            Assert.That(workflow, Does.Contain("FileManager_6.0.${{ github.run_number }}.exe"));
 
             Assert.That(configuration, Does.Contain("const DWORD THIS_CONFIG_VERSION = 105;"));
-            Assert.That(configuration, Does.Contain("\"Software\\\\Open Salamander\\\\6.0\","));
+            var currentRoot = configuration.IndexOf("\"Software\\\\File Manager\\\\6.0\"", StringComparison.Ordinal);
+            var previousRoot = configuration.IndexOf("\"Software\\\\Open Salamander\\\\6.0\"", StringComparison.Ordinal);
+            Assert.That(currentRoot, Is.GreaterThanOrEqualTo(0));
+            Assert.That(previousRoot, Is.GreaterThan(currentRoot));
             Assert.That(configuration, Does.Contain("\"Software\\\\Open Salamander\\\\5.0\","));
-            Assert.That(constants, Does.Contain("#define SALCFG_ROOTS_COUNT 84"));
+            Assert.That(constants, Does.Contain("#define SALCFG_ROOTS_COUNT 85"));
             Assert.That(assemblyVersion, Is.EqualTo("6.0.0.0"));
             Assert.That(shellExtension, Does.Contain("#define FILE_SALVER \"6.0\""));
             Assert.That(shellRegistration, Does.Contain("#define SALSHEXT_SHAREDNAMESAPPENDIX \"600\""));
-            Assert.That(readme, Does.Contain("OpenSalamander_6.0.{build_number}.exe"));
+            Assert.That(readme, Does.Contain("FileManager_6.0.{build_number}.exe"));
         });
     }
 

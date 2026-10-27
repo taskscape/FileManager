@@ -2,7 +2,7 @@
 //
 // Convert Images using ImageMagick convert
 //
-// Microsoft JScript for Open Salamander Automation plugin
+// Microsoft JScript for File Manager Automation plugin
 // Contact us 
 //
 // Copyright (c) 2010-2023 Taskscape Ltd
@@ -70,12 +70,12 @@ var logToFile = true;                                             // set 'true' 
 //   Skip All and Cancel buttons, error states handling, output log with opearation summary.
 //
 // Installation and Requirements:
-//   Open Salamander: https://www.taskscape.com/
+//   File Manager: https://www.taskscape.com/
 //   ImageMagick: http://www.imagemagick.org/ (download any Windows precompiled x86 or x64 version)
 //   Install both applications
 //
 // Usage:
-//   In Open Salamander panel select files (or directories) you need to convert
+//   In File Manager panel select files (or directories) you need to convert
 //   Inactive panel will be used as target path
 //   Start this script using Plugins > Automation menu
 //
@@ -620,8 +620,8 @@ function CheckVersions()
   {
     if (typeof(WScript) != "undefined")
     {
-      var infText = "This script requires Open Salamander with Automation plugin installed.\n";
-      infText += "Please download latest version of Open Salamander from www.taskscape.com.\n";
+      var infText = "This script requires File Manager with Automation plugin installed.\n";
+      infText += "Please download latest version of File Manager from www.taskscape.com.\n";
       infText += "Install it and use menu Plugins > Automation > Run Focused Script to start this script.";
       try
       {

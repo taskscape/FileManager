@@ -9,17 +9,17 @@
 
 <body>
 <div id="help_page">
-<div class="header">Open Salamander: Dialog Boxes: Configuration</div>
+<div class="header">File Manager: Dialog Boxes: Configuration</div>
 <div class="page">
 
 <h1>General</h1>
 
-<p>Allows you to change the general behavior of the Open Salamander.</p>
+<p>Allows you to change the general behavior of the File Manager.</p>
 
 <h4>Dialog Box Options</h4>
 <dl>
 <dt><i>Save configuration on exit</i></dt>
-<dd>When checked, configuration will be saved on Open Salamander exit. 
+<dd>When checked, configuration will be saved on File Manager exit. 
 Configuration contains settings from Configuration dialog, main window position,
 panel widths and current directories, and other options.</dd>
 
@@ -28,9 +28,9 @@ panel widths and current directories, and other options.</dd>
 this attribute during the copy operation. This is useful for further processing
 of these files.</dd>
 
-<dt><i>Allow only one instance of Salamander at one time</i></dt>
-<dd>When checked, only one instance if Open Salamander can run. If you try
-to start another instance of Open Salamander, the running instance will be
+<dt><i>Allow only one instance of File Manager at one time</i></dt>
+<dd>When checked, only one instance if File Manager can run. If you try
+to start another instance of File Manager, the running instance will be
 activated instead.</dd>
 
 <dt><i>Use speaker beep to announce finishing of work in inactive window</i></dt>
@@ -74,8 +74,8 @@ selected. You can use the Ctrl+A keyboard shortcut to select all.
 
 <dt><i>Use fast directory move on Novell Netware</i></dt>
 <dd>When checked and you are moving directory in scope of one Novell Netware drive,
-Salamander moves this directory just by renaming it directly to the target path
-(it is fast but not always working). Otherwise, Salamander renames only files, all
+File Manager moves this directory just by renaming it directly to the target path
+(it is fast but not always working). Otherwise, File Manager renames only files, all
 necessary directories are created on target path and after moving contained files
 deleted in source directory (it can be much slower but always working). We recommend
 you to try turn on this option and turn it off only when moving of directories in
@@ -83,10 +83,10 @@ scope of one Novell Netware drive fails.
 </dd>
 
 <dt><i>Copy files: use faster asynchronous algorithm on network (Windows 7 and later)</i></dt>
-<dd>When checked and you are copying files to or from network drive, Salamander uses
+<dd>When checked and you are copying files to or from network drive, File Manager uses
 asynchronous copy algorithm which is faster then conventional one (111 MB/s on GLAN
 instead of 86 MB/s). This advanced algorithm is available only on Windows 7 and later.
-Otherwise, Salamander copies files using conventional algorithm. This option affects
+Otherwise, File Manager copies files using conventional algorithm. This option affects
 also moving of files in case you are not moving in scope of one volume (then it is
 just rename, not copy and delete). Asynchronous copy algorithm is also optimized for
 network drives accessible via VPN (Virtual Private Network). It uses smaller blocks
@@ -95,11 +95,11 @@ instantly.
 </dd>
 
 <dt><i>Keep environment variables updated to system values</i></dt>
-<dd>When checked, Salamander reads system environment variables on start and when 
+<dd>When checked, File Manager reads system environment variables on start and when 
 system environment variables are changed. Values of environment variables inherited
 from parent process are overwritten by values from system. Variables which do not
 exist in system remain untouched. Uncheck this option to use inherited environment
-variables in running Salamander and all processes started from it.</dd>
+variables in running File Manager and all processes started from it.</dd>
 
 </dl>
 

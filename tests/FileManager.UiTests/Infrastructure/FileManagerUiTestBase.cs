@@ -179,14 +179,14 @@ public abstract class FileManagerUiTestBase
             NativeCommands.DismissKnownStartupErrorDialogs(application.ProcessId);
             var windows = NativeCommands.GetTopLevelWindows(application.ProcessId);
             var language = windows.FirstOrDefault(window =>
-                NativeCommands.GetWindowTitle(window) == "Open Salamander" &&
+                NativeCommands.GetWindowTitle(window) == "File Manager" &&
                 NativeCommands.GetDialogText(window).Contains("Select one of the installed languages.", StringComparison.Ordinal));
             if (language != 0)
             {
                 NativeCommands.AcceptStartupLanguage(language);
                 break;
             }
-            if (windows.Any(window => NativeCommands.GetWindowTitle(window).Contains(" - Open Salamander", StringComparison.Ordinal))) break;
+            if (windows.Any(window => NativeCommands.GetWindowTitle(window).Contains(" - File Manager", StringComparison.Ordinal))) break;
             Thread.Sleep(50);
         }
         TrackCrashReporters(reportersBeforeLaunch);
@@ -615,7 +615,7 @@ public abstract class FileManagerUiTestBase
                     }
 
                     if (string.Equals(window.Properties.ClassName.ValueOrDefault, "#32770", StringComparison.Ordinal) &&
-                        string.Equals(window.Title, "Open Salamander", StringComparison.Ordinal))
+                        string.Equals(window.Title, "File Manager", StringComparison.Ordinal))
                         languageDialog = window;
 
                 }
@@ -800,7 +800,7 @@ public abstract class FileManagerUiTestBase
         {
             log.Dispose();
             // NUnit carries this absolute path into TRX-aware runners while the file also remains directly readable.
-            TestContext.AddTestAttachment(transcriptPath, "Open Salamander UI execution transcript");
+            TestContext.AddTestAttachment(transcriptPath, "File Manager UI execution transcript");
         }
         catch (Exception exception)
         {

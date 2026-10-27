@@ -34,7 +34,7 @@
 // commit/rollback transactions, and the UI-test configuration-store override.
 // All cluster-local statics stay here; exported entry points are declared in
 // salamand.h.
-static const char* const FileManagerUiTestConfigurationRoot = "Software\\Open Salamander\\6.0-filemanager-testdata";
+static const char* const FileManagerUiTestConfigurationRoot = "Software\\File Manager\\6.0-filemanager-testdata";
 static BOOL FileManagerUiTestConfigurationStore = FALSE;
 
 // The public root remains the path that existing host and plug-in code opens.  Once a
@@ -479,13 +479,13 @@ BOOL SelectCommittedConfigurationGeneration()
                 selected = TRUE;
                 // Schema diagnostics are bounded presentation text.
                 StringCchCopyNA(ConfigurationSchemaDiagnostic, _countof(ConfigurationSchemaDiagnostic),
-                                "Open Salamander ignored an invalid configuration profile and restored the last verified profile.",
+                                "File Manager ignored an invalid configuration profile and restored the last verified profile.",
                                 _countof(ConfigurationSchemaDiagnostic) - 1);
             }
             else
                 // Schema diagnostics are bounded presentation text.
                 StringCchCopyNA(ConfigurationSchemaDiagnostic, _countof(ConfigurationSchemaDiagnostic),
-                                "Open Salamander could not validate the saved configuration. The default profile will be used.",
+                                "File Manager could not validate the saved configuration. The default profile will be used.",
                                 _countof(ConfigurationSchemaDiagnostic) - 1);
         }
     }

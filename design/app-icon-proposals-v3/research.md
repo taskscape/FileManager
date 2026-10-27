@@ -17,6 +17,6 @@ This is a visual design sample of ten recognizable file managers, not a market-s
 
 ## Design conclusion
 
-In this sample, storage objects—folders, drawers, and disks—are more common than literal screenshots of file-manager windows. Files is the most relevant modern Windows reference: its current icon uses one layered folder, rounded geometry, warm color, and restrained depth. The distinguishing cue for Open Salamander can be a two-part folder face rather than extra files, rows, or arrows. This is an inference from the sample, not a popularity-weighted count.
+In this sample, storage objects—folders, drawers, and disks—are more common than literal screenshots of file-manager windows. Files is the most relevant modern Windows reference: its current icon uses one layered folder, rounded geometry, warm color, and restrained depth. The distinguishing cue for File Manager can be a two-part folder face rather than extra files, rows, or arrows. This is an inference from the sample, not a popularity-weighted count.
 
 [Microsoft's Windows app icon guidance](https://learn.microsoft.com/en-us/windows/apps/design/iconography/app-icon-design) recommends one clear metaphor where possible, few shapes, no typography, and a legible small-size silhouette. These proposals keep the splash colors but place them on a single storage form instead of reproducing the splash artwork.

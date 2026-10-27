@@ -158,6 +158,9 @@ const DWORD THIS_CONFIG_VERSION = 105;
 // !!! Keep the corresponding lines in SalamanderConfigurationVersions up to date
 const char* SalamanderConfigurationRoots[SALCFG_ROOTS_COUNT + 1] =
     {
+        // Live profiles use the name presented to users. The next key is the previous
+        // 6.0 location and is kept so an existing profile can still be imported.
+        "Software\\File Manager\\6.0",
         "Software\\Open Salamander\\6.0",
         "Software\\Open Salamander\\5.0",
         "Software\\Taskscape Ltd\\Open Salamander 4.0",
@@ -245,6 +248,7 @@ const char* SalamanderConfigurationRoots[SALCFG_ROOTS_COUNT + 1] =
 };
 const char* SalamanderConfigurationVersions[SALCFG_ROOTS_COUNT] =
     {
+        "6.0",
         "6.0",
         "5.0",
         "4.0",

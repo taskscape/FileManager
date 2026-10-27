@@ -18,7 +18,7 @@ public sealed class UiTestSandboxLifetime
 internal static class UiTestSandbox
 {
     private const string OwnershipMarkerName = ".filemanager-testdata-owner";
-    private const string OwnershipMarkerContents = "Open Salamander UI test sandbox";
+    private const string OwnershipMarkerContents = "File Manager UI test sandbox";
     private static readonly HashSet<string> OwnedRoots = new(StringComparer.OrdinalIgnoreCase);
     // Retain known roots across per-test resets so the assembly teardown can remove clean marked directories.
     private static readonly HashSet<string> KnownRoots = new(StringComparer.OrdinalIgnoreCase);
@@ -86,7 +86,7 @@ internal static class UiTestSandbox
         // The marker prevents cleanup from deleting a similarly named directory that was not created by this run.
         File.WriteAllText(marker, OwnershipMarkerContents);
         Directory.CreateDirectory(Path.Combine(root, "temp"));
-        // The native roaming-data override creates Open Salamander below this parent on demand.
+        // The native roaming-data override creates File Manager below this parent on demand.
         Directory.CreateDirectory(Path.Combine(root, "appdata"));
         OwnedRoots.Add(root);
         KnownRoots.Add(root);

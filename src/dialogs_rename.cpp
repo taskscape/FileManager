@@ -653,13 +653,9 @@ void CImportConfigDialog::Transfer(CTransferInfo& ti)
         {
             if (ConfigurationExist[i])
             {
-                // detect whether this is "Open Salamander", "Open Salamander", or the old "Servant Salamander"
-                BOOL openSalamander = StrIStr(SalamanderConfigurationRoots[i], "Open Salamander") != NULL;
-                BOOL taskscapeSalamander = StrIStr(SalamanderConfigurationRoots[i], "Open Salamander") != NULL;
-                const char* name = openSalamander    ? "Open Salamander %s"
-                                   : taskscapeSalamander ? "Open Salamander %s"
-                                                     : "Servant Salamander %s";
-                sprintf(buff, name, SalamanderConfigurationVersions[i]);
+                // Registry paths still name older installs. The dialog shows a version only,
+                // because the name presented to users is File Manager.
+                sprintf(buff, "Version %s", SalamanderConfigurationVersions[i]);
                 SendDlgItemMessage(HWindow, IDC_IMPORTCONFIG, CB_ADDSTRING, 0, (LPARAM)buff);
                 if (selIndex == 0)
                     selIndex = 1; // the last configuration becomes default
@@ -685,13 +681,9 @@ void CImportConfigDialog::Transfer(CTransferInfo& ti)
                 lvi.iSubItem = 0;
                 lvi.state = 0;
 
-                // detect whether this is "Open Salamander", "Open Salamander", or the old "Servant Salamander"
-                BOOL openSalamander = StrIStr(SalamanderConfigurationRoots[i], "Open Salamander") != NULL;
-                BOOL taskscapeSalamander = StrIStr(SalamanderConfigurationRoots[i], "Open Salamander") != NULL;
-                const char* name = openSalamander    ? "Open Salamander %s"
-                                   : taskscapeSalamander ? "Open Salamander %s"
-                                                     : "Servant Salamander %s";
-                sprintf(buff, name, SalamanderConfigurationVersions[i]);
+                // Registry paths still name older installs. The dialog shows a version only,
+                // because the name presented to users is File Manager.
+                sprintf(buff, "Version %s", SalamanderConfigurationVersions[i]);
                 lvi.pszText = buff;
                 ListView_InsertItem(hListView, &lvi);
                 index++;
@@ -1112,7 +1104,7 @@ CLanguageSelectorDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
             if (GetLanguagesCount() == 0) // should not happen because this dialog is loaded from the .slg module (that .slg cannot be deleted)
             {
                 MessageBox(HWindow, "Unable to find any language file (.SLG) in subdirectory LANG.\n"
-                                    "Please reinstall Open Salamander.",
+                                    "Please reinstall File Manager.",
                            SALAMANDER_TEXT_VERSION, MB_OK | MB_ICONERROR);
                 TRACE_E("CLanguageSelectorDialog: unexpected situation (no language file): calling ExitProcess(667).");
                 //          ExitProcess(667);

@@ -1,13 +1,13 @@
 # Taskscape File Manager
 
-File Manager is an Open Salamander based fast and reliable two-panel file manager for Windows.
+File Manager is a fast and reliable two-panel file manager for Windows. It is derived from Open Salamander.
 
 ![Screenshot](img/screenshot.png)
 
 [![Latest release](https://img.shields.io/github/v/release/taskscape/FileManager)](https://github.com/taskscape/FileManager/releases/latest)
 [![License: GPL v2](https://img.shields.io/badge/license-GPLv2-blue.svg)](doc/license_gpl.txt)
 
-**Current line:** 6.0 · [Download](https://github.com/taskscape/FileManager/releases/latest) · [Website](https://www.opensalamander.org/)
+**Current line:** 6.0 · [Download](https://github.com/taskscape/FileManager/releases/latest) · [Website](https://github.com/taskscape/FileManager)
 
 ## Contents
 
@@ -58,11 +58,11 @@ The plugin follows NoteManager's Infostacker integration: anonymous multipart up
 
 ## Origin
 
-The original version of Servant Salamander was developed by Petr Šolín during his studies at the Czech Technical University. He released it as freeware in 1997. After graduation, Petr Šolín founded the company [Altap](https://www.altap.cz/) in cooperation with Jan Ryšavý. In 2001 they released the first shareware version of the program. In 2007 a new version was renamed to Altap Salamander 2.5. Many other programmers and translators [contributed](AUTHORS) to the project. In 2019, Altap was acquired by [Fine](https://www.finesoftware.eu/). After this acquisition, Altap Salamander 4.0 was released as freeware. In 2023, the project was open sourced under the GPLv2 license as Open Salamander 5.0.
+The original version of Servant Salamander was developed by Petr Šolín during his studies at the Czech Technical University. He released it as freeware in 1997. After graduation, Petr Šolín founded the company [Altap](https://www.altap.cz/) in cooperation with Jan Ryšavý. In 2001 they released the first shareware version of the program. In 2007 a new version was renamed to Altap Salamander 2.5. Many other programmers and translators [contributed](AUTHORS) to the project. In 2019, Altap was acquired by [Fine](https://www.finesoftware.eu/). After this acquisition, Altap Salamander 4.0 was released as freeware. In 2023, the project was open sourced under the GPLv2 license as Open Salamander 5.0. That release is documented at [opensalamander.org](https://www.opensalamander.org/).
 
 The name Servant Salamander came about when Petr Šolín and his friend Pavel Schreib were brainstorming a name for this project. At that time, the well-known file managers were the aging Norton Commander and the rising Windows Commander. They questioned why a file manager should be named Commander, which implied that it commanded instead of served. This thought led to the birth of the name Servant Salamander.
 
-Salamander was our first major C++ project. Historically it did not follow the [C++ Core Guidelines](https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines), and it made little use of smart pointers, [RAII](https://en.cppreference.com/w/cpp/language/raii), [STL](https://github.com/microsoft/STL), or [WIL](https://github.com/microsoft/wil). Open Salamander 6.0 starts adopting those practices on new and refurbished paths—scoped handle owners, selected WIL COM pointers, and modern Win32 replacements—while remaining a pure WinAPI application with no MFC or similar UI framework. Many comments were originally written in Czech; an active effort is translating them to English.
+Salamander was our first major C++ project. Historically it did not follow the [C++ Core Guidelines](https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines), and it made little use of smart pointers, [RAII](https://en.cppreference.com/w/cpp/language/raii), [STL](https://github.com/microsoft/STL), or [WIL](https://github.com/microsoft/wil). File Manager 6.0 starts adopting those practices on new and refurbished paths—scoped handle owners, selected WIL COM pointers, and modern Win32 replacements—while remaining a pure WinAPI application with no MFC or similar UI framework. Many comments were originally written in Czech; an active effort is translating them to English.
 
 We would like to thank [Fine](https://www.finesoftware.eu/) for making the open-sourced Salamander release possible.
 
@@ -99,8 +99,8 @@ The highlights below cover repository work from **March through October 2026**, 
 ### Build, tests, and releases
 
 - The solution targets **Visual Studio 2026** (MSVC v145). Windows 11 SDK `10.0.26100.4654` is the documented SDK component.
-- Every push to `main` builds a versioned Inno Setup installer and publishes a GitHub release named `OpenSalamander_6.0.{build_number}.exe`.
-- Shortly after startup, Open Salamander checks `https://api.github.com/repos/taskscape/FileManager/releases/latest`. When a newer release exists, the title bar shows `(update available)` and **Help → Download update** opens the [releases page](https://github.com/taskscape/FileManager/releases).
+- Every push to `main` builds a versioned Inno Setup installer and publishes a GitHub release named `FileManager_6.0.{build_number}.exe`.
+- Shortly after startup, File Manager checks `https://api.github.com/repos/taskscape/FileManager/releases/latest`. When a newer release exists, the title bar shows `(update available)` and **Help → Download update** opens the [releases page](https://github.com/taskscape/FileManager/releases).
 - Automated coverage now includes FlaUI/UIA3 UI tests, VHDX/virtual-volume cases, release-parity packaging (`scripts\runtests.ps1`), PE hardening audits, and an optional Application Verifier lock-stress lane.
 
 ## Open Salamander 5.0
@@ -135,7 +135,7 @@ Set the `OPENSAL_BUILD_DIR` environment variable to the build directory. The pat
 
 The solution `src\vcxproj\salamand.sln` can be built from Visual Studio or from the command line with `src\vcxproj\rebuild.cmd`.
 
-Use `src\vcxproj\!populate_build_dir.cmd` to copy the files required to run Open Salamander into the build directory.
+Use `src\vcxproj\!populate_build_dir.cmd` to copy the files required to run File Manager into the build directory.
 
 ### Automated testing
 
@@ -145,7 +145,7 @@ Reliability objectives, responsible roles, required incident records, and releas
 
 ### Creating the installer
 
-Open Salamander uses [Inno Setup](https://jrsoftware.org/isinfo.php). The script is `Installer\setup.iss`.
+File Manager uses [Inno Setup](https://jrsoftware.org/isinfo.php). The script is `Installer\setup.iss`.
 
 #### Building locally
 
@@ -186,11 +186,11 @@ The workflow `.github\workflows\build-installer.yml` runs on pushes to `main` an
 5. Compiles the installer with build-number versioning.
 6. Creates a GitHub release with the installer attached.
 
-Installers are named `OpenSalamander_6.0.{build_number}.exe`.
+Installers are named `FileManager_6.0.{build_number}.exe`.
 
 ### Update detection
 
-Open Salamander checks for newer builds automatically. The mechanism uses the GitHub releases above; no version files or manual steps are required.
+File Manager checks for newer builds automatically. The mechanism uses the GitHub releases above; no version files or manual steps are required.
 
 1. Shortly after startup, a single background thread queries `https://api.github.com/repos/taskscape/FileManager/releases/latest` (see `src\update_check.cpp`).
 2. The release `"published_at"` UTC timestamp is compared with the PE COFF header link timestamp embedded in the running executable. That stamp stays correct across installer and file-copy operations.
@@ -203,7 +203,7 @@ When an update is found, the main window title bar gains an `(update available)`
 
 ### Icons
 
-Open Salamander uses scalable SVG icons for its toolbars.
+File Manager uses scalable SVG icons for its toolbars.
 
 | Property | Value |
 | --- | --- |
@@ -219,7 +219,7 @@ The execution logging system runs only in DEBUG builds. It records major applica
 
 #### Running the Trace Server
 
-Build the `tserver` project in the **Debug | Win32** configuration, then start `tserver.exe` before debugging Open Salamander. The standard debug output path is `src\vcxproj\tserver\tserver\Debug\tserver.exe`. From PowerShell:
+Build the `tserver` project in the **Debug | Win32** configuration, then start `tserver.exe` before debugging File Manager. The standard debug output path is `src\vcxproj\tserver\tserver\Debug\tserver.exe`. From PowerShell:
 
 ```powershell
 Start-Process C:\Projects\FileManager\src\vcxproj\tserver\tserver\Debug\tserver.exe
@@ -231,13 +231,13 @@ Leave the window titled **Trace Server** open while the application runs. To ver
 Get-Process tserver
 ```
 
-Visual Studio can start both processes automatically: configure `tserver` and the main Open Salamander project as multiple startup projects, with `tserver` set to start without debugging. Start the Trace Server with the same Windows user and privilege level as the application being debugged.
+Visual Studio can start both processes automatically: configure `tserver` and the main File Manager project as multiple startup projects, with `tserver` set to start without debugging. Start the Trace Server with the same Windows user and privilege level as the application being debugged.
 
 If the debug shutdown dialog reports monitored handles that remain open, choose **Yes** only after the Trace Server is running. The application will connect and send the list of outstanding handles (including their allocation locations); it does not launch the Trace Server itself.
 
 ### Contributing
 
-This project welcomes contributions that build and enhance Open Salamander.
+This project welcomes contributions that build and enhance File Manager.
 
 Source files use UTF-8 with BOM and are formatted with `clang-format`. See `normalize.ps1` for details.
 
@@ -248,7 +248,7 @@ Source files use UTF-8 with BOM and are formatted with `clang-format`. See `norm
 | `convert\` | Conversion tables for the Convert command |
 | `doc\` | Documentation |
 | `help\` | User-manual source files |
-| `src\` | Open Salamander core source code |
+| `src\` | File Manager core source code |
 | `src\common\` | Shared libraries |
 | `src\common\dep\` | Shared third-party libraries |
 | `src\lang\` | English resources |
@@ -273,7 +273,7 @@ A few Open Salamander 5.0 plugins are either not included or cannot be compiled.
 
 ### Overview
 
-Open Salamander is a pure WinAPI C++ application with no external UI frameworks (no MFC, ATL, or Qt). The architecture follows a layered design with a plugin-based extensibility model. The codebase targets Windows Vista+ (`WINVER=0x0601`) and supports both x86 and x64 builds.
+File Manager is a pure WinAPI C++ application with no external UI frameworks (no MFC, ATL, or Qt). The architecture follows a layered design with a plugin-based extensibility model. The codebase targets Windows Vista+ (`WINVER=0x0601`) and supports both x86 and x64 builds.
 
 ```
 ┌─────────────────────────────────────────────────────────┐
@@ -543,12 +543,12 @@ Each plugin is its own `.vcxproj` linked into the solution and produces a DLL pl
 ## Resources
 
 - [User manual](manual.md)
-- [Open Salamander website](https://www.opensalamander.org/)
+- [Upstream project](https://www.opensalamander.org/)
 - [GitHub releases](https://github.com/taskscape/FileManager/releases)
 - [Automated testing](testing.md)
 - [Reliability process](reliability.md)
 
 ## License
 
-Open Salamander is open source software licensed [GPLv2](doc/license_gpl.txt) and later.
+File Manager is open source software licensed [GPLv2](doc/license_gpl.txt) and later.
 Individual [files and libraries](doc/third_party.txt) have a different, but compatible license.

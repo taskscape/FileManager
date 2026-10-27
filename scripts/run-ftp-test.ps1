@@ -10,7 +10,7 @@ if ([string]::IsNullOrWhiteSpace([Environment]::GetEnvironmentVariable('MOJERZEC
     Write-Host 'FTP UI tests have not been performed due to missing credentials (MOJERZEC_USERNAME and/or MOJERZEC_PASSWORD).'
 }
 
-# The live-server lane must never share the user's Open Salamander profile while it accepts a certificate exception.
+# The live-server lane must never share the user's File Manager profile while it accepts a certificate exception.
 $env:FILEMANAGER_UI_ISOLATED = '1'
 $repositoryRoot = Split-Path -Parent $PSScriptRoot
 # Retain Debug-only native dialog evidence after the disposable UI profile is deleted by the test harness.
