@@ -886,7 +886,8 @@ void WriteStrToFile(HANDLE file, const char* str, DWORD* err)
 }
 
 // texts in the file with an exported "server type" (extension .STR)
-const char* STR_FILE_HEADER = "File Manager - FTP Client - Exported Server Type";
+// Keep the format signature stable so exported definitions work across product renames.
+const char* STR_FILE_HEADER = "Open Salamander - FTP Client - Exported Server Type";
 const char* STR_FILE_TYPENAME = "Type Name:";
 const char* STR_FILE_ADCOND = "Autodetect Condition:";
 const char* STR_FILE_COLUMNS = "Columns:";

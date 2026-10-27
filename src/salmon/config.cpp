@@ -8,7 +8,8 @@
 
 #include "config.h"
 
-const char* DB_ROOT_KEY = "Software\\File Manager\\Bug Reporter";
+// Keep the persisted identity stable so upgrades retain the saved email address.
+const char* DB_ROOT_KEY = "Software\\Open Salamander\\Bug Reporter";
 const char* CONFIG_EMAIL_REG = "Email";
 
 CConfiguration Config;
