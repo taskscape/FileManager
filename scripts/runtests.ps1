@@ -880,6 +880,21 @@ function Remove-ExpiredTestResults {
         if ($entry.LastWriteTimeUtc -ge $cutoffUtc) {
             continue
         }
+        # Reused result trees can contain recent logs without refreshing the parent timestamp.
+        if ($entry.PSIsContainer) {
+            try {
+                $hasRecentDescendants = @(Get-ChildItem -LiteralPath $entry.FullName -Recurse -Force -ErrorAction Stop |
+                    Where-Object { $_.LastWriteTimeUtc -ge $cutoffUtc } |
+                    Select-Object -First 1).Count -gt 0
+                if ($hasRecentDescendants) {
+                    continue
+                }
+            }
+            catch {
+                Write-Warning "Could not inspect TestResults entry '$($entry.FullName)' for recent results: $($_.Exception.Message)"
+                continue
+            }
+        }
         $expiredPath = $entry.FullName
         $removed = $false
         for ($attempt = 1; $attempt -le 3 -and -not $removed; $attempt++) {
