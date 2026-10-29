@@ -40,8 +40,14 @@ CTwain::CTwain()
     AppIdentity.ProtocolMajor = TWON_PROTOCOLMAJOR;
     AppIdentity.ProtocolMinor = TWON_PROTOCOLMINOR;
     AppIdentity.SupportedGroups = DG_IMAGE | DG_CONTROL;
-    strcpy(AppIdentity.Manufacturer, "File Manager");
-    strcpy(AppIdentity.ProductFamily, "File Manager plugin");
+    // TWAIN identity fields are fixed-size: prove each literal (including its
+    // terminator) fits before copying, so future branding changes fail to build.
+    static const char manufacturer[] = "File Manager";
+    static const char productFamily[] = "File Manager plugin";
+    static_assert(sizeof(manufacturer) <= sizeof(AppIdentity.Manufacturer), "TWAIN manufacturer is too long");
+    static_assert(sizeof(productFamily) <= sizeof(AppIdentity.ProductFamily), "TWAIN product family is too long");
+    memcpy(AppIdentity.Manufacturer, manufacturer, sizeof(manufacturer));
+    memcpy(AppIdentity.ProductFamily, productFamily, sizeof(productFamily));
     strcpy(AppIdentity.ProductName, PLUGIN_NAME_EN);
 
     memset(&SrcIdentity, 0, sizeof(SrcIdentity));
