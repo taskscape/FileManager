@@ -2204,37 +2204,33 @@ void SetThreadNameInVCAndTrace(const char* name)
 
 BOOL AdoptPresentedApplicationDataDirectory(char* parentPath, int parentPathSize)
 {
-    // Previous on-disk name. Kept only so an existing profile directory can be renamed.
-    const char* previousName = "Open Salamander";
-    const char* presentedName = "File Manager";
-    char previous[MAX_PATH];
-    char presented[MAX_PATH];
-
     if (parentPath == NULL || parentPathSize <= 0)
         return FALSE;
-    if (FAILED(StringCchCopyA(previous, _countof(previous), parentPath)) ||
-        !SalPathAppend(previous, previousName, _countof(previous)) ||
-        FAILED(StringCchCopyA(presented, _countof(presented), parentPath)) ||
-        !SalPathAppend(presented, presentedName, _countof(presented)))
+
+    // Keep both migration paths in owned Unicode storage so long or non-ASCII
+    // profile paths reach Win32 without fixed-size conversion buffers.
+    CPathW previous;
+    CPathW presented;
+    if (!previous.Set(parentPath) || !previous.Append(L"Open Salamander") ||
+        !presented.Set(parentPath) || !presented.Append(L"File Manager"))
         return FALSE;
 
-    DWORD presentedAttributes = GetFileAttributesUtf8(presented);
-    DWORD previousAttributes = GetFileAttributesUtf8(previous);
+    const WCHAR* previousApiPath = previous.GetPathForWin32Api();
+    const WCHAR* presentedApiPath = presented.GetPathForWin32Api();
+    if (previousApiPath == NULL || presentedApiPath == NULL)
+        return FALSE;
+
+    // Reject an undersized caller buffer before moving any existing profile.
+    if (ConvertWideToUtf8Checked(presented.CStr(), parentPath, parentPathSize) != bsrSuccess)
+        return FALSE;
+
+    DWORD presentedAttributes = GetFileAttributesW(presentedApiPath);
+    DWORD previousAttributes = GetFileAttributesW(previousApiPath);
     if (presentedAttributes == INVALID_FILE_ATTRIBUTES &&
         previousAttributes != INVALID_FILE_ATTRIBUTES &&
         (previousAttributes & FILE_ATTRIBUTE_DIRECTORY) != 0)
     {
-        WCHAR previousWide[MAX_PATH];
-        WCHAR presentedWide[MAX_PATH];
-        if (ConvertUtf8ToWide(previous, -1, previousWide, _countof(previousWide)) > 0 &&
-            ConvertUtf8ToWide(presented, -1, presentedWide, _countof(presentedWide)) > 0)
-            MoveFileW(previousWide, presentedWide);
-    }
-
-    if (FAILED(StringCchCopyA(parentPath, parentPathSize, presented)))
-    {
-        parentPath[0] = 0;
-        return FALSE;
+        MoveFileW(previousApiPath, presentedApiPath);
     }
     return TRUE;
 }

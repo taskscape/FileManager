@@ -655,7 +655,12 @@ void CImportConfigDialog::Transfer(CTransferInfo& ti)
             {
                 // Registry paths still name older installs. The dialog shows a version only,
                 // because the name presented to users is File Manager.
-                sprintf(buff, "Version %s", SalamanderConfigurationVersions[i]);
+                // Keep item-to-profile indices intact if a label cannot fit.
+                if (FormatStringChecked(buff, _countof(buff), "Version %s", SalamanderConfigurationVersions[i]) != bsrSuccess)
+                {
+                    ti.ErrorOn(IDC_IMPORTCONFIG);
+                    return;
+                }
                 SendDlgItemMessage(HWindow, IDC_IMPORTCONFIG, CB_ADDSTRING, 0, (LPARAM)buff);
                 if (selIndex == 0)
                     selIndex = 1; // the last configuration becomes default
@@ -683,7 +688,12 @@ void CImportConfigDialog::Transfer(CTransferInfo& ti)
 
                 // Registry paths still name older installs. The dialog shows a version only,
                 // because the name presented to users is File Manager.
-                sprintf(buff, "Version %s", SalamanderConfigurationVersions[i]);
+                // Keep item-to-profile indices intact if a label cannot fit.
+                if (FormatStringChecked(buff, _countof(buff), "Version %s", SalamanderConfigurationVersions[i]) != bsrSuccess)
+                {
+                    ti.ErrorOn(IDC_REMOVECONFIG);
+                    return;
+                }
                 lvi.pszText = buff;
                 ListView_InsertItem(hListView, &lvi);
                 index++;
