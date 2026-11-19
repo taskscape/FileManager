@@ -27,7 +27,7 @@
 
 #include <strsafe.h>
 
-// Message-box caption. The version is appended to the name presented to users.
+// Keep the version label on the splash screen and About dialog aligned with the product name.
 const char* SALAMANDER_TEXT_VERSION = "File Manager " VERSINFO_VERSION;
 
 //****************************************************************************
