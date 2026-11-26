@@ -232,6 +232,8 @@ The changed-line ratchets require the pull request base commit:
 .\tools\verify-no-new-unsafe-string-calls.ps1 -BaseCommit origin/main
 ```
 
+The clock and fixed-buffer ratchets pair removed and added code within the same file before ignoring trailing `//` comment edits. String and character literals remain part of the comparison, and each removed line can excuse only one replacement. Run their Git-history regression cases with `powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\test-cpp-comment-ratchets.ps1`; the aggregate runner and x64 pull-request job collect the same cases.
+
 The toolbar icon coverage check has no parameters:
 
 ```powershell
@@ -246,6 +248,7 @@ The toolbar icon coverage check has no parameters:
 | --- | --- |
 | `verify-operation-completion-protocol.ps1` | Verifies that cancellation requests do not destroy worker-owned state, workers publish owned completion records, and the UI resumes and closes operations through the asynchronous completion protocol. |
 | `verify-durable-copy-commit.ps1` | Checks write-through creation, flush/close/verification ordering, transactional replacement, retry paths, and deterministic filesystem fault boundaries for durable copy commits. |
+| `test-cpp-comment-ratchets.ps1` | Accepts comment translations while rejecting changed calls, changed bounds, extra occurrences, cross-file additions, and changes to literals containing comment markers. |
 | `test-release-input-pinning.ps1` | Checks that release inputs have a complete lock record, all workflow actions use reviewed immutable commits, and publication consumes the gated immutable installer artifact. |
 | `audit-pe-hardening.ps1` | Inspects linked Release PE headers for ASLR, DEP/NX, CFG, CET compatibility, and high-entropy VA. The release workflow runs it after the Release build. |
 | `test-unsafe-api-baseline.ps1` | Compares every repository unsafe API fingerprint with the reviewed generated baseline and rejects new or duplicated unsafe calls. |

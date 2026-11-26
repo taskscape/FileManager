@@ -1025,6 +1025,8 @@ foreach ($relativePath in @(
     'tools\verify-durable-copy-commit.ps1',
     # Exercise the diff ratchet in an isolated Git history before release publication.
     'tools\test-raw-thread-creation-verifier.ps1',
+    # Keep translated comments from hiding either real API debt or release regressions.
+    'tools\test-cpp-comment-ratchets.ps1',
     # Keep release-input provenance enforced by the same aggregate test inventory.
     'tools\test-release-input-pinning.ps1'
 )) {

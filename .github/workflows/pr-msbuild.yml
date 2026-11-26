@@ -86,6 +86,11 @@ jobs:
         if: matrix.platform == 'x64'
         run: .\tools\test-raw-thread-creation-verifier.ps1
 
+      # Share the aggregate runner's regression cases for comment-only C++ edits.
+      - name: Exercise C++ comment ratchets
+        if: matrix.platform == 'x64'
+        run: .\tools\test-cpp-comment-ratchets.ps1
+
       - name: Reject new forced thread termination
         if: github.event_name == 'pull_request'
         run: |
