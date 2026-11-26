@@ -5,6 +5,8 @@ param(
 
 $ErrorActionPreference = 'Stop'
 
+. (Join-Path $PSScriptRoot 'cpp-ratchet-diff.ps1')
+
 $exemptionsPath = Join-Path $PSScriptRoot 'max-path-buffer-exemptions.md'
 if (-not (Test-Path -LiteralPath $exemptionsPath)) {
     throw "The MAX_PATH buffer exemption register is missing: $exemptionsPath"
@@ -44,6 +46,8 @@ $diff = git diff --no-ext-diff --unified=0 $BaseCommit HEAD -- '*.c' '*.cc' '*.c
 if ($LASTEXITCODE -ne 0) {
     throw "Unable to compare HEAD with $BaseCommit."
 }
+# Preserve the existing relocation/exemption policy while ignoring comment-only edits.
+$diff = @(Remove-CppCommentOnlyDiffChanges -Diff $diff)
 
 $violations = @()
 $currentFile = $null
