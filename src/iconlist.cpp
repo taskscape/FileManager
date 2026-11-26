@@ -101,8 +101,8 @@ BOOL CIconList::CreateOrEnlargeTmpImage(int width, int height)
 {
     if (HTmpImage == NULL || TmpImageWidth < width || TmpImageHeight < height)
     {
-        // !!! Pozor, pri pouzivani BITMAPV4HEADER u Petra padal Salamander v ICM32.DLL,
-        // stary BITMAPINFOHEADER zjevne staci
+        // !!! Warning: when using BITMAPV4HEADER Salamander crashed in ICM32.DLL on Petr's machine,
+        // the old BITMAPINFOHEADER is apparently sufficient
         BITMAPINFOHEADER bmhdr;
         memset(&bmhdr, 0, sizeof(bmhdr));
         bmhdr.biSize = sizeof(bmhdr);
@@ -205,8 +205,8 @@ BOOL CIconList::Create(int imageWidth, int imageHeight, int imageCount)
         return FALSE;
     }
 
-    // !!! Pozor, pri pouzivani BITMAPV4HEADER u Petra padal Salamander v ICM32.DLL,
-    // stary BITMAPINFOHEADER zjevne staci
+    // !!! Warning: when using BITMAPV4HEADER Salamander crashed in ICM32.DLL on Petr's machine,
+    // the old BITMAPINFOHEADER is apparently sufficient
     BITMAPINFOHEADER bmhdr;
     memset(&bmhdr, 0, sizeof(bmhdr));
     bmhdr.biSize = sizeof(bmhdr);
@@ -276,7 +276,7 @@ BOOL CIconList::CreateFromImageList(HIMAGELIST hIL, int requiredImageSize)
     if (!Create(cx, cy, count))
         return FALSE;
 
-    // j.r. tady by se dalo optimalizovat: misto predavani po ikonach predat pres ImageList_Draw
+    // j.r. this could be optimized: instead of passing icons one by one, pass them via ImageList_Draw
     if (count > 20)
     {
         TRACE_E("CIconList::CreateFromImageList(): Let me know that you need so many icons, it would deserve some optimizations here. Jan.");
@@ -403,7 +403,7 @@ CIconList::DumpToTrace(int index, BOOL dumpMask)
 {
   HANDLES(EnterCriticalSection(&CriticalSection));
 
-  // souradnice v bodech v HImage
+  // coordinates in points in HImage
   int iX = ImageWidth * (index % IL_ITEMS_IN_ROW);
   int iY = ImageHeight * (index / IL_ITEMS_IN_ROW);
 
@@ -1441,12 +1441,12 @@ CIconList::GetImageList()
     return hIL;
 
     /*
-  // vytahnu rozmery bitmapy
+  // get the bitmap dimensions
   HDC hDC = HANDLES(GetDC(NULL));
   BITMAPINFO bi;
   memset(&bi, 0, sizeof(bi));
   bi.bmiHeader.biSize = sizeof(bi.bmiHeader);
-  bi.bmiHeader.biBitCount = 0;   // nechceme paletu
+  bi.bmiHeader.biBitCount = 0;   // we do not want the palette
   
   if (!GetDIBits(hDC, 
                 hSrc,
@@ -1471,8 +1471,8 @@ CIconList::GetImageList()
   HIMAGELIST hIL = ImageList_Create(16, 16, GetImageListColorFlags() | ILC_MASK, 0, 1);
   if (hIL != NULL)
   {
-    // funkce ImageList_AddMasked nici pruhlednou barvu v hSrc, proto
-    // pridame ikonky postupne a pomalu
+    // the ImageList_AddMasked function destroys the transparent color in hSrc, therefore
+    // we add the icons one by one, slowly
     int count = bi.bmiHeader.biWidth / 16;
     int i;
     for (i = 0; i < count; i++)

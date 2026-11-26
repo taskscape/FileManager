@@ -756,7 +756,7 @@ LABEL_SortAttrNameExtAux:
         }
     } while (i <= j);
 
-    // nasledujici "hezky" kod jsme nahradili kodem podstatne setricim stack (max. log(N) zanoreni rekurze)
+    // The following "nice" code was replaced by code that saves much more stack (max. log(N) recursion depth).
     //  if (left < j) SortAttrNameExtAux(files, left, j, reverse);
     //  if (i < right) SortAttrNameExtAux(files, i, right, reverse);
 
@@ -764,7 +764,7 @@ LABEL_SortAttrNameExtAux:
     {
         if (i < right)
         {
-            if (j - left < right - i) // je potreba seradit obe "poloviny", tedy do rekurze posleme tu mensi, tu druhou zpracujeme pres "goto"
+            if (j - left < right - i) // both "halves" must be sorted, so send the smaller one to recursion and process the other via "goto"
             {
                 SortAttrNameExtAux(files, left, j, reverse);
                 left = i;
@@ -800,7 +800,7 @@ void SortAttrNameExt(CFilesArray& files, int left, int right, BOOL reverse)
 
 //
 //*****************************************************************************
-// QuickSort pro integer
+// QuickSort for integers
 //
 
 void IntSort(int array[], int left, int right)
@@ -828,7 +828,7 @@ LABEL_IntSort:
         }
     } while (i <= j);
 
-    // nasledujici "hezky" kod jsme nahradili kodem podstatne setricim stack (max. log(N) zanoreni rekurze)
+    // The following "nice" code was replaced by code that saves much more stack (max. log(N) recursion depth).
     //  if (left < j) IntSort(array, left, j);
     //  if (i < right) IntSort(array, i, right);
 
@@ -836,7 +836,7 @@ LABEL_IntSort:
     {
         if (i < right)
         {
-            if (j - left < right - i) // je potreba seradit obe "poloviny", tedy do rekurze posleme tu mensi, tu druhou zpracujeme pres "goto"
+            if (j - left < right - i) // both "halves" must be sorted, so send the smaller one to recursion and process the other via "goto"
             {
                 IntSort(array, left, j);
                 left = i;

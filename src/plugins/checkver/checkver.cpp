@@ -338,7 +338,7 @@ CPluginInterface::GetInterfaceForThumbLoader()
 }
 
 // ****************************************************************************
-// SEKCE MessageLoop
+// SECTION MessageLoop
 // ****************************************************************************
 
 unsigned WINAPI ThreadMessageLoopBody(void* param)
@@ -467,7 +467,7 @@ BOOL OnOpenCheckVersionDialog(HWND hParent, BOOL autoOpen, BOOL firstLoadAfterIn
 }
 
 // ****************************************************************************
-// SEKCE MENU
+// SECTION MENU
 // ****************************************************************************
 
 DWORD

@@ -114,7 +114,7 @@ char __ErrorBuffer[__ERROR_BUFFER_SIZE] = "";
 const char* __MessagesTitle = "Message";
 HWND __MessagesParent = NULL;
 
-// zajisti aktualnimu threadu pristup k funkcim a datum modulu
+// gives the current thread access to the module's functions and data
 void EnterMessagesModul();
 // call when current thread will no longer need access to module functions and data
 void LeaveMessagesModul();
@@ -138,18 +138,18 @@ const char* err(DWORD error);
         .MessageBoxT(__MessagesStringBuf.c_str(), \
                      __MessagesTitle, (buttons))
 
-/** zobrazi messagebox se zadanym textem a ikonou chyby, neni v novem
-    threadu, distribuje message volajiciho threadu */
+/** displays a message box with the given text and an error icon; it is not in a new
+    thread, it dispatches messages of the calling thread */
 #define MESSAGE_E(parent, str, buttons) \
     MESSAGE(parent, str, MB_ICONEXCLAMATION | (buttons))
 
-/** zobrazi messagebox se zadanym textem a ikonou informaci, v novem threadu,
-    nerozdistribuje message volajiciho threadu */
+/** displays a message box with the given text and an information icon, in a new thread,
+    it does not dispatch messages of the calling thread */
 #define MESSAGE_TI(str, buttons) \
     MESSAGE_T(str, MB_ICONINFORMATION | (buttons))
 
-/** zobrazi messagebox se zadanym textem a ikonou chyby, v novem threadu,
-    nerozdistribuje message volajiciho threadu */
+/** displays a message box with the given text and an error icon, in a new thread,
+    it does not dispatch messages of the calling thread */
 #define MESSAGE_TE(str, buttons) \
     MESSAGE_T(str, MB_ICONEXCLAMATION | (buttons))
 
@@ -202,7 +202,7 @@ int CALLBACK __MessagesMessageBoxThreadF(C__MessageBoxData* data)
 
 int C__Messages::MessageBoxT(LPCTSTR lpText, LPCTSTR lpCaption, UINT uType)
 {
-    __Handles.__MessagesStrStream.flush(); // flushnuti do bufferu (v lpText)
+    __Handles.__MessagesStrStream.flush(); // flush into the buffer (in lpText)
 
     C__MessageBoxData data;
     data.Caption = lpCaption;
@@ -210,7 +210,7 @@ int C__Messages::MessageBoxT(LPCTSTR lpText, LPCTSTR lpCaption, UINT uType)
     data.Return = 0;
 
     int len = (int)strlen(lpText) + 1;
-    char* message = (char*)malloc(len); // zaloha textu
+    char* message = (char*)malloc(len); // backup of the text
     if (message != NULL)
     {
         memcpy(message, lpText, len);
@@ -218,14 +218,14 @@ int C__Messages::MessageBoxT(LPCTSTR lpText, LPCTSTR lpCaption, UINT uType)
     }
     else
         data.Text = __MessagesLowMemory;
-    LeaveMessagesModul(); // ted uz muzou zacit blbnout ostatni thready + message loopy
+    LeaveMessagesModul(); // now the other threads and message loops can start misbehaving
 
-    // MessageBox nahodime v novem threadu, aby nerozeslal message tohoto threadu
+    // raise the MessageBox in a new thread so it does not dispatch messages of this thread
     DWORD threadID;
     HANDLE thread = CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)__MessagesMessageBoxThreadF, &data, 0, &threadID);
     if (thread != NULL)
     {
-        WaitForSingleObject(thread, INFINITE); // pockame az ho user odmackne
+        WaitForSingleObject(thread, INFINITE); // wait until the user dismisses it
         CloseHandle(thread);
     }
     // else TRACE_E("Unable to show MessageBox: " << data.Caption << ": " << data.Text);
@@ -240,16 +240,16 @@ int C__Messages::MessageBoxT(LPCTSTR lpText, LPCTSTR lpCaption, UINT uType)
 
 int C__Messages::MessageBox(HWND hWnd, LPCTSTR lpText, LPCTSTR lpCaption, UINT uType)
 {
-    __Handles.__MessagesStrStream.flush(); // flushnuti do bufferu (v lpText)
+    __Handles.__MessagesStrStream.flush(); // flush into the buffer (in lpText)
 
     int len = (int)strlen(lpText) + 1;
-    char* message = (char*)malloc(len); // zaloha textu
+    char* message = (char*)malloc(len); // backup of the text
     char* txt = message;
     if (txt != NULL)
         memcpy(txt, lpText, len);
     else
         txt = (char*)__MessagesLowMemory;
-    LeaveMessagesModul(); // ted uz muzou zacit blbnout ostatni thready + message loopy
+    LeaveMessagesModul(); // now the other threads and message loops can start misbehaving
 
     if (!IsWindow(hWnd))
         hWnd = NULL;
@@ -302,7 +302,7 @@ const char* err(DWORD error)
 
 //*****************************************************************************
 //
-// konec vlozeneho modulu MESSAGES
+// end of the embedded MESSAGES module
 //
 //*****************************************************************************
 
@@ -748,7 +748,7 @@ C__Handles::C__Handles() : __MessagesStrStream(&__MessagesStringBuf), __Messages
 
 C__Handles::~C__Handles()
 {
-    // vyrazeni handlu, ktere se uvolnuji automaticky
+    // removal of handles that are released automatically
     for (int i = Handles.Count - 1; i >= 0; i--)
     {
         if (Handles[i].Handle.Origin == __hoLoadAccelerators)
@@ -758,7 +758,7 @@ C__Handles::~C__Handles()
         else if (Handles[i].Handle.Origin == __hoGetStockObject)
             Handles.Delete(i);
     }
-    // kontrola + vypis zbylych
+    // check and list of the remaining ones
     if (Handles.Count != 0)
     {
         if (MESSAGE_E(NULL, "Some monitored handles remained opened.\n"
@@ -767,7 +767,7 @@ C__Handles::~C__Handles()
         {
             if (CanUseTrace)
             {
-                SalamanderDebug->TraceConnectToServer(); // v pripade, ze nebyl nahozeny server
+                SalamanderDebug->TraceConnectToServer(); // in case the server was not started
                 TRACE_I("List of opened handles:");
                 for (int i = 0; i < Handles.Count; i++)
                 {
@@ -786,7 +786,7 @@ C__Handles::~C__Handles()
         {
             if (CanUseTrace)
             {
-                SalamanderDebug->TraceConnectToServer(); // v pripade, ze nebyl nahozeny server
+                SalamanderDebug->TraceConnectToServer(); // in case the server was not started
                 TRACE_I(__HandlesMessageNumberOpened << Handles.Count);
             }
         }
@@ -923,7 +923,7 @@ BOOL C__Handles::DeleteHandle(C__HandlesType& type, HANDLE handle,
             }
         }
     }
-    if (foundTypeOK != -1) // nalezen jen handle, ktery nemusi byt uvolneny
+    if (foundTypeOK != -1) // found only a handle that does not have to be released
     {
         type = Handles[foundTypeOK].Handle.Type;
         if (origin != NULL)
@@ -931,7 +931,7 @@ BOOL C__Handles::DeleteHandle(C__HandlesType& type, HANDLE handle,
         Handles.Delete(foundTypeOK);
         return TRUE;
     }
-    if (found != -1) // nalezen jen handle se shodnym cislem
+    if (found != -1) // found only a handle with the same number
     {
 #if defined(_DEBUG) || defined(__HANDLES_DEBUG)
         if (CanUseTrace)
@@ -2542,7 +2542,7 @@ HDWP C__Handles::DeferWindowPos(HDWP hWinPosInfo, HWND hWnd, HWND hWndInsertAfte
 {
     HDWP ret = ::DeferWindowPos(hWinPosInfo, hWnd, hWndInsertAfter, x, y, cx, cy, uFlags);
 
-    if (ret != hWinPosInfo) // doslo k realokaci struktury - musime zmenit hodnotu hlidaneho handlu
+    if (ret != hWinPosInfo) // the structure was reallocated - we must change the value of the monitored handle
     {
         CheckClose(TRUE, (HANDLE)hWinPosInfo, __htDeferWindowPos, __GetHandlesOrigin(__hoDeferWindowPos), ERROR_SUCCESS, FALSE);
         CheckCreate(ret != NULL, __htDeferWindowPos, __hoDeferWindowPos, (HANDLE)ret, GetLastError());

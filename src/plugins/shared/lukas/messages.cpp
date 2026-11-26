@@ -66,7 +66,7 @@ BOOL CMessageCenter::SendMessage(CMessage* message, BOOL bufferTimeout)
 
     while (1)
     {
-        // vlezeme do kriticke sekce
+        // enter the critical section
         if (WaitForSingleObject(DataMutex, INFINITE) != WAIT_OBJECT_0)
         {
             TRACE_E("Unable to enter critical section for sending message.");
@@ -78,23 +78,23 @@ BOOL CMessageCenter::SendMessage(CMessage* message, BOOL bufferTimeout)
 
         if (Buffer->WritePos + message->Size <= BufferSize)
         {
-            // nastavime ID odesilatele
+            // set the sender ID
             message->SenderID = SenderID;
             // perform write
             my_memcpy2((char*)Buffer + Buffer->WritePos, message, message->Size);
-            // informuje prijemce, ze ma v bufferu zpravu
+            // informs the receiver that it has a message in the buffer
             if (Buffer->WritePos == sizeof(CBuffer))
             {
                 SetEvent(HaveMessage);
                 ResetEvent(BufferFree);
             }
             Buffer->WritePos += message->Size;
-            // uvolnime kritickou sekci
+            // leave the critical section
             ReleaseMutex(DataMutex);
-            return TRUE; // uspech
+            return TRUE; // success
         }
 
-        // uvolnime kritickou sekci
+        // leave the critical section
         ReleaseMutex(DataMutex);
 
         // wait until space is freed in buffer, or server dies
@@ -121,7 +121,7 @@ BOOL CMessageCenter::RecieveMessages(CMessageListener* listener)
     if (Sender)
         return FALSE;
 
-    // vlezeme do kriticke sekce
+    // enter the critical section
     DWORD ret = WaitForSingleObject(DataMutex, INFINITE);
     if (ret == WAIT_FAILED)
     {
@@ -131,12 +131,12 @@ BOOL CMessageCenter::RecieveMessages(CMessageListener* listener)
     }
     if (ret == WAIT_OBJECT_0)
     {
-        // vyprazdnime message buffer
+        // empty the message buffer
         for (int pos = sizeof(CBuffer); pos < Buffer->WritePos;
              pos += MESSAGE_AT_POS(pos)->Size)
         {
             if (MESSAGE_AT_POS(pos)->Size == 0)
-                break; // to by byl nekonecny cyklus a navic je to nesmysl
+                break; // that would be an infinite loop and it is also nonsense
             listener->RecieveMessage(MESSAGE_AT_POS(pos));
         }
     }
@@ -144,7 +144,7 @@ BOOL CMessageCenter::RecieveMessages(CMessageListener* listener)
     Buffer->WritePos = sizeof(CBuffer);
     SetEvent(BufferFree);
     ResetEvent(HaveMessage);
-    // uvolnime kritickou sekci
+    // leave the critical section
     ReleaseMutex(DataMutex);
     return TRUE;
 }
@@ -247,7 +247,7 @@ BOOL CMessageCenter::Init()
             }
         }
 
-        // vytvorime synchronizacni objekty
+        // create the synchronization objects
         str = Concatenate(Name, " - Data Mutex");
         DataMutex = Sender ? OpenMutex(MUTEX_ALL_ACCESS, FALSE, str) : CreateMutex(NULL, FALSE, str);
         if (!DataMutex)
@@ -266,10 +266,10 @@ BOOL CMessageCenter::Init()
             break;
         }
 
-        // vytvorime sdilenou cast pameti
+        // create the shared memory region
         const char* mapname = Concatenate(
             Concatenate(Name, " - Buffer v"), Version);
-        FileMapping = Sender ? OpenFileMapping(FILE_MAP_WRITE, FALSE, mapname) : CreateFileMapping(INVALID_HANDLE_VALUE, NULL, PAGE_READWRITE, 0, // FIXME_X64 nepredavame x86/x64 nekompatibilni data?
+        FileMapping = Sender ? OpenFileMapping(FILE_MAP_WRITE, FALSE, mapname) : CreateFileMapping(INVALID_HANDLE_VALUE, NULL, PAGE_READWRITE, 0, // FIXME_X64 are we not passing x86/x64-incompatible data?
                                                                                                    BufferSize, mapname);
         if (!FileMapping)
         {
@@ -286,13 +286,13 @@ BOOL CMessageCenter::Init()
 
         if (Sender)
         {
-            // vlezeme do kriticke sekce
+            // enter the critical section
             if (WaitForSingleObject(DataMutex, INFINITE) != WAIT_OBJECT_0)
             {
                 TRACE_E("Unable to enter critical section.");
                 break;
             }
-            // otevreme si handle na prijemce
+            // open a handle to the receiver
             RecieverPid = Buffer->Pid;
             Reciever = OpenProcess(SYNCHRONIZE, FALSE, RecieverPid);
             if (!Reciever)
@@ -301,21 +301,21 @@ BOOL CMessageCenter::Init()
                 break;
             }
             SenderID = Buffer->UniqueCounter++;
-            // uvolnime kritickou sekci
+            // leave the critical section
             ReleaseMutex(DataMutex);
         }
         else
         {
-            // vlezeme do kriticke sekce
+            // enter the critical section
             if (WaitForSingleObject(DataMutex, INFINITE) == WAIT_FAILED)
                 break;
-            // inicializujeme buffer
+            // initialize the buffer
             Buffer->Pid = GetCurrentProcessId();
             Buffer->UniqueCounter = 0;
             Buffer->WritePos = sizeof(CBuffer);
             SetEvent(BufferFree);
             ResetEvent(HaveMessage);
-            // uvolnime kritickou sekci
+            // leave the critical section
             ReleaseMutex(DataMutex);
         }
 

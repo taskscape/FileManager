@@ -1228,7 +1228,7 @@ int CTreePropDialog::Execute(const TCHAR* buttonOK,
         RECT maxPageRect;
         SetRectEmpty(&maxPageRect);
 
-        // zjistim maximalni rozmery
+        // determine the maximum dimensions
         for (int i = 0; i < Count; i++)
         {
             At(i)->ParentDialog = this;
@@ -1256,9 +1256,9 @@ int CTreePropDialog::Execute(const TCHAR* buttonOK,
             dlgStyle = *(DWORD*)(pageTemplate + 6); // style
             dlgCX = *(short*)(pageTemplate + 11);   // cx
             dlgCY = *(short*)(pageTemplate + 12);   // cy
-            WORD* t = pageTemplate + 13;            // menu, preskocime na tridu dialogu, a pak na jeho titulek
+            WORD* t = pageTemplate + 13;            // menu; we skip to the dialog class, and then to its title
             if (*t == 0)
-                t++; // zadne menu
+                t++; // no menu
             else
             {
                 if (*t == 0xffff)

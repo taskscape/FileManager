@@ -41,12 +41,12 @@ BOOL LessAttrNameExt(const CFileData& f1, const CFileData& f2, BOOL reverse);
 
 void IntSort(int array[], int left, int right);
 
-// StrICmp pro regional-settings-sort a detect-numbers-sort; v 'numericalyEqual' (neni-li
+// StrICmp for regional-settings-sort and detect-numbers-sort; in 'numericalyEqual' (if it is not
 // NULL) returns TRUE if strings are numerically equal (e.g. "a01" and "a1")
 int RegSetStrICmp(const char* s1, const char* s2);
 int RegSetStrICmpEx(const char* s1, int l1, const char* s2, int l2, BOOL* numericalyEqual);
 
-// strcmp pro regional-settings-sort a detect-numbers-sort; v 'numericalyEqual' (neni-li
+// strcmp for regional-settings-sort and detect-numbers-sort; in 'numericalyEqual' (if it is not
 // NULL) returns TRUE if strings are numerically equal (e.g. "a01" and "a1")
 int RegSetStrCmp(const char* s1, const char* s2);
 int RegSetStrCmpEx(const char* s1, int l1, const char* s2, int l2, BOOL* numericalyEqual);

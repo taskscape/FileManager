@@ -2082,8 +2082,8 @@ extern DWORD EnablerPermissions;          // focus|select is on files|directorie
 #define IDX_TB_UNSELECTALL 52       // Unselect all
 #define IDX_TB_VIEW_MODE 53         // View Mode
 #define IDX_TB_HOTPATHS 54          // Hot Paths
-#define IDX_TB_FOCUS 55             // Focus (zelena sipka)
-#define IDX_TB_STOP 56              // Stop (cervene kolecko s krizkem)
+#define IDX_TB_FOCUS 55             // Focus (green arrow)
+#define IDX_TB_STOP 56              // Stop (red circle with a cross)
 #define IDX_TB_EMAIL 57             // Email Files
 #define IDX_TB_EDITNEW 58           // Edit New
 #define IDX_TB_PASTESHORTCUT 59     // Paste Shortcut

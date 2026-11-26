@@ -33,7 +33,7 @@ public:
                WORD newWidth, WORD newHeight,
                DWORD* outBuff, BOOL processTopDown);
 
-    // destukce alokovanych bufferu a inicializace promennych
+    // destruction of the allocated buffers and initialization of variables
     void Destroy();
 
     void ProcessRows(DWORD* inBuff, DWORD rowCount);
@@ -47,7 +47,7 @@ protected:
 //
 // CSalamanderThumbnailMaker
 //
-// Slouzi pro zmensovani puvodniho obrazku do thumbnailu.
+// Used to shrink the original image into a thumbnail.
 //
 
 class CSalamanderThumbnailMaker : public CSalamanderThumbnailMakerAbstract
@@ -55,25 +55,25 @@ class CSalamanderThumbnailMaker : public CSalamanderThumbnailMakerAbstract
 protected:
     CFilesWindow* Window; // panel window whose icon-reader we operate in
 
-    DWORD* Buffer;  // vlastni buffer pro data radek od pluginu
+    DWORD* Buffer;  // dedicated buffer for row data from the plugin
     int BufferSize; // size of buffer 'Buffer'
     BOOL Error;     // if TRUE, an error occurred while processing the thumbnail (result is unusable)
-    int NextLine;   // cislo pristi zpracovavane radky
+    int NextLine;   // number of the next row to be processed
 
-    DWORD* ThumbnailBuffer;    // zmenseny obrazek
-    DWORD* AuxTransformBuffer; // pomocny buffer o stejne velikosti jako ThumbnailBuffer (slouzi pro prenos dat pri transformaci + po transformaci se buffery prohodi)
-    int ThumbnailMaxWidth;     // maximalni teoreticke rozmery thumbnailu (v bodech)
+    DWORD* ThumbnailBuffer;    // shrunk image
+    DWORD* AuxTransformBuffer; // auxiliary buffer of the same size as ThumbnailBuffer (used to transfer data during the transformation; after the transformation the buffers are swapped)
+    int ThumbnailMaxWidth;     // maximum theoretical thumbnail dimensions (in points)
     int ThumbnailMaxHeight;
-    int ThumbnailRealWidth;  // realne rozmery zmenseneho obrazku (v bodech)
+    int ThumbnailRealWidth;  // actual dimensions of the shrunk image (in points)
     int ThumbnailRealHeight; //
 
-    // parametry zpracovavaneho obrazku
+    // parameters of the image being processed
     int OriginalWidth;
     int OriginalHeight;
     DWORD PictureFlags;
     BOOL ProcessTopDown;
 
-    CShrinkImage Shrinker; // zajistuje zmensovani obrazku
+    CShrinkImage Shrinker; // performs the image shrinking
     BOOL ShrinkImage;
 
 public:
@@ -82,31 +82,31 @@ public:
 
     // Object cleanup - called before processing the next thumbnail or when
     // a thumbnail (finished or not) from this object is no longer needed.
-    // parametr 'thumbnailMaxSize' udava maximalni moznou sirku a vysku
+    // the 'thumbnailMaxSize' parameter gives the maximum possible width and height
     // thumbnail in pixels; if equal to -1, it is ignored
     void Clear(int thumbnailMaxSize = -1);
 
     // Returns TRUE if the complete thumbnail is ready in this object (it succeeded
-    // jeho ziskani od pluginu)
+    // in obtaining it from the plugin)
     BOOL ThumbnailReady();
 
     // Performs thumbnail transformation according to PictureFlags (SSTHUMB_MIRROR_VERT is already done,
-    // zbyva provest SSTHUMB_MIRROR_HOR a SSTHUMB_ROTATE_90CW)
+    // SSTHUMB_MIRROR_HOR and SSTHUMB_ROTATE_90CW remain to be performed)
     void TransformThumbnail();
 
-    // konvertuje hotovy thumbnail na DDB a jeji rozmery a raw data ulozi do 'data'
+    // converts the finished thumbnail to a DDB and stores its dimensions and raw data in 'data'
     BOOL RenderToThumbnailData(CThumbnailData* data);
 
     // If the complete thumbnail was not created and no error occurred (see 'Error'), fills
-    // zbytek thumbnailu bilou barvou (aby se v nedefinovane casti thumbnailu
+    // the rest of the thumbnail with white (so that in the undefined part of the thumbnail
     // remnants of the previous thumbnail are not displayed); if not even
-    // tri radky thumbnailu, nic se nedoplnuje (thumbnail by byl stejne k nicemu)
+    // three rows of the thumbnail, nothing is filled in (the thumbnail would be useless anyway)
     void HandleIncompleteImages();
 
     BOOL IsOnlyPreview() { return (PictureFlags & SSTHUMB_ONLY_PREVIEW) != 0; }
 
     // *********************************************************************************
-    // metody rozhrani CSalamanderThumbnailMakerAbstract
+    // methods of the CSalamanderThumbnailMakerAbstract interface
     // *********************************************************************************
 
     virtual BOOL WINAPI SetParameters(int picWidth, int picHeight, DWORD flags);

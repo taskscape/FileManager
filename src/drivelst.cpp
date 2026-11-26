@@ -971,8 +971,8 @@ BOOL CheckAndConnectUNCNetworkPath(HWND parent, const char* UNCPath, BOOL& pathI
 }
 
 // ****************************************************************************
-// tenhle kod je vzaty z Knowledge Base a slouzi k ziskani informaci o typu media
-// floppy mechaniky (3.5", 5.25", 8")
+// this code is taken from the Knowledge Base and is used to obtain the media type
+// of the floppy drive (3.5", 5.25", 8")
 
 /*
   GetDriveFormFactor returns the drive form factor.
@@ -1125,7 +1125,7 @@ CDrivesList::CDrivesList(CFilesWindow* filesWindow, const char* currentPath,
     CachedDrivesMask = 0;
     CachedCloudStoragesMask = 0;
 
-    // standardne nejde o post-cmd, proto nulujeme
+    // normally this is not a post-cmd, so we zero it
     *PostCmd = 0;
     *PostCmdParam = NULL;
     *FromContextMenu = FALSE;
@@ -1576,9 +1576,9 @@ void InitOneDrivePath()
     for (int i = 0; !done && i < 2; i++) // theoretically only needed for Windows 8 and lower (from 8.1 we have FOLDERID_SkyDrive)
     {
         if (HANDLES_Q(RegOpenKeyEx(HKEY_CURRENT_USER,
-                                   Windows8_1AndLater && !Windows10AndLater ? (i == 0 ? "Software\\Microsoft\\Windows\\CurrentVersion\\OneDrive" : // jen Win 8.1
+                                   Windows8_1AndLater && !Windows10AndLater ? (i == 0 ? "Software\\Microsoft\\Windows\\CurrentVersion\\OneDrive" : // Win 8.1 only
                                                                                    "Software\\Microsoft\\Windows\\CurrentVersion\\SkyDrive")
-                                                                            : (i == 0 ? "Software\\Microsoft\\OneDrive" : "Software\\Microsoft\\SkyDrive"), // krom Win 8.1
+                                                                            : (i == 0 ? "Software\\Microsoft\\OneDrive" : "Software\\Microsoft\\SkyDrive"), // except Win 8.1
                                    0, KEY_READ, &hKey)) == ERROR_SUCCESS)
         {
             DWORD size = sizeof(path); // size in bytes

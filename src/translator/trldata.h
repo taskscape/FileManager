@@ -521,11 +521,11 @@ public:
     BOOL SelCtrlsGetOuterRectPx(HWND hDialog, RECT* r);
     BOOL SelCtrlsGetOuterRect(RECT* r);
 
-    // metody menici selection
+    // methods that change the selection
     void SelectControlsGroup(HWND hDialog, HWND hControl, BOOL keepSelection, BOOL forceVertical);
     void ModifySelection(HWND hDialog, CModifySelectionMode mode, HWND hControl);
     void SelectControlsByCage(BOOL add, const RECT* cageR);
-    void SelectNextPrevControl(BOOL next); // reakce na Tab/Shift+Tab
+    void SelectNextPrevControl(BOOL next); // reaction to Tab/Shift+Tab
     void SelectControlByID(int id);
 
     void SetHighlightControl(int index);

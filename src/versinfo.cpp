@@ -176,7 +176,7 @@ CVersionInfo::LoadBlock(const BYTE*& ptr, CVersionBlock* parent)
 
     // skip VERSIONINFO and Key string
     ptr += sizeof(VERSIONINFO) + sizeof(WCHAR) * wcslen(block->Key);
-    // preskocime Padding
+    // skip the padding
     ptr = ALIGN_DWORD(BYTE*, ptr);
 
     switch (block->Type)
@@ -211,14 +211,14 @@ CVersionInfo::LoadBlock(const BYTE*& ptr, CVersionBlock* parent)
             return NULL;
         }
 
-        // preskocime Value
+        // skip Value
         ptr += valSize;
-        // preskocime padding
+        // skip the padding
         ptr = ALIGN_DWORD(BYTE*, ptr);
 
         if (block->Type == vbtString || block->Type == vbtVar)
         {
-            // String a Var nemaji childy, takze vypadneme
+            // String and Var have no children, so we bail out
             return block;
         }
     }
@@ -421,14 +421,14 @@ BOOL CVersionInfo::SaveBlock(CVersionBlock* block, BYTE*& ptr, const BYTE* maxPt
         return FALSE;
     }
 
-    BYTE* oldPtr = ptr; // ulozim si pro nasledny vypocet velikosti nas a nasich childu
+    BYTE* oldPtr = ptr; // save it for the subsequent calculation of our size and the size of our children
 
     // wLength
-    WORD* wLength = (WORD*)ptr; // ulozim si pro nasledne nastaveni
+    WORD* wLength = (WORD*)ptr; // save it for the subsequent assignment
     ptr += 2;
 
     // wValueLength
-    WORD* wValueLength = (WORD*)ptr; // ulozim si pro nasledne nastaveni
+    WORD* wValueLength = (WORD*)ptr; // save it for the subsequent assignment
     *wValueLength = 0;
     ptr += 2;
 
@@ -511,7 +511,7 @@ BOOL CVersionInfo::SaveBlock(CVersionBlock* block, BYTE*& ptr, const BYTE* maxPt
             return FALSE;
     }
 
-    // v opacnem pripad s paddingem
+    // in the opposite case, with padding
     if (block->Children.Count > 0)
         *wLength = (WORD)(ptr - oldPtr);
 

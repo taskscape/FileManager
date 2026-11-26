@@ -4,11 +4,11 @@
 #pragma once
 
 // SalmonClient
-// Modul SALMON.EXE slouzi k out-of-process generovani minidumpu, jeho zabaleni a upload na server
+// The SALMON.EXE module is used for out-of-process minidump generation, packing it, and uploading it to the server
 // SALMON must run from Salamander startup so it can react to crashes. Crashes before SALMON starts
-// probehnou tise a SALMON je zpracuje "priste"
+// pass silently and SALMON processes them "next time"
 //
-// tento header je sdileny mezi projekty SALMON a SALAMAND kvuli pameti, pres kterou komunikuji
+// this header is shared between the SALMON and SALAMAND projects because of the memory through which they communicate
 //
 // out of process minidumps
 // http://www.nynaeve.net/?p=128
@@ -24,7 +24,7 @@
 
 #define SALMON_FILEMAPPIN_NAME_SIZE 20
 
-// x64 a x86 verze Salamander/Salmon nejsou kompatibilni
+// x64 and x86 versions of Salamander/Salmon are not compatible
 #ifdef _WIN64
 #define SALMON_SHARED_MEMORY_VERSION_PLATFORM 0x10000000
 #else
@@ -37,20 +37,20 @@
 struct CSalmonSharedMemory
 {
     DWORD Version;           // SALMON_SHARED_MEMORY_VERSION (if SALAM/SALMON disagree, yell and do not communicate...)
-    HANDLE Process;          // Handle parent procesu (abychom mohli cekat na jeho terminovani); tutu proto hodnotu nechame leakovat
-    DWORD ProcessId;         // ID padleho parent procesu
-    DWORD ThreadId;          // ID padleho threadu
-    HANDLE Fire;             // AS signalizuje SALMONu, ze ma odeslat reporty
+    HANDLE Process;          // Handle of the parent process (so we can wait for its termination); we therefore let this value leak
+    DWORD ProcessId;         // ID of the crashed parent process
+    DWORD ThreadId;          // ID of the crashed thread
+    HANDLE Fire;             // AS signals SALMON that it should send the reports
     HANDLE Done;             // SALMON returns to AS that it is done
     HANDLE SetSLG;           // AS signals SALMON to load SLG according to buffer SLGName, which it sets before setting the event
     HANDLE CheckBugs;        // AS signals SALMON to check the bug report directory and, if it finds any (from a previous crash), offer their upload
-    char SLGName[MAX_PATH];  // ma vyznam ve chvili, kdy AS nasetuje SetSLG a rika, ktere SLG se ma nacist
+    char SLGName[MAX_PATH];  // meaningful at the moment when AS sets SetSLG and says which SLG should be loaded
     char BugPath[MAX_PATH];  // set by Salamander, specifies path where bug reports will land (path need not exist, created only on crash);
-    char BugName[MAX_PATH];  // nastavuje Salamander, udava vnitrni nazev souboru minidumpu/bug reportu
-    char BaseName[MAX_PATH]; // nastavuje salmon, jde o sestavu "UID-BugName-DATUM-CAS"; pro minidump ze za to pripoji ".DMP"
-    DWORD64 UID;             // unikatni ID stroje, vytvari se xorem z GUID; uklada se v registry v Bug Reporter klici; nastavuje Salamander, salmon jen cte a vklada do nazvu bug reportu
+    char BugName[MAX_PATH];  // set by Salamander; specifies the internal file name of the minidump/bug report
+    char BaseName[MAX_PATH]; // set by salmon; it is the composition "UID-BugName-DATE-TIME"; for a minidump it then appends ".DMP"
+    DWORD64 UID;             // unique machine ID, created by XORing a GUID; stored in the registry under the Bug Reporter key; set by Salamander, salmon only reads it and inserts it into the bug report name
 
-    // predani EXCEPTION_POINTERS po jeho slozkach; nastavime pred nasetovanim eventu Fire
+    // passing EXCEPTION_POINTERS by its parts; we set it before setting the Fire event
     EXCEPTION_RECORD ExceptionRecord;
     CONTEXT ContextRecord;
 };
@@ -60,10 +60,10 @@ struct CSalmonSharedMemory
 #ifdef INSIDE_SALAMANDER
 
 BOOL SalmonInit();
-void SalmonSetSLG(const char* slgName); // nastavi do salmon jazyk
+void SalmonSetSLG(const char* slgName); // sets the language in salmon
 void SalmonCheckBugs();
 
-// ulozi do sdilene pameti info o exception a pozada salmon o vytvoreni minidumpu; potom ceka, az dobehne
+// stores exception info in the shared memory and asks salmon to create a minidump; then waits until it finishes
 // Returns TRUE on success, FALSE if Salmon could not be called for some reason.
 BOOL SalmonFireAndWait(const EXCEPTION_POINTERS* e, char* bugReportPath);
 

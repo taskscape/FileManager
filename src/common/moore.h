@@ -49,7 +49,7 @@ public:
                                  Fail1 != NULL && Fail2 != NULL; }
     void SetFlags(WORD flags);
     void Set(const char* pattern, WORD flags);
-    // pro patterny obsahujici '\0'
+    // for patterns containing '\0'
     // buffer pattern must have length (length + 1) characters (compatibility with strings)
     void Set(const char* pattern, const int length, WORD flags);
 

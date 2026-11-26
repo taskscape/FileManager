@@ -6,7 +6,7 @@
 #include <windows.h>
 #include <crtdbg.h>
 #include <ostream>
-#include <commctrl.h> // potrebuju LPCOLORMAP
+#include <commctrl.h> // I need LPCOLORMAP
 #include <strsafe.h>
 
 #if defined(_DEBUG) && defined(_MSC_VER) // without passing file+line to 'new' operator, list of memory leaks shows only 'crtdbg.h(552)'
@@ -27,7 +27,7 @@
 
 #include "str.h"
 
-#ifndef INSIDE_SPL // krome pouziti v pluginech
+#ifndef INSIDE_SPL // except for use in plugins
 
 // The order here is important.
 // Section names must be 8 characters or less.
@@ -143,7 +143,7 @@ int StrICpy(char* dest, const char* src)
 //*****************************************************************************
 
 #ifdef _WIN64
-// Ani ve VC11 MS nedodali x64 ASM verze stringovych operaci, takze zatim take zustavame v C++
+// Even in VC11 MS did not supply x64 ASM versions of the string operations, so for now we stay in C++ as well
 
 // original function
 int StrICmp(const char* s1, const char* s2)
@@ -229,9 +229,9 @@ int StrNICmp(const char *s1, const char *s2, int n)
 */
 
 #ifdef _WIN64
-// Ani ve VC11 MS nedodali x64 ASM verze stringovych operaci, takze zatim take zustavame v C++
+// Even in VC11 MS did not supply x64 ASM versions of the string operations, so for now we stay in C++ as well
 
-// opravena verze
+// fixed version
 int StrNICmp(const char* s1, const char* s2, int n)
 {
     int res;
@@ -317,7 +317,7 @@ toend:
 //*****************************************************************************
 
 #ifdef _WIN64
-// Ani ve VC11 MS nedodali x64 ASM verze stringovych operaci, takze zatim take zustavame v C++
+// Even in VC11 MS did not supply x64 ASM versions of the string operations, so for now we stay in C++ as well
 int MemICmp(const void* buf1, const void* buf2, int n)
 {
     int ret = _memicmp(buf1, buf2, n);
@@ -388,7 +388,7 @@ toend:
 //*****************************************************************************
 
 #ifdef _WIN64
-// Ani ve VC11 MS nedodali x64 ASM verze stringovych operaci, takze zatim take zustavame v C++
+// Even in VC11 MS did not supply x64 ASM versions of the string operations, so for now we stay in C++ as well
 
 // original function
 int StrICmpEx(const char* s1, int l1, const char* s2, int l2)
@@ -577,7 +577,7 @@ int StrLen(const char *str)
   while (1)
   {
     if ((((*(DWORD *)s) & 0xF0F0F0F0) - 0x10101010) & 0x8F0F0F0F)
-    {                            // je tam znak < 16
+    {                            // there is a character < 16
       if (*s != 0) s++;
       else break;
       if (*s != 0) s++;

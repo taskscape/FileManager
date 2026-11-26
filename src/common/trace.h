@@ -361,14 +361,14 @@ extern const TCHAR* __OPEN_CONNECTION_MUTEX;
 extern const TCHAR* __CONNECT_DATA_READY_EVENT_NAME;
 extern const TCHAR* __CONNECT_DATA_ACCEPTED_EVENT_NAME;
 
-#define __PIPE_SIZE 100 // maximum dat v pipe (v kB)
+#define __PIPE_SIZE 100 // maximum data in the pipe (in kB)
 #define __COMMUNICATION_WAIT_TIMEOUT 5000
 
 //****************************************************************************
 //
 // CClientServerInitData
 //
-// tato struktura se pri zahajeni komunikace predava od clienta do serveru
+// this structure is passed from the client to the server when communication starts
 
 struct C__ClientServerInitData
 {
@@ -442,7 +442,7 @@ inline void __TraceEmptyFunction() {}
 // of storing and working with EBP/ESP, but even in that case there is only address
 // from where this function was called (not direct address of TRACE_C/TRACE_MC),
 // therefore at least for now we use old primitive way of crash
-// zapisem na NULL
+// by writing to NULL
 //#define TRACE_MC(file, line, str) DebugBreak()
 //#define TRACE_MCW(file, line, str) DebugBreak()
 //#define TRACE_C(str) DebugBreak()
@@ -483,7 +483,7 @@ uintptr_t __TRACE_beginthreadex(void* security, unsigned stack_size,
 
 #endif // MULTITHREADED_TRACE_ENABLE
 
-// info-trace, manualne zadana pozice v souboru
+// info-trace, manually specified position in the file
 #define TRACE_MI(file, line, str) \
     (::EnterCriticalSection(&__Trace.CriticalSection), __Trace.StoreLastError(), \
      __Trace.OStream() << str, __Trace) \
@@ -506,7 +506,7 @@ uintptr_t __TRACE_beginthreadex(void* security, unsigned stack_size,
 #define TRACE_W(str) TRACE_I(str)
 #define TRACE_WW(str) TRACE_IW(str)
 
-// error-trace, manualne zadana pozice v souboru
+// error-trace, manually specified position in the file
 #define TRACE_ME(file, line, str) \
     (::EnterCriticalSection(&__Trace.CriticalSection), __Trace.StoreLastError(), \
      __Trace.OStream() << str, __Trace) \
@@ -525,15 +525,15 @@ uintptr_t __TRACE_beginthreadex(void* security, unsigned stack_size,
 #define TRACE_E(str) TRACE_ME(__FILE__, __LINE__, str)
 #define TRACE_EW(str) TRACE_MEW(__WFILE__, __LINE__, str)
 
-// fatal-error-trace (CRASHING TRACE), manualne zadana pozice v souboru;
-// zastavime soft v debuggeru, pro snadne odladeni problemu, ktery prave vznikl,
+// fatal-error-trace (CRASHING TRACE), manually specified position in the file;
+// we stop the software in the debugger, for easy debugging of the problem that just occurred,
 // the release version crashes and the problem should hopefully be clear from the call stack in the bug report;
-// nepouzivame DebugBreak(), protoze pri crashi softu nejde vystopovat, kde
+// we do not use DebugBreak(), because when the software crashes it is not possible to trace where
 // contains the DebugBreak() call, because the exception address is somewhere in ntdll.dll
 // and Stack Back Trace section of bug report may contain nonsense, if
-// funkce, ze ktere volame TRACE_C/MC, nepouziva stary jednoduchy model ukladani
-// a prace s EBP/ESP (to zalezi na kompileru a zaplych optimalizacich), proto
-// aspon prozatim pouzivame stary primitivni zpusob crashe zapisem na NULL
+// the function from which we call TRACE_C/MC does not use the old simple model of storing
+// and working with EBP/ESP (that depends on the compiler and enabled optimizations), therefore
+// at least for now we use the old primitive way of crashing by writing to NULL
 #define TRACE_MC(file, line, str) \
     ((::EnterCriticalSection(&__Trace.CriticalSection), __Trace.StoreLastError(), \
       __Trace.OStream() << str, __Trace) \
@@ -592,7 +592,7 @@ protected:
     int UniqueThreadID;
 
     DWORD CacheTID[__TRACE_CACHE_SIZE];
-    DWORD CacheUID[__TRACE_CACHE_SIZE]; // hodnota -1 -> invalidni zaznam
+    DWORD CacheUID[__TRACE_CACHE_SIZE]; // value -1 -> invalid record
 
 public:
     C__TraceThreadCache();
@@ -619,9 +619,9 @@ public:
 #endif // MULTITHREADED_TRACE_ENABLE
 
 protected:
-    HANDLE HWritePipe;                  // zapisovy konec pipe
-    HANDLE HPipeSemaphore;              // slouzi pro alokaci mista v pipe (1x wait = 1kB)
-    DWORD BytesAllocatedForWriteToPipe; // kolik mista pro zapis je prave naalokovano v pipe
+    HANDLE HWritePipe;                  // write end of the pipe
+    HANDLE HPipeSemaphore;              // used to allocate space in the pipe (1x wait = 1kB)
+    DWORD BytesAllocatedForWriteToPipe; // how much space for writing is currently allocated in the pipe
 
 #ifdef TRACE_TO_FILE
     HANDLE HTraceFile; // file opened for writing in TEMP, all messages are stored in it
@@ -630,18 +630,18 @@ protected:
 #endif // __TRACESERVER
 #endif // TRACE_TO_FILE
 
-    LARGE_INTEGER StartPerformanceCounter; // pro presny counter - uvodni hodnota
-    LARGE_INTEGER PerformanceFrequency;    // pro presny counter
+    LARGE_INTEGER StartPerformanceCounter; // for the precise counter - initial value
+    LARGE_INTEGER PerformanceFrequency;    // for the precise counter
     BOOL SupportPerformanceFrequency;
 
-    const char* File;                    // pomocne promenne pro predani jmena souboru (ANSI)
-    const WCHAR* FileW;                  // pomocne promenne pro predani jmena souboru (unicode)
-    int Line;                            // a cisla radku, odkud se vola TRACE_X()
-    C__StringStreamBuf TraceStringBuf;   // string buffer drzici data trace streamu (ANSI)
-    C__StringStreamBufW TraceStringBufW; // string buffer drzici data trace streamu (unicode)
-    C__TraceStream TraceStrStream;       // vlastni trace stream (ANSI)
-    C__TraceStreamW TraceStrStreamW;     // vlastni trace stream (unicode)
-    DWORD StoredLastError;               // GetLastError() pred TRACE_? makrem
+    const char* File;                    // helper variables for passing the file name (ANSI)
+    const WCHAR* FileW;                  // helper variables for passing the file name (unicode)
+    int Line;                            // and the line number from which TRACE_X() is called
+    C__StringStreamBuf TraceStringBuf;   // string buffer holding the trace stream data (ANSI)
+    C__StringStreamBufW TraceStringBufW; // string buffer holding the trace stream data (unicode)
+    C__TraceStream TraceStrStream;       // the trace stream itself (ANSI)
+    C__TraceStreamW TraceStrStreamW;     // the trace stream itself (unicode)
+    DWORD StoredLastError;               // GetLastError() before the TRACE_? macro
 
 public:
     C__Trace();

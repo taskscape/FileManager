@@ -463,7 +463,7 @@ BOOL SalGetTempFileName(const char* path, const char* prefix, char* tmpName, int
             *sW++ = *pW++;
     }
 
-    if ((sW - tmpDirW) + 8 < MAX_PATH) // dost mista pro pripojeni "XXXX.tmp"
+    if ((sW - tmpDirW) + 8 < MAX_PATH) // enough room to append "XXXX.tmp"
     {
         // Fold the 64-bit uptime so temporary-name probing does not restart with the 32-bit tick cycle.
         const CMonotonicTimePoint timeSeed = CMonotonicClock::Now();
@@ -526,7 +526,7 @@ int HandleFileException(EXCEPTION_POINTERS* e, char* fileMem, DWORD fileMemSize)
 {
     if (e->ExceptionRecord->ExceptionCode == EXCEPTION_IN_PAGE_ERROR) // in-page-error definitely means file error
     {
-        return EXCEPTION_EXECUTE_HANDLER; // spustime __except blok
+        return EXCEPTION_EXECUTE_HANDLER; // execute the __except block
     }
     else
     {
@@ -535,11 +535,11 @@ int HandleFileException(EXCEPTION_POINTERS* e, char* fileMem, DWORD fileMemSize)
              e->ExceptionRecord->ExceptionInformation[1] >= (ULONG_PTR)fileMem && // error ptr in file view
              e->ExceptionRecord->ExceptionInformation[1] < ((ULONG_PTR)fileMem) + fileMemSize))
         {
-            return EXCEPTION_EXECUTE_HANDLER; // spustime __except blok
+            return EXCEPTION_EXECUTE_HANDLER; // execute the __except block
         }
         else
         {
-            return EXCEPTION_CONTINUE_SEARCH; // hodime vyjimku dale ... call-stacku
+            return EXCEPTION_CONTINUE_SEARCH; // pass the exception further ... up the call stack
         }
     }
 }
@@ -548,7 +548,7 @@ int HandleFileException(EXCEPTION_POINTERS* e, char* fileMem, DWORD fileMemSize)
 
 BOOL SalRemovePointsFromPath(char* afterRoot)
 {
-    char* d = afterRoot; // ukazatel za root cestu
+    char* d = afterRoot; // pointer past the root path
     while (*d != 0)
     {
         while (*d != 0 && *d != '.')
@@ -571,7 +571,7 @@ BOOL SalRemovePointsFromPath(char* afterRoot)
                         d = l;
                     }
                     else
-                        return FALSE; // ".." nelze vypustit
+                        return FALSE; // ".." cannot be dropped
                 }
                 else
                 {
@@ -595,7 +595,7 @@ BOOL SalRemovePointsFromPath(char* afterRoot)
 
 BOOL SalRemovePointsFromPath(WCHAR* afterRoot)
 {
-    WCHAR* d = afterRoot; // ukazatel za root cestu
+    WCHAR* d = afterRoot; // pointer past the root path
     while (*d != 0)
     {
         while (*d != 0 && *d != L'.')
@@ -618,7 +618,7 @@ BOOL SalRemovePointsFromPath(WCHAR* afterRoot)
                         d = l;
                     }
                     else
-                        return FALSE; // ".." nelze vypustit
+                        return FALSE; // ".." cannot be dropped
                 }
                 else
                 {
@@ -659,12 +659,12 @@ BOOL SalGetFullName(char* name, int* errTextID, const char* curDir, char* nextFo
     while (*s >= 1 && *s <= ' ')
         s++;
     if (*s == '\\' && *(s + 1) == '\\') // UNC (\\server\share\...)
-    {                                   // eliminace mezer na zacatku cesty
+    {                                   // elimination of spaces at the start of the path
         if (s != name)
             memmove(name, s, strlen(s) + 1);
         s = name + 2;
         if (*s == '.' || *s == '?')
-            err = IDS_PATHISINVALID; // cesty jako \\?\Volume{6e76293d-1828-11df-8f3c-806e6f6e6963}\ a \\.\PhysicalDisk5\ tady proste nepodporujeme...
+            err = IDS_PATHISINVALID; // paths such as \\?\Volume{6e76293d-1828-11df-8f3c-806e6f6e6963}\ and \\.\PhysicalDisk5\ are simply not supported here...
         else
         {
             if (*s == 0 || *s == '\\')
@@ -676,25 +676,25 @@ BOOL SalGetFullName(char* name, int* errTextID, const char* curDir, char* nextFo
             else
             {
                 while (*s != 0 && *s != '\\')
-                    s++; // prejeti servername
+                    s++; // skip past the server name
                 if (*s == '\\')
                     s++;
                 if (s - name > MAX_PATH - 1)
-                    err = IDS_SERVERNAMEMISSING; // nalezeny text je moc dlouhy na to, aby to byl server
+                    err = IDS_SERVERNAMEMISSING; // the text found is too long to be a server
                 else
                 {
                     if (*s == 0 || *s == '\\')
                     {
                         if (callNethood != NULL)
-                            *callNethood = *s == 0 && (*(s - 1) != '.' || *(s - 2) != '\\') && (*(s - 1) != '\\' || *(s - 2) != '.' || *(s - 3) != '\\'); // nejde o "\\." ani "\\.\" (zacatek cesty typu "\\.\C:\")
+                            *callNethood = *s == 0 && (*(s - 1) != '.' || *(s - 2) != '\\') && (*(s - 1) != '\\' || *(s - 2) != '.' || *(s - 3) != '\\'); // it is not "\\." or "\\.\" (the start of a path of type "\\.\C:\")
                         err = IDS_SHARENAMEMISSING;
                     }
                     else
                     {
                         while (*s != 0 && *s != '\\')
-                            s++; // prejeti sharename
+                            s++; // skip past the share name
                         if ((s - name) + 1 > MAX_PATH - 1)
-                            err = IDS_SHARENAMEMISSING; // nalezeny text je moc dlouhy na to, aby to byl share (+1 za koncovy backslash)
+                            err = IDS_SHARENAMEMISSING; // the text found is too long to be a share (+1 for the trailing backslash)
                         if (*s == '\\')
                             s++;
                     }
@@ -709,7 +709,7 @@ BOOL SalGetFullName(char* name, int* errTextID, const char* curDir, char* nextFo
             if (*(s + 1) == ':') // "c:..."
             {
                 if (*(s + 2) == '\\') // "c:\..."
-                {                     // eliminace mezer na zacatku cesty
+                {                     // elimination of spaces at the start of the path
                     if (s != name)
                         memmove(name, s, strlen(s) + 1);
                 }
@@ -725,10 +725,10 @@ BOOL SalGetFullName(char* name, int* errTextID, const char* curDir, char* nextFo
                             head = DefaultDir[LowerCase[*s] - 'a'];
                         int l2 = (int)strlen(head);
                         if (head[l2 - 1] != '\\')
-                            l2++; // misto pro '\\'
+                            l2++; // room for '\\'
                         if (l1 + l2 >= nameBufSize)
                             err = IDS_TOOLONGPATH;
-                        else // sestaveni full path
+                        else // building the full path
                         {
                             memmove(name + l2, s + 2, l1 + 1);
                             *(name + l2 - 1) = '\\';
@@ -743,9 +743,9 @@ BOOL SalGetFullName(char* name, int* errTextID, const char* curDir, char* nextFo
             {
                 if (curDir != NULL)
                 {
-                    // u relativnich cest bez '\\' na zacatku nebudeme pri zaplem 'allowRelPathWithSpaces' povazovat
+                    // for relative paths without '\\' at the beginning, when 'allowRelPathWithSpaces' is enabled, we will not treat
                     // spaces as a mistake (directory and file names may start with a space, although Windows and other software
-                    // vcetne Salama se tomu snazi predejit)
+                    // including Salamander, try to prevent that)
                     if (allowRelPathWithSpaces && *s != '\\')
                         s = name;
                     int l1 = (int)strlen(s);
@@ -761,7 +761,7 @@ BOOL SalGetFullName(char* name, int* errTextID, const char* curDir, char* nextFo
                                 root++;
                             if (l1 + (root - curDir) >= nameBufSize)
                                 err = IDS_TOOLONGPATH;
-                            else // sestaveni cesty z rootu akt. disku
+                            else // building the path from the root of the current drive
                             {
                                 memmove(name + (root - curDir), s, l1 + 1);
                                 memmove(name, curDir, root - curDir);
@@ -817,21 +817,21 @@ BOOL SalGetFullName(char* name, int* errTextID, const char* curDir, char* nextFo
         }
     }
 
-    if (err == 0) // eliminace '.' a '..' v ceste
+    if (err == 0) // elimination of '.' and '..' in the path
     {
         if (!SalRemovePointsFromPath(s))
             err = IDS_PATHISINVALID;
     }
 
-    if (err == 0) // vyhozeni pripadneho nezadouciho backslashe z konce retezce
+    if (err == 0) // removal of a possible unwanted backslash from the end of the string
     {
         int l = (int)strlen(name);
-        if (l > 1 && name[1] == ':') // typ cesty "c:\path"
+        if (l > 1 && name[1] == ':') // path type "c:\path"
         {
             if (l > 3) // not root path
             {
                 if (name[l - 1] == '\\')
-                    name[l - 1] = 0; // orez backslashe
+                    name[l - 1] = 0; // trim the backslash
             }
             else
             {
@@ -846,7 +846,7 @@ BOOL SalGetFullName(char* name, int* errTextID, const char* curDir, char* nextFo
                 if (l > 7) // not root path
                 {
                     if (name[l - 1] == '\\')
-                        name[l - 1] = 0; // orez backslashe
+                        name[l - 1] = 0; // trim the backslash
                 }
                 else
                 {
@@ -857,7 +857,7 @@ BOOL SalGetFullName(char* name, int* errTextID, const char* curDir, char* nextFo
             else // UNC path
             {
                 if (l > 0 && name[l - 1] == '\\')
-                    name[l - 1] = 0; // orez backslashe
+                    name[l - 1] = 0; // trim the backslash
             }
         }
     }
@@ -902,13 +902,13 @@ void AuxThreadBody(BOOL add, HANDLE thread, BOOL testIfFinished, LPCSTR descript
     {
         if (add)
         {
-            // vycistime pole od threadu, ktere jiz dobehly
+            // clear the array of threads that have already finished
             for (int i = 0; i < AuxThreads.Count; i++)
             {
                 DWORD code;
                 HANDLE tracked = AuxThreads[i].Owner != NULL ? AuxThreads[i].Owner->GetThreadHandle() : AuxThreads[i].Thread;
                 if (!GetExitCodeThread(tracked, &code) || code != STILL_ACTIVE)
-                { // thread uz dobehl
+                { // the thread has already finished
                     if (AuxThreads[i].Owner != NULL)
                     {
                         AuxThreads[i].Owner->StopAndJoin(CThreadShutdownDeadline(AuxThreads[i].Description));
@@ -925,12 +925,12 @@ void AuxThreadBody(BOOL add, HANDLE thread, BOOL testIfFinished, LPCSTR descript
             {
                 DWORD code;
                 if (!GetExitCodeThread(thread, &code) || code != STILL_ACTIVE)
-                { // thread uz dobehl
+                { // the thread has already finished
                     HANDLES(CloseHandle(thread));
                     skipAdd = TRUE;
                 }
             }
-            // pridame novy thread
+            // add a new thread
             if (!skipAdd)
                 AuxThreads.Add(owner != NULL ? CAuxThread(owner, description) : CAuxThread(thread, description));
         }
@@ -992,14 +992,14 @@ void ShutdownAuxThreads()
 class CStopRefreshStack
 {
   protected:
-    DWORD CallerCalledFromArr[STOPREFRESHSTACKSIZE];  // pole navratovych adres funkci, odkud se volal BeginStopRefresh()
-    DWORD CalledFromArr[STOPREFRESHSTACKSIZE];        // pole adres, odkud se volal BeginStopRefresh()
-    int Count;                                        // pocet prvku v predchozich dvou polich
+    DWORD CallerCalledFromArr[STOPREFRESHSTACKSIZE];  // array of return addresses of the functions from which BeginStopRefresh() was called
+    DWORD CalledFromArr[STOPREFRESHSTACKSIZE];        // array of addresses from which BeginStopRefresh() was called
+    int Count;                                        // number of elements in the previous two arrays
     int Ignored;                                      // number of BeginStopRefresh() calls we had to ignore (STOPREFRESHSTACKSIZE too small -> possibly increase it)
 
   public:
     CStopRefreshStack() {Count = 0; Ignored = 0;}
-    ~CStopRefreshStack() {CheckIfEmpty(3);} // tri BeginStopRefresh() jsou OK: pro oba panely se vola BeginStopRefresh() a treti se vola z WM_USER_CLOSE_MAINWND (ten se vola jako prvni)
+    ~CStopRefreshStack() {CheckIfEmpty(3);} // three BeginStopRefresh() calls are OK: BeginStopRefresh() is called for both panels and the third is called from WM_USER_CLOSE_MAINWND (that one is called first)
 
     void Push(DWORD caller_called_from, DWORD called_from);
     void Pop(DWORD caller_called_from, DWORD called_from);
@@ -1072,7 +1072,7 @@ void BeginStopRefresh(BOOL debugSkipOneCaller, BOOL debugDoNotTestCaller)
   {
     called_from = *(DWORD*)((char*)register_ebp + 4);
 
-pokud bude jeste nekdy potreba ozivit tenhle kod, vyuzit toho, ze lze nahradit (x86 i x64):
+if this code ever needs to be revived, take advantage of the fact that it can be replaced (x86 and x64):
     called_from = *(DWORD_PTR *)_AddressOfReturnAddress();
 
     if (debugSkipOneCaller) caller_called_from = *(DWORD*)((char*)(*(DWORD *)(*register_ebp)) + 4);
@@ -1102,7 +1102,7 @@ void EndStopRefresh(BOOL postRefresh, BOOL debugSkipOneCaller, BOOL debugDoNotTe
   {
     called_from = *(DWORD*)((char*)register_ebp + 4);
 
-pokud bude jeste nekdy potreba ozivit tenhle kod, vyuzit toho, ze lze nahradit (x86 i x64):
+if this code ever needs to be revived, take advantage of the fact that it can be replaced (x86 and x64):
     called_from = *(DWORD_PTR *)_AddressOfReturnAddress();
 
     if (debugSkipOneCaller) caller_called_from = *(DWORD*)((char*)(*(DWORD *)(*register_ebp)) + 4);
@@ -1145,7 +1145,7 @@ pokud bude jeste nekdy potreba ozivit tenhle kod, vyuzit toho, ze lze nahradit (
             {
                 MainWindow->NeedToResentDispachChangeNotif = FALSE;
 
-                // postneme zadost o rozeslani zprav o zmenach na cestach
+                // post a request to dispatch messages about changes on paths
                 HANDLES(EnterCriticalSection(&TimeCounterSection));
                 int t1 = MyTimeCounter++;
                 HANDLES(LeaveCriticalSection(&TimeCounterSection));
@@ -1350,7 +1350,7 @@ void RemoveTemporaryDir(const char* dir)
         CStrP dirW(ConvertAllocUtf8ToWide(dir, -1));
         if (dirW != NULL)
             SetCurrentDirectoryW(dirW);
-    } // aby to lepe odsejpalo (system ma rad cur-dir)
+    } // so it runs more smoothly (the system likes the current directory)
     if (strlen(dir) < MAX_PATH)
         _RemoveTemporaryDir(dir);
     SetCurrentDirectoryToSystem(); // must leave it, otherwise it can't be deleted
@@ -1468,7 +1468,7 @@ void RemoveEmptyDirs(const char* dir)
         CStrP dirW(ConvertAllocUtf8ToWide(dir, -1));
         if (dirW != NULL)
             SetCurrentDirectoryW(dirW);
-    } // aby to lepe odsejpalo (system ma rad cur-dir)
+    } // so it runs more smoothly (the system likes the current directory)
     if (strlen(dir) < MAX_PATH)
         _RemoveEmptyDirs(dir);
     SetCurrentDirectoryToSystem(); // must leave it, otherwise it can't be deleted
@@ -1521,7 +1521,7 @@ AGAIN:
     DWORD attrs = SalGetFileAttributes(dir);
     char buf[MAX_PATH + 200];
     char name[MAX_PATH];
-    if (attrs == 0xFFFFFFFF) // asi neexistuje, umoznime jej vytvorit
+    if (attrs == 0xFFFFFFFF) // it probably does not exist, allow it to be created
     {
         char root[MAX_PATH];
         GetRootPath(root, dir);
@@ -1587,13 +1587,13 @@ AGAIN:
                 else
                 {
                     StringCchCopyA(name, _countof(name), root);
-                    break; // uz jsme na root-adresari
+                    break; // we are already at the root directory
                 }
                 attrs = SalGetFileAttributes(name);
                 if (attrs != 0xFFFFFFFF) // name exists
                 {
                     if (attrs & FILE_ATTRIBUTE_DIRECTORY)
-                        break; // budeme stavet od tohoto adresare
+                        break; // we will build from this directory
                     else       // it is a file, that would not work ...
                     {
                         _snprintf_s(buf, _countof(buf), _TRUNCATE, LoadStr(IDS_NAMEUSEDFORFILE), name);
@@ -1631,7 +1631,7 @@ AGAIN:
             BOOL first = TRUE;
             while (*st != 0)
             {
-                BOOL invalidName = manualCrDir && *st <= ' '; // mezery na zacatku jmena vytvareneho adresare jsou nezadouci jen pri rucnim vytvareni (Windows to umi, ale je to potencialne nebezpecne)
+                BOOL invalidName = manualCrDir && *st <= ' '; // spaces at the start of the name of the directory being created are undesirable only during manual creation (Windows can do it, but it is potentially dangerous)
                 const char* slash = strchr(st, '\\');
                 if (slash == NULL)
                     slash = st + strlen(st);
@@ -1810,8 +1810,8 @@ BOOL PostMouseWheelMessage(MSG* pMSG)
         if (GetClassName(hWindow, className, 100) != 0)
         {
             // some versions of Synaptics touchpad (for example on HP notebooks) display their symbol window under the cursor
-            // scrolovani; v takovem pripade se nebudeme snazit o routeni do "spravneho" okna pod kurzorem, protoze
-            // se o to postara sam touchpad
+            // scrolling; in that case we will not try to route to the "correct" window under the cursor, because
+            // the touchpad itself takes care of that
             // /viewtopic.php?f=24&t=6039
             if (strcmp(className, "SynTrackCursorWindowClass") == 0 || strcmp(className, "Syn Visual Class") == 0)
             {
@@ -1822,7 +1822,7 @@ BOOL PostMouseWheelMessage(MSG* pMSG)
             {
                 DWORD winProcessId = 0;
                 GetWindowThreadProcessId(hWindow, &winProcessId);
-                if (winProcessId != GetCurrentProcessId()) // WM_USER_* nema smysl posilat mimo nas proces
+                if (winProcessId != GetCurrentProcessId()) // there is no point sending WM_USER_* outside our process
                     hWindow = pMSG->hwnd;
             }
         }
@@ -1832,7 +1832,7 @@ BOOL PostMouseWheelMessage(MSG* pMSG)
             hWindow = pMSG->hwnd;
         }
         // if this is a ScrollBar with a parent, post the message to the parent.
-        // Scrollbars v panelech nejsou subclassnute, takze je to momentalne jediny zpusob,
+        // Scrollbars in the panels are not subclassed, so this is currently the only way,
         // how the panel can learn about wheel scrolling if the cursor is over the scrollbar.
         className[0] = 0;
         if (GetClassName(hWindow, className, 100) == 0 || StrICmp(className, "scrollbar") == 0)
@@ -1862,22 +1862,22 @@ LRESULT CALLBACK MenuWheelHookProc(int nCode, WPARAM wParam, LPARAM lParam)
 
     // only WM_MOUSEWHEEL and WM_MOUSEHWHEEL interest us
     //
-    // 7.10.2009 - AS253_B1_IB34: Manison nam hlasil, ze mu pod Windows Vista nefunguje horizontalni scroll.
-    // Me fungoval (touto cestou). Po nainstalovani Intellipoint ovladacu v7 (predtime jsem na Vista x64
-    // nemel zadne spesl ovladace) prestaly WM_MOUSEHWHEEL zpravy prochazet tudy a natejkaly primo do
+    // 7.10.2009 - AS253_B1_IB34: Manison reported that horizontal scrolling does not work for him under Windows Vista.
+    // It worked for me (this way). After installing Intellipoint drivers v7 (previously, on Vista x64, I
+    // had no special drivers) WM_MOUSEHWHEEL messages stopped coming through here and went straight into
     // Salamander panel. So disable this path and catch messages only in the panel.
-    // poznamka: asi bychom stejnym zpusobem mohli odriznou i handling WM_MOUSEWHEEL, ale nebudu riskovat,
-    // ze neco podelam na starsich OS (muzeme to zkusit s prechodem na W2K a dal)
+    // note: we could probably cut off WM_MOUSEWHEEL handling the same way, but I will not risk
+    // breaking something on older OSes (we can try that with the move to W2K and later)
     // note2: if it turns out we must catch WM_MOUSEHWHEEL also through this hook, it would need
-    // provest runtime detekci, ze tudy zpravy WM_MOUSEHWHEEL natekaji a nasledne zakazat jejich zpracovani
-    // v panelech a commandline.
+    // to perform a runtime check that WM_MOUSEHWHEEL messages come through here and then disable their handling
+    // in the panels and commandline.
 
-    // 30.11.2012 - na foru se objevil clovek, kteremu WM_MOUSEHWEEL nechodi skrz message hook (stejna jako drive
-    // u Manisona v pripade WM_MOUSEHWHEEL): /viewtopic.php?f=24&t=6039
+    // 30.11.2012 - someone showed up on the forum for whom WM_MOUSEHWEEL does not arrive through the message hook (the same as before
+    // with Manison in the case of WM_MOUSEHWHEEL): /viewtopic.php?f=24&t=6039
     // so newly we will also catch the message in individual windows where it can potentially go (by focus)
-    // a nasledne ji routit tak, aby se dorucila do okna pod kurzorem, jak jsme to vzdy delali
+    // and then route it so it is delivered to the window under the cursor, as we always did
 
-    // aktualne tedy budeme jak WM_MOUSEWHEEL tak WM_MOUSEHWHEEL poustet a uvidime, co na to beta testeri
+    // for now we will therefore let both WM_MOUSEWHEEL and WM_MOUSEHWHEEL through and see what the beta testers say
 
     if ((pMSG->message != WM_MOUSEWHEEL && pMSG->message != WM_MOUSEHWHEEL) || (wParam == PM_NOREMOVE))
         return retValue;
@@ -1899,7 +1899,7 @@ BOOL InitializeMenuWheelHook()
 {
     // setup hook for mouse messages
     DWORD threadID = GetCurrentThreadId();
-    HOldMouseWheelHookProc = SetWindowsHookEx(WH_GETMESSAGE, // HANDLES neumi!
+    HOldMouseWheelHookProc = SetWindowsHookEx(WH_GETMESSAGE, // HANDLES does not support this!
                                               MenuWheelHookProc,
                                               NULL, threadID);
     return (HOldMouseWheelHookProc != NULL);
@@ -1910,7 +1910,7 @@ BOOL ReleaseMenuWheelHook()
     // unhook mouse messages
     if (HOldMouseWheelHookProc != NULL)
     {
-        UnhookWindowsHookEx(HOldMouseWheelHookProc); // HANDLES neumi!
+        UnhookWindowsHookEx(HOldMouseWheelHookProc); // HANDLES does not support this!
         HOldMouseWheelHookProc = NULL;
     }
     return TRUE;
@@ -1932,8 +1932,8 @@ BOOL SalGetTempFileName(const char* path, const char* prefix, char* tmpName, BOO
 #define DIRECTORY_COMMAND_BROWSE 1    // browse directory
 #define DIRECTORY_COMMAND_LEFT 3      // path from the left panel
 #define DIRECTORY_COMMAND_RIGHT 4     // path from the right panel
-#define DIRECTORY_COMMAND_HOTPATHF 5  // prvni hot path
-#define DIRECTORY_COMMAND_HOTPATHL 35 // posledni hot path
+#define DIRECTORY_COMMAND_HOTPATHF 5  // first hot path
+#define DIRECTORY_COMMAND_HOTPATHL 35 // last hot path
 
 BOOL SetEditOrComboText(HWND hWnd, const char* text)
 {
@@ -2138,8 +2138,8 @@ DWORD TrackDirectoryMenu(HWND hDialog, int buttonID, BOOL selectMenuItem)
     miiSep.Mask = MENU_MASK_TYPE;
     miiSep.Type = MENU_TYPE_SEPARATOR;
 
-    /* slouzi pro skript export_mnu.py, ktery generuje salmenu.mnu pro Translator
-   udrzovat synchronizovane s volanim InsertItem() dole...
+    /* used by the export_mnu.py script, which generates salmenu.mnu for Translator
+   keep in sync with the InsertItem() calls below...
 MENU_TEMPLATE_ITEM CopyMoveBrowseMenu[] = 
 {
   {MNTT_PB, 0
@@ -2168,7 +2168,7 @@ MENU_TEMPLATE_ITEM CopyMoveBrowseMenu[] =
     mii.String = LoadStr(IDS_PATHMENU_RIGHT);
     popup.InsertItem(0xFFFFFFFF, TRUE, &mii);
 
-    // pripojime hotpaths, existuji-li
+    // add hot paths if any exist
     DWORD firstID = DIRECTORY_COMMAND_HOTPATHF;
     MainWindow->HotPaths.FillHotPathsMenu(&popup, firstID, FALSE, FALSE, FALSE, TRUE);
 
@@ -2183,7 +2183,7 @@ MENU_TEMPLATE_ITEM CopyMoveBrowseMenu[] =
 
 DWORD OnKeyDownHandleSelectAll(DWORD keyCode, HWND hDialog, int editID)
 {
-    // od Windows Vista uz SelectAll standardne funguje, takze tam nechame select all na nich
+    // since Windows Vista, SelectAll already works by default, so we leave select all to the system there
     if (WindowsVistaAndLater)
         return FALSE;
 
@@ -2349,9 +2349,9 @@ void InvokeDirectoryMenuCommand(DWORD cmd, HWND hDialog, int editID, int editBuf
 class CKeyForwarder : public CWindow
 {
 protected:
-    BOOL SkipCharacter; // zamezuje pipnuti pro zpracovane klavesy
-    HWND HDialog;       // dialog, kam budeme zasilat WM_USER_KEYDOWN
-    int CtrlID;         // pro WM_USER_KEYDOWN
+    BOOL SkipCharacter; // prevents a beep for keys that were handled
+    HWND HDialog;       // dialog to which we will send WM_USER_KEYDOWN
+    int CtrlID;         // for WM_USER_KEYDOWN
 
 public:
     CKeyForwarder(HWND hDialog, int ctrlID, CObjectOrigin origin = ooAllocated);
@@ -2387,7 +2387,7 @@ CKeyForwarder::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
     case WM_SYSKEYDOWN:
     case WM_KEYDOWN:
     {
-        SkipCharacter = TRUE; // zamezime pipani
+        SkipCharacter = TRUE; // prevent the beep
         BOOL ret = (BOOL)SendMessage(HDialog, WM_USER_KEYDOWN, MAKELPARAM(CtrlID, 0), wParam);
         if (ret)
             return 0;
@@ -2398,7 +2398,7 @@ CKeyForwarder::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
     case WM_SYSKEYUP:
     case WM_KEYUP:
     {
-        SkipCharacter = FALSE; // pro jistotu
+        SkipCharacter = FALSE; // just to be sure
         break;
     }
     }
@@ -2412,7 +2412,7 @@ BOOL CreateKeyForwarder(HWND hDialog, int ctrlID)
     className[0] = 0;
     if (GetClassName(hWindow, className, 30) == 0 || StrICmp(className, "edit") != 0)
     {
-        // mohlo by jit o combobox, zkusime sahnout pro vnitrni edit
+        // it might be a combobox, we will try to reach the inner edit
         hWindow = GetWindow(hWindow, GW_CHILD);
         if (hWindow == NULL || GetClassName(hWindow, className, 30) == 0 || StrICmp(className, "edit") != 0)
         {

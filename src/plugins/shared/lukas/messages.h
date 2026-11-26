@@ -3,13 +3,13 @@
 
 #pragma once
 
-// aby byly struktury nezavisle na nastavenem zarovnavani
+// so that the structures are independent of the configured alignment
 #pragma pack(push, 4)
 
 struct CMessage
 {
     int Size;
-    int SenderID; // doplni message center pri odeslani
+    int SenderID; // filled in by the message center when sending
 };
 
 #pragma pack(pop)
@@ -73,5 +73,5 @@ private:
     CBuffer* Buffer;
     HANDLE Reciever;   // only for sender, handle of target process
     DWORD RecieverPid; // only for sender, id of target process
-    int SenderID;      // unikatni identifikator odesilatele
+    int SenderID;      // unique identifier of the sender
 };

@@ -1868,7 +1868,7 @@ CRendererWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 
         if (xPos >= RowHeight && yPos >= RowHeight)
         {
-            // select pres bunky
+            // select across cells
             int x, y;
             if (HitTest(xPos, yPos, &x, &y, FALSE))
             {
@@ -1893,7 +1893,7 @@ CRendererWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
 
         if (xPos >= RowHeight && yPos >= RowHeight)
         {
-            // select pres bunky
+            // select across cells
             int x, y;
             if (HitTest(xPos, yPos, &x, &y, FALSE))
             {

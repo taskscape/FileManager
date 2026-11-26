@@ -62,7 +62,7 @@ public:
     // windows are displayed only when calling ViewFile from this interface; detects whether
     // file 'name' is viewable (for example, file has a matching signature) in the viewer
     // and if it is, returns TRUE; if it returns FALSE, Salamander tries to find another
-    // viewer (v prioritnim seznamu vieweru, viz konfiguracni stranka Viewers)
+    // viewer (in the priority list of viewers, see the Viewers configuration page)
     virtual BOOL WINAPI CanViewFile(const char* name) = 0;
 };
 

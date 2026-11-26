@@ -450,7 +450,7 @@ RETRY:
                 drive[0] = path[0];
                 runAsMainThread = (GetDriveType(drive) != DRIVE_REMOTE);
             }
-            if (runAsMainThread) // neni sitovy -> do hl. threadu
+            if (runAsMainThread) // not a network path -> into the main thread
             {
                 valid = (SalGetFileAttributes(path) != 0xFFFFFFFF); // test directory accessibility
                 if (!valid)
@@ -458,7 +458,7 @@ RETRY:
                 else
                     lastError = ERROR_SUCCESS;
             }
-            else // je sitovy -> do jednoho z vedl. threadu
+            else // it is a network path -> into one of the secondary threads
             {
                 if (WaitForAvailableCheckPathWorker())
                     goto TEST_AGAIN;
@@ -471,12 +471,12 @@ RETRY:
         {
             BOOL success = TRUE;
             ThreadCheckState[freeThreadIndex] = ctsActive;
-            if (freeThreadIndex == 0) // odstartujeme prvni check-path thread
+            if (freeThreadIndex == 0) // start the first check-path thread
             {
-                ResetEvent(CPFirstEnd); // anulujeme pripadne predchozi ukonceni
-                SetEvent(CPFirstStart); // spustime thread
+                ResetEvent(CPFirstEnd); // cancel a possible previous completion
+                SetEvent(CPFirstStart); // start the thread
             }
-            else // start ostatnich
+            else // start the others
             {
                 if (!ThreadCheckPath[freeThreadIndex].Start(ThreadCheckPathOwnedF,
                                                             (void*)(INT_PTR)freeThreadIndex,
@@ -496,12 +496,12 @@ RETRY:
             if (success)
             {
                 DWORD exit;
-                GetAsyncKeyState(VK_ESCAPE); // init GetAsyncKeyState - viz help
-                if (freeThreadIndex == 0)    // prvni check-path thread, kontrola dokonceni
+                GetAsyncKeyState(VK_ESCAPE); // init GetAsyncKeyState - see the help
+                if (freeThreadIndex == 0)    // first check-path thread, check for completion
                 {
                     if (WaitForCheckPathCompletionOrDeadline(CPFirstEnd, NULL, 200) == cpwrWorkCompleted)
                     {
-                        exit = CPFirstExit; // nahrada navratove hodnoty
+                        exit = CPFirstExit; // replacement for the return value
                     }
                     else
                         exit = STILL_ACTIVE; // still running
@@ -541,7 +541,7 @@ RETRY:
 
                         if (waitReason == cpwrWorkCompleted && freeThreadIndex == 0)
                         {
-                            exit = CPFirstExit; // nahrada navratove hodnoty
+                            exit = CPFirstExit; // replacement for the return value
                         }
                         else if (waitReason == cpwrWorkCompleted)
                         {
@@ -604,7 +604,7 @@ RETRY:
             {
                 drvType = DRIVE_REMOTE;
                 GetRootPath(drive, path);
-                drive[strlen(drive) - 1] = 0; // nestojime o posledni '\\'
+                drive[strlen(drive) - 1] = 0; // we do not want the last '\\'
             }
             else
             {
@@ -736,14 +736,14 @@ _CHECK_AGAIN:
     while ((err = SalCheckPath(FALSE, path, ERROR_SUCCESS, TRUE, parent)) != ERROR_SUCCESS)
     {
         if (err == ERROR_SEM_TIMEOUT && !semTimeoutOccured)
-        { // Vista: pri zmene fyzickeho pripojeni (napr. Wi-Fi a pak LAN) to nepochopitelne hlasi tuto chybu a na podruhe uz je vse OK, takze tenhle opruz delame za uzivatele
+        { // Vista: when the physical connection changes (e.g. Wi-Fi and then LAN) it inexplicably reports this error, and the second time everything is already OK, so we handle this nuisance for the user
             semTimeoutOccured = TRUE;
             WaitForCheckPathRetryDeadline(300);
             continue;
         }
         if (err == ERROR_USER_TERMINATED)
             break;
-        if (tryNet) // jeste jsme to nezkouseli
+        if (tryNet) // we have not tried it yet
         {
             tryNet = FALSE;
             if (LowerCase[path[0]] >= 'a' && LowerCase[path[0]] <= 'z' &&
@@ -824,7 +824,7 @@ PARSE_AGAIN:
         secondPart = fsUserPart;
         return TRUE;
     }
-    else // Windows/archive cesty
+    else // Windows/archive paths
     {
         int len = (int)strlen(path);
         BOOL backslashAtEnd = (len > 0 && path[len - 1] == '\\'); // path ends with backslash -> necessarily directory/archive (not ordinary file name)
@@ -928,10 +928,10 @@ PARSE_AGAIN:
 
             // if there's a mask in the path, cut it off without calling SalGetFileAttributes
             BOOL hasMask = FALSE;
-            if (end > afterRoot) // jeste neni jen root
+            if (end > afterRoot) // not just the root yet
             {
                 char* end2 = end;
-                while (*--end2 != '\\') // je jiste, ze aspon za root-cestou je jeden '\\'
+                while (*--end2 != '\\') // it is certain that there is at least one '\\' after the root path
                 {
                     if (*end2 == '*' || *end2 == '?')
                         hasMask = TRUE;
@@ -949,7 +949,7 @@ PARSE_AGAIN:
 
             isDir = TRUE;
 
-            while (end > afterRoot) // jeste neni jen root
+            while (end > afterRoot) // not just the root yet
             {
                 int len2 = (int)strlen(path);
                 if (path[len2 - 1] != '\\') // paths ending with backslash behave differently (classic and UNC): UNC returns success, classic ERROR_INVALID_NAME: unpacking from archive on UNC path to path "" reported unknown archive (PackerFormatConfig.PackIsArchive got e.g. "...test.zip\\" instead of "...test.zip")
@@ -1103,7 +1103,7 @@ BOOL SalSplitWindowsPath(HWND parent, const char* title, const char* errorTitle,
         if (mask - 1 > path && *(mask - 2) == '\\' &&
             (mask - 1 > afterRoot || *path == '\\'))           // not root or is UNC root
         {                                                      // need to remove unnecessary backslash from end of string
-            memmove(mask - 2, mask - 1, 1 + strlen(mask) + 1); // '\0' + maska + '\0'
+            memmove(mask - 2, mask - 1, 1 + strlen(mask) + 1); // '\0' + mask + '\0'
             mask--;
         }
 
@@ -1327,12 +1327,12 @@ BOOL SalSplitGeneralPath(HWND parent, const char* title, const char* errorTitle,
                 else
                 {
                     SalMessageBox(parent, LoadStr(IDS_TARGETPATHMUSTEXIST), errorTitle, MB_OK | MB_ICONEXCLAMATION);
-                    char* e = path + strlen(path); // oprava 'path' (spojeni 'path' a 'mask')
+                    char* e = path + strlen(path); // fix up 'path' (joining 'path' and 'mask')
                     if (e > path && *(e - 1) != '\\')
                         *e++ = '\\';
                     if (e != mask)
-                        memmove(e, mask, strlen(mask) + 1); // je-li potreba, prisuneme masku
-                    return FALSE;                           // znovu do copy/move dialogu
+                        memmove(e, mask, strlen(mask) + 1); // if needed, move the mask forward
+                    return FALSE;                           // back into the copy/move dialog
                 }
             }
             return TRUE; // leave Copy/Move dialog loop and go perform operation
@@ -1651,7 +1651,7 @@ void CSystemPolicies::LoadFromRegistry()
             RestrictRun = 0; // low memory; cancel this option
         GetValueDontCheckTypeAux(hKey, "DisallowRun", /*REG_DWORD,*/ &DisallowRun, sizeof(DWORD));
         if (DisallowRun && !LoadList(&DisallowRunList, HKEY_CURRENT_USER, "Software\\Microsoft\\Windows\\CurrentVersion\\Policies\\Explorer\\DisallowRun"))
-            DisallowRun = 0; // malo pameti; zrusime tento option
+            DisallowRun = 0; // low memory; cancel this option
         CloseKeyAux(hKey);
     }
 

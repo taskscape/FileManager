@@ -36,7 +36,7 @@ CHotPathsBar::CHotPathsBar(HWND hNotifyWindow, CObjectOrigin origin)
 
     SetStyle(TLB_STYLE_IMAGE | TLB_STYLE_TEXT);
 
-    // naleju ikonky do vlastni toolbary
+    // load icons into our own toolbar
     // insert only top-level items and submenus; the rest will expand as submenu
     int level = 0;
     TLBI_ITEM_INFO2 tii;
@@ -109,7 +109,7 @@ CHotPathsBar::CHotPathsBar(HWND hNotifyWindow, CObjectOrigin origin)
 int CHotPathsBar::GetNeededHeight()
 {
     CALL_STACK_MESSAGE_NONE
-    // i v pripade, ze nedrzime zadnou ikonu budeem vracet spravnou vysku
+    // even if we hold no icon we will return the correct height
     int height = CToolBar::GetNeededHeight();
     int iconSize = GetIconSizeForSystemDPI(ICONSIZE_16);
     int minH = 3 + iconSize + 3;
@@ -121,7 +121,7 @@ int CHotPathsBar::GetNeededHeight()
 void CHotPathsBar::Customize()
 {
     CALL_STACK_MESSAGE_NONE
-    // nechame vybalit stranku HotPaths
+    // open the HotPaths page
     PostMessage(MainWindow->HWindow, WM_USER_CONFIGURATION, 1, -1);
 }
 

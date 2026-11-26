@@ -3,11 +3,11 @@
 
 #pragma once
 
-// nasledujici funkce nepadaji pri praci s neplatnou pameti (ani pri praci s NULL):
+// the following functions do not crash when working with invalid memory (nor when working with NULL):
 // lstrcpy, lstrcpyn, lstrlen and lstrcat (these are defined with suffix A or W, therefore
-// je primo neredefinujeme), v zajmu snazsiho odladeni chyb potrebujeme, aby padaly,
+// we do not redefine them directly); to make errors easier to debug we need them to crash,
 // because otherwise error is found later in a place where it may not be clear what
-// zpusobilo
+// caused it
 #define lstrcpyA _sal_lstrcpyA
 #define lstrcpyW _sal_lstrcpyW
 #define lstrcpynA _sal_lstrcpynA

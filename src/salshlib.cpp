@@ -109,7 +109,7 @@ void ReleaseSalShLib()
     CALL_STACK_MESSAGE1("ReleaseSalShLib()");
     if (OurDataOnClipboard)
     {
-        OleSetClipboard(NULL);      // vyhodime nas data-object z clipboardu
+        OleSetClipboard(NULL);      // remove our data-object from the clipboard
         OurDataOnClipboard = FALSE; // teoreticky zbytecne (melo by se nastavit v Release() fakeDataObjectu)
     }
     if (SalShExtSharedMemView != NULL)
@@ -245,7 +245,7 @@ STDMETHODIMP CFakeDragDropDataObject::GetData(FORMATETC* formatEtc, STGMEDIUM* m
 
     if (formatEtc->cfFormat == CFSalFakeRealPath && (formatEtc->tymed & TYMED_HGLOBAL))
     {
-        HGLOBAL dataDup = NULL; // vyrobime kopii RealPath
+        HGLOBAL dataDup = NULL; // make a copy of RealPath
         int size = (int)strlen(RealPath) + 1;
         dataDup = NOHANDLES(GlobalAlloc(GMEM_MOVEABLE | GMEM_DDESHARE, size));
         if (dataDup != NULL)
@@ -262,7 +262,7 @@ STDMETHODIMP CFakeDragDropDataObject::GetData(FORMATETC* formatEtc, STGMEDIUM* m
                 dataDup = NULL;
             }
         }
-        if (dataDup != NULL) // mame data, ulozime je na medium a vratime
+        if (dataDup != NULL) // we have the data, save them to the medium and return
         {
             medium->tymed = TYMED_HGLOBAL;
             medium->hGlobal = dataDup;
@@ -295,7 +295,7 @@ STDMETHODIMP CFakeDragDropDataObject::GetData(FORMATETC* formatEtc, STGMEDIUM* m
                     dataDup = NULL;
                 }
             }
-            if (dataDup != NULL) // mame data, ulozime je na medium a vratime
+            if (dataDup != NULL) // we have the data, save them to the medium and return
             {
                 medium->tymed = TYMED_HGLOBAL;
                 medium->hGlobal = dataDup;
@@ -309,7 +309,7 @@ STDMETHODIMP CFakeDragDropDataObject::GetData(FORMATETC* formatEtc, STGMEDIUM* m
         {
             if (formatEtc->cfFormat == CFSalFakeSrcFSPath && (formatEtc->tymed & TYMED_HGLOBAL))
             {
-                HGLOBAL dataDup = NULL; // vyrobime kopii SrcFSPath
+                HGLOBAL dataDup = NULL; // make a copy of SrcFSPath
                 int size = (int)strlen(SrcFSPath) + 1;
                 dataDup = NOHANDLES(GlobalAlloc(GMEM_MOVEABLE | GMEM_DDESHARE, size));
                 if (dataDup != NULL)
@@ -326,7 +326,7 @@ STDMETHODIMP CFakeDragDropDataObject::GetData(FORMATETC* formatEtc, STGMEDIUM* m
                         dataDup = NULL;
                     }
                 }
-                if (dataDup != NULL) // mame data, ulozime je na medium a vratime
+                if (dataDup != NULL) // we have the data, save them to the medium and return
                 {
                     medium->tymed = TYMED_HGLOBAL;
                     medium->hGlobal = dataDup;

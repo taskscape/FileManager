@@ -101,9 +101,9 @@ DWORD WINAPI FControlThread(void* param)
             // protection against looping after executing command
             if (tasklist->ProcessList->TodoUID <= lastTodoUID)
             {
-                // uvolnime ProcessList
+                // release ProcessList
                 ReleaseMutex(tasklist->FMOMutex);
-                Sleep(50); // dame prilezitost dalsim procesum
+                Sleep(50); // give opportunity to other processes
                 break;
             }
             else
@@ -219,7 +219,7 @@ DWORD WINAPI FControlThread(void* param)
                 if (HSafeMainWindow != NULL && SalShExtSharedMemView != NULL &&
                     SalShExtSharedMemView->SalamanderMainWnd == (UINT64)(DWORD_PTR)HSafeMainWindow)
                 {
-                    ResetEvent(SalShExtDoPasteEvent); // "zdrojovy" Salamander uz se nasel, dalsi hledani je zbytecne
+                    ResetEvent(SalShExtDoPasteEvent); // the "source" Salamander has already been found, further searching is pointless
                     sleep = FALSE;
                     PostMessage(HSafeMainWindow, WM_USER_SALSHEXT_PASTE, SalShExtSharedMemView->PostMsgIndex, 0);
                 }
@@ -307,7 +307,7 @@ BOOL CTaskList::Init()
         ProcessList->ItemsStateUID++;
         ProcessList->Items[0] = CProcessListItem();
 
-        //---  uvolnime FMO
+        //---  release FMO
         ReleaseMutex(FMOMutex);
     }
     else // another instance, just connect ...
@@ -353,7 +353,7 @@ BOOL CTaskList::Init()
             }
         }
 
-        //---  uvolnime FMO
+        //---  release FMO
         ReleaseMutex(FMOMutex);
     }
 
@@ -586,7 +586,7 @@ BOOL CTaskList::FireEvent(DWORD todo, DWORD pid, BOOL* timeouted)
             }
         }
 
-        // uvolnime ProcessList
+        // release ProcessList
         ReleaseMutex(FMOMutex);
 
         // start check in all Salamanders
@@ -750,8 +750,8 @@ BOOL CTaskList::RemoveKilledItems(BOOL* changed)
 
     /*
 // does not work under XP if processes within one session are started under different users
-// nemame pravo otevrit hande jineho procesu
-//---  vyhodime killnuty procesy
+// we have no right to open another process's handle
+//---  remove killed processes
 int i;
     for (i = 0; i < c; i++)
     {
@@ -762,9 +762,9 @@ int i;
         DWORD exitcode;
         if (!GetExitCodeProcess(h, &exitcode) || exitcode == STILL_ACTIVE) cont = TRUE;
         NOHANDLES(CloseHandle(h));
-        if (cont) continue;  // nechame proces v seznamu
+        if (cont) continue;  // leave process in list
       }
-//---  vykopneme proces ze seznamu
+//---  remove the process from the list
       memmove(ptr + i, ptr + i + 1, (c - i - 1) * sizeof(CTLItem));
       c--;
       i--;

@@ -28,13 +28,13 @@ public:
     // repeatedly
     void BeginPaint();
 
-    // ukonci kresleni a zkopiruje obsah back-bufferu na obrazovku
+    // finishes drawing and copies the back-buffer contents to the screen
     void EndPaint();
 
     // DC for drawing to window, valid only between BeginPaint and EndPaint
     operator HDC();
 
-    // vrati rectangle o rozmerech bufferu
+    // returns a rectangle with the buffer dimensions
     const RECT& GetRect() { return ClientRect; }
 
 private:

@@ -80,9 +80,9 @@ const char* Concatenate(const char* string1, const char* string2);
 
 // ****************************************************************************
 //
-// CDialogStack -- slouzi k ukladani hiearchie oken na zasobnik, vrchol
+// CDialogStack -- used to store the window hierarchy on a stack, the top of the
 // stack is parent for displayed message- and error-boxes, each thread
-// ma svou vlastni hierarchii oken
+// has its own window hierarchy
 //
 
 class CDialogStack
@@ -192,7 +192,7 @@ public:
 
 // ****************************************************************************
 //
-// CArgv -- Vytvori argument-vector z commanline retezce
+// CArgv -- Creates an argument vector from a command-line string
 //
 
 class CArgv : public TIndirectArray<char>

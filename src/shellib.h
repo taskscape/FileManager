@@ -73,7 +73,7 @@ BOOL IsSimpleSelection(IDataObject* pDataObject, CDragDropOperData* namesList);
 BOOL GetSHObjectName(ITEMIDLIST* pidl, DWORD flags, char* name, int nameSize, IMalloc* alloc);
 
 // TRUE = drag&drop effect was computed in the plugin FS, so Copy does not need to be forced
-// v CImpIDropSource::GiveFeedback
+// in CImpIDropSource::GiveFeedback
 extern BOOL DragFromPluginFSEffectIsFromPlugin;
 
 //*****************************************************************************
@@ -222,30 +222,30 @@ typedef void (*CDoDragDropOper)(BOOL copy, BOOL toArchive, const char* archiveOr
 typedef const char* (*CGetCurDir)(POINTL& pt, void* param, DWORD* pdwEffect, BOOL rButton,
                                   BOOL& isTgtFile, DWORD keyState, int& tgtType, int srcType);
 
-// callback oznamujici konec drop operace, drop == FALSE pri ESC
+// callback reporting the end of the drop operation, drop == FALSE on ESC
 typedef void (*CDropEnd)(BOOL drop, BOOL shortcuts, void* param, BOOL ownRutine,
                          BOOL isFakeDataObject, int tgtType);
 
-// callback pro dotaz pred dokoncenim operace (drop)
+// callback for a query before completing the operation (drop)
 typedef BOOL (*CConfirmDrop)(DWORD& effect, DWORD& defEffect, DWORD& grfKeyState);
 
-// callback oznamujici vstup a vystup mysi do targetu
+// callback reporting mouse entry into and exit from the target
 typedef void (*CEnterLeaveDrop)(BOOL enter, void* param);
 
-// callback, ktery povoluje pouziti nasich rutin pro copy/move
+// callback that allows use of our routines for copy/move
 typedef BOOL (*CUseOwnRutine)(IDataObject* pDataObject);
 
-// callback pro zjisteni default drop effectu pri tazeni z FS na FS
+// callback for determining the default drop effect when dragging from FS to FS
 typedef void (*CGetFSToFSDropEffect)(const char* srcFSPath, const char* tgtFSPath,
                                      DWORD allowedEffects, DWORD keyState,
                                      DWORD* dropEffect, void* param);
 
 enum CIDTTgtType
 {
-    idtttWindows,          // soubory/adresare z windowsove cesty na windowsovou cestu
-    idtttArchive,          // soubory/adresare z windowsove cesty do archivu
-    idtttPluginFS,         // soubory/adresare z windowsove cesty do FS
-    idtttArchiveOnWinPath, // archiv na windowsove ceste (drop=pack to archive)
+    idtttWindows,          // files/directories from a Windows path to a Windows path
+    idtttArchive,          // files/directories from a Windows path into an archive
+    idtttPluginFS,         // files/directories from a Windows path into an FS
+    idtttArchiveOnWinPath, // archive on a Windows path (drop=pack to archive)
     idtttFullPluginFSPath, // FS to FS
 };
 
@@ -257,8 +257,8 @@ private:
     HWND OwnerWindow;
     IDataObject* OldDataObject;
     BOOL OldDataObjectIsFake;
-    int OldDataObjectIsSimple;                 // -1 (neznama hodnota), TRUE/FALSE = je/neni jednoduchy (vsechna jmena na jedne ceste)
-    int OldDataObjectSrcType;                  // 0 (neznamy typ), 1/2 = archiv/FS
+    int OldDataObjectIsSimple;                 // -1 (unknown value), TRUE/FALSE = is/is not simple (all names on one path)
+    int OldDataObjectSrcType;                  // 0 (unknown type), 1/2 = archive/FS
     char OldDataObjectSrcFSPath[2 * MAX_PATH]; // only for FS type: source FS path
 
     CDoCopyMove DoCopyMove;
@@ -276,14 +276,14 @@ private:
     CConfirmDrop ConfirmDrop;
     BOOL* ConfirmDropEnable;
 
-    int TgtType; // hodnoty viz CIDTTgtType; idtttWindows i pro archivy a FS bez moznosti dropnuti aktualniho dataobjectu
+    int TgtType; // values see CIDTTgtType; idtttWindows also for archives and FS when the current data object cannot be dropped
     IDropTarget* CurDirDropTarget;
     char CurDir[2 * MAX_PATH];
 
     CEnterLeaveDrop EnterLeaveDrop;
     void* EnterLeaveDropParam;
 
-    BOOL RButton; // akce pravym tlacitkem mysi?
+    BOOL RButton; // action with the right mouse button?
 
     CUseOwnRutine UseOwnRutine;
 
@@ -316,8 +316,8 @@ public:
         DropEndParam = dropEndParam;
         OldDataObject = NULL;
         OldDataObjectIsFake = FALSE;
-        OldDataObjectIsSimple = -1; // neznama hodnota
-        OldDataObjectSrcType = 0;   // neznamy typ
+        OldDataObjectIsSimple = -1; // unknown value
+        OldDataObjectSrcType = 0;   // unknown type
         OldDataObjectSrcFSPath[0] = 0;
         ConfirmDrop = confirmDrop;
         ConfirmDropEnable = confirmDropEnable;
@@ -354,7 +354,7 @@ public:
         if (--RefCount == 0)
         {
             delete this;
-            return 0; // nesmime sahnout do objektu, uz neexistuje
+            return 0; // must not touch the object, it no longer exists
         }
         return RefCount;
     }
@@ -446,7 +446,7 @@ public:
         if (--RefCount == 0)
         {
             delete this;
-            return 0; // nesmime sahnout do objektu, uz neexistuje
+            return 0; // must not touch the object, it no longer exists
         }
         return RefCount;
     }
@@ -511,5 +511,5 @@ public:
     }
 };
 
-// uvolni CopyMoveData
+// releases CopyMoveData
 void DestroyCopyMoveData(CCopyMoveData* data);

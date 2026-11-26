@@ -108,7 +108,7 @@ void ReleaseWinLib(HINSTANCE dllInstance)
     if (WindowsManager.WindowsCount != 0)
     {
         // problem - after plugin unload software may crash, because window-procedure is called
-        //          v unloadnutem DLL (jde-li o okna zabita v ramci zabitych threadu, je to OK)
+        //          in an unloaded DLL (if these are windows killed within killed threads, that is OK)
         TRACE_E("Unable to release WinLibLT - some window or dialog (count = " << WindowsManager.WindowsCount << ") is still attached to WinLibLT!");
         // return;  // if it was window in killed thread, WinLibLT will be freed, otherwise unregister-function returns error
     }
@@ -130,7 +130,7 @@ void ReleaseWinLib(HINSTANCE dllInstance)
 // ****************************************************************************
 // CWindow
 //
-// lpvParam - v pripade, ze se pri CreateWindow zavola CWindow::CWindowProc
+// lpvParam - in case CWindow::CWindowProc is called during CreateWindow
 //            (is in window class), must contain address of created window object
 
 HWND CWindow::CreateEx(DWORD dwExStyle,        // extended window style
@@ -144,7 +144,7 @@ HWND CWindow::CreateEx(DWORD dwExStyle,        // extended window style
                        HWND hwndParent,        // handle of parent or owner window
                        HMENU hmenu,            // handle of menu or child-window identifier
                        HINSTANCE hinst,        // handle of application instance
-                       LPVOID lpvParam)        // ukazatel na objekt vytvareneho okna
+                       LPVOID lpvParam)        // pointer to the object of the window being created
 {
     HWND hWnd = CreateWindowEx(dwExStyle,
                                lpszClassName,
@@ -161,7 +161,7 @@ HWND CWindow::CreateEx(DWORD dwExStyle,        // extended window style
     if (hWnd != 0)
     {
         if (WindowsManager.GetWindowPtr(hWnd) == NULL) // if not yet in WindowsManager
-            AttachToWindow(hWnd);                      // tak ho pridame -> subclassing
+            AttachToWindow(hWnd);                      // so we add it -> subclassing
     }
     return hWnd;
 }
@@ -176,7 +176,7 @@ HWND CWindow::Create(LPCTSTR lpszClassName,  // address of registered class name
                      HWND hwndParent,        // handle of parent or owner window
                      HMENU hmenu,            // handle of menu or child-window identifier
                      HINSTANCE hinst,        // handle of application instance
-                     LPVOID lpvParam)        // ukazatel na objekt vytvareneho okna
+                     LPVOID lpvParam)        // pointer to the object of the window being created
 {
     return CreateEx(0,
                     lpszClassName,
@@ -269,7 +269,7 @@ CWindow::CWindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
     CWindow* wnd;
     switch (uMsg)
     {
-    case WM_CREATE: // prvni zprava - pripojeni objektu k oknu
+    case WM_CREATE: // first message - attaching the object to the window
     {
         // osetrim MDI_CHILD_WINDOW
         if (((CREATESTRUCT*)lParam)->dwExStyle & WS_EX_MDICHILD)
@@ -603,7 +603,7 @@ void CPropSheetPage::Init(char* title, HINSTANCE modul, int resID,
     Flags = flags;
     Icon = icon;
 
-    ParentDialog = NULL; // nastavuje se z CPropertyDialog::Execute()
+    ParentDialog = NULL; // set from CPropertyDialog::Execute()
 }
 
 CPropSheetPage::~CPropSheetPage()
@@ -671,7 +671,7 @@ CPropSheetPage::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
     {
         ParentDialog->HWindow = Parent;
         TransferData(ttDataToWindow);
-        return TRUE; // chci focus od DefDlgProc
+        return TRUE; // I want focus from DefDlgProc
     }
 
     case WM_HELP:
@@ -682,28 +682,28 @@ CPropSheetPage::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
             WinLibLTHelpCallback(HWindow, HelpID);
             return TRUE;
         }
-        break; // F1 nechame propadnout do parenta
+        break; // let F1 fall through to the parent
     }
 
     case WM_NOTIFY:
     {
-        if (((NMHDR*)lParam)->code == PSN_KILLACTIVE) // deaktivace stranky
+        if (((NMHDR*)lParam)->code == PSN_KILLACTIVE) // page deactivation
         {
             if (ValidateData())
                 SetWindowLongPtr(HWindow, DWLP_MSGRESULT, FALSE);
-            else // nepovolime deaktivaci stranky
+            else // we will not allow page deactivation
                 SetWindowLongPtr(HWindow, DWLP_MSGRESULT, TRUE);
             return TRUE;
         }
 
         if (((NMHDR*)lParam)->code == PSN_HELP)
-        { // stisknuto tlacitko Help
+        { // Help button was pressed
             if (WinLibLTHelpCallback != NULL && HelpID != -1)
                 WinLibLTHelpCallback(HWindow, HelpID);
             return TRUE;
         }
 
-        if (((NMHDR*)lParam)->code == PSN_SETACTIVE) // aktivace stranky
+        if (((NMHDR*)lParam)->code == PSN_SETACTIVE) // page activation
         {
             if (ParentDialog != NULL && ParentDialog->LastPage != NULL)
             { // remember the last page

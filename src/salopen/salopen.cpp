@@ -27,7 +27,7 @@ void my_memcpy(void* dst, const void* src, int len)
 }
 
 // for VS2019
-#pragma intrinsic(memcpy) // abych mohli prekladat s optimalizaci na rychlost a prekladac nerval
+#pragma intrinsic(memcpy) // so we can compile with speed optimization and the compiler does not complain
 #pragma function(memcpy)  // error C2169:  'memcpy': intrinsic function, cannot be defined
 void* memcpy(void* dst, const void* src, size_t len)
 {
@@ -313,7 +313,7 @@ BOOL GetShellFolder(const char* dir, IShellFolder*& shellFolderObj, LPITEMIDLIST
                     {
                         if (!isComputerFolder) // must get complex pidl, otherwise mapping does not work
                         {
-                            BOOL setWait = (GetCursor() != LoadCursor(NULL, IDC_WAIT)); // ceka uz ?
+                            BOOL setWait = (GetCursor() != LoadCursor(NULL, IDC_WAIT)); // already waiting?
                             HCURSOR oldCur;
                             if (setWait)
                                 oldCur = SetCursor(LoadCursor(NULL, IDC_WAIT));
@@ -512,7 +512,7 @@ void DoExecuteAssociation(HWND hWindow, const char* path, const char* name)
             menu->QueryContextMenu(h, 0, 0, -1, CMF_NORMAL | CMF_EXPLORE);
 
             UINT cmd = GetMenuDefaultItem(h, FALSE, GMDI_GOINTOPOPUPS);
-            if (cmd == -1) // nenasli jsme default item -> zkusime hledat jen mezi verby
+            if (cmd == -1) // we did not find the default item -> try searching only among the verbs
             {
                 DestroyMenu(h);
                 h = CreatePopupMenu();
@@ -522,7 +522,7 @@ void DoExecuteAssociation(HWND hWindow, const char* path, const char* name)
 
                     cmd = GetMenuDefaultItem(h, FALSE, GMDI_GOINTOPOPUPS);
                     if (cmd == -1)
-                        cmd = 0; // zkusime "default verb" (index 0)
+                        cmd = 0; // try the "default verb" (index 0)
                 }
             }
             if (cmd != -1)
@@ -584,7 +584,7 @@ LONG __stdcall MyUnhandledExceptionFilter(EXCEPTION_POINTERS* ExceptionInfo)
     //            "SALOPEN: An exception has occured!\n",
     //            34, &written, NULL);
     //  ExitProcess(666);
-    TerminateProcess(GetCurrentProcess(), 666); // tvrdsi exit (tenhle jeste neco vola)
+    TerminateProcess(GetCurrentProcess(), 666); // harder exit (this one still calls something)
     return EXCEPTION_EXECUTE_HANDLER;
 }
 
@@ -784,7 +784,7 @@ void WinMainCRTStartup()
     }
 
     // create hidden window and launch menu from it
-    // pod W2K+ uz asi neni potreba
+    // under W2K+ it is probably no longer needed
     HINSTANCE hInstance = GetModuleHandle(NULL);
     WNDCLASSEX CWindowClass;
     CWindowClass.cbSize = sizeof(CWindowClass);

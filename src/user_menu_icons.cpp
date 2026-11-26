@@ -72,7 +72,7 @@ CUserMenuIconDataArr::GiveIconForUMI(const char* fileName, DWORD iconIndex, cons
             strcmp(item->UMCommand, umCommand) == 0)
         {
             HICON icon = item->LoadedIcon; // set LoadedIcon to NULL, otherwise it would be deallocated (via DestroyIcon())
-            item->Clear();                 // nechceme sesouvat pole (pri mazani) - pomale+zbytecne, tak aspon vycistime polozku, aby se rychleji preskocila pri hledani
+            item->Clear();                 // we do not want to compact the array (on delete) - slow+pointless, so we at least clear the item so it is skipped faster during search
             return icon;
         }
     }
@@ -100,7 +100,7 @@ CUserMenuIconBkgndReader::CUserMenuIconBkgndReader()
 
 CUserMenuIconBkgndReader::~CUserMenuIconBkgndReader()
 {
-    if (UserMenuIIU_BkgndReaderData != NULL) // tak ted uz vazne nebudou potreba, uvolnime je
+    if (UserMenuIIU_BkgndReaderData != NULL) // they really will not be needed anymore, so we release them
     {
         delete UserMenuIIU_BkgndReaderData;
         UserMenuIIU_BkgndReaderData = NULL;
@@ -125,18 +125,18 @@ unsigned BkgndReadingIconsThreadBody(void* param)
         CUserMenuIconData* item = bkgndReaderData->At(i);
         HICON umIcon;
         if (item->FileName[0] != 0 &&
-            SalGetFileAttributes(item->FileName) != INVALID_FILE_ATTRIBUTES && // test pristupnosti (misto CheckPath)
+            SalGetFileAttributes(item->FileName) != INVALID_FILE_ATTRIBUTES && // access check (instead of CheckPath)
             ExtractIconEx(item->FileName, item->IconIndex, NULL, &umIcon, 1) == 1)
         {
-            HANDLES_ADD(__htIcon, __hoLoadImage, umIcon); // pridame handle na 'umIcon' do HANDLES
+            HANDLES_ADD(__htIcon, __hoLoadImage, umIcon); // add the handle of 'umIcon' to HANDLES
         }
         else
         {
             umIcon = NULL;
             if (item->UMCommand[0] != 0)
-            { // pro pripad, ze by minula metoda selhala - zkusim ziskat ikonku od systemu
+            { // in case the previous method failed - try to get the icon from the system
                 DWORD attrs = SalGetFileAttributes(item->UMCommand);
-                if (attrs != INVALID_FILE_ATTRIBUTES) // test pristupnosti (misto CheckPath)
+                if (attrs != INVALID_FILE_ATTRIBUTES) // access check (instead of CheckPath)
                 {
                     umIcon = GetFileOrPathIconAux(item->UMCommand, FALSE,
                                                   (attrs != INVALID_FILE_ATTRIBUTES && (attrs & FILE_ATTRIBUTE_DIRECTORY)));
@@ -165,7 +165,7 @@ unsigned BkgndReadingIconsThreadEH(void* param)
     {
         TRACE_I("Thread BkgndReadingIconsThread: calling ExitProcess(1).");
         //    ExitProcess(1);
-        TerminateProcess(GetCurrentProcess(), 1); // tvrdsi exit (tenhle jeste neco vola)
+        TerminateProcess(GetCurrentProcess(), 1); // harder exit (this one still calls something)
         return 1;
     }
 #endif // CALLSTK_DISABLE
@@ -193,10 +193,10 @@ void CUserMenuIconBkgndReader::StartBkgndReadingIcons(CUserMenuIconDataArr* bkgn
         if (thread != NULL)
         {
             // main thread runs at higher priority; whether icons should be read equally fast
-            // jako pred zavedenim cteni ve vedlejsim threadu, musime mu tez zvysit prioritu
+            // as before reading was moved to a background thread, we must raise its priority as well
             SetThreadPriority(thread, THREAD_PRIORITY_ABOVE_NORMAL);
 
-            bkgndReaderData = NULL; // jsou predana v threadu, nebudeme je uvolnovat zde
+            bkgndReaderData = NULL; // they are passed to the thread; we will not free them here
             CurIRThreadIDIsValid = TRUE;
             CurIRThreadID = newThreadID;
             // The reader uses shared menu state, so shutdown tracks it to a safe join.
@@ -210,10 +210,10 @@ void CUserMenuIconBkgndReader::StartBkgndReadingIcons(CUserMenuIconDataArr* bkgn
     HANDLES(LeaveCriticalSection(&CS));
 
     // pause briefly; if icons are read quickly, "simple" icons are not shown at all
-    // varianty (mene blikani) + nekteri uzivatele hlasili, ze se diky soucasnemu nacitani ikon do panelu
-    // dost hrube zpomalilo cteni ikon do usermenu a diky tomu se jim ikony na usermenu toolbare ukazuji
+    // variants (less flickering) + some users reported that simultaneous icon loading into the panel
+    // slowed reading of icons into the user menu quite severely, so their icons on the user menu toolbar appear
     // with a large delay, which is ugly; this should prevent that (it will simply handle only slow
-    // nacitani usermenu ikon, coz je cilem cele tehle taskarice)
+    // loading of user menu icons, which is the goal of this whole exercise)
     if (thread != NULL)
     {
         //    TRACE_I("Waiting for finishing of thread for reading user menu icons...");
@@ -257,7 +257,7 @@ void CUserMenuIconBkgndReader::ReadingFinished(DWORD threadID, CUserMenuIconData
     HWND mainWnd = ok ? MainWindow->HWindow : NULL;
     HANDLES(LeaveCriticalSection(&CS));
 
-    if (ok) // na tyto ikony stale jeste ceka User Menu
+    if (ok) // the User Menu is still waiting for these icons
         PostMessage(mainWnd, WM_USER_USERMENUICONS_READY, (WPARAM)bkgndReaderData, (LPARAM)threadID);
     else
         delete bkgndReaderData;
@@ -289,7 +289,7 @@ void CUserMenuIconBkgndReader::EndUserMenuIconsInUse()
                 PostMessage(MainWindow->HWindow, WM_USER_USERMENUICONS_READY,
                             (WPARAM)UserMenuIIU_BkgndReaderData, (LPARAM)UserMenuIIU_ThreadID);
             }
-            else // o data uz nikdo nestoji, jen je uvolnime
+            else // nobody wants the data anymore, just free it
                 delete UserMenuIIU_BkgndReaderData;
             UserMenuIIU_BkgndReaderData = NULL;
             UserMenuIIU_ThreadID = 0;
@@ -311,7 +311,7 @@ BOOL CUserMenuIconBkgndReader::EnterCSIfCanUpdateUMIcons(CUserMenuIconDataArr** 
                 delete UserMenuIIU_BkgndReaderData;
             UserMenuIIU_BkgndReaderData = *bkgndReaderData;
             UserMenuIIU_ThreadID = threadID;
-            *bkgndReaderData = NULL; // volajici nam timto data predal, uvolnime je casem sami
+            *bkgndReaderData = NULL; // the caller has handed the data over to us; we will free it ourselves later
         }
         else
         {
@@ -378,10 +378,10 @@ CUserMenuItem::CUserMenuItem(CUserMenuItem& item, CUserMenuIconDataArr* bkgndRea
     Set(item.ItemName, item.UMCommand, item.Arguments, item.InitDir, item.Icon);
     if (Type == umitItem)
     {
-        if (bkgndReaderData == NULL) // tady jde o kopii do cfg dialogu, tam nove nactene ikony nepropagujeme (pockame az na konec dialogu)
+        if (bkgndReaderData == NULL) // this is a copy into the cfg dialog; we do not propagate newly loaded icons there (we wait until the dialog ends)
         {
-            UMIcon = DuplicateIcon(NULL, item.UMIcon); // GetIconHandle(); zbytecne brzdilo
-            if (UMIcon != NULL)                        // pridame handle na 'UMIcon' do HANDLES
+            UMIcon = DuplicateIcon(NULL, item.UMIcon); // GetIconHandle(); it slowed things down needlessly
+            if (UMIcon != NULL)                        // add the handle of 'UMIcon' to HANDLES
                 HANDLES_ADD(__htIcon, __hoLoadImage, UMIcon);
         }
         else
@@ -397,7 +397,7 @@ CUserMenuItem::CUserMenuItem(CUserMenuItem& item, CUserMenuIconDataArr* bkgndRea
 
 CUserMenuItem::~CUserMenuItem()
 {
-    // umitSubmenuBegin sdili jednu ikonu
+    // umitSubmenuBegin shares one icon
     if (UMIcon != NULL && Type != umitSubmenuBegin)
         HANDLES(DestroyIcon(UMIcon));
     if (ItemName != NULL)
@@ -468,7 +468,7 @@ void CUserMenuItem::SetType(CUserMenuItemType type)
     {
         if (type == umitSubmenuBegin)
         {
-            // prechazime na sdilenou ikonu, smazneme alokovanou
+            // switching to the shared icon, delete the allocated one
             if (UMIcon != NULL)
             {
                 HANDLES(DestroyIcon(UMIcon));
@@ -476,7 +476,7 @@ void CUserMenuItem::SetType(CUserMenuItemType type)
             }
         }
         if (Type == umitSubmenuBegin)
-            UMIcon = NULL; // odchazime ze sdilene ikony
+            UMIcon = NULL; // leaving the shared icon
     }
     Type = type;
 }
@@ -495,17 +495,17 @@ BOOL CUserMenuItem::GetIconHandle(CUserMenuIconDataArr* bkgndReaderData, BOOL ge
         UMIcon = NULL;
     }
 
-    if (Type == umitSeparator) // separator nema ikonku
+    if (Type == umitSeparator) // a separator has no icon
         return TRUE;
 
-    // pokusim se vytahnout ikonu ze specifikovaneho souboru
+    // try to extract the icon from the specified file
     char fileName[MAX_PATH];
     fileName[0] = 0;
     DWORD iconIndex = -1;
     if (MainWindow != NULL && Icon != NULL && Icon[0] != 0)
     {
-        // Icon je ve formatu "nazev souboru,resID"
-        // provedu rozklad
+        // Icon is in the format "file name,resID"
+        // parse it
         char* iterator = Icon + strlen(Icon) - 1;
         while (iterator > Icon && *iterator != ',')
             iterator--;
@@ -518,16 +518,16 @@ BOOL CUserMenuItem::GetIconHandle(CUserMenuIconDataArr* bkgndReaderData, BOOL ge
         }
     }
 
-    if (bkgndReaderData == NULL && fileName[0] != 0 && // mame cist ikony hned tady
+    if (bkgndReaderData == NULL && fileName[0] != 0 && // we are supposed to read icons right here
         MainWindow->GetActivePanel() != NULL &&
         MainWindow->GetActivePanel()->CheckPath(FALSE, fileName) == ERROR_SUCCESS &&
         ExtractIconEx(fileName, iconIndex, NULL, &UMIcon, 1) == 1)
     {
-        HANDLES_ADD(__htIcon, __hoLoadImage, UMIcon); // pridame handle na 'UMIcon' do HANDLES
+        HANDLES_ADD(__htIcon, __hoLoadImage, UMIcon); // add the handle of 'UMIcon' to HANDLES
         return TRUE;
     }
 
-    // pro pripad, ze by minula metoda selhala - zkusim ziskat ikonku od systemu
+    // in case the previous method failed - try to get the icon from the system
     char umCommand[MAX_PATH];
     if (MainWindow != NULL && UMCommand != NULL && UMCommand[0] != 0 &&
         ExpandCommand(MainWindow->HWindow, UMCommand, umCommand, MAX_PATH, TRUE))
@@ -538,7 +538,7 @@ BOOL CUserMenuItem::GetIconHandle(CUserMenuIconDataArr* bkgndReaderData, BOOL ge
     else
         umCommand[0] = 0;
 
-    if (bkgndReaderData == NULL && umCommand[0] != 0 && // mame cist ikony hned tady
+    if (bkgndReaderData == NULL && umCommand[0] != 0 && // we are supposed to read icons right here
         MainWindow->GetActivePanel() != NULL &&
         MainWindow->GetActivePanel()->CheckPath(FALSE, umCommand) == ERROR_SUCCESS)
     {
@@ -551,17 +551,17 @@ BOOL CUserMenuItem::GetIconHandle(CUserMenuIconDataArr* bkgndReaderData, BOOL ge
 
     if (bkgndReaderData != NULL)
     {
-        if (getIconsFromReader) // ikoy uz jsou nactene, jen prevezmeme tu spravnou
+        if (getIconsFromReader) // the icons are already loaded, we just take the right one
         {
             UMIcon = bkgndReaderData->GiveIconForUMI(fileName, iconIndex, umCommand);
             if (UMIcon != NULL)
                 return TRUE;
         }
-        else // zadame nacteni potrebne ikony
+        else // request loading of the needed icon
             bkgndReaderData->Add(new CUserMenuIconData(fileName, iconIndex, umCommand));
     }
 
-    // vytahnu implicitni ikonu z shell32.dll
+    // get the default icon from shell32.dll
     UMIcon = SalLoadImage(2, 1, IconSizes[ICONSIZE_16], IconSizes[ICONSIZE_16], IconLRFlags);
     return TRUE;
 }

@@ -206,14 +206,14 @@ BOOL DuplicateAmpersands(char* buffer, int bufferSize, BOOL skipFirstAmpersand)
             {
                 if (l + 1 < bufferSize)
                 {
-                    memmove(s + 1, s, l - (s - buffer) + 1); // zdvojime '&'
+                    memmove(s + 1, s, l - (s - buffer) + 1); // double the '&'
                     l++;
                     s++;
                 }
-                else // nevejde se, orizneme buffer
+                else // it does not fit, trim the buffer
                 {
                     ret = FALSE;
-                    memmove(s + 1, s, l - (s - buffer)); // zdvojime '&', orizneme o znak
+                    memmove(s + 1, s, l - (s - buffer)); // double the '&', trim off one character
                     buffer[l] = 0;
                     s++;
                 }
@@ -245,7 +245,7 @@ void RemoveAmpersands(char* text)
             else
             {
                 if (*(s + 1) == '&')
-                    *d++ = *s++; // dvojice "&&" -> nahradime '&'
+                    *d++ = *s++; // a pair of "&&" -> replace with '&'
                 s++;
             }
         }
@@ -255,9 +255,9 @@ void RemoveAmpersands(char* text)
 
 BOOL CPathHistoryItem::Execute(CFilesWindow* panel)
 {
-    BOOL ret = TRUE; // standardne vracime uspech
+    BOOL ret = TRUE; // by default we return success
     char errBuf[MAX_PATH + 200];
-    if (PathOrArchiveOrFSName != NULL) // jsou platna data
+    if (PathOrArchiveOrFSName != NULL) // the data is valid
     {
         int failReason;
         BOOL clear = TRUE;
@@ -268,8 +268,8 @@ BOOL CPathHistoryItem::Execute(CFilesWindow* panel)
             {
                 if (failReason == CHPPFR_CANNOTCLOSEPATH)
                 {
-                    ret = FALSE;   // zustavame na miste
-                    clear = FALSE; // zadny skok, neni treba mazat top-indexy
+                    ret = FALSE;   // we stay in place
+                    clear = FALSE; // no jump, no need to delete the top-indexes
                 }
             }
         }
@@ -282,8 +282,8 @@ BOOL CPathHistoryItem::Execute(CFilesWindow* panel)
                 {
                     if (failReason == CHPPFR_CANNOTCLOSEPATH)
                     {
-                        ret = FALSE;   // zustavame na miste
-                        clear = FALSE; // zadny skok, neni treba mazat top-indexy
+                        ret = FALSE;   // we stay in place
+                        clear = FALSE; // no jump, no need to delete the top-indexes
                     }
                     else
                     {
@@ -436,11 +436,11 @@ BOOL CPathHistoryItem::IsTheSamePath(CPathHistoryItem& item, CPluginFSInterfaceE
             {
                 if (Type == 2) // FS
                 {
-                    if (StrICmp(PathOrArchiveOrFSName, item.PathOrArchiveOrFSName) == 0) // fs-name je "case-insensitive"
+                    if (StrICmp(PathOrArchiveOrFSName, item.PathOrArchiveOrFSName) == 0) // fs-name is "case-insensitive"
                     {
-                        if (strcmp(ArchivePathOrFSUserPart, item.ArchivePathOrFSUserPart) == 0) // fs-user-part je "case-sensitive"
+                        if (strcmp(ArchivePathOrFSUserPart, item.ArchivePathOrFSUserPart) == 0) // fs-user-part is "case-sensitive"
                             return TRUE;
-                        if (curPluginFS != NULL && // resime jeste pripad, kdy jsou obe fs-user-part shodne z duvodu, ze pro ne FS vrati TRUE z IsCurrentPath (obecne bysme museli zavest metodu pro porovnani dvou fs-user-part, coz se mi ale jen kvuli historiim nechce, treba casem...)
+                        if (curPluginFS != NULL && // we also handle the case when both fs-user-parts match because the FS returns TRUE from IsCurrentPath for them (in general we would have to add a method for comparing two fs-user-parts, but I do not want to do that just for the histories, maybe later...)
                             StrICmp(PathOrArchiveOrFSName, curPluginFS->GetPluginFSName()) == 0)
                         {
                             int fsNameInd = curPluginFS->GetPluginFSNameIndex();
@@ -492,14 +492,14 @@ void CPathHistory::ClearPluginFSFromHistory(CPluginFSInterfaceAbstract* fs)
 {
     if (NewItem != NULL && NewItem->PluginFS == fs)
     {
-        NewItem->PluginFS = NULL; // fs byl prave zavren -> NULLovani
+        NewItem->PluginFS = NULL; // the fs was just closed -> set to NULL
     }
     int i;
     for (i = 0; i < Paths.Count; i++)
     {
         CPathHistoryItem* item = Paths[i];
         if (item->Type == 2 && item->PluginFS == fs)
-            item->PluginFS = NULL; // fs byl prave zavren -> NULLovani
+            item->PluginFS = NULL; // the fs was just closed -> set to NULL
     }
 }
 
@@ -553,7 +553,7 @@ void CPathHistory::FillHistoryPopupMenu(CMenuPopup* popup, DWORD firstID, int ma
 
     int firstIndex = popup->GetItemCount();
 
-    int added = 0; // pocet pridanych polozek
+    int added = 0; // number of added items
 
     int id = firstID;
     int count = (ForwardIndex == -1) ? Paths.Count : ForwardIndex;
@@ -575,7 +575,7 @@ void CPathHistory::FillHistoryPopupMenu(CMenuPopup* popup, DWORD firstID, int ma
 
     if (separator && added > 0)
     {
-        // vlozime separator
+        // insert a separator
         mii.Mask = MENU_MASK_TYPE;
         mii.Type = MENU_TYPE_SEPARATOR;
         popup->InsertItem(firstIndex, TRUE, &mii);
@@ -600,7 +600,7 @@ void CPathHistory::Execute(int index, BOOL forward, CFilesWindow* panel, BOOL al
                 item = Paths[ForwardIndex + index - 1];
                 change = item->Execute(panel);
                 if (!change)
-                    item = NULL; // nepodarilo se zmenit cestu => nechame ji v historii
+                    item = NULL; // failed to change the path => leave it in the history
                 Lock = FALSE;
             }
             if (change && !DontChangeForwardIndex)
@@ -611,11 +611,11 @@ void CPathHistory::Execute(int index, BOOL forward, CFilesWindow* panel, BOOL al
     }
     else
     {
-        index--; // z duvodu pocatku cislovani od 2 v FillPopupMenu
+        index--; // because numbering starts at 2 in FillPopupMenu
         if (HasBackward() || allItems && HasPaths())
         {
             int count = ((ForwardIndex == -1) ? Paths.Count : ForwardIndex) - 1;
-            if (count - index >= 0) // mame kam jit (neni to posledni polozka)
+            if (count - index >= 0) // we have somewhere to go (it is not the last item)
             {
                 if (count - index < Paths.Count)
                 {
@@ -623,7 +623,7 @@ void CPathHistory::Execute(int index, BOOL forward, CFilesWindow* panel, BOOL al
                     item = Paths[count - index];
                     change = item->Execute(panel);
                     if (!change)
-                        item = NULL; // nepodarilo se zmenit cestu => nechame ji v historii
+                        item = NULL; // failed to change the path => leave it in the history
                     Lock = FALSE;
                 }
                 if (change && !DontChangeForwardIndex)
@@ -631,13 +631,13 @@ void CPathHistory::Execute(int index, BOOL forward, CFilesWindow* panel, BOOL al
             }
         }
     }
-    IdleRefreshStates = TRUE; // pri pristim Idle vynutime kontrolu stavovych promennych
+    IdleRefreshStates = TRUE; // on the next Idle force a check of the state variables
 
     if (NewItem != NULL)
     {
         AddPathUnique(NewItem->Type, NewItem->PathOrArchiveOrFSName, NewItem->ArchivePathOrFSUserPart,
                       NewItem->HIcon, NewItem->PluginFS, NULL);
-        NewItem->HIcon = NULL; // zodpovednost za destrukci ikony si prebrala metoda AddPathUnique
+        NewItem->HIcon = NULL; // the AddPathUnique method took over responsibility for destroying the icon
         delete NewItem;
         NewItem = NULL;
     }
@@ -645,7 +645,7 @@ void CPathHistory::Execute(int index, BOOL forward, CFilesWindow* panel, BOOL al
     {
         if (DontChangeForwardIndex)
         {
-            // vyradime execlou polozku ze seznamu
+            // remove the executed item from the list
             Lock = TRUE;
             int i;
             for (i = 0; i < Paths.Count; i++)
@@ -685,7 +685,7 @@ void CPathHistory::ChangeActualPathData(int type, const char* pathOrArchiveOrFSN
         else
             n2 = Paths[Paths.Count - 1];
 
-        if (n2 != NULL && n.IsTheSamePath(*n2, curPluginFS)) // stejne cesty -> zmenime data
+        if (n2 != NULL && n.IsTheSamePath(*n2, curPluginFS)) // same paths -> update the data
             n2->ChangeData(topIndex, focusedName);
     }
 }
@@ -703,7 +703,7 @@ void CPathHistory::RemoveActualPath(int type, const char* pathOrArchiveOrFSName,
         {
             CPathHistoryItem n(type, pathOrArchiveOrFSName, archivePathOrFSUserPart, NULL, pluginFS);
             CPathHistoryItem* n2 = Paths[Paths.Count - 1];
-            if (n.IsTheSamePath(*n2, curPluginFS)) // stejne cesty -> smazeme zaznam
+            if (n.IsTheSamePath(*n2, curPluginFS)) // same paths -> delete the record
                 Paths.Delete(Paths.Count - 1);
         }
         else
@@ -740,11 +740,11 @@ void CPathHistory::AddPath(int type, const char* pathOrArchiveOrFSName, const ch
         if (n2 != NULL && n->IsTheSamePath(*n2, curPluginFS))
         {
             delete n;
-            return; // stejne cesty -> neni co delat
+            return; // same paths -> nothing to do
         }
     }
 
-    // cestu je opravdu potreba pridat ...
+    // the path really needs to be added ...
     if (ForwardIndex != -1)
     {
         while (Paths.IsGood() && ForwardIndex < Paths.Count)
@@ -798,7 +798,7 @@ void CPathHistory::AddPathUnique(int type, const char* pathOrArchiveOrFSName, co
     {
         TRACE_E(LOW_MEMORY);
         if (hIcon != NULL)
-            HANDLES(DestroyIcon(hIcon)); // musime sestrelit ikonu
+            HANDLES(DestroyIcon(hIcon)); // we must destroy the icon
         return;
     }
     if (Paths.Count > 0)
@@ -817,19 +817,19 @@ void CPathHistory::AddPathUnique(int type, const char* pathOrArchiveOrFSName, co
                 delete n;
                 if (i < Paths.Count - 1)
                 {
-                    // vytahneme cestu v seznamu nahoru
+                    // move the path up in the list
                     Paths.Add(item);
                     if (Paths.IsGood())
                         Paths.Detach(i); // if adding succeeded, remove the source
                     if (!Paths.IsGood())
                         Paths.ResetState();
                 }
-                return; // stejne cesty -> neni co delat
+                return; // same paths -> nothing to do
             }
         }
     }
 
-    // cestu je opravdu potreba pridat ...
+    // the path really needs to be added ...
     if (ForwardIndex != -1)
     {
         while (Paths.IsGood() && ForwardIndex < Paths.Count)
@@ -894,7 +894,7 @@ void CPathHistory::SaveToRegistry(HKEY hKey, const char* name, BOOL onlyClear)
                     break;
                 }
 
-                // archive & FS: pouzijeme znak ':' jako oddelovac dvou casti cesty
+                // archive & FS: use the ':' character as the separator of the two path parts
                 // during load, determine the path type according to this character
                 case 1: // archive
                 case 2: // FS
@@ -971,7 +971,7 @@ void CPathHistory::LoadFromRegistry(HKEY hKey, const char* name)
                     }
                     else
                     {
-                        // kandidat na FS path
+                        // candidate for an FS path
                         if (IsPluginFSPath(path, fsName, _countof(fsName), &archivePathOrFSUserPart))
                         {
                             pathOrArchiveOrFSName = fsName;
@@ -1024,9 +1024,9 @@ void CScrollPositionMemory::Push(const char* path, int topIndex)
         ok = s - path == l && StrNICmp(path, Path, l) == 0;
     }
 
-    if (ok) // navazuje -> zapamatujeme si dalsi top-index
+    if (ok) // it continues -> remember the next top-index
     {
-        if (TopIndexesCount == TOP_INDEX_MEM_SIZE) // je potreba vyhodit z pameti prvni top-index
+        if (TopIndexesCount == TOP_INDEX_MEM_SIZE) // the first top-index must be dropped from memory
         {
             int i;
             for (i = 0; i < TOP_INDEX_MEM_SIZE - 1; i++)
@@ -1037,7 +1037,7 @@ void CScrollPositionMemory::Push(const char* path, int topIndex)
         StringCchCopyNA(Path, _countof(Path), path, _countof(Path) - 1);
         TopIndexes[TopIndexesCount++] = topIndex;
     }
-    else // nenavazuje -> prvni top-index v rade
+    else // it does not continue -> the first top-index in the series
     {
         StringCchCopyNA(Path, _countof(Path), path, _countof(Path) - 1);
         TopIndexesCount = 1;
@@ -1075,7 +1075,7 @@ BOOL CScrollPositionMemory::FindAndPop(const char* path, int& topIndex)
             return FALSE;
         }
     }
-    else // dotaz na jinou cestu -> vycistime pamet, doslo k dlouhemu skoku
+    else // a query for a different path -> clear the memory, a long jump occurred
     {
         Clear();
         return FALSE;
@@ -1110,7 +1110,7 @@ BOOL CFileHistory::AddFile(CFileHistoryItemTypeEnum type, DWORD handlerID, const
             {
                 Files.Detach(i);
                 if (!Files.IsGood())
-                    Files.ResetState(); // nemuze se nepovest, hlasi jedine nedostatek pameti pro zmenseni pole
+                    Files.ResetState(); // cannot fail, it only reports insufficient memory for shrinking the array
                 Files.Insert(0, item);
                 if (!Files.IsGood())
                 {
@@ -1123,7 +1123,7 @@ BOOL CFileHistory::AddFile(CFileHistoryItemTypeEnum type, DWORD handlerID, const
         }
     }
 
-    // polozka neexistuje - vlozime ji na horni pozici
+    // the item does not exist - insert it at the top position
     CFileHistoryItem* item = new CFileHistoryItem(type, handlerID, fileName);
     if (item == NULL)
     {
@@ -1142,7 +1142,7 @@ BOOL CFileHistory::AddFile(CFileHistoryItemTypeEnum type, DWORD handlerID, const
         delete item;
         return FALSE;
     }
-    // zarizneme na 30 polozek
+    // cut down to 30 items
     if (Files.Count > 30)
         Files.Delete(30);
 
@@ -1153,7 +1153,7 @@ BOOL CFileHistory::FillPopupMenu(CMenuPopup* popup)
 {
     CALL_STACK_MESSAGE1("CFileHistory::FillPopupMenu()");
 
-    // nalejeme polozky
+    // fill in the items
     char name[2 * MAX_PATH];
     MENU_ITEM_INFO mii;
     mii.Mask = MENU_MASK_TYPE | MENU_MASK_ID | MENU_MASK_ICON | MENU_MASK_STRING;
@@ -1176,7 +1176,7 @@ BOOL CFileHistory::FillPopupMenu(CMenuPopup* popup)
         memmove(ptr + 1, ptr, strlen(ptr) + 1);
         *(ptr + 1) = '\t';
         const char* text = "";
-        // zdvojime '&', aby se nezobrazovalo jako podtrzeni
+        // double '&' so it is not shown as an underline
         DuplicateAmpersands(name, 2 * MAX_PATH);
 
         mii.HIcon = item->HIcon;
@@ -1203,7 +1203,7 @@ BOOL CFileHistory::FillPopupMenu(CMenuPopup* popup)
     }
     if (inserted > 0)
     {
-        popup->SetStyle(MENU_POPUP_THREECOLUMNS); // prvni dva sloupce jsou zarovnane doleva
+        popup->SetStyle(MENU_POPUP_THREECOLUMNS); // the first two columns are left-aligned
         popup->AssignHotKeys();
     }
     return TRUE;

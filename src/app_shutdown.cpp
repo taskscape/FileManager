@@ -93,14 +93,14 @@ void ReleasePreloadedStrings()
 
 void ShutdownSalamander()
 {
-    //--- vsem oknum dame 1 sekundu na to, aby se uzavreli, pak je nechame odpojit
+    //--- give all windows 1 second to close, then detach them
     int timeOut = 10;
     int winsCount = WindowsManager.GetCount();
     while (timeOut-- && winsCount > 0)
     {
         Sleep(100);
         int c = WindowsManager.GetCount();
-        if (winsCount > c) // zatim jeste ubyvaji okna, budeme cekat dale aspon 1 sekundu
+        if (winsCount > c) // windows are still disappearing, so we will wait at least 1 more second
         {
             winsCount = c;
             timeOut = 10;
@@ -112,8 +112,8 @@ void ShutdownSalamander()
     TRACE_I("WindowsManager: " << WindowsManager.maxWndCount << " windows, " << WindowsManager.search << " searches, " << WindowsManager.cache << " cached searches.");
 #endif
     //---
-    DestroySafeWaitWindow(TRUE); // povel "terminate" safe-wait-message threadu
-    Sleep(1000);                 // nechame vsem threadum viewru cas, aby se ukoncili
+    DestroySafeWaitWindow(TRUE); // "terminate" command to the safe-wait-message thread
+    Sleep(1000);                 // give all viewer threads time to terminate
     // Transfer the network-browser worker to the deadline-aware shutdown owner.
     NBWNetAC3Thread.Close(TRUE);
     ShutdownAuxThreads(); // retain shared state until legacy workers have joined
@@ -138,7 +138,7 @@ void ShutdownSalamander()
     HANDLES(FreeLibrary(HLanguage));
     HLanguage = NULL;
 
-    // pro jistotu zavreme az jako posledni, ale asi zbytecne obavy
+    // just to be safe we close it last, but the concern is probably unnecessary
     ReleaseSalOpen();
 
     if (NtDLL != NULL)
@@ -153,9 +153,9 @@ void ShutdownSalamander()
     }
 
     //OleSpyStressTest(); // multi-threaded stress test
-    // OleSpyRevoke();     // odpojime OLESPY
-    OleUninitialize(); // deinicializace OLE
-    // OleSpyDump();       // vypiseme leaky
+    // OleSpyRevoke();     // disconnect OLESPY
+    OleUninitialize(); // OLE uninitialization
+    // OleSpyDump();       // print the leaks
 
     TRACE_I("End");
 }

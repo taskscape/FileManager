@@ -210,8 +210,8 @@ C__Trace::SetInfoW(const WCHAR* file, int line)
 
 struct C__TraceMsgBoxThreadData
 {
-    char* Msg;        // alokovany text hlasky
-    const char* File; // jen odkaz na staticky string
+    char* Msg;        // allocated message text
+    const char* File; // only a reference to a static string
     int Line;
 };
 
@@ -242,8 +242,8 @@ DWORD WINAPI __TraceMsgBoxThread(void* param)
 
 struct C__TraceMsgBoxThreadDataW
 {
-    WCHAR* Msg;        // alokovany text hlasky
-    const WCHAR* File; // jen odkaz na staticky string
+    WCHAR* Msg;        // allocated message text
+    const WCHAR* File; // only a reference to a static string
     int Line;
 };
 
@@ -270,7 +270,7 @@ DWORD WINAPI __TraceMsgBoxThreadW(void* param)
 
 void C__Trace::SendMessageToServer(BOOL information, BOOL unicode, BOOL crash)
 {
-    // flushnuti do bufferu
+    // flush into the buffer
     if (unicode)
         TraceStrStreamW.flush();
     else
@@ -292,19 +292,19 @@ void C__Trace::SendMessageToServer(BOOL information, BOOL unicode, BOOL crash)
                 SalamanderDebug->TraceE(File, Line, TraceStringBuf.c_str());
         }
     }
-    // jen je-li crash==TRUE:
+    // only if crash==TRUE:
     // we make a copy of data, because starting thread for msgbox can trigger more TRACE
     // messages (e.g. in DllMain reaction to DLL_THREAD_ATTACH), if we did not leave
-    // CriticalSection, nastal by deadlock;
+    // CriticalSection, a deadlock would occur;
     // TRACE_C must not be used in DllMain, otherwise deadlock occurs:
     //   - if placed in DLL_THREAD_ATTACH: wants to open new thread for msgbox
-    //     a to je z DllMainu blokovane
+    //     and that is blocked from DllMain
     //   - if placed in DLL_THREAD_DETACH: when waiting for thread with msgbox to close
-    //     predesleho TRACE_C zachytime TRACE_C z DLL_THREAD_DETACH a nechame ho
-    //     cekat v nekonecnem cyklu, viz nize
+    //     the previous TRACE_C, we catch the TRACE_C from DLL_THREAD_DETACH and leave it
+    //     waiting in an infinite loop, see below
     // additionally we introduce defense against multiplying msgboxes with multiple TRACE_C at once, it caused
     // only confusion, now msgbox opens only for first one and after closing it triggers
-    // padacku, ostatni TRACE_C zustanou chyceny v nekonecne cekaci smycce, viz nize
+    // the crash; the other TRACE_C calls remain caught in an infinite waiting loop, see below
     static BOOL msgBoxOpened = FALSE;
     C__TraceMsgBoxThreadData threadData;
     C__TraceMsgBoxThreadDataW threadDataW;
@@ -312,7 +312,7 @@ void C__Trace::SendMessageToServer(BOOL information, BOOL unicode, BOOL crash)
         memset(&threadDataW, 0, sizeof(threadDataW));
     else
         memset(&threadData, 0, sizeof(threadData));
-    if (crash) // break/padacka po vypisu TRACE error hlasky (TRACE_C a TRACE_MC)
+    if (crash) // break/crash after printing the TRACE error message (TRACE_C and TRACE_MC)
     {
         if (!msgBoxOpened)
         {
@@ -356,10 +356,10 @@ void C__Trace::SendMessageToServer(BOOL information, BOOL unicode, BOOL crash)
     LeaveCriticalSection(&CriticalSection);
     if (crash)
     {
-        if (unicode && threadDataW.Msg != NULL || // break/padacka po vypisu TRACE error hlasky (TRACE_C a TRACE_MC)
+        if (unicode && threadDataW.Msg != NULL || // break/crash after printing the TRACE error message (TRACE_C and TRACE_MC)
             !unicode && threadData.Msg != NULL)
         {
-            // vypiseme hlasku v jinem threadu, aby nepumpovala zpravy aktualniho threadu
+            // print the message in another thread so it does not pump messages of the current thread
             DWORD id;
             HANDLE msgBoxThread = CreateThread(NULL, 0, unicode ? __TraceMsgBoxThreadW : __TraceMsgBoxThread,
                                                unicode ? (void*)&threadDataW : (void*)&threadData, 0, &id);
@@ -370,16 +370,16 @@ void C__Trace::SendMessageToServer(BOOL information, BOOL unicode, BOOL crash)
             }
             msgBoxOpened = FALSE;
             HeapFree(GetProcessHeap(), 0, unicode ? (void*)threadDataW.Msg : (void*)threadData.Msg);
-            // pad softu vyvolame primo v kodu, kde je umisteny TRACE_C/TRACE_MC, aby
-            // bylo v bug reportu videt presne kde makra lezi; padacka tedy nasleduje
-            // po dokonceni teto metody
+            // we trigger the software crash directly in the code where TRACE_C/TRACE_MC is placed, so that
+            // the bug report shows exactly where the macros are; the crash therefore follows
+            // after this method finishes
         }
-        else // ostatni thready s TRACE_C zablokujeme, az se zavre msgbox otevreny pro
-        {    // prvni TRACE_C, tak to tam i spadne, at v tom neni bordel
+        else // we block the other threads with TRACE_C until the msgbox opened for the
+        {    // first TRACE_C closes; then it crashes there too, so it is not a mess
             if (msgBoxOpened)
             {
                 while (1)
-                    Sleep(1000); // blokace vede na deadlock napr. kdyz je (a nema byt) TRACE_C v DLL_THREAD_DETACH
+                    Sleep(1000); // blocking leads to a deadlock, for example when TRACE_C is (and should not be) in DLL_THREAD_DETACH
             }
         }
     }
@@ -401,11 +401,11 @@ void* _sal_safe_memcpy(void* dest, const void* src, size_t count)
 
 #endif // defined(TRACE_ENABLE) && !defined(INSIDE_SALAMANDER)
 
-// pasticka na vlastni definici techto "zakazanych" operatoru (aby fungovala kontrola
-// zakazanych kombinaci stringu WCHAR / char v TRACE makrech, nesmi byt nasledujici
+// trap for our own definition of these "forbidden" operators (so that the check of
+// forbidden combinations of WCHAR / char strings in TRACE macros works, the following must not be
 // operators defined in other modules - otherwise the linker would not report an error - idea:
-// v DEBUG verzi chytame chyby linkeru, v RELEASE verzi chytame chyby vlastni definice
-// operatoru)
+// in the DEBUG version we catch linker errors, in the RELEASE version we catch errors of our own definition
+// of the operators)
 #if !defined(_DEBUG) && !defined(INSIDE_SALAMANDER) && !defined(__BORLANDC__)
 
 #include <ostream>

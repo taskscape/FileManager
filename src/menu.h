@@ -271,7 +271,7 @@ protected:
 
 public:
     //
-    // Vlastni metody
+    // Our methods
     //
 
     CMenuPopup(DWORD id = 0);
@@ -511,7 +511,7 @@ protected:
 
 public:
     //
-    // Vlastni metody
+    // Our methods
     //
     CMenuBar(CMenuPopup* menu, HWND hNotifyWindow, CObjectOrigin origin = ooStatic);
     ~CMenuBar();

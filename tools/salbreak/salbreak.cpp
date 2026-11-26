@@ -13,7 +13,7 @@
 
 #define NOHANDLES(function) function // prevents CheckHnd from injecting HANDLES macros into the source
 
-// aby nedochazelo k problemum se stredniky v nize nadefinovanych makrech
+// to avoid problems with semicolons in the macros defined below
 inline void __TraceEmptyFunction() {}
 
 #define TRACE_E(str) __TraceEmptyFunction()
@@ -315,9 +315,9 @@ BOOL GetSidMD5(BYTE* sidMD5)
     return TRUE;
 }
 
-// Vice informaci viz:
+// More information, see:
 //   http://www.codeguru.com/cpp/w-p/win32/tutorials/print.php/c4545 (A NotQuiteNullDacl Class)
-//   http://forums.microsoft.com/msdn/ShowPost.aspx?PostID=748596&SiteID=1 (uz resi vistu)
+//   http://forums.microsoft.com/msdn/ShowPost.aspx?PostID=748596&SiteID=1 (already handles Vista)
 //   Programming Server-Side Applications for Microsoft Windows 2000, Richter/Clark, Microsoft Press 2000, Chapter 10, pp 458-460
 //   Ask Dr. Gui #49 (nemuzu ho poradne najit online, tak radeji vkladam sem):
 // Mutex Madness
@@ -349,8 +349,8 @@ BOOL GetSidMD5(BYTE* sidMD5)
 // Dr. GUI thinks that in your case you should only set the security for specific objects because you are developing a DLL, which may not want to change the security for every object in the process.
 // The following function wraps CreateMutex with the additional functionality of creating security that is more relaxed than is the default for a service:
 /*
-    // pridelime mutexu vsechna mozna prava (aby napriklad fungovalo otevirani mezi AsAdmin a User ucty)
-    // cistejsi by bylo zavolani funkce ObtainAccessableMutex(), viz jeji obsahly komentar
+    // give the mutex all possible rights (so that, for example, opening works between AsAdmin and User accounts)
+    // cleaner would be to call ObtainAccessableMutex(), see its lengthy comment
     SECURITY_ATTRIBUTES secAttr;
     char secDesc[ SECURITY_DESCRIPTOR_MIN_LENGTH ];
     secAttr.nLength = sizeof(secAttr);
@@ -368,7 +368,7 @@ BOOL GetSidMD5(BYTE* sidMD5)
 //
 // Windows Integrity Mechanism Design
 // http://msdn.microsoft.com/en-us/library/bb625963.aspx
-if (windowsVistaAndLater) // FIXME: nenarazil jsem na viste na to, ze bych musel integrity level resit (mezi AdAdmin / normalni aplikaci)
+if (windowsVistaAndLater) // FIXME: I have not run into a case on Vista where I would have to deal with the integrity level (between AdAdmin / a normal application)
 {
   PSECURITY_DESCRIPTOR pSD;
   ConvertStringSecurityDescriptorToSecurityDescriptor(
@@ -500,7 +500,7 @@ BOOL GetProcessIntegrityLevel(DWORD* integrityLevel)
 
     BOOL WindowsVistaAndLater = SalIsWindowsVersionOrGreater(6, 0, 0);
 
-    if (WindowsVistaAndLater) // integrity levels byly zavedeny od Windows Vista
+    if (WindowsVistaAndLater) // integrity levels were introduced starting with Windows Vista
     {
         hProcess = GetCurrentProcess();
         if (OpenProcessToken(hProcess, TOKEN_QUERY, &hToken))

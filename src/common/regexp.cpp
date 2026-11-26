@@ -267,12 +267,12 @@ BOOL CRegularExpression::ExpandVariables(char* pattern, char* buffer, int bufSiz
     while (*sour)
     {
         if (!bufSize)
-            return FALSE; //dosel nam buffer
+            return FALSE; //we ran out of buffer
         if (*sour == '\\')
         {
             sour++;
             if (!*sour)
-                break; // tady bych asi mnel hodit chybu takovato sekvence neni definovana
+                break; // I should probably raise an error here; such a sequence is not defined
             if (*sour >= '1' && *sour <= '9')
             {
                 int n = *sour - '0';

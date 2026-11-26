@@ -21,9 +21,9 @@ BOOL CtrlHandler(DWORD fdwCtrlType)
 {
     switch (fdwCtrlType)
     {
-    // vyignorujeme CTRL+C, Ctrl+Break a dalsi dobre duvody pro ukonceni... protoze ukoncit
+    // we ignore CTRL+C, Ctrl+Break, and other good reasons to exit... because we must terminate
     // the launched external archiver must first (otherwise the archiver continues launching,
-    // i kdyz uz Salamander pise, ze komprimace/dekomprimace skoncila)
+    // even when Salamander already says that compression/decompression has finished)
     case CTRL_C_EVENT:
     case CTRL_BREAK_EVENT:
     case CTRL_CLOSE_EVENT:
@@ -84,7 +84,7 @@ void mainCRTStartup()
 
     exeName[0] = '\0';
 
-    // nechceme zadne kriticke chyby jako "no disk in drive A:"
+    // we do not want any critical errors such as "no disk in drive A:"
     SetErrorMode(SetErrorMode(0) | SEM_FAILCRITICALERRORS);
 
     cmdline = GetCommandLine();

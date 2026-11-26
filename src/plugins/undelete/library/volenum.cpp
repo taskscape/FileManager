@@ -73,7 +73,7 @@ BOOL GetDiskFreeSpace95(const char* path, LPDWORD lpSectorsPerCluster,
             memset(&gdfs, 0, sizeof(gdfs));
             gdfs.ExtFree_Level = 0; // required
 
-            reg.reg_EBX = 0;                      // jen tak pro formu
+            reg.reg_EBX = 0;                      // just for form's sake
             reg.reg_EDX = (DWORD)(DWORD_PTR)path; // type cast is OK, we will not run it on x64
             reg.reg_ECX = sizeof(gdfs);
             reg.reg_EDI = (DWORD)(DWORD_PTR)&gdfs; // type cast is OK, we will not run it on x64

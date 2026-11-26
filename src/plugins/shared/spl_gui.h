@@ -1924,7 +1924,7 @@ public:
 #define TLBHDR_SORT 4
 #define TLBHDR_UP 5
 #define TLBHDR_DOWN 6
-// Pocet polozek
+// Number of items
 #define TLBHDR_COUNT 6
 
 // Host API for the small header toolbar above list boxes (New/Delete/Up/Down).

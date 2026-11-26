@@ -278,7 +278,7 @@ int Unreduce(CDecompressionObject* decompress) /* expand probabilistically reduc
 /******************************/
 /*  Function LoadFollowers()  */
 /******************************/
-#pragma warning(disable : 4244) //aby to nervalo ze prirazuju short do charu
+#pragma warning(disable : 4244) //so it does not complain that I assign a short to a char
 
 int LoadFollowers(CDecompressionObject* decompress,
                   f_array* followers,

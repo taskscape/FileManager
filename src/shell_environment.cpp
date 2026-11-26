@@ -362,11 +362,11 @@ void RegenEnvironmentVariables()
 //
 // IsPathOnSSD
 //
-// Inspirace: http://stackoverflow.com/questions/23363115/detecting-ssd-in-windows/33359142#33359142
+// Inspiration: http://stackoverflow.com/questions/23363115/detecting-ssd-in-windows/33359142#33359142
 //            http://nyaruru.hatenablog.com/entry/2012/09/29/063829
 //
 
-// nepotrebuje prava administratora
+// does not need administrator rights
 BOOL QueryVolumeTRIM(const char* volume, BOOL* trim)
 {
     BOOL ret = FALSE;
@@ -396,7 +396,7 @@ BOOL QueryVolumeTRIM(const char* volume, BOOL* trim)
     return ret;
 }
 
-// nepotrebuje prava administratora
+// does not need administrator rights
 BOOL QueryVolumeSeekPenalty(const char* volume, BOOL* seekPenalty)
 {
     BOOL ret = FALSE;

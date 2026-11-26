@@ -44,7 +44,7 @@ inline void __TraceEmptyFunction() {}
 #define CALL_STACK_MESSAGE12(p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11, p12)
 #define CALL_STACK_MESSAGE13(p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11, p12, p13)
 
-// prazdne makro: oznamuje CheckStk, ze u teto funkce si call-stack message neprejeme
+// empty macro: tells CheckStk that we do not want a call-stack message for this function
 #define CALL_STACK_MESSAGE_NONE
 
 // ****************************************************************************

@@ -103,13 +103,13 @@ protected:
 
 public:
     //
-    // Vlastni metody
+    // Our methods
     //
     CToolBar(HWND hNotifyWindow, CObjectOrigin origin = ooAllocated);
     ~CToolBar();
 
     //
-    // Implementace metod CGUIToolBarAbstract
+    // Implementation of CGUIToolBarAbstract methods
     //
 
     virtual BOOL WINAPI CreateWnd(HWND hParent);

@@ -210,7 +210,7 @@ inline int SWPrintFToEnd_s(WCHAR* _Dst, size_t _SizeInWords, const WCHAR* _Forma
 //
 // SPrintFToEnd_s
 //
-// jedina odlisnost od swprintf_s je, ze zapisuje az za text umisteny v bufferu
+// The only difference from sprintf_s is that it writes after the text already placed in the buffer.
 
 template <size_t _Size>
 inline int SPrintFToEnd_s(char (&_Dst)[_Size], const char* _Format, ...)

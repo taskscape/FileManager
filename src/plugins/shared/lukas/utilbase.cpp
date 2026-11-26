@@ -59,23 +59,23 @@ BOOL InitLCUtils(CSalamanderPluginEntryAbstract* salamander, const char* pluginN
 
     // this plugin is made for current version of Salamander and higher - perform check
     if (SalamanderVersion < LAST_VERSION_OF_SALAMANDER)
-    { // tady nelze volat Error, protoze pouziva SG->SalMessageBox (SG neni inicializovane + jde o nekompatibilni rozhrani)
+    { // Error cannot be called here, because it uses SG->SalMessageBox (SG is not initialized and the interface is incompatible)
         MessageBox(salamander->GetParentWindow(),
                    REQUIRE_LAST_VERSION_OF_SALAMANDER,
                    pluginName, MB_OK | MB_ICONERROR);
         return FALSE;
     }
 
-    // nechame nacist jazykovy modul (.slg)
+    // let the language module (.slg) be loaded
     HLanguage = salamander->LoadLanguageModule(salamander->GetParentWindow(), pluginName);
     if (HLanguage == NULL)
         return FALSE;
 
-    // ziskame rozhrani Salamandera
+    // obtain the Salamander interface
     SG = salamander->GetSalamanderGeneral();
     SalGUI = salamander->GetSalamanderGUI();
 
-    // zjistime si na jakem bezime OS
+    // find out which OS we are running on
     WindowsXP64AndLater = SalIsWindowsVersionOrGreater(5, 2, 0);
     WindowsVistaAndLater = SalIsWindowsVersionOrGreater(6, 0, 0);
 

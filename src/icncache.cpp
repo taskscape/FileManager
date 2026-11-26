@@ -209,7 +209,7 @@ LABEL_SortArrayForFSInt:
 BOOL CIconCache::GetIndex(const char* name, int& index, CPluginDataInterfaceEncapsulation* dataIface,
                           const CFileData* file)
 {
-    if (Count == 0 || dataIface != NULL && file == NULL) // overime platnost 'file'
+    if (Count == 0 || dataIface != NULL && file == NULL) // verify that 'file' is valid
     {
         if (dataIface != NULL && file == NULL)
             TRACE_E("CIconCache::GetIndex(): 'file' may not be NULL when 'dataIface' is not NULL! item=" << name);
@@ -320,10 +320,10 @@ void CIconCache::Release()
 
 void CIconCache::Destroy()
 {
-    // uvonime alokovana data a pole samotne
+    // free the allocated data and the array itself
     Release();
 
-    // destrukce imagelistu z IconsCache
+    // destruction of the image list from IconsCache
     IconsCache.DestroyMembers();
 }
 
@@ -356,7 +356,7 @@ int CIconCache::AllocIcon(CIconList** iconList, int* iconListIndex)
 {
     SLOW_CALL_STACK_MESSAGE1("CIconCache::AllocIcon()");
     int cache = IconsCount / ICONS_IN_LIST; // cache
-    int index = IconsCount % ICONS_IN_LIST; // index v ramci teto cache
+    int index = IconsCount % ICONS_IN_LIST; // index within this cache
     if (cache >= IconsCache.Count)
     {
         if (cache > IconsCache.Count)
@@ -447,7 +447,7 @@ BOOL CIconCache::GetIcon(int iconIndex, CIconList** iconList, int* iconListIndex
     if (iconIndex >= 0 && iconIndex < IconsCount)
     {
         int cache = iconIndex / ICONS_IN_LIST; // cache
-        int index = iconIndex % ICONS_IN_LIST; // index v ramci cache
+        int index = iconIndex % ICONS_IN_LIST; // index within the cache
         if (cache < IconsCache.Count)
         {
             *iconList = IconsCache[cache];
@@ -885,10 +885,10 @@ void CAssociations::Release()
 
 void CAssociations::Destroy()
 {
-    // uvonime alokovana data a pole samotne
+    // free the allocated data and the array itself
     Release();
 
-    // destrukce imagelistu z IconsCache
+    // destruction of the image list from IconsCache
     int i;
     for (i = 0; i < ICONSIZE_COUNT; i++)
         Icons[i].IconsCache.DestroyMembers();
@@ -933,7 +933,7 @@ BOOL CAssociations::GetIndex(const char* name, int& index)
     {
         m = (l + r) / 2;
         res = CompareDWORDS(At(m).ExtensionAndData, name, length);
-        if (res == 0) // nalezeno
+        if (res == 0) // found
         {
             index = m;
             return TRUE;
@@ -963,7 +963,7 @@ int CAssociations::AllocIcon(CIconList** iconList, int* iconListIndex, CIconSize
 {
     CALL_STACK_MESSAGE1("CAssociations::AllocIcon()");
     int cache = Icons[iconSize].IconsCount / ICONS_IN_LIST; // cache
-    int index = Icons[iconSize].IconsCount % ICONS_IN_LIST; // index v ramci teto cache
+    int index = Icons[iconSize].IconsCount % ICONS_IN_LIST; // index within this cache
     if (cache >= Icons[iconSize].IconsCache.Count)
     {
         if (cache > Icons[iconSize].IconsCache.Count)
@@ -1014,7 +1014,7 @@ BOOL CAssociations::GetIcon(int iconIndex, CIconList** iconList, int* iconListIn
     if (iconIndex >= 0 && iconIndex < Icons[iconSize].IconsCount)
     {
         int cache = iconIndex / ICONS_IN_LIST; // cache
-        int index = iconIndex % ICONS_IN_LIST; // index v ramci cache
+        int index = iconIndex % ICONS_IN_LIST; // index within the cache
         if (cache < Icons[iconSize].IconsCache.Count)
         {
             *iconList = Icons[iconSize].IconsCache[cache];
@@ -1105,7 +1105,7 @@ void CAssociations::InsertData(const char* /*origin*/, int index, BOOL overwrite
     //          ": type=" << (type == NULL ? "" : type));
 
     size = (LONG)(s - e) + 4;
-    size -= (size & 0x3); // size % 4  (zarovnani po ctyrech bytech)
+    size -= (size & 0x3); // size % 4  (alignment to four bytes)
     int iLen = (int)strlen(iconLocation) + 1;
     data.ExtensionAndData = (char*)malloc(size + iLen);
     memcpy(data.ExtensionAndData, e, size);                   // extension + zero padding +
@@ -1168,8 +1168,8 @@ void CAssociations::ReadAssociations(BOOL showWaitWnd)
         systemFileAssoc = NULL;
     }
 
-    // Windows 2000 a novejsi maji jeste "Open With..." asociace ulozeny pro kazdeho usera zvlast
-    // v klici HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Explorer\FileExts
+    // Windows 2000 and later also have "Open With..." associations stored separately for each user
+    // in the key HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Explorer\FileExts
     HKEY explorerFileExts;
     if (HANDLES_Q(RegOpenKey(HKEY_CURRENT_USER, "Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\FileExts",
                              &explorerFileExts)) != ERROR_SUCCESS)
@@ -1181,13 +1181,13 @@ void CAssociations::ReadAssociations(BOOL showWaitWnd)
     LONG enumRet;
     FILETIME ft;
     while (1)
-    { // postupne enumnuti vsech pripon
+    { // successive enumeration of all extensions
         DWORD extS = MAX_PATH;
         if ((enumRet = RegEnumKeyEx(HKEY_CLASSES_ROOT, i, ext, &extS, NULL, NULL, NULL, &ft)) == ERROR_SUCCESS)
-        { // otevreni klice pripony
+        { // open the extension key
             if (ext[0] == '.' && HANDLES_Q(RegOpenKey(HKEY_CLASSES_ROOT, ext, &extKey)) == ERROR_SUCCESS)
             {
-                size = MAX_PATH; // ziskani typu asociace
+                size = MAX_PATH; // obtain the association type
                 iconLocation[0] = 0;
                 data.SetFlag(0);
                 data.SetIndexAll(-1);
@@ -1219,14 +1219,14 @@ void CAssociations::ReadAssociations(BOOL showWaitWnd)
                 }
                 if (addExt)
                 {                // convert ext. to lowercase + add to array
-                    e = ext + 1; // preskok '.'
+                    e = ext + 1; // skip '.'
                     s = e;
                     while (*s != 0)
                     {
                         *s = LowerCase[*s];
                         s++;
                     }
-                    *(DWORD*)s = 0; // nulovani konce stringu
+                    *(DWORD*)s = 0; // zero the end of the string
 
                     InsertData("", Count, FALSE, e, s, data, size, iconLocation, type);
                 }
@@ -1237,38 +1237,38 @@ void CAssociations::ReadAssociations(BOOL showWaitWnd)
         {
             if (enumRet != ERROR_NO_MORE_ITEMS)
             {
-                // u jednoho usera (Bernard Vander Beken <Bernard.VanderBeken@deceuninck.com>) sem prijde
+                // for one user (Bernard Vander Beken <Bernard.VanderBeken@deceuninck.com>) execution arrives here
                 // one ERROR_MORE_DATA error, then many ERROR_OUTOFMEMORY errors; Microsoft Windows Server 2003,
                 // Standard Edition Service Pack 2 (Build 3790) has this, increasing buffer to 10000 does not help, must
                 // stop enumeration on the first error, otherwise it starts looping and eating memory (apparently
-                // o interni chybu Windowsu), nikdo dalsi to nehlasil, takze to dal neresime
+                // an internal Windows error), nobody else reported it, so we do not deal with it further
                 _snprintf_s(errBuf, _TRUNCATE, LoadStr(IDS_UNABLETOGETASSOC), GetErrorText(enumRet));
                 SalMessageBox(parent, errBuf, LoadStr(IDS_UNABLETOGETASSOCTITLE), MB_OK | MB_ICONEXCLAMATION);
             }
-            break; // konec enumerace
+            break; // end of enumeration
         }
         i++;
     }
     if (Count > 1)
         SortArray(0, Count - 1);
 
-    // Windows XP maji asociace (viz PerceivedType) ulozeny jeste v klici HKEY_CLASSES_ROOT\SystemFileAssociations,
-    // nacteme dosud nezname pripony jeste z tohoto klice
+    // Windows XP also stores associations (see PerceivedType) in the key HKEY_CLASSES_ROOT\SystemFileAssociations,
+    // we also load extensions not yet known from this key
     if (systemFileAssoc != NULL)
     {
         i = 0;
         while (1)
-        { // postupne enumnuti vsech pripon
+        { // successive enumeration of all extensions
             DWORD extS = MAX_PATH;
             if ((enumRet = RegEnumKeyEx(systemFileAssoc, i, ext, &extS, NULL, NULL, NULL, &ft)) == ERROR_SUCCESS)
-            { // otevreni klice pripony
+            { // open the extension key
                 if (ext[0] == '.')
                 {
-                    e = ext + 1; // preskok '.'
+                    e = ext + 1; // skip '.'
                     s = ext;
                     while (*++s != 0)
                         *s = LowerCase[*s];
-                    *(DWORD*)s = 0; // nulovani konce stringu
+                    *(DWORD*)s = 0; // zero the end of the string
 
                     int index;
                     if (!GetIndex(e, index)) // not found, makes sense to examine + possibly add
@@ -1284,15 +1284,15 @@ void CAssociations::ReadAssociations(BOOL showWaitWnd)
             {
                 if (enumRet != ERROR_NO_MORE_ITEMS)
                 {
-                    // u jednoho usera (Bernard Vander Beken <Bernard.VanderBeken@deceuninck.com>) sem prijde
+                    // for one user (Bernard Vander Beken <Bernard.VanderBeken@deceuninck.com>) execution arrives here
                     // one ERROR_MORE_DATA error, then many ERROR_OUTOFMEMORY errors; Microsoft Windows Server 2003,
                     // Standard Edition Service Pack 2 (Build 3790) has this, increasing buffer to 10000 does not help, must
                     // stop enumeration on the first error, otherwise it starts looping and eating memory (apparently
-                    // o interni chybu Windowsu), nikdo dalsi to nehlasil, takze to dal neresime
+                    // an internal Windows error), nobody else reported it, so we do not deal with it further
                     _snprintf_s(errBuf, _TRUNCATE, LoadStr(IDS_UNABLETOGETASSOC), GetErrorText(enumRet));
                     SalMessageBox(parent, errBuf, LoadStr(IDS_UNABLETOGETASSOCTITLE), MB_OK | MB_ICONEXCLAMATION);
                 }
-                break; // konec enumerace
+                break; // end of enumeration
             }
             i++;
         }
@@ -1302,17 +1302,17 @@ void CAssociations::ReadAssociations(BOOL showWaitWnd)
     {
         i = 0;
         while (1)
-        { // postupne enumnuti vsech pripon
+        { // successive enumeration of all extensions
             DWORD extS = MAX_PATH;
             if (RegEnumKeyEx(explorerFileExts, i, ext, &extS, NULL, NULL, NULL, &ft) == ERROR_SUCCESS)
-            { // otevreni klice pripony
+            { // open the extension key
                 if (ext[0] == '.' && HANDLES_Q(RegOpenKey(explorerFileExts, ext, &extKey)) == ERROR_SUCCESS)
                 {
-                    e = ext + 1; // preskok '.'
+                    e = ext + 1; // skip '.'
                     s = ext;
                     while (*++s != 0)
                         *s = LowerCase[*s];
-                    *(DWORD*)s = 0; // nulovani konce stringu
+                    *(DWORD*)s = 0; // zero the end of the string
 
                     int index;
                     BOOL found = GetIndex(e, index);
@@ -1376,7 +1376,7 @@ void CAssociations::ReadAssociations(BOOL showWaitWnd)
                 }
             }
             else
-                break; // konec enumerace
+                break; // end of enumeration
             i++;
         }
         HANDLES(RegCloseKey(explorerFileExts));

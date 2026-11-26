@@ -234,7 +234,7 @@ CFilesWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
             if (count > 0 || GetCaretIndex() != 0 ||
                 Dirs->Count == 0 || strcmp(Dirs->At(0).Name, "..") != 0) // test if we're not working only with ".."
             {
-                BeginSuspendMode(); // cmuchal takes a break
+                BeginSuspendMode(); // the snooper takes a break
                 BeginStopRefresh(); // just so that change notifications on paths are not distributed
 
                 UserWorkedOnThisPath = TRUE;
@@ -299,7 +299,7 @@ CFilesWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                     }
 
                     // successful operation, but we don't unselect source because it's a drag&drop
-                    //            SetSel(FALSE, -1, TRUE);   // explicitni prekresleni
+                    //            SetSel(FALSE, -1, TRUE);   // explicit redraw
                     //            PostMessage(HWindow, WM_USER_SELCHANGED, 0, 0);  // sel-change notify
                     UpdateWindow(MainWindow->HWindow);
                 }
@@ -312,7 +312,7 @@ CFilesWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                 }
 
                 EndStopRefresh();
-                EndSuspendMode(); // now cmuchal starts again
+                EndSuspendMode(); // now the snooper starts again
             }
         }
         free(tgtPath);
@@ -975,7 +975,7 @@ CFilesWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                                 StatusLine->SetSubTexts(varPlacements, varPlacementsCount);
                         }
                         else
-                            varPlacementsCount = 100; // mohlo se poskodit
+                            varPlacementsCount = 100; // it may have been corrupted
                     }
                 }
                 if (!done)
@@ -990,7 +990,7 @@ CFilesWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                         ExpandPluralFilesDirs(text, 200, files, dirs, epfdmSelected, FALSE);
                     if (StatusLine->SetText(text) && displaySize)
                         StatusLine->SetSubTexts(varPlacements, varPlacementsCount);
-                    varPlacementsCount = 100; // mohlo se poskodit
+                    varPlacementsCount = 100; // it may have been corrupted
                 }
             }
             else
@@ -1001,7 +1001,7 @@ CFilesWindow::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         {
             LastFocus = INT_MAX;
             int index = GetCaretIndex();
-            ItemFocused(index); // pri odznaceni
+            ItemFocused(index); // on unselection
         }
         IdleRefreshStates = TRUE; // on next Idle we'll force state variable check
         return 0;
@@ -1351,7 +1351,7 @@ void CFilesWindow::OpenDirHistory()
     if (!MainWindow->DirHistory->HasPaths())
         return;
 
-    BeginStopRefresh(); // cmuchal takes a break
+    BeginStopRefresh(); // the snooper takes a break
 
     CMenuPopup menu;
 
@@ -1374,14 +1374,14 @@ void CFilesWindow::OpenDirHistory()
     if (cmd != 0)
         MainWindow->DirHistory->Execute(cmd, FALSE, this, TRUE, FALSE);
 
-    EndStopRefresh(); // now cmuchal starts again
+    EndStopRefresh(); // now the snooper starts again
 }
 
 void CFilesWindow::OpenStopFilterMenu()
 {
     CALL_STACK_MESSAGE1("CFilesWindow::OpenStopFilterMenu()");
 
-    BeginStopRefresh(); // cmuchal takes a break
+    BeginStopRefresh(); // the snooper takes a break
 
     CMenuPopup menu;
 
@@ -1450,7 +1450,7 @@ MENU_TEMPLATE_ITEM StopFilterMenu[] =
     }
     }
 
-    EndStopRefresh(); // now cmuchal starts again
+    EndStopRefresh(); // now the snooper starts again
 }
 
 // fill popup based on available columns

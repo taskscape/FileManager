@@ -1770,7 +1770,7 @@ MENU_TEMPLATE_ITEM MsgBoxButtons[] =
                        HasTheSameRootPath(sourcePath, targetPath); // same disk (UNC and standard)
         }
         else
-            sameDisk = (StrICmp(sourcePath, targetPath) == 0); // jen rename
+            sameDisk = (StrICmp(sourcePath, targetPath) == 0); // rename only
         if (sameDisk)
         {
             if (StrICmp(sourcePath, targetPath) == 0 ||

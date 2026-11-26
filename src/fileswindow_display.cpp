@@ -1979,29 +1979,29 @@ void CFilesWindow::DrawTileItem(HDC hTgtDC, int itemIndex, RECT* itemRect, DWORD
             out0Len = 0;
         }
 
-        // vnejsi obdelnik, od ktereho mazu smerem k vnitrnimu
+        // outer rectangle, from which I erase toward the inner one
         RECT outerRect = rect;
         outerRect.left += TILE_LEFT_MARGIN + IconSizes[iconSize];
 
         //int oldRTop = r.top;
 
-        // vnitrni obdelnik, ke kterememu mazu
+        // inner rectangle, toward which I erase
         RECT r;
         r.left = outerRect.left + 2;
         r.right = r.left + 2 + widthNeeded + 2 + 1;
 
-        int visibleLines = 1; // nazev je viditelny urcite
+        int visibleLines = 1; // the name is certainly visible
         if (out1[0] != 0)
             visibleLines++;
         if (out2[0] != 0)
             visibleLines++;
         int textH = visibleLines * FontCharHeight + 4;
         int textX = r.left + 2;
-        int textY = rect.top + (rect.bottom - rect.top - textH) / 2; // centrujeme
+        int textY = rect.top + (rect.bottom - rect.top - textH) / 2; // we center it
 
         r.top = textY;
         r.bottom = textY + textH;
-        RECT focusR = r; // zazalohujeme pro kresleni focusu
+        RECT focusR = r; // save a copy for drawing the focus
 
         if (drawFocusFrame)
         {

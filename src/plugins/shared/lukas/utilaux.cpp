@@ -186,13 +186,13 @@ CArgv::CArgv(const char* commandLine) : TIndirectArray<char>(8, 8)
     const char* start = commandLine;
     while (*start)
     {
-        // orizneme white-space na zacatku
+        // trim white-space at the beginning
         while (*start && IsSpace(*start))
             start++;
         if (!*start)
             break;
         const char* end = start;
-        // najdeme konec tokenu
+        // find the end of the token
         while (*end && !IsSpace(*end))
         {
             if (*end++ == '"')
@@ -204,7 +204,7 @@ CArgv::CArgv(const char* commandLine) : TIndirectArray<char>(8, 8)
                     end = start + strlen(start);
             }
         }
-        // pridame token do pole
+        // add the token to the array
         char* str = DupStr(start, end);
         RemoveCharacters(str, str, "\"");
         Add(str);
@@ -249,7 +249,7 @@ BOOL SalGetFullName(char* name, int* errTextID, const char* curDir)
     while (*s == ' ')
         s++;
     if (*s == '\\' && *(s + 1) == '\\') // UNC (\\server\share\...)
-    {                                   // eliminace mezer na zacatku cesty
+    {                                   // elimination of spaces at the beginning of the path
         if (s != name)
             memmove(name, s, strlen(s) + 1);
         s = name + 2;
@@ -258,7 +258,7 @@ BOOL SalGetFullName(char* name, int* errTextID, const char* curDir)
         else
         {
             while (*s != 0 && *s != '\\')
-                s++; // prejeti servername
+                s++; // skip the server name
             if (*s == '\\')
                 s++;
             if (*s == 0 || *s == '\\')

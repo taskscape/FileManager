@@ -961,7 +961,7 @@ CFoundFilesListView::WindowProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
         {
             char className[30];
             // Use pointer-width access while retaining the historical low-word BS_ style check.
-            WORD wl = LOWORD(GetWindowLongPtr(next, GWL_STYLE)); // jen BS_...
+            WORD wl = LOWORD(GetWindowLongPtr(next, GWL_STYLE)); // only BS_...
             nextIsButton = (GetClassName(next, className, 30) != 0 &&
                             SG->StrICmp(className, "BUTTON") == 0 &&
                             (wl == BS_PUSHBUTTON || wl == BS_DEFPUSHBUTTON));

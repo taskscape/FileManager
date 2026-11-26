@@ -169,7 +169,7 @@ void CImpDropTarget::SetDirectory(const char* path, DWORD grfKeyState, POINTL pt
             strcpy(CurDir, path);
         }
     }
-    else // archivy + FS
+    else // archives + FS
     {
         if (CurDirDropTarget != NULL)
         {
@@ -211,12 +211,12 @@ BOOL CImpDropTarget::ProcessClipboardData(BOOL copy, const DROPFILES* data,
         if (data->fWide)
         {
             const wchar_t* fileW = (wchar_t*)(((char*)data) + data->pFiles);
-            while (1) // double null terminated, nepocita s prazdnymi stringy (zacatek)
+            while (1) // double null terminated, does not handle empty strings (at the start)
             {
                 if (*fileW == 0)
                 {
                     ret = DoCopyMove(copy, CurDir, array, DoCopyMoveParam);
-                    array = NULL; // uvolnuje DoCopyMove
+                    array = NULL; // released by DoCopyMove
                     break;
                 }
                 CCopyMoveRecord* cr;
@@ -250,12 +250,12 @@ BOOL CImpDropTarget::ProcessClipboardData(BOOL copy, const DROPFILES* data,
         else
         {
             const char* fileA = ((char*)data) + data->pFiles;
-            while (1) // double null terminated, nepocita s prazdnymi stringy (zacatek)
+            while (1) // double null terminated, does not handle empty strings (at the start)
             {
                 if (*fileA == 0)
                 {
                     ret = DoCopyMove(copy, CurDir, array, DoCopyMoveParam);
-                    array = NULL; // uvolnuje DoCopyMove
+                    array = NULL; // released by DoCopyMove
                     break;
                 }
                 CCopyMoveRecord* cr;
@@ -360,7 +360,7 @@ BOOL IsSimpleSelection(IDataObject* pDataObject, CDragDropOperData* namesList)
 {
     CALL_STACK_MESSAGE1("IsSimpleSelection()");
     BOOL ret = FALSE;
-    if (pDataObject != NULL && !IsFakeDataObject(pDataObject, NULL, NULL, 0)) // z archivu/FS se to tudy neprijima
+    if (pDataObject != NULL && !IsFakeDataObject(pDataObject, NULL, NULL, 0)) // from an archive/FS it is not accepted this way
     {
         IEnumFORMATETC* enumFormat;
         if (pDataObject->EnumFormatEtc(DATADIR_GET, &enumFormat) == S_OK)
@@ -408,9 +408,9 @@ BOOL IsSimpleSelection(IDataObject* pDataObject, CDragDropOperData* namesList)
             }
             enumFormat->Release();
 
-            BOOL remoteDesktop = cfRemoteDesktop1 && cfRemoteDesktop2 && cfRemoteDesktop3; // pochazeji data z remote desktop
+            BOOL remoteDesktop = cfRemoteDesktop1 && cfRemoteDesktop2 && cfRemoteDesktop3; // the data comes from Remote Desktop
 
-            if (cfHDrop && !cfFileMapA && !cfFileMapW && !remoteDesktop) // zadny mapovani (blokujeme Recycle Bin)
+            if (cfHDrop && !cfFileMapA && !cfFileMapW && !remoteDesktop) // no name mapping (we block the Recycle Bin)
             {
                 FORMATETC formatEtc2;
                 formatEtc2.cfFormat = CF_HDROP;
@@ -439,7 +439,7 @@ BOOL IsSimpleSelection(IDataObject* pDataObject, CDragDropOperData* namesList)
                                 char mulbyteName[MAX_PATH];
                                 wchar_t* prefix = prefixBuf;
                                 const wchar_t* fileW = (wchar_t*)(((char*)data) + data->pFiles);
-                                while (1) // double null terminated, nepocita s prazdnymi stringy (zacatek)
+                                while (1) // double null terminated, does not handle empty strings (at the start)
                                 {
                                     if (*fileW == 0) // no more names, success!
                                     {
@@ -543,7 +543,7 @@ BOOL IsSimpleSelection(IDataObject* pDataObject, CDragDropOperData* namesList)
                             {
                                 char* prefix = (char*)prefixBuf;
                                 const char* fileA = ((char*)data) + data->pFiles;
-                                while (1) // double null terminated, nepocita s prazdnymi stringy (zacatek)
+                                while (1) // double null terminated, does not handle empty strings (at the start)
                                 {
                                     if (*fileA == 0) // no more names, success!
                                     {
@@ -739,27 +739,27 @@ STDMETHODIMP CImpDropTarget::DragEnter(IDataObject* pDataObject,
         {
             DWORD allowedEffects = *pdwEffect;
             if ((origKeyState & MK_SHIFT) != 0 && (origKeyState & MK_CONTROL) == 0 &&
-                (*pdwEffect & DROPEFFECT_MOVE) != 0) // user chce Move
+                (*pdwEffect & DROPEFFECT_MOVE) != 0) // user wants Move
             {
                 *pdwEffect = DROPEFFECT_MOVE;
             }
             else
             {
                 if ((origKeyState & MK_SHIFT) == 0 && (origKeyState & MK_CONTROL) != 0 &&
-                    (*pdwEffect & DROPEFFECT_COPY) != 0) // user chce Copy
+                    (*pdwEffect & DROPEFFECT_COPY) != 0) // user wants Copy
                 {
                     *pdwEffect = DROPEFFECT_COPY;
                 }
             }
-            // zjistime defaultni drop effect
+            // determine the default drop effect
             if (TgtType == idtttFullPluginFSPath && OldDataObjectSrcType == 2 /* FS */ &&
                 OldDataObjectSrcFSPath[0] != 0 && GetFSToFSDropEffect != NULL)
-            { // FS na FS: zjistime od pluginu jaky effect preferuje
+            { // FS to FS: find out from the plug-in which effect it prefers
                 GetFSToFSDropEffect(OldDataObjectSrcFSPath, CurDir, allowedEffects, origKeyState,
                                     pdwEffect, GetFSToFSDropEffectParam);
                 DragFromPluginFSEffectIsFromPlugin = TRUE;
             }
-            else // z disku do archivu + z disku na FS: Copy ma prioritu
+            else // from disk into an archive + from disk onto an FS: Copy has priority
             {
                 if ((*pdwEffect & DROPEFFECT_COPY) != 0)
                     *pdwEffect = DROPEFFECT_COPY;
@@ -850,27 +850,27 @@ STDMETHODIMP CImpDropTarget::DragOver(DWORD grfKeyState, POINTL pt,
         {
             DWORD allowedEffects = *pdwEffect;
             if ((origKeyState & MK_SHIFT) != 0 && (origKeyState & MK_CONTROL) == 0 &&
-                (*pdwEffect & DROPEFFECT_MOVE) != 0) // user chce Move
+                (*pdwEffect & DROPEFFECT_MOVE) != 0) // user wants Move
             {
                 *pdwEffect = DROPEFFECT_MOVE;
             }
             else
             {
                 if ((origKeyState & MK_SHIFT) == 0 && (origKeyState & MK_CONTROL) != 0 &&
-                    (*pdwEffect & DROPEFFECT_COPY) != 0) // user chce Copy
+                    (*pdwEffect & DROPEFFECT_COPY) != 0) // user wants Copy
                 {
                     *pdwEffect = DROPEFFECT_COPY;
                 }
             }
-            // zjistime defaultni drop effect
+            // determine the default drop effect
             if (TgtType == idtttFullPluginFSPath && OldDataObjectSrcType == 2 /* FS */ &&
                 OldDataObjectSrcFSPath[0] != 0 && GetFSToFSDropEffect != NULL)
-            { // FS na FS: zjistime od pluginu jaky effect preferuje
+            { // FS to FS: find out from the plug-in which effect it prefers
                 GetFSToFSDropEffect(OldDataObjectSrcFSPath, CurDir, allowedEffects,
                                     origKeyState, pdwEffect, GetFSToFSDropEffectParam);
                 DragFromPluginFSEffectIsFromPlugin = TRUE;
             }
-            else // z disku do archivu + z disku na FS: Copy ma prioritu
+            else // from disk into an archive + from disk onto an FS: Copy has priority
             {
                 if ((*pdwEffect & DROPEFFECT_COPY) != 0)
                     *pdwEffect = DROPEFFECT_COPY;
@@ -970,7 +970,7 @@ STDMETHODIMP CImpDropTarget::Drop(IDataObject* pDataObject, DWORD grfKeyState,
                                             grfKeyState, tgtType, OldDataObjectSrcType);
             SetDirectory(tgtPath, grfKeyState, pt, pdwEffect, OldDataObject, tgtFile, tgtType);
             if (TgtType != idtttWindows && TgtType != idtttFullPluginFSPath)
-            { // neni-li oznaceni z jedne cesty (hrozi asi jen u Findu), neumime copy/move do archivu ani FS
+            { // if the selection is not from a single path (probably only a risk in Find), we cannot copy/move into an archive or an FS
                 if (OldDataObjectIsSimple == -1)
                     OldDataObjectIsSimple = IsSimpleSelection(OldDataObject, NULL);
                 if (!OldDataObjectIsSimple)
@@ -1007,7 +1007,7 @@ STDMETHODIMP CImpDropTarget::Drop(IDataObject* pDataObject, DWORD grfKeyState,
             }
             else
             {
-                if (CurDirDropTarget != NULL) // zjisteni default drop effectu
+                if (CurDirDropTarget != NULL) // determining the default drop effect
                 {
                     CurDirDropTarget->DragOver(grfKeyState, pt, &defEffect);
                 }
@@ -1022,29 +1022,29 @@ STDMETHODIMP CImpDropTarget::Drop(IDataObject* pDataObject, DWORD grfKeyState,
             {
                 defEffect = *pdwEffect;
                 if ((origKeyState & MK_SHIFT) != 0 && (origKeyState & MK_CONTROL) == 0 &&
-                    (defEffect & DROPEFFECT_MOVE) != 0) // user chce Move
+                    (defEffect & DROPEFFECT_MOVE) != 0) // user wants Move
                 {
                     defEffect = DROPEFFECT_MOVE;
                 }
                 else
                 {
                     if ((origKeyState & MK_SHIFT) == 0 && (origKeyState & MK_CONTROL) != 0 &&
-                        (defEffect & DROPEFFECT_COPY) != 0) // user chce Copy
+                        (defEffect & DROPEFFECT_COPY) != 0) // user wants Copy
                     {
                         defEffect = DROPEFFECT_COPY;
                     }
                 }
-                // zjistime defaultni drop effect
+                // determine the default drop effect
                 if (TgtType == idtttFullPluginFSPath && OldDataObjectSrcType == 2 /* FS */ &&
                     OldDataObjectSrcFSPath[0] != 0 && GetFSToFSDropEffect != NULL)
-                { // FS na FS: zjistime od pluginu jaky effect preferuje
+                { // FS to FS: find out from the plug-in which effect it prefers
                     GetFSToFSDropEffect(OldDataObjectSrcFSPath, CurDir, *pdwEffect,
                                         origKeyState, &defEffect, GetFSToFSDropEffectParam);
                     if (defEffect == DROPEFFECT_NONE)
                         defEffect = 0; // drop-target error
                     DragFromPluginFSEffectIsFromPlugin = TRUE;
                 }
-                else // z disku do archivu + z disku na FS: Copy ma prioritu
+                else // from disk into an archive + from disk onto an FS: Copy has priority
                 {
                     if ((defEffect & DROPEFFECT_COPY) != 0)
                         defEffect = DROPEFFECT_COPY;
@@ -1053,7 +1053,7 @@ STDMETHODIMP CImpDropTarget::Drop(IDataObject* pDataObject, DWORD grfKeyState,
                         if ((defEffect & DROPEFFECT_MOVE) != 0)
                             defEffect = DROPEFFECT_MOVE;
                         else
-                            defEffect = DROPEFFECT_NONE; // nemelo by nastat (resi se pres: TgtType==idtttWindows + CurDirDropTarget==NULL)
+                            defEffect = DROPEFFECT_NONE; // should not happen (handled via: TgtType==idtttWindows + CurDirDropTarget==NULL)
                     }
                 }
             }
@@ -1069,7 +1069,7 @@ STDMETHODIMP CImpDropTarget::Drop(IDataObject* pDataObject, DWORD grfKeyState,
         *pdwEffect = defEffect;
         origEffect = *pdwEffect;
 
-        if (CurDirDropTarget != NULL) // info o zmene klaves (shift+control u other...), od W2K zrejme zbytecne
+        if (CurDirDropTarget != NULL) // info about the key change (shift+control for other...), apparently unnecessary since W2K
         {
             CurDirDropTarget->DragOver(grfKeyState, pt, &defEffect);
             defEffect = *pdwEffect;
@@ -1099,7 +1099,7 @@ STDMETHODIMP CImpDropTarget::Drop(IDataObject* pDataObject, DWORD grfKeyState,
         SetDirectory(tgtPath, grfKeyState, pt, pdwEffect, pDataObject, tgtFile, tgtType);
         if (TgtType != idtttWindows && TgtType != idtttFullPluginFSPath &&
             !IsSimpleSelection(pDataObject, namesList))
-        { // neni-li oznaceni z jedne cesty (hrozi asi jen u Findu), neumime copy/move do archivu ani FS
+        { // if the selection is not from a single path (probably only a risk in Find), we cannot copy/move into an archive or an FS
             SetDirectory(NULL, grfKeyState, pt, pdwEffect, pDataObject, FALSE, idtttWindows);
             if (DropEnd != NULL)
                 DropEnd(FALSE, FALSE, DropEndParam, FALSE, FALSE, TgtType);
@@ -1113,7 +1113,7 @@ STDMETHODIMP CImpDropTarget::Drop(IDataObject* pDataObject, DWORD grfKeyState,
     HRESULT ret = E_UNEXPECTED;
     if (TgtType == idtttWindows)
     {
-        // zjistime defEffect
+        // determine defEffect
         BOOL ownRutine = !tgtFile && !isFake && (UseOwnRutine == NULL || UseOwnRutine(pDataObject));
         if (ownRutine && defEffect == -1)
         {
@@ -1122,7 +1122,7 @@ STDMETHODIMP CImpDropTarget::Drop(IDataObject* pDataObject, DWORD grfKeyState,
             else
             {
                 defEffect = *pdwEffect;
-                if (CurDirDropTarget != NULL) // zjisteni default drop effectu
+                if (CurDirDropTarget != NULL) // determining the default drop effect
                 {
                     CurDirDropTarget->DragOver(grfKeyState, pt, &defEffect);
                 }
@@ -1131,7 +1131,7 @@ STDMETHODIMP CImpDropTarget::Drop(IDataObject* pDataObject, DWORD grfKeyState,
             }
         }
 
-        // pokusime si s tim poradit sami
+        // we try to handle it ourselves
         defEffect &= DROPEFFECT_COPY | DROPEFFECT_MOVE;
         if (ownRutine &&
             (defEffect == DROPEFFECT_COPY || defEffect == DROPEFFECT_MOVE) &&
@@ -1228,7 +1228,7 @@ STDMETHODIMP CImpDropTarget::Drop(IDataObject* pDataObject, DWORD grfKeyState,
             }
         }
 
-        // sami si s tim neporadime, nechame to udelat system
+        // we cannot handle it ourselves, we let the system do it
         if (!operationDone && CurDirDropTarget != NULL)
         {
             ret = CurDirDropTarget->Drop(pDataObject, grfKeyState, pt, pdwEffect);
@@ -1236,34 +1236,34 @@ STDMETHODIMP CImpDropTarget::Drop(IDataObject* pDataObject, DWORD grfKeyState,
             CurDirDropTarget = NULL;
         }
     }
-    else // archivy a FS
+    else // archives and FS
     {
         if (TgtType == idtttArchive || TgtType == idtttPluginFS ||
             TgtType == idtttArchiveOnWinPath || TgtType == idtttFullPluginFSPath)
         {
             DWORD allowedEffects = *pdwEffect;
             if ((origKeyState & MK_SHIFT) != 0 && (origKeyState & MK_CONTROL) == 0 &&
-                (*pdwEffect & DROPEFFECT_MOVE) != 0) // user chce Move
+                (*pdwEffect & DROPEFFECT_MOVE) != 0) // user wants Move
             {
                 *pdwEffect = DROPEFFECT_MOVE;
             }
             else
             {
                 if ((origKeyState & MK_SHIFT) == 0 && (origKeyState & MK_CONTROL) != 0 &&
-                    (*pdwEffect & DROPEFFECT_COPY) != 0) // user chce Copy
+                    (*pdwEffect & DROPEFFECT_COPY) != 0) // user wants Copy
                 {
                     *pdwEffect = DROPEFFECT_COPY;
                 }
             }
-            // zjistime defaultni drop effect
+            // determine the default drop effect
             if (TgtType == idtttFullPluginFSPath && dataObjectSrcType == 2 /* FS */ &&
                 dataObjectSrcFSPath[0] != 0 && GetFSToFSDropEffect != NULL)
-            { // FS na FS: zjistime od pluginu jaky effect preferuje
+            { // FS to FS: find out from the plug-in which effect it prefers
                 GetFSToFSDropEffect(dataObjectSrcFSPath, CurDir, allowedEffects,
                                     origKeyState, pdwEffect, GetFSToFSDropEffectParam);
                 DragFromPluginFSEffectIsFromPlugin = TRUE;
             }
-            else // z disku do archivu + z disku na FS: Copy ma prioritu
+            else // from disk into an archive + from disk onto an FS: Copy has priority
             {
                 if ((*pdwEffect & DROPEFFECT_COPY) != 0)
                     *pdwEffect = DROPEFFECT_COPY;
@@ -1272,13 +1272,13 @@ STDMETHODIMP CImpDropTarget::Drop(IDataObject* pDataObject, DWORD grfKeyState,
                     if ((*pdwEffect & DROPEFFECT_MOVE) != 0)
                         *pdwEffect = DROPEFFECT_MOVE;
                     else
-                        *pdwEffect = DROPEFFECT_NONE; // nemelo by nastat (resi se pres: TgtType==idtttWindows + CurDirDropTarget==NULL)
+                        *pdwEffect = DROPEFFECT_NONE; // should not happen (handled via: TgtType==idtttWindows + CurDirDropTarget==NULL)
                 }
             }
 
             if (*pdwEffect != DROPEFFECT_NONE)
             {
-                if (TgtType == idtttFullPluginFSPath) // drag&drop z FS na FS
+                if (TgtType == idtttFullPluginFSPath) // drag&drop from FS to FS
                 {
                     if (isFake && dataObjectSrcType == 2 /* FS */ && CurDir[0] != 0 &&      // "always true"
                         (*pdwEffect == DROPEFFECT_COPY || *pdwEffect == DROPEFFECT_MOVE) && // "always true"
@@ -1314,7 +1314,7 @@ STDMETHODIMP CImpDropTarget::Drop(IDataObject* pDataObject, DWORD grfKeyState,
         }
     }
 
-    if (DropEnd != NULL) // parametry 'operationDone' a 'isFake' se v DropEnd ignoruji pro TgtType != idtttWindows
+    if (DropEnd != NULL) // parameters 'operationDone' and 'isFake' are ignored in DropEnd for TgtType != idtttWindows
         DropEnd(TRUE, (*pdwEffect == DROPEFFECT_LINK), DropEndParam, operationDone, isFake, TgtType);
     TgtType = idtttWindows;
     if (namesList != NULL)
@@ -1351,8 +1351,8 @@ BOOL InitializeShellib()
 {
     CALL_STACK_MESSAGE1("InitializeShellib()");
 
-    // OLE nyni inicializujeme primo ve WinMainBody, protoze na nej pripojujeme SPY
-    //  if (OleInitialize(NULL) != S_OK) // CoInitialize uz nestaci, nefunguji pak napriklad registrace oken pro drag&drop
+    // OLE is now initialized directly in WinMainBody, because we attach SPY to it
+    //  if (OleInitialize(NULL) != S_OK) // CoInitialize is no longer enough; for example, window registration for drag&drop then does not work
     //  {
     //    TRACE_E("Error in OleInitialize.");
     //    return FALSE;
@@ -1376,8 +1376,8 @@ void ReleaseShellib()
             HANDLES(TlsFree(ExecuteAssociationTlsIndex));
             ExecuteAssociationTlsIndex = TLS_OUT_OF_INDEXES;
         }
-        OleFlushClipboard(); // predame systemu data z IDataObjectu, ktery jsme na clipboardu nechali lezet (tento IDataObject se tim uvolni)
-        // OLE nyni deinicializujeme primo ve WinMainBody (SPY)
+        OleFlushClipboard(); // hand the system the data from the IDataObject we left on the clipboard (this IDataObject is released by that)
+        // OLE is now uninitialized directly in WinMainBody (SPY)
         //    OleUninitialize();
     }
     __except (EXCEPTION_EXECUTE_HANDLER)
@@ -1457,10 +1457,10 @@ LPITEMIDLIST GetItemIdListForFileName(LPSHELLFOLDER folder, const char* fileName
                                     *(name + strlen(name) - 1) = 0;
                                 if (enumNamePrefix != NULL && StrNICmp(name, enumNamePrefix, enumNamePrefixLen) == 0 &&
                                         name[enumNamePrefixLen] == '\\' && StrICmp(name + enumNamePrefixLen + 1, fileName) == 0 ||
-                                    enumNamePrefix == NULL && StrICmp(name, fileName) == 0) // mame share, ktery hledame
+                                    enumNamePrefix == NULL && StrICmp(name, fileName) == 0) // we have the share we are looking for
                                 {
                                     foundPidl = idList;
-                                    break; // pidl nalezen (ziskan)
+                                    break; // pidl found (obtained)
                                 }
                             }
                         }
@@ -1624,7 +1624,7 @@ BOOL GetShellFolder(const char* dir, IShellFolder*& shellFolderObj, LPITEMIDLIST
             }
             else
             {
-                rootFolder = &FOLDERID_NetworkFolder; // UNC - sitove zdroje
+                rootFolder = &FOLDERID_NetworkFolder; // UNC - network resources
                 isComputerFolder = FALSE;
             }
             LPITEMIDLIST rootFolderID;
@@ -1986,8 +1986,8 @@ IContextMenu2* CreateIContextMenu2Aux(HWND hOwnerWindow, const char* rootDir, in
             ITEMIDLIST** list;
 
             list = CreateItemIdList(folder, files, nextFile, param, itemsInList,
-                                    strcmp(rootDir, "\\\\") == 0,                                                                     // jde o "\\\\"?
-                                    rootDir[0] == '\\' && rootDir[1] == '\\' && rootDir[2] != 0 && strchr(rootDir + 2, '\\') == NULL, // jde o "\\\\server"?
+                                    strcmp(rootDir, "\\\\") == 0,                                                                     // is it "\\\\"?
+                                    rootDir[0] == '\\' && rootDir[1] == '\\' && rootDir[2] != 0 && strchr(rootDir + 2, '\\') == NULL, // is it "\\\\server"?
                                     rootDir);
             if (list != NULL)
             {
@@ -2600,7 +2600,7 @@ void GetNewOrBackgroundMenu(HWND hOwnerWindow, const char* dir, CMenuNew* menu,
                         GetMenuNewAux(contextMenu2, m, minCmd, maxCmd);
                         RemoveUselessSeparatorsFromMenu(m);
 
-                        if (backgoundMenu) // bereme cele background menu
+                        if (backgoundMenu) // we take the whole background menu
                         {
                             menu->Set(contextMenu2, m);
                         }
@@ -2705,7 +2705,7 @@ STDMETHODIMP CTextDataObject::GetData(FORMATETC* formatEtc, STGMEDIUM* medium)
         return E_INVALIDARG;
     if ((formatEtc->cfFormat == CF_TEXT || formatEtc->cfFormat == CF_UNICODETEXT) && (formatEtc->tymed & TYMED_HGLOBAL))
     {
-        HGLOBAL dataDup = NULL; // vyrobime kopii Data
+        HGLOBAL dataDup = NULL; // we make a copy of Data
         if (Data != NULL)
         {
             BOOL ok = FALSE;
@@ -2790,7 +2790,7 @@ STDMETHODIMP CTextDataObject::GetData(FORMATETC* formatEtc, STGMEDIUM* medium)
                 dataDup = NULL;
             }
         }
-        if (dataDup != NULL) // mame data, ulozime je na medium a vratime
+        if (dataDup != NULL) // we have the data, store it in the medium and return
         {
             medium->tymed = TYMED_HGLOBAL;
             medium->hGlobal = dataDup;
@@ -2860,7 +2860,7 @@ BOOL GetSHObjectName(ITEMIDLIST* pidl, DWORD flags, char* name, int nameSize, IM
         USHORT lastCB = lastID->mkid.cb;
         lastID->mkid.cb = 0;
 
-        // vytahneme Desktop folder
+        // obtain the Desktop folder
         IShellFolder* desktopFolder;
         if (SHGetDesktopFolder(&desktopFolder) == NOERROR && desktopFolder != NULL)
         {

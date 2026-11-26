@@ -8,7 +8,7 @@
 #include <tchar.h>
 #include <crtdbg.h>
 #include <ostream>
-#include <commctrl.h> // potrebuju LPCOLORMAP
+#include <commctrl.h> // I need LPCOLORMAP
 
 #if defined(_DEBUG) && defined(_MSC_VER) // without passing file+line to 'new' operator, list of memory leaks shows only 'crtdbg.h(552)'
 #define new new (_NORMAL_BLOCK, __FILE__, __LINE__)
@@ -549,7 +549,7 @@ C__Handles::C__Handles()
 
 C__Handles::~C__Handles()
 {
-    // vyrazeni handlu, ktere se uvolnuji automaticky
+    // drop handles that are released automatically
     for (int i = Handles.Count - 1; i >= 0; i--)
     {
         if (Handles[i].Handle.Origin == __hoLoadAccelerators)
@@ -748,7 +748,7 @@ BOOL C__Handles::DeleteHandle(C__HandlesType& type, HANDLE handle,
         Handles.Delete(foundTypeOK);
         return TRUE;
     }
-    if (found != -1) // nalezen jen handle se shodnym cislem
+    if (found != -1) // found only a handle with a matching number
     {
 #if defined(_DEBUG) || defined(__HANDLES_DEBUG)
         C__HandlesData* data = &(Handles[found]);
@@ -963,7 +963,7 @@ C__Handles::CreateFileW(LPCWSTR lpFileName, DWORD dwDesiredAccess,
     HANDLE ret = ::CreateFileW(lpFileName, dwDesiredAccess, dwShareMode,
                                lpSecurityAttributes, dwCreationDisposition,
                                dwFlagsAndAttributes, hTemplateFile);
-    WCHAR paramsBuf[800 + 200]; // na jmena souboru omezime na 800 znaku, stejne delsi nevytiskneme diky omezeni MESSAGES
+    WCHAR paramsBuf[800 + 200]; // limit file names to 800 characters; longer ones would not be printed anyway because of the MESSAGES limit
     const WCHAR* params = NULL;
     if (ret == INVALID_HANDLE_VALUE) // parameters to buffer only when error occurs (can be displayed)
     {

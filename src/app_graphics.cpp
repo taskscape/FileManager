@@ -60,7 +60,7 @@ extern "C"
 // ****************************************************************************
 
 // Walks through all colors from configuration and if they have the default value set,
-// nastavi jim prislusne barevne hodnoty
+// sets the corresponding color values for them
 
 COLORREF GetHilightColor(COLORREF clr1, COLORREF clr2)
 {
@@ -117,13 +117,13 @@ COLORREF GetHilightColor(COLORREF clr1, COLORREF clr2)
 
 COLORREF GetFullRowHighlight(COLORREF bkHighlightColor) // returns a "heuristic" highlight for full row mode
 {
-    // trochu heuristiky: zsvetle pozadi budeme "trochu" ztmavovat a tmave pozadi "trochu" zesvetlovat
+    // a bit of heuristics: we will darken a light background "a little" and lighten a dark background "a little"
     WORD h, l, s;
     ColorRGBToHLS(bkHighlightColor, &h, &l, &s);
 
-    if (l < 121) // [TMAVA]  0-120 -> zesvetlime Luminance progresivne 0..120 -> +40..+20
+    if (l < 121) // [DARK]  0-120 -> lighten Luminance progressively 0..120 -> +40..+20
         l += 20 + 20 * (120 - l) / 120;
-    else // [SVETLA] 121-240 -> ztmavime Luminance o konstatnich 20
+    else // [LIGHT] 121-240 -> darken Luminance by a constant 20
         l -= 20;
 
     return ColorHLSToRGB(h, l, s);
@@ -135,7 +135,7 @@ void UpdateDefaultColors(SALCOLOR* colors, CHighlightMasks* highlightMasks, BOOL
     {
         int bitsPerPixel = GetCurrentBPP();
 
-        // barvy pera pro ramecek kolem polozky prebereme ze systemove barvy textu okna
+        // we take the pen colors for the frame around an item from the system window text color
         if (GetFValue(colors[FOCUS_ACTIVE_NORMAL]) & SCF_DEFAULT)
             SetRGBPart(&colors[FOCUS_ACTIVE_NORMAL], GetSysColor(COLOR_WINDOWTEXT));
         if (GetFValue(colors[FOCUS_ACTIVE_SELECTED]) & SCF_DEFAULT)
@@ -145,23 +145,23 @@ void UpdateDefaultColors(SALCOLOR* colors, CHighlightMasks* highlightMasks, BOOL
         if (GetFValue(colors[FOCUS_BK_INACTIVE_SELECTED]) & SCF_DEFAULT)
             SetRGBPart(&colors[FOCUS_BK_INACTIVE_SELECTED], GetSysColor(COLOR_WINDOW));
 
-        // texty polozek v panelu prebereme ze systemove barvy textu okna
+        // we take the item text colors in the panel from the system window text color
         if (GetFValue(colors[ITEM_FG_NORMAL]) & SCF_DEFAULT)
             SetRGBPart(&colors[ITEM_FG_NORMAL], GetSysColor(COLOR_WINDOWTEXT));
         if (GetFValue(colors[ITEM_FG_FOCUSED]) & SCF_DEFAULT)
             SetRGBPart(&colors[ITEM_FG_FOCUSED], GetSysColor(COLOR_WINDOWTEXT));
-        if (GetFValue(colors[ITEM_FG_HIGHLIGHT]) & SCF_DEFAULT) // FULL ROW HIGHLIGHT vychazi z _NORMAL
+        if (GetFValue(colors[ITEM_FG_HIGHLIGHT]) & SCF_DEFAULT) // FULL ROW HIGHLIGHT is based on _NORMAL
             SetRGBPart(&colors[ITEM_FG_HIGHLIGHT], GetCOLORREF(colors[ITEM_FG_NORMAL]));
 
-        // pozadi polozek v panelu prebereme ze systemove barvy pozadi okna
+        // we take the item background colors in the panel from the system window background color
         if (GetFValue(colors[ITEM_BK_NORMAL]) & SCF_DEFAULT)
             SetRGBPart(&colors[ITEM_BK_NORMAL], GetSysColor(COLOR_WINDOW));
         if (GetFValue(colors[ITEM_BK_SELECTED]) & SCF_DEFAULT)
             SetRGBPart(&colors[ITEM_BK_SELECTED], GetSysColor(COLOR_WINDOW));
-        if (GetFValue(colors[ITEM_BK_HIGHLIGHT]) & SCF_DEFAULT) // HIGHLIGHT kopirujeme z NORMAL (aby fungovaly i custom/norton mody)
+        if (GetFValue(colors[ITEM_BK_HIGHLIGHT]) & SCF_DEFAULT) // we copy HIGHLIGHT from NORMAL (so that custom/norton modes work too)
             SetRGBPart(&colors[ITEM_BK_HIGHLIGHT], GetFullRowHighlight(GetCOLORREF(colors[ITEM_BK_NORMAL])));
 
-        // barvy progress bary
+        // progress bar colors
         if (GetFValue(colors[PROGRESS_FG_NORMAL]) & SCF_DEFAULT)
             SetRGBPart(&colors[PROGRESS_FG_NORMAL], GetSysColor(COLOR_WINDOWTEXT));
         if (GetFValue(colors[PROGRESS_FG_SELECTED]) & SCF_DEFAULT)
@@ -171,35 +171,35 @@ void UpdateDefaultColors(SALCOLOR* colors, CHighlightMasks* highlightMasks, BOOL
         if (GetFValue(colors[PROGRESS_BK_SELECTED]) & SCF_DEFAULT)
             SetRGBPart(&colors[PROGRESS_BK_SELECTED], GetSysColor(COLOR_HIGHLIGHT));
 
-        // barva selected odstinu ikonky
+        // color of the selected icon shade
         if (GetFValue(colors[ICON_BLEND_SELECTED]) & SCF_DEFAULT)
         {
-            // normalne kopirujeme do selected barvu z focused+selected
+            // normally we copy the focused+selected color into selected
             SetRGBPart(&colors[ICON_BLEND_SELECTED], GetCOLORREF(colors[ICON_BLEND_FOCSEL]));
             // if this is red (Salamander profile and thanks to color depth we can
-            // dovolit) pouzijeme pro selected svetlejsi odstin
+            // afford) we use a lighter shade for selected
             if (bitsPerPixel > 8 && GetCOLORREF(colors[ICON_BLEND_FOCSEL]) == RGB(255, 0, 0))
                 SetRGBPart(&colors[ICON_BLEND_SELECTED], RGB(255, 128, 128));
         }
 
 #define COLOR_HOTLIGHT 26 // winuser.h
 
-        // titulky panelu (aktivni/neaktivni)
+        // panel captions (active/inactive)
 
-        // aktivni titulek panelu: POZADI
+        // active panel caption: BACKGROUND
         if (GetFValue(colors[ACTIVE_CAPTION_BK]) & SCF_DEFAULT)
             SetRGBPart(&colors[ACTIVE_CAPTION_BK], GetSysColor(COLOR_ACTIVECAPTION));
-        // aktivni titulek panelu: TEXT
+        // active panel caption: TEXT
         if (GetFValue(colors[ACTIVE_CAPTION_FG]) & SCF_DEFAULT)
             SetRGBPart(&colors[ACTIVE_CAPTION_FG], GetSysColor(COLOR_CAPTIONTEXT));
-        // neaktivni titulek panelu: POZADI
+        // inactive panel caption: BACKGROUND
         if (GetFValue(colors[INACTIVE_CAPTION_BK]) & SCF_DEFAULT)
             SetRGBPart(&colors[INACTIVE_CAPTION_BK], GetSysColor(COLOR_INACTIVECAPTION));
-        // neaktivni titulek panelu: TEXT
+        // inactive panel caption: TEXT
         if (GetFValue(colors[INACTIVE_CAPTION_FG]) & SCF_DEFAULT)
         {
-            // preferujeme stejnou barvu textu jako pro aktivni titulek, ale nekdy je tato barva priliz
-            // blizka barve pozadi, potom zkusime barvu pro textu pro neaktivni titulek
+            // we prefer the same text color as for the active caption, but sometimes this color is too
+            // close to the background color, then we try the text color for the inactive caption
             COLORREF clrBk = GetCOLORREF(colors[INACTIVE_CAPTION_BK]);
             COLORREF clrFgAc = GetSysColor(COLOR_CAPTIONTEXT);
             COLORREF clrFgIn = GetSysColor(COLOR_INACTIVECAPTIONTEXT);
@@ -209,12 +209,12 @@ void UpdateDefaultColors(SALCOLOR* colors, CHighlightMasks* highlightMasks, BOOL
             SetRGBPart(&colors[INACTIVE_CAPTION_FG], (abs(grayFgAc - grayBk) >= abs(grayFgIn - grayBk)) ? clrFgAc : clrFgIn);
         }
 
-        // barvy hot polozek
+        // hot item colors
         COLORREF hotColor = GetSysColor(COLOR_HOTLIGHT);
         if (GetFValue(colors[HOT_PANEL]) & SCF_DEFAULT)
             SetRGBPart(&colors[HOT_PANEL], hotColor);
 
-        // hilight pro active panel caption
+        // hilight for active panel caption
         if (GetFValue(colors[HOT_ACTIVE]) & SCF_DEFAULT)
         {
             COLORREF clr = GetCOLORREF(colors[ACTIVE_CAPTION_FG]);
@@ -222,7 +222,7 @@ void UpdateDefaultColors(SALCOLOR* colors, CHighlightMasks* highlightMasks, BOOL
                 clr = GetHilightColor(clr, GetCOLORREF(colors[ACTIVE_CAPTION_BK]));
             SetRGBPart(&colors[HOT_ACTIVE], clr);
         }
-        // hilight pro inactive panel caption
+        // hilight for inactive panel caption
         if (GetFValue(colors[HOT_INACTIVE]) & SCF_DEFAULT)
         {
             COLORREF clr = GetCOLORREF(colors[INACTIVE_CAPTION_FG]);
@@ -234,7 +234,7 @@ void UpdateDefaultColors(SALCOLOR* colors, CHighlightMasks* highlightMasks, BOOL
 
     if (processMasks)
     {
-        // barvy zavisle na jmenu+atributech souboru
+        // colors that depend on the file name and attributes
         int i;
         for (i = 0; i < highlightMasks->Count; i++)
         {
@@ -257,7 +257,7 @@ void UpdateDefaultColors(SALCOLOR* colors, CHighlightMasks* highlightMasks, BOOL
                 SetRGBPart(&item->FocSelBk, GetCOLORREF(colors[ITEM_BK_FOCSEL]));
             if (GetFValue(item->HighlightFg) & SCF_DEFAULT)
                 SetRGBPart(&item->HighlightFg, GetCOLORREF(item->NormalFg));
-            if (GetFValue(item->HighlightBk) & SCF_DEFAULT) // FULL ROW HIGHLIGHT vychazi z _NORMAL
+            if (GetFValue(item->HighlightBk) & SCF_DEFAULT) // FULL ROW HIGHLIGHT is based on _NORMAL
                 SetRGBPart(&item->HighlightBk, GetFullRowHighlight(GetCOLORREF(item->NormalBk)));
         }
     }
@@ -272,7 +272,7 @@ void UpdateDefaultColors(SALCOLOR* colors, CHighlightMasks* highlightMasks, BOOL
 BOOL Use256ColorsBitmap()
 {
     int bitsPerPixel = GetCurrentBPP();
-    return (bitsPerPixel > 8); // vice nez 256 barev
+    return (bitsPerPixel > 8); // more than 256 colors
 }
 
 DWORD GetImageListColorFlags()
@@ -315,9 +315,9 @@ int LoadColorTable(int id, RGBQUAD* rgb, int rgbCount)
 
 BOOL InitializeConstGraphics()
 {
-    // zajistime si hladky graficky vystup
+    // we ensure smooth graphics output
     // 20 GDI API calls should be more than enough
-    // je to implicitni hodnota z NT 4.0 WS
+    // this is the default value from NT 4.0 WS
     if (GdiGetBatchLimit() < 20)
     {
         TRACE_I("Increasing GdiBatchLimit");
@@ -333,7 +333,7 @@ BOOL InitializeConstGraphics()
     if (SystemParametersInfo(SPI_GETDRAGFULLWINDOWS, 0, &DragFullWindows, FALSE) == 0)
         DragFullWindows = TRUE;
 
-    // inicializace LogFont struktury
+    // initialization of the LogFont structure
     NONCLIENTMETRICS ncm;
     ncm.cbSize = sizeof(ncm);
     SystemParametersInfo(SPI_GETNONCLIENTMETRICS, ncm.cbSize, &ncm, 0);
@@ -355,7 +355,7 @@ BOOL InitializeConstGraphics()
   strcpy(LogFont.lfFaceName, "MS Shell Dlg 2");
   */
 
-    // tyto brushe jsou alokovane systemem a automaticky se meni pri zmene barev
+    // these brushes are allocated by the system and change automatically when colors change
     HDialogBrush = GetSysColorBrush(COLOR_BTNFACE);
     HButtonTextBrush = GetSysColorBrush(COLOR_BTNTEXT);
     HMenuSelectedBkBrush = GetSysColorBrush(COLOR_HIGHLIGHT);
@@ -369,18 +369,18 @@ BOOL InitializeConstGraphics()
         TRACE_E("Unable to create brush.");
         return FALSE;
     }
-    ItemBitmap.CreateBmp(NULL, 1, 1); // zajisteni existence bitmapy
+    ItemBitmap.CreateBmp(NULL, 1, 1); // ensure the bitmap exists
 
     // load the bitmap only once (do not refresh it when resolution changes)
     // and if the user switched colors from 256 upward, during LoadBitmap (i.e. bitmap
-    // kompatibilni s display DC) by bitmapa zustala v degradovanych barvach;
-    // proto ji nacteme jako DIB
+    // compatible with the display DC) the bitmap would remain in degraded colors;
+    // therefore we load it as a DIB
     // HWorkerBitmap = HANDLES(LoadBitmap(HInstance, MAKEINTRESOURCE(IDB_WORKER)));
     //HWorkerBitmap = (HBITMAP)HANDLES(LoadImage(HInstance, MAKEINTRESOURCE(IDB_WORKER), IMAGE_BITMAP, 0, 0, LR_CREATEDIBSECTION));
     //if (HWorkerBitmap == NULL)
     //  return FALSE;
 
-    // pri zmene fontu se volaji explicitne CreatePanelFont a CreateEnvFont, prvni inicializaci provedeme zde
+    // on a font change, CreatePanelFont and CreateEnvFont are called explicitly; we do the first initialization here
     CreatePanelFont();
     CreateEnvFonts();
 
@@ -463,8 +463,8 @@ BOOL AuxAllocateImageLists()
     return TRUE;
 }
 
-// pomoci TweakUI si mohou uzivatele menit ikonku shortcuty (default, custom, zadna)
-// pokusime se ji ctit
+// using TweakUI, users can change the shortcut icon (default, custom, none)
+// we try to respect it
 BOOL GetShortcutOverlay()
 {
     int i;
@@ -480,8 +480,8 @@ BOOL GetShortcutOverlay()
     /*
   //#include <CommonControls.h>
 
-  // cteni ikon overlayu ze systemoveho image-listu, zbytecne pomale, nacteme je primo z imageres.dll
-  // tenhle kod tu nechavam jen pro pripad, ze bysme zase potrebovali zjistit kde ty ikony jsou
+  // reading overlay icons from the system image list is unnecessarily slow; we load them directly from imageres.dll
+  // I am leaving this code here only in case we need to find out again where those icons are
   typedef DECLSPEC_IMPORT HRESULT (WINAPI *F__SHGetImageList)(int iImageList, REFIID riid, void **ppvObj);
 
   F__SHGetImageList MySHGetImageList = (F__SHGetImageList)GetProcAddress(Shell32DLL, "SHGetImageList"); // Min: XP
@@ -547,7 +547,7 @@ BOOL GetShortcutOverlay()
         }
         if (buff != NULL && buff[0] != 0)
         {
-            char* num = strrchr(buff, ','); // cislo ikony je za posledni carkou
+            char* num = strrchr(buff, ','); // the icon number is after the last comma
             if (num != NULL)
             {
                 int index = atoi(num + 1);
@@ -993,14 +993,14 @@ static BOOL CreateMenuAndToolbarImageLists()
 // otherwise everything is torn down and rebuilt. Returns FALSE on failure.
 BOOL InitializeGraphics(BOOL colorsOnly)
 {
-    // 48x48 az od XP
-    // ve skutecnosti jsou velke ikonky podporeny uz davno, lze je nahodit
+    // 48x48 only from XP on
+    // in fact large icons have been supported for a long time; they can be enabled at
     // Desktop/Properties/???/Large Icons; caution, the system image list will then not exist
-    // pro ikonky 32x32; navic bychom meli ze systemu vytahnout realne velikosti ikonek
-    // zatim na to kasleme a 48x48 povolime az od XP, kde jsou bezne dostupne
+    // for 32x32 icons; moreover we should pull the real icon sizes from the system
+    // we ignore that for now and allow 48x48 only from XP, where they are commonly available
 
     //
-    // Vytahneme z Registry pozadovanou barevnou hloubku ikonek
+    // We pull the requested icon color depth from the Registry
     //
     int iconColorsCount = 0;
     HDC hDesktopDC = GetDC(NULL);
@@ -1015,7 +1015,7 @@ BOOL InitializeGraphics(BOOL colorsOnly)
     HKEY hKey;
     if (OpenKeyAux(NULL, HKEY_CURRENT_USER, "Control Panel\\Desktop\\WindowMetrics", hKey))
     {
-        // dalsi zajimave hodnoty: "Shell Icon Size", "Shell Small Icon Size"
+        // other interesting values: "Shell Icon Size", "Shell Small Icon Size"
         char buff[100];
         if (GetValueAux(NULL, hKey, "Shell Icon Bpp", REG_SZ, buff, 100))
         {
@@ -1025,7 +1025,7 @@ BOOL InitializeGraphics(BOOL colorsOnly)
         {
             if (WindowsVistaAndLater)
             {
-                // ve viste tento klic proste neni a zatim netusim, cim je nahrazen,
+                // on Vista this key simply does not exist and I do not yet know what replaced it,
                 // so pretend that icons run in full colors (otherwise we displayed ugly 16-color icons)
                 iconColorsCount = 32;
             }
@@ -1058,7 +1058,7 @@ BOOL InitializeGraphics(BOOL colorsOnly)
         }
 
         Shell32DLL = HANDLES(LoadLibraryEx("shell32.dll", NULL, LOAD_LIBRARY_AS_DATAFILE));
-        if (Shell32DLL == NULL) // to se snad vubec nemuze stat (zaklad win 4.0)
+        if (Shell32DLL == NULL) // this really cannot happen (a core part of Win 4.0)
         {
             TRACE_E("Unable to load library shell32.dll.");
             return FALSE;
@@ -1098,8 +1098,8 @@ BOOL InitializeGraphics(BOOL colorsOnly)
             return FALSE;
         }
 
-        // prekladac hlasil chybu: error C2712: Cannot use __try in functions that require object unwinding
-        // obchazim to vlozenim alokace do funkce
+        // the compiler reported an error: error C2712: Cannot use __try in functions that require object unwinding
+        // I work around it by moving the allocation into a function
         //    SymbolsIconList = new CIconList();
         //    LargeSymbolsIconList = new CIconList();
         if (!AuxAllocateImageLists())
@@ -1133,8 +1133,8 @@ BOOL InitializeGraphics(BOOL colorsOnly)
             TRACE_E("Unable to create image list.");
             return FALSE;
         }
-        ImageList_SetImageCount(HFindSymbolsImageList, 2); // inicializace
-                                                           //    ImageList_SetBkColor(HFindSymbolsImageList, GetSysColor(COLOR_WINDOW)); // aby pod XP chodily pruhledne ikonky
+        ImageList_SetImageCount(HFindSymbolsImageList, 2); // initialization
+                                                           //    ImageList_SetBkColor(HFindSymbolsImageList, GetSysColor(COLOR_WINDOW)); // so that transparent icons work under XP
 
         if (!CreateMenuAndToolbarImageLists())
             return FALSE;
@@ -1148,7 +1148,7 @@ BOOL InitializeGraphics(BOOL colorsOnly)
             return FALSE;
         }
 
-        // vytahnu z shell 32 ikony:
+        // I pull icons from shell32:
         int indexes[] = {symbolsExecutable, symbolsDirectory, symbolsNonAssociated, symbolsAssociated, -1};
         int resID[] = {3, 4, 1, 2, -1};
         int vistaResID[] = {15, 4, 2, 90, -1};
@@ -1181,7 +1181,7 @@ BOOL InitializeGraphics(BOOL colorsOnly)
         int sizeIndex;
         for (sizeIndex = ICONSIZE_16; sizeIndex < ICONSIZE_COUNT; sizeIndex++)
         {
-            // ikonka adresare
+            // directory icon
             hIcon = NULL;
             __try
             {
@@ -1199,14 +1199,14 @@ BOOL InitializeGraphics(BOOL colorsOnly)
                 NOHANDLES(DestroyIcon(hIcon));
             }
 
-            // ikonka ".."
+            // ".." icon
             hIcon = (HICON)HANDLES(LoadImage(HInstance, MAKEINTRESOURCE(IDI_UPPERDIR),
                                              IMAGE_ICON, IconSizes[sizeIndex], IconSizes[sizeIndex],
                                              IconLRFlags));
             SimpleIconLists[sizeIndex]->ReplaceIcon(symbolsUpDir, hIcon);
             HANDLES(DestroyIcon(hIcon));
 
-            // ikonka archiv
+            // archive icon
             hIcon = LoadArchiveIcon(IconSizes[sizeIndex], IconSizes[sizeIndex], IconLRFlags);
             SimpleIconLists[sizeIndex]->ReplaceIcon(symbolsArchive, hIcon);
             HANDLES(DestroyIcon(hIcon));
@@ -1316,17 +1316,17 @@ BOOL InitializeGraphics(BOOL colorsOnly)
         return FALSE;
     }
 
-    clrMap[0].from = RGB(128, 128, 128); // seda -> COLOR_BTNSHADOW
+    clrMap[0].from = RGB(128, 128, 128); // gray -> COLOR_BTNSHADOW
     clrMap[0].to = GetSysColor(COLOR_BTNSHADOW);
-    clrMap[1].from = RGB(0, 0, 0); // cerna -> COLOR_BTNTEXT
+    clrMap[1].from = RGB(0, 0, 0); // black -> COLOR_BTNTEXT
     clrMap[1].to = GetSysColor(COLOR_BTNTEXT);
-    clrMap[2].from = RGB(255, 255, 255); // bila -> pruhledna
+    clrMap[2].from = RGB(255, 255, 255); // white -> transparent
     clrMap[2].to = RGB(255, 0, 255);
     HBITMAP hBottomTB = HANDLES(CreateMappedBitmap(HInstance, IDB_BOTTOMTOOLBAR, 0, clrMap, 3));
     BOOL remapWhite = FALSE;
     if (GetCurrentBPP() > 8)
     {
-        clrMap[2].from = RGB(255, 255, 255); // bila -> svetle sedivou (at to tak nerve)
+        clrMap[2].from = RGB(255, 255, 255); // white -> light gray (so it is not so harsh)
         clrMap[2].to = RGB(235, 235, 235);
         remapWhite = TRUE;
     }
@@ -1594,7 +1594,7 @@ void ColorsChanged(BOOL refresh, BOOL colorsOnly, BOOL reloadUMIcons)
 {
     CALL_STACK_MESSAGE2("ColorsChanged(%d)", refresh);
     // CAUTION! fonts must be FALSE so the font handle does not change, which
-    // se museji dozvedet toolbary, ktere jej pouzivaji
+    // the toolbars that use it must be notified of
     ReleaseGraphics(colorsOnly);
     InitializeGraphics(colorsOnly);
     ItemBitmap.ReCreateForScreenDC();
@@ -1612,10 +1612,10 @@ void ColorsChanged(BOOL refresh, BOOL colorsOnly, BOOL reloadUMIcons)
         MainWindow->OnColorsChanged(reloadUMIcons);
     }
 
-    // dame vedet findum o zmene barev
+    // notify the Find windows about the color change
     FindDialogQueue.BroadcastMessage(WM_USER_COLORCHANGEFIND, 0, 0);
 
-    // rozesleme tuto novinku i mezi plug-iny
+    // also broadcast this change to the plug-ins
     Plugins.Event(PLUGINEVENT_COLORSCHANGED, 0);
 
     if (MainWindow != NULL && MainWindow->HTopRebar != NULL)
@@ -1625,6 +1625,6 @@ void ColorsChanged(BOOL refresh, BOOL colorsOnly, BOOL reloadUMIcons)
     {
         InvalidateRect(MainWindow->HWindow, NULL, TRUE);
     }
-    // Internal Viewer a Find:  obnova vsech oken
+    // Internal Viewer and Find:  refresh all windows
     BroadcastConfigChanged();
 }

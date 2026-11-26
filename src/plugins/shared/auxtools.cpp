@@ -123,7 +123,7 @@ void CThreadQueue::ClearFinishedThreads()
     while (act != NULL)
     {
         if (act->Locks == 0 && act->Owner->WaitForCompletion(0) != WAIT_TIMEOUT)
-        { // tento thread neni zamceny + uz skoncil, vyhodime ho ze seznamu
+        { // this thread is not locked and has already finished, remove it from the list
             if (last != NULL)
                 last->Next = act->Next;
             else
@@ -141,10 +141,10 @@ void CThreadQueue::ClearFinishedThreads()
 
 BOOL CThreadQueue::Add(CThreadQueueItem* item)
 {
-    // nejprve vyhodime thready, ktere se jiz ukoncily
+    // first remove threads that have already terminated
     ClearFinishedThreads();
 
-    // pridame novy thread
+    // add the new thread
     if (item != NULL)
     {
         item->Next = Head;
@@ -158,7 +158,7 @@ BOOL CThreadQueue::FindAndLockItem(HANDLE thread)
 {
     CScopedQueueLock lock(CS);
 
-    CThreadQueueItem* act = Head; // zkusime najit otevreny handle threadu
+    CThreadQueueItem* act = Head; // try to find an open thread handle
     while (act != NULL)
     {
         if (act->Thread == thread)
@@ -169,7 +169,7 @@ BOOL CThreadQueue::FindAndLockItem(HANDLE thread)
         act = act->Next;
     }
 
-    return act != NULL; // NULL = nenalezeno
+    return act != NULL; // NULL = not found
 }
 
 void CThreadQueue::UnlockItem(HANDLE thread, BOOL deleteIfUnlocked)
@@ -177,7 +177,7 @@ void CThreadQueue::UnlockItem(HANDLE thread, BOOL deleteIfUnlocked)
     CScopedQueueLock lock(CS);
 
     CThreadQueueItem* last = NULL;
-    CThreadQueueItem* act = Head; // zkusime najit otevreny handle threadu
+    CThreadQueueItem* act = Head; // try to find an open thread handle
     while (act != NULL)
     {
         if (act->Thread == thread)
@@ -185,13 +185,13 @@ void CThreadQueue::UnlockItem(HANDLE thread, BOOL deleteIfUnlocked)
         last = act;
         act = act->Next;
     }
-    if (act != NULL) // always true (bylo zamknute, neslo smazat)
+    if (act != NULL) // always true (it was locked, it could not be deleted)
     {
         if (act->Locks <= 0)
             TRACE_E("CThreadQueue::UnlockItem(): thread has not locks!");
         else
         {
-            if (--(act->Locks) == 0 && deleteIfUnlocked) // thread uz neni zamceny a mame ho smazat
+            if (--(act->Locks) == 0 && deleteIfUnlocked) // the thread is no longer locked and we should delete it
             {
                 if (last != NULL)
                     last->Next = act->Next;
@@ -202,7 +202,7 @@ void CThreadQueue::UnlockItem(HANDLE thread, BOOL deleteIfUnlocked)
         }
     }
     else
-        TRACE_E("CThreadQueue::UnlockItem(): unable to find thread!"); // to nebyl zamknuty, ze je smazany?
+        TRACE_E("CThreadQueue::UnlockItem(): unable to find thread!"); // it was not locked, so was it deleted?
 
 }
 

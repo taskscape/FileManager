@@ -28,12 +28,12 @@
 #include "execute.h"
 #include "drivelst.h"
 
-BOOL SalamanderBusy = TRUE;       // je Salamander busy?
-DWORD LastSalamanderIdleTime = 0; // GetTickCount() z okamziku, kdy SalamanderBusy naposledy presel na TRUE
+BOOL SalamanderBusy = TRUE;       // is Salamander busy?
+DWORD LastSalamanderIdleTime = 0; // GetTickCount() from the moment when SalamanderBusy last transitioned to TRUE
 
 int PasteLinkIsRunning = 0; // if greater than zero, Past Shortcuts command is currently running in one of the panels
 
-BOOL CannotCloseSalMainWnd = FALSE; // TRUE = nesmi dojit k zavreni hlavniho okna
+BOOL CannotCloseSalMainWnd = FALSE; // TRUE = main window must not be closed
 
 DWORD MainThreadID = -1;
 
@@ -51,9 +51,9 @@ int DecimalSeparatorLen = 1;    // length in characters without terminating zero
 char ThousandsSeparator[5] = " ";
 int ThousandsSeparatorLen = 1;
 
-BOOL WindowsXP64AndLater = FALSE;  // JRYFIXME - zrusit
-BOOL WindowsVistaAndLater = FALSE; // JRYFIXME - zrusit
-BOOL Windows7AndLater = FALSE;     // JRYFIXME - zrusit
+BOOL WindowsXP64AndLater = FALSE;  // JRYFIXME - remove
+BOOL WindowsVistaAndLater = FALSE; // JRYFIXME - remove
+BOOL Windows7AndLater = FALSE;     // JRYFIXME - remove
 BOOL Windows8AndLater = FALSE;
 BOOL Windows8_1AndLater = FALSE;
 BOOL Windows10AndLater = FALSE;
@@ -260,7 +260,7 @@ BOOL CriticalShutdown = FALSE;
 HANDLE SalOpenFileMapping = NULL;
 void* SalOpenSharedMem = NULL;
 
-// mutex pro synchronizaci load/save do Registry (dva procesy najednou nemuzou, ma to neblahe vysledky)
+// mutex for synchronizing load/save to the Registry (two processes cannot do it at once; that has unfortunate results)
 CLoadSaveToRegistryMutex LoadSaveToRegistryMutex;
 
 BOOL IsNotAlphaNorNum[256]; // array of TRUE/FALSE for characters (TRUE = not a letter or digit)
@@ -280,7 +280,7 @@ DWORD AllocationGranularity = 1; // allocation granularity (needed for using mem
 
 #ifdef USE_BETA_EXPIRATION_DATE
 
-// urcuje prvni den, kdy uz tato beta/PB verze nepobezi
+// specifies the first day on which this beta/PB version will no longer run
 // beta/PB version 4.0 beta 1 will run only until February 1, 2020
 //                                 YEAR  MONTH DAY
 SYSTEMTIME BETA_EXPIRATION_DATE = {2020, 2, 0, 1, 0, 0, 0, 0};
@@ -288,12 +288,12 @@ SYSTEMTIME BETA_EXPIRATION_DATE = {2020, 2, 0, 1, 0, 0, 0, 0};
 
 //******************************************************************************
 //
-// Rizeni Idle processingu (CMainWindow::OnEnterIdle)
+// Idle processing control (CMainWindow::OnEnterIdle)
 //
 
-BOOL IdleRefreshStates = TRUE;  // na uvod nechame nastavit promenne
-BOOL IdleForceRefresh = FALSE;  // vyradi cache Enabler*
-BOOL IdleCheckClipboard = TRUE; // koukneme taky na clipboard
+BOOL IdleRefreshStates = TRUE;  // initially we let the variables be set
+BOOL IdleForceRefresh = FALSE;  // invalidates the Enabler* cache
+BOOL IdleCheckClipboard = TRUE; // we also check the clipboard
 
 DWORD EnablerUpDir = FALSE;
 DWORD EnablerRootDir = FALSE;
@@ -368,7 +368,7 @@ SALCOLOR ViewerColors[NUMBER_OF_VIEWERCOLORS] =
 
 COLORREF SalamanderColors[NUMBER_OF_COLORS] =
     {
-        // barvy pera pro ramecek kolem polozky
+        // pen colors for the frame around an item
         RGBF(0, 0, 0, SCF_DEFAULT),       // FOCUS_ACTIVE_NORMAL
         RGBF(0, 0, 0, SCF_DEFAULT),       // FOCUS_ACTIVE_SELECTED
         RGBF(128, 128, 128, 0),           // FOCUS_FG_INACTIVE_NORMAL
@@ -376,43 +376,43 @@ COLORREF SalamanderColors[NUMBER_OF_COLORS] =
         RGBF(255, 255, 255, SCF_DEFAULT), // FOCUS_BK_INACTIVE_NORMAL
         RGBF(255, 255, 255, SCF_DEFAULT), // FOCUS_BK_INACTIVE_SELECTED
 
-        // barvy textu polozek v panelu
+        // text colors of items in panel
         RGBF(0, 0, 0, SCF_DEFAULT), // ITEM_FG_NORMAL
         RGBF(255, 0, 0, 0),         // ITEM_FG_SELECTED
         RGBF(0, 0, 0, SCF_DEFAULT), // ITEM_FG_FOCUSED
         RGBF(255, 0, 0, 0),         // ITEM_FG_FOCSEL
         RGBF(0, 0, 0, SCF_DEFAULT), // ITEM_FG_HIGHLIGHT
 
-        // barvy pozadi polozek v panelu
+        // background colors of items in panel
         RGBF(255, 255, 255, SCF_DEFAULT), // ITEM_BK_NORMAL
         RGBF(255, 255, 255, SCF_DEFAULT), // ITEM_BK_SELECTED
         RGBF(232, 232, 232, 0),           // ITEM_BK_FOCUSED
         RGBF(232, 232, 232, 0),           // ITEM_BK_FOCSEL
         RGBF(0, 0, 0, SCF_DEFAULT),       // ITEM_BK_HIGHLIGHT
 
-        // barvy pro blend ikonek
+        // colors for icon blending
         RGBF(255, 128, 128, SCF_DEFAULT), // ICON_BLEND_SELECTED
         RGBF(128, 128, 128, 0),           // ICON_BLEND_FOCUSED
         RGBF(255, 0, 0, 0),               // ICON_BLEND_FOCSEL
 
-        // barvy progress bary
+        // progress bar colors
         RGBF(0, 0, 192, SCF_DEFAULT),     // PROGRESS_FG_NORMAL
         RGBF(255, 255, 255, SCF_DEFAULT), // PROGRESS_FG_SELECTED
         RGBF(255, 255, 255, SCF_DEFAULT), // PROGRESS_BK_NORMAL
         RGBF(0, 0, 192, SCF_DEFAULT),     // PROGRESS_BK_SELECTED
 
-        // barvy hot polozek
+        // hot item colors
         RGBF(0, 0, 255, SCF_DEFAULT),     // HOT_PANEL
         RGBF(128, 128, 128, SCF_DEFAULT), // HOT_ACTIVE
         RGBF(128, 128, 128, SCF_DEFAULT), // HOT_INACTIVE
 
-        // barvy titulku panelu
+        // panel caption colors
         RGBF(255, 255, 255, SCF_DEFAULT), // ACTIVE_CAPTION_FG
         RGBF(0, 0, 128, SCF_DEFAULT),     // ACTIVE_CAPTION_BK
         RGBF(255, 255, 255, SCF_DEFAULT), // INACTIVE_CAPTION_FG
         RGBF(128, 128, 128, SCF_DEFAULT), // INACTIVE_CAPTION_BK
 
-        // barvy pera pro ramecek kolem thumbnails
+        // pen colors for the frame around thumbnails
         RGBF(192, 192, 192, 0), // THUMBNAIL_FRAME_NORMAL
         RGBF(0, 0, 0, 0),       // THUMBNAIL_FRAME_FOCUSED
         RGBF(255, 0, 0, 0),     // THUMBNAIL_FRAME_SELECTED
@@ -421,7 +421,7 @@ COLORREF SalamanderColors[NUMBER_OF_COLORS] =
 
 COLORREF ExplorerColors[NUMBER_OF_COLORS] =
     {
-        // barvy pera pro ramecek kolem polozky
+        // pen colors for the frame around an item
         RGBF(0, 0, 0, SCF_DEFAULT),       // FOCUS_ACTIVE_NORMAL
         RGBF(255, 255, 0, 0),             // FOCUS_ACTIVE_SELECTED
         RGBF(128, 128, 128, 0),           // FOCUS_FG_INACTIVE_NORMAL
@@ -429,43 +429,43 @@ COLORREF ExplorerColors[NUMBER_OF_COLORS] =
         RGBF(255, 255, 255, SCF_DEFAULT), // FOCUS_BK_INACTIVE_NORMAL
         RGBF(255, 255, 0, 0),             // FOCUS_BK_INACTIVE_SELECTED
 
-        // barvy textu polozek v panelu
+        // text colors of items in panel
         RGBF(0, 0, 0, SCF_DEFAULT), // ITEM_FG_NORMAL
         RGBF(255, 255, 255, 0),     // ITEM_FG_SELECTED
         RGBF(0, 0, 0, SCF_DEFAULT), // ITEM_FG_FOCUSED
         RGBF(255, 255, 255, 0),     // ITEM_FG_FOCSEL
         RGBF(0, 0, 0, SCF_DEFAULT), // ITEM_FG_HIGHLIGHT
 
-        // barvy pozadi polozek v panelu
+        // background colors of items in panel
         RGBF(255, 255, 255, SCF_DEFAULT), // ITEM_BK_NORMAL
         RGBF(0, 0, 128, 0),               // ITEM_BK_SELECTED
         RGBF(232, 232, 232, 0),           // ITEM_BK_FOCUSED
         RGBF(0, 0, 128, 0),               // ITEM_BK_FOCSEL
         RGBF(0, 0, 0, SCF_DEFAULT),       // ITEM_BK_HIGHLIGHT
 
-        // barvy pro blend ikonek
+        // colors for icon blending
         RGBF(0, 0, 128, SCF_DEFAULT), // ICON_BLEND_SELECTED
         RGBF(128, 128, 128, 0),       // ICON_BLEND_FOCUSED
         RGBF(0, 0, 128, 0),           // ICON_BLEND_FOCSEL
 
-        // barvy progress bary
+        // progress bar colors
         RGBF(0, 0, 192, SCF_DEFAULT),     // PROGRESS_FG_NORMAL
         RGBF(255, 255, 255, SCF_DEFAULT), // PROGRESS_FG_SELECTED
         RGBF(255, 255, 255, SCF_DEFAULT), // PROGRESS_BK_NORMAL
         RGBF(0, 0, 192, SCF_DEFAULT),     // PROGRESS_BK_SELECTED
 
-        // barvy hot polozek
+        // hot item colors
         RGBF(0, 0, 255, SCF_DEFAULT),     // HOT_PANEL
         RGBF(128, 128, 128, SCF_DEFAULT), // HOT_ACTIVE
         RGBF(128, 128, 128, SCF_DEFAULT), // HOT_INACTIVE
 
-        // barvy titulku panelu
+        // panel caption colors
         RGBF(255, 255, 255, SCF_DEFAULT), // ACTIVE_CAPTION_FG
         RGBF(0, 0, 128, SCF_DEFAULT),     // ACTIVE_CAPTION_BK
         RGBF(255, 255, 255, SCF_DEFAULT), // INACTIVE_CAPTION_FG
         RGBF(128, 128, 128, SCF_DEFAULT), // INACTIVE_CAPTION_BK
 
-        // barvy pera pro ramecek kolem thumbnails
+        // pen colors for the frame around thumbnails
         RGBF(192, 192, 192, 0), // THUMBNAIL_FRAME_NORMAL
         RGBF(0, 0, 128, 0),     // THUMBNAIL_FRAME_FOCUSED
         RGBF(0, 0, 128, 0),     // THUMBNAIL_FRAME_SELECTED
@@ -474,7 +474,7 @@ COLORREF ExplorerColors[NUMBER_OF_COLORS] =
 
 COLORREF NortonColors[NUMBER_OF_COLORS] =
     {
-        // barvy pera pro ramecek kolem polozky
+        // pen colors for the frame around an item
         RGBF(0, 128, 128, 0), // FOCUS_ACTIVE_NORMAL
         RGBF(0, 128, 128, 0), // FOCUS_ACTIVE_SELECTED
         RGBF(0, 128, 128, 0), // FOCUS_FG_INACTIVE_NORMAL
@@ -482,43 +482,43 @@ COLORREF NortonColors[NUMBER_OF_COLORS] =
         RGBF(0, 0, 128, 0),   // FOCUS_BK_INACTIVE_NORMAL
         RGBF(0, 0, 128, 0),   // FOCUS_BK_INACTIVE_SELECTED
 
-        // barvy textu polozek v panelu
+        // text colors of items in panel
         RGBF(0, 255, 255, 0),       // ITEM_FG_NORMAL
         RGBF(255, 255, 0, 0),       // ITEM_FG_SELECTED
         RGBF(0, 0, 0, SCF_DEFAULT), // ITEM_FG_FOCUSED
         RGBF(255, 255, 0, 0),       // ITEM_FG_FOCSEL
         RGBF(0, 0, 0, SCF_DEFAULT), // ITEM_FG_HIGHLIGHT
 
-        // barvy pozadi polozek v panelu
+        // background colors of items in panel
         RGBF(0, 0, 128, 0),         // ITEM_BK_NORMAL
         RGBF(0, 0, 128, 0),         // ITEM_BK_SELECTED
         RGBF(0, 128, 128, 0),       // ITEM_BK_FOCUSED
         RGBF(0, 128, 128, 0),       // ITEM_BK_FOCSEL
         RGBF(0, 0, 0, SCF_DEFAULT), // ITEM_BK_HIGHLIGHT
 
-        // barvy pro blend ikonek
+        // colors for icon blending
         RGBF(255, 255, 0, SCF_DEFAULT), // ICON_BLEND_SELECTED
         RGBF(128, 128, 128, 0),         // ICON_BLEND_FOCUSED
         RGBF(255, 255, 0, 0),           // ICON_BLEND_FOCSEL
 
-        // barvy progress bary
+        // progress bar colors
         RGBF(0, 0, 192, SCF_DEFAULT),     // PROGRESS_FG_NORMAL
         RGBF(255, 255, 255, SCF_DEFAULT), // PROGRESS_FG_SELECTED
         RGBF(255, 255, 255, SCF_DEFAULT), // PROGRESS_BK_NORMAL
         RGBF(0, 0, 192, SCF_DEFAULT),     // PROGRESS_BK_SELECTED
 
-        // barvy hot polozek
+        // hot item colors
         RGBF(0, 0, 255, SCF_DEFAULT),     // HOT_PANEL
         RGBF(128, 128, 128, SCF_DEFAULT), // HOT_ACTIVE
         RGBF(128, 128, 128, SCF_DEFAULT), // HOT_INACTIVE
 
-        // barvy titulku panelu
+        // panel caption colors
         RGBF(255, 255, 255, SCF_DEFAULT), // ACTIVE_CAPTION_FG
         RGBF(0, 0, 128, SCF_DEFAULT),     // ACTIVE_CAPTION_BK
         RGBF(255, 255, 255, SCF_DEFAULT), // INACTIVE_CAPTION_FG
         RGBF(128, 128, 128, SCF_DEFAULT), // INACTIVE_CAPTION_BK
 
-        // barvy pera pro ramecek kolem thumbnails
+        // pen colors for the frame around thumbnails
         RGBF(192, 192, 192, 0), // THUMBNAIL_FRAME_NORMAL
         RGBF(0, 128, 128, 0),   // THUMBNAIL_FRAME_FOCUSED
         RGBF(255, 255, 0, 0),   // THUMBNAIL_FRAME_SELECTED
@@ -527,7 +527,7 @@ COLORREF NortonColors[NUMBER_OF_COLORS] =
 
 COLORREF NavigatorColors[NUMBER_OF_COLORS] =
     {
-        // barvy pera pro ramecek kolem polozky
+        // pen colors for the frame around an item
         RGBF(0, 128, 128, 0), // FOCUS_ACTIVE_NORMAL
         RGBF(0, 128, 128, 0), // FOCUS_ACTIVE_SELECTED
         RGBF(0, 128, 128, 0), // FOCUS_FG_INACTIVE_NORMAL
@@ -535,43 +535,43 @@ COLORREF NavigatorColors[NUMBER_OF_COLORS] =
         RGBF(0, 0, 128, 0),   // FOCUS_BK_INACTIVE_NORMAL
         RGBF(0, 0, 128, 0),   // FOCUS_BK_INACTIVE_SELECTED
 
-        // barvy textu polozek v panelu
+        // text colors of items in panel
         RGBF(255, 255, 255, 0),     // ITEM_FG_NORMAL
         RGBF(255, 255, 0, 0),       // ITEM_FG_SELECTED
         RGBF(0, 0, 0, SCF_DEFAULT), // ITEM_FG_FOCUSED
         RGBF(255, 255, 0, 0),       // ITEM_FG_FOCSEL
         RGBF(0, 0, 0, SCF_DEFAULT), // ITEM_FG_HIGHLIGHT
 
-        // barvy pozadi polozek v panelu
+        // background colors of items in panel
         RGBF(80, 80, 80, 0),        // ITEM_BK_NORMAL
         RGBF(80, 80, 80, 0),        // ITEM_BK_SELECTED
         RGBF(0, 128, 128, 0),       // ITEM_BK_FOCUSED
         RGBF(0, 128, 128, 0),       // ITEM_BK_FOCSEL
         RGBF(0, 0, 0, SCF_DEFAULT), // ITEM_BK_HIGHLIGHT
 
-        // barvy pro blend ikonek
+        // colors for icon blending
         RGBF(255, 255, 0, SCF_DEFAULT), // ICON_BLEND_SELECTED
         RGBF(128, 128, 128, 0),         // ICON_BLEND_FOCUSED
         RGBF(255, 255, 0, 0),           // ICON_BLEND_FOCSEL
 
-        // barvy progress bary
+        // progress bar colors
         RGBF(0, 0, 192, SCF_DEFAULT),     // PROGRESS_FG_NORMAL
         RGBF(255, 255, 255, SCF_DEFAULT), // PROGRESS_FG_SELECTED
         RGBF(255, 255, 255, SCF_DEFAULT), // PROGRESS_BK_NORMAL
         RGBF(0, 0, 192, SCF_DEFAULT),     // PROGRESS_BK_SELECTED
 
-        // barvy hot polozek
+        // hot item colors
         RGBF(0, 0, 255, SCF_DEFAULT),     // HOT_PANEL
         RGBF(173, 182, 205, SCF_DEFAULT), // HOT_ACTIVE
         RGBF(212, 212, 212, SCF_DEFAULT), // HOT_INACTIVE
 
-        // barvy titulku panelu
+        // panel caption colors
         RGBF(255, 255, 255, SCF_DEFAULT), // ACTIVE_CAPTION_FG
         RGBF(0, 0, 128, SCF_DEFAULT),     // ACTIVE_CAPTION_BK
         RGBF(255, 255, 255, SCF_DEFAULT), // INACTIVE_CAPTION_FG
         RGBF(128, 128, 128, SCF_DEFAULT), // INACTIVE_CAPTION_BK
 
-        // barvy pera pro ramecek kolem thumbnails
+        // pen colors for the frame around thumbnails
         RGBF(192, 192, 192, 0), // THUMBNAIL_FRAME_NORMAL
         RGBF(0, 128, 128, 0),   // THUMBNAIL_FRAME_FOCUSED
         RGBF(255, 255, 0, 0),   // THUMBNAIL_FRAME_SELECTED

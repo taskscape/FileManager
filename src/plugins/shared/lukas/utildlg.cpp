@@ -69,13 +69,13 @@ void HistoryComboBox(CTransferInfo& ti, int id, char* text, int textMax,
         char* ptr = new char[strlen(text) + 1];
         if (ptr)
         {
-            // uvolnime pamet vymazavane polozky
+            // free the memory of the item being deleted
             if (history[toMove])
                 delete[] history[toMove];
             // create space for path we will save
             for (i = toMove; i > 0; i--)
                 history[i] = history[i - 1];
-            // ulozime cestu
+            // save the path
             strcpy(ptr, text);
             history[0] = ptr;
         }

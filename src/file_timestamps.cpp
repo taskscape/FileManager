@@ -126,7 +126,7 @@ BOOL CFileTimeStamps::AddFile(const char* zipFile, const char* zipRoot, const ch
             StrICmp(item->SourcePath, item2->SourcePath) == 0)
         {
             delete item;
-            return FALSE; // je uz zde, nepridavat dalsi ...
+            return FALSE; // it is already here, do not add another ...
         }
     }
 
@@ -149,7 +149,7 @@ struct CFileTimeStampsEnum2Info
 const char* WINAPI FileTimeStampsEnum2(HWND parent, int enumFiles, const char** dosName, BOOL* isDir,
                                        CQuadWord* size, DWORD* attr, FILETIME* lastWrite, void* param,
                                        int* errorOccured)
-{ // enumerujeme jen soubory, enumFiles lze tedy uplne vynechat
+{ // we enumerate files only, so enumFiles can be omitted entirely
     if (errorOccured != NULL)
         *errorOccured = SALENUM_SUCCESS;
     CFileTimeStampsEnum2Info* data = (CFileTimeStampsEnum2Info*)param;
@@ -208,8 +208,8 @@ void CFileTimeStamps::Remove(int* indexes, int count)
     int i;
     for (i = 0; i < count; i++)
     {
-        int index = indexes[count - i - 1];   // mazeme zezadu - mene sesouvani + neposouvaji se indexy
-        if (index < List.Count && index >= 0) // jen tak pro sychr
+        int index = indexes[count - i - 1];   // delete from the back - less shifting + indexes do not move
+        if (index < List.Count && index >= 0) // just to be safe
         {
             List.Delete(index);
         }
@@ -327,7 +327,7 @@ void CFileTimeStamps::CopyFilesTo(HWND parent, int* indexes, int count, const ch
         for (i = 0; i < count; i++)
         {
             int index = indexes[i];
-            if (index < List.Count && index >= 0) // jen tak pro sychr
+            if (index < List.Count && index >= 0) // just to be safe
             {
                 CFileTimeStampsItem* item = List[index];
                 char name[MAX_PATH];
@@ -344,8 +344,8 @@ void CFileTimeStamps::CopyFilesTo(HWND parent, int* indexes, int count, const ch
                 ok &= toStr.Add(name, (int)strlen(name) + 1);
             }
         }
-        fromStr.Add("\0", 2); // pro jistotu dame na konec dalsi dve nuly (zadne Add, taky o.k.)
-        toStr.Add("\0", 2);   // pro jistotu dame na konec dalsi dve nuly (zadne Add, taky o.k.)
+        fromStr.Add("\0", 2); // just to be sure, put two more zeros at the end (no Add is also OK)
+        toStr.Add("\0", 2);   // just to be sure, put two more zeros at the end (no Add is also OK)
 
         if (ok && !tooLongName)
         {
@@ -367,7 +367,7 @@ void CFileTimeStamps::CopyFilesTo(HWND parent, int* indexes, int count, const ch
 void CFileTimeStamps::CheckAndPackAndClear(HWND parent, BOOL* someFilesChanged, BOOL* archMaybeUpdated)
 {
     CALL_STACK_MESSAGE1("CFileTimeStamps::CheckAndPackAndClear()");
-    //---  vyhodime ze seznamu soubory, ktere nebyly zmeneny
+    //---  drop from the list the files that were not changed
     BeginStopRefresh();
     if (someFilesChanged != NULL)
         *someFilesChanged = FALSE;
@@ -395,8 +395,8 @@ void CFileTimeStamps::CheckAndPackAndClear(HWND parent, BOOL* someFilesChanged, 
         {
             HANDLES(FindClose(find));
             ConvertFindDataWToUtf8(dataW, &data);
-            if (CompareFileTime(&data.ftLastWriteTime, &item->LastWrite) != 0 ||    // lisi se casy
-                CQuadWord(data.nFileSizeLow, data.nFileSizeHigh) != item->FileSize) // lisi se velikosti
+            if (CompareFileTime(&data.ftLastWriteTime, &item->LastWrite) != 0 ||    // the times differ
+                CQuadWord(data.nFileSizeLow, data.nFileSizeHigh) != item->FileSize) // the sizes differ
             {
                 item->FileSize = CQuadWord(data.nFileSizeLow, data.nFileSizeHigh); // take the new size
                 item->LastWrite = data.ftLastWriteTime;
@@ -414,9 +414,9 @@ void CFileTimeStamps::CheckAndPackAndClear(HWND parent, BOOL* someFilesChanged, 
     {
         if (someFilesChanged != NULL)
             *someFilesChanged = TRUE;
-        // pri critical shutdown se tvarime, ze updatle soubory neexistuji, zabalit zpet do archivu je
+        // on a critical shutdown we pretend that the updated files do not exist; packing them back into the archive
         // we will not make it, but must not delete them; after startup the user must still have a chance to update files
-        // rucne do archivu zabalit
+        // pack them into the archive manually
         if (!CriticalShutdown)
         {
             CArchiveUpdateDlg dlg(parent, this, Panel);
@@ -428,8 +428,8 @@ void CFileTimeStamps::CheckAndPackAndClear(HWND parent, BOOL* someFilesChanged, 
                 {
                     if (archMaybeUpdated != NULL)
                         *archMaybeUpdated = TRUE;
-                    //--- zapakujeme zmenene soubory, po skupinach se stejnym zip-root a source-path
-                    TIndirectArray<CFileTimeStampsItem> packList(10, 5); // seznam vsech se stejnym zip-root a source-path
+                    //--- pack the changed files, in groups with the same zip-root and source-path
+                    TIndirectArray<CFileTimeStampsItem> packList(10, 5); // list of all items with the same zip-root and source-path
                     SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_NORMAL);
                     while (!showDlg && List.Count > 0)
                     {
@@ -442,13 +442,13 @@ void CFileTimeStamps::CheckAndPackAndClear(HWND parent, BOOL* someFilesChanged, 
                             packList.Add(item1);
                             List.Detach(0);
                         }
-                        for (i = List.Count - 1; i >= 0; i--) // kvadraticka slozitost zde snad nebude na obtiz
-                        {                                     // jedeme odzadu, protoze Detach je tak "jednodusi"
+                        for (i = List.Count - 1; i >= 0; i--) // the quadratic complexity should not be a problem here
+                        {                                     // we go from the back because Detach is "simpler" that way
                             CFileTimeStampsItem* item2 = List[i];
                             char* r2 = item2->ZIPRoot;
                             char* s2 = item2->SourcePath;
                             if (strcmp(r1, r2) == 0 && // equal zip-root (case-sensitive comparison required - update test\A.txt and Test\b.txt must not run simultaneously)
-                                StrICmp(s1, s2) == 0)  // shodny source-path
+                                StrICmp(s1, s2) == 0)  // same source-path
                             {
                                 packList.Add(item2);
                                 List.Detach(i);
@@ -474,7 +474,7 @@ void CFileTimeStamps::CheckAndPackAndClear(HWND parent, BOOL* someFilesChanged, 
                                 {
                                     List.Add(packList.GetData(), packList.Count);
                                     packList.DetachMembers();
-                                    showDlg = TRUE; // zobrazime znovu Archive Update dialog (se zbylymi soubory)
+                                    showDlg = TRUE; // show the Archive Update dialog again (with the remaining files)
                                 }
                             }
                             SetCurrentDirectoryToSystem();

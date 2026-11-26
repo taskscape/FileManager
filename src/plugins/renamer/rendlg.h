@@ -5,7 +5,7 @@
 
 #include "..\\..\\common\\monotonic_time.h"
 
-#define OPERATION_BUFFER 16348 // buffer pro Copy
+#define OPERATION_BUFFER 16348 // buffer for Copy
 
 extern int DialogWidth;
 extern int DialogHeight;

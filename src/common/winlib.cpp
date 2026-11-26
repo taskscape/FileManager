@@ -427,7 +427,7 @@ CWindow::CWindowProcInt(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam, BOOL
 #endif // _UNICODE
         if (wnd != NULL && wnd->Is(otWindow))
         {
-            // Petr: posunul jsem dolu pod wnd->WindowProc(), so that during WM_DESTROY
+            // Petr: I moved it down below wnd->WindowProc(), so that during WM_DESTROY
             //       messages still arrive (needed by Lukas)
             // WindowsManager.DetachWindow(hwnd);
 
@@ -460,9 +460,9 @@ CWindow::CWindowProcInt(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam, BOOL
             if (wnd->IsAllocated())
                 delete wnd;
             else
-                wnd->HWindow = NULL; // uz neni pripojeny
+                wnd->HWindow = NULL; // it is no longer attached
             if (res == 0)
-                return 0; // aplikace ji zpracovala
+                return 0; // the application processed it
             wnd = NULL;
         }
         break;
@@ -703,7 +703,7 @@ CDialog::DialogProc(UINT uMsg, WPARAM wParam, LPARAM lParam)
                 memset(&hi, 0, sizeof(hi));
                 hi.cbSize = sizeof(hi);
                 hi.iContextType = HELPINFO_WINDOW;
-                hi.dwContextId = ResID; // ve WM_HELP taky chodi ResID a ne HelpID, tak at je to konzistentni
+                hi.dwContextId = ResID; // WM_HELP also receives ResID and not HelpID, so keep it consistent
                 GetCursorPos(&hi.MousePos);
                 WinLibHelp->OnHelp(HWindow, HelpID, &hi, FALSE, FALSE);
             }
@@ -765,7 +765,7 @@ CDialog::CDialogProc(HWND hwndDlg, UINT uMsg, WPARAM wParam, LPARAM lParam)
         INT_PTR ret = FALSE; // in case it does not process it
         if (dlg != NULL && dlg->Is(otDialog))
         {
-            // Petr: posunul jsem dolu pod dlg->DialogProc(), so that during WM_DESTROY
+            // Petr: I moved it down below dlg->DialogProc(), so that during WM_DESTROY
             //       messages still arrive (needed by Lukas)
             // WindowsManager.DetachWindow(hwndDlg);
 
@@ -775,7 +775,7 @@ CDialog::CDialogProc(HWND hwndDlg, UINT uMsg, WPARAM wParam, LPARAM lParam)
             if (dlg->IsAllocated())
                 delete dlg;
             else
-                dlg->HWindow = NULL; // informace o odpojeni
+                dlg->HWindow = NULL; // information about detachment
         }
         return ret;
     }
@@ -908,7 +908,7 @@ CWindowsManager::GetWindowPtr(HWND hWnd)
     search++;
 #endif
     int i;
-    if (GetIndex(hWnd, i)) // nalezeno
+    if (GetIndex(hWnd, i)) // found
     {
         LastHWnd[GetCacheIndex(hWnd)] = hWnd;
         LastWnd[GetCacheIndex(hWnd)] = At(i).Wnd;
@@ -919,7 +919,7 @@ CWindowsManager::GetWindowPtr(HWND hWnd)
     else
     {
         CS.Leave();
-        return NULL; // nenalezeno
+        return NULL; // not found
     }
 }
 
@@ -942,7 +942,7 @@ int CWindowsManager::GetCount()
 CWindowQueue::~CWindowQueue()
 {
     if (!Empty())
-        TRACE_ET(_T("Some window is still opened in ") << QueueName << _T(" queue!")); // nemelo by nastat...
+        TRACE_ET(_T("Some window is still opened in ") << QueueName << _T(" queue!")); // this should not happen...
     // multi-threading is no longer a concern here (software is ending, threads are/were terminated)
     // deallocate at least some memory
     CWindowQueueItem* last;
@@ -979,7 +979,7 @@ void CWindowQueue::Remove(HWND hWindow)
     CWindowQueueItem* item = Head;
     while (item != NULL)
     {
-        if (item->HWindow == hWindow) // nalezeno, odstranime
+        if (item->HWindow == hWindow) // found, remove it
         {
             if (last != NULL)
                 last->Next = item->Next;
@@ -1032,7 +1032,7 @@ void CWindowQueue::BroadcastMessage(DWORD uMsg, WPARAM wParam, LPARAM lParam)
 BOOL CTransferInfo::GetControl(HWND& ctrlHWnd, int ctrlID, BOOL ignoreIsGood)
 {
     if (!ignoreIsGood && !IsGood())
-        return FALSE; // dalsi nema cenu zpracovavat
+        return FALSE; // no point processing anything further
     ctrlHWnd = GetDlgItem(HDialog, ctrlID);
     if (ctrlHWnd == NULL)
     {
@@ -1053,7 +1053,7 @@ void CTransferInfo::EnsureControlIsFocused(int ctrlID)
         while (wnd != NULL && wnd != ctrl)
             wnd = ::GetParent(wnd);
         if (wnd == NULL) // focus only if ctrl is not ancestor of GetFocus
-        {                // jako napr. edit-line v combo-boxu
+        {                // such as the edit line in a combo box
             SendMessage(HDialog, WM_NEXTDLGCTL, (WPARAM)ctrl, TRUE);
         }
     }
@@ -1138,8 +1138,8 @@ void CTransferInfo::EditLine(int ctrlID, double& value, TCHAR* format, BOOL sele
             BOOL decPoints = FALSE;
             BOOL expPart = FALSE;
             if (*s == _T('-') || *s == _T('+'))
-                s++;        // preskok znamenka
-            while (*s != 0) // prevod carky na tecku
+                s++;        // skip the sign
+            while (*s != 0) // convert comma to period
             {
                 if (!expPart && !decPoints && (*s == _T(',') || *s == _T('.')))
                 {
@@ -1152,7 +1152,7 @@ void CTransferInfo::EditLine(int ctrlID, double& value, TCHAR* format, BOOL sele
                     {
                         expPart = TRUE;
                         if (*(s + 1) == _T('+') || *(s + 1) == _T('-'))
-                            s++; // preskok +- za E
+                            s++; // skip +- after E
                     }
                     else
                     {
@@ -1204,7 +1204,7 @@ void CTransferInfo::EditLine(int ctrlID, int& value, BOOL select)
 
             TCHAR* s = buff;
             if (*s == _T('-') || *s == _T('+'))
-                s++;        // preskok znamenka
+                s++;        // skip the sign
             while (*s != 0) // number validation
             {
                 if (*s < _T('0') || *s > _T('9'))
@@ -1258,7 +1258,7 @@ void CTransferInfo::EditLine(int ctrlID, __int64& value, BOOL select, BOOL unsig
             TCHAR* s = buff;
             BOOL minus = !unsignedNum && *s == _T('-');
             if (!unsignedNum && *s == _T('-') || *s == _T('+'))
-                s++; // preskok znamenka
+                s++; // skip the sign
             unsigned __int64 num = 0;
             BOOL overflow = FALSE;
             while (*s != 0) // number validation
@@ -1276,7 +1276,7 @@ void CTransferInfo::EditLine(int ctrlID, __int64& value, BOOL select, BOOL unsig
                 else
                 {
                     if (hexMode && num > 0x0fffffffffffffffui64 ||
-                        !hexMode && num > 1844674407370955161ui64 || // max. je 18446744073709551615ui64
+                        !hexMode && num > 1844674407370955161ui64 || // max is 18446744073709551615ui64
                         !hexMode && num == 1844674407370955161ui64 && *s > _T('5'))
                     {
                         overflow = TRUE; // unsigned overflow
@@ -1325,7 +1325,7 @@ void CTransferInfo::EditLine(int ctrlID, __int64& value, BOOL select, BOOL unsig
             }
             if (overflow)
             {
-                if (ignoreOverflow) // ohlasime overflow jen pres TRACE_E
+                if (ignoreOverflow) // report the overflow only via TRACE_E
                 {
                     TRACE_ET(_T("CTransferInfo::EditLine(") << ctrlID << _T("): ") << (unsignedNum ? _T("unsigned ") : _T("")) << _T("int64 overflow has occured!"));
                 }

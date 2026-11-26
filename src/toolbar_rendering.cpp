@@ -13,7 +13,7 @@
 // CToolBar
 //
 
-#define TB_SP_WIDTH 6 // sirka separatoru
+#define TB_SP_WIDTH 6 // separator width
 
 #define TB_TEXT_TB 3
 
@@ -150,7 +150,7 @@ BOOL CToolBar::HitTest(int xPos, int yPos, int& index, BOOL& dropDown)
             else
             {
                 if (item->Style & TLBI_STYLE_SEPARATOR)
-                    item->Height = Height - 2 * Padding.ToolBarVertical; // separator nema nastavenou vysku - udelam to ted
+                    item->Height = Height - 2 * Padding.ToolBarVertical; // the separator has no height set - I will do it now
                 int yOffset = (Height - item->Height) / 2;
                 if (xPos >= item->Offset && xPos < item->Offset + item->Width &&
                     yPos >= yOffset && yPos < yOffset + item->Height)
@@ -186,7 +186,7 @@ BOOL CToolBar::InsertMarkHitTest(int xPos, int yPos, int& index, BOOL& after)
         {
             item = Items[i];
             if (item->Style & TLBI_STYLE_SEPARATOR)
-                item->Height = Height - 2 * Padding.ToolBarVertical; // separator nema nastavenou vysku - udelam to ted
+                item->Height = Height - 2 * Padding.ToolBarVertical; // the separator has no height set - I will do it now
             int yOffset = (Height - item->Height) / 2;
             if (xPos >= item->Offset && xPos < item->Offset + item->Width &&
                 yPos >= yOffset && yPos < yOffset + item->Height)
@@ -200,7 +200,7 @@ BOOL CToolBar::InsertMarkHitTest(int xPos, int yPos, int& index, BOOL& after)
                 {
                     if (index > 0)
                     {
-                        // prednostne vratime, ze jsem za minulou polozkou (eliminace blikani)
+                        // preferentially return that we are past the previous item (eliminates flickering)
                         index--;
                         after = TRUE;
                     }
@@ -213,20 +213,20 @@ BOOL CToolBar::InsertMarkHitTest(int xPos, int yPos, int& index, BOOL& after)
                     after = TRUE;
                     return TRUE;
                 }
-                // bod lezi nad tlacitkem, ale ne dost u jeho okraje
+                // the point lies over the button, but not close enough to its edge
                 return FALSE;
             }
         }
         if (item == NULL)
         {
-            // zadna polozka
+            // no item
             index = -1;
             after = FALSE;
             return TRUE;
         }
         if (xPos >= item->Offset + item->Width)
         {
-            // za posledni polozkou
+            // past the last item
             index = Items.Count - 1;
             after = TRUE;
             return TRUE;
@@ -315,7 +315,7 @@ BOOL CToolBar::Refresh()
             if (!vertical && (item->Style & TLBI_STYLE_SEPARATEDROPDOWN))
                 outterDropPresent = TRUE;
 
-            int width = 1; // levy okraj
+            int width = 1; // left edge
             int height = 0;
 
             if (iconPresent)
@@ -356,7 +356,7 @@ BOOL CToolBar::Refresh()
                 item->InnerX = width;
                 width += SVGArrowDropDown.GetWidth() + Padding.TextRight;
             }
-            width++; // pravy okraj
+            width++; // right edge
 
             if (outterDropPresent)
             {
@@ -366,7 +366,7 @@ BOOL CToolBar::Refresh()
                     width += separatedDropPadding + SVGArrowDropDown.GetWidth() + separatedDropPadding;
                 }
                 else
-                    item->OutterX = width - (separatedDropPadding + SVGArrowDropDown.GetWidth() + separatedDropPadding); // ukousneme s sirky polozky
+                    item->OutterX = width - (separatedDropPadding + SVGArrowDropDown.GetWidth() + separatedDropPadding); // subtract this from the item width
             }
 
             // Center only the visible icon/text group for opted-in fixed-width command slots.
@@ -418,7 +418,7 @@ BOOL CToolBar::Refresh()
     if (hOldFont != NULL)
         SelectObject(CacheBitmap->HMemDC, hOldFont);
     CacheBitmap->Enlarge(maxWidth, maxHeight);
-    DirtyItems = FALSE; // musim nastavit pred paintem, aby nedoslo k rekurzi
+    DirtyItems = FALSE; // I must set this before the paint so that recursion does not occur
 
     if (HWindow != NULL)
     {
@@ -487,7 +487,7 @@ void CToolBar::DrawItem(HDC hDC, int index)
 
     //  TRACE_I("TB DrawItem index:"<<index<<" x:"<<item->Offset);
 
-    // podmazu plochu podkladovou barvou
+    // fill the area with the background color
     RECT r1;
     r1.left = 0;
     r1.top = 0;
@@ -572,14 +572,14 @@ void CToolBar::DrawItem(HDC hDC, int index)
         r.right = width;
         r.bottom = r.top + height;
 
-        BOOL bodyDown = FALSE; // je telo zamackle ?
-        BOOL dropDown = FALSE; // je drop down zamackly?
+        BOOL bodyDown = FALSE; // is the body pressed ?
+        BOOL dropDown = FALSE; // is the drop down pressed?
         BOOL checked = FALSE;
         BOOL grayed = !Customizing && (item->State & TLBI_STATE_GRAYED);
         if (HelpMode && HotIndex == index)
-            grayed = FALSE; // v helpmode jsou i disabled polozky vysviceny
+            grayed = FALSE; // in helpmode even disabled items are highlighted
 
-        // vykreslim ramecek
+        // draw the frame
         if (!grayed && ((HotIndex == index || item->State & TLBI_STATE_CHECKED) || (item->State & TLBI_STATE_PRESSED)))
         {
             if (outterDropPresent)
@@ -592,7 +592,7 @@ void CToolBar::DrawItem(HDC hDC, int index)
             {
                 if (HotIndex != index)
                 {
-                    // ditherovane zamackle pozadi
+                    // dithered pressed background
                     SetBrushOrgEx(CacheBitmap->HMemDC, 0, r.top, NULL);
                     HBRUSH hOldBrush = (HBRUSH)SelectObject(CacheBitmap->HMemDC, HDitherBrush);
                     int oldTextColor = SetTextColor(CacheBitmap->HMemDC, GetSysColor(COLOR_BTNFACE));
@@ -606,13 +606,13 @@ void CToolBar::DrawItem(HDC hDC, int index)
                 checked = TRUE;
             }
 
-            // ramecek kolem tela
+            // frame around the body
             DWORD mode = bodyDown ? BDR_SUNKENOUTER : BDR_RAISEDINNER;
             DrawEdge(CacheBitmap->HMemDC, &r, mode, BF_RECT);
 
             if (HotIndex == index && outterDropPresent)
             {
-                // ramecek kolem drop down
+                // frame around the drop down
                 r.left = r.right;
                 r.right = width;
                 mode = dropDown ? BDR_SUNKENOUTER : BDR_RAISEDINNER;
@@ -844,17 +844,17 @@ void CToolBar::DrawInsertMark(HDC hDC)
     x -= 1;
     HPEN hPen = HANDLES(CreatePen(PS_SOLID, 0, RGB(0, 0, 0)));
     HPEN hOldPen = (HPEN)SelectObject(hDC, hPen);
-    // vrchni dve vodorovne cary
+    // top two horizontal lines
     MoveToEx(hDC, x - 2, 0, NULL);
     LineTo(hDC, x + 4, 0);
     MoveToEx(hDC, x - 1, 1, NULL);
     LineTo(hDC, x + 3, 1);
-    // dve svisle cary
+    // two vertical lines
     MoveToEx(hDC, x, 2, NULL);
     LineTo(hDC, x, Height - 2);
     MoveToEx(hDC, x + 1, 2, NULL);
     LineTo(hDC, x + 1, Height - 2);
-    // spodni dve vodorovne cary
+    // bottom two horizontal lines
     MoveToEx(hDC, x - 1, Height - 2, NULL);
     LineTo(hDC, x + 3, Height - 2);
     MoveToEx(hDC, x - 2, Height - 1, NULL);

@@ -126,7 +126,7 @@ public:
     void QuickSort(int left, int right, int sortBy);
     void SortItems(int sortBy);
 
-    // interface pro Data
+    // interface for Data
     CFoundFilesData* At(int index);
     void DestroyMembers();
     int GetCount();

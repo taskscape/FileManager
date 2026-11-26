@@ -3,8 +3,8 @@
 
 #include "lstrfix.h"
 
-// potlaceni warningu C4996: This function or variable may be unsafe. Consider using strcat_s instead.
-// duvod: lstrcat a dalsi Windows rutiny prost nejsou safe, takze to nema smysl resit tady
+// suppress warning C4996: This function or variable may be unsafe. Consider using strcat_s instead.
+// reason: lstrcat and other Windows routines simply are not safe, so there is no point fixing it here
 #pragma warning(push)
 #pragma warning(disable:4996)
 
@@ -75,8 +75,8 @@ LPWSTR _sal_lstrcatW(LPWSTR lpString1, LPCWSTR lpString2)
 // allows us to define these names.
 #pragma function(strlen, wcslen, strcpy, wcscpy, strcat, wcscat)
 
-// musel jsem si od MS pujcit implementace strlen, wcslen, strcpy, wcscpy, strcat a wcscat
-// protoze se zde ignoruji default-liby, kde jsou tyto funkce umistene
+// I had to borrow the strlen, wcslen, strcpy, wcscpy, strcat, and wcscat implementations from MS
+// because the default libs where these functions reside are ignored here
 size_t __cdecl strlen (
         const char * str
         )
