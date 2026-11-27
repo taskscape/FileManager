@@ -37,7 +37,8 @@ STRINGTABLE
   IDS_MENU_APPLY, "&Zastosuj plan..."
   IDS_MENU_RECOVERY, "&Dzienniki odzyskiwania..."
   IDS_MENU_CLOSE, "&Zamknij plan"
-  IDS_CHANGEDRIVE, "Plan reorganizacji"
+  // The leading tab leaves the drive shortcut column empty.
+  IDS_CHANGEDRIVE, "\tPlan reorganizacji"
   IDS_COL_CHANGE, "Zmiana"
   IDS_COL_FROM, "Skąd"
   IDS_COL_ISSUES, "Problemy"

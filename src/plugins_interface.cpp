@@ -1516,6 +1516,15 @@ void CPlugins::Load(HWND parent, HKEY regKey)
 
                         if (GetValue(itemKey, SALAMANDER_PLUGINS_FSCMDNAME, REG_SZ, fsCmdName, MAX_PATH))
                         {
+                            // Existing profiles can supply Reorganize's old label before its plug-in loads.
+                            const size_t titleLength = strlen(fsCmdName);
+                            if (titleLength > 0 && titleLength + 1 < _countof(fsCmdName) &&
+                                StrICmp(p->DLLName, "reorganize\\reorganize.spl") == 0 &&
+                                strchr(fsCmdName, '\t') == NULL)
+                            {
+                                memmove(fsCmdName + 1, fsCmdName, titleLength + 1);
+                                fsCmdName[0] = '\t';
+                            }
                             p->ChDrvMenuFSItemName = DupStr(fsCmdName);
                             if (p->ChDrvMenuFSItemName != NULL)
                             {

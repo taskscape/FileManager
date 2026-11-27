@@ -29,7 +29,8 @@ STRINGTABLE
   IDS_MENU_APPLY, "&Apply Plan..."
   IDS_MENU_RECOVERY, "Recovery &Journals..."
   IDS_MENU_CLOSE, "&Close Plan"
-  IDS_CHANGEDRIVE, "Reorganization plan"
+  // The leading tab leaves the drive shortcut column empty.
+  IDS_CHANGEDRIVE, "\tReorganization plan"
   IDS_COL_CHANGE, "Change"
   IDS_COL_FROM, "From"
   IDS_COL_ISSUES, "Issues"
